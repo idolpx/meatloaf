@@ -1,0 +1,25 @@
+# Visual Studio Code workspace files
+*.code-workspace
+
+# VS Code build directory
+**/.vscode
+
+# PlatformIO build directory
+**/.pio
+**/build
+
+# PlatformIO project settings
+platformio.ini
+
+# PlatformIO monitor logs
+platformio-device-monitor-*.log
+
+# ESP-IDF SDK configuration file
+sdkconfig
+sdkconfig.fujinet-v1
+sdkconfig.fujinet-v1-8mb
+sdkconfig.fujinet-v1-4mb
+
+include/ssid.h
+/*.log
+sdkconfig.fujinet-v1
