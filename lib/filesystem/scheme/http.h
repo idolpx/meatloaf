@@ -3,15 +3,11 @@
 #ifndef MEATFILE_DEFINES_FSHTTP_H
 #define MEATFILE_DEFINES_FSHTTP_H
 
+#include "esp_http_client.h"
+
 #include "meat_io.h"
 #include "../../include/global_defines.h"
-#if defined(ESP32)
-#include <WiFi.h>
-#include <HTTPClient.h>
-#elif defined(ESP8266)
-#include <ESP8266WiFi.h>
-#include <ESP8266HTTPClient.h>
-#endif
+
 
 /********************************************************
  * File implementations
@@ -70,8 +66,8 @@ protected:
     size_t m_bytesAvailable = 0;
     size_t m_position = 0;
        
-    WiFiClient m_file;
-	HTTPClient m_http;
+//    WiFiClient m_file;
+	esp_http_client_handle_t m_http;
 };
 
 
@@ -109,8 +105,8 @@ protected:
     size_t m_position = 0;
     bool isFriendlySkipper = false;
 
-    WiFiClient m_file;
-	HTTPClient m_http;
+//    WiFiClient m_file;
+	esp_http_client_handle_t m_http;
 };
 
 
@@ -141,9 +137,10 @@ public:
 protected:
     std::string url;
     bool m_isOpen;
-    WiFiClient m_file;
+
+//    WiFiClient m_file;
     //WiFiClient m_client;
-	HTTPClient m_http;
+	esp_http_client_handle_t m_http;
 };
 
 

@@ -65,7 +65,7 @@ bool DeviceDB::select(uint8_t new_device_id)
     else
     {
         // Create New Settings
-        deserializeJson(m_device, F("{\"id\":0,\"media\":0,\"partition\":0,\"url\":\"\",\"path\":\"/\",\"archive\":\"\",\"image\":\"\"}"));
+        deserializeJson(m_device, "{\"id\":0,\"media\":0,\"partition\":0,\"url\":\"\",\"path\":\"/\",\"archive\":\"\",\"image\":\"\"}");
         m_device["id"] = new_device_id;
         Debug_printv("created id[%d]", (uint8_t)m_device["id"]);
     }

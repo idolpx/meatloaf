@@ -8,6 +8,9 @@
 
 #include <map>
 #include <bitset>
+#include <unordered_map>
+
+#include "../../../include/debug.h"
 
 #include "string_utils.h"
 

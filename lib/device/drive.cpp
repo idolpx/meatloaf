@@ -548,12 +548,12 @@ void devDrive::sendMeatloafSystemInformation()
 	// NETWORK
 	sendLine(basicPtr, 0, CBM_DEL_DEL "NETWORK ---");
 	char ip[16];
-	sprintf(ip, "%s", ipToString(WiFi.softAPIP()).c_str());
-	sendLine(basicPtr, 0, CBM_DEL_DEL "AP MAC     : %s", WiFi.softAPmacAddress().c_str());
-	sendLine(basicPtr, 0, CBM_DEL_DEL "AP IP      : %s", ip);
-	sprintf(ip, "%s", ipToString(WiFi.localIP()).c_str());
-	sendLine(basicPtr, 0, CBM_DEL_DEL "STA MAC    : %s", WiFi.macAddress().c_str());
-	sendLine(basicPtr, 0, CBM_DEL_DEL "STA IP     : %s", ip);
+//	sprintf(ip, "%s", ipToString(WiFi.softAPIP()).c_str());
+//	sendLine(basicPtr, 0, CBM_DEL_DEL "AP MAC     : %s", WiFi.softAPmacAddress().c_str());
+//	sendLine(basicPtr, 0, CBM_DEL_DEL "AP IP      : %s", ip);
+//	sprintf(ip, "%s", ipToString(WiFi.localIP()).c_str());
+//	sendLine(basicPtr, 0, CBM_DEL_DEL "STA MAC    : %s", WiFi.macAddress().c_str());
+//	sendLine(basicPtr, 0, CBM_DEL_DEL "STA IP     : %s", ip);
 
 	// End program with two zeros after last line. Last zero goes out as EOI.
 	m_iec.send(0);

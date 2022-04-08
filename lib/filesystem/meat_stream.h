@@ -7,11 +7,11 @@
  * Universal streams
  ********************************************************/
 
-// enum SeekMode {
-//     SeekSet = 0,
-//     SeekCur = 1,
-//     SeekEnd = 2
-// };
+enum SeekMode {
+    SeekSet = 0,
+    SeekCur = 1,
+    SeekEnd = 2
+};
 
 class MStream {
 public:

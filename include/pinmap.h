@@ -64,15 +64,15 @@
 #define INVERTED_LINES	false
 
 // CBM IEC Serial Port
-#define PIN_IEC_ATN			22      // SIO 9  - PROC - Proceed
-#define PIN_IEC_CLK			27      // SIO 1  - CKI  - Clock Input
-#define PIN_IEC_DATA		21      // SIO 3  - DI   - Data Input
-#define PIN_IEC_SRQ			26      // SIO 13 - INT  - Interrupt
-#define PIN_IEC_RESET       39      // SIO 7  - CMD  - Command
+#define PIN_IEC_ATN			GPIO_NUM_22      // SIO 9  - PROC - Proceed
+#define PIN_IEC_CLK			GPIO_NUM_27      // SIO 1  - CKI  - Clock Input
+#define PIN_IEC_DATA		GPIO_NUM_21      // SIO 3  - DI   - Data Input
+#define PIN_IEC_SRQ			GPIO_NUM_26      // SIO 13 - INT  - Interrupt
+#define PIN_IEC_RESET       GPIO_NUM_39      // SIO 7  - CMD  - Command
 
 #ifdef SPLIT_LINES
-#define PIN_IEC_CLK_OUT		32      // SIO 2  - CKO  - Clock Output
-#define PIN_IEC_DATA_OUT	33      // SIO 5  - DO   - Data Output
+#define PIN_IEC_CLK_OUT		GPIO_NUM_32      // SIO 2  - CKO  - Clock Output
+#define PIN_IEC_DATA_OUT	GPIO_NUM_33      // SIO 5  - DO   - Data Output
 #endif
 
 /* Pins for AdamNet */

@@ -1,8 +1,9 @@
 #ifndef MEATLIB_UTILS_BASIC_CONFIG
 #define MEATLIB_UTILS_BASIC_CONFIG
 
-#include "string_utils.h"
-#include <map>
+#include <cstring>
+#include <unordered_map>
+
 #include "meat_io.h"
 
 

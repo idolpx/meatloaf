@@ -17,6 +17,9 @@
 
 #include "cbmstandardserial.h"
 
+#include "../../../include/debug.h"
+#include "../../../include/pinmap.h"
+
 using namespace Protocol;
 
 // STEP 1: READY TO SEND
@@ -34,7 +37,7 @@ int16_t  CBMStandardSerial::receiveByte(uint8_t device)
 	// Wait for talker ready
 	while(status(PIN_IEC_CLK) != RELEASED)
 	{
-		ESP.wdtFeed();		
+//		ESP.wdtFeed();		
 	}
 
 	// Say we're ready
@@ -111,7 +114,7 @@ int16_t  CBMStandardSerial::receiveByte(uint8_t device)
 	ESP.wdtFeed();
 #endif
 	uint8_t data = 0;
-	uint8_t bit_time;  // Used to detect JiffyDOS
+	uint16_t bit_time;  // Used to detect JiffyDOS
 	
 	uint8_t n = 0;
 	for(n = 0; n < 8; n++) 
@@ -201,7 +204,7 @@ bool CBMStandardSerial::sendByte(uint8_t data, bool signalEOI)
 	// to  accept  data.  What  happens  next  is  variable.
 	while(status(PIN_IEC_DATA) != RELEASED)
 	{
-		ESP.wdtFeed();
+//		ESP.wdtFeed();
 	}
 
 	// Either  the  talker  will pull the
@@ -337,7 +340,7 @@ bool CBMStandardSerial::sendByte(uint8_t data, bool signalEOI)
 
 
 // Wait indefinitely if wait = 0
-int16_t CBMStandardSerial::timeoutWait(byte iecPIN, bool lineStatus, size_t wait, size_t step)
+int16_t CBMStandardSerial::timeoutWait(uint8_t iecPIN, bool lineStatus, size_t wait, size_t step)
 {
 
 #if defined(ESP8266)
@@ -348,7 +351,7 @@ int16_t CBMStandardSerial::timeoutWait(byte iecPIN, bool lineStatus, size_t wait
 	if(wait == FOREVER)
 	{
 		while(status(iecPIN) != lineStatus) {
-			ESP.wdtFeed();
+//			ESP.wdtFeed();
 			delayMicroseconds(step);
 			t++;
 		}

@@ -27,18 +27,7 @@
 #include <HTTPClient.h>
 #endif
 
-#if defined(USE_SPIFFS)
-#include <FS.h>
-#if defined(ESP32)
-#include <SPIFFS.h>
-#endif
-#elif defined(USE_LITTLEFS)
-#if defined(ESP8266)
-#include <LittleFS.h>
-#elif defined(ESP32)
-#include <LITTLEFS.h>
-#endif
-#endif
+#include <unordered_map>
 
 #include "../../include/global_defines.h"
 #include "../../include/cbmdefines.h"
@@ -48,7 +37,7 @@
 #include "device_db.h"
 #include "meat_io.h"
 #include "MemoryInfo.h"
-#include "helpers.h"
+//#include "helpers.h"
 #include "utils.h"
 #include "string_utils.h"
 
@@ -98,7 +87,7 @@ protected:
 	// handler helpers.
 	virtual void handleListenCommand(IEC::Data &iec_data) = 0;
 	virtual void handleListenData(void) = 0;
-	virtual void handleTalk(byte chan) = 0;
+	virtual void handleTalk(uint8_t chan) = 0;
 	virtual void handleOpen(IEC::Data &iec_data) = 0;
 	virtual void handleClose(IEC::Data &iec_data) = 0;
 
@@ -107,7 +96,7 @@ protected:
 	IEC::Data &m_iec_data;	// IEC command buffer struct
 
 	// This is set after an open command and determines what to send next
-	byte m_openState;
+	uint8_t m_openState;
 	
 	DeviceDB m_device;
 

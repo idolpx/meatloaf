@@ -16,6 +16,8 @@
 // You should have received a copy of the GNU General Public License
 // along with Pi1541. If not, see <http://www.gnu.org/licenses/>.
 
+#include <cstdint>
+
 #ifndef PETSCII_H
 #define PETSCII_H
 

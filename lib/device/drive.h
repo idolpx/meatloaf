@@ -44,6 +44,7 @@
 #endif
 
 #include "../../include/global_defines.h"
+#include "../../include/debug.h"
 #include "../../include/cbmdefines.h"
 #include "../../include/petscii.h"
 
@@ -52,7 +53,7 @@
 
 #include "meat_io.h"
 #include "MemoryInfo.h"
-#include "helpers.h"
+//#include "helpers.h"
 #include "utils.h"
 #include "string_utils.h"
 
@@ -82,7 +83,7 @@ protected:
 	// handler helpers.
 	virtual void handleListenCommand(IEC::Data &iec_data) override;
 	virtual void handleListenData(void) override;
-	virtual void handleTalk(byte chan) override;
+	virtual void handleTalk(uint8_t chan) override;
 	virtual void handleOpen(IEC::Data &iec_data) override;
 	virtual void handleClose(IEC::Data &iec_data) override;
 
@@ -121,7 +122,7 @@ private:
 	CommandPathTuple parseLine(std::string commandLne, size_t channel);
 
 	// This is set after an open command and determines what to send next
-	byte m_openState;
+	uint8_t m_openState;
 
 	std::unique_ptr<MFile> m_mfile; // Always points to current directory
 	std::string m_filename; // Always points to current or last loaded file

@@ -17,6 +17,9 @@
 
 #include "iec.h"
 
+#include "../../include/debug.h"
+#include "../../include/pinmap.h"
+
 using namespace CBM;
 using namespace Protocol;
 
@@ -37,15 +40,15 @@ bool IEC::init()
 	protocol.release(PIN_IEC_SRQ);
 
 	// initial pin modes in GPIO
-	pinMode(PIN_IEC_ATN, INPUT);
-	pinMode(PIN_IEC_CLK, INPUT);
-	pinMode(PIN_IEC_DATA, INPUT);
-	pinMode(PIN_IEC_SRQ, OUTPUT);
-	pinMode(PIN_IEC_RESET, INPUT);
+	set_pin_mode(PIN_IEC_ATN, INPUT);
+	set_pin_mode(PIN_IEC_CLK, INPUT);
+	set_pin_mode(PIN_IEC_DATA, INPUT);
+	set_pin_mode(PIN_IEC_SRQ, OUTPUT);
+	set_pin_mode(PIN_IEC_RESET, INPUT);
 
 #ifdef SPLIT_LINES
-	pinMode(PIN_IEC_CLK_OUT, OUTPUT);
-	pinMode(PIN_IEC_DATA_OUT, OUTPUT);
+	set_pin_mode(PIN_IEC_CLK_OUT, OUTPUT);
+	set_pin_mode(PIN_IEC_DATA_OUT, OUTPUT);
 #endif
 
 	protocol.flags = CLEAR;
@@ -285,7 +288,7 @@ IEC::BusState IEC::service(Data& iec_data)
 
 IEC::BusState IEC::deviceListen(Data& iec_data)
 {
-	byte i=0;
+	uint8_t i=0;
 
 	// Okay, we will listen.
 	// Debug_printf("(20 LISTEN) (%.2d DEVICE) ", iec_data.device);
@@ -422,7 +425,7 @@ void IEC::releaseLines(bool wait)
 		//Debug_printv("Waiting for ATN to release");
 		while(protocol.status(PIN_IEC_ATN) == PULLED)
 		{
-			ESP.wdtFeed();
+//			ESP.wdtFeed();
 		}
 	}
 }

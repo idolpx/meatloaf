@@ -17,6 +17,7 @@
 
 //#include "../../include/global_defines.h"
 //#include "debug.h"
+#include "../../include/debug.h"
 
 #include "iec_device.h"
 #include "iec.h"

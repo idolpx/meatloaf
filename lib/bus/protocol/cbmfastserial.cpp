@@ -17,6 +17,9 @@
 
 #include "cbmfastserial.h"
 
+#include "../../../include/debug.h"
+#include "../../../include/pinmap.h"
+
 using namespace Protocol;
 
 // STEP 1: READY TO SEND
@@ -34,7 +37,7 @@ int16_t  CBMFastSerial::receiveByte(uint8_t device)
 	// Wait for talker ready
 	while(status(PIN_IEC_CLK) != RELEASED)
 	{
-		ESP.wdtFeed();
+//		ESP.wdtFeed();
 	}
 
 	// Say we're ready
@@ -201,7 +204,7 @@ bool CBMFastSerial::sendByte(uint8_t data, bool signalEOI)
 	// to  accept  data.  What  happens  next  is  variable.
 	while(status(PIN_IEC_DATA) != RELEASED)
 	{
-		ESP.wdtFeed();
+//		ESP.wdtFeed();
 	}
 
 	// Either  the  talker  will pull the

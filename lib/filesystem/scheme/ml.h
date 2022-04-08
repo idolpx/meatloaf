@@ -5,21 +5,14 @@
 #ifndef MEATFILE_DEFINES_FSML_H
 #define MEATFILE_DEFINES_FSML_H
 
-#if defined(ESP32)
-#include <WiFi.h>
-#include <HTTPClient.h>
-#elif defined(ESP8266)
-#include <ESP8266WiFi.h>
-#include <ESP8266HTTPClient.h>
-#endif
+#include "esp_http_client.h"
 
 //#include "meat_io.h"
 #include "http.h"
-#include "../../include/global_defines.h"
-#include "helpers.h"
+
 #include "peoples_url_parser.h"
 
-//#include <ArduinoJson.h>
+#include <ArduinoJson.h>
 
 
 /********************************************************
@@ -57,10 +50,13 @@ public:
 
 protected:
     bool dirIsOpen = false;
-    String m_lineBuffer;
-    WiFiClient m_file;
-    HTTPClient m_http;
+    std::string m_lineBuffer;
+
+//    WiFiClient m_file;
+    esp_http_client_handle_t m_http;
+
     StaticJsonDocument<256> m_jsonHTTP;
+
     size_t m_size = 0;
     bool m_isDir = false;
 };

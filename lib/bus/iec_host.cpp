@@ -25,6 +25,9 @@
 
 #include "iec_host.h"
 
+#include "../../include/debug.h"
+#include "../../include/pinmap.h"
+
 using namespace Protocol;
 
 IEC iec;

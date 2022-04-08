@@ -1,5 +1,7 @@
 #include "ml.h"
 
+#include "../../../include/global_defines.h"
+#include "../../../include/debug.h"
 
 MLFile::~MLFile() {
     // just to be sure to close it if we don't read the directory until the very end
@@ -47,7 +49,7 @@ MFile* MLFile::getNextFileInDir() {
             */
             dirIsOpen = true;
 
-            std::string fname ="ml://" + host + "/" + urldecode(m_jsonHTTP["name"]).c_str();
+            std::string fname ="ml://" + host + "/" + mstr::urlDecode(m_jsonHTTP["name"]).c_str();
             size_t size = m_jsonHTTP["size"];
             bool dir = m_jsonHTTP["dir"];
 

@@ -2,6 +2,7 @@
 #include <nvs_flash.h>
 #include <esp32/spiram.h>
 #include <esp32/himem.h>
+#include <driver/gpio.h>
 
 #include "debug.h"
 //#include "bus.h"
@@ -52,7 +53,7 @@ static devDrive drive ( iec );
 
 // sioFuji theFuji; // moved to fuji.h/.cpp
 
-void IRAM_ATTR onAttention()
+static void IRAM_ATTR on_attention_isr_handler(void* arg)
 {
     bus_state = statemachine::select;
     iec.protocol.flags or_eq ATN_PULLED;
@@ -135,11 +136,28 @@ void main_setup()
     Serial.println("]");
 
     // Setup interrupt for ATN
-    attachInterrupt(
-        digitalPinToInterrupt(PIN_IEC_ATN),
-        onAttention,
-        FALLING
-    );
+    gpio_pad_select_gpio(PIN_IEC_ATN);
+    gpio_set_direction(PIN_IEC_ATN, GPIO_MODE_INPUT);
+
+    //zero-initialize the config structure.
+    gpio_config_t io_conf = {};
+    //interrupt of falling edge
+    io_conf.intr_type = GPIO_INTR_NEGEDGE;
+    //set as input mode
+    io_conf.mode = GPIO_MODE_INPUT;
+    //bit mask of the pins that you want to set
+    io_conf.pin_bit_mask = ( 1ULL << PIN_IEC_ATN );
+    //disable pull-down mode
+    io_conf.pull_down_en = (gpio_pulldown_t)0;
+    //disable pull-up mode
+    io_conf.pull_up_en = (gpio_pullup_t)0;
+    //configure GPIO with the given settings
+    gpio_config(&io_conf);
+
+    gpio_set_intr_type(PIN_IEC_ATN, GPIO_INTR_NEGEDGE);
+    gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
+    gpio_isr_handler_add((gpio_num_t)PIN_IEC_ATN, on_attention_isr_handler, (void *)PIN_IEC_ATN);
+
 
 #ifdef DEBUG
     unsigned long endms = fnSystem.millis();

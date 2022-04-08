@@ -18,7 +18,7 @@
 #ifndef IECHOST_H
 #define IECHOST_H
 
-#include <Arduino.h>
+//#include <Arduino.h>
 
 #include "../../include/global_defines.h"
 #include "../../include/cbmdefines.h"

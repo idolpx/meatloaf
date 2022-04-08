@@ -10,6 +10,8 @@
 #include "esp_littlefs.h"
 #include "wrappers/iec_buffer.h"
 
+#include "../../include/debug.h"
+
 #include "meat_stream.h"
 #include "peoples_url_parser.h"
 #include "string_utils.h"
