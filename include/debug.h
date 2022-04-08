@@ -11,6 +11,8 @@
 #endif
 
 #include "../lib/hardware/fnUART.h"
+#define Serial fnUartDebug
+
 
 /*
   Debugging Macros
@@ -21,6 +23,8 @@
     #define Debug_printf(...) fnUartDebug.printf( __VA_ARGS__ )
     #define Debug_println(...) fnUartDebug.println( __VA_ARGS__ )
 
+    #define Debug_printv(...) fnUartDebug.printf( __VA_ARGS__ )
+
     #define HEAP_CHECK(x) Debug_printf("HEAP CHECK %s " x "\n", heap_caps_check_integrity_all(true) ? "PASSED":"FAILED")
 #endif
 
@@ -28,6 +32,8 @@
     #define Debug_print(...)
     #define Debug_printf(...)
     #define Debug_println(...)
+
+    #define Debug_printv(...)
 
     #define HEAP_CHECK(x)
 #endif
