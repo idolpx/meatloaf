@@ -3,7 +3,7 @@
 #ifndef MEATFILE_DEFINES_FSHTTP_H
 #define MEATFILE_DEFINES_FSHTTP_H
 
-#include "esp_http_client.h"
+#include "fnHttpClient.h"
 
 #include "meat_io.h"
 #include "../../include/global_defines.h"
@@ -67,7 +67,7 @@ protected:
     size_t m_position = 0;
        
 //    WiFiClient m_file;
-	esp_http_client_handle_t m_http;
+	fnHttpClient m_http;
 };
 
 
@@ -75,10 +75,11 @@ class HttpIStream: public MIStream {
 
 public:
     HttpIStream(std::string path) {
-        m_http.setUserAgent(USER_AGENT);
-        m_http.setTimeout(10000);
-        m_http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
-        m_http.setRedirectLimit(10);
+        m_http.set_header("user-agent", USER_AGENT);
+        //m_http.setUserAgent(USER_AGENT);
+        //m_http.setTimeout(10000);
+        //m_http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
+        //m_http.setRedirectLimit(10);
         url = path;
     }
     // MStream methods
@@ -106,7 +107,7 @@ protected:
     bool isFriendlySkipper = false;
 
 //    WiFiClient m_file;
-	esp_http_client_handle_t m_http;
+	fnHttpClient m_http;
 };
 
 
@@ -115,11 +116,11 @@ class HttpOStream: public MOStream {
 public:
     // MStream methods
     HttpOStream(std::string path) {
-        m_http.setUserAgent(USER_AGENT);
-        m_http.setTimeout(10000);
-        m_http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
-        m_http.setRedirectLimit(10);
-        m_http.setReuse(true);
+        m_http.set_header("user-agent", USER_AGENT);
+        //m_http.setTimeout(10000);
+        //m_http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
+        //m_http.setRedirectLimit(10);
+        //m_http.setReuse(true);
 
         url = path;
     }
@@ -140,7 +141,7 @@ protected:
 
 //    WiFiClient m_file;
     //WiFiClient m_client;
-	esp_http_client_handle_t m_http;
+	fnHttpClient m_http;
 };
 
 

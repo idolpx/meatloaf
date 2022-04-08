@@ -184,6 +184,10 @@ void fn_service_loop(void *param)
             //Debug_printv("after[%d]", bus_state);
         }
 
+#ifdef DEBUG_TIMING
+        iec.debugTiming();
+#endif
+
         taskYIELD(); // Allow other tasks to run
     }
 }

@@ -71,15 +71,15 @@ size_t HttpFile::size() {
 
 size_t HttpOStream::position() { return 0; };
 void HttpOStream::close() {
-    m_http.end();
+    m_http.close();
 }
 
 bool HttpOStream::open() {
     // we'll ad a lambda that will allow adding headers
     // m_http.addHeader("Content-Type", "application/x-www-form-urlencoded");
     mstr::replaceAll(url, "HTTP:", "http:");
-    m_http.setReuse(true);
-    bool initOk = m_http.begin(m_file, url.c_str());
+//    m_http.setReuse(true);
+    bool initOk = m_http.begin( url );
     Debug_printv("[%s] initOk[%d]", url.c_str(), initOk);
     if(!initOk)
         return false;
@@ -96,7 +96,7 @@ bool HttpOStream::open() {
 
 //size_t HttpOStream::write(uint8_t) {};
 size_t HttpOStream::write(const uint8_t *buf, size_t size) {
-    return m_file.write(buf, size);
+    return 0; // m_file.write(buf, size);
 }
 
 bool HttpOStream::isOpen() {
@@ -116,14 +116,14 @@ bool HttpIStream::seek(size_t pos) {
         char str[40];
         // Range: bytes=91536-(91536+255)
         snprintf(str, sizeof str, "bytes=%lu-%lu", (unsigned long)pos, ((unsigned long)pos + 255));
-        m_http.addHeader("range",str);
+        m_http.set_header("range",str);
         int httpCode = m_http.GET(); //Send the request
         Debug_printv("httpCode[%d] str[%s]", httpCode, str);
         if(httpCode != 200 || httpCode != 206)
             return false;
 
         Debug_printv("stream opened[%s]", url.c_str());
-        m_file = m_http.getStream();  //Get the response payload as Stream
+        //m_file = m_http.getStream();  //Get the response payload as Stream
         m_position = pos;
         m_bytesAvailable = m_length-pos;
         return true;
@@ -131,7 +131,7 @@ bool HttpIStream::seek(size_t pos) {
     } else {
         if(pos<m_position) {
             // skipping backward and range not supported, let's simply reopen the stream...
-            m_http.end();
+            m_http.close();
             bool op = open();
             if(!op)
                 return false;
@@ -153,20 +153,20 @@ size_t HttpIStream::position() {
 }
 
 void HttpIStream::close() {
-    m_http.end();
+    m_http.close();
 }
 
 bool HttpIStream::open() {
     //mstr::replaceAll(url, "HTTP:", "http:");
-    bool initOk = m_http.begin(m_file, url.c_str());
+    bool initOk = m_http.begin( url );
     Debug_printv("input %s: someRc=%d", url.c_str(), initOk);
     if(!initOk)
         return false;
 
     // Setup response headers we want to collect
-    const char * headerKeys[] = {"accept-ranges", "content-type"};
+    const char * headerKeys[] = {"accept-ranges", "content-type", "content-length"};
     const size_t numberOfHeaders = 2;
-    m_http.collectHeaders(headerKeys, numberOfHeaders);
+    m_http.collect_headers(headerKeys, numberOfHeaders);
 
     //Send the request
     int httpCode = m_http.GET();
@@ -175,17 +175,17 @@ bool HttpIStream::open() {
         return false;
 
     // Accept-Ranges: bytes - if we get such header from any request, good!
-    isFriendlySkipper = m_http.header("accept-ranges") == "bytes";
+    isFriendlySkipper = m_http.get_header("accept-ranges") == "bytes";
     Debug_printv("isFriendlySkipper[%d]", isFriendlySkipper);
     m_isOpen = true;
     Debug_printv("[%s]", url.c_str());
     //m_file = m_http.getStream();  //Get the response payload as Stream
-    m_length = m_http.getSize();
+    m_length = stoi(m_http.get_header("content-length"));
     Debug_printv("length=%d", m_length);
     m_bytesAvailable = m_length;
 
     // Is this text?
-    std::string ct = m_http.header("content-type").c_str();
+    std::string ct = m_http.get_header("content-type").c_str();
     Debug_printv("content_type[%s]", ct.c_str());
     isText = mstr::isText(ct);
 
@@ -201,8 +201,8 @@ size_t HttpIStream::size() {
 };
 
 size_t HttpIStream::read(uint8_t* buf, size_t size) {
-    auto bytesRead= m_file.read((char *) buf, size);
-    m_bytesAvailable = m_file.available();
+    auto bytesRead= m_http.read( buf, size );
+    m_bytesAvailable = m_http.available();
     m_position+=bytesRead;
     return bytesRead;
 };

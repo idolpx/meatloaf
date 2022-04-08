@@ -5,10 +5,10 @@
 #ifndef MEATFILE_DEFINES_FSML_H
 #define MEATFILE_DEFINES_FSML_H
 
-#include "esp_http_client.h"
-
 //#include "meat_io.h"
 #include "http.h"
+
+#include "fnHttpClient.h"
 
 #include "peoples_url_parser.h"
 
@@ -53,7 +53,7 @@ protected:
     std::string m_lineBuffer;
 
 //    WiFiClient m_file;
-    esp_http_client_handle_t m_http;
+    fnHttpClient m_http;
 
     StaticJsonDocument<256> m_jsonHTTP;
 
@@ -72,10 +72,10 @@ public:
     MLIStream(std::string path) :
     HttpIStream(path)
     {
-        m_http.setUserAgent(USER_AGENT);
-        m_http.setTimeout(10000);
-        m_http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
-        m_http.setRedirectLimit(10);
+        m_http.set_header("user-agent", USER_AGENT);
+        //m_http.setTimeout(10000);
+        //m_http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
+        //m_http.setRedirectLimit(10);
         url = path;
     }
     ~MLIStream() {

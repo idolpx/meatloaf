@@ -8,7 +8,9 @@
 #include "../../include/global_defines.h"
 #include "../../include/make_unique.h"
 #include "meat_io.h"
-#include "WiFiClient.h"
+
+#include "fnTcpClient.h"
+
 #include "utils.h"
 #include "string_utils.h"
 
@@ -24,7 +26,7 @@ class csstreambuf : public std::streambuf {
     char* pbuf;
 
 protected:
-    WiFiClient m_wifi;
+    fnTcpClient m_wifi;
 
 public:
     csstreambuf() {}
@@ -81,7 +83,7 @@ public:
             
             while(!(readCount = m_wifi.read((uint8_t*)gbuf, 512)) && (attempts--)>0 && m_wifi.connected()) {
                 //Debug_printv("read attempt");
-                delay(wait);
+                fnSystem.delay(wait);
                 wait+=100;
             } 
             //Debug_printv("readcount: %d, %s", readCount, gbuf);

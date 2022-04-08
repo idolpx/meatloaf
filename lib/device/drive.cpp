@@ -21,6 +21,7 @@
 #include "drive.h"
 #include "iec.h"
 #include "iec_device.h"
+#include "led.h"
 #include "wrappers/iec_buffer.h"
 #include "wrappers/directory_stream.h"
 
@@ -419,7 +420,7 @@ void devDrive::handleListenData()
 } // handleListenData
 
 
-void devDrive::handleTalk(byte chan)
+void devDrive::handleTalk(uint8_t chan)
 {
 	Debug_printv("channel[%d] openState[%d]", chan, m_openState);
 
@@ -495,8 +496,8 @@ void devDrive::sendMeatloafSystemInformation()
 	// FSInfo64 fs_info;
 	// m_fileSystem->info64(fs_info);
 	// #endif
-	char floatBuffer[10]; // buffer
-	dtostrf(getFragmentation(), 3, 2, floatBuffer);
+//	char floatBuffer[10]; // buffer
+//	dtostrf(getFragmentation(), 3, 2, floatBuffer);
 
 	// Send load address
 	m_iec.send(C64_BASIC_START bitand 0xff);
@@ -508,14 +509,14 @@ void devDrive::sendMeatloafSystemInformation()
 
 	// CPU
 	sendLine(basicPtr, 0, CBM_DEL_DEL "SYSTEM ---");
-	String sdk = String(ESP.getSdkVersion());
-	sdk.toUpperCase();
-	sendLine(basicPtr, 0, CBM_DEL_DEL "SDK VER    : %s", sdk.c_str());
+//	String sdk = String(ESP.getSdkVersion());
+//	sdk.toUpperCase();
+//	sendLine(basicPtr, 0, CBM_DEL_DEL "SDK VER    : %s", sdk.c_str());
 	//sendLine(basicPtr, 0, "BOOT VER   : %08X", ESP.getBootVersion());
 	//sendLine(basicPtr, 0, "BOOT MODE  : %08X", ESP.getBootMode());
 	//sendLine(basicPtr, 0, "CHIP ID    : %08X", ESP.getChipId());
-	sendLine(basicPtr, 0, CBM_DEL_DEL "CPU MHZ    : %d MHZ", ESP.getCpuFreqMHz());
-	sendLine(basicPtr, 0, CBM_DEL_DEL "CYCLES     : %u", ESP.getCycleCount());
+//	sendLine(basicPtr, 0, CBM_DEL_DEL "CPU MHZ    : %d MHZ", ESP.getCpuFreqMHz());
+//	sendLine(basicPtr, 0, CBM_DEL_DEL "CYCLES     : %u", ESP.getCycleCount());
 
 	// POWER
 	sendLine(basicPtr, 0, CBM_DEL_DEL "POWER ---");
@@ -526,17 +527,17 @@ void devDrive::sendMeatloafSystemInformation()
 	sendLine(basicPtr, 0, CBM_DEL_DEL "RAM SIZE   : %5d B", getTotalMemory());
 	sendLine(basicPtr, 0, CBM_DEL_DEL "RAM FREE   : %5d B", getTotalAvailableMemory());
 	sendLine(basicPtr, 0, CBM_DEL_DEL "RAM >BLK   : %5d B", getLargestAvailableBlock());
-	sendLine(basicPtr, 0, CBM_DEL_DEL "RAM FRAG   : %s %%", floatBuffer);
+//	sendLine(basicPtr, 0, CBM_DEL_DEL "RAM FRAG   : %s %%", floatBuffer);
 
 	// ROM
-	sendLine(basicPtr, 0, CBM_DEL_DEL "ROM SIZE   : %5d B", ESP.getSketchSize() + ESP.getFreeSketchSpace());
-	sendLine(basicPtr, 0, CBM_DEL_DEL "ROM USED   : %5d B", ESP.getSketchSize());
-	sendLine(basicPtr, 0, CBM_DEL_DEL "ROM FREE   : %5d B", ESP.getFreeSketchSpace());
+//	sendLine(basicPtr, 0, CBM_DEL_DEL "ROM SIZE   : %5d B", ESP.getSketchSize() + ESP.getFreeSketchSpace());
+//	sendLine(basicPtr, 0, CBM_DEL_DEL "ROM USED   : %5d B", ESP.getSketchSize());
+//	sendLine(basicPtr, 0, CBM_DEL_DEL "ROM FREE   : %5d B", ESP.getFreeSketchSpace());
 
 	// FLASH
 	sendLine(basicPtr, 0, CBM_DEL_DEL "STORAGE ---");
-	sendLine(basicPtr, 0, "FLASH SIZE : %5d B", ESP.getFlashChipRealSize());
-	sendLine(basicPtr, 0, CBM_DEL_DEL "FLASH SPEED: %d MHZ", (ESP.getFlashChipSpeed() / 1000000));
+//	sendLine(basicPtr, 0, "FLASH SIZE : %5d B", ESP.getFlashChipRealSize());
+//	sendLine(basicPtr, 0, CBM_DEL_DEL "FLASH SPEED: %d MHZ", (ESP.getFlashChipSpeed() / 1000000));
 
 	// // FILE SYSTEM
 	// sendLine(basicPtr, 0, CBM_DEL_DEL "FILE SYSTEM ---");
@@ -547,7 +548,7 @@ void devDrive::sendMeatloafSystemInformation()
 
 	// NETWORK
 	sendLine(basicPtr, 0, CBM_DEL_DEL "NETWORK ---");
-	char ip[16];
+//	char ip[16];
 //	sprintf(ip, "%s", ipToString(WiFi.softAPIP()).c_str());
 //	sendLine(basicPtr, 0, CBM_DEL_DEL "AP MAC     : %s", WiFi.softAPmacAddress().c_str());
 //	sendLine(basicPtr, 0, CBM_DEL_DEL "AP IP      : %s", ip);
@@ -559,7 +560,7 @@ void devDrive::sendMeatloafSystemInformation()
 	m_iec.send(0);
 	m_iec.sendEOI(0);
 
-	ledON();
+	fnLedManager.set(eLed::LED_BUS, true);
 } // sendMeatloafSystemInformation
 
 void devDrive::sendMeatloafVirtualDeviceStatus()
@@ -591,7 +592,7 @@ void devDrive::sendMeatloafVirtualDeviceStatus()
 	m_iec.send(0);
 	m_iec.sendEOI(0);
 
-	ledON();
+	fnLedManager.set(eLed::LED_BUS, true);
 } // sendMeatloafVirtualDeviceStatus
 
 
@@ -611,7 +612,6 @@ uint16_t devDrive::sendLine(uint16_t &basicPtr, uint16_t blocks, const char *for
 
 uint16_t devDrive::sendLine(uint16_t &basicPtr, uint16_t blocks, char *text)
 {
-	byte i;
 	uint16_t b_cnt = 0;
 
 	Debug_printf("%d %s ", blocks, text);
@@ -631,7 +631,7 @@ uint16_t devDrive::sendLine(uint16_t &basicPtr, uint16_t blocks, char *text)
 	m_iec.send(blocks >> 8);
 
 	// Send line contents
-	for (i = 0; i < len; i++)
+	for (uint8_t i = 0; i < len; i++)
 		m_iec.send(text[i]);
 
 	// Finish line
@@ -762,7 +762,7 @@ void devDrive::sendListing()
 	while(entry != nullptr)
 	{
 		uint16_t block_cnt = entry->size() / m_mfile->media_block_size;
-		byte block_spc = 3;
+		uint8_t block_spc = 3;
 		if (block_cnt > 9)
 			block_spc--;
 		if (block_cnt > 99)
@@ -770,7 +770,7 @@ void devDrive::sendListing()
 		if (block_cnt > 999)
 			block_spc--;
 
-		byte space_cnt = 21 - (entry->name.length() + 5);
+		uint8_t space_cnt = 21 - (entry->name.length() + 5);
 		if (space_cnt > 21)
 			space_cnt = 0;
 
@@ -807,7 +807,7 @@ void devDrive::sendListing()
 
 		entry.reset(m_mfile->getNextFileInDir());
 
-		ledToggle(true);
+		fnLedManager.toggle(eLed::LED_BUS);
 	}
 
 	// Send Listing Footer
@@ -819,7 +819,7 @@ void devDrive::sendListing()
 
 	Debug_printf("=================================\r\n%d bytes sent\r\n", byte_count);
 
-	ledON();
+	fnLedManager.set(eLed::LED_BUS, true);
 } // sendListing
 
 
@@ -1019,7 +1019,7 @@ void devDrive::sendFile()
 			// Toggle LED
 			if (i % 50 == 0)
 			{
-				ledToggle(true);
+				fnLedManager.toggle(eLed::LED_BUS);
 			}
 
 			avail = istream->available();
@@ -1032,7 +1032,7 @@ void devDrive::sendFile()
 	}
 
 
-	ledON();
+	fnLedManager.set(eLed::LED_BUS, true);
 
 	if (!success)
 	{
@@ -1129,14 +1129,14 @@ void devDrive::saveFile()
 			// Toggle LED
 			if (0 == i % 50)
 			{
-				ledToggle(true);
+				fnLedManager.toggle(eLed::LED_BUS);
 			}
 		} while (not done);
     }
     ostream->close(); // nor required, closes automagically
 
 	Debug_printf("=================================\r\n%d bytes saved\r\n", i);
-	ledON();
+	fnLedManager.set(eLed::LED_BUS, true);
 
 	// TODO: Handle errorFlag
 } // saveFile

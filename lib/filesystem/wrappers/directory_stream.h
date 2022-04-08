@@ -7,7 +7,7 @@ class idirbuf : public std::filebuf {
     const size_t BUFFER_SIZE = 256;
     std::shared_ptr<MFile> container;
     char* buffer;
-    byte phase = 0; // 0 = headers, 1 = files, 2 = footer
+    uint8_t phase = 0; // 0 = headers, 1 = files, 2 = footer
 
 public:
     idirbuf() {

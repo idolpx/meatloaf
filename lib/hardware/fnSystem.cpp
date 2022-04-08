@@ -207,7 +207,7 @@ void SystemManager::yield()
 // TODO: Close open files first
 void SystemManager::reboot()
 {
-    SYSTEM_BUS.shutdown();
+    //SYSTEM_BUS.shutdown();
     esp_restart();
 }
 
