@@ -898,6 +898,7 @@ void devDrive::sendFile()
 		auto istream = Meat::ifstream(file.get());
 		auto ostream = oiecstream();
 
+
 		istream.open();
 		ostream.open(&m_iec);
 
@@ -905,6 +906,7 @@ void devDrive::sendFile()
 			sendFileNotFound();
 			return;
 		}
+
 
 		//we can skip the BOM here, EF BB BF for UTF8
 		auto b = (char)istream.get();

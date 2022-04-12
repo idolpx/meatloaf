@@ -197,6 +197,7 @@ namespace Meat {
  * C++ Input MFile buffer
  ********************************************************/
 
+
     class imfilebuf : public std::filebuf {
         std::unique_ptr<MIStream> mistream;
         std::unique_ptr<MFile> mfile;
@@ -311,6 +312,7 @@ namespace Meat {
  * C++ Output MFile buffer
  ********************************************************/
 
+
     class omfilebuf : public std::filebuf {
         static const size_t obufsize = 256;
         std::unique_ptr<MOStream> mostream;
@@ -318,6 +320,11 @@ namespace Meat {
         char* data;
 
     public:
+
+        omfilebuf(const omfilebuf &copied) {
+            
+        }
+
         omfilebuf() {
             data = new char[obufsize];
         };
@@ -461,11 +468,17 @@ namespace Meat {
  * C++ Input MFile stream
  ********************************************************/
 
+
     class ifstream : public std::istream {
         imfilebuf buff;
         std::string url; 
         bool isTranslating = false; 
     public:
+
+        ifstream(const ifstream &copied) {
+            
+        }
+
         ifstream(std::string u): std::istream(&buff), url(u) {
             auto f = MFSOwner::File(u);
             isTranslating = mstr::isText(f->extension);
@@ -509,6 +522,10 @@ namespace Meat {
         omfilebuf buff;
         std::string url;
     public:
+        ofstream(const ofstream &copied) //: std::ostream(&(copied.buff)) // won't work because of const!
+        { 
+            
+        }
         ofstream(std::string u): std::ostream(&buff), url(u) {};
         ofstream(MFile* file): std::ostream(&buff), url(file->url) {};
 
