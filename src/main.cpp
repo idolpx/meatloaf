@@ -14,7 +14,12 @@
 #include "fnWiFi.h"
 // #include "fnConfig.h"
 #include "fnFsSD.h"
+
+#ifdef FLASH_SPIFFS
 #include "fnFsSPIFFS.h"
+#elif FLASH_LITTLEFS
+#include "fnFsLittleFS.h"
+#endif
 
 //#include "httpService.h"
 
@@ -107,7 +112,11 @@ void main_setup()
     fnKeyManager.setup();
     fnLedManager.setup();
 
+#ifdef FLASH_SPIFFS
     fnSPIFFS.start();
+#elif FLASH_LITTLEFS
+    fnLITTLEFS.start();
+#endif
     fnSDFAT.start();
 
     // Load our stored configuration

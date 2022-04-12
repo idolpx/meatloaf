@@ -73,11 +73,11 @@ class oiecstream : public std::ostream {
     oiecbuf buff;
 
 public:
-    oiecstream(const oiecstream &copied) {
+    oiecstream(const oiecstream &copied) : std::ios(0),  std::ostream( &buff ) {
         
     }
 
-    oiecstream() : std::ostream(&buff) {
+    oiecstream() : std::ios(0),  std::ostream( &buff ) {
         Debug_printv("oiecstream constructor");
     };
 

@@ -28,6 +28,8 @@ build_bus      = IEC
 ;build_platform  = BUILD_S100
 ;build_bus       = s100Bus
 
+flash_filesystem = FLASH_LITTLEFS ; FLASH_SPIFFS 
+
 [platformio]
 description = Meatloaf / FujiNet retro computer to ESP32 WiFi Multifunction Firmware
 ; Change this to target hardware you use from the list of [env:xxx] sections below
@@ -52,6 +54,7 @@ check_skip_packages = yes
 
 build_flags =
     -D ${fujinet.build_platform}
+    -D ${fujinet.flash_filesystem}
     -D CMAKE_EXPORT_COMPILE_COMMANDS=ON
     -D DEBUG_SPEED=921600
     ;-D NO_BUTTONS          ; if your hardware has no physical buttons

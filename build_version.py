@@ -5,7 +5,9 @@ import sys
 
 # Don't do anything if this is an 'uploadfs' or 'erase' target
 if sys.argv[9] == 'uploadfs' or sys.argv[9] == 'erase':
-    print("This isn't a build target")
+    Import("env")
+    print("Replace MKSPIFFSTOOL with mklittlefs")
+    env.Replace (MKSPIFFSTOOL = "mklittlefs")
 
 # Don't do anything if nothing has changed
 elif len(subprocess.check_output(["git", "diff", "--name-only"], universal_newlines=True)) == 0:

@@ -197,7 +197,6 @@ namespace Meat {
  * C++ Input MFile buffer
  ********************************************************/
 
-
     class imfilebuf : public std::filebuf {
         std::unique_ptr<MIStream> mistream;
         std::unique_ptr<MFile> mfile;
@@ -294,12 +293,11 @@ namespace Meat {
 
         std::streampos seekpos(std::streampos __pos, std::ios_base::openmode __mode = std::ios_base::in | std::ios_base::out) override {
             Debug_printv("Seek called on mistream: %d", (int)__pos);
-            std::streampos __ret = 0;
-//            std::streampos __ret = std::streampos(this->off_type(-1));
+            std::streampos __ret = std::streampos(off_type(-1));
 
             if(mistream->seek(__pos)) {
                 //__ret.state(_M_state_cur);
-//                __ret = std::streampos(this->off_type(__pos));
+                __ret = std::streampos(off_type(__pos));
                 // probably requires resetting setg!
             }
 
@@ -312,7 +310,6 @@ namespace Meat {
  * C++ Output MFile buffer
  ********************************************************/
 
-
     class omfilebuf : public std::filebuf {
         static const size_t obufsize = 256;
         std::unique_ptr<MOStream> mostream;
@@ -321,7 +318,7 @@ namespace Meat {
 
     public:
 
-        omfilebuf(const omfilebuf &copied) {
+        omfilebuf(const omfilebuf &copied) : std::filebuf() {
             
         }
 
@@ -467,24 +464,25 @@ namespace Meat {
 /********************************************************
  * C++ Input MFile stream
  ********************************************************/
-
+// https://stdcxx.apache.org/doc/stdlibug/39-3.html
 
     class ifstream : public std::istream {
         imfilebuf buff;
         std::string url; 
-        bool isTranslating = false; 
+        bool isTranslating = false;
+
     public:
 
-        ifstream(const ifstream &copied) {
+        ifstream(const ifstream &copied) : std::ios(0),  std::istream( &buff ) {
             
         }
 
-        ifstream(std::string u): std::istream(&buff), url(u) {
+        ifstream(std::string u) : std::ios(0),  std::istream( &buff ), url(u) {
             auto f = MFSOwner::File(u);
             isTranslating = mstr::isText(f->extension);
             delete f;
         };
-        ifstream(MFile* file): std::istream(&buff), url(file->url) {
+        ifstream(MFile* file) : std::ios(0),  std::istream( &buff ), url(file->url) {
             isTranslating = mstr::isText(file->extension);
         };
 
@@ -517,17 +515,19 @@ namespace Meat {
 /********************************************************
  * C++ Output MFile stream
  ********************************************************/
+// https://stdcxx.apache.org/doc/stdlibug/39-3.html
 
     class ofstream : public std::ostream {
         omfilebuf buff;
         std::string url;
+
     public:
-        ofstream(const ofstream &copied) //: std::ostream(&(copied.buff)) // won't work because of const!
+        ofstream(const ofstream &copied) : std::ios(0), std::ostream( &buff )
         { 
             
         }
-        ofstream(std::string u): std::ostream(&buff), url(u) {};
-        ofstream(MFile* file): std::ostream(&buff), url(file->url) {};
+        ofstream(std::string u) : std::ios(0), std::ostream( &buff ), url(u) {};
+        ofstream(MFile* file) : std::ios(0), std::ostream( &buff ), url(file->url) {};
 
         ~ofstream() {
             close();
