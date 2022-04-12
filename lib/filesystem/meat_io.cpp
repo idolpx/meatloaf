@@ -1,5 +1,7 @@
 #include "meat_io.h"
 
+#include <algorithm>
+
 #include "MIOException.h"
 
 // Scheme
@@ -8,7 +10,7 @@
 #include "scheme/smb.h"
 #include "scheme/ml.h"
 #include "scheme/cs.h"
-#include "scheme/ws.h"
+//#include "scheme/ws.h"
 
 // Disk
 #include "media/d64.h"
@@ -35,13 +37,13 @@
  ********************************************************/
 
 // initialize other filesystems here
-LittleFileSystem defaultFS(FS_PHYS_ADDR, FS_PHYS_SIZE, FS_PHYS_PAGE, FS_PHYS_BLOCK, 5);
+LittleFileSystem defaultFS;
 
 // Scheme
 HttpFileSystem httpFS;
 MLFileSystem mlFS;
 CServerFileSystem csFS;
-WSFileSystem wsFS;
+//WSFileSystem wsFS;
 
 // Disk
 D64FileSystem d64FS;
@@ -62,7 +64,7 @@ TCRTFileSystem tcrtFS;
 
 // put all available filesystems in this array - first matching system gets the file!
 // fist in list is default
-std::vector<MFileSystem*> MFSOwner::availableFS{ &defaultFS, &d64FS, &d71FS, &d80FS, &d81FS, &d82FS, &d8bFS, &dnpFS, &t64FS, &tcrtFS, &mlFS, &httpFS, &wsFS };
+std::vector<MFileSystem*> MFSOwner::availableFS{ &defaultFS, &d64FS, &d71FS, &d80FS, &d81FS, &d82FS, &d8bFS, &dnpFS, &t64FS, &tcrtFS, &mlFS, &httpFS };
 
 bool MFSOwner::mount(std::string name) {
     Serial.print("MFSOwner::mount fs:");
@@ -177,7 +179,7 @@ MFileSystem* MFSOwner::testScan(std::vector<std::string>::iterator &begin, std::
 
         //Debug_printv("index[%d] pathIterator[%s] size[%d]", pathIterator, pathIterator->c_str(), pathIterator->size());
 
-        auto foundIter=find_if(availableFS.begin() + 1, availableFS.end(), [&part](MFileSystem* fs){ 
+        auto foundIter=std::find_if(availableFS.begin() + 1, availableFS.end(), [&part](MFileSystem* fs){ 
             //Debug_printv("symbol[%s]", fs->symbol);
             return fs->handles(part); 
         } );
@@ -387,33 +389,33 @@ MFile* MFile::cd(std::string newDir) {
     }
 };
 
-bool MFile::copyTo(MFile* dst) {
-    auto istream = Meat::ifstream(this);
-    auto ostream = Meat::ofstream(dst);
+// bool MFile::copyTo(MFile* dst) {
+//     auto istream = Meat::ifstream(this);
+//     auto ostream = Meat::ofstream(dst);
 
-    int rc;
+//     int rc;
 
-    istream.open();
-    ostream.open();
+//     istream.open();
+//     ostream.open();
 
-    //Debug_printv("in copyTo, iopen=%d oopen=%d", istream.is_open(), ostream.is_open());
+//     //Debug_printv("in copyTo, iopen=%d oopen=%d", istream.is_open(), ostream.is_open());
 
-    if(!istream.is_open() || !ostream.is_open())
-        return false;
+//     if(!istream.is_open() || !ostream.is_open())
+//         return false;
 
-    //Debug_printv("commencing copy");
+//     //Debug_printv("commencing copy");
 
-    while((rc = istream.get())!= EOF) {     
-        //Serial.print(".");
-        ostream.put(rc);
-        if(ostream.bad() || istream.bad())
-            return false;
-    }
+//     while((rc = istream.get())!= EOF) {     
+//         //Serial.print(".");
+//         ostream.put(rc);
+//         if(ostream.bad() || istream.bad())
+//             return false;
+//     }
 
-    //Debug_printv("copying finished, rc=%d", rc);
+//     //Debug_printv("copying finished, rc=%d", rc);
 
-    return true;
-};
+//     return true;
+// };
 
 
 

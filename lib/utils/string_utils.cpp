@@ -1,6 +1,7 @@
 #include "string_utils.h"
 #include "../../include/petscii.h"
 #include <algorithm>
+#include <cstdarg>
 
 
 namespace mstr {

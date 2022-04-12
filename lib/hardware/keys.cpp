@@ -5,7 +5,7 @@
 #include "../../include/pinmap.h"
 
 #include "fnSystem.h"
-#include "fnConfig.h"
+//#include "fnConfig.h"
 #include "fnWiFi.h"
 #include "fnBluetooth.h"
 

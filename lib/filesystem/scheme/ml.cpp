@@ -5,7 +5,7 @@
 
 MLFile::~MLFile() {
     // just to be sure to close it if we don't read the directory until the very end
-    m_http.end();
+    m_http.close();
 }
 
 
@@ -21,7 +21,7 @@ MFile* MLFile::getNextFileInDir() {
         return nullptr; // we couldn't open it or whole dir was at this stage - return nullptr, as usual
 
     // calling this proc will read a single JSON line that will be processed into MFile and returned
-    m_lineBuffer = m_file.readStringUntil('\n');
+//    m_lineBuffer = m_http.readStringUntil('\n');
 //Serial.printf("Buffer read from ml server: %s\n", m_lineBuffer.c_str());
 	if(m_lineBuffer.length() > 1)
 	{
@@ -29,10 +29,10 @@ MFile* MLFile::getNextFileInDir() {
 		DeserializationError error = deserializeJson(m_jsonHTTP, m_lineBuffer);
 		if (error)
 		{
-			Serial.print(F("\r\ndeserializeJson() failed: "));
+			Serial.print("\r\ndeserializeJson() failed: ");
 			Serial.println(error.c_str());
             dirIsOpen = false;
-            m_http.end();
+            m_http.close();
             return nullptr;
 		}
         else {
@@ -75,25 +75,25 @@ bool MLFile::isDirectory() {
 
 	// Connect to HTTP server
 	Serial.printf("\r\nConnecting!\r\n--------------------\r\n%s\r\n%s\r\n", ml_url.c_str(), post_data.c_str());
-	if (!m_http.begin(m_file, ml_url.c_str()))
+	if (!m_http.begin( ml_url ))
 	{
 		Serial.printf("\r\nConnection failed");
         return false;
 	}
-	m_http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+	m_http.set_header("Content-Type", "application/x-www-form-urlencoded");
 
     // Setup response headers we want to collect
     const char * headerKeys[] = {"ml_media_dir"} ;
     const size_t numberOfHeaders = 1;
-    m_http.collectHeaders(headerKeys, numberOfHeaders);
+    m_http.collect_headers(headerKeys, numberOfHeaders);
 
     // Send the request
-	uint8_t httpCode = m_http.POST(post_data.c_str());
+	uint8_t httpCode = m_http.POST( post_data.c_str(), post_data.length() );
 
 	Serial.printf("HTTP Status: %d\r\n", httpCode); //Print HTTP return code
 
 	if (httpCode == 200) {
-        if (m_http.header("ml_media_dir") == "1")
+        if (m_http.get_header("ml_media_dir") == "1")
             return true;
     }
 
@@ -118,26 +118,26 @@ bool MLFile::rewindDirectory() {
 
 	// Connect to HTTP server
 	Serial.printf("\r\nConnecting!\r\n--------------------\r\n%s\r\n%s\r\n", ml_url.c_str(), post_data.c_str());
-	if (!m_http.begin(m_file, ml_url.c_str()))
+	if (!m_http.begin( ml_url ))
 	{
 		Serial.printf("\r\nConnection failed");
 		dirIsOpen = false;
         return false;
 	}
-	m_http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+	m_http.set_header("Content-Type", "application/x-www-form-urlencoded");
 
     // Setup response headers we want to collect
-    const char * headerKeys[] = {"accept-ranges", "content-type", "ml_media_header", "ml_media_id", "ml_media_blocks_free", "ml_media_block_size"} ;
-    const size_t numberOfHeaders = 6;
-    m_http.collectHeaders(headerKeys, numberOfHeaders);
+    const char * headerKeys[] = {"accept-ranges", "content-type", "content-length", "ml_media_header", "ml_media_id", "ml_media_blocks_free", "ml_media_block_size"} ;
+    const size_t numberOfHeaders = 7;
+    m_http.collect_headers(headerKeys, numberOfHeaders);
 
     // Send the request
-	uint8_t httpCode = m_http.POST(post_data.c_str());
+	uint8_t httpCode = m_http.POST(post_data.c_str(), post_data.length());
 
 	Serial.printf("HTTP Status: %d\r\n", httpCode); //Print HTTP return code
 
 	if (httpCode != 200) {
-        Serial.println(m_http.errorToString(httpCode));
+//        Serial.println(m_http.errorToString(httpCode));
 		dirIsOpen = false;
 
         // // Show HTTP Headers
@@ -155,10 +155,10 @@ bool MLFile::rewindDirectory() {
     else
     {
         dirIsOpen = true;
-        media_header = m_http.header("ml_media_header").c_str();
-        media_id = m_http.header("ml_media_id").c_str();
-        media_block_size = m_http.header("ml_media_block_size").toInt();
-        media_blocks_free = m_http.header("ml_media_blocks_free").toInt();
+        media_header = m_http.get_header("ml_media_header");
+        media_id = m_http.get_header("ml_media_id");
+        media_block_size = stoi(m_http.get_header("ml_media_block_size"));
+        media_blocks_free = stoi(m_http.get_header("ml_media_blocks_free"));
     }
 
     return dirIsOpen;
@@ -183,23 +183,28 @@ bool MLIStream::open() {
     std::string ml_url = "http://" + urlParser.host + "/api";
     std::string post_data = "p=" + urlParser.path;
 
-    m_http.setReuse(true);
-    bool initOk = m_http.begin(m_file, ml_url.c_str());
+//    m_http.setReuse(true);
+    bool initOk = m_http.begin( ml_url );
     Debug_printv("input %s: someRc=%d, post[%s]", ml_url.c_str(), initOk, post_data.c_str());
     if(!initOk)
         return false;
 
+    // Setup response headers we want to collect
+    const char * headerKeys[] = {"accept-ranges", "content-type", "content-length"} ;
+    const size_t numberOfHeaders = 3;
+    m_http.collect_headers(headerKeys, numberOfHeaders);
+
     // Send the request
-	uint8_t httpCode = m_http.POST(post_data.c_str());
+	uint8_t httpCode = m_http.POST(post_data.c_str(), post_data.length());
     Debug_printv("httpCode=%d", httpCode);
     if(httpCode != 200)
         return false;
 
     // Accept-Ranges: bytes - if we get such header from any request, good!
-    isFriendlySkipper = m_http.header("accept-ranges") == "bytes";
+    isFriendlySkipper = m_http.get_header("accept-ranges") == "bytes";
     m_isOpen = true;
     Debug_printv("[%s]", ml_url.c_str());
-    m_length = m_http.getSize();
+    m_length = stoi(m_http.get_header("content-length"));
     Debug_printv("length=%d", m_length);
     m_bytesAvailable = m_length;
     return true;

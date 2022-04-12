@@ -21,28 +21,6 @@
 #ifndef DEVICE_DRIVE_H
 #define DEVICE_DRIVE_H
 
-
-#if defined(ESP8266)
-#include <ESP8266WiFi.h>
-#include <ESP8266HTTPClient.h>
-#elif defined(ESP32)
-#include <WiFi.h>
-#include <HTTPClient.h>
-#endif
-
-#if defined(USE_SPIFFS)
-#include <FS.h>
-#if defined(ESP32)
-#include <SPIFFS.h>
-#endif
-#elif defined(USE_LITTLEFS)
-#if defined(ESP8266)
-#include <LittleFS.h>
-#elif defined(ESP32)
-#include <LITTLEFS.h>
-#endif
-#endif
-
 #include "../../include/global_defines.h"
 #include "../../include/debug.h"
 #include "../../include/cbmdefines.h"
@@ -52,7 +30,7 @@
 #include "iec_device.h"
 
 #include "meat_io.h"
-#include "MemoryInfo.h"
+//#include "MemoryInfo.h"
 //#include "helpers.h"
 #include "utils.h"
 #include "string_utils.h"

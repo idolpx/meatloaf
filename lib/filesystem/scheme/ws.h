@@ -8,7 +8,7 @@
 
 #include "meat_io.h"
 #include "../../include/global_defines.h"
-#include <ArduinoWebsockets.h>
+
 #include "string_utils.h"
 
 /********************************************************

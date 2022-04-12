@@ -6,6 +6,7 @@
 #include "utils.h"
 
 #include "../../include/global_defines.h"
+#include "../../include/debug.h"
 
 using namespace std;
 

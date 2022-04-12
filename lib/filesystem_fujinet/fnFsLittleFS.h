@@ -1,23 +1,23 @@
-#ifndef _FN_FSSD_
-#define _FN_FSSD_
+#ifndef _FN_FSLITTLEFS_
+#define _FN_FSLITTLEFS_
 
-#include <esp_vfs_fat.h>
-
-#include <stdio.h>
+#include <dirent.h>
 
 #include "fnFS.h"
 
-class FileSystemSDFAT : public FileSystem
+
+class FileSystemLittleFS : public FileSystem
 {
 private:
-    FF_DIR _dir;
-    uint64_t _card_capacity = 0;
+    DIR * _dir;
 public:
+    FileSystemLittleFS();
     bool start();
-    virtual bool is_global() override { return true; };
+    
+    fsType type() override { return FSTYPE_LITTLEFS; };
+    const char * typestring() override { return type_to_string(FSTYPE_LITTLEFS); };
 
-    fsType type() override { return FSTYPE_SDFAT; };
-    const char * typestring() override { return type_to_string(FSTYPE_SDFAT); };
+    virtual bool is_global() override { return true; };    
 
     FILE * file_open(const char* path, const char* mode = FILE_READ) override;
 
@@ -37,14 +37,10 @@ public:
     uint16_t dir_tell() override;
     bool dir_seek(uint16_t) override;
 
-    bool create_path(const char *fullpath);
-    
-    uint64_t card_size();
     uint64_t total_bytes();
     uint64_t used_bytes();
-    const char *partition_type();
 };
 
-extern FileSystemSDFAT fnSDFAT;
+extern FileSystemLittleFS fnLITTLEFS;
 
-#endif // _FN_FSSD_
+#endif // _FN_FSLITTLEFS_

@@ -1,5 +1,7 @@
 #include "tcrt.h"
 
+#include "utils.h"
+
 /********************************************************
  * Streams
  ********************************************************/
@@ -177,8 +179,10 @@ size_t TCRTFile::size() {
     // use TCRT to get size of the file in image
     auto image = ImageBroker::obtain<TCRTIStream>(streamFile->url);
 
-    //size_t blocks = (UINT16_FROM_LE_UINT16(image->entry.start_address) + image->entry.file_size)) / image->block_size;
-    size_t blocks = 1;
+    //size_t blocks = (UINT16_FROM_LE_UINT16(image->entry.load_address) + image->entry.file_size)) / image->block_size;
+    //size_t blocks = 1;
+
+    size_t blocks = ((image->entry.file_size[0] >> 24 & 0x000000FF) | (image->entry.file_size[1] >> 8 & 0x0000FF00) | (image->entry.file_size[2] << 8 & 0x00FF0000)) / image->block_size;
 
     return blocks;
 }

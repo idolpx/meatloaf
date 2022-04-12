@@ -13,10 +13,10 @@
 #include "fnSystem.h"
 #include "fnWiFi.h"
 // #include "fnConfig.h"
-// #include "fnFsSD.h"
-// #include "fnFsSPIFFS.h"
+#include "fnFsSD.h"
+#include "fnFsSPIFFS.h"
 
-#include "httpService.h"
+//#include "httpService.h"
 
 /**************************/
 // Meatloaf
@@ -107,8 +107,8 @@ void main_setup()
     fnKeyManager.setup();
     fnLedManager.setup();
 
-//    fnSPIFFS.start();
-//    fnSDFAT.start();
+    fnSPIFFS.start();
+    fnSDFAT.start();
 
     // Load our stored configuration
 //    Config.load();

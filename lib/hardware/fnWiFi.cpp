@@ -7,12 +7,14 @@
 
 #include <cstring>
 
+#include "../../include/global_defines.h"
 #include "../../include/debug.h"
 
-#include "fuji.h"
+//#include "fuji.h"
 #include "fnSystem.h"
-#include "fnConfig.h"
-#include "httpService.h"
+//#include "fnConfig.h"
+//#include "httpService.h"
+
 #include "led.h"
 
 
@@ -97,7 +99,7 @@ int WiFiManager::start()
     ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
 
     // Set a hostname from our configuration
-    esp_netif_set_hostname(_wifi_if, Config.get_general_devicename().c_str());
+//    esp_netif_set_hostname(_wifi_if, Config.get_general_devicename().c_str());
 
     _started = true;
     return 0;
@@ -106,10 +108,12 @@ int WiFiManager::start()
 // Attempts to connect using information in Config (if any)
 int WiFiManager::connect()
 {
-    if (Config.have_wifi_info())
-        return connect(Config.get_wifi_ssid().c_str(), Config.get_wifi_passphrase().c_str());
-    else
-        return -1;
+    // if (Config.have_wifi_info())
+    //     return connect(Config.get_wifi_ssid().c_str(), Config.get_wifi_passphrase().c_str());
+    // else
+    //     return -1;
+
+    return connect( WIFI_SSID, WIFI_PASSWORD );
 }
 
 int WiFiManager::connect(const char *ssid, const char *password)
@@ -456,7 +460,7 @@ void WiFiManager::handle_station_stop()
 {
     _connected = false;
     fnLedManager.set(eLed::LED_WIFI, false);
-    fnHTTPD.stop();
+//    fnHTTPD.stop();
     fnSystem.Net.stop_sntp_client();
 }
 
@@ -478,7 +482,7 @@ void WiFiManager::_wifi_event_handler(void *arg, esp_event_base_t event_base,
             pFnWiFi->_connected = true;
             fnLedManager.set(eLed::LED_WIFI, true);
             fnSystem.Net.start_sntp_client();
-            fnHTTPD.start();
+//            fnHTTPD.start();
 #ifdef BUILD_APPLE
             IWM.startup_hack();
 #endif
@@ -487,7 +491,8 @@ void WiFiManager::_wifi_event_handler(void *arg, esp_event_base_t event_base,
                 theFuji.sio_mount_all();
 #endif /* BUILD_ATARI */
             mdns_init();
-            mdns_hostname_set(Config.get_general_devicename().c_str());
+//            mdns_hostname_set(Config.get_general_devicename().c_str());
+            mdns_hostname_set( HOSTNAME );
             mdns_service_add(NULL, "_http", "_tcp", 80, NULL, 0);
             break;
         case IP_EVENT_STA_LOST_IP:
@@ -529,8 +534,10 @@ void WiFiManager::_wifi_event_handler(void *arg, esp_event_base_t event_base,
                 pFnWiFi->handle_station_stop();
             }
             // Try to reconnect
+//            if (pFnWiFi->_scan_in_progress == false &&
+//                pFnWiFi->_reconnect_attempts < FNWIFI_RECONNECT_RETRIES && Config.have_wifi_info())
             if (pFnWiFi->_scan_in_progress == false &&
-                pFnWiFi->_reconnect_attempts < FNWIFI_RECONNECT_RETRIES && Config.have_wifi_info())
+                pFnWiFi->_reconnect_attempts < FNWIFI_RECONNECT_RETRIES )
             {
                 pFnWiFi->_reconnect_attempts++;
                 Debug_printf("WiFi reconnect attempt %u of %d\n", pFnWiFi->_reconnect_attempts, FNWIFI_RECONNECT_RETRIES);

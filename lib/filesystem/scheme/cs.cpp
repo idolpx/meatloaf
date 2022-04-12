@@ -78,7 +78,7 @@ bool CServerSessionMgr::traversePath(MFile* path) {
 
         Debug_printv("Before loop");
         //Debug_printv("Chopped size:%d\n", chopped.size());
-        delay(500);
+        fnSystem.delay(500);
 
         for(size_t i = 1; i < chopped.size(); i++) {
             //Debug_printv("Before chopped deref");

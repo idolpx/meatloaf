@@ -291,18 +291,19 @@ namespace Meat {
                 : std::char_traits<char>::to_int_type(*this->gptr());
         };
 
-      std::streampos seekpos(std::streampos __pos, std::ios_base::openmode __mode = std::ios_base::in | std::ios_base::out) override {
-        Debug_printv("Seek called on mistream: %d", (int)__pos);
-        std::streampos __ret = std::streampos(off_type(-1));
+        std::streampos seekpos(std::streampos __pos, std::ios_base::openmode __mode = std::ios_base::in | std::ios_base::out) override {
+            Debug_printv("Seek called on mistream: %d", (int)__pos);
+            std::streampos __ret = 0;
+//            std::streampos __ret = std::streampos(this->off_type(-1));
 
-        if(mistream->seek(__pos)) {
-    	    //__ret.state(_M_state_cur);
-            __ret = std::streampos(off_type(__pos));
-            // probably requires resetting setg!
+            if(mistream->seek(__pos)) {
+                //__ret.state(_M_state_cur);
+//                __ret = std::streampos(this->off_type(__pos));
+                // probably requires resetting setg!
+            }
+
+            return __ret;
         }
-
-        return __ret;
-      }
 
     };
 
@@ -332,7 +333,7 @@ namespace Meat {
             mfile.reset(MFSOwner::File(filename));
             mostream.reset(mfile->outputStream());
             if(mostream->isOpen()) {
-                setp(data, data+obufsize);
+                this->setp(data, data+obufsize);
                 return this;
             }
             else
@@ -396,21 +397,21 @@ namespace Meat {
                 return EOF;
             }
 
-            char* end = pptr();
+            char* end = this->pptr();
             if ( ch != EOF ) {
                 *end ++ = ch;
             }
 
             //Debug_printv("%d bytes in buffer will be written", end-pbase());
 
-            uint8_t* pBase = (uint8_t*)pbase();
+            uint8_t* pBase = (uint8_t*)this->pbase();
 
-            if ( mostream->write( pBase, end - pbase() ) == 0 ) {
+            if ( mostream->write( pBase, end - this->pbase() ) == 0 ) {
                 ch = EOF;
             } else if ( ch == EOF ) {
                 ch = 0;
             }
-            setp(data, data+1024);
+            this->setp(data, data+1024);
             
             return ch;
         };
@@ -434,20 +435,20 @@ namespace Meat {
         int sync() override { 
             //Debug_printv("in wrapper sync");
             
-            if(pptr() == pbase()) {
+            if(this->pptr() == this->pbase()) {
                 return 0;
             }
             else {
-                uint8_t* buffer = (uint8_t*)pbase();
+                uint8_t* buffer = (uint8_t*)this->pbase();
 
                 // pptr =  Returns the pointer to the current character (put pointer) in the put area.
                 // pbase = Returns the pointer to the beginning ("base") of the put area.
                 // epptr = Returns the pointer one past the end of the put area.
-                auto result = mostream->write(buffer, pptr()-pbase()); 
+                auto result = mostream->write(buffer, this->pptr()-this->pbase()); 
 
                 //Debug_printv("%d bytes left in buffer written to sink, rc=%d", pptr()-pbase(), result);
 
-                setp(data, data+1024);
+                this->setp(data, data+1024);
 
                 return (result != 0) ? 0 : -1;  
             }  
@@ -476,7 +477,7 @@ namespace Meat {
 
         ~ifstream() {
             close();
-        };
+        }
 
         virtual void open() {
             buff.open(url);
@@ -523,13 +524,13 @@ namespace Meat {
             buff.close();
         }
 
+        virtual bool is_open() {
+            return buff.is_open();
+        }
+
         void putPetscii(char c) {
             U8Char wide = U8Char(c);
             (*this) << wide.toUtf8();
-        }
-
-        virtual bool is_open() {
-            return buff.is_open();
         }
     };
 }

@@ -114,7 +114,7 @@ int16_t  CBMStandardSerial::receiveByte(uint8_t device)
 	ESP.wdtFeed();
 #endif
 	uint8_t data = 0;
-	uint16_t bit_time;  // Used to detect JiffyDOS
+	int16_t bit_time;  // Used to detect JiffyDOS
 	
 	uint8_t n = 0;
 	for(n = 0; n < 8; n++) 

@@ -1,6 +1,7 @@
 #include "littlefs.h"
-#include "flash_hal.h"
-#include "MIOException.h"
+
+#include "../../../include/debug.h"
+
 /********************************************************
  * MFileSystem implementations
  ********************************************************/
@@ -19,102 +20,6 @@ MFile* LittleFileSystem::getFile(std::string apath)
     else
         return nullptr;
         //throw IllegalStateException();
-}
-
-bool LittleFileSystem::mount()
-{
-    if (m_isMounted)
-        return true;
-
-    if (_size <= 0) {
-        DEBUGV("LittleFS size is <= zero");
-        return false;
-    }
-
-    if (_tryMount()) {
-        return true;
-    }
-
-    if (/*!_cfg._autoFormat ||*/ !format()) {
-        return false;
-    }
-
-    return _tryMount();
-}
-
-bool LittleFileSystem::umount()
-{
-    if (m_isMounted) {
-        lfs_unmount(&lfsStruct);
-    }
-    return true;
-}
-
-bool LittleFileSystem::_tryMount() {
-    if (m_isMounted) {
-        lfs_unmount(&lfsStruct);
-        m_isMounted = false;
-    }
-    memset(&lfsStruct, 0, sizeof(lfsStruct));
-    int rc = lfs_mount(&lfsStruct, &_lfs_cfg);
-    if (rc==0) {
-        m_isMounted = true;
-    }
-    return m_isMounted;
-}
-
-bool LittleFileSystem::format() {
-    if (_size == 0) {
-        DEBUGV("lfs size is zero\n");
-        return false;
-    }
-
-    bool wasMounted = m_isMounted;
-    if (m_isMounted) {
-        lfs_unmount(&lfsStruct);
-        m_isMounted = false;
-    }
-
-    memset(&lfsStruct, 0, sizeof(lfsStruct));
-    int rc = lfs_format(&lfsStruct, &_lfs_cfg);
-    if (rc != 0) {
-        DEBUGV("lfs_format: rc=%d\n", rc);
-        return false;
-    }
-
-    if (wasMounted) {
-        return _tryMount();
-    }
-
-    return true;
-}
-
-int LittleFileSystem::lfs_flash_read(const struct lfs_config *c,
-    lfs_block_t block, lfs_off_t off, void *dst, lfs_size_t size) {
-    LittleFileSystem *me = reinterpret_cast<LittleFileSystem*>(c->context); // nie wiem, czy ten reinterpret prawidlowo zadziala
-    uint32_t addr = me->_start + (block * me->_blockSize) + off;
-    return flash_hal_read(addr, size, static_cast<uint8_t*>(dst)) == FLASH_HAL_OK ? 0 : -1;
-}
-
-int LittleFileSystem::lfs_flash_prog(const struct lfs_config *c,
-    lfs_block_t block, lfs_off_t off, const void *buffer, lfs_size_t size) {
-    LittleFileSystem *me = reinterpret_cast<LittleFileSystem*>(c->context);
-    uint32_t addr = me->_start + (block * me->_blockSize) + off;
-    const uint8_t *src = reinterpret_cast<const uint8_t *>(buffer);
-    return flash_hal_write(addr, size, static_cast<const uint8_t*>(src)) == FLASH_HAL_OK ? 0 : -1;
-}
-
-int LittleFileSystem::lfs_flash_erase(const struct lfs_config *c, lfs_block_t block) {
-    LittleFileSystem *me = reinterpret_cast<LittleFileSystem*>(c->context);
-    uint32_t addr = me->_start + (block * me->_blockSize);
-    uint32_t size = me->_blockSize;
-    return flash_hal_erase(addr, size) == FLASH_HAL_OK ? 0 : -1;
-}
-
-int LittleFileSystem::lfs_flash_sync(const struct lfs_config *c) {
-    /* NOOP */
-    (void) c;
-    return 0;
 }
 
 
@@ -152,7 +57,6 @@ int LittleFileSystem::lfs_flash_sync(const struct lfs_config *c) {
 //     else
 //         return MFile::cd(newDir);
 // };
-
 
 bool LittleFile::pathValid(std::string path) 
 {
@@ -260,7 +164,7 @@ bool LittleFile::remove() {
 
     int rc = lfs_remove(&LittleFileSystem::lfsStruct, path.c_str());
     if (rc != 0) {
-        DEBUGV("lfs_remove: rc=%d path=`%s`\n", rc, path);
+        Debug_printf("lfs_remove: rc=%d path=`%s`\n", rc, path);
         return false;
     }
     // Now try and remove any empty subdirs this makes, silently
@@ -418,7 +322,7 @@ size_t LittleOStream::write(const uint8_t *buf, size_t size) {
     //Serial.println("after lfs_file_write");
 
     if (result < 0) {
-        DEBUGV("lfs_write rc=%d\n", result);
+        Debug_printf("lfs_write rc=%d\n", result);
     }
     return result;
 };
@@ -471,7 +375,7 @@ size_t LittleIStream::read(uint8_t* buf, size_t size) {
     
     int result = lfs_file_read(&LittleFileSystem::lfsStruct, &handle->lfsFile, (void*) buf, size);
     if (result < 0) {
-        DEBUGV("lfs_read rc=%d\n", result);
+        Debug_printf("lfs_read rc=%d\n", result);
         return 0;
     }
 
@@ -521,7 +425,7 @@ void LittleHandle::dispose() {
         //Serial.println("*** closing little handle");
 
         lfs_file_close(&LittleFileSystem::lfsStruct, &lfsFile);
-        DEBUGV("lfs_file_close: fd=%p\n", _getFD());
+        // Debug_printf("lfs_file_close: fd=%p\n", _getFD());
         // if (timeCallback && (flags & LFS_O_WRONLY)) {
         //     // If the file opened with O_CREAT, write the creation time attribute
         //     if (_creation) {
@@ -590,7 +494,7 @@ void LittleHandle::obtain(int fl, std::string m_path) {
     } else if (rc == 0) {
         lfs_file_sync(&LittleFileSystem::lfsStruct, &lfsFile);
     } else {
-        DEBUGV("LittleFile::open: unknown return code rc=%d fd=%p path=`%s` openMode=%d accessMode=%d err=%d\n",
-               rc, fd, loclaPath, openMode, accessMode, rc);
+        Debug_printf("LittleFile::open: unknown return code rc=%d path=`%s`\n",
+               rc, m_path.c_str());
     }    
 }

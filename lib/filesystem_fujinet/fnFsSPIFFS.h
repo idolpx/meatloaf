@@ -27,6 +27,10 @@ public:
 
     bool rename(const char* pathFrom, const char* pathTo) override;
 
+    virtual bool mkdir(const char* path) override;
+    virtual bool rmdir(const char* path) override;
+    virtual bool dir_exists(const char* path) override;
+
     bool dir_open(const char * path, const char *pattern, uint16_t diropts) override;
     fsdir_entry *dir_read() override;
     void dir_close() override;
