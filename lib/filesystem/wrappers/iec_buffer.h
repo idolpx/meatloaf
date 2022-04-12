@@ -61,6 +61,8 @@ public:
 };
 
 
+
+
 /********************************************************
  * oiecstream
  * 
@@ -71,7 +73,7 @@ class oiecstream : public std::ostream {
     oiecbuf buff;
 
 public:
-    oiecstream() : std::ostream(&buff) {
+    oiecstream(bool) : std::ostream(&buff) {
         Debug_printv("oiecstream constructor");
     };
 
