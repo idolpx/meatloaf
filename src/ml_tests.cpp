@@ -14,7 +14,7 @@
 
 #include "fnHttpClient.h"
 
-std::unique_ptr<MFile> m_mfile(MFSOwner::File(""));
+//std::unique_ptr<MFile> m_mfile(MFSOwner::File(""));
 
 
 void testHeader(std::string testName) {
