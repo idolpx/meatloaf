@@ -117,6 +117,7 @@ void SystemManager::set_pin_mode(uint8_t pin, gpio_mode_t mode, pull_updown_t pu
     gpio_config(&io_conf);
 }
 
+
 // from esp32-hal-misc.
 // Set DIGI_LOW or DIGI_HIGH
 void IRAM_ATTR SystemManager::digital_write(uint8_t pin, uint8_t val)

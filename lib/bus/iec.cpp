@@ -40,15 +40,15 @@ bool IEC::init()
 	protocol.release(PIN_IEC_SRQ);
 
 	// initial pin modes in GPIO
-	set_pin_mode(PIN_IEC_ATN, INPUT);
-	set_pin_mode(PIN_IEC_CLK, INPUT);
-	set_pin_mode(PIN_IEC_DATA, INPUT);
-	set_pin_mode(PIN_IEC_SRQ, OUTPUT);
-	set_pin_mode(PIN_IEC_RESET, INPUT);
+	protocol.set_pin_mode(PIN_IEC_ATN, INPUT);
+	protocol.set_pin_mode(PIN_IEC_CLK, INPUT);
+	protocol.set_pin_mode(PIN_IEC_DATA, INPUT);
+	protocol.set_pin_mode(PIN_IEC_SRQ, OUTPUT);
+	protocol.set_pin_mode(PIN_IEC_RESET, INPUT);
 
 #ifdef SPLIT_LINES
-	set_pin_mode(PIN_IEC_CLK_OUT, OUTPUT);
-	set_pin_mode(PIN_IEC_DATA_OUT, OUTPUT);
+	protocol.set_pin_mode(PIN_IEC_CLK_OUT, OUTPUT);
+	protocol.set_pin_mode(PIN_IEC_DATA_OUT, OUTPUT);
 #endif
 
 	protocol.flags = CLEAR;
@@ -534,7 +534,7 @@ uint8_t IEC::state()
 
 void IEC::debugTiming()
 {
-	int pin = PIN_IEC_ATN;
+	uint8_t pin = PIN_IEC_ATN;
 	protocol.pull(pin);
 	delayMicroseconds(1000); // 1000
 	protocol.release(pin);
@@ -544,29 +544,29 @@ void IEC::debugTiming()
 	protocol.pull(pin);
 	delayMicroseconds(20); // 20
 	protocol.release(pin);
-	delayMicroseconds(1);
+	delayMicroseconds(20);
 
 	pin = PIN_IEC_DATA;
 	protocol.pull(pin);
 	delayMicroseconds(50); // 50
 	protocol.release(pin);
-	delayMicroseconds(1);
+	delayMicroseconds(50);
 
 	pin = PIN_IEC_SRQ;
 	protocol.pull(pin);
 	delayMicroseconds(60); // 60
 	protocol.release(pin);
-	delayMicroseconds(1);
+	delayMicroseconds(60);
 
-	pin = PIN_IEC_ATN;
-	protocol.pull(pin);
-	delayMicroseconds(100); // 100
-	protocol.release(pin);
-	delayMicroseconds(1);
+	// pin = PIN_IEC_ATN;
+	// protocol.pull(pin);
+	// delayMicroseconds(100); // 100
+	// protocol.release(pin);
+	// delayMicroseconds(1);
 
-	pin = PIN_IEC_CLK;
-	protocol.pull(pin);
-	delayMicroseconds(200); // 200
-	protocol.release(pin);
-	delayMicroseconds(1);
+	// pin = PIN_IEC_CLK;
+	// protocol.pull(pin);
+	// delayMicroseconds(200); // 200
+	// protocol.release(pin);
+	// delayMicroseconds(1);
 }

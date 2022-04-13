@@ -70,10 +70,9 @@
 #define PIN_IEC_SRQ			GPIO_NUM_26      // SIO 13 - INT  - Interrupt
 #define PIN_IEC_RESET       GPIO_NUM_39      // SIO 7  - CMD  - Command
 
-#ifdef SPLIT_LINES
+// SPLIT_LINES
 #define PIN_IEC_CLK_OUT		GPIO_NUM_32      // SIO 2  - CKO  - Clock Output
 #define PIN_IEC_DATA_OUT	GPIO_NUM_33      // SIO 5  - DO   - Data Output
-#endif
 
 /* Pins for AdamNet */
 #define PIN_ADAMNET_RESET   26      // SIO 13 - INT  - Interrupt

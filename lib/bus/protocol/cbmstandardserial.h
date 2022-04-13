@@ -28,7 +28,7 @@
 
 #include "fnSystem.h"
 
-#define set_pin_mode      fnSystem.set_pin_mode
+//#define set_pin_mode      fnSystem.set_pin_mode
 #define digital_write     fnSystem.digital_write
 #define digital_read      fnSystem.digital_read
 #define INPUT             gpio_mode_t::GPIO_MODE_INPUT
@@ -79,37 +79,67 @@ namespace Protocol
 {
 	class CBMStandardSerial
 	{
-	public:
-		// communication must be reset
-		uint8_t flags = CLEAR;
+		public:
+			// communication must be reset
+			uint8_t flags = CLEAR;
 
-		virtual int16_t receiveByte(uint8_t device);
-		virtual bool sendByte(uint8_t data, bool signalEOI);
-		virtual int16_t timeoutWait(uint8_t iecPIN, bool lineStatus, size_t wait = TIMEOUT, size_t step = 1);
+			virtual int16_t receiveByte(uint8_t device);
+			virtual bool sendByte(uint8_t data, bool signalEOI);
+			virtual int16_t timeoutWait(uint8_t iecPIN, bool lineStatus, size_t wait = TIMEOUT, size_t step = 1);
 
 
-		// true => PULL => DIGI_LOW
-		inline void IRAM_ATTR pull(uint8_t pin)
-		{
-			set_pin_mode(pin, OUTPUT);
-			digital_write(pin, DIGI_LOW);
-		}
+			// true => PULL => DIGI_LOW
+			inline void IRAM_ATTR pull(uint8_t pin)
+			{
+				set_pin_mode(pin, OUTPUT);
+				digital_write(pin, DIGI_LOW);
+			}
 
-		// false => RELEASE => DIGI_HIGH
-		inline void IRAM_ATTR release(uint8_t pin)
-		{
-			set_pin_mode(pin, OUTPUT);
-			digital_write(pin, DIGI_HIGH);
-		}
+			// false => RELEASE => DIGI_HIGH
+			inline void IRAM_ATTR release(uint8_t pin)
+			{
+				set_pin_mode(pin, OUTPUT);
+				digital_write(pin, DIGI_HIGH);
+			}
 
-		inline bool IRAM_ATTR status(uint8_t pin)
-		{
-			// To be able to read line we must be set to input, not driving.
-			set_pin_mode(pin, INPUT);
-			return digital_read(pin) ? RELEASED : PULLED;
-		}
+			inline bool IRAM_ATTR status(uint8_t pin)
+			{
+				// To be able to read line we must be set to input, not driving.
+				set_pin_mode(pin, INPUT);
+				return digital_read(pin) ? RELEASED : PULLED;
+			}
 
-	};
+			inline void IRAM_ATTR set_pin_mode(uint8_t pin, gpio_mode_t mode)
+			{
+				static uint64_t gpio_pin_modes;
+				uint8_t b_mode = (mode == 1) ? 1 : 0;
+
+				// is this pin mode already set the way we want?
+				if ( ((gpio_pin_modes >> pin) & 1ULL) != b_mode )
+				{
+					// toggle bit so we don't change mode unnecessarily 
+					gpio_pin_modes ^= (-b_mode ^ gpio_pin_modes) & (1ULL << pin);
+
+					gpio_config_t io_conf;
+
+					// disable interrupt
+					io_conf.intr_type = GPIO_INTR_DISABLE;
+
+					// set mode
+					io_conf.mode = mode;
+
+					io_conf.pull_up_en = gpio_pullup_t::GPIO_PULLUP_DISABLE;
+					io_conf.pull_down_en = gpio_pulldown_t::GPIO_PULLDOWN_DISABLE;
+
+					// bit mask of the pin to set
+					io_conf.pin_bit_mask = 1ULL << pin;
+
+					// configure GPIO with the given settings
+					gpio_config(&io_conf);
+				}
+			}
+
+		};
 
 };
 

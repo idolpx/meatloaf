@@ -166,7 +166,7 @@ namespace Meat {
     */
     template<class MFile>
         typename _Unique_mf::_Single_file
-        New(char* url) {
+        New(const char* url) {
             return std::unique_ptr<MFile>(MFSOwner::File(std::string(url)));
         }
 
@@ -178,7 +178,6 @@ namespace Meat {
     template<class MFile>
         typename _Unique_mf::_Single_file
         New(MFile* mFile) {
-            mFile->name;
             return std::unique_ptr<MFile>(MFSOwner::File(mFile->url));
         }
 

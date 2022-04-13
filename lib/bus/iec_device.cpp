@@ -51,7 +51,7 @@ void iecDevice::reset(void)
 
 uint8_t iecDevice::service(void)
 {
-	iecDevice::DeviceState r = DEVICE_IDLE;
+	//iecDevice::DeviceState r = DEVICE_IDLE;
 
 	//#ifdef HAS_RESET_LINE
 	//	if(m_iec.checkRESET()) {

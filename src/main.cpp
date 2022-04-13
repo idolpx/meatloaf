@@ -33,6 +33,7 @@
 #include "iec.h"
 #include "iec_device.h"
 #include "drive.h"
+#include "ml_tests.h"
 
 enum class statemachine
 {
@@ -46,7 +47,7 @@ std::string statusMessage;
 bool initFailed = false;
 
 static IEC iec;
-static devDrive drive ( iec );
+// static devDrive drive ( iec );
 
 /**************************/
 
@@ -151,11 +152,11 @@ void main_setup()
 
     //zero-initialize the config structure.
     gpio_config_t io_conf = {
-        .pin_bit_mask = ( 1ULL << PIN_IEC_ATN ),    //bit mask of the pins that you want to set
-        .mode = GPIO_MODE_INPUT,                    //set as input mode
-        .pull_up_en = (gpio_pullup_t)0,              //disable pull-up mode
-        .pull_down_en = (gpio_pulldown_t)0,         //disable pull-down mode
-        .intr_type = GPIO_INTR_NEGEDGE              //interrupt of falling edge
+        .pin_bit_mask = ( 1ULL << PIN_IEC_ATN ),    // bit mask of the pins that you want to set
+        .mode = GPIO_MODE_INPUT,                    // set as input mode
+        .pull_up_en = (gpio_pullup_t)0,             // disable pull-up mode
+        .pull_down_en = (gpio_pulldown_t)0,         // disable pull-down mode
+        .intr_type = GPIO_INTR_NEGEDGE              // interrupt of falling edge
     };
     //configure GPIO with the given settings
     gpio_config(&io_conf);
@@ -169,6 +170,8 @@ void main_setup()
     unsigned long endms = fnSystem.millis();
     Debug_printf("Available heap: %u\nSetup complete @ %lu (%lums)\n", fnSystem.get_free_heap_size(), endms, endms - startms);
 #endif // DEBUG
+
+    runTestsSuite();
 }
 
 
@@ -185,9 +188,12 @@ void fn_service_loop(void *param)
         if ( bus_state != statemachine::idle )
         {
             //Debug_printv("before[%d]", bus_state);
-            if( drive.service() == IEC::BUS_IDLE)
-                bus_state = statemachine::idle;
+            // if( drive.service() == IEC::BUS_IDLE)
+            //     bus_state = statemachine::idle;
             //Debug_printv("after[%d]", bus_state);
+            
+            Debug_printv("ATN PULLED\n");
+            bus_state = statemachine::idle;
         }
 
 #ifdef DEBUG_TIMING

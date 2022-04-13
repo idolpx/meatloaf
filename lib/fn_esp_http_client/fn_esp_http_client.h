@@ -136,12 +136,25 @@ typedef struct {
  * Enum for the HTTP status codes.
  */
 typedef enum {
+    /* 2xx - Success */
+    HttpStatus_Ok                = 200,
+
     /* 3xx - Redirection */
+    HttpStatus_MultipleChoices   = 300,
     HttpStatus_MovedPermanently  = 301,
     HttpStatus_Found             = 302,
+    HttpStatus_SeeOther          = 303,
+    HttpStatus_TemporaryRedirect = 307,
+    HttpStatus_PermanentRedirect = 308,
 
     /* 4xx - Client Error */
-    HttpStatus_Unauthorized      = 401
+    HttpStatus_BadRequest        = 400,
+    HttpStatus_Unauthorized      = 401,
+    HttpStatus_Forbidden         = 403,
+    HttpStatus_NotFound          = 404,
+
+    /* 5xx - Server Error */
+    HttpStatus_InternalError     = 500
 } HttpStatus_Code;
 
 #define ESP_ERR_HTTP_BASE               (0x7000)                    /*!< Starting number of HTTP error codes */
