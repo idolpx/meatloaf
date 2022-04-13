@@ -6,7 +6,7 @@
  * A buffer for writing IEC data, handles sending EOI
  ********************************************************/
 
-size_t oiecbuf::easyWrite(bool lastOne) {
+size_t oiecstream::easyWrite(bool lastOne) {
     size_t written = 0;
 
     // we're always writing without the last character in buffer just to be able to send this special delay
@@ -35,7 +35,7 @@ size_t oiecbuf::easyWrite(bool lastOne) {
     return written;
 }
 
-int oiecbuf::overflow(int ch) {
+int oiecstream::overflow(int ch) {
     Debug_printv("overflow for iec called");
     char* end = pptr();
     if ( ch != EOF ) {
@@ -53,7 +53,7 @@ int oiecbuf::overflow(int ch) {
     return ch;
 };
 
-int oiecbuf::sync() { 
+int oiecstream::sync() { 
     Debug_printv("sync for iec called");
     if(pptr() == pbase()) {
         return 0;
