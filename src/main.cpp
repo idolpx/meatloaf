@@ -78,17 +78,18 @@ void main_setup()
 #ifdef DEBUG
     fnUartDebug.begin(DEBUG_SPEED);
     unsigned long startms = fnSystem.millis();
-    //Debug_printf("\n\n--~--~--~--\nFujiNet %s Started @ %lu\n", fnSystem.get_fujinet_version(), startms);
+    
+    Debug_printf( "\n\n==============================\n" );
+    Debug_printf( "   " PRODUCT_ID " " FW_VERSION );
+    Debug_printf( "\n------------------------------\n\n" );
 
-    Debug_printf ( "\n\n==============================\n" );
-    Debug_printf ( "   " PRODUCT_ID " " FW_VERSION );
-    Debug_printf ( "\n------------------------------\n\n" );
+    Debug_printf( "FujiNet %s Started @ %lu\n", fnSystem.get_fujinet_version(), startms );
 
-    Debug_printf("Starting heap: %u\n", fnSystem.get_free_heap_size());
-    Debug_printf("PsramSize %u\n", fnSystem.get_psram_size());
-    Debug_printf("himem phys %u\n", esp_himem_get_phys_size());
-    Debug_printf("himem free %u\n", esp_himem_get_free_size());
-    Debug_printf("himem reserved %u\n", esp_himem_reserved_area_size());
+    Debug_printf( "Starting heap: %u\n", fnSystem.get_free_heap_size() );
+    Debug_printf( "PsramSize %u\n", fnSystem.get_psram_size() );
+    Debug_printf( "himem phys %u\n", esp_himem_get_phys_size() );
+    Debug_printf( "himem free %u\n", esp_himem_get_free_size() );
+    Debug_printf( "himem reserved %u\n", esp_himem_reserved_area_size() );
 #endif // DEBUG
 
     // Install a reboot handler
@@ -149,17 +150,13 @@ void main_setup()
     gpio_set_direction(PIN_IEC_ATN, GPIO_MODE_INPUT);
 
     //zero-initialize the config structure.
-    gpio_config_t io_conf = {};
-    //interrupt of falling edge
-    io_conf.intr_type = GPIO_INTR_NEGEDGE;
-    //set as input mode
-    io_conf.mode = GPIO_MODE_INPUT;
-    //bit mask of the pins that you want to set
-    io_conf.pin_bit_mask = ( 1ULL << PIN_IEC_ATN );
-    //disable pull-down mode
-    io_conf.pull_down_en = (gpio_pulldown_t)0;
-    //disable pull-up mode
-    io_conf.pull_up_en = (gpio_pullup_t)0;
+    gpio_config_t io_conf = {
+        .pin_bit_mask = ( 1ULL << PIN_IEC_ATN ),    //bit mask of the pins that you want to set
+        .mode = GPIO_MODE_INPUT,                    //set as input mode
+        .pull_up_en = (gpio_pullup_t)0,              //disable pull-up mode
+        .pull_down_en = (gpio_pulldown_t)0,         //disable pull-down mode
+        .intr_type = GPIO_INTR_NEGEDGE              //interrupt of falling edge
+    };
     //configure GPIO with the given settings
     gpio_config(&io_conf);
 
