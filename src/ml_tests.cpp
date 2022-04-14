@@ -493,22 +493,27 @@ void runTestsSuite() {
     // testDirectory(MFSOwner::File("/games/arcade7.d64"), true);
     // testBasicConfig();
 
-    testDirectory(MFSOwner::File("/flashfs/"), true);
+    Debug_printv("Flash File System");
+    testRecursiveDir(MFSOwner::File("/flash/"), "    ");
+
+    Debug_printv("SD Card File System");
+    testRecursiveDir(MFSOwner::File("/sd/"), "    ");
+
+
+    // DeviceDB m_device(0);
+
+    // Debug_println(m_device.path().c_str());
+    // m_device.select(8);
+    // Debug_println(m_device.path().c_str());
+    // m_device.select(9);
+    // Debug_println(m_device.path().c_str());
+    // m_device.select(10);
+    // Debug_println(m_device.path().c_str());
+    // m_device.select(11);
+    // Debug_println(m_device.path().c_str());
+    // m_device.select(30);
+    // Debug_println(m_device.path().c_str());
+
 
     Debug_println("*** All tests finished ***");
-
-    DeviceDB m_device(0);
-
-    Debug_println(m_device.path().c_str());
-    m_device.select(8);
-    Debug_println(m_device.path().c_str());
-    m_device.select(9);
-    Debug_println(m_device.path().c_str());
-    m_device.select(10);
-    Debug_println(m_device.path().c_str());
-    m_device.select(11);
-    Debug_println(m_device.path().c_str());
-    m_device.select(30);
-    Debug_println(m_device.path().c_str());
-
 }

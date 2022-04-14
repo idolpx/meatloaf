@@ -25,7 +25,7 @@
 //#define UPDATE_URL      "http://meatloaf.cc/fw/?p=meatloaf&d={{DEVICE_ID}}&a="
 #define UPDATE_URL "http://meatloaf.cc/fw/meatloaf.4MB.bin"
 //#define UPDATE_URL      "http://meatloaf.cc/fw/meatloaf.16MB.bin"
-#define SYSTEM_DIR "/flashfs/.sys/"
+#define SYSTEM_DIR "/flash/.sys/"
 
 #define HOSTNAME "meatloaf"
 #define SERVER_PORT 80   // HTTPd & WebDAV Server Port

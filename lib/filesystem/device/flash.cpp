@@ -365,7 +365,7 @@ void FlashHandle::dispose() {
 
 void FlashHandle::obtain(std::string m_path, std::string mode) {
 
-    //Serial.printf("*** Atempting opening flashfs  handle'%s'\n", m_path.c_str());
+    //Serial.printf("*** Atempting opening flash  handle'%s'\n", m_path.c_str());
 
     if ((mode[0] == 'w') && strchr(m_path.c_str(), '/')) {
         // For file creation, silently make subdirs as needed.  If any fail,

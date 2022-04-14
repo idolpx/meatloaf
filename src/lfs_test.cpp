@@ -43,8 +43,8 @@ void lfs_test ( void )
 
 
         esp_vfs_littlefs_conf_t conf = {
-            .base_path = "/flashfs",
-            .partition_label = "flashfs",
+            .base_path = "/flash",
+            .partition_label = "flash",
             .format_if_mount_failed = true,
             .dont_mount = false,
         };
@@ -84,7 +84,7 @@ void lfs_test ( void )
         // Use POSIX and C standard library functions to work with files.
         // First create a file.
         printf("Opening file\n");
-        FILE *f = fopen("/flashfs/hello.txt", "w");
+        FILE *f = fopen("/flash/hello.txt", "w");
         if (f == NULL)
         {
                 printf("Failed to open file for writing\n");
@@ -96,15 +96,15 @@ void lfs_test ( void )
 
         // Check if destination file exists before renaming
         struct stat st;
-        if (stat("/flashfs/foo.txt", &st) == 0)
+        if (stat("/flash/foo.txt", &st) == 0)
         {
                 // Delete it if it exists
-                unlink("/flashfs/foo.txt");
+                unlink("/flash/foo.txt");
         }
 
         // Rename original file
         printf("Renaming file\n");
-        if (rename("/flashfs/hello.txt", "/flashfs/foo.txt") != 0)
+        if (rename("/flash/hello.txt", "/flash/foo.txt") != 0)
         {
                 printf("Rename failed\n");
                 return;
@@ -112,7 +112,7 @@ void lfs_test ( void )
 
         // Open renamed file for reading
         printf("Reading file\n");
-        f = fopen("/flashfs/foo.txt", "r");
+        f = fopen("/flash/foo.txt", "r");
         if (f == NULL)
         {
                 printf("Failed to open file for reading\n");
@@ -131,7 +131,7 @@ void lfs_test ( void )
 
 
         // open directory path up 
-        DIR* path = opendir("/flashfs/");
+        DIR* path = opendir("/flash/");
 
         // check to see if opening up directory was successful
         if(path != NULL)
