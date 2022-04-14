@@ -140,7 +140,7 @@ bool FileSystemLittleFS::start()
         return true;
 
     // Set our basepath
-    strlcpy(_basepath, "/littlefs", sizeof(_basepath));
+    strlcpy(_basepath, "/flashfs", sizeof(_basepath));
 
     esp_vfs_littlefs_conf_t conf = {
       .base_path = _basepath,

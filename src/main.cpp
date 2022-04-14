@@ -4,7 +4,9 @@
 #include <esp32/himem.h>
 #include <driver/gpio.h>
 
-#include "debug.h"
+#include "../include/global_defines.h"
+#include "../include/debug.h"
+
 //#include "bus.h"
 //#include "device.h"
 #include "keys.h"
@@ -26,8 +28,6 @@
 /**************************/
 // Meatloaf
 
-#include "../include/global_defines.h"
-
 #include "meat_io.h"
 
 #include "iec.h"
@@ -47,7 +47,7 @@ std::string statusMessage;
 bool initFailed = false;
 
 static IEC iec;
-// static devDrive drive ( iec );
+//static devDrive drive ( iec );
 
 /**************************/
 
@@ -172,6 +172,7 @@ void main_setup()
 #endif // DEBUG
 
     runTestsSuite();
+    //lfs_test();
 }
 
 

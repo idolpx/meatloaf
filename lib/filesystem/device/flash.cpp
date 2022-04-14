@@ -17,14 +17,8 @@ bool FlashFileSystem::handles(std::string apath)
 
 MFile* FlashFileSystem::getFile(std::string apath)
 {
-    Debug_printf("FlashFileSystem::getFile  mounted[%d]", m_isMounted);
-    if(m_isMounted)
-        return new FlashFile(apath);
-    else
-        return nullptr;
-        //throw IllegalStateException();
+    return new FlashFile(apath);
 }
-
 
 
 /********************************************************
@@ -211,6 +205,7 @@ void FlashFile::closeDir() {
     if(dirOpened) {
         dirOpened = false;
         closedir( dir );
+        Debug_printf("FlashFile::closeDir  [%d]\n", dirOpened);
     }
 }
 
@@ -231,21 +226,24 @@ void FlashFile::openDir(std::string apath) {
     }
     else {
         // Skip the . and .. entries
-        struct dirent* dirent;
+        struct dirent* dirent = NULL;
         dirent = readdir( dir );
         dirent = readdir( dir );
 
         dirOpened = true;
+
+        Debug_printf("FlashFile::openDir  [%d]\n", dirOpened);
     }
 }
 
 bool FlashFile::rewindDirectory()
 {
+    Debug_printf("FlashFile::rewindDirectory  [%d]\n", dirOpened);
     _valid = false;
     rewinddir( dir );
 
     // Skip the . and .. entries
-    struct dirent* dirent;
+    struct dirent* dirent = NULL;
     dirent = readdir( dir );
     dirent = readdir( dir );
 
@@ -255,19 +253,21 @@ bool FlashFile::rewindDirectory()
 
 MFile* FlashFile::getNextFileInDir()
 {
-    struct dirent* dirent;
-
+    Debug_printf("FlashFile::getNextFileInDir  [%d]\n", dirOpened);
+    
     if(!dirOpened)
         openDir(path.c_str());
 
-    dirent = readdir( dir );
-
-    if(dirent == NULL) {
+    struct dirent* dirent = NULL;
+    if((dirent = readdir( dir )) != NULL)
+    {
+        return new FlashFile(this->path + ((this->path == "/") ? "" : "/") + std::string(dirent->d_name));
+    }
+    else
+    {
         closeDir();
         return nullptr;
     }
-    else
-        return new FlashFile(this->path + ((this->path == "/") ? "" : "/") + std::string(dirent->d_name)); // due to EdUrlParser shittiness
 }
 
 

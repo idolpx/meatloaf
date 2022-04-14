@@ -4,13 +4,15 @@
 
 #include <ArduinoJson.h>
 
+#include "../../include/global_defines.h"
+#include "../../include/debug.h"
+
 #include "ml_tests.h"
 #include "meat_io.h"
 #include "iec_host.h"
-#include "../../include/global_defines.h"
-#include "../../include/debug.h"
 #include "../../include/make_unique.h"
 #include "basic_config.h"
+#include "device_db.h"
 
 #include "fnHttpClient.h"
 
@@ -67,7 +69,11 @@ void dumpFileProperties(MFile* testMFile) {
     Debug_printf("Host: [%s]\n", testMFile->host.c_str());
     Debug_printf("Port: [%s]\n", testMFile->port.c_str());    
     Debug_printf("Path: [%s]\n", testMFile->path.c_str());
-    Debug_printf("stream src: [%s]\n", testMFile->streamFile->url.c_str());
+
+    if ( testMFile->streamFile )
+        Debug_printf("stream src: [%s]\n", testMFile->streamFile->url.c_str());
+
+
     Debug_printf("path in stream: [%s]\n", testMFile->pathInStream.c_str());
     Debug_printf("File: [%s]\n", testMFile->name.c_str());
     Debug_printf("Extension: [%s]\n", testMFile->extension.c_str());
@@ -487,8 +493,22 @@ void runTestsSuite() {
     // testDirectory(MFSOwner::File("/games/arcade7.d64"), true);
     // testBasicConfig();
 
-    testDirectory(MFSOwner::File("/"), true);
+    testDirectory(MFSOwner::File("/flashfs/"), true);
 
     Debug_println("*** All tests finished ***");
+
+    DeviceDB m_device(0);
+
+    Debug_println(m_device.path().c_str());
+    m_device.select(8);
+    Debug_println(m_device.path().c_str());
+    m_device.select(9);
+    Debug_println(m_device.path().c_str());
+    m_device.select(10);
+    Debug_println(m_device.path().c_str());
+    m_device.select(11);
+    Debug_println(m_device.path().c_str());
+    m_device.select(30);
+    Debug_println(m_device.path().c_str());
 
 }
