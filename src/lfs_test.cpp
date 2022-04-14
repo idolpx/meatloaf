@@ -41,7 +41,6 @@ void lfs_test ( void )
 
         printf("Now we are starting the LittleFs Demo ...\n");
 
-        ESP_LOGI(TAG, "Initializing LittleFS");
 
         esp_vfs_littlefs_conf_t conf = {
             .base_path = "/flashfs",
@@ -75,25 +74,25 @@ void lfs_test ( void )
         esp_err_t ret = esp_littlefs_info(conf.partition_label, &total, &used);
         if (ret != ESP_OK)
         {
-                ESP_LOGE(TAG, "Failed to get LittleFS partition information (%s)", esp_err_to_name(ret));
+                printf("Failed to get LittleFS partition information (%s)\n", esp_err_to_name(ret));
         }
         else
         {
-                ESP_LOGI(TAG, "Partition size: total: %d, used: %d", total, used);
+                printf("Partition size: total: %d, used: %d\n", total, used);
         }
 
         // Use POSIX and C standard library functions to work with files.
         // First create a file.
-        ESP_LOGI(TAG, "Opening file");
+        printf("Opening file\n");
         FILE *f = fopen("/flashfs/hello.txt", "w");
         if (f == NULL)
         {
-                ESP_LOGE(TAG, "Failed to open file for writing");
+                printf("Failed to open file for writing\n");
                 return;
         }
         fprintf(f, "LittleFS Rocks!\n");
         fclose(f);
-        ESP_LOGI(TAG, "File written");
+        printf("File written\n");
 
         // Check if destination file exists before renaming
         struct stat st;
@@ -104,19 +103,19 @@ void lfs_test ( void )
         }
 
         // Rename original file
-        ESP_LOGI(TAG, "Renaming file");
+        printf("Renaming file\n");
         if (rename("/flashfs/hello.txt", "/flashfs/foo.txt") != 0)
         {
-                ESP_LOGE(TAG, "Rename failed");
+                printf("Rename failed\n");
                 return;
         }
 
         // Open renamed file for reading
-        ESP_LOGI(TAG, "Reading file");
+        printf("Reading file\n");
         f = fopen("/flashfs/foo.txt", "r");
         if (f == NULL)
         {
-                ESP_LOGE(TAG, "Failed to open file for reading");
+                printf("Failed to open file for reading\n");
                 return;
         }
         char line[64];
@@ -128,11 +127,11 @@ void lfs_test ( void )
         {
                 *pos = '\0';
         }
-        ESP_LOGI(TAG, "Read from file: '%s'", line);
+        printf("Read from file: '%s'\n", line);
 
 
         // open directory path up 
-        DIR* path = opendir("/");
+        DIR* path = opendir("/flashfs/");
 
         // check to see if opening up directory was successful
         if(path != NULL)
@@ -143,7 +142,7 @@ void lfs_test ( void )
             // iterate through all of the  underlying files of directory_path
             while((underlying_file = readdir(path)) != NULL)
             {
-                ESP_LOGI(TAG, "%s", underlying_file->d_name);
+                printf("%s\n", underlying_file->d_name);
             }
             
             closedir(path);
