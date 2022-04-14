@@ -15,13 +15,15 @@
 #include "fnSystem.h"
 #include "fnWiFi.h"
 // #include "fnConfig.h"
-#include "fnFsSD.h"
+
 
 #ifdef FLASH_SPIFFS
 #include "fnFsSPIFFS.h"
 #elif FLASH_LITTLEFS
 #include "fnFsLittleFS.h"
 #endif
+#include "fnFsSD.h"
+
 
 //#include "httpService.h"
 
