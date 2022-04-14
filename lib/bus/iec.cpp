@@ -43,7 +43,7 @@ bool IEC::init()
 	protocol.set_pin_mode(PIN_IEC_ATN, INPUT);
 	protocol.set_pin_mode(PIN_IEC_CLK, INPUT);
 	protocol.set_pin_mode(PIN_IEC_DATA, INPUT);
-	protocol.set_pin_mode(PIN_IEC_SRQ, OUTPUT);
+	protocol.set_pin_mode(PIN_IEC_SRQ, INPUT);
 	protocol.set_pin_mode(PIN_IEC_RESET, INPUT);
 
 #ifdef SPLIT_LINES

@@ -69,6 +69,7 @@
 #define PIN_IEC_DATA		GPIO_NUM_21      // SIO 3  - DI   - Data Input
 #define PIN_IEC_SRQ			GPIO_NUM_26      // SIO 13 - INT  - Interrupt
 #define PIN_IEC_RESET       GPIO_NUM_39      // SIO 7  - CMD  - Command
+                                             // SIO 4 & 6 - GND - Ground
 
 // SPLIT_LINES
 #define PIN_IEC_CLK_OUT		GPIO_NUM_32      // SIO 2  - CKO  - Clock Output
