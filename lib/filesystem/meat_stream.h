@@ -7,11 +7,9 @@
  * Universal streams
  ********************************************************/
 
-enum SeekMode {
-    SeekSet = 0,
-    SeekCur = 1,
-    SeekEnd = 2
-};
+#define SEEK_SET  0
+#define SEEK_CUR  1
+#define SEEK_END  2
 
 class MStream {
 public:
@@ -32,11 +30,11 @@ public:
 
 class MIStream: public MStream {
 public:
-    virtual bool seek(size_t pos, SeekMode mode) {
-        if(mode == SeekSet) {
+    virtual bool seek(size_t pos, int mode) {
+        if(mode == SEEK_SET) {
             return seek(pos);
         }
-        else if(mode == SeekCur) {
+        else if(mode == SEEK_CUR) {
             return seek(position()+pos);
         }
         else {

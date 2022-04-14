@@ -1,31 +1,27 @@
-#ifndef MEATFILE_DEFINES_FSLITTLE_H
-#define MEATFILE_DEFINES_FSLITTLE_H
+#ifndef MEATFILE_DEFINES_FLASHFS_H
+#define MEATFILE_DEFINES_FLASHFS_H
 
 #include "meat_io.h"
 
 #include "../../include/global_defines.h"
 #include "../../include/make_unique.h"
 
-#include "esp_littlefs.h"
-
+#include <dirent.h>
 #include <string.h>
-
 
 
 /********************************************************
  * MFileSystem
  ********************************************************/
 
-class LittleFileSystem: public MFileSystem 
+class FlashFileSystem: public MFileSystem 
 {
+    bool handles(std::string path);
+    
+public:
+    FlashFileSystem() : MFileSystem("FlashFS") {};
     MFile* getFile(std::string path) override;
 
-public:
-    LittleFileSystem() : MFileSystem("littleFS") {};
-
-    bool handles(std::string path);
-
-    static lfs_t lfsStruct;
 };
 
 
@@ -34,21 +30,21 @@ public:
  * MFile
  ********************************************************/
 
-class LittleFile: public MFile
+class FlashFile: public MFile
 {
-friend class LittleOStream;
-friend class LittleIStream;
+friend class FlashOStream;
+friend class FlashIStream;
 
 public:
-    LittleFile(std::string path) {
+    FlashFile(std::string path) {
         parseUrl(path);
         if(!pathValid(path.c_str()))
             m_isNull = true;
         else
             m_isNull = false;
     };
-    ~LittleFile() {
-        //Serial.printf("*** Destroying littlefile %s\n", url.c_str());
+    ~FlashFile() {
+        //Serial.printf("*** Destroying flashfile %s\n", url.c_str());
         closeDir();
     }
 
@@ -70,7 +66,7 @@ public:
 private:
     void openDir(std::string path);
     void closeDir();
-    lfs_dir_t dir;
+    DIR* dir;
     bool dirOpened = false;
     bool _valid;
     std::string _pattern;
@@ -81,21 +77,21 @@ private:
 
 
 /********************************************************
- * LittleHandle
+ * FlashHandle
  ********************************************************/
 
-class LittleHandle {
+class FlashHandle {
 public:
     int rc;
-    lfs_file_t lfsFile;
+    FILE* lfsFile;
 
-    LittleHandle() : rc(-255) 
+    FlashHandle() : rc(-255) 
     {
-        //Serial.println("*** Creating little handle");
+        //Serial.println("*** Creating flash handle");
         memset(&lfsFile, 0, sizeof(lfsFile));
     };
-    ~LittleHandle();
-    void obtain(int flags, std::string localPath);
+    ~FlashHandle();
+    void obtain(std::string localPath, std::string mode);
     void dispose();
 
 private:
@@ -106,17 +102,17 @@ private:
  * MStreams O
  ********************************************************/
 
-class LittleOStream: public MOStream {
+class FlashOStream: public MOStream {
 public:
     // MStream methods
-    LittleOStream(std::string& path) {
+    FlashOStream(std::string& path) {
         localPath = path;
-        handle = std::make_unique<LittleHandle>();
+        handle = std::make_unique<FlashHandle>();
     }
     size_t position() override;
     void close() override;
     bool open() override;
-    ~LittleOStream() override {
+    ~FlashOStream() override {
         close();
     }
 
@@ -128,7 +124,7 @@ public:
 protected:
     std::string localPath;
 
-    std::unique_ptr<LittleHandle> handle;    
+    std::unique_ptr<FlashHandle> handle;    
 };
 
 
@@ -136,17 +132,17 @@ protected:
  * MStreams I
  ********************************************************/
 
-class LittleIStream: public MIStream {
+class FlashIStream: public MIStream {
 public:
-    LittleIStream(std::string& path) {
+    FlashIStream(std::string& path) {
         localPath = path;
-        handle = std::make_unique<LittleHandle>();
+        handle = std::make_unique<FlashHandle>();
     }
     // MStream methods
     size_t position() override;
     void close() override;
     bool open() override;
-    ~LittleIStream() override {
+    ~FlashIStream() override {
         close();
     }
 
@@ -157,14 +153,14 @@ public:
     size_t read(uint8_t* buf, size_t size) override;
     bool isOpen();
     virtual bool seek(size_t pos) override;
-    virtual bool seek(size_t pos, SeekMode mode) override;
+    virtual bool seek(size_t pos, int mode) override;
 
 protected:
     std::string localPath;
 
-    std::unique_ptr<LittleHandle> handle;    
+    std::unique_ptr<FlashHandle> handle;    
 };
 
 
 
-#endif
+#endif // MEATFILE_DEFINES_FLASHFS_H

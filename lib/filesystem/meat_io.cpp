@@ -4,8 +4,10 @@
 
 #include "MIOException.h"
 
+// Device
+#include "device/flash.h"
+
 // Scheme
-#include "scheme/littlefs.h"
 #include "scheme/http.h"
 #include "scheme/smb.h"
 #include "scheme/ml.h"
@@ -37,7 +39,7 @@
  ********************************************************/
 
 // initialize other filesystems here
-LittleFileSystem defaultFS;
+FlashFileSystem defaultFS;
 
 // Scheme
 HttpFileSystem httpFS;
@@ -119,7 +121,7 @@ MFile* MFSOwner::File(std::string path) {
 
     std::vector<std::string> paths = mstr::split(path,'/');
 
-    //Debug_printv("Trying to factory path [%s]", path.c_str());
+    Debug_printv("Trying to factory path [%s]", path.c_str());
 
     auto pathIterator = paths.end();
     auto begin = paths.begin();
@@ -128,25 +130,25 @@ MFile* MFSOwner::File(std::string path) {
     auto foundFS = testScan(begin, end, pathIterator);
 
     if(foundFS != nullptr) {
-        //Debug_printv("PATH: '%s' is in FS [%s]", path.c_str(), foundFS->symbol);
+        Debug_printv("PATH: '%s' is in FS [%s]", path.c_str(), foundFS->symbol);
         auto newFile = foundFS->getFile(path);
-        //Debug_printv("newFile: '%s'", newFile->url.c_str());
+        Debug_printv("newFile: '%s'", newFile->url.c_str());
 
         pathIterator++;
         newFile->pathInStream = mstr::joinToString(&pathIterator, &end, "/");
-        //Debug_printv("newFile->pathInStream: '%s'", newFile->pathInStream.c_str());
+        Debug_printv("newFile->pathInStream: '%s'", newFile->pathInStream.c_str());
 
         auto endHere = pathIterator;
         pathIterator--;
 
         if(begin == pathIterator) {
-            //Debug_printv("** LOOK DOWN PATH NOT NEEDED   path[%s]", path.c_str());
+            Debug_printv("** LOOK DOWN PATH NOT NEEDED   path[%s]", path.c_str());
             newFile->streamFile = foundFS->getFile(mstr::joinToString(&begin, &pathIterator, "/"));
             //newFile->streamFile = foundFS->getFile(path);
         } 
         else {
             auto upperPath = mstr::joinToString(&begin, &pathIterator, "/");
-            //Debug_printv("** LOOK DOWN PATH: %s", upperPath.c_str());
+            Debug_printv("** LOOK DOWN PATH: %s", upperPath.c_str());
 
             auto upperFS = testScan(begin, end, pathIterator);
 
@@ -154,9 +156,9 @@ MFile* MFSOwner::File(std::string path) {
                 auto wholePath = mstr::joinToString(&begin, &endHere, "/");
 
                 //auto cp = mstr::joinToString(&begin, &pathIterator, "/");
-                //Debug_printv("CONTAINER PATH WILL BE: '%s' ", wholePath.c_str());
+                Debug_printv("CONTAINER PATH WILL BE: '%s' ", wholePath.c_str());
                 newFile->streamFile = upperFS->getFile(wholePath); // skończy się na d64
-                //Debug_printv("CONTAINER: '%s' is in FS [%s]", newFile->streamFile->url.c_str(), upperFS->symbol);
+                Debug_printv("CONTAINER: '%s' is in FS [%s]", newFile->streamFile->url.c_str(), upperFS->symbol);
             }
             else {
                 Debug_printv("WARNING!!!! CONTAINER FAILED FOR: '%s'", upperPath.c_str());
@@ -293,7 +295,7 @@ MFile* MFile::localParent(std::string plus) {
 };
 
 MFile* MFile::root(std::string plus) {
-    return new LittleFile("/"+plus);
+    return new FlashFile("/"+plus);
 };
 
 MFile* MFile::localRoot(std::string plus) {

@@ -39,12 +39,12 @@ public:
     bool isBrowsable() override { return false; };
     bool isRandomAccess() override { return true; };
 
-    bool seek(size_t pos, SeekMode mode) override {
-        return true;
-    };
     bool seek(size_t pos) override {
         return true;
     };
+     bool seek(size_t pos, int mode) override {
+        return true;
+    };   
 
     bool seekPath(std::string path) override { return false; };
     std::string seekNextEntry() override { return ""; };
