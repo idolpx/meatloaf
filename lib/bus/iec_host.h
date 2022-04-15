@@ -29,7 +29,7 @@
 
 using namespace Protocol;
 
-class iecHost: public IEC
+class iecHost: public iecBus
 {
 private:
 

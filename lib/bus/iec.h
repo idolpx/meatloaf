@@ -18,28 +18,98 @@
 #ifndef IEC_H
 #define IEC_H
 
-//#include <Arduino.h>
-
-#include "../../include/global_defines.h"
-#include "../../include/cbmdefines.h"
-#include "../../include/petscii.h"
-
-#include "iec_device.h"
-#include "drive.h"
+#include <forward_list>
+#include <unordered_map>
 
 #include "protocol/cbmstandardserial.h"
 //#include "protocol/jiffydos.h"
 
-#include "string_utils.h"
 
 #define	IEC_CMD_MAX_LENGTH 	100
 
 using namespace Protocol;
 
-devDrive drive;
+class CommandPathTuple {
+public:
+	std::string command;
+	std::string fullPath;
+	std::string rawPath;
+};
 
-class IEC
+class Channel
 {
+public:
+	std::string url;
+	uint32_t cursor;
+	bool writing;
+};
+
+// 
+class iecBus; // declare early so can be friend
+
+class iecDevice
+{
+protected:
+	friend iecBus;
+
+public:
+	// Return values for service:
+	typedef enum
+	{
+		DEVICE_IDLE = 0,       // Ready and waiting
+		DEVICE_OPEN,           // Command received and channel opened
+		DEVICE_DATA,           // Data sent or received
+	} DEVICE_STATE;
+
+	std::unordered_map<uint16_t, Channel> channels;
+
+	iecDevice();
+	~iecDevice() {};
+
+	uint8_t process( void );
+	
+	virtual uint8_t command( void ) = 0;
+	virtual uint8_t execute( void ) = 0;
+	virtual uint8_t status(void) = 0;
+
+	uint8_t device_id;
+
+
+protected:
+	void reset(void);
+
+	// handler helpers.
+	virtual void handleListenCommand( void ) = 0;
+	virtual void handleListenData( void ) = 0;
+	virtual void handleTalk(uint8_t chan) = 0;
+	virtual void handleOpen( void ) = 0;
+	virtual void handleClose( void ) = 0;
+
+	// This is set after an open command and determines what to send next
+	uint8_t m_openState;
+
+private:
+	Channel channelSelect( void );
+	bool channelClose( bool close_all = false );
+
+};
+
+
+
+class iecBus
+{
+private:
+	std::forward_list<iecDevice *> _daisyChain;
+
+	iecDevice *_activeDev = nullptr;
+    // sioModem *_modemDev = nullptr;
+    // sioFuji *_fujiDev = nullptr;
+    // sioNetwork *_netDev[8] = {nullptr};
+    // sioMIDIMaze *_midiDev = nullptr;
+    // sioCassette *_cassetteDev = nullptr;
+    // sioCPM *_cpmDev = nullptr;
+    // sioPrinter *_printerdev = nullptr;
+
 public:
 	// Return values for service:
 	typedef enum
@@ -65,7 +135,7 @@ public:
 		IEC_OPEN = 0xF0	       // 0xF0 + channel (OPEN NAMED CHANNEL) (0-15)
 	} COMMAND;
 
-	typedef struct iec_data
+	typedef struct
 	{
 		uint8_t command;
 		uint8_t device;
@@ -78,8 +148,11 @@ public:
 
 	CBMStandardSerial protocol;
 
-	IEC();
-	~IEC() {};
+	iecBus( void );
+
+    // void setup();
+    // void service();
+    // void shutdown();
 
 	// Initialise iec driver
 	bool init();
@@ -112,6 +185,12 @@ public:
 	void enableDevice(const uint8_t deviceNumber);
 	void disableDevice(const uint8_t deviceNumber);
 
+    uint8_t numDevices();
+    void addDevice(iecDevice *pDevice, uint8_t device_id);
+    void remDevice(iecDevice *pDevice);
+    iecDevice *deviceById(uint8_t device_id);
+    void changeDeviceId(iecDevice *pDevice, uint8_t device_id);
+
 	void debugTiming();
 
 private:
@@ -127,9 +206,8 @@ private:
 	bool turnAround(void);
 	bool undoTurnAround(void);
 	void releaseLines(bool wait = true);
-
-protected:
-
 };
+
+extern iecBus IEC;
 
 #endif

@@ -19,9 +19,12 @@
 //#include "debug.h"
 
 #include "drive.h"
+
 #include "iec.h"
-#include "iec_device.h"
+#include "device_db.h"
+
 #include "led.h"
+
 #include "wrappers/iec_buffer.h"
 #include "wrappers/directory_stream.h"
 
@@ -29,9 +32,7 @@ using namespace CBM;
 using namespace Protocol;
 
 
-devDrive::devDrive(IEC &iec) :
-    iecDevice(iec),
-	m_mfile(MFSOwner::File(""))
+devDrive::devDrive() : iecDevice(),	m_mfile(MFSOwner::File(""))
 {
 	reset();
 } // ctor
@@ -41,14 +42,14 @@ void devDrive::reset(void)
 {
 	m_openState = O_NOTHING;
 	setDeviceStatus(73);
-	//m_device.reset();
+	//DEVICE_SETTINGS.reset();
 } // reset
 
 
 void devDrive::sendFileNotFound(void)
 {
 	setDeviceStatus(62);
- this->m_iec.sendFNF();
+ 	IEC.sendFNF();
 }
 
 void devDrive::sendStatus(void)
@@ -60,12 +61,12 @@ void devDrive::sendStatus(void)
 	Debug_printv("status: %s", status.c_str());
 	Debug_print("[");
 
- this->m_iec.send(status);
+ 	IEC.send(status);
 
 	Debug_println(BACKSPACE "]");
 
 	// Send CR with EOI marker.
- this->m_iec.sendEOI('\x0D');
+ 	IEC.sendEOI('\x0D');
 
 	// Clear the status message
 	m_device_status.clear();
@@ -195,7 +196,7 @@ CommandPathTuple devDrive::parseLine(std::string command, size_t channel)
 	if (mstr::endsWith(command, "*"))
 	{
 		// Find first program in listing
-		if (m_device.path().empty())
+		if (DEVICE_SETTINGS.path().empty())
 		{
 			// If in LittleFS root then set it to FB64
 			// TODO: Load configured autoload program
@@ -304,7 +305,7 @@ CommandPathTuple devDrive::parseLine(std::string command, size_t channel)
 
 void devDrive::changeDir(std::string url)
 {
-	m_device.url(url);
+	DEVICE_SETTINGS.url(url);
 	m_mfile.reset(MFSOwner::File(url));
 	m_openState = O_DIR;
 	Debug_printv("!!!! CD into [%s]", url.c_str());
@@ -314,7 +315,7 @@ void devDrive::changeDir(std::string url)
 
 void devDrive::prepareFileStream(std::string url)
 {
-	m_device.url(url);
+	DEVICE_SETTINGS.url(url);
 	m_filename = url;
 	m_openState = O_FILE;
 	Debug_printv("LOAD [%s]", url.c_str());
@@ -324,27 +325,27 @@ void devDrive::prepareFileStream(std::string url)
 
 void devDrive::handleListenCommand( void )
 {
-	if (m_device.select(this->m_iec.data.device))
+	if (DEVICE_SETTINGS.select(IEC.data.device))
 	{
-		Debug_printv("!!!! device changed: unit:%d current url: [%s]", m_device.id(), m_device.url().c_str());
-		m_mfile.reset(MFSOwner::File(m_device.url()));
+		Debug_printv("!!!! device changed: unit:%d current url: [%s]", DEVICE_SETTINGS.id(), DEVICE_SETTINGS.url().c_str());
+		m_mfile.reset(MFSOwner::File(DEVICE_SETTINGS.url()));
 		Debug_printv("m_mfile[%s]", m_mfile->url.c_str());
 	}
 
-	size_t channel = this->m_iec.data.channel;
+	size_t channel = IEC.data.channel;
 	m_openState = O_NOTHING;
 
-	if (this->m_iec.data.content.size() == 0 )
+	if (IEC.data.content.size() == 0 )
 	{
 		Debug_printv("No command to process");
 
-		if ( this->m_iec.data.channel == CMD_CHANNEL )
+		if ( IEC.data.channel == CMD_CHANNEL )
 			m_openState = O_STATUS;
 		return;
 	}
 
 	// 1. obtain command and fullPath
-	auto commandAndPath = parseLine(this->m_iec.data.content, channel);
+	auto commandAndPath = parseLine(IEC.data.content, channel);
 	auto referencedPath = Meat::New<MFile>(commandAndPath.fullPath);
 
 	Debug_printv("command[%s]", commandAndPath.command.c_str());
@@ -408,13 +409,13 @@ void devDrive::handleListenCommand( void )
 	//dumpState();
 
 	// Clear command string
-	//m_this->m_iec.data.content.clear();
+	//m_IEC.data.content.clear();
 } // handleListenCommand
 
 
 void devDrive::handleListenData()
 {
-	Debug_printv("[%s]", m_device.url().c_str());
+	Debug_printv("[%s]", DEVICE_SETTINGS.url().c_str());
 
 	saveFile();
 } // handleListenData
@@ -461,20 +462,20 @@ void devDrive::handleTalk(uint8_t chan)
 
 void devDrive::handleOpen( void )
 {
-	Debug_printv("OPEN Named Channel (%.2d Device) (%.2d Channel)", this->m_iec.data.device, this->m_iec.data.channel);
-	auto channel = channels[this->m_iec.data.command];
+	Debug_printv("OPEN Named Channel (%.2d Device) (%.2d Channel)", IEC.data.device, IEC.data.channel);
+	auto channel = channels[IEC.data.command];
 
 	// Are we writing?  Appending?
-	channels[this->m_iec.data.command].url = this->m_iec.data.content;
-	channels[this->m_iec.data.command].cursor = 0;
-	channels[this->m_iec.data.command].writing = 0;
+	channels[IEC.data.command].url = IEC.data.content;
+	channels[IEC.data.command].cursor = 0;
+	channels[IEC.data.command].writing = 0;
 } // handleOpen
 
 
 void devDrive::handleClose( void )
 {
-	Debug_printv("CLOSE Named Channel (%.2d Device) (%.2d Channel)", this->m_iec.data.device, this->m_iec.data.channel);
-	auto channel = channels[this->m_iec.data.command];
+	Debug_printv("CLOSE Named Channel (%.2d Device) (%.2d Channel)", IEC.data.device, IEC.data.channel);
+	auto channel = channels[IEC.data.command];
 
 	// If writing update BAM & Directory
 
@@ -484,116 +485,6 @@ void devDrive::handleClose( void )
 
 
 
-
-void devDrive::sendMeatloafSystemInformation()
-{
-	Debug_printf("\r\nsendDeviceInfo:\r\n");
-
-	// Reset basic memory pointer:
-	uint16_t basicPtr = C64_BASIC_START;
-
-	// #if defined(USE_LITTLEFS)
-	// FSInfo64 fs_info;
-	// m_fileSystem->info64(fs_info);
-	// #endif
-//	char floatBuffer[10]; // buffer
-//	dtostrf(getFragmentation(), 3, 2, floatBuffer);
-
-	// Send load address
-	this->m_iec.send(C64_BASIC_START bitand 0xff);
-	this->m_iec.send((C64_BASIC_START >> 8) bitand 0xff);
-	Debug_println("");
-
-	// Send List HEADER
-	sendLine(basicPtr, 0, CBM_DEL_DEL CBM_REVERSE_ON " %s V%s ", PRODUCT_ID, FW_VERSION);
-
-	// CPU
-	sendLine(basicPtr, 0, CBM_DEL_DEL "SYSTEM ---");
-//	String sdk = String(ESP.getSdkVersion());
-//	sdk.toUpperCase();
-//	sendLine(basicPtr, 0, CBM_DEL_DEL "SDK VER    : %s", sdk.c_str());
-	//sendLine(basicPtr, 0, "BOOT VER   : %08X", ESP.getBootVersion());
-	//sendLine(basicPtr, 0, "BOOT MODE  : %08X", ESP.getBootMode());
-	//sendLine(basicPtr, 0, "CHIP ID    : %08X", ESP.getChipId());
-//	sendLine(basicPtr, 0, CBM_DEL_DEL "CPU MHZ    : %d MHZ", ESP.getCpuFreqMHz());
-//	sendLine(basicPtr, 0, CBM_DEL_DEL "CYCLES     : %u", ESP.getCycleCount());
-
-	// POWER
-	sendLine(basicPtr, 0, CBM_DEL_DEL "POWER ---");
-	//sendLine(basicPtr, 0, "VOLTAGE    : %d.%d V", ( ESP.getVcc() / 1000 ), ( ESP.getVcc() % 1000 ));
-
-	// RAM
-	sendLine(basicPtr, 0, CBM_DEL_DEL "MEMORY ---");
-//	sendLine(basicPtr, 0, CBM_DEL_DEL "RAM SIZE   : %5d B", getTotalMemory());
-//	sendLine(basicPtr, 0, CBM_DEL_DEL "RAM FREE   : %5d B", getTotalAvailableMemory());
-//	sendLine(basicPtr, 0, CBM_DEL_DEL "RAM >BLK   : %5d B", getLargestAvailableBlock());
-//	sendLine(basicPtr, 0, CBM_DEL_DEL "RAM FRAG   : %s %%", floatBuffer);
-
-	// ROM
-//	sendLine(basicPtr, 0, CBM_DEL_DEL "ROM SIZE   : %5d B", ESP.getSketchSize() + ESP.getFreeSketchSpace());
-//	sendLine(basicPtr, 0, CBM_DEL_DEL "ROM USED   : %5d B", ESP.getSketchSize());
-//	sendLine(basicPtr, 0, CBM_DEL_DEL "ROM FREE   : %5d B", ESP.getFreeSketchSpace());
-
-	// FLASH
-	sendLine(basicPtr, 0, CBM_DEL_DEL "STORAGE ---");
-//	sendLine(basicPtr, 0, "FLASH SIZE : %5d B", ESP.getFlashChipRealSize());
-//	sendLine(basicPtr, 0, CBM_DEL_DEL "FLASH SPEED: %d MHZ", (ESP.getFlashChipSpeed() / 1000000));
-
-	// // FILE SYSTEM
-	// sendLine(basicPtr, 0, CBM_DEL_DEL "FILE SYSTEM ---");
-	// sendLine(basicPtr, 0, CBM_DEL_DEL "TYPE       : %s", FS_TYPE);
-	// sendLine(basicPtr, 0, CBM_DEL_DEL "SIZE       : %5d B", fs_info.totalBytes);
-	// sendLine(basicPtr, 0, CBM_DEL_DEL "USED       : %5d B", fs_info.usedBytes);
-	// sendLine(basicPtr, 0, CBM_DEL_DEL "FREE       : %5d B", fs_info.totalBytes - fs_info.usedBytes);
-
-	// NETWORK
-	sendLine(basicPtr, 0, CBM_DEL_DEL "NETWORK ---");
-//	char ip[16];
-//	sprintf(ip, "%s", ipToString(WiFi.softAPIP()).c_str());
-//	sendLine(basicPtr, 0, CBM_DEL_DEL "AP MAC     : %s", WiFi.softAPmacAddress().c_str());
-//	sendLine(basicPtr, 0, CBM_DEL_DEL "AP IP      : %s", ip);
-//	sprintf(ip, "%s", ipToString(WiFi.localIP()).c_str());
-//	sendLine(basicPtr, 0, CBM_DEL_DEL "STA MAC    : %s", WiFi.macAddress().c_str());
-//	sendLine(basicPtr, 0, CBM_DEL_DEL "STA IP     : %s", ip);
-
-	// End program with two zeros after last line. Last zero goes out as EOI.
-	this->m_iec.send(0);
-	this->m_iec.sendEOI(0);
-
-	fnLedManager.set(eLed::LED_BUS, true);
-} // sendMeatloafSystemInformation
-
-void devDrive::sendMeatloafVirtualDeviceStatus()
-{
-	Debug_printf("\r\nsendDeviceStatus:\r\n");
-
-	// Reset basic memory pointer:
-	uint16_t basicPtr = C64_BASIC_START;
-
-	// Send load address
-	this->m_iec.send(C64_BASIC_START bitand 0xff);
-	this->m_iec.send((C64_BASIC_START >> 8) bitand 0xff);
-	Debug_println("");
-
-	// Send List HEADER
-	sendLine(basicPtr, 0, CBM_DEL_DEL CBM_REVERSE_ON " %s V%s ", PRODUCT_ID, FW_VERSION);
-
-	// Current Config
-	sendLine(basicPtr, 0, CBM_DEL_DEL "DEVICE ID : %d", m_device.id());
-	sendLine(basicPtr, 0, CBM_DEL_DEL "MEDIA     : %d", m_device.media());
-	sendLine(basicPtr, 0, CBM_DEL_DEL "PARTITION : %d", m_device.partition());
-	sendLine(basicPtr, 0, CBM_DEL_DEL "URL       : %s", m_device.url().c_str());
-	sendLine(basicPtr, 0, CBM_DEL_DEL "PATH      : %s", m_device.path().c_str());
-	sendLine(basicPtr, 0, CBM_DEL_DEL "ARCHIVE   : %s", m_device.archive().c_str());
-	sendLine(basicPtr, 0, CBM_DEL_DEL "IMAGE     : %s", m_device.image().c_str());
-	sendLine(basicPtr, 0, CBM_DEL_DEL "FILENAME  : %s", m_mfile->name.c_str());
-
-	// End program with two zeros after last line. Last zero goes out as EOI.
-	this->m_iec.send(0);
-	this->m_iec.sendEOI(0);
-
-	fnLedManager.set(eLed::LED_BUS, true);
-} // sendMeatloafVirtualDeviceStatus
 
 
 
@@ -623,19 +514,19 @@ uint16_t devDrive::sendLine(uint16_t &basicPtr, uint16_t blocks, char *text)
 	basicPtr += len + 5;
 
 	// Send that pointer
-	this->m_iec.send(basicPtr bitand 0xFF);
-	this->m_iec.send(basicPtr >> 8);
+	IEC.send(basicPtr bitand 0xFF);
+	IEC.send(basicPtr >> 8);
 
 	// Send blocks
-	this->m_iec.send(blocks bitand 0xFF);
-	this->m_iec.send(blocks >> 8);
+	IEC.send(blocks bitand 0xFF);
+	IEC.send(blocks >> 8);
 
 	// Send line contents
 	for (uint8_t i = 0; i < len; i++)
-	 this->m_iec.send(text[i]);
+	 IEC.send(text[i]);
 
 	// Finish line
-	this->m_iec.send(0);
+	IEC.send(0);
 
 	Debug_println("");
 
@@ -666,7 +557,7 @@ uint16_t devDrive::sendHeader(uint16_t &basicPtr, std::string header, std::strin
 	bool sent_info = false;
 
 	PeoplesUrlParser p;
-	std::string url = m_device.url();
+	std::string url = DEVICE_SETTINGS.url();
 
 	mstr::toPETSCII(url);
 	p.parseUrl(url);
@@ -687,7 +578,7 @@ uint16_t devDrive::sendHeader(uint16_t &basicPtr, std::string header, std::strin
 
 	byte_count += sendLine(basicPtr, 0, CBM_REVERSE_ON "\"%*s%s%*s\" %s", space_cnt, "", header.c_str(), space_cnt, "", id.c_str());
 
-	//byte_count += sendLine(basicPtr, 0, "\x12\"%*s%s%*s\" %.02d 2A", space_cnt, "", PRODUCT_ID, space_cnt, "", m_device.device());
+	//byte_count += sendLine(basicPtr, 0, "\x12\"%*s%s%*s\" %.02d 2A", space_cnt, "", PRODUCT_ID, space_cnt, "", DEVICE_SETTINGS.device());
 	//byte_count += sendLine(basicPtr, 0, CBM_REVERSE_ON "%s", header.c_str());
 
 	// Send Extra INFO
@@ -706,7 +597,7 @@ uint16_t devDrive::sendHeader(uint16_t &basicPtr, std::string header, std::strin
 	if (archive.size() > 1)
 	{
 		byte_count += sendLine(basicPtr, 0, "%*s\"%-*s\" NFO", 0, "", 19, "[ARCHIVE]");
-		byte_count += sendLine(basicPtr, 0, "%*s\"%-*s\" NFO", 0, "", 19, m_device.archive().c_str());
+		byte_count += sendLine(basicPtr, 0, "%*s\"%-*s\" NFO", 0, "", 19, DEVICE_SETTINGS.archive().c_str());
 	}
 	if (image.size())
 	{
@@ -740,8 +631,8 @@ void devDrive::sendListing()
 	uint16_t basicPtr = C64_BASIC_START;
 
 	// Send load address
- this->m_iec.send(C64_BASIC_START bitand 0xff);
- this->m_iec.send((C64_BASIC_START >> 8) bitand 0xff);
+ IEC.send(C64_BASIC_START bitand 0xff);
+ IEC.send((C64_BASIC_START >> 8) bitand 0xff);
 	byte_count += 2;
 	Debug_println("");
 
@@ -750,7 +641,7 @@ void devDrive::sendListing()
 	{
 		// Set device default Listing Header
 		char buf[7] = { '\0' };
-		sprintf(buf, "%.02d 2A", m_device.id());
+		sprintf(buf, "%.02d 2A", DEVICE_SETTINGS.id());
 		byte_count += sendHeader(basicPtr, PRODUCT_ID, buf);
 	}
 	else
@@ -814,8 +705,8 @@ void devDrive::sendListing()
 	byte_count += sendFooter(basicPtr, m_mfile->media_blocks_free, m_mfile->media_block_size);
 
 	// End program with two zeros after last line. Last zero goes out as EOI.
-	this->m_iec.send(0);
-	this->m_iec.sendEOI(0);
+	IEC.send(0);
+	IEC.sendEOI(0);
 
 	Debug_printf("=================================\r\n%d bytes sent\r\n", byte_count);
 
@@ -837,7 +728,7 @@ uint16_t devDrive::sendFooter(uint16_t &basicPtr, uint16_t blocks_free, uint16_t
 		byte_count = sendLine(basicPtr, blocks_free, "BLOCKS FREE.");
 	}
 
-	// if (m_device.url().length() == 0)
+	// if (DEVICE_SETTINGS.url().length() == 0)
 	// {
 	// 	FSInfo64 fs_info;
 	// 	m_fileSystem->info64(fs_info);
@@ -868,7 +759,7 @@ void devDrive::sendFile()
 #endif
 
 	// Update device database
-	m_device.save();
+	DEVICE_SETTINGS.save();
 
 	std::unique_ptr<MFile> file(MFSOwner::File(m_filename));
 
@@ -948,7 +839,7 @@ void devDrive::sendFile()
 		}
 
 		// Position file pointer
-		//istream->seek(m_device.position(m_this->m_iec.data.channel));
+		//istream->seek(DEVICE_SETTINGS.position(m_IEC.data.channel));
 
 
 		size_t len = istream->size();
@@ -957,11 +848,11 @@ void devDrive::sendFile()
 		// Get file load address
 		i = 2;
 		istream->read(&b, 1);
-		success = this->m_iec.send(b);
+		success = IEC.send(b);
 		load_address = b & 0x00FF; // low byte
 		sys_address = b;
 		istream->read(&b, 1);
-		success = this->m_iec.send(b);
+		success = IEC.send(b);
 		load_address = load_address | b << 8;  // high byte
 		sys_address += b * 256;
 
@@ -983,11 +874,11 @@ void devDrive::sendFile()
 #endif
 				if ( ++i == len )
 				{
-					success = this->m_iec.sendEOI(b); // indicate end of file.
+					success = IEC.sendEOI(b); // indicate end of file.
 				}
 				else
 				{
-					success = this->m_iec.send(b);
+					success = IEC.send(b);
 				}
 
 #ifdef DATA_STREAM
@@ -1010,7 +901,7 @@ void devDrive::sendFile()
 			}
 
 			// // Exit if ATN is PULLED while sending
-			// if ( this->m_iec.state() bitand atnFlag )
+			// if ( IEC.state() bitand atnFlag )
 			// {
 			// 	// TODO: If sending from a named channel save file pointer position
 			// 	setDeviceStatus(74);
@@ -1040,7 +931,7 @@ void devDrive::sendFile()
 	{
 		Debug_println("sendFile: Transfer aborted!");
 		// TODO: Send something to signal that there was an error to the C64
-	 this->m_iec.sendEOI(0);
+	 IEC.sendEOI(0);
 	}
 } // sendFile
 
@@ -1080,9 +971,9 @@ void devDrive::saveFile()
 	 	// Stream is open!  Let's save this!
 
 		// Get file load address
-		ll[0] = this->m_iec.receive();
+		ll[0] = IEC.receive();
 		load_address = *ll & 0x00FF; // low byte
-		lh[0] = this->m_iec.receive();
+		lh[0] = IEC.receive();
 		load_address = load_address | *lh << 8;  // high byte
 
 		Debug_printf("saveFile: [%s] [$%.4X]\r\n=================================\r\n", file->url.c_str(), load_address);
@@ -1108,11 +999,11 @@ void devDrive::saveFile()
 			}
 #endif
 
-			b[0] = this->m_iec.receive();
+			b[0] = IEC.receive();
 			ostream->write(b, b_len);
 			i++;
 
-			uint8_t f = this->m_iec.protocol.flags;
+			uint8_t f = IEC.protocol.flags;
 			done = (f bitand EOI_RECVD) or (f bitand ERROR);
 
 #ifdef DATA_STREAM

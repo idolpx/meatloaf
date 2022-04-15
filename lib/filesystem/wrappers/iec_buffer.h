@@ -73,7 +73,7 @@
 
 class oiecstream : private std::filebuf, public std::ostream {
     char* data;
-    IEC* m_iec;
+    iecBus* m_iec;
     bool m_isOpen = false;
 
     size_t easyWrite(bool lastOne);
@@ -100,7 +100,7 @@ public:
     }
 
 
-    virtual void open(IEC* iec) {
+    virtual void open(iecBus* iec) {
         m_iec = iec;
         if(iec != nullptr)
             m_isOpen = true;

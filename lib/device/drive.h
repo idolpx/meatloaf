@@ -27,7 +27,6 @@
 #include "../../include/petscii.h"
 
 #include "iec.h"
-#include "iec_device.h"
 
 #include "meat_io.h"
 //#include "MemoryInfo.h"
@@ -50,7 +49,7 @@ enum OpenState
 class devDrive: public iecDevice
 {
 public:
-	devDrive(IEC &iec);
+	devDrive();
 	virtual ~devDrive() {};
 
  	virtual uint8_t command( void ) { return 0; };
@@ -67,10 +66,6 @@ protected:
 
 private:
 	void reset(void);
-
-	// Meatloaf Specific
-	void sendMeatloafSystemInformation(void);
-	void sendMeatloafVirtualDeviceStatus(void);
 
 	// Directory Navigation & Listing
 	bool m_show_extension = true;

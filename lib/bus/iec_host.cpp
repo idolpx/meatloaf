@@ -30,7 +30,6 @@
 
 using namespace Protocol;
 
-IEC iec;
 
 bool iecHost::deviceExists(uint8_t deviceID)
 {

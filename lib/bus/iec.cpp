@@ -19,19 +19,159 @@
 
 #include "../../include/debug.h"
 #include "../../include/pinmap.h"
+#include "../../include/cbmdefines.h"
+
+#include "string_utils.h"
+
 
 using namespace CBM;
 using namespace Protocol;
 
+/********************************************************
+ * 
+ *  IEC Device Functions
+ * 
+ ********************************************************/
 
-IEC::IEC()
+iecDevice::iecDevice( void )
+{
+	reset();
+} // ctor
+
+
+void iecDevice::reset(void)
+{
+	//m_device.reset();
+} // reset
+
+
+uint8_t iecDevice::process( void )
+{
+	//iecDevice::DeviceState r = DEVICE_IDLE;
+
+	if (IEC.state == iecBus::BUS_ERROR)
+	{
+		reset();
+		IEC.state = iecBus::BUS_IDLE;
+	}
+
+	// Did anything happen from the controller side?
+	else if (IEC.state not_eq iecBus::BUS_IDLE)
+	{
+		Debug_printf("DEVICE: [%d] ", IEC.data.device);
+
+		if (IEC.data.command == iecBus::IEC_OPEN)
+		{
+			Debug_printf("OPEN CHANNEL %d\r\n", IEC.data.channel);
+			if (IEC.data.channel == 0)
+				Debug_printf("LOAD \"%s\",%d\r\n", IEC.data.content.c_str(), IEC.data.device);
+			else if (IEC.data.channel == 1)
+				Debug_printf("SAVE \"%s\",%d\r\n", IEC.data.content.c_str(), IEC.data.device);
+			else {
+				Debug_printf("OPEN #,%d,%d,\"%s\"\r\n", IEC.data.device, IEC.data.channel, IEC.data.content.c_str());
+			}
+
+			// Open Named Channel
+			handleOpen();
+
+			// Open either file or prg for reading, writing or single line command on the command channel.
+			if (IEC.state == iecBus::BUS_COMMAND)
+			{
+				// Process a command
+				Debug_printv("[Process a command]");
+				handleListenCommand();
+			}
+			else if (IEC.state == iecBus::BUS_LISTEN)
+			{
+				// Receive data
+				Debug_printv("[Receive data]");
+				handleListenData();
+			}
+		}
+		else if (IEC.data.command == iecBus::IEC_SECOND) // data channel opened
+		{
+			Debug_printf("DATA CHANNEL %d\r\n", IEC.data.channel);
+			if (IEC.state == iecBus::BUS_COMMAND)
+			{
+				// Process a command
+				Debug_printv("[Process a command]");
+				handleListenCommand();
+			}
+			else if (IEC.state == iecBus::BUS_LISTEN)
+			{
+				// Receive data
+				Debug_printv("[Receive data]");
+				handleListenData();
+			}
+			else if (IEC.state == iecBus::BUS_TALK)
+			{
+				// Send data
+				Debug_printv("[Send data]");
+				if (IEC.data.channel == CMD_CHANNEL)
+				{
+					handleListenCommand();		 // This is typically an empty command,
+				}
+
+				handleTalk(IEC.data.channel);
+			}
+		}
+		else if (IEC.data.command == iecBus::IEC_CLOSE)
+		{
+			Debug_printf("CLOSE CHANNEL %d\r\n", IEC.data.channel);
+			if(IEC.data.channel > 0)
+			{
+				handleClose();
+			}
+		}
+	}
+	//Debug_printv("mode[%d] command[%.2X] channel[%.2X] state[%d]", mode, IEC.data.command, IEC.data.channel, m_openState);
+
+	return DEVICE_STATE::DEVICE_IDLE;
+} // service
+
+
+Channel iecDevice::channelSelect( void )
+{
+	size_t key = (IEC.data.device * 100) + IEC.data.channel;
+	if(channels.find(key)!=channels.end()) {
+		return channels.at(key);
+	}
+
+	// create and add channel if not found
+	auto newChannel = Channel();
+	newChannel.url = IEC.data.content;
+	Debug_printv("CHANNEL device[%d] channel[%d] url[%s]", IEC.data.device, IEC.data.channel, IEC.data.content.c_str());
+
+	channels.insert(std::make_pair(key, newChannel));
+	return newChannel;
+}
+
+bool iecDevice::channelClose( bool close_all )
+{
+	size_t key = (IEC.data.device * 100) + IEC.data.channel;
+	if(channels.find(key)!=channels.end()) {
+		return channels.erase(key);
+	}
+
+	return false;
+}
+
+
+/********************************************************
+ * 
+ *  IEC Bus Functions
+ * 
+ ********************************************************/
+
+
+iecBus::iecBus( void )
 {
 	init();
 } // ctor
 
 // Set all IEC_signal lines in the correct mode
 //
-bool IEC::init()
+bool iecBus::init()
 {
 	// make sure the output states are initially LOW
 	protocol.release(PIN_IEC_ATN);
@@ -57,7 +197,7 @@ bool IEC::init()
 } // init
 
 // IEC turnaround
-bool IEC::turnAround(void)
+bool iecBus::turnAround(void)
 {
 	/*
 	TURNAROUND
@@ -93,7 +233,7 @@ bool IEC::turnAround(void)
 
 // this routine will set the direction on the bus back to normal
 // (the way it was when the computer was switched on)
-bool IEC::undoTurnAround(void)
+bool iecBus::undoTurnAround(void)
 {
 	protocol.pull(PIN_IEC_DATA);
 	delayMicroseconds(TIMING_Tv);
@@ -138,10 +278,10 @@ bool IEC::undoTurnAround(void)
  * device, since the unselected devices will have dropped off when ATN ceased, leaving you with
  * nobody to talk to.
  */
-// Return value, see IEC::BUS_STATE definition.
-IEC::BUS_STATE IEC::service( void )
+// Return value, see iecBus::BUS_STATE definition.
+iecBus::BUS_STATE iecBus::service( void )
 {
-	IEC::BUS_STATE r = BUS_IDLE;
+	iecBus::BUS_STATE r = BUS_IDLE;
 
 	// Check if CBM is sending a reset (setting the RESET line high). This is typically
 	// when the CBM is reset itself. In this case, we are supposed to reset all states to initial.
@@ -163,7 +303,7 @@ IEC::BUS_STATE IEC::service( void )
 	delayMicroseconds(TIMING_Tne);
 
 	// Get command
-	int16_t c = (IEC::COMMAND)receive(this->data.device);
+	int16_t c = (iecBus::COMMAND)receive(this->data.device);
 
 	Debug_printf("   IEC: [%.2X] ", c);
 	if(protocol.flags bitand ERROR)
@@ -286,12 +426,12 @@ IEC::BUS_STATE IEC::service( void )
 
 	// Send data to device to process
 	this->state = r;
-	drive.process();
+	//drive.process();
 
 	return r;
 } // service
 
-IEC::BUS_STATE IEC::deviceListen( void )
+iecBus::BUS_STATE iecBus::deviceListen( void )
 {
 	uint8_t i=0;
 
@@ -369,7 +509,7 @@ IEC::BUS_STATE IEC::deviceListen( void )
 		return BUS_IDLE;
 }
 
-// void IEC::deviceUnListen(void)
+// void iecBus::deviceUnListen(void)
 // {
 // 	Debug_printv("");
 
@@ -384,7 +524,7 @@ IEC::BUS_STATE IEC::deviceListen( void )
 // 	}
 // }
 
-IEC::BUS_STATE IEC::deviceTalk( void )
+iecBus::BUS_STATE iecBus::deviceTalk( void )
 {
 	// Okay, we will talk soon
 	Debug_printf(" (%.2X SECONDARY) (%d CHANNEL)\r\n", this->data.command, this->data.channel);
@@ -400,7 +540,7 @@ IEC::BUS_STATE IEC::deviceTalk( void )
 	return BUS_TALK;
 }
 
-// void IEC::deviceUnTalk(void)
+// void iecBus::deviceUnTalk(void)
 // {
 // 	Debug_printv("");
 
@@ -416,7 +556,7 @@ IEC::BUS_STATE IEC::deviceTalk( void )
 // }
 
 
-void IEC::releaseLines(bool wait)
+void iecBus::releaseLines(bool wait)
 {
 	//Debug_printv("");
 
@@ -436,7 +576,7 @@ void IEC::releaseLines(bool wait)
 }
 
 
-// boolean  IEC::checkRESET()
+// boolean  iecBus::checkRESET()
 // {
 // 	return readRESET();
 // 	return false;
@@ -445,7 +585,7 @@ void IEC::releaseLines(bool wait)
 
 // IEC_receive receives a byte
 //
-int16_t IEC::receive(uint8_t device)
+int16_t iecBus::receive(uint8_t device)
 {
 	int16_t data;
 	data = protocol.receiveByte(device); // Standard CBM Timing
@@ -461,7 +601,7 @@ int16_t IEC::receive(uint8_t device)
 
 // IEC_send sends a byte
 //
-bool IEC::send(uint8_t data)
+bool iecBus::send(uint8_t data)
 {
 #ifdef DATA_STREAM
 	Debug_printf("%.2X ", data);
@@ -469,10 +609,10 @@ bool IEC::send(uint8_t data)
 	return protocol.sendByte(data, false); // Standard CBM Timing
 } // send
 
-bool IEC::send(std::string data)
+bool iecBus::send(std::string data)
 {
 	for (size_t i = 0; i < data.length(); ++i)
-		send(data[i]);
+		send((uint8_t)data[i]);
 
 	return true;
 }
@@ -480,7 +620,7 @@ bool IEC::send(std::string data)
 
 // Same as IEC_send, but indicating that this is the last byte.
 //
-bool IEC::sendEOI(uint8_t data)
+bool iecBus::sendEOI(uint8_t data)
 {
 #ifdef DATA_STREAM
 	Debug_printf("%.2X ", data);
@@ -501,7 +641,7 @@ bool IEC::sendEOI(uint8_t data)
 
 // A special send command that informs file not found condition
 //
-bool IEC::sendFNF()
+bool iecBus::sendFNF()
 {
 	// Message file not found by just releasing lines
 	protocol.release(PIN_IEC_DATA);
@@ -515,24 +655,98 @@ bool IEC::sendFNF()
 } // sendFNF
 
 
-bool IEC::isDeviceEnabled(const uint8_t deviceNumber)
+bool iecBus::isDeviceEnabled(const uint8_t deviceNumber)
 {
 	return (enabledDevices & (1<<deviceNumber));
 } // isDeviceEnabled
 
-void IEC::enableDevice(const uint8_t deviceNumber)
+void iecBus::enableDevice(const uint8_t deviceNumber)
 {
 	enabledDevices |= 1UL << deviceNumber;
 } // enableDevice
 
-void IEC::disableDevice(const uint8_t deviceNumber)
+void iecBus::disableDevice(const uint8_t deviceNumber)
 {
 	enabledDevices &= ~(1UL << deviceNumber);
 } // disableDevice
 
 
+// Add device to SIO bus
+void iecBus::addDevice(iecDevice *pDevice, uint8_t device_id)
+{
+    // if (device_id == SIO_DEVICEID_FUJINET)
+    // {
+    //     _fujiDev = (sioFuji *)pDevice;
+    // }
+    // else if (device_id == SIO_DEVICEID_RS232)
+    // {
+    //     _modemDev = (sioModem *)pDevice;
+    // }
+    // else if (device_id >= SIO_DEVICEID_FN_NETWORK && device_id <= SIO_DEVICEID_FN_NETWORK_LAST)
+    // {
+    //     _netDev[device_id - SIO_DEVICEID_FN_NETWORK] = (sioNetwork *)pDevice;
+    // }
+    // else if (device_id == SIO_DEVICEID_MIDI)
+    // {
+    //     _midiDev = (sioMIDIMaze *)pDevice;
+    // }
+    // else if (device_id == SIO_DEVICEID_CASSETTE)
+    // {
+    //     _cassetteDev = (sioCassette *)pDevice;
+    // }
+    // else if (device_id == SIO_DEVICEID_CPM)
+    // {
+    //     _cpmDev = (sioCPM *)pDevice;
+    // }
+    // else if (device_id == SIO_DEVICEID_PRINTER)
+    // {
+    //     _printerdev = (sioPrinter *)pDevice;
+    // }
 
-void IEC::debugTiming()
+    pDevice->device_id = device_id;
+
+    _daisyChain.push_front(pDevice);
+}
+
+// Removes device from the SIO bus.
+// Note that the destructor is called on the device!
+void iecBus::remDevice(iecDevice *p)
+{
+    _daisyChain.remove(p);
+}
+
+// Should avoid using this as it requires counting through the list
+uint8_t iecBus::numDevices()
+{
+    int i = 0;
+
+    for (auto devicep : _daisyChain)
+        i++;
+    return i;
+}
+
+void iecBus::changeDeviceId(iecDevice *p, uint8_t device_id)
+{
+    for (auto devicep : _daisyChain)
+    {
+        if (devicep == p)
+            devicep->device_id = device_id;
+    }
+}
+
+iecDevice *iecBus::deviceById(uint8_t device_id)
+{
+    for (auto devicep : _daisyChain)
+    {
+        if (devicep->device_id == device_id)
+            return devicep;
+    }
+    return nullptr;
+}
+
+
+
+void iecBus::debugTiming()
 {
 	uint8_t pin = PIN_IEC_ATN;
 	protocol.pull(pin);

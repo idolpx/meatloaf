@@ -46,7 +46,6 @@ statemachine bus_state = statemachine::idle;
 std::string statusMessage;
 bool initFailed = false;
 
-static IEC iec;
 
 /**************************/
 
@@ -61,7 +60,7 @@ static IEC iec;
 static void IRAM_ATTR on_attention_isr_handler(void* arg)
 {
     bus_state = statemachine::select;
-    iec.protocol.flags or_eq ATN_PULLED;
+    IEC.protocol.flags or_eq ATN_PULLED;
     fnLedManager.toggle(eLed::LED_BUS);
 }
 
@@ -132,16 +131,15 @@ void main_setup()
 
     // Setup IEC Bus
     Serial.println("IEC Bus Initialized");
-    iec.init();  // Initialize IO
 
     // Add devices to bus    
-    iec.enabledDevices = DEVICE_MASK;
-    iec.enableDevice(30);
+    IEC.enabledDevices = DEVICE_MASK;
+    IEC.enableDevice(30);
 
     Serial.print("Virtual Device(s) Started: [ " ANSI_YELLOW_BOLD );
     for (uint8_t i = 0; i < 31; i++)
     {
-        if (iec.isDeviceEnabled(i))
+        if (IEC.isDeviceEnabled(i))
         {
             Serial.printf("%.02d ", i);
         }
@@ -189,8 +187,8 @@ void fn_service_loop(void *param)
         if ( bus_state != statemachine::idle )
         {
             //Debug_printv("before[%d]", bus_state);
-            uint8_t bs = iec.service();
-            if( bs == IEC::BUS_IDLE || bs == IEC::BUS_ERROR )
+            uint8_t bs = IEC.service();
+            if( bs == iecBus::BUS_IDLE || bs == iecBus::BUS_ERROR )
                 bus_state = statemachine::idle;
             //Debug_printv("after[%d] bs[%d]", bus_state, bs);
             

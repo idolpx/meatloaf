@@ -57,4 +57,6 @@ private:
     StaticJsonDocument<RECORD_SIZE> m_device;
 };
 
+extern DeviceDB DEVICE_SETTINGS;
+
 #endif
