@@ -15,8 +15,6 @@
 // You should have received a copy of the GNU General Public License
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
-//#include "../../include/global_defines.h"
-//#include "debug.h"
 #include "../../include/debug.h"
 
 #include "iec_device.h"
@@ -26,19 +24,9 @@
 using namespace CBM;
 using namespace Protocol;
 
-namespace
-{
-	// Buffer for incoming and outgoing serial bytes and other stuff.
-	char serCmdIOBuf[MAX_BYTES_PER_REQUEST];
 
-} // unnamed namespace
-
-iecDevice::iecDevice(IEC &iec)
-	: m_iec(iec),
-	m_iec_data(*reinterpret_cast<IEC::Data *>(&serCmdIOBuf[sizeof(serCmdIOBuf) / 2])),
-	m_device(0)
+iecDevice::iecDevice( IEC &iec ) : m_iec(iec), m_device(0)
 {
-	m_iec_data.content += '\0';
 	reset();
 } // ctor
 
@@ -49,130 +37,110 @@ void iecDevice::reset(void)
 } // reset
 
 
-uint8_t iecDevice::service(void)
+uint8_t iecDevice::process( void )
 {
 	//iecDevice::DeviceState r = DEVICE_IDLE;
 
-	//#ifdef HAS_RESET_LINE
-	//	if(m_iec.checkRESET()) {
-	//		// IEC reset line is in reset device state
-	//		reset();
-	//
-	//
-	//		return IEC::BUS_RESET;
-	//	}
-	//#endif
-	// Wait for it to get out of reset.
-	//while (m_iec.checkRESET())
-	//{
-	//	Debug_println("BUS_RESET");
-	//}
-
-	//	noInterrupts();
-	IEC::BusState bus_state = m_iec.service(m_iec_data);
-	//	interrupts();
-
-
-	if (bus_state == IEC::BUS_ERROR)
+	if (this->m_iec.state == IEC::BUS_ERROR)
 	{
 		reset();
-		bus_state = IEC::BUS_IDLE;
+		this->m_iec.state = IEC::BUS_IDLE;
 	}
 
 	// Did anything happen from the controller side?
-	else if (bus_state not_eq IEC::BUS_IDLE)
+	else if (this->m_iec.state not_eq IEC::BUS_IDLE)
 	{
-		Debug_printf("DEVICE: [%d] ", m_iec_data.device);
+		Debug_printf("DEVICE: [%d] ", this->m_iec.data.device);
 
-		if (m_iec_data.command == IEC::IEC_OPEN)
+		if (this->m_iec.data.command == IEC::IEC_OPEN)
 		{
-			Debug_printf("OPEN CHANNEL %d\r\n", m_iec_data.channel);
-			if (m_iec_data.channel == 0)
-				Debug_printf("LOAD \"%s\",%d\r\n", m_iec_data.content.c_str(), m_iec_data.device);
-			else if (m_iec_data.channel == 1)
-				Debug_printf("SAVE \"%s\",%d\r\n", m_iec_data.content.c_str(), m_iec_data.device);
+			Debug_printf("OPEN CHANNEL %d\r\n", this->m_iec.data.channel);
+			if (this->m_iec.data.channel == 0)
+				Debug_printf("LOAD \"%s\",%d\r\n", this->m_iec.data.content.c_str(), this->m_iec.data.device);
+			else if (this->m_iec.data.channel == 1)
+				Debug_printf("SAVE \"%s\",%d\r\n", this->m_iec.data.content.c_str(), this->m_iec.data.device);
 			else {
-				Debug_printf("OPEN #,%d,%d,\"%s\"\r\n", m_iec_data.device, m_iec_data.channel, m_iec_data.content.c_str());
+				Debug_printf("OPEN #,%d,%d,\"%s\"\r\n", this->m_iec.data.device, this->m_iec.data.channel, this->m_iec.data.content.c_str());
 			}
 
 			// Open Named Channel
-			handleOpen(m_iec_data);
+			handleOpen();
 
 			// Open either file or prg for reading, writing or single line command on the command channel.
-			if (bus_state == IEC::BUS_COMMAND)
+			if (this->m_iec.state == IEC::BUS_COMMAND)
 			{
 				// Process a command
 				Debug_printv("[Process a command]");
-				handleListenCommand(m_iec_data);
+				handleListenCommand();
 			}
-			else if (bus_state == IEC::BUS_LISTEN)
+			else if (this->m_iec.state == IEC::BUS_LISTEN)
 			{
 				// Receive data
 				Debug_printv("[Receive data]");
 				handleListenData();
 			}
 		}
-		else if (m_iec_data.command == IEC::IEC_SECOND) // data channel opened
+		else if (this->m_iec.data.command == IEC::IEC_SECOND) // data channel opened
 		{
-			Debug_printf("DATA CHANNEL %d\r\n", m_iec_data.channel);
-			if (bus_state == IEC::BUS_COMMAND)
+			Debug_printf("DATA CHANNEL %d\r\n", this->m_iec.data.channel);
+			if (this->m_iec.state == IEC::BUS_COMMAND)
 			{
 				// Process a command
 				Debug_printv("[Process a command]");
-				handleListenCommand(m_iec_data);
+				handleListenCommand();
 			}
-			else if (bus_state == IEC::BUS_LISTEN)
+			else if (this->m_iec.state == IEC::BUS_LISTEN)
 			{
 				// Receive data
 				Debug_printv("[Receive data]");
 				handleListenData();
 			}
-			else if (bus_state == IEC::BUS_TALK)
+			else if (this->m_iec.state == IEC::BUS_TALK)
 			{
 				// Send data
 				Debug_printv("[Send data]");
-				if (m_iec_data.channel == CMD_CHANNEL)
+				if (this->m_iec.data.channel == CMD_CHANNEL)
 				{
-					handleListenCommand(m_iec_data);		 // This is typically an empty command,
+					handleListenCommand();		 // This is typically an empty command,
 				}
 
-				handleTalk(m_iec_data.channel);
+				handleTalk(this->m_iec.data.channel);
 			}
 		}
-		else if (m_iec_data.command == IEC::IEC_CLOSE)
+		else if (this->m_iec.data.command == IEC::IEC_CLOSE)
 		{
-			Debug_printf("CLOSE CHANNEL %d\r\n", m_iec_data.channel);
-			if(m_iec_data.channel > 0)
+			Debug_printf("CLOSE CHANNEL %d\r\n", this->m_iec.data.channel);
+			if(this->m_iec.data.channel > 0)
 			{
-				handleClose(m_iec_data);
+				handleClose();
 			}
 		}
 	}
-	//Debug_printv("mode[%d] command[%.2X] channel[%.2X] state[%d]", mode, m_iec_data.command, m_iec_data.channel, m_openState);
+	//Debug_printv("mode[%d] command[%.2X] channel[%.2X] state[%d]", mode, this->m_iec.data.command, this->m_iec.data.channel, m_openState);
 
-	return bus_state;
+	return DEVICE_STATE::DEVICE_IDLE;
 } // service
 
 
-Channel iecDevice::channelSelect(IEC::Data &iec_data)
+Channel iecDevice::channelSelect( void )
 {
-	size_t key = (iec_data.device * 100) + iec_data.channel;
+	size_t key = (this->m_iec.data.device * 100) + this->m_iec.data.channel;
 	if(channels.find(key)!=channels.end()) {
 		return channels.at(key);
 	}
 
 	// create and add channel if not found
 	auto newChannel = Channel();
-	newChannel.url = iec_data.content;
-	Debug_printv("CHANNEL device[%d] channel[%d] url[%s]", iec_data.device, iec_data.channel, iec_data.content.c_str());
+	newChannel.url = this->m_iec.data.content;
+	Debug_printv("CHANNEL device[%d] channel[%d] url[%s]", this->m_iec.data.device, this->m_iec.data.channel, this->m_iec.data.content.c_str());
 
 	channels.insert(std::make_pair(key, newChannel));
 	return newChannel;
 }
 
-bool iecDevice::channelClose(IEC::Data &iec_data, bool close_all)
+bool iecDevice::channelClose( bool close_all )
 {
-	size_t key = (iec_data.device * 100) + iec_data.channel;
+	size_t key = (this->m_iec.data.device * 100) + this->m_iec.data.channel;
 	if(channels.find(key)!=channels.end()) {
 		return channels.erase(key);
 	}

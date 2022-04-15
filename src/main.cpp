@@ -33,8 +33,6 @@
 #include "meat_io.h"
 
 #include "iec.h"
-#include "iec_device.h"
-#include "drive.h"
 #include "ml_tests.h"
 
 enum class statemachine
@@ -49,7 +47,6 @@ std::string statusMessage;
 bool initFailed = false;
 
 static IEC iec;
-static devDrive drive ( iec );
 
 /**************************/
 
@@ -83,9 +80,9 @@ void main_setup()
     fnUartDebug.begin(DEBUG_SPEED);
     unsigned long startms = fnSystem.millis();
     
-    Debug_printf( WHT "\n\n" BLUB "==============================" RESET "\n" );
-    Debug_printf( BLUB "   " PRODUCT_ID " " FW_VERSION "    " RESET "\n" );
-    Debug_printf( BLUB "------------------------------" RESET "\n\n" );
+    Debug_printf( ANSI_WHITE "\n\n" ANSI_BLUE_BACKGROUND "==============================" ANSI_RESET "\n" );
+    Debug_printf( ANSI_BLUE_BACKGROUND "   " PRODUCT_ID " " FW_VERSION "    " ANSI_RESET "\n" );
+    Debug_printf( ANSI_BLUE_BACKGROUND "------------------------------" ANSI_RESET "\n\n" );
 
     Debug_printf( "FujiNet %s Started @ %lu\n", fnSystem.get_fujinet_version(), startms );
 
@@ -134,12 +131,14 @@ void main_setup()
 
 
     // Setup IEC Bus
+    Serial.println("IEC Bus Initialized");
+    iec.init();  // Initialize IO
+
+    // Add devices to bus    
     iec.enabledDevices = DEVICE_MASK;
     iec.enableDevice(30);
-    iec.init();
-    Serial.println("IEC Bus Initialized");
 
-    Serial.print("Virtual Device(s) Started: [ ");
+    Serial.print("Virtual Device(s) Started: [ " ANSI_YELLOW_BOLD );
     for (uint8_t i = 0; i < 31; i++)
     {
         if (iec.isDeviceEnabled(i))
@@ -147,7 +146,7 @@ void main_setup()
             Serial.printf("%.02d ", i);
         }
     }
-    Serial.println("]");
+    Serial.println( ANSI_RESET "]");
 
     // Setup interrupt for ATN
     gpio_pad_select_gpio(PIN_IEC_ATN);
@@ -164,6 +163,7 @@ void main_setup()
     //configure GPIO with the given settings
     gpio_config(&io_conf);
     gpio_isr_handler_add((gpio_num_t)PIN_IEC_ATN, on_attention_isr_handler, (void *)PIN_IEC_ATN);
+    Serial.println( ANSI_GREEN_BOLD "IEC Bus Initialized" ANSI_RESET );
 
 
 #ifdef DEBUG
@@ -189,7 +189,7 @@ void fn_service_loop(void *param)
         if ( bus_state != statemachine::idle )
         {
             //Debug_printv("before[%d]", bus_state);
-            uint8_t bs = drive.service();
+            uint8_t bs = iec.service();
             if( bs == IEC::BUS_IDLE || bs == IEC::BUS_ERROR )
                 bus_state = statemachine::idle;
             //Debug_printv("after[%d] bs[%d]", bus_state, bs);

@@ -48,7 +48,7 @@ void devDrive::reset(void)
 void devDrive::sendFileNotFound(void)
 {
 	setDeviceStatus(62);
-	m_iec.sendFNF();
+ this->m_iec.sendFNF();
 }
 
 void devDrive::sendStatus(void)
@@ -60,12 +60,12 @@ void devDrive::sendStatus(void)
 	Debug_printv("status: %s", status.c_str());
 	Debug_print("[");
 
-	m_iec.send(status);
+ this->m_iec.send(status);
 
 	Debug_println(BACKSPACE "]");
 
 	// Send CR with EOI marker.
-	m_iec.sendEOI('\x0D');
+ this->m_iec.sendEOI('\x0D');
 
 	// Clear the status message
 	m_device_status.clear();
@@ -322,29 +322,29 @@ void devDrive::prepareFileStream(std::string url)
 
 
 
-void devDrive::handleListenCommand(IEC::Data &iec_data)
+void devDrive::handleListenCommand( void )
 {
-	if (m_device.select(iec_data.device))
+	if (m_device.select(this->m_iec.data.device))
 	{
 		Debug_printv("!!!! device changed: unit:%d current url: [%s]", m_device.id(), m_device.url().c_str());
 		m_mfile.reset(MFSOwner::File(m_device.url()));
 		Debug_printv("m_mfile[%s]", m_mfile->url.c_str());
 	}
 
-	size_t channel = iec_data.channel;
+	size_t channel = this->m_iec.data.channel;
 	m_openState = O_NOTHING;
 
-	if (iec_data.content.size() == 0 )
+	if (this->m_iec.data.content.size() == 0 )
 	{
 		Debug_printv("No command to process");
 
-		if ( iec_data.channel == CMD_CHANNEL )
+		if ( this->m_iec.data.channel == CMD_CHANNEL )
 			m_openState = O_STATUS;
 		return;
 	}
 
 	// 1. obtain command and fullPath
-	auto commandAndPath = parseLine(iec_data.content, channel);
+	auto commandAndPath = parseLine(this->m_iec.data.content, channel);
 	auto referencedPath = Meat::New<MFile>(commandAndPath.fullPath);
 
 	Debug_printv("command[%s]", commandAndPath.command.c_str());
@@ -408,7 +408,7 @@ void devDrive::handleListenCommand(IEC::Data &iec_data)
 	//dumpState();
 
 	// Clear command string
-	//m_iec_data.content.clear();
+	//m_this->m_iec.data.content.clear();
 } // handleListenCommand
 
 
@@ -459,22 +459,22 @@ void devDrive::handleTalk(uint8_t chan)
 } // handleTalk
 
 
-void devDrive::handleOpen(IEC::Data &iec_data)
+void devDrive::handleOpen( void )
 {
-	Debug_printv("OPEN Named Channel (%.2d Device) (%.2d Channel)", iec_data.device, iec_data.channel);
-	auto channel = channels[iec_data.command];
+	Debug_printv("OPEN Named Channel (%.2d Device) (%.2d Channel)", this->m_iec.data.device, this->m_iec.data.channel);
+	auto channel = channels[this->m_iec.data.command];
 
 	// Are we writing?  Appending?
-	channels[iec_data.command].url = iec_data.content;
-	channels[iec_data.command].cursor = 0;
-	channels[iec_data.command].writing = 0;
+	channels[this->m_iec.data.command].url = this->m_iec.data.content;
+	channels[this->m_iec.data.command].cursor = 0;
+	channels[this->m_iec.data.command].writing = 0;
 } // handleOpen
 
 
-void devDrive::handleClose(IEC::Data &iec_data)
+void devDrive::handleClose( void )
 {
-	Debug_printv("CLOSE Named Channel (%.2d Device) (%.2d Channel)", iec_data.device, iec_data.channel);
-	auto channel = channels[iec_data.command];
+	Debug_printv("CLOSE Named Channel (%.2d Device) (%.2d Channel)", this->m_iec.data.device, this->m_iec.data.channel);
+	auto channel = channels[this->m_iec.data.command];
 
 	// If writing update BAM & Directory
 
@@ -500,8 +500,8 @@ void devDrive::sendMeatloafSystemInformation()
 //	dtostrf(getFragmentation(), 3, 2, floatBuffer);
 
 	// Send load address
-	m_iec.send(C64_BASIC_START bitand 0xff);
-	m_iec.send((C64_BASIC_START >> 8) bitand 0xff);
+	this->m_iec.send(C64_BASIC_START bitand 0xff);
+	this->m_iec.send((C64_BASIC_START >> 8) bitand 0xff);
 	Debug_println("");
 
 	// Send List HEADER
@@ -557,8 +557,8 @@ void devDrive::sendMeatloafSystemInformation()
 //	sendLine(basicPtr, 0, CBM_DEL_DEL "STA IP     : %s", ip);
 
 	// End program with two zeros after last line. Last zero goes out as EOI.
-	m_iec.send(0);
-	m_iec.sendEOI(0);
+	this->m_iec.send(0);
+	this->m_iec.sendEOI(0);
 
 	fnLedManager.set(eLed::LED_BUS, true);
 } // sendMeatloafSystemInformation
@@ -571,8 +571,8 @@ void devDrive::sendMeatloafVirtualDeviceStatus()
 	uint16_t basicPtr = C64_BASIC_START;
 
 	// Send load address
-	m_iec.send(C64_BASIC_START bitand 0xff);
-	m_iec.send((C64_BASIC_START >> 8) bitand 0xff);
+	this->m_iec.send(C64_BASIC_START bitand 0xff);
+	this->m_iec.send((C64_BASIC_START >> 8) bitand 0xff);
 	Debug_println("");
 
 	// Send List HEADER
@@ -589,8 +589,8 @@ void devDrive::sendMeatloafVirtualDeviceStatus()
 	sendLine(basicPtr, 0, CBM_DEL_DEL "FILENAME  : %s", m_mfile->name.c_str());
 
 	// End program with two zeros after last line. Last zero goes out as EOI.
-	m_iec.send(0);
-	m_iec.sendEOI(0);
+	this->m_iec.send(0);
+	this->m_iec.sendEOI(0);
 
 	fnLedManager.set(eLed::LED_BUS, true);
 } // sendMeatloafVirtualDeviceStatus
@@ -623,19 +623,19 @@ uint16_t devDrive::sendLine(uint16_t &basicPtr, uint16_t blocks, char *text)
 	basicPtr += len + 5;
 
 	// Send that pointer
-	m_iec.send(basicPtr bitand 0xFF);
-	m_iec.send(basicPtr >> 8);
+	this->m_iec.send(basicPtr bitand 0xFF);
+	this->m_iec.send(basicPtr >> 8);
 
 	// Send blocks
-	m_iec.send(blocks bitand 0xFF);
-	m_iec.send(blocks >> 8);
+	this->m_iec.send(blocks bitand 0xFF);
+	this->m_iec.send(blocks >> 8);
 
 	// Send line contents
 	for (uint8_t i = 0; i < len; i++)
-		m_iec.send(text[i]);
+	 this->m_iec.send(text[i]);
 
 	// Finish line
-	m_iec.send(0);
+	this->m_iec.send(0);
 
 	Debug_println("");
 
@@ -740,8 +740,8 @@ void devDrive::sendListing()
 	uint16_t basicPtr = C64_BASIC_START;
 
 	// Send load address
-	m_iec.send(C64_BASIC_START bitand 0xff);
-	m_iec.send((C64_BASIC_START >> 8) bitand 0xff);
+ this->m_iec.send(C64_BASIC_START bitand 0xff);
+ this->m_iec.send((C64_BASIC_START >> 8) bitand 0xff);
 	byte_count += 2;
 	Debug_println("");
 
@@ -814,8 +814,8 @@ void devDrive::sendListing()
 	byte_count += sendFooter(basicPtr, m_mfile->media_blocks_free, m_mfile->media_block_size);
 
 	// End program with two zeros after last line. Last zero goes out as EOI.
-	m_iec.send(0);
-	m_iec.sendEOI(0);
+	this->m_iec.send(0);
+	this->m_iec.sendEOI(0);
 
 	Debug_printf("=================================\r\n%d bytes sent\r\n", byte_count);
 
@@ -948,7 +948,7 @@ void devDrive::sendFile()
 		}
 
 		// Position file pointer
-		//istream->seek(m_device.position(m_iec_data.channel));
+		//istream->seek(m_device.position(m_this->m_iec.data.channel));
 
 
 		size_t len = istream->size();
@@ -957,11 +957,11 @@ void devDrive::sendFile()
 		// Get file load address
 		i = 2;
 		istream->read(&b, 1);
-		success = m_iec.send(b);
+		success = this->m_iec.send(b);
 		load_address = b & 0x00FF; // low byte
 		sys_address = b;
 		istream->read(&b, 1);
-		success = m_iec.send(b);
+		success = this->m_iec.send(b);
 		load_address = load_address | b << 8;  // high byte
 		sys_address += b * 256;
 
@@ -983,11 +983,11 @@ void devDrive::sendFile()
 #endif
 				if ( ++i == len )
 				{
-					success = m_iec.sendEOI(b); // indicate end of file.
+					success = this->m_iec.sendEOI(b); // indicate end of file.
 				}
 				else
 				{
-					success = m_iec.send(b);
+					success = this->m_iec.send(b);
 				}
 
 #ifdef DATA_STREAM
@@ -1010,7 +1010,7 @@ void devDrive::sendFile()
 			}
 
 			// // Exit if ATN is PULLED while sending
-			// if ( m_iec.state() bitand atnFlag )
+			// if ( this->m_iec.state() bitand atnFlag )
 			// {
 			// 	// TODO: If sending from a named channel save file pointer position
 			// 	setDeviceStatus(74);
@@ -1040,7 +1040,7 @@ void devDrive::sendFile()
 	{
 		Debug_println("sendFile: Transfer aborted!");
 		// TODO: Send something to signal that there was an error to the C64
-		m_iec.sendEOI(0);
+	 this->m_iec.sendEOI(0);
 	}
 } // sendFile
 
@@ -1080,9 +1080,9 @@ void devDrive::saveFile()
 	 	// Stream is open!  Let's save this!
 
 		// Get file load address
-		ll[0] = m_iec.receive();
+		ll[0] = this->m_iec.receive();
 		load_address = *ll & 0x00FF; // low byte
-		lh[0] = m_iec.receive();
+		lh[0] = this->m_iec.receive();
 		load_address = load_address | *lh << 8;  // high byte
 
 		Debug_printf("saveFile: [%s] [$%.4X]\r\n=================================\r\n", file->url.c_str(), load_address);
@@ -1108,11 +1108,11 @@ void devDrive::saveFile()
 			}
 #endif
 
-			b[0] = m_iec.receive();
+			b[0] = this->m_iec.receive();
 			ostream->write(b, b_len);
 			i++;
 
-			uint8_t f = m_iec.state();
+			uint8_t f = this->m_iec.protocol.flags;
 			done = (f bitand EOI_RECVD) or (f bitand ERROR);
 
 #ifdef DATA_STREAM

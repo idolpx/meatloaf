@@ -23,20 +23,26 @@
 #include "../../include/global_defines.h"
 #include "../../include/cbmdefines.h"
 #include "../../include/petscii.h"
-#include "string_utils.h"
+
+#include "iec_device.h"
+#include "drive.h"
 
 #include "protocol/cbmstandardserial.h"
 //#include "protocol/jiffydos.h"
+
+#include "string_utils.h"
 
 #define	IEC_CMD_MAX_LENGTH 	100
 
 using namespace Protocol;
 
+devDrive drive;
+
 class IEC
 {
 public:
 	// Return values for service:
-	enum BusState
+	typedef enum
 	{
 		BUS_IDLE = 0,		  // Nothing recieved of our concern
 		BUS_COMMAND = 1,      // A command is recieved
@@ -44,10 +50,10 @@ public:
 		BUS_TALK = 3,	      // A command is recieved and we must talk now
 		BUS_ERROR = 5,		  // A problem occoured, reset communication
 		BUS_RESET = 6		  // The IEC bus is in a reset state (RESET line).
-	};
+	} BUS_STATE;
 
 	// IEC commands:
-	enum Command
+	typedef enum
 	{
 		IEC_GLOBAL = 0x00,	   // 0x00 + cmd (global command)
         IEC_LISTEN = 0x20,     // 0x20 + device_id (LISTEN) (0-30)
@@ -57,15 +63,20 @@ public:
 		IEC_SECOND = 0x60,     // 0x60 + channel (OPEN CHANNEL) (0-15)
 		IEC_CLOSE = 0xE0,	   // 0xE0 + channel (CLOSE NAMED CHANNEL) (0-15)
 		IEC_OPEN = 0xF0	       // 0xF0 + channel (OPEN NAMED CHANNEL) (0-15)
-	};
+	} COMMAND;
 
-	typedef struct _tagIECCMD
+	typedef struct iec_data
 	{
 		uint8_t command;
 		uint8_t device;
 		uint8_t channel;
 		std::string content;
-	} Data;
+	} iec_data_t;
+
+	BUS_STATE state;
+	iec_data_t data;
+
+	CBMStandardSerial protocol;
 
 	IEC();
 	~IEC() {};
@@ -75,7 +86,7 @@ public:
 
 	// Checks if CBM is sending an attention message. If this is the case,
 	// the message is recieved and stored in iec_data.
-	BusState service(Data &iec_data);
+	BUS_STATE service(void);
 
 	// Checks if CBM is sending a reset (setting the RESET line high). This is typicall
 	// when the CBM is reset itself. In this case, we are supposed to reset all states to initial.
@@ -103,19 +114,15 @@ public:
 
 	void debugTiming();
 
-	uint8_t state();
-
-	CBMStandardSerial protocol;
-
 private:
 	// IEC Bus Commands
-	BusState deviceListen(Data &iec_data);	  // 0x20 + device_id   Listen, device (0–30)
+	BUS_STATE deviceListen(void);	  // 0x20 + device_id   Listen, device (0–30)
 	void deviceUnListen(void);                // 0x3F               Unlisten, all devices
-	BusState deviceTalk(Data &iec_data);	  // 0x40 + device_id 	Talk, device (0–30)
+	BUS_STATE deviceTalk(void);	  // 0x40 + device_id 	Talk, device (0–30)
 	void deviceUnTalk(void);                  // 0x5F               Untalk, all devices
-	BusState deviceSecond(Data &iec_data);    // 0x60 + channel     Reopen, channel (0–15)
-	BusState deviceClose(Data &iec_data);     // 0xE0 + channel     Close, channel (0–15)
-	BusState deviceOpen(Data &iec_data);      // 0xF0 + channel     Open, channel (0–15)
+	BUS_STATE deviceSecond(void);    // 0x60 + channel     Reopen, channel (0–15)
+	BUS_STATE deviceClose(void);     // 0xE0 + channel     Close, channel (0–15)
+	BUS_STATE deviceOpen(void);      // 0xF0 + channel     Open, channel (0–15)
 
 	bool turnAround(void);
 	bool undoTurnAround(void);

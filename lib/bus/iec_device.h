@@ -60,22 +60,22 @@ class iecDevice
 {
 public:
 	// Return values for service:
-	enum DeviceState
+	typedef enum
 	{
 		DEVICE_IDLE = 0,       // Ready and waiting
 		DEVICE_OPEN,           // Command received and channel opened
 		DEVICE_DATA,           // Data sent or received
-	};
+	} DEVICE_STATE;
 
 	std::unordered_map<uint16_t, Channel> channels;
 
 	iecDevice(IEC &iec);
 	~iecDevice() {};
 
-	uint8_t service(void);
+	uint8_t process( void );
 	
-	virtual uint8_t command(IEC::Data &iec_data) = 0;
-	virtual uint8_t execute(IEC::Data &iec_data) = 0;
+	virtual uint8_t command( void ) = 0;
+	virtual uint8_t execute( void ) = 0;
 	virtual uint8_t status(void) = 0;
 
 	uint8_t device_id;
@@ -85,15 +85,13 @@ protected:
 	void reset(void);
 
 	// handler helpers.
-	virtual void handleListenCommand(IEC::Data &iec_data) = 0;
-	virtual void handleListenData(void) = 0;
+	virtual void handleListenCommand( void ) = 0;
+	virtual void handleListenData( void ) = 0;
 	virtual void handleTalk(uint8_t chan) = 0;
-	virtual void handleOpen(IEC::Data &iec_data) = 0;
-	virtual void handleClose(IEC::Data &iec_data) = 0;
+	virtual void handleOpen( void ) = 0;
+	virtual void handleClose( void ) = 0;
 
-	// our iec low level driver:
-	IEC &m_iec;
-	IEC::Data &m_iec_data;	// IEC command buffer struct
+	IEC &m_iec;	// IEC driver
 
 	// This is set after an open command and determines what to send next
 	uint8_t m_openState;
@@ -101,8 +99,8 @@ protected:
 	DeviceDB m_device;
 
 private:
-	Channel channelSelect(IEC::Data &iec_data);
-	bool channelClose(IEC::Data &iec_data, bool close_all = false);
+	Channel channelSelect( void );
+	bool channelClose( bool close_all = false );
 
 };
 
