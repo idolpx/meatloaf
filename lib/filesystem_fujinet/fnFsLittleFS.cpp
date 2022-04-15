@@ -140,10 +140,10 @@ bool FileSystemLittleFS::start()
         return true;
 
     // Set our basepath
-    strlcpy(_basepath, "/flash", sizeof(_basepath));
+    // strlcpy(_basepath, "/flash", sizeof(_basepath));
 
     esp_vfs_littlefs_conf_t conf = {
-      .base_path = _basepath,
+      .base_path = "",
       .partition_label = "flash",
       .format_if_mount_failed = false,
       .dont_mount = false

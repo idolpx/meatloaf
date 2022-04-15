@@ -120,21 +120,14 @@ namespace Protocol
 					// toggle bit so we don't change mode unnecessarily 
 					gpio_pin_modes ^= (-b_mode ^ gpio_pin_modes) & (1ULL << pin);
 
-					gpio_config_t io_conf;
-
-					// disable interrupt
-					io_conf.intr_type = GPIO_INTR_DISABLE;
-
-					// set mode
-					io_conf.mode = mode;
-
-					io_conf.pull_up_en = gpio_pullup_t::GPIO_PULLUP_DISABLE;
-					io_conf.pull_down_en = gpio_pulldown_t::GPIO_PULLDOWN_DISABLE;
-
-					// bit mask of the pin to set
-					io_conf.pin_bit_mask = 1ULL << pin;
-
-					// configure GPIO with the given settings
+					gpio_config_t io_conf = {
+						.pin_bit_mask = ( 1ULL << pin ),            // bit mask of the pins that you want to set
+						.mode = mode,                               // set as input mode
+						.pull_up_en = GPIO_PULLUP_DISABLE,          // disable pull-up mode
+						.pull_down_en = GPIO_PULLDOWN_DISABLE,      // disable pull-down mode
+						.intr_type = GPIO_INTR_DISABLE              // interrupt of falling edge
+					};
+					//configure GPIO with the given settings
 					gpio_config(&io_conf);
 				}
 			}

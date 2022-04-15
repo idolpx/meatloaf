@@ -40,7 +40,7 @@
 enum class statemachine
 {
     idle,   // BUS is idle
-    select, // ATN is PULLED read command
+    select, // ATN is PULLED, read command
     data    // READY to receive or send data
 };
 statemachine bus_state = statemachine::idle;
@@ -49,7 +49,7 @@ std::string statusMessage;
 bool initFailed = false;
 
 static IEC iec;
-//static devDrive drive ( iec );
+static devDrive drive ( iec );
 
 /**************************/
 
@@ -65,6 +65,7 @@ static void IRAM_ATTR on_attention_isr_handler(void* arg)
 {
     bus_state = statemachine::select;
     iec.protocol.flags or_eq ATN_PULLED;
+    fnLedManager.toggle(eLed::LED_BUS);
 }
 
 void main_shutdown_handler()
@@ -82,9 +83,9 @@ void main_setup()
     fnUartDebug.begin(DEBUG_SPEED);
     unsigned long startms = fnSystem.millis();
     
-    Debug_printf( "\n\n==============================\n" );
-    Debug_printf( "   " PRODUCT_ID " " FW_VERSION );
-    Debug_printf( "\n------------------------------\n\n" );
+    Debug_printf( WHT "\n\n" BLUB "==============================" RESET "\n" );
+    Debug_printf( BLUB "   " PRODUCT_ID " " FW_VERSION "    " RESET "\n" );
+    Debug_printf( BLUB "------------------------------" RESET "\n\n" );
 
     Debug_printf( "FujiNet %s Started @ %lu\n", fnSystem.get_fujinet_version(), startms );
 
@@ -152,19 +153,16 @@ void main_setup()
     gpio_pad_select_gpio(PIN_IEC_ATN);
     gpio_set_direction(PIN_IEC_ATN, GPIO_MODE_INPUT);
 
-    //zero-initialize the config structure.
+    //zero-initialize the config structure
     gpio_config_t io_conf = {
         .pin_bit_mask = ( 1ULL << PIN_IEC_ATN ),    // bit mask of the pins that you want to set
         .mode = GPIO_MODE_INPUT,                    // set as input mode
-        .pull_up_en = (gpio_pullup_t)0,             // disable pull-up mode
-        .pull_down_en = (gpio_pulldown_t)0,         // disable pull-down mode
+        .pull_up_en = GPIO_PULLUP_DISABLE,             // disable pull-up mode
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,         // disable pull-down mode
         .intr_type = GPIO_INTR_NEGEDGE              // interrupt of falling edge
     };
     //configure GPIO with the given settings
     gpio_config(&io_conf);
-
-    gpio_set_intr_type(PIN_IEC_ATN, GPIO_INTR_NEGEDGE);
-    gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
     gpio_isr_handler_add((gpio_num_t)PIN_IEC_ATN, on_attention_isr_handler, (void *)PIN_IEC_ATN);
 
 
@@ -173,7 +171,7 @@ void main_setup()
     Debug_printf("Available heap: %u\nSetup complete @ %lu (%lums)\n", fnSystem.get_free_heap_size(), endms, endms - startms);
 #endif // DEBUG
 
-    runTestsSuite();
+    //runTestsSuite();
     //lfs_test();
 }
 
@@ -191,12 +189,13 @@ void fn_service_loop(void *param)
         if ( bus_state != statemachine::idle )
         {
             //Debug_printv("before[%d]", bus_state);
-            // if( drive.service() == IEC::BUS_IDLE)
-            //     bus_state = statemachine::idle;
-            //Debug_printv("after[%d]", bus_state);
+            uint8_t bs = drive.service();
+            if( bs == IEC::BUS_IDLE || bs == IEC::BUS_ERROR )
+                bus_state = statemachine::idle;
+            //Debug_printv("after[%d] bs[%d]", bus_state, bs);
             
-            Debug_printv("ATN PULLED\n");
-            bus_state = statemachine::idle;
+            // Debug_printv("ATN PULLED\n");
+            // bus_state = statemachine::idle;
         }
 
 #ifdef DEBUG_TIMING

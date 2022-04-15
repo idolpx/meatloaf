@@ -140,10 +140,10 @@ bool FileSystemSPIFFS::start()
         return true;
 
     // Set our basepath
-    strlcpy(_basepath, "/flash", sizeof(_basepath));
+    // strlcpy(_basepath, "/flash", sizeof(_basepath));
 
     esp_vfs_spiffs_conf_t conf = {
-      .base_path = _basepath,
+      .base_path = "",
       .partition_label = "flash",
       .max_files = 10, // from SPIFFS.h
       .format_if_mount_failed = false

@@ -494,10 +494,10 @@ void runTestsSuite() {
     // testBasicConfig();
 
     Debug_printv("Flash File System");
-    testDirectory(MFSOwner::File("/flash/"), "    ");
+    testDirectory(MFSOwner::File("/"), true);
 
     Debug_printv("SD Card File System");
-    testDirectory(MFSOwner::File("/sd/"), "    ");
+    testDirectory(MFSOwner::File("/sd/"), true);
 
 
     // DeviceDB m_device(0);

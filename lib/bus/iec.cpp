@@ -143,19 +143,18 @@ IEC::BusState IEC::service(Data& iec_data)
 {
 	IEC::BusState r = BUS_IDLE;
 
-	// Checks if CBM is sending a reset (setting the RESET line high). This is typically
+	// Check if CBM is sending a reset (setting the RESET line high). This is typically
 	// when the CBM is reset itself. In this case, we are supposed to reset all states to initial.
-	// if(status(PIN_IEC_RESET) == PULLED)
-	// {
-	// 	if (status(PIN_IEC_ATN) == PULLED)
-	// 	{
-	// 		// If RESET & ATN are both PULLED then CBM is off
-	// 		return BUS_IDLE;
-	// 	}
+	if(protocol.status(PIN_IEC_RESET) == PULLED)
+	{
+		if (protocol.status(PIN_IEC_ATN) == PULLED)
+		{
+			// If RESET & ATN are both PULLED then CBM is off
+			return BUS_IDLE;
+		}
 
-	// 	return BUS_RESET;
-	// }
-
+		return BUS_RESET;
+	}
 
 	// Attention line is PULLED, go to listener mode and get message.
 	// Being fast with the next two lines here is CRITICAL!
@@ -170,6 +169,7 @@ IEC::BusState IEC::service(Data& iec_data)
 	if(protocol.flags bitand ERROR)
 	{
 		Debug_printv("Get first ATN byte");
+		releaseLines(false);
 		return BUS_ERROR;
 	}
 	if(protocol.flags bitand JIFFY_ACTIVE)
@@ -243,6 +243,7 @@ IEC::BusState IEC::service(Data& iec_data)
 		if(protocol.flags bitand ERROR)
 		{
 			Debug_printv("Get the first cmd byte");
+			releaseLines(false);
 			return BUS_ERROR;
 		}
 
@@ -279,7 +280,7 @@ IEC::BusState IEC::service(Data& iec_data)
 	if(r == BUS_IDLE || r == BUS_ERROR)
 	{
 		// Debug_printv("release lines");
-		releaseLines();
+		releaseLines(true);
 	}
 	// Don't do anything here or it could cause LOAD ERROR!!!
 

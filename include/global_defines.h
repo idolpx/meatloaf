@@ -18,14 +18,16 @@
 #ifndef GLOBAL_DEFINES_H
 #define GLOBAL_DEFINES_H
 
+#include "ansi_codes.h"
 
 #define PRODUCT_ID "MEATLOAF CBM"
-#define FW_VERSION "20211026.1" // Dynamically set at compile time in "platformio.ini"
+#define FW_VERSION "20220414.1" // Dynamically set at compile time in "platformio.ini"
 #define USER_AGENT PRODUCT_ID " [" FW_VERSION "]"
 //#define UPDATE_URL      "http://meatloaf.cc/fw/?p=meatloaf&d={{DEVICE_ID}}&a="
 #define UPDATE_URL "http://meatloaf.cc/fw/meatloaf.4MB.bin"
 //#define UPDATE_URL      "http://meatloaf.cc/fw/meatloaf.16MB.bin"
-#define SYSTEM_DIR "/flash/.sys/"
+
+#define SYSTEM_DIR "/.sys/"
 
 #define HOSTNAME "meatloaf"
 #define SERVER_PORT 80   // HTTPd & WebDAV Server Port
