@@ -21,8 +21,12 @@
 #include "../../include/pinmap.h"
 #include "../../include/cbmdefines.h"
 
+#include "drive.h"
+
 #include "string_utils.h"
 
+iecBus IEC;
+//iecDrive drive;
 
 using namespace CBM;
 using namespace Protocol;
@@ -298,9 +302,12 @@ iecBus::BUS_STATE iecBus::service( void )
 
 	// Attention line is PULLED, go to listener mode and get message.
 	// Being fast with the next two lines here is CRITICAL!
+	protocol.pull(PIN_IEC_SRQ);
 	protocol.release(PIN_IEC_CLK);
 	protocol.pull(PIN_IEC_DATA);
+	protocol.release(PIN_IEC_SRQ);
 	delayMicroseconds(TIMING_Tne);
+
 
 	// Get command
 	int16_t c = (iecBus::COMMAND)receive(this->data.device);
@@ -412,21 +419,22 @@ iecBus::BUS_STATE iecBus::service( void )
 	else
 	{
 		Debug_println("");
-		releaseLines(false);
-		return BUS_IDLE;
+		r =  BUS_IDLE;
 	}
 
 	// Was there an error?
+	this->state = r;
 	if(r == BUS_IDLE || r == BUS_ERROR)
 	{
 		// Debug_printv("release lines");
 		releaseLines(true);
 	}
+	else
+	{
+		// Send data to device to process
+		//drive.process();		
+	}
 	// Don't do anything here or it could cause LOAD ERROR!!!
-
-	// Send data to device to process
-	this->state = r;
-	//drive.process();
 
 	return r;
 } // service
@@ -588,6 +596,7 @@ void iecBus::releaseLines(bool wait)
 int16_t iecBus::receive(uint8_t device)
 {
 	int16_t data;
+
 	data = protocol.receiveByte(device); // Standard CBM Timing
 #ifdef DATA_STREAM
 	Debug_printf("%.2X ", data);

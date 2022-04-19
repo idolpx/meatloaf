@@ -34,14 +34,18 @@ int16_t  CBMStandardSerial::receiveByte(uint8_t device)
 {
 	flags = CLEAR;
 
-	// Wait for talker ready
-	while(status(PIN_IEC_CLK) != RELEASED)
-	{
-//		ESP.wdtFeed();
-		taskYIELD();		
-	}
-
 	pull(PIN_IEC_SRQ);
+
+
+	// Wait for talker ready
+	while(status(PIN_IEC_CLK) != RELEASED);
+	//timeoutWait(PIN_IEC_CLK, RELEASED, FOREVER, 1);
+// 	{
+// //		ESP.wdtFeed();
+// //		taskYIELD();
+// 	}
+
+	release(PIN_IEC_SRQ);
 
 	// Say we're ready
 	// STEP 2: READY FOR DATA
@@ -52,8 +56,6 @@ int16_t  CBMStandardSerial::receiveByte(uint8_t device)
 	release(PIN_IEC_DATA);
 	while(status(PIN_IEC_DATA) != RELEASED); // Wait for all other devices to release the data line
 	//timeoutWait(PIN_IEC_DATA, RELEASED, FOREVER, 1);
-
-	release(PIN_IEC_SRQ);
 
 	// Either  the  talker  will pull the 
 	// Clock line back to true in less than 200 microseconds - usually within 60 microseconds - or it  

@@ -17,6 +17,8 @@
 
 #include "device_db.h"
 
+DeviceDB DEVICE_SETTINGS = DeviceDB(0);
+
 DeviceDB::DeviceDB(uint8_t device)
 {
     select(device);

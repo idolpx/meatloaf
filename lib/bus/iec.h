@@ -88,7 +88,6 @@ protected:
 	// This is set after an open command and determines what to send next
 	uint8_t m_openState;
 
-private:
 	Channel channelSelect( void );
 	bool channelClose( bool close_all = false );
 
@@ -150,16 +149,15 @@ public:
 
 	iecBus( void );
 
-    // void setup();
-    // void service();
-    // void shutdown();
-
 	// Initialise iec driver
 	bool init();
+    // void setup();
 
 	// Checks if CBM is sending an attention message. If this is the case,
 	// the message is recieved and stored in iec_data.
 	BUS_STATE service(void);
+
+    // void shutdown();
 
 	// Checks if CBM is sending a reset (setting the RESET line high). This is typicall
 	// when the CBM is reset itself. In this case, we are supposed to reset all states to initial.
@@ -210,4 +208,4 @@ private:
 
 extern iecBus IEC;
 
-#endif
+#endif // IEC_H

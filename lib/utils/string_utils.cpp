@@ -176,19 +176,19 @@ namespace mstr {
     bool isText(std::string &s) 
     {
         // extensions
-        if(equals(s, "txt", false))
+        if(equals(s, (char*)"txt", false))
             return true;
-        if(equals(s, "htm", false))
+        if(equals(s, (char*)"htm", false))
             return true;
-        if(equals(s, "html", false))
+        if(equals(s, (char*)"html", false))
             return true;
 
         // content types
-        if(contains(s, "text", false))
+        if(contains(s, (char*)"text", false))
             return true;
-        if(contains(s, "json", false))
+        if(contains(s, (char*)"json", false))
             return true;
-        if(contains(s, "xml", false))
+        if(contains(s, (char*)"xml", false))
             return true;
 
         return false;

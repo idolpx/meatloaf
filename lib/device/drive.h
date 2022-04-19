@@ -46,11 +46,11 @@ enum OpenState
 	O_ML_STATUS		// Meatloaf Virtual Device Status
 };
 
-class devDrive: public iecDevice
+class iecDrive: public iecDevice
 {
 public:
-	devDrive();
-	virtual ~devDrive() {};
+	iecDrive();
+	virtual ~iecDrive() {};
 
  	virtual uint8_t command( void ) { return 0; };
 	virtual uint8_t execute( void ) { return 0; };
@@ -104,5 +104,6 @@ private:
 	void dumpState();
 };
 
+extern iecDrive drive;
 
 #endif

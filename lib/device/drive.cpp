@@ -28,17 +28,19 @@
 #include "wrappers/iec_buffer.h"
 #include "wrappers/directory_stream.h"
 
+iecDrive drive;
+
 using namespace CBM;
 using namespace Protocol;
 
 
-devDrive::devDrive() : iecDevice(),	m_mfile(MFSOwner::File(""))
+iecDrive::iecDrive() : iecDevice(),	m_mfile(MFSOwner::File(""))
 {
 	reset();
 } // ctor
 
 
-void devDrive::reset(void)
+void iecDrive::reset(void)
 {
 	m_openState = O_NOTHING;
 	setDeviceStatus(73);
@@ -46,13 +48,13 @@ void devDrive::reset(void)
 } // reset
 
 
-void devDrive::sendFileNotFound(void)
+void iecDrive::sendFileNotFound(void)
 {
 	setDeviceStatus(62);
  	IEC.sendFNF();
 }
 
-void devDrive::sendStatus(void)
+void iecDrive::sendStatus(void)
 {
 	std::string status = m_device_status;
 	if (status.size() == 0)
@@ -72,7 +74,7 @@ void devDrive::sendStatus(void)
 	m_device_status.clear();
 } // sendStatus
 
-void devDrive::setDeviceStatus(int number, int track, int sector)
+void iecDrive::setDeviceStatus(int number, int track, int sector)
 {
 	switch(number)
 	{
@@ -166,7 +168,7 @@ void devDrive::setDeviceStatus(int number, int track, int sector)
 
 
 
-MFile* devDrive::getPointed(MFile* urlFile) {
+MFile* iecDrive::getPointed(MFile* urlFile) {
 	Debug_printv("getPointed [%s]", urlFile->url.c_str());
 	auto istream = Meat::ifstream(urlFile);
 
@@ -185,7 +187,7 @@ MFile* devDrive::getPointed(MFile* urlFile) {
 	}
 };
 
-CommandPathTuple devDrive::parseLine(std::string command, size_t channel)
+CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 {
 
 	Debug_printv("* PARSE INCOMING LINE *******************************");
@@ -303,7 +305,7 @@ CommandPathTuple devDrive::parseLine(std::string command, size_t channel)
 	return tuple;
 }
 
-void devDrive::changeDir(std::string url)
+void iecDrive::changeDir(std::string url)
 {
 	DEVICE_SETTINGS.url(url);
 	m_mfile.reset(MFSOwner::File(url));
@@ -313,7 +315,7 @@ void devDrive::changeDir(std::string url)
 	Debug_printv("LOAD $");
 }
 
-void devDrive::prepareFileStream(std::string url)
+void iecDrive::prepareFileStream(std::string url)
 {
 	DEVICE_SETTINGS.url(url);
 	m_filename = url;
@@ -323,7 +325,7 @@ void devDrive::prepareFileStream(std::string url)
 
 
 
-void devDrive::handleListenCommand( void )
+void iecDrive::handleListenCommand( void )
 {
 	if (DEVICE_SETTINGS.select(IEC.data.device))
 	{
@@ -413,7 +415,7 @@ void devDrive::handleListenCommand( void )
 } // handleListenCommand
 
 
-void devDrive::handleListenData()
+void iecDrive::handleListenData()
 {
 	Debug_printv("[%s]", DEVICE_SETTINGS.url().c_str());
 
@@ -421,7 +423,7 @@ void devDrive::handleListenData()
 } // handleListenData
 
 
-void devDrive::handleTalk(uint8_t chan)
+void iecDrive::handleTalk(uint8_t chan)
 {
 	Debug_printv("channel[%d] openState[%d]", chan, m_openState);
 
@@ -447,12 +449,12 @@ void devDrive::handleTalk(uint8_t chan)
 
 		case O_ML_INFO:
 			// Send system information
-			sendMeatloafSystemInformation();
+			// sendMeatloafSystemInformation();
 			break;
 
 		case O_ML_STATUS:
 			// Send virtual device status
-			sendMeatloafVirtualDeviceStatus();
+			// sendMeatloafVirtualDeviceStatus();
 			break;
 	}
 
@@ -460,10 +462,10 @@ void devDrive::handleTalk(uint8_t chan)
 } // handleTalk
 
 
-void devDrive::handleOpen( void )
+void iecDrive::handleOpen( void )
 {
 	Debug_printv("OPEN Named Channel (%.2d Device) (%.2d Channel)", IEC.data.device, IEC.data.channel);
-	auto channel = channels[IEC.data.command];
+	auto channel = channelSelect(); // channels[IEC.data.command];
 
 	// Are we writing?  Appending?
 	channels[IEC.data.command].url = IEC.data.content;
@@ -472,14 +474,18 @@ void devDrive::handleOpen( void )
 } // handleOpen
 
 
-void devDrive::handleClose( void )
+void iecDrive::handleClose( void )
 {
 	Debug_printv("CLOSE Named Channel (%.2d Device) (%.2d Channel)", IEC.data.device, IEC.data.channel);
-	auto channel = channels[IEC.data.command];
+	auto channel = channelSelect(); channels[IEC.data.command];
 
 	// If writing update BAM & Directory
+	if (channel.writing) {
+
+	}
 
 	// Remove channel from map
+	channelClose();
 
 } // handleClose
 
@@ -489,7 +495,7 @@ void devDrive::handleClose( void )
 
 
 // send single basic line, including heading basic pointer and terminating zero.
-uint16_t devDrive::sendLine(uint16_t &basicPtr, uint16_t blocks, const char *format, ...)
+uint16_t iecDrive::sendLine(uint16_t &basicPtr, uint16_t blocks, const char *format, ...)
 {
 	// Format our string
 	va_list args;
@@ -501,7 +507,7 @@ uint16_t devDrive::sendLine(uint16_t &basicPtr, uint16_t blocks, const char *for
 	return sendLine(basicPtr, blocks, text);
 }
 
-uint16_t devDrive::sendLine(uint16_t &basicPtr, uint16_t blocks, char *text)
+uint16_t iecDrive::sendLine(uint16_t &basicPtr, uint16_t blocks, char *text)
 {
 	uint16_t b_cnt = 0;
 
@@ -535,7 +541,7 @@ uint16_t devDrive::sendLine(uint16_t &basicPtr, uint16_t blocks, char *text)
 	return b_cnt;
 } // sendLine
 
-// uint16_t devDrive::sendHeader(uint16_t &basicPtr, const char *format, ...)
+// uint16_t iecDrive::sendHeader(uint16_t &basicPtr, const char *format, ...)
 // {
 // 	Debug_printv("formatting header");
 
@@ -551,7 +557,7 @@ uint16_t devDrive::sendLine(uint16_t &basicPtr, uint16_t blocks, char *text)
 // 	return sendHeader(basicPtr, std::string(text));
 // }
 
-uint16_t devDrive::sendHeader(uint16_t &basicPtr, std::string header, std::string id)
+uint16_t iecDrive::sendHeader(uint16_t &basicPtr, std::string header, std::string id)
 {
 	uint16_t byte_count = 0;
 	bool sent_info = false;
@@ -613,7 +619,7 @@ uint16_t devDrive::sendHeader(uint16_t &basicPtr, std::string header, std::strin
 	return byte_count;
 }
 
-void devDrive::sendListing()
+void iecDrive::sendListing()
 {
 	Debug_printf("sendListing: [%s]\r\n=================================\r\n", m_mfile->url.c_str());
 
@@ -714,7 +720,7 @@ void devDrive::sendListing()
 } // sendListing
 
 
-uint16_t devDrive::sendFooter(uint16_t &basicPtr, uint16_t blocks_free, uint16_t block_size)
+uint16_t iecDrive::sendFooter(uint16_t &basicPtr, uint16_t blocks_free, uint16_t block_size)
 {
 	// Send List FOOTER
 	// #if defined(USE_LITTLEFS)
@@ -743,7 +749,7 @@ uint16_t devDrive::sendFooter(uint16_t &basicPtr, uint16_t blocks_free, uint16_t
 }
 
 
-void devDrive::sendFile()
+void iecDrive::sendFile()
 {
 	size_t i = 0;
 	bool success = true;
@@ -791,7 +797,7 @@ void devDrive::sendFile()
 
 
 		istream.open();
-		ostream.open(&m_iec);
+		ostream.open(&IEC);
 
 		if(!istream.is_open()) {
 			sendFileNotFound();
@@ -936,7 +942,7 @@ void devDrive::sendFile()
 } // sendFile
 
 
-void devDrive::saveFile()
+void iecDrive::saveFile()
 {
 	uint16_t i = 0;
 	bool done = false;
@@ -1035,7 +1041,7 @@ void devDrive::saveFile()
 } // saveFile
 
 
-void devDrive::dumpState()
+void iecDrive::dumpState()
 {
 	Debug_println("");
 	Debug_printv("-------------------------------");

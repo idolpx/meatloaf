@@ -19,7 +19,7 @@
 #define MAX_WRITE_BUFFER_TICKS 1000
 
 UARTManager fnUartDebug(UART_DEBUG);
-UARTManager fnUartSIO(UART_SIO);
+//UARTManager fnUartSIO(UART_SIO);
 
 // Constructor
 UARTManager::UARTManager(uart_port_t uart_num) : _uart_num(uart_num), _uart_q(NULL) {}

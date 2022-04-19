@@ -59,4 +59,4 @@ private:
 
 extern DeviceDB DEVICE_SETTINGS;
 
-#endif
+#endif // DEVICE_DB_H

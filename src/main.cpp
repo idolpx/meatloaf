@@ -7,14 +7,12 @@
 #include "../include/global_defines.h"
 #include "../include/debug.h"
 
-//#include "bus.h"
-//#include "device.h"
+
 #include "keys.h"
 #include "led.h"
 
 #include "fnSystem.h"
 #include "fnWiFi.h"
-// #include "fnConfig.h"
 
 
 #ifdef FLASH_SPIFFS
@@ -25,12 +23,10 @@
 #include "fnFsSD.h"
 
 
-//#include "httpService.h"
 
 /**************************/
 // Meatloaf
 
-#include "meat_io.h"
 
 #include "iec.h"
 #include "ml_tests.h"
@@ -69,7 +65,7 @@ void main_shutdown_handler()
     Debug_println("Shutdown handler called");
     // Give devices an opportunity to clean up before rebooting
 
-//    SYSTEM_BUS.shutdown();
+//    IEC.shutdown();
 }
 
 // Initial setup
@@ -79,9 +75,9 @@ void main_setup()
     fnUartDebug.begin(DEBUG_SPEED);
     unsigned long startms = fnSystem.millis();
     
-    Debug_printf( ANSI_WHITE "\n\n" ANSI_BLUE_BACKGROUND "==============================" ANSI_RESET "\n" );
-    Debug_printf( ANSI_BLUE_BACKGROUND "   " PRODUCT_ID " " FW_VERSION "    " ANSI_RESET "\n" );
-    Debug_printf( ANSI_BLUE_BACKGROUND "------------------------------" ANSI_RESET "\n\n" );
+    Debug_printf( ANSI_WHITE "\n\n" ANSI_BLUE_BACKGROUND "==============================" ANSI_RESET_NL );
+    Debug_printf( ANSI_BLUE_BACKGROUND "   " PRODUCT_ID " " FW_VERSION "    " ANSI_RESET_NL );
+    Debug_printf( ANSI_BLUE_BACKGROUND "------------------------------" ANSI_RESET_NL "\n" );
 
     Debug_printf( "FujiNet %s Started @ %lu\n", fnSystem.get_fujinet_version(), startms );
 
@@ -197,7 +193,7 @@ void fn_service_loop(void *param)
         }
 
 #ifdef DEBUG_TIMING
-        iec.debugTiming();
+        IEC.debugTiming();
 #endif
 
         taskYIELD(); // Allow other tasks to run
