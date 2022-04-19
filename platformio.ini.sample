@@ -28,7 +28,8 @@ build_bus      = IEC
 ;build_platform  = BUILD_S100
 ;build_bus       = s100Bus
 
-flash_filesystem = FLASH_LITTLEFS ; FLASH_SPIFFS 
+;flash_filesystem = FLASH_SPIFFS 
+flash_filesystem = FLASH_LITTLEFS
 
 [platformio]
 description = Meatloaf / FujiNet retro computer to ESP32 WiFi Multifunction Firmware

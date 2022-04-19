@@ -85,11 +85,12 @@ protected:
 	virtual void handleOpen( void ) = 0;
 	virtual void handleClose( void ) = 0;
 
-	// This is set after an open command and determines what to send next
-	uint8_t m_openState;
-
+	// Named Channel functions
 	Channel channelSelect( void );
 	bool channelClose( bool close_all = false );
+
+	// This is set after an open command and determines what to send next
+	uint8_t m_openState;
 
 };
 

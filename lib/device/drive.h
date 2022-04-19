@@ -29,6 +29,7 @@
 #include "iec.h"
 
 #include "meat_io.h"
+
 //#include "MemoryInfo.h"
 //#include "helpers.h"
 #include "utils.h"
@@ -49,8 +50,8 @@ enum OpenState
 class iecDrive: public iecDevice
 {
 public:
-	iecDrive();
-	virtual ~iecDrive() {};
+	// iecDrive();
+	// virtual ~iecDrive() {};
 
  	virtual uint8_t command( void ) { return 0; };
 	virtual uint8_t execute( void ) { return 0; };

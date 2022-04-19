@@ -194,7 +194,7 @@ void testCD() {
 
     Debug_println("A chain of CDs");
     // make a folder called GAMES on root of flash
-    //testDir.reset(MFSOwner::File(""));
+    //testDir.reset(MFSOwner::File("/"));
     Debug_printf("I'm in %s, changing to GAMES\n", testDir->url.c_str());
     // then on the 64   LOAD"CD:GAMES",8
     testDir.reset(testDir->cd("GAMES"));

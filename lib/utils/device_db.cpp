@@ -17,12 +17,34 @@
 
 #include "device_db.h"
 
-DeviceDB DEVICE_SETTINGS = DeviceDB(0);
+#include "../../include/global_defines.h"
+#include "meat_io.h"
 
-DeviceDB::DeviceDB(uint8_t device)
+DeviceDB device_config;
+
+// DeviceDB::DeviceDB(uint8_t device)
+// {
+//     select(device);
+//     m_dirty = false;
+
+//     // Create .sys folder if it doesn't exist
+//     std::unique_ptr<MFile> file(MFSOwner::File(SYSTEM_DIR));
+//     if ( !file->exists() )
+//     {
+//         Debug_printv("Create '" SYSTEM_DIR "' folder!");
+//         file->mkDir();
+//     }
+// } // constructor
+
+// DeviceDB::~DeviceDB()
+// {
+
+// } // destructor
+
+
+bool DeviceDB::select(uint8_t new_device_id)
 {
-    select(device);
-    m_dirty = false;
+    uint8_t device_id = m_device["id"];
 
     // Create .sys folder if it doesn't exist
     std::unique_ptr<MFile> file(MFSOwner::File(SYSTEM_DIR));
@@ -31,17 +53,6 @@ DeviceDB::DeviceDB(uint8_t device)
         Debug_printv("Create '" SYSTEM_DIR "' folder!");
         file->mkDir();
     }
-} // constructor
-
-DeviceDB::~DeviceDB()
-{
-
-} // destructor
-
-
-bool DeviceDB::select(uint8_t new_device_id)
-{
-    uint8_t device_id = m_device["id"];
 
     //Debug_printv("cur[%d] new[%d]", device_id, new_device_id);
     if ( device_id == new_device_id )
@@ -53,7 +64,8 @@ bool DeviceDB::select(uint8_t new_device_id)
     save();
 
     config_file = SYSTEM_DIR "device." + std::to_string(new_device_id) + ".conf";
-    std::unique_ptr<MFile> file(MFSOwner::File(config_file));
+    //std::unique_ptr<MFile> file(MFSOwner::File(config_file));
+    file.reset(MFSOwner::File(config_file));
 
     //Debug_printv("config_file[%s]", config_file.c_str());
     if ( file->exists() )

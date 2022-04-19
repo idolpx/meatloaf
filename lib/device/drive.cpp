@@ -26,7 +26,7 @@
 #include "led.h"
 
 #include "wrappers/iec_buffer.h"
-#include "wrappers/directory_stream.h"
+//#include "wrappers/directory_stream.h"
 
 iecDrive drive;
 
@@ -34,17 +34,17 @@ using namespace CBM;
 using namespace Protocol;
 
 
-iecDrive::iecDrive() : iecDevice(),	m_mfile(MFSOwner::File(""))
-{
-	reset();
-} // ctor
+// iecDrive::iecDrive() : iecDevice(),	m_mfile(MFSOwner::File("/"))
+// {
+// 	reset();
+// } // ctor
 
 
 void iecDrive::reset(void)
 {
 	m_openState = O_NOTHING;
 	setDeviceStatus(73);
-	//DEVICE_SETTINGS.reset();
+	//device_config.reset();
 } // reset
 
 
@@ -198,7 +198,7 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 	if (mstr::endsWith(command, "*"))
 	{
 		// Find first program in listing
-		if (DEVICE_SETTINGS.path().empty())
+		if (device_config.path().empty())
 		{
 			// If in LittleFS root then set it to FB64
 			// TODO: Load configured autoload program
@@ -307,7 +307,7 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 
 void iecDrive::changeDir(std::string url)
 {
-	DEVICE_SETTINGS.url(url);
+	device_config.url(url);
 	m_mfile.reset(MFSOwner::File(url));
 	m_openState = O_DIR;
 	Debug_printv("!!!! CD into [%s]", url.c_str());
@@ -317,7 +317,7 @@ void iecDrive::changeDir(std::string url)
 
 void iecDrive::prepareFileStream(std::string url)
 {
-	DEVICE_SETTINGS.url(url);
+	device_config.url(url);
 	m_filename = url;
 	m_openState = O_FILE;
 	Debug_printv("LOAD [%s]", url.c_str());
@@ -327,10 +327,10 @@ void iecDrive::prepareFileStream(std::string url)
 
 void iecDrive::handleListenCommand( void )
 {
-	if (DEVICE_SETTINGS.select(IEC.data.device))
+	if (device_config.select(IEC.data.device))
 	{
-		Debug_printv("!!!! device changed: unit:%d current url: [%s]", DEVICE_SETTINGS.id(), DEVICE_SETTINGS.url().c_str());
-		m_mfile.reset(MFSOwner::File(DEVICE_SETTINGS.url()));
+		Debug_printv("!!!! device changed: unit:%d current url: [%s]", device_config.id(), device_config.url().c_str());
+		m_mfile.reset(MFSOwner::File(device_config.url()));
 		Debug_printv("m_mfile[%s]", m_mfile->url.c_str());
 	}
 
@@ -417,7 +417,7 @@ void iecDrive::handleListenCommand( void )
 
 void iecDrive::handleListenData()
 {
-	Debug_printv("[%s]", DEVICE_SETTINGS.url().c_str());
+	Debug_printv("[%s]", device_config.url().c_str());
 
 	saveFile();
 } // handleListenData
@@ -563,7 +563,7 @@ uint16_t iecDrive::sendHeader(uint16_t &basicPtr, std::string header, std::strin
 	bool sent_info = false;
 
 	PeoplesUrlParser p;
-	std::string url = DEVICE_SETTINGS.url();
+	std::string url = device_config.url();
 
 	mstr::toPETSCII(url);
 	p.parseUrl(url);
@@ -584,7 +584,7 @@ uint16_t iecDrive::sendHeader(uint16_t &basicPtr, std::string header, std::strin
 
 	byte_count += sendLine(basicPtr, 0, CBM_REVERSE_ON "\"%*s%s%*s\" %s", space_cnt, "", header.c_str(), space_cnt, "", id.c_str());
 
-	//byte_count += sendLine(basicPtr, 0, "\x12\"%*s%s%*s\" %.02d 2A", space_cnt, "", PRODUCT_ID, space_cnt, "", DEVICE_SETTINGS.device());
+	//byte_count += sendLine(basicPtr, 0, "\x12\"%*s%s%*s\" %.02d 2A", space_cnt, "", PRODUCT_ID, space_cnt, "", device_config.device());
 	//byte_count += sendLine(basicPtr, 0, CBM_REVERSE_ON "%s", header.c_str());
 
 	// Send Extra INFO
@@ -603,7 +603,7 @@ uint16_t iecDrive::sendHeader(uint16_t &basicPtr, std::string header, std::strin
 	if (archive.size() > 1)
 	{
 		byte_count += sendLine(basicPtr, 0, "%*s\"%-*s\" NFO", 0, "", 19, "[ARCHIVE]");
-		byte_count += sendLine(basicPtr, 0, "%*s\"%-*s\" NFO", 0, "", 19, DEVICE_SETTINGS.archive().c_str());
+		byte_count += sendLine(basicPtr, 0, "%*s\"%-*s\" NFO", 0, "", 19, device_config.archive().c_str());
 	}
 	if (image.size())
 	{
@@ -647,7 +647,7 @@ void iecDrive::sendListing()
 	{
 		// Set device default Listing Header
 		char buf[7] = { '\0' };
-		sprintf(buf, "%.02d 2A", DEVICE_SETTINGS.id());
+		sprintf(buf, "%.02d 2A", device_config.id());
 		byte_count += sendHeader(basicPtr, PRODUCT_ID, buf);
 	}
 	else
@@ -734,7 +734,7 @@ uint16_t iecDrive::sendFooter(uint16_t &basicPtr, uint16_t blocks_free, uint16_t
 		byte_count = sendLine(basicPtr, blocks_free, "BLOCKS FREE.");
 	}
 
-	// if (DEVICE_SETTINGS.url().length() == 0)
+	// if (device_config.url().length() == 0)
 	// {
 	// 	FSInfo64 fs_info;
 	// 	m_fileSystem->info64(fs_info);
@@ -765,7 +765,7 @@ void iecDrive::sendFile()
 #endif
 
 	// Update device database
-	DEVICE_SETTINGS.save();
+	device_config.save();
 
 	std::unique_ptr<MFile> file(MFSOwner::File(m_filename));
 
@@ -845,7 +845,7 @@ void iecDrive::sendFile()
 		}
 
 		// Position file pointer
-		//istream->seek(DEVICE_SETTINGS.position(m_IEC.data.channel));
+		//istream->seek(device_config.position(m_IEC.data.channel));
 
 
 		size_t len = istream->size();

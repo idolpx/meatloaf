@@ -18,9 +18,6 @@
 #ifndef DEVICE_DB_H
 #define DEVICE_DB_H
 
-#include "../../include/global_defines.h"
-#include "meat_io.h"
-
 #include <ArduinoJson.h>
 
 #define RECORD_SIZE 512
@@ -28,8 +25,8 @@
 class DeviceDB
 {
 public:
-    DeviceDB(uint8_t device);
-    ~DeviceDB();
+    // DeviceDB(uint8_t device);
+    // ~DeviceDB();
 
     bool save();
 
@@ -57,6 +54,6 @@ private:
     StaticJsonDocument<RECORD_SIZE> m_device;
 };
 
-extern DeviceDB DEVICE_SETTINGS;
+extern DeviceDB device_config;
 
 #endif // DEVICE_DB_H

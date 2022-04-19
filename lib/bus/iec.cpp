@@ -51,84 +51,71 @@ void iecDevice::reset(void)
 
 uint8_t iecDevice::process( void )
 {
-	//iecDevice::DeviceState r = DEVICE_IDLE;
+	bool open = false;
+	Debug_printf("DEVICE: [%d] ", IEC.data.device);
 
-	if (IEC.state == iecBus::BUS_ERROR)
+	if (IEC.data.command == iecBus::IEC_OPEN)
 	{
-		reset();
-		IEC.state = iecBus::BUS_IDLE;
+		Debug_printf("OPEN CHANNEL %d\r\n", IEC.data.channel);
+		if (IEC.data.channel == 0)
+			Debug_printf("LOAD \"%s\",%d\r\n", IEC.data.content.c_str(), IEC.data.device);
+		else if (IEC.data.channel == 1)
+			Debug_printf("SAVE \"%s\",%d\r\n", IEC.data.content.c_str(), IEC.data.device);
+		else {
+			Debug_printf("OPEN #,%d,%d,\"%s\"\r\n", IEC.data.device, IEC.data.channel, IEC.data.content.c_str());
+		}
+
+		// Open Named Channel
+		handleOpen();
+
+		// Open either file or prg for reading, writing or single line command on the command channel.
+		open = true;
+	}
+	else if (IEC.data.command == iecBus::IEC_SECOND) // data channel opened
+	{
+		Debug_printf("DATA CHANNEL %d\r\n", IEC.data.channel);
+		open = true;
+	}
+	else if (IEC.data.command == iecBus::IEC_CLOSE)
+	{
+		Debug_printf("CLOSE CHANNEL %d\r\n", IEC.data.channel);
+		if(IEC.data.channel > 0)
+		{
+			handleClose();
+		}
+		// return DEVICE_STATE::DEVICE_IDLE;
+	}	
+	
+	// Ready to Send or Receive Data
+	if (open)
+	{
+		Debug_printf("DATA CHANNEL %d\r\n", IEC.data.channel);
+		if (IEC.state == iecBus::BUS_COMMAND)
+		{
+			// Process a command
+			Debug_printv("[Process a command]");
+			handleListenCommand();
+		}
+		else if (IEC.state == iecBus::BUS_LISTEN)
+		{
+			// Receive data
+			Debug_printv("[Receive data]");
+			handleListenData();
+		}
+		else if (IEC.state == iecBus::BUS_TALK)
+		{
+			// Send data
+			Debug_printv("[Send data]");
+			if (IEC.data.channel == CMD_CHANNEL)
+			{
+				handleListenCommand();		 // This is typically an empty command,
+			}
+
+			handleTalk(IEC.data.channel);
+		}
 	}
 
-	// Did anything happen from the controller side?
-	else if (IEC.state not_eq iecBus::BUS_IDLE)
-	{
-		Debug_printf("DEVICE: [%d] ", IEC.data.device);
-
-		if (IEC.data.command == iecBus::IEC_OPEN)
-		{
-			Debug_printf("OPEN CHANNEL %d\r\n", IEC.data.channel);
-			if (IEC.data.channel == 0)
-				Debug_printf("LOAD \"%s\",%d\r\n", IEC.data.content.c_str(), IEC.data.device);
-			else if (IEC.data.channel == 1)
-				Debug_printf("SAVE \"%s\",%d\r\n", IEC.data.content.c_str(), IEC.data.device);
-			else {
-				Debug_printf("OPEN #,%d,%d,\"%s\"\r\n", IEC.data.device, IEC.data.channel, IEC.data.content.c_str());
-			}
-
-			// Open Named Channel
-			handleOpen();
-
-			// Open either file or prg for reading, writing or single line command on the command channel.
-			if (IEC.state == iecBus::BUS_COMMAND)
-			{
-				// Process a command
-				Debug_printv("[Process a command]");
-				handleListenCommand();
-			}
-			else if (IEC.state == iecBus::BUS_LISTEN)
-			{
-				// Receive data
-				Debug_printv("[Receive data]");
-				handleListenData();
-			}
-		}
-		else if (IEC.data.command == iecBus::IEC_SECOND) // data channel opened
-		{
-			Debug_printf("DATA CHANNEL %d\r\n", IEC.data.channel);
-			if (IEC.state == iecBus::BUS_COMMAND)
-			{
-				// Process a command
-				Debug_printv("[Process a command]");
-				handleListenCommand();
-			}
-			else if (IEC.state == iecBus::BUS_LISTEN)
-			{
-				// Receive data
-				Debug_printv("[Receive data]");
-				handleListenData();
-			}
-			else if (IEC.state == iecBus::BUS_TALK)
-			{
-				// Send data
-				Debug_printv("[Send data]");
-				if (IEC.data.channel == CMD_CHANNEL)
-				{
-					handleListenCommand();		 // This is typically an empty command,
-				}
-
-				handleTalk(IEC.data.channel);
-			}
-		}
-		else if (IEC.data.command == iecBus::IEC_CLOSE)
-		{
-			Debug_printf("CLOSE CHANNEL %d\r\n", IEC.data.channel);
-			if(IEC.data.channel > 0)
-			{
-				handleClose();
-			}
-		}
-	}
-	//Debug_printv("mode[%d] command[%.2X] channel[%.2X] state[%d]", mode, IEC.data.command, IEC.data.channel, m_openState);
+	Debug_printv("command[%.2X] channel[%.2X] state[%d]", IEC.data.command, IEC.data.channel, m_openState);
 
 	return DEVICE_STATE::DEVICE_IDLE;
 } // service
@@ -440,10 +427,10 @@ iecBus::BUS_STATE iecBus::service( void )
 	{
 		// Send data to device to process
 		Debug_printv("Send Command [%.2X]{%s} to virtual device", IEC.data.command, IEC.data.content.c_str());
-		//drive.process();
+		drive.process();
 		
-		r = BUS_IDLE;
-		releaseLines(true);
+		// r = BUS_IDLE;
+		// releaseLines(true);
 	}
 	// Don't do anything here or it could cause LOAD ERROR!!!
 
