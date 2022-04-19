@@ -378,7 +378,7 @@ int16_t CBMStandardSerial::timeoutWait(uint8_t iecPIN, bool lineStatus, size_t w
 		}
 	}
 
-	Debug_printv("pin[%d] state[%d] wait[%d] step[%d] t[%d]", iecPIN, lineStatus, wait, step, t);
+	// Debug_printv("pin[%d] state[%d] wait[%d] step[%d] t[%d]", iecPIN, lineStatus, wait, step, t);
 	return -1;
 } // timeoutWait
 

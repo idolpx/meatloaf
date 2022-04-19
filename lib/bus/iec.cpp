@@ -302,29 +302,37 @@ iecBus::BUS_STATE iecBus::service( void )
 
 	// Attention line is PULLED, go to listener mode and get message.
 	// Being fast with the next two lines here is CRITICAL!
-	protocol.pull(PIN_IEC_SRQ);
 	protocol.release(PIN_IEC_CLK);
 	protocol.pull(PIN_IEC_DATA);
-	protocol.release(PIN_IEC_SRQ);
 	delayMicroseconds(TIMING_Tne);
 
 
 	// Get command
 	int16_t c = (iecBus::COMMAND)receive(this->data.device);
+	this->data.command = c;	
 
-	Debug_printf("   IEC: [%.2X] ", c);
+	Debug_printf("   IEC: [%.2X]", c);
+
+	// Check for error
 	if(protocol.flags bitand ERROR)
 	{
 		Debug_printv("Get first ATN byte");
 		releaseLines(false);
 		return BUS_ERROR;
 	}
+
+	// // Check for EOI
+	// if(protocol.flags bitand EOI_RECVD)
+	// {
+	// 	Debug_printf("[EOI]");
+	// }
+
+	// Check for JiffyDOS
 	if(protocol.flags bitand JIFFY_ACTIVE)
 	{
-		Debug_printf("[JIFFY] ");
+		Debug_printf("[JIFFY]");
 	}
 
-	this->data.command = c; // bitand 0xFF; // Clear flags in high byte
 
 	// Decode command byte
 	if((c bitand 0xF0) == IEC_GLOBAL)
@@ -360,24 +368,24 @@ iecBus::BUS_STATE iecBus::service( void )
 		releaseLines(false);
 		return BUS_IDLE;
 	}
-	else if((c bitand 0xF0) == IEC_SECOND)
-	{
-		this->data.command = IEC_SECOND;
-		this->data.channel = c xor IEC_SECOND;
-		Debug_printf(" (60 DATA %.2d CHANNEL)\r\n", this->data.channel);
-	}
-	else if((c bitand 0xF0) == IEC_CLOSE)
-	{
-		this->data.command = IEC_CLOSE;
-		this->data.channel = c xor IEC_CLOSE;
-		Debug_printf(" (EO CLOSE %.2d CHANNEL)\r\n", this->data.channel);
-	}
-	else if((c bitand 0xF0) == IEC_OPEN)
-	{
-		this->data.command = IEC_OPEN;
-		this->data.channel = c xor IEC_OPEN;
-		Debug_printf(" (FO OPEN %.2d CHANNEL)\r\n", this->data.channel);
-	}
+	// else if((c bitand 0xF0) == IEC_SECOND)
+	// {
+	// 	this->data.command = IEC_SECOND;
+	// 	this->data.channel = c xor IEC_SECOND;
+	// 	Debug_printf(" (60 DATA %.2d CHANNEL)\r\n", this->data.channel);
+	// }
+	// else if((c bitand 0xF0) == IEC_CLOSE)
+	// {
+	// 	this->data.command = IEC_CLOSE;
+	// 	this->data.channel = c xor IEC_CLOSE;
+	// 	Debug_printf(" (EO CLOSE %.2d CHANNEL)\r\n", this->data.channel);
+	// }
+	// else if((c bitand 0xF0) == IEC_OPEN)
+	// {
+	// 	this->data.command = IEC_OPEN;
+	// 	this->data.channel = c xor IEC_OPEN;
+	// 	Debug_printf(" (FO OPEN %.2d CHANNEL)\r\n", this->data.channel);
+	// }
 
 	//Debug_printv("command[%.2X] device[%.2d] secondary[%.2d] channel[%.2d]", this->data.command, this->data.device, this->data.secondary, this->data.channel);
 
@@ -396,7 +404,6 @@ iecBus::BUS_STATE iecBus::service( void )
 
 		this->data.command = c bitand 0xF0; // upper nibble, command
 		this->data.channel = c bitand 0x0F; // lower nibble, channel
-		//this->data.content = { 0 };
 
 		// Clear command string
 		this->data.content.clear();
@@ -432,7 +439,11 @@ iecBus::BUS_STATE iecBus::service( void )
 	else
 	{
 		// Send data to device to process
-		//drive.process();		
+		Debug_printv("Send Command [%.2X]{%s} to virtual device", IEC.data.command, IEC.data.content.c_str());
+		//drive.process();
+		
+		r = BUS_IDLE;
+		releaseLines(true);
 	}
 	// Don't do anything here or it could cause LOAD ERROR!!!
 
@@ -480,7 +491,7 @@ iecBus::BUS_STATE iecBus::deviceListen( void )
 			if(c == IEC_UNLISTEN)
 			{
 				mstr::rtrimA0(this->data.content);
-				Debug_printf(" [%s] (3F UNLISTEN)\r\n", this->data.content.c_str());
+				Debug_printf(BACKSPACE "] {%s} (3F UNLISTEN)\r\n", this->data.content.c_str());
 				break;
 			}
 
@@ -535,7 +546,7 @@ iecBus::BUS_STATE iecBus::deviceListen( void )
 iecBus::BUS_STATE iecBus::deviceTalk( void )
 {
 	// Okay, we will talk soon
-	Debug_printf(" (%.2X SECONDARY) (%d CHANNEL)\r\n", this->data.command, this->data.channel);
+	Debug_printf(" (%.2X SECONDARY) (%.2X CHANNEL)\r\n", this->data.command, this->data.channel);
 
 	// Delay after ATN is RELEASED
 	//delayMicroseconds(TIMING_BIT);
