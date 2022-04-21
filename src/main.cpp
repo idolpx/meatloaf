@@ -185,13 +185,14 @@ void fn_service_loop(void *param)
 
         if ( bus_state != statemachine::idle )
         {
+            
             //Debug_printv("before[%d]", bus_state);
             uint8_t bs = IEC.service();
             if( bs == iecBus::BUS_IDLE || bs == iecBus::BUS_ERROR )
                 bus_state = statemachine::idle;
             //Debug_printv("after[%d] bs[%d]", bus_state, bs);
             
-            // Debug_printv("ATN PULLED\n");
+            Debug_printv("ATN PULLED\n");
             // bus_state = statemachine::idle;
         }
 
