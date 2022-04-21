@@ -310,6 +310,7 @@ iecBus::BUS_STATE iecBus::service( void )
 
 
 	// Get command
+	uint8_t previous_command = this->data.command;
 	int16_t c = (iecBus::COMMAND)receive(this->data.device);
 	this->data.command = c;	
 
@@ -320,14 +321,14 @@ iecBus::BUS_STATE iecBus::service( void )
 	{
 		Debug_printv("Get first ATN byte");
 		releaseLines(false);
-		return BUS_ERROR;
+		r = BUS_ERROR;
 	}
 
-	// Check for EOI
-	if(protocol.flags bitand EOI_RECVD)
-	{
-		Debug_printf("][EOI]");
-	}
+	// // Check for EOI
+	// if(protocol.flags bitand EOI_RECVD)
+	// {
+	// 	Debug_printf("[EOI]");
+	// }
 
 	// Check for JiffyDOS
 	if(protocol.flags bitand JIFFY_ACTIVE)
@@ -337,80 +338,65 @@ iecBus::BUS_STATE iecBus::service( void )
 
 
 	// Decode command byte
-	if((c bitand 0xF0) == IEC_GLOBAL)
+	uint8_t command = c bitand 0xF0;
+	if(command == IEC_GLOBAL)
 	{
 		this->data.command = IEC_GLOBAL;
 		this->data.device = c xor IEC_GLOBAL;
 		this->data.channel = 0;
 		Debug_printf(" (00 GLOBAL) (%.2d COMMAND)\r\n", this->data.device);
+		r = BUS_IDLE;
 	}
-	else if((c bitand 0xF0) == IEC_LISTEN)
+	else if(command == IEC_LISTEN)
 	{
 		this->data.command = IEC_LISTEN;
 		this->data.device = c xor IEC_LISTEN;
 		this->data.channel = 0;
-		Debug_printf(" (20 LISTEN %.2d DEVICE) ", this->data.device);
+		Debug_printf(" (20 LISTEN %.2d DEVICE)\r\n", this->data.device);
+		r = BUS_COMMAND;
 	}
 	else if(c == IEC_UNLISTEN)
 	{
 		Debug_printf(" (3F UNLISTEN)\r\n");
 		releaseLines(false);
-		return BUS_IDLE;
+		r = BUS_IDLE;
 	}
-	else if((c bitand 0xF0) == IEC_TALK)
+	else if(command == IEC_TALK)
 	{
 		this->data.command = IEC_TALK;
 		this->data.device = c xor IEC_TALK;
 		this->data.channel = 0;
-		Debug_printf(" (40 TALK %.2d DEVICE) ", this->data.device);
+		Debug_printf(" (40 TALK   %.2d DEVICE)\r\n", this->data.device);
+		r = BUS_COMMAND;
 	}
 	else if(c == IEC_UNTALK)
 	{
 		Debug_printf(" (5F UNTALK)\r\n");
 		releaseLines(false);
-		return BUS_IDLE;
+		r = BUS_IDLE;
 	}
-	// else if((c bitand 0xF0) == IEC_SECOND)
-	// {
-	// 	this->data.command = IEC_SECOND;
-	// 	this->data.channel = c xor IEC_SECOND;
-	// 	Debug_printf(" (60 DATA %.2d CHANNEL)\r\n", this->data.channel);
-	// }
-	// else if((c bitand 0xF0) == IEC_CLOSE)
-	// {
-	// 	this->data.command = IEC_CLOSE;
-	// 	this->data.channel = c xor IEC_CLOSE;
-	// 	Debug_printf(" (EO CLOSE %.2d CHANNEL)\r\n", this->data.channel);
-	// }
-	// else if((c bitand 0xF0) == IEC_OPEN)
-	// {
-	// 	this->data.command = IEC_OPEN;
-	// 	this->data.channel = c xor IEC_OPEN;
-	// 	Debug_printf(" (FO OPEN %.2d CHANNEL)\r\n", this->data.channel);
-	// }
-
-	//Debug_printv("command[%.2X] device[%.2d] secondary[%.2d] channel[%.2d]", this->data.command, this->data.device, this->data.secondary, this->data.channel);
-
-	int8_t cc = this->data.command;
-	// Is this a Listen or Talk command and is it for us?
-	if((this->data.command == IEC_LISTEN || this->data.command == IEC_TALK) && isDeviceEnabled(this->data.device))
+	else if(command == IEC_SECOND)
 	{
-		// Get the secondary address
-		c = receive();
-		if(protocol.flags bitand ERROR)
-		{
-			Debug_printv("Get the first cmd byte");
-			releaseLines(false);
-			return BUS_ERROR;
-		}
+		this->data.command = IEC_SECOND;
+		this->data.channel = c xor IEC_SECOND;
+		Debug_printf(" (60 DATA   %.2d CHANNEL) ", this->data.channel);
+	}
+	else if(command == IEC_CLOSE)
+	{
+		this->data.command = IEC_CLOSE;
+		this->data.channel = c xor IEC_CLOSE;
+		Debug_printf(" (E0 CLOSE  %.2d CHANNEL) ", this->data.channel);
+	}
+	else if(command == IEC_OPEN)
+	{
+		this->data.command = IEC_OPEN;
+		this->data.channel = c xor IEC_OPEN;
+		Debug_printf(" (F0 OPEN   %.2d CHANNEL) ", this->data.channel);
+	}
 
-		this->data.command = c bitand 0xF0; // upper nibble, command
-		this->data.channel = c bitand 0x0F; // lower nibble, channel
-
-		// Clear command string
-		this->data.content.clear();
-
-		if ( cc == IEC_LISTEN )
+	if(command == IEC_SECOND || command == IEC_CLOSE || command == IEC_OPEN)
+	{
+		if(previous_command == IEC_LISTEN)
 		{
 			r = deviceListen();
 		}
@@ -425,37 +411,32 @@ iecBus::BUS_STATE iecBus::service( void )
 			r = BUS_ERROR;
 		}
 	}
-	else
-	{
-		Debug_println("");
-		r =  BUS_IDLE;
-	}
+
+	//Debug_printv("command[%.2X] device[%.2d] secondary[%.2d] channel[%.2d]", this->data.command, this->data.device, this->data.secondary, this->data.channel);
 
 	// Was there an error?
 	this->state = r;
-	if(r == BUS_IDLE || r == BUS_ERROR)
+	// if(r == BUS_IDLE || r == BUS_ERROR)
+	// {
+	// 	releaseLines(true);
+
+	// 	if(r == BUS_IDLE)
+	// 	{
+	// 		// Send data to device to process
+	// 		Debug_printv("Send Command [%.2X]{%s} to virtual device", IEC.data.command, IEC.data.content.c_str());
+	// 		drive.process();			
+	// 	}
+	// }
+	if ( r == BUS_IDLE )
 	{
-		// Debug_printv("release lines");
-		releaseLines(true);
+		Debug_printv("BUS_IDLE");
 	}
-	else
-	{
-		// Send data to device to process
-		Debug_printv("Send Command [%.2X]{%s} to virtual device", IEC.data.command, IEC.data.content.c_str());
-		drive.process();
-		
-		// r = BUS_IDLE;
-		// releaseLines(true);
-	}
-	// Don't do anything here or it could cause LOAD ERROR!!!
 
 	return r;
 } // service
 
 iecBus::BUS_STATE iecBus::deviceListen( void )
 {
-	uint8_t i=0;
-
 	// Okay, we will listen.
 	// Debug_printf("(20 LISTEN) (%.2d DEVICE) ", this->data.device);
 
@@ -464,57 +445,41 @@ iecBus::BUS_STATE iecBus::deviceListen( void )
 	if(this->data.command == IEC_SECOND && this->data.channel not_eq CMD_CHANNEL)
 	{
 		// A heapload of data might come now, too big for this context to handle so the caller handles this, we're done here.
-		Debug_printf(" (%.2X SECONDARY) (%.2X CHANNEL)\r\n", this->data.command, this->data.channel);
-		return BUS_LISTEN;
+		// Debug_printf(" (%.2X SECONDARY) (%.2X CHANNEL)\r\n", this->data.command, this->data.channel);
+		return BUS_COMMAND;
 	}
 
 	// OPEN
 	else if(this->data.command == IEC_SECOND || this->data.command == IEC_OPEN)
 	{
-		Debug_printf(" (%.2X OPEN) (%.2X CHANNEL) [", this->data.command, this->data.channel);
+		// Debug_printf(" (%.2X OPEN) (%.2X CHANNEL) [", this->data.command, this->data.channel);
+		Debug_printf(" [");
 
-		// Some other command. Record the cmd string until UNLISTEN is sent
-		delayMicroseconds(200);
-		while (1)
+		// Some other command. Record the cmd string until ATN is PULLED
+		while (protocol.flags bitand ATN_PULLED)
 		{
-			if(protocol.status(PIN_IEC_ATN) == PULLED)
-			{
-				Debug_printf(BACKSPACE BACKSPACE "\r\n");
-				return BUS_IDLE;
-			}
-
 			int16_t c = receive();
+
 			if(protocol.flags bitand ERROR)
 			{
 				Debug_printv("Some other command [%.2X]", c);
 				return BUS_ERROR;
 			}
 
-			if(c == IEC_UNLISTEN)
-			{
-				mstr::rtrimA0(this->data.content);
-				Debug_printf(BACKSPACE "] {%s} (3F UNLISTEN)\r\n", this->data.content.c_str());
-				break;
-			}
-
-			if(i >= IEC_CMD_MAX_LENGTH)
-			{
-				// Buffer is going to overflow, this is an error condition
-				// FIXME: here we should propagate the error type being overflow so that reading error channel can give right code out.
-				Debug_printv("IEC_CMD_MAX_LENGTH");
-				return BUS_ERROR;
-			}
 			if(c != 0x0D)
 			{
 				this->data.content += (uint8_t)c;
 			}
-		}
+		} 
+		mstr::rtrimA0(this->data.content);
+		Debug_printf(BACKSPACE "] {%s}\r\n", this->data.content.c_str());
+		return BUS_COMMAND;
 	}
 
 	// CLOSE Named Channel
 	else if(this->data.command == IEC_CLOSE)
 	{
-		Debug_printf(" (E0 CLOSE) (%.2X CHANNEL)\r\n", this->data.channel);
+		// Debug_printf(" (E0 CLOSE) (%.2X CHANNEL)\r\n", this->data.channel);
 		return BUS_COMMAND;
 	}
 
@@ -522,12 +487,13 @@ iecBus::BUS_STATE iecBus::deviceListen( void )
 	else
 	{
 		Debug_printv(" OTHER (%.2X COMMAND) (%.2X CHANNEL) ", this->data.command, this->data.channel);
+		return BUS_ERROR;
 	}
 
-	if( this->data.content.size() )
-		return BUS_COMMAND;
-	else
-		return BUS_IDLE;
+	// if( this->data.content.size() )
+	// 	return BUS_COMMAND;
+	// else
+	// 	return BUS_IDLE;
 }
 
 // void iecBus::deviceUnListen(void)
@@ -558,7 +524,7 @@ iecBus::BUS_STATE iecBus::deviceTalk( void )
 		return BUS_ERROR;
 
 	// We have recieved a CMD and we should talk now:
-	return BUS_TALK;
+	return BUS_COMMAND;
 }
 
 // void iecBus::deviceUnTalk(void)
