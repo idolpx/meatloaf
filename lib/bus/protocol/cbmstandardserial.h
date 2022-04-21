@@ -76,10 +76,14 @@
 // Not Inverted
 #define PULLED    true
 #define RELEASED  false
+#define LOW 0x00
+#define HIGH 0x01
 #else
 // Inverted
 #define PULLED    false
 #define RELEASED  true
+#define LOW 0x01
+#define HIGH 0x00
 #endif
 
 namespace Protocol
@@ -95,22 +99,22 @@ namespace Protocol
 			virtual int16_t timeoutWait(uint8_t iecPIN, bool lineStatus, size_t wait = TIMEOUT, size_t step = 1);
 
 
-			// true => PULL => DIGI_LOW
+			// true => PULL => LOW
 			inline void IRAM_ATTR pull(uint8_t pin)
 			{
 #ifndef IEC_SPLIT_LINES
 				set_pin_mode(pin, OUTPUT);
 #endif
-				digital_write(pin, DIGI_LOW);
+				digital_write(pin, LOW);
 			}
 
-			// false => RELEASE => DIGI_HIGH
+			// false => RELEASE => HIGH
 			inline void IRAM_ATTR release(uint8_t pin)
 			{
 #ifndef IEC_SPLIT_LINES
 				set_pin_mode(pin, OUTPUT);
 #endif
-				digital_write(pin, DIGI_HIGH);
+				digital_write(pin, HIGH);
 			}
 
 			inline bool IRAM_ATTR status(uint8_t pin)
