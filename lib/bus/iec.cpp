@@ -344,7 +344,7 @@ iecBus::BUS_STATE iecBus::service( void )
 		this->data.command = IEC_GLOBAL;
 		this->data.device = c xor IEC_GLOBAL;
 		this->data.channel = 0;
-		Debug_printf(" (00 GLOBAL) (%.2d COMMAND)\r\n", this->data.device);
+		Debug_printf(" (00 GLOBAL %.2d COMMAND)\r\n", this->data.device);
 		r = BUS_IDLE;
 	}
 	else if(command == IEC_LISTEN)
