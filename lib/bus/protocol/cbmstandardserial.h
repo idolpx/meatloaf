@@ -72,8 +72,15 @@
 #define TIMED_OUT -1
 #define FOREVER 0
 
+#ifndef IEC_INVERTED_LINES
+// Not Inverted
 #define PULLED    true
 #define RELEASED  false
+#else
+// Inverted
+#define PULLED    false
+#define RELEASED  true
+#endif
 
 namespace Protocol
 {
@@ -91,21 +98,26 @@ namespace Protocol
 			// true => PULL => DIGI_LOW
 			inline void IRAM_ATTR pull(uint8_t pin)
 			{
+#ifndef IEC_SPLIT_LINES
 				set_pin_mode(pin, OUTPUT);
+#endif
 				digital_write(pin, DIGI_LOW);
 			}
 
 			// false => RELEASE => DIGI_HIGH
 			inline void IRAM_ATTR release(uint8_t pin)
 			{
+#ifndef IEC_SPLIT_LINES
 				set_pin_mode(pin, OUTPUT);
+#endif
 				digital_write(pin, DIGI_HIGH);
 			}
 
 			inline bool IRAM_ATTR status(uint8_t pin)
 			{
-				// To be able to read line we must be set to input, not driving.
+#ifndef IEC_SPLIT_LINES
 				set_pin_mode(pin, INPUT);
+#endif
 				return digital_read(pin) ? RELEASED : PULLED;
 			}
 
@@ -132,8 +144,7 @@ namespace Protocol
 				}
 			}
 
-		};
-
+	};
 };
 
 #endif

@@ -167,6 +167,9 @@ void main_setup()
 
     //runTestsSuite();
     //lfs_test();
+#ifdef DEBUG_TIMING
+    Serial.println( ANSI_GREEN_BOLD "DEBUG_TIMING enabled" ANSI_RESET );
+#endif
 }
 
 

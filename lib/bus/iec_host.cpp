@@ -39,12 +39,12 @@ bool iecHost::deviceExists(uint8_t deviceID)
 
     // Get Bus Attention
     protocol.pull(PIN_IEC_ATN);
-    protocol.pull(PIN_IEC_CLK);
-    //release(PIN_IEC_DATA);
+    protocol.pull(PIN_IEC_CLK_OUT);
+    //release(PIN_IEC_DATA_OUT);
     //delayMicroseconds(TIMING_ATN_PREDELAY);
 
     // Wait for listeners to be ready
-    if(protocol.timeoutWait(PIN_IEC_DATA, PULLED) == TIMED_OUT)
+    if(protocol.timeoutWait(PIN_IEC_DATA_IN, PULLED) == TIMED_OUT)
     {
         Debug_println(" inactive\nBus empty. Exiting.");
     }
@@ -55,7 +55,7 @@ bool iecHost::deviceExists(uint8_t deviceID)
         send( IEC_LISTEN & deviceID );
         delayMicroseconds(TIMING_Tv);
 
-        if ( protocol.status( PIN_IEC_DATA ) )
+        if ( protocol.status( PIN_IEC_DATA_IN ) )
         {
             device_status = true;
             Debug_println("active");
@@ -74,7 +74,7 @@ bool iecHost::deviceExists(uint8_t deviceID)
 
     // Release ATN and Clock
     protocol.release(PIN_IEC_ATN);
-    protocol.release(PIN_IEC_CLK);
+    protocol.release(PIN_IEC_CLK_OUT);
     delayMicroseconds(TIMING_Tv);
 
     return device_status;

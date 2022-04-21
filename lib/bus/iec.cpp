@@ -164,22 +164,37 @@ iecBus::iecBus( void )
 //
 bool iecBus::init()
 {
+
+#ifndef IEC_SPLIT_LINES
 	// make sure the output states are initially LOW
 	protocol.release(PIN_IEC_ATN);
-	protocol.release(PIN_IEC_CLK);
-	protocol.release(PIN_IEC_DATA);
+	protocol.release(PIN_IEC_CLK_OUT);
+	protocol.release(PIN_IEC_DATA_OUT);
 	protocol.release(PIN_IEC_SRQ);
 
 	// initial pin modes in GPIO
 	protocol.set_pin_mode(PIN_IEC_ATN, INPUT);
-	protocol.set_pin_mode(PIN_IEC_CLK, INPUT);
-	protocol.set_pin_mode(PIN_IEC_DATA, INPUT);
+	protocol.set_pin_mode(PIN_IEC_CLK_IN, INPUT);
+	protocol.set_pin_mode(PIN_IEC_DATA_IN, INPUT);
 	protocol.set_pin_mode(PIN_IEC_SRQ, INPUT);
 	protocol.set_pin_mode(PIN_IEC_RESET, INPUT);
+#else
+	// make sure the output states are initially LOW
+	protocol.release(PIN_IEC_ATN);
+	protocol.release(PIN_IEC_CLK_IN);
+	protocol.release(PIN_IEC_CLK_OUT);
+	protocol.release(PIN_IEC_DATA_IN);
+	protocol.release(PIN_IEC_DATA_OUT);
+	protocol.release(PIN_IEC_SRQ);
 
-#ifdef SPLIT_LINES
+	// initial pin modes in GPIO
+	protocol.set_pin_mode(PIN_IEC_ATN, INPUT);
+	protocol.set_pin_mode(PIN_IEC_CLK_IN, INPUT);
 	protocol.set_pin_mode(PIN_IEC_CLK_OUT, OUTPUT);
+	protocol.set_pin_mode(PIN_IEC_DATA_IN, INPUT);
 	protocol.set_pin_mode(PIN_IEC_DATA_OUT, OUTPUT);
+	protocol.set_pin_mode(PIN_IEC_SRQ, OUTPUT);
+	protocol.set_pin_mode(PIN_IEC_RESET, INPUT);
 #endif
 
 	protocol.flags = CLEAR;
@@ -210,11 +225,11 @@ bool iecBus::turnAround(void)
 	// Debug_printf("IEC turnAround: ");
 
 	// Wait until clock is RELEASED
-	while(protocol.status(PIN_IEC_CLK) != RELEASED);
+	while(protocol.status(PIN_IEC_CLK_IN) != RELEASED);
 
-	protocol.release(PIN_IEC_DATA);
+	protocol.release(PIN_IEC_DATA_OUT);
 	delayMicroseconds(TIMING_Tv);
-	protocol.pull(PIN_IEC_CLK);
+	protocol.pull(PIN_IEC_CLK_OUT);
 	delayMicroseconds(TIMING_Tv);
 
 	// Debug_println("complete");
@@ -226,15 +241,15 @@ bool iecBus::turnAround(void)
 // (the way it was when the computer was switched on)
 bool iecBus::undoTurnAround(void)
 {
-	protocol.pull(PIN_IEC_DATA);
+	protocol.pull(PIN_IEC_DATA_OUT);
 	delayMicroseconds(TIMING_Tv);
-	protocol.release(PIN_IEC_CLK);
+	protocol.release(PIN_IEC_CLK_OUT);
 	delayMicroseconds(TIMING_Tv);
 
 	// Debug_printf("IEC undoTurnAround: ");
 
 	// wait until the computer protocol.releases the clock line
-	while(protocol.status(PIN_IEC_CLK) != RELEASED);
+	while(protocol.status(PIN_IEC_CLK_IN) != RELEASED);
 
 	// Debug_println("complete");
 	return true;
@@ -289,8 +304,8 @@ iecBus::BUS_STATE iecBus::service( void )
 
 	// Attention line is PULLED, go to listener mode and get message.
 	// Being fast with the next two lines here is CRITICAL!
-	protocol.release(PIN_IEC_CLK);
-	protocol.pull(PIN_IEC_DATA);
+	protocol.release(PIN_IEC_CLK_OUT);
+	protocol.pull(PIN_IEC_DATA_OUT);
 	delayMicroseconds(TIMING_Tne);
 
 
@@ -520,8 +535,8 @@ iecBus::BUS_STATE iecBus::deviceListen( void )
 // 	Debug_printv("");
 
 // 	// Release lines
-// 	protocol.release(PIN_IEC_CLK);
-// 	protocol.release(PIN_IEC_DATA);
+// 	protocol.release(PIN_IEC_CLK_OUT);
+// 	protocol.release(PIN_IEC_DATA_OUT);
 
 // 	// Wait for ATN to protocol.release and quit
 // 	while(protocol.status(PIN_IEC_ATN) == PULLED)
@@ -551,8 +566,8 @@ iecBus::BUS_STATE iecBus::deviceTalk( void )
 // 	Debug_printv("");
 
 // 	// Release lines
-// 	protocol.release(PIN_IEC_CLK);
-// 	protocol.release(PIN_IEC_DATA);
+// 	protocol.release(PIN_IEC_CLK_OUT);
+// 	protocol.release(PIN_IEC_DATA_OUT);
 
 // 	// Wait for ATN to protocol.release and quit
 // 	while(protocol.status(PIN_IEC_ATN) == PULLED)
@@ -567,8 +582,8 @@ void iecBus::releaseLines(bool wait)
 	//Debug_printv("");
 
 	// Release lines
-	protocol.release(PIN_IEC_CLK);
-	protocol.release(PIN_IEC_DATA);
+	protocol.release(PIN_IEC_CLK_OUT);
+	protocol.release(PIN_IEC_DATA_OUT);
 
 	// Wait for ATN to release and quit
 	if ( wait )
@@ -651,8 +666,8 @@ bool iecBus::sendEOI(uint8_t data)
 bool iecBus::sendFNF()
 {
 	// Message file not found by just releasing lines
-	protocol.release(PIN_IEC_DATA);
-	protocol.release(PIN_IEC_CLK);
+	protocol.release(PIN_IEC_DATA_OUT);
+	protocol.release(PIN_IEC_CLK_OUT);
 
 	// BETWEEN BYTES TIME
 	delayMicroseconds(TIMING_Tbb);
@@ -756,38 +771,29 @@ iecDevice *iecBus::deviceById(uint8_t device_id)
 void iecBus::debugTiming()
 {
 	uint8_t pin = PIN_IEC_ATN;
+
+#ifndef SPILIT_LINES
 	protocol.pull(pin);
 	delayMicroseconds(1000); // 1000
 	protocol.release(pin);
 	delayMicroseconds(1000);
+#endif
 
-	pin = PIN_IEC_CLK;
+	pin = PIN_IEC_CLK_OUT;
 	protocol.pull(pin);
 	delayMicroseconds(20); // 20
 	protocol.release(pin);
 	delayMicroseconds(20);
 
-	pin = PIN_IEC_DATA;
+	pin = PIN_IEC_DATA_OUT;
 	protocol.pull(pin);
-	delayMicroseconds(50); // 50
+	delayMicroseconds(40); // 40
 	protocol.release(pin);
-	delayMicroseconds(50);
+	delayMicroseconds(40);
 
 	pin = PIN_IEC_SRQ;
 	protocol.pull(pin);
 	delayMicroseconds(60); // 60
 	protocol.release(pin);
 	delayMicroseconds(60);
-
-	// pin = PIN_IEC_ATN;
-	// protocol.pull(pin);
-	// delayMicroseconds(100); // 100
-	// protocol.release(pin);
-	// delayMicroseconds(1);
-
-	// pin = PIN_IEC_CLK;
-	// protocol.pull(pin);
-	// delayMicroseconds(200); // 200
-	// protocol.release(pin);
-	// delayMicroseconds(1);
 }
