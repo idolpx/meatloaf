@@ -58,14 +58,13 @@
 
 /* Commodore IEC Pins */
 // CLK & DATA lines in/out are split between two pins
-#define IEC_SPLIT_LINES
+//#define IEC_SPLIT_LINES
 
 // Line values are inverted (7406 Hex Inverter Buffer)
 //#define IEC_INVERTED_LINES
 
 // CBM IEC Serial Port
-//#define PIN_IEC_ATN			GPIO_NUM_22      // SIO 9  - PROC - Proceed
-#define PIN_IEC_ATN         GPIO_NUM_36      // SIO 8  - MTR  - Motor Control
+#define PIN_IEC_ATN			GPIO_NUM_22      // SIO 9  - PROC - Proceed
 #define PIN_IEC_SRQ			GPIO_NUM_26      // SIO 13 - INT  - Interrupt
 #define PIN_IEC_RESET       GPIO_NUM_39      // SIO 7  - CMD  - Command
                                              // SIO 4 & 6 - GND - Ground
@@ -74,14 +73,14 @@
 #ifndef IEC_SPLIT_LINES
 // NOT SPLIT - Bidirectional Lines
 #define PIN_IEC_CLK_IN		GPIO_NUM_27      // SIO 1  - CKI  - Clock Input
-#define PIN_IEC_DATA_IN    	GPIO_NUM_21      // SIO 3  - DI   - Data Input
 #define PIN_IEC_CLK_OUT	    GPIO_NUM_27      // SIO 1  - CKI  - Clock Input
+#define PIN_IEC_DATA_IN    	GPIO_NUM_21      // SIO 3  - DI   - Data Input
 #define PIN_IEC_DATA_OUT   	GPIO_NUM_21      // SIO 3  - DI   - Data Input
 #else
 // SPLIT - Seperate Input & Output lines
 #define PIN_IEC_CLK_IN		GPIO_NUM_32      // SIO 2  - CKO  - Clock Output
-#define PIN_IEC_DATA_IN		GPIO_NUM_33      // SIO 5  - DO   - Data Output
 #define PIN_IEC_CLK_OUT		GPIO_NUM_27      // SIO 1  - CKI  - Clock Input
+#define PIN_IEC_DATA_IN		GPIO_NUM_33      // SIO 5  - DO   - Data Output
 #define PIN_IEC_DATA_OUT	GPIO_NUM_21      // SIO 3  - DI   - Data Input
 #endif
 

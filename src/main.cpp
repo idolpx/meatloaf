@@ -192,7 +192,7 @@ void fn_service_loop(void *param)
                 bus_state = statemachine::idle;
             //Debug_printv("after[%d] bs[%d]", bus_state, bs);
             
-            Debug_printv("ATN PULLED\n");
+            // Debug_printv("ATN PULLED\n");
             // bus_state = statemachine::idle;
         }
 
