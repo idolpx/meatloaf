@@ -167,28 +167,28 @@ bool iecBus::init()
 
 #ifndef IEC_SPLIT_LINES
 	// make sure the output states are initially LOW
-	protocol.release(PIN_IEC_ATN);
-	protocol.release(PIN_IEC_CLK_OUT);
-	protocol.release(PIN_IEC_DATA_OUT);
+//	protocol.release(PIN_IEC_ATN);
+	protocol.release(PIN_IEC_CLK_IN);
+	protocol.release(PIN_IEC_DATA_IN);
 	protocol.release(PIN_IEC_SRQ);
 
 	// initial pin modes in GPIO
-	protocol.set_pin_mode(PIN_IEC_ATN, INPUT);
+//	protocol.set_pin_mode(PIN_IEC_ATN, INPUT);
 	protocol.set_pin_mode(PIN_IEC_CLK_IN, INPUT);
 	protocol.set_pin_mode(PIN_IEC_DATA_IN, INPUT);
 	protocol.set_pin_mode(PIN_IEC_SRQ, INPUT);
 	protocol.set_pin_mode(PIN_IEC_RESET, INPUT);
 #else
 	// make sure the output states are initially LOW
-	protocol.release(PIN_IEC_ATN);
-	protocol.release(PIN_IEC_CLK_IN);
-	protocol.release(PIN_IEC_CLK_OUT);
-	protocol.release(PIN_IEC_DATA_IN);
-	protocol.release(PIN_IEC_DATA_OUT);
-	protocol.release(PIN_IEC_SRQ);
+//	protocol.release(PIN_IEC_ATN);
+	// protocol.release(PIN_IEC_CLK_IN);
+	// protocol.release(PIN_IEC_CLK_OUT);
+	// protocol.release(PIN_IEC_DATA_IN);
+	// protocol.release(PIN_IEC_DATA_OUT);
+	// protocol.release(PIN_IEC_SRQ);
 
 	// initial pin modes in GPIO
-	protocol.set_pin_mode(PIN_IEC_ATN, INPUT);
+//	protocol.set_pin_mode(PIN_IEC_ATN, INPUT);
 	protocol.set_pin_mode(PIN_IEC_CLK_IN, INPUT);
 	protocol.set_pin_mode(PIN_IEC_CLK_OUT, OUTPUT);
 	protocol.set_pin_mode(PIN_IEC_DATA_IN, INPUT);
@@ -298,7 +298,7 @@ iecBus::BUS_STATE iecBus::service( void )
 			// If RESET & ATN are both PULLED then CBM is off
 			return BUS_IDLE;
 		}
-
+		Debug_printv("IEC Reset!");
 		return BUS_RESET;
 	}
 

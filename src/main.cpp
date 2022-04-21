@@ -58,7 +58,19 @@ static void IRAM_ATTR on_attention_isr_handler(void* arg)
     bus_state = statemachine::select;
     IEC.protocol.flags or_eq ATN_PULLED;
     fnLedManager.toggle(eLed::LED_BUS);
+    //Debug_printv("ATN PULLED\n");
 }
+
+// static void IRAM_ATTR on_clock_isr_handler(void* arg)
+// {
+//     fnLedManager.toggle(eLed::LED_WIFI);
+//     Debug_printv("CLK PULLED\n");
+// }
+// static void IRAM_ATTR on_data_isr_handler(void* arg)
+// {
+//     fnLedManager.toggle(eLed::LED_BT);
+//     Debug_printv("DATA PULLED\n");
+// }
 
 void main_shutdown_handler()
 {
@@ -149,6 +161,7 @@ void main_setup()
     //zero-initialize the config structure
     gpio_config_t io_conf = {
         .pin_bit_mask = ( 1ULL << PIN_IEC_ATN ),    // bit mask of the pins that you want to set
+//        .pin_bit_mask = ( (1ULL << PIN_IEC_ATN) | (1ULL << PIN_IEC_CLK_IN) | (1ULL << PIN_IEC_DATA_IN) ),    // bit mask of the pins that you want to set
         .mode = GPIO_MODE_INPUT,                    // set as input mode
         .pull_up_en = GPIO_PULLUP_DISABLE,             // disable pull-up mode
         .pull_down_en = GPIO_PULLDOWN_DISABLE,         // disable pull-down mode
@@ -157,6 +170,8 @@ void main_setup()
     //configure GPIO with the given settings
     gpio_config(&io_conf);
     gpio_isr_handler_add((gpio_num_t)PIN_IEC_ATN, on_attention_isr_handler, (void *)PIN_IEC_ATN);
+    // gpio_isr_handler_add((gpio_num_t)PIN_IEC_CLK_IN, on_clock_isr_handler, (void *)PIN_IEC_CLK_IN);
+    // gpio_isr_handler_add((gpio_num_t)PIN_IEC_DATA_IN, on_data_isr_handler, (void *)PIN_IEC_DATA_IN);
     Serial.println( ANSI_GREEN_BOLD "IEC Bus Initialized" ANSI_RESET );
 
 
@@ -182,7 +197,9 @@ void fn_service_loop(void *param)
         // We don't have any delays in this loop, so IDLE threads will be starved
         // Shouldn't be a problem, but something to keep in mind...
 
-
+#ifdef DEBUG_TIMING
+        IEC.debugTiming();
+#else
         if ( bus_state != statemachine::idle )
         {
             
@@ -195,10 +212,8 @@ void fn_service_loop(void *param)
             // Debug_printv("ATN PULLED\n");
             // bus_state = statemachine::idle;
         }
-
-#ifdef DEBUG_TIMING
-        IEC.debugTiming();
 #endif
+
 
         taskYIELD(); // Allow other tasks to run
     }
