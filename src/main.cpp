@@ -213,9 +213,10 @@ void fn_service_loop(void *param)
             // bus_state = statemachine::idle;
         }
 #endif
-
-
-        taskYIELD(); // Allow other tasks to run
+        else
+        {
+            taskYIELD(); // Allow other tasks to run            
+        }
     }
 }
 

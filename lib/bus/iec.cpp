@@ -323,11 +323,11 @@ iecBus::BUS_STATE iecBus::service( void )
 		return BUS_ERROR;
 	}
 
-	// // Check for EOI
-	// if(protocol.flags bitand EOI_RECVD)
-	// {
-	// 	Debug_printf("[EOI]");
-	// }
+	// Check for EOI
+	if(protocol.flags bitand EOI_RECVD)
+	{
+		Debug_printf("][EOI]");
+	}
 
 	// Check for JiffyDOS
 	if(protocol.flags bitand JIFFY_ACTIVE)

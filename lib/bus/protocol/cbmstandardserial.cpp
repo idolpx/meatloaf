@@ -34,18 +34,13 @@ int16_t  CBMStandardSerial::receiveByte(uint8_t device)
 {
 	flags = CLEAR;
 
-	pull(PIN_IEC_SRQ);
-
-
 	// Wait for talker ready
-	while(status(PIN_IEC_CLK_IN) != RELEASED);
-	//timeoutWait(PIN_IEC_CLK_IN, RELEASED, FOREVER, 1);
-// 	{
-// //		ESP.wdtFeed();
-// //		taskYIELD();
-// 	}
-
-	release(PIN_IEC_SRQ);
+	if(timeoutWait(PIN_IEC_CLK_IN, RELEASED, FOREVER, 1) == TIMED_OUT)
+	{
+		Debug_printv("Wait for talker ready");
+		flags or_eq ERROR;
+		return -1; // return error because timeout
+	}
 
 	// Say we're ready
 	// STEP 2: READY FOR DATA
@@ -53,9 +48,15 @@ int16_t  CBMStandardSerial::receiveByte(uint8_t device)
 	// line  to  false.    Suppose  there  is  more  than one listener.  The Data line will go false 
 	// only when all listeners have RELEASED it - in other words, when  all  listeners  are  ready  
 	// to  accept  data.  What  happens  next  is  variable.
-	release(PIN_IEC_DATA_OUT);
-	while(status(PIN_IEC_DATA_IN) != RELEASED); // Wait for all other devices to release the data line
-	//timeoutWait(PIN_IEC_DATA_IN, RELEASED, FOREVER, 1);
+
+	// Wait for all other devices to release the data line
+	if(timeoutWait(PIN_IEC_DATA_IN, RELEASED, FOREVER, 1) == TIMED_OUT)
+	{
+		Debug_printv("Wait for all other devices to release the data line");
+		flags or_eq ERROR;
+		return -1; // return error because timeout
+	}
+	release(PIN_IEC_DATA_OUT); // Let other devices release first
 
 	// Either  the  talker  will pull the 
 	// Clock line back to true in less than 200 microseconds - usually within 60 microseconds - or it  
@@ -94,9 +95,9 @@ int16_t  CBMStandardSerial::receiveByte(uint8_t device)
 		}		
 	}
 
-	// Sample ATN and set flag to indicate SELECT or DATA mode
-	if(status(PIN_IEC_ATN) == PULLED)
-		flags or_eq ATN_PULLED;
+	// // Sample ATN and set flag to indicate SELECT or DATA mode
+	// if(status(PIN_IEC_ATN) == PULLED)
+	// 	flags or_eq ATN_PULLED;
 
 	// STEP 3: SENDING THE BITS
 	// The talker has eight bits to send.  They will go out without handshake; in other words, 
@@ -209,9 +210,11 @@ bool CBMStandardSerial::sendByte(uint8_t data, bool signalEOI)
 	// line  to  false.    Suppose  there  is  more  than one listener.  The Data line will go false
 	// only when all listeners have RELEASED it - in other words, when  all  listeners  are  ready
 	// to  accept  data.  What  happens  next  is  variable.
-	while(status(PIN_IEC_DATA_IN) != RELEASED)
+	if(timeoutWait(PIN_IEC_DATA_IN, RELEASED, FOREVER, 1) == TIMED_OUT)
 	{
-//		ESP.wdtFeed();
+		Debug_printv("Wait for listener to be ready");
+		flags or_eq ERROR;
+		return -1; // return error because timeout
 	}
 
 	// Either  the  talker  will pull the
@@ -346,39 +349,33 @@ bool CBMStandardSerial::sendByte(uint8_t data, bool signalEOI)
 } // sendByte
 
 
-// Wait indefinitely if wait = 0
+// Wait indefinitely if wait = 0 or until ATN status changes
 int16_t CBMStandardSerial::timeoutWait(uint8_t iecPIN, bool lineStatus, size_t wait, size_t step)
 {
+	// Sample ATN and set flag to indicate SELECT or DATA mode
+	bool atn_status = status(PIN_IEC_ATN);
+	flags or_eq atn_status;
+
+	size_t t = 0;
+
+	while(status(iecPIN) != lineStatus) {
 
 #if defined(ESP8266)
 	ESP.wdtFeed();
 #endif
+		delayMicroseconds(step);
+		t++;
 
-	size_t t = 0;
-	if(wait == FOREVER)
-	{
-		while(status(iecPIN) != lineStatus) {
-//			ESP.wdtFeed();
-			delayMicroseconds(step);
-			t++;
+		if (t > wait && wait > FOREVER) {
+			return -1;
 		}
-		return (t * step);
-	}
-	else
-	{
-		while(status(iecPIN) != lineStatus && (t < wait)) {
-			delayMicroseconds(step);
-			t++;
-		}
-		// Check the waiting condition:
-		if(t < wait)
-		{
-			// Got it!  Continue!
-			return (t * step);
+
+		if (status(PIN_IEC_ATN) != atn_status) {
+			return -1;
 		}
 	}
 
 	// Debug_printv("pin[%d] state[%d] wait[%d] step[%d] t[%d]", iecPIN, lineStatus, wait, step, t);
-	return -1;
+	return (t * step);
 } // timeoutWait
 
