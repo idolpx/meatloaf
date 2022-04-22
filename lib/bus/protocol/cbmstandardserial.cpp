@@ -35,7 +35,7 @@ int16_t  CBMStandardSerial::receiveByte(uint8_t device)
 	flags = CLEAR;
 
 	// Wait for talker ready
-	if(timeoutWait(PIN_IEC_CLK_IN, RELEASED, FOREVER, 1) == TIMED_OUT)
+	if(timeoutWait(PIN_IEC_CLK_IN, RELEASED, FOREVER) == TIMED_OUT)
 	{
 		Debug_printv("Wait for talker ready");
 		flags or_eq ERROR;
@@ -51,7 +51,7 @@ int16_t  CBMStandardSerial::receiveByte(uint8_t device)
 	release(PIN_IEC_DATA_OUT);
 
 	// Wait for all other devices to release the data line
-	if(timeoutWait(PIN_IEC_DATA_IN, RELEASED, FOREVER, 1) == TIMED_OUT)
+	if(timeoutWait(PIN_IEC_DATA_IN, RELEASED, FOREVER) == TIMED_OUT)
 	{
 		Debug_printv("Wait for all other devices to release the data line");
 		flags or_eq ERROR;
@@ -149,8 +149,6 @@ int16_t  CBMStandardSerial::receiveByte(uint8_t device)
 	}
 
 	/* If there is a delay before the last bit, the controller uses JiffyDOS */
-	if (status(PIN_IEC_ATN) == PULLED)
-		Debug_printv("bit_time[%d]", bit_time);
 	if (flags bitand ATN_PULLED && bit_time >= 218 && n == 7) {
 		if ((data>>1) < 0x60 && ((data>>1) & 0x1f) == device) {
 			/* If it's for us, notify controller that we support Jiffy too */
@@ -213,7 +211,7 @@ bool CBMStandardSerial::sendByte(uint8_t data, bool signalEOI)
 	// line  to  false.    Suppose  there  is  more  than one listener.  The Data line will go false
 	// only when all listeners have RELEASED it - in other words, when  all  listeners  are  ready
 	// to  accept  data.  What  happens  next  is  variable.
-	if(timeoutWait(PIN_IEC_DATA_IN, RELEASED, FOREVER, 1) == TIMED_OUT)
+	if(timeoutWait(PIN_IEC_DATA_IN, RELEASED, FOREVER) == TIMED_OUT)
 	{
 		Debug_printv("Wait for listener to be ready");
 		flags or_eq ERROR;
@@ -376,7 +374,7 @@ bool CBMStandardSerial::turnAround(void)
 	// Debug_printf("IEC turnAround: ");
 
 	// Wait until the computer releases the clock line
-	if(timeoutWait(PIN_IEC_CLK_IN, RELEASED, FOREVER, 1) == TIMED_OUT)
+	if(timeoutWait(PIN_IEC_CLK_IN, RELEASED, FOREVER) == TIMED_OUT)
 	{
 		Debug_printv("Wait until the computer releases the clock line");
 		flags or_eq ERROR;
@@ -405,7 +403,7 @@ bool CBMStandardSerial::undoTurnAround(void)
 	// Debug_printf("IEC undoTurnAround: ");
 
 	// Wait until the computer releases the clock line
-	if(timeoutWait(PIN_IEC_CLK_IN, RELEASED, FOREVER, 1) == TIMED_OUT)
+	if(timeoutWait(PIN_IEC_CLK_IN, RELEASED, FOREVER) == TIMED_OUT)
 	{
 		Debug_printv("Wait until the computer releases the clock line");
 		flags or_eq ERROR;
@@ -417,23 +415,26 @@ bool CBMStandardSerial::undoTurnAround(void)
 } // undoTurnAround
 
 // Wait indefinitely if wait = 0 or until ATN status changes
-int16_t CBMStandardSerial::timeoutWait(uint8_t iecPIN, bool lineStatus, size_t wait, size_t step)
+int16_t CBMStandardSerial::timeoutWait(uint8_t pin, bool target_status, size_t wait)
 {
+	uint64_t start, current, elapsed;
+	elapsed = 0;
+
+    start = current = esp_timer_get_time();
+
 	// Sample ATN and set flag to indicate SELECT or DATA mode
 	bool atn_status = status(PIN_IEC_ATN);
 	flags or_eq atn_status;
 
-	size_t t = 0;
-
-	while(status(iecPIN) != lineStatus) {
+	while(status(pin) != target_status) {
 
 #if defined(ESP8266)
 	ESP.wdtFeed();
 #endif
-		delayMicroseconds(step);
-		t++;
+        current = esp_timer_get_time();
+        elapsed = current - start;
 
-		if (t > wait && wait > FOREVER) {
+		if (elapsed > wait && wait > FOREVER) {
 			return -1;
 		}
 
@@ -442,7 +443,7 @@ int16_t CBMStandardSerial::timeoutWait(uint8_t iecPIN, bool lineStatus, size_t w
 		}
 	}
 
-	// Debug_printv("pin[%d] state[%d] wait[%d] step[%d] t[%d]", iecPIN, lineStatus, wait, step, t);
-	return (t * step);
+	// Debug_printv("pin[%d] state[%d] wait[%d] step[%d] t[%d]", pin, target_status, wait, elapsed);
+	return elapsed;
 } // timeoutWait
 

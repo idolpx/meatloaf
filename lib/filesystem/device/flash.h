@@ -158,7 +158,10 @@ public:
 protected:
     std::string localPath;
 
-    std::unique_ptr<FlashHandle> handle;    
+    std::unique_ptr<FlashHandle> handle;
+
+private:
+    size_t _size;
 };
 
 

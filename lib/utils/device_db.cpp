@@ -46,6 +46,8 @@ bool DeviceDB::select(uint8_t new_device_id)
 {
     uint8_t device_id = m_device["id"];
 
+
+#ifndef FLASH_SPIFFS
     // Create .sys folder if it doesn't exist
     std::unique_ptr<MFile> file(MFSOwner::File(SYSTEM_DIR));
     if ( !file->exists() )
@@ -53,6 +55,9 @@ bool DeviceDB::select(uint8_t new_device_id)
         Debug_printv("Create '" SYSTEM_DIR "' folder!");
         file->mkDir();
     }
+#else
+    std::unique_ptr<MFile> file(MFSOwner::File("/"));
+#endif
 
     //Debug_printv("cur[%d] new[%d]", device_id, new_device_id);
     if ( device_id == new_device_id )
@@ -92,22 +97,23 @@ bool DeviceDB::save()
     // Only save if dirty
     if ( m_dirty )
     {
-        Debug_printv("saved [%s]", config_file.c_str());
-        std::unique_ptr<MFile> file(MFSOwner::File(config_file));
-        if ( file->exists() )
-            file->remove();
+        // Debug_printv("saved [%s]", config_file.c_str());
+        // std::unique_ptr<MFile> file(MFSOwner::File(config_file));
+        // if ( file->exists() )
+        //     file->remove();
 
-        Meat::ofstream ostream(file.get()->url);
-        ostream.open();
-        if(ostream.is_open())
-        {
-            serializeJson(m_device, ostream);
-            return true;
-        }
-        else
-        {
-            return false;
-        }
+        // Meat::ofstream ostream(file.get()->url);
+        // ostream.open();
+        // if(ostream.is_open())
+        // {
+        //     serializeJson(m_device, ostream);
+        //     return true;
+        // }
+        // else
+        // {
+        //     return false;
+        // }
+        return true;
     }
 
     return false;
@@ -140,6 +146,9 @@ void DeviceDB::partition(uint8_t partition)
 }
 std::string DeviceDB::url()
 {
+    if (m_device["url"] == NULL)
+        m_device["url"] = "/";
+
     return m_device["url"];
 }
 void DeviceDB::url(std::string url)
@@ -152,6 +161,9 @@ void DeviceDB::url(std::string url)
 }
 std::string DeviceDB::path()
 {
+    if (m_device["path"] == NULL)
+        m_device["path"] = "/";
+
     return m_device["path"];
 }
 void DeviceDB::path(std::string path)

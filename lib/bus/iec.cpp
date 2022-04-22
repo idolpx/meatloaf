@@ -304,6 +304,12 @@ iecBus::BUS_STATE iecBus::service( void )
 		//releaseLines(false);
 		r = BUS_IDLE;
 	}
+	else if(command == IEC_OPEN)
+	{
+		this->data.command = IEC_OPEN;
+		this->data.channel = c xor IEC_OPEN;
+		Debug_printf(" (F0 OPEN   %.2d CHANNEL) ", this->data.channel);
+	}
 	else if(command == IEC_SECOND)
 	{
 		this->data.command = IEC_SECOND;
@@ -316,12 +322,7 @@ iecBus::BUS_STATE iecBus::service( void )
 		this->data.channel = c xor IEC_CLOSE;
 		Debug_printf(" (E0 CLOSE  %.2d CHANNEL)\r\n", this->data.channel);
 	}
-	else if(command == IEC_OPEN)
-	{
-		this->data.command = IEC_OPEN;
-		this->data.channel = c xor IEC_OPEN;
-		Debug_printf(" (F0 OPEN   %.2d CHANNEL) ", this->data.channel);
-	}
+
 
 	if(command == IEC_SECOND || command == IEC_CLOSE || command == IEC_OPEN)
 	{
@@ -358,7 +359,9 @@ iecBus::BUS_STATE iecBus::service( void )
 			// Send data to device to process
 			Debug_printv("Send Command [%.2X]{%s} to virtual device", IEC.data.command, IEC.data.content.c_str());
 			drive.process();
-					
+
+			releaseLines(false);
+			r = BUS_IDLE;
 		}
 	}
 
@@ -377,6 +380,7 @@ iecBus::BUS_STATE iecBus::deviceListen( void )
 	{
 		// A heapload of data might come now, too big for this context to handle so the caller handles this, we're done here.
 		// Debug_printf(" (%.2X SECONDARY) (%.2X CHANNEL)\r\n", this->data.command, this->data.channel);
+		Debug_printf(BACKSPACE "\r\n");
 		return BUS_LISTEN;
 	}
 
@@ -427,11 +431,6 @@ iecBus::BUS_STATE iecBus::deviceListen( void )
 		Debug_printv(" OTHER (%.2X COMMAND) (%.2X CHANNEL) ", this->data.command, this->data.channel);
 		return BUS_ERROR;
 	}
-
-	// if( this->data.content.size() )
-	// 	return BUS_COMMAND;
-	// else
-	// 	return BUS_IDLE;
 }
 
 // void iecBus::deviceUnListen(void)

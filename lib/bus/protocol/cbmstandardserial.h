@@ -99,7 +99,7 @@ namespace Protocol
 			virtual bool sendByte(uint8_t data, bool signalEOI);
 			bool turnAround(void);
 			bool undoTurnAround(void);
-			int16_t timeoutWait(uint8_t iecPIN, bool lineStatus, size_t wait = TIMEOUT, size_t step = 1);
+			int16_t timeoutWait(uint8_t pin, bool target_status, size_t wait = TIMEOUT);
 
 
 			// true => PULL => LOW

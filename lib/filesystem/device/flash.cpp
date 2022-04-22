@@ -110,7 +110,10 @@ bool FlashFile::exists()
         return true;
     }
 
-    return (access( path.c_str(), F_OK) == 0) ? true : false;
+    struct stat st;
+    int i = stat(path.c_str(), &st);
+
+    return (i == 0);
 }
 
 size_t FlashFile::size() {
@@ -290,6 +293,12 @@ bool FlashIStream::open() {
     if(!isOpen()) {
         handle->obtain(localPath, "r");
     }
+
+    // Set file size
+    fseek(handle->lfsFile, 0, SEEK_END);
+    _size = ftell(handle->lfsFile);
+    fseek(handle->lfsFile, 0, SEEK_SET);
+
     return isOpen();
 };
 
@@ -314,18 +323,18 @@ size_t FlashIStream::read(uint8_t* buf, size_t size) {
 
 
 size_t FlashIStream::size() {
-    return ftell( handle->lfsFile );
+    return _size;
 };
 
 size_t FlashIStream::available() {
     if(!isOpen()) return 0;
-    return ftell( handle->lfsFile ) - position();
+    return _size - position();
 };
 
 
 size_t FlashIStream::position() {
     if(!isOpen()) return 0;
-    else return ftell(handle->lfsFile);
+    return ftell(handle->lfsFile);
 };
 
 bool FlashIStream::seek(size_t pos) {
@@ -388,6 +397,7 @@ void FlashHandle::obtain(std::string m_path, std::string mode) {
     }
 
     lfsFile = fopen( m_path.c_str(), mode.c_str());
+    rc = 1;
 
     //Serial.printf("FSTEST: lfs_file_open file rc:%d\n",rc);
 

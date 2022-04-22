@@ -131,7 +131,7 @@ MFile* MFSOwner::File(std::string path) {
     auto foundFS = testScan(begin, end, pathIterator);
 
     if(foundFS != nullptr) {
-        //Debug_printv("PATH: '%s' is in FS [%s]", path.c_str(), foundFS->symbol);
+        Debug_printv("PATH: '%s' is in FS [%s]", path.c_str(), foundFS->symbol);
         auto newFile = foundFS->getFile(path);
         //Debug_printv("newFile: '%s'", newFile->url.c_str());
 
@@ -142,12 +142,13 @@ MFile* MFSOwner::File(std::string path) {
         auto endHere = pathIterator;
         pathIterator--;
 
-        if(begin == pathIterator) {
+        if(begin == pathIterator) 
+        {
             //Debug_printv("** LOOK DOWN PATH NOT NEEDED   path[%s]", path.c_str());
             newFile->streamFile = foundFS->getFile(mstr::joinToString(&begin, &pathIterator, "/"));
-            //newFile->streamFile = foundFS->getFile(path);
         } 
-        else {
+        else 
+        {
             auto upperPath = mstr::joinToString(&begin, &pathIterator, "/");
             //Debug_printv("** LOOK DOWN PATH: %s", upperPath.c_str());
 

@@ -1,7 +1,10 @@
 #ifndef MEATFILESYSTEM_WRAPPERS_DIRECTORY_STREAM
 #define MEATFILESYSTEM_WRAPPERS_DIRECTORY_STREAM
 
+#include <memory>
 #include <fstream>
+
+#include "meat_io.h"
 
 class idirbuf : public std::filebuf {
     const size_t BUFFER_SIZE = 256;

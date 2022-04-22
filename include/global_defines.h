@@ -21,7 +21,7 @@
 #include "ansi_codes.h"
 
 #define PRODUCT_ID "MEATLOAF CBM"
-#define FW_VERSION "20220414.1" // Dynamically set at compile time in "platformio.ini"
+#define FW_VERSION "20220422.1" // Dynamically set at compile time in "platformio.ini"
 #define USER_AGENT PRODUCT_ID " [" FW_VERSION "]"
 //#define UPDATE_URL      "http://meatloaf.cc/fw/?p=meatloaf&d={{DEVICE_ID}}&a="
 #define UPDATE_URL "http://meatloaf.cc/fw/meatloaf.4MB.bin"

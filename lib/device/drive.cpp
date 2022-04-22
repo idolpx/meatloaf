@@ -62,8 +62,8 @@ void iecDrive::sendStatus(void)
 	Debug_printv("status: {%s}", status.c_str());
 	//Debug_print("[");
 
-	status += '\x0D'; // Add CR to end
  	IEC.send(status);
+	IEC.sendEOI('\x0D');
 
 	//Debug_println(BACKSPACE "]");
 
@@ -402,6 +402,10 @@ void iecDrive::handleListenCommand( void )
 		{
 			// Set File
 			prepareFileStream(referencedPath->url);
+		}
+		else
+		{
+			Debug_printv("file doesn't exist [%s]", referencedPath->url.c_str());
 		}
 	}
 
