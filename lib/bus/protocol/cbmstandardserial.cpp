@@ -149,6 +149,8 @@ int16_t  CBMStandardSerial::receiveByte(uint8_t device)
 	}
 
 	/* If there is a delay before the last bit, the controller uses JiffyDOS */
+	if (status(PIN_IEC_ATN) == PULLED)
+		Debug_printv("bit_time[%d]", bit_time);
 	if (flags bitand ATN_PULLED && bit_time >= 218 && n == 7) {
 		if ((data>>1) < 0x60 && ((data>>1) & 0x1f) == device) {
 			/* If it's for us, notify controller that we support Jiffy too */

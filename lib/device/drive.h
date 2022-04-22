@@ -50,7 +50,7 @@ enum OpenState
 class iecDrive: public iecDevice
 {
 public:
-	// iecDrive();
+	iecDrive();
 	// virtual ~iecDrive() {};
 
  	virtual uint8_t command( void ) { return 0; };

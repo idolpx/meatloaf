@@ -42,7 +42,8 @@
 #define COMMAND_RECVD   (1 << 2)
 #define JIFFY_ACTIVE    (1 << 3)
 #define JIFFY_LOAD      (1 << 4)
-#define ERROR           (1 << 5)  // if this flag is set, something went wrong
+#define DOLPHIN_ACTIVE  (1 << 5)
+#define ERROR           (1 << 7)  // if this flag is set, something went wrong
 
 // IEC protocol timing consts in microseconds (us)
 // IEC-Disected p10-11         // Description              // min    typical    max      // Notes
@@ -56,7 +57,7 @@
 #define TIMEOUT_Tf     1000
 #define TIMING_Tr      20      // FRAME TO RELEASE OF ATN     20us   -          -
 #define TIMING_Tbb     100     // BETWEEN BYTES TIME          100us  -          -
-#define TIMING_Tye     200     // EOI RESPONSE TIME           200us  250us      -
+#define TIMING_Tye     250     // EOI RESPONSE TIME           200us  250us      -
 #define TIMING_Tei     60      // EOI RESPONSE HOLD TIME      60us   -          -           (Tei minimum must be 80μ s for external device to be a listener.)
 #define TIMING_Try     30      // TALKER RESPONSE LIMIT       0      30us       60us
 #define TIMEOUT_Try    60

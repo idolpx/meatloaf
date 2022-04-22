@@ -69,12 +69,7 @@ uint8_t iecDevice::process( void )
 		handleOpen();
 
 		// Open either file or prg for reading, writing or single line command on the command channel.
-		if (IEC.data.content.length())
-		{
-			// Process a command
-			Debug_printv("[Process a command] {%s}", IEC.data.content.c_str());
-			handleListenCommand();
-		}
+		handleListenCommand();
 		
 		if (IEC.state == iecBus::BUS_LISTEN)
 		{
@@ -313,7 +308,7 @@ iecBus::BUS_STATE iecBus::service( void )
 	{
 		this->data.command = IEC_SECOND;
 		this->data.channel = c xor IEC_SECOND;
-		Debug_printf(" (60 DATA   %.2d CHANNEL)\r\n", this->data.channel);
+		Debug_printf(" (60 DATA   %.2d CHANNEL) ", this->data.channel);
 	}
 	else if(command == IEC_CLOSE)
 	{
@@ -395,9 +390,7 @@ iecBus::BUS_STATE iecBus::deviceListen( void )
 		this->data.content.clear();
 		while (protocol.status(PIN_IEC_ATN) != PULLED)
 		{
-			IEC.protocol.pull(PIN_IEC_SRQ);
 			int16_t c = receive();
-			IEC.protocol.release(PIN_IEC_SRQ);
 
 			if(protocol.flags bitand ERROR)
 			{
@@ -409,9 +402,15 @@ iecBus::BUS_STATE iecBus::deviceListen( void )
 			{
 				this->data.content += (uint8_t)c;
 			}
-		} 
-		mstr::rtrimA0(this->data.content);
-		Debug_printf(BACKSPACE "] {%s}\r\n", this->data.content.c_str());
+		}
+
+		if (this->data.content.length()) {
+			mstr::rtrimA0(this->data.content);
+			Debug_printf(BACKSPACE "] {%s}\r\n", this->data.content.c_str());			
+		} else {
+			Debug_printf(BACKSPACE "\r\n");
+		}
+
 		return BUS_COMMAND;
 	}
 
@@ -533,7 +532,10 @@ bool iecBus::send(uint8_t data)
 #ifdef DATA_STREAM
 	Debug_printf("%.2X ", data);
 #endif
-	return protocol.sendByte(data, false); // Standard CBM Timing
+	IEC.protocol.pull(PIN_IEC_SRQ);
+	bool r = protocol.sendByte(data, false); // Standard CBM Timing
+	IEC.protocol.release(PIN_IEC_SRQ);
+	return r;
 } // send
 
 bool iecBus::send(std::string data)

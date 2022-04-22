@@ -26,7 +26,6 @@
 #include "led.h"
 
 #include "wrappers/iec_buffer.h"
-//#include "wrappers/directory_stream.h"
 
 iecDrive drive;
 
@@ -34,10 +33,10 @@ using namespace CBM;
 using namespace Protocol;
 
 
-// iecDrive::iecDrive() : iecDevice(),	m_mfile(MFSOwner::File("/"))
-// {
-// 	reset();
-// } // ctor
+iecDrive::iecDrive()
+{
+	reset();
+} // ctor
 
 
 void iecDrive::reset(void)
@@ -60,15 +59,13 @@ void iecDrive::sendStatus(void)
 	if (status.size() == 0)
 		status = "00, OK,00,00";
 
-	Debug_printv("status: %s", status.c_str());
-	Debug_print("[");
+	Debug_printv("status: {%s}", status.c_str());
+	//Debug_print("[");
 
+	status += '\x0D'; // Add CR to end
  	IEC.send(status);
 
-	Debug_println(BACKSPACE "]");
-
-	// Send CR with EOI marker.
- 	IEC.sendEOI('\x0D');
+	//Debug_println(BACKSPACE "]");
 
 	// Clear the status message
 	m_device_status.clear();
@@ -337,7 +334,7 @@ void iecDrive::handleListenCommand( void )
 	size_t channel = IEC.data.channel;
 	m_openState = O_NOTHING;
 
-	if (IEC.data.content.size() == 0 )
+	if (IEC.data.content.length() == 0 )
 	{
 		Debug_printv("No command to process");
 
@@ -410,8 +407,6 @@ void iecDrive::handleListenCommand( void )
 
 	//dumpState();
 
-	// Clear command string
-	// IEC.data.content.clear();
 } // handleListenCommand
 
 
