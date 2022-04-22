@@ -292,7 +292,7 @@ iecBus::BUS_STATE iecBus::service( void )
 	else if(c == IEC_UNLISTEN)
 	{
 		Debug_printf(" (3F UNLISTEN)\r\n");
-		releaseLines(false);
+		//releaseLines(false);
 		r = BUS_IDLE;
 	}
 	else if(command == IEC_TALK)
@@ -306,7 +306,7 @@ iecBus::BUS_STATE iecBus::service( void )
 	else if(c == IEC_UNTALK)
 	{
 		Debug_printf(" (5F UNTALK)\r\n");
-		releaseLines(false);
+		//releaseLines(false);
 		r = BUS_IDLE;
 	}
 	else if(command == IEC_SECOND)
@@ -350,10 +350,10 @@ iecBus::BUS_STATE iecBus::service( void )
 
 	// Was there an error?
 	this->state = r;
-	// if(r == BUS_IDLE || r == BUS_ERROR)
-	// {
-	// 	releaseLines(true);
-	// }
+	if(r == BUS_ERROR)
+	{
+		releaseLines(true);
+	}
 
 	if (protocol.status(PIN_IEC_ATN) == RELEASED)
 	{
@@ -367,7 +367,7 @@ iecBus::BUS_STATE iecBus::service( void )
 		}
 	}
 
-	releaseLines(false);
+	//releaseLines(false);
 
 	return r;
 } // service
@@ -539,7 +539,8 @@ bool iecBus::send(uint8_t data)
 bool iecBus::send(std::string data)
 {
 	for (size_t i = 0; i < data.length(); ++i)
-		send((uint8_t)data[i]);
+		if (!send((uint8_t)data[i]))
+			return false;
 
 	return true;
 }

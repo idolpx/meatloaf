@@ -529,7 +529,7 @@ uint16_t iecDrive::sendLine(uint16_t &basicPtr, uint16_t blocks, char *text)
 
 	// Send line contents
 	for (uint8_t i = 0; i < len; i++)
-	 IEC.send(text[i]);
+		IEC.send(text[i]);
 
 	// Finish line
 	IEC.send(0);
@@ -637,8 +637,8 @@ void iecDrive::sendListing()
 	uint16_t basicPtr = C64_BASIC_START;
 
 	// Send load address
- IEC.send(C64_BASIC_START bitand 0xff);
- IEC.send((C64_BASIC_START >> 8) bitand 0xff);
+	IEC.send(C64_BASIC_START bitand 0xff);
+	IEC.send((C64_BASIC_START >> 8) bitand 0xff);
 	byte_count += 2;
 	Debug_println("");
 
