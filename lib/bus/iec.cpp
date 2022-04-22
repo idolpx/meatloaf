@@ -353,7 +353,7 @@ iecBus::BUS_STATE iecBus::service( void )
 		this->data.device = c xor IEC_LISTEN;
 		this->data.channel = 0;
 		Debug_printf(" (20 LISTEN %.2d DEVICE)\r\n", this->data.device);
-		r = BUS_LISTEN;
+		r = BUS_ACTIVE;
 	}
 	else if(c == IEC_UNLISTEN)
 	{
@@ -367,7 +367,7 @@ iecBus::BUS_STATE iecBus::service( void )
 		this->data.device = c xor IEC_TALK;
 		this->data.channel = 0;
 		Debug_printf(" (40 TALK   %.2d DEVICE)\r\n", this->data.device);
-		r = BUS_TALK;
+		r = BUS_ACTIVE;
 	}
 	else if(c == IEC_UNTALK)
 	{
@@ -420,12 +420,13 @@ iecBus::BUS_STATE iecBus::service( void )
 	{
 		releaseLines(true);
 	}
-	if(r == BUS_COMMAND)
+	else if(r == BUS_COMMAND || r == BUS_LISTEN || r == BUS_TALK)
 	{
 		// Send data to device to process
 		Debug_printv("Send Command [%.2X]{%s} to virtual device", IEC.data.command, IEC.data.content.c_str());
-		drive.process();			
+		drive.process();		
 	}
+
 	return r;
 } // service
 
@@ -439,7 +440,7 @@ iecBus::BUS_STATE iecBus::deviceListen( void )
 	{
 		// A heapload of data might come now, too big for this context to handle so the caller handles this, we're done here.
 		// Debug_printf(" (%.2X SECONDARY) (%.2X CHANNEL)\r\n", this->data.command, this->data.channel);
-		return BUS_COMMAND;
+		return BUS_LISTEN;
 	}
 
 	// OPEN
@@ -517,7 +518,7 @@ iecBus::BUS_STATE iecBus::deviceTalk( void )
 		return BUS_ERROR;
 
 	// We have recieved a CMD and we should talk now:
-	return BUS_COMMAND;
+	return BUS_TALK;
 }
 
 // void iecBus::deviceUnTalk(void)

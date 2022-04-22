@@ -114,12 +114,13 @@ public:
 	// Return values for service:
 	typedef enum
 	{
-		BUS_IDLE = 0,		  // Nothing recieved of our concern
-		BUS_COMMAND = 1,      // A command is recieved
-		BUS_LISTEN = 2,       // A command is recieved and data is coming to us
-		BUS_TALK = 3,	      // A command is recieved and we must talk now
-		BUS_ERROR = 5,		  // A problem occoured, reset communication
-		BUS_RESET = 6		  // The IEC bus is in a reset state (RESET line).
+		BUS_IDLE,		  // Nothing recieved of our concern
+		BUS_ACTIVE,       // ATN is pulled and another command byte is expected
+		BUS_COMMAND,      // A command is recieved
+		BUS_LISTEN,       // A command is recieved and data is coming to us
+		BUS_TALK,	      // A command is recieved and we must talk now
+		BUS_ERROR,		  // A problem occoured, reset communication
+		BUS_RESET		  // The IEC bus is in a reset state (RESET line).
 	} BUS_STATE;
 
 	// IEC commands:
