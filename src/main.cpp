@@ -55,11 +55,9 @@ bool initFailed = false;
 
 static void IRAM_ATTR on_attention_isr_handler(void* arg)
 {
-    IEC.protocol.pull(PIN_IEC_SRQ);
     bus_state = statemachine::select;
     IEC.protocol.flags or_eq ATN_PULLED;
     fnLedManager.toggle(eLed::LED_BUS);
-    IEC.protocol.release(PIN_IEC_SRQ);
 }
 
 // static void IRAM_ATTR on_clock_isr_handler(void* arg)
@@ -196,8 +194,6 @@ void fn_service_loop(void *param)
 #else
         if ( bus_state != statemachine::idle )
         {
-            IEC.protocol.pull(PIN_IEC_SRQ);
-
             //Debug_printv("before[%d]", bus_state);
             uint8_t bs = IEC.service();
             if( bs == iecBus::BUS_IDLE || bs == iecBus::BUS_ERROR )
@@ -210,9 +206,8 @@ void fn_service_loop(void *param)
 #endif
         else
         {
-            IEC.protocol.release(PIN_IEC_SRQ);
+            taskYIELD(); // Allow other tasks to run 
         }
-        taskYIELD(); // Allow other tasks to run 
     }
 }
 

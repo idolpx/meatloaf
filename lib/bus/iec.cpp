@@ -54,7 +54,7 @@ uint8_t iecDevice::process( void )
 	bool open = false;
 	Debug_printf("DEVICE: [%d] ", IEC.data.device);
 
-	if (IEC.data.command == iecBus::IEC_OPEN)
+	if (IEC.data.command == iecBus::IEC_OPEN || IEC.data.command == iecBus::IEC_SECOND)
 	{
 		Debug_printf("OPEN CHANNEL %d\r\n", IEC.data.channel);
 		if (IEC.data.channel == 0)
@@ -69,34 +69,14 @@ uint8_t iecDevice::process( void )
 		handleOpen();
 
 		// Open either file or prg for reading, writing or single line command on the command channel.
-		open = true;
-	}
-	else if (IEC.data.command == iecBus::IEC_SECOND) // data channel opened
-	{
-		Debug_printf("DATA CHANNEL %d\r\n", IEC.data.channel);
-		open = true;
-	}
-	else if (IEC.data.command == iecBus::IEC_CLOSE)
-	{
-		Debug_printf("CLOSE CHANNEL %d\r\n", IEC.data.channel);
-		if(IEC.data.channel > 0)
-		{
-			handleClose();
-		}
-		// return DEVICE_STATE::DEVICE_IDLE;
-	}	
-	
-	// Ready to Send or Receive Data
-	if (open)
-	{
-		Debug_printf("DATA CHANNEL %d\r\n", IEC.data.channel);
-		if (IEC.state == iecBus::BUS_COMMAND)
+		if (IEC.data.content.length())
 		{
 			// Process a command
-			Debug_printv("[Process a command]");
+			Debug_printv("[Process a command] {%s}", IEC.data.content.c_str());
 			handleListenCommand();
 		}
-		else if (IEC.state == iecBus::BUS_LISTEN)
+		
+		if (IEC.state == iecBus::BUS_LISTEN)
 		{
 			// Receive data
 			Debug_printv("[Receive data]");
@@ -106,14 +86,17 @@ uint8_t iecDevice::process( void )
 		{
 			// Send data
 			Debug_printv("[Send data]");
-			if (IEC.data.channel == CMD_CHANNEL)
-			{
-				handleListenCommand();		 // This is typically an empty command,
-			}
-
 			handleTalk(IEC.data.channel);
 		}
 	}
+	else if (IEC.data.command == iecBus::IEC_CLOSE)
+	{
+		Debug_printf("CLOSE CHANNEL %d\r\n", IEC.data.channel);
+		if(IEC.data.channel > 0)
+		{
+			handleClose();
+		}
+	}	
 
 	Debug_printv("command[%.2X] channel[%.2X] state[%d]", IEC.data.command, IEC.data.channel, m_openState);
 
@@ -168,8 +151,8 @@ bool iecBus::init()
 #ifndef IEC_SPLIT_LINES
 	// make sure the output states are initially LOW
 //	protocol.release(PIN_IEC_ATN);
-	protocol.release(PIN_IEC_CLK_IN);
-	protocol.release(PIN_IEC_DATA_IN);
+	protocol.release(PIN_IEC_CLK_OUT);
+	protocol.release(PIN_IEC_DATA_OUT);
 	protocol.release(PIN_IEC_SRQ);
 
 	// initial pin modes in GPIO
@@ -180,7 +163,7 @@ bool iecBus::init()
 	protocol.set_pin_mode(PIN_IEC_RESET, INPUT);
 #else
 	// make sure the output states are initially LOW
-//	protocol.release(PIN_IEC_ATN);
+	// protocol.release(PIN_IEC_ATN);
 	// protocol.release(PIN_IEC_CLK_IN);
 	// protocol.release(PIN_IEC_CLK_OUT);
 	// protocol.release(PIN_IEC_DATA_IN);
@@ -202,58 +185,6 @@ bool iecBus::init()
 	return true;
 } // init
 
-// IEC turnaround
-bool iecBus::turnAround(void)
-{
-	/*
-	TURNAROUND
-	An unusual sequence takes place following ATN if the computer wishes the remote device to
-	become a talker. This will usually take place only after a Talk command has been sent.
-	Immediately after ATN is RELEASED, the selected device will be behaving like a listener. After all, it's
-	been listening during the ATN cycle, and the computer has been a talker. At this instant, we
-	have "wrong way" logic; the device is holding down the Data	line, and the computer is holding the
-	Clock line. We must turn this around. Here's the sequence:
-	the computer quickly realizes what's going on, and pulls the Data line to true (it's already there), as
-	well as releasing the Clock line to false. The device waits for this: when it sees the Clock line go
-	true [sic], it releases the Data line (which stays true anyway since the computer is now holding it down)
-	and then pulls down the Clock line. We're now in our starting position, with the talker (that's the
-	device) holding the Clock true, and the listener (the computer) holding the Data line true. The
-	computer watches for this state; only when it has gone through the cycle correctly will it be ready
-	to receive data. And data will be signalled, of course, with the usual sequence: the talker releases
-	the Clock line to signal that it's ready to send.
-	*/
-	// Debug_printf("IEC turnAround: ");
-
-	// Wait until clock is RELEASED
-	while(protocol.status(PIN_IEC_CLK_IN) != RELEASED);
-
-	protocol.release(PIN_IEC_DATA_OUT);
-	delayMicroseconds(TIMING_Tv);
-	protocol.pull(PIN_IEC_CLK_OUT);
-	delayMicroseconds(TIMING_Tv);
-
-	// Debug_println("complete");
-	return true;
-} // turnAround
-
-
-// this routine will set the direction on the bus back to normal
-// (the way it was when the computer was switched on)
-bool iecBus::undoTurnAround(void)
-{
-	protocol.pull(PIN_IEC_DATA_OUT);
-	delayMicroseconds(TIMING_Tv);
-	protocol.release(PIN_IEC_CLK_OUT);
-	delayMicroseconds(TIMING_Tv);
-
-	// Debug_printf("IEC undoTurnAround: ");
-
-	// wait until the computer protocol.releases the clock line
-	while(protocol.status(PIN_IEC_CLK_IN) != RELEASED);
-
-	// Debug_println("complete");
-	return true;
-} // undoTurnAround
 
 
 /******************************************************************************
@@ -287,7 +218,7 @@ bool iecBus::undoTurnAround(void)
 // Return value, see iecBus::BUS_STATE definition.
 iecBus::BUS_STATE iecBus::service( void )
 {
-	iecBus::BUS_STATE r = BUS_IDLE;
+	iecBus::BUS_STATE r = BUS_ACTIVE;
 
 	// Check if CBM is sending a reset (setting the RESET line high). This is typically
 	// when the CBM is reset itself. In this case, we are supposed to reset all states to initial.
@@ -308,11 +239,14 @@ iecBus::BUS_STATE iecBus::service( void )
 	protocol.pull(PIN_IEC_DATA_OUT);
 	delayMicroseconds(TIMING_Tne);
 
+    //IEC.protocol.pull(PIN_IEC_SRQ);
 
 	// Get command
 	uint8_t previous_command = this->data.command;
 	int16_t c = (iecBus::COMMAND)receive(this->data.device);
 	this->data.command = c;	
+
+	//IEC.protocol.release(PIN_IEC_SRQ);
 
 	Debug_printf("   IEC: [%.2X]", c);
 
@@ -379,13 +313,13 @@ iecBus::BUS_STATE iecBus::service( void )
 	{
 		this->data.command = IEC_SECOND;
 		this->data.channel = c xor IEC_SECOND;
-		Debug_printf(" (60 DATA   %.2d CHANNEL) ", this->data.channel);
+		Debug_printf(" (60 DATA   %.2d CHANNEL)\r\n", this->data.channel);
 	}
 	else if(command == IEC_CLOSE)
 	{
 		this->data.command = IEC_CLOSE;
 		this->data.channel = c xor IEC_CLOSE;
-		Debug_printf(" (E0 CLOSE  %.2d CHANNEL) ", this->data.channel);
+		Debug_printf(" (E0 CLOSE  %.2d CHANNEL)\r\n", this->data.channel);
 	}
 	else if(command == IEC_OPEN)
 	{
@@ -416,16 +350,24 @@ iecBus::BUS_STATE iecBus::service( void )
 
 	// Was there an error?
 	this->state = r;
-	if(r == BUS_ERROR)
+	// if(r == BUS_IDLE || r == BUS_ERROR)
+	// {
+	// 	releaseLines(true);
+	// }
+
+	if (protocol.status(PIN_IEC_ATN) == RELEASED)
 	{
-		releaseLines(true);
+		// Process commands when ATN is Released
+		if(r == BUS_COMMAND || r == BUS_LISTEN || r == BUS_TALK)
+		{
+			// Send data to device to process
+			Debug_printv("Send Command [%.2X]{%s} to virtual device", IEC.data.command, IEC.data.content.c_str());
+			drive.process();
+					
+		}
 	}
-	else if(r == BUS_COMMAND || r == BUS_LISTEN || r == BUS_TALK)
-	{
-		// Send data to device to process
-		Debug_printv("Send Command [%.2X]{%s} to virtual device", IEC.data.command, IEC.data.content.c_str());
-		drive.process();		
-	}
+
+	releaseLines(false);
 
 	return r;
 } // service
@@ -450,9 +392,12 @@ iecBus::BUS_STATE iecBus::deviceListen( void )
 		Debug_printf(" [");
 
 		// Some other command. Record the cmd string until ATN is PULLED
-		while (protocol.flags bitand ATN_PULLED)
+		this->data.content.clear();
+		while (protocol.status(PIN_IEC_ATN) != PULLED)
 		{
+			IEC.protocol.pull(PIN_IEC_SRQ);
 			int16_t c = receive();
+			IEC.protocol.release(PIN_IEC_SRQ);
 
 			if(protocol.flags bitand ERROR)
 			{
@@ -508,13 +453,13 @@ iecBus::BUS_STATE iecBus::deviceListen( void )
 iecBus::BUS_STATE iecBus::deviceTalk( void )
 {
 	// Okay, we will talk soon
-	Debug_printf(" (%.2X SECONDARY) (%.2X CHANNEL)\r\n", this->data.command, this->data.channel);
+	// Debug_printf(" (%.2X SECONDARY) (%.2X CHANNEL)\r\n", this->data.command, this->data.channel);
 
 	// Delay after ATN is RELEASED
 	//delayMicroseconds(TIMING_BIT);
 
 	// Now do bus turnaround
-	if(not turnAround())
+	if(not protocol.turnAround())
 		return BUS_ERROR;
 
 	// We have recieved a CMD and we should talk now:
@@ -611,7 +556,7 @@ bool iecBus::sendEOI(uint8_t data)
 	if(protocol.sendByte(data, true))
 	{
 		// As we have just send last byte, turn bus back around
-		if(undoTurnAround())
+		if(protocol.undoTurnAround())
 		{
 			return true;
 		}

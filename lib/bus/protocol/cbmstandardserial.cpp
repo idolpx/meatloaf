@@ -48,6 +48,7 @@ int16_t  CBMStandardSerial::receiveByte(uint8_t device)
 	// line  to  false.    Suppose  there  is  more  than one listener.  The Data line will go false 
 	// only when all listeners have RELEASED it - in other words, when  all  listeners  are  ready  
 	// to  accept  data.  What  happens  next  is  variable.
+	release(PIN_IEC_DATA_OUT);
 
 	// Wait for all other devices to release the data line
 	if(timeoutWait(PIN_IEC_DATA_IN, RELEASED, FOREVER, 1) == TIMED_OUT)
@@ -56,7 +57,7 @@ int16_t  CBMStandardSerial::receiveByte(uint8_t device)
 		flags or_eq ERROR;
 		return -1; // return error because timeout
 	}
-	release(PIN_IEC_DATA_OUT); // Let other devices release first
+	
 
 	// Either  the  talker  will pull the 
 	// Clock line back to true in less than 200 microseconds - usually within 60 microseconds - or it  
@@ -95,9 +96,6 @@ int16_t  CBMStandardSerial::receiveByte(uint8_t device)
 		}		
 	}
 
-	// // Sample ATN and set flag to indicate SELECT or DATA mode
-	// if(status(PIN_IEC_ATN) == PULLED)
-	// 	flags or_eq ATN_PULLED;
 
 	// STEP 3: SENDING THE BITS
 	// The talker has eight bits to send.  They will go out without handshake; in other words, 
@@ -170,6 +168,9 @@ int16_t  CBMStandardSerial::receiveByte(uint8_t device)
 	// Acknowledge byte received
 	delayMicroseconds(TIMING_Tf);
 	pull(PIN_IEC_DATA_OUT);
+
+	// BETWEEN BYTES TIME
+	delayMicroseconds(TIMING_Tbb);
 
 	// STEP 5: START OVER
 	// We're  finished,  and  back  where  we  started.    The  talker  is  holding  the  Clock  line  true,
@@ -295,7 +296,7 @@ bool CBMStandardSerial::sendByte(uint8_t data, bool signalEOI)
 
 
 		// set bit
-		(data bitand 1) ? release(PIN_IEC_DATA_IN) : pull(PIN_IEC_DATA_OUT);
+		(data bitand 1) ? release(PIN_IEC_DATA_OUT) : pull(PIN_IEC_DATA_OUT);
 		delayMicroseconds(TIMING_Tv);
 
 		// tell listener bit is ready to read
@@ -348,6 +349,70 @@ bool CBMStandardSerial::sendByte(uint8_t data, bool signalEOI)
 	return true;
 } // sendByte
 
+
+
+// IEC turnaround
+bool CBMStandardSerial::turnAround(void)
+{
+	/*
+	TURNAROUND
+	An unusual sequence takes place following ATN if the computer wishes the remote device to
+	become a talker. This will usually take place only after a Talk command has been sent.
+	Immediately after ATN is RELEASED, the selected device will be behaving like a listener. After all, it's
+	been listening during the ATN cycle, and the computer has been a talker. At this instant, we
+	have "wrong way" logic; the device is holding down the Data	line, and the computer is holding the
+	Clock line. We must turn this around. Here's the sequence:
+	the computer quickly realizes what's going on, and pulls the Data line to true (it's already there), as
+	well as releasing the Clock line to false. The device waits for this: when it sees the Clock line go
+	true [sic], it releases the Data line (which stays true anyway since the computer is now holding it down)
+	and then pulls down the Clock line. We're now in our starting position, with the talker (that's the
+	device) holding the Clock true, and the listener (the computer) holding the Data line true. The
+	computer watches for this state; only when it has gone through the cycle correctly will it be ready
+	to receive data. And data will be signalled, of course, with the usual sequence: the talker releases
+	the Clock line to signal that it's ready to send.
+	*/
+	// Debug_printf("IEC turnAround: ");
+
+	// Wait until the computer releases the clock line
+	if(timeoutWait(PIN_IEC_CLK_IN, RELEASED, FOREVER, 1) == TIMED_OUT)
+	{
+		Debug_printv("Wait until the computer releases the clock line");
+		flags or_eq ERROR;
+		return -1; // return error because timeout
+	}
+
+	release(PIN_IEC_DATA_OUT);
+	delayMicroseconds(TIMING_Tv);
+	pull(PIN_IEC_CLK_OUT);
+	delayMicroseconds(TIMING_Tv);
+
+	// Debug_println("complete");
+	return true;
+} // turnAround
+
+
+// this routine will set the direction on the bus back to normal
+// (the way it was when the computer was switched on)
+bool CBMStandardSerial::undoTurnAround(void)
+{
+	pull(PIN_IEC_DATA_OUT);
+	delayMicroseconds(TIMING_Tv);
+	release(PIN_IEC_CLK_OUT);
+	delayMicroseconds(TIMING_Tv);
+
+	// Debug_printf("IEC undoTurnAround: ");
+
+	// Wait until the computer releases the clock line
+	if(timeoutWait(PIN_IEC_CLK_IN, RELEASED, FOREVER, 1) == TIMED_OUT)
+	{
+		Debug_printv("Wait until the computer releases the clock line");
+		flags or_eq ERROR;
+		return -1; // return error because timeout
+	}
+
+	// Debug_println("complete");
+	return true;
+} // undoTurnAround
 
 // Wait indefinitely if wait = 0 or until ATN status changes
 int16_t CBMStandardSerial::timeoutWait(uint8_t iecPIN, bool lineStatus, size_t wait, size_t step)

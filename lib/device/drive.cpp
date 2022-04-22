@@ -411,7 +411,7 @@ void iecDrive::handleListenCommand( void )
 	//dumpState();
 
 	// Clear command string
-	//m_IEC.data.content.clear();
+	// IEC.data.content.clear();
 } // handleListenCommand
 
 

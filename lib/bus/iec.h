@@ -114,7 +114,7 @@ public:
 	// Return values for service:
 	typedef enum
 	{
-		BUS_IDLE,		  // Nothing recieved of our concern
+		BUS_IDLE = 0,		  // Nothing recieved of our concern
 		BUS_ACTIVE,       // ATN is pulled and another command byte is expected
 		BUS_COMMAND,      // A command is recieved
 		BUS_LISTEN,       // A command is recieved and data is coming to us
@@ -203,8 +203,6 @@ private:
 	BUS_STATE deviceClose(void);     // 0xE0 + channel     Close, channel (0–15)
 	BUS_STATE deviceOpen(void);      // 0xF0 + channel     Open, channel (0–15)
 
-	bool turnAround(void);
-	bool undoTurnAround(void);
 	void releaseLines(bool wait = true);
 };
 

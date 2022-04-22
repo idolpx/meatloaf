@@ -295,7 +295,7 @@
 
 
 // 		// set bit
-// 		(data bitand 1) ? release(PIN_IEC_DATA_IN) : pull(PIN_IEC_DATA_OUT);
+// 		(data bitand 1) ? release(PIN_IEC_DATA_OUT) : pull(PIN_IEC_DATA_OUT);
 // 		delayMicroseconds(TIMING_Tv);
 
 // 		// tell listener bit is ready to read
