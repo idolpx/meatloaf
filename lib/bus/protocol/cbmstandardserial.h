@@ -122,7 +122,7 @@ namespace Protocol
 #ifndef IEC_SPLIT_LINES
 				set_pin_mode(pin, INPUT);
 #endif
-				return digital_read(pin) ? RELEASED : PULLED;
+				return gpio_get_level((gpio_num_t)pin) ? RELEASED : PULLED;
 			}
 
 			inline void IRAM_ATTR set_pin_mode(uint8_t pin, gpio_mode_t mode)

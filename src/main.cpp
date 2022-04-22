@@ -55,10 +55,11 @@ bool initFailed = false;
 
 static void IRAM_ATTR on_attention_isr_handler(void* arg)
 {
+    IEC.protocol.pull(PIN_IEC_SRQ);
     bus_state = statemachine::select;
     IEC.protocol.flags or_eq ATN_PULLED;
     fnLedManager.toggle(eLed::LED_BUS);
-    //Debug_printv("ATN PULLED\n");
+    IEC.protocol.release(PIN_IEC_SRQ);
 }
 
 // static void IRAM_ATTR on_clock_isr_handler(void* arg)
@@ -155,23 +156,16 @@ void main_setup()
     Serial.println( ANSI_RESET "]");
 
     // Setup interrupt for ATN
-    gpio_pad_select_gpio(PIN_IEC_ATN);
-    gpio_set_direction(PIN_IEC_ATN, GPIO_MODE_INPUT);
-
-    //zero-initialize the config structure
     gpio_config_t io_conf = {
         .pin_bit_mask = ( 1ULL << PIN_IEC_ATN ),    // bit mask of the pins that you want to set
-//        .pin_bit_mask = ( (1ULL << PIN_IEC_ATN) | (1ULL << PIN_IEC_CLK_IN) | (1ULL << PIN_IEC_DATA_IN) ),    // bit mask of the pins that you want to set
         .mode = GPIO_MODE_INPUT,                    // set as input mode
-        .pull_up_en = GPIO_PULLUP_DISABLE,             // disable pull-up mode
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,         // disable pull-down mode
+        .pull_up_en = GPIO_PULLUP_DISABLE,          // disable pull-up mode
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,      // disable pull-down mode
         .intr_type = GPIO_INTR_NEGEDGE              // interrupt of falling edge
     };
     //configure GPIO with the given settings
     gpio_config(&io_conf);
     gpio_isr_handler_add((gpio_num_t)PIN_IEC_ATN, on_attention_isr_handler, (void *)PIN_IEC_ATN);
-    // gpio_isr_handler_add((gpio_num_t)PIN_IEC_CLK_IN, on_clock_isr_handler, (void *)PIN_IEC_CLK_IN);
-    // gpio_isr_handler_add((gpio_num_t)PIN_IEC_DATA_IN, on_data_isr_handler, (void *)PIN_IEC_DATA_IN);
     Serial.println( ANSI_GREEN_BOLD "IEC Bus Initialized" ANSI_RESET );
 
 
@@ -202,7 +196,8 @@ void fn_service_loop(void *param)
 #else
         if ( bus_state != statemachine::idle )
         {
-            
+            IEC.protocol.pull(PIN_IEC_SRQ);
+
             //Debug_printv("before[%d]", bus_state);
             uint8_t bs = IEC.service();
             if( bs == iecBus::BUS_IDLE || bs == iecBus::BUS_ERROR )
@@ -215,8 +210,9 @@ void fn_service_loop(void *param)
 #endif
         else
         {
-            taskYIELD(); // Allow other tasks to run            
+            IEC.protocol.release(PIN_IEC_SRQ);
         }
+        taskYIELD(); // Allow other tasks to run 
     }
 }
 

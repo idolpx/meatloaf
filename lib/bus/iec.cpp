@@ -173,7 +173,7 @@ bool iecBus::init()
 	protocol.release(PIN_IEC_SRQ);
 
 	// initial pin modes in GPIO
-//	protocol.set_pin_mode(PIN_IEC_ATN, INPUT);
+	protocol.set_pin_mode(PIN_IEC_ATN, INPUT);
 	protocol.set_pin_mode(PIN_IEC_CLK_IN, INPUT);
 	protocol.set_pin_mode(PIN_IEC_DATA_IN, INPUT);
 	protocol.set_pin_mode(PIN_IEC_SRQ, INPUT);
@@ -188,7 +188,7 @@ bool iecBus::init()
 	// protocol.release(PIN_IEC_SRQ);
 
 	// initial pin modes in GPIO
-//	protocol.set_pin_mode(PIN_IEC_ATN, INPUT);
+	protocol.set_pin_mode(PIN_IEC_ATN, INPUT);
 	protocol.set_pin_mode(PIN_IEC_CLK_IN, INPUT);
 	protocol.set_pin_mode(PIN_IEC_CLK_OUT, OUTPUT);
 	protocol.set_pin_mode(PIN_IEC_DATA_IN, INPUT);
@@ -353,7 +353,7 @@ iecBus::BUS_STATE iecBus::service( void )
 		this->data.device = c xor IEC_LISTEN;
 		this->data.channel = 0;
 		Debug_printf(" (20 LISTEN %.2d DEVICE)\r\n", this->data.device);
-		r = BUS_COMMAND;
+		r = BUS_LISTEN;
 	}
 	else if(c == IEC_UNLISTEN)
 	{
@@ -367,7 +367,7 @@ iecBus::BUS_STATE iecBus::service( void )
 		this->data.device = c xor IEC_TALK;
 		this->data.channel = 0;
 		Debug_printf(" (40 TALK   %.2d DEVICE)\r\n", this->data.device);
-		r = BUS_COMMAND;
+		r = BUS_TALK;
 	}
 	else if(c == IEC_UNTALK)
 	{
@@ -416,29 +416,22 @@ iecBus::BUS_STATE iecBus::service( void )
 
 	// Was there an error?
 	this->state = r;
-	// if(r == BUS_IDLE || r == BUS_ERROR)
-	// {
-	// 	releaseLines(true);
-
-	// 	if(r == BUS_IDLE)
-	// 	{
-	// 		// Send data to device to process
-	// 		Debug_printv("Send Command [%.2X]{%s} to virtual device", IEC.data.command, IEC.data.content.c_str());
-	// 		drive.process();			
-	// 	}
-	// }
-	if ( r == BUS_IDLE )
+	if(r == BUS_ERROR)
 	{
-		Debug_printv("BUS_IDLE");
+		releaseLines(true);
 	}
-
+	if(r == BUS_COMMAND)
+	{
+		// Send data to device to process
+		Debug_printv("Send Command [%.2X]{%s} to virtual device", IEC.data.command, IEC.data.content.c_str());
+		drive.process();			
+	}
 	return r;
 } // service
 
 iecBus::BUS_STATE iecBus::deviceListen( void )
 {
 	// Okay, we will listen.
-	// Debug_printf("(20 LISTEN) (%.2d DEVICE) ", this->data.device);
 
 	// If the command is SECONDARY and it is not to expect just a small command on the command channel, then
 	// we're into something more heavy. Otherwise read it all out right here until UNLISTEN is received.
