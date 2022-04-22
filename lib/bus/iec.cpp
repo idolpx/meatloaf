@@ -51,7 +51,6 @@ void iecDevice::reset(void)
 
 uint8_t iecDevice::process( void )
 {
-	bool open = false;
 	Debug_printf("DEVICE: [%d] ", IEC.data.device);
 
 	if (IEC.data.command == iecBus::IEC_OPEN || IEC.data.command == iecBus::IEC_SECOND)
@@ -93,7 +92,7 @@ uint8_t iecDevice::process( void )
 		}
 	}	
 
-	Debug_printv("command[%.2X] channel[%.2X] state[%d]", IEC.data.command, IEC.data.channel, m_openState);
+	//Debug_printv("command[%.2X] channel[%.2X] state[%d]", IEC.data.command, IEC.data.channel, m_openState);
 
 	return DEVICE_STATE::DEVICE_IDLE;
 } // service
@@ -351,21 +350,20 @@ iecBus::BUS_STATE iecBus::service( void )
 		releaseLines(true);
 	}
 
+
 	if (protocol.status(PIN_IEC_ATN) == RELEASED)
 	{
 		// Process commands when ATN is Released
 		if(r == BUS_COMMAND || r == BUS_LISTEN || r == BUS_TALK)
 		{
 			// Send data to device to process
-			Debug_printv("Send Command [%.2X]{%s} to virtual device", IEC.data.command, IEC.data.content.c_str());
+			//Debug_printv("Send Command [%.2X]{%s} to virtual device", IEC.data.command, IEC.data.content.c_str());
 			drive.process();
 
 			releaseLines(false);
 			r = BUS_IDLE;
 		}
 	}
-
-	//releaseLines(false);
 
 	return r;
 } // service
@@ -391,7 +389,7 @@ iecBus::BUS_STATE iecBus::deviceListen( void )
 		Debug_printf(" [");
 
 		// Some other command. Record the cmd string until ATN is PULLED
-		this->data.content.clear();
+		std::string listen_command;
 		while (protocol.status(PIN_IEC_ATN) != PULLED)
 		{
 			int16_t c = receive();
@@ -404,11 +402,12 @@ iecBus::BUS_STATE iecBus::deviceListen( void )
 
 			if(c != 0x0D)
 			{
-				this->data.content += (uint8_t)c;
+				listen_command += (uint8_t)c;
 			}
 		}
 
-		if (this->data.content.length()) {
+		if (listen_command.length()) {
+			this->data.content = listen_command;
 			mstr::rtrimA0(this->data.content);
 			Debug_printf(BACKSPACE "] {%s}\r\n", this->data.content.c_str());			
 		} else {

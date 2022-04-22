@@ -187,10 +187,10 @@ MFile* iecDrive::getPointed(MFile* urlFile) {
 CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 {
 
-	Debug_printv("* PARSE INCOMING LINE *******************************");
+	//Debug_printv("* PARSE INCOMING LINE *******************************");
 
-	Debug_printv("we are in              [%s]", m_mfile->url.c_str());
-	Debug_printv("unprocessed user input [%s]", command.c_str());
+	//Debug_printv("we are in              [%s]", m_mfile->url.c_str());
+	//Debug_printv("unprocessed user input [%s]", command.c_str());
 
 	if (mstr::endsWith(command, "*"))
 	{
@@ -208,7 +208,7 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 			std::string match = mstr::dropLast(command, 1);
 			while ( entry != nullptr )
 			{
-				Debug_printv("match[%s] extension[%s]", match.c_str(), entry->extension.c_str());
+				//Debug_printv("match[%s] extension[%s]", match.c_str(), entry->extension.c_str());
 				if ( !mstr::startsWith(entry->extension, "prg") || (match.size() > 0 && !mstr::startsWith( entry->name, match.c_str() ))  )
 				{
 					entry.reset(m_mfile->getNextFileInDir());
@@ -237,7 +237,7 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 		//else if ( channel != 15 )
 		//	guessedPath = command;
 
-		Debug_printv("guessedPath[%s]", guessedPath.c_str());
+		//Debug_printv("guessedPath[%s]", guessedPath.c_str());
 	}
 	else if(mstr::startsWith(command, "@info", false))
 	{
@@ -282,11 +282,11 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 	mstr::rtrim(guessedPath);
 	tuple.rawPath = guessedPath;
 
-	Debug_printv("found command     [%s]", tuple.command.c_str());
+	//Debug_printv("found command     [%s]", tuple.command.c_str());
 
 	if(guessedPath == "$")
 	{
-		Debug_printv("get directory of [%s]", m_mfile->url.c_str());
+		//Debug_printv("get directory of [%s]", m_mfile->url.c_str());
 	}
 	else if(!guessedPath.empty())
 	{
@@ -294,10 +294,10 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 
 		tuple.fullPath = fullPath->url;
 
-		Debug_printv("full referenced path [%s]", tuple.fullPath.c_str());
+		//Debug_printv("full referenced path [%s]", tuple.fullPath.c_str());
 	}
 
-	Debug_printv("* END OF PARSE LINE *******************************");
+	//Debug_printv("* END OF PARSE LINE *******************************");
 
 	return tuple;
 }
@@ -306,10 +306,13 @@ void iecDrive::changeDir(std::string url)
 {
 	device_config.url(url);
 	m_mfile.reset(MFSOwner::File(url));
-	m_openState = O_DIR;
-	Debug_printv("!!!! CD into [%s]", url.c_str());
-	Debug_printv("new current url: [%s]", m_mfile->url.c_str());
-	Debug_printv("LOAD $");
+	if ( IEC.data.channel == 0 )
+	{
+		m_openState = O_DIR;
+		//Debug_printv("!!!! CD into [%s]", url.c_str());
+		//Debug_printv("new current url: [%s]", m_mfile->url.c_str());
+		//Debug_printv("LOAD $");		
+	}
 }
 
 void iecDrive::prepareFileStream(std::string url)
@@ -383,7 +386,7 @@ void iecDrive::handleListenCommand( void )
 
 			if ( referencedPath->isDirectory() )
 			{
-				Debug_printv("change dir called for urlfile");
+				//Debug_printv("change dir called for urlfile");
 				changeDir(referencedPath->url);
 			}
 			else if ( referencedPath->exists() )
@@ -394,7 +397,7 @@ void iecDrive::handleListenCommand( void )
 		// 2. OR if command == "CD" OR fullPath.isDirectory - change directory
 		if (mstr::equals(commandAndPath.command, (char*)"cd", false) || referencedPath->isDirectory())
 		{
-			Debug_printv("change dir called by CD command or because of isDirectory");
+			//Debug_printv("change dir called by CD command or because of isDirectory");
 			changeDir(referencedPath->url);
 		}
 		// 3. else - stream file
@@ -410,6 +413,7 @@ void iecDrive::handleListenCommand( void )
 	}
 
 	//dumpState();
+	IEC.data.content.clear();
 
 } // handleListenCommand
 
@@ -424,7 +428,7 @@ void iecDrive::handleListenData()
 
 void iecDrive::handleTalk(uint8_t chan)
 {
-	Debug_printv("channel[%d] openState[%d]", chan, m_openState);
+	//Debug_printv("channel[%d] openState[%d]", chan, m_openState);
 
 	switch (m_openState)
 	{
@@ -672,8 +676,6 @@ void iecDrive::sendListing()
 
 		if (!entry->isDirectory())
 		{
-			// if ( block_cnt < 1)
-			// 	block_cnt = 1;
 
 			// Get extension
 			if (entry->extension.length())

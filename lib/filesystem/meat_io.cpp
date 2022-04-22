@@ -122,7 +122,7 @@ MFile* MFSOwner::File(std::string path) {
 
     std::vector<std::string> paths = mstr::split(path,'/');
 
-    Debug_printv("Trying to factory path [%s]", path.c_str());
+    //Debug_printv("Trying to factory path [%s]", path.c_str());
 
     auto pathIterator = paths.end();
     auto begin = paths.begin();
@@ -131,7 +131,7 @@ MFile* MFSOwner::File(std::string path) {
     auto foundFS = testScan(begin, end, pathIterator);
 
     if(foundFS != nullptr) {
-        Debug_printv("PATH: '%s' is in FS [%s]", path.c_str(), foundFS->symbol);
+        //Debug_printv("PATH: '%s' is in FS [%s]", path.c_str(), foundFS->symbol);
         auto newFile = foundFS->getFile(path);
         //Debug_printv("newFile: '%s'", newFile->url.c_str());
 
@@ -228,14 +228,14 @@ bool MFile::operator!=(nullptr_t ptr) {
 
 MIStream* MFile::inputStream() {
     // has to return OPENED stream
-    Debug_printv("pathInStream[%s] streamFile[%s]", pathInStream.c_str(), streamFile->url.c_str());
+    //Debug_printv("pathInStream[%s] streamFile[%s]", pathInStream.c_str(), streamFile->url.c_str());
     //std::shared_ptr<MFile> containerFile(MFSOwner::File(streamPath)); // get the base file that knows how to handle this kind of container, i.e 7z
 
     std::shared_ptr<MIStream> containerStream(streamFile->inputStream()); // get its base stream, i.e. zip raw file contents
-    Debug_printv("containerStream isRandomAccess[%d] isBrowsable[%d]", containerStream->isRandomAccess(), containerStream->isBrowsable());
+    //Debug_printv("containerStream isRandomAccess[%d] isBrowsable[%d]", containerStream->isRandomAccess(), containerStream->isBrowsable());
 
     MIStream* decodedStream(createIStream(containerStream)); // wrap this stream into decodec stream, i.e. unpacked zip files
-    Debug_printv("decodedStream isRandomAccess[%d] isBrowsable[%d]", decodedStream->isRandomAccess(), decodedStream->isBrowsable());
+    //Debug_printv("decodedStream isRandomAccess[%d] isBrowsable[%d]", decodedStream->isRandomAccess(), decodedStream->isBrowsable());
 
     if(decodedStream->isRandomAccess() && pathInStream != "") {
         bool foundIt = decodedStream->seekPath(this->pathInStream);
@@ -253,7 +253,7 @@ MIStream* MFile::inputStream() {
         {
             if(pointedFile == this->pathInStream)
             {
-                Debug_printv("returning decodedStream");
+                //Debug_printv("returning decodedStream");
                 return decodedStream;                
             }
 
@@ -264,7 +264,7 @@ MIStream* MFile::inputStream() {
             return nullptr;        
     }
 
-    Debug_printv("returning decodedStream");
+    //Debug_printv("returning decodedStream");
     return decodedStream;
 };
 

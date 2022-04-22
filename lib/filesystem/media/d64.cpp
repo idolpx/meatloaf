@@ -164,7 +164,7 @@ uint16_t D64IStream::blocksFree()
     for(uint8_t x = 0; x < block_allocation_map.size(); x++)
     {
         uint8_t bam[block_allocation_map[x].byte_count] = { 0 };
-        Debug_printv("start_track[%d] end_track[%d]", block_allocation_map[x].start_track, block_allocation_map[x].end_track);
+        //Debug_printv("start_track[%d] end_track[%d]", block_allocation_map[x].start_track, block_allocation_map[x].end_track);
 
         seekSector(block_allocation_map[x].track, block_allocation_map[x].sector, block_allocation_map[x].offset);
         for(uint8_t i = block_allocation_map[x].start_track; i <= block_allocation_map[x].end_track; i++)
@@ -174,7 +174,7 @@ uint16_t D64IStream::blocksFree()
             {
                 if ( i != directory_list_offset[0] )
                 {
-                    Debug_printv("x[%d] track[%d] count[%d] size[%d]", x, i, bam[0], sizeof(bam));
+                    //Debug_printv("x[%d] track[%d] count[%d] size[%d]", x, i, bam[0], sizeof(bam));
                     free_count += bam[0];
                 }
             }
@@ -306,7 +306,7 @@ bool D64File::isDirectory() {
 
 bool D64File::rewindDirectory() {
     dirIsOpen = true;
-    Debug_printv("streamFile->url[%s]", streamFile->url.c_str());
+    //Debug_printv("streamFile->url[%s]", streamFile->url.c_str());
     auto image = ImageBroker::obtain<D64IStream>(streamFile->url);
     if ( image == nullptr )
         Debug_printv("image pointer is null");

@@ -103,12 +103,12 @@ bool FlashFile::mkDir()
 
 bool FlashFile::exists()
 {
-    if (m_isNull) {
-        return false;
-    }
-    if (path=="/" || path=="") {
-        return true;
-    }
+    // if (m_isNull) {
+    //     return false;
+    // }
+    // if (path=="/" || path=="") {
+    //     return true;
+    // }
 
     struct stat st;
     int i = stat(path.c_str(), &st);
