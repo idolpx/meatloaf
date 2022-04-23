@@ -71,8 +71,10 @@ public:
     {
         //Serial.println("*** Creating flash handle");
         memset(&file_h, 0, sizeof(file_h));
+
+        dispose();
     };
-    ~TNFSHandle();
+    ~TNFSHandle() { };
 
 };
 
