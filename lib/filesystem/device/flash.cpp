@@ -262,7 +262,7 @@ size_t FlashOStream::write(const uint8_t *buf, size_t size) {
         return 0;
     }
 
-    int result = fwrite((void*) buf, 1, size, handle->lfsFile );
+    int result = fwrite((void*) buf, 1, size, handle->file_h );
 
     //Serial.printf("in byteWrite '%c'\n", buf[0]);
     //Serial.println("after lfs_file_write");
@@ -279,7 +279,7 @@ bool FlashOStream::isOpen() {
 
 size_t FlashOStream::position() {
     if(!isOpen()) return 0;
-    else return ftell(handle->lfsFile);
+    else return ftell(handle->file_h);
 };
 
 
@@ -295,9 +295,9 @@ bool FlashIStream::open() {
     }
 
     // Set file size
-    fseek(handle->lfsFile, 0, SEEK_END);
-    _size = ftell(handle->lfsFile);
-    fseek(handle->lfsFile, 0, SEEK_SET);
+    fseek(handle->file_h, 0, SEEK_END);
+    _size = ftell(handle->file_h);
+    fseek(handle->file_h, 0, SEEK_SET);
 
     return isOpen();
 };
@@ -312,7 +312,7 @@ size_t FlashIStream::read(uint8_t* buf, size_t size) {
         return 0;
     }
     
-    int result = fread((void*) buf, 1, size, handle->lfsFile );
+    int result = fread((void*) buf, 1, size, handle->file_h );
     if (result < 0) {
         Debug_printf("lfs_read rc=%d\n", result);
         return 0;
@@ -334,12 +334,12 @@ size_t FlashIStream::available() {
 
 size_t FlashIStream::position() {
     if(!isOpen()) return 0;
-    return ftell(handle->lfsFile);
+    return ftell(handle->file_h);
 };
 
 bool FlashIStream::seek(size_t pos) {
     // Debug_printv("pos[%d]", pos);
-    return ( fseek( handle->lfsFile, pos, SEEK_SET ) ) ? true : false;
+    return ( fseek( handle->file_h, pos, SEEK_SET ) ) ? true : false;
 };
 
 bool FlashIStream::seek(size_t pos, int mode) {
@@ -348,7 +348,7 @@ bool FlashIStream::seek(size_t pos, int mode) {
         Debug_printv("Not open");
         return false;
     }
-    return ( fseek( handle->lfsFile, pos, mode ) ) ? true: false;
+    return ( fseek( handle->file_h, pos, mode ) ) ? true: false;
 }
 
 bool FlashIStream::isOpen() {
@@ -367,7 +367,7 @@ FlashHandle::~FlashHandle() {
 void FlashHandle::dispose() {
     if (rc >= 0) {
 
-        fclose( lfsFile );
+        fclose( file_h );
         rc = -255;
     }
 }
@@ -396,7 +396,7 @@ void FlashHandle::obtain(std::string m_path, std::string mode) {
         delete[] pathStr;
     }
 
-    lfsFile = fopen( m_path.c_str(), mode.c_str());
+    file_h = fopen( m_path.c_str(), mode.c_str());
     rc = 1;
 
     //Serial.printf("FSTEST: lfs_file_open file rc:%d\n",rc);
@@ -405,7 +405,7 @@ void FlashHandle::obtain(std::string m_path, std::string mode) {
 //         // To support the SD.openNextFile, a null FD indicates to the FlashFSFile this is just
 //         // a directory whose name we are carrying around but which cannot be read or written
 //     } else if (rc == 0) {
-// //        lfs_file_sync(&FlashFileSystem::lfsStruct, &lfsFile);
+// //        lfs_file_sync(&FlashFileSystem::lfsStruct, &file_h);
 //     } else {
 //         Debug_printf("FlashFile::open: unknown return code rc=%d path=`%s`\n",
 //                rc, m_path.c_str());

@@ -9,6 +9,7 @@
 
 // Scheme
 #include "scheme/http.h"
+#include "scheme/tnfs.h"
 #include "scheme/smb.h"
 #include "scheme/ml.h"
 #include "scheme/cs.h"
@@ -44,6 +45,7 @@ FlashFileSystem defaultFS;
 
 // Scheme
 HttpFileSystem httpFS;
+TNFSFileSystem tnfsFS;
 MLFileSystem mlFS;
 CServerFileSystem csFS;
 //WSFileSystem wsFS;
@@ -67,7 +69,7 @@ TCRTFileSystem tcrtFS;
 
 // put all available filesystems in this array - first matching system gets the file!
 // fist in list is default
-std::vector<MFileSystem*> MFSOwner::availableFS{ &defaultFS, &d64FS, &d71FS, &d80FS, &d81FS, &d82FS, &d8bFS, &dnpFS, &t64FS, &tcrtFS, &mlFS, &httpFS };
+std::vector<MFileSystem*> MFSOwner::availableFS{ &defaultFS, &d64FS, &d71FS, &d80FS, &d81FS, &d82FS, &d8bFS, &dnpFS, &t64FS, &tcrtFS, &mlFS, &httpFS, &tnfsFS };
 
 bool MFSOwner::mount(std::string name) {
     Serial.print("MFSOwner::mount fs:");

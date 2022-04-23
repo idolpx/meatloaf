@@ -63,11 +63,14 @@ public:
     bool rename(std::string dest);
     MIStream* createIStream(std::shared_ptr<MIStream> src);
 
-private:
-    void openDir(std::string path);
-    void closeDir();
+protected:
     DIR* dir;
     bool dirOpened = false;
+
+private:
+    virtual void openDir(std::string path);
+    void closeDir();
+
     bool _valid;
     std::string _pattern;
 
@@ -83,12 +86,12 @@ private:
 class FlashHandle {
 public:
     int rc;
-    FILE* lfsFile;
+    FILE* file_h;
 
     FlashHandle() : rc(-255) 
     {
         //Serial.println("*** Creating flash handle");
-        memset(&lfsFile, 0, sizeof(lfsFile));
+        memset(&file_h, 0, sizeof(file_h));
     };
     ~FlashHandle();
     void obtain(std::string localPath, std::string mode);
