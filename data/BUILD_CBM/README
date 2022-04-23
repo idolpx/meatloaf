@@ -1,0 +1,5 @@
+
+This directory is intended for default files included in the flash file system image.
+
+.sys - Folder for storing device configuration files
+.www - Folder for storing web server files (future use)
