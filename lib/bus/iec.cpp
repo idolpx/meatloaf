@@ -214,6 +214,7 @@ iecBus::BUS_STATE iecBus::service( void )
 {
 	iecBus::BUS_STATE r = BUS_ACTIVE;
 
+#ifdef IEC_HAS_RESET
 	// Check if CBM is sending a reset (setting the RESET line high). This is typically
 	// when the CBM is reset itself. In this case, we are supposed to reset all states to initial.
 	if(protocol.status(PIN_IEC_RESET) == PULLED)
@@ -226,6 +227,7 @@ iecBus::BUS_STATE iecBus::service( void )
 		Debug_printv("IEC Reset!");
 		return BUS_RESET;
 	}
+#endif
 
 	// Attention line is PULLED, go to listener mode and get message.
 	// Being fast with the next two lines here is CRITICAL!

@@ -63,6 +63,9 @@
 // Line values are inverted (7406 Hex Inverter Buffer)
 //#define IEC_INVERTED_LINES
 
+// Reset line is available
+//#define IEC_HAS_RESET
+
 // CBM IEC Serial Port
 #define PIN_IEC_ATN         GPIO_NUM_39      // SIO 7  - CMD  - Command
 #define PIN_IEC_SRQ			GPIO_NUM_26      // SIO 13 - INT  - Interrupt
