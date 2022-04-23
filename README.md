@@ -7,3 +7,5 @@ Be sure to execute the following command in the project folder to pull the neede
 ```
 git submodule update --init --recursive
 ```
+
+Copy "platformio.ini.sample" to "platformio.ini" and edit the settings for your system.
