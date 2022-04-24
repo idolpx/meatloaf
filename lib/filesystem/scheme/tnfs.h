@@ -13,10 +13,10 @@
 
 #include "../device/flash.h"
 #include "fnFsTNFS.h"
+#include "peoples_url_parser.h"
 
 #include <dirent.h>
 #include <string.h>
-
 
 
 /********************************************************
@@ -28,17 +28,14 @@ class TNFSFile: public FlashFile
 friend class TNFSOStream;
 friend class TNFSIStream;
 
-FileSystemTNFS _filesystem;
-
-
 public:
     std::string basepath;
 
     TNFSFile(std::string path) : FlashFile(path) {
         this->parseUrl(path);
 
-        _filesystem.start(this->host.c_str(), TNFS_DEFAULT_PORT, this->path.c_str() , this->user.c_str(), this->pass.c_str());
-        basepath = _filesystem.basepath();
+        //_filesystem.start(this->host.c_str(), TNFS_DEFAULT_PORT, this->path.c_str() , this->user.c_str(), this->pass.c_str());
+        basepath = fnTNFS.basepath();
         Debug_printv("basepath[%s]", basepath.c_str());
     };
     ~TNFSFile() { }
@@ -120,6 +117,12 @@ class TNFSFileSystem: public MFileSystem
 {
 private:
     MFile* getFile(std::string path) override {
+        PeoplesUrlParser url;
+
+        url.parseUrl(path);
+        if (!fnTNFS.running())
+            fnTNFS.start(url.host.c_str(), TNFS_DEFAULT_PORT, url.path.c_str() , url.user.c_str(), url.pass.c_str());
+
         return new TNFSFile(path);
     }
 
