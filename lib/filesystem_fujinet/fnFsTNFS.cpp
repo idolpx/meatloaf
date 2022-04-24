@@ -58,7 +58,7 @@ bool FileSystemTNFS::start(const char *host, uint16_t port, const char * mountpa
     else
         _mountinfo.password[0] = '\0';
 
-    Debug_printf("TNFS mount %s[%s]:%hu\n", _mountinfo.hostname, inet_ntoa(_mountinfo.host_ip), _mountinfo.port);
+    Debug_printf("TNFS mount %s[%s]:%hu%s\n", _mountinfo.hostname, inet_ntoa(_mountinfo.host_ip), _mountinfo.port, _mountinfo.mountpath);
 
     int r = tnfs_mount(&_mountinfo);
     if (r != TNFS_RESULT_SUCCESS)
@@ -81,6 +81,7 @@ bool FileSystemTNFS::start(const char *host, uint16_t port, const char * mountpa
 
     return true;
 }
+
 
 bool FileSystemTNFS::exists(const char* path)
 {

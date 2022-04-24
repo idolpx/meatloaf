@@ -15,20 +15,24 @@ bool TNFSFile::isDirectory()
     if(path=="/" || path=="")
         return true;
 
-    return _filesystem.is_dir( path.c_str() );
+    struct stat info;
+    stat( std::string(basepath + path).c_str(), &info);
+    return (info.st_mode == S_IFDIR) ? true: false;
 }
 
 
 MIStream* TNFSFile::inputStream()
 {
-    MIStream* istream = new TNFSIStream( path );
+    std::string full_path = basepath + path;
+    MIStream* istream = new TNFSIStream(full_path);
     istream->open();   
     return istream;
 }
 
 MOStream* TNFSFile::outputStream()
 {
-    MOStream* ostream = new TNFSOStream( path );
+    std::string full_path = basepath + path;
+    MOStream* ostream = new TNFSOStream(full_path);
     ostream->open();   
     return ostream;
 }
@@ -36,7 +40,7 @@ MOStream* TNFSFile::outputStream()
 time_t TNFSFile::getLastWrite()
 {
     struct stat info;
-    stat( path.c_str(), &info);
+    stat( std::string(basepath + path).c_str(), &info);
 
     time_t ftime = info.st_mtime; // Time of last modification
     return ftime;
@@ -45,7 +49,7 @@ time_t TNFSFile::getLastWrite()
 time_t TNFSFile::getCreationTime()
 {
     struct stat info;
-    stat( path.c_str(), &info);
+    stat( std::string(basepath + path).c_str(), &info);
 
     time_t ftime = info.st_ctime; // Time of last status change
     return ftime;
@@ -56,7 +60,7 @@ bool TNFSFile::mkDir()
     if (m_isNull) {
         return false;
     }
-    int rc = mkdir( path.c_str(), ALLPERMS );
+    int rc = mkdir(std::string(basepath + path).c_str(), ALLPERMS);
     return (rc==0);
 }
 
@@ -69,7 +73,10 @@ bool TNFSFile::exists()
         return true;
     }
 
-    return _filesystem.exists( path.c_str() );
+    struct stat st;
+    int i = stat(std::string(basepath + path).c_str(), &st);
+
+    return (i == 0);
 }
 
 size_t TNFSFile::size() {
@@ -78,8 +85,11 @@ size_t TNFSFile::size() {
     else if(isDirectory()) {
         return 0;
     }
-
-    return _filesystem.filesize( path.c_str() );
+    else {
+        struct stat info;
+        stat( std::string(basepath + path).c_str(), &info);
+        return info.st_size;
+    }
 }
 
 bool TNFSFile::remove() {
@@ -87,14 +97,24 @@ bool TNFSFile::remove() {
     if(path.empty())
         return false;
 
-    return _filesystem.remove( path.c_str() );
+    int rc = ::remove( std::string(basepath + path).c_str() );
+    if (rc != 0) {
+        Debug_printf("remove: rc=%d path=`%s`\n", rc, path);
+        return false;
+    }
+
+    return true;
 }
 
 bool TNFSFile::rename(std::string pathTo) {
     if(pathTo.empty())
         return false;
 
-    return _filesystem.rename( path.c_str(), pathTo.c_str() );
+    int rc = ::rename( std::string(basepath + path).c_str(), std::string(basepath + pathTo).c_str() );
+    if (rc != 0) {
+        return false;
+    }
+    return true;
 }
 
 void TNFSFile::openDir(std::string apath) 
@@ -104,35 +124,22 @@ void TNFSFile::openDir(std::string apath)
         return;
     }
     
-    _filesystem.dir_open( path.c_str(), "*", 0 );
-
-}
-
-bool TNFSFile::rewindDirectory()
-{
-    // _valid = false;
-    // rewinddir( dir );
-
-
-    // media_blocks_free = 0;
-    // return (dir != NULL) ? true: false;
-    return true;
-}
-
-
-MFile* TNFSFile::getNextFileInDir()
-{
-    if(!dirOpened)
-        openDir(path.c_str());
-
-    fsdir_entry* direntry;
-    if((direntry = _filesystem.dir_read()) != NULL)
-    {
-        return new TNFSFile(this->path + ((this->path == "/") ? "" : "/") + std::string(direntry->filename));
+    if(apath.empty()) {
+        dir = opendir( "/" );
     }
-    else
-    {
-        _filesystem.dir_close();
-        return nullptr;
+    else {
+        dir = opendir( std::string(basepath + apath).c_str() );
     }
+
+    dirOpened = true;
+    if ( dir == NULL ) {
+        dirOpened = false;
+    }
+    // else {
+    //     // Skip the . and .. entries
+    //     struct dirent* dirent = NULL;
+    //     dirent = readdir( dir );
+    //     dirent = readdir( dir );
+    // }
 }
+

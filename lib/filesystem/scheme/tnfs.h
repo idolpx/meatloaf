@@ -32,11 +32,14 @@ FileSystemTNFS _filesystem;
 
 
 public:
+    std::string basepath;
+
     TNFSFile(std::string path) : FlashFile(path) {
         this->parseUrl(path);
-        std::string base_path = "/" + this->host;
 
-        _filesystem.start(this->host.c_str(), TNFS_DEFAULT_PORT, base_path.c_str(), this->user.c_str(), this->pass.c_str());
+        _filesystem.start(this->host.c_str(), TNFS_DEFAULT_PORT, this->path.c_str() , this->user.c_str(), this->pass.c_str());
+        basepath = _filesystem.basepath();
+        Debug_printv("basepath[%s]", basepath.c_str());
     };
     ~TNFSFile() { }
 
@@ -45,8 +48,7 @@ public:
     MOStream* outputStream() override ; // has to return OPENED stream
     time_t getLastWrite() override ;
     time_t getCreationTime() override ;
-    bool rewindDirectory() override ;
-    MFile* getNextFileInDir() override ;
+
     bool mkDir() override ;
     bool exists() override ;
     size_t size() override ;
