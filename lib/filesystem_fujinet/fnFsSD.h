@@ -27,9 +27,10 @@ public:
 
     bool rename(const char* pathFrom, const char* pathTo) override;
 
-    virtual bool mkdir(const char* path) override { return true; };
-    virtual bool rmdir(const char* path) override { return true; };
-    virtual bool dir_exists(const char* path) override { return true; };
+    bool is_dir(const char *path);
+    bool mkdir(const char* path) override { return true; };
+    bool rmdir(const char* path) override { return true; };
+    bool dir_exists(const char* path) override { return true; };
 
     bool dir_open(const char * path, const char *pattern, uint16_t diropts) override;
     fsdir_entry *dir_read() override;

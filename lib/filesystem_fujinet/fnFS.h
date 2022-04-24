@@ -75,6 +75,7 @@ public:
 
     virtual bool rename(const char* pathFrom, const char* pathTo) = 0;
 
+    virtual bool is_dir(const char *path) = 0;
     virtual bool mkdir(const char* path) = 0;
     virtual bool rmdir(const char* path) = 0;
     virtual bool dir_exists(const char* path) = 0;
