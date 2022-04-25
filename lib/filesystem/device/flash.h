@@ -8,6 +8,8 @@
 
 #include "fnFsTNFS.h"
 
+#include "device_db.h"
+
 #include <dirent.h>
 #include <string.h>
 
@@ -47,9 +49,8 @@ public:
         else
             m_isNull = false;
             
-        //_filesystem.start(this->host.c_str(), TNFS_DEFAULT_PORT, this->path.c_str() , this->user.c_str(), this->pass.c_str());
-        basepath = fnTNFS.basepath();
-        Debug_printv("basepath[%s]", basepath.c_str());
+        basepath = device_config.basepath();
+        Debug_printv("basepath[%s] path[%s]", basepath.c_str(), this->path.c_str());
     };
     ~FlashFile() {
         //Serial.printf("*** Destroying flashfile %s\n", url.c_str());

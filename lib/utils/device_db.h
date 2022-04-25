@@ -40,6 +40,8 @@ public:
     void partition(uint8_t partition);
     std::string url();
     void url(std::string url);
+    std::string basepath();
+    void basepath(std::string basepath);
     std::string path();
     void path(std::string path);
     std::string archive();

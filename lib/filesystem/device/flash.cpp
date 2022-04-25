@@ -165,11 +165,12 @@ void FlashFile::openDir(std::string apath)
         return;
     }
     
+    Debug_printv("path[%s]", apath.c_str());
     if(apath.empty()) {
-        dir = opendir( std::string(basepath + "/").c_str() );
+        dir = opendir( "/" );
     }
     else {
-        dir = opendir( std::string(basepath + apath).c_str() );
+        dir = opendir( apath.c_str() );
     }
 
     dirOpened = true;
@@ -212,7 +213,7 @@ bool FlashFile::rewindDirectory()
 MFile* FlashFile::getNextFileInDir()
 {
     if(!dirOpened)
-        openDir(path.c_str());
+        openDir(std::string(basepath + path).c_str());
 
     struct dirent* dirent = NULL;
     if((dirent = readdir( dir )) != NULL)

@@ -13,6 +13,8 @@
 
 #include "../device/flash.h"
 #include "fnFsTNFS.h"
+
+#include "device_db.h"
 #include "peoples_url_parser.h"
 
 #include <dirent.h>
@@ -30,8 +32,13 @@ private:
         PeoplesUrlParser url;
 
         url.parseUrl(path);
+
         if (!fnTNFS.running())
             fnTNFS.start(url.host.c_str(), TNFS_DEFAULT_PORT, url.path.c_str() , url.user.c_str(), url.pass.c_str());
+
+        std::string basepath = fnTNFS.basepath();
+        // basepath += std::string("/");
+        device_config.basepath( basepath );
 
         return new FlashFile(url.path);
     }
