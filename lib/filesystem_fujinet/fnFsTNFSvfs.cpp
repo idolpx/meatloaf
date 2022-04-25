@@ -258,7 +258,7 @@ esp_err_t vfs_tnfs_register(tnfsMountInfo &m_info, char *basepath, int basepathl
     vfs.lseek_p = &vfs_tnfs_lseek;
     vfs.unlink_p = &vfs_tnfs_unlink;
     vfs.rename_p = &vfs_tnfs_rename;
-
+    
     // We'll use the address of our tnfsMountInfo to provide a unique base path
     // for this instance wihtout keeping track of how many we create
     snprintf(basepath, basepathlen, "/tnfs%p", &m_info);
