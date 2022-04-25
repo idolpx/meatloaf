@@ -6,6 +6,8 @@
 #include "../../include/global_defines.h"
 #include "../../include/make_unique.h"
 
+#include "fnFsTNFS.h"
+
 #include <dirent.h>
 #include <string.h>
 
@@ -36,12 +38,18 @@ friend class FlashOStream;
 friend class FlashIStream;
 
 public:
+    std::string basepath;
+    
     FlashFile(std::string path) {
         parseUrl(path);
         if(!pathValid(path.c_str()))
             m_isNull = true;
         else
             m_isNull = false;
+            
+        //_filesystem.start(this->host.c_str(), TNFS_DEFAULT_PORT, this->path.c_str() , this->user.c_str(), this->pass.c_str());
+        basepath = fnTNFS.basepath();
+        Debug_printv("basepath[%s]", basepath.c_str());
     };
     ~FlashFile() {
         //Serial.printf("*** Destroying flashfile %s\n", url.c_str());

@@ -27,7 +27,7 @@ MFile* FlashFileSystem::getFile(std::string apath)
 
 bool FlashFile::pathValid(std::string path) 
 {
-    auto apath = path.c_str();
+    auto apath = std::string(basepath + path).c_str();
     while (*apath) {
         const char *slash = strchr(apath, '/');
         if (!slash) {
@@ -52,7 +52,7 @@ bool FlashFile::isDirectory()
         return true;
 
     struct stat info;
-    stat( path.c_str(), &info);
+    stat( std::string(basepath + path).c_str(), &info);
     return (info.st_mode == S_IFDIR) ? true: false;
 }
 
@@ -62,14 +62,16 @@ MIStream* FlashFile::createIStream(std::shared_ptr<MIStream> is) {
 
 MIStream* FlashFile::inputStream()
 {
-    MIStream* istream = new FlashIStream(path);
+    std::string full_path = basepath + path;
+    MIStream* istream = new FlashIStream(full_path);
     istream->open();   
     return istream;
 }
 
 MOStream* FlashFile::outputStream()
 {
-    MOStream* ostream = new FlashOStream(path);
+    std::string full_path = basepath + path;
+    MOStream* ostream = new FlashOStream(full_path);
     ostream->open();   
     return ostream;
 }
@@ -77,7 +79,7 @@ MOStream* FlashFile::outputStream()
 time_t FlashFile::getLastWrite()
 {
     struct stat info;
-    stat( path.c_str(), &info);
+    stat( std::string(basepath + path).c_str(), &info);
 
     time_t ftime = info.st_mtime; // Time of last modification
     return ftime;
@@ -86,7 +88,7 @@ time_t FlashFile::getLastWrite()
 time_t FlashFile::getCreationTime()
 {
     struct stat info;
-    stat( path.c_str(), &info);
+    stat( std::string(basepath + path).c_str(), &info);
 
     time_t ftime = info.st_ctime; // Time of last status change
     return ftime;
@@ -97,21 +99,21 @@ bool FlashFile::mkDir()
     if (m_isNull) {
         return false;
     }
-    int rc = mkdir(path.c_str(), ALLPERMS);
+    int rc = mkdir(std::string(basepath + path).c_str(), ALLPERMS);
     return (rc==0);
 }
 
 bool FlashFile::exists()
 {
-    // if (m_isNull) {
-    //     return false;
-    // }
-    // if (path=="/" || path=="") {
-    //     return true;
-    // }
+    if (m_isNull) {
+        return false;
+    }
+    if (path=="/" || path=="") {
+        return true;
+    }
 
     struct stat st;
-    int i = stat(path.c_str(), &st);
+    int i = stat(std::string(basepath + path).c_str(), &st);
 
     return (i == 0);
 }
@@ -124,7 +126,7 @@ size_t FlashFile::size() {
     }
     else {
         struct stat info;
-        stat( path.c_str(), &info);
+        stat( std::string(basepath + path).c_str(), &info);
         return info.st_size;
     }
 }
@@ -134,22 +136,11 @@ bool FlashFile::remove() {
     if(path.empty())
         return false;
 
-    int rc = ::remove( path.c_str() );
+    int rc = ::remove( std::string(basepath + path).c_str() );
     if (rc != 0) {
-        Debug_printf("lfs_remove: rc=%d path=`%s`\n", rc, path);
+        Debug_printf("remove: rc=%d path=`%s`\n", rc, path);
         return false;
     }
-    // Now try and remove any empty subdirs this makes, silently
-    char *pathStr = new char[path.length()];
-    strncpy(pathStr, path.data(), path.length());
-
-    char *ptr = strrchr(pathStr, '/');
-    while (ptr) {
-        *ptr = 0;
-        ::remove( pathStr ); // Don't care if fails if there are files left
-        ptr = strrchr(pathStr, '/');
-    }
-    delete[] pathStr;
 
     return true;
 }
@@ -159,7 +150,7 @@ bool FlashFile::rename(std::string pathTo) {
     if(pathTo.empty())
         return false;
 
-    int rc = ::rename( path.c_str(), pathTo.c_str() );
+    int rc = ::rename( std::string(basepath + path).c_str(), std::string(basepath + pathTo).c_str() );
     if (rc != 0) {
         return false;
     }
@@ -175,10 +166,10 @@ void FlashFile::openDir(std::string apath)
     }
     
     if(apath.empty()) {
-        dir = opendir( "/" );
+        dir = opendir( std::string(basepath + "/").c_str() );
     }
     else {
-        dir = opendir( apath.c_str() );
+        dir = opendir( std::string(basepath + apath).c_str() );
     }
 
     dirOpened = true;
@@ -268,7 +259,7 @@ size_t FlashOStream::write(const uint8_t *buf, size_t size) {
     //Serial.println("after lfs_file_write");
 
     if (result < 0) {
-        Debug_printf("lfs_write rc=%d\n", result);
+        Debug_printf("write rc=%d\n", result);
     }
     return result;
 };
@@ -314,7 +305,7 @@ size_t FlashIStream::read(uint8_t* buf, size_t size) {
     
     int result = fread((void*) buf, 1, size, handle->file_h );
     if (result < 0) {
-        Debug_printf("lfs_read rc=%d\n", result);
+        Debug_printf("read rc=%d\n", result);
         return 0;
     }
 
