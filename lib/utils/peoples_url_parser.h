@@ -182,7 +182,6 @@ public:
         else
         {
             scheme = byColon[0];
-            mstr::toLower(scheme);
 
             auto pastTheColon = byColon[1]; // don't visualise!
 

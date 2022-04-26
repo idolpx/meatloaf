@@ -50,7 +50,7 @@ public:
             m_isNull = false;
             
         basepath = device_config.basepath();
-        Debug_printv("basepath[%s] path[%s]", basepath.c_str(), this->path.c_str());
+        //Debug_printv("basepath[%s] path[%s]", basepath.c_str(), this->path.c_str());
     };
     ~FlashFile() {
         //Serial.printf("*** Destroying flashfile %s\n", url.c_str());
@@ -78,7 +78,7 @@ protected:
 
 private:
     virtual void openDir(std::string path);
-    void closeDir();
+    virtual void closeDir();
 
     bool _valid;
     std::string _pattern;

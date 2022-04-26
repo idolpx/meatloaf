@@ -688,9 +688,9 @@ void _readdirx_fill_response(tnfsDirCacheEntry *pCached, tnfsStat *filestat, cha
         strftime(t_m, sizeof(t_m), tfmt, localtime(&tt));
         tt = filestat->c_time;
         strftime(t_c, sizeof(t_c), tfmt, localtime(&tt));
-        Debug_printf("\t_readdirx_fill_response: dir: %s, size: %u, mtime: %s, ctime: %s \"%s\"\n", 
-            filestat->isDir ? "Yes" : "no",
-            filestat->filesize, t_m, t_c, dir_entry );
+        //Debug_printf("\t_readdirx_fill_response: dir: %s, size: %u, mtime: %s, ctime: %s \"%s\"\n", 
+        //    filestat->isDir ? "Yes" : "no",
+        //    filestat->filesize, t_m, t_c, dir_entry );
     }
 #endif
 }
@@ -711,7 +711,7 @@ int tnfs_readdirx(tnfsMountInfo *m_info, tnfsStat *filestat, char *dir_entry, in
     tnfsDirCacheEntry *pCached = m_info->next_dircache_entry();
     if(pCached != nullptr)
     {
-        Debug_print("tnfs_readdirx responding from cached entry\n");
+        //Debug_print("tnfs_readdirx responding from cached entry\n");
         _readdirx_fill_response(pCached, filestat, dir_entry, dir_entry_len);
         return 0;
     }
@@ -719,7 +719,7 @@ int tnfs_readdirx(tnfsMountInfo *m_info, tnfsStat *filestat, char *dir_entry, in
     // If the cache was empty and the EOF flag was set, just respond with an EOF error
     if(m_info->get_dircache_eof() == true)
     {
-        Debug_print("tnfs_readdirx returning EOF based on cached value\n");
+        //Debug_print("tnfs_readdirx returning EOF based on cached value\n");
         return TNFS_RESULT_END_OF_FILE;
     }
 

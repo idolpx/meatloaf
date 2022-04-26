@@ -78,7 +78,7 @@ size_t TNFSFile::size() {
     else if(isDirectory()) {
         return 0;
     }
-
+    Debug_printv("path[%s]", path.c_str());
     return _filesystem.filesize( path.c_str() );
 }
 
@@ -104,8 +104,17 @@ void TNFSFile::openDir(std::string apath)
         return;
     }
     
-    _filesystem.dir_open( path.c_str(), "*", 0 );
+    if (_filesystem.dir_open( path.c_str(), "*", 0 ))
+        dirOpened = true;
 
+}
+
+void TNFSFile::closeDir() 
+{
+    if(dirOpened) {
+        _filesystem.dir_close();
+        dirOpened = false;
+    }
 }
 
 bool TNFSFile::rewindDirectory()
@@ -117,8 +126,10 @@ bool TNFSFile::rewindDirectory()
 
 MFile* TNFSFile::getNextFileInDir()
 {
-    if(!dirOpened)
+    if( !dirOpened ) {
         openDir(path.c_str());
+    }
+        
 
     fsdir_entry* direntry;
     if((direntry = _filesystem.dir_read()) != NULL)

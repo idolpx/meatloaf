@@ -52,6 +52,7 @@ public:
 
 private:
     void openDir(std::string path) override;
+    void closeDir() override;
 };
 
 
@@ -122,11 +123,11 @@ private:
         if (!fnTNFS.running())
             fnTNFS.start(url.host.c_str(), TNFS_DEFAULT_PORT, url.path.c_str() , url.user.c_str(), url.pass.c_str());
 
-        std::string basepath = fnTNFS.basepath();
-        // basepath += std::string("/");
-        device_config.basepath( basepath );
+        // std::string basepath = fnTNFS.basepath();
+        // // basepath += std::string("/");
+        // device_config.basepath( basepath );
 
-        return new FlashFile(url.path);
+        return new TNFSFile(path);
     }
 
     bool handles(std::string name) {
