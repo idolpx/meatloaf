@@ -1,3 +1,170 @@
 // WEBDAV:// - Web Distributed Authoring and Versioning
 // http://www.webdav.org/specs/
 //
+
+
+#ifndef MEATFILE_DEFINES_WEBDAV_H
+#define MEATFILE_DEFINES_WEBDAV_H
+
+#include "fnHttpClient.h"
+
+#include "meat_io.h"
+#include "../../include/global_defines.h"
+
+
+/********************************************************
+ * File implementations
+ ********************************************************/
+
+
+class WebDAVFile: public MFile {
+
+public:
+    WebDAVFile(std::string path): MFile(path) {};
+
+    bool isDirectory() override;
+    MIStream* inputStream() override ; // has to return OPENED stream
+    MOStream* outputStream() override ; // has to return OPENED stream
+    time_t getLastWrite() override ;
+    time_t getCreationTime() override ;
+    bool rewindDirectory() override { return false; };
+    MFile* getNextFileInDir() override { return nullptr; };
+    bool mkDir() override { return false; };
+    bool exists() override ;
+    size_t size() override ;
+    bool remove() override { return false; };
+    bool rename(std::string dest) { return false; };
+    MIStream* createIStream(std::shared_ptr<MIStream> src);
+    //void addHeader(const String& name, const String& value, bool first = false, bool replace = true);
+};
+
+
+/********************************************************
+ * Streams
+ ********************************************************/
+
+class WebDAVIOStream: public MIStream, MOStream {
+public:
+    WebDAVIOStream(std::string& path) {
+        url = path;
+    }
+    ~WebDAVIOStream() {
+        close();
+    }
+
+    void close() override;
+    bool open() override;
+
+    // MStream methods
+    size_t position() override;
+    size_t available() override;
+    size_t read(uint8_t* buf, size_t size) override;
+    size_t write(const uint8_t *buf, size_t size) override;
+    bool isOpen();
+
+protected:
+    std::string url;
+    bool m_isOpen;
+    size_t m_length;
+    size_t m_bytesAvailable = 0;
+    size_t m_position = 0;
+       
+//    WiFiClient m_file;
+	fnHttpClient m_http;
+};
+
+
+class WebDAVIStream: public MIStream {
+
+public:
+    WebDAVIStream(std::string path) {
+        m_http.set_header("user-agent", USER_AGENT);
+        //m_http.setUserAgent(USER_AGENT);
+        //m_http.setTimeout(10000);
+        //m_http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
+        //m_http.setRedirectLimit(10);
+        url = path;
+    }
+    // MStream methods
+    size_t position() override;
+    void close() override;
+    bool open() override;
+    ~WebDAVIStream() {
+        close();
+    }
+
+    // MIStream methods
+
+    virtual bool seek(size_t pos);
+    size_t available() override;
+    size_t size() override;
+    size_t read(uint8_t* buf, size_t size) override;
+    bool isOpen();
+
+protected:
+    std::string url;
+    bool m_isOpen;
+    size_t m_bytesAvailable = 0;
+    size_t m_length = 0;
+    size_t m_position = 0;
+    bool isFriendlySkipper = false;
+
+//    WiFiClient m_file;
+	fnHttpClient m_http;
+};
+
+
+class WebDAVOStream: public MOStream {
+
+public:
+    // MStream methods
+    WebDAVOStream(std::string path) {
+        m_http.set_header("user-agent", USER_AGENT);
+        //m_http.setTimeout(10000);
+        //m_http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
+        //m_http.setRedirectLimit(10);
+        //m_http.setReuse(true);
+
+        url = path;
+    }
+    size_t position() override;
+    void close() override;
+    bool open() override;
+    ~WebDAVOStream() {
+        close();
+    }
+
+    // MOStream methods
+    size_t write(const uint8_t *buf, size_t size) override;
+    bool isOpen();
+
+protected:
+    std::string url;
+    bool m_isOpen;
+
+//    WiFiClient m_file;
+    //WiFiClient m_client;
+	fnHttpClient m_http;
+};
+
+
+/********************************************************
+ * FS
+ ********************************************************/
+
+class WebDAVFileSystem: public MFileSystem 
+{
+    MFile* getFile(std::string path) override {
+        return new WebDAVFile(path);
+    }
+
+    bool handles(std::string name) {
+        std::string pattern = "http:";
+        return mstr::equals(name, pattern, false);
+    }
+public:
+    WebDAVFileSystem(): MFileSystem("http") {};
+};
+
+
+#endif

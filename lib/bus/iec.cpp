@@ -396,6 +396,7 @@ iecBus::BUS_STATE iecBus::deviceListen( void )
 		{
 			int16_t c = receive();
 
+
 			if(protocol.flags bitand ERROR)
 			{
 				Debug_printv("Some other command [%.2X]", c);
@@ -406,6 +407,9 @@ iecBus::BUS_STATE iecBus::deviceListen( void )
 			{
 				listen_command += (uint8_t)c;
 			}
+
+			if(protocol.flags bitand EOI_RECVD)
+				break;			
 		}
 
 		if (listen_command.length()) {
