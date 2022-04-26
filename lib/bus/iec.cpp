@@ -387,8 +387,8 @@ iecBus::BUS_STATE iecBus::deviceListen( void )
 	// OPEN
 	else if(this->data.command == IEC_SECOND || this->data.command == IEC_OPEN)
 	{
-		// Debug_printf(" (%.2X OPEN) (%.2X CHANNEL) [", this->data.command, this->data.channel);
-		Debug_printf(" [");
+		if (protocol.status(PIN_IEC_ATN) != PULLED)
+			Debug_printf(" [");
 
 		// Some other command. Record the cmd string until ATN is PULLED
 		std::string listen_command;
@@ -417,7 +417,7 @@ iecBus::BUS_STATE iecBus::deviceListen( void )
 			mstr::rtrimA0(this->data.content);
 			Debug_printf(BACKSPACE "] {%s}\r\n", this->data.content.c_str());			
 		} else {
-			Debug_printf(BACKSPACE "\r\n");
+			Debug_printf("\r\n");
 		}
 
 		return BUS_COMMAND;
