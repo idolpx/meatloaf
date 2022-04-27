@@ -269,11 +269,35 @@ bool FlashOStream::isOpen() {
     return handle->rc >= 0;
 }
 
-size_t FlashOStream::position() {
-    if(!isOpen()) return 0;
-    else return ftell(handle->file_h);
+
+size_t FlashOStream::size() {
+    return _size;
 };
 
+size_t FlashOStream::available() {
+    if(!isOpen()) return 0;
+    return _size - position();
+};
+
+
+size_t FlashOStream::position() {
+    if(!isOpen()) return 0;
+    return ftell(handle->file_h);
+};
+
+bool FlashOStream::seek(size_t pos) {
+    // Debug_printv("pos[%d]", pos);
+    return ( fseek( handle->file_h, pos, SEEK_SET ) ) ? true : false;
+};
+
+bool FlashOStream::seek(size_t pos, int mode) {
+    // Debug_printv("pos[%d] mode[%d]", pos, mode);
+    if (!isOpen()) {
+        Debug_printv("Not open");
+        return false;
+    }
+    return ( fseek( handle->file_h, pos, mode ) ) ? true: false;
+}
 
 
 /********************************************************

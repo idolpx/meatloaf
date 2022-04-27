@@ -18,10 +18,13 @@
 #ifndef GLOBAL_DEFINES_H
 #define GLOBAL_DEFINES_H
 
+#include "version.h"
+#include "ssid.h"
 #include "ansi_codes.h"
 
 #define PRODUCT_ID "MEATLOAF CBM"
-#define FW_VERSION "20220422.1" // Dynamically set at compile time in "platformio.ini"
+//#define FW_VERSION "20220422.1" // Dynamically set at compile time in "platformio.ini"
+
 #define USER_AGENT PRODUCT_ID " [" FW_VERSION "]"
 //#define UPDATE_URL      "http://meatloaf.cc/fw/?p=meatloaf&d={{DEVICE_ID}}&a="
 #define UPDATE_URL "http://meatloaf.cc/fw/meatloaf.4MB.bin"
@@ -37,11 +40,6 @@
 #define DEVICE_MASK   0b00000000000000000000111100000000 //  Devices 8-11
 //#define DEVICE_MASK   0b00000000000000000000111000000000 //  Devices 9-11
 
-//#define WIFI_SSID      "CODA-23B0"
-//#define WIFI_PASSWORD  "251206044535"
-
-#define WIFI_SSID       "EEP_OPP_ORK_AH_AH"
-#define WIFI_PASSWORD   "angelmax"
 
 /*
  * DEBUG SETTINGS
@@ -57,11 +55,11 @@
 
 // Enable this to show the data stream while loading
 // Make sure device baud rate and monitor_speed = 921600
-#define DATA_STREAM
+//#define DATA_STREAM
 
 // Enable this to show the data stream for other devices
 // Listens to all commands and data to all devices
-#define IEC_SNIFFER
+//#define IEC_SNIFFER
 
 // Select the FileSystem in PLATFORMIO.INI file
 //#define USE_SPIFFS
@@ -73,17 +71,17 @@
 #define ML_WEBDAV
 #define ML_MDNS
 
-// Format storage if a valid file system is not found
-#define AUTO_FORMAT true
-#define FORMAT_LITTLEFS_IF_FAILED true
+// // Format storage if a valid file system is not found
+// #define AUTO_FORMAT true
+// #define FORMAT_LITTLEFS_IF_FAILED true
 
-#if defined USE_SPIFFS
-#define FS_TYPE "SPIFFS"
-#elif defined USE_LITTLEFS
-#define FS_TYPE "LITTLEFS"
-#elif defined USE_SDFS
-#define FS_TYPE "SDFS"
-#endif
+// #if defined USE_SPIFFS
+// #define FS_TYPE "SPIFFS"
+// #elif defined USE_LITTLEFS
+// #define FS_TYPE "LITTLEFS"
+// #elif defined USE_SDFS
+// #define FS_TYPE "SDFS"
+// #endif
 
 
 

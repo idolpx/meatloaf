@@ -13,23 +13,12 @@
 
 class MStream {
 public:
-    virtual size_t position() = 0;
-    virtual void close() = 0;
-    virtual bool open() = 0;
     virtual ~MStream() {};
-    virtual bool isOpen() = 0;
 
-    bool isText = false;
-};
+    virtual size_t available() = 0;
+    virtual size_t size() = 0;
+    virtual size_t position() = 0;
 
-class MOStream: public MStream {
-public:
-    virtual size_t write(const uint8_t *buf, size_t size) = 0;
-};
-
-
-class MIStream: public MStream {
-public:
     virtual bool seek(size_t pos, int mode) {
         if(mode == SEEK_SET) {
             return seek(pos);
@@ -43,8 +32,22 @@ public:
     }
     virtual bool seek(size_t pos) = 0;
 
-    virtual size_t available() = 0;
-    virtual size_t size() = 0;
+    virtual void close() = 0;
+    virtual bool open() = 0;
+
+    virtual bool isOpen() = 0;
+
+    bool isText = false;
+};
+
+class MOStream: public MStream {
+public:
+    virtual size_t write(const uint8_t *buf, size_t size) = 0;
+};
+
+
+class MIStream: public MStream {
+public:
     virtual size_t read(uint8_t* buf, size_t size) = 0;
 
     // For files with a browsable random access directory structure

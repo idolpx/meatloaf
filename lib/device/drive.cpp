@@ -468,22 +468,16 @@ void iecDrive::handleTalk(uint8_t chan)
 void iecDrive::handleOpen( void )
 {
 	Debug_printv("OPEN Named Channel (%.2d Device) (%.2d Channel)", IEC.data.device, IEC.data.channel);
-	auto channel = channelSelect(); // channels[IEC.data.command];
-
-	// Are we writing?  Appending?
-	channels[IEC.data.command].url = IEC.data.content;
-	channels[IEC.data.command].cursor = 0;
-	channels[IEC.data.command].writing = 0;
+	currentChannel = channelSelect();
 } // handleOpen
 
 
 void iecDrive::handleClose( void )
 {
 	Debug_printv("CLOSE Named Channel (%.2d Device) (%.2d Channel)", IEC.data.device, IEC.data.channel);
-	auto channel = channelSelect(); channels[IEC.data.command];
 
 	// If writing update BAM & Directory
-	if (channel.writing) {
+	if (currentChannel.writing) {
 
 	}
 
@@ -800,6 +794,7 @@ void iecDrive::sendFile()
 		istream.open();
 		ostream.open(&IEC);
 
+
 		if(!istream.is_open()) {
 			sendFileNotFound();
 			return;
@@ -845,12 +840,6 @@ void iecDrive::sendFile()
 			return;
 		}
 
-		// Position file pointer
-		//istream->seek(device_config.position(m_IEC.data.channel));
-
-
-		size_t len = istream->size();
-		size_t avail = istream->available();
 
 		// Get file load address
 		i = 2;
@@ -863,7 +852,13 @@ void iecDrive::sendFile()
 		load_address = load_address | b << 8;  // high byte
 		sys_address += b * 256;
 
-		Debug_printv("len[%d] avail[%d] success[%d]", len, avail, success);
+		// Position file pointer
+		istream->seek(currentChannel.cursor);
+
+		size_t len = istream->size();
+		size_t avail = istream->available();
+
+		Debug_printv("len[%d] avail[%d] cursor[%d] success[%d]", len, avail, currentChannel.cursor, success);
 
 		Debug_printf("sendFile: [%s] [$%.4X] (%d bytes)\r\n=================================\r\n", file->url.c_str(), load_address, len);
 		while( i < len && success )
@@ -907,14 +902,15 @@ void iecDrive::sendFile()
 #endif
 			}
 
-			// // Exit if ATN is PULLED while sending
-			// if ( IEC.state() bitand atnFlag )
-			// {
-			// 	// TODO: If sending from a named channel save file pointer position
-			// 	setDeviceStatus(74);
-			// 	success = true;
-			// 	break;
-			// }
+			// Exit if ATN is PULLED while sending
+			if ( IEC.protocol.flags bitand ATN_PULLED )
+			{
+				// Save file pointer position
+				channelUpdate(istream->position());
+				setDeviceStatus(74);
+				success = true;
+				break;
+			}
 
 			// Toggle LED
 			if (i % 50 == 0)
@@ -938,7 +934,7 @@ void iecDrive::sendFile()
 	{
 		Debug_println("sendFile: Transfer aborted!");
 		// TODO: Send something to signal that there was an error to the C64
-	 IEC.sendEOI(0);
+	 	IEC.sendEOI(0);
 	}
 } // sendFile
 
@@ -977,11 +973,20 @@ void iecDrive::saveFile()
 	{
 	 	// Stream is open!  Let's save this!
 
-		// Get file load address
-		ll[0] = IEC.receive();
-		load_address = *ll & 0x00FF; // low byte
-		lh[0] = IEC.receive();
-		load_address = load_address | *lh << 8;  // high byte
+		if ( currentChannel.cursor > 0 )
+		{
+			// Position file pointer
+			ostream->seek(currentChannel.cursor);
+		}
+		else
+		{
+			// Get file load address
+			ll[0] = IEC.receive();
+			load_address = *ll & 0x00FF; // low byte
+			lh[0] = IEC.receive();
+			load_address = load_address | *lh << 8;  // high byte
+		}
+
 
 		Debug_printf("saveFile: [%s] [$%.4X]\r\n=================================\r\n", file->url.c_str(), load_address);
 
@@ -1012,6 +1017,15 @@ void iecDrive::saveFile()
 
 			uint8_t f = IEC.protocol.flags;
 			done = (f bitand EOI_RECVD) or (f bitand ERROR);
+
+			// Exit if ATN is PULLED while sending
+			if ( f bitand ATN_PULLED )
+			{
+				// Save file pointer position
+				channelUpdate(ostream->position());
+				//setDeviceStatus(74);
+				break;
+			}
 
 #ifdef DATA_STREAM
 			// Show ASCII Data

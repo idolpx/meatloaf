@@ -87,7 +87,7 @@ void main_setup()
     unsigned long startms = fnSystem.millis();
     
     Debug_printf( ANSI_WHITE "\n\n" ANSI_BLUE_BACKGROUND "==============================" ANSI_RESET_NL );
-    Debug_printf( ANSI_BLUE_BACKGROUND "   " PRODUCT_ID " " FW_VERSION "    " ANSI_RESET_NL );
+    Debug_printf( ANSI_BLUE_BACKGROUND "   " PRODUCT_ID " " FW_VERSION "   " ANSI_RESET_NL );
     Debug_printf( ANSI_BLUE_BACKGROUND "------------------------------" ANSI_RESET_NL "\n" );
 
     Debug_printf( "FujiNet %s Started @ %lu\n", fnSystem.get_fujinet_version(), startms );
@@ -196,7 +196,7 @@ void fn_service_loop(void *param)
         {
             //Debug_printv("before[%d]", bus_state);
             uint8_t bs = IEC.service();
-            if( bs == iecBus::BUS_IDLE || bs == iecBus::BUS_ERROR )
+            if( bs == BUS_IDLE || bs == BUS_ERROR )
                 bus_state = statemachine::idle;
             //Debug_printv("after[%d] bs[%d]", bus_state, bs);
             

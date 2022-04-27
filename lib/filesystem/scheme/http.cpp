@@ -69,7 +69,60 @@ size_t HttpFile::size() {
  * Ostream impls
  ********************************************************/
 
-size_t HttpOStream::position() { return 0; };
+size_t HttpOStream::size() {
+    return m_length;
+};
+
+size_t HttpOStream::available() {
+    return m_bytesAvailable;
+};
+
+size_t HttpOStream::position() {
+    return m_position;
+}
+
+bool HttpOStream::seek(size_t pos) {
+    if(pos==m_position)
+        return true;
+
+    if(isFriendlySkipper) {
+        char str[40];
+        // Range: bytes=91536-(91536+255)
+        snprintf(str, sizeof str, "bytes=%lu-%lu", (unsigned long)pos, ((unsigned long)pos + 255));
+        m_http.set_header("range",str);
+        int httpCode = m_http.GET(); //Send the request
+        Debug_printv("httpCode[%d] str[%s]", httpCode, str);
+        if(httpCode != 200 || httpCode != 206)
+            return false;
+
+        Debug_printv("stream opened[%s]", url.c_str());
+        //m_file = m_http.getStream();  //Get the response payload as Stream
+        m_position = pos;
+        m_bytesAvailable = m_length-pos;
+        return true;
+
+    } else {
+        if(pos<m_position) {
+            // skipping backward and range not supported, let's simply reopen the stream...
+            m_http.close();
+            bool op = open();
+            if(!op)
+                return false;
+        }
+
+        m_position = 0;
+        // ... and then read until we reach pos
+        // while(m_position < pos) {
+        //  m_position+=m_file.readBytes(buffer, size);  <----------- trurn this on!!!!
+        // }
+        m_bytesAvailable = m_length-pos;
+
+        return true;
+    }
+}
+
+
+
 void HttpOStream::close() {
     m_http.close();
 }
@@ -107,6 +160,17 @@ bool HttpOStream::isOpen() {
 /********************************************************
  * Istream impls
  ********************************************************/
+size_t HttpIStream::size() {
+    return m_length;
+};
+
+size_t HttpIStream::available() {
+    return m_bytesAvailable;
+};
+
+size_t HttpIStream::position() {
+    return m_position;
+}
 
 bool HttpIStream::seek(size_t pos) {
     if(pos==m_position)
@@ -148,10 +212,6 @@ bool HttpIStream::seek(size_t pos) {
     }
 }
 
-size_t HttpIStream::position() {
-    return m_position;
-}
-
 void HttpIStream::close() {
     m_http.close();
 }
@@ -190,14 +250,6 @@ bool HttpIStream::open() {
     isText = mstr::isText(ct);
 
     return true;
-};
-
-size_t HttpIStream::available() {
-    return m_bytesAvailable;
-};
-
-size_t HttpIStream::size() {
-    return m_length;
 };
 
 size_t HttpIStream::read(uint8_t* buf, size_t size) {

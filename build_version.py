@@ -5,6 +5,8 @@ import sys
 
 Import("env")
 
+
+
 # Don't do anything if this is an 'uploadfs' or 'erase' target
 if sys.argv[9] == 'buildfs' or sys.argv[9] == 'uploadfs' or sys.argv[9] == 'erase':
     # Change build tool if we are using LittleFS
@@ -26,8 +28,11 @@ else:
 
     ver_date = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
 
+    fw_date = datetime.datetime.utcnow().strftime("%Y%m%d.%H")
+
     rxs = ['^#define FN_VERSION_MAJOR (\w+)', '^#define FN_VERSION_MINOR (\w+)',
-           '^(#define FN_VERSION_BUILD)', '^(#define FN_VERSION_DATE)', '^(#define FN_VERSION_FULL)']
+           '^(#define FN_VERSION_BUILD)', '^(#define FN_VERSION_DATE)', '^(#define FN_VERSION_FULL)', 
+           '^(#define FW_VERSION)']
 
     ver_maj = ""
     ver_min = ""
@@ -59,6 +64,9 @@ else:
             elif i == 4:
                 line = m.groups(0)[0] + " \"" + ver_maj + "." + \
                     ver_min + "." + ver_build + "\"\n"
+                fout.write(line)
+            elif i == 5:
+                line = m.groups(0)[0] + " \"" + fw_date + "\"\n"
                 fout.write(line)
         else:
             fout.write(line)

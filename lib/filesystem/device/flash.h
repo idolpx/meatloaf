@@ -110,6 +110,7 @@ private:
     int flags;
 };
 
+
 /********************************************************
  * MStreams O
  ********************************************************/
@@ -121,12 +122,20 @@ public:
         localPath = path;
         handle = std::make_unique<FlashHandle>();
     }
-    size_t position() override;
-    void close() override;
-    bool open() override;
     ~FlashOStream() override {
         close();
     }
+
+    // MStream methods
+    size_t available() override;
+    size_t size() override;    
+    size_t position() override;
+    
+    virtual bool seek(size_t pos) override;
+    virtual bool seek(size_t pos, int mode) override;
+
+    void close() override;
+    bool open() override;
 
     // MOStream methods
     //size_t write(uint8_t) override;
@@ -136,7 +145,10 @@ public:
 protected:
     std::string localPath;
 
-    std::unique_ptr<FlashHandle> handle;    
+    std::unique_ptr<FlashHandle> handle;
+
+private:
+    size_t _size;
 };
 
 
@@ -150,22 +162,25 @@ public:
         localPath = path;
         handle = std::make_unique<FlashHandle>();
     }
-    // MStream methods
-    size_t position() override;
-    void close() override;
-    bool open() override;
     ~FlashIStream() override {
         close();
     }
 
-    // MIStream methods
+    // MStream methods
     size_t available() override;
-    size_t size() override;
+    size_t size() override;    
+    size_t position() override;
+
+    virtual bool seek(size_t pos) override;
+    virtual bool seek(size_t pos, int mode) override;    
+
+    void close() override;
+    bool open() override;
+
+    // MIStream methods
     //uint8_t read() override;
     size_t read(uint8_t* buf, size_t size) override;
     bool isOpen();
-    virtual bool seek(size_t pos) override;
-    virtual bool seek(size_t pos, int mode) override;
 
 protected:
     std::string localPath;

@@ -256,18 +256,19 @@ public:
         close();
     }
     // MStream methods
-    size_t position() override;
-    void close() override;
     bool open() override;
+    void close() override;
 
-    // MIStream methods
     size_t available() override;
     size_t size() override;
-    size_t read(uint8_t* buf, size_t size) override;
-    bool isOpen() override;
+    size_t position() override;
+
     virtual bool seek(size_t pos) {
         return false;
     };
+
+    size_t read(uint8_t* buf, size_t size) override;
+    bool isOpen() override;
 
 protected:
     std::string url;
@@ -281,7 +282,6 @@ protected:
 class CServerOStream: public MOStream {
 
 public:
-    // MStream methods
     CServerOStream(std::string path) {
         url = path;
     }
@@ -289,9 +289,17 @@ public:
         close();
     }
 
-    size_t position() override;
-    void close() override;
+    // MStream methods
     bool open() override;
+    void close() override;
+
+    size_t available() override;
+    size_t size() override;
+    size_t position() override;
+
+    virtual bool seek(size_t pos) {
+        return false;
+    };
 
     // MOStream methods
     size_t write(const uint8_t *buf, size_t size) override;
@@ -300,6 +308,9 @@ public:
 protected:
     std::string url;
     bool m_isOpen;
+    size_t m_length;
+    size_t m_bytesAvailable = 0;
+    size_t m_position = 0;
 };
 
 

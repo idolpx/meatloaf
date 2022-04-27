@@ -123,9 +123,6 @@ bool CServerSessionMgr::traversePath(MFile* path) {
  * I Stream impls
  ********************************************************/
 
-size_t CServerIStream::position() {
-    return m_position;
-};
 
 void CServerIStream::close() {
     m_isOpen = false;
@@ -175,6 +172,10 @@ size_t CServerIStream::size() {
     return m_bytesAvailable;
 };
 
+size_t CServerIStream::position() {
+    return m_position;
+};
+
 size_t CServerIStream::read(uint8_t* buf, size_t size)  {
     //Serial.println("CServerIStream::read");
     auto bytesRead = CServerFileSystem::session.receive(buf, size);
@@ -192,10 +193,6 @@ bool CServerIStream::isOpen() {
  * O Stream impls
  ********************************************************/
 
-size_t CServerOStream::position() {
-    return 0;
-};
-
 void CServerOStream::close() {
     m_isOpen = false;
 };
@@ -210,6 +207,18 @@ bool CServerOStream::open() {
         m_isOpen = false;
 
     return m_isOpen;
+};
+
+size_t CServerOStream::available() {
+    return m_bytesAvailable;
+};
+
+size_t CServerOStream::size() {
+    return m_bytesAvailable;
+};
+
+size_t CServerOStream::position() {
+    return m_position;
 };
 
 // MOStream methods

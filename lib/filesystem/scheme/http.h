@@ -82,19 +82,21 @@ public:
         //m_http.setRedirectLimit(10);
         url = path;
     }
-    // MStream methods
-    size_t position() override;
-    void close() override;
-    bool open() override;
     ~HttpIStream() {
         close();
     }
 
-    // MIStream methods
+    // MStream methods
+    size_t size() override;
+    size_t available() override;     
+    size_t position() override;
 
     virtual bool seek(size_t pos);
-    size_t available() override;
-    size_t size() override;
+
+    void close() override;
+    bool open() override;
+
+    // MIStream methods
     size_t read(uint8_t* buf, size_t size) override;
     bool isOpen();
 
@@ -124,12 +126,20 @@ public:
 
         url = path;
     }
-    size_t position() override;
-    void close() override;
-    bool open() override;
     ~HttpOStream() {
         close();
     }
+
+    // MStream methods
+    size_t size() override;
+    size_t available() override;     
+    size_t position() override;
+
+    virtual bool seek(size_t pos);
+
+    void close() override;
+    bool open() override;
+
 
     // MOStream methods
     size_t write(const uint8_t *buf, size_t size) override;
@@ -138,7 +148,11 @@ public:
 protected:
     std::string url;
     bool m_isOpen;
-
+    size_t m_bytesAvailable = 0;
+    size_t m_length = 0;
+    size_t m_position = 0;
+    bool isFriendlySkipper = false;
+    
 //    WiFiClient m_file;
     //WiFiClient m_client;
 	fnHttpClient m_http;
