@@ -12,29 +12,19 @@
 ; Espressif32 PlatformIO Version to use for building
 esp32_platform_version = 3.4.0
 
-; Uncomment the platform you are building for below
-;build_platform = BUILD_ATARI
-;build_bus      = SIO
-
 build_platform = BUILD_CBM
 build_bus      = IEC
 
-;build_platform = BUILD_ADAM
-;build_bus      = ADAMNET
-
-;build_platform = BUILD_APPLE
-;build_bus      = IWM
-
-;build_platform  = BUILD_S100
-;build_bus       = s100Bus
-
-;flash_filesystem = FLASH_SPIFFS 
-flash_filesystem = FLASH_LITTLEFS
+flash_filesystem = FLASH_SPIFFS 
+;flash_filesystem = FLASH_LITTLEFS
+flash_size = 16mb    ; 4mb, 8mb, 16mb
 
 [platformio]
 description = Meatloaf / FujiNet retro computer to ESP32 WiFi Multifunction Firmware
 ; Change this to target hardware you use from the list of [env:xxx] sections below
 default_envs = meatloaf-fujinet-v1
+;default_envs = meatloaf-fujinet-v1-nopsram
+;default_envs = meatloaf-fujinet-esp32s3
 data_dir = $PROJECT_DIR/data/${fujinet.build_platform}
 
 [env]
@@ -58,6 +48,7 @@ build_flags =
     -D ${fujinet.flash_filesystem}
     -D CMAKE_EXPORT_COMPILE_COMMANDS=ON
     -D DEBUG_SPEED=921600
+    ;-D NO_PSRAM            ; if your hardware has no psram
     ;-D NO_BUTTONS          ; if your hardware has no physical buttons
     ;-D JTAG                ; enable use with JTAG debugger
     ;-D BLUETOOTH_SUPPORT   ; enable BlueTooth support
@@ -71,22 +62,17 @@ build_flags =
     ;-D NO_VIRTUAL_KEYBOARD
     ;-D DBUG2 ; enable monitor messages for a release build
 
-; ESP32 WROVER (16MB Flash, 8MB PSRAM) based FujiNet
+debug_tool = esp-prog
+debug_init_break = tbreak setup
+
 [env:meatloaf-fujinet-v1]
 platform = espressif32@${fujinet.esp32_platform_version}
-board = fujinet-v1
+board = fujinet-v1-${fujinet.flash_size}
 build_type = debug
 
-; ESP32 WROVER (8MB Flash, 8MB PSRAM) based FujiNet
-[env:meatloaf-fujinet-v1-8mb]
+[env:meatloaf-fujinet-v1-nopsram]
 platform = espressif32@${fujinet.esp32_platform_version}
-board = fujinet-v1-8mb
-build_type = debug
-
-; ESP32 WROVER (4MB Flash, 8MB PSRAM) based FujiNet
-[env:meatloaf-fujinet-v1-4mb]
-platform = espressif32@${fujinet.esp32_platform_version}
-board = fujinet-v1-4mb
+board = fujinet-v1-${fujinet.flash_size}
 build_type = debug
 
 [env:meatloaf-fujinet-esp32s3]

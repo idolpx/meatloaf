@@ -89,69 +89,68 @@
 
 namespace Protocol
 {
-	class CBMStandardSerial
-	{
-		public:
-			// communication must be reset
-			uint8_t flags = CLEAR;
+    class CBMStandardSerial
+    {
+        public:
+            // communication must be reset
+            uint8_t flags = CLEAR;
 
-			virtual int16_t receiveByte(uint8_t device);
-			virtual bool sendByte(uint8_t data, bool signalEOI);
-			bool turnAround(void);
-			bool undoTurnAround(void);
-			int16_t timeoutWait(uint8_t pin, bool target_status, size_t wait = TIMEOUT);
+            virtual int16_t receiveByte ( uint8_t device );
+            virtual bool sendByte ( uint8_t data, bool signalEOI );
+            int16_t timeoutWait ( uint8_t pin, bool target_status, size_t wait = TIMEOUT );
 
 
-			// true => PULL => LOW
-			inline void IRAM_ATTR pull(uint8_t pin)
-			{
+            // true => PULL => LOW
+            inline void IRAM_ATTR pull ( uint8_t pin )
+            {
 #ifndef IEC_SPLIT_LINES
-				set_pin_mode(pin, OUTPUT);
+                set_pin_mode ( pin, OUTPUT );
 #endif
-				digital_write(pin, LOW);
-			}
+                digital_write ( pin, LOW );
+            }
 
-			// false => RELEASE => HIGH
-			inline void IRAM_ATTR release(uint8_t pin)
-			{
+            // false => RELEASE => HIGH
+            inline void IRAM_ATTR release ( uint8_t pin )
+            {
 #ifndef IEC_SPLIT_LINES
-				set_pin_mode(pin, OUTPUT);
+                set_pin_mode ( pin, OUTPUT );
 #endif
-				digital_write(pin, HIGH);
-			}
+                digital_write ( pin, HIGH );
+            }
 
-			inline bool IRAM_ATTR status(uint8_t pin)
-			{
+            inline bool IRAM_ATTR status ( uint8_t pin )
+            {
 #ifndef IEC_SPLIT_LINES
-				set_pin_mode(pin, INPUT);
+                set_pin_mode ( pin, INPUT );
 #endif
-				return gpio_get_level((gpio_num_t)pin) ? RELEASED : PULLED;
-			}
+                return gpio_get_level ( ( gpio_num_t ) pin ) ? RELEASED : PULLED;
+            }
 
-			inline void IRAM_ATTR set_pin_mode(uint8_t pin, gpio_mode_t mode)
-			{
-				static uint64_t gpio_pin_modes;
-				uint8_t b_mode = (mode == 1) ? 1 : 0;
+            inline void IRAM_ATTR set_pin_mode ( uint8_t pin, gpio_mode_t mode )
+            {
+                static uint64_t gpio_pin_modes;
+                uint8_t b_mode = ( mode == 1 ) ? 1 : 0;
 
-				// is this pin mode already set the way we want?
-				if ( ((gpio_pin_modes >> pin) & 1ULL) != b_mode )
-				{
-					// toggle bit so we don't change mode unnecessarily 
-					gpio_pin_modes ^= (-b_mode ^ gpio_pin_modes) & (1ULL << pin);
+                // is this pin mode already set the way we want?
+                if ( ( ( gpio_pin_modes >> pin ) & 1ULL ) != b_mode )
+                {
+                    // toggle bit so we don't change mode unnecessarily
+                    gpio_pin_modes ^= ( -b_mode ^ gpio_pin_modes ) & ( 1ULL << pin );
 
-					gpio_config_t io_conf = {
-						.pin_bit_mask = ( 1ULL << pin ),            // bit mask of the pins that you want to set
-						.mode = mode,                               // set as input mode
-						.pull_up_en = GPIO_PULLUP_DISABLE,          // disable pull-up mode
-						.pull_down_en = GPIO_PULLDOWN_DISABLE,      // disable pull-down mode
-						.intr_type = GPIO_INTR_DISABLE              // interrupt of falling edge
-					};
-					//configure GPIO with the given settings
-					gpio_config(&io_conf);
-				}
-			}
+                    gpio_config_t io_conf =
+                    {
+                        .pin_bit_mask = ( 1ULL << pin ),            // bit mask of the pins that you want to set
+                        .mode = mode,                               // set as input mode
+                        .pull_up_en = GPIO_PULLUP_DISABLE,          // disable pull-up mode
+                        .pull_down_en = GPIO_PULLDOWN_DISABLE,      // disable pull-down mode
+                        .intr_type = GPIO_INTR_DISABLE              // interrupt of falling edge
+                    };
+                    //configure GPIO with the given settings
+                    gpio_config ( &io_conf );
+                }
+            }
 
-	};
+    };
 };
 
 #endif

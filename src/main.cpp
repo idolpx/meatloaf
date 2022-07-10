@@ -94,9 +94,12 @@ void main_setup()
 
     Debug_printf( "Starting heap: %u\n", fnSystem.get_free_heap_size() );
     Debug_printf( "PsramSize %u\n", fnSystem.get_psram_size() );
+
+#ifndef NO_PSRAM
     Debug_printf( "himem phys %u\n", esp_himem_get_phys_size() );
     Debug_printf( "himem free %u\n", esp_himem_get_free_size() );
     Debug_printf( "himem reserved %u\n", esp_himem_reserved_area_size() );
+#endif
 #endif // DEBUG
 
     // Install a reboot handler

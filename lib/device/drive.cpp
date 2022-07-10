@@ -337,7 +337,7 @@ void iecDrive::handleListenCommand( void )
 	size_t channel = IEC.data.channel;
 	m_openState = O_NOTHING;
 
-	if (IEC.data.content.length() == 0 )
+	if (IEC.data.command.length() == 0 )
 	{
 		Debug_printv("No command to process");
 
@@ -347,7 +347,7 @@ void iecDrive::handleListenCommand( void )
 	}
 
 	// 1. obtain command and fullPath
-	auto commandAndPath = parseLine(IEC.data.content, channel);
+	auto commandAndPath = parseLine(IEC.data.command, channel);
 	auto referencedPath = Meat::New<MFile>(commandAndPath.fullPath);
 
 	Debug_printv("command[%s]", commandAndPath.command.c_str());
@@ -413,7 +413,7 @@ void iecDrive::handleListenCommand( void )
 	}
 
 	//dumpState();
-	IEC.data.content.clear();
+	IEC.data.command.clear();
 
 } // handleListenCommand
 
