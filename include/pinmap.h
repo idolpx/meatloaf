@@ -11,7 +11,8 @@
 #define PIN_SD_HOST_SCK  18
 #define PIN_SD_HOST_CS   GPIO_NUM_5
 #else
-#define PIN_SD_HOST_CS GPIO_NUM_5 //fnFsSD.cpp
+//#define PIN_SD_HOST_CS GPIO_NUM_5 // fnFsSD.cpp
+#define PIN_SD_HOST_CS GPIO_NUM_4 // WEMOS D32 Pro
 #define PIN_SD_HOST_MISO GPIO_NUM_19
 #define PIN_SD_HOST_MOSI GPIO_NUM_23
 #define PIN_SD_HOST_SCK GPIO_NUM_18
