@@ -277,7 +277,7 @@ bus_state_t iecBus::service ( void )
     // Command or Data Mode
     if ( protocol.status ( PIN_IEC_ATN ) == PULLED )
     {
-        Debug_println ( "COMMAND MODE" );
+        // Debug_println ( "COMMAND MODE" );
 
         // ATN was pulled read control code from the bus
         //IEC.protocol.pull ( PIN_IEC_SRQ );
@@ -287,9 +287,10 @@ bus_state_t iecBus::service ( void )
         // Check for error
         if ( c == 0xFFFFFFFF || protocol.flags bitand ERROR )
         {
-            Debug_printv ( "Get control code" );
-            this->bus_state = BUS_ERROR;
+            Debug_printv ( "Get command" );
             releaseLines ( true );
+            this->bus_state = BUS_ERROR;
+            return this->bus_state;
         }
 
         Debug_printf ( "   IEC: [%.2X]", c );
@@ -367,12 +368,12 @@ bus_state_t iecBus::service ( void )
         // At the moment there is only the multi-drive device
         this->device_state = drive.queue_command();
 
-        Debug_printv ( "command [%.2X] bus[%d] device[%d] primary[%d] secondary[%d]", command, this->bus_state, this->device_state, this->data.primary_control_code, this->data.secondary_control_code );
+        // Debug_printv ( "command [%.2X] bus[%d] device[%d] primary[%d] secondary[%d]", command, this->bus_state, this->device_state, this->data.primary_control_code, this->data.secondary_control_code );
     }
     else
     {
-        Debug_println ( "DATA MODE" );
-        Debug_printv ( "bus[%d] device[%d] primary[%d] secondary[%d]", this->bus_state, this->device_state, this->data.primary_control_code, this->data.secondary_control_code );
+        // Debug_println ( "DATA MODE" );
+        // Debug_printv ( "bus[%d] device[%d] primary[%d] secondary[%d]", this->bus_state, this->device_state, this->data.primary_control_code, this->data.secondary_control_code );
 
         // Data Mode - Get Command or Data
         if ( this->data.primary_control_code == IEC_LISTEN )
@@ -385,16 +386,14 @@ bus_state_t iecBus::service ( void )
             this->device_state = drive.process();
              
         }
-        else
-        {
-            releaseLines( true );          
-        }
 
-        this->data.init();
+        // this->data.init();
+        releaseLines( true );
         this->bus_state = BUS_IDLE; 
     }
 
     //Debug_printv("command[%.2X] device[%.2d] secondary[%.2d] channel[%.2d]", this->data.primary_control_code, this->data.device, this->data.secondary, this->data.channel);
+
 
 
     return this->bus_state;
@@ -403,7 +402,7 @@ bus_state_t iecBus::service ( void )
 device_state_t iecBus::deviceListen ( void )
 {
     // Okay, we will listen.
-    Debug_printv( "secondary[%d] channel[%d]", this->data.secondary_control_code, this->data.channel );
+    // Debug_printv( "secondary[%d] channel[%d]", this->data.secondary_control_code, this->data.channel );
 
     // If the command is SECONDARY and it is not to expect just a small command on the command channel, then
     // we're into something more heavy. Otherwise read it all out right here until UNLISTEN is received.

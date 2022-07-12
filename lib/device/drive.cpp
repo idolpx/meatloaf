@@ -840,8 +840,10 @@ void iecDrive::sendFile()
 			return;
 		}
 
+		// Position file pointer
+		// istream->seek(currentChannel.cursor);
 
-		// Get file load address
+		// Get/Send file load address
 		i = 2;
 		istream->read(&b, 1);
 		success = IEC.send(b);
@@ -851,9 +853,6 @@ void iecDrive::sendFile()
 		success = IEC.send(b);
 		load_address = load_address | b << 8;  // high byte
 		sys_address += b * 256;
-
-		// Position file pointer
-		istream->seek(currentChannel.cursor);
 
 		size_t len = istream->size();
 		size_t avail = istream->available();

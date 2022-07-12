@@ -165,7 +165,7 @@ void FlashFile::openDir(std::string apath)
         return;
     }
     
-    Debug_printv("path[%s]", apath.c_str());
+    // Debug_printv("path[%s]", apath.c_str());
     if(apath.empty()) {
         dir = opendir( "/" );
     }
