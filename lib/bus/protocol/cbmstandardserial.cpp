@@ -366,12 +366,14 @@ int16_t CBMStandardSerial::timeoutWait ( uint8_t pin, bool target_status, size_t
     uint64_t start, current, elapsed;
     elapsed = 0;
 
+    esp_timer_init();
     start = current = esp_timer_get_time();
 
     // Sample ATN and set flag to indicate SELECT or DATA mode
     bool atn_status = status ( PIN_IEC_ATN );
     flags or_eq atn_status;
 
+    pull ( PIN_IEC_SRQ );
     while ( status ( pin ) != target_status )
     {
 
@@ -381,17 +383,21 @@ int16_t CBMStandardSerial::timeoutWait ( uint8_t pin, bool target_status, size_t
         current = esp_timer_get_time();
         elapsed = current - start;
 
-        if ( elapsed > wait && wait > FOREVER )
+        if ( elapsed > wait && wait != FOREVER )
         {
+            release ( PIN_IEC_SRQ );
             return -1;
         }
 
         if ( status ( PIN_IEC_ATN ) != atn_status )
         {
+            release ( PIN_IEC_SRQ );
+            Debug_printv("pin[%d] state[%d] wait[%d] elapsed[%d]", pin, target_status, wait, elapsed);
             return -1;
         }
     }
 
+    release ( PIN_IEC_SRQ );
     // Debug_printv("pin[%d] state[%d] wait[%d] step[%d] t[%d]", pin, target_status, wait, elapsed);
     return elapsed;
 } // timeoutWait

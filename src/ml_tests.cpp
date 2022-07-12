@@ -4,13 +4,13 @@
 
 #include <ArduinoJson.h>
 
-#include "../../include/global_defines.h"
-#include "../../include/debug.h"
+#include "../include/global_defines.h"
+#include "../include/debug.h"
 
 #include "ml_tests.h"
 #include "meat_io.h"
 #include "iec_host.h"
-#include "../../include/make_unique.h"
+#include "../include/make_unique.h"
 #include "basic_config.h"
 #include "device_db.h"
 
