@@ -69,7 +69,7 @@ device_state_t iecDevice::queue_command ( void )
 device_state_t iecDevice::process ( void )
 {
     // IEC.protocol.pull ( PIN_IEC_SRQ );
-    Debug_printv ( "bus_state[%d]", IEC.bus_state );
+    // Debug_printv ( "bus_state[%d]", IEC.bus_state );
 
     // Wait for ATN to be released so we can receive or send data
     IEC.protocol.timeoutWait ( PIN_IEC_ATN, RELEASED, FOREVER );

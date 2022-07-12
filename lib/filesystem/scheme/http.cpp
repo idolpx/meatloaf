@@ -224,7 +224,7 @@ bool HttpIStream::open() {
         return false;
 
     // Setup response headers we want to collect
-    const char * headerKeys[] = {"accept-ranges", "content-type", "content-length"};
+    const char * headerKeys[] = {"accept-ranges", "content-type"};
     const size_t numberOfHeaders = 2;
     m_http.collect_headers(headerKeys, numberOfHeaders);
 
@@ -240,7 +240,7 @@ bool HttpIStream::open() {
     m_isOpen = true;
     Debug_printv("[%s]", url.c_str());
     //m_file = m_http.getStream();  //Get the response payload as Stream
-    m_length = stoi(m_http.get_header("content-length"));
+    m_length = m_http.available();
     Debug_printv("length=%d", m_length);
     m_bytesAvailable = m_length;
 
