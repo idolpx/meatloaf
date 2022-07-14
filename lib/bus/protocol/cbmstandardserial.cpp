@@ -252,19 +252,18 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
         //flags or_eq EOI_RECVD;
 
         // Signal eoi by waiting 200 us
-        if ( !wait ( TIMING_Tye ) )
-            return false;
+        if ( !wait ( TIMING_Tye ) ) return false;
 
         // get eoi acknowledge:
         if ( timeoutWait ( PIN_IEC_DATA_IN, PULLED ) == TIMED_OUT )
         {
-            Debug_printv ( "Get EOI acknowledge" );
+            Debug_printv ( "EOI ACK: Listener didn't PULL DATA" );
             flags or_eq ERROR;
             return false; // return error because timeout
         }
         if ( timeoutWait ( PIN_IEC_DATA_IN, RELEASED ) == TIMED_OUT )
         {
-            Debug_printv ( "Listener didn't release DATA" );
+            Debug_printv ( "EOI ACK: Listener didn't RELEASE DATA" );
             flags or_eq ERROR;
             return false; // return error because timeout
         }
@@ -318,14 +317,7 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
         if ( !wait ( TIMING_Tv ) ) return false;
 
         // Release data line after bit sent
-        release ( PIN_IEC_DATA_OUT );        
-
-        // // If ATN is PULLED, exit and cleanup
-        // if ( status ( PIN_IEC_ATN ) == PULLED )
-        // {
-        //     flags or_eq ATN_PULLED;
-        //     return false;
-        // }
+        release ( PIN_IEC_DATA_OUT );
 
         // tell listner to wait
         pull ( PIN_IEC_CLK_OUT );
@@ -352,18 +344,18 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
     // happened. If EOI was sent or received in this last transmission, both talker and listener "letgo."  After a suitable pause,
     // the Clock and Data lines are RELEASED to false and transmission stops.
 
-    // if ( signalEOI )
-    // {
-    //     // EOI Received
-    //     if ( !wait ( TIMING_Tfr ) ) return false;
-    //     release ( PIN_IEC_CLK_OUT );
-    //     release ( PIN_IEC_DATA_OUT );
-    // }
-    // else
-    // {
-    //     // BETWEEN BYTES TIME
-    //     if ( !wait ( TIMING_Tbb ) ) return false;
-    // }
+    if ( signalEOI )
+    {
+        // EOI Received
+        if ( !wait ( TIMING_Tfr ) ) return false;
+        release ( PIN_IEC_CLK_OUT );
+        release ( PIN_IEC_DATA_OUT );
+    }
+    else
+    {
+        // BETWEEN BYTES TIME
+        if ( !wait ( TIMING_Tbb ) ) return false;
+    }
 
     return true;
 } // sendByte

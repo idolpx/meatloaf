@@ -373,7 +373,6 @@ bus_state_t iecBus::service ( void )
     }
     else // if ( this->bus_state == BUS_ACTIVE )
     {
-        this->bus_state = BUS_IDLE;        
         // Debug_println ( "DATA MODE" );
         // Debug_printv ( "bus[%d] device[%d] primary[%d] secondary[%d]", this->bus_state, this->device_state, this->data.primary_control_code, this->data.secondary_control_code );
 
@@ -386,9 +385,10 @@ bus_state_t iecBus::service ( void )
         {
             this->device_state = deviceTalk();
             this->device_state = drive.process();
-
-            releaseLines( true );
         }
+
+        this->bus_state = BUS_IDLE;  
+        releaseLines( true );
     }
 
     //Debug_printv("command[%.2X] device[%.2d] secondary[%.2d] channel[%.2d]", this->data.primary_control_code, this->data.device, this->data.secondary, this->data.channel);
