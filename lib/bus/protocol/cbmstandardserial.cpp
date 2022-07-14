@@ -35,8 +35,6 @@ int16_t  CBMStandardSerial::receiveByte ( uint8_t device )
     flags = CLEAR;
 
     // Go to listener mode
-    release ( PIN_IEC_CLK_OUT );
-    pull ( PIN_IEC_DATA_OUT );
     if ( !wait ( TIMING_Tne ) ) return -1;
 
     // Wait for talker ready
@@ -187,13 +185,7 @@ int16_t  CBMStandardSerial::receiveByte ( uint8_t device )
     {
         // EOI Received
         delayMicroseconds ( TIMING_Tfr );
-        release ( PIN_IEC_CLK_OUT );
         release ( PIN_IEC_DATA_OUT );
-    }
-    else
-    {
-        // BETWEEN BYTES TIME
-        delayMicroseconds ( TIMING_Tbb );        
     }
 
     return data;
@@ -349,12 +341,6 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
         // EOI Received
         if ( !wait ( TIMING_Tfr ) ) return false;
         release ( PIN_IEC_CLK_OUT );
-        release ( PIN_IEC_DATA_OUT );
-    }
-    else
-    {
-        // BETWEEN BYTES TIME
-        if ( !wait ( TIMING_Tbb ) ) return false;
     }
 
     return true;

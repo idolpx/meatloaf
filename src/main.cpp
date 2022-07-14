@@ -55,8 +55,12 @@ bool initFailed = false;
 
 static void IRAM_ATTR on_attention_isr_handler(void* arg)
 {
-    bus_state = statemachine::select;
+    IEC.protocol.release ( PIN_IEC_CLK_OUT );
+    IEC.protocol.pull ( PIN_IEC_DATA_OUT );
     IEC.protocol.flags or_eq ATN_PULLED;
+    IEC.bus_state = BUS_ACTIVE;
+
+    bus_state = statemachine::select;
     fnLedManager.toggle(eLed::LED_BUS);
 }
 

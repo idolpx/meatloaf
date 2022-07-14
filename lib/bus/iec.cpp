@@ -290,7 +290,7 @@ bus_state_t iecBus::service ( void )
         if ( c == 0xFFFFFFFF || protocol.flags bitand ERROR )
         {
             Debug_printv ( "Get command" );
-            releaseLines ( true );
+            releaseLines();
             this->bus_state = BUS_ERROR;
             return this->bus_state;
         }
@@ -330,6 +330,7 @@ bus_state_t iecBus::service ( void )
         {
             this->data.primary_control_code = IEC_UNLISTEN;
             this->bus_state = BUS_IDLE;
+            releaseLines();
             Debug_printf ( " (3F UNLISTEN)\r\n" );
         }
         else if ( command == IEC_TALK )
@@ -342,6 +343,7 @@ bus_state_t iecBus::service ( void )
         {
             this->data.primary_control_code = IEC_UNTALK;
             this->bus_state = BUS_IDLE;
+            releaseLines();
             Debug_printf ( " (5F UNTALK)\r\n" );
         }
         else if ( command == IEC_OPEN )
@@ -368,11 +370,11 @@ bus_state_t iecBus::service ( void )
         // At the moment there is only the multi-drive device
         this->device_state = drive.queue_command();
 
-        // releaseLines( false );
         // Debug_printv ( "command [%.2X] bus[%d] device[%d] primary[%d] secondary[%d]", command, this->bus_state, this->device_state, this->data.primary_control_code, this->data.secondary_control_code );
     }
     else // if ( this->bus_state == BUS_ACTIVE )
     {
+        this->bus_state = BUS_IDLE; 
         // Debug_println ( "DATA MODE" );
         // Debug_printv ( "bus[%d] device[%d] primary[%d] secondary[%d]", this->bus_state, this->device_state, this->data.primary_control_code, this->data.secondary_control_code );
 
@@ -384,11 +386,9 @@ bus_state_t iecBus::service ( void )
         else if ( this->data.primary_control_code == IEC_TALK )
         {
             this->device_state = deviceTalk();
-            this->device_state = drive.process();
+            this->device_state = drive.process();      
         }
-
-        this->bus_state = BUS_IDLE;  
-        releaseLines( true );
+        releaseLines();
     }
 
     //Debug_printv("command[%.2X] device[%.2d] secondary[%.2d] channel[%.2d]", this->data.primary_control_code, this->data.device, this->data.secondary, this->data.channel);
@@ -555,29 +555,7 @@ bool iecBus::turnAround ( void )
 } // turnAround
 
 
-// this routine will set the direction on the bus back to normal
-// (the way it was when the computer was switched on)
-bool iecBus::undoTurnAround ( void )
-{
-    protocol.pull ( PIN_IEC_DATA_OUT );
-    protocol.release ( PIN_IEC_CLK_OUT );
-
-    // Debug_printf("IEC undoTurnAround: ");
-
-    // Wait until the computer releases the clock line
-    if ( protocol.timeoutWait ( PIN_IEC_CLK_IN, RELEASED, FOREVER ) == TIMED_OUT )
-    {
-        Debug_printv ( "Wait until the computer releases the clock line" );
-        protocol.flags or_eq ERROR;
-        return -1; // return error because timeout
-    }
-
-    // Debug_println("complete");
-    return true;
-} // undoTurnAround
-
-
-void iecBus::releaseLines ( bool wait )
+void iecBus::releaseLines ( void )
 {
     //Debug_printv("");
     // IEC.protocol.pull ( PIN_IEC_SRQ );
@@ -587,11 +565,11 @@ void iecBus::releaseLines ( bool wait )
     protocol.release ( PIN_IEC_DATA_OUT );
 
     // Wait for ATN to release and quit
-    if ( wait )
-    {
-        //Debug_printv("Waiting for ATN to release");
-        IEC.protocol.timeoutWait ( PIN_IEC_ATN, RELEASED, FOREVER );
-    }
+    // if ( wait )
+    // {
+    //     //Debug_printv("Waiting for ATN to release");
+    //     IEC.protocol.timeoutWait ( PIN_IEC_ATN, RELEASED, FOREVER );
+    // }
     // IEC.protocol.release ( PIN_IEC_SRQ );
 }
 
@@ -652,19 +630,10 @@ bool iecBus::sendEOI ( uint8_t data )
 #endif
     Debug_println ( "\r\nEOI Sent!" );
 
-    if ( protocol.sendByte ( data, true ) )
-    {
-        // As we have just send last byte, turn bus back around
-        IEC.protocol.pull ( PIN_IEC_SRQ );
-        if ( undoTurnAround() )
-        {
-            IEC.protocol.release ( PIN_IEC_SRQ );
-            return true;
-        }
-    }
-    IEC.protocol.release ( PIN_IEC_SRQ );
-
-    return false;
+    IEC.protocol.pull(PIN_IEC_SRQ);
+    bool r = protocol.sendByte ( data, true ); // Standard CBM Timing
+    IEC.protocol.release(PIN_IEC_SRQ);
+    return r;
 } // sendEOI
 
 
@@ -673,8 +642,7 @@ bool iecBus::sendEOI ( uint8_t data )
 bool iecBus::sendFNF()
 {
     // Message file not found by just releasing lines
-    protocol.release ( PIN_IEC_DATA_OUT );
-    protocol.release ( PIN_IEC_CLK_OUT );
+    releaseLines();
 
     // BETWEEN BYTES TIME
     delayMicroseconds ( TIMING_Tbb );
