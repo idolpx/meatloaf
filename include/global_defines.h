@@ -27,7 +27,7 @@
 
 #define USER_AGENT PRODUCT_ID " [" FW_VERSION "]"
 //#define UPDATE_URL      "http://meatloaf.cc/fw/?p=meatloaf&d={{DEVICE_ID}}&a="
-#define UPDATE_URL "http://meatloaf.cc/fw/meatloaf.4MB.bin"
+//#define UPDATE_URL "http://meatloaf.cc/fw/meatloaf.4MB.bin"
 //#define UPDATE_URL      "http://meatloaf.cc/fw/meatloaf.16MB.bin"
 
 #define SYSTEM_DIR "/.sys/"
@@ -55,7 +55,7 @@
 
 // Enable this to show the data stream while loading
 // Make sure device baud rate and monitor_speed = 921600
-//#define DATA_STREAM
+#define DATA_STREAM
 
 // Enable this to show the data stream for other devices
 // Listens to all commands and data to all devices

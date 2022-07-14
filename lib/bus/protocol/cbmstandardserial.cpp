@@ -37,7 +37,7 @@ int16_t  CBMStandardSerial::receiveByte ( uint8_t device )
     // Go to listener mode
     release ( PIN_IEC_CLK_OUT );
     pull ( PIN_IEC_DATA_OUT );
-    delayMicroseconds ( TIMING_Tne );
+    if ( !wait ( TIMING_Tne ) ) return -1;
 
     // Wait for talker ready
     if ( timeoutWait ( PIN_IEC_CLK_IN, RELEASED, FOREVER ) == TIMED_OUT )
@@ -89,7 +89,7 @@ int16_t  CBMStandardSerial::receiveByte ( uint8_t device )
 
         // Acknowledge by pull down data more than 60us
         pull ( PIN_IEC_DATA_OUT );
-        delayMicroseconds ( TIMING_Tei );
+        if ( !wait ( TIMING_Tei ) ) return -1;
         release ( PIN_IEC_DATA_OUT );
 
         // but still wait for CLK to be PULLED
@@ -146,7 +146,6 @@ int16_t  CBMStandardSerial::receiveByte ( uint8_t device )
 
         // wait for talker to finish sending bit
         bit_time = timeoutWait ( PIN_IEC_CLK_IN, PULLED );
-
         if ( bit_time == TIMED_OUT )
         {
             Debug_printv ( "wait for talker to finish sending bit" );
@@ -175,11 +174,8 @@ int16_t  CBMStandardSerial::receiveByte ( uint8_t device )
     // one  millisecond  -  one  thousand  microseconds  -  it  will  know  that something's wrong and may alarm appropriately.
 
     // Acknowledge byte received
-    delayMicroseconds ( TIMING_Tf );
+    if ( !wait ( TIMING_Tf ) ) return -1;
     pull ( PIN_IEC_DATA_OUT );
-
-    // BETWEEN BYTES TIME
-    delayMicroseconds ( TIMING_Tbb );
 
     // STEP 5: START OVER
     // We're  finished,  and  back  where  we  started.    The  talker  is  holding  the  Clock  line  true,
@@ -193,6 +189,11 @@ int16_t  CBMStandardSerial::receiveByte ( uint8_t device )
         delayMicroseconds ( TIMING_Tfr );
         release ( PIN_IEC_CLK_OUT );
         release ( PIN_IEC_DATA_OUT );
+    }
+    else
+    {
+        // BETWEEN BYTES TIME
+        delayMicroseconds ( TIMING_Tbb );        
     }
 
     return data;
@@ -251,7 +252,8 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
         //flags or_eq EOI_RECVD;
 
         // Signal eoi by waiting 200 us
-        delayMicroseconds ( TIMING_Tye );
+        if ( !wait ( TIMING_Tye ) )
+            return false;
 
         // get eoi acknowledge:
         if ( timeoutWait ( PIN_IEC_DATA_IN, PULLED ) == TIMED_OUT )
@@ -260,7 +262,6 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
             flags or_eq ERROR;
             return false; // return error because timeout
         }
-
         if ( timeoutWait ( PIN_IEC_DATA_IN, RELEASED ) == TIMED_OUT )
         {
             Debug_printv ( "Listener didn't release DATA" );
@@ -270,7 +271,7 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
     }
     else
     {
-        delayMicroseconds ( TIMING_Tne );
+        if ( !wait ( TIMING_Tne ) ) return false;
     }
 
     // STEP 3: SENDING THE BITS
@@ -298,33 +299,39 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
 
     // tell listner to wait
     pull ( PIN_IEC_CLK_OUT );
-    delayMicroseconds ( TIMING_Tv );
+    if ( !wait ( TIMING_Tv ) ) return false;
 
     for ( uint8_t n = 0; n < 8; n++ )
     {
-        // FIXME: Here check whether data pin is PULLED, if so end (enter cleanup)!
-
+        // // If data pin is PULLED, exit and cleanup
+        // if ( status ( PIN_IEC_DATA_IN ) == PULLED )
+        // {
+        //     return false;
+        // }
 
         // set bit
         ( data bitand 1 ) ? release ( PIN_IEC_DATA_OUT ) : pull ( PIN_IEC_DATA_OUT );
-        delayMicroseconds ( TIMING_Tv );
+        data >>= 1; // get next bit
 
         // tell listener bit is ready to read
         release ( PIN_IEC_CLK_OUT );
-        delayMicroseconds ( TIMING_Tv );
+        if ( !wait ( TIMING_Tv ) ) return false;
 
-        // if ATN is PULLED, exit and cleanup
-        if ( status ( PIN_IEC_ATN ) == PULLED )
-        {
-            flags or_eq ATN_PULLED;
-            return false;
-        }
+        // Release data line after bit sent
+        release ( PIN_IEC_DATA_OUT );        
 
+        // // If ATN is PULLED, exit and cleanup
+        // if ( status ( PIN_IEC_ATN ) == PULLED )
+        // {
+        //     flags or_eq ATN_PULLED;
+        //     return false;
+        // }
+
+        // tell listner to wait
         pull ( PIN_IEC_CLK_OUT );
-        delayMicroseconds ( TIMING_Tv );
-
-        data >>= 1; // get next bit
+        if ( !wait ( TIMING_Tv ) ) return false;
     }
+
 
     // STEP 4: FRAME HANDSHAKE
     // After the eighth bit has been sent, it's the listener's turn to acknowledge.  At this moment, the Clock line  is  true
@@ -339,22 +346,24 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
         return false; // return error because timeout
     }
 
-    // BETWEEN BYTES TIME
-    delayMicroseconds ( TIMING_Tbb );
-
     // STEP 5: START OVER
     // We're  finished,  and  back  where  we  started.    The  talker  is  holding  the  Clock  line  true,
     // and  the listener is holding the Data line true. We're ready for step 1; we may send another character - unless EOI has
     // happened. If EOI was sent or received in this last transmission, both talker and listener "letgo."  After a suitable pause,
     // the Clock and Data lines are RELEASED to false and transmission stops.
 
-    if ( signalEOI )
-    {
-        // EOI Received
-        delayMicroseconds ( TIMING_Tfr );
-        release ( PIN_IEC_CLK_OUT );
-        release ( PIN_IEC_DATA_OUT );
-    }
+    // if ( signalEOI )
+    // {
+    //     // EOI Received
+    //     if ( !wait ( TIMING_Tfr ) ) return false;
+    //     release ( PIN_IEC_CLK_OUT );
+    //     release ( PIN_IEC_DATA_OUT );
+    // }
+    // else
+    // {
+    //     // BETWEEN BYTES TIME
+    //     if ( !wait ( TIMING_Tbb ) ) return false;
+    // }
 
     return true;
 } // sendByte
@@ -373,7 +382,7 @@ int16_t CBMStandardSerial::timeoutWait ( uint8_t pin, bool target_status, size_t
     bool atn_status = status ( PIN_IEC_ATN );
     flags or_eq atn_status;
 
-    pull ( PIN_IEC_SRQ );
+    // pull ( PIN_IEC_SRQ );
     while ( status ( pin ) != target_status )
     {
 
@@ -385,20 +394,55 @@ int16_t CBMStandardSerial::timeoutWait ( uint8_t pin, bool target_status, size_t
 
         if ( elapsed > wait && wait != FOREVER )
         {
-            release ( PIN_IEC_SRQ );
+            // release ( PIN_IEC_SRQ );
             return -1;
         }
 
-        if ( status ( PIN_IEC_ATN ) != atn_status )
+        bool atn_check = status ( PIN_IEC_ATN );
+        flags or_eq atn_check;
+        if ( atn_check != atn_status )
         {
-            release ( PIN_IEC_SRQ );
+            // release ( PIN_IEC_SRQ );
             Debug_printv("pin[%d] state[%d] wait[%d] elapsed[%d]", pin, target_status, wait, elapsed);
             return -1;
         }
     }
 
-    release ( PIN_IEC_SRQ );
+    // release ( PIN_IEC_SRQ );
     // Debug_printv("pin[%d] state[%d] wait[%d] step[%d] t[%d]", pin, target_status, wait, elapsed);
     return elapsed;
 } // timeoutWait
 
+
+// Wait for specified ms or until ATN status changes
+bool CBMStandardSerial::wait ( size_t wait )
+{
+    uint64_t start, current, elapsed;
+    elapsed = 0;
+
+    esp_timer_init();
+    start = current = esp_timer_get_time();
+
+    // Sample ATN and set flag to indicate SELECT or DATA mode
+    bool atn_status = status ( PIN_IEC_ATN );
+    flags or_eq atn_status;
+
+    // pull ( PIN_IEC_SRQ );
+    while ( elapsed < wait )
+    {
+        current = esp_timer_get_time();
+        elapsed = current - start;
+
+        bool atn_check = status ( PIN_IEC_ATN );
+        flags or_eq atn_check;
+        if ( atn_check != atn_status )
+        {
+            // release ( PIN_IEC_SRQ );
+            Debug_printv("wait[%d] elapsed[%d]", wait, elapsed);
+            return false;
+        }
+    }
+
+    // release ( PIN_IEC_SRQ );
+    return true;
+} // wait

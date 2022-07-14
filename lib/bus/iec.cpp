@@ -264,11 +264,13 @@ bus_state_t iecBus::service ( void )
         if ( protocol.status ( PIN_IEC_ATN ) == PULLED )
         {
             // If RESET & ATN are both PULLED then CBM is off
-            return BUS_IDLE;
+            this->bus_state = BUS_IDLE;
+            return this->bus_state;
         }
 
         Debug_printv ( "IEC Reset!" );
-        return BUS_RESET;
+        this->bus_state = BUS_RESET;
+        return this->bus_state;
     }
 
 #endif
@@ -315,34 +317,32 @@ bus_state_t iecBus::service ( void )
         {
             this->data.primary_control_code = IEC_GLOBAL;
             this->data.device = c xor IEC_GLOBAL;
-            Debug_printf ( " (00 GLOBAL %.2d COMMAND)\r\n", this->data.device );
             this->bus_state = BUS_IDLE;
+            Debug_printf ( " (00 GLOBAL %.2d COMMAND)\r\n", this->data.device );
         }
         else if ( command == IEC_LISTEN )
         {
             this->data.primary_control_code = IEC_LISTEN;
             this->data.device = c xor IEC_LISTEN;
             Debug_printf ( " (20 LISTEN %.2d DEVICE)\r\n", this->data.device );
-            this->bus_state = BUS_ACTIVE;
         }
         else if ( c == IEC_UNLISTEN )
         {
             this->data.primary_control_code = IEC_UNLISTEN;
-            Debug_printf ( " (3F UNLISTEN)\r\n" );
             this->bus_state = BUS_IDLE;
+            Debug_printf ( " (3F UNLISTEN)\r\n" );
         }
         else if ( command == IEC_TALK )
         {
             this->data.primary_control_code = IEC_TALK;
             this->data.device = c xor IEC_TALK;
             Debug_printf ( " (40 TALK   %.2d DEVICE)\r\n", this->data.device );
-            this->bus_state = BUS_ACTIVE;
         }
         else if ( c == IEC_UNTALK )
         {
             this->data.primary_control_code = IEC_UNTALK;
-            Debug_printf ( " (5F UNTALK)\r\n" );
             this->bus_state = BUS_IDLE;
+            Debug_printf ( " (5F UNTALK)\r\n" );
         }
         else if ( command == IEC_OPEN )
         {
@@ -368,10 +368,12 @@ bus_state_t iecBus::service ( void )
         // At the moment there is only the multi-drive device
         this->device_state = drive.queue_command();
 
+        // releaseLines( false );
         // Debug_printv ( "command [%.2X] bus[%d] device[%d] primary[%d] secondary[%d]", command, this->bus_state, this->device_state, this->data.primary_control_code, this->data.secondary_control_code );
     }
-    else
+    else // if ( this->bus_state == BUS_ACTIVE )
     {
+        this->bus_state = BUS_IDLE;        
         // Debug_println ( "DATA MODE" );
         // Debug_printv ( "bus[%d] device[%d] primary[%d] secondary[%d]", this->bus_state, this->device_state, this->data.primary_control_code, this->data.secondary_control_code );
 
@@ -384,18 +386,12 @@ bus_state_t iecBus::service ( void )
         {
             this->device_state = deviceTalk();
             this->device_state = drive.process();
-             
-        }
 
-        // this->data.init();
-        releaseLines( true );
-        this->bus_state = BUS_IDLE; 
+            releaseLines( true );
+        }
     }
 
     //Debug_printv("command[%.2X] device[%.2d] secondary[%.2d] channel[%.2d]", this->data.primary_control_code, this->data.device, this->data.secondary, this->data.channel);
-
-
-
     return this->bus_state;
 } // service
 
@@ -564,9 +560,7 @@ bool iecBus::turnAround ( void )
 bool iecBus::undoTurnAround ( void )
 {
     protocol.pull ( PIN_IEC_DATA_OUT );
-    delayMicroseconds ( TIMING_Tv );
     protocol.release ( PIN_IEC_CLK_OUT );
-    delayMicroseconds ( TIMING_Tv );
 
     // Debug_printf("IEC undoTurnAround: ");
 
@@ -586,6 +580,7 @@ bool iecBus::undoTurnAround ( void )
 void iecBus::releaseLines ( bool wait )
 {
     //Debug_printv("");
+    // IEC.protocol.pull ( PIN_IEC_SRQ );
 
     // Release lines
     protocol.release ( PIN_IEC_CLK_OUT );
@@ -597,6 +592,7 @@ void iecBus::releaseLines ( bool wait )
         //Debug_printv("Waiting for ATN to release");
         IEC.protocol.timeoutWait ( PIN_IEC_ATN, RELEASED, FOREVER );
     }
+    // IEC.protocol.release ( PIN_IEC_SRQ );
 }
 
 
@@ -631,9 +627,9 @@ bool iecBus::send ( uint8_t data )
 #ifdef DATA_STREAM
     Debug_printf ( "%.2X ", data );
 #endif
-    //IEC.protocol.pull(PIN_IEC_SRQ);
+    // IEC.protocol.pull(PIN_IEC_SRQ);
     bool r = protocol.sendByte ( data, false ); // Standard CBM Timing
-    //IEC.protocol.release(PIN_IEC_SRQ);
+    // IEC.protocol.release(PIN_IEC_SRQ);
     return r;
 } // send
 
@@ -659,11 +655,14 @@ bool iecBus::sendEOI ( uint8_t data )
     if ( protocol.sendByte ( data, true ) )
     {
         // As we have just send last byte, turn bus back around
+        IEC.protocol.pull ( PIN_IEC_SRQ );
         if ( undoTurnAround() )
         {
+            IEC.protocol.release ( PIN_IEC_SRQ );
             return true;
         }
     }
+    IEC.protocol.release ( PIN_IEC_SRQ );
 
     return false;
 } // sendEOI

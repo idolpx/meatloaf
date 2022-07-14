@@ -78,7 +78,7 @@ size_t TNFSFile::size() {
     else if(isDirectory()) {
         return 0;
     }
-    Debug_printv("path[%s]", path.c_str());
+    //Debug_printv("path[%s]", path.c_str());
     return _filesystem.filesize( path.c_str() );
 }
 

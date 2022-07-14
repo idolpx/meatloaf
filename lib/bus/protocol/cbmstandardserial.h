@@ -98,6 +98,7 @@ namespace Protocol
             virtual int16_t receiveByte ( uint8_t device );
             virtual bool sendByte ( uint8_t data, bool signalEOI );
             int16_t timeoutWait ( uint8_t pin, bool target_status, size_t wait = TIMEOUT );
+            bool wait ( size_t wait );
 
 
             // true => PULL => LOW
