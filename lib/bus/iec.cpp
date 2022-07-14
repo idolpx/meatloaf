@@ -251,9 +251,8 @@ bool iecBus::init()
  * nobody to talk to.
  */
 // Return value, see bus_state_t definition.
-bus_state_t iecBus::service ( void )
+void iecBus::service ( void )
 {
-    this->bus_state = BUS_ACTIVE;
 
 #ifdef IEC_HAS_RESET
 
@@ -265,12 +264,12 @@ bus_state_t iecBus::service ( void )
         {
             // If RESET & ATN are both PULLED then CBM is off
             this->bus_state = BUS_IDLE;
-            return this->bus_state;
+            return;
         }
 
         Debug_printv ( "IEC Reset!" );
         this->bus_state = BUS_RESET;
-        return this->bus_state;
+        return;
     }
 
 #endif
@@ -289,10 +288,11 @@ bus_state_t iecBus::service ( void )
         // Check for error
         if ( c == 0xFFFFFFFF || protocol.flags bitand ERROR )
         {
-            Debug_printv ( "Get command" );
-            releaseLines();
+            Debug_printv ( "Error reading command" );
+            //this->data.init();
             this->bus_state = BUS_ERROR;
-            return this->bus_state;
+            releaseLines();
+            return;
         }
 
         Debug_printf ( "   IEC: [%.2X]", c );
@@ -372,7 +372,7 @@ bus_state_t iecBus::service ( void )
 
         // Debug_printv ( "command [%.2X] bus[%d] device[%d] primary[%d] secondary[%d]", command, this->bus_state, this->device_state, this->data.primary_control_code, this->data.secondary_control_code );
     }
-    else // if ( this->bus_state == BUS_ACTIVE )
+    else if ( this->bus_state == BUS_ACTIVE )
     {
         this->bus_state = BUS_IDLE; 
         // Debug_println ( "DATA MODE" );
@@ -388,11 +388,11 @@ bus_state_t iecBus::service ( void )
             this->device_state = deviceTalk();
             this->device_state = drive.process();      
         }
-        releaseLines();
+        releaseLines();        
     }
 
     //Debug_printv("command[%.2X] device[%.2d] secondary[%.2d] channel[%.2d]", this->data.primary_control_code, this->data.device, this->data.secondary, this->data.channel);
-    return this->bus_state;
+    return;
 } // service
 
 device_state_t iecBus::deviceListen ( void )
@@ -467,20 +467,6 @@ device_state_t iecBus::deviceListen ( void )
     }
 }
 
-// void iecBus::deviceUnListen(void)
-// {
-//  Debug_printv("");
-
-//  // Release lines
-//  protocol.release(PIN_IEC_CLK_OUT);
-//  protocol.release(PIN_IEC_DATA_OUT);
-
-//  // Wait for ATN to protocol.release and quit
-//  while(protocol.status(PIN_IEC_ATN) == PULLED)
-//  {
-//      ESP.wdtFeed();
-//  }
-// }
 
 device_state_t iecBus::deviceTalk ( void )
 {
@@ -497,22 +483,6 @@ device_state_t iecBus::deviceTalk ( void )
     // We have recieved a CMD and we should talk now:
     return DEVICE_TALK;
 }
-
-// void iecBus::deviceUnTalk(void)
-// {
-//  Debug_printv("");
-
-//  // Release lines
-//  protocol.release(PIN_IEC_CLK_OUT);
-//  protocol.release(PIN_IEC_DATA_OUT);
-
-//  // Wait for ATN to protocol.release and quit
-//  while(protocol.status(PIN_IEC_ATN) == PULLED)
-//  {
-//      ESP.wdtFeed();
-//  }
-// }
-
 
 
 // IEC turnaround

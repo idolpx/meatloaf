@@ -34,9 +34,6 @@ int16_t  CBMStandardSerial::receiveByte ( uint8_t device )
 {
     flags = CLEAR;
 
-    // Go to listener mode
-    if ( !wait ( TIMING_Tne ) ) return -1;
-
     // Wait for talker ready
     if ( timeoutWait ( PIN_IEC_CLK_IN, RELEASED, FOREVER ) == TIMED_OUT )
     {

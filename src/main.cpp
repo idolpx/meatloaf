@@ -31,13 +31,6 @@
 #include "iec.h"
 #include "ml_tests.h"
 
-enum class statemachine
-{
-    idle,   // BUS is idle
-    select, // ATN is PULLED, read command
-    data    // READY to receive or send data
-};
-statemachine bus_state = statemachine::idle;
 
 std::string statusMessage;
 bool initFailed = false;
@@ -55,12 +48,12 @@ bool initFailed = false;
 
 static void IRAM_ATTR on_attention_isr_handler(void* arg)
 {
+    // Go to listener mode
     IEC.protocol.release ( PIN_IEC_CLK_OUT );
     IEC.protocol.pull ( PIN_IEC_DATA_OUT );
     IEC.protocol.flags or_eq ATN_PULLED;
     IEC.bus_state = BUS_ACTIVE;
 
-    bus_state = statemachine::select;
     fnLedManager.toggle(eLed::LED_BUS);
 }
 
@@ -199,22 +192,10 @@ void fn_service_loop(void *param)
 #ifdef DEBUG_TIMING
         IEC.debugTiming();
 #else
-        if ( bus_state != statemachine::idle )
-        {
-            //Debug_printv("before[%d]", bus_state);
-            uint8_t bs = IEC.service();
-            if( bs == BUS_IDLE || bs == BUS_ERROR )
-                bus_state = statemachine::idle;
-            //Debug_printv("after[%d] bs[%d]", bus_state, bs);
-            
-            // Debug_printv("ATN PULLED\n");
-            // bus_state = statemachine::idle;
-        }
+        IEC.service();
+        if ( IEC.bus_state < BUS_ACTIVE )
+            taskYIELD();
 #endif
-        else
-        {
-            taskYIELD(); // Allow other tasks to run 
-        }
     }
 }
 

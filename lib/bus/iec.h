@@ -125,13 +125,13 @@ class iecDevice
 // Return values for service:
 typedef enum
 {
+    BUS_RESET = -2,   // The IEC bus is in a reset state (RESET line).    
+    BUS_ERROR = -1,   // A problem occoured, reset communication
     BUS_IDLE = 0,     // Nothing recieved of our concern
-    BUS_ACTIVE,       // ATN is pulled and another command byte is expected
+    BUS_ACTIVE = 1,   // ATN is pulled and another command byte is expected
     BUS_COMMAND,      // A command is recieved
     BUS_LISTEN,       // A command is recieved and data is coming to us
     BUS_TALK,         // A command is recieved and we must talk now
-    BUS_ERROR,        // A problem occoured, reset communication
-    BUS_RESET         // The IEC bus is in a reset state (RESET line).
 } bus_state_t;
 
 // IEC commands:
@@ -176,7 +176,7 @@ class iecBus
 
         // Checks if CBM is sending an attention message. If this is the case,
         // the message is recieved and stored in iec_data.
-        bus_state_t service ( void );
+        void service ( void );
 
         // void shutdown();
 
