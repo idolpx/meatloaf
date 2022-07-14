@@ -386,9 +386,9 @@ void iecBus::service ( void )
         else if ( this->data.primary_control_code == IEC_TALK )
         {
             this->device_state = deviceTalk();
-            this->device_state = drive.process();      
-        }
-        releaseLines();        
+            this->device_state = drive.process();
+            releaseLines();
+        }      
     }
 
     //Debug_printv("command[%.2X] device[%.2d] secondary[%.2d] channel[%.2d]", this->data.primary_control_code, this->data.device, this->data.secondary, this->data.channel);
@@ -407,6 +407,7 @@ device_state_t iecBus::deviceListen ( void )
         // A heapload of data might come now, too big for this context to handle so the caller handles this, we're done here.
         // Debug_printf(" (%.2X SECONDARY) (%.2X CHANNEL)\r\n", this->data.primary_control_code, this->data.channel);
         Debug_printf ( "\r\n" );
+        this->bus_state = BUS_ACTIVE;
         return DEVICE_LISTEN;
     }
 
@@ -426,6 +427,7 @@ device_state_t iecBus::deviceListen ( void )
             if ( protocol.flags bitand ERROR )
             {
                 Debug_printv ( "Some other command [%.2X]", c );
+                releaseLines();
                 return DEVICE_ERROR;
             }
 
@@ -449,6 +451,7 @@ device_state_t iecBus::deviceListen ( void )
             Debug_printf ( "\r\n" );
         }
 
+        releaseLines();
         return DEVICE_LISTEN;
     }
 
@@ -456,6 +459,7 @@ device_state_t iecBus::deviceListen ( void )
     else if ( this->data.secondary_control_code == IEC_CLOSE )
     {
         // Debug_printf(" (E0 CLOSE) (%.2X CHANNEL)\r\n", this->data.channel);
+        releaseLines();
         return DEVICE_LISTEN;
     }
 
@@ -463,6 +467,7 @@ device_state_t iecBus::deviceListen ( void )
     else
     {
         Debug_printv ( " OTHER (%.2X COMMAND) (%.2X CHANNEL) ", this->data.secondary_control_code, this->data.channel );
+        releaseLines();
         return DEVICE_ERROR;
     }
 }

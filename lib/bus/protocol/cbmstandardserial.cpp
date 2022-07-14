@@ -184,6 +184,11 @@ int16_t  CBMStandardSerial::receiveByte ( uint8_t device )
         delayMicroseconds ( TIMING_Tfr );
         release ( PIN_IEC_DATA_OUT );
     }
+    else
+    {
+        // BETWEEN BYTES TIME
+        delayMicroseconds ( TIMING_Tbb );        
+    }
 
     return data;
 } // receiveByte
@@ -338,6 +343,11 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
         // EOI Received
         if ( !wait ( TIMING_Tfr ) ) return false;
         release ( PIN_IEC_CLK_OUT );
+    }
+    else
+    {
+        // BETWEEN BYTES TIME
+        delayMicroseconds ( TIMING_Tbb );        
     }
 
     return true;
