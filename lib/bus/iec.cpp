@@ -417,12 +417,12 @@ void iecBus::service ( void )
         // Data Mode - Get Command or Data
         if ( this->data.primary == IEC_LISTEN )
         {
-            Debug_printv( "deviceListen" );
+            // Debug_printv( "deviceListen" );
             this->bus_state = deviceListen();
         }
         else if ( this->data.primary == IEC_TALK )
         {
-            Debug_printv( "deviceTalk" );
+            // Debug_printv( "deviceTalk" );
             this->bus_state = deviceTalk();   
         }
 
@@ -430,7 +430,7 @@ void iecBus::service ( void )
         // At the moment there is only the multi-drive device
         if ( this->bus_state == BUS_PROCESS )
         {
-            Debug_printv( "deviceProcess" );
+            // Debug_printv( "deviceProcess" );
             // Process command on devices
             drive.process();
         }
