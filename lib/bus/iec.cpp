@@ -665,6 +665,7 @@ bool iecBus::sendFNF()
 {
     // Message file not found by just releasing lines
     releaseLines();
+    this->bus_state = BUS_ERROR;
 
     // BETWEEN BYTES TIME
     delayMicroseconds ( TIMING_Tbb );

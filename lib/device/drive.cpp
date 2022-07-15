@@ -409,6 +409,7 @@ void iecDrive::handleListenCommand( void )
 		else
 		{
 			Debug_printv("file doesn't exist [%s]", referencedPath->url.c_str());
+			sendFileNotFound();
 		}
 	}
 

@@ -6,6 +6,7 @@
 
 // Device
 #include "device/flash.h"
+#include "device/sd.h"
 
 // Scheme
 #include "scheme/http.h"
@@ -42,6 +43,7 @@
 
 // initialize other filesystems here
 FlashFileSystem defaultFS;
+SDFileSystem sdFS;
 
 // Scheme
 HttpFileSystem httpFS;
@@ -69,7 +71,7 @@ TCRTFileSystem tcrtFS;
 
 // put all available filesystems in this array - first matching system gets the file!
 // fist in list is default
-std::vector<MFileSystem*> MFSOwner::availableFS{ &defaultFS, &d64FS, &d71FS, &d80FS, &d81FS, &d82FS, &d8bFS, &dnpFS, &t64FS, &tcrtFS, &mlFS, &httpFS, &tnfsFS };
+std::vector<MFileSystem*> MFSOwner::availableFS{ &defaultFS, &sdFS, &d64FS, &d71FS, &d80FS, &d81FS, &d82FS, &d8bFS, &dnpFS, &t64FS, &tcrtFS, &mlFS, &httpFS, &tnfsFS };
 
 bool MFSOwner::mount(std::string name) {
     Serial.print("MFSOwner::mount fs:");
@@ -387,6 +389,7 @@ MFile* MFile::cd(std::string newDir) {
     }
     else {
         Debug_printv("> url[%s] newDir[%s]", url.c_str(), newDir.c_str());
+
         // Add new directory to path
         if ( !mstr::endsWith(url, "/") )
             url.push_back('/');
