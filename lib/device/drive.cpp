@@ -306,7 +306,7 @@ void iecDrive::changeDir(std::string url)
 {
 	device_config.url(url);
 	m_mfile.reset(MFSOwner::File(url));
-	if ( IEC.data.channel == 0 )
+	if ( this->data.channel == 0 )
 	{
 		m_openState = O_DIR;
 		//Debug_printv("!!!! CD into [%s]", url.c_str());
@@ -327,27 +327,27 @@ void iecDrive::prepareFileStream(std::string url)
 
 void iecDrive::handleListenCommand( void )
 {
-	if (device_config.select(IEC.data.device))
+	if (device_config.select(this->data.device))
 	{
 		Debug_printv("!!!! device changed: unit:%d current url: [%s]", device_config.id(), device_config.url().c_str());
 		m_mfile.reset(MFSOwner::File(device_config.url()));
 		Debug_printv("m_mfile[%s]", m_mfile->url.c_str());
 	}
 
-	size_t channel = IEC.data.channel;
+	size_t channel = this->data.channel;
 	m_openState = O_NOTHING;
 
-	if (IEC.data.command.length() == 0 )
+	if (this->data.device_command.length() == 0 )
 	{
 		Debug_printv("No command to process");
 
-		if ( IEC.data.channel == CMD_CHANNEL )
+		if ( this->data.channel == CMD_CHANNEL )
 			m_openState = O_STATUS;
 		return;
 	}
 
 	// 1. obtain command and fullPath
-	auto commandAndPath = parseLine(IEC.data.command, channel);
+	auto commandAndPath = parseLine(this->data.device_command, channel);
 	auto referencedPath = Meat::New<MFile>(commandAndPath.fullPath);
 
 	Debug_printv("command[%s]", commandAndPath.command.c_str());
@@ -413,7 +413,7 @@ void iecDrive::handleListenCommand( void )
 	}
 
 	//dumpState();
-	IEC.data.command.clear();
+	this->data.init();
 
 } // handleListenCommand
 
@@ -464,33 +464,6 @@ void iecDrive::handleTalk(uint8_t chan)
 	m_openState = O_NOTHING;
 } // handleTalk
 
-
-void iecDrive::handleOpen( void )
-{
-	Debug_printv("OPEN Named Channel (%.2d Device) (%.2d Channel)", IEC.data.device, IEC.data.channel);
-	currentChannel = channelSelect();
-} // handleOpen
-
-
-void iecDrive::handleClose( void )
-{
-	Debug_printv("CLOSE Named Channel (%.2d Device) (%.2d Channel)", IEC.data.device, IEC.data.channel);
-
-	// If writing update BAM & Directory
-	if (currentChannel.writing) {
-
-	}
-
-	// Remove channel from map
-	channelClose();
-
-} // handleClose
-
-
-
-
-
-
 // send single basic line, including heading basic pointer and terminating zero.
 uint16_t iecDrive::sendLine(uint16_t &basicPtr, uint16_t blocks, const char *format, ...)
 {
@@ -506,9 +479,16 @@ uint16_t iecDrive::sendLine(uint16_t &basicPtr, uint16_t blocks, const char *for
 
 uint16_t iecDrive::sendLine(uint16_t &basicPtr, uint16_t blocks, char *text)
 {
-	uint16_t b_cnt = 0;
-
 	Debug_printf("%d %s ", blocks, text);
+
+	// Exit if ATN is PULLED while sending
+	if ( IEC.protocol.flags bitand ATN_PULLED )
+	{
+		// Save file pointer position
+		channelUpdate(basicPtr);
+		setDeviceStatus(74);
+		return 0;
+	}
 
 	// Get text length
 	uint8_t len = strlen(text);
@@ -526,16 +506,16 @@ uint16_t iecDrive::sendLine(uint16_t &basicPtr, uint16_t blocks, char *text)
 
 	// Send line contents
 	for (uint8_t i = 0; i < len; i++)
-		IEC.send(text[i]);
+	{
+		IEC.send(text[i]);		
+	}
 
 	// Finish line
 	IEC.send(0);
 
 	Debug_println("");
 
-	b_cnt += (len + 5);
-
-	return b_cnt;
+	return len + 5;
 } // sendLine
 
 // uint16_t iecDrive::sendHeader(uint16_t &basicPtr, const char *format, ...)
@@ -694,6 +674,15 @@ void iecDrive::sendListing()
 
 		if (entry->name[0]!='.' || m_show_hidden)
 		{
+			// Exit if ATN is PULLED while sending
+			if ( IEC.protocol.flags bitand ATN_PULLED )
+			{
+				// Save file pointer position
+				channelUpdate(byte_count);
+				setDeviceStatus(74);
+				return;
+			}
+
 			byte_count += sendLine(basicPtr, block_cnt, "%*s\"%s\"%*s %s", block_spc, "", name.c_str(), space_cnt, "", extension.c_str());
 		}
 

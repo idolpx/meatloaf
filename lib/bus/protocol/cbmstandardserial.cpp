@@ -182,7 +182,6 @@ int16_t  CBMStandardSerial::receiveByte ( uint8_t device )
     {
         // EOI Received
         delayMicroseconds ( TIMING_Tfr );
-        release ( PIN_IEC_DATA_OUT );
     }
     else
     {
@@ -342,7 +341,6 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
     {
         // EOI Received
         if ( !wait ( TIMING_Tfr ) ) return false;
-        release ( PIN_IEC_CLK_OUT );
     }
     else
     {
@@ -365,7 +363,8 @@ int16_t CBMStandardSerial::timeoutWait ( uint8_t pin, bool target_status, size_t
 
     // Sample ATN and set flag to indicate SELECT or DATA mode
     bool atn_status = status ( PIN_IEC_ATN );
-    flags or_eq atn_status;
+    if ( atn_status )
+        flags or_eq ATN_PULLED;
 
     // pull ( PIN_IEC_SRQ );
     while ( status ( pin ) != target_status )
@@ -384,7 +383,9 @@ int16_t CBMStandardSerial::timeoutWait ( uint8_t pin, bool target_status, size_t
         }
 
         bool atn_check = status ( PIN_IEC_ATN );
-        flags or_eq atn_check;
+        if ( atn_check )
+            flags or_eq ATN_PULLED;
+
         if ( atn_check != atn_status )
         {
             // release ( PIN_IEC_SRQ );
@@ -410,7 +411,8 @@ bool CBMStandardSerial::wait ( size_t wait )
 
     // Sample ATN and set flag to indicate SELECT or DATA mode
     bool atn_status = status ( PIN_IEC_ATN );
-    flags or_eq atn_status;
+    if ( atn_status )
+        flags or_eq ATN_PULLED;
 
     // pull ( PIN_IEC_SRQ );
     while ( elapsed < wait )
@@ -419,7 +421,9 @@ bool CBMStandardSerial::wait ( size_t wait )
         elapsed = current - start;
 
         bool atn_check = status ( PIN_IEC_ATN );
-        flags or_eq atn_check;
+        if ( atn_check )
+            flags or_eq ATN_PULLED;
+
         if ( atn_check != atn_status )
         {
             // release ( PIN_IEC_SRQ );

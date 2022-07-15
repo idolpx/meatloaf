@@ -48,9 +48,10 @@ bool initFailed = false;
 
 static void IRAM_ATTR on_attention_isr_handler(void* arg)
 {
-    // Go to listener mode
+    // Go to listener mode and get command
     IEC.protocol.release ( PIN_IEC_CLK_OUT );
     IEC.protocol.pull ( PIN_IEC_DATA_OUT );
+
     IEC.protocol.flags or_eq ATN_PULLED;
     IEC.bus_state = BUS_ACTIVE;
 
@@ -193,8 +194,8 @@ void fn_service_loop(void *param)
         IEC.debugTiming();
 #else
         IEC.service();
-        if ( IEC.bus_state < BUS_ACTIVE )
-            taskYIELD();
+        // if ( IEC.bus_state < BUS_ACTIVE )
+        //     taskYIELD();
 #endif
     }
 }

@@ -62,8 +62,7 @@ protected:
 	virtual void handleListenCommand( void ) override;
 	virtual void handleListenData(void) override;
 	virtual void handleTalk(uint8_t chan) override;
-	virtual void handleOpen( void ) override;
-	virtual void handleClose( void ) override;
+
 
 private:
 	void reset(void);

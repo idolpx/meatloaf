@@ -32,27 +32,27 @@ using namespace Protocol;
 
 typedef enum
 {
+    DEVICE_ERROR = -1,
     DEVICE_IDLE = 0,       // Ready and waiting
-    DEVICE_LISTEN,         // A command is recieved and data is coming to us
-    DEVICE_TALK,           // A command is recieved and we must talk now
-    DEVICE_ERROR
+    DEVICE_LISTEN = 1,     // A command is recieved and data is coming to us
+    DEVICE_TALK = 2,       // A command is recieved and we must talk now
 } device_state_t;
 
 class IECData
 {
     public:
-        uint8_t primary_control_code;
+        uint8_t primary;
         uint8_t device;
-        uint8_t secondary_control_code;
+        uint8_t secondary;
         uint8_t channel;
-        std::string command;
+        std::string device_command;
 
 		void init ( void ) {
-			primary_control_code = 0;
+			primary = 0;
 			device = 0;
-			secondary_control_code = 0;
+			secondary = 0;
 			channel = 0;
-			command = "";
+			device_command = "";
 		}
 };
 
@@ -90,7 +90,7 @@ class iecDevice
         ~iecDevice() {};
 
         device_state_t queue_command ( void );
-        device_state_t process ( void );
+        bool process ( void );
 
         virtual uint8_t command ( void ) = 0;
         virtual uint8_t execute ( void ) = 0;
@@ -107,8 +107,8 @@ class iecDevice
         virtual void handleListenCommand ( void ) = 0;
         virtual void handleListenData ( void ) = 0;
         virtual void handleTalk ( uint8_t chan ) = 0;
-        virtual void handleOpen ( void ) = 0;
-        virtual void handleClose ( void ) = 0;
+        virtual void handleOpen ( void );
+        virtual void handleClose ( void );
 
         // Named Channel functions
         Channel currentChannel;
@@ -128,10 +128,8 @@ typedef enum
     BUS_RESET = -2,   // The IEC bus is in a reset state (RESET line).    
     BUS_ERROR = -1,   // A problem occoured, reset communication
     BUS_IDLE = 0,     // Nothing recieved of our concern
-    BUS_ACTIVE = 1,   // ATN is pulled and another command byte is expected
-    BUS_COMMAND,      // A command is recieved
-    BUS_LISTEN,       // A command is recieved and data is coming to us
-    BUS_TALK,         // A command is recieved and we must talk now
+    BUS_ACTIVE = 1,   // ATN is pulled and a command byte is expected
+    BUS_PROCESS = 2,  // A command is ready to be processed
 } bus_state_t;
 
 // IEC commands:
@@ -178,6 +176,8 @@ class iecBus
         // the message is recieved and stored in iec_data.
         void service ( void );
 
+        void receiveCommand ( void );
+
         // void shutdown();
 
         // Checks if CBM is sending a reset (setting the RESET line high). This is typicall
@@ -214,9 +214,9 @@ class iecBus
 
     private:
         // IEC Bus Commands
-        device_state_t deviceListen ( void ); // 0x20 + device_id   Listen, device (0–30)
+        bus_state_t deviceListen ( void ); // 0x20 + device_id   Listen, device (0–30)
 		// void deviceUnListen(void);            // 0x3F               Unlisten, all devices
-        device_state_t deviceTalk ( void );   // 0x40 + device_id   Talk, device (0–30)
+        bus_state_t deviceTalk ( void );   // 0x40 + device_id   Talk, device (0–30)
 		// void deviceUnTalk(void);              // 0x5F               Untalk, all devices
 		// device_state_t deviceSecond(void);    // 0x60 + channel     Reopen, channel (0–15)
 		// device_state_t deviceClose(void);     // 0xE0 + channel     Close, channel (0–15)
