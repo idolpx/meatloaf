@@ -413,7 +413,7 @@ void iecDrive::handleListenCommand( void )
 		}
 	}
 
-	//dumpState();
+	dumpState();
 	this->data.init();
 
 } // handleListenCommand
@@ -1050,13 +1050,14 @@ void iecDrive::dumpState()
 	Debug_println("");
 	Debug_printv("-------------------------------");
 	Debug_printv("URL: [%s]", m_mfile->url.c_str());
-    Debug_printv("streamPath: [%s]", m_mfile->streamFile->url.c_str());
-    Debug_printv("pathInStream: [%s]", m_mfile->pathInStream.c_str());
+    //Debug_printv("streamPath: [%s]", m_mfile->streamFile->url.c_str());
+    //Debug_printv("pathInStream: [%s]", m_mfile->pathInStream.c_str());
 	Debug_printv("Scheme: [%s]", m_mfile->scheme.c_str());
 	Debug_printv("Username: [%s]", m_mfile->user.c_str());
 	Debug_printv("Password: [%s]", m_mfile->pass.c_str());
 	Debug_printv("Host: [%s]", m_mfile->host.c_str());
 	Debug_printv("Port: [%s]", m_mfile->port.c_str());
+	Debug_printv("Base: [%s]", m_mfile->base().c_str());
 	Debug_printv("Path: [%s]", m_mfile->path.c_str());
 	Debug_printv("File: [%s]", m_mfile->name.c_str());
 	Debug_printv("Extension: [%s]", m_mfile->extension.c_str());

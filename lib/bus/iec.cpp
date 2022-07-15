@@ -321,74 +321,71 @@ void iecBus::service ( void )
 
         Debug_printf ( "   IEC: [%.2X]", c );
 
-        // // Check for EOI
-        // if(protocol.flags bitand EOI_RECVD)
-        // {
-        //  Debug_printf("[EOI]");
-        // }
-
         // Check for JiffyDOS
         if ( protocol.flags bitand JIFFY_ACTIVE )
         {
             Debug_printf ( "[JIFFY]" );
         }
 
-
         // Decode command byte
         uint8_t command = c bitand 0xF0;
+        if ( c == IEC_UNLISTEN ) command = IEC_UNLISTEN;
+        if ( c == IEC_UNTALK ) command = IEC_UNTALK;
 
-        if ( command == IEC_GLOBAL )
-        {
-            this->data.primary = IEC_GLOBAL;
-            this->data.device = c xor IEC_GLOBAL;
-            this->bus_state = BUS_IDLE;
-            Debug_printf ( " (00 GLOBAL %.2d COMMAND)\r\n", this->data.device );
+        switch ( command ) {
+            case IEC_GLOBAL:
+                this->data.primary = IEC_GLOBAL;
+                this->data.device = c xor IEC_GLOBAL;
+                this->bus_state = BUS_IDLE;
+                Debug_printf ( " (00 GLOBAL %.2d COMMAND)\r\n", this->data.device );
+                break;
+
+            case IEC_LISTEN:
+                this->data.primary = IEC_LISTEN;
+                this->data.device = c xor IEC_LISTEN;
+                Debug_printf ( " (20 LISTEN %.2d DEVICE)\r\n", this->data.device );
+                break;
+
+            case IEC_UNLISTEN:
+                this->data.primary = IEC_UNLISTEN;
+                //this->bus_state = BUS_IDLE;
+                Debug_printf ( " (3F UNLISTEN)\r\n" );
+                break;
+
+            case IEC_TALK:
+                this->data.primary = IEC_TALK;
+                this->data.device = c xor IEC_TALK;
+                Debug_printf ( " (40 TALK   %.2d DEVICE)\r\n", this->data.device );
+                break;
+
+            case IEC_UNTALK:
+                this->data.primary = IEC_UNTALK;
+                //this->bus_state = BUS_IDLE;
+                Debug_printf ( " (5F UNTALK)\r\n" );
+                break;
+
+            case IEC_OPEN:
+                this->data.secondary = IEC_OPEN;
+                this->data.channel = c xor IEC_OPEN;
+                this->bus_state = BUS_PROCESS;
+                Debug_printf ( " (F0 OPEN   %.2d CHANNEL)\r\n", this->data.channel );
+                break;
+
+            case IEC_SECOND:
+                this->data.secondary = IEC_SECOND;
+                this->data.channel = c xor IEC_SECOND;
+                this->bus_state = BUS_PROCESS;
+                Debug_printf ( " (60 DATA   %.2d CHANNEL)\r\n", this->data.channel );
+                break;
+
+            case IEC_CLOSE:
+                this->data.secondary = IEC_CLOSE;
+                this->data.channel = c xor IEC_CLOSE;
+                this->bus_state = BUS_PROCESS;
+                Debug_printf ( " (E0 CLOSE  %.2d CHANNEL)\r\n", this->data.channel );
+                break; 
         }
-        else if ( command == IEC_LISTEN )
-        {
-            this->data.primary = IEC_LISTEN;
-            this->data.device = c xor IEC_LISTEN;
-            Debug_printf ( " (20 LISTEN %.2d DEVICE)\r\n", this->data.device );
-        }
-        else if ( c == IEC_UNLISTEN )
-        {
-            this->data.primary = IEC_UNLISTEN;
-            // this->bus_state = BUS_IDLE;
-            Debug_printf ( " (3F UNLISTEN)\r\n" );
-        }
-        else if ( command == IEC_TALK )
-        {
-            this->data.primary = IEC_TALK;
-            this->data.device = c xor IEC_TALK;
-            Debug_printf ( " (40 TALK   %.2d DEVICE)\r\n", this->data.device );
-        }
-        else if ( c == IEC_UNTALK )
-        {
-            this->data.primary = IEC_UNTALK;
-            // this->bus_state = BUS_IDLE;
-            Debug_printf ( " (5F UNTALK)\r\n" );
-        }
-        else if ( command == IEC_OPEN )
-        {
-            this->data.secondary = IEC_OPEN;
-            this->data.channel = c xor IEC_OPEN;
-            this->bus_state = BUS_PROCESS;
-            Debug_printf ( " (F0 OPEN   %.2d CHANNEL)\r\n", this->data.channel );
-        }
-        else if ( command == IEC_SECOND )
-        {
-            this->data.secondary = IEC_SECOND;
-            this->data.channel = c xor IEC_SECOND;
-            this->bus_state = BUS_PROCESS;
-            Debug_printf ( " (60 DATA   %.2d CHANNEL)\r\n", this->data.channel );
-        }
-        else if ( command == IEC_CLOSE )
-        {
-            this->data.secondary = IEC_CLOSE;
-            this->data.channel = c xor IEC_CLOSE;
-            this->bus_state = BUS_PROCESS;
-            Debug_printf ( " (E0 CLOSE  %.2d CHANNEL)\r\n", this->data.channel );
-        }
+
 
         // Is this command for us?
         if ( !isDeviceEnabled( this->data.device ) )
@@ -610,11 +607,11 @@ int16_t iecBus::receive ( uint8_t device )
     int16_t data;
 
     data = protocol.receiveByte ( device ); // Standard CBM Timing
+
 #ifdef DATA_STREAM
-    Debug_printf ( "%.2X ", data );
+    if ( !(protocol.flags bitand ERROR) )
+        Debug_printf ( "%.2X ", data );
 #endif
-    // if(data < 0)
-    //  protocol.flags = errorFlag;
 
     return data;
 } // receive
