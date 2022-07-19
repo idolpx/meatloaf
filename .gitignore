@@ -23,4 +23,4 @@ include/ssid.h
 /*.log
 **/.backup
 .travis.yml
-lib/bus/iec.cpp
+compile_commands.json

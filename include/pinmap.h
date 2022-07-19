@@ -3,8 +3,12 @@
 #define PINMAP_H
 
 /* SD Card */
+// pins 12-15 are used to interface with the JTAG debugger
+// so leave them alone if we're using JTAG
+#ifndef JTAG
 #define PIN_CARD_DETECT 12 // fnSystem.h
 #define PIN_CARD_DETECT_FIX 15 // fnSystem.h
+#endif
 #ifdef CONFIG_IDF_TARGET_ESP32S3
 #define PIN_SD_HOST_MISO 19
 #define PIN_SD_HOST_MOSI 23
@@ -23,11 +27,7 @@
 #define PIN_UART0_TX 1
 #define PIN_UART1_RX 9
 #define PIN_UART1_TX 10
-#ifdef THOMS_GHETTO_ASS_ADAM_BREADBOARD 
-#define PIN_UART2_RX 22
-#else
 #define PIN_UART2_RX 33
-#endif /* THOMS_GHETTO_ASS_BREADBOARD*/
 #define PIN_UART2_TX 21
 
 /* Buttons */

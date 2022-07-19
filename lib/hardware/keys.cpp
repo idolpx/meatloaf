@@ -24,13 +24,16 @@ void KeyManager::setup()
 #else
     fnSystem.set_pin_mode(PIN_BUTTON_A, gpio_mode_t::GPIO_MODE_INPUT, SystemManager::pull_updown_t::PULL_NONE);
     fnSystem.set_pin_mode(PIN_BUTTON_B, gpio_mode_t::GPIO_MODE_INPUT, SystemManager::pull_updown_t::PULL_NONE);
-#endif    // Enable safe reset on Button C if available
+    // Enable safe reset on Button C if available
+#ifndef JTAG
     if (fnSystem.get_hardware_ver() >= 2)
     {
         has_button_c = true;
         fnSystem.set_pin_mode(PIN_BUTTON_C, gpio_mode_t::GPIO_MODE_INPUT, SystemManager::pull_updown_t::PULL_NONE);
         Debug_println("Enabled Safe Reset Button C");
     }
+#endif
+#endif
 
     // Start a new task to check the status of the buttons
     #define KEYS_STACKSIZE 4096

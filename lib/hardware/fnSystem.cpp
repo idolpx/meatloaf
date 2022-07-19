@@ -30,6 +30,7 @@
 #endif
 
 
+#ifndef JTAG
 static xQueueHandle card_detect_evt_queue = NULL;
 static uint32_t card_detect_status = 1; // 1 is no sd card
 
@@ -69,6 +70,7 @@ static void card_detect_intr_task(void* arg)
         }
     }
 }
+#endif
 
 // Global object to manage System
 SystemManager fnSystem;
@@ -593,6 +595,9 @@ const char *SystemManager::get_hardware_ver_str()
 */
 void SystemManager::check_hardware_ver()
 {
+    _hardware_version = 9999;
+
+#ifndef JTAG    
     int upcheck, downcheck, fixupcheck, fixdowncheck;
 
     fnSystem.set_pin_mode(PIN_CARD_DETECT_FIX, gpio_mode_t::GPIO_MODE_INPUT, SystemManager::pull_updown_t::PULL_DOWN);
@@ -607,7 +612,6 @@ void SystemManager::check_hardware_ver()
     fnSystem.set_pin_mode(PIN_CARD_DETECT, gpio_mode_t::GPIO_MODE_INPUT, SystemManager::pull_updown_t::PULL_UP);
     upcheck = fnSystem.digital_read(12);
 
-    fnSystem.set_pin_mode(PIN_BUTTON_C, gpio_mode_t::GPIO_MODE_INPUT, SystemManager::pull_updown_t::PULL_DOWN);
 
     if(fixupcheck == fixdowncheck)
     {
@@ -649,6 +653,7 @@ void SystemManager::check_hardware_ver()
     }
 
     fnSystem.set_pin_mode(PIN_BUTTON_C, gpio_mode_t::GPIO_MODE_INPUT, SystemManager::pull_updown_t::PULL_NONE);
+#endif
 }
 
 // Dumps list of current tasks
