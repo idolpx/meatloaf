@@ -461,9 +461,6 @@ bus_state_t iecBus::deviceListen ( void )
     // OPEN
     else if ( this->data.secondary == IEC_SECOND || this->data.secondary == IEC_OPEN )
     {
-        if ( protocol.status ( PIN_IEC_ATN ) != PULLED )
-            Debug_printf ( " [ " );
-
         // Some other command. Record the cmd string until ATN is PULLED
         std::string listen_command;
 
@@ -477,7 +474,7 @@ bus_state_t iecBus::deviceListen ( void )
                 return BUS_ERROR;
             }
 
-            if ( c != 0x0D )
+            if ( c != 0x0D && c != 0xFFFFFFFF )
             {
                 listen_command += ( uint8_t ) c;
             }
@@ -490,7 +487,7 @@ bus_state_t iecBus::deviceListen ( void )
         {
             this->data.device_command = listen_command;
             mstr::rtrimA0 ( this->data.device_command );
-            Debug_printf ( "] {%s}\r\n", this->data.device_command.c_str() );
+            Debug_printf ( " {%s}\r\n", this->data.device_command.c_str() );
         }
         else
         {
