@@ -34,6 +34,9 @@ int16_t  CBMStandardSerial::receiveByte ( uint8_t device )
 {
     flags = CLEAR;
 
+    // Sometimes the C64 pulls ATN but doesn't pull CLOCK right away
+    if ( !wait ( 60 ) ) return -1;
+
     // Wait for talker ready
     if ( timeoutWait ( PIN_IEC_CLK_IN, RELEASED, FOREVER ) == TIMED_OUT )
     {
@@ -262,11 +265,11 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
         // ready to send last byte
         //if ( !wait ( TIMING_Try ) ) return false;
     }
-    else
-    {
-        // ready to send next byte
-        if ( !wait ( TIMING_Tne ) ) return false;
-    }
+    // else
+    // {
+    //     // ready to send next byte
+    //     if ( !wait ( TIMING_Tne ) ) return false;
+    // }
 
     // STEP 3: SENDING THE BITS
     // The talker has eight bits to send.  They will go out without handshake; in other words,
@@ -293,7 +296,7 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
 
     // tell listner to wait
     pull ( PIN_IEC_CLK_OUT );
-    if ( !wait ( TIMING_Tv ) ) return false;
+    if ( !wait ( TIMING_Ts ) ) return false;
 
     for ( uint8_t n = 0; n < 8; n++ )
     {
@@ -311,12 +314,12 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
         release ( PIN_IEC_CLK_OUT );
         if ( !wait ( TIMING_Tv ) ) return false;
 
-        // Release data line after bit sent
-        release ( PIN_IEC_DATA_OUT );
-
         // tell listner to wait
         pull ( PIN_IEC_CLK_OUT );
-        if ( !wait ( TIMING_Tv ) ) return false;
+        if ( !wait ( TIMING_Ts ) ) return false;
+
+        // // Release data line after bit sent
+        // release ( PIN_IEC_DATA_OUT );
     }
 
 
