@@ -23,7 +23,7 @@
     "onboard_tools": [
       "ftdi"
     ],
-    "openocd_board": "esp-wrover.cfg"
+    "openocd_board": "esp32-wrover-kit-3.3v.cfg"
   },
   "frameworks": [
     "arduino",
