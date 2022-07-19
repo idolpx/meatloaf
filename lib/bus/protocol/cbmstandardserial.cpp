@@ -263,7 +263,7 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
         }
 
         // ready to send last byte
-        //if ( !wait ( TIMING_Try ) ) return false;
+        if ( !wait ( TIMING_Try ) ) return false;
     }
     // else
     // {

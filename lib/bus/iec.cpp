@@ -298,7 +298,7 @@ void iecBus::service ( void )
 
 
     // Command or Data Mode
-    if ( this->bus_state == BUS_ACTIVE )
+    if ( this->bus_state == BUS_ACTIVE || protocol.status ( PIN_IEC_ATN ) )
     {
         // Debug_println ( "COMMAND MODE" );
 
