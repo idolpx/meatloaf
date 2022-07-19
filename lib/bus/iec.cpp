@@ -313,9 +313,9 @@ void iecBus::service ( void )
             Debug_printv ( "Error reading command" );
             //this->data.init();
             this->bus_state = BUS_ERROR;
-            IEC.protocol.pull ( PIN_IEC_SRQ );
+            // IEC.protocol.pull ( PIN_IEC_SRQ );
             releaseLines();
-            IEC.protocol.release ( PIN_IEC_SRQ );
+            // IEC.protocol.release ( PIN_IEC_SRQ );
             return;
         }
 
@@ -348,7 +348,7 @@ void iecBus::service ( void )
 
             case IEC_UNLISTEN:
                 this->data.primary = IEC_UNLISTEN;
-                //this->bus_state = BUS_IDLE;
+                this->bus_state = BUS_IDLE;
                 Debug_printf ( " (3F UNLISTEN)\r\n" );
                 break;
 
@@ -360,7 +360,7 @@ void iecBus::service ( void )
 
             case IEC_UNTALK:
                 this->data.primary = IEC_UNTALK;
-                //this->bus_state = BUS_IDLE;
+                this->bus_state = BUS_IDLE;
                 Debug_printf ( " (5F UNTALK)\r\n" );
                 break;
 
@@ -398,14 +398,14 @@ void iecBus::service ( void )
             // At the moment there is only the multi-drive device
             this->device_state = drive.queue_command();
         }
-        // else if ( this->bus_state < BUS_ACTIVE )
-        // {
-        //     IEC.protocol.pull ( PIN_IEC_SRQ );
-        //     releaseLines();
-        //     IEC.protocol.release ( PIN_IEC_SRQ );
-        // }
+        else if ( this->bus_state < BUS_ACTIVE )
+        {
+            IEC.protocol.pull ( PIN_IEC_SRQ );
+            releaseLines();
+            IEC.protocol.release ( PIN_IEC_SRQ );
+        }
 
-        Debug_printv ( "command [%.2X] bus[%d] device[%d] primary[%d] secondary[%d]", command, this->bus_state, this->device_state, this->data.primary, this->data.secondary );
+        // Debug_printv ( "command [%.2X] bus[%d] device[%d] primary[%d] secondary[%d]", command, this->bus_state, this->device_state, this->data.primary, this->data.secondary );
         // Debug_printv( "primary[%.2X] secondary[%.2X] bus_state[%d]", this->data.primary, this->data.secondary, this->bus_state );
         //IEC.protocol.release ( PIN_IEC_SRQ );
     }
@@ -433,9 +433,10 @@ void iecBus::service ( void )
             // Debug_printv( "deviceProcess" );
             // Process command on devices
             drive.process();
+            this->bus_state = BUS_IDLE;
         }
         
-        Debug_printv( "primary[%.2X] secondary[%.2X] bus_state[%d]", this->data.primary, this->data.secondary, this->bus_state );
+        // Debug_printv( "primary[%.2X] secondary[%.2X] bus_state[%d]", this->data.primary, this->data.secondary, this->bus_state );
         // Debug_printv( "atn[%d] clk[%d] data[%d] srq[%d]", IEC.protocol.status(PIN_IEC_ATN), IEC.protocol.status(PIN_IEC_CLK_IN), IEC.protocol.status(PIN_IEC_DATA_IN), IEC.protocol.status(PIN_IEC_SRQ));
     }
 
@@ -583,6 +584,7 @@ void iecBus::releaseLines ( void )
     protocol.release ( PIN_IEC_CLK_OUT );
     protocol.release ( PIN_IEC_DATA_OUT );
 
+    fnSystem.delay_microseconds( 20 );
     // Wait for ATN to release and quit
     // if ( wait )
     // {
