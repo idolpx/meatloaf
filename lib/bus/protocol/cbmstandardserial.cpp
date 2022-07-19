@@ -295,16 +295,18 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
 #endif
 
     // tell listner to wait
+    // we control both CLOCK & DATA now
     pull ( PIN_IEC_CLK_OUT );
+    pull ( PIN_IEC_DATA_OUT );
     if ( !wait ( TIMING_Ts ) ) return false;
 
     for ( uint8_t n = 0; n < 8; n++ )
     {
-        // // If data pin is PULLED, exit and cleanup
-        // if ( status ( PIN_IEC_DATA_IN ) == PULLED )
-        // {
-        //     return false;
-        // }
+    
+    #ifdef SPLIT_LINES
+        // If data pin is PULLED, exit and cleanup
+        if ( status ( PIN_IEC_DATA_IN ) == PULLED ) return false;
+    #endif
 
         // set bit
         ( data bitand 1 ) ? release ( PIN_IEC_DATA_OUT ) : pull ( PIN_IEC_DATA_OUT );
@@ -349,11 +351,6 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
         if ( !wait ( TIMING_Tfr ) ) return false;
         release ( PIN_IEC_CLK_OUT );
         release ( PIN_IEC_SRQ );
-    }
-    else
-    {
-        // BETWEEN BYTES TIME
-        delayMicroseconds ( TIMING_Tbb );        
     }
 
     return true;
