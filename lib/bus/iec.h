@@ -170,7 +170,9 @@ class iecBus
 
         // Initialise iec driver
         bool init();
-        // void setup();
+        void setup();
+        void shutdown();
+        
 
         // Checks if CBM is sending an attention message. If this is the case,
         // the message is recieved and stored in iec_data.
@@ -178,7 +180,6 @@ class iecBus
 
         void receiveCommand ( void );
 
-        // void shutdown();
 
         // Checks if CBM is sending a reset (setting the RESET line high). This is typicall
         // when the CBM is reset itself. In this case, we are supposed to reset all states to initial.

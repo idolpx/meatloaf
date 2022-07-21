@@ -2,10 +2,14 @@
 
 #include <string>
 
+#include <dirent.h>
+#include <sys/stat.h>
 #include <ArduinoJson.h>
 
 #include "../include/global_defines.h"
 #include "../include/debug.h"
+
+#include "fnFsSd.h"
 
 #include "ml_tests.h"
 #include "meat_io.h"
@@ -93,6 +97,23 @@ void testDirectory(MFile* dir, bool verbose=false) {
         else
             Debug_printf("'%s'\n", entry->url.c_str());
         entry.reset(dir->getNextFileInDir());
+    }
+}
+
+void testDirectoryStandard(std::string path) {
+    DIR *dir;
+    struct dirent *ent;
+    struct stat st;
+    if ((dir = opendir ( path.c_str() )) != NULL) {
+        /* print all the files and directories within directory */
+        while ((ent = readdir (dir)) != NULL) {
+            stat(ent->d_name, &st);
+            Debug_printf ("%d %s %s\n", st.st_size, ent->d_name, S_ISREG(st.st_mode));
+        }
+        closedir (dir);
+    } else {
+        /* could not open directory */
+        Debug_println ("error");
     }
 }
 
@@ -494,10 +515,15 @@ void runTestsSuite() {
     // testBasicConfig();
 
     Debug_printv("Flash File System");
-    testDirectory(MFSOwner::File("/"), true);
+    //testDirectory(MFSOwner::File("/"), true);
+    testDirectoryStandard("/");
 
     Debug_printv("SD Card File System");
-    testDirectory(MFSOwner::File("/sd/"), true);
+    //std::string basepath = fnSDFAT.basepath();
+    //basepath += std::string("/");
+    //Debug_printv("basepath[%s]", basepath.c_str());
+    //testDirectory(MFSOwner::File( basepath ), true);
+    testDirectoryStandard( "/sd/" );
 
 
     // DeviceDB m_device(0);

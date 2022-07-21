@@ -22,91 +22,6 @@
 
 #define _filesystem fnSDFAT
 
-/********************************************************
- * MFile
- ********************************************************/
-
-class SDFile: public FlashFile
-{
-friend class SDOStream;
-friend class SDIStream;
-
-public:
-    SDFile(std::string path) : FlashFile(path) {
-        this->parseUrl(path);
-    };
-    ~SDFile() { }
-
-    bool isDirectory() override;
-    MIStream* inputStream() override ; // has to return OPENED stream
-    MOStream* outputStream() override ; // has to return OPENED stream
-    time_t getLastWrite() override ;
-    time_t getCreationTime() override ;
-    bool rewindDirectory() override ;
-    MFile* getNextFileInDir() override ;
-    bool mkDir() override ;
-    bool exists() override ;
-    size_t size() override ;
-    bool remove() override ;
-    bool rename(std::string dest);
-
-private:
-    void openDir(std::string path) override;
-    void closeDir() override;
-};
-
-
-/********************************************************
- * SDHandle
- ********************************************************/
-
-class SDHandle : public FlashHandle 
-{
-public:
-
-    SDHandle()
-    {
-        //Serial.println("*** Creating flash handle");
-        memset(&file_h, 0, sizeof(file_h));
-
-        dispose();
-    };
-    ~SDHandle() { };
-
-};
-
-/********************************************************
- * MStreams O
- ********************************************************/
-
-class SDOStream: public FlashOStream {
-public:
-    // MStream methods
-    SDOStream(std::string& path) : FlashOStream(path) {
-        localPath = path;
-        handle = std::make_unique<SDHandle>();
-    }
-
-protected:
-    std::unique_ptr<SDHandle> handle;    
-};
-
-
-/********************************************************
- * MStreams I
- ********************************************************/
-
-class SDIStream: public FlashIStream {
-public:
-    SDIStream(std::string& path) : FlashIStream(path) {
-        localPath = path;
-        handle = std::make_unique<SDHandle>();
-    }
-
-protected:
-    std::unique_ptr<SDHandle> handle;
-};
-
 
 /********************************************************
  * MFileSystem
@@ -120,9 +35,12 @@ private:
 
         url.parseUrl(path);
 
-        device_config.basepath( std::string("/sd/") );
+        std::string basepath = fnSDFAT.basepath();
+        basepath += std::string("/");
+        device_config.url("/");
+        device_config.basepath( basepath );
 
-        return new FlashFile(url.path);
+        return new FlashFile( url.path );
     }
 
     bool handles(std::string name) {

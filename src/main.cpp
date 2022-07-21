@@ -23,7 +23,6 @@
 #include "fnFsSD.h"
 
 
-
 /**************************/
 // Meatloaf
 
@@ -46,28 +45,6 @@ bool initFailed = false;
 
 // sioFuji theFuji; // moved to fuji.h/.cpp
 
-static void IRAM_ATTR on_attention_isr_handler(void* arg)
-{
-    // Go to listener mode and get command
-    IEC.protocol.release ( PIN_IEC_CLK_OUT );
-    IEC.protocol.pull ( PIN_IEC_DATA_OUT );
-
-    IEC.protocol.flags or_eq ATN_PULLED;
-    IEC.bus_state = BUS_ACTIVE;
-
-    fnLedManager.toggle(eLed::LED_BUS);
-}
-
-// static void IRAM_ATTR on_clock_isr_handler(void* arg)
-// {
-//     fnLedManager.toggle(eLed::LED_WIFI);
-//     Debug_printv("CLK PULLED\n");
-// }
-// static void IRAM_ATTR on_data_isr_handler(void* arg)
-// {
-//     fnLedManager.toggle(eLed::LED_BT);
-//     Debug_printv("DATA PULLED\n");
-// }
 
 void main_shutdown_handler()
 {
@@ -154,17 +131,7 @@ void main_setup()
     }
     Serial.println( ANSI_RESET "]");
 
-    // Setup interrupt for ATN
-    gpio_config_t io_conf = {
-        .pin_bit_mask = ( 1ULL << PIN_IEC_ATN ),    // bit mask of the pins that you want to set
-        .mode = GPIO_MODE_INPUT,                    // set as input mode
-        .pull_up_en = GPIO_PULLUP_DISABLE,          // disable pull-up mode
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,      // disable pull-down mode
-        .intr_type = GPIO_INTR_NEGEDGE              // interrupt of falling edge
-    };
-    //configure GPIO with the given settings
-    gpio_config(&io_conf);
-    gpio_isr_handler_add((gpio_num_t)PIN_IEC_ATN, on_attention_isr_handler, (void *)PIN_IEC_ATN);
+    IEC.setup();
     Serial.println( ANSI_GREEN_BOLD "IEC Bus Initialized" ANSI_RESET );
 
 

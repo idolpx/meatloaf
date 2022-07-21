@@ -21,15 +21,29 @@
 #include "../../include/pinmap.h"
 #include "../../include/cbmdefines.h"
 
-#include "drive.h"
+#include "disk.h"
 
 #include "string_utils.h"
 
 iecBus IEC;
-//iecDrive drive;
 
 using namespace CBM;
 using namespace Protocol;
+
+
+static void IRAM_ATTR cbm_on_attention_isr_handler(void* arg)
+{
+    iecBus *b = (iecBus *)arg;
+
+    // Go to listener mode and get command
+    b->protocol.release ( PIN_IEC_CLK_OUT );
+    b->protocol.pull ( PIN_IEC_DATA_OUT );
+
+    b->protocol.flags or_eq ATN_PULLED;
+    b->bus_state = BUS_ACTIVE;
+}
+
+
 
 /********************************************************
  *
@@ -395,8 +409,8 @@ void iecBus::service ( void )
         if ( this->bus_state == BUS_ACTIVE )
         {
             // Queue control codes and command in specified device
-            // At the moment there is only the multi-drive device
-            this->device_state = drive.queue_command();
+            // At the moment there is only the multi-disk device
+            this->device_state = disk.queue_command();
         }
         else if ( this->bus_state < BUS_ACTIVE )
         {
@@ -427,12 +441,12 @@ void iecBus::service ( void )
         }
 
         // If bus is not idle process commands in devices
-        // At the moment there is only the multi-drive device
+        // At the moment there is only the multi-disk device
         if ( this->bus_state == BUS_PROCESS )
         {
             // Debug_printv( "deviceProcess" );
             // Process command on devices
-            drive.process();
+            disk.process();
             this->bus_state = BUS_IDLE;
         }
         
@@ -686,6 +700,34 @@ void iecBus::disableDevice ( const uint8_t deviceNumber )
     enabledDevices &= ~ ( 1UL << deviceNumber );
 } // disableDevice
 
+
+
+void iecBus::setup()
+{
+    Debug_println("IEC SETUP");
+
+    // Setup interrupt for ATN
+    gpio_config_t io_conf = {
+        .pin_bit_mask = ( 1ULL << PIN_IEC_ATN ),    // bit mask of the pins that you want to set
+        .mode = GPIO_MODE_INPUT,                    // set as input mode
+        .pull_up_en = GPIO_PULLUP_DISABLE,          // disable pull-up mode
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,      // disable pull-down mode
+        .intr_type = GPIO_INTR_NEGEDGE              // interrupt of falling edge
+    };
+    //configure GPIO with the given settings
+    gpio_config(&io_conf);
+    gpio_isr_handler_add((gpio_num_t)PIN_IEC_ATN, cbm_on_attention_isr_handler, this);
+}
+
+void iecBus::shutdown()
+{
+    // for (auto devicep : _daisyChain)
+    // {
+    //     Debug_printf("Shutting down device %02x\n", devicep.second->id());
+    //     devicep.second->shutdown();
+    // }
+    // Debug_printf("All devices shut down.\n");
+}
 
 // Add device to SIO bus
 void iecBus::addDevice ( iecDevice *pDevice, uint8_t device_id )

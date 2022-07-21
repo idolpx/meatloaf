@@ -18,7 +18,7 @@
 //#include "../../include/global_defines.h"
 //#include "debug.h"
 
-#include "drive.h"
+#include "disk.h"
 
 #include "iec.h"
 #include "device_db.h"
@@ -27,19 +27,19 @@
 
 #include "wrappers/iec_buffer.h"
 
-iecDrive drive;
+iecDisk disk;
 
 using namespace CBM;
 using namespace Protocol;
 
 
-iecDrive::iecDrive()
+iecDisk::iecDisk()
 {
 	reset();
 } // ctor
 
 
-void iecDrive::reset(void)
+void iecDisk::reset(void)
 {
 	m_openState = O_NOTHING;
 	setDeviceStatus(73);
@@ -47,13 +47,13 @@ void iecDrive::reset(void)
 } // reset
 
 
-void iecDrive::sendFileNotFound(void)
+void iecDisk::sendFileNotFound(void)
 {
 	setDeviceStatus(62);
  	IEC.sendFNF();
 }
 
-void iecDrive::sendStatus(void)
+void iecDisk::sendStatus(void)
 {
 	std::string status = m_device_status;
 	if (status.size() == 0)
@@ -71,7 +71,7 @@ void iecDrive::sendStatus(void)
 	m_device_status.clear();
 } // sendStatus
 
-void iecDrive::setDeviceStatus(int number, int track, int sector)
+void iecDisk::setDeviceStatus(int number, int track, int sector)
 {
 	switch(number)
 	{
@@ -165,7 +165,7 @@ void iecDrive::setDeviceStatus(int number, int track, int sector)
 
 
 
-MFile* iecDrive::getPointed(MFile* urlFile) {
+MFile* iecDisk::getPointed(MFile* urlFile) {
 	Debug_printv("getPointed [%s]", urlFile->url.c_str());
 	auto istream = Meat::ifstream(urlFile);
 
@@ -184,7 +184,7 @@ MFile* iecDrive::getPointed(MFile* urlFile) {
 	}
 };
 
-CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
+CommandPathTuple iecDisk::parseLine(std::string command, size_t channel)
 {
 
 	//Debug_printv("* PARSE INCOMING LINE *******************************");
@@ -302,7 +302,7 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 	return tuple;
 }
 
-void iecDrive::changeDir(std::string url)
+void iecDisk::changeDir(std::string url)
 {
 	device_config.url(url);
 	m_mfile.reset(MFSOwner::File(url));
@@ -315,7 +315,7 @@ void iecDrive::changeDir(std::string url)
 	}
 }
 
-void iecDrive::prepareFileStream(std::string url)
+void iecDisk::prepareFileStream(std::string url)
 {
 	device_config.url(url);
 	m_filename = url;
@@ -325,7 +325,7 @@ void iecDrive::prepareFileStream(std::string url)
 
 
 
-void iecDrive::handleListenCommand( void )
+void iecDisk::handleListenCommand( void )
 {
 	if (device_config.select(this->data.device))
 	{
@@ -419,7 +419,7 @@ void iecDrive::handleListenCommand( void )
 } // handleListenCommand
 
 
-void iecDrive::handleListenData()
+void iecDisk::handleListenData()
 {
 	Debug_printv("[%s]", device_config.url().c_str());
 
@@ -427,7 +427,7 @@ void iecDrive::handleListenData()
 } // handleListenData
 
 
-void iecDrive::handleTalk(uint8_t chan)
+void iecDisk::handleTalk(uint8_t chan)
 {
 	//Debug_printv("channel[%d] openState[%d]", chan, m_openState);
 
@@ -466,7 +466,7 @@ void iecDrive::handleTalk(uint8_t chan)
 } // handleTalk
 
 // send single basic line, including heading basic pointer and terminating zero.
-uint16_t iecDrive::sendLine(uint16_t &basicPtr, uint16_t blocks, const char *format, ...)
+uint16_t iecDisk::sendLine(uint16_t &basicPtr, uint16_t blocks, const char *format, ...)
 {
 	// Format our string
 	va_list args;
@@ -478,7 +478,7 @@ uint16_t iecDrive::sendLine(uint16_t &basicPtr, uint16_t blocks, const char *for
 	return sendLine(basicPtr, blocks, text);
 }
 
-uint16_t iecDrive::sendLine(uint16_t &basicPtr, uint16_t blocks, char *text)
+uint16_t iecDisk::sendLine(uint16_t &basicPtr, uint16_t blocks, char *text)
 {
 	Debug_printf("%d %s ", blocks, text);
 
@@ -519,7 +519,7 @@ uint16_t iecDrive::sendLine(uint16_t &basicPtr, uint16_t blocks, char *text)
 	return len + 5;
 } // sendLine
 
-// uint16_t iecDrive::sendHeader(uint16_t &basicPtr, const char *format, ...)
+// uint16_t iecDisk::sendHeader(uint16_t &basicPtr, const char *format, ...)
 // {
 // 	Debug_printv("formatting header");
 
@@ -535,7 +535,7 @@ uint16_t iecDrive::sendLine(uint16_t &basicPtr, uint16_t blocks, char *text)
 // 	return sendHeader(basicPtr, std::string(text));
 // }
 
-uint16_t iecDrive::sendHeader(uint16_t &basicPtr, std::string header, std::string id)
+uint16_t iecDisk::sendHeader(uint16_t &basicPtr, std::string header, std::string id)
 {
 	uint16_t byte_count = 0;
 	bool sent_info = false;
@@ -597,7 +597,7 @@ uint16_t iecDrive::sendHeader(uint16_t &basicPtr, std::string header, std::strin
 	return byte_count;
 }
 
-void iecDrive::sendListing()
+void iecDisk::sendListing()
 {
 	Debug_printf("sendListing: [%s]\r\n=================================\r\n", m_mfile->url.c_str());
 
@@ -705,7 +705,7 @@ void iecDrive::sendListing()
 } // sendListing
 
 
-uint16_t iecDrive::sendFooter(uint16_t &basicPtr, uint16_t blocks_free, uint16_t block_size)
+uint16_t iecDisk::sendFooter(uint16_t &basicPtr, uint16_t blocks_free, uint16_t block_size)
 {
 	// Send List FOOTER
 	// #if defined(USE_LITTLEFS)
@@ -734,7 +734,7 @@ uint16_t iecDrive::sendFooter(uint16_t &basicPtr, uint16_t blocks_free, uint16_t
 }
 
 
-void iecDrive::sendFile()
+void iecDisk::sendFile()
 {
 	size_t i = 0;
 	bool success = true;
@@ -928,7 +928,7 @@ void iecDrive::sendFile()
 } // sendFile
 
 
-void iecDrive::saveFile()
+void iecDisk::saveFile()
 {
 	uint16_t i = 0;
 	bool done = false;
@@ -1045,13 +1045,24 @@ void iecDrive::saveFile()
 } // saveFile
 
 
-void iecDrive::dumpState()
+void iecDisk::dumpState()
 {
 	Debug_println("");
-	Debug_printv("-------------------------------");
+	Debug_printv("device_config -----------------");
+	Debug_printv("Device ID: [%d]", device_config.id());
+	Debug_printv("Media ID: [%d]", device_config.media());
+	Debug_printv("Partition ID: [%d]", device_config.partition());
+	Debug_printv("URL: [%s]", device_config.url().c_str());
+	Debug_printv("Base Path: [%s]", device_config.basepath().c_str());
+	Debug_printv("Path: [%s]", device_config.path().c_str());
+	Debug_printv("Archive: [%s]", device_config.archive().c_str());
+	Debug_printv("Image: [%s]", device_config.image().c_str());
+    Debug_printv("-------------------------------");
+	Debug_println("");
+	Debug_printv("m_mfile ------------------------");
 	Debug_printv("URL: [%s]", m_mfile->url.c_str());
-    //Debug_printv("streamPath: [%s]", m_mfile->streamFile->url.c_str());
-    //Debug_printv("pathInStream: [%s]", m_mfile->pathInStream.c_str());
+    Debug_printv("streamPath: [%s]", m_mfile->streamFile->url.c_str());
+    Debug_printv("pathInStream: [%s]", m_mfile->pathInStream.c_str());
 	Debug_printv("Scheme: [%s]", m_mfile->scheme.c_str());
 	Debug_printv("Username: [%s]", m_mfile->user.c_str());
 	Debug_printv("Password: [%s]", m_mfile->pass.c_str());

@@ -43,7 +43,7 @@
 #ifndef JTAG 
 #define PIN_LED_BT 13
 #else
-#define PIN_LED_BT 4
+#define PIN_LED_BT 5 // LOLIN D32 PRO
 #endif
 
 /* Audio Output */

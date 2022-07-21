@@ -127,6 +127,7 @@ int16_t  CBMStandardSerial::receiveByte ( uint8_t device )
 
     uint8_t n = 0;
 
+    // pull ( PIN_IEC_SRQ );
     for ( n = 0; n < 8; n++ )
     {
         data >>= 1;
@@ -151,6 +152,7 @@ int16_t  CBMStandardSerial::receiveByte ( uint8_t device )
             return -1; // return error because timeout
         }
     }
+    // release ( PIN_IEC_SRQ );
 
     /* If there is a delay before the last bit, the controller uses JiffyDOS */
     if ( flags bitand ATN_PULLED && bit_time >= 218 && n == 7 )

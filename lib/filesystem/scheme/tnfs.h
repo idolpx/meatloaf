@@ -22,91 +22,6 @@
 
 #define _filesystem fnTNFS
 
-/********************************************************
- * MFile
- ********************************************************/
-
-class TNFSFile: public FlashFile
-{
-friend class TNFSOStream;
-friend class TNFSIStream;
-
-public:
-    TNFSFile(std::string path) : FlashFile(path) {
-        this->parseUrl(path);
-    };
-    ~TNFSFile() { }
-
-    bool isDirectory() override;
-    MIStream* inputStream() override ; // has to return OPENED stream
-    MOStream* outputStream() override ; // has to return OPENED stream
-    time_t getLastWrite() override ;
-    time_t getCreationTime() override ;
-    bool rewindDirectory() override ;
-    MFile* getNextFileInDir() override ;
-    bool mkDir() override ;
-    bool exists() override ;
-    size_t size() override ;
-    bool remove() override ;
-    bool rename(std::string dest);
-
-private:
-    void openDir(std::string path) override;
-    void closeDir() override;
-};
-
-
-/********************************************************
- * TNFSHandle
- ********************************************************/
-
-class TNFSHandle : public FlashHandle 
-{
-public:
-
-    TNFSHandle()
-    {
-        //Serial.println("*** Creating flash handle");
-        memset(&file_h, 0, sizeof(file_h));
-
-        dispose();
-    };
-    ~TNFSHandle() { };
-
-};
-
-/********************************************************
- * MStreams O
- ********************************************************/
-
-class TNFSOStream: public FlashOStream {
-public:
-    // MStream methods
-    TNFSOStream(std::string& path) : FlashOStream(path) {
-        localPath = path;
-        handle = std::make_unique<TNFSHandle>();
-    }
-
-protected:
-    std::unique_ptr<TNFSHandle> handle;    
-};
-
-
-/********************************************************
- * MStreams I
- ********************************************************/
-
-class TNFSIStream: public FlashIStream {
-public:
-    TNFSIStream(std::string& path) : FlashIStream(path) {
-        localPath = path;
-        handle = std::make_unique<TNFSHandle>();
-    }
-
-protected:
-    std::unique_ptr<TNFSHandle> handle;
-};
-
 
 /********************************************************
  * MFileSystem
@@ -123,11 +38,12 @@ private:
         if (!fnTNFS.running())
             fnTNFS.start(url.host.c_str(), TNFS_DEFAULT_PORT, url.path.c_str() , url.user.c_str(), url.pass.c_str());
 
-        // std::string basepath = fnTNFS.basepath();
-        // // basepath += std::string("/");
-        // device_config.basepath( basepath );
+        std::string basepath = fnTNFS.basepath();
+        basepath += std::string("/");
+        device_config.url("/");
+        device_config.basepath( basepath );
 
-        return new TNFSFile(path);
+        return new FlashFile( basepath );
     }
 
     bool handles(std::string name) {
