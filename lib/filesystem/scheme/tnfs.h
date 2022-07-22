@@ -43,7 +43,7 @@ private:
         device_config.url("/");
         device_config.basepath( basepath );
 
-        return new FlashFile( basepath );
+        return new FlashFile( url.path );
     }
 
     bool handles(std::string name) {

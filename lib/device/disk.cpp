@@ -23,6 +23,8 @@
 #include "iec.h"
 #include "device_db.h"
 
+#include "fnFsSD.h"
+
 #include "led.h"
 
 #include "wrappers/iec_buffer.h"
@@ -318,6 +320,7 @@ void iecDisk::changeDir(std::string url)
 void iecDisk::prepareFileStream(std::string url)
 {
 	device_config.url(url);
+	Debug_printv("url[%s]", url.c_str());
 	m_filename = url;
 	m_openState = O_FILE;
 	Debug_printv("LOAD [%s]", url.c_str());
@@ -483,7 +486,8 @@ uint16_t iecDisk::sendLine(uint16_t &basicPtr, uint16_t blocks, char *text)
 	Debug_printf("%d %s ", blocks, text);
 
 	// Exit if ATN is PULLED while sending
-	if ( IEC.protocol.flags bitand ATN_PULLED )
+	// Exit if there is an error while sending
+	if ( IEC.protocol.flags bitand ( ATN_PULLED & ERROR ) )
 	{
 		// Save file pointer position
 		channelUpdate(basicPtr);
@@ -508,7 +512,9 @@ uint16_t iecDisk::sendLine(uint16_t &basicPtr, uint16_t blocks, char *text)
 	// Send line contents
 	for (uint8_t i = 0; i < len; i++)
 	{
-		IEC.send(text[i]);		
+		IEC.send(text[i]);
+		if ( IEC.protocol.flags bitand ERROR )
+			return 0;
 	}
 
 	// Finish line
@@ -547,9 +553,9 @@ uint16_t iecDisk::sendHeader(uint16_t &basicPtr, std::string header, std::string
 	p.parseUrl(url);
 
 	url = p.root();
-	std::string path = p.pathToFile();
-	std::string archive = "";
-	std::string image = p.name;
+	std::string path = device_config.path();
+	std::string archive = device_config.archive();
+	std::string image = device_config.image();
 
 
 
@@ -592,6 +598,10 @@ uint16_t iecDisk::sendHeader(uint16_t &basicPtr, std::string header, std::string
 	if (sent_info)
 	{
 		byte_count += sendLine(basicPtr, 0, "%*s\"-------------------\" NFO", 0, "");
+	}
+	if (fnSDFAT.running() && path.size() < 2)
+	{
+		byte_count += sendLine(basicPtr, 0, "%*s   \"SD:\"              DIR", 0, "");
 	}
 
 	return byte_count;
@@ -676,7 +686,8 @@ void iecDisk::sendListing()
 		if (entry->name[0]!='.' || m_show_hidden)
 		{
 			// Exit if ATN is PULLED while sending
-			if ( IEC.protocol.flags bitand ATN_PULLED )
+			// Exit if there is an error while sending
+			if ( IEC.protocol.flags bitand ( ATN_PULLED & ERROR ) )
 			{
 				// Save file pointer position
 				channelUpdate(byte_count);
