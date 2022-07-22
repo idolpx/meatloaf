@@ -53,7 +53,7 @@ bool FlashFile::isDirectory()
 
     struct stat info;
     stat( std::string(basepath + path).c_str(), &info);
-    return (info.st_mode == S_IFDIR) ? true: false;
+    return S_ISDIR(info.st_mode);
 }
 
 MIStream* FlashFile::createIStream(std::shared_ptr<MIStream> is) {
