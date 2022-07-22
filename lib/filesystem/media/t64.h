@@ -69,6 +69,9 @@ public:
 
     T64File(std::string path, bool is_dir = true): MFile(path) {
         isDir = is_dir;
+
+        media_image = name;
+        mstr::toASCII(media_image);
     };
     
     ~T64File() {

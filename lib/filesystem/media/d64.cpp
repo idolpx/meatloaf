@@ -71,7 +71,7 @@ bool D64IStream::seekEntry( std::string filename )
                 filename == entryFilename;
             }
 
-            if ( mstr::startsWith(entryFilename, filename.c_str()) )
+            if ( mstr::compare(filename, entryFilename) )
             {
                 // Move stream pointer to start track/sector
                 return true;
@@ -324,6 +324,7 @@ bool D64File::rewindDirectory() {
     media_blocks_free = image->blocksFree();
     media_block_size = image->block_size;
     media_image = name;
+    mstr::toASCII(media_image);
 
     return true;
 }

@@ -15,6 +15,7 @@ namespace mstr {
     bool equals(std::string &s1, std::string &s2, bool case_sensitive = true);
     bool equals(std::string &s1, char* s2, bool case_sensitive = true);
     bool contains(std::string &s1, char *s2, bool case_sensitive = true);
+    bool compare(std::string &s1, std::string &s2, bool case_sensitive = true); // s1 is Wildcard string, s2 is potential match
     std::vector<std::string> split(std::string toSplit, char ch, int limit = 9999);
     void toLower(std::string &s);
     void toUpper(std::string &s);

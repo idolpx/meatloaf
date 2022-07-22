@@ -197,7 +197,7 @@ CommandPathTuple iecDisk::parseLine(std::string command, size_t channel)
 	if (mstr::startsWith(command, "*"))
 	{
 		// Find first program in listing
-		if (device_config.path().empty())
+		if (m_mfile->url.empty())
 		{
 			// If in LittleFS root then set it to FB64
 			// TODO: Load configured autoload program
@@ -308,6 +308,11 @@ void iecDisk::changeDir(std::string url)
 {
 	device_config.url(url);
 	m_mfile.reset(MFSOwner::File(url));
+
+	device_config.archive(m_mfile->media_archive);
+	device_config.image(m_mfile->media_image);
+	device_config.path(m_mfile->pathInStream);
+
 	if ( this->data.channel == 0 )
 	{
 		m_openState = O_DIR;
@@ -557,8 +562,6 @@ uint16_t iecDisk::sendHeader(uint16_t &basicPtr, std::string header, std::string
 	std::string archive = device_config.archive();
 	std::string image = device_config.image();
 
-
-
 	// Send List HEADER
 	uint8_t space_cnt = 0;
 	space_cnt = (16 - header.size()) / 2;
@@ -599,9 +602,10 @@ uint16_t iecDisk::sendHeader(uint16_t &basicPtr, std::string header, std::string
 	{
 		byte_count += sendLine(basicPtr, 0, "%*s\"-------------------\" NFO", 0, "");
 	}
-	if (fnSDFAT.running() && path.size() < 2)
+	if (fnSDFAT.running() && m_mfile->url.size() < 2)
 	{
-		byte_count += sendLine(basicPtr, 0, "%*s   \"SD:\"              DIR", 0, "");
+		byte_count += sendLine(basicPtr, 0, "%*s\"SD:\"                 DIR", 0, "");
+		byte_count += sendLine(basicPtr, 0, "%*s\"-------------------\" NFO", 0, "");
 	}
 
 	return byte_count;

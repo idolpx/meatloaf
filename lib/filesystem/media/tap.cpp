@@ -25,7 +25,7 @@ bool TAPIStream::seekEntry( std::string filename )
                 filename == entryFilename;
             }
             
-            if ( mstr::startsWith(entryFilename, filename.c_str()) )
+            if ( mstr::compare(filename, entryFilename) )
             {
                 // Move stream pointer to start track/sector
                 return true;
@@ -141,10 +141,11 @@ bool TAPFile::rewindDirectory() {
 
     // Set Media Info Fields
     media_header = mstr::format("%.24", image->header.disk_name);
-    media_id = "TAP";
+    media_id = "tap";
     media_blocks_free = 0;
     media_block_size = image->block_size;
     media_image = name;
+    mstr::toASCII(media_image);
 
     Debug_printv("media_header[%s] media_id[%s] media_blocks_free[%d] media_block_size[%d] media_image[%s]", media_header.c_str(), media_id.c_str(), media_blocks_free, media_block_size, media_image.c_str());
 

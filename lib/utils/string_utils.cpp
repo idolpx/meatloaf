@@ -138,6 +138,31 @@ namespace mstr {
         return ( it != s1.end() );
     }
 
+    bool compare(std::string &s1, std::string &s2, bool case_sensitive)
+    {
+        unsigned int index;
+
+        for (index = 0; index < s1.size(); index++) {
+            switch (s1[index]) {
+                case '*':
+                    return true; /* rest is not interesting, it's a match */
+                case '?':
+                    if (s2[index] == 0xa0) {
+                        return false; /* wildcard, but the other is too short */
+                    }
+                    break;
+                case 0xa0: /* This one ends, let's see if the other as well */
+                    return (s2[index] == 0xa0);
+                default:
+                    if (s1[index] != s2[index]) {
+                        return false; /* does not match */
+                    }
+            }
+        }
+
+        return true; /* matched completely */
+    }
+
     // convert to lowercase (in place)
     void toLower(std::string &s)
     {

@@ -44,6 +44,7 @@ public:
 
     std::string media_header;
     std::string media_id;
+    std::string media_archive;
     std::string media_image;
     uint16_t media_blocks_free = 0;
     uint16_t media_block_size = 256;

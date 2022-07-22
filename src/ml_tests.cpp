@@ -5,6 +5,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <ArduinoJson.h>
+//#include <archive_cpp.h>
 
 #include "../include/global_defines.h"
 #include "../include/debug.h"
@@ -63,6 +64,33 @@ void testReader(MFile* readeTest) {
         Debug_printf("*** ERROR: stream could not be opened!");
     }
 }
+
+// void testArchiveReader(std::string archive) {
+//     // /* Test Line reader */
+//     testHeader("C++ archive reader");
+
+//     Debug_printf("* Trying to read archive: %s\n", archive.c_str());
+
+//     auto readerStream = ArchiveReader(readeTest);
+//     readerStream.open();
+
+//     if(readerStream.is_open()) {
+//         if(readerStream.eof()) {
+//             Debug_printf("Reader returned EOF! :(");
+//         }
+
+//         while(!readerStream.eof()) {
+//             std::string line;
+
+//             readerStream >> line;
+
+//             Debug_printf("%s\n",line.c_str());
+//         };
+//     }
+//     else {
+//         Debug_printf("*** ERROR: stream could not be opened!");
+//     }
+// }
 
 void dumpFileProperties(MFile* testMFile) {
     Debug_println("\n== File properties ==");
