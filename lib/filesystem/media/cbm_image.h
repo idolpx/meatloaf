@@ -93,8 +93,8 @@ protected:
 
 private:
 
-
     // File
+    friend class P00File;
 
     // Disk
     friend class D64File;

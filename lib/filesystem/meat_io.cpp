@@ -16,6 +16,9 @@
 #include "scheme/cs.h"
 //#include "scheme/ws.h"
 
+// File
+#include "media/p00.h"
+
 // Disk
 #include "media/d64.h"
 #include "media/d71.h"
@@ -52,6 +55,9 @@ MLFileSystem mlFS;
 CServerFileSystem csFS;
 //WSFileSystem wsFS;
 
+// File
+P00FileSystem p00FS;
+
 // Disk
 D64FileSystem d64FS;
 D71FileSystem d71FS;
@@ -71,7 +77,13 @@ TCRTFileSystem tcrtFS;
 
 // put all available filesystems in this array - first matching system gets the file!
 // fist in list is default
-std::vector<MFileSystem*> MFSOwner::availableFS{ &defaultFS, &sdFS, &d64FS, &d71FS, &d80FS, &d81FS, &d82FS, &d8bFS, &dnpFS, &t64FS, &tcrtFS, &mlFS, &httpFS, &tnfsFS };
+std::vector<MFileSystem*> MFSOwner::availableFS { 
+    &defaultFS, &sdFS,
+    &p00FS,
+    &d64FS, &d71FS, &d80FS, &d81FS, &d82FS, &d8bFS, &dnpFS,
+    &t64FS, &tcrtFS,
+    &mlFS, &httpFS, &tnfsFS
+};
 
 bool MFSOwner::mount(std::string name) {
     Serial.print("MFSOwner::mount fs:");
@@ -238,7 +250,7 @@ MIStream* MFile::inputStream() {
     std::shared_ptr<MIStream> containerStream(streamFile->inputStream()); // get its base stream, i.e. zip raw file contents
     //Debug_printv("containerStream isRandomAccess[%d] isBrowsable[%d]", containerStream->isRandomAccess(), containerStream->isBrowsable());
 
-    MIStream* decodedStream(createIStream(containerStream)); // wrap this stream into decodec stream, i.e. unpacked zip files
+    MIStream* decodedStream(createIStream(containerStream)); // wrap this stream into decoded stream, i.e. unpacked zip files
     //Debug_printv("decodedStream isRandomAccess[%d] isBrowsable[%d]", decodedStream->isRandomAccess(), decodedStream->isBrowsable());
 
     if(decodedStream->isRandomAccess() && pathInStream != "") {
@@ -255,7 +267,7 @@ MIStream* MFile::inputStream() {
 
         while (!pointedFile.empty())
         {
-            if(pointedFile == this->pathInStream)
+            if(mstr::compare(this->pathInStream, pointedFile))
             {
                 //Debug_printv("returning decodedStream");
                 return decodedStream;                
