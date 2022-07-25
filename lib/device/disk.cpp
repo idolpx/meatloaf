@@ -425,8 +425,6 @@ void iecDisk::handleListenCommand( void )
 	}
 
 	dumpState();
-	this->data.init();
-
 } // handleListenCommand
 
 
@@ -435,6 +433,7 @@ void iecDisk::handleListenData()
 	Debug_printv("[%s]", device_config.url().c_str());
 
 	saveFile();
+	this->data.init();
 } // handleListenData
 
 
@@ -474,6 +473,7 @@ void iecDisk::handleTalk(uint8_t chan)
 	}
 
 	m_openState = O_NOTHING;
+	this->data.init();
 } // handleTalk
 
 // send single basic line, including heading basic pointer and terminating zero.

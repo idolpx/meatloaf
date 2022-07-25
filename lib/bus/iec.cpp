@@ -84,7 +84,7 @@ device_state_t iecDevice::queue_command ( void )
 bool iecDevice::process ( void )
 {
     // IEC.protocol.pull ( PIN_IEC_SRQ );
-    // Debug_printv ( "bus_state[%d]", IEC.bus_state );
+    Debug_printv ( "bus_state[%d]", IEC.bus_state );
 
     // Wait for ATN to be released so we can receive or send data
     IEC.protocol.timeoutWait ( PIN_IEC_ATN, RELEASED, FOREVER );
@@ -406,13 +406,13 @@ void iecBus::service ( void )
             this->bus_state = BUS_IDLE;
 
         // 
-        if ( this->bus_state == BUS_ACTIVE )
+        if ( this->bus_state > BUS_IDLE )
         {
             // Queue control codes and command in specified device
             // At the moment there is only the multi-disk device
             this->device_state = disk.queue_command();
         }
-        else if ( this->bus_state < BUS_ACTIVE )
+        else
         {
             IEC.protocol.pull ( PIN_IEC_SRQ );
             releaseLines();
@@ -464,7 +464,7 @@ bus_state_t iecBus::deviceListen ( void )
 
     // If the command is SECONDARY and it is not to expect just a small command on the command channel, then
     // we're into something more heavy. Otherwise read it all out right here until UNLISTEN is received.
-    if ( this->data.secondary == IEC_SECOND && this->data.channel not_eq CMD_CHANNEL )
+    if ( this->data.secondary == IEC_SECOND && this->data.channel != CMD_CHANNEL )
     {
         // A heapload of data might come now, too big for this context to handle so the caller handles this, we're done here.
         // Debug_printf(" (%.2X SECONDARY) (%.2X CHANNEL)\r\n", this->data.primary, this->data.channel);
