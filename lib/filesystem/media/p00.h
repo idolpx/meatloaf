@@ -23,7 +23,7 @@ public:
 
 protected:
     struct Header {
-        char header[7];
+        char signature[7];
         uint8_t pad1;
         char filename[16];
         uint8_t pad2;

@@ -306,12 +306,15 @@ CommandPathTuple iecDisk::parseLine(std::string command, size_t channel)
 
 void iecDisk::changeDir(std::string url)
 {
+	Debug_printv("url[%s]", url.c_str());
 	device_config.url(url);
 	m_mfile.reset(MFSOwner::File(url));
 
+	std::string media_path = m_mfile->path.substr(0, m_mfile->path.size() - m_mfile->media_image.size());
+	mstr::toPETSCII(media_path);
+	device_config.path(media_path);
 	device_config.archive(m_mfile->media_archive);
 	device_config.image(m_mfile->media_image);
-	device_config.path(m_mfile->pathInStream);
 
 	if ( this->data.channel == 0 )
 	{
@@ -604,7 +607,7 @@ uint16_t iecDisk::sendHeader(uint16_t &basicPtr, std::string header, std::string
 	}
 	if (fnSDFAT.running() && m_mfile->url.size() < 2)
 	{
-		byte_count += sendLine(basicPtr, 0, "%*s\"SD:\"                 DIR", 0, "");
+		byte_count += sendLine(basicPtr, 0, "%*s\"SD\"                 DIR", 0, "");
 		byte_count += sendLine(basicPtr, 0, "%*s\"-------------------\" NFO", 0, "");
 	}
 

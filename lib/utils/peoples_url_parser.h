@@ -82,7 +82,7 @@ private:
             return;
 
         while(mstr::endsWith(path,"/")) {
-            path=mstr::dropLast(path,1);
+            path=mstr::dropLast(path, 1);
         }
         mstr::replaceAll(path, "//", "/");
     }
