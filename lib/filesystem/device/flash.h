@@ -6,8 +6,6 @@
 #include "../../include/global_defines.h"
 #include "../../include/make_unique.h"
 
-#include "fnFsTNFS.h"
-
 #include "device_db.h"
 
 #include <dirent.h>
@@ -43,13 +41,14 @@ public:
     std::string basepath;
     
     FlashFile(std::string path) {
+        basepath = device_config.basepath();
+
         parseUrl(path);
         if(!pathValid(path.c_str()))
             m_isNull = true;
         else
             m_isNull = false;
-            
-        basepath = device_config.basepath();
+
         //Debug_printv("basepath[%s] path[%s]", basepath.c_str(), this->path.c_str());
     };
     ~FlashFile() {

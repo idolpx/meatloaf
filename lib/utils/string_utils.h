@@ -34,6 +34,7 @@ namespace mstr {
     bool isA0Space(int ch);
     void A02Space(std::string &s);
     std::string format(const char *format, ...);
+    std::string formatBytes(uint64_t value);
 }
 
 #endif

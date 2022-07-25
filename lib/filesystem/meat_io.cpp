@@ -1,8 +1,15 @@
 #include "meat_io.h"
 
 #include <algorithm>
+#include <vector>
+#include <sstream>
 
 #include "MIOException.h"
+
+#include "utils.h"
+#include "string_utils.h"
+
+//#include "wrappers/directory_stream.h"
 
 // Device
 #include "device/flash.h"
@@ -10,9 +17,9 @@
 
 // Scheme
 #include "scheme/http.h"
+#include "scheme/ml.h"
 #include "scheme/tnfs.h"
 #include "scheme/smb.h"
-#include "scheme/ml.h"
 #include "scheme/cs.h"
 //#include "scheme/ws.h"
 
@@ -32,12 +39,6 @@
 #include "media/t64.h"
 #include "media/tcrt.h"
 
-#include <vector>
-#include <sstream>
-#include "utils.h"
-#include "string_utils.h"
-
-//#include "wrappers/directory_stream.h"
 
 
 /********************************************************
@@ -286,7 +287,8 @@ MIStream* MFile::inputStream() {
 
 
 MFile* MFile::parent(std::string plus) {
-    Debug_printv("url[%s] path[%s]", url.c_str(), path.c_str());
+    //Debug_printv("url[%s] path[%s]", url.c_str(), path.c_str());
+
     // drop last dir
     // add plus
     if(path.empty()) {
@@ -294,22 +296,27 @@ MFile* MFile::parent(std::string plus) {
         return MFSOwner::File("/");
     }
     else {
-        int lastSlash = url.size() - url.find_last_of('/');
-        std::string newDir = mstr::dropLast(url, lastSlash);
+        int lastSlash = url.find_last_of('/');
+        // if ( lastSlash == url.size() - 1 ) {
+        //     lastSlash = url.find_last_of('/', url.size() - 2);
+        // }
+        std::string newDir = mstr::dropLast(url, url.size() - lastSlash);
         if(!plus.empty())
             newDir+= ("/" + plus);
-        Debug_printv("new[%s]", newDir.c_str());
         return MFSOwner::File(newDir);
     }
 };
 
 MFile* MFile::localParent(std::string plus) {
-    Debug_printv("url[%s] path[%s]", url.c_str(), path.c_str());
+    //Debug_printv("url[%s] path[%s]", url.c_str(), path.c_str());
     // drop last dir
     // check if it isn't shorter than streamFile
     // add plus
-    int lastSlash = url.size() - url.find_last_of('/');
-    std::string parent = mstr::dropLast(url, lastSlash);
+    int lastSlash = url.find_last_of('/');
+    // if ( lastSlash == url.size() - 1 ) {
+    //     lastSlash = url.find_last_of('/', url.size() - 2);
+    // }
+    std::string parent = mstr::dropLast(url, url.size() - lastSlash);
     if(parent.length()-streamFile->url.length()>1)
         parent = streamFile->url;
     return MFSOwner::File(parent+"/"+plus);
@@ -411,7 +418,7 @@ MFile* MFile::cd(std::string newDir) {
         if ( !mstr::endsWith(url, "/") )
             url.push_back('/');
 
-        return MFSOwner::File(url+newDir);
+        return MFSOwner::File(url + newDir);
     }
 };
 
@@ -443,7 +450,48 @@ MFile* MFile::cd(std::string newDir) {
 //     return true;
 // };
 
+uint64_t MFile::getAvailableSpace()
+{
+//   struct statvfs stat;
 
+//   if (statvfs(path.c_str(), &stat) != 0) {
+//     // error happens, just quits here
+//     return -1;
+//   }
+
+//   // the available size is f_bsize * f_bavail
+//   return stat.f_bsize * stat.f_bavail;
+
+    Debug_printv("path[%s]", path.c_str());
+
+    if ( mstr::startsWith(path, (char *)"/sd") )
+    {
+        FATFS* fsinfo;
+        DWORD fre_clust;
+
+        if (f_getfree("/", &fre_clust, &fsinfo) == 0)
+        {
+            uint64_t total = ((uint64_t)(fsinfo->csize)) * (fsinfo->n_fatent - 2) * (fsinfo->ssize);
+            uint64_t used = ((uint64_t)(fsinfo->csize)) * ((fsinfo->n_fatent - 2) - (fsinfo->free_clst)) * (fsinfo->ssize);
+            uint64_t free = total - used;
+            Debug_printv("total[%llu] used[%llu free[%llu]", total, used, free);
+            return free;
+        }
+    }
+    else
+    {
+#ifdef FLASH_SPIFFS
+        size_t total = 0, used = 0;
+        esp_spiffs_info("flash", &total, &used);
+        size_t free = total - used;
+        Debug_printv("total[%d] used[%d] free[%d]", total, used, free);
+        return free;
+#elif FLASH_LITTLEFS
+#endif
+    }
+
+    return 65535;
+}
 
 
 

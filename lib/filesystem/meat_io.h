@@ -75,6 +75,7 @@ public:
     virtual time_t getLastWrite() = 0 ;
     virtual time_t getCreationTime() = 0 ;
     virtual size_t size() = 0;
+    virtual uint64_t getAvailableSpace();
 
     MFile* streamFile = nullptr;
     std::string pathInStream;

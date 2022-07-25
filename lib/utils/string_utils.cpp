@@ -2,9 +2,12 @@
 #include "../../include/petscii.h"
 #include <algorithm>
 #include <cstdarg>
-
+#include <cmath>
+#include "../../include/debug.h"
 
 namespace mstr {
+
+    std::string byteSuffixes[9] = { "", "K", "M", "G", "T", "P", "E", "Z", "Y" };
 
     // trim from start (in place)
     void ltrim(std::string &s)
@@ -342,5 +345,27 @@ namespace mstr {
         va_end(args);
 
         return text;
+    }
+
+    std::string formatBytes(uint64_t value)
+    {
+        uint8_t i = 0;
+        int64_t n = 0;
+        char *f = NULL;
+
+        Debug_printv("bytes[%llu]", value);
+
+        do
+        {          
+            i++;
+            n = value / std::pow(1024, i);
+            Debug_printv("i[%d] n[%llu]", i, n);
+        }
+        while ( n >= 1 );
+
+        i--;
+        auto dv = value / std::pow(1024, i);
+        asprintf(&f, "%.2f %s", dv, byteSuffixes[i].c_str());
+        return f;
     }
 }

@@ -353,7 +353,7 @@ uint64_t FileSystemSDFAT::used_bytes()
 	DWORD fre_clust;
     uint64_t size = 0ULL;
 
-	if(f_getfree("0:", &fre_clust, &fsinfo) == 0)
+	if (f_getfree("0:", &fre_clust, &fsinfo) == 0)
     {
         // cluster_size * (num_clusters - free_clusters) * sector_size
 	    size = ((uint64_t)(fsinfo->csize)) * ((fsinfo->n_fatent-2)-(fsinfo->free_clst)) * (fsinfo->ssize);
@@ -376,7 +376,7 @@ const char * FileSystemSDFAT::partition_type()
 	DWORD fre_clust;
 
     BYTE i = 0;
- 	if(f_getfree("0:", &fre_clust, &fsinfo) == 0)
+ 	if (f_getfree("0:", &fre_clust, &fsinfo) == 0)
     {
         if(fsinfo->fs_type >= FS_FAT12 && fsinfo->fs_type <= FS_EXFAT)
             i = fsinfo->fs_type;
@@ -442,7 +442,7 @@ bool FileSystemSDFAT::start()
         _card_capacity = (uint64_t)sdcard_info->csd.capacity * sdcard_info->csd.sector_size;
     #ifdef DEBUG
         Debug_println("SD mounted.");
-    /*
+    
         Debug_printf("  manufacturer: %d, oem: 0x%x \"%c%c\"\n", sdcard_info->cid.mfg_id, sdcard_info->cid.oem_id,
             (char)(sdcard_info->cid.oem_id >> 8 & 0xFF),(char)(sdcard_info->cid.oem_id & 0xFF));
         Debug_printf("  product: %s\n", sdcard_info->cid.name);
@@ -451,7 +451,7 @@ bool FileSystemSDFAT::start()
         Debug_printf("  max frequency: %ukHz\n", sdcard_info->max_freq_khz);
         Debug_printf("  partition type: %s\n", partition_type());
         Debug_printf("  partition size: %llu, used: %llu\n", total_bytes(), used_bytes());
-    */
+    
     #endif
     }
     else 

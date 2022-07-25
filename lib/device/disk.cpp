@@ -189,7 +189,7 @@ MFile* iecDisk::getPointed(MFile* urlFile) {
 CommandPathTuple iecDisk::parseLine(std::string command, size_t channel)
 {
 
-	//Debug_printv("* PARSE INCOMING LINE *******************************");
+	Debug_printv("* PARSE INCOMING LINE *******************************");
 
 	//Debug_printv("we are in              [%s]", m_mfile->url.c_str());
 	//Debug_printv("unprocessed user input [%s]", command.c_str());
@@ -208,9 +208,10 @@ CommandPathTuple iecDisk::parseLine(std::string command, size_t channel)
 			// Find first PRG file in current directory
 			std::unique_ptr<MFile> entry(m_mfile->getNextFileInDir());
 			std::string match = mstr::dropLast(command, 1);
+			Debug_printv("command[%s] match[%s]", command.c_str(), match.c_str());
 			while ( entry != nullptr )
 			{
-				//Debug_printv("match[%s] extension[%s]", match.c_str(), entry->extension.c_str());
+				Debug_printv("match[%s] extension[%s]", match.c_str(), entry->extension.c_str());
 				if ( !mstr::startsWith(entry->extension, "prg") || (match.size() > 0 && !mstr::startsWith( entry->name, match.c_str() ))  )
 				{
 					entry.reset(m_mfile->getNextFileInDir());
@@ -284,11 +285,11 @@ CommandPathTuple iecDisk::parseLine(std::string command, size_t channel)
 	mstr::rtrim(guessedPath);
 	tuple.rawPath = guessedPath;
 
-	//Debug_printv("found command     [%s]", tuple.command.c_str());
+	Debug_printv("found command     [%s]", tuple.command.c_str());
 
 	if(guessedPath == "$")
 	{
-		//Debug_printv("get directory of [%s]", m_mfile->url.c_str());
+		Debug_printv("get directory of [%s]", m_mfile->url.c_str());
 	}
 	else if(!guessedPath.empty())
 	{
@@ -296,10 +297,10 @@ CommandPathTuple iecDisk::parseLine(std::string command, size_t channel)
 
 		tuple.fullPath = fullPath->url;
 
-		//Debug_printv("full referenced path [%s]", tuple.fullPath.c_str());
+		Debug_printv("full referenced path [%s]", tuple.fullPath.c_str());
 	}
 
-	//Debug_printv("* END OF PARSE LINE *******************************");
+	Debug_printv("* END OF PARSE LINE *******************************");
 
 	return tuple;
 }
@@ -607,7 +608,7 @@ uint16_t iecDisk::sendHeader(uint16_t &basicPtr, std::string header, std::string
 	}
 	if (fnSDFAT.running() && m_mfile->url.size() < 2)
 	{
-		byte_count += sendLine(basicPtr, 0, "%*s\"SD\"                 DIR", 0, "");
+		byte_count += sendLine(basicPtr, 0, "%*s\"SD\"                  DIR", 0, "");
 		byte_count += sendLine(basicPtr, 0, "%*s\"-------------------\" NFO", 0, "");
 	}
 
@@ -711,7 +712,7 @@ void iecDisk::sendListing()
 	}
 
 	// Send Listing Footer
-	byte_count += sendFooter(basicPtr, m_mfile->media_blocks_free, m_mfile->media_block_size);
+	byte_count += sendFooter(basicPtr);
 
 	// End program with two zeros after last line. Last zero goes out as EOI.
 	IEC.send(0);
@@ -723,32 +724,25 @@ void iecDisk::sendListing()
 } // sendListing
 
 
-uint16_t iecDisk::sendFooter(uint16_t &basicPtr, uint16_t blocks_free, uint16_t block_size)
+uint16_t iecDisk::sendFooter(uint16_t &basicPtr)
 {
-	// Send List FOOTER
-	// #if defined(USE_LITTLEFS)
-	uint64_t byte_count = 0;
-	if (block_size > 256)
+	uint16_t blocks_free;
+	uint16_t byte_count = 0;
+	uint64_t bytes_free = m_mfile->getAvailableSpace();
+
+	if ( device_config.image().size() )
 	{
-		byte_count = sendLine(basicPtr, blocks_free, "BLOCKS FREE. (*%d bytes)", block_size);
+		blocks_free = m_mfile->media_blocks_free;
+		byte_count = sendLine(basicPtr, blocks_free, "BLOCKS FREE.");
 	}
 	else
 	{
-		byte_count = sendLine(basicPtr, blocks_free, "BLOCKS FREE.");
+		// We are not in a media file so let's show BYTES FREE instead
+		blocks_free = 0;
+		byte_count = sendLine(basicPtr, blocks_free, CBM_DELETE CBM_DELETE "%sBYTES FREE.", mstr::formatBytes(bytes_free).c_str() );
 	}
 
-	// if (device_config.url().length() == 0)
-	// {
-	// 	FSInfo64 fs_info;
-	// 	m_fileSystem->info64(fs_info);
-	// 	blocks_free = fs_info.totalBytes - fs_info.usedBytes;
-	// }
-
 	return byte_count;
-	// #elif defined(USE_SPIFFS)
-	// 	return sendLine(basicPtr, 00, "UNKNOWN BLOCKS FREE.");
-	// #endif
-	//Debug_println("");
 }
 
 
@@ -758,9 +752,9 @@ void iecDisk::sendFile()
 	bool success = true;
 
 	uint8_t b;
-	uint16_t bi = 0;
-	uint16_t load_address = 0;
-	uint16_t sys_address = 0;
+	size_t bi = 0;
+	size_t load_address = 0;
+	size_t sys_address = 0;
 
 #ifdef DATA_STREAM
 	char ba[9];
@@ -948,11 +942,11 @@ void iecDisk::sendFile()
 
 void iecDisk::saveFile()
 {
-	uint16_t i = 0;
+	size_t i = 0;
 	bool done = false;
 
-	uint16_t bi = 0;
-	uint16_t load_address = 0;
+	size_t bi = 0;
+	size_t load_address = 0;
 	size_t b_len = 1;
 	uint8_t b[b_len];
 	uint8_t ll[b_len];
@@ -1079,8 +1073,8 @@ void iecDisk::dumpState()
 	Debug_println("");
 	Debug_printv("m_mfile ------------------------");
 	Debug_printv("URL: [%s]", m_mfile->url.c_str());
-    Debug_printv("streamPath: [%s]", m_mfile->streamFile->url.c_str());
-    Debug_printv("pathInStream: [%s]", m_mfile->pathInStream.c_str());
+    //Debug_printv("streamPath: [%s]", m_mfile->streamFile->url.c_str());
+    //Debug_printv("pathInStream: [%s]", m_mfile->pathInStream.c_str());
 	Debug_printv("Scheme: [%s]", m_mfile->scheme.c_str());
 	Debug_printv("Username: [%s]", m_mfile->user.c_str());
 	Debug_printv("Password: [%s]", m_mfile->pass.c_str());

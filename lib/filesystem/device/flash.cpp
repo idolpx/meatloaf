@@ -205,7 +205,6 @@ bool FlashFile::rewindDirectory()
     // dirent = readdir( dir );
     // dirent = readdir( dir );
 
-    media_blocks_free = 0;
     return (dir != NULL) ? true: false;
 }
 
