@@ -442,7 +442,7 @@ bool FileSystemSDFAT::start()
         _card_capacity = (uint64_t)sdcard_info->csd.capacity * sdcard_info->csd.sector_size;
     #ifdef DEBUG
         Debug_println("SD mounted.");
-    
+    /*
         Debug_printf("  manufacturer: %d, oem: 0x%x \"%c%c\"\n", sdcard_info->cid.mfg_id, sdcard_info->cid.oem_id,
             (char)(sdcard_info->cid.oem_id >> 8 & 0xFF),(char)(sdcard_info->cid.oem_id & 0xFF));
         Debug_printf("  product: %s\n", sdcard_info->cid.name);
@@ -451,7 +451,7 @@ bool FileSystemSDFAT::start()
         Debug_printf("  max frequency: %ukHz\n", sdcard_info->max_freq_khz);
         Debug_printf("  partition type: %s\n", partition_type());
         Debug_printf("  partition size: %llu, used: %llu\n", total_bytes(), used_bytes());
-    
+    */
     #endif
     }
     else 
