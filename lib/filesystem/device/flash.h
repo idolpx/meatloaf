@@ -3,6 +3,10 @@
 
 #include "meat_io.h"
 
+#ifdef FLASH_SPIFFS
+#include "esp_spiffs.h"
+#endif
+
 #include "../../include/global_defines.h"
 #include "../../include/make_unique.h"
 
