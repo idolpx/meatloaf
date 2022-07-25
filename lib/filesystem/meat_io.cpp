@@ -297,9 +297,9 @@ MFile* MFile::parent(std::string plus) {
     }
     else {
         int lastSlash = url.find_last_of('/');
-        // if ( lastSlash == url.size() - 1 ) {
-        //     lastSlash = url.find_last_of('/', url.size() - 2);
-        // }
+        if ( lastSlash == url.size() - 1 ) {
+            lastSlash = url.find_last_of('/', url.size() - 2);
+        }
         std::string newDir = mstr::dropLast(url, url.size() - lastSlash);
         if(!plus.empty())
             newDir+= ("/" + plus);
@@ -313,9 +313,9 @@ MFile* MFile::localParent(std::string plus) {
     // check if it isn't shorter than streamFile
     // add plus
     int lastSlash = url.find_last_of('/');
-    // if ( lastSlash == url.size() - 1 ) {
-    //     lastSlash = url.find_last_of('/', url.size() - 2);
-    // }
+    if ( lastSlash == url.size() - 1 ) {
+        lastSlash = url.find_last_of('/', url.size() - 2);
+    }
     std::string parent = mstr::dropLast(url, url.size() - lastSlash);
     if(parent.length()-streamFile->url.length()>1)
         parent = streamFile->url;
