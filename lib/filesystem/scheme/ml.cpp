@@ -68,36 +68,37 @@ MFile* MLFile::getNextFileInDir() {
 };
 
 bool MLFile::isDirectory() {
-    //String url("http://c64.meatloaf.cc/api/");
-    //String ml_url = std::string("http://" + host + "/api/").c_str();
-    std::string ml_url = "http://" + host + "/api/";
-    std::string post_data = "a=checkp=" + mstr::urlEncode(path);
-
-	// Connect to HTTP server
-	Serial.printf("\r\nConnecting!\r\n--------------------\r\n%s\r\n%s\r\n", ml_url.c_str(), post_data.c_str());
-	if (!m_http.begin( ml_url ))
-	{
-		Serial.printf("\r\nConnection failed");
-        return false;
-	}
-	m_http.set_header("Content-Type", "application/x-www-form-urlencoded");
-
-    // Setup response headers we want to collect
-    const char * headerKeys[] = {"ml_media_dir"} ;
-    const size_t numberOfHeaders = 1;
-    m_http.collect_headers(headerKeys, numberOfHeaders);
-
-    // Send the request
-	uint8_t httpCode = m_http.POST( post_data.c_str(), post_data.length() );
-
-	Serial.printf("HTTP Status: %d\r\n", httpCode); //Print HTTP return code
-
-	if (httpCode == 200) {
-        if (m_http.get_header("ml_media_dir") == "1")
-            return true;
-    }
-
     return false;
+    // //String url("http://c64.meatloaf.cc/api/");
+    // //String ml_url = std::string("http://" + host + "/api/").c_str();
+    // std::string ml_url = "http://" + host + "/api/";
+    // std::string post_data = "a=checkp=" + mstr::urlEncode(path);
+
+	// // Connect to HTTP server
+	// Serial.printf("\r\nConnecting!\r\n--------------------\r\n%s\r\n%s\r\n", ml_url.c_str(), post_data.c_str());
+	// if (!m_http.begin( ml_url ))
+	// {
+	// 	Serial.printf("\r\nConnection failed");
+    //     return false;
+	// }
+	// m_http.set_header("Content-Type", "application/x-www-form-urlencoded");
+
+    // // Setup response headers we want to collect
+    // const char * headerKeys[] = {"ml_media_dir"} ;
+    // const size_t numberOfHeaders = 1;
+    // m_http.collect_headers(headerKeys, numberOfHeaders);
+
+    // // Send the request
+	// uint8_t httpCode = m_http.POST( post_data.c_str(), post_data.length() );
+
+	// Serial.printf("HTTP Status: %d\r\n", httpCode); //Print HTTP return code
+
+	// if (httpCode == 200) {
+    //     if (m_http.get_header("ml_media_dir") == "1")
+    //         return true;
+    // }
+
+    // return false;
 };
 
 
@@ -166,7 +167,7 @@ bool MLFile::rewindDirectory() {
 
 MIStream* MLFile::inputStream() {
     // has to return OPENED stream
-    Debug_printv("[%s]", url.c_str());
+    //Debug_printv("[%s]", url.c_str());
     MIStream* istream = new MLIStream(url);
     istream->open();   
     return istream;
@@ -180,12 +181,12 @@ bool MLIStream::open() {
     //String ml_url = std::string("http://" + urlParser.host + "/api/").c_str();
 	//String post_data("p=" + urlencode(m_device.path()) + "&i=" + urlencode(m_device.image()) + "&f=" + urlencode(m_filename));
     //String post_data = std::string("p=" + mstr::urlEncode(urlParser.path)).c_str(); // pathInStream will return here /c64.meatloaf.cc/some/directory
-    std::string ml_url = "http://" + urlParser.host + "/api";
-    std::string post_data = "p=" + urlParser.path;
+    std::string ml_url = "http://api.meatloaf.cc/?" + urlParser.name;
+    //std::string post_data = urlParser.path;
 
 //    m_http.setReuse(true);
     bool initOk = m_http.begin( ml_url );
-    Debug_printv("input %s: someRc=%d, post[%s]", ml_url.c_str(), initOk, post_data.c_str());
+    //Debug_printv("input %s: someRc=%d", ml_url.c_str(), initOk);
     if(!initOk)
         return false;
 
@@ -195,17 +196,18 @@ bool MLIStream::open() {
     m_http.collect_headers(headerKeys, numberOfHeaders);
 
     // Send the request
-	uint8_t httpCode = m_http.POST(post_data.c_str(), post_data.length());
-    Debug_printv("httpCode=%d", httpCode);
+	//uint8_t httpCode = m_http.POST(post_data.c_str(), post_data.length());
+    int httpCode = m_http.GET();
+    //Debug_printv("httpCode=%d", httpCode);
     if(httpCode != 200)
         return false;
 
     // Accept-Ranges: bytes - if we get such header from any request, good!
     isFriendlySkipper = m_http.get_header("accept-ranges") == "bytes";
     m_isOpen = true;
-    Debug_printv("[%s]", ml_url.c_str());
-    m_length = stoi(m_http.get_header("content-length"));
-    Debug_printv("length=%d", m_length);
+    //Debug_printv("[%s]", ml_url.c_str());
+    m_length = m_http.available(); // atoi(m_http.get_header("content-length"));
+    //Debug_printv("length=%d", m_length);
     m_bytesAvailable = m_length;
     return true;
 };

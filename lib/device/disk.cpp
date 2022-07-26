@@ -189,7 +189,7 @@ MFile* iecDisk::getPointed(MFile* urlFile) {
 CommandPathTuple iecDisk::parseLine(std::string command, size_t channel)
 {
 
-	Debug_printv("* PARSE INCOMING LINE *******************************");
+	//Debug_printv("* PARSE INCOMING LINE *******************************");
 
 	//Debug_printv("we are in              [%s]", m_mfile->url.c_str());
 	//Debug_printv("unprocessed user input [%s]", command.c_str());
@@ -208,10 +208,10 @@ CommandPathTuple iecDisk::parseLine(std::string command, size_t channel)
 			// Find first PRG file in current directory
 			std::unique_ptr<MFile> entry(m_mfile->getNextFileInDir());
 			std::string match = mstr::dropLast(command, 1);
-			Debug_printv("command[%s] match[%s]", command.c_str(), match.c_str());
+			//Debug_printv("command[%s] match[%s]", command.c_str(), match.c_str());
 			while ( entry != nullptr )
 			{
-				Debug_printv("match[%s] extension[%s]", match.c_str(), entry->extension.c_str());
+				//Debug_printv("match[%s] extension[%s]", match.c_str(), entry->extension.c_str());
 				if ( !mstr::startsWith(entry->extension, "prg") || (match.size() > 0 && !mstr::startsWith( entry->name, match.c_str() ))  )
 				{
 					entry.reset(m_mfile->getNextFileInDir());
@@ -285,7 +285,7 @@ CommandPathTuple iecDisk::parseLine(std::string command, size_t channel)
 	mstr::rtrim(guessedPath);
 	tuple.rawPath = guessedPath;
 
-	Debug_printv("found command     [%s]", tuple.command.c_str());
+	//Debug_printv("found command     [%s]", tuple.command.c_str());
 
 	if(guessedPath == "$")
 	{
@@ -297,10 +297,10 @@ CommandPathTuple iecDisk::parseLine(std::string command, size_t channel)
 
 		tuple.fullPath = fullPath->url;
 
-		Debug_printv("full referenced path [%s]", tuple.fullPath.c_str());
+		//Debug_printv("full referenced path [%s]", tuple.fullPath.c_str());
 	}
 
-	Debug_printv("* END OF PARSE LINE *******************************");
+	//Debug_printv("* END OF PARSE LINE *******************************");
 
 	return tuple;
 }
@@ -329,10 +329,10 @@ void iecDisk::changeDir(std::string url)
 void iecDisk::prepareFileStream(std::string url)
 {
 	device_config.url(url);
-	Debug_printv("url[%s]", url.c_str());
+	//Debug_printv("url[%s]", url.c_str());
 	m_filename = url;
 	m_openState = O_FILE;
-	Debug_printv("LOAD [%s]", url.c_str());
+	//Debug_printv("LOAD [%s]", url.c_str());
 }
 
 
@@ -413,19 +413,19 @@ void iecDisk::handleListenCommand( void )
 			changeDir(referencedPath->url);
 		}
 		// 3. else - stream file
-		else if ( referencedPath->exists() )
+		else //if ( referencedPath->exists() )
 		{
 			// Set File
 			prepareFileStream(referencedPath->url);
 		}
-		else
-		{
-			Debug_printv("file doesn't exist [%s]", referencedPath->url.c_str());
-			sendFileNotFound();
-		}
+		// else
+		// {
+		// 	Debug_printv("file doesn't exist [%s]", referencedPath->url.c_str());
+		// 	sendFileNotFound();
+		// }
 	}
 
-	dumpState();
+	//dumpState();
 } // handleListenCommand
 
 
@@ -768,7 +768,7 @@ void iecDisk::sendFile()
 
 	if(!file->exists())
 	{
-		Debug_printv("File Not Found!");
+		Debug_printv("File Not Found! [%s]", file->name.c_str());
 		sendFileNotFound();
 		return;
 	}
@@ -859,7 +859,7 @@ void iecDisk::sendFile()
 		size_t len = istream->size();
 		size_t avail = istream->available();
 
-		Debug_printv("len[%d] avail[%d] cursor[%d] success[%d]", len, avail, currentChannel.cursor, success);
+		//Debug_printv("len[%d] avail[%d] cursor[%d] success[%d]", len, avail, currentChannel.cursor, success);
 
 		Debug_printf("sendFile: [%s] [$%.4X] (%d bytes)\r\n=================================\r\n", file->url.c_str(), load_address, len);
 		while( i < len && success )

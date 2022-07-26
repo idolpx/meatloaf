@@ -36,7 +36,7 @@ fnHttpClient::~fnHttpClient()
 // Start an HTTP client session to the given URL
 bool fnHttpClient::begin(std::string url)
 {
-    Debug_printf("fnHttpClient::begin \"%s\"\n", url.c_str());
+    //Debug_printf("fnHttpClient::begin \"%s\"\n", url.c_str());
 
     esp_http_client_config_t cfg;
     memset(&cfg, 0, sizeof(cfg));
@@ -397,7 +397,7 @@ void fnHttpClient::_delete_subtask_if_running()
 */
 int fnHttpClient::_perform()
 {
-    Debug_printf("%08lx _perform\n", fnSystem.millis());
+    //Debug_printf("%08lx _perform\n", fnSystem.millis());
 
     _buffer_total_read = 0;
 
@@ -426,7 +426,7 @@ int fnHttpClient::_perform()
     int status = esp_http_client_get_status_code(_handle);
     int length = esp_http_client_get_content_length(_handle);
 
-    Debug_printf("%08lx _perform status = %d, length = %d, chunked = %d\n", fnSystem.millis(), status, length, chunked ? 1 : 0);
+    //Debug_printf("%08lx _perform status = %d, length = %d, chunked = %d\n", fnSystem.millis(), status, length, chunked ? 1 : 0);
     return status;
 }
 
@@ -635,7 +635,7 @@ int fnHttpClient::POST(const char *post_data, int post_datalen)
 // Execute an HTTP GET against current URL.  Returns HTTP result code
 int fnHttpClient::GET()
 {
-    Debug_println("fnHttpClient::GET");
+    //Debug_println("fnHttpClient::GET");
     if (_handle == nullptr)
         return -1;
 
