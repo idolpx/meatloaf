@@ -350,22 +350,20 @@ namespace mstr {
     std::string formatBytes(uint64_t value)
     {
         uint8_t i = 0;
-        int64_t n = 0;
+        double n = 0;
         char *f = NULL;
 
-        Debug_printv("bytes[%llu]", value);
+        //Debug_printv("bytes[%llu]", value);
 
         do
         {          
-            i++;
-            n = value / std::pow(1024, i);
-            Debug_printv("i[%d] n[%llu]", i, n);
+            n = value / std::pow(1024, ++i);
+            //Debug_printv("i[%d] n[%llu]", i, n);
         }
         while ( n >= 1 );
 
-        i--;
-        auto dv = value / std::pow(1024, i);
-        asprintf(&f, "%.2f %s", dv, byteSuffixes[i].c_str());
+        n = value / std::pow(1024, --i);
+        asprintf(&f, "%.2f %s", n, byteSuffixes[i].c_str());
         return f;
     }
 }

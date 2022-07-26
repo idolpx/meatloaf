@@ -462,7 +462,7 @@ uint64_t MFile::getAvailableSpace()
 //   // the available size is f_bsize * f_bavail
 //   return stat.f_bsize * stat.f_bavail;
 
-    Debug_printv("path[%s]", path.c_str());
+    //Debug_printv("path[%s]", path.c_str());
 
     if ( mstr::startsWith(path, (char *)"/sd") )
     {
@@ -474,7 +474,7 @@ uint64_t MFile::getAvailableSpace()
             uint64_t total = ((uint64_t)(fsinfo->csize)) * (fsinfo->n_fatent - 2) * (fsinfo->ssize);
             uint64_t used = ((uint64_t)(fsinfo->csize)) * ((fsinfo->n_fatent - 2) - (fsinfo->free_clst)) * (fsinfo->ssize);
             uint64_t free = total - used;
-            Debug_printv("total[%llu] used[%llu free[%llu]", total, used, free);
+            //Debug_printv("total[%llu] used[%llu free[%llu]", total, used, free);
             return free;
         }
     }
@@ -484,7 +484,7 @@ uint64_t MFile::getAvailableSpace()
         size_t total = 0, used = 0;
         esp_spiffs_info("flash", &total, &used);
         size_t free = total - used;
-        Debug_printv("total[%d] used[%d] free[%d]", total, used, free);
+        //Debug_printv("total[%d] used[%d] free[%d]", total, used, free);
         return free;
 #elif FLASH_LITTLEFS
 #endif

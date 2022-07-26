@@ -211,12 +211,15 @@ bool FlashFile::rewindDirectory()
 
 MFile* FlashFile::getNextFileInDir()
 {
+    //Debug_printv("base[%s] path[%s]", basepath.c_str(), path.c_str());
     if(!dirOpened)
         openDir(std::string(basepath + path).c_str());
 
+    //Debug_printv("before readdir()");
     struct dirent* dirent = NULL;
     if((dirent = readdir( dir )) != NULL)
     {
+        //Debug_printv("path[%s] name[%s]", this->path, dirent->d_name);
         return new FlashFile(this->path + ((this->path == "/") ? "" : "/") + std::string(dirent->d_name));
     }
     else
