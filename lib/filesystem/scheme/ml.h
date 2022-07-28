@@ -40,7 +40,7 @@ public:
     //time_t getLastWrite() override ; // you can implement it if you want
     //time_t getCreationTime() override ; // you can implement it if you want
     //bool mkDir() override { return false; }; // we can't write to ML server, can we?
-    bool exists() override { return true; };
+    //bool exists() override { return true; };
     size_t size() override { return m_size; };
     //bool remove() override { return false; }; // we can't write to ML server, can we?
     //bool rename(std::string dest) { return false; }; // we can't write to ML server, can we?

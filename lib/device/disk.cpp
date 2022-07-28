@@ -920,6 +920,10 @@ void iecDisk::sendFile()
 			}
 
 			avail = istream->available();
+			if ( avail > (len - i) )
+			{
+				len += (avail - (len - i));
+			}
 			//i++;
 		}
 		istream->close();

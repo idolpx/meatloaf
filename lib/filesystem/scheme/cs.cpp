@@ -23,7 +23,7 @@ std::string CServerSessionMgr::readLn() {
     char buffer[80];
     // telnet line ends with 10;
     getline(buffer, 80, 10);
-    //Debug_printv("Inside readLn: %s", buffer);
+    Debug_printv("Inside readLn: %s", buffer);
     return std::string((char *)buffer);
 }
 
@@ -66,7 +66,9 @@ bool CServerSessionMgr::traversePath(MFile* path) {
             return false;
     }
 
+    Debug_printv("here");
     if(isOK()) {
+        Debug_printv("path[%s]", path->path.c_str());
         if(path->path.compare("/") == 0) {
             currentDir = path->url;
             return true;
@@ -241,102 +243,102 @@ bool CServerOStream::isOpen() {
  ********************************************************/
 
 
-MFile* CServerFile::cd(std::string newDir) {
-    // maah - don't really know how to handle this!
+// MFile* CServerFile::cd(std::string newDir) {
+//     // maah - don't really know how to handle this!
 
-    // Drop the : if it is included
-    if(newDir[0]==':') {
-        Debug_printv("[:]");
-        newDir = mstr::drop(newDir,1);
-    }
+//     // Drop the : if it is included
+//     if(newDir[0]==':') {
+//         Debug_printv("[:]");
+//         newDir = mstr::drop(newDir,1);
+//     }
 
-    Debug_printv("cd in CServerFile! New dir [%s]\n", newDir.c_str());
-    if(newDir[0]=='/' && newDir[1]=='/') {
-        if(newDir.size()==2) {
-            // user entered: CD:// or CD//
-            // means: change to the root of roots
-            return MFSOwner::File("/"); // chedked, works ad flash root!
-        }
-        else {
-            // user entered: CD://DIR or CD//DIR
-            // means: change to a dir in root of roots
-            Debug_printv("[//]");
-            return root(mstr::drop(newDir,2));
-        }
-    }
-    else if(newDir[0]=='/') {
-        if(newDir.size()==1) {
-            // user entered: CD:/ or CD/
-            // means: change to container root
-            // *** might require a fix for flash fs!
-            return MFSOwner::File(streamFile->path);
-        }
-        else {
-            Debug_printv("[/]");
-            // user entered: CD:/DIR or CD/DIR
-            // means: change to a dir in container root
-            return MFSOwner::File("cs:/"+mstr::drop(newDir,1));
-        }
-    }
-    else if(newDir[0]=='_') {
-        if(newDir.size()==1) {
-            // user entered: CD:_ or CD_
-            // means: go up one directory
-            return parent();
-        }
-        else {
-            Debug_printv("[_]");
-            // user entered: CD:_DIR or CD_DIR
-            // means: go to a directory in the same directory as this one
-            return parent(mstr::drop(newDir,1));
-        }
-    }
-    if(newDir[0]=='.' && newDir[1]=='.') {
-        if(newDir.size()==2) {
-            // user entered: CD:.. or CD..
-            // means: go up one directory
-            return parent();
-        }
-        else {
-            Debug_printv("[..]");
-            // user entered: CD:..DIR or CD..DIR
-            // meaning: Go back one directory
-            return localParent(mstr::drop(newDir,2));
-        }
-    }
+//     Debug_printv("cd in CServerFile! New dir [%s]\n", newDir.c_str());
+//     if(newDir[0]=='/' && newDir[1]=='/') {
+//         if(newDir.size()==2) {
+//             // user entered: CD:// or CD//
+//             // means: change to the root of roots
+//             return MFSOwner::File("/"); // chedked, works ad flash root!
+//         }
+//         else {
+//             // user entered: CD://DIR or CD//DIR
+//             // means: change to a dir in root of roots
+//             Debug_printv("[//]");
+//             return root(mstr::drop(newDir,2));
+//         }
+//     }
+//     else if(newDir[0]=='/') {
+//         if(newDir.size()==1) {
+//             // user entered: CD:/ or CD/
+//             // means: change to container root
+//             // *** might require a fix for flash fs!
+//             return MFSOwner::File(streamFile->path);
+//         }
+//         else {
+//             Debug_printv("[/]");
+//             // user entered: CD:/DIR or CD/DIR
+//             // means: change to a dir in container root
+//             return MFSOwner::File("cs:/"+mstr::drop(newDir,1));
+//         }
+//     }
+//     else if(newDir[0]=='_') {
+//         if(newDir.size()==1) {
+//             // user entered: CD:_ or CD_
+//             // means: go up one directory
+//             return parent();
+//         }
+//         else {
+//             Debug_printv("[_]");
+//             // user entered: CD:_DIR or CD_DIR
+//             // means: go to a directory in the same directory as this one
+//             return parent(mstr::drop(newDir,1));
+//         }
+//     }
+//     if(newDir[0]=='.' && newDir[1]=='.') {
+//         if(newDir.size()==2) {
+//             // user entered: CD:.. or CD..
+//             // means: go up one directory
+//             return parent();
+//         }
+//         else {
+//             Debug_printv("[..]");
+//             // user entered: CD:..DIR or CD..DIR
+//             // meaning: Go back one directory
+//             return localParent(mstr::drop(newDir,2));
+//         }
+//     }
 
-    // ain't that redundant?
-    // if(newDir[0]=='.' && newDir[1]=='/') {
-    //     Debug_printv("[./]");
-    //     // Reference to current directory
-    //     return localParent(mstr::drop(newDir,2));
-    // }
+//     // ain't that redundant?
+//     // if(newDir[0]=='.' && newDir[1]=='/') {
+//     //     Debug_printv("[./]");
+//     //     // Reference to current directory
+//     //     return localParent(mstr::drop(newDir,2));
+//     // }
 
-    if(newDir[0]=='~' /*&& newDir[1]=='/' let's be consistent!*/) {
-        if(newDir.size() == 1) {
-            // user entered: CD:~ or CD~
-            // meaning: go to the .sys folder
-            return MFSOwner::File("/.sys");
-        }
-        else {
-            Debug_printv("[~]");
-            // user entered: CD:~FOLDER or CD~FOLDER
-            // meaning: go to a folder in .sys folder
-            return MFSOwner::File("/.sys/" + mstr::drop(newDir,1));
-        }
-    }    
-    if(newDir.find(':') != std::string::npos) {
-        // I can only guess we're CDing into another url scheme, this means we're changing whole path
-        return MFSOwner::File(newDir);
-    }
-    else {
-        // Add new directory to path
-        if(mstr::endsWith(url,"/"))
-            return MFSOwner::File(url+newDir);
-        else
-            return MFSOwner::File(url+"/"+newDir);
-    }
-};
+//     if(newDir[0]=='~' /*&& newDir[1]=='/' let's be consistent!*/) {
+//         if(newDir.size() == 1) {
+//             // user entered: CD:~ or CD~
+//             // meaning: go to the .sys folder
+//             return MFSOwner::File("/.sys");
+//         }
+//         else {
+//             Debug_printv("[~]");
+//             // user entered: CD:~FOLDER or CD~FOLDER
+//             // meaning: go to a folder in .sys folder
+//             return MFSOwner::File("/.sys/" + mstr::drop(newDir,1));
+//         }
+//     }    
+//     if(newDir.find(':') != std::string::npos) {
+//         // I can only guess we're CDing into another url scheme, this means we're changing whole path
+//         return MFSOwner::File(newDir);
+//     }
+//     else {
+//         // Add new directory to path
+//         if(mstr::endsWith(url,"/"))
+//             return MFSOwner::File(url+newDir);
+//         else
+//             return MFSOwner::File(url+"/"+newDir);
+//     }
+// };
 
 
 bool CServerFile::isDirectory() {

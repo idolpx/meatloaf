@@ -147,7 +147,7 @@ public:
 
 protected:
     std::string url;
-    bool m_isOpen;
+    bool m_isOpen = false;
     size_t m_bytesAvailable = 0;
     size_t m_length = 0;
     size_t m_position = 0;

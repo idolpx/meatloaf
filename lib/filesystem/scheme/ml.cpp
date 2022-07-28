@@ -178,10 +178,12 @@ bool MLIStream::open() {
     PeoplesUrlParser urlParser;
     urlParser.parseUrl(url);
 
+    m_isOpen = false;
+
     //String ml_url = std::string("http://" + urlParser.host + "/api/").c_str();
 	//String post_data("p=" + urlencode(m_device.path()) + "&i=" + urlencode(m_device.image()) + "&f=" + urlencode(m_filename));
     //String post_data = std::string("p=" + mstr::urlEncode(urlParser.path)).c_str(); // pathInStream will return here /c64.meatloaf.cc/some/directory
-    std::string ml_url = "http://api.meatloaf.cc/?" + urlParser.name;
+    std::string ml_url = "https://api.meatloaf.cc/?" + urlParser.name;
     //std::string post_data = urlParser.path;
 
 //    m_http.setReuse(true);
@@ -191,23 +193,31 @@ bool MLIStream::open() {
         return false;
 
     // Setup response headers we want to collect
-    const char * headerKeys[] = {"accept-ranges", "content-type", "content-length"} ;
+    const char * headerKeys[] = {"Accept-Ranges", "Content-Disposition", "Location"} ;
     const size_t numberOfHeaders = 3;
     m_http.collect_headers(headerKeys, numberOfHeaders);
 
     // Send the request
 	//uint8_t httpCode = m_http.POST(post_data.c_str(), post_data.length());
     int httpCode = m_http.GET();
-    //Debug_printv("httpCode=%d", httpCode);
-    if(httpCode != 200)
-        return false;
+    Debug_printv("http_code[%d]", httpCode);
+    if(httpCode == 200)
+    {
+        // Accept-Ranges: bytes - if we get such header from any request, good!
+        isFriendlySkipper = m_http.get_header("Accept-Ranges") == "bytes";
+        m_isOpen = true;
+        //Debug_printv("[%s]", ml_url.c_str());
+        m_length = m_http.available();
+        //m_length = atoi(m_http.get_header("Content-Length").c_str());
+        Debug_printv("length[%d]", m_length);
+        m_bytesAvailable = m_length;
+    }
 
-    // Accept-Ranges: bytes - if we get such header from any request, good!
-    isFriendlySkipper = m_http.get_header("accept-ranges") == "bytes";
-    m_isOpen = true;
-    //Debug_printv("[%s]", ml_url.c_str());
-    m_length = m_http.available(); // atoi(m_http.get_header("content-length"));
-    //Debug_printv("length=%d", m_length);
-    m_bytesAvailable = m_length;
-    return true;
+    Debug_printv("content-disposition[%s]", m_http.get_header("Content-Disposition").c_str());
+    Debug_printv("location[%s]", m_http.get_header("Location").c_str());
+
+    if ( httpCode > 399 )
+        return false;
+    else
+        return true;
 };

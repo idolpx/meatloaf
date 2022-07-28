@@ -220,7 +220,7 @@ public:
         return name;
     }
 
-    MFile* cd(std::string newDir);
+    //MFile* cd(std::string newDir);
     bool isDirectory() override;
     bool rewindDirectory() override;
     MFile* getNextFileInDir() override;
