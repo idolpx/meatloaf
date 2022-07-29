@@ -27,6 +27,7 @@
 #include "../../include/petscii.h"
 
 #include "iec.h"
+#include "disk/cbmdos.h"
 
 #include "meat_io.h"
 
@@ -52,6 +53,8 @@ class iecDisk: public iecDevice
 public:
 	iecDisk();
 	// virtual ~iecDisk() {};
+
+	CBMDOS dos;
 
  	virtual uint8_t command( void ) { return 0; };
 	virtual uint8_t execute( void ) { return 0; };
