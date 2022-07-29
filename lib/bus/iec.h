@@ -98,7 +98,7 @@ class iecDevice
 
         uint8_t device_id;
         IECData data;
-		device_state_t state;
+		device_state_t device_state;
 
     protected:
         void reset ( void );
@@ -140,7 +140,7 @@ typedef enum
     IEC_UNLISTEN = 0x3F,   // 0x3F (UNLISTEN)
     IEC_TALK = 0x40,       // 0x40 + device_id (TALK) (0-30)
     IEC_UNTALK = 0x5F,     // 0x5F (UNTALK)
-    IEC_SECOND = 0x60,     // 0x60 + channel (OPEN CHANNEL) (0-15)
+    IEC_DATA = 0x60,     // 0x60 + channel (OPEN CHANNEL) (0-15)
     IEC_CLOSE = 0xE0,      // 0xE0 + channel (CLOSE NAMED CHANNEL) (0-15)
     IEC_OPEN = 0xF0        // 0xF0 + channel (OPEN NAMED CHANNEL) (0-15)
 } bus_command_t;
@@ -161,7 +161,6 @@ class iecBus
 
     public:
         bus_state_t bus_state;
-        device_state_t device_state;
         IECData data;
 
         CBMStandardSerial protocol;

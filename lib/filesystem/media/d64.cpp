@@ -63,7 +63,11 @@ bool D64IStream::seekEntry( std::string filename )
         {
             std::string entryFilename = entry.filename;
             mstr::rtrimA0(entryFilename);
+            mstr::replaceAll(filename, "\\", "/");
+            mstr::toASCII(entryFilename);
             //Debug_printv("track[%d] sector[%d] filename[%s] entry.filename[%.16s]", track, sector, filename.c_str(), entryFilename.c_str());
+
+            Debug_printv("filename[%s] entry[%s]", filename.c_str(), entryFilename.c_str());
 
             // Read Entry From Stream
             if (entry.file_type & 0b00000111 && filename == "*")
@@ -243,7 +247,6 @@ bool D64IStream::seekPath(std::string path) {
 
     // call image method to obtain file bytes here, return true on success:
     // return D64Image.seekFile(containerIStream, path);
-    mstr::toPETSCII(path);
     if ( seekEntry(path) )
     {
         //auto entry = containerImage->entry;

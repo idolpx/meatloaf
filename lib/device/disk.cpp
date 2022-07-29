@@ -240,7 +240,7 @@ CommandPathTuple iecDisk::parseLine(std::string command, size_t channel)
 		//else if ( channel != 15 )
 		//	guessedPath = command;
 
-		//Debug_printv("guessedPath[%s]", guessedPath.c_str());
+		Debug_printv("guessedPath[%s]", guessedPath.c_str());
 	}
 	else if(mstr::startsWith(command, "@info", false))
 	{
@@ -286,6 +286,7 @@ CommandPathTuple iecDisk::parseLine(std::string command, size_t channel)
 	tuple.rawPath = guessedPath;
 
 	//Debug_printv("found command     [%s]", tuple.command.c_str());
+	Debug_printv("command[%s] raw[%s] full[%s]", tuple.command.c_str(), tuple.rawPath.c_str(), tuple.fullPath.c_str());
 
 	if(guessedPath == "$")
 	{
@@ -297,7 +298,7 @@ CommandPathTuple iecDisk::parseLine(std::string command, size_t channel)
 
 		tuple.fullPath = fullPath->url;
 
-		//Debug_printv("full referenced path [%s]", tuple.fullPath.c_str());
+		Debug_printv("full referenced path [%s]", tuple.fullPath.c_str());
 	}
 
 	//Debug_printv("* END OF PARSE LINE *******************************");
@@ -339,6 +340,7 @@ void iecDisk::prepareFileStream(std::string url)
 
 void iecDisk::handleListenCommand( void )
 {
+	// Switch device config if command is for a different Device ID
 	if (device_config.select(this->data.device))
 	{
 		Debug_printv("!!!! device changed: unit:%d current url: [%s]", device_config.id(), device_config.url().c_str());
@@ -358,11 +360,23 @@ void iecDisk::handleListenCommand( void )
 		return;
 	}
 
+	// Parse DOS Command
+	Debug_printv("Parse DOS Command [%s]", this->data.device_command.c_str());
+
+	// Execute DOS Command
+	if ( this->data.channel == CMD_CHANNEL )
+	{
+		Debug_printv("Execute DOS Command [%s]", this->data.device_command.c_str());
+		m_openState = O_STATUS;
+		return;
+	}
+
+
 	// 1. obtain command and fullPath
 	auto commandAndPath = parseLine(this->data.device_command, channel);
 	auto referencedPath = Meat::New<MFile>(commandAndPath.fullPath);
 
-	Debug_printv("command[%s]", commandAndPath.command.c_str());
+	Debug_printv("command[%s] path[%s]", commandAndPath.command.c_str(), commandAndPath.fullPath.c_str());
 	if (mstr::startsWith(commandAndPath.command, "$"))
 	{
 		m_openState = O_DIR;
@@ -425,7 +439,7 @@ void iecDisk::handleListenCommand( void )
 		// }
 	}
 
-	//dumpState();
+	dumpState();
 } // handleListenCommand
 
 
@@ -1063,6 +1077,8 @@ void iecDisk::saveFile()
 
 void iecDisk::dumpState()
 {
+	Debug_println("");
+	Debug_printv("openState: [%d]", m_openState);
 	Debug_println("");
 	Debug_printv("device_config -----------------");
 	Debug_printv("Device ID: [%d]", device_config.id());

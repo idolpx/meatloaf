@@ -186,10 +186,8 @@ int16_t  CBMStandardSerial::receiveByte ( uint8_t device )
     if ( flags bitand EOI_RECVD )
     {
         // EOI Received
-        pull ( PIN_IEC_SRQ );
         delayMicroseconds ( TIMING_Tfr );
         release ( PIN_IEC_DATA_OUT );
-        release ( PIN_IEC_SRQ );
     }
 
     return data;
@@ -347,10 +345,8 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
     if ( signalEOI )
     {
         // EOI Received
-        pull ( PIN_IEC_SRQ );
         if ( !wait ( TIMING_Tfr ) ) return false;
         release ( PIN_IEC_CLK_OUT );
-        release ( PIN_IEC_SRQ );
     }
 
     return true;

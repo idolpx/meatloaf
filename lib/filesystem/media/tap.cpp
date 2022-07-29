@@ -79,7 +79,6 @@ bool TAPIStream::seekPath(std::string path) {
     entry_index = 0;
 
     // call image method to obtain file bytes here, return true on success:
-    mstr::toPETSCII(path);
     if ( seekEntry(path) )
     {
         //auto entry = containerImage->entry;
