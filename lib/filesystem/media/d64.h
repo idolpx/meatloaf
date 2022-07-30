@@ -73,28 +73,6 @@ protected:
     };
 
     std::vector<Partition> partitions;
-    // std::vector<Partition> partitions = {
-    //     Partition(
-    //         18,    // track
-    //         0,     // sector
-    //         0x90,  // header_offset
-    //         18,    // directory_track
-    //         1,     // directory_sector
-    //         0x00,  // directory_offset
-    //         BAMInfo(
-    //             {      // block_allocation_map
-    //                 {
-    //                     18,   // track
-    //                     0,    // sector
-    //                     0x04, // offset
-    //                     1,    // start_track
-    //                     35,   // end_track
-    //                     4     // byte_count
-    //                 }
-    //             }
-    //         )            
-    //     )
-    // };
 
     // D64 Offsets
     std::vector<uint8_t> directory_header_offset = {18, 0, 0x90};

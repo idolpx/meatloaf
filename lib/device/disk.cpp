@@ -41,11 +41,13 @@ iecDisk::iecDisk()
 } // ctor
 
 
-void iecDisk::reset(void)
+void iecDisk::reset ( void )
 {
+    Debug_printv("Device reset");
+    this->data.init(); // Clear device command
+    device_state = DEVICE_IDLE;
 	m_openState = O_NOTHING;
 	setDeviceStatus(73);
-	//device_config.reset();
 } // reset
 
 
@@ -61,13 +63,15 @@ void iecDisk::sendStatus(void)
 	if (status.size() == 0)
 		status = "00, OK,00,00";
 
-	Debug_printv("status: {%s}", status.c_str());
+	//Debug_printv("status: {%s}", status.c_str());
 	//Debug_print("[");
 
  	IEC.send(status);
 	IEC.sendEOI('\x0D');
 
 	//Debug_println(BACKSPACE "]");
+
+	Debug_printf("\r\n{%s}\r\n", status.c_str());
 
 	// Clear the status message
 	m_device_status.clear();
@@ -367,14 +371,18 @@ void iecDisk::handleListenCommand( void )
 	if ( this->data.channel == CMD_CHANNEL )
 	{
 		Debug_printv("Execute DOS Command [%s]", this->data.device_command.c_str());
-		m_openState = O_STATUS;
-		return;
 	}
 
 
 	// 1. obtain command and fullPath
 	auto commandAndPath = parseLine(this->data.device_command, channel);
 	auto referencedPath = Meat::New<MFile>(commandAndPath.fullPath);
+
+	if ( referencedPath == nullptr )
+	{
+		sendFileNotFound();
+		return;
+	}
 
 	Debug_printv("command[%s] path[%s]", commandAndPath.command.c_str(), commandAndPath.fullPath.c_str());
 	if (mstr::startsWith(commandAndPath.command, "$"))
@@ -448,13 +456,12 @@ void iecDisk::handleListenData()
 	Debug_printv("[%s]", device_config.url().c_str());
 
 	saveFile();
-	this->data.init();
 } // handleListenData
 
 
 void iecDisk::handleTalk(uint8_t chan)
 {
-	//Debug_printv("channel[%d] openState[%d]", chan, m_openState);
+	Debug_printv("channel[%d] openState[%d]", chan, m_openState);
 
 	switch (m_openState)
 	{
@@ -488,7 +495,6 @@ void iecDisk::handleTalk(uint8_t chan)
 	}
 
 	m_openState = O_NOTHING;
-	this->data.init();
 } // handleTalk
 
 // send single basic line, including heading basic pointer and terminating zero.
@@ -858,19 +864,28 @@ void iecDisk::sendFile()
 			return;
 		}
 
+		if( IEC.data.channel == 0 )
+		{
+			// Position file pointer to beginning of file
+			istream->seek(0);
+
+			// Get/Send file load address
+			i = 2;
+			istream->read(&b, 1);
+			success = IEC.send(b);
+			load_address = b & 0x00FF; // low byte
+			sys_address = b;
+			istream->read(&b, 1);
+			success = IEC.send(b);
+			load_address = load_address | b << 8;  // high byte
+			sys_address += b * 256;
+
+			// Get SYSLINE
+		}
+
+
 		// Position file pointer
 		istream->seek(currentChannel.cursor);
-
-		// Get/Send file load address
-		i = 2;
-		istream->read(&b, 1);
-		success = IEC.send(b);
-		load_address = b & 0x00FF; // low byte
-		sys_address = b;
-		istream->read(&b, 1);
-		success = IEC.send(b);
-		load_address = load_address | b << 8;  // high byte
-		sys_address += b * 256;
 
 		size_t len = istream->size();
 		size_t avail = istream->available();
@@ -943,7 +958,7 @@ void iecDisk::sendFile()
 			//i++;
 		}
 		istream->close();
-		Debug_printf("=================================\r\n%d of %d bytes sent [SYS%d]\r\n", i, len, sys_address);
+		Debug_printf("\r\n=================================\r\n%d of %d bytes sent [SYS%d]\r\n", i, len, sys_address);
 
 		//Debug_printv("len[%d] avail[%d] success[%d]", len, avail, success);		
 	}

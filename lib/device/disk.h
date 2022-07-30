@@ -65,7 +65,7 @@ protected:
 
 
 private:
-	void reset(void);
+	void reset(void) override;
 
 	// Directory Navigation & Listing
 	bool m_show_extension = true;

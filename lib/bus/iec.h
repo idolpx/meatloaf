@@ -24,6 +24,8 @@
 #include "protocol/cbmstandardserial.h"
 //#include "protocol/jiffydos.h"
 
+#include "../../include/debug.h"
+
 
 #define IEC_CMD_MAX_LENGTH  100
 
@@ -36,6 +38,7 @@ typedef enum
     DEVICE_IDLE = 0,       // Ready and waiting
     DEVICE_LISTEN = 1,     // A command is recieved and data is coming to us
     DEVICE_TALK = 2,       // A command is recieved and we must talk now
+    DEVICE_PROCESS = 3,    // Execute device command
 } device_state_t;
 
 class IECData
@@ -101,7 +104,7 @@ class iecDevice
 		device_state_t device_state;
 
     protected:
-        void reset ( void );
+        virtual void reset ( void ) = 0;
 
         // handler helpers.
         virtual void handleListenCommand ( void ) = 0;
