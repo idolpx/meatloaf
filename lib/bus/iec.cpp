@@ -514,7 +514,7 @@ bus_state_t iecBus::deviceListen ( void )
     else if ( this->data.secondary == IEC_CLOSE )
     {
         // Debug_printf(" (E0 CLOSE) (%.2X CHANNEL)\r\n", this->data.channel);
-        return BUS_ACTIVE;
+        return BUS_PROCESS;
     }
 
     // Unknown
