@@ -26,24 +26,12 @@
 
 class D64IStream : public CBMImageStream {
 
-public:
-    D64IStream(std::shared_ptr<MIStream> is) : CBMImageStream(is) {};
-
 protected:
 
     struct Header {
         char disk_name[16];
         char unused[2];
         char id_dos[5];
-    };
-
-    struct BAMInfo {
-        uint8_t track;
-        uint8_t sector;
-        uint8_t offset;
-        uint8_t start_track;
-        uint8_t end_track;
-        uint8_t byte_count;
     };
 
     struct Entry {
@@ -65,12 +53,80 @@ protected:
         uint16_t blocks;
     };
 
+    struct BAMInfo {
+        uint8_t track;
+        uint8_t sector;
+        uint8_t offset;
+        uint8_t start_track;
+        uint8_t end_track;
+        uint8_t byte_count;
+    };
+
+    struct Partition {
+        uint8_t track;
+        uint8_t sector;
+        uint8_t header_offset;
+        uint8_t directory_track;
+        uint8_t directory_sector;
+        uint8_t directory_offset;
+        std::vector<BAMInfo> block_allocation_map;
+    };
+
+    std::vector<Partition> partitions;
+    // std::vector<Partition> partitions = {
+    //     Partition(
+    //         18,    // track
+    //         0,     // sector
+    //         0x90,  // header_offset
+    //         18,    // directory_track
+    //         1,     // directory_sector
+    //         0x00,  // directory_offset
+    //         BAMInfo(
+    //             {      // block_allocation_map
+    //                 {
+    //                     18,   // track
+    //                     0,    // sector
+    //                     0x04, // offset
+    //                     1,    // start_track
+    //                     35,   // end_track
+    //                     4     // byte_count
+    //                 }
+    //             }
+    //         )            
+    //     )
+    // };
 
     // D64 Offsets
     std::vector<uint8_t> directory_header_offset = {18, 0, 0x90};
     std::vector<uint8_t> directory_list_offset = {18, 1, 0x00};
     std::vector<BAMInfo> block_allocation_map = { {18, 0, 0x04, 1, 35, 4} };
     std::vector<uint8_t> sectorsPerTrack = { 17, 18, 19, 21 };
+
+public:
+    D64IStream(std::shared_ptr<MIStream> is) : CBMImageStream(is) 
+    {
+        // D64 Offsets
+        directory_header_offset = {18, 0, 0x90};
+        directory_list_offset = {18, 1, 0x00};
+        block_allocation_map = { {18, 0, 0x04, 1, 35, 4} };
+        sectorsPerTrack = { 17, 18, 19, 21 };
+
+        // Partition p;
+        // std::vector<BAMInfo> b = { {18, 0, 0x04, 1, 35, 4} };
+        // p = {
+        //     18,    // track
+        //     0,     // sector
+        //     0x90,  // header_offset
+        //     18,    // directory_track
+        //     1,     // directory_sector
+        //     0x00,  // directory_offset
+        //     b      // block_allocation_map
+        // };
+        // partitions.push_back(p);
+    };
+
+
+
     //uint8_t sector_buffer[256] = { 0 };
 
     bool seekSector( uint8_t track, uint8_t sector, size_t offset = 0 );

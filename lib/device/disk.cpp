@@ -732,7 +732,7 @@ void iecDisk::sendListing()
 	IEC.send(0);
 	IEC.sendEOI(0);
 
-	Debug_printf("=================================\r\n%d bytes sent\r\n", byte_count);
+	Debug_printf("\r\n=================================\r\n%d bytes sent\r\n", byte_count);
 
 	fnLedManager.set(eLed::LED_BUS, true);
 } // sendListing
@@ -816,6 +816,8 @@ void iecDisk::sendFile()
 			return;
 		}
 
+		// Position file pointer
+		//istream->seek(currentChannel.cursor);
 
 		//we can skip the BOM here, EF BB BF for UTF8
 		auto b = (char)istream.get();
@@ -857,7 +859,7 @@ void iecDisk::sendFile()
 		}
 
 		// Position file pointer
-		// istream->seek(currentChannel.cursor);
+		istream->seek(currentChannel.cursor);
 
 		// Get/Send file load address
 		i = 2;
