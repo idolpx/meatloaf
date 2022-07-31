@@ -57,7 +57,7 @@
 //#define IEC_INVERTED_LINES
 
 // Reset line is available
-//#define IEC_HAS_RESET
+#define IEC_HAS_RESET
 
 // // CBM IEC Serial Port
 // #define PIN_IEC_ATN         GPIO_NUM_39      // SIO 7  - CMD  - Command

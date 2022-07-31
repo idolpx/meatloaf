@@ -53,19 +53,18 @@ public:
 	iecDisk();
 	// virtual ~iecDisk() {};
 
- 	virtual uint8_t command( void ) { return 0; };
-	virtual uint8_t execute( void ) { return 0; };
-	virtual uint8_t status(void) { return 0; };
+ 	uint8_t command( void ) override { return 0; };
+	uint8_t execute( void ) override { return 0; };
+	uint8_t status(void) override { return 0; };
+	void reset(void) override;	
 
 protected:
 	// handler helpers.
-	virtual void handleListenCommand( void ) override;
-	virtual void handleListenData(void) override;
-	virtual void handleTalk(uint8_t chan) override;
-
+	void handleListenCommand( void ) override;
+	void handleListenData(void) override;
+	void handleTalk(uint8_t chan) override;
 
 private:
-	void reset(void) override;
 
 	// Directory Navigation & Listing
 	bool m_show_extension = true;

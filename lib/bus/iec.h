@@ -98,13 +98,13 @@ class iecDevice
         virtual uint8_t command ( void ) = 0;
         virtual uint8_t execute ( void ) = 0;
         virtual uint8_t status ( void ) = 0;
+        virtual void reset ( void ) = 0;
 
         uint8_t device_id;
         IECData data;
 		device_state_t device_state;
 
     protected:
-        virtual void reset ( void ) = 0;
 
         // handler helpers.
         virtual void handleListenCommand ( void ) = 0;
