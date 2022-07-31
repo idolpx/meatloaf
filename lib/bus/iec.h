@@ -225,6 +225,7 @@ class iecBus
 		// device_state_t deviceClose(void);     // 0xE0 + channel     Close, channel (0–15)
 		// device_state_t deviceOpen(void);      // 0xF0 + channel     Open, channel (0–15)
 		bool turnAround( void );
+        bool undoTurnAround ( void );
 
         void releaseLines ( void );
 };

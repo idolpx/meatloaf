@@ -318,8 +318,8 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
         // tell listner to wait
         pull ( PIN_IEC_CLK_OUT );
 
-        // // Release data line after bit sent
-        // release ( PIN_IEC_DATA_OUT );
+        // Release data line after bit sent
+        release ( PIN_IEC_DATA_OUT );
     }
 
 
@@ -428,7 +428,7 @@ bool CBMStandardSerial::wait ( size_t wait )
         if ( atn_check != atn_status )
         {
             // release ( PIN_IEC_SRQ );
-            Debug_printv("wait[%d] elapsed[%d]", wait, elapsed);
+            // Debug_printv("wait[%d] elapsed[%d]", wait, elapsed);
             return false;
         }
     }

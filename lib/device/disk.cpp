@@ -177,11 +177,13 @@ MFile* iecDisk::getPointed(MFile* urlFile) {
 
 	istream.open();
 
-    if(!istream.is_open()) {
+    if( !istream.is_open() ) 
+	{
         Debug_printf("couldn't open stream of urlfile");
 		return nullptr;
     }
-	else {
+	else 
+	{
 		std::string linkUrl;
 		istream >> linkUrl;
 		Debug_printv("path read from [%s]=%s", urlFile->url.c_str(), linkUrl.c_str());
@@ -347,9 +349,9 @@ void iecDisk::handleListenCommand( void )
 	// Switch device config if command is for a different Device ID
 	if (device_config.select(this->data.device))
 	{
-		Debug_printv("!!!! device changed: unit:%d current url: [%s]", device_config.id(), device_config.url().c_str());
+		// Debug_printv("!!!! device changed: unit:%d current url: [%s]", device_config.id(), device_config.url().c_str());
 		m_mfile.reset(MFSOwner::File(device_config.url()));
-		Debug_printv("m_mfile[%s]", m_mfile->url.c_str());
+		// Debug_printv("m_mfile[%s]", m_mfile->url.c_str());
 	}
 
 	size_t channel = this->data.channel;
@@ -357,7 +359,7 @@ void iecDisk::handleListenCommand( void )
 
 	if (this->data.device_command.length() == 0 )
 	{
-		Debug_printv("No command to process");
+		// Debug_printv("No command to process");
 
 		if ( this->data.channel == CMD_CHANNEL )
 			m_openState = O_STATUS;
@@ -502,9 +504,23 @@ void iecDisk::handleTalk(uint8_t chan)
 	m_openState = O_NOTHING;
 } // handleTalk
 
+
+
 // send single basic line, including heading basic pointer and terminating zero.
 uint16_t iecDisk::sendLine(uint16_t &basicPtr, uint16_t blocks, const char *format, ...)
 {
+	// Debug_printv("bus[%d]", IEC.bus_state);
+
+	// Exit if ATN is PULLED while sending
+	// Exit if there is an error while sending
+	if ( IEC.bus_state == BUS_ERROR )
+	{
+		// Save file pointer position
+		//channelUpdate(basicPtr);
+		setDeviceStatus(74);
+		return 0;
+	}
+
 	// Format our string
 	va_list args;
 	va_start(args, format);
@@ -521,10 +537,10 @@ uint16_t iecDisk::sendLine(uint16_t &basicPtr, uint16_t blocks, char *text)
 
 	// Exit if ATN is PULLED while sending
 	// Exit if there is an error while sending
-	if ( IEC.protocol.flags bitand ( ATN_PULLED & ERROR ) )
+	if ( IEC.bus_state == BUS_ERROR )
 	{
 		// Save file pointer position
-		channelUpdate(basicPtr);
+		// channelUpdate(basicPtr);
 		setDeviceStatus(74);
 		return 0;
 	}
@@ -546,9 +562,11 @@ uint16_t iecDisk::sendLine(uint16_t &basicPtr, uint16_t blocks, char *text)
 	// Send line contents
 	for (uint8_t i = 0; i < len; i++)
 	{
-		IEC.send(text[i]);
-		if ( IEC.protocol.flags bitand ERROR )
+		if ( !IEC.send(text[i]) )
+		{
+			IEC.bus_state = BUS_ERROR;
 			return 0;
+		}
 	}
 
 	// Finish line
@@ -558,22 +576,6 @@ uint16_t iecDisk::sendLine(uint16_t &basicPtr, uint16_t blocks, char *text)
 
 	return len + 5;
 } // sendLine
-
-// uint16_t iecDisk::sendHeader(uint16_t &basicPtr, const char *format, ...)
-// {
-// 	Debug_printv("formatting header");
-
-// 	// Format our string
-// 	va_list args;
-// 	va_start(args, format);
-// 	char text[vsnprintf(NULL, 0, format, args) + 1];
-// 	vsnprintf(text, sizeof text, format, args);
-// 	va_end(args);
-
-// 	Debug_printv("header[%s]", text);
-
-// 	return sendHeader(basicPtr, std::string(text));
-// }
 
 uint16_t iecDisk::sendHeader(uint16_t &basicPtr, std::string header, std::string id)
 {
@@ -720,10 +722,10 @@ void iecDisk::sendListing()
 		{
 			// Exit if ATN is PULLED while sending
 			// Exit if there is an error while sending
-			if ( IEC.protocol.flags bitand ( ATN_PULLED & ERROR ) )
+			if ( IEC.bus_state == BUS_ERROR )
 			{
 				// Save file pointer position
-				channelUpdate(byte_count);
+				// channelUpdate(byte_count);
 				setDeviceStatus(74);
 				return;
 			}
