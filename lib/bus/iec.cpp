@@ -173,7 +173,7 @@ Channel iecDevice::channelSelect ( void )
     // create and add channel if not found
     auto newChannel = Channel();
     newChannel.url = this->data.device_command;
-    newChannel.cursor = 0;
+    newChannel.cursor = 1;
     newChannel.writing = false;
     Debug_printv ( "CHANNEL device[%d] channel[%d] url[%s]", this->data.device, this->data.channel, this->data.device_command.c_str() );
 

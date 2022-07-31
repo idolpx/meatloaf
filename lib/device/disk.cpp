@@ -876,9 +876,6 @@ void iecDisk::sendFile()
 
 		if( IEC.data.channel == 0 )
 		{
-			// // Position file pointer to beginning of file
-			// istream->seek(0);
-
 			// Get/Send file load address
 			i = 2;
 			istream->read(&b, 1);
