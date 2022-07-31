@@ -448,7 +448,7 @@ void iecBus::service ( void )
         // At the moment there is only the multi-disk device
         if ( this->bus_state == BUS_PROCESS )
         {
-            // Debug_printv( "deviceProcess" );
+            Debug_printv( "DEV process" );
             // Process command on devices
 
             disk.process();
@@ -518,6 +518,7 @@ bus_state_t iecBus::deviceListen ( void )
             return BUS_PROCESS;
         }
 
+        this->data.device_command = "";
         Debug_printf ( "\r\n" );
         return BUS_ACTIVE;
     }
