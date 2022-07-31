@@ -290,11 +290,11 @@ CommandPathTuple iecDisk::parseLine(std::string command, size_t channel)
 	tuple.rawPath = guessedPath;
 
 	//Debug_printv("found command     [%s]", tuple.command.c_str());
-	Debug_printv("command[%s] raw[%s] full[%s]", tuple.command.c_str(), tuple.rawPath.c_str(), tuple.fullPath.c_str());
+	//Debug_printv("command[%s] raw[%s] full[%s]", tuple.command.c_str(), tuple.rawPath.c_str(), tuple.fullPath.c_str());
 
 	if(guessedPath == "$")
 	{
-		Debug_printv("get directory of [%s]", m_mfile->url.c_str());
+		//Debug_printv("get directory of [%s]", m_mfile->url.c_str());
 	}
 	else if(!guessedPath.empty())
 	{
@@ -302,7 +302,7 @@ CommandPathTuple iecDisk::parseLine(std::string command, size_t channel)
 
 		tuple.fullPath = fullPath->url;
 
-		Debug_printv("full referenced path [%s]", tuple.fullPath.c_str());
+		//Debug_printv("full referenced path [%s]", tuple.fullPath.c_str());
 	}
 
 	//Debug_printv("* END OF PARSE LINE *******************************");
@@ -312,7 +312,7 @@ CommandPathTuple iecDisk::parseLine(std::string command, size_t channel)
 
 void iecDisk::changeDir(std::string url)
 {
-	Debug_printv("url[%s]", url.c_str());
+	//Debug_printv("url[%s]", url.c_str());
 	device_config.url(url);
 	m_mfile.reset(MFSOwner::File(url));
 
@@ -384,7 +384,7 @@ void iecDisk::handleListenCommand( void )
 		return;
 	}
 
-	Debug_printv("command[%s] path[%s]", commandAndPath.command.c_str(), commandAndPath.fullPath.c_str());
+	//Debug_printv("command[%s] path[%s]", commandAndPath.command.c_str(), commandAndPath.fullPath.c_str());
 	if (mstr::startsWith(commandAndPath.command, "$"))
 	{
 		m_openState = O_DIR;
@@ -447,7 +447,12 @@ void iecDisk::handleListenCommand( void )
 		// }
 	}
 
-	dumpState();
+	if ( this->data.channel == CMD_CHANNEL )
+	{
+		m_openState = O_NOTHING;
+	}
+
+	// dumpState();
 } // handleListenCommand
 
 
@@ -461,7 +466,7 @@ void iecDisk::handleListenData()
 
 void iecDisk::handleTalk(uint8_t chan)
 {
-	Debug_printv("channel[%d] openState[%d]", chan, m_openState);
+	//Debug_printv("channel[%d] openState[%d]", chan, m_openState);
 
 	switch (m_openState)
 	{
@@ -864,10 +869,15 @@ void iecDisk::sendFile()
 			return;
 		}
 
+		// Position file pointer
+		i = currentChannel.cursor;
+		Debug_printv("cursor[%d]", i);
+		istream->seek(i);
+
 		if( IEC.data.channel == 0 )
 		{
-			// Position file pointer to beginning of file
-			istream->seek(0);
+			// // Position file pointer to beginning of file
+			// istream->seek(0);
 
 			// Get/Send file load address
 			i = 2;
@@ -882,10 +892,6 @@ void iecDisk::sendFile()
 
 			// Get SYSLINE
 		}
-
-
-		// Position file pointer
-		istream->seek(currentChannel.cursor);
 
 		size_t len = istream->size();
 		size_t avail = istream->available();
@@ -938,8 +944,8 @@ void iecDisk::sendFile()
 			if ( IEC.protocol.flags bitand ATN_PULLED )
 			{
 				// Save file pointer position
-				channelUpdate(istream->position());
-				setDeviceStatus(74);
+				channelUpdate( --i );
+				setDeviceStatus( 74 );
 				success = true;
 				break;
 			}
