@@ -67,7 +67,8 @@ int16_t  CBMStandardSerial::receiveByte ( uint8_t device )
     // will  do  nothing.    The  listener  should  be  watching,  and  if  200  microseconds  pass
     // without  the Clock line going to true, it has a special task to perform: note EOI.
 
-    if ( timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMEOUT_Tne ) == TIMED_OUT )
+    pull ( PIN_IEC_SRQ );
+    if ( timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMEOUT_Tne, false ) == TIMED_OUT )
     {
         // INTERMISSION: EOI
         // If the Ready for Data signal isn't acknowledged by the talker within 200 microseconds, the
@@ -82,6 +83,8 @@ int16_t  CBMStandardSerial::receiveByte ( uint8_t device )
         // it will pull the Clock line  true,  and  transmission  will  continue.  At  this point,  the  Clock
         // line  is  true  whether  or  not  we have gone through the EOI sequence; we're back to a common
         // transmission sequence.
+
+        Debug_printv("EOI!");
 
         flags or_eq EOI_RECVD;
 
@@ -98,6 +101,7 @@ int16_t  CBMStandardSerial::receiveByte ( uint8_t device )
             return -1; // return error because timeout
         }
     }
+    release ( PIN_IEC_SRQ );
 
 
     // STEP 3: SENDING THE BITS
@@ -354,7 +358,7 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
 
 
 // Wait indefinitely if wait = 0 or until ATN status changes
-int16_t CBMStandardSerial::timeoutWait ( uint8_t pin, bool target_status, size_t wait )
+int16_t CBMStandardSerial::timeoutWait ( uint8_t pin, bool target_status, size_t wait, bool watch_atn )
 {
     uint64_t start, current, elapsed;
     elapsed = 0;
@@ -383,15 +387,18 @@ int16_t CBMStandardSerial::timeoutWait ( uint8_t pin, bool target_status, size_t
             return -1;
         }
 
-        bool atn_check = status ( PIN_IEC_ATN );
-        if ( atn_check )
-            flags or_eq ATN_PULLED;
-
-        if ( atn_check != atn_status )
+        if ( watch_atn )
         {
-            // release ( PIN_IEC_SRQ );
-            Debug_printv("pin[%d] state[%d] wait[%d] elapsed[%d]", pin, target_status, wait, elapsed);
-            return -1;
+            bool atn_check = status ( PIN_IEC_ATN );
+            if ( atn_check )
+                flags or_eq ATN_PULLED;
+
+            if ( atn_check != atn_status )
+            {
+                // release ( PIN_IEC_SRQ );
+                Debug_printv("pin[%d] state[%d] wait[%d] elapsed[%d]", pin, target_status, wait, elapsed);
+                return -1;
+            }            
         }
     }
 

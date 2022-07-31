@@ -321,7 +321,7 @@ void iecBus::service ( void )
     if ( this->bus_state == BUS_ACTIVE || protocol.status ( PIN_IEC_ATN ) )
     {
         // ATN was pulled read control code from the bus
-        IEC.protocol.pull ( PIN_IEC_SRQ );
+        // IEC.protocol.pull ( PIN_IEC_SRQ );
         int16_t c = ( bus_command_t ) receive ( this->data.device );
         // IEC.protocol.release ( PIN_IEC_SRQ );
 
@@ -364,6 +364,7 @@ void iecBus::service ( void )
 
                 case IEC_UNLISTEN:
                     this->data.primary = IEC_UNLISTEN;
+                    this->bus_state = BUS_IDLE;
                     Debug_printf ( " (3F UNLISTEN)\r\n" );
                     break;
 
@@ -376,7 +377,6 @@ void iecBus::service ( void )
                 case IEC_UNTALK:
                     this->data.primary = IEC_UNTALK;
                     this->bus_state = BUS_IDLE;
-                    undoTurnAround();
                     Debug_printf ( " (5F UNTALK)\r\n" );
                     break;
 
@@ -413,18 +413,14 @@ void iecBus::service ( void )
         if ( this->bus_state < BUS_ACTIVE )
             releaseLines();          
 
-        // IEC.protocol.pull( PIN_IEC_SRQ );
-        protocol.wait( 20 );
-        // IEC.protocol.release( PIN_IEC_SRQ );
-
         // Debug_printv ( "code[%.2X] primary[%.2X] secondary[%.2X] bus[%d]", command, this->data.primary, this->data.secondary, this->bus_state );
         // Debug_printv( "primary[%.2X] secondary[%.2X] bus_state[%d]", this->data.primary, this->data.secondary, this->bus_state );
-        IEC.protocol.release ( PIN_IEC_SRQ );
+        // IEC.protocol.release ( PIN_IEC_SRQ );
     }
 
     if ( this->bus_state == BUS_PROCESS )
     {
-        IEC.protocol.pull( PIN_IEC_SRQ );
+        // IEC.protocol.pull( PIN_IEC_SRQ );
         // Debug_println ( "DATA MODE" );
         // Debug_printv ( "bus[%d] device[%d] primary[%d] secondary[%d]", this->bus_state, this->device_state, this->data.primary, this->data.secondary );
 
@@ -463,9 +459,14 @@ void iecBus::service ( void )
         //     this->bus_state = BUS_IDLE;
         // }
 
+        // Let bus settle
+        // IEC.protocol.pull( PIN_IEC_SRQ );
+        protocol.wait( 20 );
+        // IEC.protocol.release( PIN_IEC_SRQ );
+
         // Debug_printv( "primary[%.2X] secondary[%.2X] bus_state[%d]", this->data.primary, this->data.secondary, this->bus_state );
         // Debug_printv( "atn[%d] clk[%d] data[%d] srq[%d]", IEC.protocol.status(PIN_IEC_ATN), IEC.protocol.status(PIN_IEC_CLK_IN), IEC.protocol.status(PIN_IEC_DATA_IN), IEC.protocol.status(PIN_IEC_SRQ));
-        IEC.protocol.release ( PIN_IEC_SRQ );
+        // IEC.protocol.release ( PIN_IEC_SRQ );
     }
 
 

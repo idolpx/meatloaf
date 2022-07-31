@@ -50,7 +50,7 @@
 #define TIMEOUT_Tat    1000    // ATN RESPONSE (REQUIRED)     -      -          1000us      (If maximum time exceeded, device not present error.)
 #define TIMING_Th      0       // LISTENER HOLD-OFF           0      -          infinte
 #define TIMING_Tne     40      // NON-EOI RESPONSE TO RFD     -      40us       200us       (If maximum time exceeded, EOI response required.)
-#define TIMEOUT_Tne    200
+#define TIMEOUT_Tne    250
 #define TIMING_Ts      70      // BIT SET-UP TALKER           20us   70us       -           
 #define TIMING_Tv      60      // DATA VALID                  20us   20us       -           (Tv and Tpr minimum must be 60μ s for external device to be a talker. )
 #define TIMING_Tf      20      // FRAME HANDSHAKE             0      20us       1000us      (If maximum time exceeded, frame error.)
@@ -97,7 +97,7 @@ namespace Protocol
 
             virtual int16_t receiveByte ( uint8_t device );
             virtual bool sendByte ( uint8_t data, bool signalEOI );
-            int16_t timeoutWait ( uint8_t pin, bool target_status, size_t wait = TIMEOUT );
+            int16_t timeoutWait ( uint8_t pin, bool target_status, size_t wait = TIMEOUT, bool watch_atn = true );
             bool wait ( size_t wait );
 
 
