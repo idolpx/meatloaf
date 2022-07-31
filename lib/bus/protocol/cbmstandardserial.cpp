@@ -67,7 +67,7 @@ int16_t  CBMStandardSerial::receiveByte ( uint8_t device )
     // will  do  nothing.    The  listener  should  be  watching,  and  if  200  microseconds  pass
     // without  the Clock line going to true, it has a special task to perform: note EOI.
 
-    pull ( PIN_IEC_SRQ );
+    // pull ( PIN_IEC_SRQ );
     if ( timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMEOUT_Tne, false ) == TIMED_OUT )
     {
         // INTERMISSION: EOI
@@ -84,7 +84,7 @@ int16_t  CBMStandardSerial::receiveByte ( uint8_t device )
         // line  is  true  whether  or  not  we have gone through the EOI sequence; we're back to a common
         // transmission sequence.
 
-        Debug_printv("EOI!");
+        // Debug_printv("EOI!");
 
         flags or_eq EOI_RECVD;
 
@@ -101,7 +101,7 @@ int16_t  CBMStandardSerial::receiveByte ( uint8_t device )
             return -1; // return error because timeout
         }
     }
-    release ( PIN_IEC_SRQ );
+    // release ( PIN_IEC_SRQ );
 
 
     // STEP 3: SENDING THE BITS
