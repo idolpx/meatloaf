@@ -412,7 +412,7 @@ void iecBus::service ( void )
             releaseLines();
 
         // IEC.protocol.pull( PIN_IEC_SRQ );
-        protocol.wait( 20 );
+        // protocol.wait( 20 );
         // IEC.protocol.release( PIN_IEC_SRQ );
 
         // Debug_printv ( "code[%.2X] primary[%.2X] secondary[%.2X] bus[%d]", command, this->data.primary, this->data.secondary, this->bus_state );
