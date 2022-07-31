@@ -636,7 +636,7 @@ void iecBus::releaseLines ( void )
     protocol.release ( PIN_IEC_CLK_OUT );
     protocol.release ( PIN_IEC_DATA_OUT );
 
-    Debug_printv("release");
+    //Debug_printv("release");
 
     // IEC.protocol.release ( PIN_IEC_SRQ );
 }
