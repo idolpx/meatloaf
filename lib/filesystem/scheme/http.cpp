@@ -87,24 +87,31 @@ bool HttpOStream::seek(size_t pos) {
 
     if(isFriendlySkipper) {
         char str[40];
+
         // Range: bytes=91536-(91536+255)
         snprintf(str, sizeof str, "bytes=%lu-%lu", (unsigned long)pos, ((unsigned long)pos + 255));
-        m_http.set_header("range",str);
-        int httpCode = m_http.GET(); //Send the request
+        esp_http_client_set_header(m_http, "range", str);
+        esp_http_client_set_method(m_http, HTTP_METHOD_GET);
+        esp_err_t initOk = esp_http_client_perform(m_http); // or open? It's not entirely clear...
+
+        Debug_printv("SEEK ing in input %s: someRc=%d", url.c_str(), initOk);
+        if(initOk != ESP_OK)
+            return false;
+
+        int httpCode = esp_http_client_get_status_code(m_http);
         Debug_printv("httpCode[%d] str[%s]", httpCode, str);
         if(httpCode != 200 || httpCode != 206)
             return false;
 
         Debug_printv("stream opened[%s]", url.c_str());
-        //m_file = m_http.getStream();  //Get the response payload as Stream
+
         m_position = pos;
         m_bytesAvailable = m_length-pos;
         return true;
-
     } else {
         if(pos<m_position) {
             // skipping backward and range not supported, let's simply reopen the stream...
-            m_http.close();
+            esp_http_client_close(m_http);
             bool op = open();
             if(!op)
                 return false;
@@ -112,49 +119,83 @@ bool HttpOStream::seek(size_t pos) {
 
         m_position = 0;
         // ... and then read until we reach pos
-        // while(m_position < pos) {
-        //  m_position+=m_file.readBytes(buffer, size);  <----------- trurn this on!!!!
-        // }
+        while(m_position < pos) {
+            // auto bytesRead= esp_http_client_read(m_http, (char *)buf, size );
+        }
         m_bytesAvailable = m_length-pos;
 
         return true;
     }
 }
 
-
-
 void HttpOStream::close() {
-    m_http.close();
+    esp_http_client_close(m_http);
+    esp_http_client_cleanup(m_http);
 }
 
 bool HttpOStream::open() {
-    // we'll ad a lambda that will allow adding headers
-    // m_http.addHeader("Content-Type", "application/x-www-form-urlencoded");
-    mstr::replaceAll(url, "HTTP:", "http:");
-//    m_http.setReuse(true);
-    bool initOk = m_http.begin( url );
-    Debug_printv("[%s] initOk[%d]", url.c_str(), initOk);
-    if(!initOk)
+    //mstr::replaceAll(url, "HTTP:", "http:");
+    esp_http_client_config_t config = {
+        .url = url.c_str(),
+        .user_agent = USER_AGENT,
+        .method = HTTP_METHOD_PUT,
+        .timeout_ms = 10000,
+        .disable_auto_redirect = false,
+        .max_redirection_count = 10,
+        .keep_alive_enable = true,
+        .keep_alive_idle = 10,
+        .keep_alive_interval = 10,
+    };
+    m_http = esp_http_client_init(&config);
+    esp_err_t initOk = esp_http_client_perform(m_http); // or open? It's not entirely clear...
+
+    Debug_printv("upening %s: result=%d", url.c_str(), initOk);
+    if(initOk != ESP_OK)
         return false;
 
-    //int httpCode = m_http.PUT(); //Send the request
-//Serial.printf("URLSTR: httpCode=%d\n", httpCode);
-    // if(httpCode != 200)
-    //     return false;
+    int httpCode = esp_http_client_get_status_code(m_http);
+    Debug_printv("httpCode=%d", httpCode);
+    if(httpCode != 200)
+        return false;
 
     m_isOpen = true;
-    //m_file = m_http.getStream();  //Get the response payload as Stream
-    return true;
-}
+    m_position = 0;
 
-//size_t HttpOStream::write(uint8_t) {};
-size_t HttpOStream::write(const uint8_t *buf, size_t size) {
-    return 0; // m_file.write(buf, size);
-}
+    esp_http_client_fetch_headers(m_http);
+
+    // Let's get the length of the payload
+    m_length = esp_http_client_get_content_length(m_http);
+    m_bytesAvailable = m_length;
+
+    // Does this server support resume?
+    // Accept-Ranges: bytes
+    char* ranges;
+    esp_http_client_get_header(m_http, "accept-ranges", &ranges);
+    isFriendlySkipper = strcmp("bytes", ranges);
+
+    // Let's see if it's plain text, so we can do UTF8-PETSCII magic!
+    char* ct;
+    esp_http_client_get_header(m_http, "content-type", &ct);
+    std::string asString = ct;
+    isText = mstr::isText(asString);
+
+    Debug_printv("length=%d isFriendlySkipper=[%d] content_type=[%s]", m_length, isFriendlySkipper, ct);
+
+    return true;
+};
+
+size_t HttpOStream::write(const uint8_t* buf, size_t size) {
+    auto bytesRead= esp_http_client_read(m_http, (char *)buf, size );
+    m_bytesAvailable -= bytesRead;
+    m_position+=bytesRead;
+    return bytesRead;
+};
 
 bool HttpOStream::isOpen() {
     return m_isOpen;
-}
+};
+
+
 
 
 /********************************************************
@@ -178,24 +219,31 @@ bool HttpIStream::seek(size_t pos) {
 
     if(isFriendlySkipper) {
         char str[40];
+
         // Range: bytes=91536-(91536+255)
         snprintf(str, sizeof str, "bytes=%lu-%lu", (unsigned long)pos, ((unsigned long)pos + 255));
-        m_http.set_header("range",str);
-        int httpCode = m_http.GET(); //Send the request
+        esp_http_client_set_header(m_http, "range", str);
+        esp_http_client_set_method(m_http, HTTP_METHOD_GET);
+        esp_err_t initOk = esp_http_client_perform(m_http); // or open? It's not entirely clear...
+
+        Debug_printv("SEEK ing in input %s: someRc=%d", url.c_str(), initOk);
+        if(initOk != ESP_OK)
+            return false;
+
+        int httpCode = esp_http_client_get_status_code(m_http);
         Debug_printv("httpCode[%d] str[%s]", httpCode, str);
         if(httpCode != 200 || httpCode != 206)
             return false;
 
         Debug_printv("stream opened[%s]", url.c_str());
-        //m_file = m_http.getStream();  //Get the response payload as Stream
+
         m_position = pos;
         m_bytesAvailable = m_length-pos;
         return true;
-
     } else {
         if(pos<m_position) {
             // skipping backward and range not supported, let's simply reopen the stream...
-            m_http.close();
+            esp_http_client_close(m_http);
             bool op = open();
             if(!op)
                 return false;
@@ -203,9 +251,9 @@ bool HttpIStream::seek(size_t pos) {
 
         m_position = 0;
         // ... and then read until we reach pos
-        // while(m_position < pos) {
-        //  m_position+=m_file.readBytes(buffer, size);  <----------- trurn this on!!!!
-        // }
+        while(m_position < pos) {
+            // auto bytesRead= esp_http_client_read(m_http, (char *)buf, size );
+        }
         m_bytesAvailable = m_length-pos;
 
         return true;
@@ -213,48 +261,64 @@ bool HttpIStream::seek(size_t pos) {
 }
 
 void HttpIStream::close() {
-    m_http.close();
+    esp_http_client_close(m_http);
+    esp_http_client_cleanup(m_http);
 }
 
 bool HttpIStream::open() {
     //mstr::replaceAll(url, "HTTP:", "http:");
-    bool initOk = m_http.begin( url );
-    Debug_printv("input %s: someRc=%d", url.c_str(), initOk);
-    if(!initOk)
+    esp_http_client_config_t config = {
+        .url = url.c_str(),
+        .user_agent = USER_AGENT,
+        .method = HTTP_METHOD_GET,
+        .timeout_ms = 10000,
+        .disable_auto_redirect = false,
+        .max_redirection_count = 10,
+        .keep_alive_enable = true,
+        .keep_alive_idle = 10,
+        .keep_alive_interval = 10,
+    };
+    m_http = esp_http_client_init(&config);
+    esp_err_t initOk = esp_http_client_perform(m_http); // or open? It's not entirely clear...
+
+    Debug_printv("upening %s: result=%d", url.c_str(), initOk);
+    if(initOk != ESP_OK)
         return false;
 
-    // Setup response headers we want to collect
-    const char * headerKeys[] = {"accept-ranges", "content-type"};
-    const size_t numberOfHeaders = 2;
-    m_http.collect_headers(headerKeys, numberOfHeaders);
-
-    //Send the request
-    int httpCode = m_http.GET();
+    int httpCode = esp_http_client_get_status_code(m_http);
     Debug_printv("httpCode=%d", httpCode);
     if(httpCode != 200)
         return false;
 
-    // Accept-Ranges: bytes - if we get such header from any request, good!
-    isFriendlySkipper = m_http.get_header("accept-ranges") == "bytes";
-    Debug_printv("isFriendlySkipper[%d]", isFriendlySkipper);
     m_isOpen = true;
-    Debug_printv("[%s]", url.c_str());
-    //m_file = m_http.getStream();  //Get the response payload as Stream
-    m_length = m_http.available();
-    Debug_printv("length=%d", m_length);
+    m_position = 0;
+
+    esp_http_client_fetch_headers(m_http);
+
+    // Let's get the length of the payload
+    m_length = esp_http_client_get_content_length(m_http);
     m_bytesAvailable = m_length;
 
-    // Is this text?
-    std::string ct = m_http.get_header("content-type").c_str();
-    Debug_printv("content_type[%s]", ct.c_str());
-    isText = mstr::isText(ct);
+    // Does this server support resume?
+    // Accept-Ranges: bytes
+    char* ranges;
+    esp_http_client_get_header(m_http, "accept-ranges", &ranges);
+    isFriendlySkipper = strcmp("bytes", ranges);
+
+    // Let's see if it's plain text, so we can do UTF8-PETSCII magic!
+    char* ct;
+    esp_http_client_get_header(m_http, "content-type", &ct);
+    std::string asString = ct;
+    isText = mstr::isText(asString);
+
+    Debug_printv("length=%d isFriendlySkipper=[%d] content_type=[%s]", m_length, isFriendlySkipper, ct);
 
     return true;
 };
 
 size_t HttpIStream::read(uint8_t* buf, size_t size) {
-    auto bytesRead= m_http.read( buf, size );
-    m_bytesAvailable = m_http.available();
+    auto bytesRead= esp_http_client_read(m_http, (char *)buf, size );
+    m_bytesAvailable -= bytesRead;
     m_position+=bytesRead;
     return bytesRead;
 };
