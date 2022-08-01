@@ -583,12 +583,12 @@ bool iecBus::turnAround ( void )
     // Debug_printf("IEC turnAround: ");
 
     // Wait until the computer releases the ATN line
-    // if ( protocol.timeoutWait ( PIN_IEC_ATN, RELEASED, FOREVER ) == TIMED_OUT )
-    // {
-    //     Debug_printv("Wait until the computer releases the ATN line");
-    //     protocol.flags or_eq ERROR;
-    //     return -1; // return error because timeout
-    // }
+    if ( protocol.timeoutWait ( PIN_IEC_ATN, RELEASED, FOREVER ) == TIMED_OUT )
+    {
+        Debug_printv("Wait until the computer releases the ATN line");
+        protocol.flags or_eq ERROR;
+        return -1; // return error because timeout
+    }
 
     // Delay after ATN is RELEASED
     delayMicroseconds(TIMING_Ttk);

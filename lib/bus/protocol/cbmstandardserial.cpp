@@ -363,6 +363,9 @@ int16_t CBMStandardSerial::timeoutWait ( uint8_t pin, bool target_status, size_t
     uint64_t start, current, elapsed;
     elapsed = 0;
 
+    if ( pin == PIN_IEC_ATN )
+        watch_atn = false;
+
     esp_timer_init();
     start = current = esp_timer_get_time();
 

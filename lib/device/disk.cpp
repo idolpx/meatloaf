@@ -873,7 +873,6 @@ void iecDisk::sendFile()
 
 		// Position file pointer
 		i = currentChannel.cursor;
-		Debug_printv("cursor[%d]", i);
 		istream->seek(i);
 
 		if( IEC.data.channel == 0 )
@@ -997,7 +996,7 @@ void iecDisk::saveFile()
 	ba[8] = '\0';
 #endif
 
-	mstr::toASCII(m_filename);
+	// mstr::toASCII(m_filename);
 	std::unique_ptr<MFile> file(MFSOwner::File(m_filename));
 	Debug_printv("[%s]", file->url.c_str());
 
