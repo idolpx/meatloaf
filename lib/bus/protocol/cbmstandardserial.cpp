@@ -322,8 +322,8 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
         // tell listner to wait
         pull ( PIN_IEC_CLK_OUT );
 
-        // Release data line after bit sent
-        release ( PIN_IEC_DATA_OUT );
+        // // Release data line after bit sent
+        // release ( PIN_IEC_DATA_OUT );
     }
 
 
