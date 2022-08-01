@@ -92,7 +92,7 @@ bool HttpOStream::seek(size_t pos) {
         // Range: bytes=91536-(91536+255)
         snprintf(str, sizeof str, "bytes=%lu-%lu", (unsigned long)pos, ((unsigned long)pos + 255));
         esp_http_client_set_header(m_http, "range", str);
-        esp_http_client_set_method(m_http, HTTP_METHOD_GET);
+        esp_http_client_set_method(m_http, HTTP_METHOD_PUT);
         esp_err_t initOk = esp_http_client_perform(m_http); // or open? It's not entirely clear...
 
         Debug_printv("SEEK ing in input %s: someRc=%d", url.c_str(), initOk);
@@ -110,22 +110,8 @@ bool HttpOStream::seek(size_t pos) {
         m_bytesAvailable = m_length-pos;
         return true;
     } else {
-        if(pos<m_position) {
-            // skipping backward and range not supported, let's simply reopen the stream...
-            esp_http_client_close(m_http);
-            bool op = open();
-            if(!op)
-                return false;
-        }
-
-        m_position = 0;
-        // ... and then read until we reach pos
-        while(m_position < pos) {
-            // auto bytesRead= esp_http_client_read(m_http, (char *)buf, size );
-        }
-        m_bytesAvailable = m_length-pos;
-
-        return true;
+        // can't resume upload, there's nothing we can do
+        return false;
     }
 }
 
@@ -253,9 +239,14 @@ bool HttpIStream::seek(size_t pos) {
         }
 
         m_position = 0;
-        // ... and then read until we reach pos
+
+        // beginning? We're done
+        if(pos == 0)
+            return true;
+
+        // let's read until pos bytes skipped
         while(m_position < pos) {
-            // auto bytesRead= esp_http_client_read(m_http, (char *)buf, size );
+            esp_http_client_read(m_http, nullptr, pos);
         }
         m_bytesAvailable = m_length-pos;
 
