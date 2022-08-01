@@ -230,24 +230,22 @@ bool HttpIStream::seek(size_t pos) {
         m_bytesAvailable = m_length-pos;
         return true;
     } else {
-        if(pos<m_position) {
-            // skipping backward and range not supported, let's simply reopen the stream...
+        // server doesn't support resume, so...
+        if(pos<m_position || pos == 0) {
+            // skipping backward let's simply reopen the stream...
             esp_http_client_close(m_http);
             bool op = open();
             if(!op)
                 return false;
-        }
 
-        m_position = 0;
-
-        // beginning? We're done
-        if(pos == 0)
-            return true;
-
-        // let's read until pos bytes skipped
-        while(m_position < pos) {
+            // and read pos bytes
             esp_http_client_read(m_http, nullptr, pos);
         }
+        else {
+            // skipping forward let's skip a proper amount of bytes
+            esp_http_client_read(m_http, nullptr, pos-m_position);
+        }
+
         m_bytesAvailable = m_length-pos;
 
         return true;
