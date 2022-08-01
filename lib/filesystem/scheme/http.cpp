@@ -14,8 +14,10 @@ MIStream* HttpFile::inputStream() {
     // has to return OPENED stream
     Debug_printv("[%s]", url.c_str());
     MIStream* istream = new HttpIStream(url);
-    istream->open();
-    return istream;
+    if ( istream->open() )
+        return istream;
+    else
+        return nullptr;
 }
 
 MIStream* HttpFile::createIStream(std::shared_ptr<MIStream> is) {
@@ -25,8 +27,11 @@ MIStream* HttpFile::createIStream(std::shared_ptr<MIStream> is) {
 MOStream* HttpFile::outputStream() {
     // has to return OPENED stream
     MOStream* ostream = new HttpOStream(url);
-    ostream->open();
     return ostream;
+    if ( ostream->open() )
+        return ostream;
+    else
+        return nullptr;    
 }
 
 time_t HttpFile::getLastWrite() {
@@ -38,11 +43,12 @@ time_t HttpFile::getCreationTime() {
 }
 
 bool HttpFile::exists() {
-    Debug_printv("[%s]", url.c_str());
-    // we may try open the stream to check if it exists
-    std::unique_ptr<MIStream> test(inputStream());
-    // remember that MIStream destuctor should close the stream!
-    return test->isOpen();
+    // Debug_printv("[%s]", url.c_str());
+    // // we may try open the stream to check if it exists
+    // std::unique_ptr<MIStream> test(inputStream());
+    // // remember that MIStream destuctor should close the stream!
+    // return test->isOpen();
+    return true;
 }
 
 size_t HttpFile::size() {
@@ -273,9 +279,10 @@ bool HttpIStream::open() {
         .keep_alive_interval = 10,
     };
     m_http = esp_http_client_init(&config);
+    //esp_err_t initOk = esp_http_client_open(m_http, 0); // or open? It's not entirely clear...
     esp_err_t initOk = esp_http_client_perform(m_http); // or open? It's not entirely clear...
 
-    Debug_printv("upening %s: result=%d", url.c_str(), initOk);
+    Debug_printv("opening %s: result=%d", url.c_str(), initOk);
     if(initOk != ESP_OK)
         return false;
 
@@ -287,25 +294,36 @@ bool HttpIStream::open() {
     m_isOpen = true;
     m_position = 0;
 
-    esp_http_client_fetch_headers(m_http);
-
     // Let's get the length of the payload
-    m_length = esp_http_client_get_content_length(m_http);
+    m_length = esp_http_client_fetch_headers(m_http);
+    //m_length = esp_http_client_get_content_length(m_http);
+    if ( m_length == -1 )
+    {
+        char* content_length;
+        if ( esp_http_client_get_header(m_http, "Content-Length", &content_length) )
+            m_length = atoi(content_length);
+    }
     m_bytesAvailable = m_length;
+    Debug_printv("length=%d", m_length);
 
     // Does this server support resume?
     // Accept-Ranges: bytes
     char* ranges;
-    esp_http_client_get_header(m_http, "accept-ranges", &ranges);
-    isFriendlySkipper = strcmp("bytes", ranges);
+    if ( esp_http_client_get_header(m_http, "Accept-Ranges", &ranges) == ESP_OK )
+    {
+        isFriendlySkipper = strcmp("bytes", ranges);
+    }
 
-    // Let's see if it's plain text, so we can do UTF8-PETSCII magic!
-    char* ct;
-    esp_http_client_get_header(m_http, "content-type", &ct);
-    std::string asString = ct;
-    isText = mstr::isText(asString);
+    // // Let's see if it's plain text, so we can do UTF8-PETSCII magic!
+    // char* ct;
+    // if ( esp_http_client_get_header(m_http, "Content-Type", &ct) == ESP_OK )
+    // {
+    //     std::string asString = ct;
+    //     isText = mstr::isText(asString);        
+    // }
 
-    Debug_printv("length=%d isFriendlySkipper=[%d] content_type=[%s]", m_length, isFriendlySkipper, ct);
+    // Debug_printv("length=%d isFriendlySkipper=[%d] content_type=[%s]", m_length, isFriendlySkipper, ct);
+    Debug_printv("Made it here!");
 
     return true;
 };
