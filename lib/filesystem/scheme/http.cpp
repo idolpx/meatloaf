@@ -95,7 +95,7 @@ bool HttpOStream::seek(size_t pos) {
         esp_http_client_set_method(m_http, HTTP_METHOD_PUT);
         esp_err_t initOk = esp_http_client_perform(m_http); // or open? It's not entirely clear...
 
-        Debug_printv("SEEK ing in input %s: someRc=%d", url.c_str(), initOk);
+        Debug_printv("SEEK in HttpOStream %s: RC=%d", url.c_str(), initOk);
         if(initOk != ESP_OK)
             return false;
 
@@ -118,6 +118,7 @@ bool HttpOStream::seek(size_t pos) {
 void HttpOStream::close() {
     esp_http_client_close(m_http);
     esp_http_client_cleanup(m_http);
+    m_isOpen = false;
 }
 
 bool HttpOStream::open() {
@@ -138,7 +139,7 @@ bool HttpOStream::open() {
     m_http = esp_http_client_init(&config);
     esp_err_t initOk = esp_http_client_perform(m_http); // or open? It's not entirely clear...
 
-    Debug_printv("upening %s: result=%d", url.c_str(), initOk);
+    Debug_printv("opening HttpOStream %s: result=%d", url.c_str(), initOk);
     if(initOk != ESP_OK)
         return false;
 
@@ -215,7 +216,7 @@ bool HttpIStream::seek(size_t pos) {
         esp_http_client_set_method(m_http, HTTP_METHOD_GET);
         esp_err_t initOk = esp_http_client_perform(m_http); // or open? It's not entirely clear...
 
-        Debug_printv("SEEK ing in input %s: someRc=%d", url.c_str(), initOk);
+        Debug_printv("SEEK in HttpIStream %s: RC=%d", url.c_str(), initOk);
         if(initOk != ESP_OK)
             return false;
 
@@ -255,6 +256,7 @@ bool HttpIStream::seek(size_t pos) {
 void HttpIStream::close() {
     esp_http_client_close(m_http);
     esp_http_client_cleanup(m_http);
+    m_isOpen = false;
 }
 
 bool HttpIStream::open() {
