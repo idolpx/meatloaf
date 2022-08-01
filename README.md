@@ -35,7 +35,7 @@ Edit ssid.h to match your wifi
 ```
 
 ```
-Press the PlatformIO Upload icon arrow at the bottom in the status bar. (See picture below)
+Press the PlatformIO Upload icon arrow at the bottom in the status bar. This procedure will take some time to complete, and you should start seeing some logging info of the project being built. (See picture below)
 ```
 ![platformio_upload](/images/ml-build-1.png)
 
