@@ -98,12 +98,12 @@ bool iecDevice::process ( void )
 
         // Open Named Channel
         handleOpen();
+
+        // Open either file or prg for reading, writing or single line command on the command channel.
+        handleListenCommand();        
     }
     else if ( this->data.secondary == IEC_DATA )
     {
-        // Open either file or prg for reading, writing or single line command on the command channel.
-        handleListenCommand();
-
         // IEC.protocol.pull(PIN_IEC_SRQ);
         if ( device_state == DEVICE_LISTEN )
         {
