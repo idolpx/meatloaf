@@ -43,6 +43,7 @@ bool FlashFile::pathValid(std::string path)
         }
         apath = slash + 1;
     }
+
     return true;
 }
 

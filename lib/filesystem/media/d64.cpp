@@ -67,7 +67,7 @@ bool D64IStream::seekEntry( std::string filename )
             mstr::toASCII(entryFilename);
             //Debug_printv("track[%d] sector[%d] filename[%s] entry.filename[%.16s]", track, sector, filename.c_str(), entryFilename.c_str());
 
-            Debug_printv("filename[%s] entry[%s]", filename.c_str(), entryFilename.c_str());
+            //Debug_printv("filename[%s] entry[%s]", filename.c_str(), entryFilename.c_str());
 
             // Read Entry From Stream
             if (entry.file_type & 0b00000111 && filename == "*")
@@ -253,7 +253,7 @@ bool D64IStream::seekPath(std::string path) {
         auto type = decodeType(entry.file_type).c_str();
         //auto blocks = (entry.blocks[0] << 8 | entry.blocks[1] >> 8);
         //auto blocks = (entry.blocks[0] * 256) + entry.blocks[1];
-        Debug_printv("filename [%.16s] type[%s] start_track[%d] start_sector[%d]", entry.filename, type, entry.start_track, entry.start_sector);
+        //Debug_printv("filename [%.16s] type[%s] start_track[%d] start_sector[%d]", entry.filename, type, entry.start_track, entry.start_sector);
         seekSector(entry.start_track, entry.start_sector);
 
         // Calculate file size
@@ -276,7 +276,7 @@ bool D64IStream::seekPath(std::string path) {
         // Set position to beginning of file
         seekSector( entry.start_track, entry.start_sector );
 
-        Debug_printv("File Size: blocks[%d] size[%d] available[%d]", (blocks + 1), m_length, m_bytesAvailable);
+        //Debug_printv("File Size: blocks[%d] size[%d] available[%d]", (blocks + 1), m_length, m_bytesAvailable);
         
         return true;
     }
@@ -294,7 +294,7 @@ bool D64IStream::seekPath(std::string path) {
  ********************************************************/
 
 MIStream* D64File::createIStream(std::shared_ptr<MIStream> containerIstream) {
-    Debug_printv("[%s]", url.c_str());
+    // Debug_printv("[%s]", url.c_str());
 
     return new D64IStream(containerIstream);
 }
