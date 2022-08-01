@@ -133,7 +133,7 @@ bool HttpOStream::open() {
         // .user_data = local_response_buffer,
         .keep_alive_enable = true,
         .keep_alive_idle = 10,
-        .keep_alive_interval = 10,
+        .keep_alive_interval = 10
     };
     m_http = esp_http_client_init(&config);
     esp_err_t initOk = esp_http_client_perform(m_http); // or open? It's not entirely clear...
