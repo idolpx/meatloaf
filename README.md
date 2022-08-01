@@ -35,13 +35,14 @@ Edit ssid.h to match your wifi
 ```
 
 ```
-Press the PlatformIO Upload icon arrow at the bottom in the status bar
+Press the PlatformIO Upload icon arrow at the bottom in the status bar. (See picture below)
 ```
+![platformio_upload](/images/ml-build-1.png)
 
 ```
 meatloaf should now be running on the device
 ```
 
- ![platformio_upload](/images/ml-build-1.png)
+
 
 
