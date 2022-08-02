@@ -693,13 +693,16 @@ bool iecBus::send ( uint8_t data )
     return r;
 } // send
 
-bool iecBus::send ( std::string data )
+size_t iecBus::send ( std::string data, size_t offset )
 {
-    for ( size_t i = 0; i < data.length(); ++i )
+    size_t i = 0;
+    for ( i = offset; i < data.length(); ++i )
         if ( !send ( ( uint8_t ) data[i] ) )
-            return false;
+            return i;
 
-    return true;
+    IEC.sendEOI('\x0D');
+
+    return i;
 }
 
 

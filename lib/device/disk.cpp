@@ -66,15 +66,22 @@ void iecDisk::sendStatus(void)
 	//Debug_printv("status: {%s}", status.c_str());
 	//Debug_print("[");
 
- 	IEC.send(status);
-	IEC.sendEOI('\x0D');
-
+ 	size_t bytes_sent = IEC.send(status, currentChannel.cursor);
+	Debug_printv("len[%d] bytes_sent[%d]", status.length(), bytes_sent);
+	if ( bytes_sent == status.length() )
+	{
+		m_device_status.clear();
+	}
+	else
+	{
+		channelUpdate(bytes_sent);
+	}
+	
 	//Debug_println(BACKSPACE "]");
 
-	Debug_printf("\r\n{%s}\r\n", status.c_str());
+	Debug_printf("\r\n{%s}\r\n", status.substr(0, bytes_sent).c_str());
 
 	// Clear the status message
-	m_device_status.clear();
 } // sendStatus
 
 void iecDisk::setDeviceStatus(int number, int track, int sector)
@@ -195,10 +202,10 @@ MFile* iecDisk::getPointed(MFile* urlFile) {
 CommandPathTuple iecDisk::parseLine(std::string command, size_t channel)
 {
 
-	Debug_printv("* PARSE INCOMING LINE *******************************");
+	// Debug_printv("* PARSE INCOMING LINE *******************************");
 
-	Debug_printv("we are in              [%s]", m_mfile->url.c_str());
-	Debug_printv("unprocessed user input [%s]", command.c_str());
+	// Debug_printv("we are in              [%s]", m_mfile->url.c_str());
+	// Debug_printv("unprocessed user input [%s]", command.c_str());
 
 	if (mstr::startsWith(command, "*"))
 	{
@@ -294,8 +301,8 @@ CommandPathTuple iecDisk::parseLine(std::string command, size_t channel)
 		mstr::rtrim(guessedPath);
 		tuple.rawPath = guessedPath;
 
-		Debug_printv("found command     [%s]", tuple.command.c_str());
-		Debug_printv("command[%s] raw[%s] full[%s]", tuple.command.c_str(), tuple.rawPath.c_str(), tuple.fullPath.c_str());
+		// Debug_printv("found command     [%s]", tuple.command.c_str());
+		// Debug_printv("command[%s] raw[%s] full[%s]", tuple.command.c_str(), tuple.rawPath.c_str(), tuple.fullPath.c_str());
 
 		if(guessedPath == "$")
 		{
@@ -400,7 +407,6 @@ void iecDisk::handleListenCommand( void )
 	if (mstr::startsWith(commandAndPath.command, "$"))
 	{
 		m_openState = O_DIR;
-		Debug_printv("LOAD $");
 	}
 	else if (mstr::equals(commandAndPath.command, (char*)"@info", false))
 	{
@@ -454,7 +460,7 @@ void iecDisk::handleListenCommand( void )
 		}
 	}
 
-	dumpState();
+	//dumpState();
 } // handleListenCommand
 
 

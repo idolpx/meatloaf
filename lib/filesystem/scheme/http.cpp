@@ -37,11 +37,12 @@ time_t HttpFile::getCreationTime() {
 }
 
 bool HttpFile::exists() {
-    Debug_printv("[%s]", url.c_str());
-    // we may try open the stream to check if it exists
-    std::unique_ptr<MIStream> test(inputStream());
-    // remember that MIStream destuctor should close the stream!
-    return test->isOpen();
+    // Debug_printv("[%s]", url.c_str());
+    // // we may try open the stream to check if it exists
+    // std::unique_ptr<MIStream> test(inputStream());
+    // // remember that MIStream destuctor should close the stream!
+    // return test->isOpen();
+    return true;
 }
 
 size_t HttpFile::size() {
