@@ -449,11 +449,6 @@ void iecDisk::handleListenCommand( void )
 		// }
 	}
 
-	if ( this->data.channel == CMD_CHANNEL )
-	{
-		m_openState = O_NOTHING;
-	}
-
 	// dumpState();
 } // handleListenCommand
 
