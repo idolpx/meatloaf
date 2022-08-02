@@ -195,19 +195,20 @@ MFile* iecDisk::getPointed(MFile* urlFile) {
 CommandPathTuple iecDisk::parseLine(std::string command, size_t channel)
 {
 
-	//Debug_printv("* PARSE INCOMING LINE *******************************");
+	Debug_printv("* PARSE INCOMING LINE *******************************");
 
-	//Debug_printv("we are in              [%s]", m_mfile->url.c_str());
-	//Debug_printv("unprocessed user input [%s]", command.c_str());
+	Debug_printv("we are in              [%s]", m_mfile->url.c_str());
+	Debug_printv("unprocessed user input [%s]", command.c_str());
 
 	if (mstr::startsWith(command, "*"))
 	{
 		// Find first program in listing
-		if (m_mfile->url.empty())
+		if ( m_mfile->url.empty() || m_mfile->media_image.empty() )
 		{
 			// If in LittleFS root then set it to FB64
 			// TODO: Load configured autoload program
-			command = SYSTEM_DIR "fb64";
+			// command = SYSTEM_DIR "fb64";
+			command = "//fb64";
 		}
 		else
 		{
@@ -286,13 +287,12 @@ CommandPathTuple iecDisk::parseLine(std::string command, size_t channel)
 	// LOAD //something
 	// we HAVE TO PARSE IT OUR WAY!
 
-
 	// and to get a REAL FULL PATH that the user wanted to refer to, we CD into it, using supplied stripped path:
 	mstr::rtrim(guessedPath);
 	tuple.rawPath = guessedPath;
 
-	//Debug_printv("found command     [%s]", tuple.command.c_str());
-	//Debug_printv("command[%s] raw[%s] full[%s]", tuple.command.c_str(), tuple.rawPath.c_str(), tuple.fullPath.c_str());
+	Debug_printv("found command     [%s]", tuple.command.c_str());
+	Debug_printv("command[%s] raw[%s] full[%s]", tuple.command.c_str(), tuple.rawPath.c_str(), tuple.fullPath.c_str());
 
 	if(guessedPath == "$")
 	{

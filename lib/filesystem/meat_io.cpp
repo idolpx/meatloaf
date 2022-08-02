@@ -381,7 +381,7 @@ MFile* MFile::localRoot(std::string plus) {
 
 MFile* MFile::cd(std::string newDir) {
 
-    //Debug_printv("cd requested: [%s]", newDir.c_str());
+    Debug_printv("cd requested: [%s]", newDir.c_str());
 
     // OK to clarify - coming here there should be ONLY path or magicSymbol-path combo!
     // NO "cd:xxxxx", no "/cd:xxxxx" ALLOWED here! ******************
@@ -459,11 +459,12 @@ MFile* MFile::cd(std::string newDir) {
         return MFSOwner::File(newDir);
     }
     else {
-        //Debug_printv("> url[%s] newDir[%s]", url.c_str(), newDir.c_str());
+        Debug_printv("> url[%s] newDir[%s]", url.c_str(), newDir.c_str());
 
-        // Add new directory to path
-        if ( !mstr::endsWith(url, "/") )
-            url.push_back('/');
+            // Add new directory to path
+            if ( !mstr::endsWith(url, "/") )
+                url.push_back('/');            
+        }
 
         return MFSOwner::File(url + newDir);
     }
