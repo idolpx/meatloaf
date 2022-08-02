@@ -4,8 +4,6 @@
 /********************************************************
  * File impls
  ********************************************************/
-#define MAX_HTTP_OUTPUT_BUFFER 2048
-char local_response_buffer[MAX_HTTP_OUTPUT_BUFFER] = {0};
 
 bool HttpFile::isDirectory() {
     // hey, why not?
@@ -14,7 +12,7 @@ bool HttpFile::isDirectory() {
 
 MIStream* HttpFile::inputStream() {
     // has to return OPENED stream
-    Debug_printv("Input stream requested: [%s]", url.c_str());
+    //Debug_printv("Input stream requested: [%s]", url.c_str());
     MIStream* istream = new HttpIStream(url);
     istream->open();
     return istream;
@@ -214,6 +212,46 @@ size_t HttpIStream::position() {
     return m_position;
 }
 
+bool HttpIStream::isOpen() {
+    return m_isOpen;
+};
+
+bool HttpIStream::open() {
+    mstr::replaceAll(url, "HTTP:", "http:");
+    esp_http_client_config_t config = {
+        .url = url.c_str(),
+        .user_agent = USER_AGENT,
+        .method = HTTP_METHOD_GET,
+        .timeout_ms = 10000,
+        .disable_auto_redirect = false,
+        .max_redirection_count = 10,
+        .event_handler = _http_event_handler,
+        .user_data = this,
+        .keep_alive_enable = true,
+        .keep_alive_idle = 10,
+        .keep_alive_interval = 10
+    };
+
+    m_http = esp_http_client_init(&config);
+    esp_err_t initOk = esp_http_client_open(m_http, 0); // or open? It's not entirely clear...
+    m_length = esp_http_client_fetch_headers(m_http);
+    m_bytesAvailable = m_length;
+
+    int httpCode = esp_http_client_get_status_code(m_http);
+    if(httpCode != 200) {
+        Debug_printv("opening stream failed, httpCode=%d", httpCode);
+        close();
+        return false;
+    }
+
+    m_isOpen = true;
+    m_position = 0;
+
+    //Debug_printv("length=%d isFriendlySkipper=[%d] isText=[%d]", m_length, isFriendlySkipper, isText);
+
+    return true;
+};
+
 bool HttpIStream::seek(size_t pos) {
     if(pos==m_position)
         return true;
@@ -225,14 +263,16 @@ bool HttpIStream::seek(size_t pos) {
         snprintf(str, sizeof str, "bytes=%lu-%lu", (unsigned long)pos, ((unsigned long)pos + 255));
         esp_http_client_set_header(m_http, "range", str);
         esp_http_client_set_method(m_http, HTTP_METHOD_GET);
-        esp_err_t initOk = esp_http_client_perform(m_http); // or open? It's not entirely clear...
+
+        esp_err_t initOk = esp_http_client_open(m_http, 0); // or open? It's not entirely clear...
 
         Debug_printv("SEEK in HttpIStream %s: RC=%d", url.c_str(), initOk);
         if(initOk != ESP_OK)
             return false;
 
+        esp_http_client_fetch_headers(m_http);
         int httpCode = esp_http_client_get_status_code(m_http);
-        Debug_printv("httpCode[%d] str[%s]", httpCode, str);
+        Debug_printv("httpCode=[%d] request range=[%s]", httpCode, str);
         if(httpCode != 200 || httpCode != 206)
             return false;
 
@@ -264,80 +304,6 @@ bool HttpIStream::seek(size_t pos) {
     }
 }
 
-void HttpIStream::close() {
-    if(m_http != nullptr) {
-        // Debug_printv("m_http wasn't null");
-
-        if(m_isOpen) {
-            // Debug_printv("stream was open");
-            esp_http_client_close(m_http);
-        }
-        // Debug_printv("before esp_http_client_cleanup");
-        esp_http_client_cleanup(m_http);
-        // Debug_printv("post esp_http_client_cleanup");
-        m_http = nullptr;
-    }
-    m_isOpen = false;
-}
-
-
-bool HttpIStream::open() {
-    //mstr::replaceAll(url, "HTTP:", "http:");
-    esp_http_client_config_t config = {
-        .url = url.c_str(),
-        .user_agent = USER_AGENT,
-        .method = HTTP_METHOD_GET,
-        .timeout_ms = 10000,
-        .disable_auto_redirect = false,
-        .max_redirection_count = 10,
-        .event_handler = _http_event_handler,
-        .user_data = local_response_buffer,
-        .keep_alive_enable = true,
-        .keep_alive_idle = 10,
-        .keep_alive_interval = 10
-    };
-
-    m_http = esp_http_client_init(&config);
-    esp_err_t initOk = esp_http_client_open(m_http, 0); // or open? It's not entirely clear...
-    // esp_err_t initOk = esp_http_client_perform(m_http); // or open? It's not entirely clear...
-
-    // // it gets here only after running everything in http_event_handler
-    // // so connection is already closed here!
-    // Debug_printv("tried opening %s: result=%d", url.c_str(), initOk);
-    // if(initOk != ESP_OK) {
-    //     close();
-    //     return false;
-    // }
-
-    // Let's get the length of the payload
-    m_length = esp_http_client_fetch_headers(m_http);
-    //m_length = esp_http_client_get_content_length(m_http);
-    // if ( m_length == -1 )
-    // {
-    //     char* content_length;
-    //     if ( esp_http_client_get_header(m_http, "Content-Length", &content_length) )
-    //         m_length = atoi(content_length);
-    // }
-    m_bytesAvailable = m_length;
-
-    int httpCode = esp_http_client_get_status_code(m_http);
-    Debug_printv("httpCode=%d", httpCode);
-    if(httpCode != 200) {
-        close();
-        return false;
-    }
-
-    Debug_printv("Code was 200, all OK!");
-
-    m_isOpen = true;
-    m_position = 0;
-
-    Debug_printv("length=%d isFriendlySkipper=[%d] isText=[%d]", m_length, isFriendlySkipper, isText);
-    Debug_printv("Made it here!");
-
-    return true;
-};
-
 size_t HttpIStream::read(uint8_t* buf, size_t size) {
     auto bytesRead= esp_http_client_read(m_http, (char *)buf, size );
     m_bytesAvailable -= bytesRead;
@@ -345,9 +311,16 @@ size_t HttpIStream::read(uint8_t* buf, size_t size) {
     return bytesRead;
 };
 
-bool HttpIStream::isOpen() {
-    return m_isOpen;
-};
+void HttpIStream::close() {
+    if(m_http != nullptr) {
+        if(m_isOpen) {
+            esp_http_client_close(m_http);
+        }
+        esp_http_client_cleanup(m_http);
+        m_http = nullptr;
+    }
+    m_isOpen = false;
+}
 
 esp_err_t HttpIStream::_http_event_handler(esp_http_client_event_t *evt)
 {
@@ -361,29 +334,41 @@ esp_err_t HttpIStream::_http_event_handler(esp_http_client_event_t *evt)
             Debug_printv("HTTP_EVENT_ERROR");
             break;
         case HTTP_EVENT_ON_CONNECTED: // Once the HTTP has been connected to the server, no data exchange has been performed
-            Debug_printv("HTTP_EVENT_ON_CONNECTED");
+            // Debug_printv("HTTP_EVENT_ON_CONNECTED");
             break;
         case HTTP_EVENT_HEADER_SENT: // After sending all the headers to the server
-            Debug_printv("HTTP_EVENT_HEADER_SENT");
+            // Debug_printv("HTTP_EVENT_HEADER_SENT");
             break;
         case HTTP_EVENT_ON_HEADER: // Occurs when receiving each header sent from the server
-            Debug_printv("HTTP_EVENT_ON_HEADER, key=%s, value=%s", evt->header_key, evt->header_value);
 
             // Does this server support resume?
             // Accept-Ranges: bytes
             if (strcmp("Accept-Ranges", evt->header_key)==0)
             {
-                Debug_printv("Ranges info present '%s', comparison=%d!",evt->header_value, strcmp("bytes", evt->header_value)==0);
-                istream->isFriendlySkipper = strcmp("bytes", evt->header_value)==0;
+                if(istream != nullptr) {
+                    istream->isFriendlySkipper = strcmp("bytes", evt->header_value)==0;
+                    //Debug_printv("* Ranges info present '%s', comparison=%d!",evt->header_value, strcmp("bytes", evt->header_value)==0);
+                }
             }
             // what can we do UTF8<->PETSCII on this stream?
             else if (strcmp("Content-Type", evt->header_key)==0)
             {
-                Debug_printv("Content info present '%s'!", evt->header_value);
                 std::string asString = evt->header_value;
-                istream->isText = mstr::isText(asString);        
+                bool isText = mstr::isText(asString);
+
+
+                if(istream != nullptr) {
+                    istream->isText = isText;
+                    //Debug_printv("* Content info present '%s', isText=%d!", evt->header_value, isText);
+                }        
             }
-            // Last-Modified, value=Thu, 03 Dec 1992 08:37:20 - may be used to get file date
+            else if(strcmp("Last-Modified", evt->header_key)==0)
+            {
+            }
+            else {
+                // Debug_printv("HTTP_EVENT_ON_HEADER, key=%s, value=%s", evt->header_key, evt->header_value);
+                // Last-Modified, value=Thu, 03 Dec 1992 08:37:20 - may be used to get file date
+            }
 
             break;
         case HTTP_EVENT_ON_DATA: // Occurs multiple times when receiving body data from the server. MAY BE SKIPPED IF BODY IS EMPTY!
@@ -499,7 +484,7 @@ esp_err_t HttpIStream::_http_event_handler(esp_http_client_event_t *evt)
             break;
         case HTTP_EVENT_DISCONNECTED: // The connection has been disconnected
             Debug_printv("HTTP_EVENT_DISCONNECTED");
-            int mbedtls_err = 0;
+            // int mbedtls_err = 0;
             // esp_err_t err = esp_tls_get_and_clear_last_error((esp_tls_error_handle_t)evt->data, &mbedtls_err, NULL);
             // if (err != 0) {
             //     ESP_LOGI(TAG, "Last esp error code: 0x%x", err);

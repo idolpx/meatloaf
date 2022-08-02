@@ -471,27 +471,24 @@ MFile* MFile::cd(std::string newDir) {
 };
 
 bool MFile::copyTo(MFile* dst) {
-    auto istream = Meat::ifstream(this);
-    auto ostream = Meat::ofstream(dst);
+    auto istream = inputStream();
+    auto ostream = dst->outputStream();
 
     int rc;
 
-    istream.open();
-    ostream.open();
-
     //Debug_printv("in copyTo, iopen=%d oopen=%d", istream.is_open(), ostream.is_open());
 
-    if(!istream.is_open() || !ostream.is_open())
+    if(!istream->isOpen() || !ostream->isOpen())
         return false;
 
     //Debug_printv("commencing copy");
 
-    while((rc = istream.get())!= EOF) {     
-        //Serial.print(".");
-        ostream.put(rc);
-        if(ostream.bad() || istream.bad())
-            return false;
-    }
+    // while((rc = istream.get())!= EOF) {     
+    //     //Serial.print(".");
+    //     ostream.put(rc);
+    //     if(ostream.bad() || istream.bad())
+    //         return false;
+    // }
 
     //Debug_printv("copying finished, rc=%d", rc);
 
