@@ -1,74 +1,5 @@
 #include "http.h"
 
-esp_err_t _http_event_handler(esp_http_client_event_t *evt)
-{
-    static char *output_buffer;  // Buffer to store response of http request from event handler
-    static int output_len;       // Stores number of bytes read
-    switch(evt->event_id) {
-        case HTTP_EVENT_ERROR:
-            Debug_printv("HTTP_EVENT_ERROR");
-            break;
-        case HTTP_EVENT_ON_CONNECTED:
-            Debug_printv("HTTP_EVENT_ON_CONNECTED");
-            break;
-        case HTTP_EVENT_HEADER_SENT:
-            Debug_printv("HTTP_EVENT_HEADER_SENT");
-            break;
-        case HTTP_EVENT_ON_HEADER:
-            Debug_printv("HTTP_EVENT_ON_HEADER, key=%s, value=%s", evt->header_key, evt->header_value);
-            break;
-        case HTTP_EVENT_ON_DATA:
-            Debug_printv("HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
-            /*
-             *  Check for chunked encoding is added as the URL for chunked encoding used in this example returns binary data.
-             *  However, event handler can also be used in case chunked encoding is used.
-             */
-            if (!esp_http_client_is_chunked_response(evt->client)) {
-                // If user_data buffer is configured, copy the response into the buffer
-                // if (evt->user_data) {
-                //     memcpy(evt->user_data + output_len, evt->data, evt->data_len);
-                // } else {
-                //     if (output_buffer == NULL) {
-                //         output_buffer = (char *) malloc(esp_http_client_get_content_length(evt->client));
-                //         output_len = 0;
-                //         if (output_buffer == NULL) {
-                //             ESP_LOGE(TAG, "Failed to allocate memory for output buffer");
-                //             return ESP_FAIL;
-                //         }
-                //     }
-                //     memcpy(output_buffer + output_len, evt->data, evt->data_len);
-                // }
-                output_len += evt->data_len;
-            }
-
-            break;
-        case HTTP_EVENT_ON_FINISH:
-            Debug_printv("HTTP_EVENT_ON_FINISH");
-            if (output_buffer != NULL) {
-                // Response is accumulated in output_buffer. Uncomment the below line to print the accumulated response
-                // ESP_LOG_BUFFER_HEX(TAG, output_buffer, output_len);
-                free(output_buffer);
-                output_buffer = NULL;
-            }
-            output_len = 0;
-            break;
-        case HTTP_EVENT_DISCONNECTED:
-            Debug_printv("HTTP_EVENT_DISCONNECTED");
-            int mbedtls_err = 0;
-            // esp_err_t err = esp_tls_get_and_clear_last_error((esp_tls_error_handle_t)evt->data, &mbedtls_err, NULL);
-            // if (err != 0) {
-            //     ESP_LOGI(TAG, "Last esp error code: 0x%x", err);
-            //     ESP_LOGI(TAG, "Last mbedtls failure: 0x%x", mbedtls_err);
-            // }
-            // if (output_buffer != NULL) {
-            //     free(output_buffer);
-            //     output_buffer = NULL;
-            // }
-            // output_len = 0;
-            break;
-    }
-    return ESP_OK;
-}
 
 /********************************************************
  * File impls
@@ -210,9 +141,10 @@ bool HttpOStream::open() {
         .max_redirection_count = 10,
         // .event_handler = _http_event_handler,
         // .user_data = local_response_buffer,
+        .user_data = this,
         .keep_alive_enable = true,
         .keep_alive_idle = 10,
-        .keep_alive_interval = 10
+        .keep_alive_interval = 10,
     };
     m_http = esp_http_client_init(&config);
     esp_err_t initOk = esp_http_client_perform(m_http); // or open? It's not entirely clear...
@@ -239,7 +171,6 @@ bool HttpOStream::open() {
     // Accept-Ranges: bytes
     char* ranges;
     esp_http_client_get_header(m_http, "accept-ranges", &ranges);
-    isFriendlySkipper = strcmp("bytes", ranges);
 
     // Let's see if it's plain text, so we can do UTF8-PETSCII magic!
     char* ct;
@@ -359,7 +290,7 @@ bool HttpIStream::open() {
         .timeout_ms = 10000,
         .disable_auto_redirect = false,
         .max_redirection_count = 10,
-        // .event_handler = _http_event_handler,
+        .event_handler = _http_event_handler,
         .user_data = local_response_buffer,
         .keep_alive_enable = true,
         .keep_alive_idle = 10,
@@ -367,14 +298,27 @@ bool HttpIStream::open() {
     };
 
     m_http = esp_http_client_init(&config);
-    //esp_err_t initOk = esp_http_client_open(m_http, 0); // or open? It's not entirely clear...
-    esp_err_t initOk = esp_http_client_perform(m_http); // or open? It's not entirely clear...
+    esp_err_t initOk = esp_http_client_open(m_http, 0); // or open? It's not entirely clear...
+    // esp_err_t initOk = esp_http_client_perform(m_http); // or open? It's not entirely clear...
 
-    Debug_printv("tried opening %s: result=%d", url.c_str(), initOk);
-    if(initOk != ESP_OK) {
-        close();
-        return false;
-    }
+    // // it gets here only after running everything in http_event_handler
+    // // so connection is already closed here!
+    // Debug_printv("tried opening %s: result=%d", url.c_str(), initOk);
+    // if(initOk != ESP_OK) {
+    //     close();
+    //     return false;
+    // }
+
+    // Let's get the length of the payload
+    m_length = esp_http_client_fetch_headers(m_http);
+    //m_length = esp_http_client_get_content_length(m_http);
+    // if ( m_length == -1 )
+    // {
+    //     char* content_length;
+    //     if ( esp_http_client_get_header(m_http, "Content-Length", &content_length) )
+    //         m_length = atoi(content_length);
+    // }
+    m_bytesAvailable = m_length;
 
     int httpCode = esp_http_client_get_status_code(m_http);
     Debug_printv("httpCode=%d", httpCode);
@@ -383,42 +327,12 @@ bool HttpIStream::open() {
         return false;
     }
 
+    Debug_printv("Code was 200, all OK!");
+
     m_isOpen = true;
     m_position = 0;
 
-    // Let's get the length of the payload
-    m_length = esp_http_client_fetch_headers(m_http);
-    m_length = esp_http_client_get_content_length(m_http);
-    // if ( m_length == -1 )
-    // {
-    //     char* content_length;
-    //     if ( esp_http_client_get_header(m_http, "Content-Length", &content_length) )
-    //         m_length = atoi(content_length);
-    // }
-    m_bytesAvailable = m_length;
-    Debug_printv("length=%d", m_length);
-
-    // Does this server support resume?
-    // Accept-Ranges: bytes
-    //char* ranges;
-    // char ranges[MAX_HTTP_OUTPUT_BUFFER] = {0};
-    char* tempChar = new char[80];
-    tempChar[0] = 0x00;
-
-    if ( esp_http_client_get_header(m_http, "Accept-Ranges", &tempChar) == ESP_OK )
-    {
-        isFriendlySkipper = strcmp("bytes", tempChar);
-    }
-
-    tempChar[0] = 0x00;
-    // // Let's see if it's plain text, so we can do UTF8-PETSCII magic!
-    if ( esp_http_client_get_header(m_http, "Content-Type", &tempChar) == ESP_OK )
-    {
-        std::string asString = tempChar;
-        isText = mstr::isText(asString);        
-    }
-
-    // Debug_printv("length=%d isFriendlySkipper=[%d] content_type=[%s]", m_length, isFriendlySkipper, ct);
+    Debug_printv("length=%d isFriendlySkipper=[%d] isText=[%d]", m_length, isFriendlySkipper, isText);
     Debug_printv("Made it here!");
 
     return true;
@@ -435,3 +349,168 @@ bool HttpIStream::isOpen() {
     return m_isOpen;
 };
 
+esp_err_t HttpIStream::_http_event_handler(esp_http_client_event_t *evt)
+{
+    static char *output_buffer;  // Buffer to store response of http request from event handler
+    static int output_len;       // Stores number of bytes read
+
+    HttpIStream* istream = (HttpIStream*)evt->user_data;
+
+    switch(evt->event_id) {
+        case HTTP_EVENT_ERROR: // This event occurs when there are any errors during execution
+            Debug_printv("HTTP_EVENT_ERROR");
+            break;
+        case HTTP_EVENT_ON_CONNECTED: // Once the HTTP has been connected to the server, no data exchange has been performed
+            Debug_printv("HTTP_EVENT_ON_CONNECTED");
+            break;
+        case HTTP_EVENT_HEADER_SENT: // After sending all the headers to the server
+            Debug_printv("HTTP_EVENT_HEADER_SENT");
+            break;
+        case HTTP_EVENT_ON_HEADER: // Occurs when receiving each header sent from the server
+            Debug_printv("HTTP_EVENT_ON_HEADER, key=%s, value=%s", evt->header_key, evt->header_value);
+
+            // Does this server support resume?
+            // Accept-Ranges: bytes
+            if (strcmp("Accept-Ranges", evt->header_key)==0)
+            {
+                Debug_printv("Ranges info present '%s', comparison=%d!",evt->header_value, strcmp("bytes", evt->header_value)==0);
+                istream->isFriendlySkipper = strcmp("bytes", evt->header_value)==0;
+            }
+            // what can we do UTF8<->PETSCII on this stream?
+            else if (strcmp("Content-Type", evt->header_key)==0)
+            {
+                Debug_printv("Content info present '%s'!", evt->header_value);
+                std::string asString = evt->header_value;
+                istream->isText = mstr::isText(asString);        
+            }
+            // Last-Modified, value=Thu, 03 Dec 1992 08:37:20 - may be used to get file date
+
+            break;
+        case HTTP_EVENT_ON_DATA: // Occurs multiple times when receiving body data from the server. MAY BE SKIPPED IF BODY IS EMPTY!
+            Debug_printv("HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
+            /*
+             *  Check for chunked encoding is added as the URL for chunked encoding used in this example returns binary data.
+             *  However, event handler can also be used in case chunked encoding is used.
+             */
+            // if (!esp_http_client_is_chunked_response(evt->client)) {
+            //     I-
+            //     if (evt->user_data) {
+            //         memcpy(evt->user_data + output_len, evt->data, evt->data_len);
+            //     } else {
+            //         if (output_buffer == NULL) {
+            //             output_buffer = (char *) malloc(esp_http_client_get_content_length(evt->client));
+            //             output_len = 0;
+            //             if (output_buffer == NULL) {
+            //                 ESP_LOGE(TAG, "Failed to allocate memory for output buffer");
+            //                 return ESP_FAIL;
+            //             }
+            //         }
+            //         memcpy(output_buffer + output_len, evt->data, evt->data_len);
+            //     }
+            //     output_len += evt->data_len;
+            // }
+
+            break;
+
+
+
+
+// z fnHttpClient.cpp
+// #ifdef VERBOSE_HTTP
+//         Debug_printf("HTTP_EVENT_ON_DATA %u\n", uxTaskGetStackHighWaterMark(nullptr));
+// #endif
+//         // Don't do any of this if we're told to ignore the response
+//         if (client->_ignore_response_body == true)
+//             break;
+
+//         // esp_http_client will automatically retry redirects, so ignore all but the last attemp
+//         int status = esp_http_client_get_status_code(client->_handle);
+//         if ((status == HttpStatus_Found || status == HttpStatus_MovedPermanently) && client->_redirect_count < (client->_max_redirects - 1))
+//         {
+// #ifdef VERBOSE_HTTP
+//             Debug_println("HTTP_EVENT_ON_DATA: Ignoring redirect response");
+// #endif
+//             break;
+//         }
+//         /*
+//          If auth type is set to NONE, esp_http_client will automatically retry auth failures by attempting to set the auth type to
+//          BASIC or DIGEST depending on the server response code. Ignore this attempt.
+//         */
+//         if (status == HttpStatus_Unauthorized && client->_auth_type == HTTP_AUTH_TYPE_NONE && client->_redirect_count == 0)
+//         {
+// #ifdef VERBOSE_HTTP
+//             Debug_println("HTTP_EVENT_ON_DATA: Ignoring UNAUTHORIZED response");
+// #endif
+//             break;
+//         }
+
+//         // Check if this is our first time this event has been triggered
+//         if (client->_transaction_begin == true)
+//         {
+//             client->_transaction_begin = false;
+//             client->_transaction_done = false;
+//             // Let the main thread know we're done reading headers and have moved on to the data
+//             xTaskNotifyGive(client->_taskh_consumer);
+//         }
+
+//         // Wait to be told we can fill the buffer
+// #ifdef VERBOSE_HTTP
+//         Debug_println("HTTP_EVENT_ON_DATA: Waiting to start reading");
+// #endif
+//         ulTaskNotifyTake(1, pdMS_TO_TICKS(HTTPCLIENT_WAIT_FOR_CONSUMER_TASK));
+
+// #ifdef VERBOSE_HTTP
+//        Debug_printf("HTTP_EVENT_ON_DATA: Data: %p, Datalen: %d\n", evt->data, evt->data_len);
+// #endif
+
+//         client->_buffer_pos = 0;
+//         client->_buffer_len = (evt->data_len > DEFAULT_HTTP_BUF_SIZE) ? DEFAULT_HTTP_BUF_SIZE : evt->data_len;
+//         memcpy(client->_buffer, evt->data, client->_buffer_len);
+
+//         // Now let the reader know there's data in the buffer
+//         xTaskNotifyGive(client->_taskh_consumer);
+//         break;
+
+
+
+
+
+
+
+
+
+
+
+
+
+        case HTTP_EVENT_ON_FINISH: // Occurs when finish a HTTP session
+            // This may get called more than once if esp_http_client decides to retry in order to handle a redirect or auth response
+            //Debug_printf("HTTP_EVENT_ON_FINISH %u\n", uxTaskGetStackHighWaterMark(nullptr));
+            // Keep track of how many times we "finish" reading a response from the server
+
+            Debug_printv("HTTP_EVENT_ON_FINISH");
+            if (output_buffer != NULL) {
+                // Response is accumulated in output_buffer. Uncomment the below line to print the accumulated response
+                // ESP_LOG_BUFFER_HEX(TAG, output_buffer, output_len);
+                free(output_buffer);
+                output_buffer = NULL;
+            }
+            output_len = 0;
+            break;
+        case HTTP_EVENT_DISCONNECTED: // The connection has been disconnected
+            Debug_printv("HTTP_EVENT_DISCONNECTED");
+            int mbedtls_err = 0;
+            // esp_err_t err = esp_tls_get_and_clear_last_error((esp_tls_error_handle_t)evt->data, &mbedtls_err, NULL);
+            // if (err != 0) {
+            //     ESP_LOGI(TAG, "Last esp error code: 0x%x", err);
+            //     ESP_LOGI(TAG, "Last mbedtls failure: 0x%x", mbedtls_err);
+            // }
+            // if (output_buffer != NULL) {
+            //     free(output_buffer);
+            //     output_buffer = NULL;
+            // }
+            // output_len = 0;
+            break;
+    }
+    return ESP_OK;
+}
