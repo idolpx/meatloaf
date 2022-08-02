@@ -143,7 +143,7 @@ public:
     std::string pathToFile(void)
     {
         if (name.size() > 0)
-            return path.substr(0, path.size() - name.size());
+            return path.substr(0, path.size() - name.size() - 1);
         else
             return path;
     }

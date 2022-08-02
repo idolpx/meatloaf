@@ -43,6 +43,7 @@ bool FlashFile::pathValid(std::string path)
         }
         apath = slash + 1;
     }
+
     return true;
 }
 
@@ -111,6 +112,8 @@ bool FlashFile::exists()
     if (path=="/" || path=="") {
         return true;
     }
+
+    Debug_printv( "basepath[%s] path[%s]", basepath.c_str(), path.c_str() );
 
     struct stat st;
     int i = stat(std::string(basepath + path).c_str(), &st);

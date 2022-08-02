@@ -66,15 +66,22 @@ void iecDisk::sendStatus(void)
 	//Debug_printv("status: {%s}", status.c_str());
 	//Debug_print("[");
 
- 	IEC.send(status);
-	IEC.sendEOI('\x0D');
-
+ 	size_t bytes_sent = IEC.send(status, currentChannel.cursor);
+	Debug_printv("len[%d] bytes_sent[%d]", status.length(), bytes_sent);
+	if ( bytes_sent == status.length() )
+	{
+		m_device_status.clear();
+	}
+	else
+	{
+		channelUpdate(bytes_sent);
+	}
+	
 	//Debug_println(BACKSPACE "]");
 
-	Debug_printf("\r\n{%s}\r\n", status.c_str());
+	Debug_printf("\r\n{%s}\r\n", status.substr(0, bytes_sent).c_str());
 
 	// Clear the status message
-	m_device_status.clear();
 } // sendStatus
 
 void iecDisk::setDeviceStatus(int number, int track, int sector)
@@ -195,19 +202,20 @@ MFile* iecDisk::getPointed(MFile* urlFile) {
 CommandPathTuple iecDisk::parseLine(std::string command, size_t channel)
 {
 
-	//Debug_printv("* PARSE INCOMING LINE *******************************");
+	// Debug_printv("* PARSE INCOMING LINE *******************************");
 
-	//Debug_printv("we are in              [%s]", m_mfile->url.c_str());
-	//Debug_printv("unprocessed user input [%s]", command.c_str());
+	// Debug_printv("we are in              [%s]", m_mfile->url.c_str());
+	// Debug_printv("unprocessed user input [%s]", command.c_str());
 
 	if (mstr::startsWith(command, "*"))
 	{
 		// Find first program in listing
-		if (m_mfile->url.empty())
+		if ( m_mfile->url.empty() || m_mfile->media_image.empty() )
 		{
 			// If in LittleFS root then set it to FB64
 			// TODO: Load configured autoload program
-			command = SYSTEM_DIR "fb64";
+			// command = SYSTEM_DIR "fb64";
+			command = "//fb64";
 		}
 		else
 		{
@@ -234,77 +242,86 @@ CommandPathTuple iecDisk::parseLine(std::string command, size_t channel)
 	std::string guessedPath = command;
 	CommandPathTuple tuple;
 
-	mstr::toASCII(guessedPath);
 
-	// check to see if it starts with a known command token
-	if ( mstr::startsWith(command, "cd", false) ) // would be case sensitive, but I don't know the proper case
+	if ( this->data.primary == IEC_TALK || this->data.channel == CMD_CHANNEL )
 	{
-		guessedPath = mstr::drop(guessedPath, 2);
-		tuple.command = "cd";
-		if ( mstr::startsWith(guessedPath, ":") || mstr::startsWith(guessedPath, " " ) ) // drop ":" if it was specified
+		mstr::toASCII(guessedPath);
+
+		// check to see if it starts with a known command token
+		if ( mstr::startsWith(command, "cd", false) ) // would be case sensitive, but I don't know the proper case
+		{
+			guessedPath = mstr::drop(guessedPath, 2);
+			tuple.command = "cd";
+			if ( mstr::startsWith(guessedPath, ":") || mstr::startsWith(guessedPath, " " ) ) // drop ":" if it was specified
+				guessedPath = mstr::drop(guessedPath, 1);
+			//else if ( channel != 15 )
+			//	guessedPath = command;
+
+			Debug_printv("guessedPath[%s]", guessedPath.c_str());
+		}
+		else if(mstr::startsWith(command, "@info", false))
+		{
+			guessedPath = mstr::drop(guessedPath, 5);
+			tuple.command = "@info";
+		}
+		else if(mstr::startsWith(command, "@stat", false))
+		{
+			guessedPath = mstr::drop(guessedPath, 5);
+			tuple.command = "@stat";
+		}
+		else if(mstr::startsWith(command, ":")) {
+			// JiffyDOS eats commands it knows, it might be T: which means ASCII dump requested
 			guessedPath = mstr::drop(guessedPath, 1);
-		//else if ( channel != 15 )
-		//	guessedPath = command;
+			tuple.command = "t";
+		}
+		else if(mstr::startsWith(command, "S:")) {
+			// capital S = heart, that's a FAV!
+			guessedPath = mstr::drop(guessedPath, 2);
+			tuple.command = "mfav";
+		}
+		else if(mstr::startsWith(command, "MFAV:")) {
+			// capital S = heart, that's a FAV!
+			guessedPath = mstr::drop(guessedPath, 5);
+			tuple.command = "mfav";
+		}
+		else
+		{
+			tuple.command = command;
+		}
 
-		Debug_printv("guessedPath[%s]", guessedPath.c_str());
-	}
-	else if(mstr::startsWith(command, "@info", false))
-	{
-		guessedPath = mstr::drop(guessedPath, 5);
-		tuple.command = "@info";
-	}
-	else if(mstr::startsWith(command, "@stat", false))
-	{
-		guessedPath = mstr::drop(guessedPath, 5);
-		tuple.command = "@stat";
-	}
-	else if(mstr::startsWith(command, ":")) {
-		// JiffyDOS eats commands it knows, it might be T: which means ASCII dump requested
-		guessedPath = mstr::drop(guessedPath, 1);
-		tuple.command = "t";
-	}
-	else if(mstr::startsWith(command, "S:")) {
-		// capital S = heart, that's a FAV!
-		guessedPath = mstr::drop(guessedPath, 2);
-		tuple.command = "mfav";
-	}
-	else if(mstr::startsWith(command, "MFAV:")) {
-		// capital S = heart, that's a FAV!
-		guessedPath = mstr::drop(guessedPath, 5);
-		tuple.command = "mfav";
+		// TODO more of them?
+
+		// NOW, since user could have requested ANY kind of our supported magic paths like:
+		// LOAD ~/something
+		// LOAD ../something
+		// LOAD //something
+		// we HAVE TO PARSE IT OUR WAY!
+
+		// and to get a REAL FULL PATH that the user wanted to refer to, we CD into it, using supplied stripped path:
+		mstr::rtrim(guessedPath);
+		tuple.rawPath = guessedPath;
+
+		// Debug_printv("found command     [%s]", tuple.command.c_str());
+		// Debug_printv("command[%s] raw[%s] full[%s]", tuple.command.c_str(), tuple.rawPath.c_str(), tuple.fullPath.c_str());
+
+		if(guessedPath == "$")
+		{
+			//Debug_printv("get directory of [%s]", m_mfile->url.c_str());
+		}
+		else if(!guessedPath.empty())
+		{
+			auto fullPath = Meat::Wrap(m_mfile->cd(guessedPath));
+
+			tuple.fullPath = fullPath->url;
+
+			//Debug_printv("full referenced path [%s]", tuple.fullPath.c_str());
+		}
 	}
 	else
 	{
 		tuple.command = command;
-	}
-
-	// TODO more of them?
-
-	// NOW, since user could have requested ANY kind of our supported magic paths like:
-	// LOAD ~/something
-	// LOAD ../something
-	// LOAD //something
-	// we HAVE TO PARSE IT OUR WAY!
-
-
-	// and to get a REAL FULL PATH that the user wanted to refer to, we CD into it, using supplied stripped path:
-	mstr::rtrim(guessedPath);
-	tuple.rawPath = guessedPath;
-
-	//Debug_printv("found command     [%s]", tuple.command.c_str());
-	//Debug_printv("command[%s] raw[%s] full[%s]", tuple.command.c_str(), tuple.rawPath.c_str(), tuple.fullPath.c_str());
-
-	if(guessedPath == "$")
-	{
-		//Debug_printv("get directory of [%s]", m_mfile->url.c_str());
-	}
-	else if(!guessedPath.empty())
-	{
-		auto fullPath = Meat::Wrap(m_mfile->cd(guessedPath));
-
-		tuple.fullPath = fullPath->url;
-
-		//Debug_printv("full referenced path [%s]", tuple.fullPath.c_str());
+		tuple.rawPath = m_mfile->url;
+		tuple.fullPath = m_mfile->url;
 	}
 
 	//Debug_printv("* END OF PARSE LINE *******************************");
@@ -367,12 +384,12 @@ void iecDisk::handleListenCommand( void )
 	}
 
 	// Parse DOS Command
-	Debug_printv("Parse DOS Command [%s]", this->data.device_command.c_str());
+	// Debug_printv("Parse DOS Command [%s]", this->data.device_command.c_str());
 
 	// Execute DOS Command
 	if ( this->data.channel == CMD_CHANNEL )
 	{
-		Debug_printv("Execute DOS Command [%s]", this->data.device_command.c_str());
+		// Debug_printv("Execute DOS Command [%s]", this->data.device_command.c_str());
 	}
 
 
@@ -390,7 +407,6 @@ void iecDisk::handleListenCommand( void )
 	if (mstr::startsWith(commandAndPath.command, "$"))
 	{
 		m_openState = O_DIR;
-		Debug_printv("LOAD $");
 	}
 	else if (mstr::equals(commandAndPath.command, (char*)"@info", false))
 	{
@@ -442,19 +458,9 @@ void iecDisk::handleListenCommand( void )
 			// Set File
 			prepareFileStream(referencedPath->url);
 		}
-		// else
-		// {
-		// 	Debug_printv("file doesn't exist [%s]", referencedPath->url.c_str());
-		// 	sendFileNotFound();
-		// }
 	}
 
-	if ( this->data.channel == CMD_CHANNEL )
-	{
-		m_openState = O_NOTHING;
-	}
-
-	// dumpState();
+	//dumpState();
 } // handleListenCommand
 
 
@@ -681,7 +687,11 @@ void iecDisk::sendListing()
 	// Send Directory Items
 	while(entry != nullptr)
 	{
-		uint16_t block_cnt = entry->size() / m_mfile->media_block_size;
+		uint16_t s = entry->size();
+		uint16_t block_cnt = s / m_mfile->media_block_size;
+		if ( s > 0 && s < m_mfile->media_block_size )
+			block_cnt = 1;
+
 		uint8_t block_spc = 3;
 		if (block_cnt > 9)
 			block_spc--;
@@ -934,7 +944,7 @@ void iecDisk::sendFile()
 				}
 #else
 				size_t t = (i * 100) / len;
-				Debug_printf("Transferring %d%% [%d, %d]      \r", t, i, avail -1);
+				Debug_printf("\rTransferring %d%% [%d, %d]", t, i, avail -1);
 #endif
 			}
 

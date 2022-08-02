@@ -190,7 +190,7 @@ class iecBus
         // Sends a byte. The communication must be in the correct state: a load command
         // must just have been recieved. If something is not OK, FALSE is returned.
         bool send ( uint8_t data );
-        bool send ( std::string data );
+        size_t send ( std::string data, size_t offset = 0 );
 
         // Same as IEC_send, but indicating that this is the last byte.
         bool sendEOI ( uint8_t data );
@@ -227,7 +227,7 @@ class iecBus
 		bool turnAround( void );
         bool undoTurnAround ( void );
 
-        void releaseLines ( void );
+        void releaseLines ( bool wait = false );
 };
 
 extern iecBus IEC;

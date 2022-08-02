@@ -4,10 +4,13 @@
 #include <vector>
 #include <sstream>
 
+#include "../../include/debug.h"
+
 #include "MIOException.h"
 
 #include "utils.h"
 #include "string_utils.h"
+#include "peoples_url_parser.h"
 
 //#include "wrappers/directory_stream.h"
 
@@ -137,6 +140,10 @@ MFile* MFSOwner::File(std::string path) {
         return csFS.getFile(path);
     }
 
+    // If it's a local file wildcard match and return full path
+    if ( device_config.image().size() == NULL )
+        path = existsLocal(path);
+
     std::vector<std::string> paths = mstr::split(path,'/');
 
     //Debug_printv("Trying to factory path [%s]", path.c_str());
@@ -190,6 +197,46 @@ MFile* MFSOwner::File(std::string path) {
     return nullptr;
 }
 
+std::string MFSOwner::existsLocal( std::string path )
+{
+    PeoplesUrlParser url;
+    url.parseUrl(path);
+
+    // Debug_printv( "path[%s] name[%s] size[%d]", path.c_str(), url.name.c_str(), url.name.size() );
+    if ( url.name.size() == 16 )
+    {
+        struct stat st;
+        int i = stat(std::string(path).c_str(), &st);
+
+        // If not found try for a wildcard match
+        if ( i == -1 )
+        {
+            DIR *dir;
+            struct dirent *ent;
+
+            std::string p = url.pathToFile();
+            std::string name = url.name;
+            // Debug_printv( "pathToFile[%s] basename[%s]", p.c_str(), name.c_str() );
+            if ((dir = opendir ( p.c_str() )) != NULL)
+            {
+                /* print all the files and directories within directory */
+                std::string e;
+                while ((ent = readdir (dir)) != NULL) {
+                    // Debug_printv( "%s\n", ent->d_name );
+                    e = ent->d_name;
+                    if ( mstr::compare( name, e ) )
+                    {
+                        path = ( p + "/" + e );
+                        break;
+                    }
+                }
+                closedir (dir);
+            }
+        }        
+    }
+
+    return path;
+}
 
 MFileSystem* MFSOwner::testScan(std::vector<std::string>::iterator &begin, std::vector<std::string>::iterator &end, std::vector<std::string>::iterator &pathIterator) {
     while (pathIterator != begin) {
@@ -334,7 +381,7 @@ MFile* MFile::localRoot(std::string plus) {
 
 MFile* MFile::cd(std::string newDir) {
 
-    //Debug_printv("cd requested: [%s]", newDir.c_str());
+    // Debug_printv("cd requested: [%s]", newDir.c_str());
 
     // OK to clarify - coming here there should be ONLY path or magicSymbol-path combo!
     // NO "cd:xxxxx", no "/cd:xxxxx" ALLOWED here! ******************
@@ -412,10 +459,10 @@ MFile* MFile::cd(std::string newDir) {
         return MFSOwner::File(newDir);
     }
     else {
-        //Debug_printv("> url[%s] newDir[%s]", url.c_str(), newDir.c_str());
+        // Debug_printv("> url[%s] newDir[%s]", url.c_str(), newDir.c_str());
 
         // Add new directory to path
-        if ( !mstr::endsWith(url, "/") )
+        if ( !mstr::endsWith(url, "/") && newDir.size() )
             url.push_back('/');
 
         return MFSOwner::File(url + newDir);
