@@ -227,7 +227,7 @@ class iecBus
 		bool turnAround( void );
         bool undoTurnAround ( void );
 
-        void releaseLines ( void );
+        void releaseLines ( bool wait = false );
 };
 
 extern iecBus IEC;

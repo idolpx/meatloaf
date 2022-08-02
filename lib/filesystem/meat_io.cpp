@@ -141,7 +141,8 @@ MFile* MFSOwner::File(std::string path) {
     }
 
     // If it's a local file wildcard match and return full path
-    path = existsLocal(path);
+    if ( device_config.image().size() == NULL )
+        path = existsLocal(path);
 
     std::vector<std::string> paths = mstr::split(path,'/');
 
