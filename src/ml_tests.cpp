@@ -52,6 +52,8 @@ void testReader(MFile* readeTest) {
             Debug_printf("Reader returned EOF! :(");
         }
 
+        Debug_printf("* File lines follow:");
+
         while(!readerStream.eof()) {
             std::string line;
 
