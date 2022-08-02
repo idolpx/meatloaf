@@ -461,10 +461,9 @@ MFile* MFile::cd(std::string newDir) {
     else {
         Debug_printv("> url[%s] newDir[%s]", url.c_str(), newDir.c_str());
 
-            // Add new directory to path
-            if ( !mstr::endsWith(url, "/") )
-                url.push_back('/');            
-        }
+        // Add new directory to path
+        if ( !mstr::endsWith(url, "/") )
+            url.push_back('/');
 
         return MFSOwner::File(url + newDir);
     }

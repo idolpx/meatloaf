@@ -442,14 +442,9 @@ void iecDisk::handleListenCommand( void )
 			// Set File
 			prepareFileStream(referencedPath->url);
 		}
-		// else
-		// {
-		// 	Debug_printv("file doesn't exist [%s]", referencedPath->url.c_str());
-		// 	sendFileNotFound();
-		// }
 	}
 
-	// dumpState();
+	dumpState();
 } // handleListenCommand
 
 
