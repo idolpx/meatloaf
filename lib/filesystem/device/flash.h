@@ -42,7 +42,7 @@ friend class FlashOStream;
 friend class FlashIStream;
 
 public:
-    std::string basepath;
+    std::string basepath = "";
     
     FlashFile(std::string path) {
         basepath = device_config.basepath();

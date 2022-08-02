@@ -130,6 +130,7 @@ public:
 
     static MFileSystem* scanPathLeft(std::vector<std::string> paths, std::vector<std::string>::iterator &pathIterator);
 
+    static std::string existsLocal( std::string path );
     static MFileSystem* testScan(std::vector<std::string>::iterator &begin, std::vector<std::string>::iterator &end, std::vector<std::string>::iterator &pathIterator);
 
 
