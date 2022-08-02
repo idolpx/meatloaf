@@ -235,76 +235,86 @@ CommandPathTuple iecDisk::parseLine(std::string command, size_t channel)
 	std::string guessedPath = command;
 	CommandPathTuple tuple;
 
-	mstr::toASCII(guessedPath);
 
-	// check to see if it starts with a known command token
-	if ( mstr::startsWith(command, "cd", false) ) // would be case sensitive, but I don't know the proper case
+	if ( this->data.primary == IEC_TALK || this->data.channel == CMD_CHANNEL )
 	{
-		guessedPath = mstr::drop(guessedPath, 2);
-		tuple.command = "cd";
-		if ( mstr::startsWith(guessedPath, ":") || mstr::startsWith(guessedPath, " " ) ) // drop ":" if it was specified
+		mstr::toASCII(guessedPath);
+
+		// check to see if it starts with a known command token
+		if ( mstr::startsWith(command, "cd", false) ) // would be case sensitive, but I don't know the proper case
+		{
+			guessedPath = mstr::drop(guessedPath, 2);
+			tuple.command = "cd";
+			if ( mstr::startsWith(guessedPath, ":") || mstr::startsWith(guessedPath, " " ) ) // drop ":" if it was specified
+				guessedPath = mstr::drop(guessedPath, 1);
+			//else if ( channel != 15 )
+			//	guessedPath = command;
+
+			Debug_printv("guessedPath[%s]", guessedPath.c_str());
+		}
+		else if(mstr::startsWith(command, "@info", false))
+		{
+			guessedPath = mstr::drop(guessedPath, 5);
+			tuple.command = "@info";
+		}
+		else if(mstr::startsWith(command, "@stat", false))
+		{
+			guessedPath = mstr::drop(guessedPath, 5);
+			tuple.command = "@stat";
+		}
+		else if(mstr::startsWith(command, ":")) {
+			// JiffyDOS eats commands it knows, it might be T: which means ASCII dump requested
 			guessedPath = mstr::drop(guessedPath, 1);
-		//else if ( channel != 15 )
-		//	guessedPath = command;
+			tuple.command = "t";
+		}
+		else if(mstr::startsWith(command, "S:")) {
+			// capital S = heart, that's a FAV!
+			guessedPath = mstr::drop(guessedPath, 2);
+			tuple.command = "mfav";
+		}
+		else if(mstr::startsWith(command, "MFAV:")) {
+			// capital S = heart, that's a FAV!
+			guessedPath = mstr::drop(guessedPath, 5);
+			tuple.command = "mfav";
+		}
+		else
+		{
+			tuple.command = command;
+		}
 
-		Debug_printv("guessedPath[%s]", guessedPath.c_str());
-	}
-	else if(mstr::startsWith(command, "@info", false))
-	{
-		guessedPath = mstr::drop(guessedPath, 5);
-		tuple.command = "@info";
-	}
-	else if(mstr::startsWith(command, "@stat", false))
-	{
-		guessedPath = mstr::drop(guessedPath, 5);
-		tuple.command = "@stat";
-	}
-	else if(mstr::startsWith(command, ":")) {
-		// JiffyDOS eats commands it knows, it might be T: which means ASCII dump requested
-		guessedPath = mstr::drop(guessedPath, 1);
-		tuple.command = "t";
-	}
-	else if(mstr::startsWith(command, "S:")) {
-		// capital S = heart, that's a FAV!
-		guessedPath = mstr::drop(guessedPath, 2);
-		tuple.command = "mfav";
-	}
-	else if(mstr::startsWith(command, "MFAV:")) {
-		// capital S = heart, that's a FAV!
-		guessedPath = mstr::drop(guessedPath, 5);
-		tuple.command = "mfav";
+		// TODO more of them?
+
+		// NOW, since user could have requested ANY kind of our supported magic paths like:
+		// LOAD ~/something
+		// LOAD ../something
+		// LOAD //something
+		// we HAVE TO PARSE IT OUR WAY!
+
+		// and to get a REAL FULL PATH that the user wanted to refer to, we CD into it, using supplied stripped path:
+		mstr::rtrim(guessedPath);
+		tuple.rawPath = guessedPath;
+
+		Debug_printv("found command     [%s]", tuple.command.c_str());
+		Debug_printv("command[%s] raw[%s] full[%s]", tuple.command.c_str(), tuple.rawPath.c_str(), tuple.fullPath.c_str());
+
+		if(guessedPath == "$")
+		{
+			//Debug_printv("get directory of [%s]", m_mfile->url.c_str());
+		}
+		else if(!guessedPath.empty())
+		{
+			auto fullPath = Meat::Wrap(m_mfile->cd(guessedPath));
+
+			tuple.fullPath = fullPath->url;
+
+			//Debug_printv("full referenced path [%s]", tuple.fullPath.c_str());
+		}
 	}
 	else
 	{
 		tuple.command = command;
-	}
-
-	// TODO more of them?
-
-	// NOW, since user could have requested ANY kind of our supported magic paths like:
-	// LOAD ~/something
-	// LOAD ../something
-	// LOAD //something
-	// we HAVE TO PARSE IT OUR WAY!
-
-	// and to get a REAL FULL PATH that the user wanted to refer to, we CD into it, using supplied stripped path:
-	mstr::rtrim(guessedPath);
-	tuple.rawPath = guessedPath;
-
-	Debug_printv("found command     [%s]", tuple.command.c_str());
-	Debug_printv("command[%s] raw[%s] full[%s]", tuple.command.c_str(), tuple.rawPath.c_str(), tuple.fullPath.c_str());
-
-	if(guessedPath == "$")
-	{
-		//Debug_printv("get directory of [%s]", m_mfile->url.c_str());
-	}
-	else if(!guessedPath.empty())
-	{
-		auto fullPath = Meat::Wrap(m_mfile->cd(guessedPath));
-
-		tuple.fullPath = fullPath->url;
-
-		//Debug_printv("full referenced path [%s]", tuple.fullPath.c_str());
+		tuple.rawPath = m_mfile->url;
+		tuple.fullPath = m_mfile->url;
 	}
 
 	//Debug_printv("* END OF PARSE LINE *******************************");
