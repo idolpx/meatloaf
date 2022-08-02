@@ -512,7 +512,7 @@ void testBasicConfig() {
 void runTestsSuite() {
     // working, uncomment if you want
     // runFSTest("/.sys", "README"); // TODO - let urlparser drop the last slash!
-    // runFSTest("http://google.com/we/love/commodore/disk.d64/somefile","http://jigsaw.w3.org/HTTP/connection.html");
+    runFSTest("http://google.com/we/love/commodore/disk.d64/somefile","http://jigsaw.w3.org/HTTP/connection.html");
     //runFSTest("cs:/apps/ski_writer.d64","cs:/apps/ski_writer.d64/EDITOR.HLP");
     
     // not working yet, DO NOT UNCOMMENT!!!
