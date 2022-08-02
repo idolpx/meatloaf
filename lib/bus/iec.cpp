@@ -422,12 +422,9 @@ void iecBus::service ( void )
                 this->bus_state = BUS_IDLE;
         }
 
-        // // If the bus is idle then release the lines
+        // If the bus is idle then release the lines
         if ( this->bus_state < BUS_ACTIVE )
-        {
             releaseLines();
-            //return;
-        }
 
         // Debug_printv ( "code[%.2X] primary[%.2X] secondary[%.2X] bus[%d]", command, this->data.primary, this->data.secondary, this->bus_state );
         // Debug_printv( "primary[%.2X] secondary[%.2X] bus_state[%d]", this->data.primary, this->data.secondary, this->bus_state );
@@ -436,7 +433,7 @@ void iecBus::service ( void )
 
     if ( process_command )
     {
-        protocol.pull( PIN_IEC_SRQ );
+        // protocol.pull( PIN_IEC_SRQ );
         // Debug_println ( "DATA MODE" );
         // Debug_printv ( "bus[%d] device[%d] primary[%d] secondary[%d]", this->bus_state, this->device_state, this->data.primary, this->data.secondary );
 
@@ -456,29 +453,10 @@ void iecBus::service ( void )
         // At the moment there is only the multi-disk device
         device_state_t device_state = disk.queue_command();
 
-        // Debug_printv("BUS primary[%.2X] secondary[%.2X] device[%d], channel[%d] command[%s] ", this->data.primary, this->data.secondary, this->data.device, this->data.channel, this->data.device_command.c_str());
-
-        // If bus is not idle process commands in devices
+        // Process commands in devices
         // At the moment there is only the multi-disk device
-//        if ( this->bus_state == BUS_PROCESS )
-//        {
-            // Debug_printv( "DEV process" );
-            // Process command on devices
-
-            disk.process();
-            this->bus_state = BUS_IDLE;
-//        }
-        // else if ( this->bus_state == BUS_RESET )
-        // {
-        //     Debug_printv("Bus reset");
-        //     this->data.init(); // Clear bus data
-        //     this->bus_state = BUS_IDLE;
-        // }
-
-        // Let bus settle
-        // IEC.protocol.pull( PIN_IEC_SRQ );
-        // protocol.wait( 20 );
-        // IEC.protocol.release( PIN_IEC_SRQ );
+        disk.process();
+        this->bus_state = BUS_IDLE;
 
         // Debug_printv( "primary[%.2X] secondary[%.2X] bus_state[%d]", this->data.primary, this->data.secondary, this->bus_state );
         // Debug_printv( "atn[%d] clk[%d] data[%d] srq[%d]", IEC.protocol.status(PIN_IEC_ATN), IEC.protocol.status(PIN_IEC_CLK_IN), IEC.protocol.status(PIN_IEC_DATA_IN), IEC.protocol.status(PIN_IEC_SRQ));
