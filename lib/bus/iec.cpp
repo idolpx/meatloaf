@@ -58,6 +58,12 @@ device_state_t iecDevice::queue_command ( void )
 {
     // Record command for this device
     this->data = IEC.data;
+    // this->data.primary = IEC.data.primary;
+    // this->data.secondary = IEC.data.secondary;
+    // this->data.device = IEC.data.device;
+    // this->data.channel = IEC.data.channel;
+    // this->data.primary = IEC.data.primary;
+    // this->data.device_command = IEC.data.device_command;
 
     if ( this->data.primary == IEC_LISTEN )
     {
@@ -68,7 +74,7 @@ device_state_t iecDevice::queue_command ( void )
         device_state = DEVICE_TALK;
     }
 
-    // Debug_printv("DEV primary[%.2X] secondary[%.2X] device[%d], channel[%d] command[%s] ", this->data.primary, this->data.secondary, this->data.device, this->data.channel, this->data.device_command.c_str());
+    Debug_printv("DEV primary[%.2X] secondary[%.2X] device[%d], channel[%d] command[%s] ", this->data.primary, this->data.secondary, this->data.device, this->data.channel, this->data.device_command.c_str());
 
     return device_state;
 }
@@ -81,7 +87,7 @@ bool iecDevice::process ( void )
 
     Debug_printf ( "DEVICE: [%.2d] ", this->data.device );
 
-    // Debug_printv("DEV primary[%.2X] secondary[%.2X] device[%d], channel[%d] command[%s] ", this->data.primary, this->data.secondary, this->data.device, this->data.channel, this->data.device_command.c_str());
+    Debug_printv("DEV primary[%.2X] secondary[%.2X] device[%d], channel[%d] command[%s] ", this->data.primary, this->data.secondary, this->data.device, this->data.channel, this->data.device_command.c_str());
 
     if ( this->data.secondary == IEC_OPEN )
     {
@@ -456,6 +462,10 @@ void iecBus::service ( void )
         // Process commands in devices
         // At the moment there is only the multi-disk device
         disk.process();
+
+        if ( device_state == DEVICE_IDLE )
+            this->data.init();
+
         this->bus_state = BUS_IDLE;
 
         // Debug_printv( "primary[%.2X] secondary[%.2X] bus_state[%d]", this->data.primary, this->data.secondary, this->bus_state );
