@@ -221,7 +221,7 @@ std::string MFSOwner::existsLocal( std::string path )
                 /* print all the files and directories within directory */
                 std::string e;
                 while ((ent = readdir (dir)) != NULL) {
-                    Debug_printv( "%s\n", ent->d_name );
+                    // Debug_printv( "%s\n", ent->d_name );
                     e = ent->d_name;
                     if ( mstr::compare( name, e ) )
                     {
