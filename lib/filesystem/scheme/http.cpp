@@ -1,9 +1,80 @@
 #include "http.h"
 
+esp_err_t _http_event_handler(esp_http_client_event_t *evt)
+{
+    static char *output_buffer;  // Buffer to store response of http request from event handler
+    static int output_len;       // Stores number of bytes read
+    switch(evt->event_id) {
+        case HTTP_EVENT_ERROR:
+            Debug_printv("HTTP_EVENT_ERROR");
+            break;
+        case HTTP_EVENT_ON_CONNECTED:
+            Debug_printv("HTTP_EVENT_ON_CONNECTED");
+            break;
+        case HTTP_EVENT_HEADER_SENT:
+            Debug_printv("HTTP_EVENT_HEADER_SENT");
+            break;
+        case HTTP_EVENT_ON_HEADER:
+            Debug_printv("HTTP_EVENT_ON_HEADER, key=%s, value=%s", evt->header_key, evt->header_value);
+            break;
+        case HTTP_EVENT_ON_DATA:
+            Debug_printv("HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
+            /*
+             *  Check for chunked encoding is added as the URL for chunked encoding used in this example returns binary data.
+             *  However, event handler can also be used in case chunked encoding is used.
+             */
+            if (!esp_http_client_is_chunked_response(evt->client)) {
+                // If user_data buffer is configured, copy the response into the buffer
+                // if (evt->user_data) {
+                //     memcpy(evt->user_data + output_len, evt->data, evt->data_len);
+                // } else {
+                //     if (output_buffer == NULL) {
+                //         output_buffer = (char *) malloc(esp_http_client_get_content_length(evt->client));
+                //         output_len = 0;
+                //         if (output_buffer == NULL) {
+                //             ESP_LOGE(TAG, "Failed to allocate memory for output buffer");
+                //             return ESP_FAIL;
+                //         }
+                //     }
+                //     memcpy(output_buffer + output_len, evt->data, evt->data_len);
+                // }
+                output_len += evt->data_len;
+            }
+
+            break;
+        case HTTP_EVENT_ON_FINISH:
+            Debug_printv("HTTP_EVENT_ON_FINISH");
+            if (output_buffer != NULL) {
+                // Response is accumulated in output_buffer. Uncomment the below line to print the accumulated response
+                // ESP_LOG_BUFFER_HEX(TAG, output_buffer, output_len);
+                free(output_buffer);
+                output_buffer = NULL;
+            }
+            output_len = 0;
+            break;
+        case HTTP_EVENT_DISCONNECTED:
+            Debug_printv("HTTP_EVENT_DISCONNECTED");
+            int mbedtls_err = 0;
+            // esp_err_t err = esp_tls_get_and_clear_last_error((esp_tls_error_handle_t)evt->data, &mbedtls_err, NULL);
+            // if (err != 0) {
+            //     ESP_LOGI(TAG, "Last esp error code: 0x%x", err);
+            //     ESP_LOGI(TAG, "Last mbedtls failure: 0x%x", mbedtls_err);
+            // }
+            // if (output_buffer != NULL) {
+            //     free(output_buffer);
+            //     output_buffer = NULL;
+            // }
+            // output_len = 0;
+            break;
+    }
+    return ESP_OK;
+}
+
 /********************************************************
  * File impls
  ********************************************************/
-// char local_response_buffer[MAX_HTTP_OUTPUT_BUFFER] = {0};
+#define MAX_HTTP_OUTPUT_BUFFER 2048
+char local_response_buffer[MAX_HTTP_OUTPUT_BUFFER] = {0};
 
 bool HttpFile::isDirectory() {
     // hey, why not?
@@ -12,12 +83,10 @@ bool HttpFile::isDirectory() {
 
 MIStream* HttpFile::inputStream() {
     // has to return OPENED stream
-    Debug_printv("[%s]", url.c_str());
+    Debug_printv("Input stream requested: [%s]", url.c_str());
     MIStream* istream = new HttpIStream(url);
-    if ( istream->open() )
-        return istream;
-    else
-        return nullptr;
+    istream->open();
+    return istream;
 }
 
 MIStream* HttpFile::createIStream(std::shared_ptr<MIStream> is) {
@@ -53,10 +122,9 @@ bool HttpFile::exists() {
 
 size_t HttpFile::size() {
     // we may take content-lenght from header if exists
+
     std::unique_ptr<MIStream> test(inputStream());
-
     size_t size = 0;
-
     if(test->isOpen())
         size = test->available();
 
@@ -101,7 +169,7 @@ bool HttpOStream::seek(size_t pos) {
         esp_http_client_set_method(m_http, HTTP_METHOD_PUT);
         esp_err_t initOk = esp_http_client_perform(m_http); // or open? It's not entirely clear...
 
-        Debug_printv("SEEK in HttpOStream %s: RC=%d", url.c_str(), initOk);
+        Debug_printv("%s: RC=%d", url.c_str(), initOk);
         if(initOk != ESP_OK)
             return false;
 
@@ -122,8 +190,12 @@ bool HttpOStream::seek(size_t pos) {
 }
 
 void HttpOStream::close() {
-    esp_http_client_close(m_http);
-    esp_http_client_cleanup(m_http);
+    if(m_http != nullptr) {
+        if(m_isOpen)
+            esp_http_client_close(m_http);
+        esp_http_client_cleanup(m_http);
+        m_http = nullptr;
+    }
     m_isOpen = false;
 }
 
@@ -194,6 +266,8 @@ bool HttpOStream::isOpen() {
 
 
 
+
+
 /********************************************************
  * Istream impls
  ********************************************************/
@@ -260,10 +334,21 @@ bool HttpIStream::seek(size_t pos) {
 }
 
 void HttpIStream::close() {
-    esp_http_client_close(m_http);
-    esp_http_client_cleanup(m_http);
+    if(m_http != nullptr) {
+        // Debug_printv("m_http wasn't null");
+
+        if(m_isOpen) {
+            // Debug_printv("stream was open");
+            esp_http_client_close(m_http);
+        }
+        // Debug_printv("before esp_http_client_cleanup");
+        esp_http_client_cleanup(m_http);
+        // Debug_printv("post esp_http_client_cleanup");
+        m_http = nullptr;
+    }
     m_isOpen = false;
 }
+
 
 bool HttpIStream::open() {
     //mstr::replaceAll(url, "HTTP:", "http:");
@@ -274,53 +359,64 @@ bool HttpIStream::open() {
         .timeout_ms = 10000,
         .disable_auto_redirect = false,
         .max_redirection_count = 10,
+        // .event_handler = _http_event_handler,
+        .user_data = local_response_buffer,
         .keep_alive_enable = true,
         .keep_alive_idle = 10,
-        .keep_alive_interval = 10,
+        .keep_alive_interval = 10
     };
+
     m_http = esp_http_client_init(&config);
     //esp_err_t initOk = esp_http_client_open(m_http, 0); // or open? It's not entirely clear...
     esp_err_t initOk = esp_http_client_perform(m_http); // or open? It's not entirely clear...
 
-    Debug_printv("opening %s: result=%d", url.c_str(), initOk);
-    if(initOk != ESP_OK)
+    Debug_printv("tried opening %s: result=%d", url.c_str(), initOk);
+    if(initOk != ESP_OK) {
+        close();
         return false;
+    }
 
     int httpCode = esp_http_client_get_status_code(m_http);
     Debug_printv("httpCode=%d", httpCode);
-    if(httpCode != 200)
+    if(httpCode != 200) {
+        close();
         return false;
+    }
 
     m_isOpen = true;
     m_position = 0;
 
     // Let's get the length of the payload
     m_length = esp_http_client_fetch_headers(m_http);
-    //m_length = esp_http_client_get_content_length(m_http);
-    if ( m_length == -1 )
-    {
-        char* content_length;
-        if ( esp_http_client_get_header(m_http, "Content-Length", &content_length) )
-            m_length = atoi(content_length);
-    }
+    m_length = esp_http_client_get_content_length(m_http);
+    // if ( m_length == -1 )
+    // {
+    //     char* content_length;
+    //     if ( esp_http_client_get_header(m_http, "Content-Length", &content_length) )
+    //         m_length = atoi(content_length);
+    // }
     m_bytesAvailable = m_length;
     Debug_printv("length=%d", m_length);
 
     // Does this server support resume?
     // Accept-Ranges: bytes
-    char* ranges;
-    if ( esp_http_client_get_header(m_http, "Accept-Ranges", &ranges) == ESP_OK )
+    //char* ranges;
+    // char ranges[MAX_HTTP_OUTPUT_BUFFER] = {0};
+    char* tempChar = new char[80];
+    tempChar[0] = 0x00;
+
+    if ( esp_http_client_get_header(m_http, "Accept-Ranges", &tempChar) == ESP_OK )
     {
-        isFriendlySkipper = strcmp("bytes", ranges);
+        isFriendlySkipper = strcmp("bytes", tempChar);
     }
 
+    tempChar[0] = 0x00;
     // // Let's see if it's plain text, so we can do UTF8-PETSCII magic!
-    // char* ct;
-    // if ( esp_http_client_get_header(m_http, "Content-Type", &ct) == ESP_OK )
-    // {
-    //     std::string asString = ct;
-    //     isText = mstr::isText(asString);        
-    // }
+    if ( esp_http_client_get_header(m_http, "Content-Type", &tempChar) == ESP_OK )
+    {
+        std::string asString = tempChar;
+        isText = mstr::isText(asString);        
+    }
 
     // Debug_printv("length=%d isFriendlySkipper=[%d] content_type=[%s]", m_length, isFriendlySkipper, ct);
     Debug_printv("Made it here!");
@@ -339,77 +435,3 @@ bool HttpIStream::isOpen() {
     return m_isOpen;
 };
 
-// esp_err_t _http_event_handler(esp_http_client_event_t *evt)
-// {
-//     static char *output_buffer;  // Buffer to store response of http request from event handler
-//     static int output_len;       // Stores number of bytes read
-//     switch(evt->event_id) {
-//         case HTTP_EVENT_ERROR:
-//             ESP_LOGD(TAG, "HTTP_EVENT_ERROR");
-//             break;
-//         case HTTP_EVENT_ON_CONNECTED:
-//             ESP_LOGD(TAG, "HTTP_EVENT_ON_CONNECTED");
-//             break;
-//         case HTTP_EVENT_HEADER_SENT:
-//             ESP_LOGD(TAG, "HTTP_EVENT_HEADER_SENT");
-//             break;
-//         case HTTP_EVENT_ON_HEADER:
-//             ESP_LOGD(TAG, "HTTP_EVENT_ON_HEADER, key=%s, value=%s", evt->header_key, evt->header_value);
-//             break;
-//         case HTTP_EVENT_ON_DATA:
-//             ESP_LOGD(TAG, "HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
-//             /*
-//              *  Check for chunked encoding is added as the URL for chunked encoding used in this example returns binary data.
-//              *  However, event handler can also be used in case chunked encoding is used.
-//              */
-//             if (!esp_http_client_is_chunked_response(evt->client)) {
-//                 // If user_data buffer is configured, copy the response into the buffer
-//                 if (evt->user_data) {
-//                     memcpy(evt->user_data + output_len, evt->data, evt->data_len);
-//                 } else {
-//                     if (output_buffer == NULL) {
-//                         output_buffer = (char *) malloc(esp_http_client_get_content_length(evt->client));
-//                         output_len = 0;
-//                         if (output_buffer == NULL) {
-//                             ESP_LOGE(TAG, "Failed to allocate memory for output buffer");
-//                             return ESP_FAIL;
-//                         }
-//                     }
-//                     memcpy(output_buffer + output_len, evt->data, evt->data_len);
-//                 }
-//                 output_len += evt->data_len;
-//             }
-
-//             break;
-//         case HTTP_EVENT_ON_FINISH:
-//             ESP_LOGD(TAG, "HTTP_EVENT_ON_FINISH");
-//             if (output_buffer != NULL) {
-//                 // Response is accumulated in output_buffer. Uncomment the below line to print the accumulated response
-//                 // ESP_LOG_BUFFER_HEX(TAG, output_buffer, output_len);
-//                 free(output_buffer);
-//                 output_buffer = NULL;
-//             }
-//             output_len = 0;
-//             break;
-//         case HTTP_EVENT_DISCONNECTED:
-//             ESP_LOGI(TAG, "HTTP_EVENT_DISCONNECTED");
-//             int mbedtls_err = 0;
-//             esp_err_t err = esp_tls_get_and_clear_last_error((esp_tls_error_handle_t)evt->data, &mbedtls_err, NULL);
-//             if (err != 0) {
-//                 ESP_LOGI(TAG, "Last esp error code: 0x%x", err);
-//                 ESP_LOGI(TAG, "Last mbedtls failure: 0x%x", mbedtls_err);
-//             }
-//             if (output_buffer != NULL) {
-//                 free(output_buffer);
-//                 output_buffer = NULL;
-//             }
-//             output_len = 0;
-//             break;
-//         case HTTP_EVENT_REDIRECT:
-//             ESP_LOGD(TAG, "HTTP_EVENT_REDIRECT");
-//             esp_http_client_set_header(evt->client, "From", "user@example.com");
-//             esp_http_client_set_header(evt->client, "Accept", "text/html");
-//             break;
-//     }
-//     return ESP_OK;
-// }

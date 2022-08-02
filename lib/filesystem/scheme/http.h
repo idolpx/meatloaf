@@ -61,11 +61,11 @@ public:
 
 protected:
     std::string url;
-    bool m_isOpen;
-    size_t m_length;
+    bool m_isOpen = false;
+    size_t m_length = 0;
     size_t m_bytesAvailable = 0;
     size_t m_position = 0;
-    esp_http_client_handle_t m_http;
+    esp_http_client_handle_t m_http = nullptr;
        
 //    WiFiClient m_file;
 //	  fnHttpClient m_http;
@@ -99,7 +99,7 @@ public:
 
 protected:
     std::string url;
-    bool m_isOpen;
+    bool m_isOpen = false;
     size_t m_bytesAvailable = 0;
     size_t m_length = 0;
     size_t m_position = 0;
@@ -108,7 +108,7 @@ protected:
 //    WiFiClient m_file;
 	// fnHttpClient m_http;
     // MHttpClient m_http;
-    esp_http_client_handle_t m_http;
+    esp_http_client_handle_t m_http = nullptr;
 
 };
 
@@ -151,7 +151,7 @@ protected:
     //WiFiClient m_client;
     // MHttpClient m_http;
 	// fnHttpClient m_http;
-    esp_http_client_handle_t m_http;
+    esp_http_client_handle_t m_http = nullptr;
 
 };
 

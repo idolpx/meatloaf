@@ -116,15 +116,30 @@ void dumpFileProperties(MFile* testMFile) {
 void testDirectory(MFile* dir, bool verbose=false) {
     testHeader("A directory");
 
-    Debug_printf("* Listing %s\n", dir->url.c_str());
-    std::unique_ptr<MFile> entry(dir->getNextFileInDir());
+    if(!dir->isDirectory()) {
+        Debug_printf("Not a directory!");
+        return;
+    }
 
-    while(entry != nullptr) {
-        if(verbose)
-            dumpFileProperties(entry.get());
-        else
-            Debug_printf("'%s'\n", entry->url.c_str());
-        entry.reset(dir->getNextFileInDir());
+
+    Debug_printf("* Listing %s\n", dir->url.c_str());
+    auto e = dir->getNextFileInDir();
+    if(e != nullptr) {
+        std::unique_ptr<MFile> entry(e);
+
+        Debug_printf("* past creating file\n");
+
+
+        while(entry != nullptr) {
+            if(verbose)
+                dumpFileProperties(entry.get());
+            else
+                Debug_printf("'%s'\n", entry->url.c_str());
+            entry.reset(dir->getNextFileInDir());
+        }
+    }
+    else {
+        Debug_printf("Got nullptr!");
     }
 }
 
@@ -367,9 +382,13 @@ void testStdStreamWrapper(MFile* srcFile, MFile* dstFile) {
 
         Debug_printf("serializeJson returned %d\n", x);
 
+        Debug_printf("sbefore if");
+
         if(ostream.bad()) {
             Debug_println("WARNING: FILE WRITE FAILED!!!");
         }
+
+        Debug_printf("before close");
 
         ostream.close();
     }
@@ -450,15 +469,13 @@ void testNewCppStreams(std::string name) {
 
 void runFSTest(std::string dirPath, std::string filePath) {
     //Debug_println("**********************************************************************\n\n");
-    // std::shared_ptr<MFile> testDir(MFSOwner::File(dirPath));
-    // std::shared_ptr<MFile> testFile(MFSOwner::File(filePath));
-    // std::shared_ptr<MFile> destFile(MFSOwner::File("/mltestfile"));
+
 
     auto testDir = Meat::New<MFile>(dirPath);
     auto testFile = Meat::New<MFile>(filePath);
     auto destFile = Meat::New<MFile>("/mltestfile");
 
-    testNewCppStreams(filePath);
+    //testNewCppStreams(filePath);
 
     if(!dirPath.empty() && testDir != nullptr) {
         testPaths(testDir.get(),"subDir");
@@ -473,10 +490,12 @@ void runFSTest(std::string dirPath, std::string filePath) {
         testReader(testFile.get());
         testCopy(testFile.get(), destFile.get());
 
-        testStdStreamWrapper(testFile.get(), destFile.get());
+        // C++ stream wrappers are broken - don't use
+        //testStdStreamWrapper(testFile.get(), destFile.get());
 
         Debug_println("\n\n\n*** Please compare file copied to ML aginst the source:\n\n\n");
-        testReader(destFile.get());
+        // C++ stream wrappers are broken - don't use
+        //testReader(destFile.get());
     }
     else {
         Debug_println("*** WARNING - file instance couldn't be created!");
@@ -510,9 +529,11 @@ void testBasicConfig() {
 }
 
 void runTestsSuite() {
+    fnSystem.delay_microseconds(30000);
+
     // working, uncomment if you want
     // runFSTest("/.sys", "README"); // TODO - let urlparser drop the last slash!
-    runFSTest("http://google.com/we/love/commodore/disk.d64/somefile","http://jigsaw.w3.org/HTTP/connection.html");
+    runFSTest("http://info.cern.ch/hypertext/WWW/TheProject.html","http://info.cern.ch/hypertext/WWW/TheProject.html");
     //runFSTest("cs:/apps/ski_writer.d64","cs:/apps/ski_writer.d64/EDITOR.HLP");
     
     // not working yet, DO NOT UNCOMMENT!!!

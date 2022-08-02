@@ -487,14 +487,17 @@ namespace Meat {
         };
 
         ~ifstream() {
+            Debug_println("ifstream destructor");
             close();
         }
 
         virtual void open() {
+            Debug_println("ifstream open");
             buff.open(url);
         }
 
         virtual void close() {
+            Debug_println("ifstream close");
             buff.close();
         }
 
