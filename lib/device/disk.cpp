@@ -367,12 +367,12 @@ void iecDisk::handleListenCommand( void )
 	}
 
 	// Parse DOS Command
-	Debug_printv("Parse DOS Command [%s]", this->data.device_command.c_str());
+	// Debug_printv("Parse DOS Command [%s]", this->data.device_command.c_str());
 
 	// Execute DOS Command
 	if ( this->data.channel == CMD_CHANNEL )
 	{
-		Debug_printv("Execute DOS Command [%s]", this->data.device_command.c_str());
+		// Debug_printv("Execute DOS Command [%s]", this->data.device_command.c_str());
 	}
 
 
@@ -681,7 +681,11 @@ void iecDisk::sendListing()
 	// Send Directory Items
 	while(entry != nullptr)
 	{
-		uint16_t block_cnt = entry->size() / m_mfile->media_block_size;
+		uint16_t s = entry->size();
+		uint16_t block_cnt = s / m_mfile->media_block_size;
+		if ( s > 0 && s < m_mfile->media_block_size )
+			block_cnt = 1;
+
 		uint8_t block_spc = 3;
 		if (block_cnt > 9)
 			block_spc--;
@@ -934,7 +938,7 @@ void iecDisk::sendFile()
 				}
 #else
 				size_t t = (i * 100) / len;
-				Debug_printf("Transferring %d%% [%d, %d]      \r", t, i, avail -1);
+				Debug_printf("\rTransferring %d%% [%d, %d]", t, i, avail -1);
 #endif
 			}
 
