@@ -520,6 +520,13 @@ namespace Meat {
         }
     };
 
+    // ifstream& operator>>(ifstream& is, U8Char& c) {
+    //     //U8Char codePoint(this);
+    //     c = U8Char(&is);
+    //     return is;
+    // }
+
+
 /********************************************************
  * C++ Output MFile stream
  ********************************************************/

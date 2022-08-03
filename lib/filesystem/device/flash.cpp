@@ -271,7 +271,7 @@ size_t FlashOStream::write(const uint8_t *buf, size_t size) {
 };
 
 bool FlashOStream::isOpen() {
-    return handle->rc >= 0;
+    return handle->file_h != nullptr;
 }
 
 
@@ -373,7 +373,7 @@ bool FlashIStream::seek(size_t pos, int mode) {
 }
 
 bool FlashIStream::isOpen() {
-    return handle->rc >= 0;
+    return handle->file_h != nullptr;
 }
 
 /********************************************************
@@ -386,10 +386,10 @@ FlashHandle::~FlashHandle() {
 }
 
 void FlashHandle::dispose() {
-    if (rc >= 0) {
+    if (file_h != nullptr) {
 
         fclose( file_h );
-        rc = -255;
+        // rc = -255;
     }
 }
 
@@ -418,7 +418,7 @@ void FlashHandle::obtain(std::string m_path, std::string mode) {
     }
 
     file_h = fopen( m_path.c_str(), mode.c_str());
-    rc = 1;
+    // rc = 1;
 
     //Serial.printf("FSTEST: lfs_file_open file rc:%d\n",rc);
 
