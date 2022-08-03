@@ -357,6 +357,7 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
 } // sendByte
 
 
+
 // Wait indefinitely if wait = 0 or until ATN status changes
 int16_t CBMStandardSerial::timeoutWait ( uint8_t pin, bool target_status, size_t wait, bool watch_atn )
 {
@@ -374,7 +375,7 @@ int16_t CBMStandardSerial::timeoutWait ( uint8_t pin, bool target_status, size_t
     if ( atn_status )
         flags or_eq ATN_PULLED;
 
-    // pull ( PIN_IEC_SRQ );
+    pull ( PIN_IEC_SRQ );
     while ( status ( pin ) != target_status )
     {
 
@@ -386,7 +387,7 @@ int16_t CBMStandardSerial::timeoutWait ( uint8_t pin, bool target_status, size_t
 
         if ( elapsed > wait && wait != FOREVER )
         {
-            // release ( PIN_IEC_SRQ );
+            release ( PIN_IEC_SRQ );
             return -1;
         }
 
@@ -398,14 +399,14 @@ int16_t CBMStandardSerial::timeoutWait ( uint8_t pin, bool target_status, size_t
 
             if ( atn_check != atn_status )
             {
-                // release ( PIN_IEC_SRQ );
+                release ( PIN_IEC_SRQ );
                 Debug_printv("pin[%d] state[%d] wait[%d] elapsed[%d]", pin, target_status, wait, elapsed);
                 return -1;
             }            
         }
     }
 
-    // release ( PIN_IEC_SRQ );
+    release ( PIN_IEC_SRQ );
     // Debug_printv("pin[%d] state[%d] wait[%d] step[%d] t[%d]", pin, target_status, wait, elapsed);
     return elapsed;
 } // timeoutWait

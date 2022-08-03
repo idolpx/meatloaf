@@ -115,6 +115,8 @@ bool FlashFile::exists()
         return true;
     }
 
+    Debug_printv( "basepath[%s] path[%s]", basepath.c_str(), path.c_str() );
+
     struct stat st;
     int i = stat(std::string(basepath + path).c_str(), &st);
 

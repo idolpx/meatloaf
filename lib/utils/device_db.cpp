@@ -84,7 +84,7 @@ bool DeviceDB::select(uint8_t new_device_id)
     else
     {
         // Create New Settings
-        deserializeJson(m_device, "{\"id\":0,\"media\":0,\"partition\":0,\"url\":\"\",\"basepath\":\"\",\"path\":\"/\",\"archive\":\"\",\"image\":\"\"}");
+        deserializeJson(m_device, "{\"id\":0,\"url\":\"\",\"basepath\":\"\",\"path\":\"/\",\"archive\":\"\",\"image\":\"\"}");
         m_device["id"] = new_device_id;
         //Debug_printv("created id[%d]", (uint8_t)m_device["id"]);
     }
@@ -128,22 +128,6 @@ void DeviceDB::id(uint8_t id)
     select(id);
 }
 
-uint8_t DeviceDB::media()
-{
-    return m_device["media"];
-}
-void DeviceDB::media(uint8_t media)
-{
-    m_device["media"] = media;
-}
-uint8_t DeviceDB::partition()
-{
-    return m_device["partition"];
-}
-void DeviceDB::partition(uint8_t partition)
-{
-    m_device["partition"] = partition;
-}
 std::string DeviceDB::url()
 {
     if (m_device["url"] == NULL)

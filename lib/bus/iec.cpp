@@ -58,6 +58,12 @@ device_state_t iecDevice::queue_command ( void )
 {
     // Record command for this device
     this->data = IEC.data;
+    // this->data.primary = IEC.data.primary;
+    // this->data.secondary = IEC.data.secondary;
+    // this->data.device = IEC.data.device;
+    // this->data.channel = IEC.data.channel;
+    // this->data.primary = IEC.data.primary;
+    // this->data.device_command = IEC.data.device_command;
 
     if ( this->data.primary == IEC_LISTEN )
     {
@@ -419,7 +425,11 @@ void iecBus::service ( void )
 
             // Is this command for us?
             if ( !isDeviceEnabled( this->data.device ) )
+            {
                 this->bus_state = BUS_IDLE;
+                process_command = false;
+            }
+
         }
 
         // If the bus is idle then release the lines
@@ -449,6 +459,14 @@ void iecBus::service ( void )
             this->bus_state = deviceTalk();   
         }
 
+        // // Is this command for us?
+        // if ( !isDeviceEnabled( this->data.device ) )
+        // {
+        //     // Nope... let's snoop the data on the bus
+        //     if ( this->data.primary == IEC_TALK )
+        //         this->data.primary = IEC_LISTEN;
+        // }
+
         // Queue control codes and command in specified device
         // At the moment there is only the multi-disk device
         device_state_t device_state = disk.queue_command();
@@ -456,6 +474,12 @@ void iecBus::service ( void )
         // Process commands in devices
         // At the moment there is only the multi-disk device
         disk.process();
+
+        if ( device_state == DEVICE_IDLE )
+        {
+            this->data.init();
+        }
+
         this->bus_state = BUS_IDLE;
 
         // Debug_printf( "primary[%.2X] secondary[%.2X] bus_state[%d]", this->data.primary, this->data.secondary, this->bus_state );
@@ -683,13 +707,16 @@ bool iecBus::send ( uint8_t data )
     return r;
 } // send
 
-bool iecBus::send ( std::string data )
+size_t iecBus::send ( std::string data, size_t offset )
 {
-    for ( size_t i = 0; i < data.length(); ++i )
+    size_t i = 0;
+    for ( i = offset; i < data.length(); ++i )
         if ( !send ( ( uint8_t ) data[i] ) )
-            return false;
+            return i;
 
-    return true;
+    IEC.sendEOI('\x0D');
+
+    return i;
 }
 
 
