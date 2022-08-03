@@ -216,18 +216,18 @@ bool FlashFile::rewindDirectory()
 
 MFile* FlashFile::getNextFileInDir()
 {
-    Debug_printv("base[%s] path[%s]", basepath.c_str(), path.c_str());
+    // Debug_printv("base[%s] path[%s]", basepath.c_str(), path.c_str());
     if(!dirOpened)
         openDir(std::string(basepath + path).c_str());
 
     if(dir == nullptr)
         return nullptr;
 
-    Debug_printv("before readdir(), dir not null:%d", dir != nullptr);
+    // Debug_printv("before readdir(), dir not null:%d", dir != nullptr);
     struct dirent* dirent = NULL;
     if((dirent = readdir( dir )) != NULL)
     {
-        Debug_printv("path[%s] name[%s]", this->path, dirent->d_name);
+        // Debug_printv("path[%s] name[%s]", this->path, dirent->d_name);
         return new FlashFile(this->path + ((this->path == "/") ? "" : "/") + std::string(dirent->d_name));
     }
     else
@@ -393,9 +393,9 @@ bool FlashIStream::seek(size_t pos, int mode) {
 }
 
 bool FlashIStream::isOpen() {
-    Debug_printv("Inside isOpen, handle notnull:%d", handle != nullptr);
+    // Debug_printv("Inside isOpen, handle notnull:%d", handle != nullptr);
     auto temp = handle != nullptr && handle->file_h != nullptr;
-    Debug_printv("returning");
+    // Debug_printv("returning");
     return temp;
 }
 
@@ -409,9 +409,11 @@ FlashHandle::~FlashHandle() {
 }
 
 void FlashHandle::dispose() {
+    Debug_printv("file_h[%d]", file_h);
     if (file_h != nullptr) {
 
         fclose( file_h );
+        file_h = nullptr;
         // rc = -255;
     }
 }
@@ -440,6 +442,7 @@ void FlashHandle::obtain(std::string m_path, std::string mode) {
         delete[] pathStr;
     }
 
+    Debug_printv("m_path[%s] mode[%s]", m_path.c_str(), mode.c_str());
     file_h = fopen( m_path.c_str(), mode.c_str());
     // rc = 1;
 

@@ -539,7 +539,7 @@ uint16_t iecDisk::sendLine(uint16_t &basicPtr, uint16_t blocks, const char *form
 
 uint16_t iecDisk::sendLine(uint16_t &basicPtr, uint16_t blocks, char *text)
 {
-	Debug_printv("%d %s ", blocks, text);
+	Debug_printf("%d %s ", blocks, text);
 
 	// Exit if ATN is PULLED while sending
 	// Exit if there is an error while sending
@@ -650,7 +650,7 @@ uint16_t iecDisk::sendHeader(uint16_t &basicPtr, std::string header, std::string
 
 void iecDisk::sendListing()
 {
-	Debug_printv("sendListing: [%s]\r\n=================================\r\n", m_mfile->url.c_str());
+	Debug_printf("sendListing: [%s]\r\n=================================\r\n", m_mfile->url.c_str());
 
 	uint16_t byte_count = 0;
 	std::string extension = "dir";
@@ -755,7 +755,7 @@ void iecDisk::sendListing()
 	IEC.send(0);
 	IEC.sendEOI(0);
 
-	Debug_printv("\r\n=================================\r\n%d bytes sent\r\n", byte_count);
+	Debug_printf("\r\n=================================\r\n%d bytes sent\r\n", byte_count);
 
 	fnLedManager.set(eLed::LED_BUS, true);
 } // sendListing
@@ -908,7 +908,7 @@ void iecDisk::sendFile()
 
 		//Debug_printv("len[%d] avail[%d] cursor[%d] success[%d]", len, avail, currentChannel.cursor, success);
 
-		Debug_printv("sendFile: [%s] [$%.4X] (%d bytes)\r\n=================================\r\n", file->url.c_str(), load_address, len);
+		Debug_printf("sendFile: [%s] [$%.4X] (%d bytes)\r\n=================================\r\n", file->url.c_str(), load_address, len);
 		while( i < len && success )
 		{
 			success = istream->read(&b, 1);
@@ -918,10 +918,24 @@ void iecDisk::sendFile()
 #ifdef DATA_STREAM
 				if (bi == 0)
 				{
-					Debug_printv(":%.4X ", load_address);
+					Debug_printf(":%.4X ", load_address);
 					load_address += 8;
 				}
 #endif
+
+				// Exit if ATN is PULLED while sending
+				if ( IEC.protocol.flags bitand ATN_PULLED )
+				{
+					Debug_printv("ATN pulled while sending. i[%d]", i);
+
+					// Save file pointer position
+					channelUpdate( --i );
+					setDeviceStatus( 74 );
+					success = true;
+					return;
+				}
+
+
 				if ( ++i == len )
 				{
 					success = IEC.sendEOI(b); // indicate end of file.
@@ -941,23 +955,13 @@ void iecDisk::sendFile()
 				if(bi == 8)
 				{
 					size_t t = (i * 100) / len;
-					Debug_printv(" %s (%d %d%%) [%d]\r\n", ba, i, t, avail - 1);
+					Debug_printf(" %s (%d %d%%) [%d]\r\n", ba, i, t, avail - 1);
 					bi = 0;
 				}
 #else
 				size_t t = (i * 100) / len;
-				Debug_printv("\rTransferring %d%% [%d, %d]", t, i, avail -1);
+				Debug_printf("\rTransferring %d%% [%d, %d]", t, i, avail -1);
 #endif
-			}
-
-			// Exit if ATN is PULLED while sending
-			if ( IEC.protocol.flags bitand ATN_PULLED )
-			{
-				// Save file pointer position
-				channelUpdate( --i );
-				setDeviceStatus( 74 );
-				success = true;
-				break;
 			}
 
 			// Toggle LED
@@ -974,7 +978,7 @@ void iecDisk::sendFile()
 			//i++;
 		}
 		istream->close();
-		Debug_printv("\r\n=================================\r\n%d of %d bytes sent [SYS%d]\r\n", i, len, sys_address);
+		Debug_printf("\r\n=================================\r\n%d of %d bytes sent [SYS%d]\r\n", i, len, sys_address);
 
 		//Debug_printv("len[%d] avail[%d] success[%d]", len, avail, success);		
 	}

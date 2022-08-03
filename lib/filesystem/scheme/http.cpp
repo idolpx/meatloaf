@@ -476,10 +476,13 @@ bool HttpIStream::seek(size_t pos) {
 }
 
 size_t HttpIStream::read(uint8_t* buf, size_t size) {
-    auto bytesRead= esp_http_client_read(m_http, (char *)buf, size );
-    m_bytesAvailable -= bytesRead;
-    m_position+=bytesRead;
-    return bytesRead;
+    if (m_isOpen) {
+        auto bytesRead= esp_http_client_read(m_http, (char *)buf, size );
+        m_bytesAvailable -= bytesRead;
+        m_position+=bytesRead;
+        return bytesRead;        
+    }
+    return 0;
 };
 
 void HttpIStream::close() {
