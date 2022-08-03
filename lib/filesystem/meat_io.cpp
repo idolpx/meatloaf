@@ -98,7 +98,7 @@ bool MFSOwner::mount(std::string name) {
         auto fs = (*i);
 
         if(fs->handles(name)) {
-                Serial.println("MFSOwner found a proper fs");
+                Debug_printv("MFSOwner found a proper fs");
 
             bool ok = fs->mount();
 
@@ -471,26 +471,26 @@ MFile* MFile::cd(std::string newDir) {
 };
 
 bool MFile::copyTo(MFile* dst) {
-    auto istream = inputStream();
-    auto ostream = dst->outputStream();
+    Debug_printv("in copyTo\n");
+    Meat::ifstream istream(this);
+    Meat::ofstream ostream(dst);
 
     int rc;
 
-    //Debug_printv("in copyTo, iopen=%d oopen=%d", istream.is_open(), ostream.is_open());
+    Debug_printv("in copyTo, iopen=%d oopen=%d\n", istream.is_open(), ostream.is_open());
 
-    if(!istream->isOpen() || !ostream->isOpen())
+    if(!istream.is_open() || !ostream.is_open())
         return false;
 
-    //Debug_printv("commencing copy");
+    Debug_printv("commencing copy\n");
 
-    // while((rc = istream.get())!= EOF) {     
-    //     //Serial.print(".");
-    //     ostream.put(rc);
-    //     if(ostream.bad() || istream.bad())
-    //         return false;
-    // }
+    while((rc = istream.get())!= EOF) {     
+        ostream.put(rc);
+        if(ostream.bad() || istream.bad())
+            return false;
+    }
 
-    //Debug_printv("copying finished, rc=%d", rc);
+    Debug_printv("copying finished, rc=%d\n", rc);
 
     return true;
 };

@@ -65,7 +65,9 @@ MIStream* FlashFile::inputStream()
 {
     std::string full_path = basepath + path;
     MIStream* istream = new FlashIStream(full_path);
+    Debug_printv("FlashFile::inputStream() 3, not null=%d", istream != nullptr);
     istream->open();   
+    Debug_printv("FlashFile::inputStream() 4");
     return istream;
 }
 
@@ -139,7 +141,7 @@ bool FlashFile::remove() {
 
     int rc = ::remove( std::string(basepath + path).c_str() );
     if (rc != 0) {
-        Debug_printf("remove: rc=%d path=`%s`\n", rc, path);
+        Debug_printv("remove: rc=%d path=`%s`\n", rc, path);
         return false;
     }
 
@@ -212,15 +214,18 @@ bool FlashFile::rewindDirectory()
 
 MFile* FlashFile::getNextFileInDir()
 {
-    //Debug_printv("base[%s] path[%s]", basepath.c_str(), path.c_str());
+    Debug_printv("base[%s] path[%s]", basepath.c_str(), path.c_str());
     if(!dirOpened)
         openDir(std::string(basepath + path).c_str());
 
-    //Debug_printv("before readdir()");
+    if(dir == nullptr)
+        return nullptr;
+
+    Debug_printv("before readdir(), dir not null:%d", dir != nullptr);
     struct dirent* dirent = NULL;
     if((dirent = readdir( dir )) != NULL)
     {
-        //Debug_printv("path[%s] name[%s]", this->path, dirent->d_name);
+        Debug_printv("path[%s] name[%s]", this->path, dirent->d_name);
         return new FlashFile(this->path + ((this->path == "/") ? "" : "/") + std::string(dirent->d_name));
     }
     else
@@ -240,6 +245,7 @@ MFile* FlashFile::getNextFileInDir()
 // MStream methods
 
 bool FlashOStream::open() {
+    Debug_printv("Ostream: trying to open flash fs, calling isOpen");
     if(!isOpen()) {
         handle->obtain(localPath, "w+");
     }
@@ -262,16 +268,18 @@ size_t FlashOStream::write(const uint8_t *buf, size_t size) {
     // buffer, element size, count, handle
     int result = fwrite((void*) buf, 1, size, handle->file_h );
 
-    Serial.println("after lfs_file_write");
+    Debug_printv("after lfs_file_write");
 
     if (result < 0) {
-        Debug_printf("write rc=%d\n", result);
+        Debug_printv("write rc=%d\n", result);
     }
     return result;
 };
 
 bool FlashOStream::isOpen() {
-    return handle->file_h != nullptr;
+    Debug_printv("in isOpen, handle not null=%d", handle != nullptr);
+    
+    return handle != nullptr && handle->file_h != nullptr;
 }
 
 
@@ -311,16 +319,26 @@ bool FlashOStream::seek(size_t pos, int mode) {
 
 
 bool FlashIStream::open() {
-    if(!isOpen()) {
-        handle->obtain(localPath, "r");
+    if(isOpen())
+        return true;
+
+    Debug_printv("IStream: trying to open flash fs, calling isOpen");
+
+    Debug_printv("IStream: wasn't open, calling obtain");
+    handle->obtain(localPath, "r");
+
+    if(isOpen()) {
+        Debug_printv("IStream: past obtain");
+        // Set file size
+        fseek(handle->file_h, 0, SEEK_END);
+        Debug_printv("IStream: past fseek 1");
+        _size = ftell(handle->file_h);
+        Debug_printv("IStream: past ftell");
+        fseek(handle->file_h, 0, SEEK_SET);
+        Debug_printv("IStream: past fseek 2");
+        return true;
     }
-
-    // Set file size
-    fseek(handle->file_h, 0, SEEK_END);
-    _size = ftell(handle->file_h);
-    fseek(handle->file_h, 0, SEEK_SET);
-
-    return isOpen();
+    return false;
 };
 
 void FlashIStream::close() {
@@ -335,7 +353,7 @@ size_t FlashIStream::read(uint8_t* buf, size_t size) {
     
     int result = fread((void*) buf, 1, size, handle->file_h );
     if (result < 0) {
-        Debug_printf("read rc=%d\n", result);
+        Debug_printv("read rc=%d\n", result);
         return 0;
     }
 
@@ -373,7 +391,10 @@ bool FlashIStream::seek(size_t pos, int mode) {
 }
 
 bool FlashIStream::isOpen() {
-    return handle->file_h != nullptr;
+    Debug_printv("Inside isOpen, handle notnull:%d", handle != nullptr);
+    auto temp = handle != nullptr && handle->file_h != nullptr;
+    Debug_printv("returning");
+    return temp;
 }
 
 /********************************************************
@@ -428,7 +449,7 @@ void FlashHandle::obtain(std::string m_path, std::string mode) {
 //     } else if (rc == 0) {
 // //        lfs_file_sync(&FlashFileSystem::lfsStruct, &file_h);
 //     } else {
-//         Debug_printf("FlashFile::open: unknown return code rc=%d path=`%s`\n",
+//         Debug_printv("FlashFile::open: unknown return code rc=%d path=`%s`\n",
 //                rc, m_path.c_str());
 //     }
 }

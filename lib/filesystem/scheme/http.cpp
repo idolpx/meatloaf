@@ -119,6 +119,8 @@ bool HttpOStream::seek(size_t pos) {
 }
 
 void HttpOStream::close() {
+    Debug_printv("called, m_http not null:[%d]",m_http!=nullptr);
+    
     if(m_http != nullptr) {
         if(m_isOpen)
             esp_http_client_close(m_http);
@@ -402,7 +404,7 @@ esp_err_t HttpIStream::_http_event_handler(esp_http_client_event_t *evt)
 
 // z fnHttpClient.cpp
 // #ifdef VERBOSE_HTTP
-//         Debug_printf("HTTP_EVENT_ON_DATA %u\n", uxTaskGetStackHighWaterMark(nullptr));
+//         Debug_printv("HTTP_EVENT_ON_DATA %u\n", uxTaskGetStackHighWaterMark(nullptr));
 // #endif
 //         // Don't do any of this if we're told to ignore the response
 //         if (client->_ignore_response_body == true)
@@ -445,7 +447,7 @@ esp_err_t HttpIStream::_http_event_handler(esp_http_client_event_t *evt)
 //         ulTaskNotifyTake(1, pdMS_TO_TICKS(HTTPCLIENT_WAIT_FOR_CONSUMER_TASK));
 
 // #ifdef VERBOSE_HTTP
-//        Debug_printf("HTTP_EVENT_ON_DATA: Data: %p, Datalen: %d\n", evt->data, evt->data_len);
+//        Debug_printv("HTTP_EVENT_ON_DATA: Data: %p, Datalen: %d\n", evt->data, evt->data_len);
 // #endif
 
 //         client->_buffer_pos = 0;
@@ -470,7 +472,7 @@ esp_err_t HttpIStream::_http_event_handler(esp_http_client_event_t *evt)
 
         case HTTP_EVENT_ON_FINISH: // Occurs when finish a HTTP session
             // This may get called more than once if esp_http_client decides to retry in order to handle a redirect or auth response
-            //Debug_printf("HTTP_EVENT_ON_FINISH %u\n", uxTaskGetStackHighWaterMark(nullptr));
+            //Debug_printv("HTTP_EVENT_ON_FINISH %u\n", uxTaskGetStackHighWaterMark(nullptr));
             // Keep track of how many times we "finish" reading a response from the server
 
             Debug_printv("HTTP_EVENT_ON_FINISH");

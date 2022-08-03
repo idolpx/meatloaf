@@ -102,7 +102,7 @@ public:
 
     FlashHandle() 
     {
-        //Serial.println("*** Creating flash handle");
+        //Debug_printv("*** Creating flash handle");
         memset(&file_h, 0, sizeof(file_h));
     };
     ~FlashHandle();
