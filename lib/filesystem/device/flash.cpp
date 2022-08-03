@@ -257,10 +257,12 @@ size_t FlashOStream::write(const uint8_t *buf, size_t size) {
         return 0;
     }
 
+    Serial.printf("in byteWrite '%c', handle->file_h is null=[%d]\n", buf[0], handle->file_h == nullptr);
+
+    // buffer, element size, count, handle
     int result = fwrite((void*) buf, 1, size, handle->file_h );
 
-    //Serial.printf("in byteWrite '%c'\n", buf[0]);
-    //Serial.println("after lfs_file_write");
+    Serial.println("after lfs_file_write");
 
     if (result < 0) {
         Debug_printf("write rc=%d\n", result);
