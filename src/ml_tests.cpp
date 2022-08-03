@@ -11,6 +11,7 @@
 #include "../include/debug.h"
 
 #include "fnFsSd.h"
+#include "fnWiFi.h"
 
 #include "ml_tests.h"
 #include "meat_io.h"
@@ -529,7 +530,12 @@ void testBasicConfig() {
 }
 
 void runTestsSuite() {
-    fnSystem.delay_microseconds(30000);
+    // Delay waiting for wifi to connect
+    while ( !fnWiFi.connected() )
+    {
+        fnSystem.delay_microseconds(pdMS_TO_TICKS(1000)); // 1sec between checks
+    }
+    fnSystem.delay_microseconds(pdMS_TO_TICKS(5000)); // 5sec after connect
 
     // working, uncomment if you want
     // runFSTest("/.sys", "README"); // TODO - let urlparser drop the last slash!
