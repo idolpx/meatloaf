@@ -607,6 +607,7 @@ uint16_t iecDisk::sendHeader(uint16_t &basicPtr, std::string header, std::string
 	//Debug_printv("header[%s] id[%s] space_cnt[%d]", header.c_str(), id.c_str(), space_cnt);
 
 	byte_count += sendLine(basicPtr, 0, CBM_REVERSE_ON "\"%*s%s%*s\" %s", space_cnt, "", header.c_str(), space_cnt, "", id.c_str());
+	if ( byte_count == 0 ) return 0;
 
 	//byte_count += sendLine(basicPtr, 0, "\x12\"%*s%s%*s\" %.02d 2A", space_cnt, "", PRODUCT_ID, space_cnt, "", device_config.device());
 	//byte_count += sendLine(basicPtr, 0, CBM_REVERSE_ON "%s", header.c_str());
@@ -615,34 +616,45 @@ uint16_t iecDisk::sendHeader(uint16_t &basicPtr, std::string header, std::string
 	if (url.size())
 	{
 		byte_count += sendLine(basicPtr, 0, "%*s\"%-*s\" NFO", 0, "", 19, "[URL]");
+		if ( byte_count == 0 ) return 0;
 		byte_count += sendLine(basicPtr, 0, "%*s\"%-*s\" NFO", 0, "", 19, url.c_str());
+		if ( byte_count == 0 ) return 0;
 		sent_info = true;
 	}
 	if (path.size() > 1)
 	{
 		byte_count += sendLine(basicPtr, 0, "%*s\"%-*s\" NFO", 0, "", 19, "[PATH]");
+		if ( byte_count == 0 ) return 0;
 		byte_count += sendLine(basicPtr, 0, "%*s\"%-*s\" NFO", 0, "", 19, path.c_str());
+		if ( byte_count == 0 ) return 0;
 		sent_info = true;
 	}
 	if (archive.size() > 1)
 	{
 		byte_count += sendLine(basicPtr, 0, "%*s\"%-*s\" NFO", 0, "", 19, "[ARCHIVE]");
+		if ( byte_count == 0 ) return 0;
 		byte_count += sendLine(basicPtr, 0, "%*s\"%-*s\" NFO", 0, "", 19, device_config.archive().c_str());
+		if ( byte_count == 0 ) return 0;
 	}
 	if (image.size())
 	{
 		byte_count += sendLine(basicPtr, 0, "%*s\"%-*s\" NFO", 0, "", 19, "[IMAGE]");
+		if ( byte_count == 0 ) return 0;
 		byte_count += sendLine(basicPtr, 0, "%*s\"%-*s\" NFO", 0, "", 19, image.c_str());
+		if ( byte_count == 0 ) return 0;
 		sent_info = true;
 	}
 	if (sent_info)
 	{
 		byte_count += sendLine(basicPtr, 0, "%*s\"-------------------\" NFO", 0, "");
+		if ( byte_count == 0 ) return 0;
 	}
 	if (fnSDFAT.running() && m_mfile->url.size() < 2)
 	{
 		byte_count += sendLine(basicPtr, 0, "%*s\"SD\"                  DIR", 0, "");
+		if ( byte_count == 0 ) return 0;
 		byte_count += sendLine(basicPtr, 0, "%*s\"-------------------\" NFO", 0, "");
+		if ( byte_count == 0 ) return 0;
 	}
 
 	return byte_count;
@@ -678,6 +690,7 @@ void iecDisk::sendListing()
 		char buf[7] = { '\0' };
 		sprintf(buf, "%.02d 2A", device_config.id());
 		byte_count += sendHeader(basicPtr, PRODUCT_ID, buf);
+		if ( byte_count == 0 ) return;
 	}
 	else
 	{
@@ -741,6 +754,7 @@ void iecDisk::sendListing()
 			}
 
 			byte_count += sendLine(basicPtr, block_cnt, "%*s\"%s\"%*s %s", block_spc, "", name.c_str(), space_cnt, "", extension.c_str());
+			if ( byte_count == 0 ) return;
 		}
 
 		entry.reset(m_mfile->getNextFileInDir());
@@ -750,6 +764,7 @@ void iecDisk::sendListing()
 
 	// Send Listing Footer
 	byte_count += sendFooter(basicPtr);
+	if ( byte_count == 0 ) return;
 
 	// End program with two zeros after last line. Last zero goes out as EOI.
 	IEC.send(0);
@@ -1014,9 +1029,18 @@ void iecDisk::saveFile()
 	std::unique_ptr<MFile> file(MFSOwner::File(m_filename));
 	Debug_printv("[%s]", file->url.c_str());
 
+	// create folder /sd/.save/MD5{file->streamFile}/file->name
+
+	if(file == nullptr)
+	{
+	    Debug_printv("can't create file [%s]", m_filename.c_str());
+		// TODO: Set status and sendFNF
+		sendFileNotFound();
+        return;	
+	}
+
+
 	std::unique_ptr<MOStream> ostream(file->outputStream());
-
-
     if(!ostream->isOpen()) {
         Debug_printv("couldn't open a stream for writing");
 		// TODO: Set status and sendFNF
