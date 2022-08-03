@@ -125,7 +125,9 @@ void testDirectory(MFile* dir, bool verbose=false) {
 
 
     Debug_printf("* Listing %s\n", dir->url.c_str());
+    Debug_printf("* pre get next file\n");
     auto e = dir->getNextFileInDir();
+    Debug_printf("* past get next file\n");
     if(e != nullptr) {
         std::unique_ptr<MFile> entry(e);
 
@@ -149,6 +151,7 @@ void testDirectoryStandard(std::string path) {
     DIR *dir;
     struct dirent *ent;
     struct stat st;
+
     if ((dir = opendir ( path.c_str() )) != NULL) {
         /* print all the files and directories within directory */
         while ((ent = readdir (dir)) != NULL) {
@@ -399,7 +402,11 @@ void testStdStreamWrapper(MFile* srcFile, MFile* dstFile) {
 
     Debug_printf("Copy %s to %s\n", dstFile->url.c_str(), srcFile->url.c_str());
 
-    if(dstFile->copyTo(srcFile)) {
+    bool copyRc = dstFile->copyTo(srcFile);
+
+    Debug_printf("After copyto rc=%d\n", copyRc);
+
+    if(copyRc) {
         Meat::ifstream istream(srcFile);
         istream.open();
 
@@ -423,7 +430,9 @@ void testStdStreamWrapper(MFile* srcFile, MFile* dstFile) {
         Meat::ifstream newIstream(dstFile); // this is your standard istream!
         newIstream.open();
 
-        deserializeJson(m_device, newIstream);
+        if(newIstream.is_open()) {
+            deserializeJson(m_device, newIstream);
+        }
 
         Debug_printf("Got from deserialization: %s\n", m_device["url"].as<const char*>());
 
@@ -457,15 +466,26 @@ void testNewCppStreams(std::string name) {
     Debug_println(" * Write test - after declaration\n");
 
     ostream.open();
+
+    Debug_println(" * Write test - after open\n");
+
     if(ostream.is_open()) {
+        Debug_println(" * Write test - isOpen\n");
+
         ostream << "Arise, ye workers from your slumber,";
         ostream << "Arise, ye prisoners of want.";
         ostream << "For reason in revolt now thunders,";
         ostream << "and at last ends the age of cant!";
         if(ostream.bad())
             Debug_println("WRITING FAILED!!!");
+            
+        Debug_println(" * Write test - after testing bad\n");
 
         ostream.close();
+        Debug_println(" * Write test - after close\n");
+    }
+    else {
+        Debug_println(" * Write test - ERROR:The International could not be written!\n");
     }
 }
 
@@ -477,7 +497,7 @@ void runFSTest(std::string dirPath, std::string filePath) {
     auto testFile = Meat::New<MFile>(filePath);
     auto destFile = Meat::New<MFile>("/mltestfile");
 
-    //testNewCppStreams(filePath);
+    testNewCppStreams(filePath);
 
     if(!dirPath.empty() && testDir != nullptr) {
         testPaths(testDir.get(),"subDir");
@@ -493,11 +513,11 @@ void runFSTest(std::string dirPath, std::string filePath) {
         testCopy(testFile.get(), destFile.get());
 
         // C++ stream wrappers are broken - don't use
-        //testStdStreamWrapper(testFile.get(), destFile.get());
+        testStdStreamWrapper(testFile.get(), destFile.get());
 
         Debug_println("\n\n\n*** Please compare file copied to ML aginst the source:\n\n\n");
         // C++ stream wrappers are broken - don't use
-        //testReader(destFile.get());
+        testReader(destFile.get());
     }
     else {
         Debug_println("*** WARNING - file instance couldn't be created!");
@@ -566,15 +586,16 @@ void runTestsSuite() {
     // testBasicConfig();
 
     Debug_printv("Flash File System");
-    //testDirectory(MFSOwner::File("/"), true);
-    testDirectoryStandard("/");
+    testDirectory(MFSOwner::File("/"), true);
+    //testDirectoryStandard("/");
 
     Debug_printv("SD Card File System");
     //std::string basepath = fnSDFAT.basepath();
     //basepath += std::string("/");
     //Debug_printv("basepath[%s]", basepath.c_str());
     //testDirectory(MFSOwner::File( basepath ), true);
-    testDirectoryStandard( "/sd/" );
+    //testDirectoryStandard( "/sd/" );
+    testDirectory(MFSOwner::File("/sd/"), true);
 
 
     // DeviceDB m_device(0);

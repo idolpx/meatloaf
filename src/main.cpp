@@ -118,7 +118,7 @@ void main_setup()
 
 
     // Setup IEC Bus
-    Serial.println("IEC Bus Initialized");
+    Debug_printv("IEC Bus Initialized");
 
     // Add devices to bus
     IEC.enabledDevices = DEVICE_MASK;
@@ -132,10 +132,10 @@ void main_setup()
             Serial.printf("%.02d ", i);
         }
     }
-    Serial.println( ANSI_RESET "]");
+    Debug_printv( ANSI_RESET "]");
 
     IEC.setup();
-    Serial.println( ANSI_GREEN_BOLD "IEC Bus Initialized" ANSI_RESET );
+    Debug_printv( ANSI_GREEN_BOLD "IEC Bus Initialized" ANSI_RESET );
 
 
 #ifdef DEBUG
@@ -143,10 +143,15 @@ void main_setup()
     Debug_printf("Available heap: %u\nSetup complete @ %lu (%lums)\n", fnSystem.get_free_heap_size(), endms, endms - startms);
 #endif // DEBUG
 
+    // Delay waiting for wifi to connect
+    while ( !fnWiFi.connected() )
+    {
+        fnSystem.delay_microseconds(pdMS_TO_TICKS(1000)); // 1sec between checks
+    }
     runTestsSuite();
     //lfs_test();
 #ifdef DEBUG_TIMING
-    Serial.println( ANSI_GREEN_BOLD "DEBUG_TIMING enabled" ANSI_RESET );
+    Debug_printv( ANSI_GREEN_BOLD "DEBUG_TIMING enabled" ANSI_RESET );
 #endif
 }
 
