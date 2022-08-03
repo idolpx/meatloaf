@@ -503,19 +503,19 @@ namespace Meat {
         };
 
         ~ifstream() {
-            Debug_printv("ifstream destructor");
+            //Debug_printv("ifstream destructor");
             close();
         }
 
         virtual void open() {
-            Debug_printv("ifstream open %s", url.c_str());
+            //Debug_printv("ifstream open %s", url.c_str());
             buff.open(url);
         }
 
         virtual void close() {
-            Debug_printv("ifstream close for %s bufOpen=%d\n", url.c_str(), buff.is_open());
+            //Debug_printv("ifstream close for %s bufOpen=%d\n", url.c_str(), buff.is_open());
             buff.close();
-            Debug_printv("ifstream AFTER close for %s\n", url.c_str());
+            //Debug_printv("ifstream AFTER close for %s\n", url.c_str());
         }
 
         virtual bool is_open() {
