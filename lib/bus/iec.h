@@ -132,7 +132,6 @@ typedef enum
     BUS_ERROR = -1,   // A problem occoured, reset communication
     BUS_IDLE = 0,     // Nothing recieved of our concern
     BUS_ACTIVE = 1,   // ATN is pulled and a command byte is expected
-    BUS_PROCESS = 2,  // A command is ready to be processed
 } bus_state_t;
 
 // IEC commands:

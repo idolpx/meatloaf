@@ -35,7 +35,7 @@ int16_t  CBMStandardSerial::receiveByte ( uint8_t device )
     flags = CLEAR;
 
     // Sometimes the C64 pulls ATN but doesn't pull CLOCK right away
-    if ( !wait ( 60 ) ) return -1;
+    if ( !wait ( 100 ) ) return -1;
 
     // Wait for talker ready
     if ( timeoutWait ( PIN_IEC_CLK_IN, RELEASED, FOREVER ) == TIMED_OUT )
@@ -131,13 +131,13 @@ int16_t  CBMStandardSerial::receiveByte ( uint8_t device )
 
     uint8_t n = 0;
 
-    // pull ( PIN_IEC_SRQ );
+    pull ( PIN_IEC_SRQ );
     for ( n = 0; n < 8; n++ )
     {
         data >>= 1;
 
         // wait for bit to be ready to read
-        if ( timeoutWait ( PIN_IEC_CLK_IN, RELEASED ) == TIMED_OUT )
+        if ( timeoutWait ( PIN_IEC_CLK_IN, RELEASED, 1000, false ) == TIMED_OUT )
         {
             Debug_printv ( "wait for bit to be ready to read" );
             flags or_eq ERROR;
@@ -148,7 +148,7 @@ int16_t  CBMStandardSerial::receiveByte ( uint8_t device )
         data or_eq ( status ( PIN_IEC_DATA_IN ) == RELEASED ? ( 1 << 7 ) : 0 );
 
         // wait for talker to finish sending bit
-        bit_time = timeoutWait ( PIN_IEC_CLK_IN, PULLED );
+        bit_time = timeoutWait ( PIN_IEC_CLK_IN, PULLED, 1000, false );
         if ( bit_time == TIMED_OUT )
         {
             Debug_printv ( "wait for talker to finish sending bit" );
@@ -156,10 +156,11 @@ int16_t  CBMStandardSerial::receiveByte ( uint8_t device )
             return -1; // return error because timeout
         }
     }
-    // release ( PIN_IEC_SRQ );
+    release ( PIN_IEC_SRQ );
+    
 
     /* If there is a delay before the last bit, the controller uses JiffyDOS */
-    if ( flags bitand ATN_PULLED && bit_time >= 218 && n == 7 )
+    if ( flags bitand ATN_PULLED && bit_time >= 218 )
     {
         if ( ( data >> 1 ) < 0x60 && ( ( data >> 1 ) & 0x1f ) == device )
         {
@@ -192,6 +193,10 @@ int16_t  CBMStandardSerial::receiveByte ( uint8_t device )
         // EOI Received
         delayMicroseconds ( TIMING_Tfr );
         release ( PIN_IEC_DATA_OUT );
+    }
+    else
+    {
+        delayMicroseconds ( TIMING_Tbb );
     }
 
     return data;
@@ -269,11 +274,11 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
         // ready to send last byte
         if ( !wait ( TIMING_Try ) ) return false;
     }
-    // else
-    // {
-    //     // ready to send next byte
-    //     if ( !wait ( TIMING_Tne ) ) return false;
-    // }
+    else
+    {
+        // ready to send next byte
+        if ( !wait ( TIMING_Tne ) ) return false;
+    }
 
     // STEP 3: SENDING THE BITS
     // The talker has eight bits to send.  They will go out without handshake; in other words,
@@ -315,16 +320,19 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
         data >>= 1; // get next bit
         if ( !wait ( TIMING_Ts ) ) return false;        
 
+        // Release data line after bit sent
+        release ( PIN_IEC_DATA_OUT );
+
         // tell listener bit is ready to read
         release ( PIN_IEC_CLK_OUT );
         if ( !wait ( TIMING_Tv ) ) return false;
 
         // tell listner to wait
         pull ( PIN_IEC_CLK_OUT );
-
-        // // Release data line after bit sent
-        // release ( PIN_IEC_DATA_OUT );
     }
+
+    // // Release data line after byte sent
+    // release ( PIN_IEC_DATA_OUT );
 
 
     // STEP 4: FRAME HANDSHAKE
@@ -375,7 +383,7 @@ int16_t CBMStandardSerial::timeoutWait ( uint8_t pin, bool target_status, size_t
     if ( atn_status )
         flags or_eq ATN_PULLED;
 
-    pull ( PIN_IEC_SRQ );
+    //pull ( PIN_IEC_SRQ );
     while ( status ( pin ) != target_status )
     {
 
@@ -406,7 +414,7 @@ int16_t CBMStandardSerial::timeoutWait ( uint8_t pin, bool target_status, size_t
         }
     }
 
-    release ( PIN_IEC_SRQ );
+    //release ( PIN_IEC_SRQ );
     // Debug_printv("pin[%d] state[%d] wait[%d] step[%d] t[%d]", pin, target_status, wait, elapsed);
     return elapsed;
 } // timeoutWait
