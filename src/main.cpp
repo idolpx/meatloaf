@@ -143,12 +143,7 @@ void main_setup()
     Debug_printf("Available heap: %u\nSetup complete @ %lu (%lums)\n", fnSystem.get_free_heap_size(), endms, endms - startms);
 #endif // DEBUG
 
-    // Delay waiting for wifi to connect
-    while ( !fnWiFi.connected() )
-    {
-        fnSystem.delay_microseconds(pdMS_TO_TICKS(1000)); // 1sec between checks
-    }
-    runTestsSuite();
+    //runTestsSuite();
     //lfs_test();
 #ifdef DEBUG_TIMING
     Debug_printv( ANSI_GREEN_BOLD "DEBUG_TIMING enabled" ANSI_RESET );
