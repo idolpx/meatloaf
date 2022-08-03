@@ -14,6 +14,7 @@
 #include "fnSystem.h"
 #include "fnWiFi.h"
 
+#include "webdav-server.h"
 
 #ifdef FLASH_SPIFFS
 #include "fnFsSPIFFS.h"
@@ -113,6 +114,8 @@ void main_setup()
     // Go ahead and try reconnecting to WiFi
     fnWiFi.connect();
 
+    // Start WebDAV server
+    http_server_start();
 
     // Setup IEC Bus
     Serial.println("IEC Bus Initialized");
