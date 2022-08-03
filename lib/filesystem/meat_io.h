@@ -201,10 +201,12 @@ namespace Meat {
         std::unique_ptr<MIStream> mistream;
         std::unique_ptr<MFile> mfile;
         char* data;
+        static const size_t ibufsize = 256;
+
 
     public:
         imfilebuf() {
-            data = new char[1024];
+            data = new char[ibufsize];
         };
 
         ~imfilebuf() {
@@ -215,10 +217,18 @@ namespace Meat {
         }
 
         std::filebuf* open(std::string filename) {
+            // Debug_println("In filebuf open");
             mfile.reset(MFSOwner::File(filename));
-            mistream.reset(mfile->inputStream());
-            if(mistream->isOpen())
+            // Debug_println("In filebuf open pre temp");
+            auto temp = mfile->inputStream();
+            // Debug_println("In filebuf open pre reset mistream");
+            mistream.reset(temp);
+            // Debug_println("In filebuf open post reset mistream");
+            if(mistream->isOpen()) {
+                // Debug_println("In filebuf open success!");
+
                 return this;
+            }
             else
                 return nullptr;
         };
@@ -233,7 +243,10 @@ namespace Meat {
         };
 
         virtual void close() {
-            mistream->close();
+            if(is_open()) {
+                // Debug_printv("closing in filebuf\n");
+                mistream->close();
+            }
         }
 
         bool is_open() const {
@@ -276,7 +289,7 @@ namespace Meat {
                 // no more characters are available, size == 0.
                 //auto buffer = reader->read();
 
-                auto readCount = mistream->read((uint8_t*)data, 1024);
+                auto readCount = mistream->read((uint8_t*)data, ibufsize);
 
                 //Debug_printv("--imfilebuf underflow, read bytes=%d--", readCount);
 
@@ -292,7 +305,7 @@ namespace Meat {
         };
 
         std::streampos seekpos(std::streampos __pos, std::ios_base::openmode __mode = std::ios_base::in | std::ios_base::out) override {
-            Debug_printv("Seek called on mistream: %d", (int)__pos);
+            Debug_printv("Seek called on mistream ***TODO*** - reset markers!!!: %d", (int)__pos);
             std::streampos __ret = std::streampos(off_type(-1));
 
             if(mistream->seek(__pos)) {
@@ -349,6 +362,7 @@ namespace Meat {
         };
 
         virtual void close() {
+
             if(is_open()) {
                 sync();
                 mostream->close();
@@ -392,7 +406,7 @@ namespace Meat {
         int overflow(int ch  = traits_type::eof()) override
         {
 
-            Debug_printv("in overflow");
+            //Debug_printv("in overflow");
                 // pptr =  Returns the pointer to the current character (put pointer) in the put area.
                 // pbase = Returns the pointer to the beginning ("base") of the put area.
                 // epptr = Returns the pointer one past the end of the put area.
@@ -448,8 +462,10 @@ namespace Meat {
                 // pptr =  Returns the pointer to the current character (put pointer) in the put area.
                 // pbase = Returns the pointer to the beginning ("base") of the put area.
                 // epptr = Returns the pointer one past the end of the put area.
-                auto result = mostream->write(buffer, this->pptr()-this->pbase()); 
+                
 
+                //Debug_printv("before write call, mostream!=null[%d]", mostream!=nullptr);
+                auto result = mostream->write(buffer, this->pptr()-this->pbase()); 
                 //Debug_printv("%d bytes left in buffer written to sink, rc=%d", pptr()-pbase(), result);
 
                 this->setp(data, data+1024);
@@ -487,18 +503,19 @@ namespace Meat {
         };
 
         ~ifstream() {
-            Debug_println("ifstream destructor");
+            //Debug_printv("ifstream destructor");
             close();
         }
 
         virtual void open() {
-            Debug_println("ifstream open");
+            //Debug_printv("ifstream open %s", url.c_str());
             buff.open(url);
         }
 
         virtual void close() {
-            Debug_println("ifstream close");
+            //Debug_printv("ifstream close for %s bufOpen=%d\n", url.c_str(), buff.is_open());
             buff.close();
+            //Debug_printv("ifstream AFTER close for %s\n", url.c_str());
         }
 
         virtual bool is_open() {
@@ -514,6 +531,13 @@ namespace Meat {
             return getUtf8().toPetscii();
         }
     };
+
+    // ifstream& operator>>(ifstream& is, U8Char& c) {
+    //     //U8Char codePoint(this);
+    //     c = U8Char(&is);
+    //     return is;
+    // }
+
 
 /********************************************************
  * C++ Output MFile stream

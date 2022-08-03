@@ -30,7 +30,7 @@
 // 		if (error)
 // 		{
 // 			Serial.print("\r\ndeserializeJson() failed: ");
-// 			Serial.println(error.c_str());
+// 			Debug_printv(error.c_str());
 //             dirIsOpen = false;
 //             m_http.close();
 //             return nullptr;
@@ -60,7 +60,7 @@
 // 	}
 //     else {
 //         // no more entries, let's close the stream
-//         //Serial.println("no more entries");
+//         //Debug_printv("no more entries");
 
 //         dirIsOpen = false;
 //         return nullptr;
@@ -138,19 +138,19 @@
 // 	Serial.printf("HTTP Status: %d\r\n", httpCode); //Print HTTP return code
 
 // 	if (httpCode != 200) {
-// //        Serial.println(m_http.errorToString(httpCode));
+// //        Debug_printv(m_http.errorToString(httpCode));
 // 		dirIsOpen = false;
 
 //         // // Show HTTP Headers
-//         // Serial.println("HEADERS--------------");
+//         // Debug_printv("HEADERS--------------");
 //         // int i = 0;
 //         // for (i=0; i < m_http.headers(); i++)
 //         // {
-//         //     Serial.println(m_http.header(i));
+//         //     Debug_printv(m_http.header(i));
 //         // }
-//         // Serial.println("DATA-----------------");
-//         // Serial.println(m_http.getString());
-//         // Serial.println("---------------------");
+//         // Debug_printv("DATA-----------------");
+//         // Debug_printv(m_http.getString());
+//         // Debug_printv("---------------------");
 
 //     }
 //     else

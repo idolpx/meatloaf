@@ -41,6 +41,7 @@ public:
  ********************************************************/
 
 class HttpIOStream: public MIStream, MOStream {
+
 public:
     HttpIOStream(std::string& path) {
         url = path;
@@ -74,6 +75,8 @@ protected:
 
 
 class HttpIStream: public MIStream {
+
+    static esp_err_t _http_event_handler(esp_http_client_event_t *evt);
 
 public:
     HttpIStream(std::string path) {
@@ -114,6 +117,7 @@ protected:
 
 
 class HttpOStream: public MOStream {
+    static esp_err_t _http_event_handler(esp_http_client_event_t *evt);
 
 public:
     // MStream methods
