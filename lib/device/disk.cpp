@@ -911,6 +911,18 @@ void iecDisk::sendFile()
 		Debug_printf("sendFile: [%s] [$%.4X] (%d bytes)\r\n=================================\r\n", file->url.c_str(), load_address, len);
 		while( i < len && success )
 		{
+
+			// Exit if ATN is PULLED while sending
+			if ( IEC.protocol.flags bitand ATN_PULLED )
+			{
+				Debug_printv("ATN pulled while sending. i[%d]", i);
+				// Save file pointer position
+				channelUpdate( --i );
+				setDeviceStatus( 74 );
+				success = true;
+				break;
+			}
+
 			success = istream->read(&b, 1);
 			// Debug_printv("b[%02X] success[%d]", b, success);
 			if (success)
@@ -948,16 +960,6 @@ void iecDisk::sendFile()
 				size_t t = (i * 100) / len;
 				Debug_printf("\rTransferring %d%% [%d, %d]", t, i, avail -1);
 #endif
-			}
-
-			// Exit if ATN is PULLED while sending
-			if ( IEC.protocol.flags bitand ATN_PULLED )
-			{
-				// Save file pointer position
-				channelUpdate( --i );
-				setDeviceStatus( 74 );
-				success = true;
-				break;
 			}
 
 			// Toggle LED
