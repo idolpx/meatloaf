@@ -415,6 +415,8 @@ bool HttpIStream::open() {
         int discarded = 0;
         esp_http_client_flush_response(m_http, &discarded);
         Debug_printv("Got redirect, httpCode=%d, flushed=%d", httpCode, discarded);
+        m_length = esp_http_client_fetch_headers(m_http);
+        m_bytesAvailable = m_length;
         httpCode = esp_http_client_get_status_code(m_http);
     }
     
