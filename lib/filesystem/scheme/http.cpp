@@ -549,7 +549,7 @@ esp_err_t HttpIStream::_http_event_handler(esp_http_client_event_t *evt)
             else if(strcmp("Last-Modified", evt->header_key)==0)
             {
             }
-            else if(strcmp("Content-Lenght", evt->header_key)==0)
+            else if(strcmp("Content-Length", evt->header_key)==0)
             {
                 Debug_printv("* Content len present '%s'", evt->header_value);
             }
