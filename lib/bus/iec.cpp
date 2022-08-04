@@ -771,7 +771,7 @@ void iecBus::disableDevice ( const uint8_t deviceNumber )
 
 void iecBus::setup()
 {
-    Debug_println("IEC SETUP");
+    // Debug_println("IEC SETUP");
 
     // Setup interrupt for ATN
     gpio_config_t io_conf = {
