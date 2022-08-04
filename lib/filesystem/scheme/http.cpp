@@ -120,7 +120,7 @@ bool HttpOStream::open() {
     m_bytesAvailable = m_length;
 
     int httpCode = esp_http_client_get_status_code(m_http);
-    if(httpCode != 200) {
+    if(httpCode != HttpStatus_Ok) {
         Debug_printv("opening stream failed, httpCode=%d", httpCode);
         close();
         return false;
@@ -155,7 +155,7 @@ bool HttpOStream::seek(size_t pos) {
         esp_http_client_fetch_headers(m_http);
         int httpCode = esp_http_client_get_status_code(m_http);
         Debug_printv("httpCode=[%d] request range=[%s]", httpCode, str);
-        if(httpCode != 200 || httpCode != 206)
+        if(httpCode != HttpStatus_Ok || httpCode != 206)
             return false;
 
         Debug_printv("stream opened[%s]", url.c_str());
@@ -410,7 +410,7 @@ bool HttpIStream::open() {
 
     int httpCode = esp_http_client_get_status_code(m_http);
 
-    while(httpCode == 301 || httpCode == 302)
+    while(httpCode == HttpStatus_MovedPermanently || httpCode == HttpStatus_Found)
     {
         int discarded = 0;
         esp_http_client_flush_response(m_http, &discarded);
@@ -420,7 +420,7 @@ bool HttpIStream::open() {
         httpCode = esp_http_client_get_status_code(m_http);
     }
     
-    if(httpCode != 200) {
+    if(httpCode != HttpStatus_Ok) {
         Debug_printv("opening stream failed, httpCode=%d", httpCode);
         close();
         return false;
@@ -455,7 +455,7 @@ bool HttpIStream::seek(size_t pos) {
         esp_http_client_fetch_headers(m_http);
         int httpCode = esp_http_client_get_status_code(m_http);
         Debug_printv("httpCode=[%d] request range=[%s]", httpCode, str);
-        if(httpCode != 200 || httpCode != 206)
+        if(httpCode != HttpStatus_Ok || httpCode != 206)
             return false;
 
         Debug_printv("stream opened[%s]", url.c_str());
@@ -565,6 +565,9 @@ esp_err_t HttpIStream::_http_event_handler(esp_http_client_event_t *evt)
                     Debug_printv("HTTP_EVENT_ON_DATA: Ignoring redirect response");
 
                     break;
+                }
+                if (!esp_http_client_is_chunked_response(evt->client)) {
+                    Debug_printv("HTTP_EVENT_ON_DATA: Got chunked response");
                 }
             }
 
