@@ -412,7 +412,9 @@ bool HttpIStream::open() {
 
     while(httpCode == 301 || httpCode == 302)
     {
-        Debug_printv("Got redirect, httpCode=%d", httpCode);
+        int discarded = 0;
+        esp_http_client_flush_response(m_http, &discarded);
+        Debug_printv("Got redirect, httpCode=%d, flushed=%d", httpCode, discarded);
         httpCode = esp_http_client_get_status_code(m_http);
     }
     
