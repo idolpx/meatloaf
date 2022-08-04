@@ -118,7 +118,8 @@ void main_setup()
 
 
     // Setup IEC Bus
-    Debug_printf("IEC Bus Initialized");
+    IEC.setup();
+    Debug_println( ANSI_GREEN_BOLD "IEC Bus Initialized" ANSI_RESET );
 
     // Add devices to bus
     IEC.enabledDevices = DEVICE_MASK;
@@ -132,10 +133,7 @@ void main_setup()
             Serial.printf("%.02d ", i);
         }
     }
-    Debug_printf( ANSI_RESET "]");
-
-    IEC.setup();
-    Debug_printf( ANSI_GREEN_BOLD "IEC Bus Initialized" ANSI_RESET );
+    Debug_println( ANSI_RESET "]");
 
 
 #ifdef DEBUG
