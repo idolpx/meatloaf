@@ -409,6 +409,12 @@ bool HttpIStream::open() {
     m_bytesAvailable = m_length;
 
     int httpCode = esp_http_client_get_status_code(m_http);
+
+    while(httpCode == 301 || httpCode == 302)
+    {
+        httpCode = esp_http_client_get_status_code(m_http);
+    }
+    
     if(httpCode != 200) {
         Debug_printv("opening stream failed, httpCode=%d", httpCode);
         close();
