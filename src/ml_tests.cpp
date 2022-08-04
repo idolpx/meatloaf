@@ -551,6 +551,37 @@ void testBasicConfig() {
 
 }
 
+void testRedirect() {
+    testHeader("HTTP fs test");
+
+    Meat::ifstream istream("http://c64.meatloaf.cc/roms");
+
+    istream.open();
+
+    if(istream.is_open()) {
+        Debug_printf("* Stream OK!");
+
+
+        if(istream.eof()) {
+            Debug_printf("Reader returned EOF! :(");
+        }
+
+        Debug_printf("* read lines follow:\n");
+
+        while(!istream.eof()) {
+            std::string line;
+
+            istream >> line;
+
+            Debug_printf("LINE>%s\n",line.c_str());
+        };
+    }
+    else {
+        Debug_printf("* Couldn't open!");
+    }
+
+}
+
 void runTestsSuite() {
     // Delay waiting for wifi to connect
     while ( !fnWiFi.connected() )
@@ -561,7 +592,7 @@ void runTestsSuite() {
 
     // working, uncomment if you want
     // runFSTest("/.sys", "README"); // TODO - let urlparser drop the last slash!
-    runFSTest("http://info.cern.ch/hypertext/WWW/TheProject.html","http://info.cern.ch/hypertext/WWW/TheProject.html");
+    // runFSTest("http://info.cern.ch/hypertext/WWW/TheProject.html","http://info.cern.ch/hypertext/WWW/TheProject.html");
     //runFSTest("cs:/apps/ski_writer.d64","cs:/apps/ski_writer.d64/EDITOR.HLP");
     
     // not working yet, DO NOT UNCOMMENT!!!
@@ -591,17 +622,17 @@ void runTestsSuite() {
     // testDirectory(MFSOwner::File("/games/arcade7.d64"), true);
     // testBasicConfig();
 
-    Debug_printv("Flash File System");
-    testDirectory(MFSOwner::File("/"), true);
+    // Debug_printv("Flash File System");
+    // testDirectory(MFSOwner::File("/"), true);
     //testDirectoryStandard("/");
 
-    Debug_printv("SD Card File System");
+    // Debug_printv("SD Card File System");
     //std::string basepath = fnSDFAT.basepath();
     //basepath += std::string("/");
     //Debug_printv("basepath[%s]", basepath.c_str());
     //testDirectory(MFSOwner::File( basepath ), true);
     //testDirectoryStandard( "/sd/" );
-    testDirectory(MFSOwner::File("/sd/"), true);
+    // testDirectory(MFSOwner::File("/sd/"), true);
 
 
     // DeviceDB m_device(0);
@@ -618,6 +649,7 @@ void runTestsSuite() {
     // m_device.select(30);
     // Debug_println(m_device.path().c_str());
 
+    testRedirect();
 
     Debug_println("*** All tests finished ***");
 }

@@ -404,23 +404,50 @@ bool HttpIStream::open() {
     };
 
     m_http = esp_http_client_init(&config);
+
+    Debug_printv("--- PRE OPEN")
+
     esp_err_t initOk = esp_http_client_open(m_http, 0); // or open? It's not entirely clear...
+
+    Debug_printv("--- PRE FETCH HEADERS")
+
     m_length = esp_http_client_fetch_headers(m_http);
     m_bytesAvailable = m_length;
 
+    Debug_printv("--- PRE GET STATUS CODE")
+
     int httpCode = esp_http_client_get_status_code(m_http);
 
-    while(httpCode == HttpStatus_MovedPermanently || httpCode == HttpStatus_Found)
+    while(httpCode == HttpStatus_MovedPermanently || httpCode == HttpStatus_Found || httpCode == 303)
     {
-        int discarded = 0;
-        esp_http_client_flush_response(m_http, &discarded);
-        Debug_printv("Got redirect, httpCode=%d, flushed=%d", httpCode, discarded);
-        m_length = esp_http_client_fetch_headers(m_http);
-        m_bytesAvailable = m_length;
-        httpCode = esp_http_client_get_status_code(m_http);
+
+        esp_err_t redir = esp_http_client_set_redirection(m_http);
+
+        Debug_printv("--- Page moved, there's should be %d bytes ready to read, redir=%d", m_length, redir);
+
+        esp_http_client_set_method(m_http, HTTP_METHOD_GET);
+        esp_err_t initOk = esp_http_client_open(m_http, 0); // or open? It's not entirely clear...
+        esp_http_client_fetch_headers(m_http);
+        int httpCode = esp_http_client_get_status_code(m_http);
+
+        // char* temp = new char[m_length];
+
+        // esp_http_client_read(m_http, temp, m_length);
+
+        // delete[] temp;
+
+        // Debug_printv("--- post read");
+
+        // m_bytesAvailable = m_length;
+
+        // // int cl = esp_http_client_get_content_length(m_http);
+        // httpCode = esp_http_client_get_status_code(m_http);
+        // Debug_printv("--- End redirect processing, httpCode=%d, bytes avail=%d, fetching new headers", httpCode, m_bytesAvailable);
+
+        // m_length = esp_http_client_fetch_headers(m_http);
     }
     
-    if(httpCode != HttpStatus_Ok) {
+    if(httpCode != HttpStatus_Ok && httpCode != 301) {
         Debug_printv("opening stream failed, httpCode=%d", httpCode);
         close();
         return false;
@@ -429,7 +456,7 @@ bool HttpIStream::open() {
     m_isOpen = true;
     m_position = 0;
 
-    //Debug_printv("length=%d isFriendlySkipper=[%d] isText=[%d]", m_length, isFriendlySkipper, isText);
+    Debug_printv("length=%d isFriendlySkipper=[%d] isText=[%d], httpCode=[%d]", m_length, isFriendlySkipper, isText);
 
     return true;
 };
@@ -511,7 +538,9 @@ esp_err_t HttpIStream::_http_event_handler(esp_http_client_event_t *evt)
 {
     static char *output_buffer;  // Buffer to store response of http request from event handler
     static int output_len;       // Stores number of bytes read
+    char buf[1024];
 
+    bool flushing = false;
     HttpIStream* istream = (HttpIStream*)evt->user_data;
 
     switch(evt->event_id) {
@@ -554,7 +583,7 @@ esp_err_t HttpIStream::_http_event_handler(esp_http_client_event_t *evt)
                 Debug_printv("* Content len present '%s'", evt->header_value);
             }
             else {
-                // Debug_printv("HTTP_EVENT_ON_HEADER, key=%s, value=%s", evt->header_key, evt->header_value);
+                Debug_printv("HTTP_EVENT_ON_HEADER, key=%s, value=%s", evt->header_key, evt->header_value);
                 // Last-Modified, value=Thu, 03 Dec 1992 08:37:20 - may be used to get file date
             }
 
@@ -563,15 +592,41 @@ esp_err_t HttpIStream::_http_event_handler(esp_http_client_event_t *evt)
             Debug_printv("HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
             {
                 int status = esp_http_client_get_status_code(istream->m_http);
+
+                char* temp = nullptr;
+
+                if(evt->data != nullptr) {
+                    temp = new char[evt->data_len+1];
+                    memcpy(temp, evt->data, evt->data_len);
+                    temp[evt->data_len] = 0x00;
+                }
+                
                 if ((status == HttpStatus_Found || status == HttpStatus_MovedPermanently) /*&& client->_redirect_count < (client->_max_redirects - 1)*/)
                 {
-                    Debug_printv("HTTP_EVENT_ON_DATA: Ignoring redirect response");
+                    //int flushed;
+                    //esp_http_client_flush_response(istream->m_http, &flushed);
+                    //("HTTP_EVENT_ON_DATA: This is redirect, eating data (%d):", flushed);
+                    Debug_printv("============================================================");
+                    Debug_printv("HTTP_EVENT_ON_DATA: response %s", temp);
+                    Debug_printv("============================================================");
+                }
+                else {
+                    Debug_printv("HTTP_EVENT_ON_DATA: got this data:");
+                    Debug_printv("============================================================");
+                    Debug_printv("HTTP_EVENT_ON_DATA: response %s", temp);
+                    Debug_printv("============================================================");
+                }
 
-                    break;
+                if (esp_http_client_is_chunked_response(evt->client)) {
+                    int len;
+                    esp_http_client_get_chunk_length(evt->client, &len);
+                    istream->m_length = len;
+                    Debug_printv("HTTP_EVENT_ON_DATA: Got chunked response, len=%d", istream->m_length);
                 }
-                if (!esp_http_client_is_chunked_response(evt->client)) {
-                    Debug_printv("HTTP_EVENT_ON_DATA: Got chunked response");
-                }
+
+                if(temp != nullptr)
+                    delete[] temp;
+
             }
 
 
