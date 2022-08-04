@@ -547,14 +547,15 @@ esp_err_t HttpIStream::_http_event_handler(esp_http_client_event_t *evt)
             break;
         case HTTP_EVENT_ON_DATA: // Occurs multiple times when receiving body data from the server. MAY BE SKIPPED IF BODY IS EMPTY!
             Debug_printv("HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
+            {
+                int status = esp_http_client_get_status_code(istream->m_http);
+                if ((status == HttpStatus_Found || status == HttpStatus_MovedPermanently) /*&& client->_redirect_count < (client->_max_redirects - 1)*/)
+                {
+                    Debug_printv("HTTP_EVENT_ON_DATA: Ignoring redirect response");
 
-        int status = esp_http_client_get_status_code(istream->m_http);
-        if ((status == HttpStatus_Found || status == HttpStatus_MovedPermanently) /*&& client->_redirect_count < (client->_max_redirects - 1)*/)
-        {
-            Debug_printv("HTTP_EVENT_ON_DATA: Ignoring redirect response");
-
-            break;
-        }
+                    break;
+                }
+            }
 
 
             /*
