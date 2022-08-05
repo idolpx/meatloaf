@@ -27,13 +27,13 @@
 //
 // File Stat
 // https://dweb.link/api/v0/object/stat?arg=Qmbj4vDDkq4kapyfJk27dxzPjQjxvPSW2BhL1GVZngJthq/0-9/1000%20miler.d64
-// http://localhost:8080/api/v0/object/stat?arg=Qmbj4vDDkq4kapyfJk27dxzPjQjxvPSW2BhL1GVZngJthq/0-9/1000%20miler.d64
+// IPFS://localhost:8080/api/v0/object/stat?arg=Qmbj4vDDkq4kapyfJk27dxzPjQjxvPSW2BhL1GVZngJthq/0-9/1000%20miler.d64
 // NumLinks = 0, it is a file
 // DataSize = {file_size} + 10 bytes
 //
 // https://github.com/ipfs/kubo/issues/8528
 //
-// HTTP HEAD to determine DIR or FILE
+// IPFS HEAD to determine DIR or FILE
 // content-type: text/html
 // etag: "DIRIndex-*" = Directory
 // https://ipfs.io/ipfs/Qmbj4vDDkq4kapyfJk27dxzPjQjxvPSW2BhL1GVZngJthq/0-9
@@ -42,3 +42,130 @@
 // content-length: >0  = File
 // https://ipfs.io/ipfs/Qmbj4vDDkq4kapyfJk27dxzPjQjxvPSW2BhL1GVZngJthq/0-9/1000 miler.d64
 //
+
+
+#ifndef MEATFILE_DEFINES_IPFS_H
+#define MEATFILE_DEFINES_IPFS_H
+
+//#include "meat_io.h"
+#include "http.h"
+
+#include "fnHttpClient.h"
+
+#include "peoples_url_parser.h"
+
+#include <ArduinoJson.h>
+
+
+/********************************************************
+ * File
+ ********************************************************/
+
+class IPFSFile: public HttpFile {
+
+public:
+    IPFSFile(std::string path, size_t size = 0, bool isDir = false):
+    HttpFile(path), m_size(size), m_isDir(isDir)
+    {
+        parseUrl(path);
+        //Debug_printv("path[%s] size[%d] is_dir[%d]", path.c_str(), size, isDir);
+    };
+    ~IPFSFile();
+
+    bool isDirectory() override;
+    //void openDir(const char *path) override;
+    bool rewindDirectory() override;
+    MFile* getNextFileInDir() override;
+    MIStream* inputStream() override ; // file on ML server = standard HTTP file available via GET
+
+    //MOStream* outputStream() override ; // we can't write to ML server, can we?
+    //time_t getLastWrite() override ; // you can implement it if you want
+    //time_t getCreationTime() override ; // you can implement it if you want
+    //bool mkDir() override { return false; }; // we can't write to ML server, can we?
+    //bool exists() override { return true; };
+    size_t size() override { return m_size; };
+    //bool remove() override { return false; }; // we can't write to ML server, can we?
+    //bool rename(std::string dest) { return false; }; // we can't write to ML server, can we?
+    //MIStream* createIStream(std::shared_ptr<MIStream> src); // not used anyway
+
+    //std::string mediaRoot();
+
+protected:
+    bool dirIsOpen = false;
+    std::string m_lineBuffer;
+
+//    WiFiClient m_file;
+    fnHttpClient m_http;
+
+    StaticJsonDocument<256> m_jsonHTTP;
+
+    size_t m_size = 0;
+    bool m_isDir = false;
+};
+
+
+/********************************************************
+ * Streams
+ ********************************************************/
+
+class IPFSIStream: public HttpIStream {
+
+public:
+    IPFSIStream(std::string path) :
+    HttpIStream(path)
+    {
+        m_http.set_header("user-agent", USER_AGENT);
+        //m_http.setTimeout(10000);
+        //m_http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
+        //m_http.setRedirectLimit(10);
+        url = path;
+    }
+    ~IPFSIStream() {
+        close();
+    }
+
+    // MStream methods
+    // size_t position() override;
+    // void close() override;
+    bool open() override;
+
+
+    // MIStream methods
+    // int available() override;
+    // size_t read(uint8_t* buf, size_t size) override;
+    // bool isOpen();
+
+// protected:
+//     std::string url;
+//     bool m_isOpen;
+//     int m_length;
+//     WiFiClient m_file;
+//     HTTPClient m_http;
+//     int m_bytesAvailable = 0;
+//     int m_position = 0;
+//     bool isFriendlySkipper = false;
+};
+
+
+/********************************************************
+ * FS
+ ********************************************************/
+
+class IPFSFileSystem: public MFileSystem
+{
+    MFile* getFile(std::string path) override {
+        // Debug_printv("IPFSFileSystem::getFile(%s)", path.c_str());
+        return new IPFSFile(path);
+    }
+
+    bool handles(std::string name) {
+        std::string pattern = "ipfs:";
+        return mstr::startsWith(name, pattern.c_str(), false);
+    }
+
+public:
+    IPFSFileSystem(): MFileSystem("ipfs") {};
+};
+
+
+#endif // MEATFILE_DEFINES_IPFS_H

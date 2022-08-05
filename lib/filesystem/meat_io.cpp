@@ -21,6 +21,7 @@
 // Scheme
 #include "scheme/http.h"
 #include "scheme/ml.h"
+#include "scheme/ipfs.h"
 #include "scheme/tnfs.h"
 #include "scheme/smb.h"
 #include "scheme/cs.h"
@@ -54,8 +55,9 @@ SDFileSystem sdFS;
 
 // Scheme
 HttpFileSystem httpFS;
-TNFSFileSystem tnfsFS;
 MLFileSystem mlFS;
+IPFSFileSystem ipfsFS;
+TNFSFileSystem tnfsFS;
 CServerFileSystem csFS;
 //WSFileSystem wsFS;
 
@@ -86,7 +88,7 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
     &p00FS,
     &d64FS, &d71FS, &d80FS, &d81FS, &d82FS, &d8bFS, &dnpFS,
     &t64FS, &tcrtFS,
-    &mlFS, &httpFS, &tnfsFS
+    &httpFS, &mlFS, &ipfsFS, &tnfsFS
 };
 
 bool MFSOwner::mount(std::string name) {
