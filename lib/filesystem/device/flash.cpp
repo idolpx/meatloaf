@@ -417,7 +417,7 @@ FlashHandle::~FlashHandle() {
 }
 
 void FlashHandle::dispose() {
-    Debug_printv("file_h[%d]", file_h);
+    //Debug_printv("file_h[%d]", file_h);
     if (file_h != nullptr) {
 
         fclose( file_h );
