@@ -425,10 +425,10 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
             // This may get called more than once if esp_http_client decides to retry in order to handle a redirect or auth response
             //Debug_printv("HTTP_EVENT_ON_FINISH %u\n", uxTaskGetStackHighWaterMark(nullptr));
             // Keep track of how many times we "finish" reading a response from the server
-            Debug_printv("HTTP_EVENT_ON_FINISH");
+            //Debug_printv("HTTP_EVENT_ON_FINISH");
             break;
         case HTTP_EVENT_DISCONNECTED: // The connection has been disconnected
-            Debug_printv("HTTP_EVENT_DISCONNECTED");
+            //Debug_printv("HTTP_EVENT_DISCONNECTED");
             break;
     }
     return ESP_OK;
