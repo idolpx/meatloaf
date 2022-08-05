@@ -178,49 +178,20 @@ bool MLIStream::open() {
     PeoplesUrlParser urlParser;
     urlParser.parseUrl(url);
 
-    m_isOpen = false;
-
-    //String ml_url = std::string("http://" + urlParser.host + "/api/").c_str();
-	//String post_data("p=" + urlencode(m_device.path()) + "&i=" + urlencode(m_device.image()) + "&f=" + urlencode(m_filename));
-    //String post_data = std::string("p=" + mstr::urlEncode(urlParser.path)).c_str(); // pathInStream will return here /c64.meatloaf.cc/some/directory
     std::string ml_url = "https://api.meatloaf.cc/?" + urlParser.name;
-    //std::string post_data = urlParser.path;
     url = ml_url;
     
-    int httpCode = tryOpen();
-
-    while(httpCode == HttpStatus_MovedPermanently || httpCode == HttpStatus_Found || httpCode == 303)
-    {
-        Debug_printv("--- Page moved, doing redirect");
-        httpCode = tryOpen();
-        // esp_err_t redirRc = esp_http_client_set_redirection(m_http);
-        // if(redirRc == ESP_FAIL)
-        //     return false;
-
-        // Debug_printv("--- Page moved, pre open");
-
-        // esp_http_client_set_method(m_http, HTTP_METHOD_GET);
-        // esp_err_t openRc = esp_http_client_open(m_http, 0); // or open? It's not entirely clear...
-        // if(openRc == ESP_FAIL)
-        //     return false;
-
-        // Debug_printv("--- Page moved, pre fetch header");
-
-        // m_length = esp_http_client_fetch_headers(m_http); // without this it doesn't work properly
-
-        // Debug_printv("--- post status");
-    }
-    
-    if(httpCode != HttpStatus_Ok && httpCode != 301) {
-        Debug_printv("opening stream failed, httpCode=%d", httpCode);
-        close();
-        return false;
-    }
-
-    m_isOpen = true;
-    m_position = 0;
-
-    Debug_printv("length=%d isFriendlySkipper=[%d] isText=[%d], httpCode=[%d]", m_length, isFriendlySkipper, isText, httpCode);
-
-    return true;
+    // a new way to do that:
+    // 1. put an instance of MeatHttpClient somewhere in this class as a class field
+    MeatHttpClient client;
+    // 2. if you need to process some headers, use this lambda:
+    client.setOnHeader([this](char* header, char* value) {
+        // did we receive ml_media_header?
+         if(strcmp("ml_media_header", header)==0) {
+            // assign this header value to something
+            this->url = value;
+         }
+        return ESP_OK;
+    });
+    return client.GET(url);
 };

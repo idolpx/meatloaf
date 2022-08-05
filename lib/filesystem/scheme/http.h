@@ -6,7 +6,37 @@
 #include "meat_io.h"
 #include "../../include/global_defines.h"
 #include <esp_http_client.h>
+#include <functional>
 
+
+class MeatHttpClient {
+    esp_http_client_handle_t m_http = nullptr;
+    static esp_err_t _http_event_handler(esp_http_client_event_t *evt);
+    int tryOpen(esp_http_client_method_t meth);
+    esp_http_client_method_t lastMethod;
+    std::function<int(char*, char*)> onHeader = [] (char* key, char* value){ 
+        Debug_printv("HTTP_EVENT_ON_HEADER, key=%s, value=%s", key, value);
+        return 0; 
+    };
+
+public:
+    bool open(std::string url, esp_http_client_method_t meth);
+    bool GET(std::string url);
+    bool PUT(std::string url);
+    void close();
+    void setOnHeader(const std::function<int(char*, char*)> &f);
+    bool seek(size_t pos);
+    size_t read(uint8_t* buf, size_t size);
+    size_t write(const uint8_t* buf, size_t size);
+    bool m_isOpen = false;
+    size_t m_length = 0;
+    size_t m_bytesAvailable = 0;
+    size_t m_position = 0;
+    bool isText = false;
+    bool isFriendlySkipper = false;
+    std::string url;
+
+};
 
 /********************************************************
  * File implementations
@@ -64,23 +94,13 @@ public:
     bool isOpen();
 
 protected:
+    MeatHttpClient m_http;
     std::string url;
-    bool m_isOpen = false;
-    size_t m_length = 0;
-    size_t m_bytesAvailable = 0;
-    size_t m_position = 0;
-    esp_http_client_handle_t m_http = nullptr;
-       
-//    WiFiClient m_file;
-//	  fnHttpClient m_http;
-//    MHttpClient m_http;
 };
 
 
 class HttpIStream: public MIStream {
 
-    static esp_err_t _http_event_handler(esp_http_client_event_t *evt);
-    int tryOpen();
 public:
     HttpIStream(std::string path) {
         url = path;
@@ -104,23 +124,13 @@ public:
     bool isOpen();
 
 protected:
+    MeatHttpClient m_http;
     std::string url;
-    bool m_isOpen = false;
-    size_t m_bytesAvailable = 0;
-    size_t m_length = 0;
-    size_t m_position = 0;
-    bool isFriendlySkipper = false;
-
-//    WiFiClient m_file;
-	// fnHttpClient m_http;
-    // MHttpClient m_http;
-    esp_http_client_handle_t m_http = nullptr;
 
 };
 
 
 class HttpOStream: public MOStream {
-    static esp_err_t _http_event_handler(esp_http_client_event_t *evt);
 
 public:
     // MStream methods
@@ -148,18 +158,7 @@ public:
 
 protected:
     std::string url;
-    bool m_isOpen = false;
-    size_t m_bytesAvailable = 0;
-    size_t m_length = 0;
-    size_t m_position = 0;
-    bool isFriendlySkipper = false;
-    
-//    WiFiClient m_file;
-    //WiFiClient m_client;
-    // MHttpClient m_http;
-	// fnHttpClient m_http;
-    esp_http_client_handle_t m_http = nullptr;
-
+    MeatHttpClient m_http;
 };
 
 
