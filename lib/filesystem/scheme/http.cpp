@@ -413,9 +413,15 @@ int HttpIStream::tryOpen() {
         return 0;
 
     // Debug_printv("--- PRE FETCH HEADERS")
+    m_length = 0;
+    m_bytesAvailable = 0;
 
-    m_length = esp_http_client_fetch_headers(m_http);
-    m_bytesAvailable = m_length;
+    int lengthResp = esp_http_client_fetch_headers(m_http);
+    if(lengthResp > 0) {
+        // only if we aren't chunked!
+        m_length = lengthResp;
+        m_bytesAvailable = m_length;
+    }
 
     // Debug_printv("--- PRE GET STATUS CODE")
 
@@ -602,11 +608,11 @@ esp_err_t HttpIStream::_http_event_handler(esp_http_client_event_t *evt)
 
                 char* temp = nullptr;
 
-                if(evt->data != nullptr) {
-                    temp = new char[evt->data_len+1];
-                    memcpy(temp, evt->data, evt->data_len);
-                    temp[evt->data_len] = 0x00;
-                }
+                // if(evt->data != nullptr) {
+                //     temp = new char[evt->data_len+1];
+                //     memcpy(temp, evt->data, evt->data_len);
+                //     temp[evt->data_len] = 0x00;
+                // }
                 
                 if ((status == HttpStatus_Found || status == HttpStatus_MovedPermanently || status == 303) /*&& client->_redirect_count < (client->_max_redirects - 1)*/)
                 {
@@ -620,15 +626,16 @@ esp_err_t HttpIStream::_http_event_handler(esp_http_client_event_t *evt)
                 }
                 else {
                     Debug_printv("HTTP_EVENT_ON_DATA: Got response body");
-                    Debug_printv("============================================================");
-                    Debug_printv("HTTP_EVENT_ON_DATA: response %s", temp);
-                    Debug_printv("============================================================");
+                    // Debug_printv("============================================================");
+                    // Debug_printv("HTTP_EVENT_ON_DATA: response %s", temp);
+                    // Debug_printv("============================================================");
                 }
 
                 if (esp_http_client_is_chunked_response(evt->client)) {
                     int len;
                     esp_http_client_get_chunk_length(evt->client, &len);
-                    istream->m_length = len;
+                    istream->m_length += len;
+                    istream->m_bytesAvailable += len;
                     Debug_printv("HTTP_EVENT_ON_DATA: Got chunked response, len=%d", istream->m_length);
                 }
 
