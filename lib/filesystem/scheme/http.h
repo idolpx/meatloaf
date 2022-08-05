@@ -57,12 +57,12 @@ public:
     MOStream* outputStream() override ; // has to return OPENED stream
     time_t getLastWrite() override ;
     time_t getCreationTime() override ;
-    bool rewindDirectory() override { return false; };
-    MFile* getNextFileInDir() override { return nullptr; };
-    bool mkDir() override { return false; };
+    bool rewindDirectory() override ;
+    MFile* getNextFileInDir() override ;
+    bool mkDir() override ;
     bool exists() override ;
     size_t size() override ;
-    bool remove() override { return false; };
+    bool remove() override ;
     bool rename(std::string dest) { return false; };
     MIStream* createIStream(std::shared_ptr<MIStream> src);
     //void addHeader(const String& name, const String& value, bool first = false, bool replace = true);

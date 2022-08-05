@@ -1,13 +1,12 @@
 #include "http.h"
 
-
 /********************************************************
  * File impls
  ********************************************************/
 
 bool HttpFile::isDirectory() {
-    // hey, why not?
     // try webdav PROPFIND to get a listing
+    // otherwise return false
     return false;
 }
 
@@ -19,36 +18,32 @@ MIStream* HttpFile::inputStream() {
     return istream;
 }
 
-MIStream* HttpFile::createIStream(std::shared_ptr<MIStream> is) {
-    return is.get(); // we've overriden istreamfunction, so this one won't be used
-}
-
 MOStream* HttpFile::outputStream() {
     // has to return OPENED stream
     MOStream* ostream = new HttpOStream(url);
     return ostream;
-    if ( ostream->open() )
-        return ostream;
-    else
-        return nullptr;    
+}
+
+MIStream* HttpFile::createIStream(std::shared_ptr<MIStream> is) {
+    return is.get(); // DUMMY return value - we've overriden istreamfunction, so this one won't be used
 }
 
 time_t HttpFile::getLastWrite() {
-    return 0; // might be taken from Last-Modified, probably not worth it
+    // take from webdav PROPFIND or fallback to Last-Modified
+    return 0; 
 }
 
 time_t HttpFile::getCreationTime() {
-    return 0; // might be taken from Last-Modified, probably not worth it
+    // take from webdav PROPFIND or fallback to Last-Modified
+    return 0;
 }
 
 bool HttpFile::exists() {
-    // Debug_printv("[%s]", url.c_str());
-    // // we may try open the stream to check if it exists
+    // try webdav PROPFIND to get a listing
+    // or fallback to opening the stream
     // std::unique_ptr<MIStream> test(inputStream());
     // // remember that MIStream destuctor should close the stream!
     // return test->isOpen();
-
-    // try webdav PROPFIND to get a listing
 
     return true;
 }
@@ -57,7 +52,8 @@ size_t HttpFile::size() {
     // we may take content-lenght from header if exists
 
     // try webdav PROPFIND to get a listing
-
+    // or 
+    // fallback to opening the stream
     std::unique_ptr<MIStream> test(inputStream());
     size_t size = 0;
     if(test->isOpen())
@@ -68,14 +64,46 @@ size_t HttpFile::size() {
     return size;
 }
 
-// we can try if this is webdav, then
-// PROPFIND allows listing dir
-// PROPPATCH allows deletion
-// MKCOL creates dir
+bool HttpFile::remove() {
+    // PROPPATCH allows deletion
+    return false;
+}
+
+bool HttpFile::mkDir() {
+    // MKCOL creates dir
+    return false;
+}
+
+bool HttpFile::rewindDirectory() { 
+    // we can try if this is webdav, then
+    // PROPFIND allows listing dir
+    return false; 
+};
+
+MFile* HttpFile::getNextFileInDir() { 
+    // we can try if this is webdav, then
+    // PROPFIND allows listing dir
+    return nullptr; 
+};
 
 /********************************************************
  * Ostream impls
  ********************************************************/
+bool HttpOStream::open() {
+    return m_http.PUT(url);
+};
+
+void HttpOStream::close() {
+    return m_http.close();
+}
+
+bool HttpOStream::seek(size_t pos) {
+    return m_http.seek(pos);
+}
+
+size_t HttpOStream::write(const uint8_t* buf, size_t size) {
+    return m_http.write(buf ,size);
+};
 
 size_t HttpOStream::size() {
     return m_http.m_length;
@@ -93,27 +121,24 @@ bool HttpOStream::isOpen() {
     return m_http.m_isOpen;
 };
 
-bool HttpOStream::open() {
-    return m_http.PUT(url);
-};
-
-bool HttpOStream::seek(size_t pos) {
-    return m_http.seek(pos);
-}
-
-size_t HttpOStream::write(const uint8_t* buf, size_t size) {
-    return m_http.write(buf ,size);
-};
-
-void HttpOStream::close() {
-    return m_http.close();
-}
 
 /********************************************************
  * Istream impls
  ********************************************************/
 bool HttpIStream::open() {
     return m_http.GET(url);
+};
+
+void HttpIStream::close() {
+    m_http.close();
+}
+
+bool HttpIStream::seek(size_t pos) {
+    return m_http.seek(pos);
+}
+
+size_t HttpIStream::read(uint8_t* buf, size_t size) {
+    return m_http.read(buf, size);
 };
 
 bool HttpIStream::isOpen() {
@@ -132,32 +157,9 @@ size_t HttpIStream::position() {
     return m_http.m_position;
 }
 
-bool HttpIStream::seek(size_t pos) {
-    return m_http.seek(pos);
-}
-
-size_t HttpIStream::read(uint8_t* buf, size_t size) {
-    return m_http.read(buf, size);
-};
-
-void HttpIStream::close() {
-    m_http.close();
-}
-
 /********************************************************
  * Meat HTTP client impls
  ********************************************************/
-void MeatHttpClient::close() {
-    if(m_http != nullptr) {
-        if(m_isOpen) {
-            esp_http_client_close(m_http);
-        }
-        esp_http_client_cleanup(m_http);
-        m_http = nullptr;
-    }
-    m_isOpen = false;
-}
-
 bool MeatHttpClient::GET(std::string dstUrl) {
     return open(dstUrl, HTTP_METHOD_GET);
 }
@@ -165,11 +167,6 @@ bool MeatHttpClient::GET(std::string dstUrl) {
 bool MeatHttpClient::PUT(std::string dstUrl) {
     return open(dstUrl, HTTP_METHOD_PUT);
 }
-
-void MeatHttpClient::setOnHeader(const std::function<int(char*, char*)> &lambda) {
-    onHeader = lambda;
-}
-
 
 bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
     url = dstUrl;
@@ -196,6 +193,21 @@ bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
 
     return true;
 };
+
+void MeatHttpClient::close() {
+    if(m_http != nullptr) {
+        if(m_isOpen) {
+            esp_http_client_close(m_http);
+        }
+        esp_http_client_cleanup(m_http);
+        m_http = nullptr;
+    }
+    m_isOpen = false;
+}
+
+void MeatHttpClient::setOnHeader(const std::function<int(char*, char*)> &lambda) {
+    onHeader = lambda;
+}
 
 bool MeatHttpClient::seek(size_t pos) {
     if(pos==m_position)
@@ -244,6 +256,7 @@ bool MeatHttpClient::seek(size_t pos) {
         }
 
         m_bytesAvailable = m_length-pos;
+        m_position = pos;
 
         return true;
     }
@@ -404,4 +417,3 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
     }
     return ESP_OK;
 }
-
