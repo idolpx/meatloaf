@@ -436,9 +436,11 @@ bool HttpIStream::open() {
         if(openRc == ESP_FAIL)
             return false;
 
-        //Debug_printv("--- Page moved, pre fetch header");
+        Debug_printv("--- Page moved, pre fetch header");
 
-        //m_length = esp_http_client_fetch_headers(m_http);
+        m_length = esp_http_client_fetch_headers(m_http); // without this it doesn't work properly
+
+        Debug_printv("--- post status");
     }
     
     if(httpCode != HttpStatus_Ok && httpCode != 301) {
@@ -450,7 +452,7 @@ bool HttpIStream::open() {
     m_isOpen = true;
     m_position = 0;
 
-    Debug_printv("length=%d isFriendlySkipper=[%d] isText=[%d], httpCode=[%d]", m_length, isFriendlySkipper, isText);
+    Debug_printv("length=%d isFriendlySkipper=[%d] isText=[%d], httpCode=[%d]", m_length, isFriendlySkipper, isText, httpCode);
 
     return true;
 };
@@ -595,21 +597,23 @@ esp_err_t HttpIStream::_http_event_handler(esp_http_client_event_t *evt)
                 //     temp[evt->data_len] = 0x00;
                 // }
                 
-                // if ((status == HttpStatus_Found || status == HttpStatus_MovedPermanently) /*&& client->_redirect_count < (client->_max_redirects - 1)*/)
-                // {
+                if ((status == HttpStatus_Found || status == HttpStatus_MovedPermanently || status == 303) /*&& client->_redirect_count < (client->_max_redirects - 1)*/)
+                {
+                    Debug_printv("HTTP_EVENT_ON_DATA: Redirect response body, ignoring");
                 //     //int flushed;
                 //     //esp_http_client_flush_response(istream->m_http, &flushed);
                 //     //("HTTP_EVENT_ON_DATA: This is redirect, eating data (%d):", flushed);
                 //     Debug_printv("============================================================");
                 //     Debug_printv("HTTP_EVENT_ON_DATA: response %s", temp);
                 //     Debug_printv("============================================================");
-                // }
-                // else {
+                }
+                else {
+                    Debug_printv("HTTP_EVENT_ON_DATA: Got response body");
                 //     Debug_printv("HTTP_EVENT_ON_DATA: got this data:");
                 //     Debug_printv("============================================================");
                 //     Debug_printv("HTTP_EVENT_ON_DATA: response %s", temp);
                 //     Debug_printv("============================================================");
-                // }
+                }
 
                 if (esp_http_client_is_chunked_response(evt->client)) {
                     int len;
