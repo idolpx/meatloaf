@@ -105,8 +105,8 @@ bool HttpOStream::open() {
         .user_agent = USER_AGENT,
         .method = HTTP_METHOD_PUT,
         .timeout_ms = 10000,
-        .disable_auto_redirect = false,
-        .max_redirection_count = 10,
+        .disable_auto_redirect = true,
+        // .max_redirection_count = 10,
         .event_handler = _http_event_handler,
         .user_data = this,
         .keep_alive_enable = true,
@@ -387,14 +387,14 @@ bool HttpIStream::isOpen() {
     return m_isOpen;
 };
 
-bool HttpIStream::open() {
+int HttpIStream::tryOpen() {
     mstr::replaceAll(url, "HTTP:", "http:");
     esp_http_client_config_t config = {
         .url = url.c_str(),
         .user_agent = USER_AGENT,
         .method = HTTP_METHOD_GET,
         .timeout_ms = 10000,
-        .disable_auto_redirect = false,
+        // .disable_auto_redirect = false,
         .max_redirection_count = 10,
         .event_handler = _http_event_handler,
         .user_data = this,
@@ -410,7 +410,7 @@ bool HttpIStream::open() {
     esp_err_t initOk = esp_http_client_open(m_http, 0); // or open? It's not entirely clear...
 
     if(initOk == ESP_FAIL)
-        return false;
+        return 0;
 
     // Debug_printv("--- PRE FETCH HEADERS")
 
@@ -419,28 +419,34 @@ bool HttpIStream::open() {
 
     // Debug_printv("--- PRE GET STATUS CODE")
 
-    int httpCode = esp_http_client_get_status_code(m_http);
+    return esp_http_client_get_status_code(m_http);
 
-    if(httpCode == HttpStatus_MovedPermanently || httpCode == HttpStatus_Found || httpCode == 303)
+
+}
+
+bool HttpIStream::open() {
+    int httpCode = tryOpen();
+
+    while(httpCode == HttpStatus_MovedPermanently || httpCode == HttpStatus_Found || httpCode == 303)
     {
+        Debug_printv("--- Page moved, doing redirect");
+        httpCode = tryOpen();
+        // esp_err_t redirRc = esp_http_client_set_redirection(m_http);
+        // if(redirRc == ESP_FAIL)
+        //     return false;
 
-        Debug_printv("--- Page moved, pre set redirection");
-        esp_err_t redirRc = esp_http_client_set_redirection(m_http);
-        if(redirRc == ESP_FAIL)
-            return false;
+        // Debug_printv("--- Page moved, pre open");
 
-        Debug_printv("--- Page moved, pre open");
+        // esp_http_client_set_method(m_http, HTTP_METHOD_GET);
+        // esp_err_t openRc = esp_http_client_open(m_http, 0); // or open? It's not entirely clear...
+        // if(openRc == ESP_FAIL)
+        //     return false;
 
-        esp_http_client_set_method(m_http, HTTP_METHOD_GET);
-        esp_err_t openRc = esp_http_client_open(m_http, 0); // or open? It's not entirely clear...
-        if(openRc == ESP_FAIL)
-            return false;
+        // Debug_printv("--- Page moved, pre fetch header");
 
-        Debug_printv("--- Page moved, pre fetch header");
+        // m_length = esp_http_client_fetch_headers(m_http); // without this it doesn't work properly
 
-        m_length = esp_http_client_fetch_headers(m_http); // without this it doesn't work properly
-
-        Debug_printv("--- post status");
+        // Debug_printv("--- post status");
     }
     
     if(httpCode != HttpStatus_Ok && httpCode != 301) {
@@ -578,6 +584,11 @@ esp_err_t HttpIStream::_http_event_handler(esp_http_client_event_t *evt)
             {
                 Debug_printv("* Content len present '%s'", evt->header_value);
             }
+            else if(strcmp("Location", evt->header_key)==0)
+            {
+                Debug_printv("* This page redirects to '%s'", evt->header_value);
+                istream->url = evt->header_value;
+            }
             else {
                 Debug_printv("HTTP_EVENT_ON_HEADER, key=%s, value=%s", evt->header_key, evt->header_value);
                 // Last-Modified, value=Thu, 03 Dec 1992 08:37:20 - may be used to get file date
@@ -591,11 +602,11 @@ esp_err_t HttpIStream::_http_event_handler(esp_http_client_event_t *evt)
 
                 char* temp = nullptr;
 
-                // if(evt->data != nullptr) {
-                //     temp = new char[evt->data_len+1];
-                //     memcpy(temp, evt->data, evt->data_len);
-                //     temp[evt->data_len] = 0x00;
-                // }
+                if(evt->data != nullptr) {
+                    temp = new char[evt->data_len+1];
+                    memcpy(temp, evt->data, evt->data_len);
+                    temp[evt->data_len] = 0x00;
+                }
                 
                 if ((status == HttpStatus_Found || status == HttpStatus_MovedPermanently || status == 303) /*&& client->_redirect_count < (client->_max_redirects - 1)*/)
                 {
@@ -609,10 +620,9 @@ esp_err_t HttpIStream::_http_event_handler(esp_http_client_event_t *evt)
                 }
                 else {
                     Debug_printv("HTTP_EVENT_ON_DATA: Got response body");
-                //     Debug_printv("HTTP_EVENT_ON_DATA: got this data:");
-                //     Debug_printv("============================================================");
-                //     Debug_printv("HTTP_EVENT_ON_DATA: response %s", temp);
-                //     Debug_printv("============================================================");
+                    Debug_printv("============================================================");
+                    Debug_printv("HTTP_EVENT_ON_DATA: response %s", temp);
+                    Debug_printv("============================================================");
                 }
 
                 if (esp_http_client_is_chunked_response(evt->client)) {
