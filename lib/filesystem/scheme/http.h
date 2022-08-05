@@ -16,7 +16,7 @@
 class HttpFile: public MFile {
 
 public:
-    HttpFile(std::string path): MFile(path) {};
+    HttpFile(std::string path): MFile(path) { parseUrl(path); };
     HttpFile(std::string path, std::string filename): MFile(path) {};
 
     bool isDirectory() override;

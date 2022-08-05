@@ -6,9 +6,9 @@
 #define MEATFILE_DEFINES_FSML_H
 
 //#include "meat_io.h"
-#include "http.h"
+#include "scheme/http.h"
 
-#include "fnHttpClient.h"
+//#include "fnHttpClient.h"
 
 #include "peoples_url_parser.h"
 
@@ -22,12 +22,7 @@
 class MLFile: public HttpFile {
 
 public:
-    MLFile(std::string path, size_t size = 0, bool isDir = false):
-    HttpFile(path), m_size(size), m_isDir(isDir)
-    {
-        parseUrl(path);
-        //Debug_printv("path[%s] size[%d] is_dir[%d]", path.c_str(), size, isDir);
-    };
+    MLFile(std::string path): HttpFile(path) {};
     ~MLFile();
 
     bool isDirectory() override;
@@ -53,7 +48,7 @@ protected:
     std::string m_lineBuffer;
 
 //    WiFiClient m_file;
-    fnHttpClient m_http;
+    HttpFile m_http;
 
     StaticJsonDocument<256> m_jsonHTTP;
 
@@ -72,7 +67,7 @@ public:
     MLIStream(std::string path) :
     HttpIStream(path)
     {
-        m_http.set_header("user-agent", USER_AGENT);
+        //m_http.set_header("user-agent", USER_AGENT);
         //m_http.setTimeout(10000);
         //m_http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
         //m_http.setRedirectLimit(10);
