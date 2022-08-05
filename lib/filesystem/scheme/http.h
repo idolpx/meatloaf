@@ -1,7 +1,7 @@
 // HTTP:// - Hypertext Transfer Protocol
 
-#ifndef MEATFILE_DEFINES_FSHTTP_H
-#define MEATFILE_DEFINES_FSHTTP_H
+#ifndef MEATFILESYSTEM_SCHEME_HTTP
+#define MEATFILESYSTEM_SCHEME_HTTP
 
 #include "meat_io.h"
 #include "../../include/global_defines.h"
@@ -16,6 +16,9 @@
 class HttpFile: public MFile {
 
 public:
+    HttpFile() {
+        Debug_printv("C++, if you try to call this, be damned!");
+    };
     HttpFile(std::string path): MFile(path) { parseUrl(path); };
     HttpFile(std::string path, std::string filename): MFile(path) {};
 
@@ -179,4 +182,4 @@ public:
 };
 
 
-#endif
+#endif /* MEATFILESYSTEM_SCHEME_HTTP */
