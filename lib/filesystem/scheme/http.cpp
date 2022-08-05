@@ -164,8 +164,16 @@ bool MeatHttpClient::GET(std::string dstUrl) {
     return open(dstUrl, HTTP_METHOD_GET);
 }
 
+bool MeatHttpClient::POST(std::string dstUrl) {
+    return open(dstUrl, HTTP_METHOD_POST);
+}
+
 bool MeatHttpClient::PUT(std::string dstUrl) {
     return open(dstUrl, HTTP_METHOD_PUT);
+}
+
+bool MeatHttpClient::HEAD(std::string dstUrl) {
+    return open(dstUrl, HTTP_METHOD_HEAD);
 }
 
 bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {

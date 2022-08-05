@@ -49,7 +49,9 @@ public:
     HttpFile() {
         Debug_printv("C++, if you try to call this, be damned!");
     };
-    HttpFile(std::string path): MFile(path) { parseUrl(path); };
+    HttpFile(std::string path): MFile(path) { 
+        parseUrl(path); 
+    };
     HttpFile(std::string path, std::string filename): MFile(path) {};
 
     bool isDirectory() override;
@@ -76,12 +78,10 @@ public:
 class HttpIOStream: public MIStream, MOStream {
 
 public:
-    HttpIOStream(std::string& path) {
-        url = path;
-    }
+    HttpIOStream(std::string& path) {};
     ~HttpIOStream() {
         close();
-    }
+    };
 
     void close() override;
     bool open() override;
@@ -102,12 +102,10 @@ protected:
 class HttpIStream: public MIStream {
 
 public:
-    HttpIStream(std::string path) {
-        url = path;
-    }
+    HttpIStream(std::string path) {};
     ~HttpIStream() {
         close();
-    }
+    };
 
     // MStream methods
     size_t size() override;
