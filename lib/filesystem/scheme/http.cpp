@@ -405,46 +405,40 @@ bool HttpIStream::open() {
 
     m_http = esp_http_client_init(&config);
 
-    Debug_printv("--- PRE OPEN")
+    // Debug_printv("--- PRE OPEN")
 
     esp_err_t initOk = esp_http_client_open(m_http, 0); // or open? It's not entirely clear...
 
-    Debug_printv("--- PRE FETCH HEADERS")
+    if(initOk == ESP_FAIL)
+        return false;
+
+    // Debug_printv("--- PRE FETCH HEADERS")
 
     m_length = esp_http_client_fetch_headers(m_http);
     m_bytesAvailable = m_length;
 
-    Debug_printv("--- PRE GET STATUS CODE")
+    // Debug_printv("--- PRE GET STATUS CODE")
 
     int httpCode = esp_http_client_get_status_code(m_http);
 
-    while(httpCode == HttpStatus_MovedPermanently || httpCode == HttpStatus_Found || httpCode == 303)
+    if(httpCode == HttpStatus_MovedPermanently || httpCode == HttpStatus_Found || httpCode == 303)
     {
 
-        esp_err_t redir = esp_http_client_set_redirection(m_http);
+        Debug_printv("--- Page moved, pre set redirection");
+        esp_err_t redirRc = esp_http_client_set_redirection(m_http);
+        if(redirRc == ESP_FAIL)
+            return false;
 
-        Debug_printv("--- Page moved, there's should be %d bytes ready to read, redir=%d", m_length, redir);
+        Debug_printv("--- Page moved, pre open");
 
         esp_http_client_set_method(m_http, HTTP_METHOD_GET);
-        esp_err_t initOk = esp_http_client_open(m_http, 0); // or open? It's not entirely clear...
-        esp_http_client_fetch_headers(m_http);
-        int httpCode = esp_http_client_get_status_code(m_http);
+        esp_err_t openRc = esp_http_client_open(m_http, 0); // or open? It's not entirely clear...
+        if(openRc == ESP_FAIL)
+            return false;
 
-        // char* temp = new char[m_length];
+        //Debug_printv("--- Page moved, pre fetch header");
 
-        // esp_http_client_read(m_http, temp, m_length);
-
-        // delete[] temp;
-
-        // Debug_printv("--- post read");
-
-        // m_bytesAvailable = m_length;
-
-        // // int cl = esp_http_client_get_content_length(m_http);
-        // httpCode = esp_http_client_get_status_code(m_http);
-        // Debug_printv("--- End redirect processing, httpCode=%d, bytes avail=%d, fetching new headers", httpCode, m_bytesAvailable);
-
-        // m_length = esp_http_client_fetch_headers(m_http);
+        //m_length = esp_http_client_fetch_headers(m_http);
     }
     
     if(httpCode != HttpStatus_Ok && httpCode != 301) {
@@ -595,27 +589,27 @@ esp_err_t HttpIStream::_http_event_handler(esp_http_client_event_t *evt)
 
                 char* temp = nullptr;
 
-                if(evt->data != nullptr) {
-                    temp = new char[evt->data_len+1];
-                    memcpy(temp, evt->data, evt->data_len);
-                    temp[evt->data_len] = 0x00;
-                }
+                // if(evt->data != nullptr) {
+                //     temp = new char[evt->data_len+1];
+                //     memcpy(temp, evt->data, evt->data_len);
+                //     temp[evt->data_len] = 0x00;
+                // }
                 
-                if ((status == HttpStatus_Found || status == HttpStatus_MovedPermanently) /*&& client->_redirect_count < (client->_max_redirects - 1)*/)
-                {
-                    //int flushed;
-                    //esp_http_client_flush_response(istream->m_http, &flushed);
-                    //("HTTP_EVENT_ON_DATA: This is redirect, eating data (%d):", flushed);
-                    Debug_printv("============================================================");
-                    Debug_printv("HTTP_EVENT_ON_DATA: response %s", temp);
-                    Debug_printv("============================================================");
-                }
-                else {
-                    Debug_printv("HTTP_EVENT_ON_DATA: got this data:");
-                    Debug_printv("============================================================");
-                    Debug_printv("HTTP_EVENT_ON_DATA: response %s", temp);
-                    Debug_printv("============================================================");
-                }
+                // if ((status == HttpStatus_Found || status == HttpStatus_MovedPermanently) /*&& client->_redirect_count < (client->_max_redirects - 1)*/)
+                // {
+                //     //int flushed;
+                //     //esp_http_client_flush_response(istream->m_http, &flushed);
+                //     //("HTTP_EVENT_ON_DATA: This is redirect, eating data (%d):", flushed);
+                //     Debug_printv("============================================================");
+                //     Debug_printv("HTTP_EVENT_ON_DATA: response %s", temp);
+                //     Debug_printv("============================================================");
+                // }
+                // else {
+                //     Debug_printv("HTTP_EVENT_ON_DATA: got this data:");
+                //     Debug_printv("============================================================");
+                //     Debug_printv("HTTP_EVENT_ON_DATA: response %s", temp);
+                //     Debug_printv("============================================================");
+                // }
 
                 if (esp_http_client_is_chunked_response(evt->client)) {
                     int len;
