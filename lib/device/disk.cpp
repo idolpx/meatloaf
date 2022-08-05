@@ -881,7 +881,7 @@ void iecDisk::sendFile()
 			sendFileNotFound();
 			return;
 		}
-		Debug_printv("istream created!");
+		Debug_printv("istream created! length[%d] avail[%d]", istream->size(), istream->available());
 
 		// Position file pointer
 		i = currentChannel.cursor;

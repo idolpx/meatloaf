@@ -281,6 +281,7 @@ MFileSystem::~MFileSystem() {}
 
 MFile::MFile(std::string path) {
     parseUrl(path);
+    Debug_printv("url[%s]", url.c_str());
 }
 
 MFile::MFile(std::string path, std::string name) : MFile(path + "/" + name) {}

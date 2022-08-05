@@ -26,10 +26,22 @@ bool MLIStream::open() {
     // 2. if you need to process some headers, use this lambda:
     client.setOnHeader([this](char* header, char* value) {
         // did we receive ml_media_header?
-         if(strcmp("ml_media_header", header)==0) {
+        if(strcmp("ml_media_header", header)==0) {
             // assign this header value to something
             this->url = value;
-         }
+        }
+        if(strcmp("ml_media_header", header)==0) {
+            // assign this header value to something
+            this->url = value;
+        }
+        if(strcmp("ml_media_header", header)==0) {
+            // assign this header value to something
+            this->url = value;
+        }
+        if(strcmp("ml_media_header", header)==0) {
+            // assign this header value to something
+            this->url = value;
+        }
         return ESP_OK;
     });
     return client.GET(url);

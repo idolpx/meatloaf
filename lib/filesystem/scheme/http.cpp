@@ -178,13 +178,16 @@ bool MeatHttpClient::HEAD(std::string dstUrl) {
 
 bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
     url = dstUrl;
+    wasRedirected = false;
 
+    Debug_printv("url[%s]", url.c_str());
     int httpCode = tryOpen(meth);
 
     while(httpCode == HttpStatus_MovedPermanently || httpCode == HttpStatus_Found || httpCode == 303)
     {
         Debug_printv("--- Page moved, doing redirect");
         httpCode = tryOpen(meth);
+        wasRedirected = true;
     }
     
     if(httpCode != HttpStatus_Ok && httpCode != 301) {
@@ -293,6 +296,11 @@ size_t MeatHttpClient::write(const uint8_t* buf, size_t size) {
 };
 
 int MeatHttpClient::tryOpen(esp_http_client_method_t meth) {
+
+    Debug_printv("url[%s]", url.c_str());
+    if ( url.size() < 5)
+        return 0;
+
     mstr::replaceAll(url, "HTTP:", "http:");
     esp_http_client_config_t config = {
         .url = url.c_str(),
@@ -317,7 +325,7 @@ int MeatHttpClient::tryOpen(esp_http_client_method_t meth) {
         return 0;
 
     // Debug_printv("--- PRE FETCH HEADERS")
-    m_length = 0;
+    m_length = -1;
     m_bytesAvailable = 0;
 
     int lengthResp = esp_http_client_fetch_headers(m_http);
@@ -386,28 +394,28 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
             else {
                 meatClient->onHeader(evt->header_key, evt->header_value);
             }
-
             break;
 
         case HTTP_EVENT_ON_DATA: // Occurs multiple times when receiving body data from the server. MAY BE SKIPPED IF BODY IS EMPTY!
-            Debug_printv("HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
+            //Debug_printv("HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
             {
                 int status = esp_http_client_get_status_code(meatClient->m_http);
 
                 if ((status == HttpStatus_Found || status == HttpStatus_MovedPermanently || status == 303) /*&& client->_redirect_count < (client->_max_redirects - 1)*/)
                 {
-                    Debug_printv("HTTP_EVENT_ON_DATA: Redirect response body, ignoring");
+                    //Debug_printv("HTTP_EVENT_ON_DATA: Redirect response body, ignoring");
                 }
                 else {
-                    Debug_printv("HTTP_EVENT_ON_DATA: Got response body");
+                    //Debug_printv("HTTP_EVENT_ON_DATA: Got response body");
                 }
+
 
                 if (esp_http_client_is_chunked_response(evt->client)) {
                     int len;
                     esp_http_client_get_chunk_length(evt->client, &len);
-                    meatClient->m_length += len;
-                    meatClient->m_bytesAvailable += len;
-                    Debug_printv("HTTP_EVENT_ON_DATA: Got chunked response, len=%d", meatClient->m_length);
+                    //meatClient->m_length += len;
+                    meatClient->m_bytesAvailable = len;
+                    //Debug_printv("HTTP_EVENT_ON_DATA: Got chunked response, chunklen=%d, contentlen[%d]", len, meatClient->m_length);
                 }
             }
             break;

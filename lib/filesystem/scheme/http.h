@@ -20,9 +20,12 @@ class MeatHttpClient {
     };
 
 public:
-    bool open(std::string url, esp_http_client_method_t meth);
     bool GET(std::string url);
+    bool POST(std::string url);
     bool PUT(std::string url);
+    bool HEAD(std::string url);
+
+    bool open(std::string url, esp_http_client_method_t meth);
     void close();
     void setOnHeader(const std::function<int(char*, char*)> &f);
     bool seek(size_t pos);
@@ -34,6 +37,7 @@ public:
     size_t m_position = 0;
     bool isText = false;
     bool isFriendlySkipper = false;
+    bool wasRedirected = false;
     std::string url;
 
 };
@@ -50,8 +54,8 @@ public:
         Debug_printv("C++, if you try to call this, be damned!");
     };
     HttpFile(std::string path): MFile(path) { 
-        parseUrl(path); 
-    };
+        Debug_printv("url[%s]", url.c_str());
+     };
     HttpFile(std::string path, std::string filename): MFile(path) {};
 
     bool isDirectory() override;
@@ -78,7 +82,9 @@ public:
 class HttpIOStream: public MIStream, MOStream {
 
 public:
-    HttpIOStream(std::string& path) {};
+    HttpIOStream(std::string& path) {
+        url = path;
+    };
     ~HttpIOStream() {
         close();
     };
@@ -102,7 +108,9 @@ protected:
 class HttpIStream: public MIStream {
 
 public:
-    HttpIStream(std::string path) {};
+    HttpIStream(std::string path) {
+        url = path;
+    };
     ~HttpIStream() {
         close();
     };

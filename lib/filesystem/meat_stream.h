@@ -37,6 +37,7 @@ public:
 
     virtual bool isOpen() = 0;
 
+    bool isDir = false;
     bool isText = false;
 };
 
