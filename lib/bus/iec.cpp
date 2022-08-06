@@ -74,7 +74,7 @@ device_state_t iecDevice::queue_command ( void )
         device_state = DEVICE_TALK;
     }
 
-    // Debug_printv("DEV primary[%.2X] secondary[%.2X] device[%d], channel[%d] command[%s] ", this->data.primary, this->data.secondary, this->data.device, this->data.channel, this->data.device_command.c_str());
+    // Debug_printf("DEV primary[%.2X] secondary[%.2X] device[%d], channel[%d] command[%s] ", this->data.primary, this->data.secondary, this->data.device, this->data.channel, this->data.device_command.c_str());
 
     return device_state;
 }
@@ -83,11 +83,11 @@ device_state_t iecDevice::queue_command ( void )
 bool iecDevice::process ( void )
 {
     // IEC.protocol.pull ( PIN_IEC_SRQ );
-    // Debug_printv ( "bus_state[%d]", IEC.bus_state );
+    // Debug_printf ( "bus_state[%d]", IEC.bus_state );
 
     Debug_printf ( "DEVICE: [%.2d] ", this->data.device );
 
-    // Debug_printv("DEV primary[%.2X] secondary[%.2X] device[%d], channel[%d] command[%s] ", this->data.primary, this->data.secondary, this->data.device, this->data.channel, this->data.device_command.c_str());
+    // Debug_printf("DEV primary[%.2X] secondary[%.2X] device[%d], channel[%d] command[%s] ", this->data.primary, this->data.secondary, this->data.device, this->data.channel, this->data.device_command.c_str());
 
     if ( this->data.secondary == IEC_OPEN )
     {
@@ -120,14 +120,14 @@ bool iecDevice::process ( void )
             if ( this->data.channel != CMD_CHANNEL )
             {
                 // Receive data
-                // Debug_printv ( "[Receive data]" );
+                // Debug_printf ( "[Receive data]" );
                 handleListenData();
             }
         }
         else if ( device_state == DEVICE_TALK )
         {
             // Send data
-            // Debug_printv ( "[Send data]" );
+            // Debug_printf ( "[Send data]" );
             handleTalk ( this->data.channel );
         }
         // IEC.protocol.release(PIN_IEC_SRQ);
@@ -141,7 +141,7 @@ bool iecDevice::process ( void )
         this->data.init(); // Clear device command        
     }
 
-    //Debug_printv("DEV device[%d] channel[%d] state[%d] command[%s]", this->data.device, this->data.channel, m_openState, this->data.device_command.c_str());
+    //Debug_printf("DEV device[%d] channel[%d] state[%d] command[%s]", this->data.device, this->data.channel, m_openState, this->data.device_command.c_str());
     // IEC.protocol.release ( PIN_IEC_SRQ );
 
     return true;
@@ -149,16 +149,16 @@ bool iecDevice::process ( void )
 
 void iecDevice::handleOpen( void )
 {
-	// Debug_printv("OPEN Named Channel (%.2d Device) (%.2d Channel)", this->data.device, this->data.channel);
+	// Debug_printf("OPEN Named Channel (%.2d Device) (%.2d Channel)", this->data.device, this->data.channel);
 	currentChannel = channelSelect();
     currentChannel.cursor = 0;
-    // Debug_printv("cursor[%d]", currentChannel.cursor);
+    // Debug_printf("cursor[%d]", currentChannel.cursor);
 } // handleOpen
 
 
 void iecDevice::handleClose( void )
 {
-	// Debug_printv("CLOSE Named Channel (%.2d Device) (%.2d Channel)", this->data.device, this->data.channel);
+	// Debug_printf("CLOSE Named Channel (%.2d Device) (%.2d Channel)", this->data.device, this->data.channel);
 
 	// If writing update BAM & Directory
 	if (currentChannel.writing) {
@@ -176,7 +176,7 @@ Channel iecDevice::channelSelect ( void )
 
     if ( channels.find ( key ) != channels.end() )
     {
-        // Debug_printv("key[%d]", key);
+        // Debug_printf("key[%d]", key);
         return channels.at ( key );
     }
 
@@ -185,7 +185,7 @@ Channel iecDevice::channelSelect ( void )
     newChannel.url = this->data.device_command;
     newChannel.cursor = 1;
     newChannel.writing = false;
-    // Debug_printv ( "CHANNEL device[%d] channel[%d] url[%s]", this->data.device, this->data.channel, this->data.device_command.c_str() );
+    // Debug_printf ( "CHANNEL device[%d] channel[%d] url[%s]", this->data.device, this->data.channel, this->data.device_command.c_str() );
 
     channels.insert ( std::make_pair ( key, newChannel ) );
     return newChannel;
@@ -196,7 +196,7 @@ void iecDevice::channelUpdate ( size_t cursor )
     currentChannel.cursor = cursor;
     size_t key = ( this->data.device * 100 ) + this->data.channel;
     channels[key].cursor = cursor;
-    // Debug_printv("key[%d] cursor[%d]", key, cursor);
+    // Debug_printf("key[%d] cursor[%d]", key, cursor);
 }
 
 bool iecDevice::channelClose ( bool close_all )
@@ -205,7 +205,7 @@ bool iecDevice::channelClose ( bool close_all )
 
     if ( channels.find ( key ) != channels.end() )
     {
-        // Debug_printv("key[%d]", key);
+        // Debug_printf("key[%d]", key);
         return channels.erase ( key );
     }
 
@@ -316,7 +316,7 @@ void iecBus::service ( void )
             return;
         }
 
-        Debug_printv ( "IEC Reset!" );
+        Debug_printf ( "IEC Reset!" );
         this->data.init(); // Clear bus data
         this->bus_state = BUS_IDLE;
 
@@ -342,7 +342,7 @@ void iecBus::service ( void )
         // Check for error
         if ( c == 0xFFFFFFFF || protocol.flags bitand ERROR )
         {
-            Debug_printv ( "Error reading command" );
+            Debug_printf ( "Error reading command" );
             this->bus_state = BUS_ERROR;
         }
         else
@@ -421,7 +421,7 @@ void iecBus::service ( void )
                     break; 
             }
 
-            // Debug_printv ( "code[%.2X] primary[%.2X] secondary[%.2X] bus[%d]", command, this->data.primary, this->data.secondary, this->bus_state );
+            // Debug_printf ( "code[%.2X] primary[%.2X] secondary[%.2X] bus[%d]", command, this->data.primary, this->data.secondary, this->bus_state );
 
             // Is this command for us?
             if ( !isDeviceEnabled( this->data.device ) )
@@ -436,8 +436,8 @@ void iecBus::service ( void )
         if ( this->bus_state < BUS_ACTIVE )
             releaseLines();
 
-        // Debug_printv ( "code[%.2X] primary[%.2X] secondary[%.2X] bus[%d]", command, this->data.primary, this->data.secondary, this->bus_state );
-        // Debug_printv( "primary[%.2X] secondary[%.2X] bus_state[%d]", this->data.primary, this->data.secondary, this->bus_state );
+        // Debug_printf ( "code[%.2X] primary[%.2X] secondary[%.2X] bus[%d]", command, this->data.primary, this->data.secondary, this->bus_state );
+        // Debug_printf( "primary[%.2X] secondary[%.2X] bus_state[%d]", this->data.primary, this->data.secondary, this->bus_state );
         // protocol.release ( PIN_IEC_SRQ );
     }
 
@@ -445,17 +445,17 @@ void iecBus::service ( void )
     {
         // protocol.pull( PIN_IEC_SRQ );
         // Debug_println ( "DATA MODE" );
-        // Debug_printv ( "bus[%d] device[%d] primary[%d] secondary[%d]", this->bus_state, this->device_state, this->data.primary, this->data.secondary );
+        // Debug_printf ( "bus[%d] device[%d] primary[%d] secondary[%d]", this->bus_state, this->device_state, this->data.primary, this->data.secondary );
 
         // Data Mode - Get Command or Data
         if ( this->data.primary == IEC_LISTEN )
         {
-            // Debug_printv( "deviceListen" );
+            // Debug_printf( "deviceListen" );
             this->bus_state = deviceListen();
         }
         else if ( this->data.primary == IEC_TALK )
         {
-            // Debug_printv( "deviceTalk" );
+            // Debug_printf( "deviceTalk" );
             this->bus_state = deviceTalk();   
         }
 
@@ -482,19 +482,19 @@ void iecBus::service ( void )
 
         this->bus_state = BUS_IDLE;
 
-        // Debug_printv( "primary[%.2X] secondary[%.2X] bus_state[%d]", this->data.primary, this->data.secondary, this->bus_state );
-        // Debug_printv( "atn[%d] clk[%d] data[%d] srq[%d]", IEC.protocol.status(PIN_IEC_ATN), IEC.protocol.status(PIN_IEC_CLK_IN), IEC.protocol.status(PIN_IEC_DATA_IN), IEC.protocol.status(PIN_IEC_SRQ));
+        // Debug_printf( "primary[%.2X] secondary[%.2X] bus_state[%d]", this->data.primary, this->data.secondary, this->bus_state );
+        // Debug_printf( "atn[%d] clk[%d] data[%d] srq[%d]", IEC.protocol.status(PIN_IEC_ATN), IEC.protocol.status(PIN_IEC_CLK_IN), IEC.protocol.status(PIN_IEC_DATA_IN), IEC.protocol.status(PIN_IEC_SRQ));
         // protocol.release ( PIN_IEC_SRQ );
     }
 
 
-    //Debug_printv("command[%.2X] device[%.2d] secondary[%.2d] channel[%.2d]", this->data.primary, this->data.device, this->data.secondary, this->data.channel);
+    //Debug_printf("command[%.2X] device[%.2d] secondary[%.2d] channel[%.2d]", this->data.primary, this->data.device, this->data.secondary, this->data.channel);
 } // service
 
 bus_state_t iecBus::deviceListen ( void )
 {
     // Okay, we will listen.
-    // Debug_printv( "secondary[%d] channel[%d]", this->data.secondary, this->data.channel );
+    // Debug_printf( "secondary[%d] channel[%d]", this->data.secondary, this->data.channel );
 
     // If the command is SECONDARY and it is not to expect just a small command on the command channel, then
     // we're into something more heavy. Otherwise read it all out right here until UNLISTEN is received.
@@ -518,7 +518,7 @@ bus_state_t iecBus::deviceListen ( void )
 
             if ( protocol.flags bitand ERROR )
             {
-                Debug_printv ( "Some other command [%.2X]", c );
+                Debug_printf ( "Some other command [%.2X]", c );
                 return BUS_ERROR;
             }
 
@@ -551,14 +551,14 @@ bus_state_t iecBus::deviceListen ( void )
     // CLOSE Named Channel
     else if ( this->data.secondary == IEC_CLOSE )
     {
-        // Debug_printv(" (E0 CLOSE) (%d CHANNEL)\r\n", this->data.channel);
+        // Debug_printf(" (E0 CLOSE) (%d CHANNEL)\r\n", this->data.channel);
         return BUS_PROCESS;
     }
 
     // Unknown
     else
     {
-        Debug_printv ( " OTHER (%.2X COMMAND) (%.2X CHANNEL) ", this->data.secondary, this->data.channel );
+        Debug_printf ( " OTHER (%.2X COMMAND) (%.2X CHANNEL) ", this->data.secondary, this->data.channel );
         return BUS_ERROR;
     }
 }
@@ -603,7 +603,7 @@ bool iecBus::turnAround ( void )
     // Wait until the computer releases the ATN line
     if ( protocol.timeoutWait ( PIN_IEC_ATN, RELEASED, FOREVER ) == TIMED_OUT )
     {
-        Debug_printv("Wait until the computer releases the ATN line");
+        Debug_printf("Wait until the computer releases the ATN line");
         protocol.flags or_eq ERROR;
         return -1; // return error because timeout
     }
@@ -614,7 +614,7 @@ bool iecBus::turnAround ( void )
     // Wait until the computer releases the clock line
     if ( protocol.timeoutWait ( PIN_IEC_CLK_IN, RELEASED, FOREVER ) == TIMED_OUT )
     {
-        Debug_printv ( "Wait until the computer releases the clock line" );
+        Debug_printf ( "Wait until the computer releases the clock line" );
         protocol.flags or_eq ERROR;
         return -1; // return error because timeout
     }
@@ -641,7 +641,7 @@ bool iecBus::undoTurnAround ( void )
     // Wait until the computer releases the clock line
     if ( protocol.timeoutWait ( PIN_IEC_CLK_IN, RELEASED, FOREVER ) == TIMED_OUT )
     {
-        Debug_printv ( "Wait until the computer releases the clock line" );
+        Debug_printf ( "Wait until the computer releases the clock line" );
         protocol.flags or_eq ERROR;
         return -1; // return error because timeout
     }
@@ -658,7 +658,7 @@ void iecBus::releaseLines ( bool wait )
     // Wait for ATN to release and quit
     if ( wait )
     {
-        //Debug_printv("Waiting for ATN to release");
+        //Debug_printf("Waiting for ATN to release");
         IEC.protocol.timeoutWait ( PIN_IEC_ATN, RELEASED, FOREVER );
     }
 
@@ -771,7 +771,7 @@ void iecBus::disableDevice ( const uint8_t deviceNumber )
 
 void iecBus::setup()
 {
-    //Debug_println("IEC SETUP");
+    // Debug_println("IEC SETUP");
 
     // Setup interrupt for ATN
     gpio_config_t io_conf = {

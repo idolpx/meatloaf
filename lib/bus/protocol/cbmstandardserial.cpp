@@ -375,7 +375,7 @@ int16_t CBMStandardSerial::timeoutWait ( uint8_t pin, bool target_status, size_t
     if ( atn_status )
         flags or_eq ATN_PULLED;
 
-    pull ( PIN_IEC_SRQ );
+    // pull ( PIN_IEC_SRQ );
     while ( status ( pin ) != target_status )
     {
 
@@ -387,7 +387,7 @@ int16_t CBMStandardSerial::timeoutWait ( uint8_t pin, bool target_status, size_t
 
         if ( elapsed > wait && wait != FOREVER )
         {
-            release ( PIN_IEC_SRQ );
+            //release ( PIN_IEC_SRQ );
             return -1;
         }
 
@@ -405,8 +405,8 @@ int16_t CBMStandardSerial::timeoutWait ( uint8_t pin, bool target_status, size_t
             }            
         }
     }
+    // release ( PIN_IEC_SRQ );
 
-    release ( PIN_IEC_SRQ );
     // Debug_printv("pin[%d] state[%d] wait[%d] step[%d] t[%d]", pin, target_status, wait, elapsed);
     return elapsed;
 } // timeoutWait

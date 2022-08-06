@@ -3,6 +3,9 @@
 #include <esp32/spiram.h>
 #include <esp32/himem.h>
 #include <driver/gpio.h>
+#include <esp_console.h>
+#include "linenoise/linenoise.h"
+
 
 #include "../include/global_defines.h"
 #include "../include/debug.h"
@@ -141,7 +144,7 @@ void main_setup()
     //runTestsSuite();
     //lfs_test();
 #ifdef DEBUG_TIMING
-    Serial.println( ANSI_GREEN_BOLD "DEBUG_TIMING enabled" ANSI_RESET );
+    Debug_printv( ANSI_GREEN_BOLD "DEBUG_TIMING enabled" ANSI_RESET );
 #endif
 }
 
@@ -165,6 +168,26 @@ void fn_service_loop(void *param)
     }
 }
 
+void fn_console_loop(void *param)
+{
+    esp_console_config_t  config = {
+        .max_cmdline_length = 80,
+        .max_cmdline_args = 10
+    };
+
+    esp_err_t e = esp_console_init(&config);
+
+    char* line;
+
+    if(e == ESP_OK) {
+        while((line = linenoise("hello> ")) != NULL) {
+            printf("You wrote: %s\n", line);
+            linenoiseFree(line); /* Or just free(line) if you use libc malloc. */
+        }
+    }
+
+    esp_console_deinit();
+}
 /*
  * This is the start/entry point for an ESP-IDF program (must use "C" linkage)
  */
@@ -184,6 +207,9 @@ extern "C"
         xTaskCreatePinnedToCore(fn_service_loop, "fnLoop",
                                 MAIN_STACKSIZE, nullptr, MAIN_PRIORITY, nullptr, MAIN_CPUAFFINITY);
 
+    
+        // xTaskCreatePinnedToCore(fn_console_loop, "fnConsole", 
+        //                         4096, nullptr, 1, nullptr, 0);
         // Sit here twiddling our thumbs
         while (true)
             vTaskDelay(9000 / portTICK_PERIOD_MS);

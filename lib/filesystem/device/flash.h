@@ -97,12 +97,12 @@ private:
 
 class FlashHandle {
 public:
-    int rc;
+    //int rc;
     FILE* file_h;
 
-    FlashHandle() : rc(-255) 
+    FlashHandle() 
     {
-        //Serial.println("*** Creating flash handle");
+        //Debug_printv("*** Creating flash handle");
         memset(&file_h, 0, sizeof(file_h));
     };
     ~FlashHandle();

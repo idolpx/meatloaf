@@ -88,7 +88,8 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
     &p00FS,
     &d64FS, &d71FS, &d80FS, &d81FS, &d82FS, &d8bFS, &dnpFS,
     &t64FS, &tcrtFS,
-    &httpFS, &mlFS, &ipfsFS, &tnfsFS
+    &httpFS, &mlFS, &ipfsFS,
+    &tnfsFS
 };
 
 bool MFSOwner::mount(std::string name) {
@@ -99,7 +100,7 @@ bool MFSOwner::mount(std::string name) {
         auto fs = (*i);
 
         if(fs->handles(name)) {
-                Serial.println("MFSOwner found a proper fs");
+                Debug_printv("MFSOwner found a proper fs");
 
             bool ok = fs->mount();
 
@@ -471,48 +472,33 @@ MFile* MFile::cd(std::string newDir) {
     }
 };
 
-// bool MFile::copyTo(MFile* dst) {
-//     auto istream = Meat::ifstream(this);
-//     auto ostream = Meat::ofstream(dst);
+bool MFile::copyTo(MFile* dst) {
+    Debug_printv("in copyTo\n");
+    Meat::ifstream istream(this);
+    Meat::ofstream ostream(dst);
 
-//     int rc;
+    int rc;
 
-//     istream.open();
-//     ostream.open();
+    Debug_printv("in copyTo, iopen=%d oopen=%d\n", istream.is_open(), ostream.is_open());
 
-//     //Debug_printv("in copyTo, iopen=%d oopen=%d", istream.is_open(), ostream.is_open());
+    if(!istream.is_open() || !ostream.is_open())
+        return false;
 
-//     if(!istream.is_open() || !ostream.is_open())
-//         return false;
+    Debug_printv("commencing copy\n");
 
-//     //Debug_printv("commencing copy");
+    while((rc = istream.get())!= EOF) {     
+        ostream.put(rc);
+        if(ostream.bad() || istream.bad())
+            return false;
+    }
 
-//     while((rc = istream.get())!= EOF) {     
-//         //Serial.print(".");
-//         ostream.put(rc);
-//         if(ostream.bad() || istream.bad())
-//             return false;
-//     }
+    Debug_printv("copying finished, rc=%d\n", rc);
 
-//     //Debug_printv("copying finished, rc=%d", rc);
-
-//     return true;
-// };
+    return true;
+};
 
 uint64_t MFile::getAvailableSpace()
 {
-//   struct statvfs stat;
-
-//   if (statvfs(path.c_str(), &stat) != 0) {
-//     // error happens, just quits here
-//     return -1;
-//   }
-
-//   // the available size is f_bsize * f_bavail
-//   return stat.f_bsize * stat.f_bavail;
-
-    //Debug_printv("path[%s]", path.c_str());
-
     if ( mstr::startsWith(path, (char *)"/sd") )
     {
         FATFS* fsinfo;

@@ -186,7 +186,7 @@ MFile* iecDisk::getPointed(MFile* urlFile) {
 
     if( !istream.is_open() ) 
 	{
-        Debug_printf("couldn't open stream of urlfile");
+        Debug_printv("couldn't open stream of urlfile");
 		return nullptr;
     }
 	else 
@@ -896,7 +896,7 @@ void iecDisk::sendFile()
 			sendFileNotFound();
 			return;
 		}
-		Debug_printv("istream created!");
+		Debug_printv("istream created! length[%d] avail[%d]", istream->size(), istream->available());
 
 		// Position file pointer
 		i = currentChannel.cursor;
@@ -949,6 +949,20 @@ void iecDisk::sendFile()
 					load_address += 8;
 				}
 #endif
+
+				// Exit if ATN is PULLED while sending
+				if ( IEC.protocol.flags bitand ATN_PULLED )
+				{
+					Debug_printv("ATN pulled while sending. i[%d]", i);
+
+					// Save file pointer position
+					channelUpdate( --i );
+					setDeviceStatus( 74 );
+					success = true;
+					return;
+				}
+
+
 				if ( ++i == len )
 				{
 					success = IEC.sendEOI(b); // indicate end of file.
@@ -1066,7 +1080,7 @@ void iecDisk::saveFile()
 		}
 
 
-		Debug_printf("saveFile: [%s] [$%.4X]\r\n=================================\r\n", file->url.c_str(), load_address);
+		Debug_printv("saveFile: [%s] [$%.4X]\r\n=================================\r\n", file->url.c_str(), load_address);
 
 		// Recieve bytes until a EOI is detected
 		do
@@ -1084,7 +1098,7 @@ void iecDisk::saveFile()
 #ifdef DATA_STREAM
 			if (bi == 0)
 			{
-				Debug_printf(":%.4X ", load_address);
+				Debug_printv(":%.4X ", load_address);
 				load_address += 8;
 			}
 #endif
@@ -1114,7 +1128,7 @@ void iecDisk::saveFile()
 
 			if(bi == 8)
 			{
-				Debug_printf(" %s (%d)\r\n", ba, i);
+				Debug_printv(" %s (%d)\r\n", ba, i);
 				bi = 0;
 			}
 #endif
@@ -1127,7 +1141,7 @@ void iecDisk::saveFile()
     }
     ostream->close(); // nor required, closes automagically
 
-	Debug_printf("=================================\r\n%d bytes saved\r\n", i);
+	Debug_printv("=================================\r\n%d bytes saved\r\n", i);
 	fnLedManager.set(eLed::LED_BUS, true);
 
 	// TODO: Handle errorFlag
