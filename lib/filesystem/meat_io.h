@@ -492,7 +492,6 @@ namespace Meat {
     class ifstream : public std::istream {
         imfilebuf buff;
         std::string url; 
-        bool isTranslating = false;
 
     public:
 
@@ -502,11 +501,9 @@ namespace Meat {
 
         ifstream(std::string u) : std::ios(0),  std::istream( &buff ), url(u) {
             auto f = MFSOwner::File(u);
-            isTranslating = mstr::isText(f->extension);
             delete f;
         };
         ifstream(MFile* file) : std::ios(0),  std::istream( &buff ), url(file->url) {
-            isTranslating = mstr::isText(file->extension);
         };
 
         ~ifstream() {
