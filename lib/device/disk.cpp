@@ -814,30 +814,21 @@ void iecDisk::sendFile()
 
 	// TODO!!!! you should check istream for nullptr here and return error immediately if null
 
-
-	if
-	(
-		mstr::equals(file->extension, (char*)"txt", false) ||
-		mstr::equals(file->extension, (char*)"htm", false) ||
-		mstr::equals(file->extension, (char*)"html", false)
-	)
+	if(file->isText())
 	{
-		// convert UTF8 files on the fly
-
+		// it's a text file, so let's convert UTF8 files on the fly to PETSCII
 		Debug_printv("Sending a text file to C64 [%s]", file->url.c_str());
-        //std::unique_ptr<LinedReader> reader(new LinedReader(istream.get()));
 		auto istream = Meat::ifstream(file.get());
 		auto ostream = oiecstream();
 
-
 		istream.open();
-		ostream.open(&IEC);
-
 
 		if(!istream.is_open()) {
 			sendFileNotFound();
 			return;
 		}
+
+		ostream.open(&IEC);
 
 		// Position file pointer
 		//istream->seek(currentChannel.cursor);

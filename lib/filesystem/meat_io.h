@@ -77,6 +77,13 @@ public:
     virtual size_t size() = 0;
     virtual uint64_t getAvailableSpace();
 
+    virtual bool isText() {
+        return
+            (mstr::equals(extension, (char*)"txt", false) ||
+            mstr::equals(extension, (char*)"htm", false) ||
+            mstr::equals(extension, (char*)"html", false));
+    }
+
     MFile* streamFile = nullptr;
     std::string pathInStream;
 
