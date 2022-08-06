@@ -309,13 +309,13 @@ namespace Meat {
         };
 
         std::streampos seekpos(std::streampos __pos, std::ios_base::openmode __mode = std::ios_base::in | std::ios_base::out) override {
-            Debug_printv("Seek called on mistream ***TODO*** - reset markers!!!: %d", (int)__pos);
             std::streampos __ret = std::streampos(off_type(-1));
 
             if(mistream->seek(__pos)) {
                 //__ret.state(_M_state_cur);
                 __ret = std::streampos(off_type(__pos));
                 // probably requires resetting setg!
+                this->setg(data, data, data);
             }
 
             return __ret;
@@ -436,6 +436,20 @@ namespace Meat {
             
             return ch;
         };
+
+
+        std::streampos seekpos(std::streampos __pos, std::ios_base::openmode __mode = std::ios_base::in | std::ios_base::out) override {
+            std::streampos __ret = std::streampos(off_type(-1));
+
+            if(mostream->seek(__pos)) {
+                //__ret.state(_M_state_cur);
+                __ret = std::streampos(off_type(__pos));
+                // probably requires resetting setg!
+                this->setp(data, data+1024);
+            }
+
+            return __ret;
+        }
 
 
         /**
