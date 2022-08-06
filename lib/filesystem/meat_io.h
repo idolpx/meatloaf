@@ -432,7 +432,7 @@ namespace Meat {
             } else if ( ch == EOF ) {
                 ch = 0;
             }
-            this->setp(data, data+1024);
+            this->setp(data, data+obufsize);
             
             return ch;
         };
@@ -445,7 +445,7 @@ namespace Meat {
                 //__ret.state(_M_state_cur);
                 __ret = std::streampos(off_type(__pos));
                 // probably requires resetting setg!
-                this->setp(data, data+1024);
+                this->setp(data, data+obufsize);
             }
 
             return __ret;
@@ -485,7 +485,7 @@ namespace Meat {
                 auto result = mostream->write(buffer, this->pptr()-this->pbase()); 
                 //Debug_printv("%d bytes left in buffer written to sink, rc=%d", pptr()-pbase(), result);
 
-                this->setp(data, data+1024);
+                this->setp(data, data+obufsize);
 
                 return (result != 0) ? 0 : -1;  
             }  
