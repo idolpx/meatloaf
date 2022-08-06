@@ -11,7 +11,7 @@ class MeatSocket {
 
 public:
     MeatSocket() {};
-    MeatSocket(int s) : sock(s) {
+    MeatSocket(int s, uint8_t iecp) : sock(s), iecPort(iecp) {
         // for socket created by our server
     }
 
@@ -79,6 +79,7 @@ public:
 class MeatSocketServer {
     bool isAlive = false;
     int port = 0;
+    uint8_t iecPort = 0;
 
     void start(int p) {
         port = p;
@@ -168,9 +169,11 @@ class MeatSocketServer {
 
             // do_retransmit(sock);
             //
-            // we'll do this here instead:
-            // auto newSock = new MeatSocket(sock);
-            // openSockets.Add(newSock);
+            // we'll do this here instead: add a new socket that starts one IEC port above server or currently open ports
+            // if(openSocket.count < 9) {
+            //  auto newSock = new MeatSocket(sock, iecPort + openSocket.count +1);
+            //  openSockets.Add(newSock);
+            // }
             // purgeClosedSockets();
 
 
