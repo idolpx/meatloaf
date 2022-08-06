@@ -1009,6 +1009,7 @@ void iecDisk::saveFile()
 
 	//std::unique_ptr<MOStream> ostream(file->outputStream());
 	auto ostream = Meat::ofstream(m_filename);
+	ostream.open();
 
 	// TODO - do not convert if we're writing this text to a native container
 	bool isText = file->isText();
