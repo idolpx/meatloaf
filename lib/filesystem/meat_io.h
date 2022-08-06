@@ -78,10 +78,7 @@ public:
     virtual uint64_t getAvailableSpace();
 
     virtual bool isText() {
-        return
-            (mstr::equals(extension, (char*)"txt", false) ||
-            mstr::equals(extension, (char*)"htm", false) ||
-            mstr::equals(extension, (char*)"html", false));
+        return mstr::isText(extension);
     }
 
     MFile* streamFile = nullptr;
