@@ -1064,9 +1064,9 @@ void iecDisk::saveFile()
 
 			b[0] = IEC.receive();
 			if(isText)
-				ostream.write((char *)b, b_len);
-			else
 				ostream.putPetscii(b[0]);
+			else
+				ostream.write((char *)b, b_len);
 			i++;
 
 			uint8_t f = IEC.protocol.flags;
