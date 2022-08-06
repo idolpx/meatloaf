@@ -47,10 +47,7 @@
 #ifndef MEATFILE_DEFINES_IPFS_H
 #define MEATFILE_DEFINES_IPFS_H
 
-//#include "meat_io.h"
-#include "http.h"
-
-#include "fnHttpClient.h"
+#include "scheme/http.h"
 
 #include "peoples_url_parser.h"
 
@@ -64,43 +61,10 @@
 class IPFSFile: public HttpFile {
 
 public:
-    IPFSFile(std::string path, size_t size = 0, bool isDir = false):
-    HttpFile(path), m_size(size), m_isDir(isDir)
-    {
-        parseUrl(path);
-        //Debug_printv("path[%s] size[%d] is_dir[%d]", path.c_str(), size, isDir);
-    };
-    ~IPFSFile();
+    IPFSFile(std::string path): HttpFile(path) {};
+    ~IPFSFile() {};
 
-    bool isDirectory() override;
-    //void openDir(const char *path) override;
-    bool rewindDirectory() override;
-    MFile* getNextFileInDir() override;
-    MIStream* inputStream() override ; // file on ML server = standard HTTP file available via GET
-
-    //MOStream* outputStream() override ; // we can't write to ML server, can we?
-    //time_t getLastWrite() override ; // you can implement it if you want
-    //time_t getCreationTime() override ; // you can implement it if you want
-    //bool mkDir() override { return false; }; // we can't write to ML server, can we?
-    //bool exists() override { return true; };
-    size_t size() override { return m_size; };
-    //bool remove() override { return false; }; // we can't write to ML server, can we?
-    //bool rename(std::string dest) { return false; }; // we can't write to ML server, can we?
-    //MIStream* createIStream(std::shared_ptr<MIStream> src); // not used anyway
-
-    //std::string mediaRoot();
-
-protected:
-    bool dirIsOpen = false;
-    std::string m_lineBuffer;
-
-//    WiFiClient m_file;
-    fnHttpClient m_http;
-
-    StaticJsonDocument<256> m_jsonHTTP;
-
-    size_t m_size = 0;
-    bool m_isDir = false;
+    MIStream* inputStream() override; // file on IPFS server = standard HTTP file available via GET
 };
 
 
@@ -111,39 +75,10 @@ protected:
 class IPFSIStream: public HttpIStream {
 
 public:
-    IPFSIStream(std::string path) :
-    HttpIStream(path)
-    {
-        m_http.set_header("user-agent", USER_AGENT);
-        //m_http.setTimeout(10000);
-        //m_http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
-        //m_http.setRedirectLimit(10);
-        url = path;
-    }
-    ~IPFSIStream() {
-        close();
-    }
+    IPFSIStream(std::string path) : HttpIStream(path) {};
+    ~IPFSIStream() {};
 
-    // MStream methods
-    // size_t position() override;
-    // void close() override;
     bool open() override;
-
-
-    // MIStream methods
-    // int available() override;
-    // size_t read(uint8_t* buf, size_t size) override;
-    // bool isOpen();
-
-// protected:
-//     std::string url;
-//     bool m_isOpen;
-//     int m_length;
-//     WiFiClient m_file;
-//     HTTPClient m_http;
-//     int m_bytesAvailable = 0;
-//     int m_position = 0;
-//     bool isFriendlySkipper = false;
 };
 
 
@@ -166,6 +101,5 @@ class IPFSFileSystem: public MFileSystem
 public:
     IPFSFileSystem(): MFileSystem("ipfs") {};
 };
-
 
 #endif // MEATFILE_DEFINES_IPFS_H

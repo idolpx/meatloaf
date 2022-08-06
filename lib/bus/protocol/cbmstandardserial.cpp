@@ -210,6 +210,9 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
 {
     flags = CLEAR;
 
+    // // Sometimes the C64 doesn't release ATN right away
+    // if ( !wait ( 200 ) ) return -1;
+
     // Say we're ready
     release ( PIN_IEC_CLK_OUT );
 
