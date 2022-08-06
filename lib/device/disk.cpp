@@ -1007,10 +1007,13 @@ void iecDisk::saveFile()
 	std::unique_ptr<MFile> file(MFSOwner::File(m_filename));
 	Debug_printv("[%s]", file->url.c_str());
 
-	std::unique_ptr<MOStream> ostream(file->outputStream());
+	//std::unique_ptr<MOStream> ostream(file->outputStream());
+	auto ostream = Meat::ofstream(m_filename);
 
+	// TODO - do not convert if we're writing this text to a native container
+	bool isText = file->isText();
 
-    if(!ostream->isOpen()) {
+    if(!ostream.is_open()) {
         Debug_printv("couldn't open a stream for writing");
 		// TODO: Set status and sendFNF
 		sendFileNotFound();
@@ -1023,7 +1026,7 @@ void iecDisk::saveFile()
 		if ( currentChannel.cursor > 0 )
 		{
 			// Position file pointer
-			ostream->seek(currentChannel.cursor);
+			ostream.seekp(currentChannel.cursor);
 		}
 		else
 		{
@@ -1044,8 +1047,8 @@ void iecDisk::saveFile()
 			if (i == 0)
 			{
 				Debug_print("[");
-				ostream->write(ll, b_len);
-				ostream->write(lh, b_len);
+				ostream.write((char *)ll, b_len);
+				ostream.write((char *)lh, b_len);
 				i += 2;
 				Debug_println("]");
 			}
@@ -1059,7 +1062,10 @@ void iecDisk::saveFile()
 #endif
 
 			b[0] = IEC.receive();
-			ostream->write(b, b_len);
+			if(isText)
+				ostream.write((char *)b, b_len);
+			else
+				ostream.putPetscii(b[0]);
 			i++;
 
 			uint8_t f = IEC.protocol.flags;
@@ -1069,7 +1075,7 @@ void iecDisk::saveFile()
 			if ( f bitand ATN_PULLED )
 			{
 				// Save file pointer position
-				channelUpdate(ostream->position());
+				channelUpdate(ostream.tellp());
 				//setDeviceStatus(74);
 				break;
 			}
@@ -1094,7 +1100,7 @@ void iecDisk::saveFile()
 			}
 		} while (not done);
     }
-    ostream->close(); // nor required, closes automagically
+    ostream.close(); // not required, closes automagically
 
 	Debug_printv("=================================\r\n%d bytes saved\r\n", i);
 	fnLedManager.set(eLed::LED_BUS, true);
