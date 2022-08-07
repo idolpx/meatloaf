@@ -14,12 +14,9 @@ MIStream* IPFSFile::inputStream() {
 
 
 bool IPFSIStream::open() {
-    PeoplesUrlParser urlParser;
-    urlParser.parseUrl(url);
-
-    std::string ml_url = "https://dweb.link/" + urlParser.name;
-    url = ml_url;
-    
-    Debug_printv("url[%s]", url.c_str());
     return m_http.GET(url);
 };
+
+bool IPFSIStream::seek(size_t pos) {
+    return true;
+}
