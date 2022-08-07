@@ -66,7 +66,7 @@ void iecDisk::sendStatus(void)
 	//Debug_printv("status: {%s}", status.c_str());
 	//Debug_print("[");
 
- 	size_t bytes_sent = IEC.send(status, currentChannel.cursor);
+ 	size_t bytes_sent = IEC.send(status, currentStream.cursor);
 	Debug_printv("len[%d] bytes_sent[%d]", status.length(), bytes_sent);
 	if ( bytes_sent == status.length() )
 	{
@@ -74,7 +74,7 @@ void iecDisk::sendStatus(void)
 	}
 	else
 	{
-		channelUpdate(bytes_sent);
+		streamUpdate(bytes_sent);
 	}
 	
 	//Debug_println(BACKSPACE "]");
@@ -522,7 +522,7 @@ uint16_t iecDisk::sendLine(uint16_t &basicPtr, uint16_t blocks, const char *form
 	if ( IEC.bus_state == BUS_ERROR )
 	{
 		// Save file pointer position
-		//channelUpdate(basicPtr);
+		//streamUpdate(basicPtr);
 		setDeviceStatus(74);
 		return 0;
 	}
@@ -546,7 +546,7 @@ uint16_t iecDisk::sendLine(uint16_t &basicPtr, uint16_t blocks, char *text)
 	if ( IEC.bus_state == BUS_ERROR )
 	{
 		// Save file pointer position
-		// channelUpdate(basicPtr);
+		// streamUpdate(basicPtr);
 		setDeviceStatus(74);
 		return 0;
 	}
@@ -748,7 +748,7 @@ void iecDisk::sendListing()
 			if ( IEC.bus_state == BUS_ERROR )
 			{
 				// Save file pointer position
-				// channelUpdate(byte_count);
+				// streamUpdate(byte_count);
 				setDeviceStatus(74);
 				return;
 			}
@@ -798,7 +798,35 @@ uint16_t iecDisk::sendFooter(uint16_t &basicPtr)
 }
 
 
-void iecDisk::sendFile()
+std::unique_ptr<MIStream> iecDisk::fileOpen()
+{
+	// Update device database
+	device_config.save();
+
+	std::unique_ptr<MFile> file(MFSOwner::File(m_filename));
+
+	if(!file->exists())
+	{
+		Debug_printv("File Not Found! [%s]", file->name.c_str());
+		sendFileNotFound();
+		return;
+	}
+	Debug_printv("Sending File [%s]", file->name.c_str());
+
+	std::unique_ptr<MIStream> istream(file->inputStream());
+
+	if( istream == nullptr )
+	{
+		Debug_printv("Error creating istream");
+		sendFileNotFound();
+		return;
+	}
+	Debug_printv("istream created! length[%d] avail[%d]", istream->size(), istream->available());
+
+	return istream;
+}
+
+bool iecDisk::sendFile()
 {
 	size_t i = 0;
 	bool success = true;
@@ -816,46 +844,13 @@ void iecDisk::sendFile()
 	// Update device database
 	device_config.save();
 
-	std::unique_ptr<MFile> file(MFSOwner::File(m_filename));
-
-	if(!file->exists())
-	{
-		Debug_printv("File Not Found! [%s]", file->name.c_str());
-		sendFileNotFound();
-		return;
-	}
-	Debug_printv("Sending File [%s]", file->name.c_str());
-
-
 	// TODO!!!! you should check istream for nullptr here and return error immediately if null
 
-
-	if
-	(
-		mstr::equals(file->extension, (char*)"txt", false) ||
-		mstr::equals(file->extension, (char*)"htm", false) ||
-		mstr::equals(file->extension, (char*)"html", false)
-	)
+	if ( currentStream.istream.isText() )
 	{
 		// convert UTF8 files on the fly
 
 		Debug_printv("Sending a text file to C64 [%s]", file->url.c_str());
-        //std::unique_ptr<LinedReader> reader(new LinedReader(istream.get()));
-		auto istream = Meat::ifstream(file.get());
-		auto ostream = oiecstream();
-
-
-		istream.open();
-		ostream.open(&IEC);
-
-
-		if(!istream.is_open()) {
-			sendFileNotFound();
-			return;
-		}
-
-		// Position file pointer
-		//istream->seek(currentChannel.cursor);
 
 		//we can skip the BOM here, EF BB BF for UTF8
 		auto b = (char)istream.get();
@@ -883,24 +878,9 @@ void iecDisk::sendFile()
 				break;
             }
 		}
-		ostream.close();
-		istream.close();
 	}
 	else
 	{
-		std::unique_ptr<MIStream> istream(file->inputStream());
-
-		if( istream == nullptr )
-		{
-			Debug_printv("Error creating istream");
-			sendFileNotFound();
-			return;
-		}
-		Debug_printv("istream created! length[%d] avail[%d]", istream->size(), istream->available());
-
-		// Position file pointer
-		i = currentChannel.cursor;
-		istream->seek(i);
 
 		if( IEC.data.channel == 0 )
 		{
@@ -921,12 +901,16 @@ void iecDisk::sendFile()
 		size_t len = istream->size();
 		size_t avail = istream->available();
 
-		//Debug_printv("len[%d] avail[%d] cursor[%d] success[%d]", len, avail, currentChannel.cursor, success);
+		//Debug_printv("len[%d] avail[%d] cursor[%d] success[%d]", len, avail, currentStream.cursor, success);
 
 		Debug_printf("sendFile: [%s] [$%.4X] (%d bytes)\r\n=================================\r\n", file->url.c_str(), load_address, len);
-		while( i < len && success )
+		while( avail && success )
 		{
+			// Read Byte
 			success = istream->read(&b, 1);
+			if ( !success )
+				Debug_printv("fail");
+
 			// Debug_printv("b[%02X] success[%d]", b, success);
 			if (success)
 			{
@@ -937,13 +921,19 @@ void iecDisk::sendFile()
 					load_address += 8;
 				}
 #endif
-				if ( ++i == len )
+				// Send Byte
+				if ( avail == 1 )
 				{
 					success = IEC.sendEOI(b); // indicate end of file.
+					if ( !success )
+						Debug_printv("fail");
+					//Debug_printf("eoi sent, i[%d] len[%d] success[%d]", i, len, success );
 				}
 				else
 				{
 					success = IEC.send(b);
+					if ( !success )
+						Debug_printv("fail");					
 				}
 
 #ifdef DATA_STREAM
@@ -970,7 +960,7 @@ void iecDisk::sendFile()
 			{
 				Debug_printv("ATN pulled while sending. i[%d]", i);
 				// Save file pointer position
-				channelUpdate( --i );
+				streamUpdate( istream );
 				setDeviceStatus( 74 );
 				success = true;
 				break;
@@ -983,14 +973,16 @@ void iecDisk::sendFile()
 			}
 
 			avail = istream->available();
+
+			// We got another chunk, update length
 			if ( avail > (len - i) )
 			{
 				len += (avail - (len - i));
 			}
-			//i++;
+
+			i++;
 		}
-		istream->close();
-		Debug_printf("\r\n=================================\r\n%d of %d bytes sent [SYS%d]\r\n", i, len, sys_address);
+		Debug_printf("\r\n=================================\r\n%d of %d bytes sent of %d [SYS%d]\r\n", i, len, avail, sys_address);
 
 		//Debug_printv("len[%d] avail[%d] success[%d]", len, avail, success);		
 	}
@@ -1002,12 +994,14 @@ void iecDisk::sendFile()
 	{
 		Debug_println("sendFile: Transfer aborted!");
 		// TODO: Send something to signal that there was an error to the C64
-	 	IEC.sendEOI(0);
+	 	// IEC.sendEOI(0);
 	}
+
+	return success;
 } // sendFile
 
 
-void iecDisk::saveFile()
+bool iecDisk::saveFile()
 {
 	size_t i = 0;
 	bool done = false;
@@ -1050,10 +1044,10 @@ void iecDisk::saveFile()
 	{
 	 	// Stream is open!  Let's save this!
 
-		if ( currentChannel.cursor > 0 )
+		if ( currentStream.cursor > 0 )
 		{
 			// Position file pointer
-			ostream->seek(currentChannel.cursor);
+			ostream->seek(currentStream.cursor);
 		}
 		else
 		{
@@ -1099,7 +1093,7 @@ void iecDisk::saveFile()
 			if ( f bitand ATN_PULLED )
 			{
 				// Save file pointer position
-				channelUpdate(ostream->position());
+				streamUpdate(ostream->position());
 				//setDeviceStatus(74);
 				break;
 			}
@@ -1130,6 +1124,8 @@ void iecDisk::saveFile()
 	fnLedManager.set(eLed::LED_BUS, true);
 
 	// TODO: Handle errorFlag
+
+	return success;
 } // saveFile
 
 

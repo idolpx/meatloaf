@@ -21,6 +21,8 @@
 #include <forward_list>
 #include <unordered_map>
 
+#include "meat_io.h"
+
 #include "protocol/cbmstandardserial.h"
 //#include "protocol/jiffydos.h"
 
@@ -68,14 +70,6 @@ class CommandPathTuple
         std::string rawPath;
 };
 
-class Channel
-{
-    public:
-        std::string url;
-        uint32_t cursor;
-        bool writing;
-};
-
 //
 class iecBus; // declare early so can be friend
 
@@ -87,7 +81,7 @@ class iecDevice
     public:
         // Return values for service:
 
-        std::unordered_map<uint16_t, Channel> channels;
+        std::unordered_map<uint16_t, std::unique_ptr<MIStream>> streams;
 
         iecDevice();
         ~iecDevice() {};
@@ -114,10 +108,10 @@ class iecDevice
         virtual void handleClose ( void );
 
         // Named Channel functions
-        Channel currentChannel;
-        Channel channelSelect ( void );
-        void channelUpdate ( size_t cursor );
-        bool channelClose ( bool close_all = false );
+        std::unique_ptr<MIStream> currentStream;
+        std::unique_ptr<MIStream> streamSelect ( void );
+        void streamUpdate ( std::unique_ptr<MIStream> stream );
+        bool streamClose ( bool close_all = false );
 
         // This is set after an open command and determines what to send next
         uint8_t m_openState;

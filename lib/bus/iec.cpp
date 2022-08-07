@@ -150,9 +150,9 @@ bool iecDevice::process ( void )
 void iecDevice::handleOpen( void )
 {
 	// Debug_printf("OPEN Named Channel (%.2d Device) (%.2d Channel)", this->data.device, this->data.channel);
-	currentChannel = channelSelect();
-    currentChannel.cursor = 0;
-    // Debug_printf("cursor[%d]", currentChannel.cursor);
+	currentStream = streamSelect();
+    // Debug_printf("cursor[%d]", currentStream.cursor);
+
 } // handleOpen
 
 
@@ -161,52 +161,48 @@ void iecDevice::handleClose( void )
 	// Debug_printf("CLOSE Named Channel (%.2d Device) (%.2d Channel)", this->data.device, this->data.channel);
 
 	// If writing update BAM & Directory
-	if (currentChannel.writing) {
+	if (currentStream.writing) {
 
 	}
 
 	// Remove channel from map
-	channelClose();
+	streamClose();
 
 } // handleClose
 
-Channel iecDevice::channelSelect ( void )
+std::unique_ptr<MIStream> iecDevice::streamSelect ( void )
 {
     size_t key = ( this->data.device * 100 ) + this->data.channel;
 
-    if ( channels.find ( key ) != channels.end() )
+    if ( streams.find ( key ) != streams.end() )
     {
         // Debug_printf("key[%d]", key);
-        return channels.at ( key );
+        return streams.at ( key );
     }
 
     // create and add channel if not found
-    auto newChannel = Channel();
-    newChannel.url = this->data.device_command;
-    newChannel.cursor = 1;
-    newChannel.writing = false;
+    auto new_stream = MFile::inputStream( m_filename );
     // Debug_printf ( "CHANNEL device[%d] channel[%d] url[%s]", this->data.device, this->data.channel, this->data.device_command.c_str() );
 
-    channels.insert ( std::make_pair ( key, newChannel ) );
-    return newChannel;
+    streams.insert ( std::make_pair ( key, new_stream ) );
+    return new_stream;
 }
 
-void iecDevice::channelUpdate ( size_t cursor )
+void iecDevice::streamUpdate ( std::unique_ptr<MIStream> stream )
 {
-    currentChannel.cursor = cursor;
     size_t key = ( this->data.device * 100 ) + this->data.channel;
-    channels[key].cursor = cursor;
+    streams[key] = stream;
     // Debug_printf("key[%d] cursor[%d]", key, cursor);
 }
 
-bool iecDevice::channelClose ( bool close_all )
+bool iecDevice::streamClose ( bool close_all )
 {
     size_t key = ( this->data.device * 100 ) + this->data.channel;
 
-    if ( channels.find ( key ) != channels.end() )
+    if ( streams.find ( key ) != streams.end() )
     {
         // Debug_printf("key[%d]", key);
-        return channels.erase ( key );
+        return streams.erase ( key );
     }
 
     return false;
@@ -307,21 +303,24 @@ void iecBus::service ( void )
 
     // Check if CBM is sending a reset (setting the RESET line high). This is typically
     // when the CBM is reset itself. In this case, we are supposed to reset all states to initial.
-    if ( protocol.status ( PIN_IEC_RESET ) == PULLED )
+    bool pin_reset = protocol.status ( PIN_IEC_RESET );
+    bool pin_atn = protocol.status ( PIN_IEC_ATN );
+    if ( pin_reset == PULLED )
     {
-        if ( protocol.status ( PIN_IEC_ATN ) == PULLED )
+        if ( pin_atn == PULLED )
         {
             // If RESET & ATN are both PULLED then CBM is off
             this->bus_state = BUS_IDLE;
             return;
         }
 
-        Debug_printf ( "IEC Reset!" );
+        Debug_printf ( "IEC Reset! reset[%d] atn[%d]\r\n", pin_reset, pin_atn );
         this->data.init(); // Clear bus data
         this->bus_state = BUS_IDLE;
 
         // Reset virtual devices
         disk.reset();
+
         return;
     }
 
@@ -329,7 +328,7 @@ void iecBus::service ( void )
 
 
     // Command or Data Mode
-    if ( this->bus_state == BUS_ACTIVE || protocol.status ( PIN_IEC_ATN ) )
+    if ( this->bus_state == BUS_ACTIVE || pin_atn )
     {
         protocol.release ( PIN_IEC_CLK_OUT );
         protocol.pull ( PIN_IEC_DATA_OUT );
@@ -434,7 +433,10 @@ void iecBus::service ( void )
 
         // If the bus is idle then release the lines
         if ( this->bus_state < BUS_ACTIVE )
+        {
             releaseLines();
+            Debug_printv("release lines");
+        }
 
         // Debug_printf ( "code[%.2X] primary[%.2X] secondary[%.2X] bus[%d]", command, this->data.primary, this->data.secondary, this->bus_state );
         // Debug_printf( "primary[%.2X] secondary[%.2X] bus_state[%d]", this->data.primary, this->data.secondary, this->bus_state );
@@ -666,6 +668,11 @@ void iecBus::releaseLines ( bool wait )
     protocol.release ( PIN_IEC_CLK_OUT );
     protocol.release ( PIN_IEC_DATA_OUT );
 
+// #ifndef SPLIT_LINES
+//     protocol.set_pin_mode ( PIN_IEC_CLK_OUT, INPUT );
+//     protocol.set_pin_mode ( PIN_IEC_DATA_OUT, INPUT );
+// #endif
+
     // IEC.protocol.release ( PIN_IEC_SRQ );
 }
 
@@ -704,6 +711,7 @@ bool iecBus::send ( uint8_t data )
     // IEC.protocol.pull(PIN_IEC_SRQ);
     bool r = protocol.sendByte ( data, false ); // Standard CBM Timing
     // IEC.protocol.release(PIN_IEC_SRQ);
+
     return r;
 } // send
 
@@ -732,6 +740,14 @@ bool iecBus::sendEOI ( uint8_t data )
     //IEC.protocol.pull(PIN_IEC_SRQ);
     bool r = protocol.sendByte ( data, true ); // Standard CBM Timing
     //IEC.protocol.release(PIN_IEC_SRQ);
+
+    releaseLines();
+    Debug_printv("release lines");
+    this->bus_state = BUS_IDLE;
+
+    // BETWEEN BYTES TIME
+    delayMicroseconds ( TIMING_Tbb );
+
     return r;
 } // sendEOI
 
@@ -742,12 +758,13 @@ bool iecBus::sendFNF()
 {
     // Message file not found by just releasing lines
     releaseLines();
+    Debug_printv("release lines");
     this->bus_state = BUS_ERROR;
 
     // BETWEEN BYTES TIME
     delayMicroseconds ( TIMING_Tbb );
 
-    Debug_println ( "\r\nFNF Sent!" );
+    Debug_println ( "FNF Sent!" );
     return true;
 } // sendFNF
 

@@ -82,8 +82,10 @@ private:
 	// File LOAD / SAVE
 	void prepareFileStream(std::string url);
 	MFile* getPointed(MFile* urlFile);
-	void sendFile();
-	void saveFile();
+
+	std::unique_ptr<MIStream> fileOpen()
+	bool sendFile();
+	bool saveFile();
 
 	// Device Status
 	std::string m_device_status = "";
