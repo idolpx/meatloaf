@@ -77,6 +77,10 @@ public:
     virtual size_t size() = 0;
     virtual uint64_t getAvailableSpace();
 
+    virtual bool isText() {
+        return mstr::isText(extension);
+    }
+
     MFile* streamFile = nullptr;
     std::string pathInStream;
 
@@ -305,18 +309,17 @@ namespace Meat {
         };
 
         std::streampos seekpos(std::streampos __pos, std::ios_base::openmode __mode = std::ios_base::in | std::ios_base::out) override {
-            Debug_printv("Seek called on mistream ***TODO*** - reset markers!!!: %d", (int)__pos);
             std::streampos __ret = std::streampos(off_type(-1));
 
             if(mistream->seek(__pos)) {
                 //__ret.state(_M_state_cur);
                 __ret = std::streampos(off_type(__pos));
                 // probably requires resetting setg!
+                this->setg(data, data, data);
             }
 
             return __ret;
         }
-
     };
 
 /********************************************************
@@ -429,10 +432,24 @@ namespace Meat {
             } else if ( ch == EOF ) {
                 ch = 0;
             }
-            this->setp(data, data+1024);
+            this->setp(data, data+obufsize);
             
             return ch;
         };
+
+
+        std::streampos seekpos(std::streampos __pos, std::ios_base::openmode __mode = std::ios_base::in | std::ios_base::out) override {
+            std::streampos __ret = std::streampos(off_type(-1));
+
+            if(mostream->seek(__pos)) {
+                //__ret.state(_M_state_cur);
+                __ret = std::streampos(off_type(__pos));
+                // probably requires resetting setg!
+                this->setp(data, data+obufsize);
+            }
+
+            return __ret;
+        }
 
 
         /**
@@ -468,7 +485,7 @@ namespace Meat {
                 auto result = mostream->write(buffer, this->pptr()-this->pbase()); 
                 //Debug_printv("%d bytes left in buffer written to sink, rc=%d", pptr()-pbase(), result);
 
-                this->setp(data, data+1024);
+                this->setp(data, data+obufsize);
 
                 return (result != 0) ? 0 : -1;  
             }  
@@ -485,7 +502,6 @@ namespace Meat {
     class ifstream : public std::istream {
         imfilebuf buff;
         std::string url; 
-        bool isTranslating = false;
 
     public:
 
@@ -495,11 +511,9 @@ namespace Meat {
 
         ifstream(std::string u) : std::ios(0),  std::istream( &buff ), url(u) {
             auto f = MFSOwner::File(u);
-            isTranslating = mstr::isText(f->extension);
             delete f;
         };
         ifstream(MFile* file) : std::ios(0),  std::istream( &buff ), url(file->url) {
-            isTranslating = mstr::isText(file->extension);
         };
 
         ~ifstream() {

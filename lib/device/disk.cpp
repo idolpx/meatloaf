@@ -1025,7 +1025,7 @@ bool iecDisk::saveFile()
 	// std::unique_ptr<MOStream> ostream(file->outputStream());
 	std::shared_ptr<Meat::ofstream> ostream = currentStream;
 
-    if(!ostream->isOpen()) {
+    if(!ostream.is_open()) {
         Debug_printv("couldn't open a stream for writing");
 		// TODO: Set status and sendFNF
 		sendFileNotFound();
@@ -1059,8 +1059,8 @@ bool iecDisk::saveFile()
 			if (i == 0)
 			{
 				Debug_print("[");
-				ostream->write(ll, b_len);
-				ostream->write(lh, b_len);
+				ostream.write((char *)ll, b_len);
+				ostream.write((char *)lh, b_len);
 				i += 2;
 				Debug_println("]");
 			}
@@ -1074,7 +1074,10 @@ bool iecDisk::saveFile()
 #endif
 
 			b[0] = IEC.receive();
-			ostream->write(b, b_len);
+			if(isText)
+				ostream.putPetscii(b[0]);
+			else
+				ostream.write((char *)b, b_len);
 			i++;
 
 			uint8_t f = IEC.protocol.flags;

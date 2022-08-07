@@ -4,10 +4,24 @@
  * File impls
  ********************************************************/
 
+MeatHttpClient* HttpFile::formHeader() {
+    if(client == nullptr) {
+        client = new MeatHttpClient();
+
+        // let's just get the headers so we have some info
+        client->HEAD(url);
+    }
+    return client;
+}
+
 bool HttpFile::isDirectory() {
-    // try webdav PROPFIND to get a listing
-    // otherwise return false
-    return false;
+    if(formHeader()->m_isWebDAV) {
+        // try webdav PROPFIND to get a listing
+        return false;
+    }
+    else
+        // otherwise return false
+        return false;
 }
 
 MIStream* HttpFile::inputStream() {
@@ -29,62 +43,74 @@ MIStream* HttpFile::createIStream(std::shared_ptr<MIStream> is) {
 }
 
 time_t HttpFile::getLastWrite() {
+    if(formHeader()->m_isWebDAV) {
+        return 0;
+    }
+    else
     // take from webdav PROPFIND or fallback to Last-Modified
-    return 0; 
+        return 0; 
 }
 
 time_t HttpFile::getCreationTime() {
+    if(formHeader()->m_isWebDAV) {
+        return 0;
+    }
+    else
     // take from webdav PROPFIND or fallback to Last-Modified
-    return 0;
+        return 0; 
 }
 
 bool HttpFile::exists() {
-    // try webdav PROPFIND to get a listing
-    // or fallback to opening the stream
-    // std::unique_ptr<MIStream> test(inputStream());
-    // // remember that MIStream destuctor should close the stream!
-    // return test->isOpen();
-
-    return true;
+    return formHeader()->m_exists;
 }
 
 size_t HttpFile::size() {
-    // we may take content-lenght from header if exists
-
-    // try webdav PROPFIND to get a listing
-    // or 
-    // fallback to opening the stream
-    std::unique_ptr<MIStream> test(inputStream());
-    size_t size = 0;
-    if(test->isOpen())
-        size = test->available();
-
-    test->close();
-
-    return size;
+    if(formHeader()->m_isWebDAV) {
+        // take from webdav PROPFIND
+        return 0;
+    }
+    else
+        // fallback to what we had from the header
+        return formHeader()->m_length;
 }
 
 bool HttpFile::remove() {
-    // PROPPATCH allows deletion
+    if(formHeader()->m_isWebDAV) {
+        // PROPPATCH allows deletion
+        return false;
+    }
     return false;
 }
 
 bool HttpFile::mkDir() {
-    // MKCOL creates dir
+    if(formHeader()->m_isWebDAV) {
+        // MKCOL creates dir
+        return false;
+    }
     return false;
 }
 
-bool HttpFile::rewindDirectory() { 
-    // we can try if this is webdav, then
-    // PROPFIND allows listing dir
+bool HttpFile::rewindDirectory() {
+    if(formHeader()->m_isWebDAV) { 
+        // we can try if this is webdav, then
+        // PROPFIND allows listing dir
+        return false;
+    }
     return false; 
 };
 
 MFile* HttpFile::getNextFileInDir() { 
-    // we can try if this is webdav, then
-    // PROPFIND allows listing dir
+    if(formHeader()->m_isWebDAV) {
+        // we can try if this is webdav, then
+        // PROPFIND allows listing dir
+        return nullptr;
+    }
     return nullptr; 
 };
+
+bool HttpFile::isText() {
+    return formHeader()->isText;
+}
 
 /********************************************************
  * Ostream impls
@@ -173,7 +199,9 @@ bool MeatHttpClient::PUT(std::string dstUrl) {
 }
 
 bool MeatHttpClient::HEAD(std::string dstUrl) {
-    return open(dstUrl, HTTP_METHOD_HEAD);
+    bool rc = open(dstUrl, HTTP_METHOD_HEAD);
+    close();
+    return rc;
 }
 
 bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
@@ -196,7 +224,10 @@ bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
         return false;
     }
 
+
+    // TODO - set m_isWebDAV somehow
     m_isOpen = true;
+    m_exists = true;
     m_position = 0;
     lastMethod = meth;
 
