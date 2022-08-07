@@ -388,12 +388,25 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
             }
             else if(strcmp("Location", evt->header_key)==0)
             {
-                Debug_printv("* This page redirects to '%s'", evt->header_value);
-                meatClient->url = evt->header_value;
+                Debug_printv("* This page redirects from '%s' to '%s'", meatClient->url.c_str(), evt->header_value);
+                char *pattern = "http";
+                if ( mstr::startsWith(evt->header_value, pattern) )
+                {
+                    Debug_printv("match");
+                    meatClient->url = evt->header_value;
+                }
+                else
+                {
+                    Debug_printv("no match");
+                    meatClient->url += evt->header_value;                    
+                }
+
+                Debug_printv("new url '%s'", meatClient->url.c_str());
             }
-            else {
-                meatClient->onHeader(evt->header_key, evt->header_value);
-            }
+
+            // Allow override in lambda
+            meatClient->onHeader(evt->header_key, evt->header_value);
+
             break;
 
         case HTTP_EVENT_ON_DATA: // Occurs multiple times when receiving body data from the server. MAY BE SKIPPED IF BODY IS EMPTY!

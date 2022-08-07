@@ -179,8 +179,11 @@ class HttpFileSystem: public MFileSystem
     }
 
     bool handles(std::string name) {
-        std::string pattern = "http:";
-        return mstr::equals(name, pattern, false);
+        if ( mstr::equals(name, "http:", false) )
+            return true;
+        if ( mstr::equals(name, "https:", false) )
+            return true;
+        return false;
     }
 public:
     HttpFileSystem(): MFileSystem("http") {};
