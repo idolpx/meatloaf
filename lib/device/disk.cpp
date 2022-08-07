@@ -59,6 +59,7 @@ void iecDisk::sendFileNotFound(void)
 
 void iecDisk::sendStatus(void)
 {
+	static size_t position = 0;
 	std::string status = m_device_status;
 	if (status.size() == 0)
 		status = "00, OK,00,00";
@@ -66,15 +67,16 @@ void iecDisk::sendStatus(void)
 	//Debug_printv("status: {%s}", status.c_str());
 	//Debug_print("[");
 
- 	size_t bytes_sent = IEC.send(status, currentStream.cursor);
+ 	size_t bytes_sent = IEC.send(status, position);
 	Debug_printv("len[%d] bytes_sent[%d]", status.length(), bytes_sent);
 	if ( bytes_sent == status.length() )
 	{
 		m_device_status.clear();
+		position = 0;
 	}
 	else
 	{
-		streamUpdate(bytes_sent);
+		position = bytes_sent;
 	}
 	
 	//Debug_println(BACKSPACE "]");
@@ -798,7 +800,7 @@ uint16_t iecDisk::sendFooter(uint16_t &basicPtr)
 }
 
 
-std::unique_ptr<MIStream> iecDisk::fileOpen()
+std::shared_ptr<Meat::ifstream> iecDisk::fileOpen()
 {
 	// Update device database
 	device_config.save();
@@ -809,17 +811,17 @@ std::unique_ptr<MIStream> iecDisk::fileOpen()
 	{
 		Debug_printv("File Not Found! [%s]", file->name.c_str());
 		sendFileNotFound();
-		return;
+		return nullptr;
 	}
 	Debug_printv("Sending File [%s]", file->name.c_str());
 
-	std::unique_ptr<MIStream> istream(file->inputStream());
+	std::shared_ptr<Meat::ifstream> istream(file->inputStream());
 
 	if( istream == nullptr )
 	{
 		Debug_printv("Error creating istream");
 		sendFileNotFound();
-		return;
+		return nullptr;
 	}
 	Debug_printv("istream created! length[%d] avail[%d]", istream->size(), istream->available());
 
@@ -845,41 +847,42 @@ bool iecDisk::sendFile()
 	device_config.save();
 
 	// TODO!!!! you should check istream for nullptr here and return error immediately if null
+	std::shared_ptr<Meat::ifstream> istream = currentStream;
 
-	if ( currentStream.istream.isText() )
-	{
-		// convert UTF8 files on the fly
+	// if ( istream.isText() )
+	// {
+	// 	// convert UTF8 files on the fly
 
-		Debug_printv("Sending a text file to C64 [%s]", file->url.c_str());
+	// 	Debug_printv("Sending a text file to C64 [%s]", file->url.c_str());
 
-		//we can skip the BOM here, EF BB BF for UTF8
-		auto b = (char)istream.get();
-		if(b != 0xef)
-			ostream.put(b);
-		else {
-			b = istream.get();
-			if(b != 0xbb)
-				ostream.put(b);
-			else {
-				b = istream.get();
-				if(b != 0xbf)
-					ostream.put(b); // not BOM
-			}
-		}
+	// 	//we can skip the BOM here, EF BB BF for UTF8
+	// 	auto b = (char)istream.get();
+	// 	if(b != 0xef)
+	// 		ostream.put(b);
+	// 	else {
+	// 		b = istream.get();
+	// 		if(b != 0xbb)
+	// 			ostream.put(b);
+	// 		else {
+	// 			b = istream.get();
+	// 			if(b != 0xbf)
+	// 				ostream.put(b); // not BOM
+	// 		}
+	// 	}
 
-		while(!istream.eof()) {
-			auto cp = istream.getUtf8();
+	// 	while(!istream.eof()) {
+	// 		auto cp = istream.getUtf8();
 
-			ostream.putUtf8(&cp);
+	// 		ostream.putUtf8(&cp);
 
-			if(ostream.bad() || istream.bad()) {
-				Debug_printv("Error sending");
-                setDeviceStatus(60); // write error
-				break;
-            }
-		}
-	}
-	else
+	// 		if(ostream.bad() || istream.bad()) {
+	// 			Debug_printv("Error sending");
+    //             setDeviceStatus(60); // write error
+	// 			break;
+    //         }
+	// 	}
+	// }
+	// else
 	{
 
 		if( IEC.data.channel == 0 )
@@ -960,7 +963,7 @@ bool iecDisk::sendFile()
 			{
 				Debug_printv("ATN pulled while sending. i[%d]", i);
 				// Save file pointer position
-				streamUpdate( istream );
+				// streamUpdate( istream );
 				setDeviceStatus( 74 );
 				success = true;
 				break;
@@ -1004,6 +1007,7 @@ bool iecDisk::sendFile()
 bool iecDisk::saveFile()
 {
 	size_t i = 0;
+	bool success = true;
 	bool done = false;
 
 	size_t bi = 0;
@@ -1018,36 +1022,23 @@ bool iecDisk::saveFile()
 	ba[8] = '\0';
 #endif
 
-	// mstr::toASCII(m_filename);
-	std::unique_ptr<MFile> file(MFSOwner::File(m_filename));
-	Debug_printv("[%s]", file->url.c_str());
+	// std::unique_ptr<MOStream> ostream(file->outputStream());
+	std::shared_ptr<Meat::ofstream> ostream = currentStream;
 
-	// create folder /sd/.save/MD5{file->streamFile}/file->name
-
-	if(file == nullptr)
-	{
-	    Debug_printv("can't create file [%s]", m_filename.c_str());
-		// TODO: Set status and sendFNF
-		sendFileNotFound();
-        return;	
-	}
-
-
-	std::unique_ptr<MOStream> ostream(file->outputStream());
     if(!ostream->isOpen()) {
         Debug_printv("couldn't open a stream for writing");
 		// TODO: Set status and sendFNF
 		sendFileNotFound();
-        return;
+        return false;
     }
     else
 	{
 	 	// Stream is open!  Let's save this!
 
-		if ( currentStream.cursor > 0 )
+		if ( ostream->position() > 0 )
 		{
-			// Position file pointer
-			ostream->seek(currentStream.cursor);
+			// // Position file pointer
+			// ostream->seek(currentStream.cursor);
 		}
 		else
 		{
@@ -1059,7 +1050,7 @@ bool iecDisk::saveFile()
 		}
 
 
-		Debug_printv("saveFile: [%s] [$%.4X]\r\n=================================\r\n", file->url.c_str(), load_address);
+		Debug_printv("saveFile: [%s] [$%.4X]\r\n=================================\r\n", ostream->getUrl().c_str(), load_address);
 
 		// Recieve bytes until a EOI is detected
 		do
@@ -1093,7 +1084,7 @@ bool iecDisk::saveFile()
 			if ( f bitand ATN_PULLED )
 			{
 				// Save file pointer position
-				streamUpdate(ostream->position());
+				// streamUpdate(ostream->position());
 				//setDeviceStatus(74);
 				break;
 			}
@@ -1118,7 +1109,7 @@ bool iecDisk::saveFile()
 			}
 		} while (not done);
     }
-    ostream->close(); // nor required, closes automagically
+    // ostream->close(); // nor required, closes automagically
 
 	Debug_printv("=================================\r\n%d bytes saved\r\n", i);
 	fnLedManager.set(eLed::LED_BUS, true);

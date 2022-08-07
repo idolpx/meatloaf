@@ -161,16 +161,16 @@ void iecDevice::handleClose( void )
 	// Debug_printf("CLOSE Named Channel (%.2d Device) (%.2d Channel)", this->data.device, this->data.channel);
 
 	// If writing update BAM & Directory
-	if (currentStream.writing) {
+//	if (currentStream.writing) {
 
-	}
+//	}
 
 	// Remove channel from map
 	streamClose();
 
 } // handleClose
 
-std::unique_ptr<MIStream> iecDevice::streamSelect ( void )
+std::unique_ptr<std::basic_ios> iecDevice::streamSelect ( void )
 {
     size_t key = ( this->data.device * 100 ) + this->data.channel;
 
@@ -181,18 +181,11 @@ std::unique_ptr<MIStream> iecDevice::streamSelect ( void )
     }
 
     // create and add channel if not found
-    auto new_stream = MFile::inputStream( m_filename );
+    auto new_stream = Meat::ifstream( m_filename );
     // Debug_printf ( "CHANNEL device[%d] channel[%d] url[%s]", this->data.device, this->data.channel, this->data.device_command.c_str() );
 
     streams.insert ( std::make_pair ( key, new_stream ) );
     return new_stream;
-}
-
-void iecDevice::streamUpdate ( std::unique_ptr<MIStream> stream )
-{
-    size_t key = ( this->data.device * 100 ) + this->data.channel;
-    streams[key] = stream;
-    // Debug_printf("key[%d] cursor[%d]", key, cursor);
 }
 
 bool iecDevice::streamClose ( bool close_all )

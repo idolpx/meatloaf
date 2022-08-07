@@ -83,7 +83,7 @@ private:
 	void prepareFileStream(std::string url);
 	MFile* getPointed(MFile* urlFile);
 
-	std::unique_ptr<MIStream> fileOpen()
+	std::shared_ptr<Meat::ifstream> fileOpen();
 	bool sendFile();
 	bool saveFile();
 

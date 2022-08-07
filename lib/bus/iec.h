@@ -81,7 +81,7 @@ class iecDevice
     public:
         // Return values for service:
 
-        std::unordered_map<uint16_t, std::unique_ptr<MIStream>> streams;
+        std::unordered_map<uint16_t, Meat::ifstream*> streams;
 
         iecDevice();
         ~iecDevice() {};
@@ -108,9 +108,8 @@ class iecDevice
         virtual void handleClose ( void );
 
         // Named Channel functions
-        std::unique_ptr<MIStream> currentStream;
-        std::unique_ptr<MIStream> streamSelect ( void );
-        void streamUpdate ( std::unique_ptr<MIStream> stream );
+        std::shared_ptr<Meat::ifstream> currentStream;
+        std::shared_ptr<Meat::ifstream> streamSelect ( void );
         bool streamClose ( bool close_all = false );
 
         // This is set after an open command and determines what to send next
