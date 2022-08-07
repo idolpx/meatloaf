@@ -51,7 +51,7 @@ public:
 
 class HttpFile: public MFile {
     MeatHttpClient* formHeader();
-    MeatHttpClient* client;
+    MeatHttpClient* client = nullptr;
 
 public:
     HttpFile() {
