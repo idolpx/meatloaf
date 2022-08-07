@@ -71,9 +71,9 @@ public:
     }
 
     int underflow() override {
-        //_printv("In underflow");
+        Debug_printv("In underflow");
         if (!m_wifi.isOpen()) {
-            //Debug_printv("In connection closed");
+            Debug_printv("In connection closed");
             close();
             return std::char_traits<char>::eof();
         }
@@ -82,13 +82,19 @@ public:
             int attempts = 5;
             int wait = 500;
             
-            while(!(readCount = m_wifi.read((uint8_t*)gbuf, 512)) && (attempts--)>0 && m_wifi.isOpen()) {
-                //Debug_printv("read attempt");
+            readCount = m_wifi.read((uint8_t*)gbuf, 512);
+
+            while( readCount <= 0 && (attempts--)>0 && m_wifi.isOpen()) {
+                Debug_printv("got rc: %d, retrying", readCount);
                 fnSystem.delay(wait);
                 wait+=100;
+                readCount = m_wifi.read((uint8_t*)gbuf, 512);
             } 
-            //Debug_printv("readcount: %d, %s", readCount, gbuf);
+            Debug_printv("read success: %d", readCount);
             this->setg(gbuf, gbuf, gbuf + readCount);
+        }
+        else {
+            Debug_printv("else: %d - %d, (%d)", this->gptr(), this->egptr(), this->gbuf);
         }
 
         return this->gptr() == this->egptr()

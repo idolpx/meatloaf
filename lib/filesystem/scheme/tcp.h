@@ -46,6 +46,8 @@ public:
             Debug_printv("Socket unable to connect: errno %d", errno);
             return false;
         }
+
+        return true;
     }
 
     void close() {
@@ -66,8 +68,10 @@ public:
         // BSD_ERROR_WOULDBLOCK and then we can poll again, that's what we want
         // TODO - check what's the value of BSD_ERROR_WOULDBLOCK and if recv returns
         // error - mark this socket closed
-        if(!isOpen())
-            return -1;
+        if(!isOpen()) {
+            Debug_println("tcp read - NOT OPEN!\n");
+            return -100;
+        }
         return recv(sock, buffer, bufsize, MSG_DONTWAIT); // MSG_DONTWAIT instead of 0 switches to non-blocking mode
     }
 
@@ -101,7 +105,6 @@ class MeatSocketServer {
         int keepIdle = 10;
         int keepInterval = 5;
         int keepCount = 5;
-        struct sockaddr_storage dest_addr;
         char addr_str[128];
         
         int port = meatServer->port;
