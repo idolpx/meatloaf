@@ -51,6 +51,89 @@ void iecDisk::reset ( void )
 } // reset
 
 
+
+bool iecDisk::process ( void )
+{
+    // IEC.protocol.pull ( PIN_IEC_SRQ );
+    // Debug_printf ( "bus_state[%d]", IEC.bus_state );
+
+    Debug_printf ( "DEVICE: [%.2d] ", this->data.device );
+
+    // Debug_printf("DEV primary[%.2X] secondary[%.2X] device[%d], channel[%d] command[%s] ", this->data.primary, this->data.secondary, this->data.device, this->data.channel, this->data.device_command.c_str());
+
+    if ( this->data.secondary == IEC_OPEN )
+    {
+        Debug_printf ( "OPEN CHANNEL %d\r\n", this->data.channel );
+
+        bool isOpen = false;
+
+        if ( this->data.channel == 0 ) {
+            Debug_printf ( "LOAD \"%s\",%d\r\n", this->data.device_command.c_str(), this->data.device );
+            isOpen = registerStream(std::ios_base::in, m_filename);
+        }
+        else if ( IEC.data.channel == 1 ) {
+            Debug_printf ( "SAVE \"%s\",%d\r\n", this->data.device_command.c_str(), this->data.device );
+            isOpen = registerStream(std::ios_base::out, m_filename);
+        }
+        else
+        {
+            Debug_printf ( "OPEN #,%d,%d,\"%s\"\r\n", this->data.device, this->data.channel, this->data.device_command.c_str() );
+            // here we have to decide if we read, write or r/w the file, but for time being, we'll be just reading, so:
+            isOpen = registerStream(std::ios_base::in, m_filename);
+        }
+        device_config.save();
+
+
+        // Open Named Channel
+        if(isOpen) {
+        // Open either file or prg for reading, writing or single line command on the command channel.
+            currentStream = retrieveStream();
+            handleListenCommand();        
+        }
+        else {
+    		sendFileNotFound();
+        }
+    }
+    else if ( this->data.secondary == IEC_DATA )
+    {
+
+        // Open either file or prg for reading, writing or single line command on the command channel.
+        handleListenCommand(); 
+
+        // IEC.protocol.pull(PIN_IEC_SRQ);
+        if ( device_state == DEVICE_LISTEN )
+        {
+            if ( this->data.channel != CMD_CHANNEL )
+            {
+                // Receive data
+                // Debug_printf ( "[Receive data]" );
+                handleListenData();
+            }
+        }
+        else if ( device_state == DEVICE_TALK )
+        {
+            // Send data
+            // Debug_printf ( "[Send data]" );
+            handleTalk ( this->data.channel );
+        }
+        // IEC.protocol.release(PIN_IEC_SRQ);
+    }
+    else if ( this->data.secondary == IEC_CLOSE )
+    {
+        Debug_printf ( "CLOSE CHANNEL %d\r\n", this->data.channel );
+
+        closeStream();
+        device_state = DEVICE_IDLE;
+        this->data.init(); // Clear device command        
+    }
+
+    //Debug_printf("DEV device[%d] channel[%d] state[%d] command[%s]", this->data.device, this->data.channel, m_openState, this->data.device_command.c_str());
+    // IEC.protocol.release ( PIN_IEC_SRQ );
+
+    return true;
+} // process
+
+
 void iecDisk::sendFileNotFound(void)
 {
 	setDeviceStatus(62);
@@ -809,6 +892,7 @@ bool iecDisk::sendFile()
 	size_t bi = 0;
 	size_t load_address = 0;
 	size_t sys_address = 0;
+	size_t avail = 0;
 
 #ifdef DATA_STREAM
 	char ba[9];
@@ -819,7 +903,8 @@ bool iecDisk::sendFile()
 	device_config.save();
 
 	// TODO!!!! you should check istream for nullptr here and return error immediately if null
-	std::shared_ptr<MIStream> istream = std::static_pointer_cast<MIStream>(currentStream);
+	// std::shared_ptr<MIStream> istream = std::static_pointer_cast<MIStream>(currentStream);
+	auto istream = retrieveStream();
 
 	// if ( istream.isText() )
 	// {
@@ -861,11 +946,11 @@ bool iecDisk::sendFile()
 		{
 			// Get/Send file load address
 			i = 2;
-			istream->read(&b, 1);
+			istream->read((char *)b, 1);
 			success = IEC.send(b);
 			load_address = b & 0x00FF; // low byte
 			sys_address = b;
-			istream->read((char *)&b, 1);
+			istream->read((char *)b, 1);
 			success = IEC.send(b);
 			load_address = load_address | b << 8;  // high byte
 			sys_address += b * 256;
@@ -990,7 +1075,8 @@ bool iecDisk::saveFile()
 #endif
 
 	// std::unique_ptr<MOStream> ostream(file->outputStream());
-	std::shared_ptr<MOStream> ostream = std::static_pointer_cast<MOStream>(currentStream);;
+	// std::shared_ptr<MOStream> ostream = std::static_pointer_cast<MOStream>(currentStream);
+	auto ostream = retrieveStream();
 
     if(!ostream->isOpen()) {
         Debug_printv("couldn't open a stream for writing");
@@ -1018,7 +1104,7 @@ bool iecDisk::saveFile()
 		}
 
 
-		Debug_printv("saveFile: [%s] [$%.4X]\r\n=================================\r\n", ostream->getUrl().c_str(), load_address);
+		Debug_printv("saveFile: [%s] [$%.4X]\r\n=================================\r\n", ostream->url.c_str(), load_address);
 
 		// Recieve bytes until a EOI is detected
 		do

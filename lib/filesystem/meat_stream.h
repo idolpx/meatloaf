@@ -39,6 +39,7 @@ public:
 
     bool isDir = false;
     bool isText = false;
+    std::string url = "";
 };
 
 class MOStream: public MStream {

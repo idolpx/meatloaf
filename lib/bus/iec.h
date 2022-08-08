@@ -22,6 +22,7 @@
 #include <unordered_map>
 
 #include "meat_io.h"
+#include "meat_stream.h"
 
 #include "protocol/cbmstandardserial.h"
 //#include "protocol/jiffydos.h"
@@ -87,7 +88,7 @@ class iecDevice
         ~iecDevice() {};
 
         device_state_t queue_command ( void );
-        bool process ( void );
+        virtual bool process ( void ) = 0;
 
         virtual uint8_t command ( void ) = 0;
         virtual uint8_t execute ( void ) = 0;
