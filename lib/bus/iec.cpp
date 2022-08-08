@@ -97,16 +97,17 @@ bool iecDevice::process ( void )
 
         if ( this->data.channel == 0 ) {
             Debug_printf ( "LOAD \"%s\",%d\r\n", this->data.device_command.c_str(), this->data.device );
-            isOpen = registerStream(mode_i, m_filename);
+            isOpen = registerStream(std::ios_base::in, m_filename);
         }
         else if ( IEC.data.channel == 1 ) {
             Debug_printf ( "SAVE \"%s\",%d\r\n", this->data.device_command.c_str(), this->data.device );
-            isOpen = registerStream(mode_o, m_filename);
+            isOpen = registerStream(std::ios_base::out, m_filename);
         }
         else
         {
             Debug_printf ( "OPEN #,%d,%d,\"%s\"\r\n", this->data.device, this->data.channel, this->data.device_command.c_str() );
-            isOpen = registerStream(mode_io, m_filename);
+            // here we have to decide if we read, write or r/w the file, but for time being, we'll be just reading, so:
+            isOpen = registerStream(std::ios_base::in, m_filename);
         }
         device_config.save();
 
@@ -179,14 +180,19 @@ std::shared_ptr<MStream> iecDevice::retrieveStream ( void )
 
 // used to start working with a stream, registering it as underlying stream of some
 // IEC channel on some IEC device
-bool iecDevice::registerStream (int mode, std::string m_filename)
+bool iecDevice::registerStream (std::ios_base::open_mode mode, std::string m_filename)
 {
-	auto new_stream = Meat::ifstream(m_filename);
-	new_stream.open();
+    auto file = Meat::New<MFile>(m_filename);
+    std::shared_ptr<MStream> new_stream;
 
-    
+    if(mode == std::ios_base::in) {
+        new_stream = std::shared_ptr<MIStream>(file->inputStream());
+    }
+    else if(mode == std::ios_base::out) {
+        new_stream = std::shared_ptr<MOStream>(file->outputStream());
+    }
 
-	if( !new_stream.is_open() )
+	if( !new_stream->isOpen() )
 	{
 		Debug_printv("Error creating istream");
 		return false;

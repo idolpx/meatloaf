@@ -819,7 +819,7 @@ bool iecDisk::sendFile()
 	device_config.save();
 
 	// TODO!!!! you should check istream for nullptr here and return error immediately if null
-	std::shared_ptr<MIStream> istream = currentStream;
+	std::shared_ptr<MIStream> istream = std::static_pointer_cast<MIStream>(currentStream);
 
 	// if ( istream.isText() )
 	// {
@@ -861,7 +861,7 @@ bool iecDisk::sendFile()
 		{
 			// Get/Send file load address
 			i = 2;
-			istream->read((char *)&b, 1);
+			istream->read(&b, 1);
 			success = IEC.send(b);
 			load_address = b & 0x00FF; // low byte
 			sys_address = b;
@@ -990,7 +990,7 @@ bool iecDisk::saveFile()
 #endif
 
 	// std::unique_ptr<MOStream> ostream(file->outputStream());
-	std::shared_ptr<MOStream> ostream = currentStream;
+	std::shared_ptr<MOStream> ostream = std::static_pointer_cast<MOStream>(currentStream);;
 
     if(!ostream->isOpen()) {
         Debug_printv("couldn't open a stream for writing");
