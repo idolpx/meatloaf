@@ -214,7 +214,7 @@ bool iecDevice::closeStream ( bool close_all )
     {
         // Debug_printf("key[%d]", key);
         auto closingStream = (*found).second;
-        
+        closingStream->close();
         return streams.erase ( key );
     }
 
