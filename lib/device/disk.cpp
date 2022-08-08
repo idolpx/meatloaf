@@ -873,7 +873,7 @@ bool iecDisk::sendFile()
 			// Get SYSLINE
 		}
 
-		Debug_printf("sendFile: [%s] [$%.4X]\r\n=================================\r\n", file->url.c_str(), load_address);
+		Debug_printf("sendFile: [$%.4X]\r\n=================================\r\n", load_address);
 		while( avail && success )
 		{
 			// Read Byte
@@ -1042,10 +1042,10 @@ bool iecDisk::saveFile()
 #endif
 
 			b[0] = IEC.receive();
-			if(ostream->isText())
-				ostream->putPetscii(b[0]);
-			else
-				ostream->write((char *)b, b_len);
+			// if(ostream->isText())
+			// 	ostream->putPetscii(b[0]);
+			// else
+				ostream->write(b, b_len);
 			i++;
 
 			uint8_t f = IEC.protocol.flags;
