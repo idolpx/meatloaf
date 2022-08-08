@@ -93,20 +93,33 @@ bool iecDevice::process ( void )
     {
         Debug_printf ( "OPEN CHANNEL %d\r\n", this->data.channel );
 
-        if ( this->data.channel == 0 )
+        bool isOpen = false;
+
+        if ( this->data.channel == 0 ) {
             Debug_printf ( "LOAD \"%s\",%d\r\n", this->data.device_command.c_str(), this->data.device );
-        else if ( IEC.data.channel == 1 )
+            isOpen = registerStream(mode_i, m_filename);
+        }
+        else if ( IEC.data.channel == 1 ) {
             Debug_printf ( "SAVE \"%s\",%d\r\n", this->data.device_command.c_str(), this->data.device );
+            isOpen = registerStream(mode_o, m_filename);
+        }
         else
         {
             Debug_printf ( "OPEN #,%d,%d,\"%s\"\r\n", this->data.device, this->data.channel, this->data.device_command.c_str() );
+            isOpen = registerStream(mode_io, m_filename);
         }
+        device_config.save();
+
 
         // Open Named Channel
-        handleOpen();
-
+        if(isOpen) {
         // Open either file or prg for reading, writing or single line command on the command channel.
-        handleListenCommand();        
+            currentStream = retrieveStream();
+            handleListenCommand();        
+        }
+        else {
+    		sendFileNotFound();
+        }
     }
     else if ( this->data.secondary == IEC_DATA )
     {
@@ -136,7 +149,7 @@ bool iecDevice::process ( void )
     {
         Debug_printf ( "CLOSE CHANNEL %d\r\n", this->data.channel );
 
-        handleClose();
+        closeStream();
         device_state = DEVICE_IDLE;
         this->data.init(); // Clear device command        
     }
@@ -147,54 +160,55 @@ bool iecDevice::process ( void )
     return true;
 } // service
 
-void iecDevice::handleOpen( void )
-{
-	// Debug_printf("OPEN Named Channel (%.2d Device) (%.2d Channel)", this->data.device, this->data.channel);
-	currentStream = streamSelect();
-    // Debug_printf("cursor[%d]", currentStream.cursor);
-
-} // handleOpen
 
 
-void iecDevice::handleClose( void )
-{
-	// Debug_printf("CLOSE Named Channel (%.2d Device) (%.2d Channel)", this->data.device, this->data.channel);
-
-	// If writing update BAM & Directory
-//	if (currentStream.writing) {
-
-//	}
-
-	// Remove channel from map
-	streamClose();
-
-} // handleClose
-
-std::unique_ptr<std::basic_ios> iecDevice::streamSelect ( void )
+std::shared_ptr<MStream> iecDevice::retrieveStream ( void )
 {
     size_t key = ( this->data.device * 100 ) + this->data.channel;
 
     if ( streams.find ( key ) != streams.end() )
     {
-        // Debug_printf("key[%d]", key);
         return streams.at ( key );
     }
-
-    // create and add channel if not found
-    auto new_stream = Meat::ifstream( m_filename );
-    // Debug_printf ( "CHANNEL device[%d] channel[%d] url[%s]", this->data.device, this->data.channel, this->data.device_command.c_str() );
-
-    streams.insert ( std::make_pair ( key, new_stream ) );
-    return new_stream;
+    else
+    {
+		Debug_printv("Error! Trying to recall not-registered stream!");
+        return nullptr;
+    }
 }
 
-bool iecDevice::streamClose ( bool close_all )
+// used to start working with a stream, registering it as underlying stream of some
+// IEC channel on some IEC device
+bool iecDevice::registerStream (int mode, std::string m_filename)
+{
+	auto new_stream = Meat::ifstream(m_filename);
+	new_stream.open();
+
+    
+
+	if( !new_stream.is_open() )
+	{
+		Debug_printv("Error creating istream");
+		return false;
+	}
+	Debug_printv("stream created, registering in the table!");
+
+    size_t key = ( this->data.device * 100 ) + this->data.channel;
+    auto newPair = std::make_pair ( key, new_stream );
+    streams.insert ( newPair );
+    return true;
+}
+
+bool iecDevice::closeStream ( bool close_all )
 {
     size_t key = ( this->data.device * 100 ) + this->data.channel;
+    auto found = streams.find(key);
 
-    if ( streams.find ( key ) != streams.end() )
+    if ( found != streams.end() )
     {
         // Debug_printf("key[%d]", key);
+        auto closingStream = (*found).second;
+        
         return streams.erase ( key );
     }
 

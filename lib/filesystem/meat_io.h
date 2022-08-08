@@ -259,7 +259,13 @@ namespace Meat {
             else
                 return mistream->isOpen();
         }
-        
+
+        bool is_text() const {
+            if(mistream == nullptr)
+                return false;
+            else
+                return mistream->isText;
+        }        
 
         /**
          *  @brief  Fetches more data from the controlled sequence.
@@ -378,6 +384,13 @@ namespace Meat {
             else
                 return mostream->isOpen();
         }
+
+        bool is_text() const {
+            if(mostream == nullptr)
+                return false;
+            else
+                return mostream->isText;
+        }        
 
         /**
          *  @brief  Consumes data from the buffer; writes to the

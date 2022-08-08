@@ -800,34 +800,6 @@ uint16_t iecDisk::sendFooter(uint16_t &basicPtr)
 }
 
 
-std::shared_ptr<Meat::ifstream> iecDisk::fileOpen()
-{
-	// Update device database
-	device_config.save();
-
-	std::unique_ptr<MFile> file(MFSOwner::File(m_filename));
-
-	if(!file->exists())
-	{
-		Debug_printv("File Not Found! [%s]", file->name.c_str());
-		sendFileNotFound();
-		return nullptr;
-	}
-	Debug_printv("Sending File [%s]", file->name.c_str());
-
-	std::shared_ptr<Meat::ifstream> istream(file->inputStream());
-
-	if( istream == nullptr )
-	{
-		Debug_printv("Error creating istream");
-		sendFileNotFound();
-		return nullptr;
-	}
-	Debug_printv("istream created! length[%d] avail[%d]", istream->size(), istream->available());
-
-	return istream;
-}
-
 bool iecDisk::sendFile()
 {
 	size_t i = 0;
@@ -847,7 +819,7 @@ bool iecDisk::sendFile()
 	device_config.save();
 
 	// TODO!!!! you should check istream for nullptr here and return error immediately if null
-	std::shared_ptr<Meat::ifstream> istream = currentStream;
+	std::shared_ptr<MIStream> istream = currentStream;
 
 	// if ( istream.isText() )
 	// {
@@ -889,11 +861,11 @@ bool iecDisk::sendFile()
 		{
 			// Get/Send file load address
 			i = 2;
-			istream->read(&b, 1);
+			istream->read((char *)&b, 1);
 			success = IEC.send(b);
 			load_address = b & 0x00FF; // low byte
 			sys_address = b;
-			istream->read(&b, 1);
+			istream->read((char *)&b, 1);
 			success = IEC.send(b);
 			load_address = load_address | b << 8;  // high byte
 			sys_address += b * 256;
@@ -901,16 +873,11 @@ bool iecDisk::sendFile()
 			// Get SYSLINE
 		}
 
-		size_t len = istream->size();
-		size_t avail = istream->available();
-
-		//Debug_printv("len[%d] avail[%d] cursor[%d] success[%d]", len, avail, currentStream.cursor, success);
-
-		Debug_printf("sendFile: [%s] [$%.4X] (%d bytes)\r\n=================================\r\n", file->url.c_str(), load_address, len);
+		Debug_printf("sendFile: [%s] [$%.4X]\r\n=================================\r\n", file->url.c_str(), load_address);
 		while( avail && success )
 		{
 			// Read Byte
-			success = istream->read(&b, 1);
+			success = istream->read((char*)&b, 1);
 			if ( !success )
 				Debug_printv("fail");
 
@@ -948,8 +915,8 @@ bool iecDisk::sendFile()
 
 				if(bi == 8)
 				{
-					size_t t = (i * 100) / len;
-					Debug_printf(" %s (%d %d%%) [%d]\r\n", ba, i, t, avail - 1);
+					// size_t t = (i * 100) / len;
+					// Debug_printf(" %s (%d %d%%) [%d]\r\n", ba, i, t, avail - 1);
 					bi = 0;
 				}
 #else
@@ -975,17 +942,17 @@ bool iecDisk::sendFile()
 				fnLedManager.toggle(eLed::LED_BUS);
 			}
 
-			avail = istream->available();
+			// avail = istream->available();
 
 			// We got another chunk, update length
-			if ( avail > (len - i) )
-			{
-				len += (avail - (len - i));
-			}
+			// if ( avail > (len - i) )
+			// {
+			// 	len += (avail - (len - i));
+			// }
 
 			i++;
 		}
-		Debug_printf("\r\n=================================\r\n%d of %d bytes sent of %d [SYS%d]\r\n", i, len, avail, sys_address);
+		Debug_printf("\r\n=================================\r\n%d bytes sent of %d [SYS%d]\r\n", i, avail, sys_address);
 
 		//Debug_printv("len[%d] avail[%d] success[%d]", len, avail, success);		
 	}
@@ -1023,9 +990,9 @@ bool iecDisk::saveFile()
 #endif
 
 	// std::unique_ptr<MOStream> ostream(file->outputStream());
-	std::shared_ptr<Meat::ofstream> ostream = currentStream;
+	std::shared_ptr<MOStream> ostream = currentStream;
 
-    if(!ostream.is_open()) {
+    if(!ostream->isOpen()) {
         Debug_printv("couldn't open a stream for writing");
 		// TODO: Set status and sendFNF
 		sendFileNotFound();
@@ -1035,12 +1002,13 @@ bool iecDisk::saveFile()
 	{
 	 	// Stream is open!  Let's save this!
 
-		if ( ostream->position() > 0 )
-		{
-			// // Position file pointer
-			// ostream->seek(currentStream.cursor);
-		}
-		else
+		// wait - what??? If stream position == x you don't have to seek(x)!!!
+		// if ( ostream->position() > 0 )
+		// {
+		// 	// // Position file pointer
+		// 	// ostream->seek(currentStream.cursor);
+		// }
+		// else
 		{
 			// Get file load address
 			ll[0] = IEC.receive();
@@ -1059,8 +1027,8 @@ bool iecDisk::saveFile()
 			if (i == 0)
 			{
 				Debug_print("[");
-				ostream.write((char *)ll, b_len);
-				ostream.write((char *)lh, b_len);
+				ostream->write((char *)ll, b_len);
+				ostream->write((char *)lh, b_len);
 				i += 2;
 				Debug_println("]");
 			}
@@ -1074,10 +1042,10 @@ bool iecDisk::saveFile()
 #endif
 
 			b[0] = IEC.receive();
-			if(isText)
-				ostream.putPetscii(b[0]);
+			if(ostream->isText())
+				ostream->putPetscii(b[0]);
 			else
-				ostream.write((char *)b, b_len);
+				ostream->write((char *)b, b_len);
 			i++;
 
 			uint8_t f = IEC.protocol.flags;
