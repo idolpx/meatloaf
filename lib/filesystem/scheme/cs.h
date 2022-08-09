@@ -9,6 +9,7 @@
 #include "../../include/make_unique.h"
 #include "meat_io.h"
 
+#include "fnSystem.h"
 #include "fnTcpClient.h"
 
 #include "utils.h"

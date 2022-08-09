@@ -946,11 +946,11 @@ bool iecDisk::sendFile()
 		{
 			// Get/Send file load address
 			i = 2;
-			istream->read((char *)b, 1);
+			istream->read(&b, 1);
 			success = IEC.send(b);
 			load_address = b & 0x00FF; // low byte
 			sys_address = b;
-			istream->read((char *)b, 1);
+			istream->read(&b, 1);
 			success = IEC.send(b);
 			load_address = load_address | b << 8;  // high byte
 			sys_address += b * 256;
@@ -962,7 +962,7 @@ bool iecDisk::sendFile()
 		while( avail && success )
 		{
 			// Read Byte
-			success = istream->read((char*)&b, 1);
+			success = istream->read(&b, 1);
 			if ( !success )
 				Debug_printv("fail");
 
@@ -1113,8 +1113,8 @@ bool iecDisk::saveFile()
 			if (i == 0)
 			{
 				Debug_print("[");
-				ostream->write((char *)ll, b_len);
-				ostream->write((char *)lh, b_len);
+				ostream->write(ll, b_len);
+				ostream->write(lh, b_len);
 				i += 2;
 				Debug_println("]");
 			}
