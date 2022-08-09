@@ -13,6 +13,7 @@
 
 #include "keys.h"
 #include "led.h"
+#include "feedback.h"
 
 #include "fnSystem.h"
 #include "fnWiFi.h"
@@ -172,7 +173,8 @@ void fn_console_loop(void *param)
 {
     esp_console_config_t  config = {
         .max_cmdline_length = 80,
-        .max_cmdline_args = 10
+        .max_cmdline_args = 10,
+        .hint_color = 39
     };
 
     esp_err_t e = esp_console_init(&config);
@@ -210,6 +212,13 @@ extern "C"
     
         // xTaskCreatePinnedToCore(fn_console_loop, "fnConsole", 
         //                         4096, nullptr, 1, nullptr, 0);
+
+
+
+        // Start LED Strip
+        led_strip_main();
+
+
         // Sit here twiddling our thumbs
         while (true)
             vTaskDelay(9000 / portTICK_PERIOD_MS);

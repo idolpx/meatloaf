@@ -39,6 +39,14 @@
 #define PIN_LED_BT 5 // LOLIN D32 PRO
 #endif
 
+/* LED Strip */
+#define CONFIG_GPIO_NUM 27
+#define CONFIG_RMT_CHANNEL 0 // 0-7
+#define CONFIG_RGB_LED_TYPE 0 // 0=WS2812, 1=SK6812, 2=APA106
+#define CONFIG_LED_STRIP_LENGTH 5
+
+
+
 /* Audio Output */
 #define PIN_DAC1 25 // samlib.h
 
