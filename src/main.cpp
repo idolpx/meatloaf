@@ -13,7 +13,10 @@
 
 #include "keys.h"
 #include "led.h"
-#include "feedback.h"
+
+//#include "feedback.h"
+//#include "neopixel.h"
+#include "fastled_service.h"
 
 #include "fnSystem.h"
 #include "fnWiFi.h"
@@ -169,6 +172,7 @@ void fn_service_loop(void *param)
     }
 }
 
+// Main high-priority service loop
 void fn_console_loop(void *param)
 {
     esp_console_config_t  config = {
@@ -190,6 +194,7 @@ void fn_console_loop(void *param)
 
     esp_console_deinit();
 }
+
 /*
  * This is the start/entry point for an ESP-IDF program (must use "C" linkage)
  */
@@ -213,10 +218,12 @@ extern "C"
         // xTaskCreatePinnedToCore(fn_console_loop, "fnConsole", 
         //                         4096, nullptr, 1, nullptr, 0);
 
-
-
         // Start LED Strip
-        led_strip_main();
+        //led_strip_main();  // led_strip feedback lib
+
+        //neopixel_main();  // neopixel lib
+
+        fastled_app_main(); // fastled lib
 
 
         // Sit here twiddling our thumbs

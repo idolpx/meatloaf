@@ -118,65 +118,65 @@ void main_led_task(void *pv)
 		static_color.effect_color.green = 0;
 		static_color.effect_color.blue = 0;
 
-		ESP_LOGI(TAG, "Setting Red of static color effect to 255...");
-		static_color.effect_color.red = 255;
-		ESP_ERROR_CHECK( led_strip_set_effect(&led_strip, COLOR, &static_color) );					//Set full red color
-		ESP_LOGI(TAG, "LED is full red...");
+		// ESP_LOGI(TAG, "Setting Red of static color effect to 255...");
+		// static_color.effect_color.red = 255;
+		// ESP_ERROR_CHECK( led_strip_set_effect(&led_strip, COLOR, &static_color) );					//Set full red color
+		// ESP_LOGI(TAG, "LED is full red...");
 
-		vTaskDelay(2000 / portTICK_PERIOD_MS);														//Wait for 2s
-		ESP_LOGI(TAG, "Setting Green of static color effect to 255...");
-		static_color.effect_color.green = 255;
-		ESP_ERROR_CHECK( led_strip_set_effect(&led_strip, COLOR, &static_color) );					//Set full red and green color (yellow)
-		ESP_LOGI(TAG, "LED is full yellow...");
+		// vTaskDelay(2000 / portTICK_PERIOD_MS);														//Wait for 2s
+		// ESP_LOGI(TAG, "Setting Green of static color effect to 255...");
+		// static_color.effect_color.green = 255;
+		// ESP_ERROR_CHECK( led_strip_set_effect(&led_strip, COLOR, &static_color) );					//Set full red and green color (yellow)
+		// ESP_LOGI(TAG, "LED is full yellow...");
 
-		vTaskDelay(2000 / portTICK_PERIOD_MS);														//Wait for 2s
-		ESP_LOGI(TAG, "Setting Blue of static color effect to 255...");
-		static_color.effect_color.blue = 255;
-		ESP_ERROR_CHECK( led_strip_set_effect(&led_strip, COLOR, &static_color) );					//Set full red, green and blue color (white)
-		ESP_LOGI(TAG, "LED is full white...");
-		vTaskDelay(2000 / portTICK_PERIOD_MS);														//Wait for 2s
+		// vTaskDelay(2000 / portTICK_PERIOD_MS);														//Wait for 2s
+		// ESP_LOGI(TAG, "Setting Blue of static color effect to 255...");
+		// static_color.effect_color.blue = 255;
+		// ESP_ERROR_CHECK( led_strip_set_effect(&led_strip, COLOR, &static_color) );					//Set full red, green and blue color (white)
+		// ESP_LOGI(TAG, "LED is full white...");
+		// vTaskDelay(2000 / portTICK_PERIOD_MS);														//Wait for 2s
 
 		ESP_LOGI(TAG, "Setting RGB switching effect at max speed...");
 		ESP_ERROR_CHECK( led_strip_set_effect(&led_strip, RGB, &rgb_effect) );						//Set RGB switching color
 		vTaskDelay(2000 / portTICK_PERIOD_MS);														//Wait for 2s
 
-		ESP_LOGI(TAG, "Setting fade-out effect: Red = 20 for two times...");
-		effect_timed_on_fade_out.counter = 2;														//Execute for two times
-		effect_timed_on_fade_out.effect_color.red = 20;												//Starts red ON (20/255)
-		ESP_ERROR_CHECK( led_strip_set_effect(&led_strip, TIMED_ON_FADE_OUT, &effect_timed_on_fade_out) );
-		vTaskDelay(2000 / portTICK_PERIOD_MS);														//Wait for 2s
+		// ESP_LOGI(TAG, "Setting fade-out effect: Red = 20 for two times...");
+		// effect_timed_on_fade_out.counter = 2;														//Execute for two times
+		// effect_timed_on_fade_out.effect_color.red = 20;												//Starts red ON (20/255)
+		// ESP_ERROR_CHECK( led_strip_set_effect(&led_strip, TIMED_ON_FADE_OUT, &effect_timed_on_fade_out) );
+		// vTaskDelay(2000 / portTICK_PERIOD_MS);														//Wait for 2s
 
-		ESP_LOGI(TAG, "Setting fade-in effect: Red = 20 for two times...");
-		effect_timed_fade_in_off.counter = 2;														//Execute for two times
-		effect_timed_fade_in_off.effect_color.red = 20;												//Starts red off until (20/255)
-		ESP_ERROR_CHECK( led_strip_set_effect(&led_strip, TIMED_FADE_IN_OFF, &effect_timed_fade_in_off) );
-		vTaskDelay(2000 / portTICK_PERIOD_MS);														//Wait for 2s
+		// ESP_LOGI(TAG, "Setting fade-in effect: Red = 20 for two times...");
+		// effect_timed_fade_in_off.counter = 2;														//Execute for two times
+		// effect_timed_fade_in_off.effect_color.red = 20;												//Starts red off until (20/255)
+		// ESP_ERROR_CHECK( led_strip_set_effect(&led_strip, TIMED_FADE_IN_OFF, &effect_timed_fade_in_off) );
+		// vTaskDelay(2000 / portTICK_PERIOD_MS);														//Wait for 2s
 
-		ESP_LOGI(TAG, "Setting fade-out effect: Red, Green and Blue = 50 until next led_strip_set_effect command...");
-		effect_timed_on_fade_out.counter = 0;														//Execute until new led_strip_set_effect or led_strip_clear
-		effect_timed_on_fade_out.effect_color.green = 50;											//Starts green ON (50/255)
-		effect_timed_on_fade_out.effect_color.blue = 50;											//Starts blue ON (50/255)
-		ESP_ERROR_CHECK( led_strip_set_effect(&led_strip, TIMED_ON_FADE_OUT, &effect_timed_on_fade_out) );
-		vTaskDelay(5000 / portTICK_PERIOD_MS);
+		// ESP_LOGI(TAG, "Setting fade-out effect: Red, Green and Blue = 50 until next led_strip_set_effect command...");
+		// effect_timed_on_fade_out.counter = 0;														//Execute until new led_strip_set_effect or led_strip_clear
+		// effect_timed_on_fade_out.effect_color.green = 50;											//Starts green ON (50/255)
+		// effect_timed_on_fade_out.effect_color.blue = 50;											//Starts blue ON (50/255)
+		// ESP_ERROR_CHECK( led_strip_set_effect(&led_strip, TIMED_ON_FADE_OUT, &effect_timed_on_fade_out) );
+		// vTaskDelay(5000 / portTICK_PERIOD_MS);
 
-		ESP_LOGI(TAG, "Setting fade-in effect: Red, Green and Blue = 50 until next led_strip_set_effect command...");
-		effect_timed_fade_in_off.counter = 0;														//Execute until new led_strip_set_effect or led_strip_clear
-		effect_timed_fade_in_off.effect_color.green = 50;											//Starts green off until (50/255)
-		effect_timed_fade_in_off.effect_color.blue = 50;											//Starts blue off until (50/255)
-		ESP_ERROR_CHECK( led_strip_set_effect(&led_strip, TIMED_FADE_IN_OFF, &effect_timed_fade_in_off) );
-		vTaskDelay(5000 / portTICK_PERIOD_MS);
+		// ESP_LOGI(TAG, "Setting fade-in effect: Red, Green and Blue = 50 until next led_strip_set_effect command...");
+		// effect_timed_fade_in_off.counter = 0;														//Execute until new led_strip_set_effect or led_strip_clear
+		// effect_timed_fade_in_off.effect_color.green = 50;											//Starts green off until (50/255)
+		// effect_timed_fade_in_off.effect_color.blue = 50;											//Starts blue off until (50/255)
+		// ESP_ERROR_CHECK( led_strip_set_effect(&led_strip, TIMED_FADE_IN_OFF, &effect_timed_fade_in_off) );
+		// vTaskDelay(5000 / portTICK_PERIOD_MS);
 
-		ESP_LOGI(TAG, "LED is full white...");
-		ESP_ERROR_CHECK( led_strip_set_effect(&led_strip, COLOR, &static_color) );					//Set full red, green and blue color (white) again
-		vTaskDelay(1000 / portTICK_PERIOD_MS);
+		// ESP_LOGI(TAG, "LED is full white...");
+		// ESP_ERROR_CHECK( led_strip_set_effect(&led_strip, COLOR, &static_color) );					//Set full red, green and blue color (white) again
+		// vTaskDelay(1000 / portTICK_PERIOD_MS);
 
-		ESP_LOGI(TAG, "Clearing LED strip with led_strip_clear...");
-		led_strip_clear(&led_strip);																//Clears the led_strip.
-		vTaskDelay(1000 / portTICK_PERIOD_MS);
+		// ESP_LOGI(TAG, "Clearing LED strip with led_strip_clear...");
+		// led_strip_clear(&led_strip);																//Clears the led_strip.
+		// vTaskDelay(1000 / portTICK_PERIOD_MS);
 
-		ESP_LOGI(TAG, "LED is full white...");
-		ESP_ERROR_CHECK( led_strip_set_effect(&led_strip, COLOR, &static_color) );					//Set full red, green and blue color (white) again
-		vTaskDelay(1000 / portTICK_PERIOD_MS);
+		// ESP_LOGI(TAG, "LED is full white...");
+		// ESP_ERROR_CHECK( led_strip_set_effect(&led_strip, COLOR, &static_color) );					//Set full red, green and blue color (white) again
+		// vTaskDelay(1000 / portTICK_PERIOD_MS);
 
 		ESP_LOGI(TAG, "Deleting effect handler...");
 		ESP_ERROR_CHECK( led_strip_delete_effect_handler(&led_strip) );								//Delete effect handler task
