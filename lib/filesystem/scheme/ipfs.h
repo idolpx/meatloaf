@@ -43,6 +43,12 @@
 // https://ipfs.io/ipfs/Qmbj4vDDkq4kapyfJk27dxzPjQjxvPSW2BhL1GVZngJthq/0-9/1000 miler.d64
 //
 
+// OTHER IMPLEMENTATIONS
+// https://dat-ecosystem.org/
+// https://hypercore-protocol.org/
+// 
+//
+
 
 #ifndef MEATFILE_DEFINES_IPFS_H
 #define MEATFILE_DEFINES_IPFS_H
@@ -50,8 +56,6 @@
 #include "scheme/http.h"
 
 #include "peoples_url_parser.h"
-
-#include <ArduinoJson.h>
 
 
 /********************************************************
@@ -61,7 +65,11 @@
 class IPFSFile: public HttpFile {
 
 public:
-    IPFSFile(std::string path): HttpFile(path) {};
+    IPFSFile(std::string path): HttpFile(path) {
+        //this->url = "https://dweb.link/ipfs/" + this->host + "/" + this->path;
+        this->url = "https://ipfs.io/ipfs/" + this->host + "/" + this->path;
+        parseUrl(this->url);
+    };
     ~IPFSFile() {};
 
     MIStream* inputStream() override; // file on IPFS server = standard HTTP file available via GET
@@ -79,6 +87,7 @@ public:
     ~IPFSIStream() {};
 
     bool open() override;
+    bool seek(size_t pos) override;
 };
 
 

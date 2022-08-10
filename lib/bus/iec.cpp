@@ -21,7 +21,7 @@
 #include "../../include/pinmap.h"
 #include "../../include/cbmdefines.h"
 
-#include "disk.h"
+#include "drive.h"
 
 #include "string_utils.h"
 
