@@ -1113,7 +1113,7 @@ bool iecDrive::saveFile()
 	// std::shared_ptr<MOStream> ostream = std::static_pointer_cast<MOStream>(currentStream);
 	auto ostream = retrieveStream();
 
-    if(!ostream->isOpen()) {
+    if ( ostream == nullptr ) {
         Debug_printv("couldn't open a stream for writing");
 		// TODO: Set status and sendFNF
 		sendFileNotFound();

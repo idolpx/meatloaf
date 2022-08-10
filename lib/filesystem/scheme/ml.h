@@ -52,6 +52,7 @@ class MLFileSystem: public MFileSystem
         urlParser.parseUrl(path);
 
         std::string ml_url = "https://api.meatloaf.cc/?" + urlParser.name;
+        Debug_printv("ml_url[%s]", ml_url.c_str());
         
         Debug_printv("url[%s]", ml_url.c_str());
 

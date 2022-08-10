@@ -5,13 +5,13 @@
 #include "FastLED.h"
 #include "FX.h"
 
-//#define NUM_LEDS 512
-#define NUM_LEDS 5
-#define DATA_PIN_1 27 
-#define DATA_PIN_2 14
-#define BRIGHTNESS  25
-#define LED_TYPE    WS2811
-#define COLOR_ORDER RGB
+#include "../include/pinmap.h"
+// #define NUM_LEDS 5
+// #define DATA_PIN_1 27 
+// #define DATA_PIN_2 14
+// #define BRIGHTNESS  25
+// #define LED_TYPE    WS2811
+// #define COLOR_ORDER RGB
 
 
 
