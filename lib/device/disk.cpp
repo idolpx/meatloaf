@@ -63,6 +63,14 @@ bool iecDisk::process ( void )
 
     if ( this->data.secondary == IEC_OPEN )
     {
+
+		handleListenCommand();
+		if ( m_filename.size() == 0 )
+		{
+			Debug_printv("No file set");
+			return true;
+		}
+
         Debug_printf ( "OPEN CHANNEL %d\r\n", this->data.channel );
 
         bool isOpen = false;
@@ -87,8 +95,7 @@ bool iecDisk::process ( void )
         // Open Named Channel
         if(isOpen) {
         // Open either file or prg for reading, writing or single line command on the command channel.
-            currentStream = retrieveStream();
-            handleListenCommand();        
+            currentStream = retrieveStream();       
         }
         else {
     		sendFileNotFound();
@@ -98,7 +105,7 @@ bool iecDisk::process ( void )
     {
 
         // Open either file or prg for reading, writing or single line command on the command channel.
-        handleListenCommand(); 
+        // handleListenCommand(); 
 
         // IEC.protocol.pull(PIN_IEC_SRQ);
         if ( device_state == DEVICE_LISTEN )
@@ -328,8 +335,8 @@ CommandPathTuple iecDisk::parseLine(std::string command, size_t channel)
 	CommandPathTuple tuple;
 
 
-	if ( this->data.primary == IEC_TALK || this->data.channel == CMD_CHANNEL )
-	{
+	// if ( this->data.primary == IEC_LISTEN || this->data.channel == CMD_CHANNEL )
+	// {
 		mstr::toASCII(guessedPath);
 
 		// check to see if it starts with a known command token
@@ -401,13 +408,13 @@ CommandPathTuple iecDisk::parseLine(std::string command, size_t channel)
 
 			//Debug_printv("full referenced path [%s]", tuple.fullPath.c_str());
 		}
-	}
-	else
-	{
-		tuple.command = command;
-		tuple.rawPath = m_mfile->url;
-		tuple.fullPath = m_mfile->url;
-	}
+	// }
+	// else
+	// {
+	// 	tuple.command = command;
+	// 	tuple.rawPath = m_mfile->url;
+	// 	tuple.fullPath = m_mfile->url;
+	// }
 
 	//Debug_printv("* END OF PARSE LINE *******************************");
 
@@ -892,7 +899,6 @@ bool iecDisk::sendFile()
 	size_t bi = 0;
 	size_t load_address = 0;
 	size_t sys_address = 0;
-	size_t avail = 0;
 
 #ifdef DATA_STREAM
 	char ba[9];
@@ -905,6 +911,15 @@ bool iecDisk::sendFile()
 	// TODO!!!! you should check istream for nullptr here and return error immediately if null
 	// std::shared_ptr<MIStream> istream = std::static_pointer_cast<MIStream>(currentStream);
 	auto istream = retrieveStream();
+	if ( istream == nullptr )
+	{
+		Debug_printv("Stream not found!");
+		sendFileNotFound();
+		return false;
+	}
+
+	size_t len = istream->size();
+	size_t avail = istream->available();
 
 	// if ( istream.isText() )
 	// {
@@ -942,7 +957,9 @@ bool iecDisk::sendFile()
 	// else
 	{
 
-		if( IEC.data.channel == 0 )
+
+
+		if( this->data.channel == 0 )
 		{
 			// Get/Send file load address
 			i = 2;
@@ -1000,8 +1017,8 @@ bool iecDisk::sendFile()
 
 				if(bi == 8)
 				{
-					// size_t t = (i * 100) / len;
-					// Debug_printf(" %s (%d %d%%) [%d]\r\n", ba, i, t, avail - 1);
+					size_t t = (i * 100) / len;
+					Debug_printf(" %s (%d %d%%) [%d]\r\n", ba, i, t, avail - 1);
 					bi = 0;
 				}
 #else
@@ -1027,13 +1044,12 @@ bool iecDisk::sendFile()
 				fnLedManager.toggle(eLed::LED_BUS);
 			}
 
-			// avail = istream->available();
-
+			avail = istream->available();
 			// We got another chunk, update length
-			// if ( avail > (len - i) )
-			// {
-			// 	len += (avail - (len - i));
-			// }
+			if ( avail > (len - i) )
+			{
+				len += (avail - (len - i));
+			}
 
 			i++;
 		}
@@ -1184,8 +1200,6 @@ void iecDisk::dumpState()
 	Debug_println("");
 	Debug_printv("device_config -----------------");
 	Debug_printv("Device ID: [%d]", device_config.id());
-	Debug_printv("Media ID: [%d]", device_config.media());
-	Debug_printv("Partition ID: [%d]", device_config.partition());
 	Debug_printv("URL: [%s]", device_config.url().c_str());
 	Debug_printv("Base Path: [%s]", device_config.basepath().c_str());
 	Debug_printv("Path: [%s]", device_config.path().c_str());

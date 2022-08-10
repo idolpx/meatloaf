@@ -34,10 +34,6 @@ public:
 
     uint8_t id();
     void id(uint8_t device);
-    uint8_t media();
-    void media(uint8_t media);
-    uint8_t partition();
-    void partition(uint8_t partition);
     std::string url();
     void url(std::string url);
     std::string basepath();
