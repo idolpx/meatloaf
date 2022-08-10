@@ -56,6 +56,7 @@ bool iecDisk::process ( void )
 {
     // IEC.protocol.pull ( PIN_IEC_SRQ );
     // Debug_printf ( "bus_state[%d]", IEC.bus_state );
+	bool file_not_found = false;
 
     Debug_printf ( "DEVICE: [%.2d] ", this->data.device );
 
@@ -89,16 +90,22 @@ bool iecDisk::process ( void )
             // here we have to decide if we read, write or r/w the file, but for time being, we'll be just reading, so:
             isOpen = registerStream(std::ios_base::in, m_filename);
         }
-        device_config.save();
-
 
         // Open Named Channel
         if(isOpen) {
         // Open either file or prg for reading, writing or single line command on the command channel.
-            currentStream = retrieveStream();       
+            currentStream = retrieveStream();
+			if( currentStream ) 
+			{
+				device_config.save();
+			}
+			else
+			{
+				file_not_found = true;
+			}
         }
         else {
-    		sendFileNotFound();
+    		file_not_found = true;
         }
     }
     else if ( this->data.secondary == IEC_DATA )
@@ -136,6 +143,12 @@ bool iecDisk::process ( void )
 
     //Debug_printf("DEV device[%d] channel[%d] state[%d] command[%s]", this->data.device, this->data.channel, m_openState, this->data.device_command.c_str());
     // IEC.protocol.release ( PIN_IEC_SRQ );
+
+	if ( file_not_found ) 
+	{
+		sendFileNotFound();
+		return false;
+	}
 
     return true;
 } // process
@@ -376,6 +389,12 @@ CommandPathTuple iecDisk::parseLine(std::string command, size_t channel)
 			guessedPath = mstr::drop(guessedPath, 5);
 			tuple.command = "mfav";
 		}
+		else if( this->data.channel == CMD_CHANNEL )
+		{
+			// Clear the command as if it was processed
+			guessedPath = "";
+			tuple.command = "";
+		}
 		else
 		{
 			tuple.command = command;
@@ -552,7 +571,7 @@ void iecDisk::handleListenCommand( void )
 		}
 	}
 
-	//dumpState();
+	dumpState();
 } // handleListenCommand
 
 
