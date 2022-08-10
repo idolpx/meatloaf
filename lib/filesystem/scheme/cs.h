@@ -8,6 +8,7 @@
 #include "../../include/global_defines.h"
 #include "../../include/make_unique.h"
 #include "meat_io.h"
+#include "tcp.h"
 
 #include "fnSystem.h"
 #include "fnTcpClient.h"
@@ -27,7 +28,7 @@ class csstreambuf : public std::streambuf {
     char* pbuf;
 
 protected:
-    fnTcpClient m_wifi;
+    MeatSocket m_wifi;
 
 public:
     csstreambuf() {}
@@ -37,14 +38,14 @@ public:
     }      
 
     bool is_open() {
-        return (m_wifi.connected());
+        return (m_wifi.isOpen());
     }
 
     bool open() {
-        if(m_wifi.connected())
+        if(m_wifi.isOpen())
             return true;
 
-        int rc = m_wifi.connect("commodoreserver.com", 1541);
+        int rc = m_wifi.open("commodoreserver.com", 1541);
         Serial.printf("csstreambuf: connect to cserver returned: %d\n", rc);
 
         if(rc == 1) {
@@ -61,8 +62,8 @@ public:
 
     void close() {
         Serial.printf("csstreambuf: closing\n");
-        if(m_wifi.connected()) {
-            m_wifi.stop();
+        if(m_wifi.isOpen()) {
+            m_wifi.close();
         }
         if(gbuf != nullptr)
             delete[] gbuf;
@@ -71,9 +72,9 @@ public:
     }
 
     int underflow() override {
-        //_printv("In underflow");
-        if (!m_wifi.connected()) {
-            //Debug_printv("In connection closed");
+        Debug_printv("In underflow");
+        if (!m_wifi.isOpen()) {
+            Debug_printv("In connection closed");
             close();
             return std::char_traits<char>::eof();
         }
@@ -82,13 +83,19 @@ public:
             int attempts = 5;
             int wait = 500;
             
-            while(!(readCount = m_wifi.read((uint8_t*)gbuf, 512)) && (attempts--)>0 && m_wifi.connected()) {
-                //Debug_printv("read attempt");
+            readCount = m_wifi.read((uint8_t*)gbuf, 512);
+
+            while( readCount <= 0 && (attempts--)>0 && m_wifi.isOpen()) {
+                Debug_printv("got rc: %d, retrying", readCount);
                 fnSystem.delay(wait);
                 wait+=100;
+                readCount = m_wifi.read((uint8_t*)gbuf, 512);
             } 
-            //Debug_printv("readcount: %d, %s", readCount, gbuf);
+            Debug_printv("read success: %d", readCount);
             this->setg(gbuf, gbuf, gbuf + readCount);
+        }
+        else {
+            Debug_printv("else: %d - %d, (%d)", this->gptr(), this->egptr(), this->gbuf);
         }
 
         return this->gptr() == this->egptr()
@@ -101,7 +108,7 @@ public:
     {
         //Debug_printv("in overflow");
 
-        if (!m_wifi.connected()) {
+        if (!m_wifi.isOpen()) {
             close();
             return EOF;
         }
@@ -125,7 +132,7 @@ public:
 
     int sync() { 
 
-        if (!m_wifi.connected()) {
+        if (!m_wifi.isOpen()) {
             close();
             return 0;
         }

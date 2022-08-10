@@ -6,9 +6,11 @@
 
 MeatHttpClient* HttpFile::formHeader() {
     if(client == nullptr) {
+        Debug_printf("Client was not present, creating");
         client = new MeatHttpClient();
 
         // let's just get the headers so we have some info
+        Debug_printf("Client requesting head");
         client->HEAD(url);
     }
     return client;

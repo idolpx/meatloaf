@@ -6,8 +6,6 @@
 // fajna sciezka do sprawdzenia:
 // utilities/disk tools/cie.d64
 
-#define OK_REPLY "00 - OK\x0d"
-
 CServerSessionMgr CServerFileSystem::session;
 
 bool CServerSessionMgr::establishSession() {
@@ -23,7 +21,7 @@ std::string CServerSessionMgr::readLn() {
     char buffer[80];
     // telnet line ends with 10;
     getline(buffer, 80, 10);
-    Debug_printv("Inside readLn: %s", buffer);
+    Debug_printv("Inside readln got: '%s'", buffer);
     return std::string((char *)buffer);
 }
 
@@ -42,10 +40,15 @@ bool CServerSessionMgr::sendCommand(std::string command) {
 bool CServerSessionMgr::isOK() {
     // auto a = readLn();
 
-    // for(int i = 0 ; i<a.length(); i++)
-    //     Debug_printv("'%d'", a[i]);
+    auto reply = readLn();
+    // for(int i = 0 ; i<reply.length(); i++)
+    //     Debug_printv("'%d'", reply[i]);
 
-    return readLn() == OK_REPLY;
+    bool equals = strncmp("00 - OK\x0d", reply.c_str(), 7);
+
+    //Debug_printv("Testing of OK, got:'%s', %d", reply.c_str(), equals);
+
+    return equals;
 }
 
 bool CServerSessionMgr::traversePath(MFile* path) {
@@ -388,13 +391,18 @@ bool CServerFile::rewindDirectory() {
     if(!isDirectory())
         return false;
 
+
+    Debug_printv("pre traverse path");
+
     if(!CServerFileSystem::session.traversePath(this)) return false;
+
+    Debug_printv("post traverse path");
 
     if(mstr::endsWith(path, ".d64", false))
     {
         dirIsImage = true;
         // to list image contents we have to run
-        //Debug_printv("cserver: this is a d64 img!");
+        Debug_printv("cserver: this is a d64 img, sending $ command!");
         CServerFileSystem::session.sendCommand("$");
         auto line = CServerFileSystem::session.readLn(); // mounted image name
         if(CServerFileSystem::session.is_open()) {
@@ -428,8 +436,13 @@ bool CServerFile::rewindDirectory() {
 };
 
 MFile* CServerFile::getNextFileInDir() {
+
+    Debug_printv("pre rewind");
+
     if(!dirIsOpen)
         rewindDirectory();
+
+    Debug_printv("pre dir is open");
 
     if(!dirIsOpen)
         return nullptr;
@@ -441,9 +454,11 @@ MFile* CServerFile::getNextFileInDir() {
     if(url.size()>4) // If we are not at root then add additional "/"
         new_url += "/";
 
+    Debug_printv("pre dir is image");
+
     if(dirIsImage) {
         auto line = CServerFileSystem::session.readLn();
-        Debug_printv("next file in dir got %s", line);
+        Debug_printv("next file in dir got %s", line.c_str());
         // 'ot line:'0 ␒"CIE�������������" 00�2A�
         // 'ot line:'2   "CIE+SERIAL      " PRG   2049
         // 'ot line:'1   "CIE-SYS31801    " PRG   2049
