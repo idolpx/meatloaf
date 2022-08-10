@@ -251,7 +251,7 @@ void iecBus::service ( void )
         this->bus_state = BUS_IDLE;
 
         // Reset virtual devices
-        disk.reset();
+        drive.reset();
 
         return;
     }
@@ -402,12 +402,12 @@ void iecBus::service ( void )
         // }
 
         // Queue control codes and command in specified device
-        // At the moment there is only the multi-disk device
-        device_state_t device_state = disk.queue_command();
+        // At the moment there is only the multi-drive device
+        device_state_t device_state = drive.queue_command();
 
         // Process commands in devices
-        // At the moment there is only the multi-disk device
-        disk.process();
+        // At the moment there is only the multi-drive device
+        drive.process();
 
         if ( device_state == DEVICE_IDLE )
         {
