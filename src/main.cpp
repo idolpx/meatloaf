@@ -14,9 +14,11 @@
 #include "keys.h"
 #include "led.h"
 
+#ifdef LED_STRIP
 //#include "feedback.h"
 //#include "neopixel.h"
 #include "display.h"
+#endif
 
 #include "fnSystem.h"
 #include "fnWiFi.h"
@@ -220,13 +222,14 @@ extern "C"
         // xTaskCreatePinnedToCore(fn_console_loop, "fnConsole", 
         //                         4096, nullptr, 1, nullptr, 0);
 
+#ifdef LED_STRIP
         // Start LED Strip
         //led_strip_main();  // led_strip feedback lib
 
         //neopixel_main();  // neopixel lib
 
         display_app_main(); // fastled lib
-
+#endif
 
         // Sit here twiddling our thumbs
         while (true)
