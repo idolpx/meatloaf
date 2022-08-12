@@ -7,3 +7,9 @@
 [submodule "components/webdav"]
 	path = components/webdav
 	url = https://github.com/zonque/WebDavServer.git
+[submodule "components/esp-idf-smb-client"]
+	path = components/esp-idf-smb-client
+	url = https://github.com/idolpx/esp-idf-smb-client.git
+[submodule "components/libsmb2"]
+	path = components/libsmb2
+	url = https://github.com/idolpx/libsmb2.git
