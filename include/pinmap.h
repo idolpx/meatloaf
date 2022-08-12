@@ -1,4 +1,4 @@
-
+/* FujiNet Hardware Pin Mapping */
 #ifndef PINMAP_H
 #define PINMAP_H
 

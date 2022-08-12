@@ -18,7 +18,7 @@
 //#include "../../include/global_defines.h"
 //#include "debug.h"
 
-#include "disk.h"
+#include "drive.h"
 
 #include "iec.h"
 #include "device_db.h"
@@ -29,19 +29,19 @@
 
 #include "wrappers/iec_buffer.h"
 
-iecDisk disk;
+iecDrive disk;
 
 using namespace CBM;
 using namespace Protocol;
 
 
-iecDisk::iecDisk()
+iecDrive::iecDrive()
 {
 	reset();
 } // ctor
 
 
-void iecDisk::reset ( void )
+void iecDrive::reset ( void )
 {
     Debug_printv("Device reset");
     this->data.init(); // Clear device command
@@ -51,13 +51,13 @@ void iecDisk::reset ( void )
 } // reset
 
 
-void iecDisk::sendFileNotFound(void)
+void iecDrive::sendFileNotFound(void)
 {
 	setDeviceStatus(62);
  	IEC.sendFNF();
 }
 
-void iecDisk::sendStatus(void)
+void iecDrive::sendStatus(void)
 {
 	std::string status = m_device_status;
 	if (status.size() == 0)
@@ -84,7 +84,7 @@ void iecDisk::sendStatus(void)
 	// Clear the status message
 } // sendStatus
 
-void iecDisk::setDeviceStatus(int number, int track, int sector)
+void iecDrive::setDeviceStatus(int number, int track, int sector)
 {
 	switch(number)
 	{
@@ -178,7 +178,7 @@ void iecDisk::setDeviceStatus(int number, int track, int sector)
 
 
 
-MFile* iecDisk::getPointed(MFile* urlFile) {
+MFile* iecDrive::getPointed(MFile* urlFile) {
 	Debug_printv("getPointed [%s]", urlFile->url.c_str());
 	auto istream = Meat::ifstream(urlFile);
 
@@ -186,7 +186,7 @@ MFile* iecDisk::getPointed(MFile* urlFile) {
 
     if( !istream.is_open() ) 
 	{
-        Debug_printf("couldn't open stream of urlfile");
+        Debug_printv("couldn't open stream of urlfile");
 		return nullptr;
     }
 	else 
@@ -199,7 +199,7 @@ MFile* iecDisk::getPointed(MFile* urlFile) {
 	}
 };
 
-CommandPathTuple iecDisk::parseLine(std::string command, size_t channel)
+CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 {
 
 	// Debug_printv("* PARSE INCOMING LINE *******************************");
@@ -329,7 +329,7 @@ CommandPathTuple iecDisk::parseLine(std::string command, size_t channel)
 	return tuple;
 }
 
-void iecDisk::changeDir(std::string url)
+void iecDrive::changeDir(std::string url)
 {
 	//Debug_printv("url[%s]", url.c_str());
 	device_config.url(url);
@@ -350,7 +350,7 @@ void iecDisk::changeDir(std::string url)
 	}
 }
 
-void iecDisk::prepareFileStream(std::string url)
+void iecDrive::prepareFileStream(std::string url)
 {
 	device_config.url(url);
 	//Debug_printv("url[%s]", url.c_str());
@@ -361,7 +361,7 @@ void iecDisk::prepareFileStream(std::string url)
 
 
 
-void iecDisk::handleListenCommand( void )
+void iecDrive::handleListenCommand( void )
 {
 	// Switch device config if command is for a different Device ID
 	if (device_config.select(this->data.device))
@@ -464,7 +464,7 @@ void iecDisk::handleListenCommand( void )
 } // handleListenCommand
 
 
-void iecDisk::handleListenData()
+void iecDrive::handleListenData()
 {
 	Debug_printv("[%s]", device_config.url().c_str());
 
@@ -472,7 +472,7 @@ void iecDisk::handleListenData()
 } // handleListenData
 
 
-void iecDisk::handleTalk(uint8_t chan)
+void iecDrive::handleTalk(uint8_t chan)
 {
 	//Debug_printv("channel[%d] openState[%d]", chan, m_openState);
 
@@ -513,7 +513,7 @@ void iecDisk::handleTalk(uint8_t chan)
 
 
 // send single basic line, including heading basic pointer and terminating zero.
-uint16_t iecDisk::sendLine(uint16_t &basicPtr, uint16_t blocks, const char *format, ...)
+uint16_t iecDrive::sendLine(uint16_t &basicPtr, uint16_t blocks, const char *format, ...)
 {
 	// Debug_printv("bus[%d]", IEC.bus_state);
 
@@ -537,7 +537,7 @@ uint16_t iecDisk::sendLine(uint16_t &basicPtr, uint16_t blocks, const char *form
 	return sendLine(basicPtr, blocks, text);
 }
 
-uint16_t iecDisk::sendLine(uint16_t &basicPtr, uint16_t blocks, char *text)
+uint16_t iecDrive::sendLine(uint16_t &basicPtr, uint16_t blocks, char *text)
 {
 	Debug_printf("%d %s ", blocks, text);
 
@@ -583,7 +583,7 @@ uint16_t iecDisk::sendLine(uint16_t &basicPtr, uint16_t blocks, char *text)
 	return len + 5;
 } // sendLine
 
-uint16_t iecDisk::sendHeader(uint16_t &basicPtr, std::string header, std::string id)
+uint16_t iecDrive::sendHeader(uint16_t &basicPtr, std::string header, std::string id)
 {
 	uint16_t byte_count = 0;
 	bool sent_info = false;
@@ -660,7 +660,7 @@ uint16_t iecDisk::sendHeader(uint16_t &basicPtr, std::string header, std::string
 	return byte_count;
 }
 
-void iecDisk::sendListing()
+void iecDrive::sendListing()
 {
 	Debug_printf("sendListing: [%s]\r\n=================================\r\n", m_mfile->url.c_str());
 
@@ -776,7 +776,7 @@ void iecDisk::sendListing()
 } // sendListing
 
 
-uint16_t iecDisk::sendFooter(uint16_t &basicPtr)
+uint16_t iecDrive::sendFooter(uint16_t &basicPtr)
 {
 	uint16_t blocks_free;
 	uint16_t byte_count = 0;
@@ -798,7 +798,7 @@ uint16_t iecDisk::sendFooter(uint16_t &basicPtr)
 }
 
 
-void iecDisk::sendFile()
+void iecDrive::sendFile()
 {
 	size_t i = 0;
 	bool success = true;
@@ -896,7 +896,7 @@ void iecDisk::sendFile()
 			sendFileNotFound();
 			return;
 		}
-		Debug_printv("istream created!");
+		Debug_printv("istream created! length[%d] avail[%d]", istream->size(), istream->available());
 
 		// Position file pointer
 		i = currentChannel.cursor;
@@ -926,18 +926,6 @@ void iecDisk::sendFile()
 		Debug_printf("sendFile: [%s] [$%.4X] (%d bytes)\r\n=================================\r\n", file->url.c_str(), load_address, len);
 		while( i < len && success )
 		{
-
-			// Exit if ATN is PULLED while sending
-			if ( IEC.protocol.flags bitand ATN_PULLED )
-			{
-				Debug_printv("ATN pulled while sending. i[%d]", i);
-				// Save file pointer position
-				channelUpdate( --i );
-				setDeviceStatus( 74 );
-				success = true;
-				break;
-			}
-
 			success = istream->read(&b, 1);
 			// Debug_printv("b[%02X] success[%d]", b, success);
 			if (success)
@@ -977,6 +965,17 @@ void iecDisk::sendFile()
 #endif
 			}
 
+			// Exit if ATN is PULLED while sending
+			if ( IEC.protocol.flags bitand ATN_PULLED )
+			{
+				Debug_printv("ATN pulled while sending. i[%d]", i);
+				// Save file pointer position
+				channelUpdate( --i );
+				setDeviceStatus( 74 );
+				success = true;
+				break;
+			}
+
 			// Toggle LED
 			if (i % 50 == 0)
 			{
@@ -1008,7 +1007,7 @@ void iecDisk::sendFile()
 } // sendFile
 
 
-void iecDisk::saveFile()
+void iecDrive::saveFile()
 {
 	size_t i = 0;
 	bool done = false;
@@ -1066,7 +1065,7 @@ void iecDisk::saveFile()
 		}
 
 
-		Debug_printf("saveFile: [%s] [$%.4X]\r\n=================================\r\n", file->url.c_str(), load_address);
+		Debug_printv("saveFile: [%s] [$%.4X]\r\n=================================\r\n", file->url.c_str(), load_address);
 
 		// Recieve bytes until a EOI is detected
 		do
@@ -1084,7 +1083,7 @@ void iecDisk::saveFile()
 #ifdef DATA_STREAM
 			if (bi == 0)
 			{
-				Debug_printf(":%.4X ", load_address);
+				Debug_printv(":%.4X ", load_address);
 				load_address += 8;
 			}
 #endif
@@ -1114,7 +1113,7 @@ void iecDisk::saveFile()
 
 			if(bi == 8)
 			{
-				Debug_printf(" %s (%d)\r\n", ba, i);
+				Debug_printv(" %s (%d)\r\n", ba, i);
 				bi = 0;
 			}
 #endif
@@ -1127,14 +1126,14 @@ void iecDisk::saveFile()
     }
     ostream->close(); // nor required, closes automagically
 
-	Debug_printf("=================================\r\n%d bytes saved\r\n", i);
+	Debug_printv("=================================\r\n%d bytes saved\r\n", i);
 	fnLedManager.set(eLed::LED_BUS, true);
 
 	// TODO: Handle errorFlag
 } // saveFile
 
 
-void iecDisk::dumpState()
+void iecDrive::dumpState()
 {
 	Debug_println("");
 	Debug_printv("openState: [%d]", m_openState);

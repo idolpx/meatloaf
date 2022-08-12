@@ -3,7 +3,7 @@
 #ifndef MEATFILE_DEFINES_FSHTTP_H
 #define MEATFILE_DEFINES_FSHTTP_H
 
-#include "fnHttpClient.h"
+#include "http.h"
 
 #include "meat_io.h"
 #include "../../include/global_defines.h"
@@ -67,7 +67,7 @@ protected:
     size_t m_position = 0;
        
 //    WiFiClient m_file;
-	fnHttpClient m_http;
+	MeatHttpClient m_http;
 };
 
 
@@ -109,7 +109,7 @@ protected:
     bool isFriendlySkipper = false;
 
 //    WiFiClient m_file;
-	fnHttpClient m_http;
+	MeatHttpClient m_http;
 };
 
 
@@ -155,7 +155,7 @@ protected:
     
 //    WiFiClient m_file;
     //WiFiClient m_client;
-	fnHttpClient m_http;
+	MeatHttpClient m_http;
 };
 
 

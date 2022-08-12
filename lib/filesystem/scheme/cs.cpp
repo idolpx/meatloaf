@@ -150,7 +150,7 @@ bool CServerIStream::open() {
         read(buffer, 2);
         // hmmm... should we check if they're "?5" for error?!
         if(buffer[0]=='?' && buffer[1]=='5') {
-            Serial.println("CServer: open file failed");
+            Debug_printv("CServer: open file failed");
             CServerFileSystem::session.readLn();
             m_isOpen = false;
         }
@@ -179,7 +179,7 @@ size_t CServerIStream::position() {
 };
 
 size_t CServerIStream::read(uint8_t* buf, size_t size)  {
-    //Serial.println("CServerIStream::read");
+    //Debug_printv("CServerIStream::read");
     auto bytesRead = CServerFileSystem::session.receive(buf, size);
     m_bytesAvailable-=bytesRead;
     m_position+=bytesRead;
@@ -394,7 +394,7 @@ bool CServerFile::rewindDirectory() {
     {
         dirIsImage = true;
         // to list image contents we have to run
-        //Serial.println("cserver: this is a d64 img!");
+        //Debug_printv("cserver: this is a d64 img!");
         CServerFileSystem::session.sendCommand("$");
         auto line = CServerFileSystem::session.readLn(); // mounted image name
         if(CServerFileSystem::session.is_open()) {
@@ -412,7 +412,7 @@ bool CServerFile::rewindDirectory() {
     {
         dirIsImage = false;
         // to list directory contents we use
-        //Serial.println("cserver: this is a directory!");
+        //Debug_printv("cserver: this is a directory!");
         CServerFileSystem::session.sendCommand("disks");
         auto line = CServerFileSystem::session.readLn(); // dir header
         if(CServerFileSystem::session.is_open()) {
@@ -453,7 +453,7 @@ MFile* CServerFile::getNextFileInDir() {
         // 'ot line:'658 BLOCKS FREE.
 
         if(line.find('\x04')!=std::string::npos) {
-            Serial.println("No more!");
+            Debug_printv("No more!");
             dirIsOpen = false;
             return nullptr;
         }
@@ -490,7 +490,7 @@ MFile* CServerFile::getNextFileInDir() {
         // 32 62 91 68 73 83 75 32 84 79 79 76 83 93 13 No more! = > [DISK TOOLS]
 
         if(line.find('\x04')!=std::string::npos) {
-            Serial.println("No more!");
+            Debug_printv("No more!");
             dirIsOpen = false;
             return nullptr;
         }

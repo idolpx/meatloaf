@@ -27,13 +27,13 @@
 //
 // File Stat
 // https://dweb.link/api/v0/object/stat?arg=Qmbj4vDDkq4kapyfJk27dxzPjQjxvPSW2BhL1GVZngJthq/0-9/1000%20miler.d64
-// http://localhost:8080/api/v0/object/stat?arg=Qmbj4vDDkq4kapyfJk27dxzPjQjxvPSW2BhL1GVZngJthq/0-9/1000%20miler.d64
+// IPFS://localhost:8080/api/v0/object/stat?arg=Qmbj4vDDkq4kapyfJk27dxzPjQjxvPSW2BhL1GVZngJthq/0-9/1000%20miler.d64
 // NumLinks = 0, it is a file
 // DataSize = {file_size} + 10 bytes
 //
 // https://github.com/ipfs/kubo/issues/8528
 //
-// HTTP HEAD to determine DIR or FILE
+// IPFS HEAD to determine DIR or FILE
 // content-type: text/html
 // etag: "DIRIndex-*" = Directory
 // https://ipfs.io/ipfs/Qmbj4vDDkq4kapyfJk27dxzPjQjxvPSW2BhL1GVZngJthq/0-9
@@ -42,3 +42,73 @@
 // content-length: >0  = File
 // https://ipfs.io/ipfs/Qmbj4vDDkq4kapyfJk27dxzPjQjxvPSW2BhL1GVZngJthq/0-9/1000 miler.d64
 //
+
+// OTHER IMPLEMENTATIONS
+// https://dat-ecosystem.org/
+// https://hypercore-protocol.org/
+// 
+//
+
+
+#ifndef MEATFILE_DEFINES_IPFS_H
+#define MEATFILE_DEFINES_IPFS_H
+
+#include "scheme/http.h"
+
+#include "peoples_url_parser.h"
+
+
+/********************************************************
+ * File
+ ********************************************************/
+
+class IPFSFile: public HttpFile {
+
+public:
+    IPFSFile(std::string path): HttpFile(path) {
+        //this->url = "https://dweb.link/ipfs/" + this->host + "/" + this->path;
+        this->url = "https://ipfs.io/ipfs/" + this->host + "/" + this->path;
+        parseUrl(this->url);
+    };
+    ~IPFSFile() {};
+
+    MIStream* inputStream() override; // file on IPFS server = standard HTTP file available via GET
+};
+
+
+/********************************************************
+ * Streams
+ ********************************************************/
+
+class IPFSIStream: public HttpIStream {
+
+public:
+    IPFSIStream(std::string path) : HttpIStream(path) {};
+    ~IPFSIStream() {};
+
+    bool open() override;
+    bool seek(size_t pos) override;
+};
+
+
+/********************************************************
+ * FS
+ ********************************************************/
+
+class IPFSFileSystem: public MFileSystem
+{
+    MFile* getFile(std::string path) override {
+        // Debug_printv("IPFSFileSystem::getFile(%s)", path.c_str());
+        return new IPFSFile(path);
+    }
+
+    bool handles(std::string name) {
+        std::string pattern = "ipfs:";
+        return mstr::startsWith(name, pattern.c_str(), false);
+    }
+
+public:
+    IPFSFileSystem(): MFileSystem("ipfs") {};
+};
+
+#endif // MEATFILE_DEFINES_IPFS_H
