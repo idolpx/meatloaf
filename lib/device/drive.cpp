@@ -455,6 +455,7 @@ void iecDrive::changeDir(std::string url)
 	if ( this->data.channel == 0 )
 	{
 		m_openState = O_DIR;
+		m_filename = "";
 		//Debug_printv("!!!! CD into [%s]", url.c_str());
 		//Debug_printv("new current url: [%s]", m_mfile->url.c_str());
 		//Debug_printv("LOAD $");		
