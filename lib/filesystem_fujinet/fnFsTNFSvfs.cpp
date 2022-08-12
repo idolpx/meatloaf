@@ -45,6 +45,18 @@
     int (*fsync_p)(void* ctx, int fd);
 */
 
+/**
+ * @brief tnfs DIR structure
+ */
+typedef struct {
+    DIR dir;            /*!< VFS DIR struct */
+    tnfs_dir_t d;        /*!< tnfs DIR struct */
+    struct dirent e;    /*!< Last open dirent */
+    long offset;        /*!< Offset of the current dirent */
+    char *path;         /*!< Requested directory name */
+} vfs_tnfs_dir_t;
+
+
 int vfs_tnfs_mkdir(void* ctx, const char* name, mode_t mode)
 {
     tnfsMountInfo *mi = (tnfsMountInfo *)ctx;
@@ -239,6 +251,371 @@ int vfs_tnfs_fstat(void* ctx, int fd, struct stat * st)
     return vfs_tnfs_stat(mi, path, st);
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+#ifdef CONFIG_VFS_SUPPORT_DIR
+// static int vfs_tnfs_stat(void* ctx, const char * path, struct stat * st) {
+//     assert(path);
+//     esp_littlefs_t * efs = (esp_littlefs_t *)ctx;
+//     struct lfs_info info;
+//     int res;
+
+//     memset(st, 0, sizeof(struct stat));
+//     st->st_blksize = efs->cfg.block_size;
+
+//     sem_take(efs);
+//     res = lfs_stat(efs->fs, path, &info);
+//     if (res < 0) {
+//         errno = lfs_errno_remap(res);
+//         sem_give(efs);
+//         /* Not strictly an error, since stat can be used to check
+//          * if a file exists */
+//         ESP_LOGV(TAG, "Failed to stat path \"%s\". Error %s (%d)",
+//                 path, esp_littlefs_errno(res), res);
+//         return -1;
+//     }
+// #if CONFIG_LITTLEFS_USE_MTIME    
+//     st->st_mtime = vfs_tnfs_get_mtime(efs, path);
+// #endif
+//     sem_give(efs);
+//     st->st_size = info.size;
+//     st->st_mode = ((info.type==LFS_TYPE_REG)?S_IFREG:S_IFDIR);
+//     return 0;
+// }
+
+// static int vfs_tnfs_unlink(void* ctx, const char *path) {
+// #define fail_str_1 "Failed to unlink path \"%s\"."
+//     assert(path);
+//     esp_littlefs_t * efs = (esp_littlefs_t *)ctx;
+//     struct lfs_info info;
+//     int res;
+
+//     sem_take(efs);
+//     res = lfs_stat(efs->fs, path, &info);
+//     if (res < 0) {
+//         errno = lfs_errno_remap(res);
+//         sem_give(efs);
+//         ESP_LOGV(TAG, fail_str_1 " Error %s (%d)",
+//                 path, esp_littlefs_errno(res), res);
+//         return -1;
+//     }
+
+//     if(esp_littlefs_get_fd_by_name(efs, path) >= 0) {
+//         sem_give(efs);
+//         ESP_LOGE(TAG, fail_str_1 " Has open FD.", path);
+//         errno = EBUSY;
+//         return -1;
+//     }
+
+//     if (info.type == LFS_TYPE_DIR) {
+//         sem_give(efs);
+//         ESP_LOGV(TAG, "Cannot unlink a directory.");
+//         errno = EISDIR;
+//         return -1;
+//     }
+
+//     res = lfs_remove(efs->fs, path);
+//     if (res < 0) {
+//         errno = lfs_errno_remap(res);
+//         sem_give(efs);
+//         ESP_LOGV(TAG, fail_str_1 " Error %s (%d)",
+//                 path, esp_littlefs_errno(res), res);
+//         return -1;
+//     }
+
+//     sem_give(efs);
+
+//     return 0;
+// #undef fail_str_1
+// }
+
+// static int vfs_tnfs_rename(void* ctx, const char *src, const char *dst) {
+//     esp_littlefs_t * efs = (esp_littlefs_t *)ctx;
+//     int res;
+
+//     sem_take(efs);
+
+//     if(esp_littlefs_get_fd_by_name(efs, src) >= 0){
+//         sem_give(efs);
+//         ESP_LOGE(TAG, "Cannot rename; src \"%s\" is open.", src);
+//         errno = EBUSY;
+//         return -1;
+//     }
+//     else if(esp_littlefs_get_fd_by_name(efs, dst) >= 0){
+//         sem_give(efs);
+//         ESP_LOGE(TAG, "Cannot rename; dst \"%s\" is open.", dst);
+//         errno = EBUSY;
+//         return -1;
+//     }
+
+//     res = lfs_rename(efs->fs, src, dst);
+//     if (res < 0) {
+//         errno = lfs_errno_remap(res);
+//         sem_give(efs);
+//         ESP_LOGV(TAG, "Failed to rename \"%s\" -> \"%s\". Error %s (%d)",
+//                 src, dst, esp_littlefs_errno(res), res);
+//         return -1;
+//     }
+
+//     sem_give(efs);
+
+//     return 0;
+// }
+
+static DIR* vfs_tnfs_opendir(void* ctx, const char* name) {
+    //esp_littlefs_t * efs = (esp_littlefs_t *)ctx;
+    tnfsMountInfo *mi = (tnfsMountInfo *)ctx;
+    int res;
+    vfs_tnfs_dir_t *dir = NULL;
+
+    dir = calloc(1, sizeof(vfs_tnfs_dir_t));
+    if( dir == NULL ) {
+        ESP_LOGE(TAG, "dir struct could not be malloced");
+        errno = ENOMEM;
+        goto exit;
+    }
+
+    dir->path = strdup(name);
+    if(dir->path == NULL){
+        errno = ENOMEM;
+        ESP_LOGE(TAG, "dir path name could not be malloced");
+        goto exit;
+    }
+
+    sem_take(efs);
+    res = lfs_dir_open(efs->fs, &dir->d, dir->path);
+    res = tnfs_opendirx(mi->get_filehandleinfo, &dir->d)
+    sem_give(efs);
+    if (res < 0) {
+        errno = lfs_errno_remap(res);
+        ESP_LOGV(TAG, "Failed to opendir \"%s\". Error %d", dir->path, res);
+        goto exit;
+    }
+
+    return (DIR *)dir;
+
+exit:
+    esp_littlefs_dir_free(dir);
+    return NULL;
+}
+
+static int vfs_tnfs_closedir(void* ctx, DIR* pdir) {
+    assert(pdir);
+    esp_littlefs_t * efs = (esp_littlefs_t *)ctx;
+    vfs_tnfs_dir_t * dir = (vfs_tnfs_dir_t *) pdir;
+    int res;
+
+    sem_take(efs);
+    res = lfs_dir_close(efs->fs, &dir->d);
+    sem_give(efs);
+    if (res < 0) {
+        errno = lfs_errno_remap(res);
+        ESP_LOGV(TAG, "Failed to closedir \"%s\". Error %d", dir->path, res);
+        return res;
+    }
+
+    esp_littlefs_dir_free(dir);
+    return 0;
+}
+
+static struct dirent* vfs_tnfs_readdir(void* ctx, DIR* pdir) {
+    assert(pdir);
+    vfs_tnfs_dir_t * dir = (vfs_tnfs_dir_t *) pdir;
+    int res;
+    struct dirent* out_dirent;
+
+    res = vfs_tnfs_readdir_r(ctx, pdir, &dir->e, &out_dirent);
+    if (res != 0) return NULL;
+    return out_dirent;
+}
+
+// static int vfs_tnfs_readdir_r(void* ctx, DIR* pdir,
+//         struct dirent* entry, struct dirent** out_dirent) {
+//     assert(pdir);
+//     esp_littlefs_t * efs = (esp_littlefs_t *)ctx;
+//     vfs_tnfs_dir_t * dir = (vfs_tnfs_dir_t *) pdir;
+//     int res;
+//     struct lfs_info info = { 0 };
+
+//     sem_take(efs);
+//     do{ /* Read until we get a real object name */
+//         res = lfs_dir_read(efs->fs, &dir->d, &info);
+//     }while( res>0 && (strcmp(info.name, ".") == 0 || strcmp(info.name, "..") == 0));
+//     sem_give(efs);
+//     if (res < 0) {
+//         errno = lfs_errno_remap(res);
+// #ifndef CONFIG_LITTLEFS_USE_ONLY_HASH 
+//         ESP_LOGV(TAG, "Failed to readdir \"%s\". Error %s (%d)",
+//                 dir->path, esp_littlefs_errno(res), res);
+// #else
+//         ESP_LOGV(TAG, "Failed to readdir \"%s\". Error %d", dir->path, res);
+// #endif
+//         return -1;
+//     }
+
+//     if(info.type == LFS_TYPE_REG) {
+//         ESP_LOGV(TAG, "readdir a file of size %d named \"%s\"",
+//                 info.size, info.name);
+//     }
+//     else {
+//         ESP_LOGV(TAG, "readdir a dir named \"%s\"", info.name);
+//     }
+
+//     if(res == 0) {
+//         /* End of Objs */
+//         ESP_LOGV(TAG, "Reached the end of the directory.");
+//         *out_dirent = NULL;
+//     }
+//     else {
+//         entry->d_ino = 0;
+//         entry->d_type = info.type == LFS_TYPE_REG ? DT_REG : DT_DIR;
+//         strncpy(entry->d_name, info.name, sizeof(entry->d_name));
+//         *out_dirent = entry;
+//     }
+//     dir->offset++;
+
+//     return 0;
+// }
+
+// // static long vfs_tnfs_telldir(void* ctx, DIR* pdir) {
+// //     assert(pdir);
+// //     vfs_tnfs_dir_t * dir = (vfs_tnfs_dir_t *) pdir;
+// //     return dir->offset;
+// // }
+
+// // static void vfs_tnfs_seekdir(void* ctx, DIR* pdir, long offset) {
+// //     assert(pdir);
+// //     esp_littlefs_t * efs = (esp_littlefs_t *)ctx;
+// //     vfs_tnfs_dir_t * dir = (vfs_tnfs_dir_t *) pdir;
+// //     int res;
+
+// //     if (offset < dir->offset) {
+// //         /* close and re-open dir to rewind to beginning */
+// //         sem_take(efs);
+// //         res = lfs_dir_rewind(efs->fs, &dir->d);
+// //         sem_give(efs);
+// //         if (res < 0) {
+// //             errno = lfs_errno_remap(res);
+// //             ESP_LOGV(TAG, "Failed to rewind dir \"%s\". Error %s (%d)",
+// //                     dir->path, esp_littlefs_errno(res), res);
+// //             return;
+// //         }
+// //         dir->offset = 0;
+// //     }
+
+// //     while(dir->offset < offset){
+// //         struct dirent *out_dirent;
+// //         res = vfs_tnfs_readdir_r(ctx, pdir, &dir->e, &out_dirent);
+// //         if( res != 0 ){
+// //             ESP_LOGE(TAG, "Error readdir_r");
+// //             return;
+// //         }
+// //     }
+// // }
+
+// // static int vfs_tnfs_mkdir(void* ctx, const char* name, mode_t mode) {
+// //     /* Note: mode is currently unused */
+// //     esp_littlefs_t * efs = (esp_littlefs_t *)ctx;
+// //     int res;
+// //     ESP_LOGV(TAG, "mkdir \"%s\"", name);
+
+// //     sem_take(efs);
+// //     res = lfs_mkdir(efs->fs, name);
+// //     sem_give(efs);
+// //     if (res < 0) {
+// //         errno = lfs_errno_remap(res);
+// //         ESP_LOGV(TAG, "Failed to mkdir \"%s\". Error %s (%d)",
+// //                 name, esp_littlefs_errno(res), res);
+// //         return -1;
+// //     }
+// //     return 0;
+// // }
+
+// // static int vfs_tnfs_rmdir(void* ctx, const char* name) {
+// //     esp_littlefs_t * efs = (esp_littlefs_t *)ctx;
+// //     struct lfs_info info;
+// //     int res;
+
+// //     /* Error Checking */
+// //     sem_take(efs);
+// //     res = lfs_stat(efs->fs, name, &info);
+// //     if (res < 0) {
+// //         errno = lfs_errno_remap(res);
+// //         sem_give(efs);
+// //         ESP_LOGV(TAG, "\"%s\" doesn't exist.", name);
+// //         return -1;
+// //     }
+
+// //     if (info.type != LFS_TYPE_DIR) {
+// //         sem_give(efs);
+// //         ESP_LOGV(TAG, "\"%s\" is not a directory.", name);
+// //         errno = ENOTDIR;
+// //         return -1;
+// //     }
+
+// //     /* Unlink the dir */
+// //     res = lfs_remove(efs->fs, name);
+// //     sem_give(efs);
+// //     if ( res < 0) {
+// //         errno = lfs_errno_remap(res);
+// //         ESP_LOGV(TAG, "Failed to unlink path \"%s\". Error %s (%d)",
+// //                 name, esp_littlefs_errno(res), res);
+// //         return -1;
+// //     }
+
+// //     return 0;
+// // }
+
+// static ssize_t vfs_tnfs_truncate( void *ctx, const char *path, off_t size )
+// {
+//     esp_littlefs_t * efs = (esp_littlefs_t *)ctx;
+//     ssize_t res = -1;
+//     vfs_tnfs_file_t *file = NULL;
+
+//     int fd = vfs_tnfs_open( ctx, path, LFS_O_RDWR, 438 );
+
+//     sem_take(efs);
+//     if((uint32_t)fd > efs->cache_size)
+//     {
+//         sem_give(efs);
+//         ESP_LOGE(TAG, "FD %d must be <%d.", fd, efs->cache_size);
+//         errno = EBADF;
+//         return -1;
+//     }
+//     else
+//     {
+//         file = efs->cache[fd];
+//         res = lfs_file_truncate( efs->fs, &file->file, size );
+//         sem_give(efs);
+
+//         if(res < 0)
+//         {
+//             errno = lfs_errno_remap(res);
+//     #ifndef CONFIG_LITTLEFS_USE_ONLY_HASH
+//             ESP_LOGV(TAG, "Failed to truncate file \"%s\". Error %s (%d)",
+//                     file->path, esp_littlefs_errno(res), res);
+//     #else
+//             ESP_LOGV(TAG, "Failed to truncate FD %d. Error %s (%d)",
+//                     fd, esp_littlefs_errno(res), res);
+//     #endif
+//             res = -1;
+//         }
+//         else
+//         {
+//             ESP_LOGV( TAG, "Truncated file %s to %u bytes", path, (uint32_t) size );
+//         }
+//     }
+//     vfs_tnfs_close( ctx, fd );
+//     return res;
+// }
+#endif //CONFIG_VFS_SUPPORT_DIR
+
+
+
+////////////////////////////////////////////////////////////////////////////////////////////
+
 
 // Register our functions and use tnfsMountInfo as our context
 // New basepath will be stored in basepath
@@ -248,17 +625,36 @@ esp_err_t vfs_tnfs_register(tnfsMountInfo &m_info, char *basepath, int basepathl
     // results in compiloer error "non-trivial desginated initializers not supported"
     esp_vfs_t vfs;
     memset(&vfs, 0, sizeof(vfs));
-    vfs.flags = ESP_VFS_FLAG_CONTEXT_PTR;
-    vfs.open_p = &vfs_tnfs_open;
-    vfs.close_p = &vfs_tnfs_close;
-    vfs.read_p = &vfs_tnfs_read;
-    vfs.write_p = &vfs_tnfs_write;
-    vfs.stat_p = &vfs_tnfs_stat;
-    vfs.fstat_p = &vfs_tnfs_fstat;
-    vfs.lseek_p = &vfs_tnfs_lseek;
-    vfs.unlink_p = &vfs_tnfs_unlink;
-    vfs.rename_p = &vfs_tnfs_rename;
-    
+    const esp_vfs_t vfs = {
+        .flags       = ESP_VFS_FLAG_CONTEXT_PTR,
+        .write_p     = &vfs_tnfs_write,
+        .pwrite_p    = NULL, // &vfs_littlefs_pwrite,
+        .lseek_p     = &vfs_tnfs_lseek,
+        .read_p      = &vfs_tnfs_read,
+        .pread_p     = NULL, // &vfs_littlefs_pread,
+        .open_p      = &vfs_tnfs_open,
+        .close_p     = &vfs_tnfs_close,
+        .fstat_p     = &vfs_tnfs_fstat,
+
+#ifdef CONFIG_VFS_SUPPORT_DIR
+        .stat_p      = NULL, // &vfs_tnfs_stat,
+        .link_p      = NULL, /* Not Supported */
+        .unlink_p    = NULL, // &vfs_tnfs_unlink,
+        .rename_p    = NULL, // &vfs_tnfs_rename,
+        .opendir_p   = &vfs_tnfs_opendir,
+        .closedir_p  = &vfs_tnfs_closedir,
+        .readdir_p   = &vfs_tnfs_readdir,
+        .readdir_r_p = NULL, // &vfs_tnfs_readdir_r,
+        .seekdir_p   = NULL, // &vfs_tnfs_seekdir,
+        .telldir_p   = NULL, // &vfs_tnfs_telldir,
+        .mkdir_p     = NULL, // &vfs_tnfs_mkdir,
+        .rmdir_p     = NULL, // &vfs_tnfs_rmdir,
+        .fsync_p     = NULL, // &vfs_tnfs_fsync,
+		.truncate_p  = NULL, // &vfs_tnfs_truncate,
+        .utime_p     = NULL,
+#endif
+    };
+
     // We'll use the address of our tnfsMountInfo to provide a unique base path
     // for this instance wihtout keeping track of how many we create
     snprintf(basepath, basepathlen, "/tnfs%p", &m_info);
