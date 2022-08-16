@@ -60,7 +60,7 @@ bool iecDrive::process ( void )
 
     Debug_printf ( "DEVICE: [%.2d] ", this->data.device );
 
-    // Debug_printf("DEV primary[%.2X] secondary[%.2X] device[%d], channel[%d] command[%s] ", this->data.primary, this->data.secondary, this->data.device, this->data.channel, this->data.device_command.c_str());
+    Debug_printf("DEV primary[%.2X] secondary[%.2X] device[%d], channel[%d] command[%s] ", this->data.primary, this->data.secondary, this->data.device, this->data.channel, this->data.device_command.c_str());
 
     if ( this->data.secondary == IEC_OPEN )
     {
@@ -496,12 +496,12 @@ void iecDrive::handleListenCommand( void )
 	}
 
 	// Parse DOS Command
-	// Debug_printv("Parse DOS Command [%s]", this->data.device_command.c_str());
+	Debug_printv("Parse DOS Command [%s]", this->data.device_command.c_str());
 
 	// Execute DOS Command
 	if ( this->data.channel == CMD_CHANNEL )
 	{
-		// Debug_printv("Execute DOS Command [%s]", this->data.device_command.c_str());
+		Debug_printv("Execute DOS Command [%s]", this->data.device_command.c_str());
 	}
 
 
@@ -519,6 +519,7 @@ void iecDrive::handleListenCommand( void )
 	if (mstr::startsWith(commandAndPath.command, "$"))
 	{
 		m_openState = O_DIR;
+		m_filename = "";
 	}
 	else if (mstr::equals(commandAndPath.command, (char*)"@info", false))
 	{
