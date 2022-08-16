@@ -86,6 +86,7 @@ std::shared_ptr<MStream> iecDevice::retrieveStream ( void )
 
     if ( streams.find ( key ) != streams.end() )
     {
+        Debug_printv("Stream retrieved. key[%d]", key);
         return streams.at ( key );
     }
     else
@@ -116,11 +117,17 @@ bool iecDevice::registerStream (std::ios_base::open_mode mode, std::string m_fil
 		Debug_printv("Error creating istream");
 		return false;
 	}
-	Debug_printv("stream created, registering in the table!");
+    else
+    {
+        // Close the stream if it is already open
+        closeStream();
+    }
 
     size_t key = ( this->data.device * 100 ) + this->data.channel;
     auto newPair = std::make_pair ( key, new_stream );
     streams.insert ( newPair );
+
+    Debug_printv("Stream created. key[%d]", key);
     return true;
 }
 
@@ -131,7 +138,7 @@ bool iecDevice::closeStream ( bool close_all )
 
     if ( found != streams.end() )
     {
-        // Debug_printf("key[%d]", key);
+        Debug_printv("Stream closed. key[%d]", key);
         auto closingStream = (*found).second;
         closingStream->close();
         return streams.erase ( key );
