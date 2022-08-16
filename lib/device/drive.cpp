@@ -60,7 +60,7 @@ bool iecDrive::process ( void )
 
     Debug_printf ( "DEVICE: [%.2d] ", this->data.device );
 
-    Debug_printf("DEV primary[%.2X] secondary[%.2X] device[%d], channel[%d] command[%s] ", this->data.primary, this->data.secondary, this->data.device, this->data.channel, this->data.device_command.c_str());
+    // Debug_printv("DEV primary[%.2X] secondary[%.2X] device[%d], channel[%d] command[%s] ", this->data.primary, this->data.secondary, this->data.device, this->data.channel, this->data.device_command.c_str());
 
     if ( this->data.secondary == IEC_OPEN )
     {
@@ -112,7 +112,7 @@ bool iecDrive::process ( void )
     {
 
         // Open either file or prg for reading, writing or single line command on the command channel.
-        // handleListenCommand(); 
+        handleListenCommand(); 
 
         // IEC.protocol.pull(PIN_IEC_SRQ);
         if ( device_state == DEVICE_LISTEN )
@@ -430,8 +430,9 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 	// }
 	// else
 	// {
+	// 	Debug_printv("command[%s] url[%s]", command.c_str(), m_mfile->url.c_str());
 	// 	tuple.command = command;
-	// 	tuple.rawPath = m_mfile->url;
+	// 	tuple.rawPath = command;
 	// 	tuple.fullPath = m_mfile->url;
 	// }
 
@@ -1054,6 +1055,7 @@ bool iecDrive::sendFile()
 				Debug_printv("ATN pulled while sending. i[%d]", i);
 				// Save file pointer position
 				// streamUpdate( istream );
+				istream->seek(istream->position() - 1);
 				setDeviceStatus( 74 );
 				success = true;
 				break;
