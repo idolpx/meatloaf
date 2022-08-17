@@ -52,11 +52,10 @@ void iecDrive::reset ( void )
 
 
 
-bool iecDrive::process ( void )
+device_state_t iecDrive::process ( void )
 {
     // IEC.protocol.pull ( PIN_IEC_SRQ );
     // Debug_printf ( "bus_state[%d]", IEC.bus_state );
-	bool file_not_found = false;
 
     Debug_printf ( "DEVICE: [%.2d] ", this->data.device );
 
@@ -69,7 +68,7 @@ bool iecDrive::process ( void )
 		if ( m_filename.size() == 0 )
 		{
 			Debug_printv("No file set");
-			return true;
+			return DEVICE_LISTEN;
 		}
 
         Debug_printf ( "OPEN CHANNEL %d\r\n", this->data.channel );
@@ -99,13 +98,6 @@ bool iecDrive::process ( void )
 			{
 				device_config.save();
 			}
-			else
-			{
-				file_not_found = true;
-			}
-        }
-        else {
-    		file_not_found = true;
         }
     }
     else if ( this->data.secondary == IEC_DATA )
@@ -115,20 +107,26 @@ bool iecDrive::process ( void )
         handleListenCommand(); 
 
         // IEC.protocol.pull(PIN_IEC_SRQ);
-        if ( device_state == DEVICE_LISTEN )
+        if ( this->device_state == DEVICE_LISTEN )
         {
             if ( this->data.channel != CMD_CHANNEL )
             {
                 // Receive data
-                // Debug_printf ( "[Receive data]" );
+                Debug_printv ( "[Receive data]" );
                 handleListenData();
             }
         }
-        else if ( device_state == DEVICE_TALK )
+        else if ( this->device_state == DEVICE_TALK )
         {
             // Send data
-            // Debug_printf ( "[Send data]" );
+            Debug_printv ( "[Send data]" );
             handleTalk ( this->data.channel );
+			if ( this->data.channel < 2 )
+			{
+				closeStream();
+				device_state = DEVICE_IDLE;
+				this->data.init(); // Clear device command
+			}
         }
         // IEC.protocol.release(PIN_IEC_SRQ);
     }
@@ -137,27 +135,23 @@ bool iecDrive::process ( void )
         Debug_printf ( "CLOSE CHANNEL %d\r\n", this->data.channel );
 
         closeStream();
-        device_state = DEVICE_IDLE;
+        this->device_state = DEVICE_IDLE;
         this->data.init(); // Clear device command        
     }
 
     //Debug_printf("DEV device[%d] channel[%d] state[%d] command[%s]", this->data.device, this->data.channel, m_openState, this->data.device_command.c_str());
     // IEC.protocol.release ( PIN_IEC_SRQ );
 
-	if ( file_not_found ) 
-	{
-		sendFileNotFound();
-		return false;
-	}
-
-    return true;
+    return this->device_state;
 } // process
 
 
 void iecDrive::sendFileNotFound(void)
 {
+	Debug_printv("file not found");
 	setDeviceStatus(62);
- 	IEC.sendFNF();
+	this->device_state = DEVICE_ERROR;
+ 	IEC.senderTimeout();
 }
 
 void iecDrive::sendStatus(void)
@@ -179,7 +173,9 @@ void iecDrive::sendStatus(void)
 	}
 	else
 	{
-		position = bytes_sent;
+		position = bytes_sent - 1;
+		IEC.releaseLines();
+		Debug_printv("release lines");
 	}
 	
 	//Debug_println(BACKSPACE "]");
@@ -489,7 +485,7 @@ void iecDrive::handleListenCommand( void )
 
 	if (this->data.device_command.length() == 0 )
 	{
-		// Debug_printv("No command to process");
+		Debug_printv("No command to process");
 
 		if ( this->data.channel == CMD_CHANNEL )
 			m_openState = O_STATUS;
@@ -512,11 +508,12 @@ void iecDrive::handleListenCommand( void )
 
 	if ( referencedPath == nullptr )
 	{
+		Debug_printv("fnf");
 		sendFileNotFound();
 		return;
 	}
 
-	//Debug_printv("command[%s] path[%s]", commandAndPath.command.c_str(), commandAndPath.fullPath.c_str());
+	Debug_printv("command[%s] path[%s]", commandAndPath.command.c_str(), commandAndPath.fullPath.c_str());
 	if (mstr::startsWith(commandAndPath.command, "$"))
 	{
 		m_openState = O_DIR;
@@ -574,7 +571,7 @@ void iecDrive::handleListenCommand( void )
 		}
 	}
 
-	dumpState();
+	// dumpState();
 } // handleListenCommand
 
 
@@ -784,6 +781,7 @@ void iecDrive::sendListing()
 	std::unique_ptr<MFile> entry(m_mfile->getNextFileInDir());
 
 	if(entry == nullptr) {
+		Debug_printv("fnf");
 		sendFileNotFound();
 		return;
 	}
@@ -1119,7 +1117,6 @@ bool iecDrive::saveFile()
 
     if ( ostream == nullptr ) {
         Debug_printv("couldn't open a stream for writing");
-		// TODO: Set status and sendFNF
 		sendFileNotFound();
         return false;
     }

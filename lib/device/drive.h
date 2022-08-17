@@ -57,7 +57,7 @@ public:
 	uint8_t execute( void ) override { return 0; };
 	uint8_t status(void) override { return 0; };
 	void reset(void) override;	
-	bool process ( void ) override;
+	device_state_t process ( void ) override;
 
 protected:
 	// handler helpers.

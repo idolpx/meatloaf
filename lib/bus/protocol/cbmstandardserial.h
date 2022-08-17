@@ -68,6 +68,8 @@
 #define TIMING_Tda     80      // TALK-ATTENTION ACK. HOLD    80us   -          -
 #define TIMING_Tfr     60      // EOI ACKNOWLEDGE             60us   -          -
 
+#define TIMING_EMPTY   512     // SIGNAL EMPTY STREAM
+
 // See timeoutWait
 #define TIMEOUT 1000 // 1ms
 #define TIMED_OUT -1

@@ -414,10 +414,9 @@ void iecBus::service ( void )
 
         // Process commands in devices
         // At the moment there is only the multi-drive device
-        drive.process();
-
-        if ( device_state == DEVICE_IDLE )
+        if ( drive.process() < DEVICE_ACTIVE || device_state < DEVICE_ACTIVE )
         {
+            Debug_printv("device idle");
             this->data.init();
         }
 
@@ -451,7 +450,10 @@ bus_state_t iecBus::deviceListen ( void )
     else if ( this->data.secondary == IEC_OPEN || this->data.secondary == IEC_DATA )
     {
         // Record the command string until ATN is PULLED
-        std::string listen_command;
+        std::string listen_command = "";
+
+        // ATN might get pulled right away if there is no command string to send
+        protocol.wait( 60 );
 
         while ( protocol.status ( PIN_IEC_ATN ) != PULLED )
         {
@@ -481,12 +483,16 @@ bus_state_t iecBus::deviceListen ( void )
             this->data.device_command = listen_command;
             mstr::rtrimA0 ( this->data.device_command );
             Debug_printf ( " {%s}\r\n", this->data.device_command.c_str() );
-            return BUS_PROCESS;
+            //return BUS_PROCESS;
+        }
+        else
+        {
+            this->data.device_command = "";
+            Debug_printf ( "\r\n" );            
         }
 
-        this->data.device_command = "";
-        Debug_printf ( "\r\n" );
-        return BUS_ACTIVE;
+        Debug_printv("listen complete");
+        return BUS_PROCESS;
     }
 
     // CLOSE Named Channel
@@ -565,7 +571,7 @@ bool iecBus::turnAround ( void )
     protocol.pull ( PIN_IEC_CLK_OUT );
     delayMicroseconds ( TIMING_Tv );
 
-    // Debug_println("complete");
+    Debug_println("turnaround complete");
     return true;
 } // turnAround
 
@@ -693,19 +699,20 @@ bool iecBus::sendEOI ( uint8_t data )
 
 // A special send command that informs file not found condition
 //
-bool iecBus::sendFNF()
+bool iecBus::senderTimeout()
 {
+    //protocol.pull( PIN_IEC_SRQ );
     // Message file not found by just releasing lines
     releaseLines();
     Debug_printv("release lines");
     this->bus_state = BUS_ERROR;
 
-    // BETWEEN BYTES TIME
-    delayMicroseconds ( TIMING_Tbb );
+    // Signal an empty stream
+    delayMicroseconds ( TIMING_EMPTY );
 
-    Debug_println ( "FNF Sent!" );
+    //protocol.release( PIN_IEC_SRQ );
     return true;
-} // sendFNF
+} // senderTimeout
 
 
 bool iecBus::isDeviceEnabled ( const uint8_t deviceNumber )

@@ -39,19 +39,20 @@ typedef enum
 {
     DEVICE_ERROR = -1,
     DEVICE_IDLE = 0,       // Ready and waiting
-    DEVICE_LISTEN = 1,     // A command is recieved and data is coming to us
-    DEVICE_TALK = 2,       // A command is recieved and we must talk now
-    DEVICE_PROCESS = 3,    // Execute device command
+    DEVICE_ACTIVE = 1,
+    DEVICE_LISTEN = 2,     // A command is recieved and data is coming to us
+    DEVICE_TALK = 3,       // A command is recieved and we must talk now
+    DEVICE_PROCESS = 4,    // Execute device command
 } device_state_t;
 
 class IECData
 {
     public:
-        uint8_t primary;
-        uint8_t device;
-        uint8_t secondary;
-        uint8_t channel;
-        std::string device_command;
+        uint8_t primary = 0;
+        uint8_t device = 0;
+        uint8_t secondary = 0;
+        uint8_t channel = 0;
+        std::string device_command = "";
 
 		void init ( void ) {
 			primary = 0;
@@ -66,9 +67,9 @@ class IECData
 class CommandPathTuple
 {
     public:
-        std::string command;
-        std::string fullPath;
-        std::string rawPath;
+        std::string command = "";
+        std::string fullPath = "";
+        std::string rawPath = "";
 };
 
 //
@@ -88,7 +89,7 @@ class iecDevice
         ~iecDevice() {};
 
         device_state_t queue_command ( void );
-        virtual bool process ( void ) = 0;
+        virtual device_state_t process ( void ) = 0;
 
         virtual uint8_t command ( void ) = 0;
         virtual uint8_t execute ( void ) = 0;
@@ -189,7 +190,7 @@ class iecBus
         bool sendEOI ( uint8_t data );
 
         // A special send command that informs file not found condition
-        bool sendFNF();
+        bool senderTimeout();
 
         // Recieves a byte
         int16_t receive ( uint8_t device = 0 );
@@ -208,6 +209,8 @@ class iecBus
 
         void debugTiming();
 
+        void releaseLines ( bool wait = false );
+
     private:
         // IEC Bus Commands
         bus_state_t deviceListen ( void ); // 0x20 + device_id   Listen, device (0–30)
@@ -219,8 +222,6 @@ class iecBus
 		// device_state_t deviceOpen(void);      // 0xF0 + channel     Open, channel (0–15)
 		bool turnAround( void );
         bool undoTurnAround ( void );
-
-        void releaseLines ( bool wait = false );
 };
 
 extern iecBus IEC;
