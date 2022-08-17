@@ -6,11 +6,11 @@
 
 MeatHttpClient* HttpFile::formHeader() {
     if(client == nullptr) {
-        Debug_printf("Client was not present, creating");
+        Debug_printv("Client was not present, creating");
         client = new MeatHttpClient();
 
         // let's just get the headers so we have some info
-        Debug_printf("Client requesting head");
+        Debug_printv("Client requesting head");
         client->HEAD(url);
     }
     return client;
@@ -334,7 +334,7 @@ int MeatHttpClient::tryOpen(esp_http_client_method_t meth) {
     if ( url.size() < 5)
         return 0;
 
-    mstr::replaceAll(url, "HTTP:", "http:");
+    //mstr::replaceAll(url, "HTTP:", "http:");
     esp_http_client_config_t config = {
         .url = url.c_str(),
         .user_agent = USER_AGENT,
