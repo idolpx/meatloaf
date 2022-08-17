@@ -57,9 +57,9 @@ device_state_t iecDrive::process ( void )
     // IEC.protocol.pull ( PIN_IEC_SRQ );
     // Debug_printf ( "bus_state[%d]", IEC.bus_state );
 
-    Debug_printf ( "DEVICE: [%.2d] ", this->data.device );
+    Debug_printf ( "   DEVICE: [%.2d] ", this->data.device );
 
-    // Debug_printv("DEV primary[%.2X] secondary[%.2X] device[%d], channel[%d] command[%s] ", this->data.primary, this->data.secondary, this->data.device, this->data.channel, this->data.device_command.c_str());
+    //Debug_printv("DEV primary[%.2X] secondary[%.2X] device[%d], channel[%d] command[%s] ", this->data.primary, this->data.secondary, this->data.device, this->data.channel, this->data.device_command.c_str());
 
     if ( this->data.secondary == IEC_OPEN )
     {
@@ -67,7 +67,7 @@ device_state_t iecDrive::process ( void )
 		handleListenCommand();
 		if ( m_filename.size() == 0 )
 		{
-			Debug_printv("No file set");
+			//Debug_printv("No file set");
 			return DEVICE_LISTEN;
 		}
 
@@ -115,14 +115,14 @@ device_state_t iecDrive::process ( void )
             if ( this->data.channel != CMD_CHANNEL )
             {
                 // Receive data
-                Debug_printv ( "[Receive data]" );
+                //Debug_printv ( "[Receive data]" );
                 handleListenData();
             }
         }
         else if ( this->device_state == DEVICE_TALK )
         {
             // Send data
-            Debug_printv ( "[Send data]" );
+            //Debug_printv ( "[Send data]" );
             handleTalk ( this->data.channel );
 			if ( this->data.channel < 2 )
 			{
@@ -151,7 +151,7 @@ device_state_t iecDrive::process ( void )
 
 void iecDrive::sendFileNotFound(void)
 {
-	Debug_printv("file not found");
+	Debug_println("FILE NOT FOUND!");
 	setDeviceStatus(62);
 	this->device_state = DEVICE_ERROR;
  	IEC.senderTimeout();
@@ -163,10 +163,10 @@ void iecDrive::sendStatus(void)
 	if (status.size() == 0)
 		status = "00, OK,00,00";
 
-	Debug_printv("status: {%s}", status.c_str());
+	//Debug_printv("status: {%s}", status.c_str());
 
  	size_t bytes_sent = IEC.send(status, 0);
-	Debug_printv("len[%d] bytes_sent[%d]", status.length(), bytes_sent);
+	//Debug_printv("len[%d] bytes_sent[%d]", status.length(), bytes_sent);
 	Debug_printf("\r\n{%s}\r\n", status.substr(0, bytes_sent).c_str());
 
 	// Clear the status
@@ -263,7 +263,7 @@ void iecDrive::setDeviceStatus(int number, int track, int sector)
 			m_device_status = "126,NODE NOT FOUND,00,00";
 			break;
 	}
-	Debug_printv("status[%s]", m_device_status.c_str());
+	//Debug_printv("status[%s]", m_device_status.c_str());
 }
 
 
@@ -354,7 +354,7 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 			//else if ( channel != 15 )
 			//	guessedPath = command;
 
-			Debug_printv("guessedPath[%s]", guessedPath.c_str());
+			//Debug_printv("guessedPath[%s]", guessedPath.c_str());
 		}
 		else if(mstr::startsWith(command, "@info", false))
 		{
@@ -405,7 +405,7 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 		tuple.rawPath = guessedPath;
 
 		//Debug_printv("found command     [%s]", tuple.command.c_str());
-		Debug_printv("command[%s] raw[%s] full[%s]", tuple.command.c_str(), tuple.rawPath.c_str(), tuple.fullPath.c_str());
+		//Debug_printv("command[%s] raw[%s] full[%s]", tuple.command.c_str(), tuple.rawPath.c_str(), tuple.fullPath.c_str());
 
 		if(guessedPath == "$")
 		{
@@ -481,7 +481,7 @@ void iecDrive::handleListenCommand( void )
 
 	if (this->data.device_command.length() == 0 )
 	{
-		Debug_printv("No command to process");
+		//Debug_printv("No command to process");
 
 		if ( this->data.channel == CMD_CHANNEL )
 			m_openState = O_STATUS;
@@ -489,18 +489,18 @@ void iecDrive::handleListenCommand( void )
 	}
 
 	// Parse DOS Command
-	Debug_printv("Parse DOS Command [%s]", this->data.device_command.c_str());
+	//Debug_printv("Parse DOS Command [%s]", this->data.device_command.c_str());
 
 	// Execute DOS Command
 	if ( this->data.channel == CMD_CHANNEL )
 	{
-		Debug_printv("Execute DOS Command [%s]", this->data.device_command.c_str());
+		//Debug_printv("Execute DOS Command [%s]", this->data.device_command.c_str());
 	}
 
 
 	// 1. obtain command and fullPath
 	auto commandAndPath = parseLine(this->data.device_command, channel);
-	Debug_printv("command[%s] path[%s]", commandAndPath.command.c_str(), commandAndPath.fullPath.c_str());	
+	//Debug_printv("command[%s] path[%s]", commandAndPath.command.c_str(), commandAndPath.fullPath.c_str());	
 	auto referencedPath = Meat::New<MFile>(commandAndPath.fullPath);
 
 	if ( referencedPath == nullptr )
@@ -510,7 +510,7 @@ void iecDrive::handleListenCommand( void )
 		return;
 	}
 
-	Debug_printv("command[%s] path[%s]", commandAndPath.command.c_str(), commandAndPath.fullPath.c_str());
+	//Debug_printv("command[%s] path[%s]", commandAndPath.command.c_str(), commandAndPath.fullPath.c_str());
 	if (mstr::startsWith(commandAndPath.command, "$"))
 	{
 		m_openState = O_DIR;
@@ -930,7 +930,7 @@ bool iecDrive::sendFile()
 	auto istream = retrieveStream();
 	if ( istream == nullptr )
 	{
-		Debug_printv("Stream not found!");
+		//Debug_printv("Stream not found!");
 		sendFileNotFound();
 		return false;
 	}
@@ -1047,7 +1047,7 @@ bool iecDrive::sendFile()
 			// Exit if ATN is PULLED while sending
 			if ( IEC.protocol.flags bitand ATN_PULLED )
 			{
-				Debug_printv("ATN pulled while sending. i[%d]", i);
+				//Debug_printv("ATN pulled while sending. i[%d]", i);
 				// Save file pointer position
 				// streamUpdate( istream );
 				istream->seek(istream->position() - 1);

@@ -86,12 +86,12 @@ std::shared_ptr<MStream> iecDevice::retrieveStream ( void )
 
     if ( streams.find ( key ) != streams.end() )
     {
-        Debug_printv("Stream retrieved. key[%d]", key);
+        //Debug_printv("Stream retrieved. key[%d]", key);
         return streams.at ( key );
     }
     else
     {
-		Debug_printv("Error! Trying to recall not-registered stream!");
+		//Debug_printv("Error! Trying to recall not-registered stream!");
         return nullptr;
     }
 }
@@ -100,11 +100,11 @@ std::shared_ptr<MStream> iecDevice::retrieveStream ( void )
 // IEC channel on some IEC device
 bool iecDevice::registerStream (std::ios_base::open_mode mode, std::string m_filename)
 {
-    Debug_printv("m_filename[%s]", m_filename.c_str());
+    //Debug_printv("m_filename[%s]", m_filename.c_str());
     auto file = Meat::New<MFile>(m_filename);
     std::shared_ptr<MStream> new_stream;
 
-    Debug_printv("m_filename[%s]", m_filename.c_str());
+    //Debug_printv("m_filename[%s]", m_filename.c_str());
     if(mode == std::ios_base::in) {
         new_stream = std::shared_ptr<MIStream>(file->inputStream());
     }
@@ -114,7 +114,7 @@ bool iecDevice::registerStream (std::ios_base::open_mode mode, std::string m_fil
 
 	if( !new_stream->isOpen() )
 	{
-		Debug_printv("Error creating istream");
+		//Debug_printv("Error creating istream");
 		return false;
 	}
     else
@@ -127,7 +127,7 @@ bool iecDevice::registerStream (std::ios_base::open_mode mode, std::string m_fil
     auto newPair = std::make_pair ( key, new_stream );
     streams.insert ( newPair );
 
-    Debug_printv("Stream created. key[%d]", key);
+    //Debug_printv("Stream created. key[%d]", key);
     return true;
 }
 
@@ -138,7 +138,7 @@ bool iecDevice::closeStream ( bool close_all )
 
     if ( found != streams.end() )
     {
-        Debug_printv("Stream closed. key[%d]", key);
+        //Debug_printv("Stream closed. key[%d]", key);
         auto closingStream = (*found).second;
         closingStream->close();
         return streams.erase ( key );
@@ -280,7 +280,7 @@ void iecBus::service ( void )
         // Check for error
         if ( c == 0xFFFFFFFF || protocol.flags bitand ERROR )
         {
-            Debug_printf ( "Error reading command" );
+            //Debug_printv ( "Error reading command" );
             this->bus_state = BUS_ERROR;
         }
         else
@@ -344,7 +344,7 @@ void iecBus::service ( void )
                     this->data.secondary = IEC_OPEN;
                     this->data.channel = c xor IEC_OPEN;
                     this->bus_state = BUS_PROCESS;
-                    //process_command = true;
+                    process_command = true;
                     Debug_printf ( " (F0 OPEN   %.2d CHANNEL)\r\n", this->data.channel );
                     break;
 
@@ -352,7 +352,7 @@ void iecBus::service ( void )
                     this->data.secondary = IEC_DATA;
                     this->data.channel = c xor IEC_DATA;
                     this->bus_state = BUS_PROCESS;
-                    //process_command = true;
+                    process_command = true;
                     Debug_printf ( " (60 DATA   %.2d CHANNEL)\r\n", this->data.channel );
                     break;
 
@@ -360,12 +360,12 @@ void iecBus::service ( void )
                     this->data.secondary = IEC_CLOSE;
                     this->data.channel = c xor IEC_CLOSE;
                     this->bus_state = BUS_PROCESS;
-                    //process_command = true;
+                    process_command = true;
                     Debug_printf ( " (E0 CLOSE  %.2d CHANNEL)\r\n", this->data.channel );
                     break; 
             }
 
-            //Debug_printf ( "code[%.2X] primary[%.2X] secondary[%.2X] bus[%d]", command, this->data.primary, this->data.secondary, this->bus_state );
+            // Debug_printf ( "code[%.2X] primary[%.2X] secondary[%.2X] bus[%d]", command, this->data.primary, this->data.secondary, this->bus_state );
 
             // Is this command for us?
             if ( !isDeviceEnabled( this->data.device ) )
@@ -380,7 +380,7 @@ void iecBus::service ( void )
         if ( this->bus_state < BUS_ACTIVE )
         {
             releaseLines();
-            Debug_printv("release lines");
+            //Debug_printv("release lines");
             this->data.init();
         }
 
@@ -391,7 +391,7 @@ void iecBus::service ( void )
     else
     {
         // If no secondary was set, process primary with defaults
-        if ( this->data.primary > 0 )
+        if ( this->data.primary > IEC_GLOBAL )
         {
             process_command = true;
         }
@@ -406,23 +406,15 @@ void iecBus::service ( void )
         // Data Mode - Get Command or Data
         if ( this->data.primary == IEC_LISTEN )
         {
-            // Debug_printf( "deviceListen" );
+            //Debug_printv( "deviceListen" );
             this->bus_state = deviceListen();
         }
         else if ( this->data.primary == IEC_TALK )
         {
-            // Debug_printf( "deviceTalk" );
+            //Debug_printv( "deviceTalk" );
             //Debug_printf ( " (40 TALK   %.2d DEVICE %.2x SECONDARY %.2d CHANNEL)\r\n", this->data.device, this->data.secondary, this->data.channel );
             this->bus_state = deviceTalk();   
         }
-
-        // // Is this command for us?
-        // if ( !isDeviceEnabled( this->data.device ) )
-        // {
-        //     // Nope... let's snoop the data on the bus
-        //     if ( this->data.primary == IEC_TALK )
-        //         this->data.primary = IEC_LISTEN;
-        // }
 
         // Queue control codes and command in specified device
         // At the moment there is only the multi-drive device
@@ -430,9 +422,10 @@ void iecBus::service ( void )
 
         // Process commands in devices
         // At the moment there is only the multi-drive device
+        //Debug_printv( "deviceProcess" );
         if ( drive.process() < DEVICE_ACTIVE || device_state < DEVICE_ACTIVE )
         {
-            Debug_printv("device idle");
+            //Debug_printv("device idle");
             this->data.init();
         }
 
@@ -510,7 +503,7 @@ bus_state_t iecBus::deviceListen ( void )
             Debug_printf ( "\r\n" );            
         }
 
-        Debug_printv("listen complete");
+        //Debug_printv("listen complete");
         return BUS_PROCESS;
     }
 
@@ -706,7 +699,7 @@ bool iecBus::sendEOI ( uint8_t data )
     //IEC.protocol.release(PIN_IEC_SRQ);
 
     releaseLines();
-    Debug_printv("release lines");
+    //Debug_printv("release lines");
     this->bus_state = BUS_IDLE;
 
     // BETWEEN BYTES TIME
@@ -723,7 +716,7 @@ bool iecBus::senderTimeout()
     //protocol.pull( PIN_IEC_SRQ );
     // Message file not found by just releasing lines
     releaseLines();
-    Debug_printv("release lines");
+    //Debug_printv("release lines");
     this->bus_state = BUS_ERROR;
 
     // Signal an empty stream

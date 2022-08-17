@@ -65,9 +65,9 @@ MIStream* FlashFile::inputStream()
 {
     std::string full_path = basepath + path;
     MIStream* istream = new FlashIStream(full_path);
-    Debug_printv("FlashFile::inputStream() 3, not null=%d", istream != nullptr);
+    //Debug_printv("FlashFile::inputStream() 3, not null=%d", istream != nullptr);
     istream->open();   
-    Debug_printv("FlashFile::inputStream() 4");
+    //Debug_printv("FlashFile::inputStream() 4");
     return istream;
 }
 
@@ -115,7 +115,7 @@ bool FlashFile::exists()
         return true;
     }
 
-    Debug_printv( "basepath[%s] path[%s]", basepath.c_str(), path.c_str() );
+    //Debug_printv( "basepath[%s] path[%s]", basepath.c_str(), path.c_str() );
 
     struct stat st;
     int i = stat(std::string(basepath + path).c_str(), &st);
@@ -330,7 +330,7 @@ bool FlashIStream::open() {
 
     //Debug_printv("IStream: trying to open flash fs, calling isOpen");
 
-    Debug_printv("IStream: wasn't open, calling obtain");
+    //Debug_printv("IStream: wasn't open, calling obtain");
     handle->obtain(localPath, "r");
 
     if(isOpen()) {
@@ -450,7 +450,7 @@ void FlashHandle::obtain(std::string m_path, std::string mode) {
         delete[] pathStr;
     }
 
-    Debug_printv("m_path[%s] mode[%s]", m_path.c_str(), mode.c_str());
+    //Debug_printv("m_path[%s] mode[%s]", m_path.c_str(), mode.c_str());
     file_h = fopen( m_path.c_str(), mode.c_str());
     // rc = 1;
 
