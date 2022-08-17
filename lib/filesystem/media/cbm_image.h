@@ -23,7 +23,8 @@ class CBMImageStream: public MIStream {
 
 public:
     CBMImageStream(std::shared_ptr<MIStream> is) {
-        containerStream = is; 
+        this->containerStream = is;
+        this->m_isOpen = true;
     }
 
     // MStream methods
@@ -59,8 +60,8 @@ protected:
     bool seekCalled = false;
     std::shared_ptr<MIStream> containerStream;
 
-    bool m_isOpen;
-    size_t m_length;
+    bool m_isOpen = false;
+    size_t m_length = 0;
     size_t m_bytesAvailable = 0;
     size_t m_position = 0;
 

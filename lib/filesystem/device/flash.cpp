@@ -328,20 +328,20 @@ bool FlashIStream::open() {
     if(isOpen())
         return true;
 
-    Debug_printv("IStream: trying to open flash fs, calling isOpen");
+    //Debug_printv("IStream: trying to open flash fs, calling isOpen");
 
     Debug_printv("IStream: wasn't open, calling obtain");
     handle->obtain(localPath, "r");
 
     if(isOpen()) {
-        Debug_printv("IStream: past obtain");
+        //Debug_printv("IStream: past obtain");
         // Set file size
         fseek(handle->file_h, 0, SEEK_END);
-        Debug_printv("IStream: past fseek 1");
+        //Debug_printv("IStream: past fseek 1");
         _size = ftell(handle->file_h);
-        Debug_printv("IStream: past ftell");
+        //Debug_printv("IStream: past ftell");
         fseek(handle->file_h, 0, SEEK_SET);
-        Debug_printv("IStream: past fseek 2");
+        //Debug_printv("IStream: past fseek 2");
         return true;
     }
     return false;
