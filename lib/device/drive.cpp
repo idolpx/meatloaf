@@ -294,6 +294,13 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 	// Debug_printv("we are in              [%s]", m_mfile->url.c_str());
 	// Debug_printv("unprocessed user input [%s]", command.c_str());
 
+	// Chop off type, mode
+	if ( mstr::contains(command, ",") )
+	{
+		int pos = command.find(",");
+		command = command.substr(0, pos);
+	}
+
 	if (mstr::startsWith(command, "*"))
 	{
 		// Find first program in listing
