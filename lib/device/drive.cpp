@@ -104,7 +104,7 @@ device_state_t iecDrive::process ( void )
     {
 
         // Open either file or prg for reading, writing or single line command on the command channel.
-        handleListenCommand(); 
+        //handleListenCommand(); 
 
         // IEC.protocol.pull(PIN_IEC_SRQ);
         if ( this->device_state == DEVICE_LISTEN )
@@ -394,8 +394,8 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 		mstr::rtrim(guessedPath);
 		tuple.rawPath = guessedPath;
 
-		// Debug_printv("found command     [%s]", tuple.command.c_str());
-		// Debug_printv("command[%s] raw[%s] full[%s]", tuple.command.c_str(), tuple.rawPath.c_str(), tuple.fullPath.c_str());
+		//Debug_printv("found command     [%s]", tuple.command.c_str());
+		Debug_printv("command[%s] raw[%s] full[%s]", tuple.command.c_str(), tuple.rawPath.c_str(), tuple.fullPath.c_str());
 
 		if(guessedPath == "$")
 		{
@@ -490,6 +490,7 @@ void iecDrive::handleListenCommand( void )
 
 	// 1. obtain command and fullPath
 	auto commandAndPath = parseLine(this->data.device_command, channel);
+	Debug_printv("command[%s] path[%s]", commandAndPath.command.c_str(), commandAndPath.fullPath.c_str());	
 	auto referencedPath = Meat::New<MFile>(commandAndPath.fullPath);
 
 	if ( referencedPath == nullptr )
