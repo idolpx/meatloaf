@@ -15,11 +15,14 @@
 // You should have received a copy of the GNU General Public License
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
-#ifndef IEC_H
-#define IEC_H
+#ifndef MEATLIB_BUS_IEC
+#define MEATLIB_BUS_IEC
 
 #include <forward_list>
 #include <unordered_map>
+
+#include "meat_io.h"
+#include "meat_stream.h"
 
 #include "protocol/cbmstandardserial.h"
 //#include "protocol/jiffydos.h"
@@ -36,19 +39,20 @@ typedef enum
 {
     DEVICE_ERROR = -1,
     DEVICE_IDLE = 0,       // Ready and waiting
-    DEVICE_LISTEN = 1,     // A command is recieved and data is coming to us
-    DEVICE_TALK = 2,       // A command is recieved and we must talk now
-    DEVICE_PROCESS = 3,    // Execute device command
+    DEVICE_ACTIVE = 1,
+    DEVICE_LISTEN = 2,     // A command is recieved and data is coming to us
+    DEVICE_TALK = 3,       // A command is recieved and we must talk now
+    DEVICE_PROCESS = 4,    // Execute device command
 } device_state_t;
 
 class IECData
 {
     public:
-        uint8_t primary;
-        uint8_t device;
-        uint8_t secondary;
-        uint8_t channel;
-        std::string device_command;
+        uint8_t primary = 0;
+        uint8_t device = 0;
+        uint8_t secondary = 0;
+        uint8_t channel = 0;
+        std::string device_command = "";
 
 		void init ( void ) {
 			primary = 0;
@@ -63,17 +67,9 @@ class IECData
 class CommandPathTuple
 {
     public:
-        std::string command;
-        std::string fullPath;
-        std::string rawPath;
-};
-
-class Channel
-{
-    public:
-        std::string url;
-        uint32_t cursor;
-        bool writing;
+        std::string command = "";
+        std::string fullPath = "";
+        std::string rawPath = "";
 };
 
 //
@@ -87,13 +83,13 @@ class iecDevice
     public:
         // Return values for service:
 
-        std::unordered_map<uint16_t, Channel> channels;
+        std::unordered_map<uint16_t, std::shared_ptr<MStream>> streams;
 
         iecDevice();
         ~iecDevice() {};
 
         device_state_t queue_command ( void );
-        bool process ( void );
+        virtual device_state_t process ( void ) = 0;
 
         virtual uint8_t command ( void ) = 0;
         virtual uint8_t execute ( void ) = 0;
@@ -110,14 +106,12 @@ class iecDevice
         virtual void handleListenCommand ( void ) = 0;
         virtual void handleListenData ( void ) = 0;
         virtual void handleTalk ( uint8_t chan ) = 0;
-        virtual void handleOpen ( void );
-        virtual void handleClose ( void );
 
         // Named Channel functions
-        Channel currentChannel;
-        Channel channelSelect ( void );
-        void channelUpdate ( size_t cursor );
-        bool channelClose ( bool close_all = false );
+        std::shared_ptr<MStream> currentStream;
+        bool registerStream (int mode, std::string m_filename);
+        std::shared_ptr<MStream> retrieveStream ( void );
+        bool closeStream ( bool close_all = false );
 
         // This is set after an open command and determines what to send next
         uint8_t m_openState;
@@ -196,7 +190,7 @@ class iecBus
         bool sendEOI ( uint8_t data );
 
         // A special send command that informs file not found condition
-        bool sendFNF();
+        bool senderTimeout();
 
         // Recieves a byte
         int16_t receive ( uint8_t device = 0 );
@@ -215,6 +209,8 @@ class iecBus
 
         void debugTiming();
 
+        void releaseLines ( bool wait = false );
+
     private:
         // IEC Bus Commands
         bus_state_t deviceListen ( void ); // 0x20 + device_id   Listen, device (0–30)
@@ -226,10 +222,8 @@ class iecBus
 		// device_state_t deviceOpen(void);      // 0xF0 + channel     Open, channel (0–15)
 		bool turnAround( void );
         bool undoTurnAround ( void );
-
-        void releaseLines ( bool wait = false );
 };
 
 extern iecBus IEC;
 
-#endif // IEC_H
+#endif /* MEATLIB_BUS_IEC */

@@ -40,16 +40,12 @@
 #endif
 
 /* LED Strip */
-#define CONFIG_GPIO_NUM 27
-#define CONFIG_RMT_CHANNEL 0 // 0-7
-#define CONFIG_RGB_LED_TYPE 0 // 0=WS2812, 1=SK6812, 2=APA106
-#define CONFIG_LED_STRIP_LENGTH 5
-
-#define CONFIG_LED_PIN 27
-#define CONFIG_LED_COUNT 20
-#define CONFIG_DEFAULT_EFFECT_COMMAND "rainbow"
-#define CONFIG_FRAME_DELAY 5000
-
+#define NUM_LEDS 5
+#define DATA_PIN_1 27 
+#define DATA_PIN_2 14
+#define BRIGHTNESS  25
+#define LED_TYPE    WS2811
+#define COLOR_ORDER RGB
 
 /* Audio Output */
 #define PIN_DAC1 25 // samlib.h

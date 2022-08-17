@@ -57,6 +57,7 @@ public:
 	uint8_t execute( void ) override { return 0; };
 	uint8_t status(void) override { return 0; };
 	void reset(void) override;	
+	device_state_t process ( void ) override;
 
 protected:
 	// handler helpers.
@@ -82,8 +83,9 @@ private:
 	// File LOAD / SAVE
 	void prepareFileStream(std::string url);
 	MFile* getPointed(MFile* urlFile);
-	void sendFile();
-	void saveFile();
+
+	bool sendFile();
+	bool saveFile();
 
 	// Device Status
 	std::string m_device_status = "";
@@ -103,6 +105,6 @@ private:
 	void dumpState();
 };
 
-extern iecDrive disk;
+extern iecDrive drive;
 
 #endif // DEVICE_DRIVE_H
