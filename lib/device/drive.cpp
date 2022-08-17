@@ -156,33 +156,18 @@ void iecDrive::sendFileNotFound(void)
 
 void iecDrive::sendStatus(void)
 {
-	static size_t position = 0;
 	std::string status = m_device_status;
 	if (status.size() == 0)
 		status = "00, OK,00,00";
 
-	//Debug_printv("status: {%s}", status.c_str());
-	//Debug_print("[");
+	Debug_printv("status: {%s}", status.c_str());
 
- 	size_t bytes_sent = IEC.send(status, position);
+ 	size_t bytes_sent = IEC.send(status, 0);
 	Debug_printv("len[%d] bytes_sent[%d]", status.length(), bytes_sent);
-	if ( bytes_sent == status.length() )
-	{
-		m_device_status.clear();
-		position = 0;
-	}
-	else
-	{
-		position = bytes_sent - 1;
-		IEC.releaseLines();
-		Debug_printv("release lines");
-	}
-	
-	//Debug_println(BACKSPACE "]");
-
 	Debug_printf("\r\n{%s}\r\n", status.substr(0, bytes_sent).c_str());
 
-	// Clear the status message
+	// Clear the status
+	m_device_status.clear();
 } // sendStatus
 
 void iecDrive::setDeviceStatus(int number, int track, int sector)
@@ -275,6 +260,7 @@ void iecDrive::setDeviceStatus(int number, int track, int sector)
 			m_device_status = "126,NODE NOT FOUND,00,00";
 			break;
 	}
+	Debug_printv("status[%s]", m_device_status.c_str());
 }
 
 
@@ -634,7 +620,7 @@ uint16_t iecDrive::sendLine(uint16_t &basicPtr, uint16_t blocks, const char *for
 	{
 		// Save file pointer position
 		//streamUpdate(basicPtr);
-		setDeviceStatus(74);
+		//setDeviceStatus(74);
 		return 0;
 	}
 
@@ -658,7 +644,7 @@ uint16_t iecDrive::sendLine(uint16_t &basicPtr, uint16_t blocks, char *text)
 	{
 		// Save file pointer position
 		// streamUpdate(basicPtr);
-		setDeviceStatus(74);
+		//setDeviceStatus(74);
 		return 0;
 	}
 
@@ -861,7 +847,7 @@ void iecDrive::sendListing()
 			{
 				// Save file pointer position
 				// streamUpdate(byte_count);
-				setDeviceStatus(74);
+				//setDeviceStatus(74);
 				return;
 			}
 
@@ -1054,7 +1040,7 @@ bool iecDrive::sendFile()
 				// Save file pointer position
 				// streamUpdate( istream );
 				istream->seek(istream->position() - 1);
-				setDeviceStatus( 74 );
+				//setDeviceStatus( 74 );
 				success = true;
 				break;
 			}
