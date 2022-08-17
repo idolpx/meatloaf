@@ -311,12 +311,15 @@ void iecBus::service ( void )
                 case IEC_LISTEN:
                     this->data.primary = IEC_LISTEN;
                     this->data.device = c xor IEC_LISTEN;
+                    this->data.secondary = IEC_DATA;    // Default secondary command
+                    this->data.channel = CMD_CHANNEL;   // Default channel
+                    this->bus_state = BUS_ACTIVE;
                     Debug_printf ( " (20 LISTEN %.2d DEVICE)\r\n", this->data.device );
                     break;
 
                 case IEC_UNLISTEN:
                     this->data.primary = IEC_UNLISTEN;
-                    this->data.secondary = 0;
+                    this->data.secondary = 0x00;
                     this->bus_state = BUS_IDLE;
                     Debug_printf ( " (3F UNLISTEN)\r\n" );
                     break;
@@ -324,12 +327,15 @@ void iecBus::service ( void )
                 case IEC_TALK:
                     this->data.primary = IEC_TALK;
                     this->data.device = c xor IEC_TALK;
+                    this->data.secondary = IEC_DATA;    // Default secondary command
+                    this->data.channel = CMD_CHANNEL;   // Default channel
+                    this->bus_state = BUS_ACTIVE;
                     Debug_printf ( " (40 TALK   %.2d DEVICE)\r\n", this->data.device );
                     break;
 
                 case IEC_UNTALK:
                     this->data.primary = IEC_UNTALK;
-                    this->data.secondary = 0;
+                    this->data.secondary = 0x00;
                     this->bus_state = BUS_IDLE;
                     Debug_printf ( " (5F UNTALK)\r\n" );
                     break;
@@ -338,7 +344,7 @@ void iecBus::service ( void )
                     this->data.secondary = IEC_OPEN;
                     this->data.channel = c xor IEC_OPEN;
                     this->bus_state = BUS_PROCESS;
-                    process_command = true;
+                    //process_command = true;
                     Debug_printf ( " (F0 OPEN   %.2d CHANNEL)\r\n", this->data.channel );
                     break;
 
@@ -346,7 +352,7 @@ void iecBus::service ( void )
                     this->data.secondary = IEC_DATA;
                     this->data.channel = c xor IEC_DATA;
                     this->bus_state = BUS_PROCESS;
-                    process_command = true;
+                    //process_command = true;
                     Debug_printf ( " (60 DATA   %.2d CHANNEL)\r\n", this->data.channel );
                     break;
 
@@ -354,18 +360,18 @@ void iecBus::service ( void )
                     this->data.secondary = IEC_CLOSE;
                     this->data.channel = c xor IEC_CLOSE;
                     this->bus_state = BUS_PROCESS;
-                    process_command = true;
+                    //process_command = true;
                     Debug_printf ( " (E0 CLOSE  %.2d CHANNEL)\r\n", this->data.channel );
                     break; 
             }
 
-            // Debug_printf ( "code[%.2X] primary[%.2X] secondary[%.2X] bus[%d]", command, this->data.primary, this->data.secondary, this->bus_state );
+            Debug_printf ( "code[%.2X] primary[%.2X] secondary[%.2X] bus[%d]", command, this->data.primary, this->data.secondary, this->bus_state );
 
             // Is this command for us?
             if ( !isDeviceEnabled( this->data.device ) )
             {
                 this->bus_state = BUS_IDLE;
-                process_command = false;
+                //process_command = false;
             }
 
         }
@@ -375,11 +381,20 @@ void iecBus::service ( void )
         {
             releaseLines();
             Debug_printv("release lines");
+            this->data.init();
         }
 
         // Debug_printf ( "code[%.2X] primary[%.2X] secondary[%.2X] bus[%d]", command, this->data.primary, this->data.secondary, this->bus_state );
         // Debug_printf( "primary[%.2X] secondary[%.2X] bus_state[%d]", this->data.primary, this->data.secondary, this->bus_state );
         // protocol.release ( PIN_IEC_SRQ );
+    }
+    else
+    {
+        // If no secondary was set, process primary with defaults
+        if ( this->data.primary > 0 )
+        {
+            process_command = true;
+        }
     }
 
     if ( process_command )
@@ -397,6 +412,7 @@ void iecBus::service ( void )
         else if ( this->data.primary == IEC_TALK )
         {
             // Debug_printf( "deviceTalk" );
+            Debug_printf ( " (40 TALK   %.2d DEVICE %.2x SECONDARY %.2d CHANNEL)\r\n", this->data.device, this->data.secondary, this->data.channel );
             this->bus_state = deviceTalk();   
         }
 
@@ -453,11 +469,14 @@ bus_state_t iecBus::deviceListen ( void )
         std::string listen_command = "";
 
         // ATN might get pulled right away if there is no command string to send
-        protocol.wait( 60 );
+        protocol.wait( TIMING_STABLE );
 
         while ( protocol.status ( PIN_IEC_ATN ) != PULLED )
         {
             int16_t c = receive();
+
+            if ( protocol.flags bitand EMPTY_STREAM )
+                break;
 
             if ( protocol.flags bitand ERROR )
             {
@@ -571,7 +590,7 @@ bool iecBus::turnAround ( void )
     protocol.pull ( PIN_IEC_CLK_OUT );
     delayMicroseconds ( TIMING_Tv );
 
-    Debug_println("turnaround complete");
+    //Debug_println("turnaround complete");
     return true;
 } // turnAround
 

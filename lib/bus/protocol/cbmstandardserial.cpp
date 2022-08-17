@@ -94,11 +94,12 @@ int16_t  CBMStandardSerial::receiveByte ( uint8_t device )
         release ( PIN_IEC_DATA_OUT );
 
         // but still wait for CLK to be PULLED
-        if ( timeoutWait ( PIN_IEC_CLK_IN, PULLED ) == TIMED_OUT )
+        // Is this an empty stream?
+        if ( timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMING_EMPTY ) == TIMED_OUT )
         {
-            Debug_printv ( "After Acknowledge EOI" );
-            flags or_eq ERROR;
-            return -1; // return error because timeout
+            Debug_printv ( "empty stream signaled" );
+            flags or_eq EMPTY_STREAM;
+            return -1; // return error because empty stream
         }
     }
     // release ( PIN_IEC_SRQ );
@@ -358,10 +359,10 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
         if ( !wait ( TIMING_Tfr ) ) return false;
         release ( PIN_IEC_CLK_OUT );
     }
-    else
-    {
-        wait ( TIMING_Tbb );
-    }
+    // else
+    // {
+    //     wait ( TIMING_Tbb );
+    // }
 
     return true;
 } // sendByte

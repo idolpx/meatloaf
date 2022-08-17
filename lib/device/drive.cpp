@@ -104,7 +104,10 @@ device_state_t iecDrive::process ( void )
     {
 
         // Open either file or prg for reading, writing or single line command on the command channel.
-        //handleListenCommand(); 
+        if ( this->data.channel == CMD_CHANNEL )
+		{
+			handleListenCommand(); 			
+		}
 
         // IEC.protocol.pull(PIN_IEC_SRQ);
         if ( this->device_state == DEVICE_LISTEN )
