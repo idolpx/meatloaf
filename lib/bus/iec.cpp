@@ -365,7 +365,7 @@ void iecBus::service ( void )
                     break; 
             }
 
-            Debug_printf ( "code[%.2X] primary[%.2X] secondary[%.2X] bus[%d]", command, this->data.primary, this->data.secondary, this->bus_state );
+            //Debug_printf ( "code[%.2X] primary[%.2X] secondary[%.2X] bus[%d]", command, this->data.primary, this->data.secondary, this->bus_state );
 
             // Is this command for us?
             if ( !isDeviceEnabled( this->data.device ) )
@@ -412,7 +412,7 @@ void iecBus::service ( void )
         else if ( this->data.primary == IEC_TALK )
         {
             // Debug_printf( "deviceTalk" );
-            Debug_printf ( " (40 TALK   %.2d DEVICE %.2x SECONDARY %.2d CHANNEL)\r\n", this->data.device, this->data.secondary, this->data.channel );
+            //Debug_printf ( " (40 TALK   %.2d DEVICE %.2x SECONDARY %.2d CHANNEL)\r\n", this->data.device, this->data.secondary, this->data.channel );
             this->bus_state = deviceTalk();   
         }
 
