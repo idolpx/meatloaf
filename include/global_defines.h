@@ -59,7 +59,7 @@
 
 // Enable this to show the data stream while loading
 // Make sure device baud rate and monitor_speed = 921600
-#define DATA_STREAM
+//#define DATA_STREAM
 
 // Enable this to show the data stream for other devices
 // Listens to all commands and data to all devices
