@@ -7,3 +7,6 @@
 [submodule "components/webdav"]
 	path = components/webdav
 	url = https://github.com/zonque/WebDavServer.git
+[submodule "components/esp32-I2Cbus"]
+	path = components/esp32-I2Cbus
+	url = https://github.com/natanaeljr/esp32-I2Cbus.git
