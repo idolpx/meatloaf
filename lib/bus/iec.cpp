@@ -709,8 +709,7 @@ bool iecBus::sendEOI ( uint8_t data )
 } // sendEOI
 
 
-// A special send command that informs file not found condition
-//
+// Informs listener(s) there is no data to receive
 bool iecBus::senderTimeout()
 {
     //protocol.pull( PIN_IEC_SRQ );
