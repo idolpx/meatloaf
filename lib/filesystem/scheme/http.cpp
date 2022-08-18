@@ -210,6 +210,8 @@ bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
     url = dstUrl;
     wasRedirected = false;
 
+    close();
+    
     Debug_printv("url[%s]", url.c_str());
     int httpCode = tryOpen(meth);
 

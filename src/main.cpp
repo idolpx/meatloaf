@@ -20,6 +20,9 @@
 #include "display.h"
 #endif
 
+#include "sound.h"
+#include "parallel.h"
+
 #include "fnSystem.h"
 #include "fnWiFi.h"
 
@@ -232,6 +235,14 @@ extern "C"
         //neopixel_main();  // neopixel lib
 
         display_app_main(); // fastled lib
+#endif
+
+#ifdef PIEZO_BUZZER
+        mlSoundManager.setup(); // start sound
+#endif
+
+#ifdef PARALLEL_IO
+        parallel_setup();
 #endif
 
         // Sit here twiddling our thumbs
