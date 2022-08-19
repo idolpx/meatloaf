@@ -22,11 +22,6 @@
 
 #include "sound.h"
 
-#ifdef PARALLEL_BUS
-    #include "parallel.h"
-#endif
-
-
 #include "fnSystem.h"
 #include "fnWiFi.h"
 
@@ -46,6 +41,9 @@
 #include "iec.h"
 #include "ml_tests.h"
 
+#ifdef PARALLEL_BUS
+    #include "parallel.h"
+#endif
 
 std::string statusMessage;
 bool initFailed = false;

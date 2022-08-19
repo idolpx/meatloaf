@@ -100,7 +100,7 @@ device_state_t iecDrive::process ( void )
 			}
         }
     }
-    else if ( this->data.secondary == IEC_DATA )
+    else if ( this->data.secondary == IEC_REOPEN )
     {
 
         // Open either file or prg for reading, writing or single line command on the command channel.

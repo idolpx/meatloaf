@@ -34,22 +34,27 @@ static void ml_parallel_intr_task(void* arg)
         if(xQueueReceive(ml_parallel_evt_queue, &io_num, portMAX_DELAY)) 
         {
             // Read I/O lines
-            uint8_t byte = PARALLEL.readByte();
-            Debug_printv(BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN, BYTE_TO_BINARY(PARALLEL.flags), BYTE_TO_BINARY(PARALLEL.data));
-       
+            uint8_t buffer[2];
+            myI2C.readBytes( 0x20, 0x00, 2, buffer );
+            PARALLEL.flags = buffer[0];
+            PARALLEL.data = buffer[1];
+                   
             if ( PARALLEL.status( PA2 ) )
             {
                 PARALLEL.mode = MODE_RECEIVE;
+                Debug_printv("receive <<< " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
             }
             else
             {
                 PARALLEL.mode = MODE_SEND;
+                Debug_printv("send >>> " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
             }
+
 
             if ( PARALLEL.status(ATN) )
             {
                 // Set Mode
-                if ( IEC.data.secondary == IEC_OPEN || IEC.data.secondary == IEC_DATA )
+                if ( IEC.data.secondary == IEC_OPEN || IEC.data.secondary == IEC_REOPEN )
                 {
                     IEC.protocol.flags xor_eq DOLPHIN_ACTIVE;
                     Debug_printv("dolphindos");
@@ -67,7 +72,9 @@ static void ml_parallel_intr_task(void* arg)
 void parallelBus::setup ()
 {
     // Setup i2c device
-    myI2C.begin(GPIO_NUM_21, GPIO_NUM_22, 400000);
+    myI2C.begin(GPIO_NUM_21, GPIO_NUM_22, 400000); // 400Khz Default
+    //myI2C.begin(GPIO_NUM_21, GPIO_NUM_22, 800000); // 800Khz Overclocked
+    //myI2C.begin(GPIO_NUM_21, GPIO_NUM_22, 1000000); // 1Mhz Overclocked
     myI2C.setTimeout(10);
     //myI2C.scanner();
     

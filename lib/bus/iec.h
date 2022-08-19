@@ -138,7 +138,7 @@ typedef enum
     IEC_UNLISTEN = 0x3F,   // 0x3F (UNLISTEN)
     IEC_TALK = 0x40,       // 0x40 + device_id (TALK) (0-30)
     IEC_UNTALK = 0x5F,     // 0x5F (UNTALK)
-    IEC_DATA = 0x60,     // 0x60 + channel (OPEN CHANNEL) (0-15)
+    IEC_REOPEN = 0x60,     // 0x60 + channel (OPEN CHANNEL) (0-15)
     IEC_CLOSE = 0xE0,      // 0xE0 + channel (CLOSE NAMED CHANNEL) (0-15)
     IEC_OPEN = 0xF0        // 0xF0 + channel (OPEN NAMED CHANNEL) (0-15)
 } bus_command_t;
@@ -173,7 +173,7 @@ class iecBus
         
 
         // Checks if CBM is sending an attention message. If this is the case,
-        // the message is recieved and stored in iec_data.
+        // the message is recieved and stored in IEC_REOPEN.
         void service ( void );
 
         void receiveCommand ( void );
