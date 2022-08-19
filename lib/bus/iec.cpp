@@ -280,7 +280,7 @@ void iecBus::service ( void )
         // Check for error
         if ( c == 0xFFFFFFFF || protocol.flags bitand ERROR )
         {
-            //Debug_printv ( "Error reading command" );
+            Debug_printv ( "Error reading command" );
             this->bus_state = BUS_ERROR;
         }
         else

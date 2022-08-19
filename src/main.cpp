@@ -21,7 +21,11 @@
 #endif
 
 #include "sound.h"
-#include "parallel.h"
+
+#ifdef PARALLEL_BUS
+    #include "parallel.h"
+#endif
+
 
 #include "fnSystem.h"
 #include "fnWiFi.h"
@@ -133,6 +137,12 @@ void main_setup()
     IEC.setup();
     Serial.println( ANSI_GREEN_BOLD "IEC Bus Initialized" ANSI_RESET );
 
+#ifdef PARALLEL_BUS
+    // Setup Parallel Bus
+    PARALLEL.setup();
+    Serial.println( ANSI_GREEN_BOLD "Parallel Bus Initialized" ANSI_RESET );
+#endif
+
     // Add devices to bus
     IEC.enabledDevices = DEVICE_MASK;
     IEC.enableDevice(30);
@@ -239,10 +249,6 @@ extern "C"
 
 #ifdef PIEZO_BUZZER
         mlSoundManager.setup(); // start sound
-#endif
-
-#ifdef PARALLEL_IO
-        parallel_setup();
 #endif
 
         // Sit here twiddling our thumbs

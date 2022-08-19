@@ -26,6 +26,7 @@
 
 #include "protocol/cbmstandardserial.h"
 //#include "protocol/jiffydos.h"
+#include "protocol/dolphindos.h"
 
 #include "../../include/debug.h"
 
@@ -160,6 +161,7 @@ class iecBus
         bus_state_t bus_state;
         IECData data;
 
+        //std::unique_ptr<CBMStandardSerial> protocol = CBMStandardSerial();
         CBMStandardSerial protocol;
 
         iecBus ( void );

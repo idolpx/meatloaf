@@ -16,3 +16,23 @@
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
 // https://github.com/MEGA65/open-roms/blob/master/doc/Protocol-DolphinDOS.md
+// https://mega65.github.io/open-roms/doc/Protocol-DolphinDOS.html
+
+
+#ifndef PROTOCOL_DOLPHINDOS_H
+#define PROTOCOL_DOLPHINDOS_H
+
+#include "cbmstandardserial.h"
+#include "parallel.h"
+
+namespace Protocol
+{
+    class DolphinDOS: public CBMStandardSerial
+    {
+        public:
+            int16_t receiveByte ( uint8_t device ) override;
+            bool sendByte ( uint8_t data, bool signalEOI ) override;
+    };
+};
+
+#endif // PROTOCOL_DOLPHINDOS_H
