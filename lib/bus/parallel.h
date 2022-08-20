@@ -8,22 +8,22 @@
 #define I2C_REGISTER  0X00
 
 /* PCF8575 port bits */
-#define P00  0
-#define P01  1
-#define P02  2
-#define P03  3
-#define P04  4
-#define P05  5
-#define P06  6
-#define P07  7
-#define P10  8
-#define P11  9
-#define P12  10
-#define P13  11
-#define P14  12
-#define P15  13
-#define P16  14
-#define P17  15
+#define P00  1
+#define P01  2
+#define P02  3
+#define P03  4
+#define P04  5
+#define P05  6
+#define P06  7
+#define P07  8
+#define P10  9
+#define P11  10
+#define P12  11
+#define P13  12
+#define P14  13
+#define P15  14
+#define P16  15
+#define P17  16
 
 /* User Port to pin mapping */
 // #define FLAG2  P07  // B
@@ -90,11 +90,10 @@ class parallelBus
     void sendByte( uint8_t byte );
     bool status( user_port_pin_t pin );
 
-    uint16_t read_mask = 0b1000000011111111;
-    uint16_t write_mask = 0b1000000011111111;
-
+    uint8_t changed = 0x00;
+    uint8_t last = 0xFF;
     uint8_t flags = 255;
-    uint8_t data = 255;
+    uint8_t data = 0;
     parallel_mode_t mode;
 
 };

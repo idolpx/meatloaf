@@ -26,21 +26,20 @@ static void IRAM_ATTR ml_parallel_isr_handler(void* arg)
 static void ml_parallel_intr_task(void* arg)
 {
     uint32_t io_num;
-    uint8_t buffer[2];
+    uint8_t count = 0;
 
     // Setup default pin modes
-    //myI2C.readBytes( 0x20, 0x00, 2, buffer );
-    PARALLEL.readByte();
     PARALLEL.handShake();
 
     while (1) {
+
+        PARALLEL.sendByte( count++ );
+
         if(xQueueReceive(ml_parallel_evt_queue, &io_num, portMAX_DELAY)) 
         {
             // Read I/O lines, set bits we want to read to 1
-            // myI2C.readBytes( 0x20, 0x00, 2, buffer );
-            // PARALLEL.flags = buffer[0];
-            // PARALLEL.data = buffer[1];
             PARALLEL.readByte();
+            Debug_printv("changed[%d]", PARALLEL.changed);
 
             // Set RECEIVE/SEND mode   
             if ( PARALLEL.status( PA2 ) )
@@ -51,7 +50,7 @@ static void ml_parallel_intr_task(void* arg)
             else
             {
                 PARALLEL.mode = MODE_SEND;
-                Debug_printv("send >>> " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
+                Debug_printv("send    >>> " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
             }
 
             // DolphinDOS Detection
@@ -67,7 +66,7 @@ static void ml_parallel_intr_task(void* arg)
             // WIC64
             if ( PARALLEL.status( PC2 ) )
             {
-                if ( PARALLEL.data == 0x87 ) // W
+                if ( PARALLEL.data == 87 ) // W
                 {
                     IEC.protocol.flags xor_eq WIC64_ACTIVE;
                     Debug_printv("wic64");                  
@@ -113,19 +112,21 @@ void parallelBus::setup ()
 void parallelBus::handShake()
 {
     uint8_t buffer[2];
-    buffer[1] = this->data;
+    buffer[0] = 255;
 
     // Send byte with FLAG2 handshake
     
     // High
-    this->flags |= (1 << FLAG2);
-    buffer[0] = this->flags;
-    myI2C.writeBytes( I2C_ADDRESS, I2C_REGISTER, 2, buffer );
+    this->flags or_eq 128;
+    buffer[1] = this->flags;
+    //Debug_printv("high flags[%d]", this->flags);
+    myI2C.writeBytes( I2C_ADDRESS, 0x01, 2, buffer );
     
     // Low
-    this->flags &= ~(1 << FLAG2);
-    buffer[0] = this->flags;
-    myI2C.writeBytes( I2C_ADDRESS, I2C_REGISTER, 2, buffer );
+    this->flags xor_eq 128;
+    buffer[1] = this->flags;
+    //Debug_printv("low flags[%d]", this->flags);
+    myI2C.writeBytes( I2C_ADDRESS, 0x01, 2, buffer );
 }
 
 
@@ -136,8 +137,12 @@ uint8_t parallelBus::readByte()
     this->flags = buffer[0];
     this->data = buffer[1];
 
+    // What pin changed?
+    this->changed = (this->last ^ this->flags) & this->flags;
+    last = this->flags;
+
     // Acknowledge byte received
-    //this->handShake();
+    this->handShake();
 
     return this->data;
 }
@@ -162,12 +167,28 @@ void parallelBus::sendByte( uint8_t byte )
 
 bool parallelBus::status( user_port_pin_t pin )
 {
-    if ( pin < 8 ) 
+    if ( pin < 9 ) 
         return ( this->flags bitand pin );
     
-    return ( this->data bitand pin );
+    return ( this->data bitand ( pin - 8) );
 }
 
+
+void PCF857X::updateGPIO() {
+
+	/* Read current GPIO states */
+	//readGPIO(); // Experimental
+
+	/* Compute new GPIO states */
+	//uint8_t value = ((_PIN & ~_DDR) & ~(~_DDR & _PORT)) | _PORT; // Experimental
+	uint16_t value = (_PIN & ~_DDR) | _PORT;
+
+	/* Start communication and send GPIO values as byte */
+	Wire.beginTransmission(_address);
+	I2CWRITE(value & 0x00FF);
+	I2CWRITE((value & 0xFF00) >> 8);
+	Wire.endTransmission();
+}
 
 
 void wic64_command()

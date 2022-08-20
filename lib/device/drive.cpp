@@ -574,7 +574,7 @@ void iecDrive::handleListenCommand( void )
 
 void iecDrive::handleListenData()
 {
-	Debug_printv("[%s]", device_config.url().c_str());
+	//Debug_printv("[%s]", device_config.url().c_str());
 
 	saveFile();
 } // handleListenData
@@ -1137,7 +1137,7 @@ bool iecDrive::saveFile()
 		}
 
 
-		Debug_printv("saveFile: [%s] [$%.4X]\r\n=================================\r\n", ostream->url.c_str(), load_address);
+		Debug_printf("saveFile: [%s] [$%.4X]\r\n=================================\r\n", ostream->url.c_str(), load_address);
 
 		// Recieve bytes until a EOI is detected
 		do
@@ -1155,7 +1155,7 @@ bool iecDrive::saveFile()
 #ifdef DATA_STREAM
 			if (bi == 0)
 			{
-				Debug_printv(":%.4X ", load_address);
+				Debug_printf(":%.4X ", load_address);
 				load_address += 8;
 			}
 #endif
@@ -1188,7 +1188,7 @@ bool iecDrive::saveFile()
 
 			if(bi == 8)
 			{
-				Debug_printv(" %s (%d)\r\n", ba, i);
+				Debug_printf(" %s (%d)\r\n", ba, i);
 				bi = 0;
 			}
 #endif
@@ -1201,7 +1201,7 @@ bool iecDrive::saveFile()
     }
     // ostream->close(); // nor required, closes automagically
 
-	Debug_printv("=================================\r\n%d bytes saved\r\n", i);
+	Debug_printf("=================================\r\n%d bytes saved\r\n", i);
 	fnLedManager.set(eLed::LED_BUS, true);
 
 	// TODO: Handle errorFlag

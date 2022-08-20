@@ -265,12 +265,12 @@ size_t FlashOStream::write(const uint8_t *buf, size_t size) {
         return 0;
     }
 
-    Serial.printf("in byteWrite '%c', handle->file_h is null=[%d]\n", buf[0], handle->file_h == nullptr);
+    //Debug_printv("in byteWrite '%c', handle->file_h is null=[%d]\n", buf[0], handle->file_h == nullptr);
 
     // buffer, element size, count, handle
     int result = fwrite((void*) buf, 1, size, handle->file_h );
 
-    Debug_printv("after lfs_file_write");
+    //Debug_printv("after lfs_file_write");
 
     if (result < 0) {
         Debug_printv("write rc=%d\n", result);
@@ -279,7 +279,7 @@ size_t FlashOStream::write(const uint8_t *buf, size_t size) {
 };
 
 bool FlashOStream::isOpen() {
-    Debug_printv("in isOpen, handle not null=%d", handle != nullptr);
+    //Debug_printv("in isOpen, handle not null=%d", handle != nullptr);
     
     return handle != nullptr && handle->file_h != nullptr;
 }
