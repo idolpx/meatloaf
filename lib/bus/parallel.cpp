@@ -174,21 +174,21 @@ bool parallelBus::status( user_port_pin_t pin )
 }
 
 
-void PCF857X::updateGPIO() {
+// void PCF857X::updateGPIO() {
 
-	/* Read current GPIO states */
-	//readGPIO(); // Experimental
+// 	/* Read current GPIO states */
+// 	//readGPIO(); // Experimental
 
-	/* Compute new GPIO states */
-	//uint8_t value = ((_PIN & ~_DDR) & ~(~_DDR & _PORT)) | _PORT; // Experimental
-	uint16_t value = (_PIN & ~_DDR) | _PORT;
+// 	/* Compute new GPIO states */
+// 	//uint8_t value = ((_PIN & ~_DDR) & ~(~_DDR & _PORT)) | _PORT; // Experimental
+// 	uint16_t value = (_PIN & ~_DDR) | _PORT;
 
-	/* Start communication and send GPIO values as byte */
-	Wire.beginTransmission(_address);
-	I2CWRITE(value & 0x00FF);
-	I2CWRITE((value & 0xFF00) >> 8);
-	Wire.endTransmission();
-}
+// 	/* Start communication and send GPIO values as byte */
+// 	Wire.beginTransmission(_address);
+// 	I2CWRITE(value & 0x00FF);
+// 	I2CWRITE((value & 0xFF00) >> 8);
+// 	Wire.endTransmission();
+// }
 
 
 void wic64_command()
