@@ -4,6 +4,9 @@
 
 #include <I2Cbus.hpp>
 
+#define I2C_ADDRESS   0x20
+#define I2C_REGISTER  0X00
+
 /* PCF8575 port bits */
 #define P00  0
 #define P01  1
@@ -13,14 +16,14 @@
 #define P05  5
 #define P06  6
 #define P07  7
-#define P10  0 // 8
-#define P11  1 // 9
-#define P12  2 // 10
-#define P13  3 // 11
-#define P14  4 // 12
-#define P15  5 // 13
-#define P16  6 // 14
-#define P17  7 // 15
+#define P10  8
+#define P11  9
+#define P12  10
+#define P13  11
+#define P14  12
+#define P15  13
+#define P16  14
+#define P17  15
 
 /* User Port to pin mapping */
 // #define FLAG2  P07  // B
@@ -82,14 +85,21 @@ class parallelBus
   public:
     void setup();
 
+    void handShake();
     uint8_t readByte();
     void sendByte( uint8_t byte );
     bool status( user_port_pin_t pin );
 
-    uint8_t flags;
-    uint8_t data;
+    uint16_t read_mask = 0b1000000011111111;
+    uint16_t write_mask = 0b1000000011111111;
+
+    uint8_t flags = 255;
+    uint8_t data = 255;
     parallel_mode_t mode;
+
 };
+
+void wic64_command();
 
 extern parallelBus PARALLEL;
 

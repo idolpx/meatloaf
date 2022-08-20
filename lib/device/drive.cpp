@@ -63,7 +63,7 @@ device_state_t iecDrive::process ( void )
 
     if ( this->data.secondary == IEC_OPEN )
     {
-
+		// Open either file or prg for reading, writing or single line command on the command channel.
 		handleListenCommand();
 		if ( m_filename.size() == 0 )
 		{
@@ -91,8 +91,8 @@ device_state_t iecDrive::process ( void )
         }
 
         // Open Named Channel
-        if(isOpen) {
-        // Open either file or prg for reading, writing or single line command on the command channel.
+        if(isOpen) 
+		{
             currentStream = retrieveStream();
 			if( currentStream ) 
 			{
@@ -122,12 +122,12 @@ device_state_t iecDrive::process ( void )
         else if ( this->device_state == DEVICE_TALK )
         {
             // Send data
-            //Debug_printv ( "[Send data]" );
+            Debug_printv ( "[Send data]" );
             handleTalk ( this->data.channel );
-			if ( this->data.channel < 2 )
+			if ( this->data.channel < 2 || this->data.channel == CMD_CHANNEL )
 			{
 				closeStream();
-				device_state = DEVICE_IDLE;
+				this->device_state = DEVICE_IDLE;
 				this->data.init(); // Clear device command
 			}
         }

@@ -26,34 +26,37 @@ static void IRAM_ATTR ml_parallel_isr_handler(void* arg)
 static void ml_parallel_intr_task(void* arg)
 {
     uint32_t io_num;
+    uint8_t buffer[2];
 
     // Setup default pin modes
+    //myI2C.readBytes( 0x20, 0x00, 2, buffer );
     PARALLEL.readByte();
+    PARALLEL.handShake();
 
     while (1) {
         if(xQueueReceive(ml_parallel_evt_queue, &io_num, portMAX_DELAY)) 
         {
-            // Read I/O lines
-            uint8_t buffer[2];
-            myI2C.readBytes( 0x20, 0x00, 2, buffer );
-            PARALLEL.flags = buffer[0];
-            PARALLEL.data = buffer[1];
-                   
+            // Read I/O lines, set bits we want to read to 1
+            // myI2C.readBytes( 0x20, 0x00, 2, buffer );
+            // PARALLEL.flags = buffer[0];
+            // PARALLEL.data = buffer[1];
+            PARALLEL.readByte();
+
+            // Set RECEIVE/SEND mode   
             if ( PARALLEL.status( PA2 ) )
             {
                 PARALLEL.mode = MODE_RECEIVE;
-                Debug_printv("receive <<< " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
+                Debug_printv("receive <<< " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
             }
             else
             {
                 PARALLEL.mode = MODE_SEND;
-                Debug_printv("send >>> " BYTE_TO_BINARY_PATTERN " " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
+                Debug_printv("send >>> " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
             }
 
-
-            if ( PARALLEL.status(ATN) )
+            // DolphinDOS Detection
+            if ( PARALLEL.status( ATN ) )
             {
-                // Set Mode
                 if ( IEC.data.secondary == IEC_OPEN || IEC.data.secondary == IEC_REOPEN )
                 {
                     IEC.protocol.flags xor_eq DOLPHIN_ACTIVE;
@@ -61,6 +64,15 @@ static void ml_parallel_intr_task(void* arg)
                 }
             }
 
+            // WIC64
+            if ( PARALLEL.status( PC2 ) )
+            {
+                if ( PARALLEL.data == 0x87 ) // W
+                {
+                    IEC.protocol.flags xor_eq WIC64_ACTIVE;
+                    Debug_printv("wic64");                  
+                }
+            }
         }
     }
     
@@ -97,35 +109,55 @@ void parallelBus::setup ()
     gpio_isr_handler_add((gpio_num_t)GPIO_NUM_19, ml_parallel_isr_handler, NULL);    
 }
 
+
+void parallelBus::handShake()
+{
+    uint8_t buffer[2];
+    buffer[1] = this->data;
+
+    // Send byte with FLAG2 handshake
+    
+    // High
+    this->flags |= (1 << FLAG2);
+    buffer[0] = this->flags;
+    myI2C.writeBytes( I2C_ADDRESS, I2C_REGISTER, 2, buffer );
+    
+    // Low
+    this->flags &= ~(1 << FLAG2);
+    buffer[0] = this->flags;
+    myI2C.writeBytes( I2C_ADDRESS, I2C_REGISTER, 2, buffer );
+}
+
+
 uint8_t parallelBus::readByte()
 {
-    // ISR receives byte automatically
+    uint8_t buffer[2];
+    i2c0.readBytes( I2C_ADDRESS, I2C_REGISTER, 2, buffer );
+    this->flags = buffer[0];
+    this->data = buffer[1];
 
-    // uint8_t buffer[2];
-    // i2c0.readBytes( 0x20, 0x00, 2, buffer );
-    // this->flags = buffer[0];
-    // this->data = buffer[1];
-
-    // Set NMI FLAG2 to confirm byte was received
-    flags xor_eq (1 << FLAG2);
-    this->sendByte( this->data );
+    // Acknowledge byte received
+    //this->handShake();
 
     return this->data;
 }
 
 void parallelBus::sendByte( uint8_t byte )
 {
-    // Set NMI FLAG2 to confirm byte was sent
-    flags xor_eq (1 << FLAG2);
-
     uint8_t buffer[2];
+
+    // Set data
+    this->data = byte;
+
+    // Send byte with FLAG2 handshake
     buffer[0] = this->flags;
     buffer[1] = this->data;
 
-    // Wait until 
-    while ( this->mode != MODE_SEND );
+    Debug_printv("flags[%.2x] data[%.2x]", this->flags, this->data);
+    i2c0.writeBytes( I2C_ADDRESS, I2C_REGISTER, 2, buffer );
 
-    i2c0.writeBytes( 0x20, 0x00, 2, buffer );
+    // Tell receiver byte is ready to read
+    //this->handShake();
 }
 
 bool parallelBus::status( user_port_pin_t pin )
@@ -134,4 +166,226 @@ bool parallelBus::status( user_port_pin_t pin )
         return ( this->flags bitand pin );
     
     return ( this->data bitand pin );
+}
+
+
+
+void wic64_command()
+{
+    // if (lastinput.startsWith("W")) // Commando startet mit W = Richtig
+    // {
+    //     if (lastinput.charAt(3) == 1)
+    //     {
+    //         ex = true;
+    //         displaystuff("loading http");
+    //         loader(lastinput);
+
+    //         if (errorcode != "")
+    //         {
+    //             sendmessage(errorcode);
+    //         }
+    //     }
+
+    //     if (lastinput.charAt(3) == 2)
+    //     {
+    //         ex = true;
+    //         displaystuff("config wifi");
+    //         httpstring = lastinput;
+    //         sendmessage(setwlan());
+    //         delay(3000);
+    //         displaystuff("config changed");
+    //     }
+
+    //     if (lastinput.charAt(3) == 3)
+    //     {
+    //         ex = true; // Normal SW update - no debug messages on serial
+    //         displaystuff("FW update 1");
+    //         handleUpdate();
+    //     }
+
+    //     if (lastinput.charAt(3) == 4)
+    //     {
+    //         ex = true; // Developer SW update - debug output to serial
+    //         displaystuff("FW update 2");
+    //         handleDeveloper();
+    //     }
+
+    //     if (lastinput.charAt(3) == 5)
+    //     {
+    //         ex = true; // Developer SW update - debug output to serial
+    //         displaystuff("FW update 3");
+    //         handleDeveloper2();
+    //     }
+
+    //     if (lastinput.charAt(3) == 6)
+    //     {
+    //         ex = true;
+    //         displaystuff("get ip");
+    //         String ipaddress = WiFi.localIP().toString();
+    //         sendmessage(ipaddress);
+    //     }
+
+    //     if (lastinput.charAt(3) == 7)
+    //     {
+    //         ex = true;
+    //         displaystuff("get stats");
+    //         String stats = __DATE__ " " __TIME__;
+    //         sendmessage(stats);
+    //     }
+
+    //     if (lastinput.charAt(3) == 8)
+    //     {
+    //         ex = true;
+    //         displaystuff("set server");
+    //         lastinput.remove(0, 4);
+    //         setserver = lastinput;
+    //         preferences.putString("server", lastinput);
+    //     }
+
+    //     if (lastinput.charAt(3) == 9)
+    //     {
+    //         ex = true; // REM Send messages to debug console.
+    //         displaystuff("REM");
+    //         Serial.println(lastinput);
+    //     }
+
+    //     if (lastinput.charAt(3) == 10)
+    //     {
+    //         ex = true; // Get UDP data and return them to c64
+    //         displaystuff("get upd");
+    //         sendmessage(getudpmsg());
+    //     }
+
+    //     if (lastinput.charAt(3) == 11)
+    //     {
+    //         ex = true; // Send UDP data to IP
+    //         displaystuff("send udp");
+    //         sendudpmsg(lastinput);
+    //     }
+
+    //     if (lastinput.charAt(3) == 12)
+    //     {
+    //         ex = true; // wlan scanner
+    //         displaystuff("scanning wlan");
+    //         sendmessage(getWLAN());
+    //     }
+
+    //     if (lastinput.charAt(3) == 13)
+    //     {
+    //         ex = true; // wlan setup via scanlist
+    //         displaystuff("config wifi id");
+    //         httpstring = lastinput;
+    //         sendmessage(setWLAN_list());
+    //         displaystuff("config wifi set");
+    //     }
+
+    //     if (lastinput.charAt(3) == 14)
+    //     {
+    //         ex = true;
+    //         displaystuff("change udp port");
+    //         httpstring = lastinput;
+    //         startudpport();
+    //     }
+
+    //     if (lastinput.charAt(3) == 15)
+    //     {
+    //         ex = true; // Chatserver string decoding
+    //         displaystuff("loading httpchat");
+    //         loader(lastinput);
+
+    //         if (errorcode != "")
+    //         {
+    //             sendmessage(errorcode);
+    //         }
+    //     }
+
+    //     if (lastinput.charAt(3) == 16)
+    //     {
+    //         ex = true;
+    //         displaystuff("get ssid");
+    //         sendmessage(WiFi.SSID());
+    //     }
+
+    //     if (lastinput.charAt(3) == 17)
+    //     {
+    //         ex = true;
+    //         displaystuff("get rssi");
+    //         sendmessage(String(WiFi.RSSI()));
+    //     }
+
+    //     if (lastinput.charAt(3) == 18)
+    //     {
+    //         ex = true;
+    //         displaystuff("get server");
+
+    //         if (setserver != "")
+    //         {
+    //             sendmessage(setserver);
+    //         }
+    //         else
+    //         {
+    //             sendmessage("no server set");
+    //         }
+    //     }
+
+    //     if (lastinput.charAt(3) == 19)
+    //     {
+    //         ex = true; // XXXX 4 bytes header for padding !
+    //         displaystuff("get external ip");
+    //         loader("XXXXhttp://sk.sx-64.de/wic64/ip.php");
+
+    //         if (errorcode != "")
+    //         {
+    //             sendmessage(errorcode);
+    //         }
+    //     }
+
+    //     if (lastinput.charAt(3) == 20)
+    //     {
+    //         ex = true;
+    //         displaystuff("get mac");
+    //         sendmessage(WiFi.macAddress());
+    //     }
+
+    //     if (lastinput.charAt(3) == 30)
+    //     {
+    //         ex = true; // Get TCP data and return them to c64 INCOMPLETE
+    //         displaystuff("get tcp");
+    //         getudpmsg();
+
+    //         if (errorcode != "")
+    //         {
+    //             sendmessage(errorcode);
+    //         }
+    //     }
+
+    //     if (lastinput.charAt(3) == 31)
+    //     {
+    //         ex = true; // Get TCP data and return them to c64 INCOMPLETE
+    //         displaystuff("send tcp");
+    //         sendudpmsg(lastinput);
+    //         sendmessage("");
+    //         log_i("tcp send %s", lastinput);
+    //     }
+
+    //     if (lastinput.charAt(3) == 32)
+    //     {
+    //         ex = true;
+    //         displaystuff("set tcp port");
+    //         httpstring = lastinput;
+    //         settcpport();
+    //     }
+
+    //     if (lastinput.charAt(3) == 99)
+    //     {
+    //         ex = true;
+    //         displaystuff("factory reset");
+    //         WiFi.begin("-", "-");
+    //         WiFi.disconnect(true);
+    //         preferences.putString("server", defaultserver);
+    //         display.clearDisplay();
+    //         delay(3000);
+    //         ESP.restart();
+    //     }
+    // }
 }

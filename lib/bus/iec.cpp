@@ -371,7 +371,7 @@ void iecBus::service ( void )
             if ( !isDeviceEnabled( this->data.device ) )
             {
                 this->bus_state = BUS_IDLE;
-                //process_command = false;
+                process_command = false;
             }
 
         }
