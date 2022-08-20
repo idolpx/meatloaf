@@ -32,9 +32,6 @@ static void ml_parallel_intr_task(void* arg)
     PARALLEL.handShake();
 
     while (1) {
-
-        PARALLEL.sendByte( count++ );
-
         if(xQueueReceive(ml_parallel_evt_queue, &io_num, portMAX_DELAY)) 
         {
             // Read I/O lines, set bits we want to read to 1
