@@ -3,7 +3,13 @@
 
 #include <freertos/queue.h>
 
-#include <I2Cbus.hpp>
+/* Dependencies */
+#include "PCF8575.h" // Required for PCF8575
+
+/** PCF8575 instance */
+PCF8575 expander;
+
+//#include <I2Cbus.hpp>
 
 #include "iec.h"
 #include "../../include/debug.h"
@@ -11,7 +17,7 @@
 
 parallelBus PARALLEL;
 
-I2C_t& myI2C = i2c0;  // i2c0 and i2c1 are the default objects
+//I2C_t& myI2C = i2c0;  // i2c0 and i2c1 are the default objects
 
 static xQueueHandle ml_parallel_evt_queue = NULL;
 
@@ -26,27 +32,57 @@ static void IRAM_ATTR ml_parallel_isr_handler(void* arg)
 static void ml_parallel_intr_task(void* arg)
 {
     uint32_t io_num;
-    uint8_t count = 0;
 
     // Setup default pin modes
-    PARALLEL.handShake();
+    //PARALLEL.handShake();
+    Debug_printv("clear");
+    expander.clear();
+    Debug_printv("pa2");
+    expander.pinMode( PA2, GPIO_MODE_INPUT );
+    Debug_printv("atn");
+    expander.pinMode( ATN, GPIO_MODE_INPUT );
+    Debug_printv("pc2");
+    expander.pinMode( PC2, GPIO_MODE_INPUT );
+    Debug_printv("flag2");
+    expander.pinMode( FLAG2, GPIO_MODE_OUTPUT );
 
-    while (1) {
+    while (1) 
+    {
         if(xQueueReceive(ml_parallel_evt_queue, &io_num, portMAX_DELAY)) 
         {
             // Read I/O lines, set bits we want to read to 1
             PARALLEL.readByte();
-            Debug_printv("changed[%d]", PARALLEL.changed);
+            //Debug_printv("changed[%d]", PARALLEL.changed);
 
             // Set RECEIVE/SEND mode   
             if ( PARALLEL.status( PA2 ) )
             {
                 PARALLEL.mode = MODE_RECEIVE;
+
+                expander.pinMode( PB0, GPIO_MODE_INPUT );
+                expander.pinMode( PB1, GPIO_MODE_INPUT );
+                expander.pinMode( PB2, GPIO_MODE_INPUT );
+                expander.pinMode( PB3, GPIO_MODE_INPUT );
+                expander.pinMode( PB4, GPIO_MODE_INPUT );
+                expander.pinMode( PB5, GPIO_MODE_INPUT );
+                expander.pinMode( PB6, GPIO_MODE_INPUT );
+                expander.pinMode( PB7, GPIO_MODE_INPUT );
+
                 Debug_printv("receive <<< " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
             }
             else
             {
                 PARALLEL.mode = MODE_SEND;
+
+                expander.pinMode( PB0, GPIO_MODE_OUTPUT );
+                expander.pinMode( PB1, GPIO_MODE_OUTPUT );
+                expander.pinMode( PB2, GPIO_MODE_OUTPUT );
+                expander.pinMode( PB3, GPIO_MODE_OUTPUT );
+                expander.pinMode( PB4, GPIO_MODE_OUTPUT );
+                expander.pinMode( PB5, GPIO_MODE_OUTPUT );
+                expander.pinMode( PB6, GPIO_MODE_OUTPUT );
+                expander.pinMode( PB7, GPIO_MODE_OUTPUT );
+
                 Debug_printv("send    >>> " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
             }
 
@@ -72,7 +108,7 @@ static void ml_parallel_intr_task(void* arg)
         }
     }
     
-    myI2C.close();
+    //myI2C.close();
     vTaskDelay(portMAX_DELAY);
 }
 
@@ -80,11 +116,7 @@ static void ml_parallel_intr_task(void* arg)
 void parallelBus::setup ()
 {
     // Setup i2c device
-    myI2C.begin(GPIO_NUM_21, GPIO_NUM_22, 400000); // 400Khz Default
-    //myI2C.begin(GPIO_NUM_21, GPIO_NUM_22, 800000); // 800Khz Overclocked
-    //myI2C.begin(GPIO_NUM_21, GPIO_NUM_22, 1000000); // 1Mhz Overclocked
-    myI2C.setTimeout(10);
-    //myI2C.scanner();
+    expander.begin();
     
     // Create a queue to handle parallel event from ISR
     ml_parallel_evt_queue = xQueueCreate(10, sizeof(uint32_t));
@@ -96,7 +128,7 @@ void parallelBus::setup ()
     gpio_config_t io_conf = {
         .pin_bit_mask = ( 1ULL << GPIO_NUM_19 ),    // bit mask of the pins that you want to set
         .mode = GPIO_MODE_INPUT,                    // set as input mode
-        .pull_up_en = GPIO_PULLUP_DISABLE,          // disable pull-up mode
+        .pull_up_en = GPIO_PULLUP_ENABLE,          // disable pull-up mode
         .pull_down_en = GPIO_PULLDOWN_DISABLE,      // disable pull-down mode
         .intr_type = GPIO_INTR_NEGEDGE              // interrupt of falling edge
     };
@@ -108,35 +140,27 @@ void parallelBus::setup ()
 
 void parallelBus::handShake()
 {
-    uint8_t buffer[2];
-    buffer[0] = 255;
-
-    // Send byte with FLAG2 handshake
+    // Signal received or sent
     
     // High
-    this->flags or_eq 128;
-    buffer[1] = this->flags;
-    //Debug_printv("high flags[%d]", this->flags);
-    myI2C.writeBytes( I2C_ADDRESS, 0x01, 2, buffer );
+    expander.digitalWrite( FLAG2, HIGH );
     
     // Low
-    this->flags xor_eq 128;
-    buffer[1] = this->flags;
-    //Debug_printv("low flags[%d]", this->flags);
-    myI2C.writeBytes( I2C_ADDRESS, 0x01, 2, buffer );
+    expander.digitalWrite( FLAG2, LOW );
 }
 
 
 uint8_t parallelBus::readByte()
 {
-    uint8_t buffer[2];
-    i2c0.readBytes( I2C_ADDRESS, I2C_REGISTER, 2, buffer );
-    this->flags = buffer[0];
-    this->data = buffer[1];
+    uint16_t value = 0;
 
-    // What pin changed?
-    this->changed = (this->last ^ this->flags) & this->flags;
-    last = this->flags;
+    value = expander.read();
+    this->data = value & 0x00FF;             // low byte
+    this->flags  = ( value >> 8 ) & 0x00FF;  // high byte
+
+    // // What pin changed?
+    // this->changed = (this->last ^ this->flags) & this->flags;
+    // last = this->flags;
 
     // Acknowledge byte received
     this->handShake();
@@ -146,46 +170,27 @@ uint8_t parallelBus::readByte()
 
 void parallelBus::sendByte( uint8_t byte )
 {
-    uint8_t buffer[2];
+    uint16_t value = 0;
 
     // Set data
-    this->data = byte;
+    value = byte;                 // low byte
+    value |= this->flags << 8;    // high byte
 
-    // Send byte with FLAG2 handshake
-    buffer[0] = this->flags;
-    buffer[1] = this->data;
-
-    Debug_printv("flags[%.2x] data[%.2x]", this->flags, this->data);
-    i2c0.writeBytes( I2C_ADDRESS, I2C_REGISTER, 2, buffer );
+    Debug_printv("flags[%.2x] data[%.2x] value[%.2x]", this->flags, this->data, value);
+    expander.write( value );
 
     // Tell receiver byte is ready to read
-    //this->handShake();
+    this->handShake();
 }
 
 bool parallelBus::status( user_port_pin_t pin )
 {
-    if ( pin < 9 ) 
-        return ( this->flags bitand pin );
+    if ( pin < 8 ) 
+        return ( this->flags & ( 1 >> pin) );
     
-    return ( this->data bitand ( pin - 8) );
+    return ( this->data & ( 1 >> ( pin - 8) ) );
 }
 
-
-// void PCF857X::updateGPIO() {
-
-// 	/* Read current GPIO states */
-// 	//readGPIO(); // Experimental
-
-// 	/* Compute new GPIO states */
-// 	//uint8_t value = ((_PIN & ~_DDR) & ~(~_DDR & _PORT)) | _PORT; // Experimental
-// 	uint16_t value = (_PIN & ~_DDR) | _PORT;
-
-// 	/* Start communication and send GPIO values as byte */
-// 	Wire.beginTransmission(_address);
-// 	I2CWRITE(value & 0x00FF);
-// 	I2CWRITE((value & 0xFF00) >> 8);
-// 	Wire.endTransmission();
-// }
 
 
 void wic64_command()

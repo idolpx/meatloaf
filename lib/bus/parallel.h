@@ -2,28 +2,7 @@
 #ifndef BUS_PARALLEL_H
 #define BUS_PARALLEL_H
 
-#include <I2Cbus.hpp>
-
-#define I2C_ADDRESS   0x20
-#define I2C_REGISTER  0X00
-
-/* PCF8575 port bits */
-#define P00  1
-#define P01  2
-#define P02  3
-#define P03  4
-#define P04  5
-#define P05  6
-#define P06  7
-#define P07  8
-#define P10  9
-#define P11  10
-#define P12  11
-#define P13  12
-#define P14  13
-#define P15  14
-#define P16  15
-#define P17  16
+#include "pcf8575.h"
 
 /* User Port to pin mapping */
 // #define FLAG2  P07  // B
@@ -90,8 +69,9 @@ class parallelBus
     void sendByte( uint8_t byte );
     bool status( user_port_pin_t pin );
 
-    uint8_t changed = 0x00;
-    uint8_t last = 0xFF;
+    // uint8_t changed = 0x00;
+    // uint8_t last = 0xFF;
+    
     uint8_t flags = 255;
     uint8_t data = 0;
     parallel_mode_t mode;
