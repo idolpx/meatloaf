@@ -288,7 +288,7 @@ bool DolphinDOS::sendByte ( uint8_t data, bool signalEOI )
     pull ( PIN_IEC_CLK_OUT );
 
     // set byte
-    PARALLEL.sendByte( data );
+    PARALLEL.writeByte( data );
 
     if ( !wait ( TIMING_Ts ) ) return false;
 

@@ -182,8 +182,8 @@ void fn_service_loop(void *param)
         IEC.debugTiming();
 #else
         IEC.service();
-        // if ( IEC.bus_state < BUS_ACTIVE )
-        //     taskYIELD();
+        if ( IEC.bus_state < BUS_ACTIVE )
+            taskYIELD();
 #endif
     }
 }

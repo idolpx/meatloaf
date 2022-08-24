@@ -23,6 +23,8 @@
 // #define PB6    P16   // K - I
 // #define PB7    P17   // L - J
 
+#define USERPORT_PB PCF8575_PORT1
+
 typedef enum {
   FLAG2 = P07,  // B
   CNT1  = P06,  // 4
@@ -66,15 +68,12 @@ class parallelBus
 
     void handShake();
     uint8_t readByte();
-    void sendByte( uint8_t byte );
+    void writeByte( uint8_t byte );
     bool status( user_port_pin_t pin );
 
-    // uint8_t changed = 0x00;
-    // uint8_t last = 0xFF;
-    
-    uint8_t flags = 255;
+    uint8_t flags = 0;
     uint8_t data = 0;
-    parallel_mode_t mode;
+    parallel_mode_t mode = MODE_RECEIVE;
 
 };
 
