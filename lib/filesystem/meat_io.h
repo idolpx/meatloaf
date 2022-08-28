@@ -260,13 +260,6 @@ namespace Meat {
                 return mistream->isOpen();
         }
 
-        bool is_text() const {
-            if(mistream == nullptr)
-                return false;
-            else
-                return mistream->isText;
-        }        
-
         /**
          *  @brief  Fetches more data from the controlled sequence.
          *  @return  The first character from the <em>pending sequence</em>.
@@ -384,14 +377,7 @@ namespace Meat {
             else
                 return mostream->isOpen();
         }
-
-        bool is_text() const {
-            if(mostream == nullptr)
-                return false;
-            else
-                return mostream->isText;
-        }        
-
+   
         /**
          *  @brief  Consumes data from the buffer; writes to the
          *          controlled sequence.

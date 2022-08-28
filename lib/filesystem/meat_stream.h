@@ -40,10 +40,6 @@ public:
 
     virtual bool isOpen() = 0;
 
-    bool isDir = false;
-    bool isText = false;
-    std::string url = "";
-
     // For files with a browsable random access directory structure
     // d64, d74, d81, dnp, etc.
     virtual bool seekPath(std::string path) {

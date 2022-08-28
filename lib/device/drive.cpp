@@ -1137,7 +1137,7 @@ bool iecDrive::saveFile()
 		}
 
 
-		Debug_printv("saveFile: [%s] [$%.4X]\r\n=================================\r\n", ostream->url.c_str(), load_address);
+		Debug_printv("saveFile: [$%.4X]\r\n=================================\r\n", load_address);
 
 		// Recieve bytes until a EOI is detected
 		do
