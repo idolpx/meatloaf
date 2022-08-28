@@ -181,6 +181,10 @@ size_t CServerIStream::position() {
     return m_position;
 };
 
+size_t CServerIStream::write(const uint8_t *buf, size_t size) {
+    return -1;
+}
+
 size_t CServerIStream::read(uint8_t* buf, size_t size)  {
     //Debug_printv("CServerIStream::read");
     auto bytesRead = CServerFileSystem::session.receive(buf, size);
@@ -194,52 +198,6 @@ bool CServerIStream::isOpen() {
     return m_isOpen;
 }
 
-/********************************************************
- * O Stream impls
- ********************************************************/
-
-void CServerOStream::close() {
-    m_isOpen = false;
-};
-
-bool CServerOStream::open() {
-    auto file = std::make_unique<CServerFile>(url);
-
-    if(CServerFileSystem::session.traversePath(file.get())) {
-        m_isOpen = true;
-    }
-    else
-        m_isOpen = false;
-
-    return m_isOpen;
-};
-
-size_t CServerOStream::available() {
-    return m_bytesAvailable;
-};
-
-size_t CServerOStream::size() {
-    return m_bytesAvailable;
-};
-
-size_t CServerOStream::position() {
-    return m_position;
-};
-
-// MOStream methods
-size_t CServerOStream::write(const uint8_t *buf, size_t size) {
-    // we have to write all at once... sorry...
-    auto file = std::make_unique<CServerFile>(url);
-
-    CServerFileSystem::session.sendCommand("save fileName,size[,type=PRG,SEQ]");
-    m_isOpen = false; // c64 server supports only writing all at once, so this channel has to be marked closed
-    return CServerFileSystem::session.send(buf, size);
-};
-
-
-bool CServerOStream::isOpen() {
-    return m_isOpen;
-};
 
 /********************************************************
  * File impls
@@ -379,8 +337,8 @@ MIStream* CServerFile::inputStream() {
     return istream;
 }; 
 
-MOStream* CServerFile::outputStream() {
-    MOStream* ostream = new CServerOStream(url);
+MIStream* CServerFile::outputStream() {
+    MIStream* ostream = new CServerIStream(url);
     ostream->open();   
     return ostream;
 };

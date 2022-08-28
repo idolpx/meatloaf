@@ -27,7 +27,7 @@ public:
         this->m_isOpen = true;
     }
 
-    // MStream methods
+    // MIStream methods
     size_t position() override;
     void close() override;
     bool open() override;
@@ -53,6 +53,8 @@ public:
     size_t available() override;
     size_t size() override;
     size_t read(uint8_t* buf, size_t size) override;
+    size_t write(const uint8_t *buf, size_t size);
+
     bool isOpen();
 
 protected:

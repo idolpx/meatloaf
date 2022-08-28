@@ -11,9 +11,9 @@
 #define SEEK_CUR  1
 #define SEEK_END  2
 
-class MStream {
+class MIStream {
 public:
-    virtual ~MStream() {};
+    virtual ~MIStream() {};
 
     virtual size_t available() = 0;
     virtual size_t size() = 0;
@@ -43,19 +43,6 @@ public:
     bool isDir = false;
     bool isText = false;
     std::string url = "";
-};
-
-class MOStream: public MStream {
-public:
-    virtual size_t write(const uint8_t *buf, size_t size) = 0;
-    size_t read(uint8_t* buf, size_t size) override { return 0; };
-};
-
-
-class MIStream: public MStream {
-public:
-    virtual size_t read(uint8_t* buf, size_t size) = 0;
-    size_t write(const uint8_t *buf, size_t size) override { return 0; };
 
     // For files with a browsable random access directory structure
     // d64, d74, d81, dnp, etc.

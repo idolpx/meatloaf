@@ -34,9 +34,9 @@ MIStream* HttpFile::inputStream() {
     return istream;
 }
 
-MOStream* HttpFile::outputStream() {
+MIStream* HttpFile::outputStream() {
     // has to return OPENED stream
-    MOStream* ostream = new HttpOStream(url);
+    MIStream* ostream = new HttpIStream(url);
     return ostream;
 }
 
@@ -115,42 +115,6 @@ bool HttpFile::isText() {
 }
 
 /********************************************************
- * Ostream impls
- ********************************************************/
-bool HttpOStream::open() {
-    return m_http.PUT(url);
-};
-
-void HttpOStream::close() {
-    return m_http.close();
-}
-
-bool HttpOStream::seek(size_t pos) {
-    return m_http.seek(pos);
-}
-
-size_t HttpOStream::write(const uint8_t* buf, size_t size) {
-    return m_http.write(buf ,size);
-};
-
-size_t HttpOStream::size() {
-    return m_http.m_length;
-};
-
-size_t HttpOStream::available() {
-    return m_http.m_bytesAvailable;
-};
-
-size_t HttpOStream::position() {
-    return m_http.m_position;
-}
-
-bool HttpOStream::isOpen() {
-    return m_http.m_isOpen;
-};
-
-
-/********************************************************
  * Istream impls
  ********************************************************/
 bool HttpIStream::open() {
@@ -168,6 +132,12 @@ bool HttpIStream::seek(size_t pos) {
 size_t HttpIStream::read(uint8_t* buf, size_t size) {
     return m_http.read(buf, size);
 };
+
+size_t HttpIStream::write(const uint8_t *buf, size_t size) {
+    return -1;
+}
+
+
 
 bool HttpIStream::isOpen() {
     return m_http.m_isOpen;

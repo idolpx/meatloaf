@@ -1108,8 +1108,8 @@ bool iecDrive::saveFile()
 	ba[8] = '\0';
 #endif
 
-	// std::unique_ptr<MOStream> ostream(file->outputStream());
-	// std::shared_ptr<MOStream> ostream = std::static_pointer_cast<MOStream>(currentStream);
+	// std::unique_ptr<MIStream> ostream(file->outputStream());
+	// std::shared_ptr<MIStream> ostream = std::static_pointer_cast<MIStream>(currentStream);
 	auto ostream = retrieveStream();
 
     if ( ostream == nullptr ) {

@@ -21,7 +21,7 @@ public:
 
     bool isDirectory() override;
     MIStream* inputStream() override ; // has to return OPENED stream
-    MOStream* outputStream() override ; // has to return OPENED stream
+    MIStream* outputStream() override ; // has to return OPENED stream
     time_t getLastWrite() override ;
     time_t getCreationTime() override ;
     bool rewindDirectory() override { return false; };
@@ -40,7 +40,7 @@ public:
  * Streams
  ********************************************************/
 
-class WebDAVIOStream: public MIStream, MOStream {
+class WebDAVIOStream: public MIStream {
 public:
     WebDAVIOStream(std::string& path) {
         url = path;
@@ -52,7 +52,7 @@ public:
     void close() override;
     bool open() override;
 
-    // MStream methods
+    // MIStream methods
     size_t position() override;
     size_t available() override;
     size_t read(uint8_t* buf, size_t size) override;
@@ -86,7 +86,7 @@ public:
         close();
     }
 
-    // MStream methods
+    // MIStream methods
     size_t size() override;
     size_t available() override;     
     size_t position() override;
@@ -113,10 +113,10 @@ protected:
 };
 
 
-class WebDAVOStream: public MOStream {
+class WebDAVOStream: public MIStream {
 
 public:
-    // MStream methods
+    // MIStream methods
     WebDAVOStream(std::string path) {
         m_http.set_header("user-agent", USER_AGENT);
         //m_http.setTimeout(10000);
@@ -130,7 +130,7 @@ public:
         close();
     }
 
-    // MStream methods
+    // MIStream methods
     size_t size() override;
     size_t available() override;     
     size_t position() override;
@@ -141,7 +141,7 @@ public:
     bool open() override;
 
 
-    // MOStream methods
+    // MIStream methods
     size_t write(const uint8_t *buf, size_t size) override;
     bool isOpen();
 

@@ -83,7 +83,7 @@ class iecDevice
     public:
         // Return values for service:
 
-        std::unordered_map<uint16_t, std::shared_ptr<MStream>> streams;
+        std::unordered_map<uint16_t, std::shared_ptr<MIStream>> streams;
 
         iecDevice();
         ~iecDevice() {};
@@ -108,9 +108,9 @@ class iecDevice
         virtual void handleTalk ( uint8_t chan ) = 0;
 
         // Named Channel functions
-        std::shared_ptr<MStream> currentStream;
+        std::shared_ptr<MIStream> currentStream;
         bool registerStream (int mode, std::string m_filename);
-        std::shared_ptr<MStream> retrieveStream ( void );
+        std::shared_ptr<MIStream> retrieveStream ( void );
         bool closeStream ( bool close_all = false );
 
         // This is set after an open command and determines what to send next

@@ -17,7 +17,7 @@ public:
         // additionaly it has to implement getNextEntry()
         // which skips data in the stream to next file in zip
     }
-    // MStream methods
+    // MIStream methods
     size_t position() override;
     void close() override;
     bool open() override;
@@ -26,13 +26,13 @@ public:
     }
 
     // MIStream methods
-    int available() override;
-    uint8_t read() override;
+    size_t available() override;
+    //uint8_t read() override;
     size_t read(uint8_t* buf, size_t size) override;
     bool isOpen() override;
 
 protected:
-    MStream* srcStr;
+    MIStream* srcStr;
 
 };
 
@@ -49,7 +49,7 @@ public:
 
     bool isDirectory() override;
     MIStream* inputStream() override ; // has to return OPENED stream
-    MOStream* outputStream() override ; // has to return OPENED stream
+    MIStream* outputStream() override ; // has to return OPENED stream
     time_t getLastWrite() override ;
     time_t getCreationTime() override ;
     bool rewindDirectory() override ;
@@ -61,9 +61,9 @@ public:
     bool rename(std::string dest);
 
 
-    bool isBrowsable() override {
-        return true;
-    }
+    // bool isBrowsable() override {
+    //     return true;
+    // }
 };
 
 

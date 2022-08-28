@@ -15,7 +15,7 @@
  * Streams
  ********************************************************/
 
-class CSIOStream: public MIStream, public MOStream {
+class CSIOStream: public MIStream {
 public:
     CSIOStream(MFile* file, bool isServer) : m_isServer(isServer) {
         // drop ws:// from url and it's OK!
@@ -48,7 +48,7 @@ public:
         return m_isOpen;
     };
 
-    // MStream methods
+    // MIStream methods
     size_t position() override { return 0; };
     size_t available() override { return INT_MAX; };
     bool isOpen() { return m_isOpen; };
@@ -136,7 +136,7 @@ public:
         // input stream = SERVER socket
         return new CSIOStream(this, true);
     }; 
-    MOStream* outputStream() override {
+    MIStream* outputStream() override {
         // output stream = CLIENT socket
         return new CSIOStream(this, false);
     }; 

@@ -71,10 +71,10 @@ MIStream* FlashFile::inputStream()
     return istream;
 }
 
-MOStream* FlashFile::outputStream()
+MIStream* FlashFile::outputStream()
 {
     std::string full_path = basepath + path;
-    MOStream* ostream = new FlashOStream(full_path);
+    MIStream* ostream = new FlashIStream(full_path);
     ostream->open();   
     return ostream;
 }
@@ -242,25 +242,9 @@ MFile* FlashFile::getNextFileInDir()
 
 
 /********************************************************
- * MOStreams implementations
+ * MIStream implementations
  ********************************************************/
-// MStream methods
-
-bool FlashOStream::open() {
-    Debug_printv("Ostream: trying to open flash fs, calling isOpen");
-    if(!isOpen()) {
-        handle->obtain(localPath, "w+");
-    }
-    return isOpen();
-};
-
-void FlashOStream::close() {
-    if(isOpen()) {
-        handle->dispose();
-    }
-};
-
-size_t FlashOStream::write(const uint8_t *buf, size_t size) {
+size_t FlashIStream::write(const uint8_t *buf, size_t size) {
     if (!isOpen() || !buf) {
         return 0;
     }
@@ -277,46 +261,6 @@ size_t FlashOStream::write(const uint8_t *buf, size_t size) {
     }
     return result;
 };
-
-bool FlashOStream::isOpen() {
-    Debug_printv("in isOpen, handle not null=%d", handle != nullptr);
-    
-    return handle != nullptr && handle->file_h != nullptr;
-}
-
-
-size_t FlashOStream::size() {
-    return _size;
-};
-
-size_t FlashOStream::available() {
-    if(!isOpen()) return 0;
-    return _size - position();
-};
-
-
-size_t FlashOStream::position() {
-    if(!isOpen()) return 0;
-    return ftell(handle->file_h);
-};
-
-bool FlashOStream::seek(size_t pos) {
-    // Debug_printv("pos[%d]", pos);
-        if (!isOpen()) {
-        Debug_printv("Not open");
-        return false;
-    }
-    return ( fseek( handle->file_h, pos, SEEK_SET ) ) ? true : false;
-};
-
-bool FlashOStream::seek(size_t pos, int mode) {
-    // Debug_printv("pos[%d] mode[%d]", pos, mode);
-    if (!isOpen()) {
-        Debug_printv("Not open");
-        return false;
-    }
-    return ( fseek( handle->file_h, pos, mode ) ) ? true: false;
-}
 
 
 /********************************************************

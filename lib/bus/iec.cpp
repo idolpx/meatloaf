@@ -80,7 +80,7 @@ device_state_t iecDevice::queue_command ( void )
 }
 
 
-std::shared_ptr<MStream> iecDevice::retrieveStream ( void )
+std::shared_ptr<MIStream> iecDevice::retrieveStream ( void )
 {
     size_t key = ( this->data.device * 100 ) + this->data.channel;
 
@@ -102,14 +102,14 @@ bool iecDevice::registerStream (std::ios_base::open_mode mode, std::string m_fil
 {
     //Debug_printv("m_filename[%s]", m_filename.c_str());
     auto file = Meat::New<MFile>(m_filename);
-    std::shared_ptr<MStream> new_stream;
+    std::shared_ptr<MIStream> new_stream;
 
     //Debug_printv("m_filename[%s]", m_filename.c_str());
     if(mode == std::ios_base::in) {
         new_stream = std::shared_ptr<MIStream>(file->inputStream());
     }
     else if(mode == std::ios_base::out) {
-        new_stream = std::shared_ptr<MOStream>(file->outputStream());
+        new_stream = std::shared_ptr<MIStream>(file->outputStream());
     }
 
 	if( !new_stream->isOpen() )

@@ -67,7 +67,7 @@ public:
     }
     bool isDirectory() override;
     MIStream* inputStream() override ; // has to return OPENED stream
-    MOStream* outputStream() override ; // has to return OPENED stream
+    MIStream* outputStream() override ; // has to return OPENED stream
     time_t getLastWrite() override ;
     time_t getCreationTime() override ;
     bool rewindDirectory() override ;
@@ -87,7 +87,7 @@ public:
  * Streams
  ********************************************************/
 
-class HttpIOStream: public MIStream, MOStream {
+class HttpIOStream: public MIStream {
 
 public:
     HttpIOStream(std::string& path) {
@@ -100,7 +100,7 @@ public:
     void close() override;
     bool open() override;
 
-    // MStream methods
+    // MIStream methods
     size_t position() override;
     size_t available() override;
     size_t read(uint8_t* buf, size_t size) override;
@@ -123,7 +123,7 @@ public:
         close();
     };
 
-    // MStream methods
+    // MIStream methods
     size_t size() override;
     size_t available() override;     
     size_t position() override;
@@ -135,45 +135,16 @@ public:
 
     // MIStream methods
     size_t read(uint8_t* buf, size_t size) override;
-    bool isOpen();
-
-protected:
-    MeatHttpClient m_http;
-    std::string url;
-
-};
-
-
-class HttpOStream: public MOStream {
-
-public:
-    // MStream methods
-    HttpOStream(std::string path) {
-        url = path;
-    }
-    ~HttpOStream() {
-        close();
-    }
-
-    // MStream methods
-    size_t size() override;
-    size_t available() override;     
-    size_t position() override;
-
-    virtual bool seek(size_t pos);
-
-    void close() override;
-    bool open() override;
-
-
-    // MOStream methods
     size_t write(const uint8_t *buf, size_t size) override;
+
     bool isOpen();
 
 protected:
-    std::string url;
     MeatHttpClient m_http;
+    std::string url;
+
 };
+
 
 
 /********************************************************

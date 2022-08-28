@@ -61,7 +61,7 @@ public:
 
     // has to return OPENED stream
     virtual MIStream* inputStream();
-    virtual MOStream* outputStream() { return nullptr; };
+    virtual MIStream* outputStream() { return nullptr; };
 
     virtual MFile* cd(std::string newDir);
     virtual bool isDirectory() = 0;
@@ -334,7 +334,7 @@ namespace Meat {
 
     class omfilebuf : public std::filebuf {
         static const size_t obufsize = 256;
-        std::unique_ptr<MOStream> mostream;
+        std::unique_ptr<MIStream> mostream;
         std::unique_ptr<MFile> mfile;
         char* data;
 

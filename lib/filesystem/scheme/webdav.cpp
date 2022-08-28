@@ -21,9 +21,9 @@
 //     return is.get(); // we've overriden istreamfunction, so this one won't be used
 // }
 
-// MOStream* WebDAVFile::outputStream() {
+// MIStream* WebDAVFile::outputStream() {
 //     // has to return OPENED stream
-//     MOStream* ostream = new WebDAVOStream(url);
+//     MIStream* ostream = new WebDAVOStream(url);
 //     ostream->open();
 //     return ostream;
 // }
