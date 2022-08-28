@@ -20,8 +20,8 @@ public:
     WebDAVFile(std::string path): MFile(path) {};
 
     bool isDirectory() override;
-    MIStream* inputStream() override ; // has to return OPENED stream
-    MIStream* outputStream() override ; // has to return OPENED stream
+    MStream* inputStream() override ; // has to return OPENED stream
+    MStream* outputStream() override ; // has to return OPENED stream
     time_t getLastWrite() override ;
     time_t getCreationTime() override ;
     bool rewindDirectory() override { return false; };
@@ -31,7 +31,7 @@ public:
     size_t size() override ;
     bool remove() override { return false; };
     bool rename(std::string dest) { return false; };
-    MIStream* createIStream(std::shared_ptr<MIStream> src);
+    MStream* createIStream(std::shared_ptr<MStream> src);
     //void addHeader(const String& name, const String& value, bool first = false, bool replace = true);
 };
 
@@ -40,7 +40,7 @@ public:
  * Streams
  ********************************************************/
 
-class WebDAVIOStream: public MIStream {
+class WebDAVIOStream: public MStream {
 public:
     WebDAVIOStream(std::string& path) {
         url = path;
@@ -52,7 +52,7 @@ public:
     void close() override;
     bool open() override;
 
-    // MIStream methods
+    // MStream methods
     size_t position() override;
     size_t available() override;
     size_t read(uint8_t* buf, size_t size) override;
@@ -71,7 +71,7 @@ protected:
 };
 
 
-class WebDAVIStream: public MIStream {
+class WebDAVIStream: public MStream {
 
 public:
     WebDAVIStream(std::string path) {
@@ -86,7 +86,7 @@ public:
         close();
     }
 
-    // MIStream methods
+    // MStream methods
     size_t size() override;
     size_t available() override;     
     size_t position() override;
@@ -96,7 +96,7 @@ public:
     void close() override;
     bool open() override;
 
-    // MIStream methods
+    // MStream methods
     size_t read(uint8_t* buf, size_t size) override;
     bool isOpen();
 
@@ -113,10 +113,10 @@ protected:
 };
 
 
-class WebDAVOStream: public MIStream {
+class WebDAVOStream: public MStream {
 
 public:
-    // MIStream methods
+    // MStream methods
     WebDAVOStream(std::string path) {
         m_http.set_header("user-agent", USER_AGENT);
         //m_http.setTimeout(10000);
@@ -130,7 +130,7 @@ public:
         close();
     }
 
-    // MIStream methods
+    // MStream methods
     size_t size() override;
     size_t available() override;     
     size_t position() override;
@@ -141,7 +141,7 @@ public:
     bool open() override;
 
 
-    // MIStream methods
+    // MStream methods
     size_t write(const uint8_t *buf, size_t size) override;
     bool isOpen();
 

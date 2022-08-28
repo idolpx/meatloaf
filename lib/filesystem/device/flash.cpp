@@ -57,24 +57,24 @@ bool FlashFile::isDirectory()
     return S_ISDIR(info.st_mode);
 }
 
-MIStream* FlashFile::createIStream(std::shared_ptr<MIStream> is) {
+MStream* FlashFile::createIStream(std::shared_ptr<MStream> is) {
     return is.get(); // we don't have to process this stream in any way, just return the original stream
 }
 
-MIStream* FlashFile::inputStream()
+MStream* FlashFile::inputStream()
 {
     std::string full_path = basepath + path;
-    MIStream* istream = new FlashIStream(full_path);
+    MStream* istream = new FlashIStream(full_path);
     //Debug_printv("FlashFile::inputStream() 3, not null=%d", istream != nullptr);
     istream->open();   
     //Debug_printv("FlashFile::inputStream() 4");
     return istream;
 }
 
-MIStream* FlashFile::outputStream()
+MStream* FlashFile::outputStream()
 {
     std::string full_path = basepath + path;
-    MIStream* ostream = new FlashIStream(full_path);
+    MStream* ostream = new FlashIStream(full_path);
     ostream->open();   
     return ostream;
 }
@@ -242,7 +242,7 @@ MFile* FlashFile::getNextFileInDir()
 
 
 /********************************************************
- * MIStream implementations
+ * MStream implementations
  ********************************************************/
 size_t FlashIStream::write(const uint8_t *buf, size_t size) {
     if (!isOpen() || !buf) {

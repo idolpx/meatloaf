@@ -19,15 +19,15 @@
  * Streams
  ********************************************************/
 
-class CBMImageStream: public MIStream {
+class CBMImageStream: public MStream {
 
 public:
-    CBMImageStream(std::shared_ptr<MIStream> is) {
+    CBMImageStream(std::shared_ptr<MStream> is) {
         this->containerStream = is;
         this->m_isOpen = true;
     }
 
-    // MIStream methods
+    // MStream methods
     size_t position() override;
     void close() override;
     bool open() override;
@@ -36,7 +36,7 @@ public:
         close();
     }
 
-    // MIStream methods
+    // MStream methods
     bool isBrowsable() override { return false; };
     bool isRandomAccess() override { return true; };
 
@@ -60,7 +60,7 @@ public:
 protected:
 
     bool seekCalled = false;
-    std::shared_ptr<MIStream> containerStream;
+    std::shared_ptr<MStream> containerStream;
 
     bool m_isOpen = false;
     size_t m_length = 0;

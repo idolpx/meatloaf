@@ -19,7 +19,7 @@ class T64IStream : public CBMImageStream {
     // override everything that requires overriding here
 
 public:
-    T64IStream(std::shared_ptr<MIStream> is) : CBMImageStream(is) { };
+    T64IStream(std::shared_ptr<MStream> is) : CBMImageStream(is) { };
 
 protected:
     struct Header {
@@ -78,7 +78,7 @@ public:
         // don't close the stream here! It will be used by shared ptr D64Util to keep reading image params
     }
 
-    MIStream* createIStream(std::shared_ptr<MIStream> containerIstream) override;
+    MStream* createIStream(std::shared_ptr<MStream> containerIstream) override;
 
     std::string petsciiName() override {
         // It's already in PETSCII

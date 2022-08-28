@@ -19,7 +19,7 @@ size_t P00IStream::readFile(uint8_t* buf, size_t size) {
  * File implementations
  ********************************************************/
 
-MIStream* P00File::createIStream(std::shared_ptr<MIStream> containerIstream) {
+MStream* P00File::createIStream(std::shared_ptr<MStream> containerIstream) {
     Debug_printv("[%s]", url.c_str());
 
     return new P00IStream(containerIstream);

@@ -60,8 +60,8 @@ public:
     }
 
     // has to return OPENED stream
-    virtual MIStream* inputStream();
-    virtual MIStream* outputStream() { return nullptr; };
+    virtual MStream* inputStream();
+    virtual MStream* outputStream() { return nullptr; };
 
     virtual MFile* cd(std::string newDir);
     virtual bool isDirectory() = 0;
@@ -85,7 +85,7 @@ public:
     std::string pathInStream;
 
 protected:
-    virtual MIStream* createIStream(std::shared_ptr<MIStream> src) = 0;
+    virtual MStream* createIStream(std::shared_ptr<MStream> src) = 0;
     bool m_isNull;
 
 friend class MFSOwner;
@@ -202,7 +202,7 @@ namespace Meat {
  ********************************************************/
 
     class imfilebuf : public std::filebuf {
-        std::unique_ptr<MIStream> mistream;
+        std::unique_ptr<MStream> mistream;
         std::unique_ptr<MFile> mfile;
         char* data;
         static const size_t ibufsize = 256;
@@ -334,7 +334,7 @@ namespace Meat {
 
     class omfilebuf : public std::filebuf {
         static const size_t obufsize = 256;
-        std::unique_ptr<MIStream> mostream;
+        std::unique_ptr<MStream> mostream;
         std::unique_ptr<MFile> mfile;
         char* data;
 

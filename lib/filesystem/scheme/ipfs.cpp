@@ -4,10 +4,10 @@
 #include "../../../include/debug.h"
 
 
-MIStream* IPFSFile::inputStream() {
+MStream* IPFSFile::inputStream() {
     // has to return OPENED stream
     //Debug_printv("[%s]", url.c_str());
-    MIStream* istream = new IPFSIStream(url);
+    MStream* istream = new IPFSIStream(url);
     istream->open();   
     return istream;
 }; 

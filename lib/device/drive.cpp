@@ -926,7 +926,7 @@ bool iecDrive::sendFile()
 	device_config.save();
 
 	// TODO!!!! you should check istream for nullptr here and return error immediately if null
-	// std::shared_ptr<MIStream> istream = std::static_pointer_cast<MIStream>(currentStream);
+	// std::shared_ptr<MStream> istream = std::static_pointer_cast<MStream>(currentStream);
 	auto istream = retrieveStream();
 	if ( istream == nullptr )
 	{
@@ -1108,8 +1108,8 @@ bool iecDrive::saveFile()
 	ba[8] = '\0';
 #endif
 
-	// std::unique_ptr<MIStream> ostream(file->outputStream());
-	// std::shared_ptr<MIStream> ostream = std::static_pointer_cast<MIStream>(currentStream);
+	// std::unique_ptr<MStream> ostream(file->outputStream());
+	// std::shared_ptr<MStream> ostream = std::static_pointer_cast<MStream>(currentStream);
 	auto ostream = retrieveStream();
 
     if ( ostream == nullptr ) {

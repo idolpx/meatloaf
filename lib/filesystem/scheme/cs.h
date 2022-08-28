@@ -181,7 +181,7 @@ public:
         sendCommand("quit");
     };
 
-    // read/write are used only by MIStream
+    // read/write are used only by MStream
     size_t receive(uint8_t* buffer, size_t size) {
         if(buf.is_open())
             return buf.m_wifi.read(buffer, size);
@@ -189,7 +189,7 @@ public:
             return 0;
     }
 
-    // read/write are used only by MIStream
+    // read/write are used only by MStream
     size_t send(const uint8_t* buffer, size_t size) {
         if(buf.is_open())
             return buf.m_wifi.write(buffer, size);
@@ -220,9 +220,9 @@ public:
         // Debug_printv("path[%s] size[%d]", path.c_str(), size);
     };
 
-    MIStream* createIStream(std::shared_ptr<MIStream> src) { return src.get(); };
-    MIStream* inputStream() override ; // has to return OPENED stream
-    MIStream* outputStream() override ; // has to return OPENED stream    
+    MStream* createIStream(std::shared_ptr<MStream> src) { return src.get(); };
+    MStream* inputStream() override ; // has to return OPENED stream
+    MStream* outputStream() override ; // has to return OPENED stream    
 
     std::string petsciiName() override {
         return name;
@@ -254,7 +254,7 @@ private:
  ********************************************************/
 
 //
-class CServerIStream: public MIStream {
+class CServerIStream: public MStream {
 
 public:
     CServerIStream(std::string path) {
@@ -263,7 +263,7 @@ public:
     ~CServerIStream() {
         close();
     }
-    // MIStream methods
+    // MStream methods
     bool open() override;
     void close() override;
 

@@ -11,9 +11,9 @@
 #define SEEK_CUR  1
 #define SEEK_END  2
 
-class MIStream {
+class MStream {
 public:
-    virtual ~MIStream() {};
+    virtual ~MStream() {};
 
     virtual size_t available() = 0;
     virtual size_t size() = 0;

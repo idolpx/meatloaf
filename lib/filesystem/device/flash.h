@@ -61,8 +61,8 @@ public:
 
     //MFile* cd(std::string newDir);
     bool isDirectory() override;
-    MIStream* inputStream() override ; // has to return OPENED stream
-    MIStream* outputStream() override ; // has to return OPENED stream
+    MStream* inputStream() override ; // has to return OPENED stream
+    MStream* outputStream() override ; // has to return OPENED stream
     time_t getLastWrite() override ;
     time_t getCreationTime() override ;
     bool rewindDirectory() override ;
@@ -72,7 +72,7 @@ public:
     size_t size() override ;
     bool remove() override ;
     bool rename(std::string dest);
-    MIStream* createIStream(std::shared_ptr<MIStream> src);
+    MStream* createIStream(std::shared_ptr<MStream> src);
 
 protected:
     DIR* dir;
@@ -114,10 +114,10 @@ private:
 
 
 /********************************************************
- * MIStream I
+ * MStream I
  ********************************************************/
 
-class FlashIStream: public MIStream {
+class FlashIStream: public MStream {
 public:
     FlashIStream(std::string& path) {
         localPath = path;
@@ -127,7 +127,7 @@ public:
         close();
     }
 
-    // MIStream methods
+    // MStream methods
     size_t available() override;
     size_t size() override;    
     size_t position() override;
@@ -138,7 +138,7 @@ public:
     void close() override;
     bool open() override;
 
-    // MIStream methods
+    // MStream methods
     //uint8_t read() override;
     size_t read(uint8_t* buf, size_t size) override;
     size_t write(const uint8_t *buf, size_t size) override;

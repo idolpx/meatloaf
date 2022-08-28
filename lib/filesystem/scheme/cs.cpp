@@ -168,7 +168,7 @@ bool CServerIStream::open() {
     return m_isOpen;
 };
 
-// MIStream methods
+// MStream methods
 size_t CServerIStream::available() {
     return m_bytesAvailable;
 };
@@ -331,14 +331,14 @@ bool CServerFile::isDirectory() {
     return false;
 };
 
-MIStream* CServerFile::inputStream() {
-    MIStream* istream = new CServerIStream(url);
+MStream* CServerFile::inputStream() {
+    MStream* istream = new CServerIStream(url);
     istream->open();   
     return istream;
 }; 
 
-MIStream* CServerFile::outputStream() {
-    MIStream* ostream = new CServerIStream(url);
+MStream* CServerFile::outputStream() {
+    MStream* ostream = new CServerIStream(url);
     ostream->open();   
     return ostream;
 };

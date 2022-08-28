@@ -26,21 +26,21 @@ bool HttpFile::isDirectory() {
         return false;
 }
 
-MIStream* HttpFile::inputStream() {
+MStream* HttpFile::inputStream() {
     // has to return OPENED stream
     //Debug_printv("Input stream requested: [%s]", url.c_str());
-    MIStream* istream = new HttpIStream(url);
+    MStream* istream = new HttpIStream(url);
     istream->open();
     return istream;
 }
 
-MIStream* HttpFile::outputStream() {
+MStream* HttpFile::outputStream() {
     // has to return OPENED stream
-    MIStream* ostream = new HttpIStream(url);
+    MStream* ostream = new HttpIStream(url);
     return ostream;
 }
 
-MIStream* HttpFile::createIStream(std::shared_ptr<MIStream> is) {
+MStream* HttpFile::createIStream(std::shared_ptr<MStream> is) {
     return is.get(); // DUMMY return value - we've overriden istreamfunction, so this one won't be used
 }
 

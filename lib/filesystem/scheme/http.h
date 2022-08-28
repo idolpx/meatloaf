@@ -66,8 +66,8 @@ public:
             delete client;
     }
     bool isDirectory() override;
-    MIStream* inputStream() override ; // has to return OPENED stream
-    MIStream* outputStream() override ; // has to return OPENED stream
+    MStream* inputStream() override ; // has to return OPENED stream
+    MStream* outputStream() override ; // has to return OPENED stream
     time_t getLastWrite() override ;
     time_t getCreationTime() override ;
     bool rewindDirectory() override ;
@@ -78,7 +78,7 @@ public:
     bool remove() override ;
     bool isText() override ;
     bool rename(std::string dest) { return false; };
-    MIStream* createIStream(std::shared_ptr<MIStream> src);
+    MStream* createIStream(std::shared_ptr<MStream> src);
     //void addHeader(const String& name, const String& value, bool first = false, bool replace = true);
 };
 
@@ -87,7 +87,7 @@ public:
  * Streams
  ********************************************************/
 
-class HttpIOStream: public MIStream {
+class HttpIOStream: public MStream {
 
 public:
     HttpIOStream(std::string& path) {
@@ -100,7 +100,7 @@ public:
     void close() override;
     bool open() override;
 
-    // MIStream methods
+    // MStream methods
     size_t position() override;
     size_t available() override;
     size_t read(uint8_t* buf, size_t size) override;
@@ -113,7 +113,7 @@ protected:
 };
 
 
-class HttpIStream: public MIStream {
+class HttpIStream: public MStream {
 
 public:
     HttpIStream(std::string path) {
@@ -123,7 +123,7 @@ public:
         close();
     };
 
-    // MIStream methods
+    // MStream methods
     size_t size() override;
     size_t available() override;     
     size_t position() override;
@@ -133,7 +133,7 @@ public:
     void close() override;
     bool open() override;
 
-    // MIStream methods
+    // MStream methods
     size_t read(uint8_t* buf, size_t size) override;
     size_t write(const uint8_t *buf, size_t size) override;
 
