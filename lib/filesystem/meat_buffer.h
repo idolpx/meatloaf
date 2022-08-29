@@ -12,7 +12,7 @@ namespace Meat {
      ********************************************************/
 
     class mfilebuf : public std::filebuf {
-        std::unique_ptr<MStream> mistream;
+        std::unique_ptr<MStream> mstream;
         std::unique_ptr<MFile> mfile;
 
         static const size_t ibufsize = 256;
@@ -36,47 +36,43 @@ namespace Meat {
             close();
         }
 
-        std::filebuf* open(std::string filename) {
-            // Debug_println("In filebuf open");
-            mfile.reset(MFSOwner::File(filename));
-            // Debug_println("In filebuf open pre temp");
-            auto temp = mfile->inputStream();
+        std::filebuf* doOpen() {
             // Debug_println("In filebuf open pre reset mistream");
-            mistream.reset(temp);
+            mstream.reset(mfile->meatStream());
             // Debug_println("In filebuf open post reset mistream");
-            if(mistream->isOpen()) {
+            if(mstream->isOpen()) {
                 // Debug_println("In filebuf open success!");
-
-                return this;
-            }
-            else
-                return nullptr;
-        };
-
-        std::filebuf* open(MFile* file) {
-            mfile.reset(MFSOwner::File(file->url));
-            mistream.reset(mfile->inputStream());
-            if(mistream->isOpen()) {
                 this->setp(obuffer, obuffer+obufsize);
                 return this;
             }
             else
                 return nullptr;
+        }
+
+        std::filebuf* open(std::string filename) {
+            // Debug_println("In filebuf open");
+            mfile.reset(MFSOwner::File(filename));
+            return doOpen();
+        };
+
+        std::filebuf* open(MFile* file) {
+            mfile.reset(MFSOwner::File(file->url));
+            return doOpen();
         };
 
         virtual void close() {
             if(is_open()) {
                 // Debug_printv("closing in filebuf\n");
                 sync();
-                mistream->close();
+                mstream->close();
             }
         }
 
         bool is_open() const {
-            if(mistream == nullptr)
+            if(mstream == nullptr)
                 return false;
             else
-                return mistream->isOpen();
+                return mstream->isOpen();
         }
 
         /**
@@ -111,7 +107,7 @@ namespace Meat {
                 // no more characters are available, size == 0.
                 //auto buffer = reader->read();
 
-                auto readCount = mistream->read((uint8_t*)ibuffer, ibufsize);
+                auto readCount = mstream->read((uint8_t*)ibuffer, ibufsize);
 
                 //Debug_printv("--mfilebuf underflow, read bytes=%d--", readCount);
 
@@ -176,7 +172,7 @@ namespace Meat {
 
             uint8_t* pBase = (uint8_t*)this->pbase();
 
-            if ( mistream->write( pBase, end - this->pbase() ) == 0 ) {
+            if ( mstream->write( pBase, end - this->pbase() ) == 0 ) {
                 ch = EOF;
             } else if ( ch == EOF ) {
                 ch = 0;
@@ -189,7 +185,7 @@ namespace Meat {
         std::streampos seekpos(std::streampos __pos, std::ios_base::openmode __mode = std::ios_base::in | std::ios_base::out) override {
             std::streampos __ret = std::streampos(off_type(-1));
 
-            if(mistream->seek(__pos)) {
+            if(mstream->seek(__pos)) {
                 //__ret.state(_M_state_cur);
                 __ret = std::streampos(off_type(__pos));
                 // probably requires resetting setg!
@@ -230,7 +226,7 @@ namespace Meat {
                 
 
                 //Debug_printv("before write call, mostream!=null[%d]", mostream!=nullptr);
-                auto result = mistream->write(buffer, this->pptr()-this->pbase()); 
+                auto result = mstream->write(buffer, this->pptr()-this->pbase()); 
                 //Debug_printv("%d bytes left in buffer written to sink, rc=%d", pptr()-pbase(), result);
 
                 this->setp(obuffer, obuffer+obufsize);
@@ -238,11 +234,7 @@ namespace Meat {
                 return (result != 0) ? 0 : -1;  
             }  
         };
-
-
     };
-
-
 
 
 /********************************************************

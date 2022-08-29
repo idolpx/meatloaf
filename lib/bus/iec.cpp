@@ -105,7 +105,7 @@ bool iecDevice::registerStream (std::ios_base::open_mode mode, std::string m_fil
     std::shared_ptr<MStream> new_stream;
 
     //Debug_printv("m_filename[%s]", m_filename.c_str());
-    new_stream = std::shared_ptr<MStream>(file->inputStream());
+    new_stream = std::shared_ptr<MStream>(file->meatStream());
 
 	if( !new_stream->isOpen() )
 	{

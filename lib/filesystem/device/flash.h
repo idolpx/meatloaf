@@ -61,7 +61,7 @@ public:
 
     //MFile* cd(std::string newDir);
     bool isDirectory() override;
-    MStream* inputStream() override ; // has to return OPENED stream
+    MStream* meatStream() override ; // has to return OPENED stream
     time_t getLastWrite() override ;
     time_t getCreationTime() override ;
     bool rewindDirectory() override ;

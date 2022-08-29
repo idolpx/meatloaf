@@ -4,7 +4,7 @@
 // #include "../../../include/debug.h"
 
 
-// MStream* MLFile::inputStream() {
+// MStream* MLFile::meatStream() {
 //     // has to return OPENED stream
 //     //Debug_printv("[%s]", url.c_str());
 //     MStream* istream = new MLIStream(url);

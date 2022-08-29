@@ -61,13 +61,13 @@ MStream* FlashFile::createIStream(std::shared_ptr<MStream> is) {
     return is.get(); // we don't have to process this stream in any way, just return the original stream
 }
 
-MStream* FlashFile::inputStream()
+MStream* FlashFile::meatStream()
 {
     std::string full_path = basepath + path;
     MStream* istream = new FlashIStream(full_path);
-    //Debug_printv("FlashFile::inputStream() 3, not null=%d", istream != nullptr);
+    //Debug_printv("FlashFile::meatStream() 3, not null=%d", istream != nullptr);
     istream->open();   
-    //Debug_printv("FlashFile::inputStream() 4");
+    //Debug_printv("FlashFile::meatStream() 4");
     return istream;
 }
 

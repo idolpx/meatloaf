@@ -132,7 +132,7 @@ public:
 
         // create and add stream to broker if not found
         auto newFile = MFSOwner::File(url);
-        T* newStream = (T*)newFile->inputStream();
+        T* newStream = (T*)newFile->meatStream();
 
         // Are we at the root of the pathInStream?
         if ( newFile->pathInStream == "")

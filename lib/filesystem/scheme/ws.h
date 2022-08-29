@@ -132,7 +132,7 @@ public:
     WSFile(std::string path): MFile(path) {};
 
     bool isDirectory() override { return false; }
-    MStream* inputStream() override {
+    MStream* meatStream() override {
         // input stream = SERVER socket
         return new CSIOStream(this, true);
     }; 

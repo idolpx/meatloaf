@@ -331,7 +331,7 @@ bool CServerFile::isDirectory() {
     return false;
 };
 
-MStream* CServerFile::inputStream() {
+MStream* CServerFile::meatStream() {
     MStream* istream = new CServerIStream(url);
     istream->open();   
     return istream;

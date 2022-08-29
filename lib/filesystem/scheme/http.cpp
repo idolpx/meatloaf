@@ -26,7 +26,7 @@ bool HttpFile::isDirectory() {
         return false;
 }
 
-MStream* HttpFile::inputStream() {
+MStream* HttpFile::meatStream() {
     // has to return OPENED stream
     //Debug_printv("Input stream requested: [%s]", url.c_str());
     MStream* istream = new HttpIStream(url);

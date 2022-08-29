@@ -221,7 +221,7 @@ public:
     };
 
     MStream* createIStream(std::shared_ptr<MStream> src) { return src.get(); };
-    MStream* inputStream() override ; // has to return OPENED stream
+    MStream* meatStream() override ; // has to return OPENED stream
 
     std::string petsciiName() override {
         return name;

@@ -9,7 +9,7 @@
 //     return false;
 // }
 
-// MStream* WebDAVFile::inputStream() {
+// MStream* WebDAVFile::meatStream() {
 //     // has to return OPENED stream
 //     Debug_printv("[%s]", url.c_str());
 //     MStream* istream = new WebDAVIStream(url);
@@ -32,14 +32,14 @@
 // bool WebDAVFile::exists() {
 //     Debug_printv("[%s]", url.c_str());
 //     // we may try open the stream to check if it exists
-//     std::unique_ptr<MStream> test(inputStream());
+//     std::unique_ptr<MStream> test(meatStream());
 //     // remember that MStream destuctor should close the stream!
 //     return test->isOpen();
 // }
 
 // size_t WebDAVFile::size() {
 //     // we may take content-lenght from header if exists
-//     std::unique_ptr<MStream> test(inputStream());
+//     std::unique_ptr<MStream> test(meatStream());
 
 //     size_t size = 0;
 

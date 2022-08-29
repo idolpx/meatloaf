@@ -73,7 +73,7 @@ public:
     };
     ~IPFSFile() {};
 
-    MStream* inputStream() override; // file on IPFS server = standard HTTP file available via GET
+    MStream* meatStream() override; // file on IPFS server = standard HTTP file available via GET
 };
 
 
