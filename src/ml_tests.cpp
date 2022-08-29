@@ -46,8 +46,7 @@ void testReader(MFile* readeTest) {
 
     Debug_printf("* Trying to read file:%s\n", readeTest->url.c_str());
 
-    auto readerStream = Meat::ifstream(readeTest);
-    readerStream.open();
+    Meat::iostream readerStream(readeTest);
 
     if(readerStream.is_open()) {
         if(readerStream.eof()) {
@@ -379,8 +378,7 @@ void testStdStreamWrapper(MFile* srcFile, MFile* dstFile) {
     if ( dstFile->exists() )
         dstFile->remove();
 
-    Meat::ofstream ostream(dstFile); // dstFile
-    ostream.open();
+    Meat::iostream ostream(dstFile); // dstFile
     
     if(ostream.is_open()) {
         Debug_printf("Trying to serialize JSON to %s\n", dstFile->url.c_str());
@@ -409,8 +407,7 @@ void testStdStreamWrapper(MFile* srcFile, MFile* dstFile) {
     Debug_printf("After copyto rc=%d\n", copyRc);
 
     if(copyRc) {
-        Meat::ifstream istream(srcFile);
-        istream.open();
+        Meat::iostream istream(srcFile);
 
         if(istream.is_open()) {
             Debug_printf("Trying to deserialize JSON from %s\n",srcFile->url.c_str());
@@ -429,8 +426,7 @@ void testStdStreamWrapper(MFile* srcFile, MFile* dstFile) {
 
         Debug_printf("Trying to deserialize JSON from %s\n",dstFile->url.c_str());
 
-        Meat::ifstream newIstream(dstFile); // this is your standard istream!
-        newIstream.open();
+        Meat::iostream newIstream(dstFile); // this is your standard istream!
 
         if(newIstream.is_open()) {
             deserializeJson(m_device, newIstream);
@@ -448,8 +444,8 @@ void testNewCppStreams(std::string name) {
 
     Debug_println(" * Read test\n");
 
-    Meat::ifstream istream(name);
-    istream.open();
+    Meat::iostream istream(name);
+
     if(istream.is_open()) {
         std::string line;
 
@@ -463,11 +459,9 @@ void testNewCppStreams(std::string name) {
 
     Debug_println("\n * Write test\n");
 
-    Meat::ofstream ostream("/intern.txt");
+    Meat::iostream ostream("/intern.txt");
 
     Debug_println(" * Write test - after declaration\n");
-
-    ostream.open();
 
     Debug_println(" * Write test - after open\n");
 
@@ -565,9 +559,7 @@ void testHttpFile() {
 void testRedirect() {
     testHeader("HTTP fs test");
 
-    Meat::ifstream istream("http://c64.meatloaf.cc/roms");
-
-    istream.open();
+    Meat::iostream istream("http://c64.meatloaf.cc/roms");
 
     if(istream.is_open()) {
         Debug_printf("* Stream OK!");

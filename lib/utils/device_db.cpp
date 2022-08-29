@@ -19,6 +19,7 @@
 
 #include "../../include/global_defines.h"
 #include "meat_io.h"
+#include "meat_buffer.h"
 
 DeviceDB device_config;
 
@@ -76,10 +77,9 @@ bool DeviceDB::select(uint8_t new_device_id)
     if ( file->exists() )
     {
         // Load Device Settings
-        // Meat::ifstream istream(config_file);
-        // istream.open();
-        // deserializeJson(m_device, istream);
-        //Debug_printv("loaded id[%d]", (uint8_t)m_device["id"]);
+        Meat::iostream istream(config_file);
+        deserializeJson(m_device, istream);
+        Debug_printv("loaded id[%d]", (uint8_t)m_device["id"]);
     }
     else
     {
@@ -102,7 +102,7 @@ bool DeviceDB::save()
         // if ( file->exists() )
         //     file->remove();
 
-        // Meat::ofstream ostream(file.get()->url);
+        // Meat::iostream ostream(file.get()->url);
         // ostream.open();
         // if(ostream.is_open())
         // {

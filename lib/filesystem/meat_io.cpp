@@ -474,8 +474,8 @@ MFile* MFile::cd(std::string newDir) {
 
 // bool MFile::copyTo(MFile* dst) {
 //     Debug_printv("in copyTo\n");
-//     Meat::ifstream istream(this);
-//     Meat::ofstream ostream(dst);
+//     Meat::iostream istream(this);
+//     Meat::iostream ostream(dst);
 
 //     int rc;
 

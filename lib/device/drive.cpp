@@ -270,9 +270,7 @@ void iecDrive::setDeviceStatus(int number, int track, int sector)
 
 MFile* iecDrive::getPointed(MFile* urlFile) {
 	Debug_printv("getPointed [%s]", urlFile->url.c_str());
-	auto istream = Meat::ifstream(urlFile);
-
-	istream.open();
+	Meat::iostream istream(urlFile);
 
     if( !istream.is_open() ) 
 	{
@@ -529,8 +527,7 @@ void iecDrive::handleListenCommand( void )
 		// here we don't want the full path provided by commandAndPath, though
 		// the full syntax should be: heart:urlfilename,[filename] - optional name of the file that should be pointed to
 
-		auto favStream = Meat::ofstream(commandAndPath.rawPath+".url"); // put the name from argument here!
-		favStream.open();
+		Meat::iostream favStream(commandAndPath.rawPath+".url"); // put the name from argument here!
 		if(favStream.is_open()) {
 			favStream << m_mfile->url;
 		}
@@ -1160,7 +1157,7 @@ bool iecDrive::saveFile()
 
 			b[0] = IEC.receive();
 			// if(ostream->isText())
-			// 	ostream->putPetscii(b[0]);
+			// 	ostream->putPetsciiAsUtf8(b[0]);
 			// else
 				ostream->write(b, b_len);
 			i++;

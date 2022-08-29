@@ -6,72 +6,93 @@
 
 #include "meat_io.h"
 
-namespace Meat {
+namespace Meat
+{
     /********************************************************
      * C++ Input MFile buffer
      ********************************************************/
 
-    class mfilebuf : public std::filebuf {
+    template <class charT, class traits = std::char_traits<charT>>
+    class mfilebuf : public std::basic_filebuf<charT, traits>
+    {
         std::unique_ptr<MStream> mstream;
         std::unique_ptr<MFile> mfile;
 
         static const size_t ibufsize = 256;
         static const size_t obufsize = 256;
-        char* ibuffer;
-        char* obuffer;
+        char *ibuffer;
+        char *obuffer;
 
         std::streampos lastIbufPos = 0;
 
     public:
-        mfilebuf() {
+        typedef charT char_type; // 1
+        typedef traits traits_type;
+        typedef typename traits_type::int_type int_type;
+        typedef typename traits_type::off_type off_type;
+        typedef typename traits_type::pos_type pos_type;
+
+        mfilebuf()
+        {
             ibuffer = new char[ibufsize];
             obuffer = new char[obufsize];
         };
 
-        ~mfilebuf() {
-            if(obuffer != nullptr)
+        ~mfilebuf()
+        {
+            if (obuffer != nullptr)
                 delete[] obuffer;
 
-            if(ibuffer != nullptr)
+            if (ibuffer != nullptr)
                 delete[] ibuffer;
 
             close();
         }
 
-        std::filebuf* doOpen() {
+        std::filebuf *doOpen()
+        {
             // Debug_println("In filebuf open pre reset mistream");
             mstream.reset(mfile->meatStream());
             // Debug_println("In filebuf open post reset mistream");
-            if(mstream->isOpen()) {
+            if (mstream->isOpen())
+            {
                 // Debug_println("In filebuf open success!");
-                this->setp(obuffer, obuffer+obufsize);
+                this->setp(obuffer, obuffer + obufsize);
                 return this;
             }
             else
                 return nullptr;
         }
 
-        std::filebuf* open(std::string filename) {
+        std::filebuf *open(const char* filename)
+        {
             // Debug_println("In filebuf open");
             mfile.reset(MFSOwner::File(filename));
             return doOpen();
         };
 
-        std::filebuf* open(MFile* file) {
-            mfile.reset(MFSOwner::File(file->url));
+        std::filebuf *open(const std::string filename)
+        {
+            // Debug_println("In filebuf open");
+            mfile.reset(MFSOwner::File(filename));
             return doOpen();
         };
 
-        virtual void close() {
-            if(is_open()) {
+        virtual bool close()
+        {
+            if (is_open())
+            {
                 // Debug_printv("closing in filebuf\n");
                 sync();
                 mstream->close();
+                return true;
             }
+            return false;
         }
 
-        bool is_open() const {
-            if(mstream == nullptr)
+        bool is_open() const
+        {
+            if (mstream == nullptr)
                 return false;
             else
                 return mstream->isOpen();
@@ -99,21 +120,23 @@ namespace Meat {
 
         // https://newbedev.com/how-to-write-custom-input-stream-in-c
 
-
-        int underflow() override {
-            if (!is_open()) {
+        int underflow() override
+        {
+            if (!is_open())
+            {
                 return std::char_traits<char>::eof();
             }
-            else if (this->gptr() == this->egptr()) {
+            else if (this->gptr() == this->egptr())
+            {
                 // the next statement assumes "size" characters were produced (if
                 // no more characters are available, size == 0.
-                //auto buffer = reader->read();
+                // auto buffer = reader->read();
 
-                auto readCount = mstream->read((uint8_t*)ibuffer, ibufsize);
+                auto readCount = mstream->read((uint8_t *)ibuffer, ibufsize);
 
                 lastIbufPos = mstream->position();
 
-                //Debug_printv("--mfilebuf underflow, read bytes=%d--", readCount);
+                // Debug_printv("--mfilebuf underflow, read bytes=%d--", readCount);
 
                 this->setg(ibuffer, ibuffer, ibuffer + readCount);
             }
@@ -122,11 +145,9 @@ namespace Meat {
             // egptr = one past end of get area
 
             return this->gptr() == this->egptr()
-                ? std::char_traits<char>::eof()
-                : std::char_traits<char>::to_int_type(*this->gptr());
+                       ? std::char_traits<char>::eof()
+                       : std::char_traits<char>::to_int_type(*this->gptr());
         };
-
-
 
         /**
          *  @brief  Consumes data from the buffer; writes to the
@@ -152,41 +173,46 @@ namespace Meat {
          *  @note  Base class version does nothing, returns eof().
          */
 
-
         // // https://newbedev.com/how-to-write-custom-input-stream-in-c
 
-        int overflow(int ch  = traits_type::eof()) override
+        int overflow(int ch = traits_type::eof()) override
         {
 
-            //Debug_printv("in overflow");
-                // pptr =  Returns the pointer to the current character (put pointer) in the put area.
-                // pbase = Returns the pointer to the beginning ("base") of the put area.
-                // epptr = Returns the pointer one past the end of the put area.
+            // Debug_printv("in overflow");
+            //  pptr =  Returns the pointer to the current character (put pointer) in the put area.
+            //  pbase = Returns the pointer to the beginning ("base") of the put area.
+            //  epptr = Returns the pointer one past the end of the put area.
 
-            if (!is_open()) {
+            if (!is_open())
+            {
                 return EOF;
             }
 
-            char* end = this->pptr();
-            if ( ch != EOF ) {
-                *end ++ = ch;
+            char *end = this->pptr();
+            if (ch != EOF)
+            {
+                *end++ = ch;
             }
 
-            //Debug_printv("%d bytes in buffer will be written", end-pbase());
+            // Debug_printv("%d bytes in buffer will be written", end-pbase());
 
-            uint8_t* pBase = (uint8_t*)this->pbase();
+            uint8_t *pBase = (uint8_t *)this->pbase();
 
-            if ( mstream->write( pBase, end - this->pbase() ) == 0 ) {
+            if (mstream->write(pBase, end - this->pbase()) == 0)
+            {
                 ch = EOF;
-            } else if ( ch == EOF ) {
+            }
+            else if (ch == EOF)
+            {
                 ch = 0;
             }
-            this->setp(obuffer, obuffer+obufsize);
-            
+            this->setp(obuffer, obuffer + obufsize);
+
             return ch;
         };
 
-        std::streampos seekpos(std::streampos __pos, std::ios_base::openmode __mode = std::ios_base::in | std::ios_base::out) override {
+        std::streampos seekpos(std::streampos __pos, std::ios_base::openmode __mode = std::ios_base::in | std::ios_base::out) override
+        {
             std::streampos __ret = std::streampos(off_type(-1));
 
             // pbase - obuffer start
@@ -197,7 +223,8 @@ namespace Meat {
             // gptr - current ibuffer position
             // egptr - ibuffer end
 
-            if(__pos >= lastIbufPos && __pos < lastIbufPos + ibufsize) {
+            if (__pos >= lastIbufPos && __pos < lastIbufPos + ibufsize)
+            {
                 // we're seeing within existing buffer, so let's reuse
 
                 // !!!
@@ -207,10 +234,11 @@ namespace Meat {
                 size_t delta = __pos - lastIbufPos;
                 // TODO - check if eback == ibuffer!!!
                 // TODO - check if pbase == obuffer!!!
-                this->setg(eback(), ibuffer + delta, egptr());
-                this->setp(pbase(), obuffer + delta);
+                this->setg(this->eback(), ibuffer + delta, this->egptr());
+                this->setp(this->pbase(), obuffer + delta);
             }
-            else if(mstream->seek(__pos)) {
+            else if (mstream->seek(__pos))
+            {
                 // the seek op isn't within existing buffer, so we need to actually
                 // call seek on stream and force underflow/overflow
 
@@ -221,14 +249,14 @@ namespace Meat {
                 // underflow will set it to:
                 // setg(ibuffer, ibuffer, ibuffer + readCount);
                 //         begin    next     end
-                this->setg(ibuffer, ibuffer, ibuffer); 
+                this->setg(ibuffer, ibuffer, ibuffer);
 
                 // not sure if this is ok, but is supposed to cause overflow and prepare a clean buffer for writing
                 // that's how overflow does it after writing all:
                 // write(pbase, pptr-pbase)
                 // setp(obuffer, obuffer+obufsize);
                 //         begin    end
-                this->setp(obuffer, obuffer+obufsize);
+                this->setp(obuffer, obuffer + obufsize);
             }
 
             return __ret;
@@ -241,137 +269,300 @@ namespace Meat {
          *  Each derived class provides its own appropriate behavior,
          *  including the definition of @a failure.
          *  @note  Base class version does nothing, returns zero.
-         * 
-         * sync: Called on flush, should output any characters in the buffer to the sink. 
-         * If you never call setp (so there's no buffer), you're always in sync, and this 
-         * can be a no-op. overflow or uflow can call this one, or both can call some 
-         * separate function. (About the only difference between sync and uflow is that 
-         * uflow will only be called if there is a buffer, and it will never be called 
+         *
+         * sync: Called on flush, should output any characters in the buffer to the sink.
+         * If you never call setp (so there's no buffer), you're always in sync, and this
+         * can be a no-op. overflow or uflow can call this one, or both can call some
+         * separate function. (About the only difference between sync and uflow is that
+         * uflow will only be called if there is a buffer, and it will never be called
          * if the buffer is empty. sync will be called if the client code flushes the stream.)
          */
-        int sync() override { 
-            //Debug_printv("in wrapper sync");
-            
-            if(this->pptr() == this->pbase()) {
+        int sync() override
+        {
+            // Debug_printv("in wrapper sync");
+
+            if (this->pptr() == this->pbase())
+            {
                 return 0;
             }
-            else {
-                uint8_t* buffer = (uint8_t*)this->pbase();
+            else
+            {
+                uint8_t *buffer = (uint8_t *)this->pbase();
 
                 // pptr =  Returns the pointer to the current character (put pointer) in the put area.
                 // pbase = Returns the pointer to the beginning ("base") of the put area.
                 // epptr = Returns the pointer one past the end of the put area.
-                
 
-                //Debug_printv("before write call, mostream!=null[%d]", mostream!=nullptr);
-                auto result = mstream->write(buffer, this->pptr()-this->pbase()); 
-                //Debug_printv("%d bytes left in buffer written to sink, rc=%d", pptr()-pbase(), result);
+                // Debug_printv("before write call, mostream!=null[%d]", mostream!=nullptr);
+                auto result = mstream->write(buffer, this->pptr() - this->pbase());
+                // Debug_printv("%d bytes left in buffer written to sink, rc=%d", pptr()-pbase(), result);
 
-                this->setp(obuffer, obuffer+obufsize);
+                this->setp(obuffer, obuffer + obufsize);
 
-                return (result != 0) ? 0 : -1;  
-            }  
+                return (result != 0) ? 0 : -1;
+            }
         };
     };
 
 
-/********************************************************
- * C++ Input MFile stream
- ********************************************************/
-// https://stdcxx.apache.org/doc/stdlibug/39-3.html
 
-    class ifstream : public std::istream {
-        mfilebuf buff;
-        std::string url; 
+
+    // [27.8.1.11] Template class basic_fstream
+    /**
+     *  @brief  Controlling input and output for files.
+     *  @ingroup io
+     *
+     *  @tparam _CharT  Type of character stream.
+     *  @tparam _Traits  Traits for character type, defaults to
+     *                   char_traits<_CharT>.
+     *
+     *  This class supports reading from and writing to named files, using
+     *  the inherited functions from std::basic_iostream.  To control the
+     *  associated sequence, an instance of std::basic_filebuf is used, which
+     *  this page refers to as @c sb.
+     */
+    template <typename _CharT, typename _Traits = std::char_traits<_CharT>>
+    class basic_fstream : public std::basic_iostream<_CharT, _Traits>
+    {
+    public:
+        // Types:
+        typedef _CharT char_type;
+        typedef _Traits traits_type;
+        typedef typename basic_fstream::traits_type::int_type int_type;
+        typedef typename basic_fstream::traits_type::pos_type pos_type;
+        typedef typename basic_fstream::traits_type::off_type off_type;
+
+        // Non-standard types:
+        typedef mfilebuf<char_type, traits_type> __filebuf_type;
+        typedef std::basic_ios<char_type, traits_type> __ios_type;
+        typedef std::basic_iostream<char_type, traits_type> __iostream_type;
+
+    private:
+        __filebuf_type _M_filebuf;
 
     public:
-
-        ifstream(const ifstream &copied) : std::ios(0),  std::istream( &buff ) {
-            
+        // Constructors/destructor:
+        /**
+         *  @brief  Default constructor.
+         *
+         *  Initializes @c sb using its default constructor, and passes
+         *  @c &sb to the base class initializer.  Does not open any files
+         *  (you haven't given it a filename to open).
+         */
+        basic_fstream() : __iostream_type(), _M_filebuf()
+        {
+            this->init(&_M_filebuf);
         }
 
-        ifstream(std::string u) : std::ios(0),  std::istream( &buff ), url(u) {
-            auto f = MFSOwner::File(u);
-            delete f;
-        };
-        ifstream(MFile* file) : std::ios(0),  std::istream( &buff ), url(file->url) {
-        };
-
-        ~ifstream() {
-            //Debug_printv("ifstream destructor");
-            close();
+        /**
+         *  @brief  Create an input/output file stream.
+         *  @param  __s  Null terminated string specifying the filename.
+         *  @param  __mode  Open file in specified mode (see std::ios_base).
+         */
+        explicit basic_fstream(const char *__s,
+                               std::ios_base::openmode __mode = std::ios_base::in | std::ios_base::out)
+            : __iostream_type(0), _M_filebuf()
+        {
+            this->init(&_M_filebuf);
+            this->open(__s, __mode);
         }
 
-        virtual void open() {
-            //Debug_printv("ifstream open %s", url.c_str());
-            buff.open(url);
+        explicit basic_fstream(MFile* fi,
+                               std::ios_base::openmode __mode = std::ios_base::in | std::ios_base::out)
+            : __iostream_type(0), _M_filebuf()
+        {
+            this->init(&_M_filebuf);
+            this->open(fi->url.c_str(), __mode);
         }
 
-        virtual void close() {
-            //Debug_printv("ifstream close for %s bufOpen=%d\n", url.c_str(), buff.is_open());
-            buff.close();
-            //Debug_printv("ifstream AFTER close for %s\n", url.c_str());
+
+#if __cplusplus >= 201103L
+        /**
+         *  @brief  Create an input/output file stream.
+         *  @param  __s  Null terminated string specifying the filename.
+         *  @param  __mode  Open file in specified mode (see std::ios_base).
+         */
+        explicit basic_fstream(const std::string &__s, std::ios_base::openmode __mode = std::ios_base::in | std::ios_base::out) : __iostream_type(0), _M_filebuf()
+        {
+            this->init(&_M_filebuf);
+            this->open(__s, __mode);
         }
 
-        virtual bool is_open() {
-            return buff.is_open();
+#if __cplusplus >= 201703L
+        /**
+         *  @param  Create an input/output file stream.
+         *  @param  __s  filesystem::path specifying the filename.
+         *  @param  __mode  Open file in specified mode (see std::ios_base).
+         */
+        template <typename _Path, typename _Require = _If_fs_path<_Path>>
+        basic_fstream(const _Path &__s,
+                      ios_base::openmode __mode = ios_base::in | ios_base::out)
+            : basic_fstream(__s.c_str(), __mode)
+        {
+        }
+#endif // C++17
+
+        basic_fstream(const basic_fstream &) = delete;
+
+        // basic_fstream(basic_fstream &&__rhs) : __iostream_type(std::move(__rhs)), _M_filebuf(std::move(__rhs._M_filebuf))
+        // {
+        //     __iostream_type::set_rdbuf(&_M_filebuf);
+        // }
+#endif
+
+        /**
+         *  @brief  The destructor does nothing.
+         *
+         *  The file is closed by the filebuf object, not the formatting
+         *  stream.
+         */
+        ~basic_fstream()
+        {
+            _M_filebuf.close();
         }
 
-        U8Char getUtf8() {
+#if __cplusplus >= 201103L
+        // 27.8.3.2 Assign and swap:
+
+        basic_fstream &operator=(const basic_fstream &) = delete;
+
+        basic_fstream &operator=(basic_fstream &&__rhs)
+        {
+            __iostream_type::operator=(std::move(__rhs));
+            _M_filebuf = std::move(__rhs._M_filebuf);
+            return *this;
+        }
+
+        void swap(basic_fstream &__rhs)
+        {
+            __iostream_type::swap(__rhs);
+            _M_filebuf.swap(__rhs._M_filebuf);
+        }
+#endif
+
+        // Members:
+        /**
+         *  @brief  Accessing the underlying buffer.
+         *  @return  The current basic_filebuf buffer.
+         *
+         *  This hides both signatures of std::basic_ios::rdbuf().
+         */
+        __filebuf_type *
+        rdbuf() const
+        {
+            return const_cast<__filebuf_type *>(&_M_filebuf);
+        }
+
+        /**
+         *  @brief  Wrapper to test for an open file.
+         *  @return  @c rdbuf()->is_open()
+         */
+        bool is_open()
+        {
+            return _M_filebuf.is_open();
+        }
+
+        // _GLIBCXX_RESOLVE_LIB_DEFECTS
+        // 365. Lack of const-qualification in clause 27
+        bool is_open() const
+        {
+            return _M_filebuf.is_open();
+        }
+
+        /**
+         *  @brief  Opens an external file.
+         *  @param  __s  The name of the file.
+         *  @param  __mode  The open mode flags.
+         *
+         *  Calls @c std::basic_filebuf::open(__s,__mode).  If that
+         *  function fails, @c failbit is set in the stream's error state.
+         */
+        void open(const char *__s, std::ios_base::openmode __mode = std::ios_base::in | std::ios_base::out)
+        {
+            if (!_M_filebuf.open(__s/*, __mode*/))
+                this->setstate(std::ios_base::failbit);
+            else
+                // _GLIBCXX_RESOLVE_LIB_DEFECTS
+                // 409. Closing an fstream should clear error state
+                this->clear();
+        }
+
+#if __cplusplus >= 201103L
+        /**
+         *  @brief  Opens an external file.
+         *  @param  __s  The name of the file.
+         *  @param  __mode  The open mode flags.
+         *
+         *  Calls @c std::basic_filebuf::open(__s,__mode).  If that
+         *  function fails, @c failbit is set in the stream's error state.
+         */
+        void open(const std::string &__s, std::ios_base::openmode __mode = std::ios_base::in | std::ios_base::out)
+        {
+            if (!_M_filebuf.open(__s/*, __mode*/))
+                this->setstate(std::ios_base::failbit);
+            else
+                // _GLIBCXX_RESOLVE_LIB_DEFECTS
+                // 409. Closing an fstream should clear error state
+                this->clear();
+        }
+
+#if __cplusplus >= 201703L
+        /**
+         *  @brief  Opens an external file.
+         *  @param  __s  The name of the file, as a filesystem::path.
+         *  @param  __mode  The open mode flags.
+         *
+         *  Calls @c std::basic_filebuf::open(__s,__mode).  If that
+         *  function fails, @c failbit is set in the stream's error state.
+         */
+        template <typename _Path>
+        _If_fs_path<_Path, void>
+        open(const _Path &__s,
+             ios_base::openmode __mode = ios_base::in | ios_base::out)
+        {
+            open(__s.c_str(), __mode);
+        }
+#endif // C++17
+#endif // C++11
+
+        /**
+         *  @brief  Close the file.
+         *
+         *  Calls @c std::basic_filebuf::close().  If that function
+         *  fails, @c failbit is set in the stream's error state.
+         */
+        void close()
+        {
+            if (!_M_filebuf.close())
+                this->setstate(std::ios_base::failbit);
+        }
+
+        U8Char getUtf8()
+        {
             U8Char codePoint(this);
             return codePoint;
         }
 
-        char getPetscii() {
+        char getPetscii()
+        {
             return getUtf8().toPetscii();
+        }
+
+        void putPetsciiAsUtf8(char c)
+        {
+            U8Char wide = U8Char(c);
+            (*this) << wide.toUtf8();
         }
     };
 
-    // ifstream& operator>>(ifstream& is, U8Char& c) {
+    typedef basic_fstream<char> iostream;
+
+    // iostream& operator>>(iostream& is, U8Char& c) {
     //     //U8Char codePoint(this);
     //     c = U8Char(&is);
     //     return is;
     // }
 
-
-/********************************************************
- * C++ Output MFile stream
- ********************************************************/
-// https://stdcxx.apache.org/doc/stdlibug/39-3.html
-
-    class ofstream : public std::ostream {
-        mfilebuf buff;
-        std::string url;
-
-    public:
-        ofstream(const ofstream &copied) : std::ios(0), std::ostream( &buff )
-        { 
-            
-        }
-        ofstream(std::string u) : std::ios(0), std::ostream( &buff ), url(u) {};
-        ofstream(MFile* file) : std::ios(0), std::ostream( &buff ), url(file->url) {};
-
-        ~ofstream() {
-            close();
-        };
-
-        virtual void open() {
-            buff.open(url);
-        }
-
-        virtual void close() {
-            buff.close();
-        }
-
-        virtual bool is_open() {
-            return buff.is_open();
-        }
-
-        void putPetscii(char c) {
-            U8Char wide = U8Char(c);
-            (*this) << wide.toUtf8();
-        }
-    };
 }
 
 #endif /* MEATLIB_FILESYSTEM_MEAT_BUFFER */
