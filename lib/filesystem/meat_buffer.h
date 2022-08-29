@@ -20,6 +20,8 @@ namespace Meat {
         char* ibuffer;
         char* obuffer;
 
+        std::streampos lastIbufPos = 0;
+
     public:
         mfilebuf() {
             ibuffer = new char[ibufsize];
@@ -109,6 +111,8 @@ namespace Meat {
 
                 auto readCount = mstream->read((uint8_t*)ibuffer, ibufsize);
 
+                lastIbufPos = mstream->position();
+
                 //Debug_printv("--mfilebuf underflow, read bytes=%d--", readCount);
 
                 this->setg(ibuffer, ibuffer, ibuffer + readCount);
@@ -185,11 +189,45 @@ namespace Meat {
         std::streampos seekpos(std::streampos __pos, std::ios_base::openmode __mode = std::ios_base::in | std::ios_base::out) override {
             std::streampos __ret = std::streampos(off_type(-1));
 
-            if(mstream->seek(__pos)) {
+            // pbase - obuffer start
+            // pptr - current obuffer position
+            // epptr - obuffer end
+
+            // ebackk - ibuffer start
+            // gptr - current ibuffer position
+            // egptr - ibuffer end
+
+            if(__pos >= lastIbufPos && __pos < lastIbufPos + ibufsize) {
+                // we're seeing within existing buffer, so let's reuse
+
+                // !!!
+                // NOTE - THIS PIECE OF CODE HAS TO BE THROUGHLY TESTED!!!!
+                // !!!
+
+                size_t delta = __pos - lastIbufPos;
+                // TODO - check if eback == ibuffer!!!
+                // TODO - check if pbase == obuffer!!!
+                this->setg(eback(), ibuffer + delta, egptr());
+                this->setp(pbase(), obuffer + delta);
+            }
+            else if(mstream->seek(__pos)) {
+                // the seek op isn't within existing buffer, so we need to actually
+                // call seek on stream and force underflow/overflow
+
                 //__ret.state(_M_state_cur);
                 __ret = std::streampos(off_type(__pos));
-                // probably requires resetting setg!
-                this->setg(ibuffer, ibuffer, ibuffer);
+
+                // not sure if this is ok, but is supposed to cause underflow
+                // underflow will set it to:
+                // setg(ibuffer, ibuffer, ibuffer + readCount);
+                //         begin    next     end
+                this->setg(ibuffer, ibuffer, ibuffer); 
+
+                // not sure if this is ok, but is supposed to cause overflow and prepare a clean buffer for writing
+                // that's how overflow does it after writing all:
+                // write(pbase, pptr-pbase)
+                // setp(obuffer, obuffer+obufsize);
+                //         begin    end
                 this->setp(obuffer, obuffer+obufsize);
             }
 
