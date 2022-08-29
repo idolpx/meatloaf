@@ -21,13 +21,6 @@
 //     return is.get(); // we've overriden istreamfunction, so this one won't be used
 // }
 
-// MStream* WebDAVFile::outputStream() {
-//     // has to return OPENED stream
-//     MStream* ostream = new WebDAVOStream(url);
-//     ostream->open();
-//     return ostream;
-// }
-
 // time_t WebDAVFile::getLastWrite() {
 //     return 0; // might be taken from Last-Modified, probably not worth it
 // }

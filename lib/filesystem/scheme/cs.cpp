@@ -337,12 +337,6 @@ MStream* CServerFile::inputStream() {
     return istream;
 }; 
 
-MStream* CServerFile::outputStream() {
-    MStream* ostream = new CServerIStream(url);
-    ostream->open();   
-    return ostream;
-};
-
 bool CServerFile::rewindDirectory() {    
     dirIsOpen = false;
 

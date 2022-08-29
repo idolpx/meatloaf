@@ -71,14 +71,6 @@ MStream* FlashFile::inputStream()
     return istream;
 }
 
-MStream* FlashFile::outputStream()
-{
-    std::string full_path = basepath + path;
-    MStream* ostream = new FlashIStream(full_path);
-    ostream->open();   
-    return ostream;
-}
-
 time_t FlashFile::getLastWrite()
 {
     struct stat info;

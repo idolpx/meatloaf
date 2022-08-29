@@ -15,6 +15,7 @@
 
 #include "ml_tests.h"
 #include "meat_io.h"
+#include "meat_buffer.h"
 #include "iec_host.h"
 #include "../include/make_unique.h"
 #include "basic_config.h"
@@ -188,16 +189,16 @@ void testRecursiveDir(MFile* file, std::string indent) {
 }
 
 void testCopy(MFile* srcFile, MFile* dstFile) {
-    testHeader("Copy file to destination");
+    // testHeader("Copy file to destination");
 
-    Debug_printf("FROM:%s\nTO:%s\n", srcFile->url.c_str(), dstFile->url.c_str());
+    // Debug_printf("FROM:%s\nTO:%s\n", srcFile->url.c_str(), dstFile->url.c_str());
 
-    if(dstFile->exists()) {
-        bool result = dstFile->remove();
-        Debug_printf("FSTEST: %s existed, delete reult: %d\n", dstFile->path.c_str(), result);
-    }
+    // if(dstFile->exists()) {
+    //     bool result = dstFile->remove();
+    //     Debug_printf("FSTEST: %s existed, delete reult: %d\n", dstFile->path.c_str(), result);
+    // }
 
-    srcFile->copyTo(dstFile);
+    // srcFile->copyTo(dstFile);
 }
 
 void dumpParts(std::vector<std::string> v) {
@@ -403,7 +404,7 @@ void testStdStreamWrapper(MFile* srcFile, MFile* dstFile) {
 
     Debug_printf("Copy %s to %s\n", dstFile->url.c_str(), srcFile->url.c_str());
 
-    bool copyRc = dstFile->copyTo(srcFile);
+    bool copyRc = -1; //dstFile->copyTo(srcFile);
 
     Debug_printf("After copyto rc=%d\n", copyRc);
 

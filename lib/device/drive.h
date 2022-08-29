@@ -29,6 +29,7 @@
 #include "iec.h"
 
 #include "meat_io.h"
+#include "meat_buffer.h"
 
 //#include "MemoryInfo.h"
 //#include "helpers.h"

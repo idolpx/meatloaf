@@ -472,30 +472,30 @@ MFile* MFile::cd(std::string newDir) {
     }
 };
 
-bool MFile::copyTo(MFile* dst) {
-    Debug_printv("in copyTo\n");
-    Meat::ifstream istream(this);
-    Meat::ofstream ostream(dst);
+// bool MFile::copyTo(MFile* dst) {
+//     Debug_printv("in copyTo\n");
+//     Meat::ifstream istream(this);
+//     Meat::ofstream ostream(dst);
 
-    int rc;
+//     int rc;
 
-    Debug_printv("in copyTo, iopen=%d oopen=%d\n", istream.is_open(), ostream.is_open());
+//     Debug_printv("in copyTo, iopen=%d oopen=%d\n", istream.is_open(), ostream.is_open());
 
-    if(!istream.is_open() || !ostream.is_open())
-        return false;
+//     if(!istream.is_open() || !ostream.is_open())
+//         return false;
 
-    Debug_printv("commencing copy\n");
+//     Debug_printv("commencing copy\n");
 
-    while((rc = istream.get())!= EOF) {     
-        ostream.put(rc);
-        if(ostream.bad() || istream.bad())
-            return false;
-    }
+//     while((rc = istream.get())!= EOF) {     
+//         ostream.put(rc);
+//         if(ostream.bad() || istream.bad())
+//             return false;
+//     }
 
-    Debug_printv("copying finished, rc=%d\n", rc);
+//     Debug_printv("copying finished, rc=%d\n", rc);
 
-    return true;
-};
+//     return true;
+// };
 
 uint64_t MFile::getAvailableSpace()
 {

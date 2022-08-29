@@ -76,9 +76,9 @@ bool DeviceDB::select(uint8_t new_device_id)
     if ( file->exists() )
     {
         // Load Device Settings
-        Meat::ifstream istream(config_file);
-        istream.open();
-        deserializeJson(m_device, istream);
+        // Meat::ifstream istream(config_file);
+        // istream.open();
+        // deserializeJson(m_device, istream);
         //Debug_printv("loaded id[%d]", (uint8_t)m_device["id"]);
     }
     else

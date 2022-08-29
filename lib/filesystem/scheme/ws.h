@@ -136,10 +136,6 @@ public:
         // input stream = SERVER socket
         return new CSIOStream(this, true);
     }; 
-    MStream* outputStream() override {
-        // output stream = CLIENT socket
-        return new CSIOStream(this, false);
-    }; 
     time_t getLastWrite() override { return 0; };
     time_t getCreationTime() override { return 0; };
     bool rewindDirectory() override { return false; };

@@ -1,8 +1,6 @@
 #ifndef MEATFILE_STREAMS_H
 #define MEATFILE_STREAMS_H
 
-//#include "../../include/global_defines.h"
-
 /********************************************************
  * Universal streams
  ********************************************************/
@@ -18,6 +16,15 @@ public:
     virtual size_t available() = 0;
     virtual size_t size() = 0;
     virtual size_t position() = 0;
+    virtual bool isOpen() = 0;
+    virtual bool isBrowsable() { return false; };
+    virtual bool isRandomAccess() { return false; };
+
+    virtual void close() = 0;
+    virtual bool open() = 0;
+
+    virtual size_t write(const uint8_t *buf, size_t size) = 0;
+    virtual size_t read(uint8_t* buf, size_t size) = 0;
 
     virtual bool seek(size_t pos, int mode) {
         if(mode == SEEK_SET) {
@@ -32,14 +39,6 @@ public:
     }
     virtual bool seek(size_t pos) = 0;
 
-    virtual void close() = 0;
-    virtual bool open() = 0;
-
-    virtual size_t write(const uint8_t *buf, size_t size) = 0;
-    virtual size_t read(uint8_t* buf, size_t size) = 0;
-
-    virtual bool isOpen() = 0;
-
     // For files with a browsable random access directory structure
     // d64, d74, d81, dnp, etc.
     virtual bool seekPath(std::string path) {
@@ -51,10 +50,6 @@ public:
     virtual std::string seekNextEntry() {
         return "";
     };
-
-    virtual bool isBrowsable() { return false; };
-    virtual bool isRandomAccess() { return false; };
 };
-
 
 #endif

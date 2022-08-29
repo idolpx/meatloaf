@@ -49,7 +49,6 @@ public:
 
     bool isDirectory() override;
     MStream* inputStream() override ; // has to return OPENED stream
-    MStream* outputStream() override ; // has to return OPENED stream
     time_t getLastWrite() override ;
     time_t getCreationTime() override ;
     bool rewindDirectory() override ;

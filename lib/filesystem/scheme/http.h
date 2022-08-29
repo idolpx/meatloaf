@@ -66,8 +66,7 @@ public:
             delete client;
     }
     bool isDirectory() override;
-    MStream* inputStream() override ; // has to return OPENED stream
-    MStream* outputStream() override ; // has to return OPENED stream
+    MStream* inputStream() override ; // has to return OPENED streamm
     time_t getLastWrite() override ;
     time_t getCreationTime() override ;
     bool rewindDirectory() override ;

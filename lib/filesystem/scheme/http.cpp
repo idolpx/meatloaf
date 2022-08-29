@@ -34,12 +34,6 @@ MStream* HttpFile::inputStream() {
     return istream;
 }
 
-MStream* HttpFile::outputStream() {
-    // has to return OPENED stream
-    MStream* ostream = new HttpIStream(url);
-    return ostream;
-}
-
 MStream* HttpFile::createIStream(std::shared_ptr<MStream> is) {
     return is.get(); // DUMMY return value - we've overriden istreamfunction, so this one won't be used
 }
