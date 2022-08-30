@@ -109,6 +109,25 @@ namespace mstr {
         return false;
     }
 
+    bool equals(const char* a, char *b, bool case_sensitive)
+    {
+        int la = strlen(a);
+        int lb = strlen(b);
+        if(la != lb) return false;
+        for(lb = 0; lb < la; lb++)
+        {
+            char aa = a[lb];
+            char bb = b[lb];
+
+            if(case_sensitive && !compare_char(aa, bb))
+                return false;
+            else if(!case_sensitive && !compare_char_insensitive(aa, bb))
+                return false;
+        }
+        return true;
+    }
+
+
     bool equals(std::string &s1, std::string &s2, bool case_sensitive)
     {
         if(case_sensitive)
@@ -117,13 +136,6 @@ namespace mstr {
         else
             return ( (s1.size() == s2.size() ) &&
                 std::equal(s1.begin(), s1.end(), s2.begin(), &compare_char_insensitive) );
-    }
-
-    bool equals(const char* s1, char *s2, bool case_sensitive)
-    {
-        std::string str1 = s1;
-
-        return equals(str1, s2);
     }
 
 
