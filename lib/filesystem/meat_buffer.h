@@ -563,6 +563,8 @@ namespace Meat
     //     return is;
     // }
 
+    //https://stdcxx.apache.org/doc/stdlibug/39-3.html
+    //https://cplusplus.com/reference/istream/iostream/
 }
 
 #endif /* MEATLIB_FILESYSTEM_MEAT_BUFFER */

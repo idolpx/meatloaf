@@ -357,33 +357,34 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
         case HTTP_EVENT_ON_HEADER: // Occurs when receiving each header sent from the server
             // Does this server support resume?
             // Accept-Ranges: bytes
-            if (strcmp("Accept-Ranges", evt->header_key)==0)
+
+            if (mstr::equals("Accept-Ranges", evt->header_key, false))
             {
                 if(meatClient != nullptr) {
-                    meatClient->isFriendlySkipper = strcmp("bytes", evt->header_value)==0;
+                    meatClient->isFriendlySkipper = mstr::equals("bytes", evt->header_value,false);
                     //Debug_printv("* Ranges info present '%s', comparison=%d!",evt->header_value, strcmp("bytes", evt->header_value)==0);
                 }
             }
             // what can we do UTF8<->PETSCII on this stream?
-            else if (strcmp("Content-Type", evt->header_key)==0)
+            else if (mstr::equals("Content-Type", evt->header_key, false))
             {
                 std::string asString = evt->header_value;
                 bool isText = mstr::isText(asString);
 
                 if(meatClient != nullptr) {
                     meatClient->isText = isText;
-                    //Debug_printv("* Content info present '%s', isText=%d!", evt->header_value, isText);
+                    Debug_printv("* Content info present '%s', isText=%d!, type=%s", evt->header_value, isText, asString.c_str());
                 }        
             }
-            else if(strcmp("Last-Modified", evt->header_key)==0)
+            else if(mstr::equals("Last-Modified", evt->header_key, false))
             {
                 // Last-Modified, value=Thu, 03 Dec 1992 08:37:20 - may be used to get file date
             }
-            else if(strcmp("Content-Length", evt->header_key)==0)
+            else if(mstr::equals("Content-Length", evt->header_key, false))
             {
                 Debug_printv("* Content len present '%s'", evt->header_value);
             }
-            else if(strcmp("Location", evt->header_key)==0)
+            else if(mstr::equals("Location", evt->header_key, false))
             {
                 Debug_printv("* This page redirects from '%s' to '%s'", meatClient->url.c_str(), evt->header_value);
                 if ( mstr::startsWith(evt->header_value, (char *)"http") )

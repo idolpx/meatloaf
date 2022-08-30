@@ -119,6 +119,14 @@ namespace mstr {
                 std::equal(s1.begin(), s1.end(), s2.begin(), &compare_char_insensitive) );
     }
 
+    bool equals(const char* s1, char *s2, bool case_sensitive)
+    {
+        std::string str1 = s1;
+
+        return equals(str1, s2);
+    }
+
+
     bool equals(std::string &s1, char *s2, bool case_sensitive)
     {
         if(case_sensitive)
@@ -213,6 +221,8 @@ namespace mstr {
 
         // content types
         if(equals(s, (char*)"text/html", false))
+            return true;
+        if(equals(s, (char*)"text/plain", false))
             return true;
         if(contains(s, (char*)"text", false))
             return true;
