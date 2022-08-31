@@ -17,7 +17,7 @@ class DNPIStream : public D64IStream {
     // override everything that requires overriding here
 
 public:
-    DNPIStream(std::shared_ptr<MIStream> is) : D64IStream(is) 
+    DNPIStream(std::shared_ptr<MStream> is) : D64IStream(is) 
     {
         // DNP Offsets
         directory_header_offset = {1, 0, 0x04};
@@ -44,7 +44,7 @@ class DNPFile: public D64File {
 public:
     DNPFile(std::string path, bool is_dir = true) : D64File(path, is_dir) {};
 
-    MIStream* createIStream(std::shared_ptr<MIStream> containerIstream) override;
+    MStream* createIStream(std::shared_ptr<MStream> containerIstream) override;
 };
 
 

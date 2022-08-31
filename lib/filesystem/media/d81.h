@@ -19,7 +19,7 @@ class D81IStream : public D64IStream {
     // override everything that requires overriding here
 
 public:
-    D81IStream(std::shared_ptr<MIStream> is) : D64IStream(is) 
+    D81IStream(std::shared_ptr<MStream> is) : D64IStream(is) 
     {
         // D81 Offsets
         directory_header_offset = {40, 0, 0x04};
@@ -46,7 +46,7 @@ class D81File: public D64File {
 public:
     D81File(std::string path, bool is_dir = true) : D64File(path, is_dir) {};
 
-    MIStream* createIStream(std::shared_ptr<MIStream> containerIstream) override;
+    MStream* createIStream(std::shared_ptr<MStream> containerIstream) override;
 };
 
 

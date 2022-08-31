@@ -270,9 +270,7 @@ void iecDrive::setDeviceStatus(int number, int track, int sector)
 
 MFile* iecDrive::getPointed(MFile* urlFile) {
 	Debug_printv("getPointed [%s]", urlFile->url.c_str());
-	auto istream = Meat::ifstream(urlFile);
-
-	istream.open();
+	Meat::iostream istream(urlFile);
 
     if( !istream.is_open() ) 
 	{
@@ -529,8 +527,7 @@ void iecDrive::handleListenCommand( void )
 		// here we don't want the full path provided by commandAndPath, though
 		// the full syntax should be: heart:urlfilename,[filename] - optional name of the file that should be pointed to
 
-		auto favStream = Meat::ofstream(commandAndPath.rawPath+".url"); // put the name from argument here!
-		favStream.open();
+		Meat::iostream favStream(commandAndPath.rawPath+".url"); // put the name from argument here!
 		if(favStream.is_open()) {
 			favStream << m_mfile->url;
 		}
@@ -926,7 +923,7 @@ bool iecDrive::sendFile()
 	device_config.save();
 
 	// TODO!!!! you should check istream for nullptr here and return error immediately if null
-	// std::shared_ptr<MIStream> istream = std::static_pointer_cast<MIStream>(currentStream);
+	// std::shared_ptr<MStream> istream = std::static_pointer_cast<MStream>(currentStream);
 	auto istream = retrieveStream();
 	if ( istream == nullptr )
 	{
@@ -1108,8 +1105,6 @@ bool iecDrive::saveFile()
 	ba[8] = '\0';
 #endif
 
-	// std::unique_ptr<MOStream> ostream(file->outputStream());
-	// std::shared_ptr<MOStream> ostream = std::static_pointer_cast<MOStream>(currentStream);
 	auto ostream = retrieveStream();
 
     if ( ostream == nullptr ) {
@@ -1137,7 +1132,7 @@ bool iecDrive::saveFile()
 		}
 
 
-		Debug_printv("saveFile: [%s] [$%.4X]\r\n=================================\r\n", ostream->url.c_str(), load_address);
+		Debug_printv("saveFile: [$%.4X]\r\n=================================\r\n", load_address);
 
 		// Recieve bytes until a EOI is detected
 		do
@@ -1162,7 +1157,7 @@ bool iecDrive::saveFile()
 
 			b[0] = IEC.receive();
 			// if(ostream->isText())
-			// 	ostream->putPetscii(b[0]);
+			// 	ostream->putPetsciiAsUtf8(b[0]);
 			// else
 				ostream->write(b, b_len);
 			i++;

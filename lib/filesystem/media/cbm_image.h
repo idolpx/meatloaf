@@ -19,10 +19,10 @@
  * Streams
  ********************************************************/
 
-class CBMImageStream: public MIStream {
+class CBMImageStream: public MStream {
 
 public:
-    CBMImageStream(std::shared_ptr<MIStream> is) {
+    CBMImageStream(std::shared_ptr<MStream> is) {
         this->containerStream = is;
         this->m_isOpen = true;
     }
@@ -36,7 +36,7 @@ public:
         close();
     }
 
-    // MIStream methods
+    // MStream methods
     bool isBrowsable() override { return false; };
     bool isRandomAccess() override { return true; };
 
@@ -53,12 +53,14 @@ public:
     size_t available() override;
     size_t size() override;
     size_t read(uint8_t* buf, size_t size) override;
+    size_t write(const uint8_t *buf, size_t size);
+
     bool isOpen();
 
 protected:
 
     bool seekCalled = false;
-    std::shared_ptr<MIStream> containerStream;
+    std::shared_ptr<MStream> containerStream;
 
     bool m_isOpen = false;
     size_t m_length = 0;
@@ -130,7 +132,7 @@ public:
 
         // create and add stream to broker if not found
         auto newFile = MFSOwner::File(url);
-        T* newStream = (T*)newFile->inputStream();
+        T* newStream = (T*)newFile->meatStream();
 
         // Are we at the root of the pathInStream?
         if ( newFile->pathInStream == "")

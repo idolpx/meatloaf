@@ -4,7 +4,7 @@
  * File implementations
  ********************************************************/
 
-MIStream* D90File::createIStream(std::shared_ptr<MIStream> containerIstream) {
+MStream* D90File::createIStream(std::shared_ptr<MStream> containerIstream) {
     Debug_printv("[%s]", url.c_str());
 
     return new D90IStream(containerIstream);

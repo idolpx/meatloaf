@@ -57,26 +57,18 @@ bool FlashFile::isDirectory()
     return S_ISDIR(info.st_mode);
 }
 
-MIStream* FlashFile::createIStream(std::shared_ptr<MIStream> is) {
+MStream* FlashFile::createIStream(std::shared_ptr<MStream> is) {
     return is.get(); // we don't have to process this stream in any way, just return the original stream
 }
 
-MIStream* FlashFile::inputStream()
+MStream* FlashFile::meatStream()
 {
     std::string full_path = basepath + path;
-    MIStream* istream = new FlashIStream(full_path);
-    //Debug_printv("FlashFile::inputStream() 3, not null=%d", istream != nullptr);
+    MStream* istream = new FlashIStream(full_path);
+    //Debug_printv("FlashFile::meatStream() 3, not null=%d", istream != nullptr);
     istream->open();   
-    //Debug_printv("FlashFile::inputStream() 4");
+    //Debug_printv("FlashFile::meatStream() 4");
     return istream;
-}
-
-MOStream* FlashFile::outputStream()
-{
-    std::string full_path = basepath + path;
-    MOStream* ostream = new FlashOStream(full_path);
-    ostream->open();   
-    return ostream;
 }
 
 time_t FlashFile::getLastWrite()
@@ -242,25 +234,9 @@ MFile* FlashFile::getNextFileInDir()
 
 
 /********************************************************
- * MOStreams implementations
+ * MStream implementations
  ********************************************************/
-// MStream methods
-
-bool FlashOStream::open() {
-    Debug_printv("Ostream: trying to open flash fs, calling isOpen");
-    if(!isOpen()) {
-        handle->obtain(localPath, "w+");
-    }
-    return isOpen();
-};
-
-void FlashOStream::close() {
-    if(isOpen()) {
-        handle->dispose();
-    }
-};
-
-size_t FlashOStream::write(const uint8_t *buf, size_t size) {
+size_t FlashIStream::write(const uint8_t *buf, size_t size) {
     if (!isOpen() || !buf) {
         return 0;
     }
@@ -277,46 +253,6 @@ size_t FlashOStream::write(const uint8_t *buf, size_t size) {
     }
     return result;
 };
-
-bool FlashOStream::isOpen() {
-    Debug_printv("in isOpen, handle not null=%d", handle != nullptr);
-    
-    return handle != nullptr && handle->file_h != nullptr;
-}
-
-
-size_t FlashOStream::size() {
-    return _size;
-};
-
-size_t FlashOStream::available() {
-    if(!isOpen()) return 0;
-    return _size - position();
-};
-
-
-size_t FlashOStream::position() {
-    if(!isOpen()) return 0;
-    return ftell(handle->file_h);
-};
-
-bool FlashOStream::seek(size_t pos) {
-    // Debug_printv("pos[%d]", pos);
-        if (!isOpen()) {
-        Debug_printv("Not open");
-        return false;
-    }
-    return ( fseek( handle->file_h, pos, SEEK_SET ) ) ? true : false;
-};
-
-bool FlashOStream::seek(size_t pos, int mode) {
-    // Debug_printv("pos[%d] mode[%d]", pos, mode);
-    if (!isOpen()) {
-        Debug_printv("Not open");
-        return false;
-    }
-    return ( fseek( handle->file_h, pos, mode ) ) ? true: false;
-}
 
 
 /********************************************************

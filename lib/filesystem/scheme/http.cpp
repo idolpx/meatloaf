@@ -26,21 +26,15 @@ bool HttpFile::isDirectory() {
         return false;
 }
 
-MIStream* HttpFile::inputStream() {
+MStream* HttpFile::meatStream() {
     // has to return OPENED stream
     //Debug_printv("Input stream requested: [%s]", url.c_str());
-    MIStream* istream = new HttpIStream(url);
+    MStream* istream = new HttpIStream(url);
     istream->open();
     return istream;
 }
 
-MOStream* HttpFile::outputStream() {
-    // has to return OPENED stream
-    MOStream* ostream = new HttpOStream(url);
-    return ostream;
-}
-
-MIStream* HttpFile::createIStream(std::shared_ptr<MIStream> is) {
+MStream* HttpFile::createIStream(std::shared_ptr<MStream> is) {
     return is.get(); // DUMMY return value - we've overriden istreamfunction, so this one won't be used
 }
 
@@ -115,42 +109,6 @@ bool HttpFile::isText() {
 }
 
 /********************************************************
- * Ostream impls
- ********************************************************/
-bool HttpOStream::open() {
-    return m_http.PUT(url);
-};
-
-void HttpOStream::close() {
-    return m_http.close();
-}
-
-bool HttpOStream::seek(size_t pos) {
-    return m_http.seek(pos);
-}
-
-size_t HttpOStream::write(const uint8_t* buf, size_t size) {
-    return m_http.write(buf ,size);
-};
-
-size_t HttpOStream::size() {
-    return m_http.m_length;
-};
-
-size_t HttpOStream::available() {
-    return m_http.m_bytesAvailable;
-};
-
-size_t HttpOStream::position() {
-    return m_http.m_position;
-}
-
-bool HttpOStream::isOpen() {
-    return m_http.m_isOpen;
-};
-
-
-/********************************************************
  * Istream impls
  ********************************************************/
 bool HttpIStream::open() {
@@ -158,6 +116,7 @@ bool HttpIStream::open() {
 };
 
 void HttpIStream::close() {
+    Debug_printv("CLOSE called explicitly on this HTTP stream!");    
     m_http.close();
 }
 
@@ -168,6 +127,12 @@ bool HttpIStream::seek(size_t pos) {
 size_t HttpIStream::read(uint8_t* buf, size_t size) {
     return m_http.read(buf, size);
 };
+
+size_t HttpIStream::write(const uint8_t *buf, size_t size) {
+    return -1;
+}
+
+
 
 bool HttpIStream::isOpen() {
     return m_http.m_isOpen;
@@ -206,22 +171,20 @@ bool MeatHttpClient::HEAD(std::string dstUrl) {
     return rc;
 }
 
-bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
-    url = dstUrl;
+bool MeatHttpClient::reopen(int range) {
     wasRedirected = false;
+    Debug_printv("reopening url[%s] from position:%d", url.c_str(), range);
+    lastRC = tryOpen(lastMethod, range);
 
-    Debug_printv("url[%s]", url.c_str());
-    int httpCode = tryOpen(meth);
-
-    while(httpCode == HttpStatus_MovedPermanently || httpCode == HttpStatus_Found || httpCode == 303)
+    while(lastRC == HttpStatus_MovedPermanently || lastRC == HttpStatus_Found || lastRC == 303)
     {
-        Debug_printv("--- Page moved, doing redirect");
-        httpCode = tryOpen(meth);
+        Debug_printv("--- Page moved, doing redirect to [%s]", url.c_str());
+        lastRC = tryOpen(lastMethod, range);
         wasRedirected = true;
     }
     
-    if(httpCode != HttpStatus_Ok && httpCode != 301) {
-        Debug_printv("opening stream failed, httpCode=%d", httpCode);
+    if(lastRC != HttpStatus_Ok && lastRC != 301 && lastRC != 206) {
+        Debug_printv("opening stream failed, httpCode=%d", lastRC);
         close();
         return false;
     }
@@ -231,11 +194,18 @@ bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
     m_isOpen = true;
     m_exists = true;
     m_position = 0;
-    lastMethod = meth;
 
-    Debug_printv("length=%d isFriendlySkipper=[%d] isText=[%d], httpCode=[%d]", m_length, isFriendlySkipper, isText, httpCode);
+    Debug_printv("length=%d isFriendlySkipper=[%d] isText=[%d], httpCode=[%d]", m_length, isFriendlySkipper, isText, lastRC);
 
     return true;
+
+}
+
+bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
+    url = dstUrl;
+    lastMethod = meth;
+
+    return reopen(0);
 };
 
 void MeatHttpClient::close() {
@@ -258,31 +228,27 @@ bool MeatHttpClient::seek(size_t pos) {
         return true;
 
     if(isFriendlySkipper) {
-        char str[40];
+        esp_http_client_close(m_http);
 
-        // Range: bytes=91536-(91536+255)
-        snprintf(str, sizeof str, "bytes=%lu-%lu", (unsigned long)pos, ((unsigned long)pos + 255));
-        esp_http_client_set_header(m_http, "range", str);
-        esp_http_client_set_method(m_http, lastMethod);
+        bool op = reopen(pos);
 
-        esp_err_t initOk = esp_http_client_open(m_http, 0); // or open? It's not entirely clear...
-
-        Debug_printv("SEEK in HttpIStream %s: RC=%d", url.c_str(), initOk);
-        if(initOk != ESP_OK)
+        Debug_printv("SEEK in HttpIStream %s: range request RC=%d", url.c_str(), lastRC);
+        
+        if(!op)
             return false;
 
-        esp_http_client_fetch_headers(m_http);
-        int httpCode = esp_http_client_get_status_code(m_http);
-        Debug_printv("httpCode=[%d] request range=[%s]", httpCode, str);
-        if(httpCode != HttpStatus_Ok || httpCode != 206)
-            return false;
+         // 200 = range not supported! according to https://developer.mozilla.org/en-US/docs/Web/HTTP/Range_requests
+        if(lastRC == 206){
+            Debug_printv("Seek succesful");
 
-        Debug_printv("stream opened[%s]", url.c_str());
+            m_position = pos;
+            m_bytesAvailable = m_length-pos;
+            return true;
+        }
+    }
 
-        m_position = pos;
-        m_bytesAvailable = m_length-pos;
-        return true;
-    } else if(lastMethod == HTTP_METHOD_GET) {
+    if(lastMethod == HTTP_METHOD_GET) {
+        Debug_printv("Server doesn't support resume, reading from start and discarding");
         // server doesn't support resume, so...
         if(pos<m_position || pos == 0) {
             // skipping backward let's simply reopen the stream...
@@ -292,15 +258,27 @@ bool MeatHttpClient::seek(size_t pos) {
                 return false;
 
             // and read pos bytes - requires some buffer
-            esp_http_client_read(m_http, nullptr, pos);
+            for(int i = 0; i<pos; i++) {
+                char c;
+                int rc = esp_http_client_read(m_http, &c, 1);
+                if(rc == -1)
+                    return false;
+            }
         }
         else {
+            auto delta = pos-m_position;
             // skipping forward let's skip a proper amount of bytes - requires some buffer
-            esp_http_client_read(m_http, nullptr, pos-m_position);
+            for(int i = 0; i<delta; i++) {
+                char c;
+                int rc = esp_http_client_read(m_http, &c, 1);
+                if(rc == -1)
+                    return false;
+            }
         }
 
         m_bytesAvailable = m_length-pos;
         m_position = pos;
+        Debug_printv("stream opened[%s]", url.c_str());
 
         return true;
     }
@@ -311,8 +289,23 @@ bool MeatHttpClient::seek(size_t pos) {
 size_t MeatHttpClient::read(uint8_t* buf, size_t size) {
     if (m_isOpen) {
         auto bytesRead= esp_http_client_read(m_http, (char *)buf, size );
-        m_bytesAvailable -= bytesRead;
-        m_position+=bytesRead;
+        
+        if(bytesRead>0) {
+            for(int i=0; i<bytesRead; i++) {
+                Debug_printf("%c", buf[i]);
+            }
+
+            Debug_printf("  ");
+
+            for(int i=0; i<bytesRead; i++) {
+                Debug_printf("%d ", buf[i]);
+            }
+
+            Debug_printf("(%d bytes)\n", bytesRead);
+
+            m_bytesAvailable -= bytesRead;
+            m_position+=bytesRead;
+        }
         return bytesRead;        
     }
     return 0;
@@ -328,9 +321,8 @@ size_t MeatHttpClient::write(const uint8_t* buf, size_t size) {
     return 0;
 };
 
-int MeatHttpClient::tryOpen(esp_http_client_method_t meth) {
+int MeatHttpClient::tryOpen(esp_http_client_method_t meth, int resume) {
 
-    Debug_printv("url[%s]", url.c_str());
     if ( url.size() < 5)
         return 0;
 
@@ -345,10 +337,16 @@ int MeatHttpClient::tryOpen(esp_http_client_method_t meth) {
         .user_data = this,
         .keep_alive_enable = true,
         .keep_alive_idle = 10,
-        .keep_alive_interval = 10
+        .keep_alive_interval = 1
     };
 
     m_http = esp_http_client_init(&config);
+
+    if(resume > 0) {
+        char str[40];
+        snprintf(str, sizeof str, "bytes=%lu-", (unsigned long)resume);
+        esp_http_client_set_header(m_http, "range", str);
+    }
 
     // Debug_printv("--- PRE OPEN")
 
@@ -393,33 +391,40 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
         case HTTP_EVENT_ON_HEADER: // Occurs when receiving each header sent from the server
             // Does this server support resume?
             // Accept-Ranges: bytes
-            if (strcmp("Accept-Ranges", evt->header_key)==0)
+
+            if (mstr::equals("Accept-Ranges", evt->header_key, false))
             {
                 if(meatClient != nullptr) {
-                    meatClient->isFriendlySkipper = strcmp("bytes", evt->header_value)==0;
+                    meatClient->isFriendlySkipper = mstr::equals("bytes", evt->header_value,false);
                     //Debug_printv("* Ranges info present '%s', comparison=%d!",evt->header_value, strcmp("bytes", evt->header_value)==0);
                 }
             }
             // what can we do UTF8<->PETSCII on this stream?
-            else if (strcmp("Content-Type", evt->header_key)==0)
+            else if (mstr::equals("Content-Type", evt->header_key, false))
             {
                 std::string asString = evt->header_value;
                 bool isText = mstr::isText(asString);
 
                 if(meatClient != nullptr) {
                     meatClient->isText = isText;
-                    //Debug_printv("* Content info present '%s', isText=%d!", evt->header_value, isText);
+                    //Debug_printv("* Content info present '%s', isText=%d!, type=%s", evt->header_value, isText, asString.c_str());
                 }        
             }
-            else if(strcmp("Last-Modified", evt->header_key)==0)
+            else if(mstr::equals("Last-Modified", evt->header_key, false))
             {
                 // Last-Modified, value=Thu, 03 Dec 1992 08:37:20 - may be used to get file date
             }
-            else if(strcmp("Content-Length", evt->header_key)==0)
+            else if(mstr::equals("Content-Disposition", evt->header_key, false))
             {
-                Debug_printv("* Content len present '%s'", evt->header_value);
+                // Content-Disposition, value=attachment; filename*=UTF-8''GeckOS-c64.d64
+                // we can set isText from real file extension, too!
+
             }
-            else if(strcmp("Location", evt->header_key)==0)
+            else if(mstr::equals("Content-Length", evt->header_key, false))
+            {
+                //Debug_printv("* Content len present '%s'", evt->header_value);
+            }
+            else if(mstr::equals("Location", evt->header_key, false))
             {
                 Debug_printv("* This page redirects from '%s' to '%s'", meatClient->url.c_str(), evt->header_value);
                 if ( mstr::startsWith(evt->header_value, (char *)"http") )
@@ -473,7 +478,7 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
             //Debug_printv("HTTP_EVENT_ON_FINISH");
             break;
         case HTTP_EVENT_DISCONNECTED: // The connection has been disconnected
-            //Debug_printv("HTTP_EVENT_DISCONNECTED");
+            Debug_printv("HTTP_EVENT_DISCONNECTED");
             break;
     }
     return ESP_OK;

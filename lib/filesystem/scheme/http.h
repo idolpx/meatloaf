@@ -12,10 +12,10 @@
 class MeatHttpClient {
     esp_http_client_handle_t m_http = nullptr;
     static esp_err_t _http_event_handler(esp_http_client_event_t *evt);
-    int tryOpen(esp_http_client_method_t meth);
+    int tryOpen(esp_http_client_method_t meth, int resume = 0);
     esp_http_client_method_t lastMethod;
     std::function<int(char*, char*)> onHeader = [] (char* key, char* value){ 
-        Debug_printv("HTTP_EVENT_ON_HEADER, key=%s, value=%s", key, value);
+        //Debug_printv("HTTP_EVENT_ON_HEADER, key=%s, value=%s", key, value);
         return 0; 
     };
 
@@ -25,6 +25,7 @@ public:
     bool PUT(std::string url);
     bool HEAD(std::string url);
 
+    bool reopen(int range);
     bool open(std::string url, esp_http_client_method_t meth);
     void close();
     void setOnHeader(const std::function<int(char*, char*)> &f);
@@ -41,7 +42,7 @@ public:
     bool isFriendlySkipper = false;
     bool wasRedirected = false;
     std::string url;
-
+    int lastRC;
 };
 
 /********************************************************
@@ -58,7 +59,7 @@ public:
         Debug_printv("C++, if you try to call this, be damned!");
     };
     HttpFile(std::string path): MFile(path) { 
-        Debug_printv("url[%s]", url.c_str());
+        Debug_printv("constructing http file from url [%s]", url.c_str());
      };
     HttpFile(std::string path, std::string filename): MFile(path) {};
     ~HttpFile() override {
@@ -66,8 +67,7 @@ public:
             delete client;
     }
     bool isDirectory() override;
-    MIStream* inputStream() override ; // has to return OPENED stream
-    MOStream* outputStream() override ; // has to return OPENED stream
+    MStream* meatStream() override ; // has to return OPENED streamm
     time_t getLastWrite() override ;
     time_t getCreationTime() override ;
     bool rewindDirectory() override ;
@@ -78,7 +78,7 @@ public:
     bool remove() override ;
     bool isText() override ;
     bool rename(std::string dest) { return false; };
-    MIStream* createIStream(std::shared_ptr<MIStream> src);
+    MStream* createIStream(std::shared_ptr<MStream> src);
     //void addHeader(const String& name, const String& value, bool first = false, bool replace = true);
 };
 
@@ -87,7 +87,7 @@ public:
  * Streams
  ********************************************************/
 
-class HttpIOStream: public MIStream, MOStream {
+class HttpIOStream: public MStream {
 
 public:
     HttpIOStream(std::string& path) {
@@ -113,7 +113,7 @@ protected:
 };
 
 
-class HttpIStream: public MIStream {
+class HttpIStream: public MStream {
 
 public:
     HttpIStream(std::string path) {
@@ -133,47 +133,18 @@ public:
     void close() override;
     bool open() override;
 
-    // MIStream methods
+    // MStream methods
     size_t read(uint8_t* buf, size_t size) override;
-    bool isOpen();
-
-protected:
-    MeatHttpClient m_http;
-    std::string url;
-
-};
-
-
-class HttpOStream: public MOStream {
-
-public:
-    // MStream methods
-    HttpOStream(std::string path) {
-        url = path;
-    }
-    ~HttpOStream() {
-        close();
-    }
-
-    // MStream methods
-    size_t size() override;
-    size_t available() override;     
-    size_t position() override;
-
-    virtual bool seek(size_t pos);
-
-    void close() override;
-    bool open() override;
-
-
-    // MOStream methods
     size_t write(const uint8_t *buf, size_t size) override;
+
     bool isOpen();
 
 protected:
-    std::string url;
     MeatHttpClient m_http;
+    std::string url;
+
 };
+
 
 
 /********************************************************
