@@ -18,8 +18,8 @@ namespace Meat
         std::unique_ptr<MStream> mstream;
         std::unique_ptr<MFile> mfile;
 
-        static const size_t ibufsize = 256;
-        static const size_t obufsize = 256;
+        static const size_t ibufsize = 1024;
+        static const size_t obufsize = 1024;
         char *ibuffer;
         char *obuffer;
 
@@ -223,8 +223,13 @@ namespace Meat
             // gptr - current ibuffer position
             // egptr - ibuffer end
 
+            Debug_printv("meat buffer seekpos called!");
+
+
             if (__pos >= lastIbufPos && __pos < lastIbufPos + ibufsize)
             {
+                Debug_printv("Seek withn chace, lucky!");
+
                 // we're seeing within existing buffer, so let's reuse
 
                 // !!!
@@ -239,6 +244,7 @@ namespace Meat
             }
             else if (mstream->seek(__pos))
             {
+                Debug_printv("Seek missed the chache, read required!");
                 // the seek op isn't within existing buffer, so we need to actually
                 // call seek on stream and force underflow/overflow
 

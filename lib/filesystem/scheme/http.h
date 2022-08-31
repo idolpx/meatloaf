@@ -12,10 +12,10 @@
 class MeatHttpClient {
     esp_http_client_handle_t m_http = nullptr;
     static esp_err_t _http_event_handler(esp_http_client_event_t *evt);
-    int tryOpen(esp_http_client_method_t meth);
+    int tryOpen(esp_http_client_method_t meth, int resume = 0);
     esp_http_client_method_t lastMethod;
     std::function<int(char*, char*)> onHeader = [] (char* key, char* value){ 
-        Debug_printv("HTTP_EVENT_ON_HEADER, key=%s, value=%s", key, value);
+        //Debug_printv("HTTP_EVENT_ON_HEADER, key=%s, value=%s", key, value);
         return 0; 
     };
 
@@ -25,6 +25,7 @@ public:
     bool PUT(std::string url);
     bool HEAD(std::string url);
 
+    bool reopen(int range);
     bool open(std::string url, esp_http_client_method_t meth);
     void close();
     void setOnHeader(const std::function<int(char*, char*)> &f);
@@ -41,7 +42,7 @@ public:
     bool isFriendlySkipper = false;
     bool wasRedirected = false;
     std::string url;
-
+    int lastRC;
 };
 
 /********************************************************
@@ -58,7 +59,7 @@ public:
         Debug_printv("C++, if you try to call this, be damned!");
     };
     HttpFile(std::string path): MFile(path) { 
-        Debug_printv("url[%s]", url.c_str());
+        Debug_printv("constructing http file from url [%s]", url.c_str());
      };
     HttpFile(std::string path, std::string filename): MFile(path) {};
     ~HttpFile() override {

@@ -138,6 +138,8 @@ MFile* MFSOwner::File(std::shared_ptr<MFile> file) {
 
 
 MFile* MFSOwner::File(std::string path) {
+                Debug_printf("in File\n");
+
     if(mstr::startsWith(path,"cs:", false)) {
         //Serial.printf("CServer path found!\n");
         return csFS.getFile(path);

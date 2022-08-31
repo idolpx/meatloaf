@@ -475,6 +475,16 @@ void runFSTest(std::string dirPath, std::string filePath) {
 
     // if this doesn't work reading and writing files won't workk
 
+    if(testFile != nullptr) {
+        dumpFileProperties(testFile.get());
+        testReader(testFile.get());
+        testWriter(destFile.get());
+        testReader(destFile.get());
+    }
+    else {
+        Debug_printf("*** WARNING - %s instance couldn't be created!, , testDir->url.c_str()");
+    }
+
     if(!dirPath.empty() && testDir->exists() && testDir->isDirectory()) {
         dumpFileProperties(testDir.get());
         testDirectory(testDir.get());
@@ -485,16 +495,6 @@ void runFSTest(std::string dirPath, std::string filePath) {
         Debug_printf("*** WARNING - %s instance couldn't be created!", testDir->url.c_str());
     }
 
-    if(testFile != nullptr) {
-        dumpFileProperties(testFile.get());
-        testReader(testFile.get());
-        testWriter(destFile.get());
-        testReader(destFile.get());
-    }
-    else {
-        Debug_printf("*** WARNING - %s instance couldn't be created!, , testDir->url.c_str()");
-    }
-    
     Debug_println("**********************************************************************\n\n");
 }
 
@@ -586,8 +586,12 @@ void runTestsSuite() {
     // ====== Per FS dir, read and write region =======================================
 
     // working, uncomment if you want
-    runFSTest("/.sys", "README"); // TODO - let urlparser drop the last slash!
-    runFSTest("http://c64.meatloaf.cc/roms", "https://www.w3.org/TR/PNG/iso_8859-1.txt");
+    //runFSTest("/.sys", "README"); // TODO - let urlparser drop the last slash!
+    //runFSTest("http://c64.meatloaf.cc/roms", "https://www.w3.org/TR/PNG/iso_8859-1.txt");
+    // http://c64.meatloaf.cc/roms
+    //runFSTest("http://192.168.1.161:8000", "https://www104.zippyshare.com/d/TEh31GeR/1191019/GeckOS-c64.d64/index.html");
+    runFSTest("https://c64.meatloaf.cc/geckos-c64.d64", "https://c64.meatloaf.cc/geckos-c64.d64/index.html");
+    //  https://c64.meatloaf.cc
     // runFSTest("http://info.cern.ch/hypertext/WWW/TheProject.html","http://info.cern.ch/hypertext/WWW/TheProject.html");
     // runFSTest("cs:/apps/ski_writer.d64","cs:/apps/ski_writer.d64/EDITOR.HLP");
 
