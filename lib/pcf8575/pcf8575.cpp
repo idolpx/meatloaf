@@ -181,7 +181,7 @@ void PCF8575::readGPIO() {
 	// Read two bytes
 	myI2C.readBytes(_address, 2, buffer);
 	_PIN = buffer[0];                            // low byte
-	_PIN &= 0x00FF | ( (buffer[1] << 8) & 0xFF00);  // high byte
+	_PIN = (_PIN & 0x00FF) | ( (buffer[1] << 8) & 0xFF00);  // high byte
 	_PIN &= ~_DDR;
 
 	this->PORT0 = buffer[0];
