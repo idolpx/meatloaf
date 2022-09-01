@@ -413,6 +413,7 @@ void testReader(MFile* srcFile) {
 
     Meat::iostream istream(srcFile);
 
+    Debug_printv("reading file now!");
     if(istream.is_open()) {
         if(istream.eof()) {
             Debug_printf("Reader returned EOF! :(");
@@ -422,7 +423,7 @@ void testReader(MFile* srcFile) {
 
         while(!istream.eof()) {
             istream >> line;
-            Serial.print(line.c_str());
+            Debug_printv("%s", line.c_str());
         }
 
         istream.close();
