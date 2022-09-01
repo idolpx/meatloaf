@@ -297,11 +297,11 @@ size_t MeatHttpClient::read(uint8_t* buf, size_t size) {
 
             // Debug_printf("  ");
 
-            for(int i=0; i<bytesRead; i++) {
-                Debug_printf("%.2X ", buf[i]);
-            }
+            // for(int i=0; i<bytesRead; i++) {
+            //     Debug_printf("%.2X ", buf[i]);
+            // }
 
-            Debug_printf("(%d bytes)\n", bytesRead);
+            // Debug_printf("(%d bytes)\n", bytesRead);
 
             m_bytesAvailable -= bytesRead;
             m_position+=bytesRead;

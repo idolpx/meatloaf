@@ -423,7 +423,7 @@ void testReader(MFile* srcFile) {
 
         while(!istream.eof()) {
             istream >> line;
-            Debug_printv("%s", line.c_str());
+            Serial.printf("%s", line.c_str());
         }
 
         istream.close();
