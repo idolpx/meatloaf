@@ -18,8 +18,8 @@ namespace Meat
         std::unique_ptr<MStream> mstream;
         std::unique_ptr<MFile> mfile;
 
-        static const size_t ibufsize = 1024;
-        static const size_t obufsize = 1024;
+        static const size_t ibufsize = 256;
+        static const size_t obufsize = 256;
         char *ibuffer;
         char *obuffer;
 
