@@ -59,7 +59,7 @@ device_state_t iecDrive::process ( void )
 
     Debug_printf ( "   DEVICE: [%.2d] ", this->data.device );
 
-    //Debug_printv("DEV primary[%.2X] secondary[%.2X] device[%d], channel[%d] command[%s] ", this->data.primary, this->data.secondary, this->data.device, this->data.channel, this->data.device_command.c_str());
+    Debug_printv("DEV state[%d] primary[%.2X] secondary[%.2X] device[%d], channel[%d] command[%s] ", this->device_state, this->data.primary, this->data.secondary, this->data.device, this->data.channel, this->data.device_command.c_str());
 
     if ( this->data.secondary == IEC_OPEN )
     {
@@ -127,9 +127,9 @@ device_state_t iecDrive::process ( void )
 			if ( this->data.channel < 2 )
 			{
 				closeStream();
-				device_state = DEVICE_IDLE;
-				this->data.init(); // Clear device command
 			}
+			device_state = DEVICE_IDLE;
+			this->data.init(); // Clear device command
         }
         // IEC.protocol.release(PIN_IEC_SRQ);
     }
