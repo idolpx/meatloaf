@@ -162,4 +162,4 @@ public:
     }
 };
 
-#endif
+#endif /* MEATFILESYSTEM_MEDIA_CBM_IMAGE */
