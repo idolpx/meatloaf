@@ -1,7 +1,4 @@
-# meatloaf-specialty
-Meatloaf for FujiNet
-
-![meatloaf](/images/meatloaf.png)
+[![Meatloaf (C64/C128/VIC20/+4)](images/meatloaf.logo.png)](https://meatloaf.cc)
 
 This is the ESP32 version of [Meatloaf](https://github.com/idolpx/meatloaf) intended for the [FujiNet](https://github.com/FujiNetWIFI/) bring-up on the Commodore 64.
 
@@ -27,7 +24,7 @@ Edit platform.ini to match your system
 ```
 
 ```
-Copy include/ssid-example.h to include/ssid.h
+Copy include/ssid.h.sample to include/ssid.h
 ```
 
 ```
