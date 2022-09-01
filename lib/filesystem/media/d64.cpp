@@ -10,6 +10,8 @@ bool D64IStream::seekSector( uint8_t track, uint8_t sector, size_t offset )
 
     Debug_printv("track[%d] sector[%d] offset[%d]", track, sector, offset);
 
+    if ( track == 0 )
+        return false;
 
     track--;
 	for (uint8_t index = 0; index < track; ++index)
