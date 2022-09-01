@@ -479,8 +479,8 @@ void runFSTest(std::string dirPath, std::string filePath) {
     if(testFile != nullptr) {
         dumpFileProperties(testFile.get());
         testReader(testFile.get());
-        testWriter(destFile.get());
-        testReader(destFile.get());
+        //testWriter(destFile.get());
+        //testReader(destFile.get());
     }
     else {
         Debug_printf("*** WARNING - %s instance couldn't be created!, , testDir->url.c_str()");
