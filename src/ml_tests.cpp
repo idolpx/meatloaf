@@ -406,7 +406,7 @@ void testJson(MFile* srcFile, MFile* dstFile) {
 }
 
 
-void testReader(MFile* srcFile) {
+void testTextReader(MFile* srcFile) {
     testHeader("TEST reading using C++ API");
 
     Debug_printf(" * Read test for %s\n", srcFile->url.c_str());
@@ -423,7 +423,7 @@ void testReader(MFile* srcFile) {
 
         while(!istream.eof()) {
             istream >> line;
-            Serial.printf("%s", line.c_str());
+            Serial.printf("LINE:[%s]\n", line.c_str());
         }
 
         istream.close();
@@ -434,7 +434,7 @@ void testReader(MFile* srcFile) {
 
 }
 
-void testWriter(MFile* dstFile) {
+void testTextWriter(MFile* dstFile) {
     testHeader("TEST writing using C++ API");
     
     Debug_printf(" * Write test for %s\n", dstFile->url.c_str());
@@ -478,9 +478,9 @@ void runFSTest(std::string dirPath, std::string filePath) {
 
     if(testFile != nullptr) {
         dumpFileProperties(testFile.get());
-        testReader(testFile.get());
-        //testWriter(destFile.get());
-        //testReader(destFile.get());
+        testTextReader(testFile.get());
+        //testTextWriter(destFile.get());
+        //testTextReader(destFile.get());
     }
     else {
         Debug_printf("*** WARNING - %s instance couldn't be created!, , testDir->url.c_str()");
