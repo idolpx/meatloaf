@@ -369,7 +369,7 @@ int MeatHttpClient::tryOpen(esp_http_client_method_t meth, int resume) {
     m_length = -1;
     m_bytesAvailable = 0;
 
-    int lengthResp = esp_http_client_fetch_headers(m_http);
+    int lengthResp = esp_http_client_get_content_length(m_http);
     if(lengthResp > 0) {
         // only if we aren't chunked!
         m_length = lengthResp;
@@ -433,6 +433,8 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
             else if(mstr::equals("Content-Length", evt->header_key, false))
             {
                 //Debug_printv("* Content len present '%s'", evt->header_value);
+                // meatClient->m_length = atoi(evt->header_value);
+                // meatClient->m_bytesAvailable = meatClient->m_length;
             }
             else if(mstr::equals("Location", evt->header_key, false))
             {
