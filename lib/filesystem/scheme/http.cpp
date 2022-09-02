@@ -172,6 +172,7 @@ bool MeatHttpClient::HEAD(std::string dstUrl) {
 }
 
 bool MeatHttpClient::attemptRequestWithRedirect(int range) {
+    m_position = 0;
     wasRedirected = false;
     Debug_printv("requesting url[%s] from position:%d", url.c_str(), range);
     lastRC = performRequestFetchHeaders(range);
@@ -192,7 +193,6 @@ bool MeatHttpClient::attemptRequestWithRedirect(int range) {
     // TODO - set m_isWebDAV somehow
     m_isOpen = true;
     m_exists = true;
-    m_position = 0;
 
     Debug_printv("request succesful, length=%d isFriendlySkipper=[%d] isText=[%d], httpCode=[%d]", m_length, isFriendlySkipper, isText, lastRC);
 
@@ -201,6 +201,8 @@ bool MeatHttpClient::attemptRequestWithRedirect(int range) {
 }
 
 bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
+    Debug_printv("OPEN called!");
+
     url = dstUrl;
 
     if ( url.size() < 5)
