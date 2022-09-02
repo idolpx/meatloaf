@@ -205,6 +205,8 @@ bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
     url = dstUrl;
     lastMethod = meth;
 
+    // if destination url domain is different and connection is open we should close
+
     return reopen(0);
 };
 
@@ -228,7 +230,7 @@ bool MeatHttpClient::seek(size_t pos) {
         return true;
 
     if(isFriendlySkipper) {
-        esp_http_client_close(m_http);
+        // esp_http_client_close(m_http);
 
         bool op = reopen(pos);
 
@@ -326,21 +328,29 @@ int MeatHttpClient::tryOpen(esp_http_client_method_t meth, int resume) {
     if ( url.size() < 5)
         return 0;
 
-    //mstr::replaceAll(url, "HTTP:", "http:");
-    esp_http_client_config_t config = {
-        .url = url.c_str(),
-        .user_agent = USER_AGENT,
-        .method = meth,
-        .timeout_ms = 10000,
-        .max_redirection_count = 10,
-        .event_handler = _http_event_handler,
-        .user_data = this,
-        .keep_alive_enable = true,
-        .keep_alive_idle = 10,
-        .keep_alive_interval = 1
-    };
+    if ( !m_isOpen )
+    {
+        //mstr::replaceAll(url, "HTTP:", "http:");
+        esp_http_client_config_t config = {
+            .url = url.c_str(),
+            .user_agent = USER_AGENT,
+            .method = meth,
+            .timeout_ms = 10000,
+            .max_redirection_count = 10,
+            .event_handler = _http_event_handler,
+            .user_data = this,
+            .keep_alive_enable = true,
+            .keep_alive_idle = 10,
+            .keep_alive_interval = 1
+        };
 
-    m_http = esp_http_client_init(&config);
+        m_http = esp_http_client_init(&config);
+    }
+    else
+    {
+        esp_http_client_set_url(m_http, url.c_str());
+        esp_http_client_set_method(m_http, meth);
+    }
 
     if(resume > 0) {
         char str[40];
@@ -350,7 +360,7 @@ int MeatHttpClient::tryOpen(esp_http_client_method_t meth, int resume) {
 
     // Debug_printv("--- PRE OPEN")
 
-    esp_err_t initOk = esp_http_client_open(m_http, 0); // or open? It's not entirely clear...
+    esp_err_t initOk = esp_http_client_perform(m_http); // or open? It's not entirely clear...
 
     if(initOk == ESP_FAIL)
         return 0;
