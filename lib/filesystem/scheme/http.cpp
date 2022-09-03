@@ -166,9 +166,7 @@ bool MeatHttpClient::PUT(std::string dstUrl) {
 }
 
 bool MeatHttpClient::HEAD(std::string dstUrl) {
-    bool rc = open(dstUrl, HTTP_METHOD_HEAD);
-    close();
-    return rc;
+    return open(dstUrl, HTTP_METHOD_HEAD);
 }
 
 bool MeatHttpClient::attemptRequestWithRedirect(int range) {
@@ -194,14 +192,14 @@ bool MeatHttpClient::attemptRequestWithRedirect(int range) {
     m_isOpen = true;
     m_exists = true;
 
-    Debug_printv("request succesful, length=%d isFriendlySkipper=[%d] isText=[%d], httpCode=[%d]", m_length, isFriendlySkipper, isText, lastRC);
+    Debug_printv("request successful, length=%d isFriendlySkipper=[%d] isText=[%d], httpCode=[%d]", m_length, isFriendlySkipper, isText, lastRC);
 
     return true;
 
 }
 
 bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
-    Debug_printv("OPEN called!");
+    Debug_printv("OPEN called! dstUrl[%s] meth[%d]", dstUrl.c_str(), meth);
 
     url = dstUrl;
 
@@ -285,7 +283,7 @@ bool MeatHttpClient::seek(size_t pos) {
             // and read pos bytes - requires some buffer
             for(int i = 0; i<pos; i++) {
                 char c;
-                int rc = esp_http_client_read(m_http, &c, 1);
+                int rc = esp_http_client_read_response(m_http, &c, 1);
                 if(rc == -1)
                     return false;
             }
@@ -295,7 +293,7 @@ bool MeatHttpClient::seek(size_t pos) {
             // skipping forward let's skip a proper amount of bytes - requires some buffer
             for(int i = 0; i<delta; i++) {
                 char c;
-                int rc = esp_http_client_read(m_http, &c, 1);
+                int rc = esp_http_client_read_response(m_http, &c, 1);
                 if(rc == -1)
                     return false;
             }
@@ -313,7 +311,7 @@ bool MeatHttpClient::seek(size_t pos) {
 
 size_t MeatHttpClient::read(uint8_t* buf, size_t size) {
     if (m_isOpen) {
-        auto bytesRead= esp_http_client_read(m_http, (char *)buf, size );
+        auto bytesRead= esp_http_client_read_response(m_http, (char *)buf, size );
 
         Debug_printf("%d bytes were available for reading\n", bytesRead);
 
@@ -349,6 +347,7 @@ size_t MeatHttpClient::write(const uint8_t* buf, size_t size) {
 
 int MeatHttpClient::performRequestFetchHeaders(int resume) {
     esp_http_client_set_method(m_http, lastMethod);
+    esp_http_client_set_url(m_http, url.c_str());
 
     if(resume > 0) {
         char str[40];
@@ -451,7 +450,8 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
             break;
 
         case HTTP_EVENT_ON_DATA: // Occurs multiple times when receiving body data from the server. MAY BE SKIPPED IF BODY IS EMPTY!
-            //Debug_printv("HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
+            Debug_printv("HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
+            Debug_printv("data[%s]", evt->data);
             {
                 int status = esp_http_client_get_status_code(meatClient->m_http);
 
