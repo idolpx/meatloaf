@@ -171,15 +171,16 @@ bool MeatHttpClient::HEAD(std::string dstUrl) {
     return rc;
 }
 
-bool MeatHttpClient::reopen(int range) {
+bool MeatHttpClient::attemptRequestWithRedirect(int range) {
+    m_position = 0;
     wasRedirected = false;
-    Debug_printv("reopening url[%s] from position:%d", url.c_str(), range);
-    lastRC = tryOpen(lastMethod, range);
+    Debug_printv("requesting url[%s] from position:%d", url.c_str(), range);
+    lastRC = performRequestFetchHeaders(range);
 
     while(lastRC == HttpStatus_MovedPermanently || lastRC == HttpStatus_Found || lastRC == 303)
     {
         Debug_printv("--- Page moved, doing redirect to [%s]", url.c_str());
-        lastRC = tryOpen(lastMethod, range);
+        lastRC = performRequestFetchHeaders(range);
         wasRedirected = true;
     }
     
@@ -189,25 +190,43 @@ bool MeatHttpClient::reopen(int range) {
         return false;
     }
 
-
     // TODO - set m_isWebDAV somehow
     m_isOpen = true;
     m_exists = true;
-    m_position = 0;
 
-    Debug_printv("length=%d isFriendlySkipper=[%d] isText=[%d], httpCode=[%d]", m_length, isFriendlySkipper, isText, lastRC);
+    Debug_printv("request succesful, length=%d isFriendlySkipper=[%d] isText=[%d], httpCode=[%d]", m_length, isFriendlySkipper, isText, lastRC);
 
     return true;
 
 }
 
 bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
+    Debug_printv("OPEN called!");
+
     url = dstUrl;
+
+    if ( url.size() < 5)
+        return false;
+
     lastMethod = meth;
 
-    // if destination url domain is different and connection is open we should close
+    //mstr::replaceAll(url, "HTTP:", "http:");
+    esp_http_client_config_t config = {
+        .url = url.c_str(),
+        .user_agent = USER_AGENT,
+        .method = meth,
+        .timeout_ms = 10000,
+        .max_redirection_count = 10,
+        .event_handler = _http_event_handler,
+        .user_data = this,
+        .keep_alive_enable = true,
+        .keep_alive_idle = 10,
+        .keep_alive_interval = 1
+    };
 
-    return reopen(0);
+    m_http = esp_http_client_init(&config);
+
+    return attemptRequestWithRedirect(0);
 };
 
 void MeatHttpClient::close() {
@@ -232,11 +251,13 @@ bool MeatHttpClient::seek(size_t pos) {
         return true;
 
     if(isFriendlySkipper) {
-        // esp_http_client_close(m_http);
+        //esp_http_client_close(m_http);
+        
+        Debug_printv("seek will attempt range request...");
 
-        bool op = reopen(pos);
+        bool op = attemptRequestWithRedirect(pos);
 
-        Debug_printv("SEEK in HttpIStream %s: range request RC=%d", url.c_str(), lastRC);
+        Debug_printv("attemptRequestWithRedirect %s: returned=%d", url.c_str(), lastRC);
         
         if(!op)
             return false;
@@ -246,7 +267,7 @@ bool MeatHttpClient::seek(size_t pos) {
             Debug_printv("Seek successful");
 
             m_position = pos;
-            m_bytesAvailable = m_length-pos;
+            //m_bytesAvailable = m_length-pos;
             return true;
         }
     }
@@ -293,19 +314,19 @@ bool MeatHttpClient::seek(size_t pos) {
 size_t MeatHttpClient::read(uint8_t* buf, size_t size) {
     if (m_isOpen) {
         auto bytesRead= esp_http_client_read(m_http, (char *)buf, size );
-        
+
+        Debug_printf("%d bytes were available for reading\n", bytesRead);
+
         if(bytesRead>0) {
             // for(int i=0; i<bytesRead; i++) {
             //     Debug_printf("%c", buf[i]);
             // }
 
-            // Debug_printf("  ");
+            Debug_printf("  ");
 
-            // for(int i=0; i<bytesRead; i++) {
-            //     Debug_printf("%.2X ", buf[i]);
-            // }
-
-            // Debug_printf("(%d bytes)\n", bytesRead);
+            for(int i=0; i<bytesRead; i++) {
+                Debug_printf("%.2X ", buf[i]);
+            }
 
             m_bytesAvailable -= bytesRead;
             m_position+=bytesRead;
@@ -325,36 +346,9 @@ size_t MeatHttpClient::write(const uint8_t* buf, size_t size) {
     return 0;
 };
 
-int MeatHttpClient::tryOpen(esp_http_client_method_t meth, int resume) {
 
-    if ( url.size() < 5)
-        return 0;
-
-    if ( !m_isOpen )
-    {
-        //mstr::replaceAll(url, "HTTP:", "http:");
-        esp_http_client_config_t config = {
-            .url = url.c_str(),
-            .user_agent = USER_AGENT,
-            .method = meth,
-            .timeout_ms = 10000,
-            .max_redirection_count = 10,
-            .event_handler = _http_event_handler,
-            .user_data = this,
-            .keep_alive_enable = true,
-            .keep_alive_idle = 10,
-            .keep_alive_interval = 1
-        };
-
-        Debug_printv("Opening meth[%d] url[%s]", meth, url.c_str());
-        m_http = esp_http_client_init(&config);
-    }
-    else
-    {
-        Debug_printv("Already open meth[%d] url[%s]", meth, url.c_str());
-        esp_http_client_set_url(m_http, url.c_str());
-        esp_http_client_set_method(m_http, meth);
-    }
+int MeatHttpClient::performRequestFetchHeaders(int resume) {
+    esp_http_client_set_method(m_http, lastMethod);
 
     if(resume > 0) {
         char str[40];
@@ -362,25 +356,16 @@ int MeatHttpClient::tryOpen(esp_http_client_method_t meth, int resume) {
         esp_http_client_set_header(m_http, "range", str);
     }
 
-    // Debug_printv("--- PRE OPEN")
+    // Debug_printv("--- PRE PERFORM")
+
+    //esp_err_t initOk = esp_http_client_open(m_http, 0); // or open? It's not entirely clear...
+    m_bytesAvailable = 0;
 
     esp_err_t initOk = esp_http_client_perform(m_http); // or open? It's not entirely clear...
 
     if(initOk == ESP_FAIL)
         return 0;
 
-    // Debug_printv("--- PRE FETCH HEADERS")
-    m_length = -1;
-    m_bytesAvailable = 0;
-
-    int lengthResp = esp_http_client_get_content_length(m_http);
-    if(lengthResp > 0) {
-        // only if we aren't chunked!
-        m_length = lengthResp;
-        m_bytesAvailable = m_length;
-    }
-
-    // Debug_printv("--- PRE GET STATUS CODE")
 
     return esp_http_client_get_status_code(m_http);
 }
@@ -436,9 +421,12 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
             }
             else if(mstr::equals("Content-Length", evt->header_key, false))
             {
-                //Debug_printv("* Content len present '%s'", evt->header_value);
-                // meatClient->m_length = atoi(evt->header_value);
-                // meatClient->m_bytesAvailable = meatClient->m_length;
+                // 20:06:42.981 > [lib/filesystem/scheme/http.h:19] operator()(): HTTP_EVENT_ON_HEADER, key=Content-Length, value=83200
+                int leng = atoi(evt->header_value);
+                if(meatClient->m_length == 0)
+                    meatClient->m_length = leng;
+                meatClient->m_bytesAvailable = leng;
+                //Debug_printv("* Content len present '%d'", meatClient->m_length);
             }
             else if(mstr::equals("Location", evt->header_key, false))
             {
