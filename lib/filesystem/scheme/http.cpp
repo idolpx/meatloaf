@@ -226,6 +226,8 @@ void MeatHttpClient::setOnHeader(const std::function<int(char*, char*)> &lambda)
 }
 
 bool MeatHttpClient::seek(size_t pos) {
+    Debug_printv("pos[%d]", pos);
+
     if(pos==m_position)
         return true;
 
@@ -241,7 +243,7 @@ bool MeatHttpClient::seek(size_t pos) {
 
          // 200 = range not supported! according to https://developer.mozilla.org/en-US/docs/Web/HTTP/Range_requests
         if(lastRC == 206){
-            Debug_printv("Seek succesful");
+            Debug_printv("Seek successful");
 
             m_position = pos;
             m_bytesAvailable = m_length-pos;
@@ -344,10 +346,12 @@ int MeatHttpClient::tryOpen(esp_http_client_method_t meth, int resume) {
             .keep_alive_interval = 1
         };
 
+        Debug_printv("Opening meth[%d] url[%s]", meth, url.c_str());
         m_http = esp_http_client_init(&config);
     }
     else
     {
+        Debug_printv("Already open meth[%d] url[%s]", meth, url.c_str());
         esp_http_client_set_url(m_http, url.c_str());
         esp_http_client_set_method(m_http, meth);
     }
@@ -491,6 +495,7 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
             break;
         case HTTP_EVENT_DISCONNECTED: // The connection has been disconnected
             Debug_printv("HTTP_EVENT_DISCONNECTED");
+            meatClient->m_isOpen = false;
             break;
     }
     return ESP_OK;
