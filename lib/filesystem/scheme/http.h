@@ -8,6 +8,7 @@
 #include <esp_http_client.h>
 #include <functional>
 
+#define HTTP_BLOCK_SIZE 256
 
 class MeatHttpClient {
     esp_http_client_handle_t m_http = nullptr;
@@ -42,6 +43,7 @@ public:
     bool isFriendlySkipper = false;
     bool wasRedirected = false;
     std::string url;
+    char response[HTTP_BLOCK_SIZE];
     int lastRC;
 };
 

@@ -351,7 +351,7 @@ int MeatHttpClient::performRequestFetchHeaders(int resume) {
 
     if(resume > 0) {
         char str[40];
-        snprintf(str, sizeof str, "bytes=%lu-", (unsigned long)resume);
+        snprintf(str, sizeof str, "bytes=%lu-%lu", (unsigned long)resume, ((unsigned long)resume + HTTP_BLOCK_SIZE));
         esp_http_client_set_header(m_http, "range", str);
     }
 
@@ -452,9 +452,8 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
         case HTTP_EVENT_ON_DATA: // Occurs multiple times when receiving body data from the server. MAY BE SKIPPED IF BODY IS EMPTY!
             Debug_printv("HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
             {
-                char buffer[evt->data_len + 1] = { 0 };
-                memcpy(buffer, evt->data, evt->data_len);
-                Debug_printv("data[%s]", buffer);
+                memcpy(meatClient->response, evt->data, evt->data_len);
+                Debug_printv("data[%s]", meatClient->response);
 
                 int status = esp_http_client_get_status_code(meatClient->m_http);
 
