@@ -591,8 +591,8 @@ void runTestsSuite() {
     //runFSTest("http://c64.meatloaf.cc/roms", "https://www.w3.org/TR/PNG/iso_8859-1.txt");
     // http://c64.meatloaf.cc/roms
     //runFSTest("http://192.168.1.161:8000", "https://www104.zippyshare.com/d/TEh31GeR/1191019/GeckOS-c64.d64/index.html");
-    //runFSTest("https://c64.meatloaf.cc/geckos-c64.d64", "https://c64.meatloaf.cc/geckos-c64.d64/index.html");
-    runFSTest("sd:/geckos-c64.d64", "sd:/geckos-c64.d64/index.html");
+    runFSTest("https://c64.meatloaf.cc/geckos-c64.d64", "https://c64.meatloaf.cc/geckos-c64.d64/index.html");
+    //runFSTest("sd:/geckos-c64.d64", "sd:/geckos-c64.d64/index.html");
     //  https://c64.meatloaf.cc
     // runFSTest("http://info.cern.ch/hypertext/WWW/TheProject.html","http://info.cern.ch/hypertext/WWW/TheProject.html");
     // runFSTest("cs:/apps/ski_writer.d64","cs:/apps/ski_writer.d64/EDITOR.HLP");
