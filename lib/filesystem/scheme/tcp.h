@@ -5,6 +5,9 @@
 #include "lwip/netdb.h"
 #include "../../include/debug.h"
 
+//
+// This is a standard "reading socket" - i.e. if you connect to a remote server
+//
 class MeatSocket {
     int sock = -1;
     uint8_t iecPort = 0;
@@ -80,6 +83,10 @@ public:
     }
 };
 
+//
+// This is a local server socket
+// It waits for a connection and then opens a new "reading socket" for exclusive communication with anyone that connects to ML
+//
 class MeatSocketServer {
     bool isAlive = false;
     int port = 0;
@@ -187,5 +194,40 @@ class MeatSocketServer {
         vTaskDelete(NULL);
     }
 };
+
+
+
+
+class TcpStream: public MStream {
+
+public:
+    TcpStream(std::string path) {
+        url = path;
+    };
+    ~TcpStream() {
+        close();
+    };
+
+    // MStream methods
+    size_t size() override;
+    size_t available() override;     
+    size_t position() override;
+
+    virtual bool seek(size_t pos);
+
+    void close() override;
+    bool open() override;
+
+    // MStream methods
+    size_t read(uint8_t* buf, size_t size) override;
+    size_t write(const uint8_t *buf, size_t size) override;
+
+    bool isOpen();
+
+protected:
+    MeatSocket socket;
+    std::string url;
+};
+
 
 #endif /* MEATFILESYSTEM_SCHEME_TCP */

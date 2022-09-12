@@ -87,32 +87,6 @@ public:
  * Streams
  ********************************************************/
 
-class HttpIOStream: public MStream {
-
-public:
-    HttpIOStream(std::string& path) {
-        url = path;
-    };
-    ~HttpIOStream() {
-        close();
-    };
-
-    void close() override;
-    bool open() override;
-
-    // MStream methods
-    size_t position() override;
-    size_t available() override;
-    size_t read(uint8_t* buf, size_t size) override;
-    size_t write(const uint8_t *buf, size_t size) override;
-    bool isOpen();
-
-protected:
-    MeatHttpClient m_http;
-    std::string url;
-};
-
-
 class HttpIStream: public MStream {
 
 public:
