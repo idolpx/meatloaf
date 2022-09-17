@@ -423,6 +423,7 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
             else if(mstr::equals("Content-Length", evt->header_key, false))
             {
                 //Debug_printv("* Content len present '%s'", evt->header_value);
+                meatClient->m_length = std::stoi(evt->header_value);
             }
             else if(mstr::equals("Location", evt->header_key, false))
             {
@@ -463,8 +464,8 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
                 if (esp_http_client_is_chunked_response(evt->client)) {
                     int len;
                     esp_http_client_get_chunk_length(evt->client, &len);
-                    //meatClient->m_length += len;
-                    meatClient->m_bytesAvailable = len;
+                    meatClient->m_length += len;
+                    meatClient->m_bytesAvailable += len;
                     //Debug_printv("HTTP_EVENT_ON_DATA: Got chunked response, chunklen=%d, contentlen[%d]", len, meatClient->m_length);
                 }
             }

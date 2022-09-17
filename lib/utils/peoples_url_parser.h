@@ -161,6 +161,10 @@ public:
         return url;
     }
 
+    u16_t getPort() {
+        return std::stoi(port);
+    }
+
     void parseUrl(std::string u) {
         url = u;
 

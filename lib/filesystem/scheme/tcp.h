@@ -209,25 +209,129 @@ public:
     };
 
     // MStream methods
-    size_t size() override;
-    size_t available() override;     
-    size_t position() override;
+    size_t size() override {
+        return -1;
+    }
+    size_t available() override {
+        return 0;
+    }
+    size_t position() override {
+        return 0;
+    }
 
-    virtual bool seek(size_t pos);
+    virtual bool seek(size_t pos) {
+        return false;
+    }
 
-    void close() override;
-    bool open() override;
+    void close() override {
+        socket.close();
+    }
+
+    bool open() override {
+        PeoplesUrlParser p;
+        p.parseUrl(url);
+        return socket.open(p.host.c_str(), p.getPort());
+    }
 
     // MStream methods
-    size_t read(uint8_t* buf, size_t size) override;
-    size_t write(const uint8_t *buf, size_t size) override;
+    size_t read(uint8_t* buf, size_t size) override {
+        return socket.read(buf, size);
+    }
+    size_t write(const uint8_t *buf, size_t size) override {
+        return socket.write(buf, size);
+    }
 
-    bool isOpen();
+    bool isOpen() {
+        return socket.isOpen();
+    }
 
 protected:
     MeatSocket socket;
     std::string url;
 };
+
+
+/********************************************************
+ * File implementations
+ ********************************************************/
+
+
+class TcpFile: public MFile {
+
+public:
+    TcpFile() {
+        Debug_printv("C++, if you try to call this, be damned!");
+    };
+    TcpFile(std::string path): MFile(path) { 
+        Debug_printv("constructing http file from url [%s]", url.c_str());
+     };
+    TcpFile(std::string path, std::string filename): MFile(path) {};
+    ~TcpFile() override {
+    }
+    bool isDirectory() override {
+        return false;
+    }
+    MStream* meatStream() override {
+        // has to return OPENED streamm
+        MStream* istream = new TcpStream(url);
+        istream->open();
+        return istream;
+    } 
+    time_t getLastWrite() override {
+        return 0;
+    }
+    time_t getCreationTime() override {
+        return 0;
+    }
+    bool rewindDirectory() override  {
+        return false;
+    }
+    MFile* getNextFileInDir() override {
+        return nullptr;
+    }
+    bool mkDir() override {
+        return false;
+    }
+    bool exists() override {
+        return true;
+    }
+    size_t size() override {
+        return -1;
+    }
+    bool remove() override {
+        return false;
+    }
+    bool isText() override {
+        return false;
+    }
+    bool rename(std::string dest) { return false; };
+    MStream* createIStream(std::shared_ptr<MStream> src) {
+        return nullptr; // DUMMY return value - we've overriden istreamfunction, so this one won't be used
+    }
+};
+
+
+
+/********************************************************
+ * FS
+ ********************************************************/
+
+class TcpFileSystem: public MFileSystem 
+{
+    MFile* getFile(std::string path) override {
+        return new TcpFile(path);
+    }
+
+    bool handles(std::string name) {
+        if ( mstr::equals(name, (char *)"tcp:", false) )
+            return true;
+
+        return false;
+    }
+public:
+    TcpFileSystem(): MFileSystem("tcp") {};
+};
+
 
 
 #endif /* MEATFILESYSTEM_SCHEME_TCP */

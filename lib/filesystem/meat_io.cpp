@@ -59,6 +59,8 @@ MLFileSystem mlFS;
 IPFSFileSystem ipfsFS;
 TNFSFileSystem tnfsFS;
 CServerFileSystem csFS;
+TcpFileSystem tcpFS;
+
 //WSFileSystem wsFS;
 
 // File
@@ -88,7 +90,7 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
     &p00FS,
     &d64FS, &d71FS, &d80FS, &d81FS, &d82FS, &d8bFS, &dnpFS,
     &t64FS, &tcrtFS,
-    &httpFS, &mlFS, &ipfsFS,
+    &httpFS, &mlFS, &ipfsFS, &tcpFS,
     &tnfsFS
 };
 
