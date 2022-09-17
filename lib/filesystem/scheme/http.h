@@ -12,7 +12,7 @@
 class MeatHttpClient {
     esp_http_client_handle_t m_http = nullptr;
     static esp_err_t _http_event_handler(esp_http_client_event_t *evt);
-    int tryOpen(esp_http_client_method_t meth, int resume = 0);
+    int openAndFetchHeaders(esp_http_client_method_t meth, int resume = 0);
     esp_http_client_method_t lastMethod;
     std::function<int(char*, char*)> onHeader = [] (char* key, char* value){ 
         //Debug_printv("HTTP_EVENT_ON_HEADER, key=%s, value=%s", key, value);
@@ -25,7 +25,7 @@ public:
     bool PUT(std::string url);
     bool HEAD(std::string url);
 
-    bool reopen(int range);
+    bool processRedirectsAndOpen(int range);
     bool open(std::string url, esp_http_client_method_t meth);
     void close();
     void setOnHeader(const std::function<int(char*, char*)> &f);

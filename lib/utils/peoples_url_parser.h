@@ -161,7 +161,7 @@ public:
         return url;
     }
 
-    u16_t getPort() {
+    uint16_t getPort() {
         return std::stoi(port);
     }
 

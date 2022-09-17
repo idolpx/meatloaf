@@ -171,15 +171,18 @@ bool MeatHttpClient::HEAD(std::string dstUrl) {
     return rc;
 }
 
-bool MeatHttpClient::reopen(int range) {
+bool MeatHttpClient::processRedirectsAndOpen(int range) {
     wasRedirected = false;
+    m_length = -1;
+    m_bytesAvailable = 0;
+
     Debug_printv("reopening url[%s] from position:%d", url.c_str(), range);
-    lastRC = tryOpen(lastMethod, range);
+    lastRC = openAndFetchHeaders(lastMethod, range);
 
     while(lastRC == HttpStatus_MovedPermanently || lastRC == HttpStatus_Found || lastRC == 303)
     {
         Debug_printv("--- Page moved, doing redirect to [%s]", url.c_str());
-        lastRC = tryOpen(lastMethod, range);
+        lastRC = openAndFetchHeaders(lastMethod, range);
         wasRedirected = true;
     }
     
@@ -198,14 +201,13 @@ bool MeatHttpClient::reopen(int range) {
     Debug_printv("length=%d isFriendlySkipper=[%d] isText=[%d], httpCode=[%d]", m_length, isFriendlySkipper, isText, lastRC);
 
     return true;
-
 }
 
 bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
     url = dstUrl;
     lastMethod = meth;
 
-    return reopen(0);
+    return processRedirectsAndOpen(0);
 };
 
 void MeatHttpClient::close() {
@@ -230,7 +232,7 @@ bool MeatHttpClient::seek(size_t pos) {
     if(isFriendlySkipper) {
         esp_http_client_close(m_http);
 
-        bool op = reopen(pos);
+        bool op = processRedirectsAndOpen(pos);
 
         Debug_printv("SEEK in HttpIStream %s: range request RC=%d", url.c_str(), lastRC);
         
@@ -321,7 +323,7 @@ size_t MeatHttpClient::write(const uint8_t* buf, size_t size) {
     return 0;
 };
 
-int MeatHttpClient::tryOpen(esp_http_client_method_t meth, int resume) {
+int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t meth, int resume) {
 
     if ( url.size() < 5)
         return 0;
@@ -356,8 +358,6 @@ int MeatHttpClient::tryOpen(esp_http_client_method_t meth, int resume) {
         return 0;
 
     // Debug_printv("--- PRE FETCH HEADERS")
-    m_length = -1;
-    m_bytesAvailable = 0;
 
     int lengthResp = esp_http_client_fetch_headers(m_http);
     if(lengthResp > 0) {
