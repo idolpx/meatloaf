@@ -9,6 +9,23 @@
 #define SEEK_CUR  1
 #define SEEK_END  2
 
+#define TCP_NON_BLOCKING 0b0001111
+#define TCP_BLOCKING 0b00011111
+#define SA2 0b00101111
+#define SA3 0b00111111
+#define SA4 0b01001111
+#define SA5 0b01011111
+#define SA6 0b01101111
+#define SA7 0b01111111
+#define SA8 0b1001111
+#define SA9 0b10011111
+#define SA10 0b10101111
+#define SA11 0b10111111
+#define SA12 0b11001111
+#define SA13 0b11011111
+#define SA14 0b11101111
+#define SA15 0b11111111
+
 class MStream {
 public:
     virtual ~MStream() {};
