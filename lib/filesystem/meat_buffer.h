@@ -132,13 +132,20 @@ namespace Meat
                 // no more characters are available, size == 0.
                 // auto buffer = reader->read();
 
-                auto readCount = mstream->read((uint8_t *)ibuffer, ibufsize);
+                //Debug_printv("--mfilebuf underflow, calling read!");
 
-                lastIbufPos = mstream->position();
+                int readCount = mstream->read((uint8_t *)ibuffer, ibufsize);
 
-                // Debug_printv("--mfilebuf underflow, read bytes=%d--", readCount);
+                if(readCount < 1) {
+                    Debug_printv("--mfilebuf underflow could not read, count=%d!", readCount);
+                }
+                else {
+                    lastIbufPos = mstream->position();
 
-                this->setg(ibuffer, ibuffer, ibuffer + readCount);
+                    //Debug_printv("--mfilebuf underflow, read bytes=%d--", readCount);
+
+                    this->setg(ibuffer, ibuffer, ibuffer + readCount);
+                }
             }
             // eback = beginning of get area
             // gptr = current character (get pointer)
@@ -194,7 +201,7 @@ namespace Meat
                 *end++ = ch;
             }
 
-            // Debug_printv("%d bytes in buffer will be written", end-pbase());
+            Debug_printv("%d bytes in buffer will be written", end-this->pbase());
 
             uint8_t *pBase = (uint8_t *)this->pbase();
 

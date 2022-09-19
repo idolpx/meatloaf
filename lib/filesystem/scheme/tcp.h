@@ -11,6 +11,7 @@
 class MeatSocket {
     int sock = -1;
     uint8_t iecPort = 0;
+    bool blocking = true;
 
 public:
     MeatSocket() {};
@@ -24,12 +25,12 @@ public:
         dest_addr.sin_family = AF_INET;
         dest_addr.sin_port = htons(port);
         dest_addr.sin_addr.s_addr = inet_addr(address);
-        Debug_printv("dest_addr.sin_addr.s_addr=%x", dest_addr.sin_addr.s_addr);
+        //Debug_printv("dest_addr.sin_addr.s_addr=%x", dest_addr.sin_addr.s_addr);
         if (dest_addr.sin_addr.s_addr == 0xffffffff) {
             struct hostent *hp;
             hp = gethostbyname(address);
             if (hp == NULL) {
-                Debug_printv("FTP Client Error: Connect to %s", address);
+                Debug_printv("TCP Client Error: Connect to %s", address);
                 return false;
             }
             struct ip4_addr *ip4_addr;
@@ -42,13 +43,15 @@ public:
             Debug_printv("Unable to create socket: errno %d", errno);
             return false;
         }
-        Debug_printv("Socket created, connecting to %s:%d", address, port);
+        //Debug_printv("Socket created, connecting to %s:%d", address, port);
 
         int err = connect(sock, (struct sockaddr *)&dest_addr, sizeof(struct sockaddr_in6));
+
         if (err != 0) {
             Debug_printv("Socket unable to connect: errno %d", errno);
             return false;
         }
+        //Debug_printv("After connect for socet");
 
         return true;
     }
@@ -75,7 +78,11 @@ public:
             Debug_println("tcp read - NOT OPEN!\n");
             return -100;
         }
-        return recv(sock, buffer, bufsize, MSG_DONTWAIT); // MSG_DONTWAIT instead of 0 switches to non-blocking mode
+        //Debug_printv("tcp::read - calling recv, buff!=null:%d, buffsize=%d, blocking=%d", buffer!=nullptr, bufsize, blocking);
+        int byteCount = recv(sock, buffer, bufsize, (blocking) ? 0 : MSG_DONTWAIT); 
+        //Debug_printv("tcp::read - post recv");
+
+        return byteCount;
     }
 
     bool isOpen() {
@@ -263,7 +270,7 @@ public:
         Debug_printv("C++, if you try to call this, be damned!");
     };
     TcpFile(std::string path): MFile(path) { 
-        Debug_printv("constructing http file from url [%s]", url.c_str());
+        Debug_printv("constructing tcp file from url [%s]", url.c_str());
      };
     TcpFile(std::string path, std::string filename): MFile(path) {};
     ~TcpFile() override {
@@ -271,12 +278,20 @@ public:
     bool isDirectory() override {
         return false;
     }
+
+    // We are overriding meatStream, because obviously - TCP scheme won't be wrapped in anything
     MStream* meatStream() override {
         // has to return OPENED streamm
         MStream* istream = new TcpStream(url);
         istream->open();
         return istream;
     } 
+
+    // DUMMY return value - we've overriden meatStream, so this one won't be even called!
+    MStream* createIStream(std::shared_ptr<MStream> src) {
+        return nullptr; 
+    }
+
     time_t getLastWrite() override {
         return 0;
     }
@@ -305,9 +320,6 @@ public:
         return false;
     }
     bool rename(std::string dest) { return false; };
-    MStream* createIStream(std::shared_ptr<MStream> src) {
-        return nullptr; // DUMMY return value - we've overriden istreamfunction, so this one won't be used
-    }
 };
 
 
