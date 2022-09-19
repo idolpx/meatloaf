@@ -43,7 +43,7 @@ public:
     bool isFriendlySkipper = false;
     bool wasRedirected = false;
     std::string url;
-    char response[HTTP_BLOCK_SIZE + 1] = { 0 };
+    //char response[HTTP_BLOCK_SIZE + 1] = { 0 };
     int lastRC;
 };
 

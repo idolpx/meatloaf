@@ -8,7 +8,7 @@ bool D64IStream::seekSector( uint8_t track, uint8_t sector, size_t offset )
 {
 	uint16_t sectorOffset = 0;
 
-    Debug_printv("track[%d] sector[%d] offset[%d]", track, sector, offset);
+    // Debug_printv("track[%d] sector[%d] offset[%d]", track, sector, offset);
 
     if ( track == 0 )
         return false;
@@ -105,8 +105,8 @@ bool D64IStream::seekEntry( size_t index )
     uint8_t sectorOffset = index / 8;
     uint8_t entryOffset = (index % 8) * 32;
 
-    //Debug_printv("----------");
-    Debug_printv("index[%d] sectorOffset[%d] entryOffset[%d] entry_index[%d]", index, sectorOffset, entryOffset, entry_index);
+    // Debug_printv("----------");
+    // Debug_printv("index[%d] sectorOffset[%d] entryOffset[%d] entry_index[%d]", index, sectorOffset, entryOffset, entry_index);
 
 
     if (index == 0 || index != entry_index)
@@ -120,7 +120,7 @@ bool D64IStream::seekEntry( size_t index )
         {
             if ( next_track )
             {
-                //Debug_printv("next_track[%d] next_sector[%d]", entry.next_track, entry.next_sector);
+                // Debug_printv("next_track[%d] next_sector[%d]", entry.next_track, entry.next_sector);
                 r = seekSector( entry.next_track, entry.next_sector, 0x00 );
             }
 
@@ -128,7 +128,7 @@ bool D64IStream::seekEntry( size_t index )
             next_track = entry.next_track;
             next_sector = entry.next_sector;
 
-            //Debug_printv("sectorOffset[%d] -> track[%d] sector[%d]", sectorOffset, track, sector);
+            // Debug_printv("sectorOffset[%d] -> track[%d] sector[%d]", sectorOffset, track, sector);
         } while ( sectorOffset-- > 0 );
         r = seekSector( track, sector, entryOffset );
     }
@@ -139,7 +139,7 @@ bool D64IStream::seekEntry( size_t index )
             if ( next_track == 0 )
                 return false;
 
-            //Debug_printv("Follow link track[%d] sector[%d] entryOffset[%d]", next_track, next_sector, entryOffset);
+            // Debug_printv("Follow link track[%d] sector[%d] entryOffset[%d]", next_track, next_sector, entryOffset);
             r = seekSector( next_track, next_sector, entryOffset );
         }
     }
@@ -153,7 +153,7 @@ bool D64IStream::seekEntry( size_t index )
         next_sector = entry.next_sector;
     }
 
-    //Debug_printv("r[%d] file_type[%02X] file_name[%.16s]", r, entry.file_type, entry.filename);
+    // Debug_printv("r[%d] file_type[%02X] file_name[%.16s]", r, entry.file_type, entry.filename);
 
     //if ( next_track == 0 && next_sector == 0xFF )
     entry_index = index + 1;

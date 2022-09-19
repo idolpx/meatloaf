@@ -59,7 +59,7 @@ device_state_t iecDrive::process ( void )
 
     Debug_printf ( "   DEVICE: [%.2d] ", this->data.device );
 
-    Debug_printv("DEV state[%d] primary[%.2X] secondary[%.2X] device[%d], channel[%d] command[%s] ", this->device_state, this->data.primary, this->data.secondary, this->data.device, this->data.channel, this->data.device_command.c_str());
+    // Debug_printv("DEV state[%d] primary[%.2X] secondary[%.2X] device[%d], channel[%d] command[%s] ", this->device_state, this->data.primary, this->data.secondary, this->data.device, this->data.channel, this->data.device_command.c_str());
 
     if ( this->data.secondary == IEC_OPEN )
     {
@@ -124,12 +124,12 @@ device_state_t iecDrive::process ( void )
             // Send data
             //Debug_printv ( "[Send data]" );
             handleTalk ( this->data.channel );
-			if ( this->data.channel < 2 )
-			{
-				closeStream();
-			}
-			device_state = DEVICE_IDLE;
-			this->data.init(); // Clear device command
+            if ( this->data.channel < 2 )
+	    {
+		closeStream();
+		device_state = DEVICE_IDLE;
+		this->data.init(); // Clear device command
+            }
         }
         // IEC.protocol.release(PIN_IEC_SRQ);
     }
@@ -272,11 +272,11 @@ MFile* iecDrive::getPointed(MFile* urlFile) {
 	Debug_printv("getPointed [%s]", urlFile->url.c_str());
 	Meat::iostream istream(urlFile);
 
-    if( !istream.is_open() ) 
+        if( !istream.is_open() ) 
 	{
-        Debug_printv("couldn't open stream of urlfile");
+        	Debug_printv("couldn't open stream of urlfile");
 		return nullptr;
-    }
+        }
 	else 
 	{
 		std::string linkUrl;

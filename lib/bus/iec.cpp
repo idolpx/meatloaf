@@ -107,11 +107,11 @@ bool iecDevice::registerStream (std::ios_base::open_mode mode, std::string m_fil
     //Debug_printv("m_filename[%s]", m_filename.c_str());
     new_stream = std::shared_ptr<MStream>(file->meatStream());
 
-	if( !new_stream->isOpen() )
-	{
-		//Debug_printv("Error creating istream");
-		return false;
-	}
+    if( !new_stream->isOpen() )
+    {
+	//Debug_printv("Error creating istream");
+	return false;
+    }
     else
     {
         // Close the stream if it is already open

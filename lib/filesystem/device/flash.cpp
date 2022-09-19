@@ -295,20 +295,6 @@ size_t FlashIStream::read(uint8_t* buf, size_t size) {
 
     int bytesRead = fread((void*) buf, 1, size, handle->file_h );
 
-    for(int i=0; i<bytesRead; i++) {
-        Debug_printf("%c", buf[i]);
-    }
-
-    Debug_printf("  ");
-
-    for(int i=0; i<bytesRead; i++) {
-        Debug_printf("%.2X ", buf[i]);
-    }
-
-    Debug_printf("(%d bytes)\n", bytesRead);
-
-
-
     if (bytesRead < 0) {
         Debug_printv("read rc=%d\n", bytesRead);
         return 0;

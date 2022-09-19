@@ -351,7 +351,8 @@ int MeatHttpClient::performRequestFetchHeaders(int resume) {
 
     if(resume > 0) {
         char str[40];
-        snprintf(str, sizeof str, "bytes=%lu-%lu", (unsigned long)resume, ((unsigned long)resume + HTTP_BLOCK_SIZE));
+        // snprintf(str, sizeof str, "bytes=%lu-%lu", (unsigned long)resume, ((unsigned long)resume + HTTP_BLOCK_SIZE));
+        snprintf(str, sizeof str, "bytes=%lu-", (unsigned long)resume);
         esp_http_client_set_header(m_http, "range", str);
     }
 
