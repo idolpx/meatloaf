@@ -95,7 +95,7 @@ public:
                 return 1;
             }
             else {
-                Debug_printv("tcp::read in non-blocking mode - we have some data");
+                //Debug_printv("tcp::read in non-blocking mode - TODO - somehow replace all zeros in the buffer with SOMETHING?");
                 // tougher - we received something, but since we are in non-blockig mode
                 // we have to somehow escape 0 byte, as in non-blocking mode 0 means "no data" 
                 // TODO - somehow replace all zeros in the buffer with SOMETHING?

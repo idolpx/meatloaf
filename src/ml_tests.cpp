@@ -271,7 +271,7 @@ void commodoreServer()
 
     while(!stream.eof())
     {
-        stream.read((char *)b, b_len);
+        stream.read((char *)b, b_len-2);
         b[b_len-1]=0;
         if(b[0]!=0)
             Debug_printf("C= server says:[%s]\n", b);
