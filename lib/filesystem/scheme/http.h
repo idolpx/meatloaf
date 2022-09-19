@@ -13,8 +13,7 @@
 class MeatHttpClient {
     esp_http_client_handle_t m_http = nullptr;
     static esp_err_t _http_event_handler(esp_http_client_event_t *evt);
-    int performRequestFetchHeaders(int resume = 0);
-    bool attemptRequestWithRedirect(int range);
+    int openAndFetchHeaders(esp_http_client_method_t meth, int resume = 0);
     esp_http_client_method_t lastMethod;
     std::function<int(char*, char*)> onHeader = [] (char* key, char* value){ 
         //Debug_printv("HTTP_EVENT_ON_HEADER, key=%s, value=%s", key, value);
@@ -27,6 +26,7 @@ public:
     bool PUT(std::string url);
     bool HEAD(std::string url);
 
+    bool processRedirectsAndOpen(int range);
     bool open(std::string url, esp_http_client_method_t meth);
     void close();
     void setOnHeader(const std::function<int(char*, char*)> &f);
@@ -88,32 +88,6 @@ public:
 /********************************************************
  * Streams
  ********************************************************/
-
-class HttpIOStream: public MStream {
-
-public:
-    HttpIOStream(std::string& path) {
-        url = path;
-    };
-    ~HttpIOStream() {
-        close();
-    };
-
-    void close() override;
-    bool open() override;
-
-    // MStream methods
-    size_t position() override;
-    size_t available() override;
-    size_t read(uint8_t* buf, size_t size) override;
-    size_t write(const uint8_t *buf, size_t size) override;
-    bool isOpen();
-
-protected:
-    MeatHttpClient m_http;
-    std::string url;
-};
-
 
 class HttpIStream: public MStream {
 

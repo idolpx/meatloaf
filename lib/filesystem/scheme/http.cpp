@@ -166,19 +166,23 @@ bool MeatHttpClient::PUT(std::string dstUrl) {
 }
 
 bool MeatHttpClient::HEAD(std::string dstUrl) {
-    return open(dstUrl, HTTP_METHOD_HEAD);
+    bool rc = open(dstUrl, HTTP_METHOD_HEAD);
+    close();
+    return rc;
 }
 
-bool MeatHttpClient::attemptRequestWithRedirect(int range) {
-    m_position = 0;
+bool MeatHttpClient::processRedirectsAndOpen(int range) {
     wasRedirected = false;
-    Debug_printv("requesting url[%s] from position:%d", url.c_str(), range);
-    lastRC = performRequestFetchHeaders(range);
+    m_length = -1;
+    m_bytesAvailable = 0;
+
+    Debug_printv("reopening url[%s] from position:%d", url.c_str(), range);
+    lastRC = openAndFetchHeaders(lastMethod, range);
 
     while(lastRC == HttpStatus_MovedPermanently || lastRC == HttpStatus_Found || lastRC == 303)
     {
         Debug_printv("--- Page moved, doing redirect to [%s]", url.c_str());
-        lastRC = performRequestFetchHeaders(range);
+        lastRC = openAndFetchHeaders(lastMethod, range);
         wasRedirected = true;
     }
     
@@ -188,43 +192,22 @@ bool MeatHttpClient::attemptRequestWithRedirect(int range) {
         return false;
     }
 
+
     // TODO - set m_isWebDAV somehow
     m_isOpen = true;
     m_exists = true;
+    m_position = 0;
 
-    Debug_printv("request successful, length=%d isFriendlySkipper=[%d] isText=[%d], httpCode=[%d]", m_length, isFriendlySkipper, isText, lastRC);
+    Debug_printv("length[%d] avail[%d] isFriendlySkipper[%d] isText[%d] httpCode[%d]", m_length, m_bytesAvailable, isFriendlySkipper, isText, lastRC);
 
     return true;
-
 }
 
 bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
-    Debug_printv("OPEN called! dstUrl[%s] meth[%d]", dstUrl.c_str(), meth);
-
     url = dstUrl;
-
-    if ( url.size() < 5)
-        return false;
-
     lastMethod = meth;
 
-    //mstr::replaceAll(url, "HTTP:", "http:");
-    esp_http_client_config_t config = {
-        .url = url.c_str(),
-        .user_agent = USER_AGENT,
-        .method = meth,
-        .timeout_ms = 10000,
-        .max_redirection_count = 10,
-        .event_handler = _http_event_handler,
-        .user_data = this,
-        .keep_alive_enable = true,
-        .keep_alive_idle = 10,
-        .keep_alive_interval = 1
-    };
-
-    m_http = esp_http_client_init(&config);
-
-    return attemptRequestWithRedirect(0);
+    return processRedirectsAndOpen(0);
 };
 
 void MeatHttpClient::close() {
@@ -243,29 +226,25 @@ void MeatHttpClient::setOnHeader(const std::function<int(char*, char*)> &lambda)
 }
 
 bool MeatHttpClient::seek(size_t pos) {
-    Debug_printv("pos[%d]", pos);
-
     if(pos==m_position)
         return true;
 
     if(isFriendlySkipper) {
-        //esp_http_client_close(m_http);
-        
-        Debug_printv("seek will attempt range request...");
+        esp_http_client_close(m_http);
 
-        bool op = attemptRequestWithRedirect(pos);
+        bool op = processRedirectsAndOpen(pos);
 
-        Debug_printv("attemptRequestWithRedirect %s: returned=%d", url.c_str(), lastRC);
+        Debug_printv("SEEK in HttpIStream %s: range request RC=%d", url.c_str(), lastRC);
         
         if(!op)
             return false;
 
          // 200 = range not supported! according to https://developer.mozilla.org/en-US/docs/Web/HTTP/Range_requests
         if(lastRC == 206){
-            Debug_printv("Seek successful");
+            Debug_printv("Seek succesful");
 
             m_position = pos;
-            //m_bytesAvailable = m_length-pos;
+            m_bytesAvailable = m_length-pos;
             return true;
         }
     }
@@ -283,7 +262,7 @@ bool MeatHttpClient::seek(size_t pos) {
             // and read pos bytes - requires some buffer
             for(int i = 0; i<pos; i++) {
                 char c;
-                int rc = esp_http_client_read_response(m_http, &c, 1);
+                int rc = esp_http_client_read(m_http, &c, 1);
                 if(rc == -1)
                     return false;
             }
@@ -293,7 +272,7 @@ bool MeatHttpClient::seek(size_t pos) {
             // skipping forward let's skip a proper amount of bytes - requires some buffer
             for(int i = 0; i<delta; i++) {
                 char c;
-                int rc = esp_http_client_read_response(m_http, &c, 1);
+                int rc = esp_http_client_read(m_http, &c, 1);
                 if(rc == -1)
                     return false;
             }
@@ -311,20 +290,20 @@ bool MeatHttpClient::seek(size_t pos) {
 
 size_t MeatHttpClient::read(uint8_t* buf, size_t size) {
     if (m_isOpen) {
-        auto bytesRead= esp_http_client_read_response(m_http, (char *)buf, size );
-
-        Debug_printf("%d bytes were available for reading\n", bytesRead);
-
+        auto bytesRead= esp_http_client_read(m_http, (char *)buf, size );
+        
         if(bytesRead>0) {
             // for(int i=0; i<bytesRead; i++) {
             //     Debug_printf("%c", buf[i]);
             // }
 
-            Debug_printf("  ");
+            // Debug_printf("  ");
 
-            for(int i=0; i<bytesRead; i++) {
-                Debug_printf("%.2X ", buf[i]);
-            }
+            // for(int i=0; i<bytesRead; i++) {
+            //     Debug_printf("%.2X ", buf[i]);
+            // }
+
+            // Debug_printf("(%d bytes)\n", bytesRead);
 
             m_bytesAvailable -= bytesRead;
             m_position+=bytesRead;
@@ -344,28 +323,50 @@ size_t MeatHttpClient::write(const uint8_t* buf, size_t size) {
     return 0;
 };
 
+int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t meth, int resume) {
 
-int MeatHttpClient::performRequestFetchHeaders(int resume) {
-    esp_http_client_set_method(m_http, lastMethod);
-    esp_http_client_set_url(m_http, url.c_str());
+    if ( url.size() < 5)
+        return 0;
+
+    //mstr::replaceAll(url, "HTTP:", "http:");
+    esp_http_client_config_t config = {
+        .url = url.c_str(),
+        .user_agent = USER_AGENT,
+        .method = meth,
+        .timeout_ms = 10000,
+        .max_redirection_count = 10,
+        .event_handler = _http_event_handler,
+        .user_data = this,
+        .keep_alive_enable = true,
+        .keep_alive_idle = 10,
+        .keep_alive_interval = 1
+    };
+
+    m_http = esp_http_client_init(&config);
 
     if(resume > 0) {
         char str[40];
-        // snprintf(str, sizeof str, "bytes=%lu-%lu", (unsigned long)resume, ((unsigned long)resume + HTTP_BLOCK_SIZE));
         snprintf(str, sizeof str, "bytes=%lu-", (unsigned long)resume);
         esp_http_client_set_header(m_http, "range", str);
     }
 
-    // Debug_printv("--- PRE PERFORM")
+    // Debug_printv("--- PRE OPEN")
 
-    //esp_err_t initOk = esp_http_client_open(m_http, 0); // or open? It's not entirely clear...
-    m_bytesAvailable = 0;
-
-    esp_err_t initOk = esp_http_client_perform(m_http); // or open? It's not entirely clear...
+    esp_err_t initOk = esp_http_client_open(m_http, 0); // or open? It's not entirely clear...
 
     if(initOk == ESP_FAIL)
         return 0;
 
+    // Debug_printv("--- PRE FETCH HEADERS")
+
+    int lengthResp = esp_http_client_fetch_headers(m_http);
+    if(m_length == -1 && lengthResp > 0) {
+        // only if we aren't chunked!
+        m_length = lengthResp;
+        m_bytesAvailable = m_length;
+    }
+
+    // Debug_printv("--- PRE GET STATUS CODE")
 
     return esp_http_client_get_status_code(m_http);
 }
@@ -421,12 +422,9 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
             }
             else if(mstr::equals("Content-Length", evt->header_key, false))
             {
-                // 20:06:42.981 > [lib/filesystem/scheme/http.h:19] operator()(): HTTP_EVENT_ON_HEADER, key=Content-Length, value=83200
-                int leng = atoi(evt->header_value);
-                if(meatClient->m_length == 0)
-                    meatClient->m_length = leng;
-                meatClient->m_bytesAvailable = leng;
-                //Debug_printv("* Content len present '%d'", meatClient->m_length);
+                //Debug_printv("* Content len present '%s'", evt->header_value);
+                meatClient->m_length = std::stoi(evt->header_value);
+                meatClient->m_bytesAvailable = meatClient->m_length;
             }
             else if(mstr::equals("Location", evt->header_key, false))
             {
@@ -451,12 +449,8 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
             break;
 
         case HTTP_EVENT_ON_DATA: // Occurs multiple times when receiving body data from the server. MAY BE SKIPPED IF BODY IS EMPTY!
-            Debug_printv("HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
+            //Debug_printv("HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
             {
-                char buffer[evt->data_len + 1] = { 0 };
-                memcpy(buffer, evt->data, evt->data_len);
-                Debug_printv("data[%s]", buffer);
-
                 int status = esp_http_client_get_status_code(meatClient->m_http);
 
                 if ((status == HttpStatus_Found || status == HttpStatus_MovedPermanently || status == 303) /*&& client->_redirect_count < (client->_max_redirects - 1)*/)
@@ -471,8 +465,8 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
                 if (esp_http_client_is_chunked_response(evt->client)) {
                     int len;
                     esp_http_client_get_chunk_length(evt->client, &len);
-                    //meatClient->m_length += len;
-                    meatClient->m_bytesAvailable = len;
+                    meatClient->m_length += len;
+                    meatClient->m_bytesAvailable += len;
                     //Debug_printv("HTTP_EVENT_ON_DATA: Got chunked response, chunklen=%d, contentlen[%d]", len, meatClient->m_length);
                 }
             }
@@ -487,7 +481,6 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
             break;
         case HTTP_EVENT_DISCONNECTED: // The connection has been disconnected
             Debug_printv("HTTP_EVENT_DISCONNECTED");
-            meatClient->m_isOpen = false;
             break;
     }
     return ESP_OK;

@@ -5,9 +5,13 @@
 #include "lwip/netdb.h"
 #include "../../include/debug.h"
 
+//
+// This is a standard "reading socket" - i.e. if you connect to a remote server
+//
 class MeatSocket {
     int sock = -1;
     uint8_t iecPort = 0;
+    bool blocking = false;
 
 public:
     MeatSocket() {};
@@ -21,12 +25,12 @@ public:
         dest_addr.sin_family = AF_INET;
         dest_addr.sin_port = htons(port);
         dest_addr.sin_addr.s_addr = inet_addr(address);
-        Debug_printv("dest_addr.sin_addr.s_addr=%x", dest_addr.sin_addr.s_addr);
+        //Debug_printv("dest_addr.sin_addr.s_addr=%x", dest_addr.sin_addr.s_addr);
         if (dest_addr.sin_addr.s_addr == 0xffffffff) {
             struct hostent *hp;
             hp = gethostbyname(address);
             if (hp == NULL) {
-                Debug_printv("FTP Client Error: Connect to %s", address);
+                Debug_printv("TCP Client Error: Connect to %s", address);
                 return false;
             }
             struct ip4_addr *ip4_addr;
@@ -39,13 +43,15 @@ public:
             Debug_printv("Unable to create socket: errno %d", errno);
             return false;
         }
-        Debug_printv("Socket created, connecting to %s:%d", address, port);
+        //Debug_printv("Socket created, connecting to %s:%d", address, port);
 
         int err = connect(sock, (struct sockaddr *)&dest_addr, sizeof(struct sockaddr_in6));
+
         if (err != 0) {
             Debug_printv("Socket unable to connect: errno %d", errno);
             return false;
         }
+        //Debug_printv("After connect for socet");
 
         return true;
     }
@@ -72,7 +78,14 @@ public:
             Debug_println("tcp read - NOT OPEN!\n");
             return -100;
         }
-        return recv(sock, buffer, bufsize, MSG_DONTWAIT); // MSG_DONTWAIT instead of 0 switches to non-blocking mode
+        //Debug_printv("tcp::read - calling recv, buff!=null:%d, buffsize=%d, blocking=%d", buffer!=nullptr, bufsize, blocking);
+        int byteCount = recv(sock, buffer, bufsize, (blocking) ? 0 : MSG_DONTWAIT); 
+        //Debug_printv("tcp::read - post recv");
+        if(!blocking && byteCount == -1) {
+            return -69;
+        }
+
+        return byteCount;
     }
 
     bool isOpen() {
@@ -80,6 +93,10 @@ public:
     }
 };
 
+//
+// This is a local server socket
+// It waits for a connection and then opens a new "reading socket" for exclusive communication with anyone that connects to ML
+//
 class MeatSocketServer {
     bool isAlive = false;
     int port = 0;
@@ -187,5 +204,149 @@ class MeatSocketServer {
         vTaskDelete(NULL);
     }
 };
+
+
+
+
+class TcpStream: public MStream {
+
+public:
+    TcpStream(std::string path) {
+        url = path;
+    };
+    ~TcpStream() {
+        close();
+    };
+
+    // MStream methods
+    size_t size() override {
+        return -1;
+    }
+    size_t available() override {
+        return 0;
+    }
+    size_t position() override {
+        return 0;
+    }
+
+    virtual bool seek(size_t pos) {
+        return false;
+    }
+
+    void close() override {
+        socket.close();
+    }
+
+    bool open() override {
+        PeoplesUrlParser p;
+        p.parseUrl(url);
+        return socket.open(p.host.c_str(), p.getPort());
+    }
+
+    // MStream methods
+    size_t read(uint8_t* buf, size_t size) override {
+        return socket.read(buf, size);
+    }
+    size_t write(const uint8_t *buf, size_t size) override {
+        return socket.write(buf, size);
+    }
+
+    bool isOpen() {
+        return socket.isOpen();
+    }
+
+protected:
+    MeatSocket socket;
+    std::string url;
+};
+
+
+/********************************************************
+ * File implementations
+ ********************************************************/
+
+
+class TcpFile: public MFile {
+
+public:
+    TcpFile() {
+        Debug_printv("C++, if you try to call this, be damned!");
+    };
+    TcpFile(std::string path): MFile(path) { 
+        Debug_printv("constructing tcp file from url [%s]", url.c_str());
+     };
+    TcpFile(std::string path, std::string filename): MFile(path) {};
+    ~TcpFile() override {
+    }
+    bool isDirectory() override {
+        return false;
+    }
+
+    // We are overriding meatStream, because obviously - TCP scheme won't be wrapped in anything
+    MStream* meatStream() override {
+        // has to return OPENED streamm
+        MStream* istream = new TcpStream(url);
+        istream->open();
+        return istream;
+    } 
+
+    // DUMMY return value - we've overriden meatStream, so this one won't be even called!
+    MStream* createIStream(std::shared_ptr<MStream> src) {
+        return nullptr; 
+    }
+
+    time_t getLastWrite() override {
+        return 0;
+    }
+    time_t getCreationTime() override {
+        return 0;
+    }
+    bool rewindDirectory() override  {
+        return false;
+    }
+    MFile* getNextFileInDir() override {
+        return nullptr;
+    }
+    bool mkDir() override {
+        return false;
+    }
+    bool exists() override {
+        return true;
+    }
+    size_t size() override {
+        return -1;
+    }
+    bool remove() override {
+        return false;
+    }
+    bool isText() override {
+        return false;
+    }
+    bool rename(std::string dest) { return false; };
+};
+
+
+
+/********************************************************
+ * FS
+ ********************************************************/
+
+class TcpFileSystem: public MFileSystem 
+{
+    MFile* getFile(std::string path) override {
+        return new TcpFile(path);
+    }
+
+    bool handles(std::string name) {
+        if ( mstr::equals(name, (char *)"tcp:", false) )
+            return true;
+
+        return false;
+    }
+public:
+    TcpFileSystem(): MFileSystem("tcp") {};
+};
+
+
 
 #endif /* MEATFILESYSTEM_SCHEME_TCP */

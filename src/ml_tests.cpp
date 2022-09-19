@@ -256,9 +256,32 @@ void testCD() {
     Debug_printf("I'm in %s\n", testDir->url.c_str());
 }
 
+void commodoreServer()
+{
+    size_t b_len = 40;
+	uint8_t b[b_len];
+
+    Meat::iostream stream("tcp://commodoreserver.com:1541");
+
+    if(!stream.is_open())
+        return;
+
+    stream << "help\r\n";
+    stream.sync();
+
+    while(!stream.eof())
+    {
+        stream.read((char *)b, b_len-2);
+        b[b_len-1]=0;
+        if(b[0]!=0)
+            Debug_printf("C= server says:[%s]\n", b);
+    }
+    stream.close();
+    
+}
+
 void httpStream(char *url)
 {
-    bool success = true;
     size_t i = 0;
     size_t b_len = 1;
 	uint8_t b[b_len];
@@ -270,17 +293,13 @@ void httpStream(char *url)
         size_t len = file->size();
         Debug_printv("File exists! size [%d]\r\n", len);
 
-        std::unique_ptr<MStream> stream(file->meatStream());
+        Meat::iostream stream(url); // dstFile
 
-		for(i=0;i < len; i++)
+        while(!stream.eof())
 		{
-			success = stream->read(b, b_len);
-			if (success)
-			{
-                Serial.write(b, b_len);
-            }
+			stream.read((char *)b, b_len);
         }
-        stream->close();
+        stream.close();
         Debug_println("");
         Debug_printv("%d of %d bytes sent\r\n", i, len);
     }
@@ -584,6 +603,7 @@ void runTestsSuite() {
     }
     fnSystem.delay_microseconds(pdMS_TO_TICKS(5000)); // 5sec after connect
 
+    //commodoreServer();
 
     // ====== Per FS dir, read and write region =======================================
 
@@ -653,7 +673,7 @@ void runTestsSuite() {
     // Debug_println(m_device.path().c_str());
 
     //testRedirect();
-    testStrings();
+    //testStrings();
 
     Debug_println("*** All tests finished ***");
 }

@@ -6,6 +6,8 @@
 
 #include "meat_io.h"
 
+#define _MEAT_NO_DATA_AVAIL -69
+
 namespace Meat
 {
     /********************************************************
@@ -120,6 +122,11 @@ namespace Meat
 
         // https://newbedev.com/how-to-write-custom-input-stream-in-c
 
+        
+        int nda()
+        { return static_cast<int_type>(_MEAT_NO_DATA_AVAIL); }
+
+
         int underflow() override
         {
             if (!is_open())
@@ -132,13 +139,21 @@ namespace Meat
                 // no more characters are available, size == 0.
                 // auto buffer = reader->read();
 
-                auto readCount = mstream->read((uint8_t *)ibuffer, ibufsize);
+                //Debug_printv("--mfilebuf underflow, calling read!");
 
-                lastIbufPos = mstream->position();
+                int readCount = mstream->read((uint8_t *)ibuffer, ibufsize);
 
-                // Debug_printv("--mfilebuf underflow, read bytes=%d--", readCount);
+                if(readCount <0) {
+                    Debug_printv("--mfilebuf underflow no data available, count=%d!", readCount);
+                    return nda();
+                }
+                else {
+                    lastIbufPos = mstream->position();
 
-                this->setg(ibuffer, ibuffer, ibuffer + readCount);
+                    //Debug_printv("--mfilebuf underflow, read bytes=%d--", readCount);
+
+                    this->setg(ibuffer, ibuffer, ibuffer + readCount);
+                }
             }
             // eback = beginning of get area
             // gptr = current character (get pointer)
@@ -194,7 +209,7 @@ namespace Meat
                 *end++ = ch;
             }
 
-            // Debug_printv("%d bytes in buffer will be written", end-pbase());
+            Debug_printv("%d bytes in buffer will be written", end-this->pbase());
 
             uint8_t *pBase = (uint8_t *)this->pbase();
 
