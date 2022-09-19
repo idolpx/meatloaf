@@ -198,7 +198,7 @@ bool MeatHttpClient::processRedirectsAndOpen(int range) {
     m_exists = true;
     m_position = 0;
 
-    Debug_printv("length=%d isFriendlySkipper=[%d] isText=[%d], httpCode=[%d]", m_length, isFriendlySkipper, isText, lastRC);
+    Debug_printv("length[%d] avail[%d] isFriendlySkipper[%d] isText[%d] httpCode[%d]", m_length, m_bytesAvailable, isFriendlySkipper, isText, lastRC);
 
     return true;
 }
@@ -424,6 +424,7 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
             {
                 //Debug_printv("* Content len present '%s'", evt->header_value);
                 meatClient->m_length = std::stoi(evt->header_value);
+                meatClient->m_bytesAvailable = meatClient->m_length;
             }
             else if(mstr::equals("Location", evt->header_key, false))
             {

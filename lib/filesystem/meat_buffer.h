@@ -123,7 +123,7 @@ namespace Meat
         // https://newbedev.com/how-to-write-custom-input-stream-in-c
 
         
-        int nda(
+        int nda()
         { return static_cast<int_type>(_MEAT_NO_DATA_AVAIL); }
 
 
