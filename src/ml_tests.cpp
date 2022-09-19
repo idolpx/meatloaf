@@ -273,7 +273,8 @@ void commodoreServer()
     {
         stream.read((char *)b, b_len);
         b[b_len-1]=0;
-        Debug_printf("C= server says:[%s]\n", b);
+        if(b[0]!=0)
+            Debug_printf("C= server says:[%s]\n", b);
     }
     stream.close();
     

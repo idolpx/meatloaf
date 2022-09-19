@@ -11,7 +11,7 @@
 class MeatSocket {
     int sock = -1;
     uint8_t iecPort = 0;
-    bool blocking = true;
+    bool blocking = false;
 
 public:
     MeatSocket() {};
@@ -81,6 +81,26 @@ public:
         //Debug_printv("tcp::read - calling recv, buff!=null:%d, buffsize=%d, blocking=%d", buffer!=nullptr, bufsize, blocking);
         int byteCount = recv(sock, buffer, bufsize, (blocking) ? 0 : MSG_DONTWAIT); 
         //Debug_printv("tcp::read - post recv");
+        if(!blocking) {
+            if(byteCount == -1) {
+                //Debug_printv("tcp::read in non-blocking mode - would block, returning single 0 byte");
+                // no incoming data on the socket and since we are in non-blocking mode
+                // we have to return 0 here, as otherwise IEC would block waiting for next byte!
+                // So we'll give IEC something - a $0, to denote "no data", and thanks to this 
+                // will be able to do something like:
+                // 10 GET#1, A$ : REM WILL NOT BLOCK!
+                // 20 IF A$="" GOTO 10 : REM THERE WAS NO DATA ON THE SOCKET, LOOP ON!
+                // to poll bytes from a socket
+                ((uint8_t*)buffer)[0] = 0;
+                return 1;
+            }
+            else {
+                Debug_printv("tcp::read in non-blocking mode - we have some data");
+                // tougher - we received something, but since we are in non-blockig mode
+                // we have to somehow escape 0 byte, as in non-blocking mode 0 means "no data" 
+                // TODO - somehow replace all zeros in the buffer with SOMETHING?
+            }
+        }
 
         return byteCount;
     }
