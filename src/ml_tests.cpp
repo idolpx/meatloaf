@@ -269,13 +269,30 @@ void commodoreServer()
     stream << "help\r\n";
     stream.sync();
 
-    while(!stream.eof())
-    {
-        stream.read((char *)b, b_len-2);
-        b[b_len-1]=0;
-        if(b[0]!=0)
-            Debug_printf("C= server says:[%s]\n", b);
-    }
+    auto pbuf = stream.rdbuf();
+    int next;
+    do {
+        int ch = pbuf->sgetc(); // read next char, don't move the position
+        if(ch == _MEAT_NO_DATA_AVAIL) {
+            Debug_printf("NDA ");
+        }
+        else if(ch == EOF) {
+
+        }
+        else {
+            Debug_printf("%c", (char)ch);
+        }
+        next = pbuf->snextc();
+    } while ( next != EOF );
+
+
+    // while(!stream.eof())
+    // {
+    //     stream.read((char *)b, b_len-2);
+    //     b[b_len-1]=0;
+    //     if(b[0]!=0)
+    //         Debug_printf("C= server says:[%s]\n", b);
+    // }
     stream.close();
     
 }
@@ -425,7 +442,7 @@ void testJson(MFile* srcFile, MFile* dstFile) {
 }
 
 
-void testTextReader(MFile* srcFile) {
+void testReader(MFile* srcFile) {
     testHeader("TEST reading using C++ API");
 
     Debug_printf(" * Read test for %s\n", srcFile->url.c_str());
@@ -442,11 +459,10 @@ void testTextReader(MFile* srcFile) {
 
         while(!istream.eof()) {
             istream >> line;
-            Serial.printf("LINE:[%s]\n", line.c_str());
+            Serial.printf("%s", line.c_str());
         }
 
         istream.close();
-        Debug_println("");
     }
     else {
         Debug_printf(" * Read test - ERROR:%s could not be read!\n", srcFile->url.c_str());
@@ -454,7 +470,7 @@ void testTextReader(MFile* srcFile) {
 
 }
 
-void testTextWriter(MFile* dstFile) {
+void testWriter(MFile* dstFile) {
     testHeader("TEST writing using C++ API");
     
     Debug_printf(" * Write test for %s\n", dstFile->url.c_str());
@@ -492,15 +508,15 @@ void runFSTest(std::string dirPath, std::string filePath) {
 
     auto testDir = Meat::New<MFile>(dirPath);
     auto testFile = Meat::New<MFile>(filePath);
-    //auto destFile = Meat::New<MFile>(testDir->cd("internationale.txt"));
+    auto destFile = Meat::New<MFile>(testDir->cd("internationale.txt"));
 
     // if this doesn't work reading and writing files won't workk
 
     if(testFile != nullptr) {
         dumpFileProperties(testFile.get());
-        testTextReader(testFile.get());
-        //testTextWriter(destFile.get());
-        //testTextReader(destFile.get());
+        testReader(testFile.get());
+        //testWriter(destFile.get());
+        //testReader(destFile.get());
     }
     else {
         Debug_printf("*** WARNING - %s instance couldn't be created!, , testDir->url.c_str()");
@@ -603,7 +619,7 @@ void runTestsSuite() {
     }
     fnSystem.delay_microseconds(pdMS_TO_TICKS(5000)); // 5sec after connect
 
-    //commodoreServer();
+    commodoreServer();
 
     // ====== Per FS dir, read and write region =======================================
 
@@ -613,9 +629,7 @@ void runTestsSuite() {
     // http://c64.meatloaf.cc/roms
     //runFSTest("http://192.168.1.161:8000", "https://www104.zippyshare.com/d/TEh31GeR/1191019/GeckOS-c64.d64/index.html");
     //runFSTest("https://c64.meatloaf.cc/geckos-c64.d64", "https://c64.meatloaf.cc/geckos-c64.d64/index.html");
-    //runFSTest("https://c64.meatloaf.cc/", "https://c64.meatloaf.cc/index.html");
-    runFSTest("sd:/geckos-c64.d64", "sd:/geckos-c64.d64/index.html");
-    //runFSTest("sd:/", "sd:/index.html");
+    //runFSTest("sd:/geckos-c64.d64", "sd:/geckos-c64.d64/index.html");
     //  https://c64.meatloaf.cc
     // runFSTest("http://info.cern.ch/hypertext/WWW/TheProject.html","http://info.cern.ch/hypertext/WWW/TheProject.html");
     // runFSTest("cs:/apps/ski_writer.d64","cs:/apps/ski_writer.d64/EDITOR.HLP");

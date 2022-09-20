@@ -15,6 +15,8 @@
 #include "string_utils.h"
 #include "U8Char.h"
 
+#define _MEAT_NO_DATA_AVAIL -69
+
 /********************************************************
  * Universal file
  ********************************************************/

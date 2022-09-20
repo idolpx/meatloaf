@@ -6,7 +6,6 @@
 
 #include "meat_io.h"
 
-#define _MEAT_NO_DATA_AVAIL -69
 
 namespace Meat
 {
@@ -123,7 +122,7 @@ namespace Meat
         // https://newbedev.com/how-to-write-custom-input-stream-in-c
 
         
-        int nda()
+        static int nda()
         { return static_cast<int_type>(_MEAT_NO_DATA_AVAIL); }
 
 
@@ -143,9 +142,15 @@ namespace Meat
 
                 int readCount = mstream->read((uint8_t *)ibuffer, ibufsize);
 
-                if(readCount <0) {
+                if(readCount == _MEAT_NO_DATA_AVAIL) {
                     Debug_printv("--mfilebuf underflow no data available, count=%d!", readCount);
+                    this->setg(ibuffer, ibuffer, ibuffer);
                     return nda();
+                }
+                else if(readCount < 0) {
+                    Debug_printv("--mfilebuf different read error, RC=%d!", readCount);
+                    this->setg(ibuffer, ibuffer, ibuffer);
+                    return std::char_traits<char>::eof();
                 }
                 else {
                     lastIbufPos = mstream->position();

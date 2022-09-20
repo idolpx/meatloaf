@@ -82,7 +82,7 @@ public:
         int byteCount = recv(sock, buffer, bufsize, (blocking) ? 0 : MSG_DONTWAIT); 
         //Debug_printv("tcp::read - post recv");
         if(!blocking && byteCount == -1) {
-            return -69;
+            return _MEAT_NO_DATA_AVAIL;
         }
 
         return byteCount;
