@@ -619,7 +619,7 @@ void runTestsSuite() {
     }
     fnSystem.delay_microseconds(pdMS_TO_TICKS(5000)); // 5sec after connect
 
-    commodoreServer();
+    //commodoreServer();
 
     // ====== Per FS dir, read and write region =======================================
 
