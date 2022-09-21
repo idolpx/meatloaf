@@ -112,7 +112,12 @@ bool HttpFile::isText() {
  * Istream impls
  ********************************************************/
 bool HttpIStream::open() {
-    return m_http.GET(url);
+    if(secondaryAddress == 0)
+        return m_http.GET(url);
+    else if(secondaryAddress == 1)
+        return m_http.PUT(url);
+    else if(secondaryAddress == 2)
+        return m_http.POST(url);
 };
 
 void HttpIStream::close() {
