@@ -118,7 +118,9 @@ bool HttpIStream::open() {
         return m_http.PUT(url);
     else if(secondaryAddress == 2)
         return m_http.POST(url);
-};
+
+    return false;
+}
 
 void HttpIStream::close() {
     Debug_printv("CLOSE called explicitly on this HTTP stream!");    
