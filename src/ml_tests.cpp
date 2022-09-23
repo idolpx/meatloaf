@@ -269,30 +269,17 @@ void commodoreServer()
     stream << "help\r\n";
     stream.sync();
 
+    // 1. we cen obtain raw C++ buffer from our stream:
     auto pbuf = stream.rdbuf();
-    int next;
+
     do {
-        int ch = pbuf->sgetc(); // read next char, don't move the position
-        if(ch == _MEAT_NO_DATA_AVAIL) {
-            Debug_printf("NDA ");
+        int nextChar = pbuf->sgetc(); // peeks next char BUT!!! donesn't move the buffer position
+        if(nextChar != _MEAT_NO_DATA_AVAIL) {
+            pbuf->snextc(); // ok, there was real data in the buffer, let's actually advance buffer position
+            Debug_printf("%c", nextChar);
         }
-        else if(ch == EOF) {
+    } while (pbuf->sgetc() != EOF );
 
-        }
-        else {
-            Debug_printf("%c", (char)ch);
-        }
-        next = pbuf->snextc();
-    } while ( next != EOF );
-
-
-    // while(!stream.eof())
-    // {
-    //     stream.read((char *)b, b_len-2);
-    //     b[b_len-1]=0;
-    //     if(b[0]!=0)
-    //         Debug_printf("C= server says:[%s]\n", b);
-    // }
     stream.close();
     
 }
@@ -619,7 +606,7 @@ void runTestsSuite() {
     }
     fnSystem.delay_microseconds(pdMS_TO_TICKS(5000)); // 5sec after connect
 
-    //commodoreServer();
+    commodoreServer();
 
     // ====== Per FS dir, read and write region =======================================
 

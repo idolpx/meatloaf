@@ -143,9 +143,15 @@ namespace Meat
                 int readCount = mstream->read((uint8_t *)ibuffer, ibufsize);
 
                 if(readCount == _MEAT_NO_DATA_AVAIL) {
-                    Debug_printv("--mfilebuf underflow no data available, count=%d!", readCount);
-                    this->setg(ibuffer, ibuffer, ibuffer);
-                    return nda();
+                    //Debug_printv("--mfilebuf underflow no data available, will teturn=%d!", nda());
+                    // if gptr >= egptr - sgetc will call underflow again:
+                    //                   gptr     egptr
+                    this->setg(ibuffer, ibuffer, ibuffer); // beg, curr, end <=> eback, gptr, egptr
+                    ibuffer[0]=_MEAT_NO_DATA_AVAIL; // this will be picked up by commodore server test!
+                    return _MEAT_NO_DATA_AVAIL;
+                    //return nda();
+                    //return std::char_traits<char>::to_int_type('x'); // this is not read
+                    //return std::char_traits<char>::eof();
                 }
                 else if(readCount < 0) {
                     Debug_printv("--mfilebuf different read error, RC=%d!", readCount);
