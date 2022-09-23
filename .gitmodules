@@ -7,6 +7,3 @@
 [submodule "components/webdav"]
 	path = components/webdav
 	url = https://github.com/zonque/WebDavServer.git
-[submodule "components/fastled"]
-	path = components/fastled
-	url = https://github.com/bbulkow/FastLED-idf
