@@ -126,6 +126,24 @@ namespace Meat
         static int nda()
         { return static_cast<int_type>(_MEAT_NO_DATA_AVAIL); }
 
+        // let's get a byte relative to current egptr
+        int operator[](int index)
+        {
+            // 1. let's check if our index is within current buffer POINTERS
+            // gptr = current character (get pointer)
+            // egptr = one past end of get area
+            if(this->gptr() == this->egptr())
+                underflow();
+
+            if(this->gptr() < this->egptr()) {
+                Debug_printf("%d char is within gptr-egptr range", index); // or - send the char across IEC to our C64
+                return std::char_traits<char>::to_int_type(this->gptr()[index]);
+            }
+            else {
+                Debug_printf("Index out of current buffer %d", this->gptr() - this->egptr());
+                return _MEAT_NO_DATA_AVAIL;
+            }
+        }
 
         int underflow() override
         {
@@ -238,6 +256,20 @@ namespace Meat
 
             return ch;
         };
+
+        std::streampos seekposforce(std::streampos __pos, std::ios_base::openmode __mode = std::ios_base::in | std::ios_base::out)
+        {
+            std::streampos __ret = std::streampos(off_type(-1));
+
+            if (mstream->seek(__pos))
+            {
+                __ret = std::streampos(off_type(__pos));
+                this->setg(ibuffer, ibuffer, ibuffer);
+                this->setp(obuffer, obuffer + obufsize);
+            }
+
+            return __ret;
+        }
 
         std::streampos seekpos(std::streampos __pos, std::ios_base::openmode __mode = std::ios_base::in | std::ios_base::out) override
         {

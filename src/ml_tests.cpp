@@ -286,8 +286,10 @@ void seekTest()
 
     Debug_printv("Seeking");
 
+    pbuf->seekposforce(3541); // D7  MULTIPLICATION SIGN
+    auto test = (*pbuf)[9]; // get 3550th character
+    Debug_printf("10th character below will be: %c", test); // or - send the char across IEC to our C64
 
-    pbuf->seekpos(3541); // D7  MULTIPLICATION SIGN
     readABit(pbuf);
     pbuf->seekpos(3662); // D9  CAPITAL LETTER U WITH GRAVE
     readABit(pbuf);
