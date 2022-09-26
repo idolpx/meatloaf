@@ -19,12 +19,13 @@ namespace Meat
         std::unique_ptr<MStream> mstream;
         std::unique_ptr<MFile> mfile;
 
-        static const size_t ibufsize = 256;
-        static const size_t obufsize = 256;
+        static const size_t ibufsize = 2048;
+        static const size_t obufsize = 2048;
         char *ibuffer;
         char *obuffer;
 
-        std::streampos lastIbufPos = 0;
+        std::streampos currBuffStart = 0;
+        std::streampos currBuffEnd;
 
     public:
         typedef charT char_type; // 1
@@ -159,7 +160,8 @@ namespace Meat
                     return std::char_traits<char>::eof();
                 }
                 else {
-                    lastIbufPos = mstream->position();
+                    currBuffEnd = mstream->position();
+                    currBuffStart = currBuffEnd-readCount; // this is where our buffer data starts
 
                     //Debug_printv("--mfilebuf underflow, read bytes=%d--", readCount);
 
@@ -249,10 +251,9 @@ namespace Meat
             // gptr - current ibuffer position
             // egptr - ibuffer end
 
-            Debug_printv("meat buffer seekpos called!");
+            Debug_printv("meat buffer seekpos called, newPos=%d buffer=[%d,%d]", (size_t)__pos, (size_t)currBuffStart, (size_t)currBuffEnd);
 
-
-            if (__pos >= lastIbufPos && __pos < lastIbufPos + ibufsize)
+            if (__pos >= currBuffStart && __pos < currBuffEnd)
             {
                 Debug_printv("Seek withn chace, lucky!");
 
@@ -262,7 +263,7 @@ namespace Meat
                 // NOTE - THIS PIECE OF CODE HAS TO BE THROUGHLY TESTED!!!!
                 // !!!
 
-                size_t delta = __pos - lastIbufPos;
+                std::streampos delta = __pos - currBuffStart;
                 // TODO - check if eback == ibuffer!!!
                 // TODO - check if pbase == obuffer!!!
                 this->setg(this->eback(), ibuffer + delta, this->egptr());

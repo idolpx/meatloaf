@@ -256,11 +256,51 @@ void testCD() {
     Debug_printf("I'm in %s\n", testDir->url.c_str());
 }
 
+
+void readABit(Meat::mfilebuf<char>* pbuf)
+{
+    int i = 0;
+    do {
+        int nextChar = pbuf->sgetc(); // peeks next char BUT!!! donesn't move the buffer position
+        if(nextChar != _MEAT_NO_DATA_AVAIL) {
+            i++;
+            pbuf->snextc(); // ok, there was real data in the buffer, let's actually ADVANCE buffer position
+            Debug_printf("%c", nextChar); // or - send the char across IEC to our C64
+        }
+    } while (pbuf->sgetc() != EOF && i < 100);
+
+
+}
+
+void seekTest()
+{
+    Meat::iostream stream("https://www.w3.org/TR/PNG/iso_8859-1.txt");
+
+    Debug_printv("Trying to open txt on http");
+
+    if(!stream.is_open())
+        return;
+
+    // 1. we cen obtain raw C++ buffer from our stream:
+    auto pbuf = stream.rdbuf();
+
+    Debug_printv("Seeking");
+
+
+    pbuf->seekpos(3542); // D7  MULTIPLICATION SIGN
+    readABit(pbuf);
+    pbuf->seekpos(3663); // D9  CAPITAL LETTER U WITH GRAVE
+    readABit(pbuf);
+    pbuf->seekpos(3598); // D8  CAPITAL LETTER O WITH STROKE
+    readABit(pbuf);
+
+    stream.close();
+    
+}
+
+
 void commodoreServer()
 {
-    size_t b_len = 40;
-	uint8_t b[b_len];
-
     Meat::iostream stream("tcp://commodoreserver.com:1541");
 
     if(!stream.is_open())
@@ -275,8 +315,8 @@ void commodoreServer()
     do {
         int nextChar = pbuf->sgetc(); // peeks next char BUT!!! donesn't move the buffer position
         if(nextChar != _MEAT_NO_DATA_AVAIL) {
-            pbuf->snextc(); // ok, there was real data in the buffer, let's actually advance buffer position
-            Debug_printf("%c", nextChar);
+            pbuf->snextc(); // ok, there was real data in the buffer, let's actually ADVANCE buffer position
+            Debug_printf("%c", nextChar); // or - send the char across IEC to our C64
         }
     } while (pbuf->sgetc() != EOF );
 
@@ -606,7 +646,8 @@ void runTestsSuite() {
     }
     fnSystem.delay_microseconds(pdMS_TO_TICKS(5000)); // 5sec after connect
 
-    commodoreServer();
+    //commodoreServer();
+    seekTest();
 
     // ====== Per FS dir, read and write region =======================================
 
