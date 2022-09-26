@@ -287,11 +287,11 @@ void seekTest()
     Debug_printv("Seeking");
 
 
-    pbuf->seekpos(3542); // D7  MULTIPLICATION SIGN
+    pbuf->seekpos(3541); // D7  MULTIPLICATION SIGN
     readABit(pbuf);
-    pbuf->seekpos(3663); // D9  CAPITAL LETTER U WITH GRAVE
+    pbuf->seekpos(3662); // D9  CAPITAL LETTER U WITH GRAVE
     readABit(pbuf);
-    pbuf->seekpos(3598); // D8  CAPITAL LETTER O WITH STROKE
+    pbuf->seekpos(3597); // D8  CAPITAL LETTER O WITH STROKE
     readABit(pbuf);
 
     stream.close();

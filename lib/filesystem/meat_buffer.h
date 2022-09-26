@@ -20,7 +20,7 @@ namespace Meat
         std::unique_ptr<MFile> mfile;
 
         static const size_t ibufsize = 2048;
-        static const size_t obufsize = 2048;
+        static const size_t obufsize = 512;
         char *ibuffer;
         char *obuffer;
 
