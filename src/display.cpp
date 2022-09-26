@@ -7,6 +7,9 @@
    CONDITIONS OF ANY KIND, either express or implied.
 */
 
+#ifdef LED_STRIP
+
+
 #include "display.h"
 
 #include <stdio.h>
@@ -359,3 +362,5 @@ void blinkLeds_chase(void *pvParameters) {
 
 }
 
+
+#endif // #ifdef LED_STRIP

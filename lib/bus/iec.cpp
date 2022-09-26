@@ -232,13 +232,13 @@ bool iecBus::init()
 void iecBus::service ( void )
 {
     bool process_command = false;
-
+    bool pin_atn = protocol.status ( PIN_IEC_ATN );
+    
 #ifdef IEC_HAS_RESET
 
     // Check if CBM is sending a reset (setting the RESET line high). This is typically
     // when the CBM is reset itself. In this case, we are supposed to reset all states to initial.
     bool pin_reset = protocol.status ( PIN_IEC_RESET );
-    bool pin_atn = protocol.status ( PIN_IEC_ATN );
     if ( pin_reset == PULLED )
     {
         if ( pin_atn == PULLED )

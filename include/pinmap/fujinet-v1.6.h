@@ -1,6 +1,6 @@
 /* FujiNet Hardware Pin Mapping */
-#ifndef PINMAP_CBM_LOLIN_D32_PRO_H
-#define PINMAP_CBM_LOLIN_D32_PRO_H
+#ifndef PINMAP_CBM_FUJINET_16_H
+#define PINMAP_CBM_FUJINET_16_H
 
 /* SD Card */
 // pins 12-15 are used to interface with the JTAG debugger
@@ -9,18 +9,11 @@
 #define PIN_CARD_DETECT 12 // fnSystem.h
 #define PIN_CARD_DETECT_FIX 15 // fnSystem.h
 #endif
-#ifdef CONFIG_IDF_TARGET_ESP32S3
-#define PIN_SD_HOST_MISO 19
-#define PIN_SD_HOST_MOSI 23
-#define PIN_SD_HOST_SCK  18
-#define PIN_SD_HOST_CS   GPIO_NUM_5
-#else
-//#define PIN_SD_HOST_CS GPIO_NUM_5 // fnFsSD.cpp
-#define PIN_SD_HOST_CS GPIO_NUM_4 // LOLIN D32 Pro
+
+#define PIN_SD_HOST_CS GPIO_NUM_5 // fnFsSD.cpp
 #define PIN_SD_HOST_MISO GPIO_NUM_19
 #define PIN_SD_HOST_MOSI GPIO_NUM_23
 #define PIN_SD_HOST_SCK GPIO_NUM_18
-#endif
 
 /* UART */
 #define PIN_UART0_RX 3 // fnUART.cpp
@@ -57,7 +50,7 @@
 //#define IEC_INVERTED_LINES
 
 // Reset line is available
-#define IEC_HAS_RESET
+//#define IEC_HAS_RESET
 
 // // CBM IEC Serial Port
 // #define PIN_IEC_ATN         GPIO_NUM_39      // SIO 7  - CMD  - Command
@@ -89,4 +82,4 @@
 #define PIN_IEC_DATA_OUT   	GPIO_NUM_25
 #define PIN_IEC_SRQ			GPIO_NUM_26
 
-#endif // PINMAP_CBM_LOLIN_D32_PRO_H
+#endif // PINMAP_CBM_FUJINET_16_H
