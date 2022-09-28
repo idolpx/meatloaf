@@ -233,7 +233,7 @@ void iecBus::service ( void )
 {
     bool process_command = false;
     bool pin_atn = protocol.status ( PIN_IEC_ATN );
-    
+
 #ifdef IEC_HAS_RESET
 
     // Check if CBM is sending a reset (setting the RESET line high). This is typically
@@ -260,6 +260,8 @@ void iecBus::service ( void )
 
 #endif
 
+    if ( this->bus_state == BUS_OFFLINE && pin_atn )
+        pin_atn = false;
 
     // Command or Data Mode
     if ( this->bus_state == BUS_ACTIVE || pin_atn )
@@ -275,8 +277,12 @@ void iecBus::service ( void )
         // Check for error
         if ( c == 0xFFFFFFFF || protocol.flags bitand ERROR )
         {
-            //Debug_printv ( "Error reading command" );
-            this->bus_state = BUS_ERROR;
+            //Debug_printv ( "Error reading command" );            
+            if ( c == 0xFFFFFFFF )
+                this->bus_state = BUS_OFFLINE;
+            else
+
+                this->bus_state = BUS_ERROR;
         }
         else
         {
@@ -383,7 +389,7 @@ void iecBus::service ( void )
         // Debug_printf( "primary[%.2X] secondary[%.2X] bus_state[%d]", this->data.primary, this->data.secondary, this->bus_state );
         // protocol.release ( PIN_IEC_SRQ );
     }
-    else
+    else if ( this->bus_state > BUS_IDLE )
     {
         // If no secondary was set, process primary with defaults
         if ( this->data.primary > IEC_GLOBAL )
