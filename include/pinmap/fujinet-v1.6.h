@@ -15,6 +15,10 @@
 #define PIN_SD_HOST_MOSI GPIO_NUM_23
 #define PIN_SD_HOST_SCK GPIO_NUM_18
 
+/* I2C */
+#define I2C_SDA GPIO_NUM_21
+#define I2C_SCL GPIO_NUM_22
+
 /* UART */
 #define PIN_UART0_RX 3 // fnUART.cpp
 #define PIN_UART0_TX 1
@@ -38,6 +42,13 @@
 #else
 #define PIN_LED_BT 5 // LOLIN D32 PRO
 #endif
+
+/* LED Strip */
+#define NUM_LEDS 5
+#define DATA_PIN 5
+#define BRIGHTNESS  25
+#define LED_TYPE WS2811
+#define COLOR_ORDER RGB
 
 /* Audio Output */
 #define PIN_DAC1 25 // samlib.h
