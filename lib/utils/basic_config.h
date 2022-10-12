@@ -5,6 +5,7 @@
 #include <unordered_map>
 
 #include "meat_io.h"
+#include "meat_buffer.h"
 
 
 class BasicConfigReader {

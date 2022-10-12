@@ -181,7 +181,7 @@ public:
         sendCommand("quit");
     };
 
-    // read/write are used only by MStreams
+    // read/write are used only by MStream
     size_t receive(uint8_t* buffer, size_t size) {
         if(buf.is_open())
             return buf.m_wifi.read(buffer, size);
@@ -189,7 +189,7 @@ public:
             return 0;
     }
 
-    // read/write are used only by MStreams
+    // read/write are used only by MStream
     size_t send(const uint8_t* buffer, size_t size) {
         if(buf.is_open())
             return buf.m_wifi.write(buffer, size);
@@ -220,9 +220,8 @@ public:
         // Debug_printv("path[%s] size[%d]", path.c_str(), size);
     };
 
-    MIStream* createIStream(std::shared_ptr<MIStream> src) { return src.get(); };
-    MIStream* inputStream() override ; // has to return OPENED stream
-    MOStream* outputStream() override ; // has to return OPENED stream    
+    MStream* createIStream(std::shared_ptr<MStream> src) { return src.get(); };
+    MStream* meatStream() override ; // has to return OPENED stream
 
     std::string petsciiName() override {
         return name;
@@ -254,7 +253,7 @@ private:
  ********************************************************/
 
 //
-class CServerIStream: public MIStream {
+class CServerIStream: public MStream {
 
 public:
     CServerIStream(std::string path) {
@@ -276,40 +275,6 @@ public:
     };
 
     size_t read(uint8_t* buf, size_t size) override;
-    bool isOpen() override;
-
-protected:
-    std::string url;
-    bool m_isOpen;
-    size_t m_length;
-    size_t m_bytesAvailable = 0;
-    size_t m_position = 0;
-};
-
-
-class CServerOStream: public MOStream {
-
-public:
-    CServerOStream(std::string path) {
-        url = path;
-    }
-    ~CServerOStream() {
-        close();
-    }
-
-    // MStream methods
-    bool open() override;
-    void close() override;
-
-    size_t available() override;
-    size_t size() override;
-    size_t position() override;
-
-    virtual bool seek(size_t pos) {
-        return false;
-    };
-
-    // MOStream methods
     size_t write(const uint8_t *buf, size_t size) override;
     bool isOpen() override;
 
@@ -320,6 +285,7 @@ protected:
     size_t m_bytesAvailable = 0;
     size_t m_position = 0;
 };
+
 
 
 /********************************************************

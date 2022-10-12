@@ -15,6 +15,7 @@
 
 #include "ml_tests.h"
 #include "meat_io.h"
+#include "meat_buffer.h"
 #include "iec_host.h"
 #include "../include/make_unique.h"
 #include "basic_config.h"
@@ -37,35 +38,6 @@ void testDiscoverDevices()
     testHeader("Query Bus for Devices");
     for(size_t d=4; d<31; d++)
         iec.deviceExists(d);
-}
-
-void testReader(MFile* readeTest) {
-    // /* Test Line reader */
-    testHeader("C++ line reader");
-
-    Debug_printf("* Trying to read file:%s\n", readeTest->url.c_str());
-
-    auto readerStream = Meat::ifstream(readeTest);
-    readerStream.open();
-
-    if(readerStream.is_open()) {
-        if(readerStream.eof()) {
-            Debug_printf("Reader returned EOF! :(");
-        }
-
-        Debug_printf("* File lines follow:");
-
-        while(!readerStream.eof()) {
-            std::string line;
-
-            readerStream >> line;
-
-            Debug_printf("%s\n",line.c_str());
-        };
-    }
-    else {
-        Debug_printf("*** ERROR: stream could not be opened!");
-    }
 }
 
 // void testArchiveReader(std::string archive) {
@@ -96,7 +68,7 @@ void testReader(MFile* readeTest) {
 // }
 
 void dumpFileProperties(MFile* testMFile) {
-    Debug_println("\n== File properties ==");
+    Debug_printf("\n\n* %s File properties\n", testMFile->url.c_str());
     Debug_printf("Url: %s, isDir = %d\n", testMFile->url.c_str(), testMFile->isDirectory());
     Debug_printf("Scheme: [%s]\n", testMFile->scheme.c_str());
     Debug_printf("Username: [%s]\n", testMFile->user.c_str());
@@ -108,22 +80,23 @@ void dumpFileProperties(MFile* testMFile) {
     if ( testMFile->streamFile )
         Debug_printf("stream src: [%s]\n", testMFile->streamFile->url.c_str());
 
-
     Debug_printf("path in stream: [%s]\n", testMFile->pathInStream.c_str());
     Debug_printf("File: [%s]\n", testMFile->name.c_str());
     Debug_printf("Extension: [%s]\n", testMFile->extension.c_str());
     Debug_printf("Size: [%d]\n", testMFile->size());
+    Debug_printf("Is text: [%d]\n", testMFile->isText());
     Debug_printf("-------------------------------\n");
 }
 
 void testDirectory(MFile* dir, bool verbose=false) {
     testHeader("A directory");
 
+    Debug_printf(" * Trying to list dir: %s\n", dir->url.c_str());
+
     if(!dir->isDirectory()) {
-        Debug_printf("Not a directory!");
+        Debug_printf("%s: Not a directory!", dir->url.c_str());
         return;
     }
-
 
     Debug_printf("* Listing %s\n", dir->url.c_str());
     Debug_printf("* pre get next file\n");
@@ -144,7 +117,7 @@ void testDirectory(MFile* dir, bool verbose=false) {
         }
     }
     else {
-        Debug_printf("Got nullptr!");
+        Debug_printf("* got nullptr - directory is empty?");
     }
 }
 
@@ -188,27 +161,21 @@ void testRecursiveDir(MFile* file, std::string indent) {
 }
 
 void testCopy(MFile* srcFile, MFile* dstFile) {
-    testHeader("Copy file to destination");
+    // testHeader("Copy file to destination");
 
-    Debug_printf("FROM:%s\nTO:%s\n", srcFile->url.c_str(), dstFile->url.c_str());
+    // Debug_printf("FROM:%s\nTO:%s\n", srcFile->url.c_str(), dstFile->url.c_str());
 
-    if(dstFile->exists()) {
-        bool result = dstFile->remove();
-        Debug_printf("FSTEST: %s existed, delete reult: %d\n", dstFile->path.c_str(), result);
-    }
+    // if(dstFile->exists()) {
+    //     bool result = dstFile->remove();
+    //     Debug_printf("FSTEST: %s existed, delete reult: %d\n", dstFile->path.c_str(), result);
+    // }
 
-    srcFile->copyTo(dstFile);
+    // srcFile->copyTo(dstFile);
 }
 
 void dumpParts(std::vector<std::string> v) {
     for(auto i = v.begin(); i < v.end(); i++)
         Debug_printf("%s::",(*i).c_str());
-}
-
-void testStringFunctions() {
-    testHeader("String functions");
-    Debug_printf("pa == %s\n", mstr::drop("dupa",2).c_str());
-    Debug_printf("du == %s\n", mstr::dropLast("dupa",2).c_str());
 }
 
 void testPaths(MFile* testFile, std::string subDir) {
@@ -289,9 +256,78 @@ void testCD() {
     Debug_printf("I'm in %s\n", testDir->url.c_str());
 }
 
+
+void readABit(Meat::mfilebuf<char>* pbuf)
+{
+    int i = 0;
+    do {
+        int nextChar = pbuf->sgetc(); // peeks next char BUT!!! donesn't move the buffer position
+        if(nextChar != _MEAT_NO_DATA_AVAIL) {
+            i++;
+            pbuf->snextc(); // ok, there was real data in the buffer, let's actually ADVANCE buffer position
+            Debug_printf("%c", nextChar); // or - send the char across IEC to our C64
+        }
+    } while (pbuf->sgetc() != EOF && i < 100);
+
+
+}
+
+void seekTest()
+{
+    Meat::iostream stream("https://www.w3.org/TR/PNG/iso_8859-1.txt");
+
+    Debug_printv("Trying to open txt on http");
+
+    if(!stream.is_open())
+        return;
+
+    // 1. we cen obtain raw C++ buffer from our stream:
+    auto pbuf = stream.rdbuf();
+
+    Debug_printv("Seeking");
+
+    pbuf->seekposforce(3541); // D7  MULTIPLICATION SIGN
+    auto test = (*pbuf)[9]; // get 3550th character
+    Debug_printf("10th character below will be: %c", test); // or - send the char across IEC to our C64
+
+    readABit(pbuf);
+    pbuf->seekpos(3662); // D9  CAPITAL LETTER U WITH GRAVE
+    readABit(pbuf);
+    pbuf->seekpos(3597); // D8  CAPITAL LETTER O WITH STROKE
+    readABit(pbuf);
+
+    stream.close();
+    
+}
+
+
+void commodoreServer()
+{
+    Meat::iostream stream("tcp://commodoreserver.com:1541");
+
+    if(!stream.is_open())
+        return;
+
+    stream << "help\r\n";
+    stream.sync();
+
+    // 1. we cen obtain raw C++ buffer from our stream:
+    auto pbuf = stream.rdbuf();
+
+    do {
+        int nextChar = pbuf->sgetc(); // peeks next char BUT!!! donesn't move the buffer position
+        if(nextChar != _MEAT_NO_DATA_AVAIL) {
+            pbuf->snextc(); // ok, there was real data in the buffer, let's actually ADVANCE buffer position
+            Debug_printf("%c", nextChar); // or - send the char across IEC to our C64
+        }
+    } while (pbuf->sgetc() != EOF );
+
+    stream.close();
+    
+}
+
 void httpStream(char *url)
 {
-    bool success = true;
     size_t i = 0;
     size_t b_len = 1;
 	uint8_t b[b_len];
@@ -303,17 +339,13 @@ void httpStream(char *url)
         size_t len = file->size();
         Debug_printv("File exists! size [%d]\r\n", len);
 
-        std::unique_ptr<MIStream> stream(file->inputStream());
+        Meat::iostream stream(url); // dstFile
 
-		for(i=0;i < len; i++)
+        while(!stream.eof())
 		{
-			success = stream->read(b, b_len);
-			if (success)
-			{
-                Serial.write(b, b_len);
-            }
+			stream.read((char *)b, b_len);
         }
-        stream->close();
+        stream.close();
         Debug_println("");
         Debug_printv("%d of %d bytes sent\r\n", i, len);
     }
@@ -369,7 +401,7 @@ void httpGet(char *url)
     }
 }
 
-void testStdStreamWrapper(MFile* srcFile, MFile* dstFile) {
+void testJson(MFile* srcFile, MFile* dstFile) {
     testHeader("C++ stream wrappers");
 
     StaticJsonDocument<512> m_device;
@@ -378,8 +410,7 @@ void testStdStreamWrapper(MFile* srcFile, MFile* dstFile) {
     if ( dstFile->exists() )
         dstFile->remove();
 
-    Meat::ofstream ostream(dstFile); // dstFile
-    ostream.open();
+    Meat::iostream ostream(dstFile); // dstFile
     
     if(ostream.is_open()) {
         Debug_printf("Trying to serialize JSON to %s\n", dstFile->url.c_str());
@@ -403,13 +434,12 @@ void testStdStreamWrapper(MFile* srcFile, MFile* dstFile) {
 
     Debug_printf("Copy %s to %s\n", dstFile->url.c_str(), srcFile->url.c_str());
 
-    bool copyRc = dstFile->copyTo(srcFile);
+    bool copyRc = -1; //dstFile->copyTo(srcFile);
 
     Debug_printf("After copyto rc=%d\n", copyRc);
 
     if(copyRc) {
-        Meat::ifstream istream(srcFile);
-        istream.open();
+        Meat::iostream istream(srcFile);
 
         if(istream.is_open()) {
             Debug_printf("Trying to deserialize JSON from %s\n",srcFile->url.c_str());
@@ -428,8 +458,7 @@ void testStdStreamWrapper(MFile* srcFile, MFile* dstFile) {
 
         Debug_printf("Trying to deserialize JSON from %s\n",dstFile->url.c_str());
 
-        Meat::ifstream newIstream(dstFile); // this is your standard istream!
-        newIstream.open();
+        Meat::iostream newIstream(dstFile); // this is your standard istream!
 
         if(newIstream.is_open()) {
             deserializeJson(m_device, newIstream);
@@ -442,33 +471,45 @@ void testStdStreamWrapper(MFile* srcFile, MFile* dstFile) {
 }
 
 
-void testNewCppStreams(std::string name) {
-    testHeader("TEST C++ streams");
+void testReader(MFile* srcFile) {
+    testHeader("TEST reading using C++ API");
 
-    Debug_println(" * Read test\n");
+    Debug_printf(" * Read test for %s\n", srcFile->url.c_str());
 
-    Meat::ifstream istream(name);
-    istream.open();
+    Meat::iostream istream(srcFile);
+
+    Debug_printv("reading file now!");
     if(istream.is_open()) {
+        if(istream.eof()) {
+            Debug_printf("Reader returned EOF! :(");
+        }
+
         std::string line;
 
         while(!istream.eof()) {
             istream >> line;
-            Serial.print(line.c_str());
+            Serial.printf("%s", line.c_str());
         }
 
         istream.close();
     }
+    else {
+        Debug_printf(" * Read test - ERROR:%s could not be read!\n", srcFile->url.c_str());
+    }
 
-    Debug_println("\n * Write test\n");
+}
 
-    Meat::ofstream ostream("/intern.txt");
+void testWriter(MFile* dstFile) {
+    testHeader("TEST writing using C++ API");
+    
+    Debug_printf(" * Write test for %s\n", dstFile->url.c_str());
 
-    Debug_println(" * Write test - after declaration\n");
-
-    ostream.open();
+    Meat::iostream ostream(dstFile);
 
     Debug_println(" * Write test - after open\n");
+
+    if ( dstFile->exists() )
+        dstFile->remove();
 
     if(ostream.is_open()) {
         Debug_println(" * Write test - isOpen\n");
@@ -486,44 +527,40 @@ void testNewCppStreams(std::string name) {
         Debug_println(" * Write test - after close\n");
     }
     else {
-        Debug_println(" * Write test - ERROR:The International could not be written!\n");
+        Debug_println(" * Write test - ERROR:The Internationale could not be written!\n");
     }
 }
 
 void runFSTest(std::string dirPath, std::string filePath) {
+    testHeader("A full filesystem test");
     //Debug_println("**********************************************************************\n\n");
-
 
     auto testDir = Meat::New<MFile>(dirPath);
     auto testFile = Meat::New<MFile>(filePath);
-    auto destFile = Meat::New<MFile>("/mltestfile");
+    auto destFile = Meat::New<MFile>(testDir->cd("internationale.txt"));
 
-    testNewCppStreams(filePath);
+    // if this doesn't work reading and writing files won't workk
 
-    if(!dirPath.empty() && testDir != nullptr) {
+    if(testFile != nullptr) {
+        dumpFileProperties(testFile.get());
+        testReader(testFile.get());
+        //testWriter(destFile.get());
+        //testReader(destFile.get());
+    }
+    else {
+        Debug_printf("*** WARNING - %s instance couldn't be created!, , testDir->url.c_str()");
+    }
+
+    if(!dirPath.empty() && testDir->exists() && testDir->isDirectory()) {
+        dumpFileProperties(testDir.get());
         testDirectory(testDir.get());
         //testPaths(testDir.get(),"subDir");
         //testRecursiveDir(otherFile.get(),""); // fucks upp littleFS?
     }
     else {
-        Debug_println("*** WARNING - directory instance couldn't be created!");
+        Debug_printf("*** WARNING - %s instance couldn't be created!", testDir->url.c_str());
     }
 
-    if(!filePath.empty() && testFile != nullptr) {
-        testReader(testFile.get());
-        testCopy(testFile.get(), destFile.get());
-
-        // C++ stream wrappers are broken - don't use
-        testStdStreamWrapper(testFile.get(), destFile.get());
-
-        Debug_println("\n\n\n*** Please compare file copied to ML aginst the source:\n\n\n");
-        // C++ stream wrappers are broken - don't use
-        testReader(destFile.get());
-    }
-    else {
-        Debug_println("*** WARNING - file instance couldn't be created!");
-    }
-    
     Debug_println("**********************************************************************\n\n");
 }
 
@@ -551,22 +588,10 @@ void testBasicConfig() {
 
 }
 
-void testHttpFile() {
-    testHeader("HTTP file test");
-
-    auto test = Meat::New<MFile>("http://c64.meatloaf.cc/roms");
-
-    Debug_printf("Exists: %d\n", test->exists());
-    Debug_printf("Is text: %d\n", test->isText());
-
-}
-
 void testRedirect() {
     testHeader("HTTP fs test");
 
-    Meat::ifstream istream("http://c64.meatloaf.cc/roms");
-
-    istream.open();
+    Meat::iostream istream("http://c64.meatloaf.cc/roms");
 
     if(istream.is_open()) {
         Debug_printf("* Stream OK!");
@@ -592,6 +617,29 @@ void testRedirect() {
 
 }
 
+void testStrings() {
+    testHeader("Testing strings");
+
+    std::string s1("content-type");
+    std::string s2("Content-Type");
+
+    bool result = mstr::equals(s2, s1, false);
+
+    Debug_printf("String-string case-insensitive comp:%d\n", result);
+
+    result = mstr::equals(s2, "content-type", false);
+
+    Debug_printf("String-char case-insensitive comp:%d\n", result);
+
+    result = mstr::equals("Content-Type", "content-type", false);
+
+    Debug_printf("char-char case-insensitive comp:%d\n", result);
+
+    Debug_printf("pa == %s\n", mstr::drop("dupa",2).c_str());
+    Debug_printf("du == %s\n", mstr::dropLast("dupa",2).c_str());
+
+}
+
 void runTestsSuite() {
     // Delay waiting for wifi to connect
     while ( !fnWiFi.connected() )
@@ -600,14 +648,25 @@ void runTestsSuite() {
     }
     fnSystem.delay_microseconds(pdMS_TO_TICKS(5000)); // 5sec after connect
 
+    //commodoreServer();
+    seekTest();
+
+    // ====== Per FS dir, read and write region =======================================
+
     // working, uncomment if you want
-    // runFSTest("/.sys", "README"); // TODO - let urlparser drop the last slash!
+    //runFSTest("/.sys", "README"); // TODO - let urlparser drop the last slash!
+    //runFSTest("http://c64.meatloaf.cc/roms", "https://www.w3.org/TR/PNG/iso_8859-1.txt");
+    // http://c64.meatloaf.cc/roms
+    //runFSTest("http://192.168.1.161:8000", "https://www104.zippyshare.com/d/TEh31GeR/1191019/GeckOS-c64.d64/index.html");
+    //runFSTest("https://c64.meatloaf.cc/geckos-c64.d64", "https://c64.meatloaf.cc/geckos-c64.d64/index.html");
+    //runFSTest("sd:/geckos-c64.d64", "sd:/geckos-c64.d64/index.html");
+    //  https://c64.meatloaf.cc
     // runFSTest("http://info.cern.ch/hypertext/WWW/TheProject.html","http://info.cern.ch/hypertext/WWW/TheProject.html");
-    runFSTest("cs:/apps/ski_writer.d64","cs:/apps/ski_writer.d64/EDITOR.HLP");
-    
-    // not working yet, DO NOT UNCOMMENT!!!
-    //runFSTest("http://somneserver.com/utilities/disk tools/cie.dnp/subdir/CIE+SERIAL","");    
-    
+    // runFSTest("cs:/apps/ski_writer.d64","cs:/apps/ski_writer.d64/EDITOR.HLP");
+
+
+    // ====== Misc test region =======================================
+        
     //testIsDirectory();
     //testUrlParser();
     //testCD();
@@ -633,7 +692,6 @@ void runTestsSuite() {
     // testBasicConfig();
 
     // Debug_printv("Flash File System");
-    // testDirectory(MFSOwner::File("/"), true);
     //testDirectoryStandard("/");
 
     // Debug_printv("SD Card File System");
@@ -643,7 +701,6 @@ void runTestsSuite() {
     //testDirectory(MFSOwner::File( basepath ), true);
     //testDirectoryStandard( "/sd/" );
     // testDirectory(MFSOwner::File("/sd/"), true);
-
 
     // DeviceDB m_device(0);
 
@@ -660,7 +717,7 @@ void runTestsSuite() {
     // Debug_println(m_device.path().c_str());
 
     //testRedirect();
-    testHttpFile();
+    //testStrings();
 
     Debug_println("*** All tests finished ***");
 }

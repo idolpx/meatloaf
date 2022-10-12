@@ -72,6 +72,11 @@ size_t CBMImageStream::size() {
     return m_length;
 };
 
+size_t CBMImageStream::write(const uint8_t *buf, size_t size) {
+    return -1;
+}
+
+
 size_t CBMImageStream::read(uint8_t* buf, size_t size) {
     size_t bytesRead = 0;
 

@@ -16,7 +16,7 @@ class P00IStream : public CBMImageStream {
     // override everything that requires overriding here
 
 public:
-    P00IStream(std::shared_ptr<MIStream> is) : CBMImageStream(is) {
+    P00IStream(std::shared_ptr<MStream> is) : CBMImageStream(is) {
         entry_count = 1;
         seekNextEntry();
     };
@@ -81,7 +81,7 @@ public:
         // don't close the stream here! It will be used by shared ptr D64Util to keep reading image params
     }
 
-    MIStream* createIStream(std::shared_ptr<MIStream> containerIstream) override;
+    MStream* createIStream(std::shared_ptr<MStream> containerIstream) override;
 
     std::string petsciiName() override {
         // It's already in PETSCII

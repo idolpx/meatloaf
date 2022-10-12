@@ -81,7 +81,7 @@ protected:
     std::vector<uint8_t> sectorsPerTrack = { 17, 18, 19, 21 };
 
 public:
-    D64IStream(std::shared_ptr<MIStream> is) : CBMImageStream(is) 
+    D64IStream(std::shared_ptr<MStream> is) : CBMImageStream(is) 
     {
         // D64 Offsets
         directory_header_offset = {18, 0, 0x90};
@@ -212,7 +212,7 @@ public:
         // don't close the stream here! It will be used by shared ptr D64Util to keep reading image params
     }
 
-    MIStream* createIStream(std::shared_ptr<MIStream> containerIstream) override;
+    MStream* createIStream(std::shared_ptr<MStream> containerIstream) override;
 
     std::string petsciiName() override {
         // It's already in PETSCII

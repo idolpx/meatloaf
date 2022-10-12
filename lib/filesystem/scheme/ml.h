@@ -22,7 +22,7 @@
 //     MLFile(std::string path): HttpFile(path) {};
 //     ~MLFile() {};
 
-//     MIStream* inputStream() override; // file on ML server = standard HTTP file available via GET
+//     MStream* meatStream() override; // file on ML server = standard HTTP file available via GET
 // };
 
 

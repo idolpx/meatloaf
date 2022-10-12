@@ -15,7 +15,7 @@
  * Streams
  ********************************************************/
 
-class CSIOStream: public MIStream, public MOStream {
+class CSIOStream: public MStream {
 public:
     CSIOStream(MFile* file, bool isServer) : m_isServer(isServer) {
         // drop ws:// from url and it's OK!
@@ -132,13 +132,9 @@ public:
     WSFile(std::string path): MFile(path) {};
 
     bool isDirectory() override { return false; }
-    MIStream* inputStream() override {
+    MStream* meatStream() override {
         // input stream = SERVER socket
         return new CSIOStream(this, true);
-    }; 
-    MOStream* outputStream() override {
-        // output stream = CLIENT socket
-        return new CSIOStream(this, false);
     }; 
     time_t getLastWrite() override { return 0; };
     time_t getCreationTime() override { return 0; };
@@ -149,7 +145,7 @@ public:
     size_t size() override { return 0; };
     bool remove() override { return false; };
     bool rename(std::string dest) { return false; };
-    MIStream* createIStream(std::shared_ptr<MIStream> src) {
+    MStream* createIStream(std::shared_ptr<MStream> src) {
         return nullptr;
     };
 

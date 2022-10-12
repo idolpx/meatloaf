@@ -59,7 +59,7 @@ device_state_t iecDrive::process ( void )
 
     Debug_printf ( "   DEVICE: [%.2d] ", this->data.device );
 
-    //Debug_printv("DEV primary[%.2X] secondary[%.2X] device[%d], channel[%d] command[%s] ", this->data.primary, this->data.secondary, this->data.device, this->data.channel, this->data.device_command.c_str());
+    // Debug_printv("DEV state[%d] primary[%.2X] secondary[%.2X] device[%d], channel[%d] command[%s] ", this->device_state, this->data.primary, this->data.secondary, this->data.device, this->data.channel, this->data.device_command.c_str());
 
     if ( this->data.secondary == IEC_OPEN )
     {
@@ -124,12 +124,12 @@ device_state_t iecDrive::process ( void )
             // Send data
             //Debug_printv ( "[Send data]" );
             handleTalk ( this->data.channel );
-			if ( this->data.channel < 2 )
-			{
-				closeStream();
-				device_state = DEVICE_IDLE;
-				this->data.init(); // Clear device command
-			}
+            if ( this->data.channel < 2 )
+	    {
+		closeStream();
+		device_state = DEVICE_IDLE;
+		this->data.init(); // Clear device command
+            }
         }
         // IEC.protocol.release(PIN_IEC_SRQ);
     }
@@ -270,15 +270,13 @@ void iecDrive::setDeviceStatus(int number, int track, int sector)
 
 MFile* iecDrive::getPointed(MFile* urlFile) {
 	Debug_printv("getPointed [%s]", urlFile->url.c_str());
-	auto istream = Meat::ifstream(urlFile);
+	Meat::iostream istream(urlFile);
 
-	istream.open();
-
-    if( !istream.is_open() ) 
+        if( !istream.is_open() ) 
 	{
-        Debug_printv("couldn't open stream of urlfile");
+        	Debug_printv("couldn't open stream of urlfile");
 		return nullptr;
-    }
+        }
 	else 
 	{
 		std::string linkUrl;
@@ -529,8 +527,7 @@ void iecDrive::handleListenCommand( void )
 		// here we don't want the full path provided by commandAndPath, though
 		// the full syntax should be: heart:urlfilename,[filename] - optional name of the file that should be pointed to
 
-		auto favStream = Meat::ofstream(commandAndPath.rawPath+".url"); // put the name from argument here!
-		favStream.open();
+		Meat::iostream favStream(commandAndPath.rawPath+".url"); // put the name from argument here!
 		if(favStream.is_open()) {
 			favStream << m_mfile->url;
 		}
@@ -926,7 +923,7 @@ bool iecDrive::sendFile()
 	device_config.save();
 
 	// TODO!!!! you should check istream for nullptr here and return error immediately if null
-	// std::shared_ptr<MIStream> istream = std::static_pointer_cast<MIStream>(currentStream);
+	// std::shared_ptr<MStream> istream = std::static_pointer_cast<MStream>(currentStream);
 	auto istream = retrieveStream();
 	if ( istream == nullptr )
 	{
@@ -1108,8 +1105,6 @@ bool iecDrive::saveFile()
 	ba[8] = '\0';
 #endif
 
-	// std::unique_ptr<MOStream> ostream(file->outputStream());
-	// std::shared_ptr<MOStream> ostream = std::static_pointer_cast<MOStream>(currentStream);
 	auto ostream = retrieveStream();
 
     if ( ostream == nullptr ) {
@@ -1137,7 +1132,7 @@ bool iecDrive::saveFile()
 		}
 
 
-		Debug_printv("saveFile: [%s] [$%.4X]\r\n=================================\r\n", ostream->url.c_str(), load_address);
+		Debug_printv("saveFile: [$%.4X]\r\n=================================\r\n", load_address);
 
 		// Recieve bytes until a EOI is detected
 		do
@@ -1162,7 +1157,7 @@ bool iecDrive::saveFile()
 
 			b[0] = IEC.receive();
 			// if(ostream->isText())
-			// 	ostream->putPetscii(b[0]);
+			// 	ostream->putPetsciiAsUtf8(b[0]);
 			// else
 				ostream->write(b, b_len);
 			i++;

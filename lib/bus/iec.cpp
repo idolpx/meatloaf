@@ -105,18 +105,13 @@ bool iecDevice::registerStream (std::ios_base::open_mode mode, std::string m_fil
     std::shared_ptr<MStream> new_stream;
 
     //Debug_printv("m_filename[%s]", m_filename.c_str());
-    if(mode == std::ios_base::in) {
-        new_stream = std::shared_ptr<MIStream>(file->inputStream());
-    }
-    else if(mode == std::ios_base::out) {
-        new_stream = std::shared_ptr<MOStream>(file->outputStream());
-    }
+    new_stream = std::shared_ptr<MStream>(file->meatStream());
 
-	if( !new_stream->isOpen() )
-	{
-		//Debug_printv("Error creating istream");
-		return false;
-	}
+    if( !new_stream->isOpen() )
+    {
+	//Debug_printv("Error creating istream");
+	return false;
+    }
     else
     {
         // Close the stream if it is already open
@@ -237,13 +232,13 @@ bool iecBus::init()
 void iecBus::service ( void )
 {
     bool process_command = false;
+    bool pin_atn = protocol.status ( PIN_IEC_ATN );
 
 #ifdef IEC_HAS_RESET
 
     // Check if CBM is sending a reset (setting the RESET line high). This is typically
     // when the CBM is reset itself. In this case, we are supposed to reset all states to initial.
     bool pin_reset = protocol.status ( PIN_IEC_RESET );
-    bool pin_atn = protocol.status ( PIN_IEC_ATN );
     if ( pin_reset == PULLED )
     {
         if ( pin_atn == PULLED )
@@ -265,6 +260,8 @@ void iecBus::service ( void )
 
 #endif
 
+    if ( this->bus_state == BUS_OFFLINE && pin_atn )
+        pin_atn = false;
 
     // Command or Data Mode
     if ( this->bus_state == BUS_ACTIVE || pin_atn )
@@ -280,8 +277,12 @@ void iecBus::service ( void )
         // Check for error
         if ( c == 0xFFFFFFFF || protocol.flags bitand ERROR )
         {
-            //Debug_printv ( "Error reading command" );
-            this->bus_state = BUS_ERROR;
+            //Debug_printv ( "Error reading command" );            
+            if ( c == 0xFFFFFFFF )
+                this->bus_state = BUS_OFFLINE;
+            else
+
+                this->bus_state = BUS_ERROR;
         }
         else
         {
@@ -388,7 +389,7 @@ void iecBus::service ( void )
         // Debug_printf( "primary[%.2X] secondary[%.2X] bus_state[%d]", this->data.primary, this->data.secondary, this->bus_state );
         // protocol.release ( PIN_IEC_SRQ );
     }
-    else
+    else if ( this->bus_state > BUS_IDLE )
     {
         // If no secondary was set, process primary with defaults
         if ( this->data.primary > IEC_GLOBAL )

@@ -59,6 +59,8 @@ MLFileSystem mlFS;
 IPFSFileSystem ipfsFS;
 TNFSFileSystem tnfsFS;
 CServerFileSystem csFS;
+TcpFileSystem tcpFS;
+
 //WSFileSystem wsFS;
 
 // File
@@ -88,7 +90,7 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
     &p00FS,
     &d64FS, &d71FS, &d80FS, &d81FS, &d82FS, &d8bFS, &dnpFS,
     &t64FS, &tcrtFS,
-    &httpFS, &mlFS, &ipfsFS,
+    &httpFS, &mlFS, &ipfsFS, &tcpFS,
     &tnfsFS
 };
 
@@ -138,6 +140,8 @@ MFile* MFSOwner::File(std::shared_ptr<MFile> file) {
 
 
 MFile* MFSOwner::File(std::string path) {
+    //Debug_printv("in File\n");
+
     if(mstr::startsWith(path,"cs:", false)) {
         //Serial.printf("CServer path found!\n");
         return csFS.getFile(path);
@@ -293,16 +297,13 @@ bool MFile::operator!=(nullptr_t ptr) {
     return m_isNull;
 }
 
-MIStream* MFile::inputStream() {
+MStream* MFile::meatStream() {
     // has to return OPENED stream
-    //Debug_printv("pathInStream[%s] streamFile[%s]", pathInStream.c_str(), streamFile->url.c_str());
-    //std::shared_ptr<MFile> containerFile(MFSOwner::File(streamPath)); // get the base file that knows how to handle this kind of container, i.e 7z
+    std::shared_ptr<MStream> containerStream(streamFile->meatStream()); // get its base stream, i.e. zip raw file contents
+    Debug_printv("containerStream isRandomAccess[%d] isBrowsable[%d]", containerStream->isRandomAccess(), containerStream->isBrowsable());
 
-    std::shared_ptr<MIStream> containerStream(streamFile->inputStream()); // get its base stream, i.e. zip raw file contents
-    //Debug_printv("containerStream isRandomAccess[%d] isBrowsable[%d]", containerStream->isRandomAccess(), containerStream->isBrowsable());
-
-    MIStream* decodedStream(createIStream(containerStream)); // wrap this stream into decoded stream, i.e. unpacked zip files
-    //Debug_printv("decodedStream isRandomAccess[%d] isBrowsable[%d]", decodedStream->isRandomAccess(), decodedStream->isBrowsable());
+    MStream* decodedStream(createIStream(containerStream)); // wrap this stream into decoded stream, i.e. unpacked zip files
+    Debug_printv("decodedStream isRandomAccess[%d] isBrowsable[%d]", decodedStream->isRandomAccess(), decodedStream->isBrowsable());
 
     if(decodedStream->isRandomAccess() && pathInStream != "") {
         bool foundIt = decodedStream->seekPath(this->pathInStream);
@@ -472,30 +473,30 @@ MFile* MFile::cd(std::string newDir) {
     }
 };
 
-bool MFile::copyTo(MFile* dst) {
-    Debug_printv("in copyTo\n");
-    Meat::ifstream istream(this);
-    Meat::ofstream ostream(dst);
+// bool MFile::copyTo(MFile* dst) {
+//     Debug_printv("in copyTo\n");
+//     Meat::iostream istream(this);
+//     Meat::iostream ostream(dst);
 
-    int rc;
+//     int rc;
 
-    Debug_printv("in copyTo, iopen=%d oopen=%d\n", istream.is_open(), ostream.is_open());
+//     Debug_printv("in copyTo, iopen=%d oopen=%d\n", istream.is_open(), ostream.is_open());
 
-    if(!istream.is_open() || !ostream.is_open())
-        return false;
+//     if(!istream.is_open() || !ostream.is_open())
+//         return false;
 
-    Debug_printv("commencing copy\n");
+//     Debug_printv("commencing copy\n");
 
-    while((rc = istream.get())!= EOF) {     
-        ostream.put(rc);
-        if(ostream.bad() || istream.bad())
-            return false;
-    }
+//     while((rc = istream.get())!= EOF) {     
+//         ostream.put(rc);
+//         if(ostream.bad() || istream.bad())
+//             return false;
+//     }
 
-    Debug_printv("copying finished, rc=%d\n", rc);
+//     Debug_printv("copying finished, rc=%d\n", rc);
 
-    return true;
-};
+//     return true;
+// };
 
 uint64_t MFile::getAvailableSpace()
 {
