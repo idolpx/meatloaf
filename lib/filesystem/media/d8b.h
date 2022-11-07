@@ -3,8 +3,8 @@
 // https://github.com/evietron/BackBit-Tool
 //
 
-#ifndef MEATFILESYSTEM_MEDIA_D8B
-#define MEATFILESYSTEM_MEDIA_D8B
+#ifndef MEATLOAF_MEDIA_D8B
+#define MEATLOAF_MEDIA_D8B
 
 #include "meat_io.h"
 #include "d64.h"
@@ -69,4 +69,4 @@ public:
 };
 
 
-#endif /* MEATFILESYSTEM_MEDIA_D8B */
+#endif /* MEATLOAF_MEDIA_D8B */

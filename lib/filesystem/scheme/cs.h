@@ -2,8 +2,8 @@
 // see: https://www.commodoreserver.com/BlogEntryView.asp?EID=9D133160E7C344A398EC1F45AEF4BF32
 //
 
-#ifndef MEATFILESYSTEM_SCHEME_CS
-#define MEATFILESYSTEM_SCHEME_CS
+#ifndef MEATLOAF_SCHEME_CS
+#define MEATLOAF_SCHEME_CS
 
 #include "../../include/global_defines.h"
 #include "../../include/make_unique.h"
@@ -344,4 +344,4 @@ public:
 
 
 
-#endif /* MEATFILESYSTEM_SCHEME_CS */
+#endif /* MEATLOAF_SCHEME_CS */

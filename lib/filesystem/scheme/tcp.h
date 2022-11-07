@@ -1,5 +1,5 @@
-#ifndef MEATFILESYSTEM_SCHEME_TCP
-#define MEATFILESYSTEM_SCHEME_TCP
+#ifndef MEATLOAF_SCHEME_TCP
+#define MEATLOAF_SCHEME_TCP
 
 #include "lwip/sockets.h"
 #include "lwip/netdb.h"
@@ -188,4 +188,4 @@ class MeatSocketServer {
     }
 };
 
-#endif /* MEATFILESYSTEM_SCHEME_TCP */
+#endif /* MEATLOAF_SCHEME_TCP */

@@ -15,8 +15,8 @@
 // You should have received a copy of the GNU General Public License
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
-#ifndef MEATLIB_BUS_IEC
-#define MEATLIB_BUS_IEC
+#ifndef MEATLOAF_BUS_IEC
+#define MEATLOAF_BUS_IEC
 
 #include <forward_list>
 #include <unordered_map>
@@ -228,4 +228,4 @@ class iecBus
 
 extern iecBus IEC;
 
-#endif /* MEATLIB_BUS_IEC */
+#endif // MEATLOAF_BUS_IEC

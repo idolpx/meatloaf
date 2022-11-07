@@ -1,6 +1,6 @@
 
-#ifndef BUS_PARALLEL_H
-#define BUS_PARALLEL_H
+#ifndef MEATLOAF_BUS_PARALLEL
+#define MEATLOAF_BUS_PARALLEL
 
 #include "pcf8575.h"
 
@@ -81,4 +81,4 @@ void wic64_command();
 
 extern parallelBus PARALLEL;
 
-#endif // BUS_PARALLEL_H
+#endif // MEATLOAF_BUS_PARALLEL

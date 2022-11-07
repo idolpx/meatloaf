@@ -50,8 +50,8 @@
 //
 
 
-#ifndef MEATFILE_DEFINES_IPFS_H
-#define MEATFILE_DEFINES_IPFS_H
+#ifndef MEATLOAF_SCHEME_IPFS
+#define MEATLOAF_SCHEME_IPFS
 
 #include "scheme/http.h"
 
@@ -112,4 +112,4 @@ public:
     IPFSFileSystem(): MFileSystem("ipfs") {};
 };
 
-#endif // MEATFILE_DEFINES_IPFS_H
+#endif // MEATLOAF_SCHEME_IPFS

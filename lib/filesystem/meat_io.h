@@ -1,5 +1,5 @@
-#ifndef MEATLIB_FILESYSTEM_MEAT_IO
-#define MEATLIB_FILESYSTEM_MEAT_IO
+#ifndef MEATLOAF_FILESYSTEM_MEAT_IO
+#define MEATLOAF_FILESYSTEM_MEAT_IO
 
 #include <memory>
 #include <string>
@@ -606,4 +606,4 @@ namespace Meat {
     };
 }
 
-#endif /* MEATLIB_FILESYSTEM_MEAT_IO */
+#endif /* MEATLOAF_FILESYSTEM_MEAT_IO */

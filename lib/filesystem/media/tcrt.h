@@ -4,8 +4,8 @@
 // https://github.com/alexkazik/tapecart-browser/blob/master/doc/Tapecart-FileSystem.md
 
 
-#ifndef MEATFILESYSTEM_MEDIA_TCRT
-#define MEATFILESYSTEM_MEDIA_TCRT
+#ifndef MEATLOAF_MEDIA_TCRT
+#define MEATLOAF_MEDIA_TCRT
 
 #include "meat_io.h"
 #include "d64.h"
@@ -125,4 +125,4 @@ public:
 };
 
 
-#endif /* MEATFILESYSTEM_MEDIA_TCRT */
+#endif /* MEATLOAF_MEDIA_TCRT */
