@@ -1,5 +1,5 @@
-#ifndef MEATFILE_STREAMS_H
-#define MEATFILE_STREAMS_H
+#ifndef MEATFILE_STREAM
+#define MEATFILE_STREAM
 
 //#include "../../include/global_defines.h"
 
@@ -74,4 +74,4 @@ public:
 };
 
 
-#endif
+#endif // MEATFILE_STREAM
