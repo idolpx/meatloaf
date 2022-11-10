@@ -10,7 +10,7 @@
 #include "../include/global_defines.h"
 #include "../include/debug.h"
 
-#include "fnFsSd.h"
+#include "fnFsSD.h"
 #include "fnWiFi.h"
 
 #include "ml_tests.h"
