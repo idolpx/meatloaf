@@ -29,6 +29,7 @@
 #endif
 #include "fnFsSD.h"
 
+#define digital_write     fnSystem.digital_write
 
 /**************************/
 // Meatloaf
@@ -104,6 +105,12 @@ void main_setup()
 
     fnKeyManager.setup();
     fnLedManager.setup();
+
+    // Disable Modem Mode / Enable Parallel mode
+    fnSystem.set_pin_mode(PIN_MDMPAR_SW1, gpio_mode_t::GPIO_MODE_OUTPUT);
+    digital_write(PIN_MDMPAR_SW1, DIGI_LOW);
+    fnSystem.set_pin_mode(PIN_MDMPAR_SW2, gpio_mode_t::GPIO_MODE_OUTPUT);
+    digital_write(PIN_MDMPAR_SW2, DIGI_LOW);
 
 #ifdef FLASH_SPIFFS
     fnSPIFFS.start();
