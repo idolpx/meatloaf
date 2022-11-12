@@ -51,11 +51,37 @@ void display_app_main() {
   //xTaskCreatePinnedToCore(&blinkLeds_simple, "blinkLeds", 4000, NULL, 5, NULL, 0);
   //xTaskCreatePinnedToCore(&fastfade, "blinkLeds", 4000, NULL, 5, NULL, 0);
   //xTaskCreatePinnedToCore(&blinkWithFx_allpatterns, "blinkLeds", 4000, NULL, 5, NULL, 0);
-  xTaskCreatePinnedToCore(&blinkWithFx_test, "blinkLeds", 4000, NULL, 5, NULL, 0);
+  //xTaskCreatePinnedToCore(&blinkWithFx_test, "blinkLeds", 4000, NULL, 5, NULL, 0);
   //xTaskCreatePinnedToCore(&blinkLeds_chase, "blinkLeds", 4000, NULL, 5, NULL, 0);
   //xTaskCreatePinnedToCore(&blinkLeds_chase2, "blinkLeds", 4000, NULL, 5, NULL, 0);
+  xTaskCreatePinnedToCore(&larsonfx, "larsonscanner", 4000, NULL, 5, NULL, 0);
 }
 
+/* Larson scanner
+**
+*/
+
+static void larsonfx(void *pvParameters) {
+
+	uint16_t mode = FX_MODE_LARSON_SCANNER;
+
+	WS2812FX ws2812fx;
+  WS2812FX::Segment *segments = ws2812fx.getSegments();
+
+  segments[0].colors[1] = 255U; //blue, white 16777215U??
+  segments[0].colors[0] = 16711680U; //red?
+  segments[0].speed = 255;
+
+	ws2812fx.init(NUM_LEDS, leds1, false); // type was configured before
+	ws2812fx.setBrightness(BRIGHTNESS);
+	ws2812fx.setMode(0 /*segid*/, mode);
+
+  while (true)
+  {
+		ws2812fx.service();
+		vTaskDelay(10 / portTICK_PERIOD_MS); /*10ms*/
+  }
+};
 
 /* test using the FX unit
 **
@@ -68,7 +94,7 @@ static void blinkWithFx_allpatterns(void *pvParameters) {
 	WS2812FX ws2812fx;
 
 	ws2812fx.init(NUM_LEDS, leds1, false); // type was configured before
-	ws2812fx.setBrightness(255);
+	ws2812fx.setBrightness(BRIGHTNESS);
 	ws2812fx.setMode(0 /*segid*/, mode);
 
 
