@@ -100,7 +100,7 @@
 //     if ( loadmode )
 //     {
 //         /* LOAD mode: start marker is data low */
-//         while ( !IEC_DATA ) ; // wait until data actually is high again
+//         while ( !IEC_REOPEN ) ; // wait until data actually is high again
 
 //         llfl_wait_data ( 0, ATNABORT );
 //     }
@@ -131,7 +131,7 @@
 //         /* wait until data is low */
 //         delay_us ( 3 ); // allow for slow rise time
 
-//         while ( IEC_DATA && IEC_ATN ) ;
+//         while ( IEC_REOPEN && IEC_ATN ) ;
 //     }
 
 //     /* hold time */

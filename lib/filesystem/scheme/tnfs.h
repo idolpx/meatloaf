@@ -3,8 +3,8 @@
 // https://github.com/FujiNetWIFI/spectranet/blob/master/tnfs/tnfs-protocol.md
 //
 
-#ifndef MEATFILE_DEFINES_TNFS_H
-#define MEATFILE_DEFINES_TNFS_H
+#ifndef MEATLOAF_SCHEME_TNFS
+#define MEATLOAF_SCHEME_TNFS
 
 #include "meat_io.h"
 
@@ -55,4 +55,4 @@ public:
 };
 
 
-#endif // MEATFILE_DEFINES_TNFS_H
+#endif // MEATLOAF_SCHEME_TNFS

@@ -501,8 +501,8 @@ void runFSTest(std::string dirPath, std::string filePath) {
     testNewCppStreams(filePath);
 
     if(!dirPath.empty() && testDir != nullptr) {
-        testPaths(testDir.get(),"subDir");
         testDirectory(testDir.get());
+        //testPaths(testDir.get(),"subDir");
         //testRecursiveDir(otherFile.get(),""); // fucks upp littleFS?
     }
     else {
@@ -551,6 +551,16 @@ void testBasicConfig() {
 
 }
 
+void testHttpFile() {
+    testHeader("HTTP file test");
+
+    auto test = Meat::New<MFile>("http://c64.meatloaf.cc/roms");
+
+    Debug_printf("Exists: %d\n", test->exists());
+    Debug_printf("Is text: %d\n", test->isText());
+
+}
+
 void testRedirect() {
     testHeader("HTTP fs test");
 
@@ -593,7 +603,7 @@ void runTestsSuite() {
     // working, uncomment if you want
     // runFSTest("/.sys", "README"); // TODO - let urlparser drop the last slash!
     // runFSTest("http://info.cern.ch/hypertext/WWW/TheProject.html","http://info.cern.ch/hypertext/WWW/TheProject.html");
-    //runFSTest("cs:/apps/ski_writer.d64","cs:/apps/ski_writer.d64/EDITOR.HLP");
+    runFSTest("cs:/apps/ski_writer.d64","cs:/apps/ski_writer.d64/EDITOR.HLP");
     
     // not working yet, DO NOT UNCOMMENT!!!
     //runFSTest("http://somneserver.com/utilities/disk tools/cie.dnp/subdir/CIE+SERIAL","");    
@@ -649,7 +659,8 @@ void runTestsSuite() {
     // m_device.select(30);
     // Debug_println(m_device.path().c_str());
 
-    testRedirect();
+    //testRedirect();
+    testHttpFile();
 
     Debug_println("*** All tests finished ***");
 }

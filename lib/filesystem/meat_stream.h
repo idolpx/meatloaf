@@ -1,5 +1,5 @@
-#ifndef MEATFILE_STREAMS_H
-#define MEATFILE_STREAMS_H
+#ifndef MEATFILE_STREAM
+#define MEATFILE_STREAM
 
 //#include "../../include/global_defines.h"
 
@@ -35,21 +35,27 @@ public:
     virtual void close() = 0;
     virtual bool open() = 0;
 
+    virtual size_t write(const uint8_t *buf, size_t size) = 0;
+    virtual size_t read(uint8_t* buf, size_t size) = 0;
+
     virtual bool isOpen() = 0;
 
     bool isDir = false;
     bool isText = false;
+    std::string url = "";
 };
 
 class MOStream: public MStream {
 public:
     virtual size_t write(const uint8_t *buf, size_t size) = 0;
+    size_t read(uint8_t* buf, size_t size) override { return 0; };
 };
 
 
 class MIStream: public MStream {
 public:
     virtual size_t read(uint8_t* buf, size_t size) = 0;
+    size_t write(const uint8_t *buf, size_t size) override { return 0; };
 
     // For files with a browsable random access directory structure
     // d64, d74, d81, dnp, etc.
@@ -68,4 +74,4 @@ public:
 };
 
 
-#endif
+#endif // MEATFILE_STREAM

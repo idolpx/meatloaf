@@ -2,8 +2,8 @@
 // 
 
 
-#ifndef MEATFILE_DEFINES_FSML_H
-#define MEATFILE_DEFINES_FSML_H
+#ifndef MEATLOAF_SCHEME_ML
+#define MEATLOAF_SCHEME_ML
 
 #include "scheme/http.h"
 
@@ -52,6 +52,7 @@ class MLFileSystem: public MFileSystem
         urlParser.parseUrl(path);
 
         std::string ml_url = "https://api.meatloaf.cc/?" + urlParser.name;
+        Debug_printv("ml_url[%s]", ml_url.c_str());
         
         Debug_printv("url[%s]", ml_url.c_str());
 
@@ -68,4 +69,4 @@ public:
 };
 
 
-#endif
+#endif // MEATLOAF_SCHEME_ML

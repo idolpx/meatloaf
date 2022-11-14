@@ -38,6 +38,8 @@ void display_app_main() {
   FastLED.addLeds<LED_TYPE, DATA_PIN_1>(leds1, NUM_LEDS);
   //FastLED.addLeds<LED_TYPE, DATA_PIN_2>(leds2, NUM_LEDS);
 
+  FastLED.showColor(BLACK);
+
   // this is a good test because it uses the GPIO ports, these are 4 wire not 3 wire
   //FastLED.addLeds<APA102, 13, 15>(leds, NUM_LEDS);
 

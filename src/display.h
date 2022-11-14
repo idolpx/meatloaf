@@ -1,3 +1,7 @@
+//
+// https://github.com/Aircoookie/WLED
+//
+
 
 #ifndef MEATLOAF_DISPLAY_H
 #define MEATLOAF_DISPLAY_H
@@ -5,15 +9,14 @@
 #include "FastLED.h"
 #include "FX.h"
 
-#include "pinmap.h"
-/*
-#define NUM_LEDS 5
-#define DATA_PIN_1 27 
-#define DATA_PIN_2 14
-#define BRIGHTNESS  25
-#define LED_TYPE    WS2811
-#define COLOR_ORDER RGB
-*/
+#include "../include/pinmap.h"
+// #define NUM_LEDS 5
+// #define DATA_PIN_1 27 
+// #define DATA_PIN_2 14
+// #define BRIGHTNESS  25
+// #define LED_TYPE    WS2811
+// #define COLOR_ORDER RGB
+
 
 
 #define N_COLORS 17

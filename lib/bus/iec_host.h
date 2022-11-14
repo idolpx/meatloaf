@@ -15,8 +15,8 @@
 // You should have received a copy of the GNU General Public License
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
-#ifndef IECHOST_H
-#define IECHOST_H
+#ifndef MEATLOAF_BUS_IECHOST
+#define MEATLOAF_BUS_IECHOST
 
 //#include <Arduino.h>
 

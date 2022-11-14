@@ -50,8 +50,8 @@
 //
 
 
-#ifndef MEATFILE_DEFINES_IPFS_H
-#define MEATFILE_DEFINES_IPFS_H
+#ifndef MEATLOAF_SCHEME_IPFS
+#define MEATLOAF_SCHEME_IPFS
 
 #include "scheme/http.h"
 
@@ -69,6 +69,7 @@ public:
         //this->url = "https://dweb.link/ipfs/" + this->host + "/" + this->path;
         this->url = "https://ipfs.io/ipfs/" + this->host + "/" + this->path;
         parseUrl(this->url);
+        Debug_printv("url[%s]", this->url.c_str());
     };
     ~IPFSFile() {};
 
@@ -111,4 +112,4 @@ public:
     IPFSFileSystem(): MFileSystem("ipfs") {};
 };
 
-#endif // MEATFILE_DEFINES_IPFS_H
+#endif // MEATLOAF_SCHEME_IPFS

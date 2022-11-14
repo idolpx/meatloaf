@@ -3,8 +3,8 @@
 // https://en.wikipedia.org/wiki/WebSocket
 //
 
-#ifndef MEATFILESYSTEM_SCHEME_WS
-#define MEATFILESYSTEM_SCHEME_WS
+#ifndef MEATLOAF_SCHEME_WS
+#define MEATLOAF_SCHEME_WS
 
 #include "meat_io.h"
 #include "../../include/global_defines.h"
@@ -177,4 +177,4 @@ public:
 
 
 
-#endif /* MEATFILESYSTEM_SCHEME_WS */
+#endif /* MEATLOAF_SCHEME_WS */

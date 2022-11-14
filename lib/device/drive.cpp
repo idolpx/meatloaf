@@ -29,7 +29,7 @@
 
 #include "wrappers/iec_buffer.h"
 
-iecDrive disk;
+iecDrive drive;
 
 using namespace CBM;
 using namespace Protocol;
@@ -51,10 +51,110 @@ void iecDrive::reset ( void )
 } // reset
 
 
+
+device_state_t iecDrive::process ( void )
+{
+    // IEC.protocol.pull ( PIN_IEC_SRQ );
+    // Debug_printf ( "bus_state[%d]", IEC.bus_state );
+
+    Debug_printf ( "   DEVICE: [%.2d] ", this->data.device );
+
+    //Debug_printv("DEV primary[%.2X] secondary[%.2X] device[%d], channel[%d] command[%s] ", this->data.primary, this->data.secondary, this->data.device, this->data.channel, this->data.device_command.c_str());
+
+    if ( this->data.secondary == IEC_OPEN )
+    {
+		// Open either file or prg for reading, writing or single line command on the command channel.
+		handleListenCommand();
+		if ( m_filename.size() == 0 )
+		{
+			//Debug_printv("No file set");
+			return DEVICE_LISTEN;
+		}
+
+        Debug_printf ( "OPEN CHANNEL %d\r\n", this->data.channel );
+
+        bool isOpen = false;
+
+        if ( this->data.channel == 0 ) {
+            Debug_printf ( "LOAD \"%s\",%d\r\n", this->data.device_command.c_str(), this->data.device );
+            isOpen = registerStream(std::ios_base::in, m_filename);
+        }
+        else if ( IEC.data.channel == 1 ) {
+            Debug_printf ( "SAVE \"%s\",%d\r\n", this->data.device_command.c_str(), this->data.device );
+            isOpen = registerStream(std::ios_base::out, m_filename);
+        }
+        else
+        {
+            Debug_printf ( "OPEN #,%d,%d,\"%s\"\r\n", this->data.device, this->data.channel, this->data.device_command.c_str() );
+            // here we have to decide if we read, write or r/w the file, but for time being, we'll be just reading, so:
+            isOpen = registerStream(std::ios_base::in, m_filename);
+        }
+
+        // Open Named Channel
+        if(isOpen) 
+		{
+            currentStream = retrieveStream();
+			if( currentStream ) 
+			{
+				device_config.save();
+			}
+        }
+    }
+    else if ( this->data.secondary == IEC_REOPEN )
+    {
+
+        // Open either file or prg for reading, writing or single line command on the command channel.
+        if ( this->data.channel == CMD_CHANNEL )
+		{
+			handleListenCommand(); 			
+		}
+
+        // IEC.protocol.pull(PIN_IEC_SRQ);
+        if ( this->device_state == DEVICE_LISTEN )
+        {
+            if ( this->data.channel != CMD_CHANNEL )
+            {
+                // Receive data
+                //Debug_printv ( "[Receive data]" );
+                handleListenData();
+            }
+        }
+        else if ( this->device_state == DEVICE_TALK )
+        {
+            // Send data
+            Debug_printv ( "[Send data]" );
+            handleTalk ( this->data.channel );
+			if ( this->data.channel < 2 || this->data.channel == CMD_CHANNEL )
+			{
+				closeStream();
+				this->device_state = DEVICE_IDLE;
+				this->data.init(); // Clear device command
+			}
+        }
+        // IEC.protocol.release(PIN_IEC_SRQ);
+    }
+    else if ( this->data.secondary == IEC_CLOSE )
+    {
+        Debug_printf ( "CLOSE CHANNEL %d\r\n", this->data.channel );
+
+        closeStream();
+        this->device_state = DEVICE_IDLE;
+        this->data.init(); // Clear device command        
+    }
+
+    //Debug_printf("DEV device[%d] channel[%d] state[%d] command[%s]", this->data.device, this->data.channel, m_openState, this->data.device_command.c_str());
+    // IEC.protocol.release ( PIN_IEC_SRQ );
+
+    return this->device_state;
+} // process
+
+
 void iecDrive::sendFileNotFound(void)
 {
+	Debug_println("FILE NOT FOUND!");
 	setDeviceStatus(62);
- 	IEC.sendFNF();
+	this->device_state = DEVICE_ERROR;
+ 	IEC.senderTimeout();
 }
 
 void iecDrive::sendStatus(void)
@@ -64,24 +164,13 @@ void iecDrive::sendStatus(void)
 		status = "00, OK,00,00";
 
 	//Debug_printv("status: {%s}", status.c_str());
-	//Debug_print("[");
 
- 	size_t bytes_sent = IEC.send(status, currentChannel.cursor);
-	Debug_printv("len[%d] bytes_sent[%d]", status.length(), bytes_sent);
-	if ( bytes_sent == status.length() )
-	{
-		m_device_status.clear();
-	}
-	else
-	{
-		channelUpdate(bytes_sent);
-	}
-	
-	//Debug_println(BACKSPACE "]");
-
+ 	size_t bytes_sent = IEC.send(status, 0);
+	//Debug_printv("len[%d] bytes_sent[%d]", status.length(), bytes_sent);
 	Debug_printf("\r\n{%s}\r\n", status.substr(0, bytes_sent).c_str());
 
-	// Clear the status message
+	// Clear the status
+	m_device_status.clear();
 } // sendStatus
 
 void iecDrive::setDeviceStatus(int number, int track, int sector)
@@ -174,6 +263,7 @@ void iecDrive::setDeviceStatus(int number, int track, int sector)
 			m_device_status = "126,NODE NOT FOUND,00,00";
 			break;
 	}
+	//Debug_printv("status[%s]", m_device_status.c_str());
 }
 
 
@@ -206,6 +296,13 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 
 	// Debug_printv("we are in              [%s]", m_mfile->url.c_str());
 	// Debug_printv("unprocessed user input [%s]", command.c_str());
+
+	// Chop off type, mode
+	if ( mstr::contains(command, ",") )
+	{
+		int pos = command.find(",");
+		command = command.substr(0, pos);
+	}
 
 	if (mstr::startsWith(command, "*"))
 	{
@@ -243,8 +340,8 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 	CommandPathTuple tuple;
 
 
-	if ( this->data.primary == IEC_TALK || this->data.channel == CMD_CHANNEL )
-	{
+	// if ( this->data.primary == IEC_LISTEN || this->data.channel == CMD_CHANNEL )
+	// {
 		mstr::toASCII(guessedPath);
 
 		// check to see if it starts with a known command token
@@ -257,7 +354,7 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 			//else if ( channel != 15 )
 			//	guessedPath = command;
 
-			Debug_printv("guessedPath[%s]", guessedPath.c_str());
+			//Debug_printv("guessedPath[%s]", guessedPath.c_str());
 		}
 		else if(mstr::startsWith(command, "@info", false))
 		{
@@ -284,6 +381,12 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 			guessedPath = mstr::drop(guessedPath, 5);
 			tuple.command = "mfav";
 		}
+		else if( this->data.channel == CMD_CHANNEL )
+		{
+			// Clear the command as if it was processed
+			guessedPath = "";
+			tuple.command = "";
+		}
 		else
 		{
 			tuple.command = command;
@@ -301,8 +404,8 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 		mstr::rtrim(guessedPath);
 		tuple.rawPath = guessedPath;
 
-		// Debug_printv("found command     [%s]", tuple.command.c_str());
-		// Debug_printv("command[%s] raw[%s] full[%s]", tuple.command.c_str(), tuple.rawPath.c_str(), tuple.fullPath.c_str());
+		//Debug_printv("found command     [%s]", tuple.command.c_str());
+		//Debug_printv("command[%s] raw[%s] full[%s]", tuple.command.c_str(), tuple.rawPath.c_str(), tuple.fullPath.c_str());
 
 		if(guessedPath == "$")
 		{
@@ -316,13 +419,14 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 
 			//Debug_printv("full referenced path [%s]", tuple.fullPath.c_str());
 		}
-	}
-	else
-	{
-		tuple.command = command;
-		tuple.rawPath = m_mfile->url;
-		tuple.fullPath = m_mfile->url;
-	}
+	// }
+	// else
+	// {
+	// 	Debug_printv("command[%s] url[%s]", command.c_str(), m_mfile->url.c_str());
+	// 	tuple.command = command;
+	// 	tuple.rawPath = command;
+	// 	tuple.fullPath = m_mfile->url;
+	// }
 
 	//Debug_printv("* END OF PARSE LINE *******************************");
 
@@ -344,6 +448,7 @@ void iecDrive::changeDir(std::string url)
 	if ( this->data.channel == 0 )
 	{
 		m_openState = O_DIR;
+		m_filename = "";
 		//Debug_printv("!!!! CD into [%s]", url.c_str());
 		//Debug_printv("new current url: [%s]", m_mfile->url.c_str());
 		//Debug_printv("LOAD $");		
@@ -376,7 +481,7 @@ void iecDrive::handleListenCommand( void )
 
 	if (this->data.device_command.length() == 0 )
 	{
-		// Debug_printv("No command to process");
+		//Debug_printv("No command to process");
 
 		if ( this->data.channel == CMD_CHANNEL )
 			m_openState = O_STATUS;
@@ -384,21 +489,23 @@ void iecDrive::handleListenCommand( void )
 	}
 
 	// Parse DOS Command
-	// Debug_printv("Parse DOS Command [%s]", this->data.device_command.c_str());
+	//Debug_printv("Parse DOS Command [%s]", this->data.device_command.c_str());
 
 	// Execute DOS Command
 	if ( this->data.channel == CMD_CHANNEL )
 	{
-		// Debug_printv("Execute DOS Command [%s]", this->data.device_command.c_str());
+		//Debug_printv("Execute DOS Command [%s]", this->data.device_command.c_str());
 	}
 
 
 	// 1. obtain command and fullPath
 	auto commandAndPath = parseLine(this->data.device_command, channel);
+	//Debug_printv("command[%s] path[%s]", commandAndPath.command.c_str(), commandAndPath.fullPath.c_str());	
 	auto referencedPath = Meat::New<MFile>(commandAndPath.fullPath);
 
 	if ( referencedPath == nullptr )
 	{
+		Debug_printv("fnf");
 		sendFileNotFound();
 		return;
 	}
@@ -407,6 +514,7 @@ void iecDrive::handleListenCommand( void )
 	if (mstr::startsWith(commandAndPath.command, "$"))
 	{
 		m_openState = O_DIR;
+		m_filename = "";
 	}
 	else if (mstr::equals(commandAndPath.command, (char*)"@info", false))
 	{
@@ -460,13 +568,13 @@ void iecDrive::handleListenCommand( void )
 		}
 	}
 
-	//dumpState();
+	// dumpState();
 } // handleListenCommand
 
 
 void iecDrive::handleListenData()
 {
-	Debug_printv("[%s]", device_config.url().c_str());
+	//Debug_printv("[%s]", device_config.url().c_str());
 
 	saveFile();
 } // handleListenData
@@ -522,8 +630,8 @@ uint16_t iecDrive::sendLine(uint16_t &basicPtr, uint16_t blocks, const char *for
 	if ( IEC.bus_state == BUS_ERROR )
 	{
 		// Save file pointer position
-		//channelUpdate(basicPtr);
-		setDeviceStatus(74);
+		//streamUpdate(basicPtr);
+		//setDeviceStatus(74);
 		return 0;
 	}
 
@@ -546,8 +654,8 @@ uint16_t iecDrive::sendLine(uint16_t &basicPtr, uint16_t blocks, char *text)
 	if ( IEC.bus_state == BUS_ERROR )
 	{
 		// Save file pointer position
-		// channelUpdate(basicPtr);
-		setDeviceStatus(74);
+		// streamUpdate(basicPtr);
+		//setDeviceStatus(74);
 		return 0;
 	}
 
@@ -670,6 +778,7 @@ void iecDrive::sendListing()
 	std::unique_ptr<MFile> entry(m_mfile->getNextFileInDir());
 
 	if(entry == nullptr) {
+		Debug_printv("fnf");
 		sendFileNotFound();
 		return;
 	}
@@ -748,8 +857,8 @@ void iecDrive::sendListing()
 			if ( IEC.bus_state == BUS_ERROR )
 			{
 				// Save file pointer position
-				// channelUpdate(byte_count);
-				setDeviceStatus(74);
+				// streamUpdate(byte_count);
+				//setDeviceStatus(74);
 				return;
 			}
 
@@ -798,7 +907,7 @@ uint16_t iecDrive::sendFooter(uint16_t &basicPtr)
 }
 
 
-void iecDrive::sendFile()
+bool iecDrive::sendFile()
 {
 	size_t i = 0;
 	bool success = true;
@@ -816,93 +925,58 @@ void iecDrive::sendFile()
 	// Update device database
 	device_config.save();
 
-	std::unique_ptr<MFile> file(MFSOwner::File(m_filename));
-
-	if(!file->exists())
-	{
-		Debug_printv("File Not Found! [%s]", file->name.c_str());
-		sendFileNotFound();
-		return;
-	}
-	Debug_printv("Sending File [%s]", file->name.c_str());
-
-
 	// TODO!!!! you should check istream for nullptr here and return error immediately if null
-
-
-	if
-	(
-		mstr::equals(file->extension, (char*)"txt", false) ||
-		mstr::equals(file->extension, (char*)"htm", false) ||
-		mstr::equals(file->extension, (char*)"html", false)
-	)
+	// std::shared_ptr<MIStream> istream = std::static_pointer_cast<MIStream>(currentStream);
+	auto istream = retrieveStream();
+	if ( istream == nullptr )
 	{
-		// convert UTF8 files on the fly
-
-		Debug_printv("Sending a text file to C64 [%s]", file->url.c_str());
-        //std::unique_ptr<LinedReader> reader(new LinedReader(istream.get()));
-		auto istream = Meat::ifstream(file.get());
-		auto ostream = oiecstream();
-
-
-		istream.open();
-		ostream.open(&IEC);
-
-
-		if(!istream.is_open()) {
-			sendFileNotFound();
-			return;
-		}
-
-		// Position file pointer
-		//istream->seek(currentChannel.cursor);
-
-		//we can skip the BOM here, EF BB BF for UTF8
-		auto b = (char)istream.get();
-		if(b != 0xef)
-			ostream.put(b);
-		else {
-			b = istream.get();
-			if(b != 0xbb)
-				ostream.put(b);
-			else {
-				b = istream.get();
-				if(b != 0xbf)
-					ostream.put(b); // not BOM
-			}
-		}
-
-		while(!istream.eof()) {
-			auto cp = istream.getUtf8();
-
-			ostream.putUtf8(&cp);
-
-			if(ostream.bad() || istream.bad()) {
-				Debug_printv("Error sending");
-                setDeviceStatus(60); // write error
-				break;
-            }
-		}
-		ostream.close();
-		istream.close();
+		//Debug_printv("Stream not found!");
+		sendFileNotFound();
+		return false;
 	}
-	else
+
+	size_t len = istream->size();
+	size_t avail = istream->available();
+
+	// if ( istream.isText() )
+	// {
+	// 	// convert UTF8 files on the fly
+
+	// 	Debug_printv("Sending a text file to C64 [%s]", file->url.c_str());
+
+	// 	//we can skip the BOM here, EF BB BF for UTF8
+	// 	auto b = (char)istream.get();
+	// 	if(b != 0xef)
+	// 		ostream.put(b);
+	// 	else {
+	// 		b = istream.get();
+	// 		if(b != 0xbb)
+	// 			ostream.put(b);
+	// 		else {
+	// 			b = istream.get();
+	// 			if(b != 0xbf)
+	// 				ostream.put(b); // not BOM
+	// 		}
+	// 	}
+
+	// 	while(!istream.eof()) {
+	// 		auto cp = istream.getUtf8();
+
+	// 		ostream.putUtf8(&cp);
+
+	// 		if(ostream.bad() || istream.bad()) {
+	// 			Debug_printv("Error sending");
+    //             setDeviceStatus(60); // write error
+	// 			break;
+    //         }
+	// 	}
+	// }
+	// else
 	{
-		std::unique_ptr<MIStream> istream(file->inputStream());
 
-		if( istream == nullptr )
-		{
-			Debug_printv("Error creating istream");
-			sendFileNotFound();
-			return;
-		}
-		Debug_printv("istream created! length[%d] avail[%d]", istream->size(), istream->available());
 
-		// Position file pointer
-		i = currentChannel.cursor;
-		istream->seek(i);
 
-		if( IEC.data.channel == 0 )
+		if( this->data.channel == 0 )
 		{
 			// Get/Send file load address
 			i = 2;
@@ -918,15 +992,14 @@ void iecDrive::sendFile()
 			// Get SYSLINE
 		}
 
-		size_t len = istream->size();
-		size_t avail = istream->available();
-
-		//Debug_printv("len[%d] avail[%d] cursor[%d] success[%d]", len, avail, currentChannel.cursor, success);
-
-		Debug_printf("sendFile: [%s] [$%.4X] (%d bytes)\r\n=================================\r\n", file->url.c_str(), load_address, len);
-		while( i < len && success )
+		Debug_printf("sendFile: [$%.4X]\r\n=================================\r\n", load_address);
+		while( avail && success )
 		{
+			// Read Byte
 			success = istream->read(&b, 1);
+			if ( !success )
+				Debug_printv("fail");
+
 			// Debug_printv("b[%02X] success[%d]", b, success);
 			if (success)
 			{
@@ -937,13 +1010,19 @@ void iecDrive::sendFile()
 					load_address += 8;
 				}
 #endif
-				if ( ++i == len )
+				// Send Byte
+				if ( avail == 1 )
 				{
 					success = IEC.sendEOI(b); // indicate end of file.
+					if ( !success )
+						Debug_printv("fail");
+					//Debug_printf("eoi sent, i[%d] len[%d] success[%d]", i, len, success );
 				}
 				else
 				{
 					success = IEC.send(b);
+					if ( !success )
+						Debug_printv("fail");					
 				}
 
 #ifdef DATA_STREAM
@@ -968,10 +1047,11 @@ void iecDrive::sendFile()
 			// Exit if ATN is PULLED while sending
 			if ( IEC.protocol.flags bitand ATN_PULLED )
 			{
-				Debug_printv("ATN pulled while sending. i[%d]", i);
+				//Debug_printv("ATN pulled while sending. i[%d]", i);
 				// Save file pointer position
-				channelUpdate( --i );
-				setDeviceStatus( 74 );
+				// streamUpdate( istream );
+				istream->seek(istream->position() - 1);
+				//setDeviceStatus( 74 );
 				success = true;
 				break;
 			}
@@ -983,14 +1063,15 @@ void iecDrive::sendFile()
 			}
 
 			avail = istream->available();
+			// We got another chunk, update length
 			if ( avail > (len - i) )
 			{
 				len += (avail - (len - i));
 			}
-			//i++;
+
+			i++;
 		}
-		istream->close();
-		Debug_printf("\r\n=================================\r\n%d of %d bytes sent [SYS%d]\r\n", i, len, sys_address);
+		Debug_printf("\r\n=================================\r\n%d bytes sent of %d [SYS%d]\r\n", i, avail, sys_address);
 
 		//Debug_printv("len[%d] avail[%d] success[%d]", len, avail, success);		
 	}
@@ -1002,14 +1083,17 @@ void iecDrive::sendFile()
 	{
 		Debug_println("sendFile: Transfer aborted!");
 		// TODO: Send something to signal that there was an error to the C64
-	 	IEC.sendEOI(0);
+	 	// IEC.sendEOI(0);
 	}
+
+	return success;
 } // sendFile
 
 
-void iecDrive::saveFile()
+bool iecDrive::saveFile()
 {
 	size_t i = 0;
+	bool success = true;
 	bool done = false;
 
 	size_t bi = 0;
@@ -1024,38 +1108,26 @@ void iecDrive::saveFile()
 	ba[8] = '\0';
 #endif
 
-	// mstr::toASCII(m_filename);
-	std::unique_ptr<MFile> file(MFSOwner::File(m_filename));
-	Debug_printv("[%s]", file->url.c_str());
+	// std::unique_ptr<MOStream> ostream(file->outputStream());
+	// std::shared_ptr<MOStream> ostream = std::static_pointer_cast<MOStream>(currentStream);
+	auto ostream = retrieveStream();
 
-	// create folder /sd/.save/MD5{file->streamFile}/file->name
-
-	if(file == nullptr)
-	{
-	    Debug_printv("can't create file [%s]", m_filename.c_str());
-		// TODO: Set status and sendFNF
-		sendFileNotFound();
-        return;	
-	}
-
-
-	std::unique_ptr<MOStream> ostream(file->outputStream());
-    if(!ostream->isOpen()) {
+    if ( ostream == nullptr ) {
         Debug_printv("couldn't open a stream for writing");
-		// TODO: Set status and sendFNF
 		sendFileNotFound();
-        return;
+        return false;
     }
     else
 	{
 	 	// Stream is open!  Let's save this!
 
-		if ( currentChannel.cursor > 0 )
-		{
-			// Position file pointer
-			ostream->seek(currentChannel.cursor);
-		}
-		else
+		// wait - what??? If stream position == x you don't have to seek(x)!!!
+		// if ( ostream->position() > 0 )
+		// {
+		// 	// // Position file pointer
+		// 	// ostream->seek(currentStream.cursor);
+		// }
+		// else
 		{
 			// Get file load address
 			ll[0] = IEC.receive();
@@ -1065,7 +1137,7 @@ void iecDrive::saveFile()
 		}
 
 
-		Debug_printv("saveFile: [%s] [$%.4X]\r\n=================================\r\n", file->url.c_str(), load_address);
+		Debug_printf("saveFile: [%s] [$%.4X]\r\n=================================\r\n", ostream->url.c_str(), load_address);
 
 		// Recieve bytes until a EOI is detected
 		do
@@ -1083,13 +1155,16 @@ void iecDrive::saveFile()
 #ifdef DATA_STREAM
 			if (bi == 0)
 			{
-				Debug_printv(":%.4X ", load_address);
+				Debug_printf(":%.4X ", load_address);
 				load_address += 8;
 			}
 #endif
 
 			b[0] = IEC.receive();
-			ostream->write(b, b_len);
+			// if(ostream->isText())
+			// 	ostream->putPetscii(b[0]);
+			// else
+				ostream->write(b, b_len);
 			i++;
 
 			uint8_t f = IEC.protocol.flags;
@@ -1099,7 +1174,7 @@ void iecDrive::saveFile()
 			if ( f bitand ATN_PULLED )
 			{
 				// Save file pointer position
-				channelUpdate(ostream->position());
+				// streamUpdate(ostream->position());
 				//setDeviceStatus(74);
 				break;
 			}
@@ -1113,7 +1188,7 @@ void iecDrive::saveFile()
 
 			if(bi == 8)
 			{
-				Debug_printv(" %s (%d)\r\n", ba, i);
+				Debug_printf(" %s (%d)\r\n", ba, i);
 				bi = 0;
 			}
 #endif
@@ -1124,12 +1199,14 @@ void iecDrive::saveFile()
 			}
 		} while (not done);
     }
-    ostream->close(); // nor required, closes automagically
+    // ostream->close(); // nor required, closes automagically
 
-	Debug_printv("=================================\r\n%d bytes saved\r\n", i);
+	Debug_printf("=================================\r\n%d bytes saved\r\n", i);
 	fnLedManager.set(eLed::LED_BUS, true);
 
 	// TODO: Handle errorFlag
+
+	return success;
 } // saveFile
 
 
@@ -1140,8 +1217,6 @@ void iecDrive::dumpState()
 	Debug_println("");
 	Debug_printv("device_config -----------------");
 	Debug_printv("Device ID: [%d]", device_config.id());
-	Debug_printv("Media ID: [%d]", device_config.media());
-	Debug_printv("Partition ID: [%d]", device_config.partition());
 	Debug_printv("URL: [%s]", device_config.url().c_str());
 	Debug_printv("Base Path: [%s]", device_config.basepath().c_str());
 	Debug_printv("Path: [%s]", device_config.path().c_str());

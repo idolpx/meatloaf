@@ -80,133 +80,68 @@ device_state_t iecDevice::queue_command ( void )
 }
 
 
-bool iecDevice::process ( void )
+std::shared_ptr<MStream> iecDevice::retrieveStream ( void )
 {
-    // IEC.protocol.pull ( PIN_IEC_SRQ );
-    // Debug_printf ( "bus_state[%d]", IEC.bus_state );
+    size_t key = ( this->data.device * 100 ) + this->data.channel;
 
-    Debug_printf ( "DEVICE: [%.2d] ", this->data.device );
-
-    // Debug_printf("DEV primary[%.2X] secondary[%.2X] device[%d], channel[%d] command[%s] ", this->data.primary, this->data.secondary, this->data.device, this->data.channel, this->data.device_command.c_str());
-
-    if ( this->data.secondary == IEC_OPEN )
+    if ( streams.find ( key ) != streams.end() )
     {
-        Debug_printf ( "OPEN CHANNEL %d\r\n", this->data.channel );
-
-        if ( this->data.channel == 0 )
-            Debug_printf ( "LOAD \"%s\",%d\r\n", this->data.device_command.c_str(), this->data.device );
-        else if ( IEC.data.channel == 1 )
-            Debug_printf ( "SAVE \"%s\",%d\r\n", this->data.device_command.c_str(), this->data.device );
-        else
-        {
-            Debug_printf ( "OPEN #,%d,%d,\"%s\"\r\n", this->data.device, this->data.channel, this->data.device_command.c_str() );
-        }
-
-        // Open Named Channel
-        handleOpen();
-
-        // Open either file or prg for reading, writing or single line command on the command channel.
-        handleListenCommand();        
+        //Debug_printv("Stream retrieved. key[%d]", key);
+        return streams.at ( key );
     }
-    else if ( this->data.secondary == IEC_DATA )
+    else
     {
-
-        // Open either file or prg for reading, writing or single line command on the command channel.
-        handleListenCommand(); 
-
-        // IEC.protocol.pull(PIN_IEC_SRQ);
-        if ( device_state == DEVICE_LISTEN )
-        {
-            if ( this->data.channel != CMD_CHANNEL )
-            {
-                // Receive data
-                // Debug_printf ( "[Receive data]" );
-                handleListenData();
-            }
-        }
-        else if ( device_state == DEVICE_TALK )
-        {
-            // Send data
-            // Debug_printf ( "[Send data]" );
-            handleTalk ( this->data.channel );
-        }
-        // IEC.protocol.release(PIN_IEC_SRQ);
+		//Debug_printv("Error! Trying to recall not-registered stream!");
+        return nullptr;
     }
-    else if ( this->data.secondary == IEC_CLOSE )
-    {
-        Debug_printf ( "CLOSE CHANNEL %d\r\n", this->data.channel );
+}
 
-        handleClose();
-        device_state = DEVICE_IDLE;
-        this->data.init(); // Clear device command        
+// used to start working with a stream, registering it as underlying stream of some
+// IEC channel on some IEC device
+bool iecDevice::registerStream (std::ios_base::open_mode mode, std::string m_filename)
+{
+    //Debug_printv("m_filename[%s]", m_filename.c_str());
+    auto file = Meat::New<MFile>(m_filename);
+    std::shared_ptr<MStream> new_stream;
+
+    //Debug_printv("m_filename[%s]", m_filename.c_str());
+    if(mode == std::ios_base::in) {
+        new_stream = std::shared_ptr<MIStream>(file->inputStream());
+    }
+    else if(mode == std::ios_base::out) {
+        new_stream = std::shared_ptr<MOStream>(file->outputStream());
     }
 
-    //Debug_printf("DEV device[%d] channel[%d] state[%d] command[%s]", this->data.device, this->data.channel, m_openState, this->data.device_command.c_str());
-    // IEC.protocol.release ( PIN_IEC_SRQ );
-
-    return true;
-} // service
-
-void iecDevice::handleOpen( void )
-{
-	// Debug_printf("OPEN Named Channel (%.2d Device) (%.2d Channel)", this->data.device, this->data.channel);
-	currentChannel = channelSelect();
-    currentChannel.cursor = 0;
-    // Debug_printf("cursor[%d]", currentChannel.cursor);
-} // handleOpen
-
-
-void iecDevice::handleClose( void )
-{
-	// Debug_printf("CLOSE Named Channel (%.2d Device) (%.2d Channel)", this->data.device, this->data.channel);
-
-	// If writing update BAM & Directory
-	if (currentChannel.writing) {
-
+	if( !new_stream->isOpen() )
+	{
+		//Debug_printv("Error creating istream");
+		return false;
 	}
-
-	// Remove channel from map
-	channelClose();
-
-} // handleClose
-
-Channel iecDevice::channelSelect ( void )
-{
-    size_t key = ( this->data.device * 100 ) + this->data.channel;
-
-    if ( channels.find ( key ) != channels.end() )
+    else
     {
-        // Debug_printf("key[%d]", key);
-        return channels.at ( key );
+        // Close the stream if it is already open
+        closeStream();
     }
 
-    // create and add channel if not found
-    auto newChannel = Channel();
-    newChannel.url = this->data.device_command;
-    newChannel.cursor = 1;
-    newChannel.writing = false;
-    // Debug_printf ( "CHANNEL device[%d] channel[%d] url[%s]", this->data.device, this->data.channel, this->data.device_command.c_str() );
+    size_t key = ( this->data.device * 100 ) + this->data.channel;
+    auto newPair = std::make_pair ( key, new_stream );
+    streams.insert ( newPair );
 
-    channels.insert ( std::make_pair ( key, newChannel ) );
-    return newChannel;
+    //Debug_printv("Stream created. key[%d]", key);
+    return true;
 }
 
-void iecDevice::channelUpdate ( size_t cursor )
-{
-    currentChannel.cursor = cursor;
-    size_t key = ( this->data.device * 100 ) + this->data.channel;
-    channels[key].cursor = cursor;
-    // Debug_printf("key[%d] cursor[%d]", key, cursor);
-}
-
-bool iecDevice::channelClose ( bool close_all )
+bool iecDevice::closeStream ( bool close_all )
 {
     size_t key = ( this->data.device * 100 ) + this->data.channel;
+    auto found = streams.find(key);
 
-    if ( channels.find ( key ) != channels.end() )
+    if ( found != streams.end() )
     {
-        // Debug_printf("key[%d]", key);
-        return channels.erase ( key );
+        //Debug_printv("Stream closed. key[%d]", key);
+        auto closingStream = (*found).second;
+        closingStream->close();
+        return streams.erase ( key );
     }
 
     return false;
@@ -307,21 +242,24 @@ void iecBus::service ( void )
 
     // Check if CBM is sending a reset (setting the RESET line high). This is typically
     // when the CBM is reset itself. In this case, we are supposed to reset all states to initial.
-    if ( protocol.status ( PIN_IEC_RESET ) == PULLED )
+    bool pin_reset = protocol.status ( PIN_IEC_RESET );
+    bool pin_atn = protocol.status ( PIN_IEC_ATN );
+    if ( pin_reset == PULLED )
     {
-        if ( protocol.status ( PIN_IEC_ATN ) == PULLED )
+        if ( pin_atn == PULLED )
         {
             // If RESET & ATN are both PULLED then CBM is off
             this->bus_state = BUS_IDLE;
             return;
         }
 
-        Debug_printf ( "IEC Reset!" );
+        Debug_printf ( "IEC Reset! reset[%d] atn[%d]\r\n", pin_reset, pin_atn );
         this->data.init(); // Clear bus data
         this->bus_state = BUS_IDLE;
 
         // Reset virtual devices
-        disk.reset();
+        drive.reset();
+
         return;
     }
 
@@ -329,7 +267,7 @@ void iecBus::service ( void )
 
 
     // Command or Data Mode
-    if ( this->bus_state == BUS_ACTIVE || protocol.status ( PIN_IEC_ATN ) )
+    if ( this->bus_state == BUS_ACTIVE || pin_atn )
     {
         protocol.release ( PIN_IEC_CLK_OUT );
         protocol.pull ( PIN_IEC_DATA_OUT );
@@ -342,7 +280,7 @@ void iecBus::service ( void )
         // Check for error
         if ( c == 0xFFFFFFFF || protocol.flags bitand ERROR )
         {
-            Debug_printf ( "Error reading command" );
+            Debug_printv ( "Error reading command" );
             this->bus_state = BUS_ERROR;
         }
         else
@@ -373,12 +311,15 @@ void iecBus::service ( void )
                 case IEC_LISTEN:
                     this->data.primary = IEC_LISTEN;
                     this->data.device = c xor IEC_LISTEN;
+                    this->data.secondary = IEC_REOPEN;    // Default secondary command
+                    this->data.channel = CMD_CHANNEL;   // Default channel
+                    this->bus_state = BUS_ACTIVE;
                     Debug_printf ( " (20 LISTEN %.2d DEVICE)\r\n", this->data.device );
                     break;
 
                 case IEC_UNLISTEN:
                     this->data.primary = IEC_UNLISTEN;
-                    this->data.secondary = 0;
+                    this->data.secondary = 0x00;
                     this->bus_state = BUS_IDLE;
                     Debug_printf ( " (3F UNLISTEN)\r\n" );
                     break;
@@ -386,12 +327,15 @@ void iecBus::service ( void )
                 case IEC_TALK:
                     this->data.primary = IEC_TALK;
                     this->data.device = c xor IEC_TALK;
+                    this->data.secondary = IEC_REOPEN;    // Default secondary command
+                    this->data.channel = CMD_CHANNEL;   // Default channel
+                    this->bus_state = BUS_ACTIVE;
                     Debug_printf ( " (40 TALK   %.2d DEVICE)\r\n", this->data.device );
                     break;
 
                 case IEC_UNTALK:
                     this->data.primary = IEC_UNTALK;
-                    this->data.secondary = 0;
+                    this->data.secondary = 0x00;
                     this->bus_state = BUS_IDLE;
                     Debug_printf ( " (5F UNTALK)\r\n" );
                     break;
@@ -404,9 +348,9 @@ void iecBus::service ( void )
                     Debug_printf ( " (F0 OPEN   %.2d CHANNEL)\r\n", this->data.channel );
                     break;
 
-                case IEC_DATA:
-                    this->data.secondary = IEC_DATA;
-                    this->data.channel = c xor IEC_DATA;
+                case IEC_REOPEN:
+                    this->data.secondary = IEC_REOPEN;
+                    this->data.channel = c xor IEC_REOPEN;
                     this->bus_state = BUS_PROCESS;
                     process_command = true;
                     Debug_printf ( " (60 DATA   %.2d CHANNEL)\r\n", this->data.channel );
@@ -434,11 +378,23 @@ void iecBus::service ( void )
 
         // If the bus is idle then release the lines
         if ( this->bus_state < BUS_ACTIVE )
+        {
             releaseLines();
+            //Debug_printv("release lines");
+            this->data.init();
+        }
 
         // Debug_printf ( "code[%.2X] primary[%.2X] secondary[%.2X] bus[%d]", command, this->data.primary, this->data.secondary, this->bus_state );
         // Debug_printf( "primary[%.2X] secondary[%.2X] bus_state[%d]", this->data.primary, this->data.secondary, this->bus_state );
         // protocol.release ( PIN_IEC_SRQ );
+    }
+    else
+    {
+        // If no secondary was set, process primary with defaults
+        if ( this->data.primary > IEC_GLOBAL )
+        {
+            process_command = true;
+        }
     }
 
     if ( process_command )
@@ -450,33 +406,30 @@ void iecBus::service ( void )
         // Data Mode - Get Command or Data
         if ( this->data.primary == IEC_LISTEN )
         {
-            // Debug_printf( "deviceListen" );
+            //Debug_printv( "deviceListen" );
             this->bus_state = deviceListen();
         }
         else if ( this->data.primary == IEC_TALK )
         {
-            // Debug_printf( "deviceTalk" );
+            //Debug_printv( "deviceTalk" );
+            //Debug_printf ( " (40 TALK   %.2d DEVICE %.2x SECONDARY %.2d CHANNEL)\r\n", this->data.device, this->data.secondary, this->data.channel );
             this->bus_state = deviceTalk();   
         }
 
-        // // Is this command for us?
-        // if ( !isDeviceEnabled( this->data.device ) )
-        // {
-        //     // Nope... let's snoop the data on the bus
-        //     if ( this->data.primary == IEC_TALK )
-        //         this->data.primary = IEC_LISTEN;
-        // }
-
         // Queue control codes and command in specified device
-        // At the moment there is only the multi-disk device
-        device_state_t device_state = disk.queue_command();
+        // At the moment there is only the multi-drive device
+        device_state_t device_state = drive.queue_command();
+
+
+        // Switch protocol here!
+
 
         // Process commands in devices
-        // At the moment there is only the multi-disk device
-        disk.process();
-
-        if ( device_state == DEVICE_IDLE )
+        // At the moment there is only the multi-drive device
+        //Debug_printv( "deviceProcess" );
+        if ( drive.process() < DEVICE_ACTIVE || device_state < DEVICE_ACTIVE )
         {
+            //Debug_printv("device idle");
             this->data.init();
         }
 
@@ -498,7 +451,7 @@ bus_state_t iecBus::deviceListen ( void )
 
     // If the command is SECONDARY and it is not to expect just a small command on the command channel, then
     // we're into something more heavy. Otherwise read it all out right here until UNLISTEN is received.
-    if ( this->data.secondary == IEC_DATA && this->data.channel != CMD_CHANNEL )
+    if ( this->data.secondary == IEC_REOPEN && this->data.channel != CMD_CHANNEL )
     {
         // A heapload of data might come now, too big for this context to handle so the caller handles this, we're done here.
         // Debug_printf(" (%.2X SECONDARY) (%.2X CHANNEL)\r\n", this->data.primary, this->data.channel);
@@ -507,14 +460,20 @@ bus_state_t iecBus::deviceListen ( void )
     }
 
     // OPEN or DATA
-    else if ( this->data.secondary == IEC_OPEN || this->data.secondary == IEC_DATA )
+    else if ( this->data.secondary == IEC_OPEN || this->data.secondary == IEC_REOPEN )
     {
         // Record the command string until ATN is PULLED
-        std::string listen_command;
+        std::string listen_command = "";
+
+        // ATN might get pulled right away if there is no command string to send
+        protocol.wait( TIMING_STABLE );
 
         while ( protocol.status ( PIN_IEC_ATN ) != PULLED )
         {
             int16_t c = receive();
+
+            if ( protocol.flags bitand EMPTY_STREAM )
+                break;
 
             if ( protocol.flags bitand ERROR )
             {
@@ -540,12 +499,16 @@ bus_state_t iecBus::deviceListen ( void )
             this->data.device_command = listen_command;
             mstr::rtrimA0 ( this->data.device_command );
             Debug_printf ( " {%s}\r\n", this->data.device_command.c_str() );
-            return BUS_PROCESS;
+            //return BUS_PROCESS;
+        }
+        else
+        {
+            this->data.device_command = "";
+            Debug_printf ( "\r\n" );            
         }
 
-        this->data.device_command = "";
-        Debug_printf ( "\r\n" );
-        return BUS_ACTIVE;
+        //Debug_printv("listen complete");
+        return BUS_PROCESS;
     }
 
     // CLOSE Named Channel
@@ -624,7 +587,7 @@ bool iecBus::turnAround ( void )
     protocol.pull ( PIN_IEC_CLK_OUT );
     delayMicroseconds ( TIMING_Tv );
 
-    // Debug_println("complete");
+    //Debug_println("turnaround complete");
     return true;
 } // turnAround
 
@@ -666,6 +629,11 @@ void iecBus::releaseLines ( bool wait )
     protocol.release ( PIN_IEC_CLK_OUT );
     protocol.release ( PIN_IEC_DATA_OUT );
 
+// #ifndef SPLIT_LINES
+//     protocol.set_pin_mode ( PIN_IEC_CLK_OUT, INPUT );
+//     protocol.set_pin_mode ( PIN_IEC_DATA_OUT, INPUT );
+// #endif
+
     // IEC.protocol.release ( PIN_IEC_SRQ );
 }
 
@@ -704,6 +672,7 @@ bool iecBus::send ( uint8_t data )
     // IEC.protocol.pull(PIN_IEC_SRQ);
     bool r = protocol.sendByte ( data, false ); // Standard CBM Timing
     // IEC.protocol.release(PIN_IEC_SRQ);
+
     return r;
 } // send
 
@@ -732,24 +701,33 @@ bool iecBus::sendEOI ( uint8_t data )
     //IEC.protocol.pull(PIN_IEC_SRQ);
     bool r = protocol.sendByte ( data, true ); // Standard CBM Timing
     //IEC.protocol.release(PIN_IEC_SRQ);
-    return r;
-} // sendEOI
 
-
-// A special send command that informs file not found condition
-//
-bool iecBus::sendFNF()
-{
-    // Message file not found by just releasing lines
     releaseLines();
-    this->bus_state = BUS_ERROR;
+    //Debug_printv("release lines");
+    this->bus_state = BUS_IDLE;
 
     // BETWEEN BYTES TIME
     delayMicroseconds ( TIMING_Tbb );
 
-    Debug_println ( "\r\nFNF Sent!" );
+    return r;
+} // sendEOI
+
+
+// Informs listener(s) there is no data to receive
+bool iecBus::senderTimeout()
+{
+    //protocol.pull( PIN_IEC_SRQ );
+    // Message file not found by just releasing lines
+    releaseLines();
+    //Debug_printv("release lines");
+    this->bus_state = BUS_ERROR;
+
+    // Signal an empty stream
+    delayMicroseconds ( TIMING_EMPTY );
+
+    //protocol.release( PIN_IEC_SRQ );
     return true;
-} // sendFNF
+} // senderTimeout
 
 
 bool iecBus::isDeviceEnabled ( const uint8_t deviceNumber )

@@ -210,10 +210,10 @@ namespace mstr {
             return true;
         if(equals(s, (char*)"html", false))
             return true;
-        if(equals(s, (char*)"text/html", false))
-            return true;
 
         // content types
+        if(equals(s, (char*)"text/html", false))
+            return true;
         if(contains(s, (char*)"text", false))
             return true;
         if(contains(s, (char*)"json", false))

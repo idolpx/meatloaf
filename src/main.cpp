@@ -14,9 +14,13 @@
 #include "keys.h"
 #include "led.h"
 
+#ifdef LED_STRIP
 //#include "feedback.h"
 //#include "neopixel.h"
 #include "display.h"
+#endif
+
+#include "sound.h"
 
 #include "fnSystem.h"
 #include "fnWiFi.h"
@@ -38,6 +42,9 @@
 #include "iec.h"
 #include "ml_tests.h"
 
+#ifdef PARALLEL_BUS
+    #include "parallel.h"
+#endif
 
 std::string statusMessage;
 bool initFailed = false;
@@ -76,13 +83,16 @@ void main_setup()
     Debug_printf( "FujiNet %s Started @ %lu\n", fnSystem.get_fujinet_version(), startms );
 
     Debug_printf( "Starting heap: %u\n", fnSystem.get_free_heap_size() );
-    Debug_printf( "PsramSize %u\n", fnSystem.get_psram_size() );
 
 #ifndef NO_PSRAM
+    Debug_printf( "PsramSize %u\n", fnSystem.get_psram_size() );
+
     Debug_printf( "himem phys %u\n", esp_himem_get_phys_size() );
     Debug_printf( "himem free %u\n", esp_himem_get_free_size() );
     Debug_printf( "himem reserved %u\n", esp_himem_reserved_area_size() );
 #endif
+
+
 #endif // DEBUG
 
     // Install a reboot handler
@@ -134,6 +144,12 @@ void main_setup()
     IEC.setup();
     Serial.println( ANSI_GREEN_BOLD "IEC Bus Initialized" ANSI_RESET );
 
+#ifdef PARALLEL_BUS
+    // Setup Parallel Bus
+    PARALLEL.setup();
+    Serial.println( ANSI_GREEN_BOLD "Parallel Bus Initialized" ANSI_RESET );
+#endif
+
     // Add devices to bus
     IEC.enabledDevices = DEVICE_MASK;
     IEC.enableDevice(30);
@@ -175,8 +191,8 @@ void fn_service_loop(void *param)
         IEC.debugTiming();
 #else
         IEC.service();
-        // if ( IEC.bus_state < BUS_ACTIVE )
-        //     taskYIELD();
+        if ( IEC.bus_state < BUS_ACTIVE )
+            taskYIELD();
 #endif
     }
 }
@@ -229,13 +245,18 @@ extern "C"
         // xTaskCreatePinnedToCore(fn_console_loop, "fnConsole", 
         //                         4096, nullptr, 1, nullptr, 0);
 
+#ifdef LED_STRIP
         // Start LED Strip
         //led_strip_main();  // led_strip feedback lib
 
         //neopixel_main();  // neopixel lib
 
         display_app_main(); // fastled lib
+#endif
 
+#ifdef PIEZO_BUZZER
+        mlSoundManager.setup(); // start sound
+#endif
 
         // Sit here twiddling our thumbs
         while (true)

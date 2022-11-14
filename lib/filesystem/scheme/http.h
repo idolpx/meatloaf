@@ -1,7 +1,7 @@
 // HTTP:// - Hypertext Transfer Protocol
 
-#ifndef MEATFILESYSTEM_SCHEME_HTTP
-#define MEATFILESYSTEM_SCHEME_HTTP
+#ifndef MEATLOAF_SCHEME_HTTP
+#define MEATLOAF_SCHEME_HTTP
 
 #include "meat_io.h"
 #include "../../include/global_defines.h"
@@ -32,9 +32,11 @@ public:
     size_t read(uint8_t* buf, size_t size);
     size_t write(const uint8_t* buf, size_t size);
     bool m_isOpen = false;
+    bool m_exists = false;
     size_t m_length = 0;
     size_t m_bytesAvailable = 0;
     size_t m_position = 0;
+    bool m_isWebDAV = false;
     bool isText = false;
     bool isFriendlySkipper = false;
     bool wasRedirected = false;
@@ -48,6 +50,8 @@ public:
 
 
 class HttpFile: public MFile {
+    MeatHttpClient* formHeader();
+    MeatHttpClient* client = nullptr;
 
 public:
     HttpFile() {
@@ -57,7 +61,10 @@ public:
         Debug_printv("url[%s]", url.c_str());
      };
     HttpFile(std::string path, std::string filename): MFile(path) {};
-
+    ~HttpFile() override {
+        if(client != nullptr)
+            delete client;
+    }
     bool isDirectory() override;
     MIStream* inputStream() override ; // has to return OPENED stream
     MOStream* outputStream() override ; // has to return OPENED stream
@@ -69,6 +76,7 @@ public:
     bool exists() override ;
     size_t size() override ;
     bool remove() override ;
+    bool isText() override ;
     bool rename(std::string dest) { return false; };
     MIStream* createIStream(std::shared_ptr<MIStream> src);
     //void addHeader(const String& name, const String& value, bool first = false, bool replace = true);
@@ -179,10 +187,12 @@ class HttpFileSystem: public MFileSystem
     }
 
     bool handles(std::string name) {
-        if ( mstr::equals(name, "http:", false) )
+        if ( mstr::equals(name, (char *)"http:", false) )
             return true;
-        if ( mstr::equals(name, "https:", false) )
+
+        if ( mstr::equals(name, (char *)"https:", false) )
             return true;
+            
         return false;
     }
 public:
@@ -190,4 +200,4 @@ public:
 };
 
 
-#endif /* MEATFILESYSTEM_SCHEME_HTTP */
+#endif /* MEATLOAF_SCHEME_HTTP */
