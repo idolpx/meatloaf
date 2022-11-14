@@ -29,11 +29,11 @@
 #define PIN_LED_BT -1 // No BT LED
 
 /* LED Strip NEW */
-#define NUM_LEDS 5
-#define DATA_PIN_1 4 // FujiLoaf
-#define BRIGHTNESS  25
-#define LED_TYPE    WS2812B
-#define COLOR_ORDER RGB
+#define NUM_LEDS            5
+#define DATA_PIN_1          4
+#define BRIGHTNESS          125
+#define LED_TYPE            WS2812B
+#define COLOR_ORDER         RGB
 
 /* Audio Output */
 #define PIN_DAC1 25 // samlib.h
@@ -50,5 +50,11 @@
 #define PIN_IEC_SRQ			GPIO_NUM_27 // FujiLoaf
 
 /* Modem/Parallel Switch */
-#define PIN_MDMPAR_SW1       2
+#define PIN_MDMPAR_SW1       2  // High = Modem enabled
 #define PIN_MDMPAR_SW2       15 // High = UP9600 enabled
+
+/* I2C GPIO Expander */
+#define PIN_I2C_SDA         GPIO_NUM_21
+#define PIN_I2C_SCL         GPIO_NUM_22
+#define PIN_I2C_INT         GPIO_NUM_34
+#define PCA9673_ADDRESS     0x48
