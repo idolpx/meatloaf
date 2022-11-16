@@ -8,8 +8,8 @@ SoundManager mlSoundManager;
 
 void SoundManager::setup ( void )
 {
-    fnSystem.set_pin_mode ( PIN_PIEZO, GPIO_MODE_OUTPUT );
-    fnSystem.digital_write ( PIN_PIEZO, 0 );
+    //fnSystem.set_pin_mode ( PIN_DAC1, GPIO_MODE_OUTPUT );
+    //fnSystem.digital_write ( PIN_DAC1, 0 );
 }
 
 void disk_spin() {};

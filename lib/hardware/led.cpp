@@ -29,13 +29,13 @@ void LedManager::setup()
 
     fnSystem.set_pin_mode(PIN_LED_WIFI, gpio_mode_t::GPIO_MODE_OUTPUT);
     fnSystem.digital_write(PIN_LED_WIFI, DIGI_HIGH);
-#endif
 }
 
 void LedManager::set(eLed led, bool on)
 {
 #ifndef FUJILOAF_REV0
     mLedState[led] = on;
+#endif
 #ifdef PINMAP_A2_REV0
     // FujiApple Rev 0 BUS LED has reverse logic
     if (led == LED_BUS)
