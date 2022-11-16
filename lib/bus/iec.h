@@ -15,8 +15,8 @@
 // You should have received a copy of the GNU General Public License
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
-#ifndef MEATLIB_BUS_IEC
-#define MEATLIB_BUS_IEC
+#ifndef MEATLOAF_BUS_IEC
+#define MEATLOAF_BUS_IEC
 
 #include <forward_list>
 #include <unordered_map>
@@ -26,6 +26,7 @@
 
 #include "protocol/cbmstandardserial.h"
 //#include "protocol/jiffydos.h"
+#include "protocol/dolphindos.h"
 
 #include "../../include/debug.h"
 
@@ -138,7 +139,7 @@ typedef enum
     IEC_UNLISTEN = 0x3F,   // 0x3F (UNLISTEN)
     IEC_TALK = 0x40,       // 0x40 + device_id (TALK) (0-30)
     IEC_UNTALK = 0x5F,     // 0x5F (UNTALK)
-    IEC_DATA = 0x60,     // 0x60 + channel (OPEN CHANNEL) (0-15)
+    IEC_REOPEN = 0x60,     // 0x60 + channel (OPEN CHANNEL) (0-15)
     IEC_CLOSE = 0xE0,      // 0xE0 + channel (CLOSE NAMED CHANNEL) (0-15)
     IEC_OPEN = 0xF0        // 0xF0 + channel (OPEN NAMED CHANNEL) (0-15)
 } bus_command_t;
@@ -161,6 +162,7 @@ class iecBus
         bus_state_t bus_state;
         IECData data;
 
+        //std::unique_ptr<CBMStandardSerial> protocol = CBMStandardSerial();
         CBMStandardSerial protocol;
 
         iecBus ( void );
@@ -172,7 +174,7 @@ class iecBus
         
 
         // Checks if CBM is sending an attention message. If this is the case,
-        // the message is recieved and stored in iec_data.
+        // the message is recieved and stored in IEC_REOPEN.
         void service ( void );
 
         void receiveCommand ( void );
@@ -227,4 +229,4 @@ class iecBus
 
 extern iecBus IEC;
 
-#endif /* MEATLIB_BUS_IEC */
+#endif // MEATLOAF_BUS_IEC

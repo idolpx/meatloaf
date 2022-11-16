@@ -47,6 +47,9 @@
 #define LED_TYPE    WS2811
 #define COLOR_ORDER RGB
 
+/* Piezo Buzzer */
+#define PIN_PIEZO 4
+
 /* Audio Output */
 #define PIN_DAC1 25 // samlib.h
 

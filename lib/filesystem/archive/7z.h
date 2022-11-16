@@ -1,5 +1,5 @@
-#ifndef MEATFILE_DEFINES_7ZIP_H
-#define MEATFILE_DEFINES_7ZIP_H
+#ifndef MEATLOAF_ARCHIVE_7Z
+#define MEATLOAF_ARCHIVE_7Z
 
 #include "meat_io.h"
 
@@ -90,4 +90,4 @@ private:
 
 
 
-#endif
+#endif // MEATLOAF_ARCHIVE_7Z

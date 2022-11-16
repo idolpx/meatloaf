@@ -4,8 +4,8 @@
 //
 
 
-#ifndef MEATFILESYSTEM_MEDIA_D71
-#define MEATFILESYSTEM_MEDIA_D71
+#ifndef MEATLOAF_MEDIA_D71
+#define MEATLOAF_MEDIA_D71
 
 #include "meat_io.h"
 #include "d64.h"
@@ -76,4 +76,4 @@ public:
 };
 
 
-#endif /* MEATFILESYSTEM_MEDIA_D71 */
+#endif /* MEATLOAF_MEDIA_D71 */

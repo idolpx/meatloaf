@@ -1,5 +1,5 @@
-#ifndef MEATFILESYSTEM_WRAPPERS_IEC_BUFFER
-#define MEATFILESYSTEM_WRAPPERS_IEC_BUFFER
+#ifndef MEATLOAF_WRAPPER_IEC_BUFFER
+#define MEATLOAF_WRAPPER_IEC_BUFFER
 
 #include "../../../include/debug.h"
 
@@ -123,4 +123,4 @@ public:
     void putUtf8(U8Char* codePoint);
 };
 
-#endif /* MEATFILESYSTEM_WRAPPERS_IEC_BUFFER */
+#endif /* MEATLOAF_WRAPPER_IEC_BUFFER */

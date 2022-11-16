@@ -8,8 +8,8 @@
 //
 
 
-#ifndef MEATFILESYSTEM_MEDIA_TAP
-#define MEATFILESYSTEM_MEDIA_TAP
+#ifndef MEATLOAF_MEDIA_TAP
+#define MEATLOAF_MEDIA_TAP
 
 #include "meat_io.h"
 #include "cbm_media.h"
@@ -128,4 +128,4 @@ public:
 };
 
 
-#endif /* MEATFILESYSTEM_MEDIA_TAP */
+#endif /* MEATLOAF_MEDIA_TAP */

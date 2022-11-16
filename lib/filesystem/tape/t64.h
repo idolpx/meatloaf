@@ -4,8 +4,8 @@
 //
 
 
-#ifndef MEATFILESYSTEM_MEDIA_T64
-#define MEATFILESYSTEM_MEDIA_T64
+#ifndef MEATLOAF_MEDIA_T64
+#define MEATLOAF_MEDIA_T64
 
 #include "meat_io.h"
 #include "cbm_media.h"
@@ -123,4 +123,4 @@ public:
 };
 
 
-#endif /* MEATFILESYSTEM_MEDIA_T64 */
+#endif /* MEATLOAF_MEDIA_T64 */

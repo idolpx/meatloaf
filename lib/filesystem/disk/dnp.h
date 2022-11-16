@@ -2,8 +2,8 @@
 // https://ist.uwaterloo.ca/~schepers/formats/D2M-DNP.TXT
 //
 
-#ifndef MEATFILESYSTEM_MEDIA_DNP
-#define MEATFILESYSTEM_MEDIA_DNP
+#ifndef MEATLOAF_MEDIA_DNP
+#define MEATLOAF_MEDIA_DNP
 
 #include "meat_io.h"
 #include "d64.h"
@@ -68,4 +68,4 @@ public:
 };
 
 
-#endif /* MEATFILESYSTEM_MEDIA_DNP */
+#endif /* MEATLOAF_MEDIA_DNP */

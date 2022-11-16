@@ -2,8 +2,8 @@
 // https://ist.uwaterloo.ca/~schepers/formats/PC64.TXT
 //
 
-#ifndef MEATFILE_DEFINES_P00_H
-#define MEATFILE_DEFINES_P00_H
+#ifndef MEATLOAF_MEDIA_P00
+#define MEATLOAF_MEDIA_P00
 
 #include "meat_io.h"
 #include "cbm_media.h"
@@ -125,4 +125,4 @@ public:
     P00FileSystem(): MFileSystem("p00") {};
 };
 
-#endif // MEATFILE_DEFINES_P00_H
+#endif // MEATLOAF_MEDIA_P00

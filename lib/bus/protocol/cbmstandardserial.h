@@ -45,7 +45,8 @@
 
 #define JIFFY_ACTIVE     (1 << 8)
 #define JIFFY_LOAD       (1 << 9)
-#define PARALLEL_ACTIVE  (1 << 10)
+#define DOLPHIN_ACTIVE   (1 << 10)
+#define WIC64_ACTIVE     (1 << 11)
 
 
 // IEC protocol timing consts in microseconds (us)
