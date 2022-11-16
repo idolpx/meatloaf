@@ -27,6 +27,7 @@
 #include "../../include/petscii.h"
 
 #include "iec.h"
+#include "disk/cbmdos.h"
 
 #include "meat_io.h"
 #include "meat_buffer.h"
@@ -54,9 +55,13 @@ public:
 	iecDrive();
 	// virtual ~iecDrive() {};
 
+
+	CBMDOS dos;
+
  	uint8_t command( void ) override { return 0; };
 	uint8_t execute( void ) override { return 0; };
 	uint8_t status(void) override { return 0; };
+
 	void reset(void) override;	
 	device_state_t process ( void ) override;
 
