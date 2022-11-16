@@ -6,7 +6,7 @@
 #define MEATFILE_DEFINES_P00_H
 
 #include "meat_io.h"
-#include "cbm_image.h"
+#include "cbm_media.h"
 
 /********************************************************
  * Streams

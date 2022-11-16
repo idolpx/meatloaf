@@ -1,4 +1,4 @@
-#include "cbm_image.h"
+#include "cbm_media.h"
 
 // Utility Functions
 

@@ -8,7 +8,7 @@
 #define MEATFILESYSTEM_MEDIA_TCRT
 
 #include "meat_io.h"
-#include "d64.h"
+#include "cbm_media.h"
 
 
 /********************************************************

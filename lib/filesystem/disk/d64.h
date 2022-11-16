@@ -17,7 +17,7 @@
 #include <bitset>
 
 #include "string_utils.h"
-#include "cbm_image.h"
+#include "cbm_media.h"
 
 
 /********************************************************

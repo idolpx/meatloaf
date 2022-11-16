@@ -1,29 +1,25 @@
-// .TAP - The raw tape image format
-// https://vice-emu.sourceforge.io/vice_17.html#SEC330
-// https://ist.uwaterloo.ca/~schepers/formats/TAP.TXT
-// https://sourceforge.net/p/tapclean/gitcode/ci/master/tree/
-// https://github.com/binaryfields/zinc64/blob/master/doc/Analyzing%20C64%20tape%20loaders.txt
-// https://web.archive.org/web/20170117094643/http://tapes.c64.no/
-// https://web.archive.org/web/20191021114418/http://www.subchristsoftware.com:80/finaltap.htm
+// .T64 - The T64 tape image format
+// https://vice-emu.sourceforge.io/vice_17.html#SEC331
+// https://ist.uwaterloo.ca/~schepers/formats/T64.TXT
 //
 
 
-#ifndef MEATFILESYSTEM_MEDIA_TAP
-#define MEATFILESYSTEM_MEDIA_TAP
+#ifndef MEATFILESYSTEM_MEDIA_T64
+#define MEATFILESYSTEM_MEDIA_T64
 
 #include "meat_io.h"
-#include "cbm_image.h"
+#include "cbm_media.h"
 
 
 /********************************************************
  * Streams
  ********************************************************/
 
-class TAPIStream : public CBMImageStream {
+class T64IStream : public CBMImageStream {
     // override everything that requires overriding here
 
 public:
-    TAPIStream(std::shared_ptr<MStream> is) : CBMImageStream(is) { };
+    T64IStream(std::shared_ptr<MStream> is) : CBMImageStream(is) { };
 
 protected:
     struct Header {
@@ -33,8 +29,8 @@ protected:
     struct Entry {
         uint8_t entry_type;
         uint8_t file_type;
-        uint16_t start_address;
-        uint16_t end_address;
+        uint8_t start_address[2];
+        uint8_t end_address[2];
         uint16_t free_1;
         uint32_t data_offset;
         uint32_t free_2;
@@ -42,9 +38,8 @@ protected:
     };
 
     void seekHeader() override {
-        Debug_printv("here");
         containerStream->seek(0x28);
-        containerStream->read((uint8_t*)&header, sizeof(header));
+        containerStream->read((uint8_t*)&header, 24);
     }
 
     bool seekNextImageEntry() override {
@@ -61,7 +56,7 @@ protected:
     Entry entry;
 
 private:
-    friend class TAPFile;
+    friend class T64File;
 };
 
 
@@ -69,17 +64,17 @@ private:
  * File implementations
  ********************************************************/
 
-class TAPFile: public MFile {
+class T64File: public MFile {
 public:
 
-    TAPFile(std::string path, bool is_dir = true): MFile(path) {
+    T64File(std::string path, bool is_dir = true): MFile(path) {
         isDir = is_dir;
 
         media_image = name;
         mstr::toASCII(media_image);
     };
     
-    ~TAPFile() {
+    ~T64File() {
         // don't close the stream here! It will be used by shared ptr D64Util to keep reading image params
     }
 
@@ -113,19 +108,19 @@ public:
  * FS
  ********************************************************/
 
-class TAPFileSystem: public MFileSystem
+class T64FileSystem: public MFileSystem
 {
 public:
     MFile* getFile(std::string path) override {
-        return new TAPFile(path);
+        return new T64File(path);
     }
 
     bool handles(std::string fileName) {
-        return byExtension(".tap", fileName);
+        return byExtension(".t64", fileName);
     }
 
-    TAPFileSystem(): MFileSystem("tap") {};
+    T64FileSystem(): MFileSystem("t64") {};
 };
 
 
-#endif /* MEATFILESYSTEM_MEDIA_TAP */
+#endif /* MEATFILESYSTEM_MEDIA_T64 */

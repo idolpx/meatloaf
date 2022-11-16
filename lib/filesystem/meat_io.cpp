@@ -14,36 +14,38 @@
 
 //#include "wrappers/directory_stream.h"
 
+// Archive
+
+// Cartridge
+
 // Device
 #include "device/flash.h"
 #include "device/sd.h"
 
-// Scheme
-#include "scheme/http.h"
-#include "scheme/ml.h"
-#include "scheme/ipfs.h"
-#include "scheme/tnfs.h"
-#include "scheme/smb.h"
-#include "scheme/cs.h"
-//#include "scheme/ws.h"
+// Disk
+#include "disk/d64.h"
+#include "disk/d71.h"
+#include "disk/d80.h"
+#include "disk/d81.h"
+#include "disk/d82.h"
+#include "disk/d8b.h"
+#include "disk/dnp.h"
 
 // File
-#include "media/p00.h"
+#include "file/p00.h"
 
-// Disk
-#include "media/d64.h"
-#include "media/d71.h"
-#include "media/d80.h"
-#include "media/d81.h"
-#include "media/d82.h"
-#include "media/d8b.h"
-#include "media/dnp.h"
+// Network
+#include "network/http.h"
+#include "network/ml.h"
+#include "network/ipfs.h"
+#include "network/tnfs.h"
+#include "network/smb.h"
+#include "network/cs.h"
+//#include "network/ws.h"
 
 // Tape
-#include "media/t64.h"
-#include "media/tcrt.h"
-
-
+#include "tape/t64.h"
+#include "tape/tcrt.h"
 
 /********************************************************
  * MFSOwner implementations

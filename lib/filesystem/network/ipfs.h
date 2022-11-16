@@ -53,7 +53,7 @@
 #ifndef MEATFILE_DEFINES_IPFS_H
 #define MEATFILE_DEFINES_IPFS_H
 
-#include "scheme/http.h"
+#include "network/http.h"
 
 #include "peoples_url_parser.h"
 
