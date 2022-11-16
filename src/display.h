@@ -96,6 +96,7 @@ static const testModes_t testModes[] = {
 
 static void blinkWithFx_test(void *pvParameters);
 
+static void larsonfx(void *pvParameters);
 
 /*
 ** chase sequences are good for testing correctness, because you can see

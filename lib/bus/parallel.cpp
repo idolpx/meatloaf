@@ -4,7 +4,7 @@
 #include <freertos/queue.h>
 
 /* Dependencies */
-#include "PCF8575.h" // Required for PCF8575
+#include "pcf8575.h" // Required for PCF8575
 
 /** PCF8575 instance */
 PCF8575 expander;
