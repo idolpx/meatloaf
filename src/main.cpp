@@ -15,8 +15,6 @@
 #include "led.h"
 
 #ifdef LED_STRIP
-//#include "feedback.h"
-//#include "neopixel.h"
 #include "display.h"
 #endif
 
@@ -43,7 +41,7 @@
 #include "ml_tests.h"
 
 #ifdef PARALLEL_BUS
-    #include "parallel.h"
+#include "parallel.h"
 #endif
 
 std::string statusMessage;

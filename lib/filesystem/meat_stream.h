@@ -1,5 +1,5 @@
-#ifndef MEATFILE_STREAM
-#define MEATFILE_STREAM
+#ifndef MEATLOAF_STREAM
+#define MEATLOAF_STREAM
 
 /********************************************************
  * Universal streams
@@ -77,4 +77,4 @@ public:
 };
 
 
-#endif // MEATFILE_STREAM
+#endif // MEATLOAF_STREAM
