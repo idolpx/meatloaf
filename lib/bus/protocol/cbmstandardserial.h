@@ -36,14 +36,17 @@
 #define delayMicroseconds fnSystem.delay_microseconds
 
 // BIT Flags
-#define CLEAR           0x00      // clear all flags
-#define ATN_PULLED      (1 << 0)  // might be set by iec_receive
-#define EOI_RECVD       (1 << 1)
-#define COMMAND_RECVD   (1 << 2)
-#define JIFFY_ACTIVE    (1 << 3)
-#define JIFFY_LOAD      (1 << 4)
-#define DOLPHIN_ACTIVE  (1 << 5)
-#define ERROR           (1 << 7)  // if this flag is set, something went wrong
+#define CLEAR            0x0000    // clear all flags
+#define ERROR            (1 << 0)  // if this flag is set, something went wrong
+#define ATN_PULLED       (1 << 1)  // might be set by iec_receive
+#define EOI_RECVD        (1 << 2)
+#define EMPTY_STREAM     (1 << 3)
+#define COMMAND_RECVD    (1 << 4)
+
+#define JIFFY_ACTIVE     (1 << 8)
+#define JIFFY_LOAD       (1 << 9)
+#define PARALLEL_ACTIVE  (1 << 10)
+
 
 // IEC protocol timing consts in microseconds (us)
 // IEC-Disected p10-11         // Description              // min    typical    max      // Notes
@@ -67,6 +70,9 @@
 #define TIMING_Tdc     0       // TALK-ATTENTION ACKNOWLEDGE  0      -          -
 #define TIMING_Tda     80      // TALK-ATTENTION ACK. HOLD    80us   -          -
 #define TIMING_Tfr     60      // EOI ACKNOWLEDGE             60us   -          -
+
+#define TIMING_EMPTY   512     // SIGNAL EMPTY STREAM
+#define TIMING_STABLE  60      // WAIT FOR BUS TO BE STABLE
 
 // See timeoutWait
 #define TIMEOUT 1000 // 1ms
@@ -93,7 +99,7 @@ namespace Protocol
     {
         public:
             // communication must be reset
-            uint8_t flags = CLEAR;
+            uint16_t flags = CLEAR;
 
             virtual int16_t receiveByte ( uint8_t device );
             virtual bool sendByte ( uint8_t data, bool signalEOI );

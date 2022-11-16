@@ -38,7 +38,6 @@ public:
 
 class FlashFile: public MFile
 {
-friend class FlashOStream;
 friend class FlashIStream;
 
 public:
@@ -62,8 +61,7 @@ public:
 
     //MFile* cd(std::string newDir);
     bool isDirectory() override;
-    MIStream* inputStream() override ; // has to return OPENED stream
-    MOStream* outputStream() override ; // has to return OPENED stream
+    MStream* meatStream() override ; // has to return OPENED stream
     time_t getLastWrite() override ;
     time_t getCreationTime() override ;
     bool rewindDirectory() override ;
@@ -73,7 +71,7 @@ public:
     size_t size() override ;
     bool remove() override ;
     bool rename(std::string dest);
-    MIStream* createIStream(std::shared_ptr<MIStream> src);
+    MStream* createIStream(std::shared_ptr<MStream> src);
 
 protected:
     DIR* dir;
@@ -97,12 +95,12 @@ private:
 
 class FlashHandle {
 public:
-    int rc;
+    //int rc;
     FILE* file_h;
 
-    FlashHandle() : rc(-255) 
+    FlashHandle() 
     {
-        //Serial.println("*** Creating flash handle");
+        //Debug_printv("*** Creating flash handle");
         memset(&file_h, 0, sizeof(file_h));
     };
     ~FlashHandle();
@@ -115,51 +113,10 @@ private:
 
 
 /********************************************************
- * MStreams O
+ * MStream I
  ********************************************************/
 
-class FlashOStream: public MOStream {
-public:
-    // MStream methods
-    FlashOStream(std::string& path) {
-        localPath = path;
-        handle = std::make_unique<FlashHandle>();
-    }
-    ~FlashOStream() override {
-        close();
-    }
-
-    // MStream methods
-    size_t available() override;
-    size_t size() override;    
-    size_t position() override;
-    
-    virtual bool seek(size_t pos) override;
-    virtual bool seek(size_t pos, int mode) override;
-
-    void close() override;
-    bool open() override;
-
-    // MOStream methods
-    //size_t write(uint8_t) override;
-    size_t write(const uint8_t *buf, size_t size) override;
-    bool isOpen();
-
-protected:
-    std::string localPath;
-
-    std::unique_ptr<FlashHandle> handle;
-
-private:
-    size_t _size;
-};
-
-
-/********************************************************
- * MStreams I
- ********************************************************/
-
-class FlashIStream: public MIStream {
+class FlashIStream: public MStream {
 public:
     FlashIStream(std::string& path) {
         localPath = path;
@@ -180,9 +137,11 @@ public:
     void close() override;
     bool open() override;
 
-    // MIStream methods
+    // MStream methods
     //uint8_t read() override;
     size_t read(uint8_t* buf, size_t size) override;
+    size_t write(const uint8_t *buf, size_t size) override;
+
     bool isOpen();
 
 protected:

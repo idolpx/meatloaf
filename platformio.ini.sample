@@ -10,10 +10,16 @@
 
 [fujinet]
 ; Espressif32 PlatformIO Version to use for building
-esp32_platform_version = 5.0.0
+esp32_platform_version = 5.1.0
 
 build_platform = BUILD_CBM
 build_bus      = IEC
+
+; Change this to target hardware you use from the list of [env:xxx] sections below
+; Commodore IEC using Atari FujiNet
+build_board = meatloaf-fujinet-v1
+;build_board = meatloaf-fujinet-v1.nopsram  ; Board has no SPI PSRAM
+;build_board = meatloaf-fujinet-esp32s3
 
 flash_filesystem = FLASH_SPIFFS 
 ;flash_filesystem = FLASH_LITTLEFS
@@ -21,10 +27,6 @@ flash_size = 16mb    ; 4mb, 8mb, 16mb
 
 [platformio]
 description = Meatloaf / FujiNet retro computer to ESP32 WiFi Multifunction Firmware
-; Change this to target hardware you use from the list of [env:xxx] sections below
-default_envs = meatloaf-fujinet-v1
-;default_envs = meatloaf-fujinet-v1-nopsram
-;default_envs = meatloaf-fujinet-esp32s3
 data_dir = $PROJECT_DIR/data/${fujinet.build_platform}
 
 [env]
@@ -32,11 +34,11 @@ data_dir = $PROJECT_DIR/data/${fujinet.build_platform}
 framework = espidf
 extra_scripts = pre:build_version.py
 lib_ldf_mode = deep+
-upload_speed = 921600
+upload_speed = 460800 ;921600
 ;upload_port = COM1 ; Windows
 ;upload_port = /dev/ttyUSB0 ; Linux
 upload_port = /dev/tty.SLAB_USBtoUART ; Mac
-monitor_speed = 921600
+monitor_speed = 460800 ;921600
 ;monitor_port = COM1 ; Windows
 ;monitor_port = /dev/ttyUSB0 ; Linux
 monitor_port = /dev/tty.SLAB_USBtoUART ; Mac
@@ -47,33 +49,34 @@ build_flags =
     -D ${fujinet.build_platform}
     -D ${fujinet.flash_filesystem}
     -D CMAKE_EXPORT_COMPILE_COMMANDS=ON
-    -D DEBUG_SPEED=921600
+    -D DEBUG_SPEED=460800   ;921600
     ;-D NO_PSRAM            ; if your hardware has no psram
     ;-D NO_BUTTONS          ; if your hardware has no physical buttons
+    ;-D LED_STRIP           ; if your hardware has an led strip
     ;-D JTAG                ; enable use with JTAG debugger
     ;-D BLUETOOTH_SUPPORT   ; enable BlueTooth support
-    ;-D FN_HISPEED_INDEX=0
-    ;-D VERBOSE_SIO
     ;-D VERBOSE_TNFS
     ;-D VERBOSE_DISK
-    ;-D VERBOSE_ATX
+    ;-D VERBOSE_HTTP
     ;-D DEBUG_TIMING
     ;-D DATA_STREAM
     ;-D NO_VIRTUAL_KEYBOARD
     ;-D DBUG2 ; enable monitor messages for a release build
 
-debug_tool = esp-prog
-debug_init_break = tbreak setup
+;debug_tool = esp-prog
+;debug_init_break = tbreak setup
 
 [env:meatloaf-fujinet-v1]
 platform = espressif32@${fujinet.esp32_platform_version}
 board = fujinet-v1-${fujinet.flash_size}
 build_type = debug
+build_flags = ${env.build_flags}
 
-[env:meatloaf-fujinet-v1-nopsram]
+[env:meatloaf-fujinet-v1.nopsram]
 platform = espressif32@${fujinet.esp32_platform_version}
 board = fujinet-v1-${fujinet.flash_size}
 build_type = debug
+build_flags = ${env.build_flags}
 
 [env:meatloaf-fujinet-esp32s3]
 platform = https://github.com/jonathandreyer/platform-espressif32.git#espidf-440
