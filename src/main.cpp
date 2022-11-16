@@ -24,7 +24,7 @@
 #include "fnWiFi.h"
 #include "webdav.h"
 
-#include "webdav-server.h"
+#include "webdav.h"
 
 #ifdef FLASH_SPIFFS
 #include "fnFsSPIFFS.h"

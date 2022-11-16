@@ -27,7 +27,7 @@
 #include "../../include/petscii.h"
 
 #include "iec.h"
-#include "disk/cbmdos.h"
+//#include "drive/cbmdos.h"
 
 #include "meat_io.h"
 #include "meat_buffer.h"
@@ -36,8 +36,6 @@
 //#include "helpers.h"
 #include "utils.h"
 #include "string_utils.h"
-
-//#include "doscmd.h"
 
 enum OpenState
 {
@@ -56,7 +54,7 @@ public:
 	// virtual ~iecDrive() {};
 
 
-	CBMDOS dos;
+//	CBMDOS dos;
 
  	uint8_t command( void ) override { return 0; };
 	uint8_t execute( void ) override { return 0; };

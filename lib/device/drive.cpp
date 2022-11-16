@@ -488,7 +488,7 @@ void iecDrive::handleListenCommand( void )
 
 	// Parse DOS Command
 	Debug_printv("Parse DOS Command [%s]", this->data.device_command.c_str());
-	this->dos.cbmdos_command_parse(this->data.device_command.c_str());
+	//this->dos.cbmdos_command_parse(this->data.device_command.c_str());
 
 	// Execute DOS Command
 	if ( this->data.channel == CMD_CHANNEL )
