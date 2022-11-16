@@ -312,7 +312,7 @@ void iecBus::service ( void )
                 case IEC_LISTEN:
                     this->data.primary = IEC_LISTEN;
                     this->data.device = c xor IEC_LISTEN;
-                    this->data.secondary = IEC_DATA;    // Default secondary command
+                    this->data.secondary = IEC_REOPEN;    // Default secondary command
                     this->data.channel = CMD_CHANNEL;   // Default channel
                     this->bus_state = BUS_ACTIVE;
                     Debug_printf ( " (20 LISTEN %.2d DEVICE)\r\n", this->data.device );
@@ -328,7 +328,7 @@ void iecBus::service ( void )
                 case IEC_TALK:
                     this->data.primary = IEC_TALK;
                     this->data.device = c xor IEC_TALK;
-                    this->data.secondary = IEC_DATA;    // Default secondary command
+                    this->data.secondary = IEC_REOPEN;    // Default secondary command
                     this->data.channel = CMD_CHANNEL;   // Default channel
                     this->bus_state = BUS_ACTIVE;
                     Debug_printf ( " (40 TALK   %.2d DEVICE)\r\n", this->data.device );
@@ -349,9 +349,9 @@ void iecBus::service ( void )
                     Debug_printf ( " (F0 OPEN   %.2d CHANNEL)\r\n", this->data.channel );
                     break;
 
-                case IEC_DATA:
-                    this->data.secondary = IEC_DATA;
-                    this->data.channel = c xor IEC_DATA;
+                case IEC_REOPEN:
+                    this->data.secondary = IEC_REOPEN;
+                    this->data.channel = c xor IEC_REOPEN;
                     this->bus_state = BUS_PROCESS;
                     process_command = true;
                     Debug_printf ( " (60 DATA   %.2d CHANNEL)\r\n", this->data.channel );
@@ -372,7 +372,7 @@ void iecBus::service ( void )
             if ( !isDeviceEnabled( this->data.device ) )
             {
                 this->bus_state = BUS_IDLE;
-                //process_command = false;
+                process_command = false;
             }
 
         }
@@ -421,6 +421,10 @@ void iecBus::service ( void )
         // At the moment there is only the multi-drive device
         device_state_t device_state = drive.queue_command();
 
+
+        // Switch protocol here!
+
+
         // Process commands in devices
         // At the moment there is only the multi-drive device
         //Debug_printv( "deviceProcess" );
@@ -448,7 +452,7 @@ bus_state_t iecBus::deviceListen ( void )
 
     // If the command is SECONDARY and it is not to expect just a small command on the command channel, then
     // we're into something more heavy. Otherwise read it all out right here until UNLISTEN is received.
-    if ( this->data.secondary == IEC_DATA && this->data.channel != CMD_CHANNEL )
+    if ( this->data.secondary == IEC_REOPEN && this->data.channel != CMD_CHANNEL )
     {
         // A heapload of data might come now, too big for this context to handle so the caller handles this, we're done here.
         // Debug_printf(" (%.2X SECONDARY) (%.2X CHANNEL)\r\n", this->data.primary, this->data.channel);
@@ -457,7 +461,7 @@ bus_state_t iecBus::deviceListen ( void )
     }
 
     // OPEN or DATA
-    else if ( this->data.secondary == IEC_OPEN || this->data.secondary == IEC_DATA )
+    else if ( this->data.secondary == IEC_OPEN || this->data.secondary == IEC_REOPEN )
     {
         // Record the command string until ATN is PULLED
         std::string listen_command = "";

@@ -20,16 +20,16 @@
 #ifndef PROTOCOL_JIFFYDOS_H
 #define PROTOCOL_JIFFYDOS_H
 
-#include <Arduino.h>
-
 #include "cbmstandardserial.h"
 
-class JiffyDOS : public CBMStandardSerial
+namespace Protocol
 {
-
-protected:
-	int16_t receiveByte(void) override;
-	bool sendByte(uint8_t data, bool signalEOI) override;
+	class JiffyDOS : public CBMStandardSerial
+	{
+		protected:
+			int16_t receiveByte(void) override;
+			bool sendByte(uint8_t data, bool signalEOI) override;
+	};
 };
 
-#endif
+#endif // PROTOCOL_JIFFYDOS_H

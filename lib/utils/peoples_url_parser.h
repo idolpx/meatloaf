@@ -1,5 +1,5 @@
-#ifndef MEATFILE_PUP_H
-#define MEATFILE_PUP_H
+#ifndef MEATLOAF_PUP_H
+#define MEATLOAF_PUP_H
 
 
 #include <string>

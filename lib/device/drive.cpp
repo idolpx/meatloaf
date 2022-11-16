@@ -63,7 +63,7 @@ device_state_t iecDrive::process ( void )
 
     if ( this->data.secondary == IEC_OPEN )
     {
-
+		// Open either file or prg for reading, writing or single line command on the command channel.
 		handleListenCommand();
 		if ( m_filename.size() == 0 )
 		{
@@ -91,8 +91,8 @@ device_state_t iecDrive::process ( void )
         }
 
         // Open Named Channel
-        if(isOpen) {
-        // Open either file or prg for reading, writing or single line command on the command channel.
+        if(isOpen) 
+		{
             currentStream = retrieveStream();
 			if( currentStream ) 
 			{
@@ -100,7 +100,7 @@ device_state_t iecDrive::process ( void )
 			}
         }
     }
-    else if ( this->data.secondary == IEC_DATA )
+    else if ( this->data.secondary == IEC_REOPEN )
     {
 
         // Open either file or prg for reading, writing or single line command on the command channel.
@@ -122,13 +122,13 @@ device_state_t iecDrive::process ( void )
         else if ( this->device_state == DEVICE_TALK )
         {
             // Send data
-            //Debug_printv ( "[Send data]" );
+            Debug_printv ( "[Send data]" );
             handleTalk ( this->data.channel );
             if ( this->data.channel < 2 )
-	    {
-		closeStream();
-		device_state = DEVICE_IDLE;
-		this->data.init(); // Clear device command
+			{
+				closeStream();
+				device_state = DEVICE_IDLE;
+				this->data.init(); // Clear device command
             }
         }
         // IEC.protocol.release(PIN_IEC_SRQ);
@@ -487,7 +487,8 @@ void iecDrive::handleListenCommand( void )
 	}
 
 	// Parse DOS Command
-	//Debug_printv("Parse DOS Command [%s]", this->data.device_command.c_str());
+	Debug_printv("Parse DOS Command [%s]", this->data.device_command.c_str());
+	//this->dos.cbmdos_command_parse(this->data.device_command.c_str());
 
 	// Execute DOS Command
 	if ( this->data.channel == CMD_CHANNEL )
@@ -571,7 +572,7 @@ void iecDrive::handleListenCommand( void )
 
 void iecDrive::handleListenData()
 {
-	Debug_printv("[%s]", device_config.url().c_str());
+	//Debug_printv("[%s]", device_config.url().c_str());
 
 	saveFile();
 } // handleListenData
@@ -1150,7 +1151,7 @@ bool iecDrive::saveFile()
 #ifdef DATA_STREAM
 			if (bi == 0)
 			{
-				Debug_printv(":%.4X ", load_address);
+				Debug_printf(":%.4X ", load_address);
 				load_address += 8;
 			}
 #endif
@@ -1183,7 +1184,7 @@ bool iecDrive::saveFile()
 
 			if(bi == 8)
 			{
-				Debug_printv(" %s (%d)\r\n", ba, i);
+				Debug_printf(" %s (%d)\r\n", ba, i);
 				bi = 0;
 			}
 #endif
@@ -1196,7 +1197,7 @@ bool iecDrive::saveFile()
     }
     // ostream->close(); // nor required, closes automagically
 
-	Debug_printv("=================================\r\n%d bytes saved\r\n", i);
+	Debug_printf("=================================\r\n%d bytes saved\r\n", i);
 	fnLedManager.set(eLed::LED_BUS, true);
 
 	// TODO: Handle errorFlag

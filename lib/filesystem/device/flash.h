@@ -1,5 +1,5 @@
-#ifndef MEATFILE_DEFINES_FLASHFS_H
-#define MEATFILE_DEFINES_FLASHFS_H
+#ifndef MEATLOAF_DEVICE_FLASH
+#define MEATLOAF_DEVICE_FLASH
 
 #include "meat_io.h"
 
@@ -155,4 +155,4 @@ private:
 
 
 
-#endif // MEATFILE_DEFINES_FLASHFS_H
+#endif // MEATLOAF_DEVICE_FLASH

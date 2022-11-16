@@ -8,8 +8,8 @@
 // http://unusedino.de/ec64/technical3.html
 //
 
-#ifndef MEATFILESYSTEM_MEDIA_D64
-#define MEATFILESYSTEM_MEDIA_D64
+#ifndef MEATLOAF_MEDIA_D64
+#define MEATLOAF_MEDIA_D64
 
 #include "meat_io.h"
 
@@ -258,4 +258,4 @@ public:
 };
 
 
-#endif /* MEATFILESYSTEM_MEDIA_D64 */
+#endif /* MEATLOAF_MEDIA_D64 */

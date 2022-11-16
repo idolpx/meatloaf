@@ -1,3 +1,7 @@
+//
+// https://github.com/Aircoookie/WLED
+//
+
 
 #ifndef MEATLOAF_DISPLAY_H
 #define MEATLOAF_DISPLAY_H

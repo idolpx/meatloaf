@@ -1,5 +1,5 @@
-#ifndef MEATFILE_DEFINES_MKUNIQUE_H
-#define MEATFILE_DEFINES_MKUNIQUE_H
+#ifndef MEATLOAF_DEFINES_MKUNIQUE_H
+#define MEATLOAF_DEFINES_MKUNIQUE_H
 
 #include <cstddef>
 #include <memory>

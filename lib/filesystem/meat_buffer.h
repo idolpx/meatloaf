@@ -1,5 +1,5 @@
-#ifndef MEATLIB_FILESYSTEM_MEAT_BUFFER
-#define MEATLIB_FILESYSTEM_MEAT_BUFFER
+#ifndef MEATLOAF_BUFFER
+#define MEATLOAF_BUFFER
 
 #include <memory>
 #include <fstream>
@@ -632,4 +632,4 @@ namespace Meat
     //https://cplusplus.com/reference/istream/iostream/
 }
 
-#endif /* MEATLIB_FILESYSTEM_MEAT_BUFFER */
+#endif /* MEATLOAF_BUFFER */

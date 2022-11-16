@@ -1,7 +1,7 @@
-// HTTP:// - Hypertext Transfer Protocol
+// WEBDAV:// - WebDAV
 
-#ifndef MEATFILE_DEFINES_FSHTTP_H
-#define MEATFILE_DEFINES_FSHTTP_H
+#ifndef MEATLOAF_SCHEME_WEBDAV
+#define MEATLOAF_SCHEME_WEBDAV
 
 #include "http.h"
 
@@ -169,12 +169,12 @@ class WebDAVFileSystem: public MFileSystem
     }
 
     bool handles(std::string name) {
-        std::string pattern = "http:";
+        std::string pattern = "webdav:";
         return mstr::equals(name, pattern, false);
     }
 public:
-    WebDAVFileSystem(): MFileSystem("http") {};
+    WebDAVFileSystem(): MFileSystem("webdav") {};
 };
 
 
-#endif
+#endif // MEATLOAF_SCHEME_WEBDAV

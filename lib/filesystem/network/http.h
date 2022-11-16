@@ -1,7 +1,7 @@
 // HTTP:// - Hypertext Transfer Protocol
 
-#ifndef MEATFILESYSTEM_SCHEME_HTTP
-#define MEATFILESYSTEM_SCHEME_HTTP
+#ifndef MEATLOAF_SCHEME_HTTP
+#define MEATLOAF_SCHEME_HTTP
 
 #include "meat_io.h"
 #include "../../include/global_defines.h"
@@ -147,4 +147,4 @@ public:
 };
 
 
-#endif /* MEATFILESYSTEM_SCHEME_HTTP */
+#endif /* MEATLOAF_SCHEME_HTTP */

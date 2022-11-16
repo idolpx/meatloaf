@@ -15,15 +15,16 @@
 #include "led.h"
 
 #ifdef LED_STRIP
-//#include "feedback.h"
-//#include "neopixel.h"
 #include "display.h"
 #endif
+
+#include "sound.h"
 
 #include "fnSystem.h"
 #include "fnWiFi.h"
 #include "webdav.h"
 
+#include "webdav.h"
 
 #ifdef FLASH_SPIFFS
 #include "fnFsSPIFFS.h"
@@ -40,6 +41,9 @@
 #include "iec.h"
 #include "ml_tests.h"
 
+#ifdef PARALLEL_BUS
+#include "parallel.h"
+#endif
 
 std::string statusMessage;
 bool initFailed = false;
@@ -133,6 +137,12 @@ void main_setup()
     IEC.setup();
     Serial.println( ANSI_GREEN_BOLD "IEC Bus Initialized" ANSI_RESET );
 
+#ifdef PARALLEL_BUS
+    // Setup Parallel Bus
+    PARALLEL.setup();
+    Serial.println( ANSI_GREEN_BOLD "Parallel Bus Initialized" ANSI_RESET );
+#endif
+
     // Add devices to bus
     IEC.enabledDevices = DEVICE_MASK;
     IEC.enableDevice(30);
@@ -174,8 +184,8 @@ void fn_service_loop(void *param)
         IEC.debugTiming();
 #else
         IEC.service();
-        // if ( IEC.bus_state < BUS_ACTIVE )
-        //     taskYIELD();
+        if ( IEC.bus_state < BUS_ACTIVE )
+            taskYIELD();
 #endif
     }
 }
@@ -235,6 +245,10 @@ extern "C"
         //neopixel_main();  // neopixel lib
 
         display_app_main(); // fastled lib
+#endif
+
+#ifdef PIEZO_BUZZER
+        mlSoundManager.setup(); // start sound
 #endif
 
         // Sit here twiddling our thumbs

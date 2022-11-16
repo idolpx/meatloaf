@@ -1,5 +1,5 @@
-#ifndef MEATFILESYSTEM_SCHEME_TCP
-#define MEATFILESYSTEM_SCHEME_TCP
+#ifndef MEATLOAF_SCHEME_TCP
+#define MEATLOAF_SCHEME_TCP
 
 #include "lwip/sockets.h"
 #include "lwip/netdb.h"

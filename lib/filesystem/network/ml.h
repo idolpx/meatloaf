@@ -2,8 +2,8 @@
 // 
 
 
-#ifndef MEATFILE_DEFINES_FSML_H
-#define MEATFILE_DEFINES_FSML_H
+#ifndef MEATLOAF_SCHEME_ML
+#define MEATLOAF_SCHEME_ML
 
 #include "network/http.h"
 
@@ -69,4 +69,4 @@ public:
 };
 
 
-#endif
+#endif // MEATLOAF_SCHEME_ML
