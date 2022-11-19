@@ -1,8 +1,8 @@
 
 
 
-#ifndef MEATLOAF_MEDIA_CBM_IMAGE
-#define MEATLOAF_MEDIA_CBM_IMAGE
+#ifndef MEATLOAF_CBM_MEDIA
+#define MEATLOAF_CBM_MEDIA
 
 #include "meat_io.h"
 
@@ -162,4 +162,4 @@ public:
     }
 };
 
-#endif /* MEATFILESYSTEM_MEDIA_CBM_IMAGE */
+#endif // MEATLOAF_CBM_MEDIA
