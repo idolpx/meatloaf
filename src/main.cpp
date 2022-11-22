@@ -148,8 +148,8 @@ void main_setup()
 
 #ifdef PARALLEL_BUS
     // Setup Parallel Bus
-    PARALLEL.setup();
-    Serial.println( ANSI_GREEN_BOLD "Parallel Bus Initialized" ANSI_RESET );
+    //PARALLEL.setup();
+    //Serial.println( ANSI_GREEN_BOLD "Parallel Bus Initialized" ANSI_RESET );
 #endif
 
     // Add devices to bus

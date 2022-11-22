@@ -1,18 +1,21 @@
 //
 // https://www.nxp.com/docs/en/data-sheet/PCF8575.pdf
+// https://www.nxp.com/docs/en/data-sheet/PCA9673.pdf
 //
 
-#ifndef PCF8575_H
-#define PCF8575_H
+#ifndef GPIOX_H
+#define GPIOX_H
+
+#include "../../include/pinmap.h"
 
 #include <I2Cbus.hpp>
 
-#define I2C_ADDRESS  0x20
-#define I2C_SDA      GPIO_NUM_21
-#define I2C_SCL      GPIO_NUM_22
-#define I2C_SPEED    400          // 400Khz Default
+#define I2C_SDA      PIN_GPIOX_SDA
+#define I2C_SCL      PIN_GPIOX_SCL
+#define I2C_ADDRESS  GPIOX_ADDRESS
+#define I2C_SPEED    GPIOX_SPEED
 
-/* PCF8575 port bits */
+/* GPIOX port bits */
 #define P00  0
 #define P01  1
 #define P02  2
@@ -31,21 +34,21 @@
 #define P17  15
 
 typedef enum {
-	PCF8575_PORT0 = 0,
-	PCF8575_PORT1 = 1,
-	PCF8575_BOTH = 2
+	GPIOX_PORT0 = 0,
+	GPIOX_PORT1 = 1,
+	GPIOX_BOTH = 2
 } port_t;
 
 /**
- * @brief PCF8575
+ * @brief GPIOX
  */
-class PCF8575 {
+class GPIOX {
 public:
 
 	/**
-	 * Create a new PCF8575 instance
+	 * Create a new GPIOX instance
 	 */
-	PCF8575();
+	GPIOX();
 
 	uint8_t PORT0;
 	uint8_t PORT1;
@@ -53,7 +56,7 @@ public:
 	/**
 	 * Start the I2C controller and store the PCF8575 chip address
 	 */
-	void begin(uint8_t address = I2C_ADDRESS, gpio_num_t sda = I2C_SDA, gpio_num_t scl = I2C_SCL, uint16_t speed = I2C_SPEED);
+	void begin(gpio_num_t sda = I2C_SDA, gpio_num_t scl = I2C_SCL, uint8_t address = I2C_ADDRESS, uint16_t speed = I2C_SPEED);
 
 	/**
 	 * Set the direction of a pin (OUTPUT, INPUT or INPUT_PULLUP)
@@ -95,25 +98,25 @@ public:
 	 * 
 	 * @param value The new value of all pins (1 bit = 1 pin, '1' = HIGH, '0' = LOW)
 	 */
-	void write(uint16_t value, port_t port = PCF8575_BOTH);
+	void write(uint16_t value, port_t port = GPIOX_BOTH);
 
 	/**
 	 * Read the state of all pins in one go
 	 * 
 	 * @return The current value of all pins (1 bit = 1 pin, '1' = HIGH, '0' = LOW)
 	 */
-	uint16_t read(port_t port = PCF8575_PORT0);
+	uint16_t read(port_t port = GPIOX_PORT0);
 
 	/**
 	 * Exactly like write(0x00), set all pins to LOW
 	 */
-	void clear(port_t port = PCF8575_BOTH);
+	void clear(port_t port = GPIOX_BOTH);
 
 
 	/**
 	 * Exactly like write(0xFF), set all pins to HIGH
 	 */
-	void set(port_t port = PCF8575_BOTH);
+	void set(port_t port = GPIOX_BOTH);
 
 	/**
 	 * Toggle the state of a pin
@@ -134,7 +137,7 @@ protected:
 	/** Pins modes values (OUTPUT or INPUT) */
 	volatile uint16_t _DDR;
 
-	/** PCF8575 I2C address */
+	/** GPIOX I2C address */
 	uint8_t _address;
 
 	/** 
@@ -142,7 +145,7 @@ protected:
 	 *
 	 * @remarks Before reading current GPIO states, current _PIN variable value is moved to _oldPIN variable
 	 */
-	void readGPIO();
+	void readGPIOX();
 
 	/** 
 	 * Write value of _PORT variable to the GPIO
@@ -150,7 +153,7 @@ protected:
 	 * @remarks Only pin marked as OUTPUT are set, for INPUT pins their value are unchanged
 	 * @warning To work properly (and avoid any states conflicts) readGPIO() MUST be called before call this function !
 	 */
-	void updateGPIO();
+	void updateGPIOX();
 };
 
-#endif // PCF8575_H
+#endif // GPIOX_H

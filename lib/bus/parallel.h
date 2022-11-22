@@ -2,7 +2,7 @@
 #ifndef MEATLOAF_BUS_PARALLEL
 #define MEATLOAF_BUS_PARALLEL
 
-#include "pcf8575.h"
+#include "gpiox.h"
 
 /* User Port to pin mapping */
 // #define FLAG2  P07  // B
@@ -23,7 +23,7 @@
 // #define PB6    P16   // K - I
 // #define PB7    P17   // L - J
 
-#define USERPORT_PB PCF8575_PORT1
+#define USERPORT_PB GPIOX_PORT1
 
 typedef enum {
   FLAG2 = P07,  // B

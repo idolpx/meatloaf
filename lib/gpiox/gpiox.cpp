@@ -1,18 +1,18 @@
 
 
-#include "pcf8575.h"
+#include "gpiox.h"
 
 #include <hal/gpio_types.h>
 
 #include "../../include/debug.h"
 
 
-PCF8575::PCF8575() :
+GPIOX::GPIOX() :
 		_PIN(0), _oldPIN(0), _PORT(0), _DDR(0), _address(0)
 {
 }
 
-void PCF8575::begin(uint8_t address, gpio_num_t sda, gpio_num_t scl, uint16_t speed) {
+void GPIOX::begin(gpio_num_t sda, gpio_num_t scl, uint8_t address, uint16_t speed) {
 
 	/* Store the I2C address and init the Wire library */
 	_address = address;
@@ -22,10 +22,10 @@ void PCF8575::begin(uint8_t address, gpio_num_t sda, gpio_num_t scl, uint16_t sp
     //myI2C.setTimeout(10);
     //myI2C.scanner();
 
-	readGPIO();
+	readGPIOX();
 }
 
-void PCF8575::pinMode(uint8_t pin, uint8_t mode) {
+void GPIOX::pinMode(uint8_t pin, uint8_t mode) {
 
 	/* Switch according mode */
 	if ( mode == GPIO_MODE_INPUT )
@@ -44,12 +44,12 @@ void PCF8575::pinMode(uint8_t pin, uint8_t mode) {
 	} 
 
 	/* Update GPIO values */
-	updateGPIO();
+	updateGPIOX();
 }
 
-void PCF8575::portMode(port_t port, uint8_t mode) {
+void GPIOX::portMode(port_t port, uint8_t mode) {
 
-	if ( port == PCF8575_PORT0 )
+	if ( port == GPIOX_PORT0 )
 	{
 		// Modify P07-P00 (low byte)
 		if ( mode == GPIO_MODE_INPUT )
@@ -65,7 +65,7 @@ void PCF8575::portMode(port_t port, uint8_t mode) {
 			_DDR &= 0xFF00;           // set low byte to 0x00
 		}
 	}
-	else if ( port == PCF8575_PORT1 )
+	else if ( port == GPIOX_PORT1 )
 	{
 		// Modify P17-P10 (high byte)
 		if ( mode == GPIO_MODE_INPUT )
@@ -81,7 +81,7 @@ void PCF8575::portMode(port_t port, uint8_t mode) {
 			_DDR &= 0x00FF;           // set high byte to 0x00
 		}
 	}
-	else if ( port == PCF8575_BOTH )
+	else if ( port == GPIOX_BOTH )
 	{
 		_DDR = 0xFFFF;
 	}
@@ -91,10 +91,10 @@ void PCF8575::portMode(port_t port, uint8_t mode) {
 	Debug_printv("port[%d] mode[%d] ddr[%d]", port, mode, _DDR);
 
 	/* Update GPIO values */
-	updateGPIO();
+	updateGPIOX();
 }
 
-void PCF8575::digitalWrite(uint8_t pin, uint8_t value) {
+void GPIOX::digitalWrite(uint8_t pin, uint8_t value) {
 
 	/* Set PORT bit value */
 	if (value)
@@ -103,76 +103,76 @@ void PCF8575::digitalWrite(uint8_t pin, uint8_t value) {
 		_PORT &= ~(1 << pin);
 
 	/* Update GPIO values */
-	updateGPIO();
+	updateGPIOX();
 }
 
-uint8_t PCF8575::digitalRead(uint8_t pin) {
+uint8_t GPIOX::digitalRead(uint8_t pin) {
 
 	/* Read GPIO */
-	readGPIO();
+	readGPIOX();
 
 	/* Read and return the pin state */
 	return (_PIN & (1 << pin));
 }
 
 
-void PCF8575::write(uint16_t value, port_t port) {
+void GPIOX::write(uint16_t value, port_t port) {
 	/* Store pins values and apply */
-	if ( port == PCF8575_PORT0)
+	if ( port == GPIOX_PORT0)
 		// low byte swap
 		_PORT &= 0xFF00 | (value & 0x00FF);
-	else if ( port == PCF8575_PORT1 )
+	else if ( port == GPIOX_PORT1 )
 		// hight byte swap
 		_PORT &= 0x00FF | (value << 8 & 0xFF00);
 	else
 		_PORT = value;
 
 	/* Update GPIO values */
-	updateGPIO();
+	updateGPIOX();
 }
 
-uint16_t PCF8575::read(port_t port) {
+uint16_t GPIOX::read(port_t port) {
 	/* Read GPIO */
-	readGPIO();
+	readGPIOX();
 
 	/* Return current pins values */
-	if ( port == PCF8575_PORT0)
+	if ( port == GPIOX_PORT0)
 		return PORT0;
-	else if ( port == PCF8575_PORT1)
+	else if ( port == GPIOX_PORT1)
 		return PORT1;
 	else
 		return _PORT;
 }
 
-void PCF8575::clear(port_t port) {
+void GPIOX::clear(port_t port) {
 
 	/* User friendly wrapper for write() */
-	if ( port == PCF8575_BOTH )
+	if ( port == GPIOX_BOTH )
 		write(0x0000);
 	else
 		write(0x00, port);
 }
 
-void PCF8575::set(port_t port) {
+void GPIOX::set(port_t port) {
 
 	/* User friendly wrapper for write() */
-	if ( port == PCF8575_BOTH )
+	if ( port == GPIOX_BOTH )
 		write(0xFFFF);
 	else
 		write(0xFF, port);
 }
 
-void PCF8575::toggle(uint8_t pin) {
+void GPIOX::toggle(uint8_t pin) {
 
 	/* Toggle pin state */
 	_PORT ^= (1 << pin);
 
 	/* Update GPIO values */
-	updateGPIO();
+	updateGPIOX();
 }
 
 
-void PCF8575::readGPIO() {
+void GPIOX::readGPIOX() {
 
 	_oldPIN = _PIN;
 
@@ -190,12 +190,12 @@ void PCF8575::readGPIO() {
 }
 
 
-void PCF8575::updateGPIO() {
+void GPIOX::updateGPIOX() {
 
 	uint8_t buffer[2];
 
 	/* Read current GPIO states */
-	//readGPIO(); // Experimental
+	//readGPIOX(); // Experimental
 
 	/* Compute new GPIO states */
 	//uint8_t value = ((_PIN & ~_DDR) & ~(~_DDR & _PORT)) | _PORT; // Experimental

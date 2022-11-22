@@ -4,10 +4,10 @@
 #include <freertos/queue.h>
 
 /* Dependencies */
-#include "pcf8575.h" // Required for PCF8575
+#include "gpiox.h" // Required for PCF8575/PCA9674/MCP23017
 
 /** PCF8575 instance */
-PCF8575 expander;
+GPIOX expander;
 
 //#include <I2Cbus.hpp>
 
@@ -111,7 +111,7 @@ void parallelBus::setup ()
 
     // Setup interrupt for paralellel port
     gpio_config_t io_conf = {
-        .pin_bit_mask = ( 1ULL << GPIO_NUM_19 ),    // bit mask of the pins that you want to set
+        .pin_bit_mask = ( 1ULL << PIN_GPIOX_INT ),    // bit mask of the pins that you want to set
         .mode = GPIO_MODE_INPUT,                    // set as input mode
         .pull_up_en = GPIO_PULLUP_DISABLE,          // disable pull-up mode
         .pull_down_en = GPIO_PULLDOWN_ENABLE,      // disable pull-down mode
@@ -119,7 +119,7 @@ void parallelBus::setup ()
     };
     //configure GPIO with the given settings
     gpio_config(&io_conf);
-    gpio_isr_handler_add((gpio_num_t)GPIO_NUM_19, ml_parallel_isr_handler, NULL);    
+    gpio_isr_handler_add((gpio_num_t)PIN_GPIOX_INT, ml_parallel_isr_handler, NULL);    
 }
 
 
@@ -138,7 +138,7 @@ void parallelBus::handShake()
 uint8_t parallelBus::readByte()
 {
 
-    this->data = expander.read( PCF8575_PORT1 );
+    this->data = expander.read( USERPORT_PB );
     this->flags = expander.PORT0;
 
     // Acknowledge byte received
@@ -152,7 +152,7 @@ void parallelBus::writeByte( uint8_t byte )
     this->data = byte;
 
     Debug_printv("flags[%.2x] data[%.2x] byte[%.2x]", this->flags, this->data, byte);
-    expander.write( byte, PCF8575_PORT1 );
+    expander.write( byte, USERPORT_PB );
 
     // Tell receiver byte is ready to read
     this->handShake();
