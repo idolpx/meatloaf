@@ -16,11 +16,11 @@ git submodule update --init --recursive
 ```
 
 ```
-Copy platform.ini.sample to platform.ini
+Copy platformio.ini.sample to platform.ini
 ```
 
 ```
-Edit platform.ini to match your system
+Edit platformio.ini to match your system
 ```
 
 ```
