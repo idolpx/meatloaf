@@ -68,18 +68,23 @@ void display_app_main() {
 
 static void larsonfx(void *pvParameters) {
 
-	uint16_t mode = FX_MODE_LARSON_SCANNER;
-
 	WS2812FX ws2812fx;
   WS2812FX::Segment *segments = ws2812fx.getSegments();
 
-  segments[0].colors[1] = 255U; //blue, white 16777215U??
-  segments[0].colors[0] = 16711680U; //red?
-  segments[0].speed = 255;
+	// ws2812fx.init(NUM_LEDS, leds1, false); // type was configured before
+	// ws2812fx.setBrightness(BRIGHTNESS);
+	// ws2812fx.setMode(0 /*segid*/, FX_MODE_LARSON_SCANNER);
 
-	ws2812fx.init(NUM_LEDS, leds1, false); // type was configured before
-	ws2812fx.setBrightness(BRIGHTNESS);
-	ws2812fx.setMode(0 /*segid*/, mode);
+  // //segments[0].colors[1] = 255U; //blue, white 16777215U??
+  // segments[0].colors[0] = 0xFF0000; //CRGB::RED; //red?
+  // segments[0].speed = 128;
+
+  ws2812fx.init(NUM_LEDS, leds1, false);
+  ws2812fx.setBrightness(BRIGHTNESS);
+  ws2812fx.setMode(0 /*segid*/, FX_MODE_LARSON_SCANNER);
+  
+  segments[0].colors = { 0xFF0000, 0x000000, 0x000000 }; // RED, BLACK, BLACK
+  segments[0].speed = 128;
 
   while (true)
   {

@@ -51,45 +51,46 @@ static void ml_parallel_intr_task(void* arg)
     {
         if(xQueueReceive(ml_parallel_evt_queue, &io_num, portMAX_DELAY)) 
         {
-            // Read I/O lines, set bits we want to read to 1
-            PARALLEL.readByte();
+            Debug_printv( "User Port Data Interrupt Received!" );
+            // // Read I/O lines, set bits we want to read to 1
+            // PARALLEL.readByte();
 
-            // Set RECEIVE/SEND mode   
-            if ( PARALLEL.status( PA2 ) )
-            {
-                PARALLEL.mode = MODE_RECEIVE;
-                expander.portMode( USERPORT_PB, GPIO_MODE_INPUT );
-                PARALLEL.readByte();
+            // // Set RECEIVE/SEND mode   
+            // if ( PARALLEL.status( PA2 ) )
+            // {
+            //     PARALLEL.mode = MODE_RECEIVE;
+            //     expander.portMode( USERPORT_PB, GPIO_MODE_INPUT );
+            //     PARALLEL.readByte();
 
-                Debug_printv("receive <<< " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
-            }
-            else
-            {
-                PARALLEL.mode = MODE_SEND;
-                expander.portMode( USERPORT_PB, GPIO_MODE_OUTPUT );
+            //     Debug_printv("receive <<< " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
+            // }
+            // else
+            // {
+            //     PARALLEL.mode = MODE_SEND;
+            //     expander.portMode( USERPORT_PB, GPIO_MODE_OUTPUT );
 
-                Debug_printv("send    >>> " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
-            }
+            //     Debug_printv("send    >>> " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
+            // }
 
-            // DolphinDOS Detection
-            if ( PARALLEL.status( ATN ) )
-            {
-                if ( IEC.data.secondary == IEC_OPEN || IEC.data.secondary == IEC_REOPEN )
-                {
-                    IEC.protocol.flags xor_eq DOLPHIN_ACTIVE;
-                    Debug_printv("dolphindos");
-                }
-            }
+            // // DolphinDOS Detection
+            // if ( PARALLEL.status( ATN ) )
+            // {
+            //     if ( IEC.data.secondary == IEC_OPEN || IEC.data.secondary == IEC_REOPEN )
+            //     {
+            //         IEC.protocol.flags xor_eq DOLPHIN_ACTIVE;
+            //         Debug_printv("dolphindos");
+            //     }
+            // }
 
-            // WIC64
-            if ( PARALLEL.status( PC2 ) )
-            {
-                if ( PARALLEL.data == 0x57 ) // WiC64 commands start with 'W'
-                {
-                    IEC.protocol.flags xor_eq WIC64_ACTIVE;
-                    Debug_printv("wic64");                  
-                }
-            }
+            // // WIC64
+            // if ( PARALLEL.status( PC2 ) )
+            // {
+            //     if ( PARALLEL.data == 0x57 ) // WiC64 commands start with 'W'
+            //     {
+            //         IEC.protocol.flags xor_eq WIC64_ACTIVE;
+            //         Debug_printv("wic64");                  
+            //     }
+            // }
         }
     }
     
@@ -114,7 +115,7 @@ void parallelBus::setup ()
         .pin_bit_mask = ( 1ULL << PIN_GPIOX_INT ),    // bit mask of the pins that you want to set
         .mode = GPIO_MODE_INPUT,                    // set as input mode
         .pull_up_en = GPIO_PULLUP_DISABLE,          // disable pull-up mode
-        .pull_down_en = GPIO_PULLDOWN_ENABLE,      // disable pull-down mode
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,      // disable pull-down mode
         .intr_type = GPIO_INTR_NEGEDGE              // interrupt of falling edge
     };
     //configure GPIO with the given settings
