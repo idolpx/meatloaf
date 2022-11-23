@@ -35,14 +35,14 @@ typedef enum {
   ATN   = P01,  // 9
   PA2   = P00,  // M - K
 
-  PB0   = P10,   // C
-  PB1   = P11,   // D
-  PB2   = P12,   // E
-  PB3   = P13,   // F
-  PB4   = P14,   // H - G
-  PB5   = P15,   // J - H
-  PB6   = P16,   // K - I
-  PB7   = P17,   // L - J
+  PB0   = P10,  // C
+  PB1   = P11,  // D
+  PB2   = P12,  // E
+  PB3   = P13,  // F
+  PB4   = P14,  // H - G
+  PB5   = P15,  // J - H
+  PB6   = P16,  // K - I
+  PB7   = P17,  // L - J
 } user_port_pin_t;
 
 typedef enum {

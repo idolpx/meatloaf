@@ -83,6 +83,7 @@ device_state_t iecDevice::queue_command ( void )
 std::shared_ptr<MStream> iecDevice::retrieveStream ( void )
 {
     size_t key = ( this->data.device * 100 ) + this->data.channel;
+    Debug_printv("Stream key[%d]", key);
 
     if ( streams.find ( key ) != streams.end() )
     {
@@ -104,24 +105,37 @@ bool iecDevice::registerStream (std::ios_base::open_mode mode, std::string m_fil
     auto file = Meat::New<MFile>(m_filename);
     std::shared_ptr<MStream> new_stream;
 
-    //Debug_printv("m_filename[%s]", m_filename.c_str());
-    new_stream = std::shared_ptr<MStream>(file->meatStream());
-
-    if ( new_stream == nullptr )
+    // LOAD / GET / INPUT
+    if ( mode == std::ios_base::in )
     {
-        return false;
+        Debug_printv("LOAD m_filename[%s]", m_filename.c_str());
+        new_stream = std::shared_ptr<MStream>(file->meatStream());
+
+        if ( new_stream == nullptr )
+        {
+            return false;
+        }
+
+        if( !new_stream->isOpen() )
+        {
+            //Debug_printv("Error creating istream");
+            return false;
+        }
+        else
+        {
+            // Close the stream if it is already open
+            closeStream();
+        }
     }
 
-    if( !new_stream->isOpen() )
-    {
-        //Debug_printv("Error creating istream");
-        return false;
-    }
+    // SAVE / PUT / PRINT / WRITE
     else
     {
-        // Close the stream if it is already open
-        closeStream();
+        Debug_printv("SAVE m_filename[%s]", m_filename.c_str());
+        // CREATE STREAM HERE FOR OUTPUT
+        return false;
     }
+
 
     size_t key = ( this->data.device * 100 ) + this->data.channel;
     auto newPair = std::make_pair ( key, new_stream );

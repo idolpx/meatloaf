@@ -323,6 +323,11 @@ esp_err_t I2C::readBytes(uint8_t devAddr, uint8_t regAddr, size_t length, uint8_
 /*******************************************************************************
  * UTILS
  ******************************************************************************/
+
+esp_err_t I2C::reset(int32_t timeout) {
+    return writeByte( 0x00, 0x06, timeout );
+}
+
 esp_err_t I2C::testConnection(uint8_t devAddr, int32_t timeout) {
     i2c_cmd_handle_t cmd = i2c_cmd_link_create();
     i2c_master_start(cmd);

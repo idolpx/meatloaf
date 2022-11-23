@@ -58,6 +58,6 @@
 #define PIN_GPIOX_SCL         GPIO_NUM_22
 #define PIN_GPIOX_INT         GPIO_NUM_34
 //#define GPIOX_ADDRESS     0x20  // PCF8575
-#define GPIOX_ADDRESS     0x48  // PCA9673
+#define GPIOX_ADDRESS     0x24  // PCA9673
 //#define GPIOX_SPEED       400   // PCF8575 - 400Khz
 #define GPIOX_SPEED       1000  // PCA9673 - 1000Khz / 1Mhz

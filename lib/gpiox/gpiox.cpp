@@ -21,6 +21,7 @@ void GPIOX::begin(gpio_num_t sda, gpio_num_t scl, uint8_t address, uint16_t spee
     //myI2C.begin(GPIO_NUM_21, GPIO_NUM_22, 1000000); // 1Mhz Overclocked
     //myI2C.setTimeout(10);
     //myI2C.scanner();
+	myI2C.reset();
 
 	readGPIOX();
 }
@@ -208,5 +209,5 @@ void GPIOX::updateGPIOX() {
 	buffer[1] = value >> 8;      // high byte
 	//Debug_printv("low[%.2x] high[%.2x]", buffer[0], buffer[1]);
 	myI2C.writeBytes(_address, 2, buffer);
-	//Debug_printv("address[%.2x] in[%d] out[%d] ddr[%d] value[%d]", _address, _PIN, _PORT, _DDR, value);
+	Debug_printv("address[%.2x] in[%d] out[%d] ddr[%d] value[%d]", _address, _PIN, _PORT, _DDR, value);
 }

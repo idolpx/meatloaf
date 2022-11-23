@@ -107,16 +107,16 @@ void parallelBus::setup ()
     ml_parallel_evt_queue = xQueueCreate(10, sizeof(uint32_t));
 
     // Start task
-    xTaskCreate(ml_parallel_intr_task, "ml_parallel_intr_task", 2048, NULL, 10, NULL);
-    //xTaskCreatePinnedToCore(ml_parallel_intr_task, "ml_parallel_intr_task", 2048, NULL, 10, NULL, 0);
+    //xTaskCreate(ml_parallel_intr_task, "ml_parallel_intr_task", 2048, NULL, 10, NULL);
+    xTaskCreatePinnedToCore(ml_parallel_intr_task, "ml_parallel_intr_task", 2048, NULL, 10, NULL, 0);
 
     // Setup interrupt for paralellel port
     gpio_config_t io_conf = {
         .pin_bit_mask = ( 1ULL << PIN_GPIOX_INT ),    // bit mask of the pins that you want to set
-        .mode = GPIO_MODE_INPUT,                    // set as input mode
-        .pull_up_en = GPIO_PULLUP_DISABLE,          // disable pull-up mode
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,      // disable pull-down mode
-        .intr_type = GPIO_INTR_NEGEDGE              // interrupt of falling edge
+        .mode = GPIO_MODE_INPUT,                      // set as input mode
+        .pull_up_en = GPIO_PULLUP_DISABLE,            // disable pull-up mode
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,        // disable pull-down mode
+        .intr_type = GPIO_INTR_NEGEDGE                // interrupt of falling edge
     };
     //configure GPIO with the given settings
     gpio_config(&io_conf);

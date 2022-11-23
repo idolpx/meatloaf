@@ -59,7 +59,8 @@ void display_app_main() {
   //xTaskCreatePinnedToCore(&blinkWithFx_test, "blinkLeds", 4000, NULL, 5, NULL, 0);
   //xTaskCreatePinnedToCore(&blinkLeds_chase, "blinkLeds", 4000, NULL, 5, NULL, 0);
   //xTaskCreatePinnedToCore(&blinkLeds_chase2, "blinkLeds", 4000, NULL, 5, NULL, 0);
-  xTaskCreatePinnedToCore(&larsonfx, "larsonscanner", 4000, NULL, 5, NULL, 0);
+  //xTaskCreatePinnedToCore(&larsonfx, "larsonscanner", 4000, NULL, 5, NULL, 0);
+  xTaskCreatePinnedToCore(&rainbowcyclefx, "rainbowcycle", 4000, NULL, 5, NULL, 0);
 }
 
 /* Larson scanner
@@ -83,7 +84,26 @@ static void larsonfx(void *pvParameters) {
   ws2812fx.setBrightness(BRIGHTNESS);
   ws2812fx.setMode(0 /*segid*/, FX_MODE_LARSON_SCANNER);
   
-  segments[0].colors = { 0xFF0000, 0x000000, 0x000000 }; // RED, BLACK, BLACK
+  segments[0].colors[0] = 0xFF0000; // RED
+  segments[0].colors[1] = 0x00FF00; // BLACK
+  segments[0].colors[2] = 0x0000FF; // BLACK
+  segments[0].speed = 255;
+
+  while (true)
+  {
+		ws2812fx.service();
+		vTaskDelay(10 / portTICK_PERIOD_MS); /*10ms*/
+  }
+};
+
+static void rainbowcyclefx(void *pvParameters) {
+
+	WS2812FX ws2812fx;
+  WS2812FX::Segment *segments = ws2812fx.getSegments();
+
+  ws2812fx.init(NUM_LEDS, leds1, false);
+  ws2812fx.setBrightness(BRIGHTNESS);
+  ws2812fx.setMode(0, FX_MODE_THEATER_CHASE_RAINBOW);
   segments[0].speed = 128;
 
   while (true)
