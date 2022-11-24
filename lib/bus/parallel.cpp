@@ -37,40 +37,47 @@ static void ml_parallel_intr_task(void* arg)
     Debug_printv("clear");
     expander.clear();
     Debug_printv("pa2");
-    expander.pinMode( PA2, GPIO_MODE_INPUT );
+    expander.pinMode( PA2, GPIOX_MODE_INPUT );
     Debug_printv("atn");
-    expander.pinMode( ATN, GPIO_MODE_INPUT );
+    expander.pinMode( ATN, GPIOX_MODE_INPUT );
     Debug_printv("pc2");
-    expander.pinMode( PC2, GPIO_MODE_INPUT );
+    expander.pinMode( PC2, GPIOX_MODE_INPUT );
     Debug_printv("flag2");
-    expander.pinMode( FLAG2, GPIO_MODE_OUTPUT );
+    expander.pinMode( FLAG2, GPIOX_MODE_OUTPUT );
+
     Debug_printv("userport");
-    expander.portMode( USERPORT_PB, GPIO_MODE_INPUT );
+    expander.portMode( USERPORT_PB, GPIOX_MODE_INPUT );
+
+    uint16_t vboth = expander.read( GPIOX_BOTH );
+    uint16_t vport0 = expander.read( GPIOX_PORT0 );
+    uint16_t vport1 = expander.read( GPIOX_PORT1 );
+    Debug_printv("both[%.2X] port0[%.2X] port1[%.2X]", vboth, vport0, vport1);
+
 
     while ( true ) 
     {
         if(xQueueReceive(ml_parallel_evt_queue, &io_num, portMAX_DELAY)) 
         {
             Debug_printv( "User Port Data Interrupt Received!" );
-            // // Read I/O lines, set bits we want to read to 1
-            // PARALLEL.readByte();
+            // Update flags and data
+            PARALLEL.readByte();
 
-            // // Set RECEIVE/SEND mode   
-            // if ( PARALLEL.status( PA2 ) )
-            // {
-            //     PARALLEL.mode = MODE_RECEIVE;
-            //     expander.portMode( USERPORT_PB, GPIO_MODE_INPUT );
-            //     PARALLEL.readByte();
+            // Set RECEIVE/SEND mode   
+            if ( PARALLEL.status( PA2 ) )
+            {
+                PARALLEL.mode = MODE_RECEIVE;
+                expander.portMode( USERPORT_PB, GPIOX_MODE_INPUT );
+                PARALLEL.readByte();
 
-            //     Debug_printv("receive <<< " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
-            // }
-            // else
-            // {
-            //     PARALLEL.mode = MODE_SEND;
-            //     expander.portMode( USERPORT_PB, GPIO_MODE_OUTPUT );
+                Debug_printv("receive <<< " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
+            }
+            else
+            {
+                PARALLEL.mode = MODE_SEND;
+                expander.portMode( USERPORT_PB, GPIOX_MODE_OUTPUT );
 
-            //     Debug_printv("send    >>> " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
-            // }
+                Debug_printv("send    >>> " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
+            }
 
             // // DolphinDOS Detection
             // if ( PARALLEL.status( ATN ) )
@@ -142,6 +149,8 @@ uint8_t parallelBus::readByte()
     this->data = expander.read( USERPORT_PB );
     this->flags = expander.PORT0;
 
+    Debug_printv("flags[%.2x] data[%.2x]", this->flags, this->data);
+
     // Acknowledge byte received
     this->handShake();
 
@@ -153,7 +162,7 @@ void parallelBus::writeByte( uint8_t byte )
     this->data = byte;
 
     Debug_printv("flags[%.2x] data[%.2x] byte[%.2x]", this->flags, this->data, byte);
-    expander.write( byte, USERPORT_PB );
+    expander.write( USERPORT_PB, byte);
 
     // Tell receiver byte is ready to read
     this->handShake();
