@@ -43,6 +43,37 @@ static void IRAM_ATTR cbm_on_attention_isr_handler(void* arg)
     b->bus_state = BUS_ACTIVE;
 }
 
+static void ml_iec_intr_task(void* arg)
+{
+    while ( true ) 
+    {
+        IEC.service();
+        if ( IEC.bus_state < BUS_ACTIVE )
+            taskYIELD();
+
+        //vTaskDelay(portMAX_DELAY);
+    }
+}
+
+
+void iecBus::setup()
+{
+    // Start task
+    //xTaskCreate(ml_iec_intr_task, "ml_iec_intr_task", 2048, NULL, 10, NULL);
+    xTaskCreatePinnedToCore(ml_iec_intr_task, "ml_iec_intr_task", 4096, NULL, 10, NULL, 1);
+
+    // Setup interrupt for ATN
+    gpio_config_t io_conf = {
+        .pin_bit_mask = ( 1ULL << PIN_IEC_ATN ),    // bit mask of the pins that you want to set
+        .mode = GPIO_MODE_INPUT,                    // set as input mode
+        .pull_up_en = GPIO_PULLUP_DISABLE,          // disable pull-up mode
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,      // disable pull-down mode
+        .intr_type = GPIO_INTR_NEGEDGE              // interrupt of falling edge
+    };
+    //configure GPIO with the given settings
+    gpio_config(&io_conf);
+    gpio_isr_handler_add((gpio_num_t)PIN_IEC_ATN, cbm_on_attention_isr_handler, this);
+}
 
 
 /********************************************************
@@ -767,22 +798,8 @@ void iecBus::disableDevice ( const uint8_t deviceNumber )
 
 
 
-void iecBus::setup()
-{
-    // Debug_println("IEC SETUP");
 
-    // Setup interrupt for ATN
-    gpio_config_t io_conf = {
-        .pin_bit_mask = ( 1ULL << PIN_IEC_ATN ),    // bit mask of the pins that you want to set
-        .mode = GPIO_MODE_INPUT,                    // set as input mode
-        .pull_up_en = GPIO_PULLUP_DISABLE,          // disable pull-up mode
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,      // disable pull-down mode
-        .intr_type = GPIO_INTR_NEGEDGE              // interrupt of falling edge
-    };
-    //configure GPIO with the given settings
-    gpio_config(&io_conf);
-    gpio_isr_handler_add((gpio_num_t)PIN_IEC_ATN, cbm_on_attention_isr_handler, this);
-}
+
 
 void iecBus::shutdown()
 {

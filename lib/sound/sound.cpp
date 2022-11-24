@@ -1,7 +1,8 @@
 
 #include "sound.h"
 
-#include "../include/pinmap.h"
+#include "../../include/pinmap.h"
+
 #include "fnSystem.h"
 
 SoundManager mlSoundManager;

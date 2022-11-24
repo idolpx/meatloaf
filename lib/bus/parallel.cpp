@@ -39,7 +39,7 @@ static void ml_parallel_intr_task(void* arg)
     Debug_printv("pa2");
     expander.pinMode( PA2, GPIOX_MODE_INPUT );
     Debug_printv("atn");
-    expander.pinMode( ATN, GPIOX_MODE_INPUT );
+    expander.pinMode( ATN, GPIOX_MODE_OUTPUT );
     Debug_printv("pc2");
     expander.pinMode( PC2, GPIOX_MODE_INPUT );
     Debug_printv("flag2");
@@ -100,9 +100,9 @@ static void ml_parallel_intr_task(void* arg)
             //     }
             // }
         }
+
+        vTaskDelay(portMAX_DELAY);
     }
-    
-    vTaskDelay(portMAX_DELAY);
 }
 
 
@@ -126,6 +126,7 @@ void parallelBus::setup ()
         .pull_down_en = GPIO_PULLDOWN_DISABLE,        // disable pull-down mode
         .intr_type = GPIO_INTR_NEGEDGE                // interrupt of falling edge
     };
+
     //configure GPIO with the given settings
     gpio_config(&io_conf);
     gpio_isr_handler_add((gpio_num_t)PIN_GPIOX_INT, ml_parallel_isr_handler, NULL);    

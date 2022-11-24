@@ -9,7 +9,7 @@
 #include "FastLED.h"
 #include "FX.h"
 
-#include "../include/pinmap.h"
+#include "../../include/pinmap.h"
 // #define NUM_LEDS 5
 // #define DATA_PIN_1 27 
 // #define DATA_PIN_2 14
