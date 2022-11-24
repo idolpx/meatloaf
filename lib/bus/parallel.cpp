@@ -58,7 +58,8 @@ static void ml_parallel_intr_task(void* arg)
     {
         if(xQueueReceive(ml_parallel_evt_queue, &io_num, portMAX_DELAY)) 
         {
-            Debug_printv( "User Port Data Interrupt Received!" );
+            //Debug_printv( "User Port Data Interrupt Received!" );
+
             // Update flags and data
             PARALLEL.readByte();
 
@@ -149,7 +150,7 @@ uint8_t parallelBus::readByte()
     this->data = expander.read( USERPORT_PB );
     this->flags = expander.PORT0;
 
-    Debug_printv("flags[%.2x] data[%.2x]", this->flags, this->data);
+    //Debug_printv("flags[%.2x] data[%.2x]", this->flags, this->data);
 
     // Acknowledge byte received
     this->handShake();
