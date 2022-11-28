@@ -105,7 +105,7 @@ void parallelBus::setup ()
 
     // Start task
     //xTaskCreate(ml_parallel_intr_task, "ml_parallel_intr_task", 2048, NULL, 10, NULL);
-    xTaskCreatePinnedToCore(ml_parallel_intr_task, "ml_parallel_intr_task", 2048, NULL, 10, NULL, 0);
+    xTaskCreatePinnedToCore(ml_parallel_intr_task, "ml_parallel_intr_task", 2048, NULL, 10, NULL, 1);
 
     // Setup interrupt for paralellel port
     gpio_config_t io_conf = {
