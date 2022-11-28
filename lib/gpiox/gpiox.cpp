@@ -85,6 +85,29 @@ void GPIOX::portMode(port_t port, pin_mode_t mode) {
 	updateGPIOX();
 }
 
+void GPIOX::portMode(port_t port, uint16_t mode) {
+
+	if ( port == GPIOX_PORT0 )
+	{
+		// Modify P07-P00 (low byte)
+		_DDR = (_DDR & 0xFF00) | (mode & 0x00FF);    // set low byte to mode
+	}
+	else if ( port == GPIOX_PORT1 )
+	{
+		// Modify P17-P10 (high byte)
+		_DDR = (_DDR & 0x00FF) | (mode & 0xFF00);    // set high byte to mode
+	}
+	else if ( port == GPIOX_BOTH )
+	{
+		_DDR = mode;  // set high/low byte to mode
+	}
+
+	//Debug_printv("port[%.2X] mode[%.2X] _DDR[%.2X] _DOUT[%.2X]", port, mode, _DDR, _DOUT);
+
+	/* Update GPIO values */
+	updateGPIOX();
+}
+
 void GPIOX::digitalWrite(uint8_t pin, uint8_t value) {
 
 	/* Set PORT bit value */

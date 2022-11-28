@@ -23,7 +23,8 @@
 // #define PB6    P16   // K - I
 // #define PB7    P17   // L - J
 
-#define USERPORT_PB GPIOX_PORT1
+#define USERPORT_FLAGS GPIOX_PORT0
+#define USERPORT_DATA  GPIOX_PORT1
 
 typedef enum {
   FLAG2 = P07,  // B
@@ -65,6 +66,7 @@ class parallelBus
 {
   public:
     void setup();
+    void reset();
 
     void handShake();
     uint8_t readByte();
@@ -74,7 +76,7 @@ class parallelBus
     uint8_t flags = 0;
     uint8_t data = 0;
     parallel_mode_t mode = MODE_RECEIVE;
-
+    bool enabled = true;
 };
 
 void wic64_command();

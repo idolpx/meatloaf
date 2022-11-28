@@ -79,6 +79,7 @@ public:
 	 * @param mode The new mode of the pins
 	 */
 	void portMode(port_t port, pin_mode_t mode);
+	void portMode(port_t port, uint16_t mode);
 
 	/**
 	 * Set the state of a pin (HIGH or LOW)

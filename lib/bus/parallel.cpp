@@ -26,6 +26,7 @@ static void IRAM_ATTR ml_parallel_isr_handler(void* arg)
     // Generic default interrupt handler
     uint32_t gpio_num = (uint32_t) arg;
     xQueueSendFromISR(ml_parallel_evt_queue, &gpio_num, NULL);
+
     //Debug_printf("INTERRUPT ON GPIO: %d", arg);
 }
 
@@ -33,67 +34,62 @@ static void ml_parallel_intr_task(void* arg)
 {
     uint32_t io_num;
 
-    // Setup default pin modes
-    Debug_printv("clear");
-    expander.clear();
-    Debug_printv("pa2");
-    expander.pinMode( PA2, GPIOX_MODE_INPUT );
-    Debug_printv("atn");
-    expander.pinMode( ATN, GPIOX_MODE_OUTPUT );
-    Debug_printv("pc2");
-    expander.pinMode( PC2, GPIOX_MODE_INPUT );
-    Debug_printv("flag2");
-    expander.pinMode( FLAG2, GPIOX_MODE_OUTPUT );
-
-    Debug_printv("userport");
-    expander.portMode( USERPORT_PB, GPIOX_MODE_INPUT );
-
     while ( true ) 
     {
         if(xQueueReceive(ml_parallel_evt_queue, &io_num, portMAX_DELAY)) 
         {
-            //Debug_printv( "User Port Data Interrupt Received!" );
-
-            // Update flags and data
-            PARALLEL.readByte();
-
-            // Set RECEIVE/SEND mode   
-            if ( PARALLEL.status( PA2 ) )
+            //Debug_printv("bus_state[%d]", IEC.bus_state);
+            if ( IEC.bus_state > BUS_OFFLINE ) // Is C64 is powered on?
             {
-                PARALLEL.mode = MODE_RECEIVE;
-                expander.portMode( USERPORT_PB, GPIOX_MODE_INPUT );
+                //Debug_printv( "User Port Data Interrupt Received!" );
+
+                // Update flags and data
                 PARALLEL.readByte();
 
-                Debug_printv("receive <<< " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
+                // Set RECEIVE/SEND mode   
+                if ( PARALLEL.status( PA2 ) )
+                {
+                    PARALLEL.mode = MODE_RECEIVE;
+                    expander.portMode( USERPORT_DATA, GPIOX_MODE_INPUT );
+                    PARALLEL.readByte();
 
-                // // DolphinDOS Detection
-                // if ( PARALLEL.status( ATN ) )
-                // {
-                //     if ( IEC.data.secondary == IEC_OPEN || IEC.data.secondary == IEC_REOPEN )
-                //     {
-                //         IEC.protocol.flags xor_eq DOLPHIN_ACTIVE;
-                //         Debug_printv("dolphindos");
-                //     }
-                // }
+                    Debug_printv("receive <<< " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
 
-                // // WIC64
-                // if ( PARALLEL.status( PC2 ) )
-                // {
-                //     if ( PARALLEL.data == 0x57 ) // WiC64 commands start with 'W'
-                //     {
-                //         IEC.protocol.flags xor_eq WIC64_ACTIVE;
-                //         Debug_printv("wic64");                  
-                //     }
-                // }
+                    // // DolphinDOS Detection
+                    // if ( PARALLEL.status( ATN ) )
+                    // {
+                    //     if ( IEC.data.secondary == IEC_OPEN || IEC.data.secondary == IEC_REOPEN )
+                    //     {
+                    //         IEC.protocol.flags xor_eq DOLPHIN_ACTIVE;
+                    //         Debug_printv("dolphindos");
+                    //     }
+                    // }
+
+                    // // WIC64
+                    // if ( PARALLEL.status( PC2 ) )
+                    // {
+                    //     if ( PARALLEL.data == 0x57 ) // WiC64 commands start with 'W'
+                    //     {
+                    //         IEC.protocol.flags xor_eq WIC64_ACTIVE;
+                    //         Debug_printv("wic64");                  
+                    //     }
+                    // }
+                }
+                else
+                {
+                    PARALLEL.mode = MODE_SEND;
+                    expander.portMode( USERPORT_DATA, GPIOX_MODE_OUTPUT );
+
+                    Debug_printv("send    >>> " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
+                }
             }
             else
             {
-                PARALLEL.mode = MODE_SEND;
-                expander.portMode( USERPORT_PB, GPIOX_MODE_OUTPUT );
-
-                Debug_printv("send    >>> " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
+                PARALLEL.reset();
             }
         }
+
+        taskYIELD();
     }
 }
 
@@ -102,6 +98,7 @@ void parallelBus::setup ()
 {
     // Setup i2c device
     expander.begin();
+    reset();
     
     // Create a queue to handle parallel event from ISR
     ml_parallel_evt_queue = xQueueCreate(10, sizeof(uint32_t));
@@ -124,6 +121,25 @@ void parallelBus::setup ()
     gpio_isr_handler_add((gpio_num_t)PIN_GPIOX_INT, ml_parallel_isr_handler, NULL);    
 }
 
+void parallelBus::reset()
+{
+    // Reset default pin modes
+    // Debug_printv("clear");
+    // expander.clear();
+    // Debug_printv("pa2");
+    // expander.pinMode( PA2, GPIOX_MODE_INPUT );
+    // Debug_printv("pc2");
+    // expander.pinMode( PC2, GPIOX_MODE_INPUT );
+    // Debug_printv("flag2");
+    // expander.pinMode( FLAG2, GPIOX_MODE_OUTPUT );
+
+    //Debug_printv("userport flags");
+    expander.portMode( USERPORT_FLAGS, 0x05 ); // Set PA2 & PC2 to INPUT
+
+    //Debug_printv("userport data");
+    expander.portMode( USERPORT_DATA, GPIOX_MODE_INPUT );
+}
+
 
 void parallelBus::handShake()
 {
@@ -140,7 +156,7 @@ void parallelBus::handShake()
 uint8_t parallelBus::readByte()
 {
 
-    this->data = expander.read( USERPORT_PB );
+    this->data = expander.read( USERPORT_DATA );
     this->flags = expander.PORT0;
 
     //Debug_printv("flags[%.2x] data[%.2x]", this->flags, this->data);
@@ -156,7 +172,7 @@ void parallelBus::writeByte( uint8_t byte )
     this->data = byte;
 
     Debug_printv("flags[%.2x] data[%.2x] byte[%.2x]", this->flags, this->data, byte);
-    expander.write( USERPORT_PB, byte);
+    expander.write( USERPORT_DATA, byte);
 
     // Tell receiver byte is ready to read
     this->handShake();

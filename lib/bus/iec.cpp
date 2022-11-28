@@ -50,8 +50,6 @@ static void ml_iec_intr_task(void* arg)
         IEC.service();
         if ( IEC.bus_state < BUS_ACTIVE )
             taskYIELD();
-
-        //vTaskDelay(portMAX_DELAY);
     }
 }
 
@@ -294,7 +292,7 @@ void iecBus::service ( void )
         if ( pin_atn == PULLED )
         {
             // If RESET & ATN are both PULLED then CBM is off
-            this->bus_state = BUS_IDLE;
+            this->bus_state = BUS_OFFLINE;
             return;
         }
 
