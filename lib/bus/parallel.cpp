@@ -48,17 +48,11 @@ static void ml_parallel_intr_task(void* arg)
     Debug_printv("userport");
     expander.portMode( USERPORT_PB, GPIOX_MODE_INPUT );
 
-    uint16_t vboth = expander.read( GPIOX_BOTH );
-    uint16_t vport0 = expander.read( GPIOX_PORT0 );
-    uint16_t vport1 = expander.read( GPIOX_PORT1 );
-    Debug_printv("both[%.2X] port0[%.2X] port1[%.2X]", vboth, vport0, vport1);
-
-
     while ( true ) 
     {
         if(xQueueReceive(ml_parallel_evt_queue, &io_num, portMAX_DELAY)) 
         {
-            //Debug_printv( "User Port Data Interrupt Received!" );
+            Debug_printv( "User Port Data Interrupt Received!" );
 
             // Update flags and data
             PARALLEL.readByte();
@@ -71,6 +65,26 @@ static void ml_parallel_intr_task(void* arg)
                 PARALLEL.readByte();
 
                 Debug_printv("receive <<< " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
+
+                // // DolphinDOS Detection
+                // if ( PARALLEL.status( ATN ) )
+                // {
+                //     if ( IEC.data.secondary == IEC_OPEN || IEC.data.secondary == IEC_REOPEN )
+                //     {
+                //         IEC.protocol.flags xor_eq DOLPHIN_ACTIVE;
+                //         Debug_printv("dolphindos");
+                //     }
+                // }
+
+                // // WIC64
+                // if ( PARALLEL.status( PC2 ) )
+                // {
+                //     if ( PARALLEL.data == 0x57 ) // WiC64 commands start with 'W'
+                //     {
+                //         IEC.protocol.flags xor_eq WIC64_ACTIVE;
+                //         Debug_printv("wic64");                  
+                //     }
+                // }
             }
             else
             {
@@ -79,26 +93,6 @@ static void ml_parallel_intr_task(void* arg)
 
                 Debug_printv("send    >>> " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
             }
-
-            // // DolphinDOS Detection
-            // if ( PARALLEL.status( ATN ) )
-            // {
-            //     if ( IEC.data.secondary == IEC_OPEN || IEC.data.secondary == IEC_REOPEN )
-            //     {
-            //         IEC.protocol.flags xor_eq DOLPHIN_ACTIVE;
-            //         Debug_printv("dolphindos");
-            //     }
-            // }
-
-            // // WIC64
-            // if ( PARALLEL.status( PC2 ) )
-            // {
-            //     if ( PARALLEL.data == 0x57 ) // WiC64 commands start with 'W'
-            //     {
-            //         IEC.protocol.flags xor_eq WIC64_ACTIVE;
-            //         Debug_printv("wic64");                  
-            //     }
-            // }
         }
 
         vTaskDelay(portMAX_DELAY);

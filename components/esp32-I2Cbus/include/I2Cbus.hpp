@@ -29,6 +29,7 @@ IN THE SOFTWARE.
 #include "driver/gpio.h"
 #include "esp_err.h"
 
+//#define CONFIG_I2CBUS_LOG_READWRITES
 
 /* ^^^^^^
  * I2Cbus
