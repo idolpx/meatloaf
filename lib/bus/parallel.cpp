@@ -52,7 +52,7 @@ static void ml_parallel_intr_task(void* arg)
     {
         if(xQueueReceive(ml_parallel_evt_queue, &io_num, portMAX_DELAY)) 
         {
-            Debug_printv( "User Port Data Interrupt Received!" );
+            //Debug_printv( "User Port Data Interrupt Received!" );
 
             // Update flags and data
             PARALLEL.readByte();
@@ -94,8 +94,6 @@ static void ml_parallel_intr_task(void* arg)
                 Debug_printv("send    >>> " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
             }
         }
-
-        vTaskDelay(portMAX_DELAY);
     }
 }
 

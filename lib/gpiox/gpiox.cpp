@@ -180,7 +180,7 @@ void GPIOX::readGPIOX() {
 
 	this->PORT0 = buffer[0];
 	this->PORT1 = buffer[1];
-	Debug_printv("address[%.2X] port0[%.2X] port1[%.2X] din[%.2X] din_last[%.2X] ddr[%.2X]", _address, PORT0, PORT1, _DIN, _DIN_LAST, _DDR);
+	//Debug_printv("address[%.2X] port0[%.2X] port1[%.2X] din[%.2X] din_last[%.2X] ddr[%.2X]", _address, PORT0, PORT1, _DIN, _DIN_LAST, _DDR);
 }
 
 
@@ -194,9 +194,9 @@ void GPIOX::writeGPIOX() {
 	// Write two bytes
 	buffer[0] = value & 0x00FF;  // low byte
 	buffer[1] = value >> 8;      // high byte
-	Debug_printv("low[%.2X] high[%.2X]", buffer[0], buffer[1]);
+	//Debug_printv("low[%.2X] high[%.2X]", buffer[0], buffer[1]);
 	myI2C.writeBytes(_address, 2, buffer);
-	Debug_printv("address[%.2X] din[%.2X] dout[%.2X] ddr[%.2X] value[%.2X]", _address, _DIN, _DOUT, _DDR, value);
+	//Debug_printv("address[%.2X] din[%.2X] dout[%.2X] ddr[%.2X] value[%.2X]", _address, _DIN, _DOUT, _DDR, value);
 }
 
 void GPIOX::updateGPIOX() {
@@ -206,7 +206,7 @@ void GPIOX::updateGPIOX() {
 	// Set input bit mask
 	buffer[0] = _DDR & 0x00FF;  // low byte
 	buffer[1] = _DDR >> 8;      // high byte
-	Debug_printv("low[%.2X] high[%.2X]", buffer[0], buffer[1]);
+	//Debug_printv("low[%.2X] high[%.2X]", buffer[0], buffer[1]);
 	myI2C.writeBytes(_address, 2, buffer);
-	Debug_printv("address[%.2X] din[%.2X] dout[%.2X] ddr[%.2X]", _address, _DIN, _DOUT, _DDR);
+	//Debug_printv("address[%.2X] din[%.2X] dout[%.2X] ddr[%.2X]", _address, _DIN, _DOUT, _DDR);
 }
