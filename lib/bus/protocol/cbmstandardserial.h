@@ -102,7 +102,7 @@ namespace Protocol
             // communication must be reset
             uint16_t flags = CLEAR;
 
-            virtual int16_t receiveByte ( uint8_t device );
+            virtual int16_t receiveByte ();
             virtual bool sendByte ( uint8_t data, bool signalEOI );
             int16_t timeoutWait ( uint8_t pin, bool target_status, size_t wait = TIMEOUT, bool watch_atn = true );
             bool wait ( size_t wait );

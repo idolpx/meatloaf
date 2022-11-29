@@ -196,7 +196,7 @@ class iecBus
         bool senderTimeout();
 
         // Recieves a byte
-        int16_t receive ( uint8_t device = 0 );
+        int16_t receive();
 
         // Enabled Device Bit Mask
         uint32_t enabledDevices;

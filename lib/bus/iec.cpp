@@ -319,7 +319,7 @@ void iecBus::service ( void )
 
         // ATN was pulled read control code from the bus
         // protocol.pull ( PIN_IEC_SRQ );
-        int16_t c = ( bus_command_t ) receive ( this->data.device );
+        int16_t c = ( bus_command_t ) receive();
         // protocol.release ( PIN_IEC_SRQ );
 
         // Check for error
@@ -701,11 +701,11 @@ void iecBus::releaseLines ( bool wait )
 
 // IEC_receive receives a byte
 //
-int16_t iecBus::receive ( uint8_t device )
+int16_t iecBus::receive ()
 {
     int16_t data;
 
-    data = protocol.receiveByte ( device ); // Standard CBM Timing
+    data = protocol.receiveByte(); // Standard CBM Timing
 
 #ifdef DATA_STREAM
     if ( !(protocol.flags bitand ERROR) )

@@ -30,7 +30,7 @@ using namespace Protocol;
 // "ready  to  send"  signal  whenever  it  likes;  it  can  wait  a  long  time.    If  it's
 // a printer chugging out a line of print, or a disk drive with a formatting job in progress,
 // it might holdback for quite a while; there's no time limit.
-int16_t  CBMStandardSerial::receiveByte ( uint8_t device )
+int16_t  CBMStandardSerial::receiveByte ()
 {
     flags = CLEAR;
 
@@ -159,18 +159,18 @@ int16_t  CBMStandardSerial::receiveByte ( uint8_t device )
     }
     // release ( PIN_IEC_SRQ );
 
-    /* If there is a delay before the last bit, the controller uses JiffyDOS */
-    if ( flags bitand ATN_PULLED && bit_time >= 218 && n == 7 )
-    {
-        if ( ( data >> 1 ) < 0x60 && ( ( data >> 1 ) & 0x1f ) == device )
-        {
-            /* If it's for us, notify controller that we support Jiffy too */
-            // pull(PIN_IEC_DATA_OUT);
-            // delayMicroseconds(101); // nlq says 405us, but the code shows only 101
-            // release(PIN_IEC_DATA_OUT);
-            flags xor_eq JIFFY_ACTIVE;
-        }
-    }
+    // /* If there is a delay before the last bit, the controller uses JiffyDOS */
+    // if ( flags bitand ATN_PULLED && bit_time >= 218 && n == 7 )
+    // {
+    //     if ( ( data >> 1 ) < 0x60 && ( ( data >> 1 ) & 0x1f ) == device )
+    //     {
+    //         /* If it's for us, notify controller that we support Jiffy too */
+    //         // pull(PIN_IEC_DATA_OUT);
+    //         // delayMicroseconds(101); // nlq says 405us, but the code shows only 101
+    //         // release(PIN_IEC_DATA_OUT);
+    //         flags xor_eq JIFFY_ACTIVE;
+    //     }
+    // }
 
     // STEP 4: FRAME HANDSHAKE
     // After the eighth bit has been sent, it's the listener's turn to acknowledge.  At this moment, the Clock line  is  true
