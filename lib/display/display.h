@@ -9,7 +9,7 @@
 #include "FastLED.h"
 #include "FX.h"
 
-#include "../include/pinmap.h"
+#include "../../include/pinmap.h"
 // #define NUM_LEDS 5
 // #define DATA_PIN_1 27 
 // #define DATA_PIN_2 14
@@ -96,6 +96,8 @@ static const testModes_t testModes[] = {
 
 static void blinkWithFx_test(void *pvParameters);
 
+static void larsonfx(void *pvParameters);
+static void rainbowcyclefx(void *pvParameters);
 
 /*
 ** chase sequences are good for testing correctness, because you can see

@@ -53,6 +53,8 @@ build_flags =
     ;-D NO_PSRAM            ; if your hardware has no psram
     ;-D NO_BUTTONS          ; if your hardware has no physical buttons
     ;-D LED_STRIP           ; if your hardware has an led strip
+    ;-D PIEZO_BUZZER        ; if your hardware has a piezo buzzer
+    ;-D PARALLEL_BUS        ; if your hardware has parallel interface
     ;-D JTAG                ; enable use with JTAG debugger
     ;-D BLUETOOTH_SUPPORT   ; enable BlueTooth support
     ;-D VERBOSE_TNFS

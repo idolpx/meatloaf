@@ -1163,7 +1163,7 @@ bool iecDrive::saveFile()
 				ostream->write(b, b_len);
 			i++;
 
-			uint8_t f = IEC.protocol.flags;
+			uint16_t f = IEC.protocol.flags;
 			done = (f bitand EOI_RECVD) or (f bitand ERROR);
 
 			// Exit if ATN is PULLED while sending

@@ -43,6 +43,35 @@ static void IRAM_ATTR cbm_on_attention_isr_handler(void* arg)
     b->bus_state = BUS_ACTIVE;
 }
 
+static void ml_iec_intr_task(void* arg)
+{
+    while ( true ) 
+    {
+        IEC.service();
+        if ( IEC.bus_state < BUS_ACTIVE )
+            taskYIELD();
+    }
+}
+
+
+void iecBus::setup()
+{
+    // Start task
+    //xTaskCreate(ml_iec_intr_task, "ml_iec_intr_task", 2048, NULL, 10, NULL);
+    xTaskCreatePinnedToCore(ml_iec_intr_task, "ml_iec_intr_task", 4096, NULL, 10, NULL, 1);
+
+    // Setup interrupt for ATN
+    gpio_config_t io_conf = {
+        .pin_bit_mask = ( 1ULL << PIN_IEC_ATN ),    // bit mask of the pins that you want to set
+        .mode = GPIO_MODE_INPUT,                    // set as input mode
+        .pull_up_en = GPIO_PULLUP_DISABLE,          // disable pull-up mode
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,      // disable pull-down mode
+        .intr_type = GPIO_INTR_NEGEDGE              // interrupt of falling edge
+    };
+    //configure GPIO with the given settings
+    gpio_config(&io_conf);
+    gpio_isr_handler_add((gpio_num_t)PIN_IEC_ATN, cbm_on_attention_isr_handler, this);
+}
 
 
 /********************************************************
@@ -83,6 +112,7 @@ device_state_t iecDevice::queue_command ( void )
 std::shared_ptr<MStream> iecDevice::retrieveStream ( void )
 {
     size_t key = ( this->data.device * 100 ) + this->data.channel;
+    Debug_printv("Stream key[%d]", key);
 
     if ( streams.find ( key ) != streams.end() )
     {
@@ -104,24 +134,37 @@ bool iecDevice::registerStream (std::ios_base::open_mode mode, std::string m_fil
     auto file = Meat::New<MFile>(m_filename);
     std::shared_ptr<MStream> new_stream;
 
-    //Debug_printv("m_filename[%s]", m_filename.c_str());
-    new_stream = std::shared_ptr<MStream>(file->meatStream());
-
-    if ( new_stream == nullptr )
+    // LOAD / GET / INPUT
+    if ( mode == std::ios_base::in )
     {
-        return false;
+        Debug_printv("LOAD m_filename[%s]", m_filename.c_str());
+        new_stream = std::shared_ptr<MStream>(file->meatStream());
+
+        if ( new_stream == nullptr )
+        {
+            return false;
+        }
+
+        if( !new_stream->isOpen() )
+        {
+            //Debug_printv("Error creating istream");
+            return false;
+        }
+        else
+        {
+            // Close the stream if it is already open
+            closeStream();
+        }
     }
 
-    if( !new_stream->isOpen() )
-    {
-        //Debug_printv("Error creating istream");
-        return false;
-    }
+    // SAVE / PUT / PRINT / WRITE
     else
     {
-        // Close the stream if it is already open
-        closeStream();
+        Debug_printv("SAVE m_filename[%s]", m_filename.c_str());
+        // CREATE STREAM HERE FOR OUTPUT
+        return false;
     }
+
 
     size_t key = ( this->data.device * 100 ) + this->data.channel;
     auto newPair = std::make_pair ( key, new_stream );
@@ -249,7 +292,7 @@ void iecBus::service ( void )
         if ( pin_atn == PULLED )
         {
             // If RESET & ATN are both PULLED then CBM is off
-            this->bus_state = BUS_IDLE;
+            this->bus_state = BUS_OFFLINE;
             return;
         }
 
@@ -276,7 +319,7 @@ void iecBus::service ( void )
 
         // ATN was pulled read control code from the bus
         // protocol.pull ( PIN_IEC_SRQ );
-        int16_t c = ( bus_command_t ) receive ( this->data.device );
+        int16_t c = ( bus_command_t ) receive();
         // protocol.release ( PIN_IEC_SRQ );
 
         // Check for error
@@ -408,6 +451,11 @@ void iecBus::service ( void )
         // protocol.pull( PIN_IEC_SRQ );
         // Debug_println ( "DATA MODE" );
         // Debug_printf ( "bus[%d] device[%d] primary[%d] secondary[%d]", this->bus_state, this->device_state, this->data.primary, this->data.secondary );
+
+        if ( this->data.secondary == IEC_OPEN || this->data.secondary == IEC_REOPEN )
+        {
+            PARALLEL.handShake();
+        }
 
         // Data Mode - Get Command or Data
         if ( this->data.primary == IEC_LISTEN )
@@ -653,11 +701,11 @@ void iecBus::releaseLines ( bool wait )
 
 // IEC_receive receives a byte
 //
-int16_t iecBus::receive ( uint8_t device )
+int16_t iecBus::receive ()
 {
     int16_t data;
 
-    data = protocol.receiveByte ( device ); // Standard CBM Timing
+    data = protocol.receiveByte(); // Standard CBM Timing
 
 #ifdef DATA_STREAM
     if ( !(protocol.flags bitand ERROR) )
@@ -744,31 +792,19 @@ bool iecBus::isDeviceEnabled ( const uint8_t deviceNumber )
 void iecBus::enableDevice ( const uint8_t deviceNumber )
 {
     enabledDevices |= 1UL << deviceNumber;
+    protocol.enabledDevices = enabledDevices;
 } // enableDevice
 
 void iecBus::disableDevice ( const uint8_t deviceNumber )
 {
     enabledDevices &= ~ ( 1UL << deviceNumber );
+    protocol.enabledDevices = enabledDevices;
 } // disableDevice
 
 
 
-void iecBus::setup()
-{
-    // Debug_println("IEC SETUP");
 
-    // Setup interrupt for ATN
-    gpio_config_t io_conf = {
-        .pin_bit_mask = ( 1ULL << PIN_IEC_ATN ),    // bit mask of the pins that you want to set
-        .mode = GPIO_MODE_INPUT,                    // set as input mode
-        .pull_up_en = GPIO_PULLUP_DISABLE,          // disable pull-up mode
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,      // disable pull-down mode
-        .intr_type = GPIO_INTR_NEGEDGE              // interrupt of falling edge
-    };
-    //configure GPIO with the given settings
-    gpio_config(&io_conf);
-    gpio_isr_handler_add((gpio_num_t)PIN_IEC_ATN, cbm_on_attention_isr_handler, this);
-}
+
 
 void iecBus::shutdown()
 {

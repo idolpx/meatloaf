@@ -30,7 +30,7 @@ using namespace Protocol;
 // "ready  to  send"  signal  whenever  it  likes;  it  can  wait  a  long  time.    If  it's
 // a printer chugging out a line of print, or a disk drive with a formatting job in progress,
 // it might holdback for quite a while; there's no time limit.
-int16_t  CBMStandardSerial::receiveByte ( uint8_t device )
+int16_t  CBMStandardSerial::receiveByte ()
 {
     flags = CLEAR;
 
@@ -68,7 +68,7 @@ int16_t  CBMStandardSerial::receiveByte ( uint8_t device )
     // without  the Clock line going to true, it has a special task to perform: note EOI.
 
     // pull ( PIN_IEC_SRQ );
-    if ( timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMEOUT_Tne, false ) == TIMED_OUT )
+    if ( timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMEOUT_Tne, false ) >= TIMEOUT_Tne )
     {
         // INTERMISSION: EOI
         // If the Ready for Data signal isn't acknowledged by the talker within 200 microseconds, the
@@ -95,7 +95,7 @@ int16_t  CBMStandardSerial::receiveByte ( uint8_t device )
 
         // but still wait for CLK to be PULLED
         // Is this an empty stream?
-        if ( timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMING_EMPTY ) == TIMED_OUT )
+        if ( timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMING_EMPTY ) >= TIMING_EMPTY )
         {
             Debug_printv ( "empty stream signaled" );
             flags or_eq EMPTY_STREAM;
@@ -137,20 +137,39 @@ int16_t  CBMStandardSerial::receiveByte ( uint8_t device )
     {
         data >>= 1;
 
-        // wait for bit to be ready to read
-        if ( timeoutWait ( PIN_IEC_CLK_IN, RELEASED ) == TIMED_OUT )
+        do
         {
-            Debug_printv ( "wait for bit to be ready to read" );
-            flags or_eq ERROR;
-            return -1; // return error because timeout
-        }
+            // wait for bit to be ready to read
+            bit_time = timeoutWait ( PIN_IEC_CLK_IN, RELEASED, TIMING_JIFFY_ID );
 
+            /* If there is a delay before the last bit, the controller uses JiffyDOS */
+            if ( n == 7 && bit_time >= TIMING_JIFFY_ID && data < 0x60 && flags bitand ATN_PULLED )
+            {
+                uint8_t device = data & 0x1F;
+                if ( enabledDevices & ( 1 << device ) )
+                {
+                    /* If it's for us, notify controller that we support Jiffy too */
+                    pull(PIN_IEC_SRQ);
+                    //pull(PIN_IEC_DATA_OUT);
+                    delayMicroseconds(TIMING_JIFFY_ACK);
+                    //release(PIN_IEC_DATA_OUT);
+                    release(PIN_IEC_SRQ);
+                    flags xor_eq JIFFY_ACTIVE;
+                }
+            }
+            else if ( bit_time == TIMED_OUT )
+            {
+                Debug_printv ( "wait for bit to be ready to read, bit_time[%d]", bit_time );
+                flags or_eq ERROR;
+                return -1; // return error because timeout
+            }
+        } while ( bit_time >= 218 );
+        
         // get bit
         data or_eq ( status ( PIN_IEC_DATA_IN ) == RELEASED ? ( 1 << 7 ) : 0 );
 
         // wait for talker to finish sending bit
-        bit_time = timeoutWait ( PIN_IEC_CLK_IN, PULLED );
-        if ( bit_time == TIMED_OUT )
+        if ( timeoutWait ( PIN_IEC_CLK_IN, PULLED ) == TIMED_OUT )
         {
             Debug_printv ( "wait for talker to finish sending bit" );
             flags or_eq ERROR;
@@ -158,19 +177,6 @@ int16_t  CBMStandardSerial::receiveByte ( uint8_t device )
         }
     }
     // release ( PIN_IEC_SRQ );
-
-    /* If there is a delay before the last bit, the controller uses JiffyDOS */
-    if ( flags bitand ATN_PULLED && bit_time >= 218 && n == 7 )
-    {
-        if ( ( data >> 1 ) < 0x60 && ( ( data >> 1 ) & 0x1f ) == device )
-        {
-            /* If it's for us, notify controller that we support Jiffy too */
-            // pull(PIN_IEC_DATA_OUT);
-            // delayMicroseconds(101); // nlq says 405us, but the code shows only 101
-            // release(PIN_IEC_DATA_OUT);
-            flags xor_eq JIFFY_ACTIVE;
-        }
-    }
 
     // STEP 4: FRAME HANDSHAKE
     // After the eighth bit has been sent, it's the listener's turn to acknowledge.  At this moment, the Clock line  is  true
@@ -341,7 +347,7 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
     // one  millisecond  -  one  thousand  microseconds  -  it  will  know  that something's wrong and may alarm appropriately.
 
     // Wait for listener to accept data
-    if ( timeoutWait ( PIN_IEC_DATA_IN, PULLED, TIMEOUT_Tf ) == TIMED_OUT )
+    if ( timeoutWait ( PIN_IEC_DATA_IN, PULLED, TIMEOUT_Tf ) >= TIMEOUT_Tf )
     {
         Debug_printv ( "Wait for listener to acknowledge byte received" );
         return false; // return error because timeout
@@ -399,7 +405,10 @@ int16_t CBMStandardSerial::timeoutWait ( uint8_t pin, bool target_status, size_t
         if ( elapsed > wait && wait != FOREVER )
         {
             //release ( PIN_IEC_SRQ );
-            return -1;
+            if ( wait == TIMEOUT )
+                return -1;
+            
+            return wait;
         }
 
         if ( watch_atn )

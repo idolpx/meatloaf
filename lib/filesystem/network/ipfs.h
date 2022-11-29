@@ -5,6 +5,7 @@
 // https://ipfs.github.io/public-gateway-checker/
 // https://web3.storage/
 // https://docs.ipfs.tech/reference/kubo/rpc/#getting-started
+// https://www.sciencedirect.com/science/article/pii/S1877042811023998
 // 
 // List Directory
 // https://ipfs.io/api/v0/ls?arg=Qmbj4vDDkq4kapyfJk27dxzPjQjxvPSW2BhL1GVZngJthq

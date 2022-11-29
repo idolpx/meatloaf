@@ -32,7 +32,7 @@ namespace Protocol
     class DolphinDOS: public CBMStandardSerial
     {
         public:
-            int16_t receiveByte ( uint8_t device ) override;
+            int16_t receiveByte () override;
             bool sendByte ( uint8_t data, bool signalEOI ) override;
     };
 };

@@ -30,9 +30,9 @@ using namespace Protocol;
 // "ready  to  send"  signal  whenever  it  likes;  it  can  wait  a  long  time.    If  it's
 // a printer chugging out a line of print, or a disk drive with a formatting job in progress,
 // it might holdback for quite a while; there's no time limit.
-int16_t  DolphinDOS::receiveByte ( uint8_t device )
+int16_t  DolphinDOS::receiveByte ()
 {
-    flags = CLEAR;
+    flags and_eq CLEAR;
 
     // Sometimes the C64 pulls ATN but doesn't pull CLOCK right away
     if ( !wait ( 60 ) ) return -1;
@@ -95,7 +95,7 @@ int16_t  DolphinDOS::receiveByte ( uint8_t device )
 
         // but still wait for CLK to be PULLED
         // Is this an empty stream?
-        if ( timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMING_EMPTY ) == TIMED_OUT )
+        if ( timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMING_EMPTY ) >= TIMING_EMPTY )
         {
             Debug_printv ( "empty stream signaled" );
             flags or_eq EMPTY_STREAM;
@@ -190,7 +190,7 @@ int16_t  DolphinDOS::receiveByte ( uint8_t device )
 // it might holdback for quite a while; there's no time limit.
 bool DolphinDOS::sendByte ( uint8_t data, bool signalEOI )
 {
-    flags = CLEAR;
+    flags and_eq CLEAR;
 
     // // Sometimes the C64 doesn't release ATN right away
     // if ( !wait ( 200 ) ) return -1;
@@ -310,7 +310,7 @@ bool DolphinDOS::sendByte ( uint8_t data, bool signalEOI )
     // one  millisecond  -  one  thousand  microseconds  -  it  will  know  that something's wrong and may alarm appropriately.
 
     // Wait for listener to accept data
-    if ( timeoutWait ( PIN_IEC_DATA_IN, PULLED, TIMEOUT_Tf ) == TIMED_OUT )
+    if ( timeoutWait ( PIN_IEC_DATA_IN, PULLED, TIMEOUT_Tf ) >= TIMEOUT_Tf )
     {
         Debug_printv ( "Wait for listener to acknowledge byte received" );
         return false; // return error because timeout

@@ -33,6 +33,7 @@
 #endif
 #include "fnFsSD.h"
 
+#define digital_write     fnSystem.digital_write
 
 /**************************/
 // Meatloaf
@@ -115,6 +116,14 @@ void main_setup()
     fnKeyManager.setup();
     fnLedManager.setup();
 
+    // Enable/Disable Modem/Parallel Mode on Userport
+    fnSystem.set_pin_mode(PIN_MDMPAR_SW1, gpio_mode_t::GPIO_MODE_OUTPUT);
+    digital_write(PIN_MDMPAR_SW1, DIGI_LOW); // DISABLE Modem
+    //digital_write(PIN_MDMPAR_SW1, DIGI_HIGH); // ENABLE Modem
+    fnSystem.set_pin_mode(PIN_MDMPAR_SW2, gpio_mode_t::GPIO_MODE_OUTPUT);
+    digital_write(PIN_MDMPAR_SW2, DIGI_LOW); // DISABLE UP9600
+    //digital_write(PIN_MDMPAR_SW2, DIGI_HIGH); // ENABLE UP9600
+
 #ifdef FLASH_SPIFFS
     fnSPIFFS.start();
 #elif FLASH_LITTLEFS
@@ -137,12 +146,6 @@ void main_setup()
     IEC.setup();
     Serial.println( ANSI_GREEN_BOLD "IEC Bus Initialized" ANSI_RESET );
 
-#ifdef PARALLEL_BUS
-    // Setup Parallel Bus
-    PARALLEL.setup();
-    Serial.println( ANSI_GREEN_BOLD "Parallel Bus Initialized" ANSI_RESET );
-#endif
-
     // Add devices to bus
     IEC.enabledDevices = DEVICE_MASK;
     IEC.enableDevice(30);
@@ -157,6 +160,20 @@ void main_setup()
     }
     Serial.println( ANSI_RESET "]");
 
+#ifdef PARALLEL_BUS
+    // Setup Parallel Bus
+    PARALLEL.setup();
+    Serial.println( ANSI_GREEN_BOLD "Parallel Bus Initialized" ANSI_RESET );
+#endif
+
+#ifdef LED_STRIP
+        // Start LED Strip
+        display_app_main(); // fastled lib
+#endif
+
+#ifdef PIEZO_BUZZER
+        mlSoundManager.setup(); // start sound
+#endif
 
 #ifdef DEBUG
     unsigned long endms = fnSystem.millis();
@@ -170,25 +187,6 @@ void main_setup()
 #endif
 }
 
-
-
-// Main high-priority service loop
-void fn_service_loop(void *param)
-{
-    while (true)
-    {
-        // We don't have any delays in this loop, so IDLE threads will be starved
-        // Shouldn't be a problem, but something to keep in mind...
-
-#ifdef DEBUG_TIMING
-        IEC.debugTiming();
-#else
-        IEC.service();
-        if ( IEC.bus_state < BUS_ACTIVE )
-            taskYIELD();
-#endif
-    }
-}
 
 // Main high-priority service loop
 void fn_console_loop(void *param)
@@ -226,30 +224,8 @@ extern "C"
         // Call our setup routine
         main_setup();
 
-// Create a new high-priority task to handle the main loop
-// This is assigned to CPU1; the WiFi task ends up on CPU0
-#define MAIN_STACKSIZE 32768
-#define MAIN_PRIORITY 20
-#define MAIN_CPUAFFINITY 1
-        xTaskCreatePinnedToCore(fn_service_loop, "fnLoop",
-                                MAIN_STACKSIZE, nullptr, MAIN_PRIORITY, nullptr, MAIN_CPUAFFINITY);
-
-    
         // xTaskCreatePinnedToCore(fn_console_loop, "fnConsole", 
         //                         4096, nullptr, 1, nullptr, 0);
-
-#ifdef LED_STRIP
-        // Start LED Strip
-        //led_strip_main();  // led_strip feedback lib
-
-        //neopixel_main();  // neopixel lib
-
-        display_app_main(); // fastled lib
-#endif
-
-#ifdef PIEZO_BUZZER
-        mlSoundManager.setup(); // start sound
-#endif
 
         // Sit here twiddling our thumbs
         while (true)

@@ -1,18 +1,21 @@
 //
 // https://www.nxp.com/docs/en/data-sheet/PCF8575.pdf
+// https://www.nxp.com/docs/en/data-sheet/PCA9673.pdf
 //
 
-#ifndef PCF8575_H
-#define PCF8575_H
+#ifndef GPIOX_H
+#define GPIOX_H
+
+#include "../../include/pinmap.h"
 
 #include <I2Cbus.hpp>
 
-#define I2C_ADDRESS  0x20
-#define I2C_SDA      GPIO_NUM_21
-#define I2C_SCL      GPIO_NUM_22
-#define I2C_SPEED    400          // 400Khz Default
+#define I2C_SDA      PIN_GPIOX_SDA
+#define I2C_SCL      PIN_GPIOX_SCL
+#define I2C_ADDRESS  GPIOX_ADDRESS
+#define I2C_SPEED    GPIOX_SPEED
 
-/* PCF8575 port bits */
+/* GPIOX port bits */
 #define P00  0
 #define P01  1
 #define P02  2
@@ -31,47 +34,52 @@
 #define P17  15
 
 typedef enum {
-	PCF8575_PORT0 = 0,
-	PCF8575_PORT1 = 1,
-	PCF8575_BOTH = 2
+	GPIOX_MODE_OUTPUT = 0,
+	GPIOX_MODE_INPUT = 1
+} pin_mode_t;
+
+
+typedef enum {
+	GPIOX_PORT0 = 0,
+	GPIOX_PORT1 = 1,
+	GPIOX_BOTH = 2
 } port_t;
 
 /**
- * @brief PCF8575
+ * @brief GPIOX
  */
-class PCF8575 {
+class GPIOX {
 public:
 
 	/**
-	 * Create a new PCF8575 instance
+	 * Create a new GPIOX instance
 	 */
-	PCF8575();
+	GPIOX();
 
-	uint8_t PORT0;
-	uint8_t PORT1;
+	uint8_t PORT0; // PINS 00-07
+	uint8_t PORT1; // PINS 10-17
 
 	/**
 	 * Start the I2C controller and store the PCF8575 chip address
 	 */
-	void begin(uint8_t address = I2C_ADDRESS, gpio_num_t sda = I2C_SDA, gpio_num_t scl = I2C_SCL, uint16_t speed = I2C_SPEED);
+	void begin(gpio_num_t sda = I2C_SDA, gpio_num_t scl = I2C_SCL, uint8_t address = I2C_ADDRESS, uint16_t speed = I2C_SPEED);
 
 	/**
-	 * Set the direction of a pin (OUTPUT, INPUT or INPUT_PULLUP)
+	 * Set the direction of a pin (OUTPUT, INPUT)
 	 * 
 	 * @param pin The pin to set
 	 * @param mode The new mode of the pin
-	 * @remarks INPUT_PULLUP does physicaly the same thing as INPUT (no software pull-up resistors available) but is REQUIRED if you use external pull-up resistor
 	 */
-	void pinMode(uint8_t pin, uint8_t mode);
+	void pinMode(uint8_t pin, pin_mode_t mode);
 
 	/**
-	 * Set the direction of all port pins (INPUT or INPUT_PULLUP, OUTPUT)
+	 * Set the direction of all port pins (INPUT, OUTPUT)
 	 * 
 	 * @param port The port to set
 	 * @param mode The new mode of the pins
-	 * @remarks INPUT_PULLUP does physicaly the same thing as INPUT (no software pull-up resistors available) but is REQUIRED if you use external pull-up resistor
 	 */
-	void portMode(port_t port, uint8_t mode);
+	void portMode(port_t port, pin_mode_t mode);
+	void portMode(port_t port, uint16_t mode);
 
 	/**
 	 * Set the state of a pin (HIGH or LOW)
@@ -95,25 +103,26 @@ public:
 	 * 
 	 * @param value The new value of all pins (1 bit = 1 pin, '1' = HIGH, '0' = LOW)
 	 */
-	void write(uint16_t value, port_t port = PCF8575_BOTH);
+	void write(port_t port, uint16_t value);
+	void write(uint16_t value);
 
 	/**
 	 * Read the state of all pins in one go
 	 * 
 	 * @return The current value of all pins (1 bit = 1 pin, '1' = HIGH, '0' = LOW)
 	 */
-	uint16_t read(port_t port = PCF8575_PORT0);
+	uint16_t read(port_t port = GPIOX_BOTH);
 
 	/**
 	 * Exactly like write(0x00), set all pins to LOW
 	 */
-	void clear(port_t port = PCF8575_BOTH);
+	void clear(port_t port = GPIOX_BOTH);
 
 
 	/**
 	 * Exactly like write(0xFF), set all pins to HIGH
 	 */
-	void set(port_t port = PCF8575_BOTH);
+	void set(port_t port = GPIOX_BOTH);
 
 	/**
 	 * Toggle the state of a pin
@@ -125,32 +134,39 @@ protected:
 	I2C_t& myI2C = i2c0;  // i2c0 and i2c1 are the default objects
 
 	/** Current input pins values */
-	volatile uint16_t _PIN;
-	volatile uint16_t _oldPIN;
+	volatile uint16_t _DIN;
+	volatile uint16_t _DIN_LAST;
 
 	/** Output pins values */
-	volatile uint16_t _PORT;
+	volatile uint16_t _DOUT;
 
 	/** Pins modes values (OUTPUT or INPUT) */
 	volatile uint16_t _DDR;
 
-	/** PCF8575 I2C address */
+	/** GPIOX I2C address */
 	uint8_t _address;
 
 	/** 
-	 * Read GPIO states and store them in _PIN variable
+	 * Read GPIO states and store them in _DIN variable
 	 *
-	 * @remarks Before reading current GPIO states, current _PIN variable value is moved to _oldPIN variable
+	 * @remarks Before reading current GPIO states, current _DIN variable value is moved to _DIN_LAST variable
 	 */
-	void readGPIO();
+	void readGPIOX();
 
 	/** 
-	 * Write value of _PORT variable to the GPIO
+	 * Write value of _DOUT variable to the GPIOX
 	 * 
 	 * @remarks Only pin marked as OUTPUT are set, for INPUT pins their value are unchanged
 	 * @warning To work properly (and avoid any states conflicts) readGPIO() MUST be called before call this function !
 	 */
-	void updateGPIO();
+	void writeGPIOX();
+
+	/** 
+	 * Update INPUT/OUTPUT mode of all GPIOX pins
+	 * 
+	 * @remarks All pins modes are set to be equal to _DDR
+	 */
+	void updateGPIOX();
 };
 
-#endif // PCF8575_H
+#endif // GPIOX_H

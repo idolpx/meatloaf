@@ -21,7 +21,7 @@
 #include "basic_config.h"
 #include "device_db.h"
 
-#include "fnHttpClient.h"
+//#include "fnHttpClient.h"
 
 //std::unique_ptr<MFile> m_mfile(MFSOwner::File(""));
 
@@ -355,51 +355,51 @@ void httpStream(char *url)
     }
 }
 
-void httpGet(char *url)
-{
-    bool success = true;
-    size_t i = 0;
-    fnHttpClient http;
-    size_t b_len = 1;
-	uint8_t b[1];
+// void httpGet(char *url)
+// {
+//     bool success = true;
+//     size_t i = 0;
+//     fnHttpClient http;
+//     size_t b_len = 1;
+// 	uint8_t b[1];
 
-    // http.setUserAgent("some agent");
-    // http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
-    // http.setRedirectLimit(10);
+//     // http.setUserAgent("some agent");
+//     // http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
+//     // http.setRedirectLimit(10);
 
-    Debug_printf("[HTTP] begin... [%s]\n", url);
-    if (http.begin( url )) {  // HTTP
+//     Debug_printf("[HTTP] begin... [%s]\n", url);
+//     if (http.begin( url )) {  // HTTP
 
-      Serial.print("[HTTP] GET...\n");
-      // start connection and send HTTP header
-      int httpCode = http.GET();
-      size_t len = http.available();
+//       Serial.print("[HTTP] GET...\n");
+//       // start connection and send HTTP header
+//       int httpCode = http.GET();
+//       size_t len = http.available();
 
-      // httpCode will be negative on error
-      if (httpCode > 0) {
-        // HTTP header has been send and Server response header has been handled
-        Debug_printf("[HTTP] GET... code: %d\n", httpCode);
+//       // httpCode will be negative on error
+//       if (httpCode > 0) {
+//         // HTTP header has been send and Server response header has been handled
+//         Debug_printf("[HTTP] GET... code: %d\n", httpCode);
 
-        // file found at server
-        if (httpCode == HttpStatus_Ok || httpCode == HttpStatus_MovedPermanently) {
+//         // file found at server
+//         if (httpCode == HttpStatus_Ok || httpCode == HttpStatus_MovedPermanently) {
 
-            for(i=0;i < len; i++)
-            {
-                success = http.read(b, b_len);
-                if (success)
-                {
-                    Serial.write(b, b_len);
-                }
-            }
-        }
-      } else {
-        Debug_printf("[HTTP] GET... failed, error: %d\n", httpCode);
-      }
-      http.close();
-    } else {
-      Debug_printf("[HTTP} Unable to connect\n");
-    }
-}
+//             for(i=0;i < len; i++)
+//             {
+//                 success = http.read(b, b_len);
+//                 if (success)
+//                 {
+//                     Serial.write(b, b_len);
+//                 }
+//             }
+//         }
+//       } else {
+//         Debug_printf("[HTTP] GET... failed, error: %d\n", httpCode);
+//       }
+//       http.close();
+//     } else {
+//       Debug_printf("[HTTP} Unable to connect\n");
+//     }
+// }
 
 void testJson(MFile* srcFile, MFile* dstFile) {
     testHeader("C++ stream wrappers");

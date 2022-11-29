@@ -75,6 +75,9 @@
 #define TIMING_EMPTY   512     // SIGNAL EMPTY STREAM
 #define TIMING_STABLE  60      // WAIT FOR BUS TO BE STABLE
 
+#define TIMING_JIFFY_ID   218  // JIFFYDOS ENABLED DELAY ON LAST BIT
+#define TIMING_JIFFY_ACK  101  // JIFFYDOS ACK RESPONSE
+
 // See timeoutWait
 #define TIMEOUT 1000 // 1ms
 #define TIMED_OUT -1
@@ -101,8 +104,9 @@ namespace Protocol
         public:
             // communication must be reset
             uint16_t flags = CLEAR;
+            uint32_t enabledDevices;
 
-            virtual int16_t receiveByte ( uint8_t device );
+            virtual int16_t receiveByte ();
             virtual bool sendByte ( uint8_t data, bool signalEOI );
             int16_t timeoutWait ( uint8_t pin, bool target_status, size_t wait = TIMEOUT, bool watch_atn = true );
             bool wait ( size_t wait );

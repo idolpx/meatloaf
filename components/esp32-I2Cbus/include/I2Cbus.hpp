@@ -29,6 +29,7 @@ IN THE SOFTWARE.
 #include "driver/gpio.h"
 #include "esp_err.h"
 
+//#define CONFIG_I2CBUS_LOG_READWRITES
 
 /* ^^^^^^
  * I2Cbus
@@ -143,6 +144,8 @@ class I2C {
     esp_err_t readBits(uint8_t devAddr, uint8_t regAddr, uint8_t bitStart, uint8_t length, uint8_t *data, int32_t timeout = -1);
     esp_err_t readByte(uint8_t devAddr, uint8_t regAddr, uint8_t *data, int32_t timeout = -1);
     esp_err_t readBytes(uint8_t devAddr, uint8_t regAddr, size_t length, uint8_t *data, int32_t timeout = -1);
+
+    esp_err_t reset(int32_t timeout = -1);
 
     /**
      * @brief  Quick check to see if a slave device responds.

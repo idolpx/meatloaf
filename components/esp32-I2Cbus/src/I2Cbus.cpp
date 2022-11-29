@@ -163,8 +163,8 @@ esp_err_t I2C::writeBytes(uint8_t devAddr, size_t length, const uint8_t *data, i
         char str[length*5+1];
         for (size_t i = 0; i < length; i++)
             sprintf(str+i*5, "0x%s%X ", (data[i] < 0x10 ? "0" : ""), data[i]);
-        I2CBUS_LOG_RW("[port:%d, slave:0x%X] Write %d bytes to register 0x%X, data: %s",
-            port, devAddr, length, regAddr, str);
+        I2CBUS_LOG_RW("[port:%d, slave:0x%X] Write %d bytes, data: %s",
+            port, devAddr, length, str);
     }
 #endif
 #if defined CONFIG_I2CBUS_LOG_ERRORS
@@ -271,7 +271,7 @@ esp_err_t I2C::readBytes(uint8_t devAddr, size_t length, uint8_t *data, int32_t 
         char str[length*5+1];
         for (size_t i = 0; i < length; i++)
         sprintf(str+i*5, "0x%s%X ", (data[i] < 0x10 ? "0" : ""), data[i]);
-        I2CBUS_LOG_RW("[port:%d, slave:0x%X] Read_ %d bytes from register 0x%X, data: %s", port, devAddr, length, regAddr, str);
+        I2CBUS_LOG_RW("[port:%d, slave:0x%X] Read_ %d bytes, data: %s", port, devAddr, length, str);
     }
 #endif
 #if defined CONFIG_I2CBUS_LOG_ERRORS
@@ -323,6 +323,11 @@ esp_err_t I2C::readBytes(uint8_t devAddr, uint8_t regAddr, size_t length, uint8_
 /*******************************************************************************
  * UTILS
  ******************************************************************************/
+
+esp_err_t I2C::reset(int32_t timeout) {
+    return writeByte( 0x00, 0x06, timeout );
+}
+
 esp_err_t I2C::testConnection(uint8_t devAddr, int32_t timeout) {
     i2c_cmd_handle_t cmd = i2c_cmd_link_create();
     i2c_master_start(cmd);
