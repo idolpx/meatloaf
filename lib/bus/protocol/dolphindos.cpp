@@ -30,9 +30,9 @@ using namespace Protocol;
 // "ready  to  send"  signal  whenever  it  likes;  it  can  wait  a  long  time.    If  it's
 // a printer chugging out a line of print, or a disk drive with a formatting job in progress,
 // it might holdback for quite a while; there's no time limit.
-int16_t  DolphinDOS::receiveByte ( uint8_t device )
+int16_t  DolphinDOS::receiveByte ()
 {
-    flags = CLEAR;
+    flags and_eq CLEAR;
 
     // Sometimes the C64 pulls ATN but doesn't pull CLOCK right away
     if ( !wait ( 60 ) ) return -1;
@@ -190,7 +190,7 @@ int16_t  DolphinDOS::receiveByte ( uint8_t device )
 // it might holdback for quite a while; there's no time limit.
 bool DolphinDOS::sendByte ( uint8_t data, bool signalEOI )
 {
-    flags = CLEAR;
+    flags and_eq CLEAR;
 
     // // Sometimes the C64 doesn't release ATN right away
     // if ( !wait ( 200 ) ) return -1;

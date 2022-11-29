@@ -32,7 +32,7 @@
 // // it might holdback for quite a while; there's no time limit. 
 // int16_t  CBMStandardSerial::receiveByte(uint8_t device)
 // {
-// 	flags = CLEAR;
+// 	flags and_eq CLEAR;
 
 // 	// Wait for talker ready
 // 	if(timeoutWait(PIN_IEC_CLK_IN, RELEASED, FOREVER, 1) == TIMED_OUT)
@@ -199,7 +199,7 @@
 // // it might holdback for quite a while; there's no time limit.
 // bool CBMStandardSerial::sendByte(uint8_t data, bool signalEOI)
 // {
-// 	flags = CLEAR;
+// 	flags and_eq CLEAR;
 
 // 	// Say we're ready
 // 	release(PIN_IEC_CLK_OUT);
