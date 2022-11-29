@@ -68,7 +68,7 @@ int16_t  CBMStandardSerial::receiveByte ()
     // without  the Clock line going to true, it has a special task to perform: note EOI.
 
     // pull ( PIN_IEC_SRQ );
-    if ( timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMEOUT_Tne, false ) == TIMED_OUT )
+    if ( timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMEOUT_Tne, false ) >= TIMEOUT_Tne )
     {
         // INTERMISSION: EOI
         // If the Ready for Data signal isn't acknowledged by the talker within 200 microseconds, the
@@ -95,7 +95,7 @@ int16_t  CBMStandardSerial::receiveByte ()
 
         // but still wait for CLK to be PULLED
         // Is this an empty stream?
-        if ( timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMING_EMPTY ) == TIMED_OUT )
+        if ( timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMING_EMPTY ) >= TIMING_EMPTY )
         {
             Debug_printv ( "empty stream signaled" );
             flags or_eq EMPTY_STREAM;
@@ -140,32 +140,21 @@ int16_t  CBMStandardSerial::receiveByte ()
         do
         {
             // wait for bit to be ready to read
-            pull(PIN_IEC_SRQ);
-            bit_time = timeoutWait ( PIN_IEC_CLK_IN, RELEASED, 218 );
-            release(PIN_IEC_SRQ);
+            bit_time = timeoutWait ( PIN_IEC_CLK_IN, RELEASED, TIMING_JIFFY_ID );
 
             /* If there is a delay before the last bit, the controller uses JiffyDOS */
-            if ( n == 7 )
-                Debug_printv("bit_time[%d] data[%d]", bit_time, data);
-
-            if ( flags bitand ATN_PULLED && bit_time >= 218 && n == 7 )
+            if ( n == 7 && bit_time >= TIMING_JIFFY_ID && data < 0x60 && flags bitand ATN_PULLED )
             {
-                if ( data < 0x60 )
+                uint8_t device = data & 0x1F;
+                if ( enabledDevices & ( 1 << device ) )
                 {
-                    uint8_t device = data & 0x1F;
-                    Debug_printv("JIFFY ACTIVE bit_time[%d] data[%.2X] device[%d] flags[%.4X]", bit_time, data, device, flags);
-                    if ( enabledDevices & ( 1 << device ) )
-                    {
-                        //Debug_printv("JIFFY ACTIVE bit_time[%d] data[%.2X] device[%d] flags[%.4X]", bit_time, data, device, flags);
-
-                        /* If it's for us, notify controller that we support Jiffy too */
-                        pull(PIN_IEC_SRQ);
-                        pull(PIN_IEC_DATA_OUT);
-                        delayMicroseconds(101);
-                        release(PIN_IEC_DATA_OUT);
-                        release(PIN_IEC_SRQ);
-                        flags xor_eq JIFFY_ACTIVE;
-                    }
+                    /* If it's for us, notify controller that we support Jiffy too */
+                    pull(PIN_IEC_SRQ);
+                    //pull(PIN_IEC_DATA_OUT);
+                    delayMicroseconds(TIMING_JIFFY_ACK);
+                    //release(PIN_IEC_DATA_OUT);
+                    release(PIN_IEC_SRQ);
+                    flags xor_eq JIFFY_ACTIVE;
                 }
             }
             else if ( bit_time == TIMED_OUT )
@@ -358,7 +347,7 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
     // one  millisecond  -  one  thousand  microseconds  -  it  will  know  that something's wrong and may alarm appropriately.
 
     // Wait for listener to accept data
-    if ( timeoutWait ( PIN_IEC_DATA_IN, PULLED, TIMEOUT_Tf ) == TIMED_OUT )
+    if ( timeoutWait ( PIN_IEC_DATA_IN, PULLED, TIMEOUT_Tf ) >= TIMEOUT_Tf )
     {
         Debug_printv ( "Wait for listener to acknowledge byte received" );
         return false; // return error because timeout
@@ -416,7 +405,10 @@ int16_t CBMStandardSerial::timeoutWait ( uint8_t pin, bool target_status, size_t
         if ( elapsed > wait && wait != FOREVER )
         {
             //release ( PIN_IEC_SRQ );
-            return -1;
+            if ( wait == TIMEOUT )
+                return -1;
+            
+            return wait;
         }
 
         if ( watch_atn )

@@ -95,7 +95,7 @@ int16_t  DolphinDOS::receiveByte ()
 
         // but still wait for CLK to be PULLED
         // Is this an empty stream?
-        if ( timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMING_EMPTY ) == TIMED_OUT )
+        if ( timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMING_EMPTY ) >= TIMING_EMPTY )
         {
             Debug_printv ( "empty stream signaled" );
             flags or_eq EMPTY_STREAM;
@@ -310,7 +310,7 @@ bool DolphinDOS::sendByte ( uint8_t data, bool signalEOI )
     // one  millisecond  -  one  thousand  microseconds  -  it  will  know  that something's wrong and may alarm appropriately.
 
     // Wait for listener to accept data
-    if ( timeoutWait ( PIN_IEC_DATA_IN, PULLED, TIMEOUT_Tf ) == TIMED_OUT )
+    if ( timeoutWait ( PIN_IEC_DATA_IN, PULLED, TIMEOUT_Tf ) >= TIMEOUT_Tf )
     {
         Debug_printv ( "Wait for listener to acknowledge byte received" );
         return false; // return error because timeout
