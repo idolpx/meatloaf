@@ -133,6 +133,8 @@ void parallelBus::reset()
     // Debug_printv("flag2");
     // expander.pinMode( FLAG2, GPIOX_MODE_OUTPUT );
 
+    //Debug_printv("reset! bus_state[%d]", IEC.bus_state);
+
     //Debug_printv("userport flags");
     expander.portMode( USERPORT_FLAGS, 0x05 ); // Set PA2 & PC2 to INPUT
 
