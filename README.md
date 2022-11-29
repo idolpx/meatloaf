@@ -16,7 +16,7 @@ git submodule update --init --recursive
 ```
 
 ```
-Copy platformio.ini.sample to platform.ini
+Copy platformio.ini.sample to platformio.ini
 ```
 
 ```
