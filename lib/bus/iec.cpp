@@ -792,11 +792,13 @@ bool iecBus::isDeviceEnabled ( const uint8_t deviceNumber )
 void iecBus::enableDevice ( const uint8_t deviceNumber )
 {
     enabledDevices |= 1UL << deviceNumber;
+    protocol.enabledDevices = enabledDevices;
 } // enableDevice
 
 void iecBus::disableDevice ( const uint8_t deviceNumber )
 {
     enabledDevices &= ~ ( 1UL << deviceNumber );
+    protocol.enabledDevices = enabledDevices;
 } // disableDevice
 
 

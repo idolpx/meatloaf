@@ -101,6 +101,7 @@ namespace Protocol
         public:
             // communication must be reset
             uint16_t flags = CLEAR;
+            uint32_t enabledDevices;
 
             virtual int16_t receiveByte ();
             virtual bool sendByte ( uint8_t data, bool signalEOI );
