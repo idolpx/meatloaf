@@ -140,20 +140,18 @@ int16_t  CBMStandardSerial::receiveByte ()
         do
         {
             // wait for bit to be ready to read
-            bit_time = timeoutWait ( PIN_IEC_CLK_IN, RELEASED, TIMING_JIFFY_ID );
+            bit_time = timeoutWait ( PIN_IEC_CLK_IN, RELEASED, TIMING_JIFFY_DETECT );
 
             /* If there is a delay before the last bit, the controller uses JiffyDOS */
-            if ( n == 7 && bit_time >= TIMING_JIFFY_ID && data < 0x60 && flags bitand ATN_PULLED )
+            if ( n == 7 && bit_time >= TIMING_JIFFY_DETECT && data < 0x60 && flags bitand ATN_PULLED )
             {
                 uint8_t device = data & 0x1F;
                 if ( enabledDevices & ( 1 << device ) )
                 {
                     /* If it's for us, notify controller that we support Jiffy too */
-                    pull(PIN_IEC_SRQ);
-                    //pull(PIN_IEC_DATA_OUT);
+                    pull(PIN_IEC_DATA_OUT);
                     delayMicroseconds(TIMING_JIFFY_ACK);
-                    //release(PIN_IEC_DATA_OUT);
-                    release(PIN_IEC_SRQ);
+                    release(PIN_IEC_DATA_OUT);
                     flags xor_eq JIFFY_ACTIVE;
                 }
             }
@@ -405,7 +403,7 @@ int16_t CBMStandardSerial::timeoutWait ( uint8_t pin, bool target_status, size_t
         if ( elapsed > wait && wait != FOREVER )
         {
             //release ( PIN_IEC_SRQ );
-            if ( wait == TIMEOUT )
+            if ( wait == TIMEOUT_DEFAULT )
                 return -1;
             
             return wait;

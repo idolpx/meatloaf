@@ -18,6 +18,7 @@
 #ifndef MEATLOAF_BUS_IEC
 #define MEATLOAF_BUS_IEC
 
+#include <iostream>
 #include <forward_list>
 #include <unordered_map>
 
@@ -25,7 +26,7 @@
 #include "meat_stream.h"
 
 #include "protocol/cbmstandardserial.h"
-//#include "protocol/jiffydos.h"
+#include "protocol/jiffydos.h"
 #include "protocol/dolphindos.h"
 
 #include "../../include/debug.h"
@@ -144,6 +145,17 @@ typedef enum
     IEC_OPEN = 0xF0        // 0xF0 + channel (OPEN NAMED CHANNEL) (0-15)
 } bus_command_t;
 
+typedef enum {
+    PROTOCOL_CBM_SERIAL,
+    PROTOCOL_CBM_FAST,
+    PROTOCOL_JIFFYDOS,
+    PROTOCOL_EPYXFASTLOAD,
+    PROTOCOL_WARPSPEED,
+    PROTOCOL_DOLPHINDOS,
+    PROTOCOL_WIC64,
+    PROTOCOL_IEEE488
+} bus_protocol_t;
+
 class iecBus
 {
     private:
@@ -162,8 +174,25 @@ class iecBus
         bus_state_t bus_state;
         IECData data;
 
+        bus_protocol_t active_protocol = PROTOCOL_CBM_SERIAL;
         //std::unique_ptr<CBMStandardSerial> protocol = CBMStandardSerial();
-        CBMStandardSerial protocol;
+        //CBMStandardSerial protocol;
+
+        JiffyDOS protocolJiffyDOS;
+        DolphinDOS protocolDolphinDOS;
+        CBMStandardSerial protocolCBMStandardSerial;
+
+        CBMStandardSerial *protocol;
+
+        void selectProtocol() {
+            if ( active_protocol == PROTOCOL_JIFFYDOS ) {
+                protocol = static_cast<CBMStandardSerial*>(&protocolJiffyDOS);
+            } else if ( active_protocol == PROTOCOL_DOLPHINDOS ) {
+                protocol = static_cast<CBMStandardSerial*>(&protocolDolphinDOS);
+            } else {
+                protocol = static_cast<CBMStandardSerial*>(&protocolCBMStandardSerial);
+            }
+        }
 
         iecBus ( void );
 

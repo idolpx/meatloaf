@@ -75,11 +75,11 @@
 #define TIMING_EMPTY   512     // SIGNAL EMPTY STREAM
 #define TIMING_STABLE  60      // WAIT FOR BUS TO BE STABLE
 
-#define TIMING_JIFFY_ID   218  // JIFFYDOS ENABLED DELAY ON LAST BIT
-#define TIMING_JIFFY_ACK  101  // JIFFYDOS ACK RESPONSE
+#define TIMING_JIFFY_DETECT   218  // JIFFYDOS ENABLED DELAY ON LAST BIT
+#define TIMING_JIFFY_ACK      101  // JIFFYDOS ACK RESPONSE
 
 // See timeoutWait
-#define TIMEOUT 1000 // 1ms
+#define TIMEOUT_DEFAULT 1000 // 1ms
 #define TIMED_OUT -1
 #define FOREVER 0
 
@@ -108,7 +108,7 @@ namespace Protocol
 
             virtual int16_t receiveByte ();
             virtual bool sendByte ( uint8_t data, bool signalEOI );
-            int16_t timeoutWait ( uint8_t pin, bool target_status, size_t wait = TIMEOUT, bool watch_atn = true );
+            int16_t timeoutWait ( uint8_t pin, bool target_status, size_t wait = TIMEOUT_DEFAULT, bool watch_atn = true );
             bool wait ( size_t wait );
 
 

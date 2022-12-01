@@ -60,7 +60,7 @@ static void ml_parallel_intr_task(void* arg)
                     // {
                     //     if ( IEC.data.secondary == IEC_OPEN || IEC.data.secondary == IEC_REOPEN )
                     //     {
-                    //         IEC.protocol.flags xor_eq DOLPHIN_ACTIVE;
+                    //         IEC.protocol->flags xor_eq DOLPHIN_ACTIVE;
                     //         Debug_printv("dolphindos");
                     //     }
                     // }
@@ -70,7 +70,7 @@ static void ml_parallel_intr_task(void* arg)
                     // {
                     //     if ( PARALLEL.data == 0x57 ) // WiC64 commands start with 'W'
                     //     {
-                    //         IEC.protocol.flags xor_eq WIC64_ACTIVE;
+                    //         IEC.protocol->flags xor_eq WIC64_ACTIVE;
                     //         Debug_printv("wic64");                  
                     //     }
                     // }
