@@ -101,6 +101,10 @@ namespace Protocol
 {
     class CBMStandardSerial
     {
+        private:
+            virtual int16_t receiveBits ();
+            virtual bool sendBits ( uint8_t data );
+
         public:
             // communication must be reset
             uint16_t flags = CLEAR;

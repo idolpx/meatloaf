@@ -240,6 +240,8 @@ bool iecBus::init()
     protocol->set_pin_mode ( PIN_IEC_RESET, INPUT );
 #endif
 
+    active_protocol = PROTOCOL_CBM_SERIAL;
+    selectProtocol();
     protocol->flags = CLEAR;
 
     return true;

@@ -26,9 +26,9 @@ namespace Protocol
 {
 	class JiffyDOS : public CBMStandardSerial
 	{
-		protected:
-			int16_t receiveByte(void) override;
-			bool sendByte(uint8_t data, bool signalEOI) override;
+        private:
+            int16_t receiveBits ( void ) override;
+            bool sendBits ( uint8_t data ) override;
 	};
 };
 

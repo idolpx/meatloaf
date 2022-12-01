@@ -31,9 +31,9 @@ namespace Protocol
 {
     class DolphinDOS: public CBMStandardSerial
     {
-        public:
-            int16_t receiveByte () override;
-            bool sendByte ( uint8_t data, bool signalEOI ) override;
+        private:
+            int16_t receiveBits () override;
+            bool sendBits ( uint8_t data ) override;
     };
 };
 

@@ -105,24 +105,55 @@ int16_t  CBMStandardSerial::receiveByte ()
     // release ( PIN_IEC_SRQ );
 
 
-    // STEP 3: SENDING THE BITS
-    // The talker has eight bits to send.  They will go out without handshake; in other words,
-    // the listener had better be there to catch them, since the talker won't wait to hear from the listener.  At this
-    // point, the talker controls both lines, Clock and Data.  At the beginning of the sequence, it is holding the
-    // Clock true, while the Data line is RELEASED to false.  the Data line will change soon, since we'll sendthe data
-    // over it. The eights bits will go out from the character one at a time, with the least significant bit going first.
-    // For example, if the character is the ASCII question mark, which is  written  in  binary  as  00011111,  the  ones
-    // will  go out  first,  followed  by  the  zeros.  Now,  for  each bit, we set the Data line true or false according
-    // to whether the bit is one or zero.  As soon as that'sset, the Clock line is RELEASED to false, signalling "data ready."
-    // The talker will typically have a bit in  place  and  be  signalling  ready  in  70  microseconds  or  less.  Once
-    // the  talker  has  signalled  "data ready," it will hold the two lines steady for at least 20 microseconds timing needs
-    // to be increased to 60  microseconds  if  the  Commodore  64  is  listening,  since  the  64's  video  chip  may
-    // interrupt  the processor for 42 microseconds at a time, and without the extra wait the 64 might completely miss a
-    // bit. The listener plays a passive role here; it sends nothing, and just watches.  As soon as it sees the Clock line
-    // false, it grabs the bit from the Data line and puts it away.  It then waits for the clock line to go true, in order
-    // to prepare for the next bit. When the talker figures the data has been held for a sufficient  length  of  time,  it
-    // pulls  the  Clock  line true  and  releases  the  Data  line  to  false.    Then  it starts to prepare the next bit.
+    // STEP 3: RECEIVING THE BITS
+    uint8_t data = receiveBits();
 
+
+    // STEP 4: FRAME HANDSHAKE
+    // After the eighth bit has been sent, it's the listener's turn to acknowledge.  At this moment, the Clock line  is  true
+    // and  the  Data  line  is  false.    The  listener  must  acknowledge  receiving  the  byte  OK  by pulling the Data
+    // line to true. The talker is now watching the Data line.  If the listener doesn't pull the  Data  line  true  within
+    // one  millisecond  -  one  thousand  microseconds  -  it  will  know  that something's wrong and may alarm appropriately.
+
+    // Acknowledge byte received
+    if ( !wait ( TIMING_Tf ) ) return -1;
+    pull ( PIN_IEC_DATA_OUT );
+
+    // STEP 5: START OVER
+    // We're  finished,  and  back  where  we  started.    The  talker  is  holding  the  Clock  line  true,
+    // and  the listener is holding the Data line true. We're ready for step 1; we may send another character - unless EOI has
+    // happened. If EOI was sent or received in this last transmission, both talker and listener "letgo."  After a suitable pause,
+    // the Clock and Data lines are RELEASED to false and transmission stops.
+
+    if ( flags bitand EOI_RECVD )
+    {
+        // EOI Received
+        delayMicroseconds ( TIMING_Tfr );
+        release ( PIN_IEC_DATA_OUT );
+    }
+
+    return data;
+} // receiveByte
+
+// STEP 3: RECEIVING THE BITS
+// The talker has eight bits to send.  They will go out without handshake; in other words,
+// the listener had better be there to catch them, since the talker won't wait to hear from the listener.  At this
+// point, the talker controls both lines, Clock and Data.  At the beginning of the sequence, it is holding the
+// Clock true, while the Data line is RELEASED to false.  the Data line will change soon, since we'll sendthe data
+// over it. The eights bits will go out from the character one at a time, with the least significant bit going first.
+// For example, if the character is the ASCII question mark, which is  written  in  binary  as  00011111,  the  ones
+// will  go out  first,  followed  by  the  zeros.  Now,  for  each bit, we set the Data line true or false according
+// to whether the bit is one or zero.  As soon as that'sset, the Clock line is RELEASED to false, signalling "data ready."
+// The talker will typically have a bit in  place  and  be  signalling  ready  in  70  microseconds  or  less.  Once
+// the  talker  has  signalled  "data ready," it will hold the two lines steady for at least 20 microseconds timing needs
+// to be increased to 60  microseconds  if  the  Commodore  64  is  listening,  since  the  64's  video  chip  may
+// interrupt  the processor for 42 microseconds at a time, and without the extra wait the 64 might completely miss a
+// bit. The listener plays a passive role here; it sends nothing, and just watches.  As soon as it sees the Clock line
+// false, it grabs the bit from the Data line and puts it away.  It then waits for the clock line to go true, in order
+// to prepare for the next bit. When the talker figures the data has been held for a sufficient  length  of  time,  it
+// pulls  the  Clock  line true  and  releases  the  Data  line  to  false.    Then  it starts to prepare the next bit.
+int16_t  CBMStandardSerial::receiveBits ()
+{
     // Listening for bits
 #if defined(ESP8266)
     ESP.wdtFeed();
@@ -174,33 +205,10 @@ int16_t  CBMStandardSerial::receiveByte ()
             return -1; // return error because timeout
         }
     }
-    // release ( PIN_IEC_SRQ );
-
-    // STEP 4: FRAME HANDSHAKE
-    // After the eighth bit has been sent, it's the listener's turn to acknowledge.  At this moment, the Clock line  is  true
-    // and  the  Data  line  is  false.    The  listener  must  acknowledge  receiving  the  byte  OK  by pulling the Data
-    // line to true. The talker is now watching the Data line.  If the listener doesn't pull the  Data  line  true  within
-    // one  millisecond  -  one  thousand  microseconds  -  it  will  know  that something's wrong and may alarm appropriately.
-
-    // Acknowledge byte received
-    if ( !wait ( TIMING_Tf ) ) return -1;
-    pull ( PIN_IEC_DATA_OUT );
-
-    // STEP 5: START OVER
-    // We're  finished,  and  back  where  we  started.    The  talker  is  holding  the  Clock  line  true,
-    // and  the listener is holding the Data line true. We're ready for step 1; we may send another character - unless EOI has
-    // happened. If EOI was sent or received in this last transmission, both talker and listener "letgo."  After a suitable pause,
-    // the Clock and Data lines are RELEASED to false and transmission stops.
-
-    if ( flags bitand EOI_RECVD )
-    {
-        // EOI Received
-        delayMicroseconds ( TIMING_Tfr );
-        release ( PIN_IEC_DATA_OUT );
-    }
 
     return data;
-} // receiveByte
+} // receiveBits
+
 
 
 // STEP 1: READY TO SEND
@@ -284,22 +292,63 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
     // }
 
     // STEP 3: SENDING THE BITS
-    // The talker has eight bits to send.  They will go out without handshake; in other words,
-    // the listener had better be there to catch them, since the talker won't wait to hear from the listener.  At this
-    // point, the talker controls both lines, Clock and Data.  At the beginning of the sequence, it is holding the
-    // Clock true, while the Data line is RELEASED to false.  the Data line will change soon, since we'll sendthe data
-    // over it. The eights bits will go out from the character one at a time, with the least significant bit going first.
-    // For example, if the character is the ASCII question mark, which is  written  in  binary  as  00011111,  the  ones
-    // will  go out  first,  followed  by  the  zeros.  Now,  for  each bit, we set the Data line true or false according
-    // to whether the bit is one or zero.  As soon as that'sset, the Clock line is RELEASED to false, signalling "data ready."
-    // The talker will typically have a bit in  place  and  be  signalling  ready  in  70  microseconds  or  less.  Once
-    // the  talker  has  signalled  "data ready," it will hold the two lines steady for at least 20 microseconds timing needs
-    // to be increased to 60  microseconds  if  the  Commodore  64  is  listening,  since  the  64's  video  chip  may
-    // interrupt  the processor for 42 microseconds at a time, and without the extra wait the 64 might completely miss a
-    // bit. The listener plays a passive role here; it sends nothing, and just watches.  As soon as it sees the Clock line
-    // false, it grabs the bit from the Data line and puts it away.  It then waits for the clock line to go true, in order
-    // to prepare for the next bit. When the talker figures the data has been held for a sufficient  length  of  time,  it
-    // pulls  the  Clock  line true  and  releases  the  Data  line  to  false.    Then  it starts to prepare the next bit.
+    if ( !sendBits( data ) )
+        return false;
+
+
+    // STEP 4: FRAME HANDSHAKE
+    // After the eighth bit has been sent, it's the listener's turn to acknowledge.  At this moment, the Clock line  is  true
+    // and  the  Data  line  is  false.    The  listener  must  acknowledge  receiving  the  byte  OK  by pulling the Data
+    // line to true. The talker is now watching the Data line.  If the listener doesn't pull the  Data  line  true  within
+    // one  millisecond  -  one  thousand  microseconds  -  it  will  know  that something's wrong and may alarm appropriately.
+
+    // Wait for listener to accept data
+    if ( timeoutWait ( PIN_IEC_DATA_IN, PULLED, TIMEOUT_Tf ) >= TIMEOUT_Tf )
+    {
+        Debug_printv ( "Wait for listener to acknowledge byte received" );
+        return false; // return error because timeout
+    }
+
+    // STEP 5: START OVER
+    // We're  finished,  and  back  where  we  started.    The  talker  is  holding  the  Clock  line  true,
+    // and  the listener is holding the Data line true. We're ready for step 1; we may send another character - unless EOI has
+    // happened. If EOI was sent or received in this last transmission, both talker and listener "letgo."  After a suitable pause,
+    // the Clock and Data lines are RELEASED to false and transmission stops.
+
+    if ( signalEOI )
+    {
+        // EOI Received
+        if ( !wait ( TIMING_Tfr ) ) return false;
+        release ( PIN_IEC_CLK_OUT );
+    }
+    // else
+    // {
+    //     wait ( TIMING_Tbb );
+    // }
+
+    return true;
+} // sendByte
+
+
+// STEP 3: SENDING THE BITS
+// The talker has eight bits to send.  They will go out without handshake; in other words,
+// the listener had better be there to catch them, since the talker won't wait to hear from the listener.  At this
+// point, the talker controls both lines, Clock and Data.  At the beginning of the sequence, it is holding the
+// Clock true, while the Data line is RELEASED to false.  the Data line will change soon, since we'll sendthe data
+// over it. The eights bits will go out from the character one at a time, with the least significant bit going first.
+// For example, if the character is the ASCII question mark, which is  written  in  binary  as  00011111,  the  ones
+// will  go out  first,  followed  by  the  zeros.  Now,  for  each bit, we set the Data line true or false according
+// to whether the bit is one or zero.  As soon as that'sset, the Clock line is RELEASED to false, signalling "data ready."
+// The talker will typically have a bit in  place  and  be  signalling  ready  in  70  microseconds  or  less.  Once
+// the  talker  has  signalled  "data ready," it will hold the two lines steady for at least 20 microseconds timing needs
+// to be increased to 60  microseconds  if  the  Commodore  64  is  listening,  since  the  64's  video  chip  may
+// interrupt  the processor for 42 microseconds at a time, and without the extra wait the 64 might completely miss a
+// bit. The listener plays a passive role here; it sends nothing, and just watches.  As soon as it sees the Clock line
+// false, it grabs the bit from the Data line and puts it away.  It then waits for the clock line to go true, in order
+// to prepare for the next bit. When the talker figures the data has been held for a sufficient  length  of  time,  it
+// pulls  the  Clock  line true  and  releases  the  Data  line  to  false.    Then  it starts to prepare the next bit.
+bool CBMStandardSerial::sendBits ( uint8_t data )
+{
 
     // Send bits
 #if defined(ESP8266)
@@ -337,40 +386,8 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
     // Release data line after byte sent
     release ( PIN_IEC_DATA_OUT );
 
-
-    // STEP 4: FRAME HANDSHAKE
-    // After the eighth bit has been sent, it's the listener's turn to acknowledge.  At this moment, the Clock line  is  true
-    // and  the  Data  line  is  false.    The  listener  must  acknowledge  receiving  the  byte  OK  by pulling the Data
-    // line to true. The talker is now watching the Data line.  If the listener doesn't pull the  Data  line  true  within
-    // one  millisecond  -  one  thousand  microseconds  -  it  will  know  that something's wrong and may alarm appropriately.
-
-    // Wait for listener to accept data
-    if ( timeoutWait ( PIN_IEC_DATA_IN, PULLED, TIMEOUT_Tf ) >= TIMEOUT_Tf )
-    {
-        Debug_printv ( "Wait for listener to acknowledge byte received" );
-        return false; // return error because timeout
-    }
-
-    // STEP 5: START OVER
-    // We're  finished,  and  back  where  we  started.    The  talker  is  holding  the  Clock  line  true,
-    // and  the listener is holding the Data line true. We're ready for step 1; we may send another character - unless EOI has
-    // happened. If EOI was sent or received in this last transmission, both talker and listener "letgo."  After a suitable pause,
-    // the Clock and Data lines are RELEASED to false and transmission stops.
-
-    if ( signalEOI )
-    {
-        // EOI Received
-        if ( !wait ( TIMING_Tfr ) ) return false;
-        release ( PIN_IEC_CLK_OUT );
-    }
-    // else
-    // {
-    //     wait ( TIMING_Tbb );
-    // }
-
     return true;
-} // sendByte
-
+} // sendBits
 
 
 // Wait indefinitely if wait = 0 or until ATN status changes
