@@ -32,7 +32,8 @@ using namespace Protocol;
 // it might holdback for quite a while; there's no time limit.
 int16_t  CBMStandardSerial::receiveByte ()
 {
-    flags = CLEAR;
+//    flags = CLEAR;
+    flags and_eq CLEAR_LOW;
 
     // Sometimes the C64 pulls ATN but doesn't pull CLOCK right away
     if ( !wait ( 60 ) ) return -1;
@@ -192,7 +193,7 @@ int16_t  CBMStandardSerial::receiveBits ()
                 flags or_eq ERROR;
                 return -1; // return error because timeout
             }
-        } while ( bit_time >= 218 );
+        } while ( bit_time >= TIMING_JIFFY_DETECT );
         
         // get bit
         data or_eq ( status ( PIN_IEC_DATA_IN ) == RELEASED ? ( 1 << 7 ) : 0 );
@@ -221,7 +222,8 @@ int16_t  CBMStandardSerial::receiveBits ()
 // it might holdback for quite a while; there's no time limit.
 bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
 {
-    flags = CLEAR;
+//    flags = CLEAR;
+    flags and_eq CLEAR_LOW;
 
     // // Sometimes the C64 doesn't release ATN right away
     // if ( !wait ( 200 ) ) return -1;
@@ -349,7 +351,6 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
 // pulls  the  Clock  line true  and  releases  the  Data  line  to  false.    Then  it starts to prepare the next bit.
 bool CBMStandardSerial::sendBits ( uint8_t data )
 {
-
     // Send bits
 #if defined(ESP8266)
     ESP.wdtFeed();

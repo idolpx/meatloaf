@@ -1045,7 +1045,7 @@ bool iecDrive::sendFile()
 			// Exit if ATN is PULLED while sending
 			if ( IEC.protocol->flags bitand ATN_PULLED )
 			{
-				//Debug_printv("ATN pulled while sending. i[%d]", i);
+				Debug_printv("ATN pulled while sending. i[%d]", i);
 				// Save file pointer position
 				// streamUpdate( istream );
 				istream->seek(istream->position() - 1);

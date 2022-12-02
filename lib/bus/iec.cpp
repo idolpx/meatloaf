@@ -344,6 +344,12 @@ void iecBus::service ( void )
             if ( protocol->flags bitand JIFFY_ACTIVE )
             {
                 Debug_printf ( "[JIFFY]" );
+                active_protocol = PROTOCOL_JIFFYDOS;
+            }
+            if ( protocol->flags bitand DOLPHIN_ACTIVE )
+            {
+                Debug_printf ( "[DOLPHIN]" );
+                active_protocol = PROTOCOL_DOLPHINDOS;
             }
 
             // Decode command byte
@@ -487,6 +493,9 @@ void iecBus::service ( void )
         {
             //Debug_printv("device idle");
             this->data.init();
+            active_protocol = PROTOCOL_CBM_SERIAL;
+            selectProtocol();
+            protocol->flags = CLEAR;
         }
 
         this->bus_state = BUS_IDLE;
@@ -518,6 +527,9 @@ bus_state_t iecBus::deviceListen ( void )
     // OPEN or DATA
     else if ( this->data.secondary == IEC_OPEN || this->data.secondary == IEC_REOPEN )
     {
+        // Switch to detected protocol
+        selectProtocol();
+
         // Record the command string until ATN is PULLED
         std::string listen_command = "";
 
@@ -725,9 +737,7 @@ bool iecBus::send ( uint8_t data )
 #ifdef DATA_STREAM
     Debug_printf ( "%.2X ", data );
 #endif
-    // IEC.protocol->pull(PIN_IEC_SRQ);
     bool r = protocol->sendByte ( data, false ); // Standard CBM Timing
-    // IEC.protocol->release(PIN_IEC_SRQ);
 
     return r;
 } // send

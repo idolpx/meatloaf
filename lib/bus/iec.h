@@ -182,9 +182,10 @@ class iecBus
         DolphinDOS protocolDolphinDOS;
         CBMStandardSerial protocolCBMStandardSerial;
 
-        CBMStandardSerial *protocol;
+        CBMStandardSerial *protocol = static_cast<CBMStandardSerial*>(&protocolCBMStandardSerial);
 
         void selectProtocol() {
+            uint16_t flags_cp = protocol->flags;
             if ( active_protocol == PROTOCOL_JIFFYDOS ) {
                 protocol = static_cast<CBMStandardSerial*>(&protocolJiffyDOS);
             } else if ( active_protocol == PROTOCOL_DOLPHINDOS ) {
@@ -192,6 +193,8 @@ class iecBus
             } else {
                 protocol = static_cast<CBMStandardSerial*>(&protocolCBMStandardSerial);
             }
+            protocol->flags = flags_cp;
+            Debug_printv("protocol[%d]", active_protocol);
         }
 
         iecBus ( void );
