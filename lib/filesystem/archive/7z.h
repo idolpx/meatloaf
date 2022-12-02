@@ -1,5 +1,5 @@
-#ifndef MEATLOAF_ARCHIVE_7Z
-#define MEATLOAF_ARCHIVE_7Z
+#ifndef MEATFILESYSTEM_ARCHIVE_7Z
+#define MEATFILESYSTEM_ARCHIVE_7Z
 
 #include "meat_io.h"
 
@@ -20,7 +20,7 @@ public:
     // MStream methods
     size_t position() override;
     void close() override;
-    bool open() override;
+    bool open(MFileMode mode = READ) override;
     ~SevenZipIStream() {
         close();
     }
@@ -48,7 +48,7 @@ public:
     MStream* createIStream(std::shared_ptr<MStream> src) override;
 
     bool isDirectory() override;
-    MStream* meatStream() override ; // has to return OPENED stream
+    MStream* meatStream(MFileMode mode = READ) override ; // has to return OPENED stream
     time_t getLastWrite() override ;
     time_t getCreationTime() override ;
     bool rewindDirectory() override ;
@@ -90,4 +90,4 @@ private:
 
 
 
-#endif // MEATLOAF_ARCHIVE_7Z
+#endif /* MEATFILESYSTEM_ARCHIVE_7Z */

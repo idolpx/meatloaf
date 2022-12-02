@@ -36,7 +36,7 @@ std::string CBMImageStream::decodeType(uint8_t file_type, bool show_hidden)
 //     return "";
 // };
 
-bool CBMImageStream::open() {
+bool CBMImageStream::open(MFileMode mode) {
     // return true if we were able to read the image and confirmed it is valid.
     // it's up to you in what state the stream will be after open. Could be either:
     // 1. EOF-like state (0 available) and the state will be cleared only after succesful seekNextEntry or seekPath

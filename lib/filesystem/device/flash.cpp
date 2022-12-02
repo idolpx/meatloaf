@@ -61,7 +61,7 @@ MStream* FlashFile::createIStream(std::shared_ptr<MStream> is) {
     return is.get(); // we don't have to process this stream in any way, just return the original stream
 }
 
-MStream* FlashFile::meatStream()
+MStream* FlashFile::meatStream(MFileMode mode)
 {
     std::string full_path = basepath + path;
     MStream* istream = new FlashIStream(full_path);
@@ -260,7 +260,7 @@ size_t FlashIStream::write(const uint8_t *buf, size_t size) {
  ********************************************************/
 
 
-bool FlashIStream::open() {
+bool FlashIStream::open(MFileMode mode) {
     if(isOpen())
         return true;
 

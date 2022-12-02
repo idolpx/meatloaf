@@ -62,7 +62,7 @@ public:
     }
 
     // has to return OPENED stream
-    virtual MStream* meatStream();
+    virtual MStream* meatStream(MFileMode mode = READ);
 
     virtual MFile* cd(std::string newDir);
     virtual bool isDirectory() = 0;

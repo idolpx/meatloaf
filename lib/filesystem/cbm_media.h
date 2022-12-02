@@ -30,7 +30,7 @@ public:
     // MStream methods
     size_t position() override;
     void close() override;
-    bool open() override;
+    bool open(MFileMode mode = READ) override;
     ~CBMImageStream() {
         //Debug_printv("close");
         close();

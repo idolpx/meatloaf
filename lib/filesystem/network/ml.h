@@ -22,7 +22,7 @@
 //     MLFile(std::string path): HttpFile(path) {};
 //     ~MLFile() {};
 
-//     MStream* meatStream() override; // file on ML server = standard HTTP file available via GET
+//     MStream* meatStream(MFileMode mode = READ) override; // file on ML server = standard HTTP file available via GET
 // };
 
 
@@ -36,7 +36,7 @@
 //     MLIStream(std::string path) : HttpIStream(path) {};
 //     ~MLIStream() {};
 
-//     bool open() override;
+//     bool open(MFileMode mode = READ) override;
 // };
 
 

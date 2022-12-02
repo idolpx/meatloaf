@@ -20,7 +20,7 @@ public:
     WebDAVFile(std::string path): MFile(path) {};
 
     bool isDirectory() override;
-    MStream* meatStream() override ; // has to return OPENED stream
+    MStream* meatStream(MFileMode mode = READ) override ; // has to return OPENED stream
     time_t getLastWrite() override ;
     time_t getCreationTime() override ;
     bool rewindDirectory() override { return false; };
@@ -49,7 +49,7 @@ public:
     }
 
     void close() override;
-    bool open() override;
+    bool open(MFileMode mode = READ) override;
 
     // MStream methods
     size_t position() override;
@@ -93,7 +93,7 @@ public:
     virtual bool seek(size_t pos);
 
     void close() override;
-    bool open() override;
+    bool open(MFileMode mode = READ) override;
 
     // MStream methods
     size_t read(uint8_t* buf, size_t size) override;
@@ -137,7 +137,7 @@ public:
     virtual bool seek(size_t pos);
 
     void close() override;
-    bool open() override;
+    bool open(MFileMode mode = READ) override;
 
 
     // MStream methods

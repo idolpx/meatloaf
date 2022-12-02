@@ -26,7 +26,7 @@ bool HttpFile::isDirectory() {
         return false;
 }
 
-MStream* HttpFile::meatStream() {
+MStream* HttpFile::meatStream(MFileMode mode) {
     // has to return OPENED stream
     //Debug_printv("Input stream requested: [%s]", url.c_str());
     MStream* istream = new HttpIStream(url);
@@ -111,10 +111,10 @@ bool HttpFile::isText() {
 /********************************************************
  * Istream impls
  ********************************************************/
-bool HttpIStream::open() {
-    if(secondaryAddress == 0)
+bool HttpIStream::open(MFileMode mode) {
+    if(mode == READ)
         return m_http.GET(url);
-    else if(secondaryAddress == 1)
+    else if(mode == WRITE)
         return m_http.PUT(url);
     else if(secondaryAddress == 2)
         return m_http.POST(url);
