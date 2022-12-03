@@ -66,7 +66,7 @@ MStream* FlashFile::meatStream(MFileMode mode)
     std::string full_path = basepath + path;
     MStream* istream = new FlashIStream(full_path);
     //Debug_printv("FlashFile::meatStream() 3, not null=%d", istream != nullptr);
-    istream->open();   
+    istream->open(mode);   
     //Debug_printv("FlashFile::meatStream() 4");
     return istream;
 }
