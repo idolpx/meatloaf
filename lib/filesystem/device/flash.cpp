@@ -267,7 +267,12 @@ bool FlashIStream::open(MFileMode mode) {
     //Debug_printv("IStream: trying to open flash fs, calling isOpen");
 
     //Debug_printv("IStream: wasn't open, calling obtain");
-    handle->obtain(localPath, "r");
+    if(mode == READ)
+        handle->obtain(localPath, "r");
+    else if(mode == WRITE)
+        handle->obtain(localPath, "???");
+    else if(mode == APPEND)
+        handle->obtain(localPath, "???");
 
     if(isOpen()) {
         //Debug_printv("IStream: past obtain");
