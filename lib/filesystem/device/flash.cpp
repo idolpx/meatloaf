@@ -66,7 +66,7 @@ MStream* FlashFile::meatStream(MFileMode mode)
     std::string full_path = basepath + path;
     MStream* istream = new FlashIStream(full_path);
     //Debug_printv("FlashFile::meatStream() 3, not null=%d", istream != nullptr);
-    istream->open();   
+    istream->open(mode);   
     //Debug_printv("FlashFile::meatStream() 4");
     return istream;
 }
@@ -267,7 +267,12 @@ bool FlashIStream::open(MFileMode mode) {
     //Debug_printv("IStream: trying to open flash fs, calling isOpen");
 
     //Debug_printv("IStream: wasn't open, calling obtain");
-    handle->obtain(localPath, "r");
+    if(mode == READ)
+        handle->obtain(localPath, "r");
+    else if(mode == WRITE)
+        handle->obtain(localPath, "???");
+    else if(mode == APPEND)
+        handle->obtain(localPath, "???");
 
     if(isOpen()) {
         //Debug_printv("IStream: past obtain");
