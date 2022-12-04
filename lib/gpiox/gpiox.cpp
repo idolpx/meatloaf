@@ -1,4 +1,5 @@
 
+#ifdef PARALLEL
 
 #include "gpiox.h"
 
@@ -233,3 +234,5 @@ void GPIOX::updateGPIOX() {
 	myI2C.writeBytes(_address, 2, buffer);
 	//Debug_printv("address[%.2X] din[%.2X] dout[%.2X] ddr[%.2X]", _address, _DIN, _DOUT, _DDR);
 }
+
+#endif // PARALLEL

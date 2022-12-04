@@ -452,10 +452,12 @@ void iecBus::service ( void )
         // Debug_println ( "DATA MODE" );
         // Debug_printf ( "bus[%d] device[%d] primary[%d] secondary[%d]", this->bus_state, this->device_state, this->data.primary, this->data.secondary );
 
+#ifdef PARALLEL_BUS
         if ( this->data.secondary == IEC_OPEN || this->data.secondary == IEC_REOPEN )
         {
             PARALLEL.handShake();
         }
+#endif
 
         // Data Mode - Get Command or Data
         if ( this->data.primary == IEC_LISTEN )
