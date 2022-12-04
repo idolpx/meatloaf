@@ -493,12 +493,14 @@ void iecBus::service ( void )
         {
             //Debug_printv("device idle");
             this->data.init();
-            active_protocol = PROTOCOL_CBM_SERIAL;
-            selectProtocol();
-            protocol->flags = CLEAR;
         }
 
         this->bus_state = BUS_IDLE;
+
+        // Switch back to standard serial
+        active_protocol = PROTOCOL_CBM_SERIAL;
+        selectProtocol();
+        protocol->flags = CLEAR;
 
         // Debug_printf( "primary[%.2X] secondary[%.2X] bus_state[%d]", this->data.primary, this->data.secondary, this->bus_state );
         // Debug_printf( "atn[%d] clk[%d] data[%d] srq[%d]", IEC.protocol->status(PIN_IEC_ATN), IEC.protocol->status(PIN_IEC_CLK_IN), IEC.protocol->status(PIN_IEC_DATA_IN), IEC.protocol->status(PIN_IEC_SRQ));

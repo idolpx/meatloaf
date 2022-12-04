@@ -114,7 +114,7 @@ namespace Protocol
             virtual int16_t receiveByte ();
             virtual bool sendByte ( uint8_t data, bool signalEOI );
             int16_t timeoutWait ( uint8_t pin, bool target_status, size_t wait = TIMEOUT_DEFAULT, bool watch_atn = true );
-            bool wait ( size_t wait );
+            bool wait ( size_t wait, uint64_t size = 0 );
 
 
             // true => PULL => LOW

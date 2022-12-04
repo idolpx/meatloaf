@@ -22,7 +22,7 @@
 
 using namespace Protocol;
 
-// STEP 1: READY TO SEND
+// STEP 1: READY TO RECEIVE
 // Sooner or later, the talker will want to talk, and send a character.
 // When it's ready to go, it releases the Clock line to false.  This signal change might be
 // translated as "I'm ready to send a character." The listener must detect this and respond,
@@ -32,7 +32,6 @@ using namespace Protocol;
 // it might holdback for quite a while; there's no time limit.
 int16_t  CBMStandardSerial::receiveByte ()
 {
-//    flags = CLEAR;
     flags and_eq CLEAR_LOW;
 
     // Sometimes the C64 pulls ATN but doesn't pull CLOCK right away
@@ -449,13 +448,20 @@ int16_t CBMStandardSerial::timeoutWait ( uint8_t pin, bool target_status, size_t
 
 
 // Wait for specified ms or until ATN status changes
-bool CBMStandardSerial::wait ( size_t wait )
+bool CBMStandardSerial::wait ( size_t wait, uint64_t start )
 {
-    uint64_t start, current, elapsed;
+    uint64_t current, elapsed;
     elapsed = 0;
 
-    esp_timer_init();
-    start = current = esp_timer_get_time();
+    if ( start == 0 )
+    {
+        esp_timer_init();
+        start = current = esp_timer_get_time();
+    }
+    else
+    {
+        current = esp_timer_get_time();
+    }
 
     // Sample ATN and set flag to indicate SELECT or DATA mode
     bool atn_status = status ( PIN_IEC_ATN );

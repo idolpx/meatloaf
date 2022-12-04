@@ -26,6 +26,9 @@
 
 #include "cbmstandardserial.h"
 
+#define TIMING_JIFFY_BITPAIR
+#define TIMING_JIFFY_BYTE
+
 namespace Protocol
 {
 	class JiffyDOS : public CBMStandardSerial
