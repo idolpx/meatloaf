@@ -53,7 +53,9 @@
 
 // initialize other filesystems here
 FlashFileSystem defaultFS;
+#ifdef SD_CARD
 SDFileSystem sdFS;
+#endif
 
 // Scheme
 HttpFileSystem httpFS;
@@ -88,7 +90,10 @@ TCRTFileSystem tcrtFS;
 // put all available filesystems in this array - first matching system gets the file!
 // fist in list is default
 std::vector<MFileSystem*> MFSOwner::availableFS { 
-    &defaultFS, &sdFS,
+    &defaultFS,
+#ifdef SD_CARD
+    &sdFS,
+#endif
     &p00FS,
     &d64FS, &d71FS, &d80FS, &d81FS, &d82FS, &d8bFS, &dnpFS,
     &t64FS, &tcrtFS,

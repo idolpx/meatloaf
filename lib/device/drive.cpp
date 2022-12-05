@@ -755,6 +755,8 @@ uint16_t iecDrive::sendHeader(uint16_t &basicPtr, std::string header, std::strin
 		byte_count += sendLine(basicPtr, 0, "%*s\"-------------------\" NFO", 0, "");
 		if ( byte_count == 0 ) return 0;
 	}
+	
+#ifdef SD_CARD
 	if (fnSDFAT.running() && m_mfile->url.size() < 2)
 	{
 		byte_count += sendLine(basicPtr, 0, "%*s\"SD\"                  DIR", 0, "");
@@ -762,6 +764,7 @@ uint16_t iecDrive::sendHeader(uint16_t &basicPtr, std::string header, std::strin
 		byte_count += sendLine(basicPtr, 0, "%*s\"-------------------\" NFO", 0, "");
 		if ( byte_count == 0 ) return 0;
 	}
+#endif
 
 	return byte_count;
 }

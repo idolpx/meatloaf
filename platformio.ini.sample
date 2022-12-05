@@ -52,6 +52,7 @@ build_flags =
     -D DEBUG_SPEED=460800   ;921600
     ;-D NO_PSRAM            ; if your hardware has no psram
     ;-D NO_BUTTONS          ; if your hardware has no physical buttons
+    ;-D SD_CARD             ; if your hardware has an sd card slot
     ;-D LED_STRIP           ; if your hardware has an led strip
     ;-D PIEZO_BUZZER        ; if your hardware has a piezo buzzer
     ;-D PARALLEL_BUS        ; if your hardware has parallel interface
