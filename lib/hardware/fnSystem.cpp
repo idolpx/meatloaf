@@ -612,7 +612,6 @@ void SystemManager::check_hardware_ver()
     fnSystem.set_pin_mode(PIN_CARD_DETECT, gpio_mode_t::GPIO_MODE_INPUT, SystemManager::pull_updown_t::PULL_UP);
     upcheck = fnSystem.digital_read(12);
 
-
     if(fixupcheck == fixdowncheck)
     {
         // v1.6.1 fixed/changed card detect pin
