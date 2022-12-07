@@ -17,7 +17,6 @@
 // The JTAG connector uses GPIO 12, 13, 14 and 15 (see dip switch) but these are also used for SD-card (and GPIO13 is key2 as well)
 
 
-/* FujiNet Hardware Pin Mapping */
 #ifndef PINMAP_ESP32_A1S_AUDIO_KIT_V2_2
 #define PINMAP_ESP32_A1S_AUDIO_KIT_V2_2
 
@@ -25,7 +24,7 @@
 // pins 12-15 are used to interface with the JTAG debugger
 // so leave them alone if we're using JTAG
 #ifndef JTAG
-#define PIN_CARD_DETECT 9 // fnSystem.h
+#define PIN_CARD_DETECT 34 // fnSystem.h
 #define PIN_CARD_DETECT_FIX 15 // fnSystem.h
 #endif
 
@@ -44,14 +43,14 @@
 #define PIN_UART2_TX 21
 
 /* Buttons */
-#define PIN_BUTTON_A 23 // keys.cpp
-#define PIN_BUTTON_B 18
-#define PIN_BUTTON_C 5
+#define PIN_BUTTON_A 36 // keys.cpp
+#define PIN_BUTTON_B 36
+#define PIN_BUTTON_C 36
 
 /* LEDs */
-#define PIN_LED_WIFI 19 // led.cpp
+#define PIN_LED_WIFI 22 // led.cpp
 #define PIN_LED_BUS  22
-#define PIN_LED_BT   19
+#define PIN_LED_BT   22
 
 /* Audio Output */
 #define PIN_DAC1 25 // samlib.h
@@ -85,5 +84,19 @@
 #define PIN_IEC_DATA_IN    	GPIO_NUM_19
 #define PIN_IEC_DATA_OUT   	GPIO_NUM_19
 #endif
+
+
+/* Modem/Parallel Switch */
+#define PIN_MDMPAR_SW1       2  // High = Modem enabled
+#define PIN_MDMPAR_SW2       15 // High = UP9600 enabled
+
+/* I2C GPIO Expander */
+#define PIN_GPIOX_SDA         GPIO_NUM_21
+#define PIN_GPIOX_SCL         GPIO_NUM_22
+#define PIN_GPIOX_INT         GPIO_NUM_34
+//#define GPIOX_ADDRESS     0x20  // PCF8575
+#define GPIOX_ADDRESS     0x24  // PCA9673
+//#define GPIOX_SPEED       400   // PCF8575 - 400Khz
+#define GPIOX_SPEED       1000  // PCA9673 - 1000Khz / 1Mhz
 
 #endif // PINMAP_ESP32_A1S_AUDIO_KIT_V2_2
