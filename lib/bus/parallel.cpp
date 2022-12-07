@@ -1,6 +1,4 @@
 
-#ifdef PARALLEL_BUS
-
 #include "parallel.h"
 
 #include <freertos/queue.h>
@@ -48,7 +46,7 @@ static void ml_parallel_intr_task(void* arg)
                 // Update flags and data
                 PARALLEL.readByte();
 
-                // Set RECEIVE/SEND mode
+                // Set RECEIVE/SEND mode   
                 if ( PARALLEL.status( PA2 ) )
                 {
                     PARALLEL.mode = MODE_RECEIVE;
@@ -73,7 +71,7 @@ static void ml_parallel_intr_task(void* arg)
                     //     if ( PARALLEL.data == 0x57 ) // WiC64 commands start with 'W'
                     //     {
                     //         IEC.protocol->flags xor_eq WIC64_ACTIVE;
-                    //         Debug_printv("wic64");
+                    //         Debug_printv("wic64");                  
                     //     }
                     // }
                 }
@@ -101,7 +99,7 @@ void parallelBus::setup ()
     // Setup i2c device
     expander.begin();
     reset();
-
+    
     // Create a queue to handle parallel event from ISR
     ml_parallel_evt_queue = xQueueCreate(10, sizeof(uint32_t));
 
@@ -120,7 +118,7 @@ void parallelBus::setup ()
 
     //configure GPIO with the given settings
     gpio_config(&io_conf);
-    gpio_isr_handler_add((gpio_num_t)PIN_GPIOX_INT, ml_parallel_isr_handler, NULL);
+    gpio_isr_handler_add((gpio_num_t)PIN_GPIOX_INT, ml_parallel_isr_handler, NULL);    
 }
 
 void parallelBus::reset()
@@ -148,10 +146,10 @@ void parallelBus::reset()
 void parallelBus::handShake()
 {
     // Signal received or sent
-
+    
     // High
     expander.digitalWrite( FLAG2, HIGH );
-
+    
     // Low
     expander.digitalWrite( FLAG2, LOW );
 }
@@ -186,7 +184,7 @@ bool parallelBus::status( user_port_pin_t pin )
 {
     if ( pin < 8 ) 
         return ( this->flags & ( 1 >> pin) );
-
+    
     return ( this->data & ( 1 >> ( pin - 8) ) );
 }
 
@@ -411,5 +409,3 @@ void wic64_command()
     //     }
     // }
 }
-
-#endif // PARALLEL_BUS

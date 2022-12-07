@@ -72,7 +72,7 @@ public:
             delete client;
     }
     bool isDirectory() override;
-    MStream* meatStream(MFileMode mode = READ) override ; // has to return OPENED streamm
+    MStream* meatStream() override ; // has to return OPENED streamm
     time_t getLastWrite() override ;
     time_t getCreationTime() override ;
     bool rewindDirectory() override ;
@@ -110,7 +110,7 @@ public:
     virtual bool seek(size_t pos);
 
     void close() override;
-    bool open(MFileMode mode = READ) override;
+    bool open() override;
 
     // MStream methods
     size_t read(uint8_t* buf, size_t size) override;

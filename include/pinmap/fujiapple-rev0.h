@@ -56,17 +56,3 @@
 #define PIN_IEC_DATA_IN    	GPIO_NUM_32
 #define PIN_IEC_DATA_OUT   	GPIO_NUM_32
 #define PIN_IEC_SRQ			GPIO_NUM_26
-
-
-/* Modem/Parallel Switch */
-#define PIN_MDMPAR_SW1       2  // High = Modem enabled
-#define PIN_MDMPAR_SW2       15 // High = UP9600 enabled
-
-/* I2C GPIO Expander */
-#define PIN_GPIOX_SDA         GPIO_NUM_21
-#define PIN_GPIOX_SCL         GPIO_NUM_22
-#define PIN_GPIOX_INT         GPIO_NUM_34
-//#define GPIOX_ADDRESS     0x20  // PCF8575
-#define GPIOX_ADDRESS     0x24  // PCA9673
-//#define GPIOX_SPEED       400   // PCF8575 - 400Khz
-#define GPIOX_SPEED       1000  // PCA9673 - 1000Khz / 1Mhz

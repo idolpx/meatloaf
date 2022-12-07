@@ -53,9 +53,7 @@
 
 // initialize other filesystems here
 FlashFileSystem defaultFS;
-#ifdef SD_CARD
 SDFileSystem sdFS;
-#endif
 
 // Scheme
 HttpFileSystem httpFS;
@@ -90,10 +88,7 @@ TCRTFileSystem tcrtFS;
 // put all available filesystems in this array - first matching system gets the file!
 // fist in list is default
 std::vector<MFileSystem*> MFSOwner::availableFS { 
-    &defaultFS,
-#ifdef SD_CARD
-    &sdFS,
-#endif
+    &defaultFS, &sdFS,
     &p00FS,
     &d64FS, &d71FS, &d80FS, &d81FS, &d82FS, &d8bFS, &dnpFS,
     &t64FS, &tcrtFS,
@@ -304,7 +299,7 @@ bool MFile::operator!=(nullptr_t ptr) {
     return m_isNull;
 }
 
-MStream* MFile::meatStream(MFileMode mode) {
+MStream* MFile::meatStream() {
     // has to return OPENED stream
     std::shared_ptr<MStream> containerStream(streamFile->meatStream()); // get its base stream, i.e. zip raw file contents
     Debug_printv("containerStream isRandomAccess[%d] isBrowsable[%d]", containerStream->isRandomAccess(), containerStream->isBrowsable());

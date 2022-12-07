@@ -237,7 +237,7 @@ public:
         socket.close();
     }
 
-    bool open(MFileMode mode = READ) override {
+    bool open() override {
         PeoplesUrlParser p;
         p.parseUrl(url);
         return socket.open(p.host.c_str(), p.getPort());
@@ -283,7 +283,7 @@ public:
     }
 
     // We are overriding meatStream, because obviously - TCP scheme won't be wrapped in anything
-    MStream* meatStream(MFileMode mode = READ) override {
+    MStream* meatStream() override {
         // has to return OPENED streamm
         MStream* istream = new TcpStream(url);
         istream->open();

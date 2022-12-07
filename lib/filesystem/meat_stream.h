@@ -31,10 +31,6 @@
 // TCP_CLENT_SOCKET = clear bit 5
 // TCP_SERVER_SOCKET = set bit 5
 
-enum MFileMode {
-    READ, WRITE, APPEND
-};
-
 class MStream {
 public:
     virtual ~MStream() {};
@@ -47,7 +43,7 @@ public:
     virtual bool isRandomAccess() { return false; };
 
     virtual void close() = 0;
-    virtual bool open(MFileMode mode = READ) = 0;
+    virtual bool open() = 0;
 
     virtual size_t write(const uint8_t *buf, size_t size) = 0;
     virtual size_t read(uint8_t* buf, size_t size) = 0;

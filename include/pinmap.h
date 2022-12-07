@@ -8,7 +8,7 @@
 //#include "pinmap/esp-wroom-32.h"
 //#include "pinmap/esp32-a1s-audio-kit-v2.2.h"
 //#include "pinmap/esp32s3.h"
-#include "pinmap/fujiapple-rev0.h"
-//#include "pinmap/fujiloaf-rev0.h"
+//#include "pinmap/fujiapple-rev0.h"
+#include "pinmap/fujiloaf-rev0.h"
 
 #endif

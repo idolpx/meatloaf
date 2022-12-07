@@ -2,8 +2,8 @@
 // see: https://www.commodoreserver.com/BlogEntryView.asp?EID=9D133160E7C344A398EC1F45AEF4BF32
 //
 
-#ifndef MEATFILESYSTEM_NETWORK_CS
-#define MEATFILESYSTEM_NETWORK_CS
+#ifndef MEATLOAF_SCHEME_CS
+#define MEATLOAF_SCHEME_CS
 
 #include "../../include/global_defines.h"
 #include "../../include/make_unique.h"
@@ -221,7 +221,7 @@ public:
     };
 
     MStream* createIStream(std::shared_ptr<MStream> src) { return src.get(); };
-    MStream* meatStream(MFileMode mode = READ) override ; // has to return OPENED stream
+    MStream* meatStream() override ; // has to return OPENED stream
 
     std::string petsciiName() override {
         return name;
@@ -263,7 +263,7 @@ public:
         close();
     }
     // MStream methods
-    bool open(MFileMode mode = READ) override;
+    bool open() override;
     void close() override;
 
     size_t available() override;
@@ -310,4 +310,4 @@ public:
 
 
 
-#endif /* MEATFILESYSTEM_NETWORK_CS */
+#endif /* MEATLOAF_SCHEME_CS */

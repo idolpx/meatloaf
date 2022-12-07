@@ -86,12 +86,14 @@ void main_setup()
 
 #ifndef NO_PSRAM
     Debug_printf( "PsramSize %u\n", fnSystem.get_psram_size() );
+
     Debug_printf( "himem phys %u\n", esp_himem_get_phys_size() );
     Debug_printf( "himem free %u\n", esp_himem_get_free_size() );
     Debug_printf( "himem reserved %u\n", esp_himem_reserved_area_size() );
 #endif
-#endif // DEBUG
 
+
+#endif // DEBUG
 
     // Install a reboot handler
     esp_register_shutdown_handler(main_shutdown_handler);
@@ -127,9 +129,7 @@ void main_setup()
 #elif FLASH_LITTLEFS
     fnLITTLEFS.start();
 #endif
-#ifdef SD_CARD
     fnSDFAT.start();
-#endif
 
     // Load our stored configuration
 //    Config.load();
