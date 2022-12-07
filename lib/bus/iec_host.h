@@ -25,7 +25,6 @@
 #include "../../include/petscii.h"
 
 #include "iec.h"
-#include "protocol/cbmstandardserial.h"
 
 using namespace Protocol;
 
@@ -61,8 +60,6 @@ public:
     // detect    detect drives on the IEC bus
     // change    wait for a disk to be changed in the specified drive
 
-private:
-    CBMStandardSerial protocol;
 
 };
 

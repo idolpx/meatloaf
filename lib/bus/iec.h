@@ -18,6 +18,7 @@
 #ifndef MEATLOAF_BUS_IEC
 #define MEATLOAF_BUS_IEC
 
+#include <iostream>
 #include <forward_list>
 #include <unordered_map>
 
@@ -25,7 +26,7 @@
 #include "meat_stream.h"
 
 #include "protocol/cbmstandardserial.h"
-//#include "protocol/jiffydos.h"
+#include "protocol/jiffydos.h"
 #include "protocol/dolphindos.h"
 
 #include "../../include/debug.h"
@@ -117,6 +118,8 @@ class iecDevice
         // This is set after an open command and determines what to send next
         uint8_t m_openState;
 
+        std::unique_ptr<MFile> m_mfile; // Always points to current directory
+        std::string m_filename; // Always points to current or last loaded file
 };
 
 
@@ -140,9 +143,21 @@ typedef enum
     IEC_TALK = 0x40,       // 0x40 + device_id (TALK) (0-30)
     IEC_UNTALK = 0x5F,     // 0x5F (UNTALK)
     IEC_REOPEN = 0x60,     // 0x60 + channel (OPEN CHANNEL) (0-15)
+    IEC_REOPEN_JD = 0x61,  // 0x61 + channel (OPEN CHANNEL) (0-15) - JIFFYDOS LOAD
     IEC_CLOSE = 0xE0,      // 0xE0 + channel (CLOSE NAMED CHANNEL) (0-15)
     IEC_OPEN = 0xF0        // 0xF0 + channel (OPEN NAMED CHANNEL) (0-15)
 } bus_command_t;
+
+typedef enum {
+    PROTOCOL_CBM_SERIAL,
+    PROTOCOL_CBM_FAST,
+    PROTOCOL_JIFFYDOS,
+    PROTOCOL_EPYXFASTLOAD,
+    PROTOCOL_WARPSPEED,
+    PROTOCOL_DOLPHINDOS,
+    PROTOCOL_WIC64,
+    PROTOCOL_IEEE488
+} bus_protocol_t;
 
 class iecBus
 {
@@ -162,8 +177,28 @@ class iecBus
         bus_state_t bus_state;
         IECData data;
 
+        bus_protocol_t active_protocol = PROTOCOL_CBM_SERIAL;
         //std::unique_ptr<CBMStandardSerial> protocol = CBMStandardSerial();
-        CBMStandardSerial protocol;
+        //CBMStandardSerial protocol;
+
+        JiffyDOS protocolJiffyDOS;
+        DolphinDOS protocolDolphinDOS;
+        CBMStandardSerial protocolCBMStandardSerial;
+
+        CBMStandardSerial *protocol = static_cast<CBMStandardSerial*>(&protocolCBMStandardSerial);
+
+        void selectProtocol() {
+            uint16_t flags_cp = protocol->flags;
+            if ( active_protocol == PROTOCOL_JIFFYDOS ) {
+                protocol = static_cast<CBMStandardSerial*>(&protocolJiffyDOS);
+            } else if ( active_protocol == PROTOCOL_DOLPHINDOS ) {
+                protocol = static_cast<CBMStandardSerial*>(&protocolDolphinDOS);
+            } else {
+                protocol = static_cast<CBMStandardSerial*>(&protocolCBMStandardSerial);
+            }
+            protocol->flags = flags_cp;
+            Debug_printv("protocol[%d]", active_protocol);
+        }
 
         iecBus ( void );
 

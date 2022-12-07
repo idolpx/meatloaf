@@ -99,12 +99,6 @@ private:
 
 	CommandPathTuple parseLine(std::string commandLne, size_t channel);
 
-	// This is set after an open command and determines what to send next
-	uint8_t m_openState;
-
-	std::unique_ptr<MFile> m_mfile; // Always points to current directory
-	std::string m_filename; // Always points to current or last loaded file
-
 	// Debug functions
 	void dumpState();
 };
