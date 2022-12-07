@@ -22,6 +22,7 @@
 #include "../../include/cbmdefines.h"
 
 #include "drive.h"
+#include "device_db.h"
 
 #include "string_utils.h"
 
@@ -130,8 +131,10 @@ std::shared_ptr<MStream> iecDevice::retrieveStream ( void )
 // IEC channel on some IEC device
 bool iecDevice::registerStream (std::ios_base::open_mode mode, std::string m_filename)
 {
-    //Debug_printv("m_filename[%s]", m_filename.c_str());
-    auto file = Meat::New<MFile>(m_filename);
+    Debug_printv("dc_basepath[%s]",  device_config.basepath().c_str());
+    Debug_printv("m_filename[%s]", m_filename.c_str());
+    //auto file = Meat::New<MFile>( device_config.basepath() + "/" + m_filename );
+    auto file = Meat::New<MFile>( m_filename );
     std::shared_ptr<MStream> new_stream;
 
     // LOAD / GET / INPUT
@@ -436,9 +439,9 @@ void iecBus::service ( void )
         // If the bus is idle then release the lines
         if ( this->bus_state < BUS_ACTIVE )
         {
-            releaseLines();
             //Debug_printv("release lines");
             this->data.init();
+            releaseLines();
         }
 
         // Debug_printf ( "code[%.2X] primary[%.2X] secondary[%.2X] bus[%d]", command, this->data.primary, this->data.secondary, this->bus_state );
@@ -463,6 +466,9 @@ void iecBus::service ( void )
         if ( this->data.secondary == IEC_OPEN || this->data.secondary == IEC_REOPEN )
         {
             PARALLEL.handShake();
+
+            // Switch to detected protocol
+            selectProtocol();
         }
 
         // Data Mode - Get Command or Data
@@ -481,10 +487,6 @@ void iecBus::service ( void )
         // Queue control codes and command in specified device
         // At the moment there is only the multi-drive device
         device_state_t device_state = drive.queue_command();
-
-
-        // Switch protocol here!
-
 
         // Process commands in devices
         // At the moment there is only the multi-drive device
@@ -529,9 +531,6 @@ bus_state_t iecBus::deviceListen ( void )
     // OPEN or DATA
     else if ( this->data.secondary == IEC_OPEN || this->data.secondary == IEC_REOPEN )
     {
-        // Switch to detected protocol
-        selectProtocol();
-
         // Record the command string until ATN is PULLED
         std::string listen_command = "";
 

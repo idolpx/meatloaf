@@ -455,8 +455,6 @@ void iecDrive::changeDir(std::string url)
 
 void iecDrive::prepareFileStream(std::string url)
 {
-	device_config.url(url);
-	//Debug_printv("url[%s]", url.c_str());
 	m_filename = url;
 	m_openState = O_FILE;
 	//Debug_printv("LOAD [%s]", url.c_str());
@@ -993,10 +991,13 @@ bool iecDrive::sendFile()
 		Debug_printf("sendFile: [$%.4X]\r\n=================================\r\n", load_address);
 		while( avail && success )
 		{
-			// Read Byte
-			success = istream->read(&b, 1);
-			if ( !success )
-				Debug_printv("fail");
+            // Read Byte
+            success = istream->read(&b, 1);
+            if ( !success )
+            {
+                Debug_printv("fail");
+                IEC.sendEOI(0);
+            }
 
 			// Debug_printv("b[%02X] success[%d]", b, success);
 			if (success)
@@ -1020,7 +1021,7 @@ bool iecDrive::sendFile()
 				{
 					success = IEC.send(b);
 					if ( !success )
-						Debug_printv("fail");					
+						Debug_printv("fail");
 				}
 
 #ifdef DATA_STREAM
@@ -1062,10 +1063,10 @@ bool iecDrive::sendFile()
 
 			avail = istream->available();
 			// We got another chunk, update length
-			if ( avail > (len - i) )
-			{
-				len += (avail - (len - i));
-			}
+			// if ( avail > (len - i) )
+			// {
+			// 	len += (avail - (len - i));
+			// }
 
 			i++;
 		}

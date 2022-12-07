@@ -8,6 +8,8 @@
 #include <esp_http_client.h>
 #include <functional>
 
+#include "device_db.h"
+
 #define HTTP_BLOCK_SIZE 256
 
 class MeatHttpClient {
@@ -61,7 +63,8 @@ public:
         Debug_printv("C++, if you try to call this, be damned!");
     };
     HttpFile(std::string path): MFile(path) { 
-        Debug_printv("constructing http file from url [%s]", url.c_str());
+        // Debug_printv("constructing http file from url [%s]", url.c_str());
+       device_config.basepath( path );
     };
     HttpFile(std::string path, std::string filename): MFile(path) {};
     ~HttpFile() override {

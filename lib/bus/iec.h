@@ -118,6 +118,8 @@ class iecDevice
         // This is set after an open command and determines what to send next
         uint8_t m_openState;
 
+        std::unique_ptr<MFile> m_mfile; // Always points to current directory
+        std::string m_filename; // Always points to current or last loaded file
 };
 
 
@@ -141,6 +143,7 @@ typedef enum
     IEC_TALK = 0x40,       // 0x40 + device_id (TALK) (0-30)
     IEC_UNTALK = 0x5F,     // 0x5F (UNTALK)
     IEC_REOPEN = 0x60,     // 0x60 + channel (OPEN CHANNEL) (0-15)
+    IEC_REOPEN_JD = 0x61,  // 0x61 + channel (OPEN CHANNEL) (0-15) - JIFFYDOS LOAD
     IEC_CLOSE = 0xE0,      // 0xE0 + channel (CLOSE NAMED CHANNEL) (0-15)
     IEC_OPEN = 0xF0        // 0xF0 + channel (OPEN NAMED CHANNEL) (0-15)
 } bus_command_t;

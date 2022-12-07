@@ -32,8 +32,15 @@ int16_t  JiffyDOS::receiveByte ()
 {
     flags and_eq CLEAR_LOW;
 
+    pull ( PIN_IEC_SRQ );
+
     // Sometimes the C64 pulls ATN but doesn't pull CLOCK right away
-    if ( !wait ( 60 ) ) return -1;
+    // pull ( PIN_IEC_SRQ );
+    // if ( !wait ( 60 ) ) return -1;
+    // release ( PIN_IEC_SRQ );
+
+    // Release the Data line to signal we are ready
+    release ( PIN_IEC_DATA_IN );
 
     // Wait for talker ready
     if ( timeoutWait ( PIN_IEC_CLK_IN, RELEASED, FOREVER ) == TIMED_OUT )
@@ -45,51 +52,39 @@ int16_t  JiffyDOS::receiveByte ()
 
     // STEP 2: RECEIVING THE BITS
     // As soon as the talker releases the Clock line we are expected to receive the bits
-    //
-    // static const generic_2bit_t jiffy_receive_def = {
-    //   .pairtimes = {185, 315, 425, 555},
-    //   .clockbits = {4, 6, 3, 2},
-    //   .databits  = {5, 7, 1, 0},
-    //   .eorvalue  = 0xff
-    // };
-    pull ( PIN_IEC_SRQ );
-
     uint8_t data = 0;
+    uint8_t bitmask = 0xFF;
 
     // get bits 4,5
-    data or_eq ( status ( PIN_IEC_CLK_IN ) == RELEASED ? ( 1 << 7 ) : 0 );
-    data or_eq ( status ( PIN_IEC_DATA_IN ) == RELEASED ? ( 1 << 7 ) : 0 );
-    wait( 10 );
-    release( PIN_IEC_SRQ );
+    data or_eq ( status ( PIN_IEC_CLK_IN ) == RELEASED ? ( 1 << 4 ) : 0 );
+    data or_eq ( status ( PIN_IEC_DATA_IN ) == RELEASED ? ( 1 << 5 ) : 0 );
+    wait( 8 );
 
     // get bits 6,7
-    pull ( PIN_IEC_SRQ );
-    data or_eq ( status ( PIN_IEC_CLK_IN ) == RELEASED ? ( 1 << 7 ) : 0 );
+    data or_eq ( status ( PIN_IEC_CLK_IN ) == RELEASED ? ( 1 << 6 ) : 0 );
     data or_eq ( status ( PIN_IEC_DATA_IN ) == RELEASED ? ( 1 << 7 ) : 0 );
-    wait( 10 );
-    release( PIN_IEC_SRQ );
+    wait( 8 );
 
     // get bits 3,1
-    pull ( PIN_IEC_SRQ );
-    data or_eq ( status ( PIN_IEC_CLK_IN ) == RELEASED ? ( 1 << 7 ) : 0 );
-    data or_eq ( status ( PIN_IEC_DATA_IN ) == RELEASED ? ( 1 << 7 ) : 0 );
-    wait( 10 );
-    release( PIN_IEC_SRQ );
+    data or_eq ( status ( PIN_IEC_CLK_IN ) == RELEASED ? ( 1 << 3 ) : 0 );
+    data or_eq ( status ( PIN_IEC_DATA_IN ) == RELEASED ? ( 1 << 1 ) : 0 );
+    wait( 8 );
 
     // get bits 2,0
-    pull ( PIN_IEC_SRQ );
-    data or_eq ( status ( PIN_IEC_CLK_IN ) == RELEASED ? ( 1 << 7 ) : 0 );
-    data or_eq ( status ( PIN_IEC_DATA_IN ) == RELEASED ? ( 1 << 7 ) : 0 );
-    wait( 10 );
+    data or_eq ( status ( PIN_IEC_CLK_IN ) == RELEASED ? ( 1 << 2 ) : 0 );
+    data or_eq ( status ( PIN_IEC_DATA_IN ) == RELEASED ? ( 1 << 0 ) : 0 );
+    wait( 8 );
     release( PIN_IEC_SRQ );
 
-    // STEP 3: CHECK FOR EOI
-    if ( status ( PIN_IEC_CLK_IN ) == PULLED && status ( PIN_IEC_DATA_IN ) == RELEASED )
-        flags or_eq EOI_RECVD;
-    wait( 300, start );
+    // rearrange bits
+    data xor_eq bitmask;
 
-    // Acknowledge byte received
-    if ( !wait ( 730 ) ) return -1;
+    // // STEP 3: CHECK FOR EOI
+    // if ( status ( PIN_IEC_CLK_IN ) == PULLED && status ( PIN_IEC_DATA_IN ) == RELEASED )
+    //     flags or_eq EOI_RECVD;
+    // wait( 300 );
+
+    // STEP 4: Acknowledge byte received
     pull ( PIN_IEC_DATA_OUT );
 
     return data;
