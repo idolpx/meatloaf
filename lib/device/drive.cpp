@@ -998,7 +998,6 @@ bool iecDrive::sendFile()
             success = istream->read(&b, 1);
             if ( !success )
             {
-                Debug_printv("fail");
                 IEC.sendEOI(0);
             }
 
