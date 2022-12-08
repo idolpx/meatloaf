@@ -411,20 +411,27 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 		else
 		{
 			std::string url = device_config.url();
-			PeoplesUrlParser purl;
-			purl.parseUrl(url + "/" + mstr::urlEncode(guessedPath));
-
-			tuple.rawPath = purl.url;
+			if( !url.empty() )
+			{
+				if( mstr::contains(guessedPath, "$") )
+				{
+					tuple.command = url;
+					tuple.rawPath = url;
+				}
+				else
+				{
+					PeoplesUrlParser purl;
+					purl.parseUrl(url + "/" + mstr::urlEncode(guessedPath));
+					tuple.rawPath = purl.url;
+					if( tuple.command.compare("cd") == 0 )
+						tuple.command = purl.url;
+				}
+			}
 		}
 
 		// Debug_printv("found command     [%s]", tuple.command.c_str());
 		Debug_printv("command[%s] raw[%s] full[%s]", tuple.command.c_str(), tuple.rawPath.c_str(), tuple.fullPath.c_str());
-
-		if(guessedPath == "$")
-		{
-			//Debug_printv("get directory of [%s]", m_mfile->url.c_str());
-		}
-		else if(!guessedPath.empty())
+		if(!guessedPath.empty())
 		{
 			auto fullPath = Meat::Wrap(m_mfile->cd(guessedPath));
 
@@ -598,7 +605,7 @@ void iecDrive::handleListenData()
 
 void iecDrive::handleTalk(uint8_t chan)
 {
-	//Debug_printv("channel[%d] openState[%d]", chan, m_openState);
+	Debug_printv("channel[%d] openState[%d]", chan, m_openState);
 
 	switch (m_openState)
 	{
