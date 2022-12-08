@@ -72,8 +72,6 @@ public:
     };
     HttpFile(std::string path): MFile(path) { 
         // Debug_printv("constructing http file from url [%s]", url.c_str());
-        if ( !path.empty() )
-            device_config.url(path);
     };
     HttpFile(std::string path, std::string filename): MFile(path) {};
     ~HttpFile() override {

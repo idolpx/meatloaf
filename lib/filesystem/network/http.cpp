@@ -427,7 +427,12 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
             {
                 // Content-Disposition, value=attachment; filename*=UTF-8''GeckOS-c64.d64
                 // we can set isText from real file extension, too!
-
+                std::string value = evt->header_value;
+                if ( mstr::contains( value, (char *)"index.prg" ) )
+                {
+                    Debug_printv("HTTP Directory Listing [%s]", meatClient->url.c_str());
+                    device_config.url( meatClient->url );
+                }
             }
             else if(mstr::equals("Content-Length", evt->header_key, false))
             {
