@@ -27,6 +27,8 @@
 
 #include "led.h"
 
+#include "string_utils.h"
+
 #include "wrappers/iec_buffer.h"
 
 iecDrive drive;
@@ -410,7 +412,7 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 		{
 			std::string url = device_config.url();
 			PeoplesUrlParser purl;
-			purl.parseUrl(url + "/" + guessedPath);
+			purl.parseUrl(url + "/" + mstr::urlEncode(guessedPath));
 
 			tuple.rawPath = purl.url;
 		}
@@ -582,7 +584,7 @@ void iecDrive::handleListenCommand( void )
 		}
 	}
 
-	dumpState();
+	//dumpState();
 } // handleListenCommand
 
 

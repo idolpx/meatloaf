@@ -6,11 +6,11 @@
 
 MeatHttpClient* HttpFile::formHeader() {
     if(client == nullptr) {
-        Debug_printv("Client was not present, creating");
+        //Debug_printv("Client was not present, creating");
         client = new MeatHttpClient();
 
         // let's just get the headers so we have some info
-        Debug_printv("Client requesting head");
+        //Debug_printv("Client requesting head");
         client->HEAD(url);
     }
     return client;
@@ -435,20 +435,20 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
             }
             else if(mstr::equals("Location", evt->header_key, false))
             {
-                Debug_printv("* This page redirects from '%s' to '%s'", meatClient->url.c_str(), evt->header_value);
+                //Debug_printv("* This page redirects from '%s' to '%s'", meatClient->url.c_str(), evt->header_value);
                 if ( mstr::startsWith(evt->header_value, (char *)"http") )
                 {
-                    Debug_printv("match");
+                    //Debug_printv("match");
                     meatClient->url = evt->header_value;
                     device_config.url(evt->header_value);
                 }
                 else
                 {
-                    Debug_printv("no match");
+                    //Debug_printv("no match");
                     meatClient->url += evt->header_value;                    
                 }
 
-                Debug_printv("new url '%s'", meatClient->url.c_str());
+                //Debug_printv("new url '%s'", meatClient->url.c_str());
             }
 
             // Allow override in lambda

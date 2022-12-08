@@ -324,8 +324,8 @@ namespace mstr {
             c = chars[i];
             ic = c;
             // uncomment this if you want to encode spaces with +
-            if (c==' ') new_str += '+';   
-            else if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') new_str += c;
+            // if (c==' ') new_str += '+';
+            if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') new_str += c;
             else {
                 sprintf(bufHex,"%X",c);
                 if(ic < 16) 
