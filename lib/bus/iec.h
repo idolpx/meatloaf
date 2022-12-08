@@ -196,7 +196,7 @@ class iecBus
             if ( active_protocol == PROTOCOL_JIFFYDOS ) {
                 protocol = static_cast<CBMStandardSerial*>(&protocolJiffyDOS);
             } 
-#ifdef
+#ifdef PARALLEL_BUS
             else if ( active_protocol == PROTOCOL_DOLPHINDOS ) 
             {
                 protocol = static_cast<CBMStandardSerial*>(&protocolDolphinDOS);
