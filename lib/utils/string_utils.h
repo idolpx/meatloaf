@@ -36,6 +36,9 @@ namespace mstr {
     void A02Space(std::string &s);
     std::string format(const char *format, ...);
     std::string formatBytes(uint64_t value);
+    void cd(std::string &path, std::string newDir);
+    std::string parent(std::string path, std::string plus = "");
+    std::string localParent(std::string path, std::string plus);
 }
 
 #endif
