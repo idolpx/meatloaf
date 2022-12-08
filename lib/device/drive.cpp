@@ -418,7 +418,7 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 		}
 
 		// Debug_printv("found command     [%s]", tuple.command.c_str());
-		// Debug_printv("command[%s] raw[%s] full[%s]", tuple.command.c_str(), tuple.rawPath.c_str(), tuple.fullPath.c_str());
+		Debug_printv("command[%s] raw[%s] full[%s]", tuple.command.c_str(), tuple.rawPath.c_str(), tuple.fullPath.c_str());
 
 		if(guessedPath == "$")
 		{
@@ -449,7 +449,7 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 void iecDrive::changeDir(std::string url)
 {
 	//Debug_printv("url[%s]", url.c_str());
-	device_config.url(url);
+	//device_config.url(url);
 	m_mfile.reset(MFSOwner::File(url));
 
 	std::string media_path = m_mfile->path.substr(0, m_mfile->path.size() - m_mfile->media_image.size());
@@ -1074,10 +1074,10 @@ bool iecDrive::sendFile()
 					//setDeviceStatus( 74 );
 					success = true;
 				}
-				else
-				{
-					closeStream();
-				}
+				// else
+				// {
+				// 	closeStream();
+				// }
 
 				break;
 			}

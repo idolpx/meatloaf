@@ -497,6 +497,11 @@ void iecBus::service ( void )
             this->data.init();
         }
 
+        if ( protocol->flags and_eq ERROR )
+        {
+            releaseLines();
+        }
+
         this->bus_state = BUS_IDLE;
 
         // Switch back to standard serial
