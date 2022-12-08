@@ -183,9 +183,11 @@ class iecBus
         //std::unique_ptr<CBMStandardSerial> protocol = CBMStandardSerial();
         //CBMStandardSerial protocol;
 
-        JiffyDOS protocolJiffyDOS;
-        DolphinDOS protocolDolphinDOS;
         CBMStandardSerial protocolCBMStandardSerial;
+        JiffyDOS protocolJiffyDOS;
+#ifdef PARALLEL_BUS
+        DolphinDOS protocolDolphinDOS;
+#endif
 
         CBMStandardSerial *protocol = static_cast<CBMStandardSerial*>(&protocolCBMStandardSerial);
 
@@ -193,9 +195,15 @@ class iecBus
             uint16_t flags_cp = protocol->flags;
             if ( active_protocol == PROTOCOL_JIFFYDOS ) {
                 protocol = static_cast<CBMStandardSerial*>(&protocolJiffyDOS);
-            } else if ( active_protocol == PROTOCOL_DOLPHINDOS ) {
+            } 
+#ifdef
+            else if ( active_protocol == PROTOCOL_DOLPHINDOS ) 
+            {
                 protocol = static_cast<CBMStandardSerial*>(&protocolDolphinDOS);
-            } else {
+            }
+#endif
+            else 
+            {
                 protocol = static_cast<CBMStandardSerial*>(&protocolCBMStandardSerial);
             }
             protocol->flags = flags_cp;
