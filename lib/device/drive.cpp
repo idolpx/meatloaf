@@ -1066,11 +1066,19 @@ bool iecDrive::sendFile()
 			if ( IEC.protocol->flags bitand ATN_PULLED )
 			{
 				Debug_printv("ATN pulled while sending. i[%d]", i);
-				// Save file pointer position
-				// streamUpdate( istream );
-				istream->seek(istream->position() - 1);
-				//setDeviceStatus( 74 );
-				success = true;
+				if ( IEC.data.channel > 1 )
+				{
+					// Save file pointer position
+					// streamUpdate( istream );
+					istream->seek(istream->position() - 1);
+					//setDeviceStatus( 74 );
+					success = true;
+				}
+				else
+				{
+					closeStream();
+				}
+
 				break;
 			}
 
