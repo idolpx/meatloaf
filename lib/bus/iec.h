@@ -27,7 +27,9 @@
 
 #include "protocol/cbmstandardserial.h"
 #include "protocol/jiffydos.h"
+#ifdef PARALLEL_BUS
 #include "protocol/dolphindos.h"
+#endif
 
 #include "../../include/debug.h"
 

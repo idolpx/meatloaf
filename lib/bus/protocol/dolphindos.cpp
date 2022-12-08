@@ -15,6 +15,8 @@
 // You should have received a copy of the GNU General Public License
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
+#ifdef PARALLEL_BUS
+
 #include "dolphindos.h"
 
 #include "../../../include/debug.h"
@@ -266,3 +268,5 @@ bool DolphinDOS::sendByte ( uint8_t data, bool signalEOI )
 
     return true;
 } // sendByte
+
+#endif // PARALLEL_BUS

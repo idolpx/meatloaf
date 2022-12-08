@@ -1,4 +1,6 @@
 
+#ifdef PARALLEL_BUS
+
 #include "parallel.h"
 
 #include <freertos/queue.h>
@@ -409,3 +411,5 @@ void wic64_command()
     //     }
     // }
 }
+
+#endif // PARALLEL_BUS

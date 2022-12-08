@@ -465,7 +465,9 @@ void iecBus::service ( void )
 
         if ( this->data.secondary == IEC_OPEN || this->data.secondary == IEC_REOPEN )
         {
+#ifdef PARALLEL_BUS
             PARALLEL.handShake();
+#endif
 
             // Switch to detected protocol
             selectProtocol();
