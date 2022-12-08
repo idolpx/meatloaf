@@ -139,7 +139,10 @@ public:
     {
         // set base URL
         //Debug_printv("base[%s]", (root() + "/" + path).c_str());
-        return root() + "/" + path;
+        if ( !mstr::startsWith(path, "/") )
+            path = "/" + path;
+
+        return root() + path ;
     }
 
     std::string pathToFile(void)
