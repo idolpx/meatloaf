@@ -23,6 +23,14 @@ class MeatHttpClient {
     };
 
 public:
+
+    MeatHttpClient() {
+        
+    }
+    ~MeatHttpClient() {
+        close();
+    }
+
     bool GET(std::string url);
     bool POST(std::string url);
     bool PUT(std::string url);

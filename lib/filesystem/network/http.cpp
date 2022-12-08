@@ -189,6 +189,7 @@ bool MeatHttpClient::processRedirectsAndOpen(int range) {
     while(lastRC == HttpStatus_MovedPermanently || lastRC == HttpStatus_Found || lastRC == 303)
     {
         //Debug_printv("--- Page moved, doing redirect to [%s]", url.c_str());
+        close();
         lastRC = openAndFetchHeaders(lastMethod, range);
         wasRedirected = true;
     }
@@ -198,7 +199,6 @@ bool MeatHttpClient::processRedirectsAndOpen(int range) {
         close();
         return false;
     }
-
 
     // TODO - set m_isWebDAV somehow
     m_isOpen = true;
@@ -219,10 +219,11 @@ bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
 
 void MeatHttpClient::close() {
     if(m_http != nullptr) {
-        if(m_isOpen) {
+        if ( m_isOpen ) {
             esp_http_client_close(m_http);
         }
         esp_http_client_cleanup(m_http);
+        //Debug_printv("HTTP Close and Cleanup");
         m_http = nullptr;
     }
     m_isOpen = false;
@@ -349,6 +350,7 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t meth, int resum
         .keep_alive_interval = 1
     };
 
+    //Debug_printv("HTTP Init");
     m_http = esp_http_client_init(&config);
 
     if(resume > 0) {
@@ -435,7 +437,7 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
             }
             else if(mstr::equals("Location", evt->header_key, false))
             {
-                //Debug_printv("* This page redirects from '%s' to '%s'", meatClient->url.c_str(), evt->header_value);
+                Debug_printv("* This page redirects from '%s' to '%s'", meatClient->url.c_str(), evt->header_value);
                 if ( mstr::startsWith(evt->header_value, (char *)"http") )
                 {
                     //Debug_printv("match");
