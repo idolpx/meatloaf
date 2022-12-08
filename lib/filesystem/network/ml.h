@@ -47,14 +47,18 @@
 class MLFileSystem: public MFileSystem
 {
     MFile* getFile(std::string path) override {
-        // Debug_printv("MLFileSystem::getFile(%s)", path.c_str());
+        if ( path.size() == 0 )
+            return nullptr;
+
+        //Debug_printv("MLFileSystem::getFile(%s)", path.c_str());
         PeoplesUrlParser urlParser;
         urlParser.parseUrl(path);
 
+        //Debug_printv("url[%s]", urlParser.name.c_str());
         std::string ml_url = "https://api.meatloaf.cc/?" + urlParser.name;
-        Debug_printv("ml_url[%s]", ml_url.c_str());
+        //Debug_printv("ml_url[%s]", ml_url.c_str());
         
-        Debug_printv("url[%s]", ml_url.c_str());
+        //Debug_printv("url[%s]", ml_url.c_str());
 
         return new HttpFile(ml_url);
     }

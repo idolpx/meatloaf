@@ -440,6 +440,7 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
                 {
                     Debug_printv("match");
                     meatClient->url = evt->header_value;
+                    device_config.url(evt->header_value);
                 }
                 else
                 {

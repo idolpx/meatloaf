@@ -293,7 +293,7 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 	// Debug_printv("* PARSE INCOMING LINE *******************************");
 
 	// Debug_printv("we are in              [%s]", m_mfile->url.c_str());
-	// Debug_printv("unprocessed user input [%s]", command.c_str());
+	// Debug_printv("unprocessed user input [%s] channel[%d]", command.c_str(), channel);
 
 	// Chop off type, mode
 	if ( mstr::contains(command, ",") )
@@ -400,10 +400,23 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 
 		// and to get a REAL FULL PATH that the user wanted to refer to, we CD into it, using supplied stripped path:
 		mstr::rtrim(guessedPath);
-		tuple.rawPath = guessedPath;
+		tuple.fullPath = guessedPath;
 
-		//Debug_printv("found command     [%s]", tuple.command.c_str());
-		//Debug_printv("command[%s] raw[%s] full[%s]", tuple.command.c_str(), tuple.rawPath.c_str(), tuple.fullPath.c_str());
+		if ( mstr::contains(guessedPath, ":") )
+		{
+			tuple.rawPath = guessedPath;
+		}
+		else
+		{
+			std::string url = device_config.url();
+			PeoplesUrlParser purl;
+			purl.parseUrl(url + "/" + guessedPath);
+
+			tuple.rawPath = purl.url;
+		}
+
+		// Debug_printv("found command     [%s]", tuple.command.c_str());
+		// Debug_printv("command[%s] raw[%s] full[%s]", tuple.command.c_str(), tuple.rawPath.c_str(), tuple.fullPath.c_str());
 
 		if(guessedPath == "$")
 		{
@@ -415,7 +428,7 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 
 			tuple.fullPath = fullPath->url;
 
-			//Debug_printv("full referenced path [%s]", tuple.fullPath.c_str());
+			// Debug_printv("full referenced path [%s]", tuple.fullPath.c_str());
 		}
 	// }
 	// else
@@ -499,6 +512,7 @@ void iecDrive::handleListenCommand( void )
 	auto commandAndPath = parseLine(this->data.device_command, channel);
 	//Debug_printv("command[%s] path[%s]", commandAndPath.command.c_str(), commandAndPath.fullPath.c_str());	
 	auto referencedPath = Meat::New<MFile>(commandAndPath.fullPath);
+	//Debug_printv("referenced[%s]", referencedPath->url.c_str());
 
 	if ( referencedPath == nullptr )
 	{
@@ -560,11 +574,15 @@ void iecDrive::handleListenCommand( void )
 		else //if ( referencedPath->exists() )
 		{
 			// Set File
-			prepareFileStream(referencedPath->url);
+			//Debug_printv("Set File [%s]", referencedPath->url.c_str());
+			//prepareFileStream(referencedPath->url);
+
+			//Debug_printv("Set File [%s]", commandAndPath.rawPath.c_str());
+			prepareFileStream(commandAndPath.rawPath.c_str());
 		}
 	}
 
-	// dumpState();
+	dumpState();
 } // handleListenCommand
 
 
@@ -995,7 +1013,6 @@ bool iecDrive::sendFile()
             success = istream->read(&b, 1);
             if ( !success )
             {
-                Debug_printv("fail");
                 IEC.sendEOI(0);
             }
 
