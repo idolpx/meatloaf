@@ -20,7 +20,6 @@ sdkconfig.fujinet-*
 sdkconfig.meatloaf-*
 
 include/ssid.h
-include/pinmap.h
 /*.log
 **/.backup
 .travis.yml

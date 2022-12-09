@@ -2,6 +2,8 @@
 #ifndef PINMAP_LOLIN_D32_PRO_H
 #define PINMAP_LOLIN_D32_PRO_H
 
+#ifdef PINMAP_LOLIN_D32
+
 /* SD Card */
 // pins 12-15 are used to interface with the JTAG debugger
 // so leave them alone if we're using JTAG
@@ -106,5 +108,5 @@
 //#define GPIOX_SPEED       400   // PCF8575 - 400Khz
 #define GPIOX_SPEED       1000  // PCA9673 - 1000Khz / 1Mhz
 
-
+#endif // PINMAP_LOLIN_D32
 #endif // PINMAP_LOLIN_D32_PRO_H
