@@ -44,6 +44,13 @@ some logging info of the project being built.
 meatloaf should now be running on the device
 ```
 
+# Want to host your own files on a webserver?
+
+All you need is some web space on a server with PHP enabled.
+Just drop the following script in a directory with all your files and name it 'index.php'
+
+[Meatloaf PHP Server Script](https://gist.github.com/idolpx/ab8874f8396b6fa0d89cc9bab1e4dee2)
+
 
 
 
