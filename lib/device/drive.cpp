@@ -79,17 +79,17 @@ device_state_t iecDrive::process ( void )
 
         if ( this->data.channel == 0 ) {
             Debug_printf ( "LOAD \"%s\",%d\r\n", this->data.device_command.c_str(), this->data.device );
-            isOpen = registerStream(std::ios_base::in, m_filename);
+            isOpen = registerStream(std::ios_base::in);
         }
         else if ( IEC.data.channel == 1 ) {
             Debug_printf ( "SAVE \"%s\",%d\r\n", this->data.device_command.c_str(), this->data.device );
-            isOpen = registerStream(std::ios_base::out, m_filename);
+            isOpen = registerStream(std::ios_base::out);
         }
         else
         {
             Debug_printf ( "OPEN #,%d,%d,\"%s\"\r\n", this->data.device, this->data.channel, this->data.device_command.c_str() );
             // here we have to decide if we read, write or r/w the file, but for time being, we'll be just reading, so:
-            isOpen = registerStream(std::ios_base::in, m_filename);
+            isOpen = registerStream(std::ios_base::in);
         }
 
         // Open Named Channel
@@ -576,7 +576,7 @@ void iecDrive::handleListenCommand( void )
 		}
 	}
 
-	//dumpState();
+	dumpState();
 } // handleListenCommand
 
 
@@ -790,7 +790,17 @@ void iecDrive::sendListing()
 
 	if(entry == nullptr) {
 		Debug_printv("fnf");
-		sendFileNotFound();
+		
+		bool isOpen = registerStream(std::ios_base::in);
+		if(isOpen) 
+		{
+            sendFile();
+        }
+		else
+		{
+			sendFileNotFound();
+		}
+		
 		return;
 	}
 
