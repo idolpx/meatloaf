@@ -31,13 +31,6 @@ Copy include/ssid.h.sample to include/ssid.h
 Edit ssid.h to match your wifi
 ```
 
-```
-Copy include/pinmap.h.sample to include/pinmap.h
-```
-
-```
-Edit pinmap.h to match your ESP32 module
-```
 
 ```
 Press the PlatformIO Upload icon arrow at the bottom in the status bar.
