@@ -71,6 +71,7 @@ build_flags =
     -D DEBUG_SPEED=460800   ;921600
     ;-D NO_PSRAM            ; if your hardware has no PSRAM
     ;-D NO_BUTTONS          ; if your hardware has no physical buttons
+    ;-D SD_CARD             ; if your hardware has an sd card slot
     ;-D LED_STRIP           ; if your hardware has an LED strip
     ;-D PIEZO_BUZZER        ; if your hardware has a piezo buzzer
     ;-D PARALLEL_BUS        ; if your hardware has userport parallel interface
@@ -91,6 +92,7 @@ build_type = debug
 build_flags =
 	${env.build_flags}
 	-D PINMAP_FL_REV0
+    -D SD_CARD
 	-D LED_STRIP
 	-D PARALLEL_BUS
 
@@ -101,6 +103,7 @@ build_type = debug
 build_flags =
 	${env.build_flags}
 	-D PINMAP_LOLIN_D32
+    -D SD_CARD
 
 [env:esp32-wroom]
 platform = espressif32@${meatloaf.esp32_platform_version}
@@ -118,6 +121,7 @@ build_type = debug
 build_flags =
 	${env.build_flags}
 	-D PINMAP_A2_REV0
+    -D SD_CARD
 
 [env:fujinet-v1.6]
 platform = espressif32@${meatloaf.esp32_platform_version}
@@ -126,6 +130,7 @@ build_type = debug
 build_flags =
 	${env.build_flags}
 	-D PINMAP_FN_16
+    -D SD_CARD
 
 [env:esp32s3]
 platform = espressif32@${meatloaf.esp32_platform_version}

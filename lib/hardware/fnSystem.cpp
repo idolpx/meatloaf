@@ -31,6 +31,7 @@
 
 
 #ifndef JTAG
+#ifdef SD_CARD
 static xQueueHandle card_detect_evt_queue = NULL;
 static uint32_t card_detect_status = 1; // 1 is no sd card
 
@@ -70,6 +71,7 @@ static void card_detect_intr_task(void* arg)
         }
     }
 }
+#endif
 #endif
 
 // Global object to manage System
@@ -390,9 +392,11 @@ void SystemManager::delete_tempfile(FileSystem *fs, const char *filename)
 */
 void SystemManager::delete_tempfile(const char *filename)
 {
+#ifdef SD_CARD
     if (fnSDFAT.running())
         delete_tempfile(&fnSDFAT, filename);
     else
+#endif
         delete_tempfile(&fnSPIFFS, filename);
 }
 
@@ -403,9 +407,11 @@ void SystemManager::delete_tempfile(const char *filename)
 */
 FILE *SystemManager::make_tempfile(char *result_filename)
 {
+#ifdef SD_CARD
     if (fnSDFAT.running())
         return make_tempfile(&fnSDFAT, result_filename);
     else
+#endif
         return make_tempfile(&fnSPIFFS, result_filename);
 }
 
@@ -597,7 +603,8 @@ void SystemManager::check_hardware_ver()
 {
     _hardware_version = 9999;
 
-#ifndef JTAG    
+#ifndef JTAG
+#ifdef SD_CARD
     int upcheck, downcheck, fixupcheck, fixdowncheck;
 
     fnSystem.set_pin_mode(PIN_CARD_DETECT_FIX, gpio_mode_t::GPIO_MODE_INPUT, SystemManager::pull_updown_t::PULL_DOWN);
@@ -611,7 +618,6 @@ void SystemManager::check_hardware_ver()
 
     fnSystem.set_pin_mode(PIN_CARD_DETECT, gpio_mode_t::GPIO_MODE_INPUT, SystemManager::pull_updown_t::PULL_UP);
     upcheck = fnSystem.digital_read(12);
-
 
     if(fixupcheck == fixdowncheck)
     {
@@ -653,6 +659,7 @@ void SystemManager::check_hardware_ver()
     }
 
     fnSystem.set_pin_mode(PIN_BUTTON_C, gpio_mode_t::GPIO_MODE_INPUT, SystemManager::pull_updown_t::PULL_NONE);
+#endif
 #endif
 }
 
