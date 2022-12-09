@@ -2,6 +2,7 @@
 #ifndef PINMAP_FUJINET_V1_6_H
 #define PINMAP_FUJINET_V1_6_H
 
+#ifdef PINMAP_FN_16
 /* SD Card */
 // pins 12-15 are used to interface with the JTAG debugger
 // so leave them alone if we're using JTAG
@@ -98,5 +99,5 @@
 //#define GPIOX_SPEED       400   // PCF8575 - 400Khz
 #define GPIOX_SPEED       1000  // PCA9673 - 1000Khz / 1Mhz
 
-
+#endif // PINMAP_FN_16
 #endif // PINMAP_FUJINET_V1_6_H

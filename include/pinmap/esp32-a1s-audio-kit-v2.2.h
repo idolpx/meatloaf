@@ -20,6 +20,8 @@
 #ifndef PINMAP_ESP32_A1S_AUDIO_KIT_V2_2
 #define PINMAP_ESP32_A1S_AUDIO_KIT_V2_2
 
+#ifdef PINMAP_A1S_AUDIOKIT
+
 /* SD Card */
 // pins 12-15 are used to interface with the JTAG debugger
 // so leave them alone if we're using JTAG
@@ -99,4 +101,5 @@
 //#define GPIOX_SPEED       400   // PCF8575 - 400Khz
 #define GPIOX_SPEED       1000  // PCA9673 - 1000Khz / 1Mhz
 
+#endif // PINMAP_A1S_AUDIOKIT
 #endif // PINMAP_ESP32_A1S_AUDIO_KIT_V2_2

@@ -1,6 +1,8 @@
 #ifndef PINMAP_WROOM_32_H
 #define PINMAP_WROOM_32_H
 
+#ifdef PINMAP_WROOM
+
 /* SD Card */
 // pins 12-15 are used to interface with the JTAG debugger
 // so leave them alone if we're using JTAG
@@ -105,4 +107,5 @@
 //#define GPIOX_SPEED       400   // PCF8575 - 400Khz
 #define GPIOX_SPEED       1000  // PCA9673 - 1000Khz / 1Mhz
 
+#endif // PINMAP_WROOM
 #endif // PINMAP_WROOM_32_H
