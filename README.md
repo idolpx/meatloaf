@@ -51,6 +51,13 @@ Just drop the following script in a directory with all your files and name it 'i
 
 [Meatloaf PHP Server Script](https://gist.github.com/idolpx/ab8874f8396b6fa0d89cc9bab1e4dee2)
 
+Once that is done just you can get a directory listing on your C64 with Meatloaf with a standard LOAD command.
+
+```
+LOAD"HTTP://YOURDOMAIN.COM/PATH",8
+```
+
+
 
 
 
