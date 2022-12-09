@@ -25,10 +25,7 @@
 #define PROTOCOL_DOLPHINDOS_H
 
 #include "cbmstandardserial.h"
-
-#ifdef PARALLEL_BUS
 #include "parallel.h"
-#endif
 
 namespace Protocol
 {

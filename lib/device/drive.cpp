@@ -404,43 +404,9 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 		mstr::rtrim(guessedPath);
 		tuple.rawPath = guessedPath;
 
-		std::string url = device_config.url();
-		if ( !url.empty() )
-		{
-			tuple.fullPath = guessedPath;
-			if ( mstr::contains(guessedPath, ":") )
-			{
-				tuple.rawPath = guessedPath;
-			}
-			else
-			{
-				if( mstr::contains(guessedPath, "$") )
-				{
-					tuple.command = url;
-					tuple.rawPath = url;
-				}
-				else if( tuple.command.compare("cd") == 0 )
-				{
-					Debug_printv("before url[%s]", url.c_str());
-					mstr::cd(url, guessedPath);
-					device_config.url(url);
-					tuple.command = url;
-					tuple.rawPath = url;
-					Debug_printv("after url[%s]", url.c_str());
-					prepareFileStream(url);
-				}
-				else
-				{
-					PeoplesUrlParser purl;
-					purl.parseUrl(url + "/" + mstr::urlEncode(guessedPath));
-					tuple.rawPath = purl.url;
-				}
-			}
-		}
-
-
 		//Debug_printv("found command     [%s]", tuple.command.c_str());
-		Debug_printv("command[%s] raw[%s] full[%s]", tuple.command.c_str(), tuple.rawPath.c_str(), tuple.fullPath.c_str());
+		//Debug_printv("command[%s] raw[%s] full[%s]", tuple.command.c_str(), tuple.rawPath.c_str(), tuple.fullPath.c_str());
+
 		if(guessedPath == "$")
 		{
 			//Debug_printv("get directory of [%s]", m_mfile->url.c_str());
@@ -478,7 +444,7 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 void iecDrive::changeDir(std::string url)
 {
 	//Debug_printv("url[%s]", url.c_str());
-	//device_config.url(url);
+	device_config.url(url);
 	m_mfile.reset(MFSOwner::File(url));
 
 	std::string media_path = m_mfile->path.substr(0, m_mfile->path.size() - m_mfile->media_image.size());
@@ -553,7 +519,7 @@ void iecDrive::handleListenCommand( void )
 		return;
 	}
 
-	Debug_printv("command[%s] path[%s]", commandAndPath.command.c_str(), commandAndPath.fullPath.c_str());
+	//Debug_printv("command[%s] path[%s]", commandAndPath.command.c_str(), commandAndPath.fullPath.c_str());
 	if (mstr::startsWith(commandAndPath.command, "$"))
 	{
 		m_openState = O_DIR;
@@ -599,18 +565,14 @@ void iecDrive::handleListenCommand( void )
 		// 2. OR if command == "CD" OR fullPath.isDirectory - change directory
 		if (mstr::equals(commandAndPath.command, (char*)"cd", false) || referencedPath->isDirectory())
 		{
-			Debug_printv("change dir called by CD command or because of isDirectory");
+			//Debug_printv("change dir called by CD command or because of isDirectory");
 			changeDir(referencedPath->url);
 		}
 		// 3. else - stream file
 		else //if ( referencedPath->exists() )
 		{
 			// Set File
-			//Debug_printv("Set File [%s]", referencedPath->url.c_str());
-			//prepareFileStream(referencedPath->url);
-
-			Debug_printv("Set File [%s]", commandAndPath.rawPath.c_str());
-			prepareFileStream(commandAndPath.rawPath.c_str());
+			prepareFileStream(referencedPath->url);
 		}
 	}
 
@@ -628,7 +590,7 @@ void iecDrive::handleListenData()
 
 void iecDrive::handleTalk(uint8_t chan)
 {
-	Debug_printv("channel[%d] openState[%d]", chan, m_openState);
+	//Debug_printv("channel[%d] openState[%d]", chan, m_openState);
 
 	switch (m_openState)
 	{
