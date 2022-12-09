@@ -10,11 +10,6 @@ Visual studio code, and the platformio addon installed from the vscode store req
 clone this repo
 ```
 
-Be sure to execute the following command in the project folder to pull the needed submodules.
-```
-git submodule update --init --recursive
-```
-
 ```
 Copy platformio.ini.sample to platformio.ini
 ```
