@@ -81,9 +81,9 @@ private:
         if(path.size() == 0)
             return;
 
-        // while(mstr::endsWith(path,"/")) {
-        //     path=mstr::dropLast(path, 1);
-        // }
+        while(mstr::endsWith(path,"/")) {
+            path=mstr::dropLast(path, 1);
+        }
         mstr::replaceAll(path, "//", "/");
     }
 
@@ -140,7 +140,7 @@ public:
         // set base URL
         //Debug_printv("base[%s]", (root() + "/" + path).c_str());
         if ( !mstr::startsWith(path, "/") )
-            path = "/" + path + "/";
+            path = "/" + path;
 
         cleanPath();
 
