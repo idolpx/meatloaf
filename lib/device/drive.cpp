@@ -405,8 +405,7 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 		tuple.rawPath = guessedPath;
 
 		//Debug_printv("found command     [%s]", tuple.command.c_str());
-		//Debug_printv("command[%s] raw[%s] full[%s]", tuple.command.c_str(), tuple.rawPath.c_str(), tuple.fullPath.c_str());
-
+		Debug_printv("command[%s] raw[%s] full[%s]", tuple.command.c_str(), tuple.rawPath.c_str(), tuple.fullPath.c_str());
 		if(guessedPath == "$")
 		{
 			//Debug_printv("get directory of [%s]", m_mfile->url.c_str());
@@ -465,7 +464,9 @@ void iecDrive::changeDir(std::string url)
 
 void iecDrive::prepareFileStream(std::string url)
 {
-	m_filename = url;
+	PeoplesUrlParser file;
+	file.parseUrl(url);
+	m_filename = file.name;
 	m_openState = O_FILE;
 	//Debug_printv("LOAD [%s]", url.c_str());
 }
@@ -790,7 +791,7 @@ void iecDrive::sendListing()
 
 	if(entry == nullptr) {
 		Debug_printv("fnf");
-		
+
 		bool isOpen = registerStream(std::ios_base::in);
 		if(isOpen) 
 		{
