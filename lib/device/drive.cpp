@@ -404,39 +404,39 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 		mstr::rtrim(guessedPath);
 		tuple.rawPath = guessedPath;
 
-		// std::string url = device_config.url();
-		// if ( !url.empty() )
-		// {
-		// 	tuple.fullPath = guessedPath;
-		// 	if ( mstr::contains(guessedPath, ":") )
-		// 	{
-		// 		tuple.rawPath = guessedPath;
-		// 	}
-		// 	else
-		// 	{
-		// 		if( mstr::contains(guessedPath, "$") )
-		// 		{
-		// 			tuple.command = url;
-		// 			tuple.rawPath = url;
-		// 		}
-		// 		else if( tuple.command.compare("cd") == 0 )
-		// 		{
-		// 			Debug_printv("before url[%s]", url.c_str());
-		// 			mstr::cd(url, guessedPath);
-		// 			device_config.url(url);
-		// 			tuple.command = url;
-		// 			tuple.rawPath = url;
-		// 			Debug_printv("after url[%s]", url.c_str());
-		// 			prepareFileStream(url);
-		// 		}
-		// 		else
-		// 		{
-		// 			PeoplesUrlParser purl;
-		// 			purl.parseUrl(url + "/" + mstr::urlEncode(guessedPath));
-		// 			tuple.rawPath = purl.url;
-		// 		}
-		// 	}
-		// }
+		std::string url = device_config.url();
+		if ( !url.empty() )
+		{
+			tuple.fullPath = guessedPath;
+			if ( mstr::contains(guessedPath, ":") )
+			{
+				tuple.rawPath = guessedPath;
+			}
+			else
+			{
+				if( mstr::contains(guessedPath, "$") )
+				{
+					tuple.command = url;
+					tuple.rawPath = url;
+				}
+				else if( tuple.command.compare("cd") == 0 )
+				{
+					Debug_printv("before url[%s]", url.c_str());
+					mstr::cd(url, guessedPath);
+					device_config.url(url);
+					tuple.command = url;
+					tuple.rawPath = url;
+					Debug_printv("after url[%s]", url.c_str());
+					prepareFileStream(url);
+				}
+				else
+				{
+					PeoplesUrlParser purl;
+					purl.parseUrl(url + "/" + mstr::urlEncode(guessedPath));
+					tuple.rawPath = purl.url;
+				}
+			}
+		}
 
 
 		//Debug_printv("found command     [%s]", tuple.command.c_str());
@@ -612,7 +612,7 @@ void iecDrive::handleListenCommand( void )
 			//prepareFileStream(referencedPath->url);
 
 			Debug_printv("Set File [%s]", commandAndPath.rawPath.c_str());
-			prepareFileStream(commandAndPath.rawPath.c_str());
+			prepareFileStream(commandAndPath.rawPath);
 		}
 	}
 
