@@ -1,6 +1,8 @@
 /* TODO: Check why using the SD/FAT routines takes up a large amount of the stack (around 4.5K)
 */
 
+#ifdef SD_CARD
+
 #include "fnFsSD.h"
 
 #include <esp_vfs.h>
@@ -465,3 +467,5 @@ bool FileSystemSDFAT::start()
 
     return _started;
 }
+
+#endif // SD_CARD

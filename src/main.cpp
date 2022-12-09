@@ -129,7 +129,9 @@ void main_setup()
 #elif FLASH_LITTLEFS
     fnLITTLEFS.start();
 #endif
+#ifdef SD_CARD
     fnSDFAT.start();
+#endif
 
     // Load our stored configuration
 //    Config.load();
