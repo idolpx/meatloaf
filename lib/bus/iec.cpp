@@ -140,7 +140,7 @@ bool iecDevice::registerStream (std::ios_base::open_mode mode, std::string m_fil
     // LOAD / GET / INPUT
     if ( mode == std::ios_base::in )
     {
-        //Debug_printv("LOAD m_filename[%s]", m_filename.c_str());
+        Debug_printv("LOAD m_filename[%s]", m_filename.c_str());
         new_stream = std::shared_ptr<MStream>(file->meatStream());
 
         if ( new_stream == nullptr )
@@ -499,10 +499,6 @@ void iecBus::service ( void )
             this->data.init();
         }
 
-        if ( protocol->flags and_eq ERROR )
-        {
-            releaseLines();
-        }
 
         this->bus_state = BUS_IDLE;
 

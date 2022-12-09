@@ -207,7 +207,7 @@ class iecBus
                 protocol = static_cast<CBMStandardSerial*>(&protocolCBMStandardSerial);
             }
             protocol->flags = flags_cp;
-            Debug_printv("protocol[%d]", active_protocol);
+            //Debug_printv("protocol[%d]", active_protocol);
         }
 
         iecBus ( void );

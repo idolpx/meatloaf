@@ -404,43 +404,43 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 		mstr::rtrim(guessedPath);
 		tuple.rawPath = guessedPath;
 
-		std::string url = device_config.url();
-		if ( !url.empty() )
-		{
-			tuple.fullPath = guessedPath;
-			if ( mstr::contains(guessedPath, ":") )
-			{
-				tuple.rawPath = guessedPath;
-			}
-			else
-			{
-				if( mstr::contains(guessedPath, "$") )
-				{
-					tuple.command = url;
-					tuple.rawPath = url;
-				}
-				else if( tuple.command.compare("cd") == 0 )
-				{
-					Debug_printv("before url[%s]", url.c_str());
-					mstr::cd(url, guessedPath);
-					device_config.url(url);
-					tuple.command = url;
-					tuple.rawPath = url;
-					Debug_printv("after url[%s]", url.c_str());
-					prepareFileStream(url);
-				}
-				else
-				{
-					PeoplesUrlParser purl;
-					purl.parseUrl(url + "/" + mstr::urlEncode(guessedPath));
-					tuple.rawPath = purl.url;
-				}
-			}
-		}
+		// std::string url = device_config.url();
+		// if ( !url.empty() )
+		// {
+		// 	tuple.fullPath = guessedPath;
+		// 	if ( mstr::contains(guessedPath, ":") )
+		// 	{
+		// 		tuple.rawPath = guessedPath;
+		// 	}
+		// 	else
+		// 	{
+		// 		if( mstr::contains(guessedPath, "$") )
+		// 		{
+		// 			tuple.command = url;
+		// 			tuple.rawPath = url;
+		// 		}
+		// 		else if( tuple.command.compare("cd") == 0 )
+		// 		{
+		// 			Debug_printv("before url[%s]", url.c_str());
+		// 			mstr::cd(url, guessedPath);
+		// 			device_config.url(url);
+		// 			tuple.command = url;
+		// 			tuple.rawPath = url;
+		// 			Debug_printv("after url[%s]", url.c_str());
+		// 			prepareFileStream(url);
+		// 		}
+		// 		else
+		// 		{
+		// 			PeoplesUrlParser purl;
+		// 			purl.parseUrl(url + "/" + mstr::urlEncode(guessedPath));
+		// 			tuple.rawPath = purl.url;
+		// 		}
+		// 	}
+		// }
 
 
 		//Debug_printv("found command     [%s]", tuple.command.c_str());
-		Debug_printv("command[%s] raw[%s] full[%s]", tuple.command.c_str(), tuple.rawPath.c_str(), tuple.fullPath.c_str());
+		//Debug_printv("command[%s] raw[%s] full[%s]", tuple.command.c_str(), tuple.rawPath.c_str(), tuple.fullPath.c_str());
 		if(guessedPath == "$")
 		{
 			//Debug_printv("get directory of [%s]", m_mfile->url.c_str());
@@ -449,15 +449,17 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 		{
 			auto fullPath = Meat::Wrap(m_mfile->cd(guessedPath));
 
-			Debug_printv("full referenced path [%s]", tuple.fullPath.c_str());
 			tuple.fullPath = fullPath->url;
-			
+			//Debug_printv("full referenced path [%s]", tuple.fullPath.c_str());
+
 			if ( fullPath->isDirectory() )
 			{
+				Debug_printv("dir");
 				changeDir(fullPath->url);
 			}
 			else
 			{
+				Debug_printv("prg");
 				prepareFileStream(fullPath->url);
 			}
 		}
@@ -529,7 +531,7 @@ void iecDrive::handleListenCommand( void )
 	}
 
 	// Parse DOS Command
-	Debug_printv("Parse DOS Command [%s]", this->data.device_command.c_str());
+	//Debug_printv("Parse DOS Command [%s]", this->data.device_command.c_str());
 	//this->dos.cbmdos_command_parse(this->data.device_command.c_str());
 
 	// 1. obtain command and fullPath
@@ -542,7 +544,7 @@ void iecDrive::handleListenCommand( void )
 		return;
 	}
 
-	Debug_printv("command[%s] path[%s]", commandAndPath.command.c_str(), commandAndPath.fullPath.c_str());	
+	//Debug_printv("command[%s] path[%s]", commandAndPath.command.c_str(), commandAndPath.fullPath.c_str());	
 	auto referencedPath = Meat::New<MFile>(commandAndPath.fullPath);
 	//Debug_printv("referenced[%s]", referencedPath->url.c_str());
 
@@ -553,7 +555,7 @@ void iecDrive::handleListenCommand( void )
 		return;
 	}
 
-	Debug_printv("command[%s] path[%s]", commandAndPath.command.c_str(), commandAndPath.fullPath.c_str());
+	//Debug_printv("command[%s] path[%s]", commandAndPath.command.c_str(), commandAndPath.fullPath.c_str());
 	if (mstr::startsWith(commandAndPath.command, "$"))
 	{
 		m_openState = O_DIR;
@@ -628,7 +630,7 @@ void iecDrive::handleListenData()
 
 void iecDrive::handleTalk(uint8_t chan)
 {
-	Debug_printv("channel[%d] openState[%d]", chan, m_openState);
+	//Debug_printv("channel[%d] openState[%d]", chan, m_openState);
 
 	switch (m_openState)
 	{
