@@ -79,17 +79,17 @@ device_state_t iecDrive::process ( void )
 
         if ( this->data.channel == 0 ) {
             Debug_printf ( "LOAD \"%s\",%d\r\n", this->data.device_command.c_str(), this->data.device );
-            isOpen = registerStream(std::ios_base::in, m_filename);
+            isOpen = registerStream(std::ios_base::in);
         }
         else if ( IEC.data.channel == 1 ) {
             Debug_printf ( "SAVE \"%s\",%d\r\n", this->data.device_command.c_str(), this->data.device );
-            isOpen = registerStream(std::ios_base::out, m_filename);
+            isOpen = registerStream(std::ios_base::out);
         }
         else
         {
             Debug_printf ( "OPEN #,%d,%d,\"%s\"\r\n", this->data.device, this->data.channel, this->data.device_command.c_str() );
             // here we have to decide if we read, write or r/w the file, but for time being, we'll be just reading, so:
-            isOpen = registerStream(std::ios_base::in, m_filename);
+            isOpen = registerStream(std::ios_base::in);
         }
 
         // Open Named Channel
@@ -404,43 +404,9 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 		mstr::rtrim(guessedPath);
 		tuple.rawPath = guessedPath;
 
-		std::string url = device_config.url();
-		if ( !url.empty() )
-		{
-			tuple.fullPath = guessedPath;
-			if ( mstr::contains(guessedPath, ":") )
-			{
-				tuple.rawPath = guessedPath;
-			}
-			else
-			{
-				if( mstr::contains(guessedPath, "$") )
-				{
-					tuple.command = url;
-					tuple.rawPath = url;
-				}
-				else if( tuple.command.compare("cd") == 0 )
-				{
-					Debug_printv("before url[%s]", url.c_str());
-					mstr::cd(url, guessedPath);
-					device_config.url(url);
-					tuple.command = url;
-					tuple.rawPath = url;
-					Debug_printv("after url[%s]", url.c_str());
-					prepareFileStream(url);
-				}
-				else
-				{
-					PeoplesUrlParser purl;
-					purl.parseUrl(url + "/" + mstr::urlEncode(guessedPath));
-					tuple.rawPath = purl.url;
-				}
-			}
-		}
-
-
 		//Debug_printv("found command     [%s]", tuple.command.c_str());
 		//Debug_printv("command[%s] raw[%s] full[%s]", tuple.command.c_str(), tuple.rawPath.c_str(), tuple.fullPath.c_str());
+
 		if(guessedPath == "$")
 		{
 			//Debug_printv("get directory of [%s]", m_mfile->url.c_str());
@@ -450,18 +416,8 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 			auto fullPath = Meat::Wrap(m_mfile->cd(guessedPath));
 
 			tuple.fullPath = fullPath->url;
-			//Debug_printv("full referenced path [%s]", tuple.fullPath.c_str());
+			Debug_printv("full referenced path [%s] m_mfile[%s]", tuple.fullPath.c_str(), m_mfile->url.c_str());
 
-			if ( fullPath->isDirectory() )
-			{
-				Debug_printv("dir");
-				changeDir(fullPath->url);
-			}
-			else
-			{
-				Debug_printv("prg");
-				prepareFileStream(fullPath->url);
-			}
 		}
 	// }
 	// else
@@ -480,7 +436,7 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 void iecDrive::changeDir(std::string url)
 {
 	//Debug_printv("url[%s]", url.c_str());
-	//device_config.url(url);
+	device_config.url(url);
 	m_mfile.reset(MFSOwner::File(url));
 
 	std::string media_path = m_mfile->path.substr(0, m_mfile->path.size() - m_mfile->media_image.size());
@@ -531,7 +487,7 @@ void iecDrive::handleListenCommand( void )
 	}
 
 	// Parse DOS Command
-	//Debug_printv("Parse DOS Command [%s]", this->data.device_command.c_str());
+	Debug_printv("Parse DOS Command [%s]", this->data.device_command.c_str());
 	//this->dos.cbmdos_command_parse(this->data.device_command.c_str());
 
 	// 1. obtain command and fullPath
@@ -544,7 +500,7 @@ void iecDrive::handleListenCommand( void )
 		return;
 	}
 
-	//Debug_printv("command[%s] path[%s]", commandAndPath.command.c_str(), commandAndPath.fullPath.c_str());	
+	Debug_printv("command[%s] path[%s]", commandAndPath.command.c_str(), commandAndPath.fullPath.c_str());	
 	auto referencedPath = Meat::New<MFile>(commandAndPath.fullPath);
 	//Debug_printv("referenced[%s]", referencedPath->url.c_str());
 
@@ -616,7 +572,7 @@ void iecDrive::handleListenCommand( void )
 		}
 	}
 
-	//dumpState();
+	dumpState();
 } // handleListenCommand
 
 
@@ -664,6 +620,8 @@ void iecDrive::handleTalk(uint8_t chan)
 	}
 
 	m_openState = O_NOTHING;
+
+	dumpState();
 } // handleTalk
 
 
@@ -805,6 +763,8 @@ uint16_t iecDrive::sendHeader(uint16_t &basicPtr, std::string header, std::strin
 		byte_count += sendLine(basicPtr, 0, "%*s\"-------------------\" NFO", 0, "");
 		if ( byte_count == 0 ) return 0;
 	}
+	
+#ifdef SD_CARD
 	if (fnSDFAT.running() && m_mfile->url.size() < 2)
 	{
 		byte_count += sendLine(basicPtr, 0, "%*s\"SD\"                  DIR", 0, "");
@@ -812,6 +772,7 @@ uint16_t iecDrive::sendHeader(uint16_t &basicPtr, std::string header, std::strin
 		byte_count += sendLine(basicPtr, 0, "%*s\"-------------------\" NFO", 0, "");
 		if ( byte_count == 0 ) return 0;
 	}
+#endif
 
 	return byte_count;
 }

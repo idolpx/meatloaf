@@ -113,7 +113,7 @@ class iecDevice
 
         // Named Channel functions
         std::shared_ptr<MStream> currentStream;
-        bool registerStream (int mode, std::string m_filename);
+        bool registerStream (int mode);
         std::shared_ptr<MStream> retrieveStream ( void );
         bool closeStream ( bool close_all = false );
 
