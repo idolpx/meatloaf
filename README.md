@@ -10,11 +10,6 @@ Visual studio code, and the platformio addon installed from the vscode store req
 clone this repo
 ```
 
-Be sure to execute the following command in the project folder to pull the needed submodules.
-```
-git submodule update --init --recursive
-```
-
 ```
 Copy platformio.ini.sample to platformio.ini
 ```
@@ -43,6 +38,20 @@ some logging info of the project being built.
 ```
 meatloaf should now be running on the device
 ```
+
+# Want to host your own files on a webserver?
+
+All you need is some web space on a server with PHP enabled.
+Just drop the following script in a directory with all your files and name it 'index.php'
+
+[Meatloaf PHP Server Script](https://gist.github.com/idolpx/ab8874f8396b6fa0d89cc9bab1e4dee2)
+
+Once that is done just you can get a directory listing on your C64 with Meatloaf with a standard LOAD command.
+
+```
+LOAD"HTTP://YOURDOMAIN.COM/PATH",8
+```
+
 
 
 
