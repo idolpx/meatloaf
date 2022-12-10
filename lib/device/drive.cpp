@@ -443,6 +443,7 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 void iecDrive::changeDir(std::string url)
 {
 	Debug_printv("url[%s]", url.c_str());
+	mstr::replaceAll(url, " ", "%20"); // url encode spaces
 	device_config.url(url);
 	m_mfile.reset(MFSOwner::File(url));
 
@@ -464,11 +465,13 @@ void iecDrive::changeDir(std::string url)
 
 void iecDrive::prepareFileStream(std::string url)
 {
-	PeoplesUrlParser file;
-	file.parseUrl(url);
-	m_filename = file.name;
+	// PeoplesUrlParser file;
+	// file.parseUrl(url);
+	//m_filename = file.name;
+	mstr::replaceAll(url, " ", "%20"); // url encode spaces
+	m_filename = url;
 	m_openState = O_FILE;
-	Debug_printv("LOAD [%s]", url.c_str());
+	Debug_printv("LOAD [%s] [%s]", url.c_str(), m_filename.c_str());
 }
 
 
@@ -520,7 +523,7 @@ void iecDrive::handleListenCommand( void )
 		return;
 	}
 
-	//Debug_printv("command[%s] path[%s]", commandAndPath.command.c_str(), commandAndPath.fullPath.c_str());
+	Debug_printv("command[%s] path[%s]", commandAndPath.command.c_str(), commandAndPath.fullPath.c_str());
 	if (mstr::startsWith(commandAndPath.command, "$"))
 	{
 		m_openState = O_DIR;
@@ -577,7 +580,7 @@ void iecDrive::handleListenCommand( void )
 		}
 	}
 
-	//dumpState();
+	dumpState();
 } // handleListenCommand
 
 
@@ -626,7 +629,7 @@ void iecDrive::handleTalk(uint8_t chan)
 
 	m_openState = O_NOTHING;
 
-	//dumpState();
+	dumpState();
 } // handleTalk
 
 
