@@ -417,14 +417,14 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 			Debug_printv("full referenced path [%s]", tuple.fullPath.c_str());
 			tuple.fullPath = fullPath->url;
 			
-			if ( fullPath->isDirectory() )
-			{
-				changeDir(fullPath->url);
-			}
-			else
-			{
-				prepareFileStream(fullPath->url);
-			}
+			// if ( fullPath->isDirectory() )
+			// {
+			// 	changeDir(fullPath->url);
+			// }
+			// else
+			// {
+			// 	prepareFileStream(fullPath->url);
+			// }
 		}
 	// }
 	// else
@@ -442,7 +442,7 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 
 void iecDrive::changeDir(std::string url)
 {
-	//Debug_printv("url[%s]", url.c_str());
+	Debug_printv("url[%s]", url.c_str());
 	device_config.url(url);
 	m_mfile.reset(MFSOwner::File(url));
 
@@ -468,7 +468,7 @@ void iecDrive::prepareFileStream(std::string url)
 	file.parseUrl(url);
 	m_filename = file.name;
 	m_openState = O_FILE;
-	//Debug_printv("LOAD [%s]", url.c_str());
+	Debug_printv("LOAD [%s]", url.c_str());
 }
 
 
@@ -506,7 +506,7 @@ void iecDrive::handleListenCommand( void )
 	if ( this->data.channel == CMD_CHANNEL )
 	{
 		Debug_printv("Execute DOS Command [%s]", this->data.device_command.c_str());
-		return;
+		//return;
 	}
 
 	Debug_printv("command[%s] path[%s]", commandAndPath.command.c_str(), commandAndPath.fullPath.c_str());	
