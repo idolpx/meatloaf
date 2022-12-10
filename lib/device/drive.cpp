@@ -443,7 +443,6 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 void iecDrive::changeDir(std::string url)
 {
 	Debug_printv("url[%s]", url.c_str());
-	mstr::replaceAll(url, " ", "%20"); // url encode spaces
 	device_config.url(url);
 	m_mfile.reset(MFSOwner::File(url));
 
@@ -468,7 +467,6 @@ void iecDrive::prepareFileStream(std::string url)
 	// PeoplesUrlParser file;
 	// file.parseUrl(url);
 	//m_filename = file.name;
-	mstr::replaceAll(url, " ", "%20"); // url encode spaces
 	m_filename = url;
 	m_openState = O_FILE;
 	Debug_printv("LOAD [%s] [%s]", url.c_str(), m_filename.c_str());

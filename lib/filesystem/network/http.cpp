@@ -20,7 +20,10 @@ MeatHttpClient* HttpFile::fromHeader() {
 }
 
 bool HttpFile::isDirectory() {
-    if(fromHeader()->m_isWebDAV || fromHeader()->m_isDirectory) {
+    if(fromHeader()->m_isDirectory)
+        return true;
+
+    if(fromHeader()->m_isWebDAV) {
         // try webdav PROPFIND to get a listing
         return true;
     }
@@ -187,12 +190,12 @@ bool MeatHttpClient::processRedirectsAndOpen(int range) {
     m_length = -1;
     m_bytesAvailable = 0;
 
-    //Debug_printv("reopening url[%s] from position:%d", url.c_str(), range);
+    Debug_printv("reopening url[%s] from position:%d", url.c_str(), range);
     lastRC = openAndFetchHeaders(lastMethod, range);
 
     while(lastRC == HttpStatus_MovedPermanently || lastRC == HttpStatus_Found || lastRC == 303)
     {
-        //Debug_printv("--- Page moved, doing redirect to [%s]", url.c_str());
+        Debug_printv("--- Page moved, doing redirect to [%s]", url.c_str());
         close();
         lastRC = openAndFetchHeaders(lastMethod, range);
         wasRedirected = true;
@@ -341,6 +344,7 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t meth, int resum
         return 0;
 
     //mstr::replaceAll(url, "HTTP:", "http:");
+    mstr::replaceAll(url, " ", "%20");
     esp_http_client_config_t config = {
         .url = url.c_str(),
         .user_agent = USER_AGENT,
@@ -354,7 +358,7 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t meth, int resum
         .keep_alive_interval = 1
     };
 
-    //Debug_printv("HTTP Init");
+    Debug_printv("HTTP Init [%s]", url.c_str());
     m_http = esp_http_client_init(&config);
 
     if(resume > 0) {
@@ -363,14 +367,14 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t meth, int resum
         esp_http_client_set_header(m_http, "range", str);
     }
 
-    // Debug_printv("--- PRE OPEN")
+    //Debug_printv("--- PRE OPEN");
 
     esp_err_t initOk = esp_http_client_open(m_http, 0); // or open? It's not entirely clear...
 
     if(initOk == ESP_FAIL)
         return 0;
 
-    // Debug_printv("--- PRE FETCH HEADERS")
+    //Debug_printv("--- PRE FETCH HEADERS");
 
     int lengthResp = esp_http_client_fetch_headers(m_http);
     if(m_length == -1 && lengthResp > 0) {
@@ -379,7 +383,7 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t meth, int resum
         m_bytesAvailable = m_length;
     }
 
-    // Debug_printv("--- PRE GET STATUS CODE")
+    //Debug_printv("--- PRE GET STATUS CODE");
 
     return esp_http_client_get_status_code(m_http);
 }
