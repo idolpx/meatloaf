@@ -11,15 +11,18 @@ MeatHttpClient* HttpFile::fromHeader() {
 
         // let's just get the headers so we have some info
         //Debug_printv("Client requesting head");
+        //Debug_printv("before head url[%s]", url.c_str());
         client->HEAD(url);
+        //Debug_printv("after head url[%s]", client->url.c_str());
+        parseUrl(client->url);
     }
     return client;
 }
 
 bool HttpFile::isDirectory() {
-    if(fromHeader()->m_isWebDAV) {
+    if(fromHeader()->m_isWebDAV || fromHeader()->m_isDirectory) {
         // try webdav PROPFIND to get a listing
-        return false;
+        return true;
     }
     else
         // otherwise return false
@@ -103,6 +106,7 @@ MFile* HttpFile::getNextFileInDir() {
     }
     return nullptr; 
 };
+
 
 bool HttpFile::isText() {
     return fromHeader()->isText;
@@ -431,7 +435,7 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
                 if ( mstr::contains( value, (char *)"index.prg" ) )
                 {
                     Debug_printv("HTTP Directory Listing [%s]", meatClient->url.c_str());
-                    device_config.url( meatClient->url );
+                    meatClient->m_isDirectory = true;
                 }
             }
             else if(mstr::equals("Content-Length", evt->header_key, false))
@@ -447,7 +451,6 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
                 {
                     //Debug_printv("match");
                     meatClient->url = evt->header_value;
-                    device_config.url(evt->header_value);
                 }
                 else
                 {

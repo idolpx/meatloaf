@@ -274,7 +274,7 @@ MFile* iecDrive::getPointed(MFile* urlFile) {
 	Debug_printv("getPointed [%s]", urlFile->url.c_str());
 	Meat::iostream istream(urlFile);
 
-        if( !istream.is_open() ) 
+    if( !istream.is_open() ) 
 	{
         	Debug_printv("couldn't open stream of urlfile");
 		return nullptr;
@@ -545,7 +545,7 @@ void iecDrive::handleListenCommand( void )
 		}
 		favStream.close();
 	}
-	else if(!commandAndPath.rawPath.empty())
+	else if(!commandAndPath.rawPath.empty() && referencedPath->exists() )
 	{
 		// 2. fullPath.extension == "URL" - change dir or load file
 		if (mstr::equals(referencedPath->extension, (char*)"url", false))
@@ -558,7 +558,7 @@ void iecDrive::handleListenCommand( void )
 				//Debug_printv("change dir called for urlfile");
 				changeDir(referencedPath->url);
 			}
-			else if ( referencedPath->exists() )
+			else
 			{
 				prepareFileStream(referencedPath->url);
 			}
@@ -625,6 +625,8 @@ void iecDrive::handleTalk(uint8_t chan)
 	}
 
 	m_openState = O_NOTHING;
+
+	dumpState();
 } // handleTalk
 
 

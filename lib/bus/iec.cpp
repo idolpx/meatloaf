@@ -135,6 +135,9 @@ bool iecDevice::registerStream (std::ios_base::open_mode mode)
     // Debug_printv("m_filename[%s]", m_filename.c_str());
     // //auto file = Meat::New<MFile>( device_config.basepath() + "/" + m_filename );
     auto file = Meat::New<MFile>( m_mfile->url + m_filename );
+    if ( !file->exists() )
+        return false;
+
     std::shared_ptr<MStream> new_stream;
 
     // LOAD / GET / INPUT

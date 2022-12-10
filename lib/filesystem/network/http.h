@@ -8,8 +8,6 @@
 #include <esp_http_client.h>
 #include <functional>
 
-#include "device_db.h"
-
 #define HTTP_BLOCK_SIZE 256
 
 class MeatHttpClient {
@@ -49,6 +47,7 @@ public:
     size_t m_bytesAvailable = 0;
     size_t m_position = 0;
     bool m_isWebDAV = false;
+    bool m_isDirectory = false;
     bool isText = false;
     bool isFriendlySkipper = false;
     bool wasRedirected = false;
