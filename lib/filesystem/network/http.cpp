@@ -127,7 +127,7 @@ bool HttpIStream::open() {
 }
 
 void HttpIStream::close() {
-    Debug_printv("CLOSE called explicitly on this HTTP stream!");    
+    //Debug_printv("CLOSE called explicitly on this HTTP stream!");    
     m_http.close();
 }
 
