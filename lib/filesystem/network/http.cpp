@@ -4,7 +4,7 @@
  * File impls
  ********************************************************/
 
-MeatHttpClient* HttpFile::formHeader() {
+MeatHttpClient* HttpFile::fromHeader() {
     if(client == nullptr) {
         //Debug_printv("Client was not present, creating");
         client = new MeatHttpClient();
@@ -17,7 +17,7 @@ MeatHttpClient* HttpFile::formHeader() {
 }
 
 bool HttpFile::isDirectory() {
-    if(formHeader()->m_isWebDAV) {
+    if(fromHeader()->m_isWebDAV) {
         // try webdav PROPFIND to get a listing
         return false;
     }
@@ -39,7 +39,7 @@ MStream* HttpFile::createIStream(std::shared_ptr<MStream> is) {
 }
 
 time_t HttpFile::getLastWrite() {
-    if(formHeader()->m_isWebDAV) {
+    if(fromHeader()->m_isWebDAV) {
         return 0;
     }
     else
@@ -48,7 +48,7 @@ time_t HttpFile::getLastWrite() {
 }
 
 time_t HttpFile::getCreationTime() {
-    if(formHeader()->m_isWebDAV) {
+    if(fromHeader()->m_isWebDAV) {
         return 0;
     }
     else
@@ -57,21 +57,21 @@ time_t HttpFile::getCreationTime() {
 }
 
 bool HttpFile::exists() {
-    return formHeader()->m_exists;
+    return fromHeader()->m_exists;
 }
 
 size_t HttpFile::size() {
-    if(formHeader()->m_isWebDAV) {
+    if(fromHeader()->m_isWebDAV) {
         // take from webdav PROPFIND
         return 0;
     }
     else
         // fallback to what we had from the header
-        return formHeader()->m_length;
+        return fromHeader()->m_length;
 }
 
 bool HttpFile::remove() {
-    if(formHeader()->m_isWebDAV) {
+    if(fromHeader()->m_isWebDAV) {
         // PROPPATCH allows deletion
         return false;
     }
@@ -79,7 +79,7 @@ bool HttpFile::remove() {
 }
 
 bool HttpFile::mkDir() {
-    if(formHeader()->m_isWebDAV) {
+    if(fromHeader()->m_isWebDAV) {
         // MKCOL creates dir
         return false;
     }
@@ -87,7 +87,7 @@ bool HttpFile::mkDir() {
 }
 
 bool HttpFile::rewindDirectory() {
-    if(formHeader()->m_isWebDAV) { 
+    if(fromHeader()->m_isWebDAV) { 
         // we can try if this is webdav, then
         // PROPFIND allows listing dir
         return false;
@@ -96,7 +96,7 @@ bool HttpFile::rewindDirectory() {
 };
 
 MFile* HttpFile::getNextFileInDir() { 
-    if(formHeader()->m_isWebDAV) {
+    if(fromHeader()->m_isWebDAV) {
         // we can try if this is webdav, then
         // PROPFIND allows listing dir
         return nullptr;
@@ -105,7 +105,7 @@ MFile* HttpFile::getNextFileInDir() {
 };
 
 bool HttpFile::isText() {
-    return formHeader()->isText;
+    return fromHeader()->isText;
 }
 
 /********************************************************
