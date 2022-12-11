@@ -243,6 +243,9 @@ class iecBus
         // Recieves a byte
         int16_t receive();
 
+        // Bus Enable
+        bool enabled = false;  // disabled by default so we can auto configure device ids
+
         // Enabled Device Bit Mask
         uint32_t enabledDevices;
         bool isDeviceEnabled ( const uint8_t deviceNumber );

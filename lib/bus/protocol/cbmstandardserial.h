@@ -57,7 +57,7 @@
 #define TIMING_Tne     40      // NON-EOI RESPONSE TO RFD     -      40us       200us       (If maximum time exceeded, EOI response required.)
 #define TIMEOUT_Tne    250
 #define TIMING_Ts      70      // BIT SET-UP TALKER           20us   70us       -           
-#define TIMING_Tv      70      // DATA VALID                  20us   20us       -           (Tv and Tpr minimum must be 60μ s for external device to be a talker. )
+#define TIMING_Tv      80      // DATA VALID                  20us   20us       -           (Tv and Tpr minimum must be 60μ s for external device to be a talker. )
 #define TIMING_Tf      20      // FRAME HANDSHAKE             0      20us       1000us      (If maximum time exceeded, frame error.)
 #define TIMEOUT_Tf     1000
 #define TIMING_Tr      20      // FRAME TO RELEASE OF ATN     20us   -          -
