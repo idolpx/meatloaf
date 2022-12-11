@@ -19,6 +19,7 @@
 
 #include "../../include/global_defines.h"
 #include "meat_io.h"
+#include "meat_buffer.h"
 
 DeviceDB device_config;
 
@@ -76,15 +77,14 @@ bool DeviceDB::select(uint8_t new_device_id)
     if ( file->exists() )
     {
         // Load Device Settings
-        Meat::ifstream istream(config_file);
-        istream.open();
+        Meat::iostream istream(config_file);
         deserializeJson(m_device, istream);
-        //Debug_printv("loaded id[%d]", (uint8_t)m_device["id"]);
+        Debug_printv("loaded id[%d]", (uint8_t)m_device["id"]);
     }
     else
     {
         // Create New Settings
-        deserializeJson(m_device, "{\"id\":0,\"media\":0,\"partition\":0,\"url\":\"\",\"basepath\":\"\",\"path\":\"/\",\"archive\":\"\",\"image\":\"\"}");
+        deserializeJson(m_device, "{\"id\":0,\"url\":\"\",\"basepath\":\"\",\"path\":\"/\",\"archive\":\"\",\"image\":\"\"}");
         m_device["id"] = new_device_id;
         //Debug_printv("created id[%d]", (uint8_t)m_device["id"]);
     }
@@ -102,7 +102,7 @@ bool DeviceDB::save()
         // if ( file->exists() )
         //     file->remove();
 
-        // Meat::ofstream ostream(file.get()->url);
+        // Meat::iostream ostream(file.get()->url);
         // ostream.open();
         // if(ostream.is_open())
         // {
@@ -128,22 +128,6 @@ void DeviceDB::id(uint8_t id)
     select(id);
 }
 
-uint8_t DeviceDB::media()
-{
-    return m_device["media"];
-}
-void DeviceDB::media(uint8_t media)
-{
-    m_device["media"] = media;
-}
-uint8_t DeviceDB::partition()
-{
-    return m_device["partition"];
-}
-void DeviceDB::partition(uint8_t partition)
-{
-    m_device["partition"] = partition;
-}
 std::string DeviceDB::url()
 {
     if (m_device["url"] == NULL)

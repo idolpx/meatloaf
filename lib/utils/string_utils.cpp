@@ -109,6 +109,25 @@ namespace mstr {
         return false;
     }
 
+    bool equals(const char* a, char *b, bool case_sensitive)
+    {
+        int la = strlen(a);
+        int lb = strlen(b);
+        if(la != lb) return false;
+        for(lb = 0; lb < la; lb++)
+        {
+            char aa = a[lb];
+            char bb = b[lb];
+
+            if(case_sensitive && !compare_char(aa, bb))
+                return false;
+            else if(!case_sensitive && !compare_char_insensitive(aa, bb))
+                return false;
+        }
+        return true;
+    }
+
+
     bool equals(std::string &s1, std::string &s2, bool case_sensitive)
     {
         if(case_sensitive)
@@ -118,6 +137,7 @@ namespace mstr {
             return ( (s1.size() == s2.size() ) &&
                 std::equal(s1.begin(), s1.end(), s2.begin(), &compare_char_insensitive) );
     }
+
 
     bool equals(std::string &s1, char *s2, bool case_sensitive)
     {
@@ -212,6 +232,10 @@ namespace mstr {
             return true;
 
         // content types
+        if(equals(s, (char*)"text/html", false))
+            return true;
+        if(equals(s, (char*)"text/plain", false))
+            return true;
         if(contains(s, (char*)"text", false))
             return true;
         if(contains(s, (char*)"json", false))
@@ -300,8 +324,8 @@ namespace mstr {
             c = chars[i];
             ic = c;
             // uncomment this if you want to encode spaces with +
-            if (c==' ') new_str += '+';   
-            else if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') new_str += c;
+            // if (c==' ') new_str += '+';
+            if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') new_str += c;
             else {
                 sprintf(bufHex,"%X",c);
                 if(ic < 16) 
@@ -365,5 +389,122 @@ namespace mstr {
         n = value / std::pow(1024, --i);
         asprintf(&f, "%.2f %s", n, byteSuffixes[i].c_str());
         return f;
+    }
+
+
+    void cd( std::string &path, std::string newDir) 
+    {
+        //Debug_printv("cd requested: [%s]", newDir.c_str());
+
+        // OK to clarify - coming here there should be ONLY path or magicSymbol-path combo!
+        // NO "cd:xxxxx", no "/cd:xxxxx" ALLOWED here! ******************
+        //
+        // if you want to support LOAD"CDxxxxxx" just parse/drop the CD BEFORE calling this function
+        // and call it ONLY with the path you want to change into!
+
+        if(newDir[0]=='/' && newDir[1]=='/') {
+            if(newDir.size()==2) {
+                // user entered: CD:// or CD//
+                // means: change to the root of roots
+                path = "/"; // chedked, works ad flash root!
+                return;
+            }
+            else {
+                // user entered: CD://DIR or CD//DIR
+                // means: change to a dir in root of roots
+                path = mstr::drop(newDir,2);
+                return;
+            }
+        }
+        // else if(newDir[0]=='/' || newDir[0]=='^') {
+        //     if(newDir.size()==1) {
+        //         // user entered: CD:/ or CD/
+        //         // means: change to container root
+        //         // *** might require a fix for flash fs!
+        //         //return MFSOwner::File(streamPath);
+        //         return MFSOwner::File("/");
+        //     }
+        //     else {
+        //         // user entered: CD:/DIR or CD/DIR
+        //         // means: change to a dir in container root
+        //         return localRoot(mstr::drop(newDir,1));
+        //     }
+        // }
+        else if(newDir[0]=='_') {
+            if(newDir.size()==1) {
+                // user entered: CD:_ or CD_
+                // means: go up one directory
+                path = parent(path);
+                return;
+            }
+            else {
+                // user entered: CD:_DIR or CD_DIR
+                // means: go to a directory in the same directory as this one
+                path = parent(path, mstr::drop(newDir,1));
+                return;
+            }
+        }
+
+        if(newDir[0]=='.' && newDir[1]=='.') {
+            if(newDir.size()==2) {
+                // user entered: CD:.. or CD..
+                // means: go up one directory
+                path = parent(path);
+                return;
+            }
+            else {
+                // user entered: CD:..DIR or CD..DIR
+                // meaning: Go back one directory
+                path = localParent(path, mstr::drop(newDir,2));
+                return;
+            }
+        }
+
+        //Debug_printv("> url[%s] newDir[%s]", url.c_str(), newDir.c_str());
+                // Add new directory to path
+        if ( !mstr::endsWith(path, "/") && newDir.size() )
+            path.push_back('/');
+
+        path += newDir;
+        return;
+    }
+
+
+    std::string parent(std::string path, std::string plus) 
+    {
+        //Debug_printv("url[%s] path[%s]", url.c_str(), path.c_str());
+
+        // drop last dir
+        // add plus
+        if(path.empty()) {
+            // from here we can go only to flash root!
+            return "/";
+        }
+        else {
+            int lastSlash = path.find_last_of('/');
+            if ( lastSlash == path.size() - 1 ) {
+                lastSlash = path.find_last_of('/', path.size() - 2);
+            }
+            std::string newDir = mstr::dropLast(path, path.size() - lastSlash);
+            if(!plus.empty())
+                newDir+= ("/" + plus);
+            return newDir;
+        }
+    }
+
+    std::string localParent(std::string path, std::string plus) 
+    {
+        //Debug_printv("url[%s] path[%s]", url.c_str(), path.c_str());
+        // drop last dir
+        // check if it isn't shorter than streamFile
+        // add plus
+        int lastSlash = path.find_last_of('/');
+        if ( lastSlash == path.size() - 1 ) {
+            lastSlash = path.find_last_of('/', path.size() - 2);
+        }
+        std::string parent = mstr::dropLast(path, path.size() - lastSlash);
+        // if(parent.length()-streamFile->url.length()>1)
+        //     parent = streamFile->url;
+        return parent + "/" + plus;
     }
 }

@@ -1,0 +1,33 @@
+menu "I2Cbus"
+
+config I2CBUS_LOG_ERRORS
+    bool "Log fail read/write operations (errors)"
+    depends on ! LOG_DEFAULT_LEVEL_NONE
+    default "y"
+    help
+        Log any read/write operation errors that might ocurr within I2Cbus library.
+
+config I2CBUS_LOG_READWRITES
+    bool "Log successuful read/write operations (debug)"
+    depends on ! LOG_DEFAULT_LEVEL_NONE && ! LOG_DEFAULT_LEVEL_ERROR && ! LOG_DEFAULT_LEVEL_WARN
+    default "n"
+    help
+        Log all successuful read/write data, including port, slave address, 
+        target register and the data written to. Useful for debugging.
+
+choice
+    prompt "Log level"
+    depends on I2CBUS_LOG_READWRITES
+    default I2CBUS_LOG_RW_LEVEL_VERBOSE
+    help
+        Log level for successuful read/write operations. Levels depends on LOG_DEFAULT_LEVEL.
+
+config I2CBUS_LOG_RW_LEVEL_INFO
+    bool "Info"
+config I2CBUS_LOG_RW_LEVEL_DEBUG
+    bool "Debug"
+config I2CBUS_LOG_RW_LEVEL_VERBOSE
+    bool "Verbose"
+endchoice
+
+endmenu

@@ -21,19 +21,25 @@ void KeyManager::setup()
 #ifdef NO_BUTTONS
     fnSystem.set_pin_mode(PIN_BUTTON_A, gpio_mode_t::GPIO_MODE_INPUT, SystemManager::pull_updown_t::PULL_UP);
     fnSystem.set_pin_mode(PIN_BUTTON_B, gpio_mode_t::GPIO_MODE_INPUT, SystemManager::pull_updown_t::PULL_UP);
+#elif defined(PINMAP_A2_REV0)
+    fnSystem.set_pin_mode(PIN_BUTTON_A, gpio_mode_t::GPIO_MODE_INPUT, SystemManager::pull_updown_t::PULL_UP);
 #else
     fnSystem.set_pin_mode(PIN_BUTTON_A, gpio_mode_t::GPIO_MODE_INPUT, SystemManager::pull_updown_t::PULL_NONE);
+#endif /* NO_BUTTONS */
+#if !defined(BUILD_LYNX) && !defined(BUILD_APPLE)
     fnSystem.set_pin_mode(PIN_BUTTON_B, gpio_mode_t::GPIO_MODE_INPUT, SystemManager::pull_updown_t::PULL_NONE);
+#endif /* NOT LYNX OR A2 */
     // Enable safe reset on Button C if available
-#ifndef JTAG
     if (fnSystem.get_hardware_ver() >= 2)
     {
         has_button_c = true;
+#if defined(PINMAP_A2_REV0)
+        fnSystem.set_pin_mode(PIN_BUTTON_C, gpio_mode_t::GPIO_MODE_INPUT, SystemManager::pull_updown_t::PULL_UP);
+#else
         fnSystem.set_pin_mode(PIN_BUTTON_C, gpio_mode_t::GPIO_MODE_INPUT, SystemManager::pull_updown_t::PULL_NONE);
+#endif
         Debug_println("Enabled Safe Reset Button C");
     }
-#endif
-#endif
 
     // Start a new task to check the status of the buttons
     #define KEYS_STACKSIZE 4096
@@ -184,7 +190,14 @@ void KeyManager::_keystate_task(void *param)
 
         case eKeyStatus::SHORT_PRESS:
             Debug_println("BUTTON_A: SHORT PRESS");
-
+#ifdef PARALLEL_BUS
+            // Reset the Commodore via Userport, GPIO 13
+            fnSystem.set_pin_mode(GPIO_NUM_13, gpio_mode_t::GPIO_MODE_OUTPUT, SystemManager::pull_updown_t::PULL_UP);
+            fnSystem.digital_write(GPIO_NUM_13, DIGI_LOW);
+            fnSystem.delay(1);
+            fnSystem.digital_write(GPIO_NUM_13, DIGI_HIGH);
+            Debug_println("Sent RESET signal to Commodore");
+#endif
             fnLedManager.blink(BLUETOOTH_LED, 2); // blink to confirm a button press
 
 // Either toggle BT baud rate or do a disk image rotation on B_KEY SHORT PRESS

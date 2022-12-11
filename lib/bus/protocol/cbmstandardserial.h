@@ -36,23 +36,28 @@
 #define delayMicroseconds fnSystem.delay_microseconds
 
 // BIT Flags
-#define CLEAR           0x00      // clear all flags
-#define ATN_PULLED      (1 << 0)  // might be set by iec_receive
-#define EOI_RECVD       (1 << 1)
-#define COMMAND_RECVD   (1 << 2)
-#define JIFFY_ACTIVE    (1 << 3)
-#define JIFFY_LOAD      (1 << 4)
-#define DOLPHIN_ACTIVE  (1 << 5)
-#define ERROR           (1 << 7)  // if this flag is set, something went wrong
+#define CLEAR            0x0000    // clear all flags
+#define CLEAR_LOW        0xFF00    // clear low byte
+#define ERROR            (1 << 0)  // if this flag is set, something went wrong
+#define ATN_PULLED       (1 << 1)  // might be set by iec_receive
+#define EOI_RECVD        (1 << 2)
+#define EMPTY_STREAM     (1 << 3)
+#define COMMAND_RECVD    (1 << 4)
+
+#define JIFFY_ACTIVE     (1 << 8)
+#define JIFFY_LOAD       (1 << 9)
+#define DOLPHIN_ACTIVE   (1 << 10)
+#define WIC64_ACTIVE     (1 << 11)
+
 
 // IEC protocol timing consts in microseconds (us)
 // IEC-Disected p10-11         // Description              // min    typical    max      // Notes
 #define TIMEOUT_Tat    1000    // ATN RESPONSE (REQUIRED)     -      -          1000us      (If maximum time exceeded, device not present error.)
 #define TIMING_Th      0       // LISTENER HOLD-OFF           0      -          infinte
 #define TIMING_Tne     40      // NON-EOI RESPONSE TO RFD     -      40us       200us       (If maximum time exceeded, EOI response required.)
-#define TIMEOUT_Tne    200
+#define TIMEOUT_Tne    250
 #define TIMING_Ts      70      // BIT SET-UP TALKER           20us   70us       -           
-#define TIMING_Tv      60      // DATA VALID                  20us   20us       -           (Tv and Tpr minimum must be 60μ s for external device to be a talker. )
+#define TIMING_Tv      80      // DATA VALID                  20us   20us       -           (Tv and Tpr minimum must be 60μ s for external device to be a talker. )
 #define TIMING_Tf      20      // FRAME HANDSHAKE             0      20us       1000us      (If maximum time exceeded, frame error.)
 #define TIMEOUT_Tf     1000
 #define TIMING_Tr      20      // FRAME TO RELEASE OF ATN     20us   -          -
@@ -68,8 +73,14 @@
 #define TIMING_Tda     80      // TALK-ATTENTION ACK. HOLD    80us   -          -
 #define TIMING_Tfr     60      // EOI ACKNOWLEDGE             60us   -          -
 
+#define TIMING_EMPTY   512     // SIGNAL EMPTY STREAM
+#define TIMING_STABLE  60      // WAIT FOR BUS TO BE STABLE
+
+#define TIMING_JIFFY_DETECT   218  // JIFFYDOS ENABLED DELAY ON LAST BIT
+#define TIMING_JIFFY_ACK      101  // JIFFYDOS ACK RESPONSE
+
 // See timeoutWait
-#define TIMEOUT 1000 // 1ms
+#define TIMEOUT_DEFAULT 1000 // 1ms
 #define TIMED_OUT -1
 #define FOREVER 0
 
@@ -91,14 +102,19 @@ namespace Protocol
 {
     class CBMStandardSerial
     {
+        private:
+            virtual int16_t IRAM_ATTR receiveBits ();
+            virtual bool IRAM_ATTR sendBits ( uint8_t data );
+
         public:
             // communication must be reset
-            uint8_t flags = CLEAR;
+            uint16_t flags = CLEAR;
+            uint32_t enabledDevices;
 
-            virtual int16_t receiveByte ( uint8_t device );
+            virtual int16_t receiveByte ();
             virtual bool sendByte ( uint8_t data, bool signalEOI );
-            int16_t timeoutWait ( uint8_t pin, bool target_status, size_t wait = TIMEOUT );
-            bool wait ( size_t wait );
+            int16_t timeoutWait ( uint8_t pin, bool target_status, size_t wait = TIMEOUT_DEFAULT, bool watch_atn = true );
+            bool wait ( size_t wait, uint64_t size = 0 );
 
 
             // true => PULL => LOW

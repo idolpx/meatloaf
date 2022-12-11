@@ -37,9 +37,12 @@
 #define LISTEN_PORT 6400 // Listen to this if not connected. Set to zero to disable.
 
 //#define DEVICE_MASK 0b01111111111111111111111111110000 //  Devices 4-30 are enabled by default
-#define DEVICE_MASK   0b00000000000000000000111100000000 //  Devices 8-11
+//#define DEVICE_MASK   0b00000000000000000000111100000000 //  Devices 8-11
 //#define DEVICE_MASK   0b00000000000000000000111000000000 //  Devices 9-11
+#define DEVICE_MASK   0b00000000000000000000000100000000 //  Device 8 only
 //#define DEVICE_MASK   0b00000000000000000000001000000000 //  Device 9 only
+//#define DEVICE_MASK   0b00000000000000000000010000000000 //  Device 10 only
+//#define DEVICE_MASK   0b00000000000000000000100000000000 //  Device 11 only
 
 
 /*
@@ -56,7 +59,7 @@
 
 // Enable this to show the data stream while loading
 // Make sure device baud rate and monitor_speed = 921600
-#define DATA_STREAM
+//#define DATA_STREAM
 
 // Enable this to show the data stream for other devices
 // Listens to all commands and data to all devices

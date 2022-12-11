@@ -16,20 +16,27 @@
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
 // https://github.com/MEGA65/open-roms/blob/master/doc/Protocol-JiffyDOS.md
+// http://www.nlq.de/
+// http://www.baltissen.org/newhtm/sourcecodes.htm
+// https://www.amigalove.com/viewtopic.php?t=1734
+
 
 #ifndef PROTOCOL_JIFFYDOS_H
 #define PROTOCOL_JIFFYDOS_H
 
-#include <Arduino.h>
-
 #include "cbmstandardserial.h"
 
-class JiffyDOS : public CBMStandardSerial
-{
+#define TIMING_JIFFY_BITPAIR
+#define TIMING_JIFFY_BYTE
 
-protected:
-	int16_t receiveByte(void) override;
-	bool sendByte(uint8_t data, bool signalEOI) override;
+namespace Protocol
+{
+	class JiffyDOS : public CBMStandardSerial
+	{
+		protected:
+			int16_t receiveByte(void) override;
+			bool sendByte(uint8_t data, bool signalEOI) override;
+	};
 };
 
-#endif
+#endif // PROTOCOL_JIFFYDOS_H

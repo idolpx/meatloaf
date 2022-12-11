@@ -15,8 +15,8 @@
 // You should have received a copy of the GNU General Public License
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
-#ifndef IECHOST_H
-#define IECHOST_H
+#ifndef MEATLOAF_BUS_IECHOST
+#define MEATLOAF_BUS_IECHOST
 
 //#include <Arduino.h>
 
@@ -25,7 +25,6 @@
 #include "../../include/petscii.h"
 
 #include "iec.h"
-#include "protocol/cbmstandardserial.h"
 
 using namespace Protocol;
 
@@ -61,8 +60,6 @@ public:
     // detect    detect drives on the IEC bus
     // change    wait for a disk to be changed in the specified drive
 
-private:
-    CBMStandardSerial protocol;
 
 };
 

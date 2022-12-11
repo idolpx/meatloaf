@@ -3,8 +3,8 @@
 // https://github.com/arduino-libraries/SD
 //
 
-#ifndef MEATFILE_DEFINES_SDFS_H
-#define MEATFILE_DEFINES_SDFS_H
+#ifndef MEATLOAF_DEVICE_SD
+#define MEATLOAF_DEVICE_SD
 
 #include "meat_io.h"
 
@@ -53,4 +53,4 @@ public:
 };
 
 
-#endif // MEATFILE_DEFINES_SD_H
+#endif // MEATLOAF_DEVICE_SD

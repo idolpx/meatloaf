@@ -4,42 +4,48 @@
 #include <vector>
 #include <sstream>
 
+#include "../../include/debug.h"
+
 #include "MIOException.h"
 
 #include "utils.h"
 #include "string_utils.h"
+#include "peoples_url_parser.h"
 
 //#include "wrappers/directory_stream.h"
+
+// Archive
+
+// Cartridge
 
 // Device
 #include "device/flash.h"
 #include "device/sd.h"
 
-// Scheme
-#include "scheme/http.h"
-#include "scheme/ml.h"
-#include "scheme/tnfs.h"
-#include "scheme/smb.h"
-#include "scheme/cs.h"
-//#include "scheme/ws.h"
+// Disk
+#include "disk/d64.h"
+#include "disk/d71.h"
+#include "disk/d80.h"
+#include "disk/d81.h"
+#include "disk/d82.h"
+#include "disk/d8b.h"
+#include "disk/dnp.h"
 
 // File
-#include "media/p00.h"
+#include "file/p00.h"
 
-// Disk
-#include "media/d64.h"
-#include "media/d71.h"
-#include "media/d80.h"
-#include "media/d81.h"
-#include "media/d82.h"
-#include "media/d8b.h"
-#include "media/dnp.h"
+// Network
+#include "network/http.h"
+#include "network/ml.h"
+#include "network/ipfs.h"
+#include "network/tnfs.h"
+#include "network/smb.h"
+#include "network/cs.h"
+//#include "network/ws.h"
 
 // Tape
-#include "media/t64.h"
-#include "media/tcrt.h"
-
-
+#include "tape/t64.h"
+#include "tape/tcrt.h"
 
 /********************************************************
  * MFSOwner implementations
@@ -47,13 +53,18 @@
 
 // initialize other filesystems here
 FlashFileSystem defaultFS;
+#ifdef SD_CARD
 SDFileSystem sdFS;
+#endif
 
 // Scheme
 HttpFileSystem httpFS;
-TNFSFileSystem tnfsFS;
 MLFileSystem mlFS;
+IPFSFileSystem ipfsFS;
+TNFSFileSystem tnfsFS;
 CServerFileSystem csFS;
+TcpFileSystem tcpFS;
+
 //WSFileSystem wsFS;
 
 // File
@@ -79,11 +90,15 @@ TCRTFileSystem tcrtFS;
 // put all available filesystems in this array - first matching system gets the file!
 // fist in list is default
 std::vector<MFileSystem*> MFSOwner::availableFS { 
-    &defaultFS, &sdFS,
+    &defaultFS,
+#ifdef SD_CARD
+    &sdFS,
+#endif
     &p00FS,
     &d64FS, &d71FS, &d80FS, &d81FS, &d82FS, &d8bFS, &dnpFS,
     &t64FS, &tcrtFS,
-    &mlFS, &httpFS, &tnfsFS
+    &httpFS, &mlFS, &ipfsFS, &tcpFS,
+    &tnfsFS
 };
 
 bool MFSOwner::mount(std::string name) {
@@ -94,7 +109,7 @@ bool MFSOwner::mount(std::string name) {
         auto fs = (*i);
 
         if(fs->handles(name)) {
-                Serial.println("MFSOwner found a proper fs");
+                Debug_printv("MFSOwner found a proper fs");
 
             bool ok = fs->mount();
 
@@ -132,10 +147,16 @@ MFile* MFSOwner::File(std::shared_ptr<MFile> file) {
 
 
 MFile* MFSOwner::File(std::string path) {
+    //Debug_printv("in File\n");
+
     if(mstr::startsWith(path,"cs:", false)) {
         //Serial.printf("CServer path found!\n");
         return csFS.getFile(path);
     }
+
+    // If it's a local file wildcard match and return full path
+    if ( device_config.image().size() == NULL )
+        path = existsLocal(path);
 
     std::vector<std::string> paths = mstr::split(path,'/');
 
@@ -190,6 +211,46 @@ MFile* MFSOwner::File(std::string path) {
     return nullptr;
 }
 
+std::string MFSOwner::existsLocal( std::string path )
+{
+    PeoplesUrlParser url;
+    url.parseUrl(path);
+
+    // Debug_printv( "path[%s] name[%s] size[%d]", path.c_str(), url.name.c_str(), url.name.size() );
+    if ( url.name.size() == 16 )
+    {
+        struct stat st;
+        int i = stat(std::string(path).c_str(), &st);
+
+        // If not found try for a wildcard match
+        if ( i == -1 )
+        {
+            DIR *dir;
+            struct dirent *ent;
+
+            std::string p = url.pathToFile();
+            std::string name = url.name;
+            // Debug_printv( "pathToFile[%s] basename[%s]", p.c_str(), name.c_str() );
+            if ((dir = opendir ( p.c_str() )) != NULL)
+            {
+                /* print all the files and directories within directory */
+                std::string e;
+                while ((ent = readdir (dir)) != NULL) {
+                    // Debug_printv( "%s\n", ent->d_name );
+                    e = ent->d_name;
+                    if ( mstr::compare( name, e ) )
+                    {
+                        path = ( p + "/" + e );
+                        break;
+                    }
+                }
+                closedir (dir);
+            }
+        }        
+    }
+
+    return path;
+}
 
 MFileSystem* MFSOwner::testScan(std::vector<std::string>::iterator &begin, std::vector<std::string>::iterator &end, std::vector<std::string>::iterator &pathIterator) {
     while (pathIterator != begin) {
@@ -243,16 +304,13 @@ bool MFile::operator!=(nullptr_t ptr) {
     return m_isNull;
 }
 
-MIStream* MFile::inputStream() {
+MStream* MFile::meatStream() {
     // has to return OPENED stream
-    //Debug_printv("pathInStream[%s] streamFile[%s]", pathInStream.c_str(), streamFile->url.c_str());
-    //std::shared_ptr<MFile> containerFile(MFSOwner::File(streamPath)); // get the base file that knows how to handle this kind of container, i.e 7z
+    std::shared_ptr<MStream> containerStream(streamFile->meatStream()); // get its base stream, i.e. zip raw file contents
+    Debug_printv("containerStream isRandomAccess[%d] isBrowsable[%d]", containerStream->isRandomAccess(), containerStream->isBrowsable());
 
-    std::shared_ptr<MIStream> containerStream(streamFile->inputStream()); // get its base stream, i.e. zip raw file contents
-    //Debug_printv("containerStream isRandomAccess[%d] isBrowsable[%d]", containerStream->isRandomAccess(), containerStream->isBrowsable());
-
-    MIStream* decodedStream(createIStream(containerStream)); // wrap this stream into decoded stream, i.e. unpacked zip files
-    //Debug_printv("decodedStream isRandomAccess[%d] isBrowsable[%d]", decodedStream->isRandomAccess(), decodedStream->isBrowsable());
+    MStream* decodedStream(createIStream(containerStream)); // wrap this stream into decoded stream, i.e. unpacked zip files
+    Debug_printv("decodedStream isRandomAccess[%d] isBrowsable[%d]", decodedStream->isRandomAccess(), decodedStream->isBrowsable());
 
     if(decodedStream->isRandomAccess() && pathInStream != "") {
         bool foundIt = decodedStream->seekPath(this->pathInStream);
@@ -412,58 +470,44 @@ MFile* MFile::cd(std::string newDir) {
         return MFSOwner::File(newDir);
     }
     else {
-        Debug_printv("> url[%s] newDir[%s]", url.c_str(), newDir.c_str());
 
         // Add new directory to path
-        if ( !mstr::endsWith(url, "/") )
+        if ( !mstr::endsWith(url, "/") && newDir.size() )
             url.push_back('/');
+
+        Debug_printv("> url[%s] newDir[%s]", url.c_str(), newDir.c_str());
 
         return MFSOwner::File(url + newDir);
     }
 };
 
 // bool MFile::copyTo(MFile* dst) {
-//     auto istream = Meat::ifstream(this);
-//     auto ostream = Meat::ofstream(dst);
+//     Debug_printv("in copyTo\n");
+//     Meat::iostream istream(this);
+//     Meat::iostream ostream(dst);
 
 //     int rc;
 
-//     istream.open();
-//     ostream.open();
-
-//     //Debug_printv("in copyTo, iopen=%d oopen=%d", istream.is_open(), ostream.is_open());
+//     Debug_printv("in copyTo, iopen=%d oopen=%d\n", istream.is_open(), ostream.is_open());
 
 //     if(!istream.is_open() || !ostream.is_open())
 //         return false;
 
-//     //Debug_printv("commencing copy");
+//     Debug_printv("commencing copy\n");
 
 //     while((rc = istream.get())!= EOF) {     
-//         //Serial.print(".");
 //         ostream.put(rc);
 //         if(ostream.bad() || istream.bad())
 //             return false;
 //     }
 
-//     //Debug_printv("copying finished, rc=%d", rc);
+//     Debug_printv("copying finished, rc=%d\n", rc);
 
 //     return true;
 // };
 
 uint64_t MFile::getAvailableSpace()
 {
-//   struct statvfs stat;
-
-//   if (statvfs(path.c_str(), &stat) != 0) {
-//     // error happens, just quits here
-//     return -1;
-//   }
-
-//   // the available size is f_bsize * f_bavail
-//   return stat.f_bsize * stat.f_bavail;
-
-    //Debug_printv("path[%s]", path.c_str());
-
     if ( mstr::startsWith(path, (char *)"/sd") )
     {
         FATFS* fsinfo;

@@ -3,6 +3,9 @@
 #include <esp32/spiram.h>
 #include <esp32/himem.h>
 #include <driver/gpio.h>
+#include <esp_console.h>
+#include "linenoise/linenoise.h"
+
 
 #include "../include/global_defines.h"
 #include "../include/debug.h"
@@ -11,9 +14,17 @@
 #include "keys.h"
 #include "led.h"
 
+#ifdef LED_STRIP
+#include "display.h"
+#endif
+
+#include "sound.h"
+
 #include "fnSystem.h"
 #include "fnWiFi.h"
+#include "webdav.h"
 
+#include "webdav.h"
 
 #ifdef FLASH_SPIFFS
 #include "fnFsSPIFFS.h"
@@ -22,6 +33,7 @@
 #endif
 #include "fnFsSD.h"
 
+#define digital_write     fnSystem.digital_write
 
 /**************************/
 // Meatloaf
@@ -30,6 +42,9 @@
 #include "iec.h"
 #include "ml_tests.h"
 
+#ifdef PARALLEL_BUS
+#include "parallel.h"
+#endif
 
 std::string statusMessage;
 bool initFailed = false;
@@ -68,13 +83,16 @@ void main_setup()
     Debug_printf( "FujiNet %s Started @ %lu\n", fnSystem.get_fujinet_version(), startms );
 
     Debug_printf( "Starting heap: %u\n", fnSystem.get_free_heap_size() );
-    Debug_printf( "PsramSize %u\n", fnSystem.get_psram_size() );
 
 #ifndef NO_PSRAM
+    Debug_printf( "PsramSize %u\n", fnSystem.get_psram_size() );
+
     Debug_printf( "himem phys %u\n", esp_himem_get_phys_size() );
     Debug_printf( "himem free %u\n", esp_himem_get_free_size() );
     Debug_printf( "himem reserved %u\n", esp_himem_reserved_area_size() );
 #endif
+
+
 #endif // DEBUG
 
     // Install a reboot handler
@@ -98,12 +116,22 @@ void main_setup()
     fnKeyManager.setup();
     fnLedManager.setup();
 
+    // Enable/Disable Modem/Parallel Mode on Userport
+    fnSystem.set_pin_mode(PIN_MDMPAR_SW1, gpio_mode_t::GPIO_MODE_OUTPUT);
+    digital_write(PIN_MDMPAR_SW1, DIGI_LOW); // DISABLE Modem
+    //digital_write(PIN_MDMPAR_SW1, DIGI_HIGH); // ENABLE Modem
+    fnSystem.set_pin_mode(PIN_MDMPAR_SW2, gpio_mode_t::GPIO_MODE_OUTPUT);
+    digital_write(PIN_MDMPAR_SW2, DIGI_LOW); // DISABLE UP9600
+    //digital_write(PIN_MDMPAR_SW2, DIGI_HIGH); // ENABLE UP9600
+
 #ifdef FLASH_SPIFFS
     fnSPIFFS.start();
 #elif FLASH_LITTLEFS
     fnLITTLEFS.start();
 #endif
+#ifdef SD_CARD
     fnSDFAT.start();
+#endif
 
     // Load our stored configuration
 //    Config.load();
@@ -113,13 +141,17 @@ void main_setup()
     // Go ahead and try reconnecting to WiFi
     fnWiFi.connect();
 
+    // Start WebDAV Server
+    http_server_start();
 
     // Setup IEC Bus
-    Serial.println("IEC Bus Initialized");
+    IEC.setup();
+    Serial.println( ANSI_GREEN_BOLD "IEC Bus Initialized" ANSI_RESET );
 
     // Add devices to bus
     IEC.enabledDevices = DEVICE_MASK;
     IEC.enableDevice(30);
+    IEC.enabled = true;
 
     Serial.print("Virtual Device(s) Started: [ " ANSI_YELLOW_BOLD );
     for (uint8_t i = 0; i < 31; i++)
@@ -131,9 +163,20 @@ void main_setup()
     }
     Serial.println( ANSI_RESET "]");
 
-    IEC.setup();
-    Serial.println( ANSI_GREEN_BOLD "IEC Bus Initialized" ANSI_RESET );
+#ifdef PARALLEL_BUS
+    // Setup Parallel Bus
+    PARALLEL.setup();
+    Serial.println( ANSI_GREEN_BOLD "Parallel Bus Initialized" ANSI_RESET );
+#endif
 
+#ifdef LED_STRIP
+        // Start LED Strip
+        display_app_main(); // fastled lib
+#endif
+
+#ifdef PIEZO_BUZZER
+        mlSoundManager.setup(); // start sound
+#endif
 
 #ifdef DEBUG
     unsigned long endms = fnSystem.millis();
@@ -143,29 +186,35 @@ void main_setup()
     //runTestsSuite();
     //lfs_test();
 #ifdef DEBUG_TIMING
-    Serial.println( ANSI_GREEN_BOLD "DEBUG_TIMING enabled" ANSI_RESET );
+    Debug_printv( ANSI_GREEN_BOLD "DEBUG_TIMING enabled" ANSI_RESET );
 #endif
 }
-
 
 
 // Main high-priority service loop
-void fn_service_loop(void *param)
+void fn_console_loop(void *param)
 {
-    while (true)
-    {
-        // We don't have any delays in this loop, so IDLE threads will be starved
-        // Shouldn't be a problem, but something to keep in mind...
+    esp_console_config_t  config = {
+        .max_cmdline_length = 80,
+        .max_cmdline_args = 10,
+        .hint_color = 39
+    };
 
-#ifdef DEBUG_TIMING
-        IEC.debugTiming();
-#else
-        IEC.service();
-        // if ( IEC.bus_state < BUS_ACTIVE )
-        //     taskYIELD();
-#endif
+    esp_err_t e = esp_console_init(&config);
+
+    char* line;
+
+    if(e == ESP_OK) {
+        while((line = linenoise("hello> ")) != NULL) {
+            printf("You wrote: %s\n", line);
+            linenoiseFree(line); /* Or just free(line) if you use libc malloc. */
+        }
     }
+
+    esp_console_deinit();
 }
+
+
 
 /*
  * This is the start/entry point for an ESP-IDF program (must use "C" linkage)
@@ -178,13 +227,8 @@ extern "C"
         // Call our setup routine
         main_setup();
 
-// Create a new high-priority task to handle the main loop
-// This is assigned to CPU1; the WiFi task ends up on CPU0
-#define MAIN_STACKSIZE 32768
-#define MAIN_PRIORITY 20
-#define MAIN_CPUAFFINITY 1
-        xTaskCreatePinnedToCore(fn_service_loop, "fnLoop",
-                                MAIN_STACKSIZE, nullptr, MAIN_PRIORITY, nullptr, MAIN_CPUAFFINITY);
+        // xTaskCreatePinnedToCore(fn_console_loop, "fnConsole", 
+        //                         4096, nullptr, 1, nullptr, 0);
 
         // Sit here twiddling our thumbs
         while (true)

@@ -122,5 +122,5 @@ void http_server_start(void)
     config.max_uri_handlers = 32;
 
     if (httpd_start(&server, &config) == ESP_OK)
-        webdav_register(server, "/", "/");
+        webdav_register(server, "/sd", "/dav");
 }
