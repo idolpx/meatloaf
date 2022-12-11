@@ -543,36 +543,46 @@ void iecDrive::handleListenCommand( void )
 		}
 		favStream.close();
 	}
-	else if(!commandAndPath.rawPath.empty() && referencedPath->exists() )
+	else if(!commandAndPath.rawPath.empty())
 	{
-		// 2. fullPath.extension == "URL" - change dir or load file
-		if (mstr::equals(referencedPath->extension, (char*)"url", false))
+		if( referencedPath->exists() )
 		{
-			// CD to the path inside the .url file
-			referencedPath.reset(getPointed(referencedPath.get()));
-
-			if ( referencedPath->isDirectory() )
+			// 2. fullPath.extension == "URL" - change dir or load file
+			if (mstr::equals(referencedPath->extension, (char*)"url", false))
 			{
-				//Debug_printv("change dir called for urlfile");
+				// CD to the path inside the .url file
+				referencedPath.reset(getPointed(referencedPath.get()));
+
+				if ( referencedPath->isDirectory() )
+				{
+					//Debug_printv("change dir called for urlfile");
+					changeDir(referencedPath->url);
+				}
+				else
+				{
+					prepareFileStream(referencedPath->url);
+				}
+			}
+			// 2. OR if command == "CD" OR fullPath.isDirectory - change directory
+			if (mstr::equals(commandAndPath.command, (char*)"cd", false) || referencedPath->isDirectory())
+			{
+				//Debug_printv("change dir called by CD command or because of isDirectory");
 				changeDir(referencedPath->url);
 			}
-			else
+			// 3. else - stream file
+			else //if ( referencedPath->exists() )
 			{
+				// Set File
 				prepareFileStream(referencedPath->url);
 			}
 		}
-		// 2. OR if command == "CD" OR fullPath.isDirectory - change directory
-		if (mstr::equals(commandAndPath.command, (char*)"cd", false) || referencedPath->isDirectory())
+		else
 		{
-			//Debug_printv("change dir called by CD command or because of isDirectory");
-			changeDir(referencedPath->url);
+			Debug_printv("Doesn't exist! [%s]", referencedPath->url.c_str());
+			sendFileNotFound();
+			m_openState = O_NOTHING;
 		}
-		// 3. else - stream file
-		else //if ( referencedPath->exists() )
-		{
-			// Set File
-			prepareFileStream(referencedPath->url);
-		}
+
 	}
 
 	dumpState();
@@ -623,6 +633,7 @@ void iecDrive::handleTalk(uint8_t chan)
 	}
 
 	m_openState = O_NOTHING;
+	m_filename = m_mfile->url;
 
 	dumpState();
 } // handleTalk
