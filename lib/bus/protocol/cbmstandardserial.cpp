@@ -152,7 +152,7 @@ int16_t  CBMStandardSerial::receiveByte ()
 // false, it grabs the bit from the Data line and puts it away.  It then waits for the clock line to go true, in order
 // to prepare for the next bit. When the talker figures the data has been held for a sufficient  length  of  time,  it
 // pulls  the  Clock  line true  and  releases  the  Data  line  to  false.    Then  it starts to prepare the next bit.
-int16_t  CBMStandardSerial::receiveBits ()
+int16_t CBMStandardSerial::receiveBits ()
 {
     // Listening for bits
 #if defined(ESP8266)
@@ -318,13 +318,20 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
 
     if ( signalEOI )
     {
+        // Wait for listener to accept data
+        if ( timeoutWait ( PIN_IEC_DATA_IN, RELEASED, TIMEOUT_Tf ) >= TIMEOUT_Tf )
+        {
+            Debug_printv ( "Wait for listener to acknowledge byte received" );
+            return false; // return error because timeout
+        }
+
         // EOI Received
         if ( !wait ( TIMING_Tfr ) ) return false;
         release ( PIN_IEC_CLK_OUT );
     }
     // else
     // {
-    //     wait ( TIMING_Tbb );
+         wait ( 254 );
     // }
 
     return true;
@@ -355,36 +362,32 @@ bool CBMStandardSerial::sendBits ( uint8_t data )
     ESP.wdtFeed();
 #endif
 
-    // tell listner to wait
-    // we control both CLOCK & DATA now
-    pull ( PIN_IEC_CLK_OUT );
-    // if ( !wait ( TIMING_Tv ) ) return false;
-
     for ( uint8_t n = 0; n < 8; n++ )
     {
-    
-    #ifdef SPLIT_LINES
-        // If data pin is PULLED, exit and cleanup
-        if ( status ( PIN_IEC_DATA_IN ) == PULLED ) return false;
-    #endif
+        // tell listner to wait
+        // we control both CLOCK & DATA now
+        pull ( PIN_IEC_CLK_OUT );
+        //if ( !wait ( 57 ) ) return false;
+        delayMicroseconds( 57 );
 
         // set bit
         ( data bitand 1 ) ? release ( PIN_IEC_DATA_OUT ) : pull ( PIN_IEC_DATA_OUT );
         data >>= 1; // get next bit
-        if ( !wait ( TIMING_Ts ) ) return false;
-
-        // // Release data line after bit sent
-        // release ( PIN_IEC_DATA_OUT );
+        //if ( !wait ( 17 ) ) return false;
+        delayMicroseconds( 18 );
 
         // tell listener bit is ready to read
         release ( PIN_IEC_CLK_OUT );
-        if ( !wait ( TIMING_Tv ) ) return false;
+        //if ( !wait ( 76 ) ) return false;
+        delayMicroseconds( 76 );
 
-        // tell listner to wait
-        pull ( PIN_IEC_CLK_OUT );
+        // // Release data line after bit sent
+        // release ( PIN_IEC_DATA_OUT );
     }
-    // Release data line after byte sent
+    // Release data line after bit sent
     release ( PIN_IEC_DATA_OUT );
+
+    pull ( PIN_IEC_CLK_OUT );
 
     return true;
 } // sendBits
