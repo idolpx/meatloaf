@@ -444,6 +444,7 @@ void iecDrive::changeDir(std::string url)
 {
 	Debug_printv("url[%s]", url.c_str());
 	device_config.url(url);
+	m_filename = url;
 	m_mfile.reset(MFSOwner::File(url));
 
 	std::string media_path = m_mfile->path.substr(0, m_mfile->path.size() - m_mfile->media_image.size());
@@ -455,7 +456,7 @@ void iecDrive::changeDir(std::string url)
 	if ( this->data.channel == 0 )
 	{
 		m_openState = O_DIR;
-		m_filename = "";
+		//m_filename = "";
 		//Debug_printv("!!!! CD into [%s]", url.c_str());
 		//Debug_printv("new current url: [%s]", m_mfile->url.c_str());
 		//Debug_printv("LOAD $");		
@@ -464,9 +465,6 @@ void iecDrive::changeDir(std::string url)
 
 void iecDrive::prepareFileStream(std::string url)
 {
-	// PeoplesUrlParser file;
-	// file.parseUrl(url);
-	//m_filename = file.name;
 	m_filename = url;
 	m_openState = O_FILE;
 	Debug_printv("LOAD [%s] [%s]", url.c_str(), m_filename.c_str());
@@ -525,7 +523,6 @@ void iecDrive::handleListenCommand( void )
 	if (mstr::startsWith(commandAndPath.command, "$"))
 	{
 		m_openState = O_DIR;
-		m_filename = "";
 	}
 	else if (mstr::equals(commandAndPath.command, (char*)"@info", false))
 	{
