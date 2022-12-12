@@ -151,7 +151,6 @@ void main_setup()
     // Add devices to bus
     IEC.enabledDevices = DEVICE_MASK;
     IEC.enableDevice(30);
-    IEC.enabled = true;
 
     Serial.print("Virtual Device(s) Started: [ " ANSI_YELLOW_BOLD );
     for (uint8_t i = 0; i < 31; i++)
@@ -162,6 +161,7 @@ void main_setup()
         }
     }
     Serial.println( ANSI_RESET "]");
+    IEC.enabled = true;
 
 #ifdef PARALLEL_BUS
     // Setup Parallel Bus

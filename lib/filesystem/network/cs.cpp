@@ -181,6 +181,10 @@ size_t CServerIStream::position() {
     return m_position;
 };
 
+size_t CServerIStream::error() {
+    return 0;
+};
+
 size_t CServerIStream::write(const uint8_t *buf, size_t size) {
     return -1;
 }

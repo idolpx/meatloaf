@@ -367,25 +367,22 @@ bool CBMStandardSerial::sendBits ( uint8_t data )
         // tell listner to wait
         // we control both CLOCK & DATA now
         pull ( PIN_IEC_CLK_OUT );
-        //if ( !wait ( 57 ) ) return false;
-        delayMicroseconds( 57 );
+        if ( !wait ( 57 ) ) return false; // 57us 
 
         // set bit
         ( data bitand 1 ) ? release ( PIN_IEC_DATA_OUT ) : pull ( PIN_IEC_DATA_OUT );
         data >>= 1; // get next bit
-        //if ( !wait ( 17 ) ) return false;
-        delayMicroseconds( 18 );
+        if ( !wait ( 18 ) ) return false; // 18us
 
         // tell listener bit is ready to read
         release ( PIN_IEC_CLK_OUT );
-        //if ( !wait ( 76 ) ) return false;
-        delayMicroseconds( 76 );
+        if ( !wait ( 76 ) ) return false; // 76us 
 
-        // // Release data line after bit sent
-        // release ( PIN_IEC_DATA_OUT );
+        // Release data line after bit sent
+        release ( PIN_IEC_DATA_OUT );
     }
     // Release data line after bit sent
-    release ( PIN_IEC_DATA_OUT );
+    // release ( PIN_IEC_DATA_OUT );
 
     pull ( PIN_IEC_CLK_OUT );
 
@@ -455,6 +452,7 @@ bool CBMStandardSerial::wait ( size_t wait, uint64_t start )
 {
     uint64_t current, elapsed;
     elapsed = 0;
+    wait--; // Shave 1us for overhead
 
     if ( start == 0 )
     {

@@ -46,6 +46,7 @@ public:
     size_t m_length = 0;
     size_t m_bytesAvailable = 0;
     size_t m_position = 0;
+    size_t m_error = 0;
     bool m_isWebDAV = false;
     bool m_isDirectory = false;
     bool isText = false;
@@ -112,6 +113,7 @@ public:
     size_t size() override;
     size_t available() override;     
     size_t position() override;
+    size_t error() override;
 
     virtual bool seek(size_t pos);
 

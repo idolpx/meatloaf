@@ -61,6 +61,9 @@ size_t CBMImageStream::position() {
     return m_position; // return position within "seeked" file, not the D64 image!
 };
 
+size_t CBMImageStream::error() {
+    return m_error; // return position within "seeked" file, not the D64 image!
+};
 
 size_t CBMImageStream::available() {
     // return bytes available in currently "seeked" file

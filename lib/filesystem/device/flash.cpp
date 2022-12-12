@@ -319,6 +319,10 @@ size_t FlashIStream::position() {
     return ftell(handle->file_h);
 };
 
+size_t FlashIStream::error() {
+    return 0;
+};
+
 bool FlashIStream::seek(size_t pos) {
     // Debug_printv("pos[%d]", pos);
         if (!isOpen()) {

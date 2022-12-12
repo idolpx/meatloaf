@@ -164,6 +164,10 @@ size_t HttpIStream::position() {
     return m_http.m_position;
 }
 
+size_t HttpIStream::error() {
+    return m_http.m_error;
+}
+
 /********************************************************
  * Meat HTTP client impls
  ********************************************************/
@@ -220,6 +224,7 @@ bool MeatHttpClient::processRedirectsAndOpen(int range) {
 bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
     url = dstUrl;
     lastMethod = meth;
+    m_error = 0;
 
     return processRedirectsAndOpen(0);
 };
@@ -395,6 +400,7 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
     switch(evt->event_id) {
         case HTTP_EVENT_ERROR: // This event occurs when there are any errors during execution
             Debug_printv("HTTP_EVENT_ERROR");
+            meatClient->m_error = 1;
             break;
 
         case HTTP_EVENT_ON_CONNECTED: // Once the HTTP has been connected to the server, no data exchange has been performed
@@ -473,15 +479,15 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
         case HTTP_EVENT_ON_DATA: // Occurs multiple times when receiving body data from the server. MAY BE SKIPPED IF BODY IS EMPTY!
             //Debug_printv("HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
             {
-                int status = esp_http_client_get_status_code(meatClient->m_http);
+                // int status = esp_http_client_get_status_code(meatClient->m_http);
 
-                if ((status == HttpStatus_Found || status == HttpStatus_MovedPermanently || status == 303) /*&& client->_redirect_count < (client->_max_redirects - 1)*/)
-                {
-                    //Debug_printv("HTTP_EVENT_ON_DATA: Redirect response body, ignoring");
-                }
-                else {
-                    //Debug_printv("HTTP_EVENT_ON_DATA: Got response body");
-                }
+                // if ((status == HttpStatus_Found || status == HttpStatus_MovedPermanently || status == 303) /*&& client->_redirect_count < (client->_max_redirects - 1)*/)
+                // {
+                //     //Debug_printv("HTTP_EVENT_ON_DATA: Redirect response body, ignoring");
+                // }
+                // else {
+                //     //Debug_printv("HTTP_EVENT_ON_DATA: Got response body");
+                // }
 
 
                 if (esp_http_client_is_chunked_response(evt->client)) {
@@ -503,6 +509,7 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
             break;
         case HTTP_EVENT_DISCONNECTED: // The connection has been disconnected
             //Debug_printv("HTTP_EVENT_DISCONNECTED");
+            meatClient->m_bytesAvailable = 0;
             break;
     }
     return ESP_OK;

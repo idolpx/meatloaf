@@ -28,9 +28,11 @@ public:
     }
 
     // MStream methods
-    size_t position() override;
-    void close() override;
     bool open() override;
+    void close() override;
+    size_t position() override;
+    size_t error() override;
+
     ~CBMImageStream() {
         //Debug_printv("close");
         close();
@@ -66,6 +68,7 @@ protected:
     size_t m_length = 0;
     size_t m_bytesAvailable = 0;
     size_t m_position = 0;
+    size_t m_error = 0;
 
     CBMImageStream* decodedStream;
 

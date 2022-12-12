@@ -130,6 +130,7 @@ public:
     size_t available() override;
     size_t size() override;    
     size_t position() override;
+    size_t error() override;
 
     virtual bool seek(size_t pos) override;
     virtual bool seek(size_t pos, int mode) override;    

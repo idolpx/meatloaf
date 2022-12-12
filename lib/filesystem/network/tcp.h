@@ -228,6 +228,9 @@ public:
     size_t position() override {
         return 0;
     }
+    size_t error() override {
+        return 0;
+    }
 
     virtual bool seek(size_t pos) {
         return false;

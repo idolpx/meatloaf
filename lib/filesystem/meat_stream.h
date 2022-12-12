@@ -38,6 +38,8 @@ public:
     virtual size_t available() = 0;
     virtual size_t size() = 0;
     virtual size_t position() = 0;
+    virtual size_t error() = 0;
+    
     virtual bool isOpen() = 0;
     virtual bool isBrowsable() { return false; };
     virtual bool isRandomAccess() { return false; };
