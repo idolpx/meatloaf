@@ -585,7 +585,7 @@ void iecDrive::handleListenCommand( void )
 
 	}
 
-	dumpState();
+	//dumpState();
 } // handleListenCommand
 
 
@@ -635,7 +635,7 @@ void iecDrive::handleTalk(uint8_t chan)
 	m_openState = O_NOTHING;
 	m_filename = m_mfile->url;
 
-	dumpState();
+	//dumpState();
 } // handleTalk
 
 
