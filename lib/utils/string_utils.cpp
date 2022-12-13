@@ -109,7 +109,7 @@ namespace mstr {
         return false;
     }
 
-    bool equals(const char* a, char *b, bool case_sensitive)
+    bool equals(const char* a, const char *b, bool case_sensitive)
     {
         int la = strlen(a);
         int lb = strlen(b);
