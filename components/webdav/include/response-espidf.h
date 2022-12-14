@@ -5,6 +5,8 @@
 
 #include "response.h"
 
+#include "../../../include/debug.h"
+
 namespace WebDav {
 class ResponseEspIdf : public Response {
 public:
@@ -37,6 +39,8 @@ public:
 
                 if (len == -1)
                         len = strlen(buf);
+
+                Debug_printv("buf[%s]", buf);
 
                 return httpd_resp_send_chunk(req, buf, len) == ESP_OK;
         }

@@ -64,11 +64,17 @@ typedef enum {
 
 class parallelBus
 {
+  private:
+    parallel_mode_t m_mode = MODE_RECEIVE;
+
   public:
     void setup();
     void reset();
 
+    void setMode(parallel_mode_t mode);
+    parallel_mode_t getMode();
     void handShake();
+
     uint8_t readByte();
     void writeByte( uint8_t byte );
     bool status( user_port_pin_t pin );

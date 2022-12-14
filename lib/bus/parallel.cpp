@@ -51,7 +51,7 @@ static void ml_parallel_intr_task(void* arg)
                 // Set RECEIVE/SEND mode   
                 if ( PARALLEL.status( PA2 ) )
                 {
-                    PARALLEL.mode = MODE_RECEIVE;
+                    PARALLEL.setMode( MODE_RECEIVE );
                     expander.portMode( USERPORT_DATA, GPIOX_MODE_INPUT );
                     PARALLEL.readByte();
 
@@ -79,7 +79,7 @@ static void ml_parallel_intr_task(void* arg)
                 }
                 else
                 {
-                    PARALLEL.mode = MODE_SEND;
+                    PARALLEL.setMode( MODE_SEND );
                     expander.portMode( USERPORT_DATA, GPIOX_MODE_OUTPUT );
 
                     Debug_printv("send    >>> " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
@@ -144,6 +144,26 @@ void parallelBus::reset()
     expander.portMode( USERPORT_DATA, GPIOX_MODE_INPUT );
 }
 
+void parallelBus::setMode(parallel_mode_t mode)
+{
+    if ( mode == MODE_RECEIVE )
+    {
+        m_mode = MODE_RECEIVE;
+        expander.pinMode( PA2, GPIOX_MODE_INPUT );
+        expander.portMode( USERPORT_DATA, GPIOX_MODE_INPUT );
+    }
+    else
+    {
+        m_mode = MODE_SEND;
+        expander.pinMode( PA2, GPIOX_MODE_OUTPUT );
+        expander.portMode( USERPORT_DATA, GPIOX_MODE_OUTPUT );
+    }
+}
+
+parallel_mode_t parallelBus::getMode()
+{
+    return m_mode;
+}
 
 void parallelBus::handShake()
 {

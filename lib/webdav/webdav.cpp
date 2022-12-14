@@ -30,7 +30,7 @@ esp_err_t webdav_handler(httpd_req_t *httpd_req) {
         httpd_resp_set_hdr(httpd_req, "Access-Control-Allow-Headers", "*");
         httpd_resp_set_hdr(httpd_req, "Access-Control-Allow-Methods", "*");
 
-        ESP_LOGI(TAG, "%s: >%s<", http_method_str((enum http_method) httpd_req->method), httpd_req->uri);
+        Debug_printv("%s: >%s<", http_method_str((enum http_method) httpd_req->method), httpd_req->uri);
 
         switch (httpd_req->method) {
                 case HTTP_COPY:
@@ -125,7 +125,8 @@ void http_server_start(void)
 
     if (httpd_start(&server, &config) == ESP_OK)
     {
-        webdav_register(server, "/sd", "/dav");
+        webdav_register(server, "/", "/flash");
+        webdav_register(server, "/sd/", "/sd");
         Debug_printv("WebDAV Server Started!");
     }
     else

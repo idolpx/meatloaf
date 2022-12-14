@@ -473,10 +473,11 @@ void iecBus::service ( void )
         if ( this->data.secondary == IEC_OPEN || this->data.secondary == IEC_REOPEN )
         {
 #ifdef PARALLEL_BUS
-            PARALLEL.handShake();
+            //PARALLEL.handShake();
 #endif
 
             // Switch to detected protocol
+            // active_protocol = PROTOCOL_DOLPHINDOS;
             selectProtocol();
         }
 
@@ -484,12 +485,14 @@ void iecBus::service ( void )
         if ( this->data.primary == IEC_LISTEN )
         {
             //Debug_printv( "deviceListen" );
+            PARALLEL.setMode( MODE_RECEIVE );
             this->bus_state = deviceListen();
         }
         else if ( this->data.primary == IEC_TALK )
         {
             //Debug_printv( "deviceTalk" );
             //Debug_printf ( " (40 TALK   %.2d DEVICE %.2x SECONDARY %.2d CHANNEL)\r\n", this->data.device, this->data.secondary, this->data.channel );
+            PARALLEL.setMode( MODE_SEND );
             this->bus_state = deviceTalk();   
         }
 
@@ -512,6 +515,9 @@ void iecBus::service ( void )
         active_protocol = PROTOCOL_CBM_SERIAL;
         selectProtocol();
         protocol->flags = CLEAR;
+
+        // Set Parallel back to receive
+        //PARALLEL.setMode( MODE_RECEIVE );
 
         // Debug_printf( "primary[%.2X] secondary[%.2X] bus_state[%d]", this->data.primary, this->data.secondary, this->bus_state );
         // Debug_printf( "atn[%d] clk[%d] data[%d] srq[%d]", IEC.protocol->status(PIN_IEC_ATN), IEC.protocol->status(PIN_IEC_CLK_IN), IEC.protocol->status(PIN_IEC_DATA_IN), IEC.protocol->status(PIN_IEC_SRQ));

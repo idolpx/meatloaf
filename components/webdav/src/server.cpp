@@ -12,10 +12,14 @@
 #include "file-utils.h"
 #include "server.h"
 
+#include "../../../include/debug.h"
+
 using namespace WebDav;
 
 Server::Server(std::string rootPath, std::string rootURI) :
-        rootPath(rootPath), rootURI(rootURI) {}
+        rootPath(rootPath), rootURI(rootURI) {
+                Debug_printv("rootPath[%s] rootURI[%s]", rootPath.c_str(), rootURI.c_str());
+        }
 
 static std::string urlDecode(std::string str){
         std::string ret;
@@ -71,6 +75,9 @@ std::string Server::uriToPath(std::string uri) {
         while (path.substr(path.length()-1, 1) == "/")
                 path = path.substr(0, path.length()-1);
 
+        Debug_printv("path[%s]", path.c_str());
+
+
         return urlDecode(path);
 }
 
@@ -121,8 +128,12 @@ int Server::sendPropResponse(Response &resp, std::string path, int recurse) {
         struct stat sb;
         int ret = stat(path.c_str(), &sb);
         if (ret < 0)
+        {
+                Debug_printv("NOT FOUND path[%s]",path.c_str());
                 return -errno;
+        }
 
+        Debug_printv("path[%s]",path.c_str());
         std::string uri = pathToURI(path);
 // printf("%s() path >%s< uri >%s<\n", __func__, path.c_str(), uri.c_str());
 
@@ -160,6 +171,10 @@ int Server::sendPropResponse(Response &resp, std::string path, int recurse) {
                         }
 
                         closedir(dir);
+                }
+                else
+                {
+                        Debug_printv("Couldn't open [%s]", path.c_str());
                 }
         }
 
@@ -344,12 +359,17 @@ int Server::doMove(Request &req, Response &resp) {
 }
 
 int Server::doOptions(Request &req, Response &resp) {
+        Debug_printv("OPTIONS");
         return 200;
 }
 
 int Server::doPropfind(Request &req, Response &resp) {
+        Debug_printv("PROPFIND");
         bool exists = (req.getPath() == rootPath) ||
                         (access(req.getPath().c_str(), R_OK) == 0);
+
+        Debug_printv("exists[%d] path[%s]", exists, req.getPath().c_str());
+
         if (!exists)
                 return 404;
 
