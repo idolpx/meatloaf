@@ -62,7 +62,7 @@ void iecBus::setup()
 {
     // Start task
     //xTaskCreate(ml_iec_intr_task, "ml_iec_intr_task", 2048, NULL, 10, NULL);
-    xTaskCreatePinnedToCore(ml_iec_intr_task, "ml_iec_intr_task", 4096, NULL, 20, NULL, 1);
+    xTaskCreatePinnedToCore(ml_iec_intr_task, "ml_iec_intr_task", 4096, NULL, 10, NULL, 1);
 
     // Setup interrupt for ATN
     gpio_config_t io_conf = {
