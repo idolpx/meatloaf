@@ -417,14 +417,14 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 			Debug_printv("full referenced path [%s]", tuple.fullPath.c_str());
 			tuple.fullPath = fullPath->url;
 			
-			// if ( fullPath->isDirectory() )
-			// {
-			// 	changeDir(fullPath->url);
-			// }
-			// else
-			// {
-			// 	prepareFileStream(fullPath->url);
-			// }
+			if ( fullPath->isDirectory() )
+			{
+				changeDir(fullPath->url);
+			}
+			else
+			{
+				prepareFileStream(fullPath->url);
+			}
 		}
 	// }
 	// else
@@ -505,13 +505,12 @@ void iecDrive::handleListenCommand( void )
 	if ( this->data.channel == CMD_CHANNEL )
 	{
 		Debug_printv("Execute DOS Command [%s]", this->data.device_command.c_str());
-		//return;
+		return;
 	}
 
 	Debug_printv("command[%s] path[%s]", commandAndPath.command.c_str(), commandAndPath.fullPath.c_str());	
 	auto referencedPath = Meat::New<MFile>(commandAndPath.fullPath);
 	//Debug_printv("referenced[%s]", referencedPath->url.c_str());
-
 	if ( referencedPath == nullptr )
 	{
 		Debug_printv("fnf");
