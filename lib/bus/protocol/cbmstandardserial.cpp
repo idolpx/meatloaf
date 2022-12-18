@@ -240,7 +240,7 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
     {
         Debug_printv ( "Wait for listener to be ready" );
         flags or_eq ERROR;
-        return -1; // return error because timeout
+        return false; // return error because timeout
     }
 
     // Either  the  talker  will pull the
@@ -331,7 +331,7 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
     }
     // else
     // {
-         wait ( 254 );
+    //     wait ( 254 );
     // }
 
     return true;

@@ -816,6 +816,7 @@ void iecDrive::sendListing()
 
 	if(entry == nullptr) {
 		Debug_printv("fnf");
+		closeStream();
 
 		bool isOpen = registerStream(std::ios_base::in);
 		if(isOpen) 
@@ -925,6 +926,7 @@ void iecDrive::sendListing()
 	// End program with two zeros after last line. Last zero goes out as EOI.
 	IEC.send(0);
 	IEC.sendEOI(0);
+	closeStream();
 
 	Debug_printf("\r\n=================================\r\n%d bytes sent\r\n", byte_count);
 
@@ -1088,12 +1090,12 @@ bool iecDrive::sendFile()
 			if(bi == 8)
 			{
 				size_t t = (i * 100) / len;
-				Debug_printf(" %s (%d %d%%) [%d]\r\n", ba, i, t, avail - 1);
+				Debug_printf(" %s (%d %d%%) [%d]\r\n", ba, i, t, avail);
 				bi = 0;
 			}
 #else
 			size_t t = (i * 100) / len;
-			Debug_printf("\rTransferring %d%% [%d, %d]", t, i, avail -1);
+			Debug_printf("\rTransferring %d%% [%d, %d]", t, i, avail);
 #endif
 
 			// Exit if ATN is PULLED while sending
