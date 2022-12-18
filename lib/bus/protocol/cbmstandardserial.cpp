@@ -293,9 +293,10 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
     // }
 
     // STEP 3: SENDING THE BITS
-    if ( !sendBits( data ) )
+    if ( !sendBits( data ) ) {
+        Debug_printv ( "Error sending bits" );
         return false;
-
+    }
 
     // STEP 4: FRAME HANDSHAKE
     // After the eighth bit has been sent, it's the listener's turn to acknowledge.  At this moment, the Clock line  is  true
@@ -326,7 +327,10 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
         }
 
         // EOI Received
-        if ( !wait ( TIMING_Tfr ) ) return false;
+        if ( !wait ( TIMING_Tfr ) ) {
+            Debug_printv ( "ATN pulled" );
+            return false;
+        }
         release ( PIN_IEC_CLK_OUT );
     }
     // else

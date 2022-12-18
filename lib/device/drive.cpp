@@ -1066,11 +1066,6 @@ bool iecDrive::sendFile()
 				success_tx = IEC.sendEOI(bl); // indicate end of file.
 				if ( !success_tx )
 					Debug_printv("tx fail");
-				if ( IEC.data.channel <  2 )
-					closeStream();
-
-				//IEC.sendEOI(0);
-				//Debug_printv("eoi sent, i[%d] len[%d] bl[%d] success[%d]", i, len, bl, success_tx );
 			}
 			else
 			{
