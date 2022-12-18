@@ -7,7 +7,7 @@
 using namespace WebDav;
 
 void Response::setDavHeaders() {
-        setHeader("DAV", "1");
+        setHeader("DAV", "2");
         setHeader("Allow", "PROPFIND,OPTIONS,DELETE,COPY,MOVE,HEAD,POST,PUT,GET");
 }
 

@@ -494,6 +494,8 @@ void WiFiManager::_wifi_event_handler(void *arg, esp_event_base_t event_base,
 //            mdns_hostname_set(Config.get_general_devicename().c_str());
             mdns_hostname_set( HOSTNAME );
             mdns_service_add(NULL, "_http", "_tcp", 80, NULL, 0);
+
+            Debug_println("READY.");
             break;
         case IP_EVENT_STA_LOST_IP:
             Debug_println("IP_EVENT_STA_LOST_IP");

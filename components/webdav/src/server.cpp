@@ -95,7 +95,7 @@ std::string Server::formatTime(time_t t) {
         char buf[32];
         struct tm *lt = localtime(&t);
         // strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", lt);
-        strftime(buf, sizeof(buf), "%a, %d %b %H:%M:%S %Z", lt);
+        strftime(buf, sizeof(buf), "%a, %d %b %Y %H:%M:%S %Z", lt);
 
         return std::string(buf);
 }
@@ -133,7 +133,7 @@ int Server::sendPropResponse(Response &resp, std::string path, int recurse) {
                 return -errno;
         }
 
-        Debug_printv("path[%s]",path.c_str());
+        //Debug_printv("path[%s]",path.c_str());
         std::string uri = pathToURI(path);
 // printf("%s() path >%s< uri >%s<\n", __func__, path.c_str(), uri.c_str());
 
@@ -152,11 +152,15 @@ int Server::sendPropResponse(Response &resp, std::string path, int recurse) {
                 r.props["getcontentlength"] = std::to_string(sb.st_size);
                 r.props["getcontenttype"] = "application/binary";
                 r.props["getetag"] = std::to_string(sb.st_ino);
+                //Debug_printv("not a collection st_mode[%d]", sb.st_mode);
         }
 
         sendMultiStatusResponse(resp, r);
 
         if (r.isCollection && recurse > 0) {
+                if (path.size() > 1 && path.find_last_of('/') == path.size())
+                        path = path.substr(0, path.length()-1);
+
                 DIR *dir = opendir(path.c_str());
                 if (dir) {
                         struct dirent *de;
@@ -166,7 +170,7 @@ int Server::sendPropResponse(Response &resp, std::string path, int recurse) {
                                     strcmp(de->d_name, "..") == 0)
                                         continue;
 
-                                std::string rpath = path + "/" + de->d_name;
+                                std::string rpath = path + de->d_name;
                                 sendPropResponse(resp, rpath, recurse-1);
                         }
 
@@ -379,8 +383,7 @@ int Server::doPropfind(Request &req, Response &resp) {
                 32;
 
         resp.setStatus(207, "Multi-Status");
-        resp.setHeader("Transfer-Encoding", "chunked");
-        resp.setContentType("text/xml; charset=\"utf-8\"");
+        resp.setContentType("application/xml; charset=\"utf-8\"");
         resp.flushHeaders();
 
         resp.sendChunk("<?xml version=\"1.0\" encoding=\"utf-8\" ?>\n");

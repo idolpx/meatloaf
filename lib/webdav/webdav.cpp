@@ -11,7 +11,6 @@
 #include <request-espidf.h>
 #include <response-espidf.h>
 
-static const char *TAG = "webdav";
 
 esp_err_t webdav_handler(httpd_req_t *httpd_req) {
         WebDav::Server *server = (WebDav::Server *) httpd_req->user_ctx;

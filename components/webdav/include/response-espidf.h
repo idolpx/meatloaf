@@ -37,10 +37,7 @@ public:
         bool sendChunk(const char *buf, ssize_t len = -1) override {
                 chunked = true;
 
-                if (len == -1)
-                        len = strlen(buf);
-
-                Debug_printv("buf[%s]", buf);
+                Debug_printf("%s\n", buf);
 
                 return httpd_resp_send_chunk(req, buf, len) == ESP_OK;
         }
