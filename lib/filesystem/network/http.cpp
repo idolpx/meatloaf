@@ -509,7 +509,7 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
             break;
         case HTTP_EVENT_DISCONNECTED: // The connection has been disconnected
             //Debug_printv("HTTP_EVENT_DISCONNECTED");
-            meatClient->m_bytesAvailable = 0;
+            //meatClient->m_bytesAvailable = 0;
             break;
     }
     return ESP_OK;
