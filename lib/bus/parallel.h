@@ -76,6 +76,7 @@ class parallelBus
     uint8_t flags = 0;
     uint8_t data = 0;
     parallel_mode_t mode = MODE_RECEIVE;
+    bool active = false;
     bool enabled = true;
 };
 

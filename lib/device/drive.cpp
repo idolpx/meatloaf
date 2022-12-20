@@ -1039,6 +1039,7 @@ bool iecDrive::sendFile()
 			success_tx = IEC.send(b);
 			load_address = load_address | b << 8;  // high byte
 			sys_address += b * 256;
+			Debug_printv( "load_address[$%.4X] sys_address[%d]", load_address, sys_address );
 
 			// Get SYSLINE
 

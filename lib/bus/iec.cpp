@@ -484,6 +484,13 @@ void iecBus::service ( void )
         {
 #ifdef PARALLEL_BUS
             PARALLEL.handShake();
+            protocol->wait( 100 );
+            if ( PARALLEL.active ) {
+                if ( PARALLEL.data = 'W' )
+                    active_protocol = PROTOCOL_WIC64;
+                else
+                    active_protocol = PROTOCOL_DOLPHINDOS;
+            }
 #endif
 
             // Switch to detected protocol

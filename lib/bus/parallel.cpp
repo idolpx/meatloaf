@@ -45,6 +45,12 @@ static void ml_parallel_intr_task(void* arg)
             {
                 //Debug_printv( "User Port Data Interrupt Received!" );
 
+                // If PC2 is set then parallel is active and a byte is ready to be read!
+                if ( PARALLEL.status( PC2 ) )
+                {
+                    PARALLEL.active = true;
+                }
+
                 // Update flags and data
                 PARALLEL.readByte();
 
