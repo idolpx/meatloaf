@@ -451,6 +451,23 @@ void iecBus::service ( void )
                 process_command = false;
             }
 
+#ifdef PARALLEL_BUS
+            // Switch to Parallel if detected
+            else if ( PARALLEL.active && command == IEC_LISTEN || command == IEC_TALK ) 
+            {
+                active_protocol = PROTOCOL_DOLPHINDOS;
+                
+                PARALLEL.handShake();
+
+                if ( this->data.primary == IEC_LISTEN )
+                    PARALLEL.setMode( MODE_RECEIVE );
+                else
+                    PARALLEL.setMode( MODE_SEND );
+
+                // Switch to parallel protocol
+                selectProtocol();
+            }
+#endif
         }
 
         // If the bus is idle then release the lines
@@ -460,23 +477,6 @@ void iecBus::service ( void )
             this->data.init();
             releaseLines();
         }
-
-#ifdef PARALLEL_BUS
-        // Switch to Parallel if detected
-        if ( PARALLEL.active ) {
-            active_protocol = PROTOCOL_DOLPHINDOS;
-            
-            PARALLEL.handShake();
-
-            if ( this->data.primary == IEC_LISTEN )
-                PARALLEL.setMode( MODE_RECEIVE );
-            else
-                PARALLEL.setMode( MODE_SEND );
-
-            // Switch to parallel protocol
-            selectProtocol();
-        }
-#endif
 
         // Debug_printf ( "code[%.2X] primary[%.2X] secondary[%.2X] bus[%d]", command, this->data.primary, this->data.secondary, this->bus_state );
         // Debug_printf( "primary[%.2X] secondary[%.2X] bus_state[%d]", this->data.primary, this->data.secondary, this->bus_state );
