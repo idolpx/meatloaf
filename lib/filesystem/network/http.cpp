@@ -102,6 +102,7 @@ bool HttpFile::rewindDirectory() {
 };
 
 MFile* HttpFile::getNextFileInDir() { 
+    Debug_printv("");
     if(fromHeader()->m_isWebDAV) {
         // we can try if this is webdav, then
         // PROPFIND allows listing dir
@@ -172,18 +173,22 @@ size_t HttpIStream::error() {
  * Meat HTTP client impls
  ********************************************************/
 bool MeatHttpClient::GET(std::string dstUrl) {
+    Debug_printv("GET");
     return open(dstUrl, HTTP_METHOD_GET);
 }
 
 bool MeatHttpClient::POST(std::string dstUrl) {
+    Debug_printv("POST");
     return open(dstUrl, HTTP_METHOD_POST);
 }
 
 bool MeatHttpClient::PUT(std::string dstUrl) {
+    Debug_printv("PUT");
     return open(dstUrl, HTTP_METHOD_PUT);
 }
 
 bool MeatHttpClient::HEAD(std::string dstUrl) {
+    Debug_printv("HEAD");
     bool rc = open(dstUrl, HTTP_METHOD_HEAD);
     close();
     return rc;
@@ -509,7 +514,7 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
             break;
         case HTTP_EVENT_DISCONNECTED: // The connection has been disconnected
             //Debug_printv("HTTP_EVENT_DISCONNECTED");
-            meatClient->m_bytesAvailable = 0;
+            //meatClient->m_bytesAvailable = 0;
             break;
     }
     return ESP_OK;

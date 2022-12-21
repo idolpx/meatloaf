@@ -18,7 +18,9 @@
 // https://github.com/MEGA65/open-roms/blob/master/doc/Protocol-DolphinDOS.md
 // https://mega65.github.io/open-roms/doc/Protocol-DolphinDOS.html
 // https://github.com/FeralChild64/open-roms/blob/master/src/kernal/iec_fast/dolphindos_detect.s
-// 
+// http://sta.c64.org/cbmpar41c.html
+// http://sta.c64.org/cbmpar71c.html
+//
 
 
 #ifndef PROTOCOL_DOLPHINDOS_H

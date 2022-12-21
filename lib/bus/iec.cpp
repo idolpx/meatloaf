@@ -157,14 +157,14 @@ bool iecDevice::registerStream (std::ios_base::open_mode mode)
 
         if( !new_stream->isOpen() )
         {
-            //Debug_printv("Error creating istream");
+            Debug_printv("Error creating stream");
             return false;
         }
-        else
-        {
-            // Close the stream if it is already open
-            closeStream();
-        }
+        // else
+        // {
+        //     // Close the stream if it is already open
+        //     closeStream();
+        // }
     }
 
     // SAVE / PUT / PRINT / WRITE
@@ -177,6 +177,16 @@ bool iecDevice::registerStream (std::ios_base::open_mode mode)
 
 
     size_t key = ( this->data.device * 100 ) + this->data.channel;
+
+    // Check to see if a stream is open on this device/channel already
+    auto found = streams.find(key);
+    if ( found != streams.end() )
+    {
+        Debug_printv( "Stream already registered on this device/channel!" );
+        return false;
+    }
+
+    // Add stream to streams 
     auto newPair = std::make_pair ( key, new_stream );
     streams.insert ( newPair );
 
@@ -191,7 +201,7 @@ bool iecDevice::closeStream ( bool close_all )
 
     if ( found != streams.end() )
     {
-        //Debug_printv("Stream closed. key[%d]", key);
+        Debug_printv("Stream closed. key[%d]", key);
         auto closingStream = (*found).second;
         closingStream->close();
         return streams.erase ( key );
@@ -451,6 +461,21 @@ void iecBus::service ( void )
             releaseLines();
         }
 
+#ifdef PARALLEL_BUS
+        // Switch to Parallel if detected
+        if ( PARALLEL.active ) {
+            // if ( PARALLEL.data == 'w' )
+            //     active_protocol = PROTOCOL_WIC64;
+            // else
+                active_protocol = PROTOCOL_DOLPHINDOS;
+            
+            PARALLEL.handShake();
+
+            // Switch to detected protocol
+            selectProtocol();
+        }
+#endif
+
         // Debug_printf ( "code[%.2X] primary[%.2X] secondary[%.2X] bus[%d]", command, this->data.primary, this->data.secondary, this->bus_state );
         // Debug_printf( "primary[%.2X] secondary[%.2X] bus_state[%d]", this->data.primary, this->data.secondary, this->bus_state );
         // protocol->release ( PIN_IEC_SRQ );
@@ -472,9 +497,7 @@ void iecBus::service ( void )
 
         if ( this->data.secondary == IEC_OPEN || this->data.secondary == IEC_REOPEN )
         {
-#ifdef PARALLEL_BUS
-            PARALLEL.handShake();
-#endif
+
 
             // Switch to detected protocol
             selectProtocol();

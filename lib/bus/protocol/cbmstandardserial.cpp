@@ -106,7 +106,9 @@ int16_t  CBMStandardSerial::receiveByte ()
 
 
     // STEP 3: RECEIVING THE BITS
-    uint8_t data = receiveBits();
+    int16_t data = receiveBits();
+    if ( data == -1 )
+        return -1;
 
 
     // STEP 4: FRAME HANDSHAKE
@@ -163,7 +165,7 @@ int16_t CBMStandardSerial::receiveBits ()
 
     uint8_t n = 0;
 
-    // pull ( PIN_IEC_SRQ );
+    pull ( PIN_IEC_SRQ );
     for ( n = 0; n < 8; n++ )
     {
         data >>= 1;
@@ -171,7 +173,7 @@ int16_t CBMStandardSerial::receiveBits ()
         do
         {
             // wait for bit to be ready to read
-            bit_time = timeoutWait ( PIN_IEC_CLK_IN, RELEASED, TIMING_JIFFY_DETECT );
+            bit_time = timeoutWait ( PIN_IEC_CLK_IN, RELEASED );
 
             /* If there is a delay before the last bit, the controller uses JiffyDOS */
             if ( n == 7 && bit_time >= TIMING_JIFFY_DETECT && data < 0x60 && flags bitand ATN_PULLED )
@@ -205,6 +207,7 @@ int16_t CBMStandardSerial::receiveBits ()
             return -1; // return error because timeout
         }
     }
+    release( PIN_IEC_SRQ );
 
     return data;
 } // receiveBits
@@ -240,7 +243,7 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
     {
         Debug_printv ( "Wait for listener to be ready" );
         flags or_eq ERROR;
-        return -1; // return error because timeout
+        return false; // return error because timeout
     }
 
     // Either  the  talker  will pull the
@@ -293,9 +296,10 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
     // }
 
     // STEP 3: SENDING THE BITS
-    if ( !sendBits( data ) )
+    if ( !sendBits( data ) ) {
+        Debug_printv ( "Error sending bits" );
         return false;
-
+    }
 
     // STEP 4: FRAME HANDSHAKE
     // After the eighth bit has been sent, it's the listener's turn to acknowledge.  At this moment, the Clock line  is  true
@@ -326,12 +330,15 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
         }
 
         // EOI Received
-        if ( !wait ( TIMING_Tfr ) ) return false;
+        if ( !wait ( TIMING_Tfr ) ) {
+            Debug_printv ( "ATN pulled" );
+            return false;
+        }
         release ( PIN_IEC_CLK_OUT );
     }
     // else
     // {
-         wait ( 254 );
+    //     wait ( 254 );
     // }
 
     return true;
@@ -419,11 +426,13 @@ int16_t CBMStandardSerial::timeoutWait ( uint8_t pin, bool target_status, size_t
 
         if ( elapsed > wait && wait != FOREVER )
         {
-            //release ( PIN_IEC_SRQ );
-            if ( wait == TIMEOUT_DEFAULT )
-                return -1;
+            return -1;
+
+            // //release ( PIN_IEC_SRQ );
+            // if ( wait == TIMEOUT_DEFAULT )
+            //     return -1;
             
-            return wait;
+            // return wait;
         }
 
         if ( watch_atn )
@@ -434,7 +443,7 @@ int16_t CBMStandardSerial::timeoutWait ( uint8_t pin, bool target_status, size_t
 
             if ( atn_check != atn_status )
             {
-                release ( PIN_IEC_SRQ );
+                // release ( PIN_IEC_SRQ );
                 //Debug_printv("pin[%d] state[%d] wait[%d] elapsed[%d]", pin, target_status, wait, elapsed);
                 return -1;
             }            

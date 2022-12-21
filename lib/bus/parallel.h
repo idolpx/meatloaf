@@ -1,3 +1,7 @@
+// http://sta.c64.org/cbmpar.html
+// https://ist.uwaterloo.ca/~schepers/c64par.html
+// https://ist.uwaterloo.ca/~schepers/1541port.html
+//
 
 #ifndef MEATLOAF_BUS_PARALLEL
 #define MEATLOAF_BUS_PARALLEL
@@ -76,6 +80,7 @@ class parallelBus
     uint8_t flags = 0;
     uint8_t data = 0;
     parallel_mode_t mode = MODE_RECEIVE;
+    bool active = false;
     bool enabled = true;
 };
 

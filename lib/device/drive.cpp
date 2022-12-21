@@ -414,16 +414,32 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 		{
 			auto fullPath = Meat::Wrap(m_mfile->cd(guessedPath));
 
-			Debug_printv("full referenced path [%s]", tuple.fullPath.c_str());
-			tuple.fullPath = fullPath->url;
-			
-			if ( fullPath->isDirectory() )
+			// If guessedPath extension == "URL" - change dir or load file
+			if (mstr::endsWith(guessedPath, (char*)".url"))
 			{
-				changeDir(fullPath->url);
+				// CD to the path inside the .url file
+				fullPath.reset(getPointed(fullPath.get()));
+			}
+
+			if ( fullPath == nullptr )
+			{
+				//Debug_printv("fnf");
+				//sendFileNotFound();
+				tuple.command = "";
 			}
 			else
 			{
-				prepareFileStream(fullPath->url);
+				Debug_printv("full referenced path [%s]", tuple.fullPath.c_str());
+				tuple.fullPath = fullPath->url;
+				
+				if ( fullPath->isDirectory() )
+				{
+					changeDir(fullPath->url);
+				}
+				else
+				{
+					prepareFileStream(fullPath->url);
+				}
 			}
 		}
 	// }
@@ -502,23 +518,22 @@ void iecDrive::handleListenCommand( void )
 	auto commandAndPath = parseLine(this->data.device_command, channel);
 
 	// Execute DOS Command
+	Debug_printv("command[%s] path[%s]", commandAndPath.command.c_str(), commandAndPath.fullPath.c_str());	
 	if ( this->data.channel == CMD_CHANNEL )
 	{
 		Debug_printv("Execute DOS Command [%s]", this->data.device_command.c_str());
 		return;
 	}
 
-	Debug_printv("command[%s] path[%s]", commandAndPath.command.c_str(), commandAndPath.fullPath.c_str());	
-	auto referencedPath = Meat::New<MFile>(commandAndPath.fullPath);
-	//Debug_printv("referenced[%s]", referencedPath->url.c_str());
-	if ( referencedPath == nullptr )
-	{
-		Debug_printv("fnf");
-		sendFileNotFound();
-		return;
-	}
 
-	Debug_printv("command[%s] path[%s]", commandAndPath.command.c_str(), commandAndPath.fullPath.c_str());
+	// auto referencedPath = Meat::New<MFile>(commandAndPath.fullPath);
+	// //Debug_printv("referenced[%s]", referencedPath->url.c_str());
+	// if ( referencedPath == nullptr )
+	// {
+	// 	Debug_printv("fnf");
+	// 	sendFileNotFound();
+	// 	return;
+	// }
 	if (mstr::startsWith(commandAndPath.command, "$"))
 	{
 		m_openState = O_DIR;
@@ -542,47 +557,47 @@ void iecDrive::handleListenCommand( void )
 		}
 		favStream.close();
 	}
-	else if(!commandAndPath.rawPath.empty())
-	{
-		if( referencedPath->exists() )
-		{
-			// 2. fullPath.extension == "URL" - change dir or load file
-			if (mstr::equals(referencedPath->extension, (char*)"url", false))
-			{
-				// CD to the path inside the .url file
-				referencedPath.reset(getPointed(referencedPath.get()));
+	// else if(!commandAndPath.rawPath.empty())
+	// {
+	// 	if( referencedPath->exists() )
+	// 	{
+	// 		// 2. fullPath.extension == "URL" - change dir or load file
+	// 		if (mstr::equals(referencedPath->extension, (char*)"url", false))
+	// 		{
+	// 			// CD to the path inside the .url file
+	// 			referencedPath.reset(getPointed(referencedPath.get()));
 
-				if ( referencedPath->isDirectory() )
-				{
-					//Debug_printv("change dir called for urlfile");
-					changeDir(referencedPath->url);
-				}
-				else
-				{
-					prepareFileStream(referencedPath->url);
-				}
-			}
-			// 2. OR if command == "CD" OR fullPath.isDirectory - change directory
-			if (mstr::equals(commandAndPath.command, (char*)"cd", false) || referencedPath->isDirectory())
-			{
-				//Debug_printv("change dir called by CD command or because of isDirectory");
-				changeDir(referencedPath->url);
-			}
-			// 3. else - stream file
-			else //if ( referencedPath->exists() )
-			{
-				// Set File
-				prepareFileStream(referencedPath->url);
-			}
-		}
-		else
-		{
-			Debug_printv("Doesn't exist! [%s]", referencedPath->url.c_str());
-			sendFileNotFound();
-			m_openState = O_NOTHING;
-		}
+	// 			if ( referencedPath->isDirectory() )
+	// 			{
+	// 				//Debug_printv("change dir called for urlfile");
+	// 				changeDir(referencedPath->url);
+	// 			}
+	// 			else
+	// 			{
+	// 				prepareFileStream(referencedPath->url);
+	// 			}
+	// 		}
+	// 		// 2. OR if command == "CD" OR fullPath.isDirectory - change directory
+	// 		if (mstr::equals(commandAndPath.command, (char*)"cd", false) || referencedPath->isDirectory())
+	// 		{
+	// 			//Debug_printv("change dir called by CD command or because of isDirectory");
+	// 			changeDir(referencedPath->url);
+	// 		}
+	// 		// 3. else - stream file
+	// 		else //if ( referencedPath->exists() )
+	// 		{
+	// 			// Set File
+	// 			prepareFileStream(referencedPath->url);
+	// 		}
+	// 	}
+	// 	else
+	// 	{
+	// 		Debug_printv("Doesn't exist! [%s]", referencedPath->url.c_str());
+	// 		sendFileNotFound();
+	// 		m_openState = O_NOTHING;
+	// 	}
 
-	}
+	// }
 
 	//dumpState();
 } // handleListenCommand
@@ -801,6 +816,7 @@ void iecDrive::sendListing()
 
 	if(entry == nullptr) {
 		Debug_printv("fnf");
+		closeStream();
 
 		bool isOpen = registerStream(std::ios_base::in);
 		if(isOpen) 
@@ -910,6 +926,7 @@ void iecDrive::sendListing()
 	// End program with two zeros after last line. Last zero goes out as EOI.
 	IEC.send(0);
 	IEC.sendEOI(0);
+	closeStream();
 
 	Debug_printf("\r\n=================================\r\n%d bytes sent\r\n", byte_count);
 
@@ -1022,6 +1039,7 @@ bool iecDrive::sendFile()
 			success_tx = IEC.send(b);
 			load_address = load_address | b << 8;  // high byte
 			sys_address += b * 256;
+			Debug_printv( "load_address[$%.4X] sys_address[%d]", load_address, sys_address );
 
 			// Get SYSLINE
 
@@ -1030,7 +1048,7 @@ bool iecDrive::sendFile()
 		}
 
 		Debug_printf("sendFile: [$%.4X]\r\n=================================\r\n", load_address);
-		while( avail && success_rx && !istream->error() )
+		while( success_rx && !istream->error() )
 		{
             // Read Byte
             success_rx = istream->read(&b, 1);
@@ -1044,17 +1062,11 @@ bool iecDrive::sendFile()
 			}
 #endif
 			// Send Byte
-			if ( avail == 1 || !success_rx )
+			if ( !success_rx )
 			{
-				success_tx = IEC.send(bl); // indicate end of file.
+				success_tx = IEC.sendEOI(bl); // indicate end of file.
 				if ( !success_tx )
 					Debug_printv("tx fail");
-				if ( IEC.data.channel <  2 )
-					closeStream();
-
-				i++;
-				IEC.sendEOI(0);
-				//Debug_printv("eoi sent, i[%d] len[%d] bl[%d] success[%d]", i, len, bl, success_tx );
 			}
 			else
 			{
@@ -1074,12 +1086,12 @@ bool iecDrive::sendFile()
 			if(bi == 8)
 			{
 				size_t t = (i * 100) / len;
-				Debug_printf(" %s (%d %d%%) [%d]\r\n", ba, i, t, avail - 1);
+				Debug_printf(" %s (%d %d%%) [%d]\r\n", ba, i, t, avail);
 				bi = 0;
 			}
 #else
 			size_t t = (i * 100) / len;
-			Debug_printf("\rTransferring %d%% [%d, %d]", t, i, avail -1);
+			Debug_printf("\rTransferring %d%% [%d, %d]", t, i, avail);
 #endif
 
 			// Exit if ATN is PULLED while sending
