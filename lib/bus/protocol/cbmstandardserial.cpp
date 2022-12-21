@@ -106,9 +106,7 @@ int16_t  CBMStandardSerial::receiveByte ()
 
 
     // STEP 3: RECEIVING THE BITS
-    int16_t data = receiveBits();
-    if ( data == -1 )
-        return -1;
+    uint8_t data = receiveBits();
 
 
     // STEP 4: FRAME HANDSHAKE
@@ -165,7 +163,7 @@ int16_t CBMStandardSerial::receiveBits ()
 
     uint8_t n = 0;
 
-    pull ( PIN_IEC_SRQ );
+    // pull ( PIN_IEC_SRQ );
     for ( n = 0; n < 8; n++ )
     {
         data >>= 1;
@@ -207,7 +205,7 @@ int16_t CBMStandardSerial::receiveBits ()
             return -1; // return error because timeout
         }
     }
-    release( PIN_IEC_SRQ );
+    //release( PIN_IEC_SRQ );
 
     return data;
 } // receiveBits
@@ -338,7 +336,7 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
     }
     // else
     // {
-    //     wait ( 254 );
+         wait ( 254 );
     // }
 
     return true;
@@ -426,13 +424,11 @@ int16_t CBMStandardSerial::timeoutWait ( uint8_t pin, bool target_status, size_t
 
         if ( elapsed > wait && wait != FOREVER )
         {
-            return -1;
-
-            // //release ( PIN_IEC_SRQ );
-            // if ( wait == TIMEOUT_DEFAULT )
-            //     return -1;
+            //release ( PIN_IEC_SRQ );
+            if ( wait == TIMEOUT_DEFAULT )
+                return -1;
             
-            // return wait;
+            return wait;
         }
 
         if ( watch_atn )

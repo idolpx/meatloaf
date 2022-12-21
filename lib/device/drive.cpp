@@ -1048,7 +1048,7 @@ bool iecDrive::sendFile()
 		}
 
 		Debug_printf("sendFile: [$%.4X]\r\n=================================\r\n", load_address);
-		while( success_rx && !istream->error() )
+		while( avail >= 0 && success_rx && !istream->error() )
 		{
             // Read Byte
             success_rx = istream->read(&b, 1);
@@ -1062,7 +1062,7 @@ bool iecDrive::sendFile()
 			}
 #endif
 			// Send Byte
-			if ( !success_rx )
+			if ( avail == 0 || !success_rx )
 			{
 				success_tx = IEC.sendEOI(bl); // indicate end of file.
 				if ( !success_tx )
