@@ -464,9 +464,9 @@ void iecBus::service ( void )
 #ifdef PARALLEL_BUS
         // Switch to Parallel if detected
         if ( PARALLEL.active ) {
-            if ( PARALLEL.data == 'w' )
-                active_protocol = PROTOCOL_WIC64;
-            else
+            // if ( PARALLEL.data == 'w' )
+            //     active_protocol = PROTOCOL_WIC64;
+            // else
                 active_protocol = PROTOCOL_DOLPHINDOS;
             
             PARALLEL.handShake();
