@@ -54,7 +54,7 @@ void iecDrive::reset ( void )
 
 device_state_t iecDrive::process ( void )
 {
-    // IEC.protocol.pull ( PIN_IEC_SRQ );
+    // IEC.protocol->pull ( PIN_IEC_SRQ );
     // Debug_printf ( "bus_state[%d]", IEC.bus_state );
 
     Debug_printf ( "   DEVICE: [%.2d] ", this->data.device );
@@ -109,7 +109,7 @@ device_state_t iecDrive::process ( void )
 			handleListenCommand(); 			
 		}
 
-        // IEC.protocol.pull(PIN_IEC_SRQ);
+        // IEC.protocol->pull(PIN_IEC_SRQ);
         if ( this->device_state == DEVICE_LISTEN )
         {
             if ( this->data.channel != CMD_CHANNEL )
@@ -131,7 +131,7 @@ device_state_t iecDrive::process ( void )
 				this->data.init(); // Clear device command
             }
         }
-        // IEC.protocol.release(PIN_IEC_SRQ);
+        // IEC.protocol->release(PIN_IEC_SRQ);
     }
     else if ( this->data.secondary == IEC_CLOSE )
     {
@@ -143,7 +143,7 @@ device_state_t iecDrive::process ( void )
     }
 
     //Debug_printf("DEV device[%d] channel[%d] state[%d] command[%s]", this->data.device, this->data.channel, m_openState, this->data.device_command.c_str());
-    // IEC.protocol.release ( PIN_IEC_SRQ );
+    // IEC.protocol->release ( PIN_IEC_SRQ );
 
     return this->device_state;
 } // process
@@ -455,8 +455,6 @@ void iecDrive::changeDir(std::string url)
 
 void iecDrive::prepareFileStream(std::string url)
 {
-	device_config.url(url);
-	//Debug_printv("url[%s]", url.c_str());
 	m_filename = url;
 	m_openState = O_FILE;
 	//Debug_printv("LOAD [%s]", url.c_str());
@@ -996,10 +994,13 @@ bool iecDrive::sendFile()
 		Debug_printf("sendFile: [$%.4X]\r\n=================================\r\n", load_address);
 		while( avail && success )
 		{
-			// Read Byte
-			success = istream->read(&b, 1);
-			if ( !success )
-				Debug_printv("fail");
+            // Read Byte
+            success = istream->read(&b, 1);
+            if ( !success )
+            {
+                Debug_printv("fail");
+                IEC.sendEOI(0);
+            }
 
 			// Debug_printv("b[%02X] success[%d]", b, success);
 			if (success)
@@ -1023,7 +1024,7 @@ bool iecDrive::sendFile()
 				{
 					success = IEC.send(b);
 					if ( !success )
-						Debug_printv("fail");					
+						Debug_printv("fail");
 				}
 
 #ifdef DATA_STREAM
@@ -1046,9 +1047,9 @@ bool iecDrive::sendFile()
 			}
 
 			// Exit if ATN is PULLED while sending
-			if ( IEC.protocol.flags bitand ATN_PULLED )
+			if ( IEC.protocol->flags bitand ATN_PULLED )
 			{
-				//Debug_printv("ATN pulled while sending. i[%d]", i);
+				Debug_printv("ATN pulled while sending. i[%d]", i);
 				// Save file pointer position
 				// streamUpdate( istream );
 				istream->seek(istream->position() - 1);
@@ -1065,10 +1066,10 @@ bool iecDrive::sendFile()
 
 			avail = istream->available();
 			// We got another chunk, update length
-			if ( avail > (len - i) )
-			{
-				len += (avail - (len - i));
-			}
+			// if ( avail > (len - i) )
+			// {
+			// 	len += (avail - (len - i));
+			// }
 
 			i++;
 		}
@@ -1166,7 +1167,7 @@ bool iecDrive::saveFile()
 				ostream->write(b, b_len);
 			i++;
 
-			uint16_t f = IEC.protocol.flags;
+			uint16_t f = IEC.protocol->flags;
 			done = (f bitand EOI_RECVD) or (f bitand ERROR);
 
 			// Exit if ATN is PULLED while sending

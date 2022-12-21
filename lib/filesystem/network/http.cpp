@@ -183,18 +183,18 @@ bool MeatHttpClient::processRedirectsAndOpen(int range) {
     m_length = -1;
     m_bytesAvailable = 0;
 
-    Debug_printv("reopening url[%s] from position:%d", url.c_str(), range);
+    //Debug_printv("reopening url[%s] from position:%d", url.c_str(), range);
     lastRC = openAndFetchHeaders(lastMethod, range);
 
     while(lastRC == HttpStatus_MovedPermanently || lastRC == HttpStatus_Found || lastRC == 303)
     {
-        Debug_printv("--- Page moved, doing redirect to [%s]", url.c_str());
+        //Debug_printv("--- Page moved, doing redirect to [%s]", url.c_str());
         lastRC = openAndFetchHeaders(lastMethod, range);
         wasRedirected = true;
     }
     
     if(lastRC != HttpStatus_Ok && lastRC != 301 && lastRC != 206) {
-        Debug_printv("opening stream failed, httpCode=%d", lastRC);
+        //Debug_printv("opening stream failed, httpCode=%d", lastRC);
         close();
         return false;
     }
@@ -205,7 +205,7 @@ bool MeatHttpClient::processRedirectsAndOpen(int range) {
     m_exists = true;
     m_position = 0;
 
-    Debug_printv("length[%d] avail[%d] isFriendlySkipper[%d] isText[%d] httpCode[%d]", m_length, m_bytesAvailable, isFriendlySkipper, isText, lastRC);
+    //Debug_printv("length[%d] avail[%d] isFriendlySkipper[%d] isText[%d] httpCode[%d]", m_length, m_bytesAvailable, isFriendlySkipper, isText, lastRC);
 
     return true;
 }
@@ -472,8 +472,8 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
                 if (esp_http_client_is_chunked_response(evt->client)) {
                     int len;
                     esp_http_client_get_chunk_length(evt->client, &len);
-                    meatClient->m_length += len;
-                    meatClient->m_bytesAvailable += len;
+                    meatClient->m_length = len;
+                    meatClient->m_bytesAvailable = len;
                     //Debug_printv("HTTP_EVENT_ON_DATA: Got chunked response, chunklen=%d, contentlen[%d]", len, meatClient->m_length);
                 }
             }
@@ -487,7 +487,7 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
             //Debug_printv("HTTP_EVENT_ON_FINISH");
             break;
         case HTTP_EVENT_DISCONNECTED: // The connection has been disconnected
-            Debug_printv("HTTP_EVENT_DISCONNECTED");
+            //Debug_printv("HTTP_EVENT_DISCONNECTED");
             break;
     }
     return ESP_OK;

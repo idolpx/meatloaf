@@ -37,6 +37,7 @@
 
 // BIT Flags
 #define CLEAR            0x0000    // clear all flags
+#define CLEAR_LOW        0xFF00    // clear low byte
 #define ERROR            (1 << 0)  // if this flag is set, something went wrong
 #define ATN_PULLED       (1 << 1)  // might be set by iec_receive
 #define EOI_RECVD        (1 << 2)
@@ -75,11 +76,11 @@
 #define TIMING_EMPTY   512     // SIGNAL EMPTY STREAM
 #define TIMING_STABLE  60      // WAIT FOR BUS TO BE STABLE
 
-#define TIMING_JIFFY_ID   218  // JIFFYDOS ENABLED DELAY ON LAST BIT
-#define TIMING_JIFFY_ACK  101  // JIFFYDOS ACK RESPONSE
+#define TIMING_JIFFY_DETECT   218  // JIFFYDOS ENABLED DELAY ON LAST BIT
+#define TIMING_JIFFY_ACK      101  // JIFFYDOS ACK RESPONSE
 
 // See timeoutWait
-#define TIMEOUT 1000 // 1ms
+#define TIMEOUT_DEFAULT 1000 // 1ms
 #define TIMED_OUT -1
 #define FOREVER 0
 
@@ -101,6 +102,10 @@ namespace Protocol
 {
     class CBMStandardSerial
     {
+        private:
+            virtual int16_t receiveBits ();
+            virtual bool sendBits ( uint8_t data );
+
         public:
             // communication must be reset
             uint16_t flags = CLEAR;
@@ -108,8 +113,8 @@ namespace Protocol
 
             virtual int16_t receiveByte ();
             virtual bool sendByte ( uint8_t data, bool signalEOI );
-            int16_t timeoutWait ( uint8_t pin, bool target_status, size_t wait = TIMEOUT, bool watch_atn = true );
-            bool wait ( size_t wait );
+            int16_t timeoutWait ( uint8_t pin, bool target_status, size_t wait = TIMEOUT_DEFAULT, bool watch_atn = true );
+            bool wait ( size_t wait, uint64_t size = 0 );
 
 
             // true => PULL => LOW

@@ -22,7 +22,7 @@
 
 using namespace Protocol;
 
-// STEP 1: READY TO SEND
+// STEP 1: READY TO RECEIVE
 // Sooner or later, the talker will want to talk, and send a character.
 // When it's ready to go, it releases the Clock line to false.  This signal change might be
 // translated as "I'm ready to send a character." The listener must detect this and respond,
@@ -32,7 +32,7 @@ using namespace Protocol;
 // it might holdback for quite a while; there's no time limit.
 int16_t  CBMStandardSerial::receiveByte ()
 {
-    flags = CLEAR;
+    flags and_eq CLEAR_LOW;
 
     // Sometimes the C64 pulls ATN but doesn't pull CLOCK right away
     if ( !wait ( 60 ) ) return -1;
@@ -105,78 +105,9 @@ int16_t  CBMStandardSerial::receiveByte ()
     // release ( PIN_IEC_SRQ );
 
 
-    // STEP 3: SENDING THE BITS
-    // The talker has eight bits to send.  They will go out without handshake; in other words,
-    // the listener had better be there to catch them, since the talker won't wait to hear from the listener.  At this
-    // point, the talker controls both lines, Clock and Data.  At the beginning of the sequence, it is holding the
-    // Clock true, while the Data line is RELEASED to false.  the Data line will change soon, since we'll sendthe data
-    // over it. The eights bits will go out from the character one at a time, with the least significant bit going first.
-    // For example, if the character is the ASCII question mark, which is  written  in  binary  as  00011111,  the  ones
-    // will  go out  first,  followed  by  the  zeros.  Now,  for  each bit, we set the Data line true or false according
-    // to whether the bit is one or zero.  As soon as that'sset, the Clock line is RELEASED to false, signalling "data ready."
-    // The talker will typically have a bit in  place  and  be  signalling  ready  in  70  microseconds  or  less.  Once
-    // the  talker  has  signalled  "data ready," it will hold the two lines steady for at least 20 microseconds timing needs
-    // to be increased to 60  microseconds  if  the  Commodore  64  is  listening,  since  the  64's  video  chip  may
-    // interrupt  the processor for 42 microseconds at a time, and without the extra wait the 64 might completely miss a
-    // bit. The listener plays a passive role here; it sends nothing, and just watches.  As soon as it sees the Clock line
-    // false, it grabs the bit from the Data line and puts it away.  It then waits for the clock line to go true, in order
-    // to prepare for the next bit. When the talker figures the data has been held for a sufficient  length  of  time,  it
-    // pulls  the  Clock  line true  and  releases  the  Data  line  to  false.    Then  it starts to prepare the next bit.
+    // STEP 3: RECEIVING THE BITS
+    uint8_t data = receiveBits();
 
-    // Listening for bits
-#if defined(ESP8266)
-    ESP.wdtFeed();
-#endif
-    uint8_t data = 0;
-    int16_t bit_time;  // Used to detect JiffyDOS
-
-    uint8_t n = 0;
-
-    // pull ( PIN_IEC_SRQ );
-    for ( n = 0; n < 8; n++ )
-    {
-        data >>= 1;
-
-        do
-        {
-            // wait for bit to be ready to read
-            bit_time = timeoutWait ( PIN_IEC_CLK_IN, RELEASED, TIMING_JIFFY_ID );
-
-            /* If there is a delay before the last bit, the controller uses JiffyDOS */
-            if ( n == 7 && bit_time >= TIMING_JIFFY_ID && data < 0x60 && flags bitand ATN_PULLED )
-            {
-                uint8_t device = data & 0x1F;
-                if ( enabledDevices & ( 1 << device ) )
-                {
-                    /* If it's for us, notify controller that we support Jiffy too */
-                    pull(PIN_IEC_SRQ);
-                    //pull(PIN_IEC_DATA_OUT);
-                    delayMicroseconds(TIMING_JIFFY_ACK);
-                    //release(PIN_IEC_DATA_OUT);
-                    release(PIN_IEC_SRQ);
-                    flags xor_eq JIFFY_ACTIVE;
-                }
-            }
-            else if ( bit_time == TIMED_OUT )
-            {
-                Debug_printv ( "wait for bit to be ready to read, bit_time[%d]", bit_time );
-                flags or_eq ERROR;
-                return -1; // return error because timeout
-            }
-        } while ( bit_time >= 218 );
-        
-        // get bit
-        data or_eq ( status ( PIN_IEC_DATA_IN ) == RELEASED ? ( 1 << 7 ) : 0 );
-
-        // wait for talker to finish sending bit
-        if ( timeoutWait ( PIN_IEC_CLK_IN, PULLED ) == TIMED_OUT )
-        {
-            Debug_printv ( "wait for talker to finish sending bit" );
-            flags or_eq ERROR;
-            return -1; // return error because timeout
-        }
-    }
-    // release ( PIN_IEC_SRQ );
 
     // STEP 4: FRAME HANDSHAKE
     // After the eighth bit has been sent, it's the listener's turn to acknowledge.  At this moment, the Clock line  is  true
@@ -204,6 +135,81 @@ int16_t  CBMStandardSerial::receiveByte ()
     return data;
 } // receiveByte
 
+// STEP 3: RECEIVING THE BITS
+// The talker has eight bits to send.  They will go out without handshake; in other words,
+// the listener had better be there to catch them, since the talker won't wait to hear from the listener.  At this
+// point, the talker controls both lines, Clock and Data.  At the beginning of the sequence, it is holding the
+// Clock true, while the Data line is RELEASED to false.  the Data line will change soon, since we'll sendthe data
+// over it. The eights bits will go out from the character one at a time, with the least significant bit going first.
+// For example, if the character is the ASCII question mark, which is  written  in  binary  as  00011111,  the  ones
+// will  go out  first,  followed  by  the  zeros.  Now,  for  each bit, we set the Data line true or false according
+// to whether the bit is one or zero.  As soon as that'sset, the Clock line is RELEASED to false, signalling "data ready."
+// The talker will typically have a bit in  place  and  be  signalling  ready  in  70  microseconds  or  less.  Once
+// the  talker  has  signalled  "data ready," it will hold the two lines steady for at least 20 microseconds timing needs
+// to be increased to 60  microseconds  if  the  Commodore  64  is  listening,  since  the  64's  video  chip  may
+// interrupt  the processor for 42 microseconds at a time, and without the extra wait the 64 might completely miss a
+// bit. The listener plays a passive role here; it sends nothing, and just watches.  As soon as it sees the Clock line
+// false, it grabs the bit from the Data line and puts it away.  It then waits for the clock line to go true, in order
+// to prepare for the next bit. When the talker figures the data has been held for a sufficient  length  of  time,  it
+// pulls  the  Clock  line true  and  releases  the  Data  line  to  false.    Then  it starts to prepare the next bit.
+int16_t  CBMStandardSerial::receiveBits ()
+{
+    // Listening for bits
+#if defined(ESP8266)
+    ESP.wdtFeed();
+#endif
+    uint8_t data = 0;
+    int16_t bit_time;  // Used to detect JiffyDOS
+
+    uint8_t n = 0;
+
+    // pull ( PIN_IEC_SRQ );
+    for ( n = 0; n < 8; n++ )
+    {
+        data >>= 1;
+
+        do
+        {
+            // wait for bit to be ready to read
+            bit_time = timeoutWait ( PIN_IEC_CLK_IN, RELEASED, TIMING_JIFFY_DETECT );
+
+            /* If there is a delay before the last bit, the controller uses JiffyDOS */
+            if ( n == 7 && bit_time >= TIMING_JIFFY_DETECT && data < 0x60 && flags bitand ATN_PULLED )
+            {
+                uint8_t device = data & 0x1F;
+                if ( enabledDevices & ( 1 << device ) )
+                {
+                    /* If it's for us, notify controller that we support Jiffy too */
+                    pull(PIN_IEC_DATA_OUT);
+                    delayMicroseconds(TIMING_JIFFY_ACK);
+                    release(PIN_IEC_DATA_OUT);
+                    flags xor_eq JIFFY_ACTIVE;
+                }
+            }
+            else if ( bit_time == TIMED_OUT )
+            {
+                Debug_printv ( "wait for bit to be ready to read, bit_time[%d]", bit_time );
+                flags or_eq ERROR;
+                return -1; // return error because timeout
+            }
+        } while ( bit_time >= TIMING_JIFFY_DETECT );
+        
+        // get bit
+        data or_eq ( status ( PIN_IEC_DATA_IN ) == RELEASED ? ( 1 << 7 ) : 0 );
+
+        // wait for talker to finish sending bit
+        if ( timeoutWait ( PIN_IEC_CLK_IN, PULLED ) == TIMED_OUT )
+        {
+            Debug_printv ( "wait for talker to finish sending bit" );
+            flags or_eq ERROR;
+            return -1; // return error because timeout
+        }
+    }
+
+    return data;
+} // receiveBits
+
+
 
 // STEP 1: READY TO SEND
 // Sooner or later, the talker will want to talk, and send a character.
@@ -215,7 +221,8 @@ int16_t  CBMStandardSerial::receiveByte ()
 // it might holdback for quite a while; there's no time limit.
 bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
 {
-    flags = CLEAR;
+//    flags = CLEAR;
+    flags and_eq CLEAR_LOW;
 
     // // Sometimes the C64 doesn't release ATN right away
     // if ( !wait ( 200 ) ) return -1;
@@ -286,58 +293,8 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
     // }
 
     // STEP 3: SENDING THE BITS
-    // The talker has eight bits to send.  They will go out without handshake; in other words,
-    // the listener had better be there to catch them, since the talker won't wait to hear from the listener.  At this
-    // point, the talker controls both lines, Clock and Data.  At the beginning of the sequence, it is holding the
-    // Clock true, while the Data line is RELEASED to false.  the Data line will change soon, since we'll sendthe data
-    // over it. The eights bits will go out from the character one at a time, with the least significant bit going first.
-    // For example, if the character is the ASCII question mark, which is  written  in  binary  as  00011111,  the  ones
-    // will  go out  first,  followed  by  the  zeros.  Now,  for  each bit, we set the Data line true or false according
-    // to whether the bit is one or zero.  As soon as that'sset, the Clock line is RELEASED to false, signalling "data ready."
-    // The talker will typically have a bit in  place  and  be  signalling  ready  in  70  microseconds  or  less.  Once
-    // the  talker  has  signalled  "data ready," it will hold the two lines steady for at least 20 microseconds timing needs
-    // to be increased to 60  microseconds  if  the  Commodore  64  is  listening,  since  the  64's  video  chip  may
-    // interrupt  the processor for 42 microseconds at a time, and without the extra wait the 64 might completely miss a
-    // bit. The listener plays a passive role here; it sends nothing, and just watches.  As soon as it sees the Clock line
-    // false, it grabs the bit from the Data line and puts it away.  It then waits for the clock line to go true, in order
-    // to prepare for the next bit. When the talker figures the data has been held for a sufficient  length  of  time,  it
-    // pulls  the  Clock  line true  and  releases  the  Data  line  to  false.    Then  it starts to prepare the next bit.
-
-    // Send bits
-#if defined(ESP8266)
-    ESP.wdtFeed();
-#endif
-
-    // tell listner to wait
-    // we control both CLOCK & DATA now
-    pull ( PIN_IEC_CLK_OUT );
-    // if ( !wait ( TIMING_Tv ) ) return false;
-
-    for ( uint8_t n = 0; n < 8; n++ )
-    {
-    
-    #ifdef SPLIT_LINES
-        // If data pin is PULLED, exit and cleanup
-        if ( status ( PIN_IEC_DATA_IN ) == PULLED ) return false;
-    #endif
-
-        // set bit
-        ( data bitand 1 ) ? release ( PIN_IEC_DATA_OUT ) : pull ( PIN_IEC_DATA_OUT );
-        data >>= 1; // get next bit
-        if ( !wait ( TIMING_Ts ) ) return false;
-
-        // // Release data line after bit sent
-        // release ( PIN_IEC_DATA_OUT );
-
-        // tell listener bit is ready to read
-        release ( PIN_IEC_CLK_OUT );
-        if ( !wait ( TIMING_Tv ) ) return false;
-
-        // tell listner to wait
-        pull ( PIN_IEC_CLK_OUT );
-    }
-    // Release data line after byte sent
-    release ( PIN_IEC_DATA_OUT );
+    if ( !sendBits( data ) )
+        return false;
 
 
     // STEP 4: FRAME HANDSHAKE
@@ -374,6 +331,64 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
 } // sendByte
 
 
+// STEP 3: SENDING THE BITS
+// The talker has eight bits to send.  They will go out without handshake; in other words,
+// the listener had better be there to catch them, since the talker won't wait to hear from the listener.  At this
+// point, the talker controls both lines, Clock and Data.  At the beginning of the sequence, it is holding the
+// Clock true, while the Data line is RELEASED to false.  the Data line will change soon, since we'll sendthe data
+// over it. The eights bits will go out from the character one at a time, with the least significant bit going first.
+// For example, if the character is the ASCII question mark, which is  written  in  binary  as  00011111,  the  ones
+// will  go out  first,  followed  by  the  zeros.  Now,  for  each bit, we set the Data line true or false according
+// to whether the bit is one or zero.  As soon as that'sset, the Clock line is RELEASED to false, signalling "data ready."
+// The talker will typically have a bit in  place  and  be  signalling  ready  in  70  microseconds  or  less.  Once
+// the  talker  has  signalled  "data ready," it will hold the two lines steady for at least 20 microseconds timing needs
+// to be increased to 60  microseconds  if  the  Commodore  64  is  listening,  since  the  64's  video  chip  may
+// interrupt  the processor for 42 microseconds at a time, and without the extra wait the 64 might completely miss a
+// bit. The listener plays a passive role here; it sends nothing, and just watches.  As soon as it sees the Clock line
+// false, it grabs the bit from the Data line and puts it away.  It then waits for the clock line to go true, in order
+// to prepare for the next bit. When the talker figures the data has been held for a sufficient  length  of  time,  it
+// pulls  the  Clock  line true  and  releases  the  Data  line  to  false.    Then  it starts to prepare the next bit.
+bool CBMStandardSerial::sendBits ( uint8_t data )
+{
+    // Send bits
+#if defined(ESP8266)
+    ESP.wdtFeed();
+#endif
+
+    // tell listner to wait
+    // we control both CLOCK & DATA now
+    pull ( PIN_IEC_CLK_OUT );
+    // if ( !wait ( TIMING_Tv ) ) return false;
+
+    for ( uint8_t n = 0; n < 8; n++ )
+    {
+    
+    #ifdef SPLIT_LINES
+        // If data pin is PULLED, exit and cleanup
+        if ( status ( PIN_IEC_DATA_IN ) == PULLED ) return false;
+    #endif
+
+        // set bit
+        ( data bitand 1 ) ? release ( PIN_IEC_DATA_OUT ) : pull ( PIN_IEC_DATA_OUT );
+        data >>= 1; // get next bit
+        if ( !wait ( TIMING_Ts ) ) return false;
+
+        // // Release data line after bit sent
+        // release ( PIN_IEC_DATA_OUT );
+
+        // tell listener bit is ready to read
+        release ( PIN_IEC_CLK_OUT );
+        if ( !wait ( TIMING_Tv ) ) return false;
+
+        // tell listner to wait
+        pull ( PIN_IEC_CLK_OUT );
+    }
+    // Release data line after byte sent
+    release ( PIN_IEC_DATA_OUT );
+
+    return true;
+} // sendBits
+
 
 // Wait indefinitely if wait = 0 or until ATN status changes
 int16_t CBMStandardSerial::timeoutWait ( uint8_t pin, bool target_status, size_t wait, bool watch_atn )
@@ -405,7 +420,7 @@ int16_t CBMStandardSerial::timeoutWait ( uint8_t pin, bool target_status, size_t
         if ( elapsed > wait && wait != FOREVER )
         {
             //release ( PIN_IEC_SRQ );
-            if ( wait == TIMEOUT )
+            if ( wait == TIMEOUT_DEFAULT )
                 return -1;
             
             return wait;
@@ -433,13 +448,20 @@ int16_t CBMStandardSerial::timeoutWait ( uint8_t pin, bool target_status, size_t
 
 
 // Wait for specified ms or until ATN status changes
-bool CBMStandardSerial::wait ( size_t wait )
+bool CBMStandardSerial::wait ( size_t wait, uint64_t start )
 {
-    uint64_t start, current, elapsed;
+    uint64_t current, elapsed;
     elapsed = 0;
 
-    esp_timer_init();
-    start = current = esp_timer_get_time();
+    if ( start == 0 )
+    {
+        esp_timer_init();
+        start = current = esp_timer_get_time();
+    }
+    else
+    {
+        current = esp_timer_get_time();
+    }
 
     // Sample ATN and set flag to indicate SELECT or DATA mode
     bool atn_status = status ( PIN_IEC_ATN );
