@@ -126,12 +126,12 @@ device_state_t iecDrive::process ( void )
             // Send data
             Debug_printv ( "[Send data]" );
             handleTalk ( this->data.channel );
-            if ( this->data.channel < 2 )
-			{
-				closeStream();
-				device_state = DEVICE_IDLE;
-				this->data.init(); // Clear device command
-            }
+            // if ( this->data.channel < 2 )
+			// {
+			// 	closeStream();
+			// 	device_state = DEVICE_IDLE;
+			// 	this->data.init(); // Clear device command
+            // }
         }
         // IEC.protocol->release(PIN_IEC_SRQ);
     }
@@ -926,7 +926,7 @@ void iecDrive::sendListing()
 	// End program with two zeros after last line. Last zero goes out as EOI.
 	IEC.send(0);
 	IEC.sendEOI(0);
-	closeStream();
+	//closeStream();
 
 	Debug_printf("\r\n=================================\r\n%d bytes sent\r\n", byte_count);
 
@@ -983,6 +983,7 @@ bool iecDrive::sendFile()
 	{
 		//Debug_printv("Stream not found!");
 		sendFileNotFound();
+		closeStream();
 		return false;
 	}
 
