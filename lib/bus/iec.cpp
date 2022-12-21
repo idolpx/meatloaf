@@ -160,11 +160,11 @@ bool iecDevice::registerStream (std::ios_base::open_mode mode)
             Debug_printv("Error creating stream");
             return false;
         }
-        // else
-        // {
-        //     // Close the stream if it is already open
-        //     closeStream();
-        // }
+        else
+        {
+            // Close the stream if it is already open
+            closeStream();
+        }
     }
 
     // SAVE / PUT / PRINT / WRITE
@@ -178,13 +178,13 @@ bool iecDevice::registerStream (std::ios_base::open_mode mode)
 
     size_t key = ( this->data.device * 100 ) + this->data.channel;
 
-    // Check to see if a stream is open on this device/channel already
-    auto found = streams.find(key);
-    if ( found != streams.end() )
-    {
-        Debug_printv( "Stream already registered on this device/channel!" );
-        return false;
-    }
+    // // Check to see if a stream is open on this device/channel already
+    // auto found = streams.find(key);
+    // if ( found != streams.end() )
+    // {
+    //     Debug_printv( "Stream already registered on this device/channel!" );
+    //     return false;
+    // }
 
     // Add stream to streams 
     auto newPair = std::make_pair ( key, new_stream );
