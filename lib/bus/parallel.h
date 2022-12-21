@@ -1,3 +1,7 @@
+// http://sta.c64.org/cbmpar.html
+// https://ist.uwaterloo.ca/~schepers/c64par.html
+// https://ist.uwaterloo.ca/~schepers/1541port.html
+//
 
 #ifndef MEATLOAF_BUS_PARALLEL
 #define MEATLOAF_BUS_PARALLEL

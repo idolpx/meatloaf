@@ -461,6 +461,21 @@ void iecBus::service ( void )
             releaseLines();
         }
 
+#ifdef PARALLEL_BUS
+        // Switch to Parallel if detected
+        if ( PARALLEL.active ) {
+            if ( PARALLEL.data == 'w' )
+                active_protocol = PROTOCOL_WIC64;
+            else
+                active_protocol = PROTOCOL_DOLPHINDOS;
+            
+            PARALLEL.handShake();
+
+            // Switch to detected protocol
+            selectProtocol();
+        }
+#endif
+
         // Debug_printf ( "code[%.2X] primary[%.2X] secondary[%.2X] bus[%d]", command, this->data.primary, this->data.secondary, this->bus_state );
         // Debug_printf( "primary[%.2X] secondary[%.2X] bus_state[%d]", this->data.primary, this->data.secondary, this->bus_state );
         // protocol->release ( PIN_IEC_SRQ );
@@ -482,16 +497,7 @@ void iecBus::service ( void )
 
         if ( this->data.secondary == IEC_OPEN || this->data.secondary == IEC_REOPEN )
         {
-#ifdef PARALLEL_BUS
-            PARALLEL.handShake();
-            protocol->wait( 100 );
-            if ( PARALLEL.active ) {
-                if ( PARALLEL.data = 'W' )
-                    active_protocol = PROTOCOL_WIC64;
-                else
-                    active_protocol = PROTOCOL_DOLPHINDOS;
-            }
-#endif
+
 
             // Switch to detected protocol
             selectProtocol();
