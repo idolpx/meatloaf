@@ -29,8 +29,40 @@ static void IRAM_ATTR ml_parallel_isr_handler(void* arg)
     uint32_t gpio_num = (uint32_t) arg;
     xQueueSendFromISR(ml_parallel_evt_queue, &gpio_num, NULL);
 
-    //Debug_printf("INTERRUPT ON GPIO: %d", arg);
+    //parallelBus *b = (parallelBus *)arg;
+
+    // Go to listener mode and get command
+    //b->bus_state = PARALLEL_ACTIVE;
 }
+
+// static void ml_parallel_intr_task(void* arg)
+// {
+//     while ( true ) 
+//     {
+//         if ( PARALLEL.enabled && PARALLEL.bus_state == PARALLEL_ACTIVE )
+//         {
+//             //PARALLEL.service();
+//         }
+//         taskYIELD();
+//     }
+// }
+
+// void parallelBus::service()
+// {
+//     Debug_printv( "User Port Data Interrupt Received!" );
+
+//     // Update flags and data
+//     PARALLEL.readByte();
+
+//     // If PC2 is set then parallel is active and a byte is ready to be read!
+//     if ( PARALLEL.status( PC2 ) )
+//     {
+//         PARALLEL.bus_state = PARALLEL_PROCESS;
+//         Debug_printv("receive <<< " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
+//     }
+
+//     PARALLEL.bus_state = PARALLEL_IDLE;
+// }
 
 static void ml_parallel_intr_task(void* arg)
 {
@@ -51,7 +83,7 @@ static void ml_parallel_intr_task(void* arg)
                 // If PC2 is set then parallel is active and a byte is ready to be read!
                 if ( PARALLEL.status( PC2 ) )
                 {
-                    PARALLEL.active = true;
+                    PARALLEL.bus_state = PARALLEL_PROCESS;
                     Debug_printv("receive <<< " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
                 }
 
@@ -115,7 +147,7 @@ void parallelBus::setup ()
 
     // Start task
     //xTaskCreate(ml_parallel_intr_task, "ml_parallel_intr_task", 2048, NULL, 10, NULL);
-    xTaskCreatePinnedToCore(ml_parallel_intr_task, "ml_parallel_intr_task", 2048, NULL, 10, NULL, 0);
+    xTaskCreatePinnedToCore(ml_parallel_intr_task, "ml_parallel_intr_task", 4096, NULL, 10, NULL, 0);
 
     // Setup interrupt for paralellel port
     gpio_config_t io_conf = {
@@ -128,7 +160,7 @@ void parallelBus::setup ()
 
     //configure GPIO with the given settings
     gpio_config(&io_conf);
-    gpio_isr_handler_add((gpio_num_t)PIN_GPIOX_INT, ml_parallel_isr_handler, NULL);    
+    gpio_isr_handler_add((gpio_num_t)PIN_GPIOX_INT, ml_parallel_isr_handler, NULL);
 }
 
 void parallelBus::reset()
@@ -150,7 +182,15 @@ void parallelBus::reset()
     expander.digitalWrite( FLAG2, HIGH);
 
     //Debug_printv("userport data");
-    expander.portMode( USERPORT_DATA, GPIOX_MODE_INPUT );
+    setMode( MODE_RECEIVE );
+}
+
+void parallelBus::setMode(parallel_mode_t mode)
+{
+    if ( mode == MODE_RECEIVE )
+        expander.portMode( USERPORT_DATA, GPIOX_MODE_INPUT );
+    else
+        expander.portMode( USERPORT_DATA, GPIOX_MODE_OUTPUT );
 }
 
 

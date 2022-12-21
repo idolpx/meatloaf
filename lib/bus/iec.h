@@ -129,7 +129,7 @@ class iecDevice
 typedef enum
 {
     BUS_OFFLINE = -3, // Bus is empty
-    BUS_RESET = -2,   // The IEC bus is in a reset state (RESET line).    
+    BUS_RESET = -2,   // The bus is in a reset state (RESET line).    
     BUS_ERROR = -1,   // A problem occoured, reset communication
     BUS_IDLE = 0,     // Nothing recieved of our concern
     BUS_ACTIVE = 1,   // ATN is pulled and a command byte is expected
@@ -205,7 +205,9 @@ class iecBus
             else 
             {
                 protocol = static_cast<CBMStandardSerial*>(&protocolCBMStandardSerial);
-                PARALLEL.active = false;
+#ifdef PARALLEL_BUS
+                PARALLEL.bus_state = PARALLEL_IDLE;
+#endif
             }
             protocol->flags = flags_cp;
             //Debug_printv("protocol[%d]", active_protocol);
