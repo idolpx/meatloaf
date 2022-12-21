@@ -48,12 +48,11 @@ static void ml_iec_intr_task(void* arg)
 {
     while ( true ) 
     {
-        if ( IEC.enabled )
+        if ( IEC.enabled && IEC.bus_state > BUS_IDLE )
         {
             IEC.service();
-            if ( IEC.bus_state < BUS_ACTIVE )
-                taskYIELD();
         }
+        taskYIELD();
     }
 }
 

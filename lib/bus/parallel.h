@@ -71,7 +71,9 @@ class parallelBus
   public:
     void setup();
     void reset();
+    void service();
 
+    void setMode(parallel_mode_t mode);
     void handShake();
     uint8_t readByte();
     void writeByte( uint8_t byte );
@@ -80,7 +82,7 @@ class parallelBus
     uint8_t flags = 0;
     uint8_t data = 0;
     parallel_mode_t mode = MODE_RECEIVE;
-    bool active = false;
+    bus_state_t bus_state;
     bool enabled = true;
 };
 

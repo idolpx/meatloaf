@@ -129,7 +129,7 @@ class iecDevice
 typedef enum
 {
     BUS_OFFLINE = -3, // Bus is empty
-    BUS_RESET = -2,   // The IEC bus is in a reset state (RESET line).    
+    BUS_RESET = -2,   // The bus is in a reset state (RESET line).    
     BUS_ERROR = -1,   // A problem occoured, reset communication
     BUS_IDLE = 0,     // Nothing recieved of our concern
     BUS_ACTIVE = 1,   // ATN is pulled and a command byte is expected
