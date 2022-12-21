@@ -205,7 +205,9 @@ class iecBus
             else 
             {
                 protocol = static_cast<CBMStandardSerial*>(&protocolCBMStandardSerial);
+#ifdef PARALLEL_BUS
                 PARALLEL.active = false;
+#endif
             }
             protocol->flags = flags_cp;
             //Debug_printv("protocol[%d]", active_protocol);
