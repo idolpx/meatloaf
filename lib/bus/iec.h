@@ -206,7 +206,7 @@ class iecBus
             {
                 protocol = static_cast<CBMStandardSerial*>(&protocolCBMStandardSerial);
 #ifdef PARALLEL_BUS
-                PARALLEL.active = false;
+                PARALLEL.bus_state = PARALLEL_IDLE;
 #endif
             }
             protocol->flags = flags_cp;

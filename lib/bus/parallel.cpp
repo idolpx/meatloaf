@@ -32,14 +32,14 @@ static void IRAM_ATTR ml_parallel_isr_handler(void* arg)
     parallelBus *b = (parallelBus *)arg;
 
     // Go to listener mode and get command
-    b->bus_state = BUS_ACTIVE;
+    b->bus_state = PARALLEL_ACTIVE;
 }
 
-static void ml_iec_intr_task(void* arg)
+static void ml_parallel_intr_task(void* arg)
 {
     while ( true ) 
     {
-        if ( PARALLEL.enabled && PARALLEL.bus_state > BUS_IDLE )
+        if ( PARALLEL.enabled && PARALLEL.bus_state == PARALLEL_ACTIVE )
         {
             PARALLEL.service();
         }
@@ -57,7 +57,7 @@ void parallelBus::service()
     // If PC2 is set then parallel is active and a byte is ready to be read!
     if ( PARALLEL.status( PC2 ) )
     {
-        PARALLEL.bus_state = BUS_ACTIVE;
+        PARALLEL.bus_state = PARALLEL_PROCESS;
         Debug_printv("receive <<< " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
     }
 }

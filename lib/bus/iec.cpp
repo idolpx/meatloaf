@@ -452,7 +452,7 @@ void iecBus::service ( void )
 
 #ifdef PARALLEL_BUS
             // Switch to Parallel if detected
-            else if ( PARALLEL.active && command == IEC_LISTEN || command == IEC_TALK ) 
+            else if ( PARALLEL.bus_state == PARALLEL_PROCESS && ( command == IEC_LISTEN || command == IEC_TALK ) )
             {
                 active_protocol = PROTOCOL_DOLPHINDOS;
                 
