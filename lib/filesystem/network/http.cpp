@@ -4,29 +4,35 @@
  * File impls
  ********************************************************/
 
-MeatHttpClient* HttpFile::formHeader() {
+MeatHttpClient* HttpFile::fromHeader() {
     if(client == nullptr) {
-        Debug_printv("Client was not present, creating");
+        //Debug_printv("Client was not present, creating");
         client = new MeatHttpClient();
 
         // let's just get the headers so we have some info
-        Debug_printv("Client requesting head");
+        //Debug_printv("Client requesting head");
+        //Debug_printv("before head url[%s]", url.c_str());
         client->HEAD(url);
+        //Debug_printv("after head url[%s]", client->url.c_str());
+        parseUrl(client->url);
     }
     return client;
 }
 
 bool HttpFile::isDirectory() {
-    if(formHeader()->m_isWebDAV) {
+    if(fromHeader()->m_isDirectory)
+        return true;
+
+    if(fromHeader()->m_isWebDAV) {
         // try webdav PROPFIND to get a listing
-        return false;
+        return true;
     }
     else
         // otherwise return false
         return false;
 }
 
-MStream* HttpFile::meatStream(MFileMode mode) {
+MStream* HttpFile::meatStream() {
     // has to return OPENED stream
     //Debug_printv("Input stream requested: [%s]", url.c_str());
     MStream* istream = new HttpIStream(url);
@@ -39,7 +45,7 @@ MStream* HttpFile::createIStream(std::shared_ptr<MStream> is) {
 }
 
 time_t HttpFile::getLastWrite() {
-    if(formHeader()->m_isWebDAV) {
+    if(fromHeader()->m_isWebDAV) {
         return 0;
     }
     else
@@ -48,7 +54,7 @@ time_t HttpFile::getLastWrite() {
 }
 
 time_t HttpFile::getCreationTime() {
-    if(formHeader()->m_isWebDAV) {
+    if(fromHeader()->m_isWebDAV) {
         return 0;
     }
     else
@@ -57,21 +63,21 @@ time_t HttpFile::getCreationTime() {
 }
 
 bool HttpFile::exists() {
-    return formHeader()->m_exists;
+    return fromHeader()->m_exists;
 }
 
 size_t HttpFile::size() {
-    if(formHeader()->m_isWebDAV) {
+    if(fromHeader()->m_isWebDAV) {
         // take from webdav PROPFIND
         return 0;
     }
     else
         // fallback to what we had from the header
-        return formHeader()->m_length;
+        return fromHeader()->m_length;
 }
 
 bool HttpFile::remove() {
-    if(formHeader()->m_isWebDAV) {
+    if(fromHeader()->m_isWebDAV) {
         // PROPPATCH allows deletion
         return false;
     }
@@ -79,7 +85,7 @@ bool HttpFile::remove() {
 }
 
 bool HttpFile::mkDir() {
-    if(formHeader()->m_isWebDAV) {
+    if(fromHeader()->m_isWebDAV) {
         // MKCOL creates dir
         return false;
     }
@@ -87,7 +93,7 @@ bool HttpFile::mkDir() {
 }
 
 bool HttpFile::rewindDirectory() {
-    if(formHeader()->m_isWebDAV) { 
+    if(fromHeader()->m_isWebDAV) { 
         // we can try if this is webdav, then
         // PROPFIND allows listing dir
         return false;
@@ -96,7 +102,8 @@ bool HttpFile::rewindDirectory() {
 };
 
 MFile* HttpFile::getNextFileInDir() { 
-    if(formHeader()->m_isWebDAV) {
+    Debug_printv("");
+    if(fromHeader()->m_isWebDAV) {
         // we can try if this is webdav, then
         // PROPFIND allows listing dir
         return nullptr;
@@ -104,17 +111,18 @@ MFile* HttpFile::getNextFileInDir() {
     return nullptr; 
 };
 
+
 bool HttpFile::isText() {
-    return formHeader()->isText;
+    return fromHeader()->isText;
 }
 
 /********************************************************
  * Istream impls
  ********************************************************/
-bool HttpIStream::open(MFileMode mode) {
-    if(mode == READ)
+bool HttpIStream::open() {
+    if(secondaryAddress == 0)
         return m_http.GET(url);
-    else if(mode == WRITE)
+    else if(secondaryAddress == 1)
         return m_http.PUT(url);
     else if(secondaryAddress == 2)
         return m_http.POST(url);
@@ -123,7 +131,7 @@ bool HttpIStream::open(MFileMode mode) {
 }
 
 void HttpIStream::close() {
-    Debug_printv("CLOSE called explicitly on this HTTP stream!");    
+    //Debug_printv("CLOSE called explicitly on this HTTP stream!");    
     m_http.close();
 }
 
@@ -157,22 +165,30 @@ size_t HttpIStream::position() {
     return m_http.m_position;
 }
 
+size_t HttpIStream::error() {
+    return m_http.m_error;
+}
+
 /********************************************************
  * Meat HTTP client impls
  ********************************************************/
 bool MeatHttpClient::GET(std::string dstUrl) {
+    Debug_printv("GET");
     return open(dstUrl, HTTP_METHOD_GET);
 }
 
 bool MeatHttpClient::POST(std::string dstUrl) {
+    Debug_printv("POST");
     return open(dstUrl, HTTP_METHOD_POST);
 }
 
 bool MeatHttpClient::PUT(std::string dstUrl) {
+    Debug_printv("PUT");
     return open(dstUrl, HTTP_METHOD_PUT);
 }
 
 bool MeatHttpClient::HEAD(std::string dstUrl) {
+    Debug_printv("HEAD");
     bool rc = open(dstUrl, HTTP_METHOD_HEAD);
     close();
     return rc;
@@ -183,12 +199,13 @@ bool MeatHttpClient::processRedirectsAndOpen(int range) {
     m_length = -1;
     m_bytesAvailable = 0;
 
-    //Debug_printv("reopening url[%s] from position:%d", url.c_str(), range);
+    Debug_printv("reopening url[%s] from position:%d", url.c_str(), range);
     lastRC = openAndFetchHeaders(lastMethod, range);
 
     while(lastRC == HttpStatus_MovedPermanently || lastRC == HttpStatus_Found || lastRC == 303)
     {
-        //Debug_printv("--- Page moved, doing redirect to [%s]", url.c_str());
+        Debug_printv("--- Page moved, doing redirect to [%s]", url.c_str());
+        close();
         lastRC = openAndFetchHeaders(lastMethod, range);
         wasRedirected = true;
     }
@@ -198,7 +215,6 @@ bool MeatHttpClient::processRedirectsAndOpen(int range) {
         close();
         return false;
     }
-
 
     // TODO - set m_isWebDAV somehow
     m_isOpen = true;
@@ -213,16 +229,18 @@ bool MeatHttpClient::processRedirectsAndOpen(int range) {
 bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
     url = dstUrl;
     lastMethod = meth;
+    m_error = 0;
 
     return processRedirectsAndOpen(0);
 };
 
 void MeatHttpClient::close() {
     if(m_http != nullptr) {
-        if(m_isOpen) {
+        if ( m_isOpen ) {
             esp_http_client_close(m_http);
         }
         esp_http_client_cleanup(m_http);
+        //Debug_printv("HTTP Close and Cleanup");
         m_http = nullptr;
     }
     m_isOpen = false;
@@ -336,6 +354,7 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t meth, int resum
         return 0;
 
     //mstr::replaceAll(url, "HTTP:", "http:");
+    mstr::replaceAll(url, " ", "%20");
     esp_http_client_config_t config = {
         .url = url.c_str(),
         .user_agent = USER_AGENT,
@@ -349,6 +368,7 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t meth, int resum
         .keep_alive_interval = 1
     };
 
+    Debug_printv("HTTP Init [%s]", url.c_str());
     m_http = esp_http_client_init(&config);
 
     if(resume > 0) {
@@ -357,14 +377,14 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t meth, int resum
         esp_http_client_set_header(m_http, "range", str);
     }
 
-    // Debug_printv("--- PRE OPEN")
+    //Debug_printv("--- PRE OPEN");
 
     esp_err_t initOk = esp_http_client_open(m_http, 0); // or open? It's not entirely clear...
 
     if(initOk == ESP_FAIL)
         return 0;
 
-    // Debug_printv("--- PRE FETCH HEADERS")
+    //Debug_printv("--- PRE FETCH HEADERS");
 
     int lengthResp = esp_http_client_fetch_headers(m_http);
     if(m_length == -1 && lengthResp > 0) {
@@ -373,7 +393,7 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t meth, int resum
         m_bytesAvailable = m_length;
     }
 
-    // Debug_printv("--- PRE GET STATUS CODE")
+    //Debug_printv("--- PRE GET STATUS CODE");
 
     return esp_http_client_get_status_code(m_http);
 }
@@ -385,6 +405,7 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
     switch(evt->event_id) {
         case HTTP_EVENT_ERROR: // This event occurs when there are any errors during execution
             Debug_printv("HTTP_EVENT_ERROR");
+            meatClient->m_error = 1;
             break;
 
         case HTTP_EVENT_ON_CONNECTED: // Once the HTTP has been connected to the server, no data exchange has been performed
@@ -425,7 +446,12 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
             {
                 // Content-Disposition, value=attachment; filename*=UTF-8''GeckOS-c64.d64
                 // we can set isText from real file extension, too!
-
+                std::string value = evt->header_value;
+                if ( mstr::contains( value, (char *)"index.prg" ) )
+                {
+                    Debug_printv("HTTP Directory Listing [%s]", meatClient->url.c_str());
+                    meatClient->m_isDirectory = true;
+                }
             }
             else if(mstr::equals("Content-Length", evt->header_key, false))
             {
@@ -438,16 +464,16 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
                 Debug_printv("* This page redirects from '%s' to '%s'", meatClient->url.c_str(), evt->header_value);
                 if ( mstr::startsWith(evt->header_value, (char *)"http") )
                 {
-                    Debug_printv("match");
+                    //Debug_printv("match");
                     meatClient->url = evt->header_value;
                 }
                 else
                 {
-                    Debug_printv("no match");
+                    //Debug_printv("no match");
                     meatClient->url += evt->header_value;                    
                 }
 
-                Debug_printv("new url '%s'", meatClient->url.c_str());
+                //Debug_printv("new url '%s'", meatClient->url.c_str());
             }
 
             // Allow override in lambda
@@ -458,15 +484,15 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
         case HTTP_EVENT_ON_DATA: // Occurs multiple times when receiving body data from the server. MAY BE SKIPPED IF BODY IS EMPTY!
             //Debug_printv("HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
             {
-                int status = esp_http_client_get_status_code(meatClient->m_http);
+                // int status = esp_http_client_get_status_code(meatClient->m_http);
 
-                if ((status == HttpStatus_Found || status == HttpStatus_MovedPermanently || status == 303) /*&& client->_redirect_count < (client->_max_redirects - 1)*/)
-                {
-                    //Debug_printv("HTTP_EVENT_ON_DATA: Redirect response body, ignoring");
-                }
-                else {
-                    //Debug_printv("HTTP_EVENT_ON_DATA: Got response body");
-                }
+                // if ((status == HttpStatus_Found || status == HttpStatus_MovedPermanently || status == 303) /*&& client->_redirect_count < (client->_max_redirects - 1)*/)
+                // {
+                //     //Debug_printv("HTTP_EVENT_ON_DATA: Redirect response body, ignoring");
+                // }
+                // else {
+                //     //Debug_printv("HTTP_EVENT_ON_DATA: Got response body");
+                // }
 
 
                 if (esp_http_client_is_chunked_response(evt->client)) {
@@ -488,6 +514,7 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
             break;
         case HTTP_EVENT_DISCONNECTED: // The connection has been disconnected
             //Debug_printv("HTTP_EVENT_DISCONNECTED");
+            //meatClient->m_bytesAvailable = 0;
             break;
     }
     return ESP_OK;

@@ -36,7 +36,7 @@ std::string CBMImageStream::decodeType(uint8_t file_type, bool show_hidden)
 //     return "";
 // };
 
-bool CBMImageStream::open(MFileMode mode) {
+bool CBMImageStream::open() {
     // return true if we were able to read the image and confirmed it is valid.
     // it's up to you in what state the stream will be after open. Could be either:
     // 1. EOF-like state (0 available) and the state will be cleared only after succesful seekNextEntry or seekPath
@@ -61,6 +61,9 @@ size_t CBMImageStream::position() {
     return m_position; // return position within "seeked" file, not the D64 image!
 };
 
+size_t CBMImageStream::error() {
+    return m_error; // return position within "seeked" file, not the D64 image!
+};
 
 size_t CBMImageStream::available() {
     // return bytes available in currently "seeked" file

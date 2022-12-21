@@ -9,7 +9,7 @@
 //     return false;
 // }
 
-// MStream* WebDAVFile::meatStream(MFileMode mode) {
+// MStream* WebDAVFile::meatStream() {
 //     // has to return OPENED stream
 //     Debug_printv("[%s]", url.c_str());
 //     MStream* istream = new WebDAVIStream(url);
@@ -120,7 +120,7 @@
 //     m_http.close();
 // }
 
-// bool WebDAVOStream::open(MFileMode mode) {
+// bool WebDAVOStream::open() {
 //     // we'll ad a lambda that will allow adding headers
 //     // m_http.addHeader("Content-Type", "application/x-www-form-urlencoded");
 //     mstr::replaceAll(url, "HTTP:", "http:");
@@ -209,7 +209,7 @@
 //     m_http.close();
 // }
 
-// bool WebDAVIStream::open(MFileMode mode) {
+// bool WebDAVIStream::open() {
 //     //mstr::replaceAll(url, "HTTP:", "http:");
 //     bool initOk = m_http.begin( url );
 //     Debug_printv("input %s: someRc=%d", url.c_str(), initOk);

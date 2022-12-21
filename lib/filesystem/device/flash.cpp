@@ -61,12 +61,12 @@ MStream* FlashFile::createIStream(std::shared_ptr<MStream> is) {
     return is.get(); // we don't have to process this stream in any way, just return the original stream
 }
 
-MStream* FlashFile::meatStream(MFileMode mode)
+MStream* FlashFile::meatStream()
 {
     std::string full_path = basepath + path;
     MStream* istream = new FlashIStream(full_path);
     //Debug_printv("FlashFile::meatStream() 3, not null=%d", istream != nullptr);
-    istream->open(mode);   
+    istream->open();   
     //Debug_printv("FlashFile::meatStream() 4");
     return istream;
 }
@@ -260,19 +260,14 @@ size_t FlashIStream::write(const uint8_t *buf, size_t size) {
  ********************************************************/
 
 
-bool FlashIStream::open(MFileMode mode) {
+bool FlashIStream::open() {
     if(isOpen())
         return true;
 
     //Debug_printv("IStream: trying to open flash fs, calling isOpen");
 
     //Debug_printv("IStream: wasn't open, calling obtain");
-    if(mode == READ)
-        handle->obtain(localPath, "r");
-    else if(mode == WRITE)
-        handle->obtain(localPath, "???");
-    else if(mode == APPEND)
-        handle->obtain(localPath, "???");
+    handle->obtain(localPath, "r");
 
     if(isOpen()) {
         //Debug_printv("IStream: past obtain");
@@ -322,6 +317,10 @@ size_t FlashIStream::available() {
 size_t FlashIStream::position() {
     if(!isOpen()) return 0;
     return ftell(handle->file_h);
+};
+
+size_t FlashIStream::error() {
+    return 0;
 };
 
 bool FlashIStream::seek(size_t pos) {

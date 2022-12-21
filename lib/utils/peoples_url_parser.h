@@ -66,7 +66,7 @@ private:
         auto byAtSign = mstr::split(pastTheColon,'@', 2);
 
         if(byAtSign.size()==1) {
-            // just addres, port, path
+            // just address, port, path
             processAuthorityPath(mstr::drop(byAtSign[0],2));
         }
         else {
@@ -131,13 +131,20 @@ public:
         if ( port.size() )
             root += ':' + port;
 
+        //Debug_printv("root[%s]", root.c_str());
         return root;
     }
 
     std::string base(void)
     {
         // set base URL
-        return root() + path;
+        //Debug_printv("base[%s]", (root() + "/" + path).c_str());
+        if ( !mstr::startsWith(path, "/") )
+            path = "/" + path;
+
+        cleanPath();
+
+        return root() + path ;
     }
 
     std::string pathToFile(void)
@@ -152,7 +159,9 @@ public:
     {
         // set full URL
         url = base();
-        url += name;
+        //Debug_printv("url[%s]", url.c_str());
+        // url += name;
+        // Debug_printv("url[%s]", url.c_str());
         // if ( query.size() )
         //     url += '?' + query;
         // if ( fragment.size() )
@@ -209,7 +218,9 @@ public:
         // Clean things up before exiting
         cleanPath();
         fillInNameExt();
-        //rebuildUrl();
+        rebuildUrl();
+
+        //dump();
 
         return;        
     }

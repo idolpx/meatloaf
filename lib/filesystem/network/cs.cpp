@@ -133,7 +133,7 @@ void CServerIStream::close() {
     m_isOpen = false;
 };
 
-bool CServerIStream::open(MFileMode mode) {
+bool CServerIStream::open() {
     auto file = std::make_unique<CServerFile>(url);
     m_isOpen = false;
 
@@ -179,6 +179,10 @@ size_t CServerIStream::size() {
 
 size_t CServerIStream::position() {
     return m_position;
+};
+
+size_t CServerIStream::error() {
+    return 0;
 };
 
 size_t CServerIStream::write(const uint8_t *buf, size_t size) {
@@ -331,7 +335,7 @@ bool CServerFile::isDirectory() {
     return false;
 };
 
-MStream* CServerFile::meatStream(MFileMode mode) {
+MStream* CServerFile::meatStream() {
     MStream* istream = new CServerIStream(url);
     istream->open();   
     return istream;

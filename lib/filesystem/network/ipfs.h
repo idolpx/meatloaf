@@ -51,8 +51,8 @@
 //
 
 
-#ifndef MEATFILESYSTEM_NETWORK_IPFS
-#define MEATFILESYSTEM_NETWORK_IPFS
+#ifndef MEATLOAF_SCHEME_IPFS
+#define MEATLOAF_SCHEME_IPFS
 
 #include "network/http.h"
 
@@ -74,7 +74,7 @@ public:
     };
     ~IPFSFile() {};
 
-    MStream* meatStream(MFileMode mode = READ) override; // file on IPFS server = standard HTTP file available via GET
+    MStream* meatStream() override; // file on IPFS server = standard HTTP file available via GET
 };
 
 
@@ -88,7 +88,7 @@ public:
     IPFSIStream(std::string path) : HttpIStream(path) {};
     ~IPFSIStream() {};
 
-    bool open(MFileMode mode = READ) override;
+    bool open() override;
     bool seek(size_t pos) override;
 };
 
@@ -113,4 +113,4 @@ public:
     IPFSFileSystem(): MFileSystem("ipfs") {};
 };
 
-#endif /* MEATFILESYSTEM_NETWORK_IPFS */
+#endif // MEATLOAF_SCHEME_IPFS

@@ -27,7 +27,9 @@
 
 #include "protocol/cbmstandardserial.h"
 #include "protocol/jiffydos.h"
+#ifdef PARALLEL_BUS
 #include "protocol/dolphindos.h"
+#endif
 
 #include "../../include/debug.h"
 
@@ -111,7 +113,7 @@ class iecDevice
 
         // Named Channel functions
         std::shared_ptr<MStream> currentStream;
-        bool registerStream (int mode, std::string m_filename);
+        bool registerStream (int mode);
         std::shared_ptr<MStream> retrieveStream ( void );
         bool closeStream ( bool close_all = false );
 
@@ -181,9 +183,11 @@ class iecBus
         //std::unique_ptr<CBMStandardSerial> protocol = CBMStandardSerial();
         //CBMStandardSerial protocol;
 
-        JiffyDOS protocolJiffyDOS;
-        DolphinDOS protocolDolphinDOS;
         CBMStandardSerial protocolCBMStandardSerial;
+        JiffyDOS protocolJiffyDOS;
+#ifdef PARALLEL_BUS
+        DolphinDOS protocolDolphinDOS;
+#endif
 
         CBMStandardSerial *protocol = static_cast<CBMStandardSerial*>(&protocolCBMStandardSerial);
 
@@ -191,13 +195,20 @@ class iecBus
             uint16_t flags_cp = protocol->flags;
             if ( active_protocol == PROTOCOL_JIFFYDOS ) {
                 protocol = static_cast<CBMStandardSerial*>(&protocolJiffyDOS);
-            } else if ( active_protocol == PROTOCOL_DOLPHINDOS ) {
+            } 
+#ifdef PARALLEL_BUS
+            else if ( active_protocol == PROTOCOL_DOLPHINDOS ) 
+            {
                 protocol = static_cast<CBMStandardSerial*>(&protocolDolphinDOS);
-            } else {
+            }
+#endif
+            else 
+            {
                 protocol = static_cast<CBMStandardSerial*>(&protocolCBMStandardSerial);
+                PARALLEL.active = false;
             }
             protocol->flags = flags_cp;
-            Debug_printv("protocol[%d]", active_protocol);
+            //Debug_printv("protocol[%d]", active_protocol);
         }
 
         iecBus ( void );
@@ -232,6 +243,9 @@ class iecBus
 
         // Recieves a byte
         int16_t receive();
+
+        // Bus Enable
+        bool enabled = false;  // disabled by default so we can auto configure device ids
 
         // Enabled Device Bit Mask
         uint32_t enabledDevices;

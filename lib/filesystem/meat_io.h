@@ -1,5 +1,5 @@
-#ifndef MEATLIB_FILESYSTEM_MEAT_IO
-#define MEATLIB_FILESYSTEM_MEAT_IO
+#ifndef MEATLOAF_FILE
+#define MEATLOAF_FILE
 
 #include <memory>
 #include <string>
@@ -62,7 +62,7 @@ public:
     }
 
     // has to return OPENED stream
-    virtual MStream* meatStream(MFileMode mode = READ);
+    virtual MStream* meatStream();
 
     virtual MFile* cd(std::string newDir);
     virtual bool isDirectory() = 0;
@@ -200,4 +200,4 @@ namespace Meat {
 
 }
 
-#endif /* MEATLIB_FILESYSTEM_MEAT_IO */
+#endif // MEATLOAF_FILE

@@ -304,7 +304,7 @@ bool MFile::operator!=(nullptr_t ptr) {
     return m_isNull;
 }
 
-MStream* MFile::meatStream(MFileMode mode) {
+MStream* MFile::meatStream() {
     // has to return OPENED stream
     std::shared_ptr<MStream> containerStream(streamFile->meatStream()); // get its base stream, i.e. zip raw file contents
     Debug_printv("containerStream isRandomAccess[%d] isBrowsable[%d]", containerStream->isRandomAccess(), containerStream->isBrowsable());
@@ -392,7 +392,7 @@ MFile* MFile::localRoot(std::string plus) {
 
 MFile* MFile::cd(std::string newDir) {
 
-    // Debug_printv("cd requested: [%s]", newDir.c_str());
+    Debug_printv("cd requested: [%s]", newDir.c_str());
 
     // OK to clarify - coming here there should be ONLY path or magicSymbol-path combo!
     // NO "cd:xxxxx", no "/cd:xxxxx" ALLOWED here! ******************
@@ -470,11 +470,12 @@ MFile* MFile::cd(std::string newDir) {
         return MFSOwner::File(newDir);
     }
     else {
-        // Debug_printv("> url[%s] newDir[%s]", url.c_str(), newDir.c_str());
 
         // Add new directory to path
         if ( !mstr::endsWith(url, "/") && newDir.size() )
             url.push_back('/');
+
+        Debug_printv("> url[%s] newDir[%s]", url.c_str(), newDir.c_str());
 
         return MFSOwner::File(url + newDir);
     }

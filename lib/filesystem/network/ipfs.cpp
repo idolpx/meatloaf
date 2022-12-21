@@ -4,7 +4,7 @@
 #include "../../../include/debug.h"
 
 
-MStream* IPFSFile::meatStream(MFileMode mode) {
+MStream* IPFSFile::meatStream() {
     // has to return OPENED stream
     //Debug_printv("[%s]", url.c_str());
     MStream* istream = new IPFSIStream(url);
@@ -13,7 +13,7 @@ MStream* IPFSFile::meatStream(MFileMode mode) {
 }; 
 
 
-bool IPFSIStream::open(MFileMode mode) {
+bool IPFSIStream::open() {
     return m_http.GET(url);
 };
 

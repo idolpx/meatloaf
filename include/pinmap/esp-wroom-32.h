@@ -1,6 +1,7 @@
-/* FujiNet Hardware Pin Mapping */
 #ifndef PINMAP_WROOM_32_H
 #define PINMAP_WROOM_32_H
+
+#ifdef PINMAP_WROOM
 
 /* SD Card */
 // pins 12-15 are used to interface with the JTAG debugger
@@ -85,7 +86,6 @@
 // #define PIN_IEC_DATA_OUT    GPIO_NUM_21      // SIO 3  - DI   - Data Input
 // #endif
 
-// LOLIN D32 PRO 
 #define PIN_IEC_RESET       GPIO_NUM_34
 #define PIN_IEC_ATN         GPIO_NUM_32
 #define PIN_IEC_CLK_IN		GPIO_NUM_23
@@ -107,4 +107,5 @@
 //#define GPIOX_SPEED       400   // PCF8575 - 400Khz
 #define GPIOX_SPEED       1000  // PCA9673 - 1000Khz / 1Mhz
 
+#endif // PINMAP_WROOM
 #endif // PINMAP_WROOM_32_H

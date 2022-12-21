@@ -32,7 +32,7 @@ public:
         client.close();        
     }
 
-    bool open(MFileMode mode = READ) override {
+    bool open() override {
         if(m_isServer) {
             server.listen(port);
             client = server.accept();
@@ -132,7 +132,7 @@ public:
     WSFile(std::string path): MFile(path) {};
 
     bool isDirectory() override { return false; }
-    MStream* meatStream(MFileMode mode = READ) override {
+    MStream* meatStream() override {
         // input stream = SERVER socket
         return new CSIOStream(this, true);
     }; 

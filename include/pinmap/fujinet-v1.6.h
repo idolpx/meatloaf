@@ -2,6 +2,7 @@
 #ifndef PINMAP_FUJINET_V1_6_H
 #define PINMAP_FUJINET_V1_6_H
 
+#ifdef PINMAP_FN_16
 /* SD Card */
 // pins 12-15 are used to interface with the JTAG debugger
 // so leave them alone if we're using JTAG
@@ -85,4 +86,18 @@
 #endif
 
 
+/* Modem/Parallel Switch */
+#define PIN_MDMPAR_SW1       2  // High = Modem enabled
+#define PIN_MDMPAR_SW2       15 // High = UP9600 enabled
+
+/* I2C GPIO Expander */
+#define PIN_GPIOX_SDA         GPIO_NUM_21
+#define PIN_GPIOX_SCL         GPIO_NUM_22
+#define PIN_GPIOX_INT         GPIO_NUM_34
+//#define GPIOX_ADDRESS     0x20  // PCF8575
+#define GPIOX_ADDRESS     0x24  // PCA9673
+//#define GPIOX_SPEED       400   // PCF8575 - 400Khz
+#define GPIOX_SPEED       1000  // PCA9673 - 1000Khz / 1Mhz
+
+#endif // PINMAP_FN_16
 #endif // PINMAP_FUJINET_V1_6_H

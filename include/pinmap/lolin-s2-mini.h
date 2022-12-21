@@ -1,5 +1,8 @@
+
 #ifndef PINMAP_LOLIN_S2_MINI_H
 #define PINMAP_LOLIN_S2_MINI_H
+
+#ifdef PINMAP_LOLIN_S2_MINI
 
 /* SD Card */
 // pins 12-15 are used to interface with the JTAG debugger
@@ -80,7 +83,6 @@
 // #define PIN_IEC_DATA_OUT    GPIO_NUM_21      // SIO 3  - DI   - Data Input
 // #endif
 
-// LOLIN D32 PRO 
 #define PIN_IEC_RESET       GPIO_NUM_16
 #define PIN_IEC_ATN         GPIO_NUM_17
 #define PIN_IEC_CLK_IN		GPIO_NUM_18
@@ -103,5 +105,5 @@
 //#define GPIOX_SPEED       400   // PCF8575 - 400Khz
 #define GPIOX_SPEED       1000  // PCA9673 - 1000Khz / 1Mhz
 
-
+#endif // PINMAP_LOLIN_S2_MINI
 #endif // PINMAP_LOLIN_S2_MINI_H

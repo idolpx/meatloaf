@@ -1,4 +1,8 @@
 /* FujiApple Rev0 for C64 Hardware Pin Mapping */
+#ifndef PINMAP_FUJIAPPLE_REV0_H
+#define PINMAP_FUJIAPPLE_REV0_H
+
+#ifdef PINMAP_A2_REV0
 
 /* SD Card */
 #define PIN_CARD_DETECT 12 // fnSystem.h
@@ -70,3 +74,6 @@
 #define GPIOX_ADDRESS     0x24  // PCA9673
 //#define GPIOX_SPEED       400   // PCF8575 - 400Khz
 #define GPIOX_SPEED       1000  // PCA9673 - 1000Khz / 1Mhz
+
+#endif // PINMAP_A2_REV0
+#endif // PINMAP_FUJIAPPLE_REV0_H

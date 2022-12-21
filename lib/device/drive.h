@@ -18,8 +18,8 @@
 // https://ilesj.wordpress.com/2014/05/14/1541-why-so-complicated/
 // https://en.wikipedia.org/wiki/Fast_loader
 
-#ifndef MEATLIB_DEVICE_DRIVE
-#define MEATLIB_DEVICE_DRIVE
+#ifndef DEVICE_DRIVE_H
+#define DEVICE_DRIVE_H
 
 #include "../../include/global_defines.h"
 #include "../../include/debug.h"
@@ -105,4 +105,4 @@ private:
 
 extern iecDrive drive;
 
-#endif /* MEATLIB_DEVICE_DRIVE */
+#endif // DEVICE_DRIVE_H

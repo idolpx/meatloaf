@@ -4,7 +4,7 @@
 // #include "../../../include/debug.h"
 
 
-// MStream* MLFile::meatStream(MFileMode mode) {
+// MStream* MLFile::meatStream() {
 //     // has to return OPENED stream
 //     //Debug_printv("[%s]", url.c_str());
 //     MStream* istream = new MLIStream(url);
@@ -13,7 +13,7 @@
 // }; 
 
 
-// bool MLIStream::open(MFileMode mode) {
+// bool MLIStream::open() {
 //     PeoplesUrlParser urlParser;
 //     urlParser.parseUrl(url);
 

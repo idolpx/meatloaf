@@ -14,7 +14,7 @@ namespace mstr {
     bool endsWith(std::string s, const char *pattern, bool case_sensitive = true);
     bool equals(std::string &s1, std::string &s2, bool case_sensitive = true);
     bool equals(std::string &s1, char* s2, bool case_sensitive = true);
-    bool equals(const char* s1, char *s2, bool case_sensitive);
+    bool equals(const char* s1, const char *s2, bool case_sensitive);
     bool contains(std::string &s1, char *s2, bool case_sensitive = true);
     bool compare(std::string &s1, std::string &s2, bool case_sensitive = true); // s1 is Wildcard string, s2 is potential match
     std::vector<std::string> split(std::string toSplit, char ch, int limit = 9999);
@@ -36,6 +36,9 @@ namespace mstr {
     void A02Space(std::string &s);
     std::string format(const char *format, ...);
     std::string formatBytes(uint64_t value);
+    void cd(std::string &path, std::string newDir);
+    std::string parent(std::string path, std::string plus = "");
+    std::string localParent(std::string path, std::string plus);
 }
 
 #endif

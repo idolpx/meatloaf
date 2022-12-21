@@ -61,7 +61,7 @@ public:
 
     //MFile* cd(std::string newDir);
     bool isDirectory() override;
-    MStream* meatStream(MFileMode mode = READ) override ; // has to return OPENED stream
+    MStream* meatStream() override ; // has to return OPENED stream
     time_t getLastWrite() override ;
     time_t getCreationTime() override ;
     bool rewindDirectory() override ;
@@ -130,12 +130,13 @@ public:
     size_t available() override;
     size_t size() override;    
     size_t position() override;
+    size_t error() override;
 
     virtual bool seek(size_t pos) override;
     virtual bool seek(size_t pos, int mode) override;    
 
     void close() override;
-    bool open(MFileMode mode = READ) override;
+    bool open() override;
 
     // MStream methods
     //uint8_t read() override;

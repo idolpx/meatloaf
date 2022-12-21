@@ -22,7 +22,7 @@
 //     MLFile(std::string path): HttpFile(path) {};
 //     ~MLFile() {};
 
-//     MStream* meatStream(MFileMode mode = READ) override; // file on ML server = standard HTTP file available via GET
+//     MStream* meatStream() override; // file on ML server = standard HTTP file available via GET
 // };
 
 
@@ -36,7 +36,7 @@
 //     MLIStream(std::string path) : HttpIStream(path) {};
 //     ~MLIStream() {};
 
-//     bool open(MFileMode mode = READ) override;
+//     bool open() override;
 // };
 
 
@@ -47,14 +47,18 @@
 class MLFileSystem: public MFileSystem
 {
     MFile* getFile(std::string path) override {
-        // Debug_printv("MLFileSystem::getFile(%s)", path.c_str());
+        if ( path.size() == 0 )
+            return nullptr;
+
+        //Debug_printv("MLFileSystem::getFile(%s)", path.c_str());
         PeoplesUrlParser urlParser;
         urlParser.parseUrl(path);
 
+        //Debug_printv("url[%s]", urlParser.name.c_str());
         std::string ml_url = "https://api.meatloaf.cc/?" + urlParser.name;
-        Debug_printv("ml_url[%s]", ml_url.c_str());
+        //Debug_printv("ml_url[%s]", ml_url.c_str());
         
-        Debug_printv("url[%s]", ml_url.c_str());
+        //Debug_printv("url[%s]", ml_url.c_str());
 
         return new HttpFile(ml_url);
     }

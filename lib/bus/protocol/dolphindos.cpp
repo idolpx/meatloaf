@@ -15,6 +15,8 @@
 // You should have received a copy of the GNU General Public License
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
+#ifdef PARALLEL_BUS
+
 #include "dolphindos.h"
 
 #include "../../../include/debug.h"
@@ -44,55 +46,15 @@ int16_t  DolphinDOS::receiveByte ()
         return -1; // return error because timeout
     }
 
-    pull ( PIN_IEC_DATA_OUT );
+    wait( 65 );
+    release ( PIN_IEC_DATA_OUT );
+    wait( 65 ); // Wait for 
 
-    // Either  the  talker  will pull the
-    // Clock line back to true in less than 200 microseconds - usually within 60 microseconds - or it
-    // will  do  nothing.    The  listener  should  be  watching,  and  if  200  microseconds  pass
-    // without  the Clock line going to true, it has a special task to perform: note EOI.
-
-    // pull ( PIN_IEC_SRQ );
-    if ( timeoutWait ( PIN_IEC_CLK_IN, PULLED, 86, false ) >= 86 )
-    {
-        // INTERMISSION: EOI
-        // If the Ready for Data signal isn't acknowledged by the talker within 200 microseconds, the
-        // listener knows  that  the  talker  is  trying  to  signal  EOI.    EOI,  which  formally
-        // stands  for  "End  of  Indicator," means  "this  character  will  be  the  last  one."
-        // If  it's  a  sequential  disk  file,  don't  ask  for  more:  there will be no more.  If it's
-        // a relative record, that's the end of the record.  The character itself will still be coming, but
-        // the listener should note: here comes the last character. So if the listener sees the 200 microsecond
-        // time-out,  it  must  signal  "OK,  I  noticed  the  EOI"  back  to  the  talker,    It  does  this
-        // by pulling  the  Data  line  true  for  at  least  60  microseconds,  and  then  releasing  it.
-        // The  talker  will  then revert to transmitting the character in the usual way; within 60 microseconds
-        // it will pull the Clock line  true,  and  transmission  will  continue.  At  this point,  the  Clock
-        // line  is  true  whether  or  not  we have gone through the EOI sequence; we're back to a common
-        // transmission sequence.
-
-        // Debug_printv("EOI!");
-
-        flags or_eq EOI_RECVD;
-
-        // Acknowledge by pull down data more than 60us
-        pull ( PIN_IEC_DATA_OUT );
-        if ( !wait ( 57 ) ) return -1;
-        release ( PIN_IEC_DATA_OUT );
-
-        // but still wait for CLK to be PULLED
-        // Is this an empty stream?
-        if ( timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMING_EMPTY ) >= TIMING_EMPTY )
-        {
-            Debug_printv ( "empty stream signaled" );
-            flags or_eq EMPTY_STREAM;
-            return -1; // return error because empty stream
-        }
-    }
-    // release ( PIN_IEC_SRQ );
 
     // STEP 2: RECEIVING THE BYTE
     uint8_t data = PARALLEL.readByte();
-    PARALLEL.handShake();
 
-    // STEP 4: Acknowledge byte received
+    // If clock is released this was last byte
     pull ( PIN_IEC_DATA_OUT );
 
     return data;
@@ -266,3 +228,5 @@ bool DolphinDOS::sendByte ( uint8_t data, bool signalEOI )
 
     return true;
 } // sendByte
+
+#endif // PARALLEL_BUS

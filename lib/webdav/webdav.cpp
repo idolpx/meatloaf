@@ -1,5 +1,7 @@
 #include "webdav.h"
 
+#include "../../include/debug.h"
+
 #include "freertos/FreeRTOS.h"
 #include "esp_log.h"
 #include <esp_http_server.h>
@@ -122,5 +124,12 @@ void http_server_start(void)
     config.max_uri_handlers = 32;
 
     if (httpd_start(&server, &config) == ESP_OK)
+    {
         webdav_register(server, "/sd", "/dav");
+        Debug_printv("WebDAV Server Started!");
+    }
+    else
+    {
+        Debug_printv("WebDAV Server FAILED to start!");
+    }
 }

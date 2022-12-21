@@ -8,8 +8,6 @@
 #include <esp_http_client.h>
 #include <functional>
 
-#include "device_db.h"
-
 #define HTTP_BLOCK_SIZE 256
 
 class MeatHttpClient {
@@ -23,6 +21,14 @@ class MeatHttpClient {
     };
 
 public:
+
+    MeatHttpClient() {
+
+    }
+    ~MeatHttpClient() {
+        close();
+    }
+
     bool GET(std::string url);
     bool POST(std::string url);
     bool PUT(std::string url);
@@ -40,7 +46,9 @@ public:
     size_t m_length = 0;
     size_t m_bytesAvailable = 0;
     size_t m_position = 0;
+    size_t m_error = 0;
     bool m_isWebDAV = false;
+    bool m_isDirectory = false;
     bool isText = false;
     bool isFriendlySkipper = false;
     bool wasRedirected = false;
@@ -55,7 +63,7 @@ public:
 
 
 class HttpFile: public MFile {
-    MeatHttpClient* formHeader();
+    MeatHttpClient* fromHeader();
     MeatHttpClient* client = nullptr;
 
 public:
@@ -64,7 +72,6 @@ public:
     };
     HttpFile(std::string path): MFile(path) { 
         // Debug_printv("constructing http file from url [%s]", url.c_str());
-       device_config.basepath( path );
     };
     HttpFile(std::string path, std::string filename): MFile(path) {};
     ~HttpFile() override {
@@ -72,7 +79,7 @@ public:
             delete client;
     }
     bool isDirectory() override;
-    MStream* meatStream(MFileMode mode = READ) override ; // has to return OPENED streamm
+    MStream* meatStream() override ; // has to return OPENED streamm
     time_t getLastWrite() override ;
     time_t getCreationTime() override ;
     bool rewindDirectory() override ;
@@ -106,11 +113,12 @@ public:
     size_t size() override;
     size_t available() override;     
     size_t position() override;
+    size_t error() override;
 
     virtual bool seek(size_t pos);
 
     void close() override;
-    bool open(MFileMode mode = READ) override;
+    bool open() override;
 
     // MStream methods
     size_t read(uint8_t* buf, size_t size) override;

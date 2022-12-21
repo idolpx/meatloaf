@@ -37,24 +37,28 @@ bool iecHost::deviceExists(uint8_t deviceID)
 
     Debug_printf("device [%d] ", deviceID);
 
+    IEC.enabled = false; // Disable IEC Service loop
+
     // Get Bus Attention
     protocol->pull(PIN_IEC_ATN);
     protocol->pull(PIN_IEC_CLK_OUT);
-    //release(PIN_IEC_DATA_OUT);
-    //delayMicroseconds(TIMING_ATN_PREDELAY);
+    protocol->release(PIN_IEC_DATA_OUT);
+    delayMicroseconds(5);
 
     // Wait for listeners to be ready
     if(protocol->timeoutWait(PIN_IEC_DATA_IN, PULLED) == TIMED_OUT)
     {
-        Debug_println(" inactive\nBus empty. Exiting.");
+        Debug_println(" inactive - bus empty");
+        device_status = false;
     }
     else
     {
         // Send Listen Command & Device ID
         Debug_printf( "%.2X", (IEC_LISTEN & deviceID));
         send( IEC_LISTEN & deviceID );
-        delayMicroseconds(TIMING_Tv);
+        delayMicroseconds(TIMING_Tbb);
 
+        // If Data line is being pulled the device id is active on the bus
         if ( protocol->status( PIN_IEC_DATA_IN ) )
         {
             device_status = true;
@@ -65,17 +69,17 @@ bool iecHost::deviceExists(uint8_t deviceID)
             device_status = false;
             Debug_println("inactive");
         }
-        delayMicroseconds(TIMING_Tv);
 
         // Send UnListen
         send( IEC_UNLISTEN );
-        delayMicroseconds(TIMING_Tv);
+        delayMicroseconds(TIMING_Tbb);
     }
 
     // Release ATN and Clock
     protocol->release(PIN_IEC_ATN);
     protocol->release(PIN_IEC_CLK_OUT);
-    delayMicroseconds(TIMING_Tv);
+
+    IEC.enabled = true; // Re-enable IEC Service loop
 
     return device_status;
 }
