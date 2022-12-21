@@ -115,7 +115,7 @@ void parallelBus::setup ()
 
     // Start task
     //xTaskCreate(ml_parallel_intr_task, "ml_parallel_intr_task", 2048, NULL, 10, NULL);
-    xTaskCreatePinnedToCore(ml_parallel_intr_task, "ml_parallel_intr_task", 2048, NULL, 10, NULL, 0);
+    xTaskCreatePinnedToCore(ml_parallel_intr_task, "ml_parallel_intr_task", 4096, NULL, 10, NULL, 0);
 
     // Setup interrupt for paralellel port
     gpio_config_t io_conf = {
@@ -150,7 +150,15 @@ void parallelBus::reset()
     expander.digitalWrite( FLAG2, HIGH);
 
     //Debug_printv("userport data");
-    expander.portMode( USERPORT_DATA, GPIOX_MODE_INPUT );
+    setMode( MODE_RECEIVE );
+}
+
+void setMode(parallel_mode_t mode)
+{
+    if ( mode == MODE_RECEIVE )
+        expander.portMode( USERPORT_DATA, GPIOX_MODE_INPUT );
+    else
+        expander.portMode( USERPORT_DATA, GPIOX_MODE_OUTPUT );
 }
 
 
