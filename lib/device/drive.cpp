@@ -125,6 +125,9 @@ device_state_t iecDrive::process ( void )
         {
             // Send data
             Debug_printv ( "[Send data]" );
+			if ( !m_openState )
+				m_openState = O_FILE;
+
             handleTalk ( this->data.channel );
             // if ( this->data.channel < 2 )
 			// {
@@ -613,7 +616,7 @@ void iecDrive::handleListenData()
 
 void iecDrive::handleTalk(uint8_t chan)
 {
-	//Debug_printv("channel[%d] openState[%d]", chan, m_openState);
+	Debug_printv("channel[%d] openState[%d]", chan, m_openState);
 
 	switch (m_openState)
 	{
@@ -1043,10 +1046,10 @@ bool iecDrive::sendFile()
 			Debug_printv( "load_address[$%.4X] sys_address[%d]", load_address, sys_address );
 
 			// Get SYSLINE
-
-			// Get next byte
-			success_rx = istream->read(&bl, 1);
 		}
+
+		// Get next byte
+		success_rx = istream->read(&bl, 1);
 
 		Debug_printf("sendFile: [$%.4X]\r\n=================================\r\n", load_address);
 		while( avail >= 0 && success_rx && !istream->error() )
@@ -1103,7 +1106,7 @@ bool iecDrive::sendFile()
 				Debug_printv("ATN pulled while sending. i[%d]", i);
 
 				// Save file pointer position
-				istream->seek(istream->position() - 1);
+				istream->seek(istream->position() - 2);
 				success_rx = true;
 				break;
 			}
