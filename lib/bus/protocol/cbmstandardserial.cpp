@@ -107,7 +107,8 @@ int16_t  CBMStandardSerial::receiveByte ()
 
     // STEP 3: RECEIVING THE BITS
     uint8_t data = receiveBits();
-
+    if ( flags bitand ERROR)
+        return -1;
 
     // STEP 4: FRAME HANDSHAKE
     // After the eighth bit has been sent, it's the listener's turn to acknowledge.  At this moment, the Clock line  is  true

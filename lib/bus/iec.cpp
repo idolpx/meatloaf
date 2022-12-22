@@ -763,6 +763,8 @@ int16_t iecBus::receive ()
 #ifdef DATA_STREAM
     if ( !(protocol->flags bitand ERROR) )
         Debug_printf ( "%.2X ", data );
+    else
+        senderTimeout();
 #endif
 
     return data;
