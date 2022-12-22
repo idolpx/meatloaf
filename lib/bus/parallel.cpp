@@ -54,15 +54,15 @@ void parallelBus::service()
     //Debug_printv("bus_state[%d]", IEC.bus_state);
     if ( IEC.bus_state > BUS_OFFLINE ) // Is C64 is powered on?
     {
-
         // Update flags and data
         PARALLEL.readByte();
+        Debug_printv("receive <<< " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
 
         // If PC2 is set then parallel is active and a byte is ready to be read!
         if ( PARALLEL.status( PC2 ) )
         {
             PARALLEL.bus_state = PARALLEL_PROCESS;
-            Debug_printv("receive <<< " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
+            //Debug_printv("receive <<< " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
         }
 
         // // Set RECEIVE/SEND mode   

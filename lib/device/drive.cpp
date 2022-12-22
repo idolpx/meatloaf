@@ -1068,6 +1068,8 @@ bool iecDrive::sendFile()
 				success_tx = IEC.sendEOI(bl); // indicate end of file.
 				if ( !success_tx )
 					Debug_printv("tx fail");
+				
+				break;
 			}
 			else
 			{
@@ -1098,15 +1100,11 @@ bool iecDrive::sendFile()
 			// Exit if ATN is PULLED while sending
 			if ( IEC.protocol->flags bitand ATN_PULLED )
 			{
-				//Debug_printv("ATN pulled while sending. i[%d]", i);
-				if ( IEC.data.channel > 1 )
-				{
-					// Save file pointer position
-					// streamUpdate( istream );
-					istream->seek(istream->position() - 1);
-					//setDeviceStatus( 74 );
-					success_rx = true;
-				}
+				Debug_printv("ATN pulled while sending. i[%d]", i);
+
+				// Save file pointer position
+				istream->seek(istream->position() - 1);
+				success_rx = true;
 				break;
 			}
 
@@ -1122,7 +1120,7 @@ bool iecDrive::sendFile()
 		}
 		Debug_printf("\r\n=================================\r\n%d bytes sent of %d [SYS%d]\r\n", i, avail, sys_address);
 
-		//Debug_printv("len[%d] avail[%d] success[%d]", len, avail, success);		
+		//Debug_printv("len[%d] avail[%d] success_rx[%d]", len, avail, success_rx);		
 	}
 
 
