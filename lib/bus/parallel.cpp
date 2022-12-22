@@ -28,41 +28,7 @@ static void IRAM_ATTR ml_parallel_isr_handler(void* arg)
     // Generic default interrupt handler
     uint32_t gpio_num = (uint32_t) arg;
     xQueueSendFromISR(ml_parallel_evt_queue, &gpio_num, NULL);
-
-    //parallelBus *b = (parallelBus *)arg;
-
-    // Go to listener mode and get command
-    //b->bus_state = PARALLEL_ACTIVE;
 }
-
-// static void ml_parallel_intr_task(void* arg)
-// {
-//     while ( true ) 
-//     {
-//         if ( PARALLEL.enabled && PARALLEL.bus_state == PARALLEL_ACTIVE )
-//         {
-//             //PARALLEL.service();
-//         }
-//         taskYIELD();
-//     }
-// }
-
-// void parallelBus::service()
-// {
-//     Debug_printv( "User Port Data Interrupt Received!" );
-
-//     // Update flags and data
-//     PARALLEL.readByte();
-
-//     // If PC2 is set then parallel is active and a byte is ready to be read!
-//     if ( PARALLEL.status( PC2 ) )
-//     {
-//         PARALLEL.bus_state = PARALLEL_PROCESS;
-//         Debug_printv("receive <<< " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
-//     }
-
-//     PARALLEL.bus_state = PARALLEL_IDLE;
-// }
 
 static void ml_parallel_intr_task(void* arg)
 {
@@ -72,69 +38,75 @@ static void ml_parallel_intr_task(void* arg)
     {
         if(xQueueReceive(ml_parallel_evt_queue, &io_num, portMAX_DELAY)) 
         {
-            //Debug_printv("bus_state[%d]", IEC.bus_state);
-            if ( IEC.bus_state > BUS_OFFLINE ) // Is C64 is powered on?
-            {
-                Debug_printv( "User Port Data Interrupt Received!" );
-
-                // Update flags and data
-                PARALLEL.readByte();
-
-                // If PC2 is set then parallel is active and a byte is ready to be read!
-                if ( PARALLEL.status( PC2 ) )
-                {
-                    PARALLEL.bus_state = PARALLEL_PROCESS;
-                    Debug_printv("receive <<< " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
-                }
-
-
-                // // Set RECEIVE/SEND mode   
-                // if ( PARALLEL.status( PA2 ) )
-                // {
-                //     PARALLEL.mode = MODE_RECEIVE;
-                //     expander.portMode( USERPORT_DATA, GPIOX_MODE_INPUT );
-                //     PARALLEL.readByte();
-
-                //     Debug_printv("receive <<< " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
-
-                //     // // DolphinDOS Detection
-                //     // if ( PARALLEL.status( ATN ) )
-                //     // {
-                //     //     if ( IEC.data.secondary == IEC_OPEN || IEC.data.secondary == IEC_REOPEN )
-                //     //     {
-                //     //         IEC.protocol->flags xor_eq DOLPHIN_ACTIVE;
-                //     //         Debug_printv("dolphindos");
-                //     //     }
-                //     // }
-
-                //     // // WIC64
-                //     // if ( PARALLEL.status( PC2 ) )
-                //     // {
-                //     //     if ( PARALLEL.data == 0x57 ) // WiC64 commands start with 'W'
-                //     //     {
-                //     //         IEC.protocol->flags xor_eq WIC64_ACTIVE;
-                //     //         Debug_printv("wic64");                  
-                //     //     }
-                //     // }
-                // }
-                // else
-                // {
-                //     PARALLEL.mode = MODE_SEND;
-                //     expander.portMode( USERPORT_DATA, GPIOX_MODE_OUTPUT );
-
-                //     Debug_printv("send    >>> " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
-                // }
-            }
-            else
-            {
-                PARALLEL.reset();
-            }
+            PARALLEL.service();
         }
 
-        taskYIELD();
+        //taskYIELD();
     }
 }
 
+void parallelBus::service()
+{
+    PARALLEL.bus_state = PARALLEL_IDLE;
+
+    Debug_printv( "User Port Data Interrupt Received!" );
+
+    //Debug_printv("bus_state[%d]", IEC.bus_state);
+    if ( IEC.bus_state > BUS_OFFLINE ) // Is C64 is powered on?
+    {
+
+        // Update flags and data
+        PARALLEL.readByte();
+
+        // If PC2 is set then parallel is active and a byte is ready to be read!
+        if ( PARALLEL.status( PC2 ) )
+        {
+            PARALLEL.bus_state = PARALLEL_PROCESS;
+            Debug_printv("receive <<< " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
+        }
+
+        // // Set RECEIVE/SEND mode   
+        // if ( PARALLEL.status( PA2 ) )
+        // {
+        //     PARALLEL.mode = MODE_RECEIVE;
+        //     expander.portMode( USERPORT_DATA, GPIOX_MODE_INPUT );
+        //     PARALLEL.readByte();
+
+        //     Debug_printv("receive <<< " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
+
+        //     // // DolphinDOS Detection
+        //     // if ( PARALLEL.status( ATN ) )
+        //     // {
+        //     //     if ( IEC.data.secondary == IEC_OPEN || IEC.data.secondary == IEC_REOPEN )
+        //     //     {
+        //     //         IEC.protocol->flags xor_eq DOLPHIN_ACTIVE;
+        //     //         Debug_printv("dolphindos");
+        //     //     }
+        //     // }
+
+        //     // // WIC64
+        //     // if ( PARALLEL.status( PC2 ) )
+        //     // {
+        //     //     if ( PARALLEL.data == 0x57 ) // WiC64 commands start with 'W'
+        //     //     {
+        //     //         IEC.protocol->flags xor_eq WIC64_ACTIVE;
+        //     //         Debug_printv("wic64");                  
+        //     //     }
+        //     // }
+        // }
+        // else
+        // {
+        //     PARALLEL.mode = MODE_SEND;
+        //     expander.portMode( USERPORT_DATA, GPIOX_MODE_OUTPUT );
+
+        //     Debug_printv("send    >>> " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
+        // }
+    }
+    else
+    {
+        PARALLEL.reset();
+    }
+}
 
 void parallelBus::setup ()
 {
@@ -193,7 +165,6 @@ void parallelBus::setMode(parallel_mode_t mode)
         expander.portMode( USERPORT_DATA, GPIOX_MODE_OUTPUT );
 }
 
-
 void parallelBus::handShake()
 {
     // Signal received or sent
@@ -204,7 +175,6 @@ void parallelBus::handShake()
     // HIGH
     expander.digitalWrite( FLAG2, HIGH );
 }
-
 
 uint8_t parallelBus::readByte()
 {

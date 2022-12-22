@@ -453,19 +453,23 @@ void iecBus::service ( void )
 
 #ifdef PARALLEL_BUS
             // Switch to Parallel if detected
-            else if ( PARALLEL.bus_state == PARALLEL_PROCESS && ( command == IEC_LISTEN || command == IEC_TALK ) )
+            else if ( PARALLEL.bus_state == PARALLEL_PROCESS )
             {
-                active_protocol = PROTOCOL_DOLPHINDOS;
-                
-                PARALLEL.handShake();
+                if ( command == IEC_LISTEN || command == IEC_TALK )
+                    active_protocol = PROTOCOL_SPEEDDOS;
+                else if ( command == IEC_OPEN || command == IEC_REOPEN )
+                    active_protocol = PROTOCOL_DOLPHINDOS;
+
+                // Switch to parallel protocol
+                selectProtocol();
 
                 if ( this->data.primary == IEC_LISTEN )
                     PARALLEL.setMode( MODE_RECEIVE );
                 else
                     PARALLEL.setMode( MODE_SEND );
 
-                // Switch to parallel protocol
-                selectProtocol();
+                // Acknowledge parallel mode
+                PARALLEL.handShake();
             }
 #endif
         }
