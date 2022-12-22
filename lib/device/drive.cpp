@@ -125,9 +125,6 @@ device_state_t iecDrive::process ( void )
         {
             // Send data
             Debug_printv ( "[Send data]" );
-			if ( !m_openState )
-				m_openState = O_FILE;
-
             handleTalk ( this->data.channel );
             // if ( this->data.channel < 2 )
 			// {

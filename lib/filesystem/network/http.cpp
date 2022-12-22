@@ -266,7 +266,7 @@ bool MeatHttpClient::seek(size_t pos) {
 
          // 200 = range not supported! according to https://developer.mozilla.org/en-US/docs/Web/HTTP/Range_requests
         if(lastRC == 206){
-            Debug_printv("Seek succesful");
+            Debug_printv("Seek successful");
 
             m_position = pos;
             m_bytesAvailable = m_length-pos;
