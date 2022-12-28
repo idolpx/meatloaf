@@ -318,18 +318,6 @@ size_t MeatHttpClient::read(uint8_t* buf, size_t size) {
         auto bytesRead= esp_http_client_read(m_http, (char *)buf, size );
         
         if(bytesRead>0) {
-            // for(int i=0; i<bytesRead; i++) {
-            //     Debug_printf("%c", buf[i]);
-            // }
-
-            // Debug_printf("  ");
-
-            // for(int i=0; i<bytesRead; i++) {
-            //     Debug_printf("%.2X ", buf[i]);
-            // }
-
-            // Debug_printf("(%d bytes)\n", bytesRead);
-
             m_bytesAvailable -= bytesRead;
             m_position+=bytesRead;
         }
