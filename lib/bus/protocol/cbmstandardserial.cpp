@@ -544,7 +544,7 @@ int16_t CBMStandardSerial::timeoutWait ( uint8_t pin, bool target_status, size_t
     pull ( PIN_IEC_SRQ );
     while ( status ( pin ) != target_status )
     {
-        //delayMicroseconds(1);
+        delayMicroseconds(1);
         elapsed = current++ - start;
 
         if ( elapsed > wait && wait != FOREVER )
