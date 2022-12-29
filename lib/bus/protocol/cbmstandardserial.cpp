@@ -106,7 +106,9 @@ int16_t  CBMStandardSerial::receiveByte ()
 
 
     // STEP 3: RECEIVING THE BITS
+    //pull ( PIN_IEC_SRQ );
     uint8_t data = receiveBits();
+    //release ( PIN_IEC_SRQ );
     if ( flags bitand ERROR)
         return -1;
 
@@ -164,7 +166,7 @@ int16_t CBMStandardSerial::receiveBits ()
 
     uint8_t n = 0;
 
-    // pull ( PIN_IEC_SRQ );
+    //pull ( PIN_IEC_SRQ );
     for ( n = 0; n < 8; n++ )
     {
         data >>= 1;
@@ -172,24 +174,31 @@ int16_t CBMStandardSerial::receiveBits ()
         do
         {
             // wait for bit to be ready to read
-            bit_time = timeoutWait ( PIN_IEC_CLK_IN, RELEASED );
+            //pull ( PIN_IEC_SRQ );
+            bit_time = timeoutWait ( PIN_IEC_CLK_IN, RELEASED, TIMEOUT_DEFAULT, false );
+            //release ( PIN_IEC_SRQ );
 
             /* If there is a delay before the last bit, the controller uses JiffyDOS */
-            if ( n == 7 && bit_time >= TIMING_JIFFY_DETECT && data < 0x60 && flags bitand ATN_PULLED )
+            if ( n == 7 && bit_time >= TIMING_JIFFY_DETECT )
             {
-                uint8_t device = data & 0x1F;
-                if ( enabledDevices & ( 1 << device ) )
+                if ( status( PIN_IEC_ATN ) == PULLED && data < 0x60 )
                 {
-                    /* If it's for us, notify controller that we support Jiffy too */
-                    pull(PIN_IEC_DATA_OUT);
-                    delayMicroseconds(TIMING_JIFFY_ACK);
-                    release(PIN_IEC_DATA_OUT);
-                    flags xor_eq JIFFY_ACTIVE;
+                    flags or_eq ATN_PULLED;
+
+                    uint8_t device = data & 0x1F;
+                    if ( enabledDevices & ( 1 << device ) )
+                    {
+                        /* If it's for us, notify controller that we support Jiffy too */
+                        pull(PIN_IEC_DATA_OUT);
+                        delayMicroseconds(TIMING_JIFFY_ACK);
+                        release(PIN_IEC_DATA_OUT);
+                        flags xor_eq JIFFY_ACTIVE;
+                    }
                 }
             }
             else if ( bit_time == TIMED_OUT )
             {
-                Debug_printv ( "wait for bit to be ready to read, bit_time[%d]", bit_time );
+                Debug_printv ( "wait for bit to be ready to read, bit_time[%d] n[%d]", bit_time, n );
                 flags or_eq ERROR;
                 return -1; // return error because timeout
             }
@@ -197,11 +206,12 @@ int16_t CBMStandardSerial::receiveBits ()
         
         // get bit
         data or_eq ( status ( PIN_IEC_DATA_IN ) == RELEASED ? ( 1 << 7 ) : 0 );
+        //release ( PIN_IEC_SRQ );
 
         // wait for talker to finish sending bit
         if ( timeoutWait ( PIN_IEC_CLK_IN, PULLED ) == TIMED_OUT )
         {
-            Debug_printv ( "wait for talker to finish sending bit" );
+            Debug_printv ( "wait for talker to finish sending bit n[%d]", n );
             flags or_eq ERROR;
             return -1; // return error because timeout
         }
@@ -396,36 +406,150 @@ bool CBMStandardSerial::sendBits ( uint8_t data )
 } // sendBits
 
 
+// // Wait indefinitely if wait = 0 or until ATN status changes
+// int16_t CBMStandardSerial::timeoutWait ( uint8_t pin, bool target_status, size_t wait, bool watch_atn )
+// {
+//     uint32_t elapsed = 0;
+//     bool atn_status = false;
+
+//     if ( pin == PIN_IEC_ATN )
+//     {
+//         watch_atn = false;
+//     }
+//     else if ( watch_atn )
+//     {
+//         // Sample ATN and set flag to indicate SELECT or DATA mode
+//         atn_status = status ( PIN_IEC_ATN );
+//         if ( atn_status )
+//             flags or_eq ATN_PULLED;
+//     }
+
+//     fnTimer.latch();  // latch highspeed timer value
+//     fnTimer.read();   // grab timer low word
+//     fnTimer.alarm_set( (wait * 100) ); // 1000 = 1000 * 100 ns = 100 us 
+
+//     pull ( PIN_IEC_SRQ );
+//     while ( status ( pin ) != target_status )
+//     {
+//         fnTimer.latch();  // latch highspeed timer value
+//         elapsed = (fnTimer.read() / 100);  // grab timer low word
+//         if ( fnTimer.timeout() && wait != FOREVER )  // test for timeout
+//         {
+//             release ( PIN_IEC_SRQ );
+//             Debug_printv("pin[%d] state[%d] wait[%d] elapsed[%d]", pin, target_status, wait, elapsed);
+//             if ( wait == TIMEOUT_DEFAULT )
+//                 return -1;
+
+//             return wait;
+//         }
+
+//         if ( watch_atn )
+//         {
+//             bool atn_check = status ( PIN_IEC_ATN );
+//             if ( atn_check )
+//                 flags or_eq ATN_PULLED;
+
+//             if ( atn_check != atn_status )
+//             {
+//                 release ( PIN_IEC_SRQ );
+//                 //Debug_printv("pin[%d] state[%d] wait[%d] elapsed[%d]", pin, target_status, wait, elapsed);
+//                 return -1;
+//             }
+//         }
+//     }
+//     release ( PIN_IEC_SRQ );
+
+//     Debug_printv("pin[%d] state[%d] wait[%d] elapsed[%d]", pin, target_status, wait, elapsed);
+//     return elapsed;
+// } // timeoutWait
+
+// // Wait indefinitely if wait = 0 or until ATN status changes
+// int16_t CBMStandardSerial::timeoutWait ( uint8_t pin, bool target_status, size_t wait, bool watch_atn )
+// {
+//     uint64_t start, current, elapsed;
+//     bool atn_status = false;
+//     elapsed = 0;
+
+//     if ( pin == PIN_IEC_ATN )
+//     {
+//         watch_atn = false;
+//     }
+//     else if ( watch_atn )
+//     {
+//         // Sample ATN and set flag to indicate SELECT or DATA mode
+//         atn_status = status ( PIN_IEC_ATN );
+//         if ( atn_status )
+//             flags or_eq ATN_PULLED;
+//     }
+
+//     esp_timer_init();
+//     start = current = esp_timer_get_time();
+
+//     // pull ( PIN_IEC_SRQ );
+//     while ( status ( pin ) != target_status )
+//     {
+//         current = esp_timer_get_time();
+//         elapsed = current - start;
+
+//         if ( elapsed > wait && wait != FOREVER )
+//         {
+//             //release ( PIN_IEC_SRQ );
+//             if ( wait == TIMEOUT_DEFAULT )
+//                 return -1;
+            
+//             return wait;
+//         }
+
+//         if ( watch_atn )
+//         {
+//             bool atn_check = status ( PIN_IEC_ATN );
+//             if ( atn_check )
+//                 flags or_eq ATN_PULLED;
+
+//             if ( atn_check != atn_status )
+//             {
+//                 // release ( PIN_IEC_SRQ );
+//                 //Debug_printv("pin[%d] state[%d] wait[%d] elapsed[%d]", pin, target_status, wait, elapsed);
+//                 return -1;
+//             }            
+//         }
+//     }
+//     // release ( PIN_IEC_SRQ );
+
+//     // Debug_printv("pin[%d] state[%d] wait[%d] step[%d] t[%d]", pin, target_status, wait, elapsed);
+//     return elapsed;
+// } // timeoutWait
+
 // Wait indefinitely if wait = 0 or until ATN status changes
 int16_t CBMStandardSerial::timeoutWait ( uint8_t pin, bool target_status, size_t wait, bool watch_atn )
 {
     uint64_t start, current, elapsed;
+    bool atn_status = false;
     elapsed = 0;
 
     if ( pin == PIN_IEC_ATN )
+    {
         watch_atn = false;
+    }
+    else if ( watch_atn )
+    {
+        // Sample ATN and set flag to indicate SELECT or DATA mode
+        atn_status = status ( PIN_IEC_ATN );
+        if ( atn_status )
+            flags or_eq ATN_PULLED;
+    }
 
-    esp_timer_init();
-    start = current = esp_timer_get_time();
+    start = current = 0;
 
-    // Sample ATN and set flag to indicate SELECT or DATA mode
-    bool atn_status = status ( PIN_IEC_ATN );
-    if ( atn_status )
-        flags or_eq ATN_PULLED;
-
-    // pull ( PIN_IEC_SRQ );
+    pull ( PIN_IEC_SRQ );
     while ( status ( pin ) != target_status )
     {
-
-#if defined(ESP8266)
-        ESP.wdtFeed();
-#endif
-        current = esp_timer_get_time();
-        elapsed = current - start;
+        delayMicroseconds(1);
+        elapsed = current++ - start;
 
         if ( elapsed > wait && wait != FOREVER )
         {
-            //release ( PIN_IEC_SRQ );
+            release ( PIN_IEC_SRQ );
             if ( wait == TIMEOUT_DEFAULT )
                 return -1;
             
@@ -440,18 +564,17 @@ int16_t CBMStandardSerial::timeoutWait ( uint8_t pin, bool target_status, size_t
 
             if ( atn_check != atn_status )
             {
-                // release ( PIN_IEC_SRQ );
+                release ( PIN_IEC_SRQ );
                 //Debug_printv("pin[%d] state[%d] wait[%d] elapsed[%d]", pin, target_status, wait, elapsed);
                 return -1;
             }            
         }
     }
-    // release ( PIN_IEC_SRQ );
+    release ( PIN_IEC_SRQ );
 
     // Debug_printv("pin[%d] state[%d] wait[%d] step[%d] t[%d]", pin, target_status, wait, elapsed);
     return elapsed;
 } // timeoutWait
-
 
 // Wait for specified ms or until ATN status changes
 bool CBMStandardSerial::wait ( size_t wait, uint64_t start )

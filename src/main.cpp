@@ -78,7 +78,7 @@ void main_setup()
     
     Debug_printf( ANSI_WHITE "\n\n" ANSI_BLUE_BACKGROUND "==============================" ANSI_RESET_NL );
     Debug_printf( ANSI_BLUE_BACKGROUND "   " PRODUCT_ID " " FW_VERSION "   " ANSI_RESET_NL );
-    Debug_printf( ANSI_BLUE_BACKGROUND "   " PLATFORM_DETAILS "   " ANSI_RESET_NL );
+    Debug_printf( ANSI_BLUE_BACKGROUND "   " PLATFORM_DETAILS "    " ANSI_RESET_NL );
     Debug_printf( ANSI_BLUE_BACKGROUND "------------------------------" ANSI_RESET_NL "\n" );
 
     Debug_printf( "FujiNet %s Started @ %lu\n", fnSystem.get_fujinet_version(), startms );

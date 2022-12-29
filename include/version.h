@@ -10,11 +10,11 @@
 #define FN_VERSION_MAJOR 0
 #define FN_VERSION_MINOR 5
 
-#define FN_VERSION_BUILD "abb545c"
+#define FN_VERSION_BUILD "a01bdac"
 
-#define FN_VERSION_DATE "2022-12-28 16:21:04"
+#define FN_VERSION_DATE "2022-12-29 08:52:38"
 
-#define FN_VERSION_FULL "0.5.abb545c"
+#define FN_VERSION_FULL "0.5.a01bdac"
 
-#define FW_VERSION "20221228.16"
+#define FW_VERSION "20221229.08"
 
