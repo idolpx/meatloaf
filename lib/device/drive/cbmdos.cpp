@@ -4,11 +4,18 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <string.h>
+#include <ustring.h>
+#include <dirent.h>
 
 #include <ctime>
+#include <cstring>
+#include <filesystem>
+
+#include "../../../include/debug.h"
 
 #define CURSOR_RIGHT 0x1d
+
+uint8_t detected_loader;
 
 //static FIL romfile;
 
@@ -31,7 +38,7 @@ enum {
 
 // typedef uint8_t (*fastloader_rx_t)(void);
 // typedef uint8_t (*fastloader_tx_t)(uint8_t byte);
-// typedef void    (*fastloader_handler_t)(uint8_t param);
+typedef void    (*fastloader_handler_t)(uint8_t param);
 
 // struct fastloader_rxtx_s {
 //   fastloader_rx_t rxfunc;
@@ -140,76 +147,76 @@ static const struct fastloader_crc_s fl_crc_table[] = {
   { 0x327d, FL_N0SDOS_FILEREAD,  RXTX_NONE          }, // CRC up to 0x65f to avoid junk data
 #endif
 
-//  { 0, FL_NONE, 0 }, // end marker
+  { 0, FL_NONE, 0 }, // end marker
 };
 
-// struct fastloader_handler_s {
-//   uint16_t             address;
-//   uint8_t              loadertype;
-//   fastloader_handler_t handler;
-//   uint8_t              parameter;
-// };
+struct fastloader_handler_s {
+  uint16_t             address;
+  uint8_t              loadertype;
+  fastloader_handler_t handler;
+  uint8_t              parameter;
+};
 
-// static const PROGMEM struct fastloader_handler_s fl_handler_table[] = {
-// #ifdef CONFIG_LOADER_TURBODISK
-//   { 0x0303, FL_TURBODISK,        load_turbodisk, 0 },
-// #endif
-// #ifdef CONFIG_LOADER_FC3
-//   { 0x059a, FL_FC3_LOAD,         load_fc3,       0 }, // FC3
-//   { 0x0400, FL_FC3_LOAD,         load_fc3,       0 }, // EXOS
-//   { 0x059c, FL_FC3_SAVE,         save_fc3,       0 },
-//   { 0x059a, FL_FC3_SAVE,         save_fc3,       0 }, // variation
-//   { 0x0403, FL_FC3_FREEZED,      load_fc3,       1 },
-//   { 0x057f, FL_FC3_OLDFREEZED,   load_fc3oldfreeze, 0},
+static const struct fastloader_handler_s fl_handler_table[] = {
+#ifdef CONFIG_LOADER_TURBODISK
+  { 0x0303, FL_TURBODISK,        load_turbodisk, 0 },
+#endif
+#ifdef CONFIG_LOADER_FC3
+  { 0x059a, FL_FC3_LOAD,         load_fc3,       0 }, // FC3
+  { 0x0400, FL_FC3_LOAD,         load_fc3,       0 }, // EXOS
+  { 0x059c, FL_FC3_SAVE,         save_fc3,       0 },
+  { 0x059a, FL_FC3_SAVE,         save_fc3,       0 }, // variation
+  { 0x0403, FL_FC3_FREEZED,      load_fc3,       1 },
+  { 0x057f, FL_FC3_OLDFREEZED,   load_fc3oldfreeze, 0},
 
-// #endif
-// #ifdef CONFIG_LOADER_DREAMLOAD
-//   { 0x0700, FL_DREAMLOAD,        load_dreamload, 0 },
-// #endif
-// #ifdef CONFIG_LOADER_ULOAD3
-//   { 0x0336, FL_ULOAD3,           load_uload3,    0 },
-// #endif
-// #ifdef CONFIG_LOADER_ELOAD1
-//   { 0x0300, FL_ELOAD1,           load_eload1,    0 },
-// #endif
-// #ifdef CONFIG_LOADER_GIJOE
-//   { 0x0500, FL_GI_JOE,           load_gijoe,     0 },
-// #endif
-// #ifdef CONFIG_LOADER_EPYXCART
-//   { 0x01a9, FL_EPYXCART,         load_epyxcart,  0 },
-// #endif
-// #ifdef CONFIG_LOADER_GEOS
-//   { 0x0457, FL_GEOS_S1_64,       load_geos_s1,   0 },
-//   { 0x0470, FL_GEOS_S1_128,      load_geos_s1,   1 },
-//   { 0x03e2, FL_GEOS_S23_1541,    load_geos,      0 },
-//   { 0x03dc, FL_GEOS_S23_1541,    load_geos,      0 },
-//   { 0x03ff, FL_GEOS_S23_1571,    load_geos,      0 },
-//   { 0x040f, FL_GEOS_S23_1581,    load_geos,      0 },
-// # ifdef CONFIG_LOADER_WHEELS
-//   { 0x0400, FL_WHEELS_S1_64,     load_wheels_s1, 0 },
-//   { 0x0400, FL_WHEELS_S1_128,    load_wheels_s1, 1 },
-//   { 0x0300, FL_WHEELS_S2,        load_wheels_s2, 0 },
-//   { 0x0400, FL_WHEELS44_S2,      load_wheels_s2, 0 },
-//   { 0x0300, FL_WHEELS44_S2_1581, load_wheels_s2, 0 },
-//   { 0x0500, FL_WHEELS44_S2_1581, load_wheels_s2, 0 },
-// # endif
-// #endif
-// #ifdef CONFIG_LOADER_NIPPON
-//   { 0x0300, FL_NIPPON,           load_nippon,    0 },
-// #endif
-// #ifdef CONFIG_LOADER_AR6
-//   { 0x0500, FL_AR6_1581_LOAD,    load_ar6_1581,  0 },
-//   { 0x05f4, FL_AR6_1581_SAVE,    save_ar6_1581,  0 },
-// #endif
-// #ifdef CONFIG_LOADER_MMZAK
-//   { 0x0500, FL_MMZAK,            load_mmzak,     0 },
-// #endif
-// #ifdef CONFIG_LOADER_N0SDOS
-//   { 0x041b, FL_N0SDOS_FILEREAD,  load_n0sdos_fileread, 0 },
-// #endif
+#endif
+#ifdef CONFIG_LOADER_DREAMLOAD
+  { 0x0700, FL_DREAMLOAD,        load_dreamload, 0 },
+#endif
+#ifdef CONFIG_LOADER_ULOAD3
+  { 0x0336, FL_ULOAD3,           load_uload3,    0 },
+#endif
+#ifdef CONFIG_LOADER_ELOAD1
+  { 0x0300, FL_ELOAD1,           load_eload1,    0 },
+#endif
+#ifdef CONFIG_LOADER_GIJOE
+  { 0x0500, FL_GI_JOE,           load_gijoe,     0 },
+#endif
+#ifdef CONFIG_LOADER_EPYXCART
+  { 0x01a9, FL_EPYXCART,         load_epyxcart,  0 },
+#endif
+#ifdef CONFIG_LOADER_GEOS
+  { 0x0457, FL_GEOS_S1_64,       load_geos_s1,   0 },
+  { 0x0470, FL_GEOS_S1_128,      load_geos_s1,   1 },
+  { 0x03e2, FL_GEOS_S23_1541,    load_geos,      0 },
+  { 0x03dc, FL_GEOS_S23_1541,    load_geos,      0 },
+  { 0x03ff, FL_GEOS_S23_1571,    load_geos,      0 },
+  { 0x040f, FL_GEOS_S23_1581,    load_geos,      0 },
+# ifdef CONFIG_LOADER_WHEELS
+  { 0x0400, FL_WHEELS_S1_64,     load_wheels_s1, 0 },
+  { 0x0400, FL_WHEELS_S1_128,    load_wheels_s1, 1 },
+  { 0x0300, FL_WHEELS_S2,        load_wheels_s2, 0 },
+  { 0x0400, FL_WHEELS44_S2,      load_wheels_s2, 0 },
+  { 0x0300, FL_WHEELS44_S2_1581, load_wheels_s2, 0 },
+  { 0x0500, FL_WHEELS44_S2_1581, load_wheels_s2, 0 },
+# endif
+#endif
+#ifdef CONFIG_LOADER_NIPPON
+  { 0x0300, FL_NIPPON,           load_nippon,    0 },
+#endif
+#ifdef CONFIG_LOADER_AR6
+  { 0x0500, FL_AR6_1581_LOAD,    load_ar6_1581,  0 },
+  { 0x05f4, FL_AR6_1581_SAVE,    save_ar6_1581,  0 },
+#endif
+#ifdef CONFIG_LOADER_MMZAK
+  { 0x0500, FL_MMZAK,            load_mmzak,     0 },
+#endif
+#ifdef CONFIG_LOADER_N0SDOS
+  { 0x041b, FL_N0SDOS_FILEREAD,  load_n0sdos_fileread, 0 },
+#endif
 
-//   { 0, FL_NONE, NULL, 0 }, // end marker
-// };
+  { 0, FL_NONE, NULL, 0 }, // end marker
+};
 
 struct fastloader_capture_s {
   uint8_t  loadertype;
@@ -264,7 +271,7 @@ time_t date_match_start;
 time_t date_match_end;
 
 uint16_t datacrc = 0xffff;
-//static fastloaderid_t previous_loader;
+static fastloaderid_t previous_loader;
 
 /* partial fastloader data capture */
 static uint16_t  capture_address, capture_remain;
@@ -378,13 +385,7 @@ static void cbmDOS::save_capbuffer(void) {
 
 void cbmDOS::run_loader(uint16_t address) {
   if (detected_loader == FL_NONE) {
-    uart_puts_P(PSTR("Code exec at "));
-    uart_puthex(address >> 8);
-    uart_puthex(address & 0xff);
-    uart_puts_P(PSTR(", CRC "));
-    uart_puthex(datacrc >> 8);
-    uart_puthex(datacrc & 0xff);
-    uart_putcrlf();
+    Debug_println("Code exec at %.2X%.2X, CRC %.2X%.2X", (address >> 8), (address & 0xff), (datacrc >> 8), (datacrc & 0xff));
   }
 
   if (detected_loader == FL_NONE)
