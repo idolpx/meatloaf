@@ -1,12 +1,11 @@
 //
-// https://www.nxp.com/docs/en/data-sheet/PCF8575.pdf
-// https://www.nxp.com/docs/en/data-sheet/PCA9673.pdf
+// https://assets.maxlinear.com/web/documents/xra1405.pdf
 //
 
-#ifdef GPIOX_PCF8575
+#ifdef GPIOX_XRA1405
 
-#ifndef PCF8575_H
-#define PCF8575_H
+#ifndef XRA1405_H
+#define XRA1405_H
 
 #include "../../include/pinmap.h"
 
@@ -17,7 +16,7 @@
 #define I2C_ADDRESS  GPIOX_ADDRESS
 #define I2C_SPEED    GPIOX_SPEED
 
-/* PCF8575 port bits */
+/* XRA1405 port bits */
 #define P00  0
 #define P01  1
 #define P02  2
@@ -48,21 +47,21 @@ typedef enum {
 } port_t;
 
 /**
- * @brief PCF8575
+ * @brief XRA1405
  */
-class PCF8575 {
+class XRA1405 {
 public:
 
 	/**
-	 * Create a new PCF8575 instance
+	 * Create a new XRA1405 instance
 	 */
-	PCF8575();
+	XRA1405();
 
 	uint8_t PORT0; // PINS 00-07
 	uint8_t PORT1; // PINS 10-17
 
 	/**
-	 * Start the I2C controller and store the PCF8575 chip address
+	 * Start the I2C controller and store the XRA1405 chip address
 	 */
 	void begin(gpio_num_t sda = I2C_SDA, gpio_num_t scl = I2C_SCL, uint8_t address = I2C_ADDRESS, uint16_t speed = I2C_SPEED);
 
@@ -88,7 +87,7 @@ public:
 	 * 
 	 * @param pin The pin to set
 	 * @param value The new state of the pin
-	 * @remarks Software pull-up resistors are not available on the PCF8575
+	 * @remarks Software pull-up resistors are not available on the XRA1405
 	 */
 	void digitalWrite(uint8_t pin, uint8_t value);
 
@@ -171,8 +170,8 @@ protected:
 	void updateGPIOX();
 };
 
-extern PCF8575 GPIOX;
+extern XRA1405 GPIOX;
 
-#endif // PCF8575_H
+#endif // XRA1405_H
 
-#endif // GPIOX_PCF8575
+#endif // GPIOX_XRA1405
