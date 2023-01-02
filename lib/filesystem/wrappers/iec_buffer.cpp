@@ -74,7 +74,7 @@ int oiecstream::sync() {
 void oiecstream::putUtf8(U8Char* codePoint) {
     //Serial.printf("%c",codePoint->toPetscii());
     //Debug_printv("oiecstream calling put");
-    auto c = codePoint->toPetscii();
+    //auto c = codePoint->toPetscii();
     put(codePoint->toPetscii());        
 }
 

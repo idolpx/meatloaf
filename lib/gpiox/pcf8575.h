@@ -1,11 +1,12 @@
 //
-// https://ww1.microchip.com/downloads/aemDocuments/documents/APID/ProductDocuments/DataSheets/MCP23017-Data-Sheet-DS20001952.pdf
+// https://www.nxp.com/docs/en/data-sheet/PCF8575.pdf
+// https://www.nxp.com/docs/en/data-sheet/PCA9673.pdf
 //
 
-#ifdef GPIOX_MCP23017
+#ifdef GPIOX_PCF8575
 
-#ifndef MCP23017_H
-#define MCP23017_H
+#ifndef PCF8575_H
+#define PCF8575_H
 
 #include "../../include/pinmap.h"
 
@@ -16,7 +17,7 @@
 #define I2C_ADDRESS  GPIOX_ADDRESS
 #define I2C_SPEED    GPIOX_SPEED
 
-/* MCP23017 port bits */
+/* PCF8575 port bits */
 #define P00  0
 #define P01  1
 #define P02  2
@@ -47,35 +48,47 @@ typedef enum {
 } port_t;
 
 /**
- * @brief MCP23017
+ * @brief PCF8575
  */
-class MCP23017 {
+class PCF8575 {
 public:
-	/**
-	 * Create a new MCP23017 instance
-	 */
-	MCP23017();
 
 	/**
-	 * Start the I2C controller and store the MCP23017 chip address
+	 * Create a new PCF8575 instance
 	 */
-	void begin(uint8_t address = I2C_ADDRESS, gpio_num_t sda = I2C_SDA, gpio_num_t scl = I2C_SCL);
+	PCF8575();
+
+	uint8_t PORT0; // PINS 00-07
+	uint8_t PORT1; // PINS 10-17
 
 	/**
-	 * Set the direction of a pin (OUTPUT, INPUT or INPUT_PULLUP)
+	 * Start the I2C controller and store the PCF8575 chip address
+	 */
+	void begin(gpio_num_t sda = I2C_SDA, gpio_num_t scl = I2C_SCL, uint8_t address = I2C_ADDRESS, uint16_t speed = I2C_SPEED);
+
+	/**
+	 * Set the direction of a pin (OUTPUT, INPUT)
 	 * 
 	 * @param pin The pin to set
 	 * @param mode The new mode of the pin
-	 * @remarks INPUT_PULLUP does physicaly the same thing as INPUT (no software pull-up resistors available) but is REQUIRED if you use external pull-up resistor
 	 */
-	void pinMode(uint8_t pin, uint8_t mode);
+	void pinMode(uint8_t pin, pin_mode_t mode);
+
+	/**
+	 * Set the direction of all port pins (INPUT, OUTPUT)
+	 * 
+	 * @param port The port to set
+	 * @param mode The new mode of the pins
+	 */
+	void portMode(port_t port, pin_mode_t mode);
+	void portMode(port_t port, uint16_t mode);
 
 	/**
 	 * Set the state of a pin (HIGH or LOW)
 	 * 
 	 * @param pin The pin to set
 	 * @param value The new state of the pin
-	 * @remarks Software pull-up resistors are not available on the MCP23017
+	 * @remarks Software pull-up resistors are not available on the PCF8575
 	 */
 	void digitalWrite(uint8_t pin, uint8_t value);
 
@@ -92,6 +105,7 @@ public:
 	 * 
 	 * @param value The new value of all pins (1 bit = 1 pin, '1' = HIGH, '0' = LOW)
 	 */
+	void write(port_t port, uint16_t value);
 	void write(uint16_t value);
 
 	/**
@@ -99,17 +113,18 @@ public:
 	 * 
 	 * @return The current value of all pins (1 bit = 1 pin, '1' = HIGH, '0' = LOW)
 	 */
-	uint16_t read();
+	uint16_t read(port_t port = GPIOX_BOTH);
 
 	/**
 	 * Exactly like write(0x00), set all pins to LOW
 	 */
-	void clear();
+	void clear(port_t port = GPIOX_BOTH);
+
 
 	/**
 	 * Exactly like write(0xFF), set all pins to HIGH
 	 */
-	void set();
+	void set(port_t port = GPIOX_BOTH);
 
 	/**
 	 * Toggle the state of a pin
@@ -121,36 +136,43 @@ protected:
 	I2C_t& myI2C = i2c0;  // i2c0 and i2c1 are the default objects
 
 	/** Current input pins values */
-	volatile uint16_t _PIN;
-	volatile uint16_t _oldPIN;
+	volatile uint16_t _DIN;
+	volatile uint16_t _DIN_LAST;
 
 	/** Output pins values */
-	volatile uint16_t _PORT;
+	volatile uint16_t _DOUT;
 
 	/** Pins modes values (OUTPUT or INPUT) */
 	volatile uint16_t _DDR;
 
-	/** MCP23017 I2C address */
+	/** GPIOX I2C address */
 	uint8_t _address;
 
 	/** 
-	 * Read GPIO states and store them in _PIN variable
+	 * Read GPIO states and store them in _DIN variable
 	 *
-	 * @remarks Before reading current GPIO states, current _PIN variable value is moved to _oldPIN variable
+	 * @remarks Before reading current GPIO states, current _DIN variable value is moved to _DIN_LAST variable
 	 */
-	void readGPIO();
+	void readGPIOX();
 
 	/** 
-	 * Write value of _PORT variable to the GPIO
+	 * Write value of _DOUT variable to the GPIOX
 	 * 
 	 * @remarks Only pin marked as OUTPUT are set, for INPUT pins their value are unchanged
 	 * @warning To work properly (and avoid any states conflicts) readGPIO() MUST be called before call this function !
 	 */
-	void updateGPIO();
+	void writeGPIOX();
+
+	/** 
+	 * Update INPUT/OUTPUT mode of all GPIOX pins
+	 * 
+	 * @remarks All pins modes are set to be equal to _DDR
+	 */
+	void updateGPIOX();
 };
 
-extern MCP23017 GPIOX;
+extern PCF8575 GPIOX;
 
-#endif // MCP23017_H
+#endif // PCF8575_H
 
 #endif // GPIOX_MCP23017

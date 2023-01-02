@@ -4,18 +4,14 @@
 #include "parallel.h"
 
 #include <freertos/queue.h>
+#include <freertos/task.h>
 
 /* Dependencies */
 #include "gpiox.h" // Required for PCF8575/PCA9674/MCP23017
 
-/** PCF8575 instance */
-GPIOX expander;
-
-//#include <I2Cbus.hpp>
-
 #include "iec.h"
+#include "../../include/pinmap.h"
 #include "../../include/debug.h"
-
 
 parallelBus PARALLEL;
 
@@ -69,7 +65,7 @@ void parallelBus::service()
         // if ( PARALLEL.status( PA2 ) )
         // {
         //     PARALLEL.mode = MODE_RECEIVE;
-        //     expander.portMode( USERPORT_DATA, GPIOX_MODE_INPUT );
+        //     GPIOX.portMode( USERPORT_DATA, GPIOX_MODE_INPUT );
         //     PARALLEL.readByte();
 
         //     Debug_printv("receive <<< " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
@@ -97,7 +93,7 @@ void parallelBus::service()
         // else
         // {
         //     PARALLEL.mode = MODE_SEND;
-        //     expander.portMode( USERPORT_DATA, GPIOX_MODE_OUTPUT );
+        //     GPIOX.portMode( USERPORT_DATA, GPIOX_MODE_OUTPUT );
 
         //     Debug_printv("send    >>> " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
         // }
@@ -111,7 +107,7 @@ void parallelBus::service()
 void parallelBus::setup ()
 {
     // Setup i2c device
-    expander.begin();
+    GPIOX.begin();
     reset();
     
     // Create a queue to handle parallel event from ISR
@@ -139,19 +135,19 @@ void parallelBus::reset()
 {
     // Reset default pin modes
     // Debug_printv("clear");
-    // expander.clear();
+    // GPIOX.clear();
     // Debug_printv("pa2");
-    // expander.pinMode( PA2, GPIOX_MODE_INPUT );
+    // GPIOX.pinMode( PA2, GPIOX_MODE_INPUT );
     // Debug_printv("pc2");
-    // expander.pinMode( PC2, GPIOX_MODE_INPUT );
+    // GPIOX.pinMode( PC2, GPIOX_MODE_INPUT );
     // Debug_printv("flag2");
-    // expander.pinMode( FLAG2, GPIOX_MODE_OUTPUT );
+    // GPIOX.pinMode( FLAG2, GPIOX_MODE_OUTPUT );
 
     //Debug_printv("reset! bus_state[%d]", IEC.bus_state);
 
     //Debug_printv("userport flags");
-    expander.portMode( USERPORT_FLAGS, 0x05 ); // Set PA2 & PC2 to INPUT
-    expander.digitalWrite( FLAG2, HIGH);
+    GPIOX.portMode( USERPORT_FLAGS, 0x05 ); // Set PA2 & PC2 to INPUT
+    GPIOX.digitalWrite( FLAG2, HIGH);
 
     //Debug_printv("userport data");
     setMode( MODE_RECEIVE );
@@ -160,9 +156,9 @@ void parallelBus::reset()
 void parallelBus::setMode(parallel_mode_t mode)
 {
     if ( mode == MODE_RECEIVE )
-        expander.portMode( USERPORT_DATA, GPIOX_MODE_INPUT );
+        GPIOX.portMode( USERPORT_DATA, GPIOX_MODE_INPUT );
     else
-        expander.portMode( USERPORT_DATA, GPIOX_MODE_OUTPUT );
+        GPIOX.portMode( USERPORT_DATA, GPIOX_MODE_OUTPUT );
 }
 
 void parallelBus::handShake()
@@ -170,17 +166,17 @@ void parallelBus::handShake()
     // Signal received or sent
     
     // LOW
-    expander.digitalWrite( FLAG2, LOW );
+    GPIOX.digitalWrite( FLAG2, LOW );
     
     // HIGH
-    expander.digitalWrite( FLAG2, HIGH );
+    GPIOX.digitalWrite( FLAG2, HIGH );
 }
 
 uint8_t parallelBus::readByte()
 {
 
-    this->data = expander.read( USERPORT_DATA );
-    this->flags = expander.PORT0;
+    this->data = GPIOX.read( USERPORT_DATA );
+    this->flags = GPIOX.PORT0;
 
     //Debug_printv("flags[%.2x] data[%.2x]", this->flags, this->data);
 
@@ -195,7 +191,7 @@ void parallelBus::writeByte( uint8_t byte )
     this->data = byte;
 
     Debug_printv("flags[%.2x] data[%.2x] byte[%.2x]", this->flags, this->data, byte);
-    expander.write( USERPORT_DATA, byte);
+    GPIOX.write( USERPORT_DATA, byte);
 
     // Tell receiver byte is ready to read
     this->handShake();
