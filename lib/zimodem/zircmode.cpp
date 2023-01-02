@@ -44,7 +44,7 @@ void ZIRCMode::switchTo()
 
 void ZIRCMode::doIRCCommand()
 {
-  String cmd = commandMode.getNextSerialCommand();
+  std::string cmd = commandMode.getNextSerialCommand();
   char c='?';
   while((cmd.length()>0)
   &&(cmd[0]==32)||(cmd[0]==7))
@@ -86,7 +86,7 @@ void ZIRCMode::doIRCCommand()
         else
         {
           serial.printf("%s%sConnecting to %s...%s%s",EOLNC,EOLNC,pb->address,EOLNC,EOLNC);
-          String address = pb->address;
+          std::string address = pb->address;
           char vbuf[address.length()+1];
           strcpy(vbuf,pb->address);
           char *colon=strstr((char *)vbuf,":");
@@ -170,7 +170,7 @@ void ZIRCMode::doIRCCommand()
           currState=ZIRCMENU_NOTES; // just keep old values
       else
       {
-        boolean fail = cmd.indexOf(',') >= 0;
+        bool fail = cmd.indexOf(',') >= 0;
         int colonDex=cmd.indexOf(':');
         fail = fail || (colonDex <= 0) || (colonDex == cmd.length()-1);
         fail = fail || (colonDex != cmd.lastIndexOf(':'));
@@ -260,7 +260,7 @@ void ZIRCMode::doIRCCommand()
     {
       if(c=='/')
       {
-        String lccmd = cmd;
+        std::string lccmd = cmd;
         lccmd.toLowerCase();
         if(lccmd.startsWith("/join "))
         {
@@ -380,7 +380,7 @@ void ZIRCMode::loopMenuMode()
           switchBackToCommandMode();
         else
         {
-            String cmd;
+            std::string cmd;
             while((current->available()>0) && (current->isConnected()))
             {
               uint8_t c = current->read();
@@ -466,9 +466,9 @@ void ZIRCMode::loopMenuMode()
                   x1 = (x1>0)?cmd.indexOf(":", x1+1):(x0>=0)?cmd.indexOf(":", x0+1):-1;
                   if(x1>0)
                   {
-                    String msg2=cmd.substring(x1+1);
+                    std::string msg2=cmd.substring(x1+1);
                     msg2.trim();
-                    String msg1=cmd.substring(x0+1,x1);
+                    std::string msg1=cmd.substring(x0+1,x1);
                     msg1.trim();
                     int x2=msg1.indexOf("!");
                     if(x2>=0)

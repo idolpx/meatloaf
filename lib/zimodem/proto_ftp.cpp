@@ -196,10 +196,10 @@ static bool doFTPQuit(WiFiClient **c)
   return false;
 }
 
-static String readLine(WiFiClient *c, int timeout)
+static std::string readLine(WiFiClient *c, int timeout)
 {
   unsigned long now=millis();
-  String line = "";
+  std::string line = "";
   while(((millis()-now < timeout) || (c->available()>0)) 
   && (c->connected()|| (c->available()>0)))
   {
@@ -223,7 +223,7 @@ static String readLine(WiFiClient *c, int timeout)
 
 static int getFTPResponseCode(WiFiClient *c, char *buf)
 {
-  String resp = readLine(c,5000);
+  std::string resp = readLine(c,5000);
   if(resp.length() == 0)
     return -1; // timeout total
   while((resp.length()<3)

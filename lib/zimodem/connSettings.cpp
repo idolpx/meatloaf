@@ -34,7 +34,7 @@ ConnSettings::ConnSettings(const char *dmodifiers)
   secure=((strchr(dmodifiers,'s')!=null) || (strchr(dmodifiers,'S')!=null));
 }
 
-ConnSettings::ConnSettings(String modifiers) : ConnSettings(modifiers.c_str())
+ConnSettings::ConnSettings(std::string modifiers) : ConnSettings(modifiers.c_str())
 {
 }
 
@@ -65,9 +65,9 @@ int ConnSettings::getBitmap(FlowControlType forceCheck)
   return flagsBitmap;
 }
 
-String ConnSettings::getFlagString()
+std::string ConnSettings::getFlagString()
 {
-  String lastOptions =(petscii?"p":"");
+  std::string lastOptions =(petscii?"p":"");
   lastOptions += (petscii?"p":"");
   lastOptions += (telnet?"t":"");
   lastOptions += (echo?"e":"");
@@ -77,7 +77,7 @@ String ConnSettings::getFlagString()
   return lastOptions;
 }
 
-void ConnSettings::setFlag(ConnFlag flagMask, boolean newVal)
+void ConnSettings::setFlag(ConnFlag flagMask, bool newVal)
 {
   switch(flagMask)
   {
@@ -91,7 +91,7 @@ void ConnSettings::setFlag(ConnFlag flagMask, boolean newVal)
   }
 }
 
-void ConnSettings::IPtoStr(IPAddress *ip, String &str)
+void ConnSettings::IPtoStr(IPAddress *ip, std::string &str)
 {
   if(ip == null)
   {
@@ -118,7 +118,7 @@ IPAddress *ConnSettings::parseIP(const char *ipStr)
       if(le==e)
         break;
       *e=0;
-      String sdot = le;
+      std::string sdot = le;
       sdot.trim();
       if((sdot.length()==0)||(dotDex>3))
       {

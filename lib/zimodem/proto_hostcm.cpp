@@ -520,7 +520,7 @@ void HostCM::protoFinRenameFile()
     return;
   }
 
-  String on = renameF.name();
+  std::string on = renameF.name();
   renameF.close();
   if(!SD.rename(on,(char *)&inbuf[1]))
   {

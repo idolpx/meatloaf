@@ -12,17 +12,17 @@ private:
   ZSerial serial; // storage for serial settings only
   bool showMenu;
   bool savedEcho;
-  String EOLN;
+  std::string EOLN;
   const char *EOLNC;
   WiFiClientNode *current = null;
   unsigned long lastNumber;
   unsigned long timeout=0;
-  String buf;
-  String nick;
-  String lastAddress;
-  String lastOptions;
-  String lastNotes;
-  String channelName;
+  std::string buf;
+  std::string nick;
+  std::string lastAddress;
+  std::string lastOptions;
+  std::string lastNotes;
+  std::string channelName;
   bool joinReceived;
   enum ZIRCMenu
   {

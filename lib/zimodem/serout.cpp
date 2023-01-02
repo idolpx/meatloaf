@@ -337,7 +337,7 @@ size_t ZSerial::write(uint8_t *buf, int bufSz)
   return bufSz;
 }
 
-void ZSerial::prints(String str)
+void ZSerial::prints(std::string str)
 {
   prints(str.c_str());
 }

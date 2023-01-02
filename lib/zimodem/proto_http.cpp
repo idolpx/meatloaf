@@ -231,8 +231,8 @@ WiFiClient *doWebGetStream(const char *hostIp, int port, const char *req, bool d
   c->printf("Host: %s\r\n",hostIp);
   c->printf("Connection: close\r\n\r\n");
   
-  String ln = "";
-  String reUrl = "";
+  std::string ln = "";
+  std::string reUrl = "";
   uint32_t respLength = 0;
   int respCode = -1;
   bool chunked = false;
@@ -268,7 +268,7 @@ WiFiClient *doWebGetStream(const char *hostIp, int port, const char *req, bool d
         int x=ln.indexOf(':');
         if(x>0)
         {
-          String header = ln.substring(0,x);
+          std::string header = ln.substring(0,x);
           header.toLowerCase();
           if(header == "content-length")
           {

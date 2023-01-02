@@ -100,7 +100,7 @@ bool WiFiServerNode::ReadWiFiServer(File &f, WiFiServerSpec &node)
 {
   if(f.available()>0)
   {
-    String str="";
+    std::string str="";
     char c=f.read();
     while((c != ',') && (f.available()>0))
     {

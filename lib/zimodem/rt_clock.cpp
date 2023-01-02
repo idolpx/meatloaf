@@ -112,7 +112,7 @@ void RealTimeClock::tick()
       debugPrintf("Received NTP: %d/%d/%d %d:%d:%d\n\r",(int)getMonth(),(int)getDay(),(int)getYear(),(int)getHour(),(int)getMinute(),(int)getSecond());
       // now to apply the timezone.  Ugh;
       setByUnixEpoch(epoch);
-      String tz="";
+      std::string tz="";
       {
         char s=0;
         char c=pgm_read_byte_near(&(TimeZones[tzCode][1][s]));
@@ -121,7 +121,7 @@ void RealTimeClock::tick()
           tz += c;
           c=pgm_read_byte_near(&(TimeZones[tzCode][1][++s]));
         }
-        String otz=tz;
+        std::string otz=tz;
         int x=tz.indexOf("/");
         if(x > 0)
         {
@@ -412,7 +412,7 @@ bool RealTimeClock::sendTimeRequest()
     packetBuffer[14]  = 49;
     packetBuffer[15]  = 52;
     IPAddress timeServerIP;
-    String host = ntpServerName;
+    std::string host = ntpServerName;
     int port=123;
     int pi=host.indexOf(':');
     if(pi>0)
@@ -506,7 +506,7 @@ void RealTimeClock::setTimeZoneCode(int val)
   }
 }
 
-bool RealTimeClock::setTimeZone(String str)
+bool RealTimeClock::setTimeZone(std::string str)
 {
   str.toUpperCase();
   if(str.length()==0)
@@ -533,12 +533,12 @@ bool RealTimeClock::setTimeZone(String str)
   return false;
 }
 
-String RealTimeClock::getFormat()
+std::string RealTimeClock::getFormat()
 {
   return format;
 }
 
-void RealTimeClock::setFormat(String fmt)
+void RealTimeClock::setFormat(std::string fmt)
 {
   fmt.replace(',','.');
   format = fmt;
@@ -554,11 +554,11 @@ void RealTimeClock::setDisabled(bool tf)
   disabled=tf;
 }
 
-String RealTimeClock::getCurrentTimeFormatted()
+std::string RealTimeClock::getCurrentTimeFormatted()
 {
-  //String format="%M/%D/%YYYY %h:%mm:%ss%a"
+  //std::string format="%M/%D/%YYYY %h:%mm:%ss%a"
   DateTimeClock c = getCurrentTime();
-  String f=format;
+  std::string f=format;
   if(f.indexOf("%yyyy")>=0)
   {
     sprintf(str,"%04d",(int)c.getYear());
@@ -602,7 +602,7 @@ String RealTimeClock::getCurrentTimeFormatted()
   }
   if(f.indexOf("%e")>=0)
   {
-    String dow=c.getDoW();
+    std::string dow=c.getDoW();
     dow = dow.substring(0,3);
     sprintf(str,"%d",dow.c_str());
     f.replace("%e",str);
@@ -663,7 +663,7 @@ String RealTimeClock::getCurrentTimeFormatted()
     f.replace("%a",(c.getHour()<12)?"a":"p");
   if(f.indexOf("%z")>=0)
   {
-    String z="";
+    std::string z="";
     char s=0;
     char c=pgm_read_byte_near(&(TimeZones[tzCode][0][s]));
     while(c != 0)
@@ -676,7 +676,7 @@ String RealTimeClock::getCurrentTimeFormatted()
   }
   if(f.indexOf("%Z")>=0)
   {
-    String z="";
+    std::string z="";
     char s=0;
     char c=pgm_read_byte_near(&(TimeZones[tzCode][0][s]));
     while(c != 0)
@@ -689,12 +689,12 @@ String RealTimeClock::getCurrentTimeFormatted()
   return f;
 }
 
-String RealTimeClock::getNtpServerHost()
+std::string RealTimeClock::getNtpServerHost()
 {
   return ntpServerName;
 }
 
-void RealTimeClock::setNtpServerHost(String newHost)
+void RealTimeClock::setNtpServerHost(std::string newHost)
 {
   newHost.replace(',','.');
   ntpServerName = newHost;

@@ -46,7 +46,7 @@ private:
        recpkt[MAXPACKSIZ], /* Receive packet buffer */
        packet[MAXPACKSIZ], /* Packet buffer */
        ldata[1024];        /* First line of data to send over connection */
-  String **filelist = 0;
+  std::string **filelist = 0;
   int  (*recvChar)(ZSerial *ser, int);
   void (*sendChar)(ZSerial *ser, char);
   bool (*dataHandler)(File *kfp, unsigned long number, char *buffer, int len);
@@ -70,9 +70,9 @@ private:
   char seof();
 
   bool kfpClosed = true;
-  String *errStr = 0;
+  std::string *errStr = 0;
 public:
-  String rootpath = "";
+  std::string rootpath = "";
   FS *kfileSystem = &SD;
   File kfp;
   ZSerial kserial;
@@ -81,8 +81,8 @@ public:
          int (*recvChar)(ZSerial *ser, int),
          void (*sendChar)(ZSerial *ser, char),
          bool (*dataHandler)(File *kfp, unsigned long, char*, int),
-         String &errors);
-  void setTransmitList(String **fileList, int numFiles);
+         std::string &errors);
+  void setTransmitList(std::string **fileList, int numFiles);
   bool receive();
   bool transmit();
 };
@@ -134,7 +134,7 @@ static bool kDDataHandler(File *kfp, unsigned long number, char *buf, int sz)
   return true;
 }
 
-static boolean kDownload(FlowControlType commandFlow, FS &fs, String **fileList, int fileCount, String &errors)
+static bool kDownload(FlowControlType commandFlow, FS &fs, std::string **fileList, int fileCount, std::string &errors)
 {
   KModem kmo(commandFlow, kReceiveSerial, kSendSerial, kDDataHandler, errors);
   kmo.kfileSystem = &fs;
@@ -143,7 +143,7 @@ static boolean kDownload(FlowControlType commandFlow, FS &fs, String **fileList,
   return result;
 }
 
-static boolean kUpload(FlowControlType commandFlow, FS &fs, String rootPath, String &errors)
+static bool kUpload(FlowControlType commandFlow, FS &fs, std::string rootPath, std::string &errors)
 {
   KModem kmo(commandFlow, kReceiveSerial, kSendSerial, kUDataHandler, errors);
   kmo.kfileSystem = &fs;

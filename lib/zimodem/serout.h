@@ -68,7 +68,7 @@ class ZSerial : public Stream
     bool isPacketOut();
     int getConfigFlagBitmap();
     
-    void prints(String str);
+    void prints(std::string str);
     void prints(const char *expr);
     void printc(const char c);
     void printc(uint8_t c);

@@ -4,7 +4,7 @@
 class StringStream : public Stream
 {
 public:
-    StringStream(const String &s)
+    StringStream(const std::string &s)
     {
       str = s;
       position = 0;
@@ -19,7 +19,7 @@ public:
     virtual size_t write(uint8_t c) { str += (char)c; return 1;};
 
 private:
-    String str;
+    std::string str;
     int length;
     int position;
 };

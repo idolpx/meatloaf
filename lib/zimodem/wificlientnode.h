@@ -61,7 +61,7 @@ class WiFiClientNode : public Stream
     char *maskOuts = NULL;
     char *stateMachine = NULL;
     char *machineState = NULL;
-    String machineQue = "";
+    std::string machineQue = "";
 
     uint8_t nextPacketNum=1;
     uint8_t blankPackets=0;
@@ -93,14 +93,14 @@ class WiFiClientNode : public Stream
 
     size_t write(uint8_t c);
     size_t write(const uint8_t *buf, size_t size);
-    void print(String s);
+    void print(std::string s);
     int read();
     int peek();
     void flush();
     void flushAlways();
     int available();
     int read(uint8_t *buf, size_t size);
-    String readLine(unsigned int timeout);
+    std::string readLine(unsigned int timeout);
 
     static int getNumOpenWiFiConnections();
     static int checkForAutoDisconnections();

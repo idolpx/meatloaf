@@ -745,7 +745,7 @@ void iecBus::releaseLines ( bool wait )
 }
 
 
-// boolean  iecBus::checkRESET()
+// bool  iecBus::checkRESET()
 // {
 //  return readRESET();
 //  return false;

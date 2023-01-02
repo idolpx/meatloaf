@@ -189,7 +189,7 @@ ZResult ZCommand::doResetCommand()
   nextConn = null;
   WiFiServerNode::DestroyAllServers();
   setConfigDefaults();
-  String argv[CFG_LAST+1];
+  std::string argv[CFG_LAST+1];
   parseConfigOptions(argv);
   eon=0;
   serial.setXON(true);
@@ -267,7 +267,7 @@ void pinModeDecoder(int mode, int *active, int *inactive, int activeDef, int ina
   }
 }
 
-void pinModeDecoder(String newMode, int *active, int *inactive, int activeDef, int inactiveDef)
+void pinModeDecoder(std::string newMode, int *active, int *inactive, int activeDef, int inactiveDef)
 {
   if(newMode.length()>0)
   {
@@ -289,21 +289,21 @@ void ZCommand::reSaveConfig()
   int riMode = pinModeCoder(riActive, riInactive, DEFAULT_RTS_HIGH);
   int dtrMode = pinModeCoder(dtrActive, dtrInactive, DEFAULT_DTR_HIGH);
   int dsrMode = pinModeCoder(dsrActive, dsrInactive, DEFAULT_DSR_HIGH);
-  String wifiSSIhex = TOHEX(wifiSSI.c_str(),hex,256);
-  String wifiPWhex = TOHEX(wifiPW.c_str(),hex,256);
-  String zclockFormathex = TOHEX(zclock.getFormat().c_str(),hex,256);
-  String zclockHosthex = TOHEX(zclock.getNtpServerHost().c_str(),hex,256);
-  String hostnamehex = TOHEX(hostname.c_str(),hex,256);
-  String printSpechex = TOHEX(printMode.getLastPrinterSpec(),hex,256);
-  String termTypehex = TOHEX(termType.c_str(),hex,256);
-  String busyMsghex = TOHEX(busyMsg.c_str(),hex,256);
-  String staticIPstr;
+  std::string wifiSSIhex = TOHEX(wifiSSI.c_str(),hex,256);
+  std::string wifiPWhex = TOHEX(wifiPW.c_str(),hex,256);
+  std::string zclockFormathex = TOHEX(zclock.getFormat().c_str(),hex,256);
+  std::string zclockHosthex = TOHEX(zclock.getNtpServerHost().c_str(),hex,256);
+  std::string hostnamehex = TOHEX(hostname.c_str(),hex,256);
+  std::string printSpechex = TOHEX(printMode.getLastPrinterSpec(),hex,256);
+  std::string termTypehex = TOHEX(termType.c_str(),hex,256);
+  std::string busyMsghex = TOHEX(busyMsg.c_str(),hex,256);
+  std::string staticIPstr;
   ConnSettings::IPtoStr(staticIP,staticIPstr);
-  String staticDNSstr;
+  std::string staticDNSstr;
   ConnSettings::IPtoStr(staticDNS,staticDNSstr);
-  String staticGWstr;
+  std::string staticGWstr;
   ConnSettings::IPtoStr(staticGW,staticGWstr);
-  String staticSNstr;
+  std::string staticSNstr;
   ConnSettings::IPtoStr(staticSN,staticSNstr);
 
   File f = SPIFFS.open(CONFIG_FILE, "w");
@@ -333,7 +333,7 @@ void ZCommand::reSaveConfig()
   if(SPIFFS.exists(CONFIG_FILE))
   {
     File f=SPIFFS.open(CONFIG_FILE, "r");
-    String str=f.readString();
+    std::string str=f.readString();
     f.close();
     int argn=0;
     if((str!=null)&&(str.length()>0))
@@ -359,7 +359,7 @@ int ZCommand::getConfigFlagBitmap()
   return serial.getConfigFlagBitmap() | (doEcho ? FLAG_ECHO : 0);
 }
 
-void ZCommand::setOptionsFromSavedConfig(String configArguments[])
+void ZCommand::setOptionsFromSavedConfig(std::string configArguments[])
 {
   if(configArguments[CFG_EOLN].length()>0)
   {
@@ -476,7 +476,7 @@ void ZCommand::setOptionsFromSavedConfig(String configArguments[])
   updateAutoAnswer();
 }
 
-void ZCommand::parseConfigOptions(String configArguments[])
+void ZCommand::parseConfigOptions(std::string configArguments[])
 {
   delay(500);
   bool v2=SPIFFS.exists(CONFIG_FILE);
@@ -485,7 +485,7 @@ void ZCommand::parseConfigOptions(String configArguments[])
     f = SPIFFS.open(CONFIG_FILE, "r");
   else
     f = SPIFFS.open(CONFIG_FILE_OLD, "r");
-  String str=f.readString();
+  std::string str=f.readString();
   f.close();
   if((str!=null)&&(str.length()>0))
   {
@@ -519,7 +519,7 @@ void ZCommand::loadConfig()
   if(WiFi.status() == WL_CONNECTED)
     WiFi.disconnect();
   setConfigDefaults();
-  String argv[CFG_LAST+1];
+  std::string argv[CFG_LAST+1];
   parseConfigOptions(argv);
   if(argv[CFG_BAUDRATE].length()>0)
     baudRate=atoi(argv[CFG_BAUDRATE].c_str());
@@ -761,7 +761,7 @@ ZResult ZCommand::doInfoCommand(int vval, uint8_t *vbuf, int vlen, bool isNumber
     serial.prints(EOLN);
     if(staticIP != null)
     {
-      String str;
+      std::string str;
       ConnSettings::IPtoStr(staticIP,str);
       serial.prints(str.c_str());
       serial.prints(EOLN);
@@ -1181,7 +1181,7 @@ ZResult ZCommand::doWebDump(const char *filename, const bool cache)
       uint8_t *buf = (uint8_t *)malloc(1);
       delay(100);
       char *oldMachineState = machineState;
-      String oldMachineQue = machineQue;
+      std::string oldMachineQue = machineQue;
       for(int i=0;i<flen;i++)
       {
         int c=f.read();
@@ -1344,7 +1344,7 @@ ZResult ZCommand::doWiFiCommand(int vval, uint8_t *vbuf, int vlen, bool isNumber
     {
       if((doPETSCII)&&(!serial.isPetsciiMode()))
       {
-        String ssidstr=WiFi.SSID(i);
+        std::string ssidstr=WiFi.SSID(i);
         char *c = (char *)ssidstr.c_str();
         for(;*c!=0;c++)
           serial.printc(ascToPetcii(*c));
@@ -1943,10 +1943,10 @@ bool ZCommand::readSerialStream()
   return crReceived;
 }
 
-String ZCommand::getNextSerialCommand()
+std::string ZCommand::getNextSerialCommand()
 {
   int len=eon;
-  String currentCommand = (char *)nbuf;
+  std::string currentCommand = (char *)nbuf;
   currentCommand.trim();
   memset(nbuf,0,MAX_COMMAND_SIZE);
   if(serial.isPetsciiMode())
@@ -2003,7 +2003,7 @@ ZResult ZCommand::doTimeZoneSetupCommand(int vval, uint8_t *vbuf, int vlen, bool
 ZResult ZCommand::doSerialCommand()
 {
   int len=eon;
-  String sbuf = getNextSerialCommand();
+  std::string sbuf = getNextSerialCommand();
 
   if((sbuf.length()==2)
   &&(lc(sbuf[0])=='a')
@@ -2041,7 +2041,7 @@ ZResult ZCommand::doSerialCommand()
     index++;
   }
   
-  String saveCommand = (index < len) ? sbuf : previousCommand;
+  std::string saveCommand = (index < len) ? sbuf : previousCommand;
 
   if((index<len-1)
   &&(lc(sbuf[index])=='a')
@@ -2052,7 +2052,7 @@ ZResult ZCommand::doSerialCommand()
     char secCmd=' ';
     int vstart=0;
     int vlen=0;
-    String dmodifiers="";
+    std::string dmodifiers="";
     while(index<len)
     {
       while((index<len)
@@ -2146,7 +2146,7 @@ ZResult ZCommand::doSerialCommand()
         memcpy(vbuf,sbuf.c_str()+vstart,vlen);
         if((vlen > 0)&&(isNumber))
         {
-          String finalNum="";
+          std::string finalNum="";
           for(uint8_t *v=vbuf;v<(vbuf+vlen);v++)
             if((*v>='0')&&(*v<='9'))
               finalNum += (char)*v;
@@ -2511,7 +2511,7 @@ ZResult ZCommand::doSerialCommand()
               browseMode.switchTo();
             else
             {
-              String line = colon+1;
+              std::string line = colon+1;
               line.trim();
               browseMode.init();
               browseMode.doModeCommand(line);
@@ -2556,9 +2556,9 @@ ZResult ZCommand::doSerialCommand()
         else
         {
           vbuf[eqMark]=0;
-          String var=(char *)vbuf;
+          std::string var=(char *)vbuf;
           var.trim();
-          String val=(char *)(vbuf+eqMark+1);
+          std::string val=(char *)(vbuf+eqMark+1);
           val.trim();
           result = ((val.length()==0)&&((strcmp(var.c_str(),"pass")!=0))) ? ZERROR : ZOK;
           if(result == ZOK)
@@ -3102,11 +3102,11 @@ void ZCommand::showInitMessage()
   serial.flush();
 }
 
-uint8_t *ZCommand::doStateMachine(uint8_t *buf, uint16_t *bufLen, char **machineState, String *machineQue, char *stateMachine)
+uint8_t *ZCommand::doStateMachine(uint8_t *buf, uint16_t *bufLen, char **machineState, std::string *machineQue, char *stateMachine)
 {
   if((stateMachine != NULL) && ((stateMachine)[0] != 0) && (*machineState != NULL) && ((*machineState)[0] != 0))
   {
-    String newBuf = "";
+    std::string newBuf = "";
     for(int i=0;i<*bufLen;)
     {
       char matchChar = FROMHEX((*machineState)[0],(*machineState)[1]);
@@ -3571,7 +3571,7 @@ void ZCommand::acceptNewConnection()
       if(newClient.connected())
       {
         int port=newClient.localPort();
-        String remoteIPStr = newClient.remoteIP().toString();
+        std::string remoteIPStr = newClient.remoteIP().toString();
         const char *remoteIP=remoteIPStr.c_str();
         bool found=false;
         WiFiClientNode *c=conns;

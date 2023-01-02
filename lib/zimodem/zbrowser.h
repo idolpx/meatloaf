@@ -26,29 +26,29 @@ class ZBrowser : public ZMode
     ZSerial serial;
 
     void switchBackToCommandMode();
-    String makePath(String addendum);
-    String fixPathNoSlash(String path);
-    String stripDir(String path);
-    String stripFilename(String path);
-    String stripArgs(String line, String &argLetters);
-    String cleanOneArg(String line);
-    String cleanFirstArg(String line);
-    String cleanRemainArg(String line);
-    bool isMask(String mask);
-    bool matches(String fname, String mask);
-    void makeFileList(String ***l, int *n, String p, String mask, bool recurse);
-    void deleteFile(String fname, String mask, bool recurse);
-    void showDirectory(String path, String mask, String prefix, bool recurse);
-    void copyFiles(String source, String mask, String target, bool recurse, bool overwrite);
+    std::string makePath(std::string addendum);
+    std::string fixPathNoSlash(std::string path);
+    std::string stripDir(std::string path);
+    std::string stripFilename(std::string path);
+    std::string stripArgs(std::string line, std::string &argLetters);
+    std::string cleanOneArg(std::string line);
+    std::string cleanFirstArg(std::string line);
+    std::string cleanRemainArg(std::string line);
+    bool isMask(std::string mask);
+    bool matches(std::string fname, std::string mask);
+    void makeFileList(std::string ***l, int *n, std::string p, std::string mask, bool recurse);
+    void deleteFile(std::string fname, std::string mask, bool recurse);
+    void showDirectory(std::string path, std::string mask, std::string prefix, bool recurse);
+    void copyFiles(std::string source, std::string mask, std::string target, bool recurse, bool overwrite);
     
     FTPHost *ftpHost = 0;
     bool showMenu;
     bool savedEcho;
-    String path="/";
-    String EOLN;
+    std::string path="/";
+    std::string EOLN;
     char EOLNC[5];
     unsigned long lastNumber;
-    String lastString;
+    std::string lastString;
 
   public:
     ~ZBrowser();
@@ -56,6 +56,6 @@ class ZBrowser : public ZMode
     void serialIncoming();
     void loop();
     void init();
-    void doModeCommand(String &line);
+    void doModeCommand(std::string &line);
 };
 #endif

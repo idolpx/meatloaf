@@ -137,13 +137,13 @@ public:
 
   int getTimeZoneCode();
   void setTimeZoneCode(int val);
-  bool setTimeZone(String str);
+  bool setTimeZone(std::string str);
 
-  String getFormat();
-  void setFormat(String fmt);
+  std::string getFormat();
+  void setFormat(std::string fmt);
 
-  String getNtpServerHost();
-  void setNtpServerHost(String newHost);
+  std::string getNtpServerHost();
+  void setNtpServerHost(std::string newHost);
 
   bool isDisabled();
   void setDisabled(bool tf);
@@ -151,7 +151,7 @@ public:
   void forceUpdate();
 
   DateTimeClock &getCurrentTime();
-  String getCurrentTimeFormatted();
+  std::string getCurrentTimeFormatted();
 
   // should be private
 private:
@@ -164,8 +164,8 @@ private:
   int32_t ntpPeriodMillis = 60 * 1000; // every minute
   int32_t ntpPeriodLongMillis = 5 * 60 * 60 * 1000; // every 5 hours
   uint8_t tzCode = 0;
-  String format="%M/%d/%yyyy %h:%mm:%ss%aa %z";
-  String ntpServerName = "time.nist.gov";
+  std::string format="%M/%d/%yyyy %h:%mm:%ss%aa %z";
+  std::string ntpServerName = "time.nist.gov";
 
   void startUdp();
   bool sendTimeRequest();

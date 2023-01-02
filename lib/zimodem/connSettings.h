@@ -13,6 +13,11 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
+
+#include <string>
+
+#include ""
+
 enum ConnFlag
 {
   FLAG_DISCONNECT_ON_EXIT=1,
@@ -27,21 +32,21 @@ enum ConnFlag
 class ConnSettings
 {
   public:
-    boolean petscii = false;
-    boolean telnet = false;
-    boolean echo = false;
-    boolean xonxoff = false;
-    boolean rtscts = false;
-    boolean secure = false;
+    bool petscii = false;
+    bool telnet = false;
+    bool echo = false;
+    bool xonxoff = false;
+    bool rtscts = false;
+    bool secure = false;
 
     ConnSettings(int flagBitmap);
     ConnSettings(const char *dmodifiers);
-    ConnSettings(String modifiers);
+    ConnSettings(std::string modifiers);
     int getBitmap();
     int getBitmap(FlowControlType forceCheck);
-    void setFlag(ConnFlag flagMask, boolean newVal);
-    String getFlagString();
+    void setFlag(ConnFlag flagMask, bool newVal);
+    std::string getFlagString();
 
-    static void IPtoStr(IPAddress *ip, String &str);
+    static void IPtoStr(IPAddress *ip, std::string &str);
     static IPAddress *parseIP(const char *ipStr);
 };

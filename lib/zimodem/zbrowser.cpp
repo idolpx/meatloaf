@@ -63,7 +63,7 @@ void ZBrowser::serialIncoming()
   {
     if(commandMode.doEcho)
       serial.prints(EOLN);
-    String line =commandMode.getNextSerialCommand();
+    std::string line =commandMode.getNextSerialCommand();
     doModeCommand(line);
   }
 }
@@ -74,9 +74,9 @@ void ZBrowser::switchBackToCommandMode()
   currMode = &commandMode;
 }
 
-String ZBrowser::fixPathNoSlash(String p)
+std::string ZBrowser::fixPathNoSlash(std::string p)
 {
-  String finalPath="";
+  std::string finalPath="";
   int lastX=0;
   uint16_t backStack[256] = {0};
   backStack[0]=1;
@@ -87,7 +87,7 @@ String ZBrowser::fixPathNoSlash(String p)
     {
       if(i>lastX)
       {
-        String sub=p.substring(lastX,i);
+        std::string sub=p.substring(lastX,i);
         if(sub.equals("."))
         {
           // do nothing
@@ -115,7 +115,7 @@ String ZBrowser::fixPathNoSlash(String p)
 
   if(lastX<p.length())
   {
-    String sub=p.substring(lastX);
+    std::string sub=p.substring(lastX);
     if(sub.equals("."))
     {
       // do nothing
@@ -139,7 +139,7 @@ String ZBrowser::fixPathNoSlash(String p)
   return finalPath;
 }
 
-String ZBrowser::stripDir(String p)
+std::string ZBrowser::stripDir(std::string p)
 {
   int x=p.lastIndexOf("/");
   if(x<=0)
@@ -147,7 +147,7 @@ String ZBrowser::stripDir(String p)
   return p.substring(0,x);
 }
 
-String ZBrowser::stripFilename(String p)
+std::string ZBrowser::stripFilename(std::string p)
 {
   int x=p.lastIndexOf("/");
   if((x<0)||(x==p.length()-1))
@@ -155,10 +155,10 @@ String ZBrowser::stripFilename(String p)
   return p.substring(x+1);
 }
 
-String ZBrowser::cleanFirstArg(String line)
+std::string ZBrowser::cleanFirstArg(std::string line)
 {
   int state=0;
-  String arg="";
+  std::string arg="";
   for(int i=0;i<line.length();i++)
   {
     if((line[i]=='\\')&&(i<line.length()-1))
@@ -192,7 +192,7 @@ String ZBrowser::cleanFirstArg(String line)
   return arg;
 }
 
-String ZBrowser::cleanRemainArg(String line)
+std::string ZBrowser::cleanRemainArg(std::string line)
 {
   int state=0;
   int ct=0;
@@ -211,7 +211,7 @@ String ZBrowser::cleanRemainArg(String line)
       else
       if(state==1)
       {
-        String remain=line.substring(i+1);
+        std::string remain=line.substring(i+1);
         remain.trim();
         return cleanOneArg(remain);
       }
@@ -223,7 +223,7 @@ String ZBrowser::cleanRemainArg(String line)
     {
       if(state == 0)
       {
-        String remain=line.substring(i+1);
+        std::string remain=line.substring(i+1);
         remain.trim();
         return cleanOneArg(remain);
       }
@@ -235,10 +235,10 @@ String ZBrowser::cleanRemainArg(String line)
   return "";
 }
 
-String ZBrowser::cleanOneArg(String line)
+std::string ZBrowser::cleanOneArg(std::string line)
 {
   int state=0;
-  String arg="";
+  std::string arg="";
   for(int i=0;i<line.length();i++)
   {
     if((line[i]=='\\')&&(i<line.length()-1))
@@ -263,7 +263,7 @@ String ZBrowser::cleanOneArg(String line)
   return arg;
 }
 
-String ZBrowser::makePath(String addendum)
+std::string ZBrowser::makePath(std::string addendum)
 {
   if(addendum.length()>0)
   {
@@ -275,12 +275,12 @@ String ZBrowser::makePath(String addendum)
   return fixPathNoSlash(path);
 }
 
-bool ZBrowser::isMask(String mask)
+bool ZBrowser::isMask(std::string mask)
 {
   return (mask.indexOf("*")>=0) || (mask.indexOf("?")>=0);
 }
 
-String ZBrowser::stripArgs(String line, String &argLetters)
+std::string ZBrowser::stripArgs(std::string line, std::string &argLetters)
 {
   while(line.startsWith("-"))
   {
@@ -297,7 +297,7 @@ String ZBrowser::stripArgs(String line, String &argLetters)
   return line;
 }
 
-void ZBrowser::copyFiles(String source, String mask, String target, bool recurse, bool overwrite)
+void ZBrowser::copyFiles(std::string source, std::string mask, std::string target, bool recurse, bool overwrite)
 {
   int maskFilterLen = source.length();
   if(!source.endsWith("/"))
@@ -331,7 +331,7 @@ void ZBrowser::copyFiles(String source, String mask, String target, bool recurse
       if(matches(file.name()+maskFilterLen, mask))
       {
         debugPrintf("file matched:%s\n",file.name());
-        String tpath = target;
+        std::string tpath = target;
         if(file.isDirectory())
         {
           if(!recurse)
@@ -349,7 +349,7 @@ void ZBrowser::copyFiles(String source, String mask, String target, bool recurse
   }
   else
   {
-    String tpath = target;
+    std::string tpath = target;
     if(SD.exists(tpath))
     {
       File DD=SD.open(tpath);
@@ -395,7 +395,7 @@ void ZBrowser::copyFiles(String source, String mask, String target, bool recurse
   }
 }
 
-void ZBrowser::makeFileList(String ***l, int *n, String p, String mask, bool recurse)
+void ZBrowser::makeFileList(std::string ***l, int *n, std::string p, std::string mask, bool recurse)
 {
   int maskFilterLen = p.length();
   if(!p.endsWith("/"))
@@ -412,7 +412,7 @@ void ZBrowser::makeFileList(String ***l, int *n, String p, String mask, bool rec
     {
       if(matches(file.name()+maskFilterLen, mask))
       {
-        String fileName = file.name();
+        std::string fileName = file.name();
         if(file.isDirectory())
         {
           if(recurse)
@@ -424,7 +424,7 @@ void ZBrowser::makeFileList(String ***l, int *n, String p, String mask, bool rec
         else
         {
           file = root.openNextFile();
-          String **newList = (String **)malloc(sizeof(String *)*(*n+1));
+          std::string **newList = (std::string **)malloc(sizeof(std::string *)*(*n+1));
           for(int i=0;i<*n;i++)
             newList[i]=(*l)[i];
           free(*l);
@@ -440,7 +440,7 @@ void ZBrowser::makeFileList(String ***l, int *n, String p, String mask, bool rec
 
 }
 
-void ZBrowser::deleteFile(String p, String mask, bool recurse)
+void ZBrowser::deleteFile(std::string p, std::string mask, bool recurse)
 {
   int maskFilterLen = p.length();
   if(!p.endsWith("/"))
@@ -457,7 +457,7 @@ void ZBrowser::deleteFile(String p, String mask, bool recurse)
     {
       if(matches(file.name()+maskFilterLen, mask))
       {
-        String fileName = file.name();
+        std::string fileName = file.name();
         if(file.isDirectory())
         {
           if(recurse)
@@ -486,7 +486,7 @@ void ZBrowser::deleteFile(String p, String mask, bool recurse)
   }
 }
 
-bool ZBrowser::matches(String fname, String mask)
+bool ZBrowser::matches(std::string fname, std::string mask)
 {
   if((mask.length()==0)||(mask.equals("*")))
     return true;
@@ -514,7 +514,7 @@ bool ZBrowser::matches(String fname, String mask)
   return true;
 }
 
-void ZBrowser::showDirectory(String p, String mask, String prefix, bool recurse)
+void ZBrowser::showDirectory(std::string p, std::string mask, std::string prefix, bool recurse)
 {
   int maskFilterLen = p.length();
   if(!p.endsWith("/"))
@@ -537,7 +537,7 @@ void ZBrowser::showDirectory(String p, String mask, String prefix, bool recurse)
           serial.printf("%sd %s%s",prefix.c_str(),file.name()+maskFilterLen,EOLNC);
           if(recurse)
           {
-            String newPrefix = prefix + "  ";
+            std::string newPrefix = prefix + "  ";
             showDirectory(file.name(), mask, newPrefix, recurse);
           }
         }
@@ -553,7 +553,7 @@ void ZBrowser::showDirectory(String p, String mask, String prefix, bool recurse)
     serial.printf("  %s %lu%s",root.name(),root.size(),EOLNC);
 }
 
-void ZBrowser::doModeCommand(String &line)
+void ZBrowser::doModeCommand(std::string &line)
 {
   char c='?';
   for(int i=0;i<line.length();i++)
@@ -562,7 +562,7 @@ void ZBrowser::doModeCommand(String &line)
       line.remove(i--);
   }
   int sp=line.indexOf(' ');
-  String cmd=line;
+  std::string cmd=line;
   if(sp > 0)
   {
     cmd=line.substring(0,sp);
@@ -590,13 +590,13 @@ void ZBrowser::doModeCommand(String &line)
       else
       if(cmd.equalsIgnoreCase("ls")||cmd.equalsIgnoreCase("dir")||cmd.equalsIgnoreCase("$")||cmd.equalsIgnoreCase("list"))
       {
-        String argLetters = "";
+        std::string argLetters = "";
         line = stripArgs(line,argLetters);
         argLetters.toLowerCase();
         bool recurse=argLetters.indexOf('r')>=0;
-        String rawPath = makePath(cleanOneArg(line));
-        String p;
-        String mask;
+        std::string rawPath = makePath(cleanOneArg(line));
+        std::string p;
+        std::string mask;
         if((line.length()==0)||(line.endsWith("/")))
         {
           p=rawPath;
@@ -618,7 +618,7 @@ void ZBrowser::doModeCommand(String &line)
       else
       if(cmd.equalsIgnoreCase("md")||cmd.equalsIgnoreCase("mkdir")||cmd.equalsIgnoreCase("makedir"))
       {
-        String p = makePath(cleanOneArg(line));
+        std::string p = makePath(cleanOneArg(line));
         debugPrintf("md:%s\n",p.c_str());
         if((p.length() < 2) || isMask(p) || !SD.mkdir(p))
           serial.printf("Illegal path: %s%s",p.c_str(),EOLNC);
@@ -626,7 +626,7 @@ void ZBrowser::doModeCommand(String &line)
       else
       if(cmd.equalsIgnoreCase("cd"))
       {
-        String p = makePath(cleanOneArg(line));
+        std::string p = makePath(cleanOneArg(line));
         debugPrintf("cd:%s\n",p.c_str());
         if(p.length()==0)
           serial.printf("Current path: %s%s",p.c_str(),EOLNC);
@@ -649,7 +649,7 @@ void ZBrowser::doModeCommand(String &line)
       else
       if(cmd.equalsIgnoreCase("rd")||cmd.equalsIgnoreCase("rmdir")||cmd.equalsIgnoreCase("deletedir"))
       {
-        String p = makePath(cleanOneArg(line));
+        std::string p = makePath(cleanOneArg(line));
         debugPrintf("rd:%s\n",p.c_str());
         File root = SD.open(p);
         if(!root)
@@ -664,7 +664,7 @@ void ZBrowser::doModeCommand(String &line)
       else
       if(cmd.equalsIgnoreCase("cat")||cmd.equalsIgnoreCase("type"))
       {
-        String p = makePath(cleanOneArg(line));
+        std::string p = makePath(cleanOneArg(line));
         debugPrintf("cat:%s\n",p.c_str());
         File root = SD.open(p);
         if(!root)
@@ -684,7 +684,7 @@ void ZBrowser::doModeCommand(String &line)
       else
       if(cmd.equalsIgnoreCase("xget"))
       {
-        String p = makePath(cleanOneArg(line));
+        std::string p = makePath(cleanOneArg(line));
         debugPrintf("xget:%s\n",p.c_str());
         File root = SD.open(p);
         if(!root)
@@ -699,7 +699,7 @@ void ZBrowser::doModeCommand(String &line)
         {
           root.close();
           File rfile = SD.open(p, FILE_READ);
-          String errors="";
+          std::string errors="";
           serial.printf("Go to XModem download.%s",EOLNC);
           serial.flushAlways();
           if(xDownload(commandMode.getFlowControlType(), rfile,errors))
@@ -719,7 +719,7 @@ void ZBrowser::doModeCommand(String &line)
       else
       if(cmd.equalsIgnoreCase("xput"))
       {
-        String p = makePath(cleanOneArg(line));
+        std::string p = makePath(cleanOneArg(line));
         debugPrintf("xput:%s\n",p.c_str());
         File root = SD.open(p);
         if(root)
@@ -729,7 +729,7 @@ void ZBrowser::doModeCommand(String &line)
         }
         else
         {
-          String dirNm=stripDir(p);
+          std::string dirNm=stripDir(p);
           File rootDir=SD.open(dirNm);
           if((!rootDir)||(!rootDir.isDirectory()))
           {
@@ -740,7 +740,7 @@ void ZBrowser::doModeCommand(String &line)
           else
           {
             File rfile = SD.open(p, FILE_WRITE);
-            String errors="";
+            std::string errors="";
             serial.printf("Go to XModem upload.%s",EOLNC);
             serial.flushAlways();
             if(xUpload(commandMode.getFlowControlType(), rfile,errors))
@@ -761,7 +761,7 @@ void ZBrowser::doModeCommand(String &line)
       else
       if(cmd.equalsIgnoreCase("zget")||cmd.equalsIgnoreCase("rz")||cmd.equalsIgnoreCase("rz.exe"))
       {
-        String p = makePath(cleanOneArg(line));
+        std::string p = makePath(cleanOneArg(line));
         debugPrintf("zget:%s\n",p.c_str());
         File root = SD.open(p);
         if(!root)
@@ -775,7 +775,7 @@ void ZBrowser::doModeCommand(String &line)
         else
         {
           root.close();
-          String errors="";
+          std::string errors="";
           if(zDownload(commandMode.getFlowControlType(),SD,p,errors))
           {
             delay(2000);
@@ -791,9 +791,9 @@ void ZBrowser::doModeCommand(String &line)
       else
       if(cmd.equalsIgnoreCase("zput")||cmd.equalsIgnoreCase("sz"))
       {
-        String p = makePath(cleanOneArg(line));
+        std::string p = makePath(cleanOneArg(line));
         debugPrintf("zput:%s\n",p.c_str());
-        String dirNm=p;
+        std::string dirNm=p;
         File rootDir=SD.open(dirNm);
         if((!rootDir)||(!rootDir.isDirectory()))
         {
@@ -803,9 +803,9 @@ void ZBrowser::doModeCommand(String &line)
         }
         else
         {
-          String rootDirNm = rootDir.name();
+          std::string rootDirNm = rootDir.name();
           rootDir.close();
-          String errors="";
+          std::string errors="";
           serial.printf("Go to ZModem upload.%s",EOLNC);
           serial.flushAlways();
           if(zUpload(commandMode.getFlowControlType(),SD,rootDirNm,errors))
@@ -823,11 +823,11 @@ void ZBrowser::doModeCommand(String &line)
       else
       if(cmd.equalsIgnoreCase("kget")||cmd.equalsIgnoreCase("rk"))
       {
-        String rawPath = makePath(cleanOneArg(line));
-        String p=stripDir(rawPath);
-        String mask=stripFilename(rawPath);
-        String errors="";
-        String **fileList=(String**)malloc(sizeof(String *));
+        std::string rawPath = makePath(cleanOneArg(line));
+        std::string p=stripDir(rawPath);
+        std::string mask=stripFilename(rawPath);
+        std::string errors="";
+        std::string **fileList=(String**)malloc(sizeof(std::string *));
         int numFiles=0;
         makeFileList(&fileList,&numFiles,p,mask,true);
         serial.printf("Go to Kermit download.%s",EOLNC);
@@ -851,9 +851,9 @@ void ZBrowser::doModeCommand(String &line)
       else
       if(cmd.equalsIgnoreCase("kput")||cmd.equalsIgnoreCase("sk"))
       {
-        String p = makePath(cleanOneArg(line));
+        std::string p = makePath(cleanOneArg(line));
         debugPrintf("kput:%s\n",p.c_str());
-        String dirNm=p;
+        std::string dirNm=p;
         File rootDir=SD.open(dirNm);
         if((!rootDir)||(!rootDir.isDirectory()))
         {
@@ -863,9 +863,9 @@ void ZBrowser::doModeCommand(String &line)
         }
         else
         {
-          String rootDirNm = rootDir.name();
+          std::string rootDirNm = rootDir.name();
           rootDir.close();
-          String errors="";
+          std::string errors="";
           serial.printf("Go to Kermit upload.%s",EOLNC);
           serial.flushAlways();
           if(kUpload(commandMode.getFlowControlType(),SD,rootDirNm,errors))
@@ -885,27 +885,27 @@ void ZBrowser::doModeCommand(String &line)
       else
       if(cmd.equalsIgnoreCase("rm")||cmd.equalsIgnoreCase("del")||cmd.equalsIgnoreCase("delete"))
       {
-        String argLetters = "";
+        std::string argLetters = "";
         line = stripArgs(line,argLetters);
         argLetters.toLowerCase();
         bool recurse=argLetters.indexOf('r')>=0;
-        String rawPath = makePath(cleanOneArg(line));
-        String p=stripDir(rawPath);
-        String mask=stripFilename(rawPath);
+        std::string rawPath = makePath(cleanOneArg(line));
+        std::string p=stripDir(rawPath);
+        std::string mask=stripFilename(rawPath);
         debugPrintf("rm:%s (%s)\n",p.c_str(),mask.c_str());
         deleteFile(p,mask,recurse);
       }
       else
       if(cmd.equalsIgnoreCase("cp")||cmd.equalsIgnoreCase("copy"))
       {
-        String argLetters = "";
+        std::string argLetters = "";
         line = stripArgs(line,argLetters);
         argLetters.toLowerCase();
         bool recurse=argLetters.indexOf('r')>=0;
         bool overwrite=argLetters.indexOf('f')>=0;
-        String p1=makePath(cleanFirstArg(line));
-        String p2=makePath(cleanRemainArg(line));
-        String mask;
+        std::string p1=makePath(cleanFirstArg(line));
+        std::string p2=makePath(cleanRemainArg(line));
+        std::string mask;
         if((line.length()==0)||(line.endsWith("/")))
           mask="";
         else
@@ -928,8 +928,8 @@ void ZBrowser::doModeCommand(String &line)
       if(cmd.equalsIgnoreCase("ren")||cmd.equalsIgnoreCase("rename"))
       {
         
-        String p1=makePath(cleanFirstArg(line));
-        String p2=makePath(cleanRemainArg(line));
+        std::string p1=makePath(cleanFirstArg(line));
+        std::string p2=makePath(cleanRemainArg(line));
         debugPrintf("ren:%s -> %s\n",p1.c_str(), p2.c_str());
         if(p1 == p2)
           serial.printf("File exists: %s%s",p1.c_str(),EOLNC);
@@ -945,8 +945,8 @@ void ZBrowser::doModeCommand(String &line)
       else
       if(cmd.equalsIgnoreCase("wget"))
       {
-        String p1=cleanFirstArg(line);
-        String p2=makePath(cleanRemainArg(line));
+        std::string p1=cleanFirstArg(line);
+        std::string p2=makePath(cleanRemainArg(line));
         debugPrintf("wget:%s -> %s\n",p1.c_str(), p2.c_str());
         if((p1.length()<8)
         || ((strcmp(p1.substring(0,7).c_str(),"http://") != 0)
@@ -973,8 +973,8 @@ void ZBrowser::doModeCommand(String &line)
       else
       if(cmd.equalsIgnoreCase("fget"))
       {
-        String p1=cleanFirstArg(line);
-        String p2=cleanRemainArg(line);
+        std::string p1=cleanFirstArg(line);
+        std::string p2=cleanRemainArg(line);
         if(p2.length() == 0)
         {
           int slash = p1.lastIndexOf('/');
@@ -1011,8 +1011,8 @@ void ZBrowser::doModeCommand(String &line)
       else
       if(cmd.equalsIgnoreCase("fput"))
       {
-        String p1=makePath(cleanFirstArg(line));
-        String p2=cleanRemainArg(line);
+        std::string p1=makePath(cleanFirstArg(line));
+        std::string p2=cleanRemainArg(line);
         debugPrintf("fput:%s -> %s\n",p1.c_str(), p2.c_str());
         char *tmp=0;
         bool isUrl = ((p2.length()>=11)
@@ -1046,7 +1046,7 @@ void ZBrowser::doModeCommand(String &line)
       else
       if(cmd.equalsIgnoreCase("fls") || cmd.equalsIgnoreCase("fdir"))
       {
-        String p1=cleanOneArg(line);
+        std::string p1=cleanOneArg(line);
         debugPrintf("fls:%s\n",p1.c_str());
         char *tmp=0;
         bool isUrl = ((p1.length()>=11)
@@ -1070,13 +1070,13 @@ void ZBrowser::doModeCommand(String &line)
       else
       if(cmd.equalsIgnoreCase("mv")||cmd.equalsIgnoreCase("move"))
       {
-        String argLetters = "";
+        std::string argLetters = "";
         line = stripArgs(line,argLetters);
         argLetters.toLowerCase();
         bool overwrite=argLetters.indexOf('f')>=0;
-        String p1=makePath(cleanFirstArg(line));
-        String p2=makePath(cleanRemainArg(line));
-        String mask;
+        std::string p1=makePath(cleanFirstArg(line));
+        std::string p2=makePath(cleanRemainArg(line));
+        std::string mask;
         if((line.length()==0)||(line.endsWith("/")))
           mask="";
         else

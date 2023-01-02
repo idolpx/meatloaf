@@ -128,8 +128,8 @@ class ZCommand : public ZMode
     char *maskOuts = NULL;
     char *stateMachine = NULL;
     char *machineState = NULL;
-    String machineQue = "";
-    String previousCommand = "";
+    std::string machineQue = "";
+    std::string previousCommand = "";
     WiFiClientNode *nextConn=null;
     int lastPacketId = -1;
 
@@ -139,11 +139,11 @@ class ZCommand : public ZMode
     bool readSerialStream();
     bool clearPlusProgress();
     bool checkPlusEscape();
-    String getNextSerialCommand();
+    std::string getNextSerialCommand();
     ZResult doSerialCommand();
     void setConfigDefaults();
-    void parseConfigOptions(String configArguments[]);
-    void setOptionsFromSavedConfig(String configArguments[]);
+    void parseConfigOptions(std::string configArguments[]);
+    void setOptionsFromSavedConfig(std::string configArguments[]);
     void reSaveConfig();
     void reSendLastPacket(WiFiClientNode *conn, uint8_t which);
     void acceptNewConnection();
@@ -152,7 +152,7 @@ class ZCommand : public ZMode
     void sendNextPacket();
     void connectionArgs(WiFiClientNode *c);
     void updateAutoAnswer();
-    uint8_t *doStateMachine(uint8_t *buf, uint16_t *bufLen, char **machineState, String *machineQue, char *stateMachine);
+    uint8_t *doStateMachine(uint8_t *buf, uint16_t *bufLen, char **machineState, std::string *machineQue, char *stateMachine);
     uint8_t *doMaskOuts(uint8_t *buf, uint16_t *bufLen, char *maskOuts);
     ZResult doWebDump(Stream *in, int len, const bool cacheFlag);
     ZResult doWebDump(const char *filename, const bool cache);
@@ -179,8 +179,8 @@ class ZCommand : public ZMode
     bool suppressResponses;
     bool numericResponses;
     bool longResponses;
-    boolean doEcho;
-    String EOLN;
+    bool doEcho;
+    std::string EOLN;
     char EC='+';
     char ECS[32];
 

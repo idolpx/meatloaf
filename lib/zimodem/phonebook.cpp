@@ -61,7 +61,7 @@ void PhoneBookEntry::loadPhonebook()
     File f = SPIFFS.open("/zphonebook.txt", "r");
     while(f.available()>0)
     {
-      String str="";
+      std::string str="";
       char c=f.read();
       while((c != '\n') && (f.available()>0))
       {
@@ -69,7 +69,7 @@ void PhoneBookEntry::loadPhonebook()
         c=f.read();
       }
       int argn=0;
-      String configArguments[4];
+      std::string configArguments[4];
       for(int i=0;i<4;i++)
         configArguments[i]="";
       for(int i=0;i<str.length();i++)
@@ -85,7 +85,7 @@ void PhoneBookEntry::loadPhonebook()
   }
 }
 
-bool PhoneBookEntry::checkPhonebookEntry(String cmd)
+bool PhoneBookEntry::checkPhonebookEntry(std::string cmd)
 {
     const char *vbuf=(char *)cmd.c_str();
     bool error = false;
@@ -113,7 +113,7 @@ PhoneBookEntry *PhoneBookEntry::findPhonebookEntry(long number)
   return null;
 }
 
-PhoneBookEntry *PhoneBookEntry::findPhonebookEntry(String number)
+PhoneBookEntry *PhoneBookEntry::findPhonebookEntry(std::string number)
 {
   if(!checkPhonebookEntry(number))
     return null;
@@ -147,7 +147,7 @@ void PhoneBookEntry::savePhonebook()
     File f = SPIFFS.open("/zphonebook.txt", "r");
     while(f.available()>0)
     {
-      String str="";
+      std::string str="";
       char c=f.read();
       while((c != '\n') && (f.available()>0))
       {

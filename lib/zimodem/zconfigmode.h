@@ -42,12 +42,12 @@ class ZConfig : public ZMode
     void doModeCommand();
     bool showMenu;
     bool savedEcho;
-    String EOLN;
+    std::string EOLN;
     const char *EOLNC;
     unsigned long lastNumber;
-    String lastAddress;
-    String lastOptions;
-    String lastNotes;
+    std::string lastAddress;
+    std::string lastOptions;
+    std::string lastNotes;
     WiFiServerSpec serverSpec;
     bool newListen;
     bool useDHCP;

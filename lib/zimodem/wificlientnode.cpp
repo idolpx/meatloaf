@@ -69,7 +69,7 @@ WiFiClientNode::WiFiClientNode(WiFiClient newClient, int flagsBitmap, int ringDe
   setCharArray(&maskOuts,"");
   setCharArray(&stateMachine,"");
   machineState = stateMachine;
-  String remoteIPStr = newClient.remoteIP().toString();
+  std::string remoteIPStr = newClient.remoteIP().toString();
   const char *remoteIP=remoteIPStr.c_str();
   host=new char[remoteIPStr.length()+1];
   strcpy(host,remoteIP);
@@ -340,16 +340,16 @@ size_t WiFiClientNode::write(const uint8_t *buf, size_t size)
   return written;
 }
 
-void WiFiClientNode::print(String s)
+void WiFiClientNode::print(std::string s)
 {
   int size=s.length();
   write((const uint8_t *)s.c_str(),size);
 }
 
-String WiFiClientNode::readLine(unsigned int timeout)
+std::string WiFiClientNode::readLine(unsigned int timeout)
 {
   unsigned long now=millis();
-  String line = "";
+  std::string line = "";
   while(((millis()-now < timeout) || (available()>0)))
   {
     yield();

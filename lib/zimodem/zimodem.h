@@ -182,8 +182,8 @@ static WiFiServerNode *servs = null;
 static PhoneBookEntry *phonebook = null;
 static bool pinSupport[MAX_PIN_NO];
 static bool browseEnabled = false;
-static String termType = DEFAULT_TERMTYPE;
-static String busyMsg = DEFAULT_BUSYMSG;
+static std::string termType = DEFAULT_TERMTYPE;
+static std::string busyMsg = DEFAULT_BUSYMSG;
 
 static ZMode *currMode = null;
 static ZStream streamMode;
@@ -213,9 +213,9 @@ enum BaudState
   BS_SWITCH_NORMAL_NEXT
 };
 
-static String wifiSSI;
-static String wifiPW;
-static String hostname;
+static std::string wifiSSI;
+static std::string wifiPW;
+static std::string hostname;
 static IPAddress *staticIP = null;
 static IPAddress *staticDNS = null;
 static IPAddress *staticGW = null;

@@ -16,7 +16,7 @@ KModem::KModem(FlowControlType commandFlow,
                int (*recvChar)(ZSerial *ser, int msDelay),
                void (*sendChar)(ZSerial *ser, char sym),
                bool (*dataHandler)(File *kfp, unsigned long number, char *buffer, int len),
-               String &errors)
+               std::string &errors)
 {
   this->errStr = &errors;
   this->sendChar = sendChar;
@@ -775,7 +775,7 @@ void KModem::spar(char data[])
 }
 
 
-void KModem::setTransmitList(String **fileList, int numFiles)
+void KModem::setTransmitList(std::string **fileList, int numFiles)
 {
   filelist = fileList;
   filecount = numFiles;

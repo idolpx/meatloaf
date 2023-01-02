@@ -56,7 +56,7 @@ void ZConfig::switchBackToCommandMode()
 
 void ZConfig::doModeCommand()
 {
-  String cmd = commandMode.getNextSerialCommand();
+  std::string cmd = commandMode.getNextSerialCommand();
   char c='?';
   char sc='?';
   for(int i=0;i<cmd.length();i++)
@@ -276,7 +276,7 @@ void ZConfig::doModeCommand()
           currState=ZCFGMENU_NOTES; // just keep old values
       else
       {
-        boolean fail = cmd.indexOf(',') >= 0;
+        bool fail = cmd.indexOf(',') >= 0;
         int colonDex=cmd.indexOf(':');
         fail = fail || (colonDex <= 0) || (colonDex == cmd.length()-1);
         fail = fail || (colonDex != cmd.lastIndexOf(':'));
@@ -669,7 +669,7 @@ void ZConfig::loop()
         serial.printf("%sMain Menu%s",EOLNC,EOLNC);
         serial.printf("[HOST] name: %s%s",hostname.c_str(),EOLNC);
         serial.printf("[WIFI] connection: %s%s",(WiFi.status() == WL_CONNECTED)?wifiSSI.c_str():"Not connected",EOLNC);
-        String flowName;
+        std::string flowName;
         switch(commandMode.serial.getFlowControlType())
         {
           case FCT_NORMAL:
@@ -685,7 +685,7 @@ void ZConfig::loop()
             flowName = "OTHER";
             break;
         }
-        String bbsMode = "DISABLED";
+        std::string bbsMode = "DISABLED";
         if(newListen)
         {
           bbsMode = "Port ";
@@ -764,7 +764,7 @@ void ZConfig::loop()
       }
       case ZCFGMENU_SUBNET:
       {
-        String str;
+        std::string str;
         switch(netOpt)
         {
         case 'i':
@@ -799,7 +799,7 @@ void ZConfig::loop()
         serial.printf("%sNetwork settings:%s",EOLNC,EOLNC);
         if(!useDHCP)
         {
-          String str;
+          std::string str;
           ConnSettings::IPtoStr(&lastIP,str);
           serial.printf("%s[IP]: %s%s",EOLNC,str.c_str(),EOLNC);
           ConnSettings::IPtoStr(&lastSN,str);

@@ -28,8 +28,8 @@ class PhoneBookEntry
     static void loadPhonebook();
     static void clearPhonebook();
     static void savePhonebook();
-    static bool checkPhonebookEntry(String cmd);
+    static bool checkPhonebookEntry(std::string cmd);
     static PhoneBookEntry *findPhonebookEntry(long number);
-    static PhoneBookEntry *findPhonebookEntry(String number);
+    static PhoneBookEntry *findPhonebookEntry(std::string number);
 };
 

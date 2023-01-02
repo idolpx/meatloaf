@@ -202,7 +202,7 @@ void ZStream::loop()
       if(newClient.connected())
       {
         int port=newClient.localPort();
-        String remoteIPStr = newClient.remoteIP().toString();
+        std::string remoteIPStr = newClient.remoteIP().toString();
         const char *remoteIP=remoteIPStr.c_str();
         bool found=false;
         WiFiClientNode *c=conns;
