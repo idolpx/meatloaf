@@ -31,19 +31,40 @@ using namespace Protocol;
 int16_t  JiffyDOS::receiveByte ()
 {
     flags and_eq CLEAR_LOW;
-
-    pull ( PIN_IEC_SRQ );
+    uint8_t el_time = 0; // early/late time
+    uint8_t data = 0;
+    uint8_t bitmask = 0xFF;
 
     // Sometimes the C64 pulls ATN but doesn't pull CLOCK right away
-    // pull ( PIN_IEC_SRQ );
+    pull ( PIN_IEC_SRQ );
     // if ( !wait ( 60 ) ) return -1;
     // release ( PIN_IEC_SRQ );
 
     // Release the Data line to signal we are ready
     release ( PIN_IEC_DATA_IN );
+    status ( PIN_IEC_DATA_IN ); // Change mode to input
+    release ( PIN_IEC_SRQ );
+
+// Late: When the 1541 reads the bus, the data line is still set to active by
+// the C64. The C64 sets the data line to inactive an extremely short time later
+// (f.e. 0.1uS), so the 1541 must wait one complete loop (7uS). So the 1541
+// leaves the loop 7uS later than the C64 inactivates data.
+
+// Early: The 1541 reads the bus exactly in the moment when the C64 sets the
+// data line to inactive. So the 1541 doesn't wait but continues at once. So the
+// 1541 leaves the loop 0uS later than the C64 inactivates data.
 
     // Wait for talker ready
-    if ( timeoutWait ( PIN_IEC_CLK_IN, RELEASED, FOREVER ) == TIMED_OUT )
+    el_time = timeoutWait ( PIN_IEC_CLK_IN, RELEASED );
+    if ( el_time == TIMED_OUT )
+    {
+        Debug_printv ( "Wait for talker ready" );
+        flags or_eq ERROR;
+        return -1; // return error because timeout
+    }
+
+    el_time = timeoutWait ( PIN_IEC_DATA_IN, PULLED );
+    if ( el_time == TIMED_OUT )
     {
         Debug_printv ( "Wait for talker ready" );
         flags or_eq ERROR;
@@ -51,33 +72,38 @@ int16_t  JiffyDOS::receiveByte ()
     }
 
     // STEP 2: RECEIVING THE BITS
-    // As soon as the talker releases the Clock line we are expected to receive the bits
-    uint8_t data = 0;
-    uint8_t bitmask = 0xFF;
+    // As soon as the talker releases the Data line we are expected to receive the bits
 
-    // get bits 4,5
+    // get bits 0,1 - 10us
+    pull ( PIN_IEC_SRQ );
+    data or_eq ( status ( PIN_IEC_CLK_IN ) == RELEASED ? ( 1 << 0 ) : 0 );
+    data or_eq ( status ( PIN_IEC_DATA_IN ) == RELEASED ? ( 1 << 1 ) : 0 );
+    delayMicroseconds( 10 );
+
+    // get bits 2,3 - 11us
+    release ( PIN_IEC_SRQ );
+    data or_eq ( status ( PIN_IEC_CLK_IN ) == RELEASED ? ( 1 << 2 ) : 0 );
+    data or_eq ( status ( PIN_IEC_DATA_IN ) == RELEASED ? ( 1 << 3 ) : 0 );
+    delayMicroseconds( 10 );
+
+    // get bits 4,5 - 10us
+    pull ( PIN_IEC_SRQ );
     data or_eq ( status ( PIN_IEC_CLK_IN ) == RELEASED ? ( 1 << 4 ) : 0 );
     data or_eq ( status ( PIN_IEC_DATA_IN ) == RELEASED ? ( 1 << 5 ) : 0 );
-    wait( 8 );
+    delayMicroseconds( 10 );
 
-    // get bits 6,7
+    // get bits 6,7 - 9us
+    release ( PIN_IEC_SRQ );
     data or_eq ( status ( PIN_IEC_CLK_IN ) == RELEASED ? ( 1 << 6 ) : 0 );
     data or_eq ( status ( PIN_IEC_DATA_IN ) == RELEASED ? ( 1 << 7 ) : 0 );
-    wait( 8 );
+    delayMicroseconds( 10 );
 
-    // get bits 3,1
-    data or_eq ( status ( PIN_IEC_CLK_IN ) == RELEASED ? ( 1 << 3 ) : 0 );
-    data or_eq ( status ( PIN_IEC_DATA_IN ) == RELEASED ? ( 1 << 1 ) : 0 );
-    wait( 8 );
-
-    // get bits 2,0
-    data or_eq ( status ( PIN_IEC_CLK_IN ) == RELEASED ? ( 1 << 2 ) : 0 );
-    data or_eq ( status ( PIN_IEC_DATA_IN ) == RELEASED ? ( 1 << 0 ) : 0 );
-    wait( 8 );
-    release( PIN_IEC_SRQ );
+    pull( PIN_IEC_SRQ );
 
     // rearrange bits
+    Debug_printv( "data[%d]", data );
     data xor_eq bitmask;
+    Debug_printv( "data[%d]", data );
 
     // // STEP 3: CHECK FOR EOI
     // if ( status ( PIN_IEC_CLK_IN ) == PULLED && status ( PIN_IEC_DATA_IN ) == RELEASED )
@@ -86,6 +112,7 @@ int16_t  JiffyDOS::receiveByte ()
 
     // STEP 4: Acknowledge byte received
     pull ( PIN_IEC_DATA_OUT );
+    release ( PIN_IEC_SRQ );
 
     return data;
 } // receiveByte
