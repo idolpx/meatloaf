@@ -24,8 +24,9 @@
 
 #define PRODUCT_ID "MEATLOAF CBM"
 //#define FW_VERSION "20220422.1" // Dynamically set at compile time in "platformio.ini"
+#define PLATFORM_DETAILS "C64; 6510; 2; NTSC; EN;" // Make configurable. This will help server side to select appropriate content.
 
-#define USER_AGENT PRODUCT_ID " [" FW_VERSION "]"
+#define USER_AGENT "MEATLOAF/" FW_VERSION " (" PLATFORM_DETAILS ")"
 //#define UPDATE_URL      "http://meatloaf.cc/fw/?p=meatloaf&d={{DEVICE_ID}}&a="
 //#define UPDATE_URL "http://meatloaf.cc/fw/meatloaf.4MB.bin"
 //#define UPDATE_URL      "http://meatloaf.cc/fw/meatloaf.16MB.bin"

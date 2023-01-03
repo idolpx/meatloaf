@@ -149,7 +149,7 @@ namespace mstr {
                 std::equal(s1.begin(), s1.end(), s2, &compare_char_insensitive) );
     }
     
-    bool contains(std::string &s1, char *s2, bool case_sensitive)
+    bool contains(std::string &s1, const char *s2, bool case_sensitive)
     {
         std::string sn = s2;
         std::string::iterator it;

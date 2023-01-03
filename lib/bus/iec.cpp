@@ -201,7 +201,7 @@ bool iecDevice::closeStream ( bool close_all )
 
     if ( found != streams.end() )
     {
-        Debug_printv("Stream closed. key[%d]", key);
+        //Debug_printv("Stream closed. key[%d]", key);
         auto closingStream = (*found).second;
         closingStream->close();
         return streams.erase ( key );

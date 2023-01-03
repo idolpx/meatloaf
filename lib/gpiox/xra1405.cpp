@@ -1,18 +1,20 @@
 
+#ifdef GPIOX_XRA1405
 
-#include "gpiox.h"
+#include "pcf8575.h"
 
 #include <hal/gpio_types.h>
 
 #include "../../include/debug.h"
 
+XRA1405 GPIOX;
 
-GPIOX::GPIOX() :
+XRA1405::XRA1405() :
 		_DIN(0), _DIN_LAST(0), _DOUT(0), _DDR(0), _address(0)
 {
 }
 
-void GPIOX::begin(gpio_num_t sda, gpio_num_t scl, uint8_t address, uint16_t speed) {
+void XRA1405::begin(gpio_num_t sda, gpio_num_t scl, uint8_t address, uint16_t speed) {
 
 	/* Store the I2C address and init the Wire library */
 	_address = address;
@@ -26,7 +28,7 @@ void GPIOX::begin(gpio_num_t sda, gpio_num_t scl, uint8_t address, uint16_t spee
 	readGPIOX();
 }
 
-void GPIOX::pinMode(uint8_t pin, pin_mode_t mode) {
+void XRA1405::pinMode(uint8_t pin, pin_mode_t mode) {
 
 	/* Switch according mode */
 	if ( mode == GPIOX_MODE_INPUT )
@@ -41,7 +43,7 @@ void GPIOX::pinMode(uint8_t pin, pin_mode_t mode) {
 	updateGPIOX();
 }
 
-void GPIOX::portMode(port_t port, pin_mode_t mode) {
+void XRA1405::portMode(port_t port, pin_mode_t mode) {
 
 	if ( port == GPIOX_PORT0 )
 	{
@@ -85,7 +87,7 @@ void GPIOX::portMode(port_t port, pin_mode_t mode) {
 	updateGPIOX();
 }
 
-void GPIOX::portMode(port_t port, uint16_t mode) {
+void XRA1405::portMode(port_t port, uint16_t mode) {
 
 	if ( port == GPIOX_PORT0 )
 	{
@@ -108,7 +110,7 @@ void GPIOX::portMode(port_t port, uint16_t mode) {
 	updateGPIOX();
 }
 
-void GPIOX::digitalWrite(uint8_t pin, uint8_t value) {
+void XRA1405::digitalWrite(uint8_t pin, uint8_t value) {
 
 	/* Set PORT bit value */
 	if (value)
@@ -119,7 +121,7 @@ void GPIOX::digitalWrite(uint8_t pin, uint8_t value) {
 	writeGPIOX();
 }
 
-uint8_t GPIOX::digitalRead(uint8_t pin) {
+uint8_t XRA1405::digitalRead(uint8_t pin) {
 
 	/* Read GPIO */
 	readGPIOX();
@@ -129,7 +131,7 @@ uint8_t GPIOX::digitalRead(uint8_t pin) {
 }
 
 
-void GPIOX::write(port_t port, uint16_t value) {
+void XRA1405::write(port_t port, uint16_t value) {
 	/* Store pins values and apply */
 	if ( port == GPIOX_PORT0)
 		// low byte swap
@@ -144,14 +146,14 @@ void GPIOX::write(port_t port, uint16_t value) {
 	writeGPIOX();
 }
 
-void GPIOX::write(uint16_t value) {
+void XRA1405::write(uint16_t value) {
 	_DOUT = value;
 
 	/* Update GPIOX values */
 	writeGPIOX();
 }
 
-uint16_t GPIOX::read(port_t port) {
+uint16_t XRA1405::read(port_t port) {
 	/* Read GPIOX */
 	readGPIOX();
 
@@ -164,7 +166,7 @@ uint16_t GPIOX::read(port_t port) {
 		return _DOUT;
 }
 
-void GPIOX::clear(port_t port) {
+void XRA1405::clear(port_t port) {
 
 	if ( port == GPIOX_BOTH )
 		write(0x0000);
@@ -172,7 +174,7 @@ void GPIOX::clear(port_t port) {
 		write(port, 0x00);
 }
 
-void GPIOX::set(port_t port) {
+void XRA1405::set(port_t port) {
 
 	if ( port == GPIOX_BOTH )
 		write(0xFFFF);
@@ -180,7 +182,7 @@ void GPIOX::set(port_t port) {
 		write(port, 0xFF);
 }
 
-void GPIOX::toggle(uint8_t pin) {
+void XRA1405::toggle(uint8_t pin) {
 
 	/* Toggle pin state */
 	_DOUT ^= (1 << pin);
@@ -189,7 +191,7 @@ void GPIOX::toggle(uint8_t pin) {
 }
 
 
-void GPIOX::readGPIOX() {
+void XRA1405::readGPIOX() {
 
 	_DIN_LAST = _DIN;
 
@@ -207,7 +209,7 @@ void GPIOX::readGPIOX() {
 }
 
 
-void GPIOX::writeGPIOX() {
+void XRA1405::writeGPIOX() {
 
 	uint8_t buffer[2];
 
@@ -222,7 +224,7 @@ void GPIOX::writeGPIOX() {
 	//Debug_printv("address[%.2X] din[%.2X] dout[%.2X] ddr[%.2X] value[%.2X]", _address, _DIN, _DOUT, _DDR, value);
 }
 
-void GPIOX::updateGPIOX() {
+void XRA1405::updateGPIOX() {
 
 	uint8_t buffer[2];
 
@@ -233,3 +235,5 @@ void GPIOX::updateGPIOX() {
 	myI2C.writeBytes(_address, 2, buffer);
 	//Debug_printv("address[%.2X] din[%.2X] dout[%.2X] ddr[%.2X]", _address, _DIN, _DOUT, _DDR);
 }
+
+#endif // GPIOX_XRA1405

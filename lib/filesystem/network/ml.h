@@ -9,36 +9,6 @@
 
 #include "peoples_url_parser.h"
 
-//#include <ArduinoJson.h>
-
-
-/********************************************************
- * File
- ********************************************************/
-
-// class MLFile: public HttpFile {
-
-// public:
-//     MLFile(std::string path): HttpFile(path) {};
-//     ~MLFile() {};
-
-//     MStream* meatStream() override; // file on ML server = standard HTTP file available via GET
-// };
-
-
-/********************************************************
- * Streams
- ********************************************************/
-
-// class MLIStream: public HttpIStream {
-
-// public:
-//     MLIStream(std::string path) : HttpIStream(path) {};
-//     ~MLIStream() {};
-
-//     bool open() override;
-// };
-
 
 /********************************************************
  * FS

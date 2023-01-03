@@ -8,6 +8,8 @@
 
 #include "gpiox.h"
 
+#include <stdint.h>
+
 /* User Port to pin mapping */
 // #define FLAG2  P07  // B
 // #define CNT1   P06  // 4
