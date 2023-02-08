@@ -330,11 +330,11 @@ void iecBus::service ( void )
 
 #endif
 
-    if ( this->bus_state == BUS_OFFLINE && pin_atn )
-        pin_atn = false;
+    if ( this->bus_state == BUS_OFFLINE && pin_atn == PULLED)
+        pin_atn = RELEASED;
 
     // Command or Data Mode
-    if ( this->bus_state == BUS_ACTIVE || pin_atn )
+    if ( this->bus_state == BUS_ACTIVE || pin_atn == PULLED)
     {
         protocol->release ( PIN_IEC_CLK_OUT );
         protocol->pull ( PIN_IEC_DATA_OUT );

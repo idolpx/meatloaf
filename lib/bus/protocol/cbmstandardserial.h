@@ -149,7 +149,9 @@ namespace Protocol
                 uint8_t b_mode = ( mode == 1 ) ? 1 : 0;
 
                 // is this pin mode already set the way we want?
+#ifndef IEC_SPLIT_LINES
                 if ( ( ( gpio_pin_modes >> pin ) & 1ULL ) != b_mode )
+#endif
                 {
                     // toggle bit so we don't change mode unnecessarily
                     gpio_pin_modes ^= ( -b_mode ^ gpio_pin_modes ) & ( 1ULL << pin );

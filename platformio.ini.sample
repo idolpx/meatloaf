@@ -114,6 +114,18 @@ build_flags =
 	-D PINMAP_WROOM
     -D NO_PSRAM
 
+[env:esp32-wroom-pi1541]
+platform = espressif32@${meatloaf.esp32_platform_version}
+board = fujinet-v1-${meatloaf.flash_size}
+build_type = debug
+build_flags =
+	${env.build_flags}
+	-D PINMAP_WROOM_1541
+	-D NO_PSRAM
+	-D NO_BUTTONS
+	-D IEC_SPLIT_LINES
+	-D IEC_INVERTED_LINES
+
 [env:fujiapple-rev0]
 platform = espressif32@${meatloaf.esp32_platform_version}
 board = fujinet-v1-${meatloaf.flash_size}
