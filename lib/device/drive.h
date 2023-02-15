@@ -17,6 +17,8 @@
 
 // https://ilesj.wordpress.com/2014/05/14/1541-why-so-complicated/
 // https://en.wikipedia.org/wiki/Fast_loader
+// http://unusedino.de/ec64/technical/aay/c1541/
+// http://www.linusakesson.net/programming/gcr-decoding/index.php
 
 #ifndef DEVICE_DRIVE_H
 #define DEVICE_DRIVE_H
