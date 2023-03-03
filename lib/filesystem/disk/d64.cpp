@@ -75,14 +75,23 @@ bool D64IStream::seekEntry( std::string filename )
             // Read Entry From Stream
             if (entry.file_type & 0b00000111 && filename == "*")
             {
-                filename == entryFilename;
-            }
-
-            if ( mstr::compare(filename, entryFilename) )
-            {
-                // Move stream pointer to start track/sector
+                filename = entryFilename;
                 return true;
             }
+
+            if ( filename == entryFilename )
+            {
+                return true;
+            }
+            else if ( filename.size() > 16 )
+            {
+                if ( mstr::compare(filename, entryFilename) )
+                {
+                    // Move stream pointer to start track/sector
+                    return true;
+                }
+            }
+
             index++;
         }
     }
