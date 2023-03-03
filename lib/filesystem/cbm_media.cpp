@@ -57,7 +57,7 @@ void CBMImageStream::close() {
 //     return false;
 // };
 
-size_t CBMImageStream::position() {
+uint32_t CBMImageStream::position() {
     return m_position; // return position within "seeked" file, not the D64 image!
 };
 
@@ -65,23 +65,23 @@ size_t CBMImageStream::error() {
     return m_error; // return position within "seeked" file, not the D64 image!
 };
 
-size_t CBMImageStream::available() {
+uint32_t CBMImageStream::available() {
     // return bytes available in currently "seeked" file
     return m_bytesAvailable;
 };
 
-size_t CBMImageStream::size() {
+uint32_t CBMImageStream::size() {
     // size of the "seeked" file, not the image.
     return m_length;
 };
 
-size_t CBMImageStream::write(const uint8_t *buf, size_t size) {
+uint32_t CBMImageStream::write(const uint8_t *buf, uint32_t size) {
     return -1;
 }
 
 
-size_t CBMImageStream::read(uint8_t* buf, size_t size) {
-    size_t bytesRead = 0;
+uint32_t CBMImageStream::read(uint8_t* buf, uint32_t size) {
+    uint32_t bytesRead = 0;
 
     if(seekCalled) {
         // if we have the stream set to a specific file already, either via seekNextEntry or seekPath, return bytes of the file here

@@ -393,7 +393,7 @@ bool D64File::exists() {
     return true;
 } 
 
-size_t D64File::size() {
+uint32_t D64File::size() {
     // Debug_printv("[%s]", streamFile->url.c_str());
     // use D64 to get size of the file in image
     auto entry = ImageBroker::obtain<D64IStream>(streamFile->url)->entry;

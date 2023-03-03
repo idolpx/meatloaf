@@ -66,7 +66,7 @@ bool HttpFile::exists() {
     return fromHeader()->m_exists;
 }
 
-size_t HttpFile::size() {
+uint32_t HttpFile::size() {
     if(fromHeader()->m_isWebDAV) {
         // take from webdav PROPFIND
         return 0;
@@ -135,15 +135,15 @@ void HttpIStream::close() {
     m_http.close();
 }
 
-bool HttpIStream::seek(size_t pos) {
+bool HttpIStream::seek(uint32_t pos) {
     return m_http.seek(pos);
 }
 
-size_t HttpIStream::read(uint8_t* buf, size_t size) {
+uint32_t HttpIStream::read(uint8_t* buf, uint32_t size) {
     return m_http.read(buf, size);
 };
 
-size_t HttpIStream::write(const uint8_t *buf, size_t size) {
+uint32_t HttpIStream::write(const uint8_t *buf, uint32_t size) {
     return -1;
 }
 
@@ -153,15 +153,15 @@ bool HttpIStream::isOpen() {
     return m_http.m_isOpen;
 };
 
-size_t HttpIStream::size() {
+uint32_t HttpIStream::size() {
     return m_http.m_length;
 };
 
-size_t HttpIStream::available() {
+uint32_t HttpIStream::available() {
     return m_http.m_bytesAvailable;
 };
 
-size_t HttpIStream::position() {
+uint32_t HttpIStream::position() {
     return m_http.m_position;
 }
 
@@ -250,7 +250,7 @@ void MeatHttpClient::setOnHeader(const std::function<int(char*, char*)> &lambda)
     onHeader = lambda;
 }
 
-bool MeatHttpClient::seek(size_t pos) {
+bool MeatHttpClient::seek(uint32_t pos) {
     if(pos==m_position)
         return true;
 
@@ -313,7 +313,7 @@ bool MeatHttpClient::seek(size_t pos) {
         return false;
 }
 
-size_t MeatHttpClient::read(uint8_t* buf, size_t size) {
+uint32_t MeatHttpClient::read(uint8_t* buf, uint32_t size) {
     if (m_isOpen) {
         auto bytesRead= esp_http_client_read(m_http, (char *)buf, size );
         
@@ -326,7 +326,7 @@ size_t MeatHttpClient::read(uint8_t* buf, size_t size) {
     return 0;
 };
 
-size_t MeatHttpClient::write(const uint8_t* buf, size_t size) {
+uint32_t MeatHttpClient::write(const uint8_t* buf, uint32_t size) {
     if (m_isOpen) {
         auto bytesWritten= esp_http_client_write(m_http, (char *)buf, size );
         m_bytesAvailable -= bytesWritten;

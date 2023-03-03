@@ -174,7 +174,7 @@ MFile* TCRTFile::getNextFileInDir() {
 }
 
 
-size_t TCRTFile::size() {
+uint32_t TCRTFile::size() {
     // Debug_printv("[%s]", streamFile->url.c_str());
     // use TCRT to get size of the file in image
     auto image = ImageBroker::obtain<TCRTIStream>(streamFile->url);

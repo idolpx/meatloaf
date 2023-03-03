@@ -238,7 +238,7 @@ public:
     bool rename(std::string dest) { return false; };
     time_t getLastWrite() override { return 0; };
     time_t getCreationTime() override { return 0; };
-    size_t size() override;     
+    uint32_t size() override;     
 
     bool isDir = true;
     bool dirIsOpen = false;
@@ -266,25 +266,25 @@ public:
     bool open() override;
     void close() override;
 
-    size_t available() override;
-    size_t size() override;
-    size_t position() override;
+    uint32_t available() override;
+    uint32_t size() override;
+    uint32_t position() override;
     size_t error() override;
 
-    virtual bool seek(size_t pos) {
+    virtual bool seek(uint32_t pos) {
         return false;
     };
 
-    size_t read(uint8_t* buf, size_t size) override;
-    size_t write(const uint8_t *buf, size_t size) override;
+    uint32_t read(uint8_t* buf, uint32_t size) override;
+    uint32_t write(const uint8_t *buf, uint32_t size) override;
     bool isOpen() override;
 
 protected:
     std::string url;
     bool m_isOpen;
-    size_t m_length;
-    size_t m_bytesAvailable = 0;
-    size_t m_position = 0;
+    uint32_t m_length;
+    uint32_t m_bytesAvailable = 0;
+    uint32_t m_position = 0;
 };
 
 

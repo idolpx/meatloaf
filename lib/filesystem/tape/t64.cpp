@@ -191,7 +191,7 @@ MFile* T64File::getNextFileInDir() {
 }
 
 
-size_t T64File::size() {
+uint32_t T64File::size() {
     // Debug_printv("[%s]", streamFile->url.c_str());
     // use T64 to get size of the file in image
     auto entry = ImageBroker::obtain<T64IStream>(streamFile->url)->entry;

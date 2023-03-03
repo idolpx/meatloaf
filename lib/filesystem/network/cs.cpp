@@ -169,15 +169,15 @@ bool CServerIStream::open() {
 };
 
 // MStream methods
-size_t CServerIStream::available() {
+uint32_t CServerIStream::available() {
     return m_bytesAvailable;
 };
 
-size_t CServerIStream::size() {
+uint32_t CServerIStream::size() {
     return m_bytesAvailable;
 };
 
-size_t CServerIStream::position() {
+uint32_t CServerIStream::position() {
     return m_position;
 };
 
@@ -185,11 +185,11 @@ size_t CServerIStream::error() {
     return 0;
 };
 
-size_t CServerIStream::write(const uint8_t *buf, size_t size) {
+uint32_t CServerIStream::write(const uint8_t *buf, uint32_t size) {
     return -1;
 }
 
-size_t CServerIStream::read(uint8_t* buf, size_t size)  {
+uint32_t CServerIStream::read(uint8_t* buf, uint32_t size)  {
     //Debug_printv("CServerIStream::read");
     auto bytesRead = CServerFileSystem::session.receive(buf, size);
     m_bytesAvailable-=bytesRead;
@@ -492,7 +492,7 @@ bool CServerFile::exists() {
     return true;
 } ;
 
-size_t CServerFile::size() {
+uint32_t CServerFile::size() {
     return m_size;
 };
 

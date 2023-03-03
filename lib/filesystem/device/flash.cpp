@@ -115,7 +115,7 @@ bool FlashFile::exists()
     return (i == 0);
 }
 
-size_t FlashFile::size() {
+uint32_t FlashFile::size() {
     if(m_isNull || path=="/" || path=="")
         return 0;
     else if(isDirectory()) {
@@ -124,6 +124,7 @@ size_t FlashFile::size() {
     else {
         struct stat info;
         stat( std::string(basepath + path).c_str(), &info);
+        Debug_printv( "size[%d]", info.st_size );
         return info.st_size;
     }
 }
@@ -236,7 +237,7 @@ MFile* FlashFile::getNextFileInDir()
 /********************************************************
  * MStream implementations
  ********************************************************/
-size_t FlashIStream::write(const uint8_t *buf, size_t size) {
+uint32_t FlashIStream::write(const uint8_t *buf, uint32_t size) {
     if (!isOpen() || !buf) {
         return 0;
     }
@@ -287,7 +288,7 @@ void FlashIStream::close() {
     if(isOpen()) handle->dispose();
 };
 
-size_t FlashIStream::read(uint8_t* buf, size_t size) {
+uint32_t FlashIStream::read(uint8_t* buf, uint32_t size) {
     if (!isOpen() || !buf) {
         Debug_printv("Not open");
         return 0;
@@ -304,17 +305,17 @@ size_t FlashIStream::read(uint8_t* buf, size_t size) {
 };
 
 
-size_t FlashIStream::size() {
+uint32_t FlashIStream::size() {
     return _size;
 };
 
-size_t FlashIStream::available() {
+uint32_t FlashIStream::available() {
     if(!isOpen()) return 0;
     return _size - position();
 };
 
 
-size_t FlashIStream::position() {
+uint32_t FlashIStream::position() {
     if(!isOpen()) return 0;
     return ftell(handle->file_h);
 };
@@ -323,7 +324,7 @@ size_t FlashIStream::error() {
     return 0;
 };
 
-bool FlashIStream::seek(size_t pos) {
+bool FlashIStream::seek(uint32_t pos) {
     // Debug_printv("pos[%d]", pos);
         if (!isOpen()) {
         Debug_printv("Not open");
@@ -332,7 +333,7 @@ bool FlashIStream::seek(size_t pos) {
     return ( fseek( handle->file_h, pos, SEEK_SET ) ) ? true : false;
 };
 
-bool FlashIStream::seek(size_t pos, int mode) {
+bool FlashIStream::seek(uint32_t pos, int mode) {
     // Debug_printv("pos[%d] mode[%d]", pos, mode);
     if (!isOpen()) {
         Debug_printv("Not open");

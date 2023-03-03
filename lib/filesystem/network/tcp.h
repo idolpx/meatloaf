@@ -219,20 +219,20 @@ public:
     };
 
     // MStream methods
-    size_t size() override {
+    uint32_t size() override {
         return -1;
     }
-    size_t available() override {
+    uint32_t available() override {
         return 0;
     }
-    size_t position() override {
+    uint32_t position() override {
         return 0;
     }
     size_t error() override {
         return 0;
     }
 
-    virtual bool seek(size_t pos) {
+    virtual bool seek(uint32_t pos) {
         return false;
     }
 
@@ -247,10 +247,10 @@ public:
     }
 
     // MStream methods
-    size_t read(uint8_t* buf, size_t size) override {
+    uint32_t read(uint8_t* buf, uint32_t size) override {
         return socket.read(buf, size);
     }
-    size_t write(const uint8_t *buf, size_t size) override {
+    uint32_t write(const uint8_t *buf, uint32_t size) override {
         return socket.write(buf, size);
     }
 
@@ -316,7 +316,7 @@ public:
     bool exists() override {
         return true;
     }
-    size_t size() override {
+    uint32_t size() override {
         return -1;
     }
     bool remove() override {

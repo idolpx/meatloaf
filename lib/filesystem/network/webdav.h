@@ -27,7 +27,7 @@ public:
     MFile* getNextFileInDir() override { return nullptr; };
     bool mkDir() override { return false; };
     bool exists() override ;
-    size_t size() override ;
+    uint32_t size() override ;
     bool remove() override { return false; };
     bool rename(std::string dest) { return false; };
     MStream* createIStream(std::shared_ptr<MStream> src);
@@ -52,18 +52,18 @@ public:
     bool open() override;
 
     // MStream methods
-    size_t position() override;
-    size_t available() override;
-    size_t read(uint8_t* buf, size_t size) override;
-    size_t write(const uint8_t *buf, size_t size) override;
+    uint32_t position() override;
+    uint32_t available() override;
+    uint32_t read(uint8_t* buf, uint32_t size) override;
+    uint32_t write(const uint8_t *buf, uint32_t size) override;
     bool isOpen();
 
 protected:
     std::string url;
     bool m_isOpen;
-    size_t m_length;
-    size_t m_bytesAvailable = 0;
-    size_t m_position = 0;
+    uint32_t m_length;
+    uint32_t m_bytesAvailable = 0;
+    uint32_t m_position = 0;
        
 //    WiFiClient m_file;
 	MeatHttpClient m_http;
@@ -86,25 +86,25 @@ public:
     }
 
     // MStream methods
-    size_t size() override;
-    size_t available() override;     
-    size_t position() override;
+    uint32_t size() override;
+    uint32_t available() override;     
+    uint32_t position() override;
 
-    virtual bool seek(size_t pos);
+    virtual bool seek(uint32_t pos);
 
     void close() override;
     bool open() override;
 
     // MStream methods
-    size_t read(uint8_t* buf, size_t size) override;
+    uint32_t read(uint8_t* buf, uint32_t size) override;
     bool isOpen();
 
 protected:
     std::string url;
     bool m_isOpen;
-    size_t m_bytesAvailable = 0;
-    size_t m_length = 0;
-    size_t m_position = 0;
+    uint32_t m_bytesAvailable = 0;
+    uint32_t m_length = 0;
+    uint32_t m_position = 0;
     bool isFriendlySkipper = false;
 
 //    WiFiClient m_file;

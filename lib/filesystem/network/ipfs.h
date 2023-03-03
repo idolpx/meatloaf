@@ -89,7 +89,7 @@ public:
     ~IPFSIStream() {};
 
     bool open() override;
-    bool seek(size_t pos) override;
+    bool seek(uint32_t pos) override;
 };
 
 

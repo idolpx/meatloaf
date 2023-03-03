@@ -49,13 +49,13 @@ public:
     };
 
     // MStream methods
-    size_t position() override { return 0; };
-    size_t available() override { return INT_MAX; };
+    uint32_t position() override { return 0; };
+    uint32_t available() override { return INT_MAX; };
     bool isOpen() { return m_isOpen; };
-    bool seek(size_t pos) { return false; };
-    size_t size() { return INT_MAX; };
+    bool seek(uint32_t pos) { return false; };
+    uint32_t size() { return INT_MAX; };
 
-    size_t read(uint8_t* buf, size_t size) override {
+    uint32_t read(uint8_t* buf, uint32_t size) override {
         //auto msg = client.readBlocking(); // we don't want to block. We'll store a message from callback in msg
 
         if(!m_isOpen)

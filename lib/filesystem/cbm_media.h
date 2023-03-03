@@ -30,7 +30,7 @@ public:
     // MStream methods
     bool open() override;
     void close() override;
-    size_t position() override;
+    uint32_t position() override;
     size_t error() override;
 
     ~CBMImageStream() {
@@ -42,20 +42,20 @@ public:
     bool isBrowsable() override { return false; };
     bool isRandomAccess() override { return true; };
 
-    bool seek(size_t pos) override {
+    bool seek(uint32_t pos) override {
         return true;
     };
-     bool seek(size_t pos, int mode) override {
+     bool seek(uint32_t pos, int mode) override {
         return true;
     };   
 
     bool seekPath(std::string path) override { return false; };
     std::string seekNextEntry() override { return ""; };
 
-    size_t available() override;
-    size_t size() override;
-    size_t read(uint8_t* buf, size_t size) override;
-    size_t write(const uint8_t *buf, size_t size);
+    uint32_t available() override;
+    uint32_t size() override;
+    uint32_t read(uint8_t* buf, uint32_t size) override;
+    uint32_t write(const uint8_t *buf, uint32_t size);
 
     bool isOpen();
 
@@ -65,9 +65,9 @@ protected:
     std::shared_ptr<MStream> containerStream;
 
     bool m_isOpen = false;
-    size_t m_length = 0;
-    size_t m_bytesAvailable = 0;
-    size_t m_position = 0;
+    uint32_t m_length = 0;
+    uint32_t m_bytesAvailable = 0;
+    uint32_t m_position = 0;
     size_t m_error = 0;
 
     CBMImageStream* decodedStream;

@@ -55,7 +55,7 @@ public:
     MFile* getNextFileInDir() override ;
     bool mkDir() override ;
     bool exists() override ;
-    size_t size() override ;
+    uint32_t size() override ;
     bool remove() override ;
     bool rename(std::string dest);
 

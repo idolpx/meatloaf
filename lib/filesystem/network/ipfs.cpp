@@ -17,6 +17,6 @@ bool IPFSIStream::open() {
     return m_http.GET(url);
 };
 
-bool IPFSIStream::seek(size_t pos) {
+bool IPFSIStream::seek(uint32_t pos) {
     return true;
 }

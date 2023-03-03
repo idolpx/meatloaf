@@ -68,7 +68,7 @@ public:
     MFile* getNextFileInDir() override ;
     bool mkDir() override ;
     bool exists() override ;
-    size_t size() override ;
+    uint32_t size() override ;
     bool remove() override ;
     bool rename(std::string dest);
     MStream* createIStream(std::shared_ptr<MStream> src);
@@ -127,21 +127,21 @@ public:
     }
 
     // MStream methods
-    size_t available() override;
-    size_t size() override;    
-    size_t position() override;
+    uint32_t available() override;
+    uint32_t size() override;    
+    uint32_t position() override;
     size_t error() override;
 
-    virtual bool seek(size_t pos) override;
-    virtual bool seek(size_t pos, int mode) override;    
+    virtual bool seek(uint32_t pos) override;
+    virtual bool seek(uint32_t pos, int mode) override;    
 
     void close() override;
     bool open() override;
 
     // MStream methods
     //uint8_t read() override;
-    size_t read(uint8_t* buf, size_t size) override;
-    size_t write(const uint8_t *buf, size_t size) override;
+    uint32_t read(uint8_t* buf, uint32_t size) override;
+    uint32_t write(const uint8_t *buf, uint32_t size) override;
 
     bool isOpen();
 

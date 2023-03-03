@@ -38,14 +38,14 @@ public:
     bool open(std::string url, esp_http_client_method_t meth);
     void close();
     void setOnHeader(const std::function<int(char*, char*)> &f);
-    bool seek(size_t pos);
-    size_t read(uint8_t* buf, size_t size);
-    size_t write(const uint8_t* buf, size_t size);
+    bool seek(uint32_t pos);
+    uint32_t read(uint8_t* buf, uint32_t size);
+    uint32_t write(const uint8_t* buf, uint32_t size);
     bool m_isOpen = false;
     bool m_exists = false;
-    size_t m_length = 0;
-    size_t m_bytesAvailable = 0;
-    size_t m_position = 0;
+    uint32_t m_length = 0;
+    uint32_t m_bytesAvailable = 0;
+    uint32_t m_position = 0;
     size_t m_error = 0;
     bool m_isWebDAV = false;
     bool m_isDirectory = false;
@@ -86,7 +86,7 @@ public:
     MFile* getNextFileInDir() override ;
     bool mkDir() override ;
     bool exists() override ;
-    size_t size() override ;
+    uint32_t size() override ;
     bool remove() override ;
     bool isText() override ;
     bool rename(std::string dest) { return false; };
@@ -110,19 +110,19 @@ public:
     };
 
     // MStream methods
-    size_t size() override;
-    size_t available() override;     
-    size_t position() override;
+    uint32_t size() override;
+    uint32_t available() override;     
+    uint32_t position() override;
     size_t error() override;
 
-    virtual bool seek(size_t pos);
+    virtual bool seek(uint32_t pos);
 
     void close() override;
     bool open() override;
 
     // MStream methods
-    size_t read(uint8_t* buf, size_t size) override;
-    size_t write(const uint8_t *buf, size_t size) override;
+    uint32_t read(uint8_t* buf, uint32_t size) override;
+    uint32_t write(const uint8_t *buf, uint32_t size) override;
 
     bool isOpen();
 

@@ -177,7 +177,7 @@ MFile* TAPFile::getNextFileInDir() {
 }
 
 
-size_t TAPFile::size() {
+uint32_t TAPFile::size() {
     // Debug_printv("[%s]", streamFile->url.c_str());
     // use TAP to get size of the file in image
     auto image = ImageBroker::obtain<TAPIStream>(streamFile->url);

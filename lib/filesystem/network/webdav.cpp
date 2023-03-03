@@ -37,7 +37,7 @@
 //     return test->isOpen();
 // }
 
-// size_t WebDAVFile::size() {
+// uint32_t WebDAVFile::size() {
 //     // we may take content-lenght from header if exists
 //     std::unique_ptr<MStream> test(meatStream());
 
@@ -62,19 +62,19 @@
 //  * Ostream impls
 //  ********************************************************/
 
-// size_t WebDAVOStream::size() {
+// uint32_t WebDAVOStream::size() {
 //     return m_length;
 // };
 
-// size_t WebDAVOStream::available() {
+// uint32_t WebDAVOStream::available() {
 //     return m_bytesAvailable;
 // };
 
-// size_t WebDAVOStream::position() {
+// uint32_t WebDAVOStream::position() {
 //     return m_position;
 // }
 
-// bool WebDAVOStream::seek(size_t pos) {
+// bool WebDAVOStream::seek(uint32_t pos) {
 //     if(pos==m_position)
 //         return true;
 
@@ -140,8 +140,8 @@
 //     return true;
 // }
 
-// //size_t WebDAVOStream::write(uint8_t) {};
-// size_t WebDAVOStream::write(const uint8_t *buf, size_t size) {
+// //uint32_t WebDAVOStream::write(uint8_t) {};
+// uint32_t WebDAVOStream::write(const uint8_t *buf, uint32_t size) {
 //     return 0; // m_file.write(buf, size);
 // }
 
@@ -153,19 +153,19 @@
 // /********************************************************
 //  * Istream impls
 //  ********************************************************/
-// size_t WebDAVIStream::size() {
+// uint32_t WebDAVIStream::size() {
 //     return m_length;
 // };
 
-// size_t WebDAVIStream::available() {
+// uint32_t WebDAVIStream::available() {
 //     return m_bytesAvailable;
 // };
 
-// size_t WebDAVIStream::position() {
+// uint32_t WebDAVIStream::position() {
 //     return m_position;
 // }
 
-// bool WebDAVIStream::seek(size_t pos) {
+// bool WebDAVIStream::seek(uint32_t pos) {
 //     if(pos==m_position)
 //         return true;
 
@@ -245,7 +245,7 @@
 //     return true;
 // };
 
-// size_t WebDAVIStream::read(uint8_t* buf, size_t size) {
+// uint32_t WebDAVIStream::read(uint8_t* buf, uint32_t size) {
 //     auto bytesRead= m_http.read( buf, size );
 //     m_bytesAvailable = m_http.available();
 //     m_position+=bytesRead;
