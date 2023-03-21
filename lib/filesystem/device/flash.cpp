@@ -235,14 +235,13 @@ bool FlashFile::seekEntry( std::string filename )
 {
     DIR* d;
     std::string apath = (basepath + pathToFile()).c_str();
-
-    Debug_printv( "path[%s] filename[%s] size[%d]", apath.c_str(), filename.c_str(), filename.size());
-
     if (apath.empty()) {
         apath = "/";
     }
-    d = opendir( apath.c_str() );
 
+    Debug_printv( "path[%s] filename[%s] size[%d]", apath.c_str(), filename.c_str(), filename.size());
+
+    d = opendir( apath.c_str() );
     if(d == nullptr)
         return false;
 
@@ -263,22 +262,18 @@ bool FlashFile::seekEntry( std::string filename )
                 closedir( d );
                 return true;
             }
-
-            if ( filename == entryFilename )
+            else if ( filename == entryFilename )
             {
                 closedir( d );
                 return true;
             }
-            else if ( filename.size() > 16 )
+            else if ( mstr::compare(filename, entryFilename) )
             {
-                if ( mstr::compare(filename, entryFilename) )
-                {
-                    // Set filename to this filename
-                    Debug_printv( "Found! file[%s] -> entry[%s]", filename.c_str(), entryFilename.c_str() );
-                    parseUrl(apath + "/" + std::string(dirent->d_name));
-                    closedir( d );
-                    return true;
-                }
+                // Set filename to this filename
+                Debug_printv( "Found! file[%s] -> entry[%s]", filename.c_str(), entryFilename.c_str() );
+                parseUrl(apath + "/" + std::string(dirent->d_name));
+                closedir( d );
+                return true;
             }
         }
 
