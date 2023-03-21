@@ -240,7 +240,9 @@ bool iecBus::init()
     protocol->set_pin_mode ( PIN_IEC_CLK_IN, INPUT );
     protocol->set_pin_mode ( PIN_IEC_DATA_IN, INPUT );
     protocol->set_pin_mode ( PIN_IEC_SRQ, INPUT );
+#ifdef IEC_HAS_RESET
     protocol->set_pin_mode ( PIN_IEC_RESET, INPUT );
+#endif /* IEC_HAS_RESET */
 #else
     // make sure the output states are initially LOW
     // protocol->release(PIN_IEC_ATN);
@@ -257,7 +259,9 @@ bool iecBus::init()
     protocol->set_pin_mode ( PIN_IEC_DATA_IN, INPUT );
     protocol->set_pin_mode ( PIN_IEC_DATA_OUT, OUTPUT );
     protocol->set_pin_mode ( PIN_IEC_SRQ, OUTPUT );
+#ifdef IEC_HAS_RESET
     protocol->set_pin_mode ( PIN_IEC_RESET, INPUT );
+#endif /* IEC_HAS_RESET */
 #endif
 
     active_protocol = PROTOCOL_CBM_SERIAL;
