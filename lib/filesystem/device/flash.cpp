@@ -116,7 +116,7 @@ bool FlashFile::exists()
 }
 
 uint32_t FlashFile::size() {
-    if(m_isNull || path=="/" || path=="")
+    if (m_isNull || path=="/" || path=="")
         return 0;
     else if(isDirectory()) {
         return 0;
@@ -124,7 +124,7 @@ uint32_t FlashFile::size() {
     else {
         struct stat info;
         stat( std::string(basepath + path).c_str(), &info);
-        Debug_printv( "size[%d]", info.st_size );
+        // Debug_printv( "size[%d]", info.st_size );
         return info.st_size;
     }
 }
@@ -231,6 +231,63 @@ MFile* FlashFile::getNextFileInDir()
 }
 
 
+bool FlashFile::seekEntry( std::string filename )
+{
+    DIR* d;
+    std::string apath = (basepath + pathToFile()).c_str();
+
+    Debug_printv( "path[%s] filename[%s] size[%d]", apath.c_str(), filename.c_str(), filename.size());
+
+    if (apath.empty()) {
+        apath = "/";
+    }
+    d = opendir( apath.c_str() );
+
+    if(d == nullptr)
+        return false;
+
+    // Read Directory Entries
+    struct dirent* dirent = NULL;
+    if ( filename.size() > 0 )
+    {
+        while ( (dirent = readdir( d )) != NULL )
+        {
+            std::string entryFilename = dirent->d_name;
+
+            Debug_printv("path[%s] filename[%s] entry.filename[%.16s]", apath.c_str(), filename.c_str(), entryFilename.c_str());
+
+            // Read Entry From Stream
+            if (filename == "*")
+            {
+                filename = entryFilename;
+                closedir( d );
+                return true;
+            }
+
+            if ( filename == entryFilename )
+            {
+                closedir( d );
+                return true;
+            }
+            else if ( filename.size() > 16 )
+            {
+                if ( mstr::compare(filename, entryFilename) )
+                {
+                    // Set filename to this filename
+                    Debug_printv( "Found! file[%s] -> entry[%s]", filename.c_str(), entryFilename.c_str() );
+                    parseUrl(apath + "/" + std::string(dirent->d_name));
+                    closedir( d );
+                    return true;
+                }
+            }
+        }
+
+        Debug_printv( "Not Found! file[%s]", filename.c_str() );
+    }
+
+    closedir( d );
+    return false;
+}
 
 
 

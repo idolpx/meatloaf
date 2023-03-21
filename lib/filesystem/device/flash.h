@@ -46,13 +46,18 @@ public:
     FlashFile(std::string path) {
         basepath = device_config.basepath();
 
-        parseUrl(path);
-        if(!pathValid(path.c_str()))
+        parseUrl( path );
+
+        // Find full filename for wildcard
+        if (mstr::contains(name, "?") || mstr::contains(name, "*"))
+            seekEntry( name );
+
+        if (!pathValid(path.c_str()))
             m_isNull = true;
         else
             m_isNull = false;
 
-        //Debug_printv("basepath[%s] path[%s]", basepath.c_str(), this->path.c_str());
+        //Debug_printv("basepath[%s] path[%s] valid[%d]", basepath.c_str(), this->path.c_str(), m_isNull);
     };
     ~FlashFile() {
         //Serial.printf("*** Destroying flashfile %s\n", url.c_str());
@@ -72,6 +77,8 @@ public:
     bool remove() override ;
     bool rename(std::string dest);
     MStream* createIStream(std::shared_ptr<MStream> src);
+
+    bool seekEntry( std::string filename );
 
 protected:
     DIR* dir;
@@ -127,6 +134,10 @@ public:
     }
 
     // MStream methods
+    bool isBrowsable() override { return false; };
+    bool isRandomAccess() override { return true; };
+
+    // MStream methods
     uint32_t available() override;
     uint32_t size() override;    
     uint32_t position() override;
@@ -142,6 +153,11 @@ public:
     //uint8_t read() override;
     uint32_t read(uint8_t* buf, uint32_t size) override;
     uint32_t write(const uint8_t *buf, uint32_t size) override;
+
+    virtual bool seekPath(std::string path) override {
+        Debug_printv( "path[%s]", path.c_str() );
+        return false;
+    }
 
     bool isOpen();
 
