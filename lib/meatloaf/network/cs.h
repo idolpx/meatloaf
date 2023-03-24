@@ -5,8 +5,6 @@
 #ifndef MEATLOAF_SCHEME_CS
 #define MEATLOAF_SCHEME_CS
 
-#include "../../include/global_defines.h"
-#include "../../include/make_unique.h"
 #include "meat_io.h"
 #include "tcp.h"
 

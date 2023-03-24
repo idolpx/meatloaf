@@ -7,8 +7,7 @@
 #include "esp_spiffs.h"
 #endif
 
-#include "../../include/global_defines.h"
-#include "../../include/make_unique.h"
+#include "make_unique.h"
 
 #include "device_db.h"
 
