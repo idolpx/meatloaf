@@ -306,12 +306,11 @@ bool iecBus::init()
 void iecBus::service ( void )
 {
 
-    protocol->pull( PIN_IEC_SRQ );
+    //protocol->pull( PIN_IEC_SRQ );
 
     // Disable ATN interrupt
     //gpio_intr_disable( PIN_IEC_ATN );
 
-    bool process_command = false;
     bool pin_atn = protocol->status ( PIN_IEC_ATN );
     if ( pin_atn )
         bus_state = BUS_ACTIVE;
@@ -351,163 +350,11 @@ void iecBus::service ( void )
         protocol->release ( PIN_IEC_CLK_OUT );
         protocol->pull ( PIN_IEC_DATA_OUT );
 
-        // ATN was pulled read control code from the bus
-        // protocol->pull ( PIN_IEC_SRQ );
-        int16_t c = ( bus_command_t ) receive();
-        // protocol->release ( PIN_IEC_SRQ );
-
-        // Check for error
-        if ( c == 0xFFFFFFFF || protocol->flags bitand ERROR )
-        {
-            //Debug_printv ( "Error reading command" );            
-            if ( c == 0xFFFFFFFF )
-                this->bus_state = BUS_OFFLINE;
-            else
-
-                this->bus_state = BUS_ERROR;
-        }
-        else
-        {
-            // Debug_println ( "COMMAND MODE" );        
-
-            Debug_printf ( "   IEC: [%.2X]", c );
-
-            // Check for JiffyDOS
-            if ( protocol->flags bitand JIFFY_ACTIVE )
-            {
-                Debug_printf ( "[JIFFY]" );
-                active_protocol = PROTOCOL_JIFFYDOS;
-            }
-            if ( protocol->flags bitand DOLPHIN_ACTIVE )
-            {
-                Debug_printf ( "[DOLPHIN]" );
-                active_protocol = PROTOCOL_DOLPHINDOS;
-            }
-
-            // Decode command byte
-            uint8_t command = c bitand 0xF0;
-            if ( c == IEC_UNLISTEN ) command = IEC_UNLISTEN;
-            if ( c == IEC_UNTALK ) command = IEC_UNTALK;
-
-            switch ( command ) {
-                case IEC_GLOBAL:
-                    this->data.primary = IEC_GLOBAL;
-                    this->data.device = c xor IEC_GLOBAL;
-                    this->bus_state = BUS_IDLE;
-                    Debug_printf ( " (00 GLOBAL %.2d COMMAND)\r\n", this->data.device );
-                    break;
-
-                case IEC_LISTEN:
-                    this->data.primary = IEC_LISTEN;
-                    this->data.device = c xor IEC_LISTEN;
-                    this->data.secondary = IEC_REOPEN;    // Default secondary command
-                    this->data.channel = CMD_CHANNEL;   // Default channel
-                    this->bus_state = BUS_ACTIVE;
-                    Debug_printf ( " (20 LISTEN %.2d DEVICE)\r\n", this->data.device );
-                    break;
-
-                case IEC_UNLISTEN:
-                    this->data.primary = IEC_UNLISTEN;
-                    this->data.secondary = 0x00;
-                    this->bus_state = BUS_IDLE;
-                    Debug_printf ( " (3F UNLISTEN)\r\n" );
-                    break;
-
-                case IEC_TALK:
-                    this->data.primary = IEC_TALK;
-                    this->data.device = c xor IEC_TALK;
-                    this->data.secondary = IEC_REOPEN;    // Default secondary command
-                    this->data.channel = CMD_CHANNEL;   // Default channel
-                    this->bus_state = BUS_ACTIVE;
-                    Debug_printf ( " (40 TALK   %.2d DEVICE)\r\n", this->data.device );
-                    break;
-
-                case IEC_UNTALK:
-                    this->data.primary = IEC_UNTALK;
-                    this->data.secondary = 0x00;
-                    this->bus_state = BUS_IDLE;
-                    Debug_printf ( " (5F UNTALK)\r\n" );
-                    break;
-
-                case IEC_OPEN:
-                    this->data.secondary = IEC_OPEN;
-                    this->data.channel = c xor IEC_OPEN;
-                    this->bus_state = BUS_PROCESS;
-                    process_command = true;
-                    Debug_printf ( " (F0 OPEN   %.2d CHANNEL)\r\n", this->data.channel );
-                    break;
-
-                case IEC_REOPEN:
-                    this->data.secondary = IEC_REOPEN;
-                    this->data.channel = c xor IEC_REOPEN;
-                    this->bus_state = BUS_PROCESS;
-                    process_command = true;
-                    Debug_printf ( " (60 DATA   %.2d CHANNEL)\r\n", this->data.channel );
-                    break;
-
-                case IEC_CLOSE:
-                    this->data.secondary = IEC_CLOSE;
-                    this->data.channel = c xor IEC_CLOSE;
-                    this->bus_state = BUS_PROCESS;
-                    process_command = true;
-                    Debug_printf ( " (E0 CLOSE  %.2d CHANNEL)\r\n", this->data.channel );
-                    break; 
-            }
-
-            // Debug_printf ( "code[%.2X] primary[%.2X] secondary[%.2X] bus[%d]", command, this->data.primary, this->data.secondary, this->bus_state );
-
-            // Is this command for us?
-            if ( !isDeviceEnabled( this->data.device ) )
-            {
-                this->bus_state = BUS_IDLE;
-                process_command = false;
-            }
-
-#ifdef PARALLEL_BUS
-            // Switch to Parallel if detected
-            else if ( PARALLEL.bus_state == PARALLEL_PROCESS )
-            {
-                if ( command == IEC_LISTEN || command == IEC_TALK )
-                    active_protocol = PROTOCOL_SPEEDDOS;
-                else if ( command == IEC_OPEN || command == IEC_REOPEN )
-                    active_protocol = PROTOCOL_DOLPHINDOS;
-
-                // Switch to parallel protocol
-                selectProtocol();
-
-                if ( this->data.primary == IEC_LISTEN )
-                    PARALLEL.setMode( MODE_RECEIVE );
-                else
-                    PARALLEL.setMode( MODE_SEND );
-
-                // Acknowledge parallel mode
-                PARALLEL.handShake();
-            }
-#endif
-        }
-
-        // If the bus is idle then release the lines
-        if ( this->bus_state < BUS_ACTIVE )
-        {
-            //Debug_printv("release lines");
-            this->data.init();
-            releaseLines();
-        }
-
-        // Debug_printf ( "code[%.2X] primary[%.2X] secondary[%.2X] bus[%d]", command, this->data.primary, this->data.secondary, this->bus_state );
-        // Debug_printf( "primary[%.2X] secondary[%.2X] bus_state[%d]", this->data.primary, this->data.secondary, this->bus_state );
-        // protocol->release ( PIN_IEC_SRQ );
-    }
-    else if ( this->bus_state > BUS_IDLE )
-    {
-        // If no secondary was set, process primary with defaults
-        if ( this->data.primary > IEC_GLOBAL )
-        {
-            process_command = true;
-        }
+        read_command();
     }
 
-    if ( process_command )
+
+    if ( bus_state == BUS_PROCESS )
     {
         // protocol->pull( PIN_IEC_SRQ );
         // Debug_println ( "DATA MODE" );
@@ -565,17 +412,19 @@ void iecBus::service ( void )
     // Cleanup and Re-enable Interrupt
     //gpio_intr_enable( PIN_IEC_ATN );
 
-    protocol->release( PIN_IEC_SRQ );
+    //protocol->release( PIN_IEC_SRQ );
 } // service
 
 
 void iecBus::read_command()
 {
+    int16_t c = 0;
+
     do 
     {
         // ATN was pulled read bus command bytes
         //pull( PIN_IEC_SRQ );
-        int16_t c = protocol->receiveByte();
+        c = protocol->receiveByte();
         //release( PIN_IEC_SRQ );
 
         // Check for error
