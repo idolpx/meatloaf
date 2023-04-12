@@ -166,6 +166,10 @@ int16_t CBMStandardSerial::receiveBits ()
 
     uint8_t n = 0;
 
+    // Prepare IO Lines
+    set_pin_mode( PIN_IEC_CLK_IN, INPUT );
+    set_pin_mode( PIN_IEC_DATA_IN, INPUT );
+
     //pull ( PIN_IEC_SRQ );
     for ( n = 0; n < 8; n++ )
     {
@@ -377,6 +381,10 @@ bool CBMStandardSerial::sendBits ( uint8_t data )
 #if defined(ESP8266)
     ESP.wdtFeed();
 #endif
+
+    // Prepare IO Lines
+    set_pin_mode( PIN_IEC_CLK_IN, OUTPUT );
+    set_pin_mode( PIN_IEC_DATA_IN, OUTPUT );
 
     for ( uint8_t n = 0; n < 8; n++ )
     {

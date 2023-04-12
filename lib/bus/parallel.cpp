@@ -28,11 +28,11 @@ static void IRAM_ATTR ml_parallel_isr_handler(void* arg)
 
 static void ml_parallel_intr_task(void* arg)
 {
-    uint32_t io_num;
+    uint32_t gpio_num;
 
     while ( true ) 
     {
-        if(xQueueReceive(ml_parallel_evt_queue, &io_num, portMAX_DELAY)) 
+        if(xQueueReceive(ml_parallel_evt_queue, &gpio_num, portMAX_DELAY)) 
         {
             PARALLEL.service();
         }

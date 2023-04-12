@@ -10,7 +10,8 @@
 
 #include <stdint.h>
 
-/* User Port to pin mapping */
+// C64, 128, VIC20
+// User Port to pin mapping
 // #define FLAG2  P07  // B
 // #define CNT1   P06  // 4
 // #define SP1    P05  // 5
@@ -32,6 +33,7 @@
 #define USERPORT_FLAGS GPIOX_PORT0
 #define USERPORT_DATA  GPIOX_PORT1
 
+// C64, 128, VIC20
 typedef enum {
     FLAG2 = P07,  // B
     CNT1  = P06,  // 4
@@ -51,6 +53,28 @@ typedef enum {
     PB6   = P16,  // K - I
     PB7   = P17,  // L - J
 } user_port_pin_t;
+
+
+// // Plus4
+// typedef enum {
+//     PB0   = P07,  // B      // P0   DATA 0
+//     CNT1  = P06,  // 4      // P2   DATA 2 / Cassette Sense
+//     SP1   = P05,  // 5      // P3   DATA 3
+//     CNT2  = P04,  // 6      // P4   DATA 4
+//     SP2   = P03,  // 7      // P5   DATA 5
+//     PC2   = P02,  // 8      // 
+//     ATN   = P01,  // 9
+//     PA2   = P00,  // M - K
+
+//     PB0   = P10,  // C
+//     PB1   = P11,  // D
+//     PB2   = P12,  // E
+//     PB3   = P13,  // F
+//     PB4   = P14,  // H - G
+//     PB5   = P15,  // J - H
+//     PB6   = P16,  // K - I
+//     PB7   = P17,  // L - J
+// } user_port_plus4_pin_t;
 
 // Return values for service:
 typedef enum

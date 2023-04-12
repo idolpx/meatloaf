@@ -132,7 +132,7 @@ void IRAM_ATTR SystemManager::digital_write(uint8_t pin, uint8_t val)
         {
             GPIO.out_w1ts = ((uint32_t)1 << pin);
         }
-        else if (pin < 40)
+        else if (pin < 34)
         {
             GPIO.out1_w1ts.val = ((uint32_t)1 << (pin - 32));
         }
@@ -143,7 +143,7 @@ void IRAM_ATTR SystemManager::digital_write(uint8_t pin, uint8_t val)
         {
             GPIO.out_w1tc = ((uint32_t)1 << pin);
         }
-        else if (pin < 40)
+        else if (pin < 34)
         {
             GPIO.out1_w1tc.val = ((uint32_t)1 << (pin - 32));
         }

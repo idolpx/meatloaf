@@ -61,7 +61,7 @@ device_state_t iecDrive::process ( void )
 
     Debug_printf ( "   DEVICE: [%.2d] ", this->data.device );
 
-    // Debug_printv("DEV state[%d] primary[%.2X] secondary[%.2X] device[%d], channel[%d] command[%s] ", this->device_state, this->data.primary, this->data.secondary, this->data.device, this->data.channel, this->data.device_command.c_str());
+    // Debug_printv("DEV state[%d] primary[%.2X] secondary[%.2X] device[%d], channel[%d] command[%s] ", this->device_state, this->data.primary, this->data.secondary, this->data.device, this->data.channel, this->data.payload.c_str());
 
     if ( this->data.secondary == IEC_OPEN )
     {
@@ -78,16 +78,16 @@ device_state_t iecDrive::process ( void )
         bool isOpen = false;
 
         if ( this->data.channel == 0 ) {
-            Debug_printf ( "LOAD \"%s\",%d\r\n", this->data.device_command.c_str(), this->data.device );
+            Debug_printf ( "LOAD \"%s\",%d\r\n", this->data.payload.c_str(), this->data.device );
             isOpen = registerStream(std::ios_base::in);
         }
         else if ( IEC.data.channel == 1 ) {
-            Debug_printf ( "SAVE \"%s\",%d\r\n", this->data.device_command.c_str(), this->data.device );
+            Debug_printf ( "SAVE \"%s\",%d\r\n", this->data.payload.c_str(), this->data.device );
             isOpen = registerStream(std::ios_base::out);
         }
         else
         {
-            Debug_printf ( "OPEN #,%d,%d,\"%s\"\r\n", this->data.device, this->data.channel, this->data.device_command.c_str() );
+            Debug_printf ( "OPEN #,%d,%d,\"%s\"\r\n", this->data.device, this->data.channel, this->data.payload.c_str() );
             // here we have to decide if we read, write or r/w the file, but for time being, we'll be just reading, so:
             isOpen = registerStream(std::ios_base::in);
         }
@@ -144,7 +144,7 @@ device_state_t iecDrive::process ( void )
         this->data.init(); // Clear device command        
     }
 
-    //Debug_printf("DEV device[%d] channel[%d] state[%d] command[%s]", this->data.device, this->data.channel, m_openState, this->data.device_command.c_str());
+    //Debug_printf("DEV device[%d] channel[%d] state[%d] command[%s]", this->data.device, this->data.channel, m_openState, this->data.payload.c_str());
     // IEC.protocol->release ( PIN_IEC_SRQ );
 
     return this->device_state;
@@ -501,7 +501,7 @@ void iecDrive::handleListenCommand( void )
 	size_t channel = this->data.channel;
 	m_openState = O_NOTHING;
 
-	if (this->data.device_command.length() == 0 )
+	if (this->data.payload.length() == 0 )
 	{
 		//Debug_printv("No command to process");
 
@@ -511,17 +511,17 @@ void iecDrive::handleListenCommand( void )
 	}
 
 	// Parse DOS Command
-	Debug_printv("Parse DOS Command [%s]", this->data.device_command.c_str());
-	//this->dos.cbmdos_command_parse(this->data.device_command.c_str());
+	Debug_printv("Parse DOS Command [%s]", this->data.payload.c_str());
+	//this->dos.cbmdos_command_parse(this->data.payload.c_str());
 
 	// 1. obtain command and fullPath
-	auto commandAndPath = parseLine(this->data.device_command, channel);
+	auto commandAndPath = parseLine(this->data.payload, channel);
 
 	// Execute DOS Command
 	Debug_printv("command[%s] path[%s]", commandAndPath.command.c_str(), commandAndPath.fullPath.c_str());	
 	if ( this->data.channel == CMD_CHANNEL )
 	{
-		Debug_printv("Execute DOS Command [%s]", this->data.device_command.c_str());
+		Debug_printv("Execute DOS Command [%s]", this->data.payload.c_str());
 		return;
 	}
 
