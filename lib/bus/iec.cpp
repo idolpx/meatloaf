@@ -41,7 +41,8 @@ static void IRAM_ATTR cbm_on_attention_isr_handler(void* arg)
     b->protocol->pull ( PIN_IEC_DATA_OUT );
 
     b->protocol->flags or_eq ATN_PULLED;
-    //b->bus_state = BUS_ACTIVE;
+    if ( b->bus_state < BUS_ACTIVE )
+        b->bus_state = BUS_ACTIVE;
 }
 
 static void ml_iec_intr_task(void* arg)
@@ -305,15 +306,15 @@ bool iecBus::init()
 
 void iecBus::service ( void )
 {
+    bool pin_atn = true;
 
-    //protocol->pull( PIN_IEC_SRQ );
+    if ( bus_state < BUS_ACTIVE )
+        return;
+
+    protocol->pull( PIN_IEC_SRQ );
 
     // Disable ATN interrupt
     //gpio_intr_disable( PIN_IEC_ATN );
-
-    bool pin_atn = protocol->status ( PIN_IEC_ATN );
-    if ( pin_atn )
-        bus_state = BUS_ACTIVE;
 
 #ifdef IEC_HAS_RESET
 
@@ -341,78 +342,83 @@ void iecBus::service ( void )
 
 #endif
 
-    if ( this->bus_state == BUS_OFFLINE && pin_atn == PULLED)
-        pin_atn = RELEASED;
-
-    // Command or Data Mode
-    if ( this->bus_state == BUS_ACTIVE || pin_atn == PULLED)
+    do
     {
-        protocol->release ( PIN_IEC_CLK_OUT );
-        protocol->pull ( PIN_IEC_DATA_OUT );
+        if ( this->bus_state == BUS_OFFLINE && pin_atn == PULLED)
+            pin_atn = RELEASED;
 
-        read_command();
-    }
-
-
-    if ( bus_state == BUS_PROCESS )
-    {
-        // protocol->pull( PIN_IEC_SRQ );
-        // Debug_println ( "DATA MODE" );
-        // Debug_printf ( "bus[%d] device[%d] primary[%d] secondary[%d]", this->bus_state, this->device_state, this->data.primary, this->data.secondary );
-
-        if ( this->data.secondary == IEC_OPEN || this->data.secondary == IEC_REOPEN )
+        // Command or Data Mode
+        if ( this->bus_state == BUS_ACTIVE || pin_atn == PULLED)
         {
+            protocol->release ( PIN_IEC_CLK_OUT );
+            protocol->pull ( PIN_IEC_DATA_OUT );
+
+            read_command();
+        }
 
 
-            // Switch to detected protocol
+        if ( bus_state == BUS_PROCESS )
+        {
+            // protocol->pull( PIN_IEC_SRQ );
+            // Debug_println ( "DATA MODE" );
+            // Debug_printf ( "bus[%d] device[%d] primary[%d] secondary[%d]", this->bus_state, this->device_state, this->data.primary, this->data.secondary );
+
+            if ( this->data.secondary == IEC_OPEN || this->data.secondary == IEC_REOPEN )
+            {
+                // Switch to detected protocol
+                selectProtocol();
+            }
+
+            // Data Mode - Get Command or Data
+            if ( this->data.primary == IEC_LISTEN )
+            {
+                //Debug_printv( "deviceListen" );
+                deviceListen();
+            }
+            else if ( this->data.primary == IEC_TALK )
+            {
+                //Debug_printv( "deviceTalk" );
+                //Debug_printf ( " (40 TALK   %.2d DEVICE %.2x SECONDARY %.2d CHANNEL)\r\n", this->data.device, this->data.secondary, this->data.channel );
+                deviceTalk();   
+            }
+
+            // Queue control codes and command in specified device
+            // At the moment there is only the multi-drive device
+            device_state_t device_state = drive.queue_command();
+
+            // Process commands in devices
+            // At the moment there is only the multi-drive device
+            //Debug_printv( "deviceProcess" );
+            if ( drive.process() < DEVICE_ACTIVE || device_state < DEVICE_ACTIVE )
+            {
+                //Debug_printv("device idle");
+                this->data.init();
+            }
+
+            this->bus_state = BUS_IDLE;
+
+            // Switch back to standard serial
+            active_protocol = PROTOCOL_CBM_SERIAL;
             selectProtocol();
+            protocol->flags = CLEAR;
+
+            // Debug_printf( "primary[%.2X] secondary[%.2X] bus_state[%d]", this->data.primary, this->data.secondary, this->bus_state );
+            // Debug_printf( "atn[%d] clk[%d] data[%d] srq[%d]", IEC.protocol->status(PIN_IEC_ATN), IEC.protocol->status(PIN_IEC_CLK_IN), IEC.protocol->status(PIN_IEC_DATA_IN), IEC.protocol->status(PIN_IEC_SRQ));
+            // protocol->release ( PIN_IEC_SRQ );
         }
+        
+        pin_atn = protocol->status ( PIN_IEC_ATN );
+        if ( pin_atn )
+            bus_state = BUS_ACTIVE;
 
-        // Data Mode - Get Command or Data
-        if ( this->data.primary == IEC_LISTEN )
-        {
-            //Debug_printv( "deviceListen" );
-            deviceListen();
-        }
-        else if ( this->data.primary == IEC_TALK )
-        {
-            //Debug_printv( "deviceTalk" );
-            //Debug_printf ( " (40 TALK   %.2d DEVICE %.2x SECONDARY %.2d CHANNEL)\r\n", this->data.device, this->data.secondary, this->data.channel );
-            deviceTalk();   
-        }
-
-        // Queue control codes and command in specified device
-        // At the moment there is only the multi-drive device
-        device_state_t device_state = drive.queue_command();
-
-        // Process commands in devices
-        // At the moment there is only the multi-drive device
-        //Debug_printv( "deviceProcess" );
-        if ( drive.process() < DEVICE_ACTIVE || device_state < DEVICE_ACTIVE )
-        {
-            //Debug_printv("device idle");
-            this->data.init();
-        }
-
-        this->bus_state = BUS_IDLE;
-
-        // Switch back to standard serial
-        active_protocol = PROTOCOL_CBM_SERIAL;
-        selectProtocol();
-        protocol->flags = CLEAR;
-
-        // Debug_printf( "primary[%.2X] secondary[%.2X] bus_state[%d]", this->data.primary, this->data.secondary, this->bus_state );
-        // Debug_printf( "atn[%d] clk[%d] data[%d] srq[%d]", IEC.protocol->status(PIN_IEC_ATN), IEC.protocol->status(PIN_IEC_CLK_IN), IEC.protocol->status(PIN_IEC_DATA_IN), IEC.protocol->status(PIN_IEC_SRQ));
-        // protocol->release ( PIN_IEC_SRQ );
-    }
-
+    } while ( bus_state > BUS_IDLE );
 
     //Debug_printf("command[%.2X] device[%.2d] secondary[%.2d] channel[%.2d]", this->data.primary, this->data.device, this->data.secondary, this->data.channel);
 
     // Cleanup and Re-enable Interrupt
     //gpio_intr_enable( PIN_IEC_ATN );
 
-    //protocol->release( PIN_IEC_SRQ );
+    protocol->release( PIN_IEC_SRQ );
 } // service
 
 
