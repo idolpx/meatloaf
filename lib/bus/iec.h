@@ -56,14 +56,14 @@ class IECData
         uint8_t device = 0;
         uint8_t secondary = 0;
         uint8_t channel = 0;
-        std::string device_command = "";
+        std::string payload = "";
 
 		void init ( void ) {
 			primary = 0;
 			device = 0;
 			secondary = 0;
 			channel = 0;
-			device_command = "";
+			payload = "";
 		}
 };
 
@@ -267,10 +267,13 @@ class iecBus
         void releaseLines ( bool wait = false );
 
     private:
+        void read_command();
+        void read_payload();
+
         // IEC Bus Commands
-        bus_state_t deviceListen ( void ); // 0x20 + device_id   Listen, device (0–30)
+        void deviceListen ( void ); // 0x20 + device_id   Listen, device (0–30)
 		// void deviceUnListen(void);            // 0x3F               Unlisten, all devices
-        bus_state_t deviceTalk ( void );   // 0x40 + device_id   Talk, device (0–30)
+        void deviceTalk ( void );   // 0x40 + device_id   Talk, device (0–30)
 		// void deviceUnTalk(void);              // 0x5F               Untalk, all devices
 		// device_state_t deviceSecond(void);    // 0x60 + channel     Reopen, channel (0–15)
 		// device_state_t deviceClose(void);     // 0xE0 + channel     Close, channel (0–15)

@@ -90,24 +90,24 @@ iecDevice::iecDevice ( void ) { } // ctor
 device_state_t iecDevice::queue_command ( void )
 {
     // Record command for this device
-    this->data = IEC.data;
-    // this->data.primary = IEC.data.primary;
-    // this->data.secondary = IEC.data.secondary;
-    // this->data.device = IEC.data.device;
-    // this->data.channel = IEC.data.channel;
-    // this->data.primary = IEC.data.primary;
-    // this->data.device_command = IEC.data.device_command;
+    data = IEC.data;
+    // data.primary = IEC.data.primary;
+    // data.secondary = IEC.data.secondary;
+    // data.device = IEC.data.device;
+    // data.channel = IEC.data.channel;
+    // data.primary = IEC.data.primary;
+    // data.payload = IEC.data.payload;
 
-    if ( this->data.primary == IEC_LISTEN )
+    if ( data.primary == IEC_LISTEN )
     {
         device_state = DEVICE_LISTEN;
     }
-    else if ( this->data.primary == IEC_TALK )
+    else if ( data.primary == IEC_TALK )
     {
         device_state = DEVICE_TALK;
     }
 
-    // Debug_printf("DEV primary[%.2X] secondary[%.2X] device[%d], channel[%d] command[%s] ", this->data.primary, this->data.secondary, this->data.device, this->data.channel, this->data.device_command.c_str());
+    // Debug_printf("DEV primary[%.2X] secondary[%.2X] device[%d], channel[%d] command[%s] ", data.primary, data.secondary, data.device, data.channel, data.payload.c_str());
 
     return device_state;
 }
@@ -115,7 +115,7 @@ device_state_t iecDevice::queue_command ( void )
 
 std::shared_ptr<MStream> iecDevice::retrieveStream ( void )
 {
-    size_t key = ( this->data.device * 100 ) + this->data.channel;
+    size_t key = ( data.device * 100 ) + data.channel;
     Debug_printv("Stream key[%d]", key);
 
     if ( streams.find ( key ) != streams.end() )
@@ -176,7 +176,7 @@ bool iecDevice::registerStream (std::ios_base::open_mode mode)
     }
 
 
-    size_t key = ( this->data.device * 100 ) + this->data.channel;
+    size_t key = ( data.device * 100 ) + data.channel;
 
     // // Check to see if a stream is open on this device/channel already
     // auto found = streams.find(key);
@@ -196,7 +196,7 @@ bool iecDevice::registerStream (std::ios_base::open_mode mode)
 
 bool iecDevice::closeStream ( bool close_all )
 {
-    size_t key = ( this->data.device * 100 ) + this->data.channel;
+    size_t key = ( data.device * 100 ) + data.channel;
     auto found = streams.find(key);
 
     if ( found != streams.end() )
@@ -281,7 +281,7 @@ bool iecBus::init()
 
 // This function checks and deals with atn signal commands
 //
-// If a command is recieved, the this->data.string is saved in this->data. Only commands
+// If a command is recieved, the data.string is saved in data. Only commands
 // for *this* device are dealt with.
 //
 /** from Derogee's "IEC Disected"
@@ -517,13 +517,13 @@ void iecBus::service ( void )
         if ( this->data.primary == IEC_LISTEN )
         {
             //Debug_printv( "deviceListen" );
-            this->bus_state = deviceListen();
+            deviceListen();
         }
         else if ( this->data.primary == IEC_TALK )
         {
             //Debug_printv( "deviceTalk" );
             //Debug_printf ( " (40 TALK   %.2d DEVICE %.2x SECONDARY %.2d CHANNEL)\r\n", this->data.device, this->data.secondary, this->data.channel );
-            this->bus_state = deviceTalk();   
+            deviceTalk();   
         }
 
         // Queue control codes and command in specified device
@@ -555,100 +555,241 @@ void iecBus::service ( void )
     //Debug_printf("command[%.2X] device[%.2d] secondary[%.2d] channel[%.2d]", this->data.primary, this->data.device, this->data.secondary, this->data.channel);
 } // service
 
-bus_state_t iecBus::deviceListen ( void )
+
+void iecBus::read_command()
 {
-    // Okay, we will listen.
-    // Debug_printf( "secondary[%d] channel[%d]", this->data.secondary, this->data.channel );
-
-    // If the command is SECONDARY and it is not to expect just a small command on the command channel, then
-    // we're into something more heavy. Otherwise read it all out right here until UNLISTEN is received.
-    if ( this->data.secondary == IEC_REOPEN && this->data.channel != CMD_CHANNEL )
+    do 
     {
-        // A heapload of data might come now, too big for this context to handle so the caller handles this, we're done here.
-        // Debug_printf(" (%.2X SECONDARY) (%.2X CHANNEL)\r\n", this->data.primary, this->data.channel);
-        Debug_printf ( "\r\n" );
-        return BUS_ACTIVE;
-    }
+        // ATN was pulled read bus command bytes
+        //pull( PIN_IEC_SRQ );
+        int16_t c = protocol->receiveByte();
+        //release( PIN_IEC_SRQ );
 
-    // OPEN or DATA
-    else if ( this->data.secondary == IEC_OPEN || this->data.secondary == IEC_REOPEN )
-    {
-        // Record the command string until ATN is PULLED
-        std::string listen_command = "";
-
-        // ATN might get pulled right away if there is no command string to send
-        protocol->wait( TIMING_STABLE );
-
-        while ( protocol->status ( PIN_IEC_ATN ) != PULLED )
+        // Check for error
+        if (c == 0xFFFFFFFF || protocol->flags & ERROR)
         {
-            int16_t c = receive();
-
-            if ( protocol->flags bitand EMPTY_STREAM )
-                break;
-
-            if ( protocol->flags bitand ERROR )
-            {
-                Debug_printf ( "Some other command [%.2X]", c );
-                return BUS_ERROR;
-            }
-
-            if ( c != 0x0D && c != 0xFFFFFFFF )
-            {
-                listen_command += ( uint8_t ) c;
-            }
-
-            if ( protocol->flags bitand EOI_RECVD )
-                break;
+            //Debug_printv("Error reading command. flags[%d]", flags);
+            if (c == 0xFFFFFFFF)
+                bus_state = BUS_OFFLINE;
+            else
+                bus_state = BUS_ERROR;
         }
-
-        if ( listen_command.length() )
+        else if ( protocol->flags & EMPTY_STREAM)
         {
-            // remove media id from command
-            if ( listen_command[0]=='0' && listen_command[1]==':' )
-                listen_command = mstr::drop(listen_command, 2);
-
-            this->data.device_command = listen_command;
-            mstr::rtrimA0 ( this->data.device_command );
-            Debug_printf ( " {%s}\r\n", this->data.device_command.c_str() );
-            //return BUS_PROCESS;
+            bus_state = BUS_IDLE;
         }
         else
         {
-            this->data.device_command = "";
-            Debug_printf ( "\r\n" );            
+            Debug_printf("   IEC: [%.2X]", c);
+
+            // Decode command byte
+            uint8_t command = c & 0xF0;
+            if (c == IEC_UNLISTEN)
+                command = IEC_UNLISTEN;
+            if (c == IEC_UNTALK)
+                command = IEC_UNTALK;
+
+            //Debug_printv ( "device[%d] channel[%d]", data.device, data.channel);
+            //Debug_printv ("command[%.2X]", command);
+
+            switch (command)
+            {
+            case IEC_GLOBAL:
+                data.primary = IEC_GLOBAL;
+                data.device = c ^ IEC_GLOBAL;
+                bus_state = BUS_IDLE;
+                Debug_printf(" (00 GLOBAL %.2d COMMAND)\r\n", data.device);
+                break;
+
+            case IEC_LISTEN:
+                data.primary = IEC_LISTEN;
+                data.device = c ^ IEC_LISTEN;
+                data.secondary = IEC_REOPEN; // Default secondary command
+                data.channel = CMD_CHANNEL;  // Default channel
+                bus_state = BUS_ACTIVE;
+                Debug_printf(" (20 LISTEN %.2d DEVICE)\r\n", data.device);
+                break;
+
+            case IEC_UNLISTEN:
+                data.primary = IEC_UNLISTEN;
+                data.secondary = 0x00;
+                bus_state = BUS_PROCESS;
+                Debug_printf(" (3F UNLISTEN)\r\n");
+                break;
+
+            case IEC_TALK:
+                data.primary = IEC_TALK;
+                data.device = c ^ IEC_TALK;
+                data.secondary = IEC_REOPEN; // Default secondary command
+                data.channel = CMD_CHANNEL;  // Default channel
+                bus_state = BUS_ACTIVE;
+                Debug_printf(" (40 TALK   %.2d DEVICE)\r\n", data.device);
+                break;
+
+            case IEC_UNTALK:
+                data.primary = IEC_UNTALK;
+                data.secondary = 0x00;
+                bus_state = BUS_IDLE;
+                Debug_printf(" (5F UNTALK)\r\n");
+                break;
+
+            case IEC_OPEN:
+                data.secondary = IEC_OPEN;
+                data.channel = c ^ IEC_OPEN;
+                bus_state = BUS_PROCESS;
+                Debug_printf(" (F0 OPEN   %.2d CHANNEL)\r\n", data.channel);
+                break;
+
+            case IEC_REOPEN:
+                data.secondary = IEC_REOPEN;
+                data.channel = c ^ IEC_REOPEN;
+                bus_state = BUS_PROCESS;
+                Debug_printf(" (60 DATA   %.2d CHANNEL)\r\n", data.channel);
+                break;
+
+            case IEC_CLOSE:
+                data.secondary = IEC_CLOSE;
+                data.channel = c ^ IEC_CLOSE;
+                bus_state = BUS_PROCESS;
+                Debug_printf(" (E0 CLOSE  %.2d CHANNEL)\r\n", data.channel);
+                break;
+            }
         }
 
-        //Debug_printv("listen complete");
-        return BUS_PROCESS;
+    } while ( bus_state == BUS_ACTIVE );
+
+    //Debug_printv ( "code[%.2X] primary[%.2X] secondary[%.2X] bus[%d] flags[%d]", c, data.primary, data.secondary, bus_state, flags );
+    //Debug_printv ( "device[%d] channel[%d]", data.device, data.channel);
+
+    // Is this command for us?
+    if ( !isDeviceEnabled( data.device ) )
+    {
+        bus_state = BUS_IDLE;
+    }
+
+#ifdef PARALLEL_BUS
+    // Switch to Parallel if detected
+    else if ( PARALLEL.bus_state == PARALLEL_PROCESS )
+    {
+        if ( data.primary == IEC_LISTEN || data.primary == IEC_TALK )
+            active_protocol = PROTOCOL_SPEEDDOS;
+        else if ( data.primary == IEC_OPEN || data.primary == IEC_REOPEN )
+            active_protocol = PROTOCOL_DOLPHINDOS;
+
+        // Switch to parallel protocol
+        selectProtocol();
+
+        if ( data.primary == IEC_LISTEN )
+            PARALLEL.setMode( MODE_RECEIVE );
+        else
+            PARALLEL.setMode( MODE_SEND );
+
+        // Acknowledge parallel mode
+        PARALLEL.handShake();
+    }
+#endif
+
+    // If the bus is idle then release the lines
+    if ( bus_state < BUS_ACTIVE )
+    {
+        //Debug_printv("release lines");
+        data.init();
+        releaseLines();
+    }
+
+    // Debug_printf ( "code[%.2X] primary[%.2X] secondary[%.2X] bus[%d]", command, data.primary, data.secondary, bus_state );
+    // Debug_printf( "primary[%.2X] secondary[%.2X] bus_state[%d]", data.primary, data.secondary, bus_state );
+
+    // Delay to stabalize bus
+    // protocol->wait( TIMING_STABLE, 0, false );
+
+    //release( PIN_IEC_SRQ );
+}
+
+void iecBus::read_payload()
+{
+    // Record the command string until ATN is PULLED
+    std::string listen_command = "";
+
+    // ATN might get pulled right away if there is no command string to send
+    protocol->wait( TIMING_STABLE );
+
+    while (protocol->status(PIN_IEC_ATN) != PULLED)
+    {
+        int16_t c = protocol->receiveByte();
+
+        if (protocol->flags & EMPTY_STREAM)
+        {
+            bus_state = BUS_ERROR;
+            return;
+        }
+
+        if (protocol->flags & ERROR)
+        {
+            bus_state = BUS_ERROR;
+            return;
+        }
+
+        if (c != 0x0D && c != 0xFFFFFFFF)
+        {
+            listen_command += (uint8_t)c;
+        }
+
+        if (protocol->flags & EOI_RECVD)
+        {
+            data.payload = listen_command;
+        }
+    }
+
+    bus_state = BUS_IDLE;
+}
+
+void IRAM_ATTR iecBus::deviceListen()
+{
+    // If the command is SECONDARY and it is not to expect just a small command on the command channel, then
+    // we're into something more heavy. Otherwise read it all out right here until UNLISTEN is received.
+    if (data.secondary == IEC_REOPEN && data.channel != CMD_CHANNEL)
+    {
+        // A heapload of data might come now, too big for this context to handle so the caller handles this, we're done here.
+        // Debug_printf(" (%.2X SECONDARY) (%.2X CHANNEL)\r\n", data.primary, data.channel);
+        Debug_printf("REOPEN on non-command channel.\r\n");
+        bus_state = BUS_ACTIVE;
+    }
+
+    // OPEN or DATA
+    else if (data.secondary == IEC_OPEN || data.secondary == IEC_REOPEN)
+    {
+        read_payload();
+        Debug_printf("{%s}\r\n", data.payload.c_str());
     }
 
     // CLOSE Named Channel
-    else if ( this->data.secondary == IEC_CLOSE )
+    else if (data.secondary == IEC_CLOSE)
     {
-        // Debug_printf(" (E0 CLOSE) (%d CHANNEL)\r\n", this->data.channel);
-        return BUS_PROCESS;
+        //Debug_printf(" (E0 CLOSE) (%d CHANNEL)\r\n", data.channel);
+        bus_state = BUS_PROCESS;
     }
 
     // Unknown
     else
     {
-        Debug_printf ( " OTHER (%.2X COMMAND) (%.2X CHANNEL) ", this->data.secondary, this->data.channel );
-        return BUS_ERROR;
+        Debug_printf(" OTHER (%.2X COMMAND) (%.2X CHANNEL) ", data.secondary, data.channel);
+        bus_state = BUS_ERROR;
     }
 }
 
 
-bus_state_t iecBus::deviceTalk ( void )
+void iecBus::deviceTalk ( void )
 {
     // Okay, we will talk soon
-    // Debug_printf(" (%.2X SECONDARY) (%.2X CHANNEL)\r\n", this->data.primary, this->data.channel);
+    // Debug_printf(" (%.2X SECONDARY) (%.2X CHANNEL)\r\n", data.primary, data.channel);
 
     // Now do bus turnaround
     if ( not turnAround() )
-        return BUS_ERROR;
+        bus_state = BUS_ERROR;
 
     // We have recieved a CMD and we should talk now:
-    return BUS_PROCESS;
+    bus_state = BUS_PROCESS;
 }
 
 
@@ -815,7 +956,7 @@ bool iecBus::sendEOI ( uint8_t data )
 
     releaseLines();
     //Debug_printv("release lines");
-    this->bus_state = BUS_IDLE;
+    bus_state = BUS_IDLE;
 
     // BETWEEN BYTES TIME
     delayMicroseconds ( TIMING_Tbb );
@@ -831,7 +972,7 @@ bool iecBus::senderTimeout()
     // Message file not found by just releasing lines
     releaseLines();
     //Debug_printv("release lines");
-    this->bus_state = BUS_ERROR;
+    bus_state = BUS_ERROR;
 
     // Signal an empty stream
     delayMicroseconds ( TIMING_EMPTY );
