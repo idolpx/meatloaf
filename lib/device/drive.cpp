@@ -124,7 +124,7 @@ device_state_t iecDrive::process ( void )
         else if ( this->device_state == DEVICE_TALK )
         {
             // Send data
-            Debug_printv ( "[Send data]" );
+            //Debug_printv ( "[Send data]" );
             handleTalk ( this->data.channel );
             // if ( this->data.channel < 2 )
 			// {
@@ -613,7 +613,7 @@ void iecDrive::handleListenData()
 
 void iecDrive::handleTalk(uint8_t chan)
 {
-	Debug_printv("channel[%d] openState[%d]", chan, m_openState);
+	//Debug_printv("channel[%d] openState[%d]", chan, m_openState);
 
 	switch (m_openState)
 	{

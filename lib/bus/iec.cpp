@@ -342,25 +342,25 @@ void iecBus::service ( void )
 
 #endif
 
+    // Command or Data Mode
     do
     {
         if ( this->bus_state == BUS_OFFLINE && pin_atn == PULLED)
             pin_atn = RELEASED;
 
-        // Command or Data Mode
         if ( this->bus_state == BUS_ACTIVE || pin_atn == PULLED)
         {
             protocol->release ( PIN_IEC_CLK_OUT );
             protocol->pull ( PIN_IEC_DATA_OUT );
 
+            Debug_printv("command");
             read_command();
         }
-
 
         if ( bus_state == BUS_PROCESS )
         {
             // protocol->pull( PIN_IEC_SRQ );
-            // Debug_println ( "DATA MODE" );
+            Debug_printv("data");
             // Debug_printf ( "bus[%d] device[%d] primary[%d] secondary[%d]", this->bus_state, this->device_state, this->data.primary, this->data.secondary );
 
             if ( this->data.secondary == IEC_OPEN || this->data.secondary == IEC_REOPEN )
@@ -406,7 +406,7 @@ void iecBus::service ( void )
             // Debug_printf( "atn[%d] clk[%d] data[%d] srq[%d]", IEC.protocol->status(PIN_IEC_ATN), IEC.protocol->status(PIN_IEC_CLK_IN), IEC.protocol->status(PIN_IEC_DATA_IN), IEC.protocol->status(PIN_IEC_SRQ));
             // protocol->release ( PIN_IEC_SRQ );
         }
-        
+
         pin_atn = protocol->status ( PIN_IEC_ATN );
         if ( pin_atn )
             bus_state = BUS_ACTIVE;
@@ -418,6 +418,7 @@ void iecBus::service ( void )
     // Cleanup and Re-enable Interrupt
     //gpio_intr_enable( PIN_IEC_ATN );
 
+    Debug_printv("exit");
     protocol->release( PIN_IEC_SRQ );
 } // service
 
@@ -662,7 +663,8 @@ void iecBus::deviceTalk ( void )
 
 
 // IEC turnaround
-bool iecBus::turnAround ( void )
+
+bool IRAM_ATTR iecBus::turnAround()
 {
     /*
     TURNAROUND
