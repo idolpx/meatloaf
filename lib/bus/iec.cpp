@@ -409,6 +409,7 @@ void iecBus::service ( void )
     //Debug_printf("command[%.2X] device[%.2d] secondary[%.2d] channel[%.2d]", data.primary, data.device, data.secondary, data.channel);
 
     // Cleanup and Re-enable Interrupt
+    releaseLines();
     //gpio_intr_enable( PIN_IEC_ATN );
 
     //Debug_printv ( "primary[%.2X] secondary[%.2X] bus[%d] flags[%d]", data.primary, data.secondary, bus_state, protocol->flags );
