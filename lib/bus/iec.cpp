@@ -41,7 +41,7 @@ static void IRAM_ATTR cbm_on_attention_isr_handler(void* arg)
     b->protocol->pull ( PIN_IEC_DATA_OUT );
 
     b->protocol->flags or_eq ATN_PULLED;
-    b->bus_state = BUS_ACTIVE;
+    //b->bus_state = BUS_ACTIVE;
 }
 
 static void ml_iec_intr_task(void* arg)
@@ -305,8 +305,16 @@ bool iecBus::init()
 
 void iecBus::service ( void )
 {
+
+    protocol->pull( PIN_IEC_SRQ );
+
+    // Disable ATN interrupt
+    //gpio_intr_disable( PIN_IEC_ATN );
+
     bool process_command = false;
     bool pin_atn = protocol->status ( PIN_IEC_ATN );
+    if ( pin_atn )
+        bus_state = BUS_ACTIVE;
 
 #ifdef IEC_HAS_RESET
 
@@ -553,6 +561,11 @@ void iecBus::service ( void )
 
 
     //Debug_printf("command[%.2X] device[%.2d] secondary[%.2d] channel[%.2d]", this->data.primary, this->data.device, this->data.secondary, this->data.channel);
+
+    // Cleanup and Re-enable Interrupt
+    //gpio_intr_enable( PIN_IEC_ATN );
+
+    protocol->release( PIN_IEC_SRQ );
 } // service
 
 
