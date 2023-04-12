@@ -359,24 +359,24 @@ void iecBus::service ( void )
         {
             // protocol->pull( PIN_IEC_SRQ );
             Debug_printv("data");
-            // Debug_printf ( "bus[%d] device[%d] primary[%d] secondary[%d]", this->bus_state, this->device_state, this->data.primary, this->data.secondary );
+            // Debug_printf ( "bus[%d] device[%d] primary[%d] secondary[%d]", this->bus_state, this->device_state, data.primary, data.secondary );
 
-            if ( this->data.secondary == IEC_OPEN || this->data.secondary == IEC_REOPEN )
+            if ( data.secondary == IEC_OPEN || data.secondary == IEC_REOPEN )
             {
                 // Switch to detected protocol
                 selectProtocol();
             }
 
             // Data Mode - Get Command or Data
-            if ( this->data.primary == IEC_LISTEN )
+            if ( data.primary == IEC_LISTEN )
             {
                 //Debug_printv( "deviceListen" );
                 deviceListen();
             }
-            else if ( this->data.primary == IEC_TALK )
+            else if ( data.primary == IEC_TALK )
             {
                 //Debug_printv( "deviceTalk" );
-                //Debug_printf ( " (40 TALK   %.2d DEVICE %.2x SECONDARY %.2d CHANNEL)\r\n", this->data.device, this->data.secondary, this->data.channel );
+                //Debug_printf ( " (40 TALK   %.2d DEVICE %.2x SECONDARY %.2d CHANNEL)\r\n", data.device, data.secondary, data.channel );
                 deviceTalk();   
             }
 
@@ -390,19 +390,15 @@ void iecBus::service ( void )
             if ( drive.process() < DEVICE_ACTIVE || device_state < DEVICE_ACTIVE )
             {
                 //Debug_printv("device idle");
-                this->data.init();
+                data.init();
             }
 
-            this->bus_state = BUS_IDLE;
+            bus_state = BUS_IDLE;
+            protocol->flags = CLEAR;
 
             // Switch back to standard serial
             active_protocol = PROTOCOL_CBM_SERIAL;
             selectProtocol();
-            protocol->flags = CLEAR;
-
-            // Debug_printf( "primary[%.2X] secondary[%.2X] bus_state[%d]", this->data.primary, this->data.secondary, this->bus_state );
-            // Debug_printf( "atn[%d] clk[%d] data[%d] srq[%d]", IEC.protocol->status(PIN_IEC_ATN), IEC.protocol->status(PIN_IEC_CLK_IN), IEC.protocol->status(PIN_IEC_DATA_IN), IEC.protocol->status(PIN_IEC_SRQ));
-            // protocol->release ( PIN_IEC_SRQ );
         }
 
         if ( protocol->status ( PIN_IEC_ATN ) )
@@ -410,10 +406,13 @@ void iecBus::service ( void )
 
     } while ( bus_state > BUS_IDLE );
 
-    //Debug_printf("command[%.2X] device[%.2d] secondary[%.2d] channel[%.2d]", this->data.primary, this->data.device, this->data.secondary, this->data.channel);
+    //Debug_printf("command[%.2X] device[%.2d] secondary[%.2d] channel[%.2d]", data.primary, data.device, data.secondary, data.channel);
 
     // Cleanup and Re-enable Interrupt
     //gpio_intr_enable( PIN_IEC_ATN );
+
+    //Debug_printv ( "primary[%.2X] secondary[%.2X] bus[%d] flags[%d]", data.primary, data.secondary, bus_state, protocol->flags );
+    //Debug_printv ( "device[%d] channel[%d]", data.device, data.channel);
 
     Debug_printv("exit");
     protocol->release( PIN_IEC_SRQ );
