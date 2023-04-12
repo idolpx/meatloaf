@@ -167,8 +167,8 @@ int16_t CBMStandardSerial::receiveBits ()
     uint8_t n = 0;
 
     // Prepare IO Lines
-    set_pin_mode( PIN_IEC_CLK_IN, INPUT );
-    set_pin_mode( PIN_IEC_DATA_IN, INPUT );
+    //set_pin_mode( PIN_IEC_CLK_IN, INPUT );
+    //set_pin_mode( PIN_IEC_DATA_IN, INPUT );
 
     //pull ( PIN_IEC_SRQ );
     for ( n = 0; n < 8; n++ )
@@ -377,36 +377,36 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
 // pulls  the  Clock  line true  and  releases  the  Data  line  to  false.    Then  it starts to prepare the next bit.
 bool CBMStandardSerial::sendBits ( uint8_t data )
 {
-    // Send bits
 #if defined(ESP8266)
     ESP.wdtFeed();
 #endif
 
     // Prepare IO Lines
-    set_pin_mode( PIN_IEC_CLK_IN, OUTPUT );
-    set_pin_mode( PIN_IEC_DATA_IN, OUTPUT );
+    //set_pin_mode( PIN_IEC_CLK_IN, OUTPUT );
+    //set_pin_mode( PIN_IEC_DATA_IN, OUTPUT );
 
+    // Send bits
     for ( uint8_t n = 0; n < 8; n++ )
     {
         // tell listner to wait
         // we control both CLOCK & DATA now
         pull ( PIN_IEC_CLK_OUT );
-        if ( !wait ( 57 ) ) return false; // 57us 
+        if ( !wait ( TIMING_Ts1 ) ) return false; // 57us 
 
         // set bit
-        ( data bitand 1 ) ? release ( PIN_IEC_DATA_OUT ) : pull ( PIN_IEC_DATA_OUT );
+        ( data & 1 ) ? release ( PIN_IEC_DATA_OUT ) : pull ( PIN_IEC_DATA_OUT );
         data >>= 1; // get next bit
-        if ( !wait ( 28 ) ) return false; // 28us
+        if ( !wait ( TIMING_Ts2 ) ) return false; // 28us
 
         // tell listener bit is ready to read
         release ( PIN_IEC_CLK_OUT );
-        if ( !wait ( 76 ) ) return false; // 76us 
+        if ( !wait ( TIMING_Tv ) ) return false; // 76us 
 
         // Release data line after bit sent
         release ( PIN_IEC_DATA_OUT );
     }
     // Release data line after bit sent
-    // release ( PIN_IEC_DATA_OUT );
+    // IEC.release ( PIN_IEC_DATA_OUT );
 
     pull ( PIN_IEC_CLK_OUT );
 

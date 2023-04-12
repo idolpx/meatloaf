@@ -392,6 +392,11 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 			tuple.command = command;
 		}
 
+		if(mstr::startsWith(command, "0:")) {
+			// Remove media ID from command string
+			guessedPath = mstr::drop(guessedPath, 2);
+			tuple.command = "";
+		}
 		// TODO more of them?
 
 		// NOW, since user could have requested ANY kind of our supported magic paths like:

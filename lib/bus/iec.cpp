@@ -306,8 +306,6 @@ bool iecBus::init()
 
 void iecBus::service ( void )
 {
-    bool pin_atn = true;
-
     if ( bus_state < BUS_ACTIVE )
         return;
 
@@ -323,16 +321,16 @@ void iecBus::service ( void )
     bool pin_reset = protocol->status ( PIN_IEC_RESET );
     if ( pin_reset == PULLED )
     {
-        if ( pin_atn == PULLED )
+        if ( protocol->status ( PIN_IEC_ATN ) == PULLED )
         {
             // If RESET & ATN are both PULLED then CBM is off
-            this->bus_state = BUS_OFFLINE;
+            bus_state = BUS_OFFLINE;
             return;
         }
 
-        Debug_printf ( "IEC Reset! reset[%d] atn[%d]\r\n", pin_reset, pin_atn );
-        this->data.init(); // Clear bus data
-        this->bus_state = BUS_IDLE;
+        Debug_printf ( "IEC Reset! reset[%d]\r\n", pin_reset );
+        data.init(); // Clear bus data
+        bus_state = BUS_IDLE;
 
         // Reset virtual devices
         drive.reset();
@@ -345,10 +343,10 @@ void iecBus::service ( void )
     // Command or Data Mode
     do
     {
-        if ( this->bus_state == BUS_OFFLINE && pin_atn == PULLED)
-            pin_atn = RELEASED;
+        if ( bus_state == BUS_OFFLINE )
+            break;
 
-        if ( this->bus_state == BUS_ACTIVE || pin_atn == PULLED)
+        if ( bus_state == BUS_ACTIVE )
         {
             protocol->release ( PIN_IEC_CLK_OUT );
             protocol->pull ( PIN_IEC_DATA_OUT );
@@ -407,8 +405,7 @@ void iecBus::service ( void )
             // protocol->release ( PIN_IEC_SRQ );
         }
 
-        pin_atn = protocol->status ( PIN_IEC_ATN );
-        if ( pin_atn )
+        if ( protocol->status ( PIN_IEC_ATN ) )
             bus_state = BUS_ACTIVE;
 
     } while ( bus_state > BUS_IDLE );
@@ -663,7 +660,6 @@ void iecBus::deviceTalk ( void )
 
 
 // IEC turnaround
-
 bool IRAM_ATTR iecBus::turnAround()
 {
     /*
