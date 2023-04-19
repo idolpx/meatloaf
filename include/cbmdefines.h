@@ -21,7 +21,7 @@
 #define CBMDEFINES_H
 
 // The base pointer of basic.
-#define C64_BASIC_START     0x0801
+#define C64_BASIC_START     0x0401
 
 // 1541 RAM and ROM memory map definitions.
 #define CBM_1541_RAM_OFFSET 0

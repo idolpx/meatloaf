@@ -319,7 +319,8 @@ void iecBus::service ( void )
     // Check if CBM is sending a reset (setting the RESET line high). This is typically
     // when the CBM is reset itself. In this case, we are supposed to reset all states to initial.
     bool pin_reset = protocol->status ( PIN_IEC_RESET );
-    if ( pin_reset == PULLED )
+    bool pin_srq = protocol->status ( PIN_IEC_SRQ );
+    if ( pin_reset == PULLED || pin_srq == PULLED )
     {
         if ( protocol->status ( PIN_IEC_ATN ) == PULLED )
         {
@@ -708,28 +709,6 @@ bool IRAM_ATTR iecBus::turnAround()
     //Debug_println("turnaround complete");
     return true;
 } // turnAround
-
-
-// this routine will set the direction on the bus back to normal
-// (the way it was when the computer was switched on)
-bool iecBus::undoTurnAround ( void )
-{
-    protocol->pull ( PIN_IEC_DATA_OUT );
-    protocol->release ( PIN_IEC_CLK_OUT );
-
-    // Debug_printf("IEC undoTurnAround: ");
-
-    // Wait until the computer releases the clock line
-    if ( protocol->timeoutWait ( PIN_IEC_CLK_IN, RELEASED, FOREVER ) == TIMED_OUT )
-    {
-        Debug_printf ( "Wait until the computer releases the clock line" );
-        protocol->flags or_eq ERROR;
-        return -1; // return error because timeout
-    }
-
-    // Debug_println("complete");
-    return true;
-} // undoTurnAround
 
 
 void iecBus::releaseLines ( bool wait )

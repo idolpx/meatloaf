@@ -705,8 +705,9 @@ uint16_t iecDrive::sendLine(uint16_t &basicPtr, uint16_t blocks, char *text)
 	basicPtr += len + 5;
 
 	// Send that pointer
-	IEC.send(basicPtr bitand 0xFF);
-	IEC.send(basicPtr >> 8);
+	// No basic line pointer is used in the directory listing set to 0x0101
+	IEC.send(0x01);		// IEC.send(basicPtr bitand 0xFF);
+	IEC.send(0x01);		// IEC.send(basicPtr >> 8);
 
 	// Send blocks
 	IEC.send(blocks bitand 0xFF);

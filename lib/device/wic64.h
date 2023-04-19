@@ -51,6 +51,8 @@
 #ifndef DEVICE_WIC64_H
 #define DEVICE_WIC64_H
 
+#include <string>
+
 class WiC64 
 {
 public:
