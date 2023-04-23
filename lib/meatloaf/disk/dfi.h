@@ -89,3 +89,92 @@
 //
 
 // https://cbm8bit.com/8bit/commodore/server/Unrenamed%20Achives/browse/c64/dfi
+
+
+#ifndef MEATLOAF_MEDIA_DFI
+#define MEATLOAF_MEDIA_DFI
+
+#include "meat_io.h"
+#include "d64.h"
+
+
+/********************************************************
+ * Streams
+ ********************************************************/
+
+class DFIIStream : public D64IStream {
+    // override everything that requires overriding here
+
+public:
+    DFIIStream(std::shared_ptr<MStream> is) : D64IStream(is)
+    {
+        // DFI Offsets
+        directory_header_offset = {1, 0, 0x90};
+        directory_list_offset = {1, 4, 0x00};
+        block_allocation_map = { {1, 0, 0x00, 1, 40, 4} };
+        sectorsPerTrack = { 255 };
+
+        // // The header's size is 256 bytes, that's exactly one sector. The header is
+        // // always the first sector in the image (track 1, sector 0).
+        // //
+        // // $00 - $17 : magic (0x00, dreamload file archive, 0x00)
+        // // $18 - $1b : version (bit 0-15: minor, 16-31: major. $00010000 is v1.0)
+        // // $1c - $1f : tracks in this image (a track has always 256 sectors)
+        // // $20 - $21 : root dir track and sektor
+        // // $22 - $23 : bam track and sector
+        // // $24 - $5f : reserved
+        // // $60 - $ff : comment or notes
+        // this.seek(0x20);
+        // this.partitions[0].track = this.read();
+        // this.partitions[0].sector = this.read();
+        // this.partitions[0].block_allocation_map[0].track = this.read();
+        // this.partitions[0].block_allocation_map[0].sector = this.read();
+
+
+        // this.partitions[0].directory_track = this.partitions[0].track;
+        // this.partitions[0].directory_sector = this.partitions[0].sector + 1;
+    };
+
+    //virtual uint16_t blocksFree() override;
+	virtual uint8_t speedZone( uint8_t track) override { return 0; };
+
+protected:
+
+private:
+    friend class DFIFile;
+};
+
+
+/********************************************************
+ * File implementations
+ ********************************************************/
+
+class DFIFile: public D64File {
+public:
+    DFIFile(std::string path, bool is_dir = true) : D64File(path, is_dir) {};
+
+    MStream* createIStream(std::shared_ptr<MStream> containerIstream) override;
+};
+
+
+
+/********************************************************
+ * FS
+ ********************************************************/
+
+class DFIFileSystem: public MFileSystem
+{
+public:
+    MFile* getFile(std::string path) override {
+        return new DFIFile(path);
+    }
+
+    bool handles(std::string fileName) {
+        return byExtension(".dfi", fileName);
+    }
+
+    DFIFileSystem(): MFileSystem("dfi") {};
+};
+
+
+#endif /* MEATLOAF_MEDIA_DFI */
