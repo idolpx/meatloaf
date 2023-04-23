@@ -31,10 +31,10 @@ public:
     //virtual uint16_t blocksFree() override;
 	virtual uint8_t speedZone( uint8_t track) override
 	{
-        if ( track < 78 )
-		    return (track < 39) + (track < 53) + (track < 64);
+        if (track < 78)
+            return (track < 40) + (track < 54) + (track < 65);
         else
-            return (track < 116) + (track < 130) + (track < 141);
+            return (track < 117) + (track < 131) + (track < 142);
 	};
 
 protected:

@@ -1075,7 +1075,8 @@ bool iecDrive::sendFile()
 			}
 #endif
 			// Send Byte
-			if ( avail == 1 || !success_rx )
+			avail = istream->available();
+			if ( avail == 0 )
 			{
 				success_tx = IEC.sendEOI(bl); // indicate end of file.
 				if ( !success_tx )
@@ -1125,8 +1126,6 @@ bool iecDrive::sendFile()
 			{
 				fnLedManager.toggle(eLed::LED_BUS);
 			}
-
-			avail = istream->available();
 
 			i++;
 		}

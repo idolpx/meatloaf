@@ -32,9 +32,9 @@ public:
 	virtual uint8_t speedZone( uint8_t track) override
 	{
         if ( track < 35 )
-		    return (track < 17) + (track < 24) + (track < 30);
+		    return (track < 18) + (track < 25) + (track < 31);
         else
-            return (track < 52) + (track < 59) + (track < 65);
+            return (track < 53) + (track < 60) + (track < 66);
 	};
 
 protected:
