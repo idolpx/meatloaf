@@ -105,33 +105,34 @@ public:
         block_size = 256;
 
 
-        // this.size = data.media_data.length;
-        // switch (this.size + this.media_header_size) {
-        //     case 174848: // 35 tracks no errors
-        //         break;
+        uint32_t size = containerStream->size();
+        switch (size + media_header_size) 
+        {
+            case 174848: // 35 tracks no errors
+                break;
 
-        //     case 175531: // 35 w/ errors
-        //         this.error_info = true;
-        //         break;
+            case 175531: // 35 w/ errors
+                error_info = true;
+                break;
 
-        //     case 196608: // 40 tracks no errors
-        //         this.partitions[this.partition].block_allocation_map[0].end_track = 40;
-        //         break;
+            case 196608: // 40 tracks no errors
+                partitions[partition].block_allocation_map[0].end_track = 40;
+                break;
 
-        //     case 197376: // 40 w/ errors
-        //         this.partitions[this.partition].block_allocation_map[0].end_track = 40;
-        //         this.error_info = true;
-        //         break;
+            case 197376: // 40 w/ errors
+                partitions[partition].block_allocation_map[0].end_track = 40;
+                error_info = true;
+                break;
 
-        //     case 205312: // 42 tracks no errors
-        //         this.partitions[this.partition].block_allocation_map[0].end_track = 42;
-        //         break;
+            case 205312: // 42 tracks no errors
+                partitions[partition].block_allocation_map[0].end_track = 42;
+                break;
 
-        //     case 206114: // 42 w/ errors
-        //         this.partitions[this.partition].block_allocation_map[0].end_track = 42;
-        //         this.error_info = true;
-        //         break;
-        // }
+            case 206114: // 42 w/ errors
+                partitions[partition].block_allocation_map[0].end_track = 42;
+                error_info = true;
+                break;
+        }
 
         // Get DOS Version
 
@@ -179,8 +180,26 @@ public:
     };
 
 
+    // Functions
+    // read = (size) => this.containerStream.read(size);
+    // readUntil = (delimiter = 0x00) => this.containerStream.readUntil(delimiter);
+    // readString = (size) => this.containerStream.readString(size);
+    // readStringUntil = (delimiter = 0x00) => this.containerStream.readStringUntil(delimiter);
+    // seek = (offset) => this.containerStream.seek(offset + this.media_header_size);
+    // seekCurrent = (offset) => this.containerStream.seekCurrent(offset);
 
-    //uint8_t sector_buffer[256] = { 0 };
+
+
+
+
+
+
+    virtual uint16_t blocksFree();
+
+	virtual uint8_t speedZone( uint8_t track)
+	{
+		return (track < 18) + (track < 25) + (track < 31);
+	};
 
     bool seekSector( uint8_t track, uint8_t sector, size_t offset = 0 );
     bool seekSector( std::vector<uint8_t> trackSectorOffset );
@@ -198,12 +217,7 @@ public:
         return seekEntry(entry_index + 1);
     }
 
-    virtual uint16_t blocksFree();
 
-	virtual uint8_t speedZone( uint8_t track)
-	{
-		return (track < 18) + (track < 25) + (track < 31);
-	};
 
     virtual bool seekPath(std::string path) override;
     size_t readFile(uint8_t* buf, size_t size) override;

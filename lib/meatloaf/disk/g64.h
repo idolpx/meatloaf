@@ -29,7 +29,6 @@ public:
         //sectorsPerTrack = { 17, 18, 19, 21 };
     };
 
-    //virtual uint16_t blocksFree() override;
 	virtual uint8_t speedZone( uint8_t track) override
 	{
         if ( track < 35 )

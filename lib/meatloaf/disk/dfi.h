@@ -155,7 +155,6 @@ public:
         // this.partitions[0].directory_sector = this.partitions[0].sector + 1;
     };
 
-    //virtual uint16_t blocksFree() override;
 	virtual uint8_t speedZone( uint8_t track) override { return 0; };
 
 protected:

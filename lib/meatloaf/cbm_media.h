@@ -73,6 +73,7 @@ protected:
     bool show_hidden = false;
 
     size_t block_size = 256;
+    size_t media_header_size = 0x00;
     size_t entry_index = 0;  // Currently selected directory entry
     size_t entry_count = -1; // Directory list entry count (-1 unknown)
 

@@ -14,12 +14,13 @@
 //
 // You should have received a copy of the GNU General Public License
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
-
+//
 // https://github.com/MEGA65/open-roms/blob/master/doc/Protocol-JiffyDOS.md
 // http://www.nlq.de/
 // http://www.baltissen.org/newhtm/sourcecodes.htm
 // https://www.amigalove.com/viewtopic.php?t=1734
-
+// https://ar.c64.org/rrwiki/images/4/48/The_Transactor_Vol09_03_1989_Feb_JD_review.pdf
+//
 
 #ifndef PROTOCOL_JIFFYDOS_H
 #define PROTOCOL_JIFFYDOS_H

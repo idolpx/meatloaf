@@ -91,7 +91,6 @@ public:
         // this.partitions[0].block_allocation_map[0].sector = this.read();
     };
 
-    //virtual uint16_t blocksFree() override;
 	virtual uint8_t speedZone( uint8_t track) override
 	{
         if ( track < 78 )
