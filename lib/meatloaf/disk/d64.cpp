@@ -55,7 +55,7 @@ bool D64IStream::deallocateBlock( uint8_t track, uint8_t sector)
 
 bool D64IStream::seekEntry( std::string filename )
 {
-    uint8_t index = 1;
+    uint32_t index = 1;
     mstr::rtrimA0(filename);
     mstr::replaceAll(filename, "\\", "/");
 
@@ -100,7 +100,7 @@ bool D64IStream::seekEntry( std::string filename )
     return false;
 }
 
-bool D64IStream::seekEntry( size_t index )
+bool D64IStream::seekEntry( uint32_t index )
 {
     bool r = false;
 
