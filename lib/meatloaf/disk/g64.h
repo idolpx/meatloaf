@@ -25,7 +25,7 @@ public:
         // G64 Offsets
         //directory_header_offset = {18, 0, 0x90};
         //directory_list_offset = {18, 1, 0x00};
-        block_allocation_map = { {18, 0, 0x04, 1, 35, 4}, {53, 0, 0x00, 36, 70, 3} };
+        //block_allocation_map = { {18, 0, 0x04, 1, 35, 4}, {53, 0, 0x00, 36, 70, 3} };
         //sectorsPerTrack = { 17, 18, 19, 21 };
     };
 

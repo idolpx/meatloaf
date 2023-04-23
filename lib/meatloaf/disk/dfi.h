@@ -108,11 +108,31 @@ class DFIIStream : public D64IStream {
 public:
     DFIIStream(std::shared_ptr<MStream> is) : D64IStream(is)
     {
-        // DFI Offsets
-        directory_header_offset = {1, 0, 0x90};
-        directory_list_offset = {1, 4, 0x00};
-        block_allocation_map = { {1, 0, 0x00, 1, 40, 4} };
+        // DFI Partition Info
+        std::vector<BlockAllocationMap> b = { 
+            {
+                1,      // track
+                0,      // sector
+                0x00,   // offset
+                1,      // start_track
+                40,    // end_track
+                4       // byte_count
+            } 
+        };
+
+        Partition p = {
+            1,     // track
+            0,     // sector
+            0x90,  // header_offset
+            1,     // directory_track
+            4,     // directory_sector
+            0x00,  // directory_offset
+            b      // block_allocation_map
+        };
+        partitions.clear();
+        partitions.push_back(p);
         sectorsPerTrack = { 255 };
+        block_size = 256;
 
         // // The header's size is 256 bytes, that's exactly one sector. The header is
         // // always the first sector in the image (track 1, sector 0).

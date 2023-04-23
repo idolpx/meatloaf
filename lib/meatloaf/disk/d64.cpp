@@ -118,7 +118,11 @@ bool D64IStream::seekEntry( uint32_t index )
     {
         // Start at first sector of directory
         next_track = 0;
-        r = seekSector( directory_list_offset );
+        r = seekSector( 
+            partitions[partition].directory_track,
+            partitions[partition].directory_sector,
+            partitions[partition].directory_offset
+        );
 
         // Find sector with requested entry
         do
@@ -173,18 +177,22 @@ uint16_t D64IStream::blocksFree()
 {
     uint16_t free_count = 0;
 
-    for(uint8_t x = 0; x < block_allocation_map.size(); x++)
+    for(uint8_t x = 0; x < partitions[partition].block_allocation_map.size(); x++)
     {
-        uint8_t bam[block_allocation_map[x].byte_count] = { 0 };
+        uint8_t bam[partitions[partition].block_allocation_map[x].byte_count] = { 0 };
         //Debug_printv("start_track[%d] end_track[%d]", block_allocation_map[x].start_track, block_allocation_map[x].end_track);
 
-        seekSector(block_allocation_map[x].track, block_allocation_map[x].sector, block_allocation_map[x].offset);
-        for(uint8_t i = block_allocation_map[x].start_track; i <= block_allocation_map[x].end_track; i++)
+        seekSector(
+            partitions[partition].block_allocation_map[x].track, 
+            partitions[partition].block_allocation_map[x].sector, 
+            partitions[partition].block_allocation_map[x].offset
+        );
+        for(uint8_t i = partitions[partition].block_allocation_map[x].start_track; i <= partitions[partition].block_allocation_map[x].end_track; i++)
         {
             containerStream->read((uint8_t *)&bam, sizeof(bam));
             if ( sizeof(bam) > 3 )
             {
-                if ( i != directory_list_offset[0] )
+                if ( i != partitions[partition].directory_track )
                 {
                     //Debug_printv("x[%d] track[%d] count[%d] size[%d]", x, i, bam[0], sizeof(bam));
                     free_count += bam[0];

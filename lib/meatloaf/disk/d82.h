@@ -21,11 +21,55 @@ class D82IStream : public D64IStream {
 public:
     D82IStream(std::shared_ptr<MStream> is) : D64IStream(is) 
     {
-        // D82 Offsets
-        directory_header_offset = {39, 0, 0x06};
-        directory_list_offset = {39, 1, 0x00};
-        block_allocation_map = { {38, 0, 0x06, 1, 50, 5}, {38, 3, 0x06, 51, 100, 5}, {38, 6, 0x06, 101, 150, 5}, {38, 9, 0x06, 151, 154, 5} };
+        // D82 Partition Info
+        std::vector<BlockAllocationMap> b = { 
+            {
+                38,     // track
+                0,      // sector
+                0x06,   // offset
+                1,      // start_track
+                50,     // end_track
+                5       // byte_count
+            },
+            {
+                38,     // track
+                3,      // sector
+                0x06,   // offset
+                51,     // start_track
+                100,    // end_track
+                5       // byte_count
+            },
+            {
+                38,     // track
+                6,      // sector
+                0x06,   // offset
+                101,    // start_track
+                150,    // end_track
+                5       // byte_count
+            },
+            {
+                38,     // track
+                9,      // sector
+                0x06,   // offset
+                151,    // start_track
+                154,    // end_track
+                5       // byte_count
+            }
+        };
+
+        Partition p = {
+            39,    // track
+            0,     // sector
+            0x06,  // header_offset
+            39,    // directory_track
+            1,     // directory_sector
+            0x00,  // directory_offset
+            b      // block_allocation_map
+        };
+        partitions.clear();
+        partitions.push_back(p);
         sectorsPerTrack = { 23, 25, 27, 29 };
+        block_size = 256;
     };
 
     //virtual uint16_t blocksFree() override;

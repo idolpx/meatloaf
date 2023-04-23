@@ -1,6 +1,4 @@
 
-
-
 #ifndef MEATLOAF_CBM_MEDIA
 #define MEATLOAF_CBM_MEDIA
 
@@ -45,7 +43,7 @@ public:
     bool seek(uint32_t pos) override {
         return true;
     };
-     bool seek(uint32_t pos, int mode) override {
+    bool seek(uint32_t pos, int mode) override {
         return true;
     };   
 
@@ -99,24 +97,31 @@ protected:
 
 private:
 
-    // File
+    // Commodore Media
+    // FILE
     friend class P00File;
 
-    // Disk
+    // FLOPPY DISK
     friend class D64File;
     friend class D71File;
     friend class D80File;
     friend class D81File;
     friend class D82File;
-    friend class D8BFile;
-    friend class DNPFile;
 
-    // Tape
+    // HARD DRIVE
+    friend class DNPFile;
+    friend class D90File;
+
+    // MEDIA ARCHIVE
+    friend class D8BFile;
+    friend class DFIFile;
+
+    // CASSETTE TAPE
     friend class T64File;
     friend class TCRTFile;
 
-    // Cartridge
-
+    // CARTRIDGE
+    friend class CRTFile;
 };
 
 
