@@ -16,7 +16,7 @@ bool D64IStream::seekSector( uint8_t track, uint8_t sector, size_t offset )
     track--;
 	for (uint8_t index = 0; index < track; ++index)
 	{
-		sectorOffset += sectorsPerTrack[speedZone(index)];
+		sectorOffset += sectorsPerTrack[speedZone(index + 1)];
         // Debug_printv("track[%d] speedZone[%d] secotorsPerTrack[%d] sectorOffset[%d]", (index + 1), speedZone(index), sectorsPerTrack[speedZone(index)], sectorOffset);
 	}
 	sectorOffset += sector;
@@ -68,7 +68,7 @@ bool D64IStream::seekEntry( std::string filename )
             mstr::rtrimA0(entryFilename);
             mstr::replaceAll(filename, "\\", "/");
             mstr::toASCII(entryFilename);
-            Debug_printv("track[%d] sector[%d] filename[%s] entry.filename[%.16s]", track, sector, filename.c_str(), entryFilename.c_str());
+            Debug_printv("index[%d] track[%d] sector[%d] filename[%s] entry.filename[%.16s]", index, track, sector, filename.c_str(), entryFilename.c_str());
 
             //Debug_printv("filename[%s] entry[%s]", filename.c_str(), entryFilename.c_str());
 
@@ -265,8 +265,8 @@ bool D64IStream::seekPath(std::string path) {
         seekSector(entry.start_track, entry.start_sector);
 
         // Calculate file size
-        uint8_t t = 0;
-        uint8_t s = 0;
+        uint8_t t = entry.start_track;
+        uint8_t s = entry.start_sector;
         size_t blocks = 0; 
         do
         {

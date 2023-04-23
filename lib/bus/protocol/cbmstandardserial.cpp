@@ -377,6 +377,7 @@ bool CBMStandardSerial::sendBits ( uint8_t data )
 #if defined(ESP8266)
     ESP.wdtFeed();
 #endif
+    bool r = true;
 
     // Send bits
     for ( uint8_t n = 0; n < 8; n++ )
@@ -384,16 +385,27 @@ bool CBMStandardSerial::sendBits ( uint8_t data )
         // tell listner to wait
         // we control both CLOCK & DATA now
         pull ( PIN_IEC_CLK_OUT );
-        if ( !wait ( TIMING_Ts1 ) ) return false; // 57us 
+        if ( !wait ( TIMING_Ts1 ) )
+        { 
+            r = false;
+            break;
+        }
 
         // set bit
         ( data & 1 ) ? release ( PIN_IEC_DATA_OUT ) : pull ( PIN_IEC_DATA_OUT );
         data >>= 1; // get next bit
-        if ( !wait ( TIMING_Ts2 ) ) return false; // 28us
-
+        if ( !wait ( TIMING_Ts2 ) )
+        { 
+            r = false;
+            break;
+        }
         // tell listener bit is ready to read
         release ( PIN_IEC_CLK_OUT );
-        if ( !wait ( TIMING_Tv ) ) return false; // 76us 
+        if ( !wait ( TIMING_Tv ) )
+        { 
+            r = false;
+            break;
+        }
 
         // Release data line after bit sent
         release ( PIN_IEC_DATA_OUT );
@@ -403,7 +415,7 @@ bool CBMStandardSerial::sendBits ( uint8_t data )
 
     pull ( PIN_IEC_CLK_OUT );
 
-    return true;
+    return r;
 } // sendBits
 
 

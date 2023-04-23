@@ -994,8 +994,8 @@ bool iecDrive::sendFile()
 		return false;
 	}
 
-	size_t len = istream->size();
-	size_t avail = istream->available();
+	uint32_t len = istream->size();
+	uint32_t avail = istream->available();
 
 	// if ( istream.isText() )
 	// {
@@ -1056,10 +1056,15 @@ bool iecDrive::sendFile()
 		success_rx = istream->read(&bl, 1);
 
 		Debug_printf("sendFile: [$%.4X]\r\n=================================\r\n", load_address);
-		while( avail >= 0 && success_rx && !istream->error() )
+		while( avail > 0 && success_rx && !istream->error() )
 		{
             // Read Byte
             success_rx = istream->read(&b, 1);
+			if ( !success_rx )
+			{
+				Debug_printv("rx fail");
+				break;
+			}
 
 			// Debug_printv("b[%02X] success[%d]", b, success);
 #ifdef DATA_STREAM
@@ -1070,7 +1075,7 @@ bool iecDrive::sendFile()
 			}
 #endif
 			// Send Byte
-			if ( avail == 0 || !success_rx )
+			if ( avail == 1 || !success_rx )
 			{
 				success_tx = IEC.sendEOI(bl); // indicate end of file.
 				if ( !success_tx )
