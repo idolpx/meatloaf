@@ -40,12 +40,22 @@ public:
     bool isBrowsable() override { return false; };
     bool isRandomAccess() override { return true; };
 
-    bool seek(uint32_t pos) override {
-        return true;
-    };
-    bool seek(uint32_t pos, int mode) override {
-        return true;
-    };   
+    // read = (size) => this.containerStream.read(size);
+    virtual uint8_t read(uint8_t size) {
+        uint8_t b = 0;
+        if (!containerStream->read((uint8_t *)&b, 1))
+            return -1;
+
+        return b;
+    }
+    // readUntil = (delimiter = 0x00) => this.containerStream.readUntil(delimiter);
+    // readString = (size) => this.containerStream.readString(size);
+    // readStringUntil = (delimiter = 0x00) => this.containerStream.readStringUntil(delimiter);
+    // seek = (offset) => this.containerStream.seek(offset + this.media_header_size);
+    bool seek(uint32_t offset) override { return containerStream->seek(offset + media_header_size); }
+    // seekCurrent = (offset) => this.containerStream.seekCurrent(offset);
+    bool seekCurrent(uint32_t offset) { return containerStream->seek(offset); }
+
 
     bool seekPath(std::string path) override { return false; };
     std::string seekNextEntry() override { return ""; };

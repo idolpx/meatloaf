@@ -37,6 +37,7 @@ MStream* HttpFile::meatStream() {
     //Debug_printv("Input stream requested: [%s]", url.c_str());
     MStream* istream = new HttpIStream(url);
     istream->open();
+
     return istream;
 }
 
@@ -120,14 +121,15 @@ bool HttpFile::isText() {
  * Istream impls
  ********************************************************/
 bool HttpIStream::open() {
+    bool r = false;
     if(secondaryAddress == 0)
-        return m_http.GET(url);
+        r = m_http.GET(url);
     else if(secondaryAddress == 1)
-        return m_http.PUT(url);
+        r = m_http.PUT(url);
     else if(secondaryAddress == 2)
-        return m_http.POST(url);
+        r = m_http.POST(url);
 
-    return false;
+    return r;
 }
 
 void HttpIStream::close() {
@@ -152,6 +154,10 @@ uint32_t HttpIStream::write(const uint8_t *buf, uint32_t size) {
 bool HttpIStream::isOpen() {
     return m_http.m_isOpen;
 };
+
+std::string HttpIStream::base() {
+    return m_http.base;
+}
 
 uint32_t HttpIStream::size() {
     return m_http.m_length;
@@ -356,7 +362,7 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t meth, int resum
         .keep_alive_interval = 1
     };
 
-    Debug_printv("HTTP Init [%s]", url.c_str());
+    Debug_printv("HTTP Init base[%s] url[%s]", base.c_str(), url.c_str());
     m_http = esp_http_client_init(&config);
 
     if(resume > 0) {
@@ -462,6 +468,11 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
                 }
 
                 //Debug_printv("new url '%s'", meatClient->url.c_str());
+            }
+            else if(mstr::equals("base", evt->header_key, false))
+            {
+                Debug_printv("* base set '%s'", evt->header_value);
+                meatClient->base = evt->header_value;
             }
 
             // Allow override in lambda

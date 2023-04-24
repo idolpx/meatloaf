@@ -180,20 +180,6 @@ public:
     };
 
 
-    // Functions
-    // read = (size) => this.containerStream.read(size);
-    // readUntil = (delimiter = 0x00) => this.containerStream.readUntil(delimiter);
-    // readString = (size) => this.containerStream.readString(size);
-    // readStringUntil = (delimiter = 0x00) => this.containerStream.readStringUntil(delimiter);
-    // seek = (offset) => this.containerStream.seek(offset + this.media_header_size);
-    // seekCurrent = (offset) => this.containerStream.seekCurrent(offset);
-
-
-
-
-
-
-
     virtual uint16_t blocksFree();
 
 	virtual uint8_t speedZone( uint8_t track)

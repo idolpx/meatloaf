@@ -41,6 +41,7 @@ public:
     virtual size_t error() = 0;
     
     virtual bool isOpen() = 0;
+    virtual std::string base() { return ""; };
     virtual bool isBrowsable() { return false; };
     virtual bool isRandomAccess() { return false; };
 
