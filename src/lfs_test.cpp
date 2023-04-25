@@ -1,7 +1,6 @@
 
 #include "esp_err.h"
 #include "esp_log.h"
-#include "esp_spi_flash.h"
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -10,6 +9,13 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <cstring>
+
+#include "esp_flash.h"
+
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+#include "esp_chip_info.h"
+#include "spi_flash_mmap.h"
+#endif
 
 #include "esp_littlefs.h"
 #include <dirent.h>
@@ -33,7 +39,8 @@ void lfs_test ( void )
 
         printf("silicon revision %d, ", chip_info.revision);
 
-        printf("%dMB %s flash\n", spi_flash_get_chip_size() / (1024 * 1024),
+        uint32_t size_flash_chip = 0;
+        printf("%dMB %s flash\n", (esp_flash_get_size(NULL, &size_flash_chip) / (1024 * 1024)),
                (chip_info.features & CHIP_FEATURE_EMB_FLASH) ? "embedded" : "external");
 
         printf("Free heap: %d\n", esp_get_free_heap_size());

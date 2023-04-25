@@ -1072,6 +1072,7 @@ bool iecDrive::sendFile()
 			if ( !success_rx )
 			{
 				Debug_printv("rx fail");
+				IEC.sendEOI(0);
 				break;
 			}
 
