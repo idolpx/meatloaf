@@ -89,8 +89,8 @@ namespace CBM
     // Special channels.
     enum IECChannels
     {
-        READ_CHANNEL = 0,
-        WRITE_CHANNEL = 1,
+        LOAD_CHANNEL = 0,
+        SAVE_CHANNEL = 1,
         CMD_CHANNEL = 15
     };
 

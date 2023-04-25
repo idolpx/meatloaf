@@ -28,6 +28,7 @@
 #include "led.h"
 
 #include "string_utils.h"
+#include "peoples_url_parser.h"
 
 #include "wrappers/iec_buffer.h"
 
@@ -992,6 +993,14 @@ bool iecDrive::sendFile()
 		sendFileNotFound();
 		closeStream();
 		return false;
+	}
+
+	if ( IEC.data.channel == LOAD_CHANNEL )
+	{
+		PeoplesUrlParser u;
+		u.parseUrl(istream->url);
+		//Debug_printv( "Change Directory Here! [%s]", u.base().c_str() );
+		changeDir(u.base());
 	}
 
 	uint32_t len = istream->size();

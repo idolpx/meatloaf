@@ -155,10 +155,6 @@ bool HttpIStream::isOpen() {
     return m_http.m_isOpen;
 };
 
-std::string HttpIStream::base() {
-    return m_http.base;
-}
-
 uint32_t HttpIStream::size() {
     return m_http.m_length;
 };
@@ -362,7 +358,7 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t meth, int resum
         .keep_alive_interval = 1
     };
 
-    Debug_printv("HTTP Init base[%s] url[%s]", base.c_str(), url.c_str());
+    //Debug_printv("HTTP Init url[%s]", url.c_str());
     m_http = esp_http_client_init(&config);
 
     if(resume > 0) {
@@ -468,11 +464,6 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
                 }
 
                 //Debug_printv("new url '%s'", meatClient->url.c_str());
-            }
-            else if(mstr::equals("base", evt->header_key, false))
-            {
-                Debug_printv("* base set '%s'", evt->header_value);
-                meatClient->base = evt->header_value;
             }
 
             // Allow override in lambda

@@ -28,6 +28,25 @@ class D64IStream : public CBMImageStream {
 
 protected:
 
+    struct BlockAllocationMap {
+        uint8_t track;
+        uint8_t sector;
+        uint8_t offset;
+        uint8_t start_track;
+        uint8_t end_track;
+        uint8_t byte_count;
+    };
+
+    struct Partition {
+        uint8_t header_track;
+        uint8_t header_sector;
+        uint8_t header_offset;
+        uint8_t directory_track;
+        uint8_t directory_sector;
+        uint8_t directory_offset;
+        std::vector<BlockAllocationMap> block_allocation_map;
+    };
+
     struct Header {
         char disk_name[16];
         char unused[2];
@@ -51,25 +70,6 @@ protected:
         uint8_t hour;
         uint8_t minute;
         uint16_t blocks;
-    };
-
-    struct BlockAllocationMap {
-        uint8_t track;
-        uint8_t sector;
-        uint8_t offset;
-        uint8_t start_track;
-        uint8_t end_track;
-        uint8_t byte_count;
-    };
-
-    struct Partition {
-        uint8_t header_track;
-        uint8_t header_sector;
-        uint8_t header_offset;
-        uint8_t directory_track;
-        uint8_t directory_sector;
-        uint8_t directory_offset;
-        std::vector<BlockAllocationMap> block_allocation_map;
     };
 
     std::vector<Partition> partitions;

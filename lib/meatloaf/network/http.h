@@ -52,7 +52,6 @@ public:
     bool isText = false;
     bool isFriendlySkipper = false;
     bool wasRedirected = false;
-    std::string base;
     std::string url;
     //char response[HTTP_BLOCK_SIZE + 1] = { 0 };
     int lastRC;
@@ -126,11 +125,9 @@ public:
     uint32_t write(const uint8_t *buf, uint32_t size) override;
 
     bool isOpen() override;
-    std::string base() override;
 
 protected:
     MeatHttpClient m_http;
-    std::string url;
 
 };
 

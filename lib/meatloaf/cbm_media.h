@@ -66,6 +66,7 @@ public:
     uint32_t write(const uint8_t *buf, uint32_t size);
 
     bool isOpen();
+    std::string url;
 
 protected:
 

@@ -231,7 +231,7 @@ class iecBus
 
         // Checks if CBM is sending a reset (setting the RESET line high). This is typicall
         // when the CBM is reset itself. In this case, we are supposed to reset all states to initial.
-//  bool checkRESET();
+        //  bool checkRESET();
 
         // Sends a byte. The communication must be in the correct state: a load command
         // must just have been recieved. If something is not OK, FALSE is returned.
