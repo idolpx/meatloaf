@@ -1,5 +1,6 @@
 #include "meat_io.h"
 
+#include <sys/stat.h>
 #include <algorithm>
 #include <vector>
 #include <sstream>

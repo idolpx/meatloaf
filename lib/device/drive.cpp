@@ -78,11 +78,11 @@ device_state_t iecDrive::process ( void )
 
         bool isOpen = false;
 
-        if ( this->data.channel == 0 ) {
+        if ( this->data.channel == LOAD_CHANNEL ) {
             Debug_printf ( "LOAD \"%s\",%d\r\n", this->data.payload.c_str(), this->data.device );
             isOpen = registerStream(std::ios_base::in);
         }
-        else if ( IEC.data.channel == 1 ) {
+        else if ( IEC.data.channel == SAVE_CHANNEL ) {
             Debug_printf ( "SAVE \"%s\",%d\r\n", this->data.payload.c_str(), this->data.device );
             isOpen = registerStream(std::ios_base::out);
         }
@@ -339,7 +339,6 @@ CommandPathTuple iecDrive::parseLine(std::string command, size_t channel)
 
 	std::string guessedPath = command;
 	CommandPathTuple tuple;
-
 
 	// if ( this->data.primary == IEC_LISTEN || this->data.channel == CMD_CHANNEL )
 	// {
