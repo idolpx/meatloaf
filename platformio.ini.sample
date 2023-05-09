@@ -137,15 +137,6 @@ build_flags =
 	-D PINMAP_A2_REV0
     -D SD_CARD
 
-[env:fujinet-v1.6]
-platform = espressif32@${meatloaf.esp32_platform_version}
-board = fujinet-v1-${meatloaf.flash_size}
-build_type = debug
-build_flags =
-	${env.build_flags}
-	-D PINMAP_FN_16
-    -D SD_CARD
-
 [env:esp32s3]
 platform = espressif32@${meatloaf.esp32_platform_version}
 board = esp32-s3-devkitc-1
