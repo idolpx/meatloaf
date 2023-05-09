@@ -44,6 +44,7 @@ build_bus      = IEC
 
 [platformio]
 description = Meatloaf Commodore to ESP32 WiFi Multifunction Firmware
+default_envs = ${meatloaf.build_board}
 data_dir = $PROJECT_DIR/data/${meatloaf.build_platform}
 
 [env]
