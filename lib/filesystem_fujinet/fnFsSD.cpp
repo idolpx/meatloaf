@@ -1,12 +1,13 @@
 /* TODO: Check why using the SD/FAT routines takes up a large amount of the stack (around 4.5K)
 */
 
-#ifdef SD_CARD
-
 #include "fnFsSD.h"
 
 #include <esp_vfs.h>
 #include <esp_vfs_fat.h>
+#include <driver/sdmmc_host.h>
+#include <esp_rom_gpio.h>
+#include <soc/sdmmc_periph.h>
 
 #include <algorithm>
 #include <memory>
@@ -17,9 +18,9 @@
 
 #include "utils.h"
 
-
-#ifdef CONFIG_IDF_TARGET_ESP32S3
-#define HSPI_HOST SPI3_HOST
+#include <esp_idf_version.h>
+#if ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(5, 0, 0)
+#define SDSPI_DEFAULT_DMA 1
 #endif
 
 // Our global SD interface
@@ -141,9 +142,12 @@ bool FileSystemSDFAT::dir_open(const char * path, const char * pattern, uint16_t
         // Ignore items marked hidden or system
         if(finfo.fattrib & AM_HID || finfo.fattrib & AM_SYS)
             continue;
+
         // Ignore some special files we create on SD
         if(strcmp(finfo.fname, "paper") == 0 
+        #ifndef FNCONFIG_DEBUG
         || strcmp(finfo.fname, "fnconfig.ini") == 0
+        #endif
         || strcmp(finfo.fname, "rs232dump") == 0)
             continue;
 
@@ -201,6 +205,7 @@ void FileSystemSDFAT::dir_close()
 {
     // Throw out any existing directory entry data
     _dir_entries.clear();
+    _dir_entries.shrink_to_fit();
     _dir_entry_current = 0;
 }
 
@@ -243,7 +248,7 @@ FILE * FileSystemSDFAT::file_open(const char* path, const char* mode)
     free(fpath);
     //Debug_printf("sdfileopen2: task hwm %u, %p\n", uxTaskGetStackHighWaterMark(NULL), pxTaskGetStackStart(NULL));
 #ifdef DEBUG
-    Debug_printf("fopen = %s\n", result == nullptr ? "err" : "ok");
+    Debug_printf("fopen = %s : %s\n", path, result == nullptr ? "err" : "ok");
 #endif    
     return result;
 }
@@ -355,7 +360,7 @@ uint64_t FileSystemSDFAT::used_bytes()
 	DWORD fre_clust;
     uint64_t size = 0ULL;
 
-	if (f_getfree("0:", &fre_clust, &fsinfo) == 0)
+	if(f_getfree("0:", &fre_clust, &fsinfo) == 0)
     {
         // cluster_size * (num_clusters - free_clusters) * sector_size
 	    size = ((uint64_t)(fsinfo->csize)) * ((fsinfo->n_fatent-2)-(fsinfo->free_clst)) * (fsinfo->ssize);
@@ -378,7 +383,7 @@ const char * FileSystemSDFAT::partition_type()
 	DWORD fre_clust;
 
     BYTE i = 0;
- 	if (f_getfree("0:", &fre_clust, &fsinfo) == 0)
+ 	if(f_getfree("0:", &fre_clust, &fsinfo) == 0)
     {
         if(fsinfo->fs_type >= FS_FAT12 && fsinfo->fs_type <= FS_EXFAT)
             i = fsinfo->fs_type;
@@ -394,6 +399,38 @@ bool FileSystemSDFAT::start()
     // Set our basepath
     strlcpy(_basepath, "/sd", sizeof(_basepath));
 
+    // Fat FS configuration options
+    esp_vfs_fat_mount_config_t mount_config;
+    mount_config.format_if_mount_failed = false;
+    mount_config.max_files = 16;
+
+    // This is the information we'll be given in return
+    sdmmc_card_t *sdcard_info;
+
+#ifdef SDMMC_HOST_WIDTH
+
+    sdmmc_host_t host_config = SDMMC_HOST_DEFAULT();
+
+    sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
+    slot_config.width = SDMMC_HOST_WIDTH;
+    slot_config.clk = PIN_SD_HOST_CLK;
+    slot_config.cmd = PIN_SD_HOST_CMD;
+    slot_config.d0  = PIN_SD_HOST_D0;
+    slot_config.d1  = PIN_SD_HOST_D1;
+    slot_config.d2  = PIN_SD_HOST_D2;
+    slot_config.d3  = PIN_SD_HOST_D3;
+    slot_config.wp  = PIN_SD_HOST_WP;
+
+    esp_err_t e = esp_vfs_fat_sdmmc_mount(_basepath, &host_config, &slot_config, &mount_config, &sdcard_info);
+
+#if SDMMC_HOST_WP_LEVEL
+    // Override WP routing of GPIO to SDMMC peripheral in order to omit inversion - the original routing is located at
+    // https://github.com/espressif/esp-idf/blob/51772f4fb5c2bbe25b60b4a51d707fa2afd3ac75/components/driver/sdmmc/sdmmc_host.c#L508-L510
+    esp_rom_gpio_connect_in_signal(PIN_SD_HOST_WP, sdmmc_slot_info[host_config.slot].write_protect, false);
+#endif
+
+#else /* SDMMC_HOST_WIDTH */
+
     // Set up a configuration to the SD host interface
     sdmmc_host_t host_config = SDSPI_HOST_DEFAULT(); 
 
@@ -405,38 +442,22 @@ bool FileSystemSDFAT::start()
         .sclk_io_num = PIN_SD_HOST_SCK,
         .quadwp_io_num = -1,
         .quadhd_io_num = -1,
+#ifdef BUILD_APPLE
+        .max_transfer_sz = 27000
+#else
         .max_transfer_sz = 4000
+#endif
     };
 
-    spi_bus_initialize(HSPI_HOST,&bus_cfg,1);
-
-    // sdspi_slot_config_t slot_config = SDSPI_SLOT_CONFIG_DEFAULT();
-    // slot_config.gpio_cs = SD_HOST_CS;
-    // slot_config.gpio_miso = SD_HOST_MISO;
-    // slot_config.gpio_mosi = SD_HOST_MOSI;
-    // slot_config.gpio_sck = SD_HOST_SCK;
+    spi_bus_initialize(SDSPI_DEFAULT_HOST ,&bus_cfg, SDSPI_DEFAULT_DMA);
 
     sdspi_device_config_t slot_config = SDSPI_DEVICE_CONFIG_DEFAULT();
     slot_config.gpio_cs = PIN_SD_HOST_CS;
-    slot_config.host_id = SPI2_HOST;
-
-    // Fat FS configuration options
-    esp_vfs_fat_mount_config_t mount_config;
-    mount_config.format_if_mount_failed = false;
-    mount_config.max_files = 16;
-
-    // This is the information we'll be given in return
-    sdmmc_card_t *sdcard_info;
-
-    // esp_err_t e = esp_vfs_fat_sdmmc_mount(
-    //     _basepath,
-    //     &host_config,
-    //     &slot_config,
-    //     &mount_config,
-    //     &sdcard_info
-    // );
+    slot_config.host_id = SDSPI_DEFAULT_HOST;
 
     esp_err_t e = esp_vfs_fat_sdspi_mount(_basepath, &host_config, &slot_config, &mount_config, &sdcard_info);
+
+#endif /* SDMMC_HOST_WIDTH */
 
     if(e == ESP_OK)
     {
@@ -467,5 +488,3 @@ bool FileSystemSDFAT::start()
 
     return _started;
 }
-
-#endif // SD_CARD

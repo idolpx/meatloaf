@@ -15,7 +15,7 @@ size_t oiecstream::easyWrite(bool lastOne) {
 
     for(auto b = pbase(); b<pptr()-1; b++) {
         Serial.printf("%c",*b);
-        if(m_iec->send(*b)) written++;
+        if(m_iec->sendByte(*b)) written++;
         else
             break;
     }
@@ -24,7 +24,7 @@ size_t oiecstream::easyWrite(bool lastOne) {
         // ok, so we have last character, signal it
         Debug_printv("IEC easyWrite writes THE LAST ONE with EOI:%c", *(pptr()-1));
 
-        m_iec->sendEOI(*(pptr()-1));
+        m_iec->sendByte(*(pptr()-1), true);
         setp(data, data+1024);
     }
     else {

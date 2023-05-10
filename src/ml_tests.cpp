@@ -16,12 +16,13 @@
 #include "ml_tests.h"
 #include "meat_io.h"
 #include "meat_buffer.h"
-#include "iec_host.h"
+//#include "iec_host.h"
 //#include "make_unique.h"
 #include "basic_config.h"
 #include "device_db.h"
 
 //#include "fnHttpClient.h"
+#include "fnSystem.h"
 
 //std::unique_ptr<MFile> m_mfile(MFSOwner::File(""));
 
@@ -32,13 +33,13 @@ void testHeader(std::string testName) {
     Debug_println("******************************\n");
 }
 
-void testDiscoverDevices()
-{
-    iecHost iec;
-    testHeader("Query Bus for Devices");
-    for(size_t d=4; d<31; d++)
-        iec.deviceExists(d);
-}
+// void testDiscoverDevices()
+// {
+//     iecHost iec;
+//     testHeader("Query Bus for Devices");
+//     for(size_t d=4; d<31; d++)
+//         iec.deviceExists(d);
+// }
 
 // void testArchiveReader(std::string archive) {
 //     // /* Test Line reader */

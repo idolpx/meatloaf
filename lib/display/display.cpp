@@ -38,7 +38,7 @@ extern const TProgmemPalette16 IRAM_ATTR myRedWhiteBluePalette_p;
 void display_app_main() {
   printf(" entering app main, call add leds\n");
   // the WS2811 family uses the RMT driver
-  FastLED.addLeds<LED_TYPE, DATA_PIN_1>(leds1, NUM_LEDS);
+  FastLED.addLeds<LED_TYPE, LED_DATA_PIN>(leds1, NUM_LEDS);
   //FastLED.addLeds<LED_TYPE, DATA_PIN_2>(leds2, NUM_LEDS);
 
   FastLED.showColor(BLACK);
@@ -73,7 +73,7 @@ static void larsonfx(void *pvParameters) {
   WS2812FX::Segment *segments = ws2812fx.getSegments();
 
 	// ws2812fx.init(NUM_LEDS, leds1, false); // type was configured before
-	// ws2812fx.setBrightness(BRIGHTNESS);
+	// ws2812fx.setBrightness(LED_BRIGHTNESS);
 	// ws2812fx.setMode(0 /*segid*/, FX_MODE_LARSON_SCANNER);
 
   // //segments[0].colors[1] = 255U; //blue, white 16777215U??
@@ -81,7 +81,8 @@ static void larsonfx(void *pvParameters) {
   // segments[0].speed = 128;
 
   ws2812fx.init(NUM_LEDS, leds1, false);
-  ws2812fx.setBrightness(BRIGHTNESS);
+  //ws2812fx.setBrightness(LED_BRIGHTNESS);
+  FastLED.setMaxPowerInVoltsAndMilliamps(5, LED_BRIGHTNESS);
   ws2812fx.setMode(0 /*segid*/, FX_MODE_LARSON_SCANNER);
   
   segments[0].colors[0] = 0xFF0000; // RED
@@ -102,7 +103,7 @@ static void rainbowcyclefx(void *pvParameters) {
   WS2812FX::Segment *segments = ws2812fx.getSegments();
 
   ws2812fx.init(NUM_LEDS, leds1, false);
-  ws2812fx.setBrightness(BRIGHTNESS);
+  FastLED.setMaxPowerInVoltsAndMilliamps(5, LED_BRIGHTNESS);
   ws2812fx.setMode(0, FX_MODE_THEATER_CHASE_RAINBOW);
   segments[0].speed = 128;
 
@@ -124,7 +125,7 @@ static void blinkWithFx_allpatterns(void *pvParameters) {
 	WS2812FX ws2812fx;
 
 	ws2812fx.init(NUM_LEDS, leds1, false); // type was configured before
-	ws2812fx.setBrightness(BRIGHTNESS);
+	FastLED.setMaxPowerInVoltsAndMilliamps(5, LED_BRIGHTNESS);
 	ws2812fx.setMode(0 /*segid*/, mode);
 
 

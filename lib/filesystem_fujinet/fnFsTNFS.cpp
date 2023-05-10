@@ -7,8 +7,6 @@
 
 #include "fnFsTNFSvfs.h"
 
-FileSystemTNFS fnTNFS;
-
 FileSystemTNFS::FileSystemTNFS()
 {
     // TODO: Maybe allocate space for our TNFS packet so it doesn't have to get put on the stack?
@@ -29,7 +27,7 @@ bool FileSystemTNFS::start(const char *host, uint16_t port, const char * mountpa
 
     if(host == nullptr || host[0] == '\0')
         return false;
-    
+
     strlcpy(_mountinfo.hostname, host, sizeof(_mountinfo.hostname));
 
     // Try to resolve the hostname and store that so we don't have to keep looking it up
@@ -60,7 +58,7 @@ bool FileSystemTNFS::start(const char *host, uint16_t port, const char * mountpa
     else
         _mountinfo.password[0] = '\0';
 
-    Debug_printf("TNFS mount %s[%s]:%hu%s\n", _mountinfo.hostname, inet_ntoa(_mountinfo.host_ip), _mountinfo.port, _mountinfo.mountpath);
+    Debug_printf("TNFS mount %s[%s]:%hu\n", _mountinfo.hostname, inet_ntoa(_mountinfo.host_ip), _mountinfo.port);
 
     int r = tnfs_mount(&_mountinfo);
     if (r != TNFS_RESULT_SUCCESS)
@@ -83,7 +81,6 @@ bool FileSystemTNFS::start(const char *host, uint16_t port, const char * mountpa
 
     return true;
 }
-
 
 bool FileSystemTNFS::exists(const char* path)
 {
@@ -116,7 +113,7 @@ bool FileSystemTNFS::remove(const char* path)
 bool FileSystemTNFS::rename(const char* pathFrom, const char* pathTo)
 {
     int result = tnfs_rename(&_mountinfo, pathFrom, pathTo);
-    return result == TNFS_RESULT_SUCCESS;    
+    return result == TNFS_RESULT_SUCCESS;
 }
 
 FILE * FileSystemTNFS::file_open(const char* path, const char* mode)
@@ -142,7 +139,7 @@ bool FileSystemTNFS::dir_open(const char * path, const char *pattern, uint16_t d
 {
     if(!_started)
         return false;
-    
+
     uint8_t d_opt = 0;
     uint8_t s_opt = 0;
 
@@ -158,7 +155,7 @@ bool FileSystemTNFS::dir_open(const char * path, const char *pattern, uint16_t d
         {
             _current_dirpath[0] = '/';
             strlcpy(_current_dirpath + 1, path, sizeof(_current_dirpath)-1);
-        } 
+        }
         else
         {
             strlcpy(_current_dirpath, path, sizeof(_current_dirpath));

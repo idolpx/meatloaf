@@ -22,7 +22,7 @@
 ;build_board = esp32-wroom    ; generic esp32-wroom board                   (ESP32-WROOM NO PSRAM, 4M/8M/16M Flash)
 ;build_board = esp32-wroom-pi1541 ; generic esp32-wroom board with pi1541 hat (ESP32-WROOM NO PSRAM, 4M/8M/16M Flash)
 ;build_board = fujiapple-rev0 ; FujiApple REV0 with esp32-devkitc           (ESP32-WROVER 8M PSRAM, 8M Flash)
-;build_board = fujinet-v1.6   ; FujiNet v1.6                                (ESP32-WROVER 8M PSRAM, 16M Flash)
+;build_board = fujinet-v16   ; FujiNet v1.6                                (ESP32-WROVER 8M PSRAM, 16M Flash)
 ;build_board = esp32s3        ; esp32s3 devkitc                             (ESP32-S3 2M/8M PSRAM, 8M/16M/32M Flash)
 ;build_board = lolin-s2-mini  ; Wemos Lolin S2 Mini                         (ESP32-S2 2M PSRAM, 4M Flash)
 
@@ -39,7 +39,7 @@ flash_filesystem = FLASH_SPIFFS
 esp32_platform_version = 5.1.0
 
 ; Required flags, leave as is
-build_platform = BUILD_CBM
+build_platform = BUILD_IEC
 build_bus      = IEC
 
 [platformio]
@@ -137,7 +137,7 @@ build_flags =
 	-D PINMAP_A2_REV0
     -D SD_CARD
 
-[env:fujinet-v1.6]
+[env:fujinet-v16]
 platform = espressif32@${meatloaf.esp32_platform_version}
 board = fujinet-v1-${meatloaf.flash_size}
 build_type = debug

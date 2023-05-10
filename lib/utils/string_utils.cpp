@@ -3,7 +3,21 @@
 #include <algorithm>
 #include <cstdarg>
 #include <cmath>
-#include "../../include/debug.h"
+#include "../../include/petscii.h"
+#include <algorithm>
+#include <cstdarg>
+#include <cmath>
+
+// Copy string to char buffer
+void copyString(const std::string& input, char *dst, size_t dst_size)
+{
+    strncpy(dst, input.c_str(), dst_size - 1);
+    dst[dst_size - 1] = '\0';
+}
+
+constexpr unsigned int hash(const char *s, int off = 0) {                        
+    return !s[off] ? 5381 : (hash(s, off+1)*33) ^ s[off];                           
+}  
 
 namespace mstr {
 

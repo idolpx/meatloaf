@@ -138,6 +138,12 @@ void HttpIStream::close() {
 }
 
 bool HttpIStream::seek(uint32_t pos) {
+    if ( !m_http.m_isOpen )
+    {
+        Debug_printv("error");
+        return false;
+    }
+
     return m_http.seek(pos);
 }
 
@@ -213,7 +219,7 @@ bool MeatHttpClient::processRedirectsAndOpen(int range) {
     }
     
     if(lastRC != HttpStatus_Ok && lastRC != 301 && lastRC != 206) {
-        //Debug_printv("opening stream failed, httpCode=%d", lastRC);
+        Debug_printv("opening stream failed, httpCode=%d", lastRC);
         close();
         return false;
     }
@@ -223,7 +229,7 @@ bool MeatHttpClient::processRedirectsAndOpen(int range) {
     m_exists = true;
     m_position = 0;
 
-    //Debug_printv("length[%d] avail[%d] isFriendlySkipper[%d] isText[%d] httpCode[%d]", m_length, m_bytesAvailable, isFriendlySkipper, isText, lastRC);
+    Debug_printv("length[%d] avail[%d] isFriendlySkipper[%d] isText[%d] httpCode[%d]", m_length, m_bytesAvailable, isFriendlySkipper, isText, lastRC);
 
     return true;
 }

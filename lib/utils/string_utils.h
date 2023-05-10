@@ -1,11 +1,11 @@
-#ifndef _FN_STRUTILS_H
-#define _FN_STRUTILS_H
+#ifndef STRING_UTILS_H
+#define STRING_UTILS_H
 
+#include <cstring>
 #include <string>
 #include <vector>
-#include <cstring>
 
-//#include "../../include/global_defines.h"
+void copyString(const std::string& input, char *dst, size_t dst_size);
 
 namespace mstr {
     std::string drop(std::string str, size_t count);
@@ -40,5 +40,4 @@ namespace mstr {
     std::string parent(std::string path, std::string plus = "");
     std::string localParent(std::string path, std::string plus);
 }
-
 #endif

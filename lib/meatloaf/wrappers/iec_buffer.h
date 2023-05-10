@@ -3,7 +3,7 @@
 
 #include "../../../include/debug.h"
 
-#include "iec.h"
+#include "bus.h"
 
 #include <string>
 #include <iostream>
@@ -73,7 +73,7 @@
 
 class oiecstream : private std::filebuf, public std::ostream {
     char* data;
-    iecBus* m_iec;
+    systemBus* m_iec;
     bool m_isOpen = false;
 
     size_t easyWrite(bool lastOne);
@@ -100,7 +100,7 @@ public:
     }
 
 
-    virtual void open(iecBus* iec) {
+    virtual void open(systemBus* iec) {
         m_iec = iec;
         if(iec != nullptr)
             m_isOpen = true;

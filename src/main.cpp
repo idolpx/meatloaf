@@ -9,7 +9,7 @@
 #include "../include/global_defines.h"
 #include "../include/debug.h"
 
-
+#include "device.h"
 #include "keys.h"
 #include "led.h"
 
@@ -21,9 +21,8 @@
 
 #include "fnSystem.h"
 #include "fnWiFi.h"
-#include "webdav.h"
+#include "webdav2.h"
 
-#include "webdav.h"
 
 #ifdef FLASH_SPIFFS
 #include "fnFsSPIFFS.h"
@@ -32,18 +31,12 @@
 #endif
 #include "fnFsSD.h"
 
-#define digital_write     fnSystem.digital_write
-
 /**************************/
 // Meatloaf
 
 
-#include "iec.h"
+#include "bus.h"
 #include "ml_tests.h"
-
-#ifdef PARALLEL_BUS
-#include "parallel.h"
-#endif
 
 std::string statusMessage;
 bool initFailed = false;
@@ -118,11 +111,11 @@ void main_setup()
 
     // Enable/Disable Modem/Parallel Mode on Userport
     fnSystem.set_pin_mode(PIN_MDMPAR_SW1, gpio_mode_t::GPIO_MODE_OUTPUT);
-    digital_write(PIN_MDMPAR_SW1, DIGI_LOW); // DISABLE Modem
-    //digital_write(PIN_MDMPAR_SW1, DIGI_HIGH); // ENABLE Modem
+    fnSystem.digital_write(PIN_MDMPAR_SW1, DIGI_LOW); // DISABLE Modem
+    //fnSystem.digital_write(PIN_MDMPAR_SW1, DIGI_HIGH); // ENABLE Modem
     fnSystem.set_pin_mode(PIN_MDMPAR_SW2, gpio_mode_t::GPIO_MODE_OUTPUT);
-    digital_write(PIN_MDMPAR_SW2, DIGI_LOW); // DISABLE UP9600
-    //digital_write(PIN_MDMPAR_SW2, DIGI_HIGH); // ENABLE UP9600
+    fnSystem.digital_write(PIN_MDMPAR_SW2, DIGI_LOW); // DISABLE UP9600
+    //fnSystem.digital_write(PIN_MDMPAR_SW2, DIGI_HIGH); // ENABLE UP9600
 
 #ifdef FLASH_SPIFFS
     fnSPIFFS.start();
@@ -149,19 +142,25 @@ void main_setup()
     Serial.println( ANSI_GREEN_BOLD "IEC Bus Initialized" ANSI_RESET );
 
     // Add devices to bus
-    IEC.enabledDevices = DEVICE_MASK;
-    IEC.enableDevice(30);
+    //IEC.addDevice(new iecPrinter(), 4);
+    IEC.addDevice(new iecDisk(), 8);
+    //IEC.addDevice(new iecNetwork(), 16);
+    //IEC.addDevice(new iecCpm(), 20);
+    //theFuji.setup(&IEC);
 
-    Serial.print("Virtual Device(s) Started: [ " ANSI_YELLOW_BOLD );
-    for (uint8_t i = 0; i < 31; i++)
-    {
-        if (IEC.isDeviceEnabled(i))
-        {
-            Serial.printf("%.02d ", i);
-        }
-    }
-    Serial.println( ANSI_RESET "]");
-    IEC.enabled = true;
+    // IEC.enabledDevices = DEVICE_MASK;
+    // IEC.enableDevice(30);
+
+    // Serial.print("Virtual Device(s) Started: [ " ANSI_YELLOW_BOLD );
+    // for (uint8_t i = 0; i < 31; i++)
+    // {
+    //     if (IEC.isDeviceEnabled(i))
+    //     {
+    //         Serial.printf("%.02d ", i);
+    //     }
+    // }
+    // Serial.println( ANSI_RESET "]");
+    // IEC.enabled = true;
 
 #ifdef PARALLEL_BUS
     // Setup Parallel Bus

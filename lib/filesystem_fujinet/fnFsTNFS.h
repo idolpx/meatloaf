@@ -2,7 +2,7 @@
 #define _FN_FSTNFS_
 
 #include "fnFS.h"
-#include "../TNFSlib/tnfslib.h"
+#include "tnfslib.h"
 
 class FileSystemTNFS : public FileSystem
 {
@@ -39,7 +39,5 @@ public:
     uint16_t dir_tell() override;
     bool dir_seek(uint16_t) override;
 };
-
-extern FileSystemTNFS fnTNFS;
 
 #endif // _FN_FSTNFS_
