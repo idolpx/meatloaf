@@ -35,9 +35,14 @@
 #include <string>
 #include <map>
 #include <queue>
+#include <memory>
 #include <driver/gpio.h>
 #include "fnSystem.h"
 #include "protocol/iecProtocolBase.h"
+#include "protocol/jiffydos.h"
+#ifdef PARALLEL_BUS
+#include "protocol/dolphindos.h"
+#endif
 
 #include "../../../include/debug.h"
 
@@ -97,6 +102,21 @@ typedef enum
     DEVICE_TALK = 3,    // A command is recieved and we must talk now
     DEVICE_PROCESS = 4, // Execute device command
 } device_state_t;
+
+typedef enum {
+    PROTOCOL_IEC_SERIAL,
+    PROTOCOL_CBM_FAST,
+    PROTOCOL_JIFFYDOS,
+    PROTOCOL_EPYXFASTLOAD,
+    PROTOCOL_WARPSPEED,
+    PROTOCOL_SPEEDDOS,
+    PROTOCOL_DOLPHINDOS,
+    PROTOCOL_WIC64,
+    PROTOCOL_IEEE488,
+    PROTOCOL_MEATLOADER
+} bus_protocol_t;
+
+using namespace Protocol;
 
 /**
  * @class IECData
@@ -301,9 +321,19 @@ private:
     bool shuttingDown = false;
 
     /**
+     * @brief the detected bus protocol
+     */
+    bus_protocol_t detected_protocol = PROTOCOL_IEC_SERIAL;  // default is IEC Serial
+
+    /**
      * @brief the active bus protocol
      */
-    IecProtocolBase *protocol = NULL;
+    std::shared_ptr<IecProtocolBase> protocol = nullptr;
+
+    /**
+     * @brief Switch to detected bus protocol
+     */
+    std::shared_ptr<IecProtocolBase> selectProtocol();
 
     /**
      * IEC LISTEN received

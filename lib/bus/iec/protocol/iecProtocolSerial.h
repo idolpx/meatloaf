@@ -23,37 +23,40 @@
 
 #include "iecProtocolBase.h"
 
-class IecProtocolSerial : public IecProtocolBase
+namespace Protocol
 {
-    private:
-    int16_t receiveBits();
-    bool sendBits(uint8_t data);
+    class IecProtocolSerial : public IecProtocolBase
+    {
+        private:
+        int16_t receiveBits();
+        bool sendBits(uint8_t data);
 
 
-    public:
-    /**
-     * @brief ctor
-     */
-    IecProtocolSerial();
+        public:
+        /**
+         * @brief ctor
+         */
+        IecProtocolSerial();
 
-    /**
-     * @brief dtor
-     */
-    virtual ~IecProtocolSerial();
-    
-    /**
-     * @brief receive byte from bus
-     * @return The byte received from bus.
-     */
-    virtual int16_t receiveByte();
-    
-    /**
-     * @brief send byte to bus
-     * @param b Byte to send
-     * @param eoi Signal EOI (end of Information)
-     * @return true if send was successful.
-     */
-    virtual bool sendByte(uint8_t data, bool eoi);
+        /**
+         * @brief dtor
+         */
+        virtual ~IecProtocolSerial();
+        
+        /**
+         * @brief receive byte from bus
+         * @return The byte received from bus.
+         */
+        virtual int16_t receiveByte();
+        
+        /**
+         * @brief send byte to bus
+         * @param b Byte to send
+         * @param eoi Signal EOI (end of Information)
+         * @return true if send was successful.
+         */
+        virtual bool sendByte(uint8_t data, bool eoi);
+    };
 };
 
 #endif /* IECPROTOCOLSERIAL_H */

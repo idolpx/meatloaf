@@ -20,23 +20,27 @@
 // http://www.baltissen.org/newhtm/sourcecodes.htm
 // https://www.amigalove.com/viewtopic.php?t=1734
 // https://ar.c64.org/rrwiki/images/4/48/The_Transactor_Vol09_03_1989_Feb_JD_review.pdf
+// https://web.archive.org/web/20090826145226/http://home.arcor.de/jochen.adler/ajnjil-t.htm
 //
 
 #ifndef PROTOCOL_JIFFYDOS_H
 #define PROTOCOL_JIFFYDOS_H
 
-#include "cbmstandardserial.h"
+#include "iecProtocolBase.h"
 
 #define TIMING_JIFFY_BITPAIR
 #define TIMING_JIFFY_BYTE
 
 namespace Protocol
 {
-	class JiffyDOS : public CBMStandardSerial
+	class JiffyDOS : public IecProtocolBase
 	{
 		protected:
+			uint8_t loadmode = 0;
+			uint8_t skipeoi = 0;
 			int16_t receiveByte(void) override;
-			bool sendByte(uint8_t data, bool signalEOI) override;
+			bool sendByte(uint8_t data, bool eoi) override;
+			bool sendByte(uint8_t data, bool eoi, uint8_t loadflags);
 	};
 };
 

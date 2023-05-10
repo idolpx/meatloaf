@@ -19,6 +19,9 @@
 
 #include "dolphindos.h"
 
+#include "bus.h"
+#include "iecProtocolBase.h"
+
 #include "../../../include/debug.h"
 #include "../../../include/pinmap.h"
 
@@ -31,9 +34,9 @@ using namespace Protocol;
 // immediately start receiving data on both the clock and data lines.
 int16_t  DolphinDOS::receiveByte ()
 {
-    flags and_eq CLEAR_LOW;
+    IEC.flags and_eq CLEAR_LOW;
 
-    pull ( PIN_IEC_SRQ );
+    IEC.pull ( PIN_IEC_SRQ );
 
     // Sometimes the C64 pulls ATN but doesn't pull CLOCK right away
     if ( !wait ( 60 ) ) return -1;
@@ -42,12 +45,12 @@ int16_t  DolphinDOS::receiveByte ()
     if ( timeoutWait ( PIN_IEC_CLK_IN, RELEASED, FOREVER ) == TIMED_OUT )
     {
         Debug_printv ( "Wait for talker ready" );
-        flags or_eq ERROR;
+        IEC.flags or_eq ERROR;
         return -1; // return error because timeout
     }
 
     wait( 65 );
-    release ( PIN_IEC_DATA_OUT );
+    IEC.release ( PIN_IEC_DATA_OUT );
     wait( 65 ); // Wait for 
 
 
@@ -55,7 +58,7 @@ int16_t  DolphinDOS::receiveByte ()
     uint8_t data = PARALLEL.readByte();
 
     // If clock is released this was last byte
-    pull ( PIN_IEC_DATA_OUT );
+    IEC.pull ( PIN_IEC_DATA_OUT );
 
     return data;
 } // receiveByte
@@ -69,15 +72,15 @@ int16_t  DolphinDOS::receiveByte ()
 // "ready  to  send"  signal  whenever  it  likes;  it  can  wait  a  long  time.    If  it's
 // a printer chugging out a line of print, or a disk drive with a formatting job in progress,
 // it might holdback for quite a while; there's no time limit.
-bool DolphinDOS::sendByte ( uint8_t data, bool signalEOI )
+bool DolphinDOS::sendByte ( uint8_t data, bool eoi )
 {
-    flags and_eq CLEAR_LOW;
+    IEC.flags and_eq CLEAR_LOW;
 
     // // Sometimes the C64 doesn't release ATN right away
     // if ( !wait ( 200 ) ) return -1;
 
     // Say we're ready
-    release ( PIN_IEC_CLK_OUT );
+    IEC.release ( PIN_IEC_CLK_OUT );
 
     // Wait for listener to be ready
     // STEP 2: READY FOR DATA
@@ -88,7 +91,7 @@ bool DolphinDOS::sendByte ( uint8_t data, bool signalEOI )
     if ( timeoutWait ( PIN_IEC_DATA_IN, RELEASED, FOREVER ) == TIMED_OUT )
     {
         Debug_printv ( "Wait for listener to be ready" );
-        flags or_eq ERROR;
+        IEC.flags or_eq ERROR;
         return -1; // return error because timeout
     }
 
@@ -96,7 +99,7 @@ bool DolphinDOS::sendByte ( uint8_t data, bool signalEOI )
     // Clock line back to true in less than 200 microseconds - usually within 60 microseconds - or it
     // will  do  nothing.    The  listener  should  be  watching,  and  if  200  microseconds  pass
     // without  the Clock line going to true, it has a special task to perform: note EOI.
-    if ( signalEOI )
+    if ( eoi )
     {
 
         // INTERMISSION: EOI
@@ -122,13 +125,13 @@ bool DolphinDOS::sendByte ( uint8_t data, bool signalEOI )
         if ( timeoutWait ( PIN_IEC_DATA_IN, PULLED ) == TIMED_OUT )
         {
             Debug_printv ( "EOI ACK: Listener didn't PULL DATA" );
-            flags or_eq ERROR;
+            IEC.flags or_eq ERROR;
             return false; // return error because timeout
         }
         if ( timeoutWait ( PIN_IEC_DATA_IN, RELEASED ) == TIMED_OUT )
         {
             Debug_printv ( "EOI ACK: Listener didn't RELEASE DATA" );
-            flags or_eq ERROR;
+            IEC.flags or_eq ERROR;
             return false; // return error because timeout
         }
 
@@ -166,7 +169,7 @@ bool DolphinDOS::sendByte ( uint8_t data, bool signalEOI )
 
     // tell listner to wait
     // we control both CLOCK & DATA now
-    pull ( PIN_IEC_CLK_OUT );
+    IEC.pull ( PIN_IEC_CLK_OUT );
     // if ( !wait ( TIMING_Tv ) ) return false;
 
     for ( uint8_t n = 0; n < 8; n++ )
@@ -178,7 +181,7 @@ bool DolphinDOS::sendByte ( uint8_t data, bool signalEOI )
     #endif
 
         // set bit
-        ( data bitand 1 ) ? release ( PIN_IEC_DATA_OUT ) : pull ( PIN_IEC_DATA_OUT );
+        ( data bitand 1 ) ? IEC.release ( PIN_IEC_DATA_OUT ) : IEC.pull ( PIN_IEC_DATA_OUT );
         data >>= 1; // get next bit
         if ( !wait ( TIMING_Ts ) ) return false;
 
@@ -186,14 +189,14 @@ bool DolphinDOS::sendByte ( uint8_t data, bool signalEOI )
         // release ( PIN_IEC_DATA_OUT );
 
         // tell listener bit is ready to read
-        release ( PIN_IEC_CLK_OUT );
+        IEC.release ( PIN_IEC_CLK_OUT );
         if ( !wait ( TIMING_Tv ) ) return false;
 
         // tell listner to wait
-        pull ( PIN_IEC_CLK_OUT );
+        IEC.pull ( PIN_IEC_CLK_OUT );
     }
     // Release data line after byte sent
-    release ( PIN_IEC_DATA_OUT );
+    IEC.release ( PIN_IEC_DATA_OUT );
 
 
     // STEP 4: FRAME HANDSHAKE
@@ -215,11 +218,11 @@ bool DolphinDOS::sendByte ( uint8_t data, bool signalEOI )
     // happened. If EOI was sent or received in this last transmission, both talker and listener "letgo."  After a suitable pause,
     // the Clock and Data lines are RELEASED to false and transmission stops.
 
-    if ( signalEOI )
+    if ( eoi )
     {
         // EOI Received
         if ( !wait ( TIMING_Tfr ) ) return false;
-        release ( PIN_IEC_CLK_OUT );
+        IEC.release ( PIN_IEC_CLK_OUT );
     }
     // else
     // {

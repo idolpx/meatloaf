@@ -17,11 +17,13 @@
 
 #include "jiffydos.h"
 
+#include "bus.h"
+#include "iecProtocolBase.h"
+
 #include "../../../include/debug.h"
 #include "../../../include/pinmap.h"
 
 using namespace Protocol;
-
 
 // STEP 1: READY TO RECEIVE
 // Sooner or later, the talker will want to talk, and send a character.
@@ -30,9 +32,9 @@ using namespace Protocol;
 // immediately start receiving data on both the clock and data lines.
 int16_t  JiffyDOS::receiveByte ()
 {
-    flags and_eq CLEAR_LOW;
+    IEC.flags and_eq CLEAR_LOW;
 
-    pull ( PIN_IEC_SRQ );
+    IEC.pull ( PIN_IEC_SRQ );
 
     // Sometimes the C64 pulls ATN but doesn't pull CLOCK right away
     // pull ( PIN_IEC_SRQ );
@@ -40,13 +42,15 @@ int16_t  JiffyDOS::receiveByte ()
     // release ( PIN_IEC_SRQ );
 
     // Release the Data line to signal we are ready
-    release ( PIN_IEC_DATA_IN );
+#ifndef IEC_SPLIT_LINES
+    IEC.set_pin_mode ( PIN_IEC_DATA_IN, gpio_mode_t::GPIO_MODE_INPUT ); // Set DATA IN back to input
+#endif
 
     // Wait for talker ready
     if ( timeoutWait ( PIN_IEC_CLK_IN, RELEASED, FOREVER ) == TIMED_OUT )
     {
         Debug_printv ( "Wait for talker ready" );
-        flags or_eq ERROR;
+        IEC.flags or_eq ERROR;
         return -1; // return error because timeout
     }
 
@@ -56,36 +60,36 @@ int16_t  JiffyDOS::receiveByte ()
     uint8_t bitmask = 0xFF;
 
     // get bits 4,5
-    data or_eq ( status ( PIN_IEC_CLK_IN ) == RELEASED ? ( 1 << 4 ) : 0 );
-    data or_eq ( status ( PIN_IEC_DATA_IN ) == RELEASED ? ( 1 << 5 ) : 0 );
+    data >>= 1; if ( gpio_get_level ( PIN_IEC_CLK_IN ) ) data |= 0x80;
+    data >>= 1; if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0x80;
     wait( 8 );
 
     // get bits 6,7
-    data or_eq ( status ( PIN_IEC_CLK_IN ) == RELEASED ? ( 1 << 6 ) : 0 );
-    data or_eq ( status ( PIN_IEC_DATA_IN ) == RELEASED ? ( 1 << 7 ) : 0 );
+    data >>= 1; if ( gpio_get_level ( PIN_IEC_CLK_IN ) ) data |= 0x80;
+    data >>= 1; if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0x80;
     wait( 8 );
 
     // get bits 3,1
-    data or_eq ( status ( PIN_IEC_CLK_IN ) == RELEASED ? ( 1 << 3 ) : 0 );
-    data or_eq ( status ( PIN_IEC_DATA_IN ) == RELEASED ? ( 1 << 1 ) : 0 );
+    data >>= 1; if ( gpio_get_level ( PIN_IEC_CLK_IN ) ) data |= 0x80;
+    data >>= 1; if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0x80;
     wait( 8 );
 
     // get bits 2,0
-    data or_eq ( status ( PIN_IEC_CLK_IN ) == RELEASED ? ( 1 << 2 ) : 0 );
-    data or_eq ( status ( PIN_IEC_DATA_IN ) == RELEASED ? ( 1 << 0 ) : 0 );
+    data >>= 1; if ( gpio_get_level ( PIN_IEC_CLK_IN ) ) data |= 0x80;
+    data >>= 1; if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0x80;
     wait( 8 );
-    release( PIN_IEC_SRQ );
+    IEC.release( PIN_IEC_SRQ );
 
     // rearrange bits
     data xor_eq bitmask;
 
-    // // STEP 3: CHECK FOR EOI
-    // if ( status ( PIN_IEC_CLK_IN ) == PULLED && status ( PIN_IEC_DATA_IN ) == RELEASED )
-    //     flags or_eq EOI_RECVD;
-    // wait( 300 );
+    // STEP 3: CHECK FOR EOI
+    if ( IEC.status ( PIN_IEC_CLK_IN ) == PULLED && IEC.status ( PIN_IEC_DATA_IN ) == RELEASED )
+        IEC.flags or_eq EOI_RECVD;
+    wait( 300 );
 
     // STEP 4: Acknowledge byte received
-    pull ( PIN_IEC_DATA_OUT );
+    IEC.pull ( PIN_IEC_DATA_OUT );
 
     return data;
 } // receiveByte
@@ -101,103 +105,23 @@ int16_t  JiffyDOS::receiveByte ()
 // it might holdback for quite a while; there's no time limit.
 bool JiffyDOS::sendByte ( uint8_t data, bool signalEOI )
 {
-    flags and_eq CLEAR_LOW;
+    IEC.flags and_eq CLEAR_LOW;
 
-    // // Sometimes the C64 doesn't release ATN right away
-    // if ( !wait ( 200 ) ) return -1;
+    // Initial handshake
+    IEC.pull( PIN_IEC_CLK_OUT );
+    IEC.pull( PIN_IEC_DATA_OUT );
+    wait ( 3 );
 
-    // Say we're ready
-    release ( PIN_IEC_CLK_OUT );
+//   if (loadmode) {
+//     /* LOAD mode: start marker is data low */
+//     while (!IEC_DATA) ; // wait until data actually is high again
+//     llfl_wait_data(0, ATNABORT);
+//   } else {
+//     /* single byte mode: start marker is data high */
+//     llfl_wait_data(1, ATNABORT);
+//   }
 
-    // Wait for listener to be ready
-    // STEP 2: READY FOR DATA
-    // When  the  listener  is  ready  to  listen,  it  releases  the  Data
-    // line  to  false.    Suppose  there  is  more  than one listener.  The Data line will go false
-    // only when all listeners have RELEASED it - in other words, when  all  listeners  are  ready
-    // to  accept  data.  What  happens  next  is  variable.
-    if ( timeoutWait ( PIN_IEC_DATA_IN, RELEASED, FOREVER ) == TIMED_OUT )
-    {
-        Debug_printv ( "Wait for listener to be ready" );
-        flags or_eq ERROR;
-        return -1; // return error because timeout
-    }
 
-    // Either  the  talker  will pull the
-    // Clock line back to true in less than 200 microseconds - usually within 60 microseconds - or it
-    // will  do  nothing.    The  listener  should  be  watching,  and  if  200  microseconds  pass
-    // without  the Clock line going to true, it has a special task to perform: note EOI.
-    if ( signalEOI )
-    {
-
-        // INTERMISSION: EOI
-        // If the Ready for Data signal isn't acknowledged by the talker within 200 microseconds, the
-        // listener knows  that  the  talker  is  trying  to  signal  EOI.    EOI,  which  formally
-        // stands  for  "End  of  Indicator," means  "this  character  will  be  the  last  one."
-        // If  it's  a  sequential  disk  file,  don't  ask  for  more:  there will be no more.  If it's
-        // a relative record, that's the end of the record.  The character itself will still be coming, but
-        // the listener should note: here comes the last character. So if the listener sees the 200 microsecond
-        // time-out,  it  must  signal  "OK,  I  noticed  the  EOI"  back  to  the  talker,  It  does  this
-        // by pulling  the  Data  line  true  for  at  least  60  microseconds,  and  then  releasing  it.
-        // The  talker  will  then revert to transmitting the character in the usual way; within 60 microseconds
-        // it will pull the Clock line  true,  and  transmission  will  continue.  At  this point,  the  Clock
-        // line  is  true  whether  or  not  we have gone through the EOI sequence; we're back to a common
-        // transmission sequence.
-
-        //flags or_eq EOI_RECVD;
-
-        // Signal eoi by waiting 200 us
-        if ( !wait ( TIMING_Tye ) ) return false;
-
-        // get eoi acknowledge:
-        if ( timeoutWait ( PIN_IEC_DATA_IN, PULLED ) == TIMED_OUT )
-        {
-            Debug_printv ( "EOI ACK: Listener didn't PULL DATA" );
-            flags or_eq ERROR;
-            return false; // return error because timeout
-        }
-        if ( timeoutWait ( PIN_IEC_DATA_IN, RELEASED ) == TIMED_OUT )
-        {
-            Debug_printv ( "EOI ACK: Listener didn't RELEASE DATA" );
-            flags or_eq ERROR;
-            return false; // return error because timeout
-        }
-
-        // ready to send last byte
-        if ( !wait ( TIMING_Try ) ) return false;
-    }
-    // else
-    // {
-    //     // ready to send next byte
-    //     if ( !wait ( TIMING_Tne ) ) return false;
-    // }
-
-    // STEP 3: SENDING THE BITS
-    // The talker has eight bits to send.  They will go out without handshake; in other words,
-    // the listener had better be there to catch them, since the talker won't wait to hear from the listener.  At this
-    // point, the talker controls both lines, Clock and Data.  At the beginning of the sequence, it is holding the
-    // Clock true, while the Data line is RELEASED to false.  the Data line will change soon, since we'll sendthe data
-    // over it. The eights bits will go out from the character one at a time, with the least significant bit going first.
-    // For example, if the character is the ASCII question mark, which is  written  in  binary  as  00011111,  the  ones
-    // will  go out  first,  followed  by  the  zeros.  Now,  for  each bit, we set the Data line true or false according
-    // to whether the bit is one or zero.  As soon as that'sset, the Clock line is RELEASED to false, signalling "data ready."
-    // The talker will typically have a bit in  place  and  be  signalling  ready  in  70  microseconds  or  less.  Once
-    // the  talker  has  signalled  "data ready," it will hold the two lines steady for at least 20 microseconds timing needs
-    // to be increased to 60  microseconds  if  the  Commodore  64  is  listening,  since  the  64's  video  chip  may
-    // interrupt  the processor for 42 microseconds at a time, and without the extra wait the 64 might completely miss a
-    // bit. The listener plays a passive role here; it sends nothing, and just watches.  As soon as it sees the Clock line
-    // false, it grabs the bit from the Data line and puts it away.  It then waits for the clock line to go true, in order
-    // to prepare for the next bit. When the talker figures the data has been held for a sufficient  length  of  time,  it
-    // pulls  the  Clock  line true  and  releases  the  Data  line  to  false.    Then  it starts to prepare the next bit.
-
-    // Send bits
-#if defined(ESP8266)
-    ESP.wdtFeed();
-#endif
-
-    // tell listner to wait
-    // we control both CLOCK & DATA now
-    pull ( PIN_IEC_CLK_OUT );
-    // if ( !wait ( TIMING_Tv ) ) return false;
 
     for ( uint8_t n = 0; n < 8; n++ )
     {
@@ -208,7 +132,7 @@ bool JiffyDOS::sendByte ( uint8_t data, bool signalEOI )
     #endif
 
         // set bit
-        ( data bitand 1 ) ? release ( PIN_IEC_DATA_OUT ) : pull ( PIN_IEC_DATA_OUT );
+        ( data bitand 1 ) ? IEC.release ( PIN_IEC_DATA_OUT ) : IEC.pull ( PIN_IEC_DATA_OUT );
         data >>= 1; // get next bit
         if ( !wait ( TIMING_Ts ) ) return false;
 
@@ -216,14 +140,14 @@ bool JiffyDOS::sendByte ( uint8_t data, bool signalEOI )
         // release ( PIN_IEC_DATA_OUT );
 
         // tell listener bit is ready to read
-        release ( PIN_IEC_CLK_OUT );
+        IEC.release ( PIN_IEC_CLK_OUT );
         if ( !wait ( TIMING_Tv ) ) return false;
 
         // tell listner to wait
-        pull ( PIN_IEC_CLK_OUT );
+        IEC.pull ( PIN_IEC_CLK_OUT );
     }
     // Release data line after byte sent
-    release ( PIN_IEC_DATA_OUT );
+    IEC.release ( PIN_IEC_DATA_OUT );
 
 
     // STEP 4: FRAME HANDSHAKE
@@ -249,7 +173,7 @@ bool JiffyDOS::sendByte ( uint8_t data, bool signalEOI )
     {
         // EOI Received
         if ( !wait ( TIMING_Tfr ) ) return false;
-        release ( PIN_IEC_CLK_OUT );
+        IEC.release ( PIN_IEC_CLK_OUT );
     }
     // else
     // {

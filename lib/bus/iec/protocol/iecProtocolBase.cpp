@@ -1,9 +1,13 @@
 #ifdef BUILD_IEC
 
 #include "iecProtocolBase.h"
+
+#include "bus.h"
+
 #include "../../../include/pinmap.h"
 #include "../../../include/debug.h"
-#include "bus.h"
+
+using namespace Protocol;
 
 int16_t IecProtocolBase::timeoutWait(uint8_t pin, bool target_status, size_t wait, bool watch_atn)
 {

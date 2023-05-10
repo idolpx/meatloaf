@@ -15,6 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
+//
 // https://github.com/MEGA65/open-roms/blob/master/doc/Protocol-DolphinDOS.md
 // https://mega65.github.io/open-roms/doc/Protocol-DolphinDOS.html
 // https://github.com/FeralChild64/open-roms/blob/master/src/kernal/iec_fast/dolphindos_detect.s
@@ -26,12 +27,12 @@
 #ifndef PROTOCOL_DOLPHINDOS_H
 #define PROTOCOL_DOLPHINDOS_H
 
-#include "cbmstandardserial.h"
+#include "iecProtocolBase.h"
 #include "../parallel.h"
 
 namespace Protocol
 {
-    class DolphinDOS: public CBMStandardSerial
+    class DolphinDOS: public IecProtocolBase
     {
 		protected:
 			int16_t receiveByte(void) override;

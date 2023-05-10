@@ -1,6 +1,7 @@
 #ifdef BUILD_IEC
 
 #include <cstring>
+#include <memory>
 #include "iec.h"
 #include "../../include/debug.h"
 #include "../../include/pinmap.h"
@@ -9,6 +10,8 @@
 #include "protocol/iecProtocolSerial.h"
 #include "string_utils.h"
 #include "utils.h"
+
+using namespace Protocol;
 
 static void IRAM_ATTR cbm_on_attention_isr_handler(void *arg)
 {
@@ -42,7 +45,7 @@ void systemBus::setup()
     Debug_printf("IEC systemBus::setup()\n");
 
     flags = CLEAR;
-    protocol = new IecProtocolSerial();
+    protocol = selectProtocol();
     release(PIN_IEC_CLK_OUT);
     release(PIN_IEC_DATA_OUT);
     release(PIN_IEC_SRQ);
@@ -56,7 +59,7 @@ void systemBus::setup()
 
     // Start task
     //xTaskCreate(ml_iec_intr_task, "ml_iec_intr_task", 2048, NULL, 10, NULL);
-    xTaskCreatePinnedToCore(ml_iec_intr_task, "ml_iec_intr_task", 4096, NULL, 10, NULL, 1);
+    xTaskCreatePinnedToCore(ml_iec_intr_task, "ml_iec_intr_task", 4096, NULL, 20, NULL, 1);
 
     // Setup interrupt for ATN
     gpio_config_t io_conf = {
@@ -146,7 +149,8 @@ void IRAM_ATTR systemBus::service()
             Debug_printv("data");
             if (data.secondary == IEC_OPEN || data.secondary == IEC_REOPEN)
             {
-                // TODO: switch protocol subclass as needed.
+                // Switch to detected protocol
+                protocol = selectProtocol();
             }
 
             // Data Mode - Get Command or Data
@@ -181,6 +185,11 @@ void IRAM_ATTR systemBus::service()
 
             //Debug_printv("bus[%d] device[%d] flags[%d]", bus_state, device_state, flags);
             bus_state = BUS_IDLE;
+
+            // Switch back to standard serial
+            detected_protocol = PROTOCOL_IEC_SERIAL;
+            protocol = selectProtocol();
+            flags = CLEAR;
         }
 
         // Let bus stabalize
@@ -316,6 +325,28 @@ void systemBus::read_command()
         bus_state = BUS_IDLE;
     }
 
+#ifdef PARALLEL_BUS
+    // Switch to Parallel if detected
+    else if ( PARALLEL.bus_state == PARALLEL_PROCESS )
+    {
+        if ( data.primary == IEC_LISTEN || data.primary == IEC_TALK )
+            detected_protocol = PROTOCOL_SPEEDDOS;
+        else if ( data.primary == IEC_OPEN || data.primary == IEC_REOPEN )
+            detected_protocol = PROTOCOL_DOLPHINDOS;
+
+        // Switch to parallel protocol
+        protocol = selectProtocol();
+
+        if ( data.primary == IEC_LISTEN )
+            PARALLEL.setMode( MODE_RECEIVE );
+        else
+            PARALLEL.setMode( MODE_SEND );
+
+        // Acknowledge parallel mode
+        PARALLEL.handShake();
+    }
+#endif
+
     // If the bus is idle then release the lines
     if ( bus_state < BUS_ACTIVE )
     {
@@ -372,6 +403,31 @@ void systemBus::read_payload()
     }
 
     bus_state = BUS_IDLE;
+}
+
+std::shared_ptr<IecProtocolBase> systemBus::selectProtocol() 
+{
+    Debug_printv("protocol[%d]", detected_protocol);
+    
+    if ( detected_protocol == PROTOCOL_JIFFYDOS ) {
+        auto p = std::make_shared<JiffyDOS>();
+        return std::static_pointer_cast<IecProtocolBase>(p);
+    } 
+#ifdef PARALLEL_BUS
+    else if ( detected_protocol == PROTOCOL_DOLPHINDOS ) 
+    {
+        auto p = std::make_shared<DolphinDOS>();
+        return std::static_pointer_cast<IecProtocolBase>(p);
+    }
+#endif
+    else 
+    {
+#ifdef PARALLEL_BUS
+        PARALLEL.bus_state = PARALLEL_IDLE;
+#endif
+        auto p = std::make_shared<IecProtocolSerial>();
+        return std::static_pointer_cast<IecProtocolBase>(p);
+    }
 }
 
 systemBus virtualDevice::get_bus()

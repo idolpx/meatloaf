@@ -44,10 +44,11 @@
 #define EMPTY_STREAM     (1 << 3)
 #define COMMAND_RECVD    (1 << 4)
 
-#define JIFFY_ACTIVE     (1 << 8)
-#define JIFFY_LOAD       (1 << 9)
-#define DOLPHIN_ACTIVE   (1 << 10)
-#define WIC64_ACTIVE     (1 << 11)
+#define JIFFY_ACTIVE        (1 << 8)
+#define JIFFY_LOAD          (1 << 9)
+#define DOLPHIN_ACTIVE      (1 << 10)
+#define WIC64_ACTIVE        (1 << 11)
+#define MEATLOADER_ACTIVE   (1 << 12)
 
 // IEC protocol timing consts in microseconds (us)
 // IEC-Disected p10-11         // Description              //   1541    C64     min     typical     max         // Notes

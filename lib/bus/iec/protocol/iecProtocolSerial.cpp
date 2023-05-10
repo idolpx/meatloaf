@@ -1,10 +1,14 @@
 #ifdef BUILD_IEC
 
+#include "iecProtocolSerial.h"
+
 #include "bus.h"
 #include "iecProtocolBase.h"
-#include "iecProtocolSerial.h"
+
 #include "../../../include/debug.h"
 #include "../../../include/pinmap.h"
+
+using namespace Protocol;
 
 IecProtocolSerial::IecProtocolSerial()
 {
