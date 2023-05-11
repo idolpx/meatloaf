@@ -1,8 +1,22 @@
+
+// https://stackoverflow.com/questions/22543179/how-to-use-libarchive-properly
+
 #ifndef MEATLOAF_ARCHIVE_7Z
 #define MEATLOAF_ARCHIVE_7Z
 
 #include "meat_io.h"
 
+#include <sys/types.h>
+
+#include <sys/stat.h>
+
+#include <archive.h>
+#include <archive_entry.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 /********************************************************
  * Streams implementations
