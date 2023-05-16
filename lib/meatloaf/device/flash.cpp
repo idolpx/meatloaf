@@ -256,19 +256,23 @@ bool FlashFile::seekEntry( std::string filename )
             Debug_printv("path[%s] filename[%s] entry.filename[%.16s]", apath.c_str(), filename.c_str(), entryFilename.c_str());
 
             // Read Entry From Stream
-            if ( filename == entryFilename )
+            if ( dirent->d_type != DT_DIR ) // Only want to match files not directories
             {
-                closedir( d );
-                return true;
+                if ( filename == entryFilename )
+                {
+                    closedir( d );
+                    return true;
+                }
+                else if ( filename == "*" || mstr::compare(filename, entryFilename) )
+                {
+                    // Set filename to this filename
+                    Debug_printv( "Found! file[%s] -> entry[%s]", filename.c_str(), entryFilename.c_str() );
+                    parseUrl(apath + "/" + std::string(dirent->d_name));
+                    closedir( d );
+                    return true;
+                }
             }
-            else if ( filename == "*" || mstr::compare(filename, entryFilename) )
-            {
-                // Set filename to this filename
-                Debug_printv( "Found! file[%s] -> entry[%s]", filename.c_str(), entryFilename.c_str() );
-                parseUrl(apath + "/" + std::string(dirent->d_name));
-                closedir( d );
-                return true;
-            }
+
         }
 
         Debug_printv( "Not Found! file[%s]", filename.c_str() );
