@@ -1,6 +1,6 @@
 #ifdef BUILD_IEC
 
-#include "disk.h"
+#include "drive.h"
 
 #include <cstring>
 
@@ -17,7 +17,7 @@
 #include "cbm_media.h"
 
 
-iecDisk::iecDisk()
+iecDrive::iecDrive()
 {
     // device_active = false;
     device_active = true; // temporary during bring-up
@@ -27,19 +27,19 @@ iecDisk::iecDisk()
 }
 
 // Read disk data and send to computer
-void iecDisk::read()
+void iecDrive::read()
 {
     // TODO: IMPLEMENT
 }
 
 // Write disk data from computer
-void iecDisk::write(bool verify)
+void iecDrive::write(bool verify)
 {
     // TODO: IMPLEMENT
 }
 
 // Disk format
-void iecDisk::format()
+void iecDrive::format()
 {
     // TODO IMPLEMENT
 }
@@ -51,7 +51,7 @@ void iecDisk::format()
    then we assume it's MEDIATYPE_ATR.
    Return value is MEDIATYPE_UNKNOWN in case of failure.
 */
-mediatype_t iecDisk::mount(FILE *f, const char *filename, uint32_t disksize, mediatype_t disk_type)
+mediatype_t iecDrive::mount(FILE *f, const char *filename, uint32_t disksize, mediatype_t disk_type)
 {
     // TODO IMPLEMENT
     _base.reset( MFSOwner::File(filename) );
@@ -60,14 +60,14 @@ mediatype_t iecDisk::mount(FILE *f, const char *filename, uint32_t disksize, med
 }
 
 // Destructor
-iecDisk::~iecDisk()
+iecDrive::~iecDrive()
 {
     // if (_base != nullptr)
     //     delete _base;
 }
 
 // Unmount disk file
-void iecDisk::unmount()
+void iecDrive::unmount()
 {
     Debug_print("disk UNMOUNT\n");
 
@@ -79,7 +79,7 @@ void iecDisk::unmount()
 }
 
 // Create blank disk
-bool iecDisk::write_blank(FILE *f, uint16_t sectorSize, uint16_t numSectors)
+bool iecDrive::write_blank(FILE *f, uint16_t sectorSize, uint16_t numSectors)
 {
     // TODO IMPLEMENT
     return false;
@@ -87,7 +87,7 @@ bool iecDisk::write_blank(FILE *f, uint16_t sectorSize, uint16_t numSectors)
 
 
 // Process command
-device_state_t iecDisk::process(IECData *id)
+device_state_t iecDrive::process(IECData *id)
 {
     virtualDevice::process(id);
 
@@ -113,7 +113,7 @@ device_state_t iecDisk::process(IECData *id)
     return device_state;
 }
 
-void iecDisk::process_load()
+void iecDrive::process_load()
 {
     Debug_printv("secondary[%.2X]", commanddata->secondary);
     switch (commanddata->secondary)
@@ -132,7 +132,7 @@ void iecDisk::process_load()
     }
 }
 
-void iecDisk::process_save()
+void iecDrive::process_save()
 {
     Debug_printv("secondary[%.2X]", commanddata->secondary);
     switch (commanddata->secondary)
@@ -151,7 +151,7 @@ void iecDisk::process_save()
     }
 }
 
-void iecDisk::process_command()
+void iecDrive::process_command()
 {
     Debug_printv("primary[%.2X] secondary[%.2X]", commanddata->primary, commanddata->secondary);
     if (commanddata->primary == IEC_TALK) // && commanddata->secondary == IEC_REOPEN)
@@ -164,7 +164,7 @@ void iecDisk::process_command()
     }
 }
 
-void iecDisk::process_channel()
+void iecDrive::process_channel()
 {
     Debug_printv("secondary[%.2X]", commanddata->secondary);
     switch (commanddata->secondary)
@@ -184,7 +184,7 @@ void iecDisk::process_channel()
 }
 
 
-void iecDisk::iec_open()
+void iecDrive::iec_open()
 {
     std::string s = payload;
     mstr::toASCII(s);
@@ -221,7 +221,7 @@ void iecDisk::iec_open()
     }
 }
 
-void iecDisk::iec_close()
+void iecDrive::iec_close()
 {
     if (_base == nullptr)
     {
@@ -233,7 +233,7 @@ void iecDisk::iec_close()
     closeStream( commanddata->channel );
 }
 
-void iecDisk::iec_reopen_load()
+void iecDrive::iec_reopen_load()
 {
     Debug_printv( "_base[%s] _last_file[%s]", _base->url.c_str(), _last_file.c_str() );
     if ( _base->isDirectory() ) 
@@ -246,7 +246,7 @@ void iecDisk::iec_reopen_load()
     }
 }
 
-void iecDisk::iec_reopen_save()
+void iecDrive::iec_reopen_save()
 {
     if (_base == nullptr)
     {
@@ -258,7 +258,7 @@ void iecDisk::iec_reopen_save()
     saveFile();
 }
 
-void iecDisk::iec_reopen_channel()
+void iecDrive::iec_reopen_channel()
 {
     Debug_printv("primary[%.2X]", commanddata->primary);
     switch (commanddata->primary)
@@ -273,30 +273,30 @@ void iecDisk::iec_reopen_channel()
 }
 
 
-void iecDisk::iec_reopen_channel_listen()
+void iecDrive::iec_reopen_channel_listen()
 {
     Debug_printv("here");
 }
 
-void iecDisk::iec_reopen_channel_talk()
+void iecDrive::iec_reopen_channel_talk()
 {
     Debug_printv("here");
 }
 
 
-void iecDisk::iec_listen_command()
+void iecDrive::iec_listen_command()
 {
     Debug_printv("here");
 }
 
-void iecDisk::iec_talk_command()
+void iecDrive::iec_talk_command()
 {
     Debug_printv("here");
     if (response_queue.empty())
         iec_talk_command_buffer_status();
 }
 
-void iecDisk::iec_talk_command_buffer_status()
+void iecDrive::iec_talk_command_buffer_status()
 {
     Debug_printv("here");
 
@@ -308,7 +308,7 @@ void iecDisk::iec_talk_command_buffer_status()
     IEC.sendBytes(s);
 }
 
-void iecDisk::iec_command()
+void iecDrive::iec_command()
 {
     Debug_printv("command[%s]", payload.c_str());
 
@@ -479,7 +479,7 @@ void iecDisk::iec_command()
 }
 
 
-void iecDisk::set_device_id()
+void iecDrive::set_device_id()
 {
     if (pt.size() < 2)
     {
@@ -500,7 +500,7 @@ void iecDisk::set_device_id()
     iecStatus.channel = commanddata->channel;
 }
 
-void iecDisk::get_prefix()
+void iecDrive::get_prefix()
 {
     int channel = -1;
 
@@ -522,7 +522,7 @@ void iecDisk::get_prefix()
     iecStatus.channel = channel;
 }
 
-void iecDisk::set_prefix()
+void iecDrive::set_prefix()
 {
     std::string path = payload;
     mstr::toASCII(path);
@@ -545,7 +545,7 @@ void iecDisk::set_prefix()
 }
 
 
-std::shared_ptr<MStream> iecDisk::retrieveStream ( uint8_t channel )
+std::shared_ptr<MStream> iecDrive::retrieveStream ( uint8_t channel )
 {
     Debug_printv("Stream key[%d]", channel);
 
@@ -563,7 +563,7 @@ std::shared_ptr<MStream> iecDisk::retrieveStream ( uint8_t channel )
 
 // used to start working with a stream, registering it as underlying stream of some
 // IEC channel on some IEC device
-bool iecDisk::registerStream (uint8_t channel, std::ios_base::open_mode mode)
+bool iecDrive::registerStream (uint8_t channel, std::ios_base::open_mode mode)
 {
     // Debug_printv("dc_basepath[%s]",  device_config.basepath().c_str());
     // Debug_printv("_file[%s]", _file.c_str());
@@ -629,7 +629,7 @@ bool iecDisk::registerStream (uint8_t channel, std::ios_base::open_mode mode)
     return true;
 }
 
-bool iecDisk::closeStream ( uint8_t channel, bool close_all )
+bool iecDrive::closeStream ( uint8_t channel, bool close_all )
 {
     auto found = streams.find(channel);
 
@@ -647,7 +647,7 @@ bool iecDisk::closeStream ( uint8_t channel, bool close_all )
 
 
 // send single basic line, including heading basic pointer and terminating zero.
-uint16_t iecDisk::sendLine(uint16_t blocks, const char *format, ...)
+uint16_t iecDrive::sendLine(uint16_t blocks, const char *format, ...)
 {
     // Debug_printv("bus[%d]", IEC.bus_state);
 
@@ -671,7 +671,7 @@ uint16_t iecDisk::sendLine(uint16_t blocks, const char *format, ...)
     return sendLine(blocks, text);
 }
 
-uint16_t iecDisk::sendLine(uint16_t blocks, char *text)
+uint16_t iecDrive::sendLine(uint16_t blocks, char *text)
 {
     Debug_printf("%d %s ", blocks, text);
 
@@ -705,7 +705,7 @@ uint16_t iecDisk::sendLine(uint16_t blocks, char *text)
     return len + 5;
 } // sendLine
 
-uint16_t iecDisk::sendHeader(std::string header, std::string id)
+uint16_t iecDrive::sendHeader(std::string header, std::string id)
 {
     uint16_t byte_count = 0;
     bool sent_info = false;
@@ -783,7 +783,7 @@ uint16_t iecDisk::sendHeader(std::string header, std::string id)
     return byte_count;
 }
 
-uint16_t iecDisk::sendFooter()
+uint16_t iecDrive::sendFooter()
 {
     uint16_t blocks_free;
     uint16_t byte_count = 0;
@@ -804,7 +804,7 @@ uint16_t iecDisk::sendFooter()
     return byte_count;
 }
 
-void iecDisk::sendListing()
+void iecDrive::sendListing()
 {
     Debug_printf("sendListing: [%s]\r\n=================================\r\n", _base->url.c_str());
 
@@ -939,7 +939,7 @@ void iecDisk::sendListing()
 } // sendListing
 
 
-bool iecDisk::sendFile()
+bool iecDrive::sendFile()
 {
     size_t i = 0;
     bool success_rx = true;
@@ -1017,7 +1017,7 @@ bool iecDisk::sendFile()
             }
 #endif
             // Send Byte
-            avail = istream->available() + 1;
+            avail = istream->available();
             if ( !avail || !success_rx )
             {
                 //Debug_printv("b[%02X] EOI", b);
@@ -1035,6 +1035,7 @@ bool iecDisk::sendFile()
             }
             b = nb; // byte = next byte
             i++;
+            avail++;
 
 #ifdef DATA_STREAM
             // Show ASCII Data
@@ -1091,7 +1092,7 @@ bool iecDisk::sendFile()
 } // sendFile
 
 
-bool iecDisk::saveFile()
+bool iecDrive::saveFile()
 {
     size_t i = 0;
     bool success = true;

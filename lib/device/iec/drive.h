@@ -12,7 +12,7 @@
 
 #define PRODUCT_ID "MEATLOAF CBM"
 
-class iecDisk : public virtualDevice
+class iecDrive : public virtualDevice
 {
 private:
     //MediaType *_disk = nullptr;
@@ -148,7 +148,7 @@ protected:
     void iec_talk_command_buffer_status();
 
 public:
-    iecDisk();
+    iecDrive();
 
     mediatype_t mount(FILE *f, const char *filename, uint32_t disksize, mediatype_t disk_type = MEDIATYPE_UNKNOWN);
     void unmount();
@@ -158,7 +158,7 @@ public:
 
     std::unordered_map<uint16_t, std::shared_ptr<MStream>> streams;
 
-    ~iecDisk();
+    ~iecDrive();
 };
 
 #endif

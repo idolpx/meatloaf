@@ -44,7 +44,7 @@
 //
 // https://www.c64-wiki.de/wiki/Userport
 //
-// https://randomnerdtutorials.com/getting-started-with-esp32/      30 Pin Version !!! Nicht die 36er !!!
+// https://randomnerdtutorials.com/getting-started-with-esp32/      30 Pin Version !!! Not the 36 !!!
 //
 
 
@@ -60,33 +60,33 @@ public:
     bool displayattached = false;
     bool inputmode = true;
     bool transferdata = false;
-    bool ex = false;                          // Flag ob ESP gerade ein Kommand abarbeitet
+    bool ex = false;                          // Flag whether ESP is currently working on a command
 
-    unsigned long crashcounter = 0;           // Zähler für die Anzahl der Commandos - Nur für Debugging
-    unsigned long payloadsize;                // Größe der zu transferierenden Daten
+    unsigned long crashcounter = 0;           // Counter for the number of commandos - only for debugging
+    unsigned long payloadsize;                // Size of the data to be transferred
     unsigned long timeout;                    // Timeout Counter in Millis
     unsigned long count = 0;
-    unsigned long sizel;                      // Counter anzahl der bytes vom c64 low byte
-    unsigned long sizeh;                      // Counter anzahl der bytes vom c64 high byte
-    unsigned long transsize;                  // Anzahl der bytes die vom C64 kommen sollen
+    unsigned long sizel;                      // Counter Number of bytes from the C64 low byte
+    unsigned long sizeh;                      // Counter Number of bytes from the C64 High Byte
+    unsigned long transsize;                  // Number of bytes that should come from the C64
 
-    std::string defaultserver = "http://www.wic64.de/prg/"; // Zum Test des WiC64 Kernals Load ! 
+    std::string defaultserver = "http://www.wic64.de/prg/"; // To test the Wic64 Kernel Load ! 
 
-    int databyte = 0;                         // Das Byte was gelesen oder geschrieben wird am Bus
+    int databyte = 0;                         // The byte what is read or written on the bus
 
-    bool killswitch = false;                  // WiC64 deaktivieren vom Userport oder aktivieren
-    bool killled = false;                     // LED an oder aus
-    std::string payload;                           // Datenpuffer für die Übertragung
-    std::string errorcode;                         // Ladefehler Errorcode
-    std::string act;                               // Display Anzeige was gerade passiert ...
-    std::string input;                             // Eingabesting vom C64
-    std::string lastinput;                         // Puffer Eingabestring
-    std::string setserver;                         // std::stringpuffer für SETS
-    std::string httpstring;                        // HTTP Adresse von der geladen wird
-    std::string wic64hostname;                     // WiC64 Hostname bestehend aus WiC64+MAC des ESP
-    std::string localip;                           // IP des C64 WiC
-    std::string localssid;                         // WLAN zu dem Verbunden wurde
-    char sep = 1;                             // Byte zum separieren der einzelnen std::strings (Trennbyte)
+    bool killswitch = false;                  // Deactivate WIC64 from user port or activate
+    bool killled = false;                     // LED on or off
+    std::string payload;                      // Data buffer for transmission
+    std::string errorcode;                    // Loading error Errorcode
+    std::string act;                          // Display display what is happening ...
+    std::string input;                        // Input test from the C64
+    std::string lastinput;                    // Buffer input ring
+    std::string setserver;                    // std::stringpuffer for SETS
+    std::string httpstring;                   // HTTP Address
+    std::string wic64hostname;                // WiC64 Hostname consisting of WIC64+MAC of the ESP
+    std::string localip;                      // IP of the C64 WiC
+    std::string localssid;                    // WLAN to which was connected
+    char sep = 1;                             // Byte for separating the individual std::strings (separation)
     int udpport = 8080;                       // UDP message port
     int tcpport = 8081;                       // TCP message port
     std::string udpmsg;
@@ -106,7 +106,7 @@ public:
     void loop();
 
 
-    // Subs Kommandos HTTP & Error codes
+    // Subs Commands HTTP & Error codes
 
     std::string sendmessage ( std::string errorcode );
     void disablewic();

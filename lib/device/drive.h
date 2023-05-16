@@ -17,8 +17,8 @@
 #endif
 
 #ifdef BUILD_IEC
-# include "iec/disk.h"
-# define DEVICE_TYPE iecDisk
+# include "iec/drive.h"
+# define DEVICE_TYPE iecDrive
 #endif
 
 #ifdef BUILD_ADAM

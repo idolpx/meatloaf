@@ -143,7 +143,7 @@ void main_setup()
 
     // Add devices to bus
     //IEC.addDevice(new iecPrinter(), 4);
-    IEC.addDevice(new iecDisk(), 8);
+    IEC.addDevice(new iecDrive(), 8);
     //IEC.addDevice(new iecNetwork(), 16);
     //IEC.addDevice(new iecCpm(), 20);
     //theFuji.setup(&IEC);
@@ -184,6 +184,7 @@ void main_setup()
 
     //runTestsSuite();
     //lfs_test();
+    //la_test();
 #ifdef DEBUG_TIMING
     Debug_printv( ANSI_GREEN_BOLD "DEBUG_TIMING enabled" ANSI_RESET );
 #endif
