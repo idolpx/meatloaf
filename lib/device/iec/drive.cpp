@@ -1035,7 +1035,6 @@ bool iecDrive::sendFile()
             }
             b = nb; // byte = next byte
             i++;
-            avail++;
 
 #ifdef DATA_STREAM
             // Show ASCII Data
