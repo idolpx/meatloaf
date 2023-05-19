@@ -382,7 +382,7 @@ void iecDrive::iec_command()
                 Debug_printv("payload[%s] channel[%d] media[%d] track[%d] sector[%d]", payload.c_str(), pti[0], pti[1], pti[2], pti[3]);
 
                 auto stream = retrieveStream( pti[0] );
-                stream->seekSector( pti[2], pti[3], 0 );
+                stream->seekSector( pti[2], pti[3] );
                 stream->reset();
             }
         break;
@@ -993,6 +993,8 @@ bool iecDrive::sendFile()
 
     uint32_t len = istream->size();
     uint32_t avail = istream->available();
+    if ( !len )
+        len = -1;
 
     {
         //fnLedStrip.startRainbow(300);
@@ -1067,7 +1069,7 @@ bool iecDrive::sendFile()
             }
 #else
             uint32_t t = (i * 100) / len;
-            Debug_printf("\rTransferring %d%% [%d, %d]", t, i, avail);
+            Debug_printf("\rTransferring %d%% [%d, %d]      ", t, i, avail);
 #endif
 
             // Exit if ATN is PULLED while sending

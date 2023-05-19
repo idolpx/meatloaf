@@ -81,8 +81,8 @@ public:
         return "";
     };
 
-    virtual bool seekBlock( uint64_t index, uint8_t offset ) { return false; };
-    virtual bool seekSector( uint8_t track, uint8_t sector, uint8_t offset ) { return false; };
+    virtual bool seekBlock( uint64_t index, uint8_t offset = 0 ) { return false; };
+    virtual bool seekSector( uint8_t track, uint8_t sector, uint8_t offset = 0 ) { return false; };
     virtual bool seekSector( std::vector<uint8_t> trackSectorOffset ) { return false; };
 };
 
