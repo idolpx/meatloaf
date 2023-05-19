@@ -103,7 +103,6 @@ public:
         partitions.push_back(p);
         sectorsPerTrack = { 17, 18, 19, 21 };
 
-
         uint32_t size = containerStream->size();
         switch (size + media_header_size) 
         {

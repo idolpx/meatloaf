@@ -54,6 +54,8 @@ public:
     uint8_t secondaryAddress = 0;
     std::string url = "";
 
+    bool has_subdirs = true;
+
     virtual bool seek(uint32_t pos, int mode) {
         if(mode == SEEK_SET) {
             return seek(pos);

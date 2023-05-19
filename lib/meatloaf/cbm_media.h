@@ -21,8 +21,9 @@ class CBMImageStream: public MStream {
 
 public:
     CBMImageStream(std::shared_ptr<MStream> is) {
-        this->containerStream = is;
-        this->m_isOpen = true;
+        containerStream = is;
+        m_isOpen = true;
+        has_subdirs = false;
     }
 
     // MStream methods
