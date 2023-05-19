@@ -2,7 +2,7 @@
 #ifndef PINMAP_FUJILOAF_REV0_H
 #define PINMAP_FUJILOAF_REV0_H
 
-#ifdef PINMAP_FL_REV0
+#ifdef PINMAP_FUJILOAF_REV0
 /* SD Card */
 #define PIN_CARD_DETECT 35 // fnSystem.h
 #define PIN_CARD_DETECT_FIX 35 // fnSystem.h
@@ -68,5 +68,5 @@
 //#define GPIOX_SPEED       400   // PCF8575 - 400Khz
 #define GPIOX_SPEED       1000  // PCA9673 - 1000Khz / 1Mhz
 
-#endif // PINMAP_FL_REV0
+#endif // PINMAP_FUJILOAF_REV0
 #endif // PINMAP_FUJILOAF_REV0_H

@@ -8,7 +8,7 @@
 
 #include "../../include/debug.h"
 
-//#include "fnConfig.h"
+#include "fnConfig.h"
 #include "fnWiFi.h"
 
 std::string SystemManager::_net::get_hostname()
@@ -167,16 +167,16 @@ void SystemManager::_net::start_sntp_client()
     Debug_print("SNTP client start\n");
 
     // Update system timezone data
-//    fnSystem.update_timezone(Config.get_general_timezone().c_str());
+    fnSystem.update_timezone(Config.get_general_timezone().c_str());
 
     sntp_setoperatingmode(SNTP_OPMODE_POLL);
 
-//    // Set a server if we have one defined, otherwise try DHCP
-//    const char * sntpserver = Config.get_network_sntpserver();
-//    // sntp_setservername does NOT copy the string passed, so it must be in a static buffer
-//    if (sntpserver != nullptr && sntpserver[0] != '\0')
-//        sntp_setservername(0, sntpserver); 
-//    else
+    // Set a server if we have one defined, otherwise try DHCP
+    const char * sntpserver = Config.get_network_sntpserver();
+    // sntp_setservername does NOT copy the string passed, so it must be in a static buffer
+    if (sntpserver != nullptr && sntpserver[0] != '\0')
+        sntp_setservername(0, sntpserver); 
+    else
     {
         Debug_print("No SNTP server defined - attempting DHCP setting\n");
         // This will only do something if SNTP_GET_SERVERS_FROM_DHCP is set in the LWIP library

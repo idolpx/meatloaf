@@ -17,7 +17,7 @@
 #include "display.h"
 #endif
 
-#include "sound.h"
+//#include "disk-sounds.h"
 
 #include "fnSystem.h"
 #include "fnWiFi.h"
@@ -132,10 +132,12 @@ void main_setup()
     // Set up the WiFi adapter
     fnWiFi.start();
     // Go ahead and try reconnecting to WiFi
-    fnWiFi.connect();
+    fnWiFi.connect( WIFI_SSID, WIFI_PASSWORD );
 
     // Start WebDAV Server
     http_server_start();
+
+
 
     // Setup IEC Bus
     IEC.setup();
@@ -143,9 +145,10 @@ void main_setup()
 
     // Add devices to bus
     //IEC.addDevice(new iecPrinter(), 4);
-    IEC.addDevice(new iecDrive(), 8);
-    //IEC.addDevice(new iecNetwork(), 16);
+    Debug_print("Disk "); IEC.addDevice(new iecDrive(), 8);
+    Debug_print("Network "); IEC.addDevice(new iecNetwork(), 16);
     //IEC.addDevice(new iecCpm(), 20);
+    Debug_print("Voice "); IEC.addDevice(new iecVoice(), 21);
     //theFuji.setup(&IEC);
 
     // IEC.enabledDevices = DEVICE_MASK;

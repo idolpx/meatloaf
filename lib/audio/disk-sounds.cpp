@@ -1,19 +1,19 @@
 
-#include "sound.h"
+#include "disk-sounds.h"
 
 #include "../../include/pinmap.h"
 
 #include "fnSystem.h"
 
-SoundManager mlSoundManager;
+diskSounds mlDiskSounds;
 
-void SoundManager::setup ( void )
+void diskSounds::setup ( void )
 {
     //fnSystem.set_pin_mode ( PIN_DAC1, GPIO_MODE_OUTPUT );
     //fnSystem.digital_write ( PIN_DAC1, 0 );
 }
 
-void disk_spin() {};
-void disk_stop() {};
+void spin() {};
+void stop() {};
 void change_track() {};
 

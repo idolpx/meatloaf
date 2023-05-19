@@ -132,7 +132,6 @@ public:
         partitions.clear();
         partitions.push_back(p);
         sectorsPerTrack = { 255 };
-        block_size = 256;
 
         // // The header's size is 256 bytes, that's exactly one sector. The header is
         // // always the first sector in the image (track 1, sector 0).

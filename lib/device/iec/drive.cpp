@@ -54,7 +54,7 @@ void iecDrive::format()
 mediatype_t iecDrive::mount(FILE *f, const char *filename, uint32_t disksize, mediatype_t disk_type)
 {
     // TODO IMPLEMENT
-    _base.reset( MFSOwner::File(filename) );
+    // _base.reset( MFSOwner::File(filename) );
 
     return MEDIATYPE_UNKNOWN; // MEDIATYPE_UNKNOWN
 }
@@ -212,7 +212,7 @@ void iecDrive::iec_open()
         Debug_printv("_base[%s]", _base->url.c_str());
         if ( !_base->isDirectory() )
         {
-            if ( !registerStream(commanddata->channel, std::ios_base::in) )
+            if ( !registerStream(commanddata->channel) )
             {
                 Debug_printv("File Doesn't Exist [%s]", s.c_str());
                 _base.reset( MFSOwner::File( _base->base() ) );
@@ -281,6 +281,7 @@ void iecDrive::iec_reopen_channel_listen()
 void iecDrive::iec_reopen_channel_talk()
 {
     Debug_printv("here");
+    sendFile();
 }
 
 
@@ -380,8 +381,9 @@ void iecDrive::iec_command()
                 pti = util_tokenize_uint8(payload);
                 Debug_printv("payload[%s] channel[%d] media[%d] track[%d] sector[%d]", payload.c_str(), pti[0], pti[1], pti[2], pti[3]);
 
-                //CBMImageStream stream = retrieveStream( pti[0] );
-                //stream.seekBlock( );
+                auto stream = retrieveStream( pti[0] );
+                stream->seekSector( pti[2], pti[3], 0 );
+                stream->reset();
             }
         break;
         case 'V':
@@ -537,7 +539,7 @@ void iecDrive::set_prefix()
 
     if ( !_base->isDirectory() )
     {
-        if ( !registerStream(0, std::ios_base::in) )
+        if ( !registerStream(0) )
         {
             Debug_printv("File Doesn't Exist [%s]", _base->url.c_str());
         }
@@ -563,51 +565,55 @@ std::shared_ptr<MStream> iecDrive::retrieveStream ( uint8_t channel )
 
 // used to start working with a stream, registering it as underlying stream of some
 // IEC channel on some IEC device
-bool iecDrive::registerStream (uint8_t channel, std::ios_base::open_mode mode)
+bool iecDrive::registerStream (uint8_t channel)
 {
     // Debug_printv("dc_basepath[%s]",  device_config.basepath().c_str());
     // Debug_printv("_file[%s]", _file.c_str());
-    // //auto file = Meat::New<MFile>( device_config.basepath() + "/" + _file );
-    //auto file = Meat::New<MFile>( _base->url + _file );
-    // auto file = Meat::New<MFile>( _file );
-    //if ( !file->exists() )
-    //     return false;
-    if ( !_base->exists() )
-        return false;
-    
+
     Debug_printv("_base[%s]", _base->url.c_str());
+    //_base.reset( MFSOwner::File( _base->url ) );
 
     std::shared_ptr<MStream> new_stream;
 
     // LOAD / GET / INPUT
-    if ( mode == std::ios_base::in )
+    if ( channel == CHANNEL_LOAD )
     {
+        if ( !_base->exists() )
+            return false;
+
         Debug_printv("LOAD \"%s\"", _base->url.c_str());
         new_stream = std::shared_ptr<MStream>(_base->meatStream());
-
-        if ( new_stream == nullptr )
-        {
-            return false;
-        }
-
-        if( !new_stream->isOpen() )
-        {
-            Debug_printv("Error creating stream");
-            return false;
-        }
-        else
-        {
-            // Close the stream if it is already open
-            closeStream( channel );
-        }
     }
 
     // SAVE / PUT / PRINT / WRITE
-    else
+    else if ( channel == CHANNEL_SAVE )
     {
         Debug_printv("SAVE \"%s\"", _base->url.c_str());
         // CREATE STREAM HERE FOR OUTPUT
+        new_stream = std::shared_ptr<MStream>(_base->meatStream());
+        new_stream->open();
+    }
+    else
+    {
+        Debug_printv("OTHER \"%s\"", _base->url.c_str());
+        new_stream = std::shared_ptr<MStream>(_base->meatStream());
+    }
+
+
+    if ( new_stream == nullptr )
+    {
         return false;
+    }
+
+    if( !new_stream->isOpen() )
+    {
+        Debug_printv("Error creating stream");
+        return false;
+    }
+    else
+    {
+        // Close the stream if it is already open
+        closeStream( channel );
     }
 
 
@@ -816,7 +822,7 @@ void iecDrive::sendListing()
     if(entry == nullptr) {
         closeStream( commanddata->channel );
 
-        bool isOpen = registerStream(commanddata->channel, std::ios_base::in);
+        bool isOpen = registerStream(commanddata->channel);
         if(isOpen) 
         {
             sendFile();
@@ -966,7 +972,7 @@ bool iecDrive::sendFile()
         return false;
     }
 
-    if ( IEC.data.channel == CHANNEL_LOAD && !_base->isDirectory() )
+    if ( !_base->isDirectory() )
     {
         PeoplesUrlParser u;
         u.parseUrl( istream->url );
@@ -1045,12 +1051,12 @@ bool iecDrive::sendFile()
 
             if(bi == 8)
             {
-                size_t t = (i * 100) / len;
+                uint32_t t = (i * 100) / len;
                 Debug_printf(" %s (%d %d%%) [%d]\r\n", ba, i, t, avail);
                 bi = 0;
             }
 #else
-            size_t t = (i * 100) / len;
+            uint32_t t = (i * 100) / len;
             Debug_printf("\rTransferring %d%% [%d, %d]", t, i, avail);
 #endif
 

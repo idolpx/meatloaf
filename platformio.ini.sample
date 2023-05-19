@@ -93,7 +93,7 @@ board = fujinet-v1-${meatloaf.flash_size}
 build_type = debug
 build_flags =
 	${env.build_flags}
-	-D PINMAP_FL_REV0
+	-D PINMAP_FUJILOAF_REV0
     -D SD_CARD
 	-D LED_STRIP
 	-D PARALLEL_BUS

@@ -376,7 +376,7 @@ size_t FlashIStream::error() {
 
 bool FlashIStream::seek(uint32_t pos) {
     // Debug_printv("pos[%d]", pos);
-        if (!isOpen()) {
+    if (!isOpen()) {
         Debug_printv("Not open");
         return false;
     }

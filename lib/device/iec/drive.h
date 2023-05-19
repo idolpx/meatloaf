@@ -1,4 +1,3 @@
-#ifdef BUILD_IEC
 #ifndef DISK_H
 #define DISK_H
 
@@ -22,7 +21,7 @@ private:
 
     // Named Channel functions
     //std::shared_ptr<MStream> currentStream;
-    bool registerStream (uint8_t channel, int mode);
+    bool registerStream (uint8_t channel);
     std::shared_ptr<MStream> retrieveStream ( uint8_t channel );
     bool closeStream ( uint8_t channel, bool close_all = false );
 
@@ -161,5 +160,4 @@ public:
     ~iecDrive();
 };
 
-#endif
 #endif
