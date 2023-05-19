@@ -107,7 +107,7 @@ bool D64IStream::seekEntry( std::string filename )
             mstr::rtrimA0(entryFilename);
             mstr::replaceAll(filename, "\\", "/");
             mstr::toASCII(entryFilename);
-            Debug_printv("index[%d] track[%d] sector[%d] filename[%s] entry.filename[%.16s]", index, track, sector, filename.c_str(), entryFilename.c_str());
+            //Debug_printv("index[%d] track[%d] sector[%d] filename[%s] entry.filename[%.16s]", index, track, sector, filename.c_str(), entryFilename.c_str());
 
             //Debug_printv("filename[%s] entry[%s]", filename.c_str(), entryFilename.c_str());
 

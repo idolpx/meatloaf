@@ -38,13 +38,14 @@
 #endif
 
 #ifdef BUILD_IEC
-//# include "iec/cpm.h"
+# include "iec/cpm.h"
 # include "iec/drive.h"
 # include "iec/printer.h"
 # include "iec/printerlist.h"
 //# include "iec/fuji.h"
 //# include "iec/modem.h"
 //# include "iec/network.h"
+# include "iec/voice.h"
 #endif
 
 #ifdef BUILD_ADAM
