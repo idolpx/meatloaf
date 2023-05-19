@@ -147,23 +147,12 @@ void main_setup()
     //IEC.addDevice(new iecPrinter(), 4);
     Debug_print("Disk "); IEC.addDevice(new iecDrive(), 8);
     //Debug_print("Network "); IEC.addDevice(new iecNetwork(), 16);
-    //IEC.addDevice(new iecCpm(), 20);
-    //Debug_print("Voice "); IEC.addDevice(new iecVoice(), 21);
+    Debug_print("CPM "); IEC.addDevice(new iecCpm(), 20);
+    Debug_print("Voice "); IEC.addDevice(new iecVoice(), 21);
     //theFuji.setup(&IEC);
 
     // IEC.enabledDevices = DEVICE_MASK;
     // IEC.enableDevice(30);
-
-    // Serial.print("Virtual Device(s) Started: [ " ANSI_YELLOW_BOLD );
-    // for (uint8_t i = 0; i < 31; i++)
-    // {
-    //     if (IEC.isDeviceEnabled(i))
-    //     {
-    //         Serial.printf("%.02d ", i);
-    //     }
-    // }
-    // Serial.println( ANSI_RESET "]");
-    // IEC.enabled = true;
 
 #ifdef PARALLEL_BUS
     // Setup Parallel Bus
