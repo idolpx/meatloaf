@@ -258,7 +258,7 @@ void systemBus::read_command()
             Debug_printf("   IEC: [%.2X]", c);
 
             // Decode command byte
-            uint8_t command = c & 0xF0;
+            uint8_t command = c & 0x60;
             if (c == IEC_UNLISTEN)
                 command = IEC_UNLISTEN;
             if (c == IEC_UNTALK)

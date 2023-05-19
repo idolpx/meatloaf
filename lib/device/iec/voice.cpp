@@ -158,7 +158,8 @@ void iecVoice::status()
 
 device_state_t iecVoice::process(IECData *commanddata)
 {
-
+    Debug_printv( "payload[%d]", payload.c_str());
+    
     // act like a printer for POC
     switch (cmdFrame.comnd)
     {
