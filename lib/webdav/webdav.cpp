@@ -2,7 +2,7 @@
  * WebDAV parsing class for directory output
  */
 
-#include "WebDAV.h"
+#include "webdav.h"
 
 #include <cstring>
 
