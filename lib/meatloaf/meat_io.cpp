@@ -29,8 +29,10 @@
 #include "disk/d80.h"
 #include "disk/d81.h"
 #include "disk/d82.h"
-#include "disk/d8b.h"
 #include "disk/dnp.h"
+
+#include "disk/d8b.h"
+#include "disk/dfi.h"
 
 // File
 #include "file/p00.h"
@@ -79,8 +81,10 @@ D71FileSystem d71FS;
 D80FileSystem d80FS;
 D81FileSystem d81FS;
 D82FileSystem d82FS;
-D8BFileSystem d8bFS;
 DNPFileSystem dnpFS;
+
+D8BFileSystem d8bFS;
+DFIFileSystem dfiFS;
 
 // Tape
 T64FileSystem t64FS;
@@ -98,7 +102,8 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
     &sdFS,
 #endif
     &p00FS,
-    &d64FS, &d71FS, &d80FS, &d81FS, &d82FS, &d8bFS, &dnpFS,
+    &d64FS, &d71FS, &d80FS, &d81FS, &d82FS, &dnpFS,
+    &d8bFS, &dfiFS,
     &t64FS, &tcrtFS,
     &httpFS, &mlFS, &tnfsFS
 //    &ipfsFS, &tcpFS,

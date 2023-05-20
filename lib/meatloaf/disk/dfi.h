@@ -144,14 +144,20 @@ public:
         // // $24 - $5f : reserved
         // // $60 - $ff : comment or notes
         // this.seek(0x20);
+        seek ( 0x20 );
         // this.partitions[0].track = this.read();
+        partitions[0].header_track = read();
         // this.partitions[0].sector = this.read();
+        partitions[0].header_sector = read();
         // this.partitions[0].block_allocation_map[0].track = this.read();
+        partitions[0].block_allocation_map[0].track = read();
         // this.partitions[0].block_allocation_map[0].sector = this.read();
-
+        partitions[0].block_allocation_map[0].sector = read();
 
         // this.partitions[0].directory_track = this.partitions[0].track;
+        partitions[0].directory_track = partitions[0].header_track;
         // this.partitions[0].directory_sector = this.partitions[0].sector + 1;
+        partitions[0].directory_sector = partitions[0].header_sector;
     };
 
 	virtual uint8_t speedZone( uint8_t track) override { return 0; };
