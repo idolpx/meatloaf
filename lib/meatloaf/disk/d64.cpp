@@ -314,7 +314,7 @@ bool D64IStream::seekPath(std::string path) {
     {
         Debug_printv("Direct Access Mode track[0] sector[0] path[%s]", path.c_str());
         seekCalled = false;
-        return seekSector(0, 0);
+        return seekSector(1, 0);
     }
     else if ( seekEntry(path) )
     {
