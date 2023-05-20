@@ -146,7 +146,7 @@ void main_setup()
     // Add devices to bus
     //IEC.addDevice(new iecPrinter(), 4);
     Debug_print("Disk "); IEC.addDevice(new iecDrive(), 8);
-    //Debug_print("Network "); IEC.addDevice(new iecNetwork(), 16);
+    Debug_print("Network "); IEC.addDevice(new iecNetwork(), 12);
     Debug_print("CPM "); IEC.addDevice(new iecCpm(), 20);
     Debug_print("Voice "); IEC.addDevice(new iecVoice(), 21);
     //theFuji.setup(&IEC);

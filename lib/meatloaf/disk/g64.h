@@ -11,6 +11,37 @@
 #include "meat_io.h"
 #include "d64.h"
 
+// Format codes:
+// ID	Description
+// 0	Unknown format
+// 1	GCR Data
+// 2	CBM DOS
+// 3	CBM DOS Extended
+// 4	MicroProse
+// 5	RapidLok
+// 6	Datasoft
+// 7	Vorpal
+// 8	V-MAX!
+// 9	Teque
+// 10	TDP
+// 11	Big Five
+// 12	OziSoft
+
+// Format Extensions:
+// ID	Description
+// 0	Unknown protection
+// 1	Datasoft with Weak bits
+// 2	CBM DOS with Cyan loader, Weak bits
+// 3	CBM DOS with Datasoft, Weak bits
+// 4	RapidLok Key
+// 5	Data Duplication
+// 6	Melbourne House
+// 7	Melbourne House, Weak bits
+// 8	PirateBusters v1.0
+// 9	PirateBusters v2.0, Track A
+// 10	PirateBusters v2.0, Track B
+// 11	PirateSlayer
+// 12	CBM DOS, XEMAG
 
 /********************************************************
  * Streams
@@ -29,13 +60,6 @@ public:
         //sectorsPerTrack = { 17, 18, 19, 21 };
     };
 
-	virtual uint8_t speedZone( uint8_t track) override
-	{
-        if ( track < 35 )
-		    return (track < 17) + (track < 24) + (track < 30);
-        else
-            return (track < 52) + (track < 59) + (track < 65);
-	};
 
 protected:
 
