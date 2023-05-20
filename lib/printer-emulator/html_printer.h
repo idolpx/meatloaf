@@ -24,7 +24,7 @@ public:
         {
             #ifdef BUILD_ATARI
                 return sioPrinter::printer_model_str[sioPrinter::PRINTER_HTML];
-            #elif BUILD_IEC
+            #elif BUILD_CBM
                 return iecPrinter::printer_model_str[iecPrinter::PRINTER_HTML];
             #elif BUILD_APPLE
                 return iwmPrinter::printer_model_str[iwmPrinter::PRINTER_HTML];

@@ -51,7 +51,7 @@ public:
     { 
         #ifdef BUILD_ATARI
             return sioPrinter::printer_model_str[sioPrinter::PRINTER_PNG];
-        #elif BUILD_IEC
+        #elif BUILD_CBM
             return iecPrinter::printer_model_str[iecPrinter::PRINTER_PNG];
         #elif BUILD_ADAM
             return adamPrinter::printer_model_str[adamPrinter::PRINTER_PNG];

@@ -259,19 +259,19 @@ bool FlashFile::seekEntry( std::string filename )
             if ( dirent->d_type != DT_DIR ) // Only want to match files not directories
             {
                 if ( filename == entryFilename )
-                {
-                    closedir( d );
-                    return true;
-                }
-                else if ( filename == "*" || mstr::compare(filename, entryFilename) )
-                {
-                    // Set filename to this filename
-                    Debug_printv( "Found! file[%s] -> entry[%s]", filename.c_str(), entryFilename.c_str() );
-                    parseUrl(apath + "/" + std::string(dirent->d_name));
-                    closedir( d );
-                    return true;
-                }
+            {
+                closedir( d );
+                return true;
             }
+                else if ( filename == "*" || mstr::compare(filename, entryFilename) )
+            {
+                // Set filename to this filename
+                Debug_printv( "Found! file[%s] -> entry[%s]", filename.c_str(), entryFilename.c_str() );
+                parseUrl(apath + "/" + std::string(dirent->d_name));
+                closedir( d );
+                return true;
+            }
+          }
 
         }
 
@@ -380,7 +380,7 @@ bool FlashIStream::seek(uint32_t pos) {
         Debug_printv("Not open");
         return false;
     }
-    return ( fseek( handle->file_h, pos, SEEK_SET ) ) ? true : false;
+    return ( fseek( handle->file_h, pos, SEEK_SET ) ) ? false : true;
 };
 
 bool FlashIStream::seek(uint32_t pos, int mode) {
@@ -389,7 +389,7 @@ bool FlashIStream::seek(uint32_t pos, int mode) {
         Debug_printv("Not open");
         return false;
     }
-    return ( fseek( handle->file_h, pos, mode ) ) ? true: false;
+    return ( fseek( handle->file_h, pos, mode ) ) ? false : true;
 }
 
 bool FlashIStream::isOpen() {

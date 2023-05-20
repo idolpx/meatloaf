@@ -20,7 +20,7 @@ public:
         {
             #ifdef BUILD_ATARI
                 return sioPrinter::printer_model_str[sioPrinter::PRINTER_FILE_ASCII];
-            #elif BUILD_IEC
+            #elif BUILD_CBM
                 return iecPrinter::printer_model_str[iecPrinter::PRINTER_FILE_ASCII];
             #elif BUILD_APPLE
                 return iwmPrinter::printer_model_str[iwmPrinter::PRINTER_FILE_ASCII];
@@ -36,7 +36,7 @@ public:
         {
             #ifdef BUILD_ATARI
                 return sioPrinter::printer_model_str[sioPrinter::PRINTER_FILE_RAW];
-            #elif BUILD_IEC
+            #elif BUILD_CBM
                 return iecPrinter::printer_model_str[iecPrinter::PRINTER_FILE_RAW];
             #elif BUILD_APPLE
                 return iwmPrinter::printer_model_str[iwmPrinter::PRINTER_FILE_RAW];
@@ -52,7 +52,7 @@ public:
         {
             #ifdef BUILD_ATARI
                 return sioPrinter::printer_model_str[sioPrinter::PRINTER_FILE_TRIM];
-            #elif BUILD_IEC
+            #elif BUILD_CBM
                 return iecPrinter::printer_model_str[iecPrinter::PRINTER_FILE_TRIM];
             #elif BUILD_APPLE
                 return iwmPrinter::printer_model_str[iwmPrinter::PRINTER_FILE_TRIM];

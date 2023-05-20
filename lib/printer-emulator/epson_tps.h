@@ -20,7 +20,7 @@ public:
     { 
         #ifdef BUILD_ATARI
             return sioPrinter::printer_model_str[sioPrinter::PRINTER_EPSON_PRINTSHOP];
-        #elif BUILD_IEC
+        #elif BUILD_CBM
             return iecPrinter::printer_model_str[iecPrinter::PRINTER_EPSON_PRINTSHOP];
         #elif BUILD_ADAM
             return adamPrinter::printer_model_str[adamPrinter::PRINTER_EPSON_PRINTSHOP];
