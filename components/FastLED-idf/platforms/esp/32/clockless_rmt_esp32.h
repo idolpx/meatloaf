@@ -138,6 +138,7 @@ __attribute__ ((always_inline)) inline static uint32_t __clock_cycles() {
 
 #define FASTLED_HAS_CLOCKLESS 1
 #define NUM_COLOR_CHANNELS 3
+#define FASTLED_ESP32_FLASH_LOCK 1
 
 
 // -- Configuration constants
@@ -145,7 +146,7 @@ __attribute__ ((always_inline)) inline static uint32_t __clock_cycles() {
                                 /* there is no point in higher dividers, as this parameter only needs to make
                                    sure the scaling factors of the RMT intervals fit in 15 bits. */
 
-#define MEM_BLOCK_NUM       2 /* the number of memory blocks. There are 8 for the entire RMT system, and nominally
+#define MEM_BLOCK_NUM       4 /* the number of memory blocks. There are 8 for the entire RMT system, and nominally
                                 1 per channel. Using a larger number reduces the number of hardware channels that can be used
                                 at one time, but increases the resistance to RTOS interrupt jitter. 1 seems to be good enough,
                                 but jitter created by wifi might still cause glitches and 2 or more may be reuired. */

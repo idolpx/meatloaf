@@ -571,7 +571,7 @@ bool iecDrive::registerStream (uint8_t channel)
     // Debug_printv("_file[%s]", _file.c_str());
 
     Debug_printv("_base[%s]", _base->url.c_str());
-    //_base.reset( MFSOwner::File( _base->url ) );
+    _base.reset( MFSOwner::File( _base->url ) );
 
     std::shared_ptr<MStream> new_stream;
 

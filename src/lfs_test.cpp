@@ -43,7 +43,7 @@ void lfs_test ( void )
         printf("%dMB %s flash\n", (esp_flash_get_size(NULL, &size_flash_chip) / (1024 * 1024)),
                (chip_info.features & CHIP_FEATURE_EMB_FLASH) ? "embedded" : "external");
 
-        printf("Free heap: %d\n", esp_get_free_heap_size());
+        printf("Free heap: %u\n", esp_get_free_heap_size());
 
         printf("Now we are starting the LittleFs Demo ...\n");
 
