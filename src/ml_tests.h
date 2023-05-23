@@ -27,3 +27,38 @@ void lfs_test( void );
 //     if (r != ARCHIVE_OK)
 //     exit(1);
 // }
+
+class LeakDetector {
+    uint32_t prevMem = 0;
+    uint32_t startMem = 0;
+    std::string tag;
+
+public:
+    LeakDetector(std::string t) {
+        prevMem = esp_get_free_internal_heap_size();
+        startMem = prevMem;
+        tag = t;
+    };
+
+    void check(std::string checkpoint) {
+        uint32_t memNow = esp_get_free_internal_heap_size();
+        if(memNow < prevMem) {
+            Debug_printf("[I:ALLOC:%s] %d bytes allocated at checkpoint: %s\n", tag.c_str(), memNow-prevMem, checkpoint.c_str());
+        }
+        else if(memNow > prevMem) {
+            Debug_printf("[I:FREE :%s] %d bytes freed at checkpoint: %s\n", tag.c_str(), prevMem-memNow, checkpoint.c_str());
+        }
+        else {
+            Debug_printf("[I:NONE :%s] no change at checkpoint: %s\n", tag.c_str(), checkpoint.c_str());
+        }
+
+        prevMem = memNow;
+    }
+
+    void finish() {
+        uint32_t memNow = esp_get_free_internal_heap_size();
+        if(memNow < startMem) {
+            Debug_printf("[E:LEAK:%s] %d sorry to say, but it leaked: %d bytes\n", tag.c_str(), memNow-startMem);
+        }
+    }
+};
