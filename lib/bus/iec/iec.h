@@ -378,11 +378,6 @@ private:
     void read_payload();
 
     /**
-     * @brief Release the bus lines, we're done.
-     */
-    void releaseLines(bool wait = false);
-
-    /**
      * ESP timer handle for the Interrupt rate limiting timer
      */
     esp_timer_handle_t rateTimerHandle = nullptr;
@@ -443,7 +438,12 @@ public:
      * @brief Called to pulse the PROCEED interrupt, rate limited by the interrupt timer.
      */
     void assert_interrupt();
-    
+
+    /**
+     * @brief Release the bus lines, we're done.
+     */
+    void releaseLines(bool wait = false);
+
     /**
      * @brief send single byte
      * @param c byte to send

@@ -208,6 +208,7 @@ void IRAM_ATTR systemBus::service()
         }
 
         // Let bus stabalize
+        Debug_printv("stabalize!");
         protocol->wait ( TIMING_STABLE, 0, false );
 
         if ( status ( PIN_IEC_ATN ) )
@@ -332,7 +333,10 @@ void systemBus::read_command()
                     data.channel = c ^ IEC_CLOSE;
                     bus_state = BUS_PROCESS;
                     Debug_printf(" (E0 CLOSE  %.2d CHANNEL)\r\n", data.channel);
-                    break;                    
+                    break;
+
+                default:
+                    bus_state = BUS_IDLE;
                 }
             }
         }

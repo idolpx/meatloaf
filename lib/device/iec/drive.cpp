@@ -207,7 +207,9 @@ void iecDrive::iec_open()
 
     if ( s.length() )
     {
-        _base.reset( _base->cd( s ) );
+        auto n = _base->cd( s );
+        if ( n != nullptr )
+            _base.reset( n );
 
         Debug_printv("_base[%s]", _base->url.c_str());
         if ( !_base->isDirectory() )
@@ -535,7 +537,9 @@ void iecDrive::set_prefix()
         path = mstr::drop(path, 1);
 
     Debug_printv("path[%s]", path.c_str());
-    _base.reset( _base->cd( path ) );
+    auto n = _base->cd( path );
+    if ( n != nullptr )
+        _base.reset( n );
 
     if ( !_base->isDirectory() )
     {

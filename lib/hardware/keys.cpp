@@ -1,6 +1,8 @@
 
 #include "keys.h"
 
+#include <esp32/himem.h>
+
 #include "../../include/debug.h"
 #include "../../include/pinmap.h"
 
@@ -259,11 +261,17 @@ void KeyManager::_keystate_task(void *param)
                 fnLedManager.blink(LED_BUS, 2); // blink to confirm a button press
             }
             Debug_println("ACTION: Reboot");
-            fnSystem.reboot();
+            //fnSystem.reboot();
+            IEC.releaseLines();
+            Debug_printf("bus_state[%d]\n", IEC.bus_state);
+            Debug_printf("Heap: %lu\n",esp_get_free_internal_heap_size());
+            Debug_printf("PsramSize: %u\n", fnSystem.get_psram_size());
+            Debug_printf("himem phys: %u\n", esp_himem_get_phys_size());
+            Debug_printf("himem free: %u\n", esp_himem_get_free_size());
+            Debug_printf("himem reserved: %u\n", esp_himem_reserved_area_size());
 #else
             fnLedManager.blink(BLUETOOTH_LED, 2); // blink to confirm a button press
 #endif // PINMAP_A2_REV0
-
 // Either toggle BT baud rate or do a disk image rotation on B_KEY SHORT PRESS
 #ifdef BLUETOOTH_SUPPORT
             if (fnBtManager.isActive())

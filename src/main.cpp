@@ -20,6 +20,7 @@
 //#include "disk-sounds.h"
 
 #include "fnSystem.h"
+#include "fnConfig.h"
 #include "fnWiFi.h"
 #include "webdav2.h"
 
@@ -127,24 +128,31 @@ void main_setup()
 #endif
 
     // Load our stored configuration
-//    Config.load();
+    Config.load();
 
     // Set up the WiFi adapter
     fnWiFi.start();
     // Go ahead and try reconnecting to WiFi
-    fnWiFi.connect( WIFI_SSID, WIFI_PASSWORD );
+    fnWiFi.connect( 
+        Config.get_wifi_ssid().c_str(), 
+        Config.get_wifi_passphrase().c_str() 
+    );
 
     // Start WebDAV Server
     http_server_start();
-
-
 
     // Setup IEC Bus
     IEC.setup();
     Serial.println( ANSI_GREEN_BOLD "IEC Bus Initialized" ANSI_RESET );
 
     // Add devices to bus
-    //IEC.addDevice(new iecPrinter(), 4);
+    FileSystem *ptrfs = fnSDFAT.running() ? (FileSystem *)&fnSDFAT : (FileSystem *)&fnSPIFFS;
+    iecPrinter::printer_type ptype = iecPrinter::printer_type::PRINTER_COMMODORE_MPS803; // temporary
+    Debug_printf("Creating a default printer using %s storage and type %d\n", ptrfs->typestring(), ptype);
+    iecPrinter *ptr = new iecPrinter(ptrfs, ptype);
+    fnPrinters.set_entry(0, ptr, ptype, Config.get_printer_port(0));
+    Debug_print("Printer "); IEC.addDevice(ptr, 4); // add as device #4 for now
+
     Debug_print("Disk "); IEC.addDevice(new iecDrive(), 8);
     Debug_print("Network "); IEC.addDevice(new iecNetwork(), 12);
     Debug_print("CPM "); IEC.addDevice(new iecCpm(), 20);
