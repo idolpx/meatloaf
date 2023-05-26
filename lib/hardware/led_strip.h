@@ -8,15 +8,29 @@
 
 #define LED_BLINK_TIME 100
 
+// These must be defined for compile even if not used
 #ifndef NUM_LEDS
-// Must be defined for compile even if not used
 #define NUM_LEDS            4
+#endif
+#ifndef LED_DATA_PIN
 #define LED_DATA_PIN        4
+#endif
+#ifndef LED_BRIGHTNESS
 #define LED_BRIGHTNESS      11
+#endif
+#ifndef LED_TYPE
 #define LED_TYPE            WS2812B
+#endif
+#ifndef RGB_ORDER
 #define RGB_ORDER           GRB
+#endif
+#ifndef LED_WIFI_NUM
 #define LED_WIFI_NUM        0
+#endif
+#ifndef LED_BT_NUM
 #define LED_BT_NUM          1
+#endif
+#ifndef LED_BUS_NUM
 #define LED_BUS_NUM         2
 #endif
 
