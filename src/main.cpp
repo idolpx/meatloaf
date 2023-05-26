@@ -78,7 +78,7 @@ void main_setup()
 
     Debug_printf( "Starting heap: %u\n", fnSystem.get_free_heap_size() );
 
-#ifndef NO_PSRAM
+#ifdef BOARD_HAS_PSRAM
     Debug_printf( "PsramSize %u\n", fnSystem.get_psram_size() );
 
     Debug_printf( "himem phys %u\n", esp_himem_get_phys_size() );
@@ -133,9 +133,14 @@ void main_setup()
     // Set up the WiFi adapter
     fnWiFi.start();
     // Go ahead and try reconnecting to WiFi
-    fnWiFi.connect( 
-        Config.get_wifi_ssid().c_str(), 
-        Config.get_wifi_passphrase().c_str() 
+    fnWiFi.connect(
+#ifdef WIFI_SSID
+        WIFI_SSID,
+        WIFI_PASSWORD
+#else
+        Config.get_wifi_ssid().c_str(),
+        Config.get_wifi_passphrase().c_str()
+#endif
     );
 
     // Start WebDAV Server

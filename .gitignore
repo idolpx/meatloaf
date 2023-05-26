@@ -15,10 +15,10 @@ platformio.ini
 platformio-device-monitor-*.log
 
 # ESP-IDF SDK configuration file
-sdkconfig.*
 include/ssid.h
 /*.log
 **/.backup
 .travis.yml
 compile_commands.json
 .reference/*
+data/BUILD_IEC/config.ini

@@ -74,7 +74,7 @@ New behavior: copy from SD first if available, then read SPIFFS.
     FILE *fin = NULL; //declare fin
     if (fnSDFAT.running() && fnSDFAT.exists(CONFIG_FILENAME))
     {
-        Debug_println("Load fnconfig.ini from SD");
+        Debug_println("Load config.ini from SD");
         fin = fnSDFAT.file_open(CONFIG_FILENAME);
     }
     else
@@ -85,7 +85,7 @@ New behavior: copy from SD first if available, then read SPIFFS.
             Debug_println("No config found - starting fresh!");
             return; // No local copy - ABORT
         }
-        Debug_println("Load fnconfig.ini from spiffs");
+        Debug_println("Load config.ini from spiffs");
         fin = fnSPIFFS.file_open(CONFIG_FILENAME);
     }
     // Read INI file into buffer (for speed)
