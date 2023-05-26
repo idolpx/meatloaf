@@ -17,7 +17,7 @@
 
 #define HSIO_INVALID_INDEX -1
 
-#define CONFIG_FILENAME "/fnconfig.ini"
+#define CONFIG_FILENAME "/config.ini"
 #define CONFIG_FILEBUFFSIZE 2048
 
 #define CONFIG_DEFAULT_SNTPSERVER "pool.ntp.org"

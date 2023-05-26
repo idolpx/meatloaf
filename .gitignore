@@ -21,3 +21,4 @@ include/ssid.h
 .travis.yml
 compile_commands.json
 .reference/*
+data/BUILD_IEC/config.ini

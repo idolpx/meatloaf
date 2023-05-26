@@ -133,9 +133,14 @@ void main_setup()
     // Set up the WiFi adapter
     fnWiFi.start();
     // Go ahead and try reconnecting to WiFi
-    fnWiFi.connect( 
-        Config.get_wifi_ssid().c_str(), 
-        Config.get_wifi_passphrase().c_str() 
+    fnWiFi.connect(
+#ifdef WIFI_SSID
+        WIFI_SSID,
+        WIFI_PASSWORD
+#else
+        Config.get_wifi_ssid().c_str(),
+        Config.get_wifi_passphrase().c_str()
+#endif
     );
 
     // Start WebDAV Server
