@@ -22,3 +22,4 @@ include/ssid.h
 compile_commands.json
 .reference/*
 data/BUILD_IEC/config.ini
+data/BUILD_IEC/.rom/*

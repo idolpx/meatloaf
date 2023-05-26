@@ -9,29 +9,17 @@
 #define LED_BLINK_TIME 100
 
 // These must be defined for compile even if not used
-#ifndef NUM_LEDS
-#define NUM_LEDS            4
-#endif
-#ifndef LED_DATA_PIN
+#ifndef LED_STRIP
+/* LED Strip NEW */
+#define NUM_LEDS            5
 #define LED_DATA_PIN        4
-#endif
-#ifndef LED_BRIGHTNESS
-#define LED_BRIGHTNESS      11
-#endif
-#ifndef LED_TYPE
+#define LED_BRIGHTNESS      15 // max mA the LED can use determines brightness
 #define LED_TYPE            WS2812B
-#endif
-#ifndef RGB_ORDER
 #define RGB_ORDER           GRB
-#endif
-#ifndef LED_WIFI_NUM
+// LED order on the strip starting with 0
 #define LED_WIFI_NUM        0
-#endif
-#ifndef LED_BT_NUM
-#define LED_BT_NUM          1
-#endif
-#ifndef LED_BUS_NUM
-#define LED_BUS_NUM         2
+#define LED_BUS_NUM         4
+#define LED_BT_NUM          2
 #endif
 
 enum stripLed

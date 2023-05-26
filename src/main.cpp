@@ -162,7 +162,7 @@ void main_setup()
     Debug_print("Network "); IEC.addDevice(new iecNetwork(), 12);
     Debug_print("CPM "); IEC.addDevice(new iecCpm(), 20);
     Debug_print("Voice "); IEC.addDevice(new iecVoice(), 21);
-    //theFuji.setup(&IEC);
+    Debug_print("Meatloaf "); IEC.addDevice(new iecMeatloaf(), 30);
 
     // IEC.enabledDevices = DEVICE_MASK;
     // IEC.enableDevice(30);

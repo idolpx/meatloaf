@@ -13,7 +13,7 @@
 
 class iecDrive : public virtualDevice
 {
-private:
+protected:
     //MediaType *_disk = nullptr;
 
     std::unique_ptr<MFile> _base;   // Always points to current directory/image

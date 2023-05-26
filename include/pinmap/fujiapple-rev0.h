@@ -31,15 +31,6 @@
 #define PIN_LED_BUS 12 // 4 FN
 #define PIN_LED_BT -1 // No BT LED
 
-/* LED Strip NEW */
-#define NUM_LEDS 3
-#define DATA_PIN_1 27 
-//#define DATA_PIN_2 13 // pick unused gpio
-#define BRIGHTNESS  25
-#define LED_TYPE    WS2811
-#define COLOR_ORDER RGB
-
-
 /* Audio Output */
 #define PIN_DAC1 25 // samlib.h
 

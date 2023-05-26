@@ -10,7 +10,7 @@
     "flash_mode": "dio",
     "mcu": "esp32",
     "variant": "esp32",
-    "partitions": "fujinet_partitions_8MB.csv"
+    "partitions": "boards/flash_partitions_4MB.csv"
   },
   "connectivity": [
     "wifi",
@@ -29,11 +29,11 @@
     "arduino",
     "espidf"
   ],
-  "name": "#FujiNet v1 8MB",
+  "name": "Meatloaf v1 4MB",
   "upload": {
-    "flash_size": "8MB",
+    "flash_size": "4MB",
     "maximum_ram_size": 327680,
-    "maximum_size": 8388608,
+    "maximum_size": 4194304,
     "protocols": [
       "esptool",
       "espota",
@@ -42,6 +42,6 @@
     "require_upload_port": true,
     "speed": 460800
   },
-  "url": "https://github.com/FujiNetWIFI/fujinet-platformio",
-  "vendor": "FujiNet Project"
+  "url": "https://github.com/idolpx/meatloaf-specialty",
+  "vendor": "Meatloaf Project"
 }
