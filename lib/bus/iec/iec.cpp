@@ -341,7 +341,9 @@ void systemBus::read_command()
             }
         }
 
-    } while ( bus_state == BUS_ACTIVE );
+        protocol->wait( TIMING_STABLE );
+
+    } while ( status( PIN_IEC_ATN ) == PULLED );
 
     // Is this command for us?
     if (!deviceById(data.device) || !deviceById(data.device)->device_active)

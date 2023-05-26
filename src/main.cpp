@@ -78,7 +78,7 @@ void main_setup()
 
     Debug_printf( "Starting heap: %u\n", fnSystem.get_free_heap_size() );
 
-#ifndef NO_PSRAM
+#ifdef BOARD_HAS_PSRAM
     Debug_printf( "PsramSize %u\n", fnSystem.get_psram_size() );
 
     Debug_printf( "himem phys %u\n", esp_himem_get_phys_size() );

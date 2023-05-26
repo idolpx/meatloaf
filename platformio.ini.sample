@@ -55,11 +55,11 @@ lib_ldf_mode = deep+
 upload_speed = 460800 ;921600
 ;upload_port = COM1 ; Windows
 ;upload_port = /dev/ttyUSB0 ; Linux
-upload_port = /dev/tty.SLAB_USBtoUART ; Mac
+;upload_port = /dev/tty.SLAB_USBtoUART ; Mac
 monitor_speed = 460800 ;921600
 ;monitor_port = COM1 ; Windows
 ;monitor_port = /dev/ttyUSB0 ; Linux
-monitor_port = /dev/tty.SLAB_USBtoUART ; Mac
+;monitor_port = /dev/tty.SLAB_USBtoUART ; Mac
 monitor_filters = time, esp32_exception_decoder
 check_skip_packages = yes
 ;debug_tool = esp-prog
@@ -71,7 +71,6 @@ build_flags =
     -D ${meatloaf.flash_filesystem}
     -D CMAKE_EXPORT_COMPILE_COMMANDS=ON
     -D DEBUG_SPEED=460800   ;921600
-    ;-D NO_PSRAM            ; if your hardware has no PSRAM
     ;-D NO_BUTTONS          ; if your hardware has no physical buttons
     ;-D SD_CARD             ; if your hardware has an sd card slot
     ;-D LED_STRIP           ; if your hardware has an LED strip
@@ -114,7 +113,6 @@ build_type = debug
 build_flags =
 	${env.build_flags}
 	-D PINMAP_WROOM
-    -D NO_PSRAM
 
 [env:esp32-wroom-pi1541]
 platform = espressif32@${meatloaf.esp32_platform_version}
@@ -123,7 +121,6 @@ build_type = debug
 build_flags =
 	${env.build_flags}
 	-D PINMAP_WROOM_1541
-	-D NO_PSRAM
 	-D NO_BUTTONS
 	-D IEC_SPLIT_LINES
 	-D IEC_INVERTED_LINES

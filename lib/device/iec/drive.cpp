@@ -158,7 +158,7 @@ void iecDrive::process_command()
     {
         iec_talk_command();
     }
-    else if (commanddata->primary == IEC_LISTEN)
+    else if (commanddata->primary == IEC_UNLISTEN)
     {
         iec_command();
     }
@@ -1053,7 +1053,11 @@ bool iecDrive::sendFile()
             {
                 success_tx = IEC.sendByte(b);
                 if ( !success_tx )
+                {
                     Debug_printv("tx fail");
+                    break;
+                }
+                    
             }
             b = nb; // byte = next byte
             i++;
