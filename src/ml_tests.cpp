@@ -641,6 +641,12 @@ void testStrings() {
 
 }
 
+void detectLeaks() {
+    testHeader("Leak detector");
+    
+    auto testDir = Meat::New<MFile>("https://c64.meatloaf.cc/geckos-c64.d64");
+}
+
 void runTestsSuite() {
     // Delay waiting for wifi to connect
     while ( !fnWiFi.connected() )
@@ -650,7 +656,8 @@ void runTestsSuite() {
     fnSystem.delay_microseconds(pdMS_TO_TICKS(5000)); // 5sec after connect
 
     //commodoreServer();
-    seekTest();
+    //seekTest();
+    detectLeaks();
 
     // ====== Per FS dir, read and write region =======================================
 
