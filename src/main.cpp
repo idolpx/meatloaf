@@ -187,7 +187,7 @@ void main_setup()
     Debug_printf("Available heap: %u\nSetup complete @ %lu (%lums)\n", fnSystem.get_free_heap_size(), endms, endms - startms);
 #endif // DEBUG
 
-    //runTestsSuite();
+    runTestsSuite();
     //lfs_test();
     //la_test();
 #ifdef DEBUG_TIMING
