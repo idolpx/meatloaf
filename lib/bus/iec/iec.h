@@ -506,6 +506,12 @@ public:
     void remDevice(virtualDevice *pDevice);
 
     /**
+     * @brief Check if device is enabled
+     * @param deviceNumber The device ID to check
+     */
+    bool isDeviceEnabled ( const uint8_t device_id );
+
+    /**
      * @brief Return pointer to device given ID
      * @param device_id ID of device to return.
      * @return pointer to virtualDevice

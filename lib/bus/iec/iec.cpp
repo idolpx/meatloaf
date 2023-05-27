@@ -338,16 +338,24 @@ void systemBus::read_command()
             }
         }
 
-        //protocol->wait( TIMING_STABLE );
+        // Let bus stabalize
+        //Debug_printv("stabalize!");
+        protocol->wait ( TIMING_STABLE );
 
     } while ( IEC.flags & ATN_PULLED );
     //} while ( status( PIN_IEC_ATN ) == PULLED );
 
+    // // Is this command for us?
+    // if (!deviceById(data.device) || !deviceById(data.device)->device_active)
+    // {
+    //     //Debug_printf("Command not for us, ignoring.\n");
+    //     bus_state = BUS_IDLE;
+    // }
+
     // Is this command for us?
-    if (!deviceById(data.device) || !deviceById(data.device)->device_active)
+    if ( !isDeviceEnabled( data.device ) )
     {
-        //Debug_printf("Command not for us, ignoring.\n");
-        bus_state = BUS_IDLE;
+        this->bus_state = BUS_IDLE;
     }
 
 #ifdef PARALLEL_BUS
@@ -809,6 +817,7 @@ void systemBus::addDevice(virtualDevice *pDevice, int device_id)
 
     pDevice->_devnum = device_id;
     _daisyChain.push_front(pDevice);
+    enabledDevices |= 1UL << device_id;
 }
 
 void systemBus::remDevice(virtualDevice *pDevice)
@@ -820,7 +829,15 @@ void systemBus::remDevice(virtualDevice *pDevice)
     }
 
     _daisyChain.remove(pDevice);
+    enabledDevices &= ~ ( 1UL << pDevice->_devnum );
 }
+
+bool systemBus::isDeviceEnabled ( const uint8_t device_id )
+{
+    return ( enabledDevices & ( 1 << device_id ) );
+} // isDeviceEnabled
+
+
 
 void systemBus::changeDeviceId(virtualDevice *pDevice, int device_id)
 {

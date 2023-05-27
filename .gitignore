@@ -25,3 +25,4 @@ data/BUILD_IEC/config.ini
 data/BUILD_IEC/.sys/rom/*
 lib/bus/iec/iec.cpp
 \!archive/*
+dependencies.lock

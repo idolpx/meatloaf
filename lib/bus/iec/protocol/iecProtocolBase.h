@@ -33,7 +33,7 @@ namespace Protocol
          * @param pin IEC pin to watch
          * @param target_status break if target state reached
          * @param wait timeout period in microseconds (default is 1 millisecond)
-         * @param watch_atn also abort if ATN is asserted? (default is true)
+         * @param watch_atn also abort if ATN status changes (default is true)
          * @return elapsed time in microseconds, or -1 if ATN pulled, or -1 if timeout breached.
          * 
          */
@@ -43,7 +43,7 @@ namespace Protocol
          * @brief Wait for specified milliseconds, or until ATN status changes
          * @param wait # of milliseconds to wait
          * @param start The previously set start millisecond time.
-         * @param watch_atn also abort if ATN is asserted? (default is true)
+         * @param watch_atn also abort if ATN status changes? (default is true)
          */
         virtual bool wait(size_t wait, uint64_t start = 0, bool watch_atn = true);
     };

@@ -32,7 +32,7 @@ using namespace Protocol;
 // it might holdback for quite a while; there's no time limit.
 int16_t  CBMStandardSerial::receiveByte ()
 {
-    flags and_eq CLEAR_LOW;
+    flags &= CLEAR_LOW;
 
     // Sometimes the C64 pulls ATN but doesn't pull CLOCK right away
     if ( !wait ( 60 ) ) return -1;
@@ -41,7 +41,7 @@ int16_t  CBMStandardSerial::receiveByte ()
     if ( timeoutWait ( PIN_IEC_CLK_IN, RELEASED, FOREVER ) == TIMED_OUT )
     {
         Debug_printv ( "Wait for talker ready" );
-        flags or_eq ERROR;
+        flags |= ERROR;
         return -1; // return error because timeout
     }
 
@@ -57,7 +57,7 @@ int16_t  CBMStandardSerial::receiveByte ()
     if ( timeoutWait ( PIN_IEC_DATA_IN, RELEASED, FOREVER ) == TIMED_OUT )
     {
         Debug_printv ( "Wait for all other devices to release the data line" );
-        flags or_eq ERROR;
+        flags |= ERROR;
         return -1; // return error because timeout
     }
 
@@ -86,7 +86,7 @@ int16_t  CBMStandardSerial::receiveByte ()
 
         // Debug_printv("EOI!");
 
-        flags or_eq EOI_RECVD;
+        flags |= EOI_RECVD;
 
         // Acknowledge by pull down data more than 60us
         pull ( PIN_IEC_DATA_OUT );
@@ -98,7 +98,7 @@ int16_t  CBMStandardSerial::receiveByte ()
         if ( timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMING_EMPTY ) >= TIMING_EMPTY )
         {
             Debug_printv ( "empty stream signaled" );
-            flags or_eq EMPTY_STREAM;
+            flags |= EMPTY_STREAM;
             return -1; // return error because empty stream
         }
     }
@@ -182,10 +182,8 @@ int16_t CBMStandardSerial::receiveBits ()
             /* If there is a delay before the last bit, the controller uses JiffyDOS */
             if ( n == 7 && bit_time >= TIMING_JIFFY_DETECT )
             {
-                if ( status( PIN_IEC_ATN ) == PULLED && data < 0x60 )
+                if ( flags & ATN_PULLED && data < 0x60 )
                 {
-                    flags or_eq ATN_PULLED;
-
                     uint8_t device = data & 0x1F;
                     if ( enabledDevices & ( 1 << device ) )
                     {
@@ -193,27 +191,27 @@ int16_t CBMStandardSerial::receiveBits ()
                         pull(PIN_IEC_DATA_OUT);
                         delayMicroseconds(TIMING_JIFFY_ACK);
                         release(PIN_IEC_DATA_OUT);
-                        flags xor_eq JIFFY_ACTIVE;
+                        flags |= JIFFY_ACTIVE;
                     }
                 }
             }
             else if ( bit_time == TIMED_OUT )
             {
                 Debug_printv ( "wait for bit to be ready to read, bit_time[%d] n[%d]", bit_time, n );
-                flags or_eq ERROR;
+                flags |= ERROR;
                 return -1; // return error because timeout
             }
         } while ( bit_time >= TIMING_JIFFY_DETECT );
         
         // get bit
-        data or_eq ( status ( PIN_IEC_DATA_IN ) == RELEASED ? ( 1 << 7 ) : 0 );
+        data |= ( status ( PIN_IEC_DATA_IN ) == RELEASED ? ( 1 << 7 ) : 0 );
         //release ( PIN_IEC_SRQ );
 
         // wait for talker to finish sending bit
         if ( timeoutWait ( PIN_IEC_CLK_IN, PULLED ) == TIMED_OUT )
         {
             Debug_printv ( "wait for talker to finish sending bit n[%d]", n );
-            flags or_eq ERROR;
+            flags |= ERROR;
             return -1; // return error because timeout
         }
     }
@@ -235,7 +233,7 @@ int16_t CBMStandardSerial::receiveBits ()
 bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
 {
 //    flags = CLEAR;
-    flags and_eq CLEAR_LOW;
+    flags |= CLEAR_LOW;
 
     // // Sometimes the C64 doesn't release ATN right away
     // if ( !wait ( 200 ) ) return -1;
@@ -252,7 +250,7 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
     if ( timeoutWait ( PIN_IEC_DATA_IN, RELEASED, FOREVER ) == TIMED_OUT )
     {
         Debug_printv ( "Wait for listener to be ready" );
-        flags or_eq ERROR;
+        flags |= ERROR;
         return false; // return error because timeout
     }
 
@@ -277,8 +275,6 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
         // line  is  true  whether  or  not  we have gone through the EOI sequence; we're back to a common
         // transmission sequence.
 
-        //flags or_eq EOI_RECVD;
-
         // Signal eoi by waiting 200 us
         if ( !wait ( TIMING_Tye ) ) return false;
 
@@ -286,13 +282,13 @@ bool CBMStandardSerial::sendByte ( uint8_t data, bool signalEOI )
         if ( timeoutWait ( PIN_IEC_DATA_IN, PULLED ) == TIMED_OUT )
         {
             Debug_printv ( "EOI ACK: Listener didn't PULL DATA" );
-            flags or_eq ERROR;
+            flags |= ERROR;
             return false; // return error because timeout
         }
         if ( timeoutWait ( PIN_IEC_DATA_IN, RELEASED ) == TIMED_OUT )
         {
             Debug_printv ( "EOI ACK: Listener didn't RELEASE DATA" );
-            flags or_eq ERROR;
+            flags |= ERROR;
             return false; // return error because timeout
         }
 
@@ -549,7 +545,7 @@ int16_t CBMStandardSerial::timeoutWait ( uint8_t pin, bool target_status, size_t
         // Sample ATN and set flag to indicate SELECT or DATA mode
         atn_status = status ( PIN_IEC_ATN );
         if ( atn_status == PULLED)
-            flags or_eq ATN_PULLED;
+            flags |= ATN_PULLED;
     }
 
     start = current = 0;
@@ -573,7 +569,7 @@ int16_t CBMStandardSerial::timeoutWait ( uint8_t pin, bool target_status, size_t
         {
             bool atn_check = status ( PIN_IEC_ATN );
             if ( atn_check == PULLED)
-                flags or_eq ATN_PULLED;
+                flags |= ATN_PULLED;
 
             if ( atn_check != atn_status )
             {
@@ -609,7 +605,7 @@ bool CBMStandardSerial::wait ( size_t wait, uint64_t start )
     // Sample ATN and set flag to indicate SELECT or DATA mode
     bool atn_status = status ( PIN_IEC_ATN );
     if ( atn_status == PULLED)
-        flags or_eq ATN_PULLED;
+        flags |= ATN_PULLED;
 
     // pull ( PIN_IEC_SRQ );
     while ( elapsed < wait )
@@ -619,7 +615,7 @@ bool CBMStandardSerial::wait ( size_t wait, uint64_t start )
 
         bool atn_check = status ( PIN_IEC_ATN );
         if ( atn_check == PULLED)
-            flags or_eq ATN_PULLED;
+            flags |= ATN_PULLED;
 
         if ( atn_check != atn_status )
         {

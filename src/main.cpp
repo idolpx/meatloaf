@@ -156,6 +156,17 @@ void main_setup()
     Debug_print("Voice "); IEC.addDevice(new iecVoice(), 21);
     Debug_print("Meatloaf "); IEC.addDevice(new iecMeatloaf(), 30);
 
+    Serial.print("Virtual Device(s) Started: [ " ANSI_YELLOW_BOLD );
+    for (uint8_t i = 0; i < 31; i++)
+    {
+        if (IEC.isDeviceEnabled(i))
+        {
+            Serial.printf("%.02d ", i);
+        }
+    }
+    Serial.println( ANSI_RESET "]");
+    //IEC.enabled = true;
+
 #ifdef PARALLEL_BUS
     // Setup Parallel Bus
     PARALLEL.setup();
