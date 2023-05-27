@@ -3,6 +3,8 @@
 
 #include "printer.h"
 #include "../encrypt/crypt.h"
+
+#include "../../include/global_defines.h"
 #include "../../include/debug.h"
 
 #define MAX_HOST_SLOTS 8
@@ -17,7 +19,7 @@
 
 #define HSIO_INVALID_INDEX -1
 
-#define CONFIG_FILENAME "/config.ini"
+#define CONFIG_FILENAME SYSTEM_DIR "/config.ini"
 #define CONFIG_FILEBUFFSIZE 2048
 
 #define CONFIG_DEFAULT_SNTPSERVER "pool.ntp.org"

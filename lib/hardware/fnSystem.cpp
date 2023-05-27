@@ -33,7 +33,6 @@
 #include "fnFsSPIFFS.h"
 #include "fnWiFi.h"
 
-
 #ifdef BUILD_APPLE
 #define BUS_CLASS IWM
 #endif

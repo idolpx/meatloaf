@@ -156,7 +156,7 @@ void iecVoice::status()
     //bus_to_computer(status, sizeof(status), false);
 }
 
-device_state_t iecVoice::process(IECData *commanddata)
+device_state_t iecVoice::process()
 {
     Debug_printv( "payload[%d]", payload.c_str());
     
@@ -175,7 +175,7 @@ device_state_t iecVoice::process(IECData *commanddata)
         break;
     }
 
-    return DEVICE_IDLE;
+    return device_state;
 }
 
 #endif /* BUILD_IEC */

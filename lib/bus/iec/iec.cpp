@@ -129,6 +129,7 @@ void IRAM_ATTR systemBus::service()
         Debug_printf("IEC Reset! reset[%d]\r\n", pin_reset);
         data.init(); // Clear bus data
         bus_state = BUS_IDLE;
+        Debug_printv("bus init");
 
         // Reset virtual devices
         reset_all_our_devices();
@@ -181,21 +182,21 @@ void IRAM_ATTR systemBus::service()
             }
 
             // Queue control codes and command in specified device
-            // At the moment there is only the multi-drive device
-            device_state_t device_state = deviceById(data.device)->queue_command(&data);
-
-            // Process commands in devices
-            // At the moment there is only the multi-drive device
-            //Debug_printv( "deviceProcess" );
+            device_state_t device_state = deviceById(data.device)->queue_command(data);
 
             fnLedManager.set(eLed::LED_BUS, true);
 
             //Debug_printv("bus[%d] device[%d]", bus_state, device_state);
-
-            if (deviceById(data.device)->process(&data) < DEVICE_ACTIVE || device_state < DEVICE_ACTIVE)
+            device_state = deviceById(data.device)->process();
+            if ( device_state < DEVICE_ACTIVE )
             {
-                //Debug_printf("Device idle\n");
+                // for (auto devicep : _daisyChain)
+                // {
+                //     if ( devicep->device_state > DEVICE_IDLE )
+                //         devicep->process();
+                // }
                 data.init();
+                Debug_printv("bus init");
             }
 
             //Debug_printv("bus[%d] device[%d] flags[%d]", bus_state, device_state, flags);
@@ -206,10 +207,6 @@ void IRAM_ATTR systemBus::service()
             protocol = selectProtocol();
             flags = CLEAR;
         }
-
-        // Let bus stabalize
-        Debug_printv("stabalize!");
-        protocol->wait ( TIMING_STABLE, 0, false );
 
         if ( status ( PIN_IEC_ATN ) )
             bus_state = BUS_ACTIVE;
@@ -282,13 +279,13 @@ void systemBus::read_command()
                 data.device = c ^ IEC_LISTEN;
                 data.secondary = IEC_REOPEN; // Default secondary command
                 data.channel = CHANNEL_COMMAND;  // Default channel
+                data.payload = "";
                 bus_state = BUS_ACTIVE;
                 Debug_printf(" (20 LISTEN %.2d DEVICE)\r\n", data.device);
                 break;
 
             case IEC_UNLISTEN:
                 data.primary = IEC_UNLISTEN;
-                data.secondary = 0x00;
                 bus_state = BUS_PROCESS;
                 Debug_printf(" (3F UNLISTEN)\r\n");
                 break;
@@ -341,9 +338,10 @@ void systemBus::read_command()
             }
         }
 
-        protocol->wait( TIMING_STABLE );
+        //protocol->wait( TIMING_STABLE );
 
-    } while ( status( PIN_IEC_ATN ) == PULLED );
+    } while ( IEC.flags & ATN_PULLED );
+    //} while ( status( PIN_IEC_ATN ) == PULLED );
 
     // Is this command for us?
     if (!deviceById(data.device) || !deviceById(data.device)->device_active)
@@ -380,6 +378,7 @@ void systemBus::read_command()
         //Debug_printv("release lines");
         data.init();
         releaseLines();
+        Debug_printv("bus init");
     }
 
     //Debug_printv ( "code[%.2X] primary[%.2X] secondary[%.2X] bus[%d] flags[%d]", c, data.primary, data.secondary, bus_state, flags );
@@ -488,11 +487,9 @@ systemBus virtualDevice::get_bus()
     return IEC;
 }
 
-device_state_t virtualDevice::process(IECData *_commanddata)
+device_state_t virtualDevice::process()
 {
-    this->commanddata = _commanddata;
-
-    switch ((bus_command_t)commanddata->primary)
+    switch ((bus_command_t)commanddata.primary)
     {
     case bus_command_t::IEC_LISTEN:
         device_state = DEVICE_LISTEN;
@@ -507,10 +504,10 @@ device_state_t virtualDevice::process(IECData *_commanddata)
         break;
     }
 
-    switch ((bus_command_t)commanddata->secondary)
+    switch ((bus_command_t)commanddata.secondary)
     {
     case bus_command_t::IEC_OPEN:
-        payload = commanddata->payload;
+        payload = commanddata.payload;
         break;
     case bus_command_t::IEC_CLOSE:
         payload.clear();
@@ -524,7 +521,7 @@ device_state_t virtualDevice::process(IECData *_commanddata)
         }
         else if (device_state == DEVICE_LISTEN)
         {
-            payload = commanddata->payload;
+            payload = commanddata.payload;
         }
         break;
     default:
@@ -560,11 +557,11 @@ void virtualDevice::iec_talk_command_buffer_status()
 
 void virtualDevice::dumpData()
 {
-    Debug_printf("%9s: %02X\n", "Primary", commanddata->primary);
-    Debug_printf("%9s: %02u\n", "Device", commanddata->device);
-    Debug_printf("%9s: %02X\n", "Secondary", commanddata->secondary);
-    Debug_printf("%9s: %02u\n", "Channel", commanddata->channel);
-    Debug_printf("%9s: %s\n", "Payload", commanddata->payload.c_str());
+    Debug_printf("%9s: %02X\n", "Primary", commanddata.primary);
+    Debug_printf("%9s: %02u\n", "Device", commanddata.device);
+    Debug_printf("%9s: %02X\n", "Secondary", commanddata.secondary);
+    Debug_printf("%9s: %02u\n", "Channel", commanddata.channel);
+    Debug_printf("%9s: %s\n", "Payload", commanddata.payload.c_str());
 }
 
 void systemBus::assert_interrupt()

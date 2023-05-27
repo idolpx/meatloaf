@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "../../include/debug.h"
+#include "../../include/global_defines.h"
 #include "../../include/pinmap.h"
 
 #include "utils.h"
@@ -100,7 +101,6 @@ time_t _fssd_fatdatetime_to_epoch(WORD ftime, WORD fdate)
     #endif
 
     return mktime(&tmtime);
-
 }
 
 bool FileSystemSDFAT::is_dir(const char *path)
@@ -465,6 +465,7 @@ bool FileSystemSDFAT::start()
         _card_capacity = (uint64_t)sdcard_info->csd.capacity * sdcard_info->csd.sector_size;
     #ifdef DEBUG
         Debug_println("SD mounted.");
+
     /*
         Debug_printf("  manufacturer: %d, oem: 0x%x \"%c%c\"\n", sdcard_info->cid.mfg_id, sdcard_info->cid.oem_id,
             (char)(sdcard_info->cid.oem_id >> 8 & 0xFF),(char)(sdcard_info->cid.oem_id & 0xFF));
@@ -476,6 +477,9 @@ bool FileSystemSDFAT::start()
         Debug_printf("  partition size: %llu, used: %llu\n", total_bytes(), used_bytes());
     */
     #endif
+
+        // Create SYSTEM DIR if it doesn't exist
+        create_path( SYSTEM_DIR );
     }
     else 
     {

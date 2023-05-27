@@ -13,7 +13,7 @@
 
 class iecDrive : public virtualDevice
 {
-private:
+protected:
     //MediaType *_disk = nullptr;
 
     std::unique_ptr<MFile> _base;   // Always points to current directory/image
@@ -51,10 +51,9 @@ private:
 protected:
     /**
      * @brief Process command fanned out from bus
-     * @param _commanddata the passed in commanddata
      * @return new device state
      */
-    device_state_t process(IECData *commanddata) override;
+    device_state_t process() override;
 
     /**
      * @brief process command for channel 0 (load)

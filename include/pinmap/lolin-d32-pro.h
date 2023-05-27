@@ -2,7 +2,7 @@
 #ifndef PINMAP_LOLIN_D32_PRO_H
 #define PINMAP_LOLIN_D32_PRO_H
 
-#ifdef PINMAP_LOLIN_D32
+#ifdef PINMAP_LOLIN_D32_PRO
 
 /* SD Card */
 // pins 12-15 are used to interface with the JTAG debugger
@@ -40,14 +40,6 @@
 #else
 #define PIN_LED_BT 5 // LOLIN D32 PRO
 #endif
-
-/* LED Strip */
-#define NUM_LEDS 5
-#define DATA_PIN_1 27 
-#define DATA_PIN_2 14
-#define BRIGHTNESS  25
-#define LED_TYPE    WS2811
-#define COLOR_ORDER RGB
 
 /* Piezo Buzzer */
 #define PIN_PIEZO 4
@@ -108,5 +100,5 @@
 #define GPIOX_SPEED       400   // PCF8575 - 400Khz
 //#define GPIOX_SPEED       1000  // PCA9673 - 1000Khz / 1Mhz
 
-#endif // PINMAP_LOLIN_D32
+#endif // PINMAP_LOLIN_D32_PRO
 #endif // PINMAP_LOLIN_D32_PRO_H

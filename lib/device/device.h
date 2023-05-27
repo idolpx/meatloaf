@@ -42,7 +42,7 @@
 # include "iec/drive.h"
 # include "iec/printer.h"
 # include "iec/printerlist.h"
-//# include "iec/fuji.h"
+# include "iec/meatloaf.h"
 //# include "iec/modem.h"
 # include "iec/network.h"
 # include "iec/voice.h"

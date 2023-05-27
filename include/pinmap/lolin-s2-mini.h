@@ -41,13 +41,6 @@
 #define PIN_LED_BT 5 // LOLIN D32 PRO
 #endif
 
-/* LED Strip */
-#define NUM_LEDS 5
-#define DATA_PIN_1 27 
-#define DATA_PIN_2 14
-#define BRIGHTNESS  25
-#define LED_TYPE    WS2811
-#define COLOR_ORDER RGB
 
 /* Audio Output */
 #define PIN_DAC1 25 // samlib.h
