@@ -7,7 +7,7 @@
 #include "esp_littlefs.h"
 
 #include "../../include/debug.h"
-
+#include "../../include/global_defines.h"
 
 #define LITTLEFS_MAXPATH 512
 
@@ -74,6 +74,62 @@ uint16_t FileSystemLittleFS::dir_tell()
 bool FileSystemLittleFS::dir_seek(uint16_t)
 {
     return false;
+}
+
+
+/* Checks that path exists and creates if it doesn't including any parent directories
+   Each directory along the path is limited to 64 characters
+   An initial "/" is optional, but you should not include an ending "/"
+
+   Examples:
+   "abc"
+   "/abc"
+   "/abc/def"
+   "abc/def/ghi"
+*/
+bool FileSystemLittleFS::create_path(const char *fullpath)
+{
+    char segment[64];
+
+    const char *end = fullpath;
+    bool done = false;
+
+    while (!done)
+    {
+        bool found = false;
+
+        if(*end == '\0')
+        {
+            done = true;
+            // Only indicate we found a segment if we're not still pointing to the start
+            if(end != fullpath)
+                found = true;
+        } else if(*end == '/')
+        {
+            // Only indicate we found a segment if this isn't a starting '/'
+            if(end != fullpath)
+                found = true;
+        }
+
+        if(found)
+        {
+            /* We copy the segment from the fullpath using a length of (end - fullpath) + 1
+               This allows for the ending terminator but not for the trailing '/'
+               If we're done (at the end of fullpath), we assume there's no  trailing '/' so the length
+               is (end - fullpath) + 2
+            */
+            strlcpy(segment, fullpath, end - fullpath + (done ? 2 : 1));
+            Debug_printf("Checking/creating directory: \"%s\"\n", segment);
+            if(0 != mkdir(segment))
+            {
+                Debug_printf("FAILED errno=%d\n", errno);
+            }
+        }
+
+        end++;
+    }
+
+    return true;
 }
 
 FILE * FileSystemLittleFS::file_open(const char* path, const char* mode)
@@ -169,6 +225,9 @@ bool FileSystemLittleFS::start()
         Debug_printv("  partition size: %u, used: %u, free: %u\n", total, used, total-used);
         */
     #endif
+
+        // Create SYSTEM DIR if it doesn't exist
+        create_path( SYSTEM_DIR );
     }
 
     return _started;

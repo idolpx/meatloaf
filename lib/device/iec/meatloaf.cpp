@@ -37,17 +37,17 @@ iecMeatloaf::~iecMeatloaf()
 }
 
 
-device_state_t iecMeatloaf::process(IECData *id)
+device_state_t iecMeatloaf::process()
 {
-    virtualDevice::process(id);
+    virtualDevice::process();
 
-    if (commanddata->channel != 15)
+    if (commanddata.channel != 15)
     {
         Debug_printf("Meatloaf device only accepts on channel 15. Sending NOTFOUND.\n");
         device_state = DEVICE_ERROR;
         IEC.senderTimeout();
     }
-    else if (commanddata->primary != IEC_UNLISTEN)
+    else if (commanddata.primary != IEC_UNLISTEN)
         return device_state;
 
     if (payload[0] > 0x7F)
@@ -622,8 +622,8 @@ void iecMeatloaf::write_app_key()
 
     Debug_printf("Writing appkey to \"%s\"\n", filename);
 
-    // Make sure we have a "/FujiNet" directory, since that's where we're putting these files
-    fnSDFAT.create_path("/FujiNet");
+    // Make sure we have a "/.app" directory, since that's where we're putting these files
+    fnSDFAT.create_path("/.app");
 
     FILE *fOut = fnSDFAT.file_open(filename, "w");
     if (fOut == nullptr)

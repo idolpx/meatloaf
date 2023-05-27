@@ -96,7 +96,7 @@ typedef enum
 typedef enum
 {
     DEVICE_ERROR = -1,
-    DEVICE_IDLE = 0, // Ready and waiting
+    DEVICE_IDLE = 0,    // Ready and waiting
     DEVICE_ACTIVE = 1,
     DEVICE_LISTEN = 2,  // A command is recieved and data is coming to us
     DEVICE_TALK = 3,    // A command is recieved and we must talk now
@@ -193,7 +193,7 @@ protected:
     /**
      * @brief pointer to the current command data
      */
-    IECData *commanddata;
+    IECData commanddata;
 
     /**
      * @brief current device state.
@@ -235,11 +235,13 @@ protected:
     /**
      * @brief Get device ready to handle next phase of command.
      */
-    device_state_t queue_command(IECData *data)
+    device_state_t queue_command(IECData data)
     {
-        if (data->primary == IEC_LISTEN)
+        commanddata = data;
+
+        if (commanddata.primary == IEC_LISTEN)
             device_state = DEVICE_LISTEN;
-        else if (data->primary == IEC_TALK)
+        else if (commanddata.primary == IEC_TALK)
             device_state = DEVICE_TALK;
 
         return device_state;
@@ -248,10 +250,9 @@ protected:
     /**
      * @brief All IEC devices repeatedly call this routine to fan out to other methods for each command.
      *        This is typcially implemented as a switch() statement.
-     * @param commanddata The command data structure to pass
      * @return new device state.
      */
-    virtual device_state_t process(IECData *commanddata);
+    virtual device_state_t process();
 
     /**
      * @brief poll whether interrupt should be wiggled

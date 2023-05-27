@@ -97,7 +97,7 @@ protected:
     // Commodore specific
     void local_ip();
 
-    device_state_t process(IECData *commanddata) override;
+    device_state_t process() override;
 
     void shutdown() override;
 

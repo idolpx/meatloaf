@@ -26,10 +26,9 @@ class iecCpm : public virtualDevice
 
     /**
      * @brief Process command fanned out from bus
-     * @param _commanddata the passed in commanddata
      * @return new device state
      */
-    device_state_t process(IECData *_commanddata);
+    device_state_t process();
 
     protected:
 

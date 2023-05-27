@@ -39,7 +39,7 @@ esp_err_t get_handler(httpd_req_t *req)
         uri = "/index.html";
     }
 
-    auto file = MFSOwner::File( "/www" + uri );
+    auto file = MFSOwner::File( "/.www" + uri );
     auto istream = file->meatStream();
     if ( istream != nullptr )
     {

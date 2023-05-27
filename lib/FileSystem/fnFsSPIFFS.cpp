@@ -45,7 +45,6 @@ fsdir_entry * FileSystemSPIFFS::dir_read()
     if(d != nullptr)
     {
         strlcpy(_direntry.filename, d->d_name, sizeof(_direntry.filename));
-        Debug_printv("entry[%s]", _direntry.filename);
 
         _direntry.isDir = (d->d_type & DT_DIR) ? true : false;
 

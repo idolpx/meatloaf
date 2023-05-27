@@ -45,14 +45,6 @@ bool initFailed = false;
 
 /**************************/
 
-// fnSystem is declared and defined in fnSystem.h/cpp
-// fnBtManager is declared and defined in fnBluetooth.h/cpp
-// fnLedManager is declared and defined in led.h/cpp
-// fnKeyManager is declared and defined in keys.h/cpp
-// fnHTTPD is declared and defineid in HttpService.h/cpp
-
-// sioFuji theFuji; // moved to fuji.h/.cpp
-
 
 void main_shutdown_handler()
 {
@@ -164,9 +156,6 @@ void main_setup()
     Debug_print("Voice "); IEC.addDevice(new iecVoice(), 21);
     Debug_print("Meatloaf "); IEC.addDevice(new iecMeatloaf(), 30);
 
-    // IEC.enabledDevices = DEVICE_MASK;
-    // IEC.enableDevice(30);
-
 #ifdef PARALLEL_BUS
     // Setup Parallel Bus
     PARALLEL.setup();
@@ -231,9 +220,6 @@ extern "C"
         // cppcheck-suppress "unusedFunction"
         // Call our setup routine
         main_setup();
-
-        // xTaskCreatePinnedToCore(fn_console_loop, "fnConsole", 
-        //                         4096, nullptr, 1, nullptr, 0);
 
         // Sit here twiddling our thumbs
         while (true)

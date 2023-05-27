@@ -74,7 +74,7 @@ class WebDAVIStream: public MStream {
 
 public:
     WebDAVIStream(std::string path) {
-        m_http.set_header("user-agent", USER_AGENT);
+        //m_http.set_header("user-agent", USER_AGENT);
         //m_http.setUserAgent(USER_AGENT);
         //m_http.setTimeout(10000);
         //m_http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
@@ -117,7 +117,7 @@ class WebDAVOStream: public MStream {
 public:
     // MStream methods
     WebDAVOStream(std::string path) {
-        m_http.set_header("user-agent", USER_AGENT);
+        //m_http.set_header("user-agent", USER_AGENT);
         //m_http.setTimeout(10000);
         //m_http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
         //m_http.setRedirectLimit(10);

@@ -218,10 +218,16 @@ MFile* FlashFile::getNextFileInDir()
 
     // Debug_printv("before readdir(), dir not null:%d", dir != nullptr);
     struct dirent* dirent = NULL;
-    if((dirent = readdir( dir )) != NULL)
+    do
     {
-        // Debug_printv("path[%s] name[%s]", this->path, dirent->d_name);
-        return new FlashFile(this->path + ((this->path == "/") ? "" : "/") + std::string(dirent->d_name));
+        dirent = readdir( dir );
+    } while ( dirent != NULL && mstr::startsWith(dirent->d_name, ".") ); // Skip hidden files
+    
+    if ( dirent != NULL )
+    {
+        //Debug_printv("path[%s] name[%s]", this->path.c_str(), dirent->d_name);
+        std::string entry_name = this->path + ((this->path == "/") ? "" : "/") + std::string(dirent->d_name);
+        return new FlashFile( entry_name );
     }
     else
     {
@@ -259,20 +265,19 @@ bool FlashFile::seekEntry( std::string filename )
             if ( dirent->d_type != DT_DIR ) // Only want to match files not directories
             {
                 if ( filename == entryFilename )
-            {
-                closedir( d );
-                return true;
-            }
+                {
+                    closedir( d );
+                    return true;
+                }
                 else if ( filename == "*" || mstr::compare(filename, entryFilename) )
-            {
-                // Set filename to this filename
-                Debug_printv( "Found! file[%s] -> entry[%s]", filename.c_str(), entryFilename.c_str() );
-                parseUrl(apath + "/" + std::string(dirent->d_name));
-                closedir( d );
-                return true;
+                {
+                    // Set filename to this filename
+                    Debug_printv( "Found! file[%s] -> entry[%s]", filename.c_str(), entryFilename.c_str() );
+                    parseUrl(apath + "/" + std::string(dirent->d_name));
+                    closedir( d );
+                    return true;
+                }
             }
-          }
-
         }
 
         Debug_printv( "Not Found! file[%s]", filename.c_str() );

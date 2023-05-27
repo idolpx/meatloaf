@@ -51,10 +51,9 @@ protected:
 protected:
     /**
      * @brief Process command fanned out from bus
-     * @param _commanddata the passed in commanddata
      * @return new device state
      */
-    device_state_t process(IECData *commanddata) override;
+    device_state_t process() override;
 
     /**
      * @brief process command for channel 0 (load)
