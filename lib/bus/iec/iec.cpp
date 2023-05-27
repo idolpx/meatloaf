@@ -208,10 +208,6 @@ void IRAM_ATTR systemBus::service()
             flags = CLEAR;
         }
 
-        // Let bus stabalize
-        Debug_printv("stabalize!");
-        protocol->wait ( TIMING_STABLE, 0, false );
-
         if ( status ( PIN_IEC_ATN ) )
             bus_state = BUS_ACTIVE;
 
@@ -342,9 +338,10 @@ void systemBus::read_command()
             }
         }
 
-        protocol->wait( TIMING_STABLE );
+        //protocol->wait( TIMING_STABLE );
 
-    } while ( status( PIN_IEC_ATN ) == PULLED );
+    } while ( IEC.flags & ATN_PULLED );
+    //} while ( status( PIN_IEC_ATN ) == PULLED );
 
     // Is this command for us?
     if (!deviceById(data.device) || !deviceById(data.device)->device_active)
