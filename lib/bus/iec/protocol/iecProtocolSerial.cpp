@@ -83,32 +83,25 @@ bool IecProtocolSerial::sendByte(uint8_t data, bool eoi)
             Debug_printv ( "EOI ACK: Listener didn't RELEASE DATA" );
             return false; // return error because timeout
         }
-
-        // Ok... let's start over and say we're ready
-        //IEC.release ( PIN_IEC_CLK_OUT );
-
-        // Wait for listener to be ready
-        // STEP 2: READY FOR DATA
-        // When  the  listener  is  ready  to  listen,  it  releases  the  Data
-        // line  to  false.    Suppose  there  is  more  than one listener.  The Data line will go false
-        // only when all listeners have RELEASED it - in other words, when  all  listeners  are  ready
-        // to  accept  data.
-        // if ( timeoutWait ( PIN_IEC_DATA_IN, RELEASED, FOREVER ) == TIMED_OUT )
-        // {
-        //     //Debug_printv ( "Wait for listener to be ready" );
-        //     return false; // return error because of ATN or timeout
-        // }
     }
 
     // delay before byte
     IEC.pull ( PIN_IEC_CLK_OUT );
     if ( !wait ( TIMING_Tne ) ) return false;
 
-    // if ( timeoutWait ( PIN_IEC_DATA_IN, PULLED ) == TIMED_OUT )
-    // {
-    //     Debug_printv ( "Listener didn't PULL DATA" );
-    //     return false; // return error because timeout
-    // }
+    // Wait for listener to be ready
+    // STEP 2: READY FOR DATA
+    // When  the  listener  is  ready  to  listen,  it  releases  the  Data
+    // line  to  false.    Suppose  there  is  more  than one listener.  The Data line will go false
+    // only when all listeners have RELEASED it - in other words, when  all  listeners  are  ready
+    // to  accept  data.
+    //IEC.pull ( PIN_IEC_SRQ );
+    if ( timeoutWait ( PIN_IEC_DATA_IN, RELEASED, FOREVER ) == TIMED_OUT )
+    {
+        //Debug_printv ( "Wait for listener to be ready" );
+        return false; // return error because of ATN or timeout
+    }
+    //IEC.release ( PIN_IEC_SRQ );
 
     // STEP 3: SENDING THE BITS
     IEC.pull ( PIN_IEC_SRQ );
@@ -131,11 +124,7 @@ bool IecProtocolSerial::sendByte(uint8_t data, bool eoi)
         Debug_printv ( "Wait for listener to acknowledge byte received (pull data)" );
         return false; // return error because timeout
     }
-    if ( timeoutWait ( PIN_IEC_DATA_IN, RELEASED, TIMEOUT_Tf ) >= TIMEOUT_Tf )
-    {
-        Debug_printv ( "Wait for listener to acknowledge byte received (pull data)" );
-        return false; // return error because timeout
-    }
+
     //IEC.release ( PIN_IEC_SRQ );
 
     // STEP 5: START OVER
@@ -159,12 +148,16 @@ bool IecProtocolSerial::sendByte(uint8_t data, bool eoi)
     //     wait ( TIMING_Tbb );
     // }
 
+    //wait ( TIMING_Tbb );
+    // if ( timeoutWait ( PIN_IEC_DATA_IN, RELEASED, TIMEOUT_Tf ) >= TIMEOUT_Tf )
+    // {
+    //     Debug_printv ( "Wait for listener to acknowledge byte received (pull data)" );
+    //     return false; // return error because timeout
+    // }
+    //IEC.release ( PIN_IEC_SRQ );
+
     if ( eoi )
         IEC.release ( PIN_IEC_CLK_OUT );
-
-    wait ( TIMING_Tbb );
-
-    //IEC.release ( PIN_IEC_SRQ );
 
     return true;
 }
@@ -200,15 +193,16 @@ bool IecProtocolSerial::sendBits ( uint8_t data )
     // Send bits
     for ( uint8_t n = 0; n < 8; n++ )
     {
-        // if ( IEC.bus_state < BUS_ACTIVE )
-        //     return false;
+        // Check to see if DATA is being pulled
+        if ( IEC.status( PIN_IEC_DATA_IN ) == PULLED )
+            return false; // If it is we exit
 
-        if ( !wait ( TIMING_Ts1 ) ) return false; // 57us 
+        if ( !wait ( 45 ) ) return false; // 57us 
 
         // set bit
         ( data & 1 ) ? IEC.release ( PIN_IEC_DATA_OUT ) : IEC.pull ( PIN_IEC_DATA_OUT );
         data >>= 1; // shift to next bit
-        if ( !wait ( TIMING_Ts2 ) ) return false; // 28us
+        if ( !wait ( 22 ) ) return false; // 28us
 
         // tell listener bit is ready to read
         IEC.release ( PIN_IEC_CLK_OUT );
@@ -217,14 +211,15 @@ bool IecProtocolSerial::sendBits ( uint8_t data )
         // tell listner to wait
         // we control both CLOCK & DATA now
         IEC.pull ( PIN_IEC_CLK_OUT );
-        if ( !wait ( TIMING_Ts2 ) ) return false; // 28us
+        //if ( !wait ( 22 ) ) return false; // 28us
 
-        // Release data line after bit sent
-        IEC.release ( PIN_IEC_DATA_OUT );
-        //if ( !wait ( TIMING_Ts1 ) ) return false; // 57us 
+        // // Release data line after bit sent
+        // IEC.release ( PIN_IEC_DATA_OUT );
+        // if ( !wait ( 14 ) ) return false; // 57us 
     }
 
-    // Release data line after bit sent
+    // Release data line after byte sent
+    IEC.release ( PIN_IEC_DATA_OUT );
 #ifndef IEC_SPLIT_LINES
     IEC.set_pin_mode ( PIN_IEC_DATA_IN, gpio_mode_t::GPIO_MODE_INPUT ); // Set DATA IN back to input
 #endif
