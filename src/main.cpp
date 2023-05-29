@@ -22,8 +22,6 @@
 #include "fnSystem.h"
 #include "fnConfig.h"
 #include "fnWiFi.h"
-#include "webdav2.h"
-
 
 #ifdef FLASH_SPIFFS
 #include "fnFsSPIFFS.h"
@@ -134,9 +132,6 @@ void main_setup()
         Config.get_wifi_passphrase().c_str()
 #endif
     );
-
-    // Start WebDAV Server
-    http_server_start();
 
     // Setup IEC Bus
     IEC.setup();

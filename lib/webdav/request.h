@@ -3,16 +3,27 @@
 #include <string>
 #include <esp_http_server.h>
 
-#include "request.h"
-
 namespace WebDav {
 
-class RequestEspIdf : public Request {
+class Request {
 public:
-        RequestEspIdf(httpd_req_t *req, std::string path) :
-                Request(path), req(req) {}
+        enum Depth {
+                DEPTH_0 = 0,
+                DEPTH_1 = 1,
+                DEPTH_INFINITY = 2,
+        };
 
-        std::string getHeader(std::string name) override {
+        Request(std::string path) : path(path), depth(DEPTH_INFINITY), overwrite(true) {}
+
+        bool parseRequest();
+        std::string getDestination();
+
+        std::string getPath() { return path; }
+        enum Depth getDepth() { return depth; }
+        bool getOverwrite() { return overwrite; }
+
+        // Functions that depend on the underlying web server implementation
+        std::string getHeader(std::string name) {
                 size_t len = httpd_req_get_hdr_value_len(req, name.c_str());
                 if (len <= 0)
                         return "";
@@ -24,14 +35,14 @@ public:
                 return s;
         }
 
-        size_t getContentLength() override {
+        size_t getContentLength() {
                 if (!req)
                         return 0;
 
                 return req->content_len;
         }
 
-        int readBody(char *buf, int len) override {
+        int readBody(char *buf, int len) {
                 int ret = httpd_req_recv(req, buf, len);
                 if (ret == HTTPD_SOCK_ERR_TIMEOUT)
                         /* Retry receiving if timeout occurred */
@@ -42,6 +53,18 @@ public:
 
 private:
         httpd_req_t *req;
+
+protected:
+        std::string path;
+        enum Depth depth;
+        bool overwrite;
+};
+
+class RequestEspIdf : public Request {
+public:
+
+
+
 };
 
 } // namespace

@@ -16,7 +16,8 @@
 //#include "fuji.h"
 #include "fnSystem.h"
 #include "fnConfig.h"
-//#include "httpService.h"
+
+#include "webdav.h"
 #include "led.h"
 
 
@@ -483,6 +484,9 @@ void WiFiManager::_wifi_event_handler(void *arg, esp_event_base_t event_base,
             fnLedManager.set(eLed::LED_WIFI, true);
             fnSystem.Net.start_sntp_client();
             //fnHTTPD.start();
+
+            http_server_start();
+
 // #ifdef BUILD_APPLE
 //             IWM.startup_hack();
 // #endif
@@ -546,4 +550,12 @@ void WiFiManager::_wifi_event_handler(void *arg, esp_event_base_t event_base,
             break;
         }
     }
+}
+
+int32_t WiFiManager::localIP()
+{
+    std::string result;
+    esp_netif_ip_info_t ip_info;
+    esp_err_t e = esp_netif_get_ip_info(get_adapter_handle(), &ip_info);
+    return ip_info.ip.addr;
 }
