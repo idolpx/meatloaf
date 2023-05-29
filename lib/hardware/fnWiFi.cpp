@@ -487,13 +487,6 @@ void WiFiManager::_wifi_event_handler(void *arg, esp_event_base_t event_base,
 
             http_server_start();
 
-// #ifdef BUILD_APPLE
-//             IWM.startup_hack();
-// #endif
-#ifdef BUILD_ATARI // temporary
-            if (Config.get_general_config_enabled() == false)
-                theFuji.mount_all();
-#endif /* BUILD_ATARI */
             mdns_init();
             mdns_hostname_set(Config.get_general_devicename().c_str());
             mdns_service_add(NULL, "_http", "_tcp", 80, NULL, 0);

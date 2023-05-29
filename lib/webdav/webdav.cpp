@@ -229,8 +229,8 @@ void http_server_start(void)
         Serial.println( ANSI_GREEN_BOLD "WWW/WebDAV Server Started!" ANSI_RESET );
 
         // Start SSDP Service
-        SSDPDevice.start();
-        Serial.println( ANSI_GREEN_BOLD "SSDP Service Started!" ANSI_RESET );
+        // SSDPDevice.start();
+        // Serial.println( ANSI_GREEN_BOLD "SSDP Service Started!" ANSI_RESET );
     }
     else
     {
@@ -872,7 +872,7 @@ void send_file(httpd_req_t *req, const char *filename)
         set_file_content_type(req, fpath.c_str());
         // Set the expected length of the content
         char hdrval[10];
-        snprintf(hdrval, 10, "%d", file->size());
+        snprintf(hdrval, 10, "%d", istream->size());
         httpd_resp_set_hdr(req, "Content-Length", hdrval);
 
         // Send the file content out in chunks
@@ -906,10 +906,12 @@ void send_file_parsed(httpd_req_t *req, const char *filename)
     }
     else
     {
+        Debug_printv("filename[%s]", filename);
+
         // Set the response content type
         set_file_content_type(req, filename);
         // We're going to load the whole thing into memory, so watch out for big files!
-        size_t sz = file->size() + 1;
+        size_t sz = istream->size() + 1;
         char *buf = (char *)calloc(sz, 1);
         if (buf == NULL)
         {
