@@ -722,11 +722,14 @@ const std::string substitute_tag(const std::string &tag)
 
 bool is_parsable(const char *extension)
 {
+    Debug_printv("extension[%s]", extension);
     if (extension != NULL)
     {
         if (strncmp(extension, "html", 4) == 0)
             return true;
         if (strncmp(extension, "xml", 3) == 0)
+            return true;
+        if (strncmp(extension, "json", 4) == 0)
             return true;
     }
     return false;
@@ -738,6 +741,7 @@ bool is_parsable(const char *extension)
 // Returns string with subtitutions in place
 std::string parse_contents(const std::string &contents)
 {
+    Debug_printv("parsing");
     std::stringstream ss;
     uint pos = 0, x, y;
     do
@@ -797,17 +801,20 @@ const char *find_mimetype_str(const char *extension)
 {
     static std::map<std::string, std::string> mime_map {
         {"css", "text/css"},
-        {"png", "image/png"},
-        {"jpg", "image/jpeg"},
-        {"gif", "image/gif"},
-        {"svg", "image/svg+xml"},
-        {"pdf", "application/pdf"},
-        {"ico", "image/x-icon"},
         {"txt", "text/plain"},
-        {"bin", "application/octet-stream"},
-        {"js", "text/javascript"},
+        {"js",  "text/javascript"},
+        {"xml", "text/xml; charset=\"utf-8\""},
+
+        {"gif", "image/gif"},
+        {"ico", "image/x-icon"},
+        {"jpg", "image/jpeg"},
+        {"png", "image/png"},
+        {"svg", "image/svg+xml"},
+
         {"atascii", "application/octet-stream"},
-        {"xml", "text/xml; charset=\"utf-8\""}
+        {"bin",     "application/octet-stream"},
+        {"json",    "application/json"},
+        {"pdf",     "application/pdf"}
     };
 
     if (extension != NULL)
@@ -858,16 +865,17 @@ void send_file(httpd_req_t *req, const char *filename)
     if (is_parsable(get_extension(filename)))
         return send_file_parsed(req, fpath.c_str());
 
-
+    Debug_printv("filename[%s]", filename);
     auto file = MFSOwner::File( fpath );
-    auto istream = file->meatStream();
-    if (istream == nullptr)
+    if (!file->exists())
     {
         Debug_printf("Failed to open file for sending: '%s'\n", fpath.c_str());
         return_http_error(req, www_err_fileopen);
     }
     else
     {
+        auto istream = file->meatStream();
+
         // Set the response content type
         set_file_content_type(req, fpath.c_str());
         // Set the expected length of the content
@@ -892,21 +900,19 @@ void send_file(httpd_req_t *req, const char *filename)
 void send_file_parsed(httpd_req_t *req, const char *filename)
 {
     // Note that we don't add FNWS_FILE_ROOT as it should've been done in send_file()
-    if ( std::string(filename).find("device.xml") < 0 )
-        Debug_printf("Opening file for parsing: '%s'\n", filename);
 
     www_err err = www_err_noerrr;
 
+    Debug_printv("filename[%s]", filename);
     auto file = MFSOwner::File( filename );
-    auto istream = file->meatStream();
-    if (istream == nullptr)
+    if (!file->exists())
     {
         Debug_println("Failed to open file for parsing");
         err = www_err_fileopen;
     }
     else
     {
-        Debug_printv("filename[%s]", filename);
+        auto istream = file->meatStream();
 
         // Set the response content type
         set_file_content_type(req, filename);

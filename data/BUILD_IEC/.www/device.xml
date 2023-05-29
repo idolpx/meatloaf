@@ -14,6 +14,6 @@
         <modelNumber>ML-CBM-1.6.1</modelNumber>
         <modelURL>https://github.com/idolpx/meatloaf</modelURL>
         <serialNumber>MLCBM3C214F90</serialNumber>
-        <presentationURL>http://{{DEVICE_IP}}</presentationURL>
+        <presentationURL>http://{{DEVICE_IPADDRESS}}</presentationURL>
     </device> 
 </root>
