@@ -19,10 +19,7 @@
 #include "fnSystem.h"
 #include "fnConfig.h"
 #include "fnWiFi.h"
-
-#ifdef FLASH_SPIFFS
-#include "esp_spiffs.h"
-#endif
+#include "fnFsSPIFFS.h"
 
 #include "template.h"
 
