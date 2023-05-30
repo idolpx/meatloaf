@@ -1,5 +1,5 @@
 
-#include "SSDPDevice.h"
+#include "ssdp.h"
 
 #include "lwip/igmp.h"
 

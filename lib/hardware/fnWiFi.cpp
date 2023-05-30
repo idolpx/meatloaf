@@ -18,6 +18,7 @@
 #include "fnConfig.h"
 
 #include "webdav.h"
+#include "ssdp.h"
 #include "led.h"
 
 
@@ -483,13 +484,20 @@ void WiFiManager::_wifi_event_handler(void *arg, esp_event_base_t event_base,
             pFnWiFi->_connected = true;
             fnLedManager.set(eLed::LED_WIFI, true);
             fnSystem.Net.start_sntp_client();
-            //fnHTTPD.start();
 
+            // Start Web / WebDAV Server
             http_server_start();
 
+            // Start mDNS Service
             mdns_init();
             mdns_hostname_set(Config.get_general_devicename().c_str());
             mdns_service_add(NULL, "_http", "_tcp", 80, NULL, 0);
+            Serial.println( ANSI_GREEN_BOLD "mDNS Service Started!" ANSI_RESET );
+
+            // Start SSDP Service
+            // SSDPDevice.start();
+            // Serial.println( ANSI_GREEN_BOLD "SSDP Service Started!" ANSI_RESET );
+
             break;
         case IP_EVENT_STA_LOST_IP:
             Debug_println("IP_EVENT_STA_LOST_IP");

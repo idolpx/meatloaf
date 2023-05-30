@@ -20,7 +20,7 @@
 #include "fnWiFi.h"
 #include "fnFsSPIFFS.h"
 
-#include "SSDPDevice.h"
+#include "ssdp.h"
 
 #define MIN(a,b) \
    ({ __typeof__ (a) _a = (a); \
@@ -32,7 +32,6 @@
        __typeof__ (b) _b = (b); \
      _a > _b ? _a : _b; })
 
-static const char *TAG = "webdav";
 
 
 /* Our URI handler function to be called during GET /uri request */
@@ -88,14 +87,14 @@ esp_err_t post_handler(httpd_req_t *req)
 
 esp_err_t webdav_handler(httpd_req_t *httpd_req) {
         WebDav::Server *server = (WebDav::Server *) httpd_req->user_ctx;
-        WebDav::Request req(httpd_req->uri);
-        WebDav::Response resp;
+        WebDav::Request req(httpd_req);
+        WebDav::Response resp(httpd_req);
         int ret;
 
         Debug_printv("url[%s]", httpd_req->uri);
 
         if (!req.parseRequest()) {
-                resp.setStatus(400, "Invalid request");
+                resp.setStatus(400);
                 resp.flushHeaders();
                 resp.closeBody();
                 return ESP_OK;
@@ -105,7 +104,7 @@ esp_err_t webdav_handler(httpd_req_t *httpd_req) {
         httpd_resp_set_hdr(httpd_req, "Access-Control-Allow-Headers", "*");
         httpd_resp_set_hdr(httpd_req, "Access-Control-Allow-Methods", "*");
 
-        ESP_LOGI(TAG, "%s: >%s<", http_method_str((enum http_method) httpd_req->method), httpd_req->uri);
+        Debug_printv("%s[%s]", http_method_str((enum http_method) httpd_req->method), httpd_req->uri);
 
         switch (httpd_req->method) {
                 case HTTP_COPY:
@@ -149,7 +148,7 @@ esp_err_t webdav_handler(httpd_req_t *httpd_req) {
                         break;
         }
 
-        resp.setStatus(ret, "");
+        resp.setStatus(ret);
         resp.flushHeaders();
         resp.closeBody();
 
@@ -227,10 +226,6 @@ void http_server_start(void)
         httpd_register_uri_handler(server, &uri_post);
 
         Serial.println( ANSI_GREEN_BOLD "WWW/WebDAV Server Started!" ANSI_RESET );
-
-        // Start SSDP Service
-        // SSDPDevice.start();
-        // Serial.println( ANSI_GREEN_BOLD "SSDP Service Started!" ANSI_RESET );
     }
     else
     {
