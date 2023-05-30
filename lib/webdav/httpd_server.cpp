@@ -10,30 +10,48 @@
 #include "esp_log.h"
 #include <esp_http_server.h>
 #include <esp_log.h>
+#include <sys/stat.h>
 
 #include <webdav_server.h>
 #include <request.h>
 #include <response.h>
 
-
 #include "fnSystem.h"
 #include "fnConfig.h"
 #include "fnWiFi.h"
-#include "fnFsSPIFFS.h"
+
+#ifdef FLASH_SPIFFS
+#include "esp_spiffs.h"
+#endif
 
 #include "template.h"
 
-#define MIN(a,b) \
-   ({ __typeof__ (a) _a = (a); \
+#define MIN(a, b) \
+    ({ __typeof__ (a) _a = (a); \
        __typeof__ (b) _b = (b); \
      _a < _b ? _a : _b; })
 
-#define MAX(a,b) \
-   ({ __typeof__ (a) _a = (a); \
+#define MAX(a, b) \
+    ({ __typeof__ (a) _a = (a); \
        __typeof__ (b) _b = (b); \
      _a > _b ? _a : _b; })
 
 cHttpdServer oHttpdServer;
+
+long file_size(FILE *fd)
+{
+    struct stat stat_buf;
+    int rc = fstat((int)fd, &stat_buf);
+    return rc == 0 ? stat_buf.st_size : -1;
+}
+
+bool exists(std::string path)
+{
+    Debug_printv( "path[%s]", path.c_str() );
+    struct stat st;
+    int i = stat(path.c_str(), &st);
+    return (i == 0);
+}
 
 /* Our URI handler function to be called during GET /uri request */
 esp_err_t cHttpdServer::get_handler(httpd_req_t *httpd_req)
@@ -41,7 +59,7 @@ esp_err_t cHttpdServer::get_handler(httpd_req_t *httpd_req)
     Debug_printv("url[%s]", httpd_req->uri);
 
     std::string uri = mstr::urlDecode(httpd_req->uri);
-    if ( uri == "/" )
+    if (uri == "/")
     {
         uri = "/index.html";
     }
@@ -67,9 +85,11 @@ esp_err_t cHttpdServer::post_handler(httpd_req_t *httpd_req)
     size_t recv_size = MIN(httpd_req->content_len, sizeof(content));
 
     int ret = httpd_req_recv(httpd_req, content, recv_size);
-    if (ret <= 0) {  /* 0 return value indicates connection closed */
+    if (ret <= 0)
+    { /* 0 return value indicates connection closed */
         /* Check if timeout occurred */
-        if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
+        if (ret == HTTPD_SOCK_ERR_TIMEOUT)
+        {
             /* In case of timeout one can choose to retry calling
              * httpd_req_recv(), but to keep it simple, here we
              * respond with an HTTP 408 (Request Timeout) error */
@@ -86,112 +106,115 @@ esp_err_t cHttpdServer::post_handler(httpd_req_t *httpd_req)
     return ESP_OK;
 }
 
-esp_err_t cHttpdServer::webdav_handler(httpd_req_t *httpd_req) {
-        WebDav::Server *server = (WebDav::Server *) httpd_req->user_ctx;
-        WebDav::Request req(httpd_req);
-        WebDav::Response resp(httpd_req);
-        int ret;
+esp_err_t cHttpdServer::webdav_handler(httpd_req_t *httpd_req)
+{
+    WebDav::Server *server = (WebDav::Server *)httpd_req->user_ctx;
+    WebDav::Request req(httpd_req);
+    WebDav::Response resp(httpd_req);
+    int ret;
 
-        Debug_printv("url[%s]", httpd_req->uri);
+    Debug_printv("url[%s]", httpd_req->uri);
 
-        if (!req.parseRequest()) {
-                resp.setStatus(400);
-                resp.flushHeaders();
-                resp.closeBody();
-                return ESP_OK;
-        }
-
-        httpd_resp_set_hdr(httpd_req, "Access-Control-Allow-Origin", "*");
-        httpd_resp_set_hdr(httpd_req, "Access-Control-Allow-Headers", "*");
-        httpd_resp_set_hdr(httpd_req, "Access-Control-Allow-Methods", "*");
-
-        Debug_printv("%s[%s]", http_method_str((enum http_method) httpd_req->method), httpd_req->uri);
-
-        switch (httpd_req->method) {
-                case HTTP_COPY:
-                        ret = server->doCopy(req, resp);
-                        break;
-                case HTTP_DELETE:
-                        ret = server->doDelete(req, resp);
-                        break;
-                case HTTP_GET:
-                        ret = server->doGet(req, resp);
-                        break;
-                case HTTP_HEAD:
-                        ret = server->doHead(req, resp);
-                        break;
-                case HTTP_LOCK:
-                        ret = server->doLock(req, resp);
-                        break;
-                case HTTP_MKCOL:
-                        ret = server->doMkcol(req, resp);
-                        break;
-                case HTTP_MOVE:
-                        ret = server->doMove(req, resp);
-                        break;
-                case HTTP_OPTIONS:
-                        ret = server->doOptions(req, resp);
-                        break;
-                case HTTP_PROPFIND:
-                        ret = server->doPropfind(req, resp);
-                        break;
-                case HTTP_PROPPATCH:
-                        ret = server->doProppatch(req, resp);
-                        break;
-                case HTTP_PUT:
-                        ret = server->doPut(req, resp);
-                        break;
-                case HTTP_UNLOCK:
-                        ret = server->doUnlock(req, resp);
-                        break;
-                default:
-                        ret = ESP_ERR_HTTPD_INVALID_REQ;
-                        break;
-        }
-
-        resp.setStatus(ret);
+    if (!req.parseRequest())
+    {
+        resp.setStatus(400);
         resp.flushHeaders();
         resp.closeBody();
+        return ESP_OK;
+    }
 
-        return ret;
+    httpd_resp_set_hdr(httpd_req, "Access-Control-Allow-Origin", "*");
+    httpd_resp_set_hdr(httpd_req, "Access-Control-Allow-Headers", "*");
+    httpd_resp_set_hdr(httpd_req, "Access-Control-Allow-Methods", "*");
+
+    Debug_printv("%s[%s]", http_method_str((enum http_method)httpd_req->method), httpd_req->uri);
+
+    switch (httpd_req->method)
+    {
+    case HTTP_COPY:
+        ret = server->doCopy(req, resp);
+        break;
+    case HTTP_DELETE:
+        ret = server->doDelete(req, resp);
+        break;
+    case HTTP_GET:
+        ret = server->doGet(req, resp);
+        break;
+    case HTTP_HEAD:
+        ret = server->doHead(req, resp);
+        break;
+    case HTTP_LOCK:
+        ret = server->doLock(req, resp);
+        break;
+    case HTTP_MKCOL:
+        ret = server->doMkcol(req, resp);
+        break;
+    case HTTP_MOVE:
+        ret = server->doMove(req, resp);
+        break;
+    case HTTP_OPTIONS:
+        ret = server->doOptions(req, resp);
+        break;
+    case HTTP_PROPFIND:
+        ret = server->doPropfind(req, resp);
+        break;
+    case HTTP_PROPPATCH:
+        ret = server->doProppatch(req, resp);
+        break;
+    case HTTP_PUT:
+        ret = server->doPut(req, resp);
+        break;
+    case HTTP_UNLOCK:
+        ret = server->doUnlock(req, resp);
+        break;
+    default:
+        ret = ESP_ERR_HTTPD_INVALID_REQ;
+        break;
+    }
+
+    resp.setStatus(ret);
+    resp.flushHeaders();
+    resp.closeBody();
+
+    return ret;
 }
 
-void cHttpdServer::webdav_register(httpd_handle_t server, const char *root_path, const char *root_uri) {
-        WebDav::Server *webDavServer = new WebDav::Server(root_path, root_uri);
+void cHttpdServer::webdav_register(httpd_handle_t server, const char *root_path, const char *root_uri)
+{
+    WebDav::Server *webDavServer = new WebDav::Server(root_path, root_uri);
 
-        char *uri;
-        asprintf(&uri, "%s/?*", root_uri);
+    char *uri;
+    asprintf(&uri, "%s/?*", root_uri);
 
-        httpd_uri_t uri_dav = 
+    httpd_uri_t uri_dav =
         {
-            .uri      = uri,
-            .method   = http_method(0),
-            .handler  = webdav_handler,
+            .uri = uri,
+            .method = http_method(0),
+            .handler = webdav_handler,
             .user_ctx = webDavServer,
-            .is_websocket = false
-        };
+            .is_websocket = false};
 
-        http_method methods[] = {
-                HTTP_COPY,
-                HTTP_DELETE,
-                HTTP_GET,
-                HTTP_HEAD,
-                HTTP_LOCK,
-                HTTP_MKCOL,
-                HTTP_MOVE,
-                HTTP_OPTIONS,
-                HTTP_PROPFIND,
-                HTTP_PROPPATCH,
-                HTTP_PUT,
-                HTTP_UNLOCK,
-        };
+    http_method methods[] = {
+        HTTP_COPY,
+        HTTP_DELETE,
+        HTTP_GET,
+        HTTP_HEAD,
+        HTTP_LOCK,
+        HTTP_MKCOL,
+        HTTP_MOVE,
+        HTTP_OPTIONS,
+        HTTP_PROPFIND,
+        HTTP_PROPPATCH,
+        HTTP_PUT,
+        HTTP_UNLOCK,
+    };
 
-        for (int i = 0; i < sizeof(methods) / sizeof(methods[0]); i++) {
-                uri_dav.method = methods[i];
-                httpd_register_uri_handler(server, &uri_dav);
-        }
+    for (int i = 0; i < sizeof(methods) / sizeof(methods[0]); i++)
+    {
+        uri_dav.method = methods[i];
+        httpd_register_uri_handler(server, &uri_dav);
+    }
 }
-
 
 void cHttpdServer::custom_global_ctx_free(void *ctx)
 {
@@ -217,37 +240,34 @@ httpd_handle_t cHttpdServer::start_server(serverstate &state)
     config.max_uri_handlers = 16;
     config.max_resp_headers = 16;
 
-    //config.core_id = 0; // Pin to CPU core 0
-    // Keep a reference to our object
+    // config.core_id = 0; // Pin to CPU core 0
+    //  Keep a reference to our object
     config.global_user_ctx = (void *)&state;
 
     // Set our own global_user_ctx free function, otherwise the library will free an object we don't want freed
     config.global_user_ctx_free_fn = (httpd_free_ctx_fn_t)custom_global_ctx_free;
     config.uri_match_fn = httpd_uri_match_wildcard;
 
-
     Debug_printf("Starting web server on port %d\n", config.server_port);
-    //Debug_printf("Starting web server on port %d, CPU Core %d\n", config.server_port, config.core_id);
+    // Debug_printf("Starting web server on port %d, CPU Core %d\n", config.server_port, config.core_id);
 
-    //esp_log_level_set("httpd_uri", ESP_LOG_DEBUG);
+    // esp_log_level_set("httpd_uri", ESP_LOG_DEBUG);
 
     /* URI handler structure for GET /uri */
     httpd_uri_t uri_get = {
-        .uri      = "/*",
-        .method   = HTTP_GET,
-        .handler  = get_handler,
+        .uri = "/*",
+        .method = HTTP_GET,
+        .handler = get_handler,
         .user_ctx = NULL,
-        .is_websocket = false
-    };
+        .is_websocket = false};
 
     /* URI handler structure for POST /uri */
     httpd_uri_t uri_post = {
-        .uri      = "/*",
-        .method   = HTTP_POST,
-        .handler  = post_handler,
+        .uri = "/*",
+        .method = HTTP_POST,
+        .handler = post_handler,
         .user_ctx = NULL,
-        .is_websocket = false
-    };
+        .is_websocket = false};
 
     if (httpd_start(&(state.hServer), &config) == ESP_OK)
     {
@@ -258,25 +278,23 @@ httpd_handle_t cHttpdServer::start_server(serverstate &state)
         httpd_register_uri_handler(state.hServer, &uri_get);
         httpd_register_uri_handler(state.hServer, &uri_post);
 
-        Serial.println( ANSI_GREEN_BOLD "WWW/WebDAV Server Started!" ANSI_RESET );
+        Serial.println(ANSI_GREEN_BOLD "WWW/WebDAV Server Started!" ANSI_RESET);
     }
     else
     {
         state.hServer = NULL;
-        Serial.println( ANSI_RED_BOLD "WWW/WebDAV Server FAILED to start!" ANSI_RESET );
+        Serial.println(ANSI_RED_BOLD "WWW/WebDAV Server FAILED to start!" ANSI_RESET);
     }
 
     return state.hServer;
 }
 
-
-
 const char *cHttpdServer::find_mimetype_str(const char *extension)
 {
-    static std::map<std::string, std::string> mime_map {
+    static std::map<std::string, std::string> mime_map{
         {"css", "text/css"},
         {"txt", "text/plain"},
-        {"js",  "text/javascript"},
+        {"js", "text/javascript"},
         {"xml", "text/xml; charset=\"utf-8\""},
 
         {"gif", "image/gif"},
@@ -286,10 +304,9 @@ const char *cHttpdServer::find_mimetype_str(const char *extension)
         {"svg", "image/svg+xml"},
 
         {"atascii", "application/octet-stream"},
-        {"bin",     "application/octet-stream"},
-        {"json",    "application/json"},
-        {"pdf",     "application/pdf"}
-    };
+        {"bin", "application/octet-stream"},
+        {"json", "application/json"},
+        {"pdf", "application/pdf"}};
 
     if (extension != NULL)
     {
@@ -344,16 +361,16 @@ void cHttpdServer::send_file(httpd_req_t *req, const char *filename)
     FILE *file = pState->_FS->file_open(fpath.c_str());
 
     Debug_printv("filename[%s]", filename);
-    //auto file = MFSOwner::File( fpath );
-    //if (!file->exists())
-    if ( file == nullptr )
+    // auto file = MFSOwner::File( fpath );
+    // if (!file->exists())
+    if (file == nullptr)
     {
         Debug_printf("Failed to open file for sending: '%s'\n", fpath.c_str());
         return_http_error(req, http_err_fileopen);
     }
     else
     {
-        //auto istream = file->meatStream();
+        // auto istream = file->meatStream();
 
         // Set the response content type
         set_file_content_type(req, fpath.c_str());
@@ -368,7 +385,7 @@ void cHttpdServer::send_file(httpd_req_t *req, const char *filename)
         size_t count = 0;
         do
         {
-            //count = istream->read( (uint8_t *)buf, http_SEND_BUFF_SIZE );
+            // count = istream->read( (uint8_t *)buf, http_SEND_BUFF_SIZE );
             count = fread(buf, 1, http_SEND_BUFF_SIZE, file);
             httpd_resp_send_chunk(req, buf, count);
         } while (count > 0);
@@ -376,7 +393,6 @@ void cHttpdServer::send_file(httpd_req_t *req, const char *filename)
         free(buf);
     }
 }
-
 
 // Send file content after parsing for replaceable strings
 void cHttpdServer::send_file_parsed(httpd_req_t *req, const char *filename)
@@ -391,8 +407,8 @@ void cHttpdServer::send_file_parsed(httpd_req_t *req, const char *filename)
     serverstate *pState = (serverstate *)httpd_get_global_user_ctx(req->handle);
     FILE *file = pState->_FS->file_open(filename);
 
-    //auto file = MFSOwner::File( filename );
-    //if (!file->exists())
+    // auto file = MFSOwner::File( filename );
+    // if (!file->exists())
     if (file == nullptr)
     {
         Debug_println("Failed to open file for parsing");
@@ -400,7 +416,7 @@ void cHttpdServer::send_file_parsed(httpd_req_t *req, const char *filename)
     }
     else
     {
-        //auto istream = file->meatStream();
+        // auto istream = file->meatStream();
 
         // Set the response content type
         set_file_content_type(req, filename);
@@ -415,7 +431,7 @@ void cHttpdServer::send_file_parsed(httpd_req_t *req, const char *filename)
         }
         else
         {
-            //istream->read( (uint8_t *)buf, sz );
+            // istream->read( (uint8_t *)buf, sz );
             fread(buf, 1, sz, file);
             std::string contents(buf);
             free(buf);

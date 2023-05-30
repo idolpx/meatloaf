@@ -13,63 +13,11 @@
 #include <iomanip>
 
 #include "file-utils.h"
+#include "string_utils.h"
 
 using namespace WebDav;
 
 Server::Server(std::string rootPath, std::string rootURI) : rootPath(rootPath), rootURI(rootURI) {}
-
-static std::string urlDecode(std::string str)
-{
-    std::string ret;
-    char ch;
-    int i, ii, len = str.length();
-
-    for (i = 0; i < len; i++)
-    {
-        if (str[i] != '%')
-        {
-            if (str[i] == '+')
-                ret += ' ';
-            else
-                ret += str[i];
-        }
-        else
-        {
-            sscanf(str.substr(i + 1, 2).c_str(), "%x", &ii);
-            ch = static_cast<char>(ii);
-            ret += ch;
-            i += 2;
-        }
-    }
-
-    return ret;
-}
-
-static std::string urlEncode(const std::string &value)
-{
-    std::ostringstream escaped;
-    escaped.fill('0');
-    escaped << std::hex;
-
-    for (std::string::const_iterator i = value.begin(), n = value.end(); i != n; ++i)
-    {
-        std::string::value_type c = (*i);
-
-        // Keep alphanumeric and other accepted characters intact
-        if (isalnum((unsigned char)c) || c == '-' || c == '_' || c == '.' || c == '~' || c == '/' || c == ' ')
-        {
-            escaped << c;
-            continue;
-        }
-
-        // Any other characters are percent-encoded
-        escaped << std::uppercase;
-        escaped << '%' << std::setw(2) << int((unsigned char)c);
-        escaped << std::nouppercase;
-    }
-
-    return escaped.str();
-}
 
 std::string Server::uriToPath(std::string uri)
 {
@@ -80,7 +28,7 @@ std::string Server::uriToPath(std::string uri)
     while (path.substr(path.length() - 1, 1) == "/")
         path = path.substr(0, path.length() - 1);
 
-    return urlDecode(path);
+    return mstr::urlDecode(path);
 }
 
 std::string Server::pathToURI(std::string path)
@@ -91,7 +39,7 @@ std::string Server::pathToURI(std::string path)
     const char *sep = path[rootPath.length()] == '/' ? "" : "/";
     std::string uri = rootURI + sep + path.substr(rootPath.length());
 
-    return urlEncode(uri);
+    return mstr::urlEncode(uri);
 }
 
 std::string Server::formatTime(time_t t)
