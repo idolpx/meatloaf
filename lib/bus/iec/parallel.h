@@ -7,7 +7,7 @@
 #define MEATLOAF_BUS_PARALLEL
 #ifdef PARALLEL_BUS
 
-#include "gpiox.h"
+#include "../../gpiox/gpiox.h"
 
 #include <stdint.h>
 

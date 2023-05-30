@@ -40,6 +40,7 @@ flash_filesystem = FLASH_SPIFFS
 
 ; Espressif32 PlatformIO Version to use for building
 esp32_platform_version = 5.3.0
+;esp32s3_platform_version = 6.1.0
 
 ; Required flags, leave as is
 build_platform = BUILD_IEC
