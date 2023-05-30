@@ -1,3 +1,4 @@
+#ifdef FLASH_LITTLEFS
 
 #include "fnFsLittleFS.h"
 
@@ -12,11 +13,19 @@
 #define LITTLEFS_MAXPATH 512
 
 // Our global LITTLEFS interface
-FileSystemLittleFS fnLITTLEFS;
+FileSystemLittleFS fsFlash;
 
 FileSystemLittleFS::FileSystemLittleFS()
 {
     // memset(_dir,0,sizeof(DIR));
+}
+
+bool FileSystemLittleFS::is_dir(const char *path)
+{
+    char * fpath = _make_fullpath(path);
+    struct stat info;
+    stat( fpath, &info);
+    return (info.st_mode == S_IFDIR) ? true: false;
 }
 
 bool FileSystemLittleFS::dir_open(const char * path, const char * pattern, uint16_t diropts)
@@ -232,3 +241,5 @@ bool FileSystemLittleFS::start()
 
     return _started;
 }
+
+#endif // FLASH_LITTLEFS

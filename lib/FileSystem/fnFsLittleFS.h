@@ -1,5 +1,6 @@
 #ifndef _FN_FSLITTLEFS_
 #define _FN_FSLITTLEFS_
+#ifdef FLASH_LITTLEFS
 
 #include <dirent.h>
 
@@ -44,6 +45,7 @@ public:
     uint64_t used_bytes();
 };
 
-extern FileSystemLittleFS fnLITTLEFS;
+extern FileSystemLittleFS fsFlash;
 
+#endif // FLASH_LITTLEFS
 #endif // _FN_FSLITTLEFS_

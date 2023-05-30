@@ -12,10 +12,7 @@
 #include "device.h"
 #include "keys.h"
 #include "led.h"
-
-#ifdef LED_STRIP
 #include "display.h"
-#endif
 
 //#include "disk-sounds.h"
 
@@ -23,11 +20,7 @@
 #include "fnConfig.h"
 #include "fnWiFi.h"
 
-#ifdef FLASH_SPIFFS
-#include "fnFsSPIFFS.h"
-#elif FLASH_LITTLEFS
-#include "fnFsLittleFS.h"
-#endif
+#include "fsFlash.h"
 #include "fnFsSD.h"
 
 /**************************/
@@ -108,11 +101,7 @@ void main_setup()
     fnSystem.digital_write(PIN_MDMPAR_SW2, DIGI_LOW); // DISABLE UP9600
     //fnSystem.digital_write(PIN_MDMPAR_SW2, DIGI_HIGH); // ENABLE UP9600
 
-#ifdef FLASH_SPIFFS
-    fnSPIFFS.start();
-#elif FLASH_LITTLEFS
-    fnLITTLEFS.start();
-#endif
+    fsFlash.start();
 #ifdef SD_CARD
     fnSDFAT.start();
 #endif
@@ -138,7 +127,7 @@ void main_setup()
     Serial.println( ANSI_GREEN_BOLD "IEC Bus Initialized" ANSI_RESET );
 
     // Add devices to bus
-    FileSystem *ptrfs = fnSDFAT.running() ? (FileSystem *)&fnSDFAT : (FileSystem *)&fnSPIFFS;
+    FileSystem *ptrfs = fnSDFAT.running() ? (FileSystem *)&fnSDFAT : (FileSystem *)&fsFlash;
     iecPrinter::printer_type ptype = iecPrinter::printer_type::PRINTER_COMMODORE_MPS803; // temporary
     Debug_printf("Creating a default printer using %s storage and type %d\n", ptrfs->typestring(), ptype);
     iecPrinter *ptr = new iecPrinter(ptrfs, ptype);

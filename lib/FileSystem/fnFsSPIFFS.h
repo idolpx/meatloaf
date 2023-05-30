@@ -1,5 +1,6 @@
 #ifndef _FN_FSSPIFFS_
 #define _FN_FSSPIFFS_
+#ifdef FLASH_SPIFFS
 
 #include <dirent.h>
 
@@ -42,6 +43,7 @@ public:
     uint64_t used_bytes();
 };
 
-extern FileSystemSPIFFS fnSPIFFS;
+extern FileSystemSPIFFS fsFlash;
 
+#endif // FLASH_SPIFFS
 #endif // _FN_FSSPIFFS_

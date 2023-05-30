@@ -5,6 +5,7 @@
 
 #ifndef MEATLOAF_BUS_PARALLEL
 #define MEATLOAF_BUS_PARALLEL
+#ifdef PARALLEL_BUS
 
 #include "gpiox.h"
 
@@ -125,4 +126,5 @@ class parallelBus
 
 extern parallelBus PARALLEL;
 
+#endif // PARALLEL_BUS
 #endif // MEATLOAF_BUS_PARALLEL

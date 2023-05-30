@@ -8,9 +8,7 @@
 
 #ifdef BUILD_IEC
 #include "iec/iec.h"
-#ifdef PARALLEL_BUS
 #include "iec/parallel.h"
-#endif
 #define SYSTEM_BUS IEC
 #endif
 

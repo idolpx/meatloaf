@@ -7,8 +7,10 @@
 
 #include "fnSystem.h"
 #include "fnConfig.h"
-#include "fnFsSPIFFS.h"
+
+#include "fsFlash.h"
 #include "fnFsSD.h"
+
 #include "fnWiFi.h"
 #include "ssdp.h"
 
@@ -318,10 +320,10 @@ const std::string substitute_tag(const std::string &tag)
         resultstream << fnWiFi.get_current_detail_str();
         break;
     case DEVICE_SPIFFS_SIZE:
-        resultstream << fnSPIFFS.total_bytes();
+        resultstream << fsFlash.total_bytes();
         break;
     case DEVICE_SPIFFS_USED:
-        resultstream << fnSPIFFS.used_bytes();
+        resultstream << fsFlash.used_bytes();
         break;
     case DEVICE_SD_SIZE:
         resultstream << fnSDFAT.total_bytes();

@@ -17,17 +17,17 @@
 [meatloaf]
 ; Uncomment ONLY ONE of the below lines to target the hardware you use
 ; GPIO pin assignments are located in the include/pinmap/ directory for reference
-;build_board = fujiloaf-rev0  ; Meatloaf / FujiNet REV0 board, aka Fujiloaf (ESP32-WROVER 8M PSRAM, 16M Flash)
+;build_board = fujiloaf-rev0      ; Meatloaf / FujiNet REV0 board, aka Fujiloaf (ESP32-WROVER 8M PSRAM, 16M Flash)
 ;build_board = lolin-d32-pro      ; Wemos Lolin D32 Pro                         (ESP32-WROVER 4M PSRAM, 4M/8M/16M Flash)
-;build_board = ttgo-t1        ; Lilygo TTGO T1 V1.3                         (ESP32 NO PSRAM, 4M Flash)
-;build_board = esp32-wroom    ; generic esp32-wroom board                   (ESP32-WROOM NO PSRAM, 4M/8M/16M Flash)
-;build_board = esp32-wroom-pi1541 ; generic esp32-wroom board with pi1541 hat (ESP32-WROOM NO PSRAM, 4M/8M/16M Flash)
-;build_board = fujiapple-rev0 ; FujiApple REV0 with esp32-devkitc           (ESP32-WROVER 8M PSRAM, 8M Flash)
-;build_board = fujinet-v16    ; FujiNet v1.6                                (ESP32-WROVER 8M PSRAM, 16M Flash)
+;build_board = ttgo-t1            ; Lilygo TTGO T1 V1.3                         (ESP32 NO PSRAM, 4M Flash)
+;build_board = esp32-wroom        ; generic esp32-wroom board                   (ESP32-WROOM NO PSRAM, 4M/8M/16M Flash)
+;build_board = esp32-wroom-pi1541 ; generic esp32-wroom board with pi1541 hat   (ESP32-WROOM NO PSRAM, 4M/8M/16M Flash)
+;build_board = fujiapple-rev0     ; FujiApple REV0 with esp32-devkitc           (ESP32-WROVER 8M PSRAM, 8M Flash)
+;build_board = fujinet-v16        ; FujiNet v1.6                                (ESP32-WROVER 8M PSRAM, 16M Flash)
 
 ; EXPERIMENTAL
-;build_board = esp32s3        ; esp32s3 devkitc                             (ESP32-S3 2M/8M PSRAM, 8M/16M/32M Flash)
-;build_board = lolin-s2-mini  ; Wemos Lolin S2 Mini                         (ESP32-S2 2M PSRAM, 4M Flash)
+;build_board = esp32s3            ; esp32s3 devkitc                             (ESP32-S3 2M/8M PSRAM, 8M/16M/32M Flash)
+;build_board = lolin-s2-mini      ; Wemos Lolin S2 Mini                         (ESP32-S2 2M PSRAM, 4M Flash)
 
 ; Choose the size of flash available on your board
 ;flash_size = 16mb
@@ -89,6 +89,11 @@ build_flags =
     ;-D NO_VIRTUAL_KEYBOARD
     ;-D DBUG2 ; enable monitor messages for a release build
 
+    ; GPIO Expander Selection
+    ;-D GPIOX_PCF8575
+    ;-D GPIOX_MCP23017
+    ;-D GPIOX_XRA1405
+
 [env:fujiloaf-rev0]
 platform = espressif32@${meatloaf.esp32_platform_version}
 board = esp32-${meatloaf.flash_size}
@@ -100,6 +105,7 @@ build_flags =
     -D SD_CARD
 	-D LED_STRIP
 	-D PARALLEL_BUS
+    -D GPIOX_PCF8575
 
 [env:lolin-d32-pro]
 platform = espressif32@${meatloaf.esp32_platform_version}

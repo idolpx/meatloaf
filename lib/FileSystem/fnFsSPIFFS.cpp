@@ -1,3 +1,4 @@
+#ifdef FLASH_SPIFFS
 
 #include "fnFsSPIFFS.h"
 
@@ -11,7 +12,7 @@
 #define SPIFFS_MAXPATH 512
 
 // Our global SPIFFS interface
-FileSystemSPIFFS fnSPIFFS;
+FileSystemSPIFFS fsFlash;
 
 FileSystemSPIFFS::FileSystemSPIFFS()
 {
@@ -185,3 +186,5 @@ bool FileSystemSPIFFS::start()
 
     return _started;
 }
+
+#endif // FLASH_SPIFFS

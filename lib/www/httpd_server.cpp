@@ -19,7 +19,9 @@
 #include "fnSystem.h"
 #include "fnConfig.h"
 #include "fnWiFi.h"
-#include "fnFsSPIFFS.h"
+
+#include "fsFlash.h"
+#include "fnFsSD.h"
 
 #include "template.h"
 
@@ -229,7 +231,7 @@ httpd_handle_t cHttpdServer::start_server(serverstate &state)
     }
 
     // Set filesystem where we expect to find our static files
-    state._FS = &fnSPIFFS;
+    state._FS = &fsFlash;
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.task_priority = 12; // Bump this higher than fnService loop
