@@ -380,12 +380,9 @@ const std::string substitute_tag(const std::string &tag)
             } else
                 resultstream << "No Virtual Printer";
 #endif /* BUILD_ADAM */
-#ifdef BUILD_ATARI
+#if defined( BUILD_ATARI ) || defined( BUILD_APPLE ) || defined( BUILD_IEC )
             resultstream << fnPrinters.get_ptr(0)->getPrinterPtr()->modelname();
-#endif /* BUILD_ATARI */
-#ifdef BUILD_APPLE
-            resultstream << fnPrinters.get_ptr(0)->getPrinterPtr()->modelname();
-#endif /* BUILD_APPLE */
+#endif
         }
         break;
     case DEVICE_PRINTER1_PORT:
@@ -398,12 +395,9 @@ const std::string substitute_tag(const std::string &tag)
             } else
                 resultstream << "";
 #endif/* BUILD_ADAM */
-#ifdef BUILD_ATARI
+#if defined( BUILD_ATARI ) || defined( BUILD_APPLE ) || defined( BUILD_IEC )
             resultstream << (fnPrinters.get_port(0) + 1);
-#endif /* BUILD_ATARI */
-#ifdef BUILD_APPLE
-            resultstream << (fnPrinters.get_port(0) + 1);
-#endif /* BUILD_APPLE */
+#endif
         }
         break;
 #ifdef BUILD_ATARI        
