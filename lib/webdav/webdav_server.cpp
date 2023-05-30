@@ -1,3 +1,6 @@
+
+#include "webdav_server.h"
+
 #include <stdio.h>
 #include <sstream>
 #include <string.h>
@@ -10,7 +13,6 @@
 #include <iomanip>
 
 #include "file-utils.h"
-#include "server.h"
 
 using namespace WebDav;
 

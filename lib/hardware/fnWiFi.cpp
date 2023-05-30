@@ -17,7 +17,7 @@
 #include "fnSystem.h"
 #include "fnConfig.h"
 
-#include "webdav.h"
+#include "httpd_server.h"
 #include "ssdp.h"
 #include "led.h"
 
@@ -486,7 +486,7 @@ void WiFiManager::_wifi_event_handler(void *arg, esp_event_base_t event_base,
             fnSystem.Net.start_sntp_client();
 
             // Start Web / WebDAV Server
-            http_server_start();
+            oHttpdServer.start();
 
             // Start mDNS Service
             mdns_init();
