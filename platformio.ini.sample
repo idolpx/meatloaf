@@ -28,6 +28,7 @@
 ; EXPERIMENTAL
 ;build_board = esp32s3            ; esp32s3 devkitc                             (ESP32-S3 2M/8M PSRAM, 8M/16M/32M Flash)
 ;build_board = lolin-s2-mini      ; Wemos Lolin S2 Mini                         (ESP32-S2 2M PSRAM, 4M Flash)
+;build_board = lolin-s3-pro       ; Wemos Lolin S3 Pro                          (ESP32-S3 8M PSRAM, 16M Flash)
 
 ; Choose the size of flash available on your board
 ;flash_size = 16mb

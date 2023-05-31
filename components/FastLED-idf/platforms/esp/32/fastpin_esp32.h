@@ -3,11 +3,11 @@
 // In order to get the GPIO structure, we need
 // enough of the headers.
 #include <esp_types.h>
-#include "esp_err.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/xtensa_api.h"
-#include "driver/gpio.h"
-#include "soc/gpio_periph.h"
+#include <esp_err.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/xtensa_api.h>
+#include <driver/gpio.h>
+#include <soc/gpio_periph.h>
 
 FASTLED_NAMESPACE_BEGIN
 
