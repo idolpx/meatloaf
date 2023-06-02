@@ -90,3 +90,53 @@ void fnConfig::_read_section_wifi(std::stringstream &ss)
         }
     }
 }
+
+void fnConfig::_read_section_wifi_stored(std::stringstream &ss, int index)
+{
+    Debug_printf("Reading stored wifi section for index: %d\n", index);
+
+    _wifi_stored[index].ssid.clear();
+    _wifi_stored[index].passphrase.clear();
+    _wifi_stored[index].enabled = false;
+
+    std::string line;
+    // Read lines until one starts with '[' which indicates a new section
+    while (_read_line(ss, line, '[') >= 0)
+    {
+        std::string name;
+        std::string value;
+        // If there's a section, it means it's 'enabled' - we're borrowing the wifi_info structure for alternate purpose
+        _wifi_stored[index].enabled = true;
+
+        if (_split_name_value(line, name, value))
+        {
+            if (strcasecmp(name.c_str(), "SSID") == 0)
+            {
+                _wifi_stored[index].ssid = value;
+            }
+            else if (strcasecmp(name.c_str(), "passphrase") == 0)
+            {
+                _wifi_stored[index].passphrase = value;
+            }
+        }
+    }
+}
+
+void fnConfig::store_wifi_stored_ssid(int index, std::string ssid)
+{ 
+    _wifi_stored[index].ssid = ssid;
+    _dirty = true;
+}
+
+void fnConfig::store_wifi_stored_passphrase(int index, std::string passphrase)
+{
+    // TODO: check if encryption is an issue here. Should be coming from previous "current" config, which will already be encrypted if enabled.
+    _wifi_stored[index].passphrase = passphrase;
+    _dirty = true;
+}
+
+void fnConfig::store_wifi_stored_enabled(int index, bool enabled)
+{ 
+    _wifi_stored[index].enabled = enabled;
+    _dirty = true;
+}
