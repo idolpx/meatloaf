@@ -13,6 +13,7 @@
 typedef struct
 {
     char ssid[33];
+    char password[64];
     char hostname[64];
     unsigned char localIP[4];
     unsigned char gateway[4];
@@ -61,7 +62,8 @@ protected:
     void net_get_ssid();           // 0xFE
     void net_scan_networks();      // 0xFD
     void net_scan_result();        // 0xFC
-    void net_set_ssid();           // 0xFB
+    void net_set_ssid( bool store = true );           // 0xFB
+    void net_store_ssid();
     void net_get_wifi_status();    // 0xFA
     //void mount_host();             // 0xF9
     //void disk_image_mount();       // 0xF8

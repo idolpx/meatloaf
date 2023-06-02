@@ -29,11 +29,7 @@
 
 #include "bus.h"
 
-#ifdef FLASH_SPIFFS
-#include "fnFsSPIFFS.h"
-#elif FLASH_LITTLEFS
-#include "fnFsLittleFS.h"
-#endif
+#include "fsFlash.h"
 #include "fnFsSD.h"
 #include "fnWiFi.h"
 

@@ -158,12 +158,12 @@ void main_setup()
 #endif
 
 #ifdef LED_STRIP
-        // Start LED Strip
-        display_app_main(); // fastled lib
+    // Start LED Strip
+    display_app_main(); // fastled lib
 #endif
 
 #ifdef PIEZO_BUZZER
-        mlSoundManager.setup(); // start sound
+    mlSoundManager.setup(); // start sound
 #endif
 
 #ifdef DEBUG

@@ -1,5 +1,6 @@
 #ifndef LED_STRIP_H
 #define LED_STIP_H
+#ifdef LED_STRIP
 
 #include "FastLED.h"
 //#include "FX.h"
@@ -65,4 +66,6 @@ private:
 };
 
 extern LedStrip fnLedStrip;
+
+#endif // LED_STRIP
 #endif // LED_STRIP_H

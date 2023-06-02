@@ -1,3 +1,5 @@
+#ifdef LED_STRIP
+
 #include "led_strip.h"
 
 #include "../../include/debug.h"
@@ -187,3 +189,5 @@ void LedStrip::stopRainbow()
     fnLedStrip.rainbowStopper = true;
     fnLedStrip.rainbowTimer = 0;
 }
+
+#endif // LED_STRIP
