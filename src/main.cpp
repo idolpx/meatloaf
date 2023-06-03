@@ -113,14 +113,12 @@ void main_setup()
     fnWiFi.start();
     // Go ahead and try reconnecting to WiFi
     fnWiFi.connect(
-#ifdef WIFI_SSID
-        WIFI_SSID,
-        WIFI_PASSWORD
-#else
         Config.get_wifi_ssid().c_str(),
         Config.get_wifi_passphrase().c_str()
-#endif
     );
+    // Connect with default WiFi settings if not connected
+    if ( strlen( WIFI_SSID ) && !fnWiFi.connected() )
+        fnWiFi.connect( WIFI_SSID, WIFI_PASSWORD );
 
     // Setup IEC Bus
     IEC.setup();

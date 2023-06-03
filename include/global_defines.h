@@ -19,7 +19,6 @@
 #define GLOBAL_DEFINES_H
 
 #include "version.h"
-#include "ssid.h"
 #include "ansi_codes.h"
 
 #define PRODUCT_ID "MEATLOAF CBM"

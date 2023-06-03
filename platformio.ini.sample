@@ -35,6 +35,10 @@
 ;flash_size = 8mb
 ;flash_size = 4mb
 
+; Set default WiFi credentials
+wifi_ssid = "meatloaf"
+wifi_pass = "meatloaf"
+
 ; Choose SPIFFS or LITTLEFS for the filesystem used on internal flash
 flash_filesystem = FLASH_SPIFFS 
 ;flash_filesystem = FLASH_LITTLEFS
@@ -74,6 +78,8 @@ check_skip_packages = yes
 build_flags =
     -D ${meatloaf.build_platform}
     -D ${meatloaf.flash_filesystem}
+    -D WIFI_SSID=${meatloaf.wifi_ssid}
+    -D WIFI_PASSWORD=${meatloaf.wifi_pass}
     -D CMAKE_EXPORT_COMPILE_COMMANDS=ON
     -D DEBUG_SPEED=460800   ;921600
     ;-D NO_BUTTONS          ; if your hardware has no physical buttons
@@ -183,4 +189,13 @@ build_type = debug
 build_flags =
 	${env.build_flags}
 	-D PINMAP_LOLIN_S2_MINI
+    -D BOARD_HAS_PSRAM
+
+[env:lolin-s3-pro]
+platform = espressif32@${meatloaf.esp32_platform_version}
+board = esp32-s3
+build_type = debug
+build_flags =
+	${env.build_flags}
+	-D PINMAP_ESP32S3
     -D BOARD_HAS_PSRAM
