@@ -48,8 +48,10 @@ void LedManager::setup()
 
 void LedManager::set(eLed led, bool on)
 {
-    if(fnSystem.ledstrip())
-    {
+#ifndef FUJILOAF_REV0
+    mLedState[led] = on;
+    fnSystem.digital_write(mLedPin[led], (on ? DIGI_LOW : DIGI_HIGH));
+#else
         switch (led)
         {
         case eLed::LED_BUS:
@@ -65,74 +67,57 @@ void LedManager::set(eLed led, bool on)
             break;
         }
     }
-    else
-    {
-        mLedState[led] = on;
-#if defined(PINMAP_A2_REV0) || defined(PINMAP_FUJIAPPLE_IEC)
-        // FujiApple Rev 0 BUS LED has reverse logic
-        if (led == LED_BUS)
-            fnSystem.digital_write(mLedPin[led], (on ? DIGI_HIGH : DIGI_LOW));
-        else
-            fnSystem.digital_write(mLedPin[led], (on ? DIGI_LOW : DIGI_HIGH));
-#else
-        fnSystem.digital_write(mLedPin[led], (on ? DIGI_LOW : DIGI_HIGH));
 #endif
-    }
 }
 
 void LedManager::toggle(eLed led)
 {
-    if(fnSystem.ledstrip())
+#ifndef FUJILOAF_REV0
+    set(led, !mLedState[led]);
+#else
+    switch (led)
     {
-        switch (led)
-        {
-        case eLed::LED_BUS:
-            fnLedStrip.toggle(stripLed::LED_STRIP_BUS);
-            break;
-        case eLed::LED_BT:
-            fnLedStrip.toggle(stripLed::LED_STRIP_BT);
-            break;
-        case eLed::LED_WIFI:
-            fnLedStrip.toggle(stripLed::LED_STRIP_WIFI);
-            break;
-        default:
-            break;
-        }
+    case eLed::LED_BUS:
+        fnLedStrip.toggle(stripLed::LED_STRIP_BUS);
+        break;
+    case eLed::LED_BT:
+        fnLedStrip.toggle(stripLed::LED_STRIP_BT);
+        break;
+    case eLed::LED_WIFI:
+        fnLedStrip.toggle(stripLed::LED_STRIP_WIFI);
+        break;
+    default:
+        break;
     }
-    else
-    {
-        set(led, !mLedState[led]);
-    }
+#endif
 }
+
 
 void LedManager::blink(eLed led, int count)
 {
-    if(fnSystem.ledstrip())
+#ifndef FUJILOAF_REV0
+    for(int i = 0; i < count; i++)
     {
-        switch (led)
-        {
-        case eLed::LED_BUS:
-            fnLedStrip.blink(stripLed::LED_STRIP_BUS, count);
-            break;
-        case eLed::LED_BT:
-            fnLedStrip.blink(stripLed::LED_STRIP_BT, count);
-            break;
-        case eLed::LED_WIFI:
-            fnLedStrip.blink(stripLed::LED_STRIP_WIFI, count);
-            break;
-        default:
-            break;
-        }
-    }
-    else
-    {
-        for(int i = 0; i < count; i++)
-        {
-            toggle(led);
+        toggle(led);
+        fnSystem.delay(BLINKING_TIME);
+        toggle(led);
+        if(i < count - 1)
             fnSystem.delay(BLINKING_TIME);
-            toggle(led);
-            if(i < count - 1)
-                fnSystem.delay(BLINKING_TIME);
-        }
     }
+#else
+    switch (led)
+    {
+    case eLed::LED_BUS:
+        fnLedStrip.blink(stripLed::LED_STRIP_BUS, count);
+        break;
+    case eLed::LED_BT:
+        fnLedStrip.blink(stripLed::LED_STRIP_BT, count);
+        break;
+    case eLed::LED_WIFI:
+        fnLedStrip.blink(stripLed::LED_STRIP_WIFI, count);
+        break;
+    default:
+        break;
+    }
+#endif
 }
