@@ -116,9 +116,9 @@ void main_setup()
         Config.get_wifi_ssid().c_str(),
         Config.get_wifi_passphrase().c_str()
     );
-    // Connect with default WiFi settings if not connected
-    if ( strlen( WIFI_SSID ) && !fnWiFi.connected() )
-        fnWiFi.connect( WIFI_SSID, WIFI_PASSWORD );
+    // Try connect with default WiFi settings if not connected
+    //if ( strlen( "\"" WIFI_SSID "\"" ) && !fnWiFi.connected() )
+    //    fnWiFi.connect( WIFI_SSID, WIFI_PASSWORD );
 
     // Setup IEC Bus
     IEC.setup();
