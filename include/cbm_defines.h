@@ -163,7 +163,7 @@ typedef enum
 #define TIMING_Tf      45      // FRAME HANDSHAKE                               0       20us        1000us      (If maximum time exceeded, frame error.)
 #define TIMEOUT_Tf     1000
 #define TIMING_Tr      20      // FRAME TO RELEASE OF ATN                       20us    -           -
-#define TIMING_Tbb     350     // BETWEEN BYTES TIME                            100us   -           -
+#define TIMING_Tbb     100     // BETWEEN BYTES TIME                            100us   -           -
 #define TIMING_Tye     250     // EOI RESPONSE TIME                             200us   250us       -
 #define TIMING_Tei     60      // EOI RESPONSE HOLD TIME                        60us    -           -           (Tei minimum must be 80μ s for external device to be a listener.)
 #define TIMING_Try     30      // TALKER RESPONSE LIMIT                         0       30us        60us

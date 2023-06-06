@@ -44,6 +44,7 @@ flash_filesystem = FLASH_SPIFFS
 ;flash_filesystem = FLASH_LITTLEFS
 
 ; Espressif32 PlatformIO Version to use for building
+; https://github.com/platformio/platform-espressif32/releases
 esp32_platform_version = 5.1.0
 ;esp32s3_platform_version = 6.1.0
 

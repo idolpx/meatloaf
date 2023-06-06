@@ -25,6 +25,8 @@
 // https://eden.mose.org.uk/gitweb/?p=rom-reverse.git;a=blob;f=src/vic-1541-sfd.asm;hb=HEAD
 // https://www.pagetable.com/docs/Inside%20Commodore%20DOS.pdf
 // http://www.ffd2.com/fridge/docs/1541dis.html#E853
+// http://unusedino.de/ec64/technical/aay/c1541/
+// http://unusedino.de/ec64/technical/aay/c1581/
 //
 
 #include <cstdint>

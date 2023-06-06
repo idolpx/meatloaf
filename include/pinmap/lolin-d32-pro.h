@@ -85,6 +85,16 @@
 #define PIN_IEC_DATA_IN    	GPIO_NUM_25
 #define PIN_IEC_DATA_OUT   	GPIO_NUM_25
 #define PIN_IEC_SRQ			GPIO_NUM_26
+// GND - Be sure to connect GND of the IEC cable to GND on the ESP module
+
+
+// // Display Connector Pins
+// #define PIN_IEC_ATN         GPIO_NUM_32
+// #define PIN_IEC_CLK_IN      GPIO_NUM_33
+// #define PIN_IEC_CLK_OUT     GPIO_NUM_33
+// #define PIN_IEC_DATA_IN     GPIO_NUM_14
+// #define PIN_IEC_DATA_OUT    GPIO_NUM_14
+// #define PIN_IEC_SRQ         GPIO_NUM_27
 
 
 /* Modem/Parallel Switch */

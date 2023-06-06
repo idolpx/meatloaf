@@ -154,13 +154,13 @@ void IRAM_ATTR systemBus::service()
             flags = CLEAR;
 
             // Read bus command bytes
-            Debug_printv("command");
+            //Debug_printv("command");
             read_command();
         }
 
         if (bus_state == BUS_PROCESS)
         {
-            Debug_printv("data");
+            //Debug_printv("data");
             if (data.secondary == IEC_OPEN || data.secondary == IEC_REOPEN)
             {
                 // Switch to detected protocol
@@ -220,7 +220,7 @@ void IRAM_ATTR systemBus::service()
     //Debug_printv ( "primary[%.2X] secondary[%.2X] bus[%d] flags[%d]", data.primary, data.secondary, bus_state, flags );
     //Debug_printv ( "device[%d] channel[%d]", data.device, data.channel);
 
-    Debug_printv("exit");
+    //Debug_printv("exit");
     //release( PIN_IEC_SRQ );
 
     //fnLedStrip.stopRainbow();
@@ -386,7 +386,7 @@ void systemBus::read_command()
         //Debug_printv("release lines");
         data.init();
         releaseLines();
-        Debug_printv("bus init");
+        //Debug_printv("bus init");
     }
 
     //Debug_printv ( "code[%.2X] primary[%.2X] secondary[%.2X] bus[%d] flags[%d]", c, data.primary, data.secondary, bus_state, flags );
@@ -467,7 +467,7 @@ void systemBus::timer_stop()
 
 std::shared_ptr<IecProtocolBase> systemBus::selectProtocol() 
 {
-    Debug_printv("protocol[%d]", detected_protocol);
+    //Debug_printv("protocol[%d]", detected_protocol);
     
     if ( detected_protocol == PROTOCOL_JIFFYDOS ) {
         auto p = std::make_shared<JiffyDOS>();
@@ -609,12 +609,6 @@ bool systemBus::sendByte(const char c, bool eoi)
     if ( IEC.flags & ERROR )
         return false;
 
-#ifdef DATA_STREAM
-    if (eoi)
-        Debug_printf("%.2X[eoi] ", c);
-    else
-        Debug_printf("%.2X ", c);
-#endif
     if (!protocol->sendByte(c, eoi))
     {
         if (!(IEC.flags & ATN_PULLED))
@@ -625,6 +619,13 @@ bool systemBus::sendByte(const char c, bool eoi)
             return false;
         }
     }
+
+#ifdef DATA_STREAM
+    if (eoi)
+        Debug_printf("%.2X[eoi] ", c);
+    else
+        Debug_printf("%.2X ", c);
+#endif
 
     return true;
 }
@@ -756,22 +757,11 @@ bool IRAM_ATTR systemBus::turnAround()
         flags |= ERROR;
         return false; // return error because timeout
     }
+    release ( PIN_IEC_DATA_OUT );
 
     // Delay after ATN is RELEASED
-    protocol->wait( TIMING_Ttk, 0, false );
-
-    // Wait until the computer releases the clock line
-    if (protocol->timeoutWait(PIN_IEC_CLK_IN, RELEASED, FOREVER) == TIMED_OUT)
-    {
-        Debug_printf("Wait until the computer releases the clock line");
-        flags |= ERROR;
-        return false; // return error because timeout
-    }
-
-    release ( PIN_IEC_DATA_OUT );
-    fnSystem.delay_microseconds ( TIMING_Tv );
+    protocol->wait( ( TIMING_Ttk + TIMING_Tda ), 0, false );
     pull ( PIN_IEC_CLK_OUT );
-    fnSystem.delay_microseconds ( TIMING_Tv );
 
     // Debug_println("turnaround complete");
     return true;

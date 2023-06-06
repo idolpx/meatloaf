@@ -91,7 +91,7 @@ device_state_t iecDrive::process()
 {
     virtualDevice::process();
 
-    Debug_printv("channel[%d]", commanddata.channel);
+    //Debug_printv("channel[%d]", commanddata.channel);
 
     switch (commanddata.channel)
     {
@@ -169,7 +169,7 @@ void iecDrive::process_command()
 
 void iecDrive::process_channel()
 {
-    Debug_printv("secondary[%.2X]", commanddata.secondary);
+    //Debug_printv("secondary[%.2X]", commanddata.secondary);
     switch (commanddata.secondary)
     {
     case IEC_OPEN:
@@ -268,7 +268,7 @@ void iecDrive::iec_reopen_save()
 
 void iecDrive::iec_reopen_channel()
 {
-    Debug_printv("primary[%.2X]", commanddata.primary);
+    //Debug_printv("primary[%.2X]", commanddata.primary);
     switch (commanddata.primary)
     {
     case IEC_LISTEN:
@@ -288,7 +288,7 @@ void iecDrive::iec_reopen_channel_listen()
 
 void iecDrive::iec_reopen_channel_talk()
 {
-    Debug_printv("here");
+    //Debug_printv("here");
     sendFile();
 }
 
@@ -559,7 +559,7 @@ void iecDrive::set_prefix()
 
 std::shared_ptr<MStream> iecDrive::retrieveStream ( uint8_t channel )
 {
-    Debug_printv("Stream key[%d]", channel);
+    //Debug_printv("Stream key[%d]", channel);
 
     if ( streams.find ( channel ) != streams.end() )
     {
@@ -1006,108 +1006,106 @@ bool iecDrive::sendFile()
     if ( !len )
         len = -1;
 
+    //fnLedStrip.startRainbow(300);
+
+    if( IEC.data.channel == CHANNEL_LOAD )
     {
-        //fnLedStrip.startRainbow(300);
+        // Get/Send file load address
+        i = 2;
+        istream->read(&b, 1);
+        success_tx = IEC.sendByte(b);
+        load_address = b & 0x00FF; // low byte
+        sys_address = b;
+        istream->read(&b, 1);
+        success_tx = IEC.sendByte(b);
+        load_address = load_address | b << 8;  // high byte
+        sys_address += b * 256;
+        Debug_printv( "load_address[$%.4X] sys_address[%d]", load_address, sys_address );
 
-        if( IEC.data.channel == CHANNEL_LOAD )
-        {
-            // Get/Send file load address
-            i = 2;
-            istream->read(&b, 1);
-            success_tx = IEC.sendByte(b);
-            load_address = b & 0x00FF; // low byte
-            sys_address = b;
-            istream->read(&b, 1);
-            success_tx = IEC.sendByte(b);
-            load_address = load_address | b << 8;  // high byte
-            sys_address += b * 256;
-            Debug_printv( "load_address[$%.4X] sys_address[%d]", load_address, sys_address );
-
-            // Get SYSLINE
-        }
-
-        // Read byte
-        success_rx = istream->read(&b, 1);
-        Debug_printv("b[%02X] success[%d]", b, success_rx);
-
-        Debug_printf("sendFile: [$%.4X]\r\n=================================\r\n", load_address);
-        while( success_rx && !istream->error() )
-        {
-            // Read next byte
-            success_rx = istream->read(&nb, 1);
-
-            //Debug_printv("b[%02X] nb[%02X] success_rx[%d] error[%d]", b, nb, success_rx, istream->error());
-#ifdef DATA_STREAM
-            if (bi == 0)
-            {
-                Debug_printf(":%.4X ", load_address);
-                load_address += 8;
-            }
-#endif
-            // Send Byte
-            avail = istream->available();
-            if ( !avail || !success_rx )
-            {
-                //Debug_printv("b[%02X] EOI", b);
-                success_tx = IEC.sendByte(b, true); // indicate end of file.
-                if ( !success_tx )
-                    Debug_printv("tx fail");
-                
-                break;
-            }
-            else
-            {
-                success_tx = IEC.sendByte(b);
-                if ( !success_tx )
-                {
-                    Debug_printv("tx fail");
-                    break;
-                }
-                    
-            }
-            b = nb; // byte = next byte
-            i++;
-
-#ifdef DATA_STREAM
-            // Show ASCII Data
-            if (b < 32 || b >= 127)
-                ba[bi++] = 46;
-            else
-                ba[bi++] = b;
-
-            if(bi == 8)
-            {
-                uint32_t t = (i * 100) / len;
-                Debug_printf(" %s (%d %d%%) [%d]\r\n", ba, i, t, avail);
-                bi = 0;
-            }
-#else
-            uint32_t t = (i * 100) / len;
-            Debug_printf("\rTransferring %d%% [%d, %d]      ", t, i, avail);
-#endif
-
-            // Exit if ATN is PULLED while sending
-            if ( IEC.flags & ATN_PULLED )
-            {
-                Debug_printv("ATN pulled while sending. i[%d]", i);
-
-                // Save file pointer position
-                istream->seek(istream->position() - 2);
-                success_rx = true;
-                break;
-            }
-
-            // // Toggle LED
-            // if (i % 50 == 0)
-            // {
-            // 	fnLedManager.toggle(eLed::LED_BUS);
-            // }
-        }
-        Debug_printf("\r\n=================================\r\n%d bytes sent of %d [SYS%d]\r\n", i, avail, sys_address);
-
-        //Debug_printv("len[%d] avail[%d] success_rx[%d]", len, avail, success_rx);		
+        // Get SYSLINE
     }
 
+    // Read byte
+    success_rx = istream->read(&b, 1);
+    //Debug_printv("b[%02X] success[%d]", b, success_rx);
+
+    Debug_printf("sendFile: [$%.4X]\r\n=================================\r\n", load_address);
+    while( success_rx && !istream->error() )
+    {
+        // Read next byte
+        success_rx = istream->read(&nb, 1);
+
+        //Debug_printv("b[%02X] nb[%02X] success_rx[%d] error[%d]", b, nb, success_rx, istream->error());
+#ifdef DATA_STREAM
+        if (bi == 0)
+        {
+            Debug_printf(":%.4X ", load_address);
+            load_address += 8;
+        }
+#endif
+        // Send Byte
+        avail = istream->available();
+        if ( !avail || !success_rx )
+        {
+            //Debug_printv("b[%02X] EOI", b);
+            success_tx = IEC.sendByte(b, true); // indicate end of file.
+            if ( !success_tx )
+                Debug_printv("tx fail");
+            
+            break;
+        }
+        else
+        {
+            success_tx = IEC.sendByte(b);
+            if ( !success_tx )
+            {
+                Debug_printv("tx fail");
+                //break;
+            }
+                
+        }
+        b = nb; // byte = next byte
+        i++;
+
+#ifdef DATA_STREAM
+        // Show ASCII Data
+        if (b < 32 || b >= 127)
+            ba[bi++] = 46;
+        else
+            ba[bi++] = b;
+
+        if(bi == 8)
+        {
+            uint32_t t = (i * 100) / len;
+            Debug_printf(" %s (%d %d%%) [%d]\r\n", ba, i, t, avail);
+            bi = 0;
+        }
+#else
+        uint32_t t = (i * 100) / len;
+        Debug_printf("\rTransferring %d%% [%d, %d]      ", t, i, avail);
+#endif
+
+        // Exit if ATN is PULLED while sending
+        //if ( IEC.status ( PIN_IEC_ATN ) == PULLED )
+        if ( IEC.flags & ATN_PULLED )
+        {
+            //Debug_printv("ATN pulled while sending. i[%d]", i);
+
+            // Save file pointer position
+            istream->seek(istream->position() - 2);
+            //success_rx = true;
+            break;
+        }
+
+        // // Toggle LED
+        // if (i % 50 == 0)
+        // {
+        // 	fnLedManager.toggle(eLed::LED_BUS);
+        // }
+    }
+    Debug_printf("\r\n=================================\r\n%d bytes sent of %d [SYS%d]\r\n", i, avail, sys_address);
+
+    //Debug_printv("len[%d] avail[%d] success_rx[%d]", len, avail, success_rx);
 
     //fnLedManager.set(eLed::LED_BUS, false);
     //fnLedStrip.stopRainbow();
