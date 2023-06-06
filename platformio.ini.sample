@@ -60,7 +60,9 @@ data_dir = $PROJECT_DIR/data/${meatloaf.build_platform}
 [env]
 ; Common settings for all enivornments
 framework = espidf
-extra_scripts = pre:build_version.py
+extra_scripts = 
+    pre:build_version.py
+    post:pack_firmware.py
 lib_ldf_mode = deep+
 upload_speed = 460800 ;921600
 ;upload_port = COM1 ; Windows
