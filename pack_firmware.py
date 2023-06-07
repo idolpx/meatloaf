@@ -20,11 +20,20 @@ Import("env")
 
 platform = env.PioPlatform()
 
-import sys
+import sys, os, configparser
 from os.path import join
 
 sys.path.append(join(platform.get_package_dir("tool-esptoolpy")))
 import esptool
+
+
+# Create the 'firmware' output folder if it doesn't exist
+if not os.path.exists('firmware'):
+    os.makedirs('firmware')
+
+config = configparser.ConfigParser()
+config.read('platformio.ini')
+build_board = config['meatloaf']['build_board'].split()[0]
 
 def esp32_create_combined_bin(source, target, env):
     print("Generating combined binary for serial flashing")
@@ -33,7 +42,7 @@ def esp32_create_combined_bin(source, target, env):
     # This is defined in the partition .csv file
     app_offset = 0x10000
 
-    new_file_name = env.subst("$BUILD_DIR/${PROGNAME}.factory.bin")
+    new_file_name = f"firmware/meatloaf.{build_board}.factory.bin"
     sections = env.subst(env.get("FLASH_EXTRA_IMAGES"))
     firmware_name = env.subst("$BUILD_DIR/${PROGNAME}.bin")
     chip = env.get("BOARD_MCU")
