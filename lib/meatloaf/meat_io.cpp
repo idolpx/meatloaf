@@ -302,7 +302,7 @@ MFileSystem::~MFileSystem() {}
  ********************************************************/
 
 MFile::MFile(std::string path) {
-    Debug_printv("path[%s]", path.c_str());
+    // Debug_printv("path[%s]", path.c_str());
 
     // if ( mstr::contains(path, "$") )
     // {

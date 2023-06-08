@@ -247,14 +247,14 @@ void iecDrive::iec_close()
 void iecDrive::iec_reopen_load()
 {
     Debug_printv( "_base[%s] _last_file[%s]", _base->url.c_str(), _last_file.c_str() );
-    // if ( _base->isDirectory() ) 
-    // {
-    //     sendListing();
-    // }
-    // else
-    // {
+    if ( _base->isDirectory() ) 
+    {
+        sendListing();
+    }
+    else
+    {
         sendFile();
-    //}
+    }
 }
 
 void iecDrive::iec_reopen_save()
