@@ -248,18 +248,15 @@ void KeyManager::_keystate_task(void *param)
             Debug_println("Sent RESET signal to Commodore");
 #endif
 
-#if defined(PINMAP_A2_REV0) || defined(PINMAP_FUJILOAF_REV0)
-            if(fnSystem.ledstrip())
-            {
+#if defined(PINMAP_A2_REV0)
+#if defined(PINMAP_FUJILOAF_REV0)
                 if (fnLedStrip.rainbowTimer > 0)
                     fnLedStrip.stopRainbow();
                 else
                     fnLedStrip.startRainbow(10);
-            }
-            else
-            {
+#else
                 fnLedManager.blink(LED_BUS, 2); // blink to confirm a button press
-            }
+#endif
             Debug_println("ACTION: Reboot");
             //fnSystem.reboot();
             IEC.releaseLines();
