@@ -54,7 +54,7 @@ static void ml_iec_intr_task(void* arg)
 
 void systemBus::setup()
 {
-    Debug_printf("IEC systemBus::setup()\n");
+    Debug_printf("IEC systemBus::setup()\r\n");
 
     flags = CLEAR;
     protocol = selectProtocol();
@@ -172,12 +172,12 @@ void IRAM_ATTR systemBus::service()
             // Data Mode - Get Command or Data
             if (data.primary == IEC_LISTEN)
             {
-                //Debug_printv("calling deviceListen()\n");
+                //Debug_printv("calling deviceListen()\r\n");
                 deviceListen();
             }
             else if (data.primary == IEC_TALK)
             {
-                //Debug_printv("calling deviceTalk()\n");
+                //Debug_printv("calling deviceTalk()\r\n");
                 deviceTalk();
             }
 
@@ -348,7 +348,7 @@ void systemBus::read_command()
     // // Is this command for us?
     // if (!deviceById(data.device) || !deviceById(data.device)->device_active)
     // {
-    //     //Debug_printf("Command not for us, ignoring.\n");
+    //     //Debug_printf("Command not for us, ignoring.\r\n");
     //     bus_state = BUS_IDLE;
     // }
 
@@ -458,7 +458,7 @@ void systemBus::timer_stop()
     // Delete existing timer
     if (rateTimerHandle != nullptr)
     {
-        Debug_println("Deleting existing rateTimer\n");
+        Debug_println("Deleting existing rateTimer\r\n");
         esp_timer_stop(rateTimerHandle);
         esp_timer_delete(rateTimerHandle);
         rateTimerHandle = nullptr;
@@ -558,18 +558,18 @@ void virtualDevice::iec_talk_command_buffer_status()
     snprintf(reply, 80, "%u,%s,%u,%u", iecStatus.error, iecStatus.msg.c_str(), iecStatus.connected, iecStatus.channel);
     s = std::string(reply);
     mstr::toPETSCII(s);
-        Debug_printv("sending status: %s\n", reply);
+        Debug_printv("sending status: %s\r\n", reply);
     IEC.sendBytes(s);
     }
 }
 
 void virtualDevice::dumpData()
 {
-    Debug_printf("%9s: %02X\n", "Primary", commanddata.primary);
-    Debug_printf("%9s: %02u\n", "Device", commanddata.device);
-    Debug_printf("%9s: %02X\n", "Secondary", commanddata.secondary);
-    Debug_printf("%9s: %02u\n", "Channel", commanddata.channel);
-    Debug_printf("%9s: %s\n", "Payload", commanddata.payload.c_str());
+    Debug_printf("%9s: %02X\r\n", "Primary", commanddata.primary);
+    Debug_printf("%9s: %02u\r\n", "Device", commanddata.device);
+    Debug_printf("%9s: %02X\r\n", "Secondary", commanddata.secondary);
+    Debug_printf("%9s: %02u\r\n", "Channel", commanddata.channel);
+    Debug_printf("%9s: %s\r\n", "Payload", commanddata.payload.c_str());
 }
 
 void systemBus::assert_interrupt()
@@ -798,12 +798,12 @@ void systemBus::addDevice(virtualDevice *pDevice, int device_id)
 {
     if (!pDevice)
     {
-        Debug_printf("systemBus::addDevice() pDevice == nullptr! returning.\n");
+        Debug_printf("systemBus::addDevice() pDevice == nullptr! returning.\r\n");
         return;
     }
 
     // TODO, add device shortcut pointer logic like others
-    Debug_printf("Device #%02d Ready!\n", device_id);
+    Debug_printf("Device #%02d Ready!\r\n", device_id);
 
     pDevice->_devnum = device_id;
     _daisyChain.push_front(pDevice);
@@ -814,7 +814,7 @@ void systemBus::remDevice(virtualDevice *pDevice)
 {
     if (!pDevice)
     {
-        Debug_printf("system Bus::remDevice() pDevice == nullptr! returning\n");
+        Debug_printf("system Bus::remDevice() pDevice == nullptr! returning\r\n");
         return;
     }
 
@@ -833,7 +833,7 @@ void systemBus::changeDeviceId(virtualDevice *pDevice, int device_id)
 {
     if (!pDevice)
     {
-        Debug_printf("systemBus::changeDeviceId() pDevice == nullptr! returning.\n");
+        Debug_printf("systemBus::changeDeviceId() pDevice == nullptr! returning.\r\n");
         return;
     }
 
@@ -860,10 +860,10 @@ void systemBus::shutdown()
 
     for (auto devicep : _daisyChain)
     {
-        Debug_printf("Shutting down device #%02d\n", devicep->id());
+        Debug_printf("Shutting down device #%02d\r\n", devicep->id());
         devicep->shutdown();
     }
-    Debug_printf("All devices shut down.\n");
+    Debug_printf("All devices shut down.\r\n");
 }
 
 systemBus IEC;

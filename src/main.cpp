@@ -52,21 +52,21 @@ void main_setup()
     fnUartDebug.begin(DEBUG_SPEED);
     unsigned long startms = fnSystem.millis();
     
-    Debug_printf( ANSI_WHITE "\n\n" ANSI_BLUE_BACKGROUND "==============================" ANSI_RESET_NL );
+    Debug_printf( ANSI_WHITE "\r\n\r\n" ANSI_BLUE_BACKGROUND "==============================" ANSI_RESET_NL );
     Debug_printf( ANSI_BLUE_BACKGROUND "   " PRODUCT_ID " " FW_VERSION "   " ANSI_RESET_NL );
     Debug_printf( ANSI_BLUE_BACKGROUND "   " PLATFORM_DETAILS "    " ANSI_RESET_NL );
-    Debug_printf( ANSI_BLUE_BACKGROUND "------------------------------" ANSI_RESET_NL "\n" );
+    Debug_printf( ANSI_BLUE_BACKGROUND "------------------------------" ANSI_RESET_NL "\r\n" );
 
-    Debug_printf( "FujiNet %s Started @ %lu\n", fnSystem.get_fujinet_version(), startms );
+    Debug_printf( "Meatloaf %s Started @ %lu\r\n", fnSystem.get_fujinet_version(), startms );
 
-    Debug_printf( "Starting heap: %u\n", fnSystem.get_free_heap_size() );
+    Debug_printf( "Starting heap: %u\r\n", fnSystem.get_free_heap_size() );
 
 #ifdef BOARD_HAS_PSRAM
-    Debug_printf( "PsramSize %u\n", fnSystem.get_psram_size() );
+    Debug_printf( "PsramSize %u\r\n", fnSystem.get_psram_size() );
 
-    Debug_printf( "himem phys %u\n", esp_himem_get_phys_size() );
-    Debug_printf( "himem free %u\n", esp_himem_get_free_size() );
-    Debug_printf( "himem reserved %u\n", esp_himem_reserved_area_size() );
+    Debug_printf( "himem phys %u\r\n", esp_himem_get_phys_size() );
+    Debug_printf( "himem free %u\r\n", esp_himem_get_free_size() );
+    Debug_printf( "himem reserved %u\r\n", esp_himem_reserved_area_size() );
 #endif
 
 
@@ -88,7 +88,7 @@ void main_setup()
     gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
 
     fnSystem.check_hardware_ver();
-    Debug_printf("Detected Hardware Version: %s\n", fnSystem.get_hardware_ver_str());
+    Debug_printf("Detected Hardware Version: %s\r\n", fnSystem.get_hardware_ver_str());
 
     fnKeyManager.setup();
     fnLedManager.setup();
@@ -127,7 +127,7 @@ void main_setup()
     // Add devices to bus
     FileSystem *ptrfs = fnSDFAT.running() ? (FileSystem *)&fnSDFAT : (FileSystem *)&fsFlash;
     iecPrinter::printer_type ptype = iecPrinter::printer_type::PRINTER_COMMODORE_MPS803; // temporary
-    Debug_printf("Creating a default printer using %s storage and type %d\n", ptrfs->typestring(), ptype);
+    Debug_printf("Creating a default printer using %s storage and type %d\r\n", ptrfs->typestring(), ptype);
     iecPrinter *ptr = new iecPrinter(ptrfs, ptype);
     fnPrinters.set_entry(0, ptr, ptype, Config.get_printer_port(0));
     Debug_print("Printer "); IEC.addDevice(ptr, 4); // add as device #4 for now
@@ -166,7 +166,7 @@ void main_setup()
 
 #ifdef DEBUG
     unsigned long endms = fnSystem.millis();
-    Debug_printf("Available heap: %u\nSetup complete @ %lu (%lums)\n", fnSystem.get_free_heap_size(), endms, endms - startms);
+    Debug_printf("Available heap: %u\r\nSetup complete @ %lu (%lums)\r\n", fnSystem.get_free_heap_size(), endms, endms - startms);
 #endif // DEBUG
 
     runTestsSuite();
@@ -193,7 +193,7 @@ void fn_console_loop(void *param)
 
     if(e == ESP_OK) {
         while((line = linenoise("hello> ")) != NULL) {
-            printf("You wrote: %s\n", line);
+            printf("You wrote: %s\r\n", line);
             linenoiseFree(line); /* Or just free(line) if you use libc malloc. */
         }
     }

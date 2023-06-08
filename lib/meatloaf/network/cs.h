@@ -44,7 +44,7 @@ public:
             return true;
 
         int rc = m_wifi.open("commodoreserver.com", 1541);
-        Serial.printf("csstreambuf: connect to cserver returned: %d\n", rc);
+        Serial.printf("csstreambuf: connect to cserver returned: %d\r\n", rc);
 
         if(rc == 1) {
             if(gbuf == nullptr)
@@ -59,7 +59,7 @@ public:
     }
 
     void close() {
-        Serial.printf("csstreambuf: closing\n");
+        Serial.printf("csstreambuf: closing\r\n");
         if(m_wifi.isOpen()) {
             m_wifi.close();
         }
@@ -214,7 +214,7 @@ public:
     {
         media_blocks_free = 65535;
         media_block_size = 1; // blocks are already calculated
-        parseUrl(path);
+        //parseUrl(path);
         // Debug_printv("path[%s] size[%d]", path.c_str(), size);
     };
 

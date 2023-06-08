@@ -131,7 +131,7 @@
 //         return false;
 
 //     //int httpCode = m_http.PUT(); //Send the request
-// //Serial.printf("URLSTR: httpCode=%d\n", httpCode);
+// //Serial.printf("URLSTR: httpCode=%d\r\n", httpCode);
 //     // if(httpCode != 200)
 //     //     return false;
 

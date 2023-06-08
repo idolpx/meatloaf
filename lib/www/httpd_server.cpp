@@ -247,8 +247,8 @@ httpd_handle_t cHttpdServer::start_server(serverstate &state)
     config.global_user_ctx_free_fn = (httpd_free_ctx_fn_t)custom_global_ctx_free;
     config.uri_match_fn = httpd_uri_match_wildcard;
 
-    Debug_printf("Starting web server on port %d\n", config.server_port);
-    // Debug_printf("Starting web server on port %d, CPU Core %d\n", config.server_port, config.core_id);
+    Debug_printf("Starting web server on port %d\r\n", config.server_port);
+    // Debug_printf("Starting web server on port %d, CPU Core %d\r\n", config.server_port, config.core_id);
 
     // esp_log_level_set("httpd_uri", ESP_LOG_DEBUG);
 
@@ -364,7 +364,7 @@ void cHttpdServer::send_file(httpd_req_t *req, const char *filename)
     // if (!file->exists())
     if (file == nullptr)
     {
-        Debug_printf("Failed to open file for sending: '%s'\n", fpath.c_str());
+        Debug_printf("Failed to open file for sending: '%s'\r\n", fpath.c_str());
         return_http_error(req, http_err_fileopen);
     }
     else
@@ -425,7 +425,7 @@ void cHttpdServer::send_file_parsed(httpd_req_t *req, const char *filename)
         char *buf = (char *)calloc(sz, 1);
         if (buf == NULL)
         {
-            Debug_printf("Couldn't allocate %u bytes to load file contents!\n", sz);
+            Debug_printf("Couldn't allocate %u bytes to load file contents!\r\n", sz);
             err = http_err_memory;
         }
         else

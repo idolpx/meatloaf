@@ -75,7 +75,7 @@ public:
         // TODO - check what's the value of BSD_ERROR_WOULDBLOCK and if recv returns
         // error - mark this socket closed
         if(!isOpen()) {
-            Debug_println("tcp read - NOT OPEN!\n");
+            Debug_println("tcp read - NOT OPEN!\r\n");
             return -100;
         }
         //Debug_printv("tcp::read - calling recv, buff!=null:%d, buffsize=%d, blocking=%d", buffer!=nullptr, bufsize, blocking);

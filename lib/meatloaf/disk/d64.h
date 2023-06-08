@@ -309,11 +309,12 @@ class D64FileSystem: public MFileSystem
 {
 public:
     MFile* getFile(std::string path) override {
+        //Debug_printv("path[%s]", path.c_str());
         return new D64File(path);
     }
 
     bool handles(std::string fileName) {
-        //Serial.printf("handles w dnp %s %d\n", fileName.rfind(".dnp"), fileName.length()-4);
+        //Serial.printf("handles w dnp %s %d\r\n", fileName.rfind(".dnp"), fileName.length()-4);
         return byExtension(".d64", fileName);
     }
 

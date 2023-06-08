@@ -67,11 +67,11 @@ void KeyManager::setup()
         else
         {
             fnSystem.set_pin_mode(fnSystem.get_safe_reset_gpio(), gpio_mode_t::GPIO_MODE_INPUT, SystemManager::pull_updown_t::PULL_UP);
-            Debug_printf("Safe Reset button ENABLED on GPIO %d\n", fnSystem.get_safe_reset_gpio());
+            Debug_printf("Safe Reset button ENABLED on GPIO %d\r\n", fnSystem.get_safe_reset_gpio());
         }
 #else
         fnSystem.set_pin_mode(fnSystem.get_safe_reset_gpio(), gpio_mode_t::GPIO_MODE_INPUT, SystemManager::pull_updown_t::PULL_NONE);
-        Debug_printf("Safe Reset button ENABLED on GPIO %d\n", fnSystem.get_safe_reset_gpio());
+        Debug_printf("Safe Reset button ENABLED on GPIO %d\r\n", fnSystem.get_safe_reset_gpio());
 #endif
     }
 
@@ -263,12 +263,12 @@ void KeyManager::_keystate_task(void *param)
             Debug_println("ACTION: Reboot");
             //fnSystem.reboot();
             IEC.releaseLines();
-            Debug_printf("bus_state[%d]\n", IEC.bus_state);
-            Debug_printf("Heap: %lu\n",esp_get_free_internal_heap_size());
-            Debug_printf("PsramSize: %u\n", fnSystem.get_psram_size());
-            Debug_printf("himem phys: %u\n", esp_himem_get_phys_size());
-            Debug_printf("himem free: %u\n", esp_himem_get_free_size());
-            Debug_printf("himem reserved: %u\n", esp_himem_reserved_area_size());
+            Debug_printf("bus_state[%d]\r\n", IEC.bus_state);
+            Debug_printf("Heap: %lu\r\n",esp_get_free_internal_heap_size());
+            Debug_printf("PsramSize: %u\r\n", fnSystem.get_psram_size());
+            Debug_printf("himem phys: %u\r\n", esp_himem_get_phys_size());
+            Debug_printf("himem free: %u\r\n", esp_himem_get_free_size());
+            Debug_printf("himem reserved: %u\r\n", esp_himem_reserved_area_size());
 #else
             fnLedManager.blink(BLUETOOTH_LED, 2); // blink to confirm a button press
 #endif // PINMAP_A2_REV0

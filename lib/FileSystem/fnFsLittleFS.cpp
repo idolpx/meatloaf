@@ -62,7 +62,7 @@ fsdir_entry * FileSystemLittleFS::dir_read()
             _direntry.modified_time = s.st_mtime;
         }
         #ifdef DEBUG
-            // Debug_printv("stat \"%s\" errno %d\n", fpath, errno);
+            // Debug_printv("stat \"%s\" errno %d\r\n", fpath, errno);
         #endif
         return &_direntry;
     }
@@ -128,10 +128,10 @@ bool FileSystemLittleFS::create_path(const char *fullpath)
                is (end - fullpath) + 2
             */
             strlcpy(segment, fullpath, end - fullpath + (done ? 2 : 1));
-            Debug_printf("Checking/creating directory: \"%s\"\n", segment);
+            Debug_printf("Checking/creating directory: \"%s\"\r\n", segment);
             if(0 != mkdir(segment))
             {
-                Debug_printf("FAILED errno=%d\n", errno);
+                Debug_printf("FAILED errno=%d\r\n", errno);
             }
         }
 
@@ -155,7 +155,7 @@ bool FileSystemLittleFS::exists(const char* path)
     struct stat st;
     int i = stat(fpath, &st);
 #ifdef DEBUG
-    //Debug_printv("FileSystemLittleFS::exists returned %d on \"%s\" (%s)\n", i, path, fpath);
+    //Debug_printv("FileSystemLittleFS::exists returned %d on \"%s\" (%s)\r\n", i, path, fpath);
 #endif
     free(fpath);
     return (i == 0);
@@ -166,7 +166,7 @@ bool FileSystemLittleFS::remove(const char* path)
     char * fpath = _make_fullpath(path);
     int i = ::remove(fpath);
 #ifdef DEBUG
-    Debug_printv("FileSystemLittleFS::remove returned %d on \"%s\" (%s)\n", i, path, fpath);
+    Debug_printv("FileSystemLittleFS::remove returned %d on \"%s\" (%s)\r\n", i, path, fpath);
 #endif
     free(fpath);
     return (i == 0);
@@ -178,7 +178,7 @@ bool FileSystemLittleFS::rename(const char* pathFrom, const char* pathTo)
     char * dpath = _make_fullpath(pathTo);
     int i = ::rename(spath, dpath);
 #ifdef DEBUG
-    Debug_printv("FileSystemLittleFS::rename returned %d on \"%s\" -> \"%s\" (%s -> %s)\n", i, pathFrom, pathTo, spath, dpath);
+    Debug_printv("FileSystemLittleFS::rename returned %d on \"%s\" -> \"%s\" (%s -> %s)\r\n", i, pathFrom, pathTo, spath, dpath);
 #endif
     free(spath);
     free(dpath);
@@ -219,7 +219,7 @@ bool FileSystemLittleFS::start()
     if (e != ESP_OK)
     {
         #ifdef DEBUG
-        Debug_printv("Failed to mount LittleFS partition, err = %d\n", e);
+        Debug_printv("Failed to mount LittleFS partition, err = %d\r\n", e);
         #endif
         _started = false;
     }
@@ -231,7 +231,7 @@ bool FileSystemLittleFS::start()
         /*
         size_t total = 0, used = 0;
         esp_littlefs_info(NULL, &total, &used);
-        Debug_printv("  partition size: %u, used: %u, free: %u\n", total, used, total-used);
+        Debug_printv("  partition size: %u, used: %u, free: %u\r\n", total, used, total-used);
         */
     #endif
 

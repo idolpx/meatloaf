@@ -43,7 +43,7 @@ device_state_t iecMeatloaf::process()
 
     if (commanddata.channel != 15)
     {
-        Debug_printf("Meatloaf device only accepts on channel 15. Sending NOTFOUND.\n");
+        Debug_printf("Meatloaf device only accepts on channel 15. Sending NOTFOUND.\r\n");
         device_state = DEVICE_ERROR;
         IEC.senderTimeout();
     }
@@ -373,12 +373,12 @@ void iecMeatloaf::net_set_ssid( bool store )
         }
     }
 
-    Debug_printf("Storing WiFi SSID and Password.\n");
+    Debug_printf("Storing WiFi SSID and Password.\r\n");
     Config.store_wifi_ssid(cfg.ssid, sizeof(cfg.ssid));
     Config.store_wifi_passphrase(cfg.password, sizeof(cfg.password));
     Config.save();
 
-    Debug_printf("Connecting to net %s\n", cfg.ssid);
+    Debug_printf("Connecting to net %s\r\n", cfg.ssid);
     fnWiFi.connect(cfg.ssid, cfg.password);
     
     // Only save these if we're asked to, otherwise assume it was a test for connectivity
@@ -430,7 +430,7 @@ void iecMeatloaf::net_store_ssid()
 
     // case 2
     if (ssid_in_stored != -1 && Config.have_wifi_info() && Config.get_wifi_ssid() != cfg.ssid) {
-        Debug_printf("Case 2: Found new ssid in stored at %d, and it's not current (should never happen). Pushing everything down 1 and old current to 0\n", ssid_in_stored);
+        Debug_printf("Case 2: Found new ssid in stored at %d, and it's not current (should never happen). Pushing everything down 1 and old current to 0\r\n", ssid_in_stored);
         // found the new SSID at ssid_in_stored, so move everything above it down one slot, and store the current at 0
         for (int j = ssid_in_stored; j > 0; j--)
         {
@@ -459,7 +459,7 @@ void iecMeatloaf::net_get_wifi_status()
     uint8_t wifiStatus = fnWiFi.connected() ? 3 : 6;
     char r[4];
 
-    Debug_printv("payload[0]==%02x\n", payload[0]);
+    Debug_printv("payload[0]==%02x\r\n", payload[0]);
 
     if (payload[0] == FUJICMD_GET_WIFISTATUS)
     {
@@ -506,7 +506,7 @@ void iecMeatloaf::set_boot_config()
 
         if (t.size() < 2)
         {
-            Debug_printf("Invalid # of parameters.\n");
+            Debug_printf("Invalid # of parameters.\r\n");
             response_queue.push("error: invalid # of parameters\r");
             return;
         }
@@ -535,7 +535,7 @@ void iecMeatloaf::set_boot_mode()
 
         if (t.size() < 2)
         {
-            Debug_printf("Invalid # of parameters.\n");
+            Debug_printf("Invalid # of parameters.\r\n");
             // send error
             response_queue.push("error: invalid # of parameters\r");
             return;
@@ -564,7 +564,7 @@ char *_generate_appkey_filename(appkey *info)
 */
 void iecMeatloaf::open_app_key()
 {
-    Debug_print("Fuji cmd: OPEN APPKEY\n");
+    Debug_print("Fuji cmd: OPEN APPKEY\r\n");
 
     // The data expected for this command
     if (payload[0] == FUJICMD_OPEN_APPKEY)
@@ -576,7 +576,7 @@ void iecMeatloaf::open_app_key()
 
         if (t.size() < 5)
         {
-            Debug_printf("Incorrect number of parameters.\n");
+            Debug_printf("Incorrect number of parameters.\r\n");
             response_queue.push("error: invalid # of parameters\r");
             // send error.
         }
@@ -610,7 +610,7 @@ void iecMeatloaf::open_app_key()
         return;
     }
 
-    Debug_printf("App key creator = 0x%04hx, app = 0x%02hhx, key = 0x%02hhx, mode = %hhu, filename = \"%s\"\n",
+    Debug_printf("App key creator = 0x%04hx, app = 0x%02hhx, key = 0x%02hhx, mode = %hhu, filename = \"%s\"\r\n",
                  _current_appkey.creator, _current_appkey.app, _current_appkey.key, _current_appkey.mode,
                  _generate_appkey_filename(&_current_appkey));
 
@@ -624,7 +624,7 @@ void iecMeatloaf::open_app_key()
 */
 void iecMeatloaf::close_app_key()
 {
-    Debug_print("Fuji cmd: CLOSE APPKEY\n");
+    Debug_print("Fuji cmd: CLOSE APPKEY\r\n");
     _current_appkey.creator = 0;
     _current_appkey.mode = APPKEYMODE_INVALID;
     response_queue.push("ok\r");
@@ -660,7 +660,7 @@ void iecMeatloaf::write_app_key()
         }
     }
 
-    Debug_printf("Fuji cmd: WRITE APPKEY (keylen = %hu)\n", keylen);
+    Debug_printf("Fuji cmd: WRITE APPKEY (keylen = %hu)\r\n", keylen);
 
     // Make sure we have valid app key information
     if (_current_appkey.creator == 0 || _current_appkey.mode != APPKEYMODE_WRITE)
@@ -686,7 +686,7 @@ void iecMeatloaf::write_app_key()
     _current_appkey.creator = 0;
     _current_appkey.mode = APPKEYMODE_INVALID;
 
-    Debug_printf("Writing appkey to \"%s\"\n", filename);
+    Debug_printf("Writing appkey to \"%s\"\r\n", filename);
 
     // Make sure we have a "/.app" directory, since that's where we're putting these files
     fnSDFAT.create_path("/.app");
@@ -694,7 +694,7 @@ void iecMeatloaf::write_app_key()
     FILE *fOut = fnSDFAT.file_open(filename, "w");
     if (fOut == nullptr)
     {
-        Debug_printf("Failed to open/create output file: errno=%d\n", errno);
+        Debug_printf("Failed to open/create output file: errno=%d\r\n", errno);
         // Send error
         char e[8];
         itoa(errno, e, 10);
@@ -708,7 +708,7 @@ void iecMeatloaf::write_app_key()
     if (count != keylen)
     {
         char e[128];
-        sprintf(e, "error: only wrote %u bytes of expected %hu, errno=%d\n", count, keylen, errno);
+        sprintf(e, "error: only wrote %u bytes of expected %hu, errno=%d\r\n", count, keylen, errno);
         response_queue.push(std::string(e));
         // Send error
     }
@@ -727,7 +727,7 @@ void iecMeatloaf::read_app_key()
     if (fnSDFAT.running() == false)
     {
         Debug_println("No SD mounted - can't read app key");
-        response_queue.push("error: no sd mounted\n");
+        response_queue.push("error: no sd mounted\r\n");
         // Send error
         return;
     }
@@ -743,13 +743,13 @@ void iecMeatloaf::read_app_key()
 
     char *filename = _generate_appkey_filename(&_current_appkey);
 
-    Debug_printf("Reading appkey from \"%s\"\n", filename);
+    Debug_printf("Reading appkey from \"%s\"\r\n", filename);
 
     FILE *fIn = fnSDFAT.file_open(filename, "r");
     if (fIn == nullptr)
     {
         char e[128];
-        sprintf(e, "Failed to open input file: errno=%d\n", errno);
+        sprintf(e, "Failed to open input file: errno=%d\r\n", errno);
         // Send error
         response_queue.push(std::string(e));
         return;
@@ -765,7 +765,7 @@ void iecMeatloaf::read_app_key()
     size_t count = fread(response.value, 1, sizeof(response.value), fIn);
 
     fclose(fIn);
-    Debug_printf("Read %d bytes from input file\n", count);
+    Debug_printf("Read %d bytes from input file\r\n", count);
 
     response.size = count;
 
@@ -800,7 +800,7 @@ void iecMeatloaf::shutdown()
 // Get network adapter configuration
 void iecMeatloaf::get_adapter_config()
 {
-    Debug_printf("get_adapter_config()\n");
+    Debug_printf("get_adapter_config()\r\n");
 
     memset(&cfg, 0, sizeof(cfg));
 

@@ -85,7 +85,7 @@ int WiFiManager::start()
         // Configure basic WiFi settings
         wifi_init_config_t wifi_init_cfg = WIFI_INIT_CONFIG_DEFAULT();
         ESP_ERROR_CHECK(esp_wifi_init(&wifi_init_cfg));
-        Debug_printf("WiFiManager::start() complete\n");
+        Debug_printf("WiFiManager::start() complete\r\n");
     }
 
     // TODO: Provide way to change WiFi region/country?
@@ -121,8 +121,8 @@ int WiFiManager::connect()
 
         // Check if main config works
         Debug_println("WiFiManager attempting to connect:");
-        Debug_printf("ssid = %s\n", Config.get_wifi_ssid().c_str());
-        // Debug_printf("pass = %s\n", Config.get_wifi_passphrase().c_str());
+        Debug_printf("ssid = %s\r\n", Config.get_wifi_ssid().c_str());
+        // Debug_printf("pass = %s\r\n", Config.get_wifi_passphrase().c_str());
 
         return connect(Config.get_wifi_ssid().c_str(), Config.get_wifi_passphrase().c_str());
     }
@@ -132,7 +132,7 @@ int WiFiManager::connect()
 
 int WiFiManager::connect(const char *ssid, const char *password)
 {
-    Debug_printf("WiFi connect attempt to SSID \"%s\"\n", ssid == nullptr ? "" : ssid);
+    Debug_printf("WiFi connect attempt to SSID \"%s\"\r\n", ssid == nullptr ? "" : ssid);
 
     // Only set an SSID and password if given
     if (ssid != nullptr)
@@ -143,7 +143,7 @@ int WiFiManager::connect(const char *ssid, const char *password)
             std::string current_ssid = get_current_ssid();
             if (current_ssid.compare(ssid) != 0)
             {
-                Debug_printf("Disconnecting from current SSID \"%s\"\n", current_ssid.c_str());
+                Debug_printf("Disconnecting from current SSID \"%s\"\r\n", current_ssid.c_str());
                 _disconnecting = true;
                 esp_wifi_disconnect();
                 // Must delay before changing our disconnecting flag, as the network tries to reconnect before completing the new connection
@@ -160,7 +160,7 @@ int WiFiManager::connect(const char *ssid, const char *password)
         strlcpy((char *)wifi_config.sta.ssid, ssid, sizeof(wifi_config.sta.ssid));
         strlcpy((char *)wifi_config.sta.password, password, sizeof(wifi_config.sta.password));
 
-        // Debug_printf("WiFi config double-check: \"%s\", \"%s\"\n", (char *)wifi_config.sta.ssid, (char *)wifi_config.sta.password );
+        // Debug_printf("WiFi config double-check: \"%s\", \"%s\"\r\n", (char *)wifi_config.sta.ssid, (char *)wifi_config.sta.password );
 
         wifi_config.sta.pmf_cfg.capable = true;
         ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
@@ -169,7 +169,7 @@ int WiFiManager::connect(const char *ssid, const char *password)
     // Now connect
     _reconnect_attempts = 0;
     esp_err_t e = esp_wifi_connect();
-    Debug_printf("esp_wifi_connect returned %d\n", e);
+    Debug_printf("esp_wifi_connect returned %d\r\n", e);
     return e;
 }
 
@@ -217,17 +217,17 @@ uint8_t WiFiManager::scan_networks(uint8_t maxresults)
         e = esp_wifi_scan_get_ap_num(&result);
         if (e != ESP_OK)
         {
-            Debug_printf("esp_wifi_scan_get_ap_num returned error %d\n", e);
+            Debug_printf("esp_wifi_scan_get_ap_num returned error %d\r\n", e);
         }
     }
     else
     {
-        Debug_printf("esp_wifi_scan_start returned error %d\n", e);
+        Debug_printf("esp_wifi_scan_start returned error %d\r\n", e);
     }
 
     if (e == ESP_OK)
     {
-        Debug_printf("esp_wifi_scan returned %d results\n", result);
+        Debug_printf("esp_wifi_scan returned %d results\r\n", result);
 
         // Boundary check
         if (result > maxresults)
@@ -242,7 +242,7 @@ uint8_t WiFiManager::scan_networks(uint8_t maxresults)
             e = esp_wifi_scan_get_ap_records(&numloaded, _scan_records);
             if (e != ESP_OK)
             {
-                Debug_printf("esp_wifi_scan_get_ap_records returned error %d\n", e);
+                Debug_printf("esp_wifi_scan_get_ap_records returned error %d\r\n", e);
                 if (_scan_records != nullptr)
                     free(_scan_records);
                 _scan_records = nullptr;
@@ -472,7 +472,7 @@ std::string WiFiManager::get_current_bssid_str()
 
 void WiFiManager::set_hostname(const char *hostname)
 {
-    Debug_printf("WiFiManager::set_hostname(%s)\n", hostname);
+    Debug_printf("WiFiManager::set_hostname(%s)\r\n", hostname);
     esp_netif_set_hostname(_wifi_if, hostname);
 }
 
@@ -499,7 +499,7 @@ void WiFiManager::_wifi_event_handler(void *arg, esp_event_base_t event_base,
         // Consider WiFi connected once we get an IP address
         case IP_EVENT_STA_GOT_IP:
             Debug_println("IP_EVENT_STA_GOT_IP");
-            Debug_printf("Obtained IP address: %s\n", fnSystem.Net.get_ip4_address_str().c_str());
+            Debug_printf("Obtained IP address: %s\r\n", fnSystem.Net.get_ip4_address_str().c_str());
             pFnWiFi->_connected = true;
             fnLedManager.set(eLed::LED_WIFI, true);
             fnSystem.Net.start_sntp_client();
@@ -552,7 +552,7 @@ void WiFiManager::_wifi_event_handler(void *arg, esp_event_base_t event_base,
             {
                 // we were trying stored values, and found a good connection
                 int i = pFnWiFi->_matched_wifis.at(pFnWiFi->_stored_index).index;
-                Debug_printf("Found stored entry to connect to. Shuffling everything above %d down 1\n", i);
+                Debug_printf("Found stored entry to connect to. Shuffling everything above %d down 1\r\n", i);
 
                 // copy the values that worked
                 std::string working_ssid = Config.get_wifi_stored_ssid(i);
@@ -595,7 +595,7 @@ void WiFiManager::_wifi_event_handler(void *arg, esp_event_base_t event_base,
                 pFnWiFi->_reconnect_attempts < connection_attempts && Config.have_wifi_info())
             {
                 pFnWiFi->_reconnect_attempts++;
-                Debug_printf("WiFi reconnect attempt %u of %d\n", pFnWiFi->_reconnect_attempts, connection_attempts);
+                Debug_printf("WiFi reconnect attempt %u of %d\r\n", pFnWiFi->_reconnect_attempts, connection_attempts);
                 esp_wifi_connect();
             }
             else if (pFnWiFi->_scan_in_progress == false &&
@@ -620,7 +620,7 @@ void WiFiManager::_wifi_event_handler(void *arg, esp_event_base_t event_base,
                 pFnWiFi->_trying_stored = true;
                 pFnWiFi->_reconnect_attempts = 0;
 
-                Debug_printf("Trying wifi stored config 0, SSID: %s\n", common_names.at(0).ssid);
+                Debug_printf("Trying wifi stored config 0, SSID: %s\r\n", common_names.at(0).ssid);
                 pFnWiFi->connect(common_names.at(0).ssid, Config.get_wifi_stored_passphrase(common_names.at(0).index).c_str());
             }
             else if (pFnWiFi->_scan_in_progress == false &&
@@ -632,7 +632,7 @@ void WiFiManager::_wifi_event_handler(void *arg, esp_event_base_t event_base,
                 int i = pFnWiFi->_stored_index;
                 if (i < pFnWiFi->_matched_wifis.size())
                 {
-                    Debug_printf("Trying wifi stored config %d, SSID: %s\n", i, pFnWiFi->_matched_wifis.at(i).ssid);
+                    Debug_printf("Trying wifi stored config %d, SSID: %s\r\n", i, pFnWiFi->_matched_wifis.at(i).ssid);
                     pFnWiFi->connect(pFnWiFi->_matched_wifis.at(i).ssid, Config.get_wifi_stored_passphrase(pFnWiFi->_matched_wifis.at(i).index).c_str());
                 }
             }
@@ -692,16 +692,16 @@ std::vector<WiFiManager::stored_wifi> WiFiManager::get_stored_wifis()
 
 std::vector<WiFiManager::stored_wifi> WiFiManager::match_stored_with_network_wifis(std::vector<std::string> network_names, std::vector<WiFiManager::stored_wifi> stored_wifis)
 {
-    Debug_printf("Found following networks:\n");
+    Debug_printf("Found following networks:\r\n");
     for (std::string _network_name: network_names)
     {
-        Debug_printf(" - %s\n", _network_name.c_str());
+        Debug_printf(" - %s\r\n", _network_name.c_str());
     }
 
-    Debug_printf("Found following stored networks:\n");
+    Debug_printf("Found following stored networks:\r\n");
     for (stored_wifi d: stored_wifis)
     {
-        Debug_printf(" - %s, index: %d\n", d.ssid, d.index);
+        Debug_printf(" - %s, index: %d\r\n", d.ssid, d.index);
     }
 
     std::vector<stored_wifi> common_names;
@@ -715,10 +715,10 @@ std::vector<WiFiManager::stored_wifi> WiFiManager::match_stored_with_network_wif
         }
     }
 
-    Debug_printf("Common names:\n");
+    Debug_printf("Common names:\r\n");
     for (stored_wifi d: common_names)
     {
-        Debug_printf(" - %s, index: %d\n", d.ssid, d.index);
+        Debug_printf(" - %s, index: %d\r\n", d.ssid, d.index);
     }
 
     return common_names;

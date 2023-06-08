@@ -69,7 +69,7 @@ iecDrive::~iecDrive()
 // Unmount disk file
 void iecDrive::unmount()
 {
-    Debug_print("disk UNMOUNT\n");
+    Debug_print("disk UNMOUNT\r\n");
 
     if (_base != nullptr)
     {
@@ -91,7 +91,10 @@ device_state_t iecDrive::process()
 {
     virtualDevice::process();
 
-    //Debug_printv("channel[%d]", commanddata.channel);
+    Debug_printv("channel[%d]", commanddata.channel);
+
+    if ( commanddata.primary == IEC_LISTEN )
+        return device_state;
 
     switch (commanddata.channel)
     {
@@ -109,7 +112,7 @@ device_state_t iecDrive::process()
         break;
     }
 
-    //Debug_printv("url[%s] device_state[%d]", _base->url.c_str(), device_state);
+    Debug_printv("url[%s] device_state[%d]", _base->url.c_str(), device_state);
     return device_state;
 }
 
@@ -203,10 +206,10 @@ void iecDrive::iec_open()
         if ( s[0] == ':' || s[0] == ' ' )
             s = mstr::drop(s, 1);
     }
-    else if ( s[0] == '$' ) 
-    {
-        s.clear();
-    }
+    // else if ( s[0] == '$' ) 
+    // {
+    //     s.clear();
+    // }
 
     if ( s.length() )
     {
@@ -244,14 +247,14 @@ void iecDrive::iec_close()
 void iecDrive::iec_reopen_load()
 {
     Debug_printv( "_base[%s] _last_file[%s]", _base->url.c_str(), _last_file.c_str() );
-    if ( _base->isDirectory() ) 
-    {
-        sendListing();
-    }
-    else
-    {
+    // if ( _base->isDirectory() ) 
+    // {
+    //     sendListing();
+    // }
+    // else
+    // {
         sendFile();
-    }
+    //}
 }
 
 void iecDrive::iec_reopen_save()
@@ -559,16 +562,16 @@ void iecDrive::set_prefix()
 
 std::shared_ptr<MStream> iecDrive::retrieveStream ( uint8_t channel )
 {
-    //Debug_printv("Stream key[%d]", channel);
+    Debug_printv("Stream key[%d]", channel);
 
     if ( streams.find ( channel ) != streams.end() )
     {
-        //Debug_printv("Stream retrieved. key[%d]", channel);
+        Debug_printv("Stream retrieved. key[%d]", channel);
         return streams.at ( channel );
     }
     else
     {
-        //Debug_printv("Error! Trying to recall not-registered stream!");
+        Debug_printv("Error! Trying to recall not-registered stream!");
         return nullptr;
     }
 }
@@ -976,7 +979,7 @@ bool iecDrive::sendFile()
     auto istream = retrieveStream(commanddata.channel);
     if ( istream == nullptr )
     {
-        //Debug_printv("Stream not found!");
+        Debug_printv("Stream not found!");
         IEC.senderTimeout(); // File Not Found
         closeStream(commanddata.channel);
         return false;
