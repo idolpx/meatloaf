@@ -304,12 +304,12 @@ MFileSystem::~MFileSystem() {}
 MFile::MFile(std::string path) {
     Debug_printv("path[%s]", path.c_str());
 
-    // if ( mstr::contains(path, "$") )
-    // {
-    //     // Create directory stream here
-    //     Debug_printv("Create directory stream here!");
-    //     path = "";
-    // }
+    if ( mstr::contains(path, "$") )
+    {
+        // Create directory stream here
+        Debug_printv("Create directory stream here!");
+        path = "";
+    }
 
     parseUrl(path);
 }
