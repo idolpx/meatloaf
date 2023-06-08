@@ -206,10 +206,10 @@ void iecDrive::iec_open()
         if ( s[0] == ':' || s[0] == ' ' )
             s = mstr::drop(s, 1);
     }
-    // else if ( s[0] == '$' ) 
-    // {
-    //     s.clear();
-    // }
+    else if ( s[0] == '$' ) 
+    {
+        s.clear();
+    }
 
     if ( s.length() )
     {
