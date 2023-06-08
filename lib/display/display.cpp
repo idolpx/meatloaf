@@ -36,7 +36,7 @@ extern const TProgmemPalette16 IRAM_ATTR myRedWhiteBluePalette_p;
 
 
 void display_app_main() {
-  printf(" entering app main, call add leds\n");
+  printf(" entering app main, call add leds\r\n");
   // the WS2811 family uses the RMT driver
   FastLED.addLeds<LED_TYPE, LED_DATA_PIN>(leds1, NUM_LEDS);
   //FastLED.addLeds<LED_TYPE, DATA_PIN_2>(leds2, NUM_LEDS);
@@ -46,12 +46,12 @@ void display_app_main() {
   // this is a good test because it uses the GPIO ports, these are 4 wire not 3 wire
   //FastLED.addLeds<APA102, 13, 15>(leds, NUM_LEDS);
 
-  printf(" set max power\n");
+  printf(" set max power\r\n");
   // I have a 2A power supply, although it's 12v
   FastLED.setMaxPowerInVoltsAndMilliamps(5,200);
 
   // change the task below to one of the functions above to try different patterns
-  printf("create task for led blinking\n");
+  printf("create task for led blinking\r\n");
 
   //xTaskCreatePinnedToCore(&blinkLeds_simple, "blinkLeds", 4000, NULL, 5, NULL, 0);
   //xTaskCreatePinnedToCore(&fastfade, "blinkLeds", 4000, NULL, 5, NULL, 0);
@@ -139,7 +139,7 @@ static void blinkWithFx_allpatterns(void *pvParameters) {
 			mode %= MODE_COUNT;
 			mode_change_time = esp_timer_get_time();
 			ws2812fx.setMode(0 /*segid*/, mode);
-			printf(" changed mode to %d\n", mode);
+			printf(" changed mode to %d\r\n", mode);
 		}
 
 		ws2812fx.service();
@@ -163,7 +163,7 @@ static void blinkWithFx_test(void *pvParameters) {
   ws2812fx.setBrightness(255);
 
   int test_id = 0;
-  printf(" start mode: %s\n",testModes[test_id].name);
+  printf(" start mode: %s\r\n",testModes[test_id].name);
   ws2812fx.setMode(0 /*segid*/, testModes[test_id].mode);
   segments[0].colors[0] = testModes[test_id].color;
   segments[0].speed = testModes[test_id].speed;
@@ -180,7 +180,7 @@ static void blinkWithFx_test(void *pvParameters) {
       ws2812fx.setMode(0 /*segid*/, testModes[test_id].mode);
       segments[0].colors[0] = testModes[test_id].color;
       segments[0].speed = testModes[test_id].speed;
-      printf(" changed mode to: %s\n",testModes[test_id].name);
+      printf(" changed mode to: %s\r\n",testModes[test_id].name);
     }
 
     ws2812fx.service();
@@ -202,7 +202,7 @@ void blinkLeds_chase2(void *pvParameters) {
 
     for (int ci = 0; ci < N_COLORS; ci++) {
       CRGB color = colors[ci];
-      printf(" chase: *** color %s ***\n",colors_names[ci]);
+      printf(" chase: *** color %s ***\r\n",colors_names[ci]);
 
       // set strings to black first
       fill_solid(leds1, NUM_LEDS, CRGB::Black);
@@ -212,7 +212,7 @@ void blinkLeds_chase2(void *pvParameters) {
       int prev;
 
       // forward
-      printf(" chase: forward\n");
+      printf(" chase: forward\r\n");
       prev = -1;
       for (int i = 0; i < NUM_LEDS; i++) {
         if (prev >= 0) {
@@ -225,7 +225,7 @@ void blinkLeds_chase2(void *pvParameters) {
         delay(CHASE_DELAY);
       }
 
-      printf(" chase: backward\n");
+      printf(" chase: backward\r\n");
       prev = -1;
       for (int i = NUM_LEDS-1; i >= 0; i--) {
         if (prev >= 0) {
@@ -239,7 +239,7 @@ void blinkLeds_chase2(void *pvParameters) {
       }
 
       // two at a time
-      printf(" chase: twofer\n");
+      printf(" chase: twofer\r\n");
       prev = -1;
       for (int i = 0; i < NUM_LEDS; i += 2) {
         if (prev >= 0) {
@@ -283,7 +283,7 @@ void ChangePalettePeriodically(){
 
 void blinkLeds_interesting(void *pvParameters){
   while(1){
-  	printf("blink leds\n");
+  	printf("blink leds\r\n");
     ChangePalettePeriodically();
     
     static uint8_t startIndex = 0;
@@ -294,7 +294,7 @@ void blinkLeds_interesting(void *pvParameters){
         leds2[i] = ColorFromPalette( currentPalette, startIndex, 64, currentBlending);
         startIndex += 3;
     }
-    printf("show leds\n");
+    printf("show leds\r\n");
     FastLED.show();
     delay(400);
   };
@@ -316,7 +316,7 @@ static void _fastfade_cb(void *param){
   ff->color.hue++;
 
   if (ff->color.hue % 10 == 0) {
-    printf("fast hsv fade h: %d s: %d v: %d\n",ff->color.hue,ff->color.s, ff->color.v);
+    printf("fast hsv fade h: %d s: %d v: %d\r\n",ff->color.hue,ff->color.s, ff->color.v);
   }
 
   fill_solid(leds1,NUM_LEDS,ff->color);
@@ -361,7 +361,7 @@ void blinkLeds_simple(void *pvParameters){
  	while(1){
 
 		for (int j=0;j<N_COLORS;j++) {
-			printf("blink leds\n");
+			printf("blink leds\r\n");
 
 			for (int i=0;i<NUM_LEDS;i++) {
 			  leds1[i] = colors[j];
@@ -388,7 +388,7 @@ void blinkLeds_chase(void *pvParameters) {
   int pos = 0;
   int led_color = 0;
   while(1){
-  	printf("chase leds\n");
+  	printf("chase leds\r\n");
 
   		// do it the dumb way - blank the leds
 	    for (int i=0;i<NUM_LEDS;i++) {
@@ -408,7 +408,7 @@ void blinkLeds_chase(void *pvParameters) {
 	    uint64_t start = esp_timer_get_time();
 	    FastLED.show();
 	    uint64_t end = esp_timer_get_time();
-	    printf("Show Time: %" PRIu64 "\n",end-start);
+	    printf("Show Time: %" PRIu64 "\r\n",end-start);
 	    delay(200);
 	 };
 

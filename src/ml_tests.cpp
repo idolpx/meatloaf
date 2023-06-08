@@ -29,8 +29,8 @@
 
 void testHeader(std::string testName) {
     Debug_println("\n\n******************************");
-    Debug_printf("* TESTING: %s\n", testName.c_str());
-    Debug_println("******************************\n");
+    Debug_printf("* TESTING: %s\r\n", testName.c_str());
+    Debug_println("******************************\r\n");
 }
 
 // void testDiscoverDevices()
@@ -45,7 +45,7 @@ void testHeader(std::string testName) {
 //     // /* Test Line reader */
 //     testHeader("C++ archive reader");
 
-//     Debug_printf("* Trying to read archive: %s\n", archive.c_str());
+//     Debug_printf("* Trying to read archive: %s\r\n", archive.c_str());
 
 //     auto readerStream = ArchiveReader(readeTest);
 //     readerStream.open();
@@ -60,7 +60,7 @@ void testHeader(std::string testName) {
 
 //             readerStream >> line;
 
-//             Debug_printf("%s\n",line.c_str());
+//             Debug_printf("%s\r\n",line.c_str());
 //         };
 //     }
 //     else {
@@ -69,51 +69,51 @@ void testHeader(std::string testName) {
 // }
 
 void dumpFileProperties(MFile* testMFile) {
-    Debug_printf("\n\n* %s File properties\n", testMFile->url.c_str());
-    Debug_printf("Url: %s, isDir = %d\n", testMFile->url.c_str(), testMFile->isDirectory());
-    Debug_printf("Scheme: [%s]\n", testMFile->scheme.c_str());
-    Debug_printf("Username: [%s]\n", testMFile->user.c_str());
-    Debug_printf("Password: [%s]\n", testMFile->pass.c_str());
-    Debug_printf("Host: [%s]\n", testMFile->host.c_str());
-    Debug_printf("Port: [%s]\n", testMFile->port.c_str());    
-    Debug_printf("Path: [%s]\n", testMFile->path.c_str());
+    Debug_printf("\n\n* %s File properties\r\n", testMFile->url.c_str());
+    Debug_printf("Url: %s, isDir = %d\r\n", testMFile->url.c_str(), testMFile->isDirectory());
+    Debug_printf("Scheme: [%s]\r\n", testMFile->scheme.c_str());
+    Debug_printf("Username: [%s]\r\n", testMFile->user.c_str());
+    Debug_printf("Password: [%s]\r\n", testMFile->pass.c_str());
+    Debug_printf("Host: [%s]\r\n", testMFile->host.c_str());
+    Debug_printf("Port: [%s]\r\n", testMFile->port.c_str());    
+    Debug_printf("Path: [%s]\r\n", testMFile->path.c_str());
 
     if ( testMFile->streamFile )
-        Debug_printf("stream src: [%s]\n", testMFile->streamFile->url.c_str());
+        Debug_printf("stream src: [%s]\r\n", testMFile->streamFile->url.c_str());
 
-    Debug_printf("path in stream: [%s]\n", testMFile->pathInStream.c_str());
-    Debug_printf("File: [%s]\n", testMFile->name.c_str());
-    Debug_printf("Extension: [%s]\n", testMFile->extension.c_str());
-    Debug_printf("Size: [%d]\n", testMFile->size());
-    Debug_printf("Is text: [%d]\n", testMFile->isText());
-    Debug_printf("-------------------------------\n");
+    Debug_printf("path in stream: [%s]\r\n", testMFile->pathInStream.c_str());
+    Debug_printf("File: [%s]\r\n", testMFile->name.c_str());
+    Debug_printf("Extension: [%s]\r\n", testMFile->extension.c_str());
+    Debug_printf("Size: [%d]\r\n", testMFile->size());
+    Debug_printf("Is text: [%d]\r\n", testMFile->isText());
+    Debug_printf("-------------------------------\r\n");
 }
 
 void testDirectory(MFile* dir, bool verbose=false) {
     testHeader("A directory");
 
-    Debug_printf(" * Trying to list dir: %s\n", dir->url.c_str());
+    Debug_printf(" * Trying to list dir: %s\r\n", dir->url.c_str());
 
     if(!dir->isDirectory()) {
         Debug_printf("%s: Not a directory!", dir->url.c_str());
         return;
     }
 
-    Debug_printf("* Listing %s\n", dir->url.c_str());
-    Debug_printf("* pre get next file\n");
+    Debug_printf("* Listing %s\r\n", dir->url.c_str());
+    Debug_printf("* pre get next file\r\n");
     auto e = dir->getNextFileInDir();
-    Debug_printf("* past get next file\n");
+    Debug_printf("* past get next file\r\n");
     if(e != nullptr) {
         std::unique_ptr<MFile> entry(e);
 
-        Debug_printf("* past creating file\n");
+        Debug_printf("* past creating file\r\n");
 
 
         while(entry != nullptr) {
             if(verbose)
                 dumpFileProperties(entry.get());
             else
-                Debug_printf("'%s'\n", entry->url.c_str());
+                Debug_printf("'%s'\r\n", entry->url.c_str());
             entry.reset(dir->getNextFileInDir());
         }
     }
@@ -131,7 +131,7 @@ void testDirectoryStandard(std::string path) {
         /* print all the files and directories within directory */
         while ((ent = readdir (dir)) != NULL) {
             stat(ent->d_name, &st);
-            Debug_printf ("%d %s %s\n", st.st_size, ent->d_name, S_ISREG(st.st_mode));
+            Debug_printf ("%d %s %s\r\n", st.st_size, ent->d_name, S_ISREG(st.st_mode));
         }
         closedir (dir);
     } else {
@@ -148,12 +148,12 @@ void testRecursiveDir(MFile* file, std::string indent) {
         while(entry != nullptr) {
             if(entry->isDirectory())
             {
-                Debug_printf("%s%s <dir>\n", indent.c_str(), entry->name.c_str());
+                Debug_printf("%s%s <dir>\r\n", indent.c_str(), entry->name.c_str());
                 testRecursiveDir(entry.get(), indent+"   ");
             }
             else
             {
-                Debug_printf("%s%s\n", indent.c_str(), entry->name.c_str());                
+                Debug_printf("%s%s\r\n", indent.c_str(), entry->name.c_str());                
             }
 
             entry.reset(file->getNextFileInDir());
@@ -164,11 +164,11 @@ void testRecursiveDir(MFile* file, std::string indent) {
 void testCopy(MFile* srcFile, MFile* dstFile) {
     // testHeader("Copy file to destination");
 
-    // Debug_printf("FROM:%s\nTO:%s\n", srcFile->url.c_str(), dstFile->url.c_str());
+    // Debug_printf("FROM:%s\nTO:%s\r\n", srcFile->url.c_str(), dstFile->url.c_str());
 
     // if(dstFile->exists()) {
     //     bool result = dstFile->remove();
-    //     Debug_printf("FSTEST: %s existed, delete reult: %d\n", dstFile->path.c_str(), result);
+    //     Debug_printf("FSTEST: %s existed, delete reult: %d\r\n", dstFile->path.c_str(), result);
     // }
 
     // srcFile->copyTo(dstFile);
@@ -184,28 +184,28 @@ void testPaths(MFile* testFile, std::string subDir) {
     //std::shared_ptr<MFile> testFile(MFSOwner::File("http://somneserver.com/utilities/disk tools/cie.dnp/subdir/CIE+SERIAL"));
     dumpFileProperties(testFile);
 
-    Debug_printf("We are in: %s\n",testFile->url.c_str());
+    Debug_printf("We are in: %s\r\n",testFile->url.c_str());
 
     std::unique_ptr<MFile> inDnp(testFile->cd("/"+subDir));
-    Debug_printf("- cd /%s = '%s'\n", subDir.c_str(), inDnp->url.c_str());
+    Debug_printf("- cd /%s = '%s'\r\n", subDir.c_str(), inDnp->url.c_str());
 
     std::unique_ptr<MFile> inFlash(testFile->cd("//"+subDir));
-    Debug_printf("- cd //%s = '%s'\n", subDir.c_str(), inFlash->url.c_str());
+    Debug_printf("- cd //%s = '%s'\r\n", subDir.c_str(), inFlash->url.c_str());
 
     std::unique_ptr<MFile> parallel(testFile->cd("../"+subDir));
-    Debug_printf("- cd ../%s = '%s'\n", subDir.c_str(), parallel->url.c_str());
+    Debug_printf("- cd ../%s = '%s'\r\n", subDir.c_str(), parallel->url.c_str());
 
     std::unique_ptr<MFile> inCie(testFile->cd(subDir));
-    Debug_printf("- cd %s = '%s'\n", subDir.c_str(), inCie->url.c_str());
+    Debug_printf("- cd %s = '%s'\r\n", subDir.c_str(), inCie->url.c_str());
 }
 
 void testIsDirectory() {
     std::unique_ptr<MFile> testDir(MFSOwner::File("/NOTADIR/"));
-    Debug_printf("dir [%s] exists [%d]\n",testDir->url.c_str(), testDir->isDirectory());
+    Debug_printf("dir [%s] exists [%d]\r\n",testDir->url.c_str(), testDir->isDirectory());
     testDir.reset(MFSOwner::File("/.sys"));
-    Debug_printf("dir [%s] exists [%d]\n",testDir->url.c_str(), testDir->isDirectory());
+    Debug_printf("dir [%s] exists [%d]\r\n",testDir->url.c_str(), testDir->isDirectory());
     testDir.reset(MFSOwner::File("/.sys/"));
-    Debug_printf("dir [%s] exists [%d]\n",testDir->url.c_str(), testDir->isDirectory());
+    Debug_printf("dir [%s] exists [%d]\r\n",testDir->url.c_str(), testDir->isDirectory());
 }
 
 void testUrlParser() {
@@ -233,28 +233,28 @@ void testCD() {
     Debug_println("A chain of CDs");
     // make a folder called GAMES on root of flash
     //testDir.reset(MFSOwner::File("/"));
-    Debug_printf("I'm in %s, changing to GAMES\n", testDir->url.c_str());
+    Debug_printf("I'm in %s, changing to GAMES\r\n", testDir->url.c_str());
     // then on the 64   LOAD"CD:GAMES",8
     testDir.reset(testDir->cd("GAMES"));
-    Debug_printf("I'm in %s, changing to _\n", testDir->url.c_str());
+    Debug_printf("I'm in %s, changing to _\r\n", testDir->url.c_str());
     // then LOAD"CD_",8
     testDir.reset(testDir->cd("_"));
-    Debug_printf("I'm in %s, changing to GAMES\n", testDir->url.c_str());
+    Debug_printf("I'm in %s, changing to GAMES\r\n", testDir->url.c_str());
     // then LOAD"CD:GAMES",8
     testDir.reset(testDir->cd("GAMES"));
-    Debug_printf("I'm in %s, changing to _\n", testDir->url.c_str());
+    Debug_printf("I'm in %s, changing to _\r\n", testDir->url.c_str());
     // then LOAD"CD_",8
     testDir.reset(testDir->cd("_"));
-    Debug_printf("I'm in %s, changing to GAMES\n", testDir->url.c_str());
+    Debug_printf("I'm in %s, changing to GAMES\r\n", testDir->url.c_str());
     // then LOAD"CD:GAMES",8
     testDir.reset(testDir->cd("GAMES"));
-    Debug_printf("I'm in %s, changing to _\n", testDir->url.c_str());
+    Debug_printf("I'm in %s, changing to _\r\n", testDir->url.c_str());
     // then LOAD"CD_",8
     testDir.reset(testDir->cd("_"));
-    Debug_printf("I'm in %s, changing to GAMES\n", testDir->url.c_str());
+    Debug_printf("I'm in %s, changing to GAMES\r\n", testDir->url.c_str());
     // then LOAD"CD:GAMES",8
     testDir.reset(testDir->cd("GAMES"));
-    Debug_printf("I'm in %s\n", testDir->url.c_str());
+    Debug_printf("I'm in %s\r\n", testDir->url.c_str());
 }
 
 
@@ -368,10 +368,10 @@ void httpStream(char *url)
 //     // http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
 //     // http.setRedirectLimit(10);
 
-//     Debug_printf("[HTTP] begin... [%s]\n", url);
+//     Debug_printf("[HTTP] begin... [%s]\r\n", url);
 //     if (http.begin( url )) {  // HTTP
 
-//       Serial.print("[HTTP] GET...\n");
+//       Serial.print("[HTTP] GET...\r\n");
 //       // start connection and send HTTP header
 //       int httpCode = http.GET();
 //       size_t len = http.available();
@@ -379,7 +379,7 @@ void httpStream(char *url)
 //       // httpCode will be negative on error
 //       if (httpCode > 0) {
 //         // HTTP header has been send and Server response header has been handled
-//         Debug_printf("[HTTP] GET... code: %d\n", httpCode);
+//         Debug_printf("[HTTP] GET... code: %d\r\n", httpCode);
 
 //         // file found at server
 //         if (httpCode == HttpStatus_Ok || httpCode == HttpStatus_MovedPermanently) {
@@ -394,11 +394,11 @@ void httpStream(char *url)
 //             }
 //         }
 //       } else {
-//         Debug_printf("[HTTP] GET... failed, error: %d\n", httpCode);
+//         Debug_printf("[HTTP] GET... failed, error: %d\r\n", httpCode);
 //       }
 //       http.close();
 //     } else {
-//       Debug_printf("[HTTP} Unable to connect\n");
+//       Debug_printf("[HTTP} Unable to connect\r\n");
 //     }
 // }
 
@@ -414,11 +414,11 @@ void testJson(MFile* srcFile, MFile* dstFile) {
     Meat::iostream ostream(dstFile); // dstFile
     
     if(ostream.is_open()) {
-        Debug_printf("Trying to serialize JSON to %s\n", dstFile->url.c_str());
+        Debug_printf("Trying to serialize JSON to %s\r\n", dstFile->url.c_str());
 
         auto x = serializeJson(m_device, ostream); 
 
-        Debug_printf("serializeJson returned %d\n", x);
+        Debug_printf("serializeJson returned %d\r\n", x);
 
         Debug_printf("sbefore if");
 
@@ -431,23 +431,23 @@ void testJson(MFile* srcFile, MFile* dstFile) {
         ostream.close();
     }
 
-    //Debug_printf("%s size is %d\n", dstFile->url.c_str(), dstFile->size());
+    //Debug_printf("%s size is %d\r\n", dstFile->url.c_str(), dstFile->size());
 
-    Debug_printf("Copy %s to %s\n", dstFile->url.c_str(), srcFile->url.c_str());
+    Debug_printf("Copy %s to %s\r\n", dstFile->url.c_str(), srcFile->url.c_str());
 
     bool copyRc = -1; //dstFile->copyTo(srcFile);
 
-    Debug_printf("After copyto rc=%d\n", copyRc);
+    Debug_printf("After copyto rc=%d\r\n", copyRc);
 
     if(copyRc) {
         Meat::iostream istream(srcFile);
 
         if(istream.is_open()) {
-            Debug_printf("Trying to deserialize JSON from %s\n",srcFile->url.c_str());
+            Debug_printf("Trying to deserialize JSON from %s\r\n",srcFile->url.c_str());
 
             deserializeJson(m_device, istream);
 
-            Debug_printf("Got from deserialization: %s\n", m_device["url"].as<const char*>());
+            Debug_printf("Got from deserialization: %s\r\n", m_device["url"].as<const char*>());
         }
         else
         {
@@ -457,7 +457,7 @@ void testJson(MFile* srcFile, MFile* dstFile) {
     else {
         Debug_println("**** Copying failed *** WHY???");
 
-        Debug_printf("Trying to deserialize JSON from %s\n",dstFile->url.c_str());
+        Debug_printf("Trying to deserialize JSON from %s\r\n",dstFile->url.c_str());
 
         Meat::iostream newIstream(dstFile); // this is your standard istream!
 
@@ -465,7 +465,7 @@ void testJson(MFile* srcFile, MFile* dstFile) {
             deserializeJson(m_device, newIstream);
         }
 
-        Debug_printf("Got from deserialization: %s\n", m_device["url"].as<const char*>());
+        Debug_printf("Got from deserialization: %s\r\n", m_device["url"].as<const char*>());
 
     }
 
@@ -475,7 +475,7 @@ void testJson(MFile* srcFile, MFile* dstFile) {
 void testReader(MFile* srcFile) {
     testHeader("TEST reading using C++ API");
 
-    Debug_printf(" * Read test for %s\n", srcFile->url.c_str());
+    Debug_printf(" * Read test for %s\r\n", srcFile->url.c_str());
 
     Meat::iostream istream(srcFile);
 
@@ -495,7 +495,7 @@ void testReader(MFile* srcFile) {
         istream.close();
     }
     else {
-        Debug_printf(" * Read test - ERROR:%s could not be read!\n", srcFile->url.c_str());
+        Debug_printf(" * Read test - ERROR:%s could not be read!\r\n", srcFile->url.c_str());
     }
 
 }
@@ -503,17 +503,17 @@ void testReader(MFile* srcFile) {
 void testWriter(MFile* dstFile) {
     testHeader("TEST writing using C++ API");
     
-    Debug_printf(" * Write test for %s\n", dstFile->url.c_str());
+    Debug_printf(" * Write test for %s\r\n", dstFile->url.c_str());
 
     Meat::iostream ostream(dstFile);
 
-    Debug_println(" * Write test - after open\n");
+    Debug_println(" * Write test - after open\r\n");
 
     if ( dstFile->exists() )
         dstFile->remove();
 
     if(ostream.is_open()) {
-        Debug_println(" * Write test - isOpen\n");
+        Debug_println(" * Write test - isOpen\r\n");
 
         ostream << "Arise, ye workers from your slumber,";
         ostream << "Arise, ye prisoners of want.";
@@ -522,19 +522,19 @@ void testWriter(MFile* dstFile) {
         if(ostream.bad())
             Debug_println("WRITING FAILED!!!");
             
-        Debug_println(" * Write test - after testing bad\n");
+        Debug_println(" * Write test - after testing bad\r\n");
 
         ostream.close();
-        Debug_println(" * Write test - after close\n");
+        Debug_println(" * Write test - after close\r\n");
     }
     else {
-        Debug_println(" * Write test - ERROR:The Internationale could not be written!\n");
+        Debug_println(" * Write test - ERROR:The Internationale could not be written!\r\n");
     }
 }
 
 void runFSTest(std::string dirPath, std::string filePath) {
     testHeader("A full filesystem test");
-    //Debug_println("**********************************************************************\n\n");
+    //Debug_println("**********************************************************************\r\n\r\n");
 
     auto testDir = Meat::New<MFile>(dirPath);
     auto testFile = Meat::New<MFile>(filePath);
@@ -562,7 +562,7 @@ void runFSTest(std::string dirPath, std::string filePath) {
         Debug_printf("*** WARNING - %s instance couldn't be created!", testDir->url.c_str());
     }
 
-    Debug_println("**********************************************************************\n\n");
+    Debug_println("**********************************************************************\r\n\r\n");
 }
 
 void testSmartMFile() {
@@ -575,7 +575,7 @@ void testSmartMFile() {
 
     auto wrapped = Meat::Wrap<MFile>(test2->getNextFileInDir());
 
-	Debug_printf("Extension of second one: [%s]\n", test2->extension.c_str());
+	Debug_printf("Extension of second one: [%s]\r\n", test2->extension.c_str());
 }
 
 void testBasicConfig() {
@@ -584,7 +584,7 @@ void testBasicConfig() {
     BasicConfigReader bcr;
     bcr.read("/config.prg");
     if(bcr.entries->size()>0) {
-        Debug_printf("config Wifi SSID: [%s]\n", bcr.get("ssid"));
+        Debug_printf("config Wifi SSID: [%s]\r\n", bcr.get("ssid"));
     }
 
 }
@@ -602,14 +602,14 @@ void testRedirect() {
             Debug_printf("Reader returned EOF! :(");
         }
 
-        Debug_printf("* read lines follow:\n");
+        Debug_printf("* read lines follow:\r\n");
 
         while(!istream.eof()) {
             std::string line;
 
             istream >> line;
 
-            Debug_printf("LINE>%s\n",line.c_str());
+            Debug_printf("LINE>%s\r\n",line.c_str());
         };
     }
     else {
@@ -626,18 +626,18 @@ void testStrings() {
 
     bool result = mstr::equals(s2, s1, false);
 
-    Debug_printf("String-string case-insensitive comp:%d\n", result);
+    Debug_printf("String-string case-insensitive comp:%d\r\n", result);
 
     result = mstr::equals(s2, "content-type", false);
 
-    Debug_printf("String-char case-insensitive comp:%d\n", result);
+    Debug_printf("String-char case-insensitive comp:%d\r\n", result);
 
     result = mstr::equals("Content-Type", "content-type", false);
 
-    Debug_printf("char-char case-insensitive comp:%d\n", result);
+    Debug_printf("char-char case-insensitive comp:%d\r\n", result);
 
-    Debug_printf("pa == %s\n", mstr::drop("dupa",2).c_str());
-    Debug_printf("du == %s\n", mstr::dropLast("dupa",2).c_str());
+    Debug_printf("pa == %s\r\n", mstr::drop("dupa",2).c_str());
+    Debug_printf("du == %s\r\n", mstr::dropLast("dupa",2).c_str());
 
 }
 

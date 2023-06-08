@@ -117,7 +117,7 @@
 
 //       Serial.begin(115200);                              // 115.200 Baud für Debugging output 
       
-//       log_i("Version: " __DATE__ " " __TIME__ "\n");   // Compiler Variablen einsetzen - Damit die Build-Version einwandfrei identifiziert werden kann.
+//       log_i("Version: " __DATE__ " " __TIME__ "\r\n");   // Compiler Variablen einsetzen - Damit die Build-Version einwandfrei identifiziert werden kann.
 //       Wire.begin(I2C_SDA, I2C_SCL);                             // Display Pins festlegen und I2C Bus initialisieren
 //       if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { log_i("SSD1306 allocation failed"); } else { display.clearDisplay();  display.drawBitmap(0, 0,  bitmap_wic64_2, 128, 64, WHITE); display.display(); displayattached=true;} // Hostnamen beim Booten auf Display ausgeben} // Prüfen ob Display angeschlossen wurde
 
@@ -773,7 +773,7 @@
 //    String httpboundary="WiC64"+String (millis(),HEX) + "WiC64";
 
 //   if (client.connect(server1.c_str(), port1)) {
-//     String head = "--"+httpboundary+"\r\nContent-Disposition: form-data; name=\"imageFile\"; filename=\""+filename+"\"\r\nContent-Type: image/jpeg\r\n\r\n";
+//     String head = "--"+httpboundary+"\r\nContent-Disposition: form-data; name=\"imageFile\"; filename=\""+filename+"\"\r\nContent-Type: image/jpeg\r\r\n\r\n";
 //     String tail = "\r\n--"+httpboundary+"--\r\n";
 //     client.println("POST "+serverpath1+" HTTP/1.1\r\nHost: "+server1 );
 //     client.println("Content-Length: "+String(lastinput.length()+head.length()+tail.length() ));

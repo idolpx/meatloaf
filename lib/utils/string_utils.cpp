@@ -1,9 +1,8 @@
 #include "string_utils.h"
+
 #include "../../include/petscii.h"
-#include <algorithm>
-#include <cstdarg>
-#include <cmath>
-#include "../../include/petscii.h"
+#include "../../include/debug.h"
+
 #include <algorithm>
 #include <cstdarg>
 #include <cmath>
@@ -17,9 +16,9 @@ void copyString(const std::string& input, char *dst, size_t dst_size)
     dst[dst_size - 1] = '\0';
 }
 
-constexpr unsigned int hash(const char *s, int off = 0) {                        
-    return !s[off] ? 5381 : (hash(s, off+1)*33) ^ s[off];                           
-}  
+constexpr unsigned int hash(const char *s, int off = 0) {
+    return !s[off] ? 5381 : (hash(s, off+1)*33) ^ s[off];
+}
 
 namespace mstr {
 
@@ -316,7 +315,7 @@ namespace mstr {
 
             //Debug_printv("a %d res [%s]", i, res.c_str());
         }
-        //Debug_printv("res[%s] length[%d] size[%d]", res.c_str(), res.length(), res.size());
+        Debug_printv("res[%s] length[%d] size[%d]", res.c_str(), res.length(), res.size());
 
         return res.erase(res.length()-1,1);
     }

@@ -54,26 +54,26 @@ std::string Server::formatTime(time_t t)
 
 static void xmlElement(std::ostringstream &s, const char *name, const char *value)
 {
-    s << "<" << name << ">" << value << "</" << name << ">\n";
+    s << "<" << name << ">" << value << "</" << name << ">\r\n";
 }
 
 void Server::sendMultiStatusResponse(Response &resp, MultiStatusResponse &msr)
 {
     std::ostringstream s;
 
-    s << "<response>\n";
+    s << "<response>\r\n";
     xmlElement(s, "href", msr.href.c_str());
-    s << "<propstat><prop>\n";
+    s << "<propstat><prop>\r\n";
 
     for (const auto &p : msr.props)
         xmlElement(s, p.first.c_str(), p.second.c_str());
 
     xmlElement(s, "resourcetype", msr.isCollection ? "<collection/>" : "");
 
-    s << "</prop>\n";
+    s << "</prop>\r\n";
     xmlElement(s, "status", msr.status.c_str());
 
-    s << "</propstat></response>\n";
+    s << "</propstat></response>\r\n";
 
     resp.sendChunk(s.str().c_str());
 }
@@ -86,7 +86,7 @@ int Server::sendPropResponse(Response &resp, std::string path, int recurse)
         return -errno;
 
     std::string uri = pathToURI(path);
-    // printf("%s() path >%s< uri >%s<\n", __func__, path.c_str(), uri.c_str());
+    // printf("%s() path >%s< uri >%s<\r\n", __func__, path.c_str(), uri.c_str());
 
     MultiStatusResponse r;
 
@@ -344,11 +344,11 @@ int Server::doPropfind(Request &req, Response &resp)
     resp.setContentType("text/xml; charset=\"utf-8\"");
     resp.flushHeaders();
 
-    resp.sendChunk("<?xml version=\"1.0\" encoding=\"utf-8\" ?>\n");
-    resp.sendChunk("<multistatus xmlns=\"DAV:\">\n");
+    resp.sendChunk("<?xml version=\"1.0\" encoding=\"utf-8\" ?>\r\n");
+    resp.sendChunk("<multistatus xmlns=\"DAV:\">\r\n");
 
     sendPropResponse(resp, req.getPath(), recurse);
-    resp.sendChunk("</multistatus>\n");
+    resp.sendChunk("</multistatus>\r\n");
     resp.closeChunk();
 
     return 207;

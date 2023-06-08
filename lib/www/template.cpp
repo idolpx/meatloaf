@@ -268,7 +268,7 @@ const std::string substitute_tag(const std::string &tag)
     std::stringstream resultstream;
 
 #ifdef DEBUG
-    // Debug_printf("Substituting tag '%s'\n", tag.c_str());
+    // Debug_printf("Substituting tag '%s'\r\n", tag.c_str());
 #endif
 
     int tagid;
@@ -539,7 +539,7 @@ const std::string substitute_tag(const std::string &tag)
         //             strncat(result, PRINTER_CLASS::printer_model_str[i], MAX_PRINTER_LIST_BUFFER-1);
         //             strncat(result, "\">", MAX_PRINTER_LIST_BUFFER);
         //             strncat(result, PRINTER_CLASS::printer_model_str[i], MAX_PRINTER_LIST_BUFFER-1);
-        //             strncat(result, "</option>\n", MAX_PRINTER_LIST_BUFFER-1);
+        //             strncat(result, "</option>\r\n", MAX_PRINTER_LIST_BUFFER-1);
         //         }
         //         resultstream << result;
         //         free(result);
@@ -552,7 +552,7 @@ const std::string substitute_tag(const std::string &tag)
         break;
     }
 #ifdef DEBUG
-    // Debug_printf("Substitution result: \"%s\"\n", resultstream.str().c_str());
+    // Debug_printf("Substitution result: \"%s\"\r\n", resultstream.str().c_str());
 #endif
     return resultstream.str();
 }

@@ -30,7 +30,7 @@ std::string CServerSessionMgr::readLn() {
 bool CServerSessionMgr::sendCommand(std::string command) {
     // 13 (CR) sends the command
     if(establishSession()) {
-        Serial.printf("CServer: send command: %s\n", command.c_str());
+        Serial.printf("CServer: send command: %s\r\n", command.c_str());
         (*this) << (command+'\r');
         (*this).flush();
         return true;
@@ -84,7 +84,7 @@ bool CServerSessionMgr::traversePath(MFile* path) {
         //MFile::parsePath(&chopped, path->path); - nope this doessn't work and crases in the loop!
 
         Debug_printv("Before loop");
-        //Debug_printv("Chopped size:%d\n", chopped.size());
+        //Debug_printv("Chopped size:%d\r\n", chopped.size());
         fnSystem.delay(500);
 
         for(size_t i = 1; i < chopped.size(); i++) {
@@ -92,7 +92,7 @@ bool CServerSessionMgr::traversePath(MFile* path) {
 
             auto part = chopped[i];
             
-            //Debug_printv("traverse path part: [%s]\n", part.c_str());
+            //Debug_printv("traverse path part: [%s]\r\n", part.c_str());
             if(mstr::endsWith(part, ".d64", false)) 
             {
                 // THEN we have to mount the image INSERT image_name
@@ -162,7 +162,7 @@ bool CServerIStream::open() {
         else {
             m_bytesAvailable = buffer[0] + buffer[1]*256; // put len here
             // if everything was ok
-            Serial.printf("CServer: file open, size: %d\n", m_bytesAvailable);
+            Serial.printf("CServer: file open, size: %d\r\n", m_bytesAvailable);
             m_isOpen = true;
         }
     }
@@ -219,7 +219,7 @@ bool CServerIStream::isOpen() {
 //         newDir = mstr::drop(newDir,1);
 //     }
 
-//     Debug_printv("cd in CServerFile! New dir [%s]\n", newDir.c_str());
+//     Debug_printv("cd in CServerFile! New dir [%s]\r\n", newDir.c_str());
 //     if(newDir[0]=='/' && newDir[1]=='/') {
 //         if(newDir.size()==2) {
 //             // user entered: CD:// or CD//
@@ -478,7 +478,7 @@ MFile* CServerFile::getNextFileInDir() {
                 size = 683;
             }
 
-            // Debug_printv("\nurl[%s] name[%s] size[%d]\n", url.c_str(), name.c_str(), size);
+            // Debug_printv("\nurl[%s] name[%s] size[%d]\r\n", url.c_str(), name.c_str(), size);
             if(name.size() > 0)
             {
                 new_url += name;

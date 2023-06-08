@@ -30,7 +30,7 @@
 
 static void cpmTask(void *arg)
 {
-    Debug_printf("cpmTask()\n");
+    Debug_printf("cpmTask()\r\n");
     while (1)
     {
         Status = Debug = 0;
@@ -91,7 +91,7 @@ void iecCpm::iec_reopen_talk()
 
     if (cpmTaskHandle == NULL)
     {
-        Debug_printf("iecCpm::iec_reopen_talk() - No CP/M task, ignoring.\n");
+        Debug_printf("iecCpm::iec_reopen_talk() - No CP/M task, ignoring.\r\n");
         return;
     }
 
@@ -116,7 +116,7 @@ void iecCpm::iec_reopen_listen()
 {
     if (cpmTaskHandle == NULL)
     {
-        Debug_printf("iecCpm::iec_reopen_talk() - No CP/M task, ignoring.\n");
+        Debug_printf("iecCpm::iec_reopen_talk() - No CP/M task, ignoring.\r\n");
         return;
     }
 
@@ -126,7 +126,7 @@ void iecCpm::iec_reopen_listen()
 
         if (b<0)
         {
-            Debug_printf("Error on receive.\n");
+            Debug_printf("Error on receive.\r\n");
             return;
         }
 
