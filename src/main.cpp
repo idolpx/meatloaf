@@ -155,7 +155,7 @@ void main_setup()
     Serial.println( ANSI_GREEN_BOLD "Parallel Bus Initialized" ANSI_RESET );
 #endif
 
-#ifdef LED_STRIP
+#ifdef LED_STRIPX
     // Start LED Strip
     display_app_main(); // fastled lib
 #endif

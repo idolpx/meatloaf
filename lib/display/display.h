@@ -5,7 +5,7 @@
 
 #ifndef MEATLOAF_DISPLAY_H
 #define MEATLOAF_DISPLAY_H
-#ifdef LED_STRIP
+#ifdef LED_STRIPX
 
 #include "FastLED.h"
 #include "FX.h"

@@ -315,7 +315,7 @@ namespace mstr {
 
             //Debug_printv("a %d res [%s]", i, res.c_str());
         }
-        Debug_printv("res[%s] length[%d] size[%d]", res.c_str(), res.length(), res.size());
+        //Debug_printv("res[%s] length[%d] size[%d]", res.c_str(), res.length(), res.size());
 
         return res.erase(res.length()-1,1);
     }

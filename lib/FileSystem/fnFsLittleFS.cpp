@@ -129,9 +129,12 @@ bool FileSystemLittleFS::create_path(const char *fullpath)
             */
             strlcpy(segment, fullpath, end - fullpath + (done ? 2 : 1));
             Debug_printf("Checking/creating directory: \"%s\"\r\n", segment);
-            if(0 != mkdir(segment))
+            if ( !exists(segment) )
             {
-                Debug_printf("FAILED errno=%d\r\n", errno);
+                if(0 != f_mkdir(segment))
+                {
+                    Debug_printf("FAILED errno=%d\r\n", errno);
+                }
             }
         }
 
