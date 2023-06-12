@@ -9,6 +9,8 @@
 #include "../../include/debug.h"
 #include "../../include/cbm_defines.h"
 
+#include "make_unique.h"
+
 #include "fnFsSD.h"
 #include "led.h"
 #include "led_strip.h"
@@ -829,7 +831,7 @@ void iecDrive::sendListing()
     uint16_t byte_count = 0;
     std::string extension = "dir";
 
-    std::unique_ptr<MFile> entry(_base->getNextFileInDir());
+    std::unique_ptr<MFile> entry = std::unique_ptr<MFile>( _base->getNextFileInDir() );
 
     if(entry == nullptr) {
         closeStream( commanddata.channel );

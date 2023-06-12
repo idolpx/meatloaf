@@ -67,13 +67,13 @@ class iecNetwork : public virtualDevice
      * @brief Process command fanned out from bus
      * @return new device state
      */
-    device_state_t process();
+    device_state_t process() override;
 
     /**
      * @brief Check to see if SRQ needs to be asserted.
      * @param c Secondary channel # (0-15)
      */
-    virtual void poll_interrupt(unsigned char c);
+    virtual void poll_interrupt(unsigned char c) override;
 
     private:
 

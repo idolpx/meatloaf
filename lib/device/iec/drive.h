@@ -143,7 +143,7 @@ protected:
     /**
      * @brief If response queue is empty, Return 1 if ANY receive buffer has data in it, else 0
      */
-    void iec_talk_command_buffer_status();
+    void iec_talk_command_buffer_status() override;
 
 public:
     iecDrive();

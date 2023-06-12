@@ -21,7 +21,7 @@ protected:
      * @brief Process command fanned out from bus
      * @return new device state
      */
-    device_state_t process();
+    device_state_t process() override;
 
     virtual void status();
 

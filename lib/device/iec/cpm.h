@@ -28,7 +28,7 @@ class iecCpm : public virtualDevice
      * @brief Process command fanned out from bus
      * @return new device state
      */
-    device_state_t process();
+    device_state_t process() override;
 
     protected:
 
@@ -36,7 +36,7 @@ class iecCpm : public virtualDevice
 
     TaskHandle_t cpmTaskHandle = NULL;    
 
-    virtual void poll_interrupt(unsigned char c);
+    virtual void poll_interrupt(unsigned char c) override;
     
     void iec_open();
     void iec_close();
