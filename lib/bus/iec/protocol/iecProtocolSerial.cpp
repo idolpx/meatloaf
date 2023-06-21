@@ -93,7 +93,7 @@ bool IecProtocolSerial::sendByte(uint8_t data, bool eoi)
     IEC.pull ( PIN_IEC_CLK_OUT );
 
     // STEP 3: SENDING THE BITS
-    IEC.pull ( PIN_IEC_SRQ );
+    //IEC.pull ( PIN_IEC_SRQ );
     if ( !sendBits( data ) ) {
         Debug_printv ( "Error sending bits - byte '%02X'", data );
         return false;

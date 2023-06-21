@@ -215,7 +215,6 @@ void IRAM_ATTR systemBus::service()
 
     // Cleanup and Re-enable Interrupt
     releaseLines();
-    bus_state = BUS_IDLE;
     //gpio_intr_enable((gpio_num_t)PIN_IEC_ATN);
 
     //Debug_printv ( "primary[%.2X] secondary[%.2X] bus[%d] flags[%d]", data.primary, data.secondary, bus_state, flags );
@@ -236,9 +235,9 @@ void systemBus::read_command()
     do 
     {
         // ATN was pulled read bus command bytes
-        pull( PIN_IEC_SRQ );
+        //pull( PIN_IEC_SRQ );
         c = receiveByte();
-        release( PIN_IEC_SRQ );
+        //release( PIN_IEC_SRQ );
 
         // Check for error
         if (c == 0xFFFFFFFF || flags & ERROR)
@@ -405,7 +404,7 @@ void systemBus::read_payload()
 
     // ATN might get pulled right away if there is no command string to send
     //pull ( PIN_IEC_SRQ );
-    //protocol->wait( TIMING_STABLE );
+    protocol->wait( TIMING_STABLE );
 
     while (IEC.status(PIN_IEC_ATN) != PULLED)
     {
