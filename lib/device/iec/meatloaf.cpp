@@ -369,7 +369,7 @@ void iecMeatloaf::net_set_ssid( bool store )
         if (t.size() == 2)
         {
             if ( mstr::isNumeric( t[0] ) ) {
-                // Find SSID by ID Number
+                // Find SSID by CRC8 Number
                 t[0] = fnWiFi.get_network_name_by_crc8( std::stoi(t[0]) );
             }
 

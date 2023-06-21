@@ -22,7 +22,7 @@ static void IRAM_ATTR cbm_on_attention_isr_handler(void *arg)
     b->pull(PIN_IEC_DATA_OUT);
 
     b->flags |= ATN_PULLED;
-    if ( b->bus_state < BUS_ACTIVE )
+    //if ( b->bus_state < BUS_ACTIVE )
         b->bus_state = BUS_ACTIVE;
 }
 
@@ -222,6 +222,7 @@ void IRAM_ATTR systemBus::service()
     //Debug_printv ( "device[%d] channel[%d]", data.device, data.channel);
 
     Debug_printv("exit");
+    Debug_printv("bus[%d] flags[%d]", bus_state, flags);
     //release( PIN_IEC_SRQ );
 
     //fnLedStrip.stopRainbow();

@@ -95,8 +95,6 @@ device_state_t iecDrive::process()
 
     Debug_printv("channel[%d]", commanddata.channel);
 
-    if ( commanddata.primary == IEC_LISTEN )
-        return device_state;
 
     switch (commanddata.channel)
     {
@@ -197,6 +195,8 @@ void iecDrive::iec_open()
     std::string s = payload;
     mstr::toASCII(s);
 
+    Debug_printv("s[%s]", s.c_str());
+
     if ( mstr::startsWith(s, "0:") )
     {
         // Remove media ID from command string
@@ -224,7 +224,7 @@ void iecDrive::iec_open()
             if ( !registerStream(commanddata.channel) )
             {
                 Debug_printv("File Doesn't Exist [%s]", s.c_str());
-                _base.reset( MFSOwner::File( _base->base() ) );
+                //_base.reset( MFSOwner::File( _base->base() ) );
             }
         }
     }
@@ -304,14 +304,14 @@ void iecDrive::iec_listen_command()
 
 void iecDrive::iec_talk_command()
 {
-    Debug_printv("here");
+    //Debug_printv("here");
     if (response_queue.empty())
         iec_talk_command_buffer_status();
 }
 
 void iecDrive::iec_talk_command_buffer_status()
 {
-    Debug_printv("here");
+    //Debug_printv("here");
 
     //char reply[80];
     std::string s = "00, OK,00,00\r";
@@ -982,7 +982,8 @@ bool iecDrive::sendFile()
     {
         Debug_printv("Stream not found!");
         IEC.senderTimeout(); // File Not Found
-        closeStream(commanddata.channel);
+        //closeStream(commanddata.channel);
+        _base.reset( MFSOwner::File( _base->base() ) );
         return false;
     }
 
