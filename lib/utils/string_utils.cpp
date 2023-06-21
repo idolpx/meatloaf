@@ -261,6 +261,12 @@ namespace mstr {
         return false;
     };
 
+    bool isNumeric(std::string &s)
+    {
+        return std::all_of(s.begin(), s.end(), 
+                        [](unsigned char c) { return ::isdigit(c); });
+    }
+
     void replaceAll(std::string &s, const std::string &search, const std::string &replace) 
     {
         for( size_t pos = 0; ; pos += replace.length() ) {

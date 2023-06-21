@@ -32,6 +32,7 @@ namespace mstr {
     void toASCII(std::string &s);
     void toPETSCII(std::string &s);
     bool isText(std::string &s);
+    bool isNumeric(std::string &s);
     bool isA0Space(int ch);
     void A02Space(std::string &s);
     std::string format(const char *format, ...);
