@@ -236,9 +236,9 @@ void systemBus::read_command()
     do 
     {
         // ATN was pulled read bus command bytes
-        //pull( PIN_IEC_SRQ );
+        pull( PIN_IEC_SRQ );
         c = receiveByte();
-        //release( PIN_IEC_SRQ );
+        release( PIN_IEC_SRQ );
 
         // Check for error
         if (c == 0xFFFFFFFF || flags & ERROR)
@@ -342,7 +342,7 @@ void systemBus::read_command()
 
         // Let bus stabalize
         //Debug_printv("stabalize!");
-        protocol->wait ( TIMING_STABLE );
+        //protocol->wait ( TIMING_STABLE );
 
     //} while ( IEC.flags & ATN_PULLED );
     } while ( status( PIN_IEC_ATN ) == PULLED );
