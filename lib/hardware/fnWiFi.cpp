@@ -8,6 +8,7 @@
 #endif
 #include <esp_event.h>
 #include <mdns.h>
+#include <esp_crc.h>
 
 #include <cstring>
 #include <algorithm>
@@ -73,18 +74,22 @@ int WiFiManager::start()
     // Make sure our network interface is initialized
     ESP_ERROR_CHECK(esp_netif_init());
 
-    // Assume we've already done these steps if _wifi_if has a value
-    if (_wifi_if == nullptr)
+    // Assume we've already done these steps if _wifi_sta has a value
+    if (_wifi_sta == nullptr)
     {
         // Create the default event loop, which is where the WiFi driver sends events
         ESP_ERROR_CHECK(esp_event_loop_create_default());
 
         // Create a default WIFI station interface
-        _wifi_if = esp_netif_create_default_wifi_sta();
+        _wifi_sta = esp_netif_create_default_wifi_sta();
+
+        // Create a default WIFI access point interface
+        _wifi_ap = esp_netif_create_default_wifi_ap();
 
         // Configure basic WiFi settings
         wifi_init_config_t wifi_init_cfg = WIFI_INIT_CONFIG_DEFAULT();
         ESP_ERROR_CHECK(esp_wifi_init(&wifi_init_cfg));
+        ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
         Debug_printf("WiFiManager::start() complete\r\n");
     }
 
@@ -96,16 +101,46 @@ int WiFiManager::start()
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, _wifi_event_handler, this));
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_LOST_IP, _wifi_event_handler, this));
 
+
+    // SoftAP Setup
+    {
+        /* SoftAP - Wifi Access Point configuration setup */
+        wifi_config_t ap_config = {
+            .ap = {
+                //.ssid = "meatloaf",
+                //.password = NULL,
+                .ssid_len = 0,
+                .channel = 1,
+                .authmode = WIFI_AUTH_OPEN,
+                .ssid_hidden = 0,
+                .max_connection = 4,
+                .beacon_interval = 100,
+            },
+        };
+
+        /* DHCP AP configuration */
+        esp_netif_dhcps_stop(_wifi_ap); /* DHCP client/server must be stopped before setting new IP information. */
+        esp_netif_ip_info_t ap_ip_info;
+        memset(&ap_ip_info, 0x00, sizeof(ap_ip_info));
+        inet_pton(AF_INET, "10.10.0.1", &ap_ip_info.ip);
+        inet_pton(AF_INET, "10.10.0.1", &ap_ip_info.gw);
+        inet_pton(AF_INET, "255.255.255.0", &ap_ip_info.netmask);
+        ESP_ERROR_CHECK(esp_netif_set_ip_info(_wifi_ap, &ap_ip_info));
+        ESP_ERROR_CHECK(esp_netif_dhcps_start(_wifi_ap));
+
+        ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
+        ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &ap_config));
+        ESP_ERROR_CHECK(esp_wifi_set_bandwidth(WIFI_IF_AP, WIFI_BW_HT20));
+        ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
+    }
+
+
     // Set WiFi mode to Station
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-
     ESP_ERROR_CHECK(esp_wifi_start());
 
-    // Disable powersave for lower latency
-    ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
-
     // Set a hostname from our configuration
-    esp_netif_set_hostname(_wifi_if, Config.get_general_devicename().c_str());
+    esp_netif_set_hostname(_wifi_sta, Config.get_general_devicename().c_str());
 
     _started = true;
     return 0;
@@ -473,7 +508,7 @@ std::string WiFiManager::get_current_bssid_str()
 void WiFiManager::set_hostname(const char *hostname)
 {
     Debug_printf("WiFiManager::set_hostname(%s)\r\n", hostname);
-    esp_netif_set_hostname(_wifi_if, hostname);
+    esp_netif_set_hostname(_wifi_sta, hostname);
 }
 
 void WiFiManager::handle_station_stop()
@@ -651,6 +686,22 @@ int32_t WiFiManager::localIP()
     esp_err_t e = esp_netif_get_ip_info(get_adapter_handle(), &ip_info);
     return ip_info.ip.addr;
 }
+
+std::string WiFiManager::get_network_name_by_crc8(uint8_t crc8)
+{
+    std::vector<std::string> network_names = fnWiFi.get_network_names();
+    for (std::string _network_name: network_names)
+    {
+        uint8_t c_crc8 = esp_crc8_le(0, (uint8_t *)_network_name.c_str(), _network_name.length());
+        Debug_printf("[%03d] - %s\r\n", crc8, _network_name.c_str());
+        if ( c_crc8 == crc8 )
+        {
+            return _network_name;
+        }
+    }
+    return nullptr;
+}
+
 std::vector<std::string> WiFiManager::get_network_names()
 {
     struct
@@ -695,13 +746,15 @@ std::vector<WiFiManager::stored_wifi> WiFiManager::match_stored_with_network_wif
     Debug_printf("Found following networks:\r\n");
     for (std::string _network_name: network_names)
     {
-        Debug_printf(" - %s\r\n", _network_name.c_str());
+        uint8_t id = esp_crc8_le(0, (uint8_t *)_network_name.c_str(), _network_name.length());
+        Debug_printf("[%03d] - %s\r\n", id, _network_name.c_str());
     }
 
     Debug_printf("Found following stored networks:\r\n");
     for (stored_wifi d: stored_wifis)
     {
-        Debug_printf(" - %s, index: %d\r\n", d.ssid, d.index);
+        uint8_t id = esp_crc8_le(0, (uint8_t *)d.ssid, strlen(d.ssid));
+        Debug_printf("[%03d] - %s, index: %d\r\n", id, d.ssid, d.index);
     }
 
     std::vector<stored_wifi> common_names;
@@ -718,7 +771,8 @@ std::vector<WiFiManager::stored_wifi> WiFiManager::match_stored_with_network_wif
     Debug_printf("Common names:\r\n");
     for (stored_wifi d: common_names)
     {
-        Debug_printf(" - %s, index: %d\r\n", d.ssid, d.index);
+        uint8_t id = esp_crc8_le(0, (uint8_t *)d.ssid, strlen(d.ssid));
+        Debug_printf("[%03d] - %s, index: %d\r\n", id, d.ssid, d.index);
     }
 
     return common_names;

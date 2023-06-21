@@ -20,7 +20,7 @@ Import("env")
 
 platform = env.PioPlatform()
 
-import sys, os, configparser
+import sys, os, configparser, shutil
 from os.path import join
 from datetime import datetime
 
@@ -34,9 +34,9 @@ if not os.path.exists('firmware'):
 
 config = configparser.ConfigParser()
 config.read('platformio.ini')
-firmware = "meatloaf."
-firmware += config['meatloaf']['build_board'].split()[0] + "."
-firmware += datetime.now().strftime("%Y%m%d%H%M%S")
+firmware = "meatloaf"
+firmware += "." + config['meatloaf']['build_board'].split()[0]
+#firmware += "." + datetime.now().strftime("%Y%m%d%H%M%S")
 firmware += ".bin"
 
 def esp32_create_combined_bin(source, target, env):

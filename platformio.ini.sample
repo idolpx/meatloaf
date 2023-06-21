@@ -17,6 +17,7 @@
 [meatloaf]
 ; Uncomment ONLY ONE of the below lines to target the hardware you use
 ; GPIO pin assignments are located in the include/pinmap/ directory for reference
+; Some boards need a 1uf cap frm EN to GND to automatically switch to download mode
 ;build_board = fujiloaf-rev0      ; Meatloaf / FujiNet REV0 board, aka Fujiloaf (ESP32-WROVER 8M PSRAM, 16M Flash)
 ;build_board = lolin-d32-pro      ; Wemos Lolin D32 Pro                         (ESP32-WROVER 4M PSRAM, 4M/8M/16M Flash)
 ;build_board = ttgo-t1            ; Lilygo TTGO T1 V1.3                         (ESP32 NO PSRAM, 4M Flash)

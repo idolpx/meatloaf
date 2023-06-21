@@ -17,7 +17,7 @@ bool FlashFileSystem::handles(std::string path)
 
 MFile* FlashFileSystem::getFile(std::string path)
 {
-    Debug_printv("path[%s]", path.c_str());
+    //Debug_printv("path[%s]", path.c_str());
     return new FlashFile(path);
 }
 
