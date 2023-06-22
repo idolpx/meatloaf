@@ -269,6 +269,7 @@ void KeyManager::_keystate_task(void *param)
 #else
             fnLedManager.blink(BLUETOOTH_LED, 2); // blink to confirm a button press
 #endif // PINMAP_A2_REV0
+
 // Either toggle BT baud rate or do a disk image rotation on B_KEY SHORT PRESS
 #ifdef BLUETOOTH_SUPPORT
             if (fnBtManager.isActive())

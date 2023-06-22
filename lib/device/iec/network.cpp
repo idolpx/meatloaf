@@ -24,6 +24,8 @@
 #include "SSH.h"
 #include "SMB.h"
 
+#include "esp_heap_trace.h"
+
 iecNetwork::iecNetwork()
 {
     for (int i = 0; i < NUM_CHANNELS; i++)
@@ -36,7 +38,7 @@ iecNetwork::iecNetwork()
         specialBuffer[i] = new string();
     }
 
-    iecStatus.channel = 15;
+    iecStatus.channel = CHANNEL_COMMAND;
     iecStatus.connected = 0;
     iecStatus.msg = "fujinet network device";
     iecStatus.error = NETWORK_ERROR_SUCCESS;
@@ -88,11 +90,11 @@ void iecNetwork::iec_open()
 
     switch (commanddata.channel)
     {
-    case 0:                // load
+    case CHANNEL_LOAD:     // load
         cmdFrame.aux1 = 4; // read
         cmdFrame.aux2 = 0; // no translation
         break;
-    case 1:                // save
+    case CHANNEL_SAVE:     // save
         cmdFrame.aux1 = 8; // write
         cmdFrame.aux2 = 0; // no translation
         break;
@@ -112,6 +114,15 @@ void iecNetwork::iec_open()
     }
 
     urlParser[commanddata.channel] = EdUrlParser::parseUrl(deviceSpec[commanddata.channel]);
+
+    // This is unbelievably stupid, but here we are.
+    for (int i=0;i<urlParser[commanddata.channel]->query.size();i++)
+        if (urlParser[commanddata.channel]->query[i]==0xa4) // underscore
+            urlParser[commanddata.channel]->query[i]=0x5F;
+
+    for (int i=0;i<urlParser[commanddata.channel]->path.size();i++)
+        if (urlParser[commanddata.channel]->path[i]==0xa4) // underscore
+            urlParser[commanddata.channel]->path[i]=0x5F;
 
     // Convert scheme to uppercase
     std::transform(urlParser[commanddata.channel]->scheme.begin(), urlParser[commanddata.channel]->scheme.end(), urlParser[commanddata.channel]->scheme.begin(), ::toupper);
@@ -1094,13 +1105,13 @@ device_state_t iecNetwork::process()
     // fan out to appropriate process routine
     switch (commanddata.channel)
     {
-    case 0:
+    case CHANNEL_LOAD:
         process_load();
         break;
-    case 1:
+    case CHANNEL_SAVE:
         process_save();
         break;
-    case 15:
+    case CHANNEL_COMMAND:
         process_command();
         break;
     default:

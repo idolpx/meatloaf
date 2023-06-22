@@ -1,8 +1,10 @@
 #ifdef BUILD_IEC
 
+#include "iec.h"
+
 #include <cstring>
 #include <memory>
-#include "iec.h"
+
 #include "../../include/debug.h"
 #include "../../include/pinmap.h"
 #include "led.h"
@@ -201,11 +203,11 @@ void IRAM_ATTR systemBus::service()
 
             //Debug_printv("bus[%d] device[%d] flags[%d]", bus_state, device_state, flags);
             bus_state = BUS_IDLE;
+            flags = CLEAR;
 
             // Switch back to standard serial
             detected_protocol = PROTOCOL_IEC_SERIAL;
             protocol = selectProtocol();
-            flags = CLEAR;
         }
 
         if ( status ( PIN_IEC_ATN ) )

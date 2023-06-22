@@ -515,7 +515,7 @@ void WiFiManager::handle_station_stop()
 {
     _connected = false;
     fnLedManager.set(eLed::LED_WIFI, false);
-    //fnHTTPD.stop();
+    oHttpdServer.stop();
     fnSystem.Net.stop_sntp_client();
 }
 

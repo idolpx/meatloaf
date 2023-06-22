@@ -1,9 +1,9 @@
+#ifndef _DEBUG_H_
+#define _DEBUG_H_
+
 #include <string>
 
 #include "ansi_codes.h"
-
-#ifndef _DEBUG_H_
-#define _DEBUG_H_
 
 // __PLATFORMIO_BUILD_DEBUG__ is set when build_type is set to debug in platformio.ini
 #if defined(__PLATFORMIO_BUILD_DEBUG__) || defined(DBUG2)
@@ -34,8 +34,7 @@
     #define Debug_print(...)
     #define Debug_printf(...)
     #define Debug_println(...)
-
-    #define Debug_printv(...)
+    #define Debug_printv(format, ...)
 
     #define HEAP_CHECK(x)
 #endif

@@ -192,6 +192,9 @@ void iecDrive::process_channel()
 
 void iecDrive::iec_open()
 {
+    if ( commanddata.primary == IEC_UNLISTEN )
+        return;
+
     std::string s = payload;
     mstr::toASCII(s);
 
