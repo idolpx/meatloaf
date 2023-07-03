@@ -760,47 +760,48 @@ uint16_t iecDrive::sendHeader(std::string header, std::string id)
     // Send Extra INFO
     if (url.size())
     {
-        byte_count += sendLine(0, "%*s\"%-*s\" NFO", 3, "", 16, "[URL]");
+        byte_count += sendLine(0, "%*s\"%-*s\" NFO", 0, "", 19, "[URL]");
         if ( IEC.flags & ERROR ) return 0;
-        byte_count += sendLine(0, "%*s\"%-*s\" NFO", 3, "", 16, url.c_str());
+        byte_count += sendLine(0, "%*s\"%-*s\" NFO", 0, "", 19, url.c_str());
         if ( IEC.flags & ERROR ) return 0;
         sent_info = true;
     }
     if (path.size() > 1)
     {
-        byte_count += sendLine(0, "%*s\"%-*s\" NFO", 3, "", 16, "[PATH]");
+        byte_count += sendLine(0, "%*s\"%-*s\" NFO", 0, "", 19, "[PATH]");
         if ( IEC.flags & ERROR ) return 0;
-        byte_count += sendLine(0, "%*s\"%-*s\" NFO", 3, "", 16, path.c_str());
+        byte_count += sendLine(0, "%*s\"%-*s\" NFO", 0, "", 19, path.c_str());
         if ( IEC.flags & ERROR ) return 0;
         sent_info = true;
     }
     if (archive.size() > 1)
     {
-        byte_count += sendLine(0, "%*s\"%-*s\" NFO", 3, "", 16, "[ARCHIVE]");
+        byte_count += sendLine(0, "%*s\"%-*s\" NFO", 0, "", 19, "[ARCHIVE]");
         if ( IEC.flags & ERROR ) return 0;
-        byte_count += sendLine(0, "%*s\"%-*s\" NFO", 3, "", 16, archive.c_str());
+        byte_count += sendLine(0, "%*s\"%-*s\" NFO", 0, "", 19, archive.c_str());
         if ( IEC.flags & ERROR ) return 0;
     }
     if (image.size())
     {
-        byte_count += sendLine(0, "%*s\"%-*s\" NFO", 3, "", 16, "[IMAGE]");
+        byte_count += sendLine(0, "%*s\"%-*s\" NFO", 0, "", 19, "[IMAGE]");
         if ( IEC.flags & ERROR ) return 0;
-        byte_count += sendLine(0, "%*s\"%-*s\" NFO", 3, "", 16, image.c_str());
+        byte_count += sendLine(0, "%*s\"%-*s\" NFO", 0, "", 19, image.c_str());
         if ( IEC.flags & ERROR ) return 0;
         sent_info = true;
     }
     if (sent_info)
     {
-        byte_count += sendLine(0, "%*s\"----------------\" NFO", 3, "");
+        byte_count += sendLine(0, "%*s\"-------------------\" NFO", 0, "");
         if ( IEC.flags & ERROR ) return 0;
     }
     
     if (fnSDFAT.running() && _base->url.size() < 2)
     {
+        byte_count += sendLine(0, "%*s\"-------------------\" NFO", 0, "");
+        if ( IEC.flags & ERROR ) return 0;
         byte_count += sendLine(0, "%*s\"SD\"               DIR", 3, "");
         if ( IEC.flags & ERROR ) return 0;
-        byte_count += sendLine(0, "%*s\"----------------\" NFO", 3, "");
-        if ( IEC.flags & ERROR ) return 0;
+
     }
 
     return byte_count;
