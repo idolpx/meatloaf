@@ -27,3 +27,6 @@ lib/bus/iec/iec.cpp
 \!archive/*
 dependencies.lock
 firmware/*.bin
+lib/device/disk.h
+lib/device/iec/fuji.*
+lib/device/iec/disk.*

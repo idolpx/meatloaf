@@ -348,15 +348,9 @@ void systemBus::read_command()
     //} while ( IEC.flags & ATN_PULLED );
     } while ( status( PIN_IEC_ATN ) == PULLED );
 
-    // // Is this command for us?
-    // if (!deviceById(data.device) || !deviceById(data.device)->device_active)
-    // {
-    //     //Debug_printf("Command not for us, ignoring.\r\n");
-    //     bus_state = BUS_IDLE;
-    // }
-
     // Is this command for us?
     if ( !isDeviceEnabled( data.device ) )
+    // if (!deviceById(data.device) || !deviceById(data.device)->device_active)
     {
         bus_state = BUS_IDLE;
     }

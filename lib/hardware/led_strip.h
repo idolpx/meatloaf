@@ -25,10 +25,10 @@
 
 enum stripLed
 {
-  LED_STRIP_WIFI = LED_WIFI_NUM,
-  LED_STRIP_BUS = LED_BUS_NUM,
-  LED_STRIP_BT = LED_BT_NUM,
-  LED_STRIP_COUNT = NUM_LEDS
+  LED_STRIP_WIFI = LEDSTRIP_WIFI_NUM,
+  LED_STRIP_BUS = LEDSTRIP_BUS_NUM,
+  LED_STRIP_BT = LEDSTRIP_BT_NUM,
+  LED_STRIP_COUNT = LEDSTRIP_COUNT
 };
 
 enum ledState
@@ -47,9 +47,9 @@ void rainbow_wave(uint8_t thisSpeed, uint8_t deltaHue);
 class LedStrip
 {
 public:
-  int sLedState[NUM_LEDS] = { LED_OFF }; // default off
-  CRGB sLedColor[NUM_LEDS] = { CRGB::Black }; // default black (off)
-  int sLedBlinkCount[NUM_LEDS] = { 0 }; // default no blinky
+  int sLedState[LEDSTRIP_COUNT] = { LED_OFF }; // default off
+  CRGB sLedColor[LEDSTRIP_COUNT] = { CRGB::Black }; // default black (off)
+  int sLedBlinkCount[LEDSTRIP_COUNT] = { 0 }; // default no blinky
   int rainbowTimer = 0; // run the rainbow animation for this many seconds
   bool rainbowStopper = false; // flag the loop to stop if true
 

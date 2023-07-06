@@ -22,6 +22,22 @@
     sioCPM sioZ;
 #endif
 
+#ifdef BUILD_COCO
+# include "drivewire/cassette.h"
+# include "drivewire/clock.h"
+# include "drivewire/disk.h"
+# include "drivewire/modem.h"
+# include "drivewire/network.h"
+# include "drivewire/printer.h"
+# include "drivewire/printerlist.h"
+# include "drivewire/cpm.h"
+# include "drivewire/fuji.h"
+
+    drivewireClock dwClock;
+    drivewireModem *sioR;
+    drivewireCPM drivewireZ;
+#endif
+
 #ifdef BUILD_RS232
 # include "rs232/apetime.h"
 # include "rs232/disk.h"
@@ -131,6 +147,16 @@
 # include "rc2014/printerlist.h"
 # include "rc2014/fuji.h"
     rc2014Modem *sioR;
+#endif
+
+#ifdef BUILD_H89
+# include "h89/disk.h"
+# include "h89/network.h"
+# include "h89/modem.h"
+# include "h89/printer.h"
+# include "h89/printerlist.h"
+# include "h89/fuji.h"
+    H89Modem *sioR;
 #endif
 
 #endif // DEVICE_H

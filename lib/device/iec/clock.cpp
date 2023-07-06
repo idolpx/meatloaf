@@ -75,33 +75,16 @@ void iecClock::iec_reopen()
 
 void iecClock::iec_reopen_listen()
 {
-    std::string s;
-
     Debug_printf("IEC REOPEN LISTEN\n");
 
-    while (!(IEC.flags & EOI_RECVD))
-    {
-        int16_t b = IEC.receiveByte();
+    //mstr::toASCII(payload);
 
-        Debug_printf("%02X %c\n",b,b);
+    Debug_printf("Sending over %s\n",payload.c_str());
 
-        if (b<0)
-        {
-            Debug_printf("Error on receive.\n");
-            return;
-        }
-        else
-            s.push_back(b);
-    }
-
-    mstr::toASCII(s);
-
-    Debug_printf("Sending over %s\n",s.c_str());
-
-    if (mstr::isNumeric(s))
-        set_timestamp(s);
+    if (mstr::isNumeric(payload))
+        set_timestamp(payload);
     else
-        set_timestamp_format(s);
+        set_timestamp_format(payload);
 }
 
 void iecClock::iec_reopen_talk()
@@ -117,12 +100,15 @@ void iecClock::iec_reopen_talk()
 
     if (tf.empty())
     {
+        Debug_printf("sending default time string.\n");
         s = std::string(asctime(info));
         mstr::replaceAll(s,":",".");
     }
     else
     {
+        Debug_printf("Sending strftime of format %s\n",tf.c_str());
         strftime(output,sizeof(output),tf.c_str(),info);
+        s = std::string(output);
     }
     
     mstr::toUpper(s);
