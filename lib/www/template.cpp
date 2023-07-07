@@ -17,7 +17,7 @@
 
 bool is_parsable(const char *extension)
 {
-    Debug_printv("extension[%s]", extension);
+    //Debug_printv("extension[%s]", extension);
     if (extension != NULL)
     {
         if (strncmp(extension, "html", 4) == 0)
