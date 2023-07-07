@@ -30,3 +30,4 @@ firmware/*.bin
 lib/device/disk.h
 lib/device/iec/fuji.*
 lib/device/iec/disk.*
+firmware/Adafruit ESPTool.webloc
