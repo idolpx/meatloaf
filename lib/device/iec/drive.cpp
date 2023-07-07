@@ -743,6 +743,7 @@ uint16_t iecDrive::sendHeader(std::string header, std::string id)
     std::string path = p.pathToFile();
     std::string archive = "";
     std::string image = p.name;
+    Debug_printv("path[%s] size[%d]", path.c_str(), path.size());
 
     // Send List HEADER
     uint8_t space_cnt = 0;
@@ -795,14 +796,17 @@ uint16_t iecDrive::sendHeader(std::string header, std::string id)
         if ( IEC.flags & ERROR ) return 0;
     }
     
+
+    // if (path.size() > 2)
+    // {
+    //     byte_count += sendLine(0, "%*s\"_\"                DIR", 3, "");
+    //     if ( IEC.flags & ERROR ) return 0;
+    //     byte_count += sendLine(0, "%*s\"\\\"               DIR", 3, "");
+    //     if ( IEC.flags & ERROR ) return 0;
+    // }
     if (fnSDFAT.running() && _base->url.size() < 2)
     {
         byte_count += sendLine(0, "%*s\"SD\"               DIR", 3, "");
-        if ( IEC.flags & ERROR ) return 0;
-    }
-    if (path.size() < 2)
-    {
-        byte_count += sendLine(0, "%*s\"_\"                DIR", 3, "");
         if ( IEC.flags & ERROR ) return 0;
     }
 
@@ -967,7 +971,7 @@ void iecDrive::sendListing()
 
 bool iecDrive::sendFile()
 {
-    size_t i = 0;
+    size_t count = 0;
     bool success_rx = true;
     bool success_tx = true;
 
@@ -1022,15 +1026,14 @@ bool iecDrive::sendFile()
     if( IEC.data.channel == CHANNEL_LOAD )
     {
         // Get/Send file load address
-        i = 2;
+        count = 2;
         istream->read(&b, 1);
         success_tx = IEC.sendByte(b);
         load_address = b & 0x00FF; // low byte
-        sys_address = b;
         istream->read(&b, 1);
         success_tx = IEC.sendByte(b);
         load_address = load_address | b << 8;  // high byte
-        sys_address += b * 256;
+        sys_address = load_address;
         Debug_printv( "load_address[$%.4X] sys_address[%d]", load_address, sys_address );
 
         // Get SYSLINE
@@ -1055,14 +1058,13 @@ bool iecDrive::sendFile()
         }
 #endif
         // Send Byte
-        avail = istream->available();
-        if ( !avail || !success_rx )
+        if ( count + 1 == avail || !success_rx )
         {
-            //Debug_printv("b[%02X] EOI", b);
+	  //Debug_printv("b[%02X] EOI %i", b, count);
             success_tx = IEC.sendByte(b, true); // indicate end of file.
             if ( !success_tx )
                 Debug_printv("tx fail");
-            
+
             break;
         }
         else
@@ -1073,10 +1075,10 @@ bool iecDrive::sendFile()
                 Debug_printv("tx fail");
                 //break;
             }
-                
+
         }
         b = nb; // byte = next byte
-        i++;
+        count++;
 
 #ifdef DATA_STREAM
         // Show ASCII Data
@@ -1087,13 +1089,13 @@ bool iecDrive::sendFile()
 
         if(bi == 8)
         {
-            uint32_t t = (i * 100) / len;
-            Debug_printf(" %s (%d %d%%) [%d]\r\n", ba, i, t, avail);
+            uint32_t t = (count * 100) / len;
+            Debug_printf(" %s (%d %d%%) [%d]\r\n", ba, count, t, avail);
             bi = 0;
         }
 #else
-        uint32_t t = (i * 100) / len;
-        Debug_printf("\rTransferring %d%% [%d, %d]      ", t, i, avail);
+        uint32_t t = (count * 100) / len;
+        Debug_printf("\rTransferring %d%% [%d, %d]      ", t, count, avail);
 #endif
 
         // Exit if ATN is PULLED while sending
@@ -1114,7 +1116,18 @@ bool iecDrive::sendFile()
         // 	fnLedManager.toggle(eLed::LED_BUS);
         // }
     }
-    Debug_printf("\r\n=================================\r\n%d bytes sent of %d [SYS%d]\r\n", i, avail, sys_address);
+
+#ifdef DATA_STREAM
+    if (bi)
+    {
+      uint32_t t = (count * 100) / len;
+      ba[bi] = 0;
+      Debug_printf(" %s (%d %d%%) [%d]\r\n", ba, count, t, avail);
+      bi = 0;
+    }
+#endif
+
+    Debug_printf("\r\n=================================\r\n%d bytes sent of %d [SYS%d]\r\n", count, avail, sys_address);
 
     //Debug_printv("len[%d] avail[%d] success_rx[%d]", len, avail, success_rx);
 
