@@ -6,6 +6,8 @@
 #include <sys/stat.h>
 #include <ArduinoJson.h>
 //#include <archive_cpp.h>
+//#include <archive.h>
+//#include <archive_entry.h>
 
 #include "../include/global_defines.h"
 #include "../include/debug.h"
