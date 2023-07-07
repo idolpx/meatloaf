@@ -36,7 +36,7 @@ bool is_parsable(const char *extension)
 // Returns string with subtitutions in place
 std::string parse_contents(const std::string &contents)
 {
-    Debug_printv("parsing");
+    //Debug_printv("parsing");
     std::stringstream ss;
     uint pos = 0, x, y;
     do
