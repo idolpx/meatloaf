@@ -1,11 +1,24 @@
 #ifndef STRING_UTILS_H
 #define STRING_UTILS_H
 
-#include <cstring>
 #include <string>
+#include <string_view>
+
 #include <vector>
 
 void copyString(const std::string& input, char *dst, size_t dst_size);
+
+inline constexpr auto hash_djb2a(const std::string_view sv) {
+    unsigned long hash{ 5381 };
+    for (unsigned char c : sv) {
+        hash = ((hash << 5) + hash) ^ c;
+    }
+    return hash;
+}
+
+inline constexpr auto operator"" _sh(const char *str, size_t len) {
+    return hash_djb2a(std::string_view{ str, len });
+}
 
 namespace mstr {
     std::string drop(std::string str, size_t count);

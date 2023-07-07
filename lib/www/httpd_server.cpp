@@ -55,7 +55,7 @@ bool exists(std::string path)
 /* Our URI handler function to be called during GET /uri request */
 esp_err_t cHttpdServer::get_handler(httpd_req_t *httpd_req)
 {
-    Debug_printv("url[%s]", httpd_req->uri);
+    //Debug_printv("url[%s]", httpd_req->uri);
 
     std::string uri = mstr::urlDecode(httpd_req->uri);
     if (uri == "/")
@@ -400,7 +400,7 @@ void cHttpdServer::send_file_parsed(httpd_req_t *req, const char *filename)
 
     http_err err = http_err_noerrr;
 
-    Debug_printv("filename[%s]", filename);
+    //Debug_printv("filename[%s]", filename);
 
     // Retrieve server state
     serverstate *pState = (serverstate *)httpd_get_global_user_ctx(req->handle);

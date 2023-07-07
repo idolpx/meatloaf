@@ -15,11 +15,11 @@ void pdfPrinter::pdf_header()
     pdf_Y = 0;
     pdf_X = 0;
     pdf_pageCounter = 0;
-    fprintf(_file, "%%PDF-1.4\r\n");
+    fprintf(_file, "%%PDF-1.4\n");
     // first object: catalog of pages
     pdf_objCtr = 1;
     objLocations[pdf_objCtr] = ftell(_file);
-    fprintf(_file, "1 0 obj\n<</Type /Catalog /Pages 2 0 R>>\nendobj\r\n");
+    fprintf(_file, "1 0 obj\n<</Type /Catalog /Pages 2 0 R>>\nendobj\n");
     // object 2 0 R is printed by pdf_page_resource() before xref
     // object 3 0 R is printed at pdf_font_resource() before xref
     pdf_objCtr = 3; // set up counter for pdf_add_font()
@@ -33,7 +33,7 @@ void pdfPrinter::pdf_page_resource()
     {
         fprintf(_file, "%d 0 R ", pageObjects[i]);
     }
-    fprintf(_file, "] /Count %d>>\nendobj\r\n", pdf_pageCounter);
+    fprintf(_file, "] /Count %d>>\nendobj\n", pdf_pageCounter);
 }
 
 void pdfPrinter::pdf_font_resource()
@@ -55,7 +55,7 @@ void pdfPrinter::pdf_font_resource()
             fntCtr++;
         }
     }
-    fprintf(_file, ">>>>\nendobj\r\n");
+    fprintf(_file, ">>>>\nendobj\n");
 }
 
 void pdfPrinter::pdf_add_fonts() // pdfFont_t *fonts[],
@@ -196,13 +196,13 @@ void pdfPrinter::pdf_new_page()
     fprintf(_file, "%d 0 obj\n<</Type /Page /Parent 2 0 R /Resources 3 0 R /MediaBox [0 0 %g %g] /Contents [ ", pdf_objCtr, pageWidth, pageHeight);
     pdf_objCtr++; // increment for the contents stream object
     fprintf(_file, "%d 0 R ", pdf_objCtr);
-    fprintf(_file, "]>>\nendobj\r\n");
+    fprintf(_file, "]>>\nendobj\n");
 
     // open content stream
     objLocations[pdf_objCtr] = ftell(_file);
     fprintf(_file, "%d 0 obj\n<</Length ", pdf_objCtr);
     idx_stream_length = ftell(_file);
-    fprintf(_file, "0000000000 >>\nstream\r\n");
+    fprintf(_file, "0000000000 >>\nstream\n");
     idx_stream_start = ftell(_file);
 
     // open new text object
@@ -215,10 +215,10 @@ void pdfPrinter::pdf_begin_text(double Y)
     Debug_println("pdf begin text");
 #endif
     // open new text object
-    fprintf(_file, "BT\r\n");
+    fprintf(_file, "BT\n");
     TOPflag = false;
-    fprintf(_file, "/F%u %g Tf %d Tz\r\n", fontNumber, fontSize, fontHorizScale);
-    fprintf(_file, "%g %g Td\r\n", leftMargin, Y);
+    fprintf(_file, "/F%u %g Tf %d Tz\n", fontNumber, fontSize, fontHorizScale);
+    fprintf(_file, "%g %g Td\n", leftMargin, Y);
     pdf_Y = Y; // reset print roller to top of page
     pdf_X = 0; // set carriage to LHS
     BOLflag = true;
@@ -248,7 +248,7 @@ void pdfPrinter::pdf_end_line()
 #ifdef DEBUG
     Debug_println("pdf end line");
 #endif
-    fprintf(_file, ")]TJ\r\n"); // close the line
+    fprintf(_file, ")]TJ\n"); // close the line
     // pdf_Y -= lineHeight; // line feed - moved to new line()
     pdf_X = 0; // CR
     BOLflag = true;
@@ -269,9 +269,9 @@ void pdfPrinter::pdf_end_page()
     // close text object & stream
     if (!BOLflag)
         pdf_end_line();
-    fprintf(_file, "ET\r\n");
+    fprintf(_file, "ET\n");
     idx_stream_stop = ftell(_file);
-    fprintf(_file, "endstream\nendobj\r\n");
+    fprintf(_file, "endstream\nendobj\n");
     size_t idx_temp = ftell(_file);
     fflush(_file);
     fseek(_file, idx_stream_length, SEEK_SET);
@@ -290,17 +290,17 @@ void pdfPrinter::pdf_xref()
 #endif
     size_t xref = ftell(_file);
     pdf_objCtr++;
-    fprintf(_file, "xref\r\n");
-    fprintf(_file, "0 %u\r\n", pdf_objCtr);
-    fprintf(_file, "0000000000 65535 f\r\n");
+    fprintf(_file, "xref\n");
+    fprintf(_file, "0 %u\n", pdf_objCtr);
+    fprintf(_file, "0000000000 65535 f\n");
     for (int i = 1; i < pdf_objCtr; i++)
     {
-        fprintf(_file, "%010u 00000 n\r\n", objLocations[i]);
+        fprintf(_file, "%010u 00000 n\n", objLocations[i]);
     }
-    fprintf(_file, "trailer <</Size %u/Root 1 0 R>>\r\n", pdf_objCtr);
-    fprintf(_file, "startxref\r\n");
-    fprintf(_file, "%u\r\n", xref);
-    fprintf(_file, "%%%%EOF\r\n");
+    fprintf(_file, "trailer <</Size %u/Root 1 0 R>>\n", pdf_objCtr);
+    fprintf(_file, "startxref\n");
+    fprintf(_file, "%u\n", xref);
+    fprintf(_file, "%%%%EOF\n");
 }
 
 bool pdfPrinter::process_buffer(uint8_t n, uint8_t aux1, uint8_t aux2)

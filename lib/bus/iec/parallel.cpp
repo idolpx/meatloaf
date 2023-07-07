@@ -17,7 +17,7 @@ parallelBus PARALLEL;
 
 //I2C_t& myI2C = i2c0;  // i2c0 and i2c1 are the default objects
 
-static xQueueHandle ml_parallel_evt_queue = NULL;
+static QueueHandle_t ml_parallel_evt_queue = NULL;
 
 static void IRAM_ATTR ml_parallel_isr_handler(void* arg)
 {

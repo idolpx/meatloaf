@@ -4,6 +4,7 @@
 
 #include <esp_vfs.h>
 #include <errno.h>
+#include <filesystem>
 
 #include "esp_littlefs.h"
 
@@ -131,7 +132,7 @@ bool FileSystemLittleFS::create_path(const char *fullpath)
             Debug_printf("Checking/creating directory: \"%s\"\r\n", segment);
             if ( !exists(segment) )
             {
-                if(0 != f_mkdir(segment))
+                if( !std::filesystem::create_directory(segment) )
                 {
                     Debug_printf("FAILED errno=%d\r\n", errno);
                 }

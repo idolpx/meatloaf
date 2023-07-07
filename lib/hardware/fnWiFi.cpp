@@ -549,8 +549,8 @@ void WiFiManager::_wifi_event_handler(void *arg, esp_event_base_t event_base,
             Serial.println( ANSI_GREEN_BOLD "mDNS Service Started!" ANSI_RESET );
 
             // Start SSDP Service
-            // SSDPDevice.start();
-            // Serial.println( ANSI_GREEN_BOLD "SSDP Service Started!" ANSI_RESET );
+            SSDPDevice.start();
+            Serial.println( ANSI_GREEN_BOLD "SSDP Service Started!" ANSI_RESET );
 
             break;
         case IP_EVENT_STA_LOST_IP:

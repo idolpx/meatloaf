@@ -249,18 +249,23 @@ void KeyManager::_keystate_task(void *param)
 #endif
 
 #if defined(PINMAP_A2_REV0) || defined(PINMAP_FUJILOAF_REV0)
-#if defined(PINMAP_FUJILOAF_REV0)
-                if (fnLedStrip.rainbowTimer > 0)
-                    fnLedStrip.stopRainbow();
+            if(fnSystem.ledstrip())
+            {
+                // if (fnLedStrip.rainbowTimer > 0)
+                //     fnLedStrip.stopRainbow();
+                // else
+                //     fnLedStrip.startRainbow(10);
+            }
                 else
-                    fnLedStrip.startRainbow(10);
-#else
+            {
                 fnLedManager.blink(LED_BUS, 2); // blink to confirm a button press
-#endif
+            }
             Debug_println("ACTION: Reboot");
             //fnSystem.reboot();
             // IEC.releaseLines();
+#ifdef BUILD_IEC
             Debug_printf("bus_state[%d]\r\n", IEC.bus_state);
+#endif
             Debug_printf("Heap: %lu\r\n",esp_get_free_internal_heap_size());
             // Debug_printf("PsramSize: %u\r\n", fnSystem.get_psram_size());
             // Debug_printf("himem phys: %u\r\n", esp_himem_get_phys_size());
