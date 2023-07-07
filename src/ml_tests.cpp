@@ -92,6 +92,8 @@ void dumpFileProperties(MFile* testMFile) {
 void testDirectory(MFile* dir, bool verbose=false) {
     testHeader("A directory");
 
+    LeakDetector ld("Dir lister");
+
     Debug_printf(" * Trying to list dir: %s\r\n", dir->url.c_str());
 
     if(!dir->isDirectory()) {
@@ -103,6 +105,9 @@ void testDirectory(MFile* dir, bool verbose=false) {
     Debug_printf("* pre get next file\r\n");
     auto e = dir->getNextFileInDir();
     Debug_printf("* past get next file\r\n");
+
+    ld.check("Before loop");
+
     if(e != nullptr) {
         std::unique_ptr<MFile> entry(e);
 
@@ -110,16 +115,22 @@ void testDirectory(MFile* dir, bool verbose=false) {
 
 
         while(entry != nullptr) {
+            ld.check("While top");
             if(verbose)
                 dumpFileProperties(entry.get());
             else
                 Debug_printf("'%s'\r\n", entry->url.c_str());
+            ld.check("Pre reset");
             entry.reset(dir->getNextFileInDir());
+            ld.check("Post reset");
         }
     }
     else {
         Debug_printf("* got nullptr - directory is empty?");
     }
+
+    ld.check("After loop");
+    ld.finish();
 }
 
 void testDirectoryStandard(std::string path) {
@@ -644,16 +655,19 @@ void testStrings() {
 void detectLeaks() {
     testHeader("Leak detector");
     
-    auto testDir = Meat::New<MFile>("https://c64.meatloaf.cc/geckos-c64.d64");
+    //auto testDir = Meat::New<MFile>("https://c64.meatloaf.cc/geckos-c64.d64");
+    auto testDir = Meat::New<MFile>("/sd/WinGames.d64");
+
+    testDirectory(testDir.get());
 }
 
 void runTestsSuite() {
     // Delay waiting for wifi to connect
-    while ( !fnWiFi.connected() )
-    {
-        fnSystem.delay_microseconds(pdMS_TO_TICKS(1000)); // 1sec between checks
-    }
-    fnSystem.delay_microseconds(pdMS_TO_TICKS(5000)); // 5sec after connect
+    // while ( !fnWiFi.connected() )
+    // {
+    //     fnSystem.delay_microseconds(pdMS_TO_TICKS(1000)); // 1sec between checks
+    // }
+    // fnSystem.delay_microseconds(pdMS_TO_TICKS(5000)); // 5sec after connect
 
     //commodoreServer();
     //seekTest();
