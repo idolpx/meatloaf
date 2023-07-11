@@ -46,7 +46,7 @@ flash_filesystem = FLASH_SPIFFS
 
 ; Espressif32 PlatformIO Version to use for building
 ; https://github.com/platformio/platform-espressif32/releases
-esp32_platform_version = 5.1.0
+esp32_platform_version = 6.3.2
 ;esp32s3_platform_version = 6.1.0
 
 ; Required flags, leave as is
@@ -115,7 +115,7 @@ build_flags =
 	-D PINMAP_FUJILOAF_REV0
     -D BOARD_HAS_PSRAM
     -D SD_CARD
-	-D LED_STRIP
+	;-D LED_STRIP
 	-D PARALLEL_BUS
     -D GPIOX_PCF8575
 
