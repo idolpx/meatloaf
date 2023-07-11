@@ -53,8 +53,8 @@
 #define PIN_CASS_DATA_OUT       GPIO_NUM_26
 
 #define PIN_SERIAL_CD           GPIO_NUM_32
-#define PIN_SERIAL_RX           GPIO_NUM_9  // fnUartBUS
-#define PIN_SERIAL_TX           GPIO_NUM_10
+#define PIN_SERIAL_RX           GPIO_NUM_33  // fnUartBUS
+#define PIN_SERIAL_TX           GPIO_NUM_26
 
 
 /* Commodore IEC Pins */
@@ -67,24 +67,24 @@
 #define IEC_HAS_RESET // Reset line is available
 
 // // CBM IEC Serial Port
-// #define PIN_IEC_ATN         GPIO_NUM_39      // SIO 7  - CMD  - Command
-// #define PIN_IEC_SRQ         GPIO_NUM_26      // SIO 13 - INT  - Interrupt
-// #define PIN_IEC_RESET       GPIO_NUM_22      // SIO 9  - PROC - Proceed
-//                                              // SIO 4 & 6 - GND - Ground
+// #define PIN_IEC_ATN             GPIO_NUM_39      // SIO 7  - CMD  - Command
+// #define PIN_IEC_SRQ             GPIO_NUM_26      // SIO 13 - INT  - Interrupt
+// #define PIN_IEC_RESET           GPIO_NUM_22      // SIO 9  - PROC - Proceed
+//                                                  // SIO 4 & 6 - GND - Ground
 
 // // IEC_SPLIT_LINES
 // #ifndef IEC_SPLIT_LINES
 // // NOT SPLIT - Bidirectional Lines
-// #define PIN_IEC_CLK_IN       GPIO_NUM_27      // SIO 1  - CKI  - Clock Input
-// #define PIN_IEC_CLK_OUT      GPIO_NUM_27      // SIO 1  - CKI  - Clock Input
-// #define PIN_IEC_DATA_IN      GPIO_NUM_21      // SIO 3  - DI   - Data Input
-// #define PIN_IEC_DATA_OUT   	GPIO_NUM_21      // SIO 3  - DI   - Data Input
+// #define PIN_IEC_CLK_IN          GPIO_NUM_27      // SIO 1  - CKI  - Clock Input
+// #define PIN_IEC_CLK_OUT         GPIO_NUM_27      // SIO 1  - CKI  - Clock Input
+// #define PIN_IEC_DATA_IN         GPIO_NUM_21      // SIO 3  - DI   - Data Input
+// #define PIN_IEC_DATA_OUT        GPIO_NUM_21      // SIO 3  - DI   - Data Input
 // #else
 // // SPLIT - Seperate Input & Output lines
-// #define PIN_IEC_CLK_IN      GPIO_NUM_32      // SIO 2  - CKO  - Clock Output
-// #define PIN_IEC_CLK_OUT     GPIO_NUM_27      // SIO 1  - CKI  - Clock Input
-// #define PIN_IEC_DATA_IN     GPIO_NUM_33      // SIO 5  - DO   - Data Output
-// #define PIN_IEC_DATA_OUT    GPIO_NUM_21      // SIO 3  - DI   - Data Input
+// #define PIN_IEC_CLK_IN          GPIO_NUM_32      // SIO 2  - CKO  - Clock Output
+// #define PIN_IEC_CLK_OUT         GPIO_NUM_27      // SIO 1  - CKI  - Clock Input
+// #define PIN_IEC_DATA_IN         GPIO_NUM_33      // SIO 5  - DO   - Data Output
+// #define PIN_IEC_DATA_OUT        GPIO_NUM_21      // SIO 3  - DI   - Data Input
 // #endif
 
 #define PIN_IEC_RESET           GPIO_NUM_34
@@ -94,31 +94,30 @@
 #define PIN_IEC_DATA_IN         GPIO_NUM_25
 #define PIN_IEC_DATA_OUT        GPIO_NUM_25
 #define PIN_IEC_SRQ             GPIO_NUM_26
-
 // GND - Be sure to connect GND of the IEC cable to GND on the ESP module
 
 
 // // Display Connector Pins
-// #define PIN_IEC_ATN         GPIO_NUM_32
-// #define PIN_IEC_CLK_IN      GPIO_NUM_33
-// #define PIN_IEC_CLK_OUT     GPIO_NUM_33
-// #define PIN_IEC_DATA_IN     GPIO_NUM_14
-// #define PIN_IEC_DATA_OUT    GPIO_NUM_14
-// #define PIN_IEC_SRQ         GPIO_NUM_27
+// #define PIN_IEC_ATN             GPIO_NUM_32
+// #define PIN_IEC_CLK_IN          GPIO_NUM_33
+// #define PIN_IEC_CLK_OUT         GPIO_NUM_33
+// #define PIN_IEC_DATA_IN         GPIO_NUM_14
+// #define PIN_IEC_DATA_OUT        GPIO_NUM_14
+// #define PIN_IEC_SRQ             GPIO_NUM_27
 
 
 /* Modem/Parallel Switch */
-#define PIN_MODEM_ENABLE     2  // High = Modem enabled
-#define PIN_MODEM_UP9600     15 // High = UP9600 enabled
+#define PIN_MODEM_ENABLE        GPIO_NUM_2  // High = Modem enabled
+#define PIN_MODEM_UP9600        GPIO_NUM_15 // High = UP9600 enabled
 
 /* I2C GPIO Expander */
-#define PIN_GPIOX_SDA         GPIO_NUM_21
-#define PIN_GPIOX_SCL         GPIO_NUM_22
-#define PIN_GPIOX_INT         GPIO_NUM_39
-#define GPIOX_ADDRESS     0x20  // PCF8575
-//#define GPIOX_ADDRESS     0x24  // PCA9673
-#define GPIOX_SPEED       400   // PCF8575 - 400Khz
-//#define GPIOX_SPEED       1000  // PCA9673 - 1000Khz / 1Mhz
+#define PIN_GPIOX_SDA           GPIO_NUM_21
+#define PIN_GPIOX_SCL           GPIO_NUM_22
+#define PIN_GPIOX_INT           GPIO_NUM_39
+#define GPIOX_ADDRESS           0x20  // PCF8575
+//#define GPIOX_ADDRESS           0x24  // PCA9673
+#define GPIOX_SPEED             400   // PCF8575 - 400Khz
+//#define GPIOX_SPEED             1000  // PCA9673 - 1000Khz / 1Mhz
 
 #endif // PINMAP_LOLIN_D32_PRO
 #endif // PINMAP_LOLIN_D32_PRO_H
