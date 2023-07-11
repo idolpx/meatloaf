@@ -108,8 +108,8 @@
 
 
 /* Modem/Parallel Switch */
-#define PIN_MDMPAR_SW1       2  // High = Modem enabled
-#define PIN_MDMPAR_SW2       15 // High = UP9600 enabled
+#define PIN_MODEM_ENABLE     2  // High = Modem enabled
+#define PIN_MODEM_UP9600     15 // High = UP9600 enabled
 
 /* I2C GPIO Expander */
 #define PIN_GPIOX_SDA         GPIO_NUM_21
