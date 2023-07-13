@@ -74,7 +74,9 @@ void systemBus::setup()
     set_pin_mode ( PIN_IEC_CLK_IN, gpio_mode_t::GPIO_MODE_INPUT );
     set_pin_mode ( PIN_IEC_DATA_IN, gpio_mode_t::GPIO_MODE_INPUT );
     set_pin_mode ( PIN_IEC_SRQ, gpio_mode_t::GPIO_MODE_INPUT );
+#ifdef IEC_HAS_RESET
     set_pin_mode ( PIN_IEC_RESET, gpio_mode_t::GPIO_MODE_INPUT );
+#endif
 
     // Start task
     //xTaskCreate(ml_iec_intr_task, "ml_iec_intr_task", 2048, NULL, 10, NULL);
