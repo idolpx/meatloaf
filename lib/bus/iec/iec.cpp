@@ -19,7 +19,7 @@ static void IRAM_ATTR cbm_on_attention_isr_handler(void *arg)
 {
     systemBus *b = (systemBus *)arg;
 
-    b->pull(PIN_IEC_SRQ);
+    // b->pull(PIN_IEC_SRQ);
 
     // Go to listener mode and get command
     b->release(PIN_IEC_CLK_OUT);
@@ -30,7 +30,7 @@ static void IRAM_ATTR cbm_on_attention_isr_handler(void *arg)
         b->bus_state = BUS_ACTIVE;
 
     fnSystem.delay_microseconds(4);
-    b->release(PIN_IEC_SRQ);
+    // b->release(PIN_IEC_SRQ);
 }
 
 /**
@@ -151,6 +151,9 @@ void IRAM_ATTR systemBus::service()
     // Command or Data Mode
     do
     {
+        if ( status ( PIN_IEC_ATN ) == PULLED )
+            bus_state = BUS_ACTIVE;
+
         // Exit if bus is offline
         if (bus_state == BUS_OFFLINE)
             break;
@@ -217,14 +220,31 @@ void IRAM_ATTR systemBus::service()
             protocol = selectProtocol();
         }
 
-        if ( status ( PIN_IEC_ATN ) )
-            bus_state = BUS_ACTIVE;
+    } while( bus_state > BUS_IDLE || status ( PIN_IEC_ATN ) == PULLED );
 
-    } while( bus_state > BUS_IDLE );
+    pull( PIN_IEC_SRQ );
+    release( PIN_IEC_SRQ );
 
-    // Cleanup and Re-enable Interrupt
-    releaseLines();
-    //gpio_intr_enable((gpio_num_t)PIN_IEC_ATN);
+    if (status(PIN_IEC_ATN) == RELEASED)
+    {
+        pull( PIN_IEC_SRQ );
+        release( PIN_IEC_SRQ );
+        // Cleanup and Re-enable Interrupt
+#if 0
+        releaseLines();
+#else
+	// Calling method causes way too much delay, do release directly
+	release(PIN_IEC_CLK_OUT);
+	release(PIN_IEC_DATA_OUT);
+#endif
+        pull( PIN_IEC_SRQ );
+        release( PIN_IEC_SRQ );
+        //gpio_intr_enable((gpio_num_t)PIN_IEC_ATN);
+    }
+    else
+    {
+        bus_state = BUS_ACTIVE;
+    }
 
     //Debug_printv ( "primary[%.2X] secondary[%.2X] bus[%d] flags[%d]", data.primary, data.secondary, bus_state, flags );
     //Debug_printv ( "device[%d] channel[%d]", data.device, data.channel);
@@ -352,9 +372,12 @@ void systemBus::read_command()
         //Debug_printv("stabalize!");
         //protocol->wait ( TIMING_STABLE );
 
-    } while ( IEC.flags & ATN_PULLED );
-    //} while ( status( PIN_IEC_ATN ) == PULLED );
+    //} while ( IEC.flags & ATN_PULLED );
+    } while ( status( PIN_IEC_ATN ) == PULLED );
 
+    // pull( PIN_IEC_SRQ );
+    // release( PIN_IEC_SRQ );
+    
     // Is this command for us?
     if ( !isDeviceEnabled( data.device ) )
     // if (!deviceById(data.device) || !deviceById(data.device)->device_active)
@@ -384,12 +407,14 @@ void systemBus::read_command()
     }
 #endif
 
+#if 0
     // If the bus is idle then release the lines
     if ( bus_state < BUS_ACTIVE )
     {
         data.init();
         Debug_printv("bus init");
     }
+#endif
 
     //Debug_printv ( "code[%.2X] primary[%.2X] secondary[%.2X] bus[%d] flags[%d]", c, data.primary, data.secondary, bus_state, flags );
     //Debug_printv ( "device[%d] channel[%d]", data.device, data.channel);
@@ -408,12 +433,15 @@ void systemBus::read_payload()
     // ATN might get pulled right away if there is no command string to send
     //pull ( PIN_IEC_SRQ );
 
+#if 0
     /* Sometimes ATN isn't released immediately. Wait for ATN to be
        released before trying to read payload. Long ATN delay (>1.5ms)
        seems to occur more frequently with VIC-20. */
     protocol->timeoutWait(PIN_IEC_ATN, RELEASED, FOREVER, false);
+#endif
 
-    while (IEC.status(PIN_IEC_ATN) != PULLED)
+    //while (IEC.status(PIN_IEC_ATN) != PULLED)
+    for (;;)
     {
         //pull ( PIN_IEC_SRQ );
         int16_t c = protocol->receiveByte();

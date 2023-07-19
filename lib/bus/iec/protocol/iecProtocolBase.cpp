@@ -46,6 +46,7 @@ int16_t IecProtocolBase::timeoutWait(uint8_t pin, bool target_status, size_t wai
             return wait;
         }
 
+#if 0
         if ( watch_atn )
         {
             bool atn_check = IEC.status ( PIN_IEC_ATN );
@@ -56,6 +57,7 @@ int16_t IecProtocolBase::timeoutWait(uint8_t pin, bool target_status, size_t wai
                 return -1;
             }            
         }
+#endif
     }
     //IEC.release ( PIN_IEC_SRQ );
 
@@ -79,8 +81,10 @@ bool IecProtocolBase::wait(size_t wait, uint64_t start, bool watch_atn)
     else
         current = esp_timer_get_time();
 
+#if 0
     // Sample ATN and set flag to indicate SELECT or DATA mode
     bool atn_status = IEC.status ( PIN_IEC_ATN );
+#endif
 
     //IEC.pull ( PIN_IEC_SRQ );
     while ( elapsed < wait )
@@ -89,6 +93,7 @@ bool IecProtocolBase::wait(size_t wait, uint64_t start, bool watch_atn)
         current = esp_timer_get_time();
         elapsed = current - start;
 
+#if 0
         bool atn_check = IEC.status ( PIN_IEC_ATN );
         if ( atn_check != atn_status )
         {
@@ -96,6 +101,7 @@ bool IecProtocolBase::wait(size_t wait, uint64_t start, bool watch_atn)
             //Debug_printv("wait[%d] elapsed[%d] start[%d] current[%d]", wait, elapsed, start, current);
             return false;
         }
+#endif
     }
 
     //IEC.release ( PIN_IEC_SRQ );
