@@ -225,18 +225,17 @@ void IRAM_ATTR systemBus::service()
     pull( PIN_IEC_SRQ );
     release( PIN_IEC_SRQ );
 
+    // It takes 30us on Lolin to release DATA from here, during which
+    // ATN might get pulled. Add a wait to give Commodore a chance to
+    // pull ATN before testing if it is pulled.
+    protocol->wait(TIMING_STABLE);
+    
     if (status(PIN_IEC_ATN) == RELEASED)
     {
         pull( PIN_IEC_SRQ );
         release( PIN_IEC_SRQ );
         // Cleanup and Re-enable Interrupt
-#if 0
         releaseLines();
-#else
-	// Calling method causes way too much delay, do release directly
-	release(PIN_IEC_CLK_OUT);
-	release(PIN_IEC_DATA_OUT);
-#endif
         pull( PIN_IEC_SRQ );
         release( PIN_IEC_SRQ );
         //gpio_intr_enable((gpio_num_t)PIN_IEC_ATN);
