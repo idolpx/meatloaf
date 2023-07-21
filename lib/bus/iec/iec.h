@@ -1,8 +1,6 @@
 #ifndef IEC_H
 #define IEC_H
 
-#define FAST_GPIO 1
-
 // This code uses code from the Meatloaf Project:
 // Meatloaf - A Commodore 64/128 multi-device emulator
 // https://github.com/idolpx/meatloaf
@@ -41,13 +39,15 @@
 #include <queue>
 #include <memory>
 #include <driver/gpio.h>
-#include <soc/gpio_reg.h>
 #include "fnSystem.h"
 #include "protocol/iecProtocolBase.h"
 #include "protocol/jiffydos.h"
 #ifdef PARALLEL_BUS
 #include "protocol/dolphindos.h"
 #endif
+
+#include <soc/gpio_reg.h>
+#define FAST_SET_DIRECTION(p, m) ({ int _reg = GPIO_ENABLE_REG, _pin = p; if (_pin > 31) { _reg = GPIO_ENABLE1_REG, _pin -= 32; } if ((m) == GPIO_MODE_OUTPUT) { REG_SET_BIT(_reg, 1 << _pin); } else { REG_CLR_BIT(_reg, 1 << _pin); }})
 
 #include "../../../include/debug.h"
 
@@ -544,89 +544,18 @@ public:
     // true => PULL => LOW
     inline void IRAM_ATTR pull ( uint8_t pin )
     {
-#ifdef FAST_GPIO
-      int reg;
-      uint32_t bits;
-
-
-      reg = GPIO_ENABLE_REG;
-      if (pin > 31) {
-	reg = GPIO_ENABLE1_REG;
-	pin -= 32;
-      }
-
-      bits = REG_READ(reg);
-      bits |= 1 << pin;
-      REG_WRITE(reg, bits);
-#else
-#ifndef IEC_SPLIT_LINES
-        set_pin_mode ( pin, gpio_mode_t::GPIO_MODE_OUTPUT );
-#endif
-        fnSystem.digital_write ( pin, LOW );
-#endif /* FAST_GPIO */
+      FAST_SET_DIRECTION(pin, GPIO_MODE_OUTPUT);
     }
 
     // false => RELEASE => HIGH
     inline void IRAM_ATTR release ( uint8_t pin )
     {
-#ifdef FAST_GPIO
-      int reg;
-      uint32_t bits;
-
-
-      reg = GPIO_ENABLE_REG;
-      if (pin > 31) {
-	reg = GPIO_ENABLE1_REG;
-	pin -= 32;
-      }
-
-      bits = REG_READ(reg);
-      bits &= ~(1 << pin);
-      REG_WRITE(reg, bits);
-#else
-#ifndef IEC_SPLIT_LINES
-        set_pin_mode ( pin, gpio_mode_t::GPIO_MODE_OUTPUT );
-#endif
-        fnSystem.digital_write ( pin, HIGH );
-#endif
+      FAST_SET_DIRECTION(pin, GPIO_MODE_INPUT);
     }
 
     inline bool IRAM_ATTR status ( uint8_t pin )
     {
-#ifdef FAST_GPIO
-      release(pin);
-#else
-#ifndef IEC_SPLIT_LINES
-        set_pin_mode ( pin, gpio_mode_t::GPIO_MODE_INPUT );
-#endif
-#endif
         return gpio_get_level ( ( gpio_num_t ) pin ) ? RELEASED : PULLED;
-    }
-
-    inline void IRAM_ATTR set_pin_mode ( uint8_t pin, gpio_mode_t mode )
-    {
-        static uint64_t gpio_pin_modes;
-        uint8_t b_mode = ( mode == 1 ) ? 1 : 0;
-
-        // is this pin mode already set the way we want?
-#ifndef IEC_SPLIT_LINES
-        if ( ( ( gpio_pin_modes >> pin ) & 1ULL ) != b_mode )
-#endif
-        {
-            // toggle bit so we don't change mode unnecessarily
-            gpio_pin_modes ^= ( -b_mode ^ gpio_pin_modes ) & ( 1ULL << pin );
-
-            gpio_config_t io_conf =
-            {
-                .pin_bit_mask = ( 1ULL << pin ),            // bit mask of the pins that you want to set
-                .mode = mode,                               // set as input mode
-                .pull_up_en = GPIO_PULLUP_ENABLE,          // enable pull-up mode
-                .pull_down_en = GPIO_PULLDOWN_DISABLE,      // disable pull-down mode
-                .intr_type = GPIO_INTR_DISABLE              // interrupt of falling edge
-            };
-            //configure GPIO with the given settings
-            gpio_config ( &io_conf );
-        }
     }
 
 };

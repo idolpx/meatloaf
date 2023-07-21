@@ -67,25 +67,26 @@ void systemBus::setup()
     protocol = selectProtocol();
 
     // initial pin modes in GPIO
-    set_pin_mode ( PIN_IEC_ATN, gpio_mode_t::GPIO_MODE_INPUT );
-    set_pin_mode ( PIN_IEC_CLK_IN, gpio_mode_t::GPIO_MODE_INPUT );
-    set_pin_mode ( PIN_IEC_DATA_IN, gpio_mode_t::GPIO_MODE_INPUT );
-    set_pin_mode ( PIN_IEC_SRQ, gpio_mode_t::GPIO_MODE_INPUT );
+    gpio_set_direction(PIN_IEC_ATN, GPIO_MODE_INPUT);
+    gpio_set_pull_mode(PIN_IEC_ATN, GPIO_PULLUP_ONLY);
+    gpio_set_level(PIN_IEC_ATN, LOW);
 
-#ifdef FAST_GPIO
-    fnSystem.digital_write ( PIN_IEC_ATN, LOW );
-    fnSystem.digital_write ( PIN_IEC_CLK_IN, LOW );
-    fnSystem.digital_write ( PIN_IEC_DATA_IN, LOW );
-    fnSystem.digital_write ( PIN_IEC_SRQ, LOW );
-#endif
+    gpio_set_direction(PIN_IEC_CLK_OUT, GPIO_MODE_INPUT);
+    gpio_set_pull_mode(PIN_IEC_CLK_OUT, GPIO_PULLUP_ONLY);
+    gpio_set_level(PIN_IEC_CLK_OUT, LOW);
 
-    release(PIN_IEC_CLK_OUT);
-    release(PIN_IEC_DATA_OUT);
-    release(PIN_IEC_ATN);
-    release(PIN_IEC_SRQ);
+    gpio_set_direction(PIN_IEC_DATA_OUT, GPIO_MODE_INPUT);
+    gpio_set_pull_mode(PIN_IEC_DATA_OUT, GPIO_PULLUP_ONLY);
+    gpio_set_level(PIN_IEC_DATA_OUT, LOW);
+
+    gpio_set_direction(PIN_IEC_SRQ, GPIO_MODE_INPUT);
+    gpio_set_pull_mode(PIN_IEC_SRQ, GPIO_PULLUP_ONLY);
+    gpio_set_level(PIN_IEC_SRQ, LOW);
 
 #ifdef IEC_HAS_RESET
-    set_pin_mode ( PIN_IEC_RESET, gpio_mode_t::GPIO_MODE_INPUT );
+    gpio_set_direction(PIN_IEC_RESET, GPIO_MODE_INPUT);
+    gpio_set_pull_mode(PIN_IEC_RESET, GPIO_PULLUP_ONLY);
+    gpio_set_level(PIN_IEC_RESET, LOW);
 #endif
 
     // Start task
@@ -232,17 +233,10 @@ void IRAM_ATTR systemBus::service()
 
     } while( bus_state > BUS_IDLE || status ( PIN_IEC_ATN ) == PULLED );
 
-    pull( PIN_IEC_SRQ );
-    release( PIN_IEC_SRQ );
-
     if (status(PIN_IEC_ATN) == RELEASED)
     {
-        pull( PIN_IEC_SRQ );
-        release( PIN_IEC_SRQ );
         // Cleanup and Re-enable Interrupt
         releaseLines();
-        pull( PIN_IEC_SRQ );
-        release( PIN_IEC_SRQ );
         //gpio_intr_enable((gpio_num_t)PIN_IEC_ATN);
     }
     else

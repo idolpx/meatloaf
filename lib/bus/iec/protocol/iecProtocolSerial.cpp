@@ -187,11 +187,6 @@ bool IecProtocolSerial::sendBits ( uint8_t data )
 
     // Release data line after byte sent
     IEC.release ( PIN_IEC_DATA_OUT );
-#ifndef FAST_GPIO
-#ifndef IEC_SPLIT_LINES
-    IEC.set_pin_mode ( PIN_IEC_DATA_IN, gpio_mode_t::GPIO_MODE_INPUT ); // Set DATA IN back to input
-#endif
-#endif
 
     return true;
 } // sendBits
@@ -339,13 +334,7 @@ int16_t IecProtocolSerial::receiveBits ()
     uint8_t n = 0;
 
     //IEC.pull ( PIN_IEC_SRQ );
-#ifdef FAST_GPIO
     IEC.release(PIN_IEC_DATA_IN);
-#else
-#ifndef IEC_SPLIT_LINES
-    IEC.set_pin_mode ( PIN_IEC_DATA_IN, gpio_mode_t::GPIO_MODE_INPUT ); // Set DATA IN back to input
-#endif
-#endif
 
     for ( n = 0; n < 8; n++ )
     {
@@ -371,11 +360,6 @@ int16_t IecProtocolSerial::receiveBits ()
                         IEC.pull(PIN_IEC_DATA_OUT);
                         wait( TIMING_JIFFY_ACK, 0, false );
                         IEC.release(PIN_IEC_DATA_OUT);
-#ifndef FAST_GPIO
-#ifndef IEC_SPLIT_LINES
-                        IEC.set_pin_mode ( PIN_IEC_DATA_IN, gpio_mode_t::GPIO_MODE_INPUT ); // Set DATA IN back to input
-#endif
-#endif
                         IEC.flags |= JIFFY_ACTIVE;
                     }
                 }
