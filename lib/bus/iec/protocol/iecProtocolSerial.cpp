@@ -35,10 +35,6 @@ bool IecProtocolSerial::sendByte(uint8_t data, bool eoi)
 
     IEC.flags &= CLEAR_LOW;
 
-#if 0
-    if ( IEC.status ( PIN_IEC_ATN ) ) return -1;
-#endif
-
     // Say we're ready
     //wait( TIMING_STABLE );
     IEC.release ( PIN_IEC_CLK_OUT );
@@ -292,15 +288,6 @@ int16_t IecProtocolSerial::receiveByte()
     // and  the listener is holding the Data line true. We're ready for step 1; we may send another character - unless EOI has
     // happened. If EOI was sent or received in this last transmission, both talker and listener "letgo."  After a suitable pause,
     // the Clock and Data lines are RELEASED to false and transmission stops.
-
-#if 0
-    if ( (IEC.flags & EOI_RECVD)
-	 && wait ( TIMING_Tfr )
-	 && (IEC.status( PIN_IEC_ATN ) == RELEASED) )
-    {
-        IEC.release ( PIN_IEC_DATA_OUT );
-    }
-#endif
 
     timeoutWait( PIN_IEC_CLK_IN, RELEASED, TIMING_Tbb);
 

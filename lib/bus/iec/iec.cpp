@@ -405,15 +405,6 @@ void systemBus::read_command()
     }
 #endif
 
-#if 0
-    // If the bus is idle then release the lines
-    if ( bus_state < BUS_ACTIVE )
-    {
-        data.init();
-        Debug_printv("bus init");
-    }
-#endif
-
     //Debug_printv ( "code[%.2X] primary[%.2X] secondary[%.2X] bus[%d] flags[%d]", c, data.primary, data.secondary, bus_state, flags );
     //Debug_printv ( "device[%d] channel[%d]", data.device, data.channel);
 
@@ -431,14 +422,6 @@ void systemBus::read_payload()
     // ATN might get pulled right away if there is no command string to send
     //pull ( PIN_IEC_SRQ );
 
-#if 0
-    /* Sometimes ATN isn't released immediately. Wait for ATN to be
-       released before trying to read payload. Long ATN delay (>1.5ms)
-       seems to occur more frequently with VIC-20. */
-    protocol->timeoutWait(PIN_IEC_ATN, RELEASED, FOREVER, false);
-#endif
-
-    //while (IEC.status(PIN_IEC_ATN) != PULLED)
     for (;;)
     {
         //pull ( PIN_IEC_SRQ );
