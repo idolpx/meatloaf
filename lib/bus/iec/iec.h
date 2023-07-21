@@ -1,6 +1,8 @@
 #ifndef IEC_H
 #define IEC_H
 
+#define FAST_GPIO 1
+
 // This code uses code from the Meatloaf Project:
 // Meatloaf - A Commodore 64/128 multi-device emulator
 // https://github.com/idolpx/meatloaf
@@ -39,6 +41,7 @@
 #include <queue>
 #include <memory>
 #include <driver/gpio.h>
+#include <soc/gpio_reg.h>
 #include "fnSystem.h"
 #include "protocol/iecProtocolBase.h"
 #include "protocol/jiffydos.h"
@@ -541,25 +544,61 @@ public:
     // true => PULL => LOW
     inline void IRAM_ATTR pull ( uint8_t pin )
     {
+#ifdef FAST_GPIO
+      int reg;
+      uint32_t bits;
+
+
+      reg = GPIO_ENABLE_REG;
+      if (pin > 31) {
+	reg = GPIO_ENABLE1_REG;
+	pin -= 32;
+      }
+
+      bits = REG_READ(reg);
+      bits |= 1 << pin;
+      REG_WRITE(reg, bits);
+#else
 #ifndef IEC_SPLIT_LINES
         set_pin_mode ( pin, gpio_mode_t::GPIO_MODE_OUTPUT );
 #endif
         fnSystem.digital_write ( pin, LOW );
+#endif /* FAST_GPIO */
     }
 
     // false => RELEASE => HIGH
     inline void IRAM_ATTR release ( uint8_t pin )
     {
+#ifdef FAST_GPIO
+      int reg;
+      uint32_t bits;
+
+
+      reg = GPIO_ENABLE_REG;
+      if (pin > 31) {
+	reg = GPIO_ENABLE1_REG;
+	pin -= 32;
+      }
+
+      bits = REG_READ(reg);
+      bits &= ~(1 << pin);
+      REG_WRITE(reg, bits);
+#else
 #ifndef IEC_SPLIT_LINES
         set_pin_mode ( pin, gpio_mode_t::GPIO_MODE_OUTPUT );
 #endif
         fnSystem.digital_write ( pin, HIGH );
+#endif
     }
 
     inline bool IRAM_ATTR status ( uint8_t pin )
     {
+#ifdef FAST_GPIO
+      release(pin);
+#else
 #ifndef IEC_SPLIT_LINES
         set_pin_mode ( pin, gpio_mode_t::GPIO_MODE_INPUT );
+#endif
 #endif
         return gpio_get_level ( ( gpio_num_t ) pin ) ? RELEASED : PULLED;
     }
@@ -581,7 +620,7 @@ public:
             {
                 .pin_bit_mask = ( 1ULL << pin ),            // bit mask of the pins that you want to set
                 .mode = mode,                               // set as input mode
-                .pull_up_en = GPIO_PULLUP_DISABLE,          // disable pull-up mode
+                .pull_up_en = GPIO_PULLUP_ENABLE,          // enable pull-up mode
                 .pull_down_en = GPIO_PULLDOWN_DISABLE,      // disable pull-down mode
                 .intr_type = GPIO_INTR_DISABLE              // interrupt of falling edge
             };
@@ -589,6 +628,7 @@ public:
             gpio_config ( &io_conf );
         }
     }
+
 };
 
 /**

@@ -65,15 +65,25 @@ void systemBus::setup()
 
     flags = CLEAR;
     protocol = selectProtocol();
-    release(PIN_IEC_CLK_OUT);
-    release(PIN_IEC_DATA_OUT);
-    release(PIN_IEC_SRQ);
 
     // initial pin modes in GPIO
     set_pin_mode ( PIN_IEC_ATN, gpio_mode_t::GPIO_MODE_INPUT );
     set_pin_mode ( PIN_IEC_CLK_IN, gpio_mode_t::GPIO_MODE_INPUT );
     set_pin_mode ( PIN_IEC_DATA_IN, gpio_mode_t::GPIO_MODE_INPUT );
     set_pin_mode ( PIN_IEC_SRQ, gpio_mode_t::GPIO_MODE_INPUT );
+
+#ifdef FAST_GPIO
+    fnSystem.digital_write ( PIN_IEC_ATN, LOW );
+    fnSystem.digital_write ( PIN_IEC_CLK_IN, LOW );
+    fnSystem.digital_write ( PIN_IEC_DATA_IN, LOW );
+    fnSystem.digital_write ( PIN_IEC_SRQ, LOW );
+#endif
+
+    release(PIN_IEC_CLK_OUT);
+    release(PIN_IEC_DATA_OUT);
+    release(PIN_IEC_ATN);
+    release(PIN_IEC_SRQ);
+
 #ifdef IEC_HAS_RESET
     set_pin_mode ( PIN_IEC_RESET, gpio_mode_t::GPIO_MODE_INPUT );
 #endif
@@ -225,11 +235,6 @@ void IRAM_ATTR systemBus::service()
     pull( PIN_IEC_SRQ );
     release( PIN_IEC_SRQ );
 
-    // It takes 30us on Lolin to release DATA from here, during which
-    // ATN might get pulled. Add a wait to give Commodore a chance to
-    // pull ATN before testing if it is pulled.
-    protocol->wait(TIMING_STABLE);
-    
     if (status(PIN_IEC_ATN) == RELEASED)
     {
         pull( PIN_IEC_SRQ );
