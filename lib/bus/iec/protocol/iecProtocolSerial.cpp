@@ -159,13 +159,14 @@ bool IecProtocolSerial::sendBits ( uint8_t data )
         tv = TIMING_Tv; // VIC-20 data valid timing
     }
 
+    IEC.release(PIN_IEC_DATA_OUT);
+    // Check to see if DATA is being pulled
+    if ( IEC.status( PIN_IEC_DATA_IN ) == PULLED )
+        return false; // If it is we exit
+
     // Send bits
     for ( uint8_t n = 0; n < 8; n++ )
     {
-        // Check to see if DATA is being pulled
-        if ( IEC.status( PIN_IEC_DATA_IN ) == PULLED )
-            return false; // If it is we exit
-
         if ( !wait ( TIMING_Ts1 ) ) return false; // 57us 
 
         // set bit
@@ -183,9 +184,6 @@ bool IecProtocolSerial::sendBits ( uint8_t data )
 
     // Release data line after byte sent
     IEC.release ( PIN_IEC_DATA_OUT );
-#ifndef IEC_SPLIT_LINES
-    IEC.set_pin_mode ( PIN_IEC_DATA_IN, gpio_mode_t::GPIO_MODE_INPUT ); // Set DATA IN back to input
-#endif
 
     return true;
 } // sendBits
@@ -332,7 +330,7 @@ int16_t IecProtocolSerial::receiveBits ()
 
     //IEC.pull ( PIN_IEC_SRQ );
 #ifndef IEC_SPLIT_LINES
-    IEC.set_pin_mode ( PIN_IEC_DATA_IN, gpio_mode_t::GPIO_MODE_INPUT ); // Set DATA IN back to input
+    IEC.release(PIN_IEC_DATA_IN); // Set DATA IN back to input
 #endif
 
     for ( n = 0; n < 8; n++ )
@@ -360,7 +358,7 @@ int16_t IecProtocolSerial::receiveBits ()
                         wait( TIMING_JIFFY_ACK, 0, false );
                         IEC.release(PIN_IEC_DATA_OUT);
 #ifndef IEC_SPLIT_LINES
-                        IEC.set_pin_mode ( PIN_IEC_DATA_IN, gpio_mode_t::GPIO_MODE_INPUT ); // Set DATA IN back to input
+                        IEC.release(PIN_IEC_DATA_IN); // Set DATA IN back to input
 #endif
                         IEC.flags |= JIFFY_ACTIVE;
                     }

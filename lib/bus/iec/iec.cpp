@@ -19,7 +19,7 @@ static void IRAM_ATTR cbm_on_attention_isr_handler(void *arg)
 {
     systemBus *b = (systemBus *)arg;
 
-    b->pull(PIN_IEC_SRQ);
+    //b->pull(PIN_IEC_SRQ);
 
     // Go to listener mode and get command
     b->release(PIN_IEC_CLK_OUT);
@@ -30,7 +30,7 @@ static void IRAM_ATTR cbm_on_attention_isr_handler(void *arg)
         b->bus_state = BUS_ACTIVE;
 
     fnSystem.delay_microseconds(4);
-    b->release(PIN_IEC_SRQ);
+    //b->release(PIN_IEC_SRQ);
 }
 
 /**
@@ -58,6 +58,13 @@ static void ml_iec_intr_task(void* arg)
     }
 }
 
+void init_pin(gpio_num_t pin)
+{
+    gpio_set_direction(pin, GPIO_MODE_INPUT);
+    gpio_set_pull_mode(pin, GPIO_PULLUP_ONLY);
+    gpio_set_level(pin, LOW);
+    return;
+}
 
 void systemBus::setup()
 {
@@ -70,13 +77,15 @@ void systemBus::setup()
     release(PIN_IEC_SRQ);
 
     // initial pin modes in GPIO
-    set_pin_mode ( PIN_IEC_ATN, gpio_mode_t::GPIO_MODE_INPUT );
-    set_pin_mode ( PIN_IEC_CLK_IN, gpio_mode_t::GPIO_MODE_INPUT );
-    set_pin_mode ( PIN_IEC_DATA_IN, gpio_mode_t::GPIO_MODE_INPUT );
-    set_pin_mode ( PIN_IEC_SRQ, gpio_mode_t::GPIO_MODE_INPUT );
-#ifdef IEC_HAS_RESET
-    set_pin_mode ( PIN_IEC_RESET, gpio_mode_t::GPIO_MODE_INPUT );
-#endif
+
+    init_pin(PIN_IEC_ATN);
+    init_pin(PIN_IEC_CLK_OUT);
+    init_pin(PIN_IEC_DATA_OUT);
+    init_pin(PIN_IEC_SRQ);
+
+    #ifdef IEC_HAS_RESET
+    init_pin(PIN_IEC_RESET);
+    #endif
 
     // Start task
     //xTaskCreate(ml_iec_intr_task, "ml_iec_intr_task", 2048, NULL, 10, NULL);
