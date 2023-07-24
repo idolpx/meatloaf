@@ -160,7 +160,7 @@ bool IecProtocolSerial::sendBits ( uint8_t data )
     // Check to see if DATA is being pulled
     if ( IEC.status( PIN_IEC_DATA_IN ) == PULLED )
     {
-	return false; // If it is we exit
+        return false; // If it is we exit
     }
 
     // Send bits

@@ -1058,9 +1058,9 @@ bool iecDrive::sendFile()
         }
 #endif
         // Send Byte
-        if ( count + 1 == avail || !success_rx )
+        avail = istream->available();
+        if ( !avail || !success_rx )
         {
-	  //Debug_printv("b[%02X] EOI %i", b, count);
             success_tx = IEC.sendByte(b, true); // indicate end of file.
             if ( !success_tx )
                 Debug_printv("tx fail");
@@ -1071,10 +1071,7 @@ bool iecDrive::sendFile()
         {
             success_tx = IEC.sendByte(b);
             if ( !success_tx )
-            {
                 Debug_printv("tx fail");
-                //break;
-            }
 
         }
         b = nb; // byte = next byte
@@ -1117,15 +1114,15 @@ bool iecDrive::sendFile()
         // }
     }
 
-#ifdef DATA_STREAM
-    if (bi)
-    {
-      uint32_t t = (count * 100) / len;
-      ba[bi] = 0;
-      Debug_printf(" %s (%d %d%%) [%d]\r\n", ba, count, t, avail);
-      bi = 0;
-    }
-#endif
+// #ifdef DATA_STREAM
+//     if (bi)
+//     {
+//       uint32_t t = (count * 100) / len;
+//       ba[bi] = 0;
+//       Debug_printf(" %s (%d %d%%) [%d]\r\n", ba, count, t, avail);
+//       bi = 0;
+//     }
+// #endif
 
     Debug_printf("\r\n=================================\r\n%d bytes sent of %d [SYS%d]\r\n", count, avail, sys_address);
 

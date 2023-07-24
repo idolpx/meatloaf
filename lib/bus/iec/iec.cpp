@@ -249,6 +249,7 @@ void IRAM_ATTR systemBus::service()
 
     Debug_printv("exit");
     Debug_printv("bus[%d] flags[%d]", bus_state, flags);
+    //pull( PIN_IEC_SRQ );
     //release( PIN_IEC_SRQ );
 
     //fnLedStrip.stopRainbow();
