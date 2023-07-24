@@ -557,7 +557,6 @@ public:
     {
         return gpio_get_level ( ( gpio_num_t ) pin ) ? RELEASED : PULLED;
     }
-
 };
 
 /**

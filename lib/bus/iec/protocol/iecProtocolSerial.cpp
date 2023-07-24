@@ -347,6 +347,9 @@ int16_t IecProtocolSerial::receiveBits ()
                         IEC.pull(PIN_IEC_DATA_OUT);
                         wait( TIMING_JIFFY_ACK, 0, false );
                         IEC.release(PIN_IEC_DATA_OUT);
+#ifndef IEC_SPLIT_LINES
+                        IEC.release(PIN_IEC_DATA_IN); // Set DATA IN back to input
+#endif
                         IEC.flags |= JIFFY_ACTIVE;
                     }
                 }

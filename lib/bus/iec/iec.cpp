@@ -58,6 +58,13 @@ static void ml_iec_intr_task(void* arg)
     }
 }
 
+void init_pin(gpio_num_t pin)
+{
+    gpio_set_direction(pin, GPIO_MODE_INPUT);
+    gpio_set_pull_mode(pin, GPIO_PULLUP_ONLY);
+    gpio_set_level(pin, LOW);
+    return;
+}
 
 void systemBus::setup()
 {

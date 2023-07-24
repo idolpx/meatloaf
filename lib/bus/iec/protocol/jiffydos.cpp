@@ -42,7 +42,9 @@ int16_t  JiffyDOS::receiveByte ()
     // release ( PIN_IEC_SRQ );
 
     // Release the Data line to signal we are ready
-    IEC.release(PIN_IEC_DATA_OUT);
+#ifndef IEC_SPLIT_LINES
+    IEC.release(PIN_IEC_DATA_IN);
+#endif
 
     // Wait for talker ready
     if ( timeoutWait ( PIN_IEC_CLK_IN, RELEASED, FOREVER ) == TIMED_OUT )
