@@ -43,7 +43,7 @@ int16_t  JiffyDOS::receiveByte ()
 
     // Release the Data line to signal we are ready
 #ifndef IEC_SPLIT_LINES
-    IEC.set_pin_mode ( PIN_IEC_DATA_IN, gpio_mode_t::GPIO_MODE_INPUT ); // Set DATA IN back to input
+    IEC.release(PIN_IEC_DATA_IN);
 #endif
 
     // Wait for talker ready
