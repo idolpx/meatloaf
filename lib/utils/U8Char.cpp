@@ -53,6 +53,30 @@ void U8Char::fromUtf8Stream(std::istream* reader) {
     }
 };
 
+size_t U8Char::fromCharArray(char* reader) {
+    uint8_t byte = reader[0];
+    if(byte<=0x7f) {
+        ch = byte;
+        return 1;
+    }   
+    else if((byte & 0b11100000) == 0b11000000) {
+        uint16_t hi =  ((uint16_t)(byte & 0b1111)) << 6;
+        uint16_t lo = (reader[1] & 0b111111);
+        ch = hi | lo;
+        return 2;
+    }
+    else if((byte & 0b11110000) == 0b11100000) {
+        uint16_t hi = ((uint16_t)(byte & 0b111)) << 12;
+        uint16_t mi = ((uint16_t)(reader[1] & 0b111111)) << 6;
+        uint16_t lo = reader[2] & 0b111111;
+        ch = hi | mi | lo;
+        return 3;
+    }
+    else {
+        ch = 0;
+        return 1;
+    }
+};
 
 std::string U8Char::toUtf8() {
     if(ch==0) {
