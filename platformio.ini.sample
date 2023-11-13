@@ -82,10 +82,17 @@ check_skip_packages = yes
 build_flags =
     -D ${meatloaf.build_platform}
     -D ${meatloaf.flash_filesystem}
-    -D WIFI_SSID=${meatloaf.wifi_ssid}
-    -D WIFI_PASSWORD=${meatloaf.wifi_pass}
     -D CMAKE_EXPORT_COMPILE_COMMANDS=ON
     -D DEBUG_SPEED=460800   ;921600
+
+    ; Default WiFi
+    -D WIFI_SSID=${meatloaf.wifi_ssid}
+    -D WIFI_PASSWORD=${meatloaf.wifi_pass}
+
+    ; Service Options
+    ;-D ENABLE_SSDP         ; enable Simple Service Discovery Protocol service
+
+    ; Hardware Options
     ;-D NO_BUTTONS          ; if your hardware has no physical buttons
     ;-D SD_CARD             ; if your hardware has an sd card slot
     ;-D LED_STRIP           ; if your hardware has an LED strip
@@ -93,18 +100,22 @@ build_flags =
     ;-D PARALLEL_BUS        ; if your hardware has userport parallel interface
     ;-D JTAG                ; enable use with JTAG debugger
     ;-D BLUETOOTH_SUPPORT   ; enable BlueTooth support
+
+    ; GPIO Expander Selection (select only one if available)
+    ;-D GPIOX_PCF8575
+    ;-D GPIOX_MCP23017
+    ;-D GPIOX_XRA1405
+
+    ; DEBUG Options
+    -D DEBUG_SPEED=${env.monitor_speed}
+    -D DATA_STREAM
     ;-D VERBOSE_TNFS
     ;-D VERBOSE_DISK
     ;-D VERBOSE_HTTP
     ;-D DEBUG_TIMING
-    ;-D DATA_STREAM
     ;-D NO_VIRTUAL_KEYBOARD
     ;-D DBUG2 ; enable monitor messages for a release build
 
-    ; GPIO Expander Selection
-    ;-D GPIOX_PCF8575
-    ;-D GPIOX_MCP23017
-    ;-D GPIOX_XRA1405
 
 [env:fujiloaf-rev0]
 platform = espressif32@${meatloaf.esp32_platform_version}

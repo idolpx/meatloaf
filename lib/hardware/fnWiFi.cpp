@@ -21,7 +21,9 @@
 #include "fnConfig.h"
 
 #include "httpd_server.h"
+#ifdef ENABLE_SSDP
 #include "ssdp.h"
+#endif
 #include "led.h"
 
 
@@ -548,9 +550,11 @@ void WiFiManager::_wifi_event_handler(void *arg, esp_event_base_t event_base,
             mdns_service_add(NULL, "_http", "_tcp", 80, NULL, 0);
             Serial.println( ANSI_GREEN_BOLD "mDNS Service Started!" ANSI_RESET );
 
+#ifdef ENABLE_SSDP
             // Start SSDP Service
             SSDPDevice.start();
             Serial.println( ANSI_GREEN_BOLD "SSDP Service Started!" ANSI_RESET );
+#endif
 
             break;
         case IP_EVENT_STA_LOST_IP:

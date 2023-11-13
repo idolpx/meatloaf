@@ -1,4 +1,5 @@
-// .D64 - The D64 disk image format
+// .D64, .D41 - 1541 disk image format
+//
 // https://vice-emu.sourceforge.io/vice_17.html#SEC345
 // https://ist.uwaterloo.ca/~schepers/formats/D64.TXT
 // https://ist.uwaterloo.ca/~schepers/formats/GEOS.TXT
@@ -6,6 +7,7 @@
 //  - disucssion of disk id in sector missing from d64 file format is interesting
 // https://www.c64-wiki.com/wiki/Disk_Image
 // http://unusedino.de/ec64/technical3.html
+// http://www.baltissen.org/newhtm/diskimag.htm
 //
 
 #ifndef MEATLOAF_MEDIA_D64
@@ -315,7 +317,13 @@ public:
 
     bool handles(std::string fileName) {
         //Serial.printf("handles w dnp %s %d\r\n", fileName.rfind(".dnp"), fileName.length()-4);
-        return byExtension(".d64", fileName);
+        return byExtension(
+            {
+                ".d64",
+                ".d41"
+            }, 
+            fileName
+        );
     }
 
     D64FileSystem(): MFileSystem("d64") {};

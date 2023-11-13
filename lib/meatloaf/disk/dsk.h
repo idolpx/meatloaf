@@ -112,7 +112,7 @@ public:
                 ".dsk",
                 ".do",
                 ".po",
-                ".hdv",
+                ".hdv"
             }, 
             fileName
         );

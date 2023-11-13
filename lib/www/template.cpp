@@ -12,7 +12,10 @@
 #include "fnFsSD.h"
 
 #include "fnWiFi.h"
+
+#ifdef ENABLE_SSDP
 #include "ssdp.h"
+#endif
 
 
 bool is_parsable(const char *extension)
@@ -293,7 +296,11 @@ const std::string substitute_tag(const std::string &tag)
         resultstream << fnSystem.get_fujinet_version();
         break;
     case DEVICE_UUID:
+#ifdef ENABLE_SSDP
         resultstream << SSDPDevice.getUUID();
+#else
+        resultstream << "SSDP-DISABLED";
+#endif
         break;
     case DEVICE_IPADDRESS:
         resultstream << fnSystem.Net.get_ip4_address_str();

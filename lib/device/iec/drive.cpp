@@ -359,7 +359,7 @@ void iecDrive::iec_command()
             //Error(ERROR_31_SYNTAX_ERROR);	// DI, DR, DW not implemented yet
         break;
         case 'I':
-            // Initialise
+            // Initialize
             Debug_printv( "initialize");
         break;
         case 'M':

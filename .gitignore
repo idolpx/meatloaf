@@ -21,13 +21,11 @@ include/ssid.h
 .travis.yml
 compile_commands.json
 .reference/*
+\!archive/*
+bin/*
 data/BUILD_IEC/config.ini
 data/BUILD_IEC/.sys/rom/*
-lib/bus/iec/iec.cpp
-\!archive/*
 dependencies.lock
-firmware/*.bin
 lib/device/disk.h
 lib/device/iec/fuji.*
 lib/device/iec/disk.*
-firmware/Adafruit ESPTool.webloc
