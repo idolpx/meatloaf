@@ -216,14 +216,14 @@ namespace mstr {
                     [](unsigned char c) { return std::toupper(c); });
     }
 
-    // convert to ascii (in place)
+    // convert to ascii (in place) - DO NOT USE, use toUtf8 instead!
     void toASCII(std::string &s)
     {
         std::transform(s.begin(), s.end(), s.begin(),
                     [](unsigned char c) { return petscii2ascii(c); });
     }
 
-    // convert to petscii (in place)
+    // convert to petscii (in place) - DO NOT USE, utf8 can't be converted in place!
     void toPETSCII(std::string &s)
     {
         std::transform(s.begin(), s.end(), s.begin(),

@@ -15,6 +15,7 @@ class U8Char {
     static const char16_t utf8map[];
     const char missing = '?';
     void fromUtf8Stream(std::istream* reader);
+    size_t fromCharArray(char* reader);
 
 public:
     char16_t ch;
