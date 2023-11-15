@@ -42,16 +42,7 @@ int16_t  DolphinDOS::receiveByte ()
     if ( !wait ( 60 ) ) return -1;
 
     // Wait for talker ready
-    el_time = timeoutWait ( PIN_IEC_CLK_IN, RELEASED );
-    if ( el_time == TIMED_OUT )
-    {
-        Debug_printv ( "Wait for talker ready" );
-        flags or_eq ERROR;
-        return -1; // return error because timeout
-    }
-
-    el_time = timeoutWait ( PIN_IEC_DATA_IN, PULLED );
-    if ( el_time == TIMED_OUT )
+    if ( timeoutWait ( PIN_IEC_CLK_IN, RELEASED, FOREVER ) == TIMED_OUT )
     {
         Debug_printv ( "Wait for talker ready" );
         IEC.flags or_eq ERROR;
