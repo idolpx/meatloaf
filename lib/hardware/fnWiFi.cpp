@@ -9,6 +9,7 @@
 #include <esp_event.h>
 #include <mdns.h>
 #include <esp_crc.h>
+#include <lwip/sockets.h>
 
 #include <cstring>
 #include <algorithm>
@@ -19,12 +20,13 @@
 //#include "fuji.h"
 #include "fnSystem.h"
 #include "fnConfig.h"
+#include "led.h"
 
 #include "httpd_server.h"
+
 #ifdef ENABLE_SSDP
 #include "ssdp.h"
 #endif
-#include "led.h"
 
 
 // Global object to manage WiFi

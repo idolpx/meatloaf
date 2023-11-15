@@ -23,8 +23,6 @@ constexpr unsigned int hash(const char *s, int off = 0) {
 
 namespace mstr {
 
-    std::string byteSuffixes[9] = { "", "K", "M", "G", "T", "P", "E", "Z", "Y" };
-
     // trim from start (in place)
     void ltrim(std::string &s)
     {
@@ -397,24 +395,24 @@ namespace mstr {
         return text;
     }
 
-    std::string formatBytes(uint64_t value)
+    std::string formatBytes(uint64_t size)
     {
         uint8_t i = 0;
         double n = 0;
-        char *f = NULL;
 
-        //Debug_printv("bytes[%llu]", value);
+        std::string byteSuffixes[9] = { "", "K", "M", "G", "T", "P", "E", "Z", "Y" };
+
+        //Debug_printv("bytes[%llu]", size);
 
         do
         {          
-            n = value / std::pow(1024, ++i);
+            n = size / std::pow(1024, ++i);
             //Debug_printv("i[%d] n[%llu]", i, n);
         }
         while ( n >= 1 );
 
-        n = value / std::pow(1024, --i);
-        asprintf(&f, "%.2f %s", n, byteSuffixes[i].c_str());
-        return f;
+        n = size / std::pow(1024, --i);
+        return format("%.2f %s", n, byteSuffixes[i].c_str());
     }
 
 

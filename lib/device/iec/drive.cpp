@@ -47,7 +47,7 @@ void iecDrive::format()
 }
 
 /* Mount Disk
-   We determine the type of image based on the filename exteniecn.
+   We determine the type of image based on the filename extension.
    If the disk_type value passed is not MEDIATYPE_UNKNOWN then that's used instead.
    If filename has no extension or is NULL and disk_type is MEDIATYPE_UNKOWN,
    then we assume it's MEDIATYPE_ATR.
@@ -795,15 +795,8 @@ uint16_t iecDrive::sendHeader(std::string header, std::string id)
         byte_count += sendLine(0, "%*s\"-------------------\" NFO", 0, "");
         if ( IEC.flags & ERROR ) return 0;
     }
-    
 
-    // if (path.size() > 2)
-    // {
-    //     byte_count += sendLine(0, "%*s\"_\"                DIR", 3, "");
-    //     if ( IEC.flags & ERROR ) return 0;
-    //     byte_count += sendLine(0, "%*s\"\\\"               DIR", 3, "");
-    //     if ( IEC.flags & ERROR ) return 0;
-    // }
+    // If SD Card is available ad we are at the root path show it as a directory at the top
     if (fnSDFAT.running() && _base->url.size() < 2)
     {
         byte_count += sendLine(0, "%*s\"SD\"               DIR", 3, "");

@@ -781,6 +781,8 @@ void IRAM_ATTR systemBus::releaseLines(bool wait)
     // Release lines
     release(PIN_IEC_CLK_OUT);
     release(PIN_IEC_DATA_OUT);
+    protocol->timeoutWait(PIN_IEC_CLK_IN, RELEASED, FOREVER);
+    protocol->timeoutWait(PIN_IEC_DATA_IN, RELEASED, FOREVER);
 
     // Wait for ATN to release and quit
     if (wait)
