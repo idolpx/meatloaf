@@ -15,15 +15,7 @@ Copy platformio.ini.sample to platformio.ini
 ```
 
 ```
-Edit platformio.ini to match your system
-```
-
-```
-Copy include/ssid.h.sample to include/ssid.h
-```
-
-```
-Edit ssid.h to match your wifi
+Edit platformio.ini to match your device and default wifi settings
 ```
 
 

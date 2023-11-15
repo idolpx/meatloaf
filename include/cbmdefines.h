@@ -21,7 +21,7 @@
 #define CBMDEFINES_H
 
 // The base pointer of basic.
-#define C64_BASIC_START     0x0801
+#define C64_BASIC_START     0x0401
 
 // 1541 RAM and ROM memory map definitions.
 #define CBM_1541_RAM_OFFSET 0
@@ -89,8 +89,8 @@ namespace CBM
     // Special channels.
     enum IECChannels
     {
-        READ_CHANNEL = 0,
-        WRITE_CHANNEL = 1,
+        LOAD_CHANNEL = 0,
+        SAVE_CHANNEL = 1,
         CMD_CHANNEL = 15
     };
 

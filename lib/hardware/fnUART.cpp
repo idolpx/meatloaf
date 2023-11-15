@@ -2,6 +2,7 @@
 #include "fnUART.h"
 
 #include <soc/uart_reg.h>
+#include <hal/gpio_types.h>
 
 #include <cstring>
 
@@ -10,7 +11,11 @@
 
 #define UART_DEBUG UART_NUM_0
 #define UART_ADAMNET UART_NUM_2
+#ifdef BUILD_RS232
+#define UART_SIO UART_NUM_1
+#else
 #define UART_SIO UART_NUM_2
+#endif
 
 // Number of RTOS ticks to wait for data in TX buffer to complete sending
 #define MAX_FLUSH_WAIT_TICKS 200
@@ -19,7 +24,7 @@
 #define MAX_WRITE_BUFFER_TICKS 1000
 
 UARTManager fnUartDebug(UART_DEBUG);
-//UARTManager fnUartSIO(UART_SIO);
+UARTManager fnUartBUS(UART_SIO);
 
 // Constructor
 UARTManager::UARTManager(uart_port_t uart_num) : _uart_num(uart_num), _uart_q(NULL) {}
@@ -43,11 +48,19 @@ void UARTManager::begin(int baud)
         {
             .baud_rate = baud,
             .data_bits = UART_DATA_8_BITS,
+#ifdef BUILD_LYNX
+            .parity = UART_PARITY_ODD,
+#else
             .parity = UART_PARITY_DISABLE,
+#endif /* BUILD_LYNX */
             .stop_bits = UART_STOP_BITS_1,
             .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
             .rx_flow_ctrl_thresh = 122, // No idea what this is for, but shouldn't matter if flow ctrl is disabled?
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+            .source_clk = UART_SCLK_DEFAULT
+#else
             .use_ref_tick = false       // ?
+#endif
         };
 
     // This works around an obscure hardware bug where resetting UART2 causes the TX to become corrupted
@@ -78,11 +91,13 @@ void UARTManager::begin(int baud)
         rx = PIN_UART1_RX;
         tx = PIN_UART1_TX;
     }
+#ifndef BUILD_RS232
     else if (_uart_num == 2)
     {
         rx = PIN_UART2_RX;
         tx = PIN_UART2_TX;
     }
+#endif /* BUILD_RS232 */
     else
     {
         return;
@@ -112,6 +127,15 @@ void UARTManager::begin(int baud)
     uart_intr.txfifo_empty_intr_thresh = 2; // UART_EMPTY_THRESH_DEFAULT
     uart_intr_config(_uart_num, &uart_intr);
 #endif /* BUILD_ADAM */
+
+#ifdef BUILD_LYNX
+    uart_intr_config_t uart_intr;
+    uart_intr.intr_enable_mask = UART_RXFIFO_FULL_INT_ENA_M | UART_RXFIFO_TOUT_INT_ENA_M | UART_FRM_ERR_INT_ENA_M | UART_RXFIFO_OVF_INT_ENA_M | UART_BRK_DET_INT_ENA_M | UART_PARITY_ERR_INT_ENA_M;
+    uart_intr.rxfifo_full_thresh = 1;        // UART_FULL_THRESH_DEFAULT,  //120 default!! aghh! need receive 120 chars before we see them
+    uart_intr.rx_timeout_thresh = 10;        // UART_TOUT_THRESH_DEFAULT,  //10 works well for my short messages I need send/receive
+    uart_intr.txfifo_empty_intr_thresh = 2; // UART_EMPTY_THRESH_DEFAULT
+    uart_intr_config(_uart_num, &uart_intr);
+#endif /* BUILD_LYNX */
 
     // Set initialized.
     _initialized = true;
@@ -159,7 +183,7 @@ void UARTManager::set_baudrate(uint32_t baud)
 #endif
     uart_set_baudrate(_uart_num, baud);
 #ifdef DEBUG
-    Debug_printf("set_baudrate change from %d to %d\n", before, baud);
+    Debug_printf("set_baudrate change from %d to %d\r\n", before, baud);
 #endif
 }
 
@@ -175,7 +199,7 @@ int UARTManager::read(void)
         if (result == 0)
             Debug_println("### UART read() TIMEOUT ###");
         else
-            Debug_printf("### UART read() ERROR %d ###\n", result);
+            Debug_printf("### UART read() ERROR %d ###\r\n", result);
 #endif
         return -1;
     }
@@ -194,7 +218,7 @@ size_t UARTManager::readBytes(uint8_t *buffer, size_t length)
     {
         if (result < 0)
         {
-            Debug_printf("### UART readBytes() ERROR %d ###\n", result);
+            Debug_printf("### UART readBytes() ERROR %d ###\r\n", result);
         }
         else
         {

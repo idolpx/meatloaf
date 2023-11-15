@@ -13,7 +13,7 @@ There are two ways to add this component to your project
 1. As a ESP-IDF managed component: In your project directory run
 
 ```
-idf.py add-dependency joltwallet/littlefs==1.1.0
+idf.py add-dependency joltwallet/littlefs==1.5.5
 ```
 
 2. As a submodule: In your project, add this as a submodule to your `components/` directory.
@@ -139,12 +139,21 @@ LittleFS***:  20,063 us
 
 # Running Unit Tests
 
-To flash the unit-tester app and the unit-tests, run
-
+To flash the unit-tester app and the unit-tests, clone or symbolicly link this
+component to `$IDF_PATH/tools/unit-test-app/components/littlefs`. Make sure the
+folder name is `littlefs`, not `esp_littlefs`. Then, run the following:
 
 ```
-make tests
+cd $IDF_PATH/tools/unit-test-app
+idf.py menuconfig  # See notes
+idf.py -T littlefs -p YOUR_PORT_HERE flash monitor
 ```
+
+In `menuconfig`:
+
+* Set the partition table to `components/littlefs/partition_table_unit_test_app.csv`
+
+* Double check your crystal frequency `ESP32_XTAL_FREQ_SEL`; my board doesn't work with autodetect.
 
 To test on an encrypted partition, add the `encrypted` flag to the `flash_test` partition
 in `partition_table_unit_test_app.csv`. I.e.
@@ -158,11 +167,13 @@ Also make sure that `CONFIG_SECURE_FLASH_ENC_ENABLED=y` in `menuconfig`.
 The unit tester can then be flashed via the command:
 
 ```
-make TEST_COMPONENTS='src' encrypted-flash monitor
+idf.py -T littlefs -p YOUR_PORT_HERE encrypted-flash monitor
 ```
+
 # Breaking Changes
 
 * July 22, 2020 - Changed attribute type for file timestamp from `0` to `0x74` ('t' ascii value).
+* May 3, 2023 - All logging tags have been changed to a unified `esp_littlfs`.
 
 # Acknowledgement
 

@@ -1,13 +1,27 @@
 #include "string_utils.h"
+
 #include "../../include/petscii.h"
-#include <algorithm>
-#include <cstdarg>
-#include <cmath>
 #include "../../include/debug.h"
 
-namespace mstr {
+#include <algorithm>
+#include <cstdarg>
+#include <cstring>
+#include <cmath>
+#include <sstream>
+#include <iomanip>
 
-    std::string byteSuffixes[9] = { "", "K", "M", "G", "T", "P", "E", "Z", "Y" };
+// Copy string to char buffer
+void copyString(const std::string& input, char *dst, size_t dst_size)
+{
+    strncpy(dst, input.c_str(), dst_size - 1);
+    dst[dst_size - 1] = '\0';
+}
+
+constexpr unsigned int hash(const char *s, int off = 0) {                        
+    return !s[off] ? 5381 : (hash(s, off+1)*33) ^ s[off];                           
+}
+
+namespace mstr {
 
     // trim from start (in place)
     void ltrim(std::string &s)
@@ -200,14 +214,14 @@ namespace mstr {
                     [](unsigned char c) { return std::toupper(c); });
     }
 
-    // convert to ascii (in place)
+    // convert to ascii (in place) - DO NOT USE, use toUtf8 instead!
     void toASCII(std::string &s)
     {
         std::transform(s.begin(), s.end(), s.begin(),
                     [](unsigned char c) { return petscii2ascii(c); });
     }
 
-    // convert to petscii (in place)
+    // convert to petscii (in place) - DO NOT USE, utf8 can't be converted in place!
     void toPETSCII(std::string &s)
     {
         std::transform(s.begin(), s.end(), s.begin(),
@@ -245,6 +259,12 @@ namespace mstr {
 
         return false;
     };
+
+    bool isNumeric(std::string &s)
+    {
+        return std::all_of(s.begin(), s.end(), 
+                        [](unsigned char c) { return ::isdigit(c); });
+    }
 
     void replaceAll(std::string &s, const std::string &search, const std::string &replace) 
     {
@@ -312,30 +332,29 @@ namespace mstr {
     }
 
 
-    std::string urlEncode(std::string s) {
-        std::string new_str = "";
-        char c;
-        int ic;
-        const char* chars = s.c_str();
-        char bufHex[10];
-        int len = strlen(chars);
+    std::string urlEncode(const std::string &s) {
+        std::ostringstream escaped;
+        escaped.fill('0');
+        escaped << std::hex;
 
-        for(int i=0;i<len;i++){
-            c = chars[i];
-            ic = c;
-            // uncomment this if you want to encode spaces with +
-            // if (c==' ') new_str += '+';
-            if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') new_str += c;
-            else {
-                sprintf(bufHex,"%X",c);
-                if(ic < 16) 
-                    new_str += "%0"; 
-                else
-                    new_str += "%";
-                new_str += bufHex;
+        for (std::string::const_iterator i = s.begin(), n = s.end(); i != n; ++i)
+        {
+            std::string::value_type c = (*i);
+
+            // Keep alphanumeric and other accepted characters intact
+            if (isalnum((unsigned char)c) || c == '-' || c == '_' || c == '.' || c == '~' || c == '/' || c == ' ')
+            {
+                escaped << c;
+                continue;
             }
+
+            // Any other characters are percent-encoded
+            escaped << std::uppercase;
+            escaped << '%' << std::setw(2) << int((unsigned char)c);
+            escaped << std::nouppercase;
         }
-        return new_str;
+
+        return escaped.str();
     }
 
     std::string urlDecode(std::string s){
@@ -343,19 +362,24 @@ namespace mstr {
         char ch;
         int i, ii, len = s.length();
 
-        for (i=0; i < len; i++){
-            if(s[i] != '%'){
-                if(s[i] == '+')
+        for (i = 0; i < len; i++)
+        {
+            if (s[i] != '%')
+            {
+                if (s[i] == '+')
                     ret += ' ';
                 else
                     ret += s[i];
-            }else{
+            }
+            else
+            {
                 sscanf(s.substr(i + 1, 2).c_str(), "%x", &ii);
                 ch = static_cast<char>(ii);
                 ret += ch;
-                i = i + 2;
+                i += 2;
             }
         }
+
         return ret;
     }
 
@@ -371,24 +395,22 @@ namespace mstr {
         return text;
     }
 
-    std::string formatBytes(uint64_t value)
+    std::string formatBytes(uint64_t size)
     {
+        std::string byteSuffixes[9] = { "", "K", "M", "G", "T"}; //, "P", "E", "Z", "Y" };
         uint8_t i = 0;
         double n = 0;
-        char *f = NULL;
 
-        //Debug_printv("bytes[%llu]", value);
-
+        //Debug_printv("bytes[%llu]", size);
         do
         {          
-            n = value / std::pow(1024, ++i);
+            n = size / std::pow(1024, ++i);
             //Debug_printv("i[%d] n[%llu]", i, n);
         }
         while ( n >= 1 );
 
-        n = value / std::pow(1024, --i);
-        asprintf(&f, "%.2f %s", n, byteSuffixes[i].c_str());
-        return f;
+        n = size / std::pow(1024, --i);
+        return format("%.2f %s", n, byteSuffixes[i].c_str());
     }
 
 
