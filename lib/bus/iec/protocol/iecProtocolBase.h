@@ -32,20 +32,20 @@ namespace Protocol
          * @brief Wait until target status, or timeout is reached.
          * @param pin IEC pin to watch
          * @param target_status break if target state reached
-         * @param wait timeout period in microseconds (default is 1 millisecond)
+         * @param wait_us timeout period in microseconds (default is 1 millisecond)
          * @param watch_atn also abort if ATN status changes (default is true)
          * @return elapsed time in microseconds, or -1 if ATN pulled, or -1 if timeout breached.
          * 
          */
-        virtual int16_t timeoutWait(uint8_t pin, bool target_status, size_t wait = TIMEOUT_DEFAULT, bool watch_atn = true);
+        virtual int16_t timeoutWait(uint8_t pin, bool target_status, size_t wait_us = TIMEOUT_DEFAULT, bool watch_atn = true);
 
         /**
          * @brief Wait for specified milliseconds, or until ATN status changes
-         * @param wait # of milliseconds to wait
+         * @param wait_us # of milliseconds to wait
          * @param start The previously set start millisecond time.
          * @param watch_atn also abort if ATN status changes? (default is true)
          */
-        virtual bool wait(size_t wait, uint64_t start = 0, bool watch_atn = true);
+        virtual bool wait(size_t wait_us, uint64_t start = 0, bool watch_atn = true);
     };
 };
 

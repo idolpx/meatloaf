@@ -1053,7 +1053,7 @@ bool iecDrive::sendFile()
         // Send Byte
         if ( count + 1 == avail || !success_rx )
         {
-	  //Debug_printv("b[%02X] EOI %i", b, count);
+            //Debug_printv("b[%02X] EOI %i", b, count);
             success_tx = IEC.sendByte(b, true); // indicate end of file.
             if ( !success_tx )
                 Debug_printv("tx fail");

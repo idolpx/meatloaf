@@ -397,13 +397,11 @@ namespace mstr {
 
     std::string formatBytes(uint64_t size)
     {
+        std::string byteSuffixes[9] = { "", "K", "M", "G", "T"}; //, "P", "E", "Z", "Y" };
         uint8_t i = 0;
         double n = 0;
 
-        std::string byteSuffixes[9] = { "", "K", "M", "G", "T", "P", "E", "Z", "Y" };
-
         //Debug_printv("bytes[%llu]", size);
-
         do
         {          
             n = size / std::pow(1024, ++i);

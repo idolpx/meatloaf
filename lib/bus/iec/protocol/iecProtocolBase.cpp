@@ -9,13 +9,19 @@
 
 using namespace Protocol;
 
-int16_t IecProtocolBase::timeoutWait(uint8_t pin, bool target_status, size_t wait, bool watch_atn)
+int16_t IecProtocolBase::timeoutWait(uint8_t pin, bool target_status, size_t wait_us, bool watch_atn)
 {
     uint64_t start, current, elapsed;
     bool atn_status = false;
     start = 0;
     current = 0;
     elapsed = 0;
+
+    // Delay for line to be pulled up
+    if ( target_status == RELEASED )
+    {
+        wait(4);
+    }
 
     esp_timer_init();
     start = current = esp_timer_get_time();
@@ -37,13 +43,13 @@ int16_t IecProtocolBase::timeoutWait(uint8_t pin, bool target_status, size_t wai
         current = esp_timer_get_time();
         elapsed = ( current - start );
 
-        if ( elapsed >= wait && wait != FOREVER )
+        if ( elapsed >= wait_us && wait_us != FOREVER )
         {
             //IEC.release ( PIN_IEC_SRQ );
-            if ( wait == TIMEOUT_DEFAULT )
+            if ( wait_us == TIMEOUT_DEFAULT )
                 return -1;
             
-            return wait;
+            return wait_us;
         }
 
         if ( watch_atn )
@@ -64,14 +70,14 @@ int16_t IecProtocolBase::timeoutWait(uint8_t pin, bool target_status, size_t wai
 
 }
 
-bool IecProtocolBase::wait(size_t wait, uint64_t start, bool watch_atn)
+bool IecProtocolBase::wait(size_t wait_us, uint64_t start, bool watch_atn)
 {
     uint64_t current, elapsed;
     current = 0;
     elapsed = 0;
 
-    if ( wait == 0 ) return true;
-    wait--; // Shave 1us for overhead
+    if ( wait_us == 0 ) return true;
+//    wait_us--; // Shave 1us for overhead
 
     esp_timer_init();
     if ( start == 0 )
@@ -83,7 +89,7 @@ bool IecProtocolBase::wait(size_t wait, uint64_t start, bool watch_atn)
     bool atn_status = IEC.status ( PIN_IEC_ATN );
 
     //IEC.pull ( PIN_IEC_SRQ );
-    while ( elapsed < wait )
+    while ( elapsed < wait_us )
     {
         //fnSystem.delay_microseconds(1);
         current = esp_timer_get_time();

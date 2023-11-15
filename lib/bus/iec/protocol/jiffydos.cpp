@@ -60,23 +60,23 @@ int16_t  JiffyDOS::receiveByte ()
     uint8_t bitmask = 0xFF;
 
     // get bits 4,5
-    data >>= 1; if ( gpio_get_level ( PIN_IEC_CLK_IN ) ) data |= 0x80;
-    data >>= 1; if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0x80;
+    if ( gpio_get_level ( PIN_IEC_CLK_IN ) ) data |= 0b00010000;
+    if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0b00100000;
     wait( 8 );
 
     // get bits 6,7
-    data >>= 1; if ( gpio_get_level ( PIN_IEC_CLK_IN ) ) data |= 0x80;
-    data >>= 1; if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0x80;
+    if ( gpio_get_level ( PIN_IEC_CLK_IN ) ) data |= 0b01000000;
+    if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0b10000000;
     wait( 8 );
 
     // get bits 3,1
-    data >>= 1; if ( gpio_get_level ( PIN_IEC_CLK_IN ) ) data |= 0x80;
-    data >>= 1; if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0x80;
+    if ( gpio_get_level ( PIN_IEC_CLK_IN ) ) data |= 0b00001000;
+    if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0b00000010;
     wait( 8 );
 
     // get bits 2,0
-    data >>= 1; if ( gpio_get_level ( PIN_IEC_CLK_IN ) ) data |= 0x80;
-    data >>= 1; if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0x80;
+    if ( gpio_get_level ( PIN_IEC_CLK_IN ) ) data |= 0b00000100;
+    if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0b00000001;
     wait( 8 );
     IEC.release( PIN_IEC_SRQ );
 
