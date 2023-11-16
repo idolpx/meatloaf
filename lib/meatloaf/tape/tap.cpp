@@ -1,5 +1,7 @@
 #include "tap.h"
 
+#include "container_broker.h"
+
 /********************************************************
  * Streams
  ********************************************************/
@@ -129,7 +131,7 @@ bool TAPFile::isDirectory() {
 bool TAPFile::rewindDirectory() {
     dirIsOpen = true;
     Debug_printv("streamFile->url[%s]", streamFile->url.c_str());
-    auto image = ImageBroker::obtain<TAPIStream>(streamFile->url);
+    auto image = MStreamBroker::obtain(streamFile->url);
     if ( image == nullptr )
         Debug_printv("image pointer is null");
 
@@ -157,7 +159,7 @@ MFile* TAPFile::getNextFileInDir() {
         rewindDirectory();
 
     // Get entry pointed to by containerStream
-    auto image = ImageBroker::obtain<TAPIStream>(streamFile->url);
+    auto image = MStreamBroker::obtain(streamFile->url);
 
     if ( image->seekNextImageEntry() )
     {
@@ -180,7 +182,7 @@ MFile* TAPFile::getNextFileInDir() {
 uint32_t TAPFile::size() {
     // Debug_printv("[%s]", streamFile->url.c_str());
     // use TAP to get size of the file in image
-    auto image = ImageBroker::obtain<TAPIStream>(streamFile->url);
+    auto image = MStreamBroker::obtain(streamFile->url);
 
     size_t blocks = (UINT16_FROM_LE_UINT16(image->entry.end_address) - UINT16_FROM_LE_UINT16(image->entry.start_address)) / image->block_size;
 

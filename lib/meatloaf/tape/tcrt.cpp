@@ -1,5 +1,6 @@
 #include "tcrt.h"
 
+#include "container_broker.h"
 #include "utils.h"
 
 /********************************************************
@@ -128,7 +129,7 @@ bool TCRTFile::isDirectory() {
 bool TCRTFile::rewindDirectory() {
     dirIsOpen = true;
     Debug_printv("streamFile->url[%s]", streamFile->url.c_str());
-    auto image = ImageBroker::obtain<TCRTIStream>(streamFile->url);
+    auto image = MStreamBroker::obtain(streamFile->url);
     if ( image == nullptr )
         Debug_printv("image pointer is null");
 
@@ -156,7 +157,7 @@ MFile* TCRTFile::getNextFileInDir() {
         rewindDirectory();
 
     // Get entry pointed to by containerStream
-    auto image = ImageBroker::obtain<TCRTIStream>(streamFile->url);
+    auto image = MStreamBroker::obtain(streamFile->url);
 
     if ( image->seekNextImageEntry() )
     {
@@ -179,7 +180,7 @@ MFile* TCRTFile::getNextFileInDir() {
 uint32_t TCRTFile::size() {
     // Debug_printv("[%s]", streamFile->url.c_str());
     // use TCRT to get size of the file in image
-    auto image = ImageBroker::obtain<TCRTIStream>(streamFile->url);
+    auto image = MStreamBroker::obtain(streamFile->url);
 
     //size_t blocks = (UINT16_FROM_LE_UINT16(image->entry.load_address) + image->entry.file_size)) / image->block_size;
     //size_t blocks = 1;

@@ -166,48 +166,48 @@ private:
 
 
 
-/********************************************************
- * Utility implementations
- ********************************************************/
-class ImageBroker {
-    static std::unordered_map<std::string, CBMImageStream*> repo;
-public:
-    template<class T> static T* obtain(std::string url) {
-        // obviously you have to supply STREAMFILE.url to this function!
-        if(repo.find(url)!=repo.end()) {
-            return (T*)repo.at(url);
-        }
+// /********************************************************
+//  * Utility implementations
+//  ********************************************************/
+// class ImageBroker {
+//     static std::unordered_map<std::string, CBMImageStream*> repo;
+// public:
+//     template<class T> static T* obtain(std::string url) {
+//         // obviously you have to supply STREAMFILE.url to this function!
+//         if(repo.find(url)!=repo.end()) {
+//             return (T*)repo.at(url);
+//         }
 
-        // create and add stream to broker if not found
-        auto newFile = MFSOwner::File(url);
-        T* newStream = (T*)newFile->meatStream();
+//         // create and add stream to broker if not found
+//         auto newFile = MFSOwner::File(url);
+//         T* newStream = (T*)newFile->meatStream();
 
-        // Are we at the root of the pathInStream?
-        if ( newFile->pathInStream == "")
-        {
-            Debug_printv("DIRECTORY [%s]", url.c_str());
-        }
-        else
-        {
-            Debug_printv("SINGLE FILE [%s]", url.c_str());
-        }
+//         // Are we at the root of the pathInStream?
+//         if ( newFile->pathInStream == "")
+//         {
+//             Debug_printv("DIRECTORY [%s]", url.c_str());
+//         }
+//         else
+//         {
+//             Debug_printv("SINGLE FILE [%s]", url.c_str());
+//         }
 
-        repo.insert(std::make_pair(url, newStream));
-        delete newFile;
-        return newStream;
-    }
+//         repo.insert(std::make_pair(url, newStream));
+//         delete newFile;
+//         return newStream;
+//     }
 
-    static CBMImageStream* obtain(std::string url) {
-        return obtain<CBMImageStream>(url);
-    }
+//     static CBMImageStream* obtain(std::string url) {
+//         return obtain<CBMImageStream>(url);
+//     }
 
-    static void dispose(std::string url) {
-        if(repo.find(url)!=repo.end()) {
-            auto toDelete = repo.at(url);
-            repo.erase(url);
-            delete toDelete;
-        }
-    }
-};
+//     static void dispose(std::string url) {
+//         if(repo.find(url)!=repo.end()) {
+//             auto toDelete = repo.at(url);
+//             repo.erase(url);
+//             delete toDelete;
+//         }
+//     }
+// };
 
 #endif // MEATLOAF_CBM_MEDIA

@@ -1,5 +1,7 @@
 #include "p00.h"
 
+#include "container_broker.h"
+
 /********************************************************
  * Streams
  ********************************************************/
@@ -29,7 +31,7 @@ MStream* P00File::createIStream(std::shared_ptr<MStream> containerIstream) {
 uint32_t P00File::size() {
     // Debug_printv("[%s]", streamFile->url.c_str());
     // use P00 to get size of the file in image
-    auto image = ImageBroker::obtain<P00IStream>(streamFile->url);
+    auto image = MStreamBroker::obtain(streamFile->url);
 
     return image->size();
 }

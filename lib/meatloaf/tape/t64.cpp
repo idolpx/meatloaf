@@ -1,5 +1,7 @@
 #include "t64.h"
 
+#include "container_broker.h"
+
 /********************************************************
  * Streams
  ********************************************************/
@@ -144,7 +146,7 @@ bool T64File::isDirectory() {
 bool T64File::rewindDirectory() {
     dirIsOpen = true;
     Debug_printv("streamFile->url[%s]", streamFile->url.c_str());
-    auto image = ImageBroker::obtain<T64IStream>(streamFile->url);
+    auto image = MStreamBroker::obtain(streamFile->url);
     if ( image == nullptr )
         Debug_printv("image pointer is null");
 
@@ -172,7 +174,7 @@ MFile* T64File::getNextFileInDir() {
         rewindDirectory();
 
     // Get entry pointed to by containerStream
-    auto image = ImageBroker::obtain<T64IStream>(streamFile->url);
+    auto image = MStreamBroker::obtain(streamFile->url);
 
     if ( image->seekNextImageEntry() )
     {
@@ -196,7 +198,7 @@ MFile* T64File::getNextFileInDir() {
 uint32_t T64File::size() {
     // Debug_printv("[%s]", streamFile->url.c_str());
     // use T64 to get size of the file in image
-    auto entry = ImageBroker::obtain<T64IStream>(streamFile->url)->entry;
+    auto entry = MStreamBroker::obtain(streamFile->url)->entry;
 
     //Debug_printv("end0[%d] end1[%d] start0[%d] start1[%d]", entry.end_address[0], entry.end_address[1], entry.start_address[0], entry.start_address[1]);
     size_t end_address = UINT16_FROM_HILOBYTES(entry.end_address[1], entry.end_address[0]);

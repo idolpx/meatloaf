@@ -1,6 +1,7 @@
 
 #include "d64.h"
 
+#include "container_broker.h"
 
 // D64 Utility Functions
 
@@ -365,7 +366,7 @@ bool D64File::isDirectory() {
 bool D64File::rewindDirectory() {
     dirIsOpen = true;
     //Debug_printv("streamFile->url[%s]", streamFile->url.c_str());
-    auto image = ImageBroker::obtain<D64IStream>(streamFile->url);
+    auto image = MStreamBroker::obtain(streamFile->url);
     if ( image == nullptr )
         Debug_printv("image pointer is null");
 
@@ -393,7 +394,7 @@ MFile* D64File::getNextFileInDir() {
         rewindDirectory();
 
     // Get entry pointed to by containerStream
-    auto image = ImageBroker::obtain<D64IStream>(streamFile->url);
+    auto image = MStreamBroker::obtain(streamFile->url);
 
     bool r = false;
     do
@@ -425,7 +426,7 @@ time_t D64File::getLastWrite() {
 
 time_t D64File::getCreationTime() {
     tm *entry_time = 0;
-    auto entry = ImageBroker::obtain<D64IStream>(streamFile->url)->entry;
+    auto entry = MStreamBroker::obtain(streamFile->url)->entry;
     entry_time->tm_year = entry.year + 1900;
     entry_time->tm_mon = entry.month;
     entry_time->tm_mday = entry.day;
@@ -444,7 +445,7 @@ bool D64File::exists() {
 uint32_t D64File::size() {
     //Debug_printv("[%s]", streamFile->url.c_str());
     // use D64 to get size of the file in image
-    auto entry = ImageBroker::obtain<D64IStream>(streamFile->url)->entry;
+    auto entry = MStreamBroker::obtain(streamFile->url)->entry;
     uint32_t bytes = UINT16_FROM_LE_UINT16(entry.blocks);
     
     return bytes;

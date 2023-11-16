@@ -116,4 +116,4 @@ bool CBMImageStream::isOpen() {
 };
 
 
-std::unordered_map<std::string, CBMImageStream*> ImageBroker::repo;
+//std::unordered_map<std::string, CBMImageStream*> ImageBroker::repo;
