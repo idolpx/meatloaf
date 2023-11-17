@@ -2,7 +2,7 @@
 
 std::string BasicConfigReader::get(std::string key) {
     if(entries->find(key) == entries->end())
-        return ""; // return nullptr;
+        return nullptr;
     else
         return entries->at(key);
 }

@@ -316,7 +316,7 @@ void iecNetwork::iec_reopen_load()
 void iecNetwork::iec_reopen_save()
 {
     // If protocol isn't connected, then return not connected.
-    if (protocol[0] == 0x00)
+    if (protocol == nullptr)
     {
         iecStatus.error = NETWORK_ERROR_NOT_CONNECTED;
         iecStatus.channel = commanddata.channel;

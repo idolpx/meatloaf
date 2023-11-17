@@ -66,23 +66,6 @@ void init_pin(gpio_num_t pin)
     return;
 }
 
-// true => PULL => LOW
-void IRAM_ATTR systemBus::pull ( uint8_t pin )
-{
-    FAST_SET_DIRECTION(pin, GPIO_MODE_OUTPUT);
-}
-
-// false => RELEASE => HIGH
-void IRAM_ATTR systemBus::release ( uint8_t pin )
-{
-    FAST_SET_DIRECTION(pin, GPIO_MODE_INPUT);
-}
-
-bool IRAM_ATTR systemBus::status ( uint8_t pin )
-{
-    return gpio_get_level ( ( gpio_num_t ) pin ) ? RELEASED : PULLED;
-}
-
 void systemBus::setup()
 {
     Debug_printf("IEC systemBus::setup()\r\n");

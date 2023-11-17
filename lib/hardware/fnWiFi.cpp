@@ -705,7 +705,7 @@ std::string WiFiManager::get_network_name_by_crc8(uint8_t crc8)
             return _network_name;
         }
     }
-    return "";
+    return nullptr;
 }
 
 std::vector<std::string> WiFiManager::get_network_names()
