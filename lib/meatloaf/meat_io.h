@@ -15,7 +15,10 @@
 #include "string_utils.h"
 #include "U8Char.h"
 
-#define _MEAT_NO_DATA_AVAIL -69
+#define _MEAT_NO_DATA_AVAIL (std::ios_base::eofbit)
+
+static const std::ios_base::iostate ndabit = _MEAT_NO_DATA_AVAIL;
+
 
 /********************************************************
  * Universal file
