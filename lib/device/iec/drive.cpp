@@ -564,28 +564,16 @@ void iecDrive::set_prefix()
 }
 
 
-std::shared_ptr<MStream> iecDrive::retrieveStream ( uint8_t channel )
-{
-    Debug_printv("Stream key[%d]", channel);
-
-    if ( streams.find ( channel ) != streams.end() )
-    {
-        Debug_printv("Stream retrieved. key[%d]", channel);
-        return streams.at ( channel );
-    }
-    else
-    {
-        Debug_printv("Error! Trying to recall not-registered stream!");
-        return nullptr;
-    }
-}
 
 // used to start working with a stream, registering it as underlying stream of some
 // IEC channel on some IEC device
-bool iecDrive::registerStream (uint8_t channel)
+bool iecDrive::registerStream ( uint8_t channel )
 {
     // Debug_printv("dc_basepath[%s]",  device_config.basepath().c_str());
     // Debug_printv("_file[%s]", _file.c_str());
+
+    // TODO: Determine mode and create the proper stream
+    std::ios_base::openmode mode = std::ios_base::in;
 
     Debug_printv("_base[%s]", _base->url.c_str());
     _base.reset( MFSOwner::File( _base->url ) );
@@ -652,6 +640,22 @@ bool iecDrive::registerStream (uint8_t channel)
     return true;
 }
 
+std::shared_ptr<MStream> iecDrive::retrieveStream ( uint8_t channel )
+{
+    Debug_printv("Stream key[%d]", channel);
+
+    if ( streams.find ( channel ) != streams.end() )
+    {
+        Debug_printv("Stream retrieved. key[%d]", channel);
+        return streams.at ( channel );
+    }
+    else
+    {
+        Debug_printv("Error! Trying to recall not-registered stream!");
+        return nullptr;
+    }
+}
+
 bool iecDrive::closeStream ( uint8_t channel, bool close_all )
 {
     auto found = streams.find(channel);
@@ -665,6 +669,30 @@ bool iecDrive::closeStream ( uint8_t channel, bool close_all )
     }
 
     return false;
+}
+
+uint16_t iecDrive::retrieveLastByte ( uint8_t channel )
+{
+    if ( streamLastByte.find ( channel ) != streamLastByte.end() )
+    {
+        return streamLastByte.at ( channel );
+    }
+    else
+    {
+        return 999;
+    }
+}
+
+void iecDrive::storeLastByte( uint8_t channel, char last)
+{
+    auto newPair = std::make_pair ( channel, (uint16_t)last );
+    streamLastByte.insert ( newPair );
+}
+
+void iecDrive::flushLastByte( uint8_t channel )
+{
+    auto newPair = std::make_pair ( channel, (uint16_t)999 );
+    streamLastByte.insert ( newPair );
 }
 
 
@@ -960,6 +988,105 @@ void iecDrive::sendListing()
     //fnLedManager.set(eLed::LED_BUS, false);
     //fnLedStrip.stopRainbow();
 } // sendListing
+
+
+
+// bool iecDrive::sendFile()
+// {
+// 	size_t i = 0;
+// 	//bool success = true;
+// 	// size_t load_address = 0;
+// 	// size_t sys_address = 0;
+
+// 	iecStream.open(&IEC);
+
+// #ifdef DATA_STREAM
+// 	char ba[9];
+// 	ba[8] = '\0';
+// #endif
+
+// 	// Update device database
+// 	//device_config.save();
+
+// 	auto istream = retrieveStream(commanddata.channel);
+// 	if ( istream == nullptr )
+// 	{
+// 		//Debug_printv("Stream not found!");
+// 		IEC.senderTimeout(); // File Not Found
+// 		return false;
+// 	}
+
+// 	// if ( istream.isText() )
+// 	// {
+// 	// 	// convert UTF8 files on the fly
+
+// 	// 	Debug_printv("Sending a text file to C64 [%s]", file->url.c_str());
+
+// 	// 	//we can skip the BOM here, EF BB BF for UTF8
+// 	// 	auto b = (char)istream.get();
+// 	// 	if(b != 0xef)
+// 	// 		ostream.put(b);
+// 	// 	else {
+// 	// 		b = istream.get();
+// 	// 		if(b != 0xbb)
+// 	// 			ostream.put(b);
+// 	// 		else {
+// 	// 			b = istream.get();
+// 	// 			if(b != 0xbf)
+// 	// 				ostream.put(b); // not BOM
+// 	// 		}
+// 	// 	}
+
+// 	// Debug_printf("sendFile: [$%.4X]\r\n=================================\r\n", load_address);
+// 	Debug_printv("peek[%d] istream[%d] iecstream[%d]", istream->peek(), istream->bad(), iecStream.bad());
+// 	while( !istream->eof() && istream->bad() == 0 && iecStream.bad() == 0 )
+// 	{
+// 		char nextChar;
+
+// 		(*istream).checkNda();
+// 		if((*istream).nda()) {
+// 			// OK, Jaimme. So you told me there's a way to signal "no data available on IEC", here's the place
+// 			// to send it:
+// 			IEC.senderTimeout(); // File Not Found
+// 		}
+// 		else if(!(*istream).eof()) {
+// 			(*istream).get(nextChar);
+// 			iecStream.write(&nextChar, 1);
+// 		}
+
+// 		// Toggle LED
+// 		if (i % 50 == 0)
+// 		{
+// 			fnLedManager.toggle(eLed::LED_BUS);
+// 		}
+
+// 		// if ( i % 8 == 0)
+// 		// 	Debug_println("");
+
+// 		Debug_printf("%.2X ", nextChar);
+
+// 		i++;
+// 	}
+// 	Debug_printv("peek[%d] istream[%d] iecstream[%d]", istream->peek(), istream->bad(), iecStream.bad());
+// 	Debug_printv("finished sending data [%d]", i);
+
+// 	// THIS will send all remaining buffer data and EOI before last byte automagically!
+// 	iecStream.close();
+
+// 	// Debug_printf("\r\n=================================\r\n%d bytes sent of %d [SYS%d]\r\n", i, sys_address);
+	
+// 	fnLedManager.set(eLed::LED_BUS, true);
+
+// 	// if (!success)
+// 	// {
+// 	// 	Debug_println("sendFile: Transfer aborted!");
+// 	// 	// TODO: Send something to signal that there was an error to the C64
+// 	//  	// IEC.sendEOI(0);
+// 	// }
+
+// 	//return success;
+// 	return true;
+// } // sendFile
 
 
 bool iecDrive::sendFile()

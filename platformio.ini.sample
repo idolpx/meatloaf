@@ -80,8 +80,6 @@ check_skip_packages = yes
 
 ; Build flags used by ALL boards go here
 build_flags =
-    -std=gnu++17
-    -Dregister=                       ; Sinister: redefine 'register' so FastLED can use that keyword under C++17
     -D ${meatloaf.build_platform}
     -D ${meatloaf.flash_filesystem}
     -D CMAKE_EXPORT_COMPILE_COMMANDS=ON
