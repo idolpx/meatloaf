@@ -541,22 +541,10 @@ public:
      */
     void senderTimeout();
 
-    // true => PULL => LOW
-    inline void pull ( uint8_t pin )
-    {
-        FAST_SET_DIRECTION(pin, GPIO_MODE_OUTPUT);
-    }
 
-    // false => RELEASE => HIGH
-    inline void release ( uint8_t pin )
-    {
-        FAST_SET_DIRECTION(pin, GPIO_MODE_INPUT);
-    }
-
-    inline bool status ( uint8_t pin )
-    {
-        return gpio_get_level ( ( gpio_num_t ) pin ) ? RELEASED : PULLED;
-    }
+    void IRAM_ATTR pull ( uint8_t pin );     // true => PULL => LOW
+    void IRAM_ATTR release ( uint8_t pin );  // false => RELEASE => HIGH
+    bool IRAM_ATTR status ( uint8_t pin );
 };
 
 /**
