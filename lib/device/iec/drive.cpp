@@ -974,6 +974,8 @@ bool iecDrive::sendFile()
     size_t load_address = 0;
     size_t sys_address = 0;
 
+	//iecStream.open(&IEC);
+
 #ifdef DATA_STREAM
     char ba[9];
     ba[8] = '\0';

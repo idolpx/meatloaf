@@ -28,7 +28,14 @@ public:
         phase = 0;
     }
 
+    // something will be READING from this stream, that's why we need to implement underflow
     int underflow() override {
+        // it is up to us how we will fill this buffer. We can write it single line at
+        // a time, or (if made big enough) with whole directory contents, it really
+        // doesn't matter, because when everything from the buffer is read, underflow
+        // will get called again
+        //
+        // I divided it into 3 phases, for header, files and footer, but again - any way is OK
         if(phase == 0) {
             // OK, so you are in headers. 
             // First you have to fill this buffer line by line or as whole. Doesn't matter.
@@ -36,7 +43,7 @@ public:
             size_t written = lineToBuffer(69,"some header line");
             // When you're done, call this:
             this->setg(buffer, buffer, buffer + written);      
-            
+    
             // of course filling it at once would be easiest, as you just fill it here and set this:
             //phase = 1;
             // if you fill line by line incremet some count and set phase to 1 when all lines written...
@@ -51,6 +58,8 @@ public:
                 auto readCount = fileToBasicV2(entry.get());
                 // and set required pointers:
                 this->setg(buffer, buffer, buffer + readCount);
+                // we're putting just this oone file in our buffer and exiting
+                // underflow will be called to fill it with next file
             }
             else
                 phase = 2; // nope, no more files here. Let's change phase, so we can write footer
@@ -89,13 +98,13 @@ public:
     }
 };
 
-void exampleStreamFn(std::shared_ptr<MFile> container) {
-    idirbuf dirbuffer;  
-    dirbuffer.open(container);
-    std::istream dirStream(&dirbuffer);
+// void exampleStreamFn(std::shared_ptr<MFile> container) {
+//     idirbuf dirbuffer;  
+//     dirbuffer.open(container);
+//     std::istream dirStream(&dirbuffer);
 
-    // now you can just read BASIC V2 characters from dirStream
-}
+//     // now you can just read BASIC V2 characters from dirStream
+// }
 
 
 #endif /* MEATLOAF_WRAPPER_DIRECTORY_STREAM */

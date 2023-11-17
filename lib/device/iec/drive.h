@@ -8,6 +8,8 @@
 #include "../media/media.h"
 #include "../meatloaf/meat_io.h"
 #include "../meatloaf/meat_buffer.h"
+#include "wrappers/iec_buffer.h"
+#include "wrappers/directory_stream.h"
 
 #define PRODUCT_ID "MEATLOAF CBM"
 
@@ -15,6 +17,8 @@ class iecDrive : public virtualDevice
 {
 protected:
     //MediaType *_disk = nullptr;
+    oiecstream iecStream;
+    
 
     std::unique_ptr<MFile> _base;   // Always points to current directory/image
     std::string _last_file;         // Always points to last loaded file

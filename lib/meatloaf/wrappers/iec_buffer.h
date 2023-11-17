@@ -12,58 +12,7 @@
 #include <memory>
 #include "U8Char.h"
 
-/********************************************************
- * oiecbuf
- * 
- * A buffer for writing IEC data, handles sending EOI
- ********************************************************/
-
-// class oiecbuf : public std::filebuf {
-//     char* data;
-//     IEC* m_iec;
-//     bool m_isOpen = false;
-
-//     size_t easyWrite(bool lastOne);
-
-// public:
-//     oiecbuf(const oiecbuf &b) : basic_filebuf( &b) {}
-//     oiecbuf() {
-//         Debug_printv("oiecbuffer constructor");
-
-//         data = new char[1024];
-//         setp(data, data+1024);
-//     }
-
-//     ~oiecbuf() {
-//         Debug_printv("oiecbuffer desttructor");
-//         if(data != nullptr)
-//             delete[] data;
-
-//         close();
-//     }
-
-//     bool is_open() const {
-//         return m_isOpen;
-//     }
-
-//     virtual void open(IEC* iec) {
-//         m_iec = iec;
-//         if(iec != nullptr)
-//             m_isOpen = true;
-//     }
-
-//     virtual void close() {
-//         sync();
-//         m_isOpen = false;
-//     }
-
-//     int overflow(int ch  = traits_type::eof()) override;
-
-//     int sync() override;
-// };
-
-
-
+#define IEC_BUFFER_SIZE 255 // 1024
 
 /********************************************************
  * oiecstream
@@ -76,7 +25,7 @@ class oiecstream : private std::filebuf, public std::ostream {
     systemBus* m_iec;
     bool m_isOpen = false;
 
-    size_t easyWrite(bool lastOne);
+    size_t easyWrite();
 
 public:
     oiecstream(const oiecstream &copied) : std::ios(0), std::filebuf(),  std::ostream( this ) {
@@ -86,28 +35,40 @@ public:
     oiecstream() : std::ostream( this ) {
         Debug_printv("oiecstream constructor");
 
-        data = new char[1024];
-        setp(data, data+1024);
+        data = new char[IEC_BUFFER_SIZE+1];
+        setp(data, data+IEC_BUFFER_SIZE);
     };
 
     ~oiecstream() {
         Debug_printv("oiecstream destructor");
 
+        close();
+        
         if(data != nullptr)
             delete[] data;
-
-        close();
     }
 
 
     virtual void open(systemBus* iec) {
         m_iec = iec;
+        setp(data, data+IEC_BUFFER_SIZE);
         if(iec != nullptr)
+        {
             m_isOpen = true;
+            clear();
+        }
     }
 
     virtual void close() {
         sync();
+
+        if(pptr()-pbase() == 1) {
+            char last = data[0];
+            Debug_printv("closing, sending EOI with [%.2X] %c", last, last);
+            m_iec->sendByte(last, true);
+            setp(data, data+IEC_BUFFER_SIZE);
+        }
+
         m_isOpen = false;
     }
 

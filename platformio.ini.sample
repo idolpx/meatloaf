@@ -15,11 +15,19 @@
 ; https://docs.platformio.org/page/projectconf.html
 
 [meatloaf]
+; Espressif32 PlatformIO Version to use for building
+; https://github.com/platformio/platform-espressif32/releases
+esp32_platform_version = 6.4.0
+;esp32s3_platform_version = 6.1.0
+
+; Required flags, leave as is
+build_platform = BUILD_IEC
+build_bus      = IEC
+
 ; Uncomment ONLY ONE of the below lines to target the hardware you use
 ; GPIO pin assignments are located in the include/pinmap/ directory for reference
-; Some boards need a 1uf cap from EN to GND to automatically switch to download mode
 ;build_board = fujiloaf-rev0      ; Meatloaf / FujiNet REV0 board, aka Fujiloaf (ESP32-WROVER 8M PSRAM, 16M Flash)
-;build_board = lolin-d32-pro      ; Wemos Lolin D32 Pro                         (ESP32-WROVER 4M PSRAM, 4M/8M/16M Flash)
+build_board = lolin-d32-pro      ; Wemos Lolin D32 Pro                         (ESP32-WROVER 4M PSRAM, 4M/8M/16M Flash)
 ;build_board = ttgo-t1            ; Lilygo TTGO T1 V1.3                         (ESP32 NO PSRAM, 4M Flash)
 ;build_board = esp32-wroom        ; generic esp32-wroom board                   (ESP32-WROOM NO PSRAM, 4M/8M/16M Flash)
 ;build_board = esp32-wroom-pi1541 ; generic esp32-wroom board with pi1541 hat   (ESP32-WROOM NO PSRAM, 4M/8M/16M Flash)
@@ -32,26 +40,18 @@
 ;build_board = lolin-s3-pro       ; Wemos Lolin S3 Pro                          (ESP32-S3 8M PSRAM, 16M Flash)
 
 ; Choose the size of flash available on your board
-;flash_size = 16mb
+flash_size = 16mb
 ;flash_size = 8mb
 ;flash_size = 4mb
-
-; Set default WiFi credentials
-wifi_ssid = "meatloaf"
-wifi_pass = "meatloaf"
 
 ; Choose SPIFFS or LITTLEFS for the filesystem used on internal flash
 flash_filesystem = FLASH_SPIFFS 
 ;flash_filesystem = FLASH_LITTLEFS
 
-; Espressif32 PlatformIO Version to use for building
-; https://github.com/platformio/platform-espressif32/releases
-esp32_platform_version = 6.3.2
-;esp32s3_platform_version = 6.1.0
+; Set default WiFi credentials
+wifi_ssid = "meatloaf"
+wifi_pass = "meatloaf"
 
-; Required flags, leave as is
-build_platform = BUILD_IEC
-build_bus      = IEC
 
 [platformio]
 description = Meatloaf Commodore to ESP32 WiFi Multifunction Firmware
@@ -68,22 +68,23 @@ lib_ldf_mode = deep+
 upload_speed = 460800 ;921600
 ;upload_port = COM1 ; Windows
 ;upload_port = /dev/ttyUSB0 ; Linux
-;upload_port = /dev/tty.SLAB_USBtoUART ; Mac
+upload_port = /dev/cu.usbserial-1450 ; Mac
 monitor_speed = 460800 ;921600
 ;monitor_port = COM1 ; Windows
 ;monitor_port = /dev/ttyUSB0 ; Linux
-;monitor_port = /dev/tty.SLAB_USBtoUART ; Mac
-monitor_filters = time, esp32_exception_decoder
+monitor_port = /dev/cu.usbserial-1450 ; Mac
+monitor_filters = esp32_exception_decoder
 check_skip_packages = yes
 ;debug_tool = esp-prog
 ;debug_init_break = tbreak setup
 
 ; Build flags used by ALL boards go here
 build_flags =
+    -std=gnu++17
+    -Dregister=                       ; Sinister: redefine 'register' so FastLED can use that keyword under C++17
     -D ${meatloaf.build_platform}
     -D ${meatloaf.flash_filesystem}
     -D CMAKE_EXPORT_COMPILE_COMMANDS=ON
-    -D DEBUG_SPEED=460800   ;921600
 
     ; Default WiFi
     -D WIFI_SSID=${meatloaf.wifi_ssid}
@@ -108,7 +109,7 @@ build_flags =
 
     ; DEBUG Options
     -D DEBUG_SPEED=${env.monitor_speed}
-    -D DATA_STREAM
+    ;-D DATA_STREAM
     ;-D VERBOSE_TNFS
     ;-D VERBOSE_DISK
     ;-D VERBOSE_HTTP
@@ -126,7 +127,7 @@ build_flags =
 	-D PINMAP_FUJILOAF_REV0
     -D BOARD_HAS_PSRAM
     -D SD_CARD
-	;-D LED_STRIP
+	-D LED_STRIP
 	-D PARALLEL_BUS
     -D GPIOX_PCF8575
 
