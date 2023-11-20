@@ -305,11 +305,11 @@ void seekTest()
     auto test = (*pbuf)[9]; // get 3550th character
     Debug_printf("10th character below will be: %c", test); // or - send the char across IEC to our C64
 
-    readABit(pbuf);
-    pbuf->seekpos(3662); // D9  CAPITAL LETTER U WITH GRAVE
-    readABit(pbuf);
-    pbuf->seekpos(3597); // D8  CAPITAL LETTER O WITH STROKE
-    readABit(pbuf);
+//    readABit(pbuf);
+//    pbuf->seekpos(3662); // D9  CAPITAL LETTER U WITH GRAVE
+//    readABit(pbuf);
+//    pbuf->seekpos(3597); // D8  CAPITAL LETTER O WITH STROKE
+//    readABit(pbuf);
 
     stream.close();
     

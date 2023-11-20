@@ -582,28 +582,16 @@ void iecDrive::set_prefix()
 }
 
 
-std::shared_ptr<MStream> iecDrive::retrieveStream ( uint8_t channel )
-{
-    Debug_printv("Stream key[%d]", channel);
-
-    if ( streams.find ( channel ) != streams.end() )
-    {
-        Debug_printv("Stream retrieved. key[%d]", channel);
-        return streams.at ( channel );
-    }
-    else
-    {
-        Debug_printv("Error! Trying to recall not-registered stream!");
-        return nullptr;
-    }
-}
 
 // used to start working with a stream, registering it as underlying stream of some
 // IEC channel on some IEC device
-bool iecDrive::registerStream (uint8_t channel)
+bool iecDrive::registerStream ( uint8_t channel )
 {
     // Debug_printv("dc_basepath[%s]",  device_config.basepath().c_str());
     // Debug_printv("_file[%s]", _file.c_str());
+
+    // TODO: Determine mode and create the proper stream
+    std::ios_base::openmode mode = std::ios_base::in;
 
     Debug_printv("_base[%s]", _base->url.c_str());
     _base.reset( MFSOwner::File( _base->url ) );
@@ -670,6 +658,22 @@ bool iecDrive::registerStream (uint8_t channel)
     return true;
 }
 
+std::shared_ptr<MStream> iecDrive::retrieveStream ( uint8_t channel )
+{
+    Debug_printv("Stream key[%d]", channel);
+
+    if ( streams.find ( channel ) != streams.end() )
+    {
+        Debug_printv("Stream retrieved. key[%d]", channel);
+        return streams.at ( channel );
+    }
+    else
+    {
+        Debug_printv("Error! Trying to recall not-registered stream!");
+        return nullptr;
+    }
+}
+
 bool iecDrive::closeStream ( uint8_t channel, bool close_all )
 {
     auto found = streams.find(channel);
@@ -683,6 +687,30 @@ bool iecDrive::closeStream ( uint8_t channel, bool close_all )
     }
 
     return false;
+}
+
+uint16_t iecDrive::retrieveLastByte ( uint8_t channel )
+{
+    if ( streamLastByte.find ( channel ) != streamLastByte.end() )
+    {
+        return streamLastByte.at ( channel );
+    }
+    else
+    {
+        return 999;
+    }
+}
+
+void iecDrive::storeLastByte( uint8_t channel, char last)
+{
+    auto newPair = std::make_pair ( channel, (uint16_t)last );
+    streamLastByte.insert ( newPair );
+}
+
+void iecDrive::flushLastByte( uint8_t channel )
+{
+    auto newPair = std::make_pair ( channel, (uint16_t)999 );
+    streamLastByte.insert ( newPair );
 }
 
 
