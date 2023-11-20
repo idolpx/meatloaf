@@ -1,3 +1,21 @@
+// Meatloaf - A Commodore 64/128 multi-device emulator
+// https://github.com/idolpx/meatloaf
+// Copyright(C) 2020 James Johnston
+//
+// Meatloaf is free software : you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Meatloaf is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
+
+
 #ifdef BUILD_IEC
 
 #include "drive.h"
@@ -961,6 +979,184 @@ void iecDrive::sendListing()
     //fnLedStrip.stopRainbow();
 } // sendListing
 
+
+
+// bool iecDrive::sendFile()
+// {
+//     size_t count = 0;
+//     bool success_rx = true;
+//     bool success_tx = true;
+
+//     uint8_t b;  // byte
+//     uint8_t nb; // next byte
+//     size_t bi = 0;
+//     size_t load_address = 0;
+//     size_t sys_address = 0;
+
+// 	//iecStream.open(&IEC);
+
+// #ifdef DATA_STREAM
+//     char ba[9];
+//     ba[8] = '\0';
+// #endif
+
+//     // std::shared_ptr<MStream> istream = std::static_pointer_cast<MStream>(currentStream);
+//     auto istream = retrieveStream(commanddata.channel);
+//     if ( istream == nullptr )
+//     {
+//         Debug_printv("Stream not found!");
+//         IEC.senderTimeout(); // File Not Found
+//         //closeStream(commanddata.channel);
+//         _base.reset( MFSOwner::File( _base->base() ) );
+//         return false;
+//     }
+
+//     if ( !_base->isDirectory() )
+//     {
+//         if ( istream->has_subdirs )
+//         {
+//             PeoplesUrlParser u;
+//             u.parseUrl( istream->url );
+//             Debug_printv( "Subdir Change Directory Here! istream[%s] > base[%s]", istream->url.c_str(), u.base().c_str() );
+//             _last_file = u.name;
+//             _base.reset( MFSOwner::File( u.base() ) );
+//         }
+//         else
+//         {
+//             auto f = MFSOwner::File( istream->url );
+//             Debug_printv( "Change Directory Here! istream[%s] > base[%s]", istream->url.c_str(), f->streamFile->url.c_str() );
+//             _base.reset( f->streamFile );
+//         }
+
+//     }
+
+//     uint32_t len = istream->size();
+//     uint32_t avail = istream->available();
+//     if ( !len )
+//         len = -1;
+
+//     //fnLedStrip.startRainbow(300);
+
+//     if( IEC.data.channel == CHANNEL_LOAD )
+//     {
+//         // Get/Send file load address
+//         count = 2;
+//         istream->read(&b, 1);
+//         success_tx = IEC.sendByte(b);
+//         load_address = b & 0x00FF; // low byte
+//         istream->read(&b, 1);
+//         success_tx = IEC.sendByte(b);
+//         load_address = load_address | b << 8;  // high byte
+//         sys_address = load_address;
+//         Debug_printv( "load_address[$%.4X] sys_address[%d]", load_address, sys_address );
+
+//         // Get SYSLINE
+//     }
+
+//     // Read byte
+//     success_rx = istream->read(&b, 1);
+//     //Debug_printv("b[%02X] success[%d]", b, success_rx);
+
+//     Debug_printf("sendFile: [$%.4X]\r\n=================================\r\n", load_address);
+//     while( success_rx && !istream->error() )
+//     {
+//         // Read next byte
+//         success_rx = istream->read(&nb, 1);
+
+//         //Debug_printv("b[%02X] nb[%02X] success_rx[%d] error[%d]", b, nb, success_rx, istream->error());
+// #ifdef DATA_STREAM
+//         if (bi == 0)
+//         {
+//             Debug_printf(":%.4X ", load_address);
+//             load_address += 8;
+//         }
+// #endif
+//         // Send Byte
+//         if ( count + 1 == avail || !success_rx )
+//         {
+//             //Debug_printv("b[%02X] EOI %i", b, count);
+//             success_tx = IEC.sendByte(b, true); // indicate end of file.
+//             if ( !success_tx )
+//                 Debug_printv("tx fail");
+
+//             break;
+//         }
+//         else
+//         {
+//             success_tx = IEC.sendByte(b);
+//             if ( !success_tx )
+//             {
+//                 Debug_printv("tx fail");
+//                 //break;
+//             }
+
+//         }
+//         b = nb; // byte = next byte
+//         count++;
+
+// #ifdef DATA_STREAM
+//         // Show ASCII Data
+//         if (b < 32 || b >= 127)
+//             ba[bi++] = 46;
+//         else
+//             ba[bi++] = b;
+
+//         if(bi == 8)
+//         {
+//             uint32_t t = (count * 100) / len;
+//             Debug_printf(" %s (%d %d%%) [%d]\r\n", ba, count, t, avail);
+//             bi = 0;
+//         }
+// #else
+//         uint32_t t = (count * 100) / len;
+//         Debug_printf("\rTransferring %d%% [%d, %d]      ", t, count, avail);
+// #endif
+
+//         // Exit if ATN is PULLED while sending
+//         //if ( IEC.status ( PIN_IEC_ATN ) == PULLED )
+//         if ( IEC.flags & ATN_PULLED )
+//         {
+//             //Debug_printv("ATN pulled while sending. i[%d]", i);
+
+//             // Save file pointer position
+//             istream->seek(istream->position() - 2);
+//             //success_rx = true;
+//             break;
+//         }
+
+//         // // Toggle LED
+//         // if (i % 50 == 0)
+//         // {
+//         // 	fnLedManager.toggle(eLed::LED_BUS);
+//         // }
+//     }
+
+// #ifdef DATA_STREAM
+//     if (bi)
+//     {
+//       uint32_t t = (count * 100) / len;
+//       ba[bi] = 0;
+//       Debug_printf(" %s (%d %d%%) [%d]\r\n", ba, count, t, avail);
+//       bi = 0;
+//     }
+// #endif
+
+//     Debug_printf("\r\n=================================\r\n%d bytes sent of %d [SYS%d]\r\n", count, avail, sys_address);
+
+//     //Debug_printv("len[%d] avail[%d] success_rx[%d]", len, avail, success_rx);
+
+//     //fnLedManager.set(eLed::LED_BUS, false);
+//     //fnLedStrip.stopRainbow();
+
+//     if ( istream->error() )
+//     {
+//         Debug_println("sendFile: Transfer aborted!");
+//         IEC.senderTimeout();
+//         closeStream(commanddata.channel);
+//     }
+
+//     return success_rx;
+// } // sendFile
 
 bool iecDrive::sendFile()
 {

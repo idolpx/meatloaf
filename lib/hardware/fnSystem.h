@@ -9,7 +9,7 @@
 
 #include <driver/gpio.h>
 
-#include "../FileSystem/fnFS.h"
+#include "fnFS.h"
 
 
 #define FILE_COPY_BUFFERSIZE 2048

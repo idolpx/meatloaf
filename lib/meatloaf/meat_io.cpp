@@ -59,7 +59,7 @@
 FlashFileSystem defaultFS;
 #ifdef SD_CARD
 SDFileSystem sdFS;
-#endif          
+#endif
 
 // Scheme
 HttpFileSystem httpFS;

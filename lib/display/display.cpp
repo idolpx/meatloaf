@@ -7,7 +7,7 @@
    CONDITIONS OF ANY KIND, either express or implied.
 */
 
-#ifdef LED_STRIPX
+#ifdef LED_STRIP
 
 
 #include "display.h"

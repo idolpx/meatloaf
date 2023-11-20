@@ -17,7 +17,7 @@
 [meatloaf]
 ; Espressif32 PlatformIO Version to use for building
 ; https://github.com/platformio/platform-espressif32/releases
-esp32_platform_version = 6.4.0
+esp32_platform_version = 5.4.0
 ;esp32s3_platform_version = 6.1.0
 
 ; Required flags, leave as is
@@ -27,7 +27,7 @@ build_bus      = IEC
 ; Uncomment ONLY ONE of the below lines to target the hardware you use
 ; GPIO pin assignments are located in the include/pinmap/ directory for reference
 ;build_board = fujiloaf-rev0      ; Meatloaf / FujiNet REV0 board, aka Fujiloaf (ESP32-WROVER 8M PSRAM, 16M Flash)
-build_board = lolin-d32-pro      ; Wemos Lolin D32 Pro                         (ESP32-WROVER 4M PSRAM, 4M/8M/16M Flash)
+;build_board = lolin-d32-pro      ; Wemos Lolin D32 Pro                         (ESP32-WROVER 4M PSRAM, 4M/8M/16M Flash)
 ;build_board = ttgo-t1            ; Lilygo TTGO T1 V1.3                         (ESP32 NO PSRAM, 4M Flash)
 ;build_board = esp32-wroom        ; generic esp32-wroom board                   (ESP32-WROOM NO PSRAM, 4M/8M/16M Flash)
 ;build_board = esp32-wroom-pi1541 ; generic esp32-wroom board with pi1541 hat   (ESP32-WROOM NO PSRAM, 4M/8M/16M Flash)
@@ -40,7 +40,7 @@ build_board = lolin-d32-pro      ; Wemos Lolin D32 Pro                         (
 ;build_board = lolin-s3-pro       ; Wemos Lolin S3 Pro                          (ESP32-S3 8M PSRAM, 16M Flash)
 
 ; Choose the size of flash available on your board
-flash_size = 16mb
+;flash_size = 16mb
 ;flash_size = 8mb
 ;flash_size = 4mb
 
@@ -80,15 +80,13 @@ check_skip_packages = yes
 
 ; Build flags used by ALL boards go here
 build_flags =
-    -std=gnu++17
-    -Dregister=                       ; Sinister: redefine 'register' so FastLED can use that keyword under C++17
     -D ${meatloaf.build_platform}
     -D ${meatloaf.flash_filesystem}
     -D CMAKE_EXPORT_COMPILE_COMMANDS=ON
 
     ; Default WiFi
-    -D WIFI_SSID=${meatloaf.wifi_ssid}
-    -D WIFI_PASSWORD=${meatloaf.wifi_pass}
+    -D WIFI_SSID=\"${meatloaf.wifi_ssid}\"
+    -D WIFI_PASSWORD=\"${meatloaf.wifi_pass}\"
 
     ; Service Options
     ;-D ENABLE_SSDP         ; enable Simple Service Discovery Protocol service
@@ -109,7 +107,7 @@ build_flags =
 
     ; DEBUG Options
     -D DEBUG_SPEED=${env.monitor_speed}
-    ;-D DATA_STREAM
+    -D DATA_STREAM
     ;-D VERBOSE_TNFS
     ;-D VERBOSE_DISK
     ;-D VERBOSE_HTTP
@@ -123,12 +121,12 @@ platform = espressif32@${meatloaf.esp32_platform_version}
 board = esp32-${meatloaf.flash_size}
 build_type = debug
 build_flags =
-	${env.build_flags}
-	-D PINMAP_FUJILOAF_REV0
+    ${env.build_flags}
+    -D PINMAP_FUJILOAF_REV0
     -D BOARD_HAS_PSRAM
     -D SD_CARD
-	-D LED_STRIP
-	-D PARALLEL_BUS
+    -D LED_STRIP
+    -D PARALLEL_BUS
     -D GPIOX_PCF8575
 
 [env:lolin-d32-pro]
@@ -136,8 +134,8 @@ platform = espressif32@${meatloaf.esp32_platform_version}
 board = esp32-${meatloaf.flash_size}
 build_type = debug
 build_flags =
-	${env.build_flags}
-	-D PINMAP_LOLIN_D32_PRO
+    ${env.build_flags}
+    -D PINMAP_LOLIN_D32_PRO
     -D BOARD_HAS_PSRAM
     -D SD_CARD
 
@@ -146,8 +144,8 @@ platform = espressif32@${meatloaf.esp32_platform_version}
 board = esp32-${meatloaf.flash_size}
 build_type = debug
 build_flags =
-	${env.build_flags}
-	-D PINMAP_TTGO_T1
+    ${env.build_flags}
+    -D PINMAP_TTGO_T1
     -D SD_CARD
 
 [env:esp32-wroom]
@@ -155,27 +153,27 @@ platform = espressif32@${meatloaf.esp32_platform_version}
 board = esp32-${meatloaf.flash_size}
 build_type = debug
 build_flags =
-	${env.build_flags}
-	-D PINMAP_WROOM
+    ${env.build_flags}
+    -D PINMAP_WROOM
 
 [env:esp32-wroom-pi1541]
 platform = espressif32@${meatloaf.esp32_platform_version}
 board = esp32-${meatloaf.flash_size}
 build_type = debug
 build_flags =
-	${env.build_flags}
-	-D PINMAP_WROOM_1541
-	-D NO_BUTTONS
-	-D IEC_SPLIT_LINES
-	-D IEC_INVERTED_LINES
+    ${env.build_flags}
+    -D PINMAP_WROOM_1541
+    -D NO_BUTTONS
+    -D IEC_SPLIT_LINES
+    -D IEC_INVERTED_LINES
 
 [env:fujiapple-rev0]
 platform = espressif32@${meatloaf.esp32_platform_version}
 board = esp32-${meatloaf.flash_size}
 build_type = debug
 build_flags =
-	${env.build_flags}
-	-D PINMAP_A2_REV0
+    ${env.build_flags}
+    -D PINMAP_A2_REV0
     -D BOARD_HAS_PSRAM
     -D SD_CARD
 
@@ -184,8 +182,8 @@ platform = espressif32@${meatloaf.esp32_platform_version}
 board = esp32-${meatloaf.flash_size}
 build_type = debug
 build_flags =
-	${env.build_flags}
-	-D PINMAP_FN_16
+    ${env.build_flags}
+    -D PINMAP_FN_16
     -D BOARD_HAS_PSRAM
     -D SD_CARD
 
@@ -194,8 +192,8 @@ platform = espressif32@${meatloaf.esp32_platform_version}
 board = esp32-s3
 build_type = debug
 build_flags =
-	${env.build_flags}
-	-D PINMAP_ESP32S3
+    ${env.build_flags}
+    -D PINMAP_ESP32S3
     -D BOARD_HAS_PSRAM
 
 [env:lolin-s2-mini]
@@ -203,8 +201,8 @@ platform = espressif32@${meatloaf.esp32_platform_version}
 board = esp32-s2
 build_type = debug
 build_flags =
-	${env.build_flags}
-	-D PINMAP_LOLIN_S2_MINI
+    ${env.build_flags}
+    -D PINMAP_LOLIN_S2_MINI
     -D BOARD_HAS_PSRAM
 
 [env:lolin-s3-pro]
@@ -212,6 +210,6 @@ platform = espressif32@${meatloaf.esp32_platform_version}
 board = esp32-s3
 build_type = debug
 build_flags =
-	${env.build_flags}
-	-D PINMAP_ESP32S3
+    ${env.build_flags}
+    -D PINMAP_ESP32S3
     -D BOARD_HAS_PSRAM

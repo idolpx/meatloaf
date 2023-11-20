@@ -370,9 +370,6 @@ namespace Meat
         };
     };
 
-
-
-
     // [27.8.1.11] Template class basic_fstream
     /**
      *  @brief  Controlling input and output for files.
@@ -440,7 +437,6 @@ namespace Meat
             this->init(&_M_filebuf);
             this->open(fi->url.c_str(), __mode);
         }
-
 
 #if __cplusplus >= 201103L
         /**

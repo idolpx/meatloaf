@@ -18,7 +18,6 @@ class iecDrive : public virtualDevice
 protected:
     //MediaType *_disk = nullptr;
     oiecstream iecStream;
-    
 
     std::unique_ptr<MFile> _base;   // Always points to current directory/image
     std::string _last_file;         // Always points to last loaded file

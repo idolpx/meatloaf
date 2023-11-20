@@ -18,10 +18,11 @@
 #include "ml_tests.h"
 #include "meat_io.h"
 #include "meat_buffer.h"
-//#include "iec_host.h"
-//#include "make_unique.h"
+#include "iec/iec_host.h"
+#include "make_unique.h"
 #include "basic_config.h"
 #include "device_db.h"
+#include "wrappers/iec_buffer.h"
 
 //#include "fnHttpClient.h"
 #include "fnSystem.h"
@@ -551,19 +552,9 @@ void runFSTest(std::string dirPath, std::string filePath) {
 
     auto testDir = Meat::New<MFile>(dirPath);
     auto testFile = Meat::New<MFile>(filePath);
-    auto destFile = Meat::New<MFile>(testDir->cd("internationale.txt"));
+    //auto destFile = Meat::New<MFile>(testDir->cd("internationale.txt"));
 
     // if this doesn't work reading and writing files won't workk
-
-    if(testFile != nullptr) {
-        dumpFileProperties(testFile.get());
-        testReader(testFile.get());
-        //testWriter(destFile.get());
-        //testReader(destFile.get());
-    }
-    else {
-        Debug_printf("*** WARNING - %s instance couldn't be created!, , testDir->url.c_str()");
-    }
 
     if(!dirPath.empty() && testDir->exists() && testDir->isDirectory()) {
         dumpFileProperties(testDir.get());
@@ -575,7 +566,17 @@ void runFSTest(std::string dirPath, std::string filePath) {
         Debug_printf("*** WARNING - %s instance couldn't be created!", testDir->url.c_str());
     }
 
-    Debug_println("**********************************************************************\r\n\r\n");
+    if(testFile != nullptr) {
+        dumpFileProperties(testFile.get());
+        testReader(testFile.get());
+        //testWriter(destFile.get());
+        //testReader(destFile.get());
+    }
+    else {
+        Debug_printf("*** WARNING - %s instance couldn't be created!", testFile->url.c_str());
+    }
+
+    Debug_println("**********************************************************************\n\n");
 }
 
 void testSmartMFile() {

@@ -7,8 +7,6 @@
 #include <type_traits>
 #include <utility>
 
-#if defined(ARDUINO_ARCH_ESP32)
-
 namespace std {
     template<class T> struct _Unique_if {
         typedef unique_ptr<T> _Single_object;
@@ -40,6 +38,5 @@ namespace std {
         make_unique(Args&&...) = delete;
 }
 
-#endif
 #endif
 #endif
