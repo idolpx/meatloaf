@@ -397,7 +397,6 @@ void systemBus::read_command()
     if ( bus_state < BUS_ACTIVE )
     {
         data.init();
-        Debug_printv("bus init");
     }
 
     //Debug_printv ( "code[%.2X] primary[%.2X] secondary[%.2X] bus[%d] flags[%d]", c, data.primary, data.secondary, bus_state, flags );

@@ -80,7 +80,7 @@ public:
     bool seekPath(std::string path) override { return false; };
     std::string seekNextEntry() override { return ""; };
 
-    virtual uint16_t seekFileSize( uint8_t start_track, uint8_t start_sector );
+    virtual uint32_t seekFileSize( uint8_t start_track, uint8_t start_sector );
 
     uint32_t available() override;
     uint32_t size() override;
@@ -91,6 +91,7 @@ public:
         m_position = 0;
         m_length = block_size;
         m_bytesAvailable = block_size;
+        //m_load_address = {0, 0};
     }
 
     bool isOpen();
@@ -105,13 +106,13 @@ protected:
     uint32_t m_length = 0;
     uint32_t m_bytesAvailable = 0;
     uint32_t m_position = 0;
+    uint8_t m_load_address[2] = {0, 0};
     size_t m_error = 0;
 
     CBMImageStream* decodedStream;
 
     bool show_hidden = false;
 
-    size_t block_size = 256;
     size_t media_header_size = 0x00;
     size_t entry_index = 0;  // Currently selected directory entry
     size_t entry_count = -1; // Directory list entry count (-1 unknown)

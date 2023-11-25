@@ -49,7 +49,7 @@ void CBMImageStream::close() {
 
 };
 
-uint16_t CBMImageStream::seekFileSize( uint8_t start_track, uint8_t start_sector )
+uint32_t CBMImageStream::seekFileSize( uint8_t start_track, uint8_t start_sector )
 {
     // Calculate file size
     seekSector(start_track, start_sector);
@@ -90,7 +90,6 @@ uint32_t CBMImageStream::size() {
 uint32_t CBMImageStream::write(const uint8_t *buf, uint32_t size) {
     return -1;
 }
-
 
 uint32_t CBMImageStream::read(uint8_t* buf, uint32_t size) {
     uint32_t bytesRead = 0;

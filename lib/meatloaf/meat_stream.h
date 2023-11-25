@@ -35,8 +35,21 @@ class MStream {
 public:
     virtual ~MStream() {};
 
+    uint8_t secondaryAddress = 0;
+    std::string url = "";
+
+    bool has_subdirs = true;
+    size_t block_size = 256;
+
     virtual uint32_t available() = 0;
     virtual uint32_t size() = 0;
+    virtual uint32_t blocks() {
+        auto s = size();
+        if ( s > 0 && s < block_size )
+            return 1;
+        else
+            return ( s / block_size );
+    }
     virtual uint32_t position() = 0;
     virtual size_t error() = 0;
     virtual void reset() {};
@@ -51,10 +64,7 @@ public:
     virtual uint32_t write(const uint8_t *buf, uint32_t size) = 0;
     virtual uint32_t read(uint8_t* buf, uint32_t size) = 0;
 
-    uint8_t secondaryAddress = 0;
-    std::string url = "";
 
-    bool has_subdirs = true;
 
     virtual bool seek(uint32_t pos, int mode) {
         if(mode == SEEK_SET) {

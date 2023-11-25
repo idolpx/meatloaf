@@ -929,11 +929,12 @@ void iecDrive::sendListing()
     // Send Directory Items
     while(entry != nullptr)
     {
-        uint32_t s = entry->size();
-        uint32_t block_cnt = s / _base->media_block_size;
+        //uint32_t s = entry->size();
+        //uint32_t block_cnt = s / _base->media_block_size;
+        uint32_t block_cnt = entry->blocks();
         // Debug_printv( "size[%d] blocks[%d] blocksz[%d]", s, block_cnt, _base->media_block_size );
-        if ( s > 0 && s < _base->media_block_size )
-            block_cnt = 1;
+        //if ( s > 0 && s < _base->media_block_size )
+        //    block_cnt = 1;
 
         uint8_t block_spc = 3;
         if (block_cnt > 9)

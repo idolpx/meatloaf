@@ -80,6 +80,13 @@ public:
     virtual time_t getCreationTime() = 0 ;
     virtual uint32_t size() = 0;
     virtual uint64_t getAvailableSpace();
+    virtual uint32_t blocks() {
+        auto s = size();
+        if ( s > 0 && s < media_block_size )
+            return 1;
+        else
+            return ( s / media_block_size );
+    }
 
     virtual bool isText() {
         return mstr::isText(extension);
