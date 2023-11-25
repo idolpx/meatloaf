@@ -1244,6 +1244,7 @@ bool iecDrive::sendFile()
         _base.reset( MFSOwner::File( _base->base() ) );
     }
 
+    bool eoi = false;
     uint32_t len = istream->size();
     uint32_t avail = istream->available();
     if ( !len )
@@ -1285,29 +1286,22 @@ bool iecDrive::sendFile()
             load_address += 8;
         }
 #endif
-        // Send Byte
+        // Is this the last byte in the stream?
         if ( count + 1 == avail || !success_rx )
+            eoi = true;
+        
+        // Send Byte
+        success_tx = IEC.sendByte(b, eoi);
+        if ( !success_tx )
         {
-            //Debug_printv("b[%02X] EOI %i", b, count);
-            success_tx = IEC.sendByte(b, true); // indicate end of file.
-            if ( !success_tx )
-                Debug_printv("tx fail");
-
-            break;
+            Debug_printv("tx fail");
+            return false;
         }
-        else
-        {
-            success_tx = IEC.sendByte(b);
-            if ( !success_tx )
-            {
-                Debug_printv("tx fail");
-                //break;
-            }
 
-        }
         b = nb; // byte = next byte
         count++;
 
+        uint32_t t = (count * 100) / len;
 #ifdef DATA_STREAM
         // Show ASCII Data
         if (b < 32 || b >= 127)
@@ -1317,12 +1311,10 @@ bool iecDrive::sendFile()
 
         if(bi == 8)
         {
-            uint32_t t = (count * 100) / len;
             Debug_printf(" %s (%d %d%%) [%d]\r\n", ba, count, t, avail);
             bi = 0;
         }
 #else
-        uint32_t t = (count * 100) / len;
         Debug_printf("\rTransferring %d%% [%d, %d]      ", t, count, avail);
 #endif
 
@@ -1348,10 +1340,10 @@ bool iecDrive::sendFile()
 #ifdef DATA_STREAM
     if (bi)
     {
-      uint32_t t = (count * 100) / len;
-      ba[bi] = 0;
-      Debug_printf(" %s (%d %d%%) [%d]\r\n", ba, count, t, avail);
-      bi = 0;
+        uint32_t t = (count * 100) / len;
+        ba[bi] = 0;
+        Debug_printf(" %s (%d %d%%) [%d]\r\n", ba, count, t, avail);
+        bi = 0;
     }
 #endif
 
