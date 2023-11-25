@@ -65,7 +65,7 @@ uint32_t CBMImageStream::seekFileSize( uint8_t start_track, uint8_t start_sector
             seekSector( start_track, start_sector );
     } while ( start_track > 0 );
     blocks--;
-    return (blocks * (block_size - 2)) + start_sector - 1;
+    return (blocks * (block_size - 2)) + start_sector - 2;
 };
 
 

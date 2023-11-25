@@ -45,7 +45,8 @@ namespace Protocol
          * @param start The previously set start millisecond time.
          * @param watch_atn also abort if ATN status changes? (default is true)
          */
-        virtual bool wait(size_t wait_us, uint64_t start = 0, bool watch_atn = true);
+        virtual bool wait(size_t wait_us, bool watch_atn = true);
+        virtual bool wait(size_t wait_us, uint64_t start, bool watch_atn = true);
     };
 };
 

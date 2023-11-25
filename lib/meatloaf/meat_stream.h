@@ -31,7 +31,15 @@
 // TCP_CLENT_SOCKET = clear bit 5
 // TCP_SERVER_SOCKET = set bit 5
 
-class MStream {
+class MStream 
+{
+protected:
+    uint32_t m_length = 0;
+    uint32_t m_bytesAvailable = 0;
+    uint32_t m_position = 0;
+    uint8_t m_load_address[2] = {0, 0};
+    size_t m_error = 0;
+
 public:
     virtual ~MStream() {};
 

@@ -11,11 +11,9 @@ using namespace Protocol;
 
 int16_t IecProtocolBase::timeoutWait(uint8_t pin, bool target_status, size_t wait_us, bool watch_atn)
 {
-    uint64_t start, current, elapsed;
-    bool atn_status = false;
-    start = 0;
-    current = 0;
-    elapsed = 0;
+    uint64_t start = 0;
+    uint64_t current = 0;
+    uint64_t elapsed = 0;
 
     // Delay for line to be pulled up
     if ( target_status == RELEASED )
@@ -24,14 +22,11 @@ int16_t IecProtocolBase::timeoutWait(uint8_t pin, bool target_status, size_t wai
     esp_timer_init();
     start = current = esp_timer_get_time();
 
+    // Sample ATN and set flag to indicate COMMAND or DATA mode
+    bool atn_status = IEC.status ( PIN_IEC_ATN );
     if ( pin == PIN_IEC_ATN )
     {
         watch_atn = false;
-    }
-    else if ( watch_atn )
-    {
-        // Sample ATN and set flag to indicate SELECT or DATA mode
-        atn_status = IEC.status ( PIN_IEC_ATN );
     }
 
     //IEC.pull ( PIN_IEC_SRQ );
@@ -66,6 +61,11 @@ int16_t IecProtocolBase::timeoutWait(uint8_t pin, bool target_status, size_t wai
     // Debug_printv("pin[%d] state[%d] wait[%d] step[%d] t[%d]", pin, target_status, wait, elapsed);
     return elapsed;
 
+}
+
+bool IecProtocolBase::wait(size_t wait_us, bool watch_atn)
+{
+    return wait(wait_us, 0, watch_atn);
 }
 
 bool IecProtocolBase::wait(size_t wait_us, uint64_t start, bool watch_atn)

@@ -1232,10 +1232,9 @@ bool iecDrive::sendFile()
     bool eoi = false;
     uint32_t len = istream->size();
     uint32_t avail = istream->available();
-    if ( !len )
-        len = -1;
 
     //fnLedStrip.startRainbow(300);
+    Debug_printv("len[%d] avail[%d]", len, avail);
 
     if( commanddata.channel == CHANNEL_LOAD )
     {
@@ -1272,7 +1271,7 @@ bool iecDrive::sendFile()
         }
 #endif
         // Is this the last byte in the stream?
-        if ( count + 1 == avail || !success_rx )
+        if ( count++ == avail || !success_rx )
             eoi = true;
         
         // Send Byte
@@ -1284,7 +1283,6 @@ bool iecDrive::sendFile()
         }
 
         b = nb; // byte = next byte
-        count++;
 
         uint32_t t = (count * 100) / len;
 #ifdef DATA_STREAM
