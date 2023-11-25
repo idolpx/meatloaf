@@ -544,13 +544,14 @@ public:
     // true => PULL => LOW
     inline void IRAM_ATTR pull ( uint8_t pin )
     {
-	FAST_SET_DIRECTION(pin, GPIO_MODE_OUTPUT);
+	    FAST_SET_DIRECTION(pin, GPIO_MODE_OUTPUT);
     }
 
     // false => RELEASE => HIGH
     inline void IRAM_ATTR release ( uint8_t pin )
     {
-	FAST_SET_DIRECTION(pin, GPIO_MODE_INPUT);
+	    FAST_SET_DIRECTION(pin, GPIO_MODE_INPUT);
+        protocol->wait( 4 ); // Delay for slow pull up
     }
 
     inline bool IRAM_ATTR status ( uint8_t pin )

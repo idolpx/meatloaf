@@ -1237,7 +1237,7 @@ bool iecDrive::sendFile()
 
     //fnLedStrip.startRainbow(300);
 
-    if( IEC.data.channel == CHANNEL_LOAD )
+    if( commanddata.channel == CHANNEL_LOAD )
     {
         // Get/Send file load address
         count = 2;
