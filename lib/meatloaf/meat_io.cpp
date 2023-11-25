@@ -39,13 +39,16 @@
 
 // Network
 #include "network/http.h"
-#include "network/ml.h"
 #include "network/tnfs.h"
 // #include "network/ipfs.h"
 // #include "network/tnfs.h"
 // #include "network/smb.h"
-// #include "network/cs.h"
 // #include "network/ws.h"
+
+// Service
+// #include "service/cs.h"
+#include "service/ml.h"
+
 
 // Tape
 #include "tape/t64.h"
@@ -427,7 +430,7 @@ MFile* MFile::cd(std::string newDir)
 
     Debug_printv("cd requested: [%s]", newDir.c_str());
     if ( streamFile != nullptr)
-            Debug_printv("streamFile[%s]", streamFile->url.c_str());
+        Debug_printv("streamFile[%s]", streamFile->url.c_str());
 
     // OK to clarify - coming here there should be ONLY path or magicSymbol-path combo!
     // NO "cd:xxxxx", no "/cd:xxxxx" ALLOWED here! ******************

@@ -214,9 +214,10 @@ void iecDrive::iec_open()
         return;
 
     pt = util_tokenize(payload, ',');
-    std::string s = pt[0];
+    std::string s = payload;
     if ( pt.size() > 1 )
     {
+        s = pt[0];
         Debug_printv("filename[%s] type[%s] mode[%s]", pt[0].c_str(), pt[1].c_str(), pt[2].c_str());
     }
     mstr::toASCII(s);

@@ -6,7 +6,7 @@
 #define MEATLOAF_SCHEME_CS
 
 #include "meat_io.h"
-#include "tcp.h"
+#include "network/tcp.h"
 
 #include "fnSystem.h"
 #include "fnTcpClient.h"
