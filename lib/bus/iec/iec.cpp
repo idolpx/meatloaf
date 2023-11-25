@@ -630,7 +630,6 @@ bool systemBus::sendByte(const char c, bool eoi)
         if (!(IEC.flags & ATN_PULLED))
         {
             IEC.flags |= ERROR;
-            //releaseLines();
             Debug_printv("error");
             return false;
         }

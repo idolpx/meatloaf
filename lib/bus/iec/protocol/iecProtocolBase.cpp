@@ -19,9 +19,7 @@ int16_t IecProtocolBase::timeoutWait(uint8_t pin, bool target_status, size_t wai
 
     // Delay for line to be pulled up
     if ( target_status == RELEASED )
-    {
         wait(4);
-    }
 
     esp_timer_init();
     start = current = esp_timer_get_time();
@@ -43,7 +41,7 @@ int16_t IecProtocolBase::timeoutWait(uint8_t pin, bool target_status, size_t wai
         current = esp_timer_get_time();
         elapsed = ( current - start );
 
-        if ( elapsed >= wait_us && wait_us != FOREVER )
+        if ( elapsed >= wait_us ) // && wait_us != FOREVER )
         {
             //IEC.release ( PIN_IEC_SRQ );
             if ( wait_us == TIMEOUT_DEFAULT )
