@@ -213,7 +213,12 @@ void iecDrive::iec_open()
     if ( commanddata.primary == IEC_UNLISTEN )
         return;
 
-    std::string s = payload;
+    pt = util_tokenize(payload, ',');
+    std::string s = pt[0];
+    if ( pt.size() > 1 )
+    {
+        Debug_printv("filename[%s] type[%s] mode[%s]", pt[0].c_str(), pt[1].c_str(), pt[2].c_str());
+    }
     mstr::toASCII(s);
 
     Debug_printv("s[%s]", s.c_str());

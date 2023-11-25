@@ -146,6 +146,7 @@ void IRAM_ATTR systemBus::service()
 
         Debug_printf("IEC Reset! reset[%d]\r\n", pin_reset);
         data.init(); // Clear bus data
+        releaseLines();
         bus_state = BUS_IDLE;
         Debug_printv("bus init");
 
@@ -214,7 +215,7 @@ void IRAM_ATTR systemBus::service()
                 //         devicep->process();
                 // }
                 data.init();
-                Debug_printv("bus init");
+                //Debug_printv("bus init");
             }
 
             //Debug_printv("bus[%d] device[%d] flags[%d]", bus_state, device_state, flags);
@@ -397,6 +398,7 @@ void systemBus::read_command()
     if ( bus_state < BUS_ACTIVE )
     {
         data.init();
+        releaseLines( true );
     }
 
     //Debug_printv ( "code[%.2X] primary[%.2X] secondary[%.2X] bus[%d] flags[%d]", c, data.primary, data.secondary, bus_state, flags );
