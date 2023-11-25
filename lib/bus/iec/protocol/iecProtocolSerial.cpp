@@ -162,21 +162,27 @@ bool IecProtocolSerial::sendBits ( uint8_t data )
     IEC.release(PIN_IEC_DATA_OUT);
     // Check to see if DATA is being pulled
     if ( IEC.status( PIN_IEC_DATA_IN ) == PULLED )
+    {
+        Debug_printv(".");
         return false; // If it is we exit
+    }
 
     // Send bits
     for ( uint8_t n = 0; n < 8; n++ )
     {
-        if ( !wait ( TIMING_Ts1 ) ) return false; // 57us 
+        //if ( !wait ( TIMING_Ts1 ) ) return false; // 57us 
+        wait ( TIMING_Ts1, false );
 
         // set bit
         ( data & 1 ) ? IEC.release ( PIN_IEC_DATA_OUT ) : IEC.pull ( PIN_IEC_DATA_OUT );
         data >>= 1; // shift to next bit
-        if ( !wait ( TIMING_Ts2 ) ) return false; // 28us
+        //if ( !wait ( TIMING_Ts2 ) ) return false; // 28us
+        wait ( TIMING_Ts2, false );
 
         // tell listener bit is ready to read
         IEC.release ( PIN_IEC_CLK_OUT );
-        if ( !wait ( tv ) ) return false; // 76us 
+        //if ( !wait ( tv ) ) return false; // 76us 
+        wait ( tv, false );
 
         // tell listner to wait
         IEC.pull ( PIN_IEC_CLK_OUT );

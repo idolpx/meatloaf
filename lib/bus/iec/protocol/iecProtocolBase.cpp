@@ -93,12 +93,15 @@ bool IecProtocolBase::wait(size_t wait_us, uint64_t start, bool watch_atn)
         current = esp_timer_get_time();
         elapsed = current - start;
 
-        bool atn_check = IEC.status ( PIN_IEC_ATN );
-        if ( atn_check != atn_status )
+        if ( watch_atn )
         {
-            //IEC.release ( PIN_IEC_SRQ );
-            //Debug_printv("wait[%d] elapsed[%d] start[%d] current[%d]", wait, elapsed, start, current);
-            return false;
+            bool atn_check = IEC.status ( PIN_IEC_ATN );
+            if ( atn_check != atn_status )
+            {
+                //IEC.release ( PIN_IEC_SRQ );
+                //Debug_printv("wait[%d] elapsed[%d] start[%d] current[%d]", wait, elapsed, start, current);
+                return false;
+            }
         }
     }
 
