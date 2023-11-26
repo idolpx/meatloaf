@@ -93,12 +93,12 @@ bool IecProtocolSerial::sendByte(uint8_t data, bool eoi)
     IEC.pull ( PIN_IEC_CLK_OUT );
 
     // STEP 3: SENDING THE BITS
-    IEC.pull ( PIN_IEC_SRQ );
+    //IEC.pull ( PIN_IEC_SRQ );
     if ( !sendBits( data ) ) {
         Debug_printv ( "Error sending bits - byte '%02X'", data );
         return false;
     }
-    IEC.release ( PIN_IEC_SRQ );
+    //IEC.release ( PIN_IEC_SRQ );
 
     // STEP 4: FRAME HANDSHAKE
     // After the eighth bit has been sent, it's the listener's turn to acknowledge.  At this moment, the Clock line  is  true
