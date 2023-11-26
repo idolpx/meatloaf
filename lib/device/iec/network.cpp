@@ -426,8 +426,6 @@ void iecNetwork::iec_reopen_channel_talk()
         char b;
         atn = IEC.status(PIN_IEC_ATN);
 
-        Debug_printf("atn: %u\n", atn);
-
         if (atn)
             break;
 
@@ -690,6 +688,8 @@ void iecNetwork::iec_talk_command()
 
 void iecNetwork::iec_command()
 {
+    if ( pt.size() == 0 )
+        return;
 
     Debug_printf("pt[0]=='%s'\n", pt[0].c_str());
     if (pt[0] == "cd")
