@@ -121,8 +121,8 @@ bool IecProtocolSerial::sendByte(uint8_t data, bool eoi)
     // happened. If EOI was sent or received in this last transmission, both talker and listener "letgo."  After a suitable pause,
     // the Clock and Data lines are RELEASED to false and transmission stops.
 
-    // if ( eoi )
-    //     IEC.release ( PIN_IEC_CLK_OUT );
+    if ( eoi )
+        IEC.release ( PIN_IEC_CLK_OUT );
 
     timeoutWait( PIN_IEC_DATA_IN, RELEASED, TIMING_Tbb);
 
@@ -160,11 +160,11 @@ bool IecProtocolSerial::sendBits ( uint8_t data )
     }
 
     IEC.release(PIN_IEC_DATA_OUT);
-    // // Check to see if DATA is being pulled
-    // if ( IEC.status( PIN_IEC_DATA_IN ) == PULLED )
+    // Wait for DATA to be RELEASED
+    // if ( timeoutWait ( PIN_IEC_DATA_IN, RELEASED ) )
     // {
-    //     Debug_printv(".");
-    //     return false; // If it is we exit
+    //     Debug_printv ( "Wait for listener to release DATA [%d]", data );
+    //     return false; // return error because timeout
     // }
 
     // Send bits
