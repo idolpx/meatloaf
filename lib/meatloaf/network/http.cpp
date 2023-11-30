@@ -131,6 +131,11 @@ bool HttpIStream::open() {
     else if(secondaryAddress == 2)
         r = m_http.POST(url);
 
+    if ( r ) {
+        m_length = m_http.m_length;
+        m_bytesAvailable = m_length;
+    }
+
     return r;
 }
 
@@ -150,7 +155,18 @@ bool HttpIStream::seek(uint32_t pos) {
 }
 
 uint32_t HttpIStream::read(uint8_t* buf, uint32_t size) {
-    return m_http.read(buf, size);
+    uint32_t bytesRead = 0;
+    if ( size > m_bytesAvailable )
+        size = m_bytesAvailable;
+    
+    if ( size > 0 )
+    {
+        bytesRead = m_http.read(buf, size);
+        m_position += bytesRead;
+        m_bytesAvailable = m_length - m_position;
+    }
+
+    return bytesRead;
 };
 
 uint32_t HttpIStream::write(const uint8_t *buf, uint32_t size) {
