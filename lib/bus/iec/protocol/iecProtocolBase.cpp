@@ -32,7 +32,6 @@ int16_t IecProtocolBase::timeoutWait(uint8_t pin, bool target_status, size_t wai
     //IEC.pull ( PIN_IEC_SRQ );
     while ( IEC.status ( pin ) != target_status )
     {
-        //fnSystem.delay_microseconds(1);
         current = esp_timer_get_time();
         elapsed = ( current - start );
 
@@ -54,6 +53,13 @@ int16_t IecProtocolBase::timeoutWait(uint8_t pin, bool target_status, size_t wai
                 //Debug_printv("pin[%d] state[%d] wait[%d] elapsed[%d]", pin, target_status, wait, elapsed);
                 return -1;
             }            
+        }
+
+        if ( IEC.bus_state < BUS_ACTIVE || elapsed > FOREVER )
+        {
+            // Something is messed up.  Get outta here.
+            Debug_printv("wth?");
+            return -1;
         }
     }
     //IEC.release ( PIN_IEC_SRQ );

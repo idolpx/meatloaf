@@ -216,7 +216,10 @@ extern "C"
         main_setup();
 
         // Sit here twiddling our thumbs
-        while (true)
-            vTaskDelay(9000 / portTICK_PERIOD_MS);
+        // while (true)
+        //     vTaskDelay(9000 / portTICK_PERIOD_MS);
+
+        // Delete app_main() task since we no longer need it
+        vTaskDelete(NULL);
     }
 }

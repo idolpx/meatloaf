@@ -286,7 +286,7 @@ int16_t IecProtocolSerial::receiveByte()
 
     // Acknowledge byte received
     //IEC.pull ( PIN_IEC_SRQ );
-    if ( !wait ( TIMING_Tf ) ) return -1;
+    //if ( !wait ( TIMING_Tf ) ) return -1;
     IEC.pull ( PIN_IEC_DATA_OUT );
     //IEC.release ( PIN_IEC_SRQ );
 

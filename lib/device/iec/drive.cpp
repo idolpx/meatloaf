@@ -1341,13 +1341,9 @@ bool iecDrive::sendFile()
     }
 
 #ifdef DATA_STREAM
-    if (bi)
-    {
-        uint32_t t = (count * 100) / len;
-        ba[bi] = 0;
-        Debug_printf(" %s (%d %d%%) [%d]\r\n", ba, count, t, avail);
-        bi = 0;
-    }
+    uint32_t t = (count * 100) / len;
+    ba[bi++] = 0;
+    Debug_printf(" %s (%d %d%%) [%d]\r\n", ba, count, t, avail);
 #endif
 
     Debug_printf("\r\n=================================\r\n%d bytes sent of %d [SYS%d]\r\n", count, avail, sys_address);

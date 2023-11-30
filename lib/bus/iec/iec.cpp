@@ -143,7 +143,6 @@ void IRAM_ATTR systemBus::service()
             // If RESET & ATN are both PULLED then CBM is off
             bus_state = BUS_OFFLINE;
             // gpio_intr_enable((gpio_num_t)PIN_IEC_ATN);
-            return;
         }
 
         Debug_printf("IEC Reset! reset[%d]\r\n", pin_reset);
