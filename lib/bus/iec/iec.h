@@ -51,6 +51,7 @@
 
 #include "../../../include/debug.h"
 
+
 /**
  * @brief The command frame
  */
@@ -551,7 +552,7 @@ public:
     inline void IRAM_ATTR release ( uint8_t pin )
     {
         FAST_SET_DIRECTION(pin, GPIO_MODE_INPUT);
-        protocol->wait( 4 ); // Delay for slow pull up
+        //protocol->wait( 4 ); // Delay for slow pull up
     }
 
     inline bool IRAM_ATTR status ( uint8_t pin )

@@ -52,14 +52,20 @@ public:
     virtual uint32_t available() = 0;
     virtual uint32_t size() = 0;
     virtual uint32_t blocks() {
-        auto s = size();
-        if ( s > 0 && s < block_size )
+        if ( m_length > 0 && m_length < block_size )
             return 1;
         else
-            return ( s / block_size );
+            return ( m_length / block_size );
     }
     virtual uint32_t position() = 0;
     virtual size_t error() = 0;
+    virtual bool eos()  {
+//        Debug_printv("m_length[%d] m_bytesAvailable[%d] m_position[%d]", m_length, m_bytesAvailable, m_position);
+        if ( m_bytesAvailable == 0 )
+            return true;
+        
+        return false;
+    }
     virtual void reset() {};
     
     virtual bool isOpen() = 0;

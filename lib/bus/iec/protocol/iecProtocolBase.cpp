@@ -75,7 +75,7 @@ bool IecProtocolBase::wait(size_t wait_us, uint64_t start, bool watch_atn)
     elapsed = 0;
 
     if ( wait_us == 0 ) return true;
-//    wait_us--; // Shave 1us for overhead
+    wait_us--; // Shave 1us for overhead
 
     esp_timer_init();
     if ( start == 0 )

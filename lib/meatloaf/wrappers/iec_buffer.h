@@ -84,4 +84,6 @@ public:
     void putUtf8(U8Char* codePoint);
 };
 
+extern oiecstream iecStream;
+
 #endif /* MEATLOAF_WRAPPER_IEC_BUFFER */

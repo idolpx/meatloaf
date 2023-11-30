@@ -94,6 +94,8 @@ uint32_t CBMImageStream::write(const uint8_t *buf, uint32_t size) {
 uint32_t CBMImageStream::read(uint8_t* buf, uint32_t size) {
     uint32_t bytesRead = 0;
 
+    //Debug_printv("seekCalled[%d]", seekCalled);
+
     if(seekCalled) {
         // if we have the stream set to a specific file already, either via seekNextEntry or seekPath, return bytes of the file here
         // or set the stream to EOF-like state, if whle file is completely read.
@@ -106,6 +108,8 @@ uint32_t CBMImageStream::read(uint8_t* buf, uint32_t size) {
     }
 
     m_position += bytesRead;
+    m_bytesAvailable = m_length - m_position;
+
     return bytesRead;
 };
 

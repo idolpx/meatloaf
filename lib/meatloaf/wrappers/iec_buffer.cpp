@@ -1,5 +1,7 @@
 #include "iec_buffer.h"
 
+oiecstream iecStream;
+
 /********************************************************
  * oiecbuf
  * 

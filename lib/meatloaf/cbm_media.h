@@ -128,7 +128,7 @@ protected:
     virtual bool seekEntry( std::string filename ) { return false; };
     virtual bool seekEntry( size_t index ) { return false; };
 
-    virtual size_t readFile(uint8_t* buf, size_t size) = 0;
+    virtual uint32_t readFile(uint8_t* buf, uint32_t size) = 0;
     std::string decodeType(uint8_t file_type, bool show_hidden = false);
 
 private:

@@ -262,8 +262,7 @@ uint16_t D64IStream::blocksFree()
     return free_count;
 }
 
-size_t D64IStream::readFile(uint8_t* buf, size_t size) {
-    size_t bytesRead = 0;
+uint32_t D64IStream::readFile(uint8_t* buf, uint32_t size) {
 
     if ( sector_offset % block_size == 0 )
     {
@@ -275,16 +274,22 @@ size_t D64IStream::readFile(uint8_t* buf, size_t size) {
         //Debug_printv("next_track[%d] next_sector[%d] sector_offset[%d]", next_track, next_sector, sector_offset);
     }
 
-    bytesRead += containerStream->read(buf, size);
-    sector_offset += bytesRead;
-    m_bytesAvailable -= bytesRead;
-
-    if ( sector_offset % block_size == 0 )
+    uint32_t bytesRead = 0;
+    if ( size > m_bytesAvailable )
+        size = m_bytesAvailable;
+    
+    if ( size > 0 )
     {
-        // We are at the end of the block
-        // Follow track/sector link to move to next block
-        seekSector( next_track, next_sector );
-        //Debug_printv("track[%d] sector[%d] sector_offset[%d]", track, sector, sector_offset);
+        bytesRead += containerStream->read(buf, size);
+        sector_offset += bytesRead;
+
+        if ( sector_offset % block_size == 0 )
+        {
+            // We are at the end of the block
+            // Follow track/sector link to move to next block
+            seekSector( next_track, next_sector );
+            //Debug_printv("track[%d] sector[%d] sector_offset[%d]", track, sector, sector_offset);
+        }
     }
 
     // if ( !bytesRead )

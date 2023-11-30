@@ -111,7 +111,7 @@ device_state_t iecDrive::process()
 {
     virtualDevice::process();
 
-    Debug_printv("channel[%d]", commanddata.channel);
+//    Debug_printv("channel[%d]", commanddata.channel);
 
 
     switch (commanddata.channel)
@@ -130,13 +130,13 @@ device_state_t iecDrive::process()
         break;
     }
 
-    Debug_printv("url[%s] device_state[%d]", _base->url.c_str(), device_state);
+//    Debug_printv("url[%s] device_state[%d]", _base->url.c_str(), device_state);
     return device_state;
 }
 
 void iecDrive::process_load()
 {
-    Debug_printv("secondary[%.2X]", commanddata.secondary);
+//    Debug_printv("secondary[%.2X]", commanddata.secondary);
     switch (commanddata.secondary)
     {
     case IEC_OPEN:
@@ -264,12 +264,12 @@ void iecDrive::iec_close()
         IEC.senderTimeout();
         return; // Punch out.
     }
-    Debug_printv("url[%s]", _base->url.c_str());
+//    Debug_printv("url[%s]", _base->url.c_str());
 
     closeStream( commanddata.channel );
     commanddata.init();
     device_state = DEVICE_IDLE;
-    Debug_printv("device init");
+//    Debug_printv("device init");
 }
 
 void iecDrive::iec_reopen_load()
@@ -1275,8 +1275,8 @@ bool iecDrive::sendFile()
     Debug_printf("sendFile: [$%.4X]\r\n=================================\r\n", load_address);
     while( success_rx && !istream->error() )
     {
-        // Read next byte
-        success_rx = istream->read(&nb, 1);
+        count = istream->position();
+        avail = istream->available();
 
         //Debug_printv("b[%02X] nb[%02X] success_rx[%d] error[%d]", b, nb, success_rx, istream->error());
 #ifdef DATA_STREAM
@@ -1286,10 +1286,7 @@ bool iecDrive::sendFile()
             load_address += 8;
         }
 #endif
-        // Is this the last byte in the stream?
-        if ( count++ == avail || !success_rx )
-            eoi = true;
-        
+
         // Send Byte
         success_tx = IEC.sendByte(b, eoi);
         if ( !success_tx )
@@ -1297,6 +1294,13 @@ bool iecDrive::sendFile()
             Debug_printv("tx fail");
             return false;
         }
+
+        // Read next byte
+        success_rx = istream->read(&nb, 1);
+
+        // Is this the last byte in the stream?
+        if ( istream->eos() )
+            eoi = true;
 
         b = nb; // byte = next byte
 

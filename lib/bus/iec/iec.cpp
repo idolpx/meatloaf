@@ -15,6 +15,8 @@
 
 using namespace Protocol;
 
+systemBus IEC;
+
 static void IRAM_ATTR cbm_on_attention_isr_handler(void *arg)
 {
     systemBus *b = (systemBus *)arg;
@@ -398,7 +400,7 @@ void systemBus::read_command()
     if ( bus_state < BUS_ACTIVE )
     {
         data.init();
-        releaseLines( true );
+        releaseLines();
     }
 
     //Debug_printv ( "code[%.2X] primary[%.2X] secondary[%.2X] bus[%d] flags[%d]", c, data.primary, data.secondary, bus_state, flags );
@@ -421,7 +423,6 @@ void systemBus::read_payload()
     /* Sometimes ATN isn't released immediately. Wait for ATN to be
        released before trying to read payload. Long ATN delay (>1.5ms)
        seems to occur more frequently with VIC-20. */
-    Debug_printv("FOREVER");
     protocol->timeoutWait(PIN_IEC_ATN, RELEASED, FOREVER, false);
 
     while (IEC.status(PIN_IEC_ATN) != PULLED)
@@ -613,7 +614,6 @@ int16_t systemBus::receiveByte()
         if (!(IEC.flags & ATN_PULLED))
         {
             IEC.flags |= ERROR;
-            //releaseLines();
             Debug_printv("error");
         }
     }
@@ -756,7 +756,6 @@ bool IRAM_ATTR systemBus::turnAround()
     // Debug_printf("IEC turnAround: ");
 
     // Wait until the computer releases the ATN line
-    Debug_printv("FOREVER");
     if (protocol->timeoutWait(PIN_IEC_ATN, RELEASED, FOREVER) == TIMED_OUT)
     {
         Debug_printf("Wait until the computer releases the ATN line");
@@ -783,9 +782,6 @@ void IRAM_ATTR systemBus::releaseLines(bool wait)
     // Release lines
     release(PIN_IEC_CLK_OUT);
     release(PIN_IEC_DATA_OUT);
-
-    // protocol->timeoutWait(PIN_IEC_CLK_IN, RELEASED, FOREVER);
-    // protocol->timeoutWait(PIN_IEC_DATA_IN, RELEASED, FOREVER);
 
     // Wait for ATN to release and quit
     if (wait)
@@ -875,6 +871,5 @@ void systemBus::shutdown()
     Debug_printf("All devices shut down.\r\n");
 }
 
-systemBus IEC;
 
 #endif /* BUILD_IEC */
