@@ -130,7 +130,7 @@ device_state_t iecDrive::process()
         break;
     }
 
-//    Debug_printv("url[%s] device_state[%d]", _base->url.c_str(), device_state);
+    Debug_printv("url[%s] file[%s] device_state[%d]", _base->url.c_str(), _last_file.c_str(), device_state);
     return device_state;
 }
 
