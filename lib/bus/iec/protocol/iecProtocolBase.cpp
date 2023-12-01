@@ -15,9 +15,14 @@ int16_t IecProtocolBase::timeoutWait(uint8_t pin, bool target_status, size_t wai
     uint64_t current = 0;
     uint64_t elapsed = 0;
 
-    // Delay for line to be pulled up
+#ifndef SPLIT_LINES
+    // Release the pin we are watching to switch it to INPUT
+    IEC.release( pin );
+#endif
+
+    // // Delay for line to be pulled up
     if ( target_status == RELEASED )
-        wait(4);
+        wait(4, false);
 
     esp_timer_init();
     start = current = esp_timer_get_time();
@@ -58,7 +63,8 @@ int16_t IecProtocolBase::timeoutWait(uint8_t pin, bool target_status, size_t wai
         if ( IEC.bus_state < BUS_ACTIVE || elapsed > FOREVER )
         {
             // Something is messed up.  Get outta here.
-            Debug_printv("wth?");
+            Debug_printv("wth? bus_state[%d]", IEC.bus_state);
+            Debug_printv("pin[%d] target_status[%d] wait[%d] elapsed[%d]", pin, target_status, wait_us, elapsed);
             return -1;
         }
     }

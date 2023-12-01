@@ -28,10 +28,8 @@ static void IRAM_ATTR cbm_on_attention_isr_handler(void *arg)
     b->pull(PIN_IEC_DATA_OUT);
 
     b->flags |= ATN_PULLED;
-    //if ( b->bus_state < BUS_ACTIVE )
-        b->bus_state = BUS_ACTIVE;
+    b->bus_state = BUS_ACTIVE;
 
-    fnSystem.delay_microseconds(4);
     //b->release(PIN_IEC_SRQ);
 }
 
@@ -356,6 +354,9 @@ void systemBus::read_command()
                 default:
                     bus_state = BUS_IDLE;
                 }
+
+                // Let bus stabalize
+                //protocol->wait( TIMING_STABLE, false );
             }
         }
 
@@ -364,7 +365,6 @@ void systemBus::read_command()
         //protocol->wait ( TIMING_STABLE );
 
     } while ( IEC.flags & ATN_PULLED );
-    //} while ( status( PIN_IEC_ATN ) == PULLED );
 
     // Is this command for us?
     if ( !isDeviceEnabled( data.device ) )
@@ -406,7 +406,7 @@ void systemBus::read_command()
     //Debug_printv ( "device[%d] channel[%d]", data.device, data.channel);
 
     // Delay to stabalize bus
-    // protocol->wait( TIMING_STABLE, 0, false );
+    // protocol->wait( TIMING_STABLE, false );
 
     //release( PIN_IEC_SRQ );
 }

@@ -211,13 +211,8 @@ extern "C"
 {
     void app_main()
     {
-        // cppcheck-suppress "unusedFunction"
         // Call our setup routine
         main_setup();
-
-        // Sit here twiddling our thumbs
-        // while (true)
-        //     vTaskDelay(9000 / portTICK_PERIOD_MS);
 
         // Delete app_main() task since we no longer need it
         vTaskDelete(NULL);

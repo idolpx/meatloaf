@@ -40,6 +40,12 @@ bool IecProtocolSerial::sendByte(uint8_t data, bool eoi)
     // Say we're ready
     //wait( TIMING_STABLE );
     IEC.release ( PIN_IEC_CLK_OUT );
+    // if ( timeoutWait ( PIN_IEC_CLK_IN, RELEASED, FOREVER ) == TIMED_OUT )
+    // {
+    //     Debug_printv ( "Wait for other talkers to release clock [%02X]", data );
+    //     return false; // return error because of ATN or timeout
+    // }
+
 
     // Wait for listener to be ready
     // STEP 2: READY FOR DATA
@@ -360,11 +366,11 @@ int16_t IecProtocolSerial::receiveBits ()
                     {
                         /* If it's for us, notify controller that we support Jiffy too */
                         IEC.pull(PIN_IEC_DATA_OUT);
-                        wait( TIMING_JIFFY_ACK, 0, false );
+                        wait( TIMING_JIFFY_ACK, false );
                         IEC.release(PIN_IEC_DATA_OUT);
-#ifndef IEC_SPLIT_LINES
-                        IEC.release(PIN_IEC_DATA_IN); // Set DATA IN back to input
-#endif
+// #ifndef IEC_SPLIT_LINES
+//                         IEC.release(PIN_IEC_DATA_IN); // Set DATA IN back to input
+// #endif
                         IEC.flags |= JIFFY_ACTIVE;
                     }
                 }
