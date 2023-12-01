@@ -365,7 +365,7 @@ void systemBus::read_command()
                 }
 
                 // Wait for ATN to be released
-                if (data.secondary == IEC_OPEN || data.secondary == IEC_REOPEN )
+                if ( data.secondary == IEC_OPEN || data.secondary == IEC_REOPEN )
                     protocol->timeoutWait(PIN_IEC_ATN, RELEASED, FOREVER, false);
             }
         }
