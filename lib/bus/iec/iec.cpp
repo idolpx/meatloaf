@@ -365,9 +365,9 @@ void systemBus::read_command()
 
         // Let bus stabalize
         //Debug_printv("stabalize!");
-        //protocol->wait ( TIMING_STABLE );
+        protocol->wait ( TIMING_STABLE );
 
-    } while ( IEC.flags & ATN_PULLED );
+    } while ( IEC.status ( PIN_IEC_ATN ) );
 
     // Is this command for us?
     if ( !isDeviceEnabled( data.device ) )
