@@ -174,7 +174,7 @@ void iecDrive::process_save()
 
 void iecDrive::process_command()
 {
-    Debug_printv("primary[%.2X] secondary[%.2X]", commanddata.primary, commanddata.secondary);
+//    Debug_printv("primary[%.2X] secondary[%.2X]", commanddata.primary, commanddata.secondary);
     if (commanddata.primary == IEC_TALK) // && commanddata.secondary == IEC_REOPEN)
     {
         iec_talk_command();
