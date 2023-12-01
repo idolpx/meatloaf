@@ -164,9 +164,6 @@ void IRAM_ATTR systemBus::service()
         if (bus_state == BUS_OFFLINE)
             break;
 
-        // Sometimes the C64 pulls ATN but doesn't pull CLOCK right away
-        protocol->timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMING_DELAY, false );
-
         if (bus_state == BUS_ACTIVE)
         {
             release ( PIN_IEC_CLK_OUT );
@@ -255,7 +252,10 @@ void systemBus::read_command()
 
     do 
     {
-        // ATN was pulled read bus command bytes
+        // ATN was pulled, read bus command bytes
+        // Sometimes the C64 pulls ATN but doesn't pull CLOCK right away
+        protocol->timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMING_DELAY, false );
+
         //pull( PIN_IEC_SRQ );
         c = receiveByte();
         //release( PIN_IEC_SRQ );
@@ -365,7 +365,9 @@ void systemBus::read_command()
 
         // Let bus stabalize
         //Debug_printv("stabalize!");
-        protocol->wait ( TIMING_STABLE );
+        //IEC.pull ( PIN_IEC_SRQ );
+        //protocol->wait ( TIMING_STABLE );
+        //IEC.release ( PIN_IEC_SRQ );
 
     } while ( IEC.status ( PIN_IEC_ATN ) );
 
