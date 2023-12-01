@@ -165,7 +165,7 @@ void IRAM_ATTR systemBus::service()
             break;
 
         // Sometimes the C64 pulls ATN but doesn't pull CLOCK right away
-        protocol->wait ( TIMING_DELAY, false );
+        protocol->timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMING_DELAY, false );
 
         if (bus_state == BUS_ACTIVE)
         {
