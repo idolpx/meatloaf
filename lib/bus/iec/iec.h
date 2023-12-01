@@ -557,6 +557,7 @@ public:
 
     inline bool IRAM_ATTR status ( uint8_t pin )
     {
+        release ( pin );
         return gpio_get_level ( ( gpio_num_t ) pin ) ? RELEASED : PULLED;
     }
 };

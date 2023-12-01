@@ -356,7 +356,7 @@ void systemBus::read_command()
                 }
 
                 // Let bus stabalize
-                //protocol->wait( TIMING_STABLE, false );
+                protocol->wait( TIMING_STABLE, false );
             }
         }
 

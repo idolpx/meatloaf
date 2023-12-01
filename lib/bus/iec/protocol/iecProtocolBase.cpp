@@ -15,15 +15,6 @@ int16_t IecProtocolBase::timeoutWait(uint8_t pin, bool target_status, size_t wai
     uint64_t current = 0;
     uint64_t elapsed = 0;
 
-#ifndef SPLIT_LINES
-    // Release the pin we are watching to switch it to INPUT
-    IEC.release( pin );
-#endif
-
-    // // Delay for line to be pulled up
-    if ( target_status == RELEASED )
-        wait(4, false);
-
     esp_timer_init();
     start = current = esp_timer_get_time();
 

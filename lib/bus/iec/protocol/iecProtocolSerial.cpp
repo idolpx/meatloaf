@@ -165,7 +165,7 @@ bool IecProtocolSerial::sendBits ( uint8_t data )
         tv = TIMING_Tv; // VIC-20 data valid timing
     }
 
-    IEC.release(PIN_IEC_DATA_OUT);
+//    IEC.release(PIN_IEC_DATA_OUT);
     // Wait for DATA to be RELEASED
     // if ( timeoutWait ( PIN_IEC_DATA_IN, RELEASED ) )
     // {
@@ -217,7 +217,7 @@ int16_t IecProtocolSerial::receiveByte()
     IEC.flags &= CLEAR_LOW;
 
     // Sometimes the C64 pulls ATN but doesn't pull CLOCK right away
-    if ( !wait ( TIMING_STABLE ) ) return -1;
+//    if ( !wait ( TIMING_STABLE ) ) return -1;
 
     // Wait for talker ready
     if ( timeoutWait ( PIN_IEC_CLK_IN, RELEASED, FOREVER ) == TIMED_OUT )
@@ -368,9 +368,7 @@ int16_t IecProtocolSerial::receiveBits ()
                         IEC.pull(PIN_IEC_DATA_OUT);
                         wait( TIMING_JIFFY_ACK, false );
                         IEC.release(PIN_IEC_DATA_OUT);
-// #ifndef IEC_SPLIT_LINES
-//                         IEC.release(PIN_IEC_DATA_IN); // Set DATA IN back to input
-// #endif
+
                         IEC.flags |= JIFFY_ACTIVE;
                     }
                 }
