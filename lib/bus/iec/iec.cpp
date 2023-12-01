@@ -254,7 +254,13 @@ void systemBus::read_command()
     {
         // ATN was pulled, read bus command bytes
         // Sometimes the C64 pulls ATN but doesn't pull CLOCK right away
-        protocol->timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMING_DELAY, false );
+        pull( PIN_IEC_SRQ );
+        if ( protocol->timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMING_DELAY, false ) == TIMED_OUT )
+        {
+            Debug_printv ( "ATN/Clock delay" );
+            return; // return error because timeout
+        }
+        release( PIN_IEC_SRQ );
 
         //pull( PIN_IEC_SRQ );
         c = receiveByte();
@@ -358,17 +364,11 @@ void systemBus::read_command()
                     bus_state = BUS_IDLE;
                 }
 
-                // Let bus stabalize
-                //protocol->wait( TIMING_STABLE, false );
+                // Wait for ATN to be released
+                if (data.secondary == IEC_OPEN || data.secondary == IEC_REOPEN )
+                    protocol->timeoutWait(PIN_IEC_ATN, RELEASED, FOREVER, false);
             }
         }
-
-        // Let bus stabalize
-        //Debug_printv("stabalize!");
-        //IEC.pull ( PIN_IEC_SRQ );
-        //protocol->wait ( TIMING_STABLE );
-        //IEC.release ( PIN_IEC_SRQ );
-
     } while ( IEC.status ( PIN_IEC_ATN ) );
 
     // Is this command for us?
@@ -424,9 +424,9 @@ void systemBus::read_payload()
     // ATN might get pulled right away if there is no command string to send
     //pull ( PIN_IEC_SRQ );
 
-    /* Sometimes ATN isn't released immediately. Wait for ATN to be
-       released before trying to read payload. Long ATN delay (>1.5ms)
-       seems to occur more frequently with VIC-20. */
+    // Sometimes ATN isn't released immediately. Wait for ATN to be
+    // released before trying to read payload. Long ATN delay (>1.5ms)
+    // seems to occur more frequently with VIC-20.
     protocol->timeoutWait(PIN_IEC_ATN, RELEASED, FOREVER, false);
 
     while (IEC.status(PIN_IEC_ATN) != PULLED)
