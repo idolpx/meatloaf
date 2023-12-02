@@ -197,6 +197,11 @@ protected:
     std::string payload;
 
     /**
+     * @brief The current device command in raw PETSCII. Used when payload is converted to ASCII for Basic commands
+     */
+    std::string payloadRaw;
+
+    /**
      * @brief pointer to the current command data
      */
     IECData commanddata;
@@ -557,7 +562,9 @@ public:
 
     inline bool IRAM_ATTR status ( uint8_t pin )
     {
+#ifndef IEC_SPLIT_LINES
         release ( pin );
+#endif
         return gpio_get_level ( ( gpio_num_t ) pin ) ? RELEASED : PULLED;
     }
 };

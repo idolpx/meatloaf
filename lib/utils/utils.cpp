@@ -5,6 +5,7 @@
 #include <cstring>
 #include <sstream>
 #include <stack>
+#include <cmath>
 
 #include "../../include/debug.h"
 
@@ -275,6 +276,8 @@ std::string util_long_entry(std::string filename, size_t fileSize, bool is_dir)
 
     returned_entry.replace(returned_entry.length() - stylized_filesize.length() - 1, stylized_filesize.length(), stylized_filesize);
 
+    returned_entry.shrink_to_fit();
+    
     return returned_entry;
 }
 
@@ -482,7 +485,7 @@ bool util_concat_paths(char *dest, const char *parent, const char *child, int de
         }
 
         // Skip a slash in the child if it starts with one so we don't have two slashes
-        if (child[0] == '/' && child[0] == '\\')
+        if (child[0] == '/' || child[0] == '\\')
             child++;
 
         int clen = strlcpy(dest + plen, child, dest_size - plen);
@@ -861,4 +864,42 @@ void util_ascii_to_petscii_str(std::string &s)
     std::transform(s.begin(), s.end(), s.begin(),
                    [](unsigned char c)
                    { return util_ascii_to_petscii(c); });
+}
+
+char *util_hexdump(const void *buf, size_t len) {
+  const unsigned char *p = (const unsigned char *) buf;
+  size_t i, idx, n = 0, ofs = 0, dlen = len * 5 + 100;
+  char ascii[17] = "", *dst = (char *) calloc(1, dlen);
+  if (dst == NULL) return dst;
+  for (i = 0; i < len; i++) {
+    idx = i % 16;
+    if (idx == 0) {
+      if (i > 0 && dlen > n)
+        n += (size_t) snprintf(dst + n, dlen - n, "  %s\n", ascii);
+      if (dlen > n)
+        n += (size_t) snprintf(dst + n, dlen - n, "%04x ", (int) (i + ofs));
+    }
+    if (dlen < n) break;
+    n += (size_t) snprintf(dst + n, dlen - n, " %02x", p[i]);
+    ascii[idx] = (char) (p[i] < 0x20 || p[i] > 0x7e ? '.' : p[i]);
+    ascii[idx + 1] = '\0';
+  }
+  while (i++ % 16) {
+    if (n < dlen) n += (size_t) snprintf(dst + n, dlen - n, "%s", "   ");
+  }
+  if (n < dlen) n += (size_t) snprintf(dst + n, dlen - n, "  %s\n", ascii);
+  if (n > dlen - 1) n = dlen - 1;
+  dst[n] = '\0';
+  return dst;
+}
+
+bool isApproximatelyInteger(double value, double tolerance) {
+    return std::abs(value - std::floor(value)) < tolerance;
+}
+
+std::string prependSlash(const std::string& str) {
+    if (str.empty() || str[0] != '/') {
+        return "/" + str;
+    }
+    return str;
 }

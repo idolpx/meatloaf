@@ -254,13 +254,13 @@ void systemBus::read_command()
     {
         // ATN was pulled, read bus command bytes
         // Sometimes the C64 pulls ATN but doesn't pull CLOCK right away
-        pull( PIN_IEC_SRQ );
+        //pull( PIN_IEC_SRQ );
         if ( protocol->timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMING_DELAY, false ) == TIMED_OUT )
         {
             Debug_printv ( "ATN/Clock delay" );
             return; // return error because timeout
         }
-        release( PIN_IEC_SRQ );
+        //release( PIN_IEC_SRQ );
 
         //pull( PIN_IEC_SRQ );
         c = receiveByte();

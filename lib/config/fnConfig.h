@@ -70,6 +70,8 @@ public:
     void store_general_timezone(const char *timezone);
     void store_general_rotation_sounds(bool rotation_sounds);
     void store_general_config_enabled(bool config_enabled);
+    std::string get_config_filename(){ return _general.config_filename; };
+    void store_config_filename(const std::string &filename);
     bool get_general_boot_mode() { return _general.boot_mode; }
     void store_general_boot_mode(uint8_t boot_mode);
     void store_udpstream_host(const char host_ip[64]);
@@ -106,8 +108,8 @@ public:
     std::string get_wifi_stored_passphrase(int index) { return _wifi_stored[index].passphrase; }
     bool get_wifi_stored_enabled(int index) { return _wifi_stored[index].enabled; }
 
-    void store_wifi_stored_ssid(int index, std::string ssid); // { _wifi_stored[index].ssid = ssid; }
-    void store_wifi_stored_passphrase(int index, std::string passphrase);
+    void store_wifi_stored_ssid(int index, const std::string &ssid); // { _wifi_stored[index].ssid = ssid; }
+    void store_wifi_stored_passphrase(int index, const std::string &passphrase);
     void store_wifi_stored_enabled(int index, bool enabled); // { _wifi_stored[index].enabled = enabled; }
 
     // BLUETOOTH
@@ -115,7 +117,7 @@ public:
     bool get_bt_status() { return _bt.bt_status; };
     void store_bt_baud(int baud);
     int get_bt_baud() { return _bt.bt_baud; };
-    void store_bt_devname(std::string devname);
+    void store_bt_devname(const std::string &devname);
     std::string get_bt_devname() { return _bt.bt_devname; };
 
     // HOSTS
@@ -165,7 +167,9 @@ public:
 
     // CPM
     std::string get_ccp_filename(){ return _cpm.ccp; };
-    void store_ccp_filename(std::string filename);
+    void store_ccp_filename(const std::string &filename);
+    void store_cpm_enabled(bool cpm_enabled);
+    bool get_cpm_enabled(){ return _cpm.cpm_enabled; };
 
     // ENABLE/DISABLE DEVICE SLOTS
     bool get_device_slot_enable_1();
@@ -308,6 +312,7 @@ private:
         std::string timezone;
         bool rotation_sounds = true;
         bool config_enabled = true;
+        std::string config_filename;
         int boot_mode = 0;
         bool fnconfig_spifs = true;
         bool status_wait_enabled = true;
@@ -334,6 +339,7 @@ private:
 
     struct cpm_info
     {
+        bool cpm_enabled = true;
         std::string ccp;
     };
 

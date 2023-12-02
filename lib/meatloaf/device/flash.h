@@ -98,7 +98,7 @@ private:
 class FlashHandle {
 public:
     //int rc;
-    FILE* file_h;
+    FILE* file_h = nullptr;
 
     FlashHandle() 
     {
@@ -110,7 +110,7 @@ public:
     void dispose();
 
 private:
-    int flags;
+    int flags = 0;
 };
 
 

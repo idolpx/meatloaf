@@ -37,7 +37,6 @@ NetworkProtocolTCP::~NetworkProtocolTCP()
     if (server != nullptr)
     {
         delete server;
-
         server = nullptr;
     }
 }
@@ -267,12 +266,15 @@ uint8_t NetworkProtocolTCP::special_inquiry(uint8_t cmd)
  */
 bool NetworkProtocolTCP::special_00(cmdFrame_t *cmdFrame)
 {
+    Debug_printf("NetworkProtocolTCP::special_00(%c)\n",cmdFrame->comnd);
+
     switch (cmdFrame->comnd)
     {
     case 'A':
         return special_accept_connection();
         break;
     case 'c':
+        Debug_printf("CLOSING CLIENT CONNECTION!!!\n");
         return special_close_client_connection();
         break;
     }
@@ -314,7 +316,7 @@ bool NetworkProtocolTCP::open_server(unsigned short port)
     connectionIsServer = true;      // set even if we're in error
     if (res == 0)
     {
-    Debug_printf("errno = %u\r\n", errno);
+        Debug_printf("errno = %u\r\n", errno);
         errno_to_error();
         return true;
     }
@@ -401,14 +403,14 @@ bool NetworkProtocolTCP::special_close_client_connection()
     {
         Debug_printf("Attempted close client connection on NULL server socket. Aborting.\r\n");
         error = NETWORK_ERROR_SERVER_NOT_RUNNING;
-        return true; // Error
+        return false;
     }
 
     if (!client.connected())
     {
         Debug_printf("Attempted close client with no client connected.\r\n");
         error = NETWORK_ERROR_NOT_CONNECTED;
-        return true;
+        return false;
     }
 
     remoteIP = client.remoteIP();

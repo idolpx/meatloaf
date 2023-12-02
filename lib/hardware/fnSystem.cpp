@@ -527,9 +527,9 @@ uint32_t SystemManager::get_psram_size()
 
 /*
     If buffer is NULL, simply returns size of file. Otherwise
-    allocates buffer for reading file contents. Buffer must be freed by caller.
+    allocates buffer for reading file contents. Buffer must be managed by caller.
 */
-int SystemManager::load_firmware(const char *filename, uint8_t **buffer)
+int SystemManager::load_firmware(const char *filename, uint8_t *buffer)
 {
     Debug_printf("load_firmware '%s'\r\n", filename);
 
@@ -551,25 +551,13 @@ int SystemManager::load_firmware(const char *filename, uint8_t **buffer)
     }
 
     int bytes_read = -1;
-    uint8_t *result = (uint8_t *)malloc(file_size);
-    if (result == NULL)
+    if (buffer == NULL)
     {
-        Debug_println("load_firmware failed to malloc");
+        Debug_println("load_firmware passed in buffer was NULL");
     }
     else
     {
-        bytes_read = fread(result, 1, file_size, f);
-        if (bytes_read == file_size)
-        {
-            *buffer = result;
-        }
-        else
-        {
-            free(result);
-            bytes_read = -1;
-
-            Debug_printf("load_firmware only read %u bytes out of %u - failing\r\n", bytes_read, file_size);
-        }
+        bytes_read = fread(buffer, 1, file_size, f);
     }
 
     fclose(f);
@@ -656,21 +644,8 @@ void SystemManager::check_hardware_ver()
     safe_reset_gpio = (gpio_num_t)PIN_BUTTON_C;
 #endif
 
-#ifdef PINMAP_A2_REV0
-    int spifixupcheck, spifixdowncheck, ledstripupcheck, ledstripdowncheck, rev1upcheck, rev1downcheck;
-
-    /* Check for LED Strip pullup and enable it if found */
-    fnSystem.set_pin_mode(LED_DATA_PIN, gpio_mode_t::GPIO_MODE_INPUT, SystemManager::pull_updown_t::PULL_UP);
-    ledstripupcheck = fnSystem.digital_read(LED_DATA_PIN);
-    fnSystem.set_pin_mode(LED_DATA_PIN, gpio_mode_t::GPIO_MODE_INPUT, SystemManager::pull_updown_t::PULL_DOWN);
-    ledstripdowncheck = fnSystem.digital_read(LED_DATA_PIN);
-
-    // DISABLED LED Strip for A2
-    if(ledstripdowncheck == ledstripupcheck)
-    {
-        //ledstrip_found = true;
-        //Debug_printf("Enabling LED Strip\r\n");
-    }
+#if defined(PINMAP_A2_REV0) || defined(PINMAP_MAC_REV0)
+    int spifixupcheck, spifixdowncheck, rev1upcheck, rev1downcheck, bufupcheck, bufdowncheck;
 
 #ifndef MASTERIES_SPI_FIX
 #   ifdef REV1DETECT
@@ -700,6 +675,22 @@ void SystemManager::check_hardware_ver()
 
         safe_reset_gpio = GPIO_NUM_4; /* Change Safe Reset GPIO for Rev 1 */
     }
+
+    /* Apple 2 Rev 1 Latest has pulldown on IO25 for buffer/bus enable line
+       If found, enable the buffer chips
+    */
+    fnSystem.set_pin_mode(GPIO_NUM_25, gpio_mode_t::GPIO_MODE_INPUT, SystemManager::pull_updown_t::PULL_UP);
+    bufupcheck = fnSystem.digital_read(GPIO_NUM_25);
+    fnSystem.set_pin_mode(GPIO_NUM_25, gpio_mode_t::GPIO_MODE_INPUT, SystemManager::pull_updown_t::PULL_DOWN);
+    bufdowncheck = fnSystem.digital_read(GPIO_NUM_25);
+
+    if (bufupcheck == bufdowncheck && bufupcheck == DIGI_LOW)
+    {
+        Debug_printf("FujiApple Rev1 Buffered Bus Enabled\r\n");
+        fnSystem.set_pin_mode(GPIO_NUM_25, gpio_mode_t::GPIO_MODE_OUTPUT, SystemManager::pull_updown_t::PULL_NONE);
+        fnSystem.digital_write(GPIO_NUM_25, DIGI_HIGH);
+    }
+
 #   endif /* REV1DETECT */
 #endif /* MASTERIES_SPI_FIX*/
 

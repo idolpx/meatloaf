@@ -1214,14 +1214,6 @@ bool iecDrive::sendFile()
 
     // std::shared_ptr<MStream> istream = std::static_pointer_cast<MStream>(currentStream);
     auto istream = retrieveStream(commanddata.channel);
-    if ( istream == nullptr )
-    {
-        Debug_printv("Stream not found!");
-        IEC.senderTimeout(); // File Not Found
-        //closeStream(commanddata.channel);
-        _base.reset( MFSOwner::File( _base->base() ) );
-        return false;
-    }
 
     if ( !_base->isDirectory() )
     {
@@ -1243,6 +1235,14 @@ bool iecDrive::sendFile()
         Debug_printv( "Subdir Change Directory Here! url[%s] > base[%s]", _base->url.c_str(), _base->base().c_str() );
         _last_file = _base->name;
         _base.reset( MFSOwner::File( _base->base() ) );
+    }
+
+    if ( istream == nullptr )
+    {
+        Debug_printv("Stream not found!");
+        IEC.senderTimeout(); // File Not Found
+        _last_file = "";
+        return false;
     }
 
     bool eoi = false;

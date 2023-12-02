@@ -8,9 +8,9 @@
 #include "../../include/debug.h"
 
 #include "fnSystem.h"
+#include "../fn_esp_http_client/fn_esp_http_client.h"
 
 #include "utils.h"
-
 
 using namespace fujinet;
 
@@ -33,14 +33,16 @@ fnHttpClient::~fnHttpClient()
     {
         Debug_printf("esp_http_client_cleanup(%p)\r\n",_handle);
         Debug_printf("free heap: %lu\r\n",esp_get_free_heap_size());
+        Debug_printv("free low heap: %lu\r\n",esp_get_free_internal_heap_size());
         esp_http_client_cleanup(_handle);
     }
 
     free(_buffer);
+    _buffer = nullptr;
 }
 
 // Start an HTTP client session to the given URL
-bool fnHttpClient::begin(std::string url)
+bool fnHttpClient::begin(const std::string &url)
 {
     Debug_printf("fnHttpClient::begin \"%s\"\r\n", url.c_str());
 
@@ -65,20 +67,35 @@ bool fnHttpClient::begin(std::string url)
 int fnHttpClient::available()
 {
     if (_handle == nullptr)
+    {
+        Debug_printf("fnHttpClient::available() _handle is null\r\n");
         return 0;
+    }
+
+    if (_handle->response == nullptr)
+    {
+        Debug_printf("fnHttpClient::available() _handle->response is null\r\n");
+        return 0;
+    }
 
     int result = 0;
     int len = -1;
 
     if(esp_http_client_is_chunked_response(_handle))
-        len = esp_http_client_get_chunk_length(_handle);
+        len = esp_http_client_get_total_chunk_length(_handle);
     else
         len = esp_http_client_get_content_length(_handle);
 
     if (len - _buffer_total_read >= 0)
         result = len - _buffer_total_read;
 
+    // Debug_printf("::available result: %d\r\n", result);
     return result;
+}
+
+bool fnHttpClient::is_transaction_done()
+{
+    return _transaction_done;
 }
 
 /*
@@ -98,13 +115,13 @@ int fnHttpClient::read(uint8_t *dest_buffer, int dest_bufflen)
 
     int bytes_copied = 0;
 
-    // Start by using our own buffer if there's still data there
-    if (_buffer_pos > 0 && _buffer_pos < _buffer_len)
+    // Start by using our own buffer if there's data there
+    if (_buffer_len > 0 && _buffer_pos < _buffer_len)
     {
         bytes_left = _buffer_len - _buffer_pos;
         bytes_to_copy = dest_bufflen > bytes_left ? bytes_left : dest_bufflen;
 
-        //Debug_printf("::read from buffer %d\r\n", bytes_to_copy);
+        Debug_printf("::read from buffer %d\r\n", bytes_to_copy);
         memcpy(dest_buffer, _buffer + _buffer_pos, bytes_to_copy);
         _buffer_pos += bytes_to_copy;
         _buffer_total_read += bytes_to_copy;
@@ -156,8 +173,8 @@ int fnHttpClient::read(uint8_t *dest_buffer, int dest_bufflen)
         int dest_size = dest_bufflen - bytes_copied;
         bytes_to_copy = dest_size > _buffer_len ? _buffer_len : dest_size;
 
-        //Debug_printf("dest_size=%d, dest_bufflen=%d, bytes_copied=%d, bytes_to_copy=%d\r\n",
-                     //dest_size, dest_bufflen, bytes_copied, bytes_to_copy);
+        Debug_printf("dest_size=%d, dest_bufflen=%d, bytes_copied=%d, bytes_to_copy=%d\r\n",
+        dest_size, dest_bufflen, bytes_copied, bytes_to_copy);
 
         memcpy(dest_buffer + bytes_copied, _buffer, bytes_to_copy);
         _buffer_pos += bytes_to_copy;
@@ -387,7 +404,7 @@ void fnHttpClient::_perform_subtask(void *param)
         xTaskNotifyGive(parent->_taskh_consumer);
     }
 
-    //Debug_println("_perform_subtask_exiting");
+    Debug_printv("_perform_subtask_exiting");
     TaskHandle_t tmp = parent->_taskh_subtask;
     parent->_taskh_subtask = nullptr;
     vTaskDelete(tmp);
@@ -455,7 +472,8 @@ int fnHttpClient::_perform()
         Debug_printf("esp_http_client_get_status_code = %u\r\n",status);
         // Other error, use fake HTTP status code 900
         // it will be translated to NETWORK_ERROR_GENERAL (144) in NetworkProtocolHTTP::fserror_to_error()
-        if (status < 0) status = 900;
+        if (status < 0)
+            status = 900;
     }
     Debug_printf("%08lx _perform status = %d, length = %d, chunked = %d\r\n", fnSystem.millis(), status, length, chunked ? 1 : 0);
     return status;

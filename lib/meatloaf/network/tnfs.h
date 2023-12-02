@@ -81,7 +81,7 @@ private:
 class TNFSHandle {
 public:
     //int rc;
-    FILE* file_h;
+    FILE* file_h = nullptr;
 
     TNFSHandle() 
     {
@@ -93,7 +93,7 @@ public:
     void dispose();
 
 private:
-    int flags;
+    int flags = 0;
 };
 
 
@@ -112,15 +112,8 @@ public:
         close();
     }
 
-    // MStream methods
     bool isBrowsable() override { return false; };
     bool isRandomAccess() override { return true; };
-
-    // MStream methods
-    uint32_t available() override;
-    uint32_t size() override;    
-    uint32_t position() override;
-    size_t error() override;
 
     virtual bool seek(uint32_t pos) override;
     virtual bool seek(uint32_t pos, int mode) override;    
@@ -144,9 +137,6 @@ protected:
     std::string localPath;
 
     std::unique_ptr<TNFSHandle> handle;
-
-private:
-    size_t _size;
 };
 
 

@@ -49,16 +49,29 @@ public:
     bool has_subdirs = true;
     size_t block_size = 256;
 
-    virtual uint32_t available() = 0;
-    virtual uint32_t size() = 0;
+    virtual uint32_t size() {
+        return m_length;
+    };
+
+    virtual uint32_t available() {
+        return m_bytesAvailable;
+    };
+
+    virtual uint32_t position() {
+        return m_position;
+    }
+
+    virtual size_t error() {
+        return m_error;
+    }
+
     virtual uint32_t blocks() {
         if ( m_length > 0 && m_length < block_size )
             return 1;
         else
             return ( m_length / block_size );
     }
-    virtual uint32_t position() = 0;
-    virtual size_t error() = 0;
+
     virtual bool eos()  {
 //        Debug_printv("m_length[%d] m_bytesAvailable[%d] m_position[%d]", m_length, m_bytesAvailable, m_position);
         if ( m_bytesAvailable == 0 )

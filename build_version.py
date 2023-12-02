@@ -13,6 +13,10 @@ if cmdline.find('buildfs') or cmdline.find('uploadfs'):
         print("\033[1;31mReplacing MKSPIFFSTOOL with mklittlefs\033[1;37m")
         env.Replace (MKSPIFFSTOOL = "mklittlefs")
 
+# Disable automatic versioning
+if 1:
+    print("Automatic versioning disabled")
+
 # Don't do anything if nothing has changed
 elif len(subprocess.check_output(["git", "diff", "--name-only"], universal_newlines=True)) == 0:
     print("Nothing has changed")

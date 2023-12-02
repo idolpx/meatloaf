@@ -29,7 +29,7 @@ printer_emu::~printer_emu()
 // virtual void flushOutput(); // do this in pageEject
 
 // Copy contents of given file to the current printer output file
-// Assumes source file is in SPIFFS
+// Assumes source file is in FLASH
 size_t printer_emu::copy_file_to_output(const char *filename)
 {
 #define PRINTER_FILE_COPY_BUFLEN 2048
@@ -73,6 +73,7 @@ size_t printer_emu::getOutputSize()
 // All the work is done here in the derived classes. Open and close the output file before proceeding
 bool printer_emu::process(uint8_t linelen, uint8_t aux1, uint8_t aux2)
 {
+    is_printing=true;
     // Make sure the file has been initialized
     if(_output_started == false)
     {
@@ -92,6 +93,7 @@ bool printer_emu::process(uint8_t linelen, uint8_t aux1, uint8_t aux2)
     fclose(_file);
     _file = nullptr;
 
+    is_printing=false;
     return result;
 }
 

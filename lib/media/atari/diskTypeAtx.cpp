@@ -20,6 +20,7 @@
 
 #define ATX_MAGIC_HEADER 0x41543858 // "AT8X"
 #define ATX_DEFAULT_NUMTRACKS 40
+#define HEAD_TOLERANCE 2
 
 /*
   Assuming 288RPM:
@@ -69,6 +70,8 @@ AtxTrack::~AtxTrack()
 {
     if (data != nullptr)
         delete[] data;
+
+    data = nullptr;
 };
 
 AtxTrack::AtxTrack(){
@@ -203,23 +206,14 @@ void MediaTypeATX::_wait_head_position(uint16_t pos, uint16_t extra_delay)
 
     uint16_t current = _get_head_position();
 
-    // The head is ahead of the position we want - wait for a roll-over to occur
-    if (pos < current)
+    if (current == pos)
     {
-        //Debug_print("$$$ DEBUG rollover wait\r\n");
-        do
-        {
-            NOP();
-        } while (pos < (current = _get_head_position()));
+        return;
     }
 
-    // The head is behind the position we want - wait for it to reach that position
-    if (pos > current)
+    while (abs(_get_head_position() - pos) > HEAD_TOLERANCE)
     {
-        do
-        {
-            NOP();
-        } while (pos > _get_head_position());
+        NOP();
     }
 }
 
@@ -502,6 +496,7 @@ bool MediaTypeATX::_load_atx_chunk_sector_data(chunk_header_t &chunk_hdr, AtxTra
     {
         Debug_printf("failed reading %d sector data chunk bytes (%d, %d)\r\n", data_size, i, errno);
         delete[] track.data;
+        track.data = nullptr;
         return false;
     }
 
