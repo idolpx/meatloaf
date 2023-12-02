@@ -912,7 +912,11 @@ void iecDrive::sendListing()
     byte_count += 2;
 
     // If there has been a error don't try to send any more bytes
-    if ( IEC.flags & ERROR ) return;
+    if ( IEC.flags & ERROR )
+    {
+        Debug_printv(":(");
+        return;
+    }
 
     Debug_println("");
 
@@ -1288,12 +1292,15 @@ bool iecDrive::sendFile()
 #endif
 
         // Send Byte
+        //IEC.pull(PIN_IEC_SRQ);
         success_tx = IEC.sendByte(b, eoi);
         if ( !success_tx )
         {
             Debug_printv("tx fail");
+            //IEC.release(PIN_IEC_SRQ);
             return false;
         }
+        //IEC.release(PIN_IEC_SRQ);
 
         // Read next byte
         success_rx = istream->read(&nb, 1);
