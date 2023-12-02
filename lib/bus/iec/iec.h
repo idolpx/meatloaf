@@ -47,7 +47,6 @@
 #endif
 
 #include <soc/gpio_reg.h>
-#define FAST_SET_DIRECTION(p, m) ({ int _reg = GPIO_ENABLE_REG, _pin = p; if (_pin > 31) { _reg = GPIO_ENABLE1_REG, _pin -= 32; } if ((m) == GPIO_MODE_OUTPUT) { REG_SET_BIT(_reg, 1 << _pin); } else { REG_CLR_BIT(_reg, 1 << _pin); }})
 
 #include "../../../include/debug.h"
 
@@ -548,15 +547,26 @@ public:
     void senderTimeout();
 
     // true => PULL => LOW
-    inline void IRAM_ATTR pull ( uint8_t pin )
+    inline void IRAM_ATTR pull ( int _pin )
     {
-        FAST_SET_DIRECTION(pin, GPIO_MODE_OUTPUT);
+        int _reg = GPIO_ENABLE_REG; 
+        if (_pin > 31) 
+        { 
+            _reg = GPIO_ENABLE1_REG, _pin -= 32; 
+        } 
+        REG_SET_BIT(_reg, 1 << _pin); // GPIO_MODE_OUTPUT
     }
 
     // false => RELEASE => HIGH
-    inline void IRAM_ATTR release ( uint8_t pin )
+    inline void IRAM_ATTR release ( int _pin )
     {
-        FAST_SET_DIRECTION(pin, GPIO_MODE_INPUT);
+        int _reg = GPIO_ENABLE_REG; 
+        if (_pin > 31) 
+        { 
+            _reg = GPIO_ENABLE1_REG, _pin -= 32; 
+        } 
+        REG_CLR_BIT(_reg, 1 << _pin); // GPIO_MODE_INPUT
+
         //protocol->wait( 4 ); // Delay for slow pull up
     }
 
