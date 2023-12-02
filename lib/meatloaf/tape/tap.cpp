@@ -39,11 +39,11 @@ bool TAPIStream::seekEntry( std::string filename )
     return false;
 }
 
-bool TAPIStream::seekEntry( size_t index )
+bool TAPIStream::seekEntry( uint16_t index )
 {
     // Calculate Sector offset & Entry offset
     index--;
-    uint8_t entryOffset = 0x40 + (index * sizeof(entry));
+    uint16_t entryOffset = 0x40 + (index * sizeof(entry));
 
     //Debug_printv("----------");
     //Debug_printv("index[%d] sectorOffset[%d] entryOffset[%d] entry_index[%d]", index, sectorOffset, entryOffset, entry_index);
@@ -62,8 +62,8 @@ bool TAPIStream::seekEntry( size_t index )
 }
 
 
-size_t TAPIStream::readFile(uint8_t* buf, size_t size) {
-    size_t bytesRead = 0;
+uint16_t TAPIStream::readFile(uint8_t* buf, uint16_t size) {
+    uint16_t bytesRead = 0;
 
     bytesRead += containerStream->read(buf, size);
     m_bytesAvailable -= bytesRead;

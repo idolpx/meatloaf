@@ -540,7 +540,7 @@ void iecNetwork::parse_json()
 void iecNetwork::query_json()
 {
     uint8_t *tmp;
-    int channel = 0, readLen;
+    int channel = 0;
     char reply[80];
     string s;
 
@@ -567,9 +567,7 @@ void iecNetwork::query_json()
 
     json[channel]->setReadQuery(s, 0);
 
-    // readValLen() can be expensive, so just call it once
-    readLen = json[channel]->readValueLen();
-    if (!readLen)
+    if (!json[channel]->readValueLen())
     {
         iecStatus.error = NETWORK_ERROR_COULD_NOT_ALLOCATE_BUFFERS;
         iecStatus.channel = channel;
@@ -578,7 +576,7 @@ void iecNetwork::query_json()
         return;
     }
 
-    tmp = (uint8_t *)malloc(readLen);
+    tmp = (uint8_t *)malloc(json[channel]->readValueLen());
 
     if (!tmp)
     {
@@ -591,7 +589,7 @@ void iecNetwork::query_json()
         return;
     }
 
-    json_bytes_remaining[channel] = readLen;
+    json_bytes_remaining[channel] = json[channel]->readValueLen();
     json[channel]->readValue(tmp, json_bytes_remaining[channel]);
     *receiveBuffer[channel] += string((const char *)tmp, json_bytes_remaining[channel]);
 

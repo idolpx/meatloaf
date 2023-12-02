@@ -220,7 +220,7 @@ public:
     }
 
     virtual bool seekPath(std::string path) override;
-    size_t readFile(uint8_t* buf, size_t size) override;
+    uint16_t readFile(uint8_t* buf, uint16_t size) override;
 
     Header header;      // Directory header data
     Entry entry;        // Directory entry data
@@ -240,7 +240,7 @@ private:
     void sendListing();
 
     bool seekEntry( std::string filename );
-    bool seekEntry( uint32_t index = 0 );
+    bool seekEntry( uint16_t index = 0 );
 
 
     std::string readBlock( uint8_t track, uint8_t sector );

@@ -43,11 +43,11 @@ bool TCRTIStream::seekEntry( std::string filename )
     return false;
 }
 
-bool TCRTIStream::seekEntry( size_t index )
+bool TCRTIStream::seekEntry( uint16_t index )
 {
     // Calculate Sector offset & Entry offset
     index--;
-    size_t entryOffset = 0xE7 + (index * 32);
+    uint16_t entryOffset = 0xE7 + (index * 32);
 
     //Debug_printv("----------");
     //Debug_printv("index[%d] entryOffset[%d] entry_index[%d]", (index + 1), entryOffset, entry_index);
@@ -68,8 +68,8 @@ bool TCRTIStream::seekEntry( size_t index )
         return true;
 }
 
-size_t TCRTIStream::readFile(uint8_t* buf, size_t size) {
-    size_t bytesRead = 0;
+uint16_t TCRTIStream::readFile(uint8_t* buf, uint16_t size) {
+    uint16_t bytesRead = 0;
 
     if ( m_position == 0)
     {

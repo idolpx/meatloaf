@@ -69,23 +69,6 @@ uint32_t CBMImageStream::seekFileSize( uint8_t start_track, uint8_t start_sector
 };
 
 
-uint32_t CBMImageStream::position() {
-    return m_position; // return position within "seeked" file, not the D64 image!
-};
-
-size_t CBMImageStream::error() {
-    return m_error; // return position within "seeked" file, not the D64 image!
-};
-
-uint32_t CBMImageStream::available() {
-    // return bytes available in currently "seeked" file
-    return m_bytesAvailable;
-};
-
-uint32_t CBMImageStream::size() {
-    // size of the "seeked" file, not the image.
-    return m_length;
-};
 
 uint32_t CBMImageStream::write(const uint8_t *buf, uint32_t size) {
     return -1;

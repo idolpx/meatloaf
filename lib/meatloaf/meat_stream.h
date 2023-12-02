@@ -91,8 +91,6 @@ public:
     virtual uint32_t write(const uint8_t *buf, uint32_t size) = 0;
     virtual uint32_t read(uint8_t* buf, uint32_t size) = 0;
 
-
-
     virtual bool seek(uint32_t pos, int mode) {
         if(mode == SEEK_SET) {
             return seek(pos);

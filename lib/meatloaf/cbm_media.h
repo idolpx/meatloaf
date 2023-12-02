@@ -29,8 +29,6 @@ public:
     // MStream methods
     bool open() override;
     void close() override;
-    uint32_t position() override;
-    size_t error() override;
 
     ~CBMImageStream() {
         //Debug_printv("close");
@@ -67,7 +65,7 @@ public:
     virtual std::string readString( uint8_t size )
     {
         uint8_t b[size] = { 0x00 };
-        uint8_t r = containerStream->read( b, size );
+        uint32_t r = containerStream->read( b, size );
         return std::string((char *)b);
     }
     // readStringUntil = (delimiter = 0x00) => this.containerStream.readStringUntil(delimiter);
@@ -82,8 +80,6 @@ public:
 
     virtual uint32_t seekFileSize( uint8_t start_track, uint8_t start_sector );
 
-    uint32_t available() override;
-    uint32_t size() override;
     uint32_t read(uint8_t* buf, uint32_t size) override;
     uint32_t write(const uint8_t *buf, uint32_t size);
     void reset() {
@@ -126,9 +122,9 @@ protected:
 	virtual uint8_t speedZone( uint8_t track) { return 0; };
 
     virtual bool seekEntry( std::string filename ) { return false; };
-    virtual bool seekEntry( size_t index ) { return false; };
+    virtual bool seekEntry( uint16_t index ) { return false; };
 
-    virtual uint32_t readFile(uint8_t* buf, uint32_t size) = 0;
+    virtual uint16_t readFile(uint8_t* buf, uint16_t size) = 0;
     std::string decodeType(uint8_t file_type, bool show_hidden = false);
 
 private:

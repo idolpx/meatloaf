@@ -41,11 +41,11 @@ bool T64IStream::seekEntry( std::string filename )
     return false;
 }
 
-bool T64IStream::seekEntry( size_t index )
+bool T64IStream::seekEntry( uint16_t index )
 {
     // Calculate Sector offset & Entry offset
     index--;
-    uint8_t entryOffset = 0x40 + (index * sizeof(entry));
+    uint16_t entryOffset = 0x40 + (index * sizeof(entry));
 
     //Debug_printv("----------");
     //Debug_printv("index[%d] sectorOffset[%d] entryOffset[%d] entry_index[%d]", index, sectorOffset, entryOffset, entry_index);
@@ -64,8 +64,8 @@ bool T64IStream::seekEntry( size_t index )
 }
 
 
-size_t T64IStream::readFile(uint8_t* buf, size_t size) {
-    size_t bytesRead = 0;
+uint16_t T64IStream::readFile(uint8_t* buf, uint16_t size) {
+    uint16_t bytesRead = 0;
 
     if (m_position < 2)
     {

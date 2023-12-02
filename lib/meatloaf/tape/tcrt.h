@@ -48,10 +48,10 @@ protected:
     }
 
     bool seekEntry( std::string filename ) override;
-    bool seekEntry( size_t index ) override;
+    bool seekEntry( uint16_t index ) override;
     bool seekPath(std::string path) override;
 
-    size_t readFile(uint8_t* buf, size_t size) override;
+    uint16_t readFile(uint8_t* buf, uint16_t size) override;
 
     Header header;
     Entry entry;

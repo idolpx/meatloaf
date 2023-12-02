@@ -149,15 +149,15 @@ bool D64IStream::seekEntry( std::string filename )
     return false;
 }
 
-bool D64IStream::seekEntry( uint32_t index )
+bool D64IStream::seekEntry( uint16_t index )
 {
     bool r = false;
 
     // Calculate Sector offset & Entry offset
     // 8 Entries Per Sector, 32 bytes Per Entry
     index--;
-    uint8_t sectorOffset = index / 8;
-    uint8_t entryOffset = (index % 8) * 32;
+    uint16_t sectorOffset = index / 8;
+    uint16_t entryOffset = (index % 8) * 32;
 
     // Debug_printv("----------");
     // Debug_printv("index[%d] sectorOffset[%d] entryOffset[%d] entry_index[%d]", index, sectorOffset, entryOffset, entry_index);
@@ -262,7 +262,7 @@ uint16_t D64IStream::blocksFree()
     return free_count;
 }
 
-uint32_t D64IStream::readFile(uint8_t* buf, uint32_t size) {
+uint16_t D64IStream::readFile(uint8_t* buf, uint16_t size) {
 
     if ( sector_offset % block_size == 0 )
     {
@@ -274,7 +274,7 @@ uint32_t D64IStream::readFile(uint8_t* buf, uint32_t size) {
         //Debug_printv("next_track[%d] next_sector[%d] sector_offset[%d]", next_track, next_sector, sector_offset);
     }
 
-    uint32_t bytesRead = 0;
+    uint16_t bytesRead = 0;
     if ( size > m_bytesAvailable )
         size = m_bytesAvailable;
     

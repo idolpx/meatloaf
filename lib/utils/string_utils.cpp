@@ -153,7 +153,7 @@ namespace mstr {
     }
 
 
-    bool equals(std::string &s1, const char *s2, bool case_sensitive)
+    bool equals(std::string &s1, char *s2, bool case_sensitive)
     {
         if(case_sensitive)
             return ( (s1.size() == strlen(s2) ) &&
