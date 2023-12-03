@@ -451,7 +451,7 @@ void iecNetwork::iec_reopen_channel_talk()
             Debug_printv("TALK ERROR! flags[%d]\n", IEC.flags);
             return;
         }
-    } while( !(IEC.flags & ATN_PULLED) );
+    } while( !(IEC.flags & ATN_PULLED) && !set_eoi );
 }
 
 void iecNetwork::set_login_password()
