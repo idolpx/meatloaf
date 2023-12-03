@@ -314,7 +314,8 @@ void iecDrive::iec_reopen_channel()
 
 void iecDrive::iec_reopen_channel_listen()
 {
-    Debug_printv("here");
+    std::string s = IEC.receiveBytes();
+    Debug_printv("{%s}", s.c_str() );
 }
 
 void iecDrive::iec_reopen_channel_talk()

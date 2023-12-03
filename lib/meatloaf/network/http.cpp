@@ -295,7 +295,7 @@ bool MeatHttpClient::seek(uint32_t pos) {
             Debug_printv("Seek successful");
 
             m_position = pos;
-            m_bytesAvailable = m_length-pos;
+            m_bytesAvailable = m_length - m_position;
             return true;
         }
     }
@@ -329,8 +329,8 @@ bool MeatHttpClient::seek(uint32_t pos) {
             }
         }
 
-        m_bytesAvailable = m_length-pos;
         m_position = pos;
+        m_bytesAvailable = m_length - m_position;
         Debug_printv("stream opened[%s]", url.c_str());
 
         return true;
@@ -344,8 +344,8 @@ uint32_t MeatHttpClient::read(uint8_t* buf, uint32_t size) {
         auto bytesRead= esp_http_client_read(m_http, (char *)buf, size );
         
         if(bytesRead>0) {
-            m_bytesAvailable -= bytesRead;
             m_position+=bytesRead;
+            m_bytesAvailable = m_length - m_position;
         }
         return bytesRead;        
     }

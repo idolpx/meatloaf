@@ -624,6 +624,19 @@ int16_t systemBus::receiveByte()
     return b;
 }
 
+std::string systemBus::receiveBytes()
+{
+    std::string s;
+
+    while(!(flags & EOI_RECVD))
+    {
+        int16_t b = receiveByte();
+        if(b > -1)
+            s += b;
+    }
+    return s;
+}
+
 bool systemBus::sendByte(const char c, bool eoi)
 {
     // If there has been a error don't try to send any more bytes

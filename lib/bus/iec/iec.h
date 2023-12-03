@@ -482,9 +482,15 @@ public:
 
     /**
      * @brief Receive Byte from bus
-     * @return Byte received from bus, or -1 for error.
+     * @return Byte received from bus, or -1 for error
      */
     int16_t receiveByte();
+
+    /**
+     * @brief Receive String from bus
+     * @return std::string received from bus
+     */
+    std::string receiveBytes();
 
     /**
      * @brief called in response to RESET pin being asserted.

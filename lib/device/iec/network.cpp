@@ -105,7 +105,7 @@ void iecNetwork::iec_open()
         break;
     default:
         cmdFrame.aux1 = 12;                                    // default read/write
-        cmdFrame.aux2 = translationMode[commanddata.channel]; // now used
+        cmdFrame.aux2 = translationMode[commanddata.channel];  // now used
         Debug_printf("translation mode: %u\r\n", cmdFrame.aux2);
         break;
     }
@@ -426,32 +426,32 @@ void iecNetwork::iec_reopen_channel_talk()
             protocol[commanddata.channel]->read(ns.rxBytesWaiting);
     }
 
-    while (!atn)
+    if (receiveBuffer[commanddata.channel]->empty())
     {
-        char b;
-        atn = IEC.status(PIN_IEC_ATN);
+        Debug_printv("Receive Buffer Empty.");
+        IEC.senderTimeout();
+        return;
+    }
 
-        if (atn)
-            break;
+    do
+    {
+        char b = receiveBuffer[commanddata.channel]->front();
+        receiveBuffer[commanddata.channel]->erase(0, 1);
 
         if (receiveBuffer[commanddata.channel]->empty())
         {
             Debug_printv("Receive Buffer Empty.");
-            IEC.senderTimeout();
-            break;
+            set_eoi = true;
         }
-
-        b = receiveBuffer[commanddata.channel]->front();
 
         IEC.sendByte(b, set_eoi);
 
-        if (!(IEC.flags & ERROR))
-            receiveBuffer[commanddata.channel]->erase(0, 1);
-        else
-            Debug_printv("TALK ERROR!\n");
-
-        atn = IEC.status(PIN_IEC_ATN);
-    }
+        if ( IEC.flags & ERROR )
+        {
+            Debug_printv("TALK ERROR! flags[%d]\n", IEC.flags);
+            return;
+        }
+    } while( !(IEC.flags & ATN_PULLED) );
 }
 
 void iecNetwork::set_login_password()
@@ -599,7 +599,7 @@ void iecNetwork::query_json()
     iecStatus.channel = channel;
     iecStatus.connected = true;
     iecStatus.msg = string(reply);
-    Debug_printf("Query set to %s\r\n", s);
+    Debug_printf("Query set to %s\r\n", s.c_str());
 }
 
 void iecNetwork::set_translation_mode()
@@ -738,6 +738,11 @@ void iecNetwork::iec_command()
             // be done on channel 0 (or 1 for that matter.) -tschak
             if (!channel)
                 return;
+
+            cmdFrame.aux1 = atoi(pt[2].c_str());
+            cmdFrame.aux2 = atoi(pt[3].c_str());
+
+            Debug_printv("pt[0][0]=[%2X] pt[1]=[%d] aux1[%d] aux2[%d]", pt[0][0], channel, cmdFrame.aux1, cmdFrame.aux2);
 
             if (protocol[channel]->special_inquiry(pt[0][0]) == 0x00)
                 perform_special_00();
@@ -1277,7 +1282,7 @@ void iecNetwork::process_command()
     }
     else if (commanddata.primary == IEC_UNLISTEN)
     {
-        Debug_printf("Yonkinating to command with: %s\n", payload.c_str());
+        Debug_printv("Yonkinating to command with: %s\n", payload.c_str());
         iec_command();
     }
 }
