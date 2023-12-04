@@ -1222,24 +1222,20 @@ bool iecDrive::sendFile()
 
     if ( !_base->isDirectory() )
     {
-        // if ( istream->has_subdirs )
-        // {
-        //     PeoplesUrlParser u;
-        //     u.parseUrl( istream->url );
-        //     Debug_printv( "Subdir Change Directory Here! istream[%s] > base[%s]", istream->url.c_str(), u.base().c_str() );
-        //     _last_file = u.name;
-        //     _base.reset( MFSOwner::File( u.base() ) );
-        // }
-        // else
-        // {
-        //     auto f = MFSOwner::File( istream->url );
-        //     Debug_printv( "Change Directory Here! istream[%s] > base[%s]", istream->url.c_str(), f->streamFile->url.c_str() );
-        //     _base.reset( f->streamFile );
-        // }
-
-        Debug_printv( "Subdir Change Directory Here! url[%s] > base[%s]", _base->url.c_str(), _base->base().c_str() );
-        _last_file = _base->name;
-        _base.reset( MFSOwner::File( _base->base() ) );
+        if ( istream->has_subdirs )
+        {
+            PeoplesUrlParser u;
+            u.parseUrl( istream->url );
+            Debug_printv( "Subdir Change Directory Here! istream[%s] > base[%s]", istream->url.c_str(), u.base().c_str() );
+            _last_file = u.name;
+            _base.reset( MFSOwner::File( u.base() ) );
+        }
+        else
+        {
+            auto f = MFSOwner::File( istream->url );
+            Debug_printv( "Change Directory Here! istream[%s] > base[%s]", istream->url.c_str(), f->streamFile->url.c_str() );
+            _base.reset( f->streamFile );
+        }
     }
 
     if ( istream == nullptr )
