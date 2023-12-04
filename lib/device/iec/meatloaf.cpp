@@ -142,6 +142,7 @@ void iecMeatloaf::process_basic_commands()
 
 void iecMeatloaf::process_raw_commands()
 {
+    Debug_printv("payload[%d]", payload[0]);
     switch (payload[0])
     {
     case FUJICMD_RESET:

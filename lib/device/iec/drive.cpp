@@ -218,7 +218,7 @@ void iecDrive::iec_open()
     if ( pt.size() > 1 )
     {
         s = pt[0];
-        Debug_printv("filename[%s] type[%s] mode[%s]", pt[0].c_str(), pt[1].c_str(), pt[2].c_str());
+        //Debug_printv("filename[%s] type[%s] mode[%s]", pt[0].c_str(), pt[1].c_str(), pt[2].c_str());
     }
     mstr::toASCII(s);
 
@@ -1220,6 +1220,14 @@ bool iecDrive::sendFile()
     // std::shared_ptr<MStream> istream = std::static_pointer_cast<MStream>(currentStream);
     auto istream = retrieveStream(commanddata.channel);
 
+    if ( istream == nullptr )
+    {
+        Debug_printv("Stream not found!");
+        IEC.senderTimeout(); // File Not Found
+        _last_file = "";
+        return false;
+    }
+
     if ( !_base->isDirectory() )
     {
         if ( istream->has_subdirs )
@@ -1236,14 +1244,6 @@ bool iecDrive::sendFile()
             Debug_printv( "Change Directory Here! istream[%s] > base[%s]", istream->url.c_str(), f->streamFile->url.c_str() );
             _base.reset( f->streamFile );
         }
-    }
-
-    if ( istream == nullptr )
-    {
-        Debug_printv("Stream not found!");
-        IEC.senderTimeout(); // File Not Found
-        _last_file = "";
-        return false;
     }
 
     bool eoi = false;

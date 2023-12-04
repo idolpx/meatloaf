@@ -739,9 +739,6 @@ void iecNetwork::iec_command()
             if (!channel)
                 return;
 
-            cmdFrame.aux1 = atoi(pt[2].c_str());
-            cmdFrame.aux2 = atoi(pt[3].c_str());
-
             Debug_printv("pt[0][0]=[%2X] pt[1]=[%d] aux1[%d] aux2[%d]", pt[0][0], channel, cmdFrame.aux1, cmdFrame.aux2);
 
             if (protocol[channel]->special_inquiry(pt[0][0]) == 0x00)
