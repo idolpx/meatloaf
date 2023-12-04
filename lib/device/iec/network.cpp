@@ -602,6 +602,75 @@ void iecNetwork::query_json()
     Debug_printf("Query set to %s\r\n", s.c_str());
 }
 
+void iecNetwork::parse_bite()
+{
+    int channel = 0;
+    int bite_size = 255;
+    NetworkStatus ns;
+
+    if (pt.size() < 2)
+    {
+        Debug_printf("parse_bite - no channel specified\r\n");
+        iecStatus.error = NETWORK_ERROR_INVALID_DEVICESPEC;
+        iecStatus.msg = "no channel specified";
+        iecStatus.channel = 0;
+        iecStatus.connected = 0;
+        return;
+    }
+    channel = atoi(pt[1].c_str());
+
+    if (pt.size() == 3)
+    {
+        bite_size = atoi(pt[2].c_str()) - 2; // index starts at 0 and shave 1 for CR
+        Debug_printv("bite_size[%d]", bite_size);
+    }
+
+    if ( receiveBuffer[channel]->length() < bite_size )
+        return;
+
+    protocol[channel]->status(&ns);
+
+    // break up receiveBuffer[channel] into bites less than bite_size bytes
+    std::string bites = "";
+    bites.reserve(receiveBuffer[channel]->size() + (receiveBuffer[channel]->size() / bite_size ));
+
+    int start = 0;
+    int end = 0;
+    int len = 0;
+    int count = 0;
+    do
+    {
+        start = end;
+
+        // [aS A CHILD, cHUCK nORRIS USED TO ENGOY MAKING SHAPES IN SANDBOXES. WE CALL THEM]
+        // [ PYRAMIDS]
+
+        // Set remaining length
+        len = receiveBuffer[channel]->size() - start;
+        if ( len > bite_size )
+            len = bite_size;
+
+        // Don't make extra bites!
+        end = receiveBuffer[channel]->find('\r', start);
+        if ( end == std::string::npos )
+            end = start + len; // None found so set end
+
+        // Take a bite
+        Debug_printv("start[%d] end[%d] len[%d] bite_size[%d]", start, end, len, bite_size);
+        std::string bite = receiveBuffer[channel]->substr(start, len);
+        bites += bite;
+        Debug_printv("bite[%s]", bite.c_str());
+
+        // Add CR if there isn't one already
+        if ( len == bite_size)
+            bites += '\r';
+
+        count++;
+    } while ( end < receiveBuffer[channel]->size());
+ 
+    *receiveBuffer[channel] = bites;
+}
+
 void iecNetwork::set_translation_mode()
 {
     if (pt.size() < 2)
@@ -710,6 +779,13 @@ void iecNetwork::iec_command()
         parse_json();
     else if (pt[0] == "jq")
         query_json();
+    else if (pt[0] == "biteparse")
+    {
+        // Chuck Norris Chuck Norris Chuck Norris Chuck Norris Chuck Norris Chuck Norris SHUT UP! no. Chuck Norris Chuck Norris Chuck Norris Chuck Norris Chuck Norris (keeps on saying it.)
+        Debug_printv("before");
+        parse_bite();
+        Debug_printv("after");
+    }
     else if (pt[0] == "settrans")
         set_translation_mode();
     else if (pt[0] == "pwd")
