@@ -409,7 +409,6 @@ void iecNetwork::iec_reopen_channel_talk()
 {
     bool set_eoi = false;
     NetworkStatus ns;
-    bool atn = false; // inverted
 
     // If protocol isn't connected, then return not connected.
     if (protocol[commanddata.channel] == nullptr)
@@ -436,7 +435,6 @@ void iecNetwork::iec_reopen_channel_talk()
     do
     {
         char b = receiveBuffer[commanddata.channel]->front();
-        receiveBuffer[commanddata.channel]->erase(0, 1);
 
         if (receiveBuffer[commanddata.channel]->empty())
         {
@@ -451,6 +449,10 @@ void iecNetwork::iec_reopen_channel_talk()
             Debug_printv("TALK ERROR! flags[%d]\n", IEC.flags);
             return;
         }
+
+        if ( !(IEC.flags & ATN_PULLED) )
+            receiveBuffer[commanddata.channel]->erase(0, 1);
+
     } while( !(IEC.flags & ATN_PULLED) && !set_eoi );
 }
 
@@ -605,7 +607,7 @@ void iecNetwork::query_json()
 void iecNetwork::parse_bite()
 {
     int channel = 0;
-    int bite_size = 255;
+    int bite_size = 79;
     NetworkStatus ns;
 
     if (pt.size() < 2)
@@ -625,13 +627,19 @@ void iecNetwork::parse_bite()
         Debug_printv("bite_size[%d]", bite_size);
     }
 
+    protocol[channel]->status(&ns);
+
+    // escape chars that would break up INPUT#
+    //mstr::replaceAll(*receiveBuffer[channel], ",", "\",\"");
+    //mstr::replaceAll(*receiveBuffer[channel], ";", "\";\"");
+    //mstr::replaceAll(*receiveBuffer[channel], ":", "\":\"");
+    //mstr::replaceAll(*receiveBuffer[channel], "\r", "\"\r\"");
+
     if ( receiveBuffer[channel]->length() < bite_size )
         return;
 
-    protocol[channel]->status(&ns);
-
     // break up receiveBuffer[channel] into bites less than bite_size bytes
-    std::string bites = "";
+    std::string bites = "\"";
     bites.reserve(receiveBuffer[channel]->size() + (receiveBuffer[channel]->size() / bite_size ));
 
     int start = 0;
@@ -641,9 +649,6 @@ void iecNetwork::parse_bite()
     do
     {
         start = end;
-
-        // [aS A CHILD, cHUCK nORRIS USED TO ENGOY MAKING SHAPES IN SANDBOXES. WE CALL THEM]
-        // [ PYRAMIDS]
 
         // Set remaining length
         len = receiveBuffer[channel]->size() - start;
@@ -663,11 +668,13 @@ void iecNetwork::parse_bite()
 
         // Add CR if there isn't one already
         if ( len == bite_size)
-            bites += '\r';
+             bites += "\r\"";
 
         count++;
-    } while ( end < receiveBuffer[channel]->size());
+    } while ( end < receiveBuffer[channel]->size() );
  
+    //bites += "\"";
+    Debug_printv("[%s]", bites.c_str());
     *receiveBuffer[channel] = bites;
 }
 
