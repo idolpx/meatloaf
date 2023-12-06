@@ -56,7 +56,9 @@ bool IecProtocolSerial::sendByte(uint8_t data, bool eoi)
     //IEC.pull ( PIN_IEC_SRQ );
     if ( timeoutWait ( PIN_IEC_DATA_IN, RELEASED, FOREVER ) == TIMED_OUT )
     {
-        Debug_printv ( "Wait for listener to be ready [%02X]", data );
+        if ( !(IEC.flags & ATN_PULLED) )
+            Debug_printv ( "Wait for listener to be ready [%02X]", data );
+
         return false; // return error because of ATN or timeout
     }
     //IEC.release ( PIN_IEC_SRQ );
@@ -273,7 +275,6 @@ int16_t IecProtocolSerial::receiveByte()
     }
     //IEC.release ( PIN_IEC_SRQ );
 
-
     // STEP 3: RECEIVING THE BITS
     //IEC.pull ( PIN_IEC_SRQ );
     int16_t data = receiveBits();
@@ -343,56 +344,50 @@ int16_t IecProtocolSerial::receiveBits ()
 
     for ( n = 0; n < 8; n++ )
     {
-        do
+        // Time the release of the clock line to detect JiffyDOS
+        //IEC.pull ( PIN_IEC_SRQ );
+        bit_time = timeoutWait ( PIN_IEC_CLK_IN, RELEASED, TIMING_JIFFY_DETECT, false );
+        //IEC.release ( PIN_IEC_SRQ );
+
+        // // If the bit time is less than 40us we are talking with a VIC20
+        // if ( bit_time < TIMING_VIC20_DETECT )
+        //     IEC.flags |= VIC20_MODE;
+
+        // If there is a 218us delay before the last bit, the controller uses JiffyDOS
+        if ( n == 7 && bit_time >= TIMING_JIFFY_DETECT )
         {
-            // wait for bit to be ready to read
-            //IEC.pull ( PIN_IEC_SRQ );
-            bit_time = timeoutWait ( PIN_IEC_CLK_IN, RELEASED, TIMING_EMPTY, false );
-
-            // // If the bit time is less than 40us we are talking with a VIC20
-            // if ( bit_time < TIMING_VIC20_DETECT )
-            //     IEC.flags |= VIC20_MODE;
-
-            // If there is a delay before the last bit, the controller uses JiffyDOS
-            if ( n == 7 && bit_time >= TIMING_JIFFY_DETECT )
+            if ( (IEC.flags & ATN_PULLED) && data < 0x60 )
             {
-                if ( (IEC.flags & ATN_PULLED) && data < 0x60 )
+                uint8_t device = (data >> 1) & 0x1F;
+                if ( IEC.isDeviceEnabled ( device ) )
                 {
-                    uint8_t device = data & 0x1F;
-                    if ( IEC.enabledDevices & ( 1 << device ) )
-                    {
-                        /* If it's for us, notify controller that we support Jiffy too */
-                        IEC.pull(PIN_IEC_DATA_OUT);
-                        wait( TIMING_JIFFY_ACK, false );
-                        IEC.release(PIN_IEC_DATA_OUT);
+                    // acknowledge we support JiffyDOS
+                    IEC.pull(PIN_IEC_DATA_OUT);
+                    wait( TIMING_JIFFY_ACK, false );
+                    IEC.release(PIN_IEC_DATA_OUT);
 
-                        IEC.flags |= JIFFY_ACTIVE;
-                    }
+                    IEC.flags |= JIFFYDOS_ACTIVE;
                 }
             }
-            else if ( bit_time > TIMING_EMPTY )
-            {
-                if ( n == 0 )
-                {
-                    Debug_printv ( "empty stream signaled" );
-                    IEC.flags |= EMPTY_STREAM;
-                }
-                else
-                {
-                    Debug_printv ( "bit timeout" );
-                }
+        }
 
-                return -1;
+        // wait for bit to be ready to read
+        IEC.pull ( PIN_IEC_SRQ );
+        if ( timeoutWait ( PIN_IEC_CLK_IN, RELEASED, (TIMING_EMPTY - TIMING_JIFFY_DETECT) ) == TIMED_OUT )
+        {
+            if ( n == 0 )
+            {
+                Debug_printv ( "empty stream signaled" );
+                IEC.flags |= EMPTY_STREAM;
             }
-        } while ( bit_time >= TIMING_JIFFY_DETECT );
-        
-        // // wait for bit to be ready to read
-        // IEC.pull ( PIN_IEC_SRQ );
-        // if ( timeoutWait ( PIN_IEC_CLK_IN, RELEASED ) == TIMED_OUT )
-        // {
-        //     Debug_printv ( "wait for talker to start sending bit n[%d]", n );
-        //     return -1; // return error because timeout
-        // }
+            else
+            {
+                Debug_printv ( "bit timeout" );
+            }
+
+            return -1;
+        }
+        IEC.release ( PIN_IEC_SRQ );
 
         // get bit
         data >>= 1;
