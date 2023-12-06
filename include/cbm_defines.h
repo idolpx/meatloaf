@@ -144,8 +144,8 @@ typedef enum
 #define COMMAND_RECVD    (1 << 4)
 
 #define VIC20_MODE      (1 << 8)
-#define JIFFY_ACTIVE    (1 << 9)
-#define JIFFY_LOAD      (1 << 10)
+#define JIFFYDOS_ACTIVE (1 << 9)
+#define JIFFYDOS_LOAD   (1 << 10)
 #define DOLPHIN_ACTIVE  (1 << 11)
 #define WIC64_ACTIVE    (1 << 12)
 

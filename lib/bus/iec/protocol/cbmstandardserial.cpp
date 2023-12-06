@@ -191,7 +191,7 @@
 //                         pull(PIN_IEC_DATA_OUT);
 //                         delayMicroseconds(TIMING_JIFFY_ACK);
 //                         release(PIN_IEC_DATA_OUT);
-//                         flags |= JIFFY_ACTIVE;
+//                         flags |= JIFFYDOS_ACTIVE;
 //                     }
 //                 }
 //             }

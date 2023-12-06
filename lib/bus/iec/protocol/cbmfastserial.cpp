@@ -157,7 +157,7 @@
 // 			// pull(PIN_IEC_DATA_OUT);
 // 			// delayMicroseconds(101); // nlq says 405us, but the code shows only 101
 // 			// release(PIN_IEC_DATA_OUT);
-// 			flags xor_eq JIFFY_ACTIVE;
+// 			flags xor_eq JIFFYDOS_ACTIVE;
 // 		}
 // 	}
 
