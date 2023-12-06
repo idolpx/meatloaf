@@ -268,13 +268,23 @@ namespace mstr {
 
     void replaceAll(std::string &s, const std::string &search, const std::string &replace) 
     {
-        for( size_t pos = 0; ; pos += replace.length() ) {
+        const size_t size = search.size();
+        bool size_match = ( size == replace.size() );
+        for( size_t pos = 0; ; pos += replace.size() ) {
             // Locate the substring to replace
             pos = s.find( search, pos );
             if( pos == std::string::npos ) break;
-            // Replace by erasing and inserting
-            s.erase( pos, search.length() );
-            s.insert( pos, replace );
+            if ( size_match )
+            {
+                // Faster using replace if they are the same size
+                s.replace( pos, size, replace);
+            }
+            else
+            {
+                // Replace by erasing and inserting
+                s.erase( pos, search.size() );
+                s.insert( pos, replace );
+            }
         }
     }
 
