@@ -111,8 +111,8 @@ bool IecProtocolBase::wait(size_t wait_us, uint64_t start, bool watch_atn)
             }
         }
     }
-
     //IEC.release ( PIN_IEC_SRQ );
+
     return true;
 }
 

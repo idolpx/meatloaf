@@ -581,7 +581,33 @@ public:
 #ifndef IEC_SPLIT_LINES
         release ( pin );
 #endif
-        return gpio_get_level ( ( gpio_num_t ) pin ) ? RELEASED : PULLED;
+        int l = gpio_get_level ( ( gpio_num_t ) pin ) ? RELEASED : PULLED;
+        if ( pin == PIN_IEC_ATN )
+            flags |= ATN_PULLED;
+        
+        return l;
+    }
+
+    inline uint8_t IRAM_ATTR status()
+    {
+        uint8_t data = 0;
+
+        gpio_config_t io_config =
+        {
+            .pin_bit_mask = BIT(PIN_IEC_CLK_IN) | BIT(PIN_IEC_DATA_IN) | BIT(PIN_IEC_SRQ) | BIT(PIN_IEC_RESET),
+            .mode = GPIO_MODE_INPUT,
+            .intr_type = GPIO_INTR_DISABLE,
+        };
+
+        ESP_ERROR_CHECK(gpio_config(&io_config));
+        uint64_t io_data = REG_READ(GPIO_IN_REG);
+
+        // data << (1 & (io_data & (1 << PIN_IEC_CLK_IN)));
+        // data << (2 & (io_data & (1 << PIN_IEC_DATA_IN)));
+        // data << (3 & (io_data & (1 << PIN_IEC_SRQ)));
+        // data << (4 & (io_data & (1 << PIN_IEC_RESET)));
+
+        return data;
     }
 };
 

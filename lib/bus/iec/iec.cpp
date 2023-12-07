@@ -83,9 +83,9 @@ void systemBus::setup()
     init_pin(PIN_IEC_DATA_OUT);
     init_pin(PIN_IEC_SRQ);
 
-    #ifdef IEC_HAS_RESET
+#ifdef IEC_HAS_RESET
     init_pin(PIN_IEC_RESET);
-    #endif
+#endif
 
     // Start task
     //xTaskCreate(ml_iec_intr_task, "ml_iec_intr_task", 2048, NULL, 10, NULL);
@@ -219,7 +219,6 @@ void IRAM_ATTR systemBus::service()
 
             //Debug_printv("bus[%d] device[%d] flags[%d]", bus_state, device_state, flags);
             bus_state = BUS_IDLE;
-            flags = CLEAR;
 
             // Switch back to standard serial
             detected_protocol = PROTOCOL_IEC_SERIAL;
@@ -281,7 +280,15 @@ void systemBus::read_command()
         }
         else
         {
-            Debug_printf("   IEC: [%.2X]", c);
+            if ( flags & JIFFYDOS_ACTIVE )
+            {
+                Debug_printf("   IEC: [JD][%.2X]", c);
+                detected_protocol = PROTOCOL_JIFFYDOS;
+            }
+            else
+            {
+                Debug_printf("   IEC: [%.2X]", c);
+            }
 
             // Decode command byte
             uint8_t command = c & 0x60;
@@ -489,9 +496,20 @@ void systemBus::timer_stop()
 
 std::shared_ptr<IecProtocolBase> systemBus::selectProtocol() 
 {
-    //Debug_printv("protocol[%d]", detected_protocol);
+    Debug_printv("protocol[%d]", detected_protocol);
     
-    if ( detected_protocol == PROTOCOL_JIFFYDOS ) {
+    if ( detected_protocol == PROTOCOL_JIFFYDOS ) 
+    {
+        /* JiffyDOS uses a slightly modified protocol for LOAD that */
+        /* is activated by using 0x61 instead of 0x60 in the TALK   */
+        /* state. The original floppy code has additional checks    */
+        /* that force the non-load Jiffy protocol for file types    */
+        /* other than SEQ and PRG.                                  */
+        /* Please note that $ is special-cased in the kernal so it  */
+        /* will never trigger this.                                 */
+        if ( data.primary == IEC_TALK && data.secondary == 0x61 )
+            flags |= JIFFYDOS_LOAD;
+
         auto p = std::make_shared<JiffyDOS>();
         return std::static_pointer_cast<IecProtocolBase>(p);
     } 

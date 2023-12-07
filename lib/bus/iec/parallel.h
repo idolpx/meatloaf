@@ -117,7 +117,7 @@ class parallelBus
         void writeByte( uint8_t byte );
         bool status( user_port_pin_t pin );
 
-        uint8_t flags = 0;
+        uint8_t flags = 0x00;
         uint8_t data = 0;
         parallel_mode_t mode = MODE_RECEIVE;
         pbus_state_t bus_state;

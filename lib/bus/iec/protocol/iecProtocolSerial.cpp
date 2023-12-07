@@ -302,11 +302,16 @@ int16_t IecProtocolSerial::receiveByte()
 
     // if ( (IEC.flags & EOI_RECVD) )
     // {
-    //     wait ( TIMING_Tfr );
+    //     wait ( TIMING_Tbb );
     //     IEC.release ( PIN_IEC_DATA_OUT );
     // }
-
-    // timeoutWait( PIN_IEC_CLK_IN, RELEASED, TIMING_Tbb);
+    // else
+    // {
+    //     if (timeoutWait( PIN_IEC_CLK_IN, RELEASED ) == TIMED_OUT)
+    //     {
+    //         Debug_printv("Clock wasn't released after byte");
+    //     }
+    // }
 
     return data;
 }
@@ -372,7 +377,7 @@ int16_t IecProtocolSerial::receiveBits ()
         }
 
         // wait for bit to be ready to read
-        IEC.pull ( PIN_IEC_SRQ );
+        //IEC.pull ( PIN_IEC_SRQ );
         if ( timeoutWait ( PIN_IEC_CLK_IN, RELEASED, (TIMING_EMPTY - TIMING_JIFFY_DETECT) ) == TIMED_OUT )
         {
             if ( n == 0 )
@@ -387,7 +392,7 @@ int16_t IecProtocolSerial::receiveBits ()
 
             return -1;
         }
-        IEC.release ( PIN_IEC_SRQ );
+        //IEC.release ( PIN_IEC_SRQ );
 
         // get bit
         data >>= 1;

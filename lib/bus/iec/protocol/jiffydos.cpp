@@ -32,17 +32,17 @@ using namespace Protocol;
 // immediately start receiving data on both the clock and data lines.
 int16_t  JiffyDOS::receiveByte ()
 {
+    uint8_t data = 0;
+    uint8_t bus = 0;
+    uint8_t bitmask = 0xFF;
+
     IEC.flags and_eq CLEAR_LOW;
 
-    IEC.pull ( PIN_IEC_SRQ );
-
-    // Sometimes the C64 pulls ATN but doesn't pull CLOCK right away
-    // pull ( PIN_IEC_SRQ );
-    // if ( !wait ( 60 ) ) return -1;
-    // release ( PIN_IEC_SRQ );
+    //IEC.pull ( PIN_IEC_SRQ );
 
     // Release the Data line to signal we are ready
-#ifndef IEC_SPLIT_LINES
+#ifndef IEC_SPLIT_LINE
+    IEC.release(PIN_IEC_CLK_IN);
     IEC.release(PIN_IEC_DATA_IN);
 #endif
 
@@ -56,40 +56,56 @@ int16_t  JiffyDOS::receiveByte ()
 
     // STEP 2: RECEIVING THE BITS
     // As soon as the talker releases the Clock line we are expected to receive the bits
-    uint8_t data = 0;
-    uint8_t bitmask = 0xFF;
+
+    //IEC.pull ( PIN_IEC_SRQ );
 
     // get bits 4,5
-    if ( gpio_get_level ( PIN_IEC_CLK_IN ) ) data |= 0b00010000;
-    if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0b00100000;
-    wait( 8 );
+    IEC.pull ( PIN_IEC_SRQ );
+    wait( 2, false );
+    bus = IEC.status();
+    Debug_printv("bus[%2X]", bus);
+    //if ( gpio_get_level ( PIN_IEC_CLK_IN ) )  data |= 0b00010000; // 1
+    //if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0b00100000; // 0
+    data |= bus & 0;
+    data |= bus & 1;
+    Debug_printv("bus[%2X]", data);
+    IEC.release( PIN_IEC_SRQ );
 
     // get bits 6,7
-    if ( gpio_get_level ( PIN_IEC_CLK_IN ) ) data |= 0b01000000;
-    if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0b10000000;
-    wait( 8 );
+    IEC.pull ( PIN_IEC_SRQ );
+    wait( 4, false );
+    if ( gpio_get_level ( PIN_IEC_CLK_IN ) ) data |=  0b01000000; // 1
+    if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0b10000000; // 1
+    IEC.release( PIN_IEC_SRQ );
 
     // get bits 3,1
-    if ( gpio_get_level ( PIN_IEC_CLK_IN ) ) data |= 0b00001000;
-    if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0b00000010;
-    wait( 8 );
+    IEC.pull ( PIN_IEC_SRQ );
+    wait( 6, false );
+    if ( gpio_get_level ( PIN_IEC_CLK_IN ) )  data |= 0b00001000; // 0
+    if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0b00000010; // 1
+    IEC.release( PIN_IEC_SRQ );
 
     // get bits 2,0
-    if ( gpio_get_level ( PIN_IEC_CLK_IN ) ) data |= 0b00000100;
-    if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0b00000001;
-    wait( 8 );
+    IEC.pull ( PIN_IEC_SRQ );
+    wait( 8, false );
+    if ( gpio_get_level ( PIN_IEC_CLK_IN ) )  data |= 0b00000100; // 1
+    if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0b00000001; // 1
     IEC.release( PIN_IEC_SRQ );
 
     // rearrange bits
-    data xor_eq bitmask;
+    data ^= bitmask;
 
     // STEP 3: CHECK FOR EOI
+    IEC.pull ( PIN_IEC_SRQ );
+    wait( 13, false );
     if ( IEC.status ( PIN_IEC_CLK_IN ) == PULLED && IEC.status ( PIN_IEC_DATA_IN ) == RELEASED )
-        IEC.flags or_eq EOI_RECVD;
-    wait( 300 );
+        IEC.flags |= EOI_RECVD;
+    IEC.release ( PIN_IEC_SRQ );
 
     // STEP 4: Acknowledge byte received
+    wait( 60, false );
     IEC.pull ( PIN_IEC_DATA_OUT );
+    wait( 10, false );
 
     return data;
 } // receiveByte
