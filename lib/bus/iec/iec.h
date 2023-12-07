@@ -49,6 +49,7 @@
 #include <soc/gpio_reg.h>
 
 #include "../../../include/debug.h"
+#include "../../../include/pinmap.h"
 
 
 /**

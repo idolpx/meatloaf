@@ -61,36 +61,38 @@ int16_t  JiffyDOS::receiveByte ()
 
     // get bits 4,5
     IEC.pull ( PIN_IEC_SRQ );
-    wait( 2, false );
-    Debug_printv("bus[%2X]", bus);
+    wait( 13, false );
     if ( gpio_get_level ( PIN_IEC_CLK_IN ) )  data |= 0b00010000; // 1
     if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0b00100000; // 0
-    Debug_printv("bus[%2X]", data);
     IEC.release( PIN_IEC_SRQ );
+    wait( 2, false );
 
     // get bits 6,7
     IEC.pull ( PIN_IEC_SRQ );
-    wait( 4, false );
+    wait( 13, false );
     if ( gpio_get_level ( PIN_IEC_CLK_IN ) ) data |=  0b01000000; // 1
     if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0b10000000; // 1
     IEC.release( PIN_IEC_SRQ );
+    wait( 2, false );
 
     // get bits 3,1
     IEC.pull ( PIN_IEC_SRQ );
-    wait( 6, false );
+    wait( 11, false );
     if ( gpio_get_level ( PIN_IEC_CLK_IN ) )  data |= 0b00001000; // 0
     if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0b00000010; // 1
     IEC.release( PIN_IEC_SRQ );
+    wait( 2, false );
 
     // get bits 2,0
     IEC.pull ( PIN_IEC_SRQ );
-    wait( 8, false );
+    wait( 13, false );
     if ( gpio_get_level ( PIN_IEC_CLK_IN ) )  data |= 0b00000100; // 1
     if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0b00000001; // 1
     IEC.release( PIN_IEC_SRQ );
+    wait( 2, false );
 
     // rearrange bits
-    data ^= bitmask;
+    //data ^= bitmask;
 
     // STEP 3: CHECK FOR EOI
     IEC.pull ( PIN_IEC_SRQ );
