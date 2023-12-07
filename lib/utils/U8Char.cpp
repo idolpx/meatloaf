@@ -83,18 +83,26 @@ std::string U8Char::toUtf8() {
         return std::string(1, missing);
     }
     else if(ch>=0x01 && ch<=0x7f) {
+        // For code points in the range 0x0000 to 0x007F (1-byte sequences):
+        // Directly represent the code point in binary.
+        // Format: 0xxxxxxx
         return std::string(1, char(ch));
     }
     else if(ch>=0x80 && ch<=0x7ff) {
-        auto upper = (ch>>6) & (0b11111 | 0b11000000); 
-        char lower = ch & (0b111111 | 0b10000000); 
+        // First byte: 110xxxxx, where the x's are the first 5 bits of the code point.
+        char upper = (uint8_t)((ch>>6) & 0b11111) | 0b11000000; 
+        // Second byte: 10xxxxxx, where the x's are the next 6 bits of the code point.
+        auto lower = (uint8_t)(ch & 0b111111) | 0b10000000; 
         char arr[] = { (char)upper, (char)lower, '\0'};
         return std::string(arr);
     }
     else {
-        auto lower = (uint8_t)ch & (0b00111111 | 0b10000000);
-        auto mid = (uint8_t)(ch>>6) & (0b00111111 | 0b10000000);
-        auto hi = (uint8_t)(ch>>12) & (0b00111111 | 0b11100000);
+        // First byte: 1110xxxx, where the x's are the first 4 bits of the code point.
+        auto hi = (uint8_t)((ch>>12) & 0b00001111) | 0b11100000;
+        // Second byte: 10xxxxxx, where the x's are the next 6 bits.
+        auto mid = (uint8_t)((ch>>6) & 0b00111111) | 0b10000000;
+        // Third byte: 10xxxxxx, where the x's are the last 6 bits.
+        auto lower = (uint8_t)(ch & 0b00111111) | 0b10000000;
         char arr[] = { (char)hi, (char)mid, (char)lower, '\0'};
         return std::string(arr);
     }

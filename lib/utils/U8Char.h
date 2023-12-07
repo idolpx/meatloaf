@@ -15,7 +15,6 @@ class U8Char {
     static const char16_t utf8map[];
     const char missing = '?';
     void fromUtf8Stream(std::istream* reader);
-    size_t fromCharArray(char* reader);
 
 public:
     char16_t ch;
@@ -26,6 +25,8 @@ public:
     U8Char(char petscii) {
         ch = utf8map[(uint8_t)petscii];
     }
+
+    size_t fromCharArray(char* reader);
 
     std::string toUtf8();
     uint8_t toPetscii();

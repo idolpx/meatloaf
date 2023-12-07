@@ -2,6 +2,7 @@
 
 #include "../../include/petscii.h"
 #include "../../include/debug.h"
+#include "u8char.h"
 
 #include <algorithm>
 #include <cstdarg>
@@ -214,18 +215,45 @@ namespace mstr {
                     [](unsigned char c) { return std::toupper(c); });
     }
 
-    // convert to ascii (in place) - DO NOT USE, use toUtf8 instead!
-    void toASCII(std::string &s)
+    // // convert to ascii (in place) - DO NOT USE, use toUtf8 instead!
+    // void toASCII(std::string &s)
+    // {
+    //     std::transform(s.begin(), s.end(), s.begin(),
+    //                 [](unsigned char c) { return petscii2ascii(c); });
+    // }
+
+    // // convert to petscii (in place) - DO NOT USE, utf8 can't be converted in place!
+    // void toPETSCII(std::string &s)
+    // {
+    //     std::transform(s.begin(), s.end(), s.begin(),
+    //                 [](unsigned char c) { return ascii2petscii(c); });
+    // }
+
+    // convert PETSCII to UTF8, using methods from U8Char
+    std::string toUTF8(std::string &petsciiInput)
     {
-        std::transform(s.begin(), s.end(), s.begin(),
-                    [](unsigned char c) { return petscii2ascii(c); });
+        std::string utf8string;
+        for(char petscii : petsciiInput) {
+            U8Char u8char(petscii);
+            utf8string+=u8char.toUtf8();
+        }
+        return utf8string;
     }
 
-    // convert to petscii (in place) - DO NOT USE, utf8 can't be converted in place!
-    void toPETSCII(std::string &s)
+    // convert UTF8 to PETSCII, using methods from U8Char
+    std::string toPETSCII2(std::string &utfInputString)
     {
-        std::transform(s.begin(), s.end(), s.begin(),
-                    [](unsigned char c) { return ascii2petscii(c); });
+        std::string petsciiString;
+        char* utfInput = (char*)utfInputString.c_str();
+        auto end = utfInput + utfInputString.length();
+
+        while(utfInput<end) {
+            U8Char u8char(' ');
+            size_t skip = u8char.fromCharArray(utfInput);
+            petsciiString+=u8char.toPetscii();
+            utfInput+=skip;
+        }
+        return petsciiString;
     }
 
     // convert to A0 space to 20 space (in place)

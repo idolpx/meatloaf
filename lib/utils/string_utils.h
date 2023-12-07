@@ -50,8 +50,10 @@ namespace mstr {
     std::string urlEncode(const std::string &s);
     std::string urlDecode(std::string s);
 
-    void toASCII(std::string &s);
-    void toPETSCII(std::string &s);
+    // void toASCII(std::string &s);
+    // void toPETSCII(std::string &s);
+    std::string toUTF8(std::string &petsciiInput);
+    std::string toPETSCII2(std::string &utfInputString);
     bool isText(std::string &s);
     bool isNumeric(std::string &s);
     bool isA0Space(int ch);
