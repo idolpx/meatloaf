@@ -62,12 +62,9 @@ int16_t  JiffyDOS::receiveByte ()
     // get bits 4,5
     IEC.pull ( PIN_IEC_SRQ );
     wait( 2, false );
-    bus = IEC.status();
     Debug_printv("bus[%2X]", bus);
-    //if ( gpio_get_level ( PIN_IEC_CLK_IN ) )  data |= 0b00010000; // 1
-    //if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0b00100000; // 0
-    data |= bus & 0;
-    data |= bus & 1;
+    if ( gpio_get_level ( PIN_IEC_CLK_IN ) )  data |= 0b00010000; // 1
+    if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0b00100000; // 0
     Debug_printv("bus[%2X]", data);
     IEC.release( PIN_IEC_SRQ );
 

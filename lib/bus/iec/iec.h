@@ -582,8 +582,6 @@ public:
         release ( pin );
 #endif
         int l = gpio_get_level ( ( gpio_num_t ) pin ) ? RELEASED : PULLED;
-        if ( pin == PIN_IEC_ATN )
-            flags |= ATN_PULLED;
         
         return l;
     }

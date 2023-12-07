@@ -302,16 +302,11 @@ int16_t IecProtocolSerial::receiveByte()
 
     // if ( (IEC.flags & EOI_RECVD) )
     // {
-    //     wait ( TIMING_Tbb );
+    //     wait ( TIMING_Tfr );
     //     IEC.release ( PIN_IEC_DATA_OUT );
     // }
-    // else
-    // {
-    //     if (timeoutWait( PIN_IEC_CLK_IN, RELEASED ) == TIMED_OUT)
-    //     {
-    //         Debug_printv("Clock wasn't released after byte");
-    //     }
-    // }
+
+    // timeoutWait( PIN_IEC_CLK_IN, RELEASED, TIMING_Tbb);
 
     return data;
 }
