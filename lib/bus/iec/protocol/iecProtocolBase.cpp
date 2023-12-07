@@ -24,6 +24,7 @@ int16_t IecProtocolBase::timeoutWait(uint8_t pin, bool target_status, size_t wai
 
     // Sample ATN and set flag to indicate COMMAND or DATA mode
     bool atn_status = IEC.status ( PIN_IEC_ATN );
+    if ( atn_status ) IEC.flags |= ATN_PULLED;
     if ( pin == PIN_IEC_ATN )
     {
         watch_atn = false;
@@ -92,6 +93,7 @@ bool IecProtocolBase::wait(size_t wait_us, uint64_t start, bool watch_atn)
 
     // Sample ATN and set flag to indicate SELECT or DATA mode
     bool atn_status = IEC.status ( PIN_IEC_ATN );
+    if ( atn_status ) IEC.flags |= ATN_PULLED;
 
     //IEC.pull ( PIN_IEC_SRQ );
     while ( elapsed < wait_us )
