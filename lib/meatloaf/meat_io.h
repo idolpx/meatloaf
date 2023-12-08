@@ -60,8 +60,7 @@ public:
 
     virtual std::string petsciiName() {
         std::string pname = name;
-        mstr::toPETSCII(pname);
-        return pname;
+        return mstr::toPETSCII2(pname);
     }
 
     // has to return OPENED stream

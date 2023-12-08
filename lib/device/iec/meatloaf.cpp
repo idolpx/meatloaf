@@ -77,7 +77,7 @@ void iecMeatloaf::local_ip()
 
 void iecMeatloaf::process_basic_commands()
 {
-    mstr::toASCII(payload);
+    payload = mstr::toUTF8(payload);
     pt = util_tokenize(payload, ',');
 
     if (payload.find("adapterconfig") != std::string::npos)
@@ -303,7 +303,7 @@ void iecMeatloaf::net_scan_result()
     {
         char c[40];
         std::string s = std::string(detail.ssid);
-        mstr::toPETSCII(s);
+        s = mstr::toPETSCII2(s);
 
         memset(c, 0, sizeof(c));
 
@@ -341,7 +341,7 @@ void iecMeatloaf::net_get_ssid()
     else // BASIC mode.
     {
         std::string r = std::string(cfg.ssid);
-        mstr::toPETSCII(r);
+        s = mstr::toPETSCII2(r);
         status_override = r;
     }
 }

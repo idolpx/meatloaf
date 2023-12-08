@@ -101,7 +101,7 @@ string FNJSON::processString(string in)
     }
 
 #ifdef BUILD_IEC
-    mstr::toPETSCII(in);
+    in = mstr::toPETSCII2(in);
 #endif
 
 #ifdef BUILD_ATARI
@@ -214,9 +214,8 @@ string FNJSON::getValue(cJSON *item)
             {
                 #ifdef BUILD_IEC
                     // Convert key to PETSCII
-                    string tempStr = string((const char *)item->string);
-                    mstr::toPETSCII(tempStr);
-                    ss << tempStr;
+                    string tempStr = string((const char *)item->string);                    
+                    ss << mstr::toPETSCII2(tempStr);
                 #else
                     ss << item->string;
                 #endif

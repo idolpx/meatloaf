@@ -597,7 +597,7 @@ void virtualDevice::iec_talk_command_buffer_status()
     {
         snprintf(reply, 80, "%u,%s,%u,%u", iecStatus.error, iecStatus.msg.c_str(), iecStatus.connected, iecStatus.channel);
         s = std::string(reply);
-        mstr::toPETSCII(s);
+        s = mstr::toPETSCII2(s);
         Debug_printv("sending status: %s\r\n", reply);
         IEC.sendBytes(s);
     }

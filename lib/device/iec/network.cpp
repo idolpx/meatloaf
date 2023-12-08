@@ -862,8 +862,7 @@ void iecNetwork::perform_special_00()
         iecStatus.channel = commanddata.channel;
         iecStatus.connected = ns.connected;
         s = string(reply);
-        mstr::toPETSCII(s);
-        iecStatus.msg = s;
+        iecStatus.msg = mstr::toPETSCII2(s);
     }
 }
 
@@ -1274,7 +1273,7 @@ device_state_t iecNetwork::process()
 {
     // Call base class
     virtualDevice::process(); // commanddata set here.
-    mstr::toASCII(payload); // @idolpx? What should I do instead?
+    payload=mstr::toUTF8(payload); // @idolpx? What should I do instead?
 
     // fan out to appropriate process routine
     switch (commanddata.channel)

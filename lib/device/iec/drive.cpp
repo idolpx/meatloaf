@@ -789,8 +789,8 @@ uint16_t iecDrive::sendHeader(std::string header, std::string id)
     PeoplesUrlParser p;
     std::string url = _base->url;
 
+    p.parseUrl(url); // reversed the order, you shouldn't really parse an url converted to PETSCII!!!
     mstr::toPETSCII(url);
-    p.parseUrl(url);
 
     url = p.root();
     std::string path = p.pathToFile();
@@ -981,7 +981,7 @@ void iecDrive::sendListing()
         //Debug_printv("size[%d] name[%s]", entry->size(), entry->name.c_str());
 
         std::string name = entry->petsciiName();
-        mstr::toPETSCII(extension);
+        extension = mstr::toPETSCII2(extension);
 
         if (entry->name[0]!='.')
         {
