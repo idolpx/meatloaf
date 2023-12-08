@@ -178,6 +178,11 @@ void IRAM_ATTR systemBus::service()
 
         if (bus_state == BUS_PROCESS)
         {
+            // Sometimes ATN isn't released immediately. Wait for ATN to be
+            // released before trying to read payload. Long ATN delay (>1.5ms)
+            // seems to occur more frequently with VIC-20.
+            protocol->timeoutWait(PIN_IEC_ATN, RELEASED, FOREVER, false);
+
             //Debug_printv("data");
             if (data.secondary == IEC_OPEN || data.secondary == IEC_REOPEN)
             {
@@ -440,11 +445,12 @@ void systemBus::read_payload()
     {
         //pull ( PIN_IEC_SRQ );
         int16_t c = protocol->receiveByte();
+        Debug_printv("c[%2X]", c);
         //release ( PIN_IEC_SRQ );
 
         if (flags & EMPTY_STREAM || flags & ERROR)
         {
-            //Debug_printv("error");
+            Debug_printv("flags[%2X]", flags);
             bus_state = BUS_ERROR;
             return;
         }
@@ -496,7 +502,7 @@ void systemBus::timer_stop()
 
 std::shared_ptr<IecProtocolBase> systemBus::selectProtocol() 
 {
-    Debug_printv("protocol[%d]", detected_protocol);
+    //Debug_printv("protocol[%d]", detected_protocol);
     
     if ( detected_protocol == PROTOCOL_JIFFYDOS ) 
     {
@@ -622,10 +628,6 @@ void systemBus::assert_interrupt()
 
 int16_t systemBus::receiveByte()
 {
-    // If there has been a error don't try to receive any more bytes
-    if ( IEC.flags & ERROR )
-        return false;
-
     int16_t b;
     b = protocol->receiveByte();
 #ifdef DATA_STREAM
@@ -646,21 +648,17 @@ std::string systemBus::receiveBytes()
 {
     std::string s;
 
-    while(!(flags & EOI_RECVD))
+    do
     {
         int16_t b = receiveByte();
         if(b > -1)
             s += b;
-    }
+    }while(!(flags & EOI_RECVD));
     return s;
 }
 
 bool systemBus::sendByte(const char c, bool eoi)
 {
-    // If there has been a error don't try to send any more bytes
-    if ( IEC.flags & ERROR )
-        return false;
-
     if (!protocol->sendByte(c, eoi))
     {
         if (!(IEC.flags & ATN_PULLED))
@@ -810,6 +808,22 @@ bool IRAM_ATTR systemBus::turnAround()
 void systemBus::reset_all_our_devices()
 {
     // TODO iterate through our bus and send reset to each device.
+}
+
+void systemBus::setBitTiming(std::string set, int p1, int p2, int p3, int p4)
+{
+     uint8_t i = 0; // Send
+    if (mstr::equals(set, "r")) i = 1;
+    if (p1) protocol->bit_pair_timing[i][0] = p1;
+    if (p2) protocol->bit_pair_timing[i][1] = p2;
+    if (p3) protocol->bit_pair_timing[i][2] = p3;
+    if (p4) protocol->bit_pair_timing[i][3] = p4;
+
+    Debug_printv("i[%d] timing[%d][%d][%d][%d]", i,
+                    protocol->bit_pair_timing[i][0], 
+                    protocol->bit_pair_timing[i][1], 
+                    protocol->bit_pair_timing[i][2], 
+                    protocol->bit_pair_timing[i][3]);
 }
 
 void IRAM_ATTR systemBus::releaseLines(bool wait)

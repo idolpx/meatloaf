@@ -457,6 +457,16 @@ public:
     void releaseLines(bool wait = false);
 
     /**
+     * @brief Set 2bit fast loader pair timing
+     * @param set Send 's', Receive 'r'
+     * @param p1 Pair 1
+     * @param p2 Pair 2
+     * @param p3 Pair 3
+     * @param p4 Pair 4
+     */
+    void setBitTiming(std::string set, int p1 = 0, int p2 = 0, int p3 = 0, int p4 = 0);
+
+    /**
      * @brief send single byte
      * @param c byte to send
      * @param eoi Send EOI?

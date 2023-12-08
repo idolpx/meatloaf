@@ -271,7 +271,11 @@ int16_t IecProtocolSerial::receiveByte()
         IEC.flags |= EOI_RECVD;
 
         // wait for talker to pull clock line
-        while ( IEC.status ( PIN_IEC_CLK_IN ) != PULLED );
+        if ( timeoutWait ( PIN_IEC_CLK_IN, PULLED, FOREVER ) == TIMED_OUT )
+        {
+            Debug_printv ( "Wait for talker after EOI" );
+            return -1; // return error because timeout
+        }
     }
     //IEC.release ( PIN_IEC_SRQ );
 
