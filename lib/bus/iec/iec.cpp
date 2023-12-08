@@ -445,7 +445,7 @@ void systemBus::read_payload()
     {
         //pull ( PIN_IEC_SRQ );
         int16_t c = protocol->receiveByte();
-        Debug_printv("c[%2X]", c);
+        //Debug_printv("c[%2X]", c);
         //release ( PIN_IEC_SRQ );
 
         if (flags & EMPTY_STREAM || flags & ERROR)
