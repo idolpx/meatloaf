@@ -1225,6 +1225,7 @@ bool iecDrive::sendFile()
         Debug_printv("Stream not found!");
         IEC.senderTimeout(); // File Not Found
         _last_file = "";
+        _base.reset( MFSOwner::File( _base->base() ) );
         return false;
     }
 
