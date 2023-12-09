@@ -308,7 +308,7 @@ void iecNetwork::iec_reopen_load()
         if ((!ns.connected) || ns.error == 136) // EOF
             eoi = true;
 
-        IEC.sendBytes(*receiveBuffer[commanddata.channel]);
+        IEC.sendBytes(*receiveBuffer[commanddata.channel], true);
         receiveBuffer[commanddata.channel]->erase(0, blockSize);
     }
 
@@ -1276,7 +1276,7 @@ device_state_t iecNetwork::process()
 {
     // Call base class
     virtualDevice::process(); // commanddata set here.
-    payload=mstr::toUTF8(payload); // @idolpx? What should I do instead?
+    //payload=mstr::toUTF8(payload); // @idolpx? What should I do instead?
 
     Debug_printv("payload[%s]", payload.c_str());
 

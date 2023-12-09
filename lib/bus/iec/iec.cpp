@@ -595,7 +595,7 @@ void virtualDevice::iec_talk_command_buffer_status()
     if (!status_override.empty())
     {
         Debug_printv("sending explicit response.");
-        IEC.sendBytes(status_override);
+        IEC.sendBytes(status_override, true);
         status_override.clear();
         status_override.shrink_to_fit();
     }
@@ -605,7 +605,7 @@ void virtualDevice::iec_talk_command_buffer_status()
         s = std::string(reply);
         // s = mstr::toPETSCII2(s);
         Debug_printv("sending status: %s\r\n", reply);
-        IEC.sendBytes(s);
+        IEC.sendBytes(s, true);
     }
 }
 
@@ -682,9 +682,7 @@ bool systemBus::sendByte(const char c, bool eoi)
 bool systemBus::sendBytes(const char *buf, size_t len, bool eoi)
 {
     bool success = false;
-#ifdef DATA_STREAM
-    Debug_print("{ ");
-#endif
+
     for (size_t i = 0; i < len; i++)
     {
         if (i == (len - 1) && eoi)
@@ -692,16 +690,14 @@ bool systemBus::sendBytes(const char *buf, size_t len, bool eoi)
         else
             success = sendByte(buf[i], false);
     }
-#ifdef DATA_STREAM
-    Debug_println("}");
-#endif
+
     return success;
 }
 
 bool systemBus::sendBytes(std::string s, bool eoi)
 {
-    std::string out = s;
-    mstr::toPETSCII2(out);
+    std::string out;
+    out = mstr::toPETSCII2(out);
     return sendBytes(out.c_str(), out.size(), eoi);
 }
 

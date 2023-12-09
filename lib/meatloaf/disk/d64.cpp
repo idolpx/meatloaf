@@ -116,7 +116,7 @@ bool D64IStream::seekEntry( std::string filename )
             std::string entryFilename = entry.filename;
             mstr::rtrimA0(entryFilename);
             mstr::replaceAll(filename, "\\", "/");
-            mstr::toUTF8(entryFilename);
+            //mstr::toUTF8(entryFilename);
             Debug_printv("index[%d] track[%d] sector[%d] filename[%s] entry.filename[%.16s]", index, track, sector, filename.c_str(), entryFilename.c_str());
 
             //Debug_printv("filename[%s] entry[%s]", filename.c_str(), entryFilename.c_str());
@@ -387,7 +387,7 @@ bool D64File::rewindDirectory() {
     media_blocks_free = image->blocksFree();
     media_block_size = image->block_size;
     media_image = name;
-    mstr::toUTF8(media_image);
+    //mstr::toUTF8(media_image);
 
     return true;
 }

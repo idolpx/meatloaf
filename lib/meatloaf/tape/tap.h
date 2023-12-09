@@ -78,7 +78,7 @@ public:
         isDir = is_dir;
 
         media_image = name;
-        mstr::toUTF8(media_image);
+        //mstr::toUTF8(media_image);
     };
     
     ~TAPFile() {
@@ -86,12 +86,6 @@ public:
     }
 
     MStream* createIStream(std::shared_ptr<MStream> containerIstream) override;
-
-    std::string petsciiName() override {
-        // It's already in PETSCII
-        mstr::replaceAll(name, "\\", "/");
-        return name;
-    }
 
     bool isDirectory() override;
     bool rewindDirectory() override;

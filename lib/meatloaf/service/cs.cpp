@@ -28,10 +28,11 @@ std::string CServerSessionMgr::readLn() {
 }
 
 bool CServerSessionMgr::sendCommand(std::string command) {
+    std::string c = mstr::toPETSCII2(command);
     // 13 (CR) sends the command
     if(establishSession()) {
-        Serial.printf("CServer: send command: %s\r\n", command.c_str());
-        (*this) << (command+'\r');
+        Serial.printf("CServer: send command: %s\r\n", c.c_str());
+        (*this) << (c+'\r');
         (*this).flush();
         return true;
     }
@@ -148,7 +149,7 @@ bool CServerIStream::open() {
         // name here MUST BE UPPER CASE
         // trim spaces from right of name too
         mstr::rtrimA0(file->name);
-        mstr::toPETSCII2(file->name);
+        //mstr::toPETSCII2(file->name);
         CServerFileSystem::session.sendCommand("load "+file->name);
         // read first 2 bytes with size, low first, but may also reply with: ?500 - ERROR
         uint8_t buffer[2] = { 0, 0 };

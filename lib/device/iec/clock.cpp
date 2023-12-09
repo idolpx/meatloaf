@@ -21,7 +21,7 @@ void iecClock::set_timestamp(std::string s)
 void iecClock::set_timestamp_format(std::string s)
 {
     Debug_printf("set_timestamp_format(%s)\n",s.c_str());
-    tf = mstr::toUTF8(s);
+    tf = s; //mstr::toUTF8(s);
 }
 
 device_state_t iecClock::process()
@@ -112,7 +112,7 @@ void iecClock::iec_reopen_talk()
     
     mstr::toUpper(s);
     
-    IEC.sendBytes(s,true);
+    IEC.sendBytes(s, true);
 }
 
 #endif /* BUILD_IEC */

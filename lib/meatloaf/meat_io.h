@@ -58,11 +58,6 @@ public:
 
     // bool copyTo(MFile* dst);
 
-    virtual std::string petsciiName() {
-        std::string pname = name;
-        return mstr::toPETSCII2(pname);
-    }
-
     // has to return OPENED stream
     virtual MStream* meatStream();
 

@@ -20,7 +20,7 @@ bool TCRTIStream::seekEntry( std::string filename )
             std::string entryFilename = entry.filename;
             mstr::rtrimA0(entryFilename);
             mstr::replaceAll(filename, "\\", "/");
-            mstr::toUTF8(entryFilename);
+            //mstr::toUTF8(entryFilename);
             Debug_printv("filename[%s] entry.filename[%.16s]", filename.c_str(), entryFilename.c_str());
 
             // Read Entry From Stream
@@ -157,7 +157,7 @@ bool TCRTFile::rewindDirectory() {
     media_blocks_free = 0;
     media_block_size = image->block_size;
     media_image = name;
-    mstr::toUTF8(media_image);
+    //mstr::toUTF8(media_image);
 
     Debug_printv("media_header[%s] media_id[%s] media_blocks_free[%d] media_block_size[%d] media_image[%s]", media_header.c_str(), media_id.c_str(), media_blocks_free, media_block_size, media_image.c_str());
 

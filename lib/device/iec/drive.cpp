@@ -214,34 +214,33 @@ void iecDrive::iec_open()
         return;
 
     pt = util_tokenize(payload, ',');
-    std::string s = payload;
     if ( pt.size() > 1 )
     {
-        s = pt[0];
+        payload = pt[0];
         //Debug_printv("filename[%s] type[%s] mode[%s]", pt[0].c_str(), pt[1].c_str(), pt[2].c_str());
     }
-    mstr::toUTF8(s);
+    //mstr::toUTF8(s);
 
-    Debug_printv("s[%s]", s.c_str());
+    Debug_printv("payload[%s]", payload.c_str());
 
-    if ( mstr::startsWith(s, "0:") )
+    if ( mstr::startsWith(payload, "0:") )
     {
         // Remove media ID from command string
-        s = mstr::drop(s, 2);
+        payload = mstr::drop(payload, 2);
     }
-    if ( mstr::startsWith(s, "cd") )
+    if ( mstr::startsWith(payload, "cd") )
     {
-        s = mstr::drop(s, 2);
-        if ( s[0] == ':' || s[0] == ' ' )
-            s = mstr::drop(s, 1);
+        payload = mstr::drop(payload, 2);
+        if ( payload[0] == ':' || payload[0] == ' ' )
+            payload = mstr::drop(payload, 1);
     }
 
-    if ( s.length() )
+    if ( payload.length() )
     {
-        if ( s[0] == '$' ) 
-            s.clear();
+        if ( payload[0] == '$' ) 
+            payload.clear();
 
-        auto n = _base->cd( s );
+        auto n = _base->cd( payload );
         if ( n != nullptr )
             _base.reset( n );
 
@@ -250,8 +249,7 @@ void iecDrive::iec_open()
         {
             if ( !registerStream(commanddata.channel) )
             {
-                Debug_printv("File Doesn't Exist [%s]", s.c_str());
-                //_base.reset( MFSOwner::File( _base->base() ) );
+                Debug_printv("File Doesn't Exist [%s]", payload.c_str());
             }
         }
     }
@@ -346,7 +344,7 @@ void iecDrive::iec_talk_command_buffer_status()
 
     // snprintf(reply, 80, "%u,\"%s\",%u,%u", iecStatus.error, iecStatus.msg.c_str(), iecStatus.connected, iecStatus.channel);
     // s = string(reply);
-    IEC.sendBytes(s);
+    IEC.sendBytes(s, true);
 }
 
 void iecDrive::iec_command()
@@ -567,7 +565,7 @@ void iecDrive::get_prefix()
 void iecDrive::set_prefix()
 {
     std::string path = payload;
-    mstr::toUTF8(path);
+    //mstr::toUTF8(path);
 
     // Isolate path
     path = mstr::drop(path, 2);
@@ -790,7 +788,7 @@ uint16_t iecDrive::sendHeader(std::string header, std::string id)
     std::string url = _base->url;
 
     p.parseUrl(url); // reversed the order, you shouldn't really parse an url converted to PETSCII!!!
-    mstr::toPETSCII2(url);
+    //mstr::toPETSCII2(url);
 
     url = p.root();
     std::string path = p.pathToFile();
@@ -852,7 +850,7 @@ uint16_t iecDrive::sendHeader(std::string header, std::string id)
     // If SD Card is available ad we are at the root path show it as a directory at the top
     if (fnSDFAT.running() && _base->url.size() < 2)
     {
-        byte_count += sendLine(0, "%*s\"SD\"               DIR", 3, "");
+        byte_count += sendLine(0, "%*s\"sd\"               DIR", 3, "");
         if ( IEC.flags & ERROR ) return 0;
     }
 
@@ -980,8 +978,8 @@ void iecDrive::sendListing()
         // Don't show hidden folders or files
         //Debug_printv("size[%d] name[%s]", entry->size(), entry->name.c_str());
 
-        std::string name = entry->petsciiName();
-        extension = mstr::toPETSCII2(extension);
+        //std::string name = entry->petsciiName();
+        //extension = mstr::toPETSCII2(extension);
 
         if (entry->name[0]!='.')
         {
@@ -995,7 +993,7 @@ void iecDrive::sendListing()
                 return;
             }
 
-            byte_count += sendLine(block_cnt, "%*s\"%s\"%*s %s", block_spc, "", name.c_str(), space_cnt, "", extension.c_str());
+            byte_count += sendLine(block_cnt, "%*s\"%s\"%*s %s", block_spc, "", entry->name.c_str(), space_cnt, "", extension.c_str());
             if ( IEC.flags & ERROR ) return;
         }
 
@@ -1225,6 +1223,7 @@ bool iecDrive::sendFile()
         Debug_printv("Stream not found!");
         IEC.senderTimeout(); // File Not Found
         _last_file = "";
+        _base.reset( MFSOwner::File( _base->base() ) );
         return false;
     }
 

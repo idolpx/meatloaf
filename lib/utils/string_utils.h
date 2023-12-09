@@ -54,6 +54,7 @@ namespace mstr {
     // void toPETSCII(std::string &s);
     std::string toUTF8(std::string &petsciiInput);
     std::string toPETSCII2(std::string &utfInputString);
+
     bool isText(std::string &s);
     bool isNumeric(std::string &s);
     bool isA0Space(int ch);
