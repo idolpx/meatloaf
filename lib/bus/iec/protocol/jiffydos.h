@@ -21,6 +21,7 @@
 // https://www.amigalove.com/viewtopic.php?t=1734
 // https://ar.c64.org/rrwiki/images/4/48/The_Transactor_Vol09_03_1989_Feb_JD_review.pdf
 // https://web.archive.org/web/20090826145226/http://home.arcor.de/jochen.adler/ajnjil-t.htm
+// https://web.archive.org/web/20220423162959/https://sites.google.com/site/h2obsession/CBM/C128/JiffySoft128
 //
 
 #ifndef PROTOCOL_JIFFYDOS_H
@@ -35,6 +36,11 @@ namespace Protocol
 {
 	class JiffyDOS : public IecProtocolBase
 	{
+		public:
+			JiffyDOS() {
+
+			};
+
 		protected:
 			uint8_t loadmode = 0;
 			uint8_t skipeoi = 0;

@@ -13,7 +13,13 @@ namespace Protocol
     class IecProtocolBase
     {
         public:
-        
+
+        // 2bit Fast Loader Pair Timing
+        uint8_t bit_pair_timing[2][4] = { 
+            {0, 0, 0, 0},   // Send
+            {13, 12, 10, 12}    // Receive
+        };
+
         /**
          * @brief receive byte from bus
          * @return The byte received from bus.

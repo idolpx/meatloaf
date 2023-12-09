@@ -483,7 +483,18 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
                 else
                 {
                     //Debug_printv("no match");
-                    meatClient->url += evt->header_value;                    
+                    if ( mstr::startsWith(evt->header_value, (char *)"/") )
+                    {
+                        // Absolute path redirect
+                        PeoplesUrlParser u;
+                        u.parseUrl( meatClient->url );
+                        meatClient->url = u.root() + evt->header_value;
+                    }
+                    else
+                    {
+                        // Relative path redirect
+                        meatClient->url += evt->header_value;
+                    }
                 }
 
                 //Debug_printv("new url '%s'", meatClient->url.c_str());

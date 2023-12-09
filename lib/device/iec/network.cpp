@@ -363,6 +363,7 @@ void iecNetwork::iec_reopen_save()
 
 void iecNetwork::iec_reopen_channel()
 {
+    Debug_printv("primary[%2X]", commanddata.primary);
     switch (commanddata.primary)
     {
     case IEC_TALK:
@@ -376,10 +377,13 @@ void iecNetwork::iec_reopen_channel()
 
 void iecNetwork::iec_reopen_channel_listen()
 {
+    Debug_printv("channel[%2X]", commanddata.channel);
+
     // If protocol isn't connected, then return not connected.
     if (protocol[commanddata.channel] == nullptr)
     {
         Debug_printf("iec_reopen_channel_listen() - Not connected\r\n");
+        IEC.senderTimeout();
         return;
     }
 
@@ -410,10 +414,12 @@ void iecNetwork::iec_reopen_channel_talk()
     bool set_eoi = false;
     NetworkStatus ns;
 
+    Debug_printv("channel[%2X]", commanddata.channel);
+
     // If protocol isn't connected, then return not connected.
     if (protocol[commanddata.channel] == nullptr)
     {
-        Debug_printf("iec_reopen_channel_listen() - Not connected\r\n");
+        Debug_printf("iec_reopen_channel_talk() - Not connected\r\n");
         return;
     }
 
@@ -740,9 +746,6 @@ void iecNetwork::iec_talk_command()
 {
     char tmp[32];
     NetworkStatus ns;
-
-    while (IEC.status(PIN_IEC_ATN))
-        ;
 
     if (!active_status_channel)
     {
@@ -1275,6 +1278,8 @@ device_state_t iecNetwork::process()
     virtualDevice::process(); // commanddata set here.
     payload=mstr::toUTF8(payload); // @idolpx? What should I do instead?
 
+    Debug_printv("payload[%s]", payload.c_str());
+
     // fan out to appropriate process routine
     switch (commanddata.channel)
     {
@@ -1297,6 +1302,7 @@ device_state_t iecNetwork::process()
 
 void iecNetwork::process_load()
 {
+    Debug_printv("secondary[%2X]", commanddata.secondary);
     switch (commanddata.secondary)
     {
     case IEC_OPEN:
@@ -1315,6 +1321,7 @@ void iecNetwork::process_load()
 
 void iecNetwork::process_save()
 {
+    Debug_printv("secondary[%2X]", commanddata.secondary);
     switch (commanddata.secondary)
     {
     case IEC_OPEN:
@@ -1333,6 +1340,7 @@ void iecNetwork::process_save()
 
 void iecNetwork::process_channel()
 {
+    Debug_printv("secondary[%2X]", commanddata.secondary);
     switch (commanddata.secondary)
     {
     case IEC_OPEN:
@@ -1351,6 +1359,7 @@ void iecNetwork::process_channel()
 
 void iecNetwork::process_command()
 {
+    Debug_printv("primary[%2X]", commanddata.primary);
     if (commanddata.primary == IEC_LISTEN)
     {
         pt = util_tokenize(payload, ',');

@@ -138,6 +138,13 @@ void iecMeatloaf::process_basic_commands()
     //     mount_all();
     else if (payload.find("localip") != std::string::npos)
         local_ip();
+    else if (payload.find("bptiming") != std::string::npos)
+    {
+        if ( pt.size() < 3 ) 
+            return;
+
+        IEC.setBitTiming(pt[1], atoi(pt[2].c_str()), atoi(pt[3].c_str()), atoi(pt[4].c_str()), atoi(pt[5].c_str()));
+    }
 }
 
 void iecMeatloaf::process_raw_commands()
