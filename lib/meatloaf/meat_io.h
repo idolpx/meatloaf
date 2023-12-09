@@ -47,6 +47,7 @@ public:
     MFile* root(std::string);
     MFile* localRoot(std::string);
 
+    bool isPETSCII = false;
     std::string media_header;
     std::string media_id;
     std::string media_archive;

@@ -228,7 +228,7 @@ void iecDrive::iec_open()
         // Remove media ID from command string
         payload = mstr::drop(payload, 2);
     }
-    if ( mstr::startsWith(payload, "cd") )
+    if ( mstr::startsWith(payload, "CD") )
     {
         payload = mstr::drop(payload, 2);
         if ( payload[0] == ':' || payload[0] == ' ' )
@@ -565,7 +565,6 @@ void iecDrive::get_prefix()
 void iecDrive::set_prefix()
 {
     std::string path = payload;
-    //mstr::toUTF8(path);
 
     // Isolate path
     path = mstr::drop(path, 2);
@@ -788,12 +787,14 @@ uint16_t iecDrive::sendHeader(std::string header, std::string id)
     std::string url = _base->url;
 
     p.parseUrl(url); // reversed the order, you shouldn't really parse an url converted to PETSCII!!!
-    //mstr::toPETSCII2(url);
 
     url = p.root();
     std::string path = p.pathToFile();
-    std::string archive = "";
-    std::string image = p.name;
+    path = mstr::toPETSCII2(path);
+    std::string archive = _base->media_archive;
+    archive = mstr::toPETSCII2(archive);
+    std::string image = _base->media_image;
+    image = mstr::toPETSCII2(image);
     Debug_printv("path[%s] size[%d]", path.c_str(), path.size());
 
     // Send List HEADER
@@ -850,7 +851,7 @@ uint16_t iecDrive::sendHeader(std::string header, std::string id)
     // If SD Card is available ad we are at the root path show it as a directory at the top
     if (fnSDFAT.running() && _base->url.size() < 2)
     {
-        byte_count += sendLine(0, "%*s\"sd\"               DIR", 3, "");
+        byte_count += sendLine(0, "%*s\"SD\"               DIR", 3, "");
         if ( IEC.flags & ERROR ) return 0;
     }
 
@@ -883,7 +884,7 @@ void iecDrive::sendListing()
     Debug_printf("sendListing: [%s]\r\n=================================\r\n", _base->url.c_str());
 
     uint16_t byte_count = 0;
-    std::string extension = "dir";
+    std::string extension = "DIR";
 
     std::unique_ptr<MFile> entry = std::unique_ptr<MFile>( _base->getNextFileInDir() );
 
@@ -967,19 +968,23 @@ void iecDrive::sendListing()
             }
             else
             {
-                extension = "prg";
+                extension = "PRG";
             }
         }
         else
         {
-            extension = "dir";
+            extension = "DIR";
         }
 
         // Don't show hidden folders or files
         //Debug_printv("size[%d] name[%s]", entry->size(), entry->name.c_str());
-
-        //std::string name = entry->petsciiName();
-        //extension = mstr::toPETSCII2(extension);
+        std::string name = entry->name;
+        if ( !entry->isPETSCII )
+        {
+            name = mstr::toPETSCII2( entry->name );
+            extension = mstr::toPETSCII2(extension);
+        }
+        mstr::replaceAll(name, "\\", "/");
 
         if (entry->name[0]!='.')
         {
@@ -993,7 +998,7 @@ void iecDrive::sendListing()
                 return;
             }
 
-            byte_count += sendLine(block_cnt, "%*s\"%s\"%*s %s", block_spc, "", entry->name.c_str(), space_cnt, "", extension.c_str());
+            byte_count += sendLine(block_cnt, "%*s\"%s\"%*s %s", block_spc, "", name.c_str(), space_cnt, "", extension.c_str());
             if ( IEC.flags & ERROR ) return;
         }
 

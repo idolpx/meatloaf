@@ -466,7 +466,6 @@ void systemBus::read_payload()
             break;
         }
     }
-    //release ( PIN_IEC_SRQ );
 
     bus_state = BUS_IDLE;
 }

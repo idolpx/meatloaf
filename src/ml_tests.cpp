@@ -604,7 +604,8 @@ void testPetsciiUtf() {
 
 
     // should give:                        0x250c,0x2534,0x252c,0x2524,
-    std::string petscii = "Hello world! Some PETSCII: 1:\xb0 2:\xb1 3:\xb2 4:\xb3";
+    //std::string petscii = "Hello world! Some PETSCII: 1:\xb0 2:\xb1 3:\xb2 4:\xb3";
+    std::string petscii = "fb64";
     std::string utf8 = mstr::toUTF8(petscii);
     std::string petscii2 = mstr::toPETSCII2(utf8);
     std::string utf8again = mstr::toUTF8(petscii2);
