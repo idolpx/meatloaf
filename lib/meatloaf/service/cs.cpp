@@ -148,7 +148,7 @@ bool CServerIStream::open() {
         // name here MUST BE UPPER CASE
         // trim spaces from right of name too
         mstr::rtrimA0(file->name);
-        mstr::toPETSCII(file->name);
+        mstr::toPETSCII2(file->name);
         CServerFileSystem::session.sendCommand("load "+file->name);
         // read first 2 bytes with size, low first, but may also reply with: ?500 - ERROR
         uint8_t buffer[2] = { 0, 0 };

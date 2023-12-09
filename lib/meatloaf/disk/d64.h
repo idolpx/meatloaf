@@ -270,7 +270,7 @@ public:
         isDir = is_dir;
 
         media_image = name;
-        mstr::toASCII(media_image);
+        mstr::toUTF8(media_image);
     };
     
     ~D64File() {

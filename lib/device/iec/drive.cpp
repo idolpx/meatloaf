@@ -220,7 +220,7 @@ void iecDrive::iec_open()
         s = pt[0];
         //Debug_printv("filename[%s] type[%s] mode[%s]", pt[0].c_str(), pt[1].c_str(), pt[2].c_str());
     }
-    mstr::toASCII(s);
+    mstr::toUTF8(s);
 
     Debug_printv("s[%s]", s.c_str());
 
@@ -567,7 +567,7 @@ void iecDrive::get_prefix()
 void iecDrive::set_prefix()
 {
     std::string path = payload;
-    mstr::toASCII(path);
+    mstr::toUTF8(path);
 
     // Isolate path
     path = mstr::drop(path, 2);
@@ -790,7 +790,7 @@ uint16_t iecDrive::sendHeader(std::string header, std::string id)
     std::string url = _base->url;
 
     p.parseUrl(url); // reversed the order, you shouldn't really parse an url converted to PETSCII!!!
-    mstr::toPETSCII(url);
+    mstr::toPETSCII2(url);
 
     url = p.root();
     std::string path = p.pathToFile();
