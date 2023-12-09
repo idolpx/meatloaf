@@ -100,9 +100,9 @@ string FNJSON::processString(string in)
         }
     }
 
-#ifdef BUILD_IEC
-    in = mstr::toPETSCII2(in);
-#endif
+// #ifdef BUILD_IEC
+//     in = mstr::toPETSCII2(in);
+// #endif
 
 #ifdef BUILD_ATARI
     // SIO AUX bits 0+1 control the mapping
@@ -212,13 +212,13 @@ string FNJSON::getValue(cJSON *item)
             item = item->child;
             do
             {
-                #ifdef BUILD_IEC
-                    // Convert key to PETSCII
-                    string tempStr = string((const char *)item->string);                    
-                    ss << mstr::toPETSCII2(tempStr);
-                #else
+                // #ifdef BUILD_IEC
+                //     // Convert key to PETSCII
+                //     string tempStr = string((const char *)item->string);                    
+                //     ss << mstr::toPETSCII2(tempStr);
+                // #else
                     ss << item->string;
-                #endif
+                //#endif
 
                 ss << lineEnding + getValue(item);
             } while ((item = item->next) != NULL);

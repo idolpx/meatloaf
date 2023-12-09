@@ -603,7 +603,7 @@ void virtualDevice::iec_talk_command_buffer_status()
     {
         snprintf(reply, 80, "%u,%s,%u,%u", iecStatus.error, iecStatus.msg.c_str(), iecStatus.connected, iecStatus.channel);
         s = std::string(reply);
-        s = mstr::toPETSCII2(s);
+        // s = mstr::toPETSCII2(s);
         Debug_printv("sending status: %s\r\n", reply);
         IEC.sendBytes(s);
     }
@@ -700,7 +700,9 @@ bool systemBus::sendBytes(const char *buf, size_t len, bool eoi)
 
 bool systemBus::sendBytes(std::string s, bool eoi)
 {
-    return sendBytes(s.c_str(), s.size(), eoi);
+    std::string out = s;
+    mstr::toPETSCII2(out);
+    return sendBytes(out.c_str(), out.size(), eoi);
 }
 
 void systemBus::process_cmd()

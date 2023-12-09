@@ -865,7 +865,7 @@ void iecNetwork::perform_special_00()
         iecStatus.channel = commanddata.channel;
         iecStatus.connected = ns.connected;
         s = string(reply);
-        iecStatus.msg = mstr::toPETSCII2(s);
+        iecStatus.msg = s; // mstr::toPETSCII2(s);
     }
 }
 

@@ -308,11 +308,11 @@ void iecMeatloaf::net_scan_result()
     }
     else // SCANRESULT,n
     {
-        char c[40];
-        std::string s = std::string(detail.ssid);
-        s = mstr::toPETSCII2(s);
+        // char c[40];
+        // std::string s = std::string(detail.ssid);
+        // s = mstr::toPETSCII2(s);
 
-        memset(c, 0, sizeof(c));
+        // memset(c, 0, sizeof(c));
 
         iecStatus.error = detail.rssi;
         iecStatus.channel = 15;
@@ -348,7 +348,7 @@ void iecMeatloaf::net_get_ssid()
     else // BASIC mode.
     {
         std::string r = std::string(cfg.ssid);
-        s = mstr::toPETSCII2(r);
+        //s = mstr::toPETSCII2(r);
         status_override = r;
     }
 }
