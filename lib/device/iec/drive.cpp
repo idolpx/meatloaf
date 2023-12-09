@@ -968,12 +968,12 @@ void iecDrive::sendListing()
             }
             else
             {
-                extension = "PRG";
+                extension = "prg";
             }
         }
         else
         {
-            extension = "DIR";
+            extension = "dir";
         }
 
         // Don't show hidden folders or files
