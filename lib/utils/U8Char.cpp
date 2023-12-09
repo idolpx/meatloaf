@@ -115,3 +115,29 @@ uint8_t U8Char::toPetscii() {
     }
     return missing;
 }
+
+// for punycode we need utf8 converted to uint32_t 
+// workflows:
+// char* ascii_punycode -> uint32_t* -> char* utf8
+// char* utf8 -> uint32_t* -> char* ascii_punycode
+
+// convert utf8 encoded string to array of uint32_t, return length of output_unicode32
+size_t U8Char::toUnicode32(std::string& input_utf8, uint32_t* output_unicode32) {
+    size_t input_length = input_utf8.length();
+    size_t output_length = 0;
+    // for(size_t i = 0; i<input_length; i++) {
+    //     U8Char ch(input_utf8[i]);
+    //     output_unicode32[output_length++] = ch.ch;
+    // }
+    return output_length;
+}
+
+// convert array of uint32_t to utf8 encoded string, return utf8 string
+std::string U8Char::fromUnicode32(uint32_t* input_unicode32, size_t input_length) {
+    std::string output_utf8;
+    // for(size_t i = 0; i<input_length; i++) {
+    //     U8Char ch(input_unicode32[i]);
+    //     output_utf8 += ch.toUtf8();
+    // }
+    return output_utf8;
+}
