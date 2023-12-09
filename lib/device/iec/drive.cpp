@@ -789,7 +789,7 @@ uint16_t iecDrive::sendHeader(std::string header, std::string id)
     p.parseUrl(url); // reversed the order, you shouldn't really parse an url converted to PETSCII!!!
 
     url = p.root();
-    std::string path = _base->pathToFile();
+    std::string path = p.path; //_base->pathToFile();
     path = mstr::toPETSCII2(path);
     std::string archive = _base->media_archive;
     archive = mstr::toPETSCII2(archive);
@@ -984,6 +984,7 @@ void iecDrive::sendListing()
             name = mstr::toPETSCII2( entry->name );
             extension = mstr::toPETSCII2(extension);
         }
+        mstr::rtrimA0(name);
         mstr::replaceAll(name, "\\", "/");
 
         if (entry->name[0]!='.')
