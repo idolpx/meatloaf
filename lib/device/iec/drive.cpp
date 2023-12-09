@@ -789,7 +789,7 @@ uint16_t iecDrive::sendHeader(std::string header, std::string id)
     p.parseUrl(url); // reversed the order, you shouldn't really parse an url converted to PETSCII!!!
 
     url = p.root();
-    std::string path = p.pathToFile();
+    std::string path = _base->pathToFile();
     path = mstr::toPETSCII2(path);
     std::string archive = _base->media_archive;
     archive = mstr::toPETSCII2(archive);
