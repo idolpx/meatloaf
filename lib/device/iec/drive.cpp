@@ -789,7 +789,7 @@ uint16_t iecDrive::sendHeader(std::string header, std::string id)
     p.parseUrl(url); // reversed the order, you shouldn't really parse an url converted to PETSCII!!!
 
     url = p.root();
-    std::string path = p.path; //_base->pathToFile();
+    std::string path = p.pathToFile(); //_base->pathToFile();
     path = mstr::toPETSCII2(path);
     std::string archive = _base->media_archive;
     archive = mstr::toPETSCII2(archive);
@@ -939,28 +939,8 @@ void iecDrive::sendListing()
     // Send Directory Items
     while(entry != nullptr)
     {
-        //uint32_t s = entry->size();
-        //uint32_t block_cnt = s / _base->media_block_size;
-        uint32_t block_cnt = entry->blocks();
-        // Debug_printv( "size[%d] blocks[%d] blocksz[%d]", s, block_cnt, _base->media_block_size );
-        //if ( s > 0 && s < _base->media_block_size )
-        //    block_cnt = 1;
-
-        uint8_t block_spc = 3;
-        if (block_cnt > 9)
-            block_spc--;
-        if (block_cnt > 99)
-            block_spc--;
-        if (block_cnt > 999)
-            block_spc--;
-
-        uint8_t space_cnt = 21 - (entry->name.length() + 5);
-        if (space_cnt > 21)
-            space_cnt = 0;
-
         if (!entry->isDirectory())
         {
-
             // Get extension
             if (entry->extension.length())
             {
@@ -987,7 +967,26 @@ void iecDrive::sendListing()
         mstr::rtrimA0(name);
         mstr::replaceAll(name, "\\", "/");
 
-        if (entry->name[0]!='.')
+        //uint32_t s = entry->size();
+        //uint32_t block_cnt = s / _base->media_block_size;
+        uint32_t block_cnt = entry->blocks();
+        // Debug_printv( "size[%d] blocks[%d] blocksz[%d]", s, block_cnt, _base->media_block_size );
+        //if ( s > 0 && s < _base->media_block_size )
+        //    block_cnt = 1;
+
+        uint8_t block_spc = 3;
+        if (block_cnt > 9)
+            block_spc--;
+        if (block_cnt > 99)
+            block_spc--;
+        if (block_cnt > 999)
+            block_spc--;
+
+        uint8_t space_cnt = 21 - (name.size() + 5);
+        if (space_cnt > 21)
+            space_cnt = 0;
+
+        if (name[0]!='.')
         {
             // Exit if ATN is PULLED while sending
             // Exit if there is an error while sending
