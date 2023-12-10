@@ -427,7 +427,6 @@ MFile* MFile::localRoot(std::string plus)
 
 MFile* MFile::cd(std::string newDir) 
 {
-
     Debug_printv("cd requested: [%s]", newDir.c_str());
     if ( streamFile != nullptr)
         Debug_printv("streamFile[%s]", streamFile->url.c_str());
@@ -488,23 +487,10 @@ MFile* MFile::cd(std::string newDir)
         // means: change to flash root
         return MFSOwner::File("/");
     }
-
-
-    // if(newDir[0]=='@' /*&& newDir[1]=='/' let's be consistent!*/) {
-    //     if(newDir.size() == 1) {
-    //         // user entered: CD:@ or CD@
-    //         // meaning: go to the .sys folder
-    //         return MFSOwner::File("/.sys");
-    //     }
-    //     else {
-    //         // user entered: CD:@FOLDER or CD@FOLDER
-    //         // meaning: go to a folder in .sys folder
-    //         return MFSOwner::File("/.sys/" + mstr::drop(newDir,1));
-    //     }
-    // }
-
     else 
     {
+        newDir = mstr::toUTF8( newDir );
+
         // Add new directory to path
         if ( !mstr::endsWith(url, "/") && newDir.size() )
             url.push_back('/');

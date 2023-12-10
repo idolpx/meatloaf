@@ -376,9 +376,9 @@ void systemBus::read_command()
                     bus_state = BUS_IDLE;
                 }
 
-                // Wait for ATN to be released
-                if ( data.secondary == IEC_OPEN || data.secondary == IEC_REOPEN )
-                    protocol->timeoutWait(PIN_IEC_ATN, RELEASED, FOREVER, false);
+                // // Wait for ATN to be released
+                // if ( data.secondary == IEC_OPEN || data.secondary == IEC_REOPEN )
+                //     protocol->timeoutWait(PIN_IEC_ATN, RELEASED, FOREVER, false);
             }
         }
     } while ( IEC.status ( PIN_IEC_ATN ) );
@@ -466,7 +466,6 @@ void systemBus::read_payload()
             break;
         }
     }
-    //release ( PIN_IEC_SRQ );
 
     bus_state = BUS_IDLE;
 }
@@ -595,7 +594,7 @@ void virtualDevice::iec_talk_command_buffer_status()
     if (!status_override.empty())
     {
         Debug_printv("sending explicit response.");
-        IEC.sendBytes(status_override);
+        IEC.sendBytes(status_override, true);
         status_override.clear();
         status_override.shrink_to_fit();
     }
@@ -603,9 +602,9 @@ void virtualDevice::iec_talk_command_buffer_status()
     {
         snprintf(reply, 80, "%u,%s,%u,%u", iecStatus.error, iecStatus.msg.c_str(), iecStatus.connected, iecStatus.channel);
         s = std::string(reply);
-        mstr::toPETSCII(s);
+        // s = mstr::toPETSCII2(s);
         Debug_printv("sending status: %s\r\n", reply);
-        IEC.sendBytes(s);
+        IEC.sendBytes(s, true);
     }
 }
 
@@ -682,9 +681,7 @@ bool systemBus::sendByte(const char c, bool eoi)
 bool systemBus::sendBytes(const char *buf, size_t len, bool eoi)
 {
     bool success = false;
-#ifdef DATA_STREAM
-    Debug_print("{ ");
-#endif
+
     for (size_t i = 0; i < len; i++)
     {
         if (i == (len - 1) && eoi)
@@ -692,15 +689,15 @@ bool systemBus::sendBytes(const char *buf, size_t len, bool eoi)
         else
             success = sendByte(buf[i], false);
     }
-#ifdef DATA_STREAM
-    Debug_println("}");
-#endif
+
     return success;
 }
 
 bool systemBus::sendBytes(std::string s, bool eoi)
 {
-    return sendBytes(s.c_str(), s.size(), eoi);
+    std::string out;
+    out = mstr::toPETSCII2(out);
+    return sendBytes(out.c_str(), out.size(), eoi);
 }
 
 void systemBus::process_cmd()

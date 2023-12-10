@@ -221,10 +221,6 @@ public:
     MStream* createIStream(std::shared_ptr<MStream> src) { return src.get(); };
     MStream* meatStream() override ; // has to return OPENED stream
 
-    std::string petsciiName() override {
-        return name;
-    }
-
     //MFile* cd(std::string newDir);
     bool isDirectory() override;
     bool rewindDirectory() override;

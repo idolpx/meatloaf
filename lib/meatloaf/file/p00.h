@@ -83,12 +83,6 @@ public:
 
     MStream* createIStream(std::shared_ptr<MStream> containerIstream) override;
 
-    std::string petsciiName() override {
-        // It's already in PETSCII
-        mstr::replaceAll(name, "\\", "/");
-        return name;
-    }
-
     bool isDirectory() override { return false; };;
     bool rewindDirectory() override { return false; };;
     MFile* getNextFileInDir() override { return nullptr; };;

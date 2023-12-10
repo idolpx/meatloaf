@@ -270,7 +270,7 @@ public:
         isDir = is_dir;
 
         media_image = name;
-        mstr::toASCII(media_image);
+        isPETSCII = true;
     };
     
     ~D64File() {
@@ -278,12 +278,6 @@ public:
     }
 
     MStream* createIStream(std::shared_ptr<MStream> containerIstream) override;
-
-    std::string petsciiName() override {
-        // It's already in PETSCII
-        mstr::replaceAll(name, "\\", "/");
-        return name;
-    }
 
     bool isDirectory() override;
     bool rewindDirectory() override;

@@ -47,6 +47,7 @@ public:
     MFile* root(std::string);
     MFile* localRoot(std::string);
 
+    bool isPETSCII = false;
     std::string media_header;
     std::string media_id;
     std::string media_archive;
@@ -57,12 +58,6 @@ public:
     bool operator!=(nullptr_t ptr);
 
     // bool copyTo(MFile* dst);
-
-    virtual std::string petsciiName() {
-        std::string pname = name;
-        mstr::toPETSCII(pname);
-        return pname;
-    }
 
     // has to return OPENED stream
     virtual MStream* meatStream();

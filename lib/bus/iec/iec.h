@@ -481,7 +481,7 @@ public:
      * @param eoi Send EOI?
      * @return true on success, false on error
      */
-    bool sendBytes(const char *buf, size_t len, bool eoi = true);
+    bool sendBytes(const char *buf, size_t len, bool eoi = false);
 
     /**
      * @brief Send string to bus
@@ -489,7 +489,7 @@ public:
      * @param eoi Send EOI?
      * @return true on success, false on error
      */
-    bool sendBytes(std::string s, bool eoi = true);
+    bool sendBytes(std::string s, bool eoi = false);
 
     /**
      * @brief Receive Byte from bus

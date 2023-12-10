@@ -105,7 +105,8 @@ bool D64IStream::deallocateBlock( uint8_t track, uint8_t sector)
 bool D64IStream::seekEntry( std::string filename )
 {
     uint32_t index = 1;
-    mstr::rtrimA0(filename);
+    //mstr::rtrimA0(filename);
+    filename = mstr::toPETSCII2(filename);
     mstr::replaceAll(filename, "\\", "/");
 
     // Read Directory Entries
@@ -114,9 +115,7 @@ bool D64IStream::seekEntry( std::string filename )
         while ( seekEntry( index ) )
         {
             std::string entryFilename = entry.filename;
-            mstr::rtrimA0(entryFilename);
-            mstr::replaceAll(filename, "\\", "/");
-            mstr::toASCII(entryFilename);
+
             Debug_printv("index[%d] track[%d] sector[%d] filename[%s] entry.filename[%.16s]", index, track, sector, filename.c_str(), entryFilename.c_str());
 
             //Debug_printv("filename[%s] entry[%s]", filename.c_str(), entryFilename.c_str());
@@ -387,7 +386,7 @@ bool D64File::rewindDirectory() {
     media_blocks_free = image->blocksFree();
     media_block_size = image->block_size;
     media_image = name;
-    mstr::toASCII(media_image);
+    //mstr::toUTF8(media_image);
 
     return true;
 }
@@ -409,7 +408,7 @@ MFile* D64File::getNextFileInDir() {
     if ( r )
     {
         std::string fileName = image->entry.filename;
-        mstr::rtrimA0(fileName);
+        //mstr::rtrimA0(fileName);
         mstr::replaceAll(fileName, "/", "\\");
         //Debug_printv( "entry[%s]", (streamFile->url + "/" + fileName).c_str() );
         auto file = MFSOwner::File(streamFile->url + "/" + fileName);

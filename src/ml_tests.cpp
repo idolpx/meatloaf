@@ -26,6 +26,7 @@
 
 //#include "fnHttpClient.h"
 #include "fnSystem.h"
+#include "punycode.h"
 
 //std::unique_ptr<MFile> m_mfile(MFSOwner::File(""));
 
@@ -592,6 +593,42 @@ void testSmartMFile() {
 	Debug_printf("Extension of second one: [%s]\r\n", test2->extension.c_str());
 }
 
+void testPetsciiUtf() {
+    testHeader("TEST PETSCII TO UTF8");
+
+    //petscii b0 -> 250c should be E2 94 8C
+    //petscii b1 -> 2534 should be E2 94 B4
+    std::string petchar = "\xb0";
+    std::string utf8char = mstr::toUTF8(petchar);
+    // print hex representation of utf8char
+    Debug_printv("Petscii b0 as UTF8: %x %x %x (should be e2 94 8c)\r\n", utf8char[0],utf8char[1],utf8char[2]);
+
+
+    // should give:                        0x250c,0x2534,0x252c,0x2524,
+    //std::string petscii = "Hello world! Some PETSCII: 1:\xb0 2:\xb1 3:\xb2 4:\xb3";
+    std::string petscii = "fb64";
+    std::string utf8 = mstr::toUTF8(petscii);
+    std::string petscii2 = mstr::toPETSCII2(utf8);
+    std::string utf8again = mstr::toUTF8(petscii2);
+    Debug_printv("Petscii: [%s]\r\n", petscii.c_str());
+    Debug_printv("UTF8: [%s] - should be: [\u250c\u2534\u252c\u2524]\r\n", utf8.c_str());
+    Debug_printv("And back to petscii: [%s]\r\n", petscii2.c_str());
+    Debug_printv("And back to utf8: [%s]\r\n", utf8again.c_str());
+}
+
+void testPunycode() {
+    testHeader("TEST PUNYCODE");
+
+    //std::string chinese = "文件档案名";
+    const uint32_t chineseAsUnicode[] = {0x6587, 0x4ef6, 0x6843, 0x684c, 0x540d};
+    char asPunycode[256];
+    size_t dstlen = sizeof asPunycode;
+    size_t n_converted;
+    // size_t punycode_encode(const uint32_t *const src, const size_t srclen, char *const dst, size_t *const dstlen)
+    n_converted = punycode_encode(chineseAsUnicode, 5, asPunycode, &dstlen);
+    Debug_printv("Chinese text as punycode:%s", asPunycode);
+}
+
 void testBasicConfig() {
     testHeader("TEST BASIC V2 config file");
 
@@ -674,7 +711,9 @@ void runTestsSuite() {
 
     //commodoreServer();
     //seekTest();
-    detectLeaks();
+    testPetsciiUtf();
+    testPunycode();
+    //detectLeaks();
 
     // ====== Per FS dir, read and write region =======================================
 

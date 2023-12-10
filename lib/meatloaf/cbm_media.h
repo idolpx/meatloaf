@@ -109,7 +109,7 @@ protected:
     size_t entry_count = -1; // Directory list entry count (-1 unknown)
 
     enum open_modes { OPEN_READ, OPEN_WRITE, OPEN_APPEND, OPEN_MODIFY };
-    std::string file_type_label[12] = { "del", "seq", "prg", "usr", "rel", "cbm", "dir", "sys", "nat", "cmd", "cfs", "???" };
+    std::string file_type_label[12] = { "DEL", "SEQ", "PRG", "USR", "REL", "CBM", "DIR", "SUS", "NAT", "CMD", "CFS", "???" };
 
     virtual void seekHeader() = 0;
     virtual bool seekNextImageEntry() = 0;

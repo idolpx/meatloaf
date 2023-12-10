@@ -214,34 +214,33 @@ void iecDrive::iec_open()
         return;
 
     pt = util_tokenize(payload, ',');
-    std::string s = payload;
     if ( pt.size() > 1 )
     {
-        s = pt[0];
+        payload = pt[0];
         //Debug_printv("filename[%s] type[%s] mode[%s]", pt[0].c_str(), pt[1].c_str(), pt[2].c_str());
     }
-    mstr::toASCII(s);
+    //mstr::toUTF8(s);
 
-    Debug_printv("s[%s]", s.c_str());
+    Debug_printv("payload[%s]", payload.c_str());
 
-    if ( mstr::startsWith(s, "0:") )
+    if ( mstr::startsWith(payload, "0:") )
     {
         // Remove media ID from command string
-        s = mstr::drop(s, 2);
+        payload = mstr::drop(payload, 2);
     }
-    if ( mstr::startsWith(s, "cd") )
+    if ( mstr::startsWith(payload, "CD") )
     {
-        s = mstr::drop(s, 2);
-        if ( s[0] == ':' || s[0] == ' ' )
-            s = mstr::drop(s, 1);
+        payload = mstr::drop(payload, 2);
+        if ( payload[0] == ':' || payload[0] == ' ' )
+            payload = mstr::drop(payload, 1);
     }
 
-    if ( s.length() )
+    if ( payload.length() )
     {
-        if ( s[0] == '$' ) 
-            s.clear();
+        if ( payload[0] == '$' ) 
+            payload.clear();
 
-        auto n = _base->cd( s );
+        auto n = _base->cd( payload );
         if ( n != nullptr )
             _base.reset( n );
 
@@ -250,8 +249,7 @@ void iecDrive::iec_open()
         {
             if ( !registerStream(commanddata.channel) )
             {
-                Debug_printv("File Doesn't Exist [%s]", s.c_str());
-                //_base.reset( MFSOwner::File( _base->base() ) );
+                Debug_printv("File Doesn't Exist [%s]", payload.c_str());
             }
         }
     }
@@ -346,7 +344,7 @@ void iecDrive::iec_talk_command_buffer_status()
 
     // snprintf(reply, 80, "%u,\"%s\",%u,%u", iecStatus.error, iecStatus.msg.c_str(), iecStatus.connected, iecStatus.channel);
     // s = string(reply);
-    IEC.sendBytes(s);
+    IEC.sendBytes(s, true);
 }
 
 void iecDrive::iec_command()
@@ -567,7 +565,6 @@ void iecDrive::get_prefix()
 void iecDrive::set_prefix()
 {
     std::string path = payload;
-    mstr::toASCII(path);
 
     // Isolate path
     path = mstr::drop(path, 2);
@@ -789,13 +786,15 @@ uint16_t iecDrive::sendHeader(std::string header, std::string id)
     PeoplesUrlParser p;
     std::string url = _base->url;
 
-    mstr::toPETSCII(url);
-    p.parseUrl(url);
+    p.parseUrl(url); // reversed the order, you shouldn't really parse an url converted to PETSCII!!!
 
     url = p.root();
-    std::string path = p.pathToFile();
-    std::string archive = "";
-    std::string image = p.name;
+    std::string path = p.pathToFile(); //_base->pathToFile();
+    path = mstr::toPETSCII2(path);
+    std::string archive = _base->media_archive;
+    archive = mstr::toPETSCII2(archive);
+    std::string image = _base->media_image;
+    image = mstr::toPETSCII2(image);
     Debug_printv("path[%s] size[%d]", path.c_str(), path.size());
 
     // Send List HEADER
@@ -885,7 +884,7 @@ void iecDrive::sendListing()
     Debug_printf("sendListing: [%s]\r\n=================================\r\n", _base->url.c_str());
 
     uint16_t byte_count = 0;
-    std::string extension = "dir";
+    std::string extension = "DIR";
 
     std::unique_ptr<MFile> entry = std::unique_ptr<MFile>( _base->getNextFileInDir() );
 
@@ -940,28 +939,8 @@ void iecDrive::sendListing()
     // Send Directory Items
     while(entry != nullptr)
     {
-        //uint32_t s = entry->size();
-        //uint32_t block_cnt = s / _base->media_block_size;
-        uint32_t block_cnt = entry->blocks();
-        // Debug_printv( "size[%d] blocks[%d] blocksz[%d]", s, block_cnt, _base->media_block_size );
-        //if ( s > 0 && s < _base->media_block_size )
-        //    block_cnt = 1;
-
-        uint8_t block_spc = 3;
-        if (block_cnt > 9)
-            block_spc--;
-        if (block_cnt > 99)
-            block_spc--;
-        if (block_cnt > 999)
-            block_spc--;
-
-        uint8_t space_cnt = 21 - (entry->name.length() + 5);
-        if (space_cnt > 21)
-            space_cnt = 0;
-
         if (!entry->isDirectory())
         {
-
             // Get extension
             if (entry->extension.length())
             {
@@ -979,11 +958,35 @@ void iecDrive::sendListing()
 
         // Don't show hidden folders or files
         //Debug_printv("size[%d] name[%s]", entry->size(), entry->name.c_str());
+        std::string name = entry->name;
+        if ( !entry->isPETSCII )
+        {
+            name = mstr::toPETSCII2( entry->name );
+            extension = mstr::toPETSCII2(extension);
+        }
+        mstr::rtrimA0(name);
+        mstr::replaceAll(name, "\\", "/");
 
-        std::string name = entry->petsciiName();
-        mstr::toPETSCII(extension);
+        //uint32_t s = entry->size();
+        //uint32_t block_cnt = s / _base->media_block_size;
+        uint32_t block_cnt = entry->blocks();
+        // Debug_printv( "size[%d] blocks[%d] blocksz[%d]", s, block_cnt, _base->media_block_size );
+        //if ( s > 0 && s < _base->media_block_size )
+        //    block_cnt = 1;
 
-        if (entry->name[0]!='.')
+        uint8_t block_spc = 3;
+        if (block_cnt > 9)
+            block_spc--;
+        if (block_cnt > 99)
+            block_spc--;
+        if (block_cnt > 999)
+            block_spc--;
+
+        uint8_t space_cnt = 21 - (name.size() + 5);
+        if (space_cnt > 21)
+            space_cnt = 0;
+
+        if (name[0]!='.')
         {
             // Exit if ATN is PULLED while sending
             // Exit if there is an error while sending
