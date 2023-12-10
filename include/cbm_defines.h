@@ -144,10 +144,11 @@ typedef enum
 #define COMMAND_RECVD    (1 << 4)
 
 #define VIC20_MODE      (1 << 8)
-#define JIFFYDOS_ACTIVE (1 << 9)
-#define JIFFYDOS_LOAD   (1 << 10)
-#define DOLPHIN_ACTIVE  (1 << 11)
-#define WIC64_ACTIVE    (1 << 12)
+#define SAUCEDOS_ACTIVE (1 << 9)
+#define JIFFYDOS_ACTIVE (1 << 10)
+#define JIFFYDOS_LOAD   (1 << 11)
+#define DOLPHIN_ACTIVE  (1 << 12)
+#define WIC64_ACTIVE    (1 << 13)
 
 // IEC protocol timing consts in microseconds (us)
 // IEC-Disected p10-11         // Description              //   1541    C64     min     typical     max         // Notes

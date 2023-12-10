@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
-#include "jiffydos.h"
+#include "saucedos.h"
 
 #include <rom/ets_sys.h>
 
@@ -32,7 +32,7 @@ using namespace Protocol;
 // When it's ready to go, it releases the Clock line to false.  This signal change might be
 // translated as "I'm ready to send a character." The listener must detect this and 
 // immediately start receiving data on both the clock and data lines.
-int16_t  JiffyDOS::receiveByte ()
+int16_t  SauceDOS::receiveByte ()
 {
     uint8_t data = 0;
     uint8_t bus = 0;
@@ -49,16 +49,12 @@ int16_t  JiffyDOS::receiveByte ()
 #endif
 
     // Wait for talker ready
-    // if ( timeoutWait ( PIN_IEC_CLK_IN, RELEASED, FOREVER ) == TIMED_OUT )
-    // {
-    //     Debug_printv ( "Wait for talker ready" );
-    //     IEC.flags or_eq ERROR;
-    //     return -1; // return error because timeout
-    // }
-    do
+    if ( timeoutWait ( PIN_IEC_CLK_IN, RELEASED, FOREVER ) == TIMED_OUT )
     {
-        ets_delay_us(1);
-    } while( IEC.status ( PIN_IEC_CLK_IN ) != RELEASED );
+        Debug_printv ( "Wait for talker ready" );
+        IEC.flags or_eq ERROR;
+        return -1; // return error because timeout
+    }
 
 
     // STEP 2: RECEIVING THE BITS
@@ -67,55 +63,56 @@ int16_t  JiffyDOS::receiveByte ()
     //IEC.pull ( PIN_IEC_SRQ );
 
     // get bits 4,5
-    IEC.pull ( PIN_IEC_SRQ );
-    ets_delay_us(bit_pair_timing[1][0]);
     if ( gpio_get_level ( PIN_IEC_CLK_IN ) )  data |= 0b00010000; // 1
     if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0b00100000; // 0
-    IEC.release( PIN_IEC_SRQ );
-    ets_delay_us(1);
+    if ( timeoutWait ( PIN_IEC_SRQ, RELEASED, FOREVER ) == TIMED_OUT )
+    {
+        Debug_printv ( "Wait for 4,5 ready" );
+        IEC.flags |= ERROR;
+        return -1; // return error because timeout
+    }
 
     // get bits 6,7
-    IEC.pull ( PIN_IEC_SRQ );
-    ets_delay_us(bit_pair_timing[1][1]);
     if ( gpio_get_level ( PIN_IEC_CLK_IN ) ) data |=  0b01000000; // 1
     if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0b10000000; // 1
-    IEC.release( PIN_IEC_SRQ );
-    ets_delay_us(1);
+    if ( timeoutWait ( PIN_IEC_SRQ, PULLED, FOREVER ) == TIMED_OUT )
+    {
+        Debug_printv ( "Wait for 6,7 ready" );
+        IEC.flags |= ERROR;
+        return -1; // return error because timeout
+    }
+
 
     // get bits 3,1
-    IEC.pull ( PIN_IEC_SRQ );
-    ets_delay_us(bit_pair_timing[1][2]);
     if ( gpio_get_level ( PIN_IEC_CLK_IN ) )  data |= 0b00001000; // 1
     if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0b00000010; // 1
-    IEC.release( PIN_IEC_SRQ );
-    ets_delay_us(1);
+    if ( timeoutWait ( PIN_IEC_SRQ, RELEASED, FOREVER ) == TIMED_OUT )
+    {
+        Debug_printv ( "Wait for 3,1 ready" );
+        IEC.flags |= ERROR;
+        return -1; // return error because timeout
+    }
 
     // get bits 2,0
-    IEC.pull ( PIN_IEC_SRQ );
-    ets_delay_us(bit_pair_timing[1][3]);
     if ( gpio_get_level ( PIN_IEC_CLK_IN ) )  data |= 0b00000100; // 0
     if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0b00000001; // 1
-    IEC.release( PIN_IEC_SRQ );
-    ets_delay_us(1);
+    if ( timeoutWait ( PIN_IEC_SRQ, PULLED, FOREVER ) == TIMED_OUT )
+    {
+        Debug_printv ( "Wait for 2,0 ready" );
+        IEC.flags |= ERROR;
+        return -1; // return error because timeout
+    }
 
     // rearrange bits
     data ^= bitmask;
     // Debug_printv("data[%2X]", data); // $ = 0x24
 
     // STEP 3: CHECK FOR EOI
-    IEC.pull ( PIN_IEC_SRQ );
-    ets_delay_us(13);
     if ( IEC.status ( PIN_IEC_CLK_IN ) == RELEASED )
     {
         Debug_printv("EOI [%2X]", data);
         IEC.flags |= EOI_RECVD;
     }
-    IEC.release ( PIN_IEC_SRQ );
-
-    // STEP 4: Acknowledge byte received
-    ets_delay_us(11);
-    IEC.pull ( PIN_IEC_DATA_OUT );
-    ets_delay_us(31);
 
     return data;
 } // receiveByte
@@ -129,7 +126,7 @@ int16_t  JiffyDOS::receiveByte ()
 // "ready  to  send"  signal  whenever  it  likes;  it  can  wait  a  long  time.    If  it's
 // a printer chugging out a line of print, or a disk drive with a formatting job in progress,
 // it might holdback for quite a while; there's no time limit.
-bool JiffyDOS::sendByte ( uint8_t data, bool signalEOI )
+bool SauceDOS::sendByte ( uint8_t data, bool signalEOI )
 {
     IEC.flags and_eq CLEAR_LOW;
 
@@ -208,3 +205,15 @@ bool JiffyDOS::sendByte ( uint8_t data, bool signalEOI )
 
     return true;
 } // sendByte
+
+
+bool SauceDOS::waitForTransition ( bool state )
+{
+    if ( timeoutWait ( PIN_IEC_SRQ, state, FOREVER ) == TIMED_OUT )
+    {
+        Debug_printv ( "Wait for bitpair ready" );
+        IEC.flags |= ERROR;
+        return false; // return error because timeout
+    }
+    return true;
+}

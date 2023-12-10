@@ -20,7 +20,7 @@
 #include "dolphindos.h"
 
 #include "bus.h"
-#include "iecProtocolBase.h"
+#include "_protocol.h"
 
 #include "../../../include/debug.h"
 #include "../../../include/pinmap.h"

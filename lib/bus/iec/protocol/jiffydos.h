@@ -27,14 +27,14 @@
 #ifndef PROTOCOL_JIFFYDOS_H
 #define PROTOCOL_JIFFYDOS_H
 
-#include "iecProtocolBase.h"
+#include "_protocol.h"
 
 #define TIMING_JIFFY_BITPAIR
 #define TIMING_JIFFY_BYTE
 
 namespace Protocol
 {
-	class JiffyDOS : public IecProtocolBase
+	class JiffyDOS : public IECProtocol
 	{
 		public:
 			JiffyDOS() {
