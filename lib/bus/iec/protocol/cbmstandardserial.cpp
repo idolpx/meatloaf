@@ -231,7 +231,7 @@ bool IecProtocolSerial::sendBits ( uint8_t data )
 // "ready  to  send"  signal  whenever  it  likes;  it  can  wait  a  long  time.    If  it's
 // a printer chugging out a line of print, or a disk drive with a formatting job in progress,
 // it might holdback for quite a while; there's no time limit.
-int16_t IecProtocolSerial::receiveByte()
+int8_t IecProtocolSerial::receiveByte()
 {
     IEC.flags &= CLEAR_LOW;
 
@@ -241,14 +241,6 @@ int16_t IecProtocolSerial::receiveByte()
         Debug_printv ( "Wait for talker ready" );
         return -1; // return error because timeout
     }
-
-#ifdef MEATLOAF_MAX
-    // If SRQ is pulled then SauceDOS is active on controller
-    if ( IEC.status ( PIN_IEC_SRQ ) )
-    {
-        IEC.flags |= SAUCEDOS_ACTIVE;
-    }
-#endif
 
     // Say we're ready
     // STEP 2: READY FOR DATA
@@ -290,7 +282,7 @@ int16_t IecProtocolSerial::receiveByte()
 
         // Acknowledge by pull down data more than 60us
         IEC.pull ( PIN_IEC_DATA_OUT );
-        if ( !wait ( TIMING_Tei ) ) return -1;
+        wait ( TIMING_Tei, false );
         IEC.release ( PIN_IEC_DATA_OUT );
 
         IEC.flags |= EOI_RECVD;
@@ -306,10 +298,8 @@ int16_t IecProtocolSerial::receiveByte()
 
     // STEP 3: RECEIVING THE BITS
     //IEC.pull ( PIN_IEC_SRQ );
-    int16_t data = receiveBits();
+    int8_t data = receiveBits();
     //IEC.release ( PIN_IEC_SRQ );
-    if ( data < 0 )
-        return -1;
 
     // STEP 4: FRAME HANDSHAKE
     // After the eighth bit has been sent, it's the listener's turn to acknowledge.  At this moment, the Clock line  is  true
@@ -358,7 +348,7 @@ int16_t IecProtocolSerial::receiveByte()
 // false, it grabs the bit from the Data line and puts it away.  It then waits for the clock line to go true, in order
 // to prepare for the next bit. When the talker figures the data has been held for a sufficient  length  of  time,  it
 // pulls  the  Clock  line true  and  releases  the  Data  line  to  false.    Then  it starts to prepare the next bit.
-int16_t IecProtocolSerial::receiveBits ()
+int8_t IecProtocolSerial::receiveBits ()
 {
     // Listening for bits
     uint8_t data = 0;
@@ -375,34 +365,42 @@ int16_t IecProtocolSerial::receiveBits ()
     {
         // Time the release of the clock line to detect JiffyDOS
         //IEC.pull ( PIN_IEC_SRQ );
-        bit_time = timeoutWait ( PIN_IEC_CLK_IN, RELEASED, TIMING_JIFFY_DETECT, false );
+        bit_time = timeoutWait ( PIN_IEC_CLK_IN, RELEASED, TIMING_PROTOCOL_DETECT, false );
         //IEC.release ( PIN_IEC_SRQ );
 
         // // If the bit time is less than 40us we are talking with a VIC20
         // if ( bit_time < TIMING_VIC20_DETECT )
         //     IEC.flags |= VIC20_MODE;
 
-        // If there is a 218us delay before the last bit, the controller uses JiffyDOS
-        if ( n == 7 && bit_time >= TIMING_JIFFY_DETECT )
+        // If there is a 218us delay before the last bit, the controller uses SauceDOS/JiffyDOS
+        if ( (n == 3 || n == 7) && bit_time >= TIMING_PROTOCOL_DETECT )
         {
             if ( (IEC.flags & ATN_PULLED) && data < 0x60 )
             {
                 uint8_t device = (data >> 1) & 0x1F;
                 if ( IEC.isDeviceEnabled ( device ) )
                 {
-                    // acknowledge we support JiffyDOS
+                    // acknowledge we support SauceDOS/JiffyDOS
                     IEC.pull(PIN_IEC_DATA_OUT);
-                    wait( TIMING_JIFFY_ACK, false );
+                    wait( TIMING_PROTOCOL_ACK, false );
                     IEC.release(PIN_IEC_DATA_OUT);
 
-                    IEC.flags |= JIFFYDOS_ACTIVE;
+                    // If SRQ is pulled then SauceDOS is active on controller
+                    if ( IEC.status ( PIN_IEC_SRQ ) )
+                    {
+                        IEC.flags |= SAUCEDOS_ACTIVE;
+                    }
+                    else
+                    {
+                        IEC.flags |= JIFFYDOS_ACTIVE;
+                    }
                 }
             }
         }
 
         // wait for bit to be ready to read
         //IEC.pull ( PIN_IEC_SRQ );
-        if ( timeoutWait ( PIN_IEC_CLK_IN, RELEASED, (TIMING_EMPTY - TIMING_JIFFY_DETECT) ) == TIMED_OUT )
+        if ( timeoutWait ( PIN_IEC_CLK_IN, RELEASED, (TIMING_EMPTY - TIMING_PROTOCOL_DETECT) ) == TIMED_OUT )
         {
             if ( n == 0 )
             {
@@ -413,7 +411,6 @@ int16_t IecProtocolSerial::receiveBits ()
             {
                 Debug_printv ( "bit timeout" );
             }
-
             return -1;
         }
         //IEC.release ( PIN_IEC_SRQ );

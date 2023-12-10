@@ -32,7 +32,7 @@ using namespace Protocol;
 // When it's ready to go, it releases the Clock line to false.  This signal change might be
 // translated as "I'm ready to send a character." The listener must detect this and 
 // immediately start receiving data on both the clock and data lines.
-int16_t  DolphinDOS::receiveByte ()
+int8_t  DolphinDOS::receiveByte ()
 {
     IEC.flags and_eq CLEAR_LOW;
 

@@ -36,7 +36,7 @@ using namespace Protocol;
 // When it's ready to go, it releases the Clock line to false.  This signal change might be
 // translated as "I'm ready to send a character." The listener must detect this and 
 // immediately start receiving data on both the clock and data lines.
-int16_t  SauceDOS::receiveByte ()
+int8_t  SauceDOS::receiveByte ()
 {
     uint8_t data = 0;
     uint8_t bus = 0;
@@ -205,14 +205,3 @@ bool SauceDOS::sendByte ( uint8_t data, bool signalEOI )
     return true;
 } // sendByte
 
-
-bool SauceDOS::waitForTransition ( bool state )
-{
-    if ( timeoutWait ( PIN_IEC_SRQ, state, FOREVER ) == TIMED_OUT )
-    {
-        Debug_printv ( "Wait for bitpair ready" );
-        IEC.flags |= ERROR;
-        return false; // return error because timeout
-    }
-    return true;
-}

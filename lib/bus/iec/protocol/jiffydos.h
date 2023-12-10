@@ -44,7 +44,7 @@ namespace Protocol
 		protected:
 			uint8_t loadmode = 0;
 			uint8_t skipeoi = 0;
-			int16_t receiveByte(void) override;
+			int8_t receiveByte(void) override;
 			bool sendByte(uint8_t data, bool eoi) override;
 			bool sendByte(uint8_t data, bool eoi, uint8_t loadflags);
 	};

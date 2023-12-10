@@ -252,7 +252,7 @@ void IRAM_ATTR systemBus::service()
 
 void systemBus::read_command()
 {
-    int16_t c = 0;
+    int8_t c = 0;
 
     do 
     {
@@ -271,7 +271,7 @@ void systemBus::read_command()
         //release( PIN_IEC_SRQ );
 
         // Check for error
-        if (c == 0xFFFFFFFF || flags & ERROR)
+        if ( flags & ERROR )
         {
             //Debug_printv("Error reading command. flags[%d]", flags);
             if (c == 0xFFFFFFFF)
@@ -506,7 +506,7 @@ std::shared_ptr<IECProtocol> systemBus::selectProtocol()
     switch(detected_protocol)
     {
 #ifdef MEATLOAF_MAX
-        case PROTOCOL_SAUCE:
+        case PROTOCOL_SAUCEDOS:
         {
             auto p = std::make_shared<SauceDOS>();
             return std::static_pointer_cast<IECProtocol>(p);
@@ -514,16 +514,6 @@ std::shared_ptr<IECProtocol> systemBus::selectProtocol()
 #endif
         case PROTOCOL_JIFFYDOS:
         {
-            /* JiffyDOS uses a slightly modified protocol for LOAD that */
-            /* is activated by using 0x61 instead of 0x60 in the TALK   */
-            /* state. The original floppy code has additional checks    */
-            /* that force the non-load Jiffy protocol for file types    */
-            /* other than SEQ and PRG.                                  */
-            /* Please note that $ is special-cased in the kernal so it  */
-            /* will never trigger this.                                 */
-            if ( data.primary == IEC_TALK && data.secondary == IEC_REOPEN_JD )
-                flags |= JIFFYDOS_LOAD;
-
             auto p = std::make_shared<JiffyDOS>();
             return std::static_pointer_cast<IECProtocol>(p);
         }
@@ -635,9 +625,9 @@ void systemBus::assert_interrupt()
         IEC.release(PIN_IEC_SRQ);
 }
 
-int16_t systemBus::receiveByte()
+int8_t systemBus::receiveByte()
 {
-    int16_t b;
+    int8_t b;
     b = protocol->receiveByte();
 #ifdef DATA_STREAM
     Debug_printf("%.2X ", b);
@@ -659,7 +649,7 @@ std::string systemBus::receiveBytes()
 
     do
     {
-        int16_t b = receiveByte();
+        int8_t b = receiveByte();
         if(b > -1)
             s += b;
     }while(!(flags & EOI_RECVD));

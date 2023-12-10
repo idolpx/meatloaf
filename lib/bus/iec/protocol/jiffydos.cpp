@@ -32,7 +32,7 @@ using namespace Protocol;
 // When it's ready to go, it releases the Clock line to false.  This signal change might be
 // translated as "I'm ready to send a character." The listener must detect this and 
 // immediately start receiving data on both the clock and data lines.
-int16_t  JiffyDOS::receiveByte ()
+int8_t  JiffyDOS::receiveByte ()
 {
     uint8_t data = 0;
     uint8_t bus = 0;
@@ -49,16 +49,12 @@ int16_t  JiffyDOS::receiveByte ()
 #endif
 
     // Wait for talker ready
-    // if ( timeoutWait ( PIN_IEC_CLK_IN, RELEASED, FOREVER ) == TIMED_OUT )
-    // {
-    //     Debug_printv ( "Wait for talker ready" );
-    //     IEC.flags or_eq ERROR;
-    //     return -1; // return error because timeout
-    // }
-    do
+    if ( timeoutWait ( PIN_IEC_CLK_IN, RELEASED, FOREVER ) == TIMED_OUT )
     {
-        ets_delay_us(1);
-    } while( IEC.status ( PIN_IEC_CLK_IN ) != RELEASED );
+        Debug_printv ( "Wait for talker ready" );
+        IEC.flags or_eq ERROR;
+        return -1; // return error because timeout
+    }
 
 
     // STEP 2: RECEIVING THE BITS
@@ -105,7 +101,13 @@ int16_t  JiffyDOS::receiveByte ()
     // STEP 3: CHECK FOR EOI
     IEC.pull ( PIN_IEC_SRQ );
     ets_delay_us(13);
-    if ( IEC.status ( PIN_IEC_CLK_IN ) == RELEASED )
+    if ( IEC.status ( PIN_IEC_CLK_IN ) == RELEASED && IEC.status ( PIN_IEC_CLK_IN ) == RELEASED )
+    {
+        Debug_printv("ERROR [%2X]", data);
+        IEC.flags |= ERROR;
+        return -1;
+    }
+    else if ( IEC.status ( PIN_IEC_CLK_IN ) == RELEASED && IEC.status ( PIN_IEC_CLK_IN ) == PULLED )
     {
         Debug_printv("EOI [%2X]", data);
         IEC.flags |= EOI_RECVD;
@@ -137,6 +139,18 @@ bool JiffyDOS::sendByte ( uint8_t data, bool signalEOI )
     IEC.pull( PIN_IEC_CLK_OUT );
     IEC.pull( PIN_IEC_DATA_OUT );
     wait ( 3 );
+
+    /* JiffyDOS uses a slightly modified protocol for LOAD that */
+    /* is activated by using 0x61 instead of 0x60 in the TALK   */
+    /* state. The original floppy code has additional checks    */
+    /* that force the non-load Jiffy protocol for file types    */
+    /* other than SEQ and PRG.                                  */
+    /* Please note that $ is special-cased in the kernal so it  */
+    /* will never trigger this.                                 */
+    if ( IEC.data.primary == IEC_TALK && IEC.data.secondary == IEC_REOPEN_JD )
+    {
+        
+    }
 
 //   if (loadmode) {
 //     /* LOAD mode: start marker is data low */

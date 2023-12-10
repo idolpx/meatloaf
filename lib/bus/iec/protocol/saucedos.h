@@ -39,9 +39,8 @@ namespace Protocol
 			};
 
 		protected:
-			int16_t receiveByte(void) override;
+			int8_t receiveByte(void) override;
 			bool sendByte(uint8_t data, bool eoi) override;
-            bool waitForTransition(bool state);
 	};
 };
 
