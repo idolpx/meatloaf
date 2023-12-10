@@ -40,8 +40,12 @@
 #include <memory>
 #include <driver/gpio.h>
 #include "fnSystem.h"
-#include "protocol/iecProtocolBase.h"
+
+#include "protocol/_protocol.h"
 #include "protocol/jiffydos.h"
+#ifdef MEATLOAF_MAX
+#include "protocol/saucedos.h"
+#endif
 #ifdef PARALLEL_BUS
 #include "protocol/dolphindos.h"
 #endif
@@ -112,14 +116,14 @@ typedef enum
 typedef enum {
     PROTOCOL_IEC_SERIAL,
     PROTOCOL_IEC_FAST_SERIAL,
+    PROTOCOL_SAUCEDOS,
     PROTOCOL_JIFFYDOS,
     PROTOCOL_EPYXFASTLOAD,
     PROTOCOL_WARPSPEED,
     PROTOCOL_SPEEDDOS,
     PROTOCOL_DOLPHINDOS,
     PROTOCOL_WIC64,
-    PROTOCOL_IEEE488,
-    PROTOCOL_MEATLOADER
+    PROTOCOL_IEEE488
 } bus_protocol_t;
 
 using namespace Protocol;
@@ -347,12 +351,12 @@ private:
     /**
      * @brief the active bus protocol
      */
-    std::shared_ptr<IecProtocolBase> protocol = nullptr;
+    std::shared_ptr<IECProtocol> protocol = nullptr;
 
     /**
      * @brief Switch to detected bus protocol
      */
-    std::shared_ptr<IecProtocolBase> selectProtocol();
+    std::shared_ptr<IECProtocol> selectProtocol();
 
     /**
      * IEC LISTEN received

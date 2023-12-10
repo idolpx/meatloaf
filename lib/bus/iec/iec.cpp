@@ -9,7 +9,7 @@
 #include "../../include/pinmap.h"
 #include "led.h"
 #include "led_strip.h"
-#include "protocol/iecProtocolSerial.h"
+#include "protocol/cbmstandardserial.h"
 #include "string_utils.h"
 #include "utils.h"
 
@@ -499,39 +499,49 @@ void systemBus::timer_stop()
     }
 }
 
-std::shared_ptr<IecProtocolBase> systemBus::selectProtocol() 
+std::shared_ptr<IECProtocol> systemBus::selectProtocol() 
 {
     //Debug_printv("protocol[%d]", detected_protocol);
     
-    if ( detected_protocol == PROTOCOL_JIFFYDOS ) 
+    switch(detected_protocol)
     {
-        /* JiffyDOS uses a slightly modified protocol for LOAD that */
-        /* is activated by using 0x61 instead of 0x60 in the TALK   */
-        /* state. The original floppy code has additional checks    */
-        /* that force the non-load Jiffy protocol for file types    */
-        /* other than SEQ and PRG.                                  */
-        /* Please note that $ is special-cased in the kernal so it  */
-        /* will never trigger this.                                 */
-        if ( data.primary == IEC_TALK && data.secondary == 0x61 )
-            flags |= JIFFYDOS_LOAD;
+#ifdef MEATLOAF_MAX
+        case PROTOCOL_SAUCE:
+        {
+            auto p = std::make_shared<SauceDOS>();
+            return std::static_pointer_cast<IECProtocol>(p);
+        }
+#endif
+        case PROTOCOL_JIFFYDOS:
+        {
+            /* JiffyDOS uses a slightly modified protocol for LOAD that */
+            /* is activated by using 0x61 instead of 0x60 in the TALK   */
+            /* state. The original floppy code has additional checks    */
+            /* that force the non-load Jiffy protocol for file types    */
+            /* other than SEQ and PRG.                                  */
+            /* Please note that $ is special-cased in the kernal so it  */
+            /* will never trigger this.                                 */
+            if ( data.primary == IEC_TALK && data.secondary == IEC_REOPEN_JD )
+                flags |= JIFFYDOS_LOAD;
 
-        auto p = std::make_shared<JiffyDOS>();
-        return std::static_pointer_cast<IecProtocolBase>(p);
-    } 
+            auto p = std::make_shared<JiffyDOS>();
+            return std::static_pointer_cast<IECProtocol>(p);
+        }
 #ifdef PARALLEL_BUS
-    else if ( detected_protocol == PROTOCOL_DOLPHINDOS ) 
-    {
-        auto p = std::make_shared<DolphinDOS>();
-        return std::static_pointer_cast<IecProtocolBase>(p);
-    }
+        case PROTOCOL_DOLPHINDOS:
+        {
+            auto p = std::make_shared<DolphinDOS>();
+            return std::static_pointer_cast<IECProtocol>(p);
+        }
 #endif
-    else 
-    {
+        default:
+        {
 #ifdef PARALLEL_BUS
-        PARALLEL.bus_state = PARALLEL_IDLE;
+            PARALLEL.bus_state = PARALLEL_IDLE;
 #endif
-        auto p = std::make_shared<IecProtocolSerial>();
-        return std::static_pointer_cast<IecProtocolBase>(p);
+            auto p = std::make_shared<IecProtocolSerial>();
+            return std::static_pointer_cast<IECProtocol>(p);
+        }
     }
 }
 

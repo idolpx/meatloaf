@@ -10,7 +10,7 @@ namespace Protocol
     /**
      * @brief The IEC bus protocol base class
      */
-    class IecProtocolBase
+    class IECProtocol
     {
         public:
 

@@ -1,6 +1,6 @@
 #ifdef BUILD_IEC
 
-#include "iecProtocolBase.h"
+#include "_protocol.h"
 
 #include "bus.h"
 
@@ -9,7 +9,7 @@
 
 using namespace Protocol;
 
-int16_t IecProtocolBase::timeoutWait(uint8_t pin, bool target_status, size_t wait_us, bool watch_atn)
+int16_t IECProtocol::timeoutWait(uint8_t pin, bool target_status, size_t wait_us, bool watch_atn)
 {
     uint64_t start = 0;
     uint64_t current = 0;
@@ -71,12 +71,12 @@ int16_t IecProtocolBase::timeoutWait(uint8_t pin, bool target_status, size_t wai
 
 }
 
-bool IecProtocolBase::wait(size_t wait_us, bool watch_atn)
+bool IECProtocol::wait(size_t wait_us, bool watch_atn)
 {
     return wait(wait_us, 0, watch_atn);
 }
 
-bool IecProtocolBase::wait(size_t wait_us, uint64_t start, bool watch_atn)
+bool IECProtocol::wait(size_t wait_us, uint64_t start, bool watch_atn)
 {
     uint64_t current, elapsed;
     current = 0;
