@@ -26,6 +26,7 @@
 
 //#include "fnHttpClient.h"
 #include "fnSystem.h"
+#include "punycode.h"
 
 //std::unique_ptr<MFile> m_mfile(MFSOwner::File(""));
 
@@ -615,6 +616,19 @@ void testPetsciiUtf() {
     Debug_printv("And back to utf8: [%s]\r\n", utf8again.c_str());
 }
 
+void testPunycode() {
+    testHeader("TEST PUNYCODE");
+
+    //std::string chinese = "文件档案名";
+    const uint32_t chineseAsUnicode[] = {0x6587, 0x4ef6, 0x6843, 0x684c, 0x540d};
+    char asPunycode[256];
+    size_t dstlen = sizeof asPunycode;
+    size_t n_converted;
+    // size_t punycode_encode(const uint32_t *const src, const size_t srclen, char *const dst, size_t *const dstlen)
+    n_converted = punycode_encode(chineseAsUnicode, 5, asPunycode, &dstlen);
+    Debug_printv("Chinese text as punycode:%s", asPunycode);
+}
+
 void testBasicConfig() {
     testHeader("TEST BASIC V2 config file");
 
@@ -698,6 +712,7 @@ void runTestsSuite() {
     //commodoreServer();
     //seekTest();
     testPetsciiUtf();
+    testPunycode();
     //detectLeaks();
 
     // ====== Per FS dir, read and write region =======================================
