@@ -376,9 +376,9 @@ void systemBus::read_command()
                     bus_state = BUS_IDLE;
                 }
 
-                // // Wait for ATN to be released
-                // if ( data.secondary == IEC_OPEN || data.secondary == IEC_REOPEN )
-                //     protocol->timeoutWait(PIN_IEC_ATN, RELEASED, FOREVER, false);
+                // Wait for ATN to be released
+                if ( data.secondary == IEC_OPEN || data.secondary == IEC_REOPEN )
+                    protocol->timeoutWait(PIN_IEC_ATN, RELEASED, FOREVER, false);
             }
         }
     } while ( IEC.status ( PIN_IEC_ATN ) );
