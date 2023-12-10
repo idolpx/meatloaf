@@ -15,6 +15,10 @@
 // You should have received a copy of the GNU General Public License
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
+//
+//  SauceDOS is a custom Meatloaf Protocol
+//
+
 #include "saucedos.h"
 
 #include <rom/ets_sys.h>
@@ -40,8 +44,6 @@ int16_t  SauceDOS::receiveByte ()
 
     IEC.flags and_eq CLEAR_LOW;
 
-    //IEC.pull ( PIN_IEC_SRQ );
-
     // Release the Data line to signal we are ready
 #ifndef IEC_SPLIT_LINE
     IEC.release(PIN_IEC_CLK_IN);
@@ -59,8 +61,6 @@ int16_t  SauceDOS::receiveByte ()
 
     // STEP 2: RECEIVING THE BITS
     // As soon as the talker releases the Clock line we are expected to receive the bits
-
-    //IEC.pull ( PIN_IEC_SRQ );
 
     // get bits 4,5
     if ( gpio_get_level ( PIN_IEC_CLK_IN ) )  data |= 0b00010000; // 1
@@ -81,7 +81,6 @@ int16_t  SauceDOS::receiveByte ()
         IEC.flags |= ERROR;
         return -1; // return error because timeout
     }
-
 
     // get bits 3,1
     if ( gpio_get_level ( PIN_IEC_CLK_IN ) )  data |= 0b00001000; // 1
