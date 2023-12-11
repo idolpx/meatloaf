@@ -1,5 +1,5 @@
-#ifndef IECPROTOCOLBASE_H
-#define IECPROTOCOLBASE_H
+#ifndef _PROTOCOL_H
+#define _PROTOCOL_H
 
 #include <cstdint>
 #include <cstddef>

@@ -27,12 +27,12 @@
 
 using namespace Protocol;
 
-IecProtocolSerial::IecProtocolSerial()
+CPBStandardSerial::CPBStandardSerial()
 {
 
 }
 
-IecProtocolSerial::~IecProtocolSerial()
+CPBStandardSerial::~CPBStandardSerial()
 {
 
 }
@@ -46,7 +46,7 @@ IecProtocolSerial::~IecProtocolSerial()
 // "ready  to  send"  signal  whenever  it  likes;  it  can  wait  a  long  time.    If  it's
 // a printer chugging out a line of print, or a disk drive with a formatting job in progress,
 // it might holdback for quite a while; there's no time limit.
-bool IecProtocolSerial::sendByte(uint8_t data, bool eoi)
+bool CPBStandardSerial::sendByte(uint8_t data, bool eoi)
 {
     //IEC.pull ( PIN_IEC_SRQ );
 
@@ -174,7 +174,7 @@ bool IecProtocolSerial::sendByte(uint8_t data, bool eoi)
 // to prepare for the next bit. When the talker figures the data has been held for a sufficient  length  of  time,  it
 // pulls  the  Clock  line true  and  releases  the  Data  line  to  false.    Then  it starts to prepare the next bit.
 
-bool IecProtocolSerial::sendBits ( uint8_t data )
+bool CPBStandardSerial::sendBits ( uint8_t data )
 {
     uint8_t tv = TIMING_Tv64; // C64 data valid timing
 
@@ -231,7 +231,7 @@ bool IecProtocolSerial::sendBits ( uint8_t data )
 // "ready  to  send"  signal  whenever  it  likes;  it  can  wait  a  long  time.    If  it's
 // a printer chugging out a line of print, or a disk drive with a formatting job in progress,
 // it might holdback for quite a while; there's no time limit.
-int8_t IecProtocolSerial::receiveByte()
+int8_t CPBStandardSerial::receiveByte()
 {
     IEC.flags &= CLEAR_LOW;
 
@@ -348,7 +348,7 @@ int8_t IecProtocolSerial::receiveByte()
 // false, it grabs the bit from the Data line and puts it away.  It then waits for the clock line to go true, in order
 // to prepare for the next bit. When the talker figures the data has been held for a sufficient  length  of  time,  it
 // pulls  the  Clock  line true  and  releases  the  Data  line  to  false.    Then  it starts to prepare the next bit.
-int8_t IecProtocolSerial::receiveBits ()
+int8_t CPBStandardSerial::receiveBits ()
 {
     // Listening for bits
     uint8_t data = 0;

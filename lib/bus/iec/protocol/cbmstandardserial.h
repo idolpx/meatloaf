@@ -22,15 +22,16 @@
 // https://github.com/mist64/cbmsrc/blob/5c5138ff128d289ccd98d260f700af52c4a75521/DOS_1541_05/seratn.src#L6
 
 
-#ifndef PROTOCOL_CBMSTANDARDSERIAL_H
-#define PROTOCOL_CBMSTANDARDSERIAL_H
+#ifndef PROTOCOL_CPBSTANDARDSERIAL_H
+#define PROTOCOL_CPBSTANDARDSERIAL_H
 
+// Commodore Peripheral Bus: Standard Serial
 
 #include "_protocol.h"
 
 namespace Protocol
 {
-    class IecProtocolSerial : public IECProtocol
+    class CPBStandardSerial : public IECProtocol
     {
         private:
         int8_t receiveBits();
@@ -41,12 +42,12 @@ namespace Protocol
         /**
          * @brief ctor
          */
-        IecProtocolSerial();
+        CPBStandardSerial();
 
         /**
          * @brief dtor
          */
-        virtual ~IecProtocolSerial();
+        virtual ~CPBStandardSerial();
         
         /**
          * @brief receive byte from bus
@@ -64,4 +65,4 @@ namespace Protocol
     };
 };
 
-#endif // PROTOCOL_CBMSTANDARDSERIAL_H
+#endif // PROTOCOL_CPBSTANDARDSERIAL_H

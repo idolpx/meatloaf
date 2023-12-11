@@ -138,6 +138,8 @@ bool D64IStream::seekEntry( std::string filename )
 
             index++;
         }
+
+        Debug_printv("File not found!");
     }
 
     entry.next_track = 0;

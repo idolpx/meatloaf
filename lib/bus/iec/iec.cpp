@@ -529,7 +529,7 @@ std::shared_ptr<IECProtocol> systemBus::selectProtocol()
 #ifdef PARALLEL_BUS
             PARALLEL.bus_state = PARALLEL_IDLE;
 #endif
-            auto p = std::make_shared<IecProtocolSerial>();
+            auto p = std::make_shared<CPBStandardSerial>();
             return std::static_pointer_cast<IECProtocol>(p);
         }
     }

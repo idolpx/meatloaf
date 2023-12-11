@@ -19,8 +19,10 @@
 // https://a1bert.kapsi.fi/Dev/burst/
 //
 
-// #ifndef PROTOCOL_CBMFASTSERIAL_H
-// #define PROTOCOL_CBMFASTSERIAL_H
+// #ifndef PROTOCOL_CPBFASTSERIAL_H
+// #define PROTOCOL_CPBFASTSERIAL_H
+
+// Commodore Peripheral Bus: Fast Serial
 
 // #include "cbmstandardserial.h"
 
@@ -30,10 +32,10 @@
 // 	{
 // 	public:
 
-// 		virtual int16_t receiveByte(uint8_t device) override;
+// 		virtual int8_t receiveByte(uint8_t device) override;
 // 		virtual bool sendByte(uint8_t data, bool signalEOI) override;
 
 // 	};
 // }
 
-// #endif
+// #endif // PROTOCOL_CPBFASTSERIAL_H
