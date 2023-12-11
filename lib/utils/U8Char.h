@@ -32,8 +32,8 @@ public:
     uint8_t toPetscii();
     size_t toUnicode32(std::string& input_utf8, uint32_t* output_unicode32, size_t max_output_length);
     std::string fromUnicode32(uint32_t* input_unicode32, size_t input_length);
-    std::string U8Char::toPunycode(std::string utf8String);
-    std::string U8Char::fromPunycode(std::string punycodeString);
+    std::string toPunycode(std::string utf8String);
+    std::string fromPunycode(std::string punycodeString);
 };
 
 #endif /* MEATLOAF_UTILS_U8CHAR */
