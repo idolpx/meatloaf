@@ -15,8 +15,10 @@
 // You should have received a copy of the GNU General Public License
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
+//
 // https://www.c64-wiki.com/wiki/Fast_serial_bus_protocol
 // https://a1bert.kapsi.fi/Dev/burst/
+// https://web.archive.org/web/20220125025330/https://sites.google.com/site/h2obsession/CBM/C128/fast-serial-for-uiec
 //
 
 // #ifndef PROTOCOL_CPBFASTSERIAL_H
@@ -24,7 +26,7 @@
 
 // Commodore Peripheral Bus: Fast Serial
 
-// #include "cbmstandardserial.h"
+// #include "cpbfastserial.h"
 
 // namespace Protocol
 // {

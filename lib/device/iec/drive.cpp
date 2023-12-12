@@ -783,13 +783,9 @@ uint16_t iecDrive::sendHeader(std::string header, std::string id)
     uint16_t byte_count = 0;
     bool sent_info = false;
 
-    PeoplesUrlParser p;
-    std::string url = _base->url;
-
-    p.parseUrl(url); // reversed the order, you shouldn't really parse an url converted to PETSCII!!!
-
-    url = p.root();
-    std::string path = p.pathToFile(); //_base->pathToFile();
+    std::string url = _base->root();
+    url = mstr::toPETSCII2(url);
+    std::string path = _base->pathToFile();
     path = mstr::toPETSCII2(path);
     std::string archive = _base->media_archive;
     archive = mstr::toPETSCII2(archive);

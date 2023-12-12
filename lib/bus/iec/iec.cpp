@@ -9,7 +9,7 @@
 #include "../../include/pinmap.h"
 #include "led.h"
 #include "led_strip.h"
-#include "protocol/cbmstandardserial.h"
+#include "protocol/cpbstandardserial.h"
 #include "string_utils.h"
 #include "utils.h"
 
@@ -376,9 +376,12 @@ void systemBus::read_command()
                     bus_state = BUS_IDLE;
                 }
 
-                // Wait for ATN to be released
+                // *** IMPORTANT! This helps keep us in sync!
                 if ( data.secondary == IEC_OPEN || data.secondary == IEC_REOPEN )
+                {
+                    // Wait for ATN to be released
                     protocol->timeoutWait(PIN_IEC_ATN, RELEASED, FOREVER, false);
+                }
             }
         }
     } while ( IEC.status ( PIN_IEC_ATN ) );
@@ -390,9 +393,17 @@ void systemBus::read_command()
         bus_state = BUS_IDLE;
     }
 
+    // If the bus is idle then release the lines
+    if ( bus_state < BUS_ACTIVE )
+    {
+        data.init();
+        releaseLines();
+        return;
+    }
+
 #ifdef PARALLEL_BUS
     // Switch to Parallel if detected
-    else if ( PARALLEL.bus_state == PARALLEL_PROCESS )
+    if ( PARALLEL.bus_state == PARALLEL_PROCESS )
     {
         if ( data.primary == IEC_LISTEN || data.primary == IEC_TALK )
             detected_protocol = PROTOCOL_SPEEDDOS;
@@ -411,13 +422,6 @@ void systemBus::read_command()
         PARALLEL.handShake();
     }
 #endif
-
-    // If the bus is idle then release the lines
-    if ( bus_state < BUS_ACTIVE )
-    {
-        data.init();
-        releaseLines();
-    }
 
     //Debug_printv ( "code[%.2X] primary[%.2X] secondary[%.2X] bus[%d] flags[%d]", c, data.primary, data.secondary, bus_state, flags );
     //Debug_printv ( "device[%d] channel[%d]", data.device, data.channel);

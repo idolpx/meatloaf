@@ -42,11 +42,6 @@ public:
         }
     };
 
-    MFile* parent(std::string = "");
-    MFile* localParent(std::string);
-    MFile* root(std::string);
-    MFile* localRoot(std::string);
-
     bool isPETSCII = false;
     std::string media_header;
     std::string media_id;
@@ -62,7 +57,11 @@ public:
     // has to return OPENED stream
     virtual MStream* meatStream();
 
-    virtual MFile* cd(std::string newDir);
+    MFile* cd(std::string newDir);
+    MFile* cdParent(std::string = "");
+    MFile* cdLocalParent(std::string);
+    MFile* cdRoot(std::string);
+    MFile* cdLocalRoot(std::string);
     virtual bool isDirectory() = 0;
     virtual bool rewindDirectory() = 0 ;
     virtual MFile* getNextFileInDir() = 0 ;

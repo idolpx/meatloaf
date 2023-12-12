@@ -366,64 +366,6 @@ MStream* MFile::meatStream() {
 };
 
 
-MFile* MFile::parent(std::string plus) 
-{
-    Debug_printv("url[%s] path[%s] plus[%s]", url.c_str(), path.c_str(), plus.c_str());
-
-    // drop last dir
-    // add plus
-    if(path.empty()) 
-    {
-        // from here we can go only to flash root!
-        return MFSOwner::File("/");
-    }
-    else 
-    {
-        int lastSlash = url.find_last_of('/');
-        if ( lastSlash == url.size() - 1 ) 
-        {
-            lastSlash = url.find_last_of('/', url.size() - 2);
-        }
-        std::string newDir = mstr::dropLast(url, url.size() - lastSlash);
-        if(!plus.empty())
-            newDir+= ("/" + plus);
-
-        return MFSOwner::File(newDir);
-    }
-};
-
-MFile* MFile::localParent(std::string plus) 
-{
-    Debug_printv("url[%s] path[%s] plus[%s]", url.c_str(), path.c_str(), plus.c_str());
-    // drop last dir
-    // check if it isn't shorter than streamFile
-    // add plus
-    int lastSlash = url.find_last_of('/');
-    if ( lastSlash == url.size() - 1 ) {
-        lastSlash = url.find_last_of('/', url.size() - 2);
-    }
-    std::string parent = mstr::dropLast(url, url.size() - lastSlash);
-    if(parent.length()-streamFile->url.length()>1)
-        parent = streamFile->url;
-    return MFSOwner::File( parent + "/" + plus );
-};
-
-MFile* MFile::root(std::string plus) 
-{
-    Debug_printv("url[%s] path[%s] plus[%s]", url.c_str(), path.c_str(), plus.c_str());
-    return MFSOwner::File( "/" + plus );
-};
-
-MFile* MFile::localRoot(std::string plus) 
-{
-    Debug_printv("url[%s] path[%s] plus[%s]", url.c_str(), path.c_str(), plus.c_str());
-
-    if ( path.empty() || streamFile == nullptr ) {
-        // from here we can go only to flash root!
-        return MFSOwner::File( "/" + plus );
-    }
-    return MFSOwner::File( streamFile->url + "/" + plus );
-};
 
 MFile* MFile::cd(std::string newDir) 
 {
@@ -449,7 +391,7 @@ MFile* MFile::cd(std::string newDir)
 
         // user entered: CD:_DIR or CD_DIR
         // means: go to a directory in the same directory as this one
-        return parent(mstr::drop(newDir,1));
+        return cdParent(mstr::drop(newDir,1));
     }
     else if(newDir[0]=='.' && newDir[1]=='.')
     {
@@ -457,13 +399,13 @@ MFile* MFile::cd(std::string newDir)
         {
             // user entered: CD:.. or CD..
             // means: go up one directory
-            return parent();
+            return cdParent();
         }
         else 
         {
             // user entered: CD:..DIR or CD..DIR
             // meaning: Go back one directory
-            return localParent(mstr::drop(newDir,2));
+            return cdLocalParent(mstr::drop(newDir,2));
         }
     }
     else if(newDir[0]=='/' && newDir[1]=='/') 
@@ -473,13 +415,13 @@ MFile* MFile::cd(std::string newDir)
 
         // user entered: CD://DIR or CD//DIR
         // means: change to a dir in root of stream
-        return localRoot(mstr::drop(newDir,2));
+        return cdLocalRoot(mstr::drop(newDir,2));
     }
     else if(newDir[0]=='/') 
     {
         // user entered: CD:/DIR or CD/DIR
         // means: go to a directory in the same directory as this one
-        return parent(mstr::drop(newDir,1));
+        return cdParent(mstr::drop(newDir,1));
     }
     else if(newDir[0]=='^') // {CBM UP ARROW}
     {
@@ -500,6 +442,66 @@ MFile* MFile::cd(std::string newDir)
 
         return MFSOwner::File(url + newDir);
     }
+};
+
+
+MFile* MFile::cdParent(std::string plus) 
+{
+    Debug_printv("url[%s] path[%s] plus[%s]", url.c_str(), path.c_str(), plus.c_str());
+
+    // drop last dir
+    // add plus
+    if(path.empty()) 
+    {
+        // from here we can go only to flash root!
+        return MFSOwner::File("/");
+    }
+    else 
+    {
+        int lastSlash = url.find_last_of('/');
+        if ( lastSlash == url.size() - 1 ) 
+        {
+            lastSlash = url.find_last_of('/', url.size() - 2);
+        }
+        std::string newDir = mstr::dropLast(url, url.size() - lastSlash);
+        if(!plus.empty())
+            newDir+= ("/" + plus);
+
+        return MFSOwner::File(newDir);
+    }
+};
+
+MFile* MFile::cdLocalParent(std::string plus) 
+{
+    Debug_printv("url[%s] path[%s] plus[%s]", url.c_str(), path.c_str(), plus.c_str());
+    // drop last dir
+    // check if it isn't shorter than streamFile
+    // add plus
+    int lastSlash = url.find_last_of('/');
+    if ( lastSlash == url.size() - 1 ) {
+        lastSlash = url.find_last_of('/', url.size() - 2);
+    }
+    std::string parent = mstr::dropLast(url, url.size() - lastSlash);
+    if(parent.length()-streamFile->url.length()>1)
+        parent = streamFile->url;
+    return MFSOwner::File( parent + "/" + plus );
+};
+
+MFile* MFile::cdRoot(std::string plus) 
+{
+    Debug_printv("url[%s] path[%s] plus[%s]", url.c_str(), path.c_str(), plus.c_str());
+    return MFSOwner::File( "/" + plus );
+};
+
+MFile* MFile::cdLocalRoot(std::string plus) 
+{
+    Debug_printv("url[%s] path[%s] plus[%s]", url.c_str(), path.c_str(), plus.c_str());
+
+    if ( path.empty() || streamFile == nullptr ) {
+        // from here we can go only to flash root!
+        return MFSOwner::File( "/" + plus );
+    }
+    return MFSOwner::File( streamFile->url + "/" + plus );
 };
 
 // bool MFile::copyTo(MFile* dst) {

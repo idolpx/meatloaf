@@ -17,7 +17,7 @@
 
 #ifdef BUILD_IEC
 
-#include "cbmstandardserial.h"
+#include "cpbstandardserial.h"
 
 #include "bus.h"
 #include "_protocol.h"
