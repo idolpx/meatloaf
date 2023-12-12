@@ -376,8 +376,7 @@ void systemBus::read_command()
             }
 
             // *** IMPORTANT! This helps keep us in sync!
-            // Wait for ATN to be released
-            protocol->timeoutWait(PIN_IEC_ATN, RELEASED, FOREVER, false);
+            protocol->wait( TIMING_SYNC, false);
 
             Debug_printf(" (%.2X %s  %.2d CHANNEL)\r\n", data.secondary, secondary.c_str(), data.channel);
         }
