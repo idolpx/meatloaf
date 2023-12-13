@@ -89,7 +89,7 @@ void iecNetwork::iec_open()
         deviceSpec[commanddata.channel] += prefix[commanddata.channel];
 
     if (payload != "$")
-        deviceSpec[commanddata.channel] += payload;
+        deviceSpec[commanddata.channel] += mstr::toUTF8(payload);
 
     channelMode[commanddata.channel] = PROTOCOL;
 
@@ -640,9 +640,8 @@ void iecNetwork::parse_bite()
     //mstr::replaceAll(*receiveBuffer[channel], ";", "\";\"");
     //mstr::replaceAll(*receiveBuffer[channel], ":", "\":\"");
     //mstr::replaceAll(*receiveBuffer[channel], "\r", "\"\r\"");
-
-    if ( receiveBuffer[channel]->length() < bite_size )
-        return;
+    mstr::replaceAll(*receiveBuffer[channel], "\"", "\"\"");
+    *receiveBuffer[channel] = mstr::toUTF8( *receiveBuffer[channel] );
 
     // break up receiveBuffer[channel] into bites less than bite_size bytes
     std::string bites = "\"";
@@ -680,7 +679,7 @@ void iecNetwork::parse_bite()
     } while ( end < receiveBuffer[channel]->size() );
  
     //bites += "\"";
-    Debug_printv("[%s]", bites.c_str());
+    //Debug_printv("[%s]", bites.c_str());
     *receiveBuffer[channel] = bites;
 }
 
@@ -772,6 +771,7 @@ void iecNetwork::iec_talk_command()
 
 void iecNetwork::iec_command()
 {
+
     // Check pt size before proceeding to avoid a crash
     if (pt.size()==0) {
         Debug_printf("pt.size()==0!\n");
@@ -790,12 +790,7 @@ void iecNetwork::iec_command()
     else if (pt[0] == "jq")
         query_json();
     else if (pt[0] == "biteparse")
-    {
-        // Chuck Norris Chuck Norris Chuck Norris Chuck Norris Chuck Norris Chuck Norris SHUT UP! no. Chuck Norris Chuck Norris Chuck Norris Chuck Norris Chuck Norris (keeps on saying it.)
-        Debug_printv("before");
         parse_bite();
-        Debug_printv("after");
-    }
     else if (pt[0] == "settrans")
         set_translation_mode();
     else if (pt[0] == "pwd")
@@ -1362,6 +1357,7 @@ void iecNetwork::process_command()
     Debug_printv("primary[%2X]", commanddata.primary);
     if (commanddata.primary == IEC_LISTEN)
     {
+        payload=mstr::toUTF8(payload);
         pt = util_tokenize(payload, ',');
     }
     else if (commanddata.primary == IEC_TALK)

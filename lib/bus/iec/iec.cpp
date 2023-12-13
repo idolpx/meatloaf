@@ -164,7 +164,7 @@ void IRAM_ATTR systemBus::service()
         if (bus_state == BUS_OFFLINE)
             break;
 
-        pull ( PIN_IEC_SRQ );
+        //pull ( PIN_IEC_SRQ );
         if (bus_state == BUS_ACTIVE)
         {
             release ( PIN_IEC_CLK_OUT );
@@ -176,7 +176,7 @@ void IRAM_ATTR systemBus::service()
             //Debug_printv("command");
             read_command();
         }
-        release ( PIN_IEC_SRQ );
+        //release ( PIN_IEC_SRQ );
 
         if (bus_state == BUS_PROCESS)
         {
@@ -346,7 +346,7 @@ void systemBus::read_command()
 
         default:
 
-            //pull ( PIN_IEC_SRQ );
+            pull ( PIN_IEC_SRQ );
             std::string secondary;
             bus_state = BUS_PROCESS;
 
@@ -377,6 +377,7 @@ void systemBus::read_command()
 
             // *** IMPORTANT! This helps keep us in sync!
             protocol->wait( TIMING_SYNC, false);
+            release ( PIN_IEC_SRQ );
 
             Debug_printf(" (%.2X %s  %.2d CHANNEL)\r\n", data.secondary, secondary.c_str(), data.channel);
         }
