@@ -114,8 +114,8 @@ typedef enum
 } device_state_t;
 
 typedef enum {
-    PROTOCOL_IEC_SERIAL,
-    PROTOCOL_IEC_FAST_SERIAL,
+    PROTOCOL_SERIAL,
+    PROTOCOL_FAST_SERIAL,
     PROTOCOL_SAUCEDOS,
     PROTOCOL_JIFFYDOS,
     PROTOCOL_EPYXFASTLOAD,
@@ -346,7 +346,7 @@ private:
     /**
      * @brief the detected bus protocol
      */
-    bus_protocol_t detected_protocol = PROTOCOL_IEC_SERIAL;  // default is IEC Serial
+    bus_protocol_t detected_protocol = PROTOCOL_SERIAL;  // default is IEC Serial
 
     /**
      * @brief the active bus protocol

@@ -80,12 +80,12 @@ typedef enum {
 // Return values for service:
 typedef enum
 {
-    PARALLEL_OFFLINE = -3, // Bus is empty
-    PARALLEL_RESET = -2,   // The bus is in a reset state (RESET line).    
-    PARALLEL_ERROR = -1,   // A problem occoured, reset communication
-    PARALLEL_IDLE = 0,     // Nothing recieved of our concern
-    PARALLEL_ACTIVE = 1,   // ATN is pulled and a command byte is expected
-    PARALLEL_PROCESS = 2,  // A command is ready to be processed
+    PBUS_OFFLINE = -3, // Bus is empty
+    PBUS_RESET = -2,   // The bus is in a reset state (RESET line).    
+    PBUS_ERROR = -1,   // A problem occoured, reset communication
+    PBUS_IDLE = 0,     // Nothing recieved of our concern
+    PBUS_ACTIVE = 1,   // ATN is pulled and a command byte is expected
+    PBUS_PROCESS = 2,  // A command is ready to be processed
 } pbus_state_t;
 
 typedef enum {

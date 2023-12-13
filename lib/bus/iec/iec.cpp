@@ -230,7 +230,7 @@ void IRAM_ATTR systemBus::service()
             bus_state = BUS_IDLE;
 
             // Switch back to standard serial
-            detected_protocol = PROTOCOL_IEC_SERIAL;
+            detected_protocol = PROTOCOL_SERIAL;
             protocol = selectProtocol();
         }
 
@@ -402,7 +402,7 @@ void systemBus::read_command()
 
 #ifdef PARALLEL_BUS
     // Switch to Parallel if detected
-    if ( PARALLEL.bus_state == PARALLEL_PROCESS )
+    if ( PARALLEL.bus_state == PBUS_PROCESS )
     {
         if ( data.primary == IEC_LISTEN || data.primary == IEC_TALK )
             detected_protocol = PROTOCOL_SPEEDDOS;
@@ -530,7 +530,7 @@ std::shared_ptr<IECProtocol> systemBus::selectProtocol()
         default:
         {
 #ifdef PARALLEL_BUS
-            PARALLEL.bus_state = PARALLEL_IDLE;
+            PARALLEL.bus_state = PBUS_IDLE;
 #endif
             auto p = std::make_shared<CPBStandardSerial>();
             return std::static_pointer_cast<IECProtocol>(p);

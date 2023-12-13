@@ -43,7 +43,7 @@ static void ml_parallel_intr_task(void* arg)
 
 void parallelBus::service()
 {
-    PARALLEL.bus_state = PARALLEL_IDLE;
+    PARALLEL.bus_state = PBUS_IDLE;
 
     Debug_printv( "User Port Data Interrupt Received!" );
 
@@ -57,7 +57,7 @@ void parallelBus::service()
         // If PC2 is set then parallel is active and a byte is ready to be read!
         if ( PARALLEL.status( PC2 ) )
         {
-            PARALLEL.bus_state = PARALLEL_PROCESS;
+            PARALLEL.bus_state = PBUS_PROCESS;
             //Debug_printv("receive <<< " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
         }
 
@@ -75,7 +75,7 @@ void parallelBus::service()
         //     // {
         //     //     if ( IEC.data.secondary == IEC_OPEN || IEC.data.secondary == IEC_REOPEN )
         //     //     {
-        //     //         IEC.protocol->flags xor_eq DOLPHIN_ACTIVE;
+        //     //         IEC.protocol->flags xor_eq PARALLEL_ACTIVE;
         //     //         Debug_printv("dolphindos");
         //     //     }
         //     // }

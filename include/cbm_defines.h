@@ -145,11 +145,12 @@ typedef enum
 #define EMPTY_STREAM     (1 << 3)
 #define COMMAND_RECVD    (1 << 4)
 
-#define FASTSERIAL_ACTIVE   (1 << 8)
-#define SAUCEDOS_ACTIVE     (1 << 9)
-#define JIFFYDOS_ACTIVE     (1 << 10)
-#define DOLPHIN_ACTIVE      (1 << 11)
-#define WIC64_ACTIVE        (1 << 12)
+// Detected Protocols
+#define FAST_SERIAL_ACTIVE  (1 << 8)
+#define PARALLEL_ACTIVE     (1 << 9)
+#define SAUCEDOS_ACTIVE     (1 << 10)
+#define JIFFYDOS_ACTIVE     (1 << 11)
+#define WIC64_ACTIVE        (1 << 13)
 
 // IEC protocol timing consts in microseconds (us)
 // IEC-Disected p10-11         // Description              //   1541    C64     min     typical     max         // Notes
