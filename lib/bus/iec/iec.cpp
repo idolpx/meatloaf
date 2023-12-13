@@ -7,6 +7,7 @@
 
 #include "../../include/debug.h"
 #include "../../include/pinmap.h"
+#include "../../include/cbm_defines.h"
 #include "led.h"
 #include "led_strip.h"
 #include "protocol/cpbstandardserial.h"
@@ -27,6 +28,7 @@ static void IRAM_ATTR cbm_on_attention_isr_handler(void *arg)
     b->release(PIN_IEC_CLK_OUT);
     b->pull(PIN_IEC_DATA_OUT);
 
+    b->flags = CLEAR;
     b->flags |= ATN_PULLED;
     b->bus_state = BUS_ACTIVE;
 
@@ -170,7 +172,7 @@ void IRAM_ATTR systemBus::service()
             release ( PIN_IEC_CLK_OUT );
             pull ( PIN_IEC_DATA_OUT );
 
-            flags = CLEAR;
+            //flags = CLEAR;
 
             // Read bus command bytes
             //Debug_printv("command");

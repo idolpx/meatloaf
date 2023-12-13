@@ -783,7 +783,7 @@ uint16_t iecDrive::sendHeader(std::string header, std::string id)
     uint16_t byte_count = 0;
     bool sent_info = false;
 
-    std::string url = _base->root();
+    std::string url = _base->host;
     url = mstr::toPETSCII2(url);
     std::string path = _base->pathToFile();
     path = mstr::toPETSCII2(path);

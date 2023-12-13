@@ -178,11 +178,11 @@ bool CPBStandardSerial::sendBits ( uint8_t data )
 {
     uint8_t tv = TIMING_Tv64; // C64 data valid timing
 
-    // We can send faster if in VIC20 Mode
-    if ( IEC.flags & VIC20_MODE )
-    {
-        tv = TIMING_Tv; // VIC-20 data valid timing
-    }
+    // // We can send faster if in VIC20 Mode
+    // if ( IEC.flags & VIC20_MODE )
+    // {
+    //     tv = TIMING_Tv; // VIC-20 data valid timing
+    // }
 
 //    IEC.release(PIN_IEC_DATA_OUT);
     // Wait for DATA to be RELEASED
