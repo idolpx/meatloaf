@@ -226,8 +226,8 @@ void IRAM_ATTR systemBus::service()
         //pull ( PIN_IEC_SRQ );
         if (bus_state == BUS_ACTIVE)
         {
-            release ( PIN_IEC_CLK_OUT );
-            pull ( PIN_IEC_DATA_OUT );
+            //release ( PIN_IEC_CLK_OUT );
+            //pull ( PIN_IEC_DATA_OUT );
 
             //flags = CLEAR;
 
@@ -323,9 +323,9 @@ void systemBus::read_command()
     }
     //release( PIN_IEC_SRQ );
 
-    //pull( PIN_IEC_SRQ );
+    pull( PIN_IEC_SRQ );
     int8_t c = receiveByte();
-    //release( PIN_IEC_SRQ );
+    release( PIN_IEC_SRQ );
 
     // Check for error
     if ( flags & ERROR )
@@ -687,8 +687,7 @@ void systemBus::assert_interrupt()
 
 int8_t systemBus::receiveByte()
 {
-    int8_t b;
-    b = protocol->receiveByte();
+    int8_t b = protocol->receiveByte();
 #ifdef DATA_STREAM
     Debug_printf("%.2X ", b);
 #endif
@@ -755,9 +754,7 @@ bool systemBus::sendBytes(const char *buf, size_t len, bool eoi)
 
 bool systemBus::sendBytes(std::string s, bool eoi)
 {
-    std::string out;
-    out = mstr::toPETSCII2(out);
-    return sendBytes(out.c_str(), out.size(), eoi);
+    return sendBytes(s.c_str(), s.size(), eoi);
 }
 
 void systemBus::process_cmd()
