@@ -5,6 +5,10 @@ import sys
 
 Import("env")
 
+# Need to run this command in the PIO virtual environment
+#env.Execute("$PYTHONEXE -m pip list --format=json --disable-pip-version-check");
+#exit(0);
+
 # Don't do anything if this is an 'uploadfs' or 'erase' target
 cmdline = ','.join(sys.argv)
 if cmdline.find('buildfs') or cmdline.find('uploadfs'):
