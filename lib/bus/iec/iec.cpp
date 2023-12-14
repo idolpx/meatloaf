@@ -68,6 +68,63 @@ void init_pin(gpio_num_t pin)
     return;
 }
 
+
+// true => PULL => LOW
+void IRAM_ATTR systemBus::pull ( int _pin )
+{
+    int _reg = GPIO_ENABLE_REG; 
+    if (_pin > 31) 
+    { 
+        _reg = GPIO_ENABLE1_REG, _pin -= 32; 
+    } 
+    REG_SET_BIT(_reg, 1 << _pin); // GPIO_MODE_OUTPUT
+}
+
+// false => RELEASE => HIGH
+void IRAM_ATTR systemBus::release ( int _pin )
+{
+    int _reg = GPIO_ENABLE_REG; 
+    if (_pin > 31) 
+    { 
+        _reg = GPIO_ENABLE1_REG, _pin -= 32; 
+    } 
+    REG_CLR_BIT(_reg, 1 << _pin); // GPIO_MODE_INPUT
+
+    //protocol->wait( 4 ); // Delay for slow pull up
+}
+
+bool IRAM_ATTR systemBus::status ( uint8_t pin )
+{
+#ifndef IEC_SPLIT_LINES
+    release ( pin );
+#endif
+    int l = gpio_get_level ( ( gpio_num_t ) pin ) ? RELEASED : PULLED;
+    
+    return l;
+}
+
+uint8_t IRAM_ATTR systemBus::status()
+{
+    uint8_t data = 0;
+
+    gpio_config_t io_config =
+    {
+        .pin_bit_mask = BIT(PIN_IEC_CLK_IN) | BIT(PIN_IEC_DATA_IN) | BIT(PIN_IEC_SRQ) | BIT(PIN_IEC_RESET),
+        .mode = GPIO_MODE_INPUT,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+
+    ESP_ERROR_CHECK(gpio_config(&io_config));
+    uint64_t io_data = REG_READ(GPIO_IN_REG);
+
+    // data << (1 & (io_data & (1 << PIN_IEC_CLK_IN)));
+    // data << (2 & (io_data & (1 << PIN_IEC_DATA_IN)));
+    // data << (3 & (io_data & (1 << PIN_IEC_SRQ)));
+    // data << (4 & (io_data & (1 << PIN_IEC_RESET)));
+
+    return data;
+}
+
 void systemBus::setup()
 {
     Debug_printf("IEC systemBus::setup()\r\n");
