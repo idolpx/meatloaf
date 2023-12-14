@@ -77,7 +77,7 @@ void iecMeatloaf::local_ip()
 
 void iecMeatloaf::process_basic_commands()
 {
-    //payload = mstr::toUTF8(payload);
+    payload = mstr::toUTF8(payload);
     pt = util_tokenize(payload, ',');
 
     if (payload.find("adapterconfig") != std::string::npos)
