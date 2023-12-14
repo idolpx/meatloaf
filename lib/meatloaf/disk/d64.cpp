@@ -106,7 +106,7 @@ bool D64IStream::seekEntry( std::string filename )
 {
     uint32_t index = 1;
     //mstr::rtrimA0(filename);
-    filename = mstr::toPETSCII2(filename);
+    //filename = mstr::toPETSCII2(filename);
     mstr::replaceAll(filename, "\\", "/");
 
     // Read Directory Entries
@@ -115,6 +115,7 @@ bool D64IStream::seekEntry( std::string filename )
         while ( seekEntry( index ) )
         {
             std::string entryFilename = entry.filename;
+            entryFilename = mstr::toUTF8(entryFilename);
 
             Debug_printv("index[%d] track[%d] sector[%d] filename[%s] entry.filename[%.16s]", index, track, sector, filename.c_str(), entryFilename.c_str());
 
@@ -182,6 +183,10 @@ bool D64IStream::seekEntry( uint16_t index )
                 // Debug_printv("next_track[%d] next_sector[%d]", entry.next_track, entry.next_sector);
                 r = seekSector( entry.next_track, entry.next_sector );
             }
+
+            // Seek failed
+            if ( !r )
+                return false;
 
             containerStream->read((uint8_t *)&entry, sizeof(entry));
             next_track = entry.next_track;
