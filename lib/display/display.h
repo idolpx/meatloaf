@@ -5,6 +5,7 @@
 
 #ifndef MEATLOAF_DISPLAY_H
 #define MEATLOAF_DISPLAY_H
+#ifdef LED_STRIP
 
 #include "FastLED.h"
 #include "FX.h"
@@ -134,4 +135,5 @@ void blinkLeds_simple(void *pvParameters);
 
 void blinkLeds_chase(void *pvParameters);
 
+#endif // LED_STRIP
 #endif // MEATLOAF_DISPLAY_H

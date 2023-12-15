@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<root xmlns="urn:schemas-upnp-org:device-1-0">
+    <specVersion>
+        <major>1</major>
+        <minor>0</minor>
+    </specVersion>
+    <device>
+        <deviceType>urn:schemas-upnp-org:device:ManageableDevice:1</deviceType>
+        <UDN>uuid:{{DEVICE_UUID}}</UDN>
+        <friendlyName>Meatloaf (Multi-device emulator)</friendlyName>
+        <manufacturer>Meatloaf</manufacturer>
+        <manufacturerURL>https://meatloaf.cc/</manufacturerURL>
+        <modelName>ML CBM 1.6.1</modelName>
+        <modelNumber>ML-CBM-1.6.1</modelNumber>
+        <modelURL>https://github.com/idolpx/meatloaf</modelURL>
+        <serialNumber>MLCBM3C214F90</serialNumber>
+        <presentationURL>http://{{DEVICE_IPADDRESS}}</presentationURL>
+    </device> 
+</root>

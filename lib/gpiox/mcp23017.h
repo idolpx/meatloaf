@@ -2,15 +2,19 @@
 // https://ww1.microchip.com/downloads/aemDocuments/documents/APID/ProductDocuments/DataSheets/MCP23017-Data-Sheet-DS20001952.pdf
 //
 
+#ifdef GPIOX_MCP23017
 
 #ifndef MCP23017_H
 #define MCP23017_H
 
+#include "../../include/pinmap.h"
+
 #include <I2Cbus.hpp>
 
-#define I2C_ADDRESS  0x20
-#define I2C_SDA  GPIO_NUM_21
-#define I2C_SCL  GPIO_NUM_22
+#define I2C_SDA      PIN_GPIOX_SDA
+#define I2C_SCL      PIN_GPIOX_SCL
+#define I2C_ADDRESS  GPIOX_ADDRESS
+#define I2C_SPEED    GPIOX_SPEED
 
 /* MCP23017 port bits */
 #define P00  0
@@ -29,6 +33,18 @@
 #define P15  13
 #define P16  14
 #define P17  15
+
+typedef enum {
+	GPIOX_MODE_OUTPUT = 0,
+	GPIOX_MODE_INPUT = 1
+} pin_mode_t;
+
+
+typedef enum {
+	GPIOX_PORT0 = 0,
+	GPIOX_PORT1 = 1,
+	GPIOX_BOTH = 2
+} port_t;
 
 /**
  * @brief MCP23017
@@ -133,4 +149,8 @@ protected:
 	void updateGPIO();
 };
 
+extern MCP23017 GPIOX;
+
 #endif // MCP23017_H
+
+#endif // GPIOX_MCP23017
