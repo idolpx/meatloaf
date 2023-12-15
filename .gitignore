@@ -20,8 +20,8 @@ include/ssid.h
 **/.backup
 .travis.yml
 compile_commands.json
+.archive/*
 .reference/*
-\!archive/*
 bin/*
 data/BUILD_IEC/config.ini
 data/BUILD_IEC/.sys/rom/*
