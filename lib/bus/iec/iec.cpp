@@ -910,7 +910,7 @@ void systemBus::addDevice(virtualDevice *pDevice, int device_id)
     }
 
     // TODO, add device shortcut pointer logic like others
-    Debug_printf("Device #%02d Ready!\r\n", device_id);
+    Serial.printf("Device #%02d Ready!\r\n", device_id);
 
     pDevice->_devnum = device_id;
     _daisyChain.push_front(pDevice);

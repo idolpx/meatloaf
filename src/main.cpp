@@ -24,6 +24,12 @@
 #include "fsFlash.h"
 #include "fnFsSD.h"
 
+#ifdef ENABLE_ZIMODEM
+#include "zimodem.h"
+
+Zimodem zm;
+#endif
+
 /**************************/
 // Meatloaf
 
@@ -53,21 +59,21 @@ void main_setup()
     fnUartDebug.begin(DEBUG_SPEED);
     unsigned long startms = fnSystem.millis();
     
-    Debug_printf( ANSI_WHITE "\r\n\r\n" ANSI_BLUE_BACKGROUND "==============================" ANSI_RESET_NL );
-    Debug_printf( ANSI_BLUE_BACKGROUND "   " PRODUCT_ID " " FW_VERSION "   " ANSI_RESET_NL );
-    Debug_printf( ANSI_BLUE_BACKGROUND "   " PLATFORM_DETAILS "    " ANSI_RESET_NL );
-    Debug_printf( ANSI_BLUE_BACKGROUND "------------------------------" ANSI_RESET_NL "\r\n" );
+    Serial.print( ANSI_WHITE "\r\n\r\n" ANSI_BLUE_BACKGROUND "==============================" ANSI_RESET_NL );
+    Serial.print( ANSI_BLUE_BACKGROUND "   " PRODUCT_ID " " FW_VERSION "   " ANSI_RESET_NL );
+    Serial.print( ANSI_BLUE_BACKGROUND "   " PLATFORM_DETAILS "    " ANSI_RESET_NL );
+    Serial.print( ANSI_BLUE_BACKGROUND "------------------------------" ANSI_RESET_NL "\r\n" );
 
-    Debug_printf( "Meatloaf %s Started @ %lu\r\n", fnSystem.get_fujinet_version(), startms );
+    Serial.printf( "Meatloaf %s Started @ %lu\r\n", fnSystem.get_fujinet_version(), startms );
 
-    Debug_printf( "Starting heap: %u\r\n", fnSystem.get_free_heap_size() );
+    Serial.printf( "Starting heap: %u\r\n", fnSystem.get_free_heap_size() );
 
 #ifdef BOARD_HAS_PSRAM
-    Debug_printf( "PsramSize %u\r\n", fnSystem.get_psram_size() );
+    Serial.printf( "PsramSize %u\r\n", fnSystem.get_psram_size() );
 
-    Debug_printf( "himem phys %u\r\n", esp_himem_get_phys_size() );
-    Debug_printf( "himem free %u\r\n", esp_himem_get_free_size() );
-    Debug_printf( "himem reserved %u\r\n", esp_himem_reserved_area_size() );
+    Serial.printf( "himem phys %u\r\n", esp_himem_get_phys_size() );
+    Serial.printf( "himem free %u\r\n", esp_himem_get_free_size() );
+    Serial.printf( "himem reserved %u\r\n", esp_himem_reserved_area_size() );
 #endif
 
 
@@ -79,7 +85,7 @@ void main_setup()
     esp_err_t e = nvs_flash_init();
     if (e == ESP_ERR_NVS_NO_FREE_PAGES || e == ESP_ERR_NVS_NEW_VERSION_FOUND)
     {
-        Debug_println("Erasing flash");
+        Serial.print("Erasing flash");
         ESP_ERROR_CHECK(nvs_flash_erase());
         e = nvs_flash_init();
     }
@@ -89,7 +95,7 @@ void main_setup()
     gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
 
     fnSystem.check_hardware_ver();
-    Debug_printf("Detected Hardware Version: %s\r\n", fnSystem.get_hardware_ver_str());
+    Serial.printf("Detected Hardware Version: %s\r\n", fnSystem.get_hardware_ver_str());
 
     fnKeyManager.setup();
     fnLedManager.setup();
@@ -125,30 +131,32 @@ void main_setup()
     IEC.setup();
     Serial.println( ANSI_GREEN_BOLD "IEC Bus Initialized" ANSI_RESET );
 
-    // Add devices to bus
-    FileSystem *ptrfs = fnSDFAT.running() ? (FileSystem *)&fnSDFAT : (FileSystem *)&fsFlash;
-    iecPrinter::printer_type ptype = iecPrinter::printer_type::PRINTER_COMMODORE_MPS803; // temporary
-    Debug_printf("Creating a default printer using %s storage and type %d\r\n", ptrfs->typestring(), ptype);
-    iecPrinter *ptr = new iecPrinter(ptrfs, ptype);
-    fnPrinters.set_entry(0, ptr, ptype, Config.get_printer_port(0));
-    Debug_print("Printer "); IEC.addDevice(ptr, 4); // add as device #4 for now
-
-    Debug_print("Disk "); IEC.addDevice(new iecDrive(), 8);
-    Debug_print("Network "); IEC.addDevice(new iecNetwork(), 12);
-    Debug_print("CPM "); IEC.addDevice(new iecCpm(), 20);
-    Debug_print("Voice "); IEC.addDevice(new iecVoice(), 21);
-    Debug_print("Meatloaf "); IEC.addDevice(new iecMeatloaf(), 30);
-
-    Serial.print("Virtual Device(s) Started: [ " ANSI_YELLOW_BOLD );
-    for (uint8_t i = 0; i < 31; i++)
     {
-        if (IEC.isDeviceEnabled(i))
+        // Add devices to bus
+        FileSystem *ptrfs = fnSDFAT.running() ? (FileSystem *)&fnSDFAT : (FileSystem *)&fsFlash;
+        iecPrinter::printer_type ptype = iecPrinter::printer_type::PRINTER_COMMODORE_MPS803; // temporary
+        Serial.printf("Creating a default printer using %s storage and type %d\r\n", ptrfs->typestring(), ptype);
+        iecPrinter *ptr = new iecPrinter(ptrfs, ptype);
+        fnPrinters.set_entry(0, ptr, ptype, Config.get_printer_port(0));
+        Serial.print("Printer "); IEC.addDevice(ptr, 4); // add as device #4 for now
+
+        Serial.print("Disk "); IEC.addDevice(new iecDrive(), 8);
+        Serial.print("Network "); IEC.addDevice(new iecNetwork(), 16);
+        Serial.print("CPM "); IEC.addDevice(new iecCpm(), 20);
+        Serial.print("Voice "); IEC.addDevice(new iecVoice(), 21);
+        Serial.print("Meatloaf "); IEC.addDevice(new iecMeatloaf(), 30);
+
+        Serial.print("Virtual Device(s) Started: [ " ANSI_YELLOW_BOLD );
+        for (uint8_t i = 0; i < 31; i++)
         {
-            Serial.printf("%.02d ", i);
+            if (IEC.isDeviceEnabled(i))
+            {
+                Serial.printf("%.02d ", i);
+            }
         }
+        Serial.println( ANSI_RESET "]");
+        //IEC.enabled = true;
     }
-    Serial.println( ANSI_RESET "]");
-    //IEC.enabled = true;
 
 #ifdef PARALLEL_BUS
     // Setup Parallel Bus
@@ -170,11 +178,13 @@ void main_setup()
     Debug_printf("Available heap: %u\r\nSetup complete @ %lu (%lums)\r\n", fnSystem.get_free_heap_size(), endms, endms - startms);
 #endif // DEBUG
 
-    //runTestsSuite();
-    //lfs_test();
-    //la_test();
 #ifdef DEBUG_TIMING
     Debug_printv( ANSI_GREEN_BOLD "DEBUG_TIMING enabled" ANSI_RESET );
+#endif
+
+#ifdef RUN_TESTS
+    runTestsSuite();
+    // lfs_test();
 #endif
 }
 

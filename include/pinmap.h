@@ -31,4 +31,13 @@
 #define LED_BT_NUM          2
 #endif
 
+#ifdef ENABLE_ZIMODEM
+#define DEFAULT_PIN_DCD GPIO_NUM_14
+#define DEFAULT_PIN_CTS GPIO_NUM_13
+#define DEFAULT_PIN_RTS GPIO_NUM_15 // unused
+#define DEFAULT_PIN_RI  GPIO_NUM_32
+#define DEFAULT_PIN_DSR GPIO_NUM_12
+#define DEFAULT_PIN_DTR GPIO_NUM_27
+#endif
+
 #endif // PINMAP_H

@@ -221,7 +221,7 @@
  */
 
 #define ZF3_ZCANVHDR   0x01  /* Variable headers OK */
-                             /* Receiver window size override */
+/* Receiver window size override */
 #define ZF3_ZRWOVR     0x04  /* byte position for receive window override/256 */
 #define ZF3_ZXSPARS    0x40  /* encoding for sparse file operations */
 
@@ -231,274 +231,276 @@
 
 #define ZF0_ZCACK1     0x01  /* Acknowledge, then do command */
 
-typedef struct {
+typedef struct
+{
 
-  BYTE      rxd_header[ZMAXHLEN];              /* last received header */
-  int       rxd_header_len;                  /* last received header size */
-  uint32_t  rxd_header_pos;                  /* last received header position value */
+    BYTE      rxd_header[ZMAXHLEN];              /* last received header */
+    int       rxd_header_len;                  /* last received header size */
+    uint32_t  rxd_header_pos;                  /* last received header position value */
 
-  /*
-   * receiver capability flags
-   * extracted from the ZRINIT frame as received
-   */
+    /*
+     * receiver capability flags
+     * extracted from the ZRINIT frame as received
+     */
 
-  BOOL can_full_duplex;
-  BOOL can_overlap_io;
-  BOOL can_break;
-  BOOL can_fcs_32;
-  BOOL want_fcs_16;
-  BOOL escape_ctrl_chars;
-  BOOL escape_8th_bit;
+    BOOL can_full_duplex;
+    BOOL can_overlap_io;
+    BOOL can_break;
+    BOOL can_fcs_32;
+    BOOL want_fcs_16;
+    BOOL escape_ctrl_chars;
+    BOOL escape_8th_bit;
 
-  /*
-   * file management options.
-   * only one should be on
-   */
+    /*
+     * file management options.
+     * only one should be on
+     */
 
-  int management_newer;
-  int management_clobber;
-  int management_protect;
+    int management_newer;
+    int management_clobber;
+    int management_protect;
 
-  /* from zmtx.c */
+    /* from zmtx.c */
 
-  BYTE tx_data_subpacket[8192];
-  BYTE rx_data_subpacket[8192];              /* zzap = 8192 */
+    BYTE tx_data_subpacket[8192];
+    BYTE rx_data_subpacket[8192];              /* zzap = 8192 */
 
-  char       current_file_name[MAX_PATH+1];
-  int64_t    current_file_size;
-  int64_t    current_file_pos;
-  time_t     current_file_time;
-  unsigned   current_file_num;
-  unsigned   total_files;
-  int64_t    total_bytes;
-  unsigned   files_remaining;
-  int64_t    bytes_remaining;
-  int64_t    transfer_start_pos;
-  time_t     transfer_start_time;
+    char       current_file_name[MAX_PATH + 1];
+    int64_t    current_file_size;
+    int64_t    current_file_pos;
+    time_t     current_file_time;
+    unsigned   current_file_num;
+    unsigned   total_files;
+    int64_t    total_bytes;
+    unsigned   files_remaining;
+    int64_t    bytes_remaining;
+    int64_t    transfer_start_pos;
+    time_t     transfer_start_time;
 
-  int      receive_32bit_data;
-  int      use_crc16;
-  int32_t  ack_file_pos;        /* file position used in acknowledgement of correctly */
-                    /* received data subpackets */
+    int      receive_32bit_data;
+    int      use_crc16;
+    int32_t  ack_file_pos;        /* file position used in acknowledgement of correctly */
+    /* received data subpackets */
 
-  int last_sent;
+    int last_sent;
 
-  int n_cans;
+    int n_cans;
 
-  /* Stuff added by RRS */
+    /* Stuff added by RRS */
 
-  /* Status */
-  BOOL      cancelled;
-  BOOL      local_abort;
-  BOOL      file_skipped;
-  BOOL      no_streaming;
-  BOOL      frame_in_transit;
-  unsigned  recv_bufsize;  /* Receiver specified buffer size */
-  int32_t   crc_request;
-  unsigned  errors;
-  unsigned  consecutive_errors;
+    /* Status */
+    BOOL      cancelled;
+    BOOL      local_abort;
+    BOOL      file_skipped;
+    BOOL      no_streaming;
+    BOOL      frame_in_transit;
+    unsigned  recv_bufsize;  /* Receiver specified buffer size */
+    int32_t   crc_request;
+    unsigned  errors;
+    unsigned  consecutive_errors;
 
-  /* Configuration */
-  BOOL      escape_telnet_iac;
-  unsigned  init_timeout;
-  unsigned  send_timeout;
-  unsigned  recv_timeout;
-  unsigned  crc_timeout;
-  unsigned  max_errors;
-  unsigned  block_size;
-  unsigned  max_block_size;
-  int64_t   max_file_size;    /* 0 = unlimited */
-  int       *log_level;
-  /* error C2520: conversion from unsigned __int64 to double not implemented, use signed __int64 */
-  void*    cbdata;
+    /* Configuration */
+    BOOL      escape_telnet_iac;
+    unsigned  init_timeout;
+    unsigned  send_timeout;
+    unsigned  recv_timeout;
+    unsigned  crc_timeout;
+    unsigned  max_errors;
+    unsigned  block_size;
+    unsigned  max_block_size;
+    int64_t   max_file_size;    /* 0 = unlimited */
+    int       *log_level;
+    /* error C2520: conversion from unsigned __int64 to double not implemented, use signed __int64 */
+    void    *cbdata;
 } zmodem_t;
 
 class ZModem
 {
-public:
-  ZModem(FS *zfs, void* cbdata);
-  ~ZModem();
-  BOOL send_file( char* name, File* fp, BOOL request_init, time_t* start, uint64_t* bytes_sent);
-  int get_zfin();
-  int recv_init();
-  int lputs(void* unused, int level, const char* str);
-  int lprintf(int level, const char *fmt, ...);
-  int send_zabort();
-  int send_zfin();
-  int recv_files(const char* download_dir, uint64_t* bytes_received);
-  unsigned recv_file_data( File*, int64_t offset);
-  zmodem_t *zm=0;
-  ZSerial zserial;
-  FS *zfileSystem=0;
-private:
-  char* ver(char *buf);
-  const char* source(void);
-  int rx();
-  int tx(BYTE ch);
-  int send_ack( int32_t pos);
-  int send_nak();
-  int send_zskip();
-  int send_zrinit();
-  int send_pos_header(int type, int32_t pos, BOOL hex);
-  int get_zrinit();
-  BOOL get_crc( int32_t length, uint32_t* crc);
-  void parse_zrinit();
-  void parse_zfile_subpacket();
-  int recv_file_frame(File* fp);
-  int recv_header_and_check();
-  int send_hex(uchar val);
-  int send_padded_zdle();
-  int send_hex_header(unsigned char * p);
-  int send_bin32_header(unsigned char * p);
-  int send_bin16_header(unsigned char * p);
-  int send_bin_header(unsigned char * p);
-  int send_data32(uchar subpkt_type, unsigned char * p, size_t l);
-  int send_data16(uchar subpkt_type,unsigned char * p, size_t l);
-  int send_data(uchar subpkt_type, unsigned char * p, size_t l);
-  int send_data_subpkt(uchar subpkt_type, unsigned char * p, size_t l);
-  int data_waiting(unsigned timeout);
-  void recv_purge();
-  void flush();
-  int send_raw(unsigned char ch);
-  int send_esc(unsigned char c);
-  int recv_data32(unsigned char * p, unsigned maxlen, unsigned* l);
-  int recv_data16(register unsigned char* p, unsigned maxlen, unsigned* l);
-  int recv_data(unsigned char* p, size_t maxlen, unsigned* l, BOOL ack);
-  BOOL recv_subpacket(BOOL ack);
-  int recv_nibble();
-  int recv_hex();
-  int recv_raw();
-  BOOL recv_bin16_header();
-  BOOL recv_hex_header();
-  BOOL recv_bin32_header();
-  int recv_header_raw(int errors);
-  int recv_header();
-  BOOL request_crc(int32_t length);
-  BOOL recv_crc(uint32_t* crc);
-  BOOL handle_zrpos(uint64_t* pos);
-  BOOL handle_zack();
-  BOOL is_connected();
-  BOOL is_cancelled();
-  int send_from(File* fp, uint64_t pos, uint64_t* sent);
-  int send_znak();
-  int send_zeof(uint32_t pos);
-  void progress(void* cbdata, int64_t current_pos);
-  int send_byte(void* unused, uchar ch, unsigned timeout);
-  int recv_byte(void* unused, unsigned timeout); /* seconds */
-  ulong frame_pos(int type);
-  char* getfname(const char* path);
+    public:
+        ZModem (FS *zfs, void *cbdata);
+        ~ZModem();
+        BOOL send_file ( char *name, File *fp, BOOL request_init, time_t *start, uint64_t *bytes_sent);
+        int get_zfin();
+        int recv_init();
+        int lputs (void *unused, int level, const char *str);
+        int lprintf (int level, const char *fmt, ...);
+        int send_zabort();
+        int send_zfin();
+        int recv_files (const char *download_dir, uint64_t *bytes_received);
+        unsigned recv_file_data ( File *, int64_t offset);
+        zmodem_t *zm = 0;
+        ZSerial zserial;
+        FS *zfileSystem = 0;
+    private:
+        char *ver (char *buf);
+        const char *source (void);
+        int rx();
+        int tx (BYTE ch);
+        int send_ack ( int32_t pos);
+        int send_nak();
+        int send_zskip();
+        int send_zrinit();
+        int send_pos_header (int type, int32_t pos, BOOL hex);
+        int get_zrinit();
+        BOOL get_crc ( int32_t length, uint32_t *crc);
+        void parse_zrinit();
+        void parse_zfile_subpacket();
+        int recv_file_frame (File *fp);
+        int recv_header_and_check();
+        int send_hex (uchar val);
+        int send_padded_zdle();
+        int send_hex_header (unsigned char *p);
+        int send_bin32_header (unsigned char *p);
+        int send_bin16_header (unsigned char *p);
+        int send_bin_header (unsigned char *p);
+        int send_data32 (uchar subpkt_type, unsigned char *p, size_t l);
+        int send_data16 (uchar subpkt_type, unsigned char *p, size_t l);
+        int send_data (uchar subpkt_type, unsigned char *p, size_t l);
+        int send_data_subpkt (uchar subpkt_type, unsigned char *p, size_t l);
+        int data_waiting (unsigned timeout);
+        void recv_purge();
+        void flush();
+        int send_raw (unsigned char ch);
+        int send_esc (unsigned char c);
+        int recv_data32 (unsigned char *p, unsigned maxlen, unsigned *l);
+        int recv_data16 (register unsigned char *p, unsigned maxlen, unsigned *l);
+        int recv_data (unsigned char *p, size_t maxlen, unsigned *l, BOOL ack);
+        BOOL recv_subpacket (BOOL ack);
+        int recv_nibble();
+        int recv_hex();
+        int recv_raw();
+        BOOL recv_bin16_header();
+        BOOL recv_hex_header();
+        BOOL recv_bin32_header();
+        int recv_header_raw (int errors);
+        int recv_header();
+        BOOL request_crc (int32_t length);
+        BOOL recv_crc (uint32_t *crc);
+        BOOL handle_zrpos (uint64_t *pos);
+        BOOL handle_zack();
+        BOOL is_connected();
+        BOOL is_cancelled();
+        int send_from (File *fp, uint64_t pos, uint64_t *sent);
+        int send_znak();
+        int send_zeof (uint32_t pos);
+        void progress (void *cbdata, int64_t current_pos);
+        int send_byte (void *unused, uchar ch, unsigned timeout);
+        int recv_byte (void *unused, unsigned timeout); /* seconds */
+        ulong frame_pos (int type);
+        char *getfname (const char *path);
 };
 
-static ZModem *initZSerial(FS &fs, FlowControlType commandFlow)
+static ZModem *initZSerial (FS &fs, FlowControlType commandFlow)
 {
-  ZModem *modem = new ZModem(&SD, NULL);
-  modem->zserial.setFlowControlType(FCT_DISABLED);
-  if(commandFlow==FCT_RTSCTS)
-    modem->zserial.setFlowControlType(FCT_RTSCTS);
-  else
-    modem->zserial.setFlowControlType(FCT_NORMAL);
-  modem->zserial.setPetsciiMode(false);
-  modem->zserial.setXON(true);
-  return modem;
+    ZModem *modem = new ZModem (&SD, NULL);
+    modem->zserial.setFlowControlType (FCT_DISABLED);
+    if (commandFlow == FCT_RTSCTS)
+        modem->zserial.setFlowControlType (FCT_RTSCTS);
+    else
+        modem->zserial.setFlowControlType (FCT_NORMAL);
+    modem->zserial.setPetsciiMode (false);
+    modem->zserial.setXON (true);
+    return modem;
 }
 
-static bool zDownload(FlowControlType flow, FS &fs, std::string filePath, std::string &errors)
+static bool zDownload (FlowControlType flow, FS &fs, std::string filePath, std::string &errors)
 {
-  time_t starttime = 0;
-  uint64_t bytes_sent=0;
-  BOOL success=ZFALSE;
-  char filePathC[MAX_PATH];
-  File F;
+    time_t starttime = 0;
+    uint64_t bytes_sent = 0;
+    BOOL success = ZFALSE;
+    char filePathC[MAX_PATH];
+    File F;
 
-  ZModem *modem = initZSerial(fs, flow);
+    ZModem *modem = initZSerial (fs, flow);
 
-  //static int send_files(char** fname, uint fnames)
-  F=modem->zfileSystem->open(filePath);
-  modem->zm->files_remaining = 1;
-  modem->zm->bytes_remaining = F.size();
-  strcpy(filePathC,filePath.c_str());
-  success=modem->send_file(filePathC, &F, ZTRUE, &starttime, &bytes_sent);
-  if(success)
-    modem->get_zfin();
-  F.close();
+    //static int send_files(char** fname, uint fnames)
+    F = modem->zfileSystem->open (filePath);
+    modem->zm->files_remaining = 1;
+    modem->zm->bytes_remaining = F.size();
+    strcpy (filePathC, filePath.c_str());
+    success = modem->send_file (filePathC, &F, ZTRUE, &starttime, &bytes_sent);
+    if (success)
+        modem->get_zfin();
+    F.close();
 
-  modem->zserial.flushAlways();
-  delete modem;
-  return (success==ZTRUE) && (modem->zm->cancelled==ZFALSE);
+    modem->zserial.flushAlways();
+    delete modem;
+    return (success == ZTRUE) && (modem->zm->cancelled == ZFALSE);
 }
 
-static bool zUpload(FlowControlType flow, FS &fs, std::string dirPath, std::string &errors)
+static bool zUpload (FlowControlType flow, FS &fs, std::string dirPath, std::string &errors)
 {
-  BOOL success=ZFALSE;
-  int   i;
-  char str[MAX_PATH];
-  File fp;
-  int err;
+    BOOL success = ZFALSE;
+    int   i;
+    char str[MAX_PATH];
+    File fp;
+    int err;
 
-  ZModem *modem = initZSerial(fs,flow);
+    ZModem *modem = initZSerial (fs, flow);
 
-  //static int receive_files(char** fname_list, int fnames)
-  //TODO: loop might be necc around here, for multiple files?
-  i=modem->recv_init();
-  if(modem->zm->cancelled || (i<0))
-  {
+    //static int receive_files(char** fname_list, int fnames)
+    //TODO: loop might be necc around here, for multiple files?
+    i = modem->recv_init();
+    if (modem->zm->cancelled || (i < 0))
+    {
+        delete modem;
+        return ZFALSE;
+    }
+    switch (i)
+    {
+        case ZFILE:
+            //SAFECOPY(fname,zm.current_file_name);
+            //file_bytes = zm.current_file_size;
+            //ftime = zm.current_file_time;
+            //total_files = zm.files_remaining;
+            //total_bytes = zm.bytes_remaining;
+            break;
+        case ZFIN:
+        case ZCOMPL:
+            delete modem;
+            return ZTRUE; // was (!success)
+        default:
+            delete modem;
+            return ZFALSE;
+    }
+
+    strcpy (str, dirPath.c_str());
+    if (str[strlen (str) - 1] != '/')
+    {
+        str[strlen (str)] = '/';
+        str[strlen (str) + 1] = 0;
+    }
+    strcpy (str + strlen (str), modem->zm->current_file_name);
+
+    fp = modem->zfileSystem->open (str, FILE_WRITE);
+    if (!fp)
+    {
+        modem->lprintf (LOG_ERR, "Error %d creating %s", errno, str);
+        modem->send_zabort();
+        //zmodem_send_zskip(); //TODO: for when we move to multiple files
+        //continue;
+        delete modem;
+        return ZFALSE;
+    }
+    err = modem->recv_file_data (&fp, 0);
+
+    if (err <= modem->zm->max_errors && !modem->zm->cancelled)
+        success = ZTRUE;
+
+    if (success)
+        modem->send_zfin();
+
+    fp.close();
+    if (modem->zm->local_abort)
+    {
+        modem->lprintf (LOG_ERR, "Locally aborted, sending cancel to remote");
+        modem->send_zabort();
+        delete modem;
+        return ZFALSE;
+    }
+
+    modem->zserial.flushAlways();
     delete modem;
-    return ZFALSE;
-  }
-  switch(i) {
-    case ZFILE:
-      //SAFECOPY(fname,zm.current_file_name);
-      //file_bytes = zm.current_file_size;
-      //ftime = zm.current_file_time;
-      //total_files = zm.files_remaining;
-      //total_bytes = zm.bytes_remaining;
-      break;
-    case ZFIN:
-    case ZCOMPL:
-      delete modem;
-      return ZTRUE; // was (!success)
-    default:
-      delete modem;
-      return ZFALSE;
-  }
-
-  strcpy(str,dirPath.c_str());
-  if(str[strlen(str)-1]!='/')
-  {
-    str[strlen(str)]='/';
-    str[strlen(str)+1]=0;
-  }
-  strcpy(str+strlen(str),modem->zm->current_file_name);
-
-  fp = modem->zfileSystem->open(str,FILE_WRITE);
-  if(!fp)
-  {
-    modem->lprintf(LOG_ERR,"Error %d creating %s",errno,str);
-    modem->send_zabort();
-    //zmodem_send_zskip(); //TODO: for when we move to multiple files
-    //continue;
-    delete modem;
-    return ZFALSE;
-  }
-  err=modem->recv_file_data(&fp,0);
-
-  if(err<=modem->zm->max_errors && !modem->zm->cancelled)
-    success=ZTRUE;
-
-  if(success)
-    modem->send_zfin();
-
-  fp.close();
-  if(modem->zm->local_abort)
-  {
-    modem->lprintf(LOG_ERR,"Locally aborted, sending cancel to remote");
-    modem->send_zabort();
-    delete modem;
-    return ZFALSE;
-  }
-
-  modem->zserial.flushAlways();
-  delete modem;
-  return (success == ZTRUE);
+    return (success == ZTRUE);
 }
 #endif

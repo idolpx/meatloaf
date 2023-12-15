@@ -16,51 +16,51 @@
 
 enum PrintPayloadType
 {
-  PETSCII,
-  ASCII,
-  RAW
+    PETSCII,
+    ASCII,
+    RAW
 };
 
 static unsigned int DEFAULT_DELAY_MS = 5000;
 
 class ZPrint : public ZMode
 {
-  private:
-    WiFiClientNode *wifiSock = null;
-    File tfile;
-    Stream *outStream = null;
-    unsigned int timeoutDelayMs = DEFAULT_DELAY_MS;
-    char *lastPrinterSpec = 0;
-    unsigned long currentExpiresTimeMs = 0;
-    unsigned long nextFlushMs = 0;
-    PrintPayloadType payloadType = PETSCII;
-    unsigned long lastNonPlusTimeMs = 0;
-    int plussesInARow=0;
-    size_t pdex=0;
-    size_t coldex=0;
-    char pbuf[258];
-    ZSerial serial;
-    char lastLastC = 0;
-    char lastC = 0;
-    short jobNum = 0;
+    private:
+        WiFiClientNode *wifiSock = null;
+        File tfile;
+        Stream *outStream = null;
+        unsigned int timeoutDelayMs = DEFAULT_DELAY_MS;
+        char *lastPrinterSpec = 0;
+        unsigned long currentExpiresTimeMs = 0;
+        unsigned long nextFlushMs = 0;
+        PrintPayloadType payloadType = PETSCII;
+        unsigned long lastNonPlusTimeMs = 0;
+        int plussesInARow = 0;
+        size_t pdex = 0;
+        size_t coldex = 0;
+        char pbuf[258];
+        ZSerial serial;
+        char lastLastC = 0;
+        char lastC = 0;
+        short jobNum = 0;
 
-    size_t writeStr(char *s);
-    size_t writeChunk(char *s, int len);
-    void switchBackToCommandMode(bool error);
-    ZResult finishSwitchTo(char *hostIp, char *req, int port, bool doSSL);
-    void announcePrintJob(const char *hostIp, const int port, const char *req);
+        size_t writeStr (char *s);
+        size_t writeChunk (char *s, int len);
+        void switchBackToCommandMode (bool error);
+        ZResult finishSwitchTo (char *hostIp, char *req, int port, bool doSSL);
+        void announcePrintJob (const char *hostIp, const int port, const char *req);
 
-  public:
+    public:
 
-    ZResult switchTo(char *vbuf, int vlen, bool petscii);
-    ZResult switchToPostScript(char *prefix);
-    void setLastPrinterSpec(const char *spec);
-    bool testPrinterSpec(const char *vbuf, int vlen, bool petscii);
-    char *getLastPrinterSpec();
-    void setTimeoutDelayMs(int ms);
-    int getTimeoutDelayMs();
+        ZResult switchTo (char *vbuf, int vlen, bool petscii);
+        ZResult switchToPostScript (char *prefix);
+        void setLastPrinterSpec (const char *spec);
+        bool testPrinterSpec (const char *vbuf, int vlen, bool petscii);
+        char *getLastPrinterSpec();
+        void setTimeoutDelayMs (int ms);
+        int getTimeoutDelayMs();
 
-    void serialIncoming();
-    void loop();
+        void serialIncoming();
+        void loop();
 };
 

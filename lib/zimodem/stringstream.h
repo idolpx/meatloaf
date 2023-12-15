@@ -3,25 +3,38 @@
 
 class StringStream : public Stream
 {
-public:
-    StringStream(const std::string &s)
-    {
-      str = s;
-      position = 0;
-    }
+    public:
+        StringStream (const std::string &s)
+        {
+            str = s;
+            position = 0;
+        }
 
-    // Stream methods
-    virtual int available() { return str.length() - position; }
-    virtual int read() { return position < str.length() ? str[position++] : -1; }
-    virtual int peek() { return position < str.length() ? str[position] : -1; }
-    virtual void flush() { };
-    // Print methods
-    virtual size_t write(uint8_t c) { str += (char)c; return 1;};
+        // Stream methods
+        virtual int available()
+        {
+            return str.length() - position;
+        }
+        virtual int read()
+        {
+            return position < str.length() ? str[position++] : -1;
+        }
+        virtual int peek()
+        {
+            return position < str.length() ? str[position] : -1;
+        }
+        virtual void flush() { };
+        // Print methods
+        virtual size_t write (uint8_t c)
+        {
+            str += (char)c;
+            return 1;
+        };
 
-private:
-    std::string str;
-    int length;
-    int position;
+    private:
+        std::string str;
+        int length;
+        int position;
 };
 
 #endif // _STRING_STREAM_H_INCLUDED_
