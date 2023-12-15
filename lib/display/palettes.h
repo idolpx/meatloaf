@@ -1,4 +1,5 @@
 #pragma once
+#ifdef LED_STRIP
 
 #include "FastLED.h"
 #include "FX.h"
@@ -68,3 +69,4 @@ const TProgmemPalette16 myRedWhiteBluePalette_p =
     CRGB::Black
 };
 
+#endif // LED_STRIP

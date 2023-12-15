@@ -69,7 +69,7 @@ bool DeviceDB::select(uint8_t new_device_id)
     // Save current config
     save();
 
-    config_file = SYSTEM_DIR "device." + std::to_string(new_device_id) + ".conf";
+    config_file = SYSTEM_DIR "/device." + std::to_string(new_device_id) + ".conf";
     //std::unique_ptr<MFile> file(MFSOwner::File(config_file));
     file.reset(MFSOwner::File(config_file));
 

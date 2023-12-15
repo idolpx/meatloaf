@@ -17,30 +17,30 @@
 #ifdef INCLUDE_HOSTCM
 void ZHostCMMode::switchBackToCommandMode()
 {
-  if(proto != 0)
-    delete proto;
-  proto = 0;
-  currMode = &commandMode;
+    if (proto != 0)
+        delete proto;
+    proto = 0;
+    currMode = &commandMode;
 }
 
 void ZHostCMMode::switchTo()
 {
-  currMode=&hostcmMode;
-  if(proto == 0)
-    proto = new HostCM(&SD);
+    currMode = &hostcmMode;
+    if (proto == 0)
+        proto = new HostCM (&SD);
 }
 
 void ZHostCMMode::serialIncoming()
 {
-  if(proto != 0)
-    proto->receiveLoop();
+    if (proto != 0)
+        proto->receiveLoop();
 }
 
 void ZHostCMMode::loop()
 {
-  serialOutDeque();
-  if((proto != 0) && (proto->isAborted()))
-    switchBackToCommandMode();
+    serialOutDeque();
+    if ((proto != 0) && (proto->isAborted()))
+        switchBackToCommandMode();
 }
 
 #endif

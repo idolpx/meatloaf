@@ -20,14 +20,14 @@
 
 class ZHostCMMode : public ZMode
 {
-  private:
-    void switchBackToCommandMode();
-    HostCM *proto = 0;
+    private:
+        void switchBackToCommandMode();
+        HostCM *proto = 0;
 
-  public:
-    void switchTo();
-    void serialIncoming();
-    void loop();
+    public:
+        void switchTo();
+        void serialIncoming();
+        void loop();
 };
 
 #endif

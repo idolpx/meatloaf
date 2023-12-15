@@ -1,64 +1,47 @@
 #include <esp_system.h>
 #include <nvs_flash.h>
-#include <esp32/spiram.h>
 #include <esp32/himem.h>
 #include <driver/gpio.h>
 #include <esp_console.h>
 #include "linenoise/linenoise.h"
 
+//#include "archive.h"
 
 #include "../include/global_defines.h"
 #include "../include/debug.h"
 
-
+#include "device.h"
 #include "keys.h"
 #include "led.h"
-
-#ifdef LED_STRIP
 #include "display.h"
-#endif
 
-#include "sound.h"
+//#include "disk-sounds.h"
 
 #include "fnSystem.h"
+#include "fnConfig.h"
 #include "fnWiFi.h"
-#include "webdav.h"
 
-#include "webdav.h"
-
-#ifdef FLASH_SPIFFS
-#include "fnFsSPIFFS.h"
-#elif FLASH_LITTLEFS
-#include "fnFsLittleFS.h"
-#endif
+#include "fsFlash.h"
 #include "fnFsSD.h"
 
-#define digital_write     fnSystem.digital_write
+#ifdef ENABLE_ZIMODEM
+#include "zimodem.h"
+
+Zimodem zm;
+#endif
 
 /**************************/
 // Meatloaf
 
 
-#include "iec.h"
+#include "bus.h"
 #include "ml_tests.h"
-
-#ifdef PARALLEL_BUS
-#include "parallel.h"
-#endif
 
 std::string statusMessage;
 bool initFailed = false;
 
 
 /**************************/
-
-// fnSystem is declared and defined in fnSystem.h/cpp
-// fnBtManager is declared and defined in fnBluetooth.h/cpp
-// fnLedManager is declared and defined in led.h/cpp
-// fnKeyManager is declared and defined in keys.h/cpp
-// fnHTTPD is declared and defineid in HttpService.h/cpp
-
-// sioFuji theFuji; // moved to fuji.h/.cpp
 
 
 void main_shutdown_handler()
@@ -76,21 +59,21 @@ void main_setup()
     fnUartDebug.begin(DEBUG_SPEED);
     unsigned long startms = fnSystem.millis();
     
-    Debug_printf( ANSI_WHITE "\n\n" ANSI_BLUE_BACKGROUND "==============================" ANSI_RESET_NL );
-    Debug_printf( ANSI_BLUE_BACKGROUND "   " PRODUCT_ID " " FW_VERSION "   " ANSI_RESET_NL );
-    Debug_printf( ANSI_BLUE_BACKGROUND "   " PLATFORM_DETAILS "    " ANSI_RESET_NL );
-    Debug_printf( ANSI_BLUE_BACKGROUND "------------------------------" ANSI_RESET_NL "\n" );
+    Serial.print( ANSI_WHITE "\r\n\r\n" ANSI_BLUE_BACKGROUND "==============================" ANSI_RESET_NL );
+    Serial.print( ANSI_BLUE_BACKGROUND "   " PRODUCT_ID " " FW_VERSION "   " ANSI_RESET_NL );
+    Serial.print( ANSI_BLUE_BACKGROUND "   " PLATFORM_DETAILS "    " ANSI_RESET_NL );
+    Serial.print( ANSI_BLUE_BACKGROUND "------------------------------" ANSI_RESET_NL "\r\n" );
 
-    Debug_printf( "FujiNet %s Started @ %lu\n", fnSystem.get_fujinet_version(), startms );
+    Serial.printf( "Meatloaf %s Started @ %lu\r\n", fnSystem.get_fujinet_version(), startms );
 
-    Debug_printf( "Starting heap: %u\n", fnSystem.get_free_heap_size() );
+    Serial.printf( "Starting heap: %u\r\n", fnSystem.get_free_heap_size() );
 
-#ifndef NO_PSRAM
-    Debug_printf( "PsramSize %u\n", fnSystem.get_psram_size() );
+#ifdef BOARD_HAS_PSRAM
+    Serial.printf( "PsramSize %u\r\n", fnSystem.get_psram_size() );
 
-    Debug_printf( "himem phys %u\n", esp_himem_get_phys_size() );
-    Debug_printf( "himem free %u\n", esp_himem_get_free_size() );
-    Debug_printf( "himem reserved %u\n", esp_himem_reserved_area_size() );
+    Serial.printf( "himem phys %u\r\n", esp_himem_get_phys_size() );
+    Serial.printf( "himem free %u\r\n", esp_himem_get_free_size() );
+    Serial.printf( "himem reserved %u\r\n", esp_himem_reserved_area_size() );
 #endif
 
 
@@ -102,7 +85,7 @@ void main_setup()
     esp_err_t e = nvs_flash_init();
     if (e == ESP_ERR_NVS_NO_FREE_PAGES || e == ESP_ERR_NVS_NEW_VERSION_FOUND)
     {
-        Debug_println("Erasing flash");
+        Serial.print("Erasing flash");
         ESP_ERROR_CHECK(nvs_flash_erase());
         e = nvs_flash_init();
     }
@@ -112,57 +95,68 @@ void main_setup()
     gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
 
     fnSystem.check_hardware_ver();
-    Debug_printf("Detected Hardware Version: %s\n", fnSystem.get_hardware_ver_str());
+    Serial.printf("Detected Hardware Version: %s\r\n", fnSystem.get_hardware_ver_str());
 
     fnKeyManager.setup();
     fnLedManager.setup();
 
     // Enable/Disable Modem/Parallel Mode on Userport
-    fnSystem.set_pin_mode(PIN_MDMPAR_SW1, gpio_mode_t::GPIO_MODE_OUTPUT);
-    digital_write(PIN_MDMPAR_SW1, DIGI_LOW); // DISABLE Modem
-    //digital_write(PIN_MDMPAR_SW1, DIGI_HIGH); // ENABLE Modem
-    fnSystem.set_pin_mode(PIN_MDMPAR_SW2, gpio_mode_t::GPIO_MODE_OUTPUT);
-    digital_write(PIN_MDMPAR_SW2, DIGI_LOW); // DISABLE UP9600
-    //digital_write(PIN_MDMPAR_SW2, DIGI_HIGH); // ENABLE UP9600
+    fnSystem.set_pin_mode(PIN_MODEM_ENABLE, gpio_mode_t::GPIO_MODE_OUTPUT);
+    fnSystem.digital_write(PIN_MODEM_ENABLE, DIGI_LOW); // DISABLE Modem
+    //fnSystem.digital_write(PIN_MODEM_ENABLE, DIGI_HIGH); // ENABLE Modem
+    fnSystem.set_pin_mode(PIN_MODEM_UP9600, gpio_mode_t::GPIO_MODE_OUTPUT);
+    fnSystem.digital_write(PIN_MODEM_UP9600, DIGI_LOW); // DISABLE UP9600
+    //fnSystem.digital_write(PIN_MODEM_UP9600, DIGI_HIGH); // ENABLE UP9600
 
-#ifdef FLASH_SPIFFS
-    fnSPIFFS.start();
-#elif FLASH_LITTLEFS
-    fnLITTLEFS.start();
-#endif
+    fsFlash.start();
 #ifdef SD_CARD
     fnSDFAT.start();
 #endif
 
     // Load our stored configuration
-//    Config.load();
+    Config.load();
 
     // Set up the WiFi adapter
     fnWiFi.start();
     // Go ahead and try reconnecting to WiFi
-    fnWiFi.connect();
-
-    // Start WebDAV Server
-    http_server_start();
+    fnWiFi.connect(
+        Config.get_wifi_ssid().c_str(),
+        Config.get_wifi_passphrase().c_str()
+    );
+    // Try connect with default WiFi settings if not connected
+    if ( strlen( WIFI_SSID ) && !fnWiFi.connected() )
+        fnWiFi.connect( WIFI_SSID, WIFI_PASSWORD );
 
     // Setup IEC Bus
     IEC.setup();
     Serial.println( ANSI_GREEN_BOLD "IEC Bus Initialized" ANSI_RESET );
 
-    // Add devices to bus
-    IEC.enabledDevices = DEVICE_MASK;
-    IEC.enableDevice(30);
-
-    Serial.print("Virtual Device(s) Started: [ " ANSI_YELLOW_BOLD );
-    for (uint8_t i = 0; i < 31; i++)
     {
-        if (IEC.isDeviceEnabled(i))
+        // Add devices to bus
+        FileSystem *ptrfs = fnSDFAT.running() ? (FileSystem *)&fnSDFAT : (FileSystem *)&fsFlash;
+        iecPrinter::printer_type ptype = iecPrinter::printer_type::PRINTER_COMMODORE_MPS803; // temporary
+        Serial.printf("Creating a default printer using %s storage and type %d\r\n", ptrfs->typestring(), ptype);
+        iecPrinter *ptr = new iecPrinter(ptrfs, ptype);
+        fnPrinters.set_entry(0, ptr, ptype, Config.get_printer_port(0));
+        Serial.print("Printer "); IEC.addDevice(ptr, 4); // add as device #4 for now
+
+        Serial.print("Disk "); IEC.addDevice(new iecDrive(), 8);
+        Serial.print("Network "); IEC.addDevice(new iecNetwork(), 16);
+        Serial.print("CPM "); IEC.addDevice(new iecCpm(), 20);
+        Serial.print("Voice "); IEC.addDevice(new iecVoice(), 21);
+        Serial.print("Meatloaf "); IEC.addDevice(new iecMeatloaf(), 30);
+
+        Serial.print("Virtual Device(s) Started: [ " ANSI_YELLOW_BOLD );
+        for (uint8_t i = 0; i < 31; i++)
         {
-            Serial.printf("%.02d ", i);
+            if (IEC.isDeviceEnabled(i))
+            {
+                Serial.printf("%.02d ", i);
+            }
         }
+        Serial.println( ANSI_RESET "]");
+        //IEC.enabled = true;
     }
-    Serial.println( ANSI_RESET "]");
-    IEC.enabled = true;
 
 #ifdef PARALLEL_BUS
     // Setup Parallel Bus
@@ -171,23 +165,26 @@ void main_setup()
 #endif
 
 #ifdef LED_STRIP
-        // Start LED Strip
-        display_app_main(); // fastled lib
+    // Start LED Strip
+    display_app_main(); // fastled lib
 #endif
 
 #ifdef PIEZO_BUZZER
-        mlSoundManager.setup(); // start sound
+    mlSoundManager.setup(); // start sound
 #endif
 
 #ifdef DEBUG
     unsigned long endms = fnSystem.millis();
-    Debug_printf("Available heap: %u\nSetup complete @ %lu (%lums)\n", fnSystem.get_free_heap_size(), endms, endms - startms);
+    Debug_printf("Available heap: %u\r\nSetup complete @ %lu (%lums)\r\n", fnSystem.get_free_heap_size(), endms, endms - startms);
 #endif // DEBUG
 
-    //runTestsSuite();
-    //lfs_test();
 #ifdef DEBUG_TIMING
     Debug_printv( ANSI_GREEN_BOLD "DEBUG_TIMING enabled" ANSI_RESET );
+#endif
+
+#ifdef RUN_TESTS
+    runTestsSuite();
+    // lfs_test();
 #endif
 }
 
@@ -207,7 +204,7 @@ void fn_console_loop(void *param)
 
     if(e == ESP_OK) {
         while((line = linenoise("hello> ")) != NULL) {
-            printf("You wrote: %s\n", line);
+            printf("You wrote: %s\r\n", line);
             linenoiseFree(line); /* Or just free(line) if you use libc malloc. */
         }
     }
@@ -224,15 +221,10 @@ extern "C"
 {
     void app_main()
     {
-        // cppcheck-suppress "unusedFunction"
         // Call our setup routine
         main_setup();
 
-        // xTaskCreatePinnedToCore(fn_console_loop, "fnConsole", 
-        //                         4096, nullptr, 1, nullptr, 0);
-
-        // Sit here twiddling our thumbs
-        while (true)
-            vTaskDelay(9000 / portTICK_PERIOD_MS);
+        // Delete app_main() task since we no longer need it
+        vTaskDelete(NULL);
     }
 }

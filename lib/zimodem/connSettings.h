@@ -20,33 +20,33 @@
 
 enum ConnFlag
 {
-  FLAG_DISCONNECT_ON_EXIT=1,
-  FLAG_PETSCII=2,
-  FLAG_TELNET=4,
-  FLAG_ECHO=8,
-  FLAG_XONXOFF=16,
-  FLAG_SECURE=32,
-  FLAG_RTSCTS=64
+    FLAG_DISCONNECT_ON_EXIT = 1,
+    FLAG_PETSCII = 2,
+    FLAG_TELNET = 4,
+    FLAG_ECHO = 8,
+    FLAG_XONXOFF = 16,
+    FLAG_SECURE = 32,
+    FLAG_RTSCTS = 64
 };
 
 class ConnSettings
 {
-  public:
-    bool petscii = false;
-    bool telnet = false;
-    bool echo = false;
-    bool xonxoff = false;
-    bool rtscts = false;
-    bool secure = false;
+    public:
+        bool petscii = false;
+        bool telnet = false;
+        bool echo = false;
+        bool xonxoff = false;
+        bool rtscts = false;
+        bool secure = false;
 
-    ConnSettings(int flagBitmap);
-    ConnSettings(const char *dmodifiers);
-    ConnSettings(std::string modifiers);
-    int getBitmap();
-    int getBitmap(FlowControlType forceCheck);
-    void setFlag(ConnFlag flagMask, bool newVal);
-    std::string getFlagString();
+        ConnSettings (int flagBitmap);
+        ConnSettings (const char *dmodifiers);
+        ConnSettings (std::string modifiers);
+        int getBitmap();
+        int getBitmap (FlowControlType forceCheck);
+        void setFlag (ConnFlag flagMask, bool newVal);
+        std::string getFlagString();
 
-    static void IPtoStr(IPAddress *ip, std::string &str);
-    static IPAddress *parseIP(const char *ipStr);
+        static void IPtoStr (IPAddress *ip, std::string &str);
+        static IPAddress *parseIP (const char *ipStr);
 };

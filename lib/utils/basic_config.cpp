@@ -2,7 +2,7 @@
 
 std::string BasicConfigReader::get(std::string key) {
     if(entries->find(key) == entries->end())
-        return nullptr;
+        return std::string();
     else
         return entries->at(key);
 }
@@ -26,7 +26,7 @@ void BasicConfigReader::read(std::string name) {
                 // config_name:config value(s)
                 // 0
                 istream >> line;
-                mstr::toASCII(line);
+                line = mstr::toUTF8(line);
                 auto split = mstr::split(line, ':', 2);
                 if(split.size()>1) {
                     auto setting = mstr::drop(split[0],1); // drop opening quote

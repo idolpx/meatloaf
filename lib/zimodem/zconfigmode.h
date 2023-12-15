@@ -16,52 +16,52 @@
 
 class ZConfig : public ZMode
 {
-  private:
-    enum ZConfigMenu
-    {
-      ZCFGMENU_MAIN=0,
-      ZCFGMENU_NUM=1,
-      ZCFGMENU_ADDRESS=2,
-      ZCFGMENU_OPTIONS=3,
-      ZCFGMENU_WIMENU=4,
-      ZCFGMENU_WIFIPW=5,
-      ZCFGMENU_WICONFIRM=6,
-      ZCFGMENU_FLOW=7,
-      ZCFGMENU_BBSMENU=8,
-      ZCFGMENU_NEWPORT=9,
-      ZCFGMENU_NEWHOST=10,
-      ZCFGMENU_NOTES=11,
-      ZCFGMENU_NETMENU=12,
-      ZCFGMENU_SUBNET=13,
-      ZCFGMENU_NEWPRINT=14
-    } currState;
-    
-    ZSerial serial; // storage for serial settings only
+    private:
+        enum ZConfigMenu
+        {
+            ZCFGMENU_MAIN = 0,
+            ZCFGMENU_NUM = 1,
+            ZCFGMENU_ADDRESS = 2,
+            ZCFGMENU_OPTIONS = 3,
+            ZCFGMENU_WIMENU = 4,
+            ZCFGMENU_WIFIPW = 5,
+            ZCFGMENU_WICONFIRM = 6,
+            ZCFGMENU_FLOW = 7,
+            ZCFGMENU_BBSMENU = 8,
+            ZCFGMENU_NEWPORT = 9,
+            ZCFGMENU_NEWHOST = 10,
+            ZCFGMENU_NOTES = 11,
+            ZCFGMENU_NETMENU = 12,
+            ZCFGMENU_SUBNET = 13,
+            ZCFGMENU_NEWPRINT = 14
+        } currState;
 
-    void switchBackToCommandMode();
-    void doModeCommand();
-    bool showMenu;
-    bool savedEcho;
-    std::string EOLN;
-    const char *EOLNC;
-    unsigned long lastNumber;
-    std::string lastAddress;
-    std::string lastOptions;
-    std::string lastNotes;
-    WiFiServerSpec serverSpec;
-    bool newListen;
-    bool useDHCP;
-    bool settingsChanged=false;
-    char netOpt = ' ';
-    int lastNumNetworks=0;
-    IPAddress lastIP;
-    IPAddress lastDNS;
-    IPAddress lastGW;
-    IPAddress lastSN;
+        ZSerial serial; // storage for serial settings only
 
-  public:
-    void switchTo();
-    void serialIncoming();
-    void loop();
+        void switchBackToCommandMode();
+        void doModeCommand();
+        bool showMenu;
+        bool savedEcho;
+        std::string EOLN;
+        const char *EOLNC;
+        unsigned long lastNumber;
+        std::string lastAddress;
+        std::string lastOptions;
+        std::string lastNotes;
+        WiFiServerSpec serverSpec;
+        bool newListen;
+        bool useDHCP;
+        bool settingsChanged = false;
+        char netOpt = ' ';
+        int lastNumNetworks = 0;
+        IPAddress lastIP;
+        IPAddress lastDNS;
+        IPAddress lastGW;
+        IPAddress lastSN;
+
+    public:
+        void switchTo();
+        void serialIncoming();
+        void loop();
 };
 

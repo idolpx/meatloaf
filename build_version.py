@@ -5,14 +5,21 @@ import sys
 
 Import("env")
 
-
+# Need to run this command in the PIO virtual environment
+#env.Execute("$PYTHONEXE -m pip list --format=json --disable-pip-version-check");
+#exit(0);
 
 # Don't do anything if this is an 'uploadfs' or 'erase' target
-if sys.argv[9] == 'buildfs' or sys.argv[9] == 'uploadfs' or sys.argv[9] == 'erase':
+cmdline = ','.join(sys.argv)
+if cmdline.find('buildfs') or cmdline.find('uploadfs'):
     # Change build tool if we are using LittleFS
     if any("FLASH_LITTLEFS" in x for x in env['BUILD_FLAGS']):
-        print("\033[1;31mReplaceing MKSPIFFSTOOL with mklittlefs\033[1;37m")
+        print("\033[1;31mReplacing MKSPIFFSTOOL with mklittlefs\033[1;37m")
         env.Replace (MKSPIFFSTOOL = "mklittlefs")
+
+# Disable automatic versioning
+if 1:
+    print("Automatic versioning disabled")
 
 # Don't do anything if nothing has changed
 elif len(subprocess.check_output(["git", "diff", "--name-only"], universal_newlines=True)) == 0:

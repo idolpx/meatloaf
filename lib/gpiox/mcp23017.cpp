@@ -1,4 +1,5 @@
 
+#ifdef GPIOX_MCP23017
 
 #include "mcp23017.h"
 
@@ -6,6 +7,7 @@
 
 #include "../../include/debug.h"
 
+MCP23017 GPIOX;
 
 MCP23017::MCP23017() :
 		_PIN(0), _PORT(0), _DDR(0), _address(0)
@@ -139,3 +141,5 @@ void MCP23017::updateGPIO() {
 	myI2C.writeBytes(_address, 0x00, 2, buffer);
 	//Debug_printv("address[%.2x] in[%d] out[%d] ddr[%d] value[%d]", _address, _PIN, _PORT, _DDR, value);
 }
+
+#endif // GPIOX_MCP23017

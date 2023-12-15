@@ -9,13 +9,13 @@
 
 class ZSLIPMode: public ZMode
 {
-private:
-  void switchBackToCommandMode();
+    private:
+        void switchBackToCommandMode();
 
-public:
-  void switchTo();
-  void serialIncoming();
-  void loop();
+    public:
+        void switchTo();
+        void serialIncoming();
+        void loop();
 };
 
 #endif /* INCLUDE_SLIP_ */
