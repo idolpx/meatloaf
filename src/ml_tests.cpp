@@ -626,7 +626,7 @@ void testPunycode() {
     size_t n_converted;
     // size_t punycode_encode(const uint32_t *const src, const size_t srclen, char *const dst, size_t *const dstlen)
     n_converted = punycode_encode(chineseAsUnicode, 5, asPunycode, &dstlen);
-    Debug_printv("Chinese text as punycode:%s", asPunycode);
+    Debug_printv("Chinese text as punycode:'%s'\n", asPunycode);
 }
 
 void testBasicConfig() {
