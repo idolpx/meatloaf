@@ -136,12 +136,10 @@ void systemBus::setup()
     release(PIN_IEC_SRQ);
 
     // initial pin modes in GPIO
-
     init_pin(PIN_IEC_ATN);
     init_pin(PIN_IEC_CLK_OUT);
     init_pin(PIN_IEC_DATA_OUT);
     init_pin(PIN_IEC_SRQ);
-
 #ifdef IEC_HAS_RESET
     init_pin(PIN_IEC_RESET);
 #endif
@@ -200,6 +198,7 @@ void IRAM_ATTR systemBus::service()
             // If RESET & ATN are both PULLED then CBM is off
             bus_state = BUS_OFFLINE;
             // gpio_intr_enable((gpio_num_t)PIN_IEC_ATN);
+            return;
         }
 
         Debug_printf("IEC Reset! reset[%d]\r\n", pin_reset);
@@ -504,7 +503,7 @@ void systemBus::read_payload()
     while (IEC.status(PIN_IEC_ATN) != PULLED)
     {
         //pull ( PIN_IEC_SRQ );
-        int16_t c = protocol->receiveByte();
+        int8_t c = protocol->receiveByte();
         //Debug_printv("c[%2X]", c);
         //release ( PIN_IEC_SRQ );
 

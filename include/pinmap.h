@@ -7,6 +7,7 @@
 #include "pinmap/fujiapple-rev0.h"
 #include "pinmap/fujiloaf-rev0.h"
 #include "pinmap/lolin-d32-pro.h"
+#include "pinmap/iec-nugget.h"
 
 // ESP32 WROOM
 #include "pinmap/ttgo-t1.h"

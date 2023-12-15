@@ -880,7 +880,7 @@ void iecDrive::sendListing()
     Debug_printf("sendListing: [%s]\r\n=================================\r\n", _base->url.c_str());
 
     uint16_t byte_count = 0;
-    std::string extension = "DIR";
+    std::string extension = "dir";
 
     std::unique_ptr<MFile> entry = std::unique_ptr<MFile>( _base->getNextFileInDir() );
 
@@ -1218,7 +1218,6 @@ bool iecDrive::sendFile()
 
     // std::shared_ptr<MStream> istream = std::static_pointer_cast<MStream>(currentStream);
     auto istream = retrieveStream(commanddata.channel);
-
     if ( istream == nullptr )
     {
         Debug_printv("Stream not found!");

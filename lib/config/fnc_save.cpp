@@ -144,6 +144,7 @@ void fnConfig::save()
 
     // CPM
     ss << LINETERM << "[CPM]" << LINETERM;
+    ss << "cpm_enabled=" << _cpm.cpm_enabled << LINETERM;
     ss << "ccp=" << _cpm.ccp << LINETERM;
 
     // ENABLE DEVICE SLOTS

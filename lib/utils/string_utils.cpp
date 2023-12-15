@@ -2,7 +2,7 @@
 
 #include "../../include/petscii.h"
 #include "../../include/debug.h"
-#include "u8char.h"
+#include "U8Char.h"
 
 #include <algorithm>
 #include <cstdarg>
