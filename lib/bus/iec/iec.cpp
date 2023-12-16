@@ -222,9 +222,10 @@ void IRAM_ATTR systemBus::service()
         if (bus_state == BUS_OFFLINE)
             break;
 
-        //pull ( PIN_IEC_SRQ );
         if (bus_state == BUS_ACTIVE)
         {
+            pull ( PIN_IEC_SRQ );
+
             //release ( PIN_IEC_CLK_OUT );
             //pull ( PIN_IEC_DATA_OUT );
 
@@ -233,17 +234,19 @@ void IRAM_ATTR systemBus::service()
             // Read bus command bytes
             //Debug_printv("command");
             read_command();
+
+            release ( PIN_IEC_SRQ );
         }
-        //release ( PIN_IEC_SRQ );
 
         if (bus_state == BUS_PROCESS)
         {
             // Sometimes ATN isn't released immediately. Wait for ATN to be
             // released before trying to read payload. Long ATN delay (>1.5ms)
             // seems to occur more frequently with VIC-20.
-            protocol->timeoutWait(PIN_IEC_ATN, RELEASED, FOREVER, false);
+            // protocol->timeoutWait(PIN_IEC_ATN, RELEASED, FOREVER, false);
 
             //Debug_printv("data");
+            pull ( PIN_IEC_SRQ );
             if (data.secondary == IEC_OPEN || data.secondary == IEC_REOPEN)
             {
                 // Switch to detected protocol
@@ -288,6 +291,7 @@ void IRAM_ATTR systemBus::service()
             // Switch back to standard serial
             detected_protocol = PROTOCOL_SERIAL;
             protocol = selectProtocol();
+            release ( PIN_IEC_SRQ );
         }
 
         if ( status ( PIN_IEC_ATN ) )
@@ -322,9 +326,9 @@ void systemBus::read_command()
     }
     //release( PIN_IEC_SRQ );
 
-    pull( PIN_IEC_SRQ );
+    //pull( PIN_IEC_SRQ );
     int8_t c = receiveByte();
-    release( PIN_IEC_SRQ );
+    //release( PIN_IEC_SRQ );
 
     // Check for error
     if ( flags & ERROR )
@@ -404,7 +408,7 @@ void systemBus::read_command()
 
         default:
 
-            pull ( PIN_IEC_SRQ );
+            //pull ( PIN_IEC_SRQ );
             std::string secondary;
             bus_state = BUS_PROCESS;
 
@@ -435,7 +439,7 @@ void systemBus::read_command()
 
             // *** IMPORTANT! This helps keep us in sync!
             protocol->wait( TIMING_SYNC, false);
-            release ( PIN_IEC_SRQ );
+            //release ( PIN_IEC_SRQ );
 
             Debug_printf(" (%.2X %s  %.2d CHANNEL)\r\n", data.secondary, secondary.c_str(), data.channel);
         }
