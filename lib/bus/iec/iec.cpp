@@ -89,41 +89,40 @@ void IRAM_ATTR systemBus::release ( int _pin )
         _reg = GPIO_ENABLE1_REG, _pin -= 32; 
     } 
     REG_CLR_BIT(_reg, 1 << _pin); // GPIO_MODE_INPUT
-
-    //protocol->wait( 4 ); // Delay for slow pull up
 }
 
-bool IRAM_ATTR systemBus::status ( uint8_t pin )
+bool IRAM_ATTR systemBus::status ( int _pin )
 {
 #ifndef IEC_SPLIT_LINES
-    release ( pin );
+    release ( _pin );
 #endif
-    int l = gpio_get_level ( ( gpio_num_t ) pin ) ? RELEASED : PULLED;
-    
-    return l;
+
+    return gpio_get_level ( ( gpio_num_t ) _pin ) ? RELEASED : PULLED;
 }
 
-uint8_t IRAM_ATTR systemBus::status()
-{
-    uint8_t data = 0;
+// int IRAM_ATTR systemBus::status()
+// {
+//     int data = 0;
 
-    gpio_config_t io_config =
-    {
-        .pin_bit_mask = BIT(PIN_IEC_CLK_IN) | BIT(PIN_IEC_DATA_IN) | BIT(PIN_IEC_SRQ) | BIT(PIN_IEC_RESET),
-        .mode = GPIO_MODE_INPUT,
-        .intr_type = GPIO_INTR_DISABLE,
-    };
+//     gpio_config_t io_config =
+//     {
+//         .pin_bit_mask = BIT(PIN_IEC_CLK_IN) | BIT(PIN_IEC_DATA_IN) | BIT(PIN_IEC_SRQ) | BIT(PIN_IEC_RESET),
+//         .mode = GPIO_MODE_INPUT,
+//         .pull_up_en = GPIO_PULLUP_ENABLE,
+//         .intr_type = GPIO_INTR_DISABLE,
+//     };
 
-    ESP_ERROR_CHECK(gpio_config(&io_config));
-    uint64_t io_data = REG_READ(GPIO_IN_REG);
+//     ESP_ERROR_CHECK(gpio_config(&io_config));
+//     uint64_t io_data = REG_READ(GPIO_IN_REG);
 
-    // data << (1 & (io_data & (1 << PIN_IEC_CLK_IN)));
-    // data << (2 & (io_data & (1 << PIN_IEC_DATA_IN)));
-    // data << (3 & (io_data & (1 << PIN_IEC_SRQ)));
-    // data << (4 & (io_data & (1 << PIN_IEC_RESET)));
+//     //data |= (0 & (io_data & (1 << PIN_IEC_ATN)));
+//     data |= (1 & (io_data & (1 << PIN_IEC_CLK_IN)));
+//     data |= (2 & (io_data & (1 << PIN_IEC_DATA_IN)));
+//     data |= (3 & (io_data & (1 << PIN_IEC_SRQ)));
+//     data |= (4 & (io_data & (1 << PIN_IEC_RESET)));
 
-    return data;
-}
+//     return data;
+// }
 
 void systemBus::setup()
 {
@@ -327,7 +326,7 @@ void systemBus::read_command()
     //release( PIN_IEC_SRQ );
 
     //pull( PIN_IEC_SRQ );
-    int8_t c = receiveByte();
+    uint8_t c = receiveByte();
     //release( PIN_IEC_SRQ );
 
     // Check for error
@@ -692,7 +691,7 @@ int8_t systemBus::receiveByte()
 {
     int8_t b = protocol->receiveByte();
 #ifdef DATA_STREAM
-    Debug_printf("%.2X ", b);
+    Debug_printf("%.2X ", (uint8_t)b);
 #endif
     if (b == -1)
     {

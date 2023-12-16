@@ -570,8 +570,8 @@ public:
 
     void pull ( int _pin );
     void release ( int _pin );
-    bool status ( uint8_t pin );
-    uint8_t status();
+    bool status ( int _pin );
+    //int status();
 };
 /**
  * @brief Return
