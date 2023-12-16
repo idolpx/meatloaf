@@ -24,11 +24,6 @@
 #include "fsFlash.h"
 #include "fnFsSD.h"
 
-#ifdef ENABLE_ZIMODEM
-#include "zimodem.h"
-
-Zimodem zm;
-#endif
 
 /**************************/
 // Meatloaf
