@@ -319,21 +319,13 @@ MFile::MFile(std::string path) {
 
 MFile::MFile(std::string path, std::string name) : MFile(path + "/" + name) {
     if(mstr::startsWith(name, "xn--")) {
-        //Debug_printv("punycode found");
-        std::string punycode = name;
-        std::string utf8 = U8Char::fromPunycode(punycode);
-        //Debug_printv("punycode[%s] utf8[%s]", punycode.c_str(), utf8.c_str());
-        this->path += "/" + utf8;
+        this->path = path + "/" + U8Char::fromPunycode(name);
     }
 }
 
 MFile::MFile(MFile* path, std::string name) : MFile(path->path + "/" + name) {
     if(mstr::startsWith(name, "xn--")) {
-        //Debug_printv("punycode found");
-        std::string punycode = name;
-        std::string utf8 = U8Char::fromPunycode(punycode);
-        //Debug_printv("punycode[%s] utf8[%s]", punycode.c_str(), utf8.c_str());
-        this->path += "/" + utf8;
+        this->path = path->path + "/" + U8Char::fromPunycode(name);
     }
 }
 
