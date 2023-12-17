@@ -317,9 +317,17 @@ MFile::MFile(std::string path) {
     parseUrl(path);
 }
 
-MFile::MFile(std::string path, std::string name) : MFile(path + "/" + name) {}
+MFile::MFile(std::string path, std::string name) : MFile(path + "/" + name) {
+    if(mstr::startsWith(name, "xn--")) {
+        this->path = path + "/" + U8Char::fromPunycode(name);
+    }
+}
 
-MFile::MFile(MFile* path, std::string name) : MFile(path->path + "/" + name) {}
+MFile::MFile(MFile* path, std::string name) : MFile(path->path + "/" + name) {
+    if(mstr::startsWith(name, "xn--")) {
+        this->path = path->path + "/" + U8Char::fromPunycode(name);
+    }
+}
 
 bool MFile::operator!=(nullptr_t ptr) {
     return m_isNull;
