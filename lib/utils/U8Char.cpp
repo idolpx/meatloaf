@@ -153,8 +153,9 @@ std::string U8Char::toPunycode(std::string utf8String) {
     char asPunycode[1024];
     size_t dstlen = sizeof asPunycode;
     size_t n_converted;
+    U8Char temp(' ');
 
-    size_t conv_len = toUnicode32(utf8String, asU32, sizeof asU32);
+    size_t conv_len = temp.toUnicode32(utf8String, asU32, sizeof asU32);
     n_converted = punycode_encode(asU32, conv_len, asPunycode, &dstlen);    
     return std::string(asPunycode, n_converted);
 }
@@ -163,7 +164,8 @@ std::string U8Char::toPunycode(std::string utf8String) {
 std::string U8Char::fromPunycode(std::string punycodeString) {
     uint32_t asU32[1024];
     size_t dstlen = sizeof asU32;
+    U8Char temp(' ');
 
     punycode_decode(punycodeString.c_str(), punycodeString.length(), asU32, &dstlen);
-    return fromUnicode32(asU32, dstlen);
+    return temp.fromUnicode32(asU32, dstlen);
 }
