@@ -1326,7 +1326,7 @@ bool iecDrive::sendFile()
 
         // Exit if ATN is PULLED while sending
         //if ( IEC.status ( PIN_IEC_ATN ) == PULLED )
-        if ( IEC.flags & ATN_PULLED )
+        if ( IEC.flags & ATN_PULLED || istream->error() )
         {
             //Debug_printv("ATN pulled while sending. i[%d]", i);
 
