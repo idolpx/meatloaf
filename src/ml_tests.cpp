@@ -4,7 +4,7 @@
 
 #include <dirent.h>
 #include <sys/stat.h>
-#include <ArduinoJson.h>
+//#include <ArduinoJson.h>
 //#include <archive_cpp.h>
 //#include <archive.h>
 //#include <archive_entry.h>
@@ -21,7 +21,7 @@
 #include "iec/iec_host.h"
 #include "make_unique.h"
 #include "basic_config.h"
-#include "device_db.h"
+//#include "device_db.h"
 #include "wrappers/iec_buffer.h"
 
 //#include "fnHttpClient.h"
@@ -418,71 +418,71 @@ void httpStream(char *url)
 // }
 
 void testJson(MFile* srcFile, MFile* dstFile) {
-    testHeader("C++ stream wrappers");
+    // testHeader("C++ stream wrappers");
 
-    StaticJsonDocument<512> m_device;
-    deserializeJson(m_device, "{\"id\":0,\"media\":0,\"partition\":0,\"url\":\"http://niceurlman.com\",\"path\":\"/\",\"archive\":\"\",\"image\":\"\"}");
+    // StaticJsonDocument<512> m_device;
+    // deserializeJson(m_device, "{\"id\":0,\"media\":0,\"partition\":0,\"url\":\"http://niceurlman.com\",\"path\":\"/\",\"archive\":\"\",\"image\":\"\"}");
 
-    if ( dstFile->exists() )
-        dstFile->remove();
+    // if ( dstFile->exists() )
+    //     dstFile->remove();
 
-    Meat::iostream ostream(dstFile); // dstFile
+    // Meat::iostream ostream(dstFile); // dstFile
     
-    if(ostream.is_open()) {
-        Debug_printf("Trying to serialize JSON to %s\r\n", dstFile->url.c_str());
+    // if(ostream.is_open()) {
+    //     Debug_printf("Trying to serialize JSON to %s\r\n", dstFile->url.c_str());
 
-        auto x = serializeJson(m_device, ostream); 
+    //     auto x = serializeJson(m_device, ostream); 
 
-        Debug_printf("serializeJson returned %d\r\n", x);
+    //     Debug_printf("serializeJson returned %d\r\n", x);
 
-        Debug_printf("sbefore if");
+    //     Debug_printf("sbefore if");
 
-        if(ostream.bad()) {
-            Debug_println("WARNING: FILE WRITE FAILED!!!");
-        }
+    //     if(ostream.bad()) {
+    //         Debug_println("WARNING: FILE WRITE FAILED!!!");
+    //     }
 
-        Debug_printf("before close");
+    //     Debug_printf("before close");
 
-        ostream.close();
-    }
+    //     ostream.close();
+    // }
 
-    //Debug_printf("%s size is %d\r\n", dstFile->url.c_str(), dstFile->size());
+    // //Debug_printf("%s size is %d\r\n", dstFile->url.c_str(), dstFile->size());
 
-    Debug_printf("Copy %s to %s\r\n", dstFile->url.c_str(), srcFile->url.c_str());
+    // Debug_printf("Copy %s to %s\r\n", dstFile->url.c_str(), srcFile->url.c_str());
 
-    bool copyRc = -1; //dstFile->copyTo(srcFile);
+    // bool copyRc = -1; //dstFile->copyTo(srcFile);
 
-    Debug_printf("After copyto rc=%d\r\n", copyRc);
+    // Debug_printf("After copyto rc=%d\r\n", copyRc);
 
-    if(copyRc) {
-        Meat::iostream istream(srcFile);
+    // if(copyRc) {
+    //     Meat::iostream istream(srcFile);
 
-        if(istream.is_open()) {
-            Debug_printf("Trying to deserialize JSON from %s\r\n",srcFile->url.c_str());
+    //     if(istream.is_open()) {
+    //         Debug_printf("Trying to deserialize JSON from %s\r\n",srcFile->url.c_str());
 
-            deserializeJson(m_device, istream);
+    //         deserializeJson(m_device, istream);
 
-            Debug_printf("Got from deserialization: %s\r\n", m_device["url"].as<const char*>());
-        }
-        else
-        {
-            Debug_printf("Error! The stream for deserialization couldn't be opened!");
-        }
-    }
-    else {
-        Debug_println("**** Copying failed *** WHY???");
+    //         Debug_printf("Got from deserialization: %s\r\n", m_device["url"].as<const char*>());
+    //     }
+    //     else
+    //     {
+    //         Debug_printf("Error! The stream for deserialization couldn't be opened!");
+    //     }
+    // }
+    // else {
+    //     Debug_println("**** Copying failed *** WHY???");
 
-        Debug_printf("Trying to deserialize JSON from %s\r\n",dstFile->url.c_str());
+    //     Debug_printf("Trying to deserialize JSON from %s\r\n",dstFile->url.c_str());
 
-        Meat::iostream newIstream(dstFile); // this is your standard istream!
+    //     Meat::iostream newIstream(dstFile); // this is your standard istream!
 
-        if(newIstream.is_open()) {
-            deserializeJson(m_device, newIstream);
-        }
+    //     if(newIstream.is_open()) {
+    //         deserializeJson(m_device, newIstream);
+    //     }
 
-        Debug_printf("Got from deserialization: %s\r\n", m_device["url"].as<const char*>());
+    //     Debug_printf("Got from deserialization: %s\r\n", m_device["url"].as<const char*>());
 
-    }
+    // }
 
 }
 

@@ -117,8 +117,8 @@ public:
         return mstr::endsWith(fileName, ext, false);
     }
 
-    static bool byExtension(std::vector<std::string> ext, std::string fileName) {
-        for ( auto & e : ext )
+    static bool byExtension(const std::vector<std::string> &ext, std::string fileName) {
+        for ( const auto &e : ext )
         {
             if ( mstr::endsWith(fileName, e.c_str(), false) )
                 return true;

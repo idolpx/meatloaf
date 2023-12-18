@@ -18,11 +18,11 @@ class U8Char {
 
 public:
     char16_t ch;
-    U8Char(uint16_t codepoint): ch(codepoint) {};
+    U8Char(const uint16_t codepoint): ch(codepoint) {};
     U8Char(std::istream* reader) {
         fromUtf8Stream(reader);
     }
-    U8Char(char petscii) {
+    U8Char(const char petscii) {
         ch = utf8map[(uint8_t)petscii];
     }
 

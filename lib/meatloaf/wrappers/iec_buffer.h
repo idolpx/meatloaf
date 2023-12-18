@@ -21,8 +21,8 @@
  ********************************************************/
 
 class oiecstream : private std::filebuf, public std::ostream {
-    char* data;
-    systemBus* m_iec;
+    char* data = nullptr;
+    systemBus* m_iec = nullptr;
     bool m_isOpen = false;
 
     size_t easyWrite();

@@ -250,7 +250,7 @@ protected:
     /**
      * @brief Get device ready to handle next phase of command.
      */
-    device_state_t queue_command(IECData data)
+    device_state_t queue_command(const IECData &data)
     {
         commanddata = data;
 
