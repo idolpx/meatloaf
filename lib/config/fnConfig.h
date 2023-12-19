@@ -307,7 +307,7 @@ private:
 
     struct general_info
     {
-        std::string devicename = "fujinet";
+        std::string devicename = "meatloaf";
         int hsio_index = HSIO_INVALID_INDEX;
         std::string timezone;
         bool rotation_sounds = true;

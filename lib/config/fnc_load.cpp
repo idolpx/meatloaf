@@ -68,9 +68,9 @@ Original behavior: read from FLASH first and only read from SD if nothing found 
         }
     }
 */
-    /*
-New behavior: copy from SD first if available, then read FLASH.
-*/
+/*
+ *  New behavior: copy from SD first if available, then read FLASH.
+ */
     // See if we have a copy on SD load it to check if we should write to flash (only copy from SD if we don't have a local copy)
     FILE *fin = NULL; //declare fin
     if (fnSDFAT.running() && fnSDFAT.exists(CONFIG_FILENAME))

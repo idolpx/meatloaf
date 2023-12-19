@@ -22,6 +22,7 @@
 typedef struct
 {
     char ssid[33];
+    char password[64];
     char hostname[64];
     unsigned char localIP[4];
     unsigned char gateway[4];
@@ -49,16 +50,16 @@ struct appkey
 } __attribute__((packed));
 
 
-class iecMeatloaf : public virtualDevice
+class iecMeatloaf : public iecDrive
 {
 private:
     systemBus *_bus;
 
-    fujiHost _fnHosts[MAX_HOSTS];
+    // fujiHost _fnHosts[MAX_HOSTS];
 
-    fujiDisk _fnDisks[MAX_DISK_DEVICES];
+    // fujiDisk _fnDisks[MAX_DISK_DEVICES];
 
-    int _current_open_directory_slot = -1;
+    // int _current_open_directory_slot = -1;
 
     iecDrive _bootDisk; // special disk drive just for configuration
 
@@ -78,41 +79,55 @@ private:
 
 protected:
     void reset_device();           // 0xFF
+
     void net_get_ssid();           // 0xFE
     void net_scan_networks();      // 0xFD
     void net_scan_result();        // 0xFC
-    void net_set_ssid();           // 0xFB
+    void net_set_ssid( bool store = true );           // 0xFB
+    void net_store_ssid();
     void net_get_wifi_status();    // 0xFA
-    void mount_host();             // 0xF9
-    void disk_image_mount();       // 0xF8
-    void open_directory();         // 0xF7
-    void read_directory_entry();   // 0xF6
-    void close_directory();        // 0xF5
-    void read_host_slots();        // 0xF4
-    void write_host_slots();       // 0xF3
-    void read_device_slots();      // 0xF2
-    void write_device_slots();     // 0xF1
+
+    // void mount_host();             // 0xF9
+    // void disk_image_mount();       // 0xF8
+
+    // void open_directory();         // 0xF7
+    // void read_directory_entry();   // 0xF6
+    // void close_directory();        // 0xF5
+
+    // void read_host_slots();        // 0xF4
+    // void write_host_slots();       // 0xF3
+    // void read_device_slots();      // 0xF2
+    // void write_device_slots();     // 0xF1
+
     void enable_udpstream();       // 0xF0
     void net_get_wifi_enabled();   // 0xEA
-    void disk_image_umount();      // 0xE9
+
+    // void disk_image_umount();      // 0xE9
+
     void get_adapter_config();     // 0xE8
+
     void new_disk();               // 0xE7
-    void unmount_host();           // 0xE6
-    void get_directory_position(); // 0xE5
-    void set_directory_position(); // 0xE4
-    void set_hindex();             // 0xE3
-    void set_device_filename();    // 0xE2
-    void set_host_prefix();        // 0xE1
-    void get_host_prefix();        // 0xE0
+    // void unmount_host();           // 0xE6
+
+    // void get_directory_position(); // 0xE5
+    // void set_directory_position(); // 0xE4
+
+    // void set_hindex();             // 0xE3
+    // void set_device_filename();    // 0xE2
+    // void set_host_prefix();        // 0xE1
+    // void get_host_prefix();        // 0xE0
+
     void set_external_clock();     // 0xDF
+
     void write_app_key();          // 0xDE
     void read_app_key();           // 0xDD
     void open_app_key();           // 0xDC
     void close_app_key();          // 0xDB
-    void get_device_filename();    // 0xDA
-    void set_boot_config();        // 0xD9
-    void copy_file();              // 0xD8
-    void set_boot_mode();          // 0xD6
+
+    // void get_device_filename();    // 0xDA
+    // void set_boot_config();        // 0xD9
+    // void copy_file();              // 0xD8
+    // void set_boot_mode();          // 0xD6
 
     // Commodore specific
     void local_ip();
@@ -121,7 +136,17 @@ protected:
 
     void shutdown() override;
 
+protected:
+
+    /**
+     * @brief called to process command either at open or listen
+     */
+    void iec_command();
+
 public:
+    iecMeatloaf();
+    ~iecMeatloaf();
+
     bool boot_config = true;
 
     bool status_wait_enabled = true;
@@ -135,18 +160,16 @@ public:
     void setup(systemBus *bus);
 
     void image_rotate();
-    int get_disk_id(int drive_slot);
-    std::string get_host_prefix(int host_slot);
+    // int get_disk_id(int drive_slot);
+    // std::string get_host_prefix(int host_slot);
 
-    fujiHost *get_hosts(int i) { return &_fnHosts[i]; }
-    fujiDisk *get_disks(int i) { return &_fnDisks[i]; }
+    // fujiHost *get_hosts(int i) { return &_fnHosts[i]; }
+    // fujiDisk *get_disks(int i) { return &_fnDisks[i]; }
 
-    void _populate_slots_from_config();
-    void _populate_config_from_slots();
+    // void _populate_slots_from_config();
+    // void _populate_config_from_slots();
 
-    void mount_all();              // 0xD7
-
-    iecMeatloaf();
+    // void mount_all();              // 0xD7
 };
 
 extern iecMeatloaf Meatloaf;

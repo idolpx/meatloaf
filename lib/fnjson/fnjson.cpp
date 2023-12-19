@@ -100,9 +100,9 @@ string FNJSON::processString(string in)
         }
     }
 
-// #ifdef BUILD_IEC
-//     in = mstr::toPETSCII2(in);
-// #endif
+#ifdef BUILD_IEC
+    in = mstr::toPETSCII2(in);
+#endif
 
 #ifdef BUILD_ATARI
     // SIO AUX bits 0+1 control the mapping
