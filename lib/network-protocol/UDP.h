@@ -5,6 +5,8 @@
 #ifndef NETWORKPROTOCOL_UDP
 #define NETWORKPROTOCOL_UDP
 
+#include <string>
+
 #include "Protocol.h"
 #include "fnUDP.h"
 
@@ -14,7 +16,7 @@ public:
     /**
      * ctor
      */
-    NetworkProtocolUDP(string *rx_buf, string *tx_buf, string *sp_buf);
+    NetworkProtocolUDP(std::string *rx_buf, std::string *tx_buf, std::string *sp_buf);
 
     /**
      * dtor
@@ -26,7 +28,7 @@ public:
      * @param urlParser The URL object passed in to open.
      * @param cmdFrame The command frame to extract aux1/aux2/etc.
      */
-    virtual bool open(EdUrlParser *urlParser, cmdFrame_t *cmdFrame);
+    virtual bool open(PeoplesUrlParser *urlParser, cmdFrame_t *cmdFrame);
 
     /**
      * @brief Close connection to the protocol.
@@ -93,7 +95,7 @@ protected:
     /**
      * UDP destination address
      */
-    string dest;
+    std::string dest;
 
     /**
      * UDP destination port
@@ -117,7 +119,7 @@ private:
      * Is current destination multicast?
      */
     bool is_multicast(); // current UDP remote IP
-    bool is_multicast(string h); // resolve hostname to IP first.
+    bool is_multicast(std::string h); // resolve hostname to IP first.
     bool is_multicast(in_addr_t addr);
 };
 

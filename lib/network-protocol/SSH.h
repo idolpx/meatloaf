@@ -24,7 +24,7 @@ public:
     /**
      * ctor
      */
-    NetworkProtocolSSH(string *rx_buf, string *tx_buf, string *sp_buf);
+    NetworkProtocolSSH(std::string *rx_buf, std::string *tx_buf, std::string *sp_buf);
 
     /**
      * dtor
@@ -36,7 +36,7 @@ public:
      * @param urlParser The URL object passed in to open.
      * @param cmdFrame The command frame to extract aux1/aux2/etc.
      */
-    virtual bool open(EdUrlParser *urlParser, cmdFrame_t *cmdFrame);
+    virtual bool open(PeoplesUrlParser *urlParser, cmdFrame_t *cmdFrame);
 
     /**
      * @brief Close connection to the protocol.

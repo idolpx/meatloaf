@@ -1,6 +1,7 @@
 #include "ProtocolParser.h"
 
 #include <algorithm>
+#include <string>
 
 #include "TCP.h"
 #include "UDP.h"

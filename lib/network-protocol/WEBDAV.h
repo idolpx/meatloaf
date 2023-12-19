@@ -26,11 +26,11 @@ public:
         /**
          * Entry filename
          */
-        string filename;
+        std::string filename;
         /**
          * Entry filesize
          */
-        string fileSize;
+        std::string fileSize;
     };
 
     /**

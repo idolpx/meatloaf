@@ -5,6 +5,7 @@
 #include "Protocol.h"
 
 #include <algorithm>
+#include <string>
 
 #include "../../include/debug.h"
 
@@ -66,9 +67,9 @@ using namespace std;
  * @param tx_buf pointer to transmit buffer
  * @param sp_buf pointer to special buffer
  */
-NetworkProtocol::NetworkProtocol(string *rx_buf,
-                                 string *tx_buf,
-                                 string *sp_buf)
+NetworkProtocol::NetworkProtocol(std::string *rx_buf,
+                                 std::string *tx_buf,
+                                 std::string *sp_buf)
 {
     Debug_printf("NetworkProtocol::ctor()\r\n");
 
@@ -98,7 +99,7 @@ NetworkProtocol::~NetworkProtocol()
  * @param urlParser The URL object passed in to open.
  * @param cmdFrame The command frame to extract aux1/aux2/etc.
  */
-bool NetworkProtocol::open(EdUrlParser *urlParser, cmdFrame_t *cmdFrame)
+bool NetworkProtocol::open(PeoplesUrlParser *urlParser, cmdFrame_t *cmdFrame)
 {
     // Set translation mode, Bits 0-1 of aux2
     translation_mode = cmdFrame->aux2 & 0x7F; // we now have more xlation modes.

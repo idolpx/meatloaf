@@ -5,8 +5,9 @@
 #ifndef NETWORKPROTOCOL_TELNET
 #define NETWORKPROTOCOL_TELNET
 
-#include "TCP.h"
+#include <string>
 
+#include "TCP.h"
 
 class NetworkProtocolTELNET : public NetworkProtocolTCP
 {
@@ -14,7 +15,7 @@ public:
     /**
      * ctor
      */
-    NetworkProtocolTELNET(string *rx_buf, string *tx_buf, string *sp_buf);
+    NetworkProtocolTELNET(std::string *rx_buf, std::string *tx_buf, std::string *sp_buf);
 
     /**
      * dtor
@@ -38,12 +39,12 @@ public:
     /**
      * Get Receive Buffer
      */
-    string *getReceiveBuffer() { return receiveBuffer; }
+    std::string *getReceiveBuffer() { return receiveBuffer; }
 
     /**
      * Get Transmit buffer
      */
-    string *getTransmitBuffer() { return transmitBuffer; }
+    std::string *getTransmitBuffer() { return transmitBuffer; }
 
     /**
      * Flush output transmitBuffer

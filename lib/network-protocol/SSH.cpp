@@ -4,6 +4,8 @@
 
 #include "SSH.h"
 
+#include <string>
+
 #include "../../include/debug.h"
 
 #include "status_error_codes.h"
@@ -11,7 +13,7 @@
 
 #define RXBUF_SIZE 65535
 
-NetworkProtocolSSH::NetworkProtocolSSH(string *rx_buf, string *tx_buf, string *sp_buf)
+NetworkProtocolSSH::NetworkProtocolSSH(std::string *rx_buf, std::string *tx_buf, std::string *sp_buf)
     : NetworkProtocol(rx_buf, tx_buf, sp_buf)
 {
     Debug_printf("NetworkProtocolSSH::NetworkProtocolSSH(%p,%p,%p)\r\n", rx_buf, tx_buf, sp_buf);
@@ -24,7 +26,7 @@ NetworkProtocolSSH::~NetworkProtocolSSH()
     heap_caps_free(rxbuf);
 }
 
-bool NetworkProtocolSSH::open(EdUrlParser *urlParser, cmdFrame_t *cmdFrame)
+bool NetworkProtocolSSH::open(PeoplesUrlParser *urlParser, cmdFrame_t *cmdFrame)
 {
     NetworkProtocol::open(urlParser, cmdFrame);
     int ret;
@@ -60,7 +62,7 @@ bool NetworkProtocolSSH::open(EdUrlParser *urlParser, cmdFrame_t *cmdFrame)
     int verbosity = SSH_LOG_PROTOCOL;
     int port = atoi(urlParser->port.c_str());
     ssh_options_set(session, SSH_OPTIONS_USER, login->c_str());
-    ssh_options_set(session, SSH_OPTIONS_HOST, urlParser->hostName.c_str());
+    ssh_options_set(session, SSH_OPTIONS_HOST, urlParser->host.c_str());
     ssh_options_set(session, SSH_OPTIONS_LOG_VERBOSITY, &verbosity);
     ssh_options_set(session, SSH_OPTIONS_PORT, &port);
     session->opts.config_processed = true;

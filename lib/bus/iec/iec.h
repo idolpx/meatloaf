@@ -1,6 +1,3 @@
-#ifndef IEC_H
-#define IEC_H
-
 // This code uses code from the Meatloaf Project:
 // Meatloaf - A Commodore 64/128 multi-device emulator
 // https://github.com/idolpx/meatloaf
@@ -28,6 +25,9 @@
 // http://unusedino.de/ec64/technical/aay/c1541/
 // http://unusedino.de/ec64/technical/aay/c1581/
 //
+
+#ifndef IEC_H
+#define IEC_H
 
 #include <cstdint>
 #include <forward_list>

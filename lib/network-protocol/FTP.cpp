@@ -64,12 +64,12 @@ bool NetworkProtocolFTP::open_dir_handle()
     return res;
 }
 
-bool NetworkProtocolFTP::mount(EdUrlParser *url)
+bool NetworkProtocolFTP::mount(PeoplesUrlParser *url)
 {
     bool res;
 
     // Path isn't used
-    res = ftp->login("anonymous", "fujinet@fujinet.online", url->hostName);
+    res = ftp->login("anonymous", "fujinet@fujinet.online", url->host);
     fserror_to_error();
     return res;
 }
@@ -254,32 +254,32 @@ bool NetworkProtocolFTP::special_80(uint8_t *sp_buf, unsigned short len, cmdFram
     return false;
 }
 
-bool NetworkProtocolFTP::rename(EdUrlParser *url, cmdFrame_t *cmdFrame)
+bool NetworkProtocolFTP::rename(PeoplesUrlParser *url, cmdFrame_t *cmdFrame)
 {
     return false;
 }
 
-bool NetworkProtocolFTP::del(EdUrlParser *url, cmdFrame_t *cmdFrame)
+bool NetworkProtocolFTP::del(PeoplesUrlParser *url, cmdFrame_t *cmdFrame)
 {
     return false;
 }
 
-bool NetworkProtocolFTP::mkdir(EdUrlParser *url, cmdFrame_t *cmdFrame)
+bool NetworkProtocolFTP::mkdir(PeoplesUrlParser *url, cmdFrame_t *cmdFrame)
 {
     return false;
 }
 
-bool NetworkProtocolFTP::rmdir(EdUrlParser *url, cmdFrame_t *cmdFrame)
+bool NetworkProtocolFTP::rmdir(PeoplesUrlParser *url, cmdFrame_t *cmdFrame)
 {
     return false;
 }
 
-bool NetworkProtocolFTP::lock(EdUrlParser *url, cmdFrame_t *cmdFrame)
+bool NetworkProtocolFTP::lock(PeoplesUrlParser *url, cmdFrame_t *cmdFrame)
 {
     return false;
 }
 
-bool NetworkProtocolFTP::unlock(EdUrlParser *url, cmdFrame_t *cmdFrame)
+bool NetworkProtocolFTP::unlock(PeoplesUrlParser *url, cmdFrame_t *cmdFrame)
 {
     return false;
 }

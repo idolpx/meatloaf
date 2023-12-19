@@ -118,19 +118,20 @@ void iecNetwork::iec_open()
         protocol[commanddata.channel] = nullptr;
     }
 
-    urlParser[commanddata.channel] = EdUrlParser::parseUrl(deviceSpec[commanddata.channel]);
+    urlParser[commanddata.channel]->parseUrl(deviceSpec[commanddata.channel]);
 
     // This is unbelievably stupid, but here we are.
     for (int i = 0; i < urlParser[commanddata.channel]->query.size(); i++)
-        if (urlParser[commanddata.channel]->query[i]==0xa4) // underscore
+        if (urlParser[commanddata.channel]->query[i]==0xA4) // underscore
             urlParser[commanddata.channel]->query[i]=0x5F;
 
     for (int i = 0; i < urlParser[commanddata.channel]->path.size(); i++)
-        if (urlParser[commanddata.channel]->path[i]==0xa4) // underscore
+        if (urlParser[commanddata.channel]->path[i]==0xA4) // underscore
             urlParser[commanddata.channel]->path[i]=0x5F;
 
     // Convert scheme to uppercase
-    std::transform(urlParser[commanddata.channel]->scheme.begin(), urlParser[commanddata.channel]->scheme.end(), urlParser[commanddata.channel]->scheme.begin(), ::toupper);
+    //std::transform(urlParser[commanddata.channel]->scheme.begin(), urlParser[commanddata.channel]->scheme.end(), urlParser[commanddata.channel]->scheme.begin(), ::toupper);
+    mstr::toUpper(urlParser[commanddata.channel]->scheme);
 
     // Instantiate based on scheme
     if (urlParser[commanddata.channel]->scheme == "TCP")
