@@ -24,7 +24,6 @@
 #include "fsFlash.h"
 #include "fnFsSD.h"
 
-
 /**************************/
 // Meatloaf
 
@@ -113,14 +112,6 @@ void main_setup()
 
     // Set up the WiFi adapter
     fnWiFi.start();
-    // Go ahead and try reconnecting to WiFi
-    fnWiFi.connect(
-        Config.get_wifi_ssid().c_str(),
-        Config.get_wifi_passphrase().c_str()
-    );
-    // Try connect with default WiFi settings if not connected
-    if ( strlen( WIFI_SSID ) && !fnWiFi.connected() )
-        fnWiFi.connect( WIFI_SSID, WIFI_PASSWORD );
 
     // Setup IEC Bus
     IEC.setup();
