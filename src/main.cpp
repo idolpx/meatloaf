@@ -107,6 +107,9 @@ void main_setup()
     fnSDFAT.start();
 #endif
 
+    // setup crypto key - must be done before loading the config
+    crypto.setkey("MLK" + fnWiFi.get_mac_str());
+
     // Load our stored configuration
     Config.load();
 
