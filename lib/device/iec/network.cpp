@@ -183,6 +183,12 @@ void iecNetwork::iec_open()
         file_not_found = true;
     }
 
+    if (!urlParser[commanddata.channel]->user.empty())
+        protocol[commanddata.channel]->login = &urlParser[commanddata.channel]->user;
+
+    if (!urlParser[commanddata.channel]->password.empty())
+        protocol[commanddata.channel]->password = &urlParser[commanddata.channel]->password;
+
     if (!login[commanddata.channel].empty())
     {
         protocol[commanddata.channel]->login = &login[commanddata.channel];

@@ -11,6 +11,7 @@
 
 #include "status_error_codes.h"
 #include "utils.h"
+#include "base64.h"
 
 
 /**
@@ -611,6 +612,19 @@ void NetworkProtocolHTTP::http_transaction()
     if ((aux1_open != 4) && (aux1_open != 8) && (collect_headers_count > 0))
     {
         client->collect_headers((const char **)collect_headers, collect_headers_count);
+    }
+
+    // If login & password are set send Authorization header
+    if ( !login->empty() && !password->empty() )
+    {
+        std::stringstream authorization;
+        authorization << "Authorization: Basic ";
+        std::stringstream login_info;
+        login_info << login << ":" << password;
+        auto encoded = Base64::encode(login_info.str().c_str(), login_info.str().size(), NULL);
+        authorization << encoded;
+        //write_file_handle_set_header( authorization.str().c_str(), authorization.str().size() );
+        Debug_printv("auth[%s]", authorization.str().c_str());
     }
 
     switch (httpOpenMode)

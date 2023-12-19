@@ -32,7 +32,7 @@ public:
     std::string url;
     std::string scheme;
     std::string user;
-    std::string pass;    
+    std::string password;    
     std::string host;
     std::string port;
     std::string path;
@@ -74,15 +74,15 @@ private:
         }
         else {
             user = byColon[0];
-            pass = byColon[1];
+            password = byColon[1];
         }
     }
 
     void processAuthority(std::string pastTheColon) {
-        // //user:pass@/path
-        // //user:pass@authority:80/path
-        // //          authority:100
-        // //          authority:30/path            
+        // //user:password@/path
+        // //user:password@host:80/path
+        // //          host:100
+        // //          host:30/path            
         auto byAtSign = mstr::split(pastTheColon,'@', 2);
 
         if(byAtSign.size()==1) {
@@ -90,7 +90,7 @@ private:
             processAuthorityPath(mstr::drop(byAtSign[0],2));
         }
         else {
-            // user:pass
+            // user:password
             processUserPass(mstr::drop(byAtSign[0],2));
             // address, port, path
             processAuthorityPath(byAtSign[1]);
@@ -165,8 +165,8 @@ public:
         if ( user.size() )
         {
             root += user;
-            if ( pass.size() )
-                root += ':' + pass;
+            if ( password.size() )
+                root += ':' + password;
             root += '@';
         }
 
@@ -216,6 +216,9 @@ public:
     }
 
     void parseUrl(const std::string &u) {
+
+        Debug_printv("u[%s]", u.c_str());
+
         url = u;
 
         //Debug_printv("Before [%s]", url.c_str());
@@ -225,7 +228,7 @@ public:
         scheme = "";
         path = "";
         user = "";
-        pass = "";
+        password = "";
         host = "";
         port = "";
 
