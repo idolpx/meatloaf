@@ -598,43 +598,43 @@ void iecMeatloaf::net_get_wifi_enabled()
 // void iecMeatloaf::unmount_host()
 // {
 //     int hs = -1;
-
+//
 //     if (payload[0] == FUJICMD_UNMOUNT_HOST)
 //     {
 //         hs = payload[1];
 //     }
 //     else
 //     {
-        
+//
 //         if (pt.size() < 2) // send error.
 //         {
 //             response = "invalid # of parameters";
 //             return;
 //         }
-
+//
 //         hs = atoi(pt[1].c_str());
 //     }
-
+//
 //     if (!_validate_device_slot(hs, "unmount_host"))
 //     {
 //         response = "invalid device slot";
 //         return; // send error.
 //     }
-
+//
 //     if (!_fnHosts[hs].umount())
 //     {
 //         response = "unable to unmount host slot";
 //         return; // send error;
 //     }
-
+//
 //     response="ok";
 // }
-
+//
 // // Mount Server
 // void iecMeatloaf::mount_host()
 // {
 //     int hs = -1;
-
+//
 //     _populate_slots_from_config();
 //     if (payload[0] == FUJICMD_MOUNT_HOST)
 //         {
@@ -642,29 +642,29 @@ void iecMeatloaf::net_get_wifi_enabled()
 //         }
 //         else
 //         {
-        
-
+//
+//
 //         if (pt.size() < 2) // send error.
 //         {
 //             response = "INVALID # OF PARAMETERS.";
 //             return;
 //         }
-
+//
 //         hs = atoi(pt[1].c_str());
 //         }
-
+//
 //     if (!_validate_device_slot(hs, "mount_host"))
 //     {
 //         response = "INVALID HOST HOST #";
 //         return; // send error.
 //     }
-
+//
 //     if (!_fnHosts[hs].mount())
 //     {
 //         response = "UNABLE TO MOUNT HOST SLOT #";
 //         return; // send error.
 //     }
-
+//
 //     // Otherwise, mount was successful.
 //     char hn[64];
 //     string hns;
@@ -673,61 +673,61 @@ void iecMeatloaf::net_get_wifi_enabled()
 //     hns = mstr::toPETSCII2(hns);
 //     response = hns + " MOUNTED.";
 // }
-
+//
 // // Disk Image Mount
 // void iecMeatloaf::disk_image_mount()
 // {
 //     _populate_slots_from_config();
-    
+//
 //     if (pt.size() < 3)
 //     {
 //         response = "invalid # of parameters";
 //         return;
 //     }
-
+//
 //     uint8_t ds = atoi(pt[1].c_str());
 //     uint8_t mode = atoi(pt[2].c_str());
-
+//
 //     char flag[3] = {'r', 0, 0};
-
+//
 //     if (mode == DISK_ACCESS_MODE_WRITE)
 //         flag[1] = '+';
-
+//
 //     if (!_validate_device_slot(ds))
 //     {
 //         response = "invalid device slot.";
 //         return; // error.
 //     }
-
+//
 //     // A couple of reference variables to make things much easier to read...
 //     fujiDisk &disk = _fnDisks[ds];
 //     fujiHost &host = _fnHosts[disk.host_slot];
-
+//
 //     Debug_printf("Selecting '%s' from host #%u as %s on D%u:\n",
 //                  disk.filename, disk.host_slot, flag, ds + 1);
-
+//
 //     // TODO: Refactor along with mount disk image.
 //     disk.disk_dev.host = &host;
-
+//
 //     disk.fileh = host.file_open(disk.filename, disk.filename, sizeof(disk.filename), flag);
-
+//
 //     if (disk.fileh == nullptr)
 //     {
 //         response = "no file handle";
 //         return;
 //     }
-
+//
 //     // We've gotten this far, so make sure our bootable CONFIG disk is disabled
 //     boot_config = false;
-
+//
 //     // We need the file size for loading XEX files and for CASSETTE, so get that too
 //     disk.disk_size = host.file_size(disk.fileh);
-
+//
 //     // And now mount it
 //     disk.disk_type = disk.disk_dev.mount(disk.fileh, disk.filename, disk.disk_size);
 //     response = "mounted";
 // }
-
+//
 // // Toggle boot config on/off, aux1=0 is disabled, aux1=1 is enabled
 // void iecMeatloaf::set_boot_config()
 // {
@@ -737,44 +737,44 @@ void iecMeatloaf::net_get_wifi_enabled()
 //     }
 //     else
 //     {
-
-
+//
+//
 //         if (pt.size() < 2)
 //         {
 //             Debug_printf("Invalid # of parameters.\r\n");
 //             response = "invalid # of parameters";
 //             return;
 //         }
-
+//
 //         boot_config = atoi(pt[1].c_str());
 //     }
 //     response = "ok";
 // }
-
+//
 // // Do SIO copy
 // void iecMeatloaf::copy_file()
 // {
 //     // TODO IMPLEMENT
 // }
-
+//
 // // Mount all
 // void iecMeatloaf::mount_all()
 // {
 //     bool nodisks = true; // Check at the end if no disks are in a slot and disable config
-
+//
 //     for (int i = 0; i < MAX_DISK_DEVICES; i++)
 //     {
 //         fujiDisk &disk = _fnDisks[i];
 //         fujiHost &host = _fnHosts[disk.host_slot];
 //         char flag[3] = {'r', 0, 0};
-
+//
 //         if (disk.access_mode == DISK_ACCESS_MODE_WRITE)
 //             flag[1] = '+';
-
+//
 //         if (disk.host_slot != INVALID_HOST_SLOT)
 //         {
 //             nodisks = false; // We have a disk in a slot
-
+//
 //             if (host.mount() == false)
 //             {
 //                 // Send error.
@@ -783,12 +783,12 @@ void iecMeatloaf::net_get_wifi_enabled()
 //                 response = "error: unable to mount slot " + std::string(slotno) + "\r";
 //                 return;
 //             }
-
+//
 //             Debug_printf("Selecting '%s' from host #%u as %s on D%u:\n",
 //                          disk.filename, disk.host_slot, flag, i + 1);
-
+//
 //             disk.fileh = host.file_open(disk.filename, disk.filename, sizeof(disk.filename), flag);
-
+//
 //             if (disk.fileh == nullptr)
 //             {
 //                 // Send error.
@@ -797,32 +797,32 @@ void iecMeatloaf::net_get_wifi_enabled()
 //                 response = "error: invalid file handle for slot " + std::string(slotno) + "\r";
 //                 return;
 //             }
-
+//
 //             // We've gotten this far, so make sure our bootable CONFIG disk is disabled
 //             boot_config = false;
-
+//
 //             // We need the file size for loading XEX files and for CASSETTE, so get that too
 //             disk.disk_size = host.file_size(disk.fileh);
-
+//
 //             // Set the host slot for high score mode
 //             // TODO: Refactor along with mount disk image.
 //             disk.disk_dev.host = &host;
-
+//
 //             // And now mount it
 //             disk.disk_type = disk.disk_dev.mount(disk.fileh, disk.filename, disk.disk_size);
 //         }
 //     }
-
+//
 //     if (nodisks)
 //     {
 //         // No disks in a slot, disable config
 //         boot_config = false;
 //     }
-
+//
 //     // Send successful.
 //     response = "ok";
 // }
-
+//
 // // Set boot mode
 // void iecMeatloaf::set_boot_mode()
 // {
@@ -839,7 +839,7 @@ void iecMeatloaf::net_get_wifi_enabled()
 //             response = "invalid # of parameters";
 //             return;
 //         }
-
+//
 //         boot_config = true;
 //         insert_boot_device(atoi(pt[1].c_str()));
 //     }
@@ -1085,19 +1085,19 @@ void iecMeatloaf::read_app_key()
 // void iecMeatloaf::disk_image_umount()
 // {
 //     uint8_t deviceSlot = -1;
-
+//
 //     if (payload[0] == FUJICMD_UNMOUNT_IMAGE)
 //     {
 //         deviceSlot = payload[1];
 //     }
 //     else
 //     {
-        
+//
 //         deviceSlot = atoi(pt[1].c_str());
 //     }
-
+//
 //     Debug_printf("Fuji cmd: UNMOUNT IMAGE 0x%02X\n", deviceSlot);
-
+//
 //     // Handle disk slots
 //     if (deviceSlot < MAX_DISK_DEVICES)
 //     {

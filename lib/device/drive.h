@@ -16,6 +16,11 @@
 #define DEVICE_TYPE iwmDisk
 #endif
 
+#ifdef BUILD_MAC
+#include "mac/floppy.h"
+#define DEVICE_TYPE macFloppy
+#endif
+
 #ifdef BUILD_IEC
 # include "iec/drive.h"
 # define DEVICE_TYPE iecDrive
@@ -51,5 +56,14 @@
 # define DEVICE_TYPE rc2014Disk
 #endif 
 
+#ifdef BUILD_H89
+# include "h89/disk.h"
+# define DEVICE_TYPE H89Disk
+#endif 
+
+#ifdef BUILD_COCO
+# include "drivewire/disk.h"
+# define DEVICE_TYPE drivewireDisk
+#endif 
 
 #endif // DEVICE_DISK_H
