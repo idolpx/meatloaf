@@ -28,7 +28,7 @@ void test_meatloaf_mfile_directory(void)
         /* print all the files and directories within directory */
         while ((ent = readdir (dir)) != NULL) {
             stat(ent->d_name, &st);
-            printf ("%lld %s %hu\r\n", st.st_size, ent->d_name, st.st_mode);
+            printf ("%8lld %-30s %8hu\r\n", st.st_size, ent->d_name, st.st_mode);
         }
         closedir (dir);
     } else {
