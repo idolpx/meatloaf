@@ -472,11 +472,17 @@ void iecMeatloaf::net_set_ssid( bool store )
                 t[0] = fnWiFi.get_network_name_by_crc8( std::stoi(t[0]) );
             }
 
+            Debug_printv("t1[%s] t2[%s]", t[0].c_str(), t[1].c_str());
+
+            // URL Decode SSID/PASSWORD to handle special chars
+            t[0] = mstr::urlDecode(t[0]);
+            t[1] = mstr::urlDecode(t[1]);
+
             strncpy(cfg.ssid, t[0].c_str(),
                 t[0].length() > sizeof(cfg.ssid) ? sizeof(cfg.ssid) : t[0].length());
             strncpy(cfg.password, t[1].c_str(),
                 t[1].length() > sizeof(cfg.password) ? sizeof(cfg.password) : t[1].length());
-            Debug_printv("t1[%s] t2[%s] ssid[%s] pass[%s]", t[0].c_str(), t[1].c_str(), cfg.ssid, cfg.password);
+            Debug_printv("ssid[%s] pass[%s]", cfg.ssid, cfg.password);
         }
         else
         {
