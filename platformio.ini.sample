@@ -19,13 +19,13 @@ description = Meatloaf Commodore to ESP32 WiFi Multifunction Firmware
 
 ; Uncomment ONLY ONE of the below lines to target the hardware you use
 ; GPIO pin assignments are located in the include/pinmap/ directory for reference
-;environment = fujiloaf-rev0      ; Meatloaf / FujiNet REV0 board, aka Fujiloaf (ESP32-WROVER 8M PSRAM, 16M Flash)
-;environment = lolin-d32-pro      ; Wemos Lolin D32 Pro                         (ESP32-WROVER 4M PSRAM, 4M/8M/16M Flash)
+environment = lolin-d32-pro      ; Wemos Lolin D32 Pro                         (ESP32-WROVER 4M PSRAM, 4M/8M/16M Flash)
 ;environment = ttgo-t1            ; Lilygo TTGO T1 V1.3                         (ESP32 NO PSRAM, 4M Flash)
 ;environment = esp32-wroom        ; generic esp32-wroom board                   (ESP32-WROOM NO PSRAM, 4M/8M/16M Flash)
 ;environment = esp32-wroom-pi1541 ; generic esp32-wroom board with pi1541 hat   (ESP32-WROOM NO PSRAM, 4M/8M/16M Flash)
 ;environment = fujiapple-rev0     ; FujiApple REV0 with esp32-devkitc           (ESP32-WROVER 8M PSRAM, 8M Flash)
 ;environment = fujinet-v16        ; FujiNet v1.6                                (ESP32-WROVER 8M PSRAM, 16M Flash)
+;environment = fujiloaf-rev0      ; Meatloaf / FujiNet REV0 board, aka Fujiloaf (ESP32-WROVER 8M PSRAM, 16M Flash)
 
 ; EXPERIMENTAL
 ;environment = esp32s3            ; esp32s3 devkitc                             (ESP32-S3 2M/8M PSRAM, 8M/16M/32M Flash)
@@ -74,11 +74,11 @@ lib_ldf_mode = deep+
 upload_speed = 460800 ;921600
 ;upload_port = COM1 ; Windows
 ;upload_port = /dev/ttyUSB0 ; Linux
-;upload_port = /dev/cu.usbserial-1450 ; Mac
+upload_port = /dev/cu.usbserial-1450 ; Mac
 monitor_speed = 460800 ;921600
 ;monitor_port = COM1 ; Windows
 ;monitor_port = /dev/ttyUSB0 ; Linux
-;monitor_port = /dev/cu.usbserial-1450 ; Mac
+monitor_port = /dev/cu.usbserial-1450 ; Mac
 monitor_filters = esp32_exception_decoder
 check_skip_packages = yes
 ;debug_tool = esp-prog
@@ -94,11 +94,12 @@ build_flags =
     -D WIFI_SSID=\"${meatloaf.wifi_ssid}\"
     -D WIFI_PASSWORD=\"${meatloaf.wifi_pass}\"
 
-    ; Service Options
-    ;-D ENABLE_ZIMODEM      ; enable Zimodem functionality
-    ;-D ENABLE_SSDP         ; enable Simple Service Discovery Protocol service
+    ; IEC Hardware Options
+    ; These options are also useful for reusing a PI1541 Hat with Meatloaf
+    ;-D IEC_SPLIT_LINES     ; hardware uses seperate input/output lines
+    ;-D IEC_INVERTED_LINES  ; hardware inverts the signals
 
-    ; Hardware Options
+    ; Other Hardware Options
     ;-D NO_BUTTONS          ; if your hardware has no physical buttons
     ;-D SD_CARD             ; if your hardware has an sd card slot
     ;-D LED_STRIP           ; if your hardware has an LED strip
@@ -106,6 +107,10 @@ build_flags =
     ;-D PARALLEL_BUS        ; if your hardware has userport parallel interface
     ;-D JTAG                ; enable use with JTAG debugger
     ;-D BLUETOOTH_SUPPORT   ; enable BlueTooth support
+
+    ; Service Options
+    ;-D ENABLE_ZIMODEM      ; enable Zimodem functionality
+    ;-D ENABLE_SSDP         ; enable Simple Service Discovery Protocol service
 
     ; GPIO Expander Selection (select only one if available)
     ;-D GPIOX_PCF8575
@@ -123,11 +128,18 @@ build_flags =
     ;-D DBUG2 ; enable monitor messages for a release build
 
 [env:native]
+; Add Code Coverage Reporting
+; https://piolabs.com/blog/insights/test-coverage-on-unit-testing.html
+; https://blog.leon0399.ru/platformio-coverage-github-actions
 platform = native
 test_filter = native/*
+extra_scripts = gen_coverage.py
 build_flags =
     ${env.build_flags}
     -D TEST_NATIVE
+	-lgcov
+	--coverage
+    -fprofile-abs-path
 
 [env:fujiloaf-rev0]
 extends = esp32_base
