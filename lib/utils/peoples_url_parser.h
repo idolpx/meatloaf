@@ -19,13 +19,14 @@
 #ifndef MEATLOAF_PUP_H
 #define MEATLOAF_PUP_H
 
-
 #include <string>
 #include <vector>
 #include <sstream>
+
 #include "utils.h"
 #include "string_utils.h"
-//#include "../../include/global_defines.h"
+
+#include "../../include/debug.h"
 
 class PeoplesUrlParser {
 public:

@@ -69,8 +69,6 @@ void main_setup()
     Serial.printf( "himem free %u\r\n", esp_himem_get_free_size() );
     Serial.printf( "himem reserved %u\r\n", esp_himem_reserved_area_size() );
 #endif
-
-
 #endif // DEBUG
 
     // Install a reboot handler

@@ -19,6 +19,9 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+
+// https://www.charset.org/punycode
+
 #ifndef PUNYCODE_H_
 #define PUNYCODE_H_
 
