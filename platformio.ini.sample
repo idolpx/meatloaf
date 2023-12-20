@@ -125,6 +125,9 @@ build_flags =
 [env:native]
 platform = native
 test_filter = native/*
+build_flags =
+    ${env.build_flags}
+    -D TEST_NATIVE
 
 [env:fujiloaf-rev0]
 extends = esp32_base
