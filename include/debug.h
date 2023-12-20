@@ -14,7 +14,7 @@
 #undef DEBUG
 #endif
 
-#ifdef TEST_NATIVE
+#ifndef TEST_NATIVE
 #include "../lib/hardware/fnUART.h"
 #define Serial fnUartDebug
 #endif

@@ -77,7 +77,7 @@ void dumpFileProperties(MFile* testMFile) {
     Debug_printf("Url: %s, isDir = %d\r\n", testMFile->url.c_str(), testMFile->isDirectory());
     Debug_printf("Scheme: [%s]\r\n", testMFile->scheme.c_str());
     Debug_printf("Username: [%s]\r\n", testMFile->user.c_str());
-    Debug_printf("Password: [%s]\r\n", testMFile->pass.c_str());
+    Debug_printf("Password: [%s]\r\n", testMFile->password.c_str());
     Debug_printf("Host: [%s]\r\n", testMFile->host.c_str());
     Debug_printf("Port: [%s]\r\n", testMFile->port.c_str());    
     Debug_printf("Path: [%s]\r\n", testMFile->path.c_str());
