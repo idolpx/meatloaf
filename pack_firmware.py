@@ -35,7 +35,7 @@ if not os.path.exists('bin'):
 config = configparser.ConfigParser()
 config.read('platformio.ini')
 firmware = "meatloaf"
-firmware += "." + config['meatloaf']['build_board'].split()[0]
+firmware += "." + config['meatloaf']['environment'].split()[0]
 #firmware += "." + datetime.now().strftime("%Y%m%d%H%M%S")
 firmware += ".bin"
 
