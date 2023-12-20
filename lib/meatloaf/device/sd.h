@@ -2,7 +2,7 @@
 // https://en.wikipedia.org/wiki/SD_card
 // https://github.com/arduino-libraries/SD
 //
-
+#ifndef TEST_NATIVE
 #ifndef MEATLOAF_DEVICE_SD
 #define MEATLOAF_DEVICE_SD
 
@@ -48,3 +48,4 @@ public:
 
 
 #endif // MEATLOAF_DEVICE_SD
+#endif // TEST_NATIVE

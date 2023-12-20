@@ -1,3 +1,4 @@
+#ifndef TEST_NATIVE
 #ifndef MEATLOAF_DEVICE_FLASH
 #define MEATLOAF_DEVICE_FLASH
 
@@ -166,3 +167,4 @@ protected:
 
 
 #endif // MEATLOAF_DEVICE_FLASH
+#endif // TEST_NATIVE

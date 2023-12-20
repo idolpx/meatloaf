@@ -1,25 +1,46 @@
+// This code uses code from the Meatloaf Project:
+// Meatloaf - A Commodore 64/128 multi-device emulator
+// https://github.com/idolpx/meatloaf
+// Copyright(C) 2020 James Johnston
+//
+// Meatloaf is free software : you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Meatloaf is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
+
 #ifndef MEATLOAF_PUP_H
 #define MEATLOAF_PUP_H
-
 
 #include <string>
 #include <vector>
 #include <sstream>
+
 #include "utils.h"
 #include "string_utils.h"
-//#include "../../include/global_defines.h"
+
+#include "../../include/debug.h"
 
 class PeoplesUrlParser {
 public:
     std::string url;
     std::string scheme;
     std::string user;
-    std::string pass;    
+    std::string password;    
     std::string host;
     std::string port;
     std::string path;
     std::string name;
     std::string extension;
+    std::string query;
+    std::string fragment;
 
 private:
 
@@ -54,15 +75,15 @@ private:
         }
         else {
             user = byColon[0];
-            pass = byColon[1];
+            password = byColon[1];
         }
     }
 
     void processAuthority(std::string pastTheColon) {
-        // //user:pass@/path
-        // //user:pass@authority:80/path
-        // //          authority:100
-        // //          authority:30/path            
+        // //user:password@/path
+        // //user:password@host:80/path
+        // //          host:100
+        // //          host:30/path            
         auto byAtSign = mstr::split(pastTheColon,'@', 2);
 
         if(byAtSign.size()==1) {
@@ -70,7 +91,7 @@ private:
             processAuthorityPath(mstr::drop(byAtSign[0],2));
         }
         else {
-            // user:pass
+            // user:password
             processUserPass(mstr::drop(byAtSign[0],2));
             // address, port, path
             processAuthorityPath(byAtSign[1]);
@@ -87,23 +108,39 @@ private:
         mstr::replaceAll(path, "//", "/");
     }
 
-    void fillInNameExt() {
+    void processPath() {
         if(path.size() == 0)
             return;
 
-        auto pathParts = mstr::split(path,'/');
+        auto queryParts = mstr::split(path, '?');
+        auto fragmentParts = mstr::split(path, '#');
+        auto pathParts = mstr::split(queryParts.front(), '/');
 
+        // filename
         if(pathParts.size() > 1)
             name = *(--pathParts.end());
         else
             name = path;
 
-        auto nameParts = mstr::split(name,'.');
+        auto nameParts = mstr::split(name, '.');
         
+        // extension
         if(nameParts.size() > 1)
             extension = *(--nameParts.end());
         else
             extension = "";
+
+        // query
+        if(queryParts.size() > 1)
+            query = *(--queryParts.end());
+        else
+            query = path;
+        
+        // fragment
+        if(fragmentParts.size() > 1)
+            fragment = *(--fragmentParts.end());
+        else
+            fragment = "";
     }
 
 public:
@@ -129,8 +166,8 @@ public:
         if ( user.size() )
         {
             root += user;
-            if ( pass.size() )
-                root += ':' + pass;
+            if ( password.size() )
+                root += ':' + password;
             root += '@';
         }
 
@@ -180,6 +217,9 @@ public:
     }
 
     void parseUrl(const std::string &u) {
+
+        Debug_printv("u[%s]", u.c_str());
+
         url = u;
 
         //Debug_printv("Before [%s]", url.c_str());
@@ -189,7 +229,7 @@ public:
         scheme = "";
         path = "";
         user = "";
-        pass = "";
+        password = "";
         host = "";
         port = "";
 
@@ -222,7 +262,7 @@ public:
 
         // Clean things up before exiting
         cleanPath();
-        fillInNameExt();
+        processPath();
         rebuildUrl();
 
         //dump();
