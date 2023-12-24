@@ -35,6 +35,10 @@ newPipe->readFile();
 //    you can readFile() as many times as needed, and it will do what you expect (resume from where it was interrupted)
 //    as long as it stays open and not EOF.
 
+
+_S_out == C64 -> IEC -> file
+_S_in  == file -> IEC -> C64
+
 */
 class iecPipe {
     Meat::iostream* fileStream = nullptr;
@@ -64,26 +68,29 @@ public:
     }
 
     bool seek(std::streampos p) {
-        if(mode == std::ios_base::openmode::_S_in)
+        if(mode == std::ios_base::openmode::_S_in) {
+            // we are LOADing, so we need to seek within the source file input stream (get buffer):
             fileStream->seekg(p);
+            // our iec stream put buffer can potentially contain more bytes ready for read, but since we are
+            // seeking, we need to flush them, so they don't get sent to C64 as if they were read from file
+            iecStream.flushpbuff(); 
+        }
         else if(mode == std::ios_base::openmode::_S_out) {
-            // on seek we have to flush iec_buffer, so it doesn't try to send bytes cached there
-            // before ATN occured
-            iecStream.flushpbuff();
+            // we are SAVE-ing, so, we need to seek within the destination file output stream (put buffer):
             fileStream->seekp(p);
         }
 
         return false;
     }
 
-    // push file bytes to C64
+    // LOAD - push file bytes (fileStream.get) to C64 (iecStream.write)
     void readFile() {
         // this pipe wasn't itialized or wasn't meant for reading
         if(fileStream == nullptr || mode != std::ios_base::openmode::_S_in)
             return;
         
         // push bytes from file to C64 as long as they're available (eying ATN)
-        while( !fileStream->eof() && !fileStream->bad() && !(IEC.flags bitand ATN_PULLED))
+        while(!fileStream->eof() && !fileStream->bad() && !(IEC.flags bitand ATN_PULLED))
         {
             // If this is a socket stream, it might send NDA ("I have no data for you, but keep asking"), so lte's check it!
             (*fileStream).checkNda();
@@ -120,7 +127,7 @@ public:
         }
     }
 
-    // push C64 bytes to the file
+    // SAVE - pull C64 bytes (iecStream.get) to remote file (fileStream.put)
     void writeFile() {
         // this pipe wasn't itialized or wasn't meant for writing
         if(fileStream == nullptr || mode != std::ios_base::openmode::_S_out)
@@ -130,7 +137,7 @@ public:
         while(!fileStream->bad() && !(IEC.flags bitand ATN_PULLED))
         {
             char nextChar;
-            iecStream.get(nextChar);
+            //iecStream.get(nextChar); TODO
             if(!iecStream.eof()) {
                 //(*fileStream).put('a');
                 fileStream->put(nextChar);

@@ -88,11 +88,7 @@ public:
 
     void putUtf8(U8Char* codePoint);
 
-    void flushpbuff() {
-        // we are in this case:
-        // Reading from iestream == SAVE on C64 (pipe mode: _S_out), we're doing C64 -> IEC -> file
-
-    }
+    void flushpbuff();
 };
 
 extern oiecstream iecStream;

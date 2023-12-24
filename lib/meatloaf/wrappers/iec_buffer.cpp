@@ -8,8 +8,34 @@ oiecstream iecStream;
  * 
  * A buffer for writing IEC data, handles sending EOI
  ********************************************************/
+
+
+/********************************************************
+ * SAVE ops, pipe mode = _S_out, uses get area
+ ********************************************************/
+size_t oiecstream::receiveBytesViaIEC() {
+    // we are in a SAVE operation here, so we are pulling bytes from C64 to file, by reading from IEC
+    // underflow happened to our get buffer and this function was called, it has to read bytes from IEC
+    // put them in gbuff and setg to point to them
+
+    // TODO: implement
+}
+
+/********************************************************
+ * LOAD ops, pipe mode = _S_in, uses put area
+ ********************************************************/
+void oiecstream::flushpbuff() {
+    // a seek was called on our pipe, meaning we want to change the location we are reading from
+    // since there might be some bytes in the buffer from previous read operations, 
+    // waiting to be sent, we need to flush them, as they won't be!
+    
+    setp(data, data+IEC_BUFFER_SIZE); // reset the beginning and ending buffer pointers
+}
+
 size_t oiecstream::sendBytesViaIEC() {
     size_t written = 0;
+
+    // we are in a LOAD operation here, so we are pusing bytes from file to C64, by writing to IEC
 
     // Serial.printf("buff     :");
     // for(auto i = pbase(); i<pptr(); i++) {
@@ -25,7 +51,7 @@ size_t oiecstream::sendBytesViaIEC() {
     //  pptr =  Returns the pointer to the current character (put pointer) in the put area.
     //  pbase = Returns the pointer to the beginning ("base") of the put area.
     //  epptr = Returns the pointer one past the end of the put area.
-    Serial.printf("buff->IEC:");
+    Serial.printf("loading file: buff->IEC:");
     for(auto b = pbase(); b < pptr()-1; b++) {
         //Serial.printf("%c",*b);
         //Serial.printf("%c[%.2X]",*b, *b);
