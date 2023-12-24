@@ -28,7 +28,7 @@ void oiecstream::flushpbuff() {
     // a seek was called on our pipe, meaning we want to change the location we are reading from
     // since there might be some bytes in the buffer from previous read operations, 
     // waiting to be sent, we need to flush them, as they won't be!
-    
+
     setp(data, data+IEC_BUFFER_SIZE); // reset the beginning and ending buffer pointers
 }
 
@@ -59,8 +59,7 @@ size_t oiecstream::sendBytesViaIEC() {
         //bool sendSuccess = true;
         if(sendSuccess && !(IEC.flags bitand ATN_PULLED) ) written++;
         else if(!sendSuccess) {
-            // what should happen here?
-            // should the badbit be set when send returns false?
+            // JAIME: what should happen here? should the badbit be set when send returns false?
             setstate(badbit);
             setp(data+written, data+IEC_BUFFER_SIZE); // set pbase to point to next unwritten char
             Debug_printv("IEC acknowledged %d bytes, then failed\n", written);

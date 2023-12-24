@@ -32,6 +32,7 @@ class oiecstream : private std::filebuf, public std::ostream {
     bool m_isOpen = false;
 
     size_t sendBytesViaIEC();
+    size_t receiveBytesViaIEC();
 
 public:
     oiecstream(const oiecstream &copied) : std::ios(0), std::filebuf(),  std::ostream( this ) {

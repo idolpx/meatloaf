@@ -78,6 +78,7 @@ public:
         else if(mode == std::ios_base::openmode::_S_out) {
             // we are SAVE-ing, so, we need to seek within the destination file output stream (put buffer):
             fileStream->seekp(p);
+            //iecStream.flushgbuff() - not sure if it will be required
         }
 
         return false;
@@ -95,7 +96,7 @@ public:
             // If this is a socket stream, it might send NDA ("I have no data for you, but keep asking"), so lte's check it!
             (*fileStream).checkNda();
             if((*fileStream).nda()) {
-                // OK, Jaimme. So you told me there's a way to signal "no data available on IEC", here's the place
+                // JAIME: So you told me there's a way to signal "no data available on IEC", here's the place
                 // to send it:
 
                 // TODO
@@ -116,14 +117,14 @@ public:
         // the loop exited, it might be because:
         // - ATN was pulled?
         if(IEC.flags bitand ATN_PULLED) {
-            // something here?
+            // JAIME: anything needs to happen here?
         }
         // - read whole? Send EOI!
         else if(fileStream->eof())
             iecStream.close();
         // - error occured?
         else if(fileStream->bad()) {
-            // can we somehow signal an error here?
+            // JAIME: can we somehow signal an error here?
         }
     }
 
