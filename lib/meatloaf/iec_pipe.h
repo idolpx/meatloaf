@@ -119,7 +119,7 @@ public:
         if(IEC.flags bitand ATN_PULLED) {
             // JAIME: anything needs to happen here?
         }
-        // - read whole? Send EOI!
+        // - read whole? Send EOI (automatically by the buffer)
         else if(fileStream->eof())
             iecStream.close();
         // - error occured?

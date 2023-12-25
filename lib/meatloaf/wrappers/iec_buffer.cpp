@@ -19,6 +19,7 @@ size_t oiecstream::receiveBytesViaIEC() {
     // put them in gbuff and setg to point to them
 
     // TODO: implement
+    return -1;
 }
 
 /********************************************************
