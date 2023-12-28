@@ -75,7 +75,7 @@ public:
     IPFSFile(std::string path): HttpFile(path) {
         //this->url = "https://dweb.link/ipfs/" + this->host + "/" + this->path;
         this->url = "https://ipfs.io/ipfs/" + this->host + "/" + this->path;
-        parse(this->url);
+        resetURL(this->url);
         Debug_printv("url[%s]", this->url.c_str());
     };
     ~IPFSFile() {};

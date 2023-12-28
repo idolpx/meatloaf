@@ -176,32 +176,20 @@ std::string PeoplesUrlParser::base(void)
     return root() + pathToFile() ;
 }
 
-std::string PeoplesUrlParser::rebuildUrl(void)
-{
-    // set full URL
-    if ( !mstr::startsWith(path, "/") )
-        path = "/" + path;
 
-    cleanPath();
-
-    url = root() + path;
-    //Debug_printv("url[%s]", url.c_str());
-    // url += name;
-    // Debug_printv("url[%s]", url.c_str());
-    // if ( query.size() )
-    //     url += '?' + query;
-    // if ( fragment.size() )
-    //     url += '#' + fragment;
-
-    return url;
-}
 
 uint16_t PeoplesUrlParser::getPort() {
     return std::stoi(port);
 }
 
 
-void PeoplesUrlParser::parse(const std::string u) {
+PeoplesUrlParser* PeoplesUrlParser::parseURL(const std::string &u) {
+    PeoplesUrlParser *url = new PeoplesUrlParser;
+    url->resetURL(u);
+    return url;
+}
+
+void PeoplesUrlParser::resetURL(const std::string u) {
 
     if ( u.empty() )
         return;
@@ -258,12 +246,26 @@ void PeoplesUrlParser::parse(const std::string u) {
     return;        
 }
 
+std::string PeoplesUrlParser::rebuildUrl(void)
+{
+    // set full URL
+    if ( !mstr::startsWith(path, "/") )
+        path = "/" + path;
 
-PeoplesUrlParser* PeoplesUrlParser::parseUrl(const std::string &urlstr) {
-    PeoplesUrlParser *url = new PeoplesUrlParser;
-    url->parse(urlstr);
+    cleanPath();
+
+    url = root() + path;
+    //Debug_printv("url[%s]", url.c_str());
+    // url += name;
+    // Debug_printv("url[%s]", url.c_str());
+    // if ( query.size() )
+    //     url += '?' + query;
+    // if ( fragment.size() )
+    //     url += '#' + fragment;
+
     return url;
 }
+
 
 // void dump() {
 //     printf("scheme: %s\r\n", scheme.c_str());

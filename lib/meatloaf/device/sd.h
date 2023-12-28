@@ -27,7 +27,7 @@ class SDFileSystem: public MFileSystem
 {
 private:
     MFile* getFile(std::string path) override {
-        PeoplesUrlParser *url = PeoplesUrlParser::parseUrl( path );
+        PeoplesUrlParser *url = PeoplesUrlParser::parseURL( path );
 
         std::string basepath = fnSDFAT.basepath();
         basepath += std::string("/");

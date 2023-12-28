@@ -207,7 +207,7 @@ bool D64IStream::seekEntry( uint16_t index )
             if ( next_track == 0 )
                 return false;
 
-            Debug_printv("Follow link track[%d] sector[%d] entryOffset[%d]", next_track, next_sector, entryOffset);
+            //Debug_printv("Follow link track[%d] sector[%d] entryOffset[%d]", next_track, next_sector, entryOffset);
             if ( !seekSector( next_track, next_sector, entryOffset ) )
                 return false;
         }

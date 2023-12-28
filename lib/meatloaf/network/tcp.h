@@ -241,7 +241,7 @@ public:
     }
 
     bool open() override {
-        PeoplesUrlParser *p = PeoplesUrlParser::parseUrl( url );
+        PeoplesUrlParser *p = PeoplesUrlParser::parseURL( url );
         return socket.open(p->host.c_str(), p->getPort());
     }
 

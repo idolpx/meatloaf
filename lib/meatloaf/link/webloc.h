@@ -22,7 +22,7 @@ class MLFileSystem: public MFileSystem
         // Read URL file
 
         //Debug_printv("MLFileSystem::getFile(%s)", path.c_str());
-        PeoplesUrlParser *urlParser = PeoplesUrlParser::parseUrl( path );
+        PeoplesUrlParser *urlParser = PeoplesUrlParser::parseURL( path );
         std::string code = mstr::toUTF8(urlParser->name);
 
         //Debug_printv("url[%s]", urlParser.name.c_str());

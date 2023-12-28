@@ -56,8 +56,8 @@ public:
 
     uint16_t getPort();
 
-    void parse(const std::string u);
-    static PeoplesUrlParser* parseUrl(const std::string &urlstr);
+    static PeoplesUrlParser* parseURL(const std::string &u);
+    void resetURL(const std::string u);
     std::string rebuildUrl(void);
 
 

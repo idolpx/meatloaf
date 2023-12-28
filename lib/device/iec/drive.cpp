@@ -247,13 +247,11 @@ void iecDrive::iec_open()
         Debug_printv("_base[%s]", _base->url.c_str());
         if ( !_base->isDirectory() )
         {
-            Debug_printv("_base[%s]", _base->url.c_str());
             if ( !registerStream(commanddata.channel) )
             {
                 Debug_printv("File Doesn't Exist [%s]", payload.c_str());
             }
         }
-        Debug_printv("_base[%s]", _base->url.c_str());
     }
 }
 
@@ -1233,7 +1231,7 @@ bool iecDrive::sendFile()
     {
         if ( istream->has_subdirs )
         {
-            PeoplesUrlParser *u = PeoplesUrlParser::parseUrl( istream->url );
+            PeoplesUrlParser *u = PeoplesUrlParser::parseURL( istream->url );
             Debug_printv( "Subdir Change Directory Here! istream[%s] > base[%s]", istream->url.c_str(), u->base().c_str() );
             _last_file = u->name;
             _base.reset( MFSOwner::File( u->base() ) );
