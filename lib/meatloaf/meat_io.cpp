@@ -54,8 +54,6 @@
 #include "tape/t64.h"
 #include "tape/tcrt.h"
 
-#include "meat_buffer.h"
-
 /********************************************************
  * MFSOwner implementations
  ********************************************************/
@@ -227,11 +225,10 @@ MFile* MFSOwner::File(std::string path) {
 
 std::string MFSOwner::existsLocal( std::string path )
 {
-    PeoplesUrlParser url;
-    url.parseUrl(path);
+    PeoplesUrlParser *url = PeoplesUrlParser::parseUrl( path );
 
     // Debug_printv( "path[%s] name[%s] size[%d]", path.c_str(), url.name.c_str(), url.name.size() );
-    if ( url.name.size() == 16 )
+    if ( url->name.size() == 16 )
     {
         struct stat st;
         int i = stat(std::string(path).c_str(), &st);
@@ -242,8 +239,8 @@ std::string MFSOwner::existsLocal( std::string path )
             DIR *dir;
             struct dirent *ent;
 
-            std::string p = url.pathToFile();
-            std::string name = url.name;
+            std::string p = url->pathToFile();
+            std::string name = url->name;
             // Debug_printv( "pathToFile[%s] basename[%s]", p.c_str(), name.c_str() );
             if ((dir = opendir ( p.c_str() )) != NULL)
             {
@@ -316,7 +313,7 @@ MFile::MFile(std::string path) {
     //     path = "";
     // }
 
-    parseUrl(path);
+    parse(path);
 }
 
 MFile::MFile(std::string path, std::string name) : MFile(path + "/" + name) {
@@ -443,35 +440,14 @@ MFile* MFile::cd(std::string newDir)
     {
         newDir = mstr::toUTF8( newDir );
 
+        // Add new directory to path
         if ( !mstr::endsWith(url, "/") && newDir.size() )
             url.push_back('/');
 
         Debug_printv("> url[%s] newDir[%s]", url.c_str(), newDir.c_str());
 
-        // Add new directory to path
-        MFile* newPath = MFSOwner::File(url + newDir);
 
-        if(mstr::endsWith(newDir, ".url", false)) {
-            // we need to get actual url
-
-            //auto reader = Meat::New<MFile>(newDir);
-            //auto istream = reader->meatStream();
-            Meat::iostream reader(newPath);
-
-
-            //uint8_t url[istream->size()]; // NOPE, streams have no size!
-            //istream->read(url, istream->size());
-            std::string url;
-            reader >> url;
-
-            Debug_printv("url[%s]", url);
-            //std::string ml_url((char *)url);
-
-            delete newPath;
-            newPath = MFSOwner::File(url);
-        }
-        
-        return newPath;
+        return MFSOwner::File(url + newDir);
     }
 };
 
