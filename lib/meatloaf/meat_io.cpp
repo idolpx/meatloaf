@@ -47,6 +47,8 @@
 
 // Service
 // #include "service/cs.h"
+#include "service/ml.h"
+
 
 // Tape
 #include "tape/t64.h"
@@ -66,7 +68,7 @@ SDFileSystem sdFS;
 
 // Scheme
 HttpFileSystem httpFS;
-//MLFileSystem mlFS;
+MLFileSystem mlFS;
 TNFSFileSystem tnfsFS;
 // IPFSFileSystem ipfsFS;
 // TNFSFileSystem tnfsFS;
@@ -108,7 +110,7 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
     &d64FS, &d71FS, &d80FS, &d81FS, &d82FS, &dnpFS,
     &d8bFS, &dfiFS,
     &t64FS, &tcrtFS,
-    &httpFS, &tnfsFS
+    &httpFS, &mlFS, &tnfsFS
 //    &ipfsFS, &tcpFS,
 //    &tnfsFS
 };
