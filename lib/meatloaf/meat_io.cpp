@@ -47,12 +47,12 @@
 
 // Service
 // #include "service/cs.h"
-#include "service/ml.h"
-
 
 // Tape
 #include "tape/t64.h"
 #include "tape/tcrt.h"
+
+#include "meat_buffer.h"
 
 /********************************************************
  * MFSOwner implementations
@@ -66,7 +66,7 @@ SDFileSystem sdFS;
 
 // Scheme
 HttpFileSystem httpFS;
-MLFileSystem mlFS;
+//MLFileSystem mlFS;
 TNFSFileSystem tnfsFS;
 // IPFSFileSystem ipfsFS;
 // TNFSFileSystem tnfsFS;
@@ -108,7 +108,7 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
     &d64FS, &d71FS, &d80FS, &d81FS, &d82FS, &dnpFS,
     &d8bFS, &dfiFS,
     &t64FS, &tcrtFS,
-    &httpFS, &mlFS, &tnfsFS
+    &httpFS, &tnfsFS
 //    &ipfsFS, &tcpFS,
 //    &tnfsFS
 };
@@ -441,14 +441,35 @@ MFile* MFile::cd(std::string newDir)
     {
         newDir = mstr::toUTF8( newDir );
 
-        // Add new directory to path
         if ( !mstr::endsWith(url, "/") && newDir.size() )
             url.push_back('/');
 
         Debug_printv("> url[%s] newDir[%s]", url.c_str(), newDir.c_str());
 
+        // Add new directory to path
+        MFile* newPath = MFSOwner::File(url + newDir);
 
-        return MFSOwner::File(url + newDir);
+        if(mstr::endsWith(newDir,".url")) {
+            // we need to get actual url
+
+            //auto reader = Meat::New<MFile>(newDir);
+            //auto istream = reader->meatStream();
+            Meat::iostream reader(newDir);
+
+
+            //uint8_t url[istream->size()]; // NOPE, streams have no size!
+            //istream->read(url, istream->size());
+            std::string url;
+            reader >> url;
+
+            Debug_printv("url[%s]", url);
+            //std::string ml_url((char *)url);
+
+            delete newPath;
+            newPath = MFSOwner::File(url);
+        }
+        
+        return newPath;
     }
 };
 
