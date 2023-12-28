@@ -7,7 +7,7 @@ namespace WebDav {
 
 class Server {
 public:
-        Server(std::string rootPath, std::string rootURI);
+        Server(std::string rootURI, std::string rootPath);
         ~Server() {};
 
         std::string pathToURI(std::string path);
@@ -27,7 +27,7 @@ public:
         int doUnlock(Request &req, Response &resp);
 
 private:
-        std::string rootPath, rootURI;
+        std::string rootURI, rootPath;
 
         std::string formatTime(time_t t);
         int sendPropResponse(Response &resp, std::string path, int recurse);

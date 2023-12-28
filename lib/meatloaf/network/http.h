@@ -8,8 +8,9 @@
 #include <esp_http_client.h>
 #include <functional>
 
-#include "../../include/global_defines.h"
-#include "../../include/version.h"
+#include "../../../include/debug.h"
+//#include "../../include/global_defines.h"
+//#include "../../include/version.h"
 
 #define HTTP_BLOCK_SIZE 256
 

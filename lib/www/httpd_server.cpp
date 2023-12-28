@@ -175,12 +175,14 @@ esp_err_t cHttpdServer::webdav_handler(httpd_req_t *httpd_req)
     resp.flushHeaders();
     resp.closeBody();
 
+    Debug_printv("ret[%d]", ret);
+
     return ret;
 }
 
-void cHttpdServer::webdav_register(httpd_handle_t server, const char *root_path, const char *root_uri)
+void cHttpdServer::webdav_register(httpd_handle_t server, const char *root_uri, const char *root_path)
 {
-    WebDav::Server *webDavServer = new WebDav::Server(root_path, root_uri);
+    WebDav::Server *webDavServer = new WebDav::Server(root_uri, root_path);
 
     char *uri;
     asprintf(&uri, "%s/?*", root_uri);
@@ -271,7 +273,7 @@ httpd_handle_t cHttpdServer::start_server(serverstate &state)
     if (httpd_start(&(state.hServer), &config) == ESP_OK)
     {
         /* Register URI handlers */
-        webdav_register(state.hServer, "/sd", "/dav");
+        webdav_register(state.hServer, "/dav", "/sd");
 
         // Default handlers
         httpd_register_uri_handler(state.hServer, &uri_get);

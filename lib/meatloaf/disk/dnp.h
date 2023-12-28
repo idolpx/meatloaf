@@ -80,7 +80,7 @@ public:
         return new DNPFile(path);
     }
 
-    bool handles(std::string fileName) {
+    bool handles(std::string fileName) override {
         return byExtension(".dnp", fileName);
     }
 

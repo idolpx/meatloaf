@@ -6,6 +6,8 @@
 
 #include "meat_io.h"
 
+#include "../../include/debug.h"
+
 namespace Meat
 {
     /********************************************************

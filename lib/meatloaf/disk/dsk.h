@@ -106,7 +106,7 @@ public:
         return new DSKFile(path);
     }
 
-    bool handles(std::string fileName) {
+    bool handles(std::string fileName) override {
         return byExtension(
             {
                 ".dsk",

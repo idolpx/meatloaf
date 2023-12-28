@@ -94,7 +94,7 @@ public:
 
     bool exists() override { return true; };
     bool remove() override { return false; };
-    bool rename(std::string dest) { return false; };
+    bool rename(std::string dest) override { return false; };
     time_t getLastWrite() override { return 0; };
     time_t getCreationTime() override { return 0; };
     uint32_t size() override;
@@ -116,7 +116,7 @@ public:
         return new TAPFile(path);
     }
 
-    bool handles(std::string fileName) {
+    bool handles(std::string fileName) override {
         return byExtension(".tap", fileName);
     }
 

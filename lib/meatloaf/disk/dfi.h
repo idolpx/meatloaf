@@ -194,7 +194,7 @@ public:
         return new DFIFile(path);
     }
 
-    bool handles(std::string fileName) {
+    bool handles(std::string fileName) override {
         return byExtension(".dfi", fileName);
     }
 

@@ -27,6 +27,10 @@
 // http://www.ffd2.com/fridge/docs/1541dis.html#E853
 // http://unusedino.de/ec64/technical/aay/c1541/
 // http://unusedino.de/ec64/technical/aay/c1581/
+// http://www.bitcity.de/1541%20Serial%20Interface.htm
+// http://www.bitcity.de/theory.htm
+// https://comp.sys.cbm.narkive.com/ebz1uFEx/annc-vip-the-virtual-iec-peripheral
+// https://www.djupdal.org/cbm/iecata/
 //
 
 #include <cstdint>
