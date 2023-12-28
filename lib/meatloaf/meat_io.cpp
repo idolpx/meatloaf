@@ -449,7 +449,7 @@ MFile* MFile::cd(std::string newDir)
         // Add new directory to path
         MFile* newPath = MFSOwner::File(url + newDir);
 
-        if(mstr::endsWith(newDir,".url")) {
+        if(mstr::endsWith(newDir, ".url", false)) {
             // we need to get actual url
 
             //auto reader = Meat::New<MFile>(newDir);
