@@ -454,7 +454,7 @@ MFile* MFile::cd(std::string newDir)
 
             //auto reader = Meat::New<MFile>(newDir);
             //auto istream = reader->meatStream();
-            Meat::iostream reader(newDir);
+            Meat::iostream reader(newPath);
 
 
             //uint8_t url[istream->size()]; // NOPE, streams have no size!
