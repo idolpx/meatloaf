@@ -234,8 +234,11 @@ namespace mstr {
     {
         std::string utf8string;
         for(char petscii : petsciiInput) {
-            U8Char u8char(petscii);
-            utf8string+=u8char.toUtf8();
+            // if(petscii > 0)
+            // {
+                U8Char u8char(petscii);
+                utf8string+=u8char.toUtf8();
+            // }
         }
         return utf8string;
     }
@@ -255,6 +258,22 @@ namespace mstr {
         }
         return petsciiString;
     }
+
+    // convert string to hex
+    std::string toHex(const std::string &input)
+    {
+        static const char hex_digits[] = "0123456789ABCDEF";
+
+        std::string output;
+        output.reserve(input.length() * 2);
+        for (unsigned char c : input)
+        {
+            output.push_back(hex_digits[c >> 4]);
+            output.push_back(hex_digits[c & 15]);
+        }
+        return output;
+    }
+
 
     // convert to A0 space to 20 space (in place)
     void A02Space(std::string &s)
@@ -567,4 +586,5 @@ namespace mstr {
         //     parent = streamFile->url;
         return parent + "/" + plus;
     }
+
 }
