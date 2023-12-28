@@ -102,7 +102,7 @@ public:
         return new D81File(path);
     }
 
-    bool handles(std::string fileName) {
+    bool handles(std::string fileName) override {
         return byExtension(".d81", fileName);
     }
 

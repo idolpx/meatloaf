@@ -1,5 +1,6 @@
 #include "meat_io.h"
 
+#include <dirent.h>
 #include <sys/stat.h>
 #include <algorithm>
 #include <vector>
@@ -9,7 +10,6 @@
 
 #include "MIOException.h"
 
-#include "utils.h"
 #include "string_utils.h"
 #include "peoples_url_parser.h"
 

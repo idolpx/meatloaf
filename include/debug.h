@@ -24,9 +24,9 @@
 */
 #ifdef DEBUG
 #ifdef TEST_NATIVE
-    #define Debug_print(...) print( __VA_ARGS__ )
+    #define Debug_print(...) printf( __VA_ARGS__ )
     #define Debug_printf(...) printf( __VA_ARGS__ )
-    #define Debug_println(...) println( __VA_ARGS__ )
+    #define Debug_println(...) printf( __VA_ARGS__ )
     #define Debug_printv(format, ...) {printf( ANSI_YELLOW "[%s:%u] %s(): " ANSI_GREEN_BOLD format ANSI_RESET "\r\n", __FILE__, __LINE__, __FUNCTION__, ##__VA_ARGS__);}
 #else
     #define Debug_print(...) fnUartDebug.print( __VA_ARGS__ )

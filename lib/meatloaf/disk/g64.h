@@ -93,7 +93,7 @@ public:
         return new G64File(path);
     }
 
-    bool handles(std::string fileName) {
+    bool handles(std::string fileName) override {
         return byExtension(".g64", fileName);
     }
 

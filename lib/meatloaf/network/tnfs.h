@@ -5,6 +5,8 @@
 
 #include "fnFS.h"
 
+#include "../../../include/debug.h"
+
 #include "make_unique.h"
 
 #include <dirent.h>

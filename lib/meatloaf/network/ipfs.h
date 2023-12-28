@@ -60,6 +60,8 @@
 
 #include "network/http.h"
 
+#include "../../../include/debug.h"
+
 #include "peoples_url_parser.h"
 
 

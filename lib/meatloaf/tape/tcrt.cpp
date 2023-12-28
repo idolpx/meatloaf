@@ -1,6 +1,5 @@
 #include "tcrt.h"
 
-#include "utils.h"
 
 /********************************************************
  * Streams
@@ -26,7 +25,7 @@ bool TCRTIStream::seekEntry( std::string filename )
             // Read Entry From Stream
             if (filename == "*")
             {
-                filename == entryFilename;
+                filename = entryFilename;
             }
             
             if ( mstr::compare(filename, entryFilename) )

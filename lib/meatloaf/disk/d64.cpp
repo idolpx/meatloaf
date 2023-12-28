@@ -1,6 +1,7 @@
 
 #include "d64.h"
 
+#include "endianness.h"
 
 // D64 Utility Functions
 
@@ -41,9 +42,9 @@ bool D64IStream::seekSector( uint8_t track, uint8_t sector, uint8_t offset )
     //Debug_printv("track[%d] sector[%d] offset[%d]", track, sector, offset);
 
     // Is this a valid track?
-    auto c = partitions[partition].block_allocation_map.size() - 1;
-    auto start_track = partitions[partition].block_allocation_map[0].start_track;
-    auto end_track = partitions[partition].block_allocation_map[c].end_track;
+    uint8_t c = partitions[partition].block_allocation_map.size() - 1;
+    uint8_t start_track = partitions[partition].block_allocation_map[0].start_track;
+    uint8_t end_track = partitions[partition].block_allocation_map[c].end_track;
     if ( track < start_track || track > end_track )
     {
         Debug_printv("track[%d] start_track[%d] end_track[%d]", track, start_track, end_track);
@@ -237,7 +238,7 @@ uint16_t D64IStream::blocksFree()
 
     for(uint8_t x = 0; x < partitions[partition].block_allocation_map.size(); x++)
     {
-        uint8_t bam[partitions[partition].block_allocation_map[x].byte_count] = { 0 };
+        uint8_t bam[partitions[partition].block_allocation_map[x].byte_count];
         //Debug_printv("start_track[%d] end_track[%d]", block_allocation_map[x].start_track, block_allocation_map[x].end_track);
 
         r = seekSector(

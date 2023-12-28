@@ -17,7 +17,7 @@
 
 using namespace WebDav;
 
-Server::Server(std::string rootPath, std::string rootURI) : rootPath(rootPath), rootURI(rootURI) {}
+Server::Server(std::string rootURI, std::string rootPath) : rootURI(rootURI), rootPath(rootPath)  {}
 
 std::string Server::uriToPath(std::string uri)
 {
@@ -138,17 +138,21 @@ int Server::doCopy(Request &req, Response &resp)
     if (req.getDestination().empty())
         return 400;
 
-    if (req.getPath() == req.getDestination())
+    std::string source = uriToPath(req.getPath());
+    std::string destination = uriToPath(req.getDestination());
+
+    Debug_printv("req[%s] source[%s]", req.getPath().c_str(), source.c_str());
+
+    if (source == destination)
         return 403;
 
     int recurse =
         (req.getDepth() == Request::DEPTH_0) ? 0 : (req.getDepth() == Request::DEPTH_1) ? 1
                                                                                         : 32;
 
-    std::string destination = uriToPath(req.getDestination());
     bool destinationExists = access(destination.c_str(), F_OK) == 0;
 
-    int ret = copy_recursive(req.getPath(), destination, recurse, req.getOverwrite());
+    int ret = copy_recursive(source, destination, recurse, req.getOverwrite());
 
     switch (ret)
     {
@@ -181,7 +185,11 @@ int Server::doDelete(Request &req, Response &resp)
     if (req.getDepth() != Request::DEPTH_INFINITY)
         return 400;
 
-    int ret = rm_rf(req.getPath().c_str());
+    std::string path = uriToPath(req.getPath());
+
+    Debug_printv("req[%s] path[%s]", req.getPath().c_str(), path.c_str());
+
+    int ret = rm_rf(path.c_str());
     if (ret < 0)
         return 404;
 
@@ -190,12 +198,16 @@ int Server::doDelete(Request &req, Response &resp)
 
 int Server::doGet(Request &req, Response &resp)
 {
+    std::string path = uriToPath(req.getPath());
+
+    Debug_printv("req[%s] path[%s]", req.getPath().c_str(), path.c_str());
+
     struct stat sb;
-    int ret = stat(req.getPath().c_str(), &sb);
+    int ret = stat(path.c_str(), &sb);
     if (ret < 0)
         return 404;
 
-    FILE *f = fopen(req.getPath().c_str(), "r");
+    FILE *f = fopen(path.c_str(), "r");
     if (!f)
         return 500;
 
@@ -234,8 +246,12 @@ int Server::doGet(Request &req, Response &resp)
 
 int Server::doHead(Request &req, Response &resp)
 {
+    std::string path = uriToPath(req.getPath());
+
+    Debug_printv("req[%s] path[%s]", req.getPath().c_str(), path.c_str());
+
     struct stat sb;
-    int ret = stat(req.getPath().c_str(), &sb);
+    int ret = stat(path.c_str(), &sb);
     if (ret < 0)
         return 404;
 
@@ -256,7 +272,11 @@ int Server::doMkcol(Request &req, Response &resp)
     if (req.getContentLength() != 0)
         return 415;
 
-    int ret = mkdir(req.getPath().c_str(), 0755);
+    std::string path = uriToPath(req.getPath());
+
+    Debug_printv("req[%s] path[%s]", req.getPath().c_str(), path.c_str());
+
+    int ret = mkdir(path.c_str(), 0755);
     if (ret == 0)
         return 201;
 
@@ -278,8 +298,12 @@ int Server::doMove(Request &req, Response &resp)
     if (req.getDestination().empty())
         return 400;
 
+    std::string source = uriToPath(req.getPath());
+
+    Debug_printv("req[%s] source[%s]", req.getPath().c_str(), source.c_str());
+
     struct stat sourceStat;
-    int ret = stat(req.getPath().c_str(), &sourceStat);
+    int ret = stat(source.c_str(), &sourceStat);
     if (ret < 0)
         return 404;
 
@@ -294,7 +318,7 @@ int Server::doMove(Request &req, Response &resp)
         rm_rf(destination.c_str());
     }
 
-    ret = rename(req.getPath().c_str(), destination.c_str());
+    ret = rename(source.c_str(), destination.c_str());
 
     switch (ret)
     {
@@ -327,10 +351,12 @@ int Server::doOptions(Request &req, Response &resp)
 
 int Server::doPropfind(Request &req, Response &resp)
 {
-    bool exists = (req.getPath() == rootPath) ||
-                  (access(req.getPath().c_str(), R_OK) == 0);
+    std::string path = uriToPath(req.getPath());
 
-    Debug_printv("root[%s] req[%s]", rootPath.c_str(), req.getPath().c_str());
+    Debug_printv("req[%s] path[%s]", req.getPath().c_str(), path.c_str());
+
+    bool exists = (path == rootPath) ||
+                  (access(path.c_str(), R_OK) == 0);
     
     if (!exists)
         return 404;
@@ -356,7 +382,11 @@ int Server::doPropfind(Request &req, Response &resp)
 
 int Server::doProppatch(Request &req, Response &resp)
 {
-    bool exists = access(req.getPath().c_str(), R_OK) == 0;
+    std::string path = uriToPath(req.getPath());
+
+    Debug_printv("req[%s] path[%s]", req.getPath().c_str(), path.c_str());
+
+    bool exists = access(path.c_str(), R_OK) == 0;
 
     if (!exists)
         return 404;
@@ -366,8 +396,12 @@ int Server::doProppatch(Request &req, Response &resp)
 
 int Server::doPut(Request &req, Response &resp)
 {
-    bool exists = access(req.getPath().c_str(), R_OK) == 0;
-    FILE *f = fopen(req.getPath().c_str(), "w");
+    std::string path = uriToPath(req.getPath());
+
+    Debug_printv("req[%s] path[%s]", req.getPath().c_str(), path.c_str());
+
+    bool exists = access(path.c_str(), R_OK) == 0;
+    FILE *f = fopen(path.c_str(), "w");
     if (!f)
         return 404;
 

@@ -2,6 +2,9 @@
 
 #include <esp_idf_version.h>
 
+#include "../../../include/debug.h"
+#include "../../../include/global_defines.h"
+
 /********************************************************
  * File impls
  ********************************************************/
@@ -497,7 +500,7 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
                     }
                 }
 
-                //Debug_printv("new url '%s'", meatClient->url.c_str());
+                Debug_printv("new url '%s'", meatClient->url.c_str());
             }
 
             // Allow override in lambda

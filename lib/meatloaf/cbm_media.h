@@ -8,7 +8,7 @@
 #include <bitset>
 #include <unordered_map>
 
-#include "../../../include/debug.h"
+#include "../../include/debug.h"
 
 #include "string_utils.h"
 
@@ -64,7 +64,7 @@ public:
     // readString = (size) => this.containerStream.readString(size);
     virtual std::string readString( uint8_t size )
     {
-        uint8_t b[size] = { 0x00 };
+        uint8_t b[size];
         uint32_t r = containerStream->read( b, size );
         return std::string((char *)b);
     }
@@ -81,8 +81,8 @@ public:
     virtual uint32_t seekFileSize( uint8_t start_track, uint8_t start_sector );
 
     uint32_t read(uint8_t* buf, uint32_t size) override;
-    uint32_t write(const uint8_t *buf, uint32_t size);
-    void reset() {
+    uint32_t write(const uint8_t *buf, uint32_t size) override;
+    void reset() override {
         seekCalled = false;
         m_position = 0;
         m_length = block_size;
@@ -90,7 +90,7 @@ public:
         //m_load_address = {0, 0};
     }
 
-    bool isOpen();
+    bool isOpen() override;
     std::string url;
 
 protected:

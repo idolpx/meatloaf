@@ -195,9 +195,9 @@ public:
     };
 
 
-    virtual uint16_t blocksFree();
+    uint16_t blocksFree() override;
 
-	virtual uint8_t speedZone( uint8_t track)
+	uint8_t speedZone( uint8_t track) override
 	{
 		return (track < 18) + (track < 25) + (track < 31);
 	};
@@ -239,8 +239,8 @@ public:
 private:
     void sendListing();
 
-    bool seekEntry( std::string filename );
-    bool seekEntry( uint16_t index = 0 );
+    bool seekEntry( std::string filename ) override;
+    bool seekEntry( uint16_t index = 0 ) override;
 
 
     std::string readBlock( uint8_t track, uint8_t sector );
@@ -286,7 +286,7 @@ public:
 
     bool exists() override;
     bool remove() override { return false; };
-    bool rename(std::string dest) { return false; };
+    bool rename(std::string dest) override { return false; };
     time_t getLastWrite() override;
     time_t getCreationTime() override;
     uint32_t size() override;     
@@ -309,7 +309,7 @@ public:
         return new D64File(path);
     }
 
-    bool handles(std::string fileName) {
+    bool handles(std::string fileName) override {
         //Serial.printf("handles w dnp %s %d\r\n", fileName.rfind(".dnp"), fileName.length()-4);
         return byExtension(
             {

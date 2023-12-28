@@ -81,7 +81,7 @@ public:
         return new D8BFile(path);
     }
 
-    bool handles(std::string fileName) {
+    bool handles(std::string fileName) override {
         return byExtension(".d8b", fileName);
     }
 

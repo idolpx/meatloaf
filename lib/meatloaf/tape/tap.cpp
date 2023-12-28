@@ -1,5 +1,7 @@
 #include "tap.h"
 
+#include "endianness.h"
+
 /********************************************************
  * Streams
  ********************************************************/
@@ -22,7 +24,7 @@ bool TAPIStream::seekEntry( std::string filename )
             // Read Entry From Stream
             if (filename == "*")
             {
-                filename == entryFilename;
+                filename = entryFilename;
             }
             
             if ( mstr::compare(filename, entryFilename) )
@@ -86,7 +88,7 @@ bool TAPIStream::seekPath(std::string path) {
         size_t start_address = UINT16_FROM_LE_UINT16(entry.start_address);
         size_t end_address = UINT16_FROM_LE_UINT16(entry.end_address);
         size_t data_offset = UINT32_FROM_LE_UINT32(entry.data_offset);
-        Debug_printv("filename [%.16s] type[%s] start_address[%d] end_address[%d] data_offset[%d]", entry.filename, type, start_address, end_address, data_offset);
+        Debug_printv("filename [%.16s] type[%s] start_address[%zu] end_address[%zu] data_offset[%zu]", entry.filename, type, start_address, end_address, data_offset);
 
         // Calculate file size
         m_length = ( end_address - start_address );
