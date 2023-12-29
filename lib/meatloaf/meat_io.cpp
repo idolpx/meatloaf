@@ -54,6 +54,8 @@
 #include "tape/t64.h"
 #include "tape/tcrt.h"
 
+#include "meat_buffer.h"
+
 /********************************************************
  * MFSOwner implementations
  ********************************************************/
@@ -446,8 +448,30 @@ MFile* MFile::cd(std::string newDir)
 
         Debug_printv("> url[%s] newDir[%s]", url.c_str(), newDir.c_str());
 
+        // Add new directory to path
+        MFile* newPath = MFSOwner::File(url + newDir);
 
-        return MFSOwner::File(url + newDir);
+        if(mstr::endsWith(newDir, ".url", false)) {
+            // we need to get actual url
+
+            //auto reader = Meat::New<MFile>(newDir);
+            //auto istream = reader->meatStream();
+            Meat::iostream reader(newPath);
+
+
+            //uint8_t url[istream->size()]; // NOPE, streams have no size!
+            //istream->read(url, istream->size());
+            std::string url;
+            reader >> url;
+
+            Debug_printv("url[%s]", url);
+            //std::string ml_url((char *)url);
+
+            delete newPath;
+            newPath = MFSOwner::File(url);
+        }
+        
+        return newPath;
     }
 };
 
