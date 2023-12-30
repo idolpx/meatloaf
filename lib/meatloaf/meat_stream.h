@@ -11,7 +11,7 @@
 #define SEEK_CUR  1
 #define SEEK_END  2
 
-#define SA0 0b0001111
+#define SA0 0b00001111
 #define SA1 0b00011111
 #define SA2 0b00101111
 #define SA3 0b00111111
@@ -46,7 +46,6 @@ public:
     virtual ~MStream() {};
 
     std::ios_base::openmode mode;
-    uint8_t secondaryAddress = 0;
     std::string url = "";
 
     bool has_subdirs = true;

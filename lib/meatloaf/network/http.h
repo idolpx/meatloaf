@@ -12,6 +12,7 @@
 
 #include <esp_http_client.h>
 #include <functional>
+#include <map>
 
 #include "../../../include/debug.h"
 //#include "../../include/global_defines.h"
@@ -33,13 +34,19 @@ class MeatHttpClient {
         return 0; 
     };
 
+    std::map<std::string, std::string> headers;
+
 public:
 
     MeatHttpClient() {
-
     }
+    
     ~MeatHttpClient() {
         close();
+    }
+
+    void setHeaders(std::map<std::string, std::string> &h) {
+        headers = h;
     }
 
     bool GET(std::string url);
@@ -113,11 +120,15 @@ public:
  ********************************************************/
 
 class HttpIStream: public MStream {
+    std::map<std::string, std::string> headers;
 
 public:
-    HttpIStream(std::string path) {
+    HttpIStream(std::string path, std::ios_base::openmode m, std::map<std::string, std::string> &h) {
+        mode = m;
         url = path;
+        headers = h;
     };
+
     ~HttpIStream() {
         close();
     };

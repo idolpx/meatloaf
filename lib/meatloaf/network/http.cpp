@@ -40,7 +40,17 @@ bool HttpFile::isDirectory() {
 MStream* HttpFile::meatStream(std::ios_base::openmode mode) {
     // has to return OPENED stream
     //Debug_printv("Input stream requested: [%s]", url.c_str());
-    MStream* istream = new HttpIStream(url);
+
+    // headers have to be supplied here, they might be set on this channel using
+    // i.e. CBM DOS commands like
+    // H+:Accept: */*
+    // H+:Accept-Encoding: gzip, deflate
+    // here you add them all to a map, like this:
+    std::map<std::string, std::string> headers;
+    // headers["Accept"] = "*/*";
+    // headers["Accept-Encoding"] = "gzip, deflate";
+    // etc.
+    MStream* istream = new HttpIStream(url, mode, headers);
     istream->open();
 
     return istream;
@@ -127,12 +137,14 @@ bool HttpFile::isText() {
  ********************************************************/
 bool HttpIStream::open() {
     bool r = false;
-    if(secondaryAddress == 0)
-        r = m_http.GET(url);
-    else if(secondaryAddress == 1)
+    m_http.setHeaders(headers);
+
+    if(mode == (std::ios_base::out | std::ios_base::app))
         r = m_http.PUT(url);
-    else if(secondaryAddress == 2)
+    else if(mode == std::ios_base::out)
         r = m_http.POST(url);
+    else
+        r = m_http.GET(url);
 
     if ( r ) {
         m_length = m_http.m_length;
@@ -173,7 +185,9 @@ uint32_t HttpIStream::read(uint8_t* buf, uint32_t size) {
 };
 
 uint32_t HttpIStream::write(const uint8_t *buf, uint32_t size) {
-    return -1;
+    uint32_t bytesWritten = m_http.write(buf, size);
+    m_position += bytesWritten;
+    return bytesWritten;
 }
 
 
@@ -386,6 +400,11 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t meth, int resum
 
     //Debug_printv("HTTP Init url[%s]", url.c_str());
     m_http = esp_http_client_init(&config);
+    
+    for (const auto& pair : headers) {
+        std::cout << pair.first << ": " << pair.second << std::endl;
+        esp_http_client_set_header(m_http, pair.first.c_str(), pair.second.c_str());
+    }
 
     if(resume > 0) {
         char str[40];
