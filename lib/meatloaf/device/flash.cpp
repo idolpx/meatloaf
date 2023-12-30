@@ -62,7 +62,7 @@ MStream* FlashFile::createIStream(std::shared_ptr<MStream> is) {
     return is.get(); // we don't have to process this stream in any way, just return the original stream
 }
 
-MStream* FlashFile::meatStream()
+MStream* FlashFile::meatStream(std::ios_base::openmode mode)
 {
     std::string full_path = basepath + path;
     MStream* istream = new FlashIStream(full_path);

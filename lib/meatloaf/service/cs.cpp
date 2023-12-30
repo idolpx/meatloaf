@@ -338,7 +338,7 @@ bool CServerFile::isDirectory() {
     return false;
 };
 
-MStream* CServerFile::meatStream() {
+MStream* CServerFile::meatStream(std::ios_base::openmode mode) {
     MStream* istream = new CServerIStream(url);
     istream->open();   
     return istream;

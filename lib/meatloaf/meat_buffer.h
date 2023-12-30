@@ -64,18 +64,15 @@ namespace Meat
         std::filebuf *doOpen(std::ios_base::openmode mode)
         {
             // Debug_println("In filebuf open pre reset mistream");
-            if (mode == std::ios_base::in)
-                mstream.reset(mfile->meatStream());
-            else
-            {
-                // TODO - ok we have to obtain the out stream here SOMEHOW
-            }
+            mstream.reset(mfile->meatStream(mode));
 
-            // Debug_println("In filebuf open post reset mistream");
             if (mstream->isOpen())
             {
                 // Debug_println("In filebuf open success!");
-                this->setp(obuffer, obuffer + obufsize);
+                if (mode == std::ios_base::in)
+                    this->setp(obuffer, obuffer + obufsize);
+                else
+                    this->setg(ibuffer, ibuffer, ibuffer);
                 return this;
             }
             else

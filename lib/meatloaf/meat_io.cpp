@@ -333,9 +333,9 @@ bool MFile::operator!=(nullptr_t ptr) {
     return m_isNull;
 }
 
-MStream* MFile::meatStream() {
+MStream* MFile::meatStream(std::ios_base::openmode mode) {
     // has to return OPENED stream
-    std::shared_ptr<MStream> containerStream(streamFile->meatStream()); // get its base stream, i.e. zip raw file contents
+    std::shared_ptr<MStream> containerStream(streamFile->meatStream(mode)); // get its base stream, i.e. zip raw file contents
     Debug_printv("containerStream isRandomAccess[%d] isBrowsable[%d]", containerStream->isRandomAccess(), containerStream->isBrowsable());
 
     MStream* decodedStream(createIStream(containerStream)); // wrap this stream into decoded stream, i.e. unpacked zip files
@@ -372,8 +372,6 @@ MStream* MFile::meatStream() {
     //Debug_printv("returning decodedStream");
     return decodedStream;
 };
-
-
 
 MFile* MFile::cd(std::string newDir) 
 {

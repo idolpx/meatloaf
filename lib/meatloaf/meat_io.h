@@ -55,7 +55,7 @@ public:
     // bool copyTo(MFile* dst);
 
     // has to return OPENED stream
-    virtual MStream* meatStream();
+    virtual MStream* meatStream(std::ios_base::openmode mode=std::ios_base::in);
 
     MFile* cd(std::string newDir);
     MFile* cdParent(std::string = "");

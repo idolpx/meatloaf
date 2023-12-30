@@ -87,7 +87,7 @@ public:
             delete client;
     }
     bool isDirectory() override;
-    MStream* meatStream() override ; // has to return OPENED streamm
+    MStream* meatStream(std::ios_base::openmode mode=std::ios_base::in) override ; // has to return OPENED streamm
     time_t getLastWrite() override ;
     time_t getCreationTime() override ;
     bool rewindDirectory() override ;

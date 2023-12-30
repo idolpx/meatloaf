@@ -219,7 +219,7 @@ public:
     };
 
     MStream* createIStream(std::shared_ptr<MStream> src) { return src.get(); };
-    MStream* meatStream() override ; // has to return OPENED stream
+    MStream* meatStream(std::ios_base::openmode mode=std::ios_base::in) override ; // has to return OPENED stream
 
     //MFile* cd(std::string newDir);
     bool isDirectory() override;

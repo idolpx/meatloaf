@@ -286,7 +286,7 @@ public:
     }
 
     // We are overriding meatStream, because obviously - TCP scheme won't be wrapped in anything
-    MStream* meatStream() override {
+    MStream* meatStream(std::ios_base::openmode mode=std::ios_base::in) override {
         // has to return OPENED streamm
         MStream* istream = new TcpStream(url);
         istream->open();
