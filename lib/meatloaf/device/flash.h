@@ -123,8 +123,9 @@ private:
 
 class FlashIStream: public MStream {
 public:
-    FlashIStream(std::string& path) {
+    FlashIStream(std::string& path, std::ios_base::openmode m) {
         localPath = path;
+        mode = m;
         handle = std::make_unique<FlashHandle>();
         url = path;
     }

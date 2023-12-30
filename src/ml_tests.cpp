@@ -701,6 +701,11 @@ void detectLeaks() {
     testDirectory(testDir.get());
 }
 
+void testFileOutput() {
+    Meat::iostream writer("flash_file_name.txt", std::ios_base::out);
+    writer << "Let's write some text to a file!";
+}
+
 void runTestsSuite() {
     // Delay waiting for wifi to connect
     // while ( !fnWiFi.connected() )
@@ -711,8 +716,9 @@ void runTestsSuite() {
 
     //commodoreServer();
     //seekTest();
-    testPetsciiUtf();
-    testPunycode();
+    testFileOutput();
+    // testPetsciiUtf();
+    // testPunycode();
     //detectLeaks();
 
     // ====== Per FS dir, read and write region =======================================

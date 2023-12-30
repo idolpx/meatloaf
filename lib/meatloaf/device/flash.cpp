@@ -65,7 +65,7 @@ MStream* FlashFile::createIStream(std::shared_ptr<MStream> is) {
 MStream* FlashFile::meatStream(std::ios_base::openmode mode)
 {
     std::string full_path = basepath + path;
-    MStream* istream = new FlashIStream(full_path);
+    MStream* istream = new FlashIStream(full_path, mode);
     //Debug_printv("FlashFile::meatStream() 3, not null=%d", istream != nullptr);
     istream->open();   
     //Debug_printv("FlashFile::meatStream() 4");
@@ -298,16 +298,12 @@ uint32_t FlashIStream::write(const uint8_t *buf, uint32_t size) {
         return 0;
     }
 
-    //Debug_printv("in byteWrite '%c', handle->file_h is null=[%d]\r\n", buf[0], handle->file_h == nullptr);
+    Debug_printv("in byteWrite '%c', handle->file_h is null=[%d]\r\n", buf[0], handle->file_h == nullptr);
 
     // buffer, element size, count, handle
     int result = fwrite((void*) buf, 1, size, handle->file_h );
 
-    //Debug_printv("after lfs_file_write");
-
-    if (result < 0) {
-        Debug_printv("write rc=%d\r\n", result);
-    }
+    Debug_printv("after write rc=%d\r\n", result);
     return result;
 };
 
@@ -324,9 +320,26 @@ bool FlashIStream::open() {
     //Debug_printv("IStream: trying to open flash fs, calling isOpen");
 
     //Debug_printv("IStream: wasn't open, calling obtain");
-    handle->obtain(localPath, "r");
+    if(mode == std::ios_base::in)
+        handle->obtain(localPath, "r");
+    else if(mode == std::ios_base::out) {
+        Debug_printv("FlashIStream: ok, we are in write mode!");
+        handle->obtain(localPath, "w");
+    }
+    else if(mode == std::ios_base::app)
+        handle->obtain(localPath, "a");
+    else if(mode == (std::ios_base::in | std::ios_base::out))
+        handle->obtain(localPath, "r+");
+    else if(mode == (std::ios_base::in | std::ios_base::app))
+        handle->obtain(localPath, "a+");
+    else if(mode == (std::ios_base::in | std::ios_base::out | std::ios_base::trunc))
+        handle->obtain(localPath, "w+");
+    else if(mode == (std::ios_base::in | std::ios_base::out | std::ios_base::app))
+        handle->obtain(localPath, "a+");
 
-    if(isOpen()) {
+    // The below code will definitely destroy whatever open above does, because it will move the file pointer
+    // so I just wrapped it to be called only for in
+    if(isOpen() && mode == std::ios_base::in) {
         //Debug_printv("IStream: past obtain");
         // Set file size
         fseek(handle->file_h, 0, SEEK_END);

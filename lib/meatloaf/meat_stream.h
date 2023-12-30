@@ -45,6 +45,7 @@ protected:
 public:
     virtual ~MStream() {};
 
+    std::ios_base::openmode mode;
     uint8_t secondaryAddress = 0;
     std::string url = "";
 
