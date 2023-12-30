@@ -8,9 +8,9 @@
 
 bool T64IStream::seekEntry( std::string filename )
 {
-    uint8_t index = 1;
-    mstr::rtrimA0(filename);
+    size_t index = 1;
     mstr::replaceAll(filename, "\\", "/");
+    bool wildcard =  ( mstr::contains(filename, "*") || mstr::contains(filename, "?") );
 
     // Read Directory Entries
     if ( filename.size() )
@@ -19,21 +19,29 @@ bool T64IStream::seekEntry( std::string filename )
         {
             std::string entryFilename = entry.filename;
             mstr::rtrimA0(entryFilename);
-            mstr::replaceAll(filename, "\\", "/");
-            //mstr::toUTF8(entryFilename);
+            entryFilename = mstr::toUTF8(entryFilename);
+
             Debug_printv("filename[%s] entry.filename[%.16s]", filename.c_str(), entryFilename.c_str());
 
             // Read Entry From Stream
-            if (filename == "*")
+            if (filename == "*") // Match first PRG
             {
                 filename = entryFilename;
-            }
-
-            if ( mstr::compare(filename, entryFilename) )
-            {
-                // Move stream pointer to start track/sector
                 return true;
             }
+            else if ( filename == entryFilename ) // Match exact
+            {
+                return true;
+            }
+            else if ( wildcard )
+            {
+                if ( mstr::compare(filename, entryFilename) ) // X?XX?X* Wildcard match
+                {
+                    // Move stream pointer to start track/sector
+                    return true;
+                }
+            }
+
             index++;
         }
     }

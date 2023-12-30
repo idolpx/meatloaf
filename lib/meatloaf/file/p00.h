@@ -73,9 +73,7 @@ private:
 class P00File: public MFile {
 public:
 
-    P00File(std::string path, bool is_dir = false): MFile(path) {
-        isDir = is_dir;
-    };
+    P00File(std::string path, bool is_dir = false): MFile(path) {};
     
     ~P00File() {
         // don't close the stream here! It will be used by shared ptr D64Util to keep reading image params
