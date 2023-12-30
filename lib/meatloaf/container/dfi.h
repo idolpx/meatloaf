@@ -161,7 +161,6 @@ public:
         partitions[0].directory_sector = partitions[0].header_sector;
     };
 
-	virtual uint8_t speedZone( uint8_t track) override { return 0; };
 
 protected:
 
