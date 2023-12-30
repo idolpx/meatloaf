@@ -1,6 +1,8 @@
 #ifndef MEATLOAF_STREAM
 #define MEATLOAF_STREAM
 
+#include <unordered_map>
+
 /********************************************************
  * Universal streams
  ********************************************************/
@@ -48,6 +50,10 @@ public:
 
     bool has_subdirs = true;
     size_t block_size = 256;
+
+    virtual std::unordered_map<std::string, std::string> info() {
+        return {};
+    }
 
     virtual uint32_t size() {
         return m_length;

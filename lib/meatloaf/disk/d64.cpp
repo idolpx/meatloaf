@@ -106,8 +106,6 @@ bool D64IStream::deallocateBlock( uint8_t track, uint8_t sector)
 bool D64IStream::seekEntry( std::string filename )
 {
     uint32_t index = 1;
-    //mstr::rtrimA0(filename);
-    //filename = mstr::toPETSCII2(filename);
     mstr::replaceAll(filename, "\\", "/");
     bool wildcard =  ( mstr::contains(filename, "*") || mstr::contains(filename, "?") );
 

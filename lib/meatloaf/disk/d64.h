@@ -194,6 +194,19 @@ public:
 
     };
 
+	// virtual std::unordered_map<std::string, std::string> info() override { 
+    //     return {
+    //         {"System", "Commodore"},
+    //         {"Format", "D64"},
+    //         {"Media Type", "DISK"},
+    //         {"Tracks", getTrackCount()},
+    //         {"Sectors / Blocks", this.getSectorCount()},
+    //         {"Sector / Block Size", std::string(block_size)},
+    //         {"Error Info", (this.error_info) ? "Available" : "Not Available"},
+    //         {"Write Protected", ""},
+    //         {"DOS Format", this.getDiskFormat()}
+    //     }; 
+    // };
 
     uint16_t blocksFree() override;
 

@@ -45,10 +45,30 @@ public:
         partitions.clear();
         partitions.push_back(p);
         sectorsPerTrack = { 136 };
-        block_size = 256;
+
+        uint32_t size = containerStream->size();
+        switch (size + media_header_size) 
+        {
+            case 1392640: // 136 sectors per track (deprecated)
+                break;
+
+            case 1474560: // 144 sectors per track
+                sectorsPerTrack = { 144 };
+                break;
+        }
     };
 
-	virtual uint8_t speedZone( uint8_t track) override { return 0; };
+	// virtual std::unordered_map<std::string, std::string> info() override { 
+    //     return {
+    //         {"System", "Commodore"},
+    //         {"Format", "D8B"},
+    //         {"Media Type", "ARCHIVE"},
+    //         {"Tracks", getTrackCount()},
+    //         {"Sectors / Blocks", this.getSectorCount()},
+    //         {"Sector / Block Size", std::string(block_size)},
+    //         {"Format", "Backbit Archive"}
+    //     }; 
+    // };
 
 protected:
 
