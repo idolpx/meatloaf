@@ -96,7 +96,7 @@
 #define MEATLOAF_MEDIA_DFI
 
 #include "meat_io.h"
-#include "d64.h"
+#include "disk/d64.h"
 
 
 /********************************************************

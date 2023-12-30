@@ -19,6 +19,10 @@
 
 // Cartridge
 
+// Container
+#include "container/d8b.h"
+#include "container/dfi.h"
+
 // Device
 #include "device/flash.h"
 #include "device/sd.h"
@@ -29,10 +33,8 @@
 #include "disk/d80.h"
 #include "disk/d81.h"
 #include "disk/d82.h"
+#include "disk/d90.h"
 #include "disk/dnp.h"
-
-#include "disk/d8b.h"
-#include "disk/dfi.h"
 
 // File
 #include "file/p00.h"
@@ -86,6 +88,7 @@ D71FileSystem d71FS;
 D80FileSystem d80FS;
 D81FileSystem d81FS;
 D82FileSystem d82FS;
+D90FileSystem d90FS;
 DNPFileSystem dnpFS;
 
 D8BFileSystem d8bFS;
@@ -107,7 +110,7 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
     &sdFS,
 #endif
     &p00FS,
-    &d64FS, &d71FS, &d80FS, &d81FS, &d82FS, &dnpFS,
+    &d64FS, &d71FS, &d80FS, &d81FS, &d82FS, &d90FS, &dnpFS,
     &d8bFS, &dfiFS,
     &t64FS, &tcrtFS,
     &httpFS, &mlFS, &tnfsFS

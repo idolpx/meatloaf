@@ -123,9 +123,12 @@ class HttpIStream: public MStream {
     std::map<std::string, std::string> headers;
 
 public:
-    HttpIStream(std::string path, std::ios_base::openmode m, std::map<std::string, std::string> &h) {
-        mode = m;
+    HttpIStream(std::string path) {
         url = path;
+    };
+    HttpIStream(std::string path, std::ios_base::openmode m, std::map<std::string, std::string> &h) {
+        url = path;
+        mode = m;
         headers = h;
     };
 
