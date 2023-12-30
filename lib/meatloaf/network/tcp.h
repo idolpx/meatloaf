@@ -241,9 +241,8 @@ public:
     }
 
     bool open() override {
-        PeoplesUrlParser p;
-        p.parseUrl(url);
-        return socket.open(p.host.c_str(), p.getPort());
+        PeoplesUrlParser *p = PeoplesUrlParser::parseURL( url );
+        return socket.open(p->host.c_str(), p->getPort());
     }
 
     // MStream methods

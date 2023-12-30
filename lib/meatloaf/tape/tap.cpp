@@ -184,7 +184,7 @@ uint32_t TAPFile::size() {
     // use TAP to get size of the file in image
     auto image = ImageBroker::obtain<TAPIStream>(streamFile->url);
 
-    size_t blocks = (UINT16_FROM_LE_UINT16(image->entry.end_address) - UINT16_FROM_LE_UINT16(image->entry.start_address)) / image->block_size;
+    size_t bytes = UINT16_FROM_LE_UINT16(image->entry.end_address) - UINT16_FROM_LE_UINT16(image->entry.start_address);
 
-    return blocks;
+    return bytes;
 }

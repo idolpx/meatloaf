@@ -1,8 +1,9 @@
-// .URL - Meatloaf URL Links
+// ML:// - Meatloaf Server Protocol
 // 
 
-#ifndef MEATLOAF_LINK_URL
-#define MEATLOAF_LINK_URL
+
+#ifndef MEATLOAF_SCHEME_ML
+#define MEATLOAF_SCHEME_ML
 
 #include "network/http.h"
 
@@ -19,8 +20,6 @@ class MLFileSystem: public MFileSystem
         if ( path.size() == 0 )
             return nullptr;
 
-        // Read URL file
-
         //Debug_printv("MLFileSystem::getFile(%s)", path.c_str());
         PeoplesUrlParser *urlParser = PeoplesUrlParser::parseURL( path );
         std::string code = mstr::toUTF8(urlParser->name);
@@ -34,14 +33,14 @@ class MLFileSystem: public MFileSystem
         return new HttpFile(ml_url);
     }
 
-    bool handles(std::string fileName) override {
-        //Serial.printf("handles w dnp %s %d\r\n", fileName.rfind(".dnp"), fileName.length()-4);
-        return byExtension( ".webloc", fileName );
+    bool handles(std::string name) {
+        std::string pattern = "ml:";
+        return mstr::startsWith(name, pattern.c_str(), false);
     }
 
 public:
-    MLFileSystem(): MFileSystem("webloc") {};
+    MLFileSystem(): MFileSystem("meatloaf") {};
 };
 
 
-#endif // MEATLOAF_LINK_URL
+#endif // MEATLOAF_SCHEME_ML

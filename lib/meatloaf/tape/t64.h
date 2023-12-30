@@ -71,7 +71,7 @@ public:
         isDir = is_dir;
 
         media_image = name;
-        //mstr::toUTF8(media_image);
+        isPETSCII = true;
     };
     
     ~T64File() {

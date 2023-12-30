@@ -47,6 +47,8 @@
 
 // Service
 // #include "service/cs.h"
+#include "service/ml.h"
+
 
 // Tape
 #include "tape/t64.h"
@@ -66,7 +68,7 @@ SDFileSystem sdFS;
 
 // Scheme
 HttpFileSystem httpFS;
-//MLFileSystem mlFS;
+MLFileSystem mlFS;
 TNFSFileSystem tnfsFS;
 // IPFSFileSystem ipfsFS;
 // TNFSFileSystem tnfsFS;
@@ -108,7 +110,7 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
     &d64FS, &d71FS, &d80FS, &d81FS, &d82FS, &dnpFS,
     &d8bFS, &dfiFS,
     &t64FS, &tcrtFS,
-    &httpFS, &tnfsFS
+    &httpFS, &mlFS, &tnfsFS
 //    &ipfsFS, &tcpFS,
 //    &tnfsFS
 };
@@ -225,11 +227,10 @@ MFile* MFSOwner::File(std::string path) {
 
 std::string MFSOwner::existsLocal( std::string path )
 {
-    PeoplesUrlParser url;
-    url.parseUrl(path);
+    PeoplesUrlParser *url = PeoplesUrlParser::parseURL( path );
 
     // Debug_printv( "path[%s] name[%s] size[%d]", path.c_str(), url.name.c_str(), url.name.size() );
-    if ( url.name.size() == 16 )
+    if ( url->name.size() == 16 )
     {
         struct stat st;
         int i = stat(std::string(path).c_str(), &st);
@@ -240,8 +241,8 @@ std::string MFSOwner::existsLocal( std::string path )
             DIR *dir;
             struct dirent *ent;
 
-            std::string p = url.pathToFile();
-            std::string name = url.name;
+            std::string p = url->pathToFile();
+            std::string name = url->name;
             // Debug_printv( "pathToFile[%s] basename[%s]", p.c_str(), name.c_str() );
             if ((dir = opendir ( p.c_str() )) != NULL)
             {
@@ -314,7 +315,7 @@ MFile::MFile(std::string path) {
     //     path = "";
     // }
 
-    parseUrl(path);
+    resetURL(path);
 }
 
 MFile::MFile(std::string path, std::string name) : MFile(path + "/" + name) {
@@ -439,6 +440,7 @@ MFile* MFile::cd(std::string newDir)
     {
         newDir = mstr::toUTF8( newDir );
 
+        // Add new directory to path
         if ( !mstr::endsWith(url, "/") && newDir.size() )
             url.push_back('/');
 
@@ -447,7 +449,7 @@ MFile* MFile::cd(std::string newDir)
         // Add new directory to path
         MFile* newPath = MFSOwner::File(url + newDir);
 
-        if(mstr::endsWith(newDir,".url")) {
+        if(mstr::endsWith(newDir, ".url", false)) {
             // we need to get actual url
 
             //auto reader = Meat::New<MFile>(newDir);

@@ -19,28 +19,28 @@ class MLFileSystem: public MFileSystem
         if ( path.size() == 0 )
             return nullptr;
 
+        Debug_printv("path[%s]", path.c_str());
+
         // Read URL file
+        auto reader = Meat::New<MFile>(path);
+        auto istream = reader->meatStream();
 
-        //Debug_printv("MLFileSystem::getFile(%s)", path.c_str());
-        PeoplesUrlParser *urlParser = PeoplesUrlParser::parseURL( path );
-        std::string code = mstr::toUTF8(urlParser->name);
+        uint8_t url[istream->size()];
+        istream->read(url, istream->size());
 
-        //Debug_printv("url[%s]", urlParser.name.c_str());
-        std::string ml_url = "https://api.meatloaf.cc/?" + code;
-        //Debug_printv("ml_url[%s]", ml_url.c_str());
-        
-        //Debug_printv("url[%s]", ml_url.c_str());
+        Debug_printv("url[%s]", url);
+        std::string ml_url((char *)url);
 
         return new HttpFile(ml_url);
     }
 
     bool handles(std::string fileName) override {
         //Serial.printf("handles w dnp %s %d\r\n", fileName.rfind(".dnp"), fileName.length()-4);
-        return byExtension( ".webloc", fileName );
+        return byExtension( ".url", fileName );
     }
 
 public:
-    MLFileSystem(): MFileSystem("webloc") {};
+    MLFileSystem(): MFileSystem("url") {};
 };
 
 

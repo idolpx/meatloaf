@@ -106,8 +106,6 @@ bool D64IStream::deallocateBlock( uint8_t track, uint8_t sector)
 bool D64IStream::seekEntry( std::string filename )
 {
     uint32_t index = 1;
-    //mstr::rtrimA0(filename);
-    //filename = mstr::toPETSCII2(filename);
     mstr::replaceAll(filename, "\\", "/");
     bool wildcard =  ( mstr::contains(filename, "*") || mstr::contains(filename, "?") );
 
@@ -159,8 +157,6 @@ bool D64IStream::seekEntry( std::string filename )
 
 bool D64IStream::seekEntry( uint16_t index )
 {
-    bool r = false;
-
     // Calculate Sector offset & Entry offset
     // 8 Entries Per Sector, 32 bytes Per Entry
     index--;
@@ -175,11 +171,12 @@ bool D64IStream::seekEntry( uint16_t index )
     {
         // Start at first sector of directory
         next_track = 0;
-        r = seekSector( 
-            partitions[partition].directory_track,
-            partitions[partition].directory_sector,
-            partitions[partition].directory_offset
-        );
+        if ( !seekSector( 
+                partitions[partition].directory_track,
+                partitions[partition].directory_sector,
+                partitions[partition].directory_offset
+            )
+        ) return false;
 
         // Find sector with requested entry
         do
@@ -207,7 +204,7 @@ bool D64IStream::seekEntry( uint16_t index )
             if ( next_track == 0 )
                 return false;
 
-            Debug_printv("Follow link track[%d] sector[%d] entryOffset[%d]", next_track, next_sector, entryOffset);
+            //Debug_printv("Follow link track[%d] sector[%d] entryOffset[%d]", next_track, next_sector, entryOffset);
             if ( !seekSector( next_track, next_sector, entryOffset ) )
                 return false;
         }
@@ -233,7 +230,6 @@ bool D64IStream::seekEntry( uint16_t index )
 
 uint16_t D64IStream::blocksFree()
 {
-    bool r = false;
     uint16_t free_count = 0;
 
     for(uint8_t x = 0; x < partitions[partition].block_allocation_map.size(); x++)
@@ -241,14 +237,12 @@ uint16_t D64IStream::blocksFree()
         uint8_t bam[partitions[partition].block_allocation_map[x].byte_count];
         //Debug_printv("start_track[%d] end_track[%d]", block_allocation_map[x].start_track, block_allocation_map[x].end_track);
 
-        r = seekSector(
-            partitions[partition].block_allocation_map[x].track, 
-            partitions[partition].block_allocation_map[x].sector, 
-            partitions[partition].block_allocation_map[x].offset
-        );
-        // Seek failed
-        if ( !r )
-            return 0;
+        if ( !seekSector(
+                partitions[partition].block_allocation_map[x].track, 
+                partitions[partition].block_allocation_map[x].sector, 
+                partitions[partition].block_allocation_map[x].offset
+            )
+        ) return 0;
 
         for(uint8_t i = partitions[partition].block_allocation_map[x].start_track; i <= partitions[partition].block_allocation_map[x].end_track; i++)
         {
