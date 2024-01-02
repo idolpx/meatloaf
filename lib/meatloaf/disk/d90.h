@@ -1,6 +1,6 @@
 // .D90 - The D90 image is bit-for-bit copy of the hard drives in the D9090 and D9060
 //
-// https://vice-emu.sourceforge.io/vice_17.html#SEC388
+// https://vice-emu.sourceforge.io/vice_16.html#SEC429
 // http://www.baltissen.org/newhtm/diskimag.htm
 //
 
