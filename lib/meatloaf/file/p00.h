@@ -40,7 +40,6 @@ protected:
             seekHeader();
 
             m_length = ( containerStream->size() - sizeof(header) );
-            m_bytesAvailable = m_length;
 
             return true;
         }

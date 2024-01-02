@@ -90,7 +90,7 @@ uint16_t T64IStream::readFile(uint8_t* buf, uint16_t size) {
         bytesRead += containerStream->read(buf, size);
     }
 
-    m_bytesAvailable -= bytesRead;
+    m_position += bytesRead;
 
     return bytesRead;
 }
@@ -114,13 +114,12 @@ bool T64IStream::seekPath(std::string path) {
 
         // Calculate file size
         m_length = ( end_address - start_address ) + 2;
-        m_bytesAvailable = m_length;
         m_position = 0;
 
         // Set position to beginning of file
         containerStream->seek(entry.data_offset);
 
-        Debug_printv("File Size: size[%d] available[%d] position[%d]", m_length, m_bytesAvailable, m_position);
+        Debug_printv("File Size: size[%d] available[%d] position[%d]", m_length, available(), m_position);
 
         return true;
     }

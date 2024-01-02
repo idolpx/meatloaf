@@ -161,9 +161,9 @@ bool CServerIStream::open() {
             m_isOpen = false;
         }
         else {
-            m_bytesAvailable = buffer[0] + buffer[1]*256; // put len here
+            m_length = buffer[0] + buffer[1]*256; // put len here
             // if everything was ok
-            Serial.printf("CServer: file open, size: %d\r\n", m_bytesAvailable);
+            Serial.printf("CServer: file open, size: %d\r\n", m_length);
             m_isOpen = true;
         }
     }
@@ -172,21 +172,6 @@ bool CServerIStream::open() {
 };
 
 // MStream methods
-uint32_t CServerIStream::available() {
-    return m_bytesAvailable;
-};
-
-uint32_t CServerIStream::size() {
-    return m_bytesAvailable;
-};
-
-uint32_t CServerIStream::position() {
-    return m_position;
-};
-
-size_t CServerIStream::error() {
-    return 0;
-};
 
 uint32_t CServerIStream::write(const uint8_t *buf, uint32_t size) {
     return -1;
@@ -195,7 +180,6 @@ uint32_t CServerIStream::write(const uint8_t *buf, uint32_t size) {
 uint32_t CServerIStream::read(uint8_t* buf, uint32_t size)  {
     //Debug_printv("CServerIStream::read");
     auto bytesRead = CServerFileSystem::session.receive(buf, size);
-    m_bytesAvailable-=bytesRead;
     m_position+=bytesRead;
     //ledTogg(true);
     return bytesRead;

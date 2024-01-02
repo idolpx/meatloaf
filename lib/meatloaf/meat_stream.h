@@ -37,10 +37,9 @@ class MStream
 {
 protected:
     uint32_t m_length = 0;
-    uint32_t m_bytesAvailable = 0;
     uint32_t m_position = 0;
     uint8_t m_load_address[2] = {0, 0};
-    size_t m_error = 0;
+    uint8_t m_error = 0;
 
 public:
     virtual ~MStream() {};
@@ -60,11 +59,14 @@ public:
     };
 
     virtual uint32_t available() {
-        return m_bytesAvailable;
+        return m_length - m_position;
     };
 
     virtual uint32_t position() {
         return m_position;
+    }
+    virtual void position( uint32_t p) {
+        m_position = p;
     }
 
     virtual size_t error() {
@@ -79,13 +81,17 @@ public:
     }
 
     virtual bool eos()  {
-//        Debug_printv("m_length[%d] m_bytesAvailable[%d] m_position[%d]", m_length, m_bytesAvailable, m_position);
-        if ( m_bytesAvailable == 0 )
+//        Debug_printv("m_length[%d] m_bytesAvailable[%d] m_position[%d]", m_length, available(), m_position);
+        if ( available() == 0 )
             return true;
         
         return false;
     }
-    virtual void reset() {};
+    virtual void reset() 
+    {
+        m_length = block_size;
+        m_position = 0;
+    };
     
     virtual bool isOpen() = 0;
     virtual bool isBrowsable() { return false; };

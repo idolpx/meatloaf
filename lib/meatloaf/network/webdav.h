@@ -61,10 +61,7 @@ public:
 protected:
     std::string url;
     bool m_isOpen;
-    uint32_t m_length;
-    uint32_t m_bytesAvailable = 0;
-    uint32_t m_position = 0;
-       
+
 //    WiFiClient m_file;
 	MeatHttpClient m_http;
 };
@@ -102,9 +99,6 @@ public:
 protected:
     std::string url;
     bool m_isOpen;
-    uint32_t m_bytesAvailable = 0;
-    uint32_t m_length = 0;
-    uint32_t m_position = 0;
     bool isFriendlySkipper = false;
 
 //    WiFiClient m_file;
@@ -147,9 +141,6 @@ public:
 protected:
     std::string url;
     bool m_isOpen;
-    size_t m_bytesAvailable = 0;
-    size_t m_length = 0;
-    size_t m_position = 0;
     bool isFriendlySkipper = false;
     
 //    WiFiClient m_file;

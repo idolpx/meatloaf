@@ -92,7 +92,6 @@ uint32_t CBMImageStream::read(uint8_t* buf, uint32_t size) {
     }
 
     m_position += bytesRead;
-    m_bytesAvailable = m_length - m_position;
 
     return bytesRead;
 };

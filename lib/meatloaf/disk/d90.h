@@ -141,7 +141,13 @@ public:
     }
 
     bool handles(std::string fileName) override {
-        return byExtension(".d90", fileName);
+        return byExtension(
+            {
+                ".d90",
+                ".d60"
+            }, 
+            fileName
+        );
     }
 
     D90FileSystem(): MFileSystem("d90") {};

@@ -345,7 +345,6 @@ bool FlashIStream::open() {
         fseek(handle->file_h, 0, SEEK_END);
         //Debug_printv("IStream: past fseek 1");
         m_length = ftell(handle->file_h);
-        m_bytesAvailable = m_length;
         //Debug_printv("IStream: past ftell");
         fseek(handle->file_h, 0, SEEK_SET);
         //Debug_printv("IStream: past fseek 2");
@@ -365,14 +364,13 @@ uint32_t FlashIStream::read(uint8_t* buf, uint32_t size) {
     }
 
     uint32_t bytesRead = 0;
-    if ( size > m_bytesAvailable )
-        size = m_bytesAvailable;
+    if ( size > available() )
+        size = available();
     
     if ( size > 0 )
     {
         bytesRead = fread((void*) buf, 1, size, handle->file_h );
         m_position += bytesRead;
-        m_bytesAvailable = m_length - m_position;
     }
 
     return bytesRead;

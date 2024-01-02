@@ -7,6 +7,7 @@
 #include <map>
 #include <bitset>
 #include <unordered_map>
+#include <sstream>
 
 #include "../../include/debug.h"
 
@@ -65,10 +66,23 @@ public:
     virtual std::string readString( uint8_t size )
     {
         uint8_t b[size];
-        uint32_t r = containerStream->read( b, size );
-        return std::string((char *)b);
+        if ( containerStream->read( b, size ) )
+            return std::string((char *)b);
+        
+        return std::string();
     }
     // readStringUntil = (delimiter = 0x00) => this.containerStream.readStringUntil(delimiter);
+    virtual std::string readStringUntil( uint8_t delimiter = '\0' )
+    {
+        uint8_t b[1];
+        std::stringstream ss;
+        while( containerStream->read( b, 1 ) )
+        {
+            if ( b[0] == delimiter )
+                ss << b;
+        }
+        return ss.str();
+    }
 
     // seek = (offset) => this.containerStream.seek(offset + this.media_header_size);
     bool seek(uint32_t offset) override { return containerStream->seek(offset + media_header_size); }
@@ -86,7 +100,6 @@ public:
         seekCalled = false;
         m_position = 0;
         m_length = block_size;
-        m_bytesAvailable = block_size;
         //m_load_address = {0, 0};
     }
 

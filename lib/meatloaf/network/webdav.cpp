@@ -62,18 +62,6 @@
 //  * Ostream impls
 //  ********************************************************/
 
-// uint32_t WebDAVOStream::size() {
-//     return m_length;
-// };
-
-// uint32_t WebDAVOStream::available() {
-//     return m_bytesAvailable;
-// };
-
-// uint32_t WebDAVOStream::position() {
-//     return m_position;
-// }
-
 // bool WebDAVOStream::seek(uint32_t pos) {
 //     if(pos==m_position)
 //         return true;
@@ -91,7 +79,6 @@
 //         Debug_printv("stream opened[%s]", url.c_str());
 //         //m_file = m_http.getStream();  //Get the response payload as Stream
 //         m_position = pos;
-//         m_bytesAvailable = m_length-pos;
 //         return true;
 
 //     } else {
@@ -108,7 +95,6 @@
 //         // while(m_position < pos) {
 //         //  m_position+=m_file.readBytes(buffer, size);  <----------- trurn this on!!!!
 //         // }
-//         m_bytesAvailable = m_length-pos;
 
 //         return true;
 //     }
@@ -153,17 +139,6 @@
 // /********************************************************
 //  * Istream impls
 //  ********************************************************/
-// uint32_t WebDAVIStream::size() {
-//     return m_length;
-// };
-
-// uint32_t WebDAVIStream::available() {
-//     return m_bytesAvailable;
-// };
-
-// uint32_t WebDAVIStream::position() {
-//     return m_position;
-// }
 
 // bool WebDAVIStream::seek(uint32_t pos) {
 //     if(pos==m_position)
@@ -182,7 +157,6 @@
 //         Debug_printv("stream opened[%s]", url.c_str());
 //         //m_file = m_http.getStream();  //Get the response payload as Stream
 //         m_position = pos;
-//         m_bytesAvailable = m_length-pos;
 //         return true;
 
 //     } else {
@@ -199,7 +173,6 @@
 //         // while(m_position < pos) {
 //         //  m_position+=m_file.readBytes(buffer, size);  <----------- trurn this on!!!!
 //         // }
-//         m_bytesAvailable = m_length-pos;
 
 //         return true;
 //     }
@@ -235,7 +208,6 @@
 //     //m_file = m_http.getStream();  //Get the response payload as Stream
 //     m_length = stoi(m_http.get_header("content-length"));
 //     Debug_printv("length=%d", m_length);
-//     m_bytesAvailable = m_length;
 
 //     // Is this text?
 //     std::string ct = m_http.get_header("content-type").c_str();
@@ -247,7 +219,6 @@
 
 // uint32_t WebDAVIStream::read(uint8_t* buf, uint32_t size) {
 //     auto bytesRead= m_http.read( buf, size );
-//     m_bytesAvailable = m_http.available();
 //     m_position+=bytesRead;
 //     return bytesRead;
 // };

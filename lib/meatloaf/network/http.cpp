@@ -148,7 +148,6 @@ bool HttpIStream::open() {
 
     if ( r ) {
         m_length = m_http.m_length;
-        m_bytesAvailable = m_length;
     }
 
     return r;
@@ -171,14 +170,13 @@ bool HttpIStream::seek(uint32_t pos) {
 
 uint32_t HttpIStream::read(uint8_t* buf, uint32_t size) {
     uint32_t bytesRead = 0;
-    if ( size > m_bytesAvailable )
-        size = m_bytesAvailable;
+    if ( size > available() )
+        size = available();
     
     if ( size > 0 )
     {
         bytesRead = m_http.read(buf, size);
         m_position += bytesRead;
-        m_bytesAvailable = m_length - m_position;
     }
 
     return bytesRead;

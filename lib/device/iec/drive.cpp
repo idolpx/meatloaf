@@ -363,10 +363,24 @@ void iecDrive::iec_command()
     switch ( payload[0] )
     {
         case 'B':
-            // B-P buffer pointer
-            // B-A allocate bit in BAM not implemented
-            // B-F free bit in BAM not implemented
-            // B-E block execute impossible at this level of emulation!
+            if (payload[1] == '-')
+            {
+                // B-P buffer pointer
+                if (payload[2] == 'P')
+                {
+                    payload = mstr::drop(payload, 3);
+                    mstr::trim(payload);
+                    mstr::replaceAll(payload, "  ", " ");
+                    pti = util_tokenize_uint8(payload);
+                    Debug_printv("payload[%s] channel[%d] position[%d]", payload.c_str(), pti[0], pti[1]);
+
+                    auto stream = retrieveStream( pti[0] );
+                    stream->position( pti[1] );
+                }
+                // B-A allocate bit in BAM not implemented
+                // B-F free bit in BAM not implemented
+                // B-E block execute impossible at this level of emulation!
+            }
             //Error(ERROR_31_SYNTAX_ERROR);
             Debug_printv( "block/buffer");
         break;
@@ -416,6 +430,8 @@ void iecDrive::iec_command()
             if (payload[1] == '1') // User 1
             {
                 payload = mstr::drop(payload, 3);
+                mstr::trim(payload);
+                mstr::replaceAll(payload, "  ", " ");
                 pti = util_tokenize_uint8(payload);
                 Debug_printv("payload[%s] channel[%d] media[%d] track[%d] sector[%d]", payload.c_str(), pti[0], pti[1], pti[2], pti[3]);
 

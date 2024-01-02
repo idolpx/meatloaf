@@ -285,8 +285,8 @@ uint16_t D64IStream::readFile(uint8_t* buf, uint16_t size) {
     }
 
     uint16_t bytesRead = 0;
-    if ( size > m_bytesAvailable )
-        size = m_bytesAvailable;
+    if ( size > available() )
+        size = available();
     
     if ( size > 0 )
     {
@@ -330,7 +330,7 @@ bool D64IStream::seekPath(std::string path) {
     // return D64Image.seekFile(containerIStream, path);
     if ( mstr::endsWith(path,"#") ) // Direct Access Mode
     {
-        Debug_printv("Direct Access Mode track[0] sector[0] path[%s]", path.c_str());
+        Debug_printv("Direct Access Mode track[1] sector[0] path[%s]", path.c_str());
         seekCalled = false;
         return seekSector(1, 0);
     }
@@ -344,12 +344,11 @@ bool D64IStream::seekPath(std::string path) {
         uint8_t t = entry.start_track;
         uint8_t s = entry.start_sector;
         m_length = seekFileSize( t, s );
-        m_bytesAvailable = m_length;
 
         // Set position to beginning of file
         bool r = seekSector( t, s );
 
-        Debug_printv("File Size: blocks[%d] size[%d] available[%d] r[%d]", entry.blocks, m_length, m_bytesAvailable, r);
+        Debug_printv("File Size: blocks[%d] size[%d] available[%d] r[%d]", entry.blocks, m_length, available(), r);
 
         return r;
     }

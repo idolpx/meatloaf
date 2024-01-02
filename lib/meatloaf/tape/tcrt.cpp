@@ -96,7 +96,7 @@ uint16_t TCRTIStream::readFile(uint8_t* buf, uint16_t size) {
         bytesRead += containerStream->read(buf, size);
     }
 
-    m_bytesAvailable -= bytesRead;
+    m_position += bytesRead;
 
     return bytesRead;
 }
@@ -117,7 +117,6 @@ bool TCRTIStream::seekPath(std::string path) {
 
         // Calculate file size
         m_length = (entry.file_size[0] | (entry.file_size[1] << 8) | (entry.file_size[2] << 16)) + 2; // 2 bytes for load address
-        m_bytesAvailable = m_length;
 
         // Load Address
         m_load_address[0] = entry.file_load_address[0];
@@ -127,7 +126,7 @@ bool TCRTIStream::seekPath(std::string path) {
         uint32_t file_start_address = (0xD8 + (entry.file_start_address[0] << 8 | entry.file_start_address[1]));
         containerStream->seek(file_start_address);
 
-        Debug_printv("File Size: size[%d] available[%d]", m_length, m_bytesAvailable);
+        Debug_printv("File Size: size[%d] available[%d]", m_length, available());
         
         return true;
     }
