@@ -38,6 +38,7 @@
 
 // File
 #include "file/p00.h"
+#include "archive/archive_ml.h"
 
 // Network
 #include "network/http.h"
@@ -81,6 +82,7 @@ TNFSFileSystem tnfsFS;
 
 // File
 P00FileSystem p00FS;
+ArchiveContainerFileSystem archiveFS;
 
 // Disk
 D64FileSystem d64FS;
@@ -105,6 +107,7 @@ TCRTFileSystem tcrtFS;
 // put all available filesystems in this array - first matching system gets the file!
 // fist in list is default
 std::vector<MFileSystem*> MFSOwner::availableFS { 
+    &archiveFS, // extension-based FS have to be on top to be picked first, otherwise the scheme will pick them!
     &defaultFS,
 #ifdef SD_CARD
     &sdFS,
