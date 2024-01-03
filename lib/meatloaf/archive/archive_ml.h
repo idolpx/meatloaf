@@ -147,7 +147,6 @@ public:
 
     bool handles(std::string fileName)
     {
-        Debug_printv("[%s]", fileName.c_str());
         return byExtension(
             {
                 ".7z",
