@@ -13,16 +13,12 @@
 ssize_t myRead(struct archive *a, void *userData, const void **buff)
 {
     ArchiveStreamData *streamData = (ArchiveStreamData *)userData;
-    Debug_printf("srcStream pointer:%p\n", streamData->srcStream);
-    Debug_printf("Zip stream buffer allocated at:%p\n", streamData->srcBuffer);
-    Debug_printf("And attempt to call something on it...");
-    //Debug_printf("Zip src stream url:%s\n", streamData->srcStream->url.c_str());
     // 1. we have to call srcStr.read(...)
     ssize_t bc = streamData->srcStream->read(streamData->srcBuffer, ArchiveStream::buffSize);
-    Debug_printf("Past read");
+    Debug_printv("Past read");
     // 2. set *buff to the bufer read in 1.
     *buff = streamData->srcBuffer;
-    Debug_printf("Past setting buffer");
+    Debug_printv("Past setting buffer");
     // 3. return read bytes count
     return bc;
 }
@@ -74,8 +70,7 @@ ArchiveStream::ArchiveStream(std::shared_ptr<MStream> srcStr)
     archive_read_support_filter_all(a);
     archive_read_support_format_all(a);
     streamData.srcBuffer = new uint8_t[buffSize];
-    Debug_printf("Zip stream buffer allocated at:%p\n", streamData.srcBuffer);
-    Debug_printf("srcStream pointer:%p\n", streamData.srcStream);
+    Debug_printv("Stream constructor OK!");
 }
 
 ArchiveStream::~ArchiveStream()
@@ -83,6 +78,7 @@ ArchiveStream::~ArchiveStream()
     close();
     if (streamData.srcBuffer != nullptr)
         delete[] streamData.srcBuffer;
+    Debug_printv("Stream destructor OK!");
 }
 
 bool ArchiveStream::open()
@@ -94,6 +90,7 @@ bool ArchiveStream::open()
         int r = archive_read_open2(a, &streamData, NULL, myRead, myskip, myclose);
         if (r == ARCHIVE_OK)
             is_open = true;
+        Debug_printv("open called, result=%d! (OK should be 0!)", r);
     }
     return is_open;
 };
@@ -105,6 +102,7 @@ void ArchiveStream::close()
         archive_read_free(a);
         is_open = false;
     }
+    Debug_printv("Close called");
 }
 
 bool ArchiveStream::isOpen()
@@ -114,6 +112,7 @@ bool ArchiveStream::isOpen()
 
 uint32_t ArchiveStream::read(uint8_t *buf, uint32_t size)
 {
+    Debug_printv("Read called");
     // ok so here we will basically need to refill buff with consecutive
     // calls to srcStream.read, I assume buf is filled by myread callback
     size_t r = archive_read_data(a, buf, size); // calls myread?
@@ -243,53 +242,26 @@ bool ArchiveContainerFile::prepareDirListing()
         dirStream->close();
     }
 
+    Debug_printv("w prepare dir listing\n");
+
     dirStream = std::shared_ptr<MStream>(this->meatStream());
     a = archive_read_new();
     archive_read_support_filter_all(a);
     archive_read_support_format_all(a);
-    int r = archive_read_open2(a, dirStream.get(), NULL, myRead, myskip, myclose);
+
+    ArchiveStream* as = (ArchiveStream*)dirStream.get();
+
+    int r = archive_read_open2(a, &(as->streamData), NULL, myRead, myskip, myclose);
     if (r == ARCHIVE_OK)
     {
+        Debug_printv("Archive ok");
         return true;
     }
     else
     {
+        Debug_printv("Archive nok, error=%d",r);
         archive_read_free(a);
         a = nullptr;
         return false;
     }
 }
-
-// int     dup (int __fildes) {
-
-// }
-
-// int     pipe (int __fildes[2]) {
-
-// }
-
-// int posix_spawn_file_actions_init (posix_spawn_file_actions_t *) {
-
-// }
-
-// int posix_spawn_file_actions_addclose (posix_spawn_file_actions_t *, int) {
-
-// }
-
-// int posix_spawn_file_actions_adddup2 (posix_spawn_file_actions_t *, int, int) {
-
-// }
-
-// int posix_spawn_file_actions_destroy (posix_spawn_file_actions_t *) {
-
-// }
-
-// int posix_spawnp (pid_t * __restrict, const char * __restrict,
-// 	const posix_spawn_file_actions_t *, const posix_spawnattr_t * __restrict,
-// 	char * const [], char * const []) {
-
-// }
-
-// pid_t waitpid (pid_t, int *, int) {
-    
-// }

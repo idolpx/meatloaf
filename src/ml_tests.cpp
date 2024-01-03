@@ -104,10 +104,12 @@ void testDirectory(MFile* dir, bool verbose=false) {
         Debug_printf("%s: Not a directory!", dir->url.c_str());
         return;
     }
+    ld.check("After isDirectory");
 
     Debug_printf("* Listing %s\r\n", dir->url.c_str());
     Debug_printf("* pre get next file\r\n");
     auto e = dir->getNextFileInDir();
+    ld.check("After getNextFileinDir");
     Debug_printf("* past get next file\r\n");
 
     ld.check("Before loop");

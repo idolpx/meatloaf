@@ -50,7 +50,6 @@ class ArchiveStream : public MStream
     struct archive *a;
     bool is_open = false;
     uint32_t _position = 0;
-    ArchiveStreamData streamData;
 
 public:
     static const size_t buffSize = 4096;
@@ -85,6 +84,7 @@ public:
     virtual size_t error() override;
 
     virtual bool seek(uint32_t pos) override;
+    ArchiveStreamData streamData;
 
 protected:
 
