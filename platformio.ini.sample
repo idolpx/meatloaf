@@ -126,6 +126,7 @@ build_flags =
     ;-D DEBUG_TIMING
     ;-D NO_VIRTUAL_KEYBOARD
     ;-D DBUG2 ; enable monitor messages for a release build
+    ;-D RUN_TESTS
 
 [env:native]
 ; Add Code Coverage Reporting
