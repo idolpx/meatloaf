@@ -73,7 +73,7 @@ Visual studio code, and the platformio addon installed from the vscode store req
 - clone this repo
 - Copy platformio.ini.sample to platformio.ini
 - Edit platformio.ini to match your device and default wifi settings
-- Upload filesystem image
+- Upload filesystem image by clicking the alien head on left panel and selecting `lolin d32 pro` then `Platform` and then `Build Filesystem Image` and `Upload Filesystem Image` (this has to be done only once!)
 - Press the PlatformIO Upload icon arrow at the bottom in the status bar. This procedure will take some time to complete, and you should start seeing some logging info of the project being built (See picture below)
 
 ![platformio_upload](/images/ml-build-1.png)
