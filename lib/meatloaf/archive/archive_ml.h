@@ -145,22 +145,24 @@ public:
 
     bool handles(std::string fileName)
     {
-
         return byExtension(
-            {".7z",
-             ".arc",
-             ".ark",
-             ".bz2",
-             ".gz",
-             ".lha",
-             ".lzh",
-             ".lzx",
-             ".rar",
-             ".tar",
-             ".tgz",
-             ".xar",
-             ".zip"},
-            fileName);
+            {
+                ".7z",
+                ".arc",
+                ".ark",
+                ".bz2",
+                ".gz",
+                ".lha",
+                ".lzh",
+                ".lzx",
+                ".rar",
+                ".tar",
+                ".tgz",
+                ".xar",
+                ".zip"
+             },
+            fileName
+        );
     }
 
 private:
