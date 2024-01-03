@@ -11,6 +11,8 @@
 
 #include "meat_io.h"
 
+#include "../../../include/debug.h"
+
 // TODO: check how we can use archive_seek_callback, archive_passphrase_callback etc. to our benefit!
 
 /* Returns pointer and size of next block of data from archive. */
@@ -145,6 +147,7 @@ public:
 
     bool handles(std::string fileName)
     {
+        Debug_printv("[%s]", fileName.c_str());
         return byExtension(
             {
                 ".7z",
