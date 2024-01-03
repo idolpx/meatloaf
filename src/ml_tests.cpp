@@ -722,7 +722,7 @@ void runTestsSuite() {
     //detectLeaks();
 
     // ====== Per FS dir, read and write region =======================================
-
+    runFSTest("/message.zip", "/message.zip/message.txt");
     // working, uncomment if you want
     //runFSTest("/.sys", "README"); // TODO - let urlparser drop the last slash!
     //runFSTest("http://c64.meatloaf.cc/roms", "https://www.w3.org/TR/PNG/iso_8859-1.txt");

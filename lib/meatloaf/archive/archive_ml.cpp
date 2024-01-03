@@ -13,11 +13,14 @@
 ssize_t myRead(struct archive *a, void *userData, const void **buff)
 {
     ArchiveStreamData *streamData = (ArchiveStreamData *)userData;
-
+    Debug_printf("Zip src stream url:%s\n", streamData->srcStream->url.c_str());
+    Debug_printf("Zip stream buffer allocated at:%p\n", streamData->srcBuffer);
     // 1. we have to call srcStr.read(...)
     ssize_t bc = streamData->srcStream->read(streamData->srcBuffer, ArchiveStream::buffSize);
+    Debug_printf("Past read");
     // 2. set *buff to the bufer read in 1.
     *buff = streamData->srcBuffer;
+    Debug_printf("Past setting buffer");
     // 3. return read bytes count
     return bc;
 }
@@ -69,6 +72,7 @@ ArchiveStream::ArchiveStream(std::shared_ptr<MStream> srcStr)
     archive_read_support_filter_all(a);
     archive_read_support_format_all(a);
     streamData.srcBuffer = new uint8_t[buffSize];
+    Debug_printf("Zip stream buffer allocated at:%p\n", streamData.srcBuffer);
 }
 
 ArchiveStream::~ArchiveStream()
@@ -83,7 +87,7 @@ bool ArchiveStream::open()
     if (!is_open)
     {
         // callbacks set here:
-        //                                    open, read  , skip,   close
+        //                                         open, read  , skip,   close
         int r = archive_read_open2(a, &streamData, NULL, myRead, myskip, myclose);
         if (r == ARCHIVE_OK)
             is_open = true;
