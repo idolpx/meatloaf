@@ -61,19 +61,26 @@ public:
     bool seek(uint32_t pos);
     uint32_t read(uint8_t* buf, uint32_t size);
     uint32_t write(const uint8_t* buf, uint32_t size);
+
     bool m_isOpen = false;
     bool m_exists = false;
+
+    uint32_t available() {
+        return m_length - m_position;
+    }
+
     uint32_t m_length = 0;
-    uint32_t m_bytesAvailable = 0;
+    // uint32_t m_bytesAvailable = 0;
     uint32_t m_position = 0;
-    size_t m_error = 0;
+    // size_t m_error = 0;
+
     bool m_isWebDAV = false;
     bool m_isDirectory = false;
     bool isText = false;
     bool isFriendlySkipper = false;
     bool wasRedirected = false;
     std::string url;
-    //char response[HTTP_BLOCK_SIZE + 1] = { 0 };
+
     int lastRC = 0;
 };
 
@@ -137,10 +144,10 @@ public:
     };
 
     // MStream methods
-    uint32_t size() override;
-    uint32_t available() override;     
-    uint32_t position() override;
-    size_t error() override;
+    // uint32_t size() override;
+    // uint32_t available() override;     
+    // uint32_t position() override;
+    // size_t error() override;
 
     virtual bool seek(uint32_t pos);
 
