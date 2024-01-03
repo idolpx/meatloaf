@@ -189,7 +189,7 @@ MFile* MFSOwner::File(std::string path) {
     auto foundFS = testScan(begin, end, pathIterator);
 
     if(foundFS != nullptr) {
-        //Debug_printv("PATH: '%s' is in FS [%s]", path.c_str(), foundFS->symbol);
+        Debug_printv("PATH: '%s' is in FS [%s]", path.c_str(), foundFS->symbol);
         auto newFile = foundFS->getFile(path);
         //Debug_printv("newFile: '%s'", newFile->url.c_str());
 
@@ -216,12 +216,12 @@ MFile* MFSOwner::File(std::string path) {
                 auto wholePath = mstr::joinToString(&begin, &endHere, "/");
 
                 //auto cp = mstr::joinToString(&begin, &pathIterator, "/");
-                //Debug_printv("CONTAINER PATH WILL BE: '%s' ", wholePath.c_str());
+                Debug_printv("CONTAINER PATH WILL BE: '%s' ", wholePath.c_str());
                 newFile->streamFile = upperFS->getFile(wholePath); // skończy się na d64
-                //Debug_printv("CONTAINER: '%s' is in FS [%s]", newFile->streamFile->url.c_str(), upperFS->symbol);
+                Debug_printv("CONTAINER: '%s' is in FS [%s]", newFile->streamFile->url.c_str(), upperFS->symbol);
             }
             else {
-                //Debug_printv("WARNING!!!! CONTAINER FAILED FOR: '%s'", upperPath.c_str());
+                Debug_printv("WARNING!!!! CONTAINER FAILED FOR: '%s'", upperPath.c_str());
             }
         }
 
@@ -348,6 +348,8 @@ MStream* MFile::meatStream(std::ios_base::openmode mode) {
     MStream* decodedStream(createIStream(containerStream)); // wrap this stream into decoded stream, i.e. unpacked zip files
     decodedStream->url = this->url;
     Debug_printv("decodedStream isRandomAccess[%d] isBrowsable[%d]", decodedStream->isRandomAccess(), decodedStream->isBrowsable());
+
+    Debug_printv("pathInStream [%s]", pathInStream.c_str());
 
     if(decodedStream->isRandomAccess() && pathInStream != "") {
         bool foundIt = decodedStream->seekPath(this->pathInStream);

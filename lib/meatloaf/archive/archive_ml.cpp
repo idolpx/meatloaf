@@ -10,15 +10,18 @@
 // The read callback returns the number of bytes read, zero for end-of-file, or a negative failure code as above.
 // It also returns a pointer to the block of data read.
 // https://github.com/libarchive/libarchive/wiki/LibarchiveIO
+//
+// This callback is just a way to get bytes from srcStream into libarchive for processing
 ssize_t myRead(struct archive *a, void *userData, const void **buff)
 {
     ArchiveStreamData *streamData = (ArchiveStreamData *)userData;
     // 1. we have to call srcStr.read(...)
     ssize_t bc = streamData->srcStream->read(streamData->srcBuffer, ArchiveStream::buffSize);
-    Debug_printv("Past read");
+    //std::string dump((char*)streamData->srcBuffer, bc);
+    Debug_printv("Past read from container stream - got bytes:%d", bc);
+    //Debug_printv("Dumping bytes: %s", dump.c_str());
     // 2. set *buff to the bufer read in 1.
     *buff = streamData->srcBuffer;
-    Debug_printv("Past setting buffer");
     // 3. return read bytes count
     return bc;
 }
@@ -87,10 +90,19 @@ bool ArchiveStream::open()
     {
         // callbacks set here:
         //                                         open, read  , skip,   close
-        int r = archive_read_open2(a, &streamData, NULL, myRead, myskip, myclose);
+
+        archive_read_set_read_callback(a, myRead);
+        archive_read_set_skip_callback(a, myskip);
+        //archive_read_set_seek_callback(a, NULL);
+        archive_read_set_close_callback(a, myclose);
+        archive_read_set_callback_data(a, &streamData);
+        Debug_printv("Calling open1 on archive_read_new");
+        int r =  archive_read_open1(a);
+        Debug_printv("open called, result=%d! (OK should be 0!)", r);
+
+        //int r = archive_read_open2(a, &streamData, NULL, myRead, myskip, myclose);
         if (r == ARCHIVE_OK)
             is_open = true;
-        Debug_printv("open called, result=%d! (OK should be 0!)", r);
     }
     return is_open;
 };
@@ -112,12 +124,17 @@ bool ArchiveStream::isOpen()
 
 uint32_t ArchiveStream::read(uint8_t *buf, uint32_t size)
 {
-    Debug_printv("Read called");
+    Debug_printv("calling read, if not open, opening");
+    if(!is_open)
+        open();
+
     // ok so here we will basically need to refill buff with consecutive
     // calls to srcStream.read, I assume buf is filled by myread callback
-    size_t r = archive_read_data(a, buf, size); // calls myread?
-    _position += r;
-    return r;
+    // size_t r = archive_read_data(a, buf, size); // calls myread?
+    // Debug_printv("After calling archive_read_data, RC=%d", r);
+    // _position += r;
+    // return r;
+    return 0;
 }
 
 uint32_t ArchiveStream::write(const uint8_t *buf, uint32_t size)
@@ -129,12 +146,15 @@ uint32_t ArchiveStream::write(const uint8_t *buf, uint32_t size)
 // d64, d74, d81, dnp, etc.
 bool ArchiveStream::seekPath(std::string path)
 {
+    Debug_printv("seekPath called for path: %s", path.c_str());
     struct archive_entry *entry;
     while (archive_read_next_header(a, &entry) == ARCHIVE_OK)
     {
         std::string entryName = archive_entry_pathname(entry);
-        if (mstr::compare(path, entryName))
+        if (mstr::compare(path, entryName)) {
+            Debug_printv("seekPath found entry: %s", entryName.c_str());
             return true;
+        }
     }
     return false;
 };
@@ -185,7 +205,9 @@ bool ArchiveStream::seek(uint32_t pos)
 MStream *ArchiveContainerFile::createIStream(std::shared_ptr<MStream> containerIstream)
 {
     // TODO - we can get password from this URL and pass it as a parameter to this constructor
-    return new ArchiveStream(containerIstream);
+    Debug_printv("calling createIStream for ArchiveContainerFile");
+    auto stream = new ArchiveStream(containerIstream);
+    return stream;
 }
 
 // archive file is always a directory
@@ -213,9 +235,12 @@ MFile *ArchiveContainerFile::getNextFileInDir()
 
     if (a != nullptr)
     {
+        Debug_printv("getNextFileInDir calling archive_read_next_header");
         if (archive_read_next_header(a, &entry) == ARCHIVE_OK)
         {
-            auto newFile = MFSOwner::File(archive_entry_pathname(entry));
+            Debug_printv("getNextFileInDir found entry: %s", archive_entry_pathname(entry));
+            auto parent = this->cd(archive_entry_pathname(entry));
+            auto newFile = MFSOwner::File(parent);
             // TODO - we can probably fill newFile with some info that is
             // probably available in archive_entry structure!
             //newFile->size(archive_entry_size(entry)); // etc.
@@ -224,6 +249,7 @@ MFile *ArchiveContainerFile::getNextFileInDir()
         }
         else
         {
+            Debug_printv("getNextFileInDir found no more entries, freeing archive");
             archive_read_free(a);
             a = nullptr;
             return nullptr;
@@ -251,15 +277,16 @@ bool ArchiveContainerFile::prepareDirListing()
 
     ArchiveStream* as = (ArchiveStream*)dirStream.get();
 
+    Debug_printv("Calling open2 on archive_read_new");
     int r = archive_read_open2(a, &(as->streamData), NULL, myRead, myskip, myclose);
     if (r == ARCHIVE_OK)
     {
-        Debug_printv("Archive ok");
+        Debug_printv("opening Archive for dir ok");
         return true;
     }
     else
     {
-        Debug_printv("Archive nok, error=%d",r);
+        Debug_printv("opening Archive for dir nok, error=%d",r);
         archive_read_free(a);
         a = nullptr;
         return false;

@@ -86,6 +86,8 @@ public:
     virtual bool seek(uint32_t pos) override;
     ArchiveStreamData streamData;
 
+    bool isRandomAccess() override { return true; };
+
 protected:
 
 

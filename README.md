@@ -59,6 +59,7 @@ Current internet enabled programs include:
 - ISS tracking application
 - Chuck Norris jokes client
 - Terminal client
+- You can find more internet apps using `LOAD"ML:$",8`
 
 ## Many devices in one
 

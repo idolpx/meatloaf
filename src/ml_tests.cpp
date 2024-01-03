@@ -125,7 +125,7 @@ void testDirectory(MFile* dir, bool verbose=false) {
             if(verbose)
                 dumpFileProperties(entry.get());
             else
-                Debug_printf("'%s'\r\n", entry->url.c_str());
+                Debug_printf("'========> got file: %s'\r\n", entry->url.c_str());
             ld.check("Pre reset");
             entry.reset(dir->getNextFileInDir());
             ld.check("Post reset");
@@ -569,6 +569,8 @@ void runFSTest(std::string dirPath, std::string filePath) {
         Debug_printf("*** WARNING - %s instance couldn't be created!", testDir->url.c_str());
     }
 
+    Debug_printf("Now testing file reader");
+
     if(testFile != nullptr) {
         dumpFileProperties(testFile.get());
         testReader(testFile.get());
@@ -724,7 +726,7 @@ void runTestsSuite() {
     //detectLeaks();
 
     // ====== Per FS dir, read and write region =======================================
-    runFSTest("/message.zip", "/message.zip/message.txt");
+    runFSTest("/message.zip", "/message.zip/trumpeteer.txt");
     // working, uncomment if you want
     //runFSTest("/.sys", "README"); // TODO - let urlparser drop the last slash!
     //runFSTest("http://c64.meatloaf.cc/roms", "https://www.w3.org/TR/PNG/iso_8859-1.txt");

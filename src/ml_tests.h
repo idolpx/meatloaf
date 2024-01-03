@@ -60,7 +60,7 @@ public:
     void finish() {
         uint32_t memNow = esp_get_free_internal_heap_size();
         if(memNow < startMem) {
-            Debug_printf("[E:LEAK:%s] %d sorry to say, but it leaked: %d bytes\r\n", tag.c_str(), memNow-startMem);
+            Debug_printf("[E:LEAK:%s] sorry to say, but it leaked: %d bytes\r\n", tag.c_str(), memNow-startMem);
         }
     }
 };
