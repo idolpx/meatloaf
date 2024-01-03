@@ -2,7 +2,7 @@
 
 #include "punycode.h"
 #include <string>
-// #include "../lib/utils/string_utils.cpp"
+#include "../lib/utils/string_utils.cpp"
 
 void setUp(void)
 {
