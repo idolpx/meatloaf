@@ -60,6 +60,20 @@ int64_t myskip(struct archive *a, void *userData, int64_t request)
     }
 }
 
+int64_t myseek(struct archive *a, void *userData, int64_t offset, int whence)
+{
+    MStream *src_str = (MStream *)userData;
+    if (src_str->isOpen())
+    {
+        bool rc = src_str->seek(offset, whence);
+        return (rc) ? offset : ARCHIVE_WARN;
+    }
+    else
+    {
+        return ARCHIVE_FATAL;
+    }
+}
+
 /********************************************************
  * Streams implementations
  ********************************************************/
