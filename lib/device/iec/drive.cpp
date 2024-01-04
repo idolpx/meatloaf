@@ -945,8 +945,8 @@ void iecDrive::sendListing()
     else
     {
         // Send listing header from media file
-        if ( !entry.isPETSCII )
-            media_header = mstr::toPETSCII2( media_header );
+        if ( !entry->isPETSCII )
+            _base->media_header = mstr::toPETSCII2( _base->media_header );
 
         byte_count += sendHeader(_base->media_header.c_str(), _base->media_id.c_str());
         if ( IEC.flags & ERROR ) return;
