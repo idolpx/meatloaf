@@ -171,6 +171,7 @@ bool ArchiveStream::seekPath(std::string path)
     {
         std::string entryFilename = archive_entry_pathname(entry);
         m_length = archive_entry_size(entry);
+        m_position = 0;
         //archive_entry_filetype(entry);
 
         Debug_printv("filename[%s] entry.filename[%.16s] size[%d] available[%d]", path.c_str(), entryFilename.c_str(), m_length, available());
@@ -261,6 +262,7 @@ MFile *ArchiveContainerFile::getNextFileInDir()
         // TODO - we can probably fill newFile with some info that is
         // probably available in archive_entry structure!
         //newFile->size(archive_entry_size(entry)); // etc.
+        m_length = archive_entry_size(entry);
 
         return newFile;
     }
@@ -274,6 +276,11 @@ MFile *ArchiveContainerFile::getNextFileInDir()
         dirIsOpen = false;
         return nullptr;
     }
+}
+
+uint32_t ArchiveContainerFile::size()
+{
+    return m_length;
 }
 
 bool ArchiveContainerFile::prepareDirListing()

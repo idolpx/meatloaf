@@ -49,7 +49,6 @@ class ArchiveStream : public MStream
 {
     struct archive *a;
     bool is_open = false;
-    //uint32_t _position = 0;
 
 public:
     static const size_t buffSize = 4096;
@@ -116,13 +115,14 @@ public:
 
     bool mkDir() override { return false; }
     bool exists() override { return true; }
-    uint32_t size() override { return 0; }
+    uint32_t size() override;
     bool remove() override { return true; }
     bool rename(std::string dest) { return true; }
     time_t getLastWrite() override { return 0; }
     time_t getCreationTime() override { return 0; }
 
 private:
+    uint32_t m_length = 0;
     bool prepareDirListing();
 
     bool isDir = true;

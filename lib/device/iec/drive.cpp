@@ -232,8 +232,6 @@ void iecDrive::iec_open()
         payload = mstr::drop(payload, 2);
         if ( payload[0] == ':' || payload[0] == ' ' )
             payload = mstr::drop(payload, 1);
-        
-        payload = mstr::toUTF8(payload);
     }
 
     if ( payload.length() )
@@ -241,6 +239,7 @@ void iecDrive::iec_open()
         if ( payload[0] == '$' ) 
             payload.clear();
 
+        payload = mstr::toUTF8(payload);
         auto n = _base->cd( payload );
         if ( n != nullptr )
             _base.reset( n );
@@ -946,6 +945,9 @@ void iecDrive::sendListing()
     else
     {
         // Send listing header from media file
+        if ( !entry.isPETSCII )
+            media_header = mstr::toPETSCII2( media_header );
+
         byte_count += sendHeader(_base->media_header.c_str(), _base->media_id.c_str());
         if ( IEC.flags & ERROR ) return;
     }
