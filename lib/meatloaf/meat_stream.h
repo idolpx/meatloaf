@@ -108,6 +108,7 @@ public:
             return seek(pos);
         }
         else if(mode == SEEK_CUR) {
+            if(pos == 0) return true;
             return seek(position()+pos);
         }
         else {

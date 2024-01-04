@@ -47,7 +47,6 @@ public:
 
 class ArchiveStream : public MStream
 {
-    struct archive *a;
     bool is_open = false;
 
 public:
@@ -73,6 +72,7 @@ public:
 
     virtual bool seek(uint32_t pos) override;
     ArchiveStreamData streamData;
+    struct archive *a;
 
     bool isRandomAccess() override { return true; };
 
@@ -88,7 +88,11 @@ private:
 
 class ArchiveContainerFile : public MFile
 {
-    struct archive *a = nullptr;
+    struct archive *getArchive() {
+        ArchiveStream* as = (ArchiveStream*)dirStream.get();
+        return as->a;
+    }
+    
     std::shared_ptr<MStream> dirStream = nullptr; // a stream that is able to serve bytes of this archive
 
 public:

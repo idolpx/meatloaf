@@ -18,7 +18,7 @@ ssize_t myRead(struct archive *a, void *userData, const void **buff)
     // 1. we have to call srcStr.read(...)
     ssize_t bc = streamData->srcStream->read(streamData->srcBuffer, ArchiveStream::buffSize);
     //std::string dump((char*)streamData->srcBuffer, bc);
-    Debug_printv("Past read from container stream - got bytes:%d", bc);
+    Debug_printv("Libarch pulling data from src MStream, got bytes:%d", bc);
     //Debug_printv("Dumping bytes: %s", dump.c_str());
     // 2. set *buff to the bufer read in 1.
     *buff = streamData->srcBuffer;
@@ -29,6 +29,8 @@ ssize_t myRead(struct archive *a, void *userData, const void **buff)
 int myclose(struct archive *a, void *userData)
 {
     ArchiveStreamData *src_str = (ArchiveStreamData *)userData;
+    
+    Debug_printv("Libarch wants to close, but we do nothing here...");
 
     // do we want to close srcStream here???
     return (ARCHIVE_OK);
@@ -48,7 +50,7 @@ If skipping is not provided or fails, libarchive will call the read() function a
 // https://github.com/libarchive/libarchive/wiki/LibarchiveIO
 int64_t myskip(struct archive *a, void *userData, int64_t request)
 {
-    Debug_printv("skip requested, skipping %d bytes", request);
+    Debug_printv("Libarch wants to skip %d bytes", request);
     ArchiveStreamData *streamData = (ArchiveStreamData *)userData;
 
     if (streamData->srcStream->isOpen())
@@ -58,23 +60,24 @@ int64_t myskip(struct archive *a, void *userData, int64_t request)
     }
     else
     {
+        Debug_printv("ERROR! skip failed");
         return ARCHIVE_FATAL;
     }
 }
 
 int64_t myseek(struct archive *a, void *userData, int64_t offset, int whence)
 {
-    Debug_printv("seek requested, offset=%d, whence=%d", offset, whence);
+    Debug_printv("Libarch requests seek, offset=%d, whence=%d (0=begin, 1=curr, 2=end)", offset, whence);
     ArchiveStreamData *streamData = (ArchiveStreamData *)userData;
 
     if (streamData->srcStream->isOpen())
     {
         bool rc = streamData->srcStream->seek(offset, whence);
-        Debug_printv("seek success=%d", rc);
         return (rc) ? offset : ARCHIVE_WARN;
     }
     else
     {
+        Debug_printv("ERROR! seek failed");
         return ARCHIVE_FATAL;
     }
 }
@@ -92,7 +95,6 @@ ArchiveStream::ArchiveStream(std::shared_ptr<MStream> srcStr)
     archive_read_support_filter_all(a);
     archive_read_support_format_all(a);
     streamData.srcBuffer = new uint8_t[buffSize];
-    Debug_printv("Stream constructor OK!");
 }
 
 ArchiveStream::~ArchiveStream()
@@ -107,16 +109,15 @@ bool ArchiveStream::open()
 {
     if (!is_open)
     {
-
         // TODO enable seek only if the stream is random access
         archive_read_set_read_callback(a, myRead);
         archive_read_set_skip_callback(a, myskip);
         archive_read_set_seek_callback(a, myseek);
         archive_read_set_close_callback(a, myclose);
         archive_read_set_callback_data(a, &streamData);
-        Debug_printv("Calling open1 on archive_read_new");
+        Debug_printv("== BEGIN Calling open1 on archive instance ==========================");
         int r =  archive_read_open1(a);
-        Debug_printv("open called, result=%d! (OK should be 0!)", r);
+        Debug_printv("== END opening archive result=%d! (OK should be 0!) =======================================", r);
 
         //int r = archive_read_open2(a, &streamData, NULL, myRead, myskip, myclose);
         if (r == ARCHIVE_OK)
@@ -142,15 +143,14 @@ bool ArchiveStream::isOpen()
 
 uint32_t ArchiveStream::read(uint8_t *buf, uint32_t size)
 {
-    Debug_printv("calling read, if not open, opening");
-    if(!is_open)
-        open();
+    Debug_printv("calling read");
 
     // ok so here we will basically need to refill buff with consecutive
     // calls to srcStream.read, I assume buf is filled by myread callback
     size_t r = archive_read_data(a, buf, size); // calls myread?
     Debug_printv("After calling archive_read_data, RC=%d", r);
-    m_position += r;
+    if(r>0)
+        m_position += r;
     return r;
 }
 
@@ -222,8 +222,10 @@ bool ArchiveStream::seek(uint32_t pos)
 MStream *ArchiveContainerFile::createIStream(std::shared_ptr<MStream> containerIstream)
 {
     // TODO - we can get password from this URL and pass it as a parameter to this constructor
-    Debug_printv("calling createIStream for ArchiveContainerFile");
+    Debug_printv("calling createIStream for ArchiveContainerFile, we should return open stream");
     auto stream = new ArchiveStream(containerIstream);
+    stream->open();
+
     return stream;
 }
 
@@ -240,8 +242,6 @@ bool ArchiveContainerFile::isDirectory()
 bool ArchiveContainerFile::rewindDirectory()
 {
     dirIsOpen = true;
-    if (a != nullptr)
-        archive_read_free(a);
 
     return prepareDirListing();
 }
@@ -254,7 +254,7 @@ MFile *ArchiveContainerFile::getNextFileInDir()
     struct archive_entry *entry;
 
     Debug_printv("getNextFileInDir calling archive_read_next_header");
-    if (archive_read_next_header(a, &entry) == ARCHIVE_OK)
+    if (archive_read_next_header(getArchive(), &entry) == ARCHIVE_OK)
     {
         Debug_printv("getNextFileInDir found entry: %s", archive_entry_pathname(entry));
         auto parent = this->cd(archive_entry_pathname(entry));
@@ -267,9 +267,8 @@ MFile *ArchiveContainerFile::getNextFileInDir()
     }
     else
     {
-        Debug_printv("getNextFileInDir found no more entries, freeing archive");
-        archive_read_free(a);
-        a = nullptr;
+        Debug_printv("getNextFileInDir found no more entries, closing the stream");
+        dirStream->close();
 
         //Debug_printv( "END OF DIRECTORY");
         dirIsOpen = false;
@@ -289,35 +288,43 @@ bool ArchiveContainerFile::prepareDirListing()
         dirStream->close();
     }
 
-    Debug_printv("w prepare dir listing\n");
+    Debug_printv("w prepare dir listing");
 
     dirStream = std::shared_ptr<MStream>(this->meatStream());
-    a = archive_read_new();
-    archive_read_support_filter_all(a);
-    archive_read_support_format_all(a);
-
     ArchiveStream* as = (ArchiveStream*)dirStream.get();
-
-    // TODO enable seek only if the stream is random access
-    archive_read_set_read_callback(a, myRead);
-    archive_read_set_skip_callback(a, myskip);
-    archive_read_set_seek_callback(a, myseek);
-    archive_read_set_close_callback(a, myclose);
-    archive_read_set_callback_data(a, &(as->streamData));
-    Debug_printv("Calling open1 on prepareDirListing");
-    int r =  archive_read_open1(a);
-    Debug_printv("open called, result=%d! (OK should be 0!)", r);
-
-    if (r == ARCHIVE_OK)
+    if(dirStream->isOpen())
     {
-        Debug_printv("opening Archive for dir ok");
         return true;
     }
     else
     {
-        Debug_printv("opening Archive for dir nok, error=%d",r);
-        archive_read_free(a);
-        a = nullptr;
+        Debug_printv("opening Archive for dir nok");
         return false;
     }
+
+    // a = archive_read_new();
+    // archive_read_support_filter_all(a);
+    // archive_read_support_format_all(a);
+
+    // // TODO enable seek only if the stream is random access
+    // archive_read_set_read_callback(a, myRead);
+    // archive_read_set_skip_callback(a, myskip);
+    // archive_read_set_seek_callback(a, myseek);
+    // archive_read_set_close_callback(a, myclose);
+    // archive_read_set_callback_data(a, &(((ArchiveStream*)dirStream.get())->streamData));
+    // Debug_printv("== BEGIN Calling open1 on prepareDirListing ==========================");
+    // int r =  archive_read_open1(a);
+    // Debug_printv("== END open called, result=%d! (OK should be 0!) =================================", r);
+
+    // if (r == ARCHIVE_OK)
+    // {
+    //     return true;
+    // }
+    // else
+    // {
+    //     Debug_printv("opening Archive for dir nok, error=%d",r);
+    //     archive_read_free(a);
+    //     a = nullptr;
+    //     return false;
+    // }
 }
