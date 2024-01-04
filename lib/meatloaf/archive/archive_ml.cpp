@@ -301,30 +301,4 @@ bool ArchiveContainerFile::prepareDirListing()
         Debug_printv("opening Archive for dir nok");
         return false;
     }
-
-    // a = archive_read_new();
-    // archive_read_support_filter_all(a);
-    // archive_read_support_format_all(a);
-
-    // // TODO enable seek only if the stream is random access
-    // archive_read_set_read_callback(a, myRead);
-    // archive_read_set_skip_callback(a, myskip);
-    // archive_read_set_seek_callback(a, myseek);
-    // archive_read_set_close_callback(a, myclose);
-    // archive_read_set_callback_data(a, &(((ArchiveStream*)dirStream.get())->streamData));
-    // Debug_printv("== BEGIN Calling open1 on prepareDirListing ==========================");
-    // int r =  archive_read_open1(a);
-    // Debug_printv("== END open called, result=%d! (OK should be 0!) =================================", r);
-
-    // if (r == ARCHIVE_OK)
-    // {
-    //     return true;
-    // }
-    // else
-    // {
-    //     Debug_printv("opening Archive for dir nok, error=%d",r);
-    //     archive_read_free(a);
-    //     a = nullptr;
-    //     return false;
-    // }
 }
