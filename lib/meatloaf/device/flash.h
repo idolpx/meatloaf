@@ -13,7 +13,6 @@
 #include <dirent.h>
 #include <string.h>
 
-
 #include "../../include/debug.h"
 
 /********************************************************

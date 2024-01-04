@@ -1,10 +1,12 @@
 #include "flash.h"
 
-#include "../../../include/debug.h"
-
 #include <sys/stat.h>
 #include <unistd.h>
+#include <sstream>
+#include <iomanip>
 
+#include "../../../include/debug.h"
+#include "string_utils.h"
 
 /********************************************************
  * MFileSystem implementations
@@ -345,6 +347,7 @@ bool FlashIStream::open() {
         fseek(handle->file_h, 0, SEEK_END);
         //Debug_printv("IStream: past fseek 1");
         m_length = ftell(handle->file_h);
+        m_position = 0;
         //Debug_printv("IStream: past ftell");
         fseek(handle->file_h, 0, SEEK_SET);
         //Debug_printv("IStream: past fseek 2");
@@ -370,6 +373,9 @@ uint32_t FlashIStream::read(uint8_t* buf, uint32_t size) {
     if ( size > 0 )
     {
         bytesRead = fread((void*) buf, 1, size, handle->file_h );
+        // Debug_printv("bytesRead[%d]", bytesRead);
+        // auto hex = mstr::toHex(buf, bytesRead);
+        // Debug_printv("[%s]", hex.c_str());
         m_position += bytesRead;
     }
 

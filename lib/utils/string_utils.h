@@ -52,8 +52,9 @@ namespace mstr {
 
     // void toASCII(std::string &s);
     // void toPETSCII(std::string &s);
-    std::string toUTF8(std::string &petsciiInput);
-    std::string toPETSCII2(std::string &utfInputString);
+    std::string toUTF8(const std::string &petsciiInput);
+    std::string toPETSCII2(const std::string &utfInputString);
+    std::string toHex(const uint8_t *input, size_t size);
     std::string toHex(const std::string &input);
 
     bool isText(std::string &s);
