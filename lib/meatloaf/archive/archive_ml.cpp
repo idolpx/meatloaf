@@ -262,7 +262,6 @@ MFile *ArchiveContainerFile::getNextFileInDir()
         // TODO - we can probably fill newFile with some info that is
         // probably available in archive_entry structure!
         //newFile->size(archive_entry_size(entry)); // etc.
-        m_length = archive_entry_size(entry);
 
         return newFile;
     }

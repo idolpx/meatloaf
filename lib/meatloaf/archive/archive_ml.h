@@ -122,7 +122,6 @@ public:
     time_t getCreationTime() override { return 0; }
 
 private:
-    uint32_t m_length = 0;
     bool prepareDirListing();
 
     bool isDir = true;
