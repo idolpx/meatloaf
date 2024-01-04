@@ -160,6 +160,7 @@ uint32_t ArchiveStream::read(uint8_t *buf, uint32_t size)
         if(leftovers.size() <= size) {
             // ok, we can fit everything that was lerft and new data to our buffer
             m_position += leftovers.size();
+            leftovers.clear();
             return leftovers.size();
         }
         else {
