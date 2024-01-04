@@ -94,7 +94,7 @@ class ArchiveContainerFile : public MFile
 public:
     ArchiveContainerFile(std::string path) : MFile(path)
     {
-        media_header = name;
+        // media_header = name;
         media_archive = name;
     };
 
