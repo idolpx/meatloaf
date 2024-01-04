@@ -279,7 +279,7 @@ MFile *ArchiveContainerFile::getNextFileInDir()
 
 uint32_t ArchiveContainerFile::size()
 {
-    return m_length;
+    return 0;
 }
 
 bool ArchiveContainerFile::prepareDirListing()
