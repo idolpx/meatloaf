@@ -48,10 +48,12 @@ If skipping is not provided or fails, libarchive will call the read() function a
 // https://github.com/libarchive/libarchive/wiki/LibarchiveIO
 int64_t myskip(struct archive *a, void *userData, int64_t request)
 {
-    MStream *src_str = (MStream *)userData;
-    if (src_str->isOpen())
+    Debug_printv("skip requested, skipping %d bytes", request);
+    ArchiveStreamData *streamData = (ArchiveStreamData *)userData;
+
+    if (streamData->srcStream->isOpen())
     {
-        bool rc = src_str->seek(request, SEEK_CUR);
+        bool rc = streamData->srcStream->seek(request, SEEK_CUR);
         return (rc) ? request : ARCHIVE_WARN;
     }
     else
@@ -62,10 +64,13 @@ int64_t myskip(struct archive *a, void *userData, int64_t request)
 
 int64_t myseek(struct archive *a, void *userData, int64_t offset, int whence)
 {
-    MStream *src_str = (MStream *)userData;
-    if (src_str->isOpen())
+    Debug_printv("seek requested, offset=%d, whence=%d", offset, whence);
+    ArchiveStreamData *streamData = (ArchiveStreamData *)userData;
+
+    if (streamData->srcStream->isOpen())
     {
-        bool rc = src_str->seek(offset, whence);
+        bool rc = streamData->srcStream->seek(offset, whence);
+        Debug_printv("seek success=%d", rc);
         return (rc) ? offset : ARCHIVE_WARN;
     }
     else
@@ -102,12 +107,11 @@ bool ArchiveStream::open()
 {
     if (!is_open)
     {
-        // callbacks set here:
-        //                                         open, read  , skip,   close
 
+        // TODO enable seek only if the stream is random access
         archive_read_set_read_callback(a, myRead);
         archive_read_set_skip_callback(a, myskip);
-        //archive_read_set_seek_callback(a, NULL);
+        archive_read_set_seek_callback(a, myseek);
         archive_read_set_close_callback(a, myclose);
         archive_read_set_callback_data(a, &streamData);
         Debug_printv("Calling open1 on archive_read_new");
@@ -291,8 +295,16 @@ bool ArchiveContainerFile::prepareDirListing()
 
     ArchiveStream* as = (ArchiveStream*)dirStream.get();
 
-    Debug_printv("Calling open2 on archive_read_new");
-    int r = archive_read_open2(a, &(as->streamData), NULL, myRead, myskip, myclose);
+    // TODO enable seek only if the stream is random access
+    archive_read_set_read_callback(a, myRead);
+    archive_read_set_skip_callback(a, myskip);
+    archive_read_set_seek_callback(a, myseek);
+    archive_read_set_close_callback(a, myclose);
+    archive_read_set_callback_data(a, &(as->streamData));
+    Debug_printv("Calling open1 on prepareDirListing");
+    int r =  archive_read_open1(a);
+    Debug_printv("open called, result=%d! (OK should be 0!)", r);
+
     if (r == ARCHIVE_OK)
     {
         Debug_printv("opening Archive for dir ok");
