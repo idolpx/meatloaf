@@ -141,17 +141,41 @@ bool ArchiveStream::isOpen()
     return is_open;
 };
 
+std::vector<uint8_t> leftovers;
+
 uint32_t ArchiveStream::read(uint8_t *buf, uint32_t size)
 {
     Debug_printv("calling read");
+    size_t incomingSize;
+    const void *incomingBuffer;
 
-    // ok so here we will basically need to refill buff with consecutive
-    // calls to srcStream.read, I assume buf is filled by myread callback
-    size_t r = archive_read_data(a, buf, size); // calls myread?
-    Debug_printv("After calling archive_read_data, RC=%d", r);
-    if(r>0)
-        m_position += r;
-    return r;
+    if (archive_read_data_block(a, &incomingBuffer, &incomingSize, NULL) == ARCHIVE_OK) {
+        // 'buff' contains the data of the current block
+        // 'size' is the size of the current block
+
+        std::vector<uint8_t> incomingVector((uint8_t*)incomingBuffer, (uint8_t*)incomingBuffer + incomingSize);
+        // concatenate intermediate buffer with incomingVector
+        leftovers.insert(leftovers.end(), incomingVector.begin(), incomingVector.end());
+
+        if(leftovers.size() <= size) {
+            // ok, we can fit everything that was lerft and new data to our buffer
+            m_position += leftovers.size();
+            return leftovers.size();
+        }
+        else {
+            // ok, so we can only write up to size and we have to keep leftovers for next time
+            std::copy(leftovers.begin(), leftovers.begin() + size, buf);
+            std::vector<uint8_t> leftovers2(leftovers.begin() + size, leftovers.end());
+            leftovers = leftovers2;
+            m_position += size;
+            return size;
+        }
+    }
+    else
+    {
+        Debug_printv("archive_read_data_block failed");
+        return -1;
+    }
 }
 
 uint32_t ArchiveStream::write(const uint8_t *buf, uint32_t size)
@@ -291,7 +315,7 @@ bool ArchiveContainerFile::prepareDirListing()
     Debug_printv("w prepare dir listing");
 
     dirStream = std::shared_ptr<MStream>(this->meatStream());
-    ArchiveStream* as = (ArchiveStream*)dirStream.get();
+
     if(dirStream->isOpen())
     {
         return true;
