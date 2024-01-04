@@ -6,7 +6,7 @@ This is the ESP32 version of [Meatloaf](https://github.com/idolpx/meatloaf) inte
 
 ## A cloud disk drive
 
-While one can say Meatloaf is just another Commodore IEC Serial Floppy Drive similar to SD2IEC and its clones, Meatloaf is in fact much more than that, as it allows you to open not only local files stored on its internal SD card, but also any URL you can imagine, straight on your Commodore computer without any additional software. For example you can load a game from some web server:
+While one can say Meatloaf is just another Commodore IEC Serial Floppy Drive similar to SD2IEC and its clones, Meatloaf is in fact much more than that, as it allows you to load not only local files stored on its internal flash file system or SD card, but also files from any URL you can imagine, straight into your Commodore computer without any additional software. For example you can load a game from some web server:
 
 ```BASIC
 LOAD"HTTP://C64.ORG/GAMES_AZ/H/H.E.R.O.PRG",8
