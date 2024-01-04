@@ -159,9 +159,10 @@ uint32_t ArchiveStream::read(uint8_t *buf, uint32_t size)
 
         if(leftovers.size() <= size) {
             // ok, we can fit everything that was lerft and new data to our buffer
-            m_position += leftovers.size();
+            auto size = leftovers.size();
+            m_position += size;
             leftovers.clear();
-            return leftovers.size();
+            return size;
         }
         else {
             // ok, so we can only write up to size and we have to keep leftovers for next time
