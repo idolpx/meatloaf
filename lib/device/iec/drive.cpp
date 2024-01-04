@@ -588,6 +588,7 @@ void iecDrive::set_prefix()
         path = mstr::drop(path, 1);
 
     Debug_printv("path[%s]", path.c_str());
+    path = mstr::toUTF8( path );
     auto n = _base->cd( path );
     if ( n != nullptr )
         _base.reset( n );
