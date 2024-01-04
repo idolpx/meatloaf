@@ -148,11 +148,10 @@ uint32_t ArchiveStream::read(uint8_t *buf, uint32_t size)
 
     // ok so here we will basically need to refill buff with consecutive
     // calls to srcStream.read, I assume buf is filled by myread callback
-    // size_t r = archive_read_data(a, buf, size); // calls myread?
-    // Debug_printv("After calling archive_read_data, RC=%d", r);
-    // _position += r;
-    // return r;
-    return 0;
+    size_t r = archive_read_data(a, buf, size); // calls myread?
+    Debug_printv("After calling archive_read_data, RC=%d", r);
+    m_position += r;
+    return r;
 }
 
 uint32_t ArchiveStream::write(const uint8_t *buf, uint32_t size)
@@ -165,51 +164,50 @@ uint32_t ArchiveStream::write(const uint8_t *buf, uint32_t size)
 bool ArchiveStream::seekPath(std::string path)
 {
     Debug_printv("seekPath called for path: %s", path.c_str());
+    bool wildcard =  ( mstr::contains(path, "*") || mstr::contains(path, "?") );
+
     struct archive_entry *entry;
     while (archive_read_next_header(a, &entry) == ARCHIVE_OK)
     {
-        std::string entryName = archive_entry_pathname(entry);
-        if (mstr::compare(path, entryName)) {
-            Debug_printv("seekPath found entry: %s", entryName.c_str());
+        std::string entryFilename = archive_entry_pathname(entry);
+        m_length = archive_entry_size(entry);
+        //archive_entry_filetype(entry);
+
+        Debug_printv("filename[%s] entry.filename[%.16s] size[%d] available[%d]", path.c_str(), entryFilename.c_str(), m_length, available());
+
+        // Read Entry From Stream
+        if (path == "*") // Match first PRG
+        {
+            path = entryFilename;
             return true;
+        }
+        else if ( path == entryFilename ) // Match exact
+        {
+            return true;
+        }
+        else if ( wildcard )
+        {
+            if ( mstr::compare(path, entryFilename) ) // X?XX?X* Wildcard match
+            {
+                // Move stream pointer to start track/sector
+                return true;
+            }
         }
     }
     return false;
 };
 
-// For files with no directory structure
-// tap, crt, tar
-std::string ArchiveStream::seekNextEntry()
-{
-    struct archive_entry *entry;
-    if (archive_read_next_header(a, &entry) == ARCHIVE_OK)
-        return archive_entry_pathname(entry);
-    else
-        return "";
-};
+// // For files with no directory structure
+// // tap, crt, tar
+// std::string ArchiveStream::seekNextEntry()
+// {
+//     struct archive_entry *entry;
+//     if (archive_read_next_header(a, &entry) == ARCHIVE_OK)
+//         return archive_entry_pathname(entry);
+//     else
+//         return "";
+// };
 
-uint32_t ArchiveStream::position()
-{
-    return _position;
-}
-
-// STREAM HAS NO IDEA HOW MUCH IS AVALABLE - IT'S ENDLESS!
-uint32_t ArchiveStream::available()
-{
-    return 0; // whatever...
-}
-
-// STREAM HAS NO IDEA ABOUT SIZE - IT'S ENDLESS!
-uint32_t ArchiveStream::size()
-{
-    return -1;
-}
-
-// WHAT DOES THIS FUNCTION DO???
-size_t ArchiveStream::error()
-{
-    return -1;
-}
 
 bool ArchiveStream::seek(uint32_t pos)
 {
@@ -231,11 +229,16 @@ MStream *ArchiveContainerFile::createIStream(std::shared_ptr<MStream> containerI
 // archive file is always a directory
 bool ArchiveContainerFile::isDirectory()
 {
-    return true;
+    //Debug_printv("pathInStream[%s]", pathInStream.c_str());
+    if ( pathInStream == "" )
+        return true;
+    else
+        return false;
 };
 
 bool ArchiveContainerFile::rewindDirectory()
 {
+    dirIsOpen = true;
     if (a != nullptr)
         archive_read_free(a);
 
@@ -244,37 +247,31 @@ bool ArchiveContainerFile::rewindDirectory()
 
 MFile *ArchiveContainerFile::getNextFileInDir()
 {
+    if(!dirIsOpen)
+        rewindDirectory();
+
     struct archive_entry *entry;
 
-    if (a == nullptr)
+    Debug_printv("getNextFileInDir calling archive_read_next_header");
+    if (archive_read_next_header(a, &entry) == ARCHIVE_OK)
     {
-        prepareDirListing();
-    }
+        Debug_printv("getNextFileInDir found entry: %s", archive_entry_pathname(entry));
+        auto parent = this->cd(archive_entry_pathname(entry));
+        auto newFile = MFSOwner::File(parent);
+        // TODO - we can probably fill newFile with some info that is
+        // probably available in archive_entry structure!
+        //newFile->size(archive_entry_size(entry)); // etc.
 
-    if (a != nullptr)
-    {
-        Debug_printv("getNextFileInDir calling archive_read_next_header");
-        if (archive_read_next_header(a, &entry) == ARCHIVE_OK)
-        {
-            Debug_printv("getNextFileInDir found entry: %s", archive_entry_pathname(entry));
-            auto parent = this->cd(archive_entry_pathname(entry));
-            auto newFile = MFSOwner::File(parent);
-            // TODO - we can probably fill newFile with some info that is
-            // probably available in archive_entry structure!
-            //newFile->size(archive_entry_size(entry)); // etc.
-
-            return newFile;
-        }
-        else
-        {
-            Debug_printv("getNextFileInDir found no more entries, freeing archive");
-            archive_read_free(a);
-            a = nullptr;
-            return nullptr;
-        }
+        return newFile;
     }
     else
     {
+        Debug_printv("getNextFileInDir found no more entries, freeing archive");
+        archive_read_free(a);
+        a = nullptr;
+
+        //Debug_printv( "END OF DIRECTORY");
+        dirIsOpen = false;
         return nullptr;
     }
 }

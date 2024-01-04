@@ -219,7 +219,6 @@ void iecDrive::iec_open()
         payload = pt[0];
         //Debug_printv("filename[%s] type[%s] mode[%s]", pt[0].c_str(), pt[1].c_str(), pt[2].c_str());
     }
-    //mstr::toUTF8(s);
 
     Debug_printv("payload[%s]", payload.c_str());
 
@@ -233,6 +232,8 @@ void iecDrive::iec_open()
         payload = mstr::drop(payload, 2);
         if ( payload[0] == ':' || payload[0] == ' ' )
             payload = mstr::drop(payload, 1);
+        
+        payload = mstr::toUTF8(payload);
     }
 
     if ( payload.length() )
@@ -845,6 +846,7 @@ uint16_t iecDrive::sendHeader(std::string header, std::string id)
         if ( IEC.flags & ERROR ) return 0;
         byte_count += sendLine(0, "%*s\"%-*s\" NFO", 0, "", 19, archive.c_str());
         if ( IEC.flags & ERROR ) return 0;
+        sent_info = true;
     }
     if (image.size())
     {

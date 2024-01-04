@@ -49,7 +49,7 @@ class ArchiveStream : public MStream
 {
     struct archive *a;
     bool is_open = false;
-    uint32_t _position = 0;
+    //uint32_t _position = 0;
 
 public:
     static const size_t buffSize = 4096;
@@ -70,18 +70,7 @@ public:
 
     // For files with no directory structure
     // tap, crt, tar
-    std::string seekNextEntry() override;
-
-    uint32_t position() override;
-
-    // STREAM HAS NO IDEA HOW MUCH IS AVALABLE - IT'S ENDLESS!
-    uint32_t available() override;
-
-    // STREAM HAS NO IDEA ABOUT SIZE - IT'S ENDLESS!
-    virtual uint32_t size() override;
-
-    // WHAT DOES THIS FUNCTION DO???
-    virtual size_t error() override;
+//    std::string seekNextEntry() override;
 
     virtual bool seek(uint32_t pos) override;
     ArchiveStreamData streamData;
@@ -104,7 +93,11 @@ class ArchiveContainerFile : public MFile
     std::shared_ptr<MStream> dirStream = nullptr; // a stream that is able to serve bytes of this archive
 
 public:
-    ArchiveContainerFile(std::string path) : MFile(path){};
+    ArchiveContainerFile(std::string path) : MFile(path)
+    {
+        media_header = name;
+        media_archive = name;
+    };
 
     ~ArchiveContainerFile()
     {
@@ -131,6 +124,9 @@ public:
 
 private:
     bool prepareDirListing();
+
+    bool isDir = true;
+    bool dirIsOpen = false;
 };
 
 /********************************************************

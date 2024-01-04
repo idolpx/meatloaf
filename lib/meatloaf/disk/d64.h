@@ -279,7 +279,8 @@ private:
 class D64File: public MFile {
 public:
 
-    D64File(std::string path, bool is_dir = true): MFile(path) {
+    D64File(std::string path, bool is_dir = true): MFile(path)
+    {
         isDir = is_dir;
 
         media_image = name;

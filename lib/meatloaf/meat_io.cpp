@@ -446,7 +446,7 @@ MFile* MFile::cd(std::string newDir)
     }
     else 
     {
-        newDir = mstr::toUTF8( newDir );
+        //newDir = mstr::toUTF8( newDir );
 
         // Add new directory to path
         if ( !mstr::endsWith(url, "/") && newDir.size() )
