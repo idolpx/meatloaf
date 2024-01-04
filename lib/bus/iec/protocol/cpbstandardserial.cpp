@@ -22,6 +22,8 @@
 #include "bus.h"
 #include "_protocol.h"
 
+#include "fnHardwareTimer.h"
+
 #include "../../../include/debug.h"
 #include "../../../include/pinmap.h"
 
