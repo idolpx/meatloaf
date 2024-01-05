@@ -154,6 +154,9 @@ std::vector<uint8_t> leftovers;
 
 uint32_t ArchiveStream::read(uint8_t *buf, uint32_t size)
 {
+    if (!is_open)
+        open();
+
     Debug_printv("calling read size[%d]", size);
     //const void *incomingBuffer;
     //size_t incomingSize;

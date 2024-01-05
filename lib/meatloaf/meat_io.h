@@ -56,6 +56,7 @@ public:
 
     // has to return OPENED stream
     virtual MStream* getSourceStream(std::ios_base::openmode mode=std::ios_base::in);
+    virtual MStream* getDecodedStream(std::shared_ptr<MStream> src) = 0;
 
     MFile* cd(std::string newDir);
     MFile* cdParent(std::string = "");
@@ -96,7 +97,6 @@ public:
     uint32_t _exists = true;
 
 protected:
-    virtual MStream* getDecodedStream(std::shared_ptr<MStream> src) = 0;
     bool m_isNull;
 
 friend class MFSOwner;

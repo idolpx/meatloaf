@@ -60,9 +60,6 @@ bool FlashFile::isDirectory()
     return S_ISDIR(info.st_mode);
 }
 
-MStream* FlashFile::getDecodedStream(std::shared_ptr<MStream> is) {
-    return is.get(); // we don't have to process this stream in any way, just return the original stream
-}
 
 MStream* FlashFile::getSourceStream(std::ios_base::openmode mode)
 {
@@ -72,6 +69,10 @@ MStream* FlashFile::getSourceStream(std::ios_base::openmode mode)
     istream->open();   
     //Debug_printv("FlashFile::getSourceStream() 4");
     return istream;
+}
+
+MStream* FlashFile::getDecodedStream(std::shared_ptr<MStream> is) {
+    return is.get(); // we don't have to process this stream in any way, just return the original stream
 }
 
 time_t FlashFile::getLastWrite()

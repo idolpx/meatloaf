@@ -53,7 +53,9 @@ class ArchiveStream : public MStream
 
 public:
     static const size_t buffSize = 256; // 4096;
-    
+    ArchiveStreamData streamData;
+    struct archive *a;
+
     ArchiveStream(std::shared_ptr<MStream> srcStr);
     ~ArchiveStream();
 
@@ -73,8 +75,7 @@ public:
     //std::string seekNextEntry() override;
 
     virtual bool seek(uint32_t pos) override;
-    ArchiveStreamData streamData;
-    struct archive *a;
+
 
     bool isRandomAccess() override { return true; };
 
@@ -119,7 +120,8 @@ public:
 
     std::string basepath = "";
 
-    MStream *getDecodedStream(std::shared_ptr<MStream> containerIstream);
+    //MStream* getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override; // has to return OPENED stream
+    MStream* getDecodedStream(std::shared_ptr<MStream> src) override;
 
     // archive file is always a directory
     bool isDirectory();
