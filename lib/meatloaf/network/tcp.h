@@ -284,16 +284,16 @@ public:
         return false;
     }
 
-    // We are overriding meatStream, because obviously - TCP scheme won't be wrapped in anything
-    MStream* meatStream(std::ios_base::openmode mode=std::ios_base::in) override {
+    // We are overriding getSourceStream, because obviously - TCP scheme won't be wrapped in anything
+    MStream* getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override {
         // has to return OPENED streamm
         MStream* istream = new TcpStream(url);
         istream->open();
         return istream;
     } 
 
-    // DUMMY return value - we've overriden meatStream, so this one won't be even called!
-    MStream* createIStream(std::shared_ptr<MStream> src) {
+    // DUMMY return value - we've overriden getSourceStream, so this one won't be even called!
+    MStream* getDecodedStream(std::shared_ptr<MStream> src) {
         return nullptr; 
     }
 

@@ -247,10 +247,10 @@ bool ArchiveStream::seek(uint32_t pos)
  * Files implementations
  ********************************************************/
 
-MStream *ArchiveContainerFile::createIStream(std::shared_ptr<MStream> containerIstream)
+MStream *ArchiveContainerFile::getDecodedStream(std::shared_ptr<MStream> containerIstream)
 {
     // TODO - we can get password from this URL and pass it as a parameter to this constructor
-    Debug_printv("calling createIStream for ArchiveContainerFile, we should return open stream");
+    Debug_printv("calling getDecodedStream for ArchiveContainerFile, we should return open stream");
     auto stream = new ArchiveStream(containerIstream);
     stream->open();
 
@@ -378,7 +378,7 @@ bool ArchiveContainerFile::prepareDirListing()
 
     Debug_printv("w prepare dir listing");
 
-    dirStream = std::shared_ptr<MStream>(this->meatStream());
+    dirStream = std::shared_ptr<MStream>(this->getSourceStream());
 
     if(dirStream->isOpen())
     {

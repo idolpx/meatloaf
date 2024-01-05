@@ -106,7 +106,7 @@ public:
             delete client;
     }
     bool isDirectory() override;
-    MStream* meatStream(std::ios_base::openmode mode=std::ios_base::in) override ; // has to return OPENED streamm
+    MStream* getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override ; // has to return OPENED streamm
     time_t getLastWrite() override ;
     time_t getCreationTime() override ;
     bool rewindDirectory() override ;
@@ -117,7 +117,7 @@ public:
     bool remove() override ;
     bool isText() override ;
     bool rename(std::string dest) { return false; };
-    MStream* createIStream(std::shared_ptr<MStream> src);
+    MStream* getDecodedStream(std::shared_ptr<MStream> src);
     //void addHeader(const String& name, const String& value, bool first = false, bool replace = true);
 };
 

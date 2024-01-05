@@ -371,7 +371,7 @@ void cHttpdServer::send_file(httpd_req_t *req, const char *filename)
     }
     else
     {
-        // auto istream = file->meatStream();
+        // auto istream = file->getSourceStream();
 
         // Set the response content type
         set_file_content_type(req, fpath.c_str());
@@ -417,7 +417,7 @@ void cHttpdServer::send_file_parsed(httpd_req_t *req, const char *filename)
     }
     else
     {
-        // auto istream = file->meatStream();
+        // auto istream = file->getSourceStream();
 
         // Set the response content type
         set_file_content_type(req, filename);

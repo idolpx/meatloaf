@@ -119,7 +119,7 @@ public:
 
     std::string basepath = "";
 
-    MStream *createIStream(std::shared_ptr<MStream> containerIstream);
+    MStream *getDecodedStream(std::shared_ptr<MStream> containerIstream);
 
     // archive file is always a directory
     bool isDirectory();

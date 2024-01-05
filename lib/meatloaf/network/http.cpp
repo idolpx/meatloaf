@@ -37,7 +37,7 @@ bool HttpFile::isDirectory() {
         return false;
 }
 
-MStream* HttpFile::meatStream(std::ios_base::openmode mode) {
+MStream* HttpFile::getSourceStream(std::ios_base::openmode mode) {
     // has to return OPENED stream
     //Debug_printv("Input stream requested: [%s]", url.c_str());
 
@@ -56,7 +56,7 @@ MStream* HttpFile::meatStream(std::ios_base::openmode mode) {
     return istream;
 }
 
-MStream* HttpFile::createIStream(std::shared_ptr<MStream> is) {
+MStream* HttpFile::getDecodedStream(std::shared_ptr<MStream> is) {
     return is.get(); // DUMMY return value - we've overriden istreamfunction, so this one won't be used
 }
 

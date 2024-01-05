@@ -55,7 +55,7 @@ public:
     // bool copyTo(MFile* dst);
 
     // has to return OPENED stream
-    virtual MStream* meatStream(std::ios_base::openmode mode=std::ios_base::in);
+    virtual MStream* getSourceStream(std::ios_base::openmode mode=std::ios_base::in);
 
     MFile* cd(std::string newDir);
     MFile* cdParent(std::string = "");
@@ -96,7 +96,7 @@ public:
     uint32_t _exists = true;
 
 protected:
-    virtual MStream* createIStream(std::shared_ptr<MStream> src) = 0;
+    virtual MStream* getDecodedStream(std::shared_ptr<MStream> src) = 0;
     bool m_isNull;
 
 friend class MFSOwner;

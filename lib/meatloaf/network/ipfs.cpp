@@ -4,7 +4,7 @@
 #include "../../../include/debug.h"
 
 
-MStream* IPFSFile::meatStream(std::ios_base::openmode mode) {
+MStream* IPFSFile::getSourceStream(std::ios_base::openmode mode) {
     // has to return OPENED stream
     //Debug_printv("[%s]", url.c_str());
     MStream* istream = new IPFSIStream(url);

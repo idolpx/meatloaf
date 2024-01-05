@@ -336,12 +336,12 @@ bool MFile::operator!=(nullptr_t ptr) {
     return m_isNull;
 }
 
-MStream* MFile::meatStream(std::ios_base::openmode mode) {
+MStream* MFile::getSourceStream(std::ios_base::openmode mode) {
     // has to return OPENED stream
-    std::shared_ptr<MStream> containerStream(streamFile->meatStream(mode)); // get its base stream, i.e. zip raw file contents
+    std::shared_ptr<MStream> containerStream(streamFile->getSourceStream(mode)); // get its base stream, i.e. zip raw file contents
     Debug_printv("containerStream isRandomAccess[%d] isBrowsable[%d]", containerStream->isRandomAccess(), containerStream->isBrowsable());
 
-    MStream* decodedStream(createIStream(containerStream)); // wrap this stream into decoded stream, i.e. unpacked zip files
+    MStream* decodedStream(getDecodedStream(containerStream)); // wrap this stream into decoded stream, i.e. unpacked zip files
     decodedStream->url = this->url;
     Debug_printv("decodedStream isRandomAccess[%d] isBrowsable[%d]", decodedStream->isRandomAccess(), decodedStream->isBrowsable());
 
@@ -457,7 +457,7 @@ MFile* MFile::cd(std::string newDir)
             // we need to get actual url
 
             //auto reader = Meat::New<MFile>(newDir);
-            //auto istream = reader->meatStream();
+            //auto istream = reader->getSourceStream();
             Meat::iostream reader(newPath);
 
 

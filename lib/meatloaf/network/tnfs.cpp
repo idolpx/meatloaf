@@ -43,17 +43,17 @@ bool TNFSFile::isDirectory()
     return S_ISDIR(info.st_mode);
 }
 
-MStream* TNFSFile::createIStream(std::shared_ptr<MStream> is) {
+MStream* TNFSFile::getDecodedStream(std::shared_ptr<MStream> is) {
     return is.get(); // we don't have to process this stream in any way, just return the original stream
 }
 
-MStream* TNFSFile::meatStream(std::ios_base::openmode mode)
+MStream* TNFSFile::getSourceStream(std::ios_base::openmode mode)
 {
     std::string full_path = basepath + path;
     MStream* istream = new TNFSIStream(full_path);
-    //Debug_printv("TNFSFile::meatStream() 3, not null=%d", istream != nullptr);
+    //Debug_printv("TNFSFile::getSourceStream() 3, not null=%d", istream != nullptr);
     istream->open();   
-    //Debug_printv("TNFSFile::meatStream() 4");
+    //Debug_printv("TNFSFile::getSourceStream() 4");
     return istream;
 }
 

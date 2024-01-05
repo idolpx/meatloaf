@@ -90,7 +90,7 @@ class DSKFile: public D64File {
 public:
     DSKFile(std::string path, bool is_dir = true) : D64File(path, is_dir) {};
 
-    MStream* createIStream(std::shared_ptr<MStream> containerIstream) override;
+    MStream* getDecodedStream(std::shared_ptr<MStream> containerIstream) override;
 };
 
 

@@ -135,7 +135,7 @@ bool T64IStream::seekPath(std::string path) {
  * File implementations
  ********************************************************/
 
-MStream* T64File::createIStream(std::shared_ptr<MStream> containerIstream) {
+MStream* T64File::getDecodedStream(std::shared_ptr<MStream> containerIstream) {
     Debug_printv("[%s]", url.c_str());
 
     return new T64IStream(containerIstream);

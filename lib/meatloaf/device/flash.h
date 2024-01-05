@@ -63,8 +63,8 @@ public:
 
     //MFile* cd(std::string newDir);
     bool isDirectory() override;
-    MStream* meatStream(std::ios_base::openmode mode=std::ios_base::in) override ; // has to return OPENED stream
-    MStream* createIStream(std::shared_ptr<MStream> src);
+    MStream* getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override ; // has to return OPENED stream
+    MStream* getDecodedStream(std::shared_ptr<MStream> src);
 
     bool rewindDirectory() override;
     MFile* getNextFileInDir() override;

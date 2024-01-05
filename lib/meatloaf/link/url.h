@@ -23,7 +23,7 @@ class MLFileSystem: public MFileSystem
 
         // Read URL file
         auto reader = Meat::New<MFile>(path);
-        auto istream = reader->meatStream();
+        auto istream = reader->getSourceStream();
 
         uint8_t url[istream->size()];
         istream->read(url, istream->size());

@@ -132,7 +132,7 @@ public:
     WSFile(std::string path): MFile(path) {};
 
     bool isDirectory() override { return false; }
-    MStream* meatStream(std::ios_base::openmode mode=std::ios_base::in) override {
+    MStream* getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override {
         // input stream = SERVER socket
         return new CSIOStream(this, true);
     }; 
@@ -145,7 +145,7 @@ public:
     size_t size() override { return 0; };
     bool remove() override { return false; };
     bool rename(std::string dest) { return false; };
-    MStream* createIStream(std::shared_ptr<MStream> src) {
+    MStream* getDecodedStream(std::shared_ptr<MStream> src) {
         return nullptr;
     };
 

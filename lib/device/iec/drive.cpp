@@ -626,7 +626,7 @@ bool iecDrive::registerStream ( uint8_t channel )
             return false;
 
         Debug_printv("LOAD \"%s\"", _base->url.c_str());
-        new_stream = std::shared_ptr<MStream>(_base->meatStream());
+        new_stream = std::shared_ptr<MStream>(_base->getSourceStream());
     }
 
     // SAVE / PUT / PRINT / WRITE
@@ -634,13 +634,13 @@ bool iecDrive::registerStream ( uint8_t channel )
     {
         Debug_printv("SAVE \"%s\"", _base->url.c_str());
         // CREATE STREAM HERE FOR OUTPUT
-        new_stream = std::shared_ptr<MStream>(_base->meatStream());
+        new_stream = std::shared_ptr<MStream>(_base->getSourceStream());
         new_stream->open();
     }
     else
     {
         Debug_printv("OTHER \"%s\"", _base->url.c_str());
-        new_stream = std::shared_ptr<MStream>(_base->meatStream());
+        new_stream = std::shared_ptr<MStream>(_base->getSourceStream());
     }
 
 

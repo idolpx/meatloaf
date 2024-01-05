@@ -142,7 +142,7 @@ bool TCRTIStream::seekPath(std::string path) {
  * File implementations
  ********************************************************/
 
-MStream* TCRTFile::createIStream(std::shared_ptr<MStream> containerIstream) {
+MStream* TCRTFile::getDecodedStream(std::shared_ptr<MStream> containerIstream) {
     Debug_printv("[%s]", url.c_str());
 
     return new TCRTIStream(containerIstream);

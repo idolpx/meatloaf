@@ -64,7 +64,7 @@ namespace Meat
         std::filebuf *doOpen(std::ios_base::openmode mode)
         {
             // Debug_println("In filebuf open pre reset mistream");
-            mstream.reset(mfile->meatStream(mode));
+            mstream.reset(mfile->getSourceStream(mode));
 
             if (mstream->isOpen())
             {

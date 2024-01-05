@@ -20,7 +20,7 @@ public:
     WebDAVFile(std::string path): MFile(path) {};
 
     bool isDirectory() override;
-    MStream* meatStream(std::ios_base::openmode mode=std::ios_base::in) override ; // has to return OPENED stream
+    MStream* getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override ; // has to return OPENED stream
     time_t getLastWrite() override ;
     time_t getCreationTime() override ;
     bool rewindDirectory() override { return false; };
@@ -30,7 +30,7 @@ public:
     uint32_t size() override ;
     bool remove() override { return false; };
     bool rename(std::string dest) { return false; };
-    MStream* createIStream(std::shared_ptr<MStream> src);
+    MStream* getDecodedStream(std::shared_ptr<MStream> src);
     //void addHeader(const String& name, const String& value, bool first = false, bool replace = true);
 };
 
