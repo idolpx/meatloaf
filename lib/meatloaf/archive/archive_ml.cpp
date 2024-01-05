@@ -148,11 +148,13 @@ std::vector<uint8_t> leftovers;
 uint32_t ArchiveStream::read(uint8_t *buf, uint32_t size)
 {
     Debug_printv("calling read size[%d]", size);
-    const void *incomingBuffer;
-    size_t incomingSize;
-    int64_t offset;
+    //const void *incomingBuffer;
+    //size_t incomingSize;
+    //int64_t offset;
 
-    int r = archive_read_data_block(a, &incomingBuffer, &incomingSize, &offset);
+    //int r = archive_read_data_block(a, &incomingBuffer, &incomingSize, &offset);
+    int r = archive_read_data(a, buf, size);
+    Debug_printv("r[%d]", r);
     if ( r == ARCHIVE_EOF )
         return 0;
 
@@ -162,23 +164,26 @@ uint32_t ArchiveStream::read(uint8_t *buf, uint32_t size)
     // 'buff' contains the data of the current block
     // 'size' is the size of the current block
 
-    std::vector<uint8_t> incomingVector((uint8_t*)incomingBuffer, (uint8_t*)incomingBuffer + incomingSize);
-    // concatenate intermediate buffer with incomingVector
-    leftovers.insert(leftovers.end(), incomingVector.begin(), incomingVector.end());
+    // std::vector<uint8_t> incomingVector((uint8_t*)incomingBuffer, (uint8_t*)incomingBuffer + incomingSize);
+    // // concatenate intermediate buffer with incomingVector
+    // leftovers.insert(leftovers.end(), incomingVector.begin(), incomingVector.end());
 
-    if(leftovers.size() <= size) {
-        // ok, we can fit everything that was left and new data to our buffer
-        auto size = leftovers.size();
-        _position += size;
-        leftovers.clear();
-    }
-    else {
-        // ok, so we can only write up to size and we have to keep leftovers for next time
-        std::copy(leftovers.begin(), leftovers.begin() + size, buf);
-        std::vector<uint8_t> leftovers2(leftovers.begin() + size, leftovers.end());
-        leftovers = leftovers2;
-        _position += size;
-    }
+    // if(leftovers.size() <= size) {
+    //     // ok, we can fit everything that was left and new data to our buffer
+    //     auto size = leftovers.size();
+    //     _position += size;
+    //     leftovers.clear();
+    // }
+    // else {
+    //     // ok, so we can only write up to size and we have to keep leftovers for next time
+    //     std::copy(leftovers.begin(), leftovers.begin() + size, buf);
+    //     std::vector<uint8_t> leftovers2(leftovers.begin() + size, leftovers.end());
+    //     leftovers = leftovers2;
+    //     _position += size;
+    // }
+    _position += size;
+
+    Debug_printv("size[%d] position[%d]", size, _position);
 
     return size;
 }
