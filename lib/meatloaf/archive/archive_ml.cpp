@@ -82,6 +82,12 @@ int cb_close(struct archive *a, void *userData)
     return (ARCHIVE_OK);
 }
 
+int cb_open(struct a *arch, void *userData)
+{
+    // maybe we can use open for something? Check if stream is open?
+    return (ARCHIVE_OK);
+}
+
 
 /********************************************************
  * Streams implementations
@@ -115,6 +121,7 @@ bool ArchiveStream::open()
         archive_read_set_skip_callback(a, cb_skip);
         archive_read_set_seek_callback(a, cb_seek);
         archive_read_set_close_callback(a, cb_close);
+        // archive_read_set_open_callback(mpa->arch, cb_open); - what does it do?
         archive_read_set_callback_data(a, &streamData);
         Debug_printv("== BEGIN Calling open1 on archive instance ==========================");
         int r =  archive_read_open1(a);
