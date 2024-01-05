@@ -152,35 +152,35 @@ uint32_t ArchiveStream::read(uint8_t *buf, uint32_t size)
     size_t incomingSize;
     int64_t offset;
 
-    if (archive_read_data_block(a, &incomingBuffer, &incomingSize, &offset) == ARCHIVE_OK) {
-        // 'buff' contains the data of the current block
-        // 'size' is the size of the current block
+    int r = archive_read_data_block(a, &incomingBuffer, &incomingSize, &offset);
+    if ( r == ARCHIVE_EOF )
+        return 0;
 
-        std::vector<uint8_t> incomingVector((uint8_t*)incomingBuffer, (uint8_t*)incomingBuffer + incomingSize);
-        // concatenate intermediate buffer with incomingVector
-        leftovers.insert(leftovers.end(), incomingVector.begin(), incomingVector.end());
+    if ( r < ARCHIVE_OK )
+        return 0;
 
-        if(leftovers.size() <= size) {
-            // ok, we can fit everything that was left and new data to our buffer
-            auto size = leftovers.size();
-            _position += size;
-            leftovers.clear();
-            return size;
-        }
-        else {
-            // ok, so we can only write up to size and we have to keep leftovers for next time
-            std::copy(leftovers.begin(), leftovers.begin() + size, buf);
-            std::vector<uint8_t> leftovers2(leftovers.begin() + size, leftovers.end());
-            leftovers = leftovers2;
-            _position += size;
-            return size;
-        }
+    // 'buff' contains the data of the current block
+    // 'size' is the size of the current block
+
+    std::vector<uint8_t> incomingVector((uint8_t*)incomingBuffer, (uint8_t*)incomingBuffer + incomingSize);
+    // concatenate intermediate buffer with incomingVector
+    leftovers.insert(leftovers.end(), incomingVector.begin(), incomingVector.end());
+
+    if(leftovers.size() <= size) {
+        // ok, we can fit everything that was left and new data to our buffer
+        auto size = leftovers.size();
+        _position += size;
+        leftovers.clear();
     }
-    else
-    {
-        Debug_printv("archive_read_data_block failed");
-        return -1;
+    else {
+        // ok, so we can only write up to size and we have to keep leftovers for next time
+        std::copy(leftovers.begin(), leftovers.begin() + size, buf);
+        std::vector<uint8_t> leftovers2(leftovers.begin() + size, leftovers.end());
+        leftovers = leftovers2;
+        _position += size;
     }
+
+    return size;
 }
 
 uint32_t ArchiveStream::write(const uint8_t *buf, uint32_t size)
