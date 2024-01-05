@@ -343,12 +343,12 @@ bool D64IStream::seekPath(std::string path) {
         // Calculate file size
         uint8_t t = entry.start_track;
         uint8_t s = entry.start_sector;
-        m_length = seekFileSize( t, s );
+        _size = seekFileSize( t, s );
 
         // Set position to beginning of file
         bool r = seekSector( t, s );
 
-        Debug_printv("File Size: blocks[%d] size[%d] available[%d] r[%d]", entry.blocks, m_length, available(), r);
+        Debug_printv("File Size: blocks[%d] size[%d] available[%d] r[%d]", entry.blocks, _size, available(), r);
 
         return r;
     }
@@ -456,7 +456,7 @@ bool D64File::exists() {
     // here I'd rather use D64 logic to see if such file name exists in the image!
     //Debug_printv("here");
     return true;
-} 
+}
 
 uint32_t D64File::size() {
     //Debug_printv("[%s]", streamFile->url.c_str());

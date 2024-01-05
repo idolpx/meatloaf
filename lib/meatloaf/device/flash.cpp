@@ -242,7 +242,6 @@ MFile* FlashFile::getNextFileInDir()
 
 bool FlashFile::seekEntry( std::string filename )
 {
-    DIR* d;
     std::string apath = (basepath + pathToFile()).c_str();
     if (apath.empty()) {
         apath = "/";
@@ -250,14 +249,16 @@ bool FlashFile::seekEntry( std::string filename )
 
     Debug_printv( "path[%s] filename[%s] size[%d]", apath.c_str(), filename.c_str(), filename.size());
 
-    d = opendir( apath.c_str() );
+    DIR* d = opendir( apath.c_str() );
     if(d == nullptr)
         return false;
 
     // Read Directory Entries
-    struct dirent* dirent = NULL;
     if ( filename.size() > 0 )
     {
+        struct dirent* dirent = NULL;
+        bool found = false;
+        bool wildcard =  ( mstr::contains(filename, "*") || mstr::contains(filename, "?") );
         while ( (dirent = readdir( d )) != NULL )
         {
             std::string entryFilename = dirent->d_name;
@@ -267,16 +268,30 @@ bool FlashFile::seekEntry( std::string filename )
             // Read Entry From Stream
             if ( dirent->d_type != DT_DIR ) // Only want to match files not directories
             {
-                if ( filename == entryFilename )
+                // Read Entry From Stream
+                if (filename == "*") // Match first entry
                 {
-                    closedir( d );
-                    return true;
+                    filename = entryFilename;
+                    found = true;
                 }
-                else if ( filename == "*" || mstr::compare(filename, entryFilename) )
+                else if ( filename == entryFilename ) // Match exact
                 {
-                    // Set filename to this filename
-                    Debug_printv( "Found! file[%s] -> entry[%s]", filename.c_str(), entryFilename.c_str() );
-                    resetURL(apath + "/" + std::string(dirent->d_name));
+                    found = true;
+                }
+                else if ( wildcard )
+                {
+                    if ( mstr::compare(filename, entryFilename) ) // X?XX?X* Wildcard match
+                    {
+                        // Set filename to this filename
+                        Debug_printv( "Found! file[%s] -> entry[%s]", filename.c_str(), entryFilename.c_str() );
+                        resetURL(apath + "/" + entryFilename);
+                        found = true;
+                    }
+                }
+
+                if ( found )
+                {
+                    _exists = true;
                     closedir( d );
                     return true;
                 }
@@ -346,8 +361,8 @@ bool FlashIStream::open() {
         // Set file size
         fseek(handle->file_h, 0, SEEK_END);
         //Debug_printv("IStream: past fseek 1");
-        m_length = ftell(handle->file_h);
-        m_position = 0;
+        _size = ftell(handle->file_h);
+        _position = 0;
         //Debug_printv("IStream: past ftell");
         fseek(handle->file_h, 0, SEEK_SET);
         //Debug_printv("IStream: past fseek 2");
@@ -376,31 +391,31 @@ uint32_t FlashIStream::read(uint8_t* buf, uint32_t size) {
         // Debug_printv("bytesRead[%d]", bytesRead);
         // auto hex = mstr::toHex(buf, bytesRead);
         // Debug_printv("[%s]", hex.c_str());
-        m_position += bytesRead;
+        _position += bytesRead;
     }
 
     return bytesRead;
 };
 
 
-uint32_t FlashIStream::size() {
-    return m_length;
-};
+// uint32_t FlashIStream::size() {
+//     return _size;
+// };
 
-uint32_t FlashIStream::available() {
-    if(!isOpen()) return 0;
-    return m_length - position();
-};
+// uint32_t FlashIStream::available() {
+//     if(!isOpen()) return 0;
+//     return _size - position();
+// };
 
 
-uint32_t FlashIStream::position() {
-    if(!isOpen()) return 0;
-    return ftell(handle->file_h);
-};
+// uint32_t FlashIStream::position() {
+//     if(!isOpen()) return 0;
+//     return ftell(handle->file_h);
+// };
 
-size_t FlashIStream::error() {
-    return 0;
-};
+// size_t FlashIStream::error() {
+//     return 0;
+// };
 
 bool FlashIStream::seek(uint32_t pos) {
     // Debug_printv("pos[%d]", pos);

@@ -68,7 +68,7 @@ uint16_t TAPIStream::readFile(uint8_t* buf, uint16_t size) {
     uint16_t bytesRead = 0;
 
     bytesRead += containerStream->read(buf, size);
-    m_position += bytesRead;
+    _position += bytesRead;
 
     return bytesRead;
 }
@@ -91,12 +91,12 @@ bool TAPIStream::seekPath(std::string path) {
         Debug_printv("filename [%.16s] type[%s] start_address[%zu] end_address[%zu] data_offset[%zu]", entry.filename, type, start_address, end_address, data_offset);
 
         // Calculate file size
-        m_length = ( end_address - start_address );
+        _size = ( end_address - start_address );
 
         // Set position to beginning of file
         containerStream->seek(entry.data_offset);
 
-        Debug_printv("File Size: size[%d] available[%d]", m_length, available());
+        Debug_printv("File Size: size[%d] available[%d]", _size, available());
         
         return true;
     }

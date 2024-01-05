@@ -79,7 +79,7 @@ time_t HttpFile::getCreationTime() {
 }
 
 bool HttpFile::exists() {
-    return fromHeader()->m_exists;
+    return fromHeader()->_exists;
 }
 
 uint32_t HttpFile::size() {
@@ -89,7 +89,7 @@ uint32_t HttpFile::size() {
     }
     else
         // fallback to what we had from the header
-        return fromHeader()->m_length;
+        return fromHeader()->_size;
 }
 
 bool HttpFile::remove() {
@@ -147,7 +147,7 @@ bool HttpIStream::open() {
         r = m_http.GET(url);
 
     if ( r ) {
-        m_length = m_http.m_length;
+        _size = m_http._size;
     }
 
     return r;
@@ -159,7 +159,7 @@ void HttpIStream::close() {
 }
 
 bool HttpIStream::seek(uint32_t pos) {
-    if ( !m_http.m_isOpen )
+    if ( !m_http._is_open )
     {
         Debug_printv("error");
         return false;
@@ -176,7 +176,7 @@ uint32_t HttpIStream::read(uint8_t* buf, uint32_t size) {
     if ( size > 0 )
     {
         bytesRead = m_http.read(buf, size);
-        m_position += bytesRead;
+        _position += bytesRead;
     }
 
     return bytesRead;
@@ -184,18 +184,18 @@ uint32_t HttpIStream::read(uint8_t* buf, uint32_t size) {
 
 uint32_t HttpIStream::write(const uint8_t *buf, uint32_t size) {
     uint32_t bytesWritten = m_http.write(buf, size);
-    m_position += bytesWritten;
+    _position += bytesWritten;
     return bytesWritten;
 }
 
 
 
 bool HttpIStream::isOpen() {
-    return m_http.m_isOpen;
+    return m_http._is_open;
 };
 
 // uint32_t HttpIStream::size() {
-//     return m_http.m_length;
+//     return m_http._size;
 // };
 
 // uint32_t HttpIStream::available() {
@@ -203,7 +203,7 @@ bool HttpIStream::isOpen() {
 // };
 
 // uint32_t HttpIStream::position() {
-//     return m_http.m_position;
+//     return m_http._position;
 // }
 
 // size_t HttpIStream::error() {
@@ -237,7 +237,7 @@ bool MeatHttpClient::HEAD(std::string dstUrl) {
 
 bool MeatHttpClient::processRedirectsAndOpen(int range) {
     wasRedirected = false;
-    m_length = -1;
+    _size = -1;
 
     Debug_printv("reopening url[%s] from position:%d", url.c_str(), range);
     lastRC = openAndFetchHeaders(lastMethod, range);
@@ -257,11 +257,11 @@ bool MeatHttpClient::processRedirectsAndOpen(int range) {
     }
 
     // TODO - set m_isWebDAV somehow
-    m_isOpen = true;
-    m_exists = true;
-    m_position = 0;
+    _is_open = true;
+    _exists = true;
+    _position = 0;
 
-    Debug_printv("length[%d] avail[%d] isFriendlySkipper[%d] isText[%d] httpCode[%d]", m_length, available(), isFriendlySkipper, isText, lastRC);
+    Debug_printv("length[%d] avail[%d] isFriendlySkipper[%d] isText[%d] httpCode[%d]", _size, available(), isFriendlySkipper, isText, lastRC);
 
     return true;
 }
@@ -276,14 +276,14 @@ bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
 
 void MeatHttpClient::close() {
     if(m_http != nullptr) {
-        if ( m_isOpen ) {
+        if ( _is_open ) {
             esp_http_client_close(m_http);
         }
         esp_http_client_cleanup(m_http);
         //Debug_printv("HTTP Close and Cleanup");
         m_http = nullptr;
     }
-    m_isOpen = false;
+    _is_open = false;
 }
 
 void MeatHttpClient::setOnHeader(const std::function<int(char*, char*)> &lambda) {
@@ -291,7 +291,7 @@ void MeatHttpClient::setOnHeader(const std::function<int(char*, char*)> &lambda)
 }
 
 bool MeatHttpClient::seek(uint32_t pos) {
-    if(pos==m_position)
+    if(pos==_position)
         return true;
 
     if(isFriendlySkipper) {
@@ -308,7 +308,7 @@ bool MeatHttpClient::seek(uint32_t pos) {
         if(lastRC == 206){
             Debug_printv("Seek successful");
 
-            m_position = pos;
+            _position = pos;
             return true;
         }
     }
@@ -316,7 +316,7 @@ bool MeatHttpClient::seek(uint32_t pos) {
     if(lastMethod == HTTP_METHOD_GET) {
         Debug_printv("Server doesn't support resume, reading from start and discarding");
         // server doesn't support resume, so...
-        if(pos<m_position || pos == 0) {
+        if(pos<_position || pos == 0) {
             // skipping backward let's simply reopen the stream...
             esp_http_client_close(m_http);
             bool op = open(url, lastMethod);
@@ -332,7 +332,7 @@ bool MeatHttpClient::seek(uint32_t pos) {
             }
         }
         else {
-            auto delta = pos-m_position;
+            auto delta = pos-_position;
             // skipping forward let's skip a proper amount of bytes - requires some buffer
             for(int i = 0; i<delta; i++) {
                 char c;
@@ -342,7 +342,7 @@ bool MeatHttpClient::seek(uint32_t pos) {
             }
         }
 
-        m_position = pos;
+        _position = pos;
         Debug_printv("stream opened[%s]", url.c_str());
 
         return true;
@@ -352,11 +352,11 @@ bool MeatHttpClient::seek(uint32_t pos) {
 }
 
 uint32_t MeatHttpClient::read(uint8_t* buf, uint32_t size) {
-    if (m_isOpen) {
+    if (_is_open) {
         auto bytesRead= esp_http_client_read(m_http, (char *)buf, size );
         
         if(bytesRead>0) {
-            m_position+=bytesRead;
+            _position+=bytesRead;
         }
         return bytesRead;        
     }
@@ -364,9 +364,9 @@ uint32_t MeatHttpClient::read(uint8_t* buf, uint32_t size) {
 };
 
 uint32_t MeatHttpClient::write(const uint8_t* buf, uint32_t size) {
-    if (m_isOpen) {
+    if (_is_open) {
         auto bytesWritten= esp_http_client_write(m_http, (char *)buf, size );
-        m_position+=bytesWritten;
+        _position+=bytesWritten;
         return bytesWritten;        
     }
     return 0;
@@ -415,10 +415,10 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t meth, int resum
     //Debug_printv("--- PRE FETCH HEADERS");
 
     int lengthResp = esp_http_client_fetch_headers(m_http);
-    if(m_length == -1 && lengthResp > 0) {
+    if(_size == -1 && lengthResp > 0) {
         // only if we aren't chunked!
-        m_length = lengthResp;
-        m_position = 0;
+        _size = lengthResp;
+        _position = 0;
     }
 
     //Debug_printv("--- PRE GET STATUS CODE");
@@ -484,7 +484,7 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
             else if(mstr::equals("Content-Length", evt->header_key, false))
             {
                 //Debug_printv("* Content len present '%s'", evt->header_value);
-                meatClient->m_length = std::stoi(evt->header_value);
+                meatClient->_size = std::stoi(evt->header_value);
             }
             else if(mstr::equals("Location", evt->header_key, false))
             {
@@ -553,8 +553,8 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
                 if (esp_http_client_is_chunked_response(evt->client)) {
                     int len;
                     esp_http_client_get_chunk_length(evt->client, &len);
-                    meatClient->m_length = len;
-                    //Debug_printv("HTTP_EVENT_ON_DATA: Got chunked response, chunklen=%d, contentlen[%d]", len, meatClient->m_length);
+                    meatClient->_size = len;
+                    //Debug_printv("HTTP_EVENT_ON_DATA: Got chunked response, chunklen=%d, contentlen[%d]", len, meatClient->_size);
                 }
             }
             break;

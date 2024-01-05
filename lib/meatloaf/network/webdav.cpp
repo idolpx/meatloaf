@@ -63,7 +63,7 @@
 //  ********************************************************/
 
 // bool WebDAVOStream::seek(uint32_t pos) {
-//     if(pos==m_position)
+//     if(pos==_position)
 //         return true;
 
 //     if(isFriendlySkipper) {
@@ -78,11 +78,11 @@
 
 //         Debug_printv("stream opened[%s]", url.c_str());
 //         //m_file = m_http.getStream();  //Get the response payload as Stream
-//         m_position = pos;
+//         _position = pos;
 //         return true;
 
 //     } else {
-//         if(pos<m_position) {
+//         if(pos<_position) {
 //             // skipping backward and range not supported, let's simply reopen the stream...
 //             m_http.close();
 //             bool op = open();
@@ -90,10 +90,10 @@
 //                 return false;
 //         }
 
-//         m_position = 0;
+//         _position = 0;
 //         // ... and then read until we reach pos
-//         // while(m_position < pos) {
-//         //  m_position+=m_file.readBytes(buffer, size);  <----------- trurn this on!!!!
+//         // while(_position < pos) {
+//         //  _position+=m_file.readBytes(buffer, size);  <----------- trurn this on!!!!
 //         // }
 
 //         return true;
@@ -121,7 +121,7 @@
 //     // if(httpCode != 200)
 //     //     return false;
 
-//     m_isOpen = true;
+//     _is_open = true;
 //     //m_file = m_http.getStream();  //Get the response payload as Stream
 //     return true;
 // }
@@ -132,7 +132,7 @@
 // }
 
 // bool WebDAVOStream::isOpen() {
-//     return m_isOpen;
+//     return _is_open;
 // }
 
 
@@ -141,7 +141,7 @@
 //  ********************************************************/
 
 // bool WebDAVIStream::seek(uint32_t pos) {
-//     if(pos==m_position)
+//     if(pos==_position)
 //         return true;
 
 //     if(isFriendlySkipper) {
@@ -156,11 +156,11 @@
 
 //         Debug_printv("stream opened[%s]", url.c_str());
 //         //m_file = m_http.getStream();  //Get the response payload as Stream
-//         m_position = pos;
+//         _position = pos;
 //         return true;
 
 //     } else {
-//         if(pos<m_position) {
+//         if(pos<_position) {
 //             // skipping backward and range not supported, let's simply reopen the stream...
 //             m_http.close();
 //             bool op = open();
@@ -168,10 +168,10 @@
 //                 return false;
 //         }
 
-//         m_position = 0;
+//         _position = 0;
 //         // ... and then read until we reach pos
-//         // while(m_position < pos) {
-//         //  m_position+=m_file.readBytes(buffer, size);  <----------- trurn this on!!!!
+//         // while(_position < pos) {
+//         //  _position+=m_file.readBytes(buffer, size);  <----------- trurn this on!!!!
 //         // }
 
 //         return true;
@@ -203,11 +203,11 @@
 //     // Accept-Ranges: bytes - if we get such header from any request, good!
 //     isFriendlySkipper = m_http.get_header("accept-ranges") == "bytes";
 //     Debug_printv("isFriendlySkipper[%d]", isFriendlySkipper);
-//     m_isOpen = true;
+//     _is_open = true;
 //     Debug_printv("[%s]", url.c_str());
 //     //m_file = m_http.getStream();  //Get the response payload as Stream
-//     m_length = stoi(m_http.get_header("content-length"));
-//     Debug_printv("length=%d", m_length);
+//     _size = stoi(m_http.get_header("content-length"));
+//     Debug_printv("length=%d", _size);
 
 //     // Is this text?
 //     std::string ct = m_http.get_header("content-type").c_str();
@@ -219,10 +219,10 @@
 
 // uint32_t WebDAVIStream::read(uint8_t* buf, uint32_t size) {
 //     auto bytesRead= m_http.read( buf, size );
-//     m_position+=bytesRead;
+//     _position+=bytesRead;
 //     return bytesRead;
 // };
 
 // bool WebDAVIStream::isOpen() {
-//     return m_isOpen;
+//     return _is_open;
 // };

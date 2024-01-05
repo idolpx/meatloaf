@@ -64,16 +64,18 @@ public:
     //MFile* cd(std::string newDir);
     bool isDirectory() override;
     MStream* meatStream(std::ios_base::openmode mode=std::ios_base::in) override ; // has to return OPENED stream
-    time_t getLastWrite() override ;
-    time_t getCreationTime() override ;
-    bool rewindDirectory() override ;
-    MFile* getNextFileInDir() override ;
-    bool mkDir() override ;
-    bool exists() override ;
-    uint32_t size() override ;
-    bool remove() override ;
-    bool rename(std::string dest);
     MStream* createIStream(std::shared_ptr<MStream> src);
+
+    bool rewindDirectory() override;
+    MFile* getNextFileInDir() override;
+    bool mkDir() override;
+    bool exists() override;
+    bool remove() override;
+    bool rename(std::string dest);
+
+    time_t getLastWrite() override;
+    time_t getCreationTime() override;
+    uint32_t size() override;
 
     bool seekEntry( std::string filename );
 
@@ -89,7 +91,6 @@ private:
     std::string _pattern;
 
     bool pathValid(std::string path);
-
 };
 
 
@@ -126,7 +127,7 @@ public:
         localPath = path;
         mode = m;
         handle = std::make_unique<FlashHandle>();
-        url = path;
+        //url = path;
     }
     ~FlashIStream() override {
         close();
@@ -137,10 +138,10 @@ public:
     bool isRandomAccess() override { return true; };
 
     // MStream methods
-    uint32_t available() override;
-    uint32_t size() override;    
-    uint32_t position() override;
-    size_t error() override;
+    // uint32_t available() override;
+    // uint32_t size() override;
+    // uint32_t position() override;
+    // size_t error() override;
 
     virtual bool seek(uint32_t pos) override;
     virtual bool seek(uint32_t pos, int mode) override;    

@@ -60,7 +60,7 @@ public:
 
 protected:
     std::string url;
-    bool m_isOpen;
+    bool _is_open;
 
 //    WiFiClient m_file;
 	MeatHttpClient m_http;
@@ -98,7 +98,7 @@ public:
 
 protected:
     std::string url;
-    bool m_isOpen;
+    bool _is_open;
     bool isFriendlySkipper = false;
 
 //    WiFiClient m_file;
@@ -140,7 +140,7 @@ public:
 
 protected:
     std::string url;
-    bool m_isOpen;
+    bool _is_open;
     bool isFriendlySkipper = false;
     
 //    WiFiClient m_file;

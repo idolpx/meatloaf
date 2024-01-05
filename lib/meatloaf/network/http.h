@@ -62,16 +62,16 @@ public:
     uint32_t read(uint8_t* buf, uint32_t size);
     uint32_t write(const uint8_t* buf, uint32_t size);
 
-    bool m_isOpen = false;
-    bool m_exists = false;
+    bool _is_open = false;
+    bool _exists = false;
 
     uint32_t available() {
-        return m_length - m_position;
+        return _size - _position;
     }
 
-    uint32_t m_length = 0;
+    uint32_t _size = 0;
     // uint32_t m_bytesAvailable = 0;
-    uint32_t m_position = 0;
+    uint32_t _position = 0;
     // size_t m_error = 0;
 
     bool m_isWebDAV = false;

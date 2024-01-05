@@ -29,7 +29,7 @@
 class oiecstream : private std::filebuf, public std::ostream {
     char* data = nullptr;
     systemBus* m_iec = nullptr;
-    bool m_isOpen = false;
+    bool _is_open = false;
 
     size_t sendBytesViaIEC();
     size_t receiveBytesViaIEC();
@@ -61,7 +61,7 @@ public:
         setp(data, data+IEC_BUFFER_SIZE);
         if(iec != nullptr)
         {
-            m_isOpen = true;
+            _is_open = true;
             clear();
         }
     }
@@ -76,11 +76,11 @@ public:
             setp(data, data+IEC_BUFFER_SIZE);
         }
 
-        m_isOpen = false;
+        _is_open = false;
     }
 
     bool is_open() const {
-        return m_isOpen;
+        return _is_open;
     }    
 
     int overflow(int ch  = std::filebuf::traits_type::eof()) override;

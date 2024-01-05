@@ -313,7 +313,7 @@ bool TNFSIStream::open() {
         // Set file size
         fseek(handle->file_h, 0, SEEK_END);
         //Debug_printv("IStream: past fseek 1");
-        m_length = ftell(handle->file_h);
+        _size = ftell(handle->file_h);
         //Debug_printv("IStream: past ftell");
         fseek(handle->file_h, 0, SEEK_SET);
         //Debug_printv("IStream: past fseek 2");

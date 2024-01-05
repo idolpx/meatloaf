@@ -77,12 +77,12 @@ bool T64IStream::seekEntry( uint16_t index )
 uint16_t T64IStream::readFile(uint8_t* buf, uint16_t size) {
     uint16_t bytesRead = 0;
 
-    if (m_position < 2)
+    if (_position < 2)
     {
-        //Debug_printv("position[%d]", m_position);
+        //Debug_printv("position[%d]", _position);
 
         // Send Starting Address
-        buf[0] = entry.start_address[m_position];
+        buf[0] = entry.start_address[_position];
         bytesRead++;
     }
     else
@@ -90,7 +90,7 @@ uint16_t T64IStream::readFile(uint8_t* buf, uint16_t size) {
         bytesRead += containerStream->read(buf, size);
     }
 
-    m_position += bytesRead;
+    _position += bytesRead;
 
     return bytesRead;
 }
@@ -113,13 +113,13 @@ bool T64IStream::seekPath(std::string path) {
         Debug_printv("filename [%.16s] type[%s] start_address[%zu] end_address[%zu] data_offset[%zu]", entry.filename, type, start_address, end_address, data_offset);
 
         // Calculate file size
-        m_length = ( end_address - start_address ) + 2;
-        m_position = 0;
+        _size = ( end_address - start_address ) + 2;
+        _position = 0;
 
         // Set position to beginning of file
         containerStream->seek(entry.data_offset);
 
-        Debug_printv("File Size: size[%d] available[%d] position[%d]", m_length, available(), m_position);
+        Debug_printv("File Size: size[%d] available[%d] position[%d]", _size, available(), _position);
 
         return true;
     }

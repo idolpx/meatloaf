@@ -23,7 +23,7 @@ class CBMImageStream: public MStream {
 public:
     CBMImageStream(std::shared_ptr<MStream> is) {
         containerStream = is;
-        m_isOpen = true;
+        _is_open = true;
         has_subdirs = false;
     }
 
@@ -98,8 +98,8 @@ public:
     uint32_t write(const uint8_t *buf, uint32_t size) override;
     void reset() override {
         seekCalled = false;
-        m_position = 0;
-        m_length = block_size;
+        _position = 0;
+        _size = block_size;
         //m_load_address = {0, 0};
     }
 
@@ -111,7 +111,7 @@ protected:
     bool seekCalled = false;
     std::shared_ptr<MStream> containerStream;
 
-    bool m_isOpen = false;
+    bool _is_open = false;
 
     CBMImageStream* decodedStream;
 

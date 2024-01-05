@@ -18,9 +18,7 @@
 /* Returns pointer and size of next block of data from archive. */
 // The read callback returns the number of bytes read, zero for end-of-file, or a negative failure code as above.
 // It also returns a pointer to the block of data read.
-ssize_t myRead(struct archive *a, void *__src_stream, const void **buff);
-
-int myclose(struct archive *a, void *__src_stream);
+ssize_t cb_read(struct archive *a, void *__src_stream, const void **buff);
 
 /*
 It must return the number of bytes actually skipped, or a negative failure code if skipping cannot be done.
@@ -33,7 +31,11 @@ If skipping is not provided or fails, libarchive will call the read() function a
 * If you do skip fewer bytes than requested, libarchive will invoke your
 * read callback and discard data as necessary to make up the full skip.
 */
-int64_t myskip(struct archive *a, void *__src_stream, int64_t request);
+int64_t cb_skip(struct archive *a, void *__src_stream, int64_t request);
+
+int64_t cb_seek(struct archive *a, void *userData, int64_t offset, int whence);
+int cb_close(struct archive *a, void *__src_stream);
+
 
 /********************************************************
  * Streams implementations
@@ -50,7 +52,7 @@ class ArchiveStream : public MStream
     bool is_open = false;
 
 public:
-    static const size_t buffSize = 4096;
+    static const size_t buffSize = 256; // 4096;
     
     ArchiveStream(std::shared_ptr<MStream> srcStr);
     ~ArchiveStream();
@@ -68,7 +70,7 @@ public:
 
     // For files with no directory structure
     // tap, crt, tar
-//    std::string seekNextEntry() override;
+    //std::string seekNextEntry() override;
 
     virtual bool seek(uint32_t pos) override;
     ArchiveStreamData streamData;
@@ -80,6 +82,7 @@ protected:
 
 
 private:
+
 };
 
 /********************************************************
@@ -98,6 +101,10 @@ class ArchiveContainerFile : public MFile
 public:
     ArchiveContainerFile(std::string path) : MFile(path)
     {
+        // Find full filename for wildcard
+        if (mstr::contains(name, "?") || mstr::contains(name, "*"))
+            seekEntry( name );
+
         // media_header = name;
         media_archive = name;
     };
@@ -110,6 +117,8 @@ public:
         }
     }
 
+    std::string basepath = "";
+
     MStream *createIStream(std::shared_ptr<MStream> containerIstream);
 
     // archive file is always a directory
@@ -117,13 +126,14 @@ public:
     bool rewindDirectory() override;
     MFile *getNextFileInDir() override;
 
-    bool mkDir() override { return false; }
-    bool exists() override { return true; }
-    uint32_t size() override;
+    bool mkDir() override { return false; };
     bool remove() override { return true; }
     bool rename(std::string dest) { return true; }
+
     time_t getLastWrite() override { return 0; }
     time_t getCreationTime() override { return 0; }
+
+    bool seekEntry( std::string filename );
 
 private:
     bool prepareDirListing();

@@ -12,28 +12,18 @@
 // https://github.com/libarchive/libarchive/wiki/LibarchiveIO
 //
 // This callback is just a way to get bytes from srcStream into libarchive for processing
-ssize_t myRead(struct archive *a, void *userData, const void **buff)
+ssize_t cb_read(struct archive *a, void *userData, const void **buff)
 {
     ArchiveStreamData *streamData = (ArchiveStreamData *)userData;
     // 1. we have to call srcStr.read(...)
     ssize_t bc = streamData->srcStream->read(streamData->srcBuffer, ArchiveStream::buffSize);
     //std::string dump((char*)streamData->srcBuffer, bc);
-    Debug_printv("Libarch pulling data from src MStream, got bytes:%d", bc);
+    //Debug_printv("Libarch pulling data from src MStream, got bytes:%d", bc);
     //Debug_printv("Dumping bytes: %s", dump.c_str());
     // 2. set *buff to the bufer read in 1.
     *buff = streamData->srcBuffer;
     // 3. return read bytes count
     return bc;
-}
-
-int myclose(struct archive *a, void *userData)
-{
-    ArchiveStreamData *src_str = (ArchiveStreamData *)userData;
-    
-    Debug_printv("Libarch wants to close, but we do nothing here...");
-
-    // do we want to close srcStream here???
-    return (ARCHIVE_OK);
 }
 
 /*
@@ -48,9 +38,9 @@ If skipping is not provided or fails, libarchive will call the read() function a
 * read callback and discard data as necessary to make up the full skip.
 */
 // https://github.com/libarchive/libarchive/wiki/LibarchiveIO
-int64_t myskip(struct archive *a, void *userData, int64_t request)
+int64_t cb_skip(struct archive *a, void *userData, int64_t request)
 {
-    Debug_printv("Libarch wants to skip %d bytes", request);
+    Debug_printv("bytes[%d]", request);
     ArchiveStreamData *streamData = (ArchiveStreamData *)userData;
 
     if (streamData->srcStream->isOpen())
@@ -65,9 +55,9 @@ int64_t myskip(struct archive *a, void *userData, int64_t request)
     }
 }
 
-int64_t myseek(struct archive *a, void *userData, int64_t offset, int whence)
+int64_t cb_seek(struct archive *a, void *userData, int64_t offset, int whence)
 {
-    Debug_printv("Libarch requests seek, offset=%d, whence=%d (0=begin, 1=curr, 2=end)", offset, whence);
+    Debug_printv("offset[%d] whence[%d] (0=begin, 1=curr, 2=end)", offset, whence);
     ArchiveStreamData *streamData = (ArchiveStreamData *)userData;
 
     if (streamData->srcStream->isOpen())
@@ -81,6 +71,17 @@ int64_t myseek(struct archive *a, void *userData, int64_t offset, int whence)
         return ARCHIVE_FATAL;
     }
 }
+
+int cb_close(struct archive *a, void *userData)
+{
+    ArchiveStreamData *src_str = (ArchiveStreamData *)userData;
+    
+    Debug_printv("Libarch wants to close, but we do nothing here...");
+
+    // do we want to close srcStream here???
+    return (ARCHIVE_OK);
+}
+
 
 /********************************************************
  * Streams implementations
@@ -110,10 +111,10 @@ bool ArchiveStream::open()
     if (!is_open)
     {
         // TODO enable seek only if the stream is random access
-        archive_read_set_read_callback(a, myRead);
-        archive_read_set_skip_callback(a, myskip);
-        archive_read_set_seek_callback(a, myseek);
-        archive_read_set_close_callback(a, myclose);
+        archive_read_set_read_callback(a, cb_read);
+        archive_read_set_skip_callback(a, cb_skip);
+        archive_read_set_seek_callback(a, cb_seek);
+        archive_read_set_close_callback(a, cb_close);
         archive_read_set_callback_data(a, &streamData);
         Debug_printv("== BEGIN Calling open1 on archive instance ==========================");
         int r =  archive_read_open1(a);
@@ -130,6 +131,7 @@ void ArchiveStream::close()
 {
     if (is_open)
     {
+        archive_read_close(a);
         archive_read_free(a);
         is_open = false;
     }
@@ -145,11 +147,12 @@ std::vector<uint8_t> leftovers;
 
 uint32_t ArchiveStream::read(uint8_t *buf, uint32_t size)
 {
-    Debug_printv("calling read");
-    size_t incomingSize;
+    Debug_printv("calling read size[%d]", size);
     const void *incomingBuffer;
+    size_t incomingSize;
+    int64_t offset;
 
-    if (archive_read_data_block(a, &incomingBuffer, &incomingSize, NULL) == ARCHIVE_OK) {
+    if (archive_read_data_block(a, &incomingBuffer, &incomingSize, &offset) == ARCHIVE_OK) {
         // 'buff' contains the data of the current block
         // 'size' is the size of the current block
 
@@ -158,9 +161,9 @@ uint32_t ArchiveStream::read(uint8_t *buf, uint32_t size)
         leftovers.insert(leftovers.end(), incomingVector.begin(), incomingVector.end());
 
         if(leftovers.size() <= size) {
-            // ok, we can fit everything that was lerft and new data to our buffer
+            // ok, we can fit everything that was left and new data to our buffer
             auto size = leftovers.size();
-            m_position += size;
+            _position += size;
             leftovers.clear();
             return size;
         }
@@ -169,7 +172,7 @@ uint32_t ArchiveStream::read(uint8_t *buf, uint32_t size)
             std::copy(leftovers.begin(), leftovers.begin() + size, buf);
             std::vector<uint8_t> leftovers2(leftovers.begin() + size, leftovers.end());
             leftovers = leftovers2;
-            m_position += size;
+            _position += size;
             return size;
         }
     }
@@ -196,11 +199,10 @@ bool ArchiveStream::seekPath(std::string path)
     while (archive_read_next_header(a, &entry) == ARCHIVE_OK)
     {
         std::string entryFilename = archive_entry_pathname(entry);
-        m_length = archive_entry_size(entry);
-        m_position = 0;
-        //archive_entry_filetype(entry);
+        _size = archive_entry_size(entry);
+        _position = 0;
 
-        Debug_printv("filename[%s] entry.filename[%.16s] size[%d] available[%d]", path.c_str(), entryFilename.c_str(), m_length, available());
+        Debug_printv("filename[%s] entry.filename[%.16s] size[%d] available[%d]", path.c_str(), entryFilename.c_str(), _size, available());
 
         // Read Entry From Stream
         if (path == "*") // Match first PRG
@@ -282,30 +284,90 @@ MFile *ArchiveContainerFile::getNextFileInDir()
     Debug_printv("getNextFileInDir calling archive_read_next_header");
     if (archive_read_next_header(getArchive(), &entry) == ARCHIVE_OK)
     {
-        Debug_printv("getNextFileInDir found entry: %s", archive_entry_pathname(entry));
-        auto parent = this->cd(archive_entry_pathname(entry));
-        auto newFile = MFSOwner::File(parent);
-        // TODO - we can probably fill newFile with some info that is
-        // probably available in archive_entry structure!
-        //newFile->size(archive_entry_size(entry)); // etc.
-
-        return newFile;
+        std::string fileName = archive_entry_pathname(entry);
+        auto file = MFSOwner::File(streamFile->url + "/" + fileName);
+        file->_size = archive_entry_size(entry);
+        file->_exists = true;
+        return file;
     }
     else
     {
-        Debug_printv("getNextFileInDir found no more entries, closing the stream");
-        dirStream->close();
-
         //Debug_printv( "END OF DIRECTORY");
+        dirStream->close();
         dirIsOpen = false;
         return nullptr;
     }
 }
 
-uint32_t ArchiveContainerFile::size()
+
+bool ArchiveContainerFile::seekEntry( std::string filename )
 {
-    return 0;
+    std::string apath = (basepath + pathToFile()).c_str();
+    if (apath.empty()) {
+        apath = "/";
+    }
+
+    Debug_printv( "path[%s] filename[%s] size[%d]", apath.c_str(), filename.c_str(), filename.size());
+
+    // Open directory
+    if ( !prepareDirListing() )
+        return false;
+
+    // Read Directory Entries
+    if ( filename.size() > 0 )
+    {
+        struct archive_entry *entry;
+        bool found = false;
+        bool wildcard =  ( mstr::contains(filename, "*") || mstr::contains(filename, "?") );
+        while ( archive_read_next_header(getArchive(), &entry) == ARCHIVE_OK )
+        {
+            std::string entryFilename = archive_entry_pathname(entry);
+
+            Debug_printv("path[%s] filename[%s] entry.filename[%.16s]", apath.c_str(), filename.c_str(), entryFilename.c_str());
+
+            // Check filetype
+            if ( archive_entry_filetype(entry) == AE_IFDIR )
+                isDir = true;
+            else
+                isDir = false;
+
+            // Read Entry From Stream
+            if (filename == "*") // Match first entry
+            {
+                filename = entryFilename;
+                found = true;
+            }
+            else if ( filename == entryFilename ) // Match exact
+            {
+                found = true;
+            }
+            else if ( wildcard )
+            {
+                if ( mstr::compare(filename, entryFilename) ) // X?XX?X* Wildcard match
+                {
+                    // Set filename to this filename
+                    Debug_printv( "Found! file[%s] -> entry[%s]", filename.c_str(), entryFilename.c_str() );
+                    resetURL(apath + "/" + entryFilename);
+                    found = true;
+                }
+            }
+
+            if ( found )
+            {
+                _exists = true;
+                _size = archive_entry_size(entry);
+                dirStream->close();
+                return true;
+            }
+        }
+
+        Debug_printv( "Not Found! file[%s]", filename.c_str() );
+    }
+
+    dirStream->close();
+    return false;
 }
+
 
 bool ArchiveContainerFile::prepareDirListing()
 {

@@ -174,13 +174,9 @@ MFile* MFSOwner::File(std::string path) {
     //     return csFS.getFile(path);
     // }
 
-    // // If it's a local file wildcard match and return full path
-    // if ( device_config.image().empty() )
-    //     path = existsLocal(path);
-
     std::vector<std::string> paths = mstr::split(path,'/');
 
-    //Debug_printv("Trying to factory path [%s]", path.c_str());
+    Debug_printv("Trying to factory path [%s]", path.c_str());
 
     auto pathIterator = paths.end();
     auto begin = paths.begin();
@@ -191,24 +187,24 @@ MFile* MFSOwner::File(std::string path) {
     if(foundFS != nullptr) {
         Debug_printv("PATH: '%s' is in FS [%s]", path.c_str(), foundFS->symbol);
         auto newFile = foundFS->getFile(path);
-        //Debug_printv("newFile: '%s'", newFile->url.c_str());
+        Debug_printv("newFile: '%s'", newFile->url.c_str());
 
         pathIterator++;
         newFile->pathInStream = mstr::joinToString(&pathIterator, &end, "/");
-        //Debug_printv("newFile->pathInStream: '%s'", newFile->pathInStream.c_str());
+        Debug_printv("newFile->pathInStream: '%s'", newFile->pathInStream.c_str());
 
         auto endHere = pathIterator;
         pathIterator--;
 
         if(begin == pathIterator) 
         {
-            //Debug_printv("** LOOK DOWN PATH NOT NEEDED   path[%s]", path.c_str());
+            Debug_printv("** LOOK DOWN PATH NOT NEEDED   path[%s]", path.c_str());
             newFile->streamFile = foundFS->getFile(mstr::joinToString(&begin, &pathIterator, "/"));
         } 
         else 
         {
             auto upperPath = mstr::joinToString(&begin, &pathIterator, "/");
-            //Debug_printv("** LOOK DOWN PATH: %s", upperPath.c_str());
+            Debug_printv("** LOOK DOWN PATH: %s", upperPath.c_str());
 
             auto upperFS = testScan(begin, end, pathIterator);
 

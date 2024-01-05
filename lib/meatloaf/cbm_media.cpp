@@ -91,14 +91,14 @@ uint32_t CBMImageStream::read(uint8_t* buf, uint32_t size) {
         bytesRead = containerStream->read(buf, size);
     }
 
-    m_position += bytesRead;
+    _position += bytesRead;
 
     return bytesRead;
 };
 
 bool CBMImageStream::isOpen() {
 
-    return m_isOpen;
+    return _is_open;
 };
 
 

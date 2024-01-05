@@ -78,11 +78,11 @@ bool TCRTIStream::seekEntry( uint16_t index )
 uint16_t TCRTIStream::readFile(uint8_t* buf, uint16_t size) {
     uint16_t bytesRead = 0;
 
-    if ( m_position < 2)
+    if ( _position < 2)
     {
         Debug_printv("send load address[%4X]", m_load_address);
 
-        buf[0] = m_load_address[m_position];
+        buf[0] = m_load_address[_position];
         bytesRead++;
         // if ( size > 1 )
         // {
@@ -96,7 +96,7 @@ uint16_t TCRTIStream::readFile(uint8_t* buf, uint16_t size) {
         bytesRead += containerStream->read(buf, size);
     }
 
-    m_position += bytesRead;
+    _position += bytesRead;
 
     return bytesRead;
 }
@@ -116,7 +116,7 @@ bool TCRTIStream::seekPath(std::string path) {
         Debug_printv("filename [%.16s] type[%s]", entry.filename, type);
 
         // Calculate file size
-        m_length = (entry.file_size[0] | (entry.file_size[1] << 8) | (entry.file_size[2] << 16)) + 2; // 2 bytes for load address
+        _size = (entry.file_size[0] | (entry.file_size[1] << 8) | (entry.file_size[2] << 16)) + 2; // 2 bytes for load address
 
         // Load Address
         m_load_address[0] = entry.file_load_address[0];
@@ -126,7 +126,7 @@ bool TCRTIStream::seekPath(std::string path) {
         uint32_t file_start_address = (0xD8 + (entry.file_start_address[0] << 8 | entry.file_start_address[1]));
         containerStream->seek(file_start_address);
 
-        Debug_printv("File Size: size[%d] available[%d]", m_length, available());
+        Debug_printv("File Size: size[%d] available[%d]", _size, available());
         
         return true;
     }

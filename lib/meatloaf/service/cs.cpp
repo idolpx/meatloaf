@@ -133,12 +133,12 @@ bool CServerSessionMgr::traversePath(MFile* path) {
 
 
 void CServerIStream::close() {
-    m_isOpen = false;
+    _is_open = false;
 };
 
 bool CServerIStream::open() {
     auto file = std::make_unique<CServerFile>(url);
-    m_isOpen = false;
+    _is_open = false;
 
     if(file->isDirectory())
         return false; // or do we want to stream whole d64 image? :D
@@ -158,17 +158,17 @@ bool CServerIStream::open() {
         if(buffer[0]=='?' && buffer[1]=='5') {
             Debug_printv("CServer: open file failed");
             CServerFileSystem::session.readLn();
-            m_isOpen = false;
+            _is_open = false;
         }
         else {
-            m_length = buffer[0] + buffer[1]*256; // put len here
+            _size = buffer[0] + buffer[1]*256; // put len here
             // if everything was ok
-            Serial.printf("CServer: file open, size: %d\r\n", m_length);
-            m_isOpen = true;
+            Serial.printf("CServer: file open, size: %d\r\n", _size);
+            _is_open = true;
         }
     }
 
-    return m_isOpen;
+    return _is_open;
 };
 
 // MStream methods
@@ -180,13 +180,13 @@ uint32_t CServerIStream::write(const uint8_t *buf, uint32_t size) {
 uint32_t CServerIStream::read(uint8_t* buf, uint32_t size)  {
     //Debug_printv("CServerIStream::read");
     auto bytesRead = CServerFileSystem::session.receive(buf, size);
-    m_position+=bytesRead;
+    _position+=bytesRead;
     //ledTogg(true);
     return bytesRead;
 };
 
 bool CServerIStream::isOpen() {
-    return m_isOpen;
+    return _is_open;
 }
 
 

@@ -276,10 +276,10 @@ public:
 
 protected:
     std::string url;
-    bool m_isOpen;
-    // uint32_t m_length;
+    bool _is_open;
+    // uint32_t _size;
     // uint32_t m_bytesAvailable = 0;
-    // uint32_t m_position = 0;
+    // uint32_t _position = 0;
 };
 
 

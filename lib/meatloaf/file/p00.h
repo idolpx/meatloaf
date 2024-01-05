@@ -39,7 +39,7 @@ protected:
             entry_index = 1;
             seekHeader();
 
-            m_length = ( containerStream->size() - sizeof(header) );
+            _size = ( containerStream->size() - sizeof(header) );
 
             return true;
         }

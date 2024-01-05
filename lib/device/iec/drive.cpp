@@ -962,6 +962,11 @@ void iecDrive::sendListing()
             if (entry->extension.length())
             {
                 extension = entry->extension;
+
+                // Change extension to PRG if it is non-standard
+                std::string valid_extensions = "delseqprgusrrelcbm";
+                if ( mstr::contains(valid_extensions, extension.c_str()) )
+                    extension = "prg";
             }
             else
             {
