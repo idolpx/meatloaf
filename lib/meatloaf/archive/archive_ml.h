@@ -55,6 +55,7 @@ public:
     static const size_t buffSize = 256; // 4096;
     ArchiveStreamData streamData;
     struct archive *a;
+    struct archive_entry *entry;
 
     ArchiveStream(std::shared_ptr<MStream> srcStr);
     ~ArchiveStream();
@@ -76,8 +77,8 @@ public:
 
     virtual bool seek(uint32_t pos) override;
 
-
     bool isRandomAccess() override { return true; };
+    bool seekEntry( std::string filename );
 
 protected:
 
@@ -102,10 +103,6 @@ class ArchiveContainerFile : public MFile
 public:
     ArchiveContainerFile(std::string path) : MFile(path)
     {
-        // Find full filename for wildcard
-        if (mstr::contains(name, "?") || mstr::contains(name, "*"))
-            seekEntry( name );
-
         // media_header = name;
         media_archive = name;
     };
@@ -134,8 +131,6 @@ public:
 
     time_t getLastWrite() override { return 0; }
     time_t getCreationTime() override { return 0; }
-
-    bool seekEntry( std::string filename );
 
 private:
     bool prepareDirListing();

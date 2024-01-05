@@ -102,6 +102,7 @@ ArchiveStream::ArchiveStream(std::shared_ptr<MStream> srcStr)
     archive_read_support_filter_all(a);
     archive_read_support_format_all(a);
     streamData.srcBuffer = new uint8_t[buffSize];
+    open();
 }
 
 ArchiveStream::~ArchiveStream()
@@ -154,16 +155,12 @@ std::vector<uint8_t> leftovers;
 
 uint32_t ArchiveStream::read(uint8_t *buf, uint32_t size)
 {
-    if (!is_open)
-        open();
-
     Debug_printv("calling read size[%d]", size);
-    //const void *incomingBuffer;
-    //size_t incomingSize;
-    //int64_t offset;
+    const void *incomingBuffer;
+    size_t incomingSize;
+    int64_t offset;
 
-    //int r = archive_read_data_block(a, &incomingBuffer, &incomingSize, &offset);
-    int r = archive_read_data(a, buf, size);
+    int r = archive_read_data_block(a, &incomingBuffer, &incomingSize, &offset);
     Debug_printv("r[%d]", r);
     if ( r == ARCHIVE_EOF )
         return 0;
@@ -174,23 +171,23 @@ uint32_t ArchiveStream::read(uint8_t *buf, uint32_t size)
     // 'buff' contains the data of the current block
     // 'size' is the size of the current block
 
-    // std::vector<uint8_t> incomingVector((uint8_t*)incomingBuffer, (uint8_t*)incomingBuffer + incomingSize);
-    // // concatenate intermediate buffer with incomingVector
-    // leftovers.insert(leftovers.end(), incomingVector.begin(), incomingVector.end());
+    std::vector<uint8_t> incomingVector((uint8_t*)incomingBuffer, (uint8_t*)incomingBuffer + incomingSize);
+    // concatenate intermediate buffer with incomingVector
+    leftovers.insert(leftovers.end(), incomingVector.begin(), incomingVector.end());
 
-    // if(leftovers.size() <= size) {
-    //     // ok, we can fit everything that was left and new data to our buffer
-    //     auto size = leftovers.size();
-    //     _position += size;
-    //     leftovers.clear();
-    // }
-    // else {
-    //     // ok, so we can only write up to size and we have to keep leftovers for next time
-    //     std::copy(leftovers.begin(), leftovers.begin() + size, buf);
-    //     std::vector<uint8_t> leftovers2(leftovers.begin() + size, leftovers.end());
-    //     leftovers = leftovers2;
-    //     _position += size;
-    // }
+    if(leftovers.size() <= size) {
+        // ok, we can fit everything that was left and new data to our buffer
+        auto size = leftovers.size();
+        _position += size;
+        leftovers.clear();
+    }
+    else {
+        // ok, so we can only write up to size and we have to keep leftovers for next time
+        std::copy(leftovers.begin(), leftovers.begin() + size, buf);
+        std::vector<uint8_t> leftovers2(leftovers.begin() + size, leftovers.end());
+        leftovers = leftovers2;
+        _position += size;
+    }
     _position += size;
 
     Debug_printv("size[%d] position[%d]", size, _position);
@@ -208,38 +205,70 @@ uint32_t ArchiveStream::write(const uint8_t *buf, uint32_t size)
 bool ArchiveStream::seekPath(std::string path)
 {
     Debug_printv("seekPath called for path: %s", path.c_str());
-    bool wildcard =  ( mstr::contains(path, "*") || mstr::contains(path, "?") );
 
-    struct archive_entry *entry;
-    while (archive_read_next_header(a, &entry) == ARCHIVE_OK)
+    if ( seekEntry( path ) )
     {
-        std::string entryFilename = archive_entry_pathname(entry);
-        _size = archive_entry_size(entry);
-        _position = 0;
+        Debug_printv("entry[%s]", archive_entry_pathname(entry));
+        return true;
+    }
 
-        Debug_printv("filename[%s] entry.filename[%.16s] size[%d] available[%d]", path.c_str(), entryFilename.c_str(), _size, available());
+    return false;
+}
 
-        // Read Entry From Stream
-        if (path == "*") // Match first PRG
+
+bool ArchiveStream::seekEntry( std::string filename )
+{
+    Debug_printv( "filename[%s] size[%d]", filename.c_str(), filename.size());
+
+    // Read Directory Entries
+    if ( filename.size() > 0 )
+    {
+        bool found = false;
+        bool wildcard =  ( mstr::contains(filename, "*") || mstr::contains(filename, "?") );
+        while ( archive_read_next_header(a, &entry) == ARCHIVE_OK )
         {
-            path = entryFilename;
-            return true;
-        }
-        else if ( path == entryFilename ) // Match exact
-        {
-            return true;
-        }
-        else if ( wildcard )
-        {
-            if ( mstr::compare(path, entryFilename) ) // X?XX?X* Wildcard match
+            std::string entryPath = ""; //archive_entry_sourcepath(entry);
+            std::string entryFilename = archive_entry_pathname(entry);
+
+            Debug_printv("path[%s] filename[%s] entry.filename[%.16s]", entryPath.c_str(), filename.c_str(), entryFilename.c_str());
+
+            // Check filetype
+            if ( archive_entry_filetype(entry) != AE_IFDIR )
             {
-                // Move stream pointer to start track/sector
-                return true;
+                // Read Entry From Stream
+                if (filename == "*") // Match first entry
+                {
+                    filename = entryFilename;
+                    found = true;
+                }
+                else if ( filename == entryFilename ) // Match exact
+                {
+                    found = true;
+                }
+                else if ( wildcard )
+                {
+                    if ( mstr::compare(filename, entryFilename) ) // X?XX?X* Wildcard match
+                    {
+                        // Set filename to this filename
+                        Debug_printv( "Found! file[%s] -> entry[%s]", filename.c_str(), entryFilename.c_str() );
+                        found = true;
+                    }
+                }
+
+                if ( found )
+                {
+                    _size = archive_entry_size(entry);
+                    
+                    return true;
+                }
             }
         }
+
+        Debug_printv( "Not Found! file[%s]", filename.c_str() );
     }
+
     return false;
-};
+}
 
 // // For files with no directory structure
 // // tap, crt, tar
@@ -267,8 +296,6 @@ MStream *ArchiveContainerFile::getDecodedStream(std::shared_ptr<MStream> contain
     // TODO - we can get password from this URL and pass it as a parameter to this constructor
     Debug_printv("calling getDecodedStream for ArchiveContainerFile, we should return open stream");
     auto stream = new ArchiveStream(containerIstream);
-    stream->open();
-
     return stream;
 }
 
@@ -313,76 +340,6 @@ MFile *ArchiveContainerFile::getNextFileInDir()
         return nullptr;
     }
 }
-
-
-bool ArchiveContainerFile::seekEntry( std::string filename )
-{
-    std::string apath = (basepath + pathToFile()).c_str();
-    if (apath.empty()) {
-        apath = "/";
-    }
-
-    Debug_printv( "path[%s] filename[%s] size[%d]", apath.c_str(), filename.c_str(), filename.size());
-
-    // Open directory
-    if ( !prepareDirListing() )
-        return false;
-
-    // Read Directory Entries
-    if ( filename.size() > 0 )
-    {
-        struct archive_entry *entry;
-        bool found = false;
-        bool wildcard =  ( mstr::contains(filename, "*") || mstr::contains(filename, "?") );
-        while ( archive_read_next_header(getArchive(), &entry) == ARCHIVE_OK )
-        {
-            std::string entryFilename = archive_entry_pathname(entry);
-
-            Debug_printv("path[%s] filename[%s] entry.filename[%.16s]", apath.c_str(), filename.c_str(), entryFilename.c_str());
-
-            // Check filetype
-            if ( archive_entry_filetype(entry) == AE_IFDIR )
-                isDir = true;
-            else
-                isDir = false;
-
-            // Read Entry From Stream
-            if (filename == "*") // Match first entry
-            {
-                filename = entryFilename;
-                found = true;
-            }
-            else if ( filename == entryFilename ) // Match exact
-            {
-                found = true;
-            }
-            else if ( wildcard )
-            {
-                if ( mstr::compare(filename, entryFilename) ) // X?XX?X* Wildcard match
-                {
-                    // Set filename to this filename
-                    Debug_printv( "Found! file[%s] -> entry[%s]", filename.c_str(), entryFilename.c_str() );
-                    resetURL(apath + "/" + entryFilename);
-                    found = true;
-                }
-            }
-
-            if ( found )
-            {
-                _exists = true;
-                _size = archive_entry_size(entry);
-                dirStream->close();
-                return true;
-            }
-        }
-
-        Debug_printv( "Not Found! file[%s]", filename.c_str() );
-    }
-
-    dirStream->close();
-    return false;
-}
-
 
 bool ArchiveContainerFile::prepareDirListing()
 {
