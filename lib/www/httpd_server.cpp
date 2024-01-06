@@ -16,9 +16,9 @@
 //#include <cstdlib>
 
 // WebDAV
-#include "webdav_server.h"
-#include "request.h"
-#include "response.h"
+#include "webdav/webdav_server.h"
+#include "webdav/request.h"
+#include "webdav/response.h"
 
 #include "fnSystem.h"
 #include "fnConfig.h"
