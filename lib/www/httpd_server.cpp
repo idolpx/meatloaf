@@ -6,15 +6,19 @@
 // #include "meat_io.h"
 // #include "meat_stream.h"
 
-#include "freertos/FreeRTOS.h"
-#include "esp_log.h"
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <esp_system.h>
+//#include "esp_log.h"
 #include <esp_http_server.h>
 #include <esp_log.h>
 #include <sys/stat.h>
+//#include <cstdlib>
 
-#include <webdav_server.h>
-#include <request.h>
-#include <response.h>
+// WebDAV
+#include "webdav_server.h"
+#include "request.h"
+#include "response.h"
 
 #include "fnSystem.h"
 #include "fnConfig.h"
@@ -36,6 +40,11 @@
      _a > _b ? _a : _b; })
 
 cHttpdServer oHttpdServer;
+
+struct async_resp_arg {
+    httpd_handle_t hd;
+    int fd;
+};
 
 long file_size(FILE *fd)
 {
@@ -103,6 +112,87 @@ esp_err_t cHttpdServer::post_handler(httpd_req_t *httpd_req)
     const char resp[] = "URI POST Response";
     httpd_resp_send(httpd_req, resp, HTTPD_RESP_USE_STRLEN);
     return ESP_OK;
+}
+
+
+esp_err_t cHttpdServer::websocket_handler(httpd_req_t *req)
+{
+    if (req->method == HTTP_GET) {
+        Debug_printv("Handshake done, the new connection was opened");
+        return ESP_OK;
+    }
+    httpd_ws_frame_t ws_pkt;
+    uint8_t *buf = NULL;
+    memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
+    ws_pkt.type = HTTPD_WS_TYPE_TEXT;
+    /* Set max_len = 0 to get the frame len */
+    esp_err_t ret = httpd_ws_recv_frame(req, &ws_pkt, 0);
+    if (ret != ESP_OK) {
+        Debug_printv("httpd_ws_recv_frame failed to get frame len with %d", ret);
+        return ret;
+    }
+    Debug_printv("frame len is %d", ws_pkt.len);
+    if (ws_pkt.len) {
+        /* ws_pkt.len + 1 is for NULL termination as we are expecting a string */
+        buf = (uint8_t *)calloc(1, ws_pkt.len + 1);
+        if (buf == NULL) {
+            Debug_printv("Failed to calloc memory for buf");
+            return ESP_ERR_NO_MEM;
+        }
+        ws_pkt.payload = buf;
+        /* Set max_len = ws_pkt.len to get the frame payload */
+        ret = httpd_ws_recv_frame(req, &ws_pkt, ws_pkt.len);
+        if (ret != ESP_OK) {
+            Debug_printv("httpd_ws_recv_frame failed with %d", ret);
+            free(buf);
+            return ret;
+        }
+        Debug_printv("Got packet with message: %s", ws_pkt.payload);
+    }
+    Debug_printv("Packet type: %d", ws_pkt.type);
+    if (ws_pkt.type == HTTPD_WS_TYPE_TEXT &&
+        strcmp((char*)ws_pkt.payload,"Trigger async") == 0) {
+        free(buf);
+        return websocket_trigger_async_send(req->handle, req);
+    }
+
+    ret = httpd_ws_send_frame(req, &ws_pkt);
+    if (ret != ESP_OK) {
+        Debug_printv("httpd_ws_send_frame failed with %d", ret);
+    }
+    free(buf);
+    return ret;
+}
+
+esp_err_t cHttpdServer::websocket_trigger_async_send(httpd_handle_t handle, httpd_req_t *req)
+{
+    struct async_resp_arg *resp_arg = (async_resp_arg *)malloc(sizeof(struct async_resp_arg));
+    if (resp_arg == NULL) {
+        return ESP_ERR_NO_MEM;
+    }
+    resp_arg->hd = req->handle;
+    resp_arg->fd = httpd_req_to_sockfd(req);
+    esp_err_t ret = httpd_queue_work(handle, websocket_async_send, resp_arg);
+    if (ret != ESP_OK) {
+        free(resp_arg);
+    }
+    return ret;
+}
+
+void cHttpdServer::websocket_async_send(void *arg)
+{
+    static const char * data = "Async data";
+    struct async_resp_arg *resp_arg = (async_resp_arg *)arg;
+    httpd_handle_t hd = resp_arg->hd;
+    int fd = resp_arg->fd;
+    httpd_ws_frame_t ws_pkt;
+    memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
+    ws_pkt.payload = (uint8_t*)data;
+    ws_pkt.len = strlen(data);
+    ws_pkt.type = HTTPD_WS_TYPE_TEXT;
+
+    httpd_ws_send_frame_async(hd, fd, &ws_pkt);
+    free(resp_arg);
 }
 
 esp_err_t cHttpdServer::webdav_handler(httpd_req_t *httpd_req)
@@ -180,6 +270,19 @@ esp_err_t cHttpdServer::webdav_handler(httpd_req_t *httpd_req)
     return ret;
 }
 
+void cHttpdServer::websocket_register(httpd_handle_t server)
+{
+    httpd_uri_t ws = {
+        .uri = "/ws",
+        .method = HTTP_GET,
+        .handler = websocket_handler,
+        .user_ctx = NULL,
+        .is_websocket = true
+    };
+
+    httpd_register_uri_handler(server, &ws);
+}
+
 void cHttpdServer::webdav_register(httpd_handle_t server, const char *root_uri, const char *root_path)
 {
     WebDav::Server *webDavServer = new WebDav::Server(root_uri, root_path);
@@ -187,13 +290,13 @@ void cHttpdServer::webdav_register(httpd_handle_t server, const char *root_uri, 
     char *uri;
     asprintf(&uri, "%s/?*", root_uri);
 
-    httpd_uri_t uri_dav =
-        {
-            .uri = uri,
-            .method = http_method(0),
-            .handler = webdav_handler,
-            .user_ctx = webDavServer,
-            .is_websocket = false};
+    httpd_uri_t uri_dav = {
+        .uri = uri,
+        .method = http_method(0),
+        .handler = webdav_handler,
+        .user_ctx = webDavServer,
+        .is_websocket = false
+    };
 
     http_method methods[] = {
         HTTP_COPY,
@@ -268,23 +371,25 @@ httpd_handle_t cHttpdServer::start_server(serverstate &state)
         .method = HTTP_POST,
         .handler = post_handler,
         .user_ctx = NULL,
-        .is_websocket = false};
+        .is_websocket = false
+    };
 
     if (httpd_start(&(state.hServer), &config) == ESP_OK)
     {
         /* Register URI handlers */
+        websocket_register(state.hServer);
         webdav_register(state.hServer, "/dav", "/sd");
 
         // Default handlers
         httpd_register_uri_handler(state.hServer, &uri_get);
         httpd_register_uri_handler(state.hServer, &uri_post);
 
-        Serial.println(ANSI_GREEN_BOLD "WWW/WebDAV Server Started!" ANSI_RESET);
+        Serial.println(ANSI_GREEN_BOLD "WWW/WS/WebDAV Server Started!" ANSI_RESET);
     }
     else
     {
         state.hServer = NULL;
-        Serial.println(ANSI_RED_BOLD "WWW/WebDAV Server FAILED to start!" ANSI_RESET);
+        Serial.println(ANSI_RED_BOLD "WWW/WS/WebDAV Server FAILED to start!" ANSI_RESET);
     }
 
     return state.hServer;

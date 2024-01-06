@@ -1,0 +1,136 @@
+<!DOCTYPE HTML>
+<html>
+
+<head>
+    <title>ESP32 Web Server</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" href="data:,">
+    <style>
+        html {
+            font-family: New Times Roman;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            color: white;
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #07156d;
+        }
+
+        .card {
+            background-color: #F8F7F9;
+            ;
+            box-shadow: 2px 2px 12px 1px rgba(140, 140, 140, .5);
+            padding-top: 10px;
+            padding-bottom: 20px;
+        }
+
+        .topnav {
+            overflow: hidden;
+            background-color: #04296d;
+        }
+
+        body {
+            margin: 0;
+        }
+
+        .content {
+            padding: 30px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .button {
+            padding: 15px 50px;
+            font-size: 24px;
+            text-align: center;
+            outline: none;
+            color: #fff;
+            background-color: #0ffa6d; //green
+            border: #0ffa6d;
+            border-radius: 5px;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+        }
+
+        .button:active {
+            background-color: #fa0f0f;
+            transform: translateY(2px);
+        }
+
+        .state {
+            font-size: 1.5rem;
+            color: #120707;
+            font-weight: bold;
+        }
+    </style>
+    <title>ESP32 Web Server</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" href="data:,">
+</head>
+
+<body>
+    <div class="topnav">
+        <h1>ESP32 WebSocket Server</h1>
+    </div>
+    <div class="content">
+        <div class="card">
+            <h2>ONBOARD LED GPIO2</h2>
+            <p><button id="button" class="button">Toggle LED</button></p>
+            <p class="state">State: <span id="state">%s</span></p>
+        </div>
+    </div>
+    </div>
+    <script>
+        var gateway = `ws://${window.location.hostname}/ws`;
+        var websocket;
+        window.addEventListener('load', onLoad);
+        function initWebSocket() {
+            console.log('Trying to open a WebSocket connection...');
+            websocket = new WebSocket(gateway);
+            websocket.onopen = onOpen;
+            websocket.onclose = onClose;
+            websocket.onmessage = onMessage; // <-- add this line
+        }
+        function onOpen(event) {
+            console.log('Connection opened');
+        }
+        function onClose(event) {
+            console.log('Connection closed');
+            setTimeout(initWebSocket, 2000);
+        }
+        function onMessage(event) {
+            var state;
+            console.log(event.data);
+            if (event.data == "1") {
+                state = "ON";
+            }
+            else {
+                state = "OFF";
+            }
+            document.getElementById('state').innerHTML = state;
+        }
+        function onLoad(event) {
+            initWebSocket();
+            initButton();
+        }
+        function initButton() {
+            document.getElementById('button').addEventListener('click', toggle);
+        }
+        function toggle() {
+            websocket.send('toggle');
+        }
+    </script>
+</body>
+
+</html>
