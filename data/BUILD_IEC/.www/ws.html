@@ -7,7 +7,7 @@
     <link rel="icon" href="data:,">
     <style>
         html {
-            font-family: New Times Roman;
+            font-family: Arial, Helvetica, sans-serif;
             text-align: center;
         }
 
@@ -29,10 +29,19 @@
             padding-top: 10px;
             padding-bottom: 20px;
         }
+        .card input {
+            width: 80%;
+            height: 2em;
+            font-size: 24px;
+            text-align: center;
+        }
 
         .topnav {
             overflow: hidden;
-            background-color: #04296d;
+            background-color: #4d4d4d;
+        }
+        .topnav img {
+            height: 100px;
         }
 
         body {
@@ -74,20 +83,21 @@
             font-weight: bold;
         }
     </style>
-    <title>ESP32 Web Server</title>
+    <title>Meatloaf WebSocket Test</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" href="data:,">
 </head>
 
 <body>
     <div class="topnav">
-        <h1>ESP32 WebSocket Server</h1>
+        <img src="assets/logo.svg" />
+        <h1>WebSocket Test</h1>
     </div>
     <div class="content">
         <div class="card">
-            <h2>ONBOARD LED GPIO2</h2>
-            <p><button id="button" class="button">Toggle LED</button></p>
-            <p class="state">State: <span id="state">%s</span></p>
+            <h2>COMMAND</h2>
+            <input id="command" type="text"/>
+            <p><button id="button" class="button">Execute</button></p>
         </div>
     </div>
     </div>
@@ -112,23 +122,18 @@
         function onMessage(event) {
             var state;
             console.log(event.data);
-            if (event.data == "1") {
-                state = "ON";
-            }
-            else {
-                state = "OFF";
-            }
-            document.getElementById('state').innerHTML = state;
         }
         function onLoad(event) {
             initWebSocket();
             initButton();
         }
         function initButton() {
-            document.getElementById('button').addEventListener('click', toggle);
+            document.getElementById('button').addEventListener('click', execute);
         }
-        function toggle() {
-            websocket.send('toggle');
+        function execute() {
+            var command = document.getElementById('command').value;
+            console.log(command);
+            websocket.send(command);
         }
     </script>
 </body>
