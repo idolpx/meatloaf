@@ -94,3 +94,7 @@ Once that is done just you can get a directory listing on your C64 with Meatloaf
 ```
 LOAD"HTTP://YOURDOMAIN.COM/PATH",8
 ```
+
+# Advanced documentation
+
+Adding new file systems to Meatloaf: [Link](doc/filesystems.md)
