@@ -33,6 +33,25 @@ Examples of Meatloaf _Bottom Streams_ are:
 ## getSourceStream
 This method provides _Source Stream_ for your filesystem. The `getSourceStream` method default implementation does exactly that - provides you with a source stream of bytes on which you will be building your _Decoder Stream_. The default implementation of this method does all the magic of giving you the data, regardless of where your source file (ZIP archive in our example) sits, on FTP, HTTP, inside D64 on HTTP, inside a D64 on a RAR in SMB...
 So why do we mention this method? Well, there's only one case when you have to override it - when implementing a _Bottom Stream_! So, if you're developing such "root" filesystem, all this method has to return is a stream that allows reading from this very file system. 
+
+It's also important to understand how Meatloaf resolves the URL path when trying to prepare such _Source Stream_. Let's assume, an user tries to obtain a stream of such file:
+
+```http://some-server.com/storage/new_files/copy_party_2024.zip/g/gta64/disk1.d64/start```
+
+Meatloaf will scann the path __from right to left__ to match topmost filesystem that will serve the stream. Going from right:
+
+- `start` will not match anything
+- `disk1.d64` will match a D64 filesystem, so this will be file start in D64 filesystem, but since this filesystem requires a _Source Stream_, the scan will continue left:
+- `gta64` will match nothing
+- `g` will match nothing
+- `copy_party_2024.zip` will match archive filesystem, so the _Source Stream_ for the D64 will be a file named `g/gta64/disk1.d64` inside the ZIP filesystem, now we need _Source Stream_ for the archive, continuing left:
+- `new_files` will match nothing
+- `storage` will match nothing
+- `some-server.com` will match nothing
+- `http` will match HTTP filesystem, which will be the _Source Stream_ for the archive filesystem
+
+This will create a hierarchy of Russian-doll like streams, looking more or less like this: `FileStream(D64Stream(ArchiveStream(HttpStream)))`
+
 ## getDecodedStream
 This is the method you have to implement, when creating your own container streams that might be placed inside other streams. Example of such container streams are:
 - Archive files: ZIP, RAR, 7Z etc.
