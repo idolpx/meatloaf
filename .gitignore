@@ -15,6 +15,7 @@ platformio.ini
 platformio-device-monitor-*.log
 
 # ESP-IDF SDK configuration file
+sdkconfig.*.old
 include/ssid.h
 /*.log
 **/.backup
