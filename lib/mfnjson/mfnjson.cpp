@@ -5,7 +5,7 @@
  *   <thom.cherryhomes@gmail.com>
  */
 
-#include "fnjson.h"
+#include "mfnjson.h"
 
 #include <string.h>
 #include <sstream>
@@ -19,20 +19,18 @@
 /**
  * ctor
  */
-FNJSON::FNJSON()
+MFNJSON::MFNJSON()
 {
-    Debug_printf("FNJSON::ctor()\r\n");
-    _protocol = nullptr;
+    Debug_printf("MFNJSON::ctor()\r\n");
     _json = nullptr;
 }
 
 /**
  * dtor
  */
-FNJSON::~FNJSON()
+MFNJSON::~MFNJSON()
 {
-    Debug_printf("FNJSON::dtor()\r\n");
-    _protocol = nullptr;
+    Debug_printf("MFNJSON::dtor()\r\n");
     if (_json != nullptr)
         cJSON_Delete(_json);
     _json = nullptr;
@@ -41,7 +39,7 @@ FNJSON::~FNJSON()
 /**
  * Specify line ending
  */
-void FNJSON::setLineEnding(const std::string &_lineEnding)
+void MFNJSON::setLineEnding(const std::string &_lineEnding)
 {
     lineEnding = _lineEnding;
 }
@@ -49,26 +47,19 @@ void FNJSON::setLineEnding(const std::string &_lineEnding)
 /**
  * Attach protocol handler
  */
-void FNJSON::setProtocol(NetworkProtocol *newProtocol)
+void MFNJSON::setStream(std::shared_ptr<MStream> s)
 {
-    Debug_printf("FNJSON::setProtocol()\r\n");
-    _protocol = newProtocol;
-}
-
-void FNJSON::setQueryParam(uint8_t qp)
-{
-    Debug_printf("FNJSON::setQueryParam(0x%02hx)\r\n", qp);
-    _queryParam = qp;
+    Debug_printf("MFNJSON::setStream()\r\n");
+    stream = s;
 }
 
 /**
  * Set read query string
  */
-void FNJSON::setReadQuery(const std::string &queryString, uint8_t queryParam)
+void MFNJSON::setReadQuery(const std::string &queryString)
 {
-    Debug_printf("FNJSON::setReadQuery queryString: %s, queryParam: %d\r\n", queryString.c_str(), queryParam);
+    Debug_printf("MFNJSON::setReadQuery queryString: %s\r\n", queryString.c_str());
     _queryString = queryString;
-    _queryParam = queryParam;
     _item = resolveQuery();
     json_bytes_remaining = readValueLen();
 }
@@ -76,7 +67,7 @@ void FNJSON::setReadQuery(const std::string &queryString, uint8_t queryParam)
 /**
  * Resolve query string
  */
-cJSON *FNJSON::resolveQuery()
+cJSON *MFNJSON::resolveQuery()
 {
     if (_queryString.empty())
         return _json;
@@ -87,7 +78,7 @@ cJSON *FNJSON::resolveQuery()
 /**
  * Process string, strip out HTML tags if needed
  */
-std::string FNJSON::processString(std::string in)
+std::string MFNJSON::processString(std::string in)
 {
     while (in.find("<") != std::string::npos)
     {
@@ -104,51 +95,13 @@ std::string FNJSON::processString(std::string in)
     in = mstr::toPETSCII2(in);
 #endif
 
-#ifdef BUILD_ATARI
-    // SIO AUX bits 0+1 control the mapping
-    //   Bit 0=0 - don't touch the characters
-    //   Bit 0=1 - convert the characters when possible
-    //   Bit 1=0 - convert to generic ASCII/ATASCII (no font change needed)
-    //   Bit 1=1 - convert to ATASCII international charset (need to be switched on ATARI, i.e via POKE 756,204)
-
-    // SIO AUX2 Bit 1 set?
-    if ((_queryParam & 1) != 0)
-    {
-        // yes, map special characters
-        Debug_printf("S: [Mapping->ATARI]\r\n");
-
-        // SIO AUX2 Bit 2 set?
-        if ((_queryParam & 2) != 0)
-        {
-            // yes, mapping to international charset
-            std::string mapFrom[] = {"á", "ù", "Ñ", "É", "ç", "ô", "ò", "ì", "£", "ï", "ü", "ä", "Ö", "ú", "ó", "ö", "Ü", "â", "û", "î", "é", "è", "ñ", "ê", "å", "à", "Å", "¡", "Ä", "ß"};
-            std::string mapTo[] = {"\x00", "\x01", "\x02", "\x03", "\x04", "\x05", "\x06", "\x07", "\x08", "\x09", "\x0a", "\x0b", "\x0c", "\x0d", "\x0e", "\x0f", "\x10", "\x11", "\x12", "\x13", "\x14", "\x15", "\x16", "\x17", "\x18", "\x19", "\x1a", "\x60", "\x7b", "ss"};
-            int elementCount = sizeof(mapFrom) / sizeof(mapFrom[0]);
-            for (int elementIndex = 0; elementIndex < elementCount; elementIndex++)
-                if (in.find(mapFrom[elementIndex]) != std::string::npos)
-                    in.replace(in.find(mapFrom[elementIndex]), std::string(mapFrom[elementIndex]).size(), mapTo[elementIndex]);
-        }
-        else
-        {
-            // no, mapping to normal ASCI (workaround)
-            std::string mapFrom[] = {"Ä", "Ö", "Ü", "ä", "ö", "ü", "ß", "é", "è", "á", "à", "ó", "ò", "ú", "ù"};
-            std::string mapTo[] = {"Ae", "Oe", "Ue", "ae", "oe", "ue", "ss", "e", "e", "a", "a", "o", "o", "u", "u"};
-            int elementCount = sizeof(mapFrom) / sizeof(mapFrom[0]);
-            for (int elementIndex = 0; elementIndex < elementCount; elementIndex++)
-                if (in.find(mapFrom[elementIndex]) != std::string::npos)
-                    in.replace(in.find(mapFrom[elementIndex]), std::string(mapFrom[elementIndex]).size(), mapTo[elementIndex]);
-        }
-
-    }
-#endif
-
     return in;
 }
 
 /**
  * Return normalized string of JSON item
  */
-std::string FNJSON::getValue(cJSON *item)
+std::string MFNJSON::getValue(cJSON *item)
 {
     if (item == NULL)
     {
@@ -206,7 +159,7 @@ std::string FNJSON::getValue(cJSON *item)
 
         if (item->child == NULL)
         {
-            Debug_printf("FNJSON::getValue OBJECT has no CHILD, adding empty string\r\n");
+            Debug_printf("MFNJSON::getValue OBJECT has no CHILD, adding empty string\r\n");
             ss << lineEnding;
         }
         else
@@ -216,11 +169,11 @@ std::string FNJSON::getValue(cJSON *item)
             {
                 // #ifdef BUILD_IEC
                 //     // Convert key to PETSCII
-                //     string tempStr = string((const char *)item->string);
+                //     string tempStr = string((const char *)item->string);                    
                 //     ss << mstr::toPETSCII2(tempStr);
                 // #else
                     ss << item->string;
-                // #endif
+                //#endif
 
                 ss << lineEnding + getValue(item);
             } while ((item = item->next) != NULL);
@@ -244,7 +197,7 @@ std::string FNJSON::getValue(cJSON *item)
 /**
  * Return requested value
  */
-bool FNJSON::readValue(uint8_t *rx_buf, unsigned short len)
+bool MFNJSON::readValue(uint8_t *rx_buf, unsigned short len)
 {    
     if (_item == nullptr)
         return true; // error
@@ -257,7 +210,7 @@ bool FNJSON::readValue(uint8_t *rx_buf, unsigned short len)
 /**
  * Return requested value length
  */
-int FNJSON::readValueLen()
+int MFNJSON::readValueLen()
 {
     if (_item == nullptr)
         return 0;
@@ -268,10 +221,8 @@ int FNJSON::readValueLen()
 /**
  * Parse data from protocol
  */
-bool FNJSON::parse()
+bool MFNJSON::parse()
 {
-    NetworkStatus ns;
-
     if (_json != nullptr)
     {
         // delete and set to null. we only set a new _json value if the parsebuffer is not empty
@@ -279,25 +230,18 @@ bool FNJSON::parse()
         _json = nullptr;
     }
 
-    if (_protocol == nullptr)
+    if (stream == nullptr)
     {
-        Debug_printf("FNJSON::parse() - NULL protocol.\r\n");
+        Debug_printf("MFNJSON::parse() - NULL protocol.\r\n");
         return false;
     }
     _parseBuffer.clear();
-    _protocol->status(&ns);
-    Debug_printf("json parse, initial status: ns.rxBW: %d, ns.conn: %d, ns.err: %d\r\n", ns.rxBytesWaiting, ns.connected, ns.error);
 
-    while (ns.connected)
+    uint8_t buffer[256];
+
+    while (auto bytes_read = stream->read(buffer, 256))
     {
-        // don't try reading 0 bytes when there's no content.
-        if (ns.rxBytesWaiting > 0)
-        {
-            _protocol->read(ns.rxBytesWaiting);
-            _parseBuffer += *_protocol->receiveBuffer;
-            _protocol->receiveBuffer->clear();
-        }
-        _protocol->status(&ns);
+        _parseBuffer += std::string((char *)buffer, bytes_read);
         vTaskDelay(10);
     }
 
@@ -310,16 +254,16 @@ bool FNJSON::parse()
 
     if (_json == nullptr)
     {
-        Debug_printf("FNJSON::parse() - Could not parse JSON, parseBuffer length: %d\r\n", _parseBuffer.size());
+        Debug_printf("MFNJSON::parse() - Could not parse JSON, parseBuffer length: %d\r\n", _parseBuffer.size());
         return false;
     }
 
     return true;
 }
 
-bool FNJSON::status(NetworkStatus *s)
+bool MFNJSON::status(NetworkStatus *s)
 {
-    Debug_printf("FNJSON::status(%u) %s\r\n", json_bytes_remaining, getValue(_item).c_str());
+    Debug_printf("MFNJSON::status(%u) %s\r\n", json_bytes_remaining, getValue(_item).c_str());
     s->connected = true;
     s->rxBytesWaiting = json_bytes_remaining;
     s->error = json_bytes_remaining == 0 ? 136 : 0;

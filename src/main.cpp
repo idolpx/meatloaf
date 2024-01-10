@@ -127,13 +127,14 @@ void main_setup()
         Serial.printf("Creating a default printer using %s storage and type %d\r\n", ptrfs->typestring(), ptype);
         iecPrinter *ptr = new iecPrinter(ptrfs, ptype);
         fnPrinters.set_entry(0, ptr, ptype, Config.get_printer_port(0));
-        Serial.print("Printer "); IEC.addDevice(ptr, 4); // add as device #4 for now
 
-        Serial.print("Disk "); IEC.addDevice(new iecDrive(), 8);
-        Serial.print("Network "); IEC.addDevice(new iecNetwork(), 16);
-        Serial.print("CPM "); IEC.addDevice(new iecCpm(), 20);
+        Serial.print("Printer "); IEC.addDevice(ptr, 4);                    // 04-07 Printers / Plotters
+        Serial.print("Disk "); IEC.addDevice(new iecDrive(), 8);            // 08-16 Drives
+        Serial.print("Network "); IEC.addDevice(new iecNetwork(), 16);      // 16-19 Network Devices
+        Serial.print("CPM "); IEC.addDevice(new iecCpm(), 20);              // 20-29 Other
         Serial.print("Voice "); IEC.addDevice(new iecVoice(), 21);
-        Serial.print("Meatloaf "); IEC.addDevice(new iecMeatloaf(), 30);
+        Serial.print("Clock "); IEC.addDevice(new iecClock(), 29);
+        Serial.print("Meatloaf "); IEC.addDevice(new iecMeatloaf(), 30);    // 30    Meatloaf
 
         Serial.print("Virtual Device(s) Started: [ " ANSI_YELLOW_BOLD );
         for (uint8_t i = 0; i < 31; i++)

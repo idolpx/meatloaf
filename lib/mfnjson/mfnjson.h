@@ -5,24 +5,24 @@
  *   <thom.cherryhomes@gmail.com>
  */
 
-#ifndef JSON_H
-#define JSON_H
+#ifndef MJSON_H
+#define MJSON_H
 
 #include <cJSON.h>
 #include <cJSON_Utils.h>
-#include <string.h>
 
 #include "../network-protocol/Protocol.h"
+#include "meat_stream.h"
 
-class FNJSON
+class MFNJSON
 {
 public:
-    FNJSON();
-    virtual ~FNJSON();
+    MFNJSON();
+    virtual ~MFNJSON();
 
     void setLineEnding(const std::string &_lineEnding);
-    void setProtocol(NetworkProtocol *newProtocol);
-    void setReadQuery(const std::string &queryString, uint8_t queryParam);
+    void setStream(std::shared_ptr<MStream> stream);
+    void setReadQuery(const std::string &queryString);
     cJSON *resolveQuery();
     bool status(NetworkStatus *status);
     
@@ -36,12 +36,11 @@ public:
 private:
     cJSON *_json = nullptr;
     cJSON *_item = nullptr;
-    NetworkProtocol *_protocol = nullptr;
+    std::shared_ptr<MStream> stream = nullptr;
     std::string _queryString;
-    uint8_t _queryParam = 0;
     std::string lineEnding;
     std::string getValue(cJSON *item);
     std::string _parseBuffer;
 };
 
-#endif /* JSON_H */
+#endif /* MJSON_H */

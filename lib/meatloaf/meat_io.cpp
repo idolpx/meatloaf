@@ -16,6 +16,7 @@
 //#include "wrappers/directory_stream.h"
 
 // Archive
+#include "archive/archive_ml.h"
 
 // Cartridge
 
@@ -38,7 +39,6 @@
 
 // File
 #include "file/p00.h"
-#include "archive/archive_ml.h"
 
 // Network
 #include "network/http.h"
@@ -80,9 +80,11 @@ TNFSFileSystem tnfsFS;
 
 //WSFileSystem wsFS;
 
+// Archive
+ArchiveContainerFileSystem archiveFS;
+
 // File
 P00FileSystem p00FS;
-ArchiveContainerFileSystem archiveFS;
 
 // Disk
 D64FileSystem d64FS;
