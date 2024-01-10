@@ -5,7 +5,7 @@
  */
 
 #include "esp_psramfs.h"
-#include "psram.h"
+#include "psramfs.h"
 #include "psramfs_nucleus.h"
 #include "esp_log.h"
 #include "esp_partition.h"

@@ -11,7 +11,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
-#include "psram.h"
+#include "psramfs.h"
 #include "esp_compiler.h"
 
 #ifdef __cplusplus

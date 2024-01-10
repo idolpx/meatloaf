@@ -20,7 +20,7 @@
  */
 
 
-#include "psram.h"
+#include "psramfs.h"
 #include "psramfs_nucleus.h"
 
 #if !PSRAMFS_READ_ONLY

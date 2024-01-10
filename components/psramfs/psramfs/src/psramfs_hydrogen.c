@@ -5,7 +5,7 @@
  *      Author: petera
  */
 
-#include "psram.h"
+#include "psramfs.h"
 #include "psramfs_nucleus.h"
 
 #if PSRAMFS_CACHE == 1
