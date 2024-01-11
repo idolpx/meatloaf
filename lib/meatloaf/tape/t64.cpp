@@ -131,7 +131,7 @@ bool T64IStream::seekPath(std::string path) {
         Debug_printv("filename [%.16s] type[%s] start_address[%zu] end_address[%zu] data_offset[%zu]", entry.filename, type, start_address, end_address, data_offset);
 
         // Calculate file size
-        _size = ( end_address - start_address );
+        _size = ( end_address - start_address ) + 2; // 2 bytes for load address
 
         // Load Address
         _load_address[0] = entry.start_address[0];
@@ -234,7 +234,7 @@ uint32_t T64File::size() {
     size_t end_address = UINT16_FROM_HILOBYTES(entry.end_address[1], entry.end_address[0]);
     size_t start_address = UINT16_FROM_HILOBYTES(entry.start_address[1], entry.start_address[0]);
 
-    size_t bytes = ( end_address - start_address );
+    size_t bytes = ( end_address - start_address ) + 2; // 2 bytes for load address
     //Debug_printv("start_address[%d] end_address[%d] bytes[%d]", start_address, end_address, bytes);
 
     return bytes;
