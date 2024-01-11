@@ -122,21 +122,22 @@ bool D64IStream::seekEntry( std::string filename )
 
             //Debug_printv("filename[%s] entry[%s]", filename.c_str(), entryFilename.c_str());
 
-            // Read Entry From Stream
-            if (entry.file_type & 0b00000111 && filename == "*") // Match first PRG
-            {
-                filename = entryFilename;
-                return true;
-            }
-            else if ( filename == entryFilename ) // Match exact
+            if ( filename == entryFilename ) // Match exact
             {
                 return true;
             }
-            else if ( wildcard )
+            else if ( wildcard ) // Wildcard Match
             {
-                if ( mstr::compare(filename, entryFilename) ) // X?XX?X* Wildcard match
+                if (filename == "*") // Match first PRG
                 {
-                    // Move stream pointer to start track/sector
+                    if (entry.file_type & 0b00000111)
+                    {
+                        filename = entryFilename;
+                        return true;
+                    }
+                }
+                else if ( mstr::compare(filename, entryFilename) ) // X?XX?X* Wildcard match
+                {
                     return true;
                 }
             }
