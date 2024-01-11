@@ -73,7 +73,7 @@ bool TCRTIStream::seekEntry( std::string filename )
             //mstr::trim(entryFilename);
             entryFilename = mstr::toUTF8(entryFilename);
 
-            Debug_printv("index[%d] filename[%s] entry.filename[%s] entry.file_type[%d]", index, filename.c_str(), entryFilename.c_str(), entry.file_type);
+            //Debug_printv("index[%d] filename[%s] entry.filename[%s] entry.file_type[%d]", index, filename.c_str(), entryFilename.c_str(), entry.file_type);
 
             if ( filename == entryFilename ) // Match exact
             {
@@ -110,17 +110,17 @@ bool TCRTIStream::seekEntry( uint16_t index )
     index--;
     uint16_t entryOffset = 0xE7 + (index * 32);
 
-    Debug_printv("----------");
-    Debug_printv("index[%d] entryOffset[%d] entry_index[%d]", (index + 1), entryOffset, entry_index);
+    //Debug_printv("----------");
+    //Debug_printv("index[%d] entryOffset[%d] entry_index[%d]", (index + 1), entryOffset, entry_index);
 
     containerStream->seek(entryOffset);
     containerStream->read((uint8_t *)&entry, sizeof(entry));
 
-    uint32_t file_start_address = (0xD8 + (entry.file_start_address[0] << 8 | entry.file_start_address[1] << 16));
-    uint32_t file_size = (entry.file_size[0] | (entry.file_size[1] << 8) | (entry.file_size[2] << 16)) + 2; // 2 bytes for load address
-    uint32_t file_load_address = entry.file_load_address[0] | entry.file_load_address[1] << 8;
+    //uint32_t file_start_address = (0xD8 + (entry.file_start_address[0] << 8 | entry.file_start_address[1] << 16));
+    //uint32_t file_size = (entry.file_size[0] | (entry.file_size[1] << 8) | (entry.file_size[2] << 16)) + 2; // 2 bytes for load address
+    //uint32_t file_load_address = entry.file_load_address[0] | entry.file_load_address[1] << 8;
 
-    Debug_printv("file_name[%.16s] file_type[%02X] data_offset[%X] file_size[%d] load_address[%04X]", entry.filename, entry.file_type, file_start_address, file_size, file_load_address);
+    //Debug_printv("file_name[%.16s] file_type[%02X] data_offset[%X] file_size[%d] load_address[%04X]", entry.filename, entry.file_type, file_start_address, file_size, file_load_address);
 
     entry_index = index + 1;    
     if ( entry.file_type == 0xFF )

@@ -37,7 +37,7 @@ bool T64IStream::seekEntry( std::string filename )
             mstr::trim(entryFilename);
             entryFilename = mstr::toUTF8(entryFilename);
 
-            Debug_printv("filename[%s] entry.filename[%s]", filename.c_str(), entryFilename.c_str());
+            //Debug_printv("filename[%s] entry.filename[%s]", filename.c_str(), entryFilename.c_str());
 
             if ( filename == entryFilename ) // Match exact
             {
