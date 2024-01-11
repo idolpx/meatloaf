@@ -39,7 +39,7 @@ bool D64IStream::seekSector( uint8_t track, uint8_t sector, uint8_t offset )
 {
 	uint16_t sectorOffset = 0;
 
-    //Debug_printv("track[%d] sector[%d] offset[%d]", track, sector, offset);
+    Debug_printv("track[%d] sector[%d] offset[%d]", track, sector, offset);
 
     // Is this a valid track?
     uint8_t c = partitions[partition].block_allocation_map.size() - 1;
@@ -47,7 +47,7 @@ bool D64IStream::seekSector( uint8_t track, uint8_t sector, uint8_t offset )
     uint8_t end_track = partitions[partition].block_allocation_map[c].end_track;
     if ( track < start_track || track > end_track )
     {
-        Debug_printv("track[%d] start_track[%d] end_track[%d]", track, start_track, end_track);
+        Debug_printv("Invalid Track: track[%d] start_track[%d] end_track[%d]", track, start_track, end_track);
         return false;
     }
 
@@ -55,7 +55,7 @@ bool D64IStream::seekSector( uint8_t track, uint8_t sector, uint8_t offset )
     c = sectorsPerTrack[speedZone(track)];
     if ( sector > c )
     {
-        Debug_printv("sector[%d] track[%d] sectorsPerTrack[%d]", sector, track, c);
+        Debug_printv("Invalid Sector: sector[%d] sectorsPerTrack[%d]", sector, c);
         return false;
     }
 
