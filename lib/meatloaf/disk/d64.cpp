@@ -42,7 +42,7 @@ bool D64IStream::seekSector( uint8_t track, uint8_t sector, uint8_t offset )
     Debug_printv("track[%d] sector[%d] offset[%d]", track, sector, offset);
 
     // Is this a valid track?
-    uint8_t c = partitions[partition].block_allocation_map.size() - 1;
+    uint16_t c = partitions[partition].block_allocation_map.size() - 1;
     uint8_t start_track = partitions[partition].block_allocation_map[0].start_track;
     uint8_t end_track = partitions[partition].block_allocation_map[c].end_track;
     if ( track < start_track || track > end_track )
@@ -63,7 +63,7 @@ bool D64IStream::seekSector( uint8_t track, uint8_t sector, uint8_t offset )
 	for (uint8_t index = 0; index < track; ++index)
 	{
 		sectorOffset += sectorsPerTrack[speedZone(index + 1)];
-        // Debug_printv("track[%d] speedZone[%d] secotorsPerTrack[%d] sectorOffset[%d]", (index + 1), speedZone(index), sectorsPerTrack[speedZone(index)], sectorOffset);
+        Debug_printv("track[%d] speedZone[%d] secotorsPerTrack[%d] sectorOffset[%d]", (index + 1), speedZone(index), sectorsPerTrack[speedZone(index)], sectorOffset);
 	}
     track++;
 	sectorOffset += sector;
@@ -72,7 +72,7 @@ bool D64IStream::seekSector( uint8_t track, uint8_t sector, uint8_t offset )
     this->track = track;
     this->sector = sector;
 
-    //Debug_printv("track[%d] sector[%d] speedZone[%d] sectorOffset[%d]", track, sector, speedZone(track), sectorOffset);
+    Debug_printv("track[%d] sector[%d] speedZone[%d] sectorOffset[%d]", track, sector, speedZone(track), sectorOffset);
 
     return containerStream->seek( (sectorOffset * block_size) + offset );
 }
@@ -194,6 +194,7 @@ bool D64IStream::seekEntry( uint16_t index )
             next_sector = entry.next_sector;
 
             Debug_printv("sectorOffset[%d] -> track[%d] sector[%d]", sectorOffset, track, sector);
+
         } while ( sectorOffset-- > 0 );
         if ( !seekSector( track, sector, entryOffset ) )
             return false;
@@ -417,8 +418,8 @@ MFile* D64File::getNextFileInDir() {
     do
     {
         r = image->seekNextImageEntry();
-    } while ( r && image->entry.file_type == 0x00 ); // Skip hidden files
-    
+    } while ( r && (image->entry.file_type & 0b00000111) == 0x00 ); // Skip hidden files
+
     if ( r )
     {
         std::string fileName = image->entry.filename;

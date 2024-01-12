@@ -76,7 +76,7 @@ protected:
 
 public:
     std::vector<Partition> partitions;
-    std::vector<uint8_t> sectorsPerTrack = { 17, 18, 19, 21 };
+    std::vector<uint16_t> sectorsPerTrack = { 17, 18, 19, 21 };
     std::vector<uint8_t> interleave = { 3, 10 }; // Directory, File
 
     uint8_t dos_version = 0x41;
