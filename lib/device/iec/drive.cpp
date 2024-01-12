@@ -402,8 +402,24 @@ void iecDrive::iec_command()
         case 'M':
             if ( payload[1] == '-' ) // Memory
             {
-                Debug_printv( "memory");
-                //Memory();
+                if (payload[2] == 'R') // M-W memory read
+                {
+                    payload = mstr::drop(payload, 3);
+                    std::string code = mstr::toHex(payload);
+                    Debug_printv("Memory Read [%s]", code.c_str());
+                }
+                else if (payload[2] == 'W') // M-W memory write
+                {
+                    payload = mstr::drop(payload, 3);
+                    std::string code = mstr::toHex(payload);
+                    Debug_printv("Memory Write [%s]", code.c_str());
+                }
+                else if (payload[2] == 'E') // M-W memory write
+                {
+                    payload = mstr::drop(payload, 3);
+                    std::string code = mstr::toHex(payload);
+                    Debug_printv("Memory Execute [%s]", code.c_str());
+                }
             }
         break;
         case 'N':

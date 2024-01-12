@@ -87,8 +87,10 @@
 // For some example sources please download the patched cbmconvert
 // sources "cbmconvert-2.1.2_dfi.tar.gz" from the retrohackers forum:
 // http://retrohackers.org/forum/viewtopic.php?p=434#434
+// https://github.com/dr-m/cbmconvert
+// https://www.cise.ufl.edu/ubuntu/pool/universe/c/cbmconvert/
 //
-
+// https://sourceforge.net/projects/rrtools/
 // https://cbm8bit.com/8bit/commodore/server/Unrenamed%20Achives/browse/c64/dfi
 
 
