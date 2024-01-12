@@ -34,7 +34,7 @@
 #include "led_strip.h"
 #include "utils.h"
 
-#include "cbm_media.h"
+#include "meat_media.h"
 
 
 iecDrive::iecDrive()
@@ -402,23 +402,28 @@ void iecDrive::iec_command()
         case 'M':
             if ( payload[1] == '-' ) // Memory
             {
-                if (payload[2] == 'R') // M-W memory read
+                if (payload[2] == 'R') // M-R memory read
                 {
                     payload = mstr::drop(payload, 3);
                     std::string code = mstr::toHex(payload);
+                    uint16_t address = (payload[0] << 8 | payload[1]);
+                    uint8_t size = payload[2];
                     Debug_printv("Memory Read [%s]", code.c_str());
+                    Debug_printv("address[%.4X] size[%d]", address, size);
                 }
                 else if (payload[2] == 'W') // M-W memory write
                 {
                     payload = mstr::drop(payload, 3);
                     std::string code = mstr::toHex(payload);
-                    Debug_printv("Memory Write [%s]", code.c_str());
+                    uint16_t address = (payload[0] << 8 | payload[1]);
+                    Debug_printv("Memory Write address[%.4X][%s]", address, code.c_str());
                 }
-                else if (payload[2] == 'E') // M-W memory write
+                else if (payload[2] == 'E') // M-E memory write
                 {
                     payload = mstr::drop(payload, 3);
                     std::string code = mstr::toHex(payload);
-                    Debug_printv("Memory Execute [%s]", code.c_str());
+                    uint16_t address = (payload[0] << 8 | payload[1]);
+                    Debug_printv("Memory Execute address[%.4X][%s]", address, code.c_str());
                 }
             }
         break;

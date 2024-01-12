@@ -101,7 +101,7 @@ public:
         partitions[0].block_allocation_map[0].sector = read();
     };
 
-	virtual uint8_t speedZone( uint8_t track) override
+	virtual uint8_t speedZone(uint8_t track) override
 	{
         if ( track < 78 )
 		    return (track < 39) + (track < 53) + (track < 64);
