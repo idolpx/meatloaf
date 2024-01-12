@@ -1,6 +1,12 @@
 #include <esp_system.h>
 #include <nvs_flash.h>
+#ifdef BOARD_HAS_PSRAM
+#ifdef CONFIG_IDF_TARGET_ESP32S3
+#include <esp_psram.h>
+#elif
 #include <esp32/himem.h>
+#endif
+#endif
 #include <driver/gpio.h>
 #include <esp_console.h>
 #include "linenoise/linenoise.h"
@@ -65,9 +71,9 @@ void main_setup()
 #ifdef BOARD_HAS_PSRAM
     Serial.printf( "PsramSize %u\r\n", fnSystem.get_psram_size() );
 
-    Serial.printf( "himem phys %u\r\n", esp_himem_get_phys_size() );
-    Serial.printf( "himem free %u\r\n", esp_himem_get_free_size() );
-    Serial.printf( "himem reserved %u\r\n", esp_himem_reserved_area_size() );
+    Serial.printf( "himem phys %u\r\n", esp_psram_get_size() );
+    // Serial.printf( "himem free %u\r\n", esp_himem_get_free_size() );
+    // Serial.printf( "himem reserved %u\r\n", esp_himem_reserved_area_size() );
 #endif
 
 

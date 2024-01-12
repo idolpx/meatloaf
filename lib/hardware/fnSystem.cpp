@@ -37,7 +37,7 @@
 #define BUS_CLASS IWM
 #endif
 
-
+#ifdef SD_CARD
 static QueueHandle_t card_detect_evt_queue = NULL;
 
 static void IRAM_ATTR card_detect_isr_handler(void *arg)
@@ -86,6 +86,8 @@ static void setup_card_detect(gpio_num_t pin)
     // Add the card detect handler
     gpio_isr_handler_add(pin, card_detect_isr_handler, (void *)pin);
 }
+
+#endif
 
 // Global object to manage System
 SystemManager fnSystem;
@@ -600,8 +602,10 @@ void SystemManager::check_hardware_ver()
 {
 #ifdef PINMAP_ESP32S3
 
+#ifdef SD_CARD
     if (PIN_CARD_DETECT != GPIO_NUM_NC)
         setup_card_detect(PIN_CARD_DETECT);
+#endif
     _hardware_version = 4;
 
 #else /* PINMAP_ESP32S3 */

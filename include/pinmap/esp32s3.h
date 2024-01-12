@@ -9,7 +9,7 @@
 
 #define PIN_SD_HOST_CS          GPIO_NUM_4
 #define PIN_SD_HOST_MISO        GPIO_NUM_19
-#define PIN_SD_HOST_MOSI        GPIO_NUM_23
+#define PIN_SD_HOST_MOSI        GPIO_NUM_12
 #define PIN_SD_HOST_SCK         GPIO_NUM_18
 
 /* UART */
@@ -71,13 +71,13 @@
 // #endif
 
 
-#define PIN_IEC_RESET           GPIO_NUM_34
-#define PIN_IEC_ATN             GPIO_NUM_32
-#define PIN_IEC_CLK_IN          GPIO_NUM_33
-#define PIN_IEC_CLK_OUT         GPIO_NUM_33
-#define PIN_IEC_DATA_IN         GPIO_NUM_25
-#define PIN_IEC_DATA_OUT        GPIO_NUM_25
-#define PIN_IEC_SRQ             GPIO_NUM_26
+#define PIN_IEC_RESET           GPIO_NUM_9
+#define PIN_IEC_ATN             GPIO_NUM_10
+#define PIN_IEC_CLK_IN          GPIO_NUM_11
+#define PIN_IEC_CLK_OUT         GPIO_NUM_11
+#define PIN_IEC_DATA_IN         GPIO_NUM_12
+#define PIN_IEC_DATA_OUT        GPIO_NUM_12
+#define PIN_IEC_SRQ             GPIO_NUM_13
 // GND - Be sure to connect GND of the IEC cable to GND on the ESP module
 
 /* Modem/Parallel Switch */
