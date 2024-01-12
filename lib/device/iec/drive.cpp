@@ -406,7 +406,7 @@ void iecDrive::iec_command()
                 {
                     payload = mstr::drop(payload, 3);
                     std::string code = mstr::toHex(payload);
-                    uint16_t address = (payload[0] << 8 | payload[1]);
+                    uint16_t address = (payload[0] | payload[1] << 8);
                     uint8_t size = payload[2];
                     Debug_printv("Memory Read [%s]", code.c_str());
                     Debug_printv("address[%.4X] size[%d]", address, size);
@@ -415,14 +415,14 @@ void iecDrive::iec_command()
                 {
                     payload = mstr::drop(payload, 3);
                     std::string code = mstr::toHex(payload);
-                    uint16_t address = (payload[0] << 8 | payload[1]);
+                    uint16_t address = (payload[0] | payload[1] << 8);
                     Debug_printv("Memory Write address[%.4X][%s]", address, code.c_str());
                 }
                 else if (payload[2] == 'E') // M-E memory write
                 {
                     payload = mstr::drop(payload, 3);
                     std::string code = mstr::toHex(payload);
-                    uint16_t address = (payload[0] << 8 | payload[1]);
+                    uint16_t address = (payload[0] | payload[1] << 8);
                     Debug_printv("Memory Execute address[%.4X][%s]", address, code.c_str());
                 }
             }
