@@ -19,5 +19,5 @@ idf_component_register(SRCS ${srcs}
                        PRIV_REQUIRES ${pr} spi_flash)
 
 if(CMAKE_C_COMPILER_ID MATCHES "GNU")
-    set_source_files_properties(psramfs/src/psramfs_nucleus.c PROPERTIES COMPILE_FLAGS -Wno-stringop-truncation)
+    set_source_files_properties(psram/src/psramfs_nucleus.c PROPERTIES COMPILE_FLAGS -Wno-stringop-truncation)
 endif()

@@ -79,6 +79,8 @@ uint32_t CBMImageStream::read(uint8_t* buf, uint32_t size) {
     uint32_t bytesRead = 0;
 
     //Debug_printv("seekCalled[%d]", seekCalled);
+    if ( _position >= _size )
+        return 0;
 
     if(seekCalled) {
         // if we have the stream set to a specific file already, either via seekNextEntry or seekPath, return bytes of the file here

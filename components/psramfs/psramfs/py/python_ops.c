@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include "psram.h"
+#include "psramfs.h"
 
 void *my_psramfs_mount(int phys_size,
                       int phys_addr,

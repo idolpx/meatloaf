@@ -402,8 +402,24 @@ void iecDrive::iec_command()
         case 'M':
             if ( payload[1] == '-' ) // Memory
             {
-                Debug_printv( "memory");
-                //Memory();
+                if (payload[2] == 'R') // M-W memory read
+                {
+                    payload = mstr::drop(payload, 3);
+                    std::string code = mstr::toHex(payload);
+                    Debug_printv("Memory Read [%s]", code.c_str());
+                }
+                else if (payload[2] == 'W') // M-W memory write
+                {
+                    payload = mstr::drop(payload, 3);
+                    std::string code = mstr::toHex(payload);
+                    Debug_printv("Memory Write [%s]", code.c_str());
+                }
+                else if (payload[2] == 'E') // M-W memory write
+                {
+                    payload = mstr::drop(payload, 3);
+                    std::string code = mstr::toHex(payload);
+                    Debug_printv("Memory Execute [%s]", code.c_str());
+                }
             }
         break;
         case 'N':
@@ -1271,11 +1287,11 @@ bool iecDrive::sendFile()
     }
 
     bool eoi = false;
-    uint32_t len = istream->size();
+    uint32_t size = istream->size();
     uint32_t avail = istream->available();
 
     //fnLedStrip.startRainbow(300);
-    Debug_printv("len[%d] avail[%d]", len, avail);
+    Debug_printv("size[%d] avail[%d]", size, avail);
 
     if( commanddata.channel == CHANNEL_LOAD )
     {
@@ -1332,7 +1348,7 @@ bool iecDrive::sendFile()
 
         b = nb; // byte = next byte
 
-        uint32_t t = (count * 100) / len;
+        uint32_t t = (count * 100) / size;
 #ifdef DATA_STREAM
         // Show ASCII Data
         if (b < 32 || b >= 127)
@@ -1369,7 +1385,7 @@ bool iecDrive::sendFile()
     }
 
 #ifdef DATA_STREAM
-    uint32_t t = (count * 100) / len;
+    uint32_t t = (count * 100) / size;
     ba[bi++] = 0;
     Debug_printf(" %s (%d %d%%) [%d]\r\n", ba, count, t, avail);
 #endif

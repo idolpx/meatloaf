@@ -277,8 +277,6 @@ void KeyManager::_keystate_task(void *param)
             // Debug_printf("himem phys: %u\r\n", esp_himem_get_phys_size());
             // Debug_printf("himem free: %u\r\n", esp_himem_get_free_size());
             // Debug_printf("himem reserved: %u\r\n", esp_himem_reserved_area_size());
-#else
-            //fnLedManager.blink(BLUETOOTH_LED, 2); // blink to confirm a button press
 #endif // PINMAP_A2_REV0
 
 // Either toggle BT baud rate or do a disk image rotation on B_KEY SHORT PRESS
@@ -296,6 +294,7 @@ void KeyManager::_keystate_task(void *param)
                 sio_message_t msg;
                 msg.message_id = SIOMSG_DISKSWAP;
                 xQueueSend(SIO.qSioMessages, &msg, 0);
+                fnLedManager.blink(BLUETOOTH_LED, 2); // blink to confirm a button press
 #endif /* BUILD_ATARI */
 #ifdef BUILD_ADAM
                 Debug_println("ACTION: Send image_rotate message to SIO queue");

@@ -17,7 +17,7 @@
 #include "Mockqueue.h"
 
 #include "esp_partition.h"
-#include "psram.h"
+#include "psramfs.h"
 #include "psramfs_nucleus.h"
 #include "psramfs_api.h"
 

@@ -14,7 +14,7 @@ MStream* IPFSFile::getSourceStream(std::ios_base::openmode mode) {
 
 
 bool IPFSIStream::open() {
-    return m_http.GET(url);
+    return _http.GET(url);
 };
 
 bool IPFSIStream::seek(uint32_t pos) {

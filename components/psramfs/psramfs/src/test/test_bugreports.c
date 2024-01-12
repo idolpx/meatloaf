@@ -10,7 +10,7 @@
 #include "testrunner.h"
 #include "test_psramfs.h"
 #include "psramfs_nucleus.h"
-#include "psram.h"
+#include "psramfs.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>

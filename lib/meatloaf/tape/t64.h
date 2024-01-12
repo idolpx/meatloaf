@@ -55,6 +55,8 @@ protected:
     Header header;
     Entry entry;
 
+    std::string decodeType(uint8_t file_type, bool show_hidden = false) override;
+
 private:
     friend class T64File;
 };
