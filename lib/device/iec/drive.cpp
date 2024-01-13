@@ -495,6 +495,12 @@ void iecDrive::iec_command()
             Debug_printv( "get partition info");
             //Error(ERROR_31_SYNTAX_ERROR);	// G-P not implemented yet
         break;
+        case 'H':
+            process_header(payload);
+        break;
+        case 'J':
+            process_json(payload);
+        break;
         case 'M':
             if ( payload[1] == 'D') // Make Directory
             {
@@ -1531,6 +1537,97 @@ bool iecDrive::saveFile()
 
     return success;
 } // saveFile
+
+void iecDrive::process_json(std::string payload) {
+    if(payload[1]=='P') {
+        // JP:2 - Parse JSON on channel 2
+        std::string channelStr = payload.substr(3);
+        uint16_t channel = atoi(channelStr.c_str());
+
+        auto found = streams.find(channel);
+
+        if ( found != streams.end() )
+        {
+            auto stream = found->second;                
+            auto jsonParser = new MFNJSON();
+            jsonParser->setStream(stream);
+
+            if(jsonParser->parse()) {
+                // parsing succesful
+                auto newPair = std::make_pair (channel, jsonParser);
+                jsonParsers.insert (newPair);
+            }
+            else {
+                // signal error on current channel - "JSON syntax error"
+                delete jsonParser;
+            }
+        }
+        else {
+            // signal error on current channel - "channel xx not open"        
+        }
+    }
+    else if(payload[1]=='Q') {
+        // JQ:2,/choices[0]/message/content - query JSON parsed for channel 2
+        std::string queryStr = payload.substr(3);
+        auto parts = mstr::split(queryStr, ',');
+        if(parts.size() > 1) {
+            // signal error on current channel - "invalid query"
+            return;
+            uint16_t channel = atoi(parts[0].c_str());
+            std::string query = parts[1];
+
+            auto found = jsonParsers.find(channel);
+            if ( found != jsonParsers.end() ) {
+                MFNJSON* jsonParser = found->second;
+                jsonParser->setReadQuery(query);
+                auto valueLen = jsonParser->readValueLen();
+                if(!valueLen) {
+                    // signal error on current channel - JSON value not found
+                }
+                else {
+                    uint8_t buffer[valueLen];
+                    jsonParser->readValue(buffer, valueLen);
+                    // send buffer contents on current channel TODO
+                }
+            }
+            else {
+                // signal error on current channel - JSON parser not initialized for this channel
+            }
+        }
+        else {
+            // signal error - bad syntax for JQ
+        }
+    }
+    else {
+        // signal error - bad JSON command
+    }
+}
+
+void iecDrive::process_header(std::string payload)
+{
+    if(payload[1]=='+') 
+    {
+        std::string headerStr = payload.substr(3);
+        auto parts = mstr::split(headerStr, ':');
+        if(parts.size() > 1)
+        {
+            std::string header = parts[0];
+            std::string value = parts[1];
+            auto newPair = std::make_pair (header, value);
+            headers.insert (newPair);
+            Debug_printf("Added global header [%s] = [%s]", header.c_str(), value.c_str());
+        }
+    }
+    else if(payload[1]=='-')
+    {
+        std::string headerStr = payload.substr(3);
+        headers.erase(headerStr);
+    }
+    else
+    {
+        // signal error - bad header command
+    }
+}
 
 
 

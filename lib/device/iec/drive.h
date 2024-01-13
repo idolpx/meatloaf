@@ -12,6 +12,7 @@
 #include "meat_buffer.h"
 #include "wrappers/iec_buffer.h"
 #include "wrappers/directory_stream.h"
+#include "mfnjson.h"
 
 #define PRODUCT_ID "MEATLOAF CBM"
 
@@ -152,6 +153,8 @@ protected:
      */
     void iec_talk_command_buffer_status() override;
 
+    void process_json(std::string payload);
+    void process_header(std::string payload);
 public:
     iecDrive();
 //    fujiHost *host;
@@ -163,6 +166,8 @@ public:
 
     std::unordered_map<uint16_t, std::shared_ptr<MStream>> streams;
     std::unordered_map<uint16_t, uint16_t> streamLastByte;
+    std::map<std::string, std::string> headers;
+    std::unordered_map<uint16_t, MFNJSON*> jsonParsers;
 
     ~iecDrive();
 };

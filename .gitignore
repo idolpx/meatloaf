@@ -31,3 +31,4 @@ lib/device/disk.h
 lib/device/iec/fuji.*
 lib/device/iec/disk.*
 examples/*
+sdkconfig.lolin-d32-pro
