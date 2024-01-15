@@ -102,6 +102,7 @@ ArchiveStream::ArchiveStream(std::shared_ptr<MStream> srcStr)
     archive_read_support_filter_all(a);
     archive_read_support_format_all(a);
     streamData.srcBuffer = new uint8_t[buffSize];
+
     open();
 }
 
@@ -119,8 +120,8 @@ bool ArchiveStream::open()
     {
         // TODO enable seek only if the stream is random access
         archive_read_set_read_callback(a, cb_read);
-        archive_read_set_skip_callback(a, cb_skip);
         archive_read_set_seek_callback(a, cb_seek);
+        //archive_read_set_skip_callback(a, cb_skip);
         archive_read_set_close_callback(a, cb_close);
         // archive_read_set_open_callback(mpa->arch, cb_open); - what does it do?
         archive_read_set_callback_data(a, &streamData);
@@ -151,48 +152,25 @@ bool ArchiveStream::isOpen()
     return is_open;
 };
 
-std::vector<uint8_t> leftovers;
-
 uint32_t ArchiveStream::read(uint8_t *buf, uint32_t size)
 {
-    Debug_printv("calling read size[%d]", size);
-    const void *incomingBuffer;
-    size_t incomingSize;
-    int64_t offset;
+    Debug_printv("calling read, buff size=[%d]", size);
 
-    int r = archive_read_data_block(a, &incomingBuffer, &incomingSize, &offset);
-    Debug_printv("r[%d]", r);
-    if ( r == ARCHIVE_EOF )
+    int r = archive_read_data(a, &buf, size);
+
+    Debug_printv("archive returned [%d] unarchived bytes", r);
+    if ( r >= 0 ) {
+        _position += r;
+        return r;
+    }
+    else if ( r == ARCHIVE_FATAL ) 
+    {
+        close();
         return 0;
-
-    if ( r < ARCHIVE_OK )
-        return 0;
-
-    // 'buff' contains the data of the current block
-    // 'size' is the size of the current block
-
-    std::vector<uint8_t> incomingVector((uint8_t*)incomingBuffer, (uint8_t*)incomingBuffer + incomingSize);
-    // concatenate intermediate buffer with incomingVector
-    leftovers.insert(leftovers.end(), incomingVector.begin(), incomingVector.end());
-
-    if(leftovers.size() <= size) {
-        // ok, we can fit everything that was left and new data to our buffer
-        auto size = leftovers.size();
-        _position += size;
-        leftovers.clear();
     }
     else {
-        // ok, so we can only write up to size and we have to keep leftovers for next time
-        std::copy(leftovers.begin(), leftovers.begin() + size, buf);
-        std::vector<uint8_t> leftovers2(leftovers.begin() + size, leftovers.end());
-        leftovers = leftovers2;
-        _position += size;
+        return 0;
     }
-    _position += size;
-
-    Debug_printv("size[%d] position[%d]", size, _position);
-
-    return size;
 }
 
 uint32_t ArchiveStream::write(const uint8_t *buf, uint32_t size)

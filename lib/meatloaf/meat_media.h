@@ -36,8 +36,9 @@ public:
         close();
     }
 
-    // MStream methods
+    // Browsable streams might call seekNextEntry to skip current bytes
     bool isBrowsable() override { return false; };
+    // Random access streams might call seekPath to jump to a specific file
     bool isRandomAccess() override { return true; };
 
     // read = (size) => this.containerStream.read(size);
