@@ -12,7 +12,7 @@
 #include "meat_buffer.h"
 #include "wrappers/iec_buffer.h"
 #include "wrappers/directory_stream.h"
-#include "mfnjson.h"
+#include "../mfnjson/mfnjson.h"
 
 #define PRODUCT_ID "MEATLOAF CBM"
 
