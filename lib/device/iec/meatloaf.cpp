@@ -21,7 +21,7 @@
 #include "led_strip.h"
 #include "utils.h"
 
-#include "cbm_media.h"
+#include "meat_media.h"
 
 
 // iecMeatloaf Meatloaf; // global meatloaf device object
@@ -87,24 +87,24 @@ iecMeatloaf::~iecMeatloaf()
 // Initializes base settings and adds our devices to the SIO bus
 void iecMeatloaf::setup(systemBus *bus)
 {
-    // TODO IMPLEMENT
-    Debug_printf("iecFuji::setup()\n");
+//     // TODO IMPLEMENT
+//     Debug_printf("iecFuji::setup()\n");
 
-    // _populate_slots_from_config();
+//     // _populate_slots_from_config();
 
-    FileSystem *ptrfs = fnSDFAT.running() ? (FileSystem *)&fnSDFAT : (FileSystem *)&fsFlash;
-//    iecPrinter::printer_type ptype = Config.get_printer_type(0);
-    iecPrinter::printer_type ptype = iecPrinter::printer_type::PRINTER_COMMODORE_MPS803; // temporary
-    Debug_printf("Creating a default printer using %s storage and type %d\r\n", ptrfs->typestring(), ptype);
-    iecPrinter *ptr = new iecPrinter(ptrfs, ptype);
-    fnPrinters.set_entry(0, ptr, ptype, Config.get_printer_port(0));
+//     FileSystem *ptrfs = fnSDFAT.running() ? (FileSystem *)&fnSDFAT : (FileSystem *)&fsFlash;
+// //    iecPrinter::printer_type ptype = Config.get_printer_type(0);
+//     iecPrinter::printer_type ptype = iecPrinter::printer_type::PRINTER_COMMODORE_MPS803; // temporary
+//     Debug_printf("Creating a default printer using %s storage and type %d\r\n", ptrfs->typestring(), ptype);
+//     iecPrinter *ptr = new iecPrinter(ptrfs, ptype);
+//     fnPrinters.set_entry(0, ptr, ptype, Config.get_printer_port(0));
 
-    bus->addDevice(ptr, 4);                  // 04-07 Printers / Plotters
-    bus->addDevice(new iecDrive(), 8);       // 08-16 Drives
-    bus->addDevice(new iecNetwork(), 16);    // 16-19 Network Devices
-    bus->addDevice(new iecCpm(), 20);        // 20-29 Other
-    bus->addDevice(new iecClock(), 29);
-    bus->addDevice(this, 30);                // 30    FujiNet
+//     Serial.print("Printer "); bus->addDevice(ptr, 4);                   // 04-07 Printers / Plotters
+//     Serial.print("Disk "); bus->addDevice(new iecDisk(), 8);            // 08-16 Drives
+//     Serial.print("Network "); bus->addDevice(new iecNetwork(), 16);     // 16-19 Network Devices
+//     Serial.print("CPM "); bus->addDevice(new iecCpm(), 20);             // 20-29 Other
+//     Serial.print("Clock "); bus->addDevice(new iecClock(), 29);
+//     Serial.print("FujiNet "); bus->addDevice(this, 30);                 // 30    FujiNet
 }
 
 

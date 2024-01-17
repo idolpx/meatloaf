@@ -197,7 +197,7 @@ namespace Meat {
         }
 
     /**
-    *  @brief  Creates a unique_ptr<MFile> instance froma given MFile
+    *  @brief  Creates a unique_ptr<MFile> instance from a given MFile
     *  @param  file  The url to the file.
     *  @return  @c unique_ptr<MFile>
     */

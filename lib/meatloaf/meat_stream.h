@@ -73,13 +73,6 @@ public:
         return _error;
     }
 
-    virtual uint32_t blocks() {
-        if ( _size > 0 && _size < block_size )
-            return 1;
-        else
-            return ( _size / block_size );
-    }
-
     virtual bool eos()  {
 //        Debug_printv("_size[%d] m_bytesAvailable[%d] _position[%d]", _size, available(), _position);
         if ( available() == 0 )

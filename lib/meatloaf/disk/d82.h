@@ -72,7 +72,7 @@ public:
         sectorsPerTrack = { 23, 25, 27, 29 };
     };
 
-	virtual uint8_t speedZone( uint8_t track) override
+	virtual uint8_t speedZone(uint8_t track) override
 	{
         if (track < 78)
             return (track < 40) + (track < 54) + (track < 65);

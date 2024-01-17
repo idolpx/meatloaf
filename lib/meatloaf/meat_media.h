@@ -18,10 +18,10 @@
  * Streams
  ********************************************************/
 
-class CBMImageStream: public MStream {
+class MImageStream: public MStream {
 
 public:
-    CBMImageStream(std::shared_ptr<MStream> is) {
+    MImageStream(std::shared_ptr<MStream> is) {
         containerStream = is;
         _is_open = true;
         has_subdirs = false;
@@ -31,13 +31,14 @@ public:
     bool open() override;
     void close() override;
 
-    ~CBMImageStream() {
+    ~MImageStream() {
         //Debug_printv("close");
         close();
     }
 
-    // MStream methods
+    // Browsable streams might call seekNextEntry to skip current bytes
     bool isBrowsable() override { return false; };
+    // Random access streams might call seekPath to jump to a specific file
     bool isRandomAccess() override { return true; };
 
     // read = (size) => this.containerStream.read(size);
@@ -113,7 +114,7 @@ protected:
 
     bool _is_open = false;
 
-    CBMImageStream* decodedStream;
+    MImageStream* decodedStream;
 
     bool show_hidden = false;
 
@@ -132,7 +133,14 @@ protected:
 
     // Disks
     virtual uint16_t blocksFree() { return 0; };
-	virtual uint8_t speedZone( uint8_t track) { return 0; };
+	virtual uint8_t speedZone(uint8_t track) { return 0; };
+
+    virtual uint32_t blocks() {
+        if ( _size > 0 && _size < block_size )
+            return 1;
+        else
+            return ( _size / block_size );
+    }
 
     virtual bool seekEntry( std::string filename ) { return false; };
     virtual bool seekEntry( uint16_t index ) { return false; };
@@ -157,7 +165,7 @@ private:
     friend class DNPFile;
     friend class D90File;
 
-    // MEDIA ARCHIVE
+    // CONTAINER
     friend class D8BFile;
     friend class DFIFile;
 
@@ -175,7 +183,7 @@ private:
  * Utility implementations
  ********************************************************/
 class ImageBroker {
-    static std::unordered_map<std::string, CBMImageStream*> repo;
+    static std::unordered_map<std::string, MImageStream*> repo;
 public:
     template<class T> static T* obtain(std::string url) {
         // obviously you have to supply STREAMFILE.url to this function!
@@ -202,8 +210,8 @@ public:
         return newStream;
     }
 
-    static CBMImageStream* obtain(std::string url) {
-        return obtain<CBMImageStream>(url);
+    static MImageStream* obtain(std::string url) {
+        return obtain<MImageStream>(url);
     }
 
     static void dispose(std::string url) {

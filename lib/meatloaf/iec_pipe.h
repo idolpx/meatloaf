@@ -10,7 +10,7 @@ and removes them when channel is closed
 
 - each named channel is connected to one file
 
-- it allows pusing data to/from remote file
+- it allows pushing data to/from remote file
 
 - when ATN is received the transfer stops and will be seamlesly resumed on next call to send/receive
 
@@ -130,7 +130,7 @@ public:
 
     // SAVE - pull C64 bytes (iecStream.get) to remote file (fileStream.put)
     void writeFile() {
-        // this pipe wasn't itialized or wasn't meant for writing
+        // this pipe wasn't initialized or wasn't meant for writing
         if(fileStream == nullptr || mode != std::ios_base::openmode::_S_out)
             return;
         
@@ -144,7 +144,7 @@ public:
                 fileStream->put(nextChar);
             }
         }
-        // so here either the C64 stopped sending bytes to write or the outpt stream died
+        // so here either the C64 stopped sending bytes to write or the output stream died
         // nothing to see here, move along!
     }
 };

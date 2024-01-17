@@ -14,18 +14,18 @@
 #define MEATLOAF_MEDIA_TAP
 
 #include "meat_io.h"
-#include "cbm_media.h"
+#include "meat_media.h"
 
 
 /********************************************************
  * Streams
  ********************************************************/
 
-class TAPIStream : public CBMImageStream {
+class TAPIStream : public MImageStream {
     // override everything that requires overriding here
 
 public:
-    TAPIStream(std::shared_ptr<MStream> is) : CBMImageStream(is) { };
+    TAPIStream(std::shared_ptr<MStream> is) : MImageStream(is) { };
 
 protected:
     struct Header {

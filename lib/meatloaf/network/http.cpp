@@ -162,6 +162,7 @@ bool HttpIStream::seek(uint32_t pos) {
     if ( !_http._is_open )
     {
         Debug_printv("error");
+        _error = 1;
         return false;
     }
 
@@ -253,11 +254,11 @@ bool MeatHttpClient::processRedirectsAndOpen(int range) {
     
     if(lastRC != HttpStatus_Ok && lastRC != 301 && lastRC != 206) {
         Debug_printv("opening stream failed, httpCode=%d", lastRC);
+        _error = lastRC;
         close();
         return false;
     }
 
-    // TODO - set m_isWebDAV somehow
     _is_open = true;
     _exists = true;
     _position = 0;
@@ -270,7 +271,7 @@ bool MeatHttpClient::processRedirectsAndOpen(int range) {
 bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
     url = dstUrl;
     lastMethod = meth;
-    //m_error = 0;
+    _error = 0;
 
     return processRedirectsAndOpen(0);
 };
@@ -281,7 +282,7 @@ void MeatHttpClient::close() {
             esp_http_client_close(_http);
         }
         esp_http_client_cleanup(_http);
-        //Debug_printv("HTTP Close and Cleanup");
+        Debug_printv("HTTP Close and Cleanup");
         _http = nullptr;
     }
     _is_open = false;
@@ -306,7 +307,8 @@ bool MeatHttpClient::seek(uint32_t pos) {
             return false;
 
          // 200 = range not supported! according to https://developer.mozilla.org/en-US/docs/Web/HTTP/Range_requests
-        if(lastRC == 206){
+        if(lastRC == 206)
+        {
             Debug_printv("Seek successful");
 
             _position = pos;
@@ -394,7 +396,8 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t meth, int resum
 
     //Debug_printv("HTTP Init url[%s]", url.c_str());
     _http = esp_http_client_init(&config);
-    
+
+    // Set Headers
     for (const auto& pair : headers) {
         std::cout << pair.first << ": " << pair.second << std::endl;
         esp_http_client_set_header(_http, pair.first.c_str(), pair.second.c_str());
