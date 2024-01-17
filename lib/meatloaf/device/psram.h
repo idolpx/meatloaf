@@ -10,6 +10,8 @@
 #ifndef MEATLOAF_HIMEMFS_H
 #define MEATLOAF_HIMEMFS_H
 
+#ifndef CONFIG_IDF_TARGET_ESP32S3
+
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -198,5 +200,5 @@ private:
 };
 
 
-
+#endif
 #endif // MEATLOAF_HIMEM_FS

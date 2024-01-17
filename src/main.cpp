@@ -70,10 +70,13 @@ void main_setup()
 
 #ifdef BOARD_HAS_PSRAM
     Serial.printf( "PsramSize %u\r\n", fnSystem.get_psram_size() );
-
-    Serial.printf( "himem phys %u\r\n", esp_psram_get_size() );
-    // Serial.printf( "himem free %u\r\n", esp_himem_get_free_size() );
-    // Serial.printf( "himem reserved %u\r\n", esp_himem_reserved_area_size() );
+#ifdef CONFIG_IDF_TARGET_ESP32S3
+    Serial.printf( "Psram size %u\r\n", esp_psram_get_size() );
+#else
+    Serial.printf( "himem phys %u\r\n", esp_himem_get_size() );
+    Serial.printf( "himem free %u\r\n", esp_himem_get_free_size() );
+    Serial.printf( "himem reserved %u\r\n", esp_himem_reserved_area_size() );
+#endif
 #endif
 
 
