@@ -3,7 +3,7 @@
 #ifdef BOARD_HAS_PSRAM
 #ifdef CONFIG_IDF_TARGET_ESP32S3
 #include <esp_psram.h>
-#elif
+#else
 #include <esp32/himem.h>
 #endif
 #endif
@@ -73,7 +73,7 @@ void main_setup()
 #ifdef CONFIG_IDF_TARGET_ESP32S3
     Serial.printf( "Psram size %u\r\n", esp_psram_get_size() );
 #else
-    Serial.printf( "himem phys %u\r\n", esp_himem_get_size() );
+    Serial.printf( "himem phys %u\r\n", esp_himem_get_phys_size() );
     Serial.printf( "himem free %u\r\n", esp_himem_get_free_size() );
     Serial.printf( "himem reserved %u\r\n", esp_himem_reserved_area_size() );
 #endif
