@@ -239,4 +239,4 @@ build_flags =
     ${env.build_flags}
     -D PINMAP_ESP32S3_DEVKITC_1
     ; -D LED_STRIP
-    ; -D BOARD_HAS_PSRAM
+    -D BOARD_HAS_PSRAM
