@@ -3,7 +3,12 @@
 
 #include <string>
 
+#if HOST_OS==win32
+#include "../bus/bus.h"
+#else
 #include "bus.h"
+#endif
+
 #include "networkStatus.h"
 #include "peoples_url_parser.h"
 

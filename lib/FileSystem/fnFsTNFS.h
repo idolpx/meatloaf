@@ -2,7 +2,11 @@
 #define _FN_FSTNFS_
 
 #include "fnFS.h"
+#if HOST_OS==win32
+#include "../TNFSlib/tnfslib.h"
+#else
 #include "tnfslib.h"
+#endif
 
 class FileSystemTNFS : public FileSystem
 {
