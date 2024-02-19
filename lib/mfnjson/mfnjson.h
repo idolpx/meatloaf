@@ -12,7 +12,15 @@
 #include <cJSON_Utils.h>
 
 #include "../network-protocol/Protocol.h"
+
+
+#if HOST_OS==win32
+#include "../meatloaf/meat_stream.h"
+#else
 #include "meat_stream.h"
+#endif
+
+
 
 class MFNJSON
 {
