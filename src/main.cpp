@@ -129,7 +129,7 @@ void main_setup()
         fnPrinters.set_entry(0, ptr, ptype, Config.get_printer_port(0));
 
         Serial.print("Printer "); IEC.addDevice(ptr, 4);                    // 04-07 Printers / Plotters
-        Serial.print("Disk "); IEC.addDevice(new iecDrive(), 8);            // 08-16 Drives
+        Serial.print("Disk "); IEC.addDevice(new iecDrive(), 8);            // 08-15 Drives
         Serial.print("Network "); IEC.addDevice(new iecNetwork(), 16);      // 16-19 Network Devices
         Serial.print("CPM "); IEC.addDevice(new iecCpm(), 20);              // 20-29 Other
         Serial.print("Voice "); IEC.addDevice(new iecVoice(), 21);
