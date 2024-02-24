@@ -7,6 +7,9 @@
    CONDITIONS OF ANY KIND, either express or implied.
 */
 
+#include "sdkconfig.h"
+#ifndef CONFIG_IDF_TARGET_ESP32S3
+
 #include "psram.h"
 
 #include <stdio.h>
@@ -19,7 +22,6 @@
 #include "esp_system.h"
 #include "nvs_flash.h"
 #include "esp_heap_caps.h"
-#include "sdkconfig.h"
 #include "esp32/himem.h"
 
 
@@ -88,3 +90,4 @@ bool HighMemory::test_region(int check_size, int seed)
     return ret;
 }
 
+#endif

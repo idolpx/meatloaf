@@ -1,8 +1,6 @@
 
 #include "keys.h"
 
-#include <esp32/himem.h>
-
 #include "../../include/debug.h"
 #include "../../include/pinmap.h"
 

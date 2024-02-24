@@ -31,6 +31,7 @@ environment = lolin-d32-pro      ; Wemos Lolin D32 Pro                         (
 ;environment = esp32s3            ; esp32s3 devkitc                             (ESP32-S3 2M/8M PSRAM, 8M/16M/32M Flash)
 ;environment = lolin-s2-mini      ; Wemos Lolin S2 Mini                         (ESP32-S2 2M PSRAM, 4M Flash)
 ;environment = lolin-s3-pro       ; Wemos Lolin S3 Pro                          (ESP32-S3 8M PSRAM, 16M Flash)
+;environment = esp32s3-DevKitC-1   ; esp32s3 DevKitC-1                          (ESP32-S3 2M/8M PSRAM, 8M/16M/32M Flash)
 
 ; NATIVE UNIT TESTING
 ;environment = native      ; For running tests that don't require embedded hardware
@@ -55,7 +56,8 @@ build_bus      = IEC
 [platformio]
 description = ${meatloaf.description}
 default_envs = ${meatloaf.environment}
-data_dir = $PROJECT_DIR/data/${meatloaf.build_platform}
+data_dir = data/${meatloaf.build_platform}
+
 
 [esp32_base]
 ; Espressif32 PlatformIO Version to use for building
@@ -228,4 +230,13 @@ board = esp32-s3
 build_flags =
     ${env.build_flags}
     -D PINMAP_ESP32S3
+    -D BOARD_HAS_PSRAM
+
+[env:esp32s3-DevKitC-1]
+extends = esp32_base
+board = esp32-s3-${meatloaf.flash_size}
+build_flags =
+    ${env.build_flags}
+    -D PINMAP_ESP32S3_DEVKITC_1
+    ; -D LED_STRIP
     -D BOARD_HAS_PSRAM

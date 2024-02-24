@@ -1,7 +1,7 @@
-#ifndef PINMAP_ESP32S3_H
-#define PINMAP_ESP32S3_H
+#ifndef ESP32S3_DEVKITC_1_H
+#define ESP32S3_DEVKITC_1_H
 
-#ifdef PINMAP_ESP32S3
+#ifdef PINMAP_ESP32S3_DEVKITC_1
 
 /* SD Card */
 #define PIN_CARD_DETECT         GPIO_NUM_12 // fnSystem.h
@@ -26,8 +26,8 @@
 #define PIN_BUTTON_C            GPIO_NUM_14
 
 /* LEDs */
-#define PIN_LED_WIFI            GPIO_NUM_2 // led.cpp
-#define PIN_LED_BUS             GPIO_NUM_5 // 4 FN
+#define PIN_LED_WIFI            GPIO_NUM_4 // led.cpp
+#define PIN_LED_BUS             GPIO_NUM_48 // 4 FN
 
 // pins 12-15 are used to interface with the JTAG debugger
 // so leave them alone if we're using JTAG
@@ -71,13 +71,13 @@
 // #endif
 
 
-#define PIN_IEC_RESET           GPIO_NUM_9
-#define PIN_IEC_ATN             GPIO_NUM_10
+#define PIN_IEC_RESET           GPIO_NUM_13
+#define PIN_IEC_ATN             GPIO_NUM_12
 #define PIN_IEC_CLK_IN          GPIO_NUM_11
 #define PIN_IEC_CLK_OUT         GPIO_NUM_11
-#define PIN_IEC_DATA_IN         GPIO_NUM_12
-#define PIN_IEC_DATA_OUT        GPIO_NUM_12
-#define PIN_IEC_SRQ             GPIO_NUM_13
+#define PIN_IEC_DATA_IN         GPIO_NUM_10
+#define PIN_IEC_DATA_OUT        GPIO_NUM_10
+#define PIN_IEC_SRQ             GPIO_NUM_9
 // GND - Be sure to connect GND of the IEC cable to GND on the ESP module
 
 /* Modem/Parallel Switch */
@@ -93,5 +93,5 @@
 //#define GPIOX_SPEED             400   // PCF8575 - 400Khz
 #define GPIOX_SPEED             1000  // PCA9673 - 1000Khz / 1Mhz
 
-#endif // PINMAP_ESP32S3
-#endif // PINMAP_ESP32S3_H
+#endif // PINMAP_ESP32S3_DEVKITC_1
+#endif // ESP32S3_DEVKITC_1_H
