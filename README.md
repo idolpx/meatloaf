@@ -69,6 +69,8 @@ Meatloaf is not limited to be just your standard drive 8, you can configure it t
 
 ## Build and installation
 
+[![Load Commodore Files Over The Internet!?! - How To Build A Meatloaf](https://img.youtube.com/vi/QXQjwKSVHjo/maxresdefault.jpg)](https://www.youtube.com/watch?v=QXQjwKSVHjo)
+
 Visual studio code, and the platformio addon installed from the vscode store required.
 
 - clone this repo
