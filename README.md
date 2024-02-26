@@ -4,6 +4,15 @@ This is the ESP32 version of [Meatloaf](https://github.com/idolpx/meatloaf) inte
 
 # What is Meatloaf?
 
+"Meatloaf" for Commodore computers is not a game or software application. Instead, it's a hardware device designed to enhance the functionality of the classic computer. Here's what it does:
+
+* **Emulates a floppy drive:** Meatloaf plugs into the Commodore 64's IEC serial port and acts like a virtual floppy drive. This allows you to load software and data stored on its internal flash memory or stream it via WiFi using various protocol from servers all over the world.
+* **Supports multiple virtual drives:** Unlike a single floppy drive, Meatloaf can be configured to emulate up to 26 virtual drives (IDs 4-30). Each virtual drive can have a different disk image loaded, essentially offering the equivalent of having thousands of floppies connected to your C64.
+* **Supports additional virtual devices:** Printers, a network interface, and more.
+* **Connects to the internet:** Meatloaf also functions as a WiFi modem, enabling your Commodore 64 to connect to Telnet BBS (bulletin board systems) for communication and sharing information.
+
+Overall, Meatloaf is a valuable tool for Commodore enthusiasts as it provides a convenient and versatile way to load software, access a vast library of disk images, and connect to online communities, all without the need for physical floppy disks or additional hardware.
+
 ## A cloud disk drive
 
 While one can say Meatloaf is just another Commodore IEC Serial Floppy Drive similar to SD2IEC and its clones, Meatloaf is in fact much more than that, as it allows you to load not only local files stored on its internal flash file system or SD card, but also files from any URL you can imagine, straight into your Commodore computer without any additional software. For example you can load a game from some web server:
