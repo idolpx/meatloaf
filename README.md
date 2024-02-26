@@ -70,6 +70,8 @@ Meatloaf is not limited to be just your standard drive 8, you can configure it t
 ## Build and installation
 
 [![Load Commodore Files Over The Internet!?! - How To Build A Meatloaf](https://img.youtube.com/vi/QXQjwKSVHjo/maxresdefault.jpg)](https://www.youtube.com/watch?v=QXQjwKSVHjo)
+CityXen! - https://www.youtube.com/watch?v=QXQjwKSVHjo
+
 
 Visual studio code, and the platformio addon installed from the vscode store required.
 
@@ -77,11 +79,8 @@ Visual studio code, and the platformio addon installed from the vscode store req
 - Copy platformio.ini.sample to platformio.ini
 - Edit platformio.ini to match your device and default wifi settings
 - Upload filesystem image by clicking the alien head on left panel and selecting `lolin d32 pro` then `Platform` and then `Build Filesystem Image` and `Upload Filesystem Image` (this has to be done only once!)
-- Press the PlatformIO Upload icon arrow at the bottom in the status bar. This procedure will take some time to complete, and you should start seeing some logging info of the project being built (See picture below)
-
-![platformio_upload](/images/ml-build-1.png)
-
-- meatloaf should now be running on the device
+- Build & Upload firmware by clicking the alien head on left panel and selecting `lolin d32 pro` then `General` and then `Upload and Monitor` (It will take a while to compile and upload)
+- Meatloaf should now be running on the device!
 
 ## Getting a listing of a HTTP server
 
