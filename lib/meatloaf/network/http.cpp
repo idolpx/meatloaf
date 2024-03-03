@@ -46,11 +46,11 @@ MStream* HttpFile::getSourceStream(std::ios_base::openmode mode) {
     // H+:Accept: */*
     // H+:Accept-Encoding: gzip, deflate
     // here you add them all to a map, like this:
-    std::map<std::string, std::string> headers;
+    //std::map<std::string, std::string> headers;
     // headers["Accept"] = "*/*";
     // headers["Accept-Encoding"] = "gzip, deflate";
     // etc.
-    MStream* istream = new HttpIStream(url, mode, headers);
+    MStream* istream = new HttpIStream(url, mode, global_http_headers);
     istream->open();
 
     return istream;

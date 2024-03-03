@@ -1614,14 +1614,14 @@ void iecDrive::process_header(std::string payload)
             std::string header = parts[0];
             std::string value = parts[1];
             auto newPair = std::make_pair (header, value);
-            headers.insert (newPair);
+            global_http_headers.insert (newPair);
             Debug_printf("Added global header [%s] = [%s]", header.c_str(), value.c_str());
         }
     }
     else if(payload[1]=='-')
     {
         std::string headerStr = payload.substr(3);
-        headers.erase(headerStr);
+        global_http_headers.erase(headerStr);
     }
     else
     {

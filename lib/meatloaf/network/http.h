@@ -17,6 +17,7 @@
 #include "../../../include/debug.h"
 //#include "../../include/global_defines.h"
 //#include "../../include/version.h"
+#include "../../meatloaf/network/global_headers.h"
 
 #define HTTP_BLOCK_SIZE 256
 

@@ -9,7 +9,7 @@
 
 #include "fnSystem.h"
 #include "../fn_esp_http_client/fn_esp_http_client.h"
-
+#include "../meatloaf/network/global_headers.h"
 #include "utils.h"
 
 using namespace fujinet;
@@ -676,6 +676,12 @@ int fnHttpClient::POST(const char *post_data, int post_datalen)
 
     // Set method
     esp_http_client_set_method(_handle, esp_http_client_method_t::HTTP_METHOD_POST);
+
+    for (const auto& pair : global_http_headers) {
+        Debug_printv("Adding global header: %s: %s", pair.first.c_str(), pair.second.c_str());
+        esp_http_client_set_header(_handle, pair.first.c_str(), pair.second.c_str());
+    }
+
     esp_http_client_set_post_field(_handle, post_data, post_datalen);
 
     return _perform();
