@@ -13,6 +13,8 @@ This is the ESP32 version of [Meatloaf](https://github.com/idolpx/meatloaf) inte
 
 Overall, Meatloaf is a valuable tool for Commodore enthusiasts as it provides a convenient and versatile way to load software, access a vast library of disk images, and connect to online communities, all without the need for physical floppy disks or additional hardware.
 
+How is it even possible? Read more here: [Link](doc/howisitpossible.md)
+
 ## A cloud disk drive
 
 While one can say Meatloaf is just another Commodore IEC Serial Floppy Drive similar to SD2IEC and its clones, Meatloaf is in fact much more than that, as it allows you to load not only local files stored on its internal flash file system or SD card, but also files from any URL you can imagine, straight into your Commodore computer without any additional software. For example you can load a game from some web server:
