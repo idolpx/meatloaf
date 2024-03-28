@@ -17,6 +17,7 @@
 // ESP32 S2/S3
 #include "pinmap/lolin-s2-mini.h"
 #include "pinmap/esp32s3.h"
+#include "pinmap/esp32s3-devkitc-1.h"
 
 #ifndef LED_STRIP
 /* LED Strip NEW */

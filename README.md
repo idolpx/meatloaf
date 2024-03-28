@@ -4,6 +4,17 @@ This is the ESP32 version of [Meatloaf](https://github.com/idolpx/meatloaf) inte
 
 # What is Meatloaf?
 
+"Meatloaf" for Commodore computers is not a game or software application. Instead, it's a hardware device designed to enhance the functionality of the classic computer. Here's what it does:
+
+* **Emulates a floppy drive:** Meatloaf plugs into the Commodore 64's IEC serial port and acts like a virtual floppy drive. This allows you to load software and data stored on its internal flash memory, sd card, or stream it via WiFi using various protocols from servers all over the world.
+* **Supports multiple virtual drives:** Unlike a single floppy drive, Meatloaf can be configured to emulate up to 26 virtual drives (IDs 4-30). Each virtual drive can have a different disk image loaded, essentially offering the equivalent of having thousands of floppies connected to your C64.
+* **Supports additional virtual device types:** Printers, a network interface, and more.
+* **Connects to the internet:** Meatloaf also functions as a WiFi modem, enabling your Commodore 64 to connect to Telnet BBS (bulletin board systems) for communication and sharing information.
+
+Overall, Meatloaf is a valuable tool for Commodore enthusiasts as it provides a convenient and versatile way to load software, access a vast library of disk images, and connect to online communities, all without the need for physical floppy disks or additional hardware.
+
+How is it even possible? Read more here: [Link](doc/howisitpossible.md)
+
 ## A cloud disk drive
 
 While one can say Meatloaf is just another Commodore IEC Serial Floppy Drive similar to SD2IEC and its clones, Meatloaf is in fact much more than that, as it allows you to load not only local files stored on its internal flash file system or SD card, but also files from any URL you can imagine, straight into your Commodore computer without any additional software. For example you can load a game from some web server:
@@ -69,17 +80,18 @@ Meatloaf is not limited to be just your standard drive 8, you can configure it t
 
 ## Build and installation
 
+[![Load Commodore Files Over The Internet!?! - How To Build A Meatloaf](https://img.youtube.com/vi/QXQjwKSVHjo/maxresdefault.jpg)](https://www.youtube.com/watch?v=QXQjwKSVHjo)
+CityXen! - https://www.youtube.com/watch?v=QXQjwKSVHjo
+
+
 Visual studio code, and the platformio addon installed from the vscode store required.
 
 - clone this repo
 - Copy platformio.ini.sample to platformio.ini
 - Edit platformio.ini to match your device and default wifi settings
 - Upload filesystem image by clicking the alien head on left panel and selecting `lolin d32 pro` then `Platform` and then `Build Filesystem Image` and `Upload Filesystem Image` (this has to be done only once!)
-- Press the PlatformIO Upload icon arrow at the bottom in the status bar. This procedure will take some time to complete, and you should start seeing some logging info of the project being built (See picture below)
-
-![platformio_upload](/images/ml-build-1.png)
-
-- meatloaf should now be running on the device
+- Build & Upload firmware by clicking the alien head on left panel and selecting `lolin d32 pro` then `General` and then `Upload and Monitor` (It will take a while to compile and upload)
+- Meatloaf should now be running on the device!
 
 ## Getting a listing of a HTTP server
 
