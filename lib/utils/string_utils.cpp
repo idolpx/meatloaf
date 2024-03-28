@@ -396,8 +396,16 @@ namespace mstr {
         {
             std::string::value_type c = (*i);
 
+            // Change space to '+'
+            // if ( c == ' ')
+            // {
+            //     escaped << '+';
+            //     continue;
+            // }
+
             // Keep alphanumeric and other accepted characters intact
-            if (isalnum((unsigned char)c) || c == '-' || c == '_' || c == '.' || c == '~' || c == '/' || c == ' ')
+            //if (isalnum((unsigned char)c) || c == '-' || c == '_' || c == '.' || c == '~' || c == '/' || c == ' ')
+            if (isalnum((unsigned char)c) || c == '-' || c == '_' || c == '.' || c == '~' || c == '/' || c == '+')
             {
                 escaped << c;
                 continue;
