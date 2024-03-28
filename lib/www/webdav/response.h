@@ -106,7 +106,7 @@ namespace WebDav
                     Debug_printv("unhandled[%d]", ret);
             }
 
-            Debug_printv("status[%s]", status);
+            //Debug_printv("status[%s]", status);
             httpd_resp_set_status(req, status);
         }
 
@@ -133,7 +133,7 @@ namespace WebDav
 
         void closeBody()
         {
-            Debug_printv("chunked[%d]", chunked);
+            //Debug_printv("chunked[%d]", chunked);
             if (!chunked)
                 httpd_resp_send(req, "", 0);
         }
@@ -142,7 +142,7 @@ private:
         void writeHeader(const char *header, const char *value)
         {
             httpd_resp_set_hdr(req, header, value);
-            Debug_printv("%s: %s", header, value);
+            //Debug_printv("%s: %s", header, value);
         }
 
         httpd_req_t *req;

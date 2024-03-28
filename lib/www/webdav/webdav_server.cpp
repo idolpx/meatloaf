@@ -28,8 +28,9 @@ std::string Server::uriToPath(std::string uri)
     while (path.substr(path.length() - 1, 1) == "/")
         path = path.substr(0, path.length() - 1);
     mstr::replaceAll(path, "//", "/");
+    path = mstr::urlDecode(path);
     Debug_printv("uri[%s] path[%s]", uri.c_str(), path.c_str());
-    return mstr::urlDecode(path);
+    return path;
 }
 
 std::string Server::pathToURI(std::string path)
@@ -81,17 +82,15 @@ void Server::sendMultiStatusResponse(Response &resp, MultiStatusResponse &msr)
 
 int Server::sendPropResponse(Response &resp, std::string path, int recurse)
 {
-    std::string uri = path;
+    std::string uri = pathToURI(path);
+    Debug_printv("uri[%s] path[%s]", uri.c_str(), path.c_str());
 
     struct stat sb;
-    path = uriToPath(uri);
     int ret = stat(path.c_str(), &sb);
-    Debug_printv("ret[%d] path[%s]", ret, path.c_str());
     if (ret < 0)
         return -errno;
 
     // printf("%s() path >%s< uri >%s<\r\n", __func__, path.c_str(), uri.c_str());
-    Debug_printv("path[%s] uri[%s]", path.c_str(), uri.c_str());
 
     MultiStatusResponse r;
 
@@ -103,10 +102,8 @@ int Server::sendPropResponse(Response &resp, std::string path, int recurse)
     r.props["displayname"] = basename(path.c_str());
 
     Debug_printv("mode[%d]", sb.st_mode);
-    //r.isCollection = ((sb.st_mode & S_IFMT) == S_IFDIR);
-    r.isCollection = S_ISDIR(sb.st_mode);
-
-    if (!r.isCollection)
+    r.isCollection = ((sb.st_mode & S_IFMT) == S_IFDIR);
+    if ( !r.isCollection )
     {
         r.props["getcontentlength"] = std::to_string(sb.st_size);
         r.props["getcontenttype"] = "application/binary";
@@ -380,7 +377,7 @@ int Server::doPropfind(Request &req, Response &resp)
     resp.sendChunk("<?xml version=\"1.0\" encoding=\"utf-8\" ?>\r\n");
     resp.sendChunk("<multistatus xmlns=\"DAV:\">\r\n");
 
-    sendPropResponse(resp, req.getPath(), recurse);
+    sendPropResponse(resp, path, recurse);
     resp.sendChunk("</multistatus>\r\n");
     resp.closeChunk();
 
