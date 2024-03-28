@@ -385,7 +385,7 @@ int Server::doPropfind(Request &req, Response &resp)
                                                                                         : 32;
 
     resp.setStatus(207);
-    resp.setHeader("Transfer-Encoding", "chunked");
+    //resp.setHeader("Transfer-Encoding", "chunked");
     resp.setContentType("text/xml; charset=\"utf-8\"");
     resp.flushHeaders();
 
