@@ -39,6 +39,14 @@ LOAD"HTTP://C64WAREZ.NET/DROPZONE/FRESH_WAREZ.ZIP/GTA64.D64/START.PRG",8
 
 If you rather keep your files locally, you can easily upload them to Meatloaf local file system via built-in WebDAV server. No need to shuffle SDCARD between your PC and Commodore!
 
+## Select on your PC, load on your Commodore
+
+By using "Send to Meatload" browser extension you can send programs to your Meatloaf and then load them easily from Basic, without typing the full URL.
+
+[Chrome plugin](https://chromewebstore.google.com/detail/send-to-meatloaf/dofemlliemmbfmdbbjfpdaooaklfmdki)
+[Firefox plugin](https://addons.mozilla.org/en-US/firefox/addon/send-to-meatloaf/)
+[Opera plugin](https://addons.opera.com/en-gb/extensions/details/send-to-meatloaf/)
+
 ## The best network adapter for Commodore ever built!
 
 Of course - any URL could be opened using Kernal or BASIC I/O commands like `OPEN`, `CLOSE`, `PRINT#`, `GET#` or `INPUT#`, meaning you don't need a modem or a network card with dedicated application anymore! Just open a byte stream via a TCP socket:
