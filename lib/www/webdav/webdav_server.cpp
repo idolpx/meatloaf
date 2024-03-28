@@ -28,9 +28,8 @@ std::string Server::uriToPath(std::string uri)
     while (path.substr(path.length() - 1, 1) == "/")
         path = path.substr(0, path.length() - 1);
     mstr::replaceAll(path, "//", "/");
-    path = mstr::urlDecode(path);
-    Debug_printv("uri[%s] path[%s]", uri.c_str(), path.c_str());
-    return path;
+    //Debug_printv("uri[%s] path[%s]", uri.c_str(), path.c_str());
+    return mstr::urlDecode(path);
 }
 
 std::string Server::pathToURI(std::string path)
@@ -77,6 +76,8 @@ void Server::sendMultiStatusResponse(Response &resp, MultiStatusResponse &msr)
 
     s << "</propstat></response>\r\n";
 
+    //Debug_printv("[%s]", s.str().c_str());
+
     resp.sendChunk(s.str().c_str());
 }
 
@@ -99,9 +100,9 @@ int Server::sendPropResponse(Response &resp, std::string path, int recurse)
 
     r.props["creationdate"] = formatTime(sb.st_ctime);
     r.props["getlastmodified"] = formatTime(sb.st_mtime);
-    r.props["displayname"] = basename(path.c_str());
+    r.props["displayname"] = mstr::urlEncode(basename(path.c_str()));
 
-    Debug_printv("mode[%d]", sb.st_mode);
+    //Debug_printv("mode[%d]", sb.st_mode);
     r.isCollection = ((sb.st_mode & S_IFMT) == S_IFDIR);
     if ( !r.isCollection )
     {
@@ -211,9 +212,23 @@ int Server::doGet(Request &req, Response &resp)
     if (ret < 0)
         return 404;
 
+    // Method Not Allowed
+    if ((sb.st_mode & S_IFMT) == S_IFDIR)
+    {
+        char *r = "Method Not Allowed";
+        resp.setStatus(405);
+        resp.clearHeaders();
+        resp.setContentType("text/plain; charset=\"utf-8\"");
+        resp.flushHeaders();
+
+        resp.sendBody(r, 18);
+        return 405;
+    }
+
+    // Send File
     FILE *f = fopen(path.c_str(), "r");
     if (!f)
-        return 500;
+        return 404;
 
     resp.setHeader("Content-Length", sb.st_size);
     resp.setHeader("ETag", sb.st_ino);

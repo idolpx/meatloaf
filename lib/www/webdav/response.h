@@ -49,6 +49,7 @@ namespace WebDav
         void setDavHeaders();
         void setHeader(std::string header, std::string value);
         void setHeader(std::string header, size_t value);
+        void clearHeaders();
         void flushHeaders();
 
         // Functions that depend on the underlying web server implementation
@@ -129,12 +130,18 @@ namespace WebDav
         void closeChunk()
         {
             httpd_resp_send_chunk(req, NULL, 0);
+            chunked = false;
+        }
+
+        void sendBody(const char *buf, ssize_t len = -1)
+        {
+            httpd_resp_send(req, buf, len);
         }
 
         void closeBody()
         {
             //Debug_printv("chunked[%d]", chunked);
-            if (!chunked)
+            //if (!chunked)
                 httpd_resp_send(req, "", 0);
         }
 

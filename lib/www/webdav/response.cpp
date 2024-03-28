@@ -15,10 +15,15 @@ void Response::setHeader(std::string header, std::string value) {
     headers[header] = value;
 }
 
+
 void Response::setHeader(std::string header, size_t value) {
     char tmp[32];
     snprintf(tmp, sizeof(tmp), "%zu", value);
     headers[header] = tmp;
+}
+
+void Response::clearHeaders() {
+    headers.clear();
 }
 
 void Response::flushHeaders() {
