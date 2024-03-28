@@ -216,7 +216,7 @@ esp_err_t cHttpdServer::webdav_handler(httpd_req_t *httpd_req)
     httpd_resp_set_hdr(httpd_req, "Access-Control-Allow-Headers", "*");
     httpd_resp_set_hdr(httpd_req, "Access-Control-Allow-Methods", "*");
 
-    Debug_printv("%s[%s]", http_method_str((enum http_method)httpd_req->method), httpd_req->uri);
+    Debug_printv("%d %s[%s]", httpd_req->method, http_method_str((enum http_method)httpd_req->method), httpd_req->uri);
 
     switch (httpd_req->method)
     {
