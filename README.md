@@ -41,11 +41,17 @@ If you rather keep your files locally, you can easily upload them to Meatloaf lo
 
 ## Select on your PC, load on your Commodore
 
-By using "Send to Meatload" browser extension you can send programs to your Meatloaf and then load them easily from Basic, without typing the full URL.
+By using "Send to Meatload" browser extension you can send programs to your Meatloaf and then load them easily from Basic, without typing the full URL. Just install a plugin in your browser:
 
 [Chrome plugin](https://chromewebstore.google.com/detail/send-to-meatloaf/dofemlliemmbfmdbbjfpdaooaklfmdki)
 [Firefox plugin](https://addons.mozilla.org/en-US/firefox/addon/send-to-meatloaf/)
 [Opera plugin](https://addons.opera.com/en-gb/extensions/details/send-to-meatloaf/)
+
+And on your Commodore just type below command to load whatever you tagged:
+
+```BASIC
+LOAD"ML:*",8
+```
 
 ## The best network adapter for Commodore ever built!
 
