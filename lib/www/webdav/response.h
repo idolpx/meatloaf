@@ -112,6 +112,7 @@ namespace WebDav
 
         void setContentType(const char *ct)
         {
+            Debug_printv("%s", ct);
             httpd_resp_set_type(req, ct);
         }
 
@@ -132,6 +133,7 @@ namespace WebDav
 
         void closeBody()
         {
+            Debug_printv("chunked[%d]", chunked);
             if (!chunked)
                 httpd_resp_send(req, "", 0);
         }
@@ -140,10 +142,11 @@ private:
         void writeHeader(const char *header, const char *value)
         {
             httpd_resp_set_hdr(req, header, value);
+            Debug_printv("%s: %s", header, value);
         }
 
         httpd_req_t *req;
-        bool chunked;
+        bool chunked = false;
 
         std::map<std::string, std::string> headers;
     };
