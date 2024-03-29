@@ -29,6 +29,13 @@
 
 #include "template.h"
 
+#include <chrono>
+#include <thread>
+
+using namespace std::this_thread;     // sleep_for, sleep_until
+using namespace std::chrono_literals; // ns, us, ms, s, h, etc.
+using std::chrono::system_clock;
+
 #define MIN(a, b) \
     ({ __typeof__ (a) _a = (a); \
        __typeof__ (b) _b = (b); \
@@ -212,9 +219,9 @@ esp_err_t cHttpdServer::webdav_handler(httpd_req_t *httpd_req)
         return ESP_OK;
     }
 
-    httpd_resp_set_hdr(httpd_req, "Access-Control-Allow-Origin", "*");
-    httpd_resp_set_hdr(httpd_req, "Access-Control-Allow-Headers", "*");
-    httpd_resp_set_hdr(httpd_req, "Access-Control-Allow-Methods", "*");
+    // httpd_resp_set_hdr(httpd_req, "Access-Control-Allow-Origin", "*");
+    // httpd_resp_set_hdr(httpd_req, "Access-Control-Allow-Headers", "*");
+    // httpd_resp_set_hdr(httpd_req, "Access-Control-Allow-Methods", "*");
 
     Debug_printv("%d %s[%s]", httpd_req->method, http_method_str((enum http_method)httpd_req->method), httpd_req->uri);
 
@@ -264,7 +271,7 @@ esp_err_t cHttpdServer::webdav_handler(httpd_req_t *httpd_req)
     resp.setStatus(ret);
     resp.flushHeaders();
     resp.closeBody();
-
+    sleep_for(100ms);
     Debug_printv("ret[%d]", ret);
 
     return ret;

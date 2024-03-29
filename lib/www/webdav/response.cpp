@@ -29,4 +29,5 @@ void Response::clearHeaders() {
 void Response::flushHeaders() {
     for (const auto &h: headers)
         writeHeader(h.first.c_str(), h.second.c_str());
+    headers.clear();
 }

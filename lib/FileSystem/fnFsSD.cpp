@@ -143,13 +143,13 @@ bool FileSystemSDFAT::dir_open(const char * path, const char * pattern, uint16_t
         if(finfo.fattrib & AM_HID || finfo.fattrib & AM_SYS)
             continue;
 
-        // Ignore some special files we create on SD
-        if(strcmp(finfo.fname, "paper") == 0 
-        #ifndef FNCONFIG_DEBUG
-        || strcmp(finfo.fname, "config.ini") == 0
-        #endif
-        || strcmp(finfo.fname, "rs232dump") == 0)
-            continue;
+        // // Ignore some special files we create on SD
+        // if(strcmp(finfo.fname, "paper.pdf") == 0 
+        // #ifndef FNCONFIG_DEBUG
+        // || strcmp(finfo.fname, "config.ini") == 0
+        // #endif
+        // || strcmp(finfo.fname, "rs232dump") == 0)
+        //     continue;
 
         // Determine which list to put this in
         if(finfo.fattrib & AM_DIR)

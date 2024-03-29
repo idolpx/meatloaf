@@ -113,7 +113,7 @@ namespace WebDav
 
         void setContentType(const char *ct)
         {
-            Debug_printv("%s", ct);
+            //Debug_printv("%s", ct);
             httpd_resp_set_type(req, ct);
         }
 
@@ -123,6 +123,8 @@ namespace WebDav
 
             if (len == -1)
                 len = strlen(buf);
+
+            //Debug_printv("\r\n%x\r\n%s\r\n", len, buf);
 
             return httpd_resp_send_chunk(req, buf, len) == ESP_OK;
         }
