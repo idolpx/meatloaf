@@ -84,7 +84,7 @@ void Server::sendMultiStatusResponse(Response &resp, MultiStatusResponse &msr)
 int Server::sendPropResponse(Response &resp, std::string path, int recurse)
 {
     std::string uri = pathToURI(path);
-    Debug_printv("uri[%s] path[%s]", uri.c_str(), path.c_str());
+    //Debug_printv("uri[%s] path[%s]", uri.c_str(), path.c_str());
 
     struct stat sb;
     int ret = stat(path.c_str(), &sb);

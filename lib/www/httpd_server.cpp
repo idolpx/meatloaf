@@ -29,13 +29,6 @@
 
 #include "template.h"
 
-#include <chrono>
-#include <thread>
-
-using namespace std::this_thread;     // sleep_for, sleep_until
-using namespace std::chrono_literals; // ns, us, ms, s, h, etc.
-using std::chrono::system_clock;
-
 #define MIN(a, b) \
     ({ __typeof__ (a) _a = (a); \
        __typeof__ (b) _b = (b); \
@@ -213,7 +206,7 @@ esp_err_t cHttpdServer::webdav_handler(httpd_req_t *httpd_req)
 
     if (!req.parseRequest())
     {
-        resp.setStatus(400);
+        resp.setStatus(400); // Bad Request
         resp.flushHeaders();
         resp.closeBody();
         return ESP_OK;
@@ -253,6 +246,7 @@ esp_err_t cHttpdServer::webdav_handler(httpd_req_t *httpd_req)
         break;
     case HTTP_PROPFIND:
         ret = server->doPropfind(req, resp);
+        return ESP_OK;
         break;
     case HTTP_PROPPATCH:
         ret = server->doProppatch(req, resp);
@@ -264,17 +258,17 @@ esp_err_t cHttpdServer::webdav_handler(httpd_req_t *httpd_req)
         ret = server->doUnlock(req, resp);
         break;
     default:
-        ret = ESP_ERR_HTTPD_INVALID_REQ;
+        return ESP_ERR_HTTPD_INVALID_REQ;
         break;
     }
 
     resp.setStatus(ret);
     resp.flushHeaders();
     resp.closeBody();
-    sleep_for(100ms);
+
     Debug_printv("ret[%d]", ret);
 
-    return ret;
+    return ESP_OK;
 }
 
 void cHttpdServer::websocket_register(httpd_handle_t server)
