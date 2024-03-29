@@ -202,7 +202,7 @@ esp_err_t cHttpdServer::webdav_handler(httpd_req_t *httpd_req)
     WebDav::Response resp(httpd_req);
     int ret;
 
-    Debug_printv("url[%s]", httpd_req->uri);
+    //Debug_printv("url[%s]", httpd_req->uri);
 
     if (!req.parseRequest())
     {
@@ -228,6 +228,8 @@ esp_err_t cHttpdServer::webdav_handler(httpd_req_t *httpd_req)
         break;
     case HTTP_GET:
         ret = server->doGet(req, resp);
+        if ( ret == 200 )
+            return ESP_OK;
         break;
     case HTTP_HEAD:
         ret = server->doHead(req, resp);
@@ -246,7 +248,8 @@ esp_err_t cHttpdServer::webdav_handler(httpd_req_t *httpd_req)
         break;
     case HTTP_PROPFIND:
         ret = server->doPropfind(req, resp);
-        return ESP_OK;
+        if (ret == 207)
+            return ESP_OK;
         break;
     case HTTP_PROPPATCH:
         ret = server->doProppatch(req, resp);
@@ -263,8 +266,19 @@ esp_err_t cHttpdServer::webdav_handler(httpd_req_t *httpd_req)
     }
 
     resp.setStatus(ret);
-    resp.flushHeaders();
-    resp.closeBody();
+    if ( ret == 405 )
+    {
+        char *r = "Method Not Allowed";
+        resp.clearHeaders();
+        resp.setContentType("text/plain; charset=\"utf-8\"");
+        resp.flushHeaders();
+        resp.sendBody(r, 18);
+    }
+    else
+    {
+        resp.flushHeaders();
+        resp.closeBody();
+    }
 
     Debug_printv("ret[%d]", ret);
 

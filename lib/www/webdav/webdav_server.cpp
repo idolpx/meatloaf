@@ -214,16 +214,7 @@ int Server::doGet(Request &req, Response &resp)
 
     // Method Not Allowed
     if ((sb.st_mode & S_IFMT) == S_IFDIR)
-    {
-        char *r = "Method Not Allowed";
-        resp.setStatus(405);
-        resp.clearHeaders();
-        resp.setContentType("text/plain; charset=\"utf-8\"");
-        resp.flushHeaders();
-
-        resp.sendBody(r, 18);
         return 405;
-    }
 
     // Send File
     FILE *f = fopen(path.c_str(), "r");
