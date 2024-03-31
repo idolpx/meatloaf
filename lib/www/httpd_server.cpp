@@ -266,11 +266,19 @@ esp_err_t cHttpdServer::webdav_handler(httpd_req_t *httpd_req)
     }
 
     resp.setStatus(ret);
-    if ( ret == 405 )
+    if ( ret == 404 )
+    {
+        char *r = "Not found";
+        resp.clearHeaders();
+        resp.setContentType("text/plain");
+        resp.flushHeaders();
+        resp.sendBody(r, 9);
+    }
+    else if ( ret == 405 )
     {
         char *r = "Method Not Allowed";
         resp.clearHeaders();
-        resp.setContentType("text/plain; charset=\"utf-8\"");
+        resp.setContentType("text/plain");
         resp.flushHeaders();
         resp.sendBody(r, 18);
     }

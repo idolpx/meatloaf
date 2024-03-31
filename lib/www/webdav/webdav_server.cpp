@@ -78,7 +78,7 @@ void Server::sendMultiStatusResponse(Response &resp, MultiStatusResponse &msr)
     s << "</D:propstat>\r\n";
     s << "</D:response>\r\n";
 
-    Debug_printv("[%s]", s.str().c_str());
+    //Debug_printv("[%s]", s.str().c_str());
 
     resp.sendChunk(s.str().c_str());
 }
@@ -115,12 +115,12 @@ int Server::sendPropResponse(Response &resp, std::string path, int recurse)
             r.props["esp:getcontenttype"] = "application/octet-stream";
             r.props["esp:getetag"] = std::to_string(sb.st_ino);
         }
-        Debug_printv("Found!");
+        //Debug_printv("Found!");
     }
     else
     {
         r.status = "HTTP/1.1 404 Not Found";
-        Debug_printv("Not Found!");
+        //Debug_printv("Not Found!");
     }
 
     sendMultiStatusResponse(resp, r);
@@ -403,16 +403,17 @@ int Server::doPropfind(Request &req, Response &resp)
 
 int Server::doProppatch(Request &req, Response &resp)
 {
-    std::string path = uriToPath(req.getPath());
+    // std::string path = uriToPath(req.getPath());
 
-    Debug_printv("req[%s] path[%s]", req.getPath().c_str(), path.c_str());
+    // Debug_printv("req[%s] path[%s]", req.getPath().c_str(), path.c_str());
 
-    bool exists = access(path.c_str(), R_OK) == 0;
+    // bool exists = access(path.c_str(), R_OK) == 0;
 
-    if (!exists)
-        return 404;
+    // if (!exists)
+    //     return 404;
 
-    return 501;
+    // return 501;
+    return doPropfind(req, resp);
 }
 
 int Server::doPut(Request &req, Response &resp)

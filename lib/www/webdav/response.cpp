@@ -8,7 +8,7 @@ using namespace WebDav;
 
 void Response::setDavHeaders() {
     setHeader("DAV", "1, 2");
-    setHeader("Allow", "PROPPATCH,PROPFIND,OPTIONS,DELETE,UNLOCK,COPY,LOCK,MOVE,HEAD,POST,PUT,GET");
+    setHeader("Allow", "COPY,DELETE,GET,HEAD,LOCK,MKCOL,MOVE,OPTIONS,PROPFIND,PROPPATCH,PUT,UNLOCK");
     setHeader("Accept-Ranges", "bytes");
     setHeader("Connection", "keep-alive");
 }
