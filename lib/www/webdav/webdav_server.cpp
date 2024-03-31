@@ -88,15 +88,15 @@ int Server::sendPropResponse(Response &resp, std::string path, int recurse)
     std::string uri = pathToURI(path);
     Debug_printv("uri[%s] path[%s]", uri.c_str(), path.c_str());
 
-    bool exists = (path == rootPath) ||
-                  (access(path.c_str(), R_OK) == 0);
+    // bool exists = (path == rootPath) ||
+    //               (access(path.c_str(), R_OK) == 0);
 
     MultiStatusResponse r;
 
     r.href = uri;
 
-    if ( exists )
-    {
+    // if ( exists )
+    // {
         r.status = "HTTP/1.1 200 OK";
 
         struct stat sb;
@@ -116,12 +116,12 @@ int Server::sendPropResponse(Response &resp, std::string path, int recurse)
             r.props["esp:getetag"] = std::to_string(sb.st_ino);
         }
         //Debug_printv("Found!");
-    }
-    else
-    {
-        r.status = "HTTP/1.1 404 Not Found";
-        //Debug_printv("Not Found!");
-    }
+    // }
+    // else
+    // {
+    //     r.status = "HTTP/1.1 404 Not Found";
+    //     //Debug_printv("Not Found!");
+    // }
 
     sendMultiStatusResponse(resp, r);
 
@@ -377,11 +377,11 @@ int Server::doPropfind(Request &req, Response &resp)
 
     Debug_printv("req[%s] path[%s]", req.getPath().c_str(), path.c_str());
 
-    // bool exists = (path == rootPath) ||
-    //               (access(path.c_str(), R_OK) == 0);
+    bool exists = (path == rootPath) ||
+                  (access(path.c_str(), R_OK) == 0);
     
-    // if (!exists)
-    //     return 404;
+    if (!exists)
+        return 404;
 
     int recurse =
         (req.getDepth() == Request::DEPTH_0) ? 0 : (req.getDepth() == Request::DEPTH_1) ? 1

@@ -9,19 +9,20 @@
 #define http_SEND_BUFF_SIZE 512 // Used when sending files in chunks
 #define http_RECV_BUFF_SIZE 512 // Used when receiving POST data from client
 
-#define MSG_ERR_OPENING_FILE     "Error opening file"
-#define MSG_ERR_OUT_OF_MEMORY    "Ran out of memory"
-#define MSG_ERR_UNEXPECTED_HTTPD "Unexpected web server error"
-#define MSG_ERR_RECEIVE_FAILURE  "Failed to receive posted data"
+// #define MSG_ERR_OPENING_FILE     "Error opening file"
+// #define MSG_ERR_OUT_OF_MEMORY    "Ran out of memory"
+// #define MSG_ERR_UNEXPECTED_HTTPD "Unexpected web server error"
+// #define MSG_ERR_RECEIVE_FAILURE  "Failed to receive posted data"
 
 
-enum http_err
-{
-    http_err_noerrr = 0,
-    http_err_fileopen,
-    http_err_memory,
-    http_err_post_fail
-};
+// enum http_err
+// {
+//     http_err_noerrr = 0,
+//     http_err_fileopen,
+//     http_err_memory,
+//     http_err_post_fail
+// };
+
 class cHttpdServer 
 {
 private:
@@ -39,7 +40,7 @@ private:
     static void set_file_content_type(httpd_req_t *req, const char *filepath);
     static void send_file(httpd_req_t *req, const char *filename);
     static void send_file_parsed(httpd_req_t *req, const char *filename);
-    static void return_http_error(httpd_req_t *req, http_err errnum);
+    static void send_http_error(httpd_req_t *req, int errnum);
 
 public:
 

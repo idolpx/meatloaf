@@ -14,6 +14,7 @@
 #include <esp_log.h>
 #include <sys/stat.h>
 //#include <cstdlib>
+#include <sstream>
 
 // WebDAV
 #include "webdav/webdav_server.h"
@@ -268,22 +269,23 @@ esp_err_t cHttpdServer::webdav_handler(httpd_req_t *httpd_req)
     resp.setStatus(ret);
     if ( httpd_req->method != HTTP_HEAD )
     {
-        if ( ret == 404 )
-        {
-            char *r = "Not found";
-            resp.clearHeaders();
-            resp.setContentType("text/plain");
-            resp.flushHeaders();
-            resp.sendBody(r, 9);
-        }
-        else if ( ret == 405 )
-        {
-            char *r = "Method Not Allowed";
-            resp.clearHeaders();
-            resp.setContentType("text/plain");
-            resp.flushHeaders();
-            resp.sendBody(r, 18);
-        }
+        // if ( ret == 404 )
+        // {
+        //     char *r = "Not found";
+        //     resp.clearHeaders();
+        //     resp.setContentType("text/plain");
+        //     resp.flushHeaders();
+        //     resp.sendBody(r, 9);
+        // }
+        // else if ( ret == 405 )
+        // {
+        //     char *r = "Method Not Allowed";
+        //     resp.clearHeaders();
+        //     resp.setContentType("text/plain");
+        //     resp.flushHeaders();
+        //     resp.sendBody(r, 18);
+        // }
+        send_http_error(httpd_req, ret);
     }
     else
     {
@@ -369,6 +371,7 @@ httpd_handle_t cHttpdServer::start_server(serverstate &state)
     config.stack_size = 8192;
     config.max_uri_handlers = 16;
     config.max_resp_headers = 16;
+    config.keep_alive_enable = true;
 
     // config.core_id = 0; // Pin to CPU core 0
     //  Keep a reference to our object
@@ -425,8 +428,8 @@ const char *cHttpdServer::find_mimetype_str(const char *extension)
 {
     static std::map<std::string, std::string> mime_map
     {
-        {"html", "text/html"},
-        {"htm", "text/html"},
+        {"html", HTTPD_TYPE_TEXT},
+        {"htm", HTTPD_TYPE_TEXT},
 
         {"css", "text/css"},
         {"txt", "text/plain"},
@@ -434,26 +437,26 @@ const char *cHttpdServer::find_mimetype_str(const char *extension)
         {"xml", "text/xml"},
 
         {"gif", "image/gif"},
-        {"ico", "image/x-icon"},
+        // {"ico", "image/x-icon"},
         {"jpg", "image/jpeg"},
         {"png", "image/png"},
         {"svg", "image/svg+xml"},
 
-        {"ttf", "application/x-font-ttf"},
-        {"otf", "application/x-font-opentype"},
-        {"woff", "application/font-woff"},
-        {"woff2", "application/font-woff2"},
-        {"eot", "application/vnd.ms-fontobject"},
-        {"sfnt", "application/font-sfnt"},
+        // {"ttf", "application/x-font-ttf"},
+        // {"otf", "application/x-font-opentype"},
+        // {"woff", "application/font-woff"},
+        // {"woff2", "application/font-woff2"},
+        // {"eot", "application/vnd.ms-fontobject"},
+        // {"sfnt", "application/font-sfnt"},
 
-        {"atascii", "application/octet-stream"},
-        {"bin", "application/octet-stream"},
-        {"json", "application/json"},
+        // {"atascii", HTTPD_TYPE_OCTET},
+        // {"bin", HTTPD_TYPE_OCTET},
+        {"json", HTTPD_TYPE_JSON},
         {"pdf", "application/pdf"},
 
-        {"zip", "application/zip"},
-        {"gz", "application/x-gzip"},
-        {"appcache", "text/cache-manifest"}
+        // {"zip", "application/zip"},
+        {"gz", "application/x-gzip"}
+        // {"appcache", "text/cache-manifest"}
     };
 
     if (extension != NULL)
@@ -464,7 +467,7 @@ const char *cHttpdServer::find_mimetype_str(const char *extension)
         if (mmatch != mime_map.end())
             return mmatch->second.c_str();
     }
-    return "application/octet-stream";
+    return HTTPD_TYPE_OCTET;
 }
 
 char *cHttpdServer::get_extension(const char *filename)
@@ -512,7 +515,7 @@ void cHttpdServer::send_file(httpd_req_t *req, const char *filename)
     if (file == nullptr)
     {
         Debug_printv("Failed to open file for sending: '%s'\r\n", fpath.c_str());
-        return_http_error(req, http_err_fileopen);
+        send_http_error(req, 404);
     }
     else
     {
@@ -541,7 +544,7 @@ void cHttpdServer::send_file_parsed(httpd_req_t *req, const char *filename)
 {
     // Note that we don't add FNWS_FILE_ROOT as it should've been done in send_file()
 
-    http_err err = http_err_noerrr;
+    int err = 200;
 
     //Debug_printv("filename[%s]", filename);
 
@@ -552,19 +555,20 @@ void cHttpdServer::send_file_parsed(httpd_req_t *req, const char *filename)
     if (file == nullptr)
     {
         Debug_println("Failed to open file for parsing");
-        err = http_err_fileopen;
+        err = 404;
     }
     else
     {
         // Set the response content type
         set_file_content_type(req, filename);
+
         // We're going to load the whole thing into memory, so watch out for big files!
         size_t sz = FileSystem::filesize(file) + 1;
         char *buf = (char *)calloc(sz, 1);
         if (buf == NULL)
         {
             Debug_printf("Couldn't allocate %u bytes to load file contents!\r\n", sz);
-            err = http_err_memory;
+            err = 500;
         }
         else
         {
@@ -578,28 +582,18 @@ void cHttpdServer::send_file_parsed(httpd_req_t *req, const char *filename)
         fclose(file);
     }
 
-    if (err != http_err_noerrr)
-        return_http_error(req, err);
+    if (err != 200)
+        send_http_error(req, err);
 }
 
 // Send some meaningful(?) error message to client
-void cHttpdServer::return_http_error(httpd_req_t *req, http_err errnum)
+void cHttpdServer::send_http_error(httpd_req_t *req, int errnum)
 {
-    const char *message;
+    std::ostringstream error_page;
 
-    switch (errnum)
-    {
-    case http_err_fileopen:
-        message = MSG_ERR_OPENING_FILE;
-        break;
-    case http_err_memory:
-        message = MSG_ERR_OUT_OF_MEMORY;
-        break;
-    default:
-        message = MSG_ERR_UNEXPECTED_HTTPD;
-        break;
-    }
-    httpd_resp_send(req, message, strlen(message));
+    error_page << "error/" << errnum << ".html";
+
+    send_file(req, error_page.str().c_str());
 }
 
 /* Set up and start the web server
