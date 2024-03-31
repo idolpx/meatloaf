@@ -236,6 +236,7 @@ int Server::doGet(Request &req, Response &resp)
     resp.setHeader("Content-Length", sb.st_size);
     resp.setHeader("ETag", sb.st_ino);
     resp.setHeader("Last-Modified", formatTime(sb.st_mtime));
+    resp.setHeader("Connection","close");
 
     ret = 0;
 

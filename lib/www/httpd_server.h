@@ -15,14 +15,6 @@
 // #define MSG_ERR_RECEIVE_FAILURE  "Failed to receive posted data"
 
 
-// enum http_err
-// {
-//     http_err_noerrr = 0,
-//     http_err_fileopen,
-//     http_err_memory,
-//     http_err_post_fail
-// };
-
 class cHttpdServer 
 {
 private:

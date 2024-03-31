@@ -56,6 +56,7 @@ long file_size(FILE *fd)
 
 bool exists(std::string path)
 {
+    path = http_FILE_ROOT + path;
     Debug_printv( "path[%s]", path.c_str() );
     struct stat st;
     int i = stat(path.c_str(), &st);
@@ -267,25 +268,12 @@ esp_err_t cHttpdServer::webdav_handler(httpd_req_t *httpd_req)
     }
 
     resp.setStatus(ret);
+    resp.setHeader("Connection","close");
     if ( httpd_req->method != HTTP_HEAD )
     {
-        // if ( ret == 404 )
-        // {
-        //     char *r = "Not found";
-        //     resp.clearHeaders();
-        //     resp.setContentType("text/plain");
-        //     resp.flushHeaders();
-        //     resp.sendBody(r, 9);
-        // }
-        // else if ( ret == 405 )
-        // {
-        //     char *r = "Method Not Allowed";
-        //     resp.clearHeaders();
-        //     resp.setContentType("text/plain");
-        //     resp.flushHeaders();
-        //     resp.sendBody(r, 18);
-        // }
-        send_http_error(httpd_req, ret);
+        // Send error page
+        if ( ret != 200 )
+            send_http_error(httpd_req, ret);
     }
     else
     {
@@ -371,7 +359,7 @@ httpd_handle_t cHttpdServer::start_server(serverstate &state)
     config.stack_size = 8192;
     config.max_uri_handlers = 16;
     config.max_resp_headers = 16;
-    config.keep_alive_enable = true;
+    config.keep_alive_enable = false;
 
     // config.core_id = 0; // Pin to CPU core 0
     //  Keep a reference to our object
@@ -514,7 +502,7 @@ void cHttpdServer::send_file(httpd_req_t *req, const char *filename)
     Debug_printv("filename[%s]", filename);
     if (file == nullptr)
     {
-        Debug_printv("Failed to open file for sending: '%s'\r\n", fpath.c_str());
+        Debug_printv("Failed to open file for sending: [%s]", fpath.c_str());
         send_http_error(req, 404);
     }
     else
@@ -554,7 +542,7 @@ void cHttpdServer::send_file_parsed(httpd_req_t *req, const char *filename)
 
     if (file == nullptr)
     {
-        Debug_println("Failed to open file for parsing");
+        Debug_printv("Failed to open file for parsing: [%s]", filename);
         err = 404;
     }
     else
@@ -593,7 +581,10 @@ void cHttpdServer::send_http_error(httpd_req_t *req, int errnum)
 
     error_page << "error/" << errnum << ".html";
 
-    send_file(req, error_page.str().c_str());
+    if ( exists(error_page.str()) )
+        send_file(req, error_page.str().c_str());
+    else
+        httpd_resp_send(req, NULL, 0);
 }
 
 /* Set up and start the web server
