@@ -56,7 +56,7 @@ build_bus      = IEC
 [platformio]
 description = ${meatloaf.description}
 default_envs = ${meatloaf.environment}
-data_dir = data/${meatloaf.build_platform}
+data_dir = /$PROJECT_DIR/data/${meatloaf.build_platform}
 
 
 [esp32_base]
