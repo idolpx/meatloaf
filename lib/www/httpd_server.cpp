@@ -412,11 +412,15 @@ httpd_handle_t cHttpdServer::start_server(serverstate &state)
 
 const char *cHttpdServer::find_mimetype_str(const char *extension)
 {
-    static std::map<std::string, std::string> mime_map{
+    static std::map<std::string, std::string> mime_map
+    {
+        {"html", "text/html"},
+        {"htm", "text/html"},
+
         {"css", "text/css"},
         {"txt", "text/plain"},
-        {"js", "text/javascript"},
-        {"xml", "text/xml; charset=\"utf-8\""},
+        {"js", "application/javascript"},
+        {"xml", "text/xml"},
 
         {"gif", "image/gif"},
         {"ico", "image/x-icon"},
@@ -424,10 +428,22 @@ const char *cHttpdServer::find_mimetype_str(const char *extension)
         {"png", "image/png"},
         {"svg", "image/svg+xml"},
 
+        {"ttf", "application/x-font-ttf"},
+        {"otf", "application/x-font-opentype"},
+        {"woff", "application/font-woff"},
+        {"woff2", "application/font-woff2"},
+        {"eot", "application/vnd.ms-fontobject"},
+        {"sfnt", "application/font-sfnt"},
+
         {"atascii", "application/octet-stream"},
         {"bin", "application/octet-stream"},
         {"json", "application/json"},
-        {"pdf", "application/pdf"}};
+        {"pdf", "application/pdf"},
+
+        {"zip", "application/zip"},
+        {"gz", "application/x-gzip"},
+        {"appcache", "text/cache-manifest"}
+    };
 
     if (extension != NULL)
     {
@@ -437,7 +453,7 @@ const char *cHttpdServer::find_mimetype_str(const char *extension)
         if (mmatch != mime_map.end())
             return mmatch->second.c_str();
     }
-    return NULL;
+    return "application/octet-stream";
 }
 
 char *cHttpdServer::get_extension(const char *filename)
@@ -482,22 +498,17 @@ void cHttpdServer::send_file(httpd_req_t *req, const char *filename)
     FILE *file = pState->_FS->file_open(fpath.c_str());
 
     Debug_printv("filename[%s]", filename);
-    // auto file = MFSOwner::File( fpath );
-    // if (!file->exists())
     if (file == nullptr)
     {
-        Debug_printf("Failed to open file for sending: '%s'\r\n", fpath.c_str());
+        Debug_printv("Failed to open file for sending: '%s'\r\n", fpath.c_str());
         return_http_error(req, http_err_fileopen);
     }
     else
     {
-        // auto istream = file->getSourceStream();
-
         // Set the response content type
         set_file_content_type(req, fpath.c_str());
         // Set the expected length of the content
         char hdrval[10];
-        //snprintf(hdrval, 10, "%d", istream->size());
         snprintf(hdrval, 10, "%ld", FileSystem::filesize(file));
         httpd_resp_set_hdr(req, "Content-Length", hdrval);
 
@@ -506,7 +517,6 @@ void cHttpdServer::send_file(httpd_req_t *req, const char *filename)
         size_t count = 0;
         do
         {
-            // count = istream->read( (uint8_t *)buf, http_SEND_BUFF_SIZE );
             count = fread(buf, 1, http_SEND_BUFF_SIZE, file);
             httpd_resp_send_chunk(req, buf, count);
         } while (count > 0);
@@ -528,8 +538,6 @@ void cHttpdServer::send_file_parsed(httpd_req_t *req, const char *filename)
     serverstate *pState = (serverstate *)httpd_get_global_user_ctx(req->handle);
     FILE *file = pState->_FS->file_open(filename);
 
-    // auto file = MFSOwner::File( filename );
-    // if (!file->exists())
     if (file == nullptr)
     {
         Debug_println("Failed to open file for parsing");
@@ -537,12 +545,9 @@ void cHttpdServer::send_file_parsed(httpd_req_t *req, const char *filename)
     }
     else
     {
-        // auto istream = file->getSourceStream();
-
         // Set the response content type
         set_file_content_type(req, filename);
         // We're going to load the whole thing into memory, so watch out for big files!
-        //size_t sz = istream->size() + 1;
         size_t sz = FileSystem::filesize(file) + 1;
         char *buf = (char *)calloc(sz, 1);
         if (buf == NULL)
@@ -552,7 +557,6 @@ void cHttpdServer::send_file_parsed(httpd_req_t *req, const char *filename)
         }
         else
         {
-            // istream->read( (uint8_t *)buf, sz );
             fread(buf, 1, sz, file);
             std::string contents(buf);
             free(buf);

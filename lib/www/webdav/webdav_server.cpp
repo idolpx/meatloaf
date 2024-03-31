@@ -47,8 +47,9 @@ std::string Server::formatTime(time_t t)
 {
     char buf[32];
     struct tm *lt = localtime(&t);
+    // <D:getlastmodified>Tue, 22 Aug 2023 02:37:31 GMT</D:getlastmodified>
     // strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", lt);
-    strftime(buf, sizeof(buf), "%a, %d %b %H:%M:%S %Z", lt);
+    strftime(buf, sizeof(buf), "%a, %d %b %Y %H:%M:%S %Z", lt);
 
     return std::string(buf);
 }
@@ -62,21 +63,22 @@ void Server::sendMultiStatusResponse(Response &resp, MultiStatusResponse &msr)
 {
     std::ostringstream s;
 
-    s << "<response>\r\n";
-    xmlElement(s, "href", msr.href.c_str());
-    s << "<propstat><prop>\r\n";
+    s << "<D:response xmlns:esp=\"DAV:\">\r\n";
+    xmlElement(s, "D:href", msr.href.c_str());
+    s << "<D:propstat>\r\n";
+    xmlElement(s, "D:status", msr.status.c_str());
 
+    s << "<D:prop>\r\n";
     for (const auto &p : msr.props)
         xmlElement(s, p.first.c_str(), p.second.c_str());
 
-    xmlElement(s, "resourcetype", msr.isCollection ? "<collection/>" : "");
+    xmlElement(s, "esp:resourcetype", msr.isCollection ? "<D:collection/>" : "");
+    s << "</D:prop>\r\n";
 
-    s << "</prop>\r\n";
-    xmlElement(s, "status", msr.status.c_str());
+    s << "</D:propstat>\r\n";
+    s << "</D:response>\r\n";
 
-    s << "</propstat></response>\r\n";
-
-    //Debug_printv("[%s]", s.str().c_str());
+    Debug_printv("[%s]", s.str().c_str());
 
     resp.sendChunk(s.str().c_str());
 }
@@ -84,31 +86,41 @@ void Server::sendMultiStatusResponse(Response &resp, MultiStatusResponse &msr)
 int Server::sendPropResponse(Response &resp, std::string path, int recurse)
 {
     std::string uri = pathToURI(path);
-    //Debug_printv("uri[%s] path[%s]", uri.c_str(), path.c_str());
+    Debug_printv("uri[%s] path[%s]", uri.c_str(), path.c_str());
 
-    struct stat sb;
-    int ret = stat(path.c_str(), &sb);
-    if (ret < 0)
-        return -errno;
-
-    // printf("%s() path >%s< uri >%s<\r\n", __func__, path.c_str(), uri.c_str());
+    bool exists = (path == rootPath) ||
+                  (access(path.c_str(), R_OK) == 0);
 
     MultiStatusResponse r;
 
-    r.href = uri,
-    r.status = "HTTP/1.1 200 OK",
+    r.href = uri;
 
-    r.props["creationdate"] = formatTime(sb.st_ctime);
-    r.props["getlastmodified"] = formatTime(sb.st_mtime);
-    r.props["displayname"] = mstr::urlEncode(basename(path.c_str()));
-
-    //Debug_printv("mode[%d]", sb.st_mode);
-    r.isCollection = ((sb.st_mode & S_IFMT) == S_IFDIR);
-    if ( !r.isCollection )
+    if ( exists )
     {
-        r.props["getcontentlength"] = std::to_string(sb.st_size);
-        r.props["getcontenttype"] = "application/binary";
-        r.props["getetag"] = std::to_string(sb.st_ino);
+        r.status = "HTTP/1.1 200 OK";
+
+        struct stat sb;
+        int ret = stat(path.c_str(), &sb);
+        if (ret < 0)
+            return -errno;
+
+        r.props["esp:creationdate"] = formatTime(sb.st_ctime);
+        r.props["esp:getlastmodified"] = formatTime(sb.st_mtime);
+        r.props["esp:displayname"] = mstr::urlEncode(basename(path.c_str()));
+
+        r.isCollection = ((sb.st_mode & S_IFMT) == S_IFDIR);
+        if ( !r.isCollection )
+        {
+            r.props["esp:getcontentlength"] = std::to_string(sb.st_size);
+            r.props["esp:getcontenttype"] = "application/octet-stream";
+            r.props["esp:getetag"] = std::to_string(sb.st_ino);
+        }
+        Debug_printv("Found!");
+    }
+    else
+    {
+        r.status = "HTTP/1.1 404 Not Found";
+        Debug_printv("Not Found!");
     }
 
     sendMultiStatusResponse(resp, r);
@@ -365,25 +377,25 @@ int Server::doPropfind(Request &req, Response &resp)
 
     Debug_printv("req[%s] path[%s]", req.getPath().c_str(), path.c_str());
 
-    bool exists = (path == rootPath) ||
-                  (access(path.c_str(), R_OK) == 0);
+    // bool exists = (path == rootPath) ||
+    //               (access(path.c_str(), R_OK) == 0);
     
-    if (!exists)
-        return 404;
+    // if (!exists)
+    //     return 404;
 
     int recurse =
         (req.getDepth() == Request::DEPTH_0) ? 0 : (req.getDepth() == Request::DEPTH_1) ? 1
                                                                                         : 32;
 
     resp.setStatus(207);
-    resp.setContentType("text/xml; charset=\"utf-8\"");
+    resp.setContentType("application/xml;charset=utf-8");
     resp.flushHeaders();
 
-    resp.sendChunk("<?xml version=\"1.0\" encoding=\"utf-8\" ?>\r\n");
-    resp.sendChunk("<multistatus xmlns=\"DAV:\">\r\n");
+    resp.sendChunk("<?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n");
+    resp.sendChunk("<D:multistatus xmlns:D=\"DAV:\">\r\n");
 
     sendPropResponse(resp, path, recurse);
-    resp.sendChunk("</multistatus>\r\n");
+    resp.sendChunk("</D:multistatus>\r\n");
     resp.closeChunk();
 
     return 207;

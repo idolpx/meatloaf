@@ -7,14 +7,15 @@
 using namespace WebDav;
 
 void Response::setDavHeaders() {
-    setHeader("DAV", "1");
-    setHeader("Allow", "PROPFIND,OPTIONS,DELETE,COPY,MOVE,HEAD,POST,PUT,GET");
+    setHeader("DAV", "1, 2");
+    setHeader("Allow", "PROPPATCH,PROPFIND,OPTIONS,DELETE,UNLOCK,COPY,LOCK,MOVE,HEAD,POST,PUT,GET");
+    setHeader("Accept-Ranges", "bytes");
+    setHeader("Connection", "keep-alive");
 }
 
 void Response::setHeader(std::string header, std::string value) {
     headers[header] = value;
 }
-
 
 void Response::setHeader(std::string header, size_t value) {
     char tmp[32];
