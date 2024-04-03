@@ -233,6 +233,7 @@ bool CPBStandardSerial::sendBits ( uint8_t data )
 // it might holdback for quite a while; there's no time limit.
 int8_t CPBStandardSerial::receiveByte()
 {
+    //IEC.pull ( PIN_IEC_SRQ );
     IEC.flags &= CLEAR_LOW;
 
     // Wait for talker ready
@@ -356,6 +357,14 @@ int8_t CPBStandardSerial::receiveBits ()
 
     uint8_t n = 0;
 
+    //uint8_t tv = TIMING_Ts + TIMING_Tv64; // C64 data valid timing
+
+    // // We can receive faster if in VIC20 Mode
+    // if ( IEC.flags & VIC20_MODE )
+    // {
+    //     tv = TIMING_Ts + TIMING_Tv; // VIC-20 data valid timing
+    // }
+
     //IEC.pull ( PIN_IEC_SRQ );
 #ifndef IEC_SPLIT_LINES
     IEC.release(PIN_IEC_DATA_IN); // Set DATA IN back to input
@@ -368,10 +377,6 @@ int8_t CPBStandardSerial::receiveBits ()
         bit_time = timeoutWait ( PIN_IEC_CLK_IN, RELEASED, TIMING_PROTOCOL_DETECT, false );
         //IEC.release ( PIN_IEC_SRQ );
 
-        // // If the bit time is less than 40us we are talking with a VIC20
-        // if ( bit_time < TIMING_VIC20_DETECT )
-        //     IEC.flags |= VIC20_MODE;
-
         // If there is a 218us delay before the last bit, the controller uses SauceDOS/JiffyDOS
         if ( (n == 3 || n == 7) && bit_time >= TIMING_PROTOCOL_DETECT )
         {
@@ -380,13 +385,15 @@ int8_t CPBStandardSerial::receiveBits ()
                 uint8_t device = (data >> 1) & 0x1F;
                 if ( IEC.isDeviceEnabled ( device ) )
                 {
+#ifdef JIFFYDOS
                     // acknowledge we support SauceDOS/JiffyDOS
                     IEC.pull(PIN_IEC_DATA_OUT);
                     wait( TIMING_PROTOCOL_ACK, false );
                     IEC.release(PIN_IEC_DATA_OUT);
 
                     // If SRQ is pulled then SauceDOS is active on controller
-                    if ( IEC.status ( PIN_IEC_SRQ ) )
+                    //if ( IEC.status ( PIN_IEC_SRQ ) )
+                    if ( n == 3 )
                     {
                         IEC.flags |= SAUCEDOS_ACTIVE;
                     }
@@ -394,26 +401,27 @@ int8_t CPBStandardSerial::receiveBits ()
                     {
                         IEC.flags |= JIFFYDOS_ACTIVE;
                     }
+#endif
                 }
             }
-        }
 
-        // wait for bit to be ready to read
-        //IEC.pull ( PIN_IEC_SRQ );
-        if ( timeoutWait ( PIN_IEC_CLK_IN, RELEASED, (TIMING_EMPTY - TIMING_PROTOCOL_DETECT) ) == TIMED_OUT )
-        {
-            if ( n == 0 )
+            // wait for bit to be ready to read
+            //IEC.pull ( PIN_IEC_SRQ );
+            if ( timeoutWait ( PIN_IEC_CLK_IN, RELEASED ) == TIMED_OUT )
             {
-                Debug_printv ( "empty stream signaled" );
-                IEC.flags |= EMPTY_STREAM;
+                if ( n == 0 )
+                {
+                    Debug_printv ( "empty stream signaled" );
+                    IEC.flags |= EMPTY_STREAM;
+                }
+                else
+                {
+                    Debug_printv ( "bit timeout" );
+                }
+                return -1;
             }
-            else
-            {
-                Debug_printv ( "bit timeout" );
-            }
-            return -1;
+            //IEC.release ( PIN_IEC_SRQ );
         }
-        //IEC.release ( PIN_IEC_SRQ );
 
         // get bit
         data >>= 1;

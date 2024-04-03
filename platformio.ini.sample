@@ -119,6 +119,9 @@ build_flags =
     ;-D GPIOX_MCP23017
     ;-D GPIOX_XRA1405
 
+    ; Protocol Support
+    ;-D JIFFYDOS
+
     ; DEBUG Options
     -D DEBUG_SPEED=${env.monitor_speed}
     -D DATA_STREAM
