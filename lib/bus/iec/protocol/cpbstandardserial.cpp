@@ -231,7 +231,7 @@ bool CPBStandardSerial::sendBits ( uint8_t data )
 // "ready  to  send"  signal  whenever  it  likes;  it  can  wait  a  long  time.    If  it's
 // a printer chugging out a line of print, or a disk drive with a formatting job in progress,
 // it might holdback for quite a while; there's no time limit.
-int8_t CPBStandardSerial::receiveByte()
+int16_t CPBStandardSerial::receiveByte()
 {
     //IEC.pull ( PIN_IEC_SRQ );
     IEC.flags &= CLEAR_LOW;

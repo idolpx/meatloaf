@@ -34,7 +34,7 @@
 // 	{
 // 	public:
 
-// 		virtual int8_t receiveByte(uint8_t device) override;
+// 		virtual int16_t receiveByte(uint8_t device) override;
 // 		virtual bool sendByte(uint8_t data, bool signalEOI) override;
 
 // 	};

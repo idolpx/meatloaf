@@ -510,7 +510,7 @@ public:
      * @brief Receive Byte from bus
      * @return Byte received from bus, or -1 for error
      */
-    int8_t receiveByte();
+    int16_t receiveByte();
 
     /**
      * @brief Receive String from bus

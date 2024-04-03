@@ -35,7 +35,7 @@ namespace Protocol
     class DolphinDOS: public IECProtocol
     {
 		protected:
-			int8_t receiveByte(void) override;
+			int16_t receiveByte(void) override;
 			bool sendByte(uint8_t data, bool signalEOI) override;
     };
 };

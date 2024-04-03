@@ -328,7 +328,7 @@ void systemBus::read_command()
         //release( PIN_IEC_SRQ );
 
         //pull( PIN_IEC_SRQ );
-        int8_t c = receiveByte();
+        int16_t c = receiveByte();
         //release( PIN_IEC_SRQ );
 
         // Check for error
@@ -514,7 +514,7 @@ void systemBus::read_payload()
     while (IEC.status(PIN_IEC_ATN) != PULLED)
     {
         //pull ( PIN_IEC_SRQ );
-        int8_t c = protocol->receiveByte();
+        int16_t c = protocol->receiveByte();
         //Debug_printv("c[%2X]", c);
         //release ( PIN_IEC_SRQ );
 
@@ -695,11 +695,11 @@ void systemBus::assert_interrupt()
         IEC.release(PIN_IEC_SRQ);
 }
 
-int8_t systemBus::receiveByte()
+int16_t systemBus::receiveByte()
 {
-    int8_t b = protocol->receiveByte();
+    int16_t b = protocol->receiveByte();
 #ifdef DATA_STREAM
-    Debug_printf("%.2X ", (uint8_t)b);
+    Debug_printf("%.2X ", (int16_t)b);
 #endif
     if (b == -1)
     {
@@ -718,7 +718,7 @@ std::string systemBus::receiveBytes()
 
     do
     {
-        int8_t b = receiveByte();
+        int16_t b = receiveByte();
         if(b > -1)
             s += b;
     }while(!(flags & EOI_RECVD));
