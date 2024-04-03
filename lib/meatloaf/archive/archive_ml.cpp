@@ -1,6 +1,7 @@
 
 #include "archive_ml.h"
 
+#include <string.h>
 #include <archive.h>
 #include <archive_entry.h>
 
@@ -205,14 +206,14 @@ bool ArchiveStream::seekEntry( std::string filename )
         bool wildcard =  ( mstr::contains(filename, "*") || mstr::contains(filename, "?") );
         while ( archive_read_next_header(a, &entry) == ARCHIVE_OK )
         {
-            std::string entryPath = ""; //archive_entry_sourcepath(entry);
-            std::string entryFilename = archive_entry_pathname(entry);
-
-            Debug_printv("path[%s] filename[%s] entry.filename[%.16s]", entryPath.c_str(), filename.c_str(), entryFilename.c_str());
-
             // Check filetype
             if ( archive_entry_filetype(entry) != AE_IFDIR )
             {
+                std::string entryPath = ""; //archive_entry_sourcepath(entry);
+                std::string entryFilename = basename(archive_entry_pathname(entry));
+
+                Debug_printv("path[%s] filename[%s] entry.filename[%.16s]", entryPath.c_str(), filename.c_str(), entryFilename.c_str());
+
                 // Read Entry From Stream
                 if (filename == "*") // Match first entry
                 {
