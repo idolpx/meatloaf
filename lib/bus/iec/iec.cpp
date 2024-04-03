@@ -509,7 +509,7 @@ void systemBus::read_payload()
     // Sometimes ATN isn't released immediately. Wait for ATN to be
     // released before trying to read payload. Long ATN delay (>1.5ms)
     // seems to occur more frequently with VIC-20.
-    protocol->timeoutWait(PIN_IEC_ATN, RELEASED, FOREVER, false);
+    //protocol->timeoutWait(PIN_IEC_ATN, RELEASED, FOREVER, false);
 
     while (IEC.status(PIN_IEC_ATN) != PULLED)
     {

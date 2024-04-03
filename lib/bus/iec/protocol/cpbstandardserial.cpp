@@ -353,7 +353,7 @@ int8_t CPBStandardSerial::receiveBits ()
 {
     // Listening for bits
     uint8_t data = 0;
-    int16_t bit_time;  // Used to detect JiffyDOS
+    int16_t bit_time = 0;  // Used to detect JiffyDOS
 
     uint8_t n = 0;
 
@@ -416,7 +416,7 @@ int8_t CPBStandardSerial::receiveBits ()
                 }
                 else
                 {
-                    Debug_printv ( "bit timeout" );
+                    Debug_printv ( "bit %d timeout", n );
                 }
                 return -1;
             }

@@ -146,13 +146,13 @@ int16_t  JiffyDOS::receiveByte ()
     // STEP 3: CHECK FOR EOI
     IEC.pull ( PIN_IEC_SRQ );
     ets_delay_us(13);
-    if ( IEC.status ( PIN_IEC_CLK_IN ) == RELEASED && IEC.status ( PIN_IEC_CLK_IN ) == RELEASED )
+    if ( IEC.status ( PIN_IEC_CLK_IN ) == RELEASED && IEC.status ( PIN_IEC_DATA_IN ) == RELEASED )
     {
         Debug_printv("ERROR [%2X]", data);
         IEC.flags |= ERROR;
         return -1;
     }
-    else if ( IEC.status ( PIN_IEC_CLK_IN ) == RELEASED && IEC.status ( PIN_IEC_CLK_IN ) == PULLED )
+    else if ( IEC.status ( PIN_IEC_CLK_IN ) == PULLED && IEC.status ( PIN_IEC_DATA_IN ) == RELEASED )
     {
         Debug_printv("EOI [%2X]", data);
         IEC.flags |= EOI_RECVD;
