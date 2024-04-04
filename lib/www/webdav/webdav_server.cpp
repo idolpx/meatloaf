@@ -260,10 +260,10 @@ int Server::doGet(Request &req, Response &resp)
     fclose(f);
     resp.closeChunk();
 
-    if (ret == 0)
-        return 200;
+    if (ret != 0)
+        return 500;
 
-    return 500;
+    return 200;
 }
 
 int Server::doHead(Request &req, Response &resp)
@@ -456,13 +456,15 @@ int Server::doPut(Request &req, Response &resp)
     fclose(f);
     resp.closeChunk();
 
+    resp.setHeader("Connection","close");
+
     if (ret < 0)
         return 500;
 
-    if (exists)
-        return 200;
+    if (!exists)
+        return 201;
 
-    return 201;
+    return 200;
 }
 
 int Server::doUnlock(Request &req, Response &resp)

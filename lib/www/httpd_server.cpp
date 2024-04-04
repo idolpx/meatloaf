@@ -268,16 +268,17 @@ esp_err_t cHttpdServer::webdav_handler(httpd_req_t *httpd_req)
     }
 
     resp.setStatus(ret);
-    resp.setHeader("Connection","close");
-    if ( httpd_req->method != HTTP_HEAD )
+    //resp.setHeader("Connection","close");
+    resp.flushHeaders();
+
+    if ( (ret > 399) & (httpd_req->method != HTTP_HEAD) )
     {
         // Send error page
-        if ( ret != 200 )
-            send_http_error(httpd_req, ret);
+        send_http_error(httpd_req, ret);
     }
     else
     {
-        resp.flushHeaders();
+        // Send empty response
         resp.closeBody();
     }
 
@@ -359,7 +360,7 @@ httpd_handle_t cHttpdServer::start_server(serverstate &state)
     config.stack_size = 8192;
     config.max_uri_handlers = 16;
     config.max_resp_headers = 16;
-    config.keep_alive_enable = false;
+    config.keep_alive_enable = true;
 
     // config.core_id = 0; // Pin to CPU core 0
     //  Keep a reference to our object

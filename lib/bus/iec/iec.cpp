@@ -335,7 +335,7 @@ void systemBus::read_command()
         if ( flags & ERROR )
         {
             Debug_printv("Error reading command. flags[%d]", flags);
-            if (c == 0xFFFF)
+            if (c == 0xFFFFFFFF)
                 bus_state = BUS_OFFLINE;
             else
                 bus_state = BUS_ERROR;

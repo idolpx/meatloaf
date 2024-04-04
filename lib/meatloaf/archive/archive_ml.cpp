@@ -302,7 +302,7 @@ MFile *ArchiveContainerFile::getNextFileInDir()
 
     struct archive_entry *entry;
 
-    Debug_printv("getNextFileInDir calling archive_read_next_header");
+    //Debug_printv("getNextFileInDir calling archive_read_next_header");
     if (archive_read_next_header(getArchive(), &entry) == ARCHIVE_OK)
     {
         std::string fileName = archive_entry_pathname(entry);

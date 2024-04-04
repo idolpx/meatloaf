@@ -9,7 +9,7 @@ using namespace WebDav;
 void Response::setDavHeaders() {
     setHeader("DAV", "1, 2");
     setHeader("Allow", "COPY,DELETE,GET,HEAD,LOCK,MKCOL,MOVE,OPTIONS,PROPFIND,PROPPATCH,PUT,UNLOCK");
-    setHeader("Connection", "close");
+    //setHeader("Connection", "close");
 }
 
 void Response::setHeader(std::string header, std::string value) {
