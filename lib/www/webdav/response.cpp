@@ -7,9 +7,9 @@
 using namespace WebDav;
 
 void Response::setDavHeaders() {
-    setHeader("DAV", "1, 2");
+    setHeader("DAV", "1");
     setHeader("Allow", "COPY,DELETE,GET,HEAD,LOCK,MKCOL,MOVE,OPTIONS,PROPFIND,PROPPATCH,PUT,UNLOCK");
-    //setHeader("Connection", "close");
+    setHeader("Connection", "close");
 }
 
 void Response::setHeader(std::string header, std::string value) {
@@ -20,10 +20,6 @@ void Response::setHeader(std::string header, size_t value) {
     char tmp[32];
     snprintf(tmp, sizeof(tmp), "%zu", value);
     headers[header] = tmp;
-}
-
-void Response::clearHeaders() {
-    headers.clear();
 }
 
 void Response::flushHeaders() {

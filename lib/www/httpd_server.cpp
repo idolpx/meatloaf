@@ -268,8 +268,6 @@ esp_err_t cHttpdServer::webdav_handler(httpd_req_t *httpd_req)
     }
 
     resp.setStatus(ret);
-    //resp.setHeader("Connection","close");
-    resp.flushHeaders();
 
     if ( (ret > 399) & (httpd_req->method != HTTP_HEAD) )
     {
@@ -279,6 +277,8 @@ esp_err_t cHttpdServer::webdav_handler(httpd_req_t *httpd_req)
     else
     {
         // Send empty response
+        resp.setHeader("Connection","close");
+        resp.flushHeaders();
         resp.closeBody();
     }
 
@@ -426,7 +426,7 @@ const char *cHttpdServer::find_mimetype_str(const char *extension)
         {"xml", "text/xml"},
 
         {"gif", "image/gif"},
-        // {"ico", "image/x-icon"},
+        {"ico", "image/x-icon"},
         {"jpg", "image/jpeg"},
         {"png", "image/png"},
         {"svg", "image/svg+xml"},
@@ -535,7 +535,7 @@ void cHttpdServer::send_file_parsed(httpd_req_t *req, const char *filename)
 
     int err = 200;
 
-    //Debug_printv("filename[%s]", filename);
+    Debug_printv("filename[%s]", filename);
 
     // Retrieve server state
     serverstate *pState = (serverstate *)httpd_get_global_user_ctx(req->handle);

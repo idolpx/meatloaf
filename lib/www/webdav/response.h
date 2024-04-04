@@ -49,7 +49,6 @@ namespace WebDav
         void setDavHeaders();
         void setHeader(std::string header, std::string value);
         void setHeader(std::string header, size_t value);
-        void clearHeaders();
         void flushHeaders();
 
         // Functions that depend on the underlying web server implementation

@@ -378,11 +378,11 @@ int Server::doPropfind(Request &req, Response &resp)
 
     Debug_printv("req[%s] path[%s]", req.getPath().c_str(), path.c_str());
 
-    // bool exists = (path == rootPath) ||
-    //               (access(path.c_str(), R_OK) == 0);
+    bool exists = (path == rootPath) ||
+                  (access(path.c_str(), R_OK) == 0);
     
-    // if (!exists)
-    //     return 404;
+    if (!exists)
+        return 404;
 
     int recurse =
         (req.getDepth() == Request::DEPTH_0) ? 0 : (req.getDepth() == Request::DEPTH_1) ? 1
