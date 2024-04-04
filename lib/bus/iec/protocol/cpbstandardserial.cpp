@@ -195,14 +195,14 @@ bool CPBStandardSerial::sendBits ( uint8_t data )
     // Send bits
     for ( uint8_t n = 0; n < 8; n++ )
     {
-        //if ( !wait ( TIMING_Ts1 ) ) return false; // 57us 
-        wait ( TIMING_Ts1, false );
+        //if ( !wait ( TIMING_Ts0 ) ) return false; // 57us 
+        wait ( TIMING_Ts0, false );
 
         // set bit
         ( data & 1 ) ? IEC.release ( PIN_IEC_DATA_OUT ) : IEC.pull ( PIN_IEC_DATA_OUT );
         data >>= 1; // shift to next bit
-        //if ( !wait ( TIMING_Ts2 ) ) return false; // 28us
-        wait ( TIMING_Ts2, false );
+        //if ( !wait ( TIMING_Ts1 ) ) return false; // 28us
+        wait ( TIMING_Ts1, false );
 
         // tell listener bit is ready to read
         IEC.release ( PIN_IEC_CLK_OUT );
