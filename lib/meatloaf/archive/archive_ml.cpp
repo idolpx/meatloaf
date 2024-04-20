@@ -5,7 +5,7 @@
 #include <archive.h>
 #include <archive_entry.h>
 
-#include "meat_io.h"
+#include "../meat_io.h"
 
 /* Returns pointer and size of next block of data from archive. */
 // The read callback returns the number of bytes read, zero for end-of-file, or a negative failure code as above.

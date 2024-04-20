@@ -7,8 +7,8 @@
 #ifndef MEATLOAF_MEDIA_D8B
 #define MEATLOAF_MEDIA_D8B
 
-#include "meat_io.h"
-#include "disk/d64.h"
+#include "../meat_io.h"
+#include "../disk/d64.h"
 
 
 /********************************************************
@@ -69,8 +69,6 @@ public:
     //         {"Format", "Backbit Archive"}
     //     }; 
     // };
-
-	virtual uint8_t speedZone(uint8_t track) override { return 0; };
 
 protected:
 

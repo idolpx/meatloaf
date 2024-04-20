@@ -8,7 +8,7 @@
 #ifndef MEATLOAF_MEDIA_D71
 #define MEATLOAF_MEDIA_D71
 
-#include "meat_io.h"
+#include "../meat_io.h"
 #include "d64.h"
 
 
@@ -68,13 +68,13 @@ public:
         }
     };
 
-	virtual uint8_t speedZone( uint8_t track) override
-	{
+    virtual uint8_t speedZone( uint8_t track) override
+    {
         if ( track < 35 )
 		    return (track < 18) + (track < 25) + (track < 31);
         else
             return (track < 53) + (track < 60) + (track < 66);
-	};
+    };
 
 protected:
 

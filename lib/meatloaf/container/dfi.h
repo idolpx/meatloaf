@@ -97,8 +97,8 @@
 #ifndef MEATLOAF_MEDIA_DFI
 #define MEATLOAF_MEDIA_DFI
 
-#include "meat_io.h"
-#include "disk/d64.h"
+#include "../meat_io.h"
+#include "../disk/d64.h"
 
 
 /********************************************************
@@ -163,7 +163,6 @@ public:
         partitions[0].directory_sector = partitions[0].header_sector + 1;
     };
 
-	virtual uint8_t speedZone(uint8_t track) override { return 0; };
 
 protected:
 

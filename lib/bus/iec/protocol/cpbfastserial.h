@@ -26,11 +26,11 @@
 
 // Commodore Peripheral Bus: Fast Serial
 
-// #include "cpbfastserial.h"
+//#include "cpbstandardserial.h"
 
 // namespace Protocol
 // {
-// 	class CBMFastSerial : public CBMStandardSerial
+// 	class CPBFastSerial : public CBMStandardSerial
 // 	{
 // 	public:
 

@@ -9,7 +9,7 @@
 #include <archive.h>
 #include <archive_entry.h>
 
-#include "meat_io.h"
+#include "../meat_io.h"
 
 #include "../../../include/debug.h"
 
@@ -121,13 +121,13 @@ public:
     MStream* getDecodedStream(std::shared_ptr<MStream> src) override;
 
     // archive file is always a directory
-    bool isDirectory();
+    bool isDirectory() override;
     bool rewindDirectory() override;
     MFile *getNextFileInDir() override;
 
     bool mkDir() override { return false; };
     bool remove() override { return true; }
-    bool rename(std::string dest) { return true; }
+    bool rename(std::string dest) override { return true; }
 
     time_t getLastWrite() override { return 0; }
     time_t getCreationTime() override { return 0; }

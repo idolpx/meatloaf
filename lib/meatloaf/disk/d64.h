@@ -13,13 +13,14 @@
 #ifndef MEATLOAF_MEDIA_D64
 #define MEATLOAF_MEDIA_D64
 
-#include "meat_io.h"
+#include "../meat_io.h"
 
 #include <map>
 #include <bitset>
+#include <ctime>
 
+#include "../meat_media.h"
 #include "string_utils.h"
-#include "meat_media.h"
 
 
 /********************************************************
@@ -210,10 +211,10 @@ public:
 
     uint16_t blocksFree() override;
 
-	uint8_t speedZone( uint8_t track) override
-	{
-		return (track < 18) + (track < 25) + (track < 31);
-	};
+    uint8_t speedZone( uint8_t track) override
+    {
+        return (track < 18) + (track < 25) + (track < 31);
+    };
 
     bool seekBlock( uint64_t index, uint8_t offset = 0 ) override;
     bool seekSector( uint8_t track, uint8_t sector, uint8_t offset = 0 ) override;
@@ -303,7 +304,12 @@ public:
         // don't close the stream here! It will be used by shared ptr D64Util to keep reading image params
     }
 
-    MStream* getDecodedStream(std::shared_ptr<MStream> containerIstream) override;
+    MStream* getDecodedStream(std::shared_ptr<MStream> containerIstream) override
+    {
+        // Debug_printv("[%s]", url.c_str());
+
+        return new D64IStream(containerIstream);
+    }
 
     bool isDirectory() override;
     bool rewindDirectory() override;

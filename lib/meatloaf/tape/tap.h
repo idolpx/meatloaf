@@ -13,8 +13,8 @@
 #ifndef MEATLOAF_MEDIA_TAP
 #define MEATLOAF_MEDIA_TAP
 
-#include "meat_io.h"
-#include "meat_media.h"
+#include "../meat_io.h"
+#include "../meat_media.h"
 
 
 /********************************************************

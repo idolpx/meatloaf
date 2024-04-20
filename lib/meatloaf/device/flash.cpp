@@ -6,6 +6,7 @@
 #include <iomanip>
 
 #include "../../../include/debug.h"
+#include "peoples_url_parser.h"
 #include "string_utils.h"
 
 /********************************************************
@@ -140,7 +141,7 @@ bool FlashFile::remove() {
 
     int rc = ::remove( std::string(basepath + path).c_str() );
     if (rc != 0) {
-        Debug_printv("remove: rc=%d path=`%s`\r\n", rc, path);
+        Debug_printv("remove: rc=%d path=`%s`\r\n", rc, path.c_str());
         return false;
     }
 

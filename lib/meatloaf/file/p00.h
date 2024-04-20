@@ -5,8 +5,8 @@
 #ifndef MEATLOAF_MEDIA_P00
 #define MEATLOAF_MEDIA_P00
 
-#include "meat_io.h"
-#include "meat_media.h"
+#include "../meat_io.h"
+#include "../meat_media.h"
 
 /********************************************************
  * Streams

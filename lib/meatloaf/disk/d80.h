@@ -8,7 +8,7 @@
 #ifndef MEATLOAF_MEDIA_D80
 #define MEATLOAF_MEDIA_D80
 
-#include "meat_io.h"
+#include "../meat_io.h"
 #include "d64.h"
 
 
@@ -56,10 +56,10 @@ public:
         sectorsPerTrack = { 23, 25, 27, 29 };
     };
 
-	virtual uint8_t speedZone(uint8_t track) override
-	{
+    virtual uint8_t speedZone(uint8_t track) override
+    {
         return (track < 40) + (track < 54) + (track < 65);
-	};
+    };
 
 protected:
 

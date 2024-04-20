@@ -7,8 +7,8 @@
 #ifndef MEATLOAF_MEDIA_TCRT
 #define MEATLOAF_MEDIA_TCRT
 
-#include "meat_io.h"
-#include "meat_media.h"
+#include "../meat_io.h"
+#include "../meat_media.h"
 
 
 /********************************************************

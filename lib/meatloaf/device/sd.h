@@ -29,7 +29,7 @@ private:
     MFile* getFile(std::string path) override {
         PeoplesUrlParser *url = PeoplesUrlParser::parseURL( path );
 
-        std::string basepath = fnSDFAT.basepath();
+        std::string basepath = _filesystem.basepath();
         basepath += std::string("/");
         //Debug_printv("basepath[%s] url.path[%s]", basepath.c_str(), url.path.c_str());
 

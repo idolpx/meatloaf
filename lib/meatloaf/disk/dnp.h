@@ -6,7 +6,7 @@
 #ifndef MEATLOAF_MEDIA_DNP
 #define MEATLOAF_MEDIA_DNP
 
-#include "meat_io.h"
+#include "../meat_io.h"
 #include "d64.h"
 
 
@@ -46,8 +46,6 @@ public:
         sectorsPerTrack = { 256 };
         has_subdirs = true;
     };
-
-	virtual uint8_t speedZone(uint8_t track) override { return 0; };
 
 protected:
 

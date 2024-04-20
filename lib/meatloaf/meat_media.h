@@ -145,14 +145,19 @@ protected:
     virtual bool seekEntry( std::string filename ) { return false; };
     virtual bool seekEntry( uint16_t index ) { return false; };
 
+    virtual uint16_t readContainer(uint8_t *buf, uint16_t size);
     virtual uint16_t readFile(uint8_t* buf, uint16_t size) = 0;
     virtual std::string decodeType(uint8_t file_type, bool show_hidden = false);
 
 private:
 
     // Commodore Media
-    // FILE
-    friend class P00File;
+    // CARTRIDGE
+    friend class CRTFile;
+
+    // CONTAINER
+    friend class D8BFile;
+    friend class DFIFile;
 
     // FLOPPY DISK
     friend class D64File;
@@ -165,16 +170,12 @@ private:
     friend class DNPFile;
     friend class D90File;
 
-    // CONTAINER
-    friend class D8BFile;
-    friend class DFIFile;
+    // FILE
+    friend class P00File;
 
     // CASSETTE TAPE
     friend class T64File;
     friend class TCRTFile;
-
-    // CARTRIDGE
-    friend class CRTFile;
 };
 
 

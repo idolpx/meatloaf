@@ -7,8 +7,8 @@
 #ifndef MEATLOAF_MEDIA_T64
 #define MEATLOAF_MEDIA_T64
 
-#include "meat_io.h"
-#include "meat_media.h"
+#include "../meat_io.h"
+#include "../meat_media.h"
 
 
 /********************************************************

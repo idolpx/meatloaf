@@ -40,6 +40,9 @@
 // File
 #include "file/p00.h"
 
+// Link
+// Loaders
+
 // Network
 #include "network/http.h"
 #include "network/tnfs.h"
@@ -48,16 +51,20 @@
 // #include "network/smb.h"
 // #include "network/ws.h"
 
+// Scanners
+
 // Service
 // #include "service/cs.h"
 #include "service/ml.h"
-
 
 // Tape
 #include "tape/t64.h"
 #include "tape/tcrt.h"
 
+
 #include "meat_buffer.h"
+
+
 
 /********************************************************
  * MFSOwner implementations
@@ -69,19 +76,15 @@ FlashFileSystem defaultFS;
 SDFileSystem sdFS;
 #endif
 
-// Scheme
-HttpFileSystem httpFS;
-MLFileSystem mlFS;
-TNFSFileSystem tnfsFS;
-// IPFSFileSystem ipfsFS;
-// TNFSFileSystem tnfsFS;
-// CServerFileSystem csFS;
-// TcpFileSystem tcpFS;
-
-//WSFileSystem wsFS;
 
 // Archive
 ArchiveContainerFileSystem archiveFS;
+
+// Cartridge
+
+// Container
+D8BFileSystem d8bFS;
+DFIFileSystem dfiFS;
 
 // File
 P00FileSystem p00FS;
@@ -95,14 +98,23 @@ D82FileSystem d82FS;
 D90FileSystem d90FS;
 DNPFileSystem dnpFS;
 
-D8BFileSystem d8bFS;
-DFIFileSystem dfiFS;
+// Network
+HttpFileSystem httpFS;
+TNFSFileSystem tnfsFS;
+// IPFSFileSystem ipfsFS;
+// TNFSFileSystem tnfsFS;
+// TcpFileSystem tcpFS;
+//WSFileSystem wsFS;
+
+// Service
+// CServerFileSystem csFS;
+MLFileSystem mlFS;
 
 // Tape
 T64FileSystem t64FS;
 TCRTFileSystem tcrtFS;
 
-// Cartridge
+
 
 
 
@@ -114,11 +126,12 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
     &sdFS,
 #endif
     &archiveFS, // extension-based FS have to be on top to be picked first, otherwise the scheme will pick them!
-    &p00FS,
     &d64FS, &d71FS, &d80FS, &d81FS, &d82FS, &d90FS, &dnpFS,
     &d8bFS, &dfiFS,
-    &t64FS, &tcrtFS,
-    &httpFS, &mlFS, &tnfsFS
+    &p00FS,
+    &httpFS, &tnfsFS,
+    &mlFS,
+    &t64FS, &tcrtFS
 //    &ipfsFS, &tcpFS,
 //    &tnfsFS
 };
@@ -468,7 +481,7 @@ MFile* MFile::cd(std::string newDir)
             std::string url;
             reader >> url;
 
-            Debug_printv("url[%s]", url);
+            Debug_printv("url[%s]", url.c_str());
             //std::string ml_url((char *)url);
 
             delete newPath;
@@ -568,6 +581,7 @@ uint64_t MFile::getAvailableSpace()
 {
     if ( mstr::startsWith(path, (char *)"/sd") )
     {
+#ifdef SD_CARD
         FATFS* fsinfo;
         DWORD fre_clust;
 
@@ -579,6 +593,7 @@ uint64_t MFile::getAvailableSpace()
             //Debug_printv("total[%llu] used[%llu free[%llu]", total, used, free);
             return free;
         }
+#endif
     }
     else
     {
@@ -589,6 +604,8 @@ uint64_t MFile::getAvailableSpace()
         //Debug_printv("total[%d] used[%d] free[%d]", total, used, free);
         return free;
 #elif FLASH_LITTLEFS
+        // TODO: Implement for LITTLEFS
+        Debug_printv("LITTLEFS getAvailableSpace()");
 #endif
     }
 

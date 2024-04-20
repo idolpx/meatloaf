@@ -58,8 +58,8 @@ uint32_t MImageStream::seekFileSize( uint8_t start_track, uint8_t start_sector )
     do
     {
         //Debug_printv("t[%d] s[%d]", t, s);
-        containerStream->read(&start_track, 1);
-        containerStream->read(&start_sector, 1);
+        readContainer(&start_track, 1);
+        readContainer(&start_sector, 1);
         blocks++;
         if ( start_track > 0 )
             if ( !seekSector( start_track, start_sector ) )
@@ -69,6 +69,11 @@ uint32_t MImageStream::seekFileSize( uint8_t start_track, uint8_t start_sector )
     return (blocks * (block_size - 2)) + start_sector - 1;
 };
 
+
+uint16_t MImageStream::readContainer(uint8_t *buf, uint16_t size)
+{
+    return containerStream->read(buf, size);
+}
 
 
 uint32_t MImageStream::write(const uint8_t *buf, uint32_t size) {
@@ -90,7 +95,7 @@ uint32_t MImageStream::read(uint8_t* buf, uint32_t size) {
     }
     else {
         // seekXXX not called - just pipe image bytes, so it can be i.e. copied verbatim
-        bytesRead = containerStream->read(buf, size);
+        bytesRead = readContainer(buf, size);
     }
 
     _position += bytesRead;

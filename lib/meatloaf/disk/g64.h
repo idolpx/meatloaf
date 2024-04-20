@@ -1,6 +1,6 @@
 // .G64 - The G64 GCR-encoded disk image format
 //
-// https://vice-emu.sourceforge.io/vice_17.html#SEC335
+// https://vice-emu.sourceforge.io/vice_16.html#SEC398
 // https://ist.uwaterloo.ca/~schepers/formats/G64.TXT
 // http://www.linusakesson.net/programming/gcr-decoding/index.php
 //
@@ -9,8 +9,10 @@
 #ifndef MEATLOAF_MEDIA_G64
 #define MEATLOAF_MEDIA_G64
 
-#include "meat_io.h"
+#include "../meat_io.h"
 #include "d64.h"
+
+#include "endianness.h"
 
 // Format codes:
 // ID	Description
@@ -51,6 +53,14 @@
 class G64IStream : public D64IStream {
     // override everything that requires overriding here
 
+protected:
+    struct G64Header {
+        char signature[8];
+        uint8_t version;
+        uint8_t track_count;
+        uint16_t track_size;
+    };
+
 public:
     G64IStream(std::shared_ptr<MStream> is) : D64IStream(is) 
     {
@@ -59,8 +69,17 @@ public:
         //directory_list_offset = {18, 1, 0x00};
         //block_allocation_map = { {18, 0, 0x04, 1, 35, 4}, {53, 0, 0x00, 36, 70, 3} };
         //sectorsPerTrack = { 17, 18, 19, 21 };
+
+        containerStream->read((uint8_t*)&g64_header, sizeof(g64_header));
+        g64_header.track_size = UINT16_FROM_LE_UINT16(g64_header.track_size);
     };
 
+    G64Header g64_header;
+
+    bool seekBlock( uint64_t index, uint8_t offset = 0 ) override;
+    bool seekSector( uint8_t track, uint8_t sector, uint8_t offset = 0 ) override;
+
+    uint16_t readContainer(uint8_t *buf, uint16_t size) override;
 
 protected:
 
@@ -77,7 +96,12 @@ class G64File: public D64File {
 public:
     G64File(std::string path, bool is_dir = true) : D64File(path, is_dir) {};
 
-    MStream* getDecodedStream(std::shared_ptr<MStream> containerIstream) override;
+    MStream* getDecodedStream(std::shared_ptr<MStream> containerIstream) override
+    {
+        Debug_printv("[%s]", url.c_str());
+
+        return new G64IStream(containerIstream);
+    }
 };
 
 

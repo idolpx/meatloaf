@@ -277,7 +277,7 @@ bool D64IStream::seekEntry(uint16_t index)
                     return false;
             }
 
-            containerStream->read((uint8_t *)&entry, sizeof(entry));
+            readContainer((uint8_t *)&entry, sizeof(entry));
             next_track = entry.next_track;
             next_sector = entry.next_sector;
 
@@ -300,7 +300,7 @@ bool D64IStream::seekEntry(uint16_t index)
         }
     }
 
-    containerStream->read((uint8_t *)&entry, sizeof(entry));
+    readContainer((uint8_t *)&entry, sizeof(entry));
 
     // If we are at the first entry in the sector then get next_track/next_sector
     if (entryOffset == 0)
@@ -334,7 +334,7 @@ uint16_t D64IStream::blocksFree()
 
         for (uint8_t i = partitions[partition].block_allocation_map[x].start_track; i <= partitions[partition].block_allocation_map[x].end_track; i++)
         {
-            containerStream->read((uint8_t *)&bam, sizeof(bam));
+            readContainer((uint8_t *)&bam, sizeof(bam));
             if (sizeof(bam) > 3)
             {
                 if (i != partitions[partition].directory_track)
@@ -367,8 +367,8 @@ uint16_t D64IStream::readFile(uint8_t *buf, uint16_t size)
     {
         // We are at the beginning of the block
         // Read track/sector link
-        containerStream->read((uint8_t *)&next_track, 1);
-        containerStream->read((uint8_t *)&next_sector, 1);
+        readContainer((uint8_t *)&next_track, 1);
+        readContainer((uint8_t *)&next_sector, 1);
         sector_offset += 2;
         // Debug_printv("next_track[%d] next_sector[%d] sector_offset[%d]", next_track, next_sector, sector_offset);
     }
@@ -379,7 +379,7 @@ uint16_t D64IStream::readFile(uint8_t *buf, uint16_t size)
 
     if (size > 0)
     {
-        bytesRead += containerStream->read(buf, size);
+        bytesRead += readContainer(buf, size);
         sector_offset += bytesRead;
 
         if (sector_offset % block_size == 0)
@@ -451,13 +451,6 @@ bool D64IStream::seekPath(std::string path)
 /********************************************************
  * File implementations
  ********************************************************/
-
-MStream *D64File::getDecodedStream(std::shared_ptr<MStream> containerIstream)
-{
-    // Debug_printv("[%s]", url.c_str());
-
-    return new D64IStream(containerIstream);
-}
 
 bool D64File::isDirectory()
 {

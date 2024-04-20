@@ -8,7 +8,7 @@
 #ifndef MEATLOAF_MEDIA_D90
 #define MEATLOAF_MEDIA_D90
 
-#include "meat_io.h"
+#include "../meat_io.h"
 #include "d64.h"
 
 
