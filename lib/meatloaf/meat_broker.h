@@ -1,13 +1,13 @@
-#ifndef MEATLOAF_FILESYSTEM_CONTAINER_BROKER
-#define MEATLOAF_FILESYSTEM_CONTAINER_BROKER
+#ifndef MEATLOAF_STREAM_BROKER
+#define MEATLOAF_STREAM_BROKER
 
 #include <memory>
 #include <unordered_map>
-#include "meat_io.h"
-#include "meat_stream.h"
+#include "meatloaf.h"
+
 #include "../device/drive.h"
 
-class ContainerStreamBroker {
+class StreamBroker {
     static std::unordered_map<std::string, MStream*> repo;
 public:
     static MStream* obtain(std::string url);
@@ -15,4 +15,4 @@ public:
     static void purge(std::forward_list<virtualDevice *> dev);
 };
 
-#endif /* MEATLOAF_FILESYSTEM_CONTAINER_BROKER */
+#endif /* MEATLOAF_STREAM_BROKER */

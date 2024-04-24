@@ -5,7 +5,7 @@
 
 // D64 Utility Functions
 
-bool D64IStream::seekBlock(uint64_t index, uint8_t offset)
+bool D64MStream::seekBlock(uint64_t index, uint8_t offset)
 {
     uint16_t sectorOffset = 0;
     uint8_t track = 0;
@@ -35,7 +35,7 @@ bool D64IStream::seekBlock(uint64_t index, uint8_t offset)
     return containerStream->seek((index * block_size) + offset);
 }
 
-bool D64IStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
+bool D64MStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
 {
     uint16_t sectorOffset = 0;
 
@@ -77,22 +77,22 @@ bool D64IStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
     return containerStream->seek((sectorOffset * block_size) + offset);
 }
 
-bool D64IStream::seekSector(std::vector<uint8_t> trackSectorOffset)
+bool D64MStream::seekSector(std::vector<uint8_t> trackSectorOffset)
 {
     return seekSector(trackSectorOffset[0], trackSectorOffset[1], trackSectorOffset[2]);
 }
 
-std::string D64IStream::readBlock(uint8_t track, uint8_t sector)
+std::string D64MStream::readBlock(uint8_t track, uint8_t sector)
 {
     return "";
 }
 
-bool D64IStream::writeBlock(uint8_t track, uint8_t sector, std::string data)
+bool D64MStream::writeBlock(uint8_t track, uint8_t sector, std::string data)
 {
     return true;
 }
 
-bool D64IStream::allocateBlock(uint8_t track, uint8_t sector)
+bool D64MStream::allocateBlock(uint8_t track, uint8_t sector)
 {
     // int offset;
     // byte bitmask;
@@ -115,7 +115,7 @@ bool D64IStream::allocateBlock(uint8_t track, uint8_t sector)
     return true;
 }
 
-bool D64IStream::deallocateBlock(uint8_t track, uint8_t sector)
+bool D64MStream::deallocateBlock(uint8_t track, uint8_t sector)
 {
     // int offset;
     // byte bitmask;
@@ -134,7 +134,7 @@ bool D64IStream::deallocateBlock(uint8_t track, uint8_t sector)
     return true;
 }
 
-bool D64IStream::getNextFreeBlock(uint8_t startTrack, uint8_t startSector, uint8_t *foundTrack, uint8_t *foundSector)
+bool D64MStream::getNextFreeBlock(uint8_t startTrack, uint8_t startSector, uint8_t *foundTrack, uint8_t *foundSector)
 {
     uint8_t track, sector;
     bool found = false;
@@ -180,7 +180,7 @@ bool D64IStream::getNextFreeBlock(uint8_t startTrack, uint8_t startSector, uint8
     return found;
 }
 
-bool D64IStream::isBlockFree(uint8_t track, uint8_t sector)
+bool D64MStream::isBlockFree(uint8_t track, uint8_t sector)
 {
     // int offset;
     // byte bitmask;
@@ -193,7 +193,7 @@ bool D64IStream::isBlockFree(uint8_t track, uint8_t sector)
     return true;
 }
 
-bool D64IStream::seekEntry(std::string filename)
+bool D64MStream::seekEntry(std::string filename)
 {
     uint16_t index = 1;
     mstr::replaceAll(filename, "\\", "/");
@@ -246,7 +246,7 @@ bool D64IStream::seekEntry(std::string filename)
     return false;
 }
 
-bool D64IStream::seekEntry(uint16_t index)
+bool D64MStream::seekEntry(uint16_t index)
 {
     // Calculate Sector offset & Entry offset
     // 8 Entries Per Sector, 32 bytes Per Entry
@@ -317,7 +317,7 @@ bool D64IStream::seekEntry(uint16_t index)
     return true;
 }
 
-uint16_t D64IStream::blocksFree()
+uint16_t D64MStream::blocksFree()
 {
     uint16_t free_count = 0;
 
@@ -360,7 +360,7 @@ uint16_t D64IStream::blocksFree()
     return free_count;
 }
 
-uint16_t D64IStream::readFile(uint8_t *buf, uint16_t size)
+uint16_t D64MStream::readFile(uint8_t *buf, uint16_t size)
 {
 
     if (sector_offset % block_size == 0)
@@ -402,7 +402,7 @@ uint16_t D64IStream::readFile(uint8_t *buf, uint16_t size)
     return bytesRead;
 }
 
-bool D64IStream::seekPath(std::string path)
+bool D64MStream::seekPath(std::string path)
 {
     // Implement this to skip a queue of file streams to start of file by name
     // this will cause the next read to return bytes of 'path'
@@ -452,7 +452,7 @@ bool D64IStream::seekPath(std::string path)
  * File implementations
  ********************************************************/
 
-bool D64File::isDirectory()
+bool D64MFile::isDirectory()
 {
     // Debug_printv("pathInStream[%s]", pathInStream.c_str());
     if (pathInStream == "")
@@ -461,11 +461,11 @@ bool D64File::isDirectory()
         return false;
 };
 
-bool D64File::rewindDirectory()
+bool D64MFile::rewindDirectory()
 {
     dirIsOpen = true;
     // Debug_printv("streamFile->url[%s]", streamFile->url.c_str());
-    auto image = ImageBroker::obtain<D64IStream>(streamFile->url);
+    auto image = ImageBroker::obtain<D64MStream>(streamFile->url);
     if (image == nullptr)
         Debug_printv("image pointer is null");
 
@@ -487,14 +487,14 @@ bool D64File::rewindDirectory()
     return true;
 }
 
-MFile *D64File::getNextFileInDir()
+MFile *D64MFile::getNextFileInDir()
 {
 
     if (!dirIsOpen)
         rewindDirectory();
 
     // Get entry pointed to by containerStream
-    auto image = ImageBroker::obtain<D64IStream>(streamFile->url);
+    auto image = ImageBroker::obtain<D64MStream>(streamFile->url);
 
     bool r = false;
     do
@@ -520,15 +520,15 @@ MFile *D64File::getNextFileInDir()
     }
 }
 
-time_t D64File::getLastWrite()
+time_t D64MFile::getLastWrite()
 {
     return getCreationTime();
 }
 
-time_t D64File::getCreationTime()
+time_t D64MFile::getCreationTime()
 {
     tm *entry_time = 0;
-    auto entry = ImageBroker::obtain<D64IStream>(streamFile->url)->entry;
+    auto entry = ImageBroker::obtain<D64MStream>(streamFile->url)->entry;
     entry_time->tm_year = entry.year + 1900;
     entry_time->tm_mon = entry.month;
     entry_time->tm_mday = entry.day;
@@ -538,18 +538,18 @@ time_t D64File::getCreationTime()
     return mktime(entry_time);
 }
 
-bool D64File::exists()
+bool D64MFile::exists()
 {
     // here I'd rather use D64 logic to see if such file name exists in the image!
     // Debug_printv("here");
     return true;
 }
 
-uint32_t D64File::size()
+uint32_t D64MFile::size()
 {
     // Debug_printv("[%s]", streamFile->url.c_str());
     //  use D64 to get size of the file in image
-    auto entry = ImageBroker::obtain<D64IStream>(streamFile->url)->entry;
+    auto entry = ImageBroker::obtain<D64MStream>(streamFile->url)->entry;
     uint32_t bytes = UINT16_FROM_LE_UINT16(entry.blocks);
 
     return bytes;

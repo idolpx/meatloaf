@@ -13,7 +13,7 @@
 #ifndef MEATLOAF_MEDIA_D64
 #define MEATLOAF_MEDIA_D64
 
-#include "../meat_io.h"
+#include "../meatloaf.h"
 
 #include <map>
 #include <bitset>
@@ -27,7 +27,7 @@
  * Streams
  ********************************************************/
 
-class D64IStream : public MImageStream {
+class D64MStream : public MMediaStream {
 
 protected:
 
@@ -87,7 +87,7 @@ public:
     bool error_info = false;
     std::string bam_message = "";
 
-    D64IStream(std::shared_ptr<MStream> is) : MImageStream(is) 
+    D64MStream(std::shared_ptr<MStream> is) : MMediaStream(is) 
     {
         // D64 Partition Info
         std::vector<BlockAllocationMap> b = { 
@@ -272,16 +272,16 @@ private:
     bool isBlockFree(uint8_t track, uint8_t sector);
 
     // Container
-    friend class D8BFile;
-    friend class DFIFile;
+    friend class D8BMFile;
+    friend class DFIMFile;
 
     // Disk
-    friend class D64File;
-    friend class D71File;
-    friend class D80File;
-    friend class D81File;
-    friend class D82File;
-    friend class DNPFile;    
+    friend class D64MFile;
+    friend class D71MFile;
+    friend class D80MFile;
+    friend class D81MFile;
+    friend class D82MFile;
+    friend class DNPMFile;    
 };
 
 
@@ -289,10 +289,10 @@ private:
  * File implementations
  ********************************************************/
 
-class D64File: public MFile {
+class D64MFile: public MFile {
 public:
 
-    D64File(std::string path, bool is_dir = true): MFile(path)
+    D64MFile(std::string path, bool is_dir = true): MFile(path)
     {
         isDir = is_dir;
 
@@ -300,7 +300,7 @@ public:
         isPETSCII = true;
     };
     
-    ~D64File() {
+    ~D64MFile() {
         // don't close the stream here! It will be used by shared ptr D64Util to keep reading image params
     }
 
@@ -308,7 +308,7 @@ public:
     {
         // Debug_printv("[%s]", url.c_str());
 
-        return new D64IStream(containerIstream);
+        return new D64MStream(containerIstream);
     }
 
     bool isDirectory() override;
@@ -333,12 +333,12 @@ public:
  * FS
  ********************************************************/
 
-class D64FileSystem: public MFileSystem
+class D64MFileSystem: public MFileSystem
 {
 public:
     MFile* getFile(std::string path) override {
         //Debug_printv("path[%s]", path.c_str());
-        return new D64File(path);
+        return new D64MFile(path);
     }
 
     bool handles(std::string fileName) override {
@@ -352,7 +352,7 @@ public:
         );
     }
 
-    D64FileSystem(): MFileSystem("d64") {};
+    D64MFileSystem(): MFileSystem("d64") {};
 };
 
 

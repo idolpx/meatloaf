@@ -32,7 +32,7 @@
 #include <cstring>
 #include <unordered_map>
 
-#include "meat_io.h"
+#include "meatloaf.h"
 #include "meat_buffer.h"
 
 class HighMemory 
@@ -86,7 +86,7 @@ class HighMemory
 
 // void app_main(void)
 // {
-//     HighMemoryFileSystem hm;
+//     RAMMFileSystem hm;
     
 //     size_t memcnt = hm.size();
 //     size_t memfree = hm.free();
@@ -102,12 +102,12 @@ class HighMemory
  * MFileSystem
  ********************************************************/
 
-class HighMemoryFileSystem: public MFileSystem 
+class RAMMFileSystem: public MFileSystem 
 {
     bool handles(std::string path);
     
 public:
-    HighMemoryFileSystem() : MFileSystem("HighMemoryFS") {};
+    RAMMFileSystem() : MFileSystem("HighMemoryFS") {};
     MFile* getFile(std::string path) override;
 
 };
@@ -118,14 +118,14 @@ public:
  * MFile
  ********************************************************/
 
-class HighMemoryFile: public MFile
+class RAMMFile: public MFile
 {
-friend class FlashIStream;
+friend class FlashMStream;
 
 public:
     std::string basepath = "";
     
-    HighMemoryFile(std::string path): MFile(path) {
+    RAMMFile(std::string path): MFile(path) {
         // parseUrl( path );
 
         // Find full filename for wildcard
@@ -139,7 +139,7 @@ public:
 
         //Debug_printv("basepath[%s] path[%s] valid[%d]", basepath.c_str(), this->path.c_str(), m_isNull);
     };
-    ~HighMemoryFile() {
+    ~RAMMFile() {
         //Serial.printf("*** Destroying flashfile %s\r\n", url.c_str());
         closeDir();
     }

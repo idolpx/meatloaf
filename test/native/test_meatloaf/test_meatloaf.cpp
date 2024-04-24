@@ -4,9 +4,6 @@
 #include <dirent.h>
 #include <sys/stat.h>
 
-// #include "meat_io.h"
-// #include "meat_stream.h"
-// #include "meat_buffer.h"
 
 void setUp(void)
 {

@@ -6,7 +6,7 @@
  * Streams
  ********************************************************/
 
-bool TAPIStream::seekEntry( std::string filename )
+bool TAPMStream::seekEntry( std::string filename )
 {
     uint8_t index = 1;
     mstr::rtrimA0(filename);
@@ -41,7 +41,7 @@ bool TAPIStream::seekEntry( std::string filename )
     return false;
 }
 
-bool TAPIStream::seekEntry( uint16_t index )
+bool TAPMStream::seekEntry( uint16_t index )
 {
     // Calculate Sector offset & Entry offset
     index--;
@@ -64,7 +64,7 @@ bool TAPIStream::seekEntry( uint16_t index )
 }
 
 
-uint16_t TAPIStream::readFile(uint8_t* buf, uint16_t size) {
+uint16_t TAPMStream::readFile(uint8_t* buf, uint16_t size) {
     uint16_t bytesRead = 0;
 
     bytesRead += containerStream->read(buf, size);
@@ -73,7 +73,7 @@ uint16_t TAPIStream::readFile(uint8_t* buf, uint16_t size) {
     return bytesRead;
 }
 
-bool TAPIStream::seekPath(std::string path) {
+bool TAPMStream::seekPath(std::string path) {
     // Implement this to skip a queue of file streams to start of file by name
     // this will cause the next read to return bytes of 'path'
     seekCalled = true;
@@ -112,14 +112,14 @@ bool TAPIStream::seekPath(std::string path) {
  * File implementations
  ********************************************************/
 
-MStream* TAPFile::getDecodedStream(std::shared_ptr<MStream> containerIstream) {
+MStream* TAPMFile::getDecodedStream(std::shared_ptr<MStream> containerIstream) {
     Debug_printv("[%s]", url.c_str());
 
-    return new TAPIStream(containerIstream);
+    return new TAPMStream(containerIstream);
 }
 
 
-bool TAPFile::isDirectory() {
+bool TAPMFile::isDirectory() {
     //Debug_printv("pathInStream[%s]", pathInStream.c_str());
     if ( pathInStream == "" )
         return true;
@@ -127,10 +127,10 @@ bool TAPFile::isDirectory() {
         return false;
 };
 
-bool TAPFile::rewindDirectory() {
+bool TAPMFile::rewindDirectory() {
     dirIsOpen = true;
     Debug_printv("streamFile->url[%s]", streamFile->url.c_str());
-    auto image = ImageBroker::obtain<TAPIStream>(streamFile->url);
+    auto image = ImageBroker::obtain<TAPMStream>(streamFile->url);
     if ( image == nullptr )
         Debug_printv("image pointer is null");
 
@@ -152,13 +152,13 @@ bool TAPFile::rewindDirectory() {
     return true;
 }
 
-MFile* TAPFile::getNextFileInDir() {
+MFile* TAPMFile::getNextFileInDir() {
 
     if(!dirIsOpen)
         rewindDirectory();
 
     // Get entry pointed to by containerStream
-    auto image = ImageBroker::obtain<TAPIStream>(streamFile->url);
+    auto image = ImageBroker::obtain<TAPMStream>(streamFile->url);
 
     if ( image->seekNextImageEntry() )
     {
@@ -178,10 +178,10 @@ MFile* TAPFile::getNextFileInDir() {
 }
 
 
-uint32_t TAPFile::size() {
+uint32_t TAPMFile::size() {
     // Debug_printv("[%s]", streamFile->url.c_str());
     // use TAP to get size of the file in image
-    auto image = ImageBroker::obtain<TAPIStream>(streamFile->url);
+    auto image = ImageBroker::obtain<TAPMStream>(streamFile->url);
 
     size_t bytes = UINT16_FROM_LE_UINT16(image->entry.end_address) - UINT16_FROM_LE_UINT16(image->entry.start_address);
 

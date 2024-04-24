@@ -1,6 +1,6 @@
-#include "container_broker.h"
+#include "meat_broker.h"
 
-MStream* ContainerStreamBroker::obtain(std::string url) {
+MStream* StreamBroker::obtain(std::string url) {
     if(repo.find(url)!=repo.end()) {
         return repo.at(url);
     }
@@ -8,12 +8,22 @@ MStream* ContainerStreamBroker::obtain(std::string url) {
     MFile* newFile = MFSOwner::File(url);
     MStream* newStream = newFile->getSourceStream();
 
+    // Are we at the root of the pathInStream?
+    if ( newFile->pathInStream == "")
+    {
+        Debug_printv("DIRECTORY [%s]", url.c_str());
+    }
+    else
+    {
+        Debug_printv("SINGLE FILE [%s]", url.c_str());
+    }
+
     repo.insert(std::make_pair(url, newStream));
     delete newFile;
     return newStream;
 }
 
-void ContainerStreamBroker::dispose(std::string url) {
+void StreamBroker::dispose(std::string url) {
     if(repo.find(url)!=repo.end()) {
         MStream* toDelete = repo.at(url);
         repo.erase(url);
@@ -21,7 +31,7 @@ void ContainerStreamBroker::dispose(std::string url) {
     }
 }
 
-void ContainerStreamBroker::purge(std::forward_list<virtualDevice *> devs) {
+void StreamBroker::purge(std::forward_list<virtualDevice *> devs) {
     // to dispose of them we need to be sure they are not used anymore
     // how do we know they are used, though?
     // the most obvious way would be to check if any of the devices and/or channels on IEC is using a path that contains this particular container

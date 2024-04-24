@@ -6,7 +6,7 @@
 #ifndef MEATLOAF_SCHEME_WS
 #define MEATLOAF_SCHEME_WS
 
-#include "meat_io.h"
+#include "meatloaf.h"
 #include "../../include/global_defines.h"
 
 #include "string_utils.h"

@@ -15,9 +15,9 @@
 
 
 #if HOST_OS==win32
-#include "../meatloaf/meat_stream.h"
+#include "../meatloaf/meatloaf.h"
 #else
-#include "meat_stream.h"
+#include "meatloaf.h"
 #endif
 
 

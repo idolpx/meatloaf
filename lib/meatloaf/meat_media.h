@@ -1,8 +1,8 @@
 
-#ifndef MEATLOAF_CBM_MEDIA
-#define MEATLOAF_CBM_MEDIA
+#ifndef MEATLOAF_MEDIA
+#define MEATLOAF_MEDIA
 
-#include "meat_io.h"
+#include "meatloaf.h"
 
 #include <map>
 #include <bitset>
@@ -18,10 +18,10 @@
  * Streams
  ********************************************************/
 
-class MImageStream: public MStream {
+class MMediaStream: public MStream {
 
 public:
-    MImageStream(std::shared_ptr<MStream> is) {
+    MMediaStream(std::shared_ptr<MStream> is) {
         containerStream = is;
         _is_open = true;
         has_subdirs = false;
@@ -31,7 +31,7 @@ public:
     bool open() override;
     void close() override;
 
-    ~MImageStream() {
+    ~MMediaStream() {
         //Debug_printv("close");
         close();
     }
@@ -114,7 +114,7 @@ protected:
 
     bool _is_open = false;
 
-    MImageStream* decodedStream;
+    MMediaStream* decodedStream;
 
     bool show_hidden = false;
 
@@ -156,26 +156,26 @@ private:
     friend class CRTFile;
 
     // CONTAINER
-    friend class D8BFile;
-    friend class DFIFile;
+    friend class D8BMFile;
+    friend class DFIMFile;
 
     // FLOPPY DISK
-    friend class D64File;
-    friend class D71File;
-    friend class D80File;
-    friend class D81File;
-    friend class D82File;
+    friend class D64MFile;
+    friend class D71MFile;
+    friend class D80MFile;
+    friend class D81MFile;
+    friend class D82MFile;
 
     // HARD DRIVE
-    friend class DNPFile;
-    friend class D90File;
+    friend class DNPMFile;
+    friend class D90MFile;
 
     // FILE
-    friend class P00File;
+    friend class P00MFile;
 
     // CASSETTE TAPE
-    friend class T64File;
-    friend class TCRTFile;
+    friend class T64MFile;
+    friend class TCRTMFile;
 };
 
 
@@ -184,7 +184,7 @@ private:
  * Utility implementations
  ********************************************************/
 class ImageBroker {
-    static std::unordered_map<std::string, MImageStream*> repo;
+    static std::unordered_map<std::string, MMediaStream*> repo;
 public:
     template<class T> static T* obtain(std::string url) {
         // obviously you have to supply STREAMFILE.url to this function!
@@ -211,8 +211,8 @@ public:
         return newStream;
     }
 
-    static MImageStream* obtain(std::string url) {
-        return obtain<MImageStream>(url);
+    static MMediaStream* obtain(std::string url) {
+        return obtain<MMediaStream>(url);
     }
 
     static void dispose(std::string url) {
@@ -224,4 +224,4 @@ public:
     }
 };
 
-#endif // MEATLOAF_CBM_MEDIA
+#endif // MEATLOAF_MEDIA

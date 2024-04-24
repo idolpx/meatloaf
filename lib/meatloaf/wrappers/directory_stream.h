@@ -4,9 +4,9 @@
 #include <memory>
 #include <fstream>
 #if HOST_OS==win32
-#include "../meat_io.h"
+#include "../meatloaf.h"
 #else
-#include "meat_io.h"
+#include "meatloaf.h"
 #endif
 
 class idirbuf : public std::filebuf {

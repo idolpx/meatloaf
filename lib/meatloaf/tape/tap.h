@@ -13,7 +13,7 @@
 #ifndef MEATLOAF_MEDIA_TAP
 #define MEATLOAF_MEDIA_TAP
 
-#include "../meat_io.h"
+#include "../meatloaf.h"
 #include "../meat_media.h"
 
 
@@ -21,11 +21,11 @@
  * Streams
  ********************************************************/
 
-class TAPIStream : public MImageStream {
+class TAPMStream : public MMediaStream {
     // override everything that requires overriding here
 
 public:
-    TAPIStream(std::shared_ptr<MStream> is) : MImageStream(is) { };
+    TAPMStream(std::shared_ptr<MStream> is) : MMediaStream(is) { };
 
 protected:
     struct Header {
@@ -63,7 +63,7 @@ protected:
     Entry entry;
 
 private:
-    friend class TAPFile;
+    friend class TAPMFile;
 };
 
 
@@ -71,17 +71,17 @@ private:
  * File implementations
  ********************************************************/
 
-class TAPFile: public MFile {
+class TAPMFile: public MFile {
 public:
 
-    TAPFile(std::string path, bool is_dir = true): MFile(path) {
+    TAPMFile(std::string path, bool is_dir = true): MFile(path) {
         isDir = is_dir;
 
         media_image = name;
         //mstr::toUTF8(media_image);
     };
     
-    ~TAPFile() {
+    ~TAPMFile() {
         // don't close the stream here! It will be used by shared ptr D64Util to keep reading image params
     }
 
@@ -109,18 +109,18 @@ public:
  * FS
  ********************************************************/
 
-class TAPFileSystem: public MFileSystem
+class TAPMFileSystem: public MFileSystem
 {
 public:
     MFile* getFile(std::string path) override {
-        return new TAPFile(path);
+        return new TAPMFile(path);
     }
 
     bool handles(std::string fileName) override {
         return byExtension(".tap", fileName);
     }
 
-    TAPFileSystem(): MFileSystem("tap") {};
+    TAPMFileSystem(): MFileSystem("tap") {};
 };
 
 

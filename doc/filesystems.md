@@ -50,7 +50,7 @@ Meatloaf will scann the path __from right to left__ to match topmost filesystem 
 - `some-server.com` will match nothing
 - `http` will match HTTP filesystem, which will be the _Source Stream_ for the archive filesystem
 
-This will create a hierarchy of Russian-doll like streams, looking more or less like this: `FileStream(D64Stream(ArchiveStream(HttpStream)))`
+This will create a hierarchy of Russian-doll like streams, looking more or less like this: `FileStream(D64MStream(ArchiveMStream(HttpStream)))`
 
 ## getDecodedStream
 This is the method you have to implement, when creating your own container streams that might be placed inside other streams. Example of such container streams are:

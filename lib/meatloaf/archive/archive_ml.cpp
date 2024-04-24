@@ -5,7 +5,7 @@
 #include <archive.h>
 #include <archive_entry.h>
 
-#include "../meat_io.h"
+#include "../meatloaf.h"
 
 /* Returns pointer and size of next block of data from archive. */
 // The read callback returns the number of bytes read, zero for end-of-file, or a negative failure code as above.
@@ -15,9 +15,9 @@
 // This callback is just a way to get bytes from srcStream into libarchive for processing
 ssize_t cb_read(struct archive *a, void *userData, const void **buff)
 {
-    ArchiveStreamData *streamData = (ArchiveStreamData *)userData;
+    ArchiveMStreamData *streamData = (ArchiveMStreamData *)userData;
     // 1. we have to call srcStr.read(...)
-    ssize_t bc = streamData->srcStream->read(streamData->srcBuffer, ArchiveStream::buffSize);
+    ssize_t bc = streamData->srcStream->read(streamData->srcBuffer, ArchiveMStream::buffSize);
     //std::string dump((char*)streamData->srcBuffer, bc);
     //Debug_printv("Libarch pulling data from src MStream, got bytes:%d", bc);
     //Debug_printv("Dumping bytes: %s", dump.c_str());
@@ -42,7 +42,7 @@ If skipping is not provided or fails, libarchive will call the read() function a
 int64_t cb_skip(struct archive *a, void *userData, int64_t request)
 {
     Debug_printv("bytes[%d]", request);
-    ArchiveStreamData *streamData = (ArchiveStreamData *)userData;
+    ArchiveMStreamData *streamData = (ArchiveMStreamData *)userData;
 
     if (streamData->srcStream->isOpen())
     {
@@ -59,7 +59,7 @@ int64_t cb_skip(struct archive *a, void *userData, int64_t request)
 int64_t cb_seek(struct archive *a, void *userData, int64_t offset, int whence)
 {
     Debug_printv("offset[%d] whence[%d] (0=begin, 1=curr, 2=end)", offset, whence);
-    ArchiveStreamData *streamData = (ArchiveStreamData *)userData;
+    ArchiveMStreamData *streamData = (ArchiveMStreamData *)userData;
 
     if (streamData->srcStream->isOpen())
     {
@@ -75,7 +75,7 @@ int64_t cb_seek(struct archive *a, void *userData, int64_t offset, int whence)
 
 int cb_close(struct archive *a, void *userData)
 {
-    ArchiveStreamData *src_str = (ArchiveStreamData *)userData;
+    ArchiveMStreamData *src_str = (ArchiveMStreamData *)userData;
     
     Debug_printv("Libarch wants to close, but we do nothing here...");
 
@@ -94,7 +94,7 @@ int cb_open(struct a *arch, void *userData)
  * Streams implementations
  ********************************************************/
 
-ArchiveStream::ArchiveStream(std::shared_ptr<MStream> srcStr)
+ArchiveMStream::ArchiveMStream(std::shared_ptr<MStream> srcStr)
 {
     // it should be possible to to pass a password parameter here and somehow
     // call archive_passphrase_callback(password) from here, right?
@@ -107,7 +107,7 @@ ArchiveStream::ArchiveStream(std::shared_ptr<MStream> srcStr)
     open();
 }
 
-ArchiveStream::~ArchiveStream()
+ArchiveMStream::~ArchiveMStream()
 {
     close();
     if (streamData.srcBuffer != nullptr)
@@ -115,7 +115,7 @@ ArchiveStream::~ArchiveStream()
     Debug_printv("Stream destructor OK!");
 }
 
-bool ArchiveStream::open()
+bool ArchiveMStream::open()
 {
     if (!is_open)
     {
@@ -137,7 +137,7 @@ bool ArchiveStream::open()
     return is_open;
 };
 
-void ArchiveStream::close()
+void ArchiveMStream::close()
 {
     if (is_open)
     {
@@ -148,12 +148,12 @@ void ArchiveStream::close()
     Debug_printv("Close called");
 }
 
-bool ArchiveStream::isOpen()
+bool ArchiveMStream::isOpen()
 {
     return is_open;
 };
 
-uint32_t ArchiveStream::read(uint8_t *buf, uint32_t size)
+uint32_t ArchiveMStream::read(uint8_t *buf, uint32_t size)
 {
     Debug_printv("calling read, buff size=[%d]", size);
 
@@ -174,14 +174,14 @@ uint32_t ArchiveStream::read(uint8_t *buf, uint32_t size)
     }
 }
 
-uint32_t ArchiveStream::write(const uint8_t *buf, uint32_t size)
+uint32_t ArchiveMStream::write(const uint8_t *buf, uint32_t size)
 {
     return -1;
 }
 
 // For files with a browsable random access directory structure
 // d64, d74, d81, dnp, etc.
-bool ArchiveStream::seekPath(std::string path)
+bool ArchiveMStream::seekPath(std::string path)
 {
     Debug_printv("seekPath called for path: %s", path.c_str());
 
@@ -195,7 +195,7 @@ bool ArchiveStream::seekPath(std::string path)
 }
 
 
-bool ArchiveStream::seekEntry( std::string filename )
+bool ArchiveMStream::seekEntry( std::string filename )
 {
     Debug_printv( "filename[%s] size[%d]", filename.c_str(), filename.size());
 
@@ -251,7 +251,7 @@ bool ArchiveStream::seekEntry( std::string filename )
 
 // // For files with no directory structure
 // // tap, crt, tar
-// std::string ArchiveStream::seekNextEntry()
+// std::string ArchiveMStream::seekNextEntry()
 // {
 //     struct archive_entry *entry;
 //     if (archive_read_next_header(a, &entry) == ARCHIVE_OK)
@@ -261,7 +261,7 @@ bool ArchiveStream::seekEntry( std::string filename )
 // };
 
 
-bool ArchiveStream::seek(uint32_t pos)
+bool ArchiveMStream::seek(uint32_t pos)
 {
     return streamData.srcStream->seek(pos);
 }
@@ -270,16 +270,16 @@ bool ArchiveStream::seek(uint32_t pos)
  * Files implementations
  ********************************************************/
 
-MStream *ArchiveContainerFile::getDecodedStream(std::shared_ptr<MStream> containerIstream)
+MStream *ArchiveMFile::getDecodedStream(std::shared_ptr<MStream> containerIstream)
 {
     // TODO - we can get password from this URL and pass it as a parameter to this constructor
-    Debug_printv("calling getDecodedStream for ArchiveContainerFile, we should return open stream");
-    auto stream = new ArchiveStream(containerIstream);
+    Debug_printv("calling getDecodedStream for ArchiveMFile, we should return open stream");
+    auto stream = new ArchiveMStream(containerIstream);
     return stream;
 }
 
 // archive file is always a directory
-bool ArchiveContainerFile::isDirectory()
+bool ArchiveMFile::isDirectory()
 {
     //Debug_printv("pathInStream[%s]", pathInStream.c_str());
     if ( pathInStream == "" )
@@ -288,14 +288,14 @@ bool ArchiveContainerFile::isDirectory()
         return false;
 };
 
-bool ArchiveContainerFile::rewindDirectory()
+bool ArchiveMFile::rewindDirectory()
 {
     dirIsOpen = true;
 
     return prepareDirListing();
 }
 
-MFile *ArchiveContainerFile::getNextFileInDir()
+MFile *ArchiveMFile::getNextFileInDir()
 {
     if(!dirIsOpen)
         rewindDirectory();
@@ -320,7 +320,7 @@ MFile *ArchiveContainerFile::getNextFileInDir()
     }
 }
 
-bool ArchiveContainerFile::prepareDirListing()
+bool ArchiveMFile::prepareDirListing()
 {
     if (dirStream.get() != nullptr)
     {

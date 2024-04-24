@@ -10,7 +10,7 @@
 #include "sdkconfig.h"
 #ifndef CONFIG_IDF_TARGET_ESP32S3
 
-#include "psram.h"
+#include "ram.h"
 
 #include <stdio.h>
 #include <stdbool.h>

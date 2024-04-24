@@ -1,4 +1,4 @@
-#include "meat_io.h"
+#include "meatloaf.h"
 
 #include <dirent.h>
 #include <sys/stat.h>
@@ -6,14 +6,14 @@
 #include <vector>
 #include <sstream>
 
-#include "../../include/debug.h"
-
-#include "MIOException.h"
+#include "meat_buffer.h"
+//#include "wrappers/directory_stream.h"
 
 #include "string_utils.h"
 #include "peoples_url_parser.h"
 
-//#include "wrappers/directory_stream.h"
+#include "MIOException.h"
+#include "../../include/debug.h"
 
 // Archive
 #include "archive/archive_ml.h"
@@ -54,7 +54,7 @@
 // Scanners
 
 // Service
-// #include "service/cs.h"
+#include "service/cs.h"
 #include "service/ml.h"
 
 // Tape
@@ -62,41 +62,37 @@
 #include "tape/tcrt.h"
 
 
-#include "meat_buffer.h"
-
-
-
 /********************************************************
  * MFSOwner implementations
  ********************************************************/
 
 // initialize other filesystems here
-FlashFileSystem defaultFS;
+FlashMFileSystem defaultFS;
 #ifdef SD_CARD
 SDFileSystem sdFS;
 #endif
 
 
 // Archive
-ArchiveContainerFileSystem archiveFS;
+ArchiveMFileSystem archiveFS;
 
 // Cartridge
 
 // Container
-D8BFileSystem d8bFS;
-DFIFileSystem dfiFS;
+D8BMFileSystem d8bFS;
+DFIMFileSystem dfiFS;
 
 // File
-P00FileSystem p00FS;
+P00MFileSystem p00FS;
 
 // Disk
-D64FileSystem d64FS;
-D71FileSystem d71FS;
-D80FileSystem d80FS;
-D81FileSystem d81FS;
-D82FileSystem d82FS;
-D90FileSystem d90FS;
-DNPFileSystem dnpFS;
+D64MFileSystem d64FS;
+D71MFileSystem d71FS;
+D80MFileSystem d80FS;
+D81MFileSystem d81FS;
+D82MFileSystem d82FS;
+D90MFileSystem d90FS;
+DNPMFileSystem dnpFS;
 
 // Network
 HttpFileSystem httpFS;
@@ -111,11 +107,8 @@ TNFSFileSystem tnfsFS;
 MLFileSystem mlFS;
 
 // Tape
-T64FileSystem t64FS;
-TCRTFileSystem tcrtFS;
-
-
-
+T64MFileSystem t64FS;
+TCRTMFileSystem tcrtFS;
 
 
 // put all available filesystems in this array - first matching system gets the file!
@@ -182,8 +175,6 @@ MFile* MFSOwner::File(std::shared_ptr<MFile> file) {
 
 
 MFile* MFSOwner::File(std::string path) {
-    //Debug_printv("in File\r\n");
-
     // if(mstr::startsWith(path,"cs:", false)) {
     //     //Serial.printf("CServer path found!\r\n");
     //     return csFS.getFile(path);
@@ -353,6 +344,9 @@ bool MFile::operator!=(nullptr_t ptr) {
 
 MStream* MFile::getSourceStream(std::ios_base::openmode mode) {
     // has to return OPENED stream
+    Debug_printv("pathInStream[%s] streamFile[%s]", pathInStream.c_str(), streamFile->url.c_str());
+    //std::shared_ptr<MFile> containerFile(MFSOwner::File(streamPath)); // get the base file that knows how to handle this kind of container, i.e 7z
+
     std::shared_ptr<MStream> containerStream(streamFile->getSourceStream(mode)); // get its base stream, i.e. zip raw file contents
     Debug_printv("containerStream isRandomAccess[%d] isBrowsable[%d]", containerStream->isRandomAccess(), containerStream->isBrowsable());
 
@@ -611,6 +605,3 @@ uint64_t MFile::getAvailableSpace()
 
     return 65535;
 }
-
-
-

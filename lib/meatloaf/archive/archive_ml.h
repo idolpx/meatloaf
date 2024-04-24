@@ -9,7 +9,7 @@
 #include <archive.h>
 #include <archive_entry.h>
 
-#include "../meat_io.h"
+#include "../meatloaf.h"
 
 #include "../../../include/debug.h"
 
@@ -41,24 +41,24 @@ int cb_close(struct archive *a, void *__src_stream);
  * Streams implementations
  ********************************************************/
 
-class ArchiveStreamData {
+class ArchiveMStreamData {
 public:
     uint8_t *srcBuffer = nullptr;
     std::shared_ptr<MStream> srcStream = nullptr; // a stream that is able to serve bytes of this archive
 };
 
-class ArchiveStream : public MStream
+class ArchiveMStream : public MStream
 {
     bool is_open = false;
 
 public:
     static const size_t buffSize = 4096;
-    ArchiveStreamData streamData;
+    ArchiveMStreamData streamData;
     struct archive *a;
     struct archive_entry *entry;
 
-    ArchiveStream(std::shared_ptr<MStream> srcStr);
-    ~ArchiveStream();
+    ArchiveMStream(std::shared_ptr<MStream> srcStr);
+    ~ArchiveMStream();
 
     bool open() override;
     void close() override;
@@ -91,23 +91,23 @@ private:
  * Files implementations
  ********************************************************/
 
-class ArchiveContainerFile : public MFile
+class ArchiveMFile : public MFile
 {
     struct archive *getArchive() {
-        ArchiveStream* as = (ArchiveStream*)dirStream.get();
+        ArchiveMStream* as = (ArchiveMStream*)dirStream.get();
         return as->a;
     }
     
     std::shared_ptr<MStream> dirStream = nullptr; // a stream that is able to serve bytes of this archive
 
 public:
-    ArchiveContainerFile(std::string path) : MFile(path)
+    ArchiveMFile(std::string path) : MFile(path)
     {
         // media_header = name;
         media_archive = name;
     };
 
-    ~ArchiveContainerFile()
+    ~ArchiveMFile()
     {
         if (dirStream.get() != nullptr)
         {
@@ -143,15 +143,15 @@ private:
  * FS implementations
  ********************************************************/
 
-class ArchiveContainerFileSystem : public MFileSystem
+class ArchiveMFileSystem : public MFileSystem
 {
     MFile *getFile(std::string path)
     {
-        return new ArchiveContainerFile(path);
+        return new ArchiveMFile(path);
     };
 
 public:
-    ArchiveContainerFileSystem() : MFileSystem("arch") {}
+    ArchiveMFileSystem() : MFileSystem("arch") {}
 
     bool handles(std::string fileName)
     {

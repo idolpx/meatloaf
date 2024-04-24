@@ -2,7 +2,7 @@
 
 // G64 Utility Functions
 
-bool G64IStream::seekBlock(uint64_t index, uint8_t offset)
+bool G64MStream::seekBlock(uint64_t index, uint8_t offset)
 {
     uint16_t sectorOffset = 0;
     uint8_t track = 0;
@@ -32,7 +32,7 @@ bool G64IStream::seekBlock(uint64_t index, uint8_t offset)
     return containerStream->seek((index * block_size) + offset);
 }
 
-bool G64IStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
+bool G64MStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
 {
     uint16_t sectorOffset = 0;
 
@@ -75,7 +75,7 @@ bool G64IStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
 }
 
 
-uint16_t G64IStream::readContainer(uint8_t *buf, uint16_t size)
+uint16_t G64MStream::readContainer(uint8_t *buf, uint16_t size)
 {
     return containerStream->read(buf, size);
 }

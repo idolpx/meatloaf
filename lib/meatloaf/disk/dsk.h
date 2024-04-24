@@ -8,7 +8,7 @@
 #ifndef MEATLOAF_MEDIA_DSK
 #define MEATLOAF_MEDIA_DSK
 
-#include "../meat_io.h"
+#include "../meatloaf.h"
 #include "d64.h"
 
 
@@ -16,11 +16,11 @@
  * Streams
  ********************************************************/
 
-class DSKIStream : public D64IStream {
+class DSKIStream : public D64MStream {
     // override everything that requires overriding here
 
 public:
-    DSKIStream(std::shared_ptr<MStream> is) : D64IStream(is) 
+    DSKIStream(std::shared_ptr<MStream> is) : D64MStream(is) 
     {
         // DSK Partition Info
         std::vector<BlockAllocationMap> b = { 
@@ -84,9 +84,9 @@ private:
  * File implementations
  ********************************************************/
 
-class DSKFile: public D64File {
+class DSKFile: public D64MFile {
 public:
-    DSKFile(std::string path, bool is_dir = true) : D64File(path, is_dir) {};
+    DSKFile(std::string path, bool is_dir = true) : D64MFile(path, is_dir) {};
 
     MStream* getDecodedStream(std::shared_ptr<MStream> containerIstream) override
     {
