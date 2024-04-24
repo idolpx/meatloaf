@@ -1,5 +1,7 @@
 #include "meat_media.h"
 
+std::unordered_map<std::string, MMediaStream*> ImageBroker::repo;
+
 // Utility Functions
 
 std::string MMediaStream::decodeType(uint8_t file_type, bool show_hidden)
@@ -107,6 +109,3 @@ bool MMediaStream::isOpen() {
 
     return _is_open;
 };
-
-
-std::unordered_map<std::string, MMediaStream*> ImageBroker::repo;

@@ -1,5 +1,6 @@
 #include "tap.h"
 
+#include "meat_broker.h"
 #include "endianness.h"
 
 /********************************************************

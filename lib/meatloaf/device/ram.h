@@ -97,21 +97,27 @@ class HighMemory
 // }
 
 
-
 /********************************************************
- * MFileSystem
+ * HighMemoryHandle
  ********************************************************/
 
-class RAMMFileSystem: public MFileSystem 
-{
-    bool handles(std::string path);
-    
+class HighMemoryHandle {
 public:
-    RAMMFileSystem() : MFileSystem("HighMemoryFS") {};
-    MFile* getFile(std::string path) override;
+    //int rc;
+    FILE* file_h = nullptr;
 
+    HighMemoryHandle() 
+    {
+        //Debug_printv("*** Creating flash handle");
+        memset(&file_h, 0, sizeof(file_h));
+    };
+    ~HighMemoryHandle();
+    void obtain(std::string localPath, std::string mode);
+    void dispose();
+
+private:
+    int flags = 0;
 };
-
 
 
 /********************************************************
@@ -178,25 +184,17 @@ private:
 
 
 /********************************************************
- * HighMemoryHandle
+ * MFileSystem
  ********************************************************/
 
-class HighMemoryHandle {
+class RAMMFileSystem: public MFileSystem 
+{
+    bool handles(std::string path);
+    
 public:
-    //int rc;
-    FILE* file_h = nullptr;
+    RAMMFileSystem() : MFileSystem("HighMemoryFS") {};
+    MFile* getFile(std::string path) override;
 
-    HighMemoryHandle() 
-    {
-        //Debug_printv("*** Creating flash handle");
-        memset(&file_h, 0, sizeof(file_h));
-    };
-    ~HighMemoryHandle();
-    void obtain(std::string localPath, std::string mode);
-    void dispose();
-
-private:
-    int flags = 0;
 };
 
 
