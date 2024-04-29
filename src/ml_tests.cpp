@@ -299,7 +299,7 @@ void seekTest()
     if(!stream.is_open())
         return;
 
-    // 1. we cen obtain raw C++ buffer from our stream:
+    // 1. we can obtain raw C++ buffer from our stream:
     auto pbuf = stream.rdbuf();
 
     Debug_printv("Seeking");

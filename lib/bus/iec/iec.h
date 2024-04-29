@@ -579,10 +579,11 @@ public:
     void senderTimeout();
 
 
-    void pull ( int _pin );
-    void release ( int _pin );
-    bool status ( int _pin );
-    //int status();
+    void pull ( uint8_t _pin );
+    void release ( uint8_t _pin );
+    bool status ( uint8_t _pin );
+
+    void debugTiming();
 };
 /**
  * @brief Return

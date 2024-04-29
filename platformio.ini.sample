@@ -18,8 +18,10 @@
 description = Meatloaf Commodore to ESP32 WiFi Multifunction Firmware
 
 ; Uncomment ONLY ONE of the below lines to target the hardware you use
+; Uncomment ONLY ONE of the below lines to target the hardware you use
 ; GPIO pin assignments are located in the include/pinmap/ directory for reference
 environment = lolin-d32-pro      ; Wemos Lolin D32 Pro                         (ESP32-WROVER 4M PSRAM, 4M/8M/16M Flash)
+;environment = iec-nugget         ; Wemos Lolin D32 Pro (TFT Header)            (ESP32-WROVER 4M PSRAM, 4M/8M/16M Flash)
 ;environment = ttgo-t1            ; Lilygo TTGO T1 V1.3                         (ESP32 NO PSRAM, 4M Flash)
 ;environment = esp32-wroom        ; generic esp32-wroom board                   (ESP32-WROOM NO PSRAM, 4M/8M/16M Flash)
 ;environment = esp32-wroom-pi1541 ; generic esp32-wroom board with pi1541 hat   (ESP32-WROOM NO PSRAM, 4M/8M/16M Flash)
@@ -31,7 +33,7 @@ environment = lolin-d32-pro      ; Wemos Lolin D32 Pro                         (
 ;environment = esp32s3            ; esp32s3 devkitc                             (ESP32-S3 2M/8M PSRAM, 8M/16M/32M Flash)
 ;environment = lolin-s2-mini      ; Wemos Lolin S2 Mini                         (ESP32-S2 2M PSRAM, 4M Flash)
 ;environment = lolin-s3-pro       ; Wemos Lolin S3 Pro                          (ESP32-S3 8M PSRAM, 16M Flash)
-;environment = esp32s3-DevKitC-1   ; esp32s3 DevKitC-1                          (ESP32-S3 2M/8M PSRAM, 8M/16M/32M Flash)
+;environment = esp32s3-DevKitC-1
 
 ; NATIVE UNIT TESTING
 ;environment = native      ; For running tests that don't require embedded hardware
@@ -58,7 +60,6 @@ description = ${meatloaf.description}
 default_envs = ${meatloaf.environment}
 data_dir = data/${meatloaf.build_platform}
 
-
 [esp32_base]
 ; Espressif32 PlatformIO Version to use for building
 ; https://github.com/platformio/platform-espressif32/releases
@@ -76,11 +77,11 @@ lib_ldf_mode = deep+
 upload_speed = 460800 ;921600
 ;upload_port = COM1 ; Windows
 ;upload_port = /dev/ttyUSB0 ; Linux
-upload_port = /dev/cu.usbserial-1450 ; Mac
+upload_port = /dev/cu.usbserial-144240 ; Mac
 monitor_speed = 460800 ;921600
 ;monitor_port = COM1 ; Windows
 ;monitor_port = /dev/ttyUSB0 ; Linux
-monitor_port = /dev/cu.usbserial-1450 ; Mac
+monitor_port = /dev/cu.usbserial-144240 ; Mac
 monitor_filters = esp32_exception_decoder
 check_skip_packages = yes
 ;debug_tool = esp-prog
@@ -95,6 +96,9 @@ build_flags =
     ; Default WiFi
     -D WIFI_SSID=\"${meatloaf.wifi_ssid}\"
     -D WIFI_PASSWORD=\"${meatloaf.wifi_pass}\"
+
+    ; Firmware Version
+    -D MEATLOAF_MAX
 
     ; IEC Hardware Options
     ; These options are also useful for reusing a PI1541 Hat with Meatloaf
@@ -143,9 +147,9 @@ extra_scripts = gen_coverage.py
 build_flags =
     ${env.build_flags}
     -D TEST_NATIVE
-	-lgcov
-	--coverage
-    -fprofile-abs-path
+    ;-lgcov
+    ;--coverage
+    ;-fprofile-abs-path
 
 [env:fujiloaf-rev0]
 extends = esp32_base
@@ -165,7 +169,18 @@ board = esp32-${meatloaf.flash_size}
 build_flags =
     ${env.build_flags}
     -D PINMAP_LOLIN_D32_PRO
+    -D NO_BUTTONS
     -D BOARD_HAS_PSRAM
+    -D SD_CARD
+
+[env:iec-nugget]
+extends = esp32_base
+board = esp32-${meatloaf.flash_size}
+build_flags =
+    ${env.build_flags}
+    -D PINMAP_IEC_NUGGET
+    -D BOARD_HAS_PSRAM
+    -D NO_BUTTONS
     -D SD_CARD
 
 [env:ttgo-t1]

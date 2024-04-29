@@ -5,6 +5,10 @@
 #include <cstring>
 #include <memory>
 
+#include "soc/io_mux_reg.h"
+#include "driver/gpio.h"
+#include "hal/gpio_hal.h"
+
 #include "../../include/debug.h"
 #include "../../include/pinmap.h"
 #include "../../include/cbm_defines.h"
@@ -60,38 +64,39 @@ static void ml_iec_intr_task(void* arg)
     }
 }
 
-void init_pin(gpio_num_t pin)
+void init_gpio(gpio_num_t _pin)
 {
-    gpio_set_direction(pin, GPIO_MODE_INPUT);
-    gpio_set_pull_mode(pin, GPIO_PULLUP_ONLY);
-    gpio_set_level(pin, LOW);
+    PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[_pin], PIN_FUNC_GPIO);
+    gpio_set_direction(_pin, GPIO_MODE_INPUT);
+    gpio_pullup_en(_pin);
+    gpio_set_pull_mode(_pin, GPIO_PULLUP_ONLY);
+    gpio_set_level(_pin, LOW);
     return;
 }
 
-
 // true => PULL => LOW
-void IRAM_ATTR systemBus::pull ( int _pin )
+void IRAM_ATTR systemBus::pull ( uint8_t _pin )
 {
-    int _reg = GPIO_ENABLE_REG; 
+    int _reg = GPIO_ENABLE_REG;
     if (_pin > 31) 
     { 
-        _reg = GPIO_ENABLE1_REG, _pin -= 32; 
+        _reg = GPIO_ENABLE1_REG, _pin -= 32;
     } 
-    REG_SET_BIT(_reg, 1 << _pin); // GPIO_MODE_OUTPUT
+    REG_SET_BIT(_reg, 1ULL << _pin); // GPIO_MODE_OUTPUT
 }
 
 // false => RELEASE => HIGH
-void IRAM_ATTR systemBus::release ( int _pin )
+void IRAM_ATTR systemBus::release ( uint8_t _pin )
 {
-    int _reg = GPIO_ENABLE_REG; 
+    int _reg = GPIO_ENABLE_REG;
     if (_pin > 31) 
     { 
-        _reg = GPIO_ENABLE1_REG, _pin -= 32; 
+        _reg = GPIO_ENABLE1_REG, _pin -= 32;
     } 
-    REG_CLR_BIT(_reg, 1 << _pin); // GPIO_MODE_INPUT
+    REG_CLR_BIT(_reg, 1ULL << _pin); // GPIO_MODE_INPUT
 }
 
-bool IRAM_ATTR systemBus::status ( int _pin )
+bool IRAM_ATTR systemBus::status ( uint8_t _pin )
 {
 #ifndef IEC_SPLIT_LINES
     release ( _pin );
@@ -100,13 +105,15 @@ bool IRAM_ATTR systemBus::status ( int _pin )
     return gpio_get_level ( ( gpio_num_t ) _pin ) ? RELEASED : PULLED;
 }
 
+
+
 // int IRAM_ATTR systemBus::status()
 // {
 //     int data = 0;
 
 //     gpio_config_t io_config =
 //     {
-//         .pin_bit_mask = BIT(PIN_IEC_CLK_IN) | BIT(PIN_IEC_DATA_IN) | BIT(PIN_IEC_SRQ) | BIT(PIN_IEC_RESET),
+//         .pin_bit_mask = BIT(PIN_IEC_CLK_IN) | BIT(PIN_IEC_CLK_OUT) |BIT(PIN_IEC_DATA_IN) | BIT(PIN_IEC_DATA_OUT) | BIT(PIN_IEC_SRQ) | BIT(PIN_IEC_RESET),
 //         .mode = GPIO_MODE_INPUT,
 //         .pull_up_en = GPIO_PULLUP_ENABLE,
 //         .intr_type = GPIO_INTR_DISABLE,
@@ -130,17 +137,16 @@ void systemBus::setup()
 
     flags = CLEAR;
     protocol = selectProtocol();
-    release(PIN_IEC_CLK_OUT);
-    release(PIN_IEC_DATA_OUT);
-    release(PIN_IEC_SRQ);
 
     // initial pin modes in GPIO
-    init_pin(PIN_IEC_ATN);
-    init_pin(PIN_IEC_CLK_OUT);
-    init_pin(PIN_IEC_DATA_OUT);
-    init_pin(PIN_IEC_SRQ);
+    init_gpio(PIN_IEC_ATN);
+    init_gpio(PIN_IEC_CLK_IN);
+    init_gpio(PIN_IEC_CLK_OUT);
+    init_gpio(PIN_IEC_DATA_IN);
+    init_gpio(PIN_IEC_DATA_OUT);
+    init_gpio(PIN_IEC_SRQ);
 #ifdef IEC_HAS_RESET
-    init_pin(PIN_IEC_RESET);
+    init_gpio(PIN_IEC_RESET);
 #endif
 
     // Start task
@@ -175,6 +181,8 @@ void IRAM_ATTR systemBus::service()
 
     if (bus_state < BUS_ACTIVE)
     {
+        // debugTiming();
+
         // Handle SRQ for devices
         for (auto devicep : _daisyChain)
             {
@@ -439,13 +447,13 @@ void systemBus::read_command()
                 }
 
                 // *** IMPORTANT! This helps keep us in sync!
-                pull ( PIN_IEC_SRQ );
+                //pull ( PIN_IEC_SRQ );
                 if ( protocol->timeoutWait ( PIN_IEC_ATN, RELEASED ) == TIMED_OUT )
                 {
                     Debug_printv ( "ATN Not Released after secondary" );
                     return; // return error because timeout
                 }
-                release ( PIN_IEC_SRQ );
+                //release ( PIN_IEC_SRQ );
 
                 Debug_printf(" (%.2X %s  %.2d CHANNEL)\r\n", data.secondary, secondary.c_str(), data.channel);
             }
@@ -984,5 +992,45 @@ void systemBus::shutdown()
     Debug_printf("All devices shut down.\r\n");
 }
 
+
+
+void systemBus::debugTiming()
+{
+	int pin = PIN_IEC_ATN;
+	pull(pin);
+	protocol->wait(10);
+	release(pin);
+	protocol->wait(10);
+
+	pin = PIN_IEC_CLK_OUT;
+	pull(pin);
+	protocol->wait(20);
+	release(pin);
+	protocol->wait(20);
+
+	pin = PIN_IEC_DATA_OUT;
+	pull(pin);
+	protocol->wait(30);
+	release(pin);
+	protocol->wait(30);
+
+	pin = PIN_IEC_SRQ;
+	pull(pin);
+	protocol->wait(40);
+	release(pin);
+	protocol->wait(40);
+
+	// pin = PIN_IEC_ATN;
+	// pull(pin);
+	// protocol->wait(100); // 100
+	// release(pin);
+	// protocol->wait(1);
+
+	// pin = PIN_IEC_CLK_OUT;
+	// pull(pin);
+	// protocol->wait(200); // 200
+	// release(pin);
+	// protocol->wait(1);
+}
 
 #endif /* BUILD_IEC */
