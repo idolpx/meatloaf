@@ -718,6 +718,7 @@ std::shared_ptr<MStream> iecDrive::retrieveStream ( uint8_t channel )
     else
     {
         Debug_printv("Error! Trying to recall not-registered stream!");
+        registerStream( channel );
         return nullptr;
     }
 }
