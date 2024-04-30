@@ -120,9 +120,6 @@ void main_setup()
     // Load our stored configuration
     Config.load();
 
-    // Set up the WiFi adapter
-    fnWiFi.start();
-
     // Setup IEC Bus
     IEC.setup();
     Serial.println( ANSI_GREEN_BOLD "IEC Bus Initialized" ANSI_RESET );
@@ -174,6 +171,10 @@ void main_setup()
     unsigned long endms = fnSystem.millis();
     Debug_printf("Available heap: %u\r\nSetup complete @ %lu (%lums)\r\n", fnSystem.get_free_heap_size(), endms, endms - startms);
 #endif // DEBUG
+
+
+    // Set up the WiFi adapter
+    fnWiFi.start();
 
 #ifdef DEBUG_TIMING
     Debug_printv( ANSI_GREEN_BOLD "DEBUG_TIMING enabled" ANSI_RESET );
