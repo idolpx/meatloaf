@@ -640,8 +640,9 @@ void iecNetwork::parse_bite()
     //mstr::replaceAll(*receiveBuffer[channel], ";", "\";\"");
     //mstr::replaceAll(*receiveBuffer[channel], ":", "\":\"");
     //mstr::replaceAll(*receiveBuffer[channel], "\r", "\"\r\"");
-    mstr::replaceAll(*receiveBuffer[channel], "\"", "\"\"");
-    *receiveBuffer[channel] = mstr::toUTF8( *receiveBuffer[channel] );
+    //mstr::replaceAll(*receiveBuffer[channel], "\"", "\"\"");
+    mstr::replaceAll(*receiveBuffer[channel], "\"", "");
+    *receiveBuffer[channel] = mstr::toPETSCII2( *receiveBuffer[channel] );
 
     // break up receiveBuffer[channel] into bites less than bite_size bytes
     std::string bites = "\"";
