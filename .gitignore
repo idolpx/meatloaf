@@ -15,7 +15,6 @@ platformio.ini
 platformio-device-monitor-*.log
 
 # ESP-IDF SDK configuration file
-sdkconfig.*.old
 include/ssid.h
 /*.log
 **/.backup
@@ -31,5 +30,8 @@ lib/device/disk.h
 lib/device/iec/fuji.*
 lib/device/iec/disk.*
 examples/*
-sdkconfig.lolin-d32-pro
 data/BUILD_IEC/.sys/config.ini
+
+sdkconfig.*.old
+sdkconfig.lolin-d32-pro
+sdkconfig.iec-nugget
