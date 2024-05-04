@@ -20,6 +20,7 @@
 #define MEATLOAF_PUP_H
 
 #include <string>
+#include <cstdint>
 
 class PeoplesUrlParser
 {
@@ -37,6 +38,7 @@ protected:
 public:
     ~PeoplesUrlParser() {};
 
+    std::string mRawUrl;
     std::string url;
     std::string scheme;
     std::string user;
@@ -59,21 +61,21 @@ public:
     static PeoplesUrlParser* parseURL(const std::string &u);
     void resetURL(const std::string u);
     std::string rebuildUrl(void);
+    bool isValidUrl();
 
-
-    // void dump() {
-    //     printf("scheme: %s\r\n", scheme.c_str());
-    //     printf("user pass: %s -- %s\r\n", user.c_str(), password.c_str());
-    //     printf("host port: %s -- %s\r\n", host.c_str(), port.c_str());
-    //     printf("path: %s\r\n", path.c_str());
-    //     printf("name: %s\r\n", name.c_str());
-    //     printf("extension: %s\r\n", extension.c_str());
-    //     printf("query: %s\r\n", query.c_str());
-    //     printf("fragment: %s\r\n", fragment.c_str());
-    //     printf("root: %s\r\n", root().c_str());
-    //     printf("base: %s\r\n", base().c_str());
-    //     printf("pathToFile: %s\r\n", pathToFile().c_str());
-    // }
+    void dump() {
+        printf("scheme: %s\r\n", scheme.c_str());
+        printf("user pass: %s -- %s\r\n", user.c_str(), password.c_str());
+        printf("host port: %s -- %s\r\n", host.c_str(), port.c_str());
+        printf("path: %s\r\n", path.c_str());
+        printf("name: %s\r\n", name.c_str());
+        printf("extension: %s\r\n", extension.c_str());
+        printf("query: %s\r\n", query.c_str());
+        printf("fragment: %s\r\n", fragment.c_str());
+        printf("root: %s\r\n", root().c_str());
+        printf("base: %s\r\n", base().c_str());
+        printf("pathToFile: %s\r\n", pathToFile().c_str());
+    }
 
 };
 

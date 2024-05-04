@@ -43,14 +43,7 @@
 #include <queue>
 #include <memory>
 #include <driver/gpio.h>
-
-
-#if HOST_OS==win32
 #include "../../hardware/fnSystem.h"
-#else
-#include "fnSystem.h"
-#endif
-
 
 #include "protocol/_protocol.h"
 #include "protocol/jiffydos.h"

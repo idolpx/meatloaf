@@ -22,6 +22,7 @@
 #include <string>
 #include <vector>
 #include <sstream>
+#include <cstdint>
 
 #include "../../include/debug.h"
 
@@ -85,9 +86,11 @@ void PeoplesUrlParser::cleanPath() {
     if(path.size() == 0)
         return;
 
-    while(mstr::endsWith(path,"/")) {
-        path=mstr::dropLast(path, 1);
-    }
+    // apc: keep trailing '/'
+    // it's needed to list a directory on N:
+    // while(mstr::endsWith(path,"/")) {
+    //     path=mstr::dropLast(path, 1);
+    // }
     mstr::replaceAll(path, "//", "/");
 }
 
@@ -197,6 +200,7 @@ void PeoplesUrlParser::resetURL(const std::string u) {
     //Debug_printv("u[%s]", u.c_str());
 
     url = u;
+    mRawUrl = u;
 
     //Debug_printv("Before [%s]", url.c_str());
 
@@ -279,3 +283,8 @@ std::string PeoplesUrlParser::rebuildUrl(void)
 //     printf("pathToFile: %s\r\n", pathToFile().c_str());
 // }
 
+bool PeoplesUrlParser::isValidUrl()
+{
+    dump();
+    return !scheme.empty() && !(path.empty() && port.empty());
+}

@@ -6,25 +6,12 @@
 #include <string>
 #include <unordered_map>
 
-#if HOST_OS==win32
 #include "../../bus/bus.h"
-#else
-#include "bus.h"
-#endif
-
-
 #include "../../media/media.h"
-#if HOST_OS==win32
 #include "../meatloaf/meatloaf.h"
 #include "../meatloaf/meat_buffer.h"
 #include "../meatloaf/wrappers/iec_buffer.h"
 #include "../meatloaf/wrappers/directory_stream.h"
-#else
-#include "meatloaf.h"
-#include "meat_buffer.h"
-#include "wrappers/iec_buffer.h"
-#include "wrappers/directory_stream.h"
-#endif
 
 #include "../mfnjson/mfnjson.h"
 

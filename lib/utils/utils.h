@@ -3,11 +3,20 @@
 
 #include <string>
 #include <vector>
+#include <cstdint>
 
 
+#if defined(__clang__) && (__clang_major__ < 14)
+#define __BEGIN_IGNORE_UNUSEDVARS _Pragma("GCC diagnostic push")    \
+    _Pragma("GCC diagnostic ignored \"-Wunused-variable\"")
+#define __END_IGNORE_UNUSEDVARS _Pragma("GCC diagnostic pop")
+#else
 #define __BEGIN_IGNORE_UNUSEDVARS _Pragma("GCC diagnostic push")    \
     _Pragma("GCC diagnostic ignored \"-Wunused-but-set-variable\"") \
         _Pragma("GCC diagnostic ignored \"-Wunused-variable\"")
+#define __END_IGNORE_UNUSEDVARS _Pragma("GCC diagnostic pop")
+#endif
+
 #define __END_IGNORE_UNUSEDVARS _Pragma("GCC diagnostic pop")
 
 #define __BEGIN_IGNORE_TYPELIMITS _Pragma("GCC diagnostic push")    \
@@ -37,6 +46,7 @@ void util_string_ltrim(std::string &s);
 void util_string_rtrim(std::string &s);
 void util_string_trim(std::string &s);
 
+std::string util_tolower(const std::string& str);
 void util_string_tolower(std::string &s);
 void util_string_toupper(std::string &s);
 
@@ -97,5 +107,12 @@ bool isApproximatelyInteger(double value, double tolerance = 1e-6);
 
 // ensure string starts with a "/"
 std::string prependSlash(const std::string& str);
+
+#ifndef ESP_PLATFORM
+// helper function for Debug_print* macros on fujinet-pc
+void util_debug_printf(const char *fmt, ...);
+#endif // !ESP_PLATFORM
+
+char* util_strndup(const char* s, size_t n);
 
 #endif // _FN_UTILS_H

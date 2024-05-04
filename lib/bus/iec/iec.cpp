@@ -150,7 +150,6 @@ void systemBus::setup()
 #endif
 
     // Start task
-    //xTaskCreate(ml_iec_intr_task, "ml_iec_intr_task", 2048, NULL, 10, NULL);
     xTaskCreatePinnedToCore(ml_iec_intr_task, "ml_iec_intr_task", 4096, NULL, 20, NULL, 1);
 
     // Setup interrupt for ATN
@@ -185,7 +184,7 @@ void IRAM_ATTR systemBus::service()
 
         // Handle SRQ for devices
         for (auto devicep : _daisyChain)
-            {
+        {
             for (unsigned char i=0;i<16;i++)
                 devicep->poll_interrupt(i);
         }
@@ -275,21 +274,25 @@ void IRAM_ATTR systemBus::service()
             }
 
             // Queue control codes and command in specified device
-            device_state_t device_state = deviceById(data.device)->queue_command(data);
-
-            fnLedManager.set(eLed::LED_BUS, true);
-
-            //Debug_printv("bus[%d] device[%d]", bus_state, device_state);
-            device_state = deviceById(data.device)->process();
-            if ( device_state < DEVICE_ACTIVE )
+            auto d = deviceById(data.device);
+            if (d != nullptr)
             {
-                // for (auto devicep : _daisyChain)
-                // {
-                //     if ( devicep->device_state > DEVICE_IDLE )
-                //         devicep->process();
-                // }
-                data.init();
-                //Debug_printv("bus init");
+                device_state_t device_state = d->queue_command(data);
+
+                //fnLedManager.set(eLed::LED_BUS, true);
+
+                //Debug_printv("bus[%d] device[%d]", bus_state, device_state);
+                device_state = deviceById(data.device)->process();
+                if ( device_state < DEVICE_ACTIVE )
+                {
+                    // for (auto devicep : _daisyChain)
+                    // {
+                    //     if ( devicep->device_state > DEVICE_IDLE )
+                    //         devicep->process();
+                    // }
+                    data.init();
+                    //Debug_printv("bus init");
+                }
             }
 
             //Debug_printv("bus[%d] device[%d] flags[%d]", bus_state, device_state, flags);
@@ -315,6 +318,7 @@ void IRAM_ATTR systemBus::service()
 
     Debug_printv("exit");
     Debug_printv("bus[%d] flags[%d]", bus_state, flags);
+    Debug_printf("Heap: %lu\r\n",esp_get_free_internal_heap_size());
     //release( PIN_IEC_SRQ );
 
     //fnLedStrip.stopRainbow();

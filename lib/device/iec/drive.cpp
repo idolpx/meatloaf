@@ -661,7 +661,7 @@ bool iecDrive::registerStream ( uint8_t channel )
     {
         Debug_printv("SAVE \"%s\"", _base->url.c_str());
         // CREATE STREAM HERE FOR OUTPUT
-        new_stream = std::shared_ptr<MStream>(_base->getSourceStream());
+        new_stream = std::shared_ptr<MStream>(_base->getSourceStream(std::ios::out));
         new_stream->open();
     }
     else
@@ -702,7 +702,7 @@ bool iecDrive::registerStream ( uint8_t channel )
     auto newPair = std::make_pair ( channel, new_stream );
     streams.insert ( newPair );
 
-    Debug_printv("Stream created. key[%d]", channel);
+    Debug_printv("Stream created. key[%d] count[%d]", channel, streams.bucket_count());
     return true;
 }
 
@@ -712,13 +712,12 @@ std::shared_ptr<MStream> iecDrive::retrieveStream ( uint8_t channel )
 
     if ( streams.find ( channel ) != streams.end() )
     {
-        Debug_printv("Stream retrieved. key[%d]", channel);
+        Debug_printv("Stream retrieved. key[%d] count[%d]", channel, streams.bucket_count());
         return streams.at ( channel );
     }
     else
     {
         Debug_printv("Error! Trying to recall not-registered stream!");
-        registerStream( channel );
         return nullptr;
     }
 }
@@ -729,7 +728,7 @@ bool iecDrive::closeStream ( uint8_t channel, bool close_all )
 
     if ( found != streams.end() )
     {
-        //Debug_printv("Stream closed. key[%d]", key);
+        Debug_printv("Stream closed. key[%d] count[%d]", channel, streams.bucket_count());
         auto closingStream = (*found).second;
         closingStream->close();
         return streams.erase ( channel );
@@ -830,7 +829,7 @@ uint16_t iecDrive::sendHeader(std::string header, std::string id)
 
     std::string url = _base->host;
     url = mstr::toPETSCII2(url);
-    std::string path = _base->pathToFile();
+    std::string path = _base->path;
     path = mstr::toPETSCII2(path);
     std::string archive = _base->media_archive;
     archive = mstr::toPETSCII2(archive);
@@ -1258,12 +1257,10 @@ bool iecDrive::sendFile()
     bool success_tx = true;
 
     uint8_t b;  // byte
-    uint8_t nb; // next byte
-    size_t bi = 0;
-    size_t load_address = 0;
-    size_t sys_address = 0;
-
-	//iecStream.open(&IEC);
+//    uint8_t nb; // next byte
+    uint8_t bi = 0;
+    uint16_t load_address = 0;
+    uint16_t sys_address = 0;
 
 #ifdef DATA_STREAM
     char ba[9];
@@ -1283,20 +1280,30 @@ bool iecDrive::sendFile()
 
     if ( !_base->isDirectory() )
     {
-        if ( istream->has_subdirs )
-        {
-            PeoplesUrlParser *u = PeoplesUrlParser::parseURL( istream->url );
-            Debug_printv( "Subdir Change Directory Here! istream[%s] > base[%s]", istream->url.c_str(), u->base().c_str() );
-            _last_file = u->name;
-            _base.reset( MFSOwner::File( u->base() ) );
-        }
-        else
-        {
-            auto f = MFSOwner::File( istream->url );
-            Debug_printv( "Change Directory Here! istream[%s] > base[%s]", istream->url.c_str(), f->streamFile->url.c_str() );
-            _base.reset( f->streamFile );
-        }
+        _base->dump();
+        _last_file = _base->name;
+        _base.reset( MFSOwner::File( _base->base() ) );
+        _base->dump();
     }
+
+    // // if ( !_base->isDirectory() )
+    // // {
+    //     if ( istream->has_subdirs )
+    //     {
+    //         PeoplesUrlParser *u = PeoplesUrlParser::parseURL( istream->url );
+    //         Debug_printv( "Subdir Change Directory Here! istream[%s] > base[%s]", istream->url.c_str(), u->base().c_str() );
+    //         _last_file = u->name;
+    //         _base.reset( MFSOwner::File( u->base() ) );
+    //     }
+    //     else
+    //     {
+    //         auto f = MFSOwner::File( istream->url );
+    //         Debug_printv( "Change Directory Here! istream[%s] > base[%s]", istream->url.c_str(), f->streamFile->url.c_str() );
+    //         _base.reset( f->streamFile );
+    //     }
+    // //}
+
+    // _base->dump();
 
     bool eoi = false;
     uint32_t size = istream->size();
@@ -1321,9 +1328,6 @@ bool iecDrive::sendFile()
         // Get SYSLINE
     }
 
-    // Read byte
-    success_rx = istream->read(&b, 1);
-    //Debug_printv("b[%02X] success[%d]", b, success_rx);
 
     Debug_printf("sendFile: [$%.4X]\r\n=================================\r\n", load_address);
     while( success_rx && !istream->error() )
@@ -1331,7 +1335,7 @@ bool iecDrive::sendFile()
         count = istream->position();
         avail = istream->available();
 
-        //Debug_printv("b[%02X] nb[%02X] success_rx[%d] error[%d]", b, nb, success_rx, istream->error());
+        //Debug_printv("b[%02X] nb[%02X] success_rx[%d] error[%d] count[%d] avail[%d]", b, nb, success_rx, istream->error(), count, avail);
 #ifdef DATA_STREAM
         if (bi == 0)
         {
@@ -1340,27 +1344,48 @@ bool iecDrive::sendFile()
         }
 #endif
 
-        // Send Byte
-        //IEC.pull(PIN_IEC_SRQ);
-        success_tx = IEC.sendByte(b, eoi);
-        if ( !success_tx )
+        // Read byte
+        success_rx = istream->read(&b, 1);
+        //Debug_printv("b[%02X] success[%d]", b, success_rx);
+
+        if ( istream->error() )
         {
-            Debug_printv("tx fail");
-            //IEC.release(PIN_IEC_SRQ);
-            return false;
+            Debug_printv("Error reading stream.");
+            break;
         }
-        //IEC.release(PIN_IEC_SRQ);
-
-        // Read next byte
-        success_rx = istream->read(&nb, 1);
-
-        // Is this the last byte in the stream?
-        if ( istream->eos() )
+        else if ( istream->eos() )
+        {
             eoi = true;
+        }
 
-        b = nb; // byte = next byte
+        // Send Byte
+        IEC.pull(PIN_IEC_SRQ);
+        success_tx = IEC.sendByte(b, eoi);
+        // if ( !success_tx )
+        // {
+        //     Debug_printv("tx fail");
+        //     //IEC.release(PIN_IEC_SRQ);
+        //     return false;
+        // }
+        IEC.release(PIN_IEC_SRQ);
 
-        uint32_t t = (count * 100) / size;
+        // Exit if ATN is PULLED while sending
+        //if ( IEC.status ( PIN_IEC_ATN ) == PULLED )
+        if ( IEC.flags & ATN_PULLED )
+        {
+            Debug_printv("ATN pulled while sending. b[%.2X]", b);
+
+            // Save file pointer position
+            //istream->seek(istream->position() - 1);
+            istream->position( istream->position() - 4 );
+            //success_rx = true;
+            break;
+        }
+
+        uint32_t t = 0;
+        if ( size )
+            t = (count * 100) / size;
+
 #ifdef DATA_STREAM
         // Show ASCII Data
         if (b < 32 || b >= 127)
@@ -1377,33 +1402,26 @@ bool iecDrive::sendFile()
         Debug_printf("\rTransferring %d%% [%d, %d]      ", t, count, avail);
 #endif
 
-        // Exit if ATN is PULLED while sending
-        //if ( IEC.status ( PIN_IEC_ATN ) == PULLED )
-        if ( IEC.flags & ATN_PULLED || istream->error() )
-        {
-            //Debug_printv("ATN pulled while sending. i[%d]", i);
-
-            // Save file pointer position
-            istream->seek(istream->position() - 2);
-            //success_rx = true;
-            break;
-        }
-
         // // Toggle LED
         // if (i % 50 == 0)
         // {
         // 	fnLedManager.toggle(eLed::LED_BUS);
         // }
+
+        if ( eoi )
+        {
+            break;
+        }
     }
 
-#ifdef DATA_STREAM
-    if ( size )
-    {
-        uint32_t t = (count * 100) / size;
-        ba[bi++] = 0;
-        Debug_printf(" %s (%d %d%%) [%d]\r\n", ba, count, t, avail);
-    }
-#endif
+// #ifdef DATA_STREAM
+//     if ( size )
+//     {
+//         uint32_t t = (count * 100) / size;
+//         ba[bi++] = 0;
+//         Debug_printf(" %s (%d %d%%) [%d]\r\n", ba, count, t, avail);
+//     }
+// #endif
 
     Debug_printf("\r\n=================================\r\n%d bytes sent of %d [SYS%d]\r\n", count, avail, sys_address);
 

@@ -355,18 +355,18 @@ httpd_handle_t cHttpdServer::start_server(serverstate &state)
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.task_priority = 12; // Bump this higher than fnService loop
+    config.core_id = 0; // Pin to CPU core 0
     config.stack_size = 8192;
     config.max_uri_handlers = 16;
     config.max_resp_headers = 16;
     config.keep_alive_enable = true;
+    config.uri_match_fn = httpd_uri_match_wildcard;
 
-    // config.core_id = 0; // Pin to CPU core 0
     //  Keep a reference to our object
     config.global_user_ctx = (void *)&state;
 
     // Set our own global_user_ctx free function, otherwise the library will free an object we don't want freed
     config.global_user_ctx_free_fn = (httpd_free_ctx_fn_t)custom_global_ctx_free;
-    config.uri_match_fn = httpd_uri_match_wildcard;
 
     Debug_printf("Starting web server on port %d\r\n", config.server_port);
     // Debug_printf("Starting web server on port %d, CPU Core %d\r\n", config.server_port, config.core_id);

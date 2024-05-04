@@ -14,33 +14,29 @@
 #undef DEBUG
 #endif
 
-#ifndef TEST_NATIVE
-#include "../lib/hardware/fnUART.h"
-#define Serial fnUartDebug
-#endif
-
 /*
   Debugging Macros
 */
 #ifdef DEBUG
-#ifdef TEST_NATIVE
-    #define Debug_print(...) printf( __VA_ARGS__ )
-    #define Debug_printf(...) printf( __VA_ARGS__ )
-    #define Debug_println(...) printf( __VA_ARGS__ )
-    #define Debug_printv(format, ...) {printf( ANSI_YELLOW "[%s:%u] %s(): " ANSI_GREEN_BOLD format ANSI_RESET "\r\n", __FILE__, __LINE__, __FUNCTION__, ##__VA_ARGS__);}
-#else
+#ifdef ESP_PLATFORM
+    // Use FujiNet debug serial output
+    #include "../lib/hardware/fnUART.h"
+    #define Serial fnUartDebug
+
     #define Debug_print(...) fnUartDebug.print( __VA_ARGS__ )
     #define Debug_printf(...) fnUartDebug.printf( __VA_ARGS__ )
     #define Debug_println(...) fnUartDebug.println( __VA_ARGS__ )
     #define Debug_printv(format, ...) {fnUartDebug.printf( ANSI_YELLOW "[%s:%u] %s(): " ANSI_GREEN_BOLD format ANSI_RESET "\r\n", __FILE__, __LINE__, __FUNCTION__, ##__VA_ARGS__);}
-#endif
+
     #define HEAP_CHECK(x) Debug_printf("HEAP CHECK %s " x "\r\n", heap_caps_check_integrity_all(true) ? "PASSED":"FAILED")
 #else
     #define Debug_print(...)
     #define Debug_printf(...)
     #define Debug_println(...)
     #define Debug_printv(format, ...)
+
     #define HEAP_CHECK(x)
+#endif
 #endif
 
 #endif // _DEBUG_H_

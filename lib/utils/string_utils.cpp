@@ -12,6 +12,10 @@
 #include "U8Char.h"
 
 
+#if defined(_WIN32)
+#include "asprintf.h" // use asprintf from libsmb2
+#endif
+
 // Copy string to char buffer
 void copyString(const std::string& input, char *dst, size_t dst_size)
 {
@@ -182,16 +186,16 @@ namespace mstr {
         unsigned int index;
 
         for (index = 0; index < s1.size(); index++) {
-            switch (s1[index]) {
+            switch ((unsigned char)s1[index]) {
                 case '*':
                     return true; /* rest is not interesting, it's a match */
                 case '?':
-                    if (s2[index] == 0xa0) {
+                    if ((unsigned char)s2[index] == 0xa0) {
                         return false; /* wildcard, but the other is too short */
                     }
                     break;
                 case 0xa0: /* This one ends, let's see if the other as well */
-                    return (s2[index] == 0xa0);
+                    return ((unsigned char)s2[index] == 0xa0);
                 default:
                     if (s1[index] != s2[index]) {
                         return false; /* does not match */
@@ -273,11 +277,23 @@ namespace mstr {
         return toHex(input.c_str(), input.size());
     }
 
+    // convert hex char to it's integer value
+    char fromHex(char ch)
+    {
+        return isdigit(ch) ? ch - '0' : tolower(ch) - 'a' + 10;
+    }
+
+    bool isHex(std::string &s)
+    {
+        return std::all_of(s.begin(), s.end(), 
+                        [](unsigned char c) { return ::isxdigit(c); });
+    }
+
     // convert to A0 space to 20 space (in place)
     void A02Space(std::string &s)
     {
         std::transform(s.begin(), s.end(), s.begin(),
-                    [](unsigned char c) { return (c == '\xA0') ? '\x20': c; });
+                    [](unsigned char c) { return (c == 0xa0) ? 0x20: c; });
     }
 
     bool isText(std::string &s) 
@@ -444,6 +460,42 @@ namespace mstr {
         }
 
         return ret;
+    }
+
+    void urlDecode(char *s, size_t size)
+    {
+        char ch;
+        int i = 0, ii = 0;
+        char ret[size];
+
+        memset(ret,0,size);
+      
+        while ( s[i] != '\0')
+        {
+            if (i + 2 <= size)              // Is i+2 less than encoded string buffer size?
+            {
+                if (
+                    (s[i] == '%') &&        // Is this a '%' char?
+                    isxdigit(s[i + 1]) &&   // Are the next two chars valid hex?
+                    isxdigit(s[i + 2])
+                )
+                {
+                    ch = fromHex(s[i + 1]) << 4 | fromHex(s[i + 2]); // Decode byte
+                    s[ii] = ch;
+                    i += 2;
+                }
+                else
+                {
+                    s[ii] = s[i];
+                }
+                ii++;
+            }
+            //Debug_printv("ii[%d] ch[%2X] s[%s] size[%d]", ii, s[ii], s, size);
+
+            i++;
+        }
+        s[ii] = '\0';
+        //Debug_printv("ii[%d] s[%s]", ii, s);
     }
 
     std::string format(const char *format, ...)

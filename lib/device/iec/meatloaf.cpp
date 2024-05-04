@@ -362,7 +362,8 @@ void iecMeatloaf::net_scan_networks()
 
     if (payload[0] == FUJICMD_SCAN_NETWORKS)
     {
-        response[0] = _countScannedSSIDs;
+        response = "";
+        response += static_cast<char>(_countScannedSSIDs);
     }
     else
     {
@@ -498,7 +499,7 @@ void iecMeatloaf::net_set_ssid( bool store )
 
     Debug_printf("Connecting to [%s]\r\n", cfg.ssid);
     fnWiFi.connect(cfg.ssid, cfg.password);
-    
+
     // Only save these if we're asked to, otherwise assume it was a test for connectivity
     if ( store && fnWiFi.connected() )
         net_store_ssid();

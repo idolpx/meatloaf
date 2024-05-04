@@ -6,12 +6,26 @@
 #include <sstream>
 #include <stack>
 #include <cmath>
+#include "compat_string.h"
+
+#ifndef ESP_PLATFORM
+#include <cstdarg>
+#include "compat_gettimeofday.h"
+#endif
 
 #include "../../include/debug.h"
 
 #include "samlib.h"
 
 using namespace std;
+
+// non destructive version of lowercase conversion
+std::string util_tolower(const std::string& str) {
+    std::string lower_str = str;
+    std::transform(lower_str.begin(), lower_str.end(), lower_str.begin(),
+                   [](unsigned char c){ return std::tolower(c); });
+    return lower_str;
+}
 
 // convert to lowercase (in place)
 void util_string_tolower(std::string &s)
@@ -250,7 +264,15 @@ std::string util_entry(std::string crunched, size_t fileSize, bool is_dir, bool 
 
 std::string util_long_entry(std::string filename, size_t fileSize, bool is_dir)
 {
+#ifdef BUILD_COCO
+#define LONG_ENTRY_TRIM_LEN 25
+#define LONG_ENTRY_EOL "\x0D"
+    std::string returned_entry = "                               ";
+#else
+#define LONG_ENTRY_TRIM_LEN 30
+#define LONG_ENTRY_EOL "\x9B"
     std::string returned_entry = "                                     ";
+#endif /* BUILD_COCO */
     std::string stylized_filesize;
 
     char tmp[8];
@@ -260,17 +282,17 @@ std::string util_long_entry(std::string filename, size_t fileSize, bool is_dir)
 
     // Double size of returned entry if > 30 chars.
     // Add EOL so SpartaDOS doesn't truncate record. grrr.
-    if (filename.length() > 30)
-        returned_entry += "\x9b" + returned_entry;
+    if (filename.length() > LONG_ENTRY_TRIM_LEN)
+        returned_entry += LONG_ENTRY_EOL + returned_entry;
 
     returned_entry.replace(0, filename.length(), filename);
 
     if (fileSize > 1048576)
-        sprintf(tmp, "%2dM", (fileSize >> 20));
+        sprintf(tmp, "%2uM", (unsigned int)(fileSize >> 20));
     else if (fileSize > 1024)
-        sprintf(tmp, "%4dK", (fileSize >> 10));
+        sprintf(tmp, "%4uK", (unsigned int)(fileSize >> 10));
     else
-        sprintf(tmp, "%4d", fileSize);
+        sprintf(tmp, "%4u", (unsigned int)fileSize);
 
     stylized_filesize = tmp;
 
@@ -302,7 +324,11 @@ char apple2_fs[6];
 const char *apple2_filesize(size_t fileSize)
 {
     unsigned short fs = fileSize / 512;
-    itoa(fs, apple2_fs, 10);
+#ifdef ESP_PLATFORM
+     itoa(fs, apple2_fs, 10);
+#else
+    sprintf(apple2_fs, "%u", fs);
+#endif
     return apple2_fs;
 }
 
@@ -508,9 +534,9 @@ void util_dump_bytes(const uint8_t *buff, uint32_t buff_size)
     {
         for (int k = 0; (k + j) < buff_size && k < bytes_per_line; k++)
             Debug_printf("%02X ", buff[k + j]);
-        Debug_println();
+        Debug_println("");
     }
-    Debug_println();
+    Debug_println("");
 }
 
 vector<string> util_tokenize(string s, char c)
@@ -637,10 +663,17 @@ void util_sam_say(const char *p,
     char pitchs[4], speeds[4], mouths[4], throats[4]; // itoa temp vars
 
     // Convert to strings.
+#ifdef ESP_PLATFORM
     itoa(pitch, pitchs, 10);
     itoa(speed, speeds, 10);
     itoa(mouth, mouths, 10);
     itoa(throat, throats, 10);
+#else
+    sprintf(pitchs, "%u", pitch);
+    sprintf(speeds, "%u", speed);
+    sprintf(mouths, "%u", mouth);
+    sprintf(throats, "%u", throat);
+#endif
 
     memset(a, 0, sizeof(a));
     a[n++] = (char *)("sam"); // argv[0] for compatibility
@@ -665,7 +698,9 @@ void util_sam_say(const char *p,
 
     // Append the phrase to say.
     a[n++] = (char *)p;
+#ifdef ESP_PLATFORM
     sam(n, a);
+#endif
 }
 
 /**
@@ -825,8 +860,8 @@ std::string util_get_canonical_path(std::string prefix)
         st1.pop();
     }
 
-    // kludge
-    if (res[res.length() - 1] != '/')
+    // Append trailing slash if not already there
+    if ((res.length() > 0) && (res[res.length() - 1] != '/'))
         res.append("/");
 
     return res;
@@ -902,4 +937,79 @@ std::string prependSlash(const std::string& str) {
         return "/" + str;
     }
     return str;
+}
+
+#ifndef ESP_PLATFORM
+// helper function for Debug_print* macros on fujinet-pc
+void util_debug_printf(const char *fmt, ...)
+{
+    static bool print_ts = true;
+    va_list argp;
+
+    if (!print_ts)
+    {
+        if (fmt != nullptr)
+        {
+            print_ts = fmt[strlen(fmt)-1] == '\n';
+        }
+        else
+        {
+            va_start(argp, fmt);
+            const char *s = va_arg(argp, const char*);
+            print_ts = s[strlen(s)-1] == '\n';
+            va_end(argp);
+        }
+        if (print_ts)
+            printf("\n");
+    }
+
+    if (print_ts) 
+    {
+        // printf("DEBUG > ");
+        timeval tv;
+        tm tm;
+        char buffer[32];
+
+        compat_gettimeofday(&tv, NULL);
+#if defined(_WIN32)
+        time_t t = (time_t)tv.tv_sec;
+        localtime_s(&tm, &t);
+#else
+        localtime_r(&tv.tv_sec, &tm);
+#endif
+        size_t endpos = strftime(buffer, sizeof(buffer), "%H:%M:%S", &tm);
+        snprintf(buffer + endpos, sizeof(buffer) - endpos, ".%06d", (int)(tv.tv_usec));
+        printf("%s > ", buffer);
+    }
+
+    va_start(argp, fmt);
+    if (fmt != nullptr)
+    {
+        print_ts = fmt[strlen(fmt)-1] == '\n';
+        vprintf(fmt, argp);
+    }
+    else
+    {
+        const char *s = va_arg(argp, const char*);
+        print_ts = s[strlen(s)-1] == '\n';
+        printf("%s", s);
+    }
+    va_end(argp);
+    fflush(stdout);
+}
+#endif // !ESP_PLATFORM
+
+char* util_strndup(const char* s, size_t n) {
+    // Find the length of the string up to n characters
+    size_t len = strnlen(s, n);
+    // Allocate memory for the new string
+    char* new_str = (char*)malloc(len + 1);
+    if (new_str == NULL) {
+        // Allocation failed
+        return NULL;
+    }
+    // Copy the string into the new memory and null-terminate it
+    memcpy(new_str, s, len);
+    new_str[len] = '\0';
+    return new_str;
 }
