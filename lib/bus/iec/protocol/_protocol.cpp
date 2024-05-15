@@ -15,12 +15,13 @@ int16_t IECProtocol::timeoutWait(uint8_t pin, bool target_status, size_t wait_us
     uint64_t current = 0;
     uint64_t elapsed = 0;
 
-    // Quick check to see if the target status is already set
-    if ( IEC.status ( pin ) == target_status )
-        return elapsed;
+    // // Quick check to see if the target status is already set
+    // if ( IEC.status ( pin ) == target_status )
+    //     return elapsed;
 
     //esp_timer_init();
-    start = current = esp_timer_get_time();
+    //start = current = esp_timer_get_time();
+    start = esp_timer_get_time();
 
     // Sample ATN and set flag to indicate COMMAND or DATA mode
     bool atn_status = IEC.status ( PIN_IEC_ATN );
@@ -31,6 +32,9 @@ int16_t IECProtocol::timeoutWait(uint8_t pin, bool target_status, size_t wait_us
     }
 
     //IEC.pull ( PIN_IEC_SRQ );
+#ifndef IEC_SPLIT_LINES
+    IEC.release ( pin );
+#endif
     while ( IEC.status ( pin ) != target_status )
     {
         current = esp_timer_get_time();
@@ -82,14 +86,15 @@ bool IECProtocol::wait(size_t wait_us, uint64_t start, bool watch_atn)
     current = 0;
     elapsed = 0;
 
-    if ( wait_us == 0 ) return true;
-    wait_us--; // Shave 1us for overhead
+    // if ( wait_us == 0 ) return true;
+    // wait_us--; // Shave 1us for overhead
 
     //esp_timer_init();
     if ( start == 0 )
-        start = current = esp_timer_get_time();
-    else
-        current = esp_timer_get_time();
+        //start = current = esp_timer_get_time();
+        start = esp_timer_get_time();
+    // else
+    //     current = esp_timer_get_time();
 
     // Sample ATN and set flag to indicate SELECT or DATA mode
     bool atn_status = IEC.status ( PIN_IEC_ATN );

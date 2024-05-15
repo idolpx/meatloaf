@@ -170,21 +170,12 @@ int8_t CPBStandardSerial::receiveBits ()
     uint8_t data = 0;
     int16_t bit_time = 0;  // Used to detect JiffyDOS
 
-    uint8_t n = 0;
-
-    //uint8_t tv = TIMING_Ts + TIMING_Tv64; // C64 data valid timing
-
-    // // We can receive faster if in VIC20 Mode
-    // if ( IEC.flags & VIC20_MODE )
-    // {
-    //     tv = TIMING_Ts + TIMING_Tv; // VIC-20 data valid timing
-    // }
-
     //IEC.pull ( PIN_IEC_SRQ );
 #ifndef IEC_SPLIT_LINES
     IEC.release(PIN_IEC_DATA_IN); // Set DATA IN back to input
 #endif
 
+    uint8_t n = 0;
     for ( n = 0; n < 8; n++ )
     {
         // Time the release of the clock line to detect JiffyDOS
@@ -288,7 +279,7 @@ bool CPBStandardSerial::sendByte(uint8_t data, bool eoi)
     // line  to  false.    Suppose  there  is  more  than one listener.  The Data line will go false
     // only when all listeners have RELEASED it - in other words, when  all  listeners  are  ready
     // to  accept  data.
-    //IEC.pull ( PIN_IEC_SRQ );
+    IEC.pull ( PIN_IEC_SRQ );
     if ( timeoutWait ( PIN_IEC_DATA_IN, RELEASED, FOREVER ) == TIMED_OUT )
     {
         if ( !(IEC.flags & ATN_PULLED) )
@@ -296,7 +287,7 @@ bool CPBStandardSerial::sendByte(uint8_t data, bool eoi)
 
         return false; // return error because of ATN or timeout
     }
-    //IEC.release ( PIN_IEC_SRQ );
+    IEC.release ( PIN_IEC_SRQ );
 
     // What  happens  next  is  variable. Either  the  talker  will pull the
     // Clock line back to true in less than 200 microseconds - usually within 60 microseconds - or it
@@ -350,13 +341,13 @@ bool CPBStandardSerial::sendByte(uint8_t data, bool eoi)
     // one  millisecond  -  one  thousand  microseconds  -  it  will  know  that something's wrong and may alarm appropriately.
 
     // Wait for listener to accept data
-    //IEC.pull ( PIN_IEC_SRQ );
+    IEC.pull ( PIN_IEC_SRQ );
     if ( timeoutWait ( PIN_IEC_DATA_IN, PULLED, TIMEOUT_Tf ) >= TIMEOUT_Tf )
     {
         Debug_printv ( "Wait for listener to acknowledge byte received (pull data) [%02x]", data );
         return false; // return error because timeout
     }
-
+    IEC.release ( PIN_IEC_SRQ );
 
     // STEP 5: START OVER
     // We're  finished,  and  back  where  we  started.    The  talker  is  holding  the  Clock  line  true,
@@ -367,7 +358,7 @@ bool CPBStandardSerial::sendByte(uint8_t data, bool eoi)
     // if ( eoi )
     //     IEC.release ( PIN_IEC_CLK_OUT );
 
-    // timeoutWait( PIN_IEC_DATA_IN, RELEASED, TIMING_Tbb);
+    //timeoutWait( PIN_IEC_DATA_IN, RELEASED, TIMING_Tbb);
 
     //IEC.release ( PIN_IEC_SRQ );
 
@@ -396,42 +387,36 @@ bool CPBStandardSerial::sendBits ( uint8_t data )
 {
     uint8_t tv = TIMING_Tv64; // C64 data valid timing
 
-    // // We can send faster if in VIC20 Mode
-    // if ( IEC.flags & VIC20_MODE )
-    // {
-    //     tv = TIMING_Tv; // VIC-20 data valid timing
-    // }
-
-//    IEC.release(PIN_IEC_DATA_OUT);
-    // Wait for DATA to be RELEASED
-    // if ( timeoutWait ( PIN_IEC_DATA_IN, RELEASED ) )
-    // {
-    //     Debug_printv ( "Wait for listener to release DATA [%d]", data );
-    //     return false; // return error because timeout
-    // }
+    // We can send faster if in VIC20 Mode
+    if ( IEC.vic20_mode )
+    {
+        tv = TIMING_Tv; // VIC-20 data valid timing
+    }
 
     // Send bits
     for ( uint8_t n = 0; n < 8; n++ )
     {
-        //if ( !wait ( TIMING_Ts0 ) ) return false; // 57us 
-        wait ( TIMING_Ts0, false );
+        // delay before setting data bit
+        // these 2 lines are here to match the trace from a 1541
+        wait ( TIMING_Tsb, false );
+        IEC.release ( PIN_IEC_DATA_OUT );
 
         // set bit
+        wait ( TIMING_Ts0, false );
         ( data & 1 ) ? IEC.release ( PIN_IEC_DATA_OUT ) : IEC.pull ( PIN_IEC_DATA_OUT );
         data >>= 1; // shift to next bit
-        //if ( !wait ( TIMING_Ts1 ) ) return false; // 28us
         wait ( TIMING_Ts1, false );
 
         // tell listener bit is ready to read
         IEC.release ( PIN_IEC_CLK_OUT );
-        //if ( !wait ( tv ) ) return false; // 76us 
         wait ( tv, false );
 
-        // tell listener to wait
+        // tell listener to wait for next bit
         IEC.pull ( PIN_IEC_CLK_OUT );
     }
 
     // Release data line after byte sent
+    wait ( TIMING_Tsb, false );
     IEC.release ( PIN_IEC_DATA_OUT );
 
     return true;

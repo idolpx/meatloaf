@@ -242,7 +242,9 @@ public:
 
     bool open() override {
         PeoplesUrlParser *p = PeoplesUrlParser::parseURL( url );
-        return socket.open(p->host.c_str(), p->getPort());
+        std::string host = p->host;
+        uint16_t port = p->getPort();
+        return socket.open(host.c_str(), port);
     }
 
     // MStream methods

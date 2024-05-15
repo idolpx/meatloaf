@@ -130,8 +130,8 @@ device_state_t iecDrive::process()
         break;
     }
 
-//    Debug_printv("url[%s] file[%s] device_state[%d]", _base->url.c_str(), _last_file.c_str(), device_state);
-    return device_state;
+//    Debug_printv("url[%s] file[%s] state[%d]", _base->url.c_str(), _last_file.c_str(), state);
+    return state;
 }
 
 void iecDrive::process_load()
@@ -250,6 +250,7 @@ void iecDrive::iec_open()
             if ( !registerStream(commanddata.channel) )
             {
                 Debug_printv("File Doesn't Exist [%s]", payload.c_str());
+                IEC.senderTimeout();
             }
         }
     }
@@ -266,7 +267,7 @@ void iecDrive::iec_close()
 
     closeStream( commanddata.channel );
     commanddata.init();
-    device_state = DEVICE_IDLE;
+    state = DEVICE_IDLE;
 //    Debug_printv("device init");
 }
 
@@ -375,7 +376,10 @@ void iecDrive::iec_command()
                     Debug_printv("payload[%s] channel[%d] position[%d]", payload.c_str(), pti[0], pti[1]);
 
                     auto stream = retrieveStream( pti[0] );
-                    stream->position( pti[1] );
+                    if ( stream )
+                    {
+                        stream->position( pti[1] );
+                    }
                 }
                 // B-A allocate bit in BAM not implemented
                 // B-F free bit in BAM not implemented
@@ -457,8 +461,11 @@ void iecDrive::iec_command()
                 Debug_printv("payload[%s] channel[%d] media[%d] track[%d] sector[%d]", payload.c_str(), pti[0], pti[1], pti[2], pti[3]);
 
                 auto stream = retrieveStream( pti[0] );
-                stream->seekSector( pti[2], pti[3] );
-                stream->reset();
+                if ( stream )
+                {
+                    stream->seekSector( pti[2], pti[3] );
+                    stream->reset();
+                }
             }
         break;
         case 'V':
@@ -766,11 +773,11 @@ void iecDrive::flushLastByte( uint8_t channel )
 // send single basic line, including heading basic pointer and terminating zero.
 uint16_t iecDrive::sendLine(uint16_t blocks, const char *format, ...)
 {
-    // Debug_printv("bus[%d]", IEC.bus_state);
+    // Debug_printv("bus[%d]", IEC.state);
 
     // Exit if ATN is PULLED while sending
     // Exit if there is an error while sending
-    if ( IEC.bus_state == BUS_ERROR )
+    if ( IEC.state == BUS_ERROR )
     {
         // Save file pointer position
         //streamUpdate(basicPtr);
@@ -1039,7 +1046,7 @@ void iecDrive::sendListing()
         {
             // Exit if ATN is PULLED while sending
             // Exit if there is an error while sending
-            if ( IEC.bus_state == BUS_ERROR )
+            if ( IEC.state == BUS_ERROR )
             {
                 // Save file pointer position
                 // streamUpdate(byte_count);

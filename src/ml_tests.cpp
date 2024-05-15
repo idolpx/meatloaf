@@ -506,7 +506,7 @@ void testReader(MFile* srcFile) {
 
         while(!istream.eof()) {
             istream >> line;
-            Serial.printf("%s", line.c_str());
+            Debug_printf("%s", line.c_str());
         }
 
         istream.close();

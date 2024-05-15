@@ -115,7 +115,7 @@ device_state_t iecMeatloaf::process()
     if (commanddata.channel != CHANNEL_COMMAND)
     {
         Debug_printf("Meatloaf device only accepts on channel 15. Sending NOTFOUND.\r\n");
-        device_state = DEVICE_ERROR;
+        state = DEVICE_ERROR;
         IEC.senderTimeout();
     }
 
@@ -155,7 +155,7 @@ device_state_t iecMeatloaf::process()
             process_basic_commands();
     }
 
-    return device_state;
+    return state;
 }
 
 // COMMODORE SPECIFIC CONVENIENCE COMMANDS /////////////////////

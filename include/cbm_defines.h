@@ -159,12 +159,13 @@ typedef enum
 #define TIMING_Tne     40      // NON-EOI RESPONSE TO RFD                       -       40us        200us       (If maximum time exceeded, EOI response required.)
 #define TIMEOUT_Tne    250
 #define TIMING_Ts      70      // BIT SET-UP TALKER                     71us    20us    70us        -           
-#define TIMING_Ts0     57      // BIT SET-UP LISTENER PRE       57us    47us
-#define TIMING_Ts1     28      // BIT SET-UP LISTENER POST      28us    24us
+#define TIMING_Tsb     22      // BETWEEN BIT RELEASE
+#define TIMING_Ts0     65      // BIT SET-UP LISTENER PRE       57us    47us
+#define TIMING_Ts1     33      // BIT SET-UP LISTENER POST      28us    24us
 #define TIMING_Tv      20      // DATA VALID VIC20              76us    26us    20us    20us        -           (Tv and Tpr minimum must be 60μ s for external device to be a talker. )
 #define TIMING_Tv64    76      // DATA VALID C64
 #define TIMING_Tf      45      // FRAME HANDSHAKE                               0       20us        1000us      (If maximum time exceeded, frame error.)
-#define TIMEOUT_Tf     1000
+#define TIMEOUT_Tf     1200
 #define TIMING_Tr      20      // FRAME TO RELEASE OF ATN                       20us    -           -
 #define TIMING_Tbb     100     // BETWEEN BYTES TIME                            100us   -           -
 #define TIMING_Tye     250     // EOI RESPONSE TIME                             200us   250us       -

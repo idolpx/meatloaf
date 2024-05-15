@@ -22,6 +22,8 @@ void test_EdUrlParser_parse_all_url_formats(void)
     TEST_ASSERT_TRUE(url->path == "/filepath/file.ext");
     TEST_ASSERT_TRUE(url->query == "query");
     TEST_ASSERT_TRUE(url->fragment == "fragment");
+
+    delete(url);
 }
 
 

@@ -175,7 +175,7 @@ device_state_t iecVoice::process()
         break;
     }
 
-    return device_state;
+    return state;
 }
 
 #endif /* BUILD_IEC */

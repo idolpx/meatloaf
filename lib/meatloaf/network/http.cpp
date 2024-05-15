@@ -522,6 +522,7 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
                         // Absolute path redirect
                         PeoplesUrlParser *u = PeoplesUrlParser::parseURL( meatClient->url );
                         meatClient->url = u->root() + evt->header_value;
+                        delete(u);
                     }
                     else
                     {

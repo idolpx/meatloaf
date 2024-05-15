@@ -12,6 +12,10 @@
 
 #ifdef UNIT_TESTS
 #undef DEBUG
+#else
+    // Use FujiNet debug serial output
+    #include "../lib/hardware/fnUART.h"
+    #define Serial fnUartDebug
 #endif
 
 /*
@@ -19,16 +23,13 @@
 */
 #ifdef DEBUG
 #ifdef ESP_PLATFORM
-    // Use FujiNet debug serial output
-    #include "../lib/hardware/fnUART.h"
-    #define Serial fnUartDebug
-
     #define Debug_print(...) fnUartDebug.print( __VA_ARGS__ )
     #define Debug_printf(...) fnUartDebug.printf( __VA_ARGS__ )
     #define Debug_println(...) fnUartDebug.println( __VA_ARGS__ )
     #define Debug_printv(format, ...) {fnUartDebug.printf( ANSI_YELLOW "[%s:%u] %s(): " ANSI_GREEN_BOLD format ANSI_RESET "\r\n", __FILE__, __LINE__, __FUNCTION__, ##__VA_ARGS__);}
 
     #define HEAP_CHECK(x) Debug_printf("HEAP CHECK %s " x "\r\n", heap_caps_check_integrity_all(true) ? "PASSED":"FAILED")
+#endif
 #else
     #define Debug_print(...)
     #define Debug_printf(...)
@@ -37,6 +38,4 @@
 
     #define HEAP_CHECK(x)
 #endif
-#endif
-
 #endif // _DEBUG_H_

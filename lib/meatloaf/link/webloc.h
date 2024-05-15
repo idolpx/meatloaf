@@ -30,7 +30,7 @@ class MLFileSystem: public MFileSystem
         //Debug_printv("ml_url[%s]", ml_url.c_str());
         
         //Debug_printv("url[%s]", ml_url.c_str());
-
+        delete(urlParser);
         return new HttpFile(ml_url);
     }
 

@@ -242,7 +242,7 @@ void iecNetwork::iec_close()
     specialBuffer[commanddata.channel]->shrink_to_fit();
 
     commanddata.init();
-    device_state = DEVICE_IDLE;
+    state = DEVICE_IDLE;
     Debug_printv("device init");
 }
 
@@ -1294,7 +1294,7 @@ device_state_t iecNetwork::process()
         break;
     }
 
-    return device_state;
+    return state;
 }
 
 void iecNetwork::process_load()

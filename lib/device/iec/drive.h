@@ -13,12 +13,26 @@
 #include "../meatloaf/wrappers/iec_buffer.h"
 #include "../meatloaf/wrappers/directory_stream.h"
 
+#include "dos/_dos.h"
+#include "dos/cbmdos.2.5.h"
+
 #include "../mfnjson/mfnjson.h"
 
 #define PRODUCT_ID "MEATLOAF CBM"
 
 class iecDrive : public virtualDevice
 {
+private:
+    // /**
+    //  * @brief the active bus protocol
+    //  */
+    // std::shared_ptr<DOS> _dos = nullptr;
+
+    // /**
+    //  * @brief Switch to detected bus protocol
+    //  */
+    // std::shared_ptr<DOS> selectDOS();
+
 protected:
     //MediaType *_disk = nullptr;
 

@@ -99,40 +99,57 @@ int16_t  JiffyDOS::receiveByte ()
 
     // Start timer
     //timer_start(TIMER_GROUP_0, TIMER_0);
+    uint64_t cur_time = esp_timer_get_time();
 
     // get bits 4,5
     IEC.pull ( PIN_IEC_SRQ );
-    if ( gpio_get_level ( PIN_IEC_CLK_IN ) )  data |= 0b00010000; // 1
-    if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0b00100000; // 0
-    ets_delay_us(bit_pair_timing[1][0]);
+    //if ( gpio_get_level ( PIN_IEC_CLK_IN ) )  data |= 0b00010000; // 1
+    //if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0b00100000; // 0
+    //ets_delay_us(bit_pair_timing[1][0]);
     //xSemaphoreTake(s_timer_sem, portMAX_DELAY);
+    IEC.status();
+    if ( IEC.pin_clk )  data |= 0b00010000; // 1
+    if ( IEC.pin_data ) data |= 0b00100000; // 0
+    while (esp_timer_get_time() - cur_time < bit_pair_timing[1][0]);
     IEC.release( PIN_IEC_SRQ );
     //ets_delay_us(1);
 
     // get bits 6,7
     IEC.pull ( PIN_IEC_SRQ );
-    if ( gpio_get_level ( PIN_IEC_CLK_IN ) ) data |=  0b01000000; // 1
-    if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0b10000000; // 1
-    ets_delay_us(bit_pair_timing[1][1]);
+    //if ( gpio_get_level ( PIN_IEC_CLK_IN ) ) data |=  0b01000000; // 1
+    //if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0b10000000; // 1
+    //ets_delay_us(bit_pair_timing[1][1]);
     //xSemaphoreTake(s_timer_sem, portMAX_DELAY);
+    IEC.status();
+    if ( IEC.pin_clk ) data |=  0b01000000; // 1
+    if ( IEC.pin_data ) data |= 0b10000000; // 1
+    while (esp_timer_get_time() - cur_time < bit_pair_timing[1][1]);
     IEC.release( PIN_IEC_SRQ );
     //ets_delay_us(1);
 
     // get bits 3,1
     IEC.pull ( PIN_IEC_SRQ );
-    if ( gpio_get_level ( PIN_IEC_CLK_IN ) )  data |= 0b00001000; // 1
-    if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0b00000010; // 1
-    ets_delay_us(bit_pair_timing[1][2]);
+    //if ( gpio_get_level ( PIN_IEC_CLK_IN ) )  data |= 0b00001000; // 1
+    //if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0b00000010; // 1
+    //ets_delay_us(bit_pair_timing[1][2]);
     //xSemaphoreTake(s_timer_sem, portMAX_DELAY);
+    IEC.status();
+    if ( IEC.pin_clk )  data |= 0b00001000; // 1
+    if ( IEC.pin_data ) data |= 0b00000010; // 1
+    while (esp_timer_get_time() - cur_time < bit_pair_timing[1][2]);
     IEC.release( PIN_IEC_SRQ );
     //ets_delay_us(1);
 
     // get bits 2,0
     IEC.pull ( PIN_IEC_SRQ );
-    if ( gpio_get_level ( PIN_IEC_CLK_IN ) )  data |= 0b00000100; // 0
-    if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0b00000001; // 1
-    ets_delay_us(bit_pair_timing[1][3]);
+    //if ( gpio_get_level ( PIN_IEC_CLK_IN ) )  data |= 0b00000100; // 0
+    //if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0b00000001; // 1
+    //ets_delay_us(bit_pair_timing[1][3]);
     //xSemaphoreTake(s_timer_sem, portMAX_DELAY);
+    IEC.status();
+    if ( IEC.pin_clk )  data |= 0b00000100; // 0
+    if ( IEC.pin_data ) data |= 0b00000001; // 1
+    while (esp_timer_get_time() - cur_time < bit_pair_timing[1][3]);
     IEC.release( PIN_IEC_SRQ );
     //ets_delay_us(1);
 

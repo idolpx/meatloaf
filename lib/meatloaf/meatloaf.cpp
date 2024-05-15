@@ -271,6 +271,7 @@ std::string MFSOwner::existsLocal( std::string path )
         }        
     }
 
+    delete(url);
     return path;
 }
 
