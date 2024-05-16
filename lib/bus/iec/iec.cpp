@@ -704,7 +704,7 @@ void virtualDevice::iec_talk_command_buffer_status()
         snprintf(reply, 80, "%u,%s,%u,%u", iecStatus.error, iecStatus.msg.c_str(), iecStatus.connected, iecStatus.channel);
         s = std::string(reply);
         // s = mstr::toPETSCII2(s);
-        Debug_printv("sending status: %s\r\n", reply);
+        //Debug_printv("sending status: %s\r\n", reply);
         IEC.sendBytes(s, true);
     }
 }
@@ -849,14 +849,14 @@ void IRAM_ATTR systemBus::deviceListen()
 void IRAM_ATTR systemBus::deviceTalk(void)
 {
     // Now do bus turnaround
-    //pull(PIN_IEC_SRQ);
+    pull(PIN_IEC_SRQ);
     if (!turnAround())
     {
         Debug_printv("error flags[%d]", flags);
         state = BUS_ERROR;
         return;
     }
-    //release(PIN_IEC_SRQ);
+    release(PIN_IEC_SRQ);
 
     // We have recieved a CMD and we should talk now:
     state = BUS_PROCESS;
@@ -871,30 +871,43 @@ bool IRAM_ATTR systemBus::turnAround()
     Immediately after ATN is RELEASED, the selected device will be behaving like a listener. After all, it's
     been listening during the ATN cycle, and the computer has been a talker. At this instant, we
     have "wrong way" logic; the device is holding down the Data line, and the computer is holding the
-    Clock line. We must turn this around. Here's the sequence:
-    the computer quickly realizes what's going on, and pulls the Data line to true (it's already there), as
-    well as releasing the Clock line to false. The device waits for this: when it sees the Clock line go
-    true [sic], it releases the Data line (which stays true anyway since the computer is now holding it down)
-    and then pulls down the Clock line. We're now in our starting position, with the talker (that's the
-    device) holding the Clock true, and the listener (the computer) holding the Data line true. The
-    computer watches for this state; only when it has gone through the cycle correctly will it be ready
-    to receive data. And data will be signalled, of course, with the usual sequence: the talker releases
-    the Clock line to signal that it's ready to send.
+    Clock line. We must turn this around. 
+    
+    Here's the sequence:
+    1. The computer pulls the Data line to true (it's already there), as well as releases the Clock line to false. 
+    2. When the device sees the Clock line is releaseed, it releases the Data line (which stays true anyway since 
+    the computer is now holding it down) and then pulls down the Clock line. 
+    
+    We're now in our starting position, with the talker (that's the device) holding the Clock true, and 
+    the listener (the computer) holding the Data line true. The computer watches for this state; only when it has 
+    gone through the cycle correctly will it be ready to receive data. And data will be signalled, of course, with 
+    the usual sequence: the talker releases the Clock line to signal that it's ready to send.
     */
     // Debug_printf("IEC turnAround: ");
 
     // Wait until the computer releases the ATN line
-    // if (protocol->timeoutWait(PIN_IEC_ATN, RELEASED, FOREVER) == TIMED_OUT)
-    // {
-    //     Debug_printf("Wait until the computer releases the ATN line");
-    //     flags |= ERROR;
-    //     return false; // return error because timeout
-    // }
-    release ( PIN_IEC_DATA_OUT );
+    if (protocol->timeoutWait(PIN_IEC_ATN, RELEASED, FOREVER) == TIMED_OUT)
+    {
+        Debug_printf("Wait until the computer releases the ATN line");
+        flags |= ERROR;
+        return false; // return error because timeout
+    }
 
     // Delay after ATN is RELEASED
-    protocol->wait( ( TIMING_Ttk + TIMING_Tda ), 0, false );
+    protocol->wait( TIMING_Ttk, false );
+
+    // Wait for CLK to be released
+    if (protocol->timeoutWait(PIN_IEC_CLK_IN, RELEASED, FOREVER) == TIMED_OUT)
+    {
+        Debug_printf("Wait until the computer releases the CLK line");
+        flags |= ERROR;
+        return false; // return error because timeout
+    }
+    release ( PIN_IEC_DATA_OUT );
     pull ( PIN_IEC_CLK_OUT );
+
+    // 80us minimum delay after TURNAROUND
+    protocol->wait( TIMING_Tda, false );
 
     // Debug_println("turnaround complete");
     return true;
