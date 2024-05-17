@@ -1,10 +1,10 @@
 
-#include "_dos.h"
+// #include "_dos.h"
 
-#include <string>
+// #include <string>
 
-class CBMDOS_2_5: DOS
-{
-    public:
-        void parse_command(std::string command) override;
-};
+// class CBMDOS_2_5: DOS
+// {
+//     public:
+//         void execute(std::string command) override;
+// };

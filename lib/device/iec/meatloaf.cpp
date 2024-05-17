@@ -180,6 +180,8 @@ void iecMeatloaf::process_basic_commands()
     payload = mstr::toUTF8(payload);
     pt = util_tokenize(payload, ',');
 
+    Debug_printv("payload[%s]", payload.c_str());
+
     if (payload.find("adapterconfig") != std::string::npos)
         get_adapter_config();
     else if (payload.find("setssid") != std::string::npos)

@@ -383,7 +383,6 @@
 //   memset(command_buffer+command_length, 0, sizeof(command_buffer)-command_length);
 // }
 
-
 // /* Parse parameters of block commands in the command buffer */
 // /* Returns number of parameters (up to 4) or <0 on error    */
 // static int8_t parse_blockparam(uint8_t values[]) {
@@ -556,7 +555,6 @@
 //   }
 // }
 
-
 // /* ------------ */
 // /*  B commands  */
 // /* ------------ */
@@ -642,7 +640,6 @@
 //     return;
 //   }
 // }
-
 
 // /* ---------- */
 // /*  C - Copy  */
@@ -792,7 +789,6 @@
 //   cleanup_and_free_buffer(dstbuf);
 // }
 
-
 // /* ----------------------- */
 // /*  CP - Change Partition  */
 // /* ----------------------- */
@@ -822,7 +818,6 @@
 
 //   set_error_ts(ERROR_PARTITION_SELECTED, part+1, 0);
 // }
-
 
 // /* ------------ */
 // /*  D commands  */
@@ -919,7 +914,6 @@
 //   }
 // }
 
-
 // /* -------------------------- */
 // /*  G-P - Get Partition info  */
 // /* -------------------------- */
@@ -996,7 +990,6 @@
 //   *ptr   = size & 0xff;
 // }
 
-
 // /* ---------------- */
 // /*  I - Initialize  */
 // /* ---------------- */
@@ -1006,7 +999,6 @@
 //   else
 //     free_multiple_buffers(FMB_USER_CLEAN);
 // }
-
 
 // /* ------------ */
 // /*  M commands  */
@@ -1206,7 +1198,6 @@
 // #endif
 //   }
 
-
 // #ifdef CONFIG_LOADER_GEOS
 //   /* Capture decryption key */
 
@@ -1301,7 +1292,6 @@
 //   format(part, name, id);
 // }
 
-
 // /* -------------- */
 // /*  P - Position  */
 // /* -------------- */
@@ -1364,7 +1354,6 @@
 //     buf->seek(buf, offset.l, 0);
 //   }
 // }
-
 
 // /* ------------ */
 // /*  R - Rename  */
@@ -1433,7 +1422,6 @@
 //   rename(&oldpath, &dent, newname);
 // }
 
-
 // /* ------------- */
 // /*  S - Scratch  */
 // /* ------------- */
@@ -1479,7 +1467,6 @@
 
 //   set_error_ts(ERROR_SCRATCHED,count,0);
 // }
-
 
 // #ifdef HAVE_RTC
 // /* ------------------ */
@@ -1667,7 +1654,6 @@
 // }
 // #endif /* HAVE_RTC */
 
-
 // /* ------------ */
 // /*  U commands  */
 // /* ------------ */
@@ -1743,7 +1729,6 @@
 //     break;
 //   }
 // }
-
 
 // /* ------------ */
 // /*  X commands  */
@@ -1928,125 +1913,131 @@
 //   }
 // }
 
-
 /* ------------------------------------------------------------------------- */
 /*  Main command parser function                                             */
 /* ------------------------------------------------------------------------- */
 
-void CBMDOS_2_5::parse_command(std::string command) {
-//   /* Set default message: Everything ok */
-//   set_error(ERROR_OK);
+//void CBMDOS_2_5::execute(std::string command)
+//{
+//     /* Set default message: Everything ok */
+//     set_error(ERROR_OK);
 
-//   /* Abort if the command is too long */
-//   if (command_length == CONFIG_COMMAND_BUFFER_SIZE) {
-//     set_error(ERROR_SYNTAX_TOOLONG);
-//     return;
-//   }
+//     /* Abort if the command is too long */
+//     if (command_length == CONFIG_COMMAND_BUFFER_SIZE)
+//     {
+//         set_error(ERROR_SYNTAX_TOOLONG);
+//         return;
+//     }
 
 // #ifdef CONFIG_COMMAND_CHANNEL_DUMP
-//   /* Debugging aid: Dump the whole command via serial */
-//   if (detected_loader == FL_NONE) {
-//     /* Dump only if no loader was detected because it may ruin the timing */
-//     uart_trace(command_buffer,0,command_length);
-//   }
+//     /* Debugging aid: Dump the whole command via serial */
+//     if (detected_loader == FL_NONE)
+//     {
+//         /* Dump only if no loader was detected because it may ruin the timing */
+//         uart_trace(command_buffer, 0, command_length);
+//     }
 // #endif
 
-//   /* Remove one CR at end of command */
-//   original_length = command_length;
-//   if (command_length > 0 && command_buffer[command_length-1] == 0x0d)
-//     command_length--;
+//     // /* Remove one CR at end of command */
+//     // original_length = command_length;
+//     // if (command_length > 0 && command_buffer[command_length - 1] == 0x0d)
+//     //     command_length--;
 
-//   /* Abort if there is no command */
-//   if (command_length == 0) {
-//     set_error(ERROR_SYNTAX_UNABLE);
-//     return;
-//   }
-
-//   /* Send command to display */
-//   display_doscommand(command_length, command_buffer);
-
-//   /* MD/CD/RD clash with other commands, so they're checked first */
-//   if (command_buffer[0] != 'X' && command_buffer[1] == 'D') {
-//     parse_dircommand();
-//     return;
-//   }
-
-//   switch (command_buffer[0]) {
-//   case 'B':
-//     /* Block-Something */
-//     parse_block();
-//     break;
-
-//   case 'C':
-//     /* Copy or Change Partition */
-//     if (command_buffer[1] == 'P' || command_buffer[1] == 0xd0)
-//       parse_changepart();
-//     else
-//       /* Copy a file */
-//       parse_copy();
-//     break;
-
-//   case 'D':
-//     /* Direct sector access (was duplicate in CBM drives) */
-//     parse_direct();
-//     break;
-
-//   case 'G':
-//     /* Get-Partition */
-//     parse_getpartition();
-//     break;
-
-//   case 'I':
-//     /* Initialize */
-//     parse_initialize();
-//     break;
-
-//   case 'M':
-//     /* Memory-something */
-//     parse_memory();
-//     break;
-
-//   case 'N':
-//     /* New */
-//     parse_new();
-//     break;
-
-//   case 'P':
-//     /* Position */
-//     parse_position();
-//     break;
-
-//   case 'R':
-//     /* Rename */
-//     parse_rename();
-//     break;
-
-//   case 'S':
-//     if(command_length == 3 && command_buffer[1] == '-') {
-//       /* Swap drive number */
-//       set_error(ERROR_SYNTAX_UNABLE);
-//       break;
+//     /* Abort if there is no command */
+//     if (command.size() == 0)
+//     {
+//         set_error(ERROR_SYNTAX_UNABLE);
+//         return;
 //     }
-//     /* Scratch */
-//     parse_scratch();
-//     break;
+
+//     /* Send command to display */
+//     display_doscommand(command_length, command_buffer);
+
+//     /* MD/CD/RD clash with other commands, so they're checked first */
+//     if (command_buffer[0] != 'X' && command_buffer[1] == 'D')
+//     {
+//         parse_dircommand();
+//         return;
+//     }
+
+//     switch (command_buffer[0])
+//     {
+//     case 'B':
+//         /* Block-Something */
+//         parse_block();
+//         break;
+
+//     case 'C':
+//         /* Copy or Change Partition */
+//         if (command_buffer[1] == 'P' || command_buffer[1] == 0xd0)
+//             parse_changepart();
+//         else
+//             /* Copy a file */
+//             parse_copy();
+//         break;
+
+//     case 'D':
+//         /* Direct sector access (was duplicate in CBM drives) */
+//         parse_direct();
+//         break;
+
+//     case 'G':
+//         /* Get-Partition */
+//         parse_getpartition();
+//         break;
+
+//     case 'I':
+//         /* Initialize */
+//         parse_initialize();
+//         break;
+
+//     case 'M':
+//         /* Memory-something */
+//         parse_memory();
+//         break;
+
+//     case 'N':
+//         /* New */
+//         parse_new();
+//         break;
+
+//     case 'P':
+//         /* Position */
+//         parse_position();
+//         break;
+
+//     case 'R':
+//         /* Rename */
+//         parse_rename();
+//         break;
+
+//     case 'S':
+//         if (command_length == 3 && command_buffer[1] == '-')
+//         {
+//             /* Swap drive number */
+//             set_error(ERROR_SYNTAX_UNABLE);
+//             break;
+//         }
+//         /* Scratch */
+//         parse_scratch();
+//         break;
 
 // #ifdef HAVE_RTC
-//   case 'T':
-//     parse_time();
-//     break;
+//     case 'T':
+//         parse_time();
+//         break;
 // #endif
 
-//   case 'U':
-//     parse_user();
-//     break;
+//     case 'U':
+//         parse_user();
+//         break;
 
-//   case 'X':
-//     parse_xcommand();
-//     break;
+//     case 'X':
+//         parse_xcommand();
+//         break;
 
-//   default:
-//     set_error(ERROR_SYNTAX_UNKNOWN);
-//     break;
-//   }
-}
+//     default:
+//         set_error(ERROR_SYNTAX_UNKNOWN);
+//         break;
+//     }
+// }
