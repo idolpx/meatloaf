@@ -14,27 +14,33 @@ int16_t IECProtocol::timeoutWait(uint8_t pin, bool target_status, size_t wait_us
     uint64_t start = 0;
     uint64_t current = 0;
     uint64_t elapsed = 0;
+    bool atn_status = false;
+
+#ifndef IEC_SPLIT_LINES
+    IEC.release ( pin );
+#endif
 
     // Quick check to see if the target status is already set
     if ( IEC.status ( pin ) == target_status )
         return elapsed;
 
-    //esp_timer_init();
-    //start = current = esp_timer_get_time();
-    start = esp_timer_get_time();
-
-    // Sample ATN and set flag to indicate COMMAND or DATA mode
-    bool atn_status = IEC.status ( PIN_IEC_ATN );
-    if ( atn_status ) IEC.flags |= ATN_PULLED;
     if ( pin == PIN_IEC_ATN )
     {
         watch_atn = false;
     }
+    else
+    {
+#ifndef IEC_SPLIT_LINES
+        IEC.release ( PIN_IEC_ATN );
+#endif
+
+        // Sample ATN and set flag to indicate COMMAND or DATA mode
+        atn_status = IEC.status ( PIN_IEC_ATN );
+        if ( atn_status ) IEC.flags |= ATN_PULLED;
+    }
 
     //IEC.pull ( PIN_IEC_SRQ );
-#ifndef IEC_SPLIT_LINES
-    IEC.release ( pin );
-#endif
+    start = esp_timer_get_time();
     while ( IEC.status ( pin ) != target_status )
     {
         current = esp_timer_get_time();

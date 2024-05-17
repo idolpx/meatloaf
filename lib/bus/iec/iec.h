@@ -35,6 +35,7 @@
 // https://esp32.com/viewtopic.php?t=27963
 // https://github.com/alwint3r/esp32-read-multiple-gpio-pins
 // https://github.com/alwint3r/esp32-set-clear-multiple-gpio
+// https://www.commodore.ca/wp-content/uploads/2018/11/Commodore-IEC-Serial-Bus-Manual-C64-Plus4.txt
 //
 
 #include <cstdint>

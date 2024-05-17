@@ -268,7 +268,13 @@ void IRAM_ATTR systemBus::service()
             // Sometimes ATN isn't released immediately. Wait for ATN to be
             // released before trying to read payload. Long ATN delay (>1.5ms)
             // seems to occur more frequently with VIC-20.
-            // protocol->timeoutWait(PIN_IEC_ATN, RELEASED, FOREVER, false);
+            //pull(PIN_IEC_SRQ);
+            protocol->timeoutWait(PIN_IEC_ATN, RELEASED, FOREVER);
+            //release(PIN_IEC_SRQ);
+
+            // Delay after ATN is RELEASED
+            protocol->wait( TIMING_Ttk, false );
+
 
             //Debug_printv("data");
             //pull ( PIN_IEC_SRQ );
@@ -284,12 +290,16 @@ void IRAM_ATTR systemBus::service()
             if (data.primary == IEC_LISTEN)
             {
                 //Debug_printv("calling deviceListen()\r\n");
+                //pull ( PIN_IEC_SRQ );
                 deviceListen();
+                //release ( PIN_IEC_SRQ );
             }
             else if (data.primary == IEC_TALK)
             {
                 //Debug_printv("calling deviceTalk()\r\n");
+                //pull ( PIN_IEC_SRQ );
                 deviceTalk();
+                //release ( PIN_IEC_SRQ );
             }
 
             // Queue control codes and command in specified device
@@ -469,15 +479,6 @@ void systemBus::read_command()
                     state = BUS_IDLE;
                 }
 
-                // *** IMPORTANT! This helps keep us in sync!
-                //pull ( PIN_IEC_SRQ );
-                if ( protocol->timeoutWait ( PIN_IEC_ATN, RELEASED ) == TIMED_OUT )
-                {
-                    Debug_printv ( "ATN Not Released after secondary" );
-                    return; // return error because timeout
-                }
-                //release ( PIN_IEC_SRQ );
-
                 Debug_printf(" (%.2X %s  %.2d CHANNEL)\r\n", data.secondary, secondary.c_str(), data.channel);
             }
         }
@@ -536,12 +537,6 @@ void systemBus::read_payload()
 
     // ATN might get pulled right away if there is no command string to send
     //pull ( PIN_IEC_SRQ );
-
-    // Sometimes ATN isn't released immediately. Wait for ATN to be
-    // released before trying to read payload. Long ATN delay (>1.5ms)
-    // seems to occur more frequently with VIC-20.
-    //protocol->timeoutWait(PIN_IEC_ATN, RELEASED, FOREVER, false);
-
     while (IEC.status(PIN_IEC_ATN) != PULLED)
     {
         //pull ( PIN_IEC_SRQ );
@@ -849,14 +844,14 @@ void IRAM_ATTR systemBus::deviceListen()
 void IRAM_ATTR systemBus::deviceTalk(void)
 {
     // Now do bus turnaround
-    pull(PIN_IEC_SRQ);
+    //pull(PIN_IEC_SRQ);
     if (!turnAround())
     {
         Debug_printv("error flags[%d]", flags);
         state = BUS_ERROR;
         return;
     }
-    release(PIN_IEC_SRQ);
+    //release(PIN_IEC_SRQ);
 
     // We have recieved a CMD and we should talk now:
     state = BUS_PROCESS;
@@ -883,18 +878,19 @@ bool IRAM_ATTR systemBus::turnAround()
     gone through the cycle correctly will it be ready to receive data. And data will be signalled, of course, with 
     the usual sequence: the talker releases the Clock line to signal that it's ready to send.
     */
-    // Debug_printf("IEC turnAround: ");
 
-    // Wait until the computer releases the ATN line
-    if (protocol->timeoutWait(PIN_IEC_ATN, RELEASED, FOREVER) == TIMED_OUT)
-    {
-        Debug_printf("Wait until the computer releases the ATN line");
-        flags |= ERROR;
-        return false; // return error because timeout
-    }
+    // // Wait until the computer releases the ATN line
+    // pull(PIN_IEC_SRQ);
+    // if (protocol->timeoutWait(PIN_IEC_ATN, RELEASED, FOREVER) == TIMED_OUT)
+    // {
+    //     Debug_printf("Wait until the computer releases the ATN line");
+    //     flags |= ERROR;
+    //     return false; // return error because timeout
+    // }
+    // release(PIN_IEC_SRQ);
 
-    // Delay after ATN is RELEASED
-    protocol->wait( TIMING_Ttk, false );
+    // // Delay after ATN is RELEASED
+    // protocol->wait( TIMING_Ttk, false );
 
     // Wait for CLK to be released
     if (protocol->timeoutWait(PIN_IEC_CLK_IN, RELEASED, FOREVER) == TIMED_OUT)
@@ -907,9 +903,9 @@ bool IRAM_ATTR systemBus::turnAround()
     pull ( PIN_IEC_CLK_OUT );
 
     // 80us minimum delay after TURNAROUND
+    // IMPORTANT!
     protocol->wait( TIMING_Tda, false );
 
-    // Debug_println("turnaround complete");
     return true;
 } // turnAround
 
@@ -936,6 +932,8 @@ void systemBus::setBitTiming(std::string set, int p1, int p2, int p3, int p4)
 
 void IRAM_ATTR systemBus::releaseLines(bool wait)
 {
+    //pull ( PIN_IEC_SRQ );
+
     // Release lines
     release(PIN_IEC_CLK_OUT);
     release(PIN_IEC_DATA_OUT);
@@ -946,6 +944,8 @@ void IRAM_ATTR systemBus::releaseLines(bool wait)
         Debug_printv("Waiting for ATN to release");
         protocol->timeoutWait(PIN_IEC_ATN, RELEASED, FOREVER);
     }
+
+    //release ( PIN_IEC_SRQ );
 }
 
 void IRAM_ATTR systemBus::senderTimeout()
