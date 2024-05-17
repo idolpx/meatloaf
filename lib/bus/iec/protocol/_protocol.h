@@ -49,10 +49,10 @@ namespace Protocol
          * @brief Wait for specified milliseconds, or until ATN status changes
          * @param wait_us # of milliseconds to wait
          * @param start The previously set start millisecond time.
-         * @param watch_atn also abort if ATN status changes? (default is true)
+         * @param watch_atn also abort if ATN status changes? (default is false)
          */
-        virtual bool wait(size_t wait_us, bool watch_atn = true);
-        virtual bool wait(size_t wait_us, uint64_t start, bool watch_atn = true);
+        virtual bool wait(size_t wait_us, bool watch_atn = false);
+        virtual bool wait(size_t wait_us, uint64_t start, bool watch_atn = false);
     };
 };
 

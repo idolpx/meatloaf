@@ -15,9 +15,9 @@ int16_t IECProtocol::timeoutWait(uint8_t pin, bool target_status, size_t wait_us
     uint64_t current = 0;
     uint64_t elapsed = 0;
 
-    // // Quick check to see if the target status is already set
-    // if ( IEC.status ( pin ) == target_status )
-    //     return elapsed;
+    // Quick check to see if the target status is already set
+    if ( IEC.status ( pin ) == target_status )
+        return elapsed;
 
     //esp_timer_init();
     //start = current = esp_timer_get_time();
