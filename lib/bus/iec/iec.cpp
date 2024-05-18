@@ -345,148 +345,152 @@ void IRAM_ATTR systemBus::service()
 
 void systemBus::read_command()
 {
-//    do
-//    {
-        // ATN was pulled, read bus command bytes
-        // Sometimes the C64 pulls ATN but doesn't pull CLOCK right away
-        //pull( PIN_IEC_SRQ );
-        if ( protocol->timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMING_DELAY, false ) == TIMED_OUT )
-        {
-            Debug_printv ( "ATN/Clock delay" );
-            return; // return error because timeout
-        }
-        //release( PIN_IEC_SRQ );
+    // ATN was pulled, read bus command bytes
+    // Sometimes the C64 pulls ATN but doesn't pull CLOCK right away
+    //pull( PIN_IEC_SRQ );
+    if ( protocol->timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMING_DELAY, false ) == TIMED_OUT )
+    {
+        Debug_printv ( "ATN/Clock delay" );
+        return; // return error because timeout
+    }
+    //release( PIN_IEC_SRQ );
 
-        //pull( PIN_IEC_SRQ );
-        int16_t c = receiveByte();
-        //release( PIN_IEC_SRQ );
+    //pull( PIN_IEC_SRQ );
+    int16_t c = receiveByte();
+    //release( PIN_IEC_SRQ );
 
-        // Check for error
-        if ( flags & ERROR )
+    // Check for error
+    if ( flags & ERROR )
+    {
+        Debug_printv("Error reading command. flags[%d]", flags);
+        if (c == 0xFFFFFFFF)
+            state = BUS_OFFLINE;
+        else
+            state = BUS_ERROR;
+    }
+    else if ( flags & EMPTY_STREAM)
+    {
+        state = BUS_IDLE;
+    }
+    else
+    {
+        if ( flags & JIFFYDOS_ACTIVE )
         {
-            Debug_printv("Error reading command. flags[%d]", flags);
-            if (c == 0xFFFFFFFF)
-                state = BUS_OFFLINE;
-            else
-                state = BUS_ERROR;
-        }
-        else if ( flags & EMPTY_STREAM)
-        {
-            state = BUS_IDLE;
+            Debug_printf("   IEC: [JD][%.2X]", c);
+            detected_protocol = PROTOCOL_JIFFYDOS;
         }
         else
         {
-            if ( flags & JIFFYDOS_ACTIVE )
+            Debug_printf("   IEC: [%.2X]", c);
+        }
+
+        // Decode command byte
+        uint8_t command = c & 0x60;
+        if (c == IEC_UNLISTEN)
+            command = IEC_UNLISTEN;
+        if (c == IEC_UNTALK)
+            command = IEC_UNTALK;
+
+        //Debug_printv ( "device[%d] channel[%d]", data.device, data.channel);
+        //Debug_printv ("command[%.2X]", command);
+
+        switch (command)
+        {
+        // case IEC_GLOBAL:
+        //     data.primary = IEC_GLOBAL;
+        //     data.device = c ^ IEC_GLOBAL;
+        //     state = BUS_IDLE;
+        //     Debug_printf(" (00 GLOBAL %.2d COMMAND)\r\n", data.device);
+        //     break;
+
+        case IEC_LISTEN:
+            data.primary = IEC_LISTEN;
+            data.device = c ^ IEC_LISTEN;
+            data.secondary = IEC_REOPEN; // Default secondary command
+            data.channel = CHANNEL_COMMAND;  // Default channel
+            data.payload = "";
+            state = BUS_ACTIVE;
+            Debug_printf(" (20 LISTEN %.2d DEVICE)\r\n", data.device);
+            break;
+
+        case IEC_UNLISTEN:
+            data.primary = IEC_UNLISTEN;
+            state = BUS_PROCESS;
+            Debug_printf(" (3F UNLISTEN)\r\n");
+            break;
+
+        case IEC_TALK:
+            data.primary = IEC_TALK;
+            data.device = c ^ IEC_TALK;
+            data.secondary = IEC_REOPEN; // Default secondary command
+            data.channel = CHANNEL_COMMAND;  // Default channel
+            state = BUS_ACTIVE;
+            Debug_printf(" (40 TALK   %.2d DEVICE)\r\n", data.device);
+            break;
+
+        case IEC_UNTALK:
+            data.primary = IEC_UNTALK;
+            data.secondary = 0x00;
+            state = BUS_PROCESS;
+            Debug_printf(" (5F UNTALK)\r\n");
+            break;
+
+        default:
+
+            //pull ( PIN_IEC_SRQ );
+            std::string secondary;
+            state = BUS_PROCESS;
+
+            command = c & 0xF0;
+            switch ( command )
             {
-                Debug_printf("   IEC: [JD][%.2X]", c);
-                detected_protocol = PROTOCOL_JIFFYDOS;
-            }
-            else
-            {
-                Debug_printf("   IEC: [%.2X]", c);
-            }
-
-            // Decode command byte
-            uint8_t command = c & 0x60;
-            if (c == IEC_UNLISTEN)
-                command = IEC_UNLISTEN;
-            if (c == IEC_UNTALK)
-                command = IEC_UNTALK;
-
-            //Debug_printv ( "device[%d] channel[%d]", data.device, data.channel);
-            //Debug_printv ("command[%.2X]", command);
-
-            switch (command)
-            {
-            // case IEC_GLOBAL:
-            //     data.primary = IEC_GLOBAL;
-            //     data.device = c ^ IEC_GLOBAL;
-            //     state = BUS_IDLE;
-            //     Debug_printf(" (00 GLOBAL %.2d COMMAND)\r\n", data.device);
-            //     break;
-
-            case IEC_LISTEN:
-                data.primary = IEC_LISTEN;
-                data.device = c ^ IEC_LISTEN;
-                data.secondary = IEC_REOPEN; // Default secondary command
-                data.channel = CHANNEL_COMMAND;  // Default channel
-                data.payload = "";
-                state = BUS_ACTIVE;
-                Debug_printf(" (20 LISTEN %.2d DEVICE)\r\n", data.device);
+            case IEC_OPEN:
+                data.secondary = IEC_OPEN;
+                data.channel = c ^ IEC_OPEN;
+                secondary = "OPEN";
                 break;
 
-            case IEC_UNLISTEN:
-                data.primary = IEC_UNLISTEN;
-                state = BUS_PROCESS;
-                Debug_printf(" (3F UNLISTEN)\r\n");
+            case IEC_REOPEN:
+                data.secondary = IEC_REOPEN;
+                data.channel = c ^ IEC_REOPEN;
+                secondary = "DATA";
                 break;
 
-            case IEC_TALK:
-                data.primary = IEC_TALK;
-                data.device = c ^ IEC_TALK;
-                data.secondary = IEC_REOPEN; // Default secondary command
-                data.channel = CHANNEL_COMMAND;  // Default channel
-                state = BUS_ACTIVE;
-                Debug_printf(" (40 TALK   %.2d DEVICE)\r\n", data.device);
-                break;
-
-            case IEC_UNTALK:
-                data.primary = IEC_UNTALK;
-                data.secondary = 0x00;
-                state = BUS_PROCESS;
-                Debug_printf(" (5F UNTALK)\r\n");
+            case IEC_CLOSE:
+                data.secondary = IEC_CLOSE;
+                data.channel = c ^ IEC_CLOSE;
+                secondary = "CLOSE";
                 break;
 
             default:
-
-                //pull ( PIN_IEC_SRQ );
-                std::string secondary;
-                state = BUS_PROCESS;
-
-                command = c & 0xF0;
-                switch ( command )
-                {
-                case IEC_OPEN:
-                    data.secondary = IEC_OPEN;
-                    data.channel = c ^ IEC_OPEN;
-                    secondary = "OPEN";
-                    break;
-
-                case IEC_REOPEN:
-                    data.secondary = IEC_REOPEN;
-                    data.channel = c ^ IEC_REOPEN;
-                    secondary = "DATA";
-                    break;
-
-                case IEC_CLOSE:
-                    data.secondary = IEC_CLOSE;
-                    data.channel = c ^ IEC_CLOSE;
-                    secondary = "CLOSE";
-                    break;
-
-                default:
-                    state = BUS_IDLE;
-                }
-
-                // *** IMPORTANT! This helps keep us in sync!
-                // Sometimes ATN isn't released immediately. Wait for ATN to be
-                // released before trying to read payload. Long ATN delay (>1.5ms)
-                // seems to occur more frequently with VIC-20.
-                //pull ( PIN_IEC_SRQ );
-                if ( protocol->timeoutWait ( PIN_IEC_ATN, RELEASED ) == TIMED_OUT )
-                {
-                    Debug_printv ( "ATN Not Released after secondary" );
-                    return; // return error because timeout
-                }
-
-                // Delay after ATN is RELEASED
-                protocol->wait( TIMING_Ttk, false );
-                //release ( PIN_IEC_SRQ );
-
-                Debug_printf(" (%.2X %s  %.2d CHANNEL)\r\n", data.secondary, secondary.c_str(), data.channel);
+                state = BUS_IDLE;
             }
+
+
+
+            Debug_printf(" (%.2X %s  %.2d CHANNEL)\r\n", data.secondary, secondary.c_str(), data.channel);
         }
-//    } while ( status( PIN_IEC_ATN ) );
+    }
+
+
+    if ( state == BUS_PROCESS )
+    {
+        // *** IMPORTANT! This helps keep us in sync!
+        // Sometimes ATN isn't released immediately. Wait for ATN to be
+        // released before trying to process the command. 
+        // Long ATN delay (>1.5ms) seems to occur more frequently with VIC-20.
+        //pull ( PIN_IEC_SRQ );
+        if ( protocol->timeoutWait ( PIN_IEC_ATN, RELEASED ) == TIMED_OUT )
+        {
+            Debug_printv ( "ATN Not Released after secondary" );
+            return; // return error because timeout
+        }
+
+        // Delay after ATN is RELEASED
+        protocol->wait( TIMING_Ttk, false );
+        //release ( PIN_IEC_SRQ );
+    }
+
 
     // Is this command for us?
     if ( !isDeviceEnabled( data.device ) )

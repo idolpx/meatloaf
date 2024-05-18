@@ -285,6 +285,6 @@ std::string PeoplesUrlParser::rebuildUrl(void)
 
 bool PeoplesUrlParser::isValidUrl()
 {
-    dump();
+    //dump();
     return !scheme.empty() && !(path.empty() && port.empty());
 }

@@ -1287,10 +1287,10 @@ bool iecDrive::sendFile()
 
     if ( !_base->isDirectory() )
     {
-        _base->dump();
+        //_base->dump();
         _last_file = _base->name;
         _base.reset( MFSOwner::File( _base->base() ) );
-        _base->dump();
+        //_base->dump();
     }
 
     // // if ( !_base->isDirectory() )
