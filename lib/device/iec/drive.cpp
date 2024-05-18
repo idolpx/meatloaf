@@ -1366,7 +1366,7 @@ bool iecDrive::sendFile()
         }
 
         // Send Byte
-        IEC.pull(PIN_IEC_SRQ);
+        //IEC.pull(PIN_IEC_SRQ);
         success_tx = IEC.sendByte(b, eoi);
         // if ( !success_tx )
         // {
@@ -1374,7 +1374,7 @@ bool iecDrive::sendFile()
         //     //IEC.release(PIN_IEC_SRQ);
         //     return false;
         // }
-        IEC.release(PIN_IEC_SRQ);
+        //IEC.release(PIN_IEC_SRQ);
 
         // Exit if ATN is PULLED while sending
         //if ( IEC.status ( PIN_IEC_ATN ) == PULLED )
