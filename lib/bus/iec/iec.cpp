@@ -265,17 +265,6 @@ void IRAM_ATTR systemBus::service()
 
         if (state == BUS_PROCESS)
         {
-            // Sometimes ATN isn't released immediately. Wait for ATN to be
-            // released before trying to read payload. Long ATN delay (>1.5ms)
-            // seems to occur more frequently with VIC-20.
-            //pull(PIN_IEC_SRQ);
-            protocol->timeoutWait(PIN_IEC_ATN, RELEASED, FOREVER);
-            //release(PIN_IEC_SRQ);
-
-            // Delay after ATN is RELEASED
-            protocol->wait( TIMING_Ttk, false );
-
-
             //Debug_printv("data");
             //pull ( PIN_IEC_SRQ );
             if (data.secondary == IEC_OPEN || data.secondary == IEC_REOPEN)
@@ -478,6 +467,21 @@ void systemBus::read_command()
                 default:
                     state = BUS_IDLE;
                 }
+
+                // *** IMPORTANT! This helps keep us in sync!
+                // Sometimes ATN isn't released immediately. Wait for ATN to be
+                // released before trying to read payload. Long ATN delay (>1.5ms)
+                // seems to occur more frequently with VIC-20.
+                //pull ( PIN_IEC_SRQ );
+                if ( protocol->timeoutWait ( PIN_IEC_ATN, RELEASED ) == TIMED_OUT )
+                {
+                    Debug_printv ( "ATN Not Released after secondary" );
+                    return; // return error because timeout
+                }
+
+                // Delay after ATN is RELEASED
+                protocol->wait( TIMING_Ttk, false );
+                //release ( PIN_IEC_SRQ );
 
                 Debug_printf(" (%.2X %s  %.2d CHANNEL)\r\n", data.secondary, secondary.c_str(), data.channel);
             }

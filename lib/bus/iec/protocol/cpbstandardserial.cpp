@@ -71,7 +71,6 @@ int16_t CPBStandardSerial::receiveByte()
         Debug_printv ( "Wait for all other devices to release the data line" );
         return -1; // return error because timeout
     }
-    IEC.release ( PIN_IEC_DATA_OUT );
 
     // Either  the  talker  will pull the
     // Clock line back to true in less than 200 microseconds - usually within 60 microseconds - or it
@@ -127,7 +126,6 @@ int16_t CPBStandardSerial::receiveByte()
     //IEC.pull ( PIN_IEC_SRQ );
     wait ( TIMING_Tf );
     IEC.pull ( PIN_IEC_DATA_OUT );
-    //wait ( TIMING_Tpr );
     //IEC.release ( PIN_IEC_SRQ );
 
     // STEP 5: START OVER
@@ -397,13 +395,10 @@ bool CPBStandardSerial::sendBits ( uint8_t data )
 
         // tell listener to wait for next bit
         IEC.pull ( PIN_IEC_CLK_OUT );
-
-        // Release DATA after bit sent
-        IEC.release ( PIN_IEC_DATA_OUT );
     }
 
-    // // Release DATA after byte sent
-    // IEC.release ( PIN_IEC_DATA_OUT );
+    // Release DATA after byte sent
+    IEC.release ( PIN_IEC_DATA_OUT );
 
     return true;
 } // sendBits
