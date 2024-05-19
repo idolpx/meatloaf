@@ -15,9 +15,9 @@ namespace Protocol
         public:
 
         // 2bit Fast Loader Pair Timing
-        uint8_t bit_pair_timing[2][4] = { 
-            {0, 0, 0, 0},   // Send
-            {13, 11, 11, 12}    // Receive
+        uint8_t bit_pair_timing[2][4] = {
+            {13, 11, 13, 13},    // Receive
+            {14, 10, 11, 11}     // Send
         };
 
         /**

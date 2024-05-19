@@ -1283,6 +1283,8 @@ bool iecDrive::sendFile()
         return false;
     }
 
+    Debug_printv("size[%d] avail[%d] pos[%d]", istream->size(), istream->available(), istream->position());
+
     if ( !_base->isDirectory() )
     {
         //_base->dump();
@@ -1291,14 +1293,15 @@ bool iecDrive::sendFile()
         //_base->dump();
     }
 
-    // // if ( !_base->isDirectory() )
-    // // {
+    // if ( !_base->isDirectory() )
+    // {
     //     if ( istream->has_subdirs )
     //     {
     //         PeoplesUrlParser *u = PeoplesUrlParser::parseURL( istream->url );
     //         Debug_printv( "Subdir Change Directory Here! istream[%s] > base[%s]", istream->url.c_str(), u->base().c_str() );
     //         _last_file = u->name;
     //         _base.reset( MFSOwner::File( u->base() ) );
+    //         delete(u);
     //     }
     //     else
     //     {
@@ -1306,7 +1309,7 @@ bool iecDrive::sendFile()
     //         Debug_printv( "Change Directory Here! istream[%s] > base[%s]", istream->url.c_str(), f->streamFile->url.c_str() );
     //         _base.reset( f->streamFile );
     //     }
-    // //}
+    // }
 
     // _base->dump();
 
@@ -1381,8 +1384,7 @@ bool iecDrive::sendFile()
             Debug_printv("ATN pulled while sending. b[%.2X]", b);
 
             // Save file pointer position
-            //istream->seek(istream->position() - 1);
-            istream->position( istream->position() - 4 );
+            istream->seek(istream->position() - 2);
             //success_rx = true;
             break;
         }

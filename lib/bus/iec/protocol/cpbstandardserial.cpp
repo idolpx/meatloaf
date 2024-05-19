@@ -180,28 +180,35 @@ int8_t CPBStandardSerial::receiveBits ()
         // If there is a 218us delay before the last bit, the controller uses SauceDOS/JiffyDOS
         if ( (n == 3 || n == 7) && bit_time >= TIMING_PROTOCOL_DETECT )
         {
-            if ( (IEC.flags & ATN_PULLED) && data < 0x60 )
+            if ( (IEC.flags & ATN_PULLED) )
             {
-                uint8_t device = (data >> 1) & 0x1F;
-                if ( IEC.isDeviceEnabled ( device ) )
-                {
-#ifdef JIFFYDOS
-                    // acknowledge we support SauceDOS/JiffyDOS
-                    IEC.pull(PIN_IEC_DATA_OUT);
-                    wait( TIMING_PROTOCOL_ACK, false );
-                    IEC.release(PIN_IEC_DATA_OUT);
+                // Check LISTEN & TALK
+                uint8_t device = (data >> 1) & 0x1F; // LISTEN
+                if ( device > 30 )
+                    device = (data >> 1 ) & 0x3F; // TALK
 
-                    // If SRQ is pulled then SauceDOS is active on controller
-                    //if ( IEC.status ( PIN_IEC_SRQ ) )
-                    if ( n == 3 )
+                if ( device < 31 )
+                {
+                    if ( IEC.isDeviceEnabled ( device ) )
                     {
-                        IEC.flags |= SAUCEDOS_ACTIVE;
-                    }
-                    else
-                    {
-                        IEC.flags |= JIFFYDOS_ACTIVE;
-                    }
+#ifdef JIFFYDOS
+                        // acknowledge we support SauceDOS/JiffyDOS
+                        IEC.pull(PIN_IEC_DATA_OUT);
+                        wait( TIMING_PROTOCOL_ACK, false );
+                        IEC.release(PIN_IEC_DATA_OUT);
+
+                        // If SRQ is pulled then SauceDOS is active on controller
+                        //if ( IEC.status ( PIN_IEC_SRQ ) )
+                        if ( n == 3 )
+                        {
+                            IEC.flags |= SAUCEDOS_ACTIVE;
+                        }
+                        else
+                        {
+                            IEC.flags |= JIFFYDOS_ACTIVE;
+                        }
 #endif
+                    }
                 }
             }
 

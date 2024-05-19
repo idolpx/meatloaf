@@ -552,13 +552,13 @@ void systemBus::read_payload()
 
         if (flags & EMPTY_STREAM || flags & ERROR)
         {
-            Debug_printv("flags[%2X]", flags);
+            Debug_printv("flags[%02X]", flags);
             state = BUS_ERROR;
             //release ( PIN_IEC_SRQ );
             return;
         }
 
-        if (c != 0xFFFFFFFF) // && c != 0x0D) // Leave 0x0D to be stripped later
+        if (c != 0xFFFFFFFF && c != 0x0D) // Leave 0x0D to be stripped later
         {
             listen_command += (uint8_t)c;
         }
