@@ -48,15 +48,16 @@ CPBStandardSerial::~CPBStandardSerial()
 // it might holdback for quite a while; there's no time limit.
 int16_t CPBStandardSerial::receiveByte()
 {
-    //IEC.pull ( PIN_IEC_SRQ );
     IEC.flags &= CLEAR_LOW;
 
     // Wait for talker ready
+    //IEC.pull ( PIN_IEC_SRQ );
     if ( timeoutWait ( PIN_IEC_CLK_IN, RELEASED, FOREVER ) == TIMED_OUT )
     {
         Debug_printv ( "Wait for talker ready" );
         return -1; // return error because timeout
     }
+    //IEC.release ( PIN_IEC_SRQ );
 
     // Say we're ready
     // STEP 2: READY FOR DATA
@@ -335,7 +336,10 @@ bool CPBStandardSerial::sendByte(uint8_t data, bool eoi)
     //IEC.pull ( PIN_IEC_SRQ );
     if ( timeoutWait ( PIN_IEC_DATA_IN, PULLED, TIMEOUT_Tf ) >= TIMEOUT_Tf )
     {
+        // RECIEVER TIMEOUT
+        // If no receiver pulls DATA within 1000 µs at the end of the transmission of a byte (after step 28), a receiver timeout is raised.
         Debug_printv ( "Wait for listener to acknowledge byte received (pull data) [%02x]", data );
+        Debug_printv ( "RECEIVER TIMEOUT" );
         return false; // return error because timeout
     }
     //IEC.release ( PIN_IEC_SRQ );

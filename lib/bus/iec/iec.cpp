@@ -31,6 +31,7 @@ static void IRAM_ATTR cbm_on_attention_isr_handler(void *arg)
     // Go to listener mode and get command
     b->release(PIN_IEC_CLK_OUT);
     b->pull(PIN_IEC_DATA_OUT);
+    b->release(PIN_IEC_SRQ);
 
     b->flags = CLEAR;
     b->flags |= ATN_PULLED;
@@ -195,9 +196,18 @@ void IRAM_ATTR systemBus::service()
     // Disable Interrupt
     // gpio_intr_disable((gpio_num_t)PIN_IEC_ATN);
 
-    // TODO IMPLEMENT
-
-    if (state < BUS_ACTIVE)
+    if (state == BUS_ACTIVE)
+    {
+        // ATN was pulled
+        // Sometimes the C64 pulls ATN but doesn't pull CLOCK right away
+        //pull( PIN_IEC_SRQ );
+        if ( protocol->timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMEOUT_DEFAULT, false ) == TIMED_OUT )
+        {
+            Debug_printv ( "ATN/Clock delay" );
+        }
+        //release( PIN_IEC_SRQ );
+    }
+    else
     {
         // debugTiming();
 
@@ -292,6 +302,7 @@ void IRAM_ATTR systemBus::service()
             }
 
             // Queue control codes and command in specified device
+            //pull ( PIN_IEC_SRQ );
             auto d = deviceById(data.device);
             if (d != nullptr)
             {
@@ -322,6 +333,7 @@ void IRAM_ATTR systemBus::service()
             //release ( PIN_IEC_SRQ );
         }
 
+        
         if ( status ( PIN_IEC_ATN ) )
             state = BUS_ACTIVE;
 
@@ -345,16 +357,6 @@ void IRAM_ATTR systemBus::service()
 
 void systemBus::read_command()
 {
-    // ATN was pulled, read bus command bytes
-    // Sometimes the C64 pulls ATN but doesn't pull CLOCK right away
-    //pull( PIN_IEC_SRQ );
-    if ( protocol->timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMING_DELAY, false ) == TIMED_OUT )
-    {
-        Debug_printv ( "ATN/Clock delay" );
-        return; // return error because timeout
-    }
-    //release( PIN_IEC_SRQ );
-
     //pull( PIN_IEC_SRQ );
     int16_t c = receiveByte();
     //release( PIN_IEC_SRQ );
@@ -466,35 +468,31 @@ void systemBus::read_command()
                 state = BUS_IDLE;
             }
 
-
-
             Debug_printf(" (%.2X %s  %.2d CHANNEL)\r\n", data.secondary, secondary.c_str(), data.channel);
         }
-    }
 
-
-    if ( state == BUS_PROCESS )
-    {
-        // *** IMPORTANT! This helps keep us in sync!
-        // Sometimes ATN isn't released immediately. Wait for ATN to be
-        // released before trying to process the command. 
-        // Long ATN delay (>1.5ms) seems to occur more frequently with VIC-20.
-        //pull ( PIN_IEC_SRQ );
-        if ( protocol->timeoutWait ( PIN_IEC_ATN, RELEASED ) == TIMED_OUT )
+        if ( state == BUS_PROCESS )
         {
-            Debug_printv ( "ATN Not Released after secondary" );
-            return; // return error because timeout
-        }
+            // *** IMPORTANT! This helps keep us in sync!
+            // Sometimes ATN isn't released immediately. Wait for ATN to be
+            // released before trying to process the command. 
+            // Long ATN delay (>1.5ms) seems to occur more frequently with VIC-20.
+            //pull ( PIN_IEC_SRQ );
+            if ( protocol->timeoutWait ( PIN_IEC_ATN, RELEASED ) == TIMED_OUT )
+            {
+                Debug_printv ( "ATN Not Released after secondary" );
+                return; // return error because timeout
+            }
 
-        // Delay after ATN is RELEASED
-        protocol->wait( TIMING_Ttk, false );
-        //release ( PIN_IEC_SRQ );
+            // Delay after ATN is RELEASED
+            protocol->wait( TIMING_Ttk, false );
+            //release ( PIN_IEC_SRQ );
+        }
     }
 
 
     // Is this command for us?
     if ( !isDeviceEnabled( data.device ) )
-    // if (!deviceById(data.device) || !deviceById(data.device)->device_active)
     {
         state = BUS_IDLE;
     }
@@ -540,7 +538,7 @@ void systemBus::read_command()
 
 void systemBus::read_payload()
 {
-    // Record the command string until ATN is PULLED
+    // Record the command string until ATN is PULLED 
     std::string listen_command = "";
 
     // ATN might get pulled right away if there is no command string to send
@@ -556,10 +554,11 @@ void systemBus::read_payload()
         {
             Debug_printv("flags[%2X]", flags);
             state = BUS_ERROR;
+            //release ( PIN_IEC_SRQ );
             return;
         }
 
-        if (c != 0xFFFFFFFF && c != 0x0D)
+        if (c != 0xFFFFFFFF) // && c != 0x0D) // Leave 0x0D to be stripped later
         {
             listen_command += (uint8_t)c;
         }
@@ -572,6 +571,7 @@ void systemBus::read_payload()
     }
 
     state = BUS_IDLE;
+    //release ( PIN_IEC_SRQ );
 }
 
 /**
@@ -731,18 +731,17 @@ void systemBus::assert_interrupt()
 
 int16_t systemBus::receiveByte()
 {
+    //pull( PIN_IEC_SRQ );
     int16_t b = protocol->receiveByte();
 #ifdef DATA_STREAM
     Debug_printf("%.2X ", (int16_t)b);
 #endif
     if (b == -1)
     {
-        if (!(IEC.flags & ATN_PULLED))
-        {
-            IEC.flags |= ERROR;
-            Debug_printv("error");
-        }
+        flags |= ERROR;
+        Debug_printv("error");
     }
+    //release( PIN_IEC_SRQ );
     return b;
 }
 
@@ -887,23 +886,11 @@ bool IRAM_ATTR systemBus::turnAround()
     the usual sequence: the talker releases the Clock line to signal that it's ready to send.
     */
 
-    // // Wait until the computer releases the ATN line
-    // pull(PIN_IEC_SRQ);
-    // if (protocol->timeoutWait(PIN_IEC_ATN, RELEASED, FOREVER) == TIMED_OUT)
-    // {
-    //     Debug_printf("Wait until the computer releases the ATN line");
-    //     flags |= ERROR;
-    //     return false; // return error because timeout
-    // }
-    // release(PIN_IEC_SRQ);
-
-    // // Delay after ATN is RELEASED
-    // protocol->wait( TIMING_Ttk, false );
-
     // Wait for CLK to be released
-    if (protocol->timeoutWait(PIN_IEC_CLK_IN, RELEASED, FOREVER) == TIMED_OUT)
+    if (protocol->timeoutWait(PIN_IEC_CLK_IN, RELEASED, TIMEOUT_Ttlta) == TIMEOUT_Ttlta)
     {
         Debug_printf("Wait until the computer releases the CLK line");
+        Debug_printf("IEC: TURNAROUND TIMEOUT");
         flags |= ERROR;
         return false; // return error because timeout
     }

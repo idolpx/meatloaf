@@ -94,6 +94,7 @@ int16_t  JiffyDOS::receiveByte ()
 
     // STEP 2: RECEIVING THE BITS
     // As soon as the talker releases the Clock line we are expected to receive the bits
+    // Bits are inverted so use IEC.status() to get pulled/released status
 
     //IEC.pull ( PIN_IEC_SRQ );
 
@@ -103,53 +104,53 @@ int16_t  JiffyDOS::receiveByte ()
 
     // get bits 4,5
     IEC.pull ( PIN_IEC_SRQ );
-    //if ( gpio_get_level ( PIN_IEC_CLK_IN ) )  data |= 0b00010000; // 1
-    //if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0b00100000; // 0
-    //ets_delay_us(bit_pair_timing[1][0]);
+    if ( IEC.status ( PIN_IEC_CLK_IN ) )  data |= 0b00010000; // 1
+    if ( IEC.status ( PIN_IEC_DATA_IN ) ) data |= 0b00100000; // 0
+    ets_delay_us(bit_pair_timing[1][0]);
     //xSemaphoreTake(s_timer_sem, portMAX_DELAY);
-    IEC.status();
-    if ( IEC.pin_clk )  data |= 0b00010000; // 1
-    if ( IEC.pin_data ) data |= 0b00100000; // 0
-    while (esp_timer_get_time() - cur_time < bit_pair_timing[1][0]);
+    // IEC.status();
+    // if ( IEC.pin_clk )  data |= 0b00010000; // 1
+    // if ( IEC.pin_data ) data |= 0b00100000; // 0
+    // while (esp_timer_get_time() - cur_time < bit_pair_timing[1][0]);
     IEC.release( PIN_IEC_SRQ );
     //ets_delay_us(1);
 
     // get bits 6,7
     IEC.pull ( PIN_IEC_SRQ );
-    //if ( gpio_get_level ( PIN_IEC_CLK_IN ) ) data |=  0b01000000; // 1
-    //if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0b10000000; // 1
-    //ets_delay_us(bit_pair_timing[1][1]);
+    if ( IEC.status ( PIN_IEC_CLK_IN ) ) data |=  0b01000000; // 1
+    if ( IEC.status ( PIN_IEC_DATA_IN ) ) data |= 0b10000000; // 1
+    ets_delay_us(bit_pair_timing[1][1]);
     //xSemaphoreTake(s_timer_sem, portMAX_DELAY);
-    IEC.status();
-    if ( IEC.pin_clk ) data |=  0b01000000; // 1
-    if ( IEC.pin_data ) data |= 0b10000000; // 1
-    while (esp_timer_get_time() - cur_time < bit_pair_timing[1][1]);
+    // IEC.status();
+    // if ( IEC.pin_clk ) data |=  0b01000000; // 1
+    // if ( IEC.pin_data ) data |= 0b10000000; // 1
+    // while (esp_timer_get_time() - cur_time < bit_pair_timing[1][1]);
     IEC.release( PIN_IEC_SRQ );
     //ets_delay_us(1);
 
     // get bits 3,1
     IEC.pull ( PIN_IEC_SRQ );
-    //if ( gpio_get_level ( PIN_IEC_CLK_IN ) )  data |= 0b00001000; // 1
-    //if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0b00000010; // 1
-    //ets_delay_us(bit_pair_timing[1][2]);
+    if ( IEC.status ( PIN_IEC_CLK_IN ) )  data |= 0b00001000; // 1
+    if ( IEC.status ( PIN_IEC_DATA_IN ) ) data |= 0b00000010; // 1
+    ets_delay_us(bit_pair_timing[1][2]);
     //xSemaphoreTake(s_timer_sem, portMAX_DELAY);
-    IEC.status();
-    if ( IEC.pin_clk )  data |= 0b00001000; // 1
-    if ( IEC.pin_data ) data |= 0b00000010; // 1
-    while (esp_timer_get_time() - cur_time < bit_pair_timing[1][2]);
+    // IEC.status();
+    // if ( IEC.pin_clk )  data |= 0b00001000; // 1
+    // if ( IEC.pin_data ) data |= 0b00000010; // 1
+    // while (esp_timer_get_time() - cur_time < bit_pair_timing[1][2]);
     IEC.release( PIN_IEC_SRQ );
     //ets_delay_us(1);
 
     // get bits 2,0
     IEC.pull ( PIN_IEC_SRQ );
-    //if ( gpio_get_level ( PIN_IEC_CLK_IN ) )  data |= 0b00000100; // 0
-    //if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0b00000001; // 1
-    //ets_delay_us(bit_pair_timing[1][3]);
+    if ( IEC.status ( PIN_IEC_CLK_IN ) )  data |= 0b00000100; // 0
+    if ( IEC.status ( PIN_IEC_DATA_IN ) ) data |= 0b00000001; // 1
+    ets_delay_us(bit_pair_timing[1][3]);
     //xSemaphoreTake(s_timer_sem, portMAX_DELAY);
-    IEC.status();
-    if ( IEC.pin_clk )  data |= 0b00000100; // 0
-    if ( IEC.pin_data ) data |= 0b00000001; // 1
-    while (esp_timer_get_time() - cur_time < bit_pair_timing[1][3]);
+    // IEC.status();
+    // if ( IEC.pin_clk )  data |= 0b00000100; // 0
+    // if ( IEC.pin_data ) data |= 0b00000001; // 1
+    // while (esp_timer_get_time() - cur_time < bit_pair_timing[1][3]);
     IEC.release( PIN_IEC_SRQ );
     //ets_delay_us(1);
 
@@ -162,24 +163,19 @@ int16_t  JiffyDOS::receiveByte ()
 
     // STEP 3: CHECK FOR EOI
     IEC.pull ( PIN_IEC_SRQ );
-    ets_delay_us(13);
-    if ( IEC.status ( PIN_IEC_CLK_IN ) == RELEASED && IEC.status ( PIN_IEC_DATA_IN ) == RELEASED )
+    ets_delay_us(6); // This should give enough time for lines to be pulled up if necessary
+    if ( IEC.status ( PIN_IEC_DATA_IN ) == RELEASED )
     {
         Debug_printv("ERROR [%2X]", data);
         IEC.flags |= ERROR;
         return -1;
     }
-    else if ( IEC.status ( PIN_IEC_CLK_IN ) == PULLED && IEC.status ( PIN_IEC_DATA_IN ) == RELEASED )
+    else if ( IEC.status ( PIN_IEC_CLK_IN ) == PULLED )
     {
         Debug_printv("EOI [%2X]", data);
         IEC.flags |= EOI_RECVD;
     }
     IEC.release ( PIN_IEC_SRQ );
-
-    // STEP 4: Acknowledge byte received
-    ets_delay_us(11);
-    IEC.pull ( PIN_IEC_DATA_OUT );
-    ets_delay_us(31);
 
     return data;
 } // receiveByte

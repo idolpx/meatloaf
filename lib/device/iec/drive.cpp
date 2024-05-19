@@ -260,7 +260,6 @@ void iecDrive::iec_close()
 {
     if (_base == nullptr)
     {
-        IEC.senderTimeout();
         return; // Punch out.
     }
 //    Debug_printv("url[%s]", _base->url.c_str());
@@ -288,7 +287,6 @@ void iecDrive::iec_reopen_save()
 {
     if (_base == nullptr)
     {
-        IEC.senderTimeout();
         return; // Punch out.
     }
     Debug_printv("url[%s]", _base->url.c_str());
