@@ -96,18 +96,16 @@ public:
             // If this is a socket stream, it might send NDA ("I have no data for you, but keep asking"), so lte's check it!
             (*fileStream).checkNda();
             if((*fileStream).nda()) {
-                // JAIME: So you told me there's a way to signal "no data available on IEC", here's the place
-                // to send it:
-
-                // This signals No Data Available!
+                // JAIME: This signals No Data Available!
                 // It is also used for File Not Found
                 // STATUS on the C64 side will be set appropriately
+                //
+                // PRZEM: What about Thom's SRQ? Would it be useble here?
                 IEC.senderTimeout();
             }
             else {
                 // let's try to get and send next byte to IEC
                 char nextChar;
-                //(*fileStream).get(nextChar);
                 fileStream->get(nextChar);
                 // EOF could be set after this get, so
                 if(!fileStream->eof()) {
@@ -120,19 +118,26 @@ public:
         // the loop exited, it might be because:
         // - ATN was pulled?
         if(IEC.flags bitand ATN_PULLED) {
-            // JAIME: anything needs to happen here?
+            // PRZEM: anything needs to happen here?
             
-            // We just need to make sure the pointer is set so the byte it was trying to send 
+            // JAIME: We just need to make sure the pointer is set so the byte it was trying to send 
             // does not advance so a byte isn't skipped on resume
+            //
+            // PRZEM: nate that we are checking ATN_PULLED at the top of the loop. If it was pulled
+            // we 1. won't read by fileStream->get(nextChar) and 2. won't send by iecStream.write(&nextChar, 1)
+            // isn't that enough?
         }
         // - read whole? Send EOI!
         else if(fileStream->eof())
             iecStream.close();
         // - error occured?
         else if(fileStream->bad()) {
-            // JAIME: can we somehow signal an error here?
+            // PRZEM: can we somehow signal an error here?
 
-            // I think we used senderTimout() here too
+            // JAIME: I think we used senderTimout() here too
+            
+            // PRZEM: So how do we know if this is a recoverable timeout (like a socket waiting for more data)
+            // or a fatal error (like broken connection, removed diskette etc.)?
             IEC.senderTimeout();
         }
     }
@@ -149,7 +154,6 @@ public:
             char nextChar;
             //iecStream.get(nextChar); TODO
             if(!iecStream.eof()) {
-                //(*fileStream).put('a');
                 fileStream->put(nextChar);
             }
         }
