@@ -564,11 +564,9 @@ void systemBus::read_payload()
         }
 
         if (flags & EOI_RECVD)
-        {
-            data.payload = listen_command;
             break;
-        }
     }
+    data.payload = listen_command;
 
     state = BUS_IDLE;
     //release ( PIN_IEC_SRQ );

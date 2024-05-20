@@ -244,6 +244,7 @@ public:
         PeoplesUrlParser *p = PeoplesUrlParser::parseURL( url );
         std::string host = p->host;
         uint16_t port = p->getPort();
+        delete(p);
         return socket.open(host.c_str(), port);
     }
 

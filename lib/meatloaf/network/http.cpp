@@ -262,7 +262,7 @@ bool MeatHttpClient::processRedirectsAndOpen(int range) {
     _exists = true;
     _position = 0;
 
-    Debug_printv("size[%d] avail[%d] isFriendlySkipper[%d] isText[%d] httpCode[%d]", _size, available(), isFriendlySkipper, isText, lastRC);
+    Debug_printv("size[%d] avail[%d] isFriendlySkipper[%d] isText[%d] httpCode[%d] method[%d]", _size, available(), isFriendlySkipper, isText, lastRC, lastMethod);
 
     return true;
 }
@@ -271,11 +271,6 @@ bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
     url = dstUrl;
     lastMethod = meth;
     _error = 0;
-
-    // if ( meth == HTTP_METHOD_HEAD)
-    //     return processRedirectsAndOpen(0);
-    // else
-    //     return true;
 
     return processRedirectsAndOpen(0);
 };

@@ -40,12 +40,20 @@ _S_out == C64 -> IEC -> file
 _S_in  == file -> IEC -> C64
 
 */
+typedef enum {
+    STATUS_OK = 0,
+    STATUS_EOF,
+    STATUS_NDA,
+    STATUS_BAD,
+} pipe_status_t;
+
 class iecPipe {
     Meat::iostream* fileStream = nullptr;
     oiecstream iecStream;
     std::ios_base::openmode mode;
 
 public:
+    pipe_status_t status = STATUS_OK;
 
     // you call this once, when C64 requested to open the stream
     bool establish(std::string filename, std::ios_base::openmode m, systemBus* i) {
@@ -101,6 +109,11 @@ public:
                 // STATUS on the C64 side will be set appropriately
                 //
                 // PRZEM: What about Thom's SRQ? Would it be useble here?
+                //
+                // JAIME: I don't think so.  We are using SRQ to indicate that data is available to keep from polling on the C64 side
+                // and that is only for our custom program. It would not work with a standard LOAD/SAVE.
+                // We can set the status code and the virtual device using this class can read it and set the status on the command channel
+                status = STATUS_NDA;
                 IEC.senderTimeout();
             }
             else {
@@ -111,6 +124,7 @@ public:
                 if(!fileStream->eof()) {
                     iecStream.write(&nextChar, 1);
                     Debug_printf("%.2X ", nextChar);
+                    status = STATUS_OK;
                 }
             }
         }
@@ -126,10 +140,14 @@ public:
             // PRZEM: nate that we are checking ATN_PULLED at the top of the loop. If it was pulled
             // we 1. won't read by fileStream->get(nextChar) and 2. won't send by iecStream.write(&nextChar, 1)
             // isn't that enough?
+
+            // JAIME: That should be enough unless it pulls ATN while sending the byte.
         }
         // - read whole? Send EOI!
-        else if(fileStream->eof())
+        else if(fileStream->eof()) {
             iecStream.close();
+            status = STATUS_EOF;
+        }
         // - error occured?
         else if(fileStream->bad()) {
             // PRZEM: can we somehow signal an error here?
@@ -138,7 +156,12 @@ public:
             
             // PRZEM: So how do we know if this is a recoverable timeout (like a socket waiting for more data)
             // or a fatal error (like broken connection, removed diskette etc.)?
+
+            // JAIME: We check the status on the command channel to determine the error code.
+            // We need to have a status on this class that can be checked by our virtual device class and 
+            // then it will set the status on the command channel based on the cause of the error
             IEC.senderTimeout();
+            status = STATUS_BAD;
         }
     }
 
@@ -155,6 +178,7 @@ public:
             //iecStream.get(nextChar); TODO
             if(!iecStream.eof()) {
                 fileStream->put(nextChar);
+                status = STATUS_OK;
             }
         }
         // so here either the C64 stopped sending bytes to write or the output stream died
