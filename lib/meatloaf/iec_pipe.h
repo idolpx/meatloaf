@@ -99,7 +99,10 @@ public:
                 // JAIME: So you told me there's a way to signal "no data available on IEC", here's the place
                 // to send it:
 
-                // TODO
+                // This signals No Data Available!
+                // It is also used for File Not Found
+                // STATUS on the C64 side will be set appropriately
+                IEC.senderTimeout();
             }
             else {
                 // let's try to get and send next byte to IEC
@@ -118,6 +121,9 @@ public:
         // - ATN was pulled?
         if(IEC.flags bitand ATN_PULLED) {
             // JAIME: anything needs to happen here?
+            
+            // We just need to make sure the pointer is set so the byte it was trying to send 
+            // does not advance so a byte isn't skipped on resume
         }
         // - read whole? Send EOI!
         else if(fileStream->eof())
@@ -125,6 +131,9 @@ public:
         // - error occured?
         else if(fileStream->bad()) {
             // JAIME: can we somehow signal an error here?
+
+            // I think we used senderTimout() here too
+            IEC.senderTimeout();
         }
     }
 
