@@ -31,7 +31,7 @@ static void IRAM_ATTR cbm_on_attention_isr_handler(void *arg)
     // Go to listener mode and get command
     b->release(PIN_IEC_CLK_OUT);
     b->pull(PIN_IEC_DATA_OUT);
-    b->release(PIN_IEC_SRQ);
+//    b->release(PIN_IEC_SRQ);
 
     b->flags = CLEAR;
     b->flags |= ATN_PULLED;
@@ -201,10 +201,7 @@ void IRAM_ATTR systemBus::service()
         // ATN was pulled
         // Sometimes the C64 pulls ATN but doesn't pull CLOCK right away
         //pull( PIN_IEC_SRQ );
-        if ( protocol->timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMEOUT_DEFAULT, false ) == TIMED_OUT )
-        {
-            Debug_printv ( "ATN/Clock delay" );
-        }
+        protocol->timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMEOUT_ATNCLK, false );
         //release( PIN_IEC_SRQ );
     }
     else
@@ -478,10 +475,10 @@ void systemBus::read_command()
             // released before trying to process the command. 
             // Long ATN delay (>1.5ms) seems to occur more frequently with VIC-20.
             //pull ( PIN_IEC_SRQ );
-            if ( protocol->timeoutWait ( PIN_IEC_ATN, RELEASED ) == TIMED_OUT )
+            if ( protocol->timeoutWait ( PIN_IEC_ATN, RELEASED, TIMEOUT_DEFAULT, false ) == TIMED_OUT )
             {
                 Debug_printv ( "ATN Not Released after secondary" );
-                return; // return error because timeout
+                //return; // return error because timeout
             }
 
             // Delay after ATN is RELEASED
@@ -494,10 +491,10 @@ void systemBus::read_command()
     // Is this command for us?
     if ( !isDeviceEnabled( data.device ) )
     {
-        state = BUS_IDLE;
+        state = BUS_IDLE; // NOPE!
     }
 
-    // If the bus is idle then release the lines
+    // If the bus is NOT ACTIVE then release the lines
     if ( state < BUS_ACTIVE )
     {
         data.init();

@@ -39,7 +39,7 @@ int16_t  DolphinDOS::receiveByte ()
     IEC.pull ( PIN_IEC_SRQ );
 
     // Sometimes the C64 pulls ATN but doesn't pull CLOCK right away
-    if ( !wait ( 60 ) ) return -1;
+    if ( !wait ( 60, true ) ) return -1;
 
     // Wait for talker ready
     if ( timeoutWait ( PIN_IEC_CLK_IN, RELEASED, FOREVER ) == TIMED_OUT )
@@ -119,7 +119,7 @@ bool DolphinDOS::sendByte ( uint8_t data, bool eoi )
         //flags or_eq EOI_RECVD;
 
         // Signal eoi by waiting 200 us
-        if ( !wait ( TIMING_Tye ) ) return false;
+        if ( !wait ( TIMING_Tye, true ) ) return false;
 
         // get eoi acknowledge:
         if ( timeoutWait ( PIN_IEC_DATA_IN, PULLED ) == TIMED_OUT )
@@ -136,7 +136,7 @@ bool DolphinDOS::sendByte ( uint8_t data, bool eoi )
         }
 
         // ready to send last byte
-        if ( !wait ( TIMING_Try ) ) return false;
+        if ( !wait ( TIMING_Try, true ) ) return false;
     }
     // else
     // {
