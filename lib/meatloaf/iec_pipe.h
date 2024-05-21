@@ -95,8 +95,11 @@ public:
     // LOAD - push file bytes (fileStream.get) to C64 (iecStream.write)
     void readFile() {
         // this pipe wasn't itialized or wasn't meant for reading
-        if(fileStream == nullptr || mode != std::ios_base::openmode::_S_in)
+        if(fileStream == nullptr || mode != std::ios_base::openmode::_S_in) {
+            status = STATUS_BAD;
+            IEC.senderTimeout();
             return;
+        }
         
         // push bytes from file to C64 as long as they're available (eying ATN)
         while(!fileStream->eof() && !fileStream->bad() && !(IEC.flags bitand ATN_PULLED))
@@ -104,15 +107,6 @@ public:
             // If this is a socket stream, it might send NDA ("I have no data for you, but keep asking"), so lte's check it!
             (*fileStream).checkNda();
             if((*fileStream).nda()) {
-                // JAIME: This signals No Data Available!
-                // It is also used for File Not Found
-                // STATUS on the C64 side will be set appropriately
-                //
-                // PRZEM: What about Thom's SRQ? Would it be useble here?
-                //
-                // JAIME: I don't think so.  We are using SRQ to indicate that data is available to keep from polling on the C64 side
-                // and that is only for our custom program. It would not work with a standard LOAD/SAVE.
-                // We can set the status code and the virtual device using this class can read it and set the status on the command channel
                 status = STATUS_NDA;
                 IEC.senderTimeout();
             }
@@ -121,27 +115,20 @@ public:
                 // we will peek next char in case ATN is pulled during attempt to write
                 int next_char = fileStream->peek();
              
-                if (next_char == EOF) {
-                    if (fileStream->eof()) {
-                        status = STATUS_EOF;
-                    } else if (fileStream->fail()) {
-                        status = STATUS_BAD;
-                    } else {
-                        status = STATUS_BAD;
-                    }
-                } else {
+                if (next_char != EOF) {
+                    // we have a char, let's try to send it
                     char ch = static_cast<char>(next_char);
                     iecStream.write(&ch, 1);
-                    Debug_printf("%.2X ", ch);
+                    //Debug_printf("Sending byte to C64: %.2X ", ch);
                 }
 
-                // if ATN was pulled, we need to break the loop
                 if(IEC.flags bitand ATN_PULLED) {
+                    // if ATN was pulled, we need to escape from the loop
                     // PRZEM: set some status here?
                     break;
                 }
                 else {
-                    // ATN wasn't pulled, so we can safely flush that byte we peeked from the buffer
+                    // ATN wasn't pulled, so the byte was succesfully sent, so we can safely flush that byte we peeked from the buffer
                     char nextChar;
                     fileStream->get(nextChar);
                     status = STATUS_OK;
@@ -149,47 +136,35 @@ public:
             }
         }
 
-        // the loop exited, it might be because:
-        // - ATN was pulled?
+        // the loop exited, we have to check why
         if(IEC.flags bitand ATN_PULLED) {
-            // PRZEM: anything needs to happen here?
-            
-            // JAIME: We just need to make sure the pointer is set so the byte it was trying to send 
-            // does not advance so a byte isn't skipped on resume
-            //
-            // PRZEM: nate that we are checking ATN_PULLED at the top of the loop. If it was pulled
-            // we 1. won't read by fileStream->get(nextChar) and 2. won't send by iecStream.write(&nextChar, 1)
-            // isn't that enough?
+            // because ATN was pulled!
 
-            // JAIME: That should be enough unless it pulls ATN while sending the byte.
+            // do nothing
         }
-        // - read whole? Send EOI!
         else if(fileStream->eof()) {
-            iecStream.close();
+            // because we reached EOF on file stream
+
             status = STATUS_EOF;
+            // iecStream.close() call will do the last byte trick to signal EOF on C64 side
+            iecStream.close();
         }
-        // - error occured?
-        else if(fileStream->bad()) {
-            // PRZEM: can we somehow signal an error here?
+        else if(fileStream->bad() || fileStream->fail()) {
+            // because something went wrong with file stream
 
-            // JAIME: I think we used senderTimout() here too
-            
-            // PRZEM: So how do we know if this is a recoverable timeout (like a socket waiting for more data)
-            // or a fatal error (like broken connection, removed diskette etc.)?
-
-            // JAIME: We check the status on the command channel to determine the error code.
-            // We need to have a status on this class that can be checked by our virtual device class and 
-            // then it will set the status on the command channel based on the cause of the error
-            IEC.senderTimeout();
             status = STATUS_BAD;
+            IEC.senderTimeout();
         }
     }
 
     // SAVE - pull C64 bytes (iecStream.get) to remote file (fileStream.put)
     void writeFile() {
         // this pipe wasn't initialized or wasn't meant for writing
-        if(fileStream == nullptr || mode != std::ios_base::openmode::_S_out)
+        if(fileStream == nullptr || mode != std::ios_base::openmode::_S_out) {
+            status = STATUS_BAD;
+            IEC.senderTimeout();
             return;
+        }
         
         // push bytes from C64 to file as long as they're available (eying ATN)
         while(!fileStream->bad() && !(IEC.flags bitand ATN_PULLED))
