@@ -118,13 +118,21 @@ public:
             }
             else {
                 // let's try to get and send next byte to IEC
-                int nextByte = fileStream->peek();
-                // EOF could be set after this get, so
-                if(!nextByte != EOF) {
-                    // we will peek next char in case ATN is pulled during attempt to write
-                    char nextChar = (char)nextByte; // TODO - how to cast this int to char???
-                    iecStream.write(&nextChar, 1);
-                    Debug_printf("%.2X ", nextChar);
+                // we will peek next char in case ATN is pulled during attempt to write
+                int next_char = fileStream->peek();
+             
+                if (next_char == EOF) {
+                    if (fileStream->eof()) {
+                        status = STATUS_EOF;
+                    } else if (fileStream->fail()) {
+                        status = STATUS_BAD;
+                    } else {
+                        status = STATUS_BAD;
+                    }
+                } else {
+                    char ch = static_cast<char>(next_char);
+                    iecStream.write(&ch, 1);
+                    Debug_printf("%.2X ", ch);
                 }
 
                 // if ATN was pulled, we need to break the loop
