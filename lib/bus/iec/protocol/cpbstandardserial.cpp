@@ -322,7 +322,8 @@ bool CPBStandardSerial::sendByte(uint8_t data, bool eoi)
         }
     }
 
-    // Pull CLK to prepare to send bits
+    // delay before byte
+    if ( !wait ( TIMING_Tne, true ) ) return false;
     IEC.pull ( PIN_IEC_CLK_OUT );
 
     // STEP 3: SENDING THE BITS
@@ -358,7 +359,7 @@ bool CPBStandardSerial::sendByte(uint8_t data, bool eoi)
     // the Clock and Data lines are RELEASED to false and transmission stops.
 
     // Lines will be released when exiting the service loop
-    wait ( TIMING_Tbb );
+    //wait ( TIMING_Tbb );
 
     return true;
 }

@@ -1384,8 +1384,7 @@ bool iecDrive::sendFile()
             Debug_printv("ATN pulled while sending. b[%.2X]", b);
 
             // Save file pointer position
-            istream->seek(istream->position() - 2);
-            //success_rx = true;
+            istream->seek( -1, SEEK_CUR);
             break;
         }
 
