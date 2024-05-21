@@ -118,12 +118,24 @@ public:
             }
             else {
                 // let's try to get and send next byte to IEC
-                char nextChar;
-                fileStream->get(nextChar);
+                int nextByte = fileStream->peek();
                 // EOF could be set after this get, so
-                if(!fileStream->eof()) {
+                if(!nextByte != EOF) {
+                    // we will peek next char in case ATN is pulled during attempt to write
+                    char nextChar = (char)nextByte; // TODO - how to cast this int to char???
                     iecStream.write(&nextChar, 1);
                     Debug_printf("%.2X ", nextChar);
+                }
+
+                // if ATN was pulled, we need to break the loop
+                if(IEC.flags bitand ATN_PULLED) {
+                    // PRZEM: set some status here?
+                    break;
+                }
+                else {
+                    // ATN wasn't pulled, so we can safely flush that byte we peeked from the buffer
+                    char nextChar;
+                    fileStream->get(nextChar);
                     status = STATUS_OK;
                 }
             }
