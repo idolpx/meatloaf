@@ -106,42 +106,44 @@ int WiFiManager::start()
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_LOST_IP, _wifi_event_handler, this));
 
 
-    // SoftAP Setup
-    {
-        /* SoftAP - Wifi Access Point configuration setup */
-        wifi_config_t ap_config = {
-            .ap = {
-                //.ssid = "meatloaf",
-                //.password = NULL,
-                .ssid_len = 0,
-                .channel = 1,
-                .authmode = WIFI_AUTH_OPEN,
-                .ssid_hidden = 0,
-                .max_connection = 4,
-                .beacon_interval = 100,
-            },
-        };
+    // // SoftAP Setup
+    // {
+    //     /* SoftAP - Wifi Access Point configuration setup */
+    //     wifi_config_t ap_config = {
+    //         .ap = {
+    //             //.ssid = "meatloaf",
+    //             //.password = NULL,
+    //             .ssid_len = 0,
+    //             .channel = 1,
+    //             .authmode = WIFI_AUTH_OPEN,
+    //             .ssid_hidden = 0,
+    //             .max_connection = 4,
+    //             .beacon_interval = 100,
+    //         },
+    //     };
 
-        /* DHCP AP configuration */
-        esp_netif_dhcps_stop(_wifi_ap); /* DHCP client/server must be stopped before setting new IP information. */
-        esp_netif_ip_info_t ap_ip_info;
-        memset(&ap_ip_info, 0x00, sizeof(ap_ip_info));
-        inet_pton(AF_INET, "10.10.0.1", &ap_ip_info.ip);
-        inet_pton(AF_INET, "10.10.0.1", &ap_ip_info.gw);
-        inet_pton(AF_INET, "255.255.255.0", &ap_ip_info.netmask);
-        ESP_ERROR_CHECK(esp_netif_set_ip_info(_wifi_ap, &ap_ip_info));
-        ESP_ERROR_CHECK(esp_netif_dhcps_start(_wifi_ap));
+    //     /* DHCP AP configuration */
+    //     esp_netif_dhcps_stop(_wifi_ap); /* DHCP client/server must be stopped before setting new IP information. */
+    //     esp_netif_ip_info_t ap_ip_info;
+    //     memset(&ap_ip_info, 0x00, sizeof(ap_ip_info));
+    //     inet_pton(AF_INET, "10.10.0.1", &ap_ip_info.ip);
+    //     inet_pton(AF_INET, "10.10.0.1", &ap_ip_info.gw);
+    //     inet_pton(AF_INET, "255.255.255.0", &ap_ip_info.netmask);
+    //     ESP_ERROR_CHECK(esp_netif_set_ip_info(_wifi_ap, &ap_ip_info));
+    //     ESP_ERROR_CHECK(esp_netif_dhcps_start(_wifi_ap));
 
-        ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
-        ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &ap_config));
-        ESP_ERROR_CHECK(esp_wifi_set_bandwidth(WIFI_IF_AP, WIFI_BW_HT20));
-        ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
-    }
+    //     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
+    //     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &ap_config));
+    //     ESP_ERROR_CHECK(esp_wifi_set_bandwidth(WIFI_IF_AP, WIFI_BW_HT20));
+    // }
 
 
     // Set WiFi mode to Station
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_start());
+
+    // Disable powersave for lower latency
+    ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
 
     // Set a hostname from our configuration
     esp_netif_set_hostname(_wifi_sta, Config.get_general_devicename().c_str());
