@@ -20,6 +20,9 @@ if you need to close the pipe manually (i.e. because it was closed by C64), you 
 and it will be removed for you (writing last byte!)
 
 */
+
+
+/*
 class iecPipeBroker {
     // Key is a tuple of device number and channel number
     using DeviceChannelKey = std::tuple<int, int>;
@@ -101,4 +104,5 @@ public:
         return deviceChannelMap;
     }
 };
+*/
 #endif

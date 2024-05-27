@@ -11,7 +11,7 @@
 #include "../device/drive.h"
 
 // Assuming MStream and MFile classes are properly defined
-
+/*
 class StreamBroker {
 private:
     // Define a hash function for the combination of streamFile pointer and mode
@@ -75,6 +75,6 @@ public:
     }
 };
 
-
+*/
 
 #endif /* MEATLOAF_STREAM_BROKER */
