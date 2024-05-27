@@ -38,7 +38,7 @@ MediaType::~MediaType()
     unmount();
 }
 
-bool MediaType::format(uint16_t *respopnsesize)
+bool MediaType::format(uint16_t *responsesize)
 {
     return true;
 }
@@ -93,6 +93,10 @@ uint16_t MediaType::sector_size(uint16_t sector)
     (void)sector; // variable sector lengths are evil!
 
     return DISK_BYTES_PER_SECTOR_SINGLE;
+}
+
+uint32_t MediaType::num_sectors() {
+    return _media_num_sectors;
 }
 
 #endif // NEW_TARGET

@@ -1,6 +1,7 @@
 #ifdef FLASH_LITTLEFS
 
 #include "fnFsLittleFS.h"
+#include "fnFileLocal.h"
 
 #include <esp_vfs.h>
 #include <errno.h>
@@ -8,8 +9,8 @@
 
 #include "esp_littlefs.h"
 
-#include "../../include/debug.h"
 #include "../../include/global_defines.h"
+#include "../../include/debug.h"
 
 #define LITTLEFS_MAXPATH 512
 
@@ -152,6 +153,15 @@ FILE * FileSystemLittleFS::file_open(const char* path, const char* mode)
     free(fpath);
     return result;
 }
+
+#ifndef FNIO_IS_STDIO
+FileHandler * FileSystemLittleFS::filehandler_open(const char* path, const char* mode)
+{
+    Debug_printf("FileSystemLittleFS::filehandler_open %s %s\n", path, mode);
+    FILE * fh = file_open(path, mode);
+    return (fh == nullptr) ? nullptr : new FileHandlerLocal(fh);
+}
+#endif
 
 bool FileSystemLittleFS::exists(const char* path)
 {

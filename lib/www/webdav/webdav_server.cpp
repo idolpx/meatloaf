@@ -25,6 +25,7 @@ std::string Server::uriToPath(std::string uri)
         return rootPath;
 
     std::string path = rootPath + uri.substr(rootURI.length());
+    //Debug_printv("uri[%s] path[%s]", uri.c_str(), path.c_str());
     while (path.substr(path.length() - 1, 1) == "/")
         path = path.substr(0, path.length() - 1);
     mstr::replaceAll(path, "//", "/");

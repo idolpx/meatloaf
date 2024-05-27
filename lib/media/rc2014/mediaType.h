@@ -69,7 +69,7 @@ public:
     virtual void unmount();
 
     // Returns TRUE if an error condition occurred
-    virtual bool format(uint16_t *respopnsesize);
+    virtual bool format(uint16_t *responsesize);
 
     // Returns TRUE if an error condition occurred
     virtual bool read(uint16_t sectornum, uint16_t *readcount) = 0;
@@ -80,6 +80,7 @@ public:
 
     static mediatype_t discover_mediatype(const char *filename, uint32_t disksize);
     uint16_t sector_size(uint16_t sector);
+    uint32_t num_sectors();
 
     virtual ~MediaType();
 };

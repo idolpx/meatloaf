@@ -6,6 +6,8 @@
 #define ABSTRACTION_FUJINET_H
 
 #include <string.h>
+#include <errno.h>
+#include "compat_string.h"
 
 #include "globals.h"
 
@@ -14,11 +16,19 @@
 #include "fnSystem.h"
 #include "fnWiFi.h"
 #include "fnFsSD.h"
+#ifdef ESP_PLATFORM
 #include "fnUART.h"
+#endif
 #include "fnTcpServer.h"
 #include "fnTcpClient.h"
 
 //#include "fuji.h"
+
+#ifdef ESP_PLATFORM
+#define FN_CPM_LINK fnUartBUS
+#else
+#define FN_CPM_LINK fnSioCom
+#endif
 
 #define HostOS 0x07 // FUJINET
 
@@ -502,14 +512,14 @@ uint8_t _sys_makedisk(uint8_t drive)
 
 int _kbhit(void)
 {
-	return fnUartBUS.available();
+	return FN_CPM_LINK.available();
 }
 
 uint8_t _getch(void)
 {
 	if (teeMode == true)
 	{
-		while (fnUartBUS.available() > 0)
+		while (FN_CPM_LINK.available() > 0)
 		{
 			if (client.available())
 			{
@@ -518,21 +528,21 @@ uint8_t _getch(void)
 				return ch & 0x7F;
 			}
 		}
-		return fnUartBUS.read() & 0x7F;
+		return FN_CPM_LINK.read() & 0x7F;
 	}
 	else
 	{
-		while (fnUartBUS.available() <= 0)
+		while (FN_CPM_LINK.available() <= 0)
 		{
 		}
-		return fnUartBUS.read() & 0x7f;
+		return FN_CPM_LINK.read() & 0x7f;
 	}
 }
 
 uint8_t _getche(void)
 {
 	uint8_t ch = _getch() & 0x7f;
-	fnUartBUS.write(ch);
+	FN_CPM_LINK.write(ch);
 	if (teeMode == true)
 		client.write(ch);
 	return ch;
@@ -540,7 +550,7 @@ uint8_t _getche(void)
 
 void _putch(uint8_t ch)
 {
-	fnUartBUS.write(ch & 0x7f);
+	FN_CPM_LINK.write(ch & 0x7f);
 	if (teeMode == true)
 		client.write(ch);
 }
@@ -652,7 +662,7 @@ uint8_t bios_tcpListen(uint16_t port)
 	}
 	else
 	{
-	Debug_printf("bios_tcpListen - Now listening on port %u\r\n", port);
+		Debug_printf("bios_tcpListen - Now listening on port %u\r\n", port);
 		return false;
 	}
 }

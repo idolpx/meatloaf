@@ -121,6 +121,24 @@ fnConfig::section_match fnConfig::_find_section_in_line(std::string &line, int &
             {
                 return SECTION_DEVICE_ENABLE;
             }
+#ifndef ESP_PLATFORM
+            else if (strncasecmp("Serial", s1.c_str(), 6) == 0)
+            {
+                return SECTION_SERIAL;
+            }
+            else if (strncasecmp("NetSIO", s1.c_str(), 6) == 0)
+            {
+                return SECTION_NETSIO;
+            }
+            else if (strncasecmp("BOIP", s1.c_str(), 4) == 0)
+            {
+                return SECTION_BOIP;
+            }
+            else if (strncasecmp("BOS", s1.c_str(), 3) == 0)
+            {
+                return SECTION_BOS;
+            }
+#endif
         }
     }
     return SECTION_UNKNOWN;
@@ -173,6 +191,7 @@ int fnConfig::_read_line(std::stringstream &ss, std::string &line, char abort_if
     while ((iseof = ss.eof()) == false)
     {
         ss.read(&c, 1);
+        if ((iseof = ss.eof()) == true) break; // eof reached, get out
 
         // Consume the next character after \r if it's a \n
         if (c == '\r')

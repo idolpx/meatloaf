@@ -1,10 +1,13 @@
-
-#include "fnFS.h"
-
+#ifdef ESP_PLATFORM
 #include <esp_vfs.h>
+#endif
 
+#include <sys/stat.h>
+#include <cstdio>
 #include <cstring>
 
+#include "fnFS.h"
+#include "compat_string.h"
 // #include "../../include/debug.h"
 
 
@@ -23,9 +26,7 @@ char * FileSystem::_make_fullpath(const char *path)
             fullpath[l+1] = '\0';
         }
         strlcat(fullpath, path, MAX_PATHLEN);
-        #ifdef DEBUG
         //Debug_printf("_make_fullpath \"%s\" -> \"%s\"\r\n", path, fullpath);
-        #endif
 
         return fullpath;
     }
@@ -45,11 +46,28 @@ long FileSystem::filesize(FILE *f)
     return end;
 }
 
-// Returns size of file given path
-long FileSystem::filesize(const char *filepath)
+
+#ifndef FNIO_IS_STDIO
+long FileSystem::filesize(FileHandler *fh)
 {
+    long curr = fh->tell();
+    fh->seek(0, SEEK_END);
+    long end = fh->tell();
+    fh->seek(curr, SEEK_SET);
+    Debug_printf("FileSystem::filesize from FileHandler returned %ld\r\n", end);
+    return end;
+}
+#endif
+
+// TODO: implement per filesystem
+// Returns size of file given path
+long FileSystem::filesize(const char *path)
+{
+#ifndef ESP_PLATFORM
+    Debug_println("!!! TODO !!! FileSystem::filesize from path");
+#endif
     struct stat fstat;
-    if( 0 == stat(filepath, &fstat))
+    if( 0 == stat(path, &fstat))
         return fstat.st_size;
     return -1;
 }
@@ -66,6 +84,10 @@ const char * FileSystem::type_to_string(fsType type)
             return "FS_SDFAT";
         case FSTYPE_TNFS:
             return "FS_TNFS";
+        case FSTYPE_SMB:
+            return "FS_SMB";
+        case FSTYPE_FTP:
+            return "FS_FTP";
         default:
             return "UNKNOWN FS TYPE";
     }

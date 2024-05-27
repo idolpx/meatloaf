@@ -1,6 +1,8 @@
 
 #include "keys.h"
 
+#include <esp32/himem.h>
+
 #include "../../include/debug.h"
 #include "../../include/pinmap.h"
 
@@ -239,6 +241,11 @@ void KeyManager::_keystate_task(void *param)
                 Config.save();
             }
 #endif //BLUETOOTH_SUPPORT
+#ifdef BUILD_MAC
+            Debug_println("ACTION: Mount all disks");
+            theFuji.mount_all();
+#endif /* BUILD_MAC */
+
             break;
 
         case eKeyStatus::SHORT_PRESS:
@@ -260,7 +267,7 @@ void KeyManager::_keystate_task(void *param)
                 // else
                 //     fnLedStrip.startRainbow(10);
             }
-                else
+            else
             {
                 fnLedManager.blink(LED_BUS, 2); // blink to confirm a button press
             }
@@ -305,6 +312,7 @@ void KeyManager::_keystate_task(void *param)
 
         case eKeyStatus::DOUBLE_TAP:
             Debug_println("BUTTON_A: DOUBLE-TAP");
+            fnSystem.debug_print_tasks();
             break;
 
         default:

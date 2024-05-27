@@ -21,7 +21,7 @@ class MLFileSystem: public MFileSystem
             return nullptr;
 
         //Debug_printv("MLFileSystem::getFile(%s)", path.c_str());
-        PeoplesUrlParser *urlParser = PeoplesUrlParser::parseURL( path );
+        auto urlParser = PeoplesUrlParser::parseURL( path );
         //std::string code = mstr::toUTF8(urlParser->name);
 
         //Debug_printv("url[%s]", urlParser.name.c_str());
@@ -30,7 +30,6 @@ class MLFileSystem: public MFileSystem
         
         //Debug_printv("url[%s]", ml_url.c_str());
 
-        delete(urlParser);
         return new HttpFile(ml_url);
     }
 

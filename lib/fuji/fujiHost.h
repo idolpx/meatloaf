@@ -10,7 +10,9 @@ enum fujiHostType
 {
     HOSTTYPE_UNINITIALIZED = 0,
     HOSTTYPE_LOCAL,
-    HOSTTYPE_TNFS
+    HOSTTYPE_TNFS,
+    HOSTTYPE_SMB,
+    HOSTTYPE_FTP,
 };
 
 class fujiHost
@@ -27,9 +29,11 @@ private:
 
     int mount_local();
     int mount_tnfs();
+    int mount_smb();
+    int mount_ftp();
 
     int unmount_local();
-    int unmount_tnfs();
+    int unmount_fs();
 
 public:
     int slotid = -1;
@@ -54,8 +58,15 @@ public:
 
     // File functions
     bool file_exists(const char *path);
-    FILE * file_open(const char *path, char *fullpath, int fullpathlen, const char *mode);
-    long file_size(FILE *filehandle);
+    fnFile * fnfile_open(const char *path, char *fullpath, int fullpathlen, const char *mode);
+#ifdef FNIO_IS_STDIO
+    // allow compilation of FILE* based fujiHost (all platforms except ATARI and APPLE)
+    FILE * file_open(const char *path, char *fullpath, int fullpathlen, const char *mode) {
+        return fnfile_open(path, fullpath, fullpathlen, mode);
+    }
+#endif
+    long file_size(fnFile *filehandle);
+
     bool file_remove(char *fullpath);
 
     // Directory functions

@@ -6,12 +6,18 @@
 
 #include "FS.h"
 
+#include <stdlib.h>
+#include <string.h>
+
 #include "../../include/debug.h"
 
 #include "status_error_codes.h"
 #include "utils.h"
 
 #include <cstring>
+#include <memory>
+#include <iostream>
+#include <vector>
 
 #define ENTRY_BUFFER_SIZE 256
 
@@ -87,26 +93,27 @@ bool NetworkProtocolFS::open_dir()
         return true;
     }
 
-    char *entryBuffer = (char *)malloc(ENTRY_BUFFER_SIZE);
+    std::vector<uint8_t> entryBuffer(ENTRY_BUFFER_SIZE);
 
-    while (read_dir_entry(entryBuffer, ENTRY_BUFFER_SIZE-1) == false)
+    while (read_dir_entry((char *)entryBuffer.data(), ENTRY_BUFFER_SIZE - 1) == false)
     {
         if (aux2_open & 0x80)
         {
             // Long entry
             if (aux2_open == 0x81) // Apple2 80 col format.
-                dirBuffer += util_long_entry_apple2_80col(std::string(entryBuffer), fileSize, is_directory) + "\x9b";
+                dirBuffer += util_long_entry_apple2_80col((char *)entryBuffer.data(), fileSize, is_directory) + lineEnding;
             else
-            dirBuffer += util_long_entry(std::string(entryBuffer), fileSize, is_directory) + "\x9b";
+                dirBuffer += util_long_entry((char *)entryBuffer.data(), fileSize, is_directory) + lineEnding;
         }
         else
         {
             // 8.3 entry
-            dirBuffer += util_entry(util_crunch(std::string(entryBuffer)), fileSize, is_directory, is_locked) + "\x9b";
+            dirBuffer += util_entry(util_crunch((char *)entryBuffer.data()), fileSize, is_directory, is_locked) + lineEnding;
         }
         fserror_to_error();
 
-        memset(entryBuffer,0,ENTRY_BUFFER_SIZE);
+        // Clearing the buffer for reuse
+        std::fill(entryBuffer.begin(), entryBuffer.end(), 0); // fenrock was right.
     }
 
 #ifdef BUILD_ATARI
@@ -124,7 +131,7 @@ void NetworkProtocolFS::update_dir_filename(PeoplesUrlParser *url)
 {
     size_t found = url->path.find_last_of("/");
 
-    dir = url->path.substr(0, found + 1);
+    dir = util_get_canonical_path(url->path.substr(0, found + 1));
     filename = url->path.substr(found + 1);
 
     // transform the possible everything wildcards
@@ -190,34 +197,25 @@ bool NetworkProtocolFS::read(unsigned short len)
 
 bool NetworkProtocolFS::read_file(unsigned short len)
 {
-    buf = (uint8_t *)malloc(len);
+    std::vector<uint8_t> buf = std::vector<uint8_t>(len);
 
     Debug_printf("NetworkProtocolFS::read_file(%u)\r\n", len);
-
-    if (buf == nullptr)
-    {
-        Debug_printf("NetworkProtocolFS:read_file(%u) could not allocate.\r\n", len);
-        return true; // error
-    }
 
     if (receiveBuffer->length() == 0)
     {
         // Do block read.
-        if (read_file_handle(buf, len) == true)
+        if (read_file_handle(buf.data(), len) == true)
         {
-            free(buf);
+            Debug_printf("Nothing new from adapter, bailing.\n");
             return true;
         }
 
         // Append to receive buffer.
-        *receiveBuffer += std::string((char *)buf, len);
+        receiveBuffer->insert(receiveBuffer->end(), buf.begin(), buf.end());
         fileSize -= len;
     }
     else
         error = NETWORK_ERROR_SUCCESS;
-
-    // Done with the temporary buffer.
-    free(buf);
 
     // Pass back to base class for translation.
     return NetworkProtocol::read(len);
@@ -389,7 +387,7 @@ void NetworkProtocolFS::resolve()
 
 bool NetworkProtocolFS::perform_idempotent_80(PeoplesUrlParser *url, cmdFrame_t *cmdFrame)
 {
-    Debug_printf("NetworkProtocolFS::perform_idempotent_80, url: %s\r\n", url->url.c_str());
+    Debug_printf("NetworkProtocolFS::perform_idempotent_80, url: %s cmd: 0x%02X\r\n", url->url.c_str(), cmdFrame->comnd);
     switch (cmdFrame->comnd)
     {
     case 0x20:
@@ -405,7 +403,7 @@ bool NetworkProtocolFS::perform_idempotent_80(PeoplesUrlParser *url, cmdFrame_t 
     case 0x2B:
         return rmdir(url, cmdFrame);
     default:
-        Debug_printf("Uncaught idempotent command: %u\r\n", cmdFrame->comnd);
+        Debug_printf("Uncaught idempotent command: 0x%02X\r\n", cmdFrame->comnd);
         return true;
     }
 }

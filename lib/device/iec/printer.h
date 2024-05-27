@@ -4,13 +4,9 @@
 
 #include <string>
 
-#if HOST_OS==win32
+
 #include "../../bus/bus.h"
 #include "../printer-emulator/printer_emulator.h"
-#else
-#include "bus.h"
-#include "printer_emulator.h"
-#endif
 
 #include "fnFS.h"
 

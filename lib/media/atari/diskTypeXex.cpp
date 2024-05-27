@@ -3,6 +3,8 @@
 #include "diskTypeXex.h"
 
 #include <cstring>
+#include <stdlib.h>
+#include <memory.h>
 
 #include "../../include/debug.h"
 
@@ -174,13 +176,13 @@ bool MediaTypeXEX::read(uint16_t sectornum, uint16_t *readcount)
     if (sectornum != _disk_last_sector + 1)
     {
         Debug_printf("seeking to offset %d in XEX\r\n", xex_offset);
-        err = fseek(_disk_fileh, xex_offset, SEEK_SET) != 0;
+        err = fnio::fseek(_disk_fileh, xex_offset, SEEK_SET) != 0;
     }
 
     if (err == false)
     {
         Debug_printf("requesting %d bytes from XEX\r\n", data_bytes);
-        int read = fread(_disk_sectorbuff, 1, data_bytes, _disk_fileh);
+        int read = fnio::fread(_disk_sectorbuff, 1, data_bytes, _disk_fileh);
         Debug_printf("received %d bytes\r\n", read);
 
         // Fill in the sector link data pointing to the next sector
@@ -225,7 +227,7 @@ MediaTypeXEX::~MediaTypeXEX()
     unmount();
 }
 
-mediatype_t MediaTypeXEX::mount(FILE *f, uint32_t disksize)
+mediatype_t MediaTypeXEX::mount(fnFile *f, uint32_t disksize)
 {
     Debug_print("XEX MOUNT\r\n");
 

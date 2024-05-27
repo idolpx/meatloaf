@@ -1,3 +1,7 @@
+#ifdef ESP_PLATFORM
+
+// ESP UART code
+
 
 #include "fnUART.h"
 
@@ -516,3 +520,11 @@ size_t Print::println(struct tm * timeinfo, const char * format)
     return n;
 }
 */
+
+#else
+
+#ifdef BUILD_COCO
+#include "fnUART.h"
+    UARTManager fnUartBUS;
+#endif
+#endif // ESP_PLATFORM

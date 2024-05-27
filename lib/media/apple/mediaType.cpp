@@ -12,7 +12,7 @@ MediaType::~MediaType()
     unmount();
 }
 
-bool MediaType::format(uint16_t *respopnsesize)
+bool MediaType::format(uint16_t *responsesize)
 {
     return true;
 }
@@ -31,7 +31,7 @@ void MediaType::unmount()
 {
     if (_media_fileh != nullptr)
     {
-        fclose(_media_fileh);
+        fnio::fclose(_media_fileh);
         _media_fileh = nullptr;
     }
 }
@@ -65,7 +65,7 @@ mediatype_t MediaType::discover_mediatype(const char *filename)
     return MEDIATYPE_UNKNOWN;
 }
 
-mediatype_t MediaType::discover_dsk_mediatype(FILE *f, uint32_t disksize)
+mediatype_t MediaType::discover_dsk_mediatype(fnFile *f, uint32_t disksize)
 {
     mediatype_t default_mt = MEDIATYPE_DO;
 
@@ -74,10 +74,10 @@ mediatype_t MediaType::discover_dsk_mediatype(FILE *f, uint32_t disksize)
 
     // a ProDOS Volume Directory Header is always in block 2,
     // if the file is in ProDOS order, it will be at offset 1024 
-    if (fseek(f, 1024, SEEK_SET) != 0)
+    if (fnio::fseek(f, 1024, SEEK_SET) != 0)
         return default_mt;
 
-    if (fread(hdr, 1, header_size, f) != header_size)
+    if (fnio::fread(hdr, 1, header_size, f) != header_size)
         return default_mt;
 
     uint16_t prevPointer = UINT16_FROM_HILOBYTES(hdr[1], hdr[0]);

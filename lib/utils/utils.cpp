@@ -2,10 +2,12 @@
 #include "utils.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
+#include <map>
 #include <sstream>
 #include <stack>
-#include <cmath>
+
 #include "compat_string.h"
 
 #ifndef ESP_PLATFORM
@@ -385,22 +387,19 @@ int util_ellipsize(const char *src, char *dst, int dstsize)
     return dstsize;
 }
 
-/*
-std::string util_ellipsize(std::string longString, int maxLength)
-{
-    size_t partSize = (maxLength - 3) >> 1; // size of left/right parts.
-    std::string leftPart;
-    std::string rightPart;
+std::string util_ellipsize_string(const std::string& src, size_t maxSize) {
+    if (src.length() <= maxSize) {
+        return src;
+    }
+    
+    if (maxSize < 6) { // Not enough space for ellipsis in the middle
+        return src.substr(0, maxSize);
+    }
 
-    if (longString.length() <= maxLength)
-        return longString;
-
-    leftPart = longString.substr(0, partSize);
-    rightPart = longString.substr(longString.length() - partSize, longString.length());
-
-    return leftPart + "..." + rightPart;
+    size_t leftLen = (maxSize - 3) / 2; // 3 for ellipsis
+    size_t rightLen = maxSize - 3 - leftLen;
+    return src.substr(0, leftLen) + "..." + src.substr(src.length() - rightLen);
 }
-*/
 
 // Function that matches input string against given wildcard pattern
 bool util_wildcard_match(const char *str, const char *pattern)
@@ -901,31 +900,45 @@ void util_ascii_to_petscii_str(std::string &s)
                    { return util_ascii_to_petscii(c); });
 }
 
-char *util_hexdump(const void *buf, size_t len) {
-  const unsigned char *p = (const unsigned char *) buf;
-  size_t i, idx, n = 0, ofs = 0, dlen = len * 5 + 100;
-  char ascii[17] = "", *dst = (char *) calloc(1, dlen);
-  if (dst == NULL) return dst;
-  for (i = 0; i < len; i++) {
-    idx = i % 16;
-    if (idx == 0) {
-      if (i > 0 && dlen > n)
-        n += (size_t) snprintf(dst + n, dlen - n, "  %s\n", ascii);
-      if (dlen > n)
-        n += (size_t) snprintf(dst + n, dlen - n, "%04x ", (int) (i + ofs));
+std::string util_hexdump(const void *buf, size_t len)
+{
+    const unsigned char *p = (const unsigned char *)buf;
+    std::string result;
+    char line[100], ascii[17] = {};
+    size_t i, idx = 16; // Initialize idx to 16 to handle case when len is 0
+
+    for (i = 0; i < len; ++i) {
+        idx = i % 16;
+        if (idx == 0) {
+            if (i != 0) {
+                snprintf(line, sizeof(line), "  %s\n", ascii);
+                result += line;
+            }
+            snprintf(line, sizeof(line), "%04x ", (unsigned int)i);
+            result += line;
+        }
+
+        snprintf(line, sizeof(line), " %02x", p[i]);
+        result += line;
+
+        ascii[idx] = (isprint(p[i]) ? p[i] : '.');
+        ascii[idx + 1] = '\0';
     }
-    if (dlen < n) break;
-    n += (size_t) snprintf(dst + n, dlen - n, " %02x", p[i]);
-    ascii[idx] = (char) (p[i] < 0x20 || p[i] > 0x7e ? '.' : p[i]);
-    ascii[idx + 1] = '\0';
-  }
-  while (i++ % 16) {
-    if (n < dlen) n += (size_t) snprintf(dst + n, dlen - n, "%s", "   ");
-  }
-  if (n < dlen) n += (size_t) snprintf(dst + n, dlen - n, "  %s\n", ascii);
-  if (n > dlen - 1) n = dlen - 1;
-  dst[n] = '\0';
-  return dst;
+
+    // This block adjusts the final line if len is not a multiple of 16
+    if (len % 16) {
+        for (size_t j = idx + 1; j < 16; ++j) {
+            result += "   ";
+        }
+    }
+
+    // Append the final ASCII representation, if len > 0
+    if (len != 0) {
+        snprintf(line, sizeof(line), "  %s\n", ascii);
+        result += line;
+    }
+
+    return result;
 }
 
 bool isApproximatelyInteger(double value, double tolerance) {
@@ -1012,4 +1025,9 @@ char* util_strndup(const char* s, size_t n) {
     memcpy(new_str, s, len);
     new_str[len] = '\0';
     return new_str;
+}
+
+int get_value_or_default(const std::map<int, int>& map, int key, int default_value) {
+    auto it = map.find(key);
+    return it != map.end() ? it->second : default_value;
 }

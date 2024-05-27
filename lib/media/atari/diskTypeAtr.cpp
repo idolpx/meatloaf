@@ -4,6 +4,8 @@
 
 #include <memory.h>
 #include <string.h>
+#include <unistd.h>
+#include <errno.h>
 
 #include "../../include/debug.h"
 
@@ -52,7 +54,7 @@ uint32_t MediaTypeATR::_sector_to_offset(uint16_t sectorNum)
 // Returns TRUE if an error condition occurred
 bool MediaTypeATR::read(uint16_t sectornum, uint16_t *readcount)
 {
-    Debug_print("ATR READ\r\n");
+    Debug_printf("ATR READ %d / %d\r\n", sectornum, _disk_num_sectors);
 
     *readcount = 0;
 
@@ -72,11 +74,11 @@ bool MediaTypeATR::read(uint16_t sectornum, uint16_t *readcount)
     if (sectornum != _disk_last_sector + 1)
     {
         uint32_t offset = _sector_to_offset(sectornum);
-        err = fseek(_disk_fileh, offset, SEEK_SET) != 0;
+        err = fnio::fseek(_disk_fileh, offset, SEEK_SET) != 0;
     }
 
     if (err == false)
-        err = fread(_disk_sectorbuff, 1, sectorSize, _disk_fileh) != sectorSize;
+        err = fnio::fread(_disk_sectorbuff, 1, sectorSize, _disk_fileh) != sectorSize;
 
     if (err == false)
         _disk_last_sector = sectornum;
@@ -96,12 +98,12 @@ bool inHighScoreRange(int minimum, int maximum, int val)
 // Returns TRUE if an error condition occurred
 bool MediaTypeATR::write(uint16_t sectornum, bool verify)
 {
-    FILE *oldFileh, *hsFileh;
+    fnFile *oldFileh, *hsFileh;
 
     oldFileh = nullptr;
     hsFileh = nullptr;
 
-    Debug_printf("ATR WRITE\r\n", sectornum, _disk_num_sectors);
+    Debug_printf("ATR WRITE %d / %d\r\n", sectornum, _disk_num_sectors);
 
     // Return an error if we're trying to write beyond the end of the disk
     if (sectornum > _disk_num_sectors)
@@ -120,7 +122,7 @@ bool MediaTypeATR::write(uint16_t sectornum, bool verify)
         else
         {
             oldFileh = _disk_fileh;
-            hsFileh = _disk_host->file_open(_disk_filename, _disk_filename, strlen(_disk_filename) + 1, "r+");
+            hsFileh = _disk_host->fnfile_open(_disk_filename, _disk_filename, strlen(_disk_filename) + 1, "rb+");
             _disk_fileh = hsFileh;
         }
     }
@@ -133,7 +135,7 @@ bool MediaTypeATR::write(uint16_t sectornum, bool verify)
     int e;
     if (sectornum != _disk_last_sector + 1)
     {
-        e = fseek(_disk_fileh, offset, SEEK_SET);
+        e = fnio::fseek(_disk_fileh, offset, SEEK_SET);
         if (e != 0)
         {
             Debug_printf("::write seek error %d\r\n", e);
@@ -141,23 +143,22 @@ bool MediaTypeATR::write(uint16_t sectornum, bool verify)
         }
     }
     // Write the data
-    e = fwrite(_disk_sectorbuff, 1, sectorSize, _disk_fileh);
+    e = fnio::fwrite(_disk_sectorbuff, 1, sectorSize, _disk_fileh);
     if (e != sectorSize)
     {
         Debug_printf("::write error %d, %d\r\n", e, errno);
         return true;
     }
 
-    int ret = fflush(_disk_fileh);    // This doesn't seem to be connected to anything in ESP-IDF VF, so it may not do anything
-    ret = fsync(fileno(_disk_fileh)); // Since we might get reset at any moment, go ahead and sync the file (not clear if fflush does this)
-    Debug_printf("ATR::write fsync:%d\r\n", ret);
+    int ret = fnio::fflush(_disk_fileh); // Since we might get reset at any moment, go ahead and sync the file
+    Debug_printf("ATR::write fflush:%d\r\n", ret);
 
     if (_high_score_sector != 0)
     {
         Debug_printf("Closing high score sector.\r\n");
 
         if (hsFileh != nullptr)
-            fclose(hsFileh);
+            fnio::fclose(hsFileh);
 
         _disk_fileh = oldFileh;
         _disk_last_sector = INVALID_SECTOR_VALUE; // force a cache invalidate.
@@ -172,14 +173,15 @@ void MediaTypeATR::status(uint8_t statusbuff[4])
 {
     statusbuff[0] = DISK_DRIVE_STATUS_CLEAR;
 
-    if (_disk_sector_size > 128)
+    if (_percomBlock.sectors_per_trackL == 26)
+        statusbuff[0] |= DISK_DRIVE_STATUS_ENHANCED_DENSITY;
+    else if (_disk_sector_size > 128)
         statusbuff[0] |= DISK_DRIVE_STATUS_DOUBLE_DENSITY;
 
     if (_percomBlock.num_sides == 1)
         statusbuff[0] |= DISK_DRIVE_STATUS_DOUBLE_SIDED;
 
-    if (_percomBlock.sectors_per_trackL == 26)
-        statusbuff[0] |= DISK_DRIVE_STATUS_ENHANCED_DENSITY;
+
 
     statusbuff[1] = ~_disk_controller_status; // Negate the controller status
 }
@@ -218,7 +220,7 @@ bool MediaTypeATR::format(uint16_t *responsesize)
 
  07-0F have two possible interpretations but are no critical for our use
 */
-mediatype_t MediaTypeATR::mount(FILE *f, uint32_t disksize)
+mediatype_t MediaTypeATR::mount(fnFile *f, uint32_t disksize)
 {
     Debug_print("ATR MOUNT\r\n");
 
@@ -230,12 +232,12 @@ mediatype_t MediaTypeATR::mount(FILE *f, uint32_t disksize)
 
     // Get file and sector size from header
     int i;
-    if ((i = fseek(f, 0, SEEK_SET)) < 0)
+    if ((i = fnio::fseek(f, 0, SEEK_SET)) < 0)
     {
         Debug_printf("failed seeking to header on disk image (%d, %d)\r\n", i, errno);
         return _disktype;
     }
-    if ((i = fread(buf, 1, sizeof(buf), f)) != sizeof(buf))
+    if ((i = fnio::fread(buf, 1, sizeof(buf), f)) != sizeof(buf))
     {
         Debug_printf("failed reading header bytes (%d, %d)\r\n", i, errno);
         return _disktype;
@@ -280,7 +282,7 @@ mediatype_t MediaTypeATR::mount(FILE *f, uint32_t disksize)
 }
 
 // Returns FALSE on error
-bool MediaTypeATR::create(FILE *f, uint16_t sectorSize, uint16_t numSectors)
+bool MediaTypeATR::create(fnFile *f, uint16_t sectorSize, uint16_t numSectors)
 {
     Debug_print("ATR CREATE\r\n");
 
@@ -328,7 +330,7 @@ bool MediaTypeATR::create(FILE *f, uint16_t sectorSize, uint16_t numSectors)
     Debug_printf("Write header to ATR: sec_size=%d, sectors=%d, paragraphs=%d, bytes=%d\r\n",
                  sectorSize, numSectors, num_paragraphs, total_size);
 
-    uint32_t offset = fwrite(&atrHeader, 1, sizeof(atrHeader), f);
+    uint32_t offset = fnio::fwrite(&atrHeader, 1, sizeof(atrHeader), f);
 
     // Write first three 128 uint8_t sectors
     uint8_t blank[512] = {0};
@@ -337,10 +339,10 @@ bool MediaTypeATR::create(FILE *f, uint16_t sectorSize, uint16_t numSectors)
     {
         for (int i = 0; i < 3; i++)
         {
-            size_t out = fwrite(blank, 1, 128, f);
+            size_t out = fnio::fwrite(blank, 1, 128, f);
             if (out != 128)
             {
-                Debug_printf("Error writing sector %hhu\r\n", i);
+                Debug_printf("Error writing sector %d\r\n", i);
                 return false;
             }
             offset += 128;
@@ -350,8 +352,8 @@ bool MediaTypeATR::create(FILE *f, uint16_t sectorSize, uint16_t numSectors)
 
     // Write the rest of the sectors via sparse seek to the last sector
     offset += (numSectors * sectorSize) - sectorSize;
-    fseek(f, offset, SEEK_SET);
-    size_t out = fwrite(blank, 1, sectorSize, f);
+    fnio::fseek(f, offset, SEEK_SET);
+    size_t out = fnio::fwrite(blank, 1, sectorSize, f);
 
     if (out != sectorSize)
     {

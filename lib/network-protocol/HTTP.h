@@ -3,10 +3,21 @@
 
 #include <expat.h>
 
+#include "WebDAV.h"
 #include "FS.h"
 
+#ifdef ESP_PLATFORM
 #include "fnHttpClient.h"
-#include "WEBDAV.h"
+#define HTTP_CLIENT_CLASS fnHttpClient
+#else
+#include "mgHttpClient.h"
+#define HTTP_CLIENT_CLASS mgHttpClient
+#endif
+
+// on Windows/MinGW DELETE is defined already ...
+#if defined(_WIN32) && defined(DELETE)
+#undef DELETE
+#endif
 
 class NetworkProtocolHTTP : public NetworkProtocolFS
 {
@@ -18,7 +29,7 @@ public:
      * @param sp_buf pointer to special buffer
      * @return a NetworkProtocolFS object
      */
-    NetworkProtocolHTTP(string *rx_buf, string *tx_buf, string *sp_buf);
+    NetworkProtocolHTTP(std::string *rx_buf, std::string *tx_buf, std::string *sp_buf);
 
     /**
      * dTOR
@@ -180,7 +191,7 @@ private:
     /**
      * The fnHTTPClient object used by the adaptor for HTTP calls
      */
-    fnHttpClient *client = nullptr;
+    HTTP_CLIENT_CLASS *client = nullptr;
 
     /**
      * result code returned by an HTTP verb
@@ -188,19 +199,21 @@ private:
     int resultCode = 0;
 
     /**
-     * Array of up to 32 headers
+     * Headers the client wants us to collect information on if they are seen.
+     * The contract is to only collect headers the client is interested in, which they register for before making the request.
      */
-    char *collect_headers[32];
+    // char *collect_headers[32];
+    std::vector<std::string> collect_headers;
 
     /**
      * Collected headers count
      */
-    size_t collect_headers_count = 0;
+    // size_t collect_headers_count = 0;
 
     /**
      * Returned headers
      */
-    vector<string> returned_headers;
+    std::vector<std::string> returned_headers;
 
     /**
      * Returned header cursor
@@ -215,7 +228,7 @@ private:
     /**
      * POST or PUT Data to send.
      */
-    string postData;
+    std::string postData;
 
     /**
      * WebDAV handler
@@ -225,7 +238,7 @@ private:
     /**
      * Current Directory entry cursor
      */
-    vector<WebDAV::DAVEntry>::iterator dirEntryCursor;
+    std::vector<WebDAV::DAVEntry>::iterator dirEntryCursor;
 
     /**
      * Do HTTP transaction
@@ -295,42 +308,44 @@ private:
     bool parseDir(char *buf, unsigned short len);
 };
 
-/**
-     * @brief Template to wrap Start call.
-     * @param data pointer to parent class
-     * @param El the current element being parsed
-     * @param attr the array of attributes attached to element
-     */
-template <class T>
-void Start(void *data, const XML_Char *El, const XML_Char **attr)
-{
-    T *handler = static_cast<T *>(data);
-    handler->Start(El, attr);
-}
+// moved to WebDAV.cpp
+//
+// /**
+//      * @brief Template to wrap Start call.
+//      * @param data pointer to parent class
+//      * @param El the current element being parsed
+//      * @param attr the array of attributes attached to element
+//      */
+// template <class T>
+// void Start(void *data, const XML_Char *El, const XML_Char **attr)
+// {
+//     T *handler = static_cast<T *>(data);
+//     handler->Start(El, attr);
+// }
 
-/**
- * @brief Template to wrap End call
- * @param data pointer to parent class.
- * @param El the current element being parsed.
- **/
-template <class T>
-void End(void *data, const XML_Char *El)
-{
-    T *handler = static_cast<T *>(data);
-    handler->End(El);
-}
+// /**
+//  * @brief Template to wrap End call
+//  * @param data pointer to parent class.
+//  * @param El the current element being parsed.
+//  **/
+// template <class T>
+// void End(void *data, const XML_Char *El)
+// {
+//     T *handler = static_cast<T *>(data);
+//     handler->End(El);
+// }
 
-/**
- * @brief template to wrap character data.
- * @param data pointer to parent class
- * @param s pointer to the character data
- * @param len length of character data at pointer
- **/
-template <class T>
-void Char(void *data, const XML_Char *s, int len)
-{
-    T *handler = static_cast<T *>(data);
-    handler->Char(s, len);
-}
+// /**
+//  * @brief template to wrap character data.
+//  * @param data pointer to parent class
+//  * @param s pointer to the character data
+//  * @param len length of character data at pointer
+//  **/
+// template <class T>
+// void Char(void *data, const XML_Char *s, int len)
+// {
+//     T *handler = static_cast<T *>(data);
+//     handler->Char(s, len);
+// }
 
 #endif /* NETWORKPROTOCOLHTTP_H */

@@ -6,11 +6,17 @@
 
 #include "Telnet.h"
 
+#include <stdlib.h>
+#include <errno.h>
+#include <string.h>
+#include "compat_inet.h"
+
 #include "../../include/debug.h"
 
 #include "libtelnet.h"
 #include "status_error_codes.h"
 
+#include <vector>
 
 
 static const telnet_telopt_t telopts[] = {
@@ -98,15 +104,9 @@ NetworkProtocolTELNET::~NetworkProtocolTELNET()
  */
 bool NetworkProtocolTELNET::read(unsigned short len)
 {
-    char *newData = (char *)malloc(len);
+    std::vector<uint8_t> newData = std::vector<uint8_t>(len);
 
     Debug_printf("NetworkProtocolTELNET::read(%u)\r\n", len);
-
-    if (newData == nullptr)
-    {
-        Debug_printf("Could not allocate %u bytes! Aborting!\r\n");
-        return true; // error.
-    }
 
     if (receiveBuffer->length() == 0)
     {
@@ -114,25 +114,22 @@ bool NetworkProtocolTELNET::read(unsigned short len)
         if (!client.connected())
         {
             error = NETWORK_ERROR_NOT_CONNECTED;
-            free(newData);
             return true; // error
         }
 
         // Do the read from client socket.
-        client.read((uint8_t *)newData, len);
+        client.read(newData.data(), len);
 
-        telnet_recv(telnet, newData, len);
+        telnet_recv(telnet, (char *)newData.data(), len);
 
         // bail if the connection is reset.
         if (errno == ECONNRESET)
         {
             error = NETWORK_ERROR_CONNECTION_RESET;
-            free(newData);
             return true;
         }
-
-        free(newData);
     }
+
     // Return success
     error = 1;
 

@@ -19,8 +19,9 @@
 #ifndef MEATLOAF_PUP_H
 #define MEATLOAF_PUP_H
 
-#include <string>
 #include <cstdint>
+#include <memory>
+#include <string>
 
 class PeoplesUrlParser
 {
@@ -58,12 +59,13 @@ public:
 
     uint16_t getPort();
 
-    static PeoplesUrlParser* parseURL(const std::string &u);
+    static std::unique_ptr<PeoplesUrlParser> parseURL(const std::string &u);
     void resetURL(const std::string u);
     std::string rebuildUrl(void);
     bool isValidUrl();
 
     void dump() {
+        printf("url[%s]\r\n", url.c_str());
         printf("scheme: %s\r\n", scheme.c_str());
         printf("user pass: %s -- %s\r\n", user.c_str(), password.c_str());
         printf("host port: %s -- %s\r\n", host.c_str(), port.c_str());
@@ -74,7 +76,7 @@ public:
         printf("fragment: %s\r\n", fragment.c_str());
         printf("root: %s\r\n", root().c_str());
         printf("base: %s\r\n", base().c_str());
-        printf("pathToFile: %s\r\n", pathToFile().c_str());
+        printf("pathToFile: %s\r\n\r\n", pathToFile().c_str());
     }
 
 };

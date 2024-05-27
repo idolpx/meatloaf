@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-using namespace std;
+// using namespace std;
 
 /**
  * @brief a class wrapping expat parser for directory entries
@@ -26,12 +26,42 @@ public:
         /**
          * Entry filename
          */
-        string filename;
+        std::string filename;
+        /**
+         * Directory flag
+         */
+        bool isDir;
         /**
          * Entry filesize
          */
-        string fileSize;
+        std::string fileSize;
     };
+
+    /**
+     * @brief Called to setup everything before processing XML
+     */
+    bool begin_parser();
+
+    /**
+     * @brief Called to release XML parser resources
+     * @param clear_entries call clear() too
+     */
+    void end_parser(bool clear_entries = false);
+
+    /**
+     * @brief Called to parse data chunk
+     */
+    bool parse(const char *buf, int len, int isFinal);
+
+    /**
+     * @brief Called to scoot to beginning of directory entries
+     */
+    std::vector<WebDAV::DAVEntry>::iterator rewind() {return entries.begin();};
+
+    /**
+     * @brief Called to remove all stored directory entries
+     */
+    void clear();
 
     /**
      * @brief Called when start tag is encountered.
@@ -56,8 +86,9 @@ public:
     /**
      * @brief collection of DAV entries.
      */
-    vector<DAVEntry> entries;
+    std::vector<DAVEntry> entries;
 
+protected:
     /**
      * @brief the current entry
      */
@@ -77,6 +108,16 @@ public:
      * Are we inside D:getcontentlength?
      */
     bool insideGetContentLength;
+
+    /**
+     * Expat XML parser
+     */
+    XML_Parser parser;
+
+    /*
+     * Parsed entries counter
+     */
+    int entriesCounter;
 };
 
 #endif /* WebDAV_H */

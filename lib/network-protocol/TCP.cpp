@@ -6,12 +6,17 @@
 
 #include "TCP.h"
 
-#include <arpa/inet.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include <string.h>
+#include "compat_inet.h"
 
 #include "../../include/debug.h"
 
 #include "status_error_codes.h"
 
+#include <vector>
 
 /**
  * @brief ctor
@@ -50,7 +55,7 @@ bool NetworkProtocolTCP::open(PeoplesUrlParser *urlParser, cmdFrame_t *cmdFrame)
 {
     bool ret = true; // assume error until proven ok
 
-    Debug_printf("NetworkProtocolTCP::open(%s:%s)", urlParser->host.c_str(), urlParser->port.c_str());
+    Debug_printf("NetworkProtocolTCP::open(%s:%s)\r\n", urlParser->host.c_str(), urlParser->port.c_str());
 
     if (urlParser->host.empty())
     {
@@ -110,16 +115,9 @@ bool NetworkProtocolTCP::close()
 bool NetworkProtocolTCP::read(unsigned short len)
 {
     unsigned short actual_len = 0;
-    uint8_t *newData = (uint8_t *)malloc(len);
-    std::string newString;
+    std::vector<uint8_t> newData = std::vector<uint8_t>(len);
 
     Debug_printf("NetworkProtocolTCP::read(%u)\r\n", len);
-
-    if (newData == nullptr)
-    {
-        Debug_printf("Could not allocate %u bytes! Aborting!\r\n",len);
-        return true; // error.
-    }
 
     if (receiveBuffer->length() == 0)
     {
@@ -127,35 +125,28 @@ bool NetworkProtocolTCP::read(unsigned short len)
         if (!client.connected())
         {
             error = NETWORK_ERROR_NOT_CONNECTED;
-            free(newData);
             return true; // error
         }
 
         // Do the read from client socket.
-        actual_len = client.read(newData, len);
+        actual_len = client.read(newData.data(), len);
 
         // bail if the connection is reset.
         if (errno == ECONNRESET)
         {
             error = NETWORK_ERROR_CONNECTION_RESET;
-            free(newData);
             return true;
         }
         else if (actual_len != len) // Read was short and timed out.
         {
             Debug_printf("Short receive. We got %u bytes, returning %u bytes and ERROR\r\n", actual_len, len);
             error = NETWORK_ERROR_SOCKET_TIMEOUT;
-            free(newData);
             return true;
         }
 
         // Add new data to buffer.
-        newString = std::string((char *)newData, len);
-        *receiveBuffer += newString;
-    }
-    // Return success
-    free(newData);
-    
+        receiveBuffer->insert(receiveBuffer->end(), newData.begin(), newData.end());
+    }    
     error = 1;
     return NetworkProtocol::read(len);
 }
@@ -338,7 +329,11 @@ bool NetworkProtocolTCP::open_client(std::string hostname, unsigned short port)
 
     Debug_printf("Connecting to host %s port %d\r\n", hostname.c_str(), port);
 
+#ifdef ESP_PLATFORM
     res = client.connect(hostname.c_str(), port);
+#else
+    res = client.connect(hostname.c_str(), port, 5000); // TODO constant for connect timeout
+#endif
 
     if (res == 0)
     {
@@ -373,7 +368,7 @@ bool NetworkProtocolTCP::special_accept_connection()
         {
             remoteIP = client.remoteIP();
             remotePort = client.remotePort();
-            remoteIPString = inet_ntoa(remoteIP);
+            remoteIPString = compat_inet_ntoa(remoteIP);
             Debug_printf("Accepted connection from %s:%u\r\n", remoteIPString, remotePort);
             return false;
         }
@@ -415,9 +410,14 @@ bool NetworkProtocolTCP::special_close_client_connection()
 
     remoteIP = client.remoteIP();
     remotePort = client.remotePort();
-    remoteIPString = inet_ntoa(remoteIP);
+    remoteIPString = compat_inet_ntoa(remoteIP);
 
     Debug_printf("Disconnecting client %s:%u\r\n", remoteIPString, remotePort);
+
+    // Clear all buffers.
+    receiveBuffer->clear();
+    transmitBuffer->clear();
+    specialBuffer->clear();
 
     client.stop();
 

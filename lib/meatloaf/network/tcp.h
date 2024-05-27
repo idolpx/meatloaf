@@ -241,11 +241,8 @@ public:
     }
 
     bool open() override {
-        PeoplesUrlParser *p = PeoplesUrlParser::parseURL( url );
-        std::string host = p->host;
-        uint16_t port = p->getPort();
-        delete(p);
-        return socket.open(host.c_str(), port);
+        auto p = PeoplesUrlParser::parseURL( url );
+        return socket.open(p->host.c_str(), p->getPort());
     }
 
     // MStream methods

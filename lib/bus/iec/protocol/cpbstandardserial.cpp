@@ -322,7 +322,9 @@ bool CPBStandardSerial::sendByte(uint8_t data, bool eoi)
         }
     }
 
-    // delay before byte
+    // IMPORTANT!!!
+    // Delay before byte
+    // ATN might get pulled here
     if ( !wait ( TIMING_Tne, true ) ) return false;
     IEC.pull ( PIN_IEC_CLK_OUT );
 
@@ -359,7 +361,6 @@ bool CPBStandardSerial::sendByte(uint8_t data, bool eoi)
     // the Clock and Data lines are RELEASED to false and transmission stops.
 
     // Lines will be released when exiting the service loop
-    //wait ( TIMING_Tbb );
 
     return true;
 }

@@ -1,7 +1,8 @@
 #ifndef _MEDIA_TYPE_
 #define _MEDIA_TYPE_
 
-#include <stdio.h>
+#include <stdint.h>
+#include "fnio.h"
 #include"../fuji/fujiHost.h"
 
 #define INVALID_SECTOR_VALUE 65536
@@ -14,7 +15,7 @@
 
 #define DISK_CTRL_STATUS_CLEAR 0x00
 
-enum mediatype_t 
+enum mediatype_t
 {
     MEDIATYPE_UNKNOWN = 0,
     MEDIATYPE_DO,
@@ -27,9 +28,9 @@ enum mediatype_t
 class MediaType
 {
 protected:
-    FILE *_media_fileh = nullptr;
-    FILE *oldFileh = nullptr; /* Temp fileh for high score enabled games */
-    FILE *hsFileh = nullptr; /* Temp fileh for high score enabled games */
+    fnFile *_media_fileh = nullptr;
+    fnFile *oldFileh = nullptr; /* Temp fileh for high score enabled games */
+    fnFile *hsFileh = nullptr; /* Temp fileh for high score enabled games */
 
     uint32_t _media_image_size = 0;
     uint32_t _media_num_sectors = 0;
@@ -61,7 +62,7 @@ public:
 
     char _disk_filename[256];
     fujiHost *_media_host = nullptr;
-    FILE *_media_hsfileh = nullptr;
+    fnFile *_media_hsfileh = nullptr;
     bool high_score_enabled = false;
 
     // uint8_t _media_sectorbuff[DISK_SECTORBUF_SIZE];
@@ -70,11 +71,11 @@ public:
     // bool _allow_hsio = true;
     bool diskiiemulation;
 
-    virtual mediatype_t mount(FILE *f, uint32_t disksize) = 0;
+    virtual mediatype_t mount(fnFile *f, uint32_t disksize) = 0;
     virtual void unmount();
 
     // Returns TRUE if an error condition occurred
-    virtual bool format(uint16_t *respopnsesize);
+    virtual bool format(uint16_t *responsesize);
 
     // Returns TRUE if an error condition occurred
     virtual bool read(uint32_t blockNum, uint16_t *count, uint8_t* buffer) = 0;
@@ -86,7 +87,7 @@ public:
     virtual bool status() = 0;
 
     static mediatype_t discover_mediatype(const char *filename);
-    static mediatype_t discover_dsk_mediatype(FILE* f, uint32_t disksize);
+    static mediatype_t discover_dsk_mediatype(fnFile* f, uint32_t disksize);
 
     // void dump_percom_block();
     // void derive_percom_block(uint16_t numSectors);

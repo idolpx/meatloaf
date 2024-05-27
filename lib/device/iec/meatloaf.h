@@ -33,11 +33,12 @@ typedef struct
     char fn_version[15];
 } AdapterConfig;
 
-enum appkey_mode : uint8_t
+enum appkey_mode : int8_t
 {
+    APPKEYMODE_INVALID = -1,
     APPKEYMODE_READ = 0,
     APPKEYMODE_WRITE,
-    APPKEYMODE_INVALID
+    APPKEYMODE_READ_256
 };
 
 struct appkey
@@ -72,10 +73,16 @@ private:
     AdapterConfig cfg;
 
     std::string response;
+    std::vector<uint8_t> responseV;
 
     void process_raw_commands();
     void process_basic_commands();
     vector<string> tokenize_basic_command(string command);
+
+    bool validate_parameters_and_setup(uint8_t& maxlen, uint8_t& addtlopts);
+    bool validate_directory_slot();
+    std::string process_directory_entry(uint8_t maxlen, uint8_t addtlopts);
+    void format_and_set_response(const std::string& entry);
 
 protected:
     void reset_device();           // 0xFF

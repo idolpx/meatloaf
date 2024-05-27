@@ -1,6 +1,7 @@
 #ifndef _FN_UTILS_H
 #define _FN_UTILS_H
 
+#include <map>
 #include <string>
 #include <vector>
 #include <cstdint>
@@ -59,7 +60,7 @@ std::string util_entry(std::string crunched, size_t fileSize, bool is_dir, bool 
 std::string util_long_entry(std::string filename, size_t fileSize, bool is_dir);
 std::string util_long_entry_apple2_80col(std::string filename, size_t fileSize, bool is_dir);
 int util_ellipsize(const char* src, char *dst, int dstsize);
-//std::string util_ellipsize(std::string longString, int maxLength);
+std::string util_ellipsize_string(const std::string& src, size_t maxSize);
 bool util_wildcard_match(const char *str, const char *pattern);
 bool util_starts_with(std::string s, const char *pattern);
 
@@ -100,7 +101,7 @@ void util_petscii_to_ascii_str(std::string &s);
 void util_ascii_to_petscii_str(std::string &s);
 
 // generic hex dump for debug output
-char *util_hexdump(const void *buf, size_t len);
+std::string util_hexdump(const void *buf, size_t len);
 
 // check if a double is very close to an integer
 bool isApproximatelyInteger(double value, double tolerance = 1e-6);
@@ -114,5 +115,7 @@ void util_debug_printf(const char *fmt, ...);
 #endif // !ESP_PLATFORM
 
 char* util_strndup(const char* s, size_t n);
+
+int get_value_or_default(const std::map<int, int>& map, int key, int default_value);
 
 #endif // _FN_UTILS_H

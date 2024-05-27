@@ -26,7 +26,7 @@ private:
 
 public:
 
-    virtual mediatype_t mount(FILE *f, uint32_t disksize) override;
+    virtual mediatype_t mount(fnFile *f, uint32_t disksize) override;
     // virtual void unmount() override;
 
     // static bool create(FILE *f, uint32_t numBlock);

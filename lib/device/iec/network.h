@@ -2,7 +2,8 @@
 #define NETWORK_H
 
 #include <esp_timer.h>
-
+#include <memory>
+#include <array>
 #include <string>
 
 #include "../../bus/bus.h"
@@ -85,7 +86,7 @@ class iecNetwork : public virtualDevice
     /**
      * @brief the URL parser for each channel
      */
-    PeoplesUrlParser *urlParser[NUM_CHANNELS];
+    std::array<std::unique_ptr<PeoplesUrlParser>, NUM_CHANNELS> urlParser;
 
     /**
      * @brief the prefix for each channel

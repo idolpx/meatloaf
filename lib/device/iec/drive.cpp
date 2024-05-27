@@ -260,6 +260,7 @@ void iecDrive::iec_close()
 {
     if (_base == nullptr)
     {
+        IEC.senderTimeout();
         return; // Punch out.
     }
 //    Debug_printv("url[%s]", _base->url.c_str());
@@ -287,6 +288,7 @@ void iecDrive::iec_reopen_save()
 {
     if (_base == nullptr)
     {
+        IEC.senderTimeout();
         return; // Punch out.
     }
     Debug_printv("url[%s]", _base->url.c_str());
@@ -1367,18 +1369,14 @@ bool iecDrive::sendFile()
         }
 
         // Send Byte
-        //IEC.pull(PIN_IEC_SRQ);
         success_tx = IEC.sendByte(b, eoi);
-        // if ( !success_tx )
-        // {
-        //     Debug_printv("tx fail");
-        //     //IEC.release(PIN_IEC_SRQ);
-        //     return false;
-        // }
-        //IEC.release(PIN_IEC_SRQ);
+        if ( !success_tx )
+        {
+            Debug_printv("tx fail");
+            return false;
+        }
 
         // Exit if ATN is PULLED while sending
-        //if ( IEC.status ( PIN_IEC_ATN ) == PULLED )
         if ( IEC.flags & ATN_PULLED )
         {
             Debug_printv("ATN pulled while sending. b[%.2X]", b);

@@ -117,6 +117,7 @@ device_state_t iecMeatloaf::process()
         Debug_printf("Meatloaf device only accepts on channel 15. Sending NOTFOUND.\r\n");
         state = DEVICE_ERROR;
         IEC.senderTimeout();
+        return state;
     }
 
     if (commanddata.primary == IEC_TALK && commanddata.secondary == IEC_REOPEN)
@@ -124,12 +125,19 @@ device_state_t iecMeatloaf::process()
         #ifdef DEBUG
         if (response.size()>0) 
         {  
-            Debug_printv("Sending: ");
 
-            // Hex
-            for (int i=0;i<response.size();i++)
-            {
-                Debug_printf("%02X ",response[i]);
+            // ensure we don't flood the logs with debug, and make it look pretty using util_hexdump
+            uint8_t debug_len = response.size();
+            bool is_truncated = false;
+            if (debug_len > 128) {
+                debug_len = 128;
+                is_truncated = true;
+            }
+
+            auto msg = util_hexdump(response.c_str(), debug_len);
+            Debug_printf("Sending:\n%s\n", msg.c_str());
+            if (is_truncated) {
+                Debug_printf("[truncated from %d]\n", response.size());
             }
 
             // Debug_printf("  ");
@@ -144,8 +152,15 @@ device_state_t iecMeatloaf::process()
         Debug_printf("\n");
         #endif
 
-        while (!IEC.sendBytes(response, true))
-            ;
+        // TODO: review everywhere that directly uses IEC.sendBytes and make them all use iec with a common method?
+        if (!responseV.empty()) {
+            IEC.sendBytes(reinterpret_cast<char*>(responseV.data()), responseV.size());
+            responseV.clear();
+        } else {
+            IEC.sendBytes(const_cast<char*>(response.c_str()), response.size());
+            response = "";
+        }
+
     }
     else if (commanddata.primary == IEC_UNLISTEN)
     {
@@ -364,8 +379,8 @@ void iecMeatloaf::net_scan_networks()
 
     if (payload[0] == FUJICMD_SCAN_NETWORKS)
     {
-        response = "";
-        response += static_cast<char>(_countScannedSSIDs);
+        // dealing with binary data, so use the vector version
+        responseV.push_back(_countScannedSSIDs);
     }
     else
     {
@@ -400,10 +415,9 @@ void iecMeatloaf::net_scan_result()
         detail.rssi = 0;
     }
 
-    if (payload[0] == FUJICMD_GET_SCAN_RESULT) // raw
+    if (payload[0] == FUJICMD_GET_SCAN_RESULT)
     {
-        std::string r = std::string((const char *)&detail, sizeof(detail));
-        status_override = r;
+        responseV.assign(reinterpret_cast<const uint8_t*>(&detail), reinterpret_cast<const uint8_t*>(&detail) + sizeof(detail));
     }
     else // SCANRESULT,n
     {
@@ -437,7 +451,7 @@ void iecMeatloaf::net_get_ssid()
 
     if (payload[0] == FUJICMD_GET_SSID)
     {
-        response = std::string((const char *)&cfg, sizeof(cfg));
+        responseV.assign(reinterpret_cast<const uint8_t*>(&cfg), reinterpret_cast<const uint8_t*>(&cfg) + sizeof(cfg));
     }
     else // BASIC mode.
     {
@@ -577,20 +591,15 @@ void iecMeatloaf::net_store_ssid()
 // Get WiFi Status
 void iecMeatloaf::net_get_wifi_status()
 {
+    // Debug_printv("payload[0]==%02x\r\n", payload[0]);
     uint8_t wifiStatus = fnWiFi.connected() ? 3 : 6;
-    char r[4];
-
-    Debug_printv("payload[0]==%02x\r\n", payload[0]);
 
     if (payload[0] == FUJICMD_GET_WIFISTATUS)
     {
-        response.clear();
-        response = string((const char *)&wifiStatus,1);
-        return;
+        responseV.push_back(wifiStatus);
     }
     else
     {
-        response.clear();
         if (wifiStatus)
             response = "connected";
         else
@@ -1438,8 +1447,7 @@ void iecMeatloaf::get_adapter_config()
 
     if (payload[0] == FUJICMD_GET_ADAPTERCONFIG)
     {
-        std::string reply = std::string((const char *)&cfg, sizeof(AdapterConfig));
-        response = reply;
+        responseV.assign(reinterpret_cast<const uint8_t*>(&cfg), reinterpret_cast<const uint8_t*>(&cfg) + sizeof(AdapterConfig));
     }
     else if (payload == "ADAPTERCONFIG")
     {

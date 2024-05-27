@@ -9,9 +9,7 @@
 
 void pdfPrinter::pdf_header()
 {
-#ifdef DEBUG
     Debug_println("pdf header");
-#endif
     pdf_Y = 0;
     pdf_X = 0;
     pdf_pageCounter = 0;
@@ -60,9 +58,7 @@ void pdfPrinter::pdf_font_resource()
 
 void pdfPrinter::pdf_add_fonts() // pdfFont_t *fonts[],
 {
-#ifdef DEBUG
     Debug_print("pdf add fonts: ");
-#endif
 
     // OPEN LUT FILE
     char fname[30]; // filename: /f/shortname/Fi
@@ -73,9 +69,7 @@ void pdfPrinter::pdf_add_fonts() // pdfFont_t *fonts[],
     // font dictionary
     for (int i = 0; i < maxFonts; i++)
     {
-#ifdef DEBUG
         Debug_printf("font %d - ", i + 1);
-#endif
         // READ LINE IN LUT FILE
         size_t fontObjPos[7];
         for (int j = 0; j < 7; j++)
@@ -171,25 +165,17 @@ void pdfPrinter::pdf_add_fonts() // pdfFont_t *fonts[],
             fclose(fff);
             fputc('\n', _file); // make sure there's a seperator
         }
-#ifdef DEBUG
         else
-        {
             Debug_print("unused; ");
-        }
-#endif
     }
 
     fclose(lut);
-#ifdef DEBUG
     Debug_println("done.");
-#endif
 }
 
 void pdfPrinter::pdf_new_page()
 { // open a new page
-#ifdef DEBUG
     Debug_println("pdf new page");
-#endif
     pdf_objCtr++;
     pageObjects[pdf_pageCounter] = pdf_objCtr;
     objLocations[pdf_objCtr] = ftell(_file);
@@ -211,9 +197,7 @@ void pdfPrinter::pdf_new_page()
 
 void pdfPrinter::pdf_begin_text(double Y)
 {
-#ifdef DEBUG
     Debug_println("pdf begin text");
-#endif
     // open new text object
     fprintf(_file, "BT\n");
     TOPflag = false;
@@ -226,9 +210,7 @@ void pdfPrinter::pdf_begin_text(double Y)
 
 void pdfPrinter::pdf_new_line()
 {
-#ifdef DEBUG
     Debug_println("pdf new line");
-#endif
 
     // position new line and start text string array
     if (pdf_dY != 0)
@@ -245,9 +227,7 @@ void pdfPrinter::pdf_new_line()
 
 void pdfPrinter::pdf_end_line()
 {
-#ifdef DEBUG
     Debug_println("pdf end line");
-#endif
     fprintf(_file, ")]TJ\n"); // close the line
     // pdf_Y -= lineHeight; // line feed - moved to new line()
     pdf_X = 0; // CR
@@ -263,9 +243,7 @@ void pdfPrinter::pdf_set_rise()
 
 void pdfPrinter::pdf_end_page()
 {
-#ifdef DEBUG
     Debug_println("pdf end page");
-#endif
     // close text object & stream
     if (!BOLflag)
         pdf_end_line();
@@ -275,7 +253,7 @@ void pdfPrinter::pdf_end_page()
     size_t idx_temp = ftell(_file);
     fflush(_file);
     fseek(_file, idx_stream_length, SEEK_SET);
-    fprintf(_file, "%10u", (idx_stream_stop - idx_stream_start));
+    fprintf(_file, "%10u", (unsigned)(idx_stream_stop - idx_stream_start));
     fflush(_file);
     fseek(_file, idx_temp, SEEK_SET);
     // set counters
@@ -285,9 +263,7 @@ void pdfPrinter::pdf_end_page()
 
 void pdfPrinter::pdf_xref()
 {
-#ifdef DEBUG
     Debug_println("pdf xref");
-#endif
     size_t xref = ftell(_file);
     pdf_objCtr++;
     fprintf(_file, "xref\n");
@@ -295,11 +271,11 @@ void pdfPrinter::pdf_xref()
     fprintf(_file, "0000000000 65535 f\n");
     for (int i = 1; i < pdf_objCtr; i++)
     {
-        fprintf(_file, "%010u 00000 n\n", objLocations[i]);
+        fprintf(_file, "%010u 00000 n\n", (unsigned)objLocations[i]);
     }
     fprintf(_file, "trailer <</Size %d/Root 1 0 R>>\n", pdf_objCtr);
     fprintf(_file, "startxref\n");
-    fprintf(_file, "%u\n", xref);
+    fprintf(_file, "%u\n", (unsigned)xref);
     fprintf(_file, "%%%%EOF\n");
 }
 
@@ -349,9 +325,7 @@ bool pdfPrinter::process_buffer(uint8_t n, uint8_t aux1, uint8_t aux2)
     uint16_t c;
     uint16_t cc;
 
-#ifdef DEBUG
     // Debug_printf("Processing %d chars\r\n", n);
-#endif
 
     // algorithm for graphics:
     // if textMode, then can do the regular stuff
@@ -385,9 +359,7 @@ bool pdfPrinter::process_buffer(uint8_t n, uint8_t aux1, uint8_t aux2)
         if (translate850 && c == ATASCII_EOL)
             c = ASCII_CR; // the 850 interface converts EOL to CR
 
-        // #ifdef DEBUG
-        //         Debug_print(c, HEX);
-        // #endif
+        // Debug_print(c, HEX);
 
         if (!textMode || static_cast<bool>(colorMode))
         {
@@ -414,10 +386,8 @@ bool pdfPrinter::process_buffer(uint8_t n, uint8_t aux1, uint8_t aux2)
             // disposition the current byte
             pdf_handle_char(c, aux1, aux2);
 
-#ifdef DEBUG
             // Debug_printf("c: %3d  x: %6.2f  y: %6.2f  ", c, pdf_X, pdf_Y + pdf_dY);
             // Debug_printf("\r\n");
-#endif
         }
 #ifdef BUILD_APPLE // move this inside the loop incase the buffer has more than one line (SP packet buffering)
     // if wrote last line, then close the page

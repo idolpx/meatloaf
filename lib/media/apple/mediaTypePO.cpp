@@ -11,7 +11,7 @@ bool MediaTypePO::read(uint32_t blockNum, uint16_t *count, uint8_t* buffer)
     size_t readsize = *count;
 if (blockNum == 0 || blockNum != last_block_num + 1) // example optimization, only do seek if not reading next block -tschak
   {
-     if (fseek(_media_fileh, (blockNum * readsize) + offset, SEEK_SET))
+     if (fnio::fseek(_media_fileh, (blockNum * readsize) + offset, SEEK_SET))
     {
         reset_seek_opto();
         return true;
@@ -23,7 +23,7 @@ if (blockNum == 0 || blockNum != last_block_num + 1) // example optimization, on
   else
     last_block_num = blockNum;
 
-  readsize = fread((unsigned char *)buffer, 1, readsize, _media_fileh); // Reading block from SD Card
+  readsize = fnio::fread((unsigned char *)buffer, 1, readsize, _media_fileh); // Reading block from SD Card
   return (readsize != *count);
 }
 
@@ -35,20 +35,20 @@ bool MediaTypePO::write(uint32_t blockNum, uint16_t *count, uint8_t* buffer)
     {
         Debug_printf("high score: Swapping file handles\r\n");
         oldFileh = _media_fileh;
-        hsFileh = _media_host->file_open(_disk_filename, _disk_filename, strlen(_disk_filename) +1, "r+");
+        hsFileh = _media_host->fnfile_open(_disk_filename, _disk_filename, strlen(_disk_filename) +1, "rb+");
         _media_fileh = hsFileh;
     }
 
     if (blockNum != last_block_num + 1) // example optimization, only do seek if not writing next block -tschak
     {
-         if (fseek(_media_fileh, (blockNum * writesize) + offset, SEEK_SET))
+         if (fnio::fseek(_media_fileh, (blockNum * writesize) + offset, SEEK_SET))
         {
             reset_seek_opto();
             return true;
         }
     }
     last_block_num = blockNum;
-    writesize = fwrite((unsigned char *)buffer, 1, writesize, _media_fileh);
+    writesize = fnio::fwrite((unsigned char *)buffer, 1, writesize, _media_fileh);
     if (writesize != *count)
     {
        reset_seek_opto();
@@ -59,7 +59,7 @@ bool MediaTypePO::write(uint32_t blockNum, uint16_t *count, uint8_t* buffer)
     {
         Debug_printf("high score: Reverting file handles.\r\n");
         if (hsFileh != nullptr)
-            fclose(hsFileh);
+            fnio::fclose(hsFileh);
 
         _media_fileh = oldFileh;
         last_block_num = INVALID_SECTOR_VALUE; // Invalidate cache
@@ -68,16 +68,16 @@ bool MediaTypePO::write(uint32_t blockNum, uint16_t *count, uint8_t* buffer)
     return false;
 }
 
-bool MediaTypePO::format(uint16_t *respopnsesize)
+bool MediaTypePO::format(uint16_t *responsesize)
 {
     return false;
 }
 
-mediatype_t MediaTypePO::mount(FILE *f, uint32_t disksize)
+mediatype_t MediaTypePO::mount(fnFile *f, uint32_t disksize)
 {
     diskiiemulation = false;
     char hdr[64];
-    fread(&hdr,sizeof(char),64,f);
+    fnio::fread(&hdr,sizeof(char),64,f);
     if (hdr[0] == '2' && hdr[1] == 'I' && hdr[2] == 'M' && hdr[3] == 'G')
     {
         // check for 'high score enabled'

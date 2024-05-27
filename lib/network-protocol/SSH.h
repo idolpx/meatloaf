@@ -5,7 +5,9 @@
 #ifndef NETWORKPROTOCOL_SSH
 #define NETWORKPROTOCOL_SSH
 
+#ifdef ESP_PLATFORM
 #include <lwip/sockets.h>
+#endif
 
 #include <string>
 
@@ -13,9 +15,12 @@
 
 #include "fnTcpClient.h"
 #include "libssh/libssh.h"
+#ifdef ESP_PLATFORM
+// apc: this is libssh private header!
 #include "libssh/session.h"
+#endif
 
-using namespace std;
+// using namespace std;
 
 class NetworkProtocolSSH : public NetworkProtocol
 {
@@ -24,7 +29,7 @@ public:
     /**
      * ctor
      */
-    NetworkProtocolSSH(string *rx_buf, string *tx_buf, string *sp_buf);
+    NetworkProtocolSSH(std::string *rx_buf, std::string *tx_buf, std::string *sp_buf);
 
     /**
      * dtor

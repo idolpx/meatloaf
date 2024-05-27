@@ -1,13 +1,18 @@
 #ifdef FLASH_SPIFFS
 
 #include "fnFsSPIFFS.h"
+#include "fnFileLocal.h"
 
+#ifdef ESP_PLATFORM
 #include <esp_vfs.h>
 #include <esp_spiffs.h>
+#endif
+
+#include <sys/stat.h>
 #include <errno.h>
 
+#include "compat_string.h"
 #include "../../include/debug.h"
-
 
 #define SPIFFS_MAXPATH 512
 
@@ -61,9 +66,7 @@ fsdir_entry * FileSystemSPIFFS::dir_read()
             _direntry.size = s.st_size;
             _direntry.modified_time = s.st_mtime;
         }
-        #ifdef DEBUG
-            // Debug_printf("stat \"%s\" errno %d\r\n", fpath, errno);
-        #endif
+        // Debug_printf("stat \"%s\" errno %d\r\n", fpath, errno);
         return &_direntry;
     }
     return nullptr;
@@ -93,14 +96,21 @@ FILE * FileSystemSPIFFS::file_open(const char* path, const char* mode)
     return result;
 }
 
+#ifndef FNIO_IS_STDIO
+FileHandler * FileSystemSPIFFS::filehandler_open(const char* path, const char* mode)
+{
+    Debug_printf("FileSystemSPIFFS::filehandler_open %s %s\n", path, mode);
+    FILE * fh = file_open(path, mode);
+    return (fh == nullptr) ? nullptr : new FileHandlerLocal(fh);
+}
+#endif
+
 bool FileSystemSPIFFS::exists(const char* path)
 {
     char * fpath = _make_fullpath(path);
     struct stat st;
     int i = stat(fpath, &st);
-#ifdef DEBUG
     //Debug_printf("FileSystemSPIFFS::exists returned %d on \"%s\" (%s)\r\n", i, path, fpath);
-#endif
     free(fpath);
     return (i == 0);
 }
@@ -109,9 +119,7 @@ bool FileSystemSPIFFS::remove(const char* path)
 {
     char * fpath = _make_fullpath(path);
     int i = ::remove(fpath);
-#ifdef DEBUG
     Debug_printf("FileSystemSPIFFS::remove returned %d on \"%s\" (%s)\r\n", i, path, fpath);
-#endif
     free(fpath);
     return (i == 0);
 }
@@ -121,9 +129,7 @@ bool FileSystemSPIFFS::rename(const char* pathFrom, const char* pathTo)
     char * spath = _make_fullpath(pathFrom);
     char * dpath = _make_fullpath(pathTo);
     int i = ::rename(spath, dpath);
-#ifdef DEBUG
     Debug_printf("FileSystemSPIFFS::rename returned %d on \"%s\" -> \"%s\" (%s -> %s)\r\n", i, pathFrom, pathTo, spath, dpath);
-#endif
     free(spath);
     free(dpath);
     return (i == 0);
@@ -132,14 +138,18 @@ bool FileSystemSPIFFS::rename(const char* pathFrom, const char* pathTo)
 uint64_t FileSystemSPIFFS::total_bytes()
 {
     size_t total = 0, used = 0;
+#ifdef ESP_PLATFORM
 	esp_spiffs_info(NULL, &total, &used);
+#endif
     return (uint64_t)total;
 }
 
 uint64_t FileSystemSPIFFS::used_bytes()
 {
     size_t total = 0, used = 0;
+#ifdef ESP_PLATFORM
 	esp_spiffs_info(NULL, &total, &used);
+#endif
     return (uint64_t)used;
 }
 
@@ -149,12 +159,20 @@ bool FileSystemSPIFFS::start()
         return true;
 
     // Set our basepath
+#ifdef ESP_PLATFORM
 #ifndef BUILD_IEC
     strlcpy(_basepath, "/spiffs", sizeof(_basepath));
 #else
     strlcpy(_basepath, "", sizeof(_basepath));
 #endif
+// ESP_PLATFORM
+#else
+// !ESP_PLATFORM
+    strlcpy(_basepath, "data", sizeof(_basepath));
+#endif
 
+
+#ifdef ESP_PLATFORM
     esp_vfs_spiffs_conf_t conf = {
       .base_path = _basepath,
       .partition_label = "flash",
@@ -166,16 +184,15 @@ bool FileSystemSPIFFS::start()
 
     if (e != ESP_OK)
     {
-        #ifdef DEBUG
         Debug_printf("Failed to mount SPIFFS partition, err = %d\r\n", e);
-        #endif
         _started = false;
     }
     else
+#endif // ESP_PLATFORM
     {
         _started = true;
-    #ifdef DEBUG        
         Debug_println("SPIFFS mounted.");
+    #ifdef DEBUG
         /*
         size_t total = 0, used = 0;
         esp_spiffs_info(NULL, &total, &used);

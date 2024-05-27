@@ -24,8 +24,6 @@
 #include "SSH.h"
 #include "SMB.h"
 
-#include "esp_heap_trace.h"
-
 iecNetwork::iecNetwork()
 {
     for (int i = 0; i < NUM_CHANNELS; i++)
@@ -191,7 +189,7 @@ void iecNetwork::iec_open()
     Debug_printf("iecNetwork::open_protocol() - Protocol %s opened.\r\n", urlParser[commanddata.channel]->scheme.c_str());
 
     // Attempt protocol open
-    if (protocol[commanddata.channel]->open(urlParser[commanddata.channel], &cmdFrame) == true)
+    if (protocol[commanddata.channel]->open(urlParser[commanddata.channel].get(), &cmdFrame) == true)
     {
         Debug_printv("Protocol unable to make connection.\r\n");
         delete protocol[commanddata.channel];
@@ -1147,7 +1145,7 @@ void iecNetwork::set_prefix()
 
     if (prefixSpec_str == "..") // Devance path N:..
     {
-        vector<int> pathLocations;
+        std::vector<int> pathLocations;
         for (int i = 0; i < prefix[channel].size(); i++)
         {
             if (prefix[channel][i] == '/')
@@ -1262,7 +1260,7 @@ void iecNetwork::fsop(unsigned char comnd)
     cmdFrame.comnd = comnd;
 
     if (protocol[commanddata.channel] != nullptr)
-        protocol[commanddata.channel]->perform_idempotent_80(urlParser[commanddata.channel], &cmdFrame);
+        protocol[commanddata.channel]->perform_idempotent_80(urlParser[commanddata.channel].get(), &cmdFrame);
 
     iec_close();
 }

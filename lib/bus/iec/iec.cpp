@@ -18,6 +18,10 @@
 #include "string_utils.h"
 #include "utils.h"
 
+#define MAIN_STACKSIZE 4096
+#define MAIN_PRIORITY 20
+#define MAIN_CPUAFFINITY 1
+
 using namespace Protocol;
 
 systemBus IEC;
@@ -170,7 +174,9 @@ void systemBus::setup()
 #endif
 
     // Start task
-    xTaskCreatePinnedToCore(ml_iec_intr_task, "ml_iec_intr_task", 4096, NULL, 20, NULL, 1);
+    // Create a new high-priority task to handle the main service loop
+    // This is assigned to CPU1; the WiFi task ends up on CPU0
+    xTaskCreatePinnedToCore(ml_iec_intr_task, "ml_iec_intr_task", MAIN_STACKSIZE, NULL, MAIN_PRIORITY, NULL, MAIN_CPUAFFINITY);
 
     // Setup interrupt for ATN
     gpio_config_t io_conf = {
@@ -535,7 +541,8 @@ void systemBus::read_command()
 
 void systemBus::read_payload()
 {
-    // Record the command string until ATN is PULLED 
+    // Record the command string until ATN is PULLED
+    // NOTE: string is just a container, it may contain arbitrary bytes but a LOT of code treats payload as a string
     std::string listen_command = "";
 
     // ATN might get pulled right away if there is no command string to send
@@ -555,7 +562,7 @@ void systemBus::read_payload()
             return;
         }
 
-        if (c != 0xFFFFFFFF && c != 0x0D) // Leave 0x0D to be stripped later
+        if (c != 0xFFFFFFFF ) // && c != 0x0D) // Leave 0x0D to be stripped later
         {
             listen_command += (uint8_t)c;
         }
@@ -825,7 +832,7 @@ void IRAM_ATTR systemBus::deviceListen()
     else if (data.secondary == IEC_OPEN || data.secondary == IEC_REOPEN)
     {
         read_payload();
-        Debug_printf("{%s}\r\n", data.payload.c_str());
+        Debug_printf("payload: \r\n%s\r\n", util_hexdump(data.payload.data(), data.payload.size()).c_str());
     }
 
     // CLOSE Named Channel

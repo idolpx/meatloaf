@@ -1,6 +1,8 @@
 #ifndef _FN_CONFIG_H
 #define _FN_CONFIG_H
 
+#include <string>
+
 #include "printer.h"
 #include "../encrypt/crypt.h"
 
@@ -18,14 +20,32 @@
 
 #define HOST_SLOT_INVALID -1
 
+#ifdef ESP_PLATFORM
+
 #define HSIO_INVALID_INDEX -1
 
 #define CONFIG_FILENAME SYSTEM_DIR "/config.ini"
+
+#else
+
+#define HSIO_DISABLED_INDEX -1  // HSIO disabled, use standard speed only
+
+#define CONFIG_FILENAME SYSTEM_DIR "/config.ini"
+
+#define SD_CARD_DIR "SD"
+
+#define WEB_SERVER_LISTEN_URL "http://0.0.0.0:8000"
+
+#define CONFIG_DEFAULT_NETSIO_PORT 9997
+#define CONFIG_DEFAULT_BOIP_PORT 1985
+
+#endif
+
 #define CONFIG_FILEBUFFSIZE 2048
 
 #define CONFIG_DEFAULT_SNTPSERVER "pool.ntp.org"
 
-#define PHONEBOOK_CHAR_WIDTH 12 
+#define PHONEBOOK_CHAR_WIDTH 12
 
 
 class fnConfig
@@ -47,6 +67,7 @@ public:
         MOUNTMODE_INVALID
     };
     typedef mount_modes mount_mode_t;
+    mount_mode_t mount_mode_from_string(const char *str);
 
     enum mount_types
     {
@@ -55,10 +76,32 @@ public:
     };
     typedef mount_types mount_type_t;
 
-    mount_mode_t mount_mode_from_string(const char *str);
+#ifndef ESP_PLATFORM
+    enum serial_command_pin
+    {
+        SERIAL_COMMAND_NONE = 0,
+        SERIAL_COMMAND_DSR,
+        SERIAL_COMMAND_CTS,
+        SERIAL_COMMAND_RI,
+        SERIAL_COMMAND_INVALID
+    };
+    serial_command_pin serial_command_from_string(const char *str);
+
+    enum serial_proceed_pin
+    {
+        SERIAL_PROCEED_NONE = 0,
+        SERIAL_PROCEED_DTR,
+        SERIAL_PROCEED_RTS,
+        SERIAL_PROCEED_INVALID
+    };
+    serial_proceed_pin serial_proceed_from_string(const char *str);
+#endif
 
     // GENERAL
     std::string get_general_devicename() { return _general.devicename; };
+#ifndef ESP_PLATFORM
+    std::string get_general_label();
+#endif
     int get_general_hsioindex() { return _general.hsio_index; };
     std::string get_general_timezone() { return _general.timezone; };
     bool get_general_rotation_sounds() { return _general.rotation_sounds; };
@@ -85,12 +128,31 @@ public:
 
     const char * get_network_sntpserver() { return _network.sntpserver; };
 
+#ifndef ESP_PLATFORM
+    std::string get_general_interface_url() { return _general.interface_url; };
+    void store_general_interface_url(const char *url);
+    std::string get_general_config_path() { return _general.config_file_path; };
+    void store_general_config_path(const char *file_path);
+    std::string get_general_SD_path() { return _general.SD_dir_path; };
+    void store_general_SD_path(const char *dir_path);
+
+
+    // SERIAL PORT
+    std::string get_serial_port() { return _serial.port; };
+    std::string get_serial_port_baud() { return _serial.baud; };
+    serial_command_pin get_serial_command() { return _serial.command; };
+    serial_proceed_pin get_serial_proceed() { return _serial.proceed; };
+    void store_serial_port(const char *port);
+    void store_serial_command(serial_command_pin command_pin);
+    void store_serial_proceed(serial_proceed_pin proceed_pin);
+#endif
+
     // WIFI
     bool have_wifi_info() { return _wifi.ssid.empty() == false; };
     std::string get_wifi_ssid() { return _wifi.ssid; };
     std::string get_wifi_passphrase() {
         if (_general.encrypt_passphrase) {
-            // crypt is a isomorphic operation, calling it when passphrase is encrypted will decrypt it.
+            // crypt is an isomorphic operation, calling it when passphrase is encrypted will decrypt it.
             std::string cleartext = crypto.crypt(_wifi.passphrase);
             // Debug_printf("Decrypting passphrase >%s< for ssid >%s< with key >%s<, cleartext: >%s<\r\n", _wifi.passphrase.c_str(), _wifi.ssid.c_str(), crypto.getkey().c_str(), cleartext.c_str());
             return cleartext;
@@ -191,6 +253,44 @@ public:
 
     bool get_apetime_enabled();
     void store_apetime_enabled(bool enabled);
+    bool get_pclink_enabled();
+    void store_pclink_enabled(bool enabled);
+
+#ifndef ESP_PLATFORM
+    // NETSIO (Connection to Atari emulator)
+    bool get_netsio_enabled() { return _netsio.netsio_enabled; }
+    std::string get_netsio_host() { return _netsio.host; };
+    int get_netsio_port() { return _netsio.port; };
+    void store_netsio_enabled(bool enabled);
+    void store_netsio_host(const char *host);
+    void store_netsio_port(int port);
+
+    // BUS over IP
+    bool get_boip_enabled() { return _boip.boip_enabled; } // unused
+    std::string get_boip_host() { return _boip.host; }
+    int get_boip_port() { return _boip.port; }
+    void store_boip_enabled(bool enabled);
+    void store_boip_host(const char *host);
+    void store_boip_port(int port);
+
+    // BUS over Serial
+    bool get_bos_enabled() { return _bos.bos_enabled; } // unused
+    std::string get_bos_port_name() { return _bos.port_name; }
+    int get_bos_baud() { return _bos.baud; }
+    int get_bos_bits() { return _bos.bits; }
+    int get_bos_parity() { return _bos.parity; }
+    int get_bos_stop_bits() { return _bos.stop_bits; }
+    int get_bos_flowcontrol() { return _bos.flowcontrol; }
+
+    void store_bos_enabled(bool bos_enabled);
+    void store_bos_port_name(char *port_name);
+    void store_bos_baud(int baud);
+    void store_bos_bits(int bits);
+    void store_bos_parity(int parity);
+    void store_bos_stop_bits(int stop_bits);
+    void store_bos_flowcontrol(int flowcontrol);
+
+#endif
 
     void load();
     void save();
@@ -212,12 +312,18 @@ private:
     void _read_section_host(std::stringstream &ss, int index);
     void _read_section_mount(std::stringstream &ss, int index);
     void _read_section_printer(std::stringstream &ss, int index);
-    void _read_section_tape(std::stringstream &ss, int index);    
+    void _read_section_tape(std::stringstream &ss, int index);
     void _read_section_modem(std::stringstream &ss);
     void _read_section_cassette(std::stringstream &ss);
     void _read_section_phonebook(std::stringstream &ss, int index);
     void _read_section_cpm(std::stringstream &ss);
     void _read_section_device_enable(std::stringstream &ss);
+#ifndef ESP_PLATFORM
+    void _read_section_serial(std::stringstream &ss);
+    void _read_section_netsio(std::stringstream &ss);
+    void _read_section_boip(std::stringstream &ss);
+    void _read_section_bos(std::stringstream &ss);
+#endif
 
     enum section_match
     {
@@ -235,6 +341,12 @@ private:
         SECTION_PHONEBOOK,
         SECTION_CPM,
         SECTION_DEVICE_ENABLE,
+#ifndef ESP_PLATFORM
+        SECTION_SERIAL,
+        SECTION_NETSIO,
+        SECTION_BOIP,
+        SECTION_BOS,
+#endif
         SECTION_UNKNOWN
     };
     section_match _find_section_in_line(std::string &line, int &index);
@@ -248,6 +360,21 @@ private:
         "r",
         "w"
     };
+
+#ifndef ESP_PLATFORM
+    const char * _serial_command_pin_names[SERIAL_COMMAND_INVALID] = {
+        "none",
+        "DSR",
+        "CTS",
+        "RI"
+    };
+
+    const char * _serial_proceed_pin_names[SERIAL_PROCEED_INVALID] = {
+        "none",
+        "DTR",
+        "RTS"
+    };
+#endif
 
     struct host_info
     {
@@ -277,7 +404,7 @@ private:
      to those limitations.
      We set asside 33 characters to allow for a zero terminator in a 32-char SSID
      and treat it as string instead of an array of arbitrary byte values.
-     
+
      Similarly, the PSK (passphrase/password) is 64 octets.
      User-facing systems will typically take an 8 to 63 ASCII string and hash
      that into a 64 octet value. Although we're storing that ASCII string,
@@ -308,7 +435,11 @@ private:
     struct general_info
     {
         std::string devicename = "meatloaf";
+#ifdef ESP_PLATFORM
         int hsio_index = HSIO_INVALID_INDEX;
+#else
+        int hsio_index = HSIO_DISABLED_INDEX;
+#endif
         std::string timezone;
         bool rotation_sounds = true;
         bool config_enabled = true;
@@ -317,12 +448,55 @@ private:
         bool fnconfig_spifs = true;
         bool status_wait_enabled = true;
         bool encrypt_passphrase = false;
-    #ifdef BUILD_ADAM
+#ifdef BUILD_ADAM
         bool printer_enabled = false; // Not by default.
-    #else
+#else
         bool printer_enabled = true;
-    #endif
+#endif
+#ifndef ESP_PLATFORM
+        std::string interface_url = WEB_SERVER_LISTEN_URL; // default URL to serve web interface
+        std::string config_file_path = CONFIG_FILENAME; // default path to load/save config file (program CWD)
+        std::string SD_dir_path = SD_CARD_DIR; // default path to load/save config file
+#endif
     };
+
+#ifndef ESP_PLATFORM
+    struct serial_info
+    {
+        std::string port;
+        std::string baud;
+        serial_command_pin command = SERIAL_COMMAND_DSR;
+        serial_proceed_pin proceed = SERIAL_PROCEED_DTR;
+    };
+
+    struct netsio_info
+    {
+        bool netsio_enabled = false;
+        std::string host = "";
+        int port = CONFIG_DEFAULT_NETSIO_PORT;
+    };
+
+    // "bus" over IP
+    struct boip_info
+    {
+        bool boip_enabled = false;
+        std::string host = "";
+        int port = CONFIG_DEFAULT_BOIP_PORT;
+    };
+
+
+    // "bus" over serial
+    struct bos_info
+    {
+        bool bos_enabled = false;
+        std::string port_name = "COM1";
+        int baud = 9600;
+        int bits = 8;
+        int parity = 0; // SP_PARITY_NONE
+        int stop_bits = 1;
+        int flowcontrol = 0; // SP_FLOWCONTROL_NONE
+    };
+#endif
 
     struct modem_info
     {
@@ -354,6 +528,7 @@ private:
         bool device_7_enabled = true;
         bool device_8_enabled = true;
         bool apetime = true;
+        bool pclink = true;
     };
 
     struct phbook_info
@@ -375,6 +550,12 @@ private:
     general_info _general;
     modem_info _modem;
     cassette_info _cassette;
+#ifndef ESP_PLATFORM
+    serial_info _serial;
+    netsio_info _netsio;
+    boip_info _boip;
+    bos_info _bos;
+#endif
     cpm_info _cpm;
     device_enable_info _denable;
     phbook_info _phonebook_slots[MAX_PB_SLOTS];

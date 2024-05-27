@@ -8,26 +8,43 @@
 
 #include "status_error_codes.h"
 
+#include <vector>
 
 #define RXBUF_SIZE 65535
 
-NetworkProtocolSSH::NetworkProtocolSSH(string *rx_buf, string *tx_buf, string *sp_buf)
+NetworkProtocolSSH::NetworkProtocolSSH(std::string *rx_buf, std::string *tx_buf, std::string *sp_buf)
     : NetworkProtocol(rx_buf, tx_buf, sp_buf)
 {
     Debug_printf("NetworkProtocolSSH::NetworkProtocolSSH(%p,%p,%p)\r\n", rx_buf, tx_buf, sp_buf);
+#ifdef ESP_PLATFORM
     rxbuf = (char *)heap_caps_malloc(RXBUF_SIZE, MALLOC_CAP_SPIRAM);
+#else
+    rxbuf = (char *)malloc(RXBUF_SIZE);
+#endif
 }
 
 NetworkProtocolSSH::~NetworkProtocolSSH()
 {
     Debug_printf("NetworkProtocolSSH::~NetworkProtocolSSH()\r\n");
+#ifdef ESP_PLATFORM
     heap_caps_free(rxbuf);
+#else
+    free(rxbuf);
+#endif
 }
 
 bool NetworkProtocolSSH::open(PeoplesUrlParser *urlParser, cmdFrame_t *cmdFrame)
 {
     NetworkProtocol::open(urlParser, cmdFrame);
     int ret;
+
+    if (!urlParser->user.empty()) {
+        login = &urlParser->user;
+    }
+
+    if (!urlParser->password.empty()) {
+        password = &urlParser->password;
+    }
 
     if (!login || !password || (login->empty() && password->empty()))
     {
@@ -63,7 +80,9 @@ bool NetworkProtocolSSH::open(PeoplesUrlParser *urlParser, cmdFrame_t *cmdFrame)
     ssh_options_set(session, SSH_OPTIONS_HOST, urlParser->host.c_str());
     ssh_options_set(session, SSH_OPTIONS_LOG_VERBOSITY, &verbosity);
     ssh_options_set(session, SSH_OPTIONS_PORT, &port);
+#ifdef ESP_PLATFORM // apc: access to private member!
     session->opts.config_processed = true;
+#endif
 
     ret = ssh_connect(session);
     if (ret != SSH_OK)

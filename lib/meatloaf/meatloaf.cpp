@@ -236,7 +236,7 @@ MFile* MFSOwner::File(std::string path) {
 
 std::string MFSOwner::existsLocal( std::string path )
 {
-    PeoplesUrlParser *url = PeoplesUrlParser::parseURL( path );
+    auto url = PeoplesUrlParser::parseURL( path );
 
     // Debug_printv( "path[%s] name[%s] size[%d]", path.c_str(), url.name.c_str(), url.name.size() );
     if ( url->name.size() == 16 )
@@ -271,7 +271,6 @@ std::string MFSOwner::existsLocal( std::string path )
         }        
     }
 
-    delete(url);
     return path;
 }
 

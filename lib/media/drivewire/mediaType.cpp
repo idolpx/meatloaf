@@ -11,7 +11,7 @@ MediaType::~MediaType()
     unmount();
 }
 
-bool MediaType::format(uint16_t *respopnsesize)
+bool MediaType::format(uint16_t *responsesize)
 {
     return true;
 }
@@ -30,7 +30,7 @@ void MediaType::unmount()
 {
     if (_media_fileh != nullptr)
     {
-        fclose(_media_fileh);
+        fnio::fclose(_media_fileh);
         _media_fileh = nullptr;
     }
 }

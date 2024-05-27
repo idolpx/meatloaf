@@ -3,12 +3,7 @@
 
 #include <string>
 
-#if HOST_OS==win32
-#include "../bus/bus.h"
-#else
 #include "bus.h"
-#endif
-
 #include "networkStatus.h"
 #include "peoples_url_parser.h"
 
@@ -83,6 +78,27 @@ public:
      * (e.g. to start http_transaction in http protocol adapter after open)
      */
     bool forceStatus = false;
+
+    /**
+     * The line ending to emit
+     */
+    std::string lineEnding = "\x9B";
+
+    /**
+     * Set line ending to string
+     */
+    void setLineEnding(std::string s) { lineEnding = s; }
+
+    /**
+     * The sector size to display in directory for FS derived protocols
+     */
+    int FSSectorSize = 256;
+
+    /**
+     * @brief Set sector size to display in directory for FS derived protocols
+     * @param sectorSize in bytes.
+     */
+    void setFSSectorSize(int sectorSize) { FSSectorSize = sectorSize; }
 
     /**
      * @brief Open connection to the protocol using URL

@@ -15,9 +15,9 @@ public:
     virtual bool read(uint32_t blockNum, uint16_t *count, uint8_t* buffer) override;
     virtual bool write(uint32_t blockNum, uint16_t *count, uint8_t* buffer) override;
 
-    virtual bool format(uint16_t *respopnsesize) override;
+    virtual bool format(uint16_t *responsesize) override;
 
-    virtual mediatype_t mount(FILE *f, uint32_t disksize) override;
+    virtual mediatype_t mount(fnFile *f, uint32_t disksize) override;
 
     virtual bool status() override {return (_media_fileh != nullptr);}
 };

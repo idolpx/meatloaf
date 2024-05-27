@@ -7,6 +7,8 @@
 
 #include <queue>
 #include <string.h>
+#include <errno.h>
+#include "compat_string.h"
 
 #include "globals.h"
 
@@ -23,10 +25,12 @@
 
 #define HostOS 0x07 // FUJINET
 
-using namespace std;
+// using namespace std;
 
+#ifdef ESP_PLATFORM // OS
 QueueHandle_t rxq;
 QueueHandle_t txq;
+#endif
 
 typedef struct
 {
@@ -510,26 +514,36 @@ uint8_t _sys_makedisk(uint8_t drive)
 
 int _kbhit(void)
 {
+#ifdef ESP_PLATFORM // OS
 	return uxQueueMessagesWaiting(txq);
+#else
+	return 0;
+#endif
 }
 
 uint8_t _getch(void)
 {
 	uint8_t c;
+#ifdef ESP_PLATFORM // OS
 	xQueueReceive(txq,&c,portMAX_DELAY);
+#endif
 	return c;
 }
 
 uint8_t _getche(void)
 {
 	uint8_t c = _getch();
+#ifdef ESP_PLATFORM // OS
 	xQueueSend(rxq,&c,portMAX_DELAY);
+#endif
 	return c;
 }
 
 void _putch(uint8_t ch)
 {
+#ifdef ESP_PLATFORM // OS
 	xQueueSend(rxq,&ch,portMAX_DELAY);
+#endif
 }
 
 void _clrscr(void)

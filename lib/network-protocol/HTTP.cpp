@@ -10,7 +10,9 @@
 
 #include "status_error_codes.h"
 #include "utils.h"
+#include "compat_string.h"
 
+#include <vector>
 
 /**
  Modes and the N: HTTP Adapter:
@@ -39,19 +41,15 @@ NetworkProtocolHTTP::NetworkProtocolHTTP(std::string *rx_buf, std::string *tx_bu
     rmdir_implemented = true;
     fileSize = 0;
     resultCode = 0;
-    collect_headers_count = 0;
+    // collect_headers_count = 0;
     returned_header_cursor = 0;
     httpChannelMode = DATA;
 }
 
 NetworkProtocolHTTP::~NetworkProtocolHTTP()
 {
-    for (int i = 0; i < collect_headers_count; i++)
-        if (collect_headers[i] != nullptr)
-        {
-            free(collect_headers[i]);
-            collect_headers[i] = nullptr;
-        }
+    if (client)
+        delete(client);
 }
 
 uint8_t NetworkProtocolHTTP::special_inquiry(uint8_t cmd)
@@ -153,20 +151,23 @@ bool NetworkProtocolHTTP::open_file_handle()
 
 bool NetworkProtocolHTTP::open_dir_handle()
 {
-    char *buf;
-    unsigned short len, actual_len;
+    int len, actual_len;
 
     Debug_printf("NetworkProtocolHTTP::open_dir_handle()\r\n");
 
     if (client != nullptr)
     {
         delete client;
-        client = new fnHttpClient();
+        client = new HTTP_CLIENT_CLASS();
         client->begin(opened_url->url);
     }
 
     // client->begin already called in mount()
-    resultCode = client->PROPFIND(fnHttpClient::webdav_depth::DEPTH_1, "<?xml version=\"1.0\"?>\r\n<D:propfind xmlns:D=\"DAV:\">\r\n<D:prop>\r\n<D:displayname />\r\n<D:getcontentlength /></D:prop>\r\n</D:propfind>\r\n");
+    resultCode = client->PROPFIND(HTTP_CLIENT_CLASS::webdav_depth::DEPTH_1, 
+    "<?xml version=\"1.0\"?>\r\n"
+    "<D:propfind xmlns:D=\"DAV:\">\r\n"
+    "<D:prop>\r\n<D:displayname />\r\n<D:getcontentlength /><D:resourcetype /></D:prop>\r\n"
+    "</D:propfind>\r\n");
 
     if (resultCode > 399)
     {
@@ -175,48 +176,85 @@ bool NetworkProtocolHTTP::open_dir_handle()
         return true;
     }
 
-    len = client->available();
-    buf = (char *)malloc(len);
-
-    if (buf == nullptr)
+    // Setup XML WebDAV parser
+    if (webDAV.begin_parser())
     {
-        Debug_printf("Could not allocate %u bytes for PROPFIND data. Aborting\r\n", len);
+        Debug_printf("Failed to setup parser.\r\n");
         error = NETWORK_ERROR_GENERAL;
         return true;
     }
 
-    // Grab the buffer.
-    actual_len = client->read((uint8_t *)buf, len);
+    std::vector<uint8_t> buf;
 
-    if (actual_len != len)
+    // Process all response chunks
+    while ( !client->is_transaction_done() || client->available() > 0)
     {
-        Debug_printf("Expected %u bytes, actually got %u bytes.\r\n", len, actual_len);
-        error = NETWORK_ERROR_GENERAL;
-        free(buf);        
+        len = client->available();
+        if (len > 0)
+        {
+            Debug_printf("data available %d ...\n", len);
+            // increase chunk buffer if necessary
+            if (len >= buf.size())
+                buf.resize(len+1); // +1 for '\0'
+
+            // Grab the buffer
+            actual_len = client->read(buf.data(), len);
+
+            if (actual_len != len)
+            {
+                Debug_printf("Expected %d bytes, actually got %d bytes.\r\n", len, actual_len);
+                error = NETWORK_ERROR_GENERAL;
+                break;
+            }
+            buf[len] = '\0'; // make buffer C string compatible for Debug_printf()
+
+            // Parse the buffer
+            if (webDAV.parse((char *)buf.data(), len, false))
+            {
+                Debug_printf("Could not parse buffer, returning 144\r\n");
+                error = NETWORK_ERROR_GENERAL;
+                break;
+            }
+        }
+        else if (len == 0)
+        {
+            Debug_println("waiting for data");
+#ifdef ESP_PLATFORM
+            vTaskDelay(100 / portTICK_PERIOD_MS); // TBD !!!
+#endif
+        }
+        else // if (len < 0)
+        {
+            Debug_println("something went wrong");
+            error = NETWORK_ERROR_GENERAL;
+            break;
+        }
+    }
+
+    if (error != NETWORK_ERROR_SUCCESS)
+    {
+        Debug_printf("NetworkProtocolHTTP::open_dir_handle() - error %u\r\n", error);
+        webDAV.end_parser(true); // release parser resources + clear collected entries
         return true;
     }
 
-    // Parse the buffer
-    if (parseDir(buf, len))
-    {
-        Debug_printf("Could not parse buffer, returning 144\r\n");
-        error = NETWORK_ERROR_GENERAL;
-        free(buf);
-        return true;
-    }
+    // finish parsing (not sure if this is necessary)
+    webDAV.parse(nullptr, 0, true);
 
-    // Scoot to beginning of entries.
-    dirEntryCursor = webDAV.entries.begin();
+    // Release parser resources (keep directory entries)
+    webDAV.end_parser();
+
+    // Scoot to beginning of directory entries.
+    dirEntryCursor = webDAV.rewind();
 
     if (client != nullptr)
     {
         delete client;
-        client = new fnHttpClient();
+        client = new HTTP_CLIENT_CLASS();
         client->begin(opened_url->url);
     }
 
     // Directory parsed, ready to be returned by read_dir_entry()
-    free(buf);
     return false;
 }
 
@@ -226,16 +264,28 @@ bool NetworkProtocolHTTP::mount(PeoplesUrlParser *url)
 
     // fix scheme because esp-idf hates uppercase for some #()$@ reason.
     if (url->scheme == "HTTP")
+    {
         url->scheme = "http";
+        url->rebuildUrl();
+    }
     else if (url->scheme == "HTTPS")
+    {
         url->scheme = "https";
+        url->rebuildUrl();
+    }
 
-    client = new fnHttpClient();
+    if (client)
+        delete client;
+
+    client = new HTTP_CLIENT_CLASS();
 
     // fileSize = 65535;
 
     if (aux1_open == 6)
+    {
         util_replaceAll(url->path, "*.*", "");
+        url->rebuildUrl();
+    }
 
     return !client->begin(url->url);
 }
@@ -311,6 +361,8 @@ void NetworkProtocolHTTP::fserror_to_error()
     case 428:
     case 429:
     case 431:
+        error = NETWORK_ERROR_CLIENT_GENERAL;
+        break;
     case 500:
     case 501:
     case 502:
@@ -322,6 +374,8 @@ void NetworkProtocolHTTP::fserror_to_error()
     case 508:
     case 510:
     case 511:
+        error = NETWORK_ERROR_SERVER_GENERAL;
+        break;
     default:
         error = NETWORK_ERROR_GENERAL;
         break;
@@ -344,7 +398,11 @@ bool NetworkProtocolHTTP::status_file(NetworkStatus *status)
     {
     case DATA:
     {
-        if (fromInterrupt == false && resultCode == 0)
+#ifdef ESP_PLATFORM
+        if (!fromInterrupt && resultCode == 0)
+#else
+        if (!fromInterrupt && (resultCode == 0 || (!client->is_transaction_done() && client->available() == 0)))
+#endif
         {
             Debug_printf("calling http_transaction\r\n");
             http_transaction();
@@ -352,7 +410,11 @@ bool NetworkProtocolHTTP::status_file(NetworkStatus *status)
         auto available = client->available();
         status->rxBytesWaiting = available > 65535 ? 65535 : available;
         status->connected = client->is_transaction_done() ? 0 : 1;
-        status->error = available == 0 && client->is_transaction_done() && error == NETWORK_ERROR_SUCCESS ? NETWORK_ERROR_END_OF_FILE : error;
+
+        if (available == 0 && client->is_transaction_done() && error == NETWORK_ERROR_SUCCESS)
+            status->error = NETWORK_ERROR_END_OF_FILE;
+        else
+            status->error = error;
         // Debug_printf("NetworkProtocolHTTP::status_file DATA, available: %d, s.rxBW: %d, s.conn: %d, s.err: %d\r\n", available, status->rxBytesWaiting, status->connected, status->error);
         return false;
     }
@@ -366,9 +428,9 @@ bool NetworkProtocolHTTP::status_file(NetworkStatus *status)
     case GET_HEADERS:
         if (resultCode == 0)
             http_transaction();
-        status->rxBytesWaiting = (returned_header_cursor < collect_headers_count ? returned_headers[returned_header_cursor].size() : 0);
+        status->rxBytesWaiting = (returned_header_cursor < collect_headers.size() ? returned_headers[returned_header_cursor].size() : 0);
         status->connected = 0; // so that we always ask in this mode.
-        status->error = returned_header_cursor == collect_headers_count && error == NETWORK_ERROR_SUCCESS ? NETWORK_ERROR_END_OF_FILE : error;
+        status->error = returned_header_cursor == collect_headers.size() && error == NETWORK_ERROR_SUCCESS ? NETWORK_ERROR_END_OF_FILE : error;
         // Debug_printf("NetworkProtocolHTTP::status_file GH, s.rxBW: %d, s.conn: %d, s.err: %d\r\n", status->rxBytesWaiting, status->connected, status->error);
         return false;
     default:
@@ -422,22 +484,20 @@ bool NetworkProtocolHTTP::read_dir_entry(char *buf, unsigned short len)
 
     Debug_printf("NetworkProtocolHTTP::read_dir_entry(%p,%u)\r\n", buf, len);
 
-    // TODO: Get directory attribute.
-
     if (dirEntryCursor != webDAV.entries.end())
     {
+        strlcpy(buf, dirEntryCursor->filename.c_str(), len);
         fileSize = atoi(dirEntryCursor->fileSize.c_str());
-        strcpy(buf, dirEntryCursor->filename.c_str());
+        is_directory = dirEntryCursor->isDir;
         ++dirEntryCursor;
+        Debug_printf("Returning: %s, %u, %s\r\n", buf, fileSize, is_directory ? "DIR" : "FILE");
     }
     else
     {
         // EOF
-        error = 136;
+        error = NETWORK_ERROR_END_OF_FILE;
         err = true;
     }
-
-    Debug_printf("Returning: %s, %u\r\n", buf, fileSize);
 
     return err;
 }
@@ -460,6 +520,7 @@ bool NetworkProtocolHTTP::close_file_handle()
 bool NetworkProtocolHTTP::close_dir_handle()
 {
     Debug_printf("NetworkProtocolHTTP::close_dir_handle()\r\n");
+    webDAV.clear(); // release directory entries
     return false;
 }
 
@@ -487,39 +548,25 @@ bool NetworkProtocolHTTP::write_file_handle(uint8_t *buf, unsigned short len)
 
 bool NetworkProtocolHTTP::write_file_handle_get_header(uint8_t *buf, unsigned short len)
 {
-    if (httpOpenMode == GET)
-    {
-        char *requestedHeader = (char *)malloc(len);
-
-        if (requestedHeader == nullptr)
-        {
-            Debug_printf("Could not allocate %u bytes for header\r\n", len);
-            return true;
-        }
-
-        // move source buffer into requested header.
-        memcpy(requestedHeader, buf, len);
-
-        // Remove EOL, make NUL delimited.
-        for (int i = 0; i < len; i++)
-            if (requestedHeader[i] == 0x9B)
-                requestedHeader[i] = 0x00;
-            else if (requestedHeader[i] == 0x0D)
-                requestedHeader[i] = 0x00;
-            else if (requestedHeader[i] == 0x0a)
-                requestedHeader[i] = 0x00;
-
-        Debug_printf("collect_headers[%u,%u] = \"%s\"\r\n", collect_headers_count, len, requestedHeader);
-
-        // Add result to header array.
-        collect_headers[collect_headers_count++] = requestedHeader;
-        return false;
-    }
-    else
+    if (httpOpenMode != GET)
     {
         error = NETWORK_ERROR_NOT_IMPLEMENTED;
         return true;
     }
+
+    if (len > 0) {
+        unsigned char lastChar = buf[len - 1];
+        if (lastChar == 0x9B || lastChar == '\r' || lastChar == '\n') {
+            len--;
+        }
+    }
+    std::string requestedHeader(reinterpret_cast<const char*>(buf), len);
+
+    Debug_printf("collect_headers[%lu,%u] = \"%s\"\r\n", (unsigned long)collect_headers.size(), len, requestedHeader.c_str());
+
+    // Add result to header vector.
+    collect_headers.push_back(std::move(requestedHeader)); // Use std::move to avoid copying the string
+    return false;
 }
 
 bool NetworkProtocolHTTP::write_file_handle_set_header(uint8_t *buf, unsigned short len)
@@ -537,9 +584,20 @@ bool NetworkProtocolHTTP::write_file_handle_set_header(uint8_t *buf, unsigned sh
     if (pos == std::string::npos)
         return true;
 
+#ifdef ESP_PLATFORM
     Debug_printf("NetworkProtocolHTTP::write_file_set_header(%s,%s)\r\n", incomingHeader.substr(0, pos).c_str(), incomingHeader.substr(pos + 2).c_str());
 
     client->set_header(incomingHeader.substr(0, pos).c_str(), incomingHeader.substr(pos + 2).c_str());
+#else // TODO merge
+    std::string key(incomingHeader.substr(0, pos));
+    std::string val(incomingHeader.substr(pos + 2));
+    util_string_trim(key);
+    util_string_trim(val);
+
+    Debug_printf("NetworkProtocolHTTP::write_file_set_header(%s,%s)\r\n", key.c_str(), val.c_str());
+
+    client->set_header(key.c_str(), val.c_str());
+#endif
     return false;
 }
 
@@ -581,7 +639,7 @@ bool NetworkProtocolHTTP::stat()
     delete client;
 
     // Temporarily use client to do the HEAD request
-    client = new fnHttpClient();
+    client = new HTTP_CLIENT_CLASS();
     client->begin(opened_url->url);
     resultCode = client->HEAD();
     fserror_to_error();
@@ -597,7 +655,7 @@ bool NetworkProtocolHTTP::stat()
         delete client;
 
         // Recreate it for the rest of resolve()
-        client = new fnHttpClient();
+        client = new HTTP_CLIENT_CLASS();
         ret = !client->begin(opened_url->url);
         resultCode = 0; // so GET will actually happen.
     }
@@ -607,9 +665,9 @@ bool NetworkProtocolHTTP::stat()
 
 void NetworkProtocolHTTP::http_transaction()
 {
-    if ((aux1_open != 4) && (aux1_open != 8) && (collect_headers_count > 0))
+    if ((aux1_open != 4) && (aux1_open != 8) && !collect_headers.empty())
     {
-        client->collect_headers((const char **)collect_headers, collect_headers_count);
+        client->create_empty_stored_headers(collect_headers);
     }
 
     switch (httpOpenMode)
@@ -631,53 +689,19 @@ void NetworkProtocolHTTP::http_transaction()
         break;
     }
 
-    if ((aux1_open != 4) && (aux1_open != 8) && (collect_headers_count > 0))
+    // the appropriate headers to be collected should have now been done, so let's put their values into returned_headers
+    if ((aux1_open != 4) && (aux1_open != 8) && (!collect_headers.empty()))
     {
-        Debug_printf("Header count %u\r\n", client->get_header_count());
+        Debug_printf("setting returned_headers (count =%u)\r\n", client->get_header_count());
 
-        for (int i = 0; i < client->get_header_count(); i++)
-        {
-            returned_headers.push_back(std::string(client->get_header(collect_headers[i]) + "\x9b"));
+        for (const auto& header_pair : client->get_stored_headers()) {
+            std::string header = header_pair.second + "\x9b"; // TODO: can we use platform specific value rather than ATARI default?
+            returned_headers.push_back(header);
         }
     }
 
     fserror_to_error();
-    
     fileSize = bodySize = client->available();
-}
-
-bool NetworkProtocolHTTP::parseDir(char *buf, unsigned short len)
-{
-    XML_Parser p = XML_ParserCreate(NULL);
-    XML_Status xs;
-    bool err = false;
-
-    if (p == nullptr)
-    {
-        Debug_printf("NetworkProtocolHTTP::parseDir(%p,%u) - could not create expat parser. Aborting.\r\n");
-        return true;
-    }
-
-    // Put PROPFIND data to debug console
-    Debug_printf("PROPFIND DATA:\n\n%s\r\n", buf);
-
-    // Set everything up
-    XML_SetUserData(p, &webDAV);
-    XML_SetElementHandler(p, Start<WebDAV>, End<WebDAV>);
-    XML_SetCharacterDataHandler(p, Char<WebDAV>);
-
-    // And parse the damned buffer
-    xs = XML_Parse(p, buf, len, true);
-
-    if (xs == XML_STATUS_ERROR)
-    {
-        Debug_printf("DAV response XML Parse Error! msg: %s line: %lu\r\n", XML_ErrorString(XML_GetErrorCode(p)), XML_GetCurrentLineNumber(p));
-    }
-
-    if (p != nullptr)
-        XML_ParserFree(p);
-
-    return err;
 }
 
 bool NetworkProtocolHTTP::rename(PeoplesUrlParser *url, cmdFrame_t *cmdFrame)
