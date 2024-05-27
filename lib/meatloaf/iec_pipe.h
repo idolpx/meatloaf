@@ -51,14 +51,21 @@ class iecPipe {
     Meat::iostream* fileStream = nullptr;
     oiecstream iecStream;
     std::ios_base::openmode mode;
+    std::string filename;
 
 public:
     pipe_status_t status = STATUS_OK;
 
+    std::string getFilename() {
+        return filename;
+    }
+
     // you call this once, when C64 requested to open the stream
-    bool establish(std::string filename, std::ios_base::openmode m, systemBus* i) {
+    bool establish(const std::string& fn, std::ios_base::openmode m, systemBus* i) {
         if(fileStream != nullptr)
             return false;
+
+        filename = fn;
 
         mode = m;
         iecStream.open(i);
@@ -68,11 +75,19 @@ public:
 
     // this stream is disposed of, nothing more will happen with it!
     void finish() {
-        if(fileStream != nullptr)
-            delete fileStream;
+        if(fileStream != nullptr) {
+            iecStream.close(); // will push last byte and send EOI (if hasn't been closed yet)
 
-        fileStream = nullptr;
-        iecStream.close(); // will push last byte and send EOI (if hasn't been closed yet)
+            delete fileStream;
+            fileStream = nullptr;
+        }
+    }
+
+    bool isActive() {
+        if(fileStream != nullptr)
+            return fileStream->is_open();
+        else
+            return false;
     }
 
     bool seek(std::streampos p) {
