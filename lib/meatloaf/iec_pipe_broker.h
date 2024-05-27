@@ -1,3 +1,6 @@
+#ifndef MEATLOAF_PIPE_BROKER
+#define MEATLOAF_PIPE_BROKER
+
 #include <unordered_map>
 #include <string>
 #include <tuple>
@@ -91,4 +94,11 @@ public:
             }
         }
     }
+
+    // Returns a reference to the deviceChannelMap
+    const std::unordered_map<DeviceChannelKey, std::unique_ptr<iecPipe>>& getDeviceChannelMap() {
+        removeInactivePipes();
+        return deviceChannelMap;
+    }
 };
+#endif
