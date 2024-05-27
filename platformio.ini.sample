@@ -44,8 +44,8 @@ flash_size = 16mb
 ;flash_size = 4mb
 
 ; Choose SPIFFS or LITTLEFS for the filesystem used on internal flash
-flash_filesystem = FLASH_SPIFFS 
-;flash_filesystem = FLASH_LITTLEFS
+flash_filesystem = FLASH_LITTLEFS // DEFAULT
+;flash_filesystem = FLASH_SPIFFS
 
 ; Set default WiFi credentials
 wifi_ssid = "meatloaf"
@@ -73,6 +73,7 @@ extra_scripts =
 [env]
 ; Common settings for all enivornments
 build_type = debug
+board_build.filesystem = littlefs
 lib_ldf_mode = deep+
 upload_speed = 460800 ;921600
 ;upload_port = COM1 ; Windows
