@@ -2,6 +2,7 @@
 #define STRING_UTILS_H
 
 #include <cstdint>
+#include <cstdbool>
 #include <string>
 #include <string_view>
 
@@ -49,7 +50,10 @@ namespace mstr {
     std::string joinToString(std::vector<std::string>, std::string separator);
 
     std::string urlEncode(const std::string &s);
-    std::string urlDecode(std::string s);
+
+    std::string urlDecode(const std::string& s, bool alter_pluses);
+    std::string urlDecode(const std::string& s);
+    void urlDecode(char *s, size_t size, bool alter_pluses);
     void urlDecode(char *s, size_t size);
 
     // void toASCII(std::string &s);
