@@ -28,7 +28,7 @@ private:
 
 public:
     // Method to retrieve MStream instance from cache or create a new one if not found
-    std::shared_ptr<MStream> getStream(MFile* streamFile, std::ios_base::openmode mode) {
+    std::shared_ptr<MStream> getSourceStream(MFile* streamFile, std::ios_base::openmode mode) {
         auto key = std::make_pair(streamFile, mode);
         auto it = streamCache.find(key);
         if (it != streamCache.end()) {
@@ -41,19 +41,31 @@ public:
         }
     }
 
+    std::shared_ptr<MStream> getDecodedStream(MFile* streamFile, std::ios_base::openmode mode, std::shared_ptr<MStream> wrappingStream) {
+        auto key = std::make_pair(streamFile, mode);
+        auto it = streamCache.find(key);
+        if (it != streamCache.end()) {
+            return it->second; // Found in cache, return the cached instance
+        } else {
+            std::shared_ptr<MStream> newStream(streamFile->getDecodedStream(wrappingStream));
+            streamCache[key] = newStream;
+            return newStream;
+        }
+    }
+
     // Function to remove streamCache entries without matching iecPipe instances
     void flushInactiveStreams(iecPipeBroker& broker) {
         const std::unordered_map<std::tuple<int, int>, std::unique_ptr<iecPipe>> deviceChannelMap = broker.getDeviceChannelMap();
                 
         for (auto keyStreamPair = streamCache.begin(); keyStreamPair != streamCache.end();) {
-            bool found = false;
+            bool inUse = false;
             for (const auto& keyPipePair : deviceChannelMap) {
                 if (keyPipePair.second->getFilename() == keyStreamPair->first.first->path) {
-                    found = true;
+                    inUse = true;
                 }
             }
 
-            if (!found) {
+            if (!inUse) {
                 keyStreamPair->second->close(); // Close the stream before removing
                 keyStreamPair = streamCache.erase(keyStreamPair); // Remove the entry if no matching iecPipe found
             } else {
