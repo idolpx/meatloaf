@@ -21,19 +21,17 @@ and it will be removed for you (writing last byte!)
 
 */
 
-
-/*
 class iecPipeBroker {
     // Key is a tuple of device number and channel number
-    using DeviceChannelKey = std::tuple<int, int>;
+    //using DeviceChannelKey = std::tuple<int, int>;
 
     // Maps for storing and retrieving iecPipe instances
-    std::unordered_map<DeviceChannelKey, std::unique_ptr<iecPipe>> deviceChannelMap;
+    std::unordered_map<int, std::unique_ptr<iecPipe>> deviceChannelMap;
 
 public:
     // Adds a new iecPipe instance to the broker and returns a pointer to it
     iecPipe* addPipe(int device, int channel, const std::string& filename, std::ios_base::openmode mode, systemBus* bus) {
-        DeviceChannelKey key = std::make_tuple(device, channel);
+        int key = (device * 100) + channel;
         auto pipe = std::make_unique<iecPipe>();
         if (pipe->establish(filename, mode, bus)) {
             iecPipe* pipePtr = pipe.get();
@@ -47,7 +45,7 @@ public:
 
     // Retrieves an iecPipe by device and channel number
     iecPipe* getPipeByDeviceAndChannel(int device, int channel) {
-        DeviceChannelKey key = std::make_tuple(device, channel);
+        int key = (device * 100) + channel;
         auto it = deviceChannelMap.find(key);
         if (it != deviceChannelMap.end()) {
             return it->second.get();
@@ -67,7 +65,7 @@ public:
 
     // Removes an iecPipe by device and channel number
     void removePipeByDeviceAndChannel(int device, int channel) {
-        DeviceChannelKey key = std::make_tuple(device, channel);
+        int key = (device * 100) + channel;
         auto it = deviceChannelMap.find(key);
         if (it != deviceChannelMap.end()) {
             it->second->finish(); // Call finish method before removing
@@ -99,10 +97,11 @@ public:
     }
 
     // Returns a reference to the deviceChannelMap
-    const std::unordered_map<DeviceChannelKey, std::unique_ptr<iecPipe>>& getDeviceChannelMap() {
+    const std::unordered_map<int, std::unique_ptr<iecPipe>>& getDeviceChannelMap() {
         removeInactivePipes();
         return deviceChannelMap;
     }
 };
-*/
+
+
 #endif

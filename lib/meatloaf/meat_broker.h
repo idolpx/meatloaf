@@ -11,7 +11,7 @@
 #include "../device/drive.h"
 
 // Assuming MStream and MFile classes are properly defined
-/*
+
 class StreamBroker {
 private:
     // Define a hash function for the combination of streamFile pointer and mode
@@ -55,7 +55,7 @@ public:
 
     // Function to remove streamCache entries without matching iecPipe instances
     void flushInactiveStreams(iecPipeBroker& broker) {
-        const std::unordered_map<std::tuple<int, int>, std::unique_ptr<iecPipe>> deviceChannelMap = broker.getDeviceChannelMap();
+        const std::unordered_map<int, std::unique_ptr<iecPipe>> deviceChannelMap = broker.getDeviceChannelMap();
                 
         for (auto keyStreamPair = streamCache.begin(); keyStreamPair != streamCache.end();) {
             bool inUse = false;
@@ -75,6 +75,5 @@ public:
     }
 };
 
-*/
 
 #endif /* MEATLOAF_STREAM_BROKER */
