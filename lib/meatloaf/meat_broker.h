@@ -3,33 +3,34 @@
 
 #include <memory>
 #include <unordered_map>
+#include <string>
+#include <functional>
 #include "meatloaf.h"
 #include "iec_pipe_broker.h"
-#include <unordered_map>
-#include <memory>
-
 #include "../device/drive.h"
 
-// Assuming MStream and MFile classes are properly defined
-/*
+// Custom hash function for std::pair<std::string, std::ios_base::openmode>
+struct PairHash {
+    template <typename T1, typename T2>
+    std::size_t operator()(const std::pair<T1, T2>& p) const {
+        std::size_t h1 = std::hash<T1>{}(p.first);
+        std::size_t h2 = std::hash<T2>{}(p.second);
+        return h1 ^ (h2 << 1); // Combine the two hash values
+    }
+};
+
 class StreamBroker {
 private:
-    // Define a hash function for the combination of streamFile pointer and mode
-    struct StreamHash {
-        std::size_t operator()(const std::pair<MFile*, std::ios_base::openmode>& p) const {
-            std::size_t h1 = std::hash<MFile*>{}(p.first);
-            std::size_t h2 = std::hash<int>{}(static_cast<int>(p.second));
-            return h1 ^ h2;
-        }
-    };
+    // Define the key type for the cache
+    using CacheKey = std::pair<std::string, std::ios_base::openmode>;
 
     // Define the type for storing cached MStream instances
-    std::unordered_map<size_t, std::shared_ptr<MStream>, StreamHash> streamCache;
+    std::unordered_map<CacheKey, std::shared_ptr<MStream>, PairHash> streamCache;
 
 public:
     // Method to retrieve MStream instance from cache or create a new one if not found
     std::shared_ptr<MStream> getSourceStream(MFile* streamFile, std::ios_base::openmode mode) {
-        size_t key = std::hash<MFile*>{}(streamFile) ^ static_cast<int>(mode);
+        CacheKey key = std::make_pair(streamFile->path, mode);
         auto it = streamCache.find(key);
         if (it != streamCache.end()) {
             return it->second; // Found in cache, return the cached instance
@@ -42,7 +43,7 @@ public:
     }
 
     std::shared_ptr<MStream> getDecodedStream(MFile* streamFile, std::ios_base::openmode mode, std::shared_ptr<MStream> wrappingStream) {
-        size_t key = std::hash<MFile*>{}(streamFile) ^ static_cast<int>(mode);
+        CacheKey key = std::make_pair(streamFile->path, mode);
         auto it = streamCache.find(key);
         if (it != streamCache.end()) {
             return it->second; // Found in cache, return the cached instance
@@ -55,13 +56,14 @@ public:
 
     // Function to remove streamCache entries without matching iecPipe instances
     void flushInactiveStreams(iecPipeBroker& broker) {
-        const std::unordered_map<int, std::unique_ptr<iecPipe>> deviceChannelMap = broker.getDeviceChannelMap();
-                
+        const auto& deviceChannelMap = broker.getDeviceChannelMap();
+
         for (auto keyStreamPair = streamCache.begin(); keyStreamPair != streamCache.end();) {
             bool inUse = false;
             for (const auto& keyPipePair : deviceChannelMap) {
-                if (keyPipePair.second->getFilename() == keyStreamPair->first.first->path) {
+                if (keyPipePair.second->getFilename().find(keyStreamPair->first.first) != std::string::npos) {
                     inUse = true;
+                    break;
                 }
             }
 
@@ -74,6 +76,5 @@ public:
         }
     }
 };
-*/
 
 #endif /* MEATLOAF_STREAM_BROKER */
