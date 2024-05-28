@@ -42,18 +42,6 @@ public:
         }
     }
 
-    std::shared_ptr<MStream> getDecodedStream(MFile* streamFile, std::ios_base::openmode mode, std::shared_ptr<MStream> wrappingStream) {
-        CacheKey key = std::make_pair(streamFile->path, mode);
-        auto it = streamCache.find(key);
-        if (it != streamCache.end()) {
-            return it->second; // Found in cache, return the cached instance
-        } else {
-            std::shared_ptr<MStream> newStream(streamFile->getDecodedStream(wrappingStream));
-            streamCache[key] = newStream;
-            return newStream;
-        }
-    }
-
     // Function to remove streamCache entries without matching iecPipe instances
     void flushInactiveStreams(iecPipeBroker& broker) {
         const auto& deviceChannelMap = broker.getDeviceChannelMap();
