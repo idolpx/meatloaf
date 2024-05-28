@@ -11,7 +11,7 @@
 #include "../device/drive.h"
 
 // Assuming MStream and MFile classes are properly defined
-
+/*
 class StreamBroker {
 private:
     // Define a hash function for the combination of streamFile pointer and mode
@@ -24,12 +24,12 @@ private:
     };
 
     // Define the type for storing cached MStream instances
-    std::unordered_map<std::pair<MFile*, std::ios_base::openmode>, std::shared_ptr<MStream>, StreamHash> streamCache;
+    std::unordered_map<size_t, std::shared_ptr<MStream>, StreamHash> streamCache;
 
 public:
     // Method to retrieve MStream instance from cache or create a new one if not found
     std::shared_ptr<MStream> getSourceStream(MFile* streamFile, std::ios_base::openmode mode) {
-        auto key = std::make_pair(streamFile, mode);
+        size_t key = std::hash<MFile*>{}(streamFile) ^ static_cast<int>(mode);
         auto it = streamCache.find(key);
         if (it != streamCache.end()) {
             return it->second; // Found in cache, return the cached instance
@@ -42,7 +42,7 @@ public:
     }
 
     std::shared_ptr<MStream> getDecodedStream(MFile* streamFile, std::ios_base::openmode mode, std::shared_ptr<MStream> wrappingStream) {
-        auto key = std::make_pair(streamFile, mode);
+        size_t key = std::hash<MFile*>{}(streamFile) ^ static_cast<int>(mode);
         auto it = streamCache.find(key);
         if (it != streamCache.end()) {
             return it->second; // Found in cache, return the cached instance
@@ -74,6 +74,6 @@ public:
         }
     }
 };
-
+*/
 
 #endif /* MEATLOAF_STREAM_BROKER */
