@@ -250,7 +250,6 @@ void IRAM_ATTR systemBus::service()
         // gpio_intr_enable((gpio_num_t)PIN_IEC_ATN);
         return;
     }
-
 #endif
 
     // Command or Data Mode
@@ -334,11 +333,10 @@ void IRAM_ATTR systemBus::service()
             detected_protocol = PROTOCOL_SERIAL;
             protocol = selectProtocol();
             //release ( PIN_IEC_SRQ );
-        }
 
-        
-        if ( status ( PIN_IEC_ATN ) )
-            state = BUS_ACTIVE;
+            if ( status ( PIN_IEC_ATN ) )
+                state = BUS_ACTIVE;
+        }
 
     } while( state > BUS_IDLE );
 
@@ -367,11 +365,13 @@ void systemBus::read_command()
     // Check for error
     if ( flags & ERROR )
     {
-        Debug_printv("Error reading command. flags[%d]", flags);
+        Debug_printv("Error reading command. flags[%d] c[%08X]", flags, c);
         if (c == 0xFFFFFFFF)
             state = BUS_OFFLINE;
         else
             state = BUS_ERROR;
+        
+        return;
     }
     else if ( flags & EMPTY_STREAM)
     {

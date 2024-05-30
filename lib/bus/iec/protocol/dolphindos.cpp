@@ -116,7 +116,7 @@ bool DolphinDOS::sendByte ( uint8_t data, bool eoi )
         // line  is  true  whether  or  not  we have gone through the EOI sequence; we're back to a common
         // transmission sequence.
 
-        //flags or_eq EOI_RECVD;
+        //flags |= EOI_RECVD;
 
         // Signal eoi by waiting 200 us
         if ( !wait ( TIMING_Tye, true ) ) return false;
