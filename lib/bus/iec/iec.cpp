@@ -201,17 +201,6 @@ void IRAM_ATTR systemBus::service()
     // Disable Interrupt
     // gpio_intr_disable((gpio_num_t)PIN_IEC_ATN);
 
-    if ( flags & ATN_PULLED )
-    {
-        // *** IMPORTANT! This helps keep us in sync!
-        // Sometimes the C64 pulls ATN but doesn't pull CLOCK right away
-        if ( protocol->timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMEOUT_ATNCLK, false ) == TIMED_OUT )
-        {
-            Debug_printv ( "ATN/Clock delay" );
-            return; // return error because timeout
-        }
-    }
-
     if (state < BUS_ACTIVE)
     {
         // debugTiming();
@@ -264,10 +253,9 @@ void IRAM_ATTR systemBus::service()
         {
             //pull ( PIN_IEC_SRQ );
 
-            //release ( PIN_IEC_CLK_OUT );
-            //pull ( PIN_IEC_DATA_OUT );
-
-            //flags = CLEAR;
+            // *** IMPORTANT! This helps keep us in sync!
+            // Sometimes the C64 pulls ATN but doesn't pull CLOCK right away
+            protocol->timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMEOUT_ATNCLK, false );
 
             // Read bus command bytes
             //Debug_printv("command");

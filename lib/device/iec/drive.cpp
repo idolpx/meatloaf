@@ -1321,7 +1321,6 @@ bool iecDrive::sendFile()
     uint32_t avail = istream->available();
 
     //fnLedStrip.startRainbow(300);
-    Debug_printv("size[%d] avail[%d]", size, avail);
 
     if( commanddata.channel == CHANNEL_LOAD )
     {
