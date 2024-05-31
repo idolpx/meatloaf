@@ -60,12 +60,11 @@ static void ml_iec_intr_task(void* arg)
 {
     while ( true ) 
     {
-        // if ( IEC.enabled )
-        // {
+        if ( IEC.enabled )
             IEC.service();
-            if ( IEC.state < BUS_ACTIVE )
-                taskYIELD();
-        // }
+
+        if ( IEC.state < BUS_ACTIVE )
+            taskYIELD();
     }
 }
 
@@ -201,6 +200,13 @@ void IRAM_ATTR systemBus::service()
 
     // Disable Interrupt
     // gpio_intr_disable((gpio_num_t)PIN_IEC_ATN);
+
+    if ( flags & ATN_PULLED )
+    {
+        // *** IMPORTANT! This helps keep us in sync!
+        // Sometimes the C64 pulls ATN but doesn't pull CLOCK right away
+        while ( status( PIN_IEC_CLK_IN ) != PULLED );
+    }
 
     if (state < BUS_ACTIVE)
     {
@@ -341,25 +347,14 @@ void IRAM_ATTR systemBus::service()
     Debug_printv("exit");
     Debug_printv("bus[%d] flags[%d]", state, flags);
     Debug_printf("Heap: %lu\r\n",esp_get_free_internal_heap_size());
-    //release( PIN_IEC_SRQ );
 
+    //release( PIN_IEC_SRQ );
     //fnLedStrip.stopRainbow();
-    //fnLedManager.set(eLed::LED_BUS, false);
+    fnLedManager.set(eLed::LED_BUS, false);
 }
 
 void systemBus::read_command()
 {
-    // *** IMPORTANT! This helps keep us in sync!
-    // ATN was pulled, read bus command bytes
-    // Sometimes the C64 pulls ATN but doesn't pull CLOCK right away
-    //pull( PIN_IEC_SRQ );
-    if ( protocol->timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMEOUT_ATNCLK, false ) == TIMED_OUT )
-    {
-        Debug_printv ( "ATN/Clock delay" );
-        return; // return error because timeout
-    }
-    //release( PIN_IEC_SRQ );
-
     //pull( PIN_IEC_SRQ );
     int16_t c = receiveByte();
     //release( PIN_IEC_SRQ );
@@ -549,7 +544,7 @@ void systemBus::read_payload()
 
     // ATN might get pulled right away if there is no command string to send
     //pull ( PIN_IEC_SRQ );
-    while (IEC.status(PIN_IEC_ATN) != PULLED)
+    while (status(PIN_IEC_ATN) != PULLED)
     {
         //pull ( PIN_IEC_SRQ );
         int16_t c = protocol->receiveByte();
@@ -728,9 +723,9 @@ void virtualDevice::dumpData()
 void systemBus::assert_interrupt()
 {
     if (interruptSRQ)
-        IEC.pull(PIN_IEC_SRQ);
+        pull(PIN_IEC_SRQ);
     else
-        IEC.release(PIN_IEC_SRQ);
+        release(PIN_IEC_SRQ);
 }
 
 int16_t systemBus::receiveByte()
@@ -743,9 +738,9 @@ int16_t systemBus::receiveByte()
     if (b == -1)
     {
         // Not an error if ATN was pulled
-        if (!(IEC.flags & ATN_PULLED))
+        if (!( flags & ATN_PULLED))
         {
-            IEC.flags |= ERROR;
+            flags |= ERROR;
             Debug_printv("error");
         }
     }
@@ -770,9 +765,9 @@ bool systemBus::sendByte(const char c, bool eoi)
 {
     if (!protocol->sendByte(c, eoi))
     {
-        if (!(IEC.flags & ATN_PULLED))
+        if (!(flags & ATN_PULLED))
         {
-            IEC.flags |= ERROR;
+            flags |= ERROR;
             Debug_printv("error");
             return false;
         }

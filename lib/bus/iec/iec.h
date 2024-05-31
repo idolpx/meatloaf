@@ -429,6 +429,11 @@ public:
     uint16_t flags = CLEAR;
 
     /**
+     * @brief bus enabled
+     */
+    bool enabled = true;
+
+    /**
      * @brief current bus state
      */
     bus_state_t state;

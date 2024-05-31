@@ -1073,7 +1073,7 @@ void iecDrive::sendListing()
     IEC.sendByte(0, true);
     //closeStream();
 
-    Serial.printf("\r\n=================================\r\n%d bytes sent\r\n", byte_count);
+    Serial.printf("\r\n=================================\r\n%d bytes sent\r\n\r\n", byte_count);
 
     //fnLedManager.set(eLed::LED_BUS, false);
     //fnLedStrip.stopRainbow();
@@ -1428,7 +1428,7 @@ bool iecDrive::sendFile()
 //     }
 // #endif
 
-    Serial.printf("\r\n=================================\r\n%d bytes sent of %d [SYS%d]\r\n", count, avail, sys_address);
+    Serial.printf("\r\n=================================\r\n%d bytes sent of %d [SYS%d]\r\n\r\n", count, size, sys_address);
 
     //Debug_printv("len[%d] avail[%d] success_rx[%d]", len, avail, success_rx);
 
