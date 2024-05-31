@@ -797,7 +797,7 @@ uint16_t iecDrive::sendLine(uint16_t blocks, const char *format, ...)
 
 uint16_t iecDrive::sendLine(uint16_t blocks, char *text)
 {
-    Debug_printf("%d %s ", blocks, text);
+    Serial.printf("%d %s ", blocks, text);
 
     // Exit if ATN is PULLED while sending
     // Exit if there is an error while sending
@@ -824,7 +824,7 @@ uint16_t iecDrive::sendLine(uint16_t blocks, char *text)
     // Finish line
     IEC.sendByte(0);
 
-    Debug_println("");
+    Serial.println("");
     
     return len + 5;
 } // sendLine
@@ -929,7 +929,7 @@ uint16_t iecDrive::sendFooter()
 
 void iecDrive::sendListing()
 {
-    Debug_printf("sendListing: [%s]\r\n=================================\r\n", _base->url.c_str());
+    Serial.printf("sendListing: [%s]\r\n=================================\r\n", _base->url.c_str());
 
     uint16_t byte_count = 0;
     std::string extension = "dir";
@@ -966,7 +966,7 @@ void iecDrive::sendListing()
         return;
     }
 
-    Debug_println("");
+    Serial.println("");
 
     // Send Listing Header
     if (_base->media_header.size() == 0)
@@ -997,10 +997,11 @@ void iecDrive::sendListing()
             {
                 extension = entry->extension;
 
-                // Change extension to PRG if it is non-standard
-                std::string valid_extensions = "delseqprgusrrelcbm";
-                if ( mstr::contains(valid_extensions, extension.c_str()) )
-                    extension = "prg";
+                // TODO: Compatibility mode file extension
+                // // Change extension to PRG if it is non-standard
+                // std::string valid_extensions = "delseqprgusrrelcbm";
+                // if ( !mstr::contains(valid_extensions, extension.c_str()) )
+                //     extension = "prg";
             }
             else
             {
@@ -1072,7 +1073,7 @@ void iecDrive::sendListing()
     IEC.sendByte(0, true);
     //closeStream();
 
-    Debug_printf("\r\n=================================\r\n%d bytes sent\r\n", byte_count);
+    Serial.printf("\r\n=================================\r\n%d bytes sent\r\n", byte_count);
 
     //fnLedManager.set(eLed::LED_BUS, false);
     //fnLedStrip.stopRainbow();
@@ -1278,7 +1279,7 @@ bool iecDrive::sendFile()
     auto istream = retrieveStream(commanddata.channel);
     if ( istream == nullptr )
     {
-        Debug_printv("Stream not found!");
+        Serial.println("Stream not found!");
         IEC.senderTimeout(); // File Not Found
         _last_file = "";
         _base.reset( MFSOwner::File( _base->base() ) );
@@ -1333,13 +1334,13 @@ bool iecDrive::sendFile()
         success_tx = IEC.sendByte(b);
         load_address = load_address | b << 8;  // high byte
         sys_address = load_address;
-        Debug_printv( "load_address[$%.4X] sys_address[%d]", load_address, sys_address );
+        Serial.printf( "load_address[$%.4X] sys_address[%d]\r\n", load_address, sys_address );
 
         // Get SYSLINE
     }
 
 
-    Debug_printf("sendFile: [$%.4X]\r\n=================================\r\n", load_address);
+    Serial.printf("sendFile: [$%.4X]\r\n=================================\r\n", load_address);
     while( success_rx && !istream->error() )
     {
         count = istream->position();
@@ -1349,7 +1350,7 @@ bool iecDrive::sendFile()
 #ifdef DATA_STREAM
         if (bi == 0)
         {
-            Debug_printf(":%.4X ", load_address);
+            Serial.printf(":%.4X ", load_address);
             load_address += 8;
         }
 #endif
@@ -1399,11 +1400,11 @@ bool iecDrive::sendFile()
 
         if(bi == 8)
         {
-            Debug_printf(" %s (%d %d%%) [%d]\r\n", ba, count, t, avail);
+            Serial.printf(" %s (%d %d%%) [%d]\r\n", ba, count, t, avail);
             bi = 0;
         }
 #else
-        Debug_printf("\rTransferring %d%% [%d, %d]      ", t, count, avail);
+        Serial.printf("\rTransferring %d%% [%d, %d]      ", t, count, avail);
 #endif
 
         // // Toggle LED
@@ -1427,7 +1428,7 @@ bool iecDrive::sendFile()
 //     }
 // #endif
 
-    Debug_printf("\r\n=================================\r\n%d bytes sent of %d [SYS%d]\r\n", count, avail, sys_address);
+    Serial.printf("\r\n=================================\r\n%d bytes sent of %d [SYS%d]\r\n", count, avail, sys_address);
 
     //Debug_printv("len[%d] avail[%d] success_rx[%d]", len, avail, success_rx);
 
@@ -1436,7 +1437,7 @@ bool iecDrive::sendFile()
 
     if ( istream->error() )
     {
-        Debug_println("sendFile: Transfer aborted!");
+        Serial.println("sendFile: Transfer aborted!");
         IEC.senderTimeout();
         closeStream(commanddata.channel);
     }
@@ -1466,7 +1467,7 @@ bool iecDrive::saveFile()
     auto ostream = retrieveStream(commanddata.channel);
 
     if ( ostream == nullptr ) {
-        Debug_printv("couldn't open a stream for writing");
+        Serial.println("couldn't open a stream for writing");
         IEC.senderTimeout(); // File Not Found
         return false;
     }
@@ -1491,7 +1492,7 @@ bool iecDrive::saveFile()
         }
 
 
-        Debug_printv("saveFile: [$%.4X]\r\n=================================\r\n", load_address);
+        Serial.printf("saveFile: [$%.4X]\r\n=================================\r\n", load_address);
 
         // Recieve bytes until a EOI is detected
         do
@@ -1499,17 +1500,17 @@ bool iecDrive::saveFile()
             // Save Load Address
             if (i == 0)
             {
-                Debug_print("[");
+                Serial.print("[");
                 ostream->write(ll, b_len);
                 ostream->write(lh, b_len);
                 i += 2;
-                Debug_println("]");
+                Serial.print("]");
             }
 
 #ifdef DATA_STREAM
             if (bi == 0)
             {
-                Debug_printf(":%.4X ", load_address);
+                Serial.printf(":%.4X ", load_address);
                 load_address += 8;
             }
 #endif
@@ -1542,7 +1543,7 @@ bool iecDrive::saveFile()
 
             if(bi == 8)
             {
-                Debug_printf(" %s (%d)\r\n", ba, i);
+                Serial.printf(" %s (%d)\r\n", ba, i);
                 bi = 0;
             }
 #endif
@@ -1555,7 +1556,7 @@ bool iecDrive::saveFile()
     }
     // ostream->close(); // nor required, closes automagically
 
-    Debug_printf("=================================\r\n%d bytes saved\r\n", i);
+    Serial.printf("=================================\r\n%d bytes saved\r\n", i);
     //fnLedManager.set(eLed::LED_BUS, false);
     //fnLedStrip.stopRainbow();
 

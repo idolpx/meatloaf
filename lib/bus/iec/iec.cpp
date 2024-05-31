@@ -202,15 +202,7 @@ void IRAM_ATTR systemBus::service()
     // Disable Interrupt
     // gpio_intr_disable((gpio_num_t)PIN_IEC_ATN);
 
-    if (state == BUS_ACTIVE)
-    {
-        // ATN was pulled
-        // Sometimes the C64 pulls ATN but doesn't pull CLOCK right away
-        //pull( PIN_IEC_SRQ );
-        protocol->timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMEOUT_ATNCLK, false );
-        //release( PIN_IEC_SRQ );
-    }
-    else
+    if (state < BUS_ACTIVE)
     {
         // debugTiming();
 
@@ -225,7 +217,6 @@ void IRAM_ATTR systemBus::service()
     }
 
 #ifdef IEC_HAS_RESET
-
     // Check if CBM is sending a reset (setting the RESET line high). This is typically
     // when the CBM is reset itself. In this case, we are supposed to reset all states to initial.
     bool pin_reset = status(PIN_IEC_RESET);
@@ -358,6 +349,17 @@ void IRAM_ATTR systemBus::service()
 
 void systemBus::read_command()
 {
+    // *** IMPORTANT! This helps keep us in sync!
+    // ATN was pulled, read bus command bytes
+    // Sometimes the C64 pulls ATN but doesn't pull CLOCK right away
+    //pull( PIN_IEC_SRQ );
+    if ( protocol->timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMEOUT_ATNCLK, false ) == TIMED_OUT )
+    {
+        Debug_printv ( "ATN/Clock delay" );
+        return; // return error because timeout
+    }
+    //release( PIN_IEC_SRQ );
+
     //pull( PIN_IEC_SRQ );
     int16_t c = receiveByte();
     //release( PIN_IEC_SRQ );
@@ -562,10 +564,10 @@ void systemBus::read_payload()
             return;
         }
 
-        if (c != 0xFFFFFFFF ) // && c != 0x0D) // Leave 0x0D to be stripped later
-        {
+        //if (c != 0xFFFFFFFF ) // && c != 0x0D) // Leave 0x0D to be stripped later
+        //{
             listen_command += (uint8_t)c;
-        }
+        //}
 
         if (flags & EOI_RECVD)
             break;
@@ -736,12 +738,16 @@ int16_t systemBus::receiveByte()
     //pull( PIN_IEC_SRQ );
     int16_t b = protocol->receiveByte();
 #ifdef DATA_STREAM
-    Debug_printf("%.2X ", (int16_t)b);
+    Serial.printf("%.2X ", (int16_t)b);
 #endif
     if (b == -1)
     {
-        flags |= ERROR;
-        Debug_printv("error");
+        // Not an error if ATN was pulled
+        if (!(IEC.flags & ATN_PULLED))
+        {
+            IEC.flags |= ERROR;
+            Debug_printv("error");
+        }
     }
     //release( PIN_IEC_SRQ );
     return b;
@@ -774,9 +780,9 @@ bool systemBus::sendByte(const char c, bool eoi)
 
 #ifdef DATA_STREAM
     if (eoi)
-        Debug_printf("%.2X[eoi] ", c);
+        Serial.printf("%.2X[eoi] ", c);
     else
-        Debug_printf("%.2X ", c);
+        Serial.printf("%.2X ", c);
 #endif
 
     return true;
@@ -832,7 +838,7 @@ void IRAM_ATTR systemBus::deviceListen()
     else if (data.secondary == IEC_OPEN || data.secondary == IEC_REOPEN)
     {
         read_payload();
-        Debug_printf("payload: \r\n%s\r\n", util_hexdump(data.payload.data(), data.payload.size()).c_str());
+        Serial.printf("Device #%02d:%02d {%s}\r\n", data.device, data.channel, data.payload.c_str());
     }
 
     // CLOSE Named Channel
@@ -850,7 +856,7 @@ void IRAM_ATTR systemBus::deviceListen()
     }
 }
 
-void IRAM_ATTR systemBus::deviceTalk(void)
+void IRAM_ATTR systemBus::deviceTalk()
 {
     // Now do bus turnaround
     //pull(PIN_IEC_SRQ);
@@ -900,7 +906,7 @@ bool IRAM_ATTR systemBus::turnAround()
     pull ( PIN_IEC_CLK_OUT );
 
     // 80us minimum delay after TURNAROUND
-    // IMPORTANT!
+    // *** IMPORTANT!
     protocol->wait( TIMING_Tda, false );
 
     return true;

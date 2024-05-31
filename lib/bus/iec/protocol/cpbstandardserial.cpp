@@ -323,7 +323,7 @@ bool CPBStandardSerial::sendByte(uint8_t data, bool eoi)
         }
     }
 
-    // IMPORTANT!!!
+    // *** IMPORTANT!!!
     // Delay before byte
     // ATN might get pulled here
     if ( !wait ( TIMING_Tne, true ) ) return false;

@@ -55,7 +55,6 @@ void main_shutdown_handler()
 // Initial setup
 void main_setup()
 {
-#ifdef DEBUG
     fnUartDebug.begin(DEBUG_SPEED);
     unsigned long startms = fnSystem.millis();
     
@@ -76,9 +75,6 @@ void main_setup()
     Serial.printf( "himem reserved %u\r\n", esp_himem_reserved_area_size() );
 #endif
 #endif
-
-
-#endif // DEBUG
 
     // Install a reboot handler
     esp_register_shutdown_handler(main_shutdown_handler);
