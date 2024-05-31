@@ -322,10 +322,10 @@ void IRAM_ATTR systemBus::service()
             detected_protocol = PROTOCOL_SERIAL;
             protocol = selectProtocol();
             //release ( PIN_IEC_SRQ );
-        }
 
-        if ( status ( PIN_IEC_ATN ) )
-            state = BUS_ACTIVE;
+            if ( status ( PIN_IEC_ATN ) )
+                state = BUS_ACTIVE;
+        }
 
     } while( state > BUS_IDLE );
 
@@ -342,7 +342,7 @@ void IRAM_ATTR systemBus::service()
 
     //release( PIN_IEC_SRQ );
     //fnLedStrip.stopRainbow();
-    fnLedManager.set(eLed::LED_BUS, false);
+    //fnLedManager.set(eLed::LED_BUS, false);
 }
 
 void systemBus::read_command()
@@ -476,14 +476,10 @@ void systemBus::read_command()
         // released before trying to process the command. 
         // Long ATN delay (>1.5ms) seems to occur more frequently with VIC-20.
         //pull ( PIN_IEC_SRQ );
-        if ( protocol->timeoutWait ( PIN_IEC_ATN, RELEASED, TIMEOUT_DEFAULT, false ) == TIMED_OUT )
-        {
-            Debug_printv ( "ATN Not Released after secondary" );
-            //return; // return error because timeout
-        }
+        protocol->timeoutWait ( PIN_IEC_ATN, RELEASED, TIMEOUT_DEFAULT, false );
 
         // Delay after ATN is RELEASED
-        protocol->wait( TIMING_Ttk, false );
+        //protocol->wait( TIMING_Ttk, false );
         //release ( PIN_IEC_SRQ );
     }
 
@@ -930,7 +926,7 @@ void IRAM_ATTR systemBus::releaseLines(bool wait)
     if (wait)
     {
         Debug_printv("Waiting for ATN to release");
-        protocol->timeoutWait(PIN_IEC_ATN, RELEASED, FOREVER);
+        protocol->timeoutWait ( PIN_IEC_ATN, RELEASED, TIMEOUT_DEFAULT, false );
     }
 
     //release ( PIN_IEC_SRQ );
