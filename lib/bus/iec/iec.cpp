@@ -205,7 +205,11 @@ void IRAM_ATTR systemBus::service()
     {
         // *** IMPORTANT! This helps keep us in sync!
         // Sometimes the C64 pulls ATN but doesn't pull CLOCK right away
-        while ( status( PIN_IEC_CLK_IN ) != PULLED );
+        if ( protocol->timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMEOUT_ATNCLK, false ) == TIMED_OUT )
+        {
+            Debug_printv ( "ATN/Clock delay" );
+            return; // return error because timeout
+        }
     }
 
     if (state < BUS_ACTIVE)
@@ -330,10 +334,10 @@ void IRAM_ATTR systemBus::service()
             detected_protocol = PROTOCOL_SERIAL;
             protocol = selectProtocol();
             //release ( PIN_IEC_SRQ );
-
-            if ( status ( PIN_IEC_ATN ) )
-                state = BUS_ACTIVE;
         }
+
+        if ( status ( PIN_IEC_ATN ) )
+            state = BUS_ACTIVE;
 
     } while( state > BUS_IDLE );
 
@@ -470,38 +474,36 @@ void systemBus::read_command()
 
             Debug_printf(" (%.2X %s  %.2d CHANNEL)\r\n", data.secondary, secondary.c_str(), data.channel);
         }
-
-        if ( state == BUS_PROCESS )
-        {
-            // *** IMPORTANT! This helps keep us in sync!
-            // Sometimes ATN isn't released immediately. Wait for ATN to be
-            // released before trying to process the command. 
-            // Long ATN delay (>1.5ms) seems to occur more frequently with VIC-20.
-            //pull ( PIN_IEC_SRQ );
-            if ( protocol->timeoutWait ( PIN_IEC_ATN, RELEASED, TIMEOUT_DEFAULT, false ) == TIMED_OUT )
-            {
-                Debug_printv ( "ATN Not Released after secondary" );
-                //return; // return error because timeout
-            }
-
-            // Delay after ATN is RELEASED
-            protocol->wait( TIMING_Ttk, false );
-            //release ( PIN_IEC_SRQ );
-        }
     }
-
 
     // Is this command for us?
     if ( !isDeviceEnabled( data.device ) )
     {
         state = BUS_IDLE; // NOPE!
     }
+    else if ( state == BUS_PROCESS )
+    {
+        // *** IMPORTANT! This helps keep us in sync!
+        // Sometimes ATN isn't released immediately. Wait for ATN to be
+        // released before trying to process the command. 
+        // Long ATN delay (>1.5ms) seems to occur more frequently with VIC-20.
+        //pull ( PIN_IEC_SRQ );
+        if ( protocol->timeoutWait ( PIN_IEC_ATN, RELEASED, TIMEOUT_DEFAULT, false ) == TIMED_OUT )
+        {
+            Debug_printv ( "ATN Not Released after secondary" );
+            //return; // return error because timeout
+        }
+
+        // Delay after ATN is RELEASED
+        protocol->wait( TIMING_Ttk, false );
+        //release ( PIN_IEC_SRQ );
+    }
 
     // If the bus is NOT ACTIVE then release the lines
     if ( state < BUS_ACTIVE )
     {
         data.init();
-        releaseLines();
+        //releaseLines();
         return;
     }
 
