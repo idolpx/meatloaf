@@ -14,6 +14,7 @@
 #include "fnWiFi.h"
 #include "fnConfig.h"
 #include "fujiCmd.h"
+#include "status_error_codes.h"
 
 #include "device.h"
 
@@ -107,6 +108,31 @@ void iecMeatloaf::setup(systemBus *bus)
 //     Serial.print("FujiNet "); bus->addDevice(this, 30);                 // 30    FujiNet
 }
 
+void logResponse(const void* data, size_t length)
+{
+    // ensure we don't flood the logs with debug, and make it look pretty using util_hexdump
+    uint8_t debug_len = length;
+    bool is_truncated = false;
+    if (debug_len > 64) {
+        debug_len = 64;
+        is_truncated = true;
+    }
+
+    std::string msg = util_hexdump(data, debug_len);
+    Debug_printf("Sending:\n%s\n", msg.c_str());
+    if (is_truncated) {
+        Debug_printf("[truncated from %d]\n", length);
+    }
+
+    // Debug_printf("  ");
+    // // ASCII Text representation
+    // for (int i=0;i<length;i++)
+    // {
+    //     char c = petscii2ascii(data[i]);
+    //     Debug_printf("%c", c<0x20 || c>0x7f ? '.' : c);
+    // }
+
+}
 
 device_state_t iecMeatloaf::process()
 {
@@ -123,48 +149,32 @@ device_state_t iecMeatloaf::process()
     if (commanddata.primary == IEC_TALK && commanddata.secondary == IEC_REOPEN)
     {
         #ifdef DEBUG
-        if (response.size()>0) 
-        {  
-
-            // ensure we don't flood the logs with debug, and make it look pretty using util_hexdump
-            uint8_t debug_len = response.size();
-            bool is_truncated = false;
-            if (debug_len > 128) {
-                debug_len = 128;
-                is_truncated = true;
-            }
-
-            auto msg = util_hexdump(response.c_str(), debug_len);
-            Debug_printf("Sending:\n%s\n", msg.c_str());
-            if (is_truncated) {
-                Debug_printf("[truncated from %d]\n", response.size());
-            }
-
-            // Debug_printf("  ");
-            // // ASCII Text representation
-            // for (int i=0;i<response.size();i++)
-            // {
-            //     char c = petscii2ascii(response[i]);
-            //     Debug_printf("%c", c<0x20 || c>0x7f ? '.' : c);
-            // }
-        }
-        
+        if (!response.empty() && !is_raw_command) logResponse(response.data(), response.size());
+        if (!responseV.empty() && is_raw_command) logResponse(responseV.data(), responseV.size());
         Debug_printf("\n");
         #endif
 
         // TODO: review everywhere that directly uses IEC.sendBytes and make them all use iec with a common method?
-        if (!responseV.empty()) {
+
+        // only send raw back for a raw command, thus code can set "response", but we won't send it back as that's BASIC response
+        if (!responseV.empty() && is_raw_command) {
             IEC.sendBytes(reinterpret_cast<char*>(responseV.data()), responseV.size());
-            responseV.clear();
-        } else {
-            IEC.sendBytes(const_cast<char*>(response.c_str()), response.size());
-            response = "";
         }
+
+        // only send string response back for basic command        
+        if(!response.empty() && !is_raw_command) {
+            IEC.sendBytes(const_cast<char*>(response.c_str()), response.size());
+        }
+
+        // ensure responses are cleared for next command in case they were set but didn't match the command type (i.e. basic or raw)
+        responseV.clear();
+        response = "";
 
     }
     else if (commanddata.primary == IEC_UNLISTEN)
     {
-        if (payload[0] > 0x7F)
+        is_raw_command = payload[0] > 0x7F;
+        if (is_raw_command)
             process_raw_commands();
         else
             process_basic_commands();
@@ -192,31 +202,30 @@ void iecMeatloaf::local_ip()
 
 void iecMeatloaf::process_basic_commands()
 {
+    payloadRaw = payload;               // required for appkey in BASIC
     payload = mstr::toUTF8(payload);
     pt = util_tokenize(payload, ',');
-
-    Debug_printv("payload[%s]", payload.c_str());
 
     if (payload.find("adapterconfig") != std::string::npos)
         get_adapter_config();
     else if (payload.find("setssid") != std::string::npos)
-        net_set_ssid();
+        net_set_ssid_basic();
     else if (payload.find("getssid") != std::string::npos)
-        net_get_ssid();
+        net_get_ssid_basic();
     else if (payload.find("reset") != std::string::npos)
         reset_device();
     else if (payload.find("scanresult") != std::string::npos)
-        net_scan_result();
+        net_scan_result_basic();
     else if (payload.find("scan") != std::string::npos)
-        net_scan_networks();
+        net_scan_networks_basic();
     else if (payload.find("wifistatus") != std::string::npos)
         net_get_wifi_status();
     // else if (payload.find("mounthost") != std::string::npos)
-    //     mount_host();
+    //     mount_host_basic();
     // else if (payload.find("mountdrive") != std::string::npos)
-    //     disk_image_mount();
+    //     disk_image_mount_basic();
     // else if (payload.find("opendir") != std::string::npos)
-    //     open_directory();
+    //     open_directory_basic();
     // else if (payload.find("readdir") != std::string::npos)
     //     read_directory_entry();
     // else if (payload.find("closedir") != std::string::npos)
@@ -238,7 +247,7 @@ void iecMeatloaf::process_basic_commands()
     // else if (payload.find("setdrivefilename") != std::string::npos)
     //     set_device_filename();
     else if (payload.find("writeappkey") != std::string::npos)
-        write_app_key();
+        write_app_key_basic();
     else if (payload.find("readappkey") != std::string::npos)
         read_app_key();
     else if (payload.find("openappkey") != std::string::npos)
@@ -262,6 +271,7 @@ void iecMeatloaf::process_basic_commands()
 
         IEC.setBitTiming(pt[1], atoi(pt[2].c_str()), atoi(pt[3].c_str()), atoi(pt[4].c_str()), atoi(pt[5].c_str()));
     }
+
 }
 
 void iecMeatloaf::process_raw_commands()
@@ -273,28 +283,28 @@ void iecMeatloaf::process_raw_commands()
         reset_device();
         break;
     case FUJICMD_GET_SSID:
-        net_get_ssid();
+        net_get_ssid_raw();
         break;
     case FUJICMD_SCAN_NETWORKS:
-        net_scan_networks();
+        net_scan_networks_raw();
         break;
     case FUJICMD_GET_SCAN_RESULT:
-        net_scan_result();
+        net_scan_result_raw();
         break;
     case FUJICMD_SET_SSID:
-        net_set_ssid();
+        net_set_ssid_raw();
         break;
     case FUJICMD_GET_WIFISTATUS:
         net_get_wifi_status();
         break;
     // case FUJICMD_MOUNT_HOST:
-    //     mount_host();
+    //     mount_host_raw();
     //     break;
     // case FUJICMD_MOUNT_IMAGE:
-    //     disk_image_mount();
+    //     disk_image_mount_raw();
     //     break;
     // case FUJICMD_OPEN_DIRECTORY:
-    //     open_directory();
+    //     open_directory_raw();
     //     break;
     // case FUJICMD_READ_DIR_ENTRY:
     //     read_directory_entry();
@@ -336,7 +346,7 @@ void iecMeatloaf::process_raw_commands()
     //     set_device_filename();
     //     break;
     case FUJICMD_WRITE_APPKEY:
-        write_app_key();
+        write_app_key_raw();
         break;
     case FUJICMD_READ_APPKEY:
         read_app_key();
@@ -366,178 +376,179 @@ void iecMeatloaf::process_raw_commands()
 // Reset Device
 void iecMeatloaf::reset_device()
 {
-    // TODO IMPLEMENT
     fnSystem.reboot();
 }
 
-// Scan for networks
+void iecMeatloaf::net_scan_networks_basic()
+{
+    net_scan_networks();
+    response = std::to_string(_countScannedSSIDs);
+}
+
+void iecMeatloaf::net_scan_networks_raw()
+{
+    net_scan_networks();
+    responseV.push_back(_countScannedSSIDs);
+}
+
 void iecMeatloaf::net_scan_networks()
 {
-    char c[8];
-
     _countScannedSSIDs = fnWiFi.scan_networks();
-
-    if (payload[0] == FUJICMD_SCAN_NETWORKS)
-    {
-        // dealing with binary data, so use the vector version
-        responseV.push_back(_countScannedSSIDs);
-    }
-    else
-    {
-        itoa(_countScannedSSIDs, c, 10);
-        response = string(c);
-    }
 }
 
-// Return scanned network entry
-void iecMeatloaf::net_scan_result()
+void iecMeatloaf::net_scan_result_basic()
 {
-
-
-    // pt[0] = SCANRESULT
-    // pt[1] = scan result # (0-numresults)
-    struct
-    {
-        char ssid[33];
-        uint8_t rssi;
-    } detail;
-
-    if (pt.size() > 1)
-    {
-        util_remove_spaces(pt[1]);
-        int i = atoi(pt[1].c_str());
-        fnWiFi.get_scan_result(i, detail.ssid, &detail.rssi);
-        Debug_printf("SSID: %s RSSI: %u\r\n", detail.ssid, detail.rssi);
+    if (pt.size() != 2) {
+        state = DEVICE_ERROR;
+        return;
     }
-    else
-    {
-        strcpy(detail.ssid, "INVALID SSID");
-        detail.rssi = 0;
-    }
-
-    if (payload[0] == FUJICMD_GET_SCAN_RESULT)
-    {
-        responseV.assign(reinterpret_cast<const uint8_t*>(&detail), reinterpret_cast<const uint8_t*>(&detail) + sizeof(detail));
-    }
-    else // SCANRESULT,n
-    {
-        char t[8];
-
-        std::string s = std::string(detail.ssid);
-        itoa(detail.rssi, t, 10);
-
-        response = std::string(t) + ",\"" + s + "\"";
-    }
+    util_remove_spaces(pt[1]);
+    int i = atoi(pt[1].c_str());
+    scan_result_t result = net_scan_result(i);
+    response = std::to_string(result.rssi) + ",\"" + std::string(result.ssid) + "\"";
 }
 
-//  Get SSID
-void iecMeatloaf::net_get_ssid()
+void iecMeatloaf::net_scan_result_raw()
 {
-    struct
-    {
-        char ssid[MAX_SSID_LEN + 1];
-        char password[MAX_PASSPHRASE_LEN + 1];
-    } cfg;
+    int n = payload[1];
+    scan_result_t result = net_scan_result(n);
+    responseV.assign(reinterpret_cast<const uint8_t*>(&result), reinterpret_cast<const uint8_t*>(&result) + sizeof(result));
+}
 
-    memset(&cfg, 0, sizeof(cfg));
+scan_result_t iecMeatloaf::net_scan_result(int scan_num)
+{
+    scan_result_t result;
+    memset(&result.ssid[0], 0, sizeof(scan_result_t));
+    fnWiFi.get_scan_result(scan_num, result.ssid, &result.rssi);
+    Debug_printf("SSID: %s RSSI: %u\r\n", result.ssid, result.rssi);
+    return result;
+}
+
+void iecMeatloaf::net_get_ssid_basic()
+{
+    net_config_t net_config = net_get_ssid();
+    response = std::string(net_config.ssid);
+}
+
+void iecMeatloaf::net_get_ssid_raw()
+{
+    net_config_t net_config = net_get_ssid();
+    responseV.assign(reinterpret_cast<const uint8_t*>(&net_config), reinterpret_cast<const uint8_t*>(&net_config) + sizeof(net_config));
+}
+
+net_config_t iecMeatloaf::net_get_ssid()
+{
+    net_config_t net_config;
+    memset(&net_config, 0, sizeof(net_config));
 
     std::string s = Config.get_wifi_ssid();
-    memcpy(cfg.ssid, s.c_str(),
-           s.length() > sizeof(cfg.ssid) ? sizeof(cfg.ssid) : s.length());
+    memcpy(net_config.ssid, s.c_str(), s.length() > sizeof(net_config.ssid) ? sizeof(net_config.ssid) : s.length());
 
     s = Config.get_wifi_passphrase();
-    memcpy(cfg.password, s.c_str(),
-           s.length() > sizeof(cfg.password) ? sizeof(cfg.password) : s.length());
+    memcpy(net_config.password, s.c_str(), s.length() > sizeof(net_config.password) ? sizeof(net_config.password) : s.length());
 
-    if (payload[0] == FUJICMD_GET_SSID)
-    {
-        responseV.assign(reinterpret_cast<const uint8_t*>(&cfg), reinterpret_cast<const uint8_t*>(&cfg) + sizeof(cfg));
-    }
-    else // BASIC mode.
-    {
-        response = std::string(cfg.ssid);
-    }
+    return net_config;
 }
 
-// Set SSID
-void iecMeatloaf::net_set_ssid( bool store )
+void iecMeatloaf::net_set_ssid_basic(bool store)
 {
-    Debug_printv("SET SSID");
-
-    // Data for  FUJICMD_SET_SSID
-    struct
+    if (pt.size() != 2)
     {
-        char ssid[MAX_SSID_LEN + 1];
-        char password[MAX_PASSPHRASE_LEN + 1];
-    } cfg;
-
-    memset(&cfg, 0, sizeof(cfg));
-
-    if (payload[0] == FUJICMD_SET_SSID)
-    {
-        strncpy((char *)&cfg, payload.substr(12, std::string::npos).c_str(), sizeof(cfg));
-    }
-    else // easy BASIC form
-    {
-        std::string s = payload.substr(8, std::string::npos);
-        std::vector<std::string> t = util_tokenize(s, ',');
-
-        if (t.size() == 2)
-        {
-            if ( mstr::isNumeric( t[0] ) ) {
-                // Find SSID by CRC8 Number
-                t[0] = fnWiFi.get_network_name_by_crc8( std::stoi(t[0]) );
-            }
-
-            Debug_printv("t1[%s] t2[%s]", t[0].c_str(), t[1].c_str());
-
-            // URL Decode SSID/PASSWORD to handle special chars
-            t[0] = mstr::urlDecode(t[0]);
-            t[1] = mstr::urlDecode(t[1]);
-
-            strncpy(cfg.ssid, t[0].c_str(),
-                t[0].length() > sizeof(cfg.ssid) ? sizeof(cfg.ssid) : t[0].length());
-            strncpy(cfg.password, t[1].c_str(),
-                t[1].length() > sizeof(cfg.password) ? sizeof(cfg.password) : t[1].length());
-            Debug_printv("ssid[%s] pass[%s]", cfg.ssid, cfg.password);
-        }
-        else
-        {
-            Debug_printv("SSID, PASSWORD not set!");
-            return;
-        }
+        Debug_printv("error: bad args");
+        response = "BAD SSID ARGS";
+        return;
     }
 
-    Debug_printf("Storing WiFi SSID and Password.\r\n");
-    Config.store_wifi_ssid(cfg.ssid, sizeof(cfg.ssid));
-    Config.store_wifi_passphrase(cfg.password, sizeof(cfg.password));
-    Config.save();
+    // Strip off the SETSSID: part of the command
+    pt[0] = pt[0].substr(8, std::string::npos);
+    if (mstr::isNumeric(pt[0])) {
+        // Find SSID by CRC8 Number
+        pt[0] = fnWiFi.get_network_name_by_crc8(std::stoi(pt[0]));
+    }
 
-    Debug_printf("Connecting to [%s]\r\n", cfg.ssid);
-    fnWiFi.connect(cfg.ssid, cfg.password);
+    // Debug_printv("pt1[%s] pt2[%s]", pt[1].c_str(), pt[2].c_str());
 
-    // Only save these if we're asked to, otherwise assume it was a test for connectivity
-    if ( store && fnWiFi.connected() )
-        net_store_ssid();
+    // URL Decode SSID/PASSWORD. This will convert any %xx values to their equivalent char for the xx code. e.g. "%20" is a space
+    // It does NOT replace '+' with a space as that's frankly just insane.
+    // NOTE: if your password or username has a deliberate % followed by 2 digits, (e.g. the literal string "%69") you will have to type "%2569" to "escape" the percentage.
+    // but that's the price you pay for using urlencoding without asking the user if they want it!
+    std::string ssid = mstr::urlDecode(pt[0], false);
+    std::string passphrase = mstr::urlDecode(pt[1], false);
 
+    if (ssid.length() > MAX_SSID_LEN || passphrase.length() > MAX_PASSPHRASE_LEN || ssid.length() == 0 || passphrase.length() == 0) {
+        response = "ERROR: BAD SSID/PASSPHRASE";
+        return;
+    }
+
+    net_config_t net_config;
+    memset(&net_config, 0, sizeof(net_config_t));
+
+    strncpy(net_config.ssid, ssid.c_str(), ssid.length());
+    strncpy(net_config.password, passphrase.c_str(), passphrase.length());
+    Debug_printv("ssid[%s] pass[%s]", net_config.ssid, net_config.password);
+
+    net_set_ssid(store, net_config);
+}
+
+void iecMeatloaf::net_set_ssid_raw(bool store)
+{
+    net_config_t net_config;
+    memset(&net_config, 0, sizeof(net_config_t));
+
+    // the data is coming to us packed not in struct format, so depack it into the NetConfig
+    // Had issues with it not sending password after large number of \0 padding ssid.
+    uint8_t sent_ssid_len = strlen(&payload[1]);
+    uint8_t sent_pass_len = strlen(&payload[2 + sent_ssid_len]);
+    strncpy((char *)&net_config.ssid[0], (const char *) &payload[1], sent_ssid_len);
+    strncpy((char *)&net_config.password[0], (const char *) &payload[2 + sent_ssid_len], sent_pass_len);
+    Debug_printv("ssid[%s] pass[%s]", net_config.ssid, net_config.password);
+
+    net_set_ssid(store, net_config);
+}
+
+void iecMeatloaf::net_set_ssid(bool store, net_config_t& net_config)
+{
+    Debug_println("Fuji cmd: SET SSID");
+
+    int test_result = fnWiFi.test_connect(net_config.ssid, net_config.password);
+    if (test_result != 0)
+    {
+        Debug_println("Could not connect to target SSID. Aborting save.");
+        iecStatus.msg = "ssid not set";
+    } else {
+        // Only save these if we're asked to, otherwise assume it was a test for connectivity
+        if (store) {
+            net_store_ssid(net_config.ssid, net_config.password);
+        }
+        iecStatus.msg = "ssid set";
+    }
+
+    Debug_println("Restarting WiFiManager");
+    fnWiFi.start();
+
+    // give it a few seconds to restart the WiFi before we return to the client, who will immediately start checking status if this is CONFIG
+    // and get errors if we're not up yet.
+    fnSystem.delay(4000);
+
+    // what happens to iecStatus values?
     iecStatus.channel = 15;
-    iecStatus.error = 0;
-    iecStatus.msg = "ssid set";
+    iecStatus.error = test_result == 0 ? NETWORK_ERROR_SUCCESS : NETWORK_ERROR_NOT_CONNECTED;
     iecStatus.connected = fnWiFi.connected();
 }
 
-void iecMeatloaf::net_store_ssid()
+void iecMeatloaf::net_store_ssid(std::string ssid, std::string password)
 {
-    // Only save these if we're asked to, otherwise assume it was a test for connectivity
-
     // 1. if this is a new SSID and not in the old stored, we should push the current one to the top of the stored configs, and everything else down.
     // 2. If this was already in the stored configs, push the stored one to the top, remove the new one from stored so it becomes current only.
     // 3. if this is same as current, then just save it again. User reconnected to current, nothing to change in stored. This is default if above don't happen
 
     int ssid_in_stored = -1;
+
     for (int i = 0; i < MAX_WIFI_STORED; i++)
     {
-        if (Config.get_wifi_stored_ssid(i) == cfg.ssid)
+        std::string stored = Config.get_wifi_stored_ssid(i);
+        std::string ithConfig = Config.get_wifi_stored_ssid(i);
+        if (!ithConfig.empty() && ithConfig == ssid)
         {
             ssid_in_stored = i;
             break;
@@ -545,7 +556,7 @@ void iecMeatloaf::net_store_ssid()
     }
 
     // case 1
-    if (ssid_in_stored == -1 && Config.have_wifi_info() && Config.get_wifi_ssid() != cfg.ssid) {
+    if (ssid_in_stored == -1 && Config.have_wifi_info() && Config.get_wifi_ssid() != ssid) {
         Debug_println("Case 1: Didn't find new ssid in stored, and it's new. Pushing everything down 1 and old current to 0");
         // Move enabled stored down one, last one will drop off
         for (int j = MAX_WIFI_STORED - 1; j > 0; j--)
@@ -564,7 +575,7 @@ void iecMeatloaf::net_store_ssid()
     }
 
     // case 2
-    if (ssid_in_stored != -1 && Config.have_wifi_info() && Config.get_wifi_ssid() != cfg.ssid) {
+    if (ssid_in_stored != -1 && Config.have_wifi_info() && Config.get_wifi_ssid() != ssid) {
         Debug_printf("Case 2: Found new ssid in stored at %d, and it's not current (should never happen). Pushing everything down 1 and old current to 0\r\n", ssid_in_stored);
         // found the new SSID at ssid_in_stored, so move everything above it down one slot, and store the current at 0
         for (int j = ssid_in_stored; j > 0; j--)
@@ -581,33 +592,29 @@ void iecMeatloaf::net_store_ssid()
     }
 
     // save the new SSID as current
-    Config.store_wifi_ssid(cfg.ssid, sizeof(cfg.ssid));
+    Config.store_wifi_ssid(ssid.c_str(), ssid.size());
     // Clear text here, it will be encrypted internally if enabled for encryption
-    Config.store_wifi_passphrase(cfg.password, sizeof(cfg.password));
+    Config.store_wifi_passphrase(password.c_str(), password.size());
 
     Config.save();
 }
 
-// Get WiFi Status
-void iecMeatloaf::net_get_wifi_status()
+void iecMeatloaf::net_get_wifi_status_raw()
 {
-    // Debug_printv("payload[0]==%02x\r\n", payload[0]);
-    uint8_t wifiStatus = fnWiFi.connected() ? 3 : 6;
-
-    if (payload[0] == FUJICMD_GET_WIFISTATUS)
-    {
-        responseV.push_back(wifiStatus);
-    }
-    else
-    {
-        if (wifiStatus)
-            response = "connected";
-        else
-            response = "disconnected";
-    }
+    responseV.push_back(net_get_wifi_status());    
 }
 
-// Check if Wifi is enabled
+void iecMeatloaf::net_get_wifi_status_basic()
+{
+    response = net_get_wifi_status() == 3 ? "connected" : "disconnected";
+}
+
+
+uint8_t iecMeatloaf::net_get_wifi_status()
+{
+    return fnWiFi.connected() ? 3 : 6;
+}
+
 void iecMeatloaf::net_get_wifi_enabled()
 {
     // Not needed, will remove.
@@ -946,65 +953,101 @@ void iecMeatloaf::close_app_key()
     response = "ok";
 }
 
-/*
- Write an "app key" to SD (ONLY!) storage.
-*/
-void iecMeatloaf::write_app_key()
+bool iecMeatloaf::check_appkey_creator(bool check_is_write)
 {
-    uint16_t keylen = -1;
-    char value[MAX_APPKEY_LEN];
-    std::vector<std::string> ptRaw;
-
-    // Binary mode comes through as-is (PETSCII)
-    if (payload[0] == FUJICMD_WRITE_APPKEY)
-    {
-        keylen = payload[1] & 0xFF;
-        keylen |= payload[2] << 8;
-        strncpy(value, &payload.c_str()[3], MAX_APPKEY_LEN);
-    }
-    else
-    {
-        if (pt.size() > 2)
-        {
-            // Tokenize the raw PETSCII payload to save to the file
-            ptRaw = tokenize_basic_command(payloadRaw);
-
-            keylen = atoi(pt[1].c_str());
-            
-            // Bounds check
-            if (keylen > MAX_APPKEY_LEN)
-                keylen = MAX_APPKEY_LEN;
-
-            strncpy(value, ptRaw[2].c_str(), keylen);
-        }
-        else
-        {
-            // send error
-            response = "invalid # of parameters";
-            return;
-        }
-    }
-
-    Debug_printf("Fuji cmd: WRITE APPKEY (keylen = %hu)\r\n", keylen);
-
-    // Make sure we have valid app key information
-    if (_current_appkey.creator == 0 || _current_appkey.mode != APPKEYMODE_WRITE)
+    if (_current_appkey.creator == 0 || (check_is_write && _current_appkey.mode != APPKEYMODE_WRITE))
     {
         Debug_println("Invalid app key metadata - aborting");
-        // Send error
+        state = DEVICE_ERROR;
+        IEC.senderTimeout();
+        return false;
+    }
+    return true;
+}
+
+bool iecMeatloaf::check_sd_running()
+{
+    if (!fnSDFAT.running())
+    {
+        Debug_println("No SD mounted - can't write app key");
+        state = DEVICE_ERROR;
+        IEC.senderTimeout();
+        return false;
+    }
+    return true;
+}
+
+void iecMeatloaf::write_app_key_raw()
+{
+    if (!check_appkey_creator(true) || !check_sd_running())
+    {
+        // no error messages are set (yet?) in raw. Maybe that is how to send error code back?
+        return;
+    }
+
+    // payload[0] = 0xDE for write app key cmd
+    // [1+] = data to write to key, size payload - 1
+    // we can't write more than the appkey_size, which is set by the mode.
+    // May have to change this later as per Eric's comments in discord.
+    size_t write_size = payload.size() - 1;
+    if (write_size > appkey_size)
+    {
+        Debug_printf("ERROR: key data sent was larger than keysize. Aborting rather than potentially corrupting existing data.");
+        state = DEVICE_ERROR;
+        IEC.senderTimeout();
+        return;
+    }
+
+    std::vector<uint8_t> key_data(payload.begin() + 1, payload.end());
+    Debug_printf("key_data: \r\n%s\r\n", util_hexdump(key_data.data(), key_data.size()).c_str());
+    write_app_key(std::move(key_data));
+}
+
+void iecMeatloaf::write_app_key_basic()
+{
+    // In BASIC, the key length is specified in the parameters.
+    if (pt.size() <= 2)
+    {
+        // send error
+        response = "invalid # of parameters";
+        return;
+    }
+
+    if (!check_appkey_creator(true))
+    {
+        Debug_println("Invalid app key metadata - aborting");
         response = "malformed appkey data.";
         return;
     }
 
-    // Make sure we have an SD card mounted
-    if (fnSDFAT.running() == false)
+    if (!check_sd_running())
     {
         Debug_println("No SD mounted - can't write app key");
-        // Send error
         response = "no sd card mounted";
         return;
     }
 
+
+    // Tokenize the raw PETSCII payload to save to the file
+    std::vector<std::string> ptRaw;
+    ptRaw = tokenize_basic_command(payloadRaw);
+
+    // do we need keylen anymore?
+    int keylen = atoi(pt[1].c_str());
+    
+    // Bounds check
+    if (keylen > MAX_APPKEY_LEN)
+        keylen = MAX_APPKEY_LEN;
+
+    std::vector<uint8_t> key_data(ptRaw[2].begin(), ptRaw[2].end());
+    write_app_key(std::move(key_data));
+}
+
+/*
+ Write an "app key" to SD (ONLY!) storage.
+*/
+void iecMeatloaf::write_app_key(std::vector<uint8_t>&& value)
+{
     char *filename = _generate_appkey_filename(&_current_appkey);
 
     // Reset the app key data so we require calling APPKEY OPEN before another attempt
@@ -1016,30 +1059,34 @@ void iecMeatloaf::write_app_key()
     // Make sure we have a "/.app" directory, since that's where we're putting these files
     fnSDFAT.create_path("/.app");
 
-    FILE *fOut = fnSDFAT.file_open(filename, "w");
+    FILE *fOut = fnSDFAT.file_open(filename, FILE_WRITE);
     if (fOut == nullptr)
     {
-        Debug_printf("Failed to open/create output file: errno=%d\r\n", errno);
-        // Send error
-        char e[8];
-        itoa(errno, e, 10);
-        response = "failed to write appkey file " + std::string(e);
+        Debug_printf("Failed to open/create output file: errno=%d\n", errno);
         return;
     }
-    size_t count = fwrite(value, 1, keylen, fOut);
-
+    size_t count = fwrite(value.data(), 1, value.size(), fOut);
+    int e = errno;
     fclose(fOut);
 
-    if (count != keylen)
+    if (count != value.size())
     {
-        char e[128];
-        sprintf(e, "error: only wrote %u bytes of expected %hu, errno=%d\r\n", count, keylen, errno);
-        response = std::string(e);
-        // Send error
+        if (!is_raw_command)
+        {
+            std::ostringstream oss;
+            oss << "error: only wrote " << count << " bytes of expected " << value.size() << ", errno=" << e << "\r\n";
+            response = oss.str();
+        }
+        state = DEVICE_ERROR;
+        IEC.senderTimeout();
+        return;
     }
 
-    // Send ok
-    response = "ok";
+    if (!is_raw_command)
+    {
+        response = "ok";
+    }
+
 }
 
 /*
@@ -1055,6 +1102,8 @@ void iecMeatloaf::read_app_key()
         Debug_println("No SD mounted - can't read app key");
         response = "no sd mounted";
         // Send error
+        state = DEVICE_ERROR;
+        IEC.senderTimeout();
         return;
     }
 
@@ -1064,39 +1113,43 @@ void iecMeatloaf::read_app_key()
         Debug_println("Invalid app key metadata - aborting");
         response = "invalid appkey metadata";
         // Send error
+        state = DEVICE_ERROR;
+        IEC.senderTimeout();
         return;
     }
 
     char *filename = _generate_appkey_filename(&_current_appkey);
-
     Debug_printf("Reading appkey from \"%s\"\r\n", filename);
 
     FILE *fIn = fnSDFAT.file_open(filename, "r");
     if (fIn == nullptr)
     {
-        char e[128];
-        sprintf(e, "Failed to open input file: errno=%d\r\n", errno);
-        // Send error
-        response = std::string(e);
+        std::ostringstream oss;
+        oss << "Failed to open input file: errno=" << errno << "\r\n";
+        response = oss.str();
+        state = DEVICE_ERROR;
+        IEC.senderTimeout();
         return;
     }
 
-    struct
-    {
-        uint16_t size;
-        uint8_t value[MAX_APPKEY_LEN];
-    } __attribute__((packed)) _r;
-    memset(&_r, 0, sizeof(_r));
-
-    size_t count = fread(_r.value, 1, sizeof(_r.value), fIn);
-
+    std::vector<uint8_t> response_data(appkey_size);
+    size_t count = fread(response_data.data(), 1, response_data.size(), fIn);
+    response_data.resize(count);
+    Debug_printf("Read %u bytes from input file\n", (unsigned)count);
     fclose(fIn);
-    Debug_printf("Read %d bytes from input file\r\n", count);
 
-    _r.size = count;
+#ifdef DEBUG
+	Debug_printf("response raw:\r\n%s\n", util_hexdump(response_data.data(), count).c_str());
+#endif
 
-    // Bytes were written raw (PETSCII) so no need to map before sending back
-    response = std::string((char *)&_r, MAX_APPKEY_LEN);
+    if (is_raw_command)
+    {
+        responseV = std::move(response_data);
+    }
+    else {
+        response.assign(response_data.begin(), response_data.end());
+    }
+
 }
 
 // // Disk Image Unmount
@@ -1146,6 +1199,30 @@ void iecMeatloaf::image_rotate()
 void iecMeatloaf::shutdown()
 {
     // TODO IMPLEMENT
+}
+
+std::pair<std::string, std::string> split_at_delim(const std::string& input, char delim) {
+    // Find the position of the first occurrence of delim in the string
+    size_t pos = input.find(delim);
+
+    std::string firstPart, secondPart;
+    if (pos != std::string::npos) {
+        firstPart = input.substr(0, pos);
+        // Check if there's content beyond the delim for the second part
+        if (pos + 1 < input.size()) {
+            secondPart = input.substr(pos + 1);
+        }
+    } else {
+        // If delim is not found, the entire input is the first part
+        firstPart = input;
+    }
+
+    // Remove trailing slash from firstPart, if present
+    if (!firstPart.empty() && firstPart.back() == '/') {
+        firstPart.pop_back();
+    }
+
+    return {firstPart, secondPart};
 }
 
 // void iecMeatloaf::open_directory()

@@ -5,9 +5,9 @@
 #include <cstring>
 
 #include "bus.h"
-#include "drive.h"
 #include "network.h"
 #include "cassette.h"
+#include "fnWiFi.h"
 
 #include "../fuji/fujiHost.h"
 #include "../fuji/fujiDisk.h"
@@ -17,6 +17,7 @@
 #define MAX_DISK_DEVICES 8
 #define MAX_NETWORK_DEVICES 4
 
+// only in BASIC:
 #define MAX_APPKEY_LEN 64
 
 typedef struct
@@ -50,6 +51,17 @@ struct appkey
     uint8_t reserved = 0;
 } __attribute__((packed));
 
+typedef struct
+{
+    char ssid[33];
+    uint8_t rssi;
+} scan_result_t;
+
+typedef struct
+{
+    char ssid[MAX_SSID_LEN + 1];
+    char password[MAX_PASSPHRASE_LEN + 1];
+} net_config_t;
 
 class iecMeatloaf : public iecDrive
 {
@@ -74,6 +86,7 @@ private:
 
     std::string response;
     std::vector<uint8_t> responseV;
+    bool is_raw_command;
 
     void process_raw_commands();
     void process_basic_commands();
@@ -85,56 +98,91 @@ private:
     void format_and_set_response(const std::string& entry);
 
 protected:
-    void reset_device();           // 0xFF
+    // helper functions
+    void net_store_ssid(std::string ssid, std::string password);
 
-    void net_get_ssid();           // 0xFE
-    void net_scan_networks();      // 0xFD
-    void net_scan_result();        // 0xFC
-    void net_set_ssid( bool store = true );           // 0xFB
-    void net_store_ssid();
-    void net_get_wifi_status();    // 0xFA
+    // 0xFF
+    void reset_device();
 
-    // void mount_host();             // 0xF9
-    // void disk_image_mount();       // 0xF8
+    // 0xFE
+    net_config_t net_get_ssid();
+    void net_get_ssid_basic();
+    void net_get_ssid_raw();
 
-    // void open_directory();         // 0xF7
-    // void read_directory_entry();   // 0xF6
-    // void close_directory();        // 0xF5
+    // 0xFD
+    void net_scan_networks();
+    void net_scan_networks_basic();
+    void net_scan_networks_raw();
 
-    // void read_host_slots();        // 0xF4
-    // void write_host_slots();       // 0xF3
-    // void read_device_slots();      // 0xF2
-    // void write_device_slots();     // 0xF1
+    // 0xFC
+    scan_result_t net_scan_result(int scan_num);
+    void net_scan_result_basic();
+    void net_scan_result_raw();
+    
+    // 0xFB
+    void net_set_ssid(bool store, net_config_t& net_config);
+    void net_set_ssid_basic(bool store = true);
+    void net_set_ssid_raw(bool store = true);
 
+    // 0xFA
+    uint8_t net_get_wifi_status();
+    void net_get_wifi_status_basic();
+    void net_get_wifi_status_raw();
+    
+    // 0xF9
+    bool mount_host(int hs);
+    void mount_host_basic();
+    void mount_host_raw();
+
+    // 0xF8
+    bool disk_image_mount(uint8_t ds, uint8_t mode);
+    void disk_image_mount_basic();
+    void disk_image_mount_raw();
+
+    bool open_directory(uint8_t hs, std::string dirpath, std::string pattern); // 0xF7
+    void open_directory_basic();
+    void open_directory_raw();
+
+    void read_directory_entry();   // 0xF6
+    void close_directory();        // 0xF5
+    void read_host_slots();        // 0xF4
+    void write_host_slots();       // 0xF3
+    void read_device_slots();      // 0xF2
+    void write_device_slots();     // 0xF1
+    
     void enable_udpstream();       // 0xF0
     void net_get_wifi_enabled();   // 0xEA
-
-    // void disk_image_umount();      // 0xE9
-
+    
+    void disk_image_umount();      // 0xE9
+    
     void get_adapter_config();     // 0xE8
-
+    
     void new_disk();               // 0xE7
-    // void unmount_host();           // 0xE6
+    void unmount_host();           // 0xE6
 
-    // void get_directory_position(); // 0xE5
-    // void set_directory_position(); // 0xE4
+    void get_directory_position(); // 0xE5
+    void set_directory_position(); // 0xE4
 
-    // void set_hindex();             // 0xE3
-    // void set_device_filename();    // 0xE2
-    // void set_host_prefix();        // 0xE1
-    // void get_host_prefix();        // 0xE0
-
+    void set_hindex();             // 0xE3
+    void set_device_filename();    // 0xE2
+    void set_host_prefix();        // 0xE1
+    void get_host_prefix();        // 0xE0
+    
     void set_external_clock();     // 0xDF
+    
+    // 0xDE
+    void write_app_key(std::vector<uint8_t>&& value);
+    void write_app_key_basic();
+    void write_app_key_raw();
 
-    void write_app_key();          // 0xDE
     void read_app_key();           // 0xDD
     void open_app_key();           // 0xDC
     void close_app_key();          // 0xDB
-
-    // void get_device_filename();    // 0xDA
-    // void set_boot_config();        // 0xD9
-    // void copy_file();              // 0xD8
-    // void set_boot_mode();          // 0xD6
+    
+    void get_device_filename();    // 0xDA
+    void set_boot_config();        // 0xD9
+    void copy_file();              // 0xD8
+    void set_boot_mode();          // 0xD6
 
     // Commodore specific
     void local_ip();
@@ -143,7 +191,13 @@ protected:
 
     void shutdown() override;
 
-protected:
+    int appkey_size = 64;
+    std::map<int, int> mode_to_keysize = {
+        {0, 64},
+        {2, 256}
+    };
+    bool check_appkey_creator(bool check_is_write);
+    bool check_sd_running();
 
     /**
      * @brief called to process command either at open or listen
@@ -167,16 +221,16 @@ public:
     void setup(systemBus *bus);
 
     void image_rotate();
-    // int get_disk_id(int drive_slot);
-    // std::string get_host_prefix(int host_slot);
+    int get_disk_id(int drive_slot);
+    std::string get_host_prefix(int host_slot);
 
-    // fujiHost *get_hosts(int i) { return &_fnHosts[i]; }
-    // fujiDisk *get_disks(int i) { return &_fnDisks[i]; }
+//    fujiHost *get_hosts(int i) { return &_fnHosts[i]; }
+//    fujiDisk *get_disks(int i) { return &_fnDisks[i]; }
 
-    // void _populate_slots_from_config();
-    // void _populate_config_from_slots();
+    void _populate_slots_from_config();
+    void _populate_config_from_slots();
 
-    // void mount_all();              // 0xD7
+    void mount_all();              // 0xD7
 };
 
 extern iecMeatloaf Meatloaf;

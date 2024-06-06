@@ -2,6 +2,7 @@
 #define _TNFSLIB_MOUNTINFO_H
 
 #include <cstdint>
+#include <mutex>
 
 #include "fnDNS.h"
 #include "fnTcpClient.h"
@@ -25,6 +26,18 @@
 #define TNFS_PROTOCOL_UNKNOWN 0
 #define TNFS_PROTOCOL_TCP 1
 #define TNFS_PROTOCOL_UDP 2
+
+#ifdef TNFS_UDP_SIMULATE_POOR_CONNECTION
+#define TNFS_UDP_SIMULATE_SEND_LOSS
+#define TNFS_UDP_SIMULATE_RECV_LOSS
+#define TNFS_UDP_SIMULATE_SEND_TWICE
+#define TNFS_UDP_SIMULATE_RECV_TWICE
+#endif // TNFS_UDP_SIMULATE_POOR_CONNECTION
+
+#define TNFS_UDP_SIMULATE_SEND_LOSS_PROB 0.1
+#define TNFS_UDP_SIMULATE_RECV_LOSS_PROB 0.1
+#define TNFS_UDP_SIMULATE_SEND_TWICE_PROB 0.05
+#define TNFS_UDP_SIMULATE_RECV_TWICE_PROB 0.05
 
 // Some things we need to keep track of for every file we open
 struct tnfsFileHandleInfo
@@ -105,6 +118,12 @@ public:
 
     int16_t dir_handle = TNFS_INVALID_HANDLE; // Stored from server's response to TNFS_OPENDIR
     uint16_t dir_entries = 0; // Stored from server's response to TNFS_OPENDIRX
+    std::recursive_mutex transaction_mutex;
+
+#ifdef TNFS_UDP_SIMULATE_RECV_TWICE
+    uint8_t last_packet[532];
+    int last_packet_len = -1;
+#endif
 };
 
 #endif // _TNFSLIB_MOUNTINFO_H

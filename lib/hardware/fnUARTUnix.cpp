@@ -113,10 +113,12 @@ void UARTManager::set_port(const char *device, int command_pin, int proceed_pin)
     }
 }
 
-const char* UARTManager::get_port(int &command_pin, int &proceed_pin)
+const char* UARTManager::get_port(int *ptr_command_pin, int *ptr_proceed_pin)
 {
-    command_pin = _command_pin;
-    proceed_pin = _proceed_pin;
+    if (ptr_command_pin)
+        *ptr_command_pin = _command_pin;
+    if (ptr_proceed_pin)
+        *ptr_proceed_pin = _proceed_pin;
     return _device;
 }
 
@@ -164,21 +166,17 @@ void UARTManager::begin(int baud)
 #if defined(__linux__)
     // Enable low latency
 	struct serial_struct ss;
-    if (-1 == ioctl(_fd, TIOCGSERIAL, &ss))
+    if (ioctl(_fd, TIOCGSERIAL, &ss) == -1)
     {
-        Debug_printf("TIOCGSERIAL error %d: %s\n", errno, strerror(errno));
-        suspend();
-        return;
+        Debug_printf("UART warning: TIOCGSERIAL failed: %d - %s\n", errno, strerror(errno));
     }
-	ss.flags |= ASYNC_LOW_LATENCY;
-    if (-1 == ioctl(_fd, TIOCSSERIAL, &ss))
-        Debug_printf("TIOCSSERIAL error %d: %s\n", errno, strerror(errno));
+    else
+    {
+        ss.flags |= ASYNC_LOW_LATENCY;
+        if (ioctl(_fd, TIOCSSERIAL, &ss) == -1)
+            Debug_printf("UART warning: TIOCSSERIAL failed: %d - %s\n", errno, strerror(errno));
+    }
 #endif
-
-#ifdef BUILD_ADAM
-    if (_uart_num == 2)
-        uart_set_line_inverse(_uart_num, UART_SIGNAL_TXD_INV | UART_SIGNAL_RXD_INV);
-#endif /* BUILD_ADAM */
 
     // Read in existing settings
     struct termios tios;
@@ -467,7 +465,7 @@ int UARTManager::read(void)
 /* Since the underlying Stream calls this Read() multiple times to get more than one
  *  character for ReadBytes(), we override with a single call to uart_read_bytes
  */
-size_t UARTManager::readBytes(uint8_t *buffer, size_t length, bool command_mode)
+size_t UARTManager::readBytes(uint8_t *buffer, size_t length)
 {
     if (!_initialized)
         return 0;
@@ -498,12 +496,6 @@ size_t UARTManager::readBytes(uint8_t *buffer, size_t length, bool command_mode)
             break;
         }
 
-        // // wait for more data
-        // if (command_mode && !command_asserted())
-        // {
-        //     Debug_println("### UART readBytes() CMD pin deasserted while reading command ###");
-        //     return 1 + length; // indicate to SIO caller
-        // }
         if (!waitReadable(500)) // 500 ms timeout
         {
             Debug_println("UART readBytes() TIMEOUT");

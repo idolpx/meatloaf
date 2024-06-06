@@ -2,7 +2,6 @@
 #define STRING_UTILS_H
 
 #include <cstdint>
-#include <cstdbool>
 #include <string>
 #include <string_view>
 
