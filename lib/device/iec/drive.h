@@ -1,7 +1,7 @@
 #ifndef DRIVE_H
 #define DRIVE_H
 
-//#include "../fuji/fujiHost.h"
+#include "../fuji/fujiHost.h"
 
 #include <string>
 #include <unordered_map>
@@ -15,8 +15,6 @@
 
 #include "dos/_dos.h"
 #include "dos/cbmdos.2.5.h"
-
-#include "../mfnjson/mfnjson.h"
 
 #define PRODUCT_ID "MEATLOAF CBM"
 
@@ -168,11 +166,9 @@ protected:
      */
     void iec_talk_command_buffer_status() override;
 
-    void process_json(std::string payload);
-    void process_header(std::string payload);
 public:
     iecDrive();
-//    fujiHost *host;
+    fujiHost *host;
     mediatype_t mount(FILE *f, const char *filename, uint32_t disksize, mediatype_t disk_type = MEDIATYPE_UNKNOWN);
     void unmount();
     bool write_blank(FILE *f, uint16_t sectorSize, uint16_t numSectors);
@@ -181,8 +177,6 @@ public:
 
     std::unordered_map<uint16_t, std::shared_ptr<MStream>> streams;
     std::unordered_map<uint16_t, uint16_t> streamLastByte;
-    std::map<std::string, std::string> headers;
-    std::unordered_map<uint16_t, MFNJSON*> jsonParsers;
 
     ~iecDrive();
 };

@@ -287,6 +287,15 @@ bool NetworkProtocolHTTP::mount(PeoplesUrlParser *url)
         url->rebuildUrl();
     }
 
+#if 0
+    // this would allow to make path like "Homesoft Collection" (entered by user, not encoded) working
+    // but it currently breaks any URL using query component (e.g. query from lobby client: ?platform=atari)
+    // the issue is in url parser as it leaves query part in path component, it needs to be fixed first
+    std::string encoded = mstr::urlEncode(url->path);
+    url->path = encoded;
+    url->rebuildUrl();
+#endif
+
     return !client->begin(url->url);
 }
 

@@ -94,6 +94,7 @@ typedef enum
     BUS_IDLE = 0,     // Nothing recieved of our concern
     BUS_ACTIVE = 1,   // ATN is pulled and a command byte is expected
     BUS_PROCESS = 2,  // A command is ready to be processed
+    BUS_RELEASE = 3   // Clean Up
 } bus_state_t;
 
 /**
@@ -174,7 +175,7 @@ public:
      */
     void init(void)
     {
-        primary = 0;
+        //primary = 0;
         device = 0;
         secondary = 0;
         channel = 0;
@@ -236,11 +237,6 @@ protected:
     std::queue<std::string> response_queue;
 
     /**
-     * @brief status override (for binary commands)
-     */
-    std::string status_override;
-
-    /**
      * @brief tokenized payload
      */
     std::vector<std::string> pt;
@@ -248,14 +244,15 @@ protected:
 
     /**
      * @brief The status information to send back on cmd input
-     * @param bw = # of bytes waiting
+     * @param error = the latest error status
      * @param msg = most recent status message
      * @param connected = is most recent channel connected?
      * @param channel = channel of most recent status msg.
      */
     struct _iecStatus
     {
-        uint8_t error;
+        int8_t error;
+        uint8_t cmd;
         std::string msg;
         bool connected;
         int channel;
@@ -270,8 +267,12 @@ protected:
 
         if (commanddata.primary == IEC_LISTEN)
             state = DEVICE_LISTEN;
+        else if (commanddata.primary == IEC_UNLISTEN)
+            state = DEVICE_IDLE;
         else if (commanddata.primary == IEC_TALK)
             state = DEVICE_TALK;
+        else if (commanddata.primary == IEC_UNTALK)
+            state = DEVICE_IDLE;
 
         return state;
     }
@@ -328,6 +329,32 @@ public:
      * @brief Get the systemBus object that this virtualDevice is attached to.
      */
     systemBus get_bus();
+
+    void set_iec_status(int8_t error, uint8_t cmd, const std::string& msg, bool connected, int channel) {
+        iecStatus.error = error;
+        iecStatus.cmd = cmd;
+        iecStatus.msg = msg;
+        iecStatus.connected = connected;
+        iecStatus.channel = channel;
+    }
+
+    // TODO: does this need to translate the message to PETSCII?
+    std::vector<uint8_t> iec_status_to_vector() {
+        std::vector<uint8_t> data;
+        data.push_back(static_cast<uint8_t>(iecStatus.error));
+        data.push_back(iecStatus.cmd);
+        data.push_back(iecStatus.connected ? 1 : 0);
+        data.push_back(static_cast<uint8_t>(iecStatus.channel & 0xFF)); // it's only an int because of atoi from some basic commands, but it's never really more than 1 byte
+
+        // max of 41 chars in message including the null terminator. It will simply be truncated, so if we find any that are excessive, should trim them down in firmware
+        size_t actualLength = std::min(iecStatus.msg.length(), static_cast<size_t>(40));
+        for (size_t i = 0; i < actualLength; ++i) {
+            data.push_back(static_cast<uint8_t>(iecStatus.msg[i]));
+        }
+        data.push_back(0); // null terminate the string
+
+        return data;
+    }
 };
 
 /**
@@ -509,7 +536,7 @@ public:
      * @param eoi Send EOI?
      * @return true on success, false on error
      */
-    bool sendBytes(const char *buf, size_t len, bool eoi = false);
+    bool sendBytes(const char *buf, size_t len, bool eoi = true);
 
     /**
      * @brief Send string to bus
@@ -517,13 +544,13 @@ public:
      * @param eoi Send EOI?
      * @return true on success, false on error
      */
-    bool sendBytes(std::string s, bool eoi = false);
+    bool sendBytes(std::string s, bool eoi = true);
 
     /**
      * @brief Receive Byte from bus
      * @return Byte received from bus, or -1 for error
      */
-    int16_t receiveByte();
+    uint8_t receiveByte();
 
     /**
      * @brief Receive String from bus
@@ -592,16 +619,34 @@ public:
     void senderTimeout();
 
 
+    uint8_t bit = 0;
+    uint8_t byte = 0;
+
     bool pin_atn = false;
     bool pin_clk = false;
     bool pin_data = false;
     bool pin_srq = false;
     bool pin_reset = false;
 
+    void init_gpio(gpio_num_t _pin);
     void pull ( uint8_t _pin );
     void release ( uint8_t _pin );
     bool status ( uint8_t _pin );
     bool status ();
+
+    uint8_t read()
+    {
+        bit = 0;
+        byte = 0;
+        while ( bit < 8 )
+        {
+            if ( flags & ATN_PULLED )
+                break;
+
+            esp_rom_delay_us( 3 );
+        }
+        return byte;
+    }
 
     void debugTiming();
 };

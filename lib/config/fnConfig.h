@@ -21,24 +21,25 @@
 #define HOST_SLOT_INVALID -1
 
 #ifdef ESP_PLATFORM
-
 #define HSIO_INVALID_INDEX -1
-
 #define CONFIG_FILENAME SYSTEM_DIR "/config.ini"
-
+// ESP_PLATFORM
 #else
-
+// !ESP_PLATFORM
 #define HSIO_DISABLED_INDEX -1  // HSIO disabled, use standard speed only
-
 #define CONFIG_FILENAME SYSTEM_DIR "/config.ini"
-
 #define SD_CARD_DIR "SD"
-
 #define WEB_SERVER_LISTEN_URL "http://0.0.0.0:8000"
-
 #define CONFIG_DEFAULT_NETSIO_PORT 9997
-#define CONFIG_DEFAULT_BOIP_PORT 1985
+#endif
 
+// Bus Over IP default port
+#ifdef BUILD_COCO
+#define CONFIG_DEFAULT_BOIP_PORT 65504
+#endif
+#ifndef CONFIG_DEFAULT_BOIP_PORT
+// default used by APPLE
+#define CONFIG_DEFAULT_BOIP_PORT 1985
 #endif
 
 #define CONFIG_FILEBUFFSIZE 2048
@@ -139,7 +140,7 @@ public:
 
     // SERIAL PORT
     std::string get_serial_port() { return _serial.port; };
-    std::string get_serial_port_baud() { return _serial.baud; };
+    int get_serial_port_baud() { return _serial.baud; };
     serial_command_pin get_serial_command() { return _serial.command; };
     serial_proceed_pin get_serial_proceed() { return _serial.proceed; };
     void store_serial_port(const char *port);
@@ -256,6 +257,14 @@ public:
     bool get_pclink_enabled();
     void store_pclink_enabled(bool enabled);
 
+    // BUS over IP
+    bool get_boip_enabled() { return _boip.boip_enabled; } // unused on Apple
+    std::string get_boip_host() { return _boip.host; }
+    int get_boip_port() { return _boip.port; }
+    void store_boip_enabled(bool enabled);
+    void store_boip_host(const char *host);
+    void store_boip_port(int port);
+
 #ifndef ESP_PLATFORM
     // NETSIO (Connection to Atari emulator)
     bool get_netsio_enabled() { return _netsio.netsio_enabled; }
@@ -264,14 +273,6 @@ public:
     void store_netsio_enabled(bool enabled);
     void store_netsio_host(const char *host);
     void store_netsio_port(int port);
-
-    // BUS over IP
-    bool get_boip_enabled() { return _boip.boip_enabled; } // unused
-    std::string get_boip_host() { return _boip.host; }
-    int get_boip_port() { return _boip.port; }
-    void store_boip_enabled(bool enabled);
-    void store_boip_host(const char *host);
-    void store_boip_port(int port);
 
     // BUS over Serial
     bool get_bos_enabled() { return _bos.bos_enabled; } // unused
@@ -318,10 +319,10 @@ private:
     void _read_section_phonebook(std::stringstream &ss, int index);
     void _read_section_cpm(std::stringstream &ss);
     void _read_section_device_enable(std::stringstream &ss);
+    void _read_section_boip(std::stringstream &ss);
 #ifndef ESP_PLATFORM
     void _read_section_serial(std::stringstream &ss);
     void _read_section_netsio(std::stringstream &ss);
-    void _read_section_boip(std::stringstream &ss);
     void _read_section_bos(std::stringstream &ss);
 #endif
 
@@ -341,10 +342,10 @@ private:
         SECTION_PHONEBOOK,
         SECTION_CPM,
         SECTION_DEVICE_ENABLE,
+        SECTION_BOIP,
 #ifndef ESP_PLATFORM
         SECTION_SERIAL,
         SECTION_NETSIO,
-        SECTION_BOIP,
         SECTION_BOS,
 #endif
         SECTION_UNKNOWN
@@ -434,7 +435,7 @@ private:
 
     struct general_info
     {
-        std::string devicename = "meatloaf";
+        std::string devicename = "Meatloaf";
 #ifdef ESP_PLATFORM
         int hsio_index = HSIO_INVALID_INDEX;
 #else
@@ -460,11 +461,19 @@ private:
 #endif
     };
 
+    // "bus" over IP
+    struct boip_info
+    {
+        bool boip_enabled = false;
+        std::string host = "";
+        int port = CONFIG_DEFAULT_BOIP_PORT;
+    };
+
 #ifndef ESP_PLATFORM
     struct serial_info
     {
         std::string port;
-        std::string baud;
+        int baud;
         serial_command_pin command = SERIAL_COMMAND_DSR;
         serial_proceed_pin proceed = SERIAL_PROCEED_DTR;
     };
@@ -474,14 +483,6 @@ private:
         bool netsio_enabled = false;
         std::string host = "";
         int port = CONFIG_DEFAULT_NETSIO_PORT;
-    };
-
-    // "bus" over IP
-    struct boip_info
-    {
-        bool boip_enabled = false;
-        std::string host = "";
-        int port = CONFIG_DEFAULT_BOIP_PORT;
     };
 
 
@@ -550,10 +551,10 @@ private:
     general_info _general;
     modem_info _modem;
     cassette_info _cassette;
+    boip_info _boip;
 #ifndef ESP_PLATFORM
     serial_info _serial;
     netsio_info _netsio;
-    boip_info _boip;
     bos_info _bos;
 #endif
     cpm_info _cpm;

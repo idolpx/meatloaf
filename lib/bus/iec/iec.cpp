@@ -26,7 +26,7 @@ using namespace Protocol;
 
 systemBus IEC;
 
-static void IRAM_ATTR cbm_on_attention_isr_handler(void *arg)
+static void IRAM_ATTR cbm_on_atn_isr_handler(void *arg)
 {
     systemBus *b = (systemBus *)arg;
 
@@ -35,13 +35,26 @@ static void IRAM_ATTR cbm_on_attention_isr_handler(void *arg)
     // Go to listener mode and get command
     b->release(PIN_IEC_CLK_OUT);
     b->pull(PIN_IEC_DATA_OUT);
-//    b->release(PIN_IEC_SRQ);
 
     b->flags = CLEAR;
     b->flags |= ATN_PULLED;
     b->state = BUS_ACTIVE;
 
     //b->release(PIN_IEC_SRQ);
+}
+
+static void IRAM_ATTR cbm_on_clk_isr_handler(void *arg)
+{
+    systemBus *b = (systemBus *)arg;
+
+    //IEC.pull(PIN_IEC_SRQ);
+
+    // get bit
+    b->byte >>= 1;
+    if ( !IEC.status ( PIN_IEC_DATA_IN ) ) b->byte |= 0x80;
+    b->bit++;
+
+    //IEC.release(PIN_IEC_SRQ);
 }
 
 /**
@@ -68,7 +81,7 @@ static void ml_iec_intr_task(void* arg)
     }
 }
 
-void init_gpio(gpio_num_t _pin)
+void systemBus::init_gpio(gpio_num_t _pin)
 {
     PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[_pin], PIN_FUNC_GPIO);
     gpio_set_direction(_pin, GPIO_MODE_INPUT);
@@ -185,9 +198,19 @@ void systemBus::setup()
         .pull_down_en = GPIO_PULLDOWN_DISABLE,      // disable pull-down mode
         .intr_type = GPIO_INTR_NEGEDGE              // interrupt of falling edge
     };
-    //configure GPIO with the given settings
     gpio_config(&io_conf);
-    gpio_isr_handler_add((gpio_num_t)PIN_IEC_ATN, cbm_on_attention_isr_handler, this);
+    gpio_isr_handler_add((gpio_num_t)PIN_IEC_ATN, cbm_on_atn_isr_handler, this);
+
+    // Setup interrupt config for CLK
+    io_conf = {
+        .pin_bit_mask = ( 1ULL << PIN_IEC_CLK_IN ),    // bit mask of the pins that you want to set
+        .mode = GPIO_MODE_INPUT,                    // set as input mode
+        .pull_up_en = GPIO_PULLUP_DISABLE,          // disable pull-up mode
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,      // disable pull-down mode
+        .intr_type = GPIO_INTR_POSEDGE              // interrupt of rising edge
+    };
+    gpio_config(&io_conf);
+    gpio_isr_handler_add((gpio_num_t)PIN_IEC_CLK_IN, cbm_on_clk_isr_handler, this);
 
     // Start SRQ timer service
     timer_start();
@@ -229,11 +252,11 @@ void IRAM_ATTR systemBus::service()
             return;
         }
 
-        Debug_printf("IEC Reset! reset[%d]\r\n", pin_reset);
+        //Debug_printf("IEC Reset! reset[%d]\r\n", pin_reset);
         data.init(); // Clear bus data
         releaseLines();
         state = BUS_IDLE;
-        Debug_printv("bus init");
+        //Debug_printv("bus init");
 
         // Reset virtual devices
         reset_all_our_devices();
@@ -245,10 +268,6 @@ void IRAM_ATTR systemBus::service()
     // Command or Data Mode
     do
     {
-        // Exit if bus is offline
-        if (state == BUS_OFFLINE)
-            break;
-
         if (state == BUS_ACTIVE)
         {
             //pull ( PIN_IEC_SRQ );
@@ -261,6 +280,11 @@ void IRAM_ATTR systemBus::service()
             //Debug_printv("command");
             read_command();
 
+            if ( state < BUS_IDLE )
+            {
+                releaseLines();
+                //Debug_printv("here");
+            }
             //release ( PIN_IEC_SRQ );
         }
 
@@ -301,18 +325,15 @@ void IRAM_ATTR systemBus::service()
 
                 //fnLedManager.set(eLed::LED_BUS, true);
 
-                //Debug_printv("bus[%d] device[%d]", state, device_state);
-                device_state = deviceById(data.device)->process();
-                if ( device_state < DEVICE_ACTIVE )
-                {
-                    // for (auto devicep : _daisyChain)
-                    // {
-                    //     if ( devicep->device_state > DEVICE_IDLE )
-                    //         devicep->process();
-                    // }
-                    data.init();
-                    //Debug_printv("bus init");
-                }
+                Debug_printv("bus[%d] device[%d]", state, device_state);
+                // for (auto devicep : _daisyChain)
+                // {
+                    device_state = d->process();
+                    if ( device_state < DEVICE_ACTIVE )
+                    {
+                        state = BUS_RELEASE;
+                    }
+                // }
             }
 
             //Debug_printv("bus[%d] device[%d] flags[%d]", state, device_state, flags);
@@ -329,9 +350,13 @@ void IRAM_ATTR systemBus::service()
 
     } while( state > BUS_IDLE );
 
-    // Cleanup and Re-enable Interrupt
-    releaseLines();
-    //gpio_intr_enable((gpio_num_t)PIN_IEC_ATN);
+     // Clean Up
+    if ( state < BUS_RELEASE )
+    {
+        releaseLines();
+        data.init();
+        //Debug_printv("bus init");
+    }
 
     //Debug_printv ( "primary[%.2X] secondary[%.2X] bus[%d] flags[%d]", data.primary, data.secondary, state, flags );
     //Debug_printv ( "device[%d] channel[%d]", data.device, data.channel);
@@ -348,17 +373,14 @@ void IRAM_ATTR systemBus::service()
 void systemBus::read_command()
 {
     //pull( PIN_IEC_SRQ );
-    int16_t c = receiveByte();
+    uint8_t c = receiveByte();
     //release( PIN_IEC_SRQ );
 
     // Check for error
     if ( flags & ERROR )
     {
-        Debug_printv("Error reading command. flags[%d] c[%08X]", flags, c);
-        if (c == 0xFFFFFFFF)
-            state = BUS_OFFLINE;
-        else
-            state = BUS_ERROR;
+        Debug_printv("Error reading command. flags[%d] c[%X]", flags, c);
+        state = BUS_ERROR;
         
         return;
     }
@@ -425,7 +447,7 @@ void systemBus::read_command()
         case IEC_UNTALK:
             data.primary = IEC_UNTALK;
             data.secondary = 0x00;
-            state = BUS_PROCESS;
+            state = BUS_RELEASE;
             Debug_printf(" (5F UNTALK)\r\n");
             break;
 
@@ -673,28 +695,10 @@ device_state_t virtualDevice::process()
     return state;
 }
 
+// This is only used in iecDrive, and it has its own implementation
 void virtualDevice::iec_talk_command_buffer_status()
 {
-    char reply[80];
-    std::string s;
-
-    //fnSystem.delay_microseconds(100);
-
-    if (!status_override.empty())
-    {
-        Debug_printv("sending explicit response.");
-        IEC.sendBytes(status_override, true);
-        status_override.clear();
-        status_override.shrink_to_fit();
-    }
-    else
-    {
-        snprintf(reply, 80, "%u,%s,%u,%u", iecStatus.error, iecStatus.msg.c_str(), iecStatus.connected, iecStatus.channel);
-        s = std::string(reply);
-        // s = mstr::toPETSCII2(s);
-        //Debug_printv("sending status: %s\r\n", reply);
-        IEC.sendBytes(s, true);
-    }
+    // Removed implementation as it wasn't being used
 }
 
 void virtualDevice::dumpData()
@@ -714,21 +718,17 @@ void systemBus::assert_interrupt()
         release(PIN_IEC_SRQ);
 }
 
-int16_t systemBus::receiveByte()
+uint8_t systemBus::receiveByte()
 {
     //pull( PIN_IEC_SRQ );
-    int16_t b = protocol->receiveByte();
+    uint8_t b = protocol->receiveByte();
 #ifdef DATA_STREAM
     Serial.printf("%.2X ", (int16_t)b);
 #endif
-    if (b == -1)
+    // Not an error if ATN was pulled
+    if ( flags & ERROR )
     {
-        // Not an error if ATN was pulled
-        if (!( flags & ATN_PULLED))
-        {
-            flags |= ERROR;
-            Debug_printv("error");
-        }
+        Debug_printv("error");
     }
     //release( PIN_IEC_SRQ );
     return b;
@@ -740,8 +740,8 @@ std::string systemBus::receiveBytes()
 
     do
     {
-        int16_t b = receiveByte();
-        if(b > -1)
+        uint8_t b = receiveByte();
+        if ( !(flags & ERROR) )
             s += b;
     }while(!(flags & EOI_RECVD));
     return s;
@@ -819,7 +819,8 @@ void IRAM_ATTR systemBus::deviceListen()
     else if (data.secondary == IEC_OPEN || data.secondary == IEC_REOPEN)
     {
         read_payload();
-        Serial.printf("Device #%02d:%02d {%s}\r\n", data.device, data.channel, data.payload.c_str());
+        std::string s = mstr::toHex(data.payload);
+        Serial.printf("Device #%02d:%02d {%s} [%s]\r\n", data.device, data.channel, data.payload.c_str(), s.c_str());
     }
 
     // CLOSE Named Channel

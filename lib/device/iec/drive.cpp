@@ -21,7 +21,7 @@
 #include "drive.h"
 
 #include <cstring>
-
+#include <sstream>
 #include <unordered_map>
 
 #include "../../include/debug.h"
@@ -250,7 +250,6 @@ void iecDrive::iec_open()
             if ( !registerStream(commanddata.channel) )
             {
                 Debug_printv("File Doesn't Exist [%s]", payload.c_str());
-                IEC.senderTimeout();
             }
         }
     }
@@ -338,13 +337,10 @@ void iecDrive::iec_talk_command()
 
 void iecDrive::iec_talk_command_buffer_status()
 {
-    //Debug_printv("here");
-
-    //char reply[80];
+    // std::ostringstream ss;
+    // ss << iecStatus.error << "," << "\"" << iecStatus.msg << "\"" << "," << iecStatus.connected << "," << iecStatus.channel;
+    // std::string s = ss.str();
     std::string s = "00, OK,00,00\r";
-
-    // snprintf(reply, 80, "%u,\"%s\",%u,%u", iecStatus.error, iecStatus.msg.c_str(), iecStatus.connected, iecStatus.channel);
-    // s = string(reply);
     IEC.sendBytes(s, true);
 }
 
@@ -501,12 +497,6 @@ void iecDrive::iec_command()
         case 'G':
             Debug_printv( "get partition info");
             //Error(ERROR_31_SYNTAX_ERROR);	// G-P not implemented yet
-        break;
-        case 'H':
-            process_header(payload);
-        break;
-        case 'J':
-            process_json(payload);
         break;
         case 'M':
             if ( payload[1] == 'D') // Make Directory
@@ -1080,184 +1070,6 @@ void iecDrive::sendListing()
 } // sendListing
 
 
-
-// bool iecDrive::sendFile()
-// {
-//     size_t count = 0;
-//     bool success_rx = true;
-//     bool success_tx = true;
-
-//     uint8_t b;  // byte
-//     uint8_t nb; // next byte
-//     size_t bi = 0;
-//     size_t load_address = 0;
-//     size_t sys_address = 0;
-
-// 	//iecStream.open(&IEC);
-
-// #ifdef DATA_STREAM
-//     char ba[9];
-//     ba[8] = '\0';
-// #endif
-
-//     // std::shared_ptr<MStream> istream = std::static_pointer_cast<MStream>(currentStream);
-//     auto istream = retrieveStream(commanddata.channel);
-//     if ( istream == nullptr )
-//     {
-//         Debug_printv("Stream not found!");
-//         IEC.senderTimeout(); // File Not Found
-//         //closeStream(commanddata.channel);
-//         _base.reset( MFSOwner::File( _base->base() ) );
-//         return false;
-//     }
-
-//     if ( !_base->isDirectory() )
-//     {
-//         if ( istream->has_subdirs )
-//         {
-//             PeoplesUrlParser u;
-//             u.parseUrl( istream->url );
-//             Debug_printv( "Subdir Change Directory Here! istream[%s] > base[%s]", istream->url.c_str(), u.base().c_str() );
-//             _last_file = u.name;
-//             _base.reset( MFSOwner::File( u.base() ) );
-//         }
-//         else
-//         {
-//             auto f = MFSOwner::File( istream->url );
-//             Debug_printv( "Change Directory Here! istream[%s] > base[%s]", istream->url.c_str(), f->streamFile->url.c_str() );
-//             _base.reset( f->streamFile );
-//         }
-
-//     }
-
-//     uint32_t len = istream->size();
-//     uint32_t avail = istream->available();
-//     if ( !len )
-//         len = -1;
-
-//     //fnLedStrip.startRainbow(300);
-
-//     if( IEC.data.channel == CHANNEL_LOAD )
-//     {
-//         // Get/Send file load address
-//         count = 2;
-//         istream->read(&b, 1);
-//         success_tx = IEC.sendByte(b);
-//         load_address = b & 0x00FF; // low byte
-//         istream->read(&b, 1);
-//         success_tx = IEC.sendByte(b);
-//         load_address = load_address | b << 8;  // high byte
-//         sys_address = load_address;
-//         Debug_printv( "load_address[$%.4X] sys_address[%d]", load_address, sys_address );
-
-//         // Get SYSLINE
-//     }
-
-//     // Read byte
-//     success_rx = istream->read(&b, 1);
-//     //Debug_printv("b[%02X] success[%d]", b, success_rx);
-
-//     Debug_printf("sendFile: [$%.4X]\r\n=================================\r\n", load_address);
-//     while( success_rx && !istream->error() )
-//     {
-//         // Read next byte
-//         success_rx = istream->read(&nb, 1);
-
-//         //Debug_printv("b[%02X] nb[%02X] success_rx[%d] error[%d]", b, nb, success_rx, istream->error());
-// #ifdef DATA_STREAM
-//         if (bi == 0)
-//         {
-//             Debug_printf(":%.4X ", load_address);
-//             load_address += 8;
-//         }
-// #endif
-//         // Send Byte
-//         if ( count + 1 == avail || !success_rx )
-//         {
-//             //Debug_printv("b[%02X] EOI %i", b, count);
-//             success_tx = IEC.sendByte(b, true); // indicate end of file.
-//             if ( !success_tx )
-//                 Debug_printv("tx fail");
-
-//             break;
-//         }
-//         else
-//         {
-//             success_tx = IEC.sendByte(b);
-//             if ( !success_tx )
-//             {
-//                 Debug_printv("tx fail");
-//                 //break;
-//             }
-
-//         }
-//         b = nb; // byte = next byte
-//         count++;
-
-// #ifdef DATA_STREAM
-//         // Show ASCII Data
-//         if (b < 32 || b >= 127)
-//             ba[bi++] = 46;
-//         else
-//             ba[bi++] = b;
-
-//         if(bi == 8)
-//         {
-//             uint32_t t = (count * 100) / len;
-//             Debug_printf(" %s (%d %d%%) [%d]\r\n", ba, count, t, avail);
-//             bi = 0;
-//         }
-// #else
-//         uint32_t t = (count * 100) / len;
-//         Debug_printf("\rTransferring %d%% [%d, %d]      ", t, count, avail);
-// #endif
-
-//         // Exit if ATN is PULLED while sending
-//         //if ( IEC.status ( PIN_IEC_ATN ) == PULLED )
-//         if ( IEC.flags & ATN_PULLED )
-//         {
-//             //Debug_printv("ATN pulled while sending. i[%d]", i);
-
-//             // Save file pointer position
-//             istream->seek(istream->position() - 2);
-//             //success_rx = true;
-//             break;
-//         }
-
-//         // // Toggle LED
-//         // if (i % 50 == 0)
-//         // {
-//         // 	fnLedManager.toggle(eLed::LED_BUS);
-//         // }
-//     }
-
-// #ifdef DATA_STREAM
-//     if (bi)
-//     {
-//       uint32_t t = (count * 100) / len;
-//       ba[bi] = 0;
-//       Debug_printf(" %s (%d %d%%) [%d]\r\n", ba, count, t, avail);
-//       bi = 0;
-//     }
-// #endif
-
-//     Debug_printf("\r\n=================================\r\n%d bytes sent of %d [SYS%d]\r\n", count, avail, sys_address);
-
-//     //Debug_printv("len[%d] avail[%d] success_rx[%d]", len, avail, success_rx);
-
-//     //fnLedManager.set(eLed::LED_BUS, false);
-//     //fnLedStrip.stopRainbow();
-
-//     if ( istream->error() )
-//     {
-//         Debug_println("sendFile: Transfer aborted!");
-//         IEC.senderTimeout();
-//         closeStream(commanddata.channel);
-//     }
-
-//     return success_rx;
-// } // sendFile
-
 bool iecDrive::sendFile()
 {
     size_t count = 0;
@@ -1279,7 +1091,7 @@ bool iecDrive::sendFile()
     auto istream = retrieveStream(commanddata.channel);
     if ( istream == nullptr )
     {
-        Serial.println("Stream not found!");
+        Serial.println("File/Stream not found!");
         IEC.senderTimeout(); // File Not Found
         _last_file = "";
         _base.reset( MFSOwner::File( _base->base() ) );
@@ -1563,97 +1375,6 @@ bool iecDrive::saveFile()
 
     return success;
 } // saveFile
-
-void iecDrive::process_json(std::string payload) {
-    if(payload[1]=='P') {
-        // JP:2 - Parse JSON on channel 2
-        std::string channelStr = payload.substr(3);
-        uint16_t channel = atoi(channelStr.c_str());
-
-        auto found = streams.find(channel);
-
-        if ( found != streams.end() )
-        {
-            auto stream = found->second;                
-            auto jsonParser = new MFNJSON();
-            jsonParser->setStream(stream);
-
-            if(jsonParser->parse()) {
-                // parsing succesful
-                auto newPair = std::make_pair (channel, jsonParser);
-                jsonParsers.insert (newPair);
-            }
-            else {
-                // signal error on current channel - "JSON syntax error"
-                delete jsonParser;
-            }
-        }
-        else {
-            // signal error on current channel - "channel xx not open"        
-        }
-    }
-    else if(payload[1]=='Q') {
-        // JQ:2,/choices[0]/message/content - query JSON parsed for channel 2
-        std::string queryStr = payload.substr(3);
-        auto parts = mstr::split(queryStr, ',');
-        if(parts.size() > 1) {
-            // signal error on current channel - "invalid query"
-            return;
-            uint16_t channel = atoi(parts[0].c_str());
-            std::string query = parts[1];
-
-            auto found = jsonParsers.find(channel);
-            if ( found != jsonParsers.end() ) {
-                MFNJSON* jsonParser = found->second;
-                jsonParser->setReadQuery(query);
-                auto valueLen = jsonParser->readValueLen();
-                if(!valueLen) {
-                    // signal error on current channel - JSON value not found
-                }
-                else {
-                    uint8_t buffer[valueLen];
-                    jsonParser->readValue(buffer, valueLen);
-                    // send buffer contents on current channel TODO
-                }
-            }
-            else {
-                // signal error on current channel - JSON parser not initialized for this channel
-            }
-        }
-        else {
-            // signal error - bad syntax for JQ
-        }
-    }
-    else {
-        // signal error - bad JSON command
-    }
-}
-
-void iecDrive::process_header(std::string payload)
-{
-    if(payload[1]=='+') 
-    {
-        std::string headerStr = payload.substr(3);
-        auto parts = mstr::split(headerStr, ':');
-        if(parts.size() > 1)
-        {
-            std::string header = parts[0];
-            std::string value = parts[1];
-            auto newPair = std::make_pair (header, value);
-            headers.insert (newPair);
-            Debug_printf("Added global header [%s] = [%s]", header.c_str(), value.c_str());
-        }
-    }
-    else if(payload[1]=='-')
-    {
-        std::string headerStr = payload.substr(3);
-        headers.erase(headerStr);
-    }
-    else
-    {
-        // signal error - bad header command
-    }
-}
 
 
 

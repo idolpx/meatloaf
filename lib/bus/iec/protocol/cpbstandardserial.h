@@ -34,11 +34,12 @@ namespace Protocol
     class CPBStandardSerial : public IECProtocol
     {
         private:
-        int8_t receiveBits();
+        //uint8_t receiveBits();
         bool sendBits(uint8_t data);
 
 
         public:
+
         /**
          * @brief ctor
          */
@@ -53,7 +54,7 @@ namespace Protocol
          * @brief receive byte from bus
          * @return The byte received from bus.
          */
-        virtual int16_t receiveByte();
+        virtual uint8_t receiveByte();
         
         /**
          * @brief send byte to bus

@@ -36,7 +36,7 @@ using namespace Protocol;
 // When it's ready to go, it releases the Clock line to false.  This signal change might be
 // translated as "I'm ready to send a character." The listener must detect this and 
 // immediately start receiving data on both the clock and data lines.
-int16_t  SauceDOS::receiveByte ()
+uint8_t SauceDOS::receiveByte ()
 {
     uint8_t data = 0;
     uint8_t bus = 0;

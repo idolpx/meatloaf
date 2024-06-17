@@ -432,17 +432,16 @@ uint8_t _findnext(uint8_t isdir)
 
 uint8_t _findfirst(uint8_t isdir)
 {
-	// uint8 path[4] = {'?', FOLDERCHAR, '?', 0};
-	// path[0] = filename[0];
-	// path[2] = filename[2];
-	// fnSDFAT.dir_close();
-	// fnSDFAT.dir_open(full_path((char *)path), "*", 0);
-	// _HostnameToFCBname(filename, pattern);
-	// fileRecords = 0;
-	// fileExtents = 0;
-	// fileExtentsUsed = 0;
-	// return (_findnext(isdir));
-	return 0;
+	uint8 path[4] = {'?', FOLDERCHAR, '?', 0};
+	path[0] = filename[0];
+	path[2] = filename[2];
+	fnSDFAT.dir_close();
+	fnSDFAT.dir_open(full_path((char *)path), "*", 0);
+	_HostnameToFCBname(filename, pattern);
+	fileRecords = 0;
+	fileExtents = 0;
+	fileExtentsUsed = 0;
+	return (_findnext(isdir));
 }
 
 uint8_t _findnextallusers(uint8_t isdir)
@@ -468,44 +467,44 @@ uint8_t _Truncate(char *fn, uint8_t rc)
 
 void _MakeUserDir()
 {
-	// uint8 dFolder = cDrive + 'A';
-	// uint8 uFolder = toupper(tohex(userCode));
+	uint8 dFolder = cDrive + 'A';
+	uint8 uFolder = toupper(tohex(userCode));
 
-	// uint8 path[4] = {dFolder, FOLDERCHAR, uFolder, 0};
+	uint8 path[4] = {dFolder, FOLDERCHAR, uFolder, 0};
 
-	// if (fnSDFAT.exists(full_path((char *)path)))
-	// {
-	// 	return;
-	// }
+	if (fnSDFAT.exists(full_path((char *)path)))
+	{
+		return;
+	}
 
-	// fnSDFAT.create_path(full_path((char *)path));
+	fnSDFAT.create_path(full_path((char *)path));
 }
 
 uint8_t _sys_makedisk(uint8_t drive)
 {
 	uint8 result = 0;
-	// if (drive < 1 || drive > 16)
-	// {
-	// 	result = 0xff;
-	// }
-	// else
-	// {
-	// 	uint8 dFolder = drive + '@';
-	// 	uint8 disk[2] = {dFolder, 0};
+	if (drive < 1 || drive > 16)
+	{
+		result = 0xff;
+	}
+	else
+	{
+		uint8 dFolder = drive + '@';
+		uint8 disk[2] = {dFolder, 0};
 
-	// 	if (fnSDFAT.exists(full_path((char *)disk)))
-	// 		return 0;
+		if (fnSDFAT.exists(full_path((char *)disk)))
+			return 0;
 
-	// 	if (!fnSDFAT.create_path(full_path((char *)disk)))
-	// 	{
-	// 		result = 0xfe;
-	// 	}
-	// 	else
-	// 	{
-	// 		uint8 path[4] = {dFolder, FOLDERCHAR, '0', 0};
-	// 		fnSDFAT.create_path(full_path((char *)path));
-	// 	}
-	// }
+		if (!fnSDFAT.create_path(full_path((char *)disk)))
+		{
+			result = 0xfe;
+		}
+		else
+		{
+			uint8 path[4] = {dFolder, FOLDERCHAR, '0', 0};
+			fnSDFAT.create_path(full_path((char *)path));
+		}
+	}
 	return (result);
 }
 

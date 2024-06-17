@@ -39,7 +39,7 @@ namespace Protocol
 			};
 
 		protected:
-			int16_t receiveByte(void) override;
+			uint8_t receiveByte(void) override;
 			bool sendByte(uint8_t data, bool eoi) override;
 	};
 };
