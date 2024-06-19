@@ -351,11 +351,10 @@ void IRAM_ATTR systemBus::service()
     } while( state > BUS_IDLE );
 
      // Clean Up
-    if ( state < BUS_RELEASE )
+    if ( state == BUS_RELEASE )
     {
         releaseLines();
         data.init();
-        //Debug_printv("bus init");
     }
 
     //Debug_printv ( "primary[%.2X] secondary[%.2X] bus[%d] flags[%d]", data.primary, data.secondary, state, flags );
@@ -486,10 +485,13 @@ void systemBus::read_command()
         }
     }
 
-    // Is this command for us?
-    if ( !isDeviceEnabled( data.device ) )
+    if ( state == BUS_ACTIVE )
     {
-        state = BUS_IDLE; // NOPE!
+        if ( !isDeviceEnabled( data.device ) )
+        {
+            // Is this command for us?
+            state = BUS_IDLE; // NOPE!
+        }
     }
     else if ( state == BUS_PROCESS )
     {
@@ -505,13 +507,13 @@ void systemBus::read_command()
         //release ( PIN_IEC_SRQ );
     }
 
-    // If the bus is NOT ACTIVE then release the lines
-    if ( state < BUS_ACTIVE )
-    {
-        data.init();
-        //releaseLines();
-        return;
-    }
+    // // If the bus is NOT ACTIVE then release the lines
+    // if ( state < BUS_ACTIVE )
+    // {
+    //     data.init();
+    //     //releaseLines();
+    //     return;
+    // }
 
 #ifdef PARALLEL_BUS
     // Switch to Parallel if detected
