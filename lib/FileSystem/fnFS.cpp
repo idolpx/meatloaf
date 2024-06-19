@@ -8,7 +8,7 @@
 
 #include "fnFS.h"
 #include "compat_string.h"
-// #include "../../include/debug.h"
+#include "../../include/debug.h"
 
 
 char * FileSystem::_make_fullpath(const char *path)
