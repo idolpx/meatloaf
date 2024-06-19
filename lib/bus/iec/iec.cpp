@@ -676,10 +676,7 @@ device_state_t virtualDevice::process()
         payload = commanddata.payload;
         break;
     case bus_command_t::IEC_CLOSE:
-        payload.clear();
-        std::queue<std::string>().swap(response_queue);
-        pt.clear();
-        pt.shrink_to_fit();
+        reset_state();
         break;
     case bus_command_t::IEC_REOPEN:
         if (state == DEVICE_TALK)
@@ -881,8 +878,8 @@ bool IRAM_ATTR systemBus::turnAround()
     // Wait for CLK to be released
     if (protocol->timeoutWait(PIN_IEC_CLK_IN, RELEASED, TIMEOUT_Ttlta) == TIMEOUT_Ttlta)
     {
-        Debug_printf("Wait until the computer releases the CLK line");
-        Debug_printf("IEC: TURNAROUND TIMEOUT");
+        Debug_printf("Wait until the computer releases the CLK line\r\n");
+        Debug_printf("IEC: TURNAROUND TIMEOUT\r\n");
         flags |= ERROR;
         return false; // return error because timeout
     }
