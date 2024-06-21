@@ -902,7 +902,8 @@ uint16_t iecDrive::sendFooter()
     uint16_t byte_count = 0;
     uint64_t bytes_free = _base->getAvailableSpace();
 
-    if ( _base->size() )
+    //Debug_printv("image[%s] size[%d] blocks[%d]", _base->media_image.c_str(), _base->size(), _base->media_blocks_free);
+    if ( _base->media_image.size() )
     {
         blocks_free = _base->media_blocks_free;
         byte_count = sendLine(blocks_free, "BLOCKS FREE.");
