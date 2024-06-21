@@ -249,7 +249,11 @@ void iecDrive::iec_open()
         {
             if ( !registerStream(commanddata.channel) )
             {
-                Debug_printv("File Doesn't Exist [%s]", payload.c_str());
+                Debug_printv("File Doesn't Exist [%s]", _base->url.c_str());
+                _last_file = "";
+                _base.reset( MFSOwner::File( _base->base() ) );
+                Debug_printv("_base[%s] reset", _base->url.c_str());
+                IEC.senderTimeout(); // File Not Found
             }
         }
     }
