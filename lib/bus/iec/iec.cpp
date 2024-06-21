@@ -750,7 +750,7 @@ bool systemBus::sendByte(const char c, bool eoi)
 {
     if (!protocol->sendByte(c, eoi))
     {
-        if (!(flags & ATN_PULLED))
+        if (!(IEC.status ( PIN_IEC_ATN )))
         {
             flags |= ERROR;
             Debug_printv("error");
@@ -778,6 +778,11 @@ bool systemBus::sendBytes(const char *buf, size_t len, bool eoi)
             success = sendByte(buf[i], true);
         else
             success = sendByte(buf[i], false);
+
+        if ( IEC.status ( PIN_IEC_ATN ) )
+        {
+            return true;
+        }
     }
 
     return success;
