@@ -1,7 +1,7 @@
 #ifndef _FUJI_DISK_
 #define _FUJI_DISK_
 
-#include "../device/drive.h"
+#include "../device/disk.h"
 
 // #ifdef BUILD_APPLE
 // #include "../device/iwm/disk.h"

@@ -59,6 +59,7 @@ data_dir = data/${meatloaf.build_platform}
 ; https://github.com/platformio/platform-espressif32/releases
 platform = espressif32 @ 6.4.0
 framework = espidf
+board_build.filesystem = littlefs
 test_filter = embedded/*
 extra_scripts = 
     pre:build_version.py
@@ -71,14 +72,13 @@ lib_ldf_mode = deep+
 upload_speed = 460800 ;921600
 ;upload_port = COM1 ; Windows
 ;upload_port = /dev/ttyUSB0 ; Linux
-upload_port = /dev/cu.usbserial-14433420 ; Mac
+;upload_port = /dev/cu.usbserial-14433420 ; Mac
 monitor_speed = 460800 ;921600
 ;monitor_port = COM1 ; Windows
 ;monitor_port = /dev/ttyUSB0 ; Linux
-monitor_port = /dev/cu.usbserial-14433420 ; Mac
+;monitor_port = /dev/cu.usbserial-14433420 ; Mac
 monitor_filters = esp32_exception_decoder
 check_skip_packages = yes
-board_build.filesystem = littlefs
 ;debug_tool = esp-prog
 ;debug_init_break = tbreak setup
 
