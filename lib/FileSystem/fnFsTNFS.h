@@ -2,6 +2,8 @@
 #define _FN_FSTNFS_
 
 #include "fnFS.h"
+#include <esp_timer.h>
+
 #include "../TNFSlib/tnfslib.h"
 
 class FileSystemTNFS : public FileSystem

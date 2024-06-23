@@ -48,6 +48,7 @@
 #include <queue>
 #include <memory>
 #include <driver/gpio.h>
+#include <esp_timer.h>
 #include "../../hardware/fnSystem.h"
 
 #include "protocol/_protocol.h"

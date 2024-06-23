@@ -78,6 +78,12 @@ int WiFiManager::start()
     // Make sure our network interface is initialized
     ESP_ERROR_CHECK(esp_netif_init());
 
+    // Set custom MAC Address
+    uint8_t mac[6];
+    esp_read_mac(mac, ESP_MAC_WIFI_STA);
+    mac[0]=0x00; mac[1]=0x80; mac[2]=0x10; // OUI 00:80:10 Commodore International
+    esp_base_mac_addr_set(mac);
+
     // Assume we've already done these steps if _wifi_sta has a value
     if (_wifi_sta == nullptr)
     {
@@ -95,6 +101,11 @@ int WiFiManager::start()
         ESP_ERROR_CHECK(esp_wifi_init(&wifi_init_cfg));
         ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
         Debug_printf("WiFiManager::start() complete\r\n");
+        Serial.printf("MAC Address: ");
+        for (int i = 0; i < 5; i++) {
+            Serial.printf("%02X:", mac[i]);
+        }
+        Serial.printf("%02X\r\n", mac[5]);
     }
 
     // TODO: Provide way to change WiFi region/country?
@@ -136,7 +147,6 @@ int WiFiManager::start()
     //     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &ap_config));
     //     ESP_ERROR_CHECK(esp_wifi_set_bandwidth(WIFI_IF_AP, WIFI_BW_HT20));
     // }
-
 
     // Set WiFi mode to Station
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));

@@ -32,9 +32,9 @@ using namespace Protocol;
 // When it's ready to go, it releases the Clock line to false.  This signal change might be
 // translated as "I'm ready to send a character." The listener must detect this and 
 // immediately start receiving data on both the clock and data lines.
-int16_t  DolphinDOS::receiveByte ()
+uint8_t  DolphinDOS::receiveByte ()
 {
-    IEC.flags and_eq CLEAR_LOW;
+    IEC.flags &= CLEAR_LOW;
 
     IEC.pull ( PIN_IEC_SRQ );
 
@@ -46,7 +46,7 @@ int16_t  DolphinDOS::receiveByte ()
     {
         Debug_printv ( "Wait for talker ready" );
         IEC.flags or_eq ERROR;
-        return -1; // return error because timeout
+        return 0; // return error because timeout
     }
 
     wait( 65 );
@@ -91,8 +91,8 @@ bool DolphinDOS::sendByte ( uint8_t data, bool eoi )
     if ( timeoutWait ( PIN_IEC_DATA_IN, RELEASED, FOREVER ) == TIMED_OUT )
     {
         Debug_printv ( "Wait for listener to be ready" );
-        IEC.flags or_eq ERROR;
-        return -1; // return error because timeout
+        IEC.flags |= ERROR;
+        return false; // return error because timeout
     }
 
     // Either  the  talker  will pull the
@@ -125,13 +125,13 @@ bool DolphinDOS::sendByte ( uint8_t data, bool eoi )
         if ( timeoutWait ( PIN_IEC_DATA_IN, PULLED ) == TIMED_OUT )
         {
             Debug_printv ( "EOI ACK: Listener didn't PULL DATA" );
-            IEC.flags or_eq ERROR;
+            IEC.flags |= ERROR;
             return false; // return error because timeout
         }
         if ( timeoutWait ( PIN_IEC_DATA_IN, RELEASED ) == TIMED_OUT )
         {
             Debug_printv ( "EOI ACK: Listener didn't RELEASE DATA" );
-            IEC.flags or_eq ERROR;
+            IEC.flags |= ERROR;
             return false; // return error because timeout
         }
 

@@ -27,6 +27,7 @@
 
 // Archive
 #include "archive/archive_ml.h"
+#include "archive/lbr.h"
 
 // Cartridge
 
@@ -85,6 +86,7 @@ SDFileSystem sdFS;
 
 // Archive
 ArchiveMFileSystem archiveFS;
+LBRMFileSystem lbrFS;
 
 // Cartridge
 
@@ -129,6 +131,7 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
     &sdFS,
 #endif
     &archiveFS, // extension-based FS have to be on top to be picked first, otherwise the scheme will pick them!
+    &lbrFS,
     &d64FS, &d71FS, &d80FS, &d81FS, &d82FS, &d90FS, &dnpFS,
     &d8bFS, &dfiFS,
     &p00FS,
