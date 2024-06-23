@@ -7,7 +7,7 @@
 #include <functional>
 #include "meatloaf.h"
 #include "iec_pipe_broker.h"
-#include "../device/drive.h"
+#include "../device/disk.h"
 
 // Custom hash function for std::pair<std::string, std::ios_base::openmode>
 struct PairHash {
