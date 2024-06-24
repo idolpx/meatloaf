@@ -63,7 +63,7 @@ board_build.filesystem = littlefs
 test_filter = embedded/*
 extra_scripts = 
     pre:build_version.py
-    post:pack_firmware.py
+;    post:pack_firmware.py
 
 [env]
 ; Common settings for all enivornments
