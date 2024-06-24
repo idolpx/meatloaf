@@ -28,16 +28,17 @@ def makezip(source, target, env):
     # Make sure all the files are built and ready to zip
     zipit = True
     if not os.path.exists(env.subst("$BUILD_DIR/bootloader.bin")):
-        print("BOOTLOADER not available to pack in firmware zip")
+        print("\033[1;31mBOOTLOADER not available to pack in firmware zip\033[1;37m")
         zipit = False
     if not os.path.exists(env.subst("$BUILD_DIR/partitions.bin")):
-        print("PARTITIONS not available to pack in firmware zip")
+        print("\033[1;31mPARTITIONS not available to pack in firmware zip\033[1;37m")
         zipit = False
     if not os.path.exists(env.subst("$BUILD_DIR/firmware.bin")):
-        print("FIRMWARE not available to pack in firmware zip")
+        print("\033[1;31mFIRMWARE not available to pack in firmware zip\033[1;37m")
         zipit = False
-    if not os.path.exists(env.subst("$BUILD_DIR/littlefs.bin")) and not os.path.exists(firmdir+"/littlefs.bin"):
-        print("LittleFS not available to pack in firmware zip, run \"Build Filesystem Image\" first")
+    if not os.path.exists(env.subst("$BUILD_DIR/littlefs.bin")):
+        print("\033[1;31mLittleFS not available to pack in firmware zip, building...\033[1;37m")
+        os.system("pio run -t buildfs")
         zipit = False
 
     if zipit == True:
@@ -76,7 +77,7 @@ def makezip(source, target, env):
 
         # Copy filesystem image to firmware folder
         try:
-            shutil.copy(env.subst("$BUILD_DIR/littlefs.bin"), firmdir)
+            shutil.copy(env.subst("$BUILD_DIR/littlefs.bin"), firmdir+"/filesystem.bin")
         except: pass
 
         # Filename variables
@@ -122,7 +123,7 @@ def makezip(source, target, env):
             "offset": "0x10000"
         },
         {
-            "filename": "littlefs.bin",
+            "filename": "filesystem.bin",
             "offset": "0x250000"
         }
     ]
@@ -142,7 +143,7 @@ def makezip(source, target, env):
             "offset": "0x10000"
         },
         {
-            "filename": "littlefs.bin",
+            "filename": "filesystem.bin",
             "offset": "0x600000"
         }
     ]
@@ -162,7 +163,7 @@ def makezip(source, target, env):
             "offset": "0x10000"
         },
         {
-            "filename": "littlefs.bin",
+            "filename": "filesystem.bin",
             "offset": "0x910000"
         }
     ]
@@ -178,7 +179,7 @@ def makezip(source, target, env):
                 zip_object.write(env.subst("$BUILD_DIR/bootloader.bin"), "bootloader.bin")
                 zip_object.write(env.subst("$BUILD_DIR/partitions.bin"), "partitions.bin")
                 zip_object.write(env.subst("$BUILD_DIR/firmware.bin"), "firmware.bin")
-                zip_object.write(firmdir+"/littlefs.bin", "littlefs.bin")
+                zip_object.write(firmdir+"/filesystem.bin", "filesystem.bin")
                 zip_object.write("firmware/release.json", "release.json")
         finally: 
             print("*" * 80)
