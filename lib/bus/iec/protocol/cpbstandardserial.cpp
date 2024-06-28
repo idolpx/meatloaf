@@ -118,8 +118,7 @@ uint8_t CPBStandardSerial::receiveByte()
 
     // STEP 3: RECEIVING THE BITS
     //IEC.pull ( PIN_IEC_SRQ );
-    //int8_t data = receiveBits();
-    uint8_t data = IEC.read();
+    int8_t data = receiveBits();
     //IEC.release ( PIN_IEC_SRQ );
 
     // STEP 4: FRAME HANDSHAKE
@@ -163,6 +162,22 @@ uint8_t CPBStandardSerial::receiveByte()
 // false, it grabs the bit from the Data line and puts it away.  It then waits for the clock line to go true, in order
 // to prepare for the next bit. When the talker figures the data has been held for a sufficient  length  of  time,  it
 // pulls  the  Clock  line true  and  releases  the  Data  line  to  false.    Then  it starts to prepare the next bit.
+
+uint8_t CPBStandardSerial::receiveBits ()
+{
+    IEC.bit = 0;
+    IEC.byte = 0;
+    while ( IEC.bit < 8 )
+    {
+        if ( IEC.flags & ATN_PULLED )
+            break;
+
+        esp_rom_delay_us( 3 );
+    }
+    return IEC.byte;
+}
+
+
 // uint8_t CPBStandardSerial::receiveBits ()
 // {
 //     // Listening for bits

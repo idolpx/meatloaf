@@ -642,20 +642,6 @@ public:
     bool status ( uint8_t _pin );
     bool status ();
 
-    uint8_t read()
-    {
-        bit = 0;
-        byte = 0;
-        while ( bit < 8 )
-        {
-            if ( flags & ATN_PULLED )
-                break;
-
-            esp_rom_delay_us( 3 );
-        }
-        return byte;
-    }
-
     void debugTiming();
 };
 /**
