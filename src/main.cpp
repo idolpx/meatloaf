@@ -8,8 +8,7 @@
 #endif
 #endif
 #include <driver/gpio.h>
-#include <esp_console.h>
-#include "linenoise/linenoise.h"
+
 
 //#include "archive.h"
 
@@ -133,7 +132,8 @@ void main_setup()
         Serial.print("Network "); IEC.addDevice(new iecNetwork(), 16);      // 16-19 Network Devices
         Serial.print("CPM "); IEC.addDevice(new iecCpm(), 20);              // 20-29 Other
         Serial.print("Voice "); IEC.addDevice(new iecVoice(), 21);
-        Serial.print("Clock "); IEC.addDevice(new iecClock(), 29);
+        Serial.print("Clock "); IEC.addDevice(new iecClock(), 28);
+        Serial.print("OpenAI "); IEC.addDevice(new iecOpenAI(), 29);
         Serial.print("Meatloaf "); IEC.addDevice(new iecMeatloaf(), 30);    // 30    Meatloaf
 
         Serial.print("Virtual Device(s) Started: [ " ANSI_YELLOW_BOLD );
@@ -181,32 +181,6 @@ void main_setup()
     // lfs_test();
 #endif
 }
-
-
-// Main high-priority service loop
-void fn_console_loop(void *param)
-{
-    esp_console_config_t  config = {
-        .max_cmdline_length = 80,
-        .max_cmdline_args = 10,
-        .hint_color = 39
-    };
-
-    esp_err_t e = esp_console_init(&config);
-
-    char* line;
-
-    if(e == ESP_OK) {
-        while((line = linenoise("hello> ")) != NULL) {
-            printf("You wrote: %s\r\n", line);
-            linenoiseFree(line); /* Or just free(line) if you use libc malloc. */
-        }
-    }
-
-    esp_console_deinit();
-}
-
-
 
 /*
  * This is the start/entry point for an ESP-IDF program (must use "C" linkage)

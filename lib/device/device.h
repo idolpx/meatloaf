@@ -61,11 +61,12 @@
 # include "iec/clock.h"
 # include "iec/cpm.h"
 # include "iec/drive.h"
-# include "iec/printer.h"
-# include "iec/printerlist.h"
 # include "iec/meatloaf.h"
 //# include "iec/modem.h"
 # include "iec/network.h"
+# include "iec/openai.h"
+# include "iec/printer.h"
+# include "iec/printerlist.h"
 # include "iec/voice.h"
 #endif
 
