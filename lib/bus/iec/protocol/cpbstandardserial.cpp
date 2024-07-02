@@ -51,6 +51,10 @@ uint8_t CPBStandardSerial::receiveByte()
 {
     IEC.flags &= CLEAR_LOW;
 
+    // Sample ATN and set flag to indicate COMMAND or DATA mode
+    if ( IEC.status ( PIN_IEC_ATN ) )
+        IEC.flags |= ATN_PULLED;
+
     // Wait for talker ready
     //IEC.pull ( PIN_IEC_SRQ );
     if ( timeoutWait ( PIN_IEC_CLK_IN, RELEASED, FOREVER ) == TIMED_OUT )
@@ -176,26 +180,23 @@ uint8_t CPBStandardSerial::receiveBits ()
     timer_start( TIMING_PROTOCOL_DETECT );
     while ( IEC.bit < 8 )
     {
-        if ( timer_timedout )
+        if ( timer_timedout && ( IEC.flags &  ATN_PULLED ) )
         {
-            if ( IEC.status( PIN_IEC_ATN ) )
+            // Check LISTEN & TALK
+            uint8_t device = (IEC.byte >> 1) & 0x1F; // LISTEN
+            if ( device > 30 )
+                device = (IEC.byte >> 1 ) & 0x3F; // TALK
+
+            if ( IEC.isDeviceEnabled ( device ) )
             {
-                // Check LISTEN & TALK
-                uint8_t device = (IEC.byte >> 1) & 0x1F; // LISTEN
-                if ( device > 30 )
-                    device = (IEC.byte >> 1 ) & 0x3F; // TALK
+                // acknowledge we support JiffyDOS
+                IEC.pull(PIN_IEC_DATA_OUT);
+                wait( TIMING_PROTOCOL_ACK, false );
+                IEC.release(PIN_IEC_DATA_OUT);
 
-                if ( IEC.isDeviceEnabled ( device ) )
-                {
-                    // acknowledge we support JiffyDOS
-                    IEC.pull(PIN_IEC_DATA_OUT);
-                    wait( TIMING_PROTOCOL_ACK, false );
-                    IEC.release(PIN_IEC_DATA_OUT);
-
-                    IEC.flags |= JIFFYDOS_ACTIVE;
-                }
-                timer_timedout = false;
+                IEC.flags |= JIFFYDOS_ACTIVE;
             }
+            timer_timedout = false;
         }
 
         usleep( 2 );
