@@ -167,13 +167,40 @@ uint8_t CPBStandardSerial::receiveBits ()
 {
     IEC.bit = 0;
     IEC.byte = 0;
+    while ( IEC.bit < 7 )
+    {
+        usleep( 2 );
+    }
+
+    // If there is a 218us delay before bit 7, the controller uses JiffyDOS
+    timer_start( TIMING_PROTOCOL_DETECT );
     while ( IEC.bit < 8 )
     {
-        if ( IEC.flags & ATN_PULLED )
-            break;
+        if ( timer_timedout )
+        {
+            if ( IEC.status( PIN_IEC_ATN ) )
+            {
+                // Check LISTEN & TALK
+                uint8_t device = (IEC.byte >> 1) & 0x1F; // LISTEN
+                if ( device > 30 )
+                    device = (IEC.byte >> 1 ) & 0x3F; // TALK
 
-        esp_rom_delay_us( 3 );
+                if ( IEC.isDeviceEnabled ( device ) )
+                {
+                    // acknowledge we support JiffyDOS
+                    IEC.pull(PIN_IEC_DATA_OUT);
+                    wait( TIMING_PROTOCOL_ACK, false );
+                    IEC.release(PIN_IEC_DATA_OUT);
+
+                    IEC.flags |= JIFFYDOS_ACTIVE;
+                }
+                timer_timedout = false;
+            }
+        }
+
+        usleep( 2 );
     }
+
     return IEC.byte;
 }
 
