@@ -42,16 +42,9 @@
 //     ldx #$23
 //     stx $dd00   ; data=active,clock=inactive,ATN=inactive
 //     bit $dd00
-//     bvc lloadinnerloop  ; branch if 1541 sets clock active (needs to load next block)
-//     nop
-//     sta $dd00   ; set data inactive
-//     lda $dd00   ; read bits 1/0
-//     nop
-//     lsr
-//     lsr
-//     eor $dd00   ; read bits 3/2
-//     bit $00     ; burn cycles
-//     lsr
+//     bvc lloadinnerloop  ; branch if 1541 sets clock active (needs to load
+//     next block) nop sta $dd00   ; set data inactive lda $dd00   ; read bits
+//     1/0 nop lsr lsr eor $dd00   ; read bits 3/2 bit $00     ; burn cycles lsr
 //     lsr
 //     eor $dd00   ; read bits 5/4
 //     bit $00     ; burn cycles
@@ -71,25 +64,24 @@
 
 #include "_protocol.h"
 
+#include <vector>
+
 #define TIMING_JIFFY_BITPAIR
 #define TIMING_JIFFY_BYTE
 
-namespace Protocol
-{
-	class JiffyDOS : public IECProtocol
-	{
-		public:
-			JiffyDOS() {
+namespace Protocol {
+class JiffyDOS : public IECProtocol {
+   public:
+    JiffyDOS();
+	~JiffyDOS();
 
-			};
-
-		protected:
-			uint8_t loadmode = 0;
-			uint8_t skipeoi = 0;
-			uint8_t receiveByte(void) override;
-			bool sendByte(uint8_t data, bool eoi) override;
-			bool sendByte(uint8_t data, bool eoi, uint8_t loadflags);
-	};
+   protected:
+    uint8_t loadmode = 0;
+    uint8_t skipeoi = 0;
+    uint8_t receiveByte(void) override;
+    bool sendByte(uint8_t data, bool eoi) override;
+    bool sendByte(uint8_t data, bool eoi, uint8_t loadflags);
 };
+};  // namespace Protocol
 
-#endif // PROTOCOL_JIFFYDOS_H
+#endif  // PROTOCOL_JIFFYDOS_H

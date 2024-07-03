@@ -225,14 +225,14 @@ uint8_t CPBStandardSerial::receiveBits ()
 //         //IEC.pull ( PIN_IEC_SRQ );
 //         //bit_time = timeoutWait ( PIN_IEC_CLK_IN, RELEASED, TIMING_PROTOCOL_DETECT, false );
 //         while ( IEC.status(PIN_IEC_CLK_IN) != RELEASED );
-//         IEC.pull ( PIN_IEC_SRQ );
+//         //IEC.pull ( PIN_IEC_SRQ );
 //         //IEC.release ( PIN_IEC_SRQ );
 
 // #ifdef JIFFYDOS
 //         // If there is a 218us delay before bit 7, the controller uses JiffyDOS
 //         if ( bit_time >= TIMING_PROTOCOL_DETECT )
 //         {
-//             IEC.pull ( PIN_IEC_SRQ );
+//             //IEC.pull ( PIN_IEC_SRQ );
 //             if ( n == 7 && IEC.status( PIN_IEC_ATN ) )
 //             {
 //                 // Check LISTEN & TALK
@@ -253,7 +253,7 @@ uint8_t CPBStandardSerial::receiveBits ()
 //                     }
 //                 }
 //             }
-//             IEC.release ( PIN_IEC_SRQ );
+//             //IEC.release ( PIN_IEC_SRQ );
 
 //             // wait for bit to be ready to read
 //             //IEC.pull ( PIN_IEC_SRQ );

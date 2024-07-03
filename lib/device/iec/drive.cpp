@@ -67,16 +67,15 @@ void iecDrive::format()
 /* Mount Disk
    We determine the type of image based on the filename extension.
    If the disk_type value passed is not MEDIATYPE_UNKNOWN then that's used instead.
-   If filename has no extension or is NULL and disk_type is MEDIATYPE_UNKOWN,
-   then we assume it's MEDIATYPE_ATR.
    Return value is MEDIATYPE_UNKNOWN in case of failure.
 */
 mediatype_t iecDrive::mount(FILE *f, const char *filename, uint32_t disksize, mediatype_t disk_type)
 {
-    // TODO IMPLEMENT
-    // _base.reset( MFSOwner::File(filename) );
+    Debug_printv("disk MOUNT %s\n", filename);
 
-    return MEDIATYPE_UNKNOWN; // MEDIATYPE_UNKNOWN
+    _base.reset( MFSOwner::File(filename) );
+
+    return MediaType::discover_mediatype(filename); // MEDIATYPE_UNKNOWN
 }
 
 // Destructor
@@ -89,7 +88,7 @@ iecDrive::~iecDrive()
 // Unmount disk file
 void iecDrive::unmount()
 {
-    Debug_print("disk UNMOUNT\r\n");
+    Debug_printv("disk UNMOUNT\r\n");
 
     if (_base != nullptr)
     {

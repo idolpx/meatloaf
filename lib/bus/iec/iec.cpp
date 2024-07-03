@@ -116,10 +116,6 @@ void IRAM_ATTR systemBus::release ( uint8_t _pin )
 
 bool IRAM_ATTR systemBus::status ( uint8_t _pin )
 {
-// #ifndef IEC_SPLIT_LINES
-//     release ( _pin );
-// #endif
-
     int _reg = GPIO_IN_REG;
     if (_pin > 31) 
     { 
@@ -325,7 +321,7 @@ void IRAM_ATTR systemBus::service()
 
                 //fnLedManager.set(eLed::LED_BUS, true);
 
-                Debug_printv("bus[%d] device[%d]", state, device_state);
+                //Debug_printv("bus[%d] device[%d]", state, device_state);
                 // for (auto devicep : _daisyChain)
                 // {
                     device_state = d->process();
@@ -337,15 +333,21 @@ void IRAM_ATTR systemBus::service()
             }
 
             //Debug_printv("bus[%d] device[%d] flags[%d]", state, device_state, flags);
-            state = BUS_IDLE;
 
             // Switch back to standard serial
             detected_protocol = PROTOCOL_SERIAL;
             protocol = selectProtocol();
             //release ( PIN_IEC_SRQ );
 
+            state = BUS_IDLE;
             if ( status ( PIN_IEC_ATN ) )
+            {
                 state = BUS_ACTIVE;
+            }
+            else if (data.primary == IEC_UNLISTEN)
+            {
+                state = BUS_RELEASE;
+            }
         }
 
     } while( state > BUS_IDLE );
@@ -360,7 +362,6 @@ void IRAM_ATTR systemBus::service()
     //Debug_printv ( "primary[%.2X] secondary[%.2X] bus[%d] flags[%d]", data.primary, data.secondary, state, flags );
     //Debug_printv ( "device[%d] channel[%d]", data.device, data.channel);
 
-    Debug_printv("exit");
     Debug_printv("bus[%d] flags[%d]", state, flags);
     Debug_printf("Heap: %lu\r\n",esp_get_free_internal_heap_size());
 
@@ -440,7 +441,7 @@ void systemBus::read_command()
             data.secondary = IEC_REOPEN; // Default secondary command
             data.channel = CHANNEL_COMMAND;  // Default channel
             state = BUS_ACTIVE;
-            Debug_printf(" (40 TALK   %.2d DEVICE)\r\n", data.device);
+            Debug_printf(" (40 TALK  %.2d DEVICE)\r\n", data.device);
             break;
 
         case IEC_UNTALK:
@@ -883,8 +884,8 @@ bool IRAM_ATTR systemBus::turnAround()
     // Wait for CLK to be released
     if (protocol->timeoutWait(PIN_IEC_CLK_IN, RELEASED, TIMEOUT_Ttlta) == TIMEOUT_Ttlta)
     {
-        Debug_printf("Wait until the computer releases the CLK line\r\n");
-        Debug_printf("IEC: TURNAROUND TIMEOUT\r\n");
+        Debug_printv("Wait until the computer releases the CLK line\r\n");
+        Debug_printv("IEC: TURNAROUND TIMEOUT\r\n");
         flags |= ERROR;
         return false; // return error because timeout
     }
