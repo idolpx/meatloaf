@@ -111,7 +111,7 @@ void IRAM_ATTR systemBus::release ( uint8_t _pin )
         _reg = GPIO_ENABLE1_REG, _pin -= 32;
     } 
     REG_CLR_BIT(_reg, 1ULL << _pin); // GPIO_MODE_INPUT
-    protocol->wait( 4, false );
+    usleep ( 4 );
 }
 
 bool IRAM_ATTR systemBus::status ( uint8_t _pin )

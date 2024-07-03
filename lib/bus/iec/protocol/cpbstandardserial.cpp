@@ -169,10 +169,18 @@ uint8_t CPBStandardSerial::receiveByte()
 
 uint8_t CPBStandardSerial::receiveBits ()
 {
+    timer_start( TIMEOUT_DEFAULT );
+
     IEC.bit = 0;
     IEC.byte = 0;
     while ( IEC.bit < 7 )
     {
+        if ( timer_timedout )
+        {
+            IEC.flags |= ERROR;
+            return 0;
+        }
+
         usleep( 2 );
     }
 
