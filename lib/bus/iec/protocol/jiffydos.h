@@ -42,9 +42,16 @@
 //     ldx #$23
 //     stx $dd00   ; data=active,clock=inactive,ATN=inactive
 //     bit $dd00
-//     bvc lloadinnerloop  ; branch if 1541 sets clock active (needs to load
-//     next block) nop sta $dd00   ; set data inactive lda $dd00   ; read bits
-//     1/0 nop lsr lsr eor $dd00   ; read bits 3/2 bit $00     ; burn cycles lsr
+//     bvc lloadinnerloop  ; branch if 1541 sets clock active (needs to load next block)
+//     nop
+//     sta $dd00   ; set data inactive
+//     lda $dd00   ; read bits 1/0
+//     nop
+//     lsr
+//     lsr
+//     eor $dd00   ; read bits 3/2
+//     bit $00     ; burn cycles
+//     lsr
 //     lsr
 //     eor $dd00   ; read bits 5/4
 //     bit $00     ; burn cycles

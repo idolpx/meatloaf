@@ -331,7 +331,7 @@ public:
      */
     systemBus get_bus();
 
-    void set_iec_status(int8_t error, uint8_t cmd, const std::string& msg, bool connected, int channel) {
+    void set_iec_status(int8_t error, uint8_t cmd, const std::string msg, bool connected, int channel) {
         iecStatus.error = error;
         iecStatus.cmd = cmd;
         iecStatus.msg = msg;

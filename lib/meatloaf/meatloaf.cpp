@@ -58,7 +58,6 @@
 #include "network/http.h"
 #include "network/tnfs.h"
 // #include "network/ipfs.h"
-// #include "network/tnfs.h"
 // #include "network/smb.h"
 // #include "network/ws.h"
 
@@ -110,7 +109,6 @@ DNPMFileSystem dnpFS;
 HttpFileSystem httpFS;
 TNFSFileSystem tnfsFS;
 // IPFSFileSystem ipfsFS;
-// TNFSFileSystem tnfsFS;
 // TcpFileSystem tcpFS;
 //WSFileSystem wsFS;
 

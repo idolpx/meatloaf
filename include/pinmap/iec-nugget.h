@@ -46,14 +46,16 @@
 
 /* Commodore IEC Pins */
 //#define IEC_HAS_RESET // Reset line is available
-
-#define PIN_IEC_RESET           GPIO_NUM_34
-#define PIN_IEC_ATN             GPIO_NUM_32
-#define PIN_IEC_CLK_IN          GPIO_NUM_33
-#define PIN_IEC_CLK_OUT         GPIO_NUM_33
-#define PIN_IEC_DATA_IN         GPIO_NUM_14
-#define PIN_IEC_DATA_OUT        GPIO_NUM_14
-#define PIN_IEC_SRQ             GPIO_NUM_27
+                                                //            WIRING
+                                                //  C64    DIN6    D32Pro          TFT
+#define PIN_IEC_RESET           GPIO_NUM_34     //  RESET  6       A 32            N/C
+#define PIN_IEC_ATN             GPIO_NUM_32     //  ATN    3       A T-LED 32      10 (PURPLE)
+#define PIN_IEC_CLK_IN          GPIO_NUM_33     //  CLK    4       A T-RST 33      8  (BROWN)
+#define PIN_IEC_CLK_OUT         GPIO_NUM_33     //
+#define PIN_IEC_DATA_IN         GPIO_NUM_14     //  DATA   5       T-CS 14         2  (BLACK)
+#define PIN_IEC_DATA_OUT        GPIO_NUM_14     //
+#define PIN_IEC_SRQ             GPIO_NUM_27     //  SRQ    1       T-DC 27         7  (ORANGE)
+                                                //  GND    2       GND             9  (GREY)
 
 /* Modem/Parallel Switch */
 /* Unused with Nugget    */

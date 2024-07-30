@@ -122,7 +122,7 @@ uint8_t CPBStandardSerial::receiveByte()
 
     // STEP 3: RECEIVING THE BITS
     //IEC.pull ( PIN_IEC_SRQ );
-    int8_t data = receiveBits();
+    uint8_t data = receiveBits();
     //IEC.release ( PIN_IEC_SRQ );
 
     // STEP 4: FRAME HANDSHAKE
@@ -188,23 +188,29 @@ uint8_t CPBStandardSerial::receiveBits ()
     timer_start( TIMING_PROTOCOL_DETECT );
     while ( IEC.bit < 8 )
     {
-        if ( timer_timedout && ( IEC.flags &  ATN_PULLED ) )
+        // if ( timer_timedout && ( IEC.flags &  ATN_PULLED ) )
+        // {
+        //     // Check LISTEN & TALK
+        //     uint8_t device = (IEC.byte >> 1) & 0x1F; // LISTEN
+        //     if ( device > 30 )
+        //         device = (IEC.byte >> 1 ) & 0x3F; // TALK
+
+        //     if ( IEC.isDeviceEnabled ( device ) )
+        //     {
+        //         // acknowledge we support JiffyDOS
+        //         IEC.pull(PIN_IEC_DATA_OUT);
+        //         wait( TIMING_PROTOCOL_ACK, false );
+        //         IEC.release(PIN_IEC_DATA_OUT);
+
+        //         IEC.flags |= JIFFYDOS_ACTIVE;
+        //     }
+        //     timer_timedout = false;
+        // }
+
+        if ( timer_timedout )
         {
-            // Check LISTEN & TALK
-            uint8_t device = (IEC.byte >> 1) & 0x1F; // LISTEN
-            if ( device > 30 )
-                device = (IEC.byte >> 1 ) & 0x3F; // TALK
-
-            if ( IEC.isDeviceEnabled ( device ) )
-            {
-                // acknowledge we support JiffyDOS
-                IEC.pull(PIN_IEC_DATA_OUT);
-                wait( TIMING_PROTOCOL_ACK, false );
-                IEC.release(PIN_IEC_DATA_OUT);
-
-                IEC.flags |= JIFFYDOS_ACTIVE;
-            }
-            timer_timedout = false;
+            IEC.flags |= ERROR;
+            return 0;
         }
 
         usleep( 2 );
