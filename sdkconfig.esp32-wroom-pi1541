@@ -1,6 +1,6 @@
 #
 # Automatically generated file. DO NOT EDIT.
-# Espressif IoT Development Framework (ESP-IDF) 5.1.1 Project Configuration
+# Espressif IoT Development Framework (ESP-IDF)  Project Configuration
 #
 CONFIG_SOC_BROWNOUT_RESET_SUPPORTED="Not determined"
 CONFIG_SOC_TWAI_BRP_DIV_SUPPORTED="Not determined"
@@ -1122,7 +1122,7 @@ CONFIG_ESP_TIMER_TASK_AFFINITY=0x0
 CONFIG_ESP_TIMER_TASK_AFFINITY_CPU0=y
 CONFIG_ESP_TIMER_ISR_AFFINITY=0x1
 CONFIG_ESP_TIMER_ISR_AFFINITY_CPU0=y
-CONFIG_ESP_TIMER_SUPPORTS_ISR_DISPATCH_METHOD=y
+# CONFIG_ESP_TIMER_SUPPORTS_ISR_DISPATCH_METHOD is not set
 CONFIG_ESP_TIMER_IMPL_TG0_LAC=y
 # end of High resolution timer (esp_timer)
 
