@@ -19,8 +19,8 @@ description = Meatloaf Commodore to ESP32 WiFi Multifunction Firmware
 
 ; Uncomment ONLY ONE of the below lines to target the hardware you use
 ; GPIO pin assignments are located in the include/pinmap/ directory for reference
-environment = lolin-d32-pro      ; Wemos Lolin D32 Pro                         (ESP32-WROVER 4M PSRAM, 4M/8M/16M Flash)
-;environment = iec-nugget         ; Wemos Lolin D32 Pro (TFT Header)            (ESP32-WROVER 4M PSRAM, 4M/8M/16M Flash)
+environment = lolin-d32-pro      ; Wemos Lolin D32 Pro                         (ESP32-WROVER 8M PSRAM, 4M/8M/16M Flash)
+;environment = iec-nugget         ; Wemos Lolin D32 Pro (TFT Header)            (ESP32-WROVER 8M PSRAM, 4M/8M/16M Flash)
 ;environment = ttgo-t1            ; Lilygo TTGO T1 V1.3                         (ESP32 NO PSRAM, 4M Flash)
 ;environment = esp32-wroom        ; generic esp32-wroom board                   (ESP32-WROOM NO PSRAM, 4M/8M/16M Flash)
 ;environment = esp32-wroom-pi1541 ; generic esp32-wroom board with pi1541 hat   (ESP32-WROOM NO PSRAM, 4M/8M/16M Flash)
@@ -180,7 +180,7 @@ build_flags =
 
 [env:ttgo-t1]
 extends = esp32_base
-board = esp32-16mb
+board = esp32-4mb
 build_flags =
     ${env.build_flags}
     -D PINMAP_TTGO_T1
