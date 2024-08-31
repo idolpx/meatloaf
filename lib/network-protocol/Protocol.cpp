@@ -118,6 +118,14 @@ bool NetworkProtocol::open(PeoplesUrlParser *urlParser, cmdFrame_t *cmdFrame)
     return false;
 }
 
+void NetworkProtocol::set_open_params(uint8_t p1, uint8_t p2)
+{
+    aux1_open = p1;
+    aux2_open = p2;
+    translation_mode = p2 & 0x7F;
+    Debug_printf("Changed open params to aux1_open = %d, aux2_open = %d. Set translation_mode to %d\r\n", p1, p2, translation_mode);
+}
+
 /**
  * @brief Close connection to the protocol.
  */
@@ -184,6 +192,7 @@ bool NetworkProtocol::status(NetworkStatus *status)
   */
 void NetworkProtocol::translate_receive_buffer()
 {
+    // Debug_printf("#### Translating receive buffer, mode: %u\r\n", translation_mode);
     if (translation_mode == 0)
         return;
 

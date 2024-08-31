@@ -2,18 +2,16 @@
 #define NETWORK_H
 
 #include <array>
+#include <cstdint>
 #include <esp_timer.h>
 #include <memory>
 #include <string>
 
-#include "../../bus/bus.h"
-
+#include "bus.h"
+#include "fnjson.h"
+#include "network_data.h"
 #include "peoples_url_parser.h"
-
-#include "../network-protocol/Protocol.h"
-
-#include "../fnjson/fnjson.h"
-
+#include "Protocol.h"
 #include "string_utils.h"
 
 /**
@@ -32,7 +30,7 @@ using namespace std;
 
 class iecNetwork : public virtualDevice
 {    
-    public:
+public:
 
     /**
      * @brief CTOR
@@ -40,29 +38,32 @@ class iecNetwork : public virtualDevice
     iecNetwork();
 
     /**
-     * @brief the Receive buffers, for each channel
-     */
-    string *receiveBuffer[NUM_CHANNELS];
-    
-    /**
-     * @brief the Transmit buffers, one for each channel.
-     */
-    string *transmitBuffer[NUM_CHANNELS];
-
-    /**
-     * @brief the Special buffers, one for each channel.
-     */
-    string *specialBuffer[NUM_CHANNELS];
-
-    /**
-     * @brief the protocol instance for given channel
-    */
-    NetworkProtocol *protocol[NUM_CHANNELS];
-
-    /**
      * @brief DTOR
      */
     virtual ~iecNetwork();
+
+    std::unordered_map<uint8_t, NetworkData> network_data_map;
+
+    // /**
+    //  * @brief the Receive buffers, for each channel
+    //  */
+    // string *receiveBuffer[NUM_CHANNELS];
+    
+    // /**
+    //  * @brief the Transmit buffers, one for each channel.
+    //  */
+    // string *transmitBuffer[NUM_CHANNELS];
+
+    // /**
+    //  * @brief the Special buffers, one for each channel.
+    //  */
+    // string *specialBuffer[NUM_CHANNELS];
+
+    // /**
+    //  * @brief the protocol instance for given channel
+    // */
+    // NetworkProtocol *protocol[NUM_CHANNELS];
+
 
     /**
      * @brief Process command fanned out from bus
@@ -76,74 +77,78 @@ class iecNetwork : public virtualDevice
      */
     virtual void poll_interrupt(unsigned char c) override;
 
-    private:
-
+private:
     /**
-     * @brief the active URL for each channel
+     * @brief flag to indicate if the status result should be binary or string
      */
-    string deviceSpec[NUM_CHANNELS];
+    bool is_binary_status = false;
 
-    /**
-     * @brief the URL parser for each channel
-     */
-    std::array<std::unique_ptr<PeoplesUrlParser>, NUM_CHANNELS> urlParser;
+    // /**
+    //  * @brief the active URL for each channel
+    //  */
+    // string deviceSpec[NUM_CHANNELS];
 
-    /**
-     * @brief the prefix for each channel
-     */
-    string prefix[NUM_CHANNELS];
+    // /**
+    //  * @brief the URL parser for each channel
+    //  */
+    // std::array<std::unique_ptr<PeoplesUrlParser>, NUM_CHANNELS> urlParser;
 
-    /**
-     * @brief the active Channel mode for each channel
-     */
-        enum _channel_mode
-    {
-        PROTOCOL,
-        JSON
-    } channelMode[NUM_CHANNELS] =
-        {
-            PROTOCOL,
-            PROTOCOL,
-            PROTOCOL,
-            PROTOCOL,
-            PROTOCOL,
-            PROTOCOL,
-            PROTOCOL,
-            PROTOCOL,
-            PROTOCOL,
-            PROTOCOL,
-            PROTOCOL,
-            PROTOCOL,
-            PROTOCOL,
-            PROTOCOL,
-            PROTOCOL,
-            PROTOCOL
-        };
+    // /**
+    //  * @brief the prefix for each channel
+    //  */
+    // string prefix[NUM_CHANNELS];
 
-    /**
-     * @brief the active translation mode for each channel 
-     */
-    uint8_t translationMode[NUM_CHANNELS];
+    // /**
+    //  * @brief the active Channel mode for each channel
+    //  */
+    // enum _channel_mode
+    // {
+    //     PROTOCOL,
+    //     JSON
+    // } channelMode[NUM_CHANNELS] =
+    //     {
+    //         PROTOCOL,
+    //         PROTOCOL,
+    //         PROTOCOL,
+    //         PROTOCOL,
+    //         PROTOCOL,
+    //         PROTOCOL,
+    //         PROTOCOL,
+    //         PROTOCOL,
+    //         PROTOCOL,
+    //         PROTOCOL,
+    //         PROTOCOL,
+    //         PROTOCOL,
+    //         PROTOCOL,
+    //         PROTOCOL,
+    //         PROTOCOL,
+    //         PROTOCOL
+    //     };
 
-    /**
-     * @brief the login (username) for each channel
-     */
-    string login[NUM_CHANNELS];
+    // /**
+    //  * @brief the active translation mode for each channel 
+    //  */
+    // uint8_t translationMode[NUM_CHANNELS];
 
-    /**
-     * @brief the password for each channel
-     */
-    string password[NUM_CHANNELS];
+    // /**
+    //  * @brief the login (username) for each channel
+    //  */
+    // string login[NUM_CHANNELS];
 
-    /**
-     * @brief the JSON object for each channel
-     */
-    FNJSON *json[NUM_CHANNELS];
+    // /**
+    //  * @brief the password for each channel
+    //  */
+    // string password[NUM_CHANNELS];
 
-    /**
-     * @brief # of bytes remaining in json query/channel
-     */
-    int json_bytes_remaining[NUM_CHANNELS];
+    // /**
+    //  * @brief the JSON object for each channel
+    //  */
+    // FNJSON *json[NUM_CHANNELS];
+
+    // /**
+    //  * @brief # of bytes remaining in json query/channel
+    //  */
+    // int json_bytes_remaining[NUM_CHANNELS];
 
     /**
      * @brief signal file not found
@@ -178,7 +183,7 @@ class iecNetwork : public virtualDevice
     /**
      * @brief Set channel to retrieve status from.
      */
-    void set_status();
+    void set_status(bool is_binary);
 
     /**
      * @brief Set desired prefix for channel
@@ -295,6 +300,11 @@ class iecNetwork : public virtualDevice
      * @brief process every other channel (2-14)
      */
     void process_channel();
+
+    /**
+     * @brief changes the open mode for the channel (e.g. to DELETE)
+     */
+    void set_open_params();
 
 };
 

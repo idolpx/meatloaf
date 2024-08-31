@@ -101,10 +101,16 @@ std::string FNJSON::processString(std::string in)
     }
 
 #ifdef BUILD_IEC
-    in = mstr::toPETSCII2(in);
+    // TODO: fix translations. There needs to be the ability to decide if we translate the TRANSMIT to internet and RECEIVE back to the host separately.
+    // Can't set _protocol->translation_mode to PETSCII to mark the incoming for changes, as that affects outgoing chars too. They need to be split
+    // if (_protocol->translation_mode == 4) {
+        // removing this, and doing it in the TALK phase instead
+        // in = mstr::toPETSCII2(in);
+    // }
 #endif
 
 #ifdef BUILD_ATARI
+
     // SIO AUX bits 0+1 control the mapping
     //   Bit 0=0 - don't touch the characters
     //   Bit 0=1 - convert the characters when possible
@@ -309,7 +315,7 @@ bool FNJSON::parse()
 #endif
     }
 
-    Debug_printf("S: %s\r\n", _parseBuffer.c_str());
+    // Debug_printf("S: %s\r\n", _parseBuffer.c_str());
     // only try and parse the buffer if it has data. Empty response doesn't need parsing.
     if (!_parseBuffer.empty())
     {
@@ -327,7 +333,7 @@ bool FNJSON::parse()
 
 bool FNJSON::status(NetworkStatus *s)
 {
-    Debug_printf("FNJSON::status(%u) %s\r\n", json_bytes_remaining, getValue(_item).c_str());
+    // Debug_printf("FNJSON::status(%u) %s\r\n", json_bytes_remaining, getValue(_item).c_str());
     s->connected = true;
     s->rxBytesWaiting = json_bytes_remaining;
     s->error = json_bytes_remaining == 0 ? 136 : 0;

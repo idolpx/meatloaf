@@ -7,6 +7,7 @@
 #include <map>
 #include <sstream>
 #include <stack>
+#include <string>
 
 #include "compat_string.h"
 
@@ -16,6 +17,7 @@
 #endif
 
 #include "../../include/debug.h"
+#include "string_utils.h"
 
 #include "samlib.h"
 
@@ -588,6 +590,25 @@ void util_devicespec_fix_9b(uint8_t *buf, unsigned short len)
     for (int i = 0; i < len; i++)
         if (buf[i] == 0x9b)
             buf[i] = 0x00;
+}
+
+// does 3 things:
+// 1. replace 0xa4 with 0x5f (underscore char)
+// 2. removes final 0x9b chars that may be coming out the host because of x-platform code
+// 3. converts petscii to ascii
+void clean_transform_petscii_to_ascii(std::string& data) {
+    // 1. Replace all chars of value 0xa4 to 0x5f (the dreaded underscore)
+    std::transform(data.begin(), data.end(), data.begin(), [](unsigned char c) {
+        return c == 0xa4 ? 0x5f : c;
+    });
+
+    // 2. Remove any trailing 0x9b chars
+    while (!data.empty() && static_cast<unsigned char>(data.back()) == 0x9b) {
+        data.pop_back();
+    }
+
+    // 3. Convert the characters from PETSCII to UTF8
+    data = mstr::toUTF8(data);
 }
 
 // Non-mutating
