@@ -57,6 +57,11 @@ int16_t IRAM_ATTR IECProtocol::timeoutWait(uint8_t pin, bool target_status, size
     uint64_t start = esp_timer_get_time();
     uint64_t current = 0;
     timer_start( wait_us );
+
+#ifndef IEC_SPLIT_LINES
+    IEC.release ( pin );
+#endif
+
     while ( !timer_timedout )
     {
         IEC.pull ( PIN_IEC_SRQ );
