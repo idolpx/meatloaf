@@ -655,6 +655,14 @@ void WiFiManager::handle_station_stop()
     fnSystem.Net.stop_sntp_client();
 }
 
+void add_mdns_services()
+{
+    mdns_txt_item_t wdi[3] = {{"path","/dav"}, {"u","fujinet"}, {"p",""}};
+    mdns_txt_item_t hti[3] = {{"u",""},{"p",""}, {"path","/"}};
+    mdns_service_add(NULL,"_webdav","_tcp",80,wdi,3);
+    mdns_service_add(NULL,"_http","_tcp",80,hti,3);
+}
+
 void WiFiManager::_wifi_event_handler(void *arg, esp_event_base_t event_base,
                                       int32_t event_id, void *event_data)
 {
@@ -681,7 +689,7 @@ void WiFiManager::_wifi_event_handler(void *arg, esp_event_base_t event_base,
             // Start mDNS Service
             mdns_init();
             mdns_hostname_set(Config.get_general_devicename().c_str());
-            mdns_service_add(NULL, "_http", "_tcp", 80, NULL, 0);
+            add_mdns_services();
             Serial.println( ANSI_GREEN_BOLD "mDNS Service Started!" ANSI_RESET );
 
 #ifdef ENABLE_SSDP
@@ -821,7 +829,7 @@ int32_t WiFiManager::localIP()
 {
     std::string result;
     esp_netif_ip_info_t ip_info;
-    esp_err_t e = esp_netif_get_ip_info(get_adapter_handle(), &ip_info);
+    esp_netif_get_ip_info(get_adapter_handle(), &ip_info);
     return ip_info.ip.addr;
 }
 
