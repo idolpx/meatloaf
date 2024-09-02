@@ -767,7 +767,7 @@ bool systemBus::sendByte(const char c, bool eoi)
 #ifdef DATA_STREAM
     if (eoi)
     {
-        Serial.printf("%.2X[eoi] ", c);
+        Serial.printf("%.2X [eoi]", c);
         //releaseLines();
     }
     else

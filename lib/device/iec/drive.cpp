@@ -1188,8 +1188,11 @@ bool iecDrive::sendFile()
         if ( IEC.status ( PIN_IEC_ATN ) == PULLED )
         {
             //IEC.pull ( PIN_IEC_SRQ );
-            Serial.println();
-            Debug_printv("ATN pulled while sending. b[%.2X]", b);
+            //Serial.println();
+            //Debug_printv("ATN pulled while sending. b[%.2X]", b);
+#ifdef DATA_STREAM
+            Serial.printf("[atn]");
+#endif
 
             // Save file pointer position
             istream->seek( -1, SEEK_CUR);
