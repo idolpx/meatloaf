@@ -329,7 +329,7 @@ void IRAM_ATTR systemBus::service()
 
                 //fnLedManager.set(eLed::LED_BUS, true);
 
-                Debug_printv("bus[%d] device[%d]", state, device_state);
+                //Debug_printv("bus[%d] device[%d]", state, device_state);
                 // for (auto devicep : _daisyChain)
                 // {
                     device_state = d->process();
