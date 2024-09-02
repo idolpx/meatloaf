@@ -30,7 +30,7 @@ static void IRAM_ATTR cbm_on_atn_isr_handler(void *arg)
 {
     systemBus *b = (systemBus *)arg;
 
-    //b->pull(PIN_IEC_SRQ);
+    b->pull(PIN_IEC_SRQ);
 
     // Go to listener mode and get command
     b->release(PIN_IEC_CLK_OUT);
@@ -40,7 +40,7 @@ static void IRAM_ATTR cbm_on_atn_isr_handler(void *arg)
     b->flags |= ATN_PULLED;
     b->state = BUS_ACTIVE;
 
-    //b->release(PIN_IEC_SRQ);
+    b->release(PIN_IEC_SRQ);
 }
 
 static void IRAM_ATTR cbm_on_clk_isr_handler(void *arg)
@@ -276,11 +276,6 @@ void IRAM_ATTR systemBus::service()
             //Debug_printv("command");
             read_command();
 
-            if ( state < BUS_IDLE )
-            {
-                releaseLines();
-                //Debug_printv("here");
-            }
             //release ( PIN_IEC_SRQ );
         }
 
@@ -375,9 +370,9 @@ void IRAM_ATTR systemBus::service()
 
 void systemBus::read_command()
 {
-    //pull( PIN_IEC_SRQ );
+    pull( PIN_IEC_SRQ );
     uint8_t c = receiveByte();
-    //release( PIN_IEC_SRQ );
+    release( PIN_IEC_SRQ );
 
     // Check for error
     if ( flags & ERROR )
@@ -389,7 +384,7 @@ void systemBus::read_command()
     }
     else if ( flags & EMPTY_STREAM)
     {
-        state = BUS_IDLE;
+        state = BUS_RELEASE;
     }
     else
     {
@@ -511,13 +506,6 @@ void systemBus::read_command()
         //release ( PIN_IEC_SRQ );
     }
 
-    // // If the bus is NOT ACTIVE then release the lines
-    // if ( state < BUS_ACTIVE )
-    // {
-    //     data.init();
-    //     //releaseLines();
-    //     return;
-    // }
 
 #ifdef PARALLEL_BUS
     // Switch to Parallel if detected
@@ -543,9 +531,6 @@ void systemBus::read_command()
 
     //Debug_printv ( "code[%.2X] primary[%.2X] secondary[%.2X] bus[%d] flags[%d]", c, data.primary, data.secondary, state, flags );
     //Debug_printv ( "device[%d] channel[%d]", data.device, data.channel);
-
-    // Delay to stabalize bus
-    // protocol->wait( TIMING_STABLE, false );
 
     //release( PIN_IEC_SRQ );
 }
@@ -728,7 +713,7 @@ uint8_t systemBus::receiveByte()
 #ifdef DATA_STREAM
     Serial.printf("%.2X ", (int16_t)b);
 #endif
-    // Not an error if ATN was pulled
+
     if ( flags & ERROR )
     {
         Debug_printv("error");
@@ -755,7 +740,7 @@ bool systemBus::sendByte(const char c, bool eoi)
     gpio_intr_disable( PIN_IEC_CLK_IN );
     if (!protocol->sendByte(c, eoi))
     {
-        if (!(IEC.status ( PIN_IEC_ATN )))
+        if (!(flags & ATN_PULLED))
         {
             flags |= ERROR;
             Debug_printv("error");
@@ -767,12 +752,12 @@ bool systemBus::sendByte(const char c, bool eoi)
 #ifdef DATA_STREAM
     if (eoi)
     {
-        Serial.printf("%.2X [eoi]", c);
-        //releaseLines();
+        Serial.printf("%.2X [eoi]\r\n", c);
     }
     else
     {
-        Serial.printf("%.2X ", c);
+        if (!(flags & ATN_PULLED))
+            Serial.printf("%.2X ", c);
     }
 #endif
     gpio_intr_enable( PIN_IEC_CLK_IN );
@@ -954,6 +939,7 @@ void IRAM_ATTR systemBus::senderTimeout()
     this->state = BUS_ERROR;
 
     protocol->wait( TIMING_EMPTY );
+    pull( PIN_IEC_DATA_OUT );
 } // senderTimeout
 
 void systemBus::addDevice(virtualDevice *pDevice, int device_id)

@@ -56,6 +56,7 @@ protected:
     // File
 	bool sendFile();
 	bool saveFile();
+    void sendFileNotFound();
 
     struct _error_response
     {
