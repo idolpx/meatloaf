@@ -286,6 +286,10 @@ void IRAM_ATTR systemBus::service()
 
         if (state == BUS_PROCESS)
         {
+            // Reset bit/byte
+            bit = 0;
+            byte = 0;
+
             //Debug_printv("data");
             //pull ( PIN_IEC_SRQ );
             if (data.secondary == IEC_OPEN || data.secondary == IEC_REOPEN)
@@ -311,6 +315,10 @@ void IRAM_ATTR systemBus::service()
                 deviceTalk();
                 //release ( PIN_IEC_SRQ );
             }
+            else if (data.primary == IEC_UNLISTEN)
+            {
+                state = BUS_RELEASE;
+            }
 
             // Queue control codes and command in specified device
             //pull ( PIN_IEC_SRQ );
@@ -321,11 +329,11 @@ void IRAM_ATTR systemBus::service()
 
                 //fnLedManager.set(eLed::LED_BUS, true);
 
-                //Debug_printv("bus[%d] device[%d]", state, device_state);
+                Debug_printv("bus[%d] device[%d]", state, device_state);
                 // for (auto devicep : _daisyChain)
                 // {
                     device_state = d->process();
-                    if ( device_state < DEVICE_ACTIVE )
+                    if ( device_state < DEVICE_ACTIVE || device_state == DEVICE_TALK )
                     {
                         state = BUS_RELEASE;
                     }
@@ -339,14 +347,9 @@ void IRAM_ATTR systemBus::service()
             protocol = selectProtocol();
             //release ( PIN_IEC_SRQ );
 
-            state = BUS_IDLE;
             if ( status ( PIN_IEC_ATN ) )
             {
                 state = BUS_ACTIVE;
-            }
-            else if (data.primary == IEC_UNLISTEN)
-            {
-                state = BUS_RELEASE;
             }
         }
 
@@ -763,9 +766,14 @@ bool systemBus::sendByte(const char c, bool eoi)
 
 #ifdef DATA_STREAM
     if (eoi)
+    {
         Serial.printf("%.2X[eoi] ", c);
+        //releaseLines();
+    }
     else
+    {
         Serial.printf("%.2X ", c);
+    }
 #endif
     gpio_intr_enable( PIN_IEC_CLK_IN );
     return true;
