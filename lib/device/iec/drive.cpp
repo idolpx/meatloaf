@@ -1035,7 +1035,7 @@ void iecDrive::sendListing()
             name = mstr::toPETSCII2( entry->name );
             extension = mstr::toPETSCII2(extension);
         }
-        mstr::rtrimA0(name);
+        //mstr::rtrimA0(name);
         mstr::replaceAll(name, "\\", "/");
 
         //uint32_t s = entry->size();

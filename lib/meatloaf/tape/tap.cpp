@@ -10,7 +10,9 @@
 bool TAPMStream::seekEntry( std::string filename )
 {
     uint8_t index = 1;
-    mstr::rtrimA0(filename);
+    uint8_t i = filename.find_first_of(0xA0);
+    filename = filename.substr(0, i);
+    //mstr::rtrimA0(filename);
     mstr::replaceAll(filename, "\\", "/");
 
     // Read Directory Entries

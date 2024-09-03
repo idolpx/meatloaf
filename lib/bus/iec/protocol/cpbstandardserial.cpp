@@ -101,15 +101,15 @@ uint8_t CPBStandardSerial::receiveByte()
     IEC.flags &= CLEAR_LOW;
 
     // Wait for talker ready
-    IEC.pull ( PIN_IEC_SRQ );
+    //IEC.pull ( PIN_IEC_SRQ );
     if ( timeoutWait ( PIN_IEC_CLK_IN, RELEASED, FOREVER, false ) == TIMED_OUT )
     {
         Debug_printv ( "Wait for talker ready" );
         IEC.flags |= ERROR;
-        IEC.release ( PIN_IEC_SRQ );
+        //IEC.release ( PIN_IEC_SRQ );
         return 0; // return error because timeout
     }
-    IEC.release ( PIN_IEC_SRQ );
+    //IEC.release ( PIN_IEC_SRQ );
 
     // Say we're ready
     // STEP 2: READY FOR DATA
@@ -198,7 +198,7 @@ uint8_t CPBStandardSerial::receiveByte()
     // the Clock and Data lines are RELEASED to false and transmission stops.
 
     // Lines will be released when exiting the service loop
-    usleep ( TIMING_Tbb );
+    //usleep ( TIMING_Tbb );
     IEC.release ( PIN_IEC_SRQ );
 
     return data;
@@ -472,17 +472,30 @@ bool CPBStandardSerial::sendByte(uint8_t data, bool eoi)
 
     // Wait for listener to accept data
     IEC.pull ( PIN_IEC_SRQ );
-    if ( timeoutWait ( PIN_IEC_DATA_IN, PULLED, TIMEOUT_Tf, false ) >= TIMEOUT_Tf )
+    // if ( timeoutWait ( PIN_IEC_DATA_IN, PULLED, TIMEOUT_Tf ) == TIMEOUT_Tf )
+    // {
+    //     // RECIEVER TIMEOUT
+    //     // If no receiver pulls DATA within 1000 µs at the end of the transmission of a byte (after step 28), a receiver timeout is raised.
+    //     Debug_printv ( "Wait for listener to acknowledge byte received (pull data) [%02x]", data );
+    //     Debug_printv ( "RECEIVER TIMEOUT" );
+    //     IEC.flags |= ERROR;
+    //     IEC.release ( PIN_IEC_SRQ );
+    //     return false; // return error because timeout
+    // }
+    timer_start( TIMEOUT_Tf );
+    while ( IEC.status ( PIN_IEC_DATA_IN ) != PULLED )
     {
-        // RECIEVER TIMEOUT
-        // If no receiver pulls DATA within 1000 µs at the end of the transmission of a byte (after step 28), a receiver timeout is raised.
-        Debug_printv ( "Wait for listener to acknowledge byte received (pull data) [%02x]", data );
-        Debug_printv ( "RECEIVER TIMEOUT" );
-        IEC.flags |= ERROR;
-        IEC.release ( PIN_IEC_SRQ );
-        return false; // return error because timeout
+        if ( timer_timedout )
+        {
+            // RECIEVER TIMEOUT
+            // If no receiver pulls DATA within 1000 µs at the end of the transmission of a byte (after step 28), a receiver timeout is raised.
+            Debug_printv ( "Wait for listener to acknowledge byte received (pull data) [%02x]", data );
+            Debug_printv ( "RECEIVER TIMEOUT" );
+            IEC.flags |= ERROR;
+            IEC.release ( PIN_IEC_SRQ );
+            return false; // return error because timeout
+        }
     }
-    timeoutWait ( PIN_IEC_DATA_IN, RELEASED, TIMEOUT_Tne );
     IEC.release ( PIN_IEC_SRQ );
 
     // STEP 5: START OVER
@@ -492,7 +505,6 @@ bool CPBStandardSerial::sendByte(uint8_t data, bool eoi)
     // the Clock and Data lines are RELEASED to false and transmission stops.
 
     // Lines will be released when exiting the service loop
-    usleep( TIMING_Tbb );
 
     return true;
 }
