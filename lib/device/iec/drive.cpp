@@ -245,18 +245,18 @@ void iecDrive::iec_open()
             payload.clear();
 
         payload = mstr::toUTF8(payload);
-        auto n = _base->cd( payload );
-        if ( n != nullptr )
-            _base.reset( n );
+        // auto n = _base->cd( payload );
+        // if ( n != nullptr )
+        //     _base.reset( n );
 
-        Debug_printv("_base[%s]", _base->url.c_str());
-        if ( !_base->isDirectory() )
-        {
-            if ( !registerStream(commanddata.channel) )
-            {
-                Debug_printv("File Doesn't Exist [%s]", _base->url.c_str());
-            }
-        }
+        // Debug_printv("_base[%s]", _base->url.c_str());
+        // if ( !_base->isDirectory() )
+        // {
+        //     if ( !registerStream(commanddata.channel) )
+        //     {
+        //         Debug_printv("File Doesn't Exist [%s]", _base->url.c_str());
+        //     }
+        // }
     }
 }
 
@@ -278,6 +278,24 @@ void iecDrive::iec_close()
 void iecDrive::iec_reopen_load()
 {
     Debug_printv( "_base[%s] _last_file[%s]", _base->url.c_str(), _last_file.c_str() );
+
+    if ( payload.length() )
+    {
+        auto n = _base->cd( payload );
+        if ( n != nullptr )
+            _base.reset( n );
+
+        Debug_printv("_base[%s]", _base->url.c_str());
+        if ( !_base->isDirectory() )
+        {
+            if ( !registerStream(commanddata.channel) )
+            {
+                sendFileNotFound();
+                return;
+            }
+        }
+    }
+
     if ( _base->isDirectory() ) 
     {
         sendListing();
@@ -1131,7 +1149,6 @@ bool iecDrive::sendFile()
     if( commanddata.channel == CHANNEL_LOAD )
     {
         // Get/Send file load address
-        count = 2;
         istream->read(&b, 1);
         success_tx = IEC.sendByte(b);
         load_address = b & 0x00FF; // low byte
@@ -1148,8 +1165,8 @@ bool iecDrive::sendFile()
     Serial.printf("\r\nsendFile: [$%.4X] pos[%d]\r\n=================================\r\n", load_address, istream->position());
     while( success_rx && !istream->error() )
     {
-        count = istream->position();
-        avail = istream->available();
+        // count = istream->position() + 1; // position starts at 0 so add 1
+        // avail = istream->available();
 
         //Debug_printv("b[%02X] nb[%02X] success_rx[%d] error[%d] count[%d] avail[%d]", b, nb, success_rx, istream->error(), count, avail);
 #ifdef DATA_STREAM
@@ -1163,6 +1180,9 @@ bool iecDrive::sendFile()
         // Read byte
         success_rx = istream->read(&b, 1);
         //Debug_printv("b[%02X] success[%d]", b, success_rx);
+
+        count = istream->position();
+        avail = istream->available();
 
         if ( istream->error() )
         {

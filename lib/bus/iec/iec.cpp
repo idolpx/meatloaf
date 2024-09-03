@@ -30,7 +30,7 @@ static void IRAM_ATTR cbm_on_atn_isr_handler(void *arg)
 {
     systemBus *b = (systemBus *)arg;
 
-    b->pull(PIN_IEC_SRQ);
+    //b->pull(PIN_IEC_SRQ);
 
     // Go to listener mode and get command
     b->release(PIN_IEC_CLK_OUT);
@@ -40,21 +40,21 @@ static void IRAM_ATTR cbm_on_atn_isr_handler(void *arg)
     b->flags |= ATN_PULLED;
     b->state = BUS_ACTIVE;
 
-    b->release(PIN_IEC_SRQ);
+    //b->release(PIN_IEC_SRQ);
 }
 
 static void IRAM_ATTR cbm_on_clk_isr_handler(void *arg)
 {
     systemBus *b = (systemBus *)arg;
 
-    //IEC.pull(PIN_IEC_SRQ);
+    IEC.pull(PIN_IEC_SRQ);
 
     // get bit
     b->byte >>= 1;
     if ( !IEC.status ( PIN_IEC_DATA_IN ) ) b->byte |= 0x80;
     b->bit++;
 
-    //IEC.release(PIN_IEC_SRQ);
+    IEC.release(PIN_IEC_SRQ);
 }
 
 /**
@@ -370,9 +370,9 @@ void IRAM_ATTR systemBus::service()
 
 void systemBus::read_command()
 {
-    pull( PIN_IEC_SRQ );
+    //pull( PIN_IEC_SRQ );
     uint8_t c = receiveByte();
-    release( PIN_IEC_SRQ );
+    //release( PIN_IEC_SRQ );
 
     // Check for error
     if ( flags & ERROR )
