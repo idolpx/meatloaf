@@ -1196,6 +1196,12 @@ bool iecDrive::sendFile()
 
         // Send Byte
         success_tx = IEC.sendByte(b, eoi);
+        if ( !success_tx )
+        {
+            Debug_printv("Error sending byte.")
+            break;
+        }
+
 
         // Exit if ATN is PULLED while sending
         if ( !eoi && IEC.flags & ATN_PULLED )
@@ -1253,7 +1259,7 @@ bool iecDrive::sendFile()
     //fnLedManager.set(eLed::LED_BUS, false);
     //fnLedStrip.stopRainbow();
 
-    if ( istream->error() )
+    if ( istream->error() || success_tx )
     {
         Serial.println("sendFile: Transfer aborted!");
         IEC.senderTimeout();
