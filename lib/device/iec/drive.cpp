@@ -245,18 +245,18 @@ void iecDrive::iec_open()
             payload.clear();
 
         payload = mstr::toUTF8(payload);
-        // auto n = _base->cd( payload );
-        // if ( n != nullptr )
-        //     _base.reset( n );
+        auto n = _base->cd( payload );
+        if ( n != nullptr )
+            _base.reset( n );
 
-        // Debug_printv("_base[%s]", _base->url.c_str());
-        // if ( !_base->isDirectory() )
-        // {
-        //     if ( !registerStream(commanddata.channel) )
-        //     {
-        //         Debug_printv("File Doesn't Exist [%s]", _base->url.c_str());
-        //     }
-        // }
+        Debug_printv("_base[%s]", _base->url.c_str());
+        if ( !_base->isDirectory() )
+        {
+            if ( !registerStream(commanddata.channel) )
+            {
+                Debug_printv("File Doesn't Exist [%s]", _base->url.c_str());
+            }
+        }
     }
 }
 
@@ -279,22 +279,22 @@ void iecDrive::iec_reopen_load()
 {
     Debug_printv( "_base[%s] _last_file[%s]", _base->url.c_str(), _last_file.c_str() );
 
-    if ( payload.length() )
-    {
-        auto n = _base->cd( payload );
-        if ( n != nullptr )
-            _base.reset( n );
+    // if ( payload.length() )
+    // {
+    //     auto n = _base->cd( payload );
+    //     if ( n != nullptr )
+    //         _base.reset( n );
 
-        Debug_printv("_base[%s]", _base->url.c_str());
-        if ( !_base->isDirectory() )
-        {
-            if ( !registerStream(commanddata.channel) )
-            {
-                sendFileNotFound();
-                return;
-            }
-        }
-    }
+    //     Debug_printv("_base[%s]", _base->url.c_str());
+    //     if ( !_base->isDirectory() )
+    //     {
+    //         if ( !registerStream(commanddata.channel) )
+    //         {
+    //             sendFileNotFound();
+    //             return;
+    //         }
+    //     }
+    // }
 
     if ( _base->isDirectory() ) 
     {
@@ -1198,7 +1198,7 @@ bool iecDrive::sendFile()
         success_tx = IEC.sendByte(b, eoi);
 
         // Exit if ATN is PULLED while sending
-        if ( IEC.status ( PIN_IEC_ATN ) == PULLED )
+        if ( !eoi && IEC.flags & ATN_PULLED )
         {
             //IEC.pull ( PIN_IEC_SRQ );
             //Serial.println();
