@@ -484,12 +484,13 @@ void systemBus::read_command()
         }
     }
 
-    if ( state == BUS_ACTIVE )
+    //if ( state == BUS_ACTIVE )  // Normal behaviour is to ignore everything if it's not for us
+    if ( state == BUS_PROCESS )  // Use this to sniff the secondary commands
     {
         if ( !isDeviceEnabled( data.device ) )
         {
             // Is this command for us?
-            state = BUS_IDLE; // NOPE!
+            state = BUS_RELEASE; // NOPE!
         }
     }
     else if ( state == BUS_PROCESS )
