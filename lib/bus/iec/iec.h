@@ -171,9 +171,12 @@ public:
     std::string payload = "";
     /**
      * @brief the raw bytes received for the command
-    */
+     */
     std::vector<uint8_t> payload_raw;
-
+    /**
+     * @brief secondary action description
+     */
+    std::string action ="";
     /**
      * @brief clear and initialize IEC command data
      */
@@ -185,6 +188,7 @@ public:
         channel = 0;
         payload = "";
         payload_raw.clear();
+        action = "";
     }
 };
 

@@ -287,13 +287,6 @@ void IRAM_ATTR systemBus::service()
 
             //Debug_printv("data");
             //pull ( PIN_IEC_SRQ );
-            if (data.secondary == IEC_OPEN || data.secondary == IEC_REOPEN)
-            {
-                // Switch to detected protocol
-                //pull ( PIN_IEC_SRQ );
-                protocol = selectProtocol();
-                //release ( PIN_IEC_SRQ );
-            }
 
             // Data Mode - Get Command or Data
             if (data.primary == IEC_LISTEN)
@@ -309,10 +302,19 @@ void IRAM_ATTR systemBus::service()
                 //pull ( PIN_IEC_SRQ );
                 deviceTalk();
                 //release ( PIN_IEC_SRQ );
+                Debug_printf(" (%.2X %s  %.2d CHANNEL)\r\n", data.secondary, data.action.c_str(), data.channel);
             }
             else if (data.primary == IEC_UNLISTEN)
             {
                 state = BUS_RELEASE;
+            }
+
+            // Switch to detected protocol
+            if (data.secondary == IEC_OPEN || data.secondary == IEC_REOPEN)
+            {
+                //pull ( PIN_IEC_SRQ );
+                protocol = selectProtocol();
+                //release ( PIN_IEC_SRQ );
             }
 
             // Queue control codes and command in specified device
@@ -461,26 +463,27 @@ void systemBus::read_command()
             case IEC_OPEN:
                 data.secondary = IEC_OPEN;
                 data.channel = c ^ IEC_OPEN;
-                secondary = "OPEN";
+                data.action = "OPEN";
                 break;
 
             case IEC_REOPEN:
                 data.secondary = IEC_REOPEN;
                 data.channel = c ^ IEC_REOPEN;
-                secondary = "DATA";
+                data.action = "DATA";
                 break;
 
             case IEC_CLOSE:
                 data.secondary = IEC_CLOSE;
                 data.channel = c ^ IEC_CLOSE;
-                secondary = "CLOSE";
+                data.action = "CLOSE";
                 break;
 
             default:
                 state = BUS_IDLE;
             }
 
-            Debug_printf(" (%.2X %s  %.2d CHANNEL)\r\n", data.secondary, secondary.c_str(), data.channel);
+            if ( data.primary != IEC_TALK )
+                Debug_printf(" (%.2X %s  %.2d CHANNEL)\r\n", data.secondary, data.action.c_str(), data.channel);
         }
     }
 
@@ -878,6 +881,7 @@ bool IRAM_ATTR systemBus::turnAround()
     */
 
     // Wait for CLK to be released
+    //pull ( PIN_IEC_SRQ );
     if (protocol->timeoutWait(PIN_IEC_CLK_IN, RELEASED, TIMEOUT_Ttlta) == TIMEOUT_Ttlta)
     {
         Debug_printv("Wait until the computer releases the CLK line\r\n");
@@ -887,6 +891,7 @@ bool IRAM_ATTR systemBus::turnAround()
     }
     release ( PIN_IEC_DATA_OUT );
     pull ( PIN_IEC_CLK_OUT );
+    //release ( PIN_IEC_SRQ );
 
     // 80us minimum delay after TURNAROUND
     // *** IMPORTANT!
