@@ -1146,7 +1146,7 @@ bool iecDrive::sendFile()
 
     //fnLedStrip.startRainbow(300);
 
-    if( commanddata.channel == CHANNEL_LOAD )
+    if( commanddata.channel == CHANNEL_LOAD && istream->position() == 0 )
     {
         // Get/Send file load address
         istream->read(&b, 1);
@@ -1165,9 +1165,6 @@ bool iecDrive::sendFile()
     Serial.printf("\r\nsendFile: [$%.4X] pos[%d]\r\n=================================\r\n", load_address, istream->position());
     while( success_rx && !istream->error() )
     {
-        // count = istream->position() + 1; // position starts at 0 so add 1
-        // avail = istream->available();
-
         //Debug_printv("b[%02X] nb[%02X] success_rx[%d] error[%d] count[%d] avail[%d]", b, nb, success_rx, istream->error(), count, avail);
 #ifdef DATA_STREAM
         if (bi == 0)
@@ -1201,7 +1198,6 @@ bool iecDrive::sendFile()
             Debug_printv("Error sending byte.")
             break;
         }
-
 
         // Exit if ATN is PULLED while sending
         if ( !eoi && IEC.flags & ATN_PULLED )
@@ -1259,7 +1255,7 @@ bool iecDrive::sendFile()
     //fnLedManager.set(eLed::LED_BUS, false);
     //fnLedStrip.stopRainbow();
 
-    if ( istream->error() || success_tx )
+    if ( istream->error() || !success_tx )
     {
         Serial.println("sendFile: Transfer aborted!");
         IEC.senderTimeout();

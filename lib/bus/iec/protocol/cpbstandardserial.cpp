@@ -150,7 +150,7 @@ uint8_t CPBStandardSerial::receiveByte()
         // line  is  true  whether  or  not  we have gone through the EOI sequence; we're back to a common
         // transmission sequence.
 
-        IEC.pull ( PIN_IEC_SRQ );
+        //IEC.pull ( PIN_IEC_SRQ );
 
         if ( timer_timedout )
         {
@@ -164,9 +164,9 @@ uint8_t CPBStandardSerial::receiveByte()
             IEC.release ( PIN_IEC_DATA_OUT );
         }
 
-        usleep( 1 );
-        IEC.release ( PIN_IEC_SRQ );
-        usleep( 1 );
+        //usleep( 2 );
+        //IEC.release ( PIN_IEC_SRQ );
+        //usleep( 2 );
     }
     //IEC.release ( PIN_IEC_SRQ );
 
@@ -186,8 +186,8 @@ uint8_t CPBStandardSerial::receiveByte()
     // one  millisecond  -  one  thousand  microseconds  -  it  will  know  that something's wrong and may alarm appropriately.
 
     // Acknowledge byte received
-    IEC.pull ( PIN_IEC_SRQ );
-    usleep ( TIMING_Tf );
+    //IEC.pull ( PIN_IEC_SRQ );
+    wait ( TIMING_Tf );
     IEC.pull ( PIN_IEC_DATA_OUT );
     //IEC.release ( PIN_IEC_SRQ );
 
@@ -198,9 +198,8 @@ uint8_t CPBStandardSerial::receiveByte()
     // the Clock and Data lines are RELEASED to false and transmission stops.
 
     // Lines will be released when exiting the service loop
-    //usleep ( TIMING_Tbb );
-    IEC.release ( PIN_IEC_SRQ );
 
+    //IEC.release ( PIN_IEC_SRQ );
     return data;
 }
 
@@ -395,15 +394,29 @@ bool CPBStandardSerial::sendByte(uint8_t data, bool eoi)
     // only when all listeners have RELEASED it - in other words, when  all  listeners  are  ready
     // to  accept  data.
     //IEC.pull ( PIN_IEC_SRQ );
-    if ( timeoutWait ( PIN_IEC_DATA_IN, RELEASED, FOREVER ) == TIMED_OUT )
-    {
-        if ( !(IEC.flags & ATN_PULLED) )
-        {
-            Debug_printv ( "Wait for listener to be ready [%02X]", data );
-            IEC.flags |= ERROR;
-        }
+    // if ( timeoutWait ( PIN_IEC_DATA_IN, RELEASED, FOREVER ) == TIMED_OUT )
+    // {
+    //     if ( !(IEC.flags & ATN_PULLED) )
+    //     {
+    //         Debug_printv ( "Wait for listener to be ready [%02X]", data );
+    //         IEC.flags |= ERROR;
+    //     }
 
-        return false; // return error because of ATN or timeout
+    //     return false; // return error because of ATN or timeout
+    // }
+    timer_start( TIMEOUT_Tf );
+    while ( IEC.status ( PIN_IEC_DATA_IN ) != RELEASED )
+    {
+        if ( timer_timedout )
+        {
+            IEC.flags |= ERROR;
+            return false;
+        }
+        if ( IEC.status ( PIN_IEC_ATN ) )
+        {
+            IEC.flags |= ATN_PULLED;
+            return false;
+        }
     }
     //IEC.release ( PIN_IEC_SRQ );
 
@@ -454,14 +467,11 @@ bool CPBStandardSerial::sendByte(uint8_t data, bool eoi)
     // ATN might get pulled here
     if ( !wait ( TIMING_Tne, true ) ) return false;
     IEC.pull ( PIN_IEC_CLK_OUT );
+    usleep ( TIMING_Tna );
 
     // STEP 3: SENDING THE BITS
     //IEC.pull ( PIN_IEC_SRQ );
-    if ( !sendBits( data ) ) {
-        Debug_printv ( "Error sending bits - byte '%02X'", data );
-        IEC.flags |= ERROR;
-        return false;
-    }
+    sendBits( data );
     //IEC.release ( PIN_IEC_SRQ );
 
     // STEP 4: FRAME HANDSHAKE
@@ -471,7 +481,7 @@ bool CPBStandardSerial::sendByte(uint8_t data, bool eoi)
     // one  millisecond  -  one  thousand  microseconds  -  it  will  know  that something's wrong and may alarm appropriately.
 
     // Wait for listener to accept data
-    IEC.pull ( PIN_IEC_SRQ );
+    //IEC.pull ( PIN_IEC_SRQ );
     // if ( timeoutWait ( PIN_IEC_DATA_IN, PULLED, TIMEOUT_Tf ) == TIMEOUT_Tf )
     // {
     //     // RECIEVER TIMEOUT
@@ -482,6 +492,8 @@ bool CPBStandardSerial::sendByte(uint8_t data, bool eoi)
     //     IEC.release ( PIN_IEC_SRQ );
     //     return false; // return error because timeout
     // }
+    //IEC.release ( PIN_IEC_SRQ );
+    IEC.pull ( PIN_IEC_SRQ );
     timer_start( TIMEOUT_Tf );
     while ( IEC.status ( PIN_IEC_DATA_IN ) != PULLED )
     {
@@ -505,6 +517,7 @@ bool CPBStandardSerial::sendByte(uint8_t data, bool eoi)
     // the Clock and Data lines are RELEASED to false and transmission stops.
 
     // Lines will be released when exiting the service loop
+    usleep ( TIMING_Tbb );
 
     return true;
 }
@@ -578,6 +591,9 @@ bool CPBStandardSerial::sendBits ( uint8_t data )
 
         // tell listener to wait for next bit
         IEC.pull ( PIN_IEC_CLK_OUT );
+
+        // Release DATA after bit sent
+        //IEC.release ( PIN_IEC_DATA_OUT );
     }
 
     // Release DATA after byte sent
