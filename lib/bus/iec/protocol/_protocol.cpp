@@ -134,22 +134,15 @@ int16_t IRAM_ATTR IECProtocol::timeoutWait(uint8_t pin, bool target_status, size
             return wait_us;
         }
 
-        if ( watch_atn )
+        if ( watch_atn && (IEC.flags & ATN_PULLED) )
         {
-            // bool atn_check = IEC.status ( PIN_IEC_ATN );
-            // if ( atn_check != atn_status )
-            if ( IEC.status ( PIN_IEC_ATN ) )
-            {
-                IEC.flags |= ATN_PULLED;
-                //IEC.release ( PIN_IEC_SRQ );
-                //Debug_printv("pin[%d] state[%d] wait[%d] elapsed[%d]", pin, target_status, wait, elapsed);
-                return -1;
-            }
+            return -1;
         }
 
         if ( IEC.state < BUS_ACTIVE || elapsed > FOREVER )
         {
             // Something is messed up.  Get outta here.
+            // FOREVER really isn't forever
             Debug_printv("wth? bus_state[%d]", IEC.state);
             Debug_printv("pin[%d] target_status[%d] wait[%d] elapsed[%d]", pin, target_status, wait_us, elapsed);
             return -1;

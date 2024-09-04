@@ -160,10 +160,10 @@ typedef enum
 #define TIMEOUT_Tne     250
 
 #define TIMING_Ts       70      // BIT SET-UP TALKER                     71us    20us    70us        -           
-#define TIMING_Ts0      35      // BIT SET-UP LISTENER PRE       57us    47us
+#define TIMING_Ts0      40      // BIT SET-UP LISTENER PRE       57us    47us
 #define TIMING_Ts1      35      // BIT SET-UP LISTENER POST      18us    24us
 #define TIMING_Tv       20      // DATA VALID VIC20              76us    26us    20us    20us        -           (Tv and Tpr minimum must be 60μ s for external device to be a talker. )
-#define TIMING_Tv64     76      // DATA VALID C64
+#define TIMING_Tv64     80      // DATA VALID C64
 
 #define TIMING_Tr       20      // FRAME TO RELEASE OF ATN                       20us    -           -
 #define TIMING_Tbb      200     // BETWEEN BYTES TIME                            100us   -           -

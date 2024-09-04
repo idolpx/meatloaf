@@ -393,32 +393,18 @@ bool CPBStandardSerial::sendByte(uint8_t data, bool eoi)
     // line  to  false.    Suppose  there  is  more  than one listener.  The Data line will go false
     // only when all listeners have RELEASED it - in other words, when  all  listeners  are  ready
     // to  accept  data.
-    //IEC.pull ( PIN_IEC_SRQ );
-    // if ( timeoutWait ( PIN_IEC_DATA_IN, RELEASED, FOREVER ) == TIMED_OUT )
-    // {
-    //     if ( !(IEC.flags & ATN_PULLED) )
-    //     {
-    //         Debug_printv ( "Wait for listener to be ready [%02X]", data );
-    //         IEC.flags |= ERROR;
-    //     }
-
-    //     return false; // return error because of ATN or timeout
-    // }
-    timer_start( TIMEOUT_Tf );
-    while ( IEC.status ( PIN_IEC_DATA_IN ) != RELEASED )
+    IEC.pull ( PIN_IEC_SRQ );
+    if ( timeoutWait ( PIN_IEC_DATA_IN, RELEASED, FOREVER ) == TIMED_OUT )
     {
-        if ( timer_timedout )
+        if ( !(IEC.flags & ATN_PULLED) )
         {
+            Debug_printv ( "Wait for listener to be ready [%02X]", data );
             IEC.flags |= ERROR;
-            return false;
         }
-        if ( IEC.status ( PIN_IEC_ATN ) )
-        {
-            IEC.flags |= ATN_PULLED;
-            return false;
-        }
+
+        return false; // return error because of ATN or timeout
     }
-    //IEC.release ( PIN_IEC_SRQ );
+    IEC.release ( PIN_IEC_SRQ );
 
     // What  happens  next  is  variable. Either  the  talker  will pull the
     // Clock line back to true in less than 200 microseconds - usually within 60 microseconds - or it
@@ -593,11 +579,11 @@ bool CPBStandardSerial::sendBits ( uint8_t data )
         IEC.pull ( PIN_IEC_CLK_OUT );
 
         // Release DATA after bit sent
-        //IEC.release ( PIN_IEC_DATA_OUT );
+        IEC.release ( PIN_IEC_DATA_OUT );
     }
 
     // Release DATA after byte sent
-    IEC.release ( PIN_IEC_DATA_OUT );
+    //IEC.release ( PIN_IEC_DATA_OUT );
 
     return true;
 } // sendBits

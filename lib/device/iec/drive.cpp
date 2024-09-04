@@ -814,7 +814,7 @@ uint16_t iecDrive::sendLine(uint16_t blocks, char *text)
 
     // Exit if ATN is PULLED while sending
     // Exit if there is an error while sending
-    if ( IEC.flags & ERROR ) return 0;
+    if ( IEC.flags & ERROR ) {Debug_printv("line[%s]", text); return 0;};
 
     // Get text length
     uint8_t len = strlen(text);
@@ -822,20 +822,26 @@ uint16_t iecDrive::sendLine(uint16_t blocks, char *text)
     // Send that pointer
     // No basic line pointer is used in the directory listing set to 0x0101
     IEC.sendByte(0x01);		// IEC.sendByte(basicPtr bitand 0xFF);
+    if ( IEC.flags & ERROR ) {Debug_printv("line[%s]", text); return 0;};
     IEC.sendByte(0x01);		// IEC.sendByte(basicPtr >> 8);
+    if ( IEC.flags & ERROR ) {Debug_printv("line[%s]", text); return 0;};
 
     // Send blocks
     IEC.sendByte(blocks bitand 0xFF);
+    if ( IEC.flags & ERROR ) {Debug_printv("line[%s]", text); return 0;};
     IEC.sendByte(blocks >> 8);
+    if ( IEC.flags & ERROR ) {Debug_printv("line[%s]", text); return 0;};
 
     // Send line contents
     for (uint8_t i = 0; i < len; i++)
     {
-        if ( !IEC.sendByte(text[i]) ) return 0;
+        IEC.sendByte(text[i]);
+        if ( IEC.flags & ERROR ) {Debug_printv("line[%s]", text); return 0;};
     }
 
     // Finish line
     IEC.sendByte(0);
+    if ( IEC.flags & ERROR ) {Debug_printv("line[%s]", text); return 0;};
 
     Serial.println("");
     
