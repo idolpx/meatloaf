@@ -20,9 +20,9 @@
 
 bool is_parsable(const char *extension)
 {
-    Debug_printv("extension[%s]", extension);
     if (extension != NULL)
     {
+        Debug_printv("extension[%s]", extension);
         if (strncmp(extension, "html", 4) == 0)
             return true;
         if (strncmp(extension, "xml", 3) == 0)
