@@ -97,7 +97,7 @@ int Server::sendPropResponse(Response &resp, std::string path, int recurse)
 {
     mstr::replaceAll(path, "//", "/");
     std::string uri = pathToURI(path);
-    Debug_printv("uri[%s] path[%s] recurse[%d]", uri.c_str(), path.c_str(), recurse);
+    //Debug_printv("uri[%s] path[%s] recurse[%d]", uri.c_str(), path.c_str(), recurse);
 
     // bool exists = (path == rootPath) ||
     //               (access(path.c_str(), R_OK) == 0);
@@ -303,7 +303,39 @@ int Server::doHead(Request &req, Response &resp)
 
 int Server::doLock(Request &req, Response &resp)
 {
-    return 501;
+    Debug_printv("req[%s]", req.getPath().c_str());
+
+    resp.setStatus(200);
+    resp.setContentType("application/xml;charset=utf-8");
+    resp.setHeader("Lock-Token", "urn:uuid:26e57cb3-834d-191a-00de-000042bdecf9");
+    resp.flushHeaders();
+
+    resp.sendChunk("<?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n");
+
+    std::ostringstream s;
+
+    s << "<D:prop xmlns:esp=\"DAV:\">\r\n";
+    s << "<D:lockdiscovery>\r\n";
+    s << "<D:activelock>\r\n";
+    s << "<D:locktype><write/></D:locktype>\r\n";
+    s << "<D:lockscope><exclusive/></D:lockscope>\r\n";
+    s << "<D:locktoken><D:href>urn:uuid:26e57cb3-834d-191a-00de-000042bdecf9</D:href></D:locktoken>\r\n";
+    s << "<D:lockroot>\r\n";
+    xmlElement(s, "D:href", "http://meatloaf.local");
+    s << "</D:lockroot>\r\n";
+    s << "<D:depth>infinity</D:depth>\r\n";
+    s << "<D:owner><a:href xmlns:a=\"DAV:\">idolpx</a:href></D:owner>\r\n";
+    s << "<D:timeout>Second-3600</D:timeout>\r\n";
+    s << "</D:activelock>\r\n";
+    s << "</D:lockdiscovery>\r\n";
+    s << "</D:prop>";
+
+    Debug_printv("[%s]", s.str().c_str());
+
+    resp.sendChunk(s.str().c_str());
+    resp.closeChunk();
+
+    return 200;
 }
 
 int Server::doMkcol(Request &req, Response &resp)
@@ -393,7 +425,7 @@ int Server::doPropfind(Request &req, Response &resp)
 {
     std::string path = uriToPath(req.getPath());
 
-    Debug_printv("req[%s] path[%s]", req.getPath().c_str(), path.c_str());
+    //Debug_printv("req[%s] path[%s]", req.getPath().c_str(), path.c_str());
 
     // bool exists = (path == rootPath) ||
     //               (access(path.c_str(), R_OK) == 0);
@@ -488,5 +520,9 @@ int Server::doPut(Request &req, Response &resp)
 
 int Server::doUnlock(Request &req, Response &resp)
 {
-    return 501;
+    Debug_printv("req[%s]", req.getPath().c_str());
+    resp.setStatus(200);
+    resp.setHeader("Lock-Token", "urn:uuid:26e57cb3-834d-191a-00de-000042bdecf9");
+    resp.flushHeaders();
+    return 200;
 }

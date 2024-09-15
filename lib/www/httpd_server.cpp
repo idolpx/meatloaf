@@ -54,8 +54,7 @@ long file_size(FILE *fd)
 
 bool exists(std::string path)
 {
-    path = http_FILE_ROOT + path;
-    Debug_printv( "path[%s]", path.c_str() );
+    //Debug_printv( "path[%s]", path.c_str() );
     struct stat st;
     int i = stat(path.c_str(), &st);
     return (i == 0);
@@ -202,7 +201,7 @@ esp_err_t cHttpdServer::webdav_handler(httpd_req_t *httpd_req)
     WebDav::Response resp(httpd_req);
     int ret;
 
-    Debug_printv("url[%s]", httpd_req->uri);
+    //Debug_printv("url[%s]", httpd_req->uri);
 
     if (!req.parseRequest())
     {
@@ -236,6 +235,7 @@ esp_err_t cHttpdServer::webdav_handler(httpd_req_t *httpd_req)
         break;
     case HTTP_LOCK:
         ret = server->doLock(req, resp);
+        return ESP_OK;
         break;
     case HTTP_MKCOL:
         ret = server->doMkcol(req, resp);
@@ -259,6 +259,7 @@ esp_err_t cHttpdServer::webdav_handler(httpd_req_t *httpd_req)
         break;
     case HTTP_UNLOCK:
         ret = server->doUnlock(req, resp);
+        return ESP_OK;
         break;
     default:
         return ESP_ERR_HTTPD_INVALID_REQ;
@@ -319,7 +320,7 @@ void cHttpdServer::webdav_register(httpd_handle_t server, const char *root_uri, 
     http_method methods[] = {
         HTTP_COPY,
         HTTP_DELETE,
-        HTTP_GET,
+//        HTTP_GET,
         HTTP_HEAD,
         HTTP_LOCK,
         HTTP_MKCOL,
@@ -402,8 +403,8 @@ httpd_handle_t cHttpdServer::start_server(serverstate &state)
         webdav_register(state.hServer);
 
         // Default handlers
-        // httpd_register_uri_handler(state.hServer, &uri_get);
-        // httpd_register_uri_handler(state.hServer, &uri_post);
+        httpd_register_uri_handler(state.hServer, &uri_get);
+        httpd_register_uri_handler(state.hServer, &uri_post);
 
         Serial.println(ANSI_GREEN_BOLD "WWW/WS/WebDAV Server Started!" ANSI_RESET);
     }
@@ -491,9 +492,16 @@ void cHttpdServer::send_file(httpd_req_t *req, const char *filename)
     // Build the full file path
     std::string fpath = http_FILE_ROOT;
     // Trim any '/' prefix before adding it to the base directory
-    while (*filename == '/')
-        filename++;
-    fpath += filename;
+    if ( !exists(filename) )
+    {
+        while (*filename == '/')
+            filename++;
+        fpath += filename;
+    }
+    else
+    {
+        fpath = filename;
+    }
 
     // Handle file differently if it's one of the types we parse
     if (is_parsable(get_extension(filename)))
@@ -583,7 +591,7 @@ void cHttpdServer::send_http_error(httpd_req_t *req, int errnum)
 {
     std::ostringstream error_page;
 
-    error_page << "error/" << errnum << ".html";
+    error_page << http_FILE_ROOT << "error/" << errnum << ".html";
 
     if ( exists(error_page.str()) )
         send_file(req, error_page.str().c_str());
