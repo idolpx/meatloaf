@@ -121,6 +121,10 @@ Once that is done just you can get a directory listing on your C64 with Meatloaf
 LOAD"HTTP://YOURDOMAIN.COM/PATH",8
 ```
 
+## And much more in the Wiki!
+
+Please read the [Meatloaf Wiki](https://github.com/idolpx/meatloaf/wiki/Using-Your-Meatloaf) for more usage tips!
+
 # Advanced documentation
 
 Adding new file systems to Meatloaf: [Link](doc/filesystems.md)
