@@ -22,7 +22,7 @@ Server::Server(std::string rootURI, std::string rootPath) : rootURI(rootURI), ro
 std::string Server::uriToPath(std::string uri)
 {
     if ( rootURI == rootPath )
-    return uri;
+    return mstr::urlDecode(uri);
 
     if (uri.find(rootURI) != 0)
         return rootPath;
@@ -74,7 +74,7 @@ void Server::sendMultiStatusResponse(Response &resp, MultiStatusResponse &msr)
     std::ostringstream s;
 
     s << "<D:response xmlns:esp=\"DAV:\">\r\n";
-    xmlElement(s, "D:href", msr.href.c_str());
+    xmlElement(s, "D:href", mstr::urlEncode( msr.href ).c_str());
     s << "<D:propstat>\r\n";
     xmlElement(s, "D:status", msr.status.c_str());
 
@@ -112,11 +112,6 @@ int Server::sendPropResponse(Response &resp, std::string path, int recurse)
     if ( exists )
     {
         r.status = "HTTP/1.1 200 OK";
-
-        // struct stat sb;
-        // int ret = stat(path.c_str(), &sb);
-        // if (ret < 0)
-        //     return -errno;
 
         r.props["esp:creationdate"] = formatTime(sb.st_ctime);
         r.props["esp:getlastmodified"] = formatTime(sb.st_mtime);

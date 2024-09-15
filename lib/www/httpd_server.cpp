@@ -303,7 +303,10 @@ void cHttpdServer::webdav_register(httpd_handle_t server, const char *root_uri, 
     WebDav::Server *webDavServer = new WebDav::Server(root_uri, root_path);
 
     char *uri;
-    asprintf(&uri, "%s/?*", root_uri);
+    if ( strlen(root_uri ) > 1 )
+        asprintf(&uri, "%s/?*", root_uri);
+    else
+        asprintf(&uri, "/?*");
 
     httpd_uri_t uri_dav = {
         .uri = uri,
@@ -379,7 +382,8 @@ httpd_handle_t cHttpdServer::start_server(serverstate &state)
         .method = HTTP_GET,
         .handler = get_handler,
         .user_ctx = NULL,
-        .is_websocket = false};
+        .is_websocket = false
+    };
 
     /* URI handler structure for POST /uri */
     httpd_uri_t uri_post = {
@@ -394,12 +398,12 @@ httpd_handle_t cHttpdServer::start_server(serverstate &state)
     {
         /* Register URI handlers */
         websocket_register(state.hServer);
-        webdav_register(state.hServer, "/dav", "/");
-        //webdav_register(state.hServer);
+        //webdav_register(state.hServer, "/dav", "/");
+        webdav_register(state.hServer);
 
         // Default handlers
-        httpd_register_uri_handler(state.hServer, &uri_get);
-        httpd_register_uri_handler(state.hServer, &uri_post);
+        // httpd_register_uri_handler(state.hServer, &uri_get);
+        // httpd_register_uri_handler(state.hServer, &uri_post);
 
         Serial.println(ANSI_GREEN_BOLD "WWW/WS/WebDAV Server Started!" ANSI_RESET);
     }
