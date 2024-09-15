@@ -3,6 +3,7 @@
 #include <string>
 #include <esp_http_server.h>
 
+#include "string_utils.h"
 #include "../../include/debug.h"
 
 namespace WebDav
@@ -24,6 +25,10 @@ namespace WebDav
             path = httpd_req->uri;
             depth = DEPTH_INFINITY;
             overwrite = true;
+
+            // Drop trailing slash from path
+            if (mstr::endsWith(path, "/"))
+                mstr::drop(path, 1);
         }
 
         bool parseRequest();

@@ -202,7 +202,7 @@ esp_err_t cHttpdServer::webdav_handler(httpd_req_t *httpd_req)
     WebDav::Response resp(httpd_req);
     int ret;
 
-    //Debug_printv("url[%s]", httpd_req->uri);
+    Debug_printv("url[%s]", httpd_req->uri);
 
     if (!req.parseRequest())
     {
@@ -394,7 +394,8 @@ httpd_handle_t cHttpdServer::start_server(serverstate &state)
     {
         /* Register URI handlers */
         websocket_register(state.hServer);
-        webdav_register(state.hServer, "/dav", "/sd");
+        webdav_register(state.hServer, "/dav", "/");
+        //webdav_register(state.hServer);
 
         // Default handlers
         httpd_register_uri_handler(state.hServer, &uri_get);

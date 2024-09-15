@@ -21,20 +21,29 @@ Server::Server(std::string rootURI, std::string rootPath) : rootURI(rootURI), ro
 
 std::string Server::uriToPath(std::string uri)
 {
+    if ( rootURI == rootPath )
+    return uri;
+
     if (uri.find(rootURI) != 0)
         return rootPath;
 
     std::string path = rootPath + uri.substr(rootURI.length());
-    //Debug_printv("uri[%s] path[%s]", uri.c_str(), path.c_str());
-    while (path.substr(path.length() - 1, 1) == "/")
-        path = path.substr(0, path.length() - 1);
     mstr::replaceAll(path, "//", "/");
+    //Debug_printv("uri[%s] path[%s]", uri.c_str(), path.c_str());
+    if ( path.length() > 1 )
+    {
+        while (path.substr(path.length() - 1, 1) == "/")
+            path = path.substr(0, path.length() - 1);
+    }
     //Debug_printv("uri[%s] path[%s]", uri.c_str(), path.c_str());
     return mstr::urlDecode(path);
 }
 
 std::string Server::pathToURI(std::string path)
 {
+    if ( rootURI == rootPath )
+        return path;
+
     if (path.find(rootPath) != 0)
         return "";
 
@@ -86,11 +95,15 @@ void Server::sendMultiStatusResponse(Response &resp, MultiStatusResponse &msr)
 
 int Server::sendPropResponse(Response &resp, std::string path, int recurse)
 {
+    mstr::replaceAll(path, "//", "/");
     std::string uri = pathToURI(path);
     Debug_printv("uri[%s] path[%s] recurse[%d]", uri.c_str(), path.c_str(), recurse);
 
-    bool exists = (path == rootPath) ||
-                  (access(path.c_str(), R_OK) == 0);
+    // bool exists = (path == rootPath) ||
+    //               (access(path.c_str(), R_OK) == 0);
+    struct stat sb;
+    int i = stat(path.c_str(), &sb);
+    bool exists (i == 0);
 
     MultiStatusResponse r;
 
@@ -100,10 +113,10 @@ int Server::sendPropResponse(Response &resp, std::string path, int recurse)
     {
         r.status = "HTTP/1.1 200 OK";
 
-        struct stat sb;
-        int ret = stat(path.c_str(), &sb);
-        if (ret < 0)
-            return -errno;
+        // struct stat sb;
+        // int ret = stat(path.c_str(), &sb);
+        // if (ret < 0)
+        //     return -errno;
 
         r.props["esp:creationdate"] = formatTime(sb.st_ctime);
         r.props["esp:getlastmodified"] = formatTime(sb.st_mtime);
@@ -142,9 +155,17 @@ int Server::sendPropResponse(Response &resp, std::string path, int recurse)
                 std::string rpath = path + "/" + de->d_name;
                 sendPropResponse(resp, rpath, recurse - 1);
             }
-
             closedir(dir);
         }
+
+        // If we are at root and SD card is mounted send entry
+        if (path == "/")
+        {
+            i = stat("/sd", &sb);
+            if (i == 0)
+                sendPropResponse(resp, "/sd", recurse - 1);
+        }
+
     }
 
     return 0;
@@ -379,9 +400,12 @@ int Server::doPropfind(Request &req, Response &resp)
 
     Debug_printv("req[%s] path[%s]", req.getPath().c_str(), path.c_str());
 
-    bool exists = (path == rootPath) ||
-                  (access(path.c_str(), R_OK) == 0);
-    
+    // bool exists = (path == rootPath) ||
+    //               (access(path.c_str(), R_OK) == 0);
+    struct stat sb;
+    int i = stat(path.c_str(), &sb);
+    bool exists (i == 0);
+
     if (!exists)
         return 404;
 
@@ -395,7 +419,6 @@ int Server::doPropfind(Request &req, Response &resp)
 
     resp.sendChunk("<?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n");
     resp.sendChunk("<D:multistatus xmlns:D=\"DAV:\">\r\n");
-
     sendPropResponse(resp, path, recurse);
     resp.sendChunk("</D:multistatus>\r\n");
     resp.closeChunk();

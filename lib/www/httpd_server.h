@@ -43,7 +43,7 @@ public:
     static void websocket_register(httpd_handle_t server);
     static void websocket_async_send(void *arg);
     static esp_err_t websocket_trigger_async_send(httpd_handle_t handle, httpd_req_t *req);
-    static void webdav_register(httpd_handle_t server, const char *root_uri, const char *root_path);
+    static void webdav_register(httpd_handle_t server, const char *root_uri = "/", const char *root_path = "/");
 
     void start();
     void stop();
