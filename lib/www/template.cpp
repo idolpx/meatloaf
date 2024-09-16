@@ -109,8 +109,8 @@ const std::string substitute_tag(const std::string &tag)
         DEVICE_WIFIBSSID,
         DEVICE_WIFIMAC,
         DEVICE_WIFIDETAIL,
-        DEVICE_SPIFFS_SIZE,
-        DEVICE_SPIFFS_USED,
+        DEVICE_FLASH_SIZE,
+        DEVICE_FLASH_USED,
         DEVICE_SD_SIZE,
         DEVICE_SD_USED,
         DEVICE_UPTIME_STRING,
@@ -195,8 +195,8 @@ const std::string substitute_tag(const std::string &tag)
         "DEVICE_WIFIBSSID",
         "DEVICE_WIFIMAC",
         "DEVICE_WIFIDETAIL",
-        "DEVICE_SPIFFS_SIZE",
-        "DEVICE_SPIFFS_USED",
+        "DEVICE_FLASH_SIZE",
+        "DEVICE_FLASH_USED",
         "DEVICE_SD_SIZE",
         "DEVICE_SD_USED",
         "DEVICE_UPTIME_STRING",
@@ -326,10 +326,10 @@ const std::string substitute_tag(const std::string &tag)
     case DEVICE_WIFIDETAIL:
         resultstream << fnWiFi.get_current_detail_str();
         break;
-    case DEVICE_SPIFFS_SIZE:
+    case DEVICE_FLASH_SIZE:
         resultstream << fsFlash.total_bytes();
         break;
-    case DEVICE_SPIFFS_USED:
+    case DEVICE_FLASH_USED:
         resultstream << fsFlash.used_bytes();
         break;
     case DEVICE_SD_SIZE:

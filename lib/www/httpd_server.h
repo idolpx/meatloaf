@@ -1,11 +1,13 @@
-#ifndef WEBDAV_H
-#define WEBDAV_H
+#ifndef HTTPD_H
+#define HTTPD_H
+
+#include <string>
 
 #include "webdav/request.h"
 
 #include "fnFS.h"
 
-#define http_FILE_ROOT "/.www/"
+//#define http_FILE_ROOT "/sd/.www/"
 #define http_SEND_BUFF_SIZE 512 // Used when sending files in chunks
 #define http_RECV_BUFF_SIZE 512 // Used when receiving POST data from client
 
@@ -27,7 +29,7 @@ private:
 
     static httpd_handle_t start_server(serverstate &state);
 
-    static char * get_extension(const char *filename);
+    static char *get_extension(const char *filename);
     static const char *find_mimetype_str(const char *extension);
     static void set_file_content_type(httpd_req_t *req, const char *filepath);
     static void send_file(httpd_req_t *req, const char *filename);
@@ -53,4 +55,4 @@ public:
 };
 
 extern cHttpdServer oHttpdServer;
-#endif // WEBDAV_H
+#endif // HTTPD_H

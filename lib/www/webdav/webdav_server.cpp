@@ -321,7 +321,7 @@ int Server::doLock(Request &req, Response &resp)
     s << "<D:lockscope><exclusive/></D:lockscope>\r\n";
     s << "<D:locktoken><D:href>urn:uuid:26e57cb3-834d-191a-00de-000042bdecf9</D:href></D:locktoken>\r\n";
     s << "<D:lockroot>\r\n";
-    xmlElement(s, "D:href", "http://meatloaf.local");
+    xmlElement(s, "D:href", "http://meatloaf.local");  // fnSystem.Net.get_hostname()
     s << "</D:lockroot>\r\n";
     s << "<D:depth>infinity</D:depth>\r\n";
     s << "<D:owner><a:href xmlns:a=\"DAV:\">idolpx</a:href></D:owner>\r\n";

@@ -40,6 +40,8 @@
 
 cHttpdServer oHttpdServer;
 
+std::string httpdocs;
+
 struct async_resp_arg {
     httpd_handle_t hd;
     int fd;
@@ -395,6 +397,11 @@ httpd_handle_t cHttpdServer::start_server(serverstate &state)
         .is_websocket = false
     };
 
+    // Set the default folder for http docs
+    httpdocs = "/.www/";
+    if (exists("/sd/.www"))
+        httpdocs = "/sd/.www/";
+
     if (httpd_start(&(state.hServer), &config) == ESP_OK)
     {
         /* Register URI handlers */
@@ -426,7 +433,7 @@ const char *cHttpdServer::find_mimetype_str(const char *extension)
 
         {"css", "text/css"},
         {"txt", "text/plain"},
-        {"js", "application/javascript"},
+        {"js",  "text/javascript"},
         {"xml", "text/xml"},
 
         {"gif", "image/gif"},
@@ -451,6 +458,8 @@ const char *cHttpdServer::find_mimetype_str(const char *extension)
         {"gz", "application/x-gzip"}
         // {"appcache", "text/cache-manifest"}
     };
+
+    //Debug_printv("extension[%s]", extension);
 
     if (extension != NULL)
     {
@@ -478,19 +487,22 @@ void cHttpdServer::set_file_content_type(httpd_req_t *req, const char *filepath)
 {
     // Find the current file extension
     char *dot = get_extension(filepath);
-    if (dot != NULL)
-    {
+    // if (dot != NULL)
+    // {
         const char *mimetype = find_mimetype_str(dot);
-        if (mimetype)
+        // if (mimetype)
+        // {
             httpd_resp_set_type(req, mimetype);
-    }
+            //Debug_printv("mimetype[%s]", mimetype);
+        //}
+    //}
 }
 
 // Send content of given file out to client
 void cHttpdServer::send_file(httpd_req_t *req, const char *filename)
 {
     // Build the full file path
-    std::string fpath = http_FILE_ROOT;
+    std::string fpath = httpdocs;
     // Trim any '/' prefix before adding it to the base directory
     if ( !exists(filename) )
     {
@@ -521,6 +533,7 @@ void cHttpdServer::send_file(httpd_req_t *req, const char *filename)
     {
         // Set the response content type
         set_file_content_type(req, fpath.c_str());
+
         // Set the expected length of the content
         char hdrval[10];
         snprintf(hdrval, 10, "%ld", FileSystem::filesize(file));
@@ -591,7 +604,7 @@ void cHttpdServer::send_http_error(httpd_req_t *req, int errnum)
 {
     std::ostringstream error_page;
 
-    error_page << http_FILE_ROOT << "error/" << errnum << ".html";
+    error_page << httpdocs << "error/" << errnum << ".html";
 
     if ( exists(error_page.str()) )
         send_file(req, error_page.str().c_str());
