@@ -42,7 +42,7 @@ std::string Server::uriToPath(std::string uri)
 std::string Server::pathToURI(std::string path)
 {
     if ( rootURI == rootPath )
-        return path;
+        return mstr::urlEncode(path);;
 
     if (path.find(rootPath) != 0)
         return "";
@@ -73,7 +73,7 @@ void Server::sendMultiStatusResponse(Response &resp, MultiStatusResponse &msr)
 {
     std::ostringstream s;
 
-    s << "<D:response xmlns:esp=\"DAV:\">\r\n";
+    s << "<D:response>\r\n";
     xmlElement(s, "D:href", mstr::urlEncode( msr.href ).c_str());
     s << "<D:propstat>\r\n";
     xmlElement(s, "D:status", msr.status.c_str());
@@ -82,7 +82,7 @@ void Server::sendMultiStatusResponse(Response &resp, MultiStatusResponse &msr)
     for (const auto &p : msr.props)
         xmlElement(s, p.first.c_str(), p.second.c_str());
 
-    xmlElement(s, "esp:resourcetype", msr.isCollection ? "<D:collection/>" : "");
+    xmlElement(s, "D:resourcetype", msr.isCollection ? "<D:collection/>" : "");
     s << "</D:prop>\r\n";
 
     s << "</D:propstat>\r\n";
@@ -113,16 +113,18 @@ int Server::sendPropResponse(Response &resp, std::string path, int recurse)
     {
         r.status = "HTTP/1.1 200 OK";
 
-        r.props["esp:creationdate"] = formatTime(sb.st_ctime);
-        r.props["esp:getlastmodified"] = formatTime(sb.st_mtime);
-        r.props["esp:displayname"] = mstr::urlEncode(basename(path.c_str()));
+        r.props["D:creationdate"] = formatTime(sb.st_ctime);
+        r.props["D:getlastmodified"] = formatTime(sb.st_mtime);
+        //r.props["D:displayname"] = mstr::urlEncode(basename(path.c_str()));
+        //r.props["D:getetag"] = std::to_string(sb.st_ino);
+        std::string s = path + std::to_string(sb.st_ctime);
+        r.props["D:getetag"] = mstr::sha1(s);
 
         r.isCollection = ((sb.st_mode & S_IFMT) == S_IFDIR);
         if ( !r.isCollection )
         {
-            r.props["esp:getcontentlength"] = std::to_string(sb.st_size);
-            r.props["esp:getcontenttype"] = HTTPD_TYPE_OCTET;
-            r.props["esp:getetag"] = std::to_string(sb.st_ino);
+            r.props["D:getcontentlength"] = std::to_string(sb.st_size);
+            r.props["D:getcontenttype"] = HTTPD_TYPE_OCTET;
         }
         //Debug_printv("Found!");
     }
@@ -253,7 +255,7 @@ int Server::doGet(Request &req, Response &resp)
     resp.setHeader("Content-Length", sb.st_size);
     resp.setHeader("ETag", sb.st_ino);
     resp.setHeader("Last-Modified", formatTime(sb.st_mtime));
-    resp.setHeader("Connection","close");
+//    resp.setHeader("Connection","Keep-Alive");
 
     ret = 0;
 
@@ -314,7 +316,7 @@ int Server::doLock(Request &req, Response &resp)
 
     std::ostringstream s;
 
-    s << "<D:prop xmlns:esp=\"DAV:\">\r\n";
+    s << "<D:prop>\r\n";
     s << "<D:lockdiscovery>\r\n";
     s << "<D:activelock>\r\n";
     s << "<D:locktype><write/></D:locktype>\r\n";
@@ -474,7 +476,16 @@ int Server::doPut(Request &req, Response &resp)
 
     Debug_printv("req[%s] path[%s]", req.getPath().c_str(), path.c_str());
 
-    bool exists = access(path.c_str(), R_OK) == 0;
+    struct stat sb;
+    int i = stat(path.c_str(), &sb);
+    bool exists (i == 0);
+
+    // // Do we need to continue to get the data?
+    // if (req.getHeader("Expect").contains("100-continue") )
+    // {
+    //     return 100;
+    // }
+
     FILE *f = fopen(path.c_str(), "w");
     if (!f)
         return 404;
@@ -505,9 +516,6 @@ int Server::doPut(Request &req, Response &resp)
 
     free(chunk);
     fclose(f);
-    resp.closeChunk();
-
-    resp.setHeader("Connection","close");
 
     if (ret < 0)
         return 500;

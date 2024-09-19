@@ -65,13 +65,17 @@ bool exists(std::string path)
 /* Our URI handler function to be called during GET /uri request */
 esp_err_t cHttpdServer::get_handler(httpd_req_t *httpd_req)
 {
-    //Debug_printv("url[%s]", httpd_req->uri);
+    //Debug_printv("uri[%s]", httpd_req->uri);
 
     std::string uri = mstr::urlDecode(httpd_req->uri);
     if (uri == "/")
     {
         uri = "/index.html";
     }
+    Debug_printv("uri[%s]", uri.c_str());
+
+    // Remove query string from uri
+    uri = uri.substr(0, uri.find("?"));
 
     send_file(httpd_req, uri.c_str());
 
@@ -149,12 +153,14 @@ esp_err_t cHttpdServer::websocket_handler(httpd_req_t *req)
             return ret;
         }
         Debug_printv("Got packet with message: %s", ws_pkt.payload);
-    }
-    Debug_printv("Packet type: %d", ws_pkt.type);
-    if (ws_pkt.type == HTTPD_WS_TYPE_TEXT &&
-        strcmp((char*)ws_pkt.payload,"Trigger async") == 0) {
-        free(buf);
-        return websocket_trigger_async_send(req->handle, req);
+
+        Debug_printv("Packet type: %d", ws_pkt.type);
+
+        if (ws_pkt.type == HTTPD_WS_TYPE_TEXT &&
+            strcmp((char*)ws_pkt.payload,"Trigger async") == 0) {
+            free(buf);
+            return websocket_trigger_async_send(req->handle, req);
+        }
     }
 
     ret = httpd_ws_send_frame(req, &ws_pkt);
@@ -237,7 +243,6 @@ esp_err_t cHttpdServer::webdav_handler(httpd_req_t *httpd_req)
         break;
     case HTTP_LOCK:
         ret = server->doLock(req, resp);
-        return ESP_OK;
         break;
     case HTTP_MKCOL:
         ret = server->doMkcol(req, resp);
@@ -261,7 +266,6 @@ esp_err_t cHttpdServer::webdav_handler(httpd_req_t *httpd_req)
         break;
     case HTTP_UNLOCK:
         ret = server->doUnlock(req, resp);
-        return ESP_OK;
         break;
     default:
         return ESP_ERR_HTTPD_INVALID_REQ;
@@ -278,7 +282,6 @@ esp_err_t cHttpdServer::webdav_handler(httpd_req_t *httpd_req)
     else
     {
         // Send empty response
-        resp.setHeader("Connection","close");
         resp.flushHeaders();
         resp.closeBody();
     }

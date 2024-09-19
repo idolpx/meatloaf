@@ -9,6 +9,7 @@
 #include "../../include/debug.h"
 
 /* Some commonly used status codes */
+#define HTTPD_100      "100 Continue"
 #define HTTPD_200      "200 OK"                     /*!< HTTP Response 200 */
 #define HTTPD_201      "201 Created"
 #define HTTPD_204      "204 No Content"             /*!< HTTP Response 204 */
@@ -57,6 +58,9 @@ namespace WebDav
             const char *status = NULL;
             switch (ret)
             {
+                case 100:
+                    status = HTTPD_100;
+                    break;
                 case 200:
                     status = HTTPD_200;
                     break;
@@ -141,9 +145,7 @@ namespace WebDav
 
         void closeBody()
         {
-            //Debug_printv("chunked[%d]", chunked);
-            //if (!chunked)
-                httpd_resp_send(req, "", 0);
+            httpd_resp_send(req, "", 0);
         }
 
 private:
