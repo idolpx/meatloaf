@@ -28,10 +28,6 @@ bool Request::parseRequest() {
             return false;
     }
 
-    // Ignore OSX junk files
-    if (mstr::contains(path, ".DS_Store") || mstr::contains(path, "._."))
-        return false;
-
     return true;
 }
 

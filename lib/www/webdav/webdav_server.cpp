@@ -332,7 +332,7 @@ int Server::doLock(Request &req, Response &resp)
     s << "</D:lockdiscovery>\r\n";
     s << "</D:prop>";
 
-    Debug_printv("[%s]", s.str().c_str());
+    //Debug_printv("[%s]", s.str().c_str());
 
     resp.sendChunk(s.str().c_str());
     resp.closeChunk();
