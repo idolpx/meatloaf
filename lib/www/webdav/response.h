@@ -9,7 +9,6 @@
 #include "../../include/debug.h"
 
 /* Some commonly used status codes */
-#define HTTPD_100      "100 Continue"
 #define HTTPD_200      "200 OK"                     /*!< HTTP Response 200 */
 #define HTTPD_201      "201 Created"
 #define HTTPD_204      "204 No Content"             /*!< HTTP Response 204 */
@@ -43,7 +42,6 @@ namespace WebDav
     public:
         Response(httpd_req_t *httpd_req) {
             req = httpd_req;
-            setDavHeaders();
         }
         ~Response() {}
 
@@ -58,9 +56,6 @@ namespace WebDav
             const char *status = NULL;
             switch (ret)
             {
-                case 100:
-                    status = HTTPD_100;
-                    break;
                 case 200:
                     status = HTTPD_200;
                     break;
@@ -112,6 +107,7 @@ namespace WebDav
 
             //Debug_printv("status[%s]", status);
             httpd_resp_set_status(req, status);
+            setDavHeaders();
         }
 
         void setContentType(const char *ct)

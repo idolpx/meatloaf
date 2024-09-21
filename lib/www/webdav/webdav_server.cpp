@@ -12,6 +12,8 @@
 #include <cctype>
 #include <iomanip>
 
+#include <esp_http_server.h>
+
 #include "file-utils.h"
 #include "string_utils.h"
 
@@ -74,7 +76,7 @@ void Server::sendMultiStatusResponse(Response &resp, MultiStatusResponse &msr)
     std::ostringstream s;
 
     s << "<D:response>\r\n";
-    xmlElement(s, "D:href", mstr::urlEncode( msr.href ).c_str());
+    xmlElement(s, "D:href", msr.href.c_str());
     s << "<D:propstat>\r\n";
     xmlElement(s, "D:status", msr.status.c_str());
 
@@ -116,8 +118,8 @@ int Server::sendPropResponse(Response &resp, std::string path, int recurse)
         r.props["D:creationdate"] = formatTime(sb.st_ctime);
         r.props["D:getlastmodified"] = formatTime(sb.st_mtime);
         //r.props["D:displayname"] = mstr::urlEncode(basename(path.c_str()));
-        //r.props["D:getetag"] = std::to_string(sb.st_ino);
-        std::string s = path + std::to_string(sb.st_ctime);
+
+        std::string s = path + std::to_string(sb.st_mtime);
         r.props["D:getetag"] = mstr::sha1(s);
 
         r.isCollection = ((sb.st_mode & S_IFMT) == S_IFDIR);
@@ -252,10 +254,11 @@ int Server::doGet(Request &req, Response &resp)
     if (!f)
         return 404;
 
+    std::string s = path + std::to_string(sb.st_mtime);
+
     resp.setHeader("Content-Length", sb.st_size);
-    resp.setHeader("ETag", sb.st_ino);
+    resp.setHeader("ETag", mstr::sha1(s));
     resp.setHeader("Last-Modified", formatTime(sb.st_mtime));
-//    resp.setHeader("Connection","Keep-Alive");
 
     ret = 0;
 
@@ -296,8 +299,10 @@ int Server::doHead(Request &req, Response &resp)
     if (ret < 0)
         return 404;
 
+    std::string s = path + std::to_string(sb.st_mtime);
+
     resp.setHeader("Content-Length", sb.st_size);
-    resp.setHeader("ETag", sb.st_ino);
+    resp.setHeader("ETag", mstr::sha1(s));
     resp.setHeader("Last-Modified", formatTime(sb.st_mtime));
 
     return 200;
@@ -316,18 +321,17 @@ int Server::doLock(Request &req, Response &resp)
 
     std::ostringstream s;
 
-    s << "<D:prop>\r\n";
+    s << "<D:prop xmls:D=\"DAV:\">\r\n";
     s << "<D:lockdiscovery>\r\n";
     s << "<D:activelock>\r\n";
-    s << "<D:locktype><write/></D:locktype>\r\n";
-    s << "<D:lockscope><exclusive/></D:lockscope>\r\n";
-    s << "<D:locktoken><D:href>urn:uuid:26e57cb3-834d-191a-00de-000042bdecf9</D:href></D:locktoken>\r\n";
-    s << "<D:lockroot>\r\n";
-    xmlElement(s, "D:href", "http://meatloaf.local");  // fnSystem.Net.get_hostname()
-    s << "</D:lockroot>\r\n";
-    s << "<D:depth>infinity</D:depth>\r\n";
-    s << "<D:owner><a:href xmlns:a=\"DAV:\">idolpx</a:href></D:owner>\r\n";
-    s << "<D:timeout>Second-3600</D:timeout>\r\n";
+    s << "<D:locktype><D:write/></D:locktype>\r\n";
+    s << "<D:lockscope><D:exclusive/></D:lockscope>\r\n";
+    s << "<D:depth>0</D:depth>\r\n";
+    s << "<D:owner><a:href xmlns:a=\"DAV:\">http://meatloaf.cc</a:href></D:owner>\r\n";
+    s << "<D:timeout>Second-600</D:timeout>\r\n";
+    s << "<D:locktoken>\r\n";
+    s << "<D:href>opaquelocktoken:89f0e324-e19d-4efd-bafe-e383829cf5a8</D:href>\r\n";
+    s << "</D:locktoken>\r\n";
     s << "</D:activelock>\r\n";
     s << "</D:lockdiscovery>\r\n";
     s << "</D:prop>";
@@ -480,15 +484,16 @@ int Server::doPut(Request &req, Response &resp)
     int i = stat(path.c_str(), &sb);
     bool exists (i == 0);
 
-    // // Do we need to continue to get the data?
-    // if (req.getHeader("Expect").contains("100-continue") )
-    // {
-    //     return 100;
-    // }
-
     FILE *f = fopen(path.c_str(), "w");
     if (!f)
         return 404;
+
+    // // Do we need to continue to get the data?
+    // if (req.getHeader("Expect").contains("100-continue") )
+    // {
+    //     Debug_printv("continue");
+    //     req.sendContinue();
+    // }
 
     int remaining = req.getContentLength();
 
@@ -529,8 +534,6 @@ int Server::doPut(Request &req, Response &resp)
 int Server::doUnlock(Request &req, Response &resp)
 {
     Debug_printv("req[%s]", req.getPath().c_str());
-    resp.setStatus(200);
     resp.setHeader("Lock-Token", "urn:uuid:26e57cb3-834d-191a-00de-000042bdecf9");
-    resp.flushHeaders();
-    return 200;
+    return 204;
 }

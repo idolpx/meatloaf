@@ -262,6 +262,8 @@ esp_err_t cHttpdServer::webdav_handler(httpd_req_t *httpd_req)
         break;
     case HTTP_LOCK:
         ret = server->doLock(req, resp);
+        if ( ret == 200 )
+            return ESP_OK;
         break;
     case HTTP_MKCOL:
         ret = server->doMkcol(req, resp);
