@@ -78,7 +78,7 @@ esp_err_t cHttpdServer::get_handler(httpd_req_t *httpd_req)
     // Remove query string from uri
     uri = uri.substr(0, uri.find("?"));
 
-    // Ignore OSX junk files
+    // Ignore OSX/WIN junk files
     if (mstr::isJunk(uri))
     {
         send_http_error(httpd_req, 404);
