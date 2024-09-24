@@ -28,7 +28,7 @@
 #define PROTOCOL_DOLPHINDOS_H
 
 #include "_protocol.h"
-#include "../parallel.h"
+#include "../userport.h"
 
 namespace Protocol
 {

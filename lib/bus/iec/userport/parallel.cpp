@@ -9,7 +9,7 @@
 /* Dependencies */
 #include "gpiox.h" // Required for PCF8575/PCA9674/MCP23017
 
-#include "iec.h"
+#include "../iec.h"
 #include "../../include/pinmap.h"
 #include "../../include/debug.h"
 
@@ -52,7 +52,7 @@ void parallelBus::service()
     {
         // Update flags and data
         PARALLEL.readByte();
-        Debug_printv("receive <<< " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
+        Debug_printv("receive <<< " BYTE_TO_BINARY_PATTERN " flags[%02X] " BYTE_TO_BINARY_PATTERN " data[%02X]", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
 
         // If PC2 is set then parallel is active and a byte is ready to be read!
         if ( PARALLEL.status( PC2 ) )
@@ -61,42 +61,42 @@ void parallelBus::service()
             //Debug_printv("receive <<< " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
         }
 
-        // // Set RECEIVE/SEND mode   
-        // if ( PARALLEL.status( PA2 ) )
-        // {
-        //     PARALLEL.mode = MODE_RECEIVE;
-        //     GPIOX.portMode( USERPORT_DATA, GPIOX_MODE_INPUT );
-        //     PARALLEL.readByte();
+        // Set RECEIVE/SEND mode   
+        if ( PARALLEL.status( PA2 ) )
+        {
+            PARALLEL.mode = MODE_RECEIVE;
+            GPIOX.portMode( USERPORT_DATA, GPIOX_MODE_INPUT );
+            PARALLEL.readByte();
 
-        //     Debug_printv("receive <<< " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
+            Debug_printv("receive <<< " BYTE_TO_BINARY_PATTERN " flags[%02X] " BYTE_TO_BINARY_PATTERN " data[%02X]", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
 
-        //     // // DolphinDOS Detection
-        //     // if ( PARALLEL.status( ATN ) )
-        //     // {
-        //     //     if ( IEC.data.secondary == IEC_OPEN || IEC.data.secondary == IEC_REOPEN )
-        //     //     {
-        //     //         IEC.protocol->flags xor_eq PARALLEL_ACTIVE;
-        //     //         Debug_printv("dolphindos");
-        //     //     }
-        //     // }
+            // DolphinDOS Detection
+            if ( PARALLEL.status( ATN ) )
+            {
+                if ( IEC.data.secondary == IEC_OPEN || IEC.data.secondary == IEC_REOPEN )
+                {
+                    IEC.flags |= PARALLEL_ACTIVE;
+                    Debug_printv("dolphindos");
+                }
+            }
 
-        //     // // WIC64
-        //     // if ( PARALLEL.status( PC2 ) )
-        //     // {
-        //     //     if ( PARALLEL.data == 0x57 ) // WiC64 commands start with 'W'
-        //     //     {
-        //     //         IEC.protocol->flags xor_eq WIC64_ACTIVE;
-        //     //         Debug_printv("wic64");                  
-        //     //     }
-        //     // }
-        // }
-        // else
-        // {
-        //     PARALLEL.mode = MODE_SEND;
-        //     GPIOX.portMode( USERPORT_DATA, GPIOX_MODE_OUTPUT );
+            // WIC64
+            if ( PARALLEL.status( PC2 ) )
+            {
+                if ( PARALLEL.data == 0x57 ) // WiC64 commands start with 'W'
+                {
+                    IEC.flags |= WIC64_ACTIVE;
+                    Debug_printv("wic64");                  
+                }
+            }
+        }
+        else
+        {
+            PARALLEL.mode = MODE_SEND;
+            GPIOX.portMode( USERPORT_DATA, GPIOX_MODE_OUTPUT );
 
-        //     Debug_printv("send    >>> " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
-        // }
+            Debug_printv("send    >>> " BYTE_TO_BINARY_PATTERN " flags[%02X] " BYTE_TO_BINARY_PATTERN " data[%02X]", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
+        }
     }
     else
     {

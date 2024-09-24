@@ -13,8 +13,8 @@
 
 #ifdef BUILD_IEC
 #include "iec/iec.h"
-#include "iec/parallel.h"
 #include "iec/ieee-488.h"
+#include "iec/userport.h"
 #define SYSTEM_BUS IEC
 #define FN_BUS_PORT fnUartBUS  // TBD
 #endif
