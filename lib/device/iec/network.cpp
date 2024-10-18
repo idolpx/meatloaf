@@ -32,6 +32,9 @@ iecNetwork::iecNetwork()
     iecStatus.connected = 0;
     iecStatus.msg = "fujinet network device";
     iecStatus.error = NETWORK_ERROR_SUCCESS;
+
+    cmdFrame.aux1 = 12;
+    cmdFrame.aux2 = 2;
 }
 
 iecNetwork::~iecNetwork()
@@ -61,8 +64,8 @@ void iecNetwork::iec_open()
     int channelId = commanddata.channel;
     auto& channel_data = network_data_map[channelId]; // This will create the channel if it doesn't exist
 
-    uint8_t channel_aux1 = 12;
-    uint8_t channel_aux2 = channel_data.translationMode; // not sure about this, you can't set this unless you send a command for the channel first, I think it relies on the array being init to 0s
+    // uint8_t channel_aux1 = 12;
+    // uint8_t channel_aux2 = channel_data.translationMode; // not sure about this, you can't set this unless you send a command for the channel first, I think it relies on the array being init to 0s
 
     Debug_printv("commanddata: prim:%02x, dev:%02x, 2nd:%02x, chan:%02x\r\n", commanddata.primary, commanddata.device, commanddata.secondary, commanddata.channel);
 
@@ -74,12 +77,13 @@ void iecNetwork::iec_open()
         channel_data.deviceSpec += channel_data.prefix;
     }
 
-        // Check if the payload is RAW (i.e. from fujinet-lib) by the presence of "01" as the first byte, which can't happen for BASIC.
+    // Check if the payload is RAW (i.e. from fujinet-lib) by the presence of "01" as the first byte, which can't happen for BASIC.
     // If it is, then the next 2 bytes are the aux1/aux2 values (mode and trans), and the rest is the actual URL.
-    // This is an efficiency so we don't have to send a 2nd command to tell it what the parameters should have been. BASIC will still need to use "openparams" command, as the OPEN line doesn't have capacity for the parameters (can't use a "," as that's a valid URL character)
+    // This is an efficiency so we don't have to send a 2nd command to tell it what the parameters should have been. 
+    // BASIC will still need to use "openparams" command, as the OPEN line doesn't have capacity for the parameters (can't use a "," as that's a valid URL character)
     if (payload[0] == 0x01) {
-        channel_aux1 = payload[1];
-        channel_aux2 = payload[2];
+        uint8_t channel_aux1 = payload[1];
+        uint8_t channel_aux2 = payload[2];
 
         // capture the trans mode as though "settrans" had been invoked
         channel_data.translationMode = channel_aux2;
@@ -87,6 +91,9 @@ void iecNetwork::iec_open()
         
         // remove the marker bytes so the payload can continue as with BASIC setup
         payload = payload.substr(3);
+
+        cmdFrame.aux1 = (channelId == CHANNEL_LOAD) ? 4 : (channelId == CHANNEL_SAVE) ? 8 : channel_aux1;
+        cmdFrame.aux2 = (channelId == CHANNEL_LOAD || channelId == CHANNEL_SAVE) ? 0 : channel_aux2;
     }
 
     if (payload != "$") {
@@ -97,8 +104,8 @@ void iecNetwork::iec_open()
 
     channel_data.channelMode = NetworkData::PROTOCOL;
 
-    cmdFrame.aux1 = (channelId == CHANNEL_LOAD) ? 4 : (channelId == CHANNEL_SAVE) ? 8 : channel_aux1;
-    cmdFrame.aux2 = (channelId == CHANNEL_LOAD || channelId == CHANNEL_SAVE) ? 0 : channel_aux2;
+    // cmdFrame.aux1 = (channelId == CHANNEL_LOAD) ? 4 : (channelId == CHANNEL_SAVE) ? 8 : channel_aux1;
+    // cmdFrame.aux2 = (channelId == CHANNEL_LOAD || channelId == CHANNEL_SAVE) ? 0 : channel_aux2;
 
     // Reset protocol if it exists
     channel_data.protocol.reset();
@@ -109,7 +116,7 @@ void iecNetwork::iec_open()
                    [](unsigned char c) { return std::toupper(c); });
 
     // Instantiate protocol based on the scheme
-    Debug_printv("Creating protocol for chema %s\r\n", channel_data.urlParser->scheme.c_str());
+    Debug_printv("Creating protocol for schema %s\r\n", channel_data.urlParser->scheme.c_str());
     channel_data.protocol = std::move(NetworkProtocolFactory::createProtocol(channel_data.urlParser->scheme, channel_data));
 
     if (!channel_data.protocol) {
@@ -311,7 +318,7 @@ void iecNetwork::iec_reopen_channel_listen()
     int channelId = commanddata.channel;
     auto& channel_data = network_data_map[channelId];
 
-    Debug_printv("channel[%2X]", channelId);
+    Debug_printv("channel[%02X]", channelId);
 
     if (!channel_data.protocol)
     {
@@ -355,7 +362,7 @@ void iecNetwork::iec_reopen_channel_talk()
     bool set_eoi = false;
     NetworkStatus ns;
 
-    Debug_printv("channel[%2X]", channelId);
+    Debug_printv("channel[%02X]", channelId);
 
     // If protocol isn't connected, then return not connected.
     if (!channel_data.protocol)
@@ -733,7 +740,7 @@ void iecNetwork::iec_command()
         return;
     }
 
-    Debug_printf("pt[0]=='%s'\n", pt[0].c_str());
+    Debug_printv("pt[0]=='%s'\n", pt[0].c_str());
     if (pt[0] == "cd")
         set_prefix();
     else if (pt[0] == "chmode")
@@ -789,13 +796,13 @@ void iecNetwork::iec_command()
                 return;
             }
 
-            Debug_printv("pt[0][0]=[%2X] pt[1]=[%d] aux1[%d] aux2[%d]", pt[0][0], channel, cmdFrame.aux1, cmdFrame.aux2);
-
-            if (channel_data.protocol->special_inquiry(pt[0][0]) == 0x00)
+            uint8_t m = channel_data.protocol->special_inquiry(pt[0][0]);
+            Debug_printv("pt[0][0]=[%2X] pt[1]=[%d] size[%d] m[%d]", pt[0][0], channel, pt.size(), m);
+            if (m == 0x00)
                 perform_special_00();
-            else if (channel_data.protocol->special_inquiry(pt[0][0]) == 0x40)
+            else if (m == 0x40)
                 perform_special_40();
-            else if (channel_data.protocol->special_inquiry(pt[0][0]) == 0x80)
+            else if (m == 0x80)
                 perform_special_80();
         }
     }
@@ -818,6 +825,8 @@ void iecNetwork::perform_special_00()
         cmdFrame.aux2 = atoi(pt[3].c_str());
 
     auto& channel_data = network_data_map[channel];
+
+    Debug_printv("cmd[%c] aux1[%d] aux2[%d]", cmdFrame.comnd, cmdFrame.aux1, cmdFrame.aux2);
 
     if (channel_data.protocol->special_00(&cmdFrame))
     {
@@ -1241,8 +1250,8 @@ void iecNetwork::fsop(unsigned char comnd)
 
 void iecNetwork::set_open_params()
 {
-    // openparams,<channel>,<mode>,<trans>
-    if (pt.size() < 3)
+    // openparams,<mode>,<trans>
+    if (pt.size() < 2)
     {
         iecStatus.error = NETWORK_ERROR_INVALID_DEVICESPEC;
         iecStatus.channel = commanddata.channel;
@@ -1250,19 +1259,14 @@ void iecNetwork::set_open_params()
         iecStatus.msg = "invalid # of parameters";
         return;
     }
-    
-    int channel = atoi(pt[1].c_str());
-    int mode = atoi(pt[2].c_str());
-    int trans = atoi(pt[3].c_str());
 
-    auto& channel_data = network_data_map[channel];
-
-    channel_data.protocol->set_open_params(mode, trans);
+    cmdFrame.aux1 = atoi(pt[1].c_str()); // mode
+    cmdFrame.aux2 = atoi(pt[2].c_str()); // trans
 
     iecStatus.error = 0;
     iecStatus.msg = "ok";
     iecStatus.connected = 0;
-    iecStatus.channel = channel;
+    iecStatus.channel = commanddata.channel;
 
 }
 

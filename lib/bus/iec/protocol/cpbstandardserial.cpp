@@ -132,9 +132,9 @@ uint8_t CPBStandardSerial::receiveByte()
     // without  the Clock line going to true, it has a special task to perform: note EOI.
 
     //IEC.pull ( PIN_IEC_SRQ );
-    //if ( timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMING_Tye, false ) == TIMING_Tye )
-    timer_start( TIMING_Tye );
-    while ( IEC.status ( PIN_IEC_CLK_IN ) != PULLED )
+    if ( timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMING_Tye, false ) == TIMING_Tye )
+    // timer_start( TIMING_Tye );
+    // while ( IEC.status ( PIN_IEC_CLK_IN ) != PULLED )
     {
         // INTERMISSION: EOI
         // If the Ready for Data signal isn't acknowledged by the talker within 200 microseconds, the
@@ -152,7 +152,7 @@ uint8_t CPBStandardSerial::receiveByte()
 
         //IEC.pull ( PIN_IEC_SRQ );
 
-        if ( timer_timedout )
+        //if ( timer_timedout )
         {
             timer_timedout = false;
             IEC.flags |= EOI_RECVD;
@@ -162,6 +162,9 @@ uint8_t CPBStandardSerial::receiveByte()
             IEC.pull ( PIN_IEC_DATA_OUT );
             wait ( TIMING_Tei );
             IEC.release ( PIN_IEC_DATA_OUT );
+
+            // Wait for clock line to be pulled
+            timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMING_Tye, false );
         }
 
         //usleep( 2 );
@@ -486,13 +489,11 @@ bool CPBStandardSerial::sendByte(uint8_t data, bool eoi)
         if ( timer_timedout )
         {
             // RECIEVER TIMEOUT
-            IEC.pull ( PIN_IEC_SRQ );
-            usleep ( 1 );
-            IEC.release ( PIN_IEC_SRQ );
             // If no receiver pulls DATA within 1000 µs at the end of the transmission of a byte (after step 28), a receiver timeout is raised.
             Debug_printv ( "Wait for listener to acknowledge byte received (pull data) [%02x]", data );
             Debug_printv ( "RECEIVER TIMEOUT" );
             IEC.flags |= ERROR;
+            //IEC.release ( PIN_IEC_SRQ );
             return false; // return error because timeout
         }
     }
@@ -581,11 +582,11 @@ bool CPBStandardSerial::sendBits ( uint8_t data )
         IEC.pull ( PIN_IEC_CLK_OUT );
 
         // Release DATA after bit sent
-        //IEC.release ( PIN_IEC_DATA_OUT );
+        IEC.release ( PIN_IEC_DATA_OUT );
     }
 
     // Release DATA after byte sent
-    IEC.release ( PIN_IEC_DATA_OUT );
+    //IEC.release ( PIN_IEC_DATA_OUT );
 
     return true;
 } // sendBits

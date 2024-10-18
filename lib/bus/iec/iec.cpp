@@ -486,8 +486,8 @@ void systemBus::read_command()
         }
     }
 
-    //if ( state == BUS_ACTIVE )  // Normal behaviour is to ignore everything if it's not for us
-    if ( state == BUS_PROCESS )  // Use this to sniff the secondary commands
+    if ( state == BUS_ACTIVE )  // Normal behaviour is to ignore everything if it's not for us
+    //if ( state == BUS_PROCESS )  // Use this to sniff the secondary commands
     {
         if ( !isDeviceEnabled( data.device ) )
         {
@@ -495,18 +495,19 @@ void systemBus::read_command()
             state = BUS_RELEASE; // NOPE!
         }
     }
-    else if ( state == BUS_PROCESS )
+
+    if ( state == BUS_PROCESS )
     {
         // *** IMPORTANT! This helps keep us in sync!
         // Sometimes ATN isn't released immediately. Wait for ATN to be
         // released before trying to process the command. 
         // Long ATN delay (>1.5ms) seems to occur more frequently with VIC-20.
-        //pull ( PIN_IEC_SRQ );
+        pull ( PIN_IEC_SRQ );
         protocol->timeoutWait ( PIN_IEC_ATN, RELEASED, TIMEOUT_DEFAULT, false );
 
         // Delay after ATN is RELEASED
         //protocol->wait( TIMING_Ttk, false );
-        //release ( PIN_IEC_SRQ );
+        release ( PIN_IEC_SRQ );
     }
 
 

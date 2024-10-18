@@ -54,10 +54,10 @@ NetworkProtocolHTTP::~NetworkProtocolHTTP()
 
 uint8_t NetworkProtocolHTTP::special_inquiry(uint8_t cmd)
 {
-
+    Debug_printv("cmd[%c] aux1_open[%d] aux2_open[%d]", cmd, aux1_open, aux2_open);
     switch (cmd)
     {
-    case 'M':
+    case 'm':
         return (aux1_open > 8 ? 0x00 : 0xFF);
     default:
         return 0xFF;
@@ -66,9 +66,10 @@ uint8_t NetworkProtocolHTTP::special_inquiry(uint8_t cmd)
 
 bool NetworkProtocolHTTP::special_00(cmdFrame_t *cmdFrame)
 {
+    Debug_printv("cmd[%c] aux1[%d] aux2[%d]", cmdFrame->comnd, cmdFrame->aux1, cmdFrame->aux2);
     switch (cmdFrame->comnd)
     {
-    case 'M':
+    case 'm':
         return special_set_channel_mode(cmdFrame);
     default:
         return true;
@@ -108,12 +109,15 @@ bool NetworkProtocolHTTP::special_set_channel_mode(cmdFrame_t *cmdFrame)
         err = true;
     }
 
+    Debug_printv("cmd[%c] aux1[%d] aux2[%d] mode[%d]", cmdFrame->comnd, cmdFrame->aux1, cmdFrame->aux2, httpChannelMode);
+
     return err;
 }
 
 bool NetworkProtocolHTTP::open_file_handle()
 {
     Debug_printv("NetworkProtocolHTTP::open_file_handle() aux1[%d]\r\n", aux1_open);
+    Debug_printv("aux1_open[%d] aux2_open[%d]", aux1_open, aux2_open);
 
     error = NETWORK_ERROR_SUCCESS;
 
@@ -483,6 +487,8 @@ bool NetworkProtocolHTTP::read_file_handle_data(uint8_t *buf, unsigned short len
         http_transaction();
 
     actual_len = client->read(buf, len);
+    
+    Debug_printv("[%s]", buf);
 
     return len != actual_len;
 }
@@ -612,6 +618,7 @@ bool NetworkProtocolHTTP::write_file_handle_set_header(uint8_t *buf, unsigned sh
 
 bool NetworkProtocolHTTP::write_file_handle_send_post_data(uint8_t *buf, unsigned short len)
 {
+    Debug_printv("mode[%d] buf[%s]", httpOpenMode, buf);
     if (httpOpenMode != POST)
     {
         error = NETWORK_ERROR_INVALID_COMMAND;
@@ -624,6 +631,7 @@ bool NetworkProtocolHTTP::write_file_handle_send_post_data(uint8_t *buf, unsigne
 
 bool NetworkProtocolHTTP::write_file_handle_data(uint8_t *buf, unsigned short len)
 {
+    Debug_printv("mode[%d] buf[%s]", httpOpenMode, buf);
     if (httpOpenMode != PUT)
     {
         error = NETWORK_ERROR_INVALID_COMMAND;
@@ -679,6 +687,7 @@ void NetworkProtocolHTTP::http_transaction()
         client->create_empty_stored_headers(collect_headers);
     }
 
+    Debug_printv("mode[%d] aux1_open[%d] aux2_open[%d]", httpOpenMode, aux1_open, aux2_open);
     switch (httpOpenMode)
     {
     case GET:

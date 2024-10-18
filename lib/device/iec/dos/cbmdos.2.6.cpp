@@ -23,7 +23,7 @@
 
 */
 
-#include "cbmdos.2.5.h"
+#include "cbmdos.2.6.h"
 
 // #include <ctype.h>
 // #include <stdlib.h>
