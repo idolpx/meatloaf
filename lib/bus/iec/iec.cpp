@@ -342,11 +342,12 @@ void IRAM_ATTR systemBus::service()
             detected_protocol = PROTOCOL_SERIAL;
             protocol = selectProtocol();
             //release ( PIN_IEC_SRQ );
+        }
 
-            if ( status ( PIN_IEC_ATN ) )
-            {
-                state = BUS_ACTIVE;
-            }
+        // Let's check the bus again before we exit and cleaning up
+        if ( status ( PIN_IEC_ATN ) )
+        {
+            state = BUS_ACTIVE;
         }
 
     } while( state > BUS_IDLE );

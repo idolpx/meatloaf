@@ -74,7 +74,7 @@ CPBStandardSerial::CPBStandardSerial()
         .callback = onSendBits,
         .arg = this,
         .dispatch_method = ESP_TIMER_ISR,
-        .name = "Send"
+        .name = "onSendBits"
     };
     esp_timer_create(&args, &timer_send_h);
     //Debug_printv("send_timer_create");
@@ -229,18 +229,20 @@ uint8_t CPBStandardSerial::receiveBits ()
 {
     IEC.bit = 0;
     IEC.byte = 0;
-    timer_start( TIMEOUT_DEFAULT );
 
+    timer_start( TIMEOUT_DEFAULT );
     while ( IEC.bit < 7 )
     {
         if ( timer_timedout )
         {
+            Debug_printv ( "Timeout bit[%d]", IEC.bit );
             IEC.flags |= ERROR;
             return 0;
         }
 
         usleep( 2 );
     }
+    timer_stop();
 
     // If there is a 218us delay before bit 7, the controller uses JiffyDOS
     timer_start( TIMING_PROTOCOL_DETECT );
@@ -272,6 +274,7 @@ uint8_t CPBStandardSerial::receiveBits ()
 
         usleep( 2 );
     }
+    timer_stop();
 
     // Wait for CLK to be pulled after last bit
     if ( timeoutWait ( PIN_IEC_CLK_IN, PULLED, FOREVER, false ) == TIMED_OUT )
@@ -383,7 +386,7 @@ uint8_t CPBStandardSerial::receiveBits ()
 // it might holdback for quite a while; there's no time limit.
 bool CPBStandardSerial::sendByte(uint8_t data, bool eoi)
 {
-    //IEC.pull ( PIN_IEC_SRQ );
+    IEC.pull ( PIN_IEC_SRQ );
 
     IEC.flags &= CLEAR_LOW;
 
@@ -407,7 +410,7 @@ bool CPBStandardSerial::sendByte(uint8_t data, bool eoi)
 
         return false; // return error because of ATN or timeout
     }
-    //IEC.release ( PIN_IEC_SRQ );
+    IEC.release ( PIN_IEC_SRQ );
 
     // What  happens  next  is  variable. Either  the  talker  will pull the
     // Clock line back to true in less than 200 microseconds - usually within 60 microseconds - or it
@@ -471,32 +474,32 @@ bool CPBStandardSerial::sendByte(uint8_t data, bool eoi)
 
     // Wait for listener to accept data
     //IEC.pull ( PIN_IEC_SRQ );
-    // if ( timeoutWait ( PIN_IEC_DATA_IN, PULLED, TIMEOUT_Tf ) == TIMEOUT_Tf )
-    // {
-    //     // RECIEVER TIMEOUT
-    //     // If no receiver pulls DATA within 1000 µs at the end of the transmission of a byte (after step 28), a receiver timeout is raised.
-    //     Debug_printv ( "Wait for listener to acknowledge byte received (pull data) [%02x]", data );
-    //     Debug_printv ( "RECEIVER TIMEOUT" );
-    //     IEC.flags |= ERROR;
-    //     IEC.release ( PIN_IEC_SRQ );
-    //     return false; // return error because timeout
-    // }
+    if ( timeoutWait ( PIN_IEC_DATA_IN, PULLED, TIMEOUT_Tf ) == TIMEOUT_Tf )
+    {
+        // RECIEVER TIMEOUT
+        // If no receiver pulls DATA within 1000 µs at the end of the transmission of a byte (after step 28), a receiver timeout is raised.
+        Debug_printv ( "Wait for listener to acknowledge byte received (pull data) [%02X]", data );
+        Debug_printv ( "RECEIVER TIMEOUT" );
+        IEC.flags |= ERROR;
+        //IEC.release ( PIN_IEC_SRQ );
+        return false; // return error because timeout
+    }
     //IEC.release ( PIN_IEC_SRQ );
     //IEC.pull ( PIN_IEC_SRQ );
-    timer_start( TIMEOUT_Tf );
-    while ( IEC.status ( PIN_IEC_DATA_IN ) != PULLED )
-    {
-        if ( timer_timedout )
-        {
-            // RECIEVER TIMEOUT
-            // If no receiver pulls DATA within 1000 µs at the end of the transmission of a byte (after step 28), a receiver timeout is raised.
-            Debug_printv ( "Wait for listener to acknowledge byte received (pull data) [%02x]", data );
-            Debug_printv ( "RECEIVER TIMEOUT" );
-            IEC.flags |= ERROR;
-            //IEC.release ( PIN_IEC_SRQ );
-            return false; // return error because timeout
-        }
-    }
+    // timer_start( TIMEOUT_Tf );
+    // while ( IEC.status ( PIN_IEC_DATA_IN ) != PULLED )
+    // {
+    //     if ( timer_timedout )
+    //     {
+    //         // RECIEVER TIMEOUT
+    //         // If no receiver pulls DATA within 1000 µs at the end of the transmission of a byte (after step 28), a receiver timeout is raised.
+    //         Debug_printv ( "Wait for listener to acknowledge byte received (pull data) [%02X]", data );
+    //         Debug_printv ( "RECEIVER TIMEOUT" );
+    //         IEC.flags |= ERROR;
+    //         //IEC.release ( PIN_IEC_SRQ );
+    //         return false; // return error because timeout
+    //     }
+    // }
     //IEC.release ( PIN_IEC_SRQ );
 
     // STEP 5: START OVER

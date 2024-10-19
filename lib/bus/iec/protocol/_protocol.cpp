@@ -24,7 +24,8 @@ IECProtocol::IECProtocol() {
     esp_timer_create_args_t args = {
         .callback = onTimer,
         .arg = this,
-        .name = nullptr
+        .dispatch_method = ESP_TIMER_ISR,
+        .name = "onTimer"
     };
     esp_timer_create(&args, &timer_handle);
 };
@@ -46,6 +47,7 @@ void IECProtocol::timer_start(uint64_t timeout_us)
 }
 void IECProtocol::timer_stop()
 {
+    esp_timer_get_expiry_time(timer_handle, &timer_elapsed);
     esp_timer_stop(timer_handle);
     //IEC.release( PIN_IEC_SRQ );
 }
