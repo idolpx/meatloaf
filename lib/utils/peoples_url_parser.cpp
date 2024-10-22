@@ -26,6 +26,7 @@
 #include <vector>
 
 #include "../../include/debug.h"
+#include "utils.h"
 
 #include "string_utils.h"
 
@@ -92,7 +93,7 @@ void PeoplesUrlParser::cleanPath() {
     // while(mstr::endsWith(path,"/")) {
     //     path=mstr::dropLast(path, 1);
     // }
-    mstr::replaceAll(path, "//", "/");
+    path = util_get_canonical_path(path);
 }
 
 void PeoplesUrlParser::processPath() {
@@ -288,6 +289,8 @@ std::string PeoplesUrlParser::rebuildUrl(void)
 
 bool PeoplesUrlParser::isValidUrl()
 {
+#ifdef VERBOSE_HTTP
     dump();
+#endif
     return !scheme.empty() && !(path.empty() && port.empty());
 }

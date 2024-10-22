@@ -267,6 +267,13 @@ void IRAM_ATTR systemBus::service()
         {
             //pull ( PIN_IEC_SRQ );
 
+            // Switch to standard serial protocol
+            if ( detected_protocol != PROTOCOL_SERIAL)
+            {
+                detected_protocol = PROTOCOL_SERIAL;
+                protocol = selectProtocol();
+            }
+
             // *** IMPORTANT! This helps keep us in sync!
             // Sometimes the C64 pulls ATN but doesn't pull CLOCK right away
             protocol->timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMEOUT_ATNCLK, false );
@@ -312,7 +319,10 @@ void IRAM_ATTR systemBus::service()
             if (data.secondary == IEC_OPEN || data.secondary == IEC_REOPEN)
             {
                 //pull ( PIN_IEC_SRQ );
-                protocol = selectProtocol();
+                if ( detected_protocol != PROTOCOL_SERIAL)
+                {
+                    protocol = selectProtocol();
+                }
                 //release ( PIN_IEC_SRQ );
             }
 
@@ -329,22 +339,21 @@ void IRAM_ATTR systemBus::service()
                 // for (auto devicep : _daisyChain)
                 // {
                     device_state = d->process();
-                    if ( device_state < DEVICE_ACTIVE || device_state == DEVICE_TALK )
-                    {
-                        state = BUS_RELEASE;
-                    }
+                    if ( data.primary == IEC_TALK )
+                        data.init();
                 // }
             }
 
             //Debug_printv("bus[%d] device[%d] flags[%d]", state, device_state, flags);
 
-            // Switch back to standard serial
-            detected_protocol = PROTOCOL_SERIAL;
-            protocol = selectProtocol();
+
             //release ( PIN_IEC_SRQ );
         }
 
-        // Let's check the bus again before we exit and cleaning up
+        if ( state == BUS_RELEASE )
+            break;
+
+        // Let's check ATN again before we exit and clean up
         if ( status ( PIN_IEC_ATN ) )
         {
             state = BUS_ACTIVE;
@@ -503,12 +512,12 @@ void systemBus::read_command()
         // Sometimes ATN isn't released immediately. Wait for ATN to be
         // released before trying to process the command. 
         // Long ATN delay (>1.5ms) seems to occur more frequently with VIC-20.
-        pull ( PIN_IEC_SRQ );
+        //pull ( PIN_IEC_SRQ );
         protocol->timeoutWait ( PIN_IEC_ATN, RELEASED, TIMEOUT_DEFAULT, false );
 
         // Delay after ATN is RELEASED
         //protocol->wait( TIMING_Ttk, false );
-        release ( PIN_IEC_SRQ );
+        //release ( PIN_IEC_SRQ );
     }
 
 
@@ -891,12 +900,13 @@ bool IRAM_ATTR systemBus::turnAround()
         return false; // return error because timeout
     }
     release ( PIN_IEC_DATA_OUT );
+    protocol->wait( TIMING_Ttcp );
     pull ( PIN_IEC_CLK_OUT );
     //release ( PIN_IEC_SRQ );
 
     // 80us minimum delay after TURNAROUND
     // *** IMPORTANT!
-    protocol->wait( TIMING_Tda, false );
+    protocol->wait( TIMING_Tda );
 
     return true;
 } // turnAround

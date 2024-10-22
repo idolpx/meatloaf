@@ -98,7 +98,13 @@ CPBStandardSerial::~CPBStandardSerial()
 // it might holdback for quite a while; there's no time limit.
 uint8_t CPBStandardSerial::receiveByte()
 {
+    bool atn_status = false;
     IEC.flags &= CLEAR_LOW;
+
+    // Sample ATN and set flag to indicate COMMAND or DATA mode
+    atn_status = IEC.status ( PIN_IEC_ATN );
+    if ( atn_status )
+        IEC.flags |= ATN_PULLED;
 
     // Wait for talker ready
     //IEC.pull ( PIN_IEC_SRQ );
@@ -118,7 +124,8 @@ uint8_t CPBStandardSerial::receiveByte()
     // only when all listeners have RELEASED it - in other words, when  all  listeners  are  ready
     // to  accept  data.  What  happens  next  is  variable.
 
-    // Wait for all other devices to release the data line
+    // Release Data and wait for all other devices to release the data line too
+    //IEC.release( PIN_IEC_DATA_IN );
     if ( timeoutWait ( PIN_IEC_DATA_IN, RELEASED, FOREVER, false ) == TIMED_OUT )
     {
         Debug_printv ( "Wait for all other devices to release the data line" );
@@ -132,9 +139,10 @@ uint8_t CPBStandardSerial::receiveByte()
     // without  the Clock line going to true, it has a special task to perform: note EOI.
 
     //IEC.pull ( PIN_IEC_SRQ );
-    if ( timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMING_Tye, false ) == TIMING_Tye )
-    // timer_start( TIMING_Tye );
-    // while ( IEC.status ( PIN_IEC_CLK_IN ) != PULLED )
+    //if ( timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMING_Tye, false ) == TIMING_Tye )
+    portDISABLE_INTERRUPTS();
+    timer_start( TIMING_Tye );
+    while ( IEC.status(PIN_IEC_CLK_IN) != PULLED )
     {
         // INTERMISSION: EOI
         // If the Ready for Data signal isn't acknowledged by the talker within 200 microseconds, the
@@ -152,7 +160,7 @@ uint8_t CPBStandardSerial::receiveByte()
 
         //IEC.pull ( PIN_IEC_SRQ );
 
-        //if ( timer_timedout )
+        if ( timer_timedout )
         {
             timer_timedout = false;
             IEC.flags |= EOI_RECVD;
@@ -162,20 +170,26 @@ uint8_t CPBStandardSerial::receiveByte()
             IEC.pull ( PIN_IEC_DATA_OUT );
             wait ( TIMING_Tei );
             IEC.release ( PIN_IEC_DATA_OUT );
-
-            // Wait for clock line to be pulled
-            timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMING_Tye, false );
         }
 
-        //usleep( 2 );
-        //IEC.release ( PIN_IEC_SRQ );
-        //usleep( 2 );
+        // Wait for clock line to be pulled
+        //timeoutWait ( PIN_IEC_CLK_IN, PULLED, TIMING_Tye, false );
+        // IEC.pull( PIN_IEC_SRQ );
+        // usleep( 1 );
+        // IEC.release( PIN_IEC_SRQ );
+        // usleep( 1 );
     }
+    timer_stop();
+    portENABLE_INTERRUPTS();
     //IEC.release ( PIN_IEC_SRQ );
 
-    // Sample ATN and set flag to indicate COMMAND or DATA mode
-    if ( IEC.status ( PIN_IEC_ATN ) )
+    // Has ATN status changed?
+    if ( atn_status != IEC.status ( PIN_IEC_ATN ) )
+    {
+        Debug_printv ( "ATN status changed!" );
         IEC.flags |= ATN_PULLED;
+        return 0;
+    }
 
     // STEP 3: RECEIVING THE BITS
     //IEC.pull ( PIN_IEC_SRQ );
@@ -240,7 +254,10 @@ uint8_t CPBStandardSerial::receiveBits ()
             return 0;
         }
 
-        usleep( 2 );
+        IEC.pull( PIN_IEC_SRQ );
+        usleep( 1 );
+        IEC.release( PIN_IEC_SRQ );
+        usleep( 1 );
     }
     timer_stop();
 
@@ -272,7 +289,10 @@ uint8_t CPBStandardSerial::receiveBits ()
             }
         }
 
-        usleep( 2 );
+        IEC.pull( PIN_IEC_SRQ );
+        usleep( 1 );
+        IEC.release( PIN_IEC_SRQ );
+        usleep( 1 );
     }
     timer_stop();
 
@@ -386,7 +406,7 @@ uint8_t CPBStandardSerial::receiveBits ()
 // it might holdback for quite a while; there's no time limit.
 bool CPBStandardSerial::sendByte(uint8_t data, bool eoi)
 {
-    IEC.pull ( PIN_IEC_SRQ );
+    //IEC.pull ( PIN_IEC_SRQ );
 
     IEC.flags &= CLEAR_LOW;
 
@@ -410,7 +430,7 @@ bool CPBStandardSerial::sendByte(uint8_t data, bool eoi)
 
         return false; // return error because of ATN or timeout
     }
-    IEC.release ( PIN_IEC_SRQ );
+    //IEC.release ( PIN_IEC_SRQ );
 
     // What  happens  next  is  variable. Either  the  talker  will pull the
     // Clock line back to true in less than 200 microseconds - usually within 60 microseconds - or it

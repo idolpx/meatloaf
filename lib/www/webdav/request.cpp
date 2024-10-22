@@ -2,7 +2,6 @@
 #include "request.h"
 
 #include <esp_http_server.h>
-
 #include <string>
 
 using namespace WebDav;
@@ -35,10 +34,12 @@ std::string Request::getDestination() {
     std::string destination = getHeader("Destination");
     std::string host = getHeader("Host");
 
-    if (destination.empty() || host.empty()) return "";
+    if (destination.empty() || host.empty())
+        return "";
 
     size_t pos = destination.find(host);
-    if (pos == std::string::npos) return "";
+    if (pos == std::string::npos)
+        return "";
 
     return destination.substr(pos + host.length());
 }

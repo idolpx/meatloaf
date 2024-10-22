@@ -41,14 +41,14 @@ IECProtocol::~IECProtocol() {
 void IECProtocol::timer_start(uint64_t timeout_us)
 {
     timer_timedout = false;
-    esp_timer_stop(timer_handle);
+    timer_started = esp_timer_get_time();
     esp_timer_start_once(timer_handle, timeout_us);
     //IEC.pull( PIN_IEC_SRQ );
 }
 void IECProtocol::timer_stop()
 {
-    esp_timer_get_expiry_time(timer_handle, &timer_elapsed);
     esp_timer_stop(timer_handle);
+    timer_elapsed = esp_timer_get_time() - timer_started;
     //IEC.release( PIN_IEC_SRQ );
 }
 
@@ -95,7 +95,6 @@ int16_t IRAM_ATTR IECProtocol::timeoutWait(uint8_t pin, bool target_status, size
     uint64_t start = 0;
     uint64_t current = 0;
     uint64_t elapsed = 0;
-    bool atn_status = false;
 
 #ifndef IEC_SPLIT_LINES
     IEC.release ( pin );
@@ -115,9 +114,9 @@ int16_t IRAM_ATTR IECProtocol::timeoutWait(uint8_t pin, bool target_status, size
         IEC.release ( PIN_IEC_ATN );
 #endif
 
-        // // Sample ATN and set flag to indicate COMMAND or DATA mode
-        // atn_status = IEC.status ( PIN_IEC_ATN );
-        // if ( atn_status ) IEC.flags |= ATN_PULLED;
+        // Sample ATN and set flag to indicate COMMAND or DATA mode
+        if( IEC.status ( PIN_IEC_ATN ) )
+            IEC.flags |= ATN_PULLED;
     }
 
     //IEC.pull ( PIN_IEC_SRQ );
@@ -136,9 +135,10 @@ int16_t IRAM_ATTR IECProtocol::timeoutWait(uint8_t pin, bool target_status, size
             return wait_us;
         }
 
-        if ( watch_atn && (IEC.flags & ATN_PULLED) )
+        if ( watch_atn )
         {
-            return -1;
+            if ( IEC.flags & ATN_PULLED )
+                return -1;
         }
 
         if ( IEC.state < BUS_ACTIVE || elapsed > FOREVER )

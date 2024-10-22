@@ -189,8 +189,8 @@ def makezip(source, target, env):
             print("*" * 80)
  
 	
-    else:
-        print("Skipping making firmware ZIP due to error")
+    # else:
+    #     print("Skipping making firmware ZIP due to error")
 
 env.AddPostAction("$BUILD_DIR/${PROGNAME}.bin", makezip)
 env.AddPostAction("buildfs", makezip)
