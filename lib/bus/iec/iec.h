@@ -106,7 +106,7 @@ typedef enum
     IEC_TALK = 0x40,      // 0x40 + device_id (TALK) (0-30)
     IEC_UNTALK = 0x5F,    // 0x5F (UNTALK)
     IEC_REOPEN = 0x60,    // 0x60 + channel (OPEN CHANNEL) (0-15)
-    IEC_REOPEN_JD = 0x61, // 0x61 + channel (OPEN CHANNEL) (0-15) - JIFFYDOS LOAD
+    IEC_LOAD = 0x61,      // 0x61 + channel (OPEN CHANNEL) (0-15) - JIFFYDOS/DOLPHINDOS LOAD PROTOCOL
     IEC_CLOSE = 0xE0,     // 0xE0 + channel (CLOSE NAMED CHANNEL) (0-15)
     IEC_OPEN = 0xF0       // 0xF0 + channel (OPEN NAMED CHANNEL) (0-15)
 } bus_command_t;
@@ -114,11 +114,11 @@ typedef enum
 typedef enum
 {
     DEVICE_ERROR = -1,
-    DEVICE_IDLE = 0,    // Ready and waiting
+    DEVICE_IDLE = 0,      // Ready and waiting
     DEVICE_ACTIVE = 1,
-    DEVICE_LISTEN = 2,  // A command is recieved and data is coming to us
-    DEVICE_TALK = 3,    // A command is recieved and we must talk now
-    DEVICE_PROCESS = 4, // Execute device command
+    DEVICE_LISTEN = 2,    // A command is recieved and data is coming to us
+    DEVICE_TALK = 3,      // A command is recieved and we must talk now
+    DEVICE_PAUSED = 4,    // Execute device command
 } device_state_t;
 
 typedef enum {

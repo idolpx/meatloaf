@@ -1229,11 +1229,11 @@ bool iecDrive::sendFile()
         // Send Bytes
         written = IEC.sendBytes((const char *) buf, len, eoi);
         if (written != len) {
-          Debug_printv("Short write: %i expected: %i cur: %i", written, len, count);
-          count -= len - written;
-          istream->seek(count, SEEK_SET);
-          //break;
-          return true;
+            Debug_printv("Short write: %i expected: %i cur: %i", written, len, count);
+            count -= len - written;
+            istream->seek(count, SEEK_SET);
+            state = DEVICE_PAUSED;
+            return true;
         }
 
         uint32_t t = 0;

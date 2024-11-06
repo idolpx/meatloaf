@@ -65,11 +65,6 @@ namespace Protocol
             {0, 0, 0, 0}     // Send
         };
 
-        bool timer_timedout = false;
-        uint64_t timer_started = 0;
-        uint64_t timer_elapsed = 0;
-
-
 
         /**
          * ESP timer handle for the Interrupt rate limiting timer
@@ -103,7 +98,11 @@ namespace Protocol
         /*
          * @brief Start timer
         */
+        bool timer_timedout = false;
+        uint64_t timer_started = 0;
+        uint16_t timer_elapsed = 0;
         void timer_start(uint64_t timeout);
+        void timer_wait(uint16_t target_us);
         void timer_stop();
 
         /**

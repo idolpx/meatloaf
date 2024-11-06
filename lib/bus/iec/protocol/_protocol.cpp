@@ -46,6 +46,14 @@ void IECProtocol::timer_start(uint64_t timeout_us)
     esp_timer_start_once(timer_handle, timeout_us);
     //IEC.pull( PIN_IEC_SRQ );
 }
+void IECProtocol::timer_wait(uint16_t target_us)
+{
+    do 
+    {
+        timer_elapsed = esp_timer_get_time() - timer_started;
+    }
+    while ( timer_elapsed < target_us );
+}
 void IECProtocol::timer_stop()
 {
     esp_timer_stop(timer_handle);

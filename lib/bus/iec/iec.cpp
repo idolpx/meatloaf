@@ -405,6 +405,14 @@ void IRAM_ATTR systemBus::service()
         if ( IEC_IS_ASSERTED( PIN_IEC_ATN ) )
         {
             state = BUS_ACTIVE;
+            IEC_ASSERT( PIN_IEC_SRQ );
+            usleep( 1 );
+            IEC_RELEASE( PIN_IEC_SRQ );
+            usleep( 1 );
+            IEC_ASSERT( PIN_IEC_SRQ );
+            usleep( 1 );
+            IEC_RELEASE( PIN_IEC_SRQ );
+            usleep( 1 );
         }
 
     } while( state > BUS_IDLE );
@@ -964,7 +972,7 @@ void systemBus::setBitTiming(std::string set, int p1, int p2, int p3, int p4)
 
 void IRAM_ATTR systemBus::releaseLines(bool wait)
 {
-    IEC_ASSERT( PIN_IEC_SRQ );
+    //IEC_ASSERT( PIN_IEC_SRQ );
 
     // Wait for ATN to release and quit
     if (wait)
@@ -978,7 +986,7 @@ void IRAM_ATTR systemBus::releaseLines(bool wait)
     IEC_RELEASE(PIN_IEC_CLK_OUT);
     IEC_RELEASE(PIN_IEC_DATA_OUT);
 
-    IEC_RELEASE( PIN_IEC_SRQ );
+    //IEC_RELEASE( PIN_IEC_SRQ );
 }
 
 void IRAM_ATTR systemBus::senderTimeout()

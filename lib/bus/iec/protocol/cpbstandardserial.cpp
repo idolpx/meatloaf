@@ -438,11 +438,11 @@ bool CPBStandardSerial::sendByte(uint8_t data, bool eoi)
 {
     bool success = true;
 
-    IEC_ASSERT( PIN_IEC_SRQ );
+    //IEC_ASSERT( PIN_IEC_SRQ );
 
     IEC.flags &= CLEAR_LOW;
 
-    portDISABLE_INTERRUPTS();
+    //portDISABLE_INTERRUPTS();
 
     // Say we're ready
     IEC_RELEASE ( PIN_IEC_CLK_OUT );
@@ -592,9 +592,9 @@ bool CPBStandardSerial::sendByte(uint8_t data, bool eoi)
     usleep ( TIMING_Tbb );
 
  done:
-    portENABLE_INTERRUPTS();
+    //portENABLE_INTERRUPTS();
 
-    IEC_RELEASE( PIN_IEC_SRQ );
+    //IEC_RELEASE( PIN_IEC_SRQ );
     return success;
 }
 
