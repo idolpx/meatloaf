@@ -10,6 +10,7 @@
 #include "gpiox.h" // Required for PCF8575/PCA9674/MCP23017
 
 #include "../iec.h"
+#include "../../include/cbm_defines.h"
 #include "../../include/pinmap.h"
 #include "../../include/debug.h"
 

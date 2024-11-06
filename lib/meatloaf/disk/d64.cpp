@@ -363,7 +363,7 @@ uint16_t D64MStream::blocksFree()
     return free_count;
 }
 
-uint16_t D64MStream::readFile(uint8_t *buf, uint16_t size)
+uint32_t D64MStream::readFile(uint8_t *buf, uint32_t size)
 {
 
     if (sector_offset % block_size == 0)
@@ -376,12 +376,15 @@ uint16_t D64MStream::readFile(uint8_t *buf, uint16_t size)
         // Debug_printv("next_track[%d] next_sector[%d] sector_offset[%d]", next_track, next_sector, sector_offset);
     }
 
-    uint16_t bytesRead = 0;
+    uint32_t bytesRead = 0;
     if (size > available())
         size = available();
 
     if (size > 0)
     {
+        // Only read up to the bytes remaining in this sector
+        size = std::min(size, (uint32_t) (block_size - sector_offset % block_size));
+
         bytesRead += readContainer(buf, size);
         sector_offset += bytesRead;
 

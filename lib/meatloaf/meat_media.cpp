@@ -91,7 +91,7 @@ uint32_t MMediaStream::seekFileSize( uint8_t start_track, uint8_t start_sector )
 };
 
 
-uint16_t MMediaStream::readContainer(uint8_t *buf, uint16_t size)
+uint32_t MMediaStream::readContainer(uint8_t *buf, uint32_t size)
 {
     return containerStream->read(buf, size);
 }

@@ -3,6 +3,7 @@
 // https://vice-emu.sourceforge.io/vice_16.html#SEC398
 // https://ist.uwaterloo.ca/~schepers/formats/G64.TXT
 // http://www.linusakesson.net/programming/gcr-decoding/index.php
+// https://www.pagetable.com/?p=1356
 //
 
 
@@ -46,6 +47,11 @@
 // 11	PirateSlayer
 // 12	CBM DOS, XEMAG
 
+
+#define TRACK_TABLE_OFFSET 0x000C
+#define SPEED_ZONE_OFFSET  0x015C
+
+
 /********************************************************
  * Streams
  ********************************************************/
@@ -54,11 +60,19 @@ class G64MStream : public D64MStream {
     // override everything that requires overriding here
 
 protected:
-    struct G64Header {
+    struct MediaHeader {
         char signature[8];
         uint8_t version;
         uint8_t track_count;
         uint16_t track_size;
+    };
+
+    struct SectorHeader {
+        uint8_t header_code;
+        uint8_t track;
+        uint8_t sector;
+        char id[2];
+        uint8_t checksum;
     };
 
 public:
@@ -71,15 +85,22 @@ public:
         //sectorsPerTrack = { 17, 18, 19, 21 };
 
         containerStream->read((uint8_t*)&g64_header, sizeof(g64_header));
-        g64_header.track_size = UINT16_FROM_LE_UINT16(g64_header.track_size);
+
+        Debug_printv("sig[%s] ver[%d] tcnt[%d] tsz[%d]", g64_header.signature, g64_header.version, g64_header.track_count, g64_header.track_size);
     };
 
-    G64Header g64_header;
+    MediaHeader g64_header;
+    SectorHeader g64_sector_header;
 
     bool seekBlock( uint64_t index, uint8_t offset = 0 ) override;
     bool seekSector( uint8_t track, uint8_t sector, uint8_t offset = 0 ) override;
 
-    uint16_t readContainer(uint8_t *buf, uint16_t size) override;
+    uint32_t readContainer(uint8_t *buf, uint32_t size) override;
+
+    bool readSectorHeader();
+    bool readSector();
+    bool findSync(uint32_t gcr_end);
+    int convert4BytesFromGCR(uint8_t * gcr, uint8_t * plain);
 
 protected:
 

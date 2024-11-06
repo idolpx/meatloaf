@@ -2,6 +2,8 @@
 #define MEATLIB_FILESYSTEM_IEC_PIPE
 
 #include "meat_buffer.h"
+
+#include "../../../include/cbm_defines.h"
 #include "wrappers/iec_buffer.h"
 
 /*
@@ -117,7 +119,7 @@ public:
         }
         
         // push bytes from file to C64 as long as they're available (eying ATN)
-        while(!fileStream->eof() && !fileStream->bad() && !(IEC.flags bitand ATN_PULLED))
+        while(!fileStream->eof() && !fileStream->bad() && !(IEC.flags bitand ATN_ASSERTED))
         {
             // If this is a socket stream, it might send NDA ("I have no data for you, but keep asking"), so lte's check it!
             (*fileStream).checkNda();
@@ -137,7 +139,7 @@ public:
                     //Debug_printf("Sending byte to C64: %.2X ", ch);
                 }
 
-                if(IEC.flags bitand ATN_PULLED) {
+                if(IEC.flags bitand ATN_ASSERTED) {
                     // if ATN was pulled, we need to escape from the loop
                     // PRZEM: set some status here?
                     break;
@@ -152,7 +154,7 @@ public:
         }
 
         // the loop exited, we have to check why
-        if(IEC.flags bitand ATN_PULLED) {
+        if(IEC.flags bitand ATN_ASSERTED) {
             // because ATN was pulled!
 
             // do nothing
@@ -182,7 +184,7 @@ public:
         }
         
         // push bytes from C64 to file as long as they're available (eying ATN)
-        while(!fileStream->bad() && !(IEC.flags bitand ATN_PULLED))
+        while(!fileStream->bad() && !(IEC.flags bitand ATN_ASSERTED))
         {
             char nextChar;
             //iecStream.get(nextChar); TODO

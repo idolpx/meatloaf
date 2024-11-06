@@ -151,8 +151,8 @@ protected:
     virtual bool seekEntry( std::string filename ) { return false; };
     virtual bool seekEntry( uint16_t index ) { return false; };
 
-    virtual uint16_t readContainer(uint8_t *buf, uint16_t size);
-    virtual uint16_t readFile(uint8_t* buf, uint16_t size) = 0;
+    virtual uint32_t readContainer(uint8_t *buf, uint32_t size);
+    virtual uint32_t readFile(uint8_t* buf, uint32_t size) = 0;
     virtual std::string decodeType(uint8_t file_type, bool show_hidden = false);
     virtual std::string decodeType(std::string file_type);
 

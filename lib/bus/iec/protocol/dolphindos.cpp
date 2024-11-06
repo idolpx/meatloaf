@@ -36,13 +36,13 @@ uint8_t  DolphinDOS::receiveByte ()
 {
     IEC.flags &= CLEAR_LOW;
 
-    IEC.pull ( PIN_IEC_SRQ );
+    IEC_ASSERT ( PIN_IEC_SRQ );
 
     // Sometimes the C64 pulls ATN but doesn't pull CLOCK right away
     if ( !wait ( 60, true ) ) return -1;
 
     // Wait for talker ready
-    if ( timeoutWait ( PIN_IEC_CLK_IN, RELEASED, FOREVER ) == TIMED_OUT )
+    if ( timeoutWait ( PIN_IEC_CLK_IN, IEC_RELEASED, FOREVER ) == TIMED_OUT )
     {
         Debug_printv ( "Wait for talker ready" );
         IEC.flags or_eq ERROR;
@@ -50,7 +50,7 @@ uint8_t  DolphinDOS::receiveByte ()
     }
 
     wait( 65 );
-    IEC.release ( PIN_IEC_DATA_OUT );
+    IEC_RELEASE ( PIN_IEC_DATA_OUT );
     wait( 65 ); // Wait for 
 
 
@@ -58,7 +58,7 @@ uint8_t  DolphinDOS::receiveByte ()
     uint8_t data = PARALLEL.readByte();
 
     // If clock is released this was last byte
-    IEC.pull ( PIN_IEC_DATA_OUT );
+    IEC_ASSERT ( PIN_IEC_DATA_OUT );
 
     return data;
 } // receiveByte
@@ -80,7 +80,7 @@ bool DolphinDOS::sendByte ( uint8_t data, bool eoi )
     // if ( !wait ( 200 ) ) return -1;
 
     // Say we're ready
-    IEC.release ( PIN_IEC_CLK_OUT );
+    IEC_RELEASE ( PIN_IEC_CLK_OUT );
 
     // Wait for listener to be ready
     // STEP 2: READY FOR DATA
@@ -88,7 +88,7 @@ bool DolphinDOS::sendByte ( uint8_t data, bool eoi )
     // line  to  false.    Suppose  there  is  more  than one listener.  The Data line will go false
     // only when all listeners have RELEASED it - in other words, when  all  listeners  are  ready
     // to  accept  data.  What  happens  next  is  variable.
-    if ( timeoutWait ( PIN_IEC_DATA_IN, RELEASED, FOREVER ) == TIMED_OUT )
+    if ( timeoutWait ( PIN_IEC_DATA_IN, IEC_RELEASED, FOREVER ) == TIMED_OUT )
     {
         Debug_printv ( "Wait for listener to be ready" );
         IEC.flags |= ERROR;
@@ -122,13 +122,13 @@ bool DolphinDOS::sendByte ( uint8_t data, bool eoi )
         if ( !wait ( TIMING_Tye, true ) ) return false;
 
         // get eoi acknowledge:
-        if ( timeoutWait ( PIN_IEC_DATA_IN, PULLED ) == TIMED_OUT )
+        if ( timeoutWait ( PIN_IEC_DATA_IN, IEC_ASSERTED ) == TIMED_OUT )
         {
             Debug_printv ( "EOI ACK: Listener didn't PULL DATA" );
             IEC.flags |= ERROR;
             return false; // return error because timeout
         }
-        if ( timeoutWait ( PIN_IEC_DATA_IN, RELEASED ) == TIMED_OUT )
+        if ( timeoutWait ( PIN_IEC_DATA_IN, IEC_RELEASED ) == TIMED_OUT )
         {
             Debug_printv ( "EOI ACK: Listener didn't RELEASE DATA" );
             IEC.flags |= ERROR;
@@ -169,7 +169,7 @@ bool DolphinDOS::sendByte ( uint8_t data, bool eoi )
 
     // tell listner to wait
     // we control both CLOCK & DATA now
-    IEC.pull ( PIN_IEC_CLK_OUT );
+    IEC_ASSERT ( PIN_IEC_CLK_OUT );
     // if ( !wait ( TIMING_Tv ) ) return false;
 
     for ( uint8_t n = 0; n < 8; n++ )
@@ -181,7 +181,7 @@ bool DolphinDOS::sendByte ( uint8_t data, bool eoi )
     #endif
 
         // set bit
-        ( data bitand 1 ) ? IEC.release ( PIN_IEC_DATA_OUT ) : IEC.pull ( PIN_IEC_DATA_OUT );
+        ( data bitand 1 ) ? IEC_RELEASE ( PIN_IEC_DATA_OUT ) : IEC_ASSERT ( PIN_IEC_DATA_OUT );
         data >>= 1; // get next bit
         if ( !wait ( TIMING_Ts ) ) return false;
 
@@ -189,14 +189,14 @@ bool DolphinDOS::sendByte ( uint8_t data, bool eoi )
         // release ( PIN_IEC_DATA_OUT );
 
         // tell listener bit is ready to read
-        IEC.release ( PIN_IEC_CLK_OUT );
+        IEC_RELEASE ( PIN_IEC_CLK_OUT );
         if ( !wait ( TIMING_Tv ) ) return false;
 
         // tell listner to wait
-        IEC.pull ( PIN_IEC_CLK_OUT );
+        IEC_ASSERT ( PIN_IEC_CLK_OUT );
     }
     // Release data line after byte sent
-    IEC.release ( PIN_IEC_DATA_OUT );
+    IEC_RELEASE ( PIN_IEC_DATA_OUT );
 
 
     // STEP 4: FRAME HANDSHAKE
@@ -206,7 +206,7 @@ bool DolphinDOS::sendByte ( uint8_t data, bool eoi )
     // one  millisecond  -  one  thousand  microseconds  -  it  will  know  that something's wrong and may alarm appropriately.
 
     // Wait for listener to accept data
-    if ( timeoutWait ( PIN_IEC_DATA_IN, PULLED, TIMEOUT_Tf ) >= TIMEOUT_Tf )
+    if ( timeoutWait ( PIN_IEC_DATA_IN, IEC_ASSERTED, TIMEOUT_Tf ) >= TIMEOUT_Tf )
     {
         Debug_printv ( "Wait for listener to acknowledge byte received" );
         return false; // return error because timeout
@@ -222,7 +222,7 @@ bool DolphinDOS::sendByte ( uint8_t data, bool eoi )
     {
         // EOI Received
         if ( !wait ( TIMING_Tfr ) ) return false;
-        IEC.release ( PIN_IEC_CLK_OUT );
+        IEC_RELEASE ( PIN_IEC_CLK_OUT );
     }
     // else
     // {

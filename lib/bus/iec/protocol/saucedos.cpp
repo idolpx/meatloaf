@@ -46,12 +46,12 @@ uint8_t SauceDOS::receiveByte ()
 
     // Release the Data line to signal we are ready
 #ifndef IEC_SPLIT_LINE
-    IEC.release(PIN_IEC_CLK_IN);
-    IEC.release(PIN_IEC_DATA_IN);
+    IEC_RELEASE(PIN_IEC_CLK_IN);
+    IEC_RELEASE(PIN_IEC_DATA_IN);
 #endif
 
     // Wait for talker ready
-    if ( timeoutWait ( PIN_IEC_CLK_IN, RELEASED, FOREVER ) == TIMED_OUT )
+    if ( timeoutWait ( PIN_IEC_CLK_IN, IEC_RELEASED, FOREVER ) == TIMED_OUT )
     {
         Debug_printv ( "Wait for talker ready" );
         IEC.flags or_eq ERROR;
@@ -65,7 +65,7 @@ uint8_t SauceDOS::receiveByte ()
     // get bits 4,5
     if ( gpio_get_level ( PIN_IEC_CLK_IN ) )  data |= 0b00010000; // 1
     if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0b00100000; // 0
-    if ( timeoutWait ( PIN_IEC_SRQ, RELEASED, FOREVER ) == TIMED_OUT )
+    if ( timeoutWait ( PIN_IEC_SRQ, IEC_RELEASED, FOREVER ) == TIMED_OUT )
     {
         Debug_printv ( "Wait for 4,5 ready" );
         IEC.flags |= ERROR;
@@ -75,7 +75,7 @@ uint8_t SauceDOS::receiveByte ()
     // get bits 6,7
     if ( gpio_get_level ( PIN_IEC_CLK_IN ) ) data |=  0b01000000; // 1
     if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0b10000000; // 1
-    if ( timeoutWait ( PIN_IEC_SRQ, PULLED, FOREVER ) == TIMED_OUT )
+    if ( timeoutWait ( PIN_IEC_SRQ, IEC_ASSERTED, FOREVER ) == TIMED_OUT )
     {
         Debug_printv ( "Wait for 6,7 ready" );
         IEC.flags |= ERROR;
@@ -85,7 +85,7 @@ uint8_t SauceDOS::receiveByte ()
     // get bits 3,1
     if ( gpio_get_level ( PIN_IEC_CLK_IN ) )  data |= 0b00001000; // 1
     if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0b00000010; // 1
-    if ( timeoutWait ( PIN_IEC_SRQ, RELEASED, FOREVER ) == TIMED_OUT )
+    if ( timeoutWait ( PIN_IEC_SRQ, IEC_RELEASED, FOREVER ) == TIMED_OUT )
     {
         Debug_printv ( "Wait for 3,1 ready" );
         IEC.flags |= ERROR;
@@ -95,7 +95,7 @@ uint8_t SauceDOS::receiveByte ()
     // get bits 2,0
     if ( gpio_get_level ( PIN_IEC_CLK_IN ) )  data |= 0b00000100; // 0
     if ( gpio_get_level ( PIN_IEC_DATA_IN ) ) data |= 0b00000001; // 1
-    if ( timeoutWait ( PIN_IEC_SRQ, PULLED, FOREVER ) == TIMED_OUT )
+    if ( timeoutWait ( PIN_IEC_SRQ, IEC_ASSERTED, FOREVER ) == TIMED_OUT )
     {
         Debug_printv ( "Wait for 2,0 ready" );
         IEC.flags |= ERROR;
@@ -107,7 +107,7 @@ uint8_t SauceDOS::receiveByte ()
     // Debug_printv("data[%2X]", data); // $ = 0x24
 
     // STEP 3: CHECK FOR EOI
-    if ( IEC.status ( PIN_IEC_CLK_IN ) == RELEASED )
+    if ( IEC_IS_ASSERTED ( PIN_IEC_CLK_IN ) == IEC_RELEASED )
     {
         Debug_printv("EOI [%2X]", data);
         IEC.flags |= EOI_RECVD;
@@ -130,8 +130,8 @@ bool SauceDOS::sendByte ( uint8_t data, bool signalEOI )
     IEC.flags and_eq CLEAR_LOW;
 
     // Initial handshake
-    IEC.pull( PIN_IEC_CLK_OUT );
-    IEC.pull( PIN_IEC_DATA_OUT );
+    IEC_ASSERT( PIN_IEC_CLK_OUT );
+    IEC_ASSERT( PIN_IEC_DATA_OUT );
     wait ( 3 );
 
 //   if (loadmode) {
@@ -149,12 +149,12 @@ bool SauceDOS::sendByte ( uint8_t data, bool signalEOI )
     {
     
     #ifdef SPLIT_LINES
-        // If data pin is PULLED, exit and cleanup
-        if ( status ( PIN_IEC_DATA_IN ) == PULLED ) return false;
+        // If data pin is IEC_ASSERTED, exit and cleanup
+        if ( status ( PIN_IEC_DATA_IN ) == IEC_ASSERTED ) return false;
     #endif
 
         // set bit
-        ( data bitand 1 ) ? IEC.release ( PIN_IEC_DATA_OUT ) : IEC.pull ( PIN_IEC_DATA_OUT );
+        ( data bitand 1 ) ? IEC_RELEASE ( PIN_IEC_DATA_OUT ) : IEC_ASSERT ( PIN_IEC_DATA_OUT );
         data >>= 1; // get next bit
         if ( !wait ( TIMING_Ts ) ) return false;
 
@@ -162,14 +162,14 @@ bool SauceDOS::sendByte ( uint8_t data, bool signalEOI )
         // release ( PIN_IEC_DATA_OUT );
 
         // tell listener bit is ready to read
-        IEC.release ( PIN_IEC_CLK_OUT );
+        IEC_RELEASE ( PIN_IEC_CLK_OUT );
         if ( !wait ( TIMING_Tv ) ) return false;
 
         // tell listner to wait
-        IEC.pull ( PIN_IEC_CLK_OUT );
+        IEC_ASSERT ( PIN_IEC_CLK_OUT );
     }
     // Release data line after byte sent
-    IEC.release ( PIN_IEC_DATA_OUT );
+    IEC_RELEASE ( PIN_IEC_DATA_OUT );
 
 
     // STEP 4: FRAME HANDSHAKE
@@ -179,7 +179,7 @@ bool SauceDOS::sendByte ( uint8_t data, bool signalEOI )
     // one  millisecond  -  one  thousand  microseconds  -  it  will  know  that something's wrong and may alarm appropriately.
 
     // Wait for listener to accept data
-    if ( timeoutWait ( PIN_IEC_DATA_IN, PULLED, TIMEOUT_Tf ) >= TIMEOUT_Tf )
+    if ( timeoutWait ( PIN_IEC_DATA_IN, IEC_ASSERTED, TIMEOUT_Tf ) >= TIMEOUT_Tf )
     {
         Debug_printv ( "Wait for listener to acknowledge byte received" );
         return false; // return error because timeout
@@ -189,13 +189,13 @@ bool SauceDOS::sendByte ( uint8_t data, bool signalEOI )
     // We're  finished,  and  back  where  we  started.    The  talker  is  holding  the  Clock  line  true,
     // and  the listener is holding the Data line true. We're ready for step 1; we may send another character - unless EOI has
     // happened. If EOI was sent or received in this last transmission, both talker and listener "letgo."  After a suitable pause,
-    // the Clock and Data lines are RELEASED to false and transmission stops.
+    // the Clock and Data lines are IEC_RELEASED to false and transmission stops.
 
     if ( signalEOI )
     {
         // EOI Received
         if ( !wait ( TIMING_Tfr ) ) return false;
-        IEC.release ( PIN_IEC_CLK_OUT );
+        IEC_RELEASE ( PIN_IEC_CLK_OUT );
     }
     // else
     // {

@@ -27,6 +27,28 @@ void iecOpenAI::set_response_format(std::string s)
     response_format = mstr::toUTF8(s);
 }
 
+#if 1
+device_state_t iecOpenAI::openChannel(/*int chan, IECPayload &payload*/)
+{
+  return state;
+}
+
+device_state_t iecOpenAI::closeChannel(/*int chan*/)
+{
+  return state;
+}
+
+device_state_t iecOpenAI::readChannel(/*int chan*/)
+{
+  return state;
+}
+
+device_state_t iecOpenAI::writeChannel(/*int chan, IECPayload &payload*/)
+{
+  //write(commanddata.channel);
+  return state;
+}
+#else
 device_state_t iecOpenAI::process()
 {
     virtualDevice::process();
@@ -48,6 +70,7 @@ device_state_t iecOpenAI::process()
 
     return state;
 }
+#endif
 
 void iecOpenAI::iec_open()
 {

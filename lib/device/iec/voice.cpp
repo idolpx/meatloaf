@@ -156,6 +156,28 @@ void iecVoice::status()
     //bus_to_computer(status, sizeof(status), false);
 }
 
+#if 1
+device_state_t iecVoice::openChannel(/*int chan, IECPayload &payload*/)
+{
+  return state;
+}
+
+device_state_t iecVoice::closeChannel(/*int chan*/)
+{
+  return state;
+}
+
+device_state_t iecVoice::readChannel(/*int chan*/)
+{
+  return state;
+}
+
+device_state_t iecVoice::writeChannel(/*int chan, IECPayload &payload*/)
+{
+  //write(commanddata.channel);
+  return state;
+}
+#else
 device_state_t iecVoice::process()
 {
     Debug_printv( "payload[%d]", payload.c_str());
@@ -177,5 +199,6 @@ device_state_t iecVoice::process()
 
     return state;
 }
+#endif
 
 #endif /* BUILD_IEC */

@@ -17,7 +17,14 @@ class iecOpenAI : public virtualDevice
     iecOpenAI();
     ~iecOpenAI();
 
-    device_state_t process();
+#if 0
+    device_state_t process() override;
+#else
+    virtual device_state_t openChannel(/*int chan, IECPayload &payload*/) override;
+    virtual device_state_t closeChannel(/*int chan*/) override;
+    virtual device_state_t readChannel(/*int chan*/) override;
+    virtual device_state_t writeChannel(/*int chan, IECPayload &payload*/) override;
+#endif
 
     void iec_open();
     void iec_close();
