@@ -1138,7 +1138,6 @@ void iecDrive::sendListing()
 bool iecDrive::sendFile()
 {
     uint32_t count = 0, startpos;
-    bool success_rx = true;
 
     uint8_t buf[128];
     uint16_t load_address = 0;
@@ -1201,9 +1200,9 @@ bool iecDrive::sendFile()
 
     startpos = istream->position();
     Serial.printf("\r\nsendFile: [$%.4X] pos[%d]\r\n=================================\r\n", load_address, startpos);
-    while( success_rx && !istream->error() )
+    while( !istream->error() )
     {
-        //Debug_printv("b[%02X] nb[%02X] success_rx[%d] error[%d] count[%d] avail[%d]", b, nb, success_rx, istream->error(), count, avail);
+        //Debug_printv("b[%02X] nb[%02X] error[%d] count[%d] avail[%d]", b, nb, istream->error(), count, avail);
 #ifdef DATA_STREAM
         if (bi == 0)
         {
@@ -1233,7 +1232,8 @@ bool iecDrive::sendFile()
           Debug_printv("Short write: %i expected: %i cur: %i", written, len, count);
           count -= len - written;
           istream->seek(count, SEEK_SET);
-          break;
+          //break;
+          return true;
         }
 
         uint32_t t = 0;
@@ -1272,9 +1272,9 @@ bool iecDrive::sendFile()
     t_end -= t_start;
     double seconds = t_end / 1000000.0;
     double cps = (count - startpos) / seconds;
-    Serial.printf("\r\n=================================\r\n%d bytes sent of %d @ %0.2fcps[SYS%d]\r\n\r\n", count, size, cps, sys_address);
+    Serial.printf("\r\n=================================\r\n%d bytes sent of %d @ %0.2fcps [SYS%d]\r\n\r\n", count, size, cps, sys_address);
 
-    //Debug_printv("len[%d] avail[%d] success_rx[%d]", len, avail, success_rx);
+    //Debug_printv("len[%d] avail[%d]", len, avail);
 
     //fnLedManager.set(eLed::LED_BUS, false);
     //fnLedStrip.stopRainbow();
@@ -1284,9 +1284,10 @@ bool iecDrive::sendFile()
         Serial.println("sendFile: Transfer aborted!");
         IEC.senderTimeout();
         closeStream(commanddata.channel);
+        return false;
     }
 
-    return success_rx;
+    return true;
 } // sendFile
 
 

@@ -249,7 +249,7 @@ void systemBus::setup()
 
 void IRAM_ATTR systemBus::service()
 {
-    // IEC_ASSERT( PIN_IEC_SRQ );
+    //IEC_ASSERT( PIN_IEC_SRQ );
 
     // Disable Interrupt
     // gpio_intr_disable((gpio_num_t)PIN_IEC_ATN);
@@ -374,18 +374,18 @@ void IRAM_ATTR systemBus::service()
                 //Debug_printv("bus[%d] device[%d]", state, device_state);
                 // for (auto devicep : _daisyChain)
                 // {
+                    //IEC_ASSERT( PIN_IEC_SRQ );
                     device_state = d->process();
                     if ( data.primary == IEC_TALK )
                     {
                         data.init();
                         state = BUS_IDLE;
                     }
+                    //IEC_RELEASE( PIN_IEC_SRQ );
                 // }
             }
 
             //Debug_printv("bus[%d] device[%d] flags[%d]", state, device_state, flags);
-
-
             //IEC_RELEASE( PIN_IEC_SRQ );
         }
 
@@ -536,10 +536,12 @@ void systemBus::read_command()
     if ( state == BUS_ACTIVE )  // Normal behaviour is to ignore everything if it's not for us
     //if ( state == BUS_PROCESS )  // Use this to sniff the secondary commands
     {
+        // Is this command for us?
         if ( !isDeviceEnabled( data.device ) )
         {
-            // Is this command for us?
-            state = BUS_RELEASE; // NOPE!
+            // NOPE!
+            state = BUS_IDLE;
+            return;
         }
     }
 
@@ -610,10 +612,7 @@ void systemBus::read_payload()
             return;
         }
 
-        //if (c != 0xFFFFFFFF ) // && c != 0x0D) // Leave 0x0D to be stripped later
-        //{
-            listen_command += (uint8_t)c;
-        //}
+        listen_command += (uint8_t)c;
 
         if (flags & EOI_RECVD)
             break;
@@ -861,41 +860,31 @@ void systemBus::process_queue()
 
 void IRAM_ATTR systemBus::deviceListen()
 {
-    // If the command is SECONDARY and it is not to expect just a small command on the command channel, then
-    // we're into something more heavy. Otherwise read it all out right here until UNLISTEN is received.
-    if (data.secondary == IEC_REOPEN && data.channel != CHANNEL_COMMAND)
-    {
-        // A heapload of data might come now, too big for this context to handle so the caller handles this, we're done here.
-        // Debug_printf(" (%.2X SECONDARY) (%.2X CHANNEL)\r\n", data.primary, data.channel);
-        Debug_printf("REOPEN on non-command channel.\r\n");
-        state = BUS_ACTIVE;
-    }
-
     // OPEN
-    else if (data.secondary == IEC_OPEN)
+    if (data.secondary == IEC_OPEN)
     {
         read_payload();
         std::string s = mstr::toHex(data.payload);
-        Serial.printf("Device #%02d:%02d {%s} [%s]\r\n", data.device, data.channel, data.payload.c_str(), s.c_str());
+        Serial.printf("Open #%02d:%02d {%s} [%s]\r\n", data.device, data.channel, data.payload.c_str(), s.c_str());
     }
 
     // REOPEN / DATA
     else if (data.secondary == IEC_REOPEN)
     {
-        Serial.printf("Device #%02d:%02d (data)\r\n", data.device, data.channel);
+        Serial.printf("ReOpen #%02d:%02d (data)\r\n", data.device, data.channel);
     }
 
-    // CLOSE Named Channel
+    // CLOSE
     else if (data.secondary == IEC_CLOSE)
     {
-        // Debug_printf(" (E0 CLOSE) (%d CHANNEL)\r\n", data.channel);
-        state = BUS_PROCESS;
+        Serial.printf("Close #%02d:%02d (data)\r\n", data.device, data.channel);
+        state = BUS_IDLE;
     }
 
     // Unknown
     else
     {
-        Debug_printf(" OTHER (%.2X COMMAND) (%.2X CHANNEL) ", data.secondary, data.channel);
+        Serial.printf("Unknown #%02d:%02d (data)\r\n", data.device, data.channel);
         state = BUS_ERROR;
     }
 }

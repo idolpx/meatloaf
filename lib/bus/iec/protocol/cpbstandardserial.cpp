@@ -142,7 +142,7 @@ uint8_t CPBStandardSerial::receiveByte()
     // if 200 microseconds pass without the Clock line being asserted,
     // it has a special task to perform: note EOI.
 
-    IEC_ASSERT( PIN_IEC_SRQ );
+    //IEC_ASSERT( PIN_IEC_SRQ );
     //if ( timeoutWait ( PIN_IEC_CLK_IN, ASSERTED, TIMING_Tye, false ) == TIMING_Tye )
     timer_start( TIMING_Tye );
     while ( !IEC_IS_ASSERTED(PIN_IEC_CLK_IN) )
@@ -189,7 +189,7 @@ uint8_t CPBStandardSerial::receiveByte()
         // usleep( 1 );
     }
     timer_stop();
-    IEC_RELEASE( PIN_IEC_SRQ );
+    //IEC_RELEASE( PIN_IEC_SRQ );
 
 
     // Has ATN status changed?
@@ -281,10 +281,10 @@ uint8_t CPBStandardSerial::receiveBits ()
             return 0;
         }
 
-        IEC_ASSERT( PIN_IEC_SRQ );
-        usleep( 1 );
-        IEC_RELEASE( PIN_IEC_SRQ );
-        usleep( 1 );
+        //IEC_ASSERT( PIN_IEC_SRQ );
+        //usleep( 1 );
+        //IEC_RELEASE( PIN_IEC_SRQ );
+        usleep( 2 );
     }
     timer_stop();
 
@@ -316,10 +316,10 @@ uint8_t CPBStandardSerial::receiveBits ()
             }
         }
 
-        IEC_ASSERT( PIN_IEC_SRQ );
-        usleep( 1 );
-        IEC_RELEASE( PIN_IEC_SRQ );
-        usleep( 1 );
+        //IEC_ASSERT( PIN_IEC_SRQ );
+        //usleep( 1 );
+        //IEC_RELEASE( PIN_IEC_SRQ );
+        usleep( 2 );
     }
     timer_stop();
 
@@ -437,7 +437,7 @@ bool CPBStandardSerial::sendByte(uint8_t data, bool eoi)
 {
     bool success = true;
 
-    //IEC_ASSERT( PIN_IEC_SRQ );
+    IEC_ASSERT( PIN_IEC_SRQ );
 
     IEC.flags &= CLEAR_LOW;
 
@@ -592,6 +592,8 @@ bool CPBStandardSerial::sendByte(uint8_t data, bool eoi)
 
  done:
     portENABLE_INTERRUPTS();
+
+    IEC_RELEASE( PIN_IEC_SRQ );
     return success;
 }
 
