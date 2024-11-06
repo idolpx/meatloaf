@@ -150,14 +150,21 @@ device_state_t iecDrive::readChannel(/*int chan*/)
 
 device_state_t iecDrive::writeChannel(/*int chan, IECPayload &payload*/)
 {
-  if (_base == nullptr) {
-    IEC.senderTimeout();
-    return state;
-  }
-  Debug_printv("url[%s]", _base->url.c_str());
+    if (_base == nullptr) {
+        IEC.senderTimeout();
+        return state;
+    }
+    Debug_printv("url[%s]", _base->url.c_str());
 
-  saveFile();
-  return state;
+    if (commanddata.channel == CHANNEL_COMMAND)
+    {
+        iec_command();
+    }
+    else
+    {
+        saveFile();
+    }
+    return state;
 }
 #else
 // Process command

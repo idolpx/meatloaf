@@ -883,7 +883,18 @@ void IRAM_ATTR systemBus::deviceListen()
     // REOPEN / DATA
     else if (data.secondary == IEC_REOPEN)
     {
-        Serial.printf("ReOpen #%02d:%02d (data)\r\n", data.device, data.channel);
+        if ( data.channel == CHANNEL_COMMAND )
+        {
+            read_payload();
+            std::string s = mstr::toHex(data.payload);
+            Serial.printf("ReOpen #%02d:%02d {%s} [%s]\r\n", data.device, data.channel, data.payload.c_str(), s.c_str());
+            state = BUS_IDLE;
+        }
+        else
+        {
+            Serial.printf("ReOpen #%02d:%02d (data)\r\n", data.device, data.channel);
+            state = BUS_ACTIVE;
+        }
     }
 
     // CLOSE
