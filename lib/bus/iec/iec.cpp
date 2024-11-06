@@ -392,7 +392,11 @@ void IRAM_ATTR systemBus::service()
         // Clean Up
         else if (state == BUS_RELEASE)
         {
-            releaseLines(true);
+            if (data.primary == IEC_LISTEN)
+                releaseLines();
+            else
+                releaseLines(true);
+
             data.init();
             state = BUS_IDLE;
         }
@@ -540,7 +544,7 @@ void systemBus::read_command()
         if ( !isDeviceEnabled( data.device ) )
         {
             // NOPE!
-            state = BUS_IDLE;
+            state = BUS_RELEASE;
             return;
         }
     }

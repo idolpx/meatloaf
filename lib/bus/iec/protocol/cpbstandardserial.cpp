@@ -219,6 +219,7 @@ uint8_t CPBStandardSerial::receiveByte()
     //IEC_ASSERT( PIN_IEC_SRQ );
     usleep ( TIMING_Tf );
     IEC_ASSERT( PIN_IEC_DATA_OUT );
+    usleep ( TIMING_Tpr );
     //IEC_RELEASE( PIN_IEC_SRQ );
 
     // STEP 5: START OVER
