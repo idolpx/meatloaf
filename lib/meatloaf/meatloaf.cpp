@@ -203,7 +203,8 @@ MFile* MFSOwner::File(std::string path) {
 
     auto foundFS = testScan(begin, end, pathIterator);
 
-    if(foundFS != nullptr) {
+    if ( foundFS != nullptr )
+    {
         //Debug_printv("PATH: '%s' is in FS [%s]", path.c_str(), foundFS->symbol);
         auto newFile = foundFS->getFile(path);
         //Debug_printv("newFile: '%s'", newFile->url.c_str());
@@ -227,7 +228,8 @@ MFile* MFSOwner::File(std::string path) {
 
             auto upperFS = testScan(begin, end, pathIterator);
 
-            if(upperFS != nullptr) {
+            if ( upperFS != nullptr )
+            {
                 auto wholePath = mstr::joinToString(&begin, &endHere, "/");
 
                 //auto cp = mstr::joinToString(&begin, &pathIterator, "/");
@@ -235,13 +237,16 @@ MFile* MFSOwner::File(std::string path) {
                 newFile->streamFile = upperFS->getFile(wholePath); // skończy się na d64
                 //Debug_printv("CONTAINER: '%s' is in FS [%s]", newFile->streamFile->url.c_str(), upperFS->symbol);
             }
-            else {
-                Debug_printv("WARNING!!!! CONTAINER FAILED FOR: '%s'", upperPath.c_str());
+            else
+            {
+                //Debug_printv("WARNING!!!! CONTAINER FAILED FOR: '%s'", upperPath.c_str());
             }
         }
 
         return newFile;
     }
+
+    Debug_printv("Not Found! path[%s]", path.c_str());
 
     return nullptr;
 }
@@ -356,12 +361,22 @@ bool MFile::operator!=(nullptr_t ptr) {
 }
 
 MStream* MFile::getSourceStream(std::ios_base::openmode mode) {
+
+    if ( streamFile == nullptr )
+        return nullptr;
+
     // has to return OPENED stream
     Debug_printv("pathInStream[%s] streamFile[%s]", pathInStream.c_str(), streamFile->url.c_str());
     //std::shared_ptr<MFile> containerFile(MFSOwner::File(streamPath)); // get the base file that knows how to handle this kind of container, i.e 7z
 
+
+    auto sourceStream = streamFile->getSourceStream(mode);
+    if ( sourceStream == nullptr )
+        return nullptr;
+
     // will be replaced by streamBroker->getSourceStream(streamFile, mode)
-    std::shared_ptr<MStream> containerStream(streamFile->getSourceStream(mode)); // get its base stream, i.e. zip raw file contents
+    std::shared_ptr<MStream> containerStream(sourceStream); // get its base stream, i.e. zip raw file contents
+
     Debug_printv("containerStream isRandomAccess[%d] isBrowsable[%d]", containerStream->isRandomAccess(), containerStream->isBrowsable());
 
     // will be replaced by streamBroker->getDecodedStream(this, mode, containerStream)
@@ -497,8 +512,11 @@ MFile* MFile::cd(std::string newDir)
             newPath = MFSOwner::File(url);
         }
         
-        return newPath;
+        if ( newPath->exists() )
+            return newPath;
     }
+
+    return nullptr;
 };
 
 
@@ -585,6 +603,11 @@ MFile* MFile::cdLocalRoot(std::string plus)
 
 //     return true;
 // };
+
+bool MFile::exists() { 
+    Debug_printv("here!");
+    return _exists; 
+};
 
 uint64_t MFile::getAvailableSpace()
 {

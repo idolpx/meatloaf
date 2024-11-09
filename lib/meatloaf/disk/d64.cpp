@@ -473,7 +473,9 @@ bool D64MFile::rewindDirectory()
     // Debug_printv("streamFile->url[%s]", streamFile->url.c_str());
     auto image = ImageBroker::obtain<D64MStream>(streamFile->url);
     if (image == nullptr)
-        Debug_printv("image pointer is null");
+    {
+        return false;
+    }
 
     image->resetEntryCounter();
 
@@ -501,6 +503,10 @@ MFile *D64MFile::getNextFileInDir()
 
     // Get entry pointed to by containerStream
     auto image = ImageBroker::obtain<D64MStream>(streamFile->url);
+    if (image == nullptr)
+    {
+        return nullptr;
+    }
 
     bool r = false;
     do

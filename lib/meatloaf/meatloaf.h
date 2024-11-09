@@ -194,8 +194,7 @@ public:
     virtual bool rewindDirectory() = 0 ;
     virtual MFile* getNextFileInDir() = 0 ;
     virtual bool mkDir() = 0 ;    
-
-    virtual bool exists() { return _exists; };
+    virtual bool exists();
     virtual bool remove() = 0;
     virtual bool rename(std::string dest) = 0;    
     virtual time_t getLastWrite() = 0 ;

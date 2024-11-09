@@ -68,11 +68,12 @@ protected:
     };
 
     struct SectorHeader {
-        uint8_t header_code;
-        uint8_t track;
-        uint8_t sector;
-        char id[2];
+        uint8_t code; // 0x08
         uint8_t checksum;
+        uint8_t sector;
+        uint8_t track;
+        uint8_t id1;
+        uint8_t id0;
     };
 
 public:

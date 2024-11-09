@@ -93,17 +93,17 @@ bool G64MStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
     sector = 0;
     while ( sector < c)
     {
-        sectorOffset = g64_track_offset + (sector * 361);
+        sectorOffset = g64_track_offset + (sector * 360);
         containerStream->seek( sectorOffset );
 
         Debug_printv("track[%d] g64_track[%d] g64_track_offset[%04X] g64_track_size[%d]", track, (g64_track + 2), g64_track_offset, g64_track_size);
         Debug_printv("g64_track_end[%04X] sector_offset[%04X]", g64_track_end, sectorOffset);
 
         findSync( g64_track_end );
-        Debug_printv( "Read Sector Header" );
+        Debug_printv( "Read Sector Header [%d]", containerStream->position() );
         readSectorHeader();
         findSync( g64_track_end );
-        Debug_printv( "Read Sector Data" );
+        Debug_printv( "Read Sector Data [%d]", containerStream->position() );
 
         sector++;
     }
@@ -132,12 +132,21 @@ bool G64MStream::readSectorHeader()
 
     containerStream->read(buf, sizeof(buf));
     convert4BytesFromGCR(buf, data);
-    printf("H[%02X] T[%02X] S[%02X] ID0[%02X] ", data[0], data[1], data[2], data[3]);
+    g64_sector_header.code = data[0];
+    g64_sector_header.checksum = data[1];
+    g64_sector_header.sector = data[2];
+    g64_sector_header.track = data[3];
+    printf("H[%02X] C[%02X] S[%d] T[%d] ", data[0], data[1], data[2], data[3]);
 
     containerStream->read(buf, sizeof(buf));
     convert4BytesFromGCR(buf, data);
-    printf("ID1[%02X] C[%02X] G0[%02X] G1[%02X]\r\n", data[0], data[1], data[2], data[3]);
+    g64_sector_header.id1 = data[0];
+    g64_sector_header.id0 = data[1];
+    printf("ID1[%02X] ID0[%02X]", data[0], data[1]);
 
+    uint8_t checksum = g64_sector_header.sector ^ g64_sector_header.track ^ g64_sector_header.id1 ^ g64_sector_header.id0;
+
+    printf(" VERIFY[%02X]\r\n", checksum);
     return true;
 }
 
@@ -160,6 +169,7 @@ bool G64MStream::findSync(uint32_t track_end)
     uint8_t gcr_byte0 = 0x00;
     uint8_t gcr_byte1 = 0x00;
 
+    Debug_printv( "start[%04X]", containerStream->position() );
 	while (1)
 	{
 		if (containerStream->position() + 1 >= track_end)
@@ -189,6 +199,8 @@ bool G64MStream::findSync(uint32_t track_end)
     containerStream->seek(containerStream->position() - 1);
 
     Debug_printf("\r\n");
+
+    Debug_printv( "end[%04X]", containerStream->position() );
 
 	return true;
 }
