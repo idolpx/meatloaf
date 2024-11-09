@@ -366,7 +366,7 @@ MStream* MFile::getSourceStream(std::ios_base::openmode mode) {
         return nullptr;
 
     // has to return OPENED stream
-    Debug_printv("pathInStream[%s] streamFile[%s]", pathInStream.c_str(), streamFile->url.c_str());
+    //Debug_printv("pathInStream[%s] streamFile[%s]", pathInStream.c_str(), streamFile->url.c_str());
     //std::shared_ptr<MFile> containerFile(MFSOwner::File(streamPath)); // get the base file that knows how to handle this kind of container, i.e 7z
 
 
@@ -377,21 +377,21 @@ MStream* MFile::getSourceStream(std::ios_base::openmode mode) {
     // will be replaced by streamBroker->getSourceStream(streamFile, mode)
     std::shared_ptr<MStream> containerStream(sourceStream); // get its base stream, i.e. zip raw file contents
 
-    Debug_printv("containerStream isRandomAccess[%d] isBrowsable[%d]", containerStream->isRandomAccess(), containerStream->isBrowsable());
+    //Debug_printv("containerStream isRandomAccess[%d] isBrowsable[%d]", containerStream->isRandomAccess(), containerStream->isBrowsable());
 
     // will be replaced by streamBroker->getDecodedStream(this, mode, containerStream)
     MStream* decodedStream(getDecodedStream(containerStream)); // wrap this stream into decoded stream, i.e. unpacked zip files
     decodedStream->url = this->url;
-    Debug_printv("decodedStream isRandomAccess[%d] isBrowsable[%d]", decodedStream->isRandomAccess(), decodedStream->isBrowsable());
+    //Debug_printv("decodedStream isRandomAccess[%d] isBrowsable[%d]", decodedStream->isRandomAccess(), decodedStream->isBrowsable());
 
-    Debug_printv("pathInStream [%s]", pathInStream.c_str());
+    //Debug_printv("pathInStream [%s]", pathInStream.c_str());
 
     if(decodedStream->isRandomAccess() && pathInStream != "") {
         bool foundIt = decodedStream->seekPath(this->pathInStream);
 
         if(!foundIt)
         {
-            Debug_printv("path in stream not found");
+            //Debug_printv("path in stream not found");
             return nullptr;
         }        
     }
@@ -408,7 +408,7 @@ MStream* MFile::getSourceStream(std::ios_base::openmode mode) {
 
             pointedFile = decodedStream->seekNextEntry();
         }
-        Debug_printv("path in stream not found!");
+        //Debug_printv("path in stream not found!");
         if(pointedFile.empty())
             return nullptr;        
     }
