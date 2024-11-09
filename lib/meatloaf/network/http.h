@@ -81,7 +81,6 @@ public:
     }
 
     uint32_t _size = 0;
-    // uint32_t m_bytesAvailable = 0;
     uint32_t _position = 0;
     size_t _error = 0;
 

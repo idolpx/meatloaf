@@ -903,6 +903,10 @@ uint16_t iecDrive::sendHeader(std::string header, std::string id)
     archive = mstr::toPETSCII2(archive);
     std::string image = _base->media_image;
     image = mstr::toPETSCII2(image);
+
+    if ( image.size() )
+        mstr::replaceAll(path, image, "");
+
     //Debug_printv("path[%s] size[%d]", path.c_str(), path.size());
 
     // Send List HEADER

@@ -32,13 +32,13 @@ std::string MMediaStream::decodeType(std::string file_type)
     std::string type = "PRG";
 
     if (file_type == "P")
-        type += "PRG";
+        type = "PRG";
     else if (file_type == "S")
-        type += "SEQ";
+        type = "SEQ";
     else if (file_type == "U")
-        type += "USR";
+        type = "USR";
     else if (file_type == "R")
-        type += "REL";
+        type = "REL";
 
     return type;
 }

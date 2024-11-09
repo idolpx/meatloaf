@@ -20,7 +20,7 @@ class LBRMStream : public MMediaStream {
     // override everything that requires overriding here
 
 public:
-    LBRMStream(std::shared_ptr<MStream> is) : MMediaStream(is) { 
+    LBRMStream(std::shared_ptr<MStream> is) : MMediaStream(is) {
         loadEntries();
     };
 
@@ -46,7 +46,7 @@ protected:
     }
 
     bool seekNextImageEntry() override {
-        return seekEntry(entry_index + 1);
+        return seekEntry(entry_index);
     }
 
     bool seekEntry( std::string filename ) override;

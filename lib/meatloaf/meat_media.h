@@ -51,19 +51,19 @@ public:
     // readUntil = (delimiter = 0x00) => this.containerStream.readUntil(delimiter);
     virtual std::string readUntil( uint8_t delimiter = 0x00 )
     {
-        uint8_t b = 0, r = 0;
+        uint8_t b = 0, s = 0;
         std::string bytes = "";
         do
         {
-            r = containerStream->read( &b, 1 );
+            s = containerStream->read( &b, 1 );
+            _position += s;
             if ( b != delimiter )
             {
                 bytes += b;
-                _position++;
             }
             else
                 break;
-        } while ( r );
+        } while ( s );
 
         return bytes;
     }
@@ -81,20 +81,27 @@ public:
     // readStringUntil = (delimiter = 0x00) => this.containerStream.readStringUntil(delimiter);
     virtual std::string readStringUntil( uint8_t delimiter = '\0' )
     {
-        uint8_t b[1];
+        uint8_t b = 0;
         std::stringstream ss;
-        while( containerStream->read( b, 1 ) )
+        while( containerStream->read( &b, 1 ) )
         {
-            if ( b[0] == delimiter )
+            _position++;
+            if ( b == delimiter )
                 ss << b;
         }
         return ss.str();
     }
 
     // seek = (offset) => this.containerStream.seek(offset + this.media_header_size);
-    bool seek(uint32_t offset) override { return containerStream->seek(offset + media_header_size); }
+    bool seek(uint32_t offset) override {
+        _position = media_header_size + offset;
+        return containerStream->seek( _position ); 
+    }
     // seekCurrent = (offset) => this.containerStream.seekCurrent(offset);
-    bool seekCurrent(uint32_t offset) { return containerStream->seek(offset); }
+    bool seekCurrent(uint32_t offset) {
+        _position += offset;
+        return containerStream->seek( _position );
+    }
 
     bool seekPath(std::string path) override { return false; };
     std::string seekNextEntry() override { return ""; };

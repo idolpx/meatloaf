@@ -107,7 +107,9 @@ bool FileSystemSMB::remove(const char *path)
         smb_error = smb2_unlink(_smb, path);
 
     if (smb_error != 0)
+    {
         Debug_printf("FileSystemSMB::remove(\"%s\") - failed, SMB2 error: %s\n", path, smb2_get_error(_smb));
+    }
 
     return smb_error == 0;
 }

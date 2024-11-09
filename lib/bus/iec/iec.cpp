@@ -983,12 +983,12 @@ void systemBus::setBitTiming(std::string set, int p1, int p2, int p3, int p4)
 
 void IRAM_ATTR systemBus::releaseLines(bool wait)
 {
-    //IEC_ASSERT( PIN_IEC_SRQ );
+    IEC_ASSERT( PIN_IEC_SRQ );
 
     // Wait for ATN to release and quit
     if (wait)
     {
-        Debug_printv("Waiting for ATN to release");
+        //Debug_printv("Waiting for ATN to release");
         //protocol->timeoutWait ( PIN_IEC_ATN, IEC_RELEASED, FOREVER );
         while ( IEC_IS_ASSERTED( PIN_IEC_ATN ) );
     }
@@ -997,7 +997,7 @@ void IRAM_ATTR systemBus::releaseLines(bool wait)
     IEC_RELEASE(PIN_IEC_CLK_OUT);
     IEC_RELEASE(PIN_IEC_DATA_OUT);
 
-    //IEC_RELEASE( PIN_IEC_SRQ );
+    IEC_RELEASE( PIN_IEC_SRQ );
 }
 
 void IRAM_ATTR systemBus::senderTimeout()

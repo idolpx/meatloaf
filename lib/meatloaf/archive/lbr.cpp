@@ -1,21 +1,3 @@
-/*
-   LBR Tool -- Build and extract from C64 LBR archives
-
-   Copyright 2020 Talas (talas.pw)
-
-   This program is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 3 of the License, or
-   (at your option) any later version.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
 
 #include "lbr.h"
 
@@ -27,32 +9,27 @@
 
 int8_t LBRMStream::loadEntries()
 {
-    Debug_printv("position[%d]", _position);
     std::string signature = readUntil(0x20);
     if (signature[0] != 'D' || signature[1] != 'W' || signature[2] != 'B')
     {
         std::cout << "Error: invalid signature, not an LBR file?" << std::endl;
         return -1;
     }
-    Debug_printv("position[%d]", _position);
-    seekCurrent(1); // space
-    Debug_printv("position[%d]", _position);
     std::string count = readUntil(0x20);
-    Debug_printv("position[%d]", _position);
-    seekCurrent(2); // space + cr
-    Debug_printv("position[%d]", _position);
+    seekCurrent(1); // cr
     entry_count = atoi(count.c_str());
 
-    Debug_printv("signature[%s] count[%s] entry_count[%d]", signature.c_str(), count.c_str(), entry_count);
+    //Debug_printv("signature[%s] count[%s] entry_count[%d]", signature.c_str(), count.c_str(), entry_count);
 
     for (int i = 0; i < entry_count; ++i)
     {
         std::string filename = readUntil(0x0D);
-        seekCurrent(2); // cr + space
-        std::string type = readUntil(0x20);
-        seekCurrent(2); // space + cr
+        std::string type = readUntil(0x0D);
+        seekCurrent(1); // space
         std::string size = readUntil(0x20);
-        seekCurrent(2); // space + cr
+        seekCurrent(1); // cr
+
+        //Debug_printv("i[%d] filename[%s] type[%s] size[%s]", i, filename.c_str(), type.c_str(), size.c_str());
 
         // Add Entry to array
         Entry e;
@@ -61,7 +38,7 @@ int8_t LBRMStream::loadEntries()
         e.type = decodeType(type);
         entries.push_back(e);
 
-        Debug_printv("i[%d] filename[%s] type[%s] size[%s]", i, e.filename.c_str(), e.type.c_str(), e.size);
+        //Debug_printv("i[%d] filename[%s] type[%s] size[%d]", i, e.filename.c_str(), e.type.c_str(), e.size);
     }
 
     // Calculate offset for start of entry
@@ -71,7 +48,7 @@ int8_t LBRMStream::loadEntries()
         e.offset = offset;
             offset += e.size;
 
-        Debug_printv("name[%s] type[%s] size[%d] offset[%d]", e.filename.c_str(), e.type.c_str(), e.size, e.offset);
+        //Debug_printv("name[%s] type[%s] size[%d] offset[%d]", e.filename.c_str(), e.type.c_str(), e.size, e.offset);
     }
 
     return entry_count;
@@ -80,7 +57,7 @@ int8_t LBRMStream::loadEntries()
 
 bool LBRMStream::seekEntry(std::string filename)
 {
-    size_t index = 1;
+    size_t index = 0;
     mstr::replaceAll(filename, "\\", "/");
     bool wildcard = (mstr::contains(filename, "*") || mstr::contains(filename, "?"));
 
@@ -89,12 +66,12 @@ bool LBRMStream::seekEntry(std::string filename)
     {
         while (seekEntry(index))
         {
-            std::string entryFilename = mstr::format("%.16s", entry.filename);
+            std::string entryFilename = mstr::format("%.16s", entry.filename.c_str());
             mstr::replaceAll(entryFilename, "/", "\\");
             mstr::trim(entryFilename);
             entryFilename = mstr::toUTF8(entryFilename);
 
-            // Debug_printv("filename[%s] entry.filename[%s]", filename.c_str(), entryFilename.c_str());
+            Debug_printv("filename[%s] entry.filename[%s]", filename.c_str(), entryFilename.c_str());
 
             if (filename == entryFilename) // Match exact
             {
@@ -124,9 +101,14 @@ bool LBRMStream::seekEntry(std::string filename)
 
 bool LBRMStream::seekEntry(uint16_t index)
 {
-    entry = entries[index];
-    entry_index = index + 1;
-    return true;
+    if ( index < entries.size() )
+    {
+        entry = entries[index];
+        entry_index = index + 1;
+        return true;
+    }
+
+    return false;
 }
 
 uint32_t LBRMStream::readFile(uint8_t *buf, uint32_t size)
@@ -195,7 +177,11 @@ bool LBRMStream::seekPath(std::string path)
 
 bool LBRMFile::isDirectory()
 {
-    return false;
+    // Debug_printv("pathInStream[%s]", pathInStream.c_str());
+    if (pathInStream == "")
+        return true;
+    else
+        return false;
 };
 
 bool LBRMFile::rewindDirectory()
@@ -212,8 +198,8 @@ bool LBRMFile::rewindDirectory()
     image->seekHeader();
 
     // Set Media Info Fields
-    media_header = mstr::format("%.16s", image->header.disk_name);
-    media_id = " LBR ";
+    media_header = mstr::format("%.16s", image->header.disk_name.c_str());
+    media_id = image->header.id_dos;
     media_blocks_free = 0;
     media_block_size = image->block_size;
     media_image = name;
@@ -235,13 +221,13 @@ MFile *LBRMFile::getNextFileInDir()
 
     if (image->seekNextImageEntry())
     {
-        std::string fileName = mstr::format("%.16s", image->entry.filename);
+        std::string fileName = mstr::format("%.16s", image->entry.filename.c_str());
         mstr::replaceAll(fileName, "/", "\\");
         mstr::trim(fileName);
-        // Debug_printv( "entry[%s]", (streamFile->url + "/" + fileName).c_str() );
+        //Debug_printv( "entry[%s]", (streamFile->url + "/" + fileName).c_str() );
         auto file = MFSOwner::File(streamFile->url + "/" + fileName);
         file->extension = image->entry.type;
-        Debug_printv("entry[%s] ext[%s]", fileName.c_str(), file->extension.c_str());
+        //Debug_printv("entry[%s] ext[%s]", fileName.c_str(), file->extension.c_str());
         return file;
     }
     else
