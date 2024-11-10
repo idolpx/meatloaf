@@ -480,7 +480,7 @@ MFile* MFile::cd(std::string newDir)
     {
         // user entered: CD:^ or CD^ 
         // means: change to flash root
-        return MFSOwner::File("/");
+        return cdRoot(mstr::drop(newDir,1));
     }
     else 
     {
