@@ -368,11 +368,12 @@ uint32_t FlashMStream::read(uint8_t* buf, uint32_t size) {
     }
 
     uint32_t bytesRead = 0;
-    if ( size > available() )
-        size = available();
     
     if ( size > 0 )
     {
+        if ( size > available() )
+            size = available();
+
         bytesRead = fread((void*) buf, 1, size, handle->file_h );
         // Debug_printv("bytesRead[%d]", bytesRead);
         // auto hex = mstr::toHex(buf, bytesRead);

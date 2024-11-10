@@ -77,6 +77,9 @@ public:
     };
 
     virtual uint32_t available() {
+        if ( _position > _size )
+            return 0;
+
         return _size - _position;
     };
 
@@ -93,8 +96,8 @@ public:
     }
 
     virtual bool eos()  {
-        //Debug_printv("_size[%d] m_bytesAvailable[%d] _position[%d]", _size, available(), _position);
-        if ( available() == 0 )
+        //Debug_printv("_size[%d] _available[%d] _position[%d]", _size, available(), _position);
+        if ( available() <= 0 )
             return true;
         
         return false;

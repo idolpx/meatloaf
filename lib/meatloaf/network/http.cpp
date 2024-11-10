@@ -170,11 +170,12 @@ bool HttpIStream::seek(uint32_t pos) {
 
 uint32_t HttpIStream::read(uint8_t* buf, uint32_t size) {
     uint32_t bytesRead = 0;
-    if ( size > available() )
-        size = available();
-    
+
     if ( size > 0 )
     {
+        if ( size > available() )
+            size = available();
+
         bytesRead = _http.read(buf, size);
         _position += bytesRead;
         _error = _http._error;

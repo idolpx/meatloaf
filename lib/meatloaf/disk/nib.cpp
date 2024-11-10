@@ -53,7 +53,7 @@ bool NIBMStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
     {
         containerStream->read(data, sizeof(data));
         gcr_track_index++;
-        Debug_printv("gcr_track_index[%d] track[%d] gcr_track[%d] data0[%d] data1[%d]", gcr_track_index, track, gcr_track, data[0], data[1]);
+        //Debug_printv("gcr_track_index[%d] track[%d] gcr_track[%d] data0[%d] data1[%d]", gcr_track_index, track, gcr_track, data[0], data[1]);
     }
     while( gcr_track != data[0] && data[0] != 0x00);
 
@@ -69,7 +69,7 @@ bool NIBMStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
         //Debug_printv("track[%d] gcr_track[%d] gcr_track_offset[%04X] gcr_track_size[%d]", track, (gcr_track + 2), gcr_track_offset, gcr_track_size);
         //Debug_printv("gcr_track_end[%04X]", gcr_track_end);
 
-        Debug_printv( "Read Sector Header [%04X]", containerStream->position() );
+        //Debug_printv( "Read Sector Header [%04X]", containerStream->position() );
         readSectorHeader();
         sync_found = findSync( gcr_track_end );
         if (sector == gcr_sector_header.sector)

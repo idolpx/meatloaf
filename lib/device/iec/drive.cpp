@@ -1246,6 +1246,8 @@ bool iecDrive::sendFile()
             eoi = true;
         }
 
+        //Debug_printv("size[%d] avail[%d] pos[%d] len[%d] eoi[%d]", istream->size(), istream->available(), istream->position(), len, eoi);
+
         // Send Bytes
         written = IEC.sendBytes((const char *) buf, len, eoi);
         if (written != len) {

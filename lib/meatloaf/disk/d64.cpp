@@ -373,7 +373,7 @@ uint32_t D64MStream::readFile(uint8_t *buf, uint32_t size)
         readContainer((uint8_t *)&next_track, 1);
         readContainer((uint8_t *)&next_sector, 1);
         sector_offset += 2;
-        Debug_printv("next_track[%d] next_sector[%d] sector_offset[%d]", next_track, next_sector, sector_offset);
+        //Debug_printv("next_track[%d] next_sector[%d] sector_offset[%d]", next_track, next_sector, sector_offset);
     }
 
     uint32_t bytesRead = 0;
@@ -397,7 +397,7 @@ uint32_t D64MStream::readFile(uint8_t *buf, uint32_t size)
             {
                 return 0;
             }
-            Debug_printv("track[%d] sector[%d] sector_offset[%d]", track, sector, sector_offset);
+            //Debug_printv("track[%d] sector[%d] sector_offset[%d]", track, sector, sector_offset);
         }
     }
 
