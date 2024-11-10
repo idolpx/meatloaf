@@ -21,6 +21,7 @@
 
 #include "../meat_media.h"
 #include "string_utils.h"
+#include "utils.h"
 
 
 /********************************************************
@@ -226,7 +227,10 @@ public:
             partitions[partition].header_sector, 
             partitions[partition].header_offset 
         );
-        containerStream->read((uint8_t*)&header, sizeof(header));
+        readContainer((uint8_t*)&header, sizeof(header));
+        Debug_printv("header[%s] id[%s]", header.disk_name, header.id_dos);
+        util_dump_bytes((const uint8_t *)header.disk_name, 16);
+        util_dump_bytes((const uint8_t *)header.id_dos, 5);
     }
     uint16_t getSectorCount( uint16_t track )
     {

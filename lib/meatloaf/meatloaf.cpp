@@ -48,6 +48,7 @@
 #include "disk/d90.h"
 #include "disk/dnp.h"
 #include "disk/g64.h"
+#include "disk/nib.h"
 
 // File
 #include "file/p00.h"
@@ -106,6 +107,7 @@ D82MFileSystem d82FS;
 D90MFileSystem d90FS;
 DNPMFileSystem dnpFS;
 G64MFileSystem g64FS;
+NIBMFileSystem nibFS;
 
 // Network
 HttpFileSystem httpFS;
@@ -132,7 +134,8 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
 #endif
     &archiveFS, // extension-based FS have to be on top to be picked first, otherwise the scheme will pick them!
     &lbrFS,
-    &d64FS, &d71FS, &d80FS, &d81FS, &d82FS, &d90FS, &dnpFS, &g64FS,
+    &d64FS, &d71FS, &d80FS, &d81FS, &d82FS, &d90FS, &dnpFS, 
+    &g64FS, &nibFS,
     &d8bFS, &dfiFS,
     &p00FS,
     &httpFS, &tnfsFS,

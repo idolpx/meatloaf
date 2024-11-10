@@ -1,4 +1,4 @@
-#include "G64.h"
+#include "nib.h"
 
 #include <cstring>
 
@@ -21,10 +21,8 @@ static uint8_t gcr_decode_low[32] = {
 
 // GCR Utility Functions
 
-bool G64MStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
+bool NIBMStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
 {
-    uint32_t sectorOffset = 0;
-
     Debug_printv("track[%d] sector[%d] offset[%d]", track, sector, offset);
 
     // Is this a valid track?
@@ -46,52 +44,59 @@ bool G64MStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
     }
 
 
-    track--;
-
+    // Find track index
+    uint8_t data[2];
     uint8_t gcr_track = (track * 2);
-    uint32_t gcr_track_offset = TRACK_TABLE_OFFSET + (gcr_track * 4);
-    containerStream->seek(gcr_track_offset);
-    containerStream->read((uint8_t *)&gcr_track_offset, sizeof(gcr_track_offset));
+    uint8_t gcr_track_index = -1;
+    containerStream->seek(0x10);
+    do
+    {
+        containerStream->read(data, sizeof(data));
+        gcr_track_index++;
+        Debug_printv("gcr_track_index[%d] track[%d] gcr_track[%d] data0[%d] data1[%d]", gcr_track_index, track, gcr_track, data[0], data[1]);
+    }
+    while( gcr_track != data[0] && data[0] != 0x00);
 
-    uint16_t gcr_track_size = 0x00;
-    containerStream->seek(gcr_track_offset);
-    containerStream->read((uint8_t *)&gcr_track_size, sizeof(gcr_track_size));
-    gcr_track_offset += 2;
-    uint32_t gcr_track_end = gcr_track_offset + gcr_track_size;
+    // Calculate track offset and end
+    uint32_t gcr_track_offset = NIB_HEADER_SIZE + 1 + (gcr_track_index * NIB_TRACK_LENGTH);
+    uint32_t gcr_track_end = gcr_track_offset + NIB_TRACK_LENGTH;
 
-    track++;
-
-    sectorOffset = gcr_track_offset + (sector * 360);
-    containerStream->seek( sectorOffset );
+    // Find sector in track
+    bool sync_found = false;
+    containerStream->seek( gcr_track_offset );
     do
     {
         //Debug_printv("track[%d] gcr_track[%d] gcr_track_offset[%04X] gcr_track_size[%d]", track, (gcr_track + 2), gcr_track_offset, gcr_track_size);
-        //Debug_printv("gcr_track_end[%04X] sector_offset[%04X]", gcr_track_end, sectorOffset);
+        //Debug_printv("gcr_track_end[%04X]", gcr_track_end);
 
-        findSync( gcr_track_end );
-        //Debug_printv( "Read Sector Header [%04X]", containerStream->position() );
+        Debug_printv( "Read Sector Header [%04X]", containerStream->position() );
         readSectorHeader();
-        findSync( gcr_track_end );
-        //Debug_printv( "Read Sector Data [%04X]", containerStream->position() );
-    } 
-    while ( sector != gcr_sector_header.sector );
+        sync_found = findSync( gcr_track_end );
+        if (sector == gcr_sector_header.sector)
+            break;
+
+        sync_found = findSync( gcr_track_end );
+    }
+    while ( sync_found );
+
+    if ( !sync_found )
+        return false;
+
     Debug_printv( "Start Sector Data [%04X]", containerStream->position() );
     readSector();
 
-    sectorOffset += sector;
 
-    this->block = sectorOffset;
     this->track = track;
     this->sector = sector;
     _position = offset;
 
-    //Debug_printv("track[%d] sector[%d] speedZone[%d] sectorOffset[%d]", track, sector, speedZone(track), sectorOffset);
+    //Debug_printv("track[%d] sector[%d] speedZone[%d]", track, sector, speedZone(track));
 
     return true;
 }
 
 
- uint32_t G64MStream::readContainer(uint8_t *buf, uint32_t size)
+ uint32_t NIBMStream::readContainer(uint8_t *buf, uint32_t size)
 {
     uint8_t *s = sector_buffer + _position;
     std::memcpy(buf, s, size);
@@ -99,7 +104,7 @@ bool G64MStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
     return size;
 }
 
-bool G64MStream::readSectorHeader()
+bool NIBMStream::readSectorHeader()
 {
     uint8_t buf[5] = { 0x00 };
     uint8_t data[4] = { 0x00 };
@@ -124,7 +129,7 @@ bool G64MStream::readSectorHeader()
     return true;
 }
 
-bool G64MStream::readSector()
+bool NIBMStream::readSector()
 {
     uint8_t buf[5] = { 0x00 };
     uint8_t data[4] = { 0x00 };
@@ -154,7 +159,7 @@ bool G64MStream::readSector()
 }
 
 
-bool G64MStream::findSync(uint32_t track_end)
+bool NIBMStream::findSync(uint32_t track_end)
 {
     uint8_t gcr_byte0 = 0x00;
     uint8_t gcr_byte1 = 0x00;
@@ -196,7 +201,7 @@ bool G64MStream::findSync(uint32_t track_end)
 }
 
 
-int G64MStream::convert4BytesFromGCR(uint8_t * gcr, uint8_t * plain)
+int NIBMStream::convert4BytesFromGCR(uint8_t * gcr, uint8_t * plain)
 {
 	uint8_t hnibble, lnibble;
 	int badGCR, nConverted;

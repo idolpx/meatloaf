@@ -232,7 +232,10 @@ MFile* FlashMFile::getNextFileInDir()
     {
         //Debug_printv("path[%s] name[%s]", this->path.c_str(), dirent->d_name);
         std::string entry_name = this->path + ((this->path == "/") ? "" : "/") + std::string(dirent->d_name);
-        return new FlashMFile( entry_name );
+
+        auto file = new FlashMFile(entry_name);
+        file->extension = " " + file->extension;
+        return file;
     }
     else
     {

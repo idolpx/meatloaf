@@ -1,11 +1,10 @@
-// .G64 - The G64 GCR-encoded disk image format
+// .G64 - The G64 G64-encoded disk image format
 //
 // https://vice-emu.sourceforge.io/vice_16.html#SEC398
 // https://ist.uwaterloo.ca/~schepers/formats/G64.TXT
 // http://www.linusakesson.net/programming/gcr-decoding/index.php
 // https://www.pagetable.com/?p=1356
 //
-
 
 #ifndef MEATLOAF_MEDIA_G64
 #define MEATLOAF_MEDIA_G64
@@ -18,7 +17,7 @@
 // Format codes:
 // ID	Description
 // 0	Unknown format
-// 1	GCR Data
+// 1	G64 Data
 // 2	CBM DOS
 // 3	CBM DOS Extended
 // 4	MicroProse
@@ -85,15 +84,14 @@ public:
         //block_allocation_map = { {18, 0, 0x04, 1, 35, 4}, {53, 0, 0x00, 36, 70, 3} };
         //sectorsPerTrack = { 17, 18, 19, 21 };
 
-        containerStream->read((uint8_t*)&g64_header, sizeof(g64_header));
+        containerStream->read((uint8_t*)&gcr_header, sizeof(gcr_header));
 
-        Debug_printv("sig[%s] ver[%d] tcnt[%d] tsz[%d]", g64_header.signature, g64_header.version, g64_header.track_count, g64_header.track_size);
+        Debug_printv("signature[%s] version[%d] track_count[%d] track_size[%d]", gcr_header.signature, gcr_header.version, gcr_header.track_count, gcr_header.track_size);
     };
 
-    MediaHeader g64_header;
-    SectorHeader g64_sector_header;
+    MediaHeader gcr_header;
+    SectorHeader gcr_sector_header;
 
-    bool seekBlock( uint64_t index, uint8_t offset = 0 ) override;
     bool seekSector( uint8_t track, uint8_t sector, uint8_t offset = 0 ) override;
 
     uint32_t readContainer(uint8_t *buf, uint32_t size) override;
@@ -104,6 +102,7 @@ public:
     int convert4BytesFromGCR(uint8_t * gcr, uint8_t * plain);
 
 protected:
+    uint8_t sector_buffer[260];
 
 private:
     friend class G64MFile;
@@ -120,8 +119,6 @@ public:
 
     MStream* getDecodedStream(std::shared_ptr<MStream> containerIstream) override
     {
-        Debug_printv("[%s]", url.c_str());
-
         return new G64MStream(containerIstream);
     }
 };
@@ -140,10 +137,16 @@ public:
     }
 
     bool handles(std::string fileName) override {
-        return byExtension(".g64", fileName);
+        return byExtension(
+            {
+                ".g41",
+                ".g64"
+             },
+            fileName
+        );
     }
 
-    G64MFileSystem(): MFileSystem("g64") {};
+    G64MFileSystem(): MFileSystem("G64") {};
 };
 
 

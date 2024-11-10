@@ -389,7 +389,9 @@ friend Protocol::CPBStandardSerial;
 friend Protocol::JiffyDOS;
 friend Protocol::SauceDOS;
 friend Protocol::DolphinDOS;
+#ifdef PARALLEL_BUS
 friend parallelBus;
+#endif
 friend oiecstream;
 friend iecPipe;
 
