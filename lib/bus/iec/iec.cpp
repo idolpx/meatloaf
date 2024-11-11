@@ -390,7 +390,7 @@ void IRAM_ATTR systemBus::service()
         }
 
         // Clean Up
-        else if (state == BUS_RELEASE)
+        if (state == BUS_RELEASE)
         {
             if (data.primary == IEC_LISTEN)
                 releaseLines();
@@ -398,11 +398,10 @@ void IRAM_ATTR systemBus::service()
                 releaseLines(true);
 
             data.init();
-            state = BUS_IDLE;
         }
 
-        // Let's check ATN again before we exit and clean up
-        if ( IEC_IS_ASSERTED( PIN_IEC_ATN ) )
+        // Let's check ATN again before we exit
+        else if ( IEC_IS_ASSERTED( PIN_IEC_ATN ) )
         {
             state = BUS_ACTIVE;
             IEC_ASSERT( PIN_IEC_SRQ );

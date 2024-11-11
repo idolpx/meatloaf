@@ -99,9 +99,10 @@ namespace Protocol
          * @brief Start timer
         */
         bool timer_timedout = false;
-        uint64_t timer_started = 0;
-        uint16_t timer_elapsed = 0;
+        uint64_t timer_start_us = 0;
+        uint16_t timer_elapsed_us = 0;
         void timer_start(uint64_t timeout);
+        uint16_t timer_elapsed();
         void timer_wait(uint16_t target_us);
         void timer_stop();
 

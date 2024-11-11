@@ -174,11 +174,19 @@ uint8_t CPBStandardSerial::receiveByte()
             timer_timedout = false;
             IEC.flags |= EOI_RECVD;
 
-            // Acknowledge by asserting data more than 60us
+            // Acknowledge EOI by asserting data more than 60us
             //wait ( TIMING_Th );
             IEC_ASSERT( PIN_IEC_DATA_OUT );
             usleep ( TIMING_Tei );
             IEC_RELEASE( PIN_IEC_DATA_OUT );
+        }
+
+        if ( timer_elapsed() > TIMEOUT_DEFAULT )
+        {
+            // Empty stream detected
+            IEC.flags |= EMPTY_STREAM;
+            timer_stop();
+            return 0;
         }
 
         // Wait for clock line to be asserted
@@ -192,18 +200,11 @@ uint8_t CPBStandardSerial::receiveByte()
     //IEC_RELEASE( PIN_IEC_SRQ );
 
 
-    // Has ATN status changed?
-    if ( atn_status != IEC_IS_ASSERTED( PIN_IEC_ATN ) )
-    {
-        Debug_printv ( "ATN status changed!" );
-        IEC.flags |= ATN_ASSERTED;
-        return 0; // return error because timeout
-    }
-
-
     // STEP 3: RECEIVING THE BITS
     //IEC_ASSERT( PIN_IEC_SRQ );
-    uint8_t data = receiveBits();
+    uint8_t data = receiveBits( atn_status );
+    if ( IEC.flags & ERROR )
+        return 0;
     //IEC_RELEASE( PIN_IEC_SRQ );
 
     // STEP 4: FRAME HANDSHAKE
@@ -267,7 +268,7 @@ uint8_t CPBStandardSerial::receiveByte()
 // sufficient length of time, it asserts the Clock line and releases
 // the Data line. Then it starts to prepare the next bit.
 
-uint8_t CPBStandardSerial::receiveBits ()
+uint8_t CPBStandardSerial::receiveBits ( bool atn_status )
 {
     IEC.bit = 0;
     IEC.byte = 0;
@@ -275,7 +276,14 @@ uint8_t CPBStandardSerial::receiveBits ()
     timer_start( TIMEOUT_DEFAULT );
     while ( IEC.bit < 7 )
     {
-        if ( timer_timedout )
+        // Has ATN status changed?
+        if ( atn_status != IEC_IS_ASSERTED( PIN_IEC_ATN ) )
+        {
+            Debug_printv ( "ATN status changed!" );
+            IEC.flags |= ATN_ASSERTED;
+            return 0; // return error because timeout
+        }
+        else if ( timer_timedout )
         {
             Debug_printv ( "Timeout bit[%d]", IEC.bit );
             IEC.flags |= ERROR;

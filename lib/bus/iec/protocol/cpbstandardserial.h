@@ -34,7 +34,7 @@ namespace Protocol
     class CPBStandardSerial : public IECProtocol
     {
         private:
-        uint8_t receiveBits();
+        uint8_t receiveBits ( bool atn_status );
         bool sendBits(uint8_t data);
 
 

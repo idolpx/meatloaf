@@ -42,22 +42,24 @@ IECProtocol::~IECProtocol() {
 void IECProtocol::timer_start(uint64_t timeout_us)
 {
     timer_timedout = false;
-    timer_started = esp_timer_get_time();
+    timer_start_us = esp_timer_get_time();
     esp_timer_start_once(timer_handle, timeout_us);
     //IEC.pull( PIN_IEC_SRQ );
 }
+uint16_t IECProtocol::timer_elapsed()
+{
+    timer_elapsed_us = esp_timer_get_time() - timer_start_us;
+    return timer_elapsed_us;
+}
 void IECProtocol::timer_wait(uint16_t target_us)
 {
-    do 
-    {
-        timer_elapsed = esp_timer_get_time() - timer_started;
-    }
-    while ( timer_elapsed < target_us );
+    while ( timer_elapsed() < target_us )
+        usleep(2);
 }
 void IECProtocol::timer_stop()
 {
     esp_timer_stop(timer_handle);
-    timer_elapsed = esp_timer_get_time() - timer_started;
+    timer_elapsed();
     //IEC.release( PIN_IEC_SRQ );
 }
 
