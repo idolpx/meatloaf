@@ -145,6 +145,7 @@ uint8_t CPBStandardSerial::receiveByte()
     //IEC_ASSERT( PIN_IEC_SRQ );
     //if ( timeoutWait ( PIN_IEC_CLK_IN, ASSERTED, TIMING_Tye, false ) == TIMING_Tye )
     timer_start( TIMING_Tye );
+    portDISABLE_INTERRUPTS();
     while ( !IEC_IS_ASSERTED(PIN_IEC_CLK_IN) )
     {
         // INTERMISSION: EOI
@@ -196,6 +197,7 @@ uint8_t CPBStandardSerial::receiveByte()
         //IEC_RELEASE( PIN_IEC_SRQ );
         // usleep( 1 );
     }
+    portENABLE_INTERRUPTS();
     timer_stop();
     //IEC_RELEASE( PIN_IEC_SRQ );
 
@@ -450,7 +452,7 @@ bool CPBStandardSerial::sendByte(uint8_t data, bool eoi)
 
     IEC.flags &= CLEAR_LOW;
 
-    //portDISABLE_INTERRUPTS();
+    portDISABLE_INTERRUPTS();
 
     // Say we're ready
     IEC_RELEASE ( PIN_IEC_CLK_OUT );
@@ -600,7 +602,7 @@ bool CPBStandardSerial::sendByte(uint8_t data, bool eoi)
     usleep ( TIMING_Tbb );
 
  done:
-    //portENABLE_INTERRUPTS();
+    portENABLE_INTERRUPTS();
 
     //IEC_RELEASE( PIN_IEC_SRQ );
     return success;

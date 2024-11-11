@@ -101,7 +101,7 @@ namespace Protocol
         bool timer_timedout = false;
         uint64_t timer_start_us = 0;
         uint16_t timer_elapsed_us = 0;
-        void timer_start(uint64_t timeout);
+        void timer_start(uint64_t timeout = 500000);
         uint16_t timer_elapsed();
         void timer_wait(uint16_t target_us);
         void timer_stop();

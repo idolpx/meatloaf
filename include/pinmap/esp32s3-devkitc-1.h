@@ -1,6 +1,8 @@
 #ifndef ESP32S3_DEVKITC_1_H
 #define ESP32S3_DEVKITC_1_H
 
+// https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/hw-reference/esp32s3/user-guide-devkitc-1.html
+
 #ifdef PINMAP_ESP32S3_DEVKITC_1
 
 /* SD Card */

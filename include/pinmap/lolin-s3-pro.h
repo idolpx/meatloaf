@@ -1,11 +1,11 @@
 
-#ifndef PINMAP_LOLIN_D32_PRO_H
-#define PINMAP_LOLIN_D32_PRO_H
+#ifndef PINMAP_LOLIN_S3_PRO_H
+#define PINMAP_LOLIN_S3_PRO_H
 
-// https://www.wemos.cc/en/latest/d32/d32_pro.html
-// https://www.wemos.cc/en/latest/_static/files/sch_d32_pro_v2.0.0.pdf
+// https://www.wemos.cc/en/latest/s3/s3_pro.html
+// https://www.wemos.cc/en/latest/_static/files/sch_s3_pro_v1.0.0.pdf
 
-#ifdef PINMAP_LOLIN_D32_PRO
+#ifdef PINMAP_LOLIN_S3_PRO
 
 
 /* SD Card */
@@ -122,5 +122,5 @@
 #define GPIOX_SPEED             400   // PCF8575 - 400Khz
 //#define GPIOX_SPEED             1000  // PCA9673 - 1000Khz / 1Mhz
 
-#endif // PINMAP_LOLIN_D32_PRO
-#endif // PINMAP_LOLIN_D32_PRO_H
+#endif // PINMAP_LOLIN_S3_PRO
+#endif // PINMAP_LOLIN_S3_PRO_H

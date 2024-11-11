@@ -21,7 +21,7 @@
   ],
     "mcu": "esp32s3",
     "variant": "esp32s3",
-    "partitions": "boards/flash_partitions_8MB.csv",
+    "partitions": "boards/flash_partitions_4MB.csv",
     "memory_type": "qio_opi"
   },
   "connectivity": [
@@ -39,11 +39,11 @@
 "arduino",
     "espidf"
   ],
-  "name": "Meatloaf ESP32-S3 8MB",
+  "name": "Meatloaf ESP32-S3 4MB",
   "upload": {
-    "flash_size": "8MB",
+    "flash_size": "4MB",
     "maximum_ram_size": 327680,
-    "maximum_size": 8388608,
+    "maximum_size": 4194304,
     "require_upload_port": true,
     "speed": 460800
   },

@@ -1,6 +1,9 @@
 #ifndef PINMAP_IEC_NUGGET_H
 #define PINMAP_IEC_NUGGET_H
 
+// https://www.wemos.cc/en/latest/d32/d32_pro.html
+// https://www.wemos.cc/en/latest/_static/files/sch_d32_pro_v2.0.0.pdf
+
 #ifdef PINMAP_IEC_NUGGET
 
 /* SD Card */

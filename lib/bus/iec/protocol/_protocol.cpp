@@ -24,9 +24,9 @@ IECProtocol::IECProtocol() {
     esp_timer_create_args_t args = {
         .callback = onTimer,
         .arg = this,
-	.dispatch_method = ESP_TIMER_TASK,
+        .dispatch_method = ESP_TIMER_TASK,
         .name = "onTimer",
-	.skip_unhandled_events = 0,
+        .skip_unhandled_events = 0,
     };
     esp_timer_create(&args, &timer_handle);
 };
@@ -42,6 +42,7 @@ IECProtocol::~IECProtocol() {
 void IECProtocol::timer_start(uint64_t timeout_us)
 {
     timer_timedout = false;
+    timer_elapsed_us = 0;
     timer_start_us = esp_timer_get_time();
     esp_timer_start_once(timer_handle, timeout_us);
     //IEC.pull( PIN_IEC_SRQ );

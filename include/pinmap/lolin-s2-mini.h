@@ -2,6 +2,9 @@
 #ifndef PINMAP_LOLIN_S2_MINI_H
 #define PINMAP_LOLIN_S2_MINI_H
 
+// https://www.wemos.cc/en/latest/s2/s2_mini.html
+// https://www.wemos.cc/en/latest/_static/files/sch_s2_mini_v1.0.0.pdf
+
 #ifdef PINMAP_LOLIN_S2_MINI
 
 /* SD Card */
