@@ -419,7 +419,7 @@ void IRAM_ATTR systemBus::service()
     //Debug_printv ( "primary[%.2X] secondary[%.2X] bus[%d] flags[%d]", data.primary, data.secondary, state, flags );
     //Debug_printv ( "device[%d] channel[%d]", data.device, data.channel);
 
-    Debug_printv("bus[%d] flags[%d]", state, flags);
+    Debug_printv("state[%d] flags[%d]", state, flags);
     Debug_printf("Heap: %lu\r\n",esp_get_free_internal_heap_size());
 
     //IEC_RELEASE( PIN_IEC_SRQ );
