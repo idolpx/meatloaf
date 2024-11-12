@@ -115,7 +115,6 @@ uint8_t  JiffyDOS::receiveByte ()
     //Debug_printv("data[%02X] eoi[%d]", data, IEC.flags); // $ = 0x24
 
 done:
-    timer_stop();
     portENABLE_INTERRUPTS();
 
     return data;
@@ -213,7 +212,6 @@ bool JiffyDOS::sendByte ( uint8_t data, bool eoi )
     Debug_printv("data[%02X] eoi[%d]", data, eoi); // $ = 0x24
 
 done:
-    timer_stop();
     portENABLE_INTERRUPTS();
 
     return true;

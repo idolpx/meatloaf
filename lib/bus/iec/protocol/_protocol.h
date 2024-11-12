@@ -45,10 +45,11 @@
 #define IEC_RELEASE(x)      release(x)
 #endif
 
-// static uint64_t timer_start_us;
-// #define timer_start()           timer_start_us = esp_timer_get_time()
-// #define timer_elapsed()         esp_timer_get_time() - timer_start_us
-// #define timer_wait_until(us)    while( (esp_timer_get_time()-timer_start_us) < ((int) (us+0.5)) )
+static uint64_t timer_start_us;
+#define timer_start()       timer_start_us = esp_timer_get_time()
+#define timer_elapsed()     esp_timer_get_time() - timer_start_us
+#define timer_wait(us)      while( (esp_timer_get_time()-timer_start_us) < ((int) (us+0.5)) )
+#define timer_timeout(us)   (esp_timer_get_time() - timer_start_us > us) 
 
 namespace Protocol
 {
@@ -69,7 +70,7 @@ namespace Protocol
         /**
          * ESP timer handle for the Interrupt rate limiting timer
          */
-        esp_timer_handle_t timer_handle = nullptr;
+        //esp_timer_handle_t timer_handle = nullptr;
 
         /**
          * @brief ctor
@@ -98,13 +99,13 @@ namespace Protocol
         /*
          * @brief Start timer
         */
-        bool timer_timedout = false;
-        uint64_t timer_start_us = 0;
-        uint16_t timer_elapsed_us = 0;
-        void timer_start(uint64_t timeout = 500000);
-        uint16_t timer_elapsed();
-        void timer_wait(uint16_t target_us);
-        void timer_stop();
+        // bool timer_timedout = false;
+        // uint64_t timer_start_us = 0;
+        // uint16_t timer_elapsed_us = 0;
+        // void timer_start(uint64_t timeout = 500000);
+        // uint16_t timer_elapsed();
+        // void timer_wait(uint16_t target_us);
+        // void timer_stop();
 
         /**
          * @brief Wait until target status, or timeout is reached.

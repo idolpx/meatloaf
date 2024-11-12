@@ -416,7 +416,7 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t meth, int resum
 
     //Debug_printv("--- PRE FETCH HEADERS");
 
-    int lengthResp = esp_http_client_fetch_headers(_http);
+    int64_t lengthResp = esp_http_client_fetch_headers(_http);
     if(_size == -1 && lengthResp > 0) {
         // only if we aren't chunked!
         _size = lengthResp;

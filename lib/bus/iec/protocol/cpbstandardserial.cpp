@@ -144,8 +144,9 @@ uint8_t CPBStandardSerial::receiveByte()
 
     //IEC_ASSERT( PIN_IEC_SRQ );
     //if ( timeoutWait ( PIN_IEC_CLK_IN, ASSERTED, TIMING_Tye, false ) == TIMING_Tye )
-    timer_start( TIMING_Tye );
+    timer_start();
     portDISABLE_INTERRUPTS();
+    bool eoi_ack = false;
     while ( !IEC_IS_ASSERTED(PIN_IEC_CLK_IN) )
     {
         // INTERMISSION: EOI
@@ -170,9 +171,8 @@ uint8_t CPBStandardSerial::receiveByte()
 
         //IEC_ASSERT( PIN_IEC_SRQ );
 
-        if ( timer_timedout )
+        if ( timer_timeout( TIMING_Tye ) && !eoi_ack )
         {
-            timer_timedout = false;
             IEC.flags |= EOI_RECVD;
 
             // Acknowledge EOI by asserting data more than 60us
@@ -180,13 +180,14 @@ uint8_t CPBStandardSerial::receiveByte()
             IEC_ASSERT( PIN_IEC_DATA_OUT );
             usleep ( TIMING_Tei );
             IEC_RELEASE( PIN_IEC_DATA_OUT );
+            eoi_ack = true;
         }
 
-        if ( timer_elapsed() > TIMEOUT_DEFAULT )
+        if ( timer_timeout( TIMING_EMPTY ) )
         {
             // Empty stream detected
             IEC.flags |= EMPTY_STREAM;
-            timer_stop();
+            portENABLE_INTERRUPTS();
             return 0;
         }
 
@@ -198,7 +199,6 @@ uint8_t CPBStandardSerial::receiveByte()
         // usleep( 1 );
     }
     portENABLE_INTERRUPTS();
-    timer_stop();
     //IEC_RELEASE( PIN_IEC_SRQ );
 
 
@@ -275,7 +275,7 @@ uint8_t CPBStandardSerial::receiveBits ( bool atn_status )
     IEC.bit = 0;
     IEC.byte = 0;
 
-    timer_start( TIMEOUT_DEFAULT );
+    timer_start();
     while ( IEC.bit < 7 )
     {
         // Has ATN status changed?
@@ -285,7 +285,7 @@ uint8_t CPBStandardSerial::receiveBits ( bool atn_status )
             IEC.flags |= ATN_ASSERTED;
             return 0; // return error because timeout
         }
-        else if ( timer_timedout )
+        else if ( timer_timeout( TIMEOUT_DEFAULT ) )
         {
             Debug_printv ( "Timeout bit[%d]", IEC.bit );
             IEC.flags |= ERROR;
@@ -297,17 +297,17 @@ uint8_t CPBStandardSerial::receiveBits ( bool atn_status )
         //IEC_RELEASE( PIN_IEC_SRQ );
         usleep( 2 );
     }
-    timer_stop();
 
     // If there is a 218us delay before bit 7, the controller uses JiffyDOS
-    timer_start( TIMING_PROTOCOL_DETECT );
+    timer_start();
+    bool jiffydos_ack = false;
     while ( IEC.bit < 8 )
     {
         // Are we in COMMAND mode?
-        if ( IEC.flags &  ATN_ASSERTED )
+        if ( IEC.flags & ATN_ASSERTED )
         {
             // Have we timed out?
-            if ( timer_timedout )
+            if ( timer_timeout( TIMING_PROTOCOL_DETECT ) && !jiffydos_ack )
             {
                 // Check LISTEN & TALK
                 uint8_t device = (IEC.byte >> 1) & 0x1F; // LISTEN
@@ -323,7 +323,7 @@ uint8_t CPBStandardSerial::receiveBits ( bool atn_status )
 
                     IEC.flags |= JIFFYDOS_ACTIVE;
                 }
-                timer_timedout = false;
+                jiffydos_ack = true;
             }
         }
 
@@ -332,7 +332,6 @@ uint8_t CPBStandardSerial::receiveBits ( bool atn_status )
         //IEC_RELEASE( PIN_IEC_SRQ );
         usleep( 2 );
     }
-    timer_stop();
 
     // Wait for CLK to be asserted after last bit
     if ( timeoutWait ( PIN_IEC_CLK_IN, IEC_ASSERTED, FOREVER, false ) == TIMED_OUT )
@@ -452,7 +451,7 @@ bool CPBStandardSerial::sendByte(uint8_t data, bool eoi)
 
     IEC.flags &= CLEAR_LOW;
 
-    portDISABLE_INTERRUPTS();
+    //portDISABLE_INTERRUPTS();
 
     // Say we're ready
     IEC_RELEASE ( PIN_IEC_CLK_OUT );
@@ -602,7 +601,7 @@ bool CPBStandardSerial::sendByte(uint8_t data, bool eoi)
     usleep ( TIMING_Tbb );
 
  done:
-    portENABLE_INTERRUPTS();
+    //portENABLE_INTERRUPTS();
 
     //IEC_RELEASE( PIN_IEC_SRQ );
     return success;

@@ -474,12 +474,12 @@ private:
     /**
      * @brief Start the Interrupt rate limiting timer
      */
-    void timer_start();
+    void timer_srq_start();
 
     /**
      * @brief Stop the Interrupt rate limiting timer
      */
-    void timer_stop();
+    void timer_srq_stop();
 
     /**
      * @brief Receive Byte from bus

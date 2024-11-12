@@ -243,7 +243,7 @@ void systemBus::setup()
     gpio_isr_handler_add((gpio_num_t)PIN_IEC_CLK_IN, cbm_on_clk_isr_forwarder, this);
 
     // Start SRQ timer service
-    timer_start();
+    //timer_srq_start();
 }
 
 
@@ -259,11 +259,11 @@ void IRAM_ATTR systemBus::service()
         // debugTiming();
 
         // Handle SRQ for devices
-        for (auto devicep : _daisyChain)
-        {
-            for (unsigned char i=0;i<16;i++)
-                devicep->poll_interrupt(i);
-        }
+        // for (auto devicep : _daisyChain)
+        // {
+        //     for (unsigned char i=0;i<16;i++)
+        //         devicep->poll_interrupt(i);
+        // }
 
         return;
     }
@@ -366,7 +366,11 @@ void IRAM_ATTR systemBus::service()
                     //IEC_RELEASE( PIN_IEC_SRQ );
                 // }
                 data.init();
-                state = BUS_IDLE;
+
+                if ( flags & ATN_ASSERTED )
+                    state = BUS_ACTIVE;
+                else
+                    state = BUS_IDLE;
             }
 
             //Debug_printv("bus[%d] device[%d] flags[%d]", state, device_state, flags);
@@ -380,13 +384,6 @@ void IRAM_ATTR systemBus::service()
                 releaseLines();
             else
                 releaseLines(true);
-
-            // Switch to standard serial protocol
-            if ( detected_protocol != PROTOCOL_SERIAL)
-            {
-                detected_protocol = PROTOCOL_SERIAL;
-                protocol = selectProtocol();
-            }
 
             data.init();
         }
@@ -403,6 +400,13 @@ void IRAM_ATTR systemBus::service()
             usleep( 1 );
             IEC_RELEASE( PIN_IEC_SRQ );
             usleep( 1 );
+        }
+
+        // Switch to standard serial protocol
+        if ( detected_protocol != PROTOCOL_SERIAL)
+        {
+            detected_protocol = PROTOCOL_SERIAL;
+            protocol = selectProtocol();
         }
 
     } while( state > BUS_IDLE );
@@ -434,10 +438,10 @@ void systemBus::read_command()
         
         return;
     }
-    else if ( flags & EMPTY_STREAM)
-    {
-        state = BUS_RELEASE;
-    }
+    // else if ( flags & EMPTY_STREAM)
+    // {
+    //     state = BUS_RELEASE;
+    // }
     else
     {
         if ( flags & JIFFYDOS_ACTIVE )
@@ -625,7 +629,7 @@ void systemBus::read_payload()
 /**
  * Start the Interrupt rate limiting timer
  */
-void systemBus::timer_start()
+void systemBus::timer_srq_start()
 {
     esp_timer_create_args_t tcfg;
     tcfg.arg = this;
@@ -639,7 +643,7 @@ void systemBus::timer_start()
 /**
  * Stop the Interrupt rate limiting timer
  */
-void systemBus::timer_stop()
+void systemBus::timer_srq_stop()
 {
     // Delete existing timer
     if (rateTimerHandle != nullptr)

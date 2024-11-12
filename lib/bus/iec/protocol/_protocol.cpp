@@ -13,56 +13,56 @@ using namespace Protocol;
 /**
  * Callback function to set timeout 
  */
-static void onTimer(void *arg)
-{
-    IECProtocol *p = (IECProtocol *)arg;
-    p->timer_timedout = true;
-    //IEC.release( PIN_IEC_SRQ );
-}
+// static void onTimer(void *arg)
+// {
+//     IECProtocol *p = (IECProtocol *)arg;
+//     p->timer_timedout = true;
+//     //IEC.release( PIN_IEC_SRQ );
+// }
 
 IECProtocol::IECProtocol() {
-    esp_timer_create_args_t args = {
-        .callback = onTimer,
-        .arg = this,
-        .dispatch_method = ESP_TIMER_TASK,
-        .name = "onTimer",
-        .skip_unhandled_events = 0,
-    };
-    esp_timer_create(&args, &timer_handle);
+    // esp_timer_create_args_t args = {
+    //     .callback = onTimer,
+    //     .arg = this,
+    //     .dispatch_method = ESP_TIMER_TASK,
+    //     .name = "onTimer",
+    //     .skip_unhandled_events = 0,
+    // };
+    // esp_timer_create(&args, &timer_handle);
 };
 
 IECProtocol::~IECProtocol() {
-    esp_timer_stop(timer_handle);
-    esp_timer_delete(timer_handle);
+    // esp_timer_stop(timer_handle);
+    // esp_timer_delete(timer_handle);
 };
 
 /**
  * Start the timeout timer
  */
-void IECProtocol::timer_start(uint64_t timeout_us)
-{
-    timer_timedout = false;
-    timer_elapsed_us = 0;
-    timer_start_us = esp_timer_get_time();
-    esp_timer_start_once(timer_handle, timeout_us);
-    //IEC.pull( PIN_IEC_SRQ );
-}
-uint16_t IECProtocol::timer_elapsed()
-{
-    timer_elapsed_us = esp_timer_get_time() - timer_start_us;
-    return timer_elapsed_us;
-}
-void IECProtocol::timer_wait(uint16_t target_us)
-{
-    while ( timer_elapsed() < target_us )
-        usleep(2);
-}
-void IECProtocol::timer_stop()
-{
-    esp_timer_stop(timer_handle);
-    timer_elapsed();
-    //IEC.release( PIN_IEC_SRQ );
-}
+// void IECProtocol::timer_start(uint64_t timeout_us)
+// {
+//     timer_timedout = false;
+//     timer_elapsed_us = 0;
+//     timer_start_us = esp_timer_get_time();
+//     //esp_timer_start_once(timer_handle, timeout_us);
+//     //IEC.pull( PIN_IEC_SRQ );
+// }
+// uint16_t IECProtocol::timer_elapsed()
+// {
+//     timer_elapsed_us = esp_timer_get_time() - timer_start_us;
+//     return timer_elapsed_us;
+// }
+// void IECProtocol::timer_wait(uint16_t target_us)
+// {
+//     while ( timer_elapsed() < target_us )
+//         usleep(2);
+// }
+// void IECProtocol::timer_stop()
+// {
+//     esp_timer_stop(timer_handle);
+//     timer_elapsed();
+//     //IEC.release( PIN_IEC_SRQ );
+// }
 
 
 // int16_t IRAM_ATTR IECProtocol::timeoutWait(uint8_t pin, bool target_status, size_t wait_us, bool watch_atn)
