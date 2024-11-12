@@ -200,7 +200,10 @@ private:
 class ImageBroker {
     static std::unordered_map<std::string, MMediaStream*> repo;
 public:
-    template<class T> static T* obtain(std::string url) {
+    template<class T> static T* obtain(std::string url) 
+    {
+        Debug_printv("streams[%d] url[%s]", repo.size(), url.c_str());
+
         // obviously you have to supply STREAMFILE.url to this function!
         if(repo.find(url)!=repo.end()) {
             return (T*)repo.at(url);
@@ -210,6 +213,7 @@ public:
         auto newFile = MFSOwner::File(url);
 
         T* newStream = (T*)newFile->getSourceStream();
+
         if ( newStream != nullptr )
         {
             // Are we at the root of the pathInStream?
@@ -240,6 +244,11 @@ public:
             repo.erase(url);
             delete toDelete;
         }
+        Debug_printv("streams[%d]", repo.size());
+    }
+
+    static void validate() {
+        
     }
 };
 

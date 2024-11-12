@@ -443,7 +443,7 @@ bool D64MStream::seekPath(std::string path)
         // Set position to beginning of file
         bool r = seekSector(t, s);
 
-        Debug_printv("File Size: blocks[%d] size[%d] available[%d] r[%d]", entry.blocks, _size, available(), r);
+        Debug_printv("blocks[%d] size[%d] available[%d] r[%d]", entry.blocks, _size, available(), r);
 
         return r;
     }

@@ -46,6 +46,12 @@ iecDrive::iecDrive()
     _last_file = "";
 }
 
+iecDrive::~iecDrive()
+{
+    // if (_base != nullptr)
+    //     delete _base;
+}
+
 // Read disk data and send to computer
 void iecDrive::read()
 {
@@ -84,12 +90,6 @@ mediatype_t iecDrive::mount(FILE *f, const char *filename, uint32_t disksize, me
     return MediaType::discover_mediatype(filename); // MEDIATYPE_UNKNOWN
 }
 
-// Destructor
-iecDrive::~iecDrive()
-{
-    // if (_base != nullptr)
-    //     delete _base;
-}
 
 // Unmount disk file
 void iecDrive::unmount()
@@ -778,7 +778,7 @@ bool iecDrive::registerStream ( uint8_t channel )
     auto newPair = std::make_pair ( channel, new_stream );
     streams.insert ( newPair );
 
-    Debug_printv("Stream created. key[%d] count[%d]", channel, streams.bucket_count());
+    Debug_printv("Stream created. key[%d] count[%d]", channel, streams.size());
     return true;
 }
 
@@ -804,9 +804,9 @@ bool iecDrive::closeStream ( uint8_t channel, bool close_all )
 
     if ( found != streams.end() )
     {
-        Debug_printv("Stream closed. key[%d] count[%d]", channel, streams.bucket_count());
         auto closingStream = (*found).second;
-        closingStream->close();
+        ImageBroker::dispose(closingStream->url);
+        Debug_printv("Stream closed. key[%d] count[%d] url[%s]", channel, streams.size(), closingStream->url.c_str());
         return streams.erase ( channel );
     }
 
@@ -1173,6 +1173,7 @@ bool iecDrive::sendFile()
         return false;
     }
 
+    Debug_printv("stream_url[%s]", istream->url.c_str());
     Debug_printv("size[%d] avail[%d] pos[%d]", istream->size(), istream->available(), istream->position());
 
     if ( !_base->isDirectory() )

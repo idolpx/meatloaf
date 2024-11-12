@@ -406,14 +406,14 @@ MStream* MFile::getSourceStream(std::ios_base::openmode mode) {
             if(mstr::compare(this->pathInStream, pointedFile))
             {
                 //Debug_printv("returning decodedStream");
-                return decodedStream;                
+                return decodedStream;
             }
 
             pointedFile = decodedStream->seekNextEntry();
         }
         //Debug_printv("path in stream not found!");
         if(pointedFile.empty())
-            return nullptr;        
+            return nullptr;
     }
 
     //Debug_printv("returning decodedStream");

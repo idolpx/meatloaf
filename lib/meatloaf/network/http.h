@@ -15,7 +15,7 @@
 #include <map>
 
 #include "../../../include/debug.h"
-//#include "../../include/global_defines.h"
+#include "../../include/global_defines.h"
 //#include "../../include/version.h"
 #include "utils.h"
 
@@ -40,6 +40,22 @@ class MeatHttpClient {
 public:
 
     MeatHttpClient() {
+        esp_http_client_config_t config;
+        memset(&config, 0, sizeof(config));
+        config.url = "https://api.meatloaf.cc/?$";
+        config.auth_type = HTTP_AUTH_TYPE_BASIC;
+        config.user_agent = USER_AGENT;
+        config.method = HTTP_METHOD_GET;
+        config.timeout_ms = 10000;
+        config.max_redirection_count = 10;
+        config.event_handler = _http_event_handler;
+        config.user_data = this;
+        config.keep_alive_enable = true;
+        config.keep_alive_idle = 5;
+        config.keep_alive_interval = 5;
+
+        //Debug_printv("HTTP Init url[%s]", url.c_str());
+        _http = esp_http_client_init(&config);
     }
     
     ~MeatHttpClient() {
@@ -151,12 +167,6 @@ public:
         close();
     };
 
-    // MStream methods
-    // uint32_t size() override;
-    // uint32_t available() override;     
-    // uint32_t position() override;
-    // size_t error() override;
-
     virtual bool seek(uint32_t pos);
 
     void close() override;
@@ -170,7 +180,6 @@ public:
 
 protected:
     MeatHttpClient _http;
-
 };
 
 

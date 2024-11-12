@@ -73,7 +73,6 @@ bool MMediaStream::open()
 void MMediaStream::close()
 {
     Debug_printv("url[%s]", url.c_str());
-    ImageBroker::dispose(url);
 };
 
 uint32_t MMediaStream::seekFileSize( uint8_t start_track, uint8_t start_sector )
