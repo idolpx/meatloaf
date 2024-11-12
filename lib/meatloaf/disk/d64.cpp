@@ -211,7 +211,7 @@ bool D64MStream::seekEntry(std::string filename)
             //mstr::rtrimA0(entryFilename);
             entryFilename = mstr::toUTF8(entryFilename);
 
-            Debug_printv("index[%d] track[%d] sector[%d] filename[%s] entry.filename[%.16s]", index, track, sector, filename.c_str(), entryFilename.c_str());
+            //Debug_printv("index[%d] track[%d] sector[%d] filename[%s] entry.filename[%.16s]", index, track, sector, filename.c_str(), entryFilename.c_str());
 
             // Debug_printv("filename[%s] entry[%s]", filename.c_str(), entryFilename.c_str());
 
@@ -275,7 +275,7 @@ bool D64MStream::seekEntry(uint16_t index)
         {
             if (next_track)
             {
-                Debug_printv("next_track[%d] next_sector[%d]", entry.next_track, entry.next_sector);
+                //Debug_printv("next_track[%d] next_sector[%d]", entry.next_track, entry.next_sector);
                 if (!seekSector(entry.next_track, entry.next_sector))
                     return false;
             }
@@ -284,7 +284,7 @@ bool D64MStream::seekEntry(uint16_t index)
             next_track = entry.next_track;
             next_sector = entry.next_sector;
 
-            Debug_printv("sectorOffset[%d] -> track[%d] sector[%d]", sectorOffset, track, sector);
+            //Debug_printv("sectorOffset[%d] -> track[%d] sector[%d]", sectorOffset, track, sector);
 
         } while (sectorOffset-- > 0);
         if (!seekSector(track, sector, entryOffset))

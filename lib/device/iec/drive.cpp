@@ -273,9 +273,6 @@ void iecDrive::process_channel()
 
 void iecDrive::iec_open()
 {
-    if ( commanddata.primary == IEC_UNLISTEN )
-        return;
-
     pt = util_tokenize(payload, ',');
     if ( pt.size() > 1 )
     {
@@ -720,7 +717,7 @@ bool iecDrive::registerStream ( uint8_t channel )
     std::ios_base::openmode mode = std::ios_base::in;
 #endif
 
-    Debug_printv("_base[%s]", _base->url.c_str());
+    //Debug_printv("_base[%s]", _base->url.c_str());
     _base.reset( MFSOwner::File( _base->url ) );
 
     std::shared_ptr<MStream> new_stream;
@@ -787,11 +784,11 @@ bool iecDrive::registerStream ( uint8_t channel )
 
 std::shared_ptr<MStream> iecDrive::retrieveStream ( uint8_t channel )
 {
-    Debug_printv("Stream key[%d]", channel);
+    //Debug_printv("Stream key[%d]", channel);
 
     if ( streams.find ( channel ) != streams.end() )
     {
-        Debug_printv("Stream retrieved. key[%d] count[%d]", channel, streams.bucket_count());
+        Debug_printv("Stream retrieved. key[%d] count[%d]", channel, streams.size());
         return streams.at ( channel );
     }
     else

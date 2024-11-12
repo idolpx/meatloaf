@@ -146,13 +146,13 @@ public:
      */
     uint8_t primary = 0;
     /**
-     * @brief the primary device number
-     */
-    uint8_t device = 0;
-    /**
      * @brief the secondary command byte
      */
     uint8_t secondary = 0;
+    /**
+     * @brief the primary device number
+     */
+    uint8_t device = 0;
     /**
      * @brief the secondary command channel
      */
@@ -166,21 +166,16 @@ public:
      */
     std::vector<uint8_t> payload_raw;
     /**
-     * @brief secondary action description
-     */
-    std::string action ="";
-    /**
      * @brief clear and initialize IEC command data
      */
     void init(void)
     {
         //primary = 0;
-        device = 0;
         secondary = 0;
+        device = 0;
         channel = 0;
-        payload = "";
+        payload.clear();
         payload_raw.clear();
-        action = "";
     }
 };
 

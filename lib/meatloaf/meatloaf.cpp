@@ -422,9 +422,7 @@ MStream* MFile::getSourceStream(std::ios_base::openmode mode) {
 
 MFile* MFile::cd(std::string newDir) 
 {
-    Debug_printv("cd requested: [%s]", newDir.c_str());
-    if ( streamFile != nullptr)
-        Debug_printv("streamFile[%s]", streamFile->url.c_str());
+    Debug_printv("cd[%s]", newDir.c_str());
 
     // OK to clarify - coming here there should be ONLY path or magicSymbol-path combo!
     // NO "cd:xxxxx", no "/cd:xxxxx" ALLOWED here! ******************
@@ -490,8 +488,6 @@ MFile* MFile::cd(std::string newDir)
         if ( !mstr::endsWith(url, "/") && newDir.size() )
             url.push_back('/');
 
-        Debug_printv("> url[%s] newDir[%s]", url.c_str(), newDir.c_str());
-
         // Add new directory to path
         MFile* newPath = MFSOwner::File(url + newDir);
 
@@ -501,7 +497,6 @@ MFile* MFile::cd(std::string newDir)
             //auto reader = Meat::New<MFile>(newDir);
             //auto istream = reader->getSourceStream();
             Meat::iostream reader(newPath);
-
 
             //uint8_t url[istream->size()]; // NOPE, streams have no size!
             //istream->read(url, istream->size());
@@ -514,9 +509,8 @@ MFile* MFile::cd(std::string newDir)
             delete newPath;
             newPath = MFSOwner::File(url);
         }
-        
-        if ( newPath->exists() )
-            return newPath;
+
+        return newPath;
     }
 
     return nullptr;
