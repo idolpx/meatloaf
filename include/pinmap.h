@@ -44,4 +44,9 @@
 #define DEFAULT_PIN_DTR GPIO_NUM_27
 #endif
 
+
+#ifndef PIN_DEBUG
+#define PIN_DEBUG		PIN_IEC_SRQ
+#endif
+
 #endif // PINMAP_H

@@ -34,9 +34,7 @@ namespace Protocol
 	class SauceDOS : public IECProtocol
 	{
 		public:
-			SauceDOS() {
-
-			};
+			SauceDOS();
 
 		protected:
 			uint8_t receiveByte(void) override;

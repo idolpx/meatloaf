@@ -204,14 +204,10 @@ typedef enum
 // Not Inverted
 #define IEC_ASSERTED  true
 #define IEC_RELEASED  false
-#define LOW 0x00
-#define HIGH 0x01
 #else
 // Inverted
 #define IEC_ASSERTED  false
 #define IEC_RELEASED  true
-#define LOW 0x01
-#define HIGH 0x00
 #endif
 
 #endif // CBMDEFINES_H

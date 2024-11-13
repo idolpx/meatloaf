@@ -10,6 +10,7 @@
 #include "gpiox.h" // Required for PCF8575/PCA9674/MCP23017
 
 #include "../iec.h"
+#include "../protocol/_protocol.h"
 #include "../../include/cbm_defines.h"
 #include "../../include/pinmap.h"
 #include "../../include/debug.h"
@@ -49,21 +50,21 @@ void parallelBus::service()
     Debug_printv( "User Port Data Interrupt Received!" );
 
     //Debug_printv("state[%d]", IEC.state);
-    if ( IEC.state > BUS_OFFLINE ) // Is C64 is powered on?
+    if ( IEC.enabled ) // Is C64 is powered on?
     {
         // Update flags and data
         PARALLEL.readByte();
         Debug_printv("receive <<< " BYTE_TO_BINARY_PATTERN " flags[%02X] " BYTE_TO_BINARY_PATTERN " data[%02X]", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
 
         // If PC2 is set then parallel is active and a byte is ready to be read!
-        if ( PARALLEL.status( PC2 ) )
+        if ( IEC_IS_ASSERTED( PC2 ) )
         {
             PARALLEL.state = PBUS_PROCESS;
             //Debug_printv("receive <<< " BYTE_TO_BINARY_PATTERN " (%0.2d) " BYTE_TO_BINARY_PATTERN " (%0.2d)", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
         }
 
         // Set RECEIVE/SEND mode   
-        if ( PARALLEL.status( PA2 ) )
+        if ( IEC_IS_ASSERTED( PA2 ) )
         {
             PARALLEL.mode = MODE_RECEIVE;
             GPIOX.portMode( USERPORT_DATA, GPIOX_MODE_INPUT );
@@ -72,17 +73,17 @@ void parallelBus::service()
             Debug_printv("receive <<< " BYTE_TO_BINARY_PATTERN " flags[%02X] " BYTE_TO_BINARY_PATTERN " data[%02X]", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
 
             // DolphinDOS Detection
-            if ( PARALLEL.status( ATN ) )
+            if ( IEC_IS_ASSERTED( ATN ) )
             {
-                if ( IEC.data.secondary == IEC_OPEN || IEC.data.secondary == IEC_REOPEN )
-                {
-                    IEC.flags |= PARALLEL_ACTIVE;
-                    Debug_printv("dolphindos");
-                }
+                // if ( IEC.data.secondary == IEC_OPEN || IEC.data.secondary == IEC_REOPEN )
+                // {
+                //     IEC.flags |= PARALLEL_ACTIVE;
+                //     Debug_printv("dolphindos");
+                // }
             }
 
             // WIC64
-            if ( PARALLEL.status( PC2 ) )
+            if ( IEC_IS_ASSERTED( PC2 ) )
             {
                 if ( PARALLEL.data == 0x57 ) // WiC64 commands start with 'W'
                 {
@@ -196,14 +197,6 @@ void parallelBus::writeByte( uint8_t byte )
 
     // Tell receiver byte is ready to read
     this->handShake();
-}
-
-bool parallelBus::status( user_port_pin_t pin )
-{
-    if ( pin < 8 ) 
-        return ( this->flags & ( 1 >> pin) );
-    
-    return ( this->data & ( 1 >> ( pin - 8) ) );
 }
 
 

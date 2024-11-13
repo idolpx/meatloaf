@@ -1,6 +1,7 @@
 #ifdef BUILD_IEC
 
 #include "fuji.h"
+#include "../../../include/cbm_defines.h"
 
 #include <driver/ledc.h>
 
@@ -11,9 +12,8 @@
 #include <string>
 #include <utility>
 
-#include "../../../include/cbm_defines.h"
-#include "../../../include/debug.h"
 #include "string_utils.h"
+#include "../../../include/debug.h"
 
 #include "fnSystem.h"
 #include "fnConfig.h"

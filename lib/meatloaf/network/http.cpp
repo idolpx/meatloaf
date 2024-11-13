@@ -191,26 +191,10 @@ uint32_t HttpIStream::write(const uint8_t *buf, uint32_t size) {
 }
 
 
-
 bool HttpIStream::isOpen() {
     return _http._is_open;
 };
 
-// uint32_t HttpIStream::size() {
-//     return _http._size;
-// };
-
-// uint32_t HttpIStream::available() {
-//     return _http.m_bytesAvailable;
-// };
-
-// uint32_t HttpIStream::position() {
-//     return _http._position;
-// }
-
-// size_t HttpIStream::error() {
-//     return _http.m_error;
-// }
 
 /********************************************************
  * Meat HTTP client impls
@@ -275,6 +259,9 @@ bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
 
 void MeatHttpClient::close() {
     if(_http != nullptr) {
+        if ( _is_open ) {
+            esp_http_client_close(_http);
+        }
         esp_http_client_cleanup(_http);
         Debug_printv("HTTP Close and Cleanup");
         _http = nullptr;
@@ -356,11 +343,15 @@ uint32_t MeatHttpClient::read(uint8_t* buf, uint32_t size) {
     }
 
     if (_is_open) {
+        Debug_printv("Reading HTTP Stream!");
         auto bytesRead= esp_http_client_read(_http, (char *)buf, size );
         
         if(bytesRead>0) {
             _position+=bytesRead;
         }
+        if(bytesRead<0)
+            return 0;
+
         return bytesRead;        
     }
     return 0;

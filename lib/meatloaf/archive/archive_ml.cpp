@@ -19,7 +19,7 @@ ssize_t cb_read(struct archive *a, void *userData, const void **buff)
     // 1. we have to call srcStr.read(...)
     ssize_t bc = streamData->srcStream->read(streamData->srcBuffer, ArchiveMStream::buffSize);
     //std::string dump((char*)streamData->srcBuffer, bc);
-    //Debug_printv("Libarch pulling data from src MStream, got bytes:%d", bc);
+    Debug_printv("libarchive pulling data from src MStream, got bytes:%d", bc);
     //Debug_printv("Dumping bytes: %s", dump.c_str());
     // 2. set *buff to the bufer read in 1.
     *buff = streamData->srcBuffer;
@@ -157,15 +157,16 @@ uint32_t ArchiveMStream::read(uint8_t *buf, uint32_t size)
 {
     Debug_printv("calling read, buff size=[%d]", size);
 
-    int r = archive_read_data(a, &buf, size);
+    ssize_t zsize = archive_read_data(a, &buf, size);
 
-    Debug_printv("archive returned [%d] unarchived bytes", r);
-    if ( r >= 0 ) {
-        _position += r;
-        return r;
+    Debug_printv("archive returned [%d] unarchived bytes", zsize);
+    if ( zsize >= 0 ) {
+        _position += zsize;
+        return zsize;
     }
-    else if ( r == ARCHIVE_FATAL ) 
+    else if ( zsize < 0 ) 
     {
+        _error = zsize;
         close();
         return 0;
     }
@@ -207,12 +208,12 @@ bool ArchiveMStream::seekEntry( std::string filename )
         while ( archive_read_next_header(a, &entry) == ARCHIVE_OK )
         {
             // Check filetype
-            if ( archive_entry_filetype(entry) != AE_IFDIR )
+            const mode_t type = archive_entry_filetype(entry);
+            if ( S_ISREG(type) )
             {
-                std::string entryPath = ""; //archive_entry_sourcepath(entry);
                 std::string entryFilename = basename(archive_entry_pathname(entry));
 
-                Debug_printv("path[%s] filename[%s] entry.filename[%.16s]", entryPath.c_str(), filename.c_str(), entryFilename.c_str());
+                Debug_printv("filename[%s] entry.filename[%.16s]", filename.c_str(), entryFilename.c_str());
 
                 // Read Entry From Stream
                 if (filename == "*") // Match first entry

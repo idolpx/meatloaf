@@ -717,7 +717,7 @@ bool iecDrive::registerStream ( uint8_t channel )
     std::ios_base::openmode mode = std::ios_base::in;
 #endif
 
-    //Debug_printv("_base[%s]", _base->url.c_str());
+    Debug_printv("_base[%s]", _base->url.c_str());
     _base.reset( MFSOwner::File( _base->url ) );
 
     std::shared_ptr<MStream> new_stream;
@@ -1249,11 +1249,10 @@ bool iecDrive::sendFile()
         // Send Bytes
         written = IEC.sendBytes((const char *) buf, len, eoi);
         if (written != len) {
-            Debug_printv("Short write: %i expected: %i cur: %i", written, len, count);
-            count -= len - written;
-            istream->seek(count, SEEK_SET);
-            state = DEVICE_PAUSED;
-            return true;
+          Debug_printv("Short write: %i expected: %i cur: %i", written, len, count);
+          count -= len - written;
+          istream->seek(count, SEEK_SET);
+          break;
         }
 
         uint32_t t = 0;

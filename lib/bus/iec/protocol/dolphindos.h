@@ -28,7 +28,6 @@
 #define PROTOCOL_DOLPHINDOS_H
 
 #include "_protocol.h"
-#include "../userport.h"
 
 namespace Protocol
 {

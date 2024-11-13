@@ -115,7 +115,6 @@ class parallelBus
         void handShake();
         uint8_t readByte();
         void writeByte( uint8_t byte );
-        bool status( user_port_pin_t pin );
 
         uint8_t flags = 0x00;
         uint8_t data = 0;

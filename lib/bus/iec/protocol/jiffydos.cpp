@@ -1,4 +1,5 @@
 #ifdef BUILD_IEC
+#ifdef JIFFYDOS
 // Meatloaf - A Commodore 64/128 multi-device emulator
 // https://github.com/idolpx/meatloaf
 // Copyright(C) 2020 James Johnston
@@ -217,4 +218,5 @@ done:
     return true;
 } // sendByte
 
-#endif /* BUILD_IEC*/
+#endif // JIFFYDOS
+#endif // BUILD_IEC

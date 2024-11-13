@@ -29,9 +29,12 @@
 #include "string_utils.h"
 #include "utils.h"
 
-#define MAIN_STACKSIZE 4096
-#define MAIN_PRIORITY 20
+#define MAIN_STACKSIZE	 4096
+#define MAIN_PRIORITY	 20
 #define MAIN_CPUAFFINITY 1
+
+#define IEC_ALLDEV		 31
+#define IEC_SET_STATE(x) ({ _state = x; })
 
 using namespace Protocol;
 
@@ -47,16 +50,29 @@ static void IRAM_ATTR cbm_on_atn_isr_forwarder(void *arg)
 void IRAM_ATTR systemBus::cbm_on_atn_isr_handler()
 {
     //IEC_ASSERT(PIN_IEC_SRQ);
+    if (IEC_IS_ASSERTED(PIN_IEC_ATN))
+    {
+        // Go to listener mode and get command
+        IEC_RELEASE(PIN_IEC_CLK_OUT);
+        IEC_ASSERT(PIN_IEC_DATA_OUT);
 
-    // Go to listener mode and get command
-    IEC_RELEASE(PIN_IEC_CLK_OUT);
-    IEC_ASSERT(PIN_IEC_DATA_OUT);
+        flags = CLEAR;
+        flags |= ATN_ASSERTED;
+        IEC_SET_STATE(BUS_ACTIVE);
 
-    flags = CLEAR;
-    flags |= ATN_ASSERTED;
-    state = BUS_ACTIVE;
-
-    //IEC_RELEASE(PIN_IEC_SRQ);
+        // Commands are always sent using standard serial
+        if (detected_protocol != PROTOCOL_SERIAL)
+        {
+            detected_protocol = PROTOCOL_SERIAL;
+            protocol = selectProtocol();
+        }
+    }
+    else if (_state == BUS_RELEASE)
+    {
+        releaseLines();
+        IEC_SET_STATE(BUS_IDLE);
+    }
+    //IEC_RELEASE(PIN_DEBUG);
 }
 
 static void IRAM_ATTR cbm_on_clk_isr_forwarder(void *arg)
@@ -69,26 +85,122 @@ static void IRAM_ATTR cbm_on_clk_isr_forwarder(void *arg)
 void IRAM_ATTR systemBus::cbm_on_clk_isr_handler()
 {
     //IEC_ASSERT(PIN_IEC_SRQ);
+    int atn, val;
+    int cmd, dev;
 
-    // get bit
-    byte >>= 1;
-    if ( !IEC_IS_ASSERTED( PIN_IEC_DATA_IN ) ) byte |= 0x80;
-    bit++;
+    if (_state < BUS_ACTIVE)
+        return;
 
-    //IEC_RELEASE(PIN_IEC_SRQ);
+    atn = IEC_IS_ASSERTED(PIN_IEC_ATN);
+    gpio_intr_disable(PIN_IEC_CLK_IN);
+
+    val = protocol->receiveByte();
+    if (flags & ERROR)
+        goto done;
+
+    if (atn)
+    {
+        cmd = val & 0xe0;
+        dev = val & 0x1f;
+
+        switch (cmd)
+        {
+        case IEC_LISTEN:
+        case IEC_TALK:
+            if (dev == IEC_ALLDEV || !isDeviceEnabled(dev))
+            {
+                if (dev == IEC_ALLDEV)
+                {
+                    // Handle releaseLines() when ATN is released outside of this
+                    // interrupt to prevent watchdog timeout
+                    IEC_SET_STATE(BUS_RELEASE);
+                }
+                else
+                {
+                    IEC_SET_STATE(BUS_IDLE);
+                    protocol->transferDelaySinceLast(TIMING_Tbb);
+                    releaseLines();
+                }
+                sendInput();
+            }
+            else
+            {
+                newIO(val);
+#ifdef JIFFYDOS
+                if (flags & JIFFYDOS_ACTIVE)
+                {
+                    detected_protocol = PROTOCOL_JIFFYDOS;
+                    protocol = selectProtocol();
+                }
+#endif
+            }
+            break;
+
+        case IEC_REOPEN:
+            /* Take a break driver 8. We can reach our destination, but we're still a ways away */
+            if (iec_curCommand)
+            {
+                channelIO(val);
+                if (iec_curCommand->primary == IEC_TALK)
+                {
+                    IEC_SET_STATE(BUS_IDLE);
+                    turnAround();
+                    sendInput();
+                }
+            }
+            break;
+
+        case IEC_CLOSE:
+            if (iec_curCommand)
+            {
+                channelIO(val);
+                if (dev == 0x00)
+                    sendInput();
+            }
+            break;
+
+        default:
+            break;
+        }
+    }
+    else if (iec_curCommand)
+        iec_curCommand->payload += val & 0xff;
+
+done:
+    gpio_intr_enable(PIN_IEC_CLK_IN);
+    //IEC_RELEASE(PIN_DEBUG);
+    return;
 }
 
-// void IRAM_ATTR systemBus::cbm_on_srq_isr_handler()
-// {
-//     //IEC_ASSERT(PIN_IEC_SRQ);
+void IRAM_ATTR systemBus::newIO(int val)
+{
+    iec_curCommand = new IECData();
+    iec_curCommand->primary = val & 0xe0;
+    iec_curCommand->device = val & 0x1f;
+    iec_curCommand->payload = "";
 
-//     // get bit
-//     byte >>= 1;
-//     if ( !IEC_IS_ASSERTED( PIN_IEC_SRQ ) ) byte |= 0x80;
-//     bit++;
+    return;
+}
 
-//     //IEC_RELEASE(PIN_IEC_SRQ);
-// }
+void IRAM_ATTR systemBus::channelIO(int val)
+{
+    iec_curCommand->secondary = val & 0xf0;
+    iec_curCommand->channel = val & 0x0f;
+    return;
+}
+
+void IRAM_ATTR systemBus::sendInput(void)
+{
+    BaseType_t woken;
+
+    // IEC_ASSERT(PIN_DEBUG);
+    if (iec_curCommand)
+        xQueueSendFromISR(iec_commandQueue, &iec_curCommand, &woken);
+    iec_curCommand = nullptr;
+    // IEC_RELEASE(PIN_DEBUG);
+
+    return;
+}
 
 /**
  * Static callback function for the interrupt rate limiting timer. It sets the interruptProceed
@@ -97,20 +209,19 @@ void IRAM_ATTR systemBus::cbm_on_clk_isr_handler()
 static void onTimer(void *info)
 {
     systemBus *parent = (systemBus *)info;
-    //portENTER_CRITICAL_ISR(&parent->timerMux);
+    // portENTER_CRITICAL_ISR(&parent->timerMux);
     parent->interruptSRQ = !parent->interruptSRQ;
-    //portEXIT_CRITICAL_ISR(&parent->timerMux);
+    // portEXIT_CRITICAL_ISR(&parent->timerMux);
 }
 
 static void ml_iec_intr_task(void* arg)
 {
-    while ( true ) 
+    while ( true )
     {
         if ( IEC.enabled )
             IEC.service();
 
-        if ( IEC.state < BUS_ACTIVE )
-            taskYIELD();
+        taskYIELD();
     }
 }
 
@@ -120,82 +231,9 @@ void systemBus::init_gpio(gpio_num_t _pin)
     gpio_set_direction(_pin, GPIO_MODE_INPUT);
     gpio_pullup_en(_pin);
     gpio_set_pull_mode(_pin, GPIO_PULLUP_ONLY);
-    gpio_set_level(_pin, LOW);
+    gpio_set_level(_pin, 0);
     return;
 }
-
-#ifdef IEC_ASSERT_RELEASE_AS_FUNCTIONS
-// true => ASSERT => LOW
-void IRAM_ATTR systemBus::pull ( uint8_t _pin )
-{
-    int _reg = GPIO_ENABLE_REG;
-    if (_pin > 31) 
-    { 
-        _reg = GPIO_ENABLE1_REG, _pin -= 32;
-    } 
-    REG_SET_BIT(_reg, 1ULL << _pin); // GPIO_MODE_OUTPUT
-}
-
-// false => RELEASE => HIGH
-void IRAM_ATTR systemBus::release ( uint8_t _pin )
-{
-    int _reg = GPIO_ENABLE_REG;
-    if (_pin > 31) 
-    { 
-        _reg = GPIO_ENABLE1_REG, _pin -= 32;
-    } 
-    REG_CLR_BIT(_reg, 1ULL << _pin); // GPIO_MODE_INPUT
-}
-
-bool IRAM_ATTR systemBus::status ( uint8_t _pin )
-{
-    int _reg = GPIO_IN_REG;
-    if (_pin > 31) 
-    { 
-        _reg = GPIO_IN1_REG, _pin -= 32;
-    } 
-    return (REG_READ(_reg) & BIT(_pin)) ? RELEASED : ASSERTED;
-}
-#endif
-
-bool IRAM_ATTR systemBus::status ()
-{
-    // uint64_t pin_states;
-    // pin_states = REG_READ(GPIO_IN1_REG);
-    // pin_states << 32 & REG_READ(GPIO_IN_REG);
-    // pin_atn = pin_states & BIT(PIN_IEC_ATN);
-    // pin_clk = pin_states & BIT(PIN_IEC_CLK_IN);
-    // pin_data = pin_states & BIT(PIN_IEC_DATA_IN);
-    // pin_srq = pin_states & BIT(PIN_IEC_SRQ);
-    // pin_reset = pin_states & BIT(PIN_IEC_RESET);
-    return true;
-};
-
-
-
-// uint8_t IRAM_ATTR systemBus::status()
-// {
-//     int data = 0;
-
-//     // gpio_config_t io_config =
-//     // {
-//     //     .pin_bit_mask = BIT(PIN_IEC_CLK_IN) | BIT(PIN_IEC_CLK_OUT) |BIT(PIN_IEC_DATA_IN) | BIT(PIN_IEC_DATA_OUT) | BIT(PIN_IEC_SRQ) | BIT(PIN_IEC_RESET),
-//     //     .mode = GPIO_MODE_INPUT,
-//     //     .pull_up_en = GPIO_PULLUP_ENABLE,
-//     //     .intr_type = GPIO_INTR_DISABLE,
-//     // };
-
-//     // ESP_ERROR_CHECK(gpio_config(&io_config));
-//     uint64_t io_data = REG_READ(GPIO_IN_REG);
-
-//     //data |= (0 & (io_data & (1 << PIN_IEC_ATN)));
-//     data |= (1 & (io_data & (1 << PIN_IEC_CLK_IN)));
-//     data |= (2 & (io_data & (1 << PIN_IEC_DATA_IN)));
-//     data |= (3 & (io_data & (1 << PIN_IEC_SRQ)));
-//     data |= (4 & (io_data & (1 << PIN_IEC_RESET)));
-
-//     return data;
-// }
 
 void systemBus::setup()
 {
@@ -215,6 +253,12 @@ void systemBus::setup()
     init_gpio(PIN_IEC_RESET);
 #endif
 
+#ifdef IEC_INVERTED_LINES
+#warning intr_type likely needs to be fixed!
+#endif
+
+    iec_commandQueue = xQueueCreate(10, sizeof(IECData *));
+
     // Start task
     // Create a new high-priority task to handle the main service loop
     // This is assigned to CPU1; the WiFi task ends up on CPU0
@@ -222,414 +266,60 @@ void systemBus::setup()
 
     // Setup interrupt for ATN
     gpio_config_t io_conf = {
-        .pin_bit_mask = ( 1ULL << PIN_IEC_ATN ),    // bit mask of the pins that you want to set
-        .mode = GPIO_MODE_INPUT,                    // set as input mode
-        .pull_up_en = GPIO_PULLUP_DISABLE,          // disable pull-up mode
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,      // disable pull-down mode
-        .intr_type = GPIO_INTR_NEGEDGE              // interrupt of falling edge
+        .pin_bit_mask = (1ULL << PIN_IEC_ATN), // bit mask of the pins that you want to set
+        .mode = GPIO_MODE_INPUT,			   // set as input mode
+        .pull_up_en = GPIO_PULLUP_DISABLE,	   // disable pull-up mode
+        .pull_down_en = GPIO_PULLDOWN_DISABLE, // disable pull-down mode
+        .intr_type = GPIO_INTR_ANYEDGE		   // interrupt of any edge
     };
     gpio_config(&io_conf);
     gpio_isr_handler_add((gpio_num_t)PIN_IEC_ATN, cbm_on_atn_isr_forwarder, this);
 
     // Setup interrupt config for CLK
     io_conf = {
-        .pin_bit_mask = ( 1ULL << PIN_IEC_CLK_IN ),    // bit mask of the pins that you want to set
+        .pin_bit_mask = (1ULL << PIN_IEC_CLK_IN),   // bit mask of the pins that you want to set
         .mode = GPIO_MODE_INPUT,                    // set as input mode
         .pull_up_en = GPIO_PULLUP_DISABLE,          // disable pull-up mode
         .pull_down_en = GPIO_PULLDOWN_DISABLE,      // disable pull-down mode
+#ifdef IEC_INVERTED_LINES
+        .intr_type = GPIO_INTR_NEGEDGE              // interrupt of falling edge
+#else
         .intr_type = GPIO_INTR_POSEDGE              // interrupt of rising edge
+#endif
     };
     gpio_config(&io_conf);
     gpio_isr_handler_add((gpio_num_t)PIN_IEC_CLK_IN, cbm_on_clk_isr_forwarder, this);
 
     // Start SRQ timer service
-    //timer_srq_start();
+    //timer_start_srq();
 }
-
 
 void IRAM_ATTR systemBus::service()
 {
-    //IEC_ASSERT( PIN_IEC_SRQ );
+    IECData *received;
 
-    // Disable Interrupt
-    // gpio_intr_disable((gpio_num_t)PIN_IEC_ATN);
-
-    if (state < BUS_ACTIVE)
-    {
-        // debugTiming();
-
-        // Handle SRQ for devices
-        // for (auto devicep : _daisyChain)
-        // {
-        //     for (unsigned char i=0;i<16;i++)
-        //         devicep->poll_interrupt(i);
-        // }
-
+    if (!xQueueReceive(iec_commandQueue, &received, 0))
         return;
+
+    received->debugPrint();
+
+    auto d = deviceById(received->device);
+    if (d != nullptr)
+    {
+        d->commanddata = *received;
+        d->process();
     }
 
-#ifdef IEC_HAS_RESET
-    // Check if CBM is sending a reset (setting the RESET line high). This is typically
-    // when the CBM is reset itself. In this case, we are supposed to reset all states to initial.
-    if (IEC_IS_ASSERTED(PIN_IEC_RESET))
-    {
-        if (IEC_IS_ASSERTED(PIN_IEC_ATN))
-        {
-            // If RESET & ATN are both ASSERTED then CBM is off
-            state = BUS_OFFLINE;
-            // gpio_intr_enable((gpio_num_t)PIN_IEC_ATN);
-            return;
-        }
+    // Command was processed, clear it out
+    delete received;
 
-        //Debug_printf("IEC Reset! reset\r\n");
-        data.init(); // Clear bus data
-        releaseLines();
-        state = BUS_IDLE;
-        //Debug_printv("bus init");
-
-        // Reset virtual devices
-        reset_all_our_devices();
-        // gpio_intr_enable((gpio_num_t)PIN_IEC_ATN);
-        return;
-    }
-#endif
-
-    // Command or Data Mode
-    do
-    {
-        if (state == BUS_ACTIVE)
-        {
-            // Command Mode
-
-            //IEC_ASSERT( PIN_IEC_SRQ );
-
-            // *** IMPORTANT! This helps keep us in sync!
-            // Sometimes the C64 asserts ATN but doesn't assert CLOCK right away
-            protocol->timeoutWait ( PIN_IEC_CLK_IN, IEC_ASSERTED, TIMEOUT_ATNCLK, false );
-
-            // Read bus command bytes
-            //Debug_printv("command");
-            read_command();
-
-            //IEC_RELEASE( PIN_IEC_SRQ );
-        }
-
-        if (state == BUS_PROCESS)
-        {
-            // Data Mode
-
-            //Debug_printv("data");
-            //IEC_ASSERT( PIN_IEC_SRQ );
-
-            // Reset bit/byte
-            bit = 0;
-            byte = 0;
-
-            // Switch to detected protocol
-            //IEC_ASSERT( PIN_IEC_SRQ );
-            if ( detected_protocol != PROTOCOL_SERIAL)
-            {
-                protocol = selectProtocol();
-            }
-            //IEC_RELEASE( PIN_IEC_SRQ );
-
-            if ( data.primary == IEC_LISTEN )
-            {
-                //Debug_printv("calling deviceListen()\r\n");
-                //IEC_ASSERT( PIN_IEC_SRQ );
-                deviceListen();
-                //IEC_RELEASE( PIN_IEC_SRQ );
-            }
-            else if ( data.primary == IEC_TALK )
-            {
-                //Debug_printv("calling deviceTalk()\r\n");
-                //IEC_ASSERT( PIN_IEC_SRQ );
-                deviceTalk();
-                //IEC_RELEASE( PIN_IEC_SRQ );
-            }
-
-            // Queue command in specified device
-            auto d = deviceById(data.device);
-            if (d != nullptr)
-            {
-                d->queue_command(data);
-            }
-
-            // Process device commands
-            if (d != nullptr && state == BUS_PROCESS )
-            {
-                //Debug_printv("bus[%d] device[%d]", state, device_state);
-                // for (auto devicep : _daisyChain)
-                // {
-                    //IEC_ASSERT( PIN_IEC_SRQ );
-                    d->process();
-                    //IEC_RELEASE( PIN_IEC_SRQ );
-                // }
-                data.init();
-
-                if ( flags & ATN_ASSERTED )
-                    state = BUS_ACTIVE;
-                else
-                    state = BUS_IDLE;
-            }
-
-            //Debug_printv("bus[%d] device[%d] flags[%d]", state, device_state, flags);
-            //IEC_RELEASE( PIN_IEC_SRQ );
-        }
-
-        // Clean Up
-        if (state == BUS_RELEASE)
-        {
-            if (data.primary == IEC_LISTEN)
-                releaseLines();
-            else
-                releaseLines(true);
-
-            data.init();
-        }
-
-        // Let's check ATN again before we exit
-        else if ( IEC_IS_ASSERTED( PIN_IEC_ATN ) )
-        {
-            state = BUS_ACTIVE;
-            IEC_ASSERT( PIN_IEC_SRQ );
-            usleep( 1 );
-            IEC_RELEASE( PIN_IEC_SRQ );
-            usleep( 1 );
-            IEC_ASSERT( PIN_IEC_SRQ );
-            usleep( 1 );
-            IEC_RELEASE( PIN_IEC_SRQ );
-            usleep( 1 );
-        }
-
-        // Switch to standard serial protocol
-        if ( detected_protocol != PROTOCOL_SERIAL)
-        {
-            detected_protocol = PROTOCOL_SERIAL;
-            protocol = selectProtocol();
-        }
-
-    } while( state > BUS_IDLE );
-
-    //Debug_printv ( "primary[%.2X] secondary[%.2X] bus[%d] flags[%d]", data.primary, data.secondary, state, flags );
-    //Debug_printv ( "device[%d] channel[%d]", data.device, data.channel);
-
-    Debug_printv("state[%d] flags[%d]", state, flags);
-    Debug_printf("Heap: %lu\r\n",esp_get_free_internal_heap_size());
-
-    //IEC_RELEASE( PIN_IEC_SRQ );
-    //fnLedStrip.stopRainbow();
-    //fnLedManager.set(eLed::LED_BUS, false);
-}
-
-void systemBus::read_command()
-{
-    std::string action;
-
-    //IEC_ASSERT( PIN_IEC_SRQ );
-    uint8_t c = receiveByte();
-    //IEC_RELEASE( PIN_IEC_SRQ );
-
-    // Check for error
-    if ( flags & ERROR )
-    {
-        Debug_printv("Error reading command. flags[%d] c[%X]", flags, c);
-        state = BUS_ERROR;
-        
-        return;
-    }
-    // else if ( flags & EMPTY_STREAM)
-    // {
-    //     state = BUS_RELEASE;
-    // }
-    else
-    {
-        if ( flags & JIFFYDOS_ACTIVE )
-        {
-            Debug_printf("   IEC: [JD][%.2X]", c);
-            detected_protocol = PROTOCOL_JIFFYDOS;
-        }
-        else
-        {
-            Debug_printf("   IEC: [%.2X]", c);
-        }
-
-        // Decode command byte
-        uint8_t command = c & 0x60;
-        if (c == IEC_UNLISTEN)
-            command = IEC_UNLISTEN;
-        if (c == IEC_UNTALK)
-            command = IEC_UNTALK;
-
-        //Debug_printv ( "device[%d] channel[%d]", data.device, data.channel);
-        //Debug_printv ("command[%.2X]", command);
-
-        switch (command)
-        {
-        // case IEC_GLOBAL:
-        //     data.primary = IEC_GLOBAL;
-        //     data.device = c ^ IEC_GLOBAL;
-        //     state = BUS_IDLE;
-        //     Debug_printf(" (00 GLOBAL %.2d COMMAND)\r\n", data.device);
-        //     break;
-
-        case IEC_LISTEN:
-            data.primary = IEC_LISTEN;
-            data.device = c ^ IEC_LISTEN;
-            //data.payload = "";
-            state = BUS_ACTIVE;
-            Debug_printf(" (20 LISTEN %.2d DEVICE)\r\n", data.device);
-            break;
-
-        case IEC_UNLISTEN:
-            data.primary = IEC_UNLISTEN;
-            state = BUS_PROCESS;
-            Debug_printf(" (3F UNLISTEN)\r\n");
-            break;
-
-        case IEC_TALK:
-            data.primary = IEC_TALK;
-            data.device = c ^ IEC_TALK;
-            state = BUS_ACTIVE;
-            Debug_printf(" (40 TALK  %.2d DEVICE)\r\n", data.device);
-            break;
-
-        case IEC_UNTALK:
-            data.primary = IEC_UNTALK;
-            state = BUS_RELEASE;
-            Debug_printf(" (5F UNTALK)\r\n");
-            break;
-
-        default:
-
-            //IEC_ASSERT( PIN_IEC_SRQ );
-            std::string secondary;
-            state = BUS_PROCESS;
-
-            command = c & 0xF0;
-            switch ( command )
-            {
-            case IEC_OPEN:
-                data.secondary = IEC_OPEN;
-                data.channel = c ^ IEC_OPEN;
-                action = "OPEN";
-                break;
-
-            case IEC_REOPEN:
-                data.secondary = IEC_REOPEN;
-                data.channel = c ^ IEC_REOPEN;
-                action = "DATA";
-                break;
-
-            case IEC_CLOSE:
-                data.secondary = IEC_CLOSE;
-                data.channel = c ^ IEC_CLOSE;
-                action = "CLOSE";
-                break;
-
-            default:
-                state = BUS_IDLE;
-            }
-        }
-    }
-
-    if ( state == BUS_PROCESS )
-    {
-        // *** IMPORTANT! This helps keep us in sync!
-        // Sometimes ATN isn't released immediately. Wait for ATN to be
-        // released before trying to process the command. 
-        // Long ATN delay (>1.5ms) seems to occur more frequently with VIC-20.
-        //IEC_ASSERT( PIN_IEC_SRQ );
-        protocol->timeoutWait ( PIN_IEC_ATN, IEC_RELEASED, TIMEOUT_DEFAULT, false );
-        //while ( IEC_IS_ASSERTED( PIN_IEC_ATN ) );
-
-        // Delay after ATN is RELEASED
-        //protocol->wait( TIMING_Ttk, false );
-        //IEC_RELEASE( PIN_IEC_SRQ );
-    }
-
-    if ( data.secondary && data.primary != IEC_UNLISTEN )
-        Debug_printf(" (%.2X %s  %.2d CHANNEL)\r\n", data.secondary, action.c_str(), data.channel);
-
-    if ( state == BUS_ACTIVE )  // Normal behaviour is to ignore everything if it's not for us
-    //if ( state == BUS_PROCESS )  // Use this to sniff the secondary commands
-    {
-        // Is this command for us?
-        if ( !isDeviceEnabled( data.device ) )
-        {
-            // NOPE!
-            state = BUS_RELEASE;
-            return;
-        }
-    }
-
-
-#ifdef PARALLEL_BUS
-    // Switch to Parallel if detected
-    if ( PARALLEL.state == PBUS_PROCESS )
-    {
-        if ( data.primary == IEC_LISTEN || data.primary == IEC_TALK )
-            detected_protocol = PROTOCOL_SPEEDDOS;
-        else if ( data.primary == IEC_OPEN || data.primary == IEC_REOPEN )
-            detected_protocol = PROTOCOL_DOLPHINDOS;
-
-        // Switch to parallel protocol
-        protocol = selectProtocol();
-
-        if ( data.primary == IEC_LISTEN )
-            PARALLEL.setMode( MODE_RECEIVE );
-        else
-            PARALLEL.setMode( MODE_SEND );
-
-        // Acknowledge parallel mode
-        PARALLEL.handShake();
-    }
-#endif
-
-    //Debug_printv ( "code[%.2X] primary[%.2X] secondary[%.2X] bus[%d] flags[%d]", c, data.primary, data.secondary, state, flags );
-    //Debug_printv ( "device[%d] channel[%d]", data.device, data.channel);
-
-    //IEC_RELEASE( PIN_IEC_SRQ );
-}
-
-void systemBus::read_payload()
-{
-    // Record the command string until ATN is ASSERTED
-    // NOTE: string is just a container, it may contain arbitrary bytes but a LOT of code treats payload as a string
-    std::string listen_command = "";
-
-    // ATN might get asserted right away if there is no command string to send
-    //IEC_ASSERT( PIN_IEC_SRQ );
-    while (!IEC_IS_ASSERTED(PIN_IEC_ATN))
-    {
-        //IEC_ASSERT( PIN_IEC_SRQ );
-        int16_t c = protocol->receiveByte();
-        //Debug_printv("c[%2X]", c);
-        //IEC_RELEASE( PIN_IEC_SRQ );
-
-        if (flags & EMPTY_STREAM || flags & ERROR)
-        {
-            Debug_printv("flags[%02X]", flags);
-            state = BUS_ERROR;
-            //IEC_RELEASE( PIN_IEC_SRQ );
-            return;
-        }
-
-        listen_command += (uint8_t)c;
-
-        if (flags & EOI_RECVD)
-            break;
-    }
-    data.payload = listen_command;
-
-    state = BUS_IDLE;
-    //IEC_RELEASE( PIN_IEC_SRQ );
+    return;
 }
 
 /**
  * Start the Interrupt rate limiting timer
  */
-void systemBus::timer_srq_start()
+void systemBus::timer_start_srq()
 {
     esp_timer_create_args_t tcfg;
     tcfg.arg = this;
@@ -643,7 +333,7 @@ void systemBus::timer_srq_start()
 /**
  * Stop the Interrupt rate limiting timer
  */
-void systemBus::timer_srq_stop()
+void systemBus::timer_stop_srq()
 {
     // Delete existing timer
     if (rateTimerHandle != nullptr)
@@ -655,11 +345,11 @@ void systemBus::timer_srq_stop()
     }
 }
 
-std::shared_ptr<IECProtocol> systemBus::selectProtocol() 
+std::shared_ptr<IECProtocol> systemBus::selectProtocol()
 {
-    //Debug_printv("protocol[%d]", detected_protocol);
-    
-    switch(detected_protocol)
+    // Debug_printv("protocol[%d]", detected_protocol);
+
+    switch (detected_protocol)
     {
 #ifdef MEATLOAF_MAX
         case PROTOCOL_SAUCEDOS:
@@ -668,11 +358,13 @@ std::shared_ptr<IECProtocol> systemBus::selectProtocol()
             return std::static_pointer_cast<IECProtocol>(p);
         }
 #endif
+#ifdef JIFFYDOS
         case PROTOCOL_JIFFYDOS:
         {
             auto p = std::make_shared<JiffyDOS>();
             return std::static_pointer_cast<IECProtocol>(p);
         }
+#endif
 #ifdef PARALLEL_BUS
         case PROTOCOL_DOLPHINDOS:
         {
@@ -691,17 +383,13 @@ std::shared_ptr<IECProtocol> systemBus::selectProtocol()
     }
 }
 
-systemBus virtualDevice::get_bus()
-{
-    return IEC;
-}
+systemBus virtualDevice::get_bus() { return IEC; }
 
-#if 1
 device_state_t virtualDevice::process()
 {
     switch ((bus_command_t)commanddata.primary)
     {
-    case bus_command_t::IEC_UNLISTEN:
+    case bus_command_t::IEC_LISTEN:
         switch (commanddata.secondary)
         {
         case bus_command_t::IEC_OPEN:
@@ -713,7 +401,7 @@ device_state_t virtualDevice::process()
             break;
         case bus_command_t::IEC_REOPEN:
             payload = commanddata.payload;
-            state = writeChannel(/*commanddata.channel*/);
+            state = writeChannel(/*commanddata.channel, payload*/);
             break;
         }
         break;
@@ -729,48 +417,6 @@ device_state_t virtualDevice::process()
 
     return state;
 }
-#else
-device_state_t virtualDevice::process()
-{
-    switch ((bus_command_t)commanddata.primary)
-    {
-    case bus_command_t::IEC_LISTEN:
-        state = DEVICE_LISTEN;
-        break;
-    case bus_command_t::IEC_UNLISTEN:
-        state = DEVICE_PROCESS;
-        break;
-    case bus_command_t::IEC_TALK:
-        state = DEVICE_TALK;
-        break;
-    default:
-        break;
-    }
-
-    switch ((bus_command_t)commanddata.secondary)
-    {
-    case bus_command_t::IEC_OPEN:
-        payload = commanddata.payload;
-        break;
-    case bus_command_t::IEC_CLOSE:
-        reset_state();
-        break;
-    case bus_command_t::IEC_REOPEN:
-        if (state == DEVICE_TALK)
-        {
-        }
-        else if (state == DEVICE_LISTEN)
-        {
-            payload = commanddata.payload;
-        }
-        break;
-    default:
-        break;
-    }
-
-    return state;
-}
-#endif
 
 // This is only used in iecDrive, and it has its own implementation
 void virtualDevice::iec_talk_command_buffer_status()
@@ -795,39 +441,7 @@ void systemBus::assert_interrupt()
         IEC_RELEASE(PIN_IEC_SRQ);
 }
 
-uint8_t systemBus::receiveByte()
-{
-    //IEC_ASSERT( PIN_IEC_SRQ );
-    uint8_t b = protocol->receiveByte();
-#ifdef DATA_STREAM
-    Serial.printf("%.2X ", (int16_t)b);
-#endif
-
-    if ( flags & ERROR )
-    {
-        Debug_printv("error");
-    }
-    //IEC_RELEASE( PIN_IEC_SRQ );
-    return b;
-}
-
-std::string systemBus::receiveBytes()
-{
-    std::string s;
-
-    do
-    {
-        uint8_t b = receiveByte();
-        if ( !(flags & ERROR) )
-            s += b;
-    }while(!(flags & EOI_RECVD));
-    return s;
-}
-
-bool systemBus::sendByte(const char c, bool eoi)
-{
-    return protocol->sendByte(c, eoi);
-}
+bool systemBus::sendByte(const char c, bool eoi) { return protocol->sendByte(c, eoi); }
 
 size_t systemBus::sendBytes(const char *buf, size_t len, bool eoi)
 {
@@ -836,117 +450,67 @@ size_t systemBus::sendBytes(const char *buf, size_t len, bool eoi)
     for (i = 0; i < len; i++)
     {
         if (!sendByte(buf[i], eoi && i == (len - 1)))
-	    break;
+            break;
     }
 
     return i;
 }
 
-size_t systemBus::sendBytes(std::string s, bool eoi)
+size_t systemBus::sendBytes(std::string s, bool eoi) { return sendBytes(s.c_str(), s.size(), eoi); }
+
+bool IRAM_ATTR systemBus::turnAround()
 {
-    return sendBytes(s.c_str(), s.size(), eoi);
-}
-
-void systemBus::process_cmd()
-{
-    // fnLedManager.set(eLed::LED_BUS, true);
-
-    // TODO implement
-
-    // fnLedManager.set(eLed::LED_BUS, false);
-}
-
-void systemBus::process_queue()
-{
-    // TODO IMPLEMENT
-}
-
-void IRAM_ATTR systemBus::deviceListen()
-{
-    // OPEN
-    if (data.secondary == IEC_OPEN)
-    {
-        read_payload();
-        std::string s = mstr::toHex(data.payload);
-        Serial.printf("Open #%02d:%02d {%s} [%s]\r\n", data.device, data.channel, data.payload.c_str(), s.c_str());
-    }
-
-    // REOPEN / DATA
-    else if (data.secondary == IEC_REOPEN)
-    {
-        if ( data.channel == CHANNEL_COMMAND )
-        {
-            read_payload();
-            std::string s = mstr::toHex(data.payload);
-            Serial.printf("ReOpen #%02d:%02d {%s} [%s]\r\n", data.device, data.channel, data.payload.c_str(), s.c_str());
-        }
-        else
-        {
-            Serial.printf("ReOpen #%02d:%02d (data)\r\n", data.device, data.channel);
-            state = BUS_ACTIVE;
-        }
-    }
-
-    // CLOSE
-    else if (data.secondary == IEC_CLOSE)
-    {
-        Serial.printf("Close #%02d:%02d (data)\r\n", data.device, data.channel);
-    }
-
-    // Unknown
-    else
-    {
-        Serial.printf("Unknown #%02d:%02d (data)\r\n", data.device, data.channel);
-        state = BUS_ERROR;
-    }
-}
-
-void IRAM_ATTR systemBus::deviceTalk()
-{
-    // Now do bus turnaround
-    //IEC_ASSERT(PIN_IEC_SRQ);
-
     /*
     TURNAROUND
-    An unusual sequence takes place following ATN if the computer wishes the remote device to
-    become a talker. This will usually take place only after a Talk command has been sent.
-    Immediately after ATN is RELEASED, the selected device will be behaving like a listener. After all, it's
-    been listening during the ATN cycle, and the computer has been a talker. At this instant, we
-    have "wrong way" logic; the device is holding down the Data line, and the computer is holding the
-    Clock line. We must turn this around. 
-    
+    An unusual sequence takes place following ATN if the computer
+    wishes the remote device to become a talker. This will usually
+    take place only after a Talk command has been sent.  Immediately
+    after ATN is RELEASED, the selected device will be behaving like a
+    listener. After all, it's been listening during the ATN cycle, and
+    the computer has been a talker. At this instant, we have "wrong
+    way" logic; the device is asserting the Data line, and the
+    computer is asserting the Clock line. We must turn this around.
+
     Here's the sequence:
-    1. The computer asserts the Data line (it's already there), as well as releases the Clock line. 
-    2. When the device sees the Clock line is releaseed, it releases the Data line (which stays true anyway since 
-    the computer is asserting it) and then asserts the Clock line. 
-    
-    We're now in our starting position, with the talker (that's the device) holding the Clock true, and 
-    the listener (the computer) holding the Data line true. The computer watches for this state; only when it has 
-    gone through the cycle correctly will it be ready to receive data. And data will be signalled, of course, with 
-    the usual sequence: the talker releases the Clock line to signal that it's ready to send.
+
+    1. The computer asserts the Data line (it's already there), as
+       well as releases the Clock line.
+
+    2. When the device sees the Clock line is releaseed, it releases
+       the Data line (which stays asserted anyway since the computer
+       is asserting it) and then asserts the Clock line.
+
+    We're now in our starting position, with the talker (that's the
+    device) asserting the Clock, and the listener (the computer)
+    asserting the Data line. The computer watches for this state;
+    only when it has gone through the cycle correctly will it be ready
+    to receive data. And data will be signalled, of course, with the
+    usual sequence: the talker releases the Clock line to signal that
+    it's ready to send.
     */
 
+    // Wait for ATN to be released
+    if (protocol->waitForSignals(PIN_IEC_ATN, IEC_RELEASED, 0, 0, FOREVER) == TIMED_OUT)
+    {
+        flags |= ERROR;
+        return false;
+    }
+
     // Wait for CLK to be released
-    //IEC_ASSERT( PIN_IEC_SRQ );
-    // if (protocol->timeoutWait(PIN_IEC_CLK_IN, IEC_RELEASED, TIMEOUT_Ttlta) == TIMEOUT_Ttlta)
-    // {
-    //     Debug_printv("Wait until the computer releases the CLK line\r\n");
-    //     Debug_printv("IEC: TURNAROUND TIMEOUT\r\n");
-    //     flags |= ERROR;
-    //     return; // return because timeout
-    // }
-    while( IEC_IS_ASSERTED( PIN_IEC_CLK_IN ) );
-    IEC_RELEASE( PIN_IEC_DATA_OUT );
-    usleep( TIMING_Ttca );
-    IEC_ASSERT( PIN_IEC_CLK_OUT );
-    //IEC_RELEASE( PIN_IEC_SRQ );
+    if (protocol->waitForSignals(PIN_IEC_CLK_IN, IEC_RELEASED, 0, 0, TIMEOUT_Ttlta) == TIMED_OUT)
+    {
+        flags |= ERROR;
+        return false; // return error because timeout
+    }
+    IEC_RELEASE(PIN_IEC_DATA_OUT);
+    usleep(TIMING_Ttca);
+    IEC_ASSERT(PIN_IEC_CLK_OUT);
 
     // 80us minimum delay after TURNAROUND
     // *** IMPORTANT!
-    //protocol->wait( TIMING_Tda );
-    usleep( TIMING_Tda );
+    usleep(TIMING_Tda);
 
-    //IEC_RELEASE( PIN_IEC_SRQ );
+    return true;
 } // turnAround
 
 void systemBus::reset_all_our_devices()
@@ -972,31 +536,26 @@ void systemBus::setBitTiming(std::string set, int p1, int p2, int p3, int p4)
 
 void IRAM_ATTR systemBus::releaseLines(bool wait)
 {
-    IEC_ASSERT( PIN_IEC_SRQ );
+    // Release lines
+    IEC_RELEASE(PIN_IEC_CLK_OUT);
+    IEC_RELEASE(PIN_IEC_DATA_OUT);
+    IEC_SET_STATE(BUS_IDLE);
 
     // Wait for ATN to release and quit
     if (wait)
     {
-        //Debug_printv("Waiting for ATN to release");
-        //protocol->timeoutWait ( PIN_IEC_ATN, IEC_RELEASED, FOREVER );
-        protocol->timeoutWait ( PIN_IEC_ATN, IEC_RELEASED, TIMEOUT_DEFAULT, false );
-        //while ( IEC_IS_ASSERTED( PIN_IEC_ATN ) );
+        Debug_printv("Waiting for ATN to release");
+        protocol->waitForSignals(PIN_IEC_ATN, IEC_RELEASED, 0, 0, TIMEOUT_DEFAULT);
     }
-
-    // Release lines
-    IEC_RELEASE(PIN_IEC_CLK_OUT);
-    IEC_RELEASE(PIN_IEC_DATA_OUT);
-
-    IEC_RELEASE( PIN_IEC_SRQ );
 }
 
 void IRAM_ATTR systemBus::senderTimeout()
 {
     releaseLines();
-    this->state = BUS_ERROR;
+    IEC_SET_STATE(BUS_ERROR);
 
-    protocol->wait( TIMING_EMPTY );
-    IEC_ASSERT( PIN_IEC_DATA_OUT );
+    usleep(TIMING_EMPTY);
+    IEC_ASSERT(PIN_IEC_DATA_OUT);
 } // senderTimeout
 
 void systemBus::addDevice(virtualDevice *pDevice, int device_id)
@@ -1024,15 +583,10 @@ void systemBus::remDevice(virtualDevice *pDevice)
     }
 
     _daisyChain.remove(pDevice);
-    enabledDevices &= ~ ( 1UL << pDevice->_devnum );
+    enabledDevices &= ~(1UL << pDevice->_devnum);
 }
 
-bool systemBus::isDeviceEnabled ( const uint8_t device_id )
-{
-    return ( enabledDevices & ( 1 << device_id ) );
-} // isDeviceEnabled
-
-
+bool systemBus::isDeviceEnabled(const uint8_t device_id) { return (enabledDevices & (1 << device_id)); } // isDeviceEnabled
 
 void systemBus::changeDeviceId(virtualDevice *pDevice, int device_id)
 {
@@ -1071,45 +625,46 @@ void systemBus::shutdown()
     Debug_printf("All devices shut down.\r\n");
 }
 
-
-
-void systemBus::debugTiming()
+enum
 {
-	int pin = PIN_IEC_ATN;
-	IEC_ASSERT(pin);
-	protocol->wait(10);
-	IEC_RELEASE(pin);
-	protocol->wait(10);
+    IECOpenChannel = 0,
+    IECCloseChannel,
+    IECReadChannel,
+    IECWriteChannel,
+};
 
-	pin = PIN_IEC_CLK_OUT;
-	IEC_ASSERT(pin);
-	protocol->wait(20);
-	IEC_RELEASE(pin);
-	protocol->wait(20);
+static const char *IECCommandNames[] = {
+    "UNKNOWN", "LISTEN", "TALK", "REOPEN", "OPEN", "CLOSE", "READ", "WRITE",
+};
 
-	pin = PIN_IEC_DATA_OUT;
-	IEC_ASSERT(pin);
-	protocol->wait(30);
-	IEC_RELEASE(pin);
-	protocol->wait(30);
+int IECData::channelCommand()
+{
+    switch (primary)
+    {
+    case IEC_LISTEN:
+        switch (secondary)
+        {
+        case IEC_OPEN:
+            return IECOpenChannel;
+        case IEC_CLOSE:
+            return IECCloseChannel;
+        case IEC_REOPEN:
+            return IECWriteChannel;
+        }
+        break;
 
-	pin = PIN_IEC_SRQ;
-	IEC_ASSERT(pin);
-	protocol->wait(40);
-	IEC_RELEASE(pin);
-	protocol->wait(40);
+    case IEC_TALK:
+        return IECReadChannel;
+    }
 
-	// pin = PIN_IEC_ATN;
-	// IEC_ASSERT(pin);
-	// protocol->wait(100); // 100
-	// IEC_RELEASE(pin);
-	// protocol->wait(1);
+    return 0;
+}
 
-	// pin = PIN_IEC_CLK_OUT;
-	// IEC_ASSERT(pin);
-	// protocol->wait(200); // 200
-	// IEC_RELEASE(pin);
-	// protocol->wait(1);
+void IECData::debugPrint()
+{
+    Debug_printf("IEC %2i %-5s %2i: %-6s [%02X %02X]\r\n", device, IECCommandNames[channelCommand() + 4], channel, IECCommandNames[primary >> 5], primary, secondary);
+    if (payload.size())
+        Debug_printf("%s", util_hexdump(payload.data(), payload.size()).c_str());
 }
 
 #endif /* BUILD_IEC */
