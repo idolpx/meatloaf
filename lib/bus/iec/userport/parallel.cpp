@@ -149,7 +149,7 @@ void parallelBus::reset()
 
     //Debug_printv("userport flags");
     GPIOX.portMode( USERPORT_FLAGS, 0x05 ); // Set PA2 & PC2 to INPUT
-    GPIOX.digitalWrite( FLAG2, HIGH);
+    GPIOX.digitalWrite( FLAG2, 1);
 
     //Debug_printv("userport data");
     setMode( MODE_RECEIVE );
@@ -168,10 +168,10 @@ void parallelBus::handShake()
     // Signal received or sent
     
     // LOW
-    GPIOX.digitalWrite( FLAG2, LOW );
+    GPIOX.digitalWrite( FLAG2, 0 );
     
     // HIGH
-    GPIOX.digitalWrite( FLAG2, HIGH );
+    GPIOX.digitalWrite( FLAG2, 1 );
 }
 
 uint8_t parallelBus::readByte()
