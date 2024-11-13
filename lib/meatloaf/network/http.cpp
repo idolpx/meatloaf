@@ -343,7 +343,7 @@ uint32_t MeatHttpClient::read(uint8_t* buf, uint32_t size) {
     }
 
     if (_is_open) {
-        Debug_printv("Reading HTTP Stream!");
+        //Debug_printv("Reading HTTP Stream!");
         auto bytesRead= esp_http_client_read(_http, (char *)buf, size );
         
         if(bytesRead>0) {
