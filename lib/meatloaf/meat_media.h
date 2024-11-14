@@ -202,7 +202,7 @@ class ImageBroker {
 public:
     template<class T> static T* obtain(std::string url) 
     {
-        Debug_printv("streams[%d] url[%s]", repo.size(), url.c_str());
+        //Debug_printv("streams[%d] url[%s]", repo.size(), url.c_str());
 
         // obviously you have to supply STREAMFILE.url to this function!
         if(repo.find(url)!=repo.end()) {
@@ -219,11 +219,11 @@ public:
             // Are we at the root of the pathInStream?
             if ( newFile->pathInStream == "")
             {
-                Debug_printv("DIRECTORY [%s]", url.c_str());
+                //Debug_printv("DIRECTORY [%s]", url.c_str());
             }
             else
             {
-                Debug_printv("SINGLE FILE [%s]", url.c_str());
+                //Debug_printv("SINGLE FILE [%s]", url.c_str());
             }
 
             repo.insert(std::make_pair(url, newStream));
