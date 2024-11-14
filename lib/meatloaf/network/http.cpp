@@ -283,7 +283,7 @@ bool MeatHttpClient::seek(uint32_t pos) {
             // Read to end of the stream
             //Debug_printv("Skipping to end!");
             char c[256];
-            while( esp_http_client_read(_http, c, 255) > 0 );
+            while( esp_http_client_read(_http, c, 256) > 0 );
         }
 
         bool op = processRedirectsAndOpen(pos);
