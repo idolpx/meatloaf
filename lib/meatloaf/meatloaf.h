@@ -8,7 +8,7 @@
 #include <ctime>
 //#include <unordered_map>
 
-//#include "../../include/debug.h"
+#include "../../include/debug.h"
 
 //#include "wrappers/iec_buffer.h"
 
@@ -112,11 +112,11 @@ public:
     virtual bool isBrowsable() { return false; };
     virtual bool isRandomAccess() { return false; };
 
+    virtual bool open(std::ios_base::openmode mode) = 0;
     virtual void close() = 0;
-    virtual bool open() = 0;
 
-    virtual uint32_t write(const uint8_t *buf, uint32_t size) = 0;
     virtual uint32_t read(uint8_t* buf, uint32_t size) = 0;
+    virtual uint32_t write(const uint8_t *buf, uint32_t size) = 0;
 
     virtual bool seek(uint32_t pos, int mode) {
         if(mode == SEEK_SET) {
@@ -147,6 +147,19 @@ public:
     virtual bool seekBlock( uint64_t index, uint8_t offset = 0 ) { return false; };
     virtual bool seekSector( uint8_t track, uint8_t sector, uint8_t offset = 0 ) { return false; };
     virtual bool seekSector( std::vector<uint8_t> trackSectorOffset ) { return false; };
+
+private:
+
+    // DEVICE
+    friend class FlashMFile;
+
+    // NETWORK
+    friend class HTTPMFile;
+    friend class TNFSMFile;
+
+    // SERVICE
+    friend class CSIPMFile;
+    friend class TCPMFile;
 };
 
 
@@ -350,4 +363,62 @@ namespace Meat {
 
 }
 
+
+/********************************************************
+ * Utility implementations
+ ********************************************************/
+class StreamBroker {
+    static std::unordered_map<std::string, MStream*> stream_repo;
+public:
+    template<class T> static T* obtain(std::string url) 
+    {
+        //Debug_printv("streams[%d] url[%s]", stream_repo.size(), url.c_str());
+
+        // obviously you have to supply STREAMFILE.url to this function!
+        if(stream_repo.find(url)!=stream_repo.end()) {
+            return (T*)stream_repo.at(url);
+        }
+
+        // create and add stream to broker if not found
+        auto newFile = MFSOwner::File(url);
+
+        T* newStream = (T*)newFile->getSourceStream();
+
+        if ( newStream != nullptr )
+        {
+            // Are we at the root of the pathInStream?
+            if ( newFile->pathInStream == "")
+            {
+                Debug_printv("DIRECTORY [%s]", url.c_str());
+            }
+            else
+            {
+                Debug_printv("SINGLE FILE [%s]", url.c_str());
+            }
+
+            stream_repo.insert(std::make_pair(url, newStream));
+            return newStream;
+        }
+
+        delete newFile;
+        return nullptr;
+    }
+
+    static MStream* obtain(std::string url) {
+        return obtain<MStream>(url);
+    }
+
+    static void dispose(std::string url) {
+        if(stream_repo.find(url)!=stream_repo.end()) {
+            auto toDelete = stream_repo.at(url);
+            stream_repo.erase(url);
+            delete toDelete;
+        }
+        Debug_printv("streams[%d]", stream_repo.size());
+    }
+
+    static void validate() {
+        
+    }
+};
 #endif // MEATLOAF_FILE

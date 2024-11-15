@@ -738,7 +738,7 @@ bool iecDrive::registerStream ( uint8_t channel )
         Debug_printv("SAVE \"%s\"", _base->url.c_str());
         // CREATE STREAM HERE FOR OUTPUT
         new_stream = std::shared_ptr<MStream>(_base->getSourceStream(std::ios::out));
-        new_stream->open();
+        new_stream->open(std::ios::out);
     }
     else
     {
@@ -806,7 +806,8 @@ bool iecDrive::closeStream ( uint8_t channel, bool close_all )
     {
         auto closingStream = (*found).second;
         ImageBroker::dispose(closingStream->url);
-        Debug_printv("Stream closed. key[%d] count[%d] url[%s]", channel, streams.size(), closingStream->url.c_str());
+        auto closingMFile(MFSOwner::File(closingStream->url));
+        Debug_printv("Stream closed. key[%d] count[%d] url[%s] path[%s]", channel, streams.size(), closingStream->url.c_str(), closingMFile->pathInStream.c_str());
         return streams.erase ( channel );
     }
 

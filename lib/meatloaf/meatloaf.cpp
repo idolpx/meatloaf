@@ -6,6 +6,9 @@
 #include <vector>
 #include <sstream>
 
+
+std::unordered_map<std::string, MStream*> StreamBroker::stream_repo;
+
 #ifdef FLASH_SPIFFS
 #include "esp_spiffs.h"
 #endif
@@ -66,7 +69,7 @@
 // Scanners
 
 // Service
-#include "service/cs.h"
+#include "service/csip.h"
 #include "service/ml.h"
 
 // Tape
@@ -110,15 +113,15 @@ G64MFileSystem g64FS;
 NIBMFileSystem nibFS;
 
 // Network
-HttpFileSystem httpFS;
-TNFSFileSystem tnfsFS;
+HTTPMFileSystem httpFS;
+TNFSMFileSystem tnfsFS;
 // IPFSFileSystem ipfsFS;
 // TcpFileSystem tcpFS;
 //WSFileSystem wsFS;
 
 // Service
-// CServerFileSystem csFS;
-MLFileSystem mlFS;
+CSIPMFileSystem csipFS;
+MLMFileSystem mlFS;
 
 // Tape
 T64MFileSystem t64FS;
@@ -139,7 +142,7 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
     &d8bFS, &dfiFS,
     &p00FS,
     &httpFS, &tnfsFS,
-    &mlFS,
+    &csipFS, &mlFS,
     &t64FS, &tcrtFS
 //    &ipfsFS, &tcpFS,
 //    &tnfsFS

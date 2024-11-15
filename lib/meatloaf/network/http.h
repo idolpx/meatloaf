@@ -115,19 +115,19 @@ public:
  ********************************************************/
 
 
-class HttpFile: public MFile {
+class HTTPMFile: public MFile {
     MeatHttpClient* fromHeader();
     MeatHttpClient* client = nullptr;
 
 public:
-    HttpFile() {
+    HTTPMFile() {
         Debug_printv("C++, if you try to call this, be damned!");
     };
-    HttpFile(std::string path): MFile(path) { 
+    HTTPMFile(std::string path): MFile(path) { 
         // Debug_printv("constructing http file from url [%s]", url.c_str());
     };
-    HttpFile(std::string path, std::string filename): MFile(path) {};
-    ~HttpFile() override {
+    HTTPMFile(std::string path, std::string filename): MFile(path) {};
+    ~HTTPMFile() override {
         if(client != nullptr)
             delete client;
     }
@@ -152,31 +152,40 @@ public:
  * Streams
  ********************************************************/
 
-class HttpIStream: public MStream {
+class HTTPMStream: public MStream {
 
 public:
-    HttpIStream(std::string path) {
+    HTTPMStream(std::string path) {
         url = path;
     };
-    HttpIStream(std::string path, std::ios_base::openmode m) {
+    HTTPMStream(std::string path, std::ios_base::openmode m) {
         url = path;
         mode = m;
     };
 
-    ~HttpIStream() {
+    ~HTTPMStream() {
         close();
     };
 
-    virtual bool seek(uint32_t pos);
-
-    void close() override;
-    bool open() override;
 
     // MStream methods
+    bool isOpen() override;
+    bool isBrowsable() override { return false; };
+    bool isRandomAccess() override { return true; };
+
+    bool open(std::ios_base::openmode mode) override;
+    void close() override;
+
     uint32_t read(uint8_t* buf, uint32_t size) override;
     uint32_t write(const uint8_t *buf, uint32_t size) override;
 
-    bool isOpen() override;
+    virtual bool seek(uint32_t pos);
+
+    virtual bool seekPath(std::string path) override {
+        Debug_printv( "path[%s]", path.c_str() );
+        return false;
+    }
+
 
 protected:
     MeatHttpClient _http;
@@ -188,10 +197,10 @@ protected:
  * FS
  ********************************************************/
 
-class HttpFileSystem: public MFileSystem 
+class HTTPMFileSystem: public MFileSystem 
 {
     MFile* getFile(std::string path) override {
-        return new HttpFile(path);
+        return new HTTPMFile(path);
     }
 
     bool handles(std::string name) {
@@ -204,7 +213,7 @@ class HttpFileSystem: public MFileSystem
         return false;
     }
 public:
-    HttpFileSystem(): MFileSystem("http") {};
+    HTTPMFileSystem(): MFileSystem("http") {};
 };
 
 

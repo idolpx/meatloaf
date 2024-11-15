@@ -69,16 +69,16 @@
  * File
  ********************************************************/
 
-class IPFSFile: public HttpFile {
+class IPFSMFile: public HTTPMFile {
 
 public:
-    IPFSFile(std::string path): HttpFile(path) {
+    IPFSMFile(std::string path): HTTPMFile(path) {
         //this->url = "https://dweb.link/ipfs/" + this->host + "/" + this->path;
         this->url = "https://ipfs.io/ipfs/" + this->host + "/" + this->path;
         resetURL(this->url);
         Debug_printv("url[%s]", this->url.c_str());
     };
-    ~IPFSFile() {};
+    ~IPFSMFile() {};
 
     MStream* getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override; // file on IPFS server = standard HTTP file available via GET
 };
@@ -88,13 +88,13 @@ public:
  * Streams
  ********************************************************/
 
-class IPFSIStream: public HttpIStream {
+class IPFSMStream: public HTTPMStream {
 
 public:
-    IPFSIStream(std::string path) : HttpIStream(path) {};
-    ~IPFSIStream() {};
+    IPFSMStream(std::string path) : HTTPMStream(path) {};
+    ~IPFSMStream() {};
 
-    bool open() override;
+    bool open(std::ios_base::openmode mode) override;
     bool seek(uint32_t pos) override;
 };
 
@@ -107,7 +107,7 @@ class IPFSFileSystem: public MFileSystem
 {
     MFile* getFile(std::string path) override {
         // Debug_printv("IPFSFileSystem::getFile(%s)", path.c_str());
-        return new IPFSFile(path);
+        return new IPFSMFile(path);
     }
 
     bool handles(std::string name) {

@@ -4,19 +4,19 @@
 #include "../../../include/debug.h"
 
 
-MStream* IPFSFile::getSourceStream(std::ios_base::openmode mode) {
+MStream* IPFSMFile::getSourceStream(std::ios_base::openmode mode) {
     // has to return OPENED stream
     //Debug_printv("[%s]", url.c_str());
-    MStream* istream = new IPFSIStream(url);
-    istream->open();   
+    MStream* istream = new IPFSMStream(url);
+    istream->open(mode);   
     return istream;
 }; 
 
 
-bool IPFSIStream::open() {
+bool IPFSMStream::open(std::ios_base::openmode mode) {
     return _http.GET(url);
 };
 
-bool IPFSIStream::seek(uint32_t pos) {
+bool IPFSMStream::seek(uint32_t pos) {
     return true;
 }

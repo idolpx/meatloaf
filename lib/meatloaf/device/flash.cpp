@@ -67,7 +67,7 @@ MStream* FlashMFile::getSourceStream(std::ios_base::openmode mode)
     std::string full_path = basepath + path;
     MStream* istream = new FlashMStream(full_path, mode);
     //Debug_printv("FlashMFile::getSourceStream() 3, not null=%d", istream != nullptr);
-    istream->open();   
+    istream->open(mode);   
     //Debug_printv("FlashMFile::getSourceStream() 4");
     return istream;
 }
@@ -316,7 +316,7 @@ bool FlashMFile::seekEntry( std::string filename )
  * MStream implementations
  ********************************************************/
 
-bool FlashMStream::open() {
+bool FlashMStream::open(std::ios_base::openmode mode) {
     if(isOpen())
         return true;
 

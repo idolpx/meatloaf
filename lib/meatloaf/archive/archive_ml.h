@@ -60,7 +60,7 @@ public:
     ArchiveMStream(std::shared_ptr<MStream> srcStr);
     ~ArchiveMStream();
 
-    bool open() override;
+    bool open(std::ios_base::openmode mode) override;
     void close() override;
     bool isOpen() override;
 

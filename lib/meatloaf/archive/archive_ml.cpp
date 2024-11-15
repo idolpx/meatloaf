@@ -104,7 +104,7 @@ ArchiveMStream::ArchiveMStream(std::shared_ptr<MStream> srcStr)
     archive_read_support_format_all(a);
     streamData.srcBuffer = new uint8_t[buffSize];
 
-    open();
+    open(std::ios::in);
 }
 
 ArchiveMStream::~ArchiveMStream()
@@ -115,7 +115,7 @@ ArchiveMStream::~ArchiveMStream()
     Debug_printv("Stream destructor OK!");
 }
 
-bool ArchiveMStream::open()
+bool ArchiveMStream::open(std::ios_base::openmode mode)
 {
     if (!is_open)
     {

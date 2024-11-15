@@ -136,7 +136,7 @@ public:
     virtual bool seek(uint32_t pos) override;
 
     void close() override;
-    bool open() override;
+    bool open(std::ios_base::openmode mode) override;
 
     // MStream methods
     //uint8_t read() override;
