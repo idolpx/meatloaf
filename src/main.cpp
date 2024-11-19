@@ -1,6 +1,6 @@
 #include <esp_system.h>
 #include <nvs_flash.h>
-#ifdef BOARD_HAS_PSRAM
+#ifdef PSRAM_SIZE
 #ifdef CONFIG_IDF_TARGET_ESP32S3
 #include <esp_psram.h>
 #else
@@ -39,13 +39,16 @@
 std::string statusMessage;
 bool initFailed = false;
 
+//#include "../lib/console/console.h"
+//using namespace ESP32Console;
+//Console console;
 
 /**************************/
 
 
 void main_shutdown_handler()
 {
-    Debug_println("Shutdown handler called");
+    Debug_printf("Shutdown handler called");
     // Give devices an opportunity to clean up before rebooting
 
 //    IEC.shutdown();
@@ -54,24 +57,33 @@ void main_shutdown_handler()
 // Initial setup
 void main_setup()
 {
-    fnUartDebug.begin(DEBUG_SPEED);
+    Serial.begin(DEBUG_SPEED);
+    //You can change the console prompt before calling begin(). By default it is "ESP32>"
+    //console.setPrompt("meatloaf# ");
+
+    //You can change the baud rate and pin numbers similar to Serial.begin() here.
+    //console.begin(DEBUG_SPEED);
+
+    //Register builtin commands like 'reboot', 'version', or 'meminfo'
+    //console.registerSystemCommands();
+
     unsigned long startms = fnSystem.millis();
     
-    Serial.print( ANSI_WHITE "\r\n\r\n" ANSI_BLUE_BACKGROUND "==============================" ANSI_RESET_NL );
-    Serial.print( ANSI_BLUE_BACKGROUND "   " PRODUCT_ID " " FW_VERSION "   " ANSI_RESET_NL );
-    Serial.print( ANSI_BLUE_BACKGROUND "   " PLATFORM_DETAILS "    " ANSI_RESET_NL );
-    Serial.print( ANSI_BLUE_BACKGROUND "------------------------------" ANSI_RESET_NL "\r\n" );
+    printf( ANSI_WHITE "\r\n\r\n" ANSI_BLUE_BACKGROUND "==============================" ANSI_RESET_NL );
+    printf( ANSI_BLUE_BACKGROUND "   " PRODUCT_ID " " FW_VERSION "   " ANSI_RESET_NL );
+    printf( ANSI_BLUE_BACKGROUND "   " PLATFORM_DETAILS "    " ANSI_RESET_NL );
+    printf( ANSI_BLUE_BACKGROUND "------------------------------" ANSI_RESET_NL "\r\n" );
 
-    Serial.printf( "Meatloaf %s Started @ %lu\r\n", fnSystem.get_fujinet_version(), startms );
+    printf( "Meatloaf %s Started @ %lu\r\n", fnSystem.get_fujinet_version(), startms );
 
-    Serial.printf( "Starting heap: %u\r\n", fnSystem.get_free_heap_size() );
+    printf( "Starting heap: %lu\r\n", fnSystem.get_free_heap_size() );
 
-#ifdef BOARD_HAS_PSRAM
-    Serial.printf( "PsramSize %u\r\n", fnSystem.get_psram_size() );
+#ifdef PSRAM_SIZE
+    printf( "PsramSize %lu\r\n", fnSystem.get_psram_size() );
 #if !defined(CONFIG_IDF_TARGET_ESP32S3)
-    Serial.printf( "himem phys %u\r\n", esp_himem_get_phys_size() );
-    Serial.printf( "himem free %u\r\n", esp_himem_get_free_size() );
-    Serial.printf( "himem reserved %u\r\n", esp_himem_reserved_area_size() );
+    printf( "himem phys %u\r\n", esp_himem_get_phys_size() );
+    printf( "himem free %u\r\n", esp_himem_get_free_size() );
+    printf( "himem reserved %u\r\n", esp_himem_reserved_area_size() );
 #endif
 #endif
 
@@ -81,7 +93,7 @@ void main_setup()
     esp_err_t e = nvs_flash_init();
     if (e == ESP_ERR_NVS_NO_FREE_PAGES || e == ESP_ERR_NVS_NEW_VERSION_FOUND)
     {
-        Serial.print("Erasing flash");
+        printf("Erasing flash");
         ESP_ERROR_CHECK(nvs_flash_erase());
         e = nvs_flash_init();
     }
@@ -91,7 +103,7 @@ void main_setup()
     gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
 
     fnSystem.check_hardware_ver();
-    Serial.printf("Detected Hardware Version: %s\r\n", fnSystem.get_hardware_ver_str());
+    printf("Detected Hardware Version: %s\r\n", fnSystem.get_hardware_ver_str());
 
     fnKeyManager.setup();
     fnLedManager.setup();
@@ -105,8 +117,15 @@ void main_setup()
     //fnSystem.digital_write(PIN_MODEM_UP9600, DIGI_HIGH); // ENABLE UP9600
 
     fsFlash.start();
+
+    // Create SYSTEM DIR if it doesn't exist
+    fsFlash.create_path( SYSTEM_DIR );
+
 #ifdef SD_CARD
     fnSDFAT.start();
+
+    // Create SYSTEM DIR if it doesn't exist
+    fnSDFAT.create_path( SYSTEM_DIR );
 #endif
 
     // setup crypto key - must be done before loading the config
@@ -117,41 +136,41 @@ void main_setup()
 
     // Setup IEC Bus
     IEC.setup();
-    Serial.println( ANSI_GREEN_BOLD "IEC Bus Initialized" ANSI_RESET );
+    printf(ANSI_GREEN_BOLD "IEC Bus Initialized" ANSI_RESET "\r\n");
 
     {
         // Add devices to bus
         FileSystem *ptrfs = fnSDFAT.running() ? (FileSystem *)&fnSDFAT : (FileSystem *)&fsFlash;
         iecPrinter::printer_type ptype = iecPrinter::printer_type::PRINTER_COMMODORE_MPS803; // temporary
-        Serial.printf("Creating a default printer using %s storage and type %d\r\n", ptrfs->typestring(), ptype);
+        printf("Creating a default printer using %s storage and type %d\r\n", ptrfs->typestring(), ptype);
         iecPrinter *ptr = new iecPrinter(ptrfs, ptype);
         fnPrinters.set_entry(0, ptr, ptype, Config.get_printer_port(0));
 
-        Serial.print("Printer "); IEC.addDevice(ptr, 4);                    // 04-07 Printers / Plotters
-        Serial.print("Disk "); IEC.addDevice(new iecDrive(), 8);            // 08-15 Drives
-        Serial.print("Network "); IEC.addDevice(new iecNetwork(), 16);      // 16-19 Network Devices
-        Serial.print("CPM "); IEC.addDevice(new iecCpm(), 20);              // 20-29 Other
-        Serial.print("Voice "); IEC.addDevice(new iecVoice(), 21);
-        Serial.print("Clock "); IEC.addDevice(new iecClock(), 28);
-        Serial.print("OpenAI "); IEC.addDevice(new iecOpenAI(), 29);
-        Serial.print("Meatloaf "); IEC.addDevice(new iecMeatloaf(), 30);    // 30    Meatloaf
+        printf("Printer "); IEC.addDevice(ptr, 4);                    // 04-07 Printers / Plotters
+        printf("Disk "); IEC.addDevice(new iecDrive(), 8);            // 08-15 Drives
+        printf("Network "); IEC.addDevice(new iecNetwork(), 16);      // 16-19 Network Devices
+        printf("CPM "); IEC.addDevice(new iecCpm(), 20);              // 20-29 Other
+        printf("Voice "); IEC.addDevice(new iecVoice(), 21);
+        printf("Clock "); IEC.addDevice(new iecClock(), 28);
+        printf("OpenAI "); IEC.addDevice(new iecOpenAI(), 29);
+        printf("Meatloaf "); IEC.addDevice(new iecMeatloaf(), 30);    // 30    Meatloaf
 
-        Serial.print("Virtual Device(s) Started: [ " ANSI_YELLOW_BOLD );
+        printf("Virtual Device(s) Started: [ " ANSI_YELLOW_BOLD );
         for (uint8_t i = 0; i < 31; i++)
         {
             if (IEC.isDeviceEnabled(i))
             {
-                Serial.printf("%.02d ", i);
+                printf("%.02d ", i);
             }
         }
-        Serial.println( ANSI_RESET "]");
+        printf( ANSI_RESET "]\r\n");
         //IEC.enabled = true;
     }
 
 #ifdef PARALLEL_BUS
     // Setup Parallel Bus
     PARALLEL.setup();
-    Serial.println( ANSI_GREEN_BOLD "Parallel Bus Initialized" ANSI_RESET );
+    printf( ANSI_GREEN_BOLD "Parallel Bus Initialized" ANSI_RESET "\r\n" );
 #endif
 
 #ifdef LED_STRIP
@@ -165,7 +184,7 @@ void main_setup()
 
 #ifdef DEBUG
     unsigned long endms = fnSystem.millis();
-    Debug_printf("Available heap: %u\r\nSetup complete @ %lu (%lums)\r\n", fnSystem.get_free_heap_size(), endms, endms - startms);
+    Debug_printf("Available heap: %lu\r\nSetup complete @ %lu (%lums)\r\n", fnSystem.get_free_heap_size(), endms, endms - startms);
 #endif // DEBUG
 
 

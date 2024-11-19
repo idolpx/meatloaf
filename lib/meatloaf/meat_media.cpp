@@ -185,7 +185,7 @@ uint32_t MMediaStream::seekFileSize( uint8_t start_track, uint8_t start_sector )
     size_t blocks = 0; 
     do
     {
-        Serial.printf("t[%d] s[%d] b[%d]\r", start_track, start_sector, blocks);
+        printf("t[%d] s[%d] b[%d]\r", start_track, start_sector, blocks);
         readContainer(&start_track, 1);
         readContainer(&start_sector, 1);
         blocks++;
@@ -195,6 +195,6 @@ uint32_t MMediaStream::seekFileSize( uint8_t start_track, uint8_t start_sector )
     } while ( start_track > 0 );
     blocks--;
     uint32_t size = (blocks * (block_size - 2)) + start_sector - 1;
-    Serial.printf("File size is [%d] bytes...\r\n", size);
+    printf("File size is [%lu] bytes...\r\n", size);
     return size;
 };

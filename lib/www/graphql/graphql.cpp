@@ -13,7 +13,7 @@
 //             break;
 //         case WSEvent::connected:
 //             isConnected = true;
-//             Serial.printf_P(PSTR("GraphqlEsp: Websocket connected. Sending connection init\n"));
+//             printf_P(PSTR("GraphqlEsp: Websocket connected. Sending connection init\n"));
 //             _ws.sendtxt("{\"type\":\"connection_init\",\"payload\":{}}");
 //             /* If I don't send GQEvent::connected, but instead later after receiving connection_ack, 
 //                 CRASH! Why? */
@@ -23,15 +23,15 @@
 //             {
 //                 char* type = parseText((char *)payload, "type");
 //                 if (type) {
-//                     //Serial.printf_P(PSTR("GraphqlEsp: type:%s\n"), type);
+//                     //printf_P(PSTR("GraphqlEsp: type:%s\n"), type);
 //                     if (!strncmp_P(type, PSTR("connection_ack"), 14)) { // Connection successfull
-//                         Serial.printf_P(PSTR("GraphqlEsp: Got connection_ack\n"));
+//                         printf_P(PSTR("GraphqlEsp: Got connection_ack\n"));
 //                         /* See comment above about the CRASH! */
 //                         //callCallback(GQEvent::connected, nullptr);
 //                         return;
 //                     }
 //                     if (!strncmp_P(type, PSTR("ka"), 2)) { // Keep-alive from server
-//                         Serial.printf_P(PSTR("."));
+//                         printf_P(PSTR("."));
 //                         return;
 //                     }
 //                     if (!strncmp_P(type, PSTR("error"), 5)) { // Error
@@ -39,12 +39,12 @@
 //                         return;
 //                     }
 //                 }
-//                 //Serial.printf_P(PSTR("GraphqlEsp: ws text:%s\n"),(char*)payload);
+//                 //printf_P(PSTR("GraphqlEsp: ws text:%s\n"),(char*)payload);
 //                 callCallback(GQEvent::data, (char *)payload);
 //             }
 //             break;
 //         default:
-//             Serial.printf_P(PSTR("WS Got unimplemented event\n"));
+//             printf_P(PSTR("WS Got unimplemented event\n"));
 //             break;
 //         }
 //     };
@@ -60,7 +60,7 @@
 //                         "\"%s{"
 //                         "%s"
 //                         "}\"}}"), id, oper, data);
-//     Serial.printf_P(PSTR("GraphqlEsp: Sending %s: %s\n"), oper, buf);
+//     printf_P(PSTR("GraphqlEsp: Sending %s: %s\n"), oper, buf);
 //     _ws.sendtxt(buf);
 //     return id++;
 // }

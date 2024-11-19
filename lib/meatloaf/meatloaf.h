@@ -198,7 +198,7 @@ public:
     // bool copyTo(MFile* dst);
 
     // has to return OPENED stream
-    virtual MStream* getSourceStream(std::ios_base::openmode mode=std::ios_base::in);
+    virtual MStream* getSourceStream(std::ios_base::openmode mode = std::ios::in);
     virtual MStream* getDecodedStream(std::shared_ptr<MStream> src) = 0;
 
     MFile* cd(std::string newDir);
@@ -306,62 +306,7 @@ public:
     static bool umount(std::string name);
 };
 
-/********************************************************
- * Meat namespace, standard C++ buffers and streams
- ********************************************************/
 
-namespace Meat {
-    struct _Unique_mf {
-        typedef std::unique_ptr<MFile> _Single_file;
-    };
-
-    // Creates a unique_ptr<MFile> for a given url
-
-    /**
-    *  @brief  Creates a unique_ptr<MFile> instance froma given url
-    *  @param  url  The url to the file.
-    *  @return  @c unique_ptr<MFile>
-    */
-    template<class MFile>
-        typename _Unique_mf::_Single_file
-        New(std::string url) {
-            return std::unique_ptr<MFile>(MFSOwner::File(url));
-        }
-
-    /**
-    *  @brief  Creates a unique_ptr<MFile> instance froma given url
-    *  @param  url  The url to the file.
-    *  @return  @c unique_ptr<MFile>
-    */
-    template<class MFile>
-        typename _Unique_mf::_Single_file
-        New(const char* url) {
-            return std::unique_ptr<MFile>(MFSOwner::File(std::string(url)));
-        }
-
-    /**
-    *  @brief  Creates a unique_ptr<MFile> instance from a given MFile
-    *  @param  file  The url to the file.
-    *  @return  @c unique_ptr<MFile>
-    */
-    template<class MFile>
-        typename _Unique_mf::_Single_file
-        New(MFile* mFile) {
-            return std::unique_ptr<MFile>(MFSOwner::File(mFile->url));
-        }
-
-    /**
-    *  @brief  Wraps MFile* into unique_ptr<MFile> so it closes itself as required
-    *  @param  file  The url to the file.
-    *  @return  @c unique_ptr<MFile>
-    */
-    template<class MFile>
-        typename _Unique_mf::_Single_file
-        Wrap(MFile* file) {
-            return std::unique_ptr<MFile>(file);
-        }
-
-}
 
 
 /********************************************************
@@ -421,4 +366,64 @@ public:
         
     }
 };
+
+
+/********************************************************
+ * Meat namespace, standard C++ buffers and streams
+ ********************************************************/
+
+namespace Meat {
+    struct _Unique_mf {
+        typedef std::unique_ptr<MFile> _Single_file;
+    };
+
+    // Creates a unique_ptr<MFile> for a given url
+
+    /**
+    *  @brief  Creates a unique_ptr<MFile> instance froma given url
+    *  @param  url  The url to the file.
+    *  @return  @c unique_ptr<MFile>
+    */
+    template<class MFile>
+        typename _Unique_mf::_Single_file
+        New(std::string url) {
+            return std::unique_ptr<MFile>(MFSOwner::File(url));
+        }
+
+    /**
+    *  @brief  Creates a unique_ptr<MFile> instance froma given url
+    *  @param  url  The url to the file.
+    *  @return  @c unique_ptr<MFile>
+    */
+    template<class MFile>
+        typename _Unique_mf::_Single_file
+        New(const char* url) {
+            return std::unique_ptr<MFile>(MFSOwner::File(std::string(url)));
+        }
+
+    /**
+    *  @brief  Creates a unique_ptr<MFile> instance from a given MFile
+    *  @param  file  The url to the file.
+    *  @return  @c unique_ptr<MFile>
+    */
+    template<class MFile>
+        typename _Unique_mf::_Single_file
+        New(MFile* mFile) {
+            return std::unique_ptr<MFile>(MFSOwner::File(mFile->url));
+        }
+
+    /**
+    *  @brief  Wraps MFile* into unique_ptr<MFile> so it closes itself as required
+    *  @param  file  The url to the file.
+    *  @return  @c unique_ptr<MFile>
+    */
+    template<class MFile>
+        typename _Unique_mf::_Single_file
+        Wrap(MFile* file) {
+            return std::unique_ptr<MFile>(file);
+        }
+
+};
+
+
 #endif // MEATLOAF_FILE

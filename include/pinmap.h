@@ -24,15 +24,15 @@
 
 #ifndef RGB_LED_STRIP
 /* LED Strip NEW */
-#define RGB_DATA_PIN        4
-#define RGB_BRIGHTNESS      15 // max mA the LED can use determines brightness
-#define RGB_COUNT           5
-#define RGB_TYPE            WS2812B
-#define RGB_ORDER           GRB
+#define RGB_LED_DATA_PIN        PIN_LED_RGB
+#define RGB_LED_BRIGHTNESS      15 // max mA the LED can use determines brightness
+#define RGB_LED_COUNT           5
+#define RGB_LED_TYPE            WS2812B
+#define RGB_LED_ORDER           GRB
 // LED order on the strip starting with 0
-#define RGB_WIFI_NUM        0
-#define RGB_BUS_NUM         4
-#define RGB_BT_NUM          2
+#define RGB_LED_WIFI_NUM        0
+#define RGB_LED_BUS_NUM         4
+#define RGB_LED_BT_NUM          2
 #endif
 
 #ifdef ENABLE_ZIMODEM

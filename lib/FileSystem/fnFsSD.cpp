@@ -24,7 +24,6 @@
 #include <vector>
 
 #include "../../include/debug.h"
-#include "../../include/global_defines.h"
 #include "../../include/pinmap.h"
 
 #include "utils.h"
@@ -198,8 +197,8 @@ bool FileSystemSDFAT::dir_open(const char * path, const char * pattern, uint16_t
 	bool filter_dirs = have_pattern && pattern[strlen(pattern)-1] == '/';
 	if (filter_dirs) {
 		Debug_printf (
-			"FileSystemSDFAT::dir_open I am filtering directories.\n",
-			have_pattern ? "" : " do not"
+			"FileSystemSDFAT::dir_open I am %s filtering directories.\n",
+			have_pattern ? "" : "not"
 		);
 		strlcpy (realpat, pattern, sizeof (realpat));
 		realpat[strlen(realpat)-1] = '\0';
@@ -689,9 +688,6 @@ bool FileSystemSDFAT::start()
         Debug_printf("  partition type: %s\r\n", partition_type());
         Debug_printf("  partition size: %llu, used: %llu\r\n", total_bytes(), used_bytes());
     */
-
-        // Create SYSTEM DIR if it doesn't exist
-        create_path( SYSTEM_DIR );
     }
     else 
     {

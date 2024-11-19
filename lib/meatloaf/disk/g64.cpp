@@ -75,7 +75,7 @@ bool G64MStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
         //Debug_printv( "Read Sector Data [%04X]", containerStream->position() );
     } 
     while ( sector != gcr_sector_header.sector );
-    Debug_printv( "Start Sector Data [%04X]", containerStream->position() );
+    Debug_printv( "Start Sector Data [%04lX]", containerStream->position() );
     readSector();
 
     sectorOffset += sector;

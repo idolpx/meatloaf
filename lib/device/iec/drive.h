@@ -38,6 +38,8 @@ protected:
     std::string _last_file;         // Always points to last loaded file
 
     // RAM/ROM
+    // https://g3sl.github.io/c1541rom.html
+    // https://www.ythiee.com/2021/06/06/floppy-drive-deep-dive/
 //    std::streambuf ram;
     std::unique_ptr<MFile> rom;     // ROM File for current drive model if available
 

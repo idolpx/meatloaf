@@ -88,7 +88,7 @@ void dumpFileProperties(MFile* testMFile) {
     Debug_printf("path in stream: [%s]\r\n", testMFile->pathInStream.c_str());
     Debug_printf("File: [%s]\r\n", testMFile->name.c_str());
     Debug_printf("Extension: [%s]\r\n", testMFile->extension.c_str());
-    Debug_printf("Size: [%d]\r\n", testMFile->size());
+    Debug_printf("Size: [%lu]\r\n", testMFile->size());
     Debug_printf("Is text: [%d]\r\n", testMFile->isText());
     Debug_printf("-------------------------------\r\n");
 }
@@ -148,7 +148,7 @@ void testDirectoryStandard(std::string path) {
         /* print all the files and directories within directory */
         while ((ent = readdir (dir)) != NULL) {
             stat(ent->d_name, &st);
-            Debug_printf ("%d %s %s\r\n", st.st_size, ent->d_name, S_ISREG(st.st_mode));
+            Debug_printf ("%d %s %d\r\n", (int)st.st_size, ent->d_name, S_ISREG(st.st_mode));
         }
         closedir (dir);
     } else {
@@ -364,7 +364,7 @@ void httpStream(char *url)
 			stream.read((char *)b, b_len);
         }
         stream.close();
-        Debug_println("");
+        //Debug_println("");
         Debug_printv("%d of %d bytes sent\r\n", i, len);
     }
     else
@@ -388,7 +388,7 @@ void httpStream(char *url)
 //     Debug_printf("[HTTP] begin... [%s]\r\n", url);
 //     if (http.begin( url )) {  // HTTP
 
-//       Serial.print("[HTTP] GET...\r\n");
+//       printf("[HTTP] GET...\r\n");
 //       // start connection and send HTTP header
 //       int httpCode = http.GET();
 //       size_t len = http.available();
@@ -639,7 +639,7 @@ void testBasicConfig() {
     BasicConfigReader bcr;
     bcr.read("/config.prg");
     if(bcr.entries->size()>0) {
-        Debug_printf("config Wifi SSID: [%s]\r\n", bcr.get("ssid"));
+        Debug_printf("config Wifi SSID: [%s]\r\n", bcr.get("ssid").c_str());
     }
 
 }

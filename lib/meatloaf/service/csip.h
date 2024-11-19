@@ -44,7 +44,7 @@ public:
             return true;
 
         int rc = m_wifi.open("commodoreserver.com", 1541);
-        Serial.printf("csstreambuf: connect to cserver returned: %d\r\n", rc);
+        printf("csstreambuf: connect to cserver returned: %d\r\n", rc);
 
         if(rc == 1) {
             if(gbuf == nullptr)
@@ -59,7 +59,7 @@ public:
     }
 
     void close() {
-        Serial.printf("csstreambuf: closing\r\n");
+        printf("csstreambuf: closing\r\n");
         if(m_wifi.isOpen()) {
             m_wifi.close();
         }
@@ -93,7 +93,7 @@ public:
             this->setg(gbuf, gbuf, gbuf + readCount);
         }
         else {
-            Debug_printv("else: %d - %d, (%d)", this->gptr(), this->egptr(), this->gbuf);
+            //Debug_printv("else: %d - %d, (%d)", this->gptr(), this->egptr(), this->gbuf);
         }
 
         return this->gptr() == this->egptr()

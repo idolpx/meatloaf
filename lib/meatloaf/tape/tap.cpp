@@ -99,7 +99,7 @@ bool TAPMStream::seekPath(std::string path) {
         // Set position to beginning of file
         containerStream->seek(entry.data_offset);
 
-        Debug_printv("File Size: size[%d] available[%d]", _size, available());
+        Debug_printv("File Size: size[%ld] available[%ld]", _size, available());
         
         return true;
     }

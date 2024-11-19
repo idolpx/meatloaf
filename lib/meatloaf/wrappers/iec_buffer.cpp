@@ -39,9 +39,9 @@ size_t oiecstream::sendBytesViaIEC() {
 
     // we are in a LOAD operation here, so we are pusing bytes from file to C64, by writing to IEC
 
-    // Serial.printf("buff     :");
+    // printf("buff     :");
     // for(auto i = pbase(); i<pptr(); i++) {
-    //     Serial.printf("%c",*i);
+    //     printf("%c",*i);
     // }
     // Debug_printv("\n");
 
@@ -53,10 +53,10 @@ size_t oiecstream::sendBytesViaIEC() {
     //  pptr =  Returns the pointer to the current character (put pointer) in the put area.
     //  pbase = Returns the pointer to the beginning ("base") of the put area.
     //  epptr = Returns the pointer one past the end of the put area.
-    Serial.printf("loading file: buff->IEC:");
+    printf("loading file: buff->IEC:");
     for(auto b = pbase(); b < pptr()-1; b++) {
-        //Serial.printf("%c",*b);
-        //Serial.printf("%c[%.2X]",*b, *b);
+        //printf("%c",*b);
+        //printf("%c[%.2X]",*b, *b);
         bool sendSuccess = m_iec->sendByte(*b);
         //bool sendSuccess = true;
         if(sendSuccess && !(IEC.flags bitand ATN_ASSERTED) ) written++;
@@ -133,7 +133,7 @@ int oiecstream::sync() {
  ********************************************************/
 
 void oiecstream::putUtf8(U8Char* codePoint) {
-    //Serial.printf("%c",codePoint->toPetscii());
+    //printf("%c",codePoint->toPetscii());
     //Debug_printv("oiecstream calling put");
     auto c = codePoint->toPetscii();
     put(c);

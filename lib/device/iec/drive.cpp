@@ -77,7 +77,8 @@ void iecDrive::format()
 */
 mediatype_t iecDrive::mount(FILE *f, const char *filename, uint32_t disksize, mediatype_t disk_type)
 {
-    std::string url = this->host->get_hostname();
+    Debug_printv("filename[%s], disksize[%lu] disktype[%d]", filename, disksize, disk_type);
+    std::string url = this->host->get_basepath();
     mstr::toLower(url);
     if ( url == "sd" )
         url = "//sd";
@@ -730,6 +731,7 @@ bool iecDrive::registerStream ( uint8_t channel )
 
         Debug_printv("LOAD \"%s\"", _base->url.c_str());
         new_stream = std::shared_ptr<MStream>(_base->getSourceStream());
+        Debug_printv("after load");
     }
 
     // SAVE / PUT / PRINT / WRITE
@@ -869,7 +871,7 @@ uint16_t iecDrive::sendLine(uint16_t blocks, const char *format, ...)
 
 uint16_t iecDrive::sendLine(uint16_t blocks, char *text)
 {
-    Serial.printf("%d %s ", blocks, text);
+    printf("%d %s ", blocks, text);
 
     // Get text length
     uint8_t len = strlen(text);
@@ -892,7 +894,7 @@ uint16_t iecDrive::sendLine(uint16_t blocks, char *text)
     // Finish line
     if (!IEC.sendByte(0)) {Debug_printv("line[%s]", text); return 0;};
 
-    Serial.println("");
+    printf("\r\n");
     
     return len + 5;
 } // sendLine
@@ -1015,7 +1017,7 @@ uint16_t iecDrive::sendFooter()
 
 void iecDrive::sendListing()
 {
-    Serial.printf("sendListing: [%s]\r\n=================================\r\n", _base->url.c_str());
+    printf("sendListing: [%s]\r\n=================================\r\n", _base->url.c_str());
 
     uint16_t byte_count = 0;
     std::string extension = "dir";
@@ -1038,7 +1040,7 @@ void iecDrive::sendListing()
         return;
     }
 
-    //fnLedStrip.startRainbow(300);
+    //oLedStrip.startRainbow(300);
 
     // Send load address
     size_t written = 0;
@@ -1053,7 +1055,7 @@ void iecDrive::sendListing()
         return;
     }
 
-    Serial.println("");
+    printf("\r\n");
 
     // Send Listing Header
     if (_base->media_header.size() == 0)
@@ -1146,10 +1148,10 @@ void iecDrive::sendListing()
     IEC.sendByte(0, true);
     //closeStream();
 
-    Serial.printf("\r\n=================================\r\n%d bytes sent\r\n\r\n", byte_count);
+    printf("\r\n=================================\r\n%d bytes sent\r\n\r\n", byte_count);
 
     //fnLedManager.set(eLed::LED_BUS, false);
-    //fnLedStrip.stopRainbow();
+    //oLedStrip.stopRainbow();
 } // sendListing
 
 
@@ -1175,7 +1177,7 @@ bool iecDrive::sendFile()
     }
 
     Debug_printv("stream_url[%s]", istream->url.c_str());
-    Debug_printv("size[%d] avail[%d] pos[%d]", istream->size(), istream->available(), istream->position());
+    Debug_printv("size[%lu] avail[%lu] pos[%lu]", istream->size(), istream->available(), istream->position());
 
     if ( !_base->isDirectory() )
     {
@@ -1202,7 +1204,7 @@ bool iecDrive::sendFile()
     size_t written = 0, len;
     uint64_t t_start = esp_timer_get_time(), t_end;
 
-    //fnLedStrip.startRainbow(300);
+    //oLedStrip.startRainbow(300);
 
     if( commanddata.channel == CHANNEL_LOAD && istream->position() == 0 )
     {
@@ -1212,20 +1214,20 @@ bool iecDrive::sendFile()
         load_address = buf[0] & 0x00FF; // low byte
         load_address = load_address | buf[1] << 8;  // high byte
         sys_address = load_address;
-        Serial.printf( "load_address[$%.4X] sys_address[%d]", load_address, sys_address );
+        printf( "load_address[$%.4X] sys_address[%d]", load_address, sys_address );
 
         // Get SYSLINE
     }
 
     startpos = istream->position();
-    Serial.printf("\r\nsendFile: [$%.4X] pos[%d]\r\n=================================\r\n", load_address, startpos);
+    printf("\r\nsendFile: [$%.4X] pos[%lu]\r\n=================================\r\n", load_address, startpos);
     while( !istream->error() )
     {
         //Debug_printv("b[%02X] nb[%02X] error[%d] count[%d] avail[%d]", b, nb, istream->error(), count, avail);
 #ifdef DATA_STREAM
         if (bi == 0)
         {
-            Serial.printf(":%.4X ", load_address);
+            printf(":%.4X ", load_address);
             load_address += 8;
         }
 #endif
@@ -1250,13 +1252,13 @@ bool iecDrive::sendFile()
         // Send Bytes
         written = IEC.sendBytes((const char *) buf, len, eoi);
         if (written != len) {
-          Debug_printv("Short write: %i expected: %i cur: %i", written, len, count);
+          Debug_printv("Short write: %i expected: %i cur: %li", written, len, count);
           count -= len - written;
           istream->seek(count, SEEK_SET);
           break;
         }
 
-        uint32_t t = 0;
+        uint8_t t = 0;
         if ( size )
             t = (count * 100) / size;
 
@@ -1269,11 +1271,11 @@ bool iecDrive::sendFile()
 
         if(bi == 8)
         {
-            Serial.printf(" %s (%d %d%%) [%d]\r\n", ba, count, t, avail);
+            printf(" %s (%d %d%%) [%d]\r\n", ba, count, t, avail);
             bi = 0;
         }
 #else
-        Serial.printf("\rTransferring %d%% [%d, %d]      ", t, count, avail);
+        printf("\rTransferring %d%% [%lu, %lu]      ", t, count, avail);
 #endif
 
         // // Toggle LED
@@ -1292,16 +1294,16 @@ bool iecDrive::sendFile()
     t_end -= t_start;
     double seconds = t_end / 1000000.0;
     double cps = (count - startpos) / seconds;
-    Serial.printf("\r\n=================================\r\n%d bytes sent of %d @ %0.2fcps [SYS%d]\r\n\r\n", count, size, cps, sys_address);
+    printf("\r\n=================================\r\n%lu bytes sent of %lu @ %0.2fcps [SYS%d]\r\n\r\n", count, size, cps, sys_address);
 
     //Debug_printv("len[%d] avail[%d]", len, avail);
 
     //fnLedManager.set(eLed::LED_BUS, false);
-    //fnLedStrip.stopRainbow();
+    //oLedStrip.stopRainbow();
 
     if ( istream->error() )
     {
-        Serial.println("sendFile: Transfer aborted!");
+        printf("sendFile: Transfer aborted!\r\n");
         IEC.senderTimeout();
         closeStream(commanddata.channel);
         return false;
@@ -1325,7 +1327,7 @@ bool iecDrive::saveFile()
     auto ostream = retrieveStream(commanddata.channel);
 
     if ( ostream == nullptr ) {
-        Serial.println("couldn't open a stream for writing");
+        printf("couldn't open a stream for writing\r\n");
         IEC.senderTimeout(); // Error
         return false;
     }
@@ -1342,12 +1344,12 @@ bool iecDrive::saveFile()
         }
 
 
-        Serial.printf("saveFile: [$%.4X]\r\n=================================\r\n", load_address);
+        printf("saveFile: [$%.4X]\r\n=================================\r\n", load_address);
 
 	ostream->write((const uint8_t *) payload.data(), payload.size());
     }
 
-    Serial.printf("=================================\r\n%d bytes saved\r\n", ostream->position());
+    printf("=================================\r\n%lu bytes saved\r\n", ostream->position());
 
     // TODO: Handle errorFlag
 

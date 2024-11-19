@@ -3,6 +3,7 @@
 #include "led_strip.h"
 
 #include "../../include/debug.h"
+#include "../../include/pinmap.h"
 
 #include <stdio.h>
 #include <stdint.h>
@@ -17,7 +18,7 @@
 //#include "FX.h"
 
 // Global LED manager object
-LedStrip fnLedStrip;
+LedStrip oLedStrip;
 
 CRGB ledstrip[NUM_LEDS];
 
@@ -29,30 +30,30 @@ void ledStripTask(void *pvParameters)
     int rainbowMillis = 0; // keep track of time for the rainbow
 
     // Get current LED states
-    int wifiLedState = fnLedStrip.sLedState[LED_STRIP_WIFI];
-    int busLedState = fnLedStrip.sLedState[LED_STRIP_BUS];
-    int btLedState = fnLedStrip.sLedState[LED_STRIP_BT];
+    int wifiLedState = oLedStrip.sLedState[LED_STRIP_WIFI];
+    int busLedState = oLedStrip.sLedState[LED_STRIP_BUS];
+    int btLedState = oLedStrip.sLedState[LED_STRIP_BT];
 
     while (true)
     {
         // Check and set LED mode changes
-        if (wifiLedState != fnLedStrip.sLedState[LED_STRIP_WIFI])
+        if (wifiLedState != oLedStrip.sLedState[LED_STRIP_WIFI])
         {
-            wifiLedState = fnLedStrip.sLedState[LED_STRIP_WIFI]; // set new state
+            wifiLedState = oLedStrip.sLedState[LED_STRIP_WIFI]; // set new state
             stateChange = true;
         }
-        if (busLedState != fnLedStrip.sLedState[LED_STRIP_BUS])
+        if (busLedState != oLedStrip.sLedState[LED_STRIP_BUS])
         {
-            busLedState = fnLedStrip.sLedState[LED_STRIP_BUS]; // set new state
+            busLedState = oLedStrip.sLedState[LED_STRIP_BUS]; // set new state
            stateChange = true;
         }
-        if (btLedState != fnLedStrip.sLedState[LED_STRIP_BT])
+        if (btLedState != oLedStrip.sLedState[LED_STRIP_BT])
         {
-            btLedState = fnLedStrip.sLedState[LED_STRIP_BT]; // set new state
+            btLedState = oLedStrip.sLedState[LED_STRIP_BT]; // set new state
             stateChange = true;
         }
 
-        if (fnLedStrip.rainbowTimer > 0 && !rainbowRun)
+        if (oLedStrip.rainbowTimer > 0 && !rainbowRun)
         {
             rainbowRun = true;
             rainbowMillis = fnSystem.millis();
@@ -62,22 +63,22 @@ void ledStripTask(void *pvParameters)
         }
         else if(rainbowRun)
         {
-            if ((fnSystem.millis() - rainbowMillis) > (fnLedStrip.rainbowTimer * 1000) || fnLedStrip.rainbowStopper) // Times Up!
+            if ((fnSystem.millis() - rainbowMillis) > (oLedStrip.rainbowTimer * 1000) || oLedStrip.rainbowStopper) // Times Up!
             {
                 rainbowRun = false;
                 rainbowMillis = 0;
-                fnLedStrip.rainbowTimer = 0;
-                fnLedStrip.rainbowStopper = false;
+                oLedStrip.rainbowTimer = 0;
+                oLedStrip.rainbowStopper = false;
 
                 for (int i=0;i<LED_STRIP_COUNT;i++)
                 {
-                    if (fnLedStrip.sLedState[i] == LED_OFF)
+                    if (oLedStrip.sLedState[i] == LED_OFF)
                     { // Off Black
                         ledstrip[i] = CRGB::Black;
                     }
-                    else if (fnLedStrip.sLedState[i] == LED_ON)
+                    else if (oLedStrip.sLedState[i] == LED_ON)
                     { // On Color
-                        ledstrip[i] = fnLedStrip.sLedColor[i];
+                        ledstrip[i] = oLedStrip.sLedColor[i];
                     }
                 }
             }
@@ -92,13 +93,13 @@ void ledStripTask(void *pvParameters)
             // Prep the led states
             for (int i=0;i<LED_STRIP_COUNT;i++)
             {
-                if (fnLedStrip.sLedState[i] == LED_OFF)
+                if (oLedStrip.sLedState[i] == LED_OFF)
                 { // Off Black
                     ledstrip[i] = CRGB::Black;
                 }
-                else if (fnLedStrip.sLedState[i] == LED_ON)
+                else if (oLedStrip.sLedState[i] == LED_ON)
                 { // On Color
-                    ledstrip[i] = fnLedStrip.sLedColor[i];
+                    ledstrip[i] = oLedStrip.sLedColor[i];
                 }
                 else
                 { // Blinking
@@ -143,7 +144,7 @@ void LedStrip::setup()
         xTaskCreatePinnedToCore(&ledStripTask, "LEDStripTask", 4000, NULL, 5, NULL, 0);
 
         // Taste the Rainbow at startup
-        fnLedStrip.startRainbow(3);
+        oLedStrip.startRainbow(3);
     }
 }
 
@@ -180,14 +181,14 @@ void LedStrip::blink(stripLed led, int count)
 // Start rainbow mode
 void LedStrip::startRainbow(int seconds)
 {
-    fnLedStrip.rainbowTimer = seconds;
+    oLedStrip.rainbowTimer = seconds;
 }
 
 // Stop rainbow mode
 void LedStrip::stopRainbow()
 {
-    fnLedStrip.rainbowStopper = true;
-    fnLedStrip.rainbowTimer = 0;
+    oLedStrip.rainbowStopper = true;
+    oLedStrip.rainbowTimer = 0;
 }
 
 #endif // LED_STRIP

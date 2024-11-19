@@ -35,7 +35,7 @@
 //   arg = cli.next();    // Get the next argument from the SerialCommand object buffer
 //   if (arg != NULL)      // As long as it existed, take it
 //   {
-//     Serial.print("Hello ");
+//     printf("Hello ");
 //     Debug_printv(arg);
 //   }
 //   else {
@@ -53,7 +53,7 @@
 //   if (arg != NULL)
 //   {
 //     aNumber=atoi(arg);    // Converts a char string to an integer
-//     Serial.print("First argument was: ");
+//     printf("First argument was: ");
 //     Debug_printv(aNumber);
 //   }
 //   else {
@@ -64,7 +64,7 @@
 //   if (arg != NULL)
 //   {
 //     aNumber=atol(arg);
-//     Serial.print("Second argument was: ");
+//     printf("Second argument was: ");
 //     Debug_printv(aNumber);
 //   }
 //   else {
@@ -84,7 +84,7 @@
 // 	Dir dir = fileSystem->openDir("/");
 // 	// or Dir dir = LittleFS.openDir("/data");
 // 	while (dir.next()) {
-// 		//Serial.print(dir.fileName());
+// 		//printf(dir.fileName());
 // 		if(dir.fileSize()) {
 // 			File f = dir.openFile("r");
 // 			Debug_printf("%s\t%d\r\n", dir.fileName().c_str(), (f.size()/256));
@@ -104,7 +104,7 @@
 //   if (strcmp_P(arg, "init"))
 //   {
 // 	  iec.init();
-// 	  Serial.printf_P("IEC Interface initialized\r\n");
+// 	  printf_P("IEC Interface initialized\r\n");
 //   }
 
 // }
@@ -125,7 +125,7 @@
 // 		Debug_printf("\r\n[%s] (%d bytes)\r\n================================\r\n", filename, len);
 // 		for(i = 0; i < len; i++) {
 // 			file.readBytes(b, sizeof(b));
-// 			Serial.print(b);
+// 			printf(b);
 // 		}
 // 		file.close();
 // 	}

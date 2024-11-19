@@ -30,7 +30,7 @@
 #include "utils.h"
 
 #define MAIN_STACKSIZE	 4096
-#define MAIN_PRIORITY	 20
+#define MAIN_PRIORITY	 17
 #define MAIN_CPUAFFINITY 1
 
 #define IEC_ALLDEV		 31
@@ -567,7 +567,7 @@ void systemBus::addDevice(virtualDevice *pDevice, int device_id)
     }
 
     // TODO, add device shortcut pointer logic like others
-    Serial.printf("Device #%02d Ready!\r\n", device_id);
+    printf("Device #%02d Ready!\r\n", device_id);
 
     pDevice->_devnum = device_id;
     _daisyChain.push_front(pDevice);

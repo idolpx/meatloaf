@@ -41,7 +41,7 @@ If skipping is not provided or fails, libarchive will call the read() function a
 // https://github.com/libarchive/libarchive/wiki/LibarchiveIO
 int64_t cb_skip(struct archive *a, void *userData, int64_t request)
 {
-    Debug_printv("bytes[%d]", request);
+    Debug_printv("bytes[%lld]", request);
     ArchiveMStreamData *streamData = (ArchiveMStreamData *)userData;
 
     if (streamData->srcStream->isOpen())
@@ -58,7 +58,7 @@ int64_t cb_skip(struct archive *a, void *userData, int64_t request)
 
 int64_t cb_seek(struct archive *a, void *userData, int64_t offset, int whence)
 {
-    Debug_printv("offset[%d] whence[%d] (0=begin, 1=curr, 2=end)", offset, whence);
+    Debug_printv("offset[%lld] whence[%d] (0=begin, 1=curr, 2=end)", offset, whence);
     ArchiveMStreamData *streamData = (ArchiveMStreamData *)userData;
 
     if (streamData->srcStream->isOpen())
@@ -155,22 +155,17 @@ bool ArchiveMStream::isOpen()
 
 uint32_t ArchiveMStream::read(uint8_t *buf, uint32_t size)
 {
-    Debug_printv("calling read, buff size=[%d]", size);
+    Debug_printv("calling read, buff size=[%ld]", size);
 
-    ssize_t zsize = archive_read_data(a, &buf, size);
+    uint64_t zsize = archive_read_data(a, &buf, size);
 
-    Debug_printv("archive returned [%d] unarchived bytes", zsize);
-    if ( zsize >= 0 ) {
+    Debug_printv("archive returned [%llu] unarchived bytes", zsize);
+    if ( zsize > 0 ) {
         _position += zsize;
         return zsize;
     }
-    else if ( zsize < 0 ) 
+    else
     {
-        _error = zsize;
-        close();
-        return 0;
-    }
-    else {
         return 0;
     }
 }

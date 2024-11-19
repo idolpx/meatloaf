@@ -53,7 +53,7 @@ public:
         //Debug_printv("basepath[%s] path[%s] valid[%d]", basepath.c_str(), this->path.c_str(), m_isNull);
     };
     ~FlashMFile() {
-        //Serial.printf("*** Destroying flashfile %s\r\n", url.c_str());
+        //printf("*** Destroying flashfile %s\r\n", url.c_str());
         closeDir();
     }
 

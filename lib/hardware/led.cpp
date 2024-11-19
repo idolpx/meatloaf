@@ -57,13 +57,13 @@ void LedManager::set(eLed led, bool on)
         switch (led)
         {
         case eLed::LED_BUS:
-            //fnLedStrip.set(stripLed::LED_STRIP_BUS, on);
+            //oLedStrip.set(stripLed::LED_STRIP_BUS, on);
             break;
         case eLed::LED_BT:
-            //fnLedStrip.set(stripLed::LED_STRIP_BT, on);
+            //oLedStrip.set(stripLed::LED_STRIP_BT, on);
             break;
         case eLed::LED_WIFI:
-            //fnLedStrip.set(stripLed::LED_STRIP_WIFI, on);
+            //oLedStrip.set(stripLed::LED_STRIP_WIFI, on);
             break;
         default:
             break;
@@ -93,13 +93,13 @@ void LedManager::toggle(eLed led)
         switch (led)
         {
         case eLed::LED_BUS:
-            //fnLedStrip.toggle(stripLed::LED_STRIP_BUS);
+            //oLedStrip.toggle(stripLed::LED_STRIP_BUS);
             break;
         case eLed::LED_BT:
-            //fnLedStrip.toggle(stripLed::LED_STRIP_BT);
+            //oLedStrip.toggle(stripLed::LED_STRIP_BT);
             break;
         case eLed::LED_WIFI:
-            //fnLedStrip.toggle(stripLed::LED_STRIP_WIFI);
+            //oLedStrip.toggle(stripLed::LED_STRIP_WIFI);
             break;
         default:
             break;
@@ -120,13 +120,13 @@ void LedManager::blink(eLed led, int count)
         switch (led)
         {
         case eLed::LED_BUS:
-            //fnLedStrip.blink(stripLed::LED_STRIP_BUS, count);
+            //oLedStrip.blink(stripLed::LED_STRIP_BUS, count);
             break;
         case eLed::LED_BT:
-            //fnLedStrip.blink(stripLed::LED_STRIP_BT, count);
+            //oLedStrip.blink(stripLed::LED_STRIP_BT, count);
             break;
         case eLed::LED_WIFI:
-            //fnLedStrip.blink(stripLed::LED_STRIP_WIFI, count);
+            //oLedStrip.blink(stripLed::LED_STRIP_WIFI, count);
             break;
         default:
             break;

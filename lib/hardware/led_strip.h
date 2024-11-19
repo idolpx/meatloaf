@@ -65,7 +65,7 @@ public:
 private:
 };
 
-extern LedStrip fnLedStrip;
+extern LedStrip oLedStrip;
 
 #endif // LED_STRIP
 #endif // LED_STRIP_H

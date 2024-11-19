@@ -1259,8 +1259,8 @@ void iecNetwork::fsop(unsigned char comnd)
 
 void iecNetwork::set_open_params()
 {
-    // openparams,<mode>,<trans>
-    if (pt.size() < 2)
+    // openparams,<channel>,<mode>,<trans>
+    if (pt.size() < 3)
     {
         iecStatus.error = NETWORK_ERROR_INVALID_DEVICESPEC;
         iecStatus.channel = commanddata.channel;
@@ -1268,14 +1268,19 @@ void iecNetwork::set_open_params()
         iecStatus.msg = "invalid # of parameters";
         return;
     }
+    
+    int channel = atoi(pt[1].c_str());
+    int mode = atoi(pt[2].c_str());
+    int trans = atoi(pt[3].c_str());
 
-    cmdFrame.aux1 = atoi(pt[1].c_str()); // mode
-    cmdFrame.aux2 = atoi(pt[2].c_str()); // trans
+    auto& channel_data = network_data_map[channel];
+
+    channel_data.protocol->set_open_params(mode, trans);
 
     iecStatus.error = 0;
     iecStatus.msg = "ok";
     iecStatus.connected = 0;
-    iecStatus.channel = 0; //channel;
+    iecStatus.channel = channel;
 
 }
 

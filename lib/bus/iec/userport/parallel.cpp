@@ -277,7 +277,7 @@ void wic64_command()
     //     {
     //         ex = true; // REM Send messages to debug console.
     //         displaystuff("REM");
-    //         Serial.println(lastinput);
+    //         printf(lastinput "\r\n");
     //     }
 
     //     if (lastinput.charAt(3) == 10)

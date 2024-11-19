@@ -437,12 +437,12 @@ httpd_handle_t cHttpdServer::start_server(serverstate &state)
         httpd_register_uri_handler(state.hServer, &uri_get);
         httpd_register_uri_handler(state.hServer, &uri_post);
 
-        Serial.println(ANSI_GREEN_BOLD "WWW/WS/WebDAV Server Started!" ANSI_RESET);
+        printf(ANSI_GREEN_BOLD "WWW/WS/WebDAV Server Started!" ANSI_RESET "\r\n");
     }
     else
     {
         state.hServer = NULL;
-        Serial.println(ANSI_RED_BOLD "WWW/WS/WebDAV Server FAILED to start!" ANSI_RESET);
+        printf(ANSI_RED_BOLD "WWW/WS/WebDAV Server FAILED to start!" ANSI_RESET "\r\n");
     }
 
     return state.hServer;

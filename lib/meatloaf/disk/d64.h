@@ -88,7 +88,7 @@ public:
     bool error_info = false;
     std::string bam_message = "";
 
-    D64MStream(std::shared_ptr<MStream> is) : MMediaStream(is) 
+    D64MStream(std::shared_ptr<MStream> is) : MMediaStream(is)
     {
         // D64 Partition Info
         std::vector<BlockAllocationMap> b = { 
@@ -343,7 +343,7 @@ public:
     }
 
     bool handles(std::string fileName) override {
-        //Serial.printf("handles w dnp %s %d\r\n", fileName.rfind(".dnp"), fileName.length()-4);
+        //printf("handles w dnp %s %d\r\n", fileName.rfind(".dnp"), fileName.length()-4);
         return byExtension(
             {
                 ".d64",

@@ -82,7 +82,7 @@ bool NIBMStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
     if ( !sync_found )
         return false;
 
-    Debug_printv( "Start Sector Data [%04X]", containerStream->position() );
+    Debug_printv( "Start Sector Data [%04lX]", containerStream->position() );
     readSector();
 
 

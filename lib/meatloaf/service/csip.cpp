@@ -32,7 +32,7 @@ bool CSIPMSessionMgr::sendCommand(std::string command) {
     std::string c = mstr::toPETSCII2(command);
     // 13 (CR) sends the command
     if(establishSession()) {
-        Serial.printf("CSIP: send command: %s\r\n", c.c_str());
+        printf("CSIP: send command: %s\r\n", c.c_str());
         (*this) << (c+'\r');
         (*this).flush();
         return true;
@@ -164,7 +164,7 @@ bool CSIPMStream::open(std::ios_base::openmode mode) {
         else {
             _size = buffer[0] + buffer[1]*256; // put len here
             // if everything was ok
-            Serial.printf("CSIP: file open, size: %d\r\n", _size);
+            printf("CSIP: file open, size: %lu\r\n", _size);
             _is_open = true;
         }
     }

@@ -180,7 +180,7 @@ bool TCRTMStream::seekPath(std::string path) {
         uint32_t file_start_address = (0xD8 + (entry.file_start_address[0] << 8 | entry.file_start_address[1] << 16));
         containerStream->seek(file_start_address);
 
-        Debug_printv("File Size: size[%d] available[%d]", _size, available());
+        Debug_printv("File Size: size[%ld] available[%ld]", _size, available());
         
         return true;
     }

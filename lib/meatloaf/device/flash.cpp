@@ -5,6 +5,8 @@
 #include <sstream>
 #include <iomanip>
 
+#include "meatloaf.h"
+
 #include "../../../include/debug.h"
 #include "peoples_url_parser.h"
 #include "string_utils.h"
@@ -65,7 +67,8 @@ bool FlashMFile::isDirectory()
 MStream* FlashMFile::getSourceStream(std::ios_base::openmode mode)
 {
     std::string full_path = basepath + path;
-    MStream* istream = new FlashMStream(full_path, mode);
+    //MStream* istream = new FlashMStream(full_path, mode);4
+    auto istream = StreamBroker::obtain<FlashMStream>(url);
     //Debug_printv("FlashMFile::getSourceStream() 3, not null=%d", istream != nullptr);
     istream->open(mode);   
     //Debug_printv("FlashMFile::getSourceStream() 4");
@@ -390,7 +393,7 @@ uint32_t FlashMStream::write(const uint8_t *buf, uint32_t size) {
         return 0;
     }
 
-    Debug_printv("buf[%02X] size[%d] handle->file_h[%d]", buf[0], size, handle->file_h);
+    Debug_printv("buf[%02X] size[%ld]", buf[0], size);
 
     // buffer, element size, count, handle
     int result = fwrite((void*) buf, 1, size, handle->file_h );
@@ -438,7 +441,7 @@ void FlashHandle::dispose() {
 
 void FlashHandle::obtain(std::string m_path, std::string mode) {
 
-    //Serial.printf("*** Atempting opening flash  handle'%s'\r\n", m_path.c_str());
+    //printf("*** Atempting opening flash  handle'%s'\r\n", m_path.c_str());
 
     if ((mode[0] == 'w') && strchr(m_path.c_str(), '/')) {
         // For file creation, silently make subdirs as needed.  If any fail,
@@ -464,7 +467,7 @@ void FlashHandle::obtain(std::string m_path, std::string mode) {
     file_h = fopen( m_path.c_str(), mode.c_str());
     // rc = 1;
 
-    //Serial.printf("FSTEST: lfs_file_open file rc:%d\r\n",rc);
+    //printf("FSTEST: lfs_file_open file rc:%d\r\n",rc);
 
 //     if (rc == LFS_ERR_ISDIR) {
 //         // To support the SD.openNextFile, a null FD indicates to the FlashFSFile this is just

@@ -234,7 +234,7 @@ int tnfs_open(tnfsMountInfo *m_info, const char *filepath, uint16_t open_mode, u
                 else if (open_mode & TNFS_OPENMODE_WRITE_TRUNCATE)
                     pFileInf->file_size = 0;
             }
-            Debug_printf("File opened, handle ID: %hd, size: %u, pos: %u\r\n", *file_handle, pFileInf->file_size, pFileInf->file_position);
+            Debug_printf("File opened, handle ID: %hd, size: %lu, pos: %lu\r\n", *file_handle, pFileInf->file_size, pFileInf->file_position);
         }
         result = packet.payload[0];
     }
@@ -278,14 +278,14 @@ int tnfs_close(tnfsMountInfo *m_info, int16_t file_handle)
 void _tnfs_cache_dump(const char *title, uint8_t *cache, uint32_t cache_size)
 {
     int bytes_per_line = 16;
-    Debug_printf("\n%s %u\r\n", title, cache_size);
+    Debug_printf("\n%s %lu\r\n", title, cache_size);
     for (int j = 0; j < cache_size; j += bytes_per_line)
     {
         for (int k = 0; (k + j) < cache_size && k < bytes_per_line; k++)
             Debug_printf("%02X ", cache[k + j]);
-        Debug_println("");
+        Debug_println("\r\n");
     }
-    Debug_println("");
+    Debug_println("\r\n");
 }
 
 /*
@@ -764,7 +764,7 @@ void _readdirx_fill_response(tnfsDirCacheEntry *pCached, tnfsStat *filestat, cha
         strftime(t_m, sizeof(t_m), tfmt, localtime(&tt));
         tt = filestat->c_time;
         strftime(t_c, sizeof(t_c), tfmt, localtime(&tt));
-        Debug_printf("\t_readdirx_fill_response: dir: %s, size: %u, mtime: %s, ctime: %s \"%s\"\r\n",
+        Debug_printf("\t_readdirx_fill_response: dir: %s, size: %lu, mtime: %s, ctime: %s \"%s\"\r\n",
             filestat->isDir ? "Yes" : "no",
             filestat->filesize, t_m, t_c, dir_entry );
     }

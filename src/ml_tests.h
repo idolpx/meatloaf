@@ -45,10 +45,10 @@ public:
     void check(std::string checkpoint) {
         uint32_t memNow = esp_get_free_internal_heap_size();
         if(memNow < prevMem) {
-            Debug_printf("[I:ALLOC:%s] %d bytes allocated at checkpoint: %s\r\n", tag.c_str(), memNow-prevMem, checkpoint.c_str());
+            Debug_printf("[I:ALLOC:%s] %lu bytes allocated at checkpoint: %s\r\n", tag.c_str(), memNow-prevMem, checkpoint.c_str());
         }
         else if(memNow > prevMem) {
-            Debug_printf("[I:FREE :%s] %d bytes freed at checkpoint: %s\r\n", tag.c_str(), prevMem-memNow, checkpoint.c_str());
+            Debug_printf("[I:FREE :%s] %lu bytes freed at checkpoint: %s\r\n", tag.c_str(), prevMem-memNow, checkpoint.c_str());
         }
         else {
             Debug_printf("[I:NONE :%s] no change at checkpoint: %s\r\n", tag.c_str(), checkpoint.c_str());
@@ -60,7 +60,7 @@ public:
     void finish() {
         uint32_t memNow = esp_get_free_internal_heap_size();
         if(memNow < startMem) {
-            Debug_printf("[E:LEAK:%s] sorry to say, but it leaked: %d bytes\r\n", tag.c_str(), memNow-startMem);
+            Debug_printf("[E:LEAK:%s] sorry to say, but it leaked: %lu bytes\r\n", tag.c_str(), memNow-startMem);
         }
     }
 };

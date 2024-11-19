@@ -101,11 +101,11 @@ int WiFiManager::start()
         ESP_ERROR_CHECK(esp_wifi_init(&wifi_init_cfg));
         ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
         Debug_printf("WiFiManager::start() complete\r\n");
-        Serial.printf("MAC Address: ");
+        printf("MAC Address: ");
         for (int i = 0; i < 5; i++) {
-            Serial.printf("%02X:", mac[i]);
+            printf("%02X:", mac[i]);
         }
-        Serial.printf("%02X\r\n", mac[5]);
+        printf("%02X\r\n", mac[5]);
     }
 
     // TODO: Provide way to change WiFi region/country?
@@ -254,7 +254,7 @@ void WiFiManager::conn_event_handler(void* arg, esp_event_base_t event_base, int
                 xEventGroupSetBits(wifi_event_group, WIFI_NO_IP_YET_BIT);
                 break;
             default:
-                Debug_printf("Ignoring event_id: %d\r\n", event_id);
+                Debug_printf("Ignoring event_id: %ld\r\n", event_id);
                 break;
         }
     }
@@ -267,7 +267,7 @@ void WiFiManager::conn_event_handler(void* arg, esp_event_base_t event_base, int
                 xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_BIT);
                 break;
             default:
-                Debug_printf("Ignoring event_id: %d\r\n", event_id);
+                Debug_printf("Ignoring event_id: %ld\r\n", event_id);
                 break;
         }
     }
@@ -690,12 +690,12 @@ void WiFiManager::_wifi_event_handler(void *arg, esp_event_base_t event_base,
             mdns_init();
             mdns_hostname_set(Config.get_general_devicename().c_str());
             add_mdns_services();
-            Serial.println( ANSI_GREEN_BOLD "mDNS Service Started!" ANSI_RESET );
+            printf( ANSI_GREEN_BOLD "mDNS Service Started!" ANSI_RESET "\r\n");
 
 #ifdef ENABLE_SSDP
             // Start SSDP Service
             SSDPDevice.start();
-            Serial.println( ANSI_GREEN_BOLD "SSDP Service Started!" ANSI_RESET );
+            printf( ANSI_GREEN_BOLD "SSDP Service Started!" ANSI_RESET "\r\n");
 #endif
 
             break;

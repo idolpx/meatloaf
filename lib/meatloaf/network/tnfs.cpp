@@ -123,7 +123,7 @@ bool TNFSMFile::remove() {
 
     int rc = ::remove( std::string(basepath + path).c_str() );
     if (rc != 0) {
-        Debug_printv("remove: rc=%d path=`%s`\r\n", rc, path);
+        Debug_printv("remove: rc=%d path=`%s`\r\n", rc, path.c_str());
         return false;
     }
 
@@ -389,7 +389,7 @@ void TNFSHandle::dispose() {
 
 void TNFSHandle::obtain(std::string m_path, std::string mode) {
 
-    //Serial.printf("*** Atempting opening flash  handle'%s'\r\n", m_path.c_str());
+    //printf("*** Atempting opening flash  handle'%s'\r\n", m_path.c_str());
 
     if ((mode[0] == 'w') && strchr(m_path.c_str(), '/')) {
         // For file creation, silently make subdirs as needed.  If any fail,
@@ -415,7 +415,7 @@ void TNFSHandle::obtain(std::string m_path, std::string mode) {
     file_h = fopen( m_path.c_str(), mode.c_str());
     // rc = 1;
 
-    //Serial.printf("FSTEST: lfs_file_open file rc:%d\r\n",rc);
+    //printf("FSTEST: lfs_file_open file rc:%d\r\n",rc);
 
 //     if (rc == LFS_ERR_ISDIR) {
 //         // To support the SD.openNextFile, a null FD indicates to the FlashFSFile this is just

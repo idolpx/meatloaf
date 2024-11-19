@@ -31,8 +31,10 @@ environment = lolin-d32-pro      ; Wemos Lolin D32 Pro                         (
 ; EXPERIMENTAL
 ;environment = esp32s3            ; esp32s3 devkitc                             (ESP32-S3 2M/8M PSRAM, 8M/16M/32M Flash)
 ;environment = lolin-s2-mini      ; Wemos Lolin S2 Mini                         (ESP32-S2 2M PSRAM, 4M Flash)
+
 ;environment = lolin-s3-pro       ; Wemos Lolin S3 Pro                          (ESP32-S3 8M PSRAM, 16M Flash)
-;environment = esp32s3-DevKitC-1
+;environment = esp32-s3-zero      ;                                             (ESP32-S3 2M PSRAM, 4M Flash)
+;environment = esp32s3-DevKitC-1  ;
 
 ; NATIVE UNIT TESTING
 ;environment = native      ; For running tests that don't require embedded hardware
@@ -57,26 +59,27 @@ data_dir = data/${meatloaf.build_platform}
 [esp32_base]
 ; Espressif32 PlatformIO Version to use for building
 ; https://github.com/platformio/platform-espressif32/releases
-platform = espressif32 @ 6.4.0
+platform = espressif32 @ 6.3.2
+;platform = espressif32 @ 6.7.0
 framework = espidf
 board_build.filesystem = littlefs
 test_filter = embedded/*
 extra_scripts = 
     pre:build_version.py
-;    post:pack_firmware.py
+;    post:archive_firmware.py
 
 [env]
 ; Common settings for all enivornments
 build_type = debug ;debug ;release
 lib_ldf_mode = deep+
-upload_speed = 460800 ;921600
+upload_speed = 460800 ;460800 ;921600
 ;upload_port = COM1 ; Windows
 ;upload_port = /dev/ttyUSB0 ; Linux
-;upload_port = /dev/cu.usbserial-14433420 ; Mac
-monitor_speed = 460800 ;921600
+;upload_port = /dev/cu.usbserial-144210 ; Mac
+monitor_speed = 460800 ;460800 ;921600
 ;monitor_port = COM1 ; Windows
 ;monitor_port = /dev/ttyUSB0 ; Linux
-;monitor_port = /dev/cu.usbserial-14433420 ; Mac
+;monitor_port = /dev/cu.usbserial-144210 ; Mac
 monitor_filters = esp32_exception_decoder
 check_skip_packages = yes
 ;debug_tool = esp-prog
@@ -93,7 +96,7 @@ build_flags =
     -D WIFI_PASSWORD=\"${meatloaf.wifi_pass}\"
 
     ; Firmware Version
-    -D MEATLOAF_MAX
+    ;-D MEATLOAF_MAX
 
     ; IEC Hardware Options
     ; These options are also useful for reusing a PI1541 Hat with Meatloaf
@@ -103,7 +106,7 @@ build_flags =
     ; Other Hardware Options
     ;-D NO_BUTTONS          ; if your hardware has no physical buttons
     ;-D SD_CARD             ; if your hardware has an sd card slot
-    ;-D LED_STRIP           ; if your hardware has an LED strip
+    ;-D RGB_LED_STRIP       ; if your hardware has an RGB LED strip
     ;-D PIEZO_BUZZER        ; if your hardware has a piezo buzzer
     ;-D PARALLEL_BUS        ; if your hardware has userport parallel interface
     ;-D JTAG                ; enable use with JTAG debugger
@@ -120,6 +123,9 @@ build_flags =
 
     ; Protocol Support
     ;-D JIFFYDOS
+
+    ; Component Options
+    -D QRCODEVERSION=8
 
     ; DEBUG Options
     -D DEBUG_SPEED=${env.monitor_speed}
@@ -152,11 +158,12 @@ board = esp32-16mb
 build_flags =
     ${env.build_flags}
     -D PINMAP_FUJILOAF_REV0
-    -D BOARD_HAS_PSRAM
     -D SD_CARD
-    ;-D LED_STRIP
+    -D RGB_LED_STRIP
     -D PARALLEL_BUS
     -D GPIOX_PCF8575
+    -D MEATLOAF_MAX
+    -D JIFFYDOS
 
 [env:lolin-d32-pro]
 extends = esp32_base
@@ -165,7 +172,6 @@ build_flags =
     ${env.build_flags}
     -D PINMAP_LOLIN_D32_PRO
     -D NO_BUTTONS
-    -D BOARD_HAS_PSRAM
     -D SD_CARD
 
 [env:iec-nugget]
@@ -174,7 +180,6 @@ board = esp32-16mb
 build_flags =
     ${env.build_flags}
     -D PINMAP_IEC_NUGGET
-    -D BOARD_HAS_PSRAM
     -D NO_BUTTONS
     -D SD_CARD
 
@@ -209,7 +214,6 @@ board = esp32-8mb
 build_flags =
     ${env.build_flags}
     -D PINMAP_A2_REV0
-    -D BOARD_HAS_PSRAM
     -D SD_CARD
 
 [env:fujinet-v16]
@@ -218,7 +222,6 @@ board = esp32-8mb
 build_flags =
     ${env.build_flags}
     -D PINMAP_FN_16
-    -D BOARD_HAS_PSRAM
     -D SD_CARD
 
 [env:esp32s3]
@@ -227,7 +230,7 @@ board = esp32-s3-4mb
 build_flags =
     ${env.build_flags}
     -D PINMAP_ESP32S3
-    -D BOARD_HAS_PSRAM
+    -D SD_CARD
 
 [env:lolin-s2-mini]
 extends = esp32_base
@@ -235,21 +238,25 @@ board = esp32-s2-4mb
 build_flags =
     ${env.build_flags}
     -D PINMAP_LOLIN_S2_MINI
-    -D BOARD_HAS_PSRAM
+
+[env:esp32-s3-zero]
+extends = esp32_base
+board = esp32-s3-zero
+build_flags =
+    ${env.build_flags}
+    -D PINMAP_ESP32_S3_ZERO
+    ;-D RGB_LED_STRIP
 
 [env:lolin-s3-pro]
 extends = esp32_base
-board = esp32-s3-16mb
+board = lolin-s3-pro
 build_flags =
     ${env.build_flags}
-    -D PINMAP_ESP32S3
-    -D BOARD_HAS_PSRAM
-
+    -D PINMAP_LOLIN_S3_PRO
+    -D SD_CARD
 [env:esp32s3-DevKitC-1]
 extends = esp32_base
 board = esp32-s3-16mb
 build_flags =
     ${env.build_flags}
     -D PINMAP_ESP32S3_DEVKITC_1
-    ; -D LED_STRIP
-    -D BOARD_HAS_PSRAM

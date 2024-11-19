@@ -149,8 +149,8 @@ bool LBRMStream::seekPath(std::string path)
     {
         // auto entry = containerImage->entry;
         auto type = entry.type.c_str();
-        size_t data_offset = entry.offset;
-        Debug_printv("filename [%.16s] type[%s] start_address[%zu] end_address[%zu] data_offset[%zu]", entry.filename, type, data_offset);
+        uint32_t data_offset = entry.offset;
+        Debug_printv("filename [%.16s] type[%s] start_address[%lu] data_offset[%lu]", entry.filename.c_str(), type, entry.offset, data_offset);
 
         // Calculate file size
         _size = entry.size;
@@ -159,7 +159,7 @@ bool LBRMStream::seekPath(std::string path)
         _position = 0;
         containerStream->seek(data_offset);
 
-        Debug_printv("File Size: size[%d] available[%d] position[%d]", _size, available(), _position);
+        Debug_printv("File Size: size[%ld] available[%ld] position[%ld]", _size, available(), _position);
 
         return true;
     }

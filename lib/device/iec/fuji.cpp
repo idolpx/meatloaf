@@ -93,19 +93,19 @@ void iecFuji::setup(systemBus *bus)
     fnPrinters.set_entry(0, ptr, ptype, Config.get_printer_port(0));
 
     // 04-07 Printers / Plotters
-    Serial.print("Printer "); bus->addDevice(ptr, 4);
+    printf("Printer "); bus->addDevice(ptr, 4);
 
     // 08-15 Drives
     for (int i = 0; i < MAX_DISK_DEVICES; i++)
     {
-        Serial.print("Disk ");
+        printf("Disk ");
         bus->addDevice(&_fnDisks[i].disk_dev, BUS_DEVICEID_DISK + i);
     }
 
-    Serial.print("Network "); bus->addDevice(new iecNetwork(), 16);     // 16-19 Network Devices
-    Serial.print("CPM "); bus->addDevice(new iecCpm(), 20);             // 20-29 Other
-    Serial.print("Clock "); bus->addDevice(new iecClock(), 29);
-    Serial.print("FujiNet "); bus->addDevice(this, 30);                 // 30    FujiNet
+    printf("Network "); bus->addDevice(new iecNetwork(), 16);     // 16-19 Network Devices
+    printf("CPM "); bus->addDevice(new iecCpm(), 20);             // 20-29 Other
+    printf("Clock "); bus->addDevice(new iecClock(), 29);
+    printf("FujiNet "); bus->addDevice(this, 30);                 // 30    FujiNet
 }
 
 void logResponse(const void* data, size_t length)
@@ -1580,7 +1580,7 @@ void iecFuji::get_directory_position_basic()
     if (!validate_directory_slot())
     {
         response = "no currently open directory";
-        Debug_println(response);
+        Debug_println(response.c_str());
         set_fuji_iec_status(DEVICE_ERROR, response);
         IEC.senderTimeout();
         return;
@@ -1590,7 +1590,7 @@ void iecFuji::get_directory_position_basic()
     if (pos == FNFS_INVALID_DIRPOS)
     {
         response = "invalid directory position";
-        Debug_println(response);
+        Debug_println(response.c_str());
         set_fuji_iec_status(DEVICE_ERROR, response);
         IEC.senderTimeout();
         return;
