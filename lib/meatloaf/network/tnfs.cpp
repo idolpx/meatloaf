@@ -1,6 +1,7 @@
 #include "tnfs.h"
 
 #include "meatloaf.h"
+
 #include "../../../include/debug.h"
 
 #include <sys/stat.h>
@@ -44,17 +45,26 @@ bool TNFSMFile::isDirectory()
     return S_ISDIR(info.st_mode);
 }
 
-MStream* TNFSMFile::getDecodedStream(std::shared_ptr<MStream> is) {
-    return is.get(); // we don't have to process this stream in any way, just return the original stream
-}
-
 MStream* TNFSMFile::getSourceStream(std::ios_base::openmode mode)
 {
     std::string full_path = basepath + path;
     MStream* istream = new TNFSMStream(full_path);
+    //auto istream = StreamBroker::obtain<TNFSMStream>(full_path, mode);
     //Debug_printv("TNFSMFile::getSourceStream() 3, not null=%d", istream != nullptr);
     istream->open(mode);   
     //Debug_printv("TNFSMFile::getSourceStream() 4");
+    return istream;
+}
+
+MStream* TNFSMFile::getDecodedStream(std::shared_ptr<MStream> is) {
+    return is.get(); // we don't have to process this stream in any way, just return the original stream
+}
+
+MStream* TNFSMFile::createStream(std::ios_base::openmode mode)
+{
+    std::string full_path = basepath + path;
+    MStream* istream = new TNFSMStream(full_path);
+    istream->open(mode);
     return istream;
 }
 

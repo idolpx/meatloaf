@@ -165,19 +165,19 @@ void OutputSound()
     //fnSystem.dac_output_enable(SystemManager::dac_channel_t::DAC_CHAN_0);
     //fnSystem.dac_output_voltage(SystemManager::dac_channel_t::DAC_CHAN_0, 100);
 
-    dac_output_enable(DAC_CHAN_0);
+    dac_output_enable(DAC_CHANNEL_1);
 
     for (int i = 0; i < n; i++)
     {
         //dacWrite(DAC1, s[i]);
         // fnSystem.dac_write(PIN_DAC1, s[i]);
-        dac_output_voltage(DAC_CHAN_0, s[i]);
+        dac_output_voltage(DAC_CHANNEL_1, s[i]);
         //delayMicroseconds(40);
         fnSystem.delay_microseconds(40);
     }
 
     //fnSystem.dac_output_disable(SystemManager::dac_channel_t::DAC_CHANNEL_1);
-    dac_output_disable(DAC_CHAN_0);
+    dac_output_disable(DAC_CHANNEL_1);
 
     FreeBuffer();
 #endif

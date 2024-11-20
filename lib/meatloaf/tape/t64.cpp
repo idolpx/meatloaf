@@ -142,7 +142,7 @@ bool T64MStream::seekPath(std::string path) {
         _position = 0;
         containerStream->seek(entry.data_offset);
 
-        Debug_printv("File Size: size[%ld] available[%ld] position[%ld]", _size, available(), _position);
+        Debug_printv("File Size: size[%lu] available[%lu] position[%lu]", _size, available(), _position);
 
         return true;
     }

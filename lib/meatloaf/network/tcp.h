@@ -5,6 +5,7 @@
 #include "lwip/netdb.h"
 
 #include "meatloaf.h"
+
 #include "../../include/debug.h"
 
 //
@@ -290,13 +291,21 @@ public:
     MStream* getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override {
         // has to return OPENED streamm
         MStream* istream = new TCPMStream(url);
-        //istream->open(mode);
+        //auto istream = StreamBroker::obtain<TCPMStream>(url, mode);
+        //istream->open(std::ios_base::openmode mode);
         return istream;
     } 
 
     // DUMMY return value - we've overriden getSourceStream, so this one won't be even called!
-    MStream* getDecodedStream(std::shared_ptr<MStream> src) {
+    MStream* getDecodedStream(std::shared_ptr<MStream> src)
+    {
         return nullptr; 
+    }
+
+    MStream* createStream(std::ios_base::openmode mode) override
+    {
+        MStream* istream = new TCPMStream(url);
+        return istream;
     }
 
     time_t getLastWrite() override {

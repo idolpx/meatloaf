@@ -218,8 +218,9 @@ public:
         isPETSCII = true;
     };
 
-    MStream* getDecodedStream(std::shared_ptr<MStream> src) { return src.get(); };
     MStream* getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override ; // has to return OPENED stream
+    MStream* getDecodedStream(std::shared_ptr<MStream> src) { return src.get(); };
+    MStream* createStream(std::ios_base::openmode mode) override;
 
     //MFile* cd(std::string newDir);
     bool isDirectory() override;

@@ -355,6 +355,8 @@ bool CPBStandardSerial::sendByte(uint8_t data, bool eoi)
       IEC_SET_STATE(BUS_IDLE);
     }
   }
+  portENABLE_INTERRUPTS();
+  gpio_intr_enable(PIN_IEC_CLK_IN);
   //IEC_RELEASE(PIN_DEBUG);//Debug
 
 #ifdef DYNAMIC_DELAY
@@ -374,9 +376,6 @@ bool CPBStandardSerial::sendByte(uint8_t data, bool eoi)
 
   if ((abort && IEC_IS_ASSERTED(PIN_IEC_ATN)) || eoi)
     IEC_RELEASE(PIN_IEC_CLK_OUT);
-
-  portENABLE_INTERRUPTS();
-  gpio_intr_enable(PIN_IEC_CLK_IN);
 
   return !abort;
 }

@@ -6,7 +6,7 @@
 #include <vector>
 #include <sstream>
 
-
+std::unordered_map<std::string, MFile*> FileBroker::file_repo;
 std::unordered_map<std::string, MStream*> StreamBroker::stream_repo;
 
 #ifdef FLASH_SPIFFS
@@ -368,16 +368,21 @@ bool MFile::operator!=(nullptr_t ptr) {
 
 MStream* MFile::getSourceStream(std::ios_base::openmode mode) {
 
-    Debug_printv("here");
     if ( streamFile == nullptr )
+    {
+        Debug_printv("null streamFile");
         return nullptr;
+    }
 
     // has to return OPENED stream
     Debug_printv("pathInStream[%s] streamFile[%s]", pathInStream.c_str(), streamFile->url.c_str());
 
     auto sourceStream = streamFile->getSourceStream(mode);
     if ( sourceStream == nullptr )
+    {
+        Debug_printv("null sourceStream");
         return nullptr;
+    }
 
     // will be replaced by streamBroker->getSourceStream(streamFile, mode)
     std::shared_ptr<MStream> containerStream(sourceStream); // get its base stream, i.e. zip raw file contents

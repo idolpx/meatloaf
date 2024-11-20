@@ -2,6 +2,8 @@
 
 #include <esp_idf_version.h>
 
+#include "meatloaf.h"
+
 #include "../../../include/debug.h"
 //#include "../../../include/global_defines.h"
 
@@ -51,6 +53,7 @@ MStream* HTTPMFile::getSourceStream(std::ios_base::openmode mode) {
     // headers["Accept-Encoding"] = "gzip, deflate";
     // etc.
     MStream* istream = new HTTPMStream(url, mode);
+    //auto istream = StreamBroker::obtain<HTTPMStream>(url, mode);
     istream->open(mode);
 
     return istream;
@@ -58,6 +61,13 @@ MStream* HTTPMFile::getSourceStream(std::ios_base::openmode mode) {
 
 MStream* HTTPMFile::getDecodedStream(std::shared_ptr<MStream> is) {
     return is.get(); // DUMMY return value - we've overriden istreamfunction, so this one won't be used
+}
+
+MStream* HTTPMFile::createStream(std::ios_base::openmode mode)
+{
+    MStream* istream = new HTTPMStream(url);
+    istream->open(mode);
+    return istream;
 }
 
 time_t HTTPMFile::getLastWrite() {
@@ -239,6 +249,7 @@ bool MeatHttpClient::processRedirectsAndOpen(uint32_t position, uint32_t size) {
     if(lastRC != HttpStatus_Ok && lastRC != 301 && lastRC != 206) {
         Debug_printv("opening stream failed, httpCode=%d", lastRC);
         _error = lastRC;
+        _is_open = false;
         return false;
     }
 
@@ -413,7 +424,19 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
     // esp_http_client_set_post_field(client, post_data, strlen(post_data));
 
     //Debug_printv("--- PRE OPEN");
-    esp_err_t rc = esp_http_client_open(_http, 0); // or open? It's not entirely clear...
+    esp_err_t rc;
+    int retry = 5;
+    do
+    {
+        rc = esp_http_client_open(_http, 0); // or open? It's not entirely clear...
+        if ( rc == ESP_FAIL )
+        {
+            Debug_printv("Connection failed... retrying... [%d]", retry);
+            esp_http_client_close(_http);
+        }
+
+        retry--;
+    } while ( rc == ESP_FAIL && retry > 0 );
 
     if (rc == ESP_OK)
     {
@@ -439,7 +462,7 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
         case HTTP_EVENT_ERROR: // This event occurs when there are any errors during execution
             Debug_printv("HTTP_EVENT_ERROR");
             meatClient->_error = 1;
-            meatClient->close();
+            //meatClient->close();
             break;
 
         case HTTP_EVENT_ON_CONNECTED: // Once the HTTP has been connected to the server, no data exchange has been performed

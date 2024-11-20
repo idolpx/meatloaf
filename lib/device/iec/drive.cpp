@@ -731,7 +731,6 @@ bool iecDrive::registerStream ( uint8_t channel )
 
         Debug_printv("LOAD \"%s\"", _base->url.c_str());
         new_stream = std::shared_ptr<MStream>(_base->getSourceStream());
-        Debug_printv("after load");
     }
 
     // SAVE / PUT / PRINT / WRITE

@@ -1,6 +1,7 @@
 #include "csip.h"
 
 #include "meatloaf.h"
+
 #include "make_unique.h"
 
 /********************************************************
@@ -325,10 +326,18 @@ bool CSIPMFile::isDirectory() {
 
 MStream* CSIPMFile::getSourceStream(std::ios_base::openmode mode) {
     MStream* istream = new CSIPMStream(url);
-    //auto istream = ImageBroker::obtain<CSIPMStream>(url);
+    //auto istream = StreamBroker::obtain<CSIPMStream>(url, mode);
     istream->open(mode);   
     return istream;
-}; 
+};
+
+
+
+MStream* CSIPMFile::createStream(std::ios_base::openmode mode)
+{
+    MStream* istream = new CSIPMStream(url);
+    return istream;
+}
 
 bool CSIPMFile::rewindDirectory() {    
     dirIsOpen = false;

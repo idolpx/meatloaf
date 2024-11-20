@@ -30,7 +30,7 @@
 #include "utils.h"
 
 #define MAIN_STACKSIZE	 4096
-#define MAIN_PRIORITY	 17
+#define MAIN_PRIORITY	 20
 #define MAIN_CPUAFFINITY 1
 
 #define IEC_ALLDEV		 31
