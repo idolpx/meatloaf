@@ -424,34 +424,38 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
     // esp_http_client_set_post_field(client, post_data, strlen(post_data));
 
     //Debug_printv("--- PRE OPEN");
+    int status = 0;
     esp_err_t rc;
     int retry = 5;
     do
     {
         rc = esp_http_client_open(_http, 0); // or open? It's not entirely clear...
-        if ( rc == ESP_FAIL )
+
+        if (rc == ESP_OK)
+        {
+            //Debug_printv("--- PRE FETCH HEADERS");
+
+            int64_t lengthResp = esp_http_client_fetch_headers(_http);
+            if(_size == -1 && lengthResp > 0) {
+                // only if we aren't chunked!
+                _size = lengthResp;
+                _position = position;
+            }
+        }
+
+        status = esp_http_client_get_status_code(_http);
+        //Debug_printv("after open rc[%d] status[%d]", rc, status);
+        if ( status < 0 )
         {
             Debug_printv("Connection failed... retrying... [%d]", retry);
             esp_http_client_close(_http);
         }
 
         retry--;
-    } while ( rc == ESP_FAIL && retry > 0 );
-
-    if (rc == ESP_OK)
-    {
-        //Debug_printv("--- PRE FETCH HEADERS");
-
-        int64_t lengthResp = esp_http_client_fetch_headers(_http);
-        if(_size == -1 && lengthResp > 0) {
-            // only if we aren't chunked!
-            _size = lengthResp;
-            _position = position;
-        }
-    }
+    } while ( status < 0 && retry > 0 );
 
     //Debug_printv("--- PRE GET STATUS CODE");
-    return esp_http_client_get_status_code(_http);
+    return status;
 }
 
 esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
