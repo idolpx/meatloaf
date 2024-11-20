@@ -268,7 +268,7 @@ bool CPBStandardSerial::sendByte(uint8_t data, bool eoi)
   /* Because interrupts are disabled it's possible to miss the ATN pause signal */
   if (IEC_IS_ASSERTED(PIN_IEC_ATN)) {
     abort = 1;
-    Debug_printv("ATN abort");
+    //Debug_printv("ATN abort");
   }
 
   // What happens next is variable. Either the talker will assert
@@ -315,7 +315,7 @@ bool CPBStandardSerial::sendByte(uint8_t data, bool eoi)
   // STEP 3: SENDING THE BITS
   for (len = 0; !abort && len < 8; len++, data >>= 1) {
     if (IEC_IS_ASSERTED(PIN_IEC_ATN)) {
-      Debug_printv("ATN 2 abort");
+      //Debug_printv("ATN 2 abort");
       abort = 1;
       break;
     }

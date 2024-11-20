@@ -54,7 +54,7 @@ void parallelBus::service()
     {
         // Update flags and data
         PARALLEL.readByte();
-        Debug_printv("receive <<< " BYTE_TO_BINARY_PATTERN " flags[%02X] " BYTE_TO_BINARY_PATTERN " data[%02X]", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
+        Debug_printv("receive <<< " BYTE_TO_BINARY_PATTERN " flags[%02X] " BYTE_TO_BINARY_PATTERN " data(%c)[%02X]", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data, PARALLEL.data);
 
         // If PC2 is set then parallel is active and a byte is ready to be read!
         if ( IEC_IS_ASSERTED( PC2 ) )
@@ -70,7 +70,7 @@ void parallelBus::service()
             GPIOX.portMode( USERPORT_DATA, GPIOX_MODE_INPUT );
             PARALLEL.readByte();
 
-            Debug_printv("receive <<< " BYTE_TO_BINARY_PATTERN " flags[%02X] " BYTE_TO_BINARY_PATTERN " data[%02X]", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
+            Debug_printv("receive <<< " BYTE_TO_BINARY_PATTERN " flags[%02X] " BYTE_TO_BINARY_PATTERN " data(%c)[%02X]", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data, PARALLEL.data);
 
             // DolphinDOS Detection
             if ( IEC_IS_ASSERTED( ATN ) )
@@ -88,7 +88,7 @@ void parallelBus::service()
                 if ( PARALLEL.data == 0x57 ) // WiC64 commands start with 'W'
                 {
                     IEC.flags |= WIC64_ACTIVE;
-                    Debug_printv("wic64");                  
+                    Debug_printv("wic64");
                 }
             }
         }
@@ -97,7 +97,7 @@ void parallelBus::service()
             PARALLEL.mode = MODE_SEND;
             GPIOX.portMode( USERPORT_DATA, GPIOX_MODE_OUTPUT );
 
-            Debug_printv("send    >>> " BYTE_TO_BINARY_PATTERN " flags[%02X] " BYTE_TO_BINARY_PATTERN " data[%02X]", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data);
+            Debug_printv("send   >>> " BYTE_TO_BINARY_PATTERN " flags[%02X] " BYTE_TO_BINARY_PATTERN " data(%c)[%02X]", BYTE_TO_BINARY(PARALLEL.flags), PARALLEL.flags, BYTE_TO_BINARY(PARALLEL.data), PARALLEL.data, PARALLEL.data);
         }
     }
     else
