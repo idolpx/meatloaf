@@ -147,9 +147,20 @@ static int meminfo(int argc, char **argv)
     uint32_t total = ESP.getHeapSize() / 1024;
     uint32_t used = total - free;
     uint32_t min = ESP.getMinFreeHeap() / 1024;
+    uint32_t total_free = esp_get_free_heap_size() / 1024;
 
-    printf("Internal Heap: %lu KB free, %lu KB used, (%lu KB total)\n", free, used, total);
-    printf("Minimum free heap size during uptime was: %lu KB\n", min);
+    printf("Internal Heap: %lu KB free, %lu KB used, (%lu KB total)\r\n", free, used, total);
+    printf("Minimum free heap size during uptime was: %lu KB\r\n", min);
+    printf("Overall Free Memory: %lu KB\r\n", total_free);
+    return EXIT_SUCCESS;
+}
+
+static int taskinfo(int argc, char **argv)
+{
+    printf( "Task Name\tStatus\tPrio\tHWM\tTask\tAffinity\r\n");
+    char stats_buffer[1024];
+    vTaskList(stats_buffer);
+    printf("%s\r\n", stats_buffer);
     return EXIT_SUCCESS;
 }
 
@@ -260,6 +271,11 @@ namespace ESP32Console::Commands
     const ConsoleCommand getMemInfoCommand()
     {
         return ConsoleCommand("meminfo", &meminfo, "Shows information about heap usage");
+    }
+
+    const ConsoleCommand getTaskInfoCommand()
+    {
+        return ConsoleCommand("ps", &taskinfo, "Shows information about running tasks");
     }
 
     const ConsoleCommand getDateCommand()

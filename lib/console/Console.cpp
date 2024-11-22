@@ -40,6 +40,7 @@ namespace ESP32Console
         registerCommand(getSysInfoCommand());
         registerCommand(getRestartCommand());
         registerCommand(getMemInfoCommand());
+        registerCommand(getTaskInfoCommand());
         registerCommand(getDateCommand());
     }
 
@@ -59,6 +60,7 @@ namespace ESP32Console
         registerCommand(getCPCommand());
         registerCommand(getRMCommand());
         registerCommand(getRMDirCommand());
+        registerCommand(getMKDirCommand());
         registerCommand(getEditCommand());
     }
 

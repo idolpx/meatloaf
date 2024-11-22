@@ -133,9 +133,13 @@ int ls(int argc, char **argv)
     }
 
     struct dirent *d;
+    struct stat st;
     while ((d = readdir(dir)) != NULL)
     {
-        printf("%s\n", d->d_name);
+        std::string filename = path;
+        filename += d->d_name;
+        stat(filename.c_str(), &st);
+        printf("%c %8lu  %s\r\n", (S_ISDIR(st.st_mode)) ? 'D':'F', st.st_size, d->d_name);
     }
 
     closedir(dir);
@@ -230,7 +234,7 @@ int rm(int argc, char **argv)
 {
     if (argc != 2)
     {
-        fprintf(stderr, "You have to pass exactly one file. Syntax rm [FIILE]\n");
+        fprintf(stderr, "You have to pass exactly one file. Syntax rm [FILE]\n");
         return EXIT_SUCCESS;
     }
 
@@ -248,15 +252,33 @@ int rmdir(int argc, char **argv)
 {
     if (argc != 2)
     {
-        fprintf(stderr, "You have to pass exactly one file. Syntax rmdir [FIILE]\n");
+        fprintf(stderr, "You have to pass exactly one file. Syntax rmdir [DIRECTORY]\n");
         return EXIT_SUCCESS;
     }
 
     char filename[PATH_MAX];
     ESP32Console::console_realpath(argv[1], filename);
 
-    if(remove(filename)) {
+    if(rmdir(filename)) {
         fprintf(stderr, "Error deleting %s: %s\n", filename, strerror(errno));
+    }
+
+    return EXIT_SUCCESS;
+}
+
+int mkdir(int argc, char **argv)
+{
+    if (argc != 2)
+    {
+        fprintf(stderr, "You have to pass exactly one file. Syntax mkdir [DIRECTORY]\n");
+        return EXIT_SUCCESS;
+    }
+
+    char directory[PATH_MAX];
+    ESP32Console::console_realpath(argv[1], directory);
+
+    if(mkdir(directory, 0755)) {
+        fprintf(stderr, "Error creating %s: %s\n", directory, strerror(errno));
     }
 
     return EXIT_SUCCESS;
@@ -302,6 +324,11 @@ namespace ESP32Console::Commands
     const ConsoleCommand getRMDirCommand()
     {
         return ConsoleCommand("rmdir", &rmdir, "Permanenty deletes the given folder. Folder must be empty!");
+    }
+
+    const ConsoleCommand getMKDirCommand()
+    {
+        return ConsoleCommand("mkdir", &mkdir, "Create the DIRECTORY(ies), if they do not already exist.");
     }
 
     const ConsoleCommand getEditCommand()
