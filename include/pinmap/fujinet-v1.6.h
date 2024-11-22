@@ -2,7 +2,15 @@
 #ifndef PINMAP_FUJINET_V1_6_H
 #define PINMAP_FUJINET_V1_6_H
 
+// https://github.com/FujiNetWIFI/fujinet-firmware/wiki/Official-Hardware-Versions
+// https://www.espressif.com.cn/sites/default/files/documentation/esp32-wrover-e_esp32-wrover-ie_datasheet_en.pdf
+
 #ifdef PINMAP_FN_16
+
+// ESP32-WROVER-E-N8R8
+#define FLASH_SIZE              16
+#define PSRAM_SIZE              8
+
 /* SD Card */
 // pins 12-15 are used to interface with the JTAG debugger
 // so leave them alone if we're using JTAG

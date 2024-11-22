@@ -1,25 +1,31 @@
-/* FujiNet Hardware Pin Mapping */
+/* Meatloaf Hardware Pin Mapping */
 #ifndef PINMAP_H
 #define PINMAP_H
 
-// ESP32 WROVER
+// ESP32 WROOM-32
+#include "pinmap/ttgo-t1.h"
+#include "pinmap/esp-wroom-32.h"
+#include "pinmap/esp-wroom-32-pi1541.h"
+
+// ESP32 WROVER-E
 #include "pinmap/fujinet-v1.6.h"
 #include "pinmap/fujiapple-rev0.h"
 #include "pinmap/fujiloaf-rev0.h"
 #include "pinmap/lolin-d32-pro.h"
 #include "pinmap/iec-nugget.h"
 
-// ESP32 WROOM
-#include "pinmap/ttgo-t1.h"
-#include "pinmap/esp-wroom-32.h"
-#include "pinmap/esp-wroom-32-pi1541.h"
-
-// ESP32 S2/S3
+// ESP32 S2
 #include "pinmap/lolin-s2-mini.h"
-#include "pinmap/esp32s3.h"
-#include "pinmap/esp32s3-devkitc-1.h"
-#include "pinmap/lolin-s3-pro.h"
+
+// ESP32 C3
+#include "pinmap/esp32-c3-super-mini.h"
+
+// ESP32 S3
+#include "pinmap/esp32-s3-devkitc-1.h"
 #include "pinmap/esp32-s3-zero.h"
+#include "pinmap/freenove-esp32-s3-wroom.h"
+#include "pinmap/lolin-s3-pro.h"
+#include "pinmap/nodemcu-esp-s3-12k-kit.h"
 
 
 #ifndef RGB_LED_STRIP

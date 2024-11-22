@@ -5,6 +5,10 @@
 
 #ifdef PINMAP_ESP32S3_DEVKITC_1
 
+// ESP32-S3-WROOM-1-N16R8
+#define FLASH_SIZE              16
+#define PSRAM_SIZE              8
+
 /* SD Card */
 #define PIN_CARD_DETECT         GPIO_NUM_12 // fnSystem.h
 #define PIN_CARD_DETECT_FIX     GPIO_NUM_15 // fnSystem.h

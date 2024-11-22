@@ -8,6 +8,7 @@
 // https://www.c64-wiki.com/wiki/Disk_Image
 // http://unusedino.de/ec64/technical3.html
 // http://www.baltissen.org/newhtm/diskimag.htm
+// http://www.baltissen.org/newhtm/1541c.htm
 //
 
 #ifndef MEATLOAF_MEDIA_D64
@@ -64,10 +65,10 @@ protected:
         uint8_t start_track;
         uint8_t start_sector;
         char filename[16];
-        uint8_t rel_start_track;   // Or GOES info block start track
-        uint8_t rel_start_sector;  // Or GEOS info block start sector
-        uint8_t rel_record_length; // Or GEOS file structure (Sequential / VLIR file)
-        uint8_t geos_type;         // $00 - Non-GEOS (normal C64 file)
+        uint8_t rel_start_track;    // Or GOES info block start track
+        uint8_t rel_start_sector;   // Or GEOS info block start sector
+        uint8_t rel_record_length;  // Or GEOS file structure (Sequential / VLIR file)
+        uint8_t geos_file_type;     // $00 - Non-GEOS (normal C64 file)
         uint8_t year;
         uint8_t month;
         uint8_t day;

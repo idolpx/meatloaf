@@ -17,7 +17,7 @@
 
 #include "../runcpm/globals.h"
 #include "../runcpm/ram.h"     // ram.h - Implements the RAM
-#include "../runcpm/console.h" // console.h - implements console.
+#include "../runcpm/cpm_console.h" // console.h - implements console.
 #include "../runcpm/cpu.h"     // cpu.h - Implements the emulated CPU
 #include "../runcpm/disk.h"    // disk.h - Defines all the disk access abstraction functions
 #include "../runcpm/host.h"    // host.h - Custom host-specific BDOS call

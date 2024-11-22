@@ -2,7 +2,13 @@
 #ifndef PINMAP_FUJIAPPLE_REV0_H
 #define PINMAP_FUJIAPPLE_REV0_H
 
+// https://www.espressif.com.cn/sites/default/files/documentation/esp32-wrover-e_esp32-wrover-ie_datasheet_en.pdf
+
 #ifdef PINMAP_A2_REV0
+
+// ESP32-WROVER-E-N8R8
+#define FLASH_SIZE              8
+#define PSRAM_SIZE              8
 
 /* SD Card */
 #define PIN_CARD_DETECT         GPIO_NUM_12 // fnSystem.h

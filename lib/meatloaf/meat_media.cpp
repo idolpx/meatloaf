@@ -49,6 +49,81 @@ std::string MMediaStream::decodeType(std::string file_type)
     return type;
 }
 
+std::string MMediaStream::decodeGEOSType(uint8_t geos_file_structure, uint8_t geos_file_type)
+{
+    // Decode geos_file_type
+    std::string geos_type;
+    if ( geos_file_type )
+    {
+        if ( geos_file_structure == 0x00 )
+            geos_type = "SEQ ";
+        else
+            geos_type = "VLIR ";
+
+        switch (geos_file_type) {
+            case 0x01:
+                geos_type += 'BASIC';
+                break;
+
+            case 0x02:
+                geos_type += 'Assembler';
+                break;
+
+            case 0x03:
+                geos_type += 'Data file';
+                break;
+
+            case 0x04:
+                geos_type += 'System File';
+                break;
+
+            case 0x05:
+                geos_type += 'Desk Accessory';
+                break;
+
+            case 0x06:
+                geos_type += 'Application';
+                break;
+
+            case 0x07:
+                geos_type += 'Application Data'; // (user-created documents)
+                break;
+
+            case 0x08:
+                geos_type += 'Font File';
+                break;
+
+            case 0x09:
+                geos_type += 'Printer Driver';
+                break;
+
+            case 0x0A:
+                geos_type += 'Input Driver';
+                break;
+
+            case 0x0B:
+                geos_type += 'Disk Driver'; // (or Disk Device)
+                break;
+
+            case 0x0C:
+                geos_type += 'System Boot File';
+                break;
+
+            case 0x0D:
+                geos_type += 'Temporary';
+                break;
+
+            case 0x0E:
+                geos_type += 'Auto-Execute File';
+                break;
+            
+            default:
+                geos_type += "Undefined";
+        }
+    }
+    return geos_type;
+}
+
 /********************************************************
  * Istream impls
  ********************************************************/
@@ -77,7 +152,7 @@ bool MMediaStream::open(std::ios_base::openmode mode)
 
 void MMediaStream::close()
 {
-    Debug_printv("url[%s]", url.c_str());
+    //Debug_printv("Heap[%lu]", esp_get_free_heap_size());
 };
 
 

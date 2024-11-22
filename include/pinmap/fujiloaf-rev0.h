@@ -2,7 +2,14 @@
 #ifndef PINMAP_FUJILOAF_REV0_H
 #define PINMAP_FUJILOAF_REV0_H
 
+// https://www.espressif.com.cn/sites/default/files/documentation/esp32-wrover-e_esp32-wrover-ie_datasheet_en.pdf
+
 #ifdef PINMAP_FUJILOAF_REV0
+
+// ESP32-WROVER-E-N16R8
+#define FLASH_SIZE              16
+#define PSRAM_SIZE              8
+
 /* SD Card */
 #define PIN_CARD_DETECT         GPIO_NUM_35 // fnSystem.h
 #define PIN_CARD_DETECT_FIX     GPIO_NUM_35 // fnSystem.h

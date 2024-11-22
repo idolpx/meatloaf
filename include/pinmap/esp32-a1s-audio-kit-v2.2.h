@@ -1,10 +1,14 @@
 //
 // ESP32-A1S Audio Development Kit
 //
+// https://docs.ai-thinker.com/esp32-a1s
+// https://docs.ai-thinker.com/_media/esp32-audio-kit_v2.2_sch.pdf
+// https://docs.ai-thinker.com/_media/esp32/docs/esp32-a1s_product_specification_zh.pdf
+//
 // https://github.com/marcel-licence/AC101
 // https://forums.slimdevices.com/showthread.php?113804-ESP32-A1S-Audio-Kit-V2-2
-// https://docs.ai-thinker.com/_media/esp32-audio-kit_v2.2_sch.pdf
 // https://github.com/donny681/esp-adf
+// https://github.com/sle118/squeezelite-esp32
 // 
 //
 // amplifier: GPIO21
@@ -21,6 +25,10 @@
 #define PINMAP_ESP32_A1S_AUDIO_KIT_V2_2
 
 #ifdef PINMAP_A1S_AUDIOKIT
+
+// ESP32-A1S
+#define FLASH_SIZE              4
+#define PSRAM_SIZE              4
 
 /* SD Card */
 // pins 12-15 are used to interface with the JTAG debugger

@@ -1,12 +1,12 @@
 
-#ifndef PINMAP_LOLIN_S3_PRO_H
-#define PINMAP_LOLIN_S3_PRO_H
+#ifndef PINMAP_ESP32_1732S019_H
+#define PINMAP_ESP32_1732S019_H
 
-// https://www.wemos.cc/en/latest/s3/s3_pro.html
-// https://www.wemos.cc/en/latest/_static/files/sch_s3_pro_v1.0.0.pdf
+// https://github.com/OttoMeister/ESP32-1732S019
+// http://pan.jczn1688.com/directlink/1/ESP32%20module/1.9inch_ESP32-1732S019.zip
 // https://www.espressif.com.cn/sites/default/files/documentation/esp32-s3-wroom-1_wroom-1u_datasheet_en.pdf
 
-#ifdef PINMAP_LOLIN_S3_PRO
+#ifdef PINMAP_ESP32_1732S019
 
 // ESP32-S3-WROOM-1-N16R8
 #define FLASH_SIZE              16
@@ -38,6 +38,28 @@
 #define PIN_LED_WIFI            GPIO_NUM_5   // led.cpp
 #define PIN_LED_BUS             GPIO_NUM_NC
 #define PIN_LED_BT              GPIO_NUM_NC
+
+/* LCD */
+#define ST7789_DRIVER  
+#define TFT_WIDTH 170
+#define TFT_HEIGHT 320
+#define TFT_MISO -1 
+#define TFT_MOSI 13   
+#define TFT_SCLK 12
+#define TFT_CS   10 
+#define TFT_DC   11 
+#define TFT_RST  1 
+#define TFT_BL   14
+#define TFT_BACKLIGHT_ON HIGH
+#define LOAD_GLCD  
+#define LOAD_FONT2 
+#define LOAD_FONT4 
+#define LOAD_FONT6 
+#define LOAD_FONT7
+#define LOAD_FONT8 
+#define LOAD_GFXFF 
+#define SMOOTH_FONT
+#define SPI_FREQUENCY  40000000
 
 /* Audio Output */
 #define PIN_DAC1                GPIO_NUM_NC // samlib.h
@@ -77,5 +99,5 @@
 #define GPIOX_SPEED             400   // PCF8575 - 400Khz
 //#define GPIOX_SPEED             1000  // PCA9673 - 1000Khz / 1Mhz
 
-#endif // PINMAP_LOLIN_S3_PRO
-#endif // PINMAP_LOLIN_S3_PRO_H
+#endif // PINMAP_ESP32_1732S019
+#endif // PINMAP_ESP32_1732S019_H

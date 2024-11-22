@@ -38,7 +38,7 @@
     })
 #endif /* !IEC_INVERTED_LINES */
 
-static uint64_t timer_start_us;
+static uint64_t timer_start_us = 0;
 #define timer_start()       timer_start_us = esp_timer_get_time()
 #define timer_elapsed()     esp_timer_get_time() - timer_start_us
 #define timer_wait(us)      while( (esp_timer_get_time()-timer_start_us) < ((int) (us+0.5)) )

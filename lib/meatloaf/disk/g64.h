@@ -4,6 +4,7 @@
 // https://ist.uwaterloo.ca/~schepers/formats/G64.TXT
 // http://www.linusakesson.net/programming/gcr-decoding/index.php
 // https://www.pagetable.com/?p=1356
+// http://www.baltissen.org/newhtm/1541c.htm
 //
 
 #ifndef MEATLOAF_MEDIA_G64

@@ -3,8 +3,14 @@
 
 // https://github.com/LilyGO/ESP32-TTGO-T1
 // https://github.com/LilyGO/ESP32-TTGO-T1/blob/master/T1_V1.3.pdf
+// https://www.espressif.com.cn/sites/default/files/documentation/esp32_datasheet_en.pdf
+// https://media.digikey.com/pdf/Data%20Sheets/Winbond%20PDFs/W25Q32FV.pdf
 
 #ifdef PINMAP_TTGO_T1
+
+// ESP32-D0WDQ6
+#define FLASH_SIZE              4
+//#define PSRAM_SIZE              8
 
 /* SD Card */
 // pins 12-15 are used to interface with the JTAG debugger

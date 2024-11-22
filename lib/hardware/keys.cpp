@@ -1,7 +1,7 @@
 
 #include "keys.h"
 
-#if CONFIG_IDF_TARGET_ESP32S3 != y
+#ifndef CONFIG_IDF_TARGET_ESP32S3
 #include <esp32/himem.h>
 #endif
 

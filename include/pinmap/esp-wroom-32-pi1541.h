@@ -1,7 +1,13 @@
 #ifndef PINMAP_WROOM_1541_32_H
 #define PINMAP_WROOM_1541_32_H
 
+// https://www.espressif.com.cn/sites/default/files/documentation/esp32-wroom-32_datasheet_en.pdf
+
 #ifdef PINMAP_WROOM_1541
+
+// ESP32-WROOM-32
+#define FLASH_SIZE              4
+//#define PSRAM_SIZE              8
 
 /* SD Card */
 #define PIN_CARD_DETECT         GPIO_NUM_12 // fnSystem.h

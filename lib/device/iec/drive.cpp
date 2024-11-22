@@ -145,6 +145,7 @@ device_state_t iecDrive::readChannel(/*int chan*/)
     else
       sendFile();
   }
+  Debug_printv("Heap [%lu] Task[%u]", esp_get_free_heap_size(), uxTaskGetStackHighWaterMark(NULL));
 
   return state;
 }
@@ -195,7 +196,7 @@ device_state_t iecDrive::process()
 //    Debug_printv("url[%s] file[%s] state[%d]", _base->url.c_str(), _last_file.c_str(), state);
     return state;
 }
-#endif
+
 
 void iecDrive::process_load()
 {
@@ -235,6 +236,7 @@ void iecDrive::process_save()
     }
 }
 
+
 void iecDrive::process_command()
 {
 //    Debug_printv("primary[%.2X] secondary[%.2X]", commanddata.primary, commanddata.secondary);
@@ -251,7 +253,7 @@ void iecDrive::process_command()
     }
 }
 
-#if 0
+
 void iecDrive::process_channel()
 {
     //Debug_printv("secondary[%.2X]", commanddata.secondary);
@@ -336,6 +338,7 @@ void iecDrive::iec_close()
 //    Debug_printv("device init");
 }
 
+#if 0
 void iecDrive::iec_reopen_load()
 {
     Debug_printv( "_base[%s] _last_file[%s]", _base->url.c_str(), _last_file.c_str() );
@@ -379,7 +382,7 @@ void iecDrive::iec_reopen_save()
     saveFile();
 }
 
-#if 0
+
 void iecDrive::iec_reopen_channel()
 {
     //Debug_printv("primary[%.2X]", commanddata.primary);
@@ -399,7 +402,7 @@ void iecDrive::iec_reopen_channel_listen()
     std::string s = IEC.receiveBytes();
     Debug_printv("{%s}", s.c_str() );
 }
-#endif
+
 
 void iecDrive::iec_reopen_channel_talk()
 {
@@ -419,6 +422,7 @@ void iecDrive::iec_talk_command()
     if (response_queue.empty())
         iec_talk_command_buffer_status();
 }
+#endif
 
 void iecDrive::iec_talk_command_buffer_status()
 {
@@ -658,27 +662,6 @@ void iecDrive::set_device_id()
     iecStatus.channel = commanddata.channel;
 }
 
-void iecDrive::get_prefix()
-{
-    int channel = -1;
-
-    if (pt.size() < 2)
-    {
-        iecStatus.error = 255; // TODO: Add error number for this
-        iecStatus.connected = 0;
-        iecStatus.channel = channel;
-        iecStatus.msg = "need channel #";
-        return;
-    }
-
-    channel = atoi(pt[1].c_str());
-    auto stream = retrieveStream( channel );
-
-    iecStatus.error = 0;
-    iecStatus.msg = stream->url;
-    iecStatus.connected = 0;
-    iecStatus.channel = channel;
-}
 
 void iecDrive::set_prefix()
 {
@@ -703,6 +686,31 @@ void iecDrive::set_prefix()
         }
     }
 }
+
+
+void iecDrive::get_prefix()
+{
+    int channel = -1;
+
+    if (pt.size() < 2)
+    {
+        iecStatus.error = 255; // TODO: Add error number for this
+        iecStatus.connected = 0;
+        iecStatus.channel = channel;
+        iecStatus.msg = "need channel #";
+        return;
+    }
+
+    channel = atoi(pt[1].c_str());
+    auto stream = retrieveStream( channel );
+
+    iecStatus.error = 0;
+    iecStatus.msg = stream->url;
+    iecStatus.connected = 0;
+    iecStatus.channel = channel;
+}
+
+
 
 
 
@@ -815,6 +823,7 @@ bool iecDrive::closeStream ( uint8_t channel, bool close_all )
     return false;
 }
 
+#if 0
 uint16_t iecDrive::retrieveLastByte ( uint8_t channel )
 {
     if ( streamLastByte.find ( channel ) != streamLastByte.end() )
@@ -838,181 +847,8 @@ void iecDrive::flushLastByte( uint8_t channel )
     auto newPair = std::make_pair ( channel, (uint16_t)999 );
     streamLastByte.insert ( newPair );
 }
-
-
-
-// send single basic line, including heading basic pointer and terminating zero.
-uint16_t iecDrive::sendLine(uint16_t blocks, const char *format, ...)
-{
-    // Debug_printv("bus[%d]", IEC.state);
-
-#if 0
-    // Exit if ATN is ASSERTED while sending
-    // Exit if there is an error while sending
-    if ( IEC.state == BUS_ERROR )
-    {
-        // Save file pointer position
-        //streamUpdate(basicPtr);
-        //setDeviceStatus(74);
-        return 0;
-    }
 #endif
 
-    // Format our string
-    va_list args;
-    va_start(args, format);
-    char text[vsnprintf(NULL, 0, format, args) + 1];
-    vsnprintf(text, sizeof text, format, args);
-    va_end(args);
-
-    return sendLine(blocks, text);
-}
-
-uint16_t iecDrive::sendLine(uint16_t blocks, char *text)
-{
-    printf("%d %s ", blocks, text);
-
-    // Get text length
-    uint8_t len = strlen(text);
-
-    // Send that pointer
-    // No basic line pointer is used in the directory listing set to 0x0101
-    if (!IEC.sendByte(0x01)) {Debug_printv("line[%s]", text); return 0;};
-    if (!IEC.sendByte(0x01)) {Debug_printv("line[%s]", text); return 0;};
-
-    // Send blocks
-    if (!IEC.sendByte(blocks bitand 0xFF)) {Debug_printv("line[%s]", text); return 0;};
-    if (!IEC.sendByte(blocks >> 8)) {Debug_printv("line[%s]", text); return 0;};
-
-    // Send line contents
-    for (uint8_t i = 0; i < len; i++)
-    {
-        if (!IEC.sendByte(text[i])) {Debug_printv("line[%s]", text); return 0;};
-    }
-
-    // Finish line
-    if (!IEC.sendByte(0)) {Debug_printv("line[%s]", text); return 0;};
-
-    printf("\r\n");
-    
-    return len + 5;
-} // sendLine
-
-uint16_t iecDrive::sendHeader(std::string header, std::string id)
-{
-    uint16_t byte_count = 0;
-    bool sent_info = false;
-
-    std::string url = _base->host;
-    url = mstr::toPETSCII2(url);
-    std::string path = _base->path;
-    path = mstr::toPETSCII2(path);
-    std::string archive = _base->media_archive;
-    archive = mstr::toPETSCII2(archive);
-    std::string image = _base->media_image;
-    image = mstr::toPETSCII2(image);
-
-    if ( image.size() )
-        mstr::replaceAll(path, image, "");
-
-    //Debug_printv("path[%s] size[%d]", path.c_str(), path.size());
-
-    // Send List HEADER
-    uint8_t space_cnt = 0;
-    space_cnt = (16 - header.size()) / 2;
-    space_cnt = (space_cnt > 8 ) ? 0 : space_cnt;
-
-    //Debug_printv("header[%s] id[%s] space_cnt[%d]", header.c_str(), id.c_str(), space_cnt);
-
-    size_t written;
-
-    written = sendLine(0, CBM_REVERSE_ON "\"%*s%s%*s\" %s", space_cnt, "", header.c_str(), space_cnt, "", id.c_str());
-    if ( !written ) return 0;
-    byte_count += written;
-
-    //byte_count += sendLine(basicPtr, 0, "\x12\"%*s%s%*s\" %.02d 2A", space_cnt, "", PRODUCT_ID, space_cnt, "", device_config.device());
-    //byte_count += sendLine(basicPtr, 0, CBM_REVERSE_ON "%s", header.c_str());
-
-    // Send Extra INFO
-    if (url.size())
-    {
-        written = sendLine(0, "%*s\"%-*s\" NFO", 0, "", 19, "[URL]");
-        if (!written) return 0;
-        byte_count += written;
-        written = sendLine(0, "%*s\"%-*s\" NFO", 0, "", 19, url.c_str());
-        if (!written) return 0;
-        byte_count += written;
-        sent_info = true;
-    }
-    if (path.size() > 1)
-    {
-        written = sendLine(0, "%*s\"%-*s\" NFO", 0, "", 19, "[PATH]");
-        if (!written) return 0;
-        byte_count += written;
-        written = sendLine(0, "%*s\"%-*s\" NFO", 0, "", 19, path.c_str());
-        if (!written) return 0;
-        byte_count += written;
-        sent_info = true;
-    }
-    if (archive.size() > 1)
-    {
-        written = sendLine(0, "%*s\"%-*s\" NFO", 0, "", 19, "[ARCHIVE]");
-        if (!written) return 0;
-        byte_count += written;
-        written = sendLine(0, "%*s\"%-*s\" NFO", 0, "", 19, archive.c_str());
-        if (!written) return 0;
-        byte_count += written;
-        sent_info = true;
-    }
-    if (image.size())
-    {
-        written = sendLine(0, "%*s\"%-*s\" NFO", 0, "", 19, "[IMAGE]");
-        if (!written) return 0;
-        byte_count += written;
-        written = sendLine(0, "%*s\"%-*s\" NFO", 0, "", 19, image.c_str());
-        if (!written) return 0;
-        byte_count += written;
-        sent_info = true;
-    }
-    if (sent_info)
-    {
-        written = sendLine(0, "%*s\"-------------------\" NFO", 0, "");
-        if (!written) return 0;
-        byte_count += written;
-    }
-
-    // If SD Card is available ad we are at the root path show it as a directory at the top
-    if (fnSDFAT.running() && _base->url.size() < 2)
-    {
-        written = sendLine(0, "%*s\"SD\"               DIR", 3, "");
-        if (!written) return 0;
-        byte_count += written;
-    }
-
-    return byte_count;
-}
-
-uint16_t iecDrive::sendFooter()
-{
-    uint16_t blocks_free;
-    uint16_t byte_count = 0;
-    uint64_t bytes_free = _base->getAvailableSpace();
-
-    //Debug_printv("image[%s] size[%d] blocks[%d]", _base->media_image.c_str(), _base->size(), _base->media_blocks_free);
-    if ( _base->media_image.size() )
-    {
-        blocks_free = _base->media_blocks_free;
-        byte_count = sendLine(blocks_free, "BLOCKS FREE.");
-    }
-    else
-    {
-        // We are not in a media file so let's show BYTES FREE instead
-        blocks_free = 0;
-        byte_count = sendLine(blocks_free, CBM_DELETE CBM_DELETE "%sBYTES FREE.", mstr::formatBytes(bytes_free).c_str() );
-    }
-
-    return byte_count;
-}
 
 void iecDrive::sendListing()
 {
@@ -1154,6 +990,181 @@ void iecDrive::sendListing()
 } // sendListing
 
 
+uint16_t iecDrive::sendHeader(std::string header, std::string id)
+{
+    uint16_t byte_count = 0;
+    bool sent_info = false;
+
+    std::string url = _base->host;
+    url = mstr::toPETSCII2(url);
+    std::string path = _base->path;
+    path = mstr::toPETSCII2(path);
+    std::string archive = _base->media_archive;
+    archive = mstr::toPETSCII2(archive);
+    std::string image = _base->media_image;
+    image = mstr::toPETSCII2(image);
+
+    if ( image.size() )
+        mstr::replaceAll(path, image, "");
+
+    //Debug_printv("path[%s] size[%d]", path.c_str(), path.size());
+
+    // Send List HEADER
+    uint8_t space_cnt = 0;
+    space_cnt = (16 - header.size()) / 2;
+    space_cnt = (space_cnt > 8 ) ? 0 : space_cnt;
+
+    //Debug_printv("header[%s] id[%s] space_cnt[%d]", header.c_str(), id.c_str(), space_cnt);
+
+    size_t written;
+
+    written = sendLine(0, CBM_REVERSE_ON "\"%*s%s%*s\" %s", space_cnt, "", header.c_str(), space_cnt, "", id.c_str());
+    if ( !written ) return 0;
+    byte_count += written;
+
+    //byte_count += sendLine(basicPtr, 0, "\x12\"%*s%s%*s\" %.02d 2A", space_cnt, "", PRODUCT_ID, space_cnt, "", device_config.device());
+    //byte_count += sendLine(basicPtr, 0, CBM_REVERSE_ON "%s", header.c_str());
+
+    // Send Extra INFO
+    if (url.size())
+    {
+        written = sendLine(0, "%*s\"%-*s\" NFO", 0, "", 19, "[URL]");
+        if (!written) return 0;
+        byte_count += written;
+        written = sendLine(0, "%*s\"%-*s\" NFO", 0, "", 19, url.c_str());
+        if (!written) return 0;
+        byte_count += written;
+        sent_info = true;
+    }
+    if (path.size() > 1)
+    {
+        written = sendLine(0, "%*s\"%-*s\" NFO", 0, "", 19, "[PATH]");
+        if (!written) return 0;
+        byte_count += written;
+        written = sendLine(0, "%*s\"%-*s\" NFO", 0, "", 19, path.c_str());
+        if (!written) return 0;
+        byte_count += written;
+        sent_info = true;
+    }
+    if (archive.size() > 1)
+    {
+        written = sendLine(0, "%*s\"%-*s\" NFO", 0, "", 19, "[ARCHIVE]");
+        if (!written) return 0;
+        byte_count += written;
+        written = sendLine(0, "%*s\"%-*s\" NFO", 0, "", 19, archive.c_str());
+        if (!written) return 0;
+        byte_count += written;
+        sent_info = true;
+    }
+    if (image.size())
+    {
+        written = sendLine(0, "%*s\"%-*s\" NFO", 0, "", 19, "[IMAGE]");
+        if (!written) return 0;
+        byte_count += written;
+        written = sendLine(0, "%*s\"%-*s\" NFO", 0, "", 19, image.c_str());
+        if (!written) return 0;
+        byte_count += written;
+        sent_info = true;
+    }
+    if (sent_info)
+    {
+        written = sendLine(0, "%*s\"-------------------\" NFO", 0, "");
+        if (!written) return 0;
+        byte_count += written;
+    }
+
+    // If SD Card is available ad we are at the root path show it as a directory at the top
+    if (fnSDFAT.running() && _base->url.size() < 2)
+    {
+        written = sendLine(0, "%*s\"SD\"               DIR", 3, "");
+        if (!written) return 0;
+        byte_count += written;
+    }
+
+    return byte_count;
+}
+
+// send single basic line, including heading basic pointer and terminating zero.
+uint16_t iecDrive::sendLine(uint16_t blocks, const char *format, ...)
+{
+    // Debug_printv("bus[%d]", IEC.state);
+
+#if 0
+    // Exit if ATN is ASSERTED while sending
+    // Exit if there is an error while sending
+    if ( IEC.state == BUS_ERROR )
+    {
+        // Save file pointer position
+        //streamUpdate(basicPtr);
+        //setDeviceStatus(74);
+        return 0;
+    }
+#endif
+
+    // Format our string
+    va_list args;
+    va_start(args, format);
+    char text[vsnprintf(NULL, 0, format, args) + 1];
+    vsnprintf(text, sizeof text, format, args);
+    va_end(args);
+
+    return sendLine(blocks, text);
+}
+
+uint16_t iecDrive::sendLine(uint16_t blocks, char *text)
+{
+    printf("%d %s ", blocks, text);
+
+    // Get text length
+    uint8_t len = strlen(text);
+
+    // Send that pointer
+    // No basic line pointer is used in the directory listing set to 0x0101
+    if (!IEC.sendByte(0x01)) {Debug_printv("line[%s]", text); return 0;};
+    if (!IEC.sendByte(0x01)) {Debug_printv("line[%s]", text); return 0;};
+
+    // Send blocks
+    if (!IEC.sendByte(blocks bitand 0xFF)) {Debug_printv("line[%s]", text); return 0;};
+    if (!IEC.sendByte(blocks >> 8)) {Debug_printv("line[%s]", text); return 0;};
+
+    // Send line contents
+    for (uint8_t i = 0; i < len; i++)
+    {
+        if (!IEC.sendByte(text[i])) {Debug_printv("line[%s]", text); return 0;};
+    }
+
+    // Finish line
+    if (!IEC.sendByte(0)) {Debug_printv("line[%s]", text); return 0;};
+
+    printf("\r\n");
+    
+    return len + 5;
+} // sendLine
+
+
+uint16_t iecDrive::sendFooter()
+{
+    uint16_t blocks_free;
+    uint16_t byte_count = 0;
+    uint64_t bytes_free = _base->getAvailableSpace();
+
+    //Debug_printv("image[%s] size[%d] blocks[%d]", _base->media_image.c_str(), _base->size(), _base->media_blocks_free);
+    if ( _base->media_image.size() )
+    {
+        blocks_free = _base->media_blocks_free;
+        byte_count = sendLine(blocks_free, "BLOCKS FREE.");
+    }
+    else
+    {
+        // We are not in a media file so let's show BYTES FREE instead
+        blocks_free = 0;
+        byte_count = sendLine(blocks_free, CBM_DELETE CBM_DELETE "%sBYTES FREE.", mstr::formatBytes(bytes_free).c_str() );
+    }
+
+    return byte_count;
+}
+
+
 bool iecDrive::sendFile()
 {
     uint32_t count = 0, startpos;
@@ -1236,7 +1247,7 @@ bool iecDrive::sendFile()
         count = istream->position();
         avail = istream->available();
 
-        if ( istream->error() )
+        if ( istream->error() || len < 1 )
         {
             Debug_printv("Error reading stream.");
             break;

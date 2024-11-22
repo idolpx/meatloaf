@@ -9,9 +9,6 @@
 #endif
 #include <driver/gpio.h>
 
-
-//#include "archive.h"
-
 #include "../include/global_defines.h"
 #include "../include/debug.h"
 
@@ -19,7 +16,6 @@
 #include "keys.h"
 #include "led.h"
 #include "display.h"
-
 //#include "disk-sounds.h"
 
 #include "fnSystem.h"
@@ -34,14 +30,14 @@
 
 
 #include "bus.h"
-#include "ml_tests.h"
+//#include "ml_tests.h"
 
 std::string statusMessage;
 bool initFailed = false;
 
-//#include "../lib/console/console.h"
-//using namespace ESP32Console;
-//Console console;
+#include "../lib/console/Console.h"
+using namespace ESP32Console;
+Console console;
 
 /**************************/
 
@@ -57,18 +53,15 @@ void main_shutdown_handler()
 // Initial setup
 void main_setup()
 {
-    Serial.begin(DEBUG_SPEED);
+    unsigned long startms = fnSystem.millis();
+
+    //Serial.begin(DEBUG_SPEED);
     //You can change the console prompt before calling begin(). By default it is "ESP32>"
-    //console.setPrompt("meatloaf# ");
+    console.setPrompt("meatloaf[%pwd%]# ");
 
     //You can change the baud rate and pin numbers similar to Serial.begin() here.
-    //console.begin(DEBUG_SPEED);
+    console.begin(DEBUG_SPEED);
 
-    //Register builtin commands like 'reboot', 'version', or 'meminfo'
-    //console.registerSystemCommands();
-
-    unsigned long startms = fnSystem.millis();
-    
     printf( ANSI_WHITE "\r\n\r\n" ANSI_BLUE_BACKGROUND "==============================" ANSI_RESET_NL );
     printf( ANSI_BLUE_BACKGROUND "   " PRODUCT_ID " " FW_VERSION "   " ANSI_RESET_NL );
     printf( ANSI_BLUE_BACKGROUND "   " PLATFORM_DETAILS "    " ANSI_RESET_NL );
@@ -79,12 +72,12 @@ void main_setup()
     printf( "Starting heap: %lu\r\n", fnSystem.get_free_heap_size() );
 
 #ifdef PSRAM_SIZE
-    printf( "PsramSize %lu\r\n", fnSystem.get_psram_size() );
-#if !defined(CONFIG_IDF_TARGET_ESP32S3)
-    printf( "himem phys %u\r\n", esp_himem_get_phys_size() );
-    printf( "himem free %u\r\n", esp_himem_get_free_size() );
-    printf( "himem reserved %u\r\n", esp_himem_reserved_area_size() );
-#endif
+    printf( "PSRAM Size %lu\r\n", fnSystem.get_psram_size() );
+// #ifndef CONFIG_IDF_TARGET_ESP32S3
+//     printf( "himem phys %u\r\n", esp_himem_get_phys_size() );
+//     printf( "himem free %u\r\n", esp_himem_get_free_size() );
+//     printf( "himem reserved %u\r\n", esp_himem_reserved_area_size() );
+// #endif
 #endif
 
     // Install a reboot handler
@@ -199,6 +192,21 @@ void main_setup()
     runTestsSuite();
     // lfs_test();
 #endif
+
+    printf("READY.\r\n");
+    {
+        //Register builtin commands like 'reboot', 'version', or 'meminfo'
+        console.registerSystemCommands();
+
+        //Register network commands
+        console.registerNetworkCommands();
+
+        //Register the VFS specific commands
+        console.registerVFSCommands();
+
+        //Register GPIO commands
+        console.registerGPIOCommands();
+    }
 }
 
 /*
