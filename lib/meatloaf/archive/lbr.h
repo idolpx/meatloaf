@@ -45,10 +45,6 @@ protected:
         header.id_dos = " LBR ";
     }
 
-    bool seekNextImageEntry() override {
-        return seekEntry(entry_index);
-    }
-
     bool seekEntry( std::string filename ) override;
     bool seekEntry( uint16_t index ) override;
 

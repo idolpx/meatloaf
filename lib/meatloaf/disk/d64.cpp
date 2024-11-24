@@ -195,7 +195,7 @@ bool D64MStream::isBlockFree(uint8_t track, uint8_t sector)
     return true;
 }
 
-bool D64MStream::seekEntry(std::string filename)
+bool D64MStream::seekEntry( std::string filename )
 {
     uint16_t index = 1;
     mstr::replaceAll(filename, "\\", "/");
@@ -250,7 +250,7 @@ bool D64MStream::seekEntry(std::string filename)
     return false;
 }
 
-bool D64MStream::seekEntry(uint16_t index)
+bool D64MStream::seekEntry( uint16_t index )
 {
     // Calculate Sector offset & Entry offset
     // 8 Entries Per Sector, 32 bytes Per Entry
@@ -434,7 +434,7 @@ bool D64MStream::seekPath(std::string path)
     else if (seekEntry(path))
     {
         // auto entry = containerImage->entry;
-        auto type = decodeType(entry.file_type).c_str();
+        //auto type = decodeType(entry.file_type).c_str();
         //Debug_printv("filename[%.16s] type[%s] start_track[%d] start_sector[%d]", entry.filename, type, entry.start_track, entry.start_sector);
 
         // Calculate file size

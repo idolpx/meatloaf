@@ -1,11 +1,13 @@
-// .T64 - The T64 tape image format
-// https://vice-emu.sourceforge.io/vice_17.html#SEC331
-// https://ist.uwaterloo.ca/~schepers/formats/T64.TXT
+// .ARK - ARKive containers
+// .SRK - Compressed ARKive archives (very rare)
+//
+// https://ist.uwaterloo.ca/~schepers/formats/ARK-SRK.TXT
+// https://www.zimmers.net/anonftp/pub/cbm/crossplatform/converters/unix/unkar.c
 //
 
 
-#ifndef MEATLOAF_MEDIA_T64
-#define MEATLOAF_MEDIA_T64
+#ifndef MEATLOAF_MEDIA_ARK
+#define MEATLOAF_MEDIA_ARK
 
 #include "../meatloaf.h"
 #include "../meat_media.h"
@@ -15,31 +17,44 @@
  * Streams
  ********************************************************/
 
-class T64MStream : public MMediaStream {
+class ARKMStream : public MMediaStream {
     // override everything that requires overriding here
 
 public:
-    T64MStream(std::shared_ptr<MStream> is) : MMediaStream(is) { };
+    ARKMStream(std::shared_ptr<MStream> is) : MMediaStream(is)
+    {
+        // Get the entry count
+        containerStream->seek(0);
+        uint8_t count;
+        readContainer((uint8_t *)&count, 1);
+        entry_count = count;
+    };
 
 protected:
     struct Header {
-        char disk_name[24];
+        std::string disk_name;
+        std::string id_dos;
     };
 
-    struct Entry {
-        uint8_t entry_type;
+    struct __attribute__ ((__packed__)) Entry {
         uint8_t file_type;
-        uint8_t start_address[2];
-        uint8_t end_address[2];
-        uint16_t free_1;
-        uint32_t data_offset;
-        uint32_t free_2;
+        uint8_t lsu_byte;           // Last Sector Usage (bytes used in the last sector)
         char filename[16];
+        uint8_t rel_record_length;  // Or GEOS file structure (Sequential / VLIR file)
+        uint8_t geos_file_type;     // $00 - Non-GEOS (normal C64 file)
+        uint8_t year;
+        uint8_t month;
+        uint8_t day;
+        uint8_t hour;
+        uint8_t minute;
+        uint8_t rel_block_count;    // REL file side sector block count (side sector info contained at end of file)
+        uint8_t rel_lsu;            // Number of bytes+1 used in the last side sector entry
+        uint16_t blocks;
     };
 
     void seekHeader() override {
-        containerStream->seek(0x28);
-        containerStream->read((uint8_t*)&header, 24);
+        header.disk_name = "ARK FILE";
+        header.id_dos = " ARK ";
     }
 
     bool seekEntry( std::string filename ) override;
@@ -51,10 +66,8 @@ protected:
     Header header;
     Entry entry;
 
-    std::string decodeType(uint8_t file_type, bool show_hidden = false) override;
-
 private:
-    friend class T64MFile;
+    friend class ARKMFile;
 };
 
 
@@ -62,17 +75,17 @@ private:
  * File implementations
  ********************************************************/
 
-class T64MFile: public MFile {
+class ARKMFile: public MFile {
 public:
 
-    T64MFile(std::string path, bool is_dir = true): MFile(path) {
+    ARKMFile(std::string path, bool is_dir = true): MFile(path) {
         isDir = is_dir;
 
         media_image = name;
         isPETSCII = true;
     };
     
-    ~T64MFile() {
+    ~ARKMFile() {
         // don't close the stream here! It will be used by shared ptr D64Util to keep reading image params
     }
 
@@ -80,7 +93,7 @@ public:
     {
         Debug_printv("[%s]", url.c_str());
 
-        return new T64MStream(containerIstream);
+        return new ARKMStream(containerIstream);
     }
 
     bool isDirectory() override;
@@ -105,19 +118,19 @@ public:
  * FS
  ********************************************************/
 
-class T64MFileSystem: public MFileSystem
+class ARKMFileSystem: public MFileSystem
 {
 public:
     MFile* getFile(std::string path) override {
-        return new T64MFile(path);
+        return new ARKMFile(path);
     }
 
     bool handles(std::string fileName) override {
-        return byExtension(".t64", fileName);
+        return byExtension(".ark", fileName);
     }
 
-    T64MFileSystem(): MFileSystem("t64") {};
+    ARKMFileSystem(): MFileSystem("ark") {};
 };
 
 
-#endif /* MEATLOAF_MEDIA_T64 */
+#endif /* MEATLOAF_MEDIA_ARK */

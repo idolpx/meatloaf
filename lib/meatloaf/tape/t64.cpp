@@ -33,9 +33,10 @@ bool T64MStream::seekEntry( std::string filename )
     {
         while ( seekEntry( index ) )
         {
-            std::string entryFilename = mstr::format("%.16s", entry.filename);
-            mstr::replaceAll(entryFilename, "/", "\\");
-            mstr::trim(entryFilename);
+            std::string entryFilename = entry.filename;
+            uint8_t i = entryFilename.find_first_of(0xA0);
+            entryFilename = entryFilename.substr(0, i);
+            //mstr::rtrimA0(entryFilename);
             entryFilename = mstr::toUTF8(entryFilename);
 
             //Debug_printv("filename[%s] entry.filename[%s]", filename.c_str(), entryFilename.c_str());
@@ -201,13 +202,15 @@ MFile* T64MFile::getNextFileInDir() {
 
     if ( image->seekNextImageEntry() )
     {
-        std::string fileName = mstr::format("%.16s", image->entry.filename);
-        mstr::replaceAll(fileName, "/", "\\");
-        mstr::trim(fileName);
-        //Debug_printv( "entry[%s]", (streamFile->url + "/" + fileName).c_str() );
-        auto file = MFSOwner::File(streamFile->url + "/" + fileName);
+        std::string filename = image->entry.filename;
+        uint8_t i = filename.find_first_of(0xA0);
+        filename = filename.substr(0, i);
+        // mstr::rtrimA0(filename);
+        mstr::replaceAll(filename, "/", "\\");
+        //Debug_printv( "entry[%s]", (streamFile->url + "/" + filename).c_str() );
+        auto file = MFSOwner::File(streamFile->url + "/" + filename);
         file->extension = image->decodeType(image->entry.file_type);
-        Debug_printv( "entry[%s] ext[%s]", fileName.c_str(), file->extension.c_str() );
+        Debug_printv( "entry[%s] ext[%s]", filename.c_str(), file->extension.c_str() );
         return file;
     }
     else

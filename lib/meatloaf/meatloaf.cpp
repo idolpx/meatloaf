@@ -30,6 +30,7 @@ std::unordered_map<std::string, MStream*> StreamBroker::stream_repo;
 
 // Archive
 #include "archive/archive_ml.h"
+#include "archive/ark.h"
 #include "archive/lbr.h"
 
 // Cartridge
@@ -90,6 +91,7 @@ SDFileSystem sdFS;
 
 // Archive
 ArchiveMFileSystem archiveFS;
+ARKMFileSystem arkFS;
 LBRMFileSystem lbrFS;
 
 // Cartridge
@@ -136,7 +138,7 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
     &sdFS,
 #endif
     &archiveFS, // extension-based FS have to be on top to be picked first, otherwise the scheme will pick them!
-    &lbrFS,
+    &arkFS, &lbrFS,
     &d64FS, &d71FS, &d80FS, &d81FS, &d82FS, &d90FS, &dnpFS, 
     &g64FS, &nibFS,
     &d8bFS, &dfiFS,

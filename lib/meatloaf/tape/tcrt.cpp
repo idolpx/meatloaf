@@ -69,9 +69,10 @@ bool TCRTMStream::seekEntry( std::string filename )
     {
         while ( seekEntry( index ) )
         {
-            std::string entryFilename = mstr::format("%.16s", entry.filename);
-            mstr::replaceAll(entryFilename, "/", "\\");
-            //mstr::trim(entryFilename);
+            std::string entryFilename = entry.filename;
+            uint8_t i = entryFilename.find_first_of(0xA0);
+            entryFilename = entryFilename.substr(0, i);
+            //mstr::rtrimA0(entryFilename);
             entryFilename = mstr::toUTF8(entryFilename);
 
             //Debug_printv("index[%d] filename[%s] entry.filename[%s] entry.file_type[%d]", index, filename.c_str(), entryFilename.c_str(), entry.file_type);
@@ -245,10 +246,13 @@ MFile* TCRTMFile::getNextFileInDir() {
     
     if ( r )
     {
-        std::string fileName = mstr::format("%.16s", image->entry.filename);
-        mstr::replaceAll(fileName, "/", "\\");
+        std::string filename = image->entry.filename;
+        uint8_t i = filename.find_first_of(0xA0);
+        filename = filename.substr(0, i);
+        // mstr::rtrimA0(filename);
+        mstr::replaceAll(filename, "/", "\\");
         //Debug_printv( "entry[%s]", (streamFile->url + "/" + fileName).c_str() );
-        auto file = MFSOwner::File(streamFile->url + "/" + fileName);
+        auto file = MFSOwner::File(streamFile->url + "/" + filename);
         file->extension = image->decodeType(image->entry.file_type);
         return file;
     }

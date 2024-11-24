@@ -43,10 +43,6 @@ protected:
         containerStream->read((uint8_t*)&header, sizeof(header));
     }
 
-    bool seekNextImageEntry() override {
-        return seekEntry(entry_index + 1);
-    }
-
     bool seekEntry( std::string filename ) override;
     bool seekEntry( uint16_t index ) override;
     bool seekPath(std::string path) override;

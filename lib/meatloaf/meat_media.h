@@ -87,16 +87,19 @@ protected:
     bool show_hidden = false;
 
     size_t media_header_size = 0x00;
-    size_t entry_index = 0;  // Currently selected directory entry
+    size_t media_data_offset = 0x00;
+    size_t entry_index = 0;  // Currently selected directory entry (0 no selection)
     size_t entry_count = -1; // Directory list entry count (-1 unknown)
 
     enum open_modes { OPEN_READ, OPEN_WRITE, OPEN_APPEND, OPEN_MODIFY };
     std::string file_type_label[12] = { "DEL", "SEQ", "PRG", "USR", "REL", "CBM", "DIR", "SUS", "NAT", "CMD", "CFS", "???" };
 
     virtual void seekHeader() = 0;
-    virtual bool seekNextImageEntry() = 0;
     void resetEntryCounter() {
         entry_index = 0;
+    }
+    virtual bool seekNextImageEntry() {
+        return seekEntry(entry_index + 1);
     }
 
     // Disks

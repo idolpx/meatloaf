@@ -158,8 +158,8 @@ public:
         return byExtension(
             {
                 ".7z",
-                ".arc",
-                ".ark",
+                //".arc",  // Have to find a way to distinquish between PC/C64 ARC file
+                //".ark",  // Have to find a way to distinquish between PC/C64 ARK file
                 ".bz2",
                 ".gz",
                 ".lha",

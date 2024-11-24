@@ -239,10 +239,6 @@ public:
         return partitions[0].block_allocation_map[0].end_track;
     }
 
-    bool seekNextImageEntry() override {
-        return seekEntry( entry_index + 1 );
-    }
-
     virtual bool seekPath(std::string path) override;
     uint32_t readFile(uint8_t* buf, uint32_t size) override;
 
