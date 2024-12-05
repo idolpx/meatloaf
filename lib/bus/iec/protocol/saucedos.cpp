@@ -25,198 +25,185 @@
 // #include <freertos/semphr.h>
 // #include <driver/timer.h>
 
-#include "bus.h"
-#include "_protocol.h"
-
+#include "../../../include/cbm_defines.h"
 #include "../../../include/debug.h"
 #include "../../../include/pinmap.h"
+#include "_protocol.h"
+#include "bus.h"
 
 using namespace Protocol;
 
-
-SauceDOS::SauceDOS() {
-
-    // Fast Loader Pair Timing
-    bit_pair_timing.clear();
-    bit_pair_timing = {
-        {14, 27, 38, 51},    // Receive
-        {17, 27, 39, 50}     // Send
-    };
-
-};
-
-
-uint8_t  SauceDOS::receiveByte ()
-{
+uint8_t SauceDOS::receiveByte() {
+    int abort = 0;
     uint8_t data = 0;
 
     portDISABLE_INTERRUPTS();
 
     IEC.flags &= CLEAR_LOW;
 
-    // Release the data to signal we are ready
-    IEC_RELEASE(PIN_IEC_DATA_IN);
+    // RECEIVING THE BITS
+    // As soon as the talker releases the Clock line we are expected to receive
+    // the bits Bits are inverted so use IEC_IS_ASSERTED() to get
+    // asserted/released status
 
-    // Wait for talker ready
-    while ( IEC_IS_ASSERTED( PIN_IEC_CLK_IN ) )
-    {
-        if ( IEC_IS_ASSERTED( PIN_IEC_ATN) )
-        {
-            IEC.flags |= ATN_ASSERTED;
-            goto done;
+    // SIGNAL WE ARE READY TO RECEIVE
+    IEC_RELEASE(PIN_IEC_CLK_OUT);
+
+    for (int idx = data = 0; !abort && idx < 7; idx++) {
+        if ((abort = waitForSignals(PIN_IEC_CLK_IN, IEC_RELEASED, 0, 0,
+                                    TIMEOUT_DEFAULT)))
+            break;
+
+        // Read First Bit
+        if (!IEC_IS_ASSERTED(PIN_IEC_DATA_IN)) data |= (1 << idx);
+
+        // Read Second Bit
+        idx++;
+        if (!IEC_IS_ASSERTED(PIN_IEC_SRQ)) data |= (1 << idx);
+
+        if (waitForSignals(PIN_IEC_CLK_IN, IEC_ASSERTED, 0, 0,
+                           TIMEOUT_DEFAULT)) {
+            if (idx < 7) abort = 1;
         }
     }
-
-    // RECEIVING THE BITS
-    // As soon as the talker releases the Clock line we are expected to receive the bits
-    // Bits are inverted so use IEC_IS_ASSERTED() to get asserted/released status
-
-    //IEC_ASSERT( PIN_IEC_SRQ );
-    timer_start();
-
-    // get bits 4,5
-    timer_wait ( bit_pair_timing[0][0] ); // Includes setup delay
-    if ( IEC_IS_ASSERTED( PIN_IEC_CLK_IN ) )  data |= 0b00010000; // 0
-    if ( IEC_IS_ASSERTED( PIN_IEC_DATA_IN ) ) data |= 0b00100000; // 1
-    //IEC_ASSERT( PIN_IEC_SRQ );
-
-    // get bits 6,7
-    timer_wait ( bit_pair_timing[0][1] );
-    if ( IEC_IS_ASSERTED( PIN_IEC_CLK_IN ) ) data |=  0b01000000; // 0
-    if ( IEC_IS_ASSERTED( PIN_IEC_DATA_IN ) ) data |= 0b10000000; // 0
-    //IEC_RELEASE( PIN_IEC_SRQ );
-
-    // get bits 3,1
-    timer_wait ( bit_pair_timing[0][2] );
-    if ( IEC_IS_ASSERTED( PIN_IEC_CLK_IN ) )  data |= 0b00001000; // 0
-    if ( IEC_IS_ASSERTED( PIN_IEC_DATA_IN ) ) data |= 0b00000010; // 0
-    //IEC_ASSERT( PIN_IEC_SRQ );
-
-    // get bits 2,0
-    timer_wait ( bit_pair_timing[0][3] );
-    if ( IEC_IS_ASSERTED( PIN_IEC_CLK_IN ) )  data |= 0b00000100; // 1
-    if ( IEC_IS_ASSERTED( PIN_IEC_DATA_IN ) ) data |= 0b00000001; // 0
-    //IEC_RELEASE( PIN_IEC_SRQ );
-
-    // Check CLK for EOI
-    timer_wait ( 64 );
-    if ( IEC_IS_ASSERTED( PIN_IEC_CLK_IN ) )
-        IEC.flags |= EOI_RECVD;
-    //IEC_ASSERT( PIN_IEC_SRQ );
 
     // Acknowledge byte received
     // If we want to indicate an error we can release DATA
-    IEC_ASSERT( PIN_IEC_DATA_OUT );
+    if (!waitForSignals(PIN_IEC_CLK_IN, IEC_ASSERTED, 0, 0, TIMEOUT_DEFAULT)) {
+        if (IEC_IS_ASSERTED(PIN_IEC_SRQ)) {
+            // Check CLK for EOI
+            IEC.flags |= EOI_RECVD;
+        }
 
-    // Wait for sender to read acknowledgement
-    timer_wait ( 83 );
+        IEC_ASSERT(PIN_IEC_DATA_OUT);
+        usleep(TIMING_Tv);
+        IEC_RELEASE(PIN_IEC_DATA_OUT);
+    }
 
-    //IEC_RELEASE( PIN_IEC_SRQ );
+    if (mode == PROTOCOL_COMMAND) {
+        if (data & (1 << 8))
+            mode = PROTOCOL_LISTEN;
+        else
+            mode = PROTOCOL_TALK;
+    }
 
-    //Debug_printv("data[%02X] eoi[%d]", data, IEC.flags); // $ = 0x24
-
-done:
     portENABLE_INTERRUPTS();
 
     return data;
-} // receiveByte
-
+}  // receiveByte
 
 // STEP 1: READY TO SEND
-// Sooner or later, the talker will want to talk, and send a character.
-// When it's ready to go, it releases the Clock line to false.  This signal change might be
-// translated as "I'm ready to send a character." The listener must detect this and respond,
-// but it doesn't have to do so immediately. The listener will respond  to  the  talker's
-// "ready  to  send"  signal  whenever  it  likes;  it  can  wait  a  long  time.    If  it's
-// a printer chugging out a line of print, or a disk drive with a formatting job in progress,
-// it might holdback for quite a while; there's no time limit.
-bool SauceDOS::sendByte ( uint8_t data, bool eoi )
-{
+// Sooner or later, the talker will want to talk, and send a
+// character. When it's ready to go, it releases the Clock line. This
+// signal change might be translated as "I'm ready to send a
+// character." The listener must detect this and respond, but it
+// doesn't have to do so immediately. The listener will respond to the
+// talker's "ready to send" signal whenever it likes; it can wait a
+// long time. If it's a printer chugging out a line of print, or a
+// disk drive with a formatting job in progress, it might holdback for
+// quite a while; there's no time limit.
+bool IRAM_ATTR SauceDOS::sendByte(uint8_t data, bool eoi) {
+    int len;
+    int abort = 0;
+
+    // IEC_ASSERT(PIN_IEC_SRQ);//Debug
+    gpio_intr_disable(PIN_IEC_CLK_IN);
     portDISABLE_INTERRUPTS();
 
-    IEC.flags &= CLEAR_LOW;
+    // SIGNAL WE READY TO SEND
+    IEC_RELEASE(PIN_IEC_CLK_OUT);
 
-    // Release the data to signal we are ready
-    IEC_RELEASE(PIN_IEC_CLK_IN);
+    // Is CLOCK being streched?
 
-    // Wait for listener ready
-    while ( IEC_IS_ASSERTED( PIN_IEC_DATA_IN ) )
-    {
-        if ( IEC_IS_ASSERTED( PIN_IEC_ATN) )
-        {
-            IEC.flags |= ATN_ASSERTED;
-            goto done;
+    // FIXME - Can't wait FOREVER because watchdog will get
+    //         mad. Probably need to configure DATA GPIO with POSEDGE
+    //         interrupt and not do portDISABLE_INTERRUPTS(). Without
+    //         interrupts disabled though there is a big risk of false
+    //         EOI being sent. Maybe the DATA ISR needs to handle EOI
+    //         signaling too?
+
+    if ((abort = waitForSignals(PIN_IEC_CLK_IN, IEC_RELEASED, PIN_IEC_ATN,
+                                IEC_ASSERTED, FOREVER))) {
+        Debug_printv("data released abort");
+    }
+
+    /* Because interrupts are disabled it's possible to miss the ATN pause
+     * signal */
+    if (IEC_IS_ASSERTED(PIN_IEC_ATN)) {
+        abort = 1;
+        // Debug_printv("ATN abort");
+    }
+
+    // STEP 3: SEND THE BITS
+    for (int idx = 0; !abort && idx < 8; len++) {
+        // Have to make sure CLK is release before setting
+        IEC_RELEASE(PIN_IEC_CLK_OUT);
+
+        if (IEC_IS_ASSERTED(PIN_IEC_ATN)) {
+            // Debug_printv("ATN 2 abort");
+            abort = 1;
+            break;
         }
+
+        // Set First Bit
+        if (data & (1 << idx)) {
+            IEC_RELEASE(PIN_IEC_DATA_OUT);
+
+            // Check to see if DATA is being pulled
+            // If so abort because of bus collision
+        } else
+            IEC_ASSERT(PIN_IEC_DATA_OUT);
+
+        // Set Second Bit
+        idx++;
+        if (data & (1 << idx))
+            IEC_RELEASE(PIN_IEC_SRQ);
+        else
+            IEC_ASSERT(PIN_IEC_SRQ);
+
+        usleep(TIMING_Tv);
+        IEC_RELEASE(PIN_IEC_DATA_OUT);
+        usleep(TIMING_Tv);
+        IEC_ASSERT(PIN_IEC_CLK_OUT);
     }
 
-    // STEP 2: SENDING THE BITS
-    // As soon as the listener releases the DATA line we are expected to send the bits
-    // Bits are inverted so use IEC_IS_ASSERTED() to get asserted/released status
+    // STEP 4: FRAME HANDSHAKE
+    // After the eighth bit has been sent, it's the listener's turn to
+    // acknowledge. At this moment, the Clock line is asserted and the
+    // Data line is released. The listener must acknowledge receiving
+    // the byte OK by asserting the Data line. The talker is now
+    // watching the Data line. If the listener doesn't assert the Data
+    // line within one millisecond - one thousand microseconds - it
+    // will know that something's wrong and may alarm appropriately.
 
-    //IEC_ASSERT( PIN_IEC_SRQ );
-    timer_start();
+    // Wait for listener to accept data
+    IEC_RELEASE(PIN_IEC_CLK_OUT);
 
-    // set bits 0,1
-    //IEC_ASSERT( PIN_IEC_SRQ );
-    ( data & 1 ) ? IEC_RELEASE( PIN_IEC_CLK_OUT ) : IEC_ASSERT( PIN_IEC_CLK_OUT );
-    data >>= 1; // shift to next bit
-    ( data & 1 ) ? IEC_RELEASE( PIN_IEC_DATA_OUT ) : IEC_ASSERT( PIN_IEC_DATA_OUT );
-    timer_wait ( bit_pair_timing[1][1] );
-
-    // set bits 2,3
-    data >>= 1; // shift to next bit
-    ( data & 1 ) ? IEC_RELEASE( PIN_IEC_CLK_OUT ) : IEC_ASSERT( PIN_IEC_CLK_OUT );
-    data >>= 1; // shift to next bit
-    ( data & 1 ) ? IEC_RELEASE( PIN_IEC_DATA_OUT ) : IEC_ASSERT( PIN_IEC_DATA_OUT );
-    timer_wait ( bit_pair_timing[1][2] );
-
-    // set bits 4,5
-    data >>= 1; // shift to next bit
-    ( data & 1 ) ? IEC_RELEASE( PIN_IEC_CLK_OUT ) : IEC_ASSERT( PIN_IEC_CLK_OUT );
-    data >>= 1; // shift to next bit
-    ( data & 1 ) ? IEC_RELEASE( PIN_IEC_DATA_OUT ) : IEC_ASSERT( PIN_IEC_DATA_OUT );
-    timer_wait ( bit_pair_timing[1][3] );
-
-    // set bits 6,7
-    data >>= 1; // shift to next bit
-    ( data & 1 ) ? IEC_RELEASE( PIN_IEC_CLK_OUT ) : IEC_ASSERT( PIN_IEC_CLK_OUT );
-    data >>= 1; // shift to next bit
-    ( data & 1 ) ? IEC_RELEASE( PIN_IEC_DATA_OUT ) : IEC_ASSERT( PIN_IEC_DATA_OUT );
-    timer_wait ( bit_pair_timing[1][4] );
-
-    // Check CLK for EOI
-    if ( eoi )
-    {
-        // This was the last byte
-        IEC_RELEASE( PIN_IEC_CLK_OUT );
-        IEC_ASSERT( PIN_IEC_CLK_OUT );
-    }
+    // Set EOI signal
+    if (eoi)
+        IEC_ASSERT(PIN_IEC_SRQ);
     else
-    {
-        // More data to come
-        IEC_ASSERT( PIN_IEC_CLK_OUT );
-        IEC_RELEASE( PIN_IEC_CLK_OUT );
-    }
-    timer_wait ( 60 );
-    //IEC_RELEASE( PIN_IEC_SRQ );
+        IEC_RELEASE(PIN_IEC_SRQ);
 
-    // Wait for listener to acknowledge of byte received
-    while ( !IEC_IS_ASSERTED( PIN_IEC_DATA_IN ) )
-    {
-        if ( IEC_IS_ASSERTED( PIN_IEC_ATN) )
-        {
-            IEC.flags |= ATN_ASSERTED;
-            goto done;
+    if (!abort &&
+        (abort = waitForSignals(PIN_IEC_DATA_IN, IEC_ASSERTED, PIN_IEC_ATN,
+                                IEC_ASSERTED, TIMEOUT_Tf))) {
+        // RECIEVER TIMEOUT
+        // If no receiver asserts DATA within 1000 µs at the end of
+        // the transmission of a byte (after step 28), a receiver
+        // timeout is raised.
+        if (!IEC_IS_ASSERTED(PIN_IEC_ATN)) {
+            abort = 0;
+        } else {
+            IEC_SET_STATE(BUS_IDLE);
         }
     }
-
-    Debug_printv("data[%02X] eoi[%d]", data, eoi); // $ = 0x24
-
-done:
     portENABLE_INTERRUPTS();
+    gpio_intr_enable(PIN_IEC_CLK_IN);
+    // IEC_RELEASE(PIN_DEBUG);//Debug
 
-    return true;
-} // sendByte
+    return !abort;
+}
 
-#endif // JIFFYDOS
-#endif // BUILD_IEC
+#endif  // MEATLOAF_MAX
+#endif  // BUILD_IEC

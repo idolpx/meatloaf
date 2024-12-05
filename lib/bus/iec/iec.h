@@ -614,6 +614,8 @@ public:
     // FIXME - these should be private
     void cbm_on_atn_isr_handler();
     void cbm_on_clk_isr_handler();
+    void cbm_on_data_isr_handler();
+    void cbm_on_reset_isr_handler();
 
     void init_gpio(gpio_num_t _pin);
 #if IEC_ASSERT_RELEASE_AS_FUNCTIONS
@@ -628,6 +630,6 @@ public:
 /**
  * @brief Return
  */
-extern systemBus IEC;
+extern DRAM_ATTR systemBus IEC;
 
 #endif /* IEC_H */

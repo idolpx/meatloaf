@@ -234,12 +234,12 @@ const char *EspClass::getChipModel(void) {
     switch (chip_info.model) {
         case CHIP_ESP32S3:
             return "ESP32-S3";
-        case CHIP_ESP32C3:
-            return "ESP32-C3";
         case CHIP_ESP32C2:
             return "ESP32-C2";
-        case CHIP_ESP32C6:
-            return "ESP32-C6";
+        case CHIP_ESP32C3:
+            return "ESP32-C3";
+        // case CHIP_ESP32C6:
+        //     return "ESP32-C6";
         case CHIP_ESP32H2:
             return "ESP32-H2";
         default:
@@ -508,33 +508,34 @@ float EspClass::temperatureRead() {
 #elif SOC_TEMP_SENSOR_SUPPORTED
 
 float EspClass::temperatureRead() {
-    float result = NAN;
+    // float result = NAN;
 
-    static temperature_sensor_handle_t temp_sensor = NULL;
-    static volatile bool initialized = false;
-    if (!initialized) {
-        initialized = true;
-        // Install temperature sensor, expected temp ranger range: 10~50 ℃
-        temperature_sensor_config_t temp_sensor_config =
-            TEMPERATURE_SENSOR_CONFIG_DEFAULT(10, 50);
-        if (temperature_sensor_install(&temp_sensor_config, &temp_sensor) !=
-            ESP_OK) {
-            initialized = false;
-            temp_sensor = NULL;
-            log_e("temperature_sensor_install failed");
-        } else if (temperature_sensor_enable(temp_sensor) != ESP_OK) {
-            temperature_sensor_uninstall(temp_sensor);
-            initialized = false;
-            temp_sensor = NULL;
-            log_e("temperature_sensor_enable failed");
-        }
-    }
+    // static temperature_sensor_handle_t temp_sensor = NULL;
+    // static volatile bool initialized = false;
+    // if (!initialized) {
+    //     initialized = true;
+    //     // Install temperature sensor, expected temp ranger range: 10~50 ℃
+    //     temperature_sensor_config_t temp_sensor_config =
+    //         TEMPERATURE_SENSOR_CONFIG_DEFAULT(10, 50);
+    //     if (temperature_sensor_install(&temp_sensor_config, &temp_sensor) !=
+    //         ESP_OK) {
+    //         initialized = false;
+    //         temp_sensor = NULL;
+    //         log_e("temperature_sensor_install failed");
+    //     } else if (temperature_sensor_enable(temp_sensor) != ESP_OK) {
+    //         temperature_sensor_uninstall(temp_sensor);
+    //         initialized = false;
+    //         temp_sensor = NULL;
+    //         log_e("temperature_sensor_enable failed");
+    //     }
+    // }
 
-    if (initialized) {
-        if (temperature_sensor_get_celsius(temp_sensor, &result) != ESP_OK) {
-            log_e("temperature_sensor_get_celsius failed");
-        }
-    }
-    return result;
+    // if (initialized) {
+    //     if (temperature_sensor_get_celsius(temp_sensor, &result) != ESP_OK) {
+    //         log_e("temperature_sensor_get_celsius failed");
+    //     }
+    // }
+    // return result;
+    return 0;
 }
 #endif

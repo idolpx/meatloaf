@@ -14,6 +14,7 @@
 // List Directory
 // https://ipfs.io/api/v0/ls?arg=QmbpUikCNvAbtUCgqvjMiKRFZbbNRAeg8V2KVyVqmtp7Fi
 // https://dweb.link/api/v0/ls?arg=QmbpUikCNvAbtUCgqvjMiKRFZbbNRAeg8V2KVyVqmtp7Fi
+// https://gateway.pinata.cloud/ipfs/QmbpUikCNvAbtUCgqvjMiKRFZbbNRAeg8V2KVyVqmtp7Fi/
 //
 // List Directory from root CID
 // https://dweb.link/api/v0/ls?arg=QmbpUikCNvAbtUCgqvjMiKRFZbbNRAeg8V2KVyVqmtp7Fi/0-9

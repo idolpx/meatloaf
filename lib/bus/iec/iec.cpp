@@ -52,6 +52,8 @@ void IRAM_ATTR systemBus::cbm_on_atn_isr_handler()
     //IEC_ASSERT(PIN_IEC_SRQ);
     if (IEC_IS_ASSERTED(PIN_IEC_ATN))
     {
+        //IEC_ASSERT(PIN_DEBUG);
+
         // Go to listener mode and get command
         IEC_RELEASE(PIN_IEC_CLK_OUT);
         IEC_ASSERT(PIN_IEC_DATA_OUT);
@@ -66,11 +68,27 @@ void IRAM_ATTR systemBus::cbm_on_atn_isr_handler()
             detected_protocol = PROTOCOL_SERIAL;
             protocol = selectProtocol();
         }
+        //IEC_RELEASE(PIN_DEBUG);
     }
     else if (_state == BUS_RELEASE)
     {
         releaseLines();
         IEC_SET_STATE(BUS_IDLE);
+    }
+    else
+    {
+#ifdef JIFFYDOS
+        if (flags & JIFFYDOS_ACTIVE)
+        {
+            //IEC_ASSERT(PIN_DEBUG);
+            detected_protocol = PROTOCOL_JIFFYDOS;
+            protocol = selectProtocol();
+            //IEC_RELEASE(PIN_DEBUG);
+
+            // Release DATA to signal we are ready to receive byte
+            IEC_RELEASE(PIN_IEC_DATA_IN);
+        }
+#endif
     }
     //IEC_RELEASE(PIN_DEBUG);
 }
@@ -94,7 +112,10 @@ void IRAM_ATTR systemBus::cbm_on_clk_isr_handler()
     atn = IEC_IS_ASSERTED(PIN_IEC_ATN);
     gpio_intr_disable(PIN_IEC_CLK_IN);
 
+    //IEC_ASSERT(PIN_DEBUG);
     val = protocol->receiveByte();
+    //IEC_RELEASE(PIN_DEBUG);
+
     if (flags & ERROR)
         goto done;
 
@@ -126,13 +147,6 @@ void IRAM_ATTR systemBus::cbm_on_clk_isr_handler()
             else
             {
                 newIO(val);
-#ifdef JIFFYDOS
-                if (flags & JIFFYDOS_ACTIVE)
-                {
-                    detected_protocol = PROTOCOL_JIFFYDOS;
-                    protocol = selectProtocol();
-                }
-#endif
             }
             break;
 
@@ -164,13 +178,71 @@ void IRAM_ATTR systemBus::cbm_on_clk_isr_handler()
         }
     }
     else if (iec_curCommand)
+    {
+        // Just read the bytes
         iec_curCommand->payload += val & 0xff;
+
+#ifdef JIFFYDOS
+        if (flags & JIFFYDOS_ACTIVE)
+        {
+            // Release DATA to signal we are ready to receive next byte
+            IEC_RELEASE(PIN_IEC_DATA_IN);
+        }
+#endif
+    }
 
 done:
     gpio_intr_enable(PIN_IEC_CLK_IN);
     //IEC_RELEASE(PIN_DEBUG);
     return;
 }
+
+#ifdef MEATLOAF_MAX
+static void IRAM_ATTR cbm_on_data_isr_forwarder(void *arg)
+{
+    systemBus *b = (systemBus *)arg;
+
+    b->cbm_on_data_isr_handler();
+}
+
+void IRAM_ATTR systemBus::cbm_on_data_isr_handler()
+{
+    // DATA
+    if ( !IEC_IS_ASSERTED(PIN_IEC_ATN) && !IEC_IS_ASSERTED(PIN_IEC_CLK_IN) )
+    {
+        // 
+        IEC_ASSERT(PIN_IEC_SRQ);
+
+        // Wait for CLK to be asserted
+        // If asserted within a certain time we are talking SauceDOS protocol
+        if (!protocol->waitForSignals(PIN_IEC_CLK_IN, IEC_ASSERTED, 0, 0, TIMEOUT_DEFAULT))
+        {
+            // Stretch CLK to prepare to receive bits
+            IEC_ASSERT(PIN_IEC_CLK_OUT);
+
+            detected_protocol = PROTOCOL_SAUCEDOS;
+            selectProtocol();
+        }
+    }
+}
+#endif
+
+#ifdef IEC_HAS_RESET
+static void IRAM_ATTR cbm_on_reset_isr_forwarder(void *arg)
+{
+    systemBus *b = (systemBus *)arg;
+
+    b->cbm_on_reset_isr_handler();
+}
+
+void IRAM_ATTR systemBus::cbm_on_reset_isr_handler()
+{
+    if ( IEC_IS_ASSERTED(PIN_IEC_ATN) )
+    {
+        // RESET!
+    }
+}
+#endif
 
 void IRAM_ATTR systemBus::newIO(int val)
 {
@@ -200,6 +272,45 @@ void IRAM_ATTR systemBus::sendInput(void)
     // IEC_RELEASE(PIN_DEBUG);
 
     return;
+}
+
+
+std::shared_ptr<IECProtocol> IRAM_ATTR systemBus::selectProtocol()
+{
+    //Debug_printv("protocol[%d]", detected_protocol);
+
+    switch (detected_protocol)
+    {
+#ifdef MEATLOAF_MAX
+        case PROTOCOL_SAUCEDOS:
+        {
+            auto p = std::make_shared<SauceDOS>();
+            return std::static_pointer_cast<IECProtocol>(p);
+        }
+#endif
+#ifdef JIFFYDOS
+        case PROTOCOL_JIFFYDOS:
+        {
+            auto p = std::make_shared<JiffyDOS>();
+            return std::static_pointer_cast<IECProtocol>(p);
+        }
+#endif
+#ifdef PARALLEL_BUS
+        case PROTOCOL_DOLPHINDOS:
+        {
+            auto p = std::make_shared<DolphinDOS>();
+            return std::static_pointer_cast<IECProtocol>(p);
+        }
+#endif
+        default:
+        {
+#ifdef PARALLEL_BUS
+            PARALLEL.state = PBUS_IDLE;
+#endif
+            auto p = std::make_shared<CPBStandardSerial>();
+            return std::static_pointer_cast<IECProtocol>(p);
+        }
+    }
 }
 
 /**
@@ -290,6 +401,36 @@ void systemBus::setup()
     gpio_config(&io_conf);
     gpio_isr_handler_add((gpio_num_t)PIN_IEC_CLK_IN, cbm_on_clk_isr_forwarder, this);
 
+#ifdef MEATLOAF_MAX
+    // Setup interrupt config for DATA
+    io_conf = {
+        .pin_bit_mask = (1ULL << PIN_IEC_DATA_IN),   // bit mask of the pins that you want to set
+        .mode = GPIO_MODE_INPUT,                    // set as input mode
+        .pull_up_en = GPIO_PULLUP_DISABLE,          // disable pull-up mode
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,      // disable pull-down mode
+#ifdef IEC_INVERTED_LINES
+        .intr_type = GPIO_INTR_NEGEDGE              // interrupt of falling edge
+#else
+        .intr_type = GPIO_INTR_POSEDGE              // interrupt of rising edge
+#endif
+    };
+    gpio_config(&io_conf);
+    gpio_isr_handler_add((gpio_num_t)PIN_IEC_DATA_IN, cbm_on_data_isr_forwarder, this);
+#endif
+
+#ifdef IEC_HAS_RESET
+    // Setup interrupt config for RESET
+    io_conf = {
+        .pin_bit_mask = (1ULL << PIN_IEC_RESET),   // bit mask of the pins that you want to set
+        .mode = GPIO_MODE_INPUT,                    // set as input mode
+        .pull_up_en = GPIO_PULLUP_DISABLE,          // disable pull-up mode
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,      // disable pull-down mode
+        .intr_type = GPIO_INTR_NEGEDGE              // interrupt of falling edge
+    };
+    gpio_config(&io_conf);
+    gpio_isr_handler_add((gpio_num_t)PIN_IEC_RESET, cbm_on_reset_isr_forwarder, this);
+#endif
+
     // Start SRQ timer service
     //timer_start_srq();
 }
@@ -345,43 +486,6 @@ void systemBus::timer_stop_srq()
     }
 }
 
-std::shared_ptr<IECProtocol> systemBus::selectProtocol()
-{
-    // Debug_printv("protocol[%d]", detected_protocol);
-
-    switch (detected_protocol)
-    {
-#ifdef MEATLOAF_MAX
-        case PROTOCOL_SAUCEDOS:
-        {
-            auto p = std::make_shared<SauceDOS>();
-            return std::static_pointer_cast<IECProtocol>(p);
-        }
-#endif
-#ifdef JIFFYDOS
-        case PROTOCOL_JIFFYDOS:
-        {
-            auto p = std::make_shared<JiffyDOS>();
-            return std::static_pointer_cast<IECProtocol>(p);
-        }
-#endif
-#ifdef PARALLEL_BUS
-        case PROTOCOL_DOLPHINDOS:
-        {
-            auto p = std::make_shared<DolphinDOS>();
-            return std::static_pointer_cast<IECProtocol>(p);
-        }
-#endif
-        default:
-        {
-#ifdef PARALLEL_BUS
-            PARALLEL.state = PBUS_IDLE;
-#endif
-            auto p = std::make_shared<CPBStandardSerial>();
-            return std::static_pointer_cast<IECProtocol>(p);
-        }
-    }
-}
 
 systemBus virtualDevice::get_bus() { return IEC; }
 
@@ -516,6 +620,20 @@ bool IRAM_ATTR systemBus::turnAround()
 void systemBus::reset_all_our_devices()
 {
     // TODO iterate through our bus and send reset to each device.
+
+    // The reset line on the IEC bus signals all of the drives on the bus to reset. 
+    // Each drive is a separate computer with its own power system. Therefore, it 
+    // will often be the case that a drive has been on, it has been used to load a 
+    // program, but then the computer gets power cycled. This does not cause the 
+    // drives to power cycle, but because they get that reset signal they will jump 
+    // through their own initialization procedure. On a CMD storage device, or an 
+    // SD2IEC device, this means that they will take certain steps like, unmount all 
+    // mounted .D64 images, unassign any assigned disk image swaplist, revert the 
+    // current path of all partitions to the root directory, and revert the current 
+    // partition to the drive's default partition. The error channel is cleared and 
+    // replaced with a message about the drive's DOS version. Drives may also clear 
+    // out certain cached data, such as the disk's BAM. And of course, all open files 
+    // are automatically closed.
 }
 
 void systemBus::setBitTiming(std::string set, int p1, int p2, int p3, int p4)

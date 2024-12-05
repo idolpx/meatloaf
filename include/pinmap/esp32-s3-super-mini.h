@@ -1,5 +1,5 @@
-#ifndef PINMAP_ESP32_S3_ZERO_H
-#define PINMAP_ESP32_S3_ZERO_H
+#ifndef PINMAP_ESP32_S3_SUPER_MINI_H
+#define PINMAP_ESP32_S3_SUPER_MINI_H
 
 // https://www.waveshare.com/esp32-s3-zero.htm
 // https://www.waveshare.com/wiki/ESP32-S3-Zero
@@ -7,7 +7,7 @@
 // https://www.espressif.com.cn/sites/default/files/documentation/esp32-s3_datasheet_en.pdf
 // https://randomnerdtutorials.com/esp32-s3-devkitc-pinout-guide/
 
-#ifdef PINMAP_ESP32_S3_ZERO
+#ifdef PINMAP_ESP32_S3_SUPER_MINI
 
 // ESP32-S3FH4R2
 #define FLASH_SIZE              4
@@ -37,7 +37,7 @@
 #define PIN_LED_WIFI            GPIO_NUM_NC
 #define PIN_LED_BT              GPIO_NUM_NC
 #define PIN_LED_BUS             GPIO_NUM_NC
-#define PIN_LED_RGB             GPIO_NUM_21
+#define PIN_LED_RGB             GPIO_NUM_48
 
 /* Audio Output */
 #define PIN_DAC1                GPIO_NUM_NC  // samlib.h
@@ -69,5 +69,5 @@
 #define PIN_MODEM_ENABLE        GPIO_NUM_40  // High = Modem enabled
 #define PIN_MODEM_UP9600        GPIO_NUM_41  // High = UP9600 enabled
 
-#endif // PINMAP_ESP32_S3_ZERO
-#endif // PINMAP_ESP32_S3_ZERO_H
+#endif // PINMAP_ESP32_S3_SUPER_MINI
+#endif // PINMAP_ESP32_S3_SUPER_MINI_H

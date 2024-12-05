@@ -27,8 +27,6 @@
 #include "../../../include/debug.h"
 #include "../../../include/pinmap.h"
 
-#define IEC_SET_STATE(x) ({IEC._state = x;})
-
 using namespace Protocol;
 
 // STEP 1: READY TO RECEIVE
@@ -41,7 +39,7 @@ using namespace Protocol;
 // long time. If it's a printer chugging out a line of print, or a
 // disk drive with a formatting job in progress, it might holdback for
 // quite a while; there's no time limit.
-uint8_t CPBStandardSerial::receiveByte()
+uint8_t IRAM_ATTR CPBStandardSerial::receiveByte()
 {
   int abort;
   int idx, data;
@@ -140,11 +138,7 @@ uint8_t CPBStandardSerial::receiveByte()
   // sufficient length of time, it asserts the Clock line and releases
   // the Data line. Then it starts to prepare the next bit.
 
-#ifndef JIFFYDOS
-  for (idx = data = 0; !abort && idx < 8; idx++) {
-#else
   for (idx = data = 0; !abort && idx < 7; idx++) {
-#endif
     if ((abort = waitForSignals(PIN_IEC_CLK_IN, IEC_RELEASED, 0, 0, TIMEOUT_DEFAULT)))
       break;
 
@@ -161,6 +155,7 @@ uint8_t CPBStandardSerial::receiveByte()
   // If there is a 218us delay before bit 7, the controller uses JiffyDOS
   if (waitForSignals(PIN_IEC_CLK_IN, IEC_RELEASED, 0, 0,
 		     TIMING_PROTOCOL_DETECT) == TIMED_OUT) {
+
     // acknowledge we support JiffyDOS
     IEC_ASSERT(PIN_IEC_DATA_OUT);
     usleep(TIMING_PROTOCOL_ACK);
@@ -222,7 +217,7 @@ uint8_t CPBStandardSerial::receiveByte()
 // long time. If it's a printer chugging out a line of print, or a
 // disk drive with a formatting job in progress, it might holdback for
 // quite a while; there's no time limit.
-bool CPBStandardSerial::sendByte(uint8_t data, bool eoi)
+bool IRAM_ATTR CPBStandardSerial::sendByte(uint8_t data, bool eoi)
 {
   int len;
   int abort = 0;

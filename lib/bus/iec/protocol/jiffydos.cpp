@@ -46,78 +46,79 @@ JiffyDOS::JiffyDOS() {
 };
 
 
-uint8_t  JiffyDOS::receiveByte ()
+uint8_t IRAM_ATTR JiffyDOS::receiveByte ()
 {
+    //IEC_ASSERT(PIN_DEBUG);
     uint8_t data = 0;
 
     portDISABLE_INTERRUPTS();
 
     IEC.flags &= CLEAR_LOW;
 
-    // Release the data to signal we are ready
-    IEC_RELEASE(PIN_IEC_DATA_IN);
+    // // Release the data to signal we are ready
+    // IEC_RELEASE(PIN_IEC_DATA_IN);
 
-    // Wait for talker ready
-    while ( IEC_IS_ASSERTED( PIN_IEC_CLK_IN ) )
-    {
-        if ( IEC_IS_ASSERTED( PIN_IEC_ATN) )
-        {
-            IEC.flags |= ATN_ASSERTED;
-            goto done;
-        }
-    }
+    // // Wait for talker ready
+    // while ( IEC_IS_ASSERTED( PIN_IEC_CLK_IN ) )
+    // {
+    //     if ( IEC_IS_ASSERTED( PIN_IEC_ATN) )
+    //     {
+    //         IEC.flags |= ATN_ASSERTED;
+    //         goto done;
+    //     }
+    // }
 
     // RECEIVING THE BITS
     // As soon as the talker releases the Clock line we are expected to receive the bits
     // Bits are inverted so use IEC_IS_ASSERTED() to get asserted/released status
 
-    //IEC_ASSERT( PIN_IEC_SRQ );
+    IEC_ASSERT( PIN_DEBUG );
     timer_start();
 
     // get bits 4,5
-    timer_wait ( bit_pair_timing[0][0] ); // Includes setup delay
+    timer_wait_until ( bit_pair_timing[0][0] ); // Includes setup delay
     if ( IEC_IS_ASSERTED( PIN_IEC_CLK_IN ) )  data |= 0b00010000; // 0
     if ( IEC_IS_ASSERTED( PIN_IEC_DATA_IN ) ) data |= 0b00100000; // 1
-    //IEC_ASSERT( PIN_IEC_SRQ );
+    IEC_RELEASE( PIN_DEBUG );
 
     // get bits 6,7
-    timer_wait ( bit_pair_timing[0][1] );
+    timer_wait_until ( bit_pair_timing[0][1] );
     if ( IEC_IS_ASSERTED( PIN_IEC_CLK_IN ) ) data |=  0b01000000; // 0
     if ( IEC_IS_ASSERTED( PIN_IEC_DATA_IN ) ) data |= 0b10000000; // 0
-    //IEC_RELEASE( PIN_IEC_SRQ );
+    IEC_ASSERT( PIN_DEBUG );
 
     // get bits 3,1
-    timer_wait ( bit_pair_timing[0][2] );
+    timer_wait_until ( bit_pair_timing[0][2] );
     if ( IEC_IS_ASSERTED( PIN_IEC_CLK_IN ) )  data |= 0b00001000; // 0
     if ( IEC_IS_ASSERTED( PIN_IEC_DATA_IN ) ) data |= 0b00000010; // 0
-    //IEC_ASSERT( PIN_IEC_SRQ );
+    IEC_RELEASE( PIN_DEBUG );
 
     // get bits 2,0
-    timer_wait ( bit_pair_timing[0][3] );
+    timer_wait_until ( bit_pair_timing[0][3] );
     if ( IEC_IS_ASSERTED( PIN_IEC_CLK_IN ) )  data |= 0b00000100; // 1
     if ( IEC_IS_ASSERTED( PIN_IEC_DATA_IN ) ) data |= 0b00000001; // 0
-    //IEC_RELEASE( PIN_IEC_SRQ );
+    IEC_ASSERT( PIN_DEBUG );
 
     // Check CLK for EOI
-    timer_wait ( 64 );
+    timer_wait_until ( 64 );
     if ( IEC_IS_ASSERTED( PIN_IEC_CLK_IN ) )
         IEC.flags |= EOI_RECVD;
-    //IEC_ASSERT( PIN_IEC_SRQ );
+    IEC_RELEASE( PIN_DEBUG );
 
     // Acknowledge byte received
     // If we want to indicate an error we can release DATA
     IEC_ASSERT( PIN_IEC_DATA_OUT );
 
     // Wait for sender to read acknowledgement
-    timer_wait ( 83 );
-
-    //IEC_RELEASE( PIN_IEC_SRQ );
+    timer_wait_until ( 83 );
 
     //Debug_printv("data[%02X] eoi[%d]", data, IEC.flags); // $ = 0x24
 
-done:
+//done:
+    IEC_ASSERT( PIN_DEBUG );
     portENABLE_INTERRUPTS();
 
+    IEC_RELEASE(PIN_DEBUG);
     return data;
 } // receiveByte
 
@@ -130,13 +131,13 @@ done:
 // "ready  to  send"  signal  whenever  it  likes;  it  can  wait  a  long  time.    If  it's
 // a printer chugging out a line of print, or a disk drive with a formatting job in progress,
 // it might holdback for quite a while; there's no time limit.
-bool JiffyDOS::sendByte ( uint8_t data, bool eoi )
+bool IRAM_ATTR JiffyDOS::sendByte ( uint8_t data, bool eoi )
 {
     portDISABLE_INTERRUPTS();
 
     IEC.flags &= CLEAR_LOW;
 
-    // Release the data to signal we are ready
+    // Release clock to signal we are ready
     IEC_RELEASE(PIN_IEC_CLK_IN);
 
     // Wait for listener ready
@@ -153,36 +154,29 @@ bool JiffyDOS::sendByte ( uint8_t data, bool eoi )
     // As soon as the listener releases the DATA line we are expected to send the bits
     // Bits are inverted so use IEC_IS_ASSERTED() to get asserted/released status
 
-    //IEC_ASSERT( PIN_IEC_SRQ );
+    //IEC_ASSERT( PIN_DEBUG );
     timer_start();
 
     // set bits 0,1
-    //IEC_ASSERT( PIN_IEC_SRQ );
-    ( data & 1 ) ? IEC_RELEASE( PIN_IEC_CLK_OUT ) : IEC_ASSERT( PIN_IEC_CLK_OUT );
-    data >>= 1; // shift to next bit
-    ( data & 1 ) ? IEC_RELEASE( PIN_IEC_DATA_OUT ) : IEC_ASSERT( PIN_IEC_DATA_OUT );
-    timer_wait ( bit_pair_timing[1][1] );
+    //IEC_ASSERT( PIN_DEBUG );
+    ( data & (1 << 0 ) ) ? IEC_RELEASE( PIN_IEC_CLK_OUT ) : IEC_ASSERT( PIN_IEC_CLK_OUT );
+    ( data & (1 << 1 ) ) ? IEC_RELEASE( PIN_IEC_DATA_OUT ) : IEC_ASSERT( PIN_IEC_DATA_OUT );
+    timer_wait_until ( bit_pair_timing[1][0] );
 
     // set bits 2,3
-    data >>= 1; // shift to next bit
-    ( data & 1 ) ? IEC_RELEASE( PIN_IEC_CLK_OUT ) : IEC_ASSERT( PIN_IEC_CLK_OUT );
-    data >>= 1; // shift to next bit
-    ( data & 1 ) ? IEC_RELEASE( PIN_IEC_DATA_OUT ) : IEC_ASSERT( PIN_IEC_DATA_OUT );
-    timer_wait ( bit_pair_timing[1][2] );
+    ( data & (1 << 2 ) ) ? IEC_RELEASE( PIN_IEC_CLK_OUT ) : IEC_ASSERT( PIN_IEC_CLK_OUT );
+    ( data & (1 << 3 ) ) ? IEC_RELEASE( PIN_IEC_DATA_OUT ) : IEC_ASSERT( PIN_IEC_DATA_OUT );
+    timer_wait_until ( bit_pair_timing[1][1] );
 
     // set bits 4,5
-    data >>= 1; // shift to next bit
-    ( data & 1 ) ? IEC_RELEASE( PIN_IEC_CLK_OUT ) : IEC_ASSERT( PIN_IEC_CLK_OUT );
-    data >>= 1; // shift to next bit
-    ( data & 1 ) ? IEC_RELEASE( PIN_IEC_DATA_OUT ) : IEC_ASSERT( PIN_IEC_DATA_OUT );
-    timer_wait ( bit_pair_timing[1][3] );
+    ( data & (1 << 4 ) ) ? IEC_RELEASE( PIN_IEC_CLK_OUT ) : IEC_ASSERT( PIN_IEC_CLK_OUT );
+    ( data & (1 << 5 ) ) ? IEC_RELEASE( PIN_IEC_DATA_OUT ) : IEC_ASSERT( PIN_IEC_DATA_OUT );
+    timer_wait_until ( bit_pair_timing[1][2] );
 
     // set bits 6,7
-    data >>= 1; // shift to next bit
-    ( data & 1 ) ? IEC_RELEASE( PIN_IEC_CLK_OUT ) : IEC_ASSERT( PIN_IEC_CLK_OUT );
-    data >>= 1; // shift to next bit
-    ( data & 1 ) ? IEC_RELEASE( PIN_IEC_DATA_OUT ) : IEC_ASSERT( PIN_IEC_DATA_OUT );
-    timer_wait ( bit_pair_timing[1][4] );
+    ( data & (1 << 6 ) ) ? IEC_RELEASE( PIN_IEC_CLK_OUT ) : IEC_ASSERT( PIN_IEC_CLK_OUT );
+    ( data & (1 << 7 ) ) ? IEC_RELEASE( PIN_IEC_DATA_OUT ) : IEC_ASSERT( PIN_IEC_DATA_OUT );
+    timer_wait_until ( bit_pair_timing[1][3] );
 
     // Check CLK for EOI
     if ( eoi )
@@ -197,8 +191,10 @@ bool JiffyDOS::sendByte ( uint8_t data, bool eoi )
         IEC_ASSERT( PIN_IEC_CLK_OUT );
         IEC_RELEASE( PIN_IEC_CLK_OUT );
     }
-    timer_wait ( 60 );
-    //IEC_RELEASE( PIN_IEC_SRQ );
+    timer_wait_until ( 60 );
+    //IEC_RELEASE( PIN_DEBUG );
+
+    portENABLE_INTERRUPTS();
 
     // Wait for listener to acknowledge of byte received
     while ( !IEC_IS_ASSERTED( PIN_IEC_DATA_IN ) )
@@ -210,10 +206,10 @@ bool JiffyDOS::sendByte ( uint8_t data, bool eoi )
         }
     }
 
-    Debug_printv("data[%02X] eoi[%d]", data, eoi); // $ = 0x24
+    //Debug_printv("data[%02X] eoi[%d]", data, eoi); // $ = 0x24
 
 done:
-    portENABLE_INTERRUPTS();
+
 
     return true;
 } // sendByte

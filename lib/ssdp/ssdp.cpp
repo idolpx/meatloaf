@@ -20,7 +20,7 @@ static void ssdp_service_task(void* arg)
     while ( true ) 
     {
         SSDPDevice.service();
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
     }
 }
 

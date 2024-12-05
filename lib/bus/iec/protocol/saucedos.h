@@ -22,6 +22,8 @@
 // https://ar.c64.org/rrwiki/images/4/48/The_Transactor_Vol09_03_1989_Feb_JD_review.pdf
 // https://web.archive.org/web/20090826145226/http://home.arcor.de/jochen.adler/ajnjil-t.htm
 // https://web.archive.org/web/20220423162959/https://sites.google.com/site/h2obsession/CBM/C128/JiffySoft128
+// https://youtu.be/CAvawEcxoPU?si=7K1W2_R9uwS-q82h
+// https://youtu.be/0nVNwozXsIc?si=p6CtYQMzjydh_1_c
 //
 
 #ifndef PROTOCOL_SAUCEDOS_H
@@ -34,7 +36,11 @@ namespace Protocol
 	class SauceDOS : public IECProtocol
 	{
 		public:
-			SauceDOS();
+			SauceDOS()
+			{
+				mode = PROTOCOL_COMMAND;
+			};
+
 
 		protected:
 			uint8_t receiveByte(void) override;

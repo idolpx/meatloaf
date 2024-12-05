@@ -728,5 +728,5 @@ bool FileSystemSDFAT::start(const char *sd_path)
 
     return _started;
 }
-// !ESP_PLATFORM
-#endif
+
+#endif // !ESP_PLATFORM

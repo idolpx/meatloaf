@@ -1,5 +1,6 @@
 //
 // https://github.com/markusC64/p64conv/blob/master/lib/p64refimp/p64tech.txt
+// https://www.cbmstuff.com/forum/showthread.php?tid=70&pid=302
 //
 
 // Bit 1 of the flags is read only as written down in the VICE page. But there

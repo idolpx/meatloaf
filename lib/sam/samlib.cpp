@@ -4,7 +4,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/timers.h>
 #include <driver/gpio.h>
-#ifndef CONFIG_IDF_TARGET_ESP32S3
+#if !defined(CONFIG_IDF_TARGET_ESP32S3) & !defined(CONFIG_IDF_TARGET_ESP32C3)
 #include <driver/dac.h>
 #endif
 
@@ -158,7 +158,7 @@ void OutputSound()
 void OutputSound()
 {
 #ifdef ESP_PLATFORM
-#ifndef CONFIG_IDF_TARGET_ESP32S3
+#if !defined(CONFIG_IDF_TARGET_ESP32S3) & !defined(CONFIG_IDF_TARGET_ESP32C3)
     int n = GetBufferLength() / 50;
     char *s = GetBuffer();
 

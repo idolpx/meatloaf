@@ -211,7 +211,7 @@ std::string FNJSON::getValue(cJSON *item)
         {
             // yes, return as 64 bit integer
 #ifdef VERBOSE_PROTOCOL
-            Debug_printf("S: [cJSON_IsNumber INT] %d\r\n", (int64_t)num);
+            Debug_printf("S: [cJSON_IsNumber INT] %llu\r\n", (int64_t)num);
 #endif
             ss << (int64_t)num;
         }
@@ -341,9 +341,12 @@ bool FNJSON::parse()
     }
 
     // Debug_printf("S: %s\r\n", _parseBuffer.c_str());
+
     // only try and parse the buffer if it has data. Empty response doesn't need parsing.
     if (!_parseBuffer.empty())
     {
+        std::string b = util_hexdump(&_parseBuffer, _parseBuffer.size());
+        Debug_printf("%s", b.c_str());
         _json = cJSON_Parse(_parseBuffer.c_str());
     }
 
