@@ -51,11 +51,19 @@ uint8_t IRAM_ATTR CPBStandardSerial::receiveByte()
   if (IEC_IS_ASSERTED(PIN_IEC_ATN))
     IEC.flags |= ATN_ASSERTED;
 
+
+  gpio_intr_disable(PIN_IEC_CLK_IN);
   portDISABLE_INTERRUPTS();
 
 #ifdef DYNAMIC_DELAY
   transferDelaySinceLast(TIMING_Tf);
 #endif
+
+  // Wait for talker to be ready
+  if (waitForSignals(PIN_IEC_CLK_IN, IEC_RELEASED, 0, 0,
+		     TIMEOUT_DEFAULT) == TIMED_OUT) {
+          abort = 1;
+         }
 
   // STEP 2: READY FOR DATA
   // line. Suppose there is more than one listener. The Data line
@@ -175,6 +183,7 @@ uint8_t IRAM_ATTR CPBStandardSerial::receiveByte()
   }
 
   portENABLE_INTERRUPTS();
+  gpio_intr_enable(PIN_IEC_CLK_IN);
 
   // STEP 4: FRAME HANDSHAKE
   // After the eighth bit has been sent, it's the listener's turn to

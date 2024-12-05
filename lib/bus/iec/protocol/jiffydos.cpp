@@ -55,18 +55,18 @@ uint8_t IRAM_ATTR JiffyDOS::receiveByte ()
 
     IEC.flags &= CLEAR_LOW;
 
-    // // Release the data to signal we are ready
-    // IEC_RELEASE(PIN_IEC_DATA_IN);
+    // Release the data to signal we are ready
+    IEC_RELEASE(PIN_IEC_DATA_IN);
 
-    // // Wait for talker ready
-    // while ( IEC_IS_ASSERTED( PIN_IEC_CLK_IN ) )
-    // {
-    //     if ( IEC_IS_ASSERTED( PIN_IEC_ATN) )
-    //     {
-    //         IEC.flags |= ATN_ASSERTED;
-    //         goto done;
-    //     }
-    // }
+    // Wait for talker ready
+    while ( IEC_IS_ASSERTED( PIN_IEC_CLK_IN ) )
+    {
+        if ( IEC_IS_ASSERTED( PIN_IEC_ATN) )
+        {
+            IEC.flags |= ATN_ASSERTED;
+            goto done;
+        }
+    }
 
     // RECEIVING THE BITS
     // As soon as the talker releases the Clock line we are expected to receive the bits
@@ -114,7 +114,7 @@ uint8_t IRAM_ATTR JiffyDOS::receiveByte ()
 
     //Debug_printv("data[%02X] eoi[%d]", data, IEC.flags); // $ = 0x24
 
-//done:
+done:
     IEC_ASSERT( PIN_DEBUG );
     portENABLE_INTERRUPTS();
 

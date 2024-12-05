@@ -227,7 +227,7 @@ static int	lha_read_file_header_1(struct archive_read *, struct lha *);
 static int	lha_read_file_header_2(struct archive_read *, struct lha *);
 static int	lha_read_file_header_3(struct archive_read *, struct lha *);
 static int	lha_read_file_extended_header(struct archive_read *,
-		    struct lha *, uint16_t *, int, size_t, size_t *);
+		    struct lha *, uint16_t *, int, uint64_t, size_t *);
 static size_t	lha_check_header_format(const void *);
 static int	lha_skip_sfx(struct archive_read *);
 static time_t	lha_dos_time(const unsigned char *);
@@ -265,7 +265,7 @@ archive_read_support_format_lha(struct archive *_a)
 	archive_check_magic(_a, ARCHIVE_READ_MAGIC,
 	    ARCHIVE_STATE_NEW, "archive_read_support_format_lha");
 
-	lha = (struct lha *)calloc(1, sizeof(*lha));
+	lha = calloc(1, sizeof(*lha));
 	if (lha == NULL) {
 		archive_set_error(&a->archive, ENOMEM,
 		    "Can't allocate lha data");
@@ -945,7 +945,7 @@ lha_read_file_header_1(struct archive_read *a, struct lha *lha)
 
 	/* Read extended headers */
 	err2 = lha_read_file_extended_header(a, lha, NULL, 2,
-	    (size_t)(lha->compsize + 2), &extdsize);
+	    (uint64_t)(lha->compsize + 2), &extdsize);
 	if (err2 < ARCHIVE_WARN)
 		return (err2);
 	if (err2 < err)
@@ -1138,7 +1138,7 @@ invalid:
  */
 static int
 lha_read_file_extended_header(struct archive_read *a, struct lha *lha,
-    uint16_t *crc, int sizefield_length, size_t limitsize, size_t *total_size)
+    uint16_t *crc, int sizefield_length, uint64_t limitsize, size_t *total_size)
 {
 	const void *h;
 	const unsigned char *extdheader;
@@ -1187,8 +1187,7 @@ lha_read_file_extended_header(struct archive_read *a, struct lha *lha,
 		}
 
 		/* Sanity check to the extended header size. */
-		if (((uint64_t)*total_size + extdsize) >
-				    (uint64_t)limitsize ||
+		if (((uint64_t)*total_size + extdsize) > limitsize ||
 		    extdsize <= (size_t)sizefield_length)
 			goto invalid;
 
@@ -1347,6 +1346,8 @@ lha_read_file_extended_header(struct archive_read *a, struct lha *lha,
 				lha->compsize = archive_le64dec(extdheader);
 				extdheader += sizeof(uint64_t);
 				lha->origsize = archive_le64dec(extdheader);
+				if (lha->compsize < 0 || lha->origsize < 0)
+					goto invalid;
 			}
 			break;
 		case EXT_CODEPAGE:
@@ -1693,7 +1694,7 @@ archive_read_format_lha_cleanup(struct archive_read *a)
  * example.
  *   1. a symbolic-name is 'aaa/bb/cc'
  *   2. a filename is 'xxx/bbb'
- *  then a archived pathname is 'xxx/bbb|aaa/bb/cc'
+ *  then an archived pathname is 'xxx/bbb|aaa/bb/cc'
  */
 static int
 lha_parse_linkname(struct archive_wstring *linkname,
@@ -1818,13 +1819,16 @@ lha_crc16(uint16_t crc, const void *pp, size_t len)
 		/* This if statement expects compiler optimization will
 		 * remove the statement which will not be executed. */
 #undef bswap16
+#ifndef __has_builtin
+#define __has_builtin(x) 0
+#endif
 #if defined(_MSC_VER) && _MSC_VER >= 1400  /* Visual Studio */
 #  define bswap16(x) _byteswap_ushort(x)
 #elif defined(__GNUC__) && ((__GNUC__ == 4 && __GNUC_MINOR__ >= 8) || __GNUC__ > 4)
 /* GCC 4.8 and later has __builtin_bswap16() */
 #  define bswap16(x) __builtin_bswap16(x)
-#elif defined(__clang__)
-/* All clang versions have __builtin_bswap16() */
+#elif defined(__clang__) && __has_builtin(__builtin_bswap16)
+/* Newer clang versions have __builtin_bswap16() */
 #  define bswap16(x) __builtin_bswap16(x)
 #else
 #  define bswap16(x) ((((x) >> 8) & 0xff) | ((x) << 8))
@@ -2009,10 +2013,10 @@ lzh_br_fillup(struct lzh_stream *strm, struct lzh_br *br)
 				    ((uint64_t)strm->next_in[0]) << 48 |
 				    ((uint64_t)strm->next_in[1]) << 40 |
 				    ((uint64_t)strm->next_in[2]) << 32 |
-				    ((uint32_t)strm->next_in[3]) << 24 |
-				    ((uint32_t)strm->next_in[4]) << 16 |
-				    ((uint32_t)strm->next_in[5]) << 8 |
-				     (uint32_t)strm->next_in[6];
+				    ((uint64_t)strm->next_in[3]) << 24 |
+				    ((uint64_t)strm->next_in[4]) << 16 |
+				    ((uint64_t)strm->next_in[5]) << 8 |
+				     (uint64_t)strm->next_in[6];
 				strm->next_in += 7;
 				strm->avail_in -= 7;
 				br->cache_avail += 7 * 8;
@@ -2022,10 +2026,10 @@ lzh_br_fillup(struct lzh_stream *strm, struct lzh_br *br)
 		 		   (br->cache_buffer << 48) |
 				    ((uint64_t)strm->next_in[0]) << 40 |
 				    ((uint64_t)strm->next_in[1]) << 32 |
-				    ((uint32_t)strm->next_in[2]) << 24 |
-				    ((uint32_t)strm->next_in[3]) << 16 |
-				    ((uint32_t)strm->next_in[4]) << 8 |
-				     (uint32_t)strm->next_in[5];
+				    ((uint64_t)strm->next_in[2]) << 24 |
+				    ((uint64_t)strm->next_in[3]) << 16 |
+				    ((uint64_t)strm->next_in[4]) << 8 |
+				     (uint64_t)strm->next_in[5];
 				strm->next_in += 6;
 				strm->avail_in -= 6;
 				br->cache_avail += 6 * 8;
@@ -2382,7 +2386,7 @@ lzh_decode_blocks(struct lzh_stream *strm, int last)
 					return (100);
 				}
 
-				/* lzh_br_read_ahead() always try to fill the
+				/* lzh_br_read_ahead() always tries to fill the
 				 * cache buffer up. In specific situation we
 				 * are close to the end of the data, the cache
 				 * buffer will not be full and thus we have to

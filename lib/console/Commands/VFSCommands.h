@@ -23,4 +23,10 @@ namespace ESP32Console::Commands
     const ConsoleCommand getMKDirCommand();
 
     const ConsoleCommand getEditCommand();
+
+    const ConsoleCommand getStatusCommand();
+
+    const ConsoleCommand getMountCommand();
+
+    const ConsoleCommand getCRC32Command();
 }

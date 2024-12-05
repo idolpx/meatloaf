@@ -13,11 +13,11 @@
 #include <soc/soc.h>
 #include <esp_partition.h>
 
-#include "soc/spi_reg.h"
-#include "esp_system.h"
-#include "esp_chip_info.h"
-#include "esp_mac.h"
-#include "esp_flash.h"
+#include <soc/spi_reg.h>
+#include <esp_system.h>
+#include <esp_chip_info.h>
+#include <esp_mac.h>
+#include <esp_flash.h>
 
 #include "../ESP32Console.h"
 

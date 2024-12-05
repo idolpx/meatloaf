@@ -526,6 +526,10 @@ public:
      */
     void setBitTiming(std::string set, int p1 = 0, int p2 = 0, int p3 = 0, int p4 = 0);
 
+
+    uint8_t receiveByte();
+    std::string receiveBytes();
+
     /**
      * @brief send single byte
      * @param c byte to send

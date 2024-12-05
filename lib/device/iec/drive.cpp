@@ -145,8 +145,7 @@ device_state_t iecDrive::readChannel(/*int chan*/)
     else
       sendFile();
   }
-  Debug_printv("Heap [%lu] Task[%u]", esp_get_free_heap_size(), uxTaskGetStackHighWaterMark(NULL));
-
+  Debug_printv("Heap[%lu] Low[%lu] Task[%u]", esp_get_free_heap_size(), esp_get_free_internal_heap_size(), uxTaskGetStackHighWaterMark(NULL));
   return state;
 }
 

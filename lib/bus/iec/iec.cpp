@@ -84,11 +84,9 @@ void IRAM_ATTR systemBus::cbm_on_atn_isr_handler()
             detected_protocol = PROTOCOL_JIFFYDOS;
             protocol = selectProtocol();
             //IEC_RELEASE(PIN_DEBUG);
-
-            // Release DATA to signal we are ready to receive byte
-            IEC_RELEASE(PIN_IEC_DATA_IN);
         }
 #endif
+        sendInput();
     }
     //IEC_RELEASE(PIN_DEBUG);
 }
@@ -177,19 +175,20 @@ void IRAM_ATTR systemBus::cbm_on_clk_isr_handler()
             break;
         }
     }
-    else if (iec_curCommand)
-    {
-        // Just read the bytes
-        iec_curCommand->payload += val & 0xff;
+//     else if (iec_curCommand)
+//     {
 
-#ifdef JIFFYDOS
-        if (flags & JIFFYDOS_ACTIVE)
-        {
-            // Release DATA to signal we are ready to receive next byte
-            IEC_RELEASE(PIN_IEC_DATA_IN);
-        }
-#endif
-    }
+//         // Just read the bytes
+//         iec_curCommand->payload += val & 0xff;
+
+// #ifdef JIFFYDOS
+//         if (flags & JIFFYDOS_ACTIVE)
+//         {
+//             // Release DATA to signal we are ready to receive next byte
+//             IEC_RELEASE(PIN_IEC_DATA_IN);
+//         }
+// #endif
+//     }
 
 done:
     gpio_intr_enable(PIN_IEC_CLK_IN);
@@ -265,17 +264,19 @@ void IRAM_ATTR systemBus::sendInput(void)
 {
     BaseType_t woken;
 
-    // IEC_ASSERT(PIN_DEBUG);
+    //IEC_ASSERT(PIN_DEBUG);
     if (iec_curCommand)
+    {
         xQueueSendFromISR(iec_commandQueue, &iec_curCommand, &woken);
+    }
     iec_curCommand = nullptr;
-    // IEC_RELEASE(PIN_DEBUG);
+    //IEC_RELEASE(PIN_DEBUG);
 
     return;
 }
 
 
-std::shared_ptr<IECProtocol> IRAM_ATTR systemBus::selectProtocol()
+std::shared_ptr<IECProtocol> systemBus::selectProtocol()
 {
     //Debug_printv("protocol[%d]", detected_protocol);
 
@@ -442,6 +443,15 @@ void IRAM_ATTR systemBus::service()
     if (!xQueueReceive(iec_commandQueue, &received, 0))
         return;
 
+    // Read Payload
+    if (received->primary == IEC_LISTEN && received->secondary != IEC_CLOSE)
+    {
+        //IEC_ASSERT(PIN_DEBUG);
+        received->payload = protocol->receiveBytes();
+        Debug_printv("payload[%s]", received->payload.c_str());
+        //IEC_RELEASE(PIN_DEBUG);
+    }
+
     received->debugPrint();
 
     auto d = deviceById(received->device);
@@ -544,6 +554,9 @@ void systemBus::assert_interrupt()
     else
         IEC_RELEASE(PIN_IEC_SRQ);
 }
+
+uint8_t systemBus::receiveByte() { return protocol->receiveByte(); }
+std::string systemBus::receiveBytes() { return protocol->receiveBytes(); }
 
 bool systemBus::sendByte(const char c, bool eoi) { return protocol->sendByte(c, eoi); }
 

@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <cstddef>
+#include <string>
 #include <vector>
 
 #include <esp_timer.h>
@@ -10,6 +11,7 @@
 #include <esp_attr.h>
 #include <esp_cpu.h>
 
+#include "bus.h"
 #include "../../include/cbm_defines.h"
 
 static DRAM_ATTR esp_cpu_cycle_count_t timer_start_cycles, timer_cycles_per_us;
@@ -87,6 +89,26 @@ namespace Protocol
          * @return The byte received from bus.
         */
         virtual uint8_t receiveByte() = 0;
+        virtual std::string receiveBytes() {
+          std::string data;
+          do
+          {
+            IEC_ASSERT(PIN_DEBUG);
+            uint8_t b = receiveByte();
+            IEC_RELEASE(PIN_DEBUG);
+            if ( IEC.flags & ATN_ASSERTED || IEC.flags & ERROR )
+              break;
+            
+            data += b;
+
+            if ( IEC.flags & EOI_RECVD )
+              break;
+          }
+          while ( true );
+
+          Debug_printv("data[%s]", data.c_str());
+          return data;
+        };
 
         /**
          * @brief send byte to bus
@@ -94,7 +116,7 @@ namespace Protocol
          * @param eoi Signal EOI (end of Information)
          * @return true if send was successful.
         */
-        virtual bool sendByte(uint8_t b, bool signalEOI) = 0;
+        virtual bool sendByte(uint8_t b, bool eoi) = 0;
 
         int waitForSignals(int pin1, int state1, int pin2, int state2, int timeout);
         void transferDelaySinceLast(size_t minimumDelay);

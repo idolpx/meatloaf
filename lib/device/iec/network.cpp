@@ -179,6 +179,7 @@ void iecNetwork::iec_close()
     Debug_printv("device init");
 }
 
+
 void iecNetwork::iec_reopen_load()
 {
     NetworkStatus ns;
@@ -1284,22 +1285,26 @@ void iecNetwork::set_open_params()
 
 }
 
-#if 1
 device_state_t iecNetwork::openChannel(/*int chan, IECPayload &payload*/)
 {
-  process_channel();
+  if (commanddata.channel == CHANNEL_COMMAND)
+    process_command();
+  else
+    iec_open();
+
   return state;
 }
 
 device_state_t iecNetwork::closeChannel(/*int chan*/)
 {
-  return state;
+    iec_close();
+    return state;
 }
 
 device_state_t iecNetwork::readChannel(/*int chan*/)
 {
   if (commanddata.channel == CHANNEL_COMMAND)
-    process_command();
+    iec_talk_command_buffer_status();
   else
     process_load();
   return state;
@@ -1307,10 +1312,17 @@ device_state_t iecNetwork::readChannel(/*int chan*/)
 
 device_state_t iecNetwork::writeChannel(/*int chan, IECPayload &payload*/)
 {
-  process_save();
-  return state;
+    if (commanddata.channel == CHANNEL_COMMAND)
+    {
+        process_command();
+    }
+    else
+    {
+        process_save();
+    }
+    return state;
 }
-#else
+#if 0
 device_state_t iecNetwork::process()
 {
     // Call base class
@@ -1390,6 +1402,7 @@ void iecNetwork::process_save()
     }
 }
 
+#if 0
 void iecNetwork::process_channel()
 {
     Debug_printv("secondary[%2X]", commanddata.secondary);
@@ -1418,6 +1431,7 @@ void iecNetwork::process_channel()
         return;
     }
 }
+#endif
 
 void iecNetwork::process_command()
 {
@@ -1429,19 +1443,17 @@ void iecNetwork::process_command()
         // Debug_printv("FIXING PAYLOAD DATA TO ASCII\r\n");
         clean_transform_petscii_to_ascii(payload);
         pt = util_tokenize(payload, ',');
+        iec_command();
         break;
     case IEC_TALK:
         // Debug_printv("[IEC_TALK]");
         iec_talk_command();
-        break;
-    case IEC_UNLISTEN:
-        // Debug_printv("[IEC_UNLISTEN - CALLING iec_command()]");
-        iec_command();
         break;
     default:
         break;
     }
 
 }
+
 
 #endif /* BUILD_IEC */

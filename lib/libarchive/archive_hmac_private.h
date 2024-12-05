@@ -52,7 +52,7 @@ int __libarchive_hmac_build_hack(void);
 
 typedef	CCHmacContext archive_hmac_sha1_ctx;
 
-#elif defined(_WIN32) && !defined(__CYGWIN__) && defined(HAVE_BCRYPT_H)
+#elif defined(_WIN32) && !defined(__CYGWIN__) && defined(HAVE_BCRYPT_H) && _WIN32_WINNT >= _WIN32_WINNT_VISTA
 #include <bcrypt.h>
 
 typedef struct {
@@ -77,6 +77,8 @@ typedef	struct hmac_sha1_ctx archive_hmac_sha1_ctx;
 #include <openssl/opensslv.h>
 #include <openssl/hmac.h>
 #if OPENSSL_VERSION_NUMBER >= 0x30000000L
+#include <openssl/params.h>
+
 typedef EVP_MAC_CTX *archive_hmac_sha1_ctx;
 
 #else

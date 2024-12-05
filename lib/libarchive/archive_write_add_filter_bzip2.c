@@ -26,8 +26,6 @@
 
 #include "archive_platform.h"
 
-__FBSDID("$FreeBSD: head/lib/libarchive/archive_write_set_compression_bzip2.c 201091 2009-12-28 02:22:41Z kientzle $");
-
 #ifdef HAVE_ERRNO_H
 #include <errno.h>
 #endif
@@ -170,7 +168,7 @@ archive_compressor_bzip2_open(struct archive_write_filter *f)
 	if (data->compressed == NULL) {
 		size_t bs = 65536, bpb;
 		if (f->archive->magic == ARCHIVE_WRITE_MAGIC) {
-			/* Buffer size should be a multiple number of the of bytes
+			/* Buffer size should be a multiple number of the bytes
 			 * per block for performance. */
 			bpb = archive_write_get_bytes_per_block(f->archive);
 			if (bpb > bs)
@@ -179,8 +177,7 @@ archive_compressor_bzip2_open(struct archive_write_filter *f)
 				bs -= bs % bpb;
 		}
 		data->compressed_buffer_size = bs;
-		data->compressed
-		    = (char *)malloc(data->compressed_buffer_size);
+		data->compressed = malloc(data->compressed_buffer_size);
 		if (data->compressed == NULL) {
 			archive_set_error(f->archive, ENOMEM,
 			    "Can't allocate data for compression buffer");
@@ -190,7 +187,7 @@ archive_compressor_bzip2_open(struct archive_write_filter *f)
 
 	memset(&data->stream, 0, sizeof(data->stream));
 	data->stream.next_out = data->compressed;
-	data->stream.avail_out = data->compressed_buffer_size;
+	data->stream.avail_out = (uint32_t)data->compressed_buffer_size;
 	f->write = archive_compressor_bzip2_write;
 
 	/* Initialize compression library */
@@ -244,7 +241,7 @@ archive_compressor_bzip2_write(struct archive_write_filter *f,
 
 	/* Compress input data to output buffer */
 	SET_NEXT_IN(data, buff);
-	data->stream.avail_in = length;
+	data->stream.avail_in = (uint32_t)length;
 	if (drive_compressor(f, data, 0))
 		return (ARCHIVE_FATAL);
 	return (ARCHIVE_OK);
@@ -313,7 +310,7 @@ drive_compressor(struct archive_write_filter *f,
 				return (ARCHIVE_FATAL);
 			}
 			data->stream.next_out = data->compressed;
-			data->stream.avail_out = data->compressed_buffer_size;
+			data->stream.avail_out = (uint32_t)data->compressed_buffer_size;
 		}
 
 		/* If there's nothing to do, we're done. */
