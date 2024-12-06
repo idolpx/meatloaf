@@ -322,6 +322,7 @@ void iecDrive::iec_open()
                     break;
 
                 Debug_printv("RETRY!");
+                retry--;
             } while (retry > 0);
             
             if ( retry == 0 )
