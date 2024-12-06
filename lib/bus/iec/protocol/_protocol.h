@@ -106,7 +106,7 @@ namespace Protocol
           }
           while ( true );
 
-          Debug_printv("data[%s]", data.c_str());
+          //Debug_printv("data[%s]", data.c_str());
           return data;
         };
 

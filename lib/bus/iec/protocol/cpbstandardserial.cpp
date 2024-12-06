@@ -242,7 +242,7 @@ bool IRAM_ATTR CPBStandardSerial::sendByte(uint8_t data, bool eoi)
   }
 
   //IEC_ASSERT(PIN_IEC_SRQ);//Debug
-  gpio_intr_disable(PIN_IEC_CLK_IN);
+  //gpio_intr_disable(PIN_IEC_CLK_IN);
   portDISABLE_INTERRUPTS();
 
 #ifdef DYNAMIC_DELAY
@@ -360,7 +360,7 @@ bool IRAM_ATTR CPBStandardSerial::sendByte(uint8_t data, bool eoi)
     }
   }
   portENABLE_INTERRUPTS();
-  gpio_intr_enable(PIN_IEC_CLK_IN);
+  //gpio_intr_enable(PIN_IEC_CLK_IN);
   //IEC_RELEASE(PIN_DEBUG);//Debug
 
 #ifdef DYNAMIC_DELAY

@@ -68,6 +68,7 @@ void IRAM_ATTR systemBus::cbm_on_atn_isr_handler()
             detected_protocol = PROTOCOL_SERIAL;
             protocol = selectProtocol();
         }
+        gpio_intr_enable(PIN_IEC_CLK_IN);
         //IEC_RELEASE(PIN_DEBUG);
     }
     else if (_state == BUS_RELEASE)
@@ -77,6 +78,7 @@ void IRAM_ATTR systemBus::cbm_on_atn_isr_handler()
     }
     else
     {
+        gpio_intr_disable(PIN_IEC_CLK_IN);
 #ifdef JIFFYDOS
         if (flags & JIFFYDOS_ACTIVE)
         {
@@ -448,7 +450,7 @@ void IRAM_ATTR systemBus::service()
     {
         //IEC_ASSERT(PIN_DEBUG);
         received->payload = protocol->receiveBytes();
-        Debug_printv("payload[%s]", received->payload.c_str());
+        Debug_printv("primary[%02X] secondary[%02X] payload[%s]", received->primary, received->secondary, received->payload.c_str());
         //IEC_RELEASE(PIN_DEBUG);
     }
 
