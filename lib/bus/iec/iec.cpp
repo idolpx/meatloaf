@@ -177,20 +177,6 @@ void IRAM_ATTR systemBus::cbm_on_clk_isr_handler()
             break;
         }
     }
-//     else if (iec_curCommand)
-//     {
-
-//         // Just read the bytes
-//         iec_curCommand->payload += val & 0xff;
-
-// #ifdef JIFFYDOS
-//         if (flags & JIFFYDOS_ACTIVE)
-//         {
-//             // Release DATA to signal we are ready to receive next byte
-//             IEC_RELEASE(PIN_IEC_DATA_IN);
-//         }
-// #endif
-//     }
 
 done:
     gpio_intr_enable(PIN_IEC_CLK_IN);
@@ -403,6 +389,7 @@ void systemBus::setup()
     };
     gpio_config(&io_conf);
     gpio_isr_handler_add((gpio_num_t)PIN_IEC_CLK_IN, cbm_on_clk_isr_forwarder, this);
+    gpio_intr_disable(PIN_IEC_CLK_IN);
 
 #ifdef MEATLOAF_MAX
     // Setup interrupt config for DATA
@@ -450,7 +437,7 @@ void IRAM_ATTR systemBus::service()
     {
         //IEC_ASSERT(PIN_DEBUG);
         received->payload = protocol->receiveBytes();
-        Debug_printv("primary[%02X] secondary[%02X] payload[%s]", received->primary, received->secondary, received->payload.c_str());
+        //Debug_printv("primary[%02X] secondary[%02X] payload[%s]", received->primary, received->secondary, received->payload.c_str());
         //IEC_RELEASE(PIN_DEBUG);
     }
 

@@ -89,26 +89,7 @@ namespace Protocol
          * @return The byte received from bus.
         */
         virtual uint8_t receiveByte() = 0;
-        virtual std::string receiveBytes() {
-          std::string data;
-          do
-          {
-            IEC_ASSERT(PIN_DEBUG);
-            uint8_t b = receiveByte();
-            IEC_RELEASE(PIN_DEBUG);
-            if ( IEC.flags & ATN_ASSERTED || IEC.flags & ERROR )
-              break;
-            
-            data += b;
-
-            if ( IEC.flags & EOI_RECVD )
-              break;
-          }
-          while ( true );
-
-          //Debug_printv("data[%s]", data.c_str());
-          return data;
-        };
+        virtual std::string receiveBytes();
 
         /**
          * @brief send byte to bus

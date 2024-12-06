@@ -314,7 +314,17 @@ void iecDrive::iec_open()
         Debug_printv("_base[%s]", _base->url.c_str());
         if ( !_base->isDirectory() )
         {
-            if ( !registerStream(commanddata.channel) )
+            // Retry a few times on failure
+            uint8_t retry = 3;
+            do
+            {
+                if (registerStream(commanddata.channel))
+                    break;
+
+                Debug_printv("RETRY!");
+            } while (retry > 0);
+            
+            if ( retry == 0 )
             {
                 Debug_printv("File Doesn't Exist [%s]", _base->url.c_str());
             }
