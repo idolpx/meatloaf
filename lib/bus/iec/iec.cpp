@@ -441,6 +441,9 @@ void IRAM_ATTR systemBus::service()
         //IEC_RELEASE(PIN_DEBUG);
     }
 
+    if (flags & JIFFYDOS_ACTIVE)
+        Debug_println("JiffyDOS!");
+
     received->debugPrint();
 
     auto d = deviceById(received->device);
@@ -782,7 +785,15 @@ int IECData::channelCommand()
 
 void IECData::debugPrint()
 {
-    Debug_printf("IEC %2i %-5s %2i: %-6s [%02X %02X]\r\n", device, IECCommandNames[channelCommand() + 4], channel, IECCommandNames[primary >> 5], primary, secondary);
+    //Debug_printf("IEC %2i %-5s %2i: %-6s [%02X %02X]\r\n", device, IECCommandNames[channelCommand() + 4], channel, IECCommandNames[primary >> 5], primary, secondary);
+    Debug_printf("IEC [%02X %02X] %-6s %02d %-5s %02d \r\n", 
+        primary,
+        secondary,
+        IECCommandNames[primary >> 5],
+        device,
+        IECCommandNames[channelCommand() + 4],
+        channel
+    );
     if (payload.size())
         Debug_printf("%s", util_hexdump(payload.data(), payload.size()).c_str());
 }

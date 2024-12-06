@@ -314,18 +314,23 @@ void iecDrive::iec_open()
         Debug_printv("_base[%s]", _base->url.c_str());
         if ( !_base->isDirectory() )
         {
-            // Retry a few times on failure
-            uint8_t retry = 3;
-            do
-            {
-                if (registerStream(commanddata.channel))
-                    break;
+            // // Retry a few times on failure
+            // uint8_t retry = 3;
+            // do
+            // {
+            //     if (registerStream(commanddata.channel))
+            //         break;
 
-                Debug_printv("RETRY!");
-                retry--;
-            } while (retry > 0);
+            //     Debug_printv("RETRY!");
+            //     retry--;
+            // } while (retry > 0);
             
-            if ( retry == 0 )
+            // if ( retry == 0 )
+            // {
+            //     Debug_printv("File Doesn't Exist [%s]", _base->url.c_str());
+            // }
+
+            if ( !registerStream(commanddata.channel) )
             {
                 Debug_printv("File Doesn't Exist [%s]", _base->url.c_str());
             }
@@ -888,13 +893,15 @@ void iecDrive::sendListing()
     //oLedStrip.startRainbow(300);
 
     // Send load address
-    size_t written = 0;
-    written += IEC.sendByte(CBM_BASIC_START & 0xff);
-    written += IEC.sendByte((CBM_BASIC_START >> 8) & 0xff);
-    byte_count += written;
+    std::string load;
+    //written += IEC.sendByte(CBM_BASIC_START & 0xff);
+    //written += IEC.sendByte((CBM_BASIC_START >> 8) & 0xff);
+    load += (CBM_BASIC_START & 0xFF);
+    load += (CBM_BASIC_START >> 8);
+    byte_count += IEC.sendBytes( load, false );
 
     // If there has been a error don't try to send any more bytes
-    if (written != 2)
+    if (byte_count != 2)
     {
         Debug_printv(":(");
         return;
@@ -991,6 +998,7 @@ void iecDrive::sendListing()
     // End program with two zeros after last line. Last zero goes out as EOI.
     IEC.sendByte(0);
     IEC.sendByte(0, true);
+    byte_count += 2;
     //closeStream();
 
     printf("\r\n=================================\r\n%d bytes sent\r\n\r\n", byte_count);
@@ -1123,32 +1131,39 @@ uint16_t iecDrive::sendLine(uint16_t blocks, const char *format, ...)
 
 uint16_t iecDrive::sendLine(uint16_t blocks, char *text)
 {
+    std::string line;
     printf("%d %s ", blocks, text);
-
-    // Get text length
-    uint8_t len = strlen(text);
 
     // Send that pointer
     // No basic line pointer is used in the directory listing set to 0x0101
-    if (!IEC.sendByte(0x01)) {Debug_printv("line[%s]", text); return 0;};
-    if (!IEC.sendByte(0x01)) {Debug_printv("line[%s]", text); return 0;};
+    //if (!IEC.sendByte(0x01)) {Debug_printv("line[%s]", text); return 0;};
+    //if (!IEC.sendByte(0x01)) {Debug_printv("line[%s]", text); return 0;};
+    line += '\x01';
+    line += '\x01';
 
     // Send blocks
-    if (!IEC.sendByte(blocks bitand 0xFF)) {Debug_printv("line[%s]", text); return 0;};
-    if (!IEC.sendByte(blocks >> 8)) {Debug_printv("line[%s]", text); return 0;};
+    //if (!IEC.sendByte(blocks bitand 0xFF)) {Debug_printv("line[%s]", text); return 0;};
+    //if (!IEC.sendByte(blocks >> 8)) {Debug_printv("line[%s]", text); return 0;};
+    line += (blocks & 0xFF);
+    line += (blocks >> 8);
 
     // Send line contents
-    for (uint8_t i = 0; i < len; i++)
-    {
-        if (!IEC.sendByte(text[i])) {Debug_printv("line[%s]", text); return 0;};
-    }
+    // if (!IEC.sendBytes(text)) {Debug_printv("line[%s]", text); return 0;};
+    // for (uint8_t i = 0; i < len; i++)
+    // {
+    //     if (!IEC.sendByte(text[i])) {Debug_printv("line[%s]", text); return 0;};
+    // }
+    line += text;
 
     // Finish line
-    if (!IEC.sendByte(0)) {Debug_printv("line[%s]", text); return 0;};
+    //if (!IEC.sendByte(0)) {Debug_printv("line[%s]", text); return 0;};
+    line += '\x00';
+
+    if (!IEC.sendBytes(line, false)) {Debug_printv("line[%s]", line.c_str()); return 0;};
 
     printf("\r\n");
     
-    return len + 5;
+    return line.size();
 } // sendLine
 
 
