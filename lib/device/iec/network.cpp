@@ -152,7 +152,7 @@ void iecNetwork::iec_open()
 
 void iecNetwork::iec_close()
 {
-    Debug_printf("iecNetwork::iec_close()\r\n");
+    //Debug_printf("iecNetwork::iec_close()\r\n");
 
     int channelId = commanddata.channel;
     auto& channel_data = network_data_map[channelId];

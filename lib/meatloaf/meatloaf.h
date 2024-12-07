@@ -60,7 +60,9 @@ protected:
     uint8_t _error = 0;
 
 public:
-    virtual ~MStream() {};
+    virtual ~MStream() {
+        //Debug_printv("dstr url[%s]", url.c_str());
+    };
 
     std::ios_base::openmode mode;
     std::string url = "";
@@ -183,6 +185,7 @@ public:
             //Debug_printv("Deleting: [%s]", this->url.c_str());
             delete streamFile;
         }
+        //Debug_printv("dtor path[%s]", path.c_str());
     };
 
     bool isPETSCII = false;

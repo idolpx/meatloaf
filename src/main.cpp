@@ -9,6 +9,19 @@
 #endif
 #include <driver/gpio.h>
 
+// Disable when not debugging memory leaks
+// #include "esp_heap_trace.h"
+// #define NUM_RECORDS 100
+// static DRAM_ATTR heap_trace_record_t trace_record[NUM_RECORDS]; // This buffer must be in internal RAM
+// ESP_ERROR_CHECK( heap_trace_start(HEAP_TRACE_LEAKS) );
+// DO_SOME_FUNCTION() HERE
+// ESP_ERROR_CHECK( heap_trace_stop() );
+// heap_trace_dump();
+//
+// main()
+// ESP_ERROR_CHECK( heap_trace_init_standalone(trace_record, NUM_RECORDS) );
+
+
 #include "../include/global_defines.h"
 #include "../include/debug.h"
 
@@ -53,6 +66,8 @@ void main_shutdown_handler()
 // Initial setup
 void main_setup()
 {
+    // ESP_ERROR_CHECK( heap_trace_init_standalone(trace_record, NUM_RECORDS) );
+
     unsigned long startms = fnSystem.millis();
 
     //Serial.begin(DEBUG_SPEED);

@@ -348,6 +348,7 @@ MFile::MFile(std::string path) {
     //     Debug_printv("Create directory stream here!");
     //     path = "";
     // }
+    //Debug_printv("ctor path[%s]", path.c_str());
 
     resetURL(path);
 }

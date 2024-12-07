@@ -75,7 +75,7 @@ void iecCpm::iec_close()
 
     commanddata.init();
     state = DEVICE_IDLE;
-    Debug_printv("device init");
+    //Debug_printv("device init");
 }
 
 void iecCpm::poll_interrupt(unsigned char c)

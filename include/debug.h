@@ -5,6 +5,7 @@
 
 #include "ansi_codes.h"
 
+
 // __PLATFORMIO_BUILD_DEBUG__ is set when build_type is set to debug in platformio.ini
 // __PC_BUILD_DEBUG__ is set when build_type is set Debug in in fujinet_pc.cmake
 // DBUG2 is set to enable monitor messages for a release build
@@ -43,6 +44,8 @@
 
     #define HEAP_CHECK(x) Debug_printf("HEAP CHECK %s " x "\r\n", heap_caps_check_integrity_all(true) ? "PASSED":"FAILED")
 #endif
+
+#define DEBUG_MEM_LEAK {Debug_printv("Heap[%lu] Low[%lu] Task[%u]", esp_get_free_heap_size(), esp_get_free_internal_heap_size(), uxTaskGetStackHighWaterMark(NULL));}
 #endif // DEBUG
 
 #ifndef DEBUG

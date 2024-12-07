@@ -145,7 +145,8 @@ device_state_t iecDrive::readChannel(/*int chan*/)
     else
       sendFile();
   }
-  Debug_printv("Heap[%lu] Low[%lu] Task[%u]", esp_get_free_heap_size(), esp_get_free_internal_heap_size(), uxTaskGetStackHighWaterMark(NULL));
+  //Debug_printv("Heap[%lu] Low[%lu] Task[%u]", esp_get_free_heap_size(), esp_get_free_internal_heap_size(), uxTaskGetStackHighWaterMark(NULL));
+  DEBUG_MEM_LEAK;
   return state;
 }
 
@@ -872,7 +873,7 @@ void iecDrive::sendListing()
     uint16_t byte_count = 0;
     std::string extension = "dir";
 
-    std::unique_ptr<MFile> entry = std::unique_ptr<MFile>( _base->getNextFileInDir() );
+    std::unique_ptr<MFile> entry( _base->getNextFileInDir() );
 
     if(entry == nullptr) {
         closeStream( commanddata.channel );
@@ -893,12 +894,8 @@ void iecDrive::sendListing()
     //oLedStrip.startRainbow(300);
 
     // Send load address
-    std::string load;
-    //written += IEC.sendByte(CBM_BASIC_START & 0xff);
-    //written += IEC.sendByte((CBM_BASIC_START >> 8) & 0xff);
-    load += (CBM_BASIC_START & 0xFF);
-    load += (CBM_BASIC_START >> 8);
-    byte_count += IEC.sendBytes( load, false );
+    byte_count += IEC.sendByte(CBM_BASIC_START & 0xff);
+    byte_count += IEC.sendByte(CBM_BASIC_START >> 8);
 
     // If there has been a error don't try to send any more bytes
     if (byte_count != 2)
@@ -1159,7 +1156,7 @@ uint16_t iecDrive::sendLine(uint16_t blocks, char *text)
     //if (!IEC.sendByte(0)) {Debug_printv("line[%s]", text); return 0;};
     line += '\x00';
 
-    if (!IEC.sendBytes(line, false)) {Debug_printv("line[%s]", line.c_str()); return 0;};
+    if (!IEC.sendBytes(line)) {Debug_printv("line[%s]", line.c_str()); return 0;};
 
     printf("\r\n");
     
@@ -1194,7 +1191,7 @@ bool iecDrive::sendFile()
 {
     uint32_t count = 0, startpos;
 
-    uint8_t buf[256];
+    uint8_t buf[256]; // MALLOC_CAP_DMA
     uint16_t load_address = 0;
     uint16_t sys_address = 0;
 
