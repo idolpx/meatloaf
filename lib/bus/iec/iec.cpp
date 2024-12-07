@@ -103,15 +103,17 @@ static void IRAM_ATTR cbm_on_clk_isr_forwarder(void *arg)
 
 void IRAM_ATTR systemBus::cbm_on_clk_isr_handler()
 {
-    IEC_ASSERT(PIN_DEBUG);
     int atn, val;
     int cmd, dev;
+
+    gpio_intr_disable(PIN_IEC_CLK_IN);
 
     if (_state < BUS_ACTIVE)
         return;
 
+    IEC_ASSERT(PIN_DEBUG);
+
     atn = IEC_IS_ASSERTED(PIN_IEC_ATN);
-    gpio_intr_disable(PIN_IEC_CLK_IN);
 
     //IEC_ASSERT(PIN_DEBUG);
     val = protocol->receiveByte();
@@ -142,12 +144,13 @@ void IRAM_ATTR systemBus::cbm_on_clk_isr_handler()
                     IEC_SET_STATE(BUS_IDLE);
                     protocol->transferDelaySinceLast(TIMING_Tbb);
                     releaseLines();
+                    sendInput();
                 }
-                sendInput();
             }
             else
             {
                 newIO(val);
+                gpio_intr_enable(PIN_IEC_CLK_IN);
             }
             break;
 
@@ -180,7 +183,6 @@ void IRAM_ATTR systemBus::cbm_on_clk_isr_handler()
     }
 
 done:
-    //gpio_intr_enable(PIN_IEC_CLK_IN);
     IEC_RELEASE(PIN_DEBUG);
     return;
 }
