@@ -545,7 +545,7 @@ public:
      * @param eoi Send EOI?
      * @return true on success, false on error
      */
-    size_t sendBytes(const char *buf, size_t len, bool eoi = true);
+    size_t sendBytes(const char *buf, size_t len, bool eoi = false);
 
     /**
      * @brief Send string to bus
@@ -553,7 +553,7 @@ public:
      * @param eoi Send EOI?
      * @return true on success, false on error
      */
-    size_t sendBytes(std::string s, bool eoi = true);
+    size_t sendBytes(std::string s, bool eoi = false);
 
     /**
      * @brief called in response to RESET pin being asserted.
@@ -634,6 +634,7 @@ public:
 /**
  * @brief Return
  */
-extern DRAM_ATTR systemBus IEC;
+//extern DRAM_ATTR systemBus IEC;
+extern systemBus IEC;
 
 #endif /* IEC_H */

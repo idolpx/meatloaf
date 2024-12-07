@@ -8,7 +8,7 @@
 
 using namespace Protocol;
 
-std::string IRAM_ATTR IECProtocol::receiveBytes() {
+std::string IECProtocol::receiveBytes() {
     std::string data;
     do {
         // IEC_ASSERT(PIN_DEBUG);
@@ -23,6 +23,19 @@ std::string IRAM_ATTR IECProtocol::receiveBytes() {
 
     // Debug_printv("data[%s]", data.c_str());
     return data;
+}
+
+size_t IECProtocol::sendBytes(const char *buf, size_t len, bool eoi)
+{
+    size_t i;
+
+    for (i = 0; i < len; i++)
+    {
+        if (!sendByte(buf[i], eoi && i == (len - 1)))
+            break;
+    }
+
+    return i;
 }
 
 int IRAM_ATTR IECProtocol::waitForSignals(int pin1, int state1, int pin2,

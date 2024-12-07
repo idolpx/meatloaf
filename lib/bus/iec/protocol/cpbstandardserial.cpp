@@ -53,7 +53,6 @@ uint8_t IRAM_ATTR CPBStandardSerial::receiveByte()
 
 
   gpio_intr_disable(PIN_IEC_CLK_IN);
-  portDISABLE_INTERRUPTS();
 
 #ifdef DYNAMIC_DELAY
   transferDelaySinceLast(TIMING_Tf);
@@ -61,7 +60,7 @@ uint8_t IRAM_ATTR CPBStandardSerial::receiveByte()
 
   // Wait for talker to be ready
   if (waitForSignals(PIN_IEC_CLK_IN, IEC_RELEASED, 0, 0,
-		     TIMEOUT_DEFAULT) == TIMED_OUT) {
+		     FOREVER) == TIMED_OUT) {
           abort = 1;
          }
 
@@ -74,6 +73,12 @@ uint8_t IRAM_ATTR CPBStandardSerial::receiveByte()
   // Release Data and wait for all other devices to release the data line too
 
   IEC_RELEASE(PIN_IEC_DATA_OUT);
+  if (waitForSignals(PIN_IEC_DATA_IN, IEC_RELEASED, 0, 0,
+		     FOREVER) == TIMED_OUT) {
+          abort = 1;
+         }
+
+  portDISABLE_INTERRUPTS();
 
   // Either the talker will assert the Clock line back to asserted
   // in less than 200 microseconds - usually within 60 microseconds

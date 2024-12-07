@@ -62,13 +62,14 @@ void IRAM_ATTR systemBus::cbm_on_atn_isr_handler()
         flags |= ATN_ASSERTED;
         IEC_SET_STATE(BUS_ACTIVE);
 
+        gpio_intr_enable(PIN_IEC_CLK_IN);
+
         // Commands are always sent using standard serial
         if (detected_protocol != PROTOCOL_SERIAL)
         {
             detected_protocol = PROTOCOL_SERIAL;
             protocol = selectProtocol();
         }
-        gpio_intr_enable(PIN_IEC_CLK_IN);
         //IEC_RELEASE(PIN_DEBUG);
     }
     else if (_state == BUS_RELEASE)
@@ -102,7 +103,7 @@ static void IRAM_ATTR cbm_on_clk_isr_forwarder(void *arg)
 
 void IRAM_ATTR systemBus::cbm_on_clk_isr_handler()
 {
-    //IEC_ASSERT(PIN_IEC_SRQ);
+    IEC_ASSERT(PIN_DEBUG);
     int atn, val;
     int cmd, dev;
 
@@ -179,8 +180,8 @@ void IRAM_ATTR systemBus::cbm_on_clk_isr_handler()
     }
 
 done:
-    gpio_intr_enable(PIN_IEC_CLK_IN);
-    //IEC_RELEASE(PIN_DEBUG);
+    //gpio_intr_enable(PIN_IEC_CLK_IN);
+    IEC_RELEASE(PIN_DEBUG);
     return;
 }
 
@@ -551,21 +552,8 @@ uint8_t systemBus::receiveByte() { return protocol->receiveByte(); }
 std::string systemBus::receiveBytes() { return protocol->receiveBytes(); }
 
 bool systemBus::sendByte(const char c, bool eoi) { return protocol->sendByte(c, eoi); }
-
-size_t systemBus::sendBytes(const char *buf, size_t len, bool eoi)
-{
-    size_t i;
-
-    for (i = 0; i < len; i++)
-    {
-        if (!sendByte(buf[i], eoi && i == (len - 1)))
-            break;
-    }
-
-    return i;
-}
-
-size_t systemBus::sendBytes(std::string s, bool eoi) { return sendBytes(s.c_str(), s.size(), eoi); }
+size_t systemBus::sendBytes(const char *buf, size_t len, bool eoi) { return protocol->sendBytes(buf, len, eoi); }
+size_t systemBus::sendBytes(std::string s, bool eoi) { return protocol->sendBytes(s.c_str(), s.size(), eoi); }
 
 bool IRAM_ATTR systemBus::turnAround()
 {

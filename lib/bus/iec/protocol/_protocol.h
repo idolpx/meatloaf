@@ -97,7 +97,8 @@ namespace Protocol
          * @param eoi Signal EOI (end of Information)
          * @return true if send was successful.
         */
-        virtual bool sendByte(uint8_t b, bool eoi) = 0;
+        virtual bool sendByte(uint8_t b, bool eoi = false) = 0;
+        virtual size_t sendBytes(const char *buf, size_t len, bool eoi = false);
 
         int waitForSignals(int pin1, int state1, int pin2, int state2, int timeout);
         void transferDelaySinceLast(size_t minimumDelay);
