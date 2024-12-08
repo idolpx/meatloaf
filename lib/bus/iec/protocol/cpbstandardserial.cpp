@@ -59,10 +59,9 @@ uint8_t IRAM_ATTR CPBStandardSerial::receiveByte()
 #endif
 
   // Wait for talker to be ready
-  if (waitForSignals(PIN_IEC_CLK_IN, IEC_RELEASED, 0, 0,
-		     FOREVER) == TIMED_OUT) {
-          abort = 1;
-         }
+  if ((abort = waitForSignals(PIN_IEC_CLK_IN, IEC_RELEASED, PIN_IEC_ATN, IEC_ASSERTED, FOREVER))) {
+    Debug_printv("clk released abort");
+  }
 
   // STEP 2: READY FOR DATA
   // line. Suppose there is more than one listener. The Data line
@@ -73,10 +72,9 @@ uint8_t IRAM_ATTR CPBStandardSerial::receiveByte()
   // Release Data and wait for all other devices to release the data line too
 
   IEC_RELEASE(PIN_IEC_DATA_OUT);
-  if (waitForSignals(PIN_IEC_DATA_IN, IEC_RELEASED, 0, 0,
-		     FOREVER) == TIMED_OUT) {
-          abort = 1;
-         }
+  if ((abort = waitForSignals(PIN_IEC_DATA_IN, IEC_RELEASED, PIN_IEC_ATN, IEC_ASSERTED, FOREVER))) {
+    Debug_printv("data released abort");
+  }
 
   portDISABLE_INTERRUPTS();
 
@@ -247,7 +245,7 @@ bool IRAM_ATTR CPBStandardSerial::sendByte(uint8_t data, bool eoi)
   }
 
   //IEC_ASSERT(PIN_IEC_SRQ);//Debug
-  //gpio_intr_disable(PIN_IEC_CLK_IN);
+  gpio_intr_disable(PIN_IEC_CLK_IN);
   portDISABLE_INTERRUPTS();
 
 #ifdef DYNAMIC_DELAY
@@ -365,7 +363,7 @@ bool IRAM_ATTR CPBStandardSerial::sendByte(uint8_t data, bool eoi)
     }
   }
   portENABLE_INTERRUPTS();
-  //gpio_intr_enable(PIN_IEC_CLK_IN);
+  gpio_intr_enable(PIN_IEC_CLK_IN);
   //IEC_RELEASE(PIN_DEBUG);//Debug
 
 #ifdef DYNAMIC_DELAY

@@ -1,5 +1,5 @@
 
-#include "archive_ml.h"
+#include "archive.h"
 
 #include <string.h>
 #include <archive.h>
@@ -19,7 +19,7 @@ ssize_t cb_read(struct archive *a, void *userData, const void **buff)
     // 1. we have to call srcStr.read(...)
     ssize_t bc = streamData->srcStream->read(streamData->srcBuffer, ArchiveMStream::buffSize);
     //std::string dump((char*)streamData->srcBuffer, bc);
-    Debug_printv("libarchive pulling data from src MStream, got bytes:%d", bc);
+    //Debug_printv("libarchive pulling data from src MStream, got bytes:%d", bc);
     //Debug_printv("Dumping bytes: %s", dump.c_str());
     // 2. set *buff to the bufer read in 1.
     *buff = streamData->srcBuffer;
@@ -77,7 +77,7 @@ int cb_close(struct archive *a, void *userData)
 {
     ArchiveMStreamData *src_str = (ArchiveMStreamData *)userData;
     
-    Debug_printv("Libarch wants to close, but we do nothing here...");
+    //Debug_printv("Libarch wants to close, but we do nothing here...");
 
     // do we want to close srcStream here???
     return (ARCHIVE_OK);
@@ -145,7 +145,7 @@ void ArchiveMStream::close()
         archive_read_free(a);
         is_open = false;
     }
-    Debug_printv("Close called");
+    //Debug_printv("Close called");
 }
 
 bool ArchiveMStream::isOpen()
@@ -155,11 +155,11 @@ bool ArchiveMStream::isOpen()
 
 uint32_t ArchiveMStream::read(uint8_t *buf, uint32_t size)
 {
-    Debug_printv("calling read, buff size=[%ld]", size);
+    //Debug_printv("calling read, buff size=[%ld]", size);
 
-    uint64_t zsize = archive_read_data(a, &buf, size);
+    uint64_t zsize = archive_read_data(a, buf, size);
 
-    Debug_printv("archive returned [%llu] unarchived bytes", zsize);
+    //Debug_printv("archive returned [%llu] unarchived bytes", zsize);
     if ( zsize > 0 ) {
         _position += zsize;
         return zsize;
@@ -298,11 +298,21 @@ MFile *ArchiveMFile::getNextFileInDir()
 
     struct archive_entry *entry;
 
-    //Debug_printv("getNextFileInDir calling archive_read_next_header");
-    if (archive_read_next_header(getArchive(), &entry) == ARCHIVE_OK)
+    bool found = false;
+    std::string filename;
+    do
     {
-        std::string fileName = archive_entry_pathname(entry);
-        auto file = MFSOwner::File(streamFile->url + "/" + fileName);
+        if (archive_read_next_header(getArchive(), &entry) != ARCHIVE_OK)
+            break;
+
+        filename = basename(archive_entry_pathname(entry));
+        //Debug_printv("size[%d] empty[%d] pathInStream[%s] filename[%s]", filename.size(), filename.empty(), pathInStream.c_str(), filename.c_str());
+    } while (filename.empty()); // Skip empty filenames
+
+    //Debug_printv("getNextFileInDir calling archive_read_next_header");
+    if (filename.size() > 0)
+    {
+        auto file = MFSOwner::File(streamFile->url + "/" + filename);
         file->_size = archive_entry_size(entry);
         file->_exists = true;
         return file;
