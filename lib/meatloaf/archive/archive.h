@@ -52,7 +52,7 @@ class ArchiveMStream : public MStream
     bool is_open = false;
 
 public:
-    static const size_t buffSize = 4096;
+    static const size_t buffSize = 256; // 4096
     ArchiveMStreamData streamData;
     struct archive *a;
     struct archive_entry *entry;

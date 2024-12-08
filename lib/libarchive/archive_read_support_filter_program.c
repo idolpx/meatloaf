@@ -26,8 +26,6 @@
 
 #include "archive_platform.h"
 
-#include <sys/wait.h>
-
 #ifdef HAVE_SYS_WAIT_H
 #  include <sys/wait.h>
 #endif
@@ -59,6 +57,8 @@
 #include "archive_read_private.h"
 #include "filter_fork.h"
 
+static inline pid_t waitpid_stub() { errno = ENOSYS; return (pid_t)-1; }
+#define waitpid(pid,status,options) waitpid_stub()
 
 #if ARCHIVE_VERSION_NUMBER < 4000000
 /* Deprecated; remove in libarchive 4.0 */
@@ -240,10 +240,10 @@ child_stop(struct archive_read_filter *self, struct program_filter *state)
 
 	if (state->child != 0) {
 		/* Reap the child. */
-		// do {
-		// 	state->waitpid_return
-		// 	    = waitpid(state->child, &state->exit_status, 0);
-		// } while (state->waitpid_return == -1 && errno == EINTR);
+		do {
+			state->waitpid_return
+			    = waitpid(state->child, &state->exit_status, 0);
+		} while (state->waitpid_return == -1 && errno == EINTR);
 #if defined(_WIN32) && !defined(__CYGWIN__)
 		CloseHandle(state->child);
 #endif
