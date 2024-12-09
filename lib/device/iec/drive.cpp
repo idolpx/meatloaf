@@ -315,22 +315,6 @@ void iecDrive::iec_open()
         Debug_printv("_base[%s]", _base->url.c_str());
         if ( !_base->isDirectory() )
         {
-            // // Retry a few times on failure
-            // uint8_t retry = 3;
-            // do
-            // {
-            //     if (registerStream(commanddata.channel))
-            //         break;
-
-            //     Debug_printv("RETRY!");
-            //     retry--;
-            // } while (retry > 0);
-            
-            // if ( retry == 0 )
-            // {
-            //     Debug_printv("File Doesn't Exist [%s]", _base->url.c_str());
-            // }
-
             if ( !registerStream(commanddata.channel) )
             {
                 Debug_printv("File Doesn't Exist [%s]", _base->url.c_str());
@@ -745,7 +729,7 @@ bool iecDrive::registerStream ( uint8_t channel )
     Debug_printv("_base[%s]", _base->url.c_str());
     _base.reset( MFSOwner::File( _base->url ) );
 
-    std::shared_ptr<MStream> new_stream;
+    std::shared_ptr<MStream> new_stream = nullptr;
 
     // LOAD / GET / INPUT
     if ( channel == CHANNEL_LOAD )
@@ -762,8 +746,14 @@ bool iecDrive::registerStream ( uint8_t channel )
     {
         Debug_printv("SAVE \"%s\"", _base->url.c_str());
         // CREATE STREAM HERE FOR OUTPUT
-        new_stream = std::shared_ptr<MStream>(_base->getSourceStream(std::ios::out));
-        new_stream->open(std::ios::out);
+        
+        if ( _base->isWritable )
+        {
+            new_stream = std::shared_ptr<MStream>(_base->getSourceStream(std::ios::out));
+            new_stream->open(std::ios::out);
+        }
+        else
+            Debug_printv("not write enabled");
     }
     else
     {
@@ -1357,31 +1347,49 @@ bool iecDrive::saveFile()
 #endif
 
     auto ostream = retrieveStream(commanddata.channel);
-
     if ( ostream == nullptr ) {
         printf("couldn't open a stream for writing\r\n");
-        IEC.senderTimeout(); // Error
+        sendFileNotFound();
         return false;
     }
-    else
+
+    Debug_printv("stream_url[%s]", ostream->url.c_str());
+
+    if ( !_base->isDirectory() )
     {
-         // Stream is open!  Let's save this!
-
-        // wait - what??? If stream position == x you don't have to seek(x)!!!
-        i = ostream->position();
-        if ( i == 0 )
+        if ( ostream->has_subdirs )
         {
-            // Get file load address
-            load_address = (payload[1] << 8) | payload[0];
+            // Filesystem supports sub directories
+            Debug_printv( "Subdir Change Directory Here! istream[%s] > base[%s]", _base->url.c_str(), _base->base().c_str() );
+            _last_file = _base->name;
+            _base.reset( MFSOwner::File( _base->base() ) );
         }
-
-
-        printf("saveFile: [$%.4X]\r\n=================================\r\n", load_address);
-
-	ostream->write((const uint8_t *) payload.data(), payload.size());
+        else
+        {
+            // Handles media files that may have '/' as part of the filename
+            auto f = MFSOwner::File( ostream->url );
+            Debug_printv( "Change Directory Here! istream[%s] > base[%s]", ostream->url.c_str(), f->streamFile->url.c_str() );
+            _base.reset( f->streamFile );
+        }
     }
 
-    printf("=================================\r\n%lu bytes saved\r\n", ostream->position());
+
+    // Stream is open!  Let's save this!
+
+    // wait - what??? If stream position == x you don't have to seek(x)!!!
+    i = ostream->position();
+    if ( i == 0 )
+    {
+        // Get file load address
+        load_address = (payload[1] << 8) | payload[0];
+    }
+
+
+    printf("saveFile: [$%.4X]\r\n=================================\r\n", load_address);
+
+	ostream->write((const uint8_t *) payload.data(), payload.size());
+
+    printf("=================================\r\n%lu bytes saved\r\n", payload.size());
 
     // TODO: Handle errorFlag
 

@@ -50,6 +50,7 @@ public:
         else
             m_isNull = false;
 
+        isWritable = true;
         //Debug_printv("basepath[%s] path[%s] valid[%d]", basepath.c_str(), this->path.c_str(), m_isNull);
     };
     ~FlashMFile() {

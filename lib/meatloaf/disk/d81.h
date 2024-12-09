@@ -54,8 +54,9 @@ public:
         partitions.clear();
         partitions.push_back(p);
         sectorsPerTrack = { 40 };
-        dos_rom = "dos1581";
         has_subdirs = true;
+
+        dos_rom = "dos1581";
 
         uint32_t size = containerStream->size();
         switch (size + media_header_size) 

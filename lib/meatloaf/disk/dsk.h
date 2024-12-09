@@ -46,10 +46,11 @@ public:
         partitions.clear();
         partitions.push_back(p);
         sectorsPerTrack = { 16 };
+        has_subdirs = false;
+        error_info = false;
+
         dos_rom = "";
         dos_name = "";
-        has_subdirs = false;
-        error_info = true;
 
         uint32_t size = containerStream->size();
         switch (size + media_header_size) 

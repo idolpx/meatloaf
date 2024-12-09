@@ -5,6 +5,7 @@
 // http://www.linusakesson.net/programming/gcr-decoding/index.php
 // https://www.pagetable.com/?p=1356
 // http://www.baltissen.org/newhtm/1541c.htm
+// https://csdb.dk/forums/?roomid=11&topicid=94092
 //
 
 #ifndef MEATLOAF_MEDIA_G64

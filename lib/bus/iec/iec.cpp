@@ -49,6 +49,12 @@ static void IRAM_ATTR cbm_on_atn_isr_forwarder(void *arg)
 
 void IRAM_ATTR systemBus::cbm_on_atn_isr_handler()
 {
+    if (IEC_IS_ASSERTED(PIN_IEC_RESET))
+    {
+        // C64 is being reset
+        return;
+    }
+
     //IEC_ASSERT(PIN_IEC_SRQ);
     if (IEC_IS_ASSERTED(PIN_IEC_ATN))
     {
@@ -217,22 +223,6 @@ void IRAM_ATTR systemBus::cbm_on_data_isr_handler()
 }
 #endif
 
-#ifdef IEC_HAS_RESET
-static void IRAM_ATTR cbm_on_reset_isr_forwarder(void *arg)
-{
-    systemBus *b = (systemBus *)arg;
-
-    b->cbm_on_reset_isr_handler();
-}
-
-void IRAM_ATTR systemBus::cbm_on_reset_isr_handler()
-{
-    if ( IEC_IS_ASSERTED(PIN_IEC_ATN) )
-    {
-        // RESET!
-    }
-}
-#endif
 
 void IRAM_ATTR systemBus::newIO(int val)
 {
@@ -409,19 +399,6 @@ void systemBus::setup()
     };
     gpio_config(&io_conf);
     gpio_isr_handler_add((gpio_num_t)PIN_IEC_DATA_IN, cbm_on_data_isr_forwarder, this);
-#endif
-
-#ifdef IEC_HAS_RESET
-    // Setup interrupt config for RESET
-    io_conf = {
-        .pin_bit_mask = (1ULL << PIN_IEC_RESET),   // bit mask of the pins that you want to set
-        .mode = GPIO_MODE_INPUT,                    // set as input mode
-        .pull_up_en = GPIO_PULLUP_DISABLE,          // disable pull-up mode
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,      // disable pull-down mode
-        .intr_type = GPIO_INTR_NEGEDGE              // interrupt of falling edge
-    };
-    gpio_config(&io_conf);
-    gpio_isr_handler_add((gpio_num_t)PIN_IEC_RESET, cbm_on_reset_isr_forwarder, this);
 #endif
 
     // Start SRQ timer service

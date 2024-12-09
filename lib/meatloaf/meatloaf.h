@@ -189,6 +189,7 @@ public:
     };
 
     bool isPETSCII = false;
+    bool isWritable = false;
     std::string media_header;
     std::string media_id;
     std::string media_archive;

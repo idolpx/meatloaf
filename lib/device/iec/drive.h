@@ -5,6 +5,8 @@
 // https://sites.google.com/site/jamesskingdom/Home/computers-exposed/commodore-disk-drives
 // https://c-128.freeforums.net/thread/130/c128-autoboot
 // https://commodoreman.com/Commodore/Library/Mag/CFF.html
+// https://www.commodore.ca/manuals/pdfs/commodore_1541_Troubleshooting_and_Repair_Guide_sams.pdf
+// https://g3sl.github.io/c1541rom.html
 //
 
 #include "../fuji/fujiHost.h"
