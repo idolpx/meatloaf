@@ -66,7 +66,6 @@
 #define HAVE_SHA512_INIT 1
 
 //#define HAVE_BSDXML_H 1
-//#define HAVE_BZLIB_H 1
 #define HAVE_CHFLAGS 1
 #define HAVE_CHOWN 1
 #define HAVE_CHROOT 1
@@ -221,9 +220,14 @@
 #define HAVE_WMEMCMP 1
 #define HAVE_WMEMCPY 1
 #define HAVE_WMEMMOVE 1
-#define HAVE_ZLIB_H 1
 #define TIME_WITH_SYS_TIME 1
 //#define HAVE__GET_TIMEZONE 1
+
+#define HAVE_BZLIB_H 1
+#define HAVE_ZLIB_H 1
+//#define HAVE_LIBLZMA 1
+//#define HAVE_LZMA_H 1
+#define HAVE_LZ4_H 1
 
 // #if __FreeBSD_version >= 800505
 // #define HAVE_LIBLZMA 1

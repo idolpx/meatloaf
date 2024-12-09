@@ -10,6 +10,7 @@
 #include <archive_entry.h>
 
 #include "../meatloaf.h"
+#include "../meat_media.h"
 
 #include "../../../include/debug.h"
 
@@ -47,9 +48,8 @@ public:
     std::shared_ptr<MStream> srcStream = nullptr; // a stream that is able to serve bytes of this archive
 };
 
-class ArchiveMStream : public MStream
+class ArchiveMStream : public MMediaStream
 {
-    bool is_open = false;
 
 public:
     static const size_t buffSize = 256; // 4096
@@ -57,34 +57,33 @@ public:
     struct archive *a;
     struct archive_entry *entry;
 
-    ArchiveMStream(std::shared_ptr<MStream> srcStr);
+    ArchiveMStream(std::shared_ptr<MStream> is);
     ~ArchiveMStream();
+
+protected:
+    // MStream methods
+    bool isBrowsable() override { return false; };
+    bool isRandomAccess() override { return true; };
 
     bool open(std::ios_base::openmode mode) override;
     void close() override;
-    bool isOpen() override;
 
     uint32_t read(uint8_t *buf, uint32_t size) override;
     uint32_t write(const uint8_t *buf, uint32_t size) override;
 
-    // For files with a browsable random access directory structure
-    // d64, d74, d81, dnp, etc.
-    bool seekPath(std::string path) override;
-
-    // For files with no directory structure
-    // tap, crt, tar
-    //std::string seekNextEntry() override;
-
     virtual bool seek(uint32_t pos) override;
 
-    bool isRandomAccess() override { return true; };
-    bool seekEntry( std::string filename );
+    void seekHeader() override { };
+    bool seekEntry( std::string filename ) override;
+    // bool seekEntry( uint16_t index ) override;
 
-protected:
-
+    // For files with a browsable random access directory structure
+    // d64, d74, d81, dnp, etc.
+    uint32_t readFile(uint8_t* buf, uint32_t size) override;
+    bool seekPath(std::string path) override;
 
 private:
-
+    friend class ArchiveMFile;
 };
 
 /********************************************************
@@ -115,25 +114,24 @@ public:
         }
     }
 
-    std::string basepath = "";
+    MStream* getDecodedStream(std::shared_ptr<MStream> containerIstream) override
+    {
+        Debug_printv("[%s]", url.c_str());
 
-    //MStream* getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override; // has to return OPENED stream
-    MStream* getDecodedStream(std::shared_ptr<MStream> src) override;
+        return new ArchiveMStream(containerIstream);
+    }
 
-    // archive file is always a directory
     bool isDirectory() override;
     bool rewindDirectory() override;
-    MFile *getNextFileInDir() override;
-
+    MFile* getNextFileInDir() override;
     bool mkDir() override { return false; };
-    bool remove() override { return true; }
-    bool rename(std::string dest) override { return true; }
 
-    time_t getLastWrite() override { return 0; }
-    time_t getCreationTime() override { return 0; }
-
-private:
-    bool prepareDirListing();
+    bool exists() override { return true; };
+    bool remove() override { return false; };
+    bool rename(std::string dest) override { return false; };
+    time_t getLastWrite() override { return 0; };
+    time_t getCreationTime() override { return 0; };
+    uint32_t size() override;
 
     bool isDir = true;
     bool dirIsOpen = false;

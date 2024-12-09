@@ -10,13 +10,12 @@
 
 bool ARKMStream::seekEntry( std::string filename )
 {
-    size_t index = 1;
-    mstr::replaceAll(filename, "\\", "/");
-    bool wildcard = (mstr::contains(filename, "*") || mstr::contains(filename, "?"));
-
     // Read Directory Entries
     if (filename.size())
     {
+        size_t index = 1;
+        mstr::replaceAll(filename, "\\", "/");
+        bool wildcard = (mstr::contains(filename, "*") || mstr::contains(filename, "?"));
         while (seekEntry(index))
         {
             std::string entryFilename = entry.filename;

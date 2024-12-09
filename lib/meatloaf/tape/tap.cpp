@@ -9,31 +9,38 @@
 
 bool TAPMStream::seekEntry( std::string filename )
 {
-    uint8_t index = 1;
-    uint8_t i = filename.find_first_of(0xA0);
-    filename = filename.substr(0, i);
-    //mstr::rtrimA0(filename);
-    mstr::replaceAll(filename, "\\", "/");
-
     // Read Directory Entries
     if ( filename.size() )
     {
+        uint16_t index = 1;
+        mstr::replaceAll(filename, "\\", "/");
+        bool wildcard = (mstr::contains(filename, "*") || mstr::contains(filename, "?"));
         while ( seekEntry( index ) )
         {
             std::string entryFilename = entry.filename;
-            mstr::rtrimA0(entryFilename);
+            uint8_t i = entryFilename.find_first_of(0xA0);
+            entryFilename = entryFilename.substr(0, i);
+            //mstr::rtrimA0(entryFilename);
+            entryFilename = mstr::toUTF8(entryFilename);
             Debug_printv("filename[%s] entry.filename[%.16s]", filename.c_str(), entryFilename.c_str());
 
             // Read Entry From Stream
-            if (filename == "*")
+            if (filename == entryFilename) // Match exact
             {
-                filename = entryFilename;
-            }
-            
-            if ( mstr::compare(filename, entryFilename) )
-            {
-                // Move stream pointer to start track/sector
                 return true;
+            }
+            else if (wildcard) // Wildcard Match
+            {
+                if (filename == "*") // Match first PRG
+                {
+                    filename = entryFilename;
+                    return true;
+                }
+                else if ( mstr::compare(filename, entryFilename) )
+                {
+                    // Move stream pointer to start track/sector
+                    return true;
+                }
             }
             index++;
         }

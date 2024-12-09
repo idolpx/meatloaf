@@ -197,13 +197,12 @@ bool D64MStream::isBlockFree(uint8_t track, uint8_t sector)
 
 bool D64MStream::seekEntry( std::string filename )
 {
-    uint16_t index = 1;
-    mstr::replaceAll(filename, "\\", "/");
-    bool wildcard = (mstr::contains(filename, "*") || mstr::contains(filename, "?"));
-
     // Read Directory Entries
     if (filename.size())
     {
+        uint16_t index = 1;
+        mstr::replaceAll(filename, "\\", "/");
+        bool wildcard = (mstr::contains(filename, "*") || mstr::contains(filename, "?"));
         while (seekEntry(index))
         {
             std::string entryFilename = entry.filename;
@@ -473,7 +472,7 @@ bool D64MFile::isDirectory()
 bool D64MFile::rewindDirectory()
 {
     dirIsOpen = true;
-    // Debug_printv("streamFile->url[%s]", streamFile->url.c_str());
+    Debug_printv("streamFile->url[%s]", streamFile->url.c_str());
     auto image = ImageBroker::obtain<D64MStream>(streamFile->url);
     if (image == nullptr)
     {

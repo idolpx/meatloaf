@@ -132,29 +132,26 @@ public:
     }
 
     // MStream methods
+    bool isOpen() override;
     bool isBrowsable() override { return false; };
     bool isRandomAccess() override { return true; };
 
-    virtual bool seek(uint32_t pos) override;
-
-    void close() override;
     bool open(std::ios_base::openmode mode) override;
+    void close() override;
 
-    // MStream methods
-    //uint8_t read() override;
     uint32_t read(uint8_t* buf, uint32_t size) override;
     uint32_t write(const uint8_t *buf, uint32_t size) override;
+
+    virtual bool seek(uint32_t pos) override;
 
     virtual bool seekPath(std::string path) override {
         Debug_printv( "path[%s]", path.c_str() );
         return false;
     }
 
-    bool isOpen() override;
 
 protected:
     std::string localPath;
-
     std::unique_ptr<FlashHandle> handle;
 };
 

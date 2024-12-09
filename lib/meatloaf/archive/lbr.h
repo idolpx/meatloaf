@@ -40,11 +40,7 @@ protected:
     std::vector<Entry> entries;
     int8_t loadEntries();
 
-    void seekHeader() override {
-        header.disk_name = "LBR FILE";
-        header.id_dos = " LBR ";
-    }
-
+    void seekHeader() override { };
     bool seekEntry( std::string filename ) override;
     bool seekEntry( uint16_t index ) override;
 

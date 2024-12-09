@@ -55,23 +55,22 @@ std::string TCRTMStream::decodeType(uint8_t file_type, bool show_hidden)
     // 0xff: Marker for the first free entry.
 
     // All types not mentioned above are reserved.
-    return type;
+    return " " + type;
 }
 
 bool TCRTMStream::seekEntry( std::string filename )
 {
-    size_t index = 1;
-    mstr::replaceAll(filename, "\\", "/");
-    bool wildcard =  ( mstr::contains(filename, "*") || mstr::contains(filename, "?") );
-
     // Read Directory Entries
     if ( filename.size() )
     {
+        size_t index = 1;
+        mstr::replaceAll(filename, "\\", "/");
+        bool wildcard =  ( mstr::contains(filename, "*") || mstr::contains(filename, "?") );
         while ( seekEntry( index ) )
         {
             std::string entryFilename = entry.filename;
-            uint8_t i = entryFilename.find_first_of(0x01);
-            entryFilename = entryFilename.substr(0, i);
+            //uint8_t i = entryFilename.find_first_of(0x00); // padded with NUL (0x00)
+            entryFilename = entryFilename.substr(0, 16);
             //mstr::rtrimA0(entryFilename);
             entryFilename = mstr::toUTF8(entryFilename);
 
@@ -247,8 +246,8 @@ MFile* TCRTMFile::getNextFileInDir() {
     if ( r )
     {
         std::string filename = image->entry.filename;
-        uint8_t i = filename.find_first_of(0x01);
-        filename = filename.substr(0, i);
+        //uint8_t i = filename.find_first_of(0x00); // padded with NUL (0x00)
+        filename = filename.substr(0, 16);
         // mstr::rtrimA0(filename);
         mstr::replaceAll(filename, "/", "\\");
         //Debug_printv( "entry[%s]", (streamFile->url + "/" + filename).c_str() );

@@ -171,7 +171,7 @@ public:
         close();
     };
 
-
+protected:
     // MStream methods
     bool isOpen() override;
     bool isBrowsable() override { return false; };
@@ -190,9 +190,10 @@ public:
         return false;
     }
 
-
-protected:
     MeatHttpClient _http;
+
+private:
+    friend class HTTPMFile;
 };
 
 

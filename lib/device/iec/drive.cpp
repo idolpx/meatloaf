@@ -940,7 +940,7 @@ void iecDrive::sendListing()
         }
 
         // Don't show hidden folders or files
-        //Debug_printv("size[%d] name[%s]", entry->size(), entry->name.c_str());
+        //Debug_printv("size[%lu] name[%s]", entry->size(), entry->name.c_str());
         std::string name = entry->name;
         if ( !entry->isPETSCII )
         {
@@ -1389,7 +1389,7 @@ bool iecDrive::saveFile()
 
 	ostream->write((const uint8_t *) payload.data(), payload.size());
 
-    printf("=================================\r\n%lu bytes saved\r\n", payload.size());
+    printf("=================================\r\n%u bytes saved\r\n", payload.size());
 
     // TODO: Handle errorFlag
 

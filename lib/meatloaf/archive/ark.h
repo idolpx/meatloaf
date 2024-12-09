@@ -52,11 +52,7 @@ protected:
         uint16_t blocks;
     };
 
-    void seekHeader() override {
-        header.disk_name = "ARK FILE";
-        header.id_dos = " ARK ";
-    }
-
+    void seekHeader() override { };
     bool seekEntry( std::string filename ) override;
     bool seekEntry( uint16_t index ) override;
 

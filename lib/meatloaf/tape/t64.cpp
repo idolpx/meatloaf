@@ -19,23 +19,22 @@ std::string T64MStream::decodeType(uint8_t file_type, bool show_hidden)
             type = "FRZ";
     }
 
-    return type;
+    return " " + type;
 }
 
 bool T64MStream::seekEntry( std::string filename )
 {
-    size_t index = 1;
-    mstr::replaceAll(filename, "\\", "/");
-    bool wildcard =  ( mstr::contains(filename, "*") || mstr::contains(filename, "?") );
-
     // Read Directory Entries
     if ( filename.size() )
     {
+        size_t index = 1;
+        mstr::replaceAll(filename, "\\", "/");
+        bool wildcard =  ( mstr::contains(filename, "*") || mstr::contains(filename, "?") );
         while ( seekEntry( index ) )
         {
             std::string entryFilename = entry.filename;
-            uint8_t i = entryFilename.find_first_of(0xA0);
-            entryFilename = entryFilename.substr(0, i);
+            uint8_t i = entryFilename.find_first_of(0x20); // (in PETASCII, padded with $20, not $A0)
+            entryFilename = entryFilename.substr(0, (i > 16 ? 16 : i));
             //mstr::rtrimA0(entryFilename);
             entryFilename = mstr::toUTF8(entryFilename);
 
@@ -47,13 +46,15 @@ bool T64MStream::seekEntry( std::string filename )
             }
             else if ( wildcard ) // Wildcard Match
             {
-                if (filename == "*") // Match first PRG
+                if (filename == "*") // Match first entry
                 {
                     filename = entryFilename;
                     return true;
                 }
                 else if ( mstr::compare(filename, entryFilename) ) // X?XX?X* Wildcard match
                 {
+                    // Set filename to this filename
+                    Debug_printv( "Found! file[%s] -> entry[%s]", filename.c_str(), entryFilename.c_str() );
                     return true;
                 }
             }
@@ -203,8 +204,8 @@ MFile* T64MFile::getNextFileInDir() {
     if ( image->seekNextImageEntry() )
     {
         std::string filename = image->entry.filename;
-        uint8_t i = filename.find_first_of(0xA0);
-        filename = filename.substr(0, i);
+        uint8_t i = filename.find_first_of(0x20); // (in PETASCII, padded with $20, not $A0)
+        filename = filename.substr(0, (i > 16 ? 16 : i));
         // mstr::rtrimA0(filename);
         mstr::replaceAll(filename, "/", "\\");
         //Debug_printv( "entry[%s]", (streamFile->url + "/" + filename).c_str() );
