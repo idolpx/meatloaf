@@ -19,7 +19,7 @@ ssize_t cb_read(struct archive *a, void *userData, const void **buff)
     // 1. we have to call srcStr.read(...)
     ssize_t bc = streamData->srcStream->read(streamData->srcBuffer, ArchiveMStream::buffSize);
     //std::string dump((char*)streamData->srcBuffer, bc);
-    Debug_printv("libarchive pulling data from src MStream, got bytes:%d", bc);
+    //Debug_printv("libarchive pulling data from src MStream, got bytes:%d", bc);
     //Debug_printv("Dumping bytes: %s", dump.c_str());
     // 2. set *buff to the bufer read in 1.
     *buff = streamData->srcBuffer;
@@ -58,7 +58,7 @@ int64_t cb_skip(struct archive *a, void *userData, int64_t request)
 
 int64_t cb_seek(struct archive *a, void *userData, int64_t offset, int whence)
 {
-    Debug_printv("offset[%lld] whence[%d] (0=begin, 1=curr, 2=end)", offset, whence);
+    //Debug_printv("offset[%lld] whence[%d] (0=begin, 1=curr, 2=end)", offset, whence);
     ArchiveMStreamData *streamData = (ArchiveMStreamData *)userData;
 
     if (streamData->srcStream->isOpen())
@@ -77,7 +77,7 @@ int cb_close(struct archive *a, void *userData)
 {
     //ArchiveMStreamData *src_str = (ArchiveMStreamData *)userData;
     
-    Debug_printv("Libarch wants to close, but we do nothing here...");
+    //Debug_printv("Libarch wants to close, but we do nothing here...");
 
     // do we want to close srcStream here???
     return (ARCHIVE_OK);
@@ -117,12 +117,12 @@ ArchiveMStream::~ArchiveMStream()
 
 bool ArchiveMStream::open(std::ios_base::openmode mode)
 {
-    if (!_is_open)
+    if (!is_open)
     {
         // TODO enable seek only if the stream is random access
         archive_read_set_read_callback(a, cb_read);
         archive_read_set_seek_callback(a, cb_seek);
-        //archive_read_set_skip_callback(a, cb_skip);
+        archive_read_set_skip_callback(a, cb_skip);
         archive_read_set_close_callback(a, cb_close);
         // archive_read_set_open_callback(mpa->arch, cb_open); - what does it do?
         archive_read_set_callback_data(a, &streamData);
@@ -130,31 +130,39 @@ bool ArchiveMStream::open(std::ios_base::openmode mode)
         int r =  archive_read_open1(a);
         Debug_printv("== END opening archive result=%d! (OK should be 0!) =======================================", r);
 
+        //int r = archive_read_open2(a, &streamData, NULL, myRead, myskip, myclose);
         if (r == ARCHIVE_OK)
-            _is_open = true;
+            is_open = true;
     }
-    return _is_open;
+    else
+        Debug_printv("Archive already open!");
+
+    return is_open;
 };
 
 void ArchiveMStream::close()
 {
-    if (_is_open)
+    if (is_open)
     {
         archive_read_close(a);
         archive_read_free(a);
-        _is_open = false;
+        is_open = false;
     }
-    Debug_printv("Close called");
+    //Debug_printv("Close called");
 }
 
+bool ArchiveMStream::isOpen()
+{
+    return is_open;
+};
 
 uint32_t ArchiveMStream::read(uint8_t *buf, uint32_t size)
 {
-    Debug_printv("calling read, buff size=[%ld]", size);
+    //Debug_printv("calling read, buff size=[%ld]", size);
 
     uint64_t zsize = archive_read_data(a, buf, size);
 
-    Debug_printv("archive returned [%llu] unarchived bytes", zsize);
+    //Debug_printv("archive returned [%llu] unarchived bytes", zsize);
     if ( zsize > 0 ) {
         _position += zsize;
         return zsize;
@@ -170,14 +178,10 @@ uint32_t ArchiveMStream::write(const uint8_t *buf, uint32_t size)
     return -1;
 }
 
-bool ArchiveMStream::seek(uint32_t pos)
-{
-    return streamData.srcStream->seek(pos);
-}
 
 bool ArchiveMStream::seekEntry( std::string filename )
 {
-    Debug_printv( "filename[%s] size[%d]", filename.c_str(), filename.size());
+    //Debug_printv( "filename[%s] size[%d]", filename.c_str(), filename.size());
 
     // Read Directory Entries
     if ( filename.size() > 0 )
@@ -186,6 +190,8 @@ bool ArchiveMStream::seekEntry( std::string filename )
         bool wildcard =  ( mstr::contains(filename, "*") || mstr::contains(filename, "?") );
         while ( archive_read_next_header(a, &entry) == ARCHIVE_OK )
         {
+            entry_index++;
+
             // Check filetype
             const mode_t type = archive_entry_filetype(entry);
             if ( S_ISREG(type) )
@@ -259,6 +265,10 @@ bool ArchiveMStream::seekPath(std::string path)
 
 
 
+bool ArchiveMStream::seek(uint32_t pos)
+{
+    return streamData.srcStream->seek(pos);
+}
 
 /********************************************************
  * Files implementations
@@ -317,10 +327,10 @@ MFile *ArchiveMFile::getNextFileInDir()
             break;
 
         filename = basename(archive_entry_pathname(entry));
-        Debug_printv("size[%d] empty[%d] pathInStream[%s] filename[%s]", filename.size(), filename.empty(), pathInStream.c_str(), filename.c_str());
+        //Debug_printv("size[%d] empty[%d] pathInStream[%s] filename[%s]", filename.size(), filename.empty(), pathInStream.c_str(), filename.c_str());
     } while (filename.empty()); // Skip empty filenames
 
-    Debug_printv("getNextFileInDir calling archive_read_next_header");
+    //Debug_printv("getNextFileInDir calling archive_read_next_header");
     if (filename.size() > 0)
     {
         auto file = MFSOwner::File(streamFile->url + "/" + filename);
@@ -335,19 +345,4 @@ MFile *ArchiveMFile::getNextFileInDir()
         dirIsOpen = false;
         return nullptr;
     }
-}
-
-uint32_t ArchiveMFile::size()
-{
-    // Debug_printv("[%s]", streamFile->url.c_str());
-    //  use D64 to get size of the file in image
-    auto stream = ImageBroker::obtain<ArchiveMStream>(streamFile->url);
-    if ( stream == nullptr )
-        return 0;
-
-    auto entry = stream->entry;
-
-    uint32_t bytes = archive_entry_size(entry);
-
-    return bytes;
 }

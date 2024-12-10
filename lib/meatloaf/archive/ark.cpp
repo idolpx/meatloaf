@@ -187,6 +187,8 @@ MFile *ARKMFile::getNextFileInDir()
 
     // Get entry pointed to by containerStream
     auto image = ImageBroker::obtain<ARKMStream>(streamFile->url);
+    if (image == nullptr)
+        goto exit;
 
     if (image->seekNextImageEntry())
     {
@@ -199,18 +201,19 @@ MFile *ARKMFile::getNextFileInDir()
         auto file = MFSOwner::File(streamFile->url + "/" + filename);
         file->extension = image->decodeType(image->entry.file_type);
         //Debug_printv("entry[%s] ext[%s]", fileName.c_str(), file->extension.c_str());
+
         return file;
     }
-    else
-    {
-        // Debug_printv( "END OF DIRECTORY");
-        dirIsOpen = false;
-        return nullptr;
-    }
+
+
+exit:
+    // Debug_printv( "END OF DIRECTORY");
+    dirIsOpen = false;
+    return nullptr;
 }
 
-uint32_t ARKMFile::size()
-{
-    auto entry = ImageBroker::obtain<ARKMStream>(streamFile->url)->entry;
-    return UINT16_FROM_LE_UINT16(entry.blocks);
-}
+// uint32_t ARKMFile::size()
+// {
+//     auto entry = ImageBroker::obtain<ARKMStream>(streamFile->url)->entry;
+//     return UINT16_FROM_LE_UINT16(entry.blocks);
+// }

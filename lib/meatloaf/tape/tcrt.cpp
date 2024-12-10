@@ -229,15 +229,18 @@ bool TCRTMFile::rewindDirectory() {
     return true;
 }
 
-MFile* TCRTMFile::getNextFileInDir() {
+MFile* TCRTMFile::getNextFileInDir() 
+{
+    bool r = false;
 
     if(!dirIsOpen)
         rewindDirectory();
 
     // Get entry pointed to by containerStream
     auto image = ImageBroker::obtain<TCRTMStream>(streamFile->url);
+    if ( image == nullptr )
+        goto exit;
 
-    bool r = false;
     do
     {
         r = image->seekNextImageEntry();
@@ -253,29 +256,29 @@ MFile* TCRTMFile::getNextFileInDir() {
         //Debug_printv( "entry[%s]", (streamFile->url + "/" + filename).c_str() );
         auto file = MFSOwner::File(streamFile->url + "/" + filename);
         file->extension = image->decodeType(image->entry.file_type);
+
         return file;
     }
-    else
-    {
-        //Debug_printv( "END OF DIRECTORY");
-        dirIsOpen = false;
-        return nullptr;
-    }
+
+exit:
+    //Debug_printv( "END OF DIRECTORY");
+    dirIsOpen = false;
+    return nullptr;
 }
 
 
-uint32_t TCRTMFile::size() {
-    //Debug_printv("[%s]", streamFile->url.c_str());
-    // use TCRT to get size of the file in image
-    auto entry = ImageBroker::obtain<TCRTMStream>(streamFile->url)->entry;
+// uint32_t TCRTMFile::size() {
+//     //Debug_printv("[%s]", streamFile->url.c_str());
+//     // use TCRT to get size of the file in image
+//     auto entry = ImageBroker::obtain<TCRTMStream>(streamFile->url)->entry;
 
-    //size_t blocks = (UINT16_FROM_LE_UINT16(image->entry.load_address) + image->entry.file_size)) / image->block_size;
-    //size_t blocks = 1;
+//     //size_t blocks = (UINT16_FROM_LE_UINT16(image->entry.load_address) + image->entry.file_size)) / image->block_size;
+//     //size_t blocks = 1;
 
-    // 9E 60 00
-    // 158 96 0
+//     // 9E 60 00
+//     // 158 96 0
 
-    size_t bytes = (entry.file_size[0] | (entry.file_size[1] << 8) | (entry.file_size[2] << 16)) + 2; // 2 bytes for load address
+//     size_t bytes = (entry.file_size[0] | (entry.file_size[1] << 8) | (entry.file_size[2] << 16)) + 2; // 2 bytes for load address
 
-    return bytes;
-}
+//     return bytes;
+// }

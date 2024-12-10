@@ -202,6 +202,8 @@ MFile *LBRMFile::getNextFileInDir()
 
     // Get entry pointed to by containerStream
     auto image = ImageBroker::obtain<LBRMStream>(streamFile->url);
+    if (image == nullptr)
+        goto exit;
 
     if (image->seekNextImageEntry())
     {
@@ -214,21 +216,21 @@ MFile *LBRMFile::getNextFileInDir()
         auto file = MFSOwner::File(streamFile->url + "/" + filename);
         file->extension = image->entry.type;
         //Debug_printv("entry[%s] ext[%s]", fileName.c_str(), file->extension.c_str());
+        
         return file;
     }
-    else
-    {
-        // Debug_printv( "END OF DIRECTORY");
-        dirIsOpen = false;
-        return nullptr;
-    }
+
+exit:
+    // Debug_printv( "END OF DIRECTORY");
+    dirIsOpen = false;
+    return nullptr;
 }
 
-uint32_t LBRMFile::size()
-{
-    // Debug_printv("[%s]", streamFile->url.c_str());
-    // use LBR to get size of the file in image
-    auto entry = ImageBroker::obtain<LBRMStream>(streamFile->url)->entry;
+// uint32_t LBRMFile::size()
+// {
+//     // Debug_printv("[%s]", streamFile->url.c_str());
+//     // use LBR to get size of the file in image
+//     auto entry = ImageBroker::obtain<LBRMStream>(streamFile->url)->entry;
 
-    return entry.size;
-}
+//     return entry.size;
+// }

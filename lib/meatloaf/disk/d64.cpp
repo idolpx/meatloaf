@@ -475,9 +475,7 @@ bool D64MFile::rewindDirectory()
     Debug_printv("streamFile->url[%s]", streamFile->url.c_str());
     auto image = ImageBroker::obtain<D64MStream>(streamFile->url);
     if (image == nullptr)
-    {
         return false;
-    }
 
     image->resetEntryCounter();
 
@@ -499,6 +497,7 @@ bool D64MFile::rewindDirectory()
 
 MFile *D64MFile::getNextFileInDir()
 {
+    bool r = false;
 
     if (!dirIsOpen)
         rewindDirectory();
@@ -506,11 +505,8 @@ MFile *D64MFile::getNextFileInDir()
     // Get entry pointed to by containerStream
     auto image = ImageBroker::obtain<D64MStream>(streamFile->url);
     if (image == nullptr)
-    {
-        return nullptr;
-    }
+        goto exit;
 
-    bool r = false;
     do
     {
         r = image->seekNextImageEntry();
@@ -526,14 +522,14 @@ MFile *D64MFile::getNextFileInDir()
         // Debug_printv( "entry[%s]", (streamFile->url + "/" + filename).c_str() );
         auto file = MFSOwner::File(streamFile->url + "/" + filename);
         file->extension = image->decodeType(image->entry.file_type);
+
         return file;
     }
-    else
-    {
-        // Debug_printv( "END OF DIRECTORY");
-        dirIsOpen = false;
-        return nullptr;
-    }
+
+exit:
+    // Debug_printv( "END OF DIRECTORY");
+    dirIsOpen = false;
+    return nullptr;
 }
 
 time_t D64MFile::getLastWrite()
@@ -544,12 +540,16 @@ time_t D64MFile::getLastWrite()
 time_t D64MFile::getCreationTime()
 {
     tm *entry_time = 0;
-    auto entry = ImageBroker::obtain<D64MStream>(streamFile->url)->entry;
-    entry_time->tm_year = entry.year + 1900;
-    entry_time->tm_mon = entry.month;
-    entry_time->tm_mday = entry.day;
-    entry_time->tm_hour = entry.hour;
-    entry_time->tm_min = entry.minute;
+    auto stream = ImageBroker::obtain<D64MStream>(streamFile->url);
+    if ( stream != nullptr )
+    {
+        auto entry = stream->entry;
+        entry_time->tm_year = entry.year + 1900;
+        entry_time->tm_mon = entry.month;
+        entry_time->tm_mday = entry.day;
+        entry_time->tm_hour = entry.hour;
+        entry_time->tm_min = entry.minute;
+    }
 
     return mktime(entry_time);
 }
@@ -561,17 +561,17 @@ bool D64MFile::exists()
     return true;
 }
 
-uint32_t D64MFile::size()
-{
-    // Debug_printv("[%s]", streamFile->url.c_str());
-    //  use D64 to get size of the file in image
-    auto stream = ImageBroker::obtain<D64MStream>(streamFile->url);
-    if ( stream == nullptr )
-        return 0;
+// uint32_t D64MFile::size()
+// {
+//     // Debug_printv("[%s]", streamFile->url.c_str());
+//     //  use D64 to get size of the file in image
+//     auto stream = ImageBroker::obtain<D64MStream>(streamFile->url);
+//     if ( stream == nullptr )
+//         return 0;
 
-    auto entry = stream->entry;
+//     auto entry = stream->entry;
 
-    uint32_t bytes = UINT16_FROM_LE_UINT16(entry.blocks);
+//     uint32_t bytes = UINT16_FROM_LE_UINT16(entry.blocks);
 
-    return bytes;
-}
+//     return bytes;
+// }

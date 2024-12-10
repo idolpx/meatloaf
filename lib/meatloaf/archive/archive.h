@@ -50,6 +50,7 @@ public:
 
 class ArchiveMStream : public MMediaStream
 {
+    bool is_open = false;
 
 public:
     static const size_t buffSize = 256; // 4096
@@ -61,8 +62,7 @@ public:
     ~ArchiveMStream();
 
 protected:
-    // MStream methods
-    bool isBrowsable() override { return false; };
+    bool isOpen() override;
     bool isRandomAccess() override { return true; };
 
     bool open(std::ios_base::openmode mode) override;
@@ -131,7 +131,6 @@ public:
     bool rename(std::string dest) override { return false; };
     time_t getLastWrite() override { return 0; };
     time_t getCreationTime() override { return 0; };
-    uint32_t size() override;
 
     bool isDir = true;
     bool dirIsOpen = false;
@@ -167,7 +166,8 @@ public:
                 ".tar",
                 ".tgz",
                 ".xar",
-                ".zip"
+                ".zip",
+                ".iso"
              },
             fileName
         );

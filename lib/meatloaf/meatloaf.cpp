@@ -247,7 +247,7 @@ MFile* MFSOwner::File(std::string path) {
             }
             else
             {
-                //Debug_printv("WARNING!!!! CONTAINER FAILED FOR: '%s'", upperPath.c_str());
+                Debug_printv("WARNING!!!! CONTAINER FAILED FOR: '%s'", upperPath.c_str());
             }
         }
 
@@ -399,7 +399,10 @@ MStream* MFile::getSourceStream(std::ios_base::openmode mode) {
 
     Debug_printv("pathInStream [%s]", pathInStream.c_str());
 
-    if(decodedStream->isRandomAccess() && pathInStream != "") {
+    if(decodedStream->isRandomAccess() && pathInStream != "")
+    {
+        // For files with a browsable random access directory structure
+        // d64, d74, d81, dnp, etc.
         bool foundIt = decodedStream->seekPath(this->pathInStream);
 
         if(!foundIt)
@@ -408,7 +411,10 @@ MStream* MFile::getSourceStream(std::ios_base::openmode mode) {
             return nullptr;
         }        
     }
-    else if(decodedStream->isBrowsable() && pathInStream != "") {
+    else if(decodedStream->isBrowsable() && pathInStream != "")
+    {
+        // For files with no directory structure
+        // tap, crt, tar
         auto pointedFile = decodedStream->seekNextEntry();
 
         while (!pointedFile.empty())

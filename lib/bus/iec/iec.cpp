@@ -52,6 +52,9 @@ void IRAM_ATTR systemBus::cbm_on_atn_isr_handler()
     if (IEC_IS_ASSERTED(PIN_IEC_RESET))
     {
         // C64 is being reset
+
+        // Clear ImageBroker
+
         return;
     }
 

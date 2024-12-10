@@ -211,9 +211,11 @@ public:
     MFile* cdLocalParent(std::string);
     MFile* cdRoot(std::string);
     MFile* cdLocalRoot(std::string);
+
     virtual bool isDirectory() = 0;
     virtual bool rewindDirectory() = 0 ;
     virtual MFile* getNextFileInDir() = 0 ;
+
     virtual bool mkDir() = 0 ;    
     virtual bool exists();
     virtual bool remove() = 0;

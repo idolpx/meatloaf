@@ -169,6 +169,8 @@ MFile* TAPMFile::getNextFileInDir() {
 
     // Get entry pointed to by containerStream
     auto image = ImageBroker::obtain<TAPMStream>(streamFile->url);
+    if ( image == nullptr )
+        goto exit;
 
     if ( image->seekNextImageEntry() )
     {
@@ -177,23 +179,23 @@ MFile* TAPMFile::getNextFileInDir() {
         //Debug_printv( "entry[%s]", (streamFile->url + "/" + fileName).c_str() );
         auto file = MFSOwner::File(streamFile->url + "/" + fileName);
         file->extension = image->decodeType(image->entry.file_type);
+        
         return file;
     }
-    else
-    {
-        //Debug_printv( "END OF DIRECTORY");
-        dirIsOpen = false;
-        return nullptr;
-    }
+
+exit:
+    //Debug_printv( "END OF DIRECTORY");
+    dirIsOpen = false;
+    return nullptr;
 }
 
 
-uint32_t TAPMFile::size() {
-    // Debug_printv("[%s]", streamFile->url.c_str());
-    // use TAP to get size of the file in image
-    auto image = ImageBroker::obtain<TAPMStream>(streamFile->url);
+// uint32_t TAPMFile::size() {
+//     // Debug_printv("[%s]", streamFile->url.c_str());
+//     // use TAP to get size of the file in image
+//     auto image = ImageBroker::obtain<TAPMStream>(streamFile->url);
 
-    size_t bytes = UINT16_FROM_LE_UINT16(image->entry.end_address) - UINT16_FROM_LE_UINT16(image->entry.start_address);
+//     size_t bytes = UINT16_FROM_LE_UINT16(image->entry.end_address) - UINT16_FROM_LE_UINT16(image->entry.start_address);
 
-    return bytes;
-}
+//     return bytes;
+// }

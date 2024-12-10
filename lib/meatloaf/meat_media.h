@@ -209,6 +209,10 @@ public:
     static void validate() {
         
     }
+
+    static void clear() {
+        image_repo.clear();
+    }
 };
 
 #endif // MEATLOAF_MEDIA

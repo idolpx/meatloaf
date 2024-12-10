@@ -200,6 +200,8 @@ MFile* T64MFile::getNextFileInDir() {
 
     // Get entry pointed to by containerStream
     auto image = ImageBroker::obtain<T64MStream>(streamFile->url);
+    if ( image == nullptr )
+        goto exit;
 
     if ( image->seekNextImageEntry() )
     {
@@ -212,28 +214,28 @@ MFile* T64MFile::getNextFileInDir() {
         auto file = MFSOwner::File(streamFile->url + "/" + filename);
         file->extension = image->decodeType(image->entry.file_type);
         Debug_printv( "entry[%s] ext[%s]", filename.c_str(), file->extension.c_str() );
+        
         return file;
     }
-    else
-    {
-        //Debug_printv( "END OF DIRECTORY");
-        dirIsOpen = false;
-        return nullptr;
-    }
+
+exit:
+    //Debug_printv( "END OF DIRECTORY");
+    dirIsOpen = false;
+    return nullptr;
 }
 
 
-uint32_t T64MFile::size() {
-    // Debug_printv("[%s]", streamFile->url.c_str());
-    // use T64 to get size of the file in image
-    auto entry = ImageBroker::obtain<T64MStream>(streamFile->url)->entry;
+// uint32_t T64MFile::size() {
+//     // Debug_printv("[%s]", streamFile->url.c_str());
+//     // use T64 to get size of the file in image
+//     auto entry = ImageBroker::obtain<T64MStream>(streamFile->url)->entry;
 
-    //Debug_printv("end0[%d] end1[%d] start0[%d] start1[%d]", entry.end_address[0], entry.end_address[1], entry.start_address[0], entry.start_address[1]);
-    size_t end_address = UINT16_FROM_HILOBYTES(entry.end_address[1], entry.end_address[0]);
-    size_t start_address = UINT16_FROM_HILOBYTES(entry.start_address[1], entry.start_address[0]);
+//     //Debug_printv("end0[%d] end1[%d] start0[%d] start1[%d]", entry.end_address[0], entry.end_address[1], entry.start_address[0], entry.start_address[1]);
+//     size_t end_address = UINT16_FROM_HILOBYTES(entry.end_address[1], entry.end_address[0]);
+//     size_t start_address = UINT16_FROM_HILOBYTES(entry.start_address[1], entry.start_address[0]);
 
-    size_t bytes = ( end_address - start_address ) + 2; // 2 bytes for load address
-    //Debug_printv("start_address[%d] end_address[%d] bytes[%d]", start_address, end_address, bytes);
+//     size_t bytes = ( end_address - start_address ) + 2; // 2 bytes for load address
+//     //Debug_printv("start_address[%d] end_address[%d] bytes[%d]", start_address, end_address, bytes);
 
-    return bytes;
-}
+//     return bytes;
+// }
