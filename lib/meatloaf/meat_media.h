@@ -211,6 +211,9 @@ public:
     }
 
     static void clear() {
+        std::for_each(image_repo.begin(), image_repo.end(), [](auto& pair) {
+            delete pair.second;
+        });
         image_repo.clear();
     }
 };

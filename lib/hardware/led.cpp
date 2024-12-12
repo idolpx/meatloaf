@@ -24,7 +24,7 @@ LedManager::LedManager()
 void LedManager::setup()
 {
 #ifdef ESP_PLATFORM
-#if defined(PINMAP_A2_REV0) || defined(PINMAP_FUJIAPPLE_IEC) || defined(PINMAP_MAC_REV0)
+#if defined(PINMAP_A2_REV0) || defined(PINMAP_FUJIAPPLE_IEC) || defined(PINMAP_FUJIAPPLE_IEC_DD) || defined(PINMAP_MAC_REV0)
     fnSystem.set_pin_mode(PIN_LED_BUS, gpio_mode_t::GPIO_MODE_OUTPUT);
     fnSystem.digital_write(PIN_LED_BUS, DIGI_LOW);
 
@@ -72,7 +72,7 @@ void LedManager::set(eLed led, bool on)
     else
     {
         mLedState[led] = on;
-#if defined(PINMAP_A2_REV0) || defined(PINMAP_FUJIAPPLE_IEC) || defined(PINMAP_MAC_REV0)
+#if defined(PINMAP_A2_REV0) || defined(PINMAP_FUJIAPPLE_IEC) || defined(PINMAP_FUJIAPPLE_IEC_DD) || defined(PINMAP_MAC_REV0)
         // FujiApple Rev 0 BUS LED has reverse logic
         if (led == LED_BUS)
             fnSystem.digital_write(mLedPin[led], (on ? DIGI_HIGH : DIGI_LOW));

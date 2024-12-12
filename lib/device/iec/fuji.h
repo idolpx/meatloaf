@@ -84,7 +84,18 @@ typedef struct
     char password[MAX_PASSPHRASE_LEN + 1];
 } net_config_t;
 
-class iecFuji : public virtualDevice
+typedef enum
+{
+    DEVICE_ERROR = -1,
+    DEVICE_IDLE = 0,      // Ready and waiting
+    DEVICE_ACTIVE = 1,
+    DEVICE_LISTEN = 2,    // A command is recieved and data is coming to us
+    DEVICE_TALK = 3,      // A command is recieved and we must talk now
+    DEVICE_PAUSED = 4,    // Execute device command
+} device_state_t;
+
+
+class iecFuji : public IECDevice
 {
 private:
     systemBus *_bus;
@@ -107,15 +118,18 @@ private:
 
     Hash::Algorithm algorithm = Hash::Algorithm::UNKNOWN;
 
-    std::string response;
+    std::vector<std::string> pt;
+    std::string payloadRaw, payload, response;
     std::vector<uint8_t> responseV;
+    size_t responsePtr;
     bool is_raw_command;
 
+    void process_cmd();
     void process_raw_cmd_data();
     void process_immediate_raw_cmds();
 
     void process_basic_commands();
-    vector<string> tokenize_basic_command(string command);
+    std::vector<std::string> tokenize_basic_command(std::string command);
 
     bool validate_parameters_and_setup(uint8_t& maxlen, uint8_t& addtlopts);
     bool validate_directory_slot();
@@ -127,6 +141,17 @@ private:
     int last_command = -1;
 
 protected:
+    virtual void talk(uint8_t secondary) override;
+    virtual void listen(uint8_t secondary) override;
+    virtual void untalk() override;
+    virtual void unlisten() override;
+    virtual int8_t canWrite() override;
+    virtual int8_t canRead() override;
+    virtual void write(uint8_t data, bool eoi) override;
+    virtual uint8_t read() override;
+    virtual void task() override;
+    virtual void reset() override;
+
     // is the cmd supported by RAW?
     bool is_supported(uint8_t cmd);
 
@@ -327,17 +352,6 @@ protected:
     // Commodore specific
     void local_ip();
 
-#if 0
-    device_state_t process() override;
-#else
-    virtual device_state_t openChannel(/*int chan, IECPayload &payload*/) override;
-    virtual device_state_t closeChannel(/*int chan*/) override;
-    virtual device_state_t readChannel(/*int chan*/) override;
-    virtual device_state_t writeChannel(/*int chan, IECPayload &payload*/) override;
-#endif
-
-    void shutdown() override;
-
     int appkey_size = 64;
     std::map<int, int> mode_to_keysize = {
         {0, 64},
@@ -345,14 +359,53 @@ protected:
     };
     bool check_appkey_creator(bool check_is_write);
 
-    /**
-     * @brief called to process command either at open or listen
-     */
-    void iec_command();
-
     void set_fuji_iec_status(int8_t error, const std::string msg) {
         set_iec_status(error, last_command, msg, fnWiFi.connected(), 15);
     }
+
+    void set_iec_status(int8_t error, uint8_t cmd, const std::string msg, bool connected, int channel) {
+        iecStatus.error = error;
+        iecStatus.cmd = cmd;
+        iecStatus.msg = msg;
+        iecStatus.connected = connected;
+        iecStatus.channel = channel;
+    }
+
+    // TODO: does this need to translate the message to PETSCII?
+    std::vector<uint8_t> iec_status_to_vector() {
+        std::vector<uint8_t> data;
+        data.push_back(static_cast<uint8_t>(iecStatus.error));
+        data.push_back(iecStatus.cmd);
+        data.push_back(iecStatus.connected ? 1 : 0);
+        data.push_back(static_cast<uint8_t>(iecStatus.channel & 0xFF)); // it's only an int because of atoi from some basic commands, but it's never really more than 1 byte
+
+        // max of 41 chars in message including the null terminator. It will simply be truncated, so if we find any that are excessive, should trim them down in firmware
+        size_t actualLength = std::min(iecStatus.msg.length(), static_cast<size_t>(40));
+        for (size_t i = 0; i < actualLength; ++i) {
+            data.push_back(static_cast<uint8_t>(iecStatus.msg[i]));
+        }
+        data.push_back(0); // null terminate the string
+
+        return data;
+    }
+
+    /**
+     * @brief The status information to send back on cmd input
+     * @param error = the latest error status
+     * @param msg = most recent status message
+     * @param connected = is most recent channel connected?
+     * @param channel = channel of most recent status msg.
+     */
+    struct _iecStatus
+    {
+        int8_t error;
+        uint8_t cmd;
+        std::string msg;
+        bool connected;
+        int channel;
+    } iecStatus;
+
+    device_state_t state;
 
 public:
     bool boot_config = true;
@@ -379,6 +432,11 @@ public:
 
     // 0xD7 - why is this public?
     void mount_all();
+
+    // overriding the IECDevice isActive() function because device_active
+    // must be a global variable
+    bool device_active = true;
+    virtual bool isActive() { return device_active; }
 
     iecFuji();
 };

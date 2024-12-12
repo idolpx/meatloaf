@@ -60,7 +60,7 @@ void main_shutdown_handler()
     Debug_printf("Shutdown handler called");
     // Give devices an opportunity to clean up before rebooting
 
-//    IEC.shutdown();
+    IEC.shutdown();
 }
 
 // Initial setup
@@ -146,34 +146,35 @@ void main_setup()
     IEC.setup();
     printf(ANSI_GREEN_BOLD "IEC Bus Initialized" ANSI_RESET "\r\n");
 
-    {
-        // Add devices to bus
-        FileSystem *ptrfs = fnSDFAT.running() ? (FileSystem *)&fnSDFAT : (FileSystem *)&fsFlash;
-        iecPrinter::printer_type ptype = iecPrinter::printer_type::PRINTER_COMMODORE_MPS803; // temporary
-        printf("Creating a default printer using %s storage and type %d\r\n", ptrfs->typestring(), ptype);
-        iecPrinter *ptr = new iecPrinter(ptrfs, ptype);
-        fnPrinters.set_entry(0, ptr, ptype, Config.get_printer_port(0));
+    Meatloaf.setup(&IEC);
+    // {
+    //     // Add devices to bus
+    //     FileSystem *ptrfs = fnSDFAT.running() ? (FileSystem *)&fnSDFAT : (FileSystem *)&fsFlash;
+    //     iecPrinter::printer_type ptype = iecPrinter::printer_type::PRINTER_COMMODORE_MPS803; // temporary
+    //     printf("Creating a default printer using %s storage and type %d\r\n", ptrfs->typestring(), ptype);
+    //     iecPrinter *ptr = new iecPrinter(ptrfs, ptype);
+    //     fnPrinters.set_entry(0, ptr, ptype, Config.get_printer_port(0));
 
-        printf("Printer "); IEC.addDevice(ptr, 4);                    // 04-07 Printers / Plotters
-        printf("Disk "); IEC.addDevice(new iecDrive(), 8);            // 08-15 Drives
-        printf("Network "); IEC.addDevice(new iecNetwork(), 16);      // 16-19 Network Devices
-        printf("CPM "); IEC.addDevice(new iecCpm(), 20);              // 20-29 Other
-        printf("Voice "); IEC.addDevice(new iecVoice(), 21);
-        printf("Clock "); IEC.addDevice(new iecClock(), 28);
-        printf("OpenAI "); IEC.addDevice(new iecOpenAI(), 29);
-        printf("Meatloaf "); IEC.addDevice(new iecMeatloaf(), 30);    // 30    Meatloaf
+    //     printf("Printer "); IEC.addDevice(ptr, 4);                    // 04-07 Printers / Plotters
+    //     printf("Disk "); IEC.addDevice(new iecDrive(), 8);            // 08-15 Drives
+    //     printf("Network "); IEC.addDevice(new iecNetwork(), 16);      // 16-19 Network Devices
+    //     printf("CPM "); IEC.addDevice(new iecCpm(), 20);              // 20-29 Other
+    //     printf("Voice "); IEC.addDevice(new iecVoice(), 21);
+    //     printf("Clock "); IEC.addDevice(new iecClock(), 28);
+    //     printf("OpenAI "); IEC.addDevice(new iecOpenAI(), 29);
+    //     printf("Meatloaf "); IEC.addDevice(new iecMeatloaf(), 30);    // 30    Meatloaf
 
-        printf("Virtual Device(s) Started: [ " ANSI_YELLOW_BOLD );
-        for (uint8_t i = 0; i < 31; i++)
-        {
-            if (IEC.isDeviceEnabled(i))
-            {
-                printf("%.02d ", i);
-            }
-        }
-        printf( ANSI_RESET "]\r\n");
-        //IEC.enabled = true;
-    }
+    //     printf("Virtual Device(s) Started: [ " ANSI_YELLOW_BOLD );
+    //     for (uint8_t i = 0; i < 31; i++)
+    //     {
+    //         if (IEC.isDeviceEnabled(i))
+    //         {
+    //             printf("%.02d ", i);
+    //         }
+    //     }
+    //     printf( ANSI_RESET "]\r\n");
+    //     //IEC.enabled = true;
+    // }
 
 #ifdef PARALLEL_BUS
     // Setup Parallel Bus
