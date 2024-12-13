@@ -31,6 +31,7 @@ class iecChannelHandler
 
   virtual uint8_t writeBufferData() = 0;
   virtual uint8_t readBufferData()  = 0;
+  virtual MStream *getStream() { return nullptr; };
 
  protected:
   iecDrive *m_drive;
@@ -47,10 +48,11 @@ class iecChannelHandlerFile : public iecChannelHandler
 
   virtual uint8_t readBufferData();
   virtual uint8_t writeBufferData();
+  virtual MStream *getStream() override { return m_stream; };
 
  private:
-  MStream *m_stream;
-  int      m_fixLoadAddress;
+  MStream  *m_stream;
+  int       m_fixLoadAddress;
   uint32_t  m_byteCount;
   uint64_t  m_timeStart, m_transportTimeUS;
 };

@@ -248,7 +248,6 @@ uint8_t iecChannelHandlerFile::readBufferData()
   return ST_OK;
 }
 
-
 // -------------------------------------------------------------------------------------------------
 
 
@@ -390,18 +389,51 @@ uint8_t iecChannelHandlerDir::readBufferData()
             }
           mstr::replaceAll(name, "\\", "/");
           
+          // File name
           m_data[m_len++] = '"';
-          size_t n = std::min(16, (int) name.size());
-          memcpy(m_data+m_len, name.data(), n);
-          m_len += n;
-          m_data[m_len++] = '"';
-          n = 17-n;
-          while(n-->0) m_data[m_len++] = ' ';
-          memcpy(m_data+m_len, ext.data(), 3);
-          m_len+=3;
-          while( m_len<31 ) m_data[m_len++] = ' ';
-          m_data[31] = 0;
-          m_len = 32;
+
+          // C64 compatibale name
+          // {
+          //   size_t n = std::min(16, (int) name.size());
+          //   memcpy(m_data+m_len, name.data(), n);
+          //   m_len += n;
+          //   m_data[m_len++] = '"';
+
+          //   // Extension gap
+          //   n = 17-n;
+          //   while(n-->0) m_data[m_len++] = ' ';
+
+          //   // Extension
+          //   memcpy(m_data+m_len, ext.data(), 3);
+          //   m_len+=3;
+          //   while( m_len<31 ) m_data[m_len++] = ' ';
+          //   m_data[31] = 0;
+          //   m_len = 32;
+          // }
+
+          // Full long name
+          {
+            size_t n = (int) name.size();
+            memcpy(m_data+m_len, name.data(), n);
+
+            m_len += n;
+            m_data[m_len++] = '"';
+
+            // Extension gap
+            if (n<16)
+            {
+              n = 17-n;
+              while(n-->0) m_data[m_len++] = ' ';
+            }
+            else
+              m_data[m_len++] = ' ';
+
+            // Extension
+            memcpy(m_data+m_len, ext.data(), 3);
+            m_len+=3;
+            m_data[m_len++] = ' ';
+            m_data[m_len++] = 0;
+          }
         }
       else
         {
@@ -470,8 +502,6 @@ bool iecDrive::open(uint8_t channel, const char *cname)
   std::string name;
   std::vector<std::string> pt = util_tokenize(std::string(cname), ',');
   if( pt.size()>0 ) name = pt[0];
-  if( mstr::startsWith(name, "0:") )
-    name = mstr::drop(name, 2);
 
   // determine file mode (read/write)
   bool overwrite = false;
@@ -485,11 +515,19 @@ bool iecDrive::open(uint8_t channel, const char *cname)
         mode = std::ios_base::out;
     }
 
-  if( mstr::startsWith(name, "@:") )
+  if( mstr::startsWith(name, "@") )
     {
       overwrite = true;
+      name = mstr::drop(name, 1);
+    }
+
+  if( mstr::startsWith(name, "0:") )
+    name = mstr::drop(name, 2);
+
+  if( mstr::startsWith(name, "CD") )
+    {
       name = mstr::drop(name, 2);
-    }      
+    }
 
   // file name officially ends at first "shifted space" (0xA0) character
   size_t i = name.find('\xa0');
@@ -516,7 +554,7 @@ bool iecDrive::open(uint8_t channel, const char *cname)
       // get file
       MFile *f = m_cwd->cd(mstr::toUTF8(name));
 
-      if( f == nullptr || f->url.empty() )
+      if( f == nullptr ) // || f->url.empty() )
         {
           Debug_printv("Error: could not find file system for URL [%s]", name.c_str());
           setStatusCode(ST_FILE_NOT_FOUND);
@@ -739,7 +777,215 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
   else
     {
       setStatusCode(ST_SYNTAX_ERROR_31);
-      Debug_printv("Invalid command");
+      //Debug_printv("Invalid command");
+    }
+
+
+    // Drive level commands
+    // CBM DOS 2.6
+    switch ( command[0] )
+    {
+        case 'B':
+            if (command[1] == '-')
+            {
+                // B-P buffer pointer
+                if (command[2] == 'P')
+                {
+                    command = mstr::drop(command, 3);
+                    mstr::trim(command);
+                    mstr::replaceAll(command, "  ", " ");
+                    std::vector<uint8_t> pti = util_tokenize_uint8(command);
+                    Debug_printv("command[%s] channel[%d] position[%d]", command.c_str(), pti[0], pti[1]);
+
+                    auto channel = m_channels[pti[0]];
+                    if ( channel != nullptr )
+                    {
+                        auto stream = channel->getStream();
+                        stream->position( pti[1] );
+                        setStatusCode(ST_OK);
+                    }
+                }
+                // B-A allocate bit in BAM not implemented
+                // B-F free bit in BAM not implemented
+                // B-E block execute impossible at this level of emulation!
+            }
+            //Error(ERROR_31_SYNTAX_ERROR);
+            Debug_printv( "block/buffer");
+        break;
+        case 'C':
+            if ( command[1] != 'D' && command[2] == ':')
+            {
+                //Copy(); // Copy File
+                Debug_printv( "copy file");
+            }
+        break;
+        case 'D':
+            Debug_printv( "duplicate disk");
+            //Error(ERROR_31_SYNTAX_ERROR);	// DI, DR, DW not implemented yet
+        break;
+        case 'I':
+            // Initialize
+            Debug_printv( "initialize");
+            reset();
+        break;
+        case 'M':
+            if ( command[1] == '-' ) // Memory
+            {
+                if (command[2] == 'R') // M-R memory read
+                {
+                    command = mstr::drop(command, 3);
+                    std::string code = mstr::toHex(command);
+                    uint16_t address = (command[0] | command[1] << 8);
+                    uint8_t size = command[2];
+                    Debug_printv("Memory Read [%s]", code.c_str());
+                    Debug_printv("address[%.4X] size[%d]", address, size);
+                }
+                else if (command[2] == 'W') // M-W memory write
+                {
+                    command = mstr::drop(command, 3);
+                    std::string code = mstr::toHex(command);
+                    uint16_t address = (command[0] | command[1] << 8);
+                    Debug_printv("Memory Write address[%.4X][%s]", address, code.c_str());
+                }
+                else if (command[2] == 'E') // M-E memory execute
+                {
+                    command = mstr::drop(command, 3);
+                    std::string code = mstr::toHex(command);
+                    uint16_t address = (command[0] | command[1] << 8);
+                    Debug_printv("Memory Execute address[%.4X][%s]", address, code.c_str());
+                }
+                setStatusCode(ST_OK);
+            }
+        break;
+        case 'N':
+            //New();
+            Debug_printv( "new (format)");
+        break;
+        case 'R':
+            if ( command[1] != 'D' && command[2] == ':' ) // Rename
+            {
+                Debug_printv( "rename file");
+                // Rename();
+            }
+        break;
+        case 'S':
+            if (command[2] == ':') // Scratch
+            {
+                Debug_printv( "scratch");
+                //Scratch();
+            }
+        break;
+        case 'U':
+            Debug_printv( "user 01a2b");
+            //User();
+            if (command[1] == '1') // User 1
+            {
+                command = mstr::drop(command, 3);
+                mstr::trim(command);
+                mstr::replaceAll(command, "  ", " ");
+                std::vector<uint8_t> pti = util_tokenize_uint8(command);
+                Debug_printv("command[%s] channel[%d] media[%d] track[%d] sector[%d]", command.c_str(), pti[0], pti[1], pti[2], pti[3]);
+
+                auto channel = m_channels[pti[0]];
+                if ( channel != nullptr )
+                {
+                    auto stream = channel->getStream();
+                    stream->seekSector( pti[2], pti[3] );
+                    setStatusCode(ST_OK);
+                }
+            }
+        break;
+        case 'V':
+            Debug_printv( "validate bam");
+        break;
+        default:
+            //Error(ERROR_31_SYNTAX_ERROR);
+        break;
+    }
+
+    // SD2IEC Commands
+    // http://www.n2dvm.com/UIEC.pdf
+    switch ( command[0] )
+    {
+        case 'C':
+            if ( command[1] == 'P') // Change Partition
+            {
+                Debug_printv( "change partition");
+                //ChangeDevice();
+            }
+            else if ( command[1] == 'D') // Change Directory
+            {
+                Debug_printv( "change directory");
+                //set_prefix();
+            }
+        break;
+        case 'E':
+            if (command[1] == '-')
+            {
+                Debug_printv( "eeprom");
+            }
+        break;
+        case 'G':
+            Debug_printv( "get partition info");
+            //Error(ERROR_31_SYNTAX_ERROR);	// G-P not implemented yet
+        break;
+        case 'M':
+            if ( command[1] == 'D') // Make Directory
+            {
+                Debug_printv( "make directory");
+            }
+        break;
+        case 'P':
+            Debug_printv( "position");
+            //Error(ERROR_31_SYNTAX_ERROR);	// P not implemented yet
+        break;
+        case 'R':
+            if ( command[1] == 'D') // Remove Directory
+            {
+                Debug_printv( "remove directory");
+            }
+        break;
+        case 'S':
+            if (command[1] == '-')
+            {
+                // Swap drive number 
+                Debug_printv( "swap drive number");
+                //Error(ERROR_31_SYNTAX_ERROR);
+                break;
+            }
+        break;
+        case 'T':
+            if (command[1] == '-')
+            {
+                Debug_printv( "time"); // RTC support
+                //Error(ERROR_31_SYNTAX_ERROR);	// T-R and T-W not implemented yet
+            }
+        break;
+        case 'W':
+            // Save out current options?
+            //OPEN1, 9, 15, "XW":CLOSE1
+            Debug_printv( "user 1a2b");
+        break;
+        case 'X':
+            Debug_printv( "xtended commands");
+            // X{0-4}
+            // XE+ / XE-
+            // XB+ / XB-
+            // X{0-7}={0-15}
+            // XD?
+            // XJ+ / XJ-
+            // X
+            // XS:{name} / XS
+            // XW
+            // X?
+            //Extended();
+        break;
+        case '/':
+
+        break;
+        default:
+            //Error(ERROR_31_SYNTAX_ERROR);
+        break;
     }
 }
 

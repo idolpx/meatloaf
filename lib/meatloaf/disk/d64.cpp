@@ -428,6 +428,7 @@ bool D64MStream::seekPath(std::string path)
     {
         //Debug_printv("Direct Access Mode track[1] sector[0] path[%s]", path.c_str());
         seekCalled = false;
+        _size = block_size;
         return seekSector(1, 0);
     }
     else if (seekEntry(path))

@@ -22,6 +22,7 @@
 // https://ar.c64.org/rrwiki/images/4/48/The_Transactor_Vol09_03_1989_Feb_JD_review.pdf
 // https://web.archive.org/web/20090826145226/http://home.arcor.de/jochen.adler/ajnjil-t.htm
 // https://web.archive.org/web/20220423162959/https://sites.google.com/site/h2obsession/CBM/C128/JiffySoft128
+// https://web.archive.org/web/20090211031551/http://hem.passagen.se/harlekin/jiffy1.doc
 // https://www.c64-wiki.com/wiki/SJLOAD
 // https://github.com/mist64/cbmbus_doc/blob/cb021f3454b499c579c265859ce67ba99e85652b/7%20JiffyDOS.md
 // https://ar.c64.org/rrwiki/images/4/48/The_Transactor_Vol09_03_1989_Feb_JD_review.pdf
