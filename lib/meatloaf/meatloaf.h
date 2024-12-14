@@ -269,6 +269,97 @@ public:
         return _is_mounted;
     }
 
+    // Determine file type by contents
+    static std::string detectFileType(size_t size, const char* header) 
+    {
+        std::string extension = nullptr;
+
+        // // Open File for reading
+        // std::ifstream file(fileName, std::ios::binary | std::ios::ate);
+
+        // // Get first 16 bytes
+        // file.seekg(0, std::ios::beg);
+        // std::string header(16, ' ');
+        // file.read(&header[0], 16);
+
+        // // Get file size
+        // file.seekg(0, std::ios::end);
+        // uint32_t fileSize = file.tellg();
+        // file.seekg(0, std::ios::beg);
+
+        // // Close file
+        // file.close();
+
+        // Determine file type by file size
+        switch(size) {
+            case 174848: // 35 tracks no errors
+            case 175531: // 35 w/ errors
+            case 196608: // 40 tracks no errors
+            case 197376: // 40 w/ errors
+            case 205312: // 42 tracks no errors
+            case 206114: // 42 w/ errors
+                extension = ".d64";
+                break;
+
+            case 349696: // 70 tracks no errors
+            case 351062: // 70 w/ errors
+                extension = ".d71";
+                break;
+
+            case 533248:
+                extension = ".d80";
+                break;
+
+            case 819200:  // 80 tracks no errors
+            case 822400:  // 80 w/ errors
+                extension = ".d81";
+                break;
+
+            case 1066496:
+                extension = ".d82";
+                break;
+
+            case 1392640: // 136 sectors per track (deprecated)
+            case 1474560: // 144 sectors per track
+                extension = ".d8b";
+                break;
+
+             case 5013504:  // D9060
+             case 7520256:  // D9090
+                extension = ".d90";
+                 break;
+
+            default:
+                break;
+        }
+
+        // If we already have a file extension we are done
+        if ( extension.size() )
+            return extension;
+
+        // Determine file type by file header
+        // https://en.wikipedia.org/wiki/List_of_file_signatures
+        if ( mstr::startsWith(header, (const char*)'\x04\x01') ||
+             mstr::startsWith(header, (const char*)'\x08\x01') )
+            extension = ".prg";
+        else if ( mstr::startsWith(header, (const char*)'C64File') )
+            extension = ".p00";
+        else if ( mstr::startsWith(header, (const char*)'C64 tape image file') )
+            extension = ".t64";
+        else if ( mstr::startsWith(header, (const char*)'C64 CARTRIDGE\x20\x20\x20') )
+            extension = ".crt";
+        else if ( mstr::startsWith(header, (const char*)'GCR-1541') )
+            extension = ".g64";
+        else if ( mstr::startsWith(header, (const char*)'PK\x03\x04') ||
+             mstr::startsWith(header, (const char*)'PK\x05\x06') ||
+             mstr::startsWith(header, (const char*)'PK\x07\x08') )
+            extension = ".zip";
+        else if ( mstr::startsWith(header, (const char*)'Rar!\x1A\x07'))
+            extension = ".rar";
+
+        return extension;
+    }
+
     static bool byExtension(const char* ext, std::string fileName) {
         return mstr::endsWith(fileName, ext, false);
     }
@@ -302,6 +393,7 @@ public:
     static MFile* File(std::string name);
     static MFile* File(std::shared_ptr<MFile> file);
     static MFile* File(MFile* file);
+    static MFile* NewFile(std::string name);
 
     static MFileSystem* scanPathLeft(std::vector<std::string> paths, std::vector<std::string>::iterator &pathIterator);
 

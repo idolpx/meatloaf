@@ -2,9 +2,11 @@
 
 #include <dirent.h>
 #include <sys/stat.h>
+#include <unistd.h>
 #include <algorithm>
 #include <vector>
 #include <sstream>
+
 
 std::unordered_map<std::string, MFile*> FileBroker::file_repo;
 std::unordered_map<std::string, MStream*> StreamBroker::stream_repo;
@@ -258,6 +260,41 @@ MFile* MFSOwner::File(std::string path) {
 
     return nullptr;
 }
+
+MFile* MFSOwner::NewFile(std::string path) {
+
+    auto newFile = File(path);
+    if ( newFile != nullptr )
+        return nullptr;
+    
+    if (newFile->exists()) {
+        Debug_printv("File already exists [%s]", path.c_str());
+        return nullptr;
+    }
+
+    // Create new file
+    const int size = newFile->size();
+
+    // Open the file in write mode
+    int fd = open(path.c_str(), O_WRONLY | O_CREAT, 0644);
+
+    if (fd == -1) {
+        // Handle file opening error
+        return nullptr;
+    }
+
+    // Truncate the file to the desired size
+    if (ftruncate(fd, size) == -1) {
+        // Handle file truncation error
+        close(fd);
+        return nullptr;
+    }
+
+    close(fd);
+
+    return newFile;
+}
+
 
 std::string MFSOwner::existsLocal( std::string path )
 {

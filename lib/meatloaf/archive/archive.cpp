@@ -41,7 +41,7 @@ If skipping is not provided or fails, libarchive will call the read() function a
 // https://github.com/libarchive/libarchive/wiki/LibarchiveIO
 int64_t cb_skip(struct archive *a, void *userData, int64_t request)
 {
-    Debug_printv("bytes[%lld]", request);
+    //Debug_printv("bytes[%lld]", request);
     ArchiveMStreamData *streamData = (ArchiveMStreamData *)userData;
 
     if (streamData->srcStream->isOpen())

@@ -297,6 +297,7 @@ public:
 
         media_image = name;
         isPETSCII = true;
+        _size = 174848; // Default - 35 tracks no errors
     };
     
     ~D64MFile() {

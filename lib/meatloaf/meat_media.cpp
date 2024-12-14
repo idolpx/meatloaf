@@ -140,6 +140,8 @@ bool MMediaStream::isOpen() {
     return _is_open;
 };
 
+
+
 bool MMediaStream::open(std::ios_base::openmode mode) 
 {
     // return true if we were able to read the image and confirmed it is valid.
