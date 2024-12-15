@@ -334,7 +334,7 @@ MFile *ArchiveMFile::getNextFileInDir()
     if (filename.size() > 0)
     {
         auto file = MFSOwner::File(streamFile->url + "/" + filename);
-        file->_size = archive_entry_size(entry);
+        file->size = archive_entry_size(entry);
         file->_exists = true;
         return file;
     }

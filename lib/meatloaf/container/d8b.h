@@ -87,7 +87,7 @@ class D8BMFile: public D64MFile {
 public:
     D8BMFile(std::string path, bool is_dir = true) : D64MFile(path, is_dir) 
     {
-        _size = 1474560; // Default - 144 sectors per track
+        size = 1474560; // Default - 144 sectors per track
     };
 
     MStream* getDecodedStream(std::shared_ptr<MStream> containerIstream) override

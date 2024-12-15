@@ -15,7 +15,7 @@ bool TAPMStream::seekEntry( std::string filename )
         uint16_t index = 1;
         mstr::replaceAll(filename, "\\", "/");
         bool wildcard = (mstr::contains(filename, "*") || mstr::contains(filename, "?"));
-        while ( seekEntry( index ) )
+        while ( readEntry( index ) )
         {
             std::string entryFilename = entry.filename;
             uint8_t i = entryFilename.find_first_of(0xA0);
@@ -147,7 +147,7 @@ bool TAPMFile::rewindDirectory() {
     image->resetEntryCounter();
 
     // Read Header
-    image->seekHeader();
+    image->readHeader();
 
     // Set Media Info Fields
     media_header = mstr::format("%.24", image->header.disk_name);
@@ -172,7 +172,7 @@ MFile* TAPMFile::getNextFileInDir() {
     if ( image == nullptr )
         goto exit;
 
-    if ( image->seekNextImageEntry() )
+    if ( image->getNextImageEntry() )
     {
         std::string fileName = mstr::format("%.16s", image->entry.filename);
         mstr::replaceAll(fileName, "/", "\\");

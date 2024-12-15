@@ -326,9 +326,7 @@ public:
     bool exists() override {
         return true;
     }
-    uint32_t size() override {
-        return -1;
-    }
+
     bool remove() override {
         return false;
     }

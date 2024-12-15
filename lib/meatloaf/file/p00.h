@@ -30,14 +30,17 @@ protected:
         uint8_t rel_flag;
     };
 
-    void seekHeader() override {
+    bool readHeader() override {
         containerStream->seek(0x00);
-        containerStream->read((uint8_t*)&header, sizeof(header));
+        if (containerStream->read((uint8_t*)&header, sizeof(header)))
+            return true;
+
+        return false;
     }
-    bool seekNextImageEntry() override {
+    bool getNextImageEntry() override {
         if ( entry_index == 0 ) {
             entry_index = 1;
-            seekHeader();
+            readHeader();
 
             _size = ( containerStream->size() - sizeof(header) );
 
@@ -50,13 +53,14 @@ protected:
     // tap, crt, tar
     std::string seekNextEntry() override {
         seekCalled = true;
-        if ( seekNextImageEntry() ) {
+        if ( getNextImageEntry() ) {
             return header.filename;
         }
         return "";
     };
 
     uint32_t readFile(uint8_t* buf, uint32_t size) override;
+    uint32_t writeFile(uint8_t* buf, uint32_t size) override { return 0; };
 
     Header header;
 

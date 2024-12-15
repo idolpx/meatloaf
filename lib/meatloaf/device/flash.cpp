@@ -130,19 +130,19 @@ bool FlashMFile::exists()
     return (i == 0);
 }
 
-uint32_t FlashMFile::size() {
-    if (m_isNull || path=="/" || path=="")
-        return 0;
-    else if(isDirectory()) {
-        return 0;
-    }
-    else {
-        struct stat info;
-        stat( std::string(basepath + path).c_str(), &info);
-        // Debug_printv( "size[%d]", info.st_size );
-        return info.st_size;
-    }
-}
+// uint32_t FlashMFile::size() {
+//     if (m_isNull || path=="/" || path=="")
+//         return 0;
+//     else if(isDirectory()) {
+//         return 0;
+//     }
+//     else {
+//         struct stat info;
+//         stat( std::string(basepath + path).c_str(), &info);
+//         // Debug_printv( "size[%d]", info.st_size );
+//         return info.st_size;
+//     }
+// }
 
 bool FlashMFile::remove() {
     // musi obslugiwac usuwanie plikow i katalogow!
@@ -245,6 +245,16 @@ MFile* FlashMFile::getNextFileInDir()
 
         auto file = new FlashMFile(entry_name);
         file->extension = " " + file->extension;
+
+        if(file->isDirectory()) {
+            file->size = 0;
+        }
+        else {
+            struct stat info;
+            stat( std::string(entry_name).c_str(), &info);
+            file->size = info.st_size;
+        }
+
         return file;
     }
     else
@@ -255,7 +265,7 @@ MFile* FlashMFile::getNextFileInDir()
 }
 
 
-bool FlashMFile::seekEntry( std::string filename )
+bool FlashMFile::readEntry( std::string filename )
 {
     std::string apath = (basepath + pathToFile()).c_str();
     if (apath.empty()) {

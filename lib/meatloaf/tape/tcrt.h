@@ -38,9 +38,12 @@ protected:
         uint16_t bundle_main_call_address;
     };
 
-    void seekHeader() override {
+    bool readHeader() override {
         containerStream->seek(0x18);
-        containerStream->read((uint8_t*)&header, sizeof(header));
+        if (containerStream->read((uint8_t*)&header, sizeof(header)))
+            return true;
+
+        return false;
     }
 
     bool seekEntry( std::string filename ) override;
@@ -48,6 +51,7 @@ protected:
     bool seekPath(std::string path) override;
 
     uint32_t readFile(uint8_t* buf, uint32_t size) override;
+    uint32_t writeFile(uint8_t* buf, uint32_t size) override { return 0; };
 
     Header header;
     Entry entry;

@@ -223,14 +223,7 @@ public:
     bool seekSector( uint8_t track, uint8_t sector, uint8_t offset = 0 ) override;
     bool seekSector( std::vector<uint8_t> trackSectorOffset ) override;
 
-    void seekHeader() override {
-        seekSector( 
-            partitions[partition].header_track, 
-            partitions[partition].header_sector, 
-            partitions[partition].header_offset 
-        );
-        readContainer((uint8_t*)&header, sizeof(header));
-    }
+
     uint16_t getSectorCount( uint16_t track )
     {
         return sectorsPerTrack[speedZone(track)];
@@ -242,6 +235,7 @@ public:
 
     virtual bool seekPath(std::string path) override;
     uint32_t readFile(uint8_t* buf, uint32_t size) override;
+    uint32_t writeFile(uint8_t* buf, uint32_t size) override;
 
     Header header;      // Directory header data
     Entry entry;        // Directory entry data
@@ -260,8 +254,33 @@ public:
 private:
     void sendListing();
 
+    bool readHeader() override {
+        seekSector( 
+            partitions[partition].header_track, 
+            partitions[partition].header_sector, 
+            partitions[partition].header_offset 
+        );
+        if (readContainer((uint8_t*)&header, sizeof(header)))
+            return true;
+
+        return false;
+    }
+    bool writeHeader() override {
+        seekSector( 
+            partitions[partition].header_track, 
+            partitions[partition].header_sector, 
+            partitions[partition].header_offset 
+        );
+        if (writeContainer((uint8_t*)&header, sizeof(header)))
+            return true;
+        
+        return false;
+    }
+
     bool seekEntry( std::string filename ) override;
     bool seekEntry( uint16_t index = 0 ) override;
+    bool readEntry( uint16_t index = 0 ) override;
+    bool writeEntry( uint16_t index = 0 ) override;
 
     std::string readBlock( uint8_t track, uint8_t sector );
     bool writeBlock( uint8_t track, uint8_t sector, std::string data );
@@ -297,7 +316,7 @@ public:
 
         media_image = name;
         isPETSCII = true;
-        _size = 174848; // Default - 35 tracks no errors
+        size = 174848; // Default - 35 tracks no errors
     };
     
     ~D64MFile() {
@@ -314,7 +333,6 @@ public:
     bool isDirectory() override;
     bool rewindDirectory() override;
     MFile* getNextFileInDir() override;
-    bool mkDir() override { return false; };
 
     bool exists() override;
     bool remove() override { return false; };

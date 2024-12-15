@@ -66,7 +66,7 @@ bool TCRTMStream::seekEntry( std::string filename )
         size_t index = 1;
         mstr::replaceAll(filename, "\\", "/");
         bool wildcard =  ( mstr::contains(filename, "*") || mstr::contains(filename, "?") );
-        while ( seekEntry( index ) )
+        while ( readEntry( index ) )
         {
             std::string entryFilename = entry.filename;
             //uint8_t i = entryFilename.find_first_of(0x00); // padded with NUL (0x00)
@@ -214,7 +214,7 @@ bool TCRTMFile::rewindDirectory() {
     image->resetEntryCounter();
 
     // Read Header
-    image->seekHeader();
+    image->readHeader();
 
     // Set Media Info Fields
     media_header = mstr::format("%.16s", image->header.disk_name);
@@ -243,7 +243,7 @@ MFile* TCRTMFile::getNextFileInDir()
 
     do
     {
-        r = image->seekNextImageEntry();
+        r = image->getNextImageEntry();
     } while ( r && image->entry.file_type >= 0xFE); // Skip SYSTEM files
     
     if ( r )
@@ -256,6 +256,7 @@ MFile* TCRTMFile::getNextFileInDir()
         //Debug_printv( "entry[%s]", (streamFile->url + "/" + filename).c_str() );
         auto file = MFSOwner::File(streamFile->url + "/" + filename);
         file->extension = image->decodeType(image->entry.file_type);
+        file->size = (image->entry.file_size[0] | (image->entry.file_size[1] << 8) | (image->entry.file_size[2] << 16)) + 2; // 2 bytes for load address
 
         return file;
     }

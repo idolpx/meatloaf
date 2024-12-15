@@ -43,16 +43,20 @@ protected:
         char filename[16];
     };
 
-    void seekHeader() override {
+    bool readHeader() override {
         Debug_printv("here");
         containerStream->seek(0x28);
-        containerStream->read((uint8_t*)&header, sizeof(header));
+        if (containerStream->read((uint8_t*)&header, sizeof(header)))
+            return true;
+
+        return false;
     }
 
     bool seekEntry( std::string filename ) override;
     bool seekEntry( uint16_t index ) override;
 
     uint32_t readFile(uint8_t* buf, uint32_t size) override;
+    uint32_t writeFile(uint8_t* buf, uint32_t size) override { return 0; };
     bool seekPath(std::string path) override;
 
     Header header;

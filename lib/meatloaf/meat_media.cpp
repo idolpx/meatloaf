@@ -162,7 +162,10 @@ uint32_t MMediaStream::readContainer(uint8_t *buf, uint32_t size)
 {
     return containerStream->read(buf, size);
 }
-
+uint32_t MMediaStream::writeContainer(uint8_t *buf, uint32_t size)
+{
+    return containerStream->read(buf, size);
+}
 
 uint8_t MMediaStream::read() 
 {

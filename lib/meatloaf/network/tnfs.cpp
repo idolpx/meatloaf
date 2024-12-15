@@ -112,19 +112,19 @@ bool TNFSMFile::exists()
     return (i == 0);
 }
 
-uint32_t TNFSMFile::size() {
-    if (m_isNull || path=="/" || path=="")
-        return 0;
-    else if(isDirectory()) {
-        return 0;
-    }
-    else {
-        struct stat info;
-        stat( std::string(basepath + path).c_str(), &info);
-        // Debug_printv( "size[%d]", info.st_size );
-        return info.st_size;
-    }
-}
+// uint32_t TNFSMFile::size() {
+//     if (m_isNull || path=="/" || path=="")
+//         return 0;
+//     else if(isDirectory()) {
+//         return 0;
+//     }
+//     else {
+//         struct stat info;
+//         stat( std::string(basepath + path).c_str(), &info);
+//         // Debug_printv( "size[%d]", info.st_size );
+//         return info.st_size;
+//     }
+// }
 
 bool TNFSMFile::remove() {
     // musi obslugiwac usuwanie plikow i katalogow!
@@ -213,12 +213,30 @@ MFile* TNFSMFile::getNextFileInDir()
     if(dir == nullptr)
         return nullptr;
 
-    // Debug_printv("before readdir(), dir not null:%d", dir != nullptr);
     struct dirent* dirent = NULL;
-    if((dirent = readdir( dir )) != NULL)
+    do
     {
-        // Debug_printv("path[%s] name[%s]", this->path, dirent->d_name);
-        return new TNFSMFile(this->path + ((this->path == "/") ? "" : "/") + std::string(dirent->d_name));
+        dirent = readdir( dir );
+    } while ( dirent != NULL && mstr::startsWith(dirent->d_name, ".") ); // Skip hidden files
+
+    if ( dirent != NULL )
+    {
+        //Debug_printv("path[%s] name[%s]", this->path.c_str(), dirent->d_name);
+        std::string entry_name = this->path + ((this->path == "/") ? "" : "/") + std::string(dirent->d_name);
+
+        auto file = new TNFSMFile(entry_name);
+        file->extension = " " + file->extension;
+
+        if(file->isDirectory()) {
+            file->size = 0;
+        }
+        else {
+            struct stat info;
+            stat( std::string(entry_name).c_str(), &info);
+            file->size = info.st_size;
+        }
+
+        return file;
     }
     else
     {
@@ -228,7 +246,7 @@ MFile* TNFSMFile::getNextFileInDir()
 }
 
 
-bool TNFSMFile::seekEntry( std::string filename )
+bool TNFSMFile::readEntry( std::string filename )
 {
     DIR* d;
     std::string apath = (basepath + pathToFile()).c_str();

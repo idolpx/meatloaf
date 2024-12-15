@@ -206,6 +206,8 @@ public:
     virtual MStream* getDecodedStream(std::shared_ptr<MStream> src) = 0;
     virtual MStream* createStream(std::ios_base::openmode) { return nullptr; };
 
+    virtual bool format(std::string header, std::string id);
+
     MFile* cd(std::string newDir);
     MFile* cdParent(std::string = "");
     MFile* cdLocalParent(std::string);
@@ -216,7 +218,8 @@ public:
     virtual bool rewindDirectory() = 0 ;
     virtual MFile* getNextFileInDir() = 0 ;
 
-    virtual bool mkDir() = 0 ;    
+    virtual bool mkDir() { return false; };
+    virtual bool rmDir() { return false; };
     virtual bool exists();
     virtual bool remove() = 0;
     virtual bool rename(std::string dest) = 0;    
@@ -224,15 +227,11 @@ public:
     virtual time_t getCreationTime() = 0 ;
     virtual uint64_t getAvailableSpace();
 
-    virtual uint32_t size() {
-        return _size;
-    };
     virtual uint32_t blocks() {
-        auto s = size();
-        if ( s > 0 && s < media_block_size )
+        if ( size > 0 && size < media_block_size )
             return 1;
         else
-            return ( s / media_block_size );
+            return ( size / media_block_size );
     }
 
     virtual bool isText() {
@@ -242,7 +241,7 @@ public:
     MFile* streamFile = nullptr;
     std::string pathInStream;
 
-    uint32_t _size = 0;
+    uint32_t size = 0;
     uint32_t _exists = true;
 
 protected:
@@ -269,8 +268,8 @@ public:
         return _is_mounted;
     }
 
-    // Determine file type by contents
-    static std::string detectFileType(size_t size, const char* header) 
+    // Determine file type by file contents
+    static std::string byContent(const char* header) 
     {
         std::string extension = nullptr;
 
@@ -290,7 +289,61 @@ public:
         // // Close file
         // file.close();
 
-        // Determine file type by file size
+        // Determine file type by file header
+        // https://en.wikipedia.org/wiki/List_of_file_signatures
+        if ( mstr::startsWith(header, "\x04\x01") ||
+             mstr::startsWith(header, "\x08\x01") )
+            extension = ".prg";
+        else if ( mstr::startsWith(header, "C64File") )
+            extension = ".p00";
+        else if ( mstr::startsWith(header, "C64-TAPE-RAW") )
+            extension = ".tap";
+        else if ( mstr::startsWith(header, "CUTE32-HIRES") )
+            extension = ".htap";
+        else if ( mstr::startsWith(header, "C64 tape image file") )
+            extension = ".t64";
+        else if ( mstr::startsWith(header, "tapecartImage") )
+            extension = ".tcrt";
+        else if ( mstr::startsWith(header, "C64 CARTRIDGE\x20\x20\x20") )
+            extension = ".crt";
+        else if ( mstr::startsWith(header, "GCR-1541") )
+            extension = ".g64";
+        else if ( mstr::startsWith(header, "GCR-1571") )
+            extension = ".g71";
+        else if ( mstr::startsWith(header, "MFM-1581") )
+            extension = ".g81";
+        else if ( mstr::startsWith(header, "MNIB-1541-RAW") )
+            extension = ".nib";
+        else if ( mstr::startsWith((header + 1), "MNIB-1541-RAW") )
+            extension = ".nbz";
+        else if ( mstr::startsWith(header, "P64-1541") )
+            extension = ".p64";
+        else if ( mstr::startsWith(header, "P64-1581") )
+            extension = ".p81";
+        else if ( mstr::startsWith(header, "SCP") )
+            extension = ".scp";
+
+        if ( mstr::startsWith(header, "\x00\x60") )
+            extension = ".koa";
+        else if ( mstr::startsWith(header, "PSID") )
+            extension = ".psid";
+
+
+        else if ( mstr::startsWith(header, "PK\x03\x04") ||
+             mstr::startsWith(header, "PK\x05\x06") ||
+             mstr::startsWith(header, "PK\x07\x08") )
+            extension = ".zip";
+        else if ( mstr::startsWith(header, "Rar!\x1A\x07"))
+            extension = ".rar";
+
+        return extension;
+    }
+
+    // Determine file type by file size
+    static std::string bySize(size_t size) 
+    {
+        std::string extension = nullptr;
+
         switch(size) {
             case 174848: // 35 tracks no errors
             case 175531: // 35 w/ errors
@@ -312,6 +365,7 @@ public:
 
             case 819200:  // 80 tracks no errors
             case 822400:  // 80 w/ errors
+            case 829440:  // 81 tracks no errors
                 extension = ".d81";
                 break;
 
@@ -324,38 +378,18 @@ public:
                 extension = ".d8b";
                 break;
 
-             case 5013504:  // D9060
-             case 7520256:  // D9090
+            case 5013504: // D9060
+            case 7520256: // D9090
                 extension = ".d90";
-                 break;
+                break;
+
+            case 10003: // Koala image
+                extension = ".koa";
+                break;
 
             default:
                 break;
         }
-
-        // If we already have a file extension we are done
-        if ( extension.size() )
-            return extension;
-
-        // Determine file type by file header
-        // https://en.wikipedia.org/wiki/List_of_file_signatures
-        if ( mstr::startsWith(header, (const char*)'\x04\x01') ||
-             mstr::startsWith(header, (const char*)'\x08\x01') )
-            extension = ".prg";
-        else if ( mstr::startsWith(header, (const char*)'C64File') )
-            extension = ".p00";
-        else if ( mstr::startsWith(header, (const char*)'C64 tape image file') )
-            extension = ".t64";
-        else if ( mstr::startsWith(header, (const char*)'C64 CARTRIDGE\x20\x20\x20') )
-            extension = ".crt";
-        else if ( mstr::startsWith(header, (const char*)'GCR-1541') )
-            extension = ".g64";
-        else if ( mstr::startsWith(header, (const char*)'PK\x03\x04') ||
-             mstr::startsWith(header, (const char*)'PK\x05\x06') ||
-             mstr::startsWith(header, (const char*)'PK\x07\x08') )
-            extension = ".zip";
-        else if ( mstr::startsWith(header, (const char*)'Rar!\x1A\x07'))
-            extension = ".rar";
 
         return extension;
     }

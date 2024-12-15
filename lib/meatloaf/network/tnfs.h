@@ -28,7 +28,7 @@ public:
 
         // Find full filename for wildcard
         if (mstr::contains(name, "?") || mstr::contains(name, "*"))
-            seekEntry( name );
+            readEntry( name );
 
         if (!pathValid(path.c_str()))
             m_isNull = true;
@@ -55,12 +55,12 @@ public:
     MFile* getNextFileInDir() override ;
     bool mkDir() override ;
     bool exists() override ;
-    uint32_t size() override ;
+
     bool remove() override ;
     bool rename(std::string dest);
 
 
-    bool seekEntry( std::string filename );
+    bool readEntry( std::string filename );
 
 protected:
     DIR* dir;

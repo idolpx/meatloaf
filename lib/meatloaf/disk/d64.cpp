@@ -321,6 +321,16 @@ bool D64MStream::seekEntry( uint16_t index )
     return true;
 }
 
+bool D64MStream::readEntry( uint16_t index ) {
+    return seekEntry(index);
+}
+bool D64MStream::writeEntry( uint16_t index) {
+    if ( seekEntry(index - 1) ) {
+        return writeContainer((uint8_t*)&entry, sizeof(entry));
+    }
+    return false;
+}
+
 uint16_t D64MStream::blocksFree()
 {
     uint16_t free_count = 0;
@@ -365,6 +375,52 @@ uint16_t D64MStream::blocksFree()
 }
 
 uint32_t D64MStream::readFile(uint8_t *buf, uint32_t size)
+{
+
+    if (sector_offset % block_size == 0)
+    {
+        // We are at the beginning of the block
+        // Read track/sector link
+        readContainer((uint8_t *)&next_track, 1);
+        readContainer((uint8_t *)&next_sector, 1);
+        sector_offset += 2;
+        //Debug_printv("next_track[%d] next_sector[%d] sector_offset[%d]", next_track, next_sector, sector_offset);
+    }
+
+    uint32_t bytesRead = 0;
+
+    if (size > 0)
+    {
+        if (size > available())
+            size = available();
+        
+        // Only read up to the bytes remaining in this sector
+        size = std::min(size, (uint32_t) (block_size - sector_offset % block_size));
+
+        bytesRead += readContainer(buf, size);
+        sector_offset += bytesRead;
+
+        if (next_track && sector_offset % block_size == 0)
+        {
+            // We are at the end of the block
+            // Follow track/sector link to move to next block
+            if (!seekSector(next_track, next_sector))
+            {
+                return 0;
+            }
+            //Debug_printv("track[%d] sector[%d] sector_offset[%d]", track, sector, sector_offset);
+        }
+    }
+
+    // if ( !bytesRead )
+    // {
+    //     sector_offset = 0;
+    // }
+
+    return bytesRead;
+}
+
+uint32_t D64MStream::writeFile(uint8_t *buf, uint32_t size)
 {
 
     if (sector_offset % block_size == 0)
@@ -481,7 +537,7 @@ bool D64MFile::rewindDirectory()
     image->resetEntryCounter();
 
     // Read Header
-    image->seekHeader();
+    image->readHeader();
 
     // Set Media Info Fields
     media_header = mstr::format("%.16s", image->header.disk_name);
@@ -510,7 +566,7 @@ MFile *D64MFile::getNextFileInDir()
 
     do
     {
-        r = image->seekNextImageEntry();
+        r = image->getNextImageEntry();
     } while (r && (image->entry.file_type & 0b00000111) == 0x00); // Skip hidden files
 
     if (r)
@@ -518,11 +574,13 @@ MFile *D64MFile::getNextFileInDir()
         std::string filename = image->entry.filename;
         uint8_t i = filename.find_first_of(0xA0);
         filename = filename.substr(0, i);
+
         // mstr::rtrimA0(filename);
         mstr::replaceAll(filename, "/", "\\");
         // Debug_printv( "entry[%s]", (streamFile->url + "/" + filename).c_str() );
         auto file = MFSOwner::File(streamFile->url + "/" + filename);
         file->extension = image->decodeType(image->entry.file_type);
+        file->size = UINT16_FROM_LE_UINT16(image->entry.blocks);
 
         return file;
     }

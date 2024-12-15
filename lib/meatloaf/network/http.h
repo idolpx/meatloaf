@@ -71,7 +71,7 @@ public:
         }
         return false;
     }
-    std::string getHeader(std::string header)
+    std::string readHeader(std::string header)
     {
         return headers[header];
     }
@@ -143,7 +143,7 @@ public:
     MFile* getNextFileInDir() override ;
     bool mkDir() override ;
     bool exists() override ;
-    uint32_t size() override ;
+    //uint32_t size() override ;
     bool remove() override ;
     bool isText() override ;
     bool rename(std::string dest) { return false; };

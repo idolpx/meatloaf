@@ -30,7 +30,7 @@ bool T64MStream::seekEntry( std::string filename )
         size_t index = 1;
         mstr::replaceAll(filename, "\\", "/");
         bool wildcard =  ( mstr::contains(filename, "*") || mstr::contains(filename, "?") );
-        while ( seekEntry( index ) )
+        while ( readEntry( index ) )
         {
             std::string entryFilename = entry.filename;
             uint8_t i = entryFilename.find_first_of(0x20); // (in PETASCII, padded with $20, not $A0)
@@ -178,7 +178,7 @@ bool T64MFile::rewindDirectory() {
     image->resetEntryCounter();
 
     // Read Header
-    image->seekHeader();
+    image->readHeader();
 
     // Set Media Info Fields
     media_header = mstr::format("%.16s", image->header.disk_name);
@@ -203,7 +203,7 @@ MFile* T64MFile::getNextFileInDir() {
     if ( image == nullptr )
         goto exit;
 
-    if ( image->seekNextImageEntry() )
+    if ( image->getNextImageEntry() )
     {
         std::string filename = image->entry.filename;
         uint8_t i = filename.find_first_of(0x20); // (in PETASCII, padded with $20, not $A0)
@@ -213,6 +213,11 @@ MFile* T64MFile::getNextFileInDir() {
         //Debug_printv( "entry[%s]", (streamFile->url + "/" + filename).c_str() );
         auto file = MFSOwner::File(streamFile->url + "/" + filename);
         file->extension = image->decodeType(image->entry.file_type);
+
+        size_t end_address = UINT16_FROM_HILOBYTES(image->entry.end_address[1], image->entry.end_address[0]);
+        size_t start_address = UINT16_FROM_HILOBYTES(image->entry.start_address[1], image->entry.start_address[0]);
+        file->size = ( end_address - start_address ) + 2; // 2 bytes for load address
+
         Debug_printv( "entry[%s] ext[%s]", filename.c_str(), file->extension.c_str() );
         
         return file;

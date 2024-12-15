@@ -490,9 +490,9 @@ bool CSIPMFile::exists() {
     return true;
 } ;
 
-uint32_t CSIPMFile::size() {
-    return m_size;
-};
+// uint32_t CSIPMFile::size() {
+//     return m_size;
+// };
 
 bool CSIPMFile::mkDir() { 
     // but it does support creating dirs = MD FOLDER

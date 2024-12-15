@@ -94,11 +94,18 @@ protected:
     enum open_modes { OPEN_READ, OPEN_WRITE, OPEN_APPEND, OPEN_MODIFY };
     std::string file_type_label[12] = { "DEL", "SEQ", "PRG", "USR", "REL", "CBM", "DIR", "SUS", "NAT", "CMD", "CFS", "???" };
 
-    virtual void seekHeader() = 0;
+    virtual bool readHeader() = 0;
+    virtual bool writeHeader() { return false; };
+
+    virtual bool seekEntry( std::string filename ) { return false; };
+    virtual bool seekEntry( uint16_t index ) { return false; };
+    virtual bool readEntry( uint16_t index ) { return false; };
+    virtual bool writeEntry( uint16_t index ) { return false; };
+
     void resetEntryCounter() {
         entry_index = 0;
     }
-    virtual bool seekNextImageEntry() {
+    virtual bool getNextImageEntry() {
         return seekEntry(entry_index + 1);
     }
 
@@ -113,11 +120,10 @@ protected:
             return ( _size / block_size );
     }
 
-    virtual bool seekEntry( std::string filename ) { return false; };
-    virtual bool seekEntry( uint16_t index ) { return false; };
-
     virtual uint32_t readContainer(uint8_t *buf, uint32_t size);
+    virtual uint32_t writeContainer(uint8_t *buf, uint32_t size);
     virtual uint32_t readFile(uint8_t* buf, uint32_t size) = 0;
+    virtual uint32_t writeFile(uint8_t* buf, uint32_t size) = 0;
     virtual std::string decodeType(uint8_t file_type, bool show_hidden = false);
     virtual std::string decodeType(std::string file_type);
     virtual std::string decodeGEOSType(uint8_t geos_file_structure, uint8_t geos_file_type);

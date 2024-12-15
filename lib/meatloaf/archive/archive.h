@@ -73,13 +73,14 @@ protected:
 
     virtual bool seek(uint32_t pos) override;
 
-    void seekHeader() override { };
+    bool readHeader() override { return false; };
     bool seekEntry( std::string filename ) override;
-    // bool seekEntry( uint16_t index ) override;
+    // bool readEntry( uint16_t index ) override;
 
     // For files with a browsable random access directory structure
     // d64, d74, d81, dnp, etc.
     uint32_t readFile(uint8_t* buf, uint32_t size) override;
+    uint32_t writeFile(uint8_t* buf, uint32_t size) override { return 0; };
     bool seekPath(std::string path) override;
 
 private:

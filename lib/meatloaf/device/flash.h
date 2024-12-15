@@ -43,7 +43,7 @@ public:
 
         // Find full filename for wildcard
         if (mstr::contains(name, "?") || mstr::contains(name, "*"))
-            seekEntry( name );
+            readEntry( name );
 
         if (!pathValid(path.c_str()))
             m_isNull = true;
@@ -73,9 +73,8 @@ public:
 
     time_t getLastWrite() override;
     time_t getCreationTime() override;
-    uint32_t size() override;
 
-    bool seekEntry( std::string filename );
+    bool readEntry( std::string filename );
 
 protected:
     DIR* dir;

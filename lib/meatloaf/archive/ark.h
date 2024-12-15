@@ -52,11 +52,12 @@ protected:
         uint16_t blocks;
     };
 
-    void seekHeader() override { };
+    bool readHeader() override { return true; };
     bool seekEntry( std::string filename ) override;
     bool seekEntry( uint16_t index ) override;
 
     uint32_t readFile(uint8_t* buf, uint32_t size) override;
+    uint32_t writeFile(uint8_t* buf, uint32_t size) override { return 0; };
     bool seekPath(std::string path) override;
 
     Header header;

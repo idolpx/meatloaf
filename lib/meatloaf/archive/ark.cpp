@@ -16,7 +16,7 @@ bool ARKMStream::seekEntry( std::string filename )
         size_t index = 1;
         mstr::replaceAll(filename, "\\", "/");
         bool wildcard = (mstr::contains(filename, "*") || mstr::contains(filename, "?"));
-        while (seekEntry(index))
+        while (readEntry(index))
         {
             std::string entryFilename = entry.filename;
             uint8_t i = entryFilename.find_first_of(0xA0);
@@ -114,7 +114,7 @@ bool ARKMStream::seekPath(std::string path)
         uint8_t t = entry_index;
         while ( c < t )
         {
-            seekEntry(c);
+            readEntry(c);
             entry_data_offset += ( entry.blocks * 254);
             Debug_printv("c[%d] blocks[%u] entry_index[%d] entry_data_offset[%lu]", c, entry.blocks, entry_index, entry_data_offset);
             c++;
@@ -164,7 +164,7 @@ bool ARKMFile::rewindDirectory()
     image->resetEntryCounter();
 
     // Read Header
-    image->seekHeader();
+    image->readHeader();
 
     // Set Media Info Fields
     media_header = mstr::format("%.16s", image->header.disk_name.c_str());
@@ -190,7 +190,7 @@ MFile *ARKMFile::getNextFileInDir()
     if (image == nullptr)
         goto exit;
 
-    if (image->seekNextImageEntry())
+    if (image->getNextImageEntry())
     {
         std::string filename = image->entry.filename;
         uint8_t i = filename.find_first_of(0xA0);

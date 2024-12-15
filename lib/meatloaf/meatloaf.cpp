@@ -272,25 +272,7 @@ MFile* MFSOwner::NewFile(std::string path) {
         return nullptr;
     }
 
-    // Create new file
-    const int size = newFile->size();
 
-    // Open the file in write mode
-    int fd = open(path.c_str(), O_WRONLY | O_CREAT, 0644);
-
-    if (fd == -1) {
-        // Handle file opening error
-        return nullptr;
-    }
-
-    // Truncate the file to the desired size
-    if (ftruncate(fd, size) == -1) {
-        // Handle file truncation error
-        close(fd);
-        return nullptr;
-    }
-
-    close(fd);
 
     return newFile;
 }
@@ -472,6 +454,33 @@ MStream* MFile::getSourceStream(std::ios_base::openmode mode) {
     Debug_printv("returning decodedStream 2");
     return decodedStream;
 };
+
+bool MFile::format(std::string header, std::string id)
+{
+    // Open the file in write mode
+    int fd = open(path.c_str(), O_WRONLY | O_CREAT, 0644);
+
+    if (fd == -1) {
+        // Handle file opening error
+        return false;
+    }
+
+    // Truncate the file to the desired size
+    if (ftruncate(fd, size) == -1) {
+        // Handle file truncation error
+        close(fd);
+        return false;
+    }
+
+    // Write the header to the file
+
+    // Clear directory track
+
+
+    close(fd);
+    return true;
+}
+
 
 MFile* MFile::cd(std::string newDir) 
 {
