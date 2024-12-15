@@ -226,11 +226,3 @@ exit:
     return nullptr;
 }
 
-// uint32_t LBRMFile::size()
-// {
-//     // Debug_printv("[%s]", streamFile->url.c_str());
-//     // use LBR to get size of the file in image
-//     auto entry = ImageBroker::obtain<LBRMStream>(streamFile->url)->entry;
-
-//     return entry.size;
-// }

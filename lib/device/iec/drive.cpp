@@ -6,6 +6,7 @@
 #include <sstream>
 #include <unordered_map>
 
+#include "../../include/global_defines.h"
 #include "../../include/debug.h"
 #include "../../include/cbm_defines.h"
 
@@ -393,47 +394,47 @@ uint8_t iecChannelHandlerDir::readBufferData()
           m_data[m_len++] = '"';
 
           // C64 compatibale name
-          // {
-          //   size_t n = std::min(16, (int) name.size());
-          //   memcpy(m_data+m_len, name.data(), n);
-          //   m_len += n;
-          //   m_data[m_len++] = '"';
-
-          //   // Extension gap
-          //   n = 17-n;
-          //   while(n-->0) m_data[m_len++] = ' ';
-
-          //   // Extension
-          //   memcpy(m_data+m_len, ext.data(), 3);
-          //   m_len+=3;
-          //   while( m_len<31 ) m_data[m_len++] = ' ';
-          //   m_data[31] = 0;
-          //   m_len = 32;
-          // }
-
-          // Full long name
           {
-            size_t n = (int) name.size();
+            size_t n = std::min(16, (int) name.size());
             memcpy(m_data+m_len, name.data(), n);
-
             m_len += n;
             m_data[m_len++] = '"';
 
             // Extension gap
-            if (n<16)
-            {
-              n = 17-n;
-              while(n-->0) m_data[m_len++] = ' ';
-            }
-            else
-              m_data[m_len++] = ' ';
+            n = 17-n;
+            while(n-->0) m_data[m_len++] = ' ';
 
             // Extension
             memcpy(m_data+m_len, ext.data(), 3);
             m_len+=3;
-            m_data[m_len++] = ' ';
-            m_data[m_len++] = 0;
+            while( m_len<31 ) m_data[m_len++] = ' ';
+            m_data[31] = 0;
+            m_len = 32;
           }
+
+          // // Full long name
+          // {
+          //   size_t n = (int) name.size();
+          //   memcpy(m_data+m_len, name.data(), n);
+
+          //   m_len += n;
+          //   m_data[m_len++] = '"';
+
+          //   // Extension gap
+          //   if (n<16)
+          //   {
+          //     n = 17-n;
+          //     while(n-->0) m_data[m_len++] = ' ';
+          //   }
+          //   else
+          //     m_data[m_len++] = ' ';
+
+          //   // Extension
+          //   memcpy(m_data+m_len, ext.data(), 3);
+          //   m_len+=3;
+          //   m_data[m_len++] = ' ';
+          //   m_data[m_len++] = 0;
+          // }
         }
       else
         {
@@ -713,35 +714,7 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
 
   std::string command = std::string(cmd, cmdLen);
 
-  if( mstr::startsWith(command, "S:") )
-    {
-      // SCRATCH (delete)
-      uint8_t n = 0;
-      command = command.substr(2);
-
-      MFile *dir = MFSOwner::File(m_cwd->url);
-      if( dir!=nullptr )
-        {
-          if( dir->isDirectory() )
-            {
-              std::unique_ptr<MFile> entry;
-              while( (entry=std::unique_ptr<MFile>(m_cwd->getNextFileInDir()))!=nullptr )
-                {
-                  if( !entry->isDirectory() && isMatch(mstr::toPETSCII2(entry->name), command) )
-                    {
-                      Debug_printv("DELETING %s", entry->name.c_str());
-                      if( entry->remove() ) n++;
-                    }
-                  //else Debug_printv("NOT DELETING %s", entry->name.c_str());
-                }
-            }
-
-          delete dir;
-        }
-
-      setStatusCode(ST_SCRATCHED, n);
-    }
-  else if( mstr::startsWith(command, "CD") )
+  if( mstr::startsWith(command, "CD") )
     {
       set_cwd(mstr::drop(command, 2));
     }
@@ -783,6 +756,18 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
 
     // Drive level commands
     // CBM DOS 2.6
+    uint8_t media = 0; // N:, N0:, S:, S0, I:, I0:, etc
+    uint8_t colon_position = 0;
+
+    if (command[1] == ':') 
+      colon_position = 1;
+    else if (command[2] == ':')
+    {
+      media = atoi((char *) &command[1]);
+      colon_position = 2;
+    }
+    Debug_printv("media[%d] colon_position[%d]", media, colon_position);
+
     switch ( command[0] )
     {
         case 'B':
@@ -813,7 +798,7 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
             Debug_printv( "block/buffer");
         break;
         case 'C':
-            if ( command[1] != 'D' && command[2] == ':')
+            if ( command[1] != 'D' && colon_position)
             {
                 //Copy(); // Copy File
                 Debug_printv( "copy file");
@@ -839,6 +824,9 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                     uint8_t size = command[2];
                     Debug_printv("Memory Read [%s]", code.c_str());
                     Debug_printv("address[%.4X] size[%d]", address, size);
+
+                    uint8_t data[size] = { 0 };
+                    setStatus((char *) data, size);
                 }
                 else if (command[2] == 'W') // M-W memory write
                 {
@@ -846,6 +834,8 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                     std::string code = mstr::toHex(command);
                     uint16_t address = (command[0] | command[1] << 8);
                     Debug_printv("Memory Write address[%.4X][%s]", address, code.c_str());
+
+                    // Add to m_mw_hash
                 }
                 else if (command[2] == 'E') // M-E memory execute
                 {
@@ -853,6 +843,11 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                     std::string code = mstr::toHex(command);
                     uint16_t address = (command[0] | command[1] << 8);
                     Debug_printv("Memory Execute address[%.4X][%s]", address, code.c_str());
+
+                    // Compare m_mw_hash to known software fastload hashes
+
+                    // Clear m_mw_hash
+                    m_mw_hash = 0;
                 }
                 setStatusCode(ST_OK);
             }
@@ -862,17 +857,42 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
             Debug_printv( "new (format)");
         break;
         case 'R':
-            if ( command[1] != 'D' && command[2] == ':' ) // Rename
+            if ( command[1] != 'D' && colon_position ) // Rename
             {
                 Debug_printv( "rename file");
                 // Rename();
             }
         break;
-        case 'S':
-            if (command[2] == ':') // Scratch
+        case 'S': // Scratch
+            if ( colon_position )
             {
                 Debug_printv( "scratch");
                 //Scratch();
+                // SCRATCH (delete)
+                uint8_t n = 0;
+                command = command.substr(colon_position + 1);
+
+                MFile *dir = MFSOwner::File(m_cwd->url);
+                if( dir!=nullptr )
+                  {
+                    if( dir->isDirectory() )
+                      {
+                        std::unique_ptr<MFile> entry;
+                        while( (entry=std::unique_ptr<MFile>(m_cwd->getNextFileInDir()))!=nullptr )
+                          {
+                            if( !entry->isDirectory() && isMatch(mstr::toPETSCII2(entry->name), command) )
+                              {
+                                Debug_printv("DELETING %s", entry->name.c_str());
+                                if( entry->remove() ) n++;
+                              }
+                            //else Debug_printv("NOT DELETING %s", entry->name.c_str());
+                          }
+                      }
+
+                    delete dir;
+                  }
+
+                setStatusCode(ST_SCRATCHED, n);
             }
         break;
         case 'U':
@@ -975,6 +995,26 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
             // XD?
             // XJ+ / XJ-
             // X
+            // XR:{name}
+            if (command[1] == 'R' && colon_position)
+            {
+                command = command.substr(colon_position + 1);
+                Debug_printv("rom[%s]", command.c_str());
+                
+                auto rom = MFSOwner::File("/sd/.rom/" + command);
+                if (rom == nullptr)
+                  rom = MFSOwner::File("/.rom/" + command);
+                if (rom == nullptr)
+                {
+                    setStatusCode(ST_FILE_NOT_FOUND);
+                    return;
+                }
+
+                Debug_printv("Drive ROM Loaded[%s] size[%lu]", rom->url.c_str(), rom->size);
+                m_memory.setROM(rom->getSourceStream());
+                delete rom;
+                setStatusCode(ST_OK);
+            }
             // XS:{name} / XS
             // XW
             // X?

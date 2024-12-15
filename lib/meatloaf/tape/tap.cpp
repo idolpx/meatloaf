@@ -190,12 +190,3 @@ exit:
 }
 
 
-// uint32_t TAPMFile::size() {
-//     // Debug_printv("[%s]", streamFile->url.c_str());
-//     // use TAP to get size of the file in image
-//     auto image = ImageBroker::obtain<TAPMStream>(streamFile->url);
-
-//     size_t bytes = UINT16_FROM_LE_UINT16(image->entry.end_address) - UINT16_FROM_LE_UINT16(image->entry.start_address);
-
-//     return bytes;
-// }

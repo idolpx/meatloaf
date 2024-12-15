@@ -164,7 +164,6 @@ public:
 
     time_t getLastWrite() override;
     time_t getCreationTime() override;
-    uint32_t size() override;
 
     bool readEntry( std::string filename );
 

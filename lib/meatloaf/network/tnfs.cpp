@@ -112,19 +112,6 @@ bool TNFSMFile::exists()
     return (i == 0);
 }
 
-// uint32_t TNFSMFile::size() {
-//     if (m_isNull || path=="/" || path=="")
-//         return 0;
-//     else if(isDirectory()) {
-//         return 0;
-//     }
-//     else {
-//         struct stat info;
-//         stat( std::string(basepath + path).c_str(), &info);
-//         // Debug_printv( "size[%d]", info.st_size );
-//         return info.st_size;
-//     }
-// }
 
 bool TNFSMFile::remove() {
     // musi obslugiwac usuwanie plikow i katalogow!

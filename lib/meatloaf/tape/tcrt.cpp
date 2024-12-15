@@ -268,18 +268,3 @@ exit:
 }
 
 
-// uint32_t TCRTMFile::size() {
-//     //Debug_printv("[%s]", streamFile->url.c_str());
-//     // use TCRT to get size of the file in image
-//     auto entry = ImageBroker::obtain<TCRTMStream>(streamFile->url)->entry;
-
-//     //size_t blocks = (UINT16_FROM_LE_UINT16(image->entry.load_address) + image->entry.file_size)) / image->block_size;
-//     //size_t blocks = 1;
-
-//     // 9E 60 00
-//     // 158 96 0
-
-//     size_t bytes = (entry.file_size[0] | (entry.file_size[1] << 8) | (entry.file_size[2] << 16)) + 2; // 2 bytes for load address
-
-//     return bytes;
-// }

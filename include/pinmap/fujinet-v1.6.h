@@ -70,7 +70,7 @@
 #define PIN_IEC_ATN            GPIO_NUM_39      // SIO 7  - CMD  - Command
 #define PIN_IEC_SRQ            GPIO_NUM_26      // SIO 13 - INT  - Interrupt
 #define PIN_IEC_RESET          GPIO_NUM_22      // SIO 9  - PROC - Proceed
-                                             // SIO 4 & 6 - GND - Ground
+                                                // SIO 4 & 6 - GND - Ground
 
 // IEC_SPLIT_LINES
 #ifndef IEC_SPLIT_LINES

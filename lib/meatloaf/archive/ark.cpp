@@ -212,8 +212,3 @@ exit:
     return nullptr;
 }
 
-// uint32_t ARKMFile::size()
-// {
-//     auto entry = ImageBroker::obtain<ARKMStream>(streamFile->url)->entry;
-//     return UINT16_FROM_LE_UINT16(entry.blocks);
-// }

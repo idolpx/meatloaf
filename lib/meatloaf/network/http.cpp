@@ -92,16 +92,6 @@ bool HTTPMFile::exists() {
     return fromHeader()->_exists;
 }
 
-// uint32_t HTTPMFile::size() {
-//     if(fromHeader()->m_isWebDAV) {
-//         // take from webdav PROPFIND
-//         return 0;
-//     }
-//     else
-//         // fallback to what we had from the header
-//         return fromHeader()->_size;
-// }
-
 bool HTTPMFile::remove() {
     if(fromHeader()->m_isWebDAV) {
         // PROPPATCH allows deletion

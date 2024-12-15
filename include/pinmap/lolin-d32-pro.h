@@ -54,16 +54,6 @@
 #define PIN_DAC1                GPIO_NUM_25 // samlib.h
 
 
-/* Color Computer */
-#define PIN_CASS_MOTOR          GPIO_NUM_34 // Second motor pin is tied to +3V
-#define PIN_CASS_DATA_IN        GPIO_NUM_33
-#define PIN_CASS_DATA_OUT       GPIO_NUM_26
-
-#define PIN_SERIAL_CD           GPIO_NUM_32
-#define PIN_SERIAL_RX           GPIO_NUM_33  // fnUartBUS
-#define PIN_SERIAL_TX           GPIO_NUM_26
-
-
 /* Commodore IEC Pins */
 // CLK & DATA lines in/out are split between two pins
 //#define IEC_SPLIT_LINES
@@ -73,27 +63,6 @@
 
 #define IEC_HAS_RESET // Reset line is available
 
-// // CBM IEC Serial Port
-// #define PIN_IEC_ATN             GPIO_NUM_39      // SIO 7  - CMD  - Command
-// #define PIN_IEC_SRQ             GPIO_NUM_26      // SIO 13 - INT  - Interrupt
-// #define PIN_IEC_RESET           GPIO_NUM_22      // SIO 9  - PROC - Proceed
-//                                                  // SIO 4 & 6 - GND - Ground
-
-// // IEC_SPLIT_LINES
-// #ifndef IEC_SPLIT_LINES
-// // NOT SPLIT - Bidirectional Lines
-// #define PIN_IEC_CLK_IN          GPIO_NUM_27      // SIO 1  - CKI  - Clock Input
-// #define PIN_IEC_CLK_OUT         GPIO_NUM_27      // SIO 1  - CKI  - Clock Input
-// #define PIN_IEC_DATA_IN         GPIO_NUM_21      // SIO 3  - DI   - Data Input
-// #define PIN_IEC_DATA_OUT        GPIO_NUM_21      // SIO 3  - DI   - Data Input
-// #else
-// // SPLIT - Seperate Input & Output lines
-// #define PIN_IEC_CLK_IN          GPIO_NUM_32      // SIO 2  - CKO  - Clock Output
-// #define PIN_IEC_CLK_OUT         GPIO_NUM_27      // SIO 1  - CKI  - Clock Input
-// #define PIN_IEC_DATA_IN         GPIO_NUM_33      // SIO 5  - DO   - Data Output
-// #define PIN_IEC_DATA_OUT        GPIO_NUM_21      // SIO 3  - DI   - Data Input
-// #endif
-
 #define PIN_IEC_RESET           GPIO_NUM_34
 #define PIN_IEC_ATN             GPIO_NUM_32
 #define PIN_IEC_CLK_IN          GPIO_NUM_33
@@ -102,15 +71,6 @@
 #define PIN_IEC_DATA_OUT        GPIO_NUM_25
 #define PIN_IEC_SRQ             GPIO_NUM_26
 // GND - Be sure to connect GND of the IEC cable to GND on the ESP module
-
-
-// // Display Connector Pins
-// #define PIN_IEC_ATN             GPIO_NUM_32
-// #define PIN_IEC_CLK_IN          GPIO_NUM_33
-// #define PIN_IEC_CLK_OUT         GPIO_NUM_33
-// #define PIN_IEC_DATA_IN         GPIO_NUM_14
-// #define PIN_IEC_DATA_OUT        GPIO_NUM_14
-// #define PIN_IEC_SRQ             GPIO_NUM_27
 
 
 /* Modem/Parallel Switch */

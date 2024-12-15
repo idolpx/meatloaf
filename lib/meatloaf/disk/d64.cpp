@@ -620,17 +620,3 @@ bool D64MFile::exists()
     return true;
 }
 
-// uint32_t D64MFile::size()
-// {
-//     // Debug_printv("[%s]", streamFile->url.c_str());
-//     //  use D64 to get size of the file in image
-//     auto stream = ImageBroker::obtain<D64MStream>(streamFile->url);
-//     if ( stream == nullptr )
-//         return 0;
-
-//     auto entry = stream->entry;
-
-//     uint32_t bytes = UINT16_FROM_LE_UINT16(entry.blocks);
-
-//     return bytes;
-// }

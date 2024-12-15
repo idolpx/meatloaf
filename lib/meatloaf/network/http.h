@@ -143,7 +143,7 @@ public:
     MFile* getNextFileInDir() override ;
     bool mkDir() override ;
     bool exists() override ;
-    //uint32_t size() override ;
+
     bool remove() override ;
     bool isText() override ;
     bool rename(std::string dest) { return false; };

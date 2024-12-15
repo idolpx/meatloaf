@@ -99,7 +99,6 @@ public:
     bool rename(std::string dest) override { return false; };
     time_t getLastWrite() override { return 0; };
     time_t getCreationTime() override { return 0; };
-    //uint32_t size() override;
 
     bool isDir = false;
     bool dirIsOpen = false;

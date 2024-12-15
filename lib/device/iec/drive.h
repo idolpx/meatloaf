@@ -76,6 +76,28 @@ class iecChannelHandlerDir : public iecChannelHandler
 };
 
 
+class driveMemory
+{
+ private:
+  // TODO: Ustilize ESP32 HighMemory API to access unused 4MB of PSRAM
+  uint8_t ram[2048] = { 0x00 };  // 0000-07FF  RAM
+  // uint8_t via1[1024] = { 0x00 }; // 1800-1BFF  6522 VIA1
+  // uint8_t via2[1024] = { 0x00 }; // 1C00-1FFF  6522 VIA2
+  MStream *rom = nullptr;        // C000-FFFF  ROM 16KB
+
+ public:
+  //driveMemory();
+  ~driveMemory() {
+    if ( rom ) delete rom;
+  }
+
+  void setROM(MStream *romStream) { 
+    if ( rom ) delete rom;
+    rom = romStream; 
+  };
+  char *read(uint16_t addr, size_t len);
+  void write(uint16_t addr, const char *data, size_t len);
+};
 
 class iecDrive : public IECFileDevice
 {
@@ -98,6 +120,7 @@ class iecDrive : public IECFileDevice
   // must be a global variable
   bool device_active = true;
   virtual bool isActive() { return device_active; }
+
 
  private:
   // open file "name" on channel
@@ -135,6 +158,9 @@ class iecDrive : public IECFileDevice
   std::unique_ptr<MFile> m_cwd;   // current working directory
   iecChannelHandler *m_channels[16];
   uint8_t m_statusCode, m_statusTrk, m_numOpenChannels;
+
+  driveMemory m_memory;
+  uint32_t m_mw_hash = 0;
 };
 
 #endif // DRIVE_H

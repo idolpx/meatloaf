@@ -51,7 +51,7 @@
 //#define IEC_INVERTED_LINES
 
 // Reset line is available
-//#define IEC_HAS_RESET
+#define IEC_HAS_RESET
                                                 //            WIRING
                                                 //  C64    DIN6    D32Pro       S3PRO   TFT
 #define PIN_IEC_ATN             GPIO_NUM_14     //  ATN    3       A T-LED 32   14      10 (PURPLE)
