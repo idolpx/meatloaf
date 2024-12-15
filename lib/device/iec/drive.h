@@ -79,7 +79,7 @@ class iecChannelHandlerDir : public iecChannelHandler
 class driveMemory
 {
  private:
-  // TODO: Ustilize ESP32 HighMemory API to access unused 4MB of PSRAM
+  // TODO: Utilize ESP32 HighMemory API to access unused 4MB of PSRAM
   uint8_t ram[2048] = { 0x00 };  // 0000-07FF  RAM
   // uint8_t via1[1024] = { 0x00 }; // 1800-1BFF  6522 VIA1
   // uint8_t via2[1024] = { 0x00 }; // 1C00-1FFF  6522 VIA2
