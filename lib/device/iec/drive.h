@@ -95,8 +95,52 @@ class driveMemory
     if ( rom ) delete rom;
     rom = romStream; 
   };
-  char *read(uint16_t addr, size_t len);
-  void write(uint16_t addr, const char *data, size_t len);
+  size_t read(uint16_t addr, uint8_t *data, size_t len) 
+  {
+    // RAM
+    if ( addr < 0x0FFF )
+    {
+      if ( addr >= 0x0800 )
+        addr -= 0x0800; // RAM Mirror
+    
+      memcpy(data, ram + addr, len);
+      return len;
+    }
+
+    // ROM
+    if ( addr >= 0xC000 )
+    {
+      addr -= 0xC000;
+      if ( addr >= 0x8000 )
+        addr -= 0x8000; // ROM Mirror
+    
+      rom->seek(addr, SEEK_SET);
+      return rom->read(data, len);
+    }
+  }
+
+  void write(uint16_t addr, const uint8_t *data, size_t len)
+  {
+    // RAM
+    if ( addr < 0x0FFF )
+    {
+      if ( addr >= 0x0800 )
+        addr -= 0x0800; // RAM Mirror
+    
+      memcpy(ram + addr, data, len);
+    }
+
+    // ROM
+    if ( addr >= 0xC000 )
+    {
+      addr -= 0xC000;
+      if ( addr >= 0x8000 )
+        addr -= 0x8000; // ROM Mirror
+    
+      rom->seek(addr, SEEK_SET);
+      rom->write(data, len);
+    }
+  }
 };
 
 class iecDrive : public IECFileDevice
