@@ -479,7 +479,7 @@ iecDrive::iecDrive(uint8_t devnum) : IECFileDevice(devnum)
 {
   m_host = nullptr;
   m_cwd.reset( MFSOwner::File("/") );
-  m_memory.setROM("dos1541");
+  m_memory.setROM("dos1541*");
   m_statusCode = ST_SPLASH;
   m_statusTrk  = 0;
   m_numOpenChannels = 0;
@@ -841,9 +841,11 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                     
                     Debug_printv("Memory Write address[%04X][%s]", address, code.c_str());
 
-                    m_memory.write(address, (const uint8_t *)command[0], command.size());
+                    m_memory.write(address, (const uint8_t *)&command, command.size());
 
                     // Add to m_mw_hash
+
+                    setStatusCode(ST_OK);
                 }
                 else if (command[2] == 'E') // M-E memory execute
                 {
@@ -856,8 +858,12 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
 
                     // Clear m_mw_hash
                     m_mw_hash = 0;
+
+                    m_memory.execute(address);
+
+                    setStatusCode(ST_OK);
                 }
-                setStatusCode(ST_OK);
+                
             }
         break;
         case 'N':

@@ -102,8 +102,8 @@ class driveMemory
     if (rom_file == nullptr)
         return false;
 
-    Debug_printv("Drive ROM Loaded[%s] size[%lu]", rom_file->url.c_str(), rom_file->size);
     rom = rom_file->getSourceStream();
+    Debug_printv("Drive ROM Loaded file[%s] stream[%s] size[%lu]", rom_file->url.c_str(), rom->url.c_str(), rom->size());
     delete rom_file;
     return true;
   }
@@ -148,6 +148,34 @@ class driveMemory
     
       memcpy(ram + addr, data, len);
       Debug_printv("RAM write %04X:%s", addr, mstr::toHex(data, len).c_str());
+    }
+  }
+
+  void execute(uint16_t addr)
+  {
+    // RAM
+    if ( addr < 0x0FFF )
+    {
+      if ( addr >= 0x0800 )
+        addr -= 0x0800; // RAM Mirror
+
+      // ram + addr
+    }
+
+    // ROM
+    if ( rom )
+    {
+      if ( addr >= 0x8000 )
+      {
+        if ( addr >= 0xC000 )
+          addr -= 0xC000;
+        else if ( addr >= 0x8000 )
+          addr -= 0x8000; // ROM Mirror
+      
+        //rom->seek(addr, SEEK_SET);
+
+        // Translate ROM functions to virtual drive functions
+      }
     }
   }
 };
