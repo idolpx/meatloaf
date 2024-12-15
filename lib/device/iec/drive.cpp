@@ -479,6 +479,7 @@ iecDrive::iecDrive(uint8_t devnum) : IECFileDevice(devnum)
 {
   m_host = nullptr;
   m_cwd.reset( MFSOwner::File("/") );
+  m_memory.setROM("dos1541");
   m_statusCode = ST_SPLASH;
   m_statusTrk  = 0;
   m_numOpenChannels = 0;
@@ -823,12 +824,12 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                     uint16_t address = (command[0] | command[1] << 8);
                     uint8_t size = command[2];
                     Debug_printv("Memory Read [%s]", code.c_str());
-                    Debug_printv("address[%.4X] size[%d]", address, size);
+                    Debug_printv("address[%04X] size[%d]", address, size);
 
                     uint8_t data[size] = { 0 };
                     m_memory.read(address, data, size);
                     setStatus((char *) data, size);
-                    Debug_printv("address[%.4X] data[%s]", address, mstr::toHex(data, size).c_str());
+                    Debug_printv("address[%04X] data[%s]", address, mstr::toHex(data, size).c_str());
                 }
                 else if (command[2] == 'W') // M-W memory write
                 {
@@ -838,7 +839,7 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                     command = mstr::drop(command, 2);
                     std::string code = mstr::toHex(command);
                     
-                    Debug_printv("Memory Write address[%.4X][%s]", address, code.c_str());
+                    Debug_printv("Memory Write address[%04X][%s]", address, code.c_str());
 
                     m_memory.write(address, (const uint8_t *)command[0], command.size());
 
@@ -849,7 +850,7 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                     command = mstr::drop(command, 3);
                     std::string code = mstr::toHex(command);
                     uint16_t address = (command[0] | command[1] << 8);
-                    Debug_printv("Memory Execute address[%.4X][%s]", address, code.c_str());
+                    Debug_printv("Memory Execute address[%04X][%s]", address, code.c_str());
 
                     // Compare m_mw_hash to known software fastload hashes
 
@@ -1007,19 +1008,11 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
             {
                 command = command.substr(colon_position + 1);
                 Debug_printv("rom[%s]", command.c_str());
-                
-                auto rom = MFSOwner::File("/sd/.rom/" + command);
-                if (rom == nullptr)
-                  rom = MFSOwner::File("/.rom/" + command);
-                if (rom == nullptr)
+                if (!m_memory.setROM(command))
                 {
                     setStatusCode(ST_FILE_NOT_FOUND);
-                    return;
+                    break;
                 }
-
-                Debug_printv("Drive ROM Loaded[%s] size[%lu]", rom->url.c_str(), rom->size);
-                m_memory.setROM(rom->getSourceStream());
-                delete rom;
                 setStatusCode(ST_OK);
             }
             // XS:{name} / XS

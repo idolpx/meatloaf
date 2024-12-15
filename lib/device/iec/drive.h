@@ -92,10 +92,22 @@ class driveMemory
     if ( rom ) delete rom;
   }
 
-  void setROM(MStream *romStream) { 
+  bool setROM(std::string filename) { 
     if ( rom ) delete rom;
-    rom = romStream; 
-  };
+
+    // Check for ROM file in SD Card then Flash
+    auto rom_file = MFSOwner::File("/sd/.rom/" + filename);
+    if (rom_file == nullptr)
+      rom_file = MFSOwner::File("/.rom/" + filename);
+    if (rom_file == nullptr)
+        return false;
+
+    Debug_printv("Drive ROM Loaded[%s] size[%lu]", rom_file->url.c_str(), rom_file->size);
+    rom = rom_file->getSourceStream();
+    delete rom_file;
+    return true;
+  }
+
   size_t read(uint16_t addr, uint8_t *data, size_t len) 
   {
     // RAM
@@ -137,6 +149,7 @@ class driveMemory
       memcpy(ram + addr, data, len);
       Debug_printv("RAM write %04X:%s", addr, mstr::toHex(data, len).c_str());
     }
+  }
 };
 
 class iecDrive : public IECFileDevice
