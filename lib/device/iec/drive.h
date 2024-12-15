@@ -109,15 +109,18 @@ class driveMemory
     }
 
     // ROM
-    if ( addr >= 0x8000 )
+    if ( rom )
     {
-      if ( addr >= 0xC000 )
-        addr -= 0xC000;
-      else if ( addr >= 0x8000 )
-        addr -= 0x8000; // ROM Mirror
-    
-      rom->seek(addr, SEEK_SET);
-      return rom->read(data, len);
+      if ( addr >= 0x8000 )
+      {
+        if ( addr >= 0xC000 )
+          addr -= 0xC000;
+        else if ( addr >= 0x8000 )
+          addr -= 0x8000; // ROM Mirror
+      
+        rom->seek(addr, SEEK_SET);
+        return rom->read(data, len);
+      }
     }
 
     return 0;
@@ -134,20 +137,6 @@ class driveMemory
       memcpy(ram + addr, data, len);
       Debug_printv("RAM write %04X:%s", addr, mstr::toHex(data, len).c_str());
     }
-
-    // ROM
-    if ( addr >= 0xC000 )
-    {
-      if ( addr >= 0xC000 )
-        addr -= 0xC000;
-      else if ( addr >= 0x8000 )
-        addr -= 0x8000; // ROM Mirror
-    
-      rom->seek(addr, SEEK_SET);
-      rom->write(data, len);
-      Debug_printv("ROM write %04X:%s", addr, mstr::toHex(data, len).c_str());
-    }
-  }
 };
 
 class iecDrive : public IECFileDevice
