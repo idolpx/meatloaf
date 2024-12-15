@@ -826,14 +826,21 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                     Debug_printv("address[%.4X] size[%d]", address, size);
 
                     uint8_t data[size] = { 0 };
+                    m_memory.read(address, data, size);
                     setStatus((char *) data, size);
+                    Debug_printv("address[%.4X] data[%s]", address, mstr::toHex(data, size).c_str());
                 }
                 else if (command[2] == 'W') // M-W memory write
                 {
                     command = mstr::drop(command, 3);
-                    std::string code = mstr::toHex(command);
                     uint16_t address = (command[0] | command[1] << 8);
+
+                    command = mstr::drop(command, 2);
+                    std::string code = mstr::toHex(command);
+                    
                     Debug_printv("Memory Write address[%.4X][%s]", address, code.c_str());
+
+                    m_memory.write(address, (const uint8_t *)command[0], command.size());
 
                     // Add to m_mw_hash
                 }

@@ -4,6 +4,7 @@
 #include "../fuji/fujiHost.h"
 
 #include <string>
+#include <cstring>
 #include <unordered_map>
 
 #include "../../bus/iec/IECFileDevice.h"
@@ -118,6 +119,8 @@ class driveMemory
       rom->seek(addr, SEEK_SET);
       return rom->read(data, len);
     }
+
+    return 0;
   }
 
   void write(uint16_t addr, const uint8_t *data, size_t len)
@@ -129,6 +132,7 @@ class driveMemory
         addr -= 0x0800; // RAM Mirror
     
       memcpy(ram + addr, data, len);
+      Debug_printv("RAM write %04X:%s", addr, mstr::toHex(data, len).c_str());
     }
 
     // ROM
@@ -141,6 +145,7 @@ class driveMemory
     
       rom->seek(addr, SEEK_SET);
       rom->write(data, len);
+      Debug_printv("ROM write %04X:%s", addr, mstr::toHex(data, len).c_str());
     }
   }
 };
