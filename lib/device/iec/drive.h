@@ -108,10 +108,11 @@ class driveMemory
     }
 
     // ROM
-    if ( addr >= 0xC000 )
+    if ( addr >= 0x8000 )
     {
-      addr -= 0xC000;
-      if ( addr >= 0x8000 )
+      if ( addr >= 0xC000 )
+        addr -= 0xC000;
+      else if ( addr >= 0x8000 )
         addr -= 0x8000; // ROM Mirror
     
       rom->seek(addr, SEEK_SET);
@@ -133,8 +134,9 @@ class driveMemory
     // ROM
     if ( addr >= 0xC000 )
     {
-      addr -= 0xC000;
-      if ( addr >= 0x8000 )
+      if ( addr >= 0xC000 )
+        addr -= 0xC000;
+      else if ( addr >= 0x8000 )
         addr -= 0x8000; // ROM Mirror
     
       rom->seek(addr, SEEK_SET);
