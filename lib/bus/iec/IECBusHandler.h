@@ -188,9 +188,8 @@ class IECBusHandler
 #endif
 #endif
 
-  static IECBusHandler *s_bushandler1,  *s_bushandler2;
-  static void atnInterruptFcn1(INTERRUPT_FCN_ARG);
-  static void atnInterruptFcn2(INTERRUPT_FCN_ARG);
+  static IECBusHandler *s_bushandler;
+  static void atnInterruptFcn(INTERRUPT_FCN_ARG);
 };
 
 #endif

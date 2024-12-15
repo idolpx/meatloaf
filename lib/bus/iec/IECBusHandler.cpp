@@ -282,7 +282,7 @@ static IRAM_ATTR void delayMicrosecondsISafe(uint16_t t)
 #define TC_CLK_HIGH  4
 
 
-IECBusHandler *IECBusHandler::s_bushandler1 = NULL, *IECBusHandler::s_bushandler2 = NULL;
+IECBusHandler *IECBusHandler::s_bushandler = NULL;
 
 
 void IRAM_ATTR IECBusHandler::writePinCLK(bool v)
@@ -576,18 +576,10 @@ void IECBusHandler::begin()
 
   // if the ATN pin is capable of interrupts then use interrupts to detect 
   // ATN requests, otherwise we'll poll the ATN pin in function microTask().
-  if( m_atnInterrupt!=NOT_AN_INTERRUPT )
+  if( m_atnInterrupt!=NOT_AN_INTERRUPT && s_bushandler==NULL )
     {
-      if( s_bushandler1==NULL )
-        {
-          s_bushandler1 = this;
-          attachInterrupt(m_atnInterrupt, atnInterruptFcn1, FALLING);
-        }
-      else if( s_bushandler2==NULL )
-        {
-          s_bushandler2 = this;
-          attachInterrupt(m_atnInterrupt, atnInterruptFcn2, FALLING);
-        }
+      s_bushandler = this;
+      attachInterrupt(m_atnInterrupt, atnInterruptFcn, FALLING);
     }
 
   // call begin() function for all attached devices
@@ -658,17 +650,10 @@ IECDevice *IECBusHandler::findDevice(uint8_t devnr, bool includeInactive)
 }
 
 
-void IECBusHandler::atnInterruptFcn1(INTERRUPT_FCN_ARG)
+void IRAM_ATTR IECBusHandler::atnInterruptFcn(INTERRUPT_FCN_ARG)
 { 
-  if( s_bushandler1!=NULL && !s_bushandler1->m_inTask & ((s_bushandler1->m_flags & P_ATN)==0) )
-    s_bushandler1->atnRequest();
-}
-
-
-void IECBusHandler::atnInterruptFcn2(INTERRUPT_FCN_ARG)
-{ 
-  if( s_bushandler2!=NULL && !s_bushandler2->m_inTask & ((s_bushandler2->m_flags & P_ATN)==0) )
-    s_bushandler2->atnRequest();
+  if( s_bushandler!=NULL && !s_bushandler->m_inTask & ((s_bushandler->m_flags & P_ATN)==0) )
+    s_bushandler->atnRequest();
 }
 
 
@@ -1037,7 +1022,7 @@ bool IRAM_ATTR IECBusHandler::transmitJiffyBlock(uint8_t *buffer, uint8_t numByt
 #if !defined(__AVR_ATmega328P__) && !defined(__AVR_ATmega2560__)
 
 volatile static bool _handshakeReceived = false;
-static void handshakeIRQ(INTERRUPT_FCN_ARG) { _handshakeReceived = true; }
+static void IRAM_ATTR handshakeIRQ(INTERRUPT_FCN_ARG) { _handshakeReceived = true; }
 
 bool IRAM_ATTR IECBusHandler::parallelCableDetect()
 {
@@ -2257,7 +2242,7 @@ bool IECBusHandler::transmitIECByte(uint8_t numData)
 
 // called when a falling edge on ATN is detected, either by the pin change
 // interrupt handler or by polling within the microTask function
-void IECBusHandler::atnRequest()
+void IRAM_ATTR IECBusHandler::atnRequest()
 {
   // check if ATN is actually LOW, if not then just return (stray interrupt request)
   if( readPinATN() ) return;
@@ -2268,7 +2253,16 @@ void IECBusHandler::atnRequest()
   m_currentDevice = NULL;
 
   // ignore anything for 100us after ATN falling edge
+#ifdef ESP_PLATFORM
+  // calling "micros()" (aka esp_timer_get_time()) within an interrupt handler
+  // on ESP32 appears to sometimes return incorrect values. This was observed
+  // when running Meatloaf on a LOLIN D32 board. So we just note that the 
+  // timeout needs to be started and will actually set m_timeoutStart outside 
+  // of the interrupt handler within the task() function
+  m_timeoutStart = 0xFFFFFFFF;
+#else
   m_timeoutStart = micros();
+#endif
 
   // release CLK (in case we were holding it LOW before)
   writePinCLK(HIGH);
@@ -2330,7 +2324,14 @@ void IECBusHandler::task()
       atnRequest();
     } 
 
+#ifdef ESP_PLATFORM
+  // see comment in atnRequest function
+  if( (m_flags & P_ATN)!=0 && !readPinATN() &&
+      (m_timeoutStart==0xFFFFFFFF ? (m_timeoutStart=micros(),false) : (micros()-m_timeoutStart)>100) &&
+      readPinCLK() )
+#else
   if( (m_flags & P_ATN)!=0 && !readPinATN() && (micros()-m_timeoutStart)>100 && readPinCLK() )
+#endif
     {
       // we are under ATN, have waited 100us and the host has released CLK
       // => no more interrupts until the ATN sequence is finished. If we allowed interrupts
@@ -2489,7 +2490,7 @@ void IECBusHandler::task()
           m_secondary = 0x60;
         }
 
-      m_currentDevice->m_sflags &= ~S_DOLPHIN_BURST_TRANSMIT;
+      if( m_currentDevice!=NULL ) m_currentDevice->m_sflags &= ~S_DOLPHIN_BURST_TRANSMIT;
     }
   else if( (m_devices[devidx]->m_sflags&S_DOLPHIN_BURST_RECEIVE)!=0 && (micros()-m_timeoutStart)>500 && !readPinCLK() )
     {
@@ -2520,7 +2521,7 @@ void IECBusHandler::task()
           writePinDATA(LOW);
         }
 
-      m_currentDevice->m_sflags &= ~S_DOLPHIN_BURST_RECEIVE;
+      if( m_currentDevice!=NULL ) m_currentDevice->m_sflags &= ~S_DOLPHIN_BURST_RECEIVE;
     }
 #endif
 
