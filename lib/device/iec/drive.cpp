@@ -935,7 +935,7 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                     return;
                 }
             }
-            else if (command[1] == 'I') // UI
+            else if (command[1] == 'I' && command.size() == 2) // UI
             {
               Debug_printv( "warm reset");
               setStatusCode(ST_SPLASH);
@@ -950,7 +950,23 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
             else if (command[1] == 0xCA) // U{Shift-J}
             {
               Debug_printv( "hard reset");
-              fnSystem.reboot();
+              reset();
+              m_cwd.reset(m_cwd->cd("^")); // reset to flash root
+              return;
+            }
+            else if (command[1] == 'I' && command.size() == 3) // UI+/-
+            {
+              if (command[2] == '-')
+              {
+                Debug_printv( "VIC-20 Bus Speed");
+                // Set IEC Data Valid timing to 20us
+              }
+              else
+              {
+                Debug_printv( "C64 Bus Speed");
+                // Set IEC Data Valid timing to 60us
+              }
+              setStatusCode(ST_OK);
               return;
             }
         break;
