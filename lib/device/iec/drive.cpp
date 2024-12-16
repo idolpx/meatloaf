@@ -479,7 +479,6 @@ iecDrive::iecDrive(uint8_t devnum) : IECFileDevice(devnum)
 {
   m_host = nullptr;
   m_cwd.reset( MFSOwner::File("/") );
-  m_memory.setROM("dos1541*");
   m_statusCode = ST_SPLASH;
   m_statusTrk  = 0;
   m_numOpenChannels = 0;
@@ -819,7 +818,7 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
             {
                 if (command[2] == 'R') // M-R memory read
                 {
-                    command = mstr::drop(command, 3);
+                    command = mstr::drop(command, 3); // Drop M-R
                     std::string code = mstr::toHex(command);
                     uint16_t address = (command[0] | command[1] << 8);
                     uint8_t size = command[2];
@@ -833,15 +832,16 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                 }
                 else if (command[2] == 'W') // M-W memory write
                 {
-                    command = mstr::drop(command, 3);
+                    command = mstr::drop(command, 3); // Drop M-W
                     uint16_t address = (command[0] | command[1] << 8);
+                    uint8_t size = command[2]; // Limited to 34 bytes per command
 
-                    command = mstr::drop(command, 2);
+                    command = mstr::drop(command, 3); // Drop address, size
                     std::string code = mstr::toHex(command);
                     
                     Debug_printv("Memory Write address[%04X][%s]", address, code.c_str());
 
-                    m_memory.write(address, (const uint8_t *)&command, command.size());
+                    m_memory.write(address, (const uint8_t *)command.c_str(), size);
 
                     // Add to m_mw_hash
 
@@ -849,7 +849,7 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                 }
                 else if (command[2] == 'E') // M-E memory execute
                 {
-                    command = mstr::drop(command, 3);
+                    command = mstr::drop(command, 3); // Drop M-E
                     std::string code = mstr::toHex(command);
                     uint16_t address = (command[0] | command[1] << 8);
                     Debug_printv("Memory Execute address[%04X][%s]", address, code.c_str());
@@ -1014,6 +1014,7 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
             {
                 command = command.substr(colon_position + 1);
                 Debug_printv("rom[%s]", command.c_str());
+                command = mstr::toUTF8(command);
                 if (!m_memory.setROM(command))
                 {
                     setStatusCode(ST_FILE_NOT_FOUND);

@@ -13,6 +13,7 @@
 #include "../meatloaf/meat_buffer.h"
 #include "../meatloaf/wrappers/iec_buffer.h"
 #include "../meatloaf/wrappers/directory_stream.h"
+#include "utils.h"
 
 //#include "dos/_dos.h"
 //#include "dos/cbmdos.2.5.h"
@@ -81,30 +82,37 @@ class driveMemory
 {
  private:
   // TODO: Utilize ESP32 HighMemory API to access unused 4MB of PSRAM
-  uint8_t ram[2048] = { 0x00 };  // 0000-07FF  RAM
+  std::vector<uint8_t> ram;         // 0000-07FF  RAM
   // uint8_t via1[1024] = { 0x00 }; // 1800-1BFF  6522 VIA1
   // uint8_t via2[1024] = { 0x00 }; // 1C00-1FFF  6522 VIA2
-  MStream *rom = nullptr;        // C000-FFFF  ROM 16KB
+  std::unique_ptr<MStream> rom;     // C000-FFFF  ROM 16KB
 
  public:
-  //driveMemory();
-  ~driveMemory() {
-    if ( rom ) delete rom;
+   driveMemory(size_t ramSize = 2048) : ram(ramSize, 0x00) {
+    setROM("dos1541"); // Default to 1541 ROM
+  }
+  ~driveMemory() = default;
+
+  bool setRAM(size_t ramSize) {
+    ram.resize(ramSize, 0x00);
+    return true;
   }
 
   bool setROM(std::string filename) { 
-    if ( rom ) delete rom;
-
     // Check for ROM file in SD Card then Flash
     auto rom_file = MFSOwner::File("/sd/.rom/" + filename);
-    if (rom_file == nullptr)
+    if (rom_file == nullptr) {
       rom_file = MFSOwner::File("/.rom/" + filename);
-    if (rom_file == nullptr)
-        return false;
+    }
+    if (rom_file == nullptr) {
+      return false;
+    }
 
-    rom = rom_file->getSourceStream();
+    rom.reset(rom_file->getSourceStream());
+    if (!rom) {
+      return false;
+    }
     Debug_printv("Drive ROM Loaded file[%s] stream[%s] size[%lu]", rom_file->url.c_str(), rom->url.c_str(), rom->size());
-    delete rom_file;
     return true;
   }
 
@@ -116,7 +124,14 @@ class driveMemory
       if ( addr >= 0x0800 )
         addr -= 0x0800; // RAM Mirror
     
-      memcpy(data, ram + addr, len);
+      if (addr + len > ram.size()) {
+        // Handle bounds error
+        return 0;
+      }
+
+      memcpy(data, &ram[addr], len);
+      Debug_printv("RAM read %04X:%s", addr, mstr::toHex(data, len).c_str());
+      //printf("%s",util_hexdump((const uint8_t *)ram.data(), ram.size()).c_str());
       return len;
     }
 
@@ -146,8 +161,12 @@ class driveMemory
       if ( addr >= 0x0800 )
         addr -= 0x0800; // RAM Mirror
     
-      memcpy(ram + addr, data, len);
-      Debug_printv("RAM write %04X:%s", addr, mstr::toHex(data, len).c_str());
+      if (addr + len > ram.size()) {
+        // Handle bounds error
+        return;
+      }
+      memcpy(&ram[addr], data, len);
+      Debug_printv("RAM write %04X:%s [%d]", addr, mstr::toHex(data, len).c_str(), len);
     }
   }
 
@@ -160,6 +179,7 @@ class driveMemory
         addr -= 0x0800; // RAM Mirror
 
       // ram + addr
+      Debug_printv("RAM execute %04X", addr);
     }
 
     // ROM
@@ -175,6 +195,7 @@ class driveMemory
         //rom->seek(addr, SEEK_SET);
 
         // Translate ROM functions to virtual drive functions
+        Debug_printv("ROM execute %04X", addr);
       }
     }
   }
