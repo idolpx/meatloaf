@@ -935,6 +935,24 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                     return;
                 }
             }
+            else if (command[1] == 'I') // UI
+            {
+              Debug_printv( "warm reset");
+              setStatusCode(ST_SPLASH);
+              return;
+            }
+            else if (command[1] == 'J') // UJ
+            {
+              Debug_printv( "cold reset");
+              reset();
+              return;
+            }
+            else if (command[1] == 0xCA) // U{Shift-J}
+            {
+              Debug_printv( "hard reset");
+              fnSystem.reboot();
+              return;
+            }
         break;
         case 'V':
             Debug_printv( "validate bam");
