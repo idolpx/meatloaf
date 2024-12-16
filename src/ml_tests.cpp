@@ -88,7 +88,7 @@ void dumpFileProperties(MFile* testMFile) {
     Debug_printf("path in stream: [%s]\r\n", testMFile->pathInStream.c_str());
     Debug_printf("File: [%s]\r\n", testMFile->name.c_str());
     Debug_printf("Extension: [%s]\r\n", testMFile->extension.c_str());
-    Debug_printf("Size: [%lu]\r\n", testMFile->size());
+    Debug_printf("Size: [%lu]\r\n", testMFile->size);
     Debug_printf("Is text: [%d]\r\n", testMFile->isText());
     Debug_printf("-------------------------------\r\n");
 }
@@ -354,7 +354,7 @@ void httpStream(char *url)
 
     if (file->exists())
     {
-        size_t len = file->size();
+        size_t len = file->size;
         Debug_printv("File exists! size [%d]\r\n", len);
 
         Meat::iostream stream(url); // dstFile

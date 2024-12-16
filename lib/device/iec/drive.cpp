@@ -522,6 +522,12 @@ bool iecDrive::open(uint8_t channel, const char *cname)
       name = mstr::drop(name, 1);
     }
 
+  if( mstr::startsWith(name, ":") )
+    {
+      overwrite = true;
+      name = mstr::drop(name, 1);
+    }
+
   if( mstr::startsWith(name, "0:") )
     name = mstr::drop(name, 2);
 
@@ -789,6 +795,7 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                         stream->position( pti[1] );
                         setStatusCode(ST_OK);
                     }
+                    return;
                 }
                 // B-A allocate bit in BAM not implemented
                 // B-F free bit in BAM not implemented
@@ -812,6 +819,7 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
             // Initialize
             Debug_printv( "initialize");
             reset();
+            return;
         break;
         case 'M':
             if ( command[1] == '-' ) // Memory
@@ -834,7 +842,7 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                 {
                     command = mstr::drop(command, 3); // Drop M-W
                     uint16_t address = (command[0] | command[1] << 8);
-                    uint8_t size = command[2]; // Limited to 34 bytes per command
+                    uint8_t size = command[2]; // Limited to 34 data bytes per command
 
                     command = mstr::drop(command, 3); // Drop address, size
                     std::string code = mstr::toHex(command);
@@ -844,8 +852,6 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                     m_memory.write(address, (const uint8_t *)command.c_str(), size);
 
                     // Add to m_mw_hash
-
-                    setStatusCode(ST_OK);
                 }
                 else if (command[2] == 'E') // M-E memory execute
                 {
@@ -860,10 +866,9 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                     m_mw_hash = 0;
 
                     m_memory.execute(address);
-
-                    setStatusCode(ST_OK);
                 }
-                
+                setStatusCode(ST_OK);
+                return;
             }
         break;
         case 'N':
@@ -907,6 +912,7 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                   }
 
                 setStatusCode(ST_SCRATCHED, n);
+                return;
             }
         break;
         case 'U':
@@ -926,6 +932,7 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                     auto stream = channel->getStream();
                     stream->seekSector( pti[2], pti[3] );
                     setStatusCode(ST_OK);
+                    return;
                 }
             }
         break;
@@ -1095,6 +1102,7 @@ void iecDrive::reset()
     if( m_channels[i]!=nullptr )
       close(i);
   m_numOpenChannels = 0;
+  m_memory.reset();
 
   IECFileDevice::reset();
 

@@ -131,7 +131,7 @@ class driveMemory
 
       memcpy(data, &ram[addr], len);
       Debug_printv("RAM read %04X:%s", addr, mstr::toHex(data, len).c_str());
-      //printf("%s",util_hexdump((const uint8_t *)ram.data(), ram.size()).c_str());
+      printf("%s",util_hexdump((const uint8_t *)ram.data(), ram.size()).c_str());
       return len;
     }
 
@@ -167,6 +167,7 @@ class driveMemory
       }
       memcpy(&ram[addr], data, len);
       Debug_printv("RAM write %04X:%s [%d]", addr, mstr::toHex(data, len).c_str(), len);
+      printf("%s",util_hexdump((const uint8_t *)ram.data(), ram.size()).c_str());
     }
   }
 
@@ -198,6 +199,10 @@ class driveMemory
         Debug_printv("ROM execute %04X", addr);
       }
     }
+  }
+
+  void reset() {
+    ram.assign(ram.size(), 0x00);
   }
 };
 
