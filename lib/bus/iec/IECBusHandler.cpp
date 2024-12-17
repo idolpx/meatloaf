@@ -152,7 +152,7 @@ static DRAM_ATTR esp_cpu_cycle_count_t timer_start_cycles, timer_cycles_per_us;
 #define timer_reset()        timer_start_cycles = esp_cpu_get_cycle_count()
 #define timer_start()        timer_start_cycles = esp_cpu_get_cycle_count()
 #define timer_stop()         while(0)
-#define timer_less_than(us)  ((esp_cpu_get_cycle_count()-timer_start_cycles) < ((us+0.5)*timer_cycles_per_us))
+#define timer_less_than(us)  ((esp_cpu_get_cycle_count()-timer_start_cycles) < (uint32_t(us+0.5)*timer_cycles_per_us))
 #define timer_wait_until(us) timer_wait_until_(us+0.5)
 FORCE_INLINE_ATTR void timer_wait_until_(uint32_t us)
 {
@@ -390,6 +390,27 @@ bool IECBusHandler::waitTimeout(uint16_t timeout, uint8_t cond)
           timeout -= 100;
         }
     }
+}
+
+
+void IECBusHandler::waitPinATN(bool state)
+{
+#ifdef ESP_PLATFORM
+  // waiting indefinitely with interrupts disabled on ESP32 is bad because
+  // the interrupt WDT will reboot the system if we wait too long (more than 800ms)
+  // => if interrupts are disabled then briefly enable them every 700ms to "feed" the WDT
+  uint64_t t = esp_timer_get_time();
+  while( readPinATN()!=state )
+    {
+      if( !haveInterrupts && (esp_timer_get_time()-t)>700000 )
+        {
+          interrupts(); noInterrupts();
+          t = esp_timer_get_time();
+        }
+    }
+#else
+  while( readPinATN()!=state );
+#endif
 }
 
 
@@ -700,7 +721,17 @@ bool IRAM_ATTR IECBusHandler::receiveJiffyByte(bool canWriteOk)
   // NOTE: this must be in a blocking loop since the sender starts transmitting
   // the byte immediately after setting CLK high. If we exit the "task" function then
   // we may not get back here in time to receive.
+#ifdef ESP_PLATFORM
+  while( !digitalReadFastExt(m_pinCLK, m_regCLKread, m_bitCLK) && digitalReadFastExt(m_pinATN, m_regATNread, m_bitATN) )
+    if( !timer_less_than(700000) )
+      {
+        // briefly enable interrupts every 700ms to "feed" the WDT, otherwise we'll get re-booted
+        interrupts(); noInterrupts();
+        timer_reset();
+      }
+#else
   while( !digitalReadFastExt(m_pinCLK, m_regCLKread, m_bitCLK) && digitalReadFastExt(m_pinATN, m_regATNread, m_bitATN) );
+#endif
 
   // start timer (on AVR, lag from CLK high to timer start is between 700...1700ns)
   timer_start();
@@ -797,7 +828,17 @@ bool IRAM_ATTR IECBusHandler::transmitJiffyByte(uint8_t numData)
   // NOTE: this must be in a blocking loop since the receiver receives the data
   // immediately after setting DATA high. If we exit the "task" function then
   // we may not get back here in time to transmit.
+#ifdef ESP_PLATFORM
+  while( !digitalReadFastExt(m_pinDATA, m_regDATAread, m_bitDATA) && digitalReadFastExt(m_pinATN, m_regATNread, m_bitATN) )
+    if( !timer_less_than(700000) )
+      {
+        // briefly enable interrupts every 700ms to "feed" the WDT, otherwise we'll get re-booted
+        interrupts(); noInterrupts();
+        timer_reset();
+      }
+#else
   while( !digitalReadFastExt(m_pinDATA, m_regDATAread, m_bitDATA) && digitalReadFastExt(m_pinATN, m_regATNread, m_bitATN) );
+#endif
 
   // start timer (on AVR, lag from DATA high to timer start is between 700...1700ns)
   timer_start();
@@ -945,7 +986,17 @@ bool IRAM_ATTR IECBusHandler::transmitJiffyBlock(uint8_t *buffer, uint8_t numByt
       // NOTE: this must be in a blocking loop since the receiver receives the data
       // immediately after setting DATA high. If we exit the "task" function then
       // we may not get back here in time to transmit.
+#ifdef ESP_PLATFORM
+      while( digitalReadFastExt(m_pinDATA, m_regDATAread, m_bitDATA) && digitalReadFastExt(m_pinATN, m_regATNread, m_bitATN) )
+        if( !timer_less_than(700000) )
+          {
+            // briefly enable interrupts every 700ms to "feed" the WDT, otherwise we'll get re-booted
+            interrupts(); noInterrupts();
+            timer_reset();
+          }
+#else
       while( digitalReadFastExt(m_pinDATA, m_regDATAread, m_bitDATA) && digitalReadFastExt(m_pinATN, m_regATNread, m_bitATN) );
+#endif
 
       // start timer (on AVR, lag from DATA low to timer start is between 700...1700ns)
       timer_start();
@@ -1686,7 +1737,17 @@ bool IRAM_ATTR IECBusHandler::transmitEpyxByte(uint8_t data)
   // NOTE: this must be in a blocking loop since the sender starts transmitting
   // the byte immediately after setting CLK high. If we exit the "task" function then
   // we may not get back here in time to receive.
+#ifdef ESP_PLATFORM
+  while( !digitalReadFastExt(m_pinDATA, m_regDATAread, m_bitDATA) && digitalReadFastExt(m_pinATN, m_regATNread, m_bitATN) )
+    if( !timer_less_than(700000) )
+      {
+        // briefly enable interrupts every 700ms to "feed" the WDT, otherwise we'll get re-booted
+        interrupts(); noInterrupts();
+        timer_reset();
+      }
+#else
   while( !digitalReadFastExt(m_pinDATA, m_regDATAread, m_bitDATA) && digitalReadFastExt(m_pinATN, m_regATNread, m_bitATN) );
+#endif
   
   // start timer
   timer_start();
@@ -1989,6 +2050,10 @@ bool IECBusHandler::receiveEpyxHeader()
 
 bool IECBusHandler::transmitEpyxBlock()
 {
+  // set channel number for read() call below
+  m_currentDevice->talk(0);
+
+  // get data
   uint8_t n = m_currentDevice->read(m_buffer, m_bufferSize);
 
   noInterrupts();
@@ -2347,7 +2412,7 @@ void IECBusHandler::task()
           if( (m_primary == 0x3f) || (m_primary == 0x5f) || !receiveIECByteATN(m_secondary) ) m_secondary = 0;
 
           // wait until ATN is released
-          while( !readPinATN() );
+          waitPinATN(HIGH);
           m_flags &= ~P_ATN;
 
           // allow ATN to pull DATA low in hardware
@@ -2424,7 +2489,7 @@ void IECBusHandler::task()
           delayMicrosecondsISafe(150);
           writePinCLK(HIGH);
           writePinDATA(HIGH);
-          while( !readPinATN() );
+          waitPinATN(HIGH);
 
           // allow ATN to pull DATA low in hardware
           writePinCTRL(LOW);
@@ -2650,7 +2715,7 @@ void IECBusHandler::task()
          uint8_t numData = m_currentDevice->read(m_buffer, m_bufferSize);
 
          // delay to make sure receiver sees our CLK LOW and enters "new data block" state.
-         // Due to a possible VIC "bad line" plus a possible DRAM refresh delay it may take
+         // If a possible VIC "bad line" occurs right after reading bits 6+7 it may take
          // the receiver up to 160us after reading bits 6+7 (at FB71) to checking for CLK low (at FB54).
          // If we make it back into transmitJiffyBlock() during that time period
          // then we may already set CLK HIGH again before receiver sees the CLK LOW, 
