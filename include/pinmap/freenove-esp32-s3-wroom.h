@@ -1,4 +1,4 @@
-#ifdef PINMAP_FREENOVE_ESP32S3_H
+#ifndef PINMAP_FREENOVE_ESP32S3_H
 #define PINMAP_FREENOVE_ESP32S3_H
 
 // https://github.com/Freenove/Freenove_ESP32_S3_WROOM_Board
@@ -22,8 +22,8 @@
 /* UART */
 #define PIN_UART0_RX            GPIO_NUM_44  // fnUART.cpp
 #define PIN_UART0_TX            GPIO_NUM_43
-#define PIN_UART1_RX            GPIO_NUM_18
-#define PIN_UART1_TX            GPIO_NUM_17
+#define PIN_UART1_RX            GPIO_NUM_NC
+#define PIN_UART1_TX            GPIO_NUM_NC
 #define PIN_UART2_RX            GPIO_NUM_NC
 #define PIN_UART2_TX            GPIO_NUM_NC
 
@@ -32,13 +32,24 @@
 #define PIN_BUTTON_B            GPIO_NUM_NC
 #define PIN_BUTTON_C            GPIO_NUM_NC
 
-/* LEDs (RGB LED GPIO_48) */
+/* LEDs */
 #define PIN_LED_WIFI            GPIO_NUM_2  // led.cpp
 #define PIN_LED_BUS             GPIO_NUM_NC
 #define PIN_LED_BT              GPIO_NUM_NC
+#define PIN_LED_RGB             GPIO_NUM_48
 
 /* Audio Output */
 #define PIN_DAC1                GPIO_NUM_NC
+#define PIN_I2S                 GPIO_NUM_42
+
+/* I2C GPIO Expander */
+#define PIN_GPIOX_SDA           GPIO_NUM_9
+#define PIN_GPIOX_SCL           GPIO_NUM_10
+#define PIN_GPIOX_INT           GPIO_NUM_41
+#define GPIOX_ADDRESS           0x20  // PCF8575
+//#define GPIOX_ADDRESS           0x24  // PCA9673
+#define GPIOX_SPEED             400   // PCF8575 - 400Khz
+//#define GPIOX_SPEED             1000  // PCA9673 - 1000Khz / 1Mhz
 
 /* Commodore IEC Pins */
 // CLK & DATA lines in/out are split between two pins
@@ -57,7 +68,7 @@
 #define PIN_IEC_DATA_IN         GPIO_NUM_6      //  DATA   5       T-CS 14         2  (BLACK)
 #define PIN_IEC_DATA_OUT        GPIO_NUM_6      //
 #define PIN_IEC_SRQ             GPIO_NUM_7      //  SRQ    1       T-DC 27         7  (ORANGE)
-#define PIN_IEC_RESET           GPIO_NUM_15     //  RESET  6       A 32            N/C
+#define PIN_IEC_RESET           GPIO_NUM_8     //  RESET  6       A 32            N/C
                                                 //  GND    2       GND             9  (GREY)
 
 /* Modem/Parallel Switch */

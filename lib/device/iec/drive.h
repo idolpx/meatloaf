@@ -6,6 +6,7 @@
 #include <string>
 #include <cstring>
 #include <unordered_map>
+#include <esp_rom_crc.h>
 
 #include "../../bus/iec/IECFileDevice.h"
 #include "../../media/media.h"
@@ -93,6 +94,8 @@ class driveMemory
   }
   ~driveMemory() = default;
 
+  uint16_t mw_hash = 0;
+
   bool setRAM(size_t ramSize) {
     ram.resize(ramSize, 0x00);
     return true;
@@ -168,6 +171,8 @@ class driveMemory
       memcpy(&ram[addr], data, len);
       Debug_printv("RAM write %04X:%s [%d]", addr, mstr::toHex(data, len).c_str(), len);
       printf("%s",util_hexdump((const uint8_t *)ram.data(), ram.size()).c_str());
+
+      mw_hash = esp_rom_crc16_le(mw_hash, data, len);
     }
   }
 
@@ -181,6 +186,7 @@ class driveMemory
 
       // ram + addr
       Debug_printv("RAM execute %04X", addr);
+      mw_hash = 0;
     }
 
     // ROM
@@ -267,7 +273,6 @@ class iecDrive : public IECFileDevice
   uint8_t m_statusCode, m_statusTrk, m_numOpenChannels;
 
   driveMemory m_memory;
-  uint32_t m_mw_hash = 0;
 };
 
 #endif // DRIVE_H

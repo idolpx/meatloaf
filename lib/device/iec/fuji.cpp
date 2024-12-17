@@ -734,7 +734,8 @@ void iecFuji::net_set_ssid_raw(bool store)
     uint8_t sent_ssid_len = strlen(&payload[0]);
     uint8_t sent_pass_len = strlen(&payload[1 + sent_ssid_len]);
     strncpy((char *)&net_config.ssid[0], (const char *) &payload[0], sent_ssid_len);
-    strncpy((char *)&net_config.password[0], (const char *) &payload[1 + sent_ssid_len], sent_pass_len);
+    std::string password = mstr::toPETSCII2((const char *) &payload[1 + sent_ssid_len]);
+    strncpy((char *)&net_config.password[0], (const char *) &password[0], sent_pass_len);
     Debug_printv("ssid[%s] pass[%s]", net_config.ssid, net_config.password);
 
     net_set_ssid(store, net_config);

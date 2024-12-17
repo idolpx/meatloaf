@@ -38,9 +38,20 @@
 #define PIN_LED_WIFI            GPIO_NUM_5   // led.cpp
 #define PIN_LED_BUS             GPIO_NUM_NC
 #define PIN_LED_BT              GPIO_NUM_NC
+#define PIN_LED_RGB             GPIO_NUM_38
 
 /* Audio Output */
 #define PIN_DAC1                GPIO_NUM_NC // samlib.h
+#define PIN_I2S                 GPIO_NUM_42
+
+/* I2C GPIO Expander */
+#define PIN_GPIOX_SDA           GPIO_NUM_9
+#define PIN_GPIOX_SCL           GPIO_NUM_10
+#define PIN_GPIOX_INT           GPIO_NUM_41
+#define GPIOX_ADDRESS           0x20  // PCF8575
+//#define GPIOX_ADDRESS           0x24  // PCA9673
+#define GPIOX_SPEED             400   // PCF8575 - 400Khz
+//#define GPIOX_SPEED             1000  // PCA9673 - 1000Khz / 1Mhz
 
 
 /* Commodore IEC Pins */
@@ -54,28 +65,19 @@
 #define IEC_HAS_RESET
                                                 //            WIRING
                                                 //  C64    DIN6    D32Pro       S3PRO   TFT
-#define PIN_IEC_ATN             GPIO_NUM_14     //  ATN    3       A T-LED 32   14      10 (PURPLE)
-#define PIN_IEC_CLK_IN          GPIO_NUM_21     //  CLK    4       A T-RST 33   21      8  (BROWN)
-#define PIN_IEC_CLK_OUT         GPIO_NUM_21     //
-#define PIN_IEC_DATA_IN         GPIO_NUM_48     //  DATA   5       T-CS 14      48      2  (BLACK)
-#define PIN_IEC_DATA_OUT        GPIO_NUM_48     //
-#define PIN_IEC_SRQ             GPIO_NUM_47     //  SRQ    1       T-DC 27      47      7  (ORANGE)
-#define PIN_IEC_RESET           GPIO_NUM_15     //  RESET  6       A 32                 N/C
-                                                //  GND    2       GND                  9  (GREY)
+#define PIN_IEC_ATN             GPIO_NUM_4      //  ATN    3       A T-LED 32      10 (PURPLE)
+#define PIN_IEC_CLK_IN          GPIO_NUM_5      //  CLK    4       A T-RST 33      8  (BROWN)
+#define PIN_IEC_CLK_OUT         GPIO_NUM_5      //
+#define PIN_IEC_DATA_IN         GPIO_NUM_6      //  DATA   5       T-CS 14         2  (BLACK)
+#define PIN_IEC_DATA_OUT        GPIO_NUM_6      //
+#define PIN_IEC_SRQ             GPIO_NUM_7      //  SRQ    1       T-DC 27         7  (ORANGE)
+#define PIN_IEC_RESET           GPIO_NUM_8      //  RESET  6       A 32            N/C
+                                                //  GND    2       GND             9  (GREY)
 
 
 /* Modem/Parallel Switch */
 #define PIN_MODEM_ENABLE        GPIO_NUM_2  // High = Modem enabled
 #define PIN_MODEM_UP9600        GPIO_NUM_15 // High = UP9600 enabled
-
-/* I2C GPIO Expander */
-#define PIN_GPIOX_SDA           GPIO_NUM_9
-#define PIN_GPIOX_SCL           GPIO_NUM_10
-#define PIN_GPIOX_INT           GPIO_NUM_39
-#define GPIOX_ADDRESS           0x20  // PCF8575
-//#define GPIOX_ADDRESS           0x24  // PCA9673
-#define GPIOX_SPEED             400   // PCF8575 - 400Khz
-//#define GPIOX_SPEED             1000  // PCA9673 - 1000Khz / 1Mhz
 
 #endif // PINMAP_LOLIN_S3_PRO
 #endif // PINMAP_LOLIN_S3_PRO_H

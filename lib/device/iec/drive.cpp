@@ -850,8 +850,6 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                     Debug_printv("Memory Write address[%04X][%s]", address, code.c_str());
 
                     m_memory.write(address, (const uint8_t *)command.c_str(), size);
-
-                    // Add to m_mw_hash
                 }
                 else if (command[2] == 'E') // M-E memory execute
                 {
@@ -861,11 +859,11 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                     Debug_printv("Memory Execute address[%04X][%s]", address, code.c_str());
 
                     // Compare m_mw_hash to known software fastload hashes
-
-                    // Clear m_mw_hash
-                    m_mw_hash = 0;
+                    Debug_printv("M-W Hash [%02X]", m_memory.mw_hash);
 
                     m_memory.execute(address);
+
+                    // Execute detected fast loader
                 }
                 setStatusCode(ST_OK);
                 return;
@@ -949,6 +947,12 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
             }
             else if (command[1] == 0xCA) // U{Shift-J}
             {
+              if ( command[2] == '+')
+              {
+                Debug_printv( "reboot");
+                fnSystem.reboot();
+                return;
+              }
               Debug_printv( "hard reset");
               reset();
               m_cwd.reset(m_cwd->cd("^")); // reset to flash root

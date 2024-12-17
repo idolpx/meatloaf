@@ -23,7 +23,9 @@
 
 
 #include "../include/global_defines.h"
+#include "../include/pinmap.h"
 #include "../include/debug.h"
+
 
 #include "device.h"
 #include "keys.h"

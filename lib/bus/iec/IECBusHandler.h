@@ -113,6 +113,7 @@ class IECBusHandler
   bool receiveIECByteATN(uint8_t &data);
   bool receiveIECByte(bool canWriteOk);
   bool transmitIECByte(uint8_t numData);
+  bool deviceExists(uint8_t devnr);
 
   volatile uint16_t m_timeoutDuration; 
   volatile uint32_t m_timeoutStart;
