@@ -19,7 +19,7 @@ int cat(int argc, char **argv)
 {
     if (argc == 1)
     {
-        fprintf(stderr, "You have to pass at least one file path!\n");
+        fprintf(stderr, "You have to pass at least one file path!\r\n");
         return EXIT_SUCCESS;
     }
 
@@ -32,7 +32,7 @@ int cat(int argc, char **argv)
         FILE *file = fopen(filename, "r");
         if (file == nullptr)
         {
-            fprintf(stderr, "%s %s : %s\n", argv[0], filename,
+            fprintf(stderr, "%s %s : %s\r\n", argv[0], filename,
                     strerror(errno));
             return errno;
         }
@@ -48,7 +48,7 @@ int cat(int argc, char **argv)
 
 int pwd(int argc, char **argv)
 {
-    printf("%s\n", ESP32Console::console_getpwd());
+    printf("%s\r\n", ESP32Console::console_getpwd());
     return EXIT_SUCCESS;
 }
 
@@ -61,7 +61,7 @@ int cd(int argc, char **argv)
         path = getenv("HOME");
         if (!path)
         {
-            fprintf(stderr, "No HOME env variable set!\n");
+            fprintf(stderr, "No HOME env variable set!\r\n");
             return EXIT_FAILURE;
         }
     }
@@ -79,13 +79,13 @@ int cd(int argc, char **argv)
     if (file)
     {
         fclose(file);
-        fprintf(stderr, "Can not cd into a file!\n");
+        fprintf(stderr, "Can not cd into a file!\r\n");
         return 1;
     }
 
     if (ESP32Console::console_chdir(path))
     {
-        fprintf(stderr, "Error: %s\n", strerror(errno));
+        fprintf(stderr, "Error: %s\r\n", strerror(errno));
         return 1;
     }
 
@@ -99,7 +99,7 @@ int cd(int argc, char **argv)
     }
     else if (ENOENT == errno)
     {
-        fprintf(stderr, "Choosen directory maybe does not exists!\n");
+        fprintf(stderr, "Choosen directory maybe does not exists!\r\n");
     }
 
     return EXIT_SUCCESS;
@@ -118,7 +118,7 @@ int ls(int argc, char **argv)
     }
     else
     {
-        printf("You can pass only one filename!\n");
+        printf("You can pass only one filename!\r\n");
         return 1;
     }
 
@@ -128,7 +128,7 @@ int ls(int argc, char **argv)
     DIR *dir = opendir(path);
     if (!dir)
     {
-        fprintf(stderr, "Could not open filepath: %s\n", strerror(errno));
+        fprintf(stderr, "Could not open filepath: %s\r\n", strerror(errno));
         return 1;
     }
 
@@ -139,7 +139,7 @@ int ls(int argc, char **argv)
         std::string filename = path;
         filename += d->d_name;
         stat(filename.c_str(), &st);
-        printf("%c %8lu  %s\r\n", (S_ISDIR(st.st_mode)) ? 'D':'F', st.st_size, d->d_name);
+        printf("%c %8lu  %s\r\r\n", (S_ISDIR(st.st_mode)) ? 'D':'F', st.st_size, d->d_name);
     }
 
     closedir(dir);
@@ -150,7 +150,7 @@ int mv(int argc, char **argv)
 {
     if (argc != 3)
     {
-        fprintf(stderr, "Syntax is mv [ORIGIN] [TARGET]\n");
+        fprintf(stderr, "Syntax is mv [ORIGIN] [TARGET]\r\n");
         return 1;
     }
 
@@ -163,7 +163,7 @@ int mv(int argc, char **argv)
     // Do rename
     if (rename(old_name, new_name))
     {
-        printf("Error moving: %s\n", strerror(errno));
+        printf("Error moving: %s\r\n", strerror(errno));
         return EXIT_FAILURE;
     }
 
@@ -175,7 +175,7 @@ int cp(int argc, char **argv)
     //TODO: Shows weird error message
     if (argc != 3)
     {
-        fprintf(stderr, "Syntax is cp [ORIGIN] [TARGET]\n");
+        fprintf(stderr, "Syntax is cp [ORIGIN] [TARGET]\r\n");
         return 1;
     }
 
@@ -189,7 +189,7 @@ int cp(int argc, char **argv)
     FILE *origin = fopen(old_name, "r");
     if (!origin)
     {
-        fprintf(stderr, "Error opening origin file: %s\n", strerror(errno));
+        fprintf(stderr, "Error opening origin file: %s\r\n", strerror(errno));
         return 1;
     }
 
@@ -197,7 +197,7 @@ int cp(int argc, char **argv)
     if (!target)
     {
         fclose(origin);
-        fprintf(stderr, "Error opening target file: %s\n", strerror(errno));
+        fprintf(stderr, "Error opening target file: %s\r\n", strerror(errno));
         return 1;
     }
 
@@ -209,7 +209,7 @@ int cp(int argc, char **argv)
     while ((buffer = getc(origin)) != EOF)
     {
         if(fputc(buffer, target) == EOF) {
-            fprintf(stderr, "Error writing: %s\n", strerror(errno));
+            fprintf(stderr, "Error writing: %s\r\n", strerror(errno));
             fclose(origin); fclose(target);
             return 1;
         }
@@ -218,7 +218,7 @@ int cp(int argc, char **argv)
     error = errno;
     if (error && !feof(origin))
     {
-        fprintf(stderr, "Error copying: %s\n", strerror(error));
+        fprintf(stderr, "Error copying: %s\r\n", strerror(error));
         fclose(origin);
         fclose(target);
         return 1;
@@ -234,7 +234,7 @@ int rm(int argc, char **argv)
 {
     if (argc != 2)
     {
-        fprintf(stderr, "You have to pass exactly one file. Syntax rm [FILE]\n");
+        fprintf(stderr, "You have to pass exactly one file. Syntax rm [FILE]\r\n");
         return EXIT_SUCCESS;
     }
 
@@ -242,7 +242,7 @@ int rm(int argc, char **argv)
     ESP32Console::console_realpath(argv[1], filename);
 
     if(remove(filename)) {
-        fprintf(stderr, "Error deleting %s: %s\n", filename, strerror(errno));
+        fprintf(stderr, "Error deleting %s: %s\r\n", filename, strerror(errno));
     }
 
     return EXIT_SUCCESS;
@@ -252,7 +252,7 @@ int rmdir(int argc, char **argv)
 {
     if (argc != 2)
     {
-        fprintf(stderr, "You have to pass exactly one file. Syntax rmdir [DIRECTORY]\n");
+        fprintf(stderr, "You have to pass exactly one file. Syntax rmdir [DIRECTORY]\r\n");
         return EXIT_SUCCESS;
     }
 
@@ -260,7 +260,7 @@ int rmdir(int argc, char **argv)
     ESP32Console::console_realpath(argv[1], filename);
 
     if(rmdir(filename)) {
-        fprintf(stderr, "Error deleting %s: %s\n", filename, strerror(errno));
+        fprintf(stderr, "Error deleting %s: %s\r\n", filename, strerror(errno));
     }
 
     return EXIT_SUCCESS;
@@ -270,7 +270,7 @@ int mkdir(int argc, char **argv)
 {
     if (argc != 2)
     {
-        fprintf(stderr, "You have to pass exactly one file. Syntax mkdir [DIRECTORY]\n");
+        fprintf(stderr, "You have to pass exactly one file. Syntax mkdir [DIRECTORY]\r\n");
         return EXIT_SUCCESS;
     }
 
@@ -278,7 +278,7 @@ int mkdir(int argc, char **argv)
     ESP32Console::console_realpath(argv[1], directory);
 
     if(mkdir(directory, 0755)) {
-        fprintf(stderr, "Error creating %s: %s\n", directory, strerror(errno));
+        fprintf(stderr, "Error creating %s: %s\r\n", directory, strerror(errno));
     }
 
     return EXIT_SUCCESS;

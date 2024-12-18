@@ -28,12 +28,12 @@ namespace ESP32Console
             //Print help on --help argument
             if (result.count("help")) {
                 printf(options.help().c_str());
-                printf("\n");
+                printf("\r\n");
                 return EXIT_SUCCESS;
             }
 
             if (command.getVersion() && result.count("version")) {
-                printf("Version: %s\n", command.getVersion());
+                printf("Version: %s\r\n", command.getVersion());
                 return EXIT_SUCCESS;
             }
 
@@ -42,7 +42,7 @@ namespace ESP32Console
         // catch (const std::exception &err)
         // {
         //     printf(err.what());
-        //     printf("\n");
+        //     printf("\r\n");
         //     return EXIT_FAILURE;
         // }
     }

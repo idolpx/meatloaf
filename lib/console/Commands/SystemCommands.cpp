@@ -100,36 +100,36 @@ static int sysInfo(int argc, char **argv)
     esp_chip_info_t info;
     esp_chip_info(&info);
 
-    printf("ESP32Console version: %s\n", ESP32CONSOLE_VERSION);
-//    printf("Arduino Core version: %s (%x)\n", XTSTR(ARDUINO_ESP32_GIT_DESC), ARDUINO_ESP32_GIT_VER);
-    printf("ESP-IDF Version: %s\n", ESP.getSdkVersion());
+    printf("ESP32Console version: %s\r\n", ESP32CONSOLE_VERSION);
+//    printf("Arduino Core version: %s (%x)\r\n", XTSTR(ARDUINO_ESP32_GIT_DESC), ARDUINO_ESP32_GIT_VER);
+    printf("ESP-IDF Version: %s\r\n", ESP.getSdkVersion());
 
-    printf("\n");
-    printf("Chip info:\n");
-    printf("\tModel: %s\n", ESP.getChipModel());
-    printf("\tRevison number: %d\n", ESP.getChipRevision());
-    printf("\tCores: %d\n", ESP.getChipCores());
-    printf("\tClock: %lu MHz\n", ESP.getCpuFreqMHz());
-    printf("\tFeatures:%s%s%s%s%s\r\n",
+    printf("\r\n");
+    printf("Chip info:\r\n");
+    printf("\tModel: %s\r\n", ESP.getChipModel());
+    printf("\tRevison number: %d\r\n", ESP.getChipRevision());
+    printf("\tCores: %d\r\n", ESP.getChipCores());
+    printf("\tClock: %lu MHz\r\n", ESP.getCpuFreqMHz());
+    printf("\tFeatures:%s%s%s%s%s\r\r\n",
            info.features & CHIP_FEATURE_WIFI_BGN ? " 802.11bgn " : "",
            info.features & CHIP_FEATURE_BLE ? " BLE " : "",
            info.features & CHIP_FEATURE_BT ? " BT " : "",
            info.features & CHIP_FEATURE_EMB_FLASH ? " Embedded-Flash " : " External-Flash ",
            info.features & CHIP_FEATURE_EMB_PSRAM ? " Embedded-PSRAM" : "");
 
-    printf("EFuse MAC: %s\n", mac2String(ESP.getEfuseMac()).c_str());
+    printf("EFuse MAC: %s\r\n", mac2String(ESP.getEfuseMac()).c_str());
 
-    printf("Flash size: %ld MB (mode: %s, speed: %ld MHz)\n", ESP.getFlashChipSize() / (1024 * 1024), getFlashModeStr(), ESP.getFlashChipSpeed() / (1024 * 1024));
-    printf("PSRAM size: %ld MB\n", ESP.getPsramSize() / (1024 * 1024));
+    printf("Flash size: %ld MB (mode: %s, speed: %ld MHz)\r\n", ESP.getFlashChipSize() / (1024 * 1024), getFlashModeStr(), ESP.getFlashChipSpeed() / (1024 * 1024));
+    printf("PSRAM size: %ld MB\r\n", ESP.getPsramSize() / (1024 * 1024));
 
 #ifndef CONFIG_APP_REPRODUCIBLE_BUILD
-    printf("Compilation datetime: " __DATE__ " " __TIME__ "\n");
+    printf("Compilation datetime: " __DATE__ " " __TIME__ "\r\n");
 #endif
 
-    printf("\nReset reason: %s\n", getResetReasonStr());
+    printf("\nReset reason: %s\r\n", getResetReasonStr());
 
-    printf("\n");
-    printf("CPU temperature: %.01f °C\n", ESP.temperatureRead());
+    printf("\r\n");
+    printf("CPU temperature: %.01f °C\r\n", ESP.temperatureRead());
 
     return EXIT_SUCCESS;
 }
@@ -149,18 +149,18 @@ static int meminfo(int argc, char **argv)
     uint32_t min = ESP.getMinFreeHeap() / 1024;
     uint32_t total_free = esp_get_free_heap_size() / 1024;
 
-    printf("Internal Heap: %lu KB free, %lu KB used, (%lu KB total)\r\n", free, used, total);
-    printf("Minimum free heap size during uptime was: %lu KB\r\n", min);
-    printf("Overall Free Memory: %lu KB\r\n", total_free);
+    printf("Internal Heap: %lu KB free, %lu KB used, (%lu KB total)\r\r\n", free, used, total);
+    printf("Minimum free heap size during uptime was: %lu KB\r\r\n", min);
+    printf("Overall Free Memory: %lu KB\r\r\n", total_free);
     return EXIT_SUCCESS;
 }
 
 static int taskinfo(int argc, char **argv)
 {
-    printf( "Task Name\tStatus\tPrio\tHWM\tTask\tAffinity\r\n");
+    printf( "Task Name\tStatus\tPrio\tHWM\tTask\tAffinity\r\r\n");
     char stats_buffer[1024];
     vTaskList(stats_buffer);
-    printf("%s\r\n", stats_buffer);
+    printf("%s\r\r\n", stats_buffer);
     return EXIT_SUCCESS;
 }
 
@@ -182,10 +182,10 @@ static int date(int argc, char **argv)
             set_time = true;
             break;
         case '?':
-            printf("Unknown option: %c\n", optopt);
+            printf("Unknown option: %c\r\n", optopt);
             return 1;
         case ':':
-            printf("Missing arg for %c\n", optopt);
+            printf("Missing arg for %c\r\n", optopt);
             return 1;
         }
 
@@ -198,7 +198,7 @@ static int date(int argc, char **argv)
     {
         if (!target)
         {
-            fprintf(stderr, "Set option requires an datetime as argument in format '%%Y-%%m-%%d %%H:%%M:%%S' (e.g. 'date -s \"2022-07-13 22:47:00\"'\n");
+            fprintf(stderr, "Set option requires an datetime as argument in format '%%Y-%%m-%%d %%H:%%M:%%S' (e.g. 'date -s \"2022-07-13 22:47:00\"'\r\n");
             return 1;
         }
 
@@ -206,7 +206,7 @@ static int date(int argc, char **argv)
 
         if (!strptime(target, "%Y-%m-%d %H:%M:%S", &t))
         {
-            fprintf(stderr, "Set option requires an datetime as argument in format '%%Y-%%m-%%d %%H:%%M:%%S' (e.g. 'date -s \"2022-07-13 22:47:00\"'\n");
+            fprintf(stderr, "Set option requires an datetime as argument in format '%%Y-%%m-%%d %%H:%%M:%%S' (e.g. 'date -s \"2022-07-13 22:47:00\"'\r\n");
             return 1;
         }
 
@@ -225,7 +225,7 @@ static int date(int argc, char **argv)
         constexpr int buffer_size = 100;
         char buffer[buffer_size];
         strftime(buffer, buffer_size, "%a %b %e %H:%M:%S %Z %Y", localtime(&tmp));
-        printf("Time set: %s\n", buffer);
+        printf("Time set: %s\r\n", buffer);
 
         return 0;
     }
@@ -239,7 +239,7 @@ static int date(int argc, char **argv)
     // Ensure the format string is correct
     if (target[0] != '+')
     {
-        fprintf(stderr, "Format string must start with an +!\n");
+        fprintf(stderr, "Format string must start with an +!\r\n");
         return 1;
     }
 
@@ -250,7 +250,7 @@ static int date(int argc, char **argv)
     char buffer[buffer_size];
     time_t t = time(nullptr);
     strftime(buffer, buffer_size, target, localtime(&t));
-    printf("%s\n", buffer);
+    printf("%s\r\n", buffer);
     return 0;
 
     return EXIT_SUCCESS;

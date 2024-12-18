@@ -446,11 +446,11 @@ void iecNetwork::iec_command()
 {
     // Check pt size before proceeding to avoid a crash
     if (pt.size()==0) {
-        Debug_printf("pt.size()==0!\n");
+        Debug_printf("pt.size()==0!\r\n");
         return;
     }
 
-    Debug_printv("pt[0]=='%s'\n", pt[0].c_str());
+    Debug_printv("pt[0]=='%s'\r\n", pt[0].c_str());
     if (pt[0] == "cd")
         set_prefix();
     else if (pt[0] == "chmode")
@@ -626,7 +626,7 @@ void iecNetwork::perform_special_80()
     int channel = 0;
     NetworkStatus ns;
 
-    Debug_printf("perform_special_80()\n");
+    Debug_printf("perform_special_80()\r\n");
 
     if (pt.size() < 2)
     {
@@ -769,16 +769,16 @@ void iecNetwork::set_status(bool is_binary)
     is_binary_status = is_binary;
     if (pt.size() < 2)
     {
-        Debug_printf("Channel # Required\n");
+        Debug_printf("Channel # Required\r\n");
         iecStatus.error = NETWORK_ERROR_INVALID_DEVICESPEC;
-        iecStatus.msg = "channel # required.\n";
+        iecStatus.msg = "channel # required.\r\n";
         iecStatus.connected = 0;
         iecStatus.channel = 15;
         return;
     }
 
     active_status_channel = atoi(pt[1].c_str());
-    Debug_printf("Active status channel now: %u\n", active_status_channel);
+    Debug_printf("Active status channel now: %u\r\n", active_status_channel);
 
     iecStatus.error = NETWORK_ERROR_SUCCESS;
     iecStatus.msg = "Active status channel set.";
@@ -1119,22 +1119,22 @@ uint8_t iecNetwork::getStatusData(char *buffer, uint8_t bufferSize)
       if( is_binary_status )
         {
           if (!active_status_channel) 
-            Debug_printf("No active status channel\n");
+            Debug_printf("No active status channel\r\n");
 
           if( !network_data_map[active_status_channel].protocol )
-            Debug_printf("No active protocol\n");
+            Debug_printf("No active protocol\r\n");
 
           return 0;
         }
       else
         {
-          Debug_printf("msg: %s\n", iecStatus.msg.c_str());
+          Debug_printf("msg: %s\r\n", iecStatus.msg.c_str());
           util_petscii_to_ascii_str(iecStatus.msg); // are the util pescii/asccii functions reversed?
-          Debug_printf("msgPETSCII: %s\n", iecStatus.msg.c_str());
-          snprintf(buffer, bufferSize, "%d,%s,%02d,%02d\r", 
+          Debug_printf("msgPETSCII: %s\r\n", iecStatus.msg.c_str());
+          snprintf(buffer, bufferSize, "%d,%s,%02d,%02d\r\n", 
                    iecStatus.error, iecStatus.msg.c_str(), iecStatus.channel, iecStatus.connected);
 
-          Debug_printf("Sending status: %s\n", buffer);
+          Debug_printf("Sending status: %s\r\n", buffer);
           
           // reset status
           iecStatus.error = 0;
@@ -1163,11 +1163,11 @@ uint8_t iecNetwork::getStatusData(char *buffer, uint8_t bufferSize)
         buffer[2] = ns.connected;
         buffer[3] = ns.error;
 
-        Debug_printf("Sending binary status for active channel #%d: %s\n", active_status_channel, mstr::toHex((uint8_t *) buffer, 4).c_str());
+        Debug_printf("Sending binary status for active channel #%d: %s\r\n", active_status_channel, mstr::toHex((uint8_t *) buffer, 4).c_str());
         return 4;
       } else {
         snprintf(buffer, bufferSize, "%u,%u,%u", ns.rxBytesWaiting, ns.connected, ns.error);
-        Debug_printf("Sending status for active channel #%d: %s\n", active_status_channel, buffer);
+        Debug_printf("Sending status for active channel #%d: %s\r\n", active_status_channel, buffer);
         return strlen(buffer);
       }
     }

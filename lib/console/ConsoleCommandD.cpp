@@ -27,7 +27,7 @@ namespace ESP32Console
         // catch (const std::exception &err)
         // {
         //     printf("%s", err.what());
-        //     printf("\n");
+        //     printf("\r\n");
         //     return 1;
         // }
     }

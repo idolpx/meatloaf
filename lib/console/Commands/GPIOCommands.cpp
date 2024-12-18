@@ -13,7 +13,7 @@ static int _pinmode(int argc, char **argv)
 {
     // if (argc != 3)
     // {
-    //     printf("You have to pass a pin number and mode. Syntax: pinMode [GPIO] [MODE]\n");
+    //     printf("You have to pass a pin number and mode. Syntax: pinMode [GPIO] [MODE]\r\n");
     //     return 1;
     // }
 
@@ -28,12 +28,12 @@ static int _pinmode(int argc, char **argv)
     // }
     // catch (std::invalid_argument ex)
     // {
-    //     fprintf(stderr, "Invalid argument for pin: %s\n", ex.what());
+    //     fprintf(stderr, "Invalid argument for pin: %s\r\n", ex.what());
     //     return 1;
     // }
 
     // if (pin > 255 || !digitalPinIsValid(pin)) {
-    //     fprintf(stderr, "%d is not a GPIO pin\n", pin);
+    //     fprintf(stderr, "%d is not a GPIO pin\r\n", pin);
     //     return 1;
     // }
 
@@ -61,11 +61,11 @@ static int _pinmode(int argc, char **argv)
     // }
     // else
     // {
-    //     fprintf(stderr, "Invalid mode: Allowed modes are INPUT, OUTPUT, INPUT_PULLUP, INPUT_PULLDOWN, OUTPUT_OPEN_DRAIN\n");
+    //     fprintf(stderr, "Invalid mode: Allowed modes are INPUT, OUTPUT, INPUT_PULLUP, INPUT_PULLDOWN, OUTPUT_OPEN_DRAIN\r\n");
     // }
 
     // pinMode(pin, mode);
-    // printf("Mode set successful.\n");
+    // printf("Mode set successful.\r\n");
 
     return 0;
 }
@@ -74,7 +74,7 @@ static int _digitalWrite(int argc, char** argv)
 {
     // if (argc != 3)
     // {
-    //     printf("You have to pass an pin number and level. Syntax: digitalWrite [GPIO] [Level]\n");
+    //     printf("You have to pass an pin number and level. Syntax: digitalWrite [GPIO] [Level]\r\n");
     //     return 1;
     // }
 
@@ -89,12 +89,12 @@ static int _digitalWrite(int argc, char** argv)
     // }
     // catch (std::invalid_argument ex)
     // {
-    //     fprintf(stderr, "Invalid argument for pin: %s\n", ex.what());
+    //     fprintf(stderr, "Invalid argument for pin: %s\r\n", ex.what());
     //     return 1;
     // }
 
     // if (pin > 255 || !digitalPinCanOutput(pin)) {
-    //     fprintf(stderr, "%d is not a GPIO pin\n", pin);
+    //     fprintf(stderr, "%d is not a GPIO pin\r\n", pin);
     //     return 1;
     // }
 
@@ -109,11 +109,11 @@ static int _digitalWrite(int argc, char** argv)
     //     mode = LOW;
     // } else
     // {
-    //     fprintf(stderr, "Invalid mode: Allowed levels are HIGH, LOW, 0 and 1\n");
+    //     fprintf(stderr, "Invalid mode: Allowed levels are HIGH, LOW, 0 and 1\r\n");
     // }
 
     // pinMode(pin, mode);
-    // printf("Output set successful.\n");
+    // printf("Output set successful.\r\n");
 
     return 0;
 }
@@ -122,7 +122,7 @@ static int _digitalRead(int argc, char** argv)
 {
     // if (argc != 2)
     // {
-    //     printf("You have to pass an pin number to read\n");
+    //     printf("You have to pass an pin number to read\r\n");
     //     return 1;
     // }
 
@@ -136,23 +136,23 @@ static int _digitalRead(int argc, char** argv)
     // }
     // catch (std::invalid_argument ex)
     // {
-    //     fprintf(stderr, "Invalid argument for pin: %s\n", ex.what());
+    //     fprintf(stderr, "Invalid argument for pin: %s\r\n", ex.what());
     //     return 1;
     // }
 
     // if (pin > 255 || !digitalPinCanOutput(pin)) {
-    //     fprintf(stderr, "%d is not a GPIO pin\n", pin);
+    //     fprintf(stderr, "%d is not a GPIO pin\r\n", pin);
     //     return 1;
     // }
 
     // auto level = digitalRead(pin);
 
     // if(level == HIGH) {
-    //     printf("HIGH\n");
+    //     printf("HIGH\r\n");
     // } else if(level == LOW) {
-    //     printf("LOW\n");
+    //     printf("LOW\r\n");
     // } else {
-    //     fprintf(stderr, "Unknown state (%u) of pin %u!\n", level, pin);
+    //     fprintf(stderr, "Unknown state (%u) of pin %u!\r\n", level, pin);
     //     return 1;
     // }
 
@@ -163,7 +163,7 @@ static int _analogRead(int argc, char** argv)
 {
     // if (argc != 2)
     // {
-    //     printf("You have to pass an pin number to read\n");
+    //     printf("You have to pass an pin number to read\r\n");
     //     return 1;
     // }
 
@@ -177,18 +177,18 @@ static int _analogRead(int argc, char** argv)
     // }
     // catch (std::invalid_argument ex)
     // {
-    //     fprintf(stderr, "Invalid argument for pin: %s\n", ex.what());
+    //     fprintf(stderr, "Invalid argument for pin: %s\r\n", ex.what());
     //     return 1;
     // }
 
     // if (pin > 255 || digitalPinToAnalogChannel(pin) == -1) {
-    //     fprintf(stderr, "%d is not a ADC pin\n", pin);
+    //     fprintf(stderr, "%d is not a ADC pin\r\n", pin);
     //     return 1;
     // }
 
     // auto value = analogReadMilliVolts(pin);
     
-    // printf("%u mV\n", value);
+    // printf("%u mV\r\n", value);
 
     return 0;
 }

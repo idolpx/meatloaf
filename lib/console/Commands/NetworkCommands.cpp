@@ -62,7 +62,7 @@ static void on_ping_success(esp_ping_handle_t hdl, void *args)
     esp_ping_get_profile(hdl, ESP_PING_PROF_IPADDR, &target_addr, sizeof(target_addr));
     esp_ping_get_profile(hdl, ESP_PING_PROF_SIZE, &recv_len, sizeof(recv_len));
     esp_ping_get_profile(hdl, ESP_PING_PROF_TIMEGAP, &elapsed_time, sizeof(elapsed_time));
-    printf("%lu bytes from %s icmp_seq=%d ttl=%d time=%lu ms\n",
+    printf("%lu bytes from %s icmp_seq=%d ttl=%d time=%lu ms\r\n",
            recv_len, inet_ntoa(target_addr.u_addr.ip4), seqno, ttl, elapsed_time);
 }
 
@@ -72,7 +72,7 @@ static void on_ping_timeout(esp_ping_handle_t hdl, void *args)
     ip_addr_t target_addr;
     esp_ping_get_profile(hdl, ESP_PING_PROF_SEQNO, &seqno, sizeof(seqno));
     esp_ping_get_profile(hdl, ESP_PING_PROF_IPADDR, &target_addr, sizeof(target_addr));
-    printf("From %s icmp_seq=%u timeout\n", inet_ntoa(target_addr.u_addr.ip4), seqno);
+    printf("From %s icmp_seq=%u timeout\r\n", inet_ntoa(target_addr.u_addr.ip4), seqno);
 }
 
 static void on_ping_end(esp_ping_handle_t hdl, void *args)
@@ -91,14 +91,14 @@ static int ping(int argc, char **argv)
                 number_of_pings = atoi(optarg);
                 break;
             case '?':
-                printf("Unknown option: %c\n", optopt);
+                printf("Unknown option: %c\r\n", optopt);
                 break;
             case ':':
-                printf("Missing arg for %c\n", optopt);
+                printf("Missing arg for %c\r\n", optopt);
                 break;
 
             default:
-                fprintf(stderr, "Usage: ping -n 5 [HOSTNAME]\n");
+                fprintf(stderr, "Usage: ping -n 5 [HOSTNAME]\r\n");
                 fprintf(stderr, "-n: The number of pings. 0 means infinite. Can be aborted with Ctrl+D or Ctrl+C.");
                 return 1;
         }
@@ -108,7 +108,7 @@ static int ping(int argc, char **argv)
 
     //Get hostname
     if (argind >= argc) {
-        fprintf(stderr, "You need to pass an hostname!\n");
+        fprintf(stderr, "You need to pass an hostname!\r\n");
         return EXIT_FAILURE;
     }
 
@@ -123,7 +123,7 @@ static int ping(int argc, char **argv)
     auto result = getaddrinfo(hostname, NULL, &hint, &res);
 
     if (result) {
-        fprintf(stderr, "Could not resolve hostname! (getaddrinfo returned %d)\n", result);
+        fprintf(stderr, "Could not resolve hostname! (getaddrinfo returned %d)\r\n", result);
         return 1;
     }
 
@@ -178,7 +178,7 @@ static int ping(int argc, char **argv)
     esp_ping_get_profile(ping, ESP_PING_PROF_REQUEST, &transmitted, sizeof(transmitted));
     esp_ping_get_profile(ping, ESP_PING_PROF_REPLY, &received, sizeof(received));
     esp_ping_get_profile(ping, ESP_PING_PROF_DURATION, &total_time_ms, sizeof(total_time_ms));
-    printf("%lu packets transmitted, %lu received, time %lu ms\n", transmitted, received, total_time_ms);
+    printf("%lu packets transmitted, %lu received, time %lu ms\r\n", transmitted, received, total_time_ms);
 
 
 
@@ -189,30 +189,30 @@ static int ping(int argc, char **argv)
 
 static void ipconfig_wlan()
 {
-    printf("==== WLAN ====\n");
+    printf("==== WLAN ====\r\n");
     // auto status = WiFi.status();
-    // printf("Mode: %s\n", wlmode2string(WiFi.getMode()));
-    // printf("Status: %s\n", wlstatus2string(status));
+    // printf("Mode: %s\r\n", wlmode2string(WiFi.getMode()));
+    // printf("Status: %s\r\n", wlstatus2string(status));
 
     // if (status == WL_NO_SHIELD) {
     //     return;
     // }
     
-    // printf("\n");
-    // printf("SSID: %s\n", WiFi.SSID().c_str());
-    // printf("BSSID: %s\n", WiFi.BSSIDstr().c_str());
-    // printf("Channel: %d\n", WiFi.channel());
+    // printf("\r\n");
+    // printf("SSID: %s\r\n", WiFi.SSID().c_str());
+    // printf("BSSID: %s\r\n", WiFi.BSSIDstr().c_str());
+    // printf("Channel: %d\r\n", WiFi.channel());
 
-    // printf("\n");
-    // printf("IP: %s\n", WiFi.localIP().toString().c_str());
-    // printf("Subnet Mask: %s (/%d)\n", WiFi.subnetMask().toString().c_str(), WiFi.subnetCIDR());
-    // printf("Gateway: %s\n", WiFi.gatewayIP().toString().c_str());
-    // printf("IPv6: %s\n", WiFi.localIPv6().toString().c_str());
+    // printf("\r\n");
+    // printf("IP: %s\r\n", WiFi.localIP().toString().c_str());
+    // printf("Subnet Mask: %s (/%d)\r\n", WiFi.subnetMask().toString().c_str(), WiFi.subnetCIDR());
+    // printf("Gateway: %s\r\n", WiFi.gatewayIP().toString().c_str());
+    // printf("IPv6: %s\r\n", WiFi.localIPv6().toString().c_str());
     
-    // printf("\n");
-    // printf("Hostname: %s\n", WiFi.getHostname());
-    // printf("DNS1: %s\n", WiFi.dnsIP(0).toString().c_str());
-    // printf("DNS2: %s\n", WiFi.dnsIP(0).toString().c_str());
+    // printf("\r\n");
+    // printf("Hostname: %s\r\n", WiFi.getHostname());
+    // printf("DNS1: %s\r\n", WiFi.dnsIP(0).toString().c_str());
+    // printf("DNS2: %s\r\n", WiFi.dnsIP(0).toString().c_str());
 }
 
 static int ipconfig(int argc, char **argv)

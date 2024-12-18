@@ -12,7 +12,7 @@ static int clear(int argc, char **argv)
     // If we are on a dumb erminal clearing does not work
     if (linenoiseProbe())
     {
-        printf("\nYour terminal does not support escape sequences. Clearing screen does not work!\n");
+        printf("\r\nYour terminal does not support escape sequences. Clearing screen does not work!\r\n");
         return EXIT_FAILURE;
     }
 
@@ -26,7 +26,7 @@ static int echo(int argc, char **argv)
     {
         printf("%s ", argv[n]);
     }
-    printf("\n");
+    printf("\r\n");
 
     return EXIT_SUCCESS;
 }
@@ -35,7 +35,7 @@ static int set_multiline_mode(int argc, char **argv)
 {
     if (argc != 2)
     {
-        printf("You have to give 'on' or 'off' as an argument!\n");
+        printf("You have to give 'on' or 'off' as an argument!\r\n");
         return EXIT_FAILURE;
     }
 
@@ -54,11 +54,11 @@ static int set_multiline_mode(int argc, char **argv)
     }
     else
     {
-        printf("Unknown option. Pass 'on' or 'off' (without quotes)!\n");
+        printf("Unknown option. Pass 'on' or 'off' (without quotes)!\r\n");
         return EXIT_FAILURE;
     }
 
-    printf("Multiline mode set.\n");
+    printf("Multiline mode set.\r\n");
 
     return EXIT_SUCCESS;
 }
@@ -73,13 +73,13 @@ static int history(int argc, char **argv)
         if (strcasecmp(argv[1], "-c"))
         { // When -c option was detected clear history.
             linenoiseHistorySetMaxLen(0);
-            printf("History cleared!\n");
+            printf("History cleared!\r\n");
             linenoiseHistorySetMaxLen(10);
             return EXIT_SUCCESS;
         }
         else
         {
-            printf("Invalid argument. Use -c to clear history.\n");
+            printf("Invalid argument. Use -c to clear history.\r\n");
 
             return EXIT_FAILURE;
         }
@@ -106,7 +106,7 @@ static int env(int argc, char **argv)
 
     for (; *s; s++)
     {
-        printf("%s\n", *s);
+        printf("%s\r\n", *s);
     }
     return EXIT_SUCCESS;
 }
@@ -114,7 +114,7 @@ static int env(int argc, char **argv)
 static int declare(int argc, char **argv)
 {
     if (argc != 3) {
-        fprintf(stderr, "Syntax: declare VAR short OR declare VARIABLE \"Long Value\"\n");
+        fprintf(stderr, "Syntax: declare VAR short OR declare VARIABLE \"Long Value\"\r\n");
         return EXIT_FAILURE; 
     }
 

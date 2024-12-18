@@ -500,7 +500,7 @@ float EspClass::temperatureRead() {
     // // Uninstall the temperature sensor
     // ESP_ERROR_CHECK(temperature_sensor_uninstall(temp_handle));
 
-    // printf("Temperature in %f °C\n", tsens_out);
+    // printf("Temperature in %f °C\r\n", tsens_out);
 
     // // return tsens_out; // Celsius
     // return (tsens_out - 32) / 1.8; // Fahrenheit

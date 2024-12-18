@@ -1616,11 +1616,11 @@ namespace cxxopts
       std::string result;
       for(const auto& kv: m_sequential)
       {
-        result += kv.key() + " = " + kv.value() + "\n";
+        result += kv.key() + " = " + kv.value() + "\r\n";
       }
       for(const auto& kv: m_defaults)
       {
-        result += kv.key() + " = " + kv.value() + " " + "(default)" + "\n";
+        result += kv.key() + " = " + kv.value() + " " + "(default)" + "\r\n";
       }
       return result;
     }
@@ -2053,7 +2053,7 @@ namespace cxxopts
 
           if (*previous != '\n')
           {
-            stringAppend(result, "\n");
+            stringAppend(result, "\r\n");
           }
 
           stringAppend(result, start, ' ');
@@ -2559,7 +2559,7 @@ Options::help_one_group(const std::string& g) const
 
   if (!g.empty())
   {
-    result += toLocalString(" " + g + " options:\n");
+    result += toLocalString(" " + g + " options:\r\n");
   }
 
   for (const auto& o : group->second.options)
@@ -2661,14 +2661,14 @@ inline
 std::string
 Options::help(const std::vector<std::string>& help_groups) const
 {
-  String result = m_help_string + "\nUsage:\n  " +
+  String result = m_help_string + "\r\nUsage:\r\n  " +
     toLocalString(m_program) + " " + toLocalString(m_custom_help);
 
   if (!m_positional.empty() && !m_positional_help.empty()) {
     result += " " + toLocalString(m_positional_help);
   }
 
-  result += "\n\n";
+  result += "\r\n\r\n";
 
   if (help_groups.empty())
   {

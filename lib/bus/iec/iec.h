@@ -19,6 +19,7 @@
 #include "../../../include/debug.h"
 #include "../../../include/pinmap.h"
 
+#include "IECHost.h"
 #include "IECDevice.h"
 #include "IECBusHandler.h"
 

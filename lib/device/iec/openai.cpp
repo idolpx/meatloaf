@@ -17,13 +17,13 @@
 
 // void iecOpenAI::set_apikey(std::string s)
 // {
-//     Debug_printf("set_apikey(%s)\n",s.c_str());
+//     Debug_printf("set_apikey(%s)\r\n",s.c_str());
 //     api_key = mstr::toUTF8(s);
 // }
 
 // void iecOpenAI::set_response_format(std::string s)
 // {
-//     Debug_printf("set_response_format(%s)\n",s.c_str());
+//     Debug_printf("set_response_format(%s)\r\n",s.c_str());
 //     response_format = mstr::toUTF8(s);
 // }
 
@@ -100,11 +100,11 @@
 
 // void iecOpenAI::iec_reopen_listen()
 // {
-//     Debug_printf("IEC REOPEN LISTEN\n");
+//     Debug_printf("IEC REOPEN LISTEN\r\n");
 
 //     //mstr::toASCII(payload);
 
-//     Debug_printf("Sending over %s\n",payload.c_str());
+//     Debug_printf("Sending over %s\r\n",payload.c_str());
 
 //     // if (mstr::isNumeric(payload))
 //     //     set_timestamp(payload);
@@ -125,13 +125,13 @@
 
 //     // if (tf.empty())
 //     // {
-//     //     Debug_printf("sending default time string.\n");
+//     //     Debug_printf("sending default time string.\r\n");
 //     //     s = std::string(asctime(info));
 //     //     mstr::replaceAll(s,":",".");
 //     // }
 //     // else
 //     // {
-//     //     Debug_printf("Sending strftime of format %s\n",tf.c_str());
+//     //     Debug_printf("Sending strftime of format %s\r\n",tf.c_str());
 //     //     strftime(output,sizeof(output),tf.c_str(),info);
 //     //     s = std::string(output);
 //     // }

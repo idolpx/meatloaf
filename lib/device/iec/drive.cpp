@@ -1194,7 +1194,7 @@ mediatype_t iecDrive::mount(FILE *f, const char *filename, uint32_t disksize, me
     url = "//sd";
   url += filename;
   
-  Debug_printv("DRIVE[#%d] URL[%s] MOUNT[%s]\n", m_devnr, url.c_str(), filename);
+  Debug_printv("DRIVE[#%d] URL[%s] MOUNT[%s]", m_devnr, url.c_str(), filename);
   
   m_cwd.reset( MFSOwner::File( url ) );
   

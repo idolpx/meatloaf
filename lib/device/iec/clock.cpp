@@ -17,13 +17,13 @@ iecClock::~iecClock()
 
 void iecClock::set_timestamp(std::string s)
 {
-    Debug_printf("set_timestamp(%s)\n",s.c_str());
+    Debug_printf("set_timestamp(%s)\r\n",s.c_str());
     ts = atoi(payload.c_str());
 }
 
 void iecClock::set_timestamp_format(std::string s)
 {
-    Debug_printf("set_timestamp_format(%s)\n",s.c_str());
+    Debug_printf("set_timestamp_format(%s)\r\n",s.c_str());
     s = mstr::toUTF8(s);
     tf = s;
 }
@@ -109,13 +109,13 @@ void iecClock::task()
 
       if (tf.empty())
         {
-          Debug_printf("sending default time string.\n");
+          Debug_printf("sending default time string.\r\n");
           s = std::string(asctime(info));
           mstr::replaceAll(s,":",".");
         }
       else
         {
-          Debug_printf("Sending strftime of format %s\n",tf.c_str());
+          Debug_printf("Sending strftime of format %s\r\n",tf.c_str());
           strftime(output,sizeof(output),tf.c_str(),info);
           s = std::string(output);
         }
