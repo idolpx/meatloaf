@@ -548,13 +548,14 @@ bool iecDrive::open(uint8_t channel, const char *cname)
       Debug_printv("Error: empty file name");
       setStatusCode(ST_SYNTAX_ERROR_33);
     }
-  else if( m_channels[channel] != nullptr && channel > 1)
-    {
-      Debug_printv("Error: a file is already open on this channel");
-      setStatusCode(ST_NO_CHANNEL);
-    }
   else
     {
+      if( m_channels[channel] )
+        {
+          Debug_printv("channel[%d] is already in use, closing it before re-opening", channel);
+          close(channel);
+        }
+
       if ( name[0] == '$' ) 
         name.clear();
 
