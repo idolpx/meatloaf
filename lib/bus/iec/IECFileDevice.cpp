@@ -173,7 +173,7 @@ int8_t IECFileDevice::canRead()
       // here because we have already received the LISTEN after the UNLISTEN that
       // initiated the OPEN and so m_channel will not be set again => remember and restore it here
       if( m_cmd==IFD_OPEN )
-        { byte c = m_channel; fileTask(); m_channel = c; }
+        { uint8_t c = m_channel; fileTask(); m_channel = c; }
       else
         fileTask();
     }
@@ -297,7 +297,7 @@ int8_t IECFileDevice::canWrite()
       // here because we have already received the TALK after the UNLISTEN that
       // initiated the OPEN and so m_channel will not be set again => remember and restore it here
       if( m_cmd==IFD_OPEN )
-        { byte c = m_channel; fileTask(); m_channel = c; }
+        { uint8_t c = m_channel; fileTask(); m_channel = c; }
       else
         fileTask();
     }
