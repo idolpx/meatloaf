@@ -167,7 +167,16 @@ int8_t IECFileDevice::canRead()
 #endif
 
   // see comment in IECFileDevice constructor
-  if( !m_canServeATN ) fileTask();
+  if( !m_canServeATN )
+    {
+      // for IFD_OPEN, fileTask() resets the channel to 0xFF which is a problem when we call it from
+      // here because we have already received the LISTEN after the UNLISTEN that
+      // initiated the OPEN and so m_channel will not be set again => remember and restore it here
+      if( m_cmd==IFD_OPEN )
+        { byte c = m_channel; fileTask(); m_channel = c; }
+      else
+        fileTask();
+    }
 
   if( m_channel==15 )
     {
@@ -196,6 +205,9 @@ int8_t IECFileDevice::canRead()
   else
     {
       fillReadBuffer();
+#if DEBUG>2
+      print_hex(m_readBufferLen[m_channel]);
+#endif
       return m_readBufferLen[m_channel];
     }
 }
@@ -279,7 +291,16 @@ int8_t IECFileDevice::canWrite()
 #endif
 
   // see comment in IECFileDevice constructor
-  if( !m_canServeATN ) fileTask();
+  if( !m_canServeATN )
+    {
+      // for IFD_OPEN, fileTask() resets the channel to 0xFF which is a problem when we call it from
+      // here because we have already received the TALK after the UNLISTEN that
+      // initiated the OPEN and so m_channel will not be set again => remember and restore it here
+      if( m_cmd==IFD_OPEN )
+        { byte c = m_channel; fileTask(); m_channel = c; }
+      else
+        fileTask();
+    }
 
   if( m_channel == 15 || m_opening )
     {
@@ -443,10 +464,11 @@ bool IECFileDevice::epyxWriteSector(uint8_t track, uint8_t sector, uint8_t *buff
 
 void IECFileDevice::fillReadBuffer()
 {
-  if( m_readBufferLen[m_channel]<2 )
+  while( m_readBufferLen[m_channel]<2 )
     {
       uint8_t n = 2-m_readBufferLen[m_channel];
       n = read(m_channel, m_readBuffer[m_channel]+m_readBufferLen[m_channel], n);
+      if( n==0 ) break;
 #if DEBUG==1
       for(uint8_t i=0; i<n; i++) dbg_data(m_readBuffer[m_channel][m_readBufferLen[m_channel]+i]);
 #endif
