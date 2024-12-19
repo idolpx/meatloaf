@@ -2054,7 +2054,10 @@ bool IECBusHandler::transmitEpyxBlock()
   m_currentDevice->talk(0);
 
   // get data
+  m_inTask = false;
   uint8_t n = m_currentDevice->read(m_buffer, m_bufferSize);
+  m_inTask = true;
+  if( (m_flags & P_ATN) || !readPinATN() ) return false;
 
   noInterrupts();
 
@@ -2712,7 +2715,9 @@ void IECBusHandler::task()
      if( (m_currentDevice->m_sflags & S_JIFFY_BLOCK)!=0 )
        {
          // JiffyDOS block transfer mode
+         m_inTask = false;
          uint8_t numData = m_currentDevice->read(m_buffer, m_bufferSize);
+         m_inTask = true;
 
          // delay to make sure receiver sees our CLK LOW and enters "new data block" state.
          // If a possible VIC "bad line" occurs right after reading bits 6+7 it may take
@@ -2722,7 +2727,7 @@ void IECBusHandler::task()
          // preventing the receiver from going into "new data block" state
          while( (micros()-m_timeoutStart)<175 );
 
-         if( !transmitJiffyBlock(m_buffer, numData) )
+         if( (m_flags & P_ATN) || !readPinATN() || !transmitJiffyBlock(m_buffer, numData) )
            {
              // either a transmission error, no more data to send or falling edge on ATN
              m_flags |= P_DONE;
