@@ -14,7 +14,7 @@
 #define PIN_CARD_DETECT         GPIO_NUM_NC
 #define PIN_CARD_DETECT_FIX     GPIO_NUM_NC
 
-#define PIN_SD_HOST_CS          GPIO_NUM_NC
+#define PIN_SD_HOST_CS          GPIO_NUM_41
 #define PIN_SD_HOST_MISO        GPIO_NUM_40  // SD_DATA (MISO/DAT0/DATA OUT)
 #define PIN_SD_HOST_MOSI        GPIO_NUM_38  // SD_CMD (MOSI/CMD/DATA IN)
 #define PIN_SD_HOST_SCK         GPIO_NUM_39  // SD_CLK (SCK/CLK)

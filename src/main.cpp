@@ -40,6 +40,12 @@
 #include "fsFlash.h"
 #include "fnFsSD.h"
 
+
+#ifdef ENABLE_CONSOLE
+#include "console.h"
+Console console;
+#endif
+
 /**************************/
 // Meatloaf
 
@@ -50,9 +56,6 @@
 std::string statusMessage;
 bool initFailed = false;
 
-#include "../lib/console/Console.h"
-using namespace ESP32Console;
-Console console;
 
 /**************************/
 
@@ -72,12 +75,16 @@ void main_setup()
 
     unsigned long startms = fnSystem.millis();
 
-    //Serial.begin(DEBUG_SPEED);
+#ifdef ENABLE_CONSOLE
     //You can change the console prompt before calling begin(). By default it is "ESP32>"
-    console.setPrompt("meatloaf[%pwd%]# ");
+    //console.setPrompt("meatloaf[%pwd%]# ");
 
     //You can change the baud rate and pin numbers similar to Serial.begin() here.
-    console.begin(DEBUG_SPEED);
+    //console.setBaudRate(DEBUG_SPEED);
+    //console.start();
+#else
+    Serial.begin(DEBUG_SPEED);
+#endif
 
     printf( ANSI_WHITE "\r\n\r\n" ANSI_BLUE_BACKGROUND "==============================" ANSI_RESET_NL );
     printf( ANSI_BLUE_BACKGROUND "   " PRODUCT_ID " " FW_VERSION "   " ANSI_RESET_NL );
@@ -212,19 +219,6 @@ void main_setup()
 #endif
 
     printf("READY.\r\n");
-    {
-        //Register builtin commands like 'reboot', 'version', or 'meminfo'
-        console.registerSystemCommands();
-
-        //Register network commands
-        console.registerNetworkCommands();
-
-        //Register the VFS specific commands
-        console.registerVFSCommands();
-
-        //Register GPIO commands
-        console.registerGPIOCommands();
-    }
 }
 
 /*

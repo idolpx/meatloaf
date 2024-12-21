@@ -67,9 +67,12 @@ void iecNetwork::iec_open()
         channel_data.deviceSpec += channel_data.prefix;
     }
 
-        // Check if the payload is RAW (i.e. from fujinet-lib) by the presence of "01" as the first uint8_t, which can't happen for BASIC.
+    Debug_printf("%s", util_hexdump(payload.c_str(), payload.length()).c_str());
+
+    // Check if the payload is RAW (i.e. from fujinet-lib) by the presence of "01" as the first uint8_t, which can't happen for BASIC.
     // If it is, then the next 2 bytes are the aux1/aux2 values (mode and trans), and the rest is the actual URL.
-    // This is an efficiency so we don't have to send a 2nd command to tell it what the parameters should have been. BASIC will still need to use "openparams" command, as the OPEN line doesn't have capacity for the parameters (can't use a "," as that's a valid URL character)
+    // This is an efficiency so we don't have to send a 2nd command to tell it what the parameters should have been. 
+    //BASIC will still need to use "openparams" command, as the OPEN line doesn't have capacity for the parameters (can't use a "," as that's a valid URL character)
     if (payload[0] == 0x01) {
         channel_aux1 = payload[1];
         channel_aux2 = payload[2];
@@ -79,7 +82,8 @@ void iecNetwork::iec_open()
         // translationMode[commanddata.channel] = channel_aux2;
         
         // remove the marker bytes so the payload can continue as with BASIC setup
-        payload = payload.substr(3);
+        if (payload.length() > 3)
+            payload = payload.substr(3);
     }
 
     if (payload != "$") {
@@ -426,17 +430,20 @@ void iecNetwork::set_translation_mode()
         iecStatus.msg = "no translation";
         break;
     case 1:
-        iecStatus.msg = "atascii<->ascii CR";
+        iecStatus.msg = "petscii<->ascii CR";
         break;
     case 2:
-        iecStatus.msg = "atascii<->ascii LF";
+        iecStatus.msg = "petscii<->ascii LF";
         break;
     case 3:
-        iecStatus.msg = "atascii<->ascii CRLF";
+        iecStatus.msg = "petscii<->ascii CRLF";
         break;
     case 4:
         iecStatus.msg = "petscii<->ascii";
         break;
+    case 5:
+        iecStatus.msg = "ascii<->petscii";
+        mstr::toPETSCII2(channel_data.receiveBuffer);
     }
 
     Debug_printf("Translation mode for channel %u is now %u", channel, channel_data.translationMode);
