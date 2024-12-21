@@ -271,7 +271,7 @@ public:
     // Determine file type by file contents
     static std::string byContent(const char* header) 
     {
-        std::string extension = nullptr;
+        std::string extension;
 
         // // Open File for reading
         // std::ifstream file(fileName, std::ios::binary | std::ios::ate);
@@ -342,7 +342,7 @@ public:
     // Determine file type by file size
     static std::string bySize(size_t size) 
     {
-        std::string extension = nullptr;
+        std::string extension;
 
         switch(size) {
             case 174848: // 35 tracks no errors
