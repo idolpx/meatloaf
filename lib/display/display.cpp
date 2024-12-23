@@ -1,418 +1,262 @@
-/* Hello World Example
-
-   This example code is in the Public Domain (or CC0 licensed, at your option.)
-
-   Unless required by applicable law or agreed to in writing, this
-   software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
-   CONDITIONS OF ANY KIND, either express or implied.
-*/
-
-#ifdef LED_STRIP
-
+#ifdef ENABLE_DISPLAY
 
 #include "display.h"
 
 #include <stdio.h>
-#include <stdint.h>
 #include "freertos/FreeRTOS.h"
+#include <freertos/queue.h>
 #include "freertos/task.h"
-#include "esp_system.h"
-#include "esp_spi_flash.h"
 
-#include "FastLED.h"
-#include "FX.h"
+#include "../../include/pinmap.h"
+#include "../../include/debug.h"
+
+#define ST_OK                  0
+#define ST_SCRATCHED           1
+#define ST_WRITE_ERROR        25
+#define ST_WRITE_PROTECT      26
+#define ST_SYNTAX_ERROR_31    31
+#define ST_SYNTAX_ERROR_33    33
+#define ST_FILE_NOT_OPEN      61
+#define ST_FILE_NOT_FOUND     62
+#define ST_FILE_EXISTS        63
+#define ST_FILE_TYPE_MISMATCH 64
+#define ST_NO_CHANNEL         70
+#define ST_SPLASH             73
+#define ST_DRIVE_NOT_READY    74
+
+Display DISPLAY;
+
+CRGB* ws2812_buffer;
 
 
-CRGB leds1[NUM_LEDS];
-CRGB leds2[NUM_LEDS];
+uint16_t *dma_buffer;
+CRGB *ws28xx_pixels;
+static int n_of_leds, reset_delay, dma_buf_size;
+led_strip_model_t led_model;
 
-CRGBPalette16 currentPalette;
-TBlendType    currentBlending;
+static spi_settings_t spi_settings = {
+    .host = SPI3_HOST,
+    .dma_chan = SPI_DMA_CH_AUTO,
+    .devcfg =
+        {
+            .command_bits = 0,
+            .address_bits = 0,
+            .mode = 0,                           // SPI mode 0
+            .clock_speed_hz = (int)(3.2 * 1000 * 1000), // Clock out at 3.2 MHz
+            .spics_io_num = -1,                  // CS pin
+            .flags = SPI_DEVICE_TXBIT_LSBFIRST,
+            .queue_size = 1,
+        },
+    .buscfg =
+        {
+            .miso_io_num = -1,
+            .sclk_io_num = -1,
+            .quadwp_io_num = -1,
+            .quadhd_io_num = -1,
+        },
+};
 
-#include "palettes.h"
+static const uint16_t timing_bits[16] = {
+    0x1111, 0x7111, 0x1711, 0x7711, 0x1171, 0x7171, 0x1771, 0x7771,
+    0x1117, 0x7117, 0x1717, 0x7717, 0x1177, 0x7177, 0x1777, 0x7777};
 
-extern CRGBPalette16 myRedWhiteBluePalette;
-extern const TProgmemPalette16 IRAM_ATTR myRedWhiteBluePalette_p;
 
-
-void display_app_main() {
-  printf(" entering app main, call add leds\r\n");
-  // the WS2811 family uses the RMT driver
-  FastLED.addLeds<LED_TYPE, LED_DATA_PIN>(leds1, NUM_LEDS);
-  //FastLED.addLeds<LED_TYPE, DATA_PIN_2>(leds2, NUM_LEDS);
-
-  FastLED.showColor(BLACK);
-
-  // this is a good test because it uses the GPIO ports, these are 4 wire not 3 wire
-  //FastLED.addLeds<APA102, 13, 15>(leds, NUM_LEDS);
-
-  printf(" set max power\r\n");
-  // I have a 2A power supply, although it's 12v
-  FastLED.setMaxPowerInVoltsAndMilliamps(5,200);
-
-  // change the task below to one of the functions above to try different patterns
-  printf("create task for led blinking\r\n");
-
-  //xTaskCreatePinnedToCore(&blinkLeds_simple, "blinkLeds", 4000, NULL, 5, NULL, 0);
-  //xTaskCreatePinnedToCore(&fastfade, "blinkLeds", 4000, NULL, 5, NULL, 0);
-  //xTaskCreatePinnedToCore(&blinkWithFx_allpatterns, "blinkLeds", 4000, NULL, 5, NULL, 0);
-  //xTaskCreatePinnedToCore(&blinkWithFx_test, "blinkLeds", 4000, NULL, 5, NULL, 0);
-  //xTaskCreatePinnedToCore(&blinkLeds_chase, "blinkLeds", 4000, NULL, 5, NULL, 0);
-  //xTaskCreatePinnedToCore(&blinkLeds_chase2, "blinkLeds", 4000, NULL, 5, NULL, 0);
-  //xTaskCreatePinnedToCore(&larsonfx, "larsonscanner", 4000, NULL, 5, NULL, 0);
-  xTaskCreatePinnedToCore(&rainbowcyclefx, "rainbowcycle", 4000, NULL, 5, NULL, 0);
+static void display_task(void *args)
+{
+    Display *d = (Display *)args;
+    while (1) {
+        d->service();
+        vTaskDelay(d->speed / portTICK_PERIOD_MS);
+    }
 }
 
-/* Larson scanner
-**
-*/
+void Display::service()
+{
+    switch(mode)
+    {
+        case MODE_IDLE:
+            // MODE_IDLE
+            speed = 1000;
+            meatloaf();
+            break;
+        case MODE_SEND:
+        case MODE_RECEIVE:
+            break;
+        case MODE_STATUS:
+            switch( m_statusCode )
+            {
+                case ST_OK             :
+                case ST_SCRATCHED      :
+                case ST_SPLASH         :
+                    mode = MODE_IDLE;
+                    break;
+                default                :
+                    speed = 100;
+                    blink();
+                    break;
+            }
+            break;
+        case MODE_CUSTOM:
+            mode = MODE_IDLE;
+            break;
+    }
+    if ( progress < 100 ) {
+        show_progress();
+    }
+    update();
+}
 
-static void larsonfx(void *pvParameters) {
+esp_err_t Display::init(int pin, led_strip_model_t model, int num_of_leds, CRGB **led_buffer_ptr)
+{
+    esp_err_t err = ESP_OK;
+    n_of_leds = num_of_leds;
+    led_model = model;
+    // Insrease if something breaks. values are less than recommended in
+    // datasheets but seem stable
+    reset_delay = (model == WS2812B) ? 3 : 30;
+    // 12 bytes for each led + bytes for initial zero and reset state
+    dma_buf_size = n_of_leds * 12 + (reset_delay + 1) * 2;
+    ws28xx_pixels = (CRGB*)malloc(sizeof(CRGB) * n_of_leds);
+    if (ws28xx_pixels == NULL) {
+        return ESP_ERR_NO_MEM;
+    }
+    *led_buffer_ptr = ws28xx_pixels;
 
-	WS2812FX ws2812fx;
-  WS2812FX::Segment *segments = ws2812fx.getSegments();
+    // Set pixels to rainbow colors
+    // for (int i = 0; i < n_of_leds; i++) {
+    //     ws28xx_pixels[i] = CRGB::Red;
+    // }
 
-	// ws2812fx.init(NUM_LEDS, leds1, false); // type was configured before
-	// ws2812fx.setBrightness(LED_BRIGHTNESS);
-	// ws2812fx.setMode(0 /*segid*/, FX_MODE_LARSON_SCANNER);
+    spi_settings.buscfg.mosi_io_num = pin;
+    spi_settings.buscfg.max_transfer_sz = dma_buf_size;
+    err = spi_bus_initialize(spi_settings.host, &spi_settings.buscfg,
+                             spi_settings.dma_chan);
+    if (err != ESP_OK) {
+        free(ws28xx_pixels);
+        return err;
+    }
+    err = spi_bus_add_device(spi_settings.host, &spi_settings.devcfg,
+                             &spi_settings.spi);
+    if (err != ESP_OK) {
+        free(ws28xx_pixels);
+        return err;
+    }
+    // Critical to be DMA memory.
+    dma_buffer = (uint16_t*)heap_caps_malloc(dma_buf_size, MALLOC_CAP_DMA);
+    if (dma_buffer == NULL) {
+        free(ws28xx_pixels);
+        return ESP_ERR_NO_MEM;
+    }
+    return ESP_OK;
+}
 
-  // //segments[0].colors[1] = 255U; //blue, white 16777215U??
-  // segments[0].colors[0] = 0xFF0000; //CRGB::RED; //red?
-  // segments[0].speed = 128;
+void Display::fill_all(CRGB color) 
+{
+    for (int i = 0; i < n_of_leds; i++) {
+        ws28xx_pixels[i] = color;
+    }
+}
 
-  ws2812fx.init(NUM_LEDS, leds1, false);
-  //ws2812fx.setBrightness(LED_BRIGHTNESS);
-  FastLED.setMaxPowerInVoltsAndMilliamps(5, LED_BRIGHTNESS);
-  ws2812fx.setMode(0 /*segid*/, FX_MODE_LARSON_SCANNER);
-  
-  segments[0].colors[0] = 0xFF0000; // RED
-  segments[0].colors[1] = 0x00FF00; // BLACK
-  segments[0].colors[2] = 0x0000FF; // BLACK
-  segments[0].speed = 255;
+void Display::show_progress()
+{
+    speed = 100;
 
-  while (true)
-  {
-		ws2812fx.service();
-		vTaskDelay(10 / portTICK_PERIOD_MS); /*10ms*/
-  }
-};
+    // Set all leds to black
+    fill_all((CRGB){.r=0, .g=0, .b=0});
 
-static void rainbowcyclefx(void *pvParameters) {
-
-	WS2812FX ws2812fx;
-  WS2812FX::Segment *segments = ws2812fx.getSegments();
-
-  ws2812fx.init(NUM_LEDS, leds1, false);
-  FastLED.setMaxPowerInVoltsAndMilliamps(5, LED_BRIGHTNESS);
-  ws2812fx.setMode(0, FX_MODE_THEATER_CHASE_RAINBOW);
-  segments[0].speed = 128;
-
-  while (true)
-  {
-		ws2812fx.service();
-		vTaskDelay(10 / portTICK_PERIOD_MS); /*10ms*/
-  }
-};
-
-/* test using the FX unit
-**
-*/
-
-static void blinkWithFx_allpatterns(void *pvParameters) {
-
-	uint16_t mode = FX_MODE_STATIC;
-
-	WS2812FX ws2812fx;
-
-	ws2812fx.init(NUM_LEDS, leds1, false); // type was configured before
-	FastLED.setMaxPowerInVoltsAndMilliamps(5, LED_BRIGHTNESS);
-	ws2812fx.setMode(0 /*segid*/, mode);
-
-
-	// microseconds
-	uint64_t mode_change_time = esp_timer_get_time();
-
-	while (true) {
-
-		if ((mode_change_time + 10000000L) < esp_timer_get_time() ) {
-			mode += 1;
-			mode %= MODE_COUNT;
-			mode_change_time = esp_timer_get_time();
-			ws2812fx.setMode(0 /*segid*/, mode);
-			printf(" changed mode to %d\r\n", mode);
-		}
-
-		ws2812fx.service();
-		vTaskDelay(10 / portTICK_PERIOD_MS); /*10ms*/
-	}
-};
-
-/* test specific patterns so we know FX is working right
-**
-*/
-
-
-#define TEST_MODES_N ( sizeof(testModes) / sizeof(testModes_t))
-
-static void blinkWithFx_test(void *pvParameters) {
-
-  WS2812FX ws2812fx;
-  WS2812FX::Segment *segments = ws2812fx.getSegments();
-
-  ws2812fx.init(NUM_LEDS, leds1, false); // type was configured before
-  ws2812fx.setBrightness(255);
-
-  int test_id = 0;
-  printf(" start mode: %s\r\n",testModes[test_id].name);
-  ws2812fx.setMode(0 /*segid*/, testModes[test_id].mode);
-  segments[0].colors[0] = testModes[test_id].color;
-  segments[0].speed = testModes[test_id].speed;
-  uint64_t nextMode = esp_timer_get_time() + (testModes[test_id].secs * 1000000L );
-
-
-  while (true) {
-
-    uint64_t now = esp_timer_get_time();
-
-    if (nextMode < now ) {
-      test_id = (test_id +1) % TEST_MODES_N;
-      nextMode = esp_timer_get_time() + (testModes[test_id].secs * 1000000L );
-      ws2812fx.setMode(0 /*segid*/, testModes[test_id].mode);
-      segments[0].colors[0] = testModes[test_id].color;
-      segments[0].speed = testModes[test_id].speed;
-      printf(" changed mode to: %s\r\n",testModes[test_id].name);
+    // Number of leds to light up
+    int n = (n_of_leds * progress) / 100;
+    for (int i = 0; i < n; i++) {
+        // rotate all elements of the array
+        ws28xx_pixels[i] = (CRGB){.r=0, .g=100, .b=0};
     }
 
-    ws2812fx.service();
-    vTaskDelay(10 / portTICK_PERIOD_MS); /*10ms*/
-  }
-};
-
-
-/*
-** chase sequences are good for testing correctness, because you can see
-** that the colors are correct, and you can see cases where the wrong pixel is lit.
-*/
-
-#define CHASE_DELAY 200
-
-void blinkLeds_chase2(void *pvParameters) {
-
-  while(true) {
-
-    for (int ci = 0; ci < N_COLORS; ci++) {
-      CRGB color = colors[ci];
-      printf(" chase: *** color %s ***\r\n",colors_names[ci]);
-
-      // set strings to black first
-      fill_solid(leds1, NUM_LEDS, CRGB::Black);
-      fill_solid(leds2, NUM_LEDS, CRGB::Black);
-      FastLED.show();
-
-      int prev;
-
-      // forward
-      printf(" chase: forward\r\n");
-      prev = -1;
-      for (int i = 0; i < NUM_LEDS; i++) {
-        if (prev >= 0) {
-          leds2[prev] = leds1[prev] = CRGB::Black;
-        }
-        leds2[i] = leds1[i] = color;
-        prev = i;
-
-        FastLED.show();
-        delay(CHASE_DELAY);
-      }
-
-      printf(" chase: backward\r\n");
-      prev = -1;
-      for (int i = NUM_LEDS-1; i >= 0; i--) {
-        if (prev >= 0) {
-          leds2[prev] = leds1[prev] = CRGB::Black;
-        }
-        leds2[i] = leds1[i] = color;
-        prev = i;
-
-        FastLED.show();
-        delay(CHASE_DELAY);
-      }
-
-      // two at a time
-      printf(" chase: twofer\r\n");
-      prev = -1;
-      for (int i = 0; i < NUM_LEDS; i += 2) {
-        if (prev >= 0) {
-          leds2[prev] = leds1[prev] = CRGB::Black;
-          leds2[prev+1] = leds1[prev+1] = CRGB::Black;
-        }
-        leds2[i] = leds1[i] = color;
-        leds2[i+1] = leds1[i+1] = color;
-        prev = i;
-
-        FastLED.show();
-        delay(CHASE_DELAY);
-      }
-
-    } // for all colors
-  } // while true
-
-}
-
-void ChangePalettePeriodically(){
-
-  uint8_t secondHand = (millis() / 1000) % 60;
-  static uint8_t lastSecond = 99;
-
-  if( lastSecond != secondHand) {
-    lastSecond = secondHand;
-    if( secondHand ==  0)  { currentPalette = RainbowColors_p;         currentBlending = LINEARBLEND; }
-    if( secondHand == 10)  { currentPalette = RainbowStripeColors_p;   currentBlending = NOBLEND;  }
-    if( secondHand == 15)  { currentPalette = RainbowStripeColors_p;   currentBlending = LINEARBLEND; }
-    if( secondHand == 20)  { SetupPurpleAndGreenPalette();             currentBlending = LINEARBLEND; }
-    if( secondHand == 25)  { SetupTotallyRandomPalette();              currentBlending = LINEARBLEND; }
-    if( secondHand == 30)  { SetupBlackAndWhiteStripedPalette();       currentBlending = NOBLEND; }
-    if( secondHand == 35)  { SetupBlackAndWhiteStripedPalette();       currentBlending = LINEARBLEND; }
-    if( secondHand == 40)  { currentPalette = CloudColors_p;           currentBlending = LINEARBLEND; }
-    if( secondHand == 45)  { currentPalette = PartyColors_p;           currentBlending = LINEARBLEND; }
-    if( secondHand == 50)  { currentPalette = myRedWhiteBluePalette_p; currentBlending = NOBLEND;  }
-    if( secondHand == 55)  { currentPalette = myRedWhiteBluePalette_p; currentBlending = LINEARBLEND; }
-  }
-
-}
-
-void blinkLeds_interesting(void *pvParameters){
-  while(1){
-  	printf("blink leds\r\n");
-    ChangePalettePeriodically();
-    
-    static uint8_t startIndex = 0;
-    startIndex = startIndex + 1; /* motion speed */
-    
-    for( int i = 0; i < NUM_LEDS; i++) {
-        leds1[i] = ColorFromPalette( currentPalette, startIndex, 64, currentBlending);
-        leds2[i] = ColorFromPalette( currentPalette, startIndex, 64, currentBlending);
-        startIndex += 3;
+    static bool led_state_off = !led_state_off;
+    if (led_state_off) 
+    {
+        ws2812_buffer[n] = (CRGB){.r=200, .g=200, .b=200};
+        ws2812_buffer[4] = (CRGB){.r=200, .g=200, .b=200};
     }
-    printf("show leds\r\n");
-    FastLED.show();
-    delay(400);
-  };
+    else
+    {
+        ws2812_buffer[n] = (CRGB){.r=200, .g=200, .b=200};
+        ws2812_buffer[4] = (CRGB){.r=0, .g=200, .b=0};
+    }
 
-};
+    update();
+}
 
-// Going to use the ESP timer system to attempt to get a frame rate.
-// According to the documentation, this is a fairly high priority,
-// and one should attempt to do minimal work - such as dispatching a message to a queue.
-// at first, let's try just blasting pixels on it.
+esp_err_t Display::update() 
+{
+    esp_err_t err;
+    int n = 0;
+    memset(dma_buffer, 0, dma_buf_size);
+    dma_buffer[n++] = 0;
+    for (int i = 0; i < n_of_leds; i++) {
+        // Data you want to write to each LEDs
+        uint32_t temp = ws28xx_pixels[i].num;
+        if (led_model == WS2815) {
+            // Red
+            dma_buffer[n++] = timing_bits[0x0f & (temp >> 4)];
+            dma_buffer[n++] = timing_bits[0x0f & (temp)];
 
-// Target frames per second
-#define FASTFADE_FPS 30
+            // Green
+            dma_buffer[n++] = timing_bits[0x0f & (temp >> 12)];
+            dma_buffer[n++] = timing_bits[0x0f & (temp) >> 8];
+        } else {
+            // Green
+            dma_buffer[n++] = timing_bits[0x0f & (temp >> 12)];
+            dma_buffer[n++] = timing_bits[0x0f & (temp) >> 8];
 
-static void _fastfade_cb(void *param){
-
-  fastfade_t *ff = (fastfade_t *)param;
-
-  ff->color.hue++;
-
-  if (ff->color.hue % 10 == 0) {
-    printf("fast hsv fade h: %d s: %d v: %d\r\n",ff->color.hue,ff->color.s, ff->color.v);
-  }
-
-  fill_solid(leds1,NUM_LEDS,ff->color);
-  fill_solid(leds2,NUM_LEDS,ff->color);
-
-  FastLED.show();
-
-};
-
-
-static void fastfade(void *pvParameters){
-
-  fastfade_t ff_t = {
-    .color = CHSV(0/*hue*/,255/*sat*/,255/*value*/)
-  };
-
-  esp_timer_create_args_t timer_create_args = {
-        .callback = _fastfade_cb,
-        .arg = (void *) &ff_t,
-        .dispatch_method = ESP_TIMER_TASK,
-        .name = "fastfade_timer"
+            // Red
+            dma_buffer[n++] = timing_bits[0x0f & (temp >> 4)];
+            dma_buffer[n++] = timing_bits[0x0f & (temp)];
+        }
+        // Blue
+        dma_buffer[n++] = timing_bits[0x0f & (temp >> 20)];
+        dma_buffer[n++] = timing_bits[0x0f & (temp) >> 16];
+    }
+    for (int i = 0; i < reset_delay; i++) {
+        dma_buffer[n++] = 0;
+    }
+    spi_transaction_t tx_conf = {
+        .length = (size_t)(dma_buf_size * 8),
+        .tx_buffer = dma_buffer,
     };
+    err = spi_device_transmit(spi_settings.spi, &tx_conf);
+    return err;
+}
 
-  esp_timer_handle_t timer_h;
+void Display::start(void)
+{
+    init(PIN_LED_RGB, WS2812B, LED_RGB_COUNT, &ws2812_buffer);
 
-  esp_timer_create(&timer_create_args, &timer_h);
-
-  esp_timer_start_periodic(timer_h, 1000000L / FASTFADE_FPS );
-
-  // suck- just trying this
-  while(1){
-
-      vTaskDelay(1000 / portTICK_PERIOD_MS);
-  };
-
+    // Start DISPLAY task
+    if ( xTaskCreatePinnedToCore(display_task, "display_task", 1024, this, 5, NULL, 0) != pdTRUE)
+    {
+        Debug_printv("Could not start DISPLAY task!");
+    }
 }
 
 
-
-void blinkLeds_simple(void *pvParameters){
-
- 	while(1){
-
-		for (int j=0;j<N_COLORS;j++) {
-			printf("blink leds\r\n");
-
-			for (int i=0;i<NUM_LEDS;i++) {
-			  leds1[i] = colors[j];
-        leds2[i] = colors[j];
-			}
-			FastLED.show();
-			delay(1000);
-		};
-	}
-};
-
-#define N_COLORS_CHASE 7
-CRGB colors_chase[N_COLORS_CHASE] = { 
-  CRGB::AliceBlue,
-  CRGB::Lavender,
-  CRGB::DarkOrange,
-  CRGB::Red,
-  CRGB::Green,
-  CRGB::Blue,
-  CRGB::White,
-};
-
-void blinkLeds_chase(void *pvParameters) {
-  int pos = 0;
-  int led_color = 0;
-  while(1){
-  	printf("chase leds\r\n");
-
-  		// do it the dumb way - blank the leds
-	    for (int i=0;i<NUM_LEDS;i++) {
-	      leds1[i] =   CRGB::Black;
-        leds2[i] =   CRGB::Black;
-	    }
-
-	    // set the one LED to the right color
-	    leds1[pos] = leds2[pos] = colors_chase[led_color];
-	    pos = (pos + 1) % NUM_LEDS;
-
-	    // use a new color
-	    if (pos == 0) {
-	    	led_color = (led_color + 1) % N_COLORS_CHASE ;
-	    }
-
-	    uint64_t start = esp_timer_get_time();
-	    FastLED.show();
-	    uint64_t end = esp_timer_get_time();
-	    printf("Show Time: %" PRIu64 "\r\n",end-start);
-	    delay(200);
-	 };
-
+void Display::blink(void) 
+{
+    static bool led_state_off = !led_state_off;
+    for(int i = 0; i < LED_RGB_COUNT; i++) {
+        if (led_state_off) 
+            ws2812_buffer[i] = (CRGB){.r=0, .g=0, .b=0};
+        else 
+            ws2812_buffer[i] = (CRGB){.r=20, .g=0, .b=0};
+    }
 }
 
+void Display::meatloaf()
+{
+    ws28xx_pixels[0] = (CRGB){.r=178, .g=61, .b=53};    // RED
+    ws28xx_pixels[1] = (CRGB){.r=178, .g=102, .b=51};   // ORANGE
+    ws28xx_pixels[2] = (CRGB){.r=178, .g=168, .b=58};   // YELLOW
+    ws28xx_pixels[3] = (CRGB){.r=128, .g=178, .b=58};   // GREEN
+    ws28xx_pixels[4] = (CRGB){.r=87, .g=145, .b=178};  // BLUE
+}
 
-#endif // #ifdef LED_STRIP
+#endif // ENABLE_DISPLAY

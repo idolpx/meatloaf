@@ -16,6 +16,7 @@
 #include "fnFsSD.h"
 #include "led.h"
 #include "utils.h"
+#include "display.h"
 
 #include "meat_media.h"
 
@@ -113,7 +114,10 @@ uint8_t iecChannelHandler::read(uint8_t *data, uint8_t n)
         }
     }
   else
+  {
+    DISPLAY.idle();
     return 0;
+  }
 }
 
 
@@ -219,6 +223,10 @@ uint8_t iecChannelHandlerFile::readBufferData()
   */
     {
       Debug_printv("size[%lu] avail[%lu] pos[%lu]", m_stream->size(), m_stream->available(), m_stream->position());
+      // send progress percentage
+      uint32_t percent = (m_stream->position() * 100) / m_stream->size();
+      if( percent>100 ) percent = 100;
+      DISPLAY.progress = percent;
 
       if( m_fixLoadAddress>=0 && m_stream->position()==0 )
         {
@@ -584,7 +592,7 @@ bool iecDrive::open(uint8_t channel, const char *cname)
                   m_cwd.reset(MFSOwner::File(f->url));
                   Debug_printv("Reading directory [%s]", f->url.c_str());
                   f = nullptr; // f will be deleted in iecChannelHandlerDir destructor
-                  setStatusCode(ST_OK);
+                  //setStatusCode(ST_OK);
                 }
               else
                 {
@@ -1085,11 +1093,14 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
 
 void iecDrive::setStatusCode(uint8_t code, uint8_t trk)
 {
+  Debug_printv("code[%d]", code);
   m_statusCode = code;
   m_statusTrk  = trk;
 
   // clear current status buffer to force a call to getStatus()
   clearStatus();
+
+  DISPLAY.status( code );
 }
 
 
@@ -1127,6 +1138,7 @@ void iecDrive::getStatus(char *buffer, uint8_t bufferSize)
   Debug_printv("status: %s", buffer);
   m_statusCode = ST_OK;
   m_statusTrk  = 0;
+  DISPLAY.status( ST_OK );
 }
 
 

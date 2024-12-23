@@ -1,139 +1,99 @@
-//
-// https://github.com/Aircoookie/WLED
-//
-
 
 #ifndef MEATLOAF_DISPLAY_H
 #define MEATLOAF_DISPLAY_H
-#ifdef LED_STRIP
 
-#include "FastLED.h"
-#include "FX.h"
+#include "freertos/FreeRTOS.h"
+#include <freertos/queue.h>
+#include "freertos/task.h"
+
+#include "driver/gpio.h"
+#include "driver/spi_master.h"
+#include <stdio.h>
+#include <string.h>
 
 #include "../../include/pinmap.h"
-// #define NUM_LEDS 5
-// #define DATA_PIN_1 27 
-// #define DATA_PIN_2 14
-// #define BRIGHTNESS  25
-// #define LED_TYPE    WS2811
-// #define COLOR_ORDER RGB
+#include "../../include/debug.h"
+typedef struct {
+    union {
+        struct {
+            union {
+                uint8_t r;
+                uint8_t red;
+            };
 
+            union {
+                uint8_t g;
+                uint8_t green;
+            };
 
+            union {
+                uint8_t b;
+                uint8_t blue;
+            };
+        };
 
-#define N_COLORS 17
-static const CRGB colors[N_COLORS] = { 
-  CRGB::Red,
-  CRGB::Green,
-  CRGB::Blue,
-  CRGB::White,
-  CRGB::AliceBlue,
-  CRGB::ForestGreen,
-  CRGB::Lavender,
-  CRGB::MistyRose,
-  CRGB::DarkOrchid,
-  CRGB::DarkOrange,
-  CRGB::Black,
-  CRGB::Teal,
-  CRGB::Violet,
-  CRGB::Lime,
-  CRGB::Chartreuse,
-  CRGB::BlueViolet,
-  CRGB::Aqua
-};
-
-static const char *colors_names[N_COLORS] {
-  "Red",
-  "Green",
-  "Blue",
-  "White",
-  "aliceblue",
-  "ForestGreen",
-  "Lavender",
-  "MistyRose",
-  "DarkOrchid",
-  "DarkOrange",
-  "Black",
-  "Teal",
-  "Violet",
-  "Lime",
-  "Chartreuse",
-  "BlueViolet",
-  "Aqua"
-};
-
-
-void display_app_main();
-
-/* test using the FX unit
-**
-*/
-
-static void blinkWithFx_allpatterns(void *pvParameters);
-
-/* test specific patterns so we know FX is working right
-**
-*/
+        uint8_t raw[3];
+        uint32_t num;
+    };
+} CRGB;
 
 typedef struct {
-  const char *name;
-  int   mode;
-  int   secs; // secs to test it
-  uint32_t color;
-  int speed;
-} testModes_t;
+    spi_host_device_t host;
+    spi_device_handle_t spi;
+    int dma_chan;
+    spi_device_interface_config_t devcfg;
+    spi_bus_config_t buscfg;
+} spi_settings_t;
 
+typedef enum {
+    WS2812B = 0,
+    WS2815,
+} led_strip_model_t;
 
-static const testModes_t testModes[] = {
-  { "color wipe: all leds after each other up. Then off. Repeat. RED", FX_MODE_COLOR_WIPE, 5, 0xFF0000, 1000 },
-  { "color wipe: all leds after each other up. Then off. Repeat. RGREE", FX_MODE_COLOR_WIPE, 5, 0x00FF00, 1000 },
-  { "color wipe: all leds after each other up. Then off. Repeat. Blu", FX_MODE_COLOR_WIPE, 5, 0x0000FF, 1000 },
-  { "chase rainbow: Color running on white.", FX_MODE_CHASE_RAINBOW, 10, 0xffffff, 200 },
-  { "breath, on white.", FX_MODE_BREATH, 5, 0xffffff, 100 },
-  { "breath, on red.", FX_MODE_BREATH, 5, 0xff0000, 100 },
-  { "what is twinkefox? on red?", FX_MODE_TWINKLEFOX, 20, 0xff0000, 2000 },
+enum Mode {
+  MODE_STATUS  = -1,
+  MODE_IDLE    = 0,
+  MODE_SEND    = 1,
+  MODE_RECEIVE = 2,
+  MODE_CUSTOM  = 3
 };
 
-#define TEST_MODES_N ( sizeof(testModes) / sizeof(testModes_t))
+//static QueueHandle_t display_evt_queue = NULL;
+    
+class Display
+{
+  private:
+    //BaseType_t m_task_handle;
+    uint8_t m_statusCode = 0;
+    uint8_t m_direction = 0; // 0 = left to right (SEND), 1 = right to left (RECEIVE)
 
-static void blinkWithFx_test(void *pvParameters);
+    esp_err_t init(int pin, led_strip_model_t model, int num_of_leds, CRGB **led_buffer_ptr);
 
-static void larsonfx(void *pvParameters);
-static void rainbowcyclefx(void *pvParameters);
+  public:
+    Mode mode = MODE_IDLE;
+    uint16_t speed = 300;
+    uint8_t progress = 100;
 
-/*
-** chase sequences are good for testing correctness, because you can see
-** that the colors are correct, and you can see cases where the wrong pixel is lit.
-*/
+    void start(void);
+    void service();
+    esp_err_t update();
 
-#define CHASE_DELAY 200
+    void idle(void) { mode = MODE_IDLE; };
+    void send(void) { mode = MODE_SEND; m_direction = 0; };
+    void receive(void) { mode = MODE_RECEIVE; m_direction = 1; };
+    void status(uint8_t code) { 
+        mode = MODE_STATUS;
+        m_statusCode = code;
+    };
 
-void blinkLeds_chase2(void *pvParameters);
+    void show_progress();
+    void show_activity();
+    void blink();
+    void fill_all(CRGB color);
 
-void ChangePalettePeriodically();
+    void meatloaf();
+};
 
-void blinkLeds_interesting(void *pvParameters);
+extern Display DISPLAY;
 
-// Going to use the ESP timer system to attempt to get a frame rate.
-// According to the documentation, this is a fairly high priority,
-// and one should attempt to do minimal work - such as dispatching a message to a queue.
-// at first, let's try just blasting pixels on it.
-
-// Target frames per second
-#define FASTFADE_FPS 30
-
-typedef struct {
-  CHSV color;
-} fastfade_t;
-
-static void _fastfade_cb(void *param);
-static void fastfade(void *pvParameters);
-
-
-void blinkLeds_simple(void *pvParameters);
-
-
-
-void blinkLeds_chase(void *pvParameters);
-
-#endif // LED_STRIP
 #endif // MEATLOAF_DISPLAY_H

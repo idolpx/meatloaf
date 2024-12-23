@@ -430,20 +430,17 @@ void iecNetwork::set_translation_mode()
         iecStatus.msg = "no translation";
         break;
     case 1:
-        iecStatus.msg = "petscii<->ascii CR";
+        iecStatus.msg = "atascii<->ascii CR";
         break;
     case 2:
-        iecStatus.msg = "petscii<->ascii LF";
+        iecStatus.msg = "atascii<->ascii LF";
         break;
     case 3:
-        iecStatus.msg = "petscii<->ascii CRLF";
+        iecStatus.msg = "atascii<->ascii CRLF";
         break;
     case 4:
         iecStatus.msg = "petscii<->ascii";
         break;
-    case 5:
-        iecStatus.msg = "ascii<->petscii";
-        mstr::toPETSCII2(channel_data.receiveBuffer);
     }
 
     Debug_printf("Translation mode for channel %u is now %u", channel, channel_data.translationMode);

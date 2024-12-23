@@ -30,8 +30,7 @@
 #include "device.h"
 #include "keys.h"
 #include "led.h"
-#include "display.h"
-//#include "disk-sounds.h"
+
 
 #include "fnSystem.h"
 #include "fnConfig.h"
@@ -45,6 +44,12 @@
 #include "console.h"
 Console console;
 #endif
+
+#ifdef ENABLE_DISPLAY
+#include "display.h"
+#endif
+
+//#include "disk-sounds.h"
 
 /**************************/
 // Meatloaf
@@ -191,12 +196,11 @@ void main_setup()
     printf( ANSI_GREEN_BOLD "Parallel Bus Initialized" ANSI_RESET "\r\n" );
 #endif
 
-#ifdef LED_STRIP
-    // Start LED Strip
-    display_app_main(); // fastled lib
+#ifdef ENABLE_DISPLAY
+    DISPLAY.start();
 #endif
 
-#ifdef PIEZO_BUZZER
+#ifdef ENABLE_SOUND
     mlSoundManager.setup(); // start sound
 #endif
 

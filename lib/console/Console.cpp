@@ -139,7 +139,7 @@ void Console::repl_task(void *args)
 void Console::start()
 {
     // Start REPL task
-    if ( m_task_handle = xTaskCreatePinnedToCore(&Console::repl_task, "console_repl", task_stack_size_, this, task_priority_, &task_, 0) != pdTRUE)
+    if ( xTaskCreatePinnedToCore(&Console::repl_task, "console_repl", 4000, this, 5, &m_task_handle, 0) != pdTRUE )
     {
         Debug_printv("Could not start REPL task!");
     }
