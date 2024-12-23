@@ -76,8 +76,7 @@ void Display::service()
     {
         case MODE_IDLE:
             // MODE_IDLE
-            speed = 1000;
-            meatloaf();
+            rotate();
             break;
         case MODE_SEND:
         case MODE_RECEIVE:
@@ -91,7 +90,6 @@ void Display::service()
                     mode = MODE_IDLE;
                     break;
                 default                :
-                    speed = 100;
                     blink();
                     break;
             }
@@ -159,7 +157,9 @@ void Display::fill_all(CRGB color)
 
 void Display::show_progress()
 {
-    speed = 100;
+    static bool led_state_off = false;
+
+    speed = 25;
 
     // Set all leds to black
     fill_all((CRGB){.r=0, .g=0, .b=0});
@@ -171,17 +171,17 @@ void Display::show_progress()
         ws28xx_pixels[i] = (CRGB){.r=0, .g=100, .b=0};
     }
 
-    static bool led_state_off = !led_state_off;
+    led_state_off = !led_state_off;
     if (led_state_off) 
     {
         ws2812_buffer[n] = (CRGB){.r=200, .g=200, .b=200};
-        ws2812_buffer[4] = (CRGB){.r=200, .g=200, .b=200};
     }
     else
     {
-        ws2812_buffer[n] = (CRGB){.r=200, .g=200, .b=200};
-        ws2812_buffer[4] = (CRGB){.r=0, .g=200, .b=0};
+        ws2812_buffer[n] = (CRGB){.r=0, .g=200, .b=0};
     }
+    //if (n != 4)
+    //    ws2812_buffer[4] = (CRGB){.r=200, .g=200, .b=200};
 
     update();
 }
@@ -230,6 +230,7 @@ esp_err_t Display::update()
 void Display::start(void)
 {
     init(PIN_LED_RGB, WS2812B, LED_RGB_COUNT, &ws2812_buffer);
+    idle();
 
     // Start DISPLAY task
     if ( xTaskCreatePinnedToCore(display_task, "display_task", 1024, this, 5, NULL, 0) != pdTRUE)
@@ -241,7 +242,10 @@ void Display::start(void)
 
 void Display::blink(void) 
 {
-    static bool led_state_off = !led_state_off;
+    static bool led_state_off = false;
+    speed = 100;
+
+    led_state_off = !led_state_off;
     for(int i = 0; i < LED_RGB_COUNT; i++) {
         if (led_state_off) 
             ws2812_buffer[i] = (CRGB){.r=0, .g=0, .b=0};
@@ -250,13 +254,30 @@ void Display::blink(void)
     }
 }
 
+void Display::rotate()
+{
+    auto temp = ws28xx_pixels[0];
+    memmove(ws28xx_pixels, ws28xx_pixels + 1, sizeof(CRGB) * (n_of_leds - 1));
+    ws28xx_pixels[n_of_leds - 1] = temp;
+}
+
 void Display::meatloaf()
 {
-    ws28xx_pixels[0] = (CRGB){.r=178, .g=61, .b=53};    // RED
-    ws28xx_pixels[1] = (CRGB){.r=178, .g=102, .b=51};   // ORANGE
-    ws28xx_pixels[2] = (CRGB){.r=178, .g=168, .b=58};   // YELLOW
-    ws28xx_pixels[3] = (CRGB){.r=128, .g=178, .b=58};   // GREEN
-    ws28xx_pixels[4] = (CRGB){.r=87, .g=145, .b=178};  // BLUE
+    // Pastel Meatloaf Pixels
+    // ws28xx_pixels[0] = (CRGB){.r=87, .g=145, .b=178};   // BLUE
+    // ws28xx_pixels[1] = (CRGB){.r=128, .g=178, .b=58};   // GREEN
+    // ws28xx_pixels[2] = (CRGB){.r=178, .g=168, .b=58};   // YELLOW
+    // ws28xx_pixels[3] = (CRGB){.r=178, .g=102, .b=51};   // ORANGE
+    // ws28xx_pixels[4] = (CRGB){.r=178, .g=61, .b=53};    // RED
+
+    // Vibrant Meatloaf Pixels
+    ws28xx_pixels[0] = (CRGB){.r=0, .g=0, .b=255};   // BLUE
+    ws28xx_pixels[1] = (CRGB){.r=0, .g=255, .b=0};   // GREEN
+    ws28xx_pixels[2] = (CRGB){.r=255, .g=255, .b=0};   // YELLOW
+    ws28xx_pixels[3] = (CRGB){.r=255, .g=114, .b=0};   // ORANGE
+    ws28xx_pixels[4] = (CRGB){.r=255, .g=0, .b=0};    // RED
+
+    update();
 }
 
 #endif // ENABLE_DISPLAY

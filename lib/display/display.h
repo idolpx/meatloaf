@@ -78,7 +78,7 @@ class Display
     void service();
     esp_err_t update();
 
-    void idle(void) { mode = MODE_IDLE; };
+    void idle(void) { mode = MODE_IDLE;  meatloaf(); progress = 100; speed = 1000; };
     void send(void) { mode = MODE_SEND; m_direction = 0; };
     void receive(void) { mode = MODE_RECEIVE; m_direction = 1; };
     void status(uint8_t code) { 
@@ -89,6 +89,7 @@ class Display
     void show_progress();
     void show_activity();
     void blink();
+    void rotate();
     void fill_all(CRGB color);
 
     void meatloaf();
