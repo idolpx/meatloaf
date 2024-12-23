@@ -51,7 +51,9 @@ static const char* TAG __attribute__((unused)) = "I2Cbus";
  * OBJECTS
  ******************************************************************************/
 I2C_t i2c0 = i2cbus::I2C(I2C_NUM_0);
+#if SOC_I2C_NUM >= 2
 I2C_t i2c1 = i2cbus::I2C(I2C_NUM_1);
+#endif
 
 
 /* ^^^^^^

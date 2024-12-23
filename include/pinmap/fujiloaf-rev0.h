@@ -36,20 +36,21 @@
 #define PIN_LED_WIFI            GPIO_NUM_2  // led.cpp
 #define PIN_LED_BUS             GPIO_NUM_12 // 4 FN
 #define PIN_LED_BT              GPIO_NUM_NC // No BT LED
+#define PIN_LED_RGB             GPIO_NUM_4
 
-/* LED Strip NEW */
-#define LEDSTRIP_DATA_PIN       GPIO_NUM_4
-#define LEDSTRIP_COUNT          5
-#define LEDSTRIP_BRIGHTNESS     15 // max mA the LED can use determines brightness
-#define LEDSTRIP_TYPE           WS2812B
-#define LEDSTRIP_RGB_ORDER      GRB
+/* LED Strip */
+#define LED_RGB_COUNT           5
+#define LED_RGB_BRIGHTNESS      15 // max mA the LED can use determines brightness
+#define LED_RGB_TYPE            WS2812B
+#define LED_RGB_ORDER           GRB
 // LED order on the strip starting with 0
-#define LEDSTRIP_WIFI_NUM       0
-#define LEDSTRIP_BUS_NUM        4
-#define LEDSTRIP_BT_NUM         2
+#define LED_RGB_WIFI_NUM        0
+#define LED_RGB_BUS_NUM         4
+#define LED_RGB_BT_NUM          2
 
 /* Audio Output */
 #define PIN_DAC1                GPIO_NUM_25 // samlib.h
+#define PIN_I2S                 GPIO_NUM_25
 
 // Reset line is available
 #define IEC_HAS_RESET
