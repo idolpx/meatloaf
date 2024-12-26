@@ -399,6 +399,7 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
 
     // Set Headers
     for (const auto& pair : headers) {
+        Debug_printv("%s:%s", pair.first.c_str(), pair.second.c_str());
         std::cout << pair.first << ": " << pair.second << std::endl;
         esp_http_client_set_header(_http, pair.first.c_str(), pair.second.c_str());
     }

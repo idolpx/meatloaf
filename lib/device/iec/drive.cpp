@@ -1093,7 +1093,7 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
 
 void iecDrive::setStatusCode(uint8_t code, uint8_t trk)
 {
-  Debug_printv("code[%d]", code);
+  //Debug_printv("code[%d]", code);
   m_statusCode = code;
   m_statusTrk  = trk;
 
@@ -1159,6 +1159,7 @@ void iecDrive::reset()
 
   ImageBroker::clear();
 
+  DISPLAY.idle();
   DEBUG_MEM_LEAK;
 }
 

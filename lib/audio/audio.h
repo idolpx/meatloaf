@@ -2,16 +2,20 @@
 // https://diyi0t.com/active-passive-buzzer-arduino-esp8266-esp32/
 //
 
-#ifndef DISK_SOUNDS_H
-#define DISK_SOUNDS_H
+#ifndef AUDIO_H
+#define AUDIO_H
+
+#include "freertos/FreeRTOS.h"
+#include <freertos/queue.h>
+#include "freertos/task.h"
 
 #include "../../include/pinmap.h"
 
 
-class diskSounds
+class Audio
 {
 public:
-    diskSounds() {};
+    Audio() {};
 
     void spin();
     void stop();
@@ -19,5 +23,5 @@ public:
 
 };
 
-extern diskSounds mlDiskSounds;
-#endif // DISK_SOUNDS_H
+extern Audio audio;
+#endif // AUDIO_H

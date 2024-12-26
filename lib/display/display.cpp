@@ -10,6 +10,8 @@
 #include "../../include/pinmap.h"
 #include "../../include/debug.h"
 
+//#include "WS2812FX/WS2812FX.h"
+
 #define ST_OK                  0
 #define ST_SCRATCHED           1
 #define ST_WRITE_ERROR        25
@@ -25,9 +27,6 @@
 #define ST_DRIVE_NOT_READY    74
 
 Display DISPLAY;
-
-CRGB* ws2812_buffer;
-
 
 uint16_t *dma_buffer;
 CRGB *ws28xx_pixels;
@@ -104,7 +103,7 @@ void Display::service()
     update();
 }
 
-esp_err_t Display::init(int pin, led_strip_model_t model, int num_of_leds, CRGB **led_buffer_ptr)
+esp_err_t Display::init(int pin, led_strip_model_t model, int num_of_leds)
 {
     esp_err_t err = ESP_OK;
     n_of_leds = num_of_leds;
@@ -118,12 +117,6 @@ esp_err_t Display::init(int pin, led_strip_model_t model, int num_of_leds, CRGB 
     if (ws28xx_pixels == NULL) {
         return ESP_ERR_NO_MEM;
     }
-    *led_buffer_ptr = ws28xx_pixels;
-
-    // Set pixels to rainbow colors
-    // for (int i = 0; i < n_of_leds; i++) {
-    //     ws28xx_pixels[i] = CRGB::Red;
-    // }
 
     spi_settings.buscfg.mosi_io_num = pin;
     spi_settings.buscfg.max_transfer_sz = dma_buf_size;
@@ -147,6 +140,9 @@ esp_err_t Display::init(int pin, led_strip_model_t model, int num_of_leds, CRGB 
     }
     return ESP_OK;
 }
+
+void Display::set_pixel(uint16_t index, CRGB color) { ws28xx_pixels[index] = color; };
+void Display::set_pixel(uint16_t index, uint8_t r, uint8_t g, uint8_t b) { ws28xx_pixels[index] = (CRGB){.r=r, .g=g, .b=b}; };
 
 void Display::fill_all(CRGB color) 
 {
@@ -174,14 +170,19 @@ void Display::show_progress()
     led_state_off = !led_state_off;
     if (led_state_off) 
     {
-        ws2812_buffer[n] = (CRGB){.r=200, .g=200, .b=200};
+        ws28xx_pixels[n] = (CRGB){.r=200, .g=200, .b=200};
     }
     else
     {
-        ws2812_buffer[n] = (CRGB){.r=0, .g=200, .b=0};
+        ws28xx_pixels[n] = (CRGB){.r=0, .g=200, .b=0};
     }
     //if (n != 4)
-    //    ws2812_buffer[4] = (CRGB){.r=200, .g=200, .b=200};
+    //    ws28xx_pixels[4] = (CRGB){.r=200, .g=200, .b=200};
+
+    // Set remaining pixels to black
+    // for (int i = n + 1; i < n_of_leds; i++) {
+    //     ws28xx_pixels[i] = (CRGB){.r=0, .g=0, .b=0};
+    // }
 
     update();
 }
@@ -229,7 +230,7 @@ esp_err_t Display::update()
 
 void Display::start(void)
 {
-    init(PIN_LED_RGB, WS2812B, LED_RGB_COUNT, &ws2812_buffer);
+    init(PIN_LED_RGB, WS2812B, LED_RGB_COUNT);
     idle();
 
     // Start DISPLAY task
@@ -248,34 +249,47 @@ void Display::blink(void)
     led_state_off = !led_state_off;
     for(int i = 0; i < LED_RGB_COUNT; i++) {
         if (led_state_off) 
-            ws2812_buffer[i] = (CRGB){.r=0, .g=0, .b=0};
+            ws28xx_pixels[i] = (CRGB){.r=0, .g=0, .b=0};
         else 
-            ws2812_buffer[i] = (CRGB){.r=20, .g=0, .b=0};
+            ws28xx_pixels[i] = (CRGB){.r=20, .g=0, .b=0};
     }
 }
 
 void Display::rotate()
 {
-    auto temp = ws28xx_pixels[0];
-    memmove(ws28xx_pixels, ws28xx_pixels + 1, sizeof(CRGB) * (n_of_leds - 1));
-    ws28xx_pixels[n_of_leds - 1] = temp;
+    if ( !direction )
+    {
+        // rotate left
+        auto temp = ws28xx_pixels[0];
+        memmove(ws28xx_pixels, ws28xx_pixels + 1, sizeof(CRGB) * (n_of_leds - 1));
+        ws28xx_pixels[n_of_leds - 1] = temp;
+    }
+    else
+    {
+        // rotate right
+        auto temp = ws28xx_pixels[n_of_leds - 1];
+        memmove(ws28xx_pixels + 1, ws28xx_pixels, sizeof(CRGB) * (n_of_leds - 1));
+        ws28xx_pixels[0] = temp;
+    }
+    memcpy(ws28xx_pixels, ws28xx_pixels, sizeof(CRGB) * n_of_leds);
+
 }
 
 void Display::meatloaf()
 {
     // Pastel Meatloaf Pixels
-    // ws28xx_pixels[0] = (CRGB){.r=87, .g=145, .b=178};   // BLUE
-    // ws28xx_pixels[1] = (CRGB){.r=128, .g=178, .b=58};   // GREEN
-    // ws28xx_pixels[2] = (CRGB){.r=178, .g=168, .b=58};   // YELLOW
-    // ws28xx_pixels[3] = (CRGB){.r=178, .g=102, .b=51};   // ORANGE
-    // ws28xx_pixels[4] = (CRGB){.r=178, .g=61, .b=53};    // RED
+    ws28xx_pixels[0] = (CRGB){.r=87, .g=145, .b=178};   // BLUE
+    ws28xx_pixels[1] = (CRGB){.r=128, .g=178, .b=58};   // GREEN
+    ws28xx_pixels[2] = (CRGB){.r=178, .g=168, .b=58};   // YELLOW
+    ws28xx_pixels[3] = (CRGB){.r=178, .g=102, .b=51};   // ORANGE
+    ws28xx_pixels[4] = (CRGB){.r=178, .g=61, .b=53};    // RED
 
-    // Vibrant Meatloaf Pixels
-    ws28xx_pixels[0] = (CRGB){.r=0, .g=0, .b=255};   // BLUE
-    ws28xx_pixels[1] = (CRGB){.r=0, .g=255, .b=0};   // GREEN
-    ws28xx_pixels[2] = (CRGB){.r=255, .g=255, .b=0};   // YELLOW
-    ws28xx_pixels[3] = (CRGB){.r=255, .g=114, .b=0};   // ORANGE
-    ws28xx_pixels[4] = (CRGB){.r=255, .g=0, .b=0};    // RED
+    // // Vibrant Meatloaf Pixels
+    // ws28xx_pixels[0] = (CRGB){.r=0, .g=0, .b=255};   // BLUE
+    // ws28xx_pixels[1] = (CRGB){.r=0, .g=255, .b=0};   // GREEN
+    // ws28xx_pixels[2] = (CRGB){.r=255, .g=255, .b=0};   // YELLOW
+    // ws28xx_pixels[3] = (CRGB){.r=255, .g=114, .b=0};   // ORANGE
+    // ws28xx_pixels[4] = (CRGB){.r=255, .g=0, .b=0};    // RED
 
     update();
 }
