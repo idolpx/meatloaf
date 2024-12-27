@@ -115,6 +115,8 @@ build_flags =
     ; Service Options
     ;-D ENABLE_ZIMODEM      ; enable Zimodem functionality
     ;-D ENABLE_SSDP         ; enable Simple Service Discovery Protocol service
+    ;-D ENABLE_DISPLAY      ; enable display service
+    ;-D ENABLE_AUDIO        ; enable audio service
 
     ; GPIO Expander Selection (select only one if available)
     ;-D GPIOX_PCF8575

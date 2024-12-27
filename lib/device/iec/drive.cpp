@@ -115,7 +115,9 @@ uint8_t iecChannelHandler::read(uint8_t *data, uint8_t n)
     }
   else
   {
+#ifdef ENABLE_DISPLAY
     DISPLAY.idle();
+#endif
     return 0;
   }
 }
@@ -223,10 +225,12 @@ uint8_t iecChannelHandlerFile::readBufferData()
   */
     {
       Debug_printv("size[%lu] avail[%lu] pos[%lu]", m_stream->size(), m_stream->available(), m_stream->position());
+#ifdef ENABLE_DISPLAY
       // send progress percentage
       uint32_t percent = (m_stream->position() * 100) / m_stream->size();
       if( percent>100 ) percent = 100;
       DISPLAY.progress = percent;
+#endif
 
       if( m_fixLoadAddress>=0 && m_stream->position()==0 )
         {
@@ -1100,7 +1104,9 @@ void iecDrive::setStatusCode(uint8_t code, uint8_t trk)
   // clear current status buffer to force a call to getStatus()
   clearStatus();
 
+#ifdef ENABLE_DISPLAY
   DISPLAY.status( code );
+#endif
 }
 
 
@@ -1138,7 +1144,10 @@ void iecDrive::getStatus(char *buffer, uint8_t bufferSize)
   Debug_printv("status: %s", buffer);
   m_statusCode = ST_OK;
   m_statusTrk  = 0;
+
+#ifdef ENABLE_DISPLAY
   DISPLAY.status( ST_OK );
+#endif
 }
 
 
@@ -1159,7 +1168,10 @@ void iecDrive::reset()
 
   ImageBroker::clear();
 
+#ifdef ENABLE_DISPLAY
   DISPLAY.idle();
+#endif
+
   DEBUG_MEM_LEAK;
 }
 

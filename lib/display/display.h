@@ -70,6 +70,15 @@ private:
     // Array of segements that contain index and length
     std::vector<std::pair<uint8_t, uint8_t>> segments;
 
+    // Use properties to change state and let the task call these functions
+    void show_progress();
+    void show_activity();
+    void blink();
+    void rotate();
+    void fill_all(CRGB color);
+
+    void meatloaf();
+
 public:
     Mode mode = MODE_IDLE;
     uint16_t speed = 300;
@@ -101,15 +110,6 @@ public:
     void set_pixel(uint16_t index, uint8_t r, uint8_t g, uint8_t b);
     void set_pixels(uint16_t index, CRGB *colors, uint16_t count);
 
-private:
-    // Use properties to change state and let the task call these functions
-    void show_progress();
-    void show_activity();
-    void blink();
-    void rotate();
-    void fill_all(CRGB color);
-
-    void meatloaf();
 };
 
 extern Display DISPLAY;
