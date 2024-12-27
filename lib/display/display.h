@@ -47,18 +47,21 @@ typedef enum {
     WS2815,
 } led_strip_model_t;
 
-enum Mode {
-    MODE_STATUS  = -1,
-    MODE_IDLE    = 0,
-    MODE_SEND    = 1,
-    MODE_RECEIVE = 2,
-    MODE_CUSTOM  = 3
-};
+
 
 //static QueueHandle_t display_evt_queue = NULL;
     
 class Display
 {
+
+    enum Mode {
+        MODE_STATUS  = -1,
+        MODE_IDLE    = 0,
+        MODE_SEND    = 1,
+        MODE_RECEIVE = 2,
+        MODE_CUSTOM  = 3
+    };
+
 private:
     //BaseType_t m_task_handle;
     uint8_t m_statusCode = 0;
