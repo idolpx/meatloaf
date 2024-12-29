@@ -35,8 +35,8 @@
 #define PIN_BUTTON_C            GPIO_NUM_14
 
 /* LEDs */
-#define PIN_LED_WIFI            GPIO_NUM_5 // led.cpp
-#define PIN_LED_BUS             GPIO_NUM_2
+#define PIN_LED_WIFI            GPIO_NUM_2 // led.cpp
+#define PIN_LED_BUS             GPIO_NUM_5
 #define PIN_LED_BT              GPIO_NUM_13
 
 /* Audio Output */
