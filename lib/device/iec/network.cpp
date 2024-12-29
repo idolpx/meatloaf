@@ -1070,7 +1070,7 @@ bool iecNetwork::receive(NetworkData &channel_data, uint16_t rxBytes)
 }
 
 
-uint8_t iecNetwork::write(uint8_t channel, uint8_t *buffer, uint8_t bufferSize)
+uint8_t iecNetwork::write(uint8_t channel, uint8_t *buffer, uint8_t bufferSize, bool eoi)
 {
   if( bufferSize==0 ) return 0;
 
@@ -1084,7 +1084,7 @@ uint8_t iecNetwork::write(uint8_t channel, uint8_t *buffer, uint8_t bufferSize)
 }
 
 
-uint8_t iecNetwork::read(uint8_t channel, uint8_t *buffer, uint8_t bufferSize)
+uint8_t iecNetwork::read(uint8_t channel, uint8_t *buffer, uint8_t bufferSize, bool *eoi)
 {
   int channelId = commanddata.channel;
   auto& channel_data = network_data_map[channelId];

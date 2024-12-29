@@ -41,6 +41,7 @@
 #define ST_NO_CHANNEL         70
 #define ST_SPLASH             73
 #define ST_DRIVE_NOT_READY    74
+#define ST_VDRIVE             255
 
 
 static bool isMatch(std::string name, std::string pattern)
@@ -494,6 +495,9 @@ iecDrive::iecDrive(uint8_t devnum) : IECFileDevice(devnum)
   m_statusCode = ST_SPLASH;
   m_statusTrk  = 0;
   m_numOpenChannels = 0;
+#ifdef USE_VDRIVE
+  m_vdrive = NULL;
+#endif
   for(int i=0; i<16; i++) 
     m_channels[i] = nullptr;
 }
@@ -511,6 +515,26 @@ bool iecDrive::open(uint8_t channel, const char *cname)
 {
   Debug_printv("iecDrive::open(#%d, %d, \"%s\")", m_devnr, channel, cname);
   
+#ifdef USE_VDRIVE
+  if( m_vdrive!=nullptr && (strncmp(cname, "//", 2)==0 || strncmp(cname, "ML:", 3)==0 || strstr(cname, "://")!=NULL) )
+    {
+      Debug_printv("Closing VDrive");
+      delete m_vdrive;
+      m_vdrive = NULL;
+    }
+
+  if( m_vdrive!=nullptr )
+    {
+      bool ok = m_vdrive->openFile(channel, cname);
+      Debug_printv("File opened on VDrive");
+      setStatusCode(ok ? ST_OK : ST_VDRIVE);
+      m_timeStart = esp_timer_get_time();
+      m_byteCount = 0;
+      return ok;
+    }
+  else
+#endif
+    {
   // determine file name
   std::string name;
   std::vector<std::string> pt = util_tokenize(std::string(cname), ',');
@@ -596,7 +620,7 @@ bool iecDrive::open(uint8_t channel, const char *cname)
                   m_cwd.reset(MFSOwner::File(f->url));
                   Debug_printv("Reading directory [%s]", f->url.c_str());
                   f = nullptr; // f will be deleted in iecChannelHandlerDir destructor
-                  //setStatusCode(ST_OK);
+                      setStatusCode(ST_OK);
                 }
               else
                 {
@@ -633,6 +657,14 @@ bool iecDrive::open(uint8_t channel, const char *cname)
               Debug_printv("Error: file exists [%s]", f->url.c_str());
               setStatusCode(ST_FILE_EXISTS);
             }
+#ifdef USE_VDRIVE
+              else if( !f->isDirectory() && (m_vdrive=VDrive::create(m_devnr-8, f->url.c_str()))!=nullptr )
+                {
+                  Debug_printv("Created VDrive for URL %s. Loading directory.", f->url.c_str());
+                  delete f;
+                  return m_vdrive->openFile(channel, "$");
+                }
+#endif
           else
             {
               MStream *new_stream = f->getSourceStream(mode);
@@ -684,12 +716,24 @@ bool iecDrive::open(uint8_t channel, const char *cname)
 
   return m_channels[channel]!=NULL;
 }
+}
 
 
 void iecDrive::close(uint8_t channel)
 {
   Debug_printv("iecDrive::close(#%d, %d)", m_devnr, channel);
 
+#ifdef USE_VDRIVE
+  if( m_vdrive!=nullptr )
+    {
+      double seconds = (esp_timer_get_time()-m_timeStart) / 1000000.0;
+      m_vdrive->closeFile(channel);
+      Debug_printv("File closed on VDrive");
+      double cps = m_byteCount / seconds;
+      Debug_printv("Transferred %lu bytes in %0.2f seconds @ %0.2fcps", m_byteCount, seconds, cps);
+    }
+  else 
+#endif
   if( m_channels[channel] != nullptr )
     {
       delete m_channels[channel];
@@ -701,29 +745,61 @@ void iecDrive::close(uint8_t channel)
 }
 
 
-uint8_t iecDrive::write(uint8_t channel, uint8_t *data, uint8_t dataLen) 
+uint8_t iecDrive::write(uint8_t channel, uint8_t *data, uint8_t dataLen, bool eoi)
 {
-  iecChannelHandler *handler = m_channels[channel];
-  if( handler==nullptr )
+#ifdef USE_VDRIVE
+  if( m_vdrive!=nullptr )
     {
-      if( m_statusCode==ST_OK ) setStatusCode(ST_FILE_NOT_OPEN);
-      return 0;
+      size_t n = dataLen;
+      if( !m_vdrive->write(channel, data, &n) )
+        setStatusCode(ST_VDRIVE);
+
+      if( (m_byteCount+n)/256 > m_byteCount/256 ) { printf("."); fflush(stdout); }
+      m_byteCount += n;
+
+      return n;
     }
   else
-    return handler->write(data, dataLen);
+#endif
+    {
+      iecChannelHandler *handler = m_channels[channel];
+      if( handler==nullptr )
+        {
+          if( m_statusCode==ST_OK ) setStatusCode(ST_FILE_NOT_OPEN);
+          return 0;
+        }
+      else
+        return handler->write(data, dataLen);
+    }
 }
 
- 
-uint8_t iecDrive::read(uint8_t channel, uint8_t *data, uint8_t maxDataLen)
+
+uint8_t iecDrive::read(uint8_t channel, uint8_t *data, uint8_t maxDataLen, bool *eoi)
 { 
-  iecChannelHandler *handler = m_channels[channel];
-  if( handler==nullptr )
+#ifdef USE_VDRIVE
+  if( m_vdrive!=nullptr )
     {
-      if( m_statusCode==ST_OK ) setStatusCode(ST_FILE_NOT_OPEN);
-      return 0;
+      size_t n = maxDataLen;
+      if( !m_vdrive->read(channel, data, &n, eoi) )
+        setStatusCode(ST_VDRIVE);
+
+      if( (m_byteCount+n)/256 > m_byteCount/256 ) { printf("."); fflush(stdout); }
+      m_byteCount += n;
+ 
+      return n;
     }
   else
-    return handler->read(data, maxDataLen);
+#endif
+    { 
+      iecChannelHandler *handler = m_channels[channel];
+      if( handler==nullptr )
+        {
+          if( m_statusCode==ST_OK ) setStatusCode(ST_FILE_NOT_OPEN);
+          return 0;
+        }
+      else
+        return handler->read(data, maxDataLen);
+    }
 }
 
 
@@ -733,6 +809,51 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
 
   std::string command = std::string(cmd, cmdLen);
 
+  // set status code to OK, failing commands below will set it to the appropriate error code
+  setStatusCode(ST_OK);
+
+#ifdef USE_VDRIVE
+  // check whether we are currently operating in "virtual drive" mode
+  if( m_vdrive!=nullptr )
+    {
+      if( (command=="CD_" || command=="CD:_" || command=="CD.." || command=="CD:.." || command=="CD^" || command=="CD:^") || 
+          (mstr::startsWith(command, "CD:") && (mstr::contains(command, "ML:") || mstr::contains(command, "://"))) )
+        {
+          // exit out of virtual drive
+          Debug_printv("Closing VDrive");
+          delete m_vdrive;
+          m_vdrive = NULL;
+
+          // if we're just going up one directory then we're done, otherwise continue
+          if( command=="CD_" || command=="CD:_" || command=="CD.." || command=="CD:.." )
+            return;
+        }
+      else
+        {
+          // execute command within virtual drive
+          int ok = m_vdrive->execute(cmd, cmdLen);
+          if( ok==2 )
+            {
+              // this was a command that placed its response in the status buffer
+              uint8_t buf[IECFILEDEVICE_STATUS_BUFFER_SIZE];
+              size_t len = m_vdrive->getStatusBuffer(buf, IECFILEDEVICE_STATUS_BUFFER_SIZE);
+              IECFileDevice::setStatus((const char *) buf, len);
+            }
+          else if( !ok )
+            setStatusCode(ST_VDRIVE);
+
+          // when executing a "P" (position relative file) command we need
+          // to clear the read buffer of the channel for which this command
+          // is issued, otherwise remaining characters in the buffer will be
+          // prefixed to the data from the new record
+          if( ok && cmd[0]=='P' && cmdLen>=2 )
+            clearReadBuffer(command[1] & 0x0f);
+          
+          return;
+        }
+    }
+#endif
+  
   if( mstr::startsWith(command, "CD") )
     {
       set_cwd(mstr::drop(command, 2));
@@ -883,8 +1004,48 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
             }
         break;
         case 'N':
+          {
+#ifdef USE_VDRIVE
+            string params = command.substr(colon_position+1);
+            size_t dot = params.find('.');
+
+            if( dot==string::npos )
+              {
+                // must have extension to determine image type
+                setStatusCode(ST_SYNTAX_ERROR_31);
+              }
+            else
+              {
+                string filename, diskname, ext;
+                size_t comma = params.find(',');
+                if( comma==string::npos )
+                  {
+                    filename = mstr::toUTF8(params);
+                    diskname = params.substr(0,dot);
+                  }
+                else
+                  {
+                    filename = mstr::toUTF8(params.substr(0, comma));
+                    diskname = params.substr(comma+1);
+                  }
+
+                fnLedManager.set(eLed::LED_BUS, true);
+                MFile *f = m_cwd->cd(filename);
+                if( f->exists() )
+                  setStatusCode(ST_FILE_EXISTS);
+                else if( !f->isWritable )
+                  setStatusCode(ST_WRITE_PROTECT);
+                else if( !VDrive::createDiskImage(filename.c_str(), NULL, diskname.c_str(), false) )
+                  setStatusCode(ST_WRITE_ERROR);
+                else
+                  setStatusCode(ST_OK);
+                fnLedManager.set(eLed::LED_BUS, false);
+              }
+#else
             //New();
             Debug_printv( "new (format)");
+#endif
+          }
         break;
         case 'R':
             if ( command[1] != 'D' && colon_position ) // Rename
@@ -1116,9 +1277,32 @@ bool iecDrive::hasError()
 }
 
 
+uint8_t iecDrive::getNumOpenChannels() 
+{ 
+#ifdef USE_VDRIVE
+  return m_vdrive!=nullptr ? m_vdrive->getNumOpenChannels() : m_numOpenChannels;
+#else
+  return m_numOpenChannels;
+#endif
+}
+
+
 void iecDrive::getStatus(char *buffer, uint8_t bufferSize)
 {
   Debug_printv("iecDrive::getStatus(#%d)", m_devnr);
+
+#ifdef USE_VDRIVE
+  if( m_statusCode==ST_VDRIVE && m_vdrive!=nullptr )
+    {
+      strncpy(buffer, m_vdrive->getStatusString(), bufferSize);
+      buffer[bufferSize-1] = '\r';
+
+      Debug_printv("vdrive-status: %s", buffer);
+      m_statusCode = ST_OK;
+      m_statusTrk  = 0;
+      return;
+    }
+#endif
 
   const char *msg = NULL;
   switch( m_statusCode )
@@ -1164,6 +1348,10 @@ void iecDrive::reset()
   m_numOpenChannels = 0;
   m_memory.reset();
 
+#ifdef USE_VDRIVE
+  if( m_vdrive!=nullptr ) m_vdrive->closeAllChannels();
+#endif
+
   IECFileDevice::reset();
 
   ImageBroker::clear();
@@ -1185,10 +1373,31 @@ void iecDrive::set_cwd(std::string path)
     Debug_printv("path[%s]", path.c_str());
     path = mstr::toUTF8( path );
 
-    auto n = m_cwd->cd( path );
+    MFile *n = m_cwd->cd( path );
     if( n != nullptr )
       {
-        if( n->exists() && (n->isDirectory() || n->getSourceStream()!=nullptr) )
+        // bug in HTTPMFile: must call isDirectory() before getSourceStream(), otherwise 
+        // getSourceStream() call will hang for several seconds for HTTP files
+        bool isDirectory = n->isDirectory();
+
+        // check whether we can get a stream
+        MStream *s = n->exists() ? n->getSourceStream() : nullptr; 
+        bool haveStream = (s!=nullptr);
+        if( s ) delete s;
+
+        Debug_printv("url[%s] isDirectory[%i] haveStream[%i]", n->url.c_str(), isDirectory, haveStream);
+
+#ifdef USE_VDRIVE
+        if( n->exists() && !isDirectory && haveStream &&
+            (m_vdrive=VDrive::create(m_devnr-8, n->url.c_str()))!=nullptr )
+          {
+            // we were able to creata a VDrive => this is a valid disk image
+            Debug_printv("Created VDrive for URL %s", n->url.c_str());
+            setStatusCode(ST_OK);
+          }
+        else 
+#endif
+        if( n->exists() && (isDirectory || haveStream) )
           {
             m_cwd.reset( n );
             setStatusCode(ST_OK);

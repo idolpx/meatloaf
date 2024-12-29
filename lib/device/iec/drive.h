@@ -16,6 +16,10 @@
 #include "../meatloaf/wrappers/directory_stream.h"
 #include "utils.h"
 
+#ifdef USE_VDRIVE
+#include "../vdrive/VDriveClass.h"
+#endif
+
 //#include "dos/_dos.h"
 //#include "dos/cbmdos.2.5.h"
 
@@ -222,7 +226,7 @@ class iecDrive : public IECFileDevice
   void unmount();
 
   int     id() { return m_devnr; };
-  uint8_t getNumOpenChannels() { return m_numOpenChannels; }
+  uint8_t getNumOpenChannels();
   uint8_t getStatusCode() { return m_statusCode; }
   void    setStatusCode(uint8_t code, uint8_t trk = 0);
   bool    hasError();
@@ -244,13 +248,13 @@ class iecDrive : public IECFileDevice
 
   // write bufferSize bytes to file on channel, returning the number of bytes written
   // Returning less than bufferSize signals "cannot receive more data" for this file
-  virtual uint8_t write(uint8_t channel, uint8_t *buffer, uint8_t bufferSize);
+  virtual uint8_t write(uint8_t channel, uint8_t *buffer, uint8_t bufferSize, bool eoi);
 
   // read up to bufferSize bytes from file in channel, returning the number of bytes read
   // returning 0 will signal end-of-file to the receiver. Returning 0
   // for the FIRST call after open() signals an error condition
   // (e.g. C64 load command will show "file not found")
-  virtual uint8_t read(uint8_t channel, uint8_t *buffer, uint8_t bufferSize);
+  virtual uint8_t read(uint8_t channel, uint8_t *buffer, uint8_t bufferSize, bool *eoi);
 
   // called when the bus master reads from channel 15 and the status
   // buffer is currently empty. this should populate buffer with an appropriate 
@@ -271,6 +275,11 @@ class iecDrive : public IECFileDevice
   std::unique_ptr<MFile> m_cwd;   // current working directory
   iecChannelHandler *m_channels[16];
   uint8_t m_statusCode, m_statusTrk, m_numOpenChannels;
+#ifdef USE_VDRIVE
+  VDrive   *m_vdrive;
+#endif
+  uint32_t  m_byteCount;
+  uint64_t  m_timeStart;
 
   driveMemory m_memory;
 };

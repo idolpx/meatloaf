@@ -270,10 +270,10 @@ uint8_t IECFileDevice::read(uint8_t *buffer, uint8_t bufferSize)
     }
 
   // get data from higher class
-  while( res<bufferSize )
+  while( res<bufferSize && !m_eoi )
     {
-      uint8_t n = read(m_channel, buffer+res, bufferSize-res);
-      if( n==0 ) break;
+      uint8_t n = read(m_channel, buffer+res, bufferSize-res, &m_eoi);
+      if( n==0 ) m_eoi = true;
 #if DEBUG>0
       for(uint8_t i=0; i<n; i++) dbg_data(buffer[res+i]);
 #endif
@@ -327,6 +327,7 @@ void IECFileDevice::write(uint8_t data, bool eoi)
   // => do not add Serial.print or function call that may take longer!
   // (at 115200 baud we can send 10 characters in less than 1 ms)
 
+  m_eoi |= eoi;
   if( m_writeBufferLen<IECFILEDEVICE_WRITE_BUFFER_SIZE-1 )
     m_writeBuffer[m_writeBufferLen++] = data;
  
@@ -340,13 +341,14 @@ uint8_t IECFileDevice::write(uint8_t *buffer, uint8_t bufferSize, bool eoi)
 {
   if( m_channel < 15 )
     {
-      // first transmit data that has been buffered (if any), if that is not
+      // first pass on data that has been buffered (if any), if that is not
       // possible then return indicating that nothing of the new data has been sent
       emptyWriteBuffer();
       if( m_writeBufferLen>0 ) return 0;
 
-      // now send data
-      uint8_t nn = write(m_channel, buffer, bufferSize);
+      // now pass on new data
+      m_eoi |= eoi;
+      uint8_t nn = write(m_channel, buffer, bufferSize, m_eoi);
 #if DEBUG>0
       for(uint8_t i=0; i<nn; i++) dbg_data(buffer[i]);
 #endif
@@ -364,6 +366,7 @@ void IECFileDevice::talk(uint8_t secondary)
 #endif
 
   m_channel = secondary & 0x0F;
+  m_eoi = false;
 }
 
 
@@ -384,6 +387,7 @@ void IECFileDevice::listen(uint8_t secondary)
   Serial.write('L'); print_hex(secondary);
 #endif
   m_channel = secondary & 0x0F;
+  m_eoi = false;
 
   if( m_channel==15 )
     m_writeBufferLen = 0;
@@ -464,11 +468,11 @@ bool IECFileDevice::epyxWriteSector(uint8_t track, uint8_t sector, uint8_t *buff
 
 void IECFileDevice::fillReadBuffer()
 {
-  while( m_readBufferLen[m_channel]<2 )
+  while( m_readBufferLen[m_channel]<2 && !m_eoi )
     {
       uint8_t n = 2-m_readBufferLen[m_channel];
-      n = read(m_channel, m_readBuffer[m_channel]+m_readBufferLen[m_channel], n);
-      if( n==0 ) break;
+      n = read(m_channel, m_readBuffer[m_channel]+m_readBufferLen[m_channel], n, &m_eoi);
+      if( n==0 ) m_eoi = true;
 #if DEBUG==1
       for(uint8_t i=0; i<n; i++) dbg_data(m_readBuffer[m_channel][m_readBufferLen[m_channel]+i]);
 #endif
@@ -481,7 +485,7 @@ void IECFileDevice::emptyWriteBuffer()
 {
   if( m_writeBufferLen>0 )
     {
-      uint8_t n = write(m_channel, m_writeBuffer, m_writeBufferLen);
+      uint8_t n = write(m_channel, m_writeBuffer, m_writeBufferLen, m_eoi);
 #if DEBUG==1
       for(uint8_t i=0; i<n; i++) dbg_data(m_writeBuffer[i]);
 #endif
@@ -495,6 +499,11 @@ void IECFileDevice::emptyWriteBuffer()
     }
 }
 
+
+void IECFileDevice::clearReadBuffer(uint8_t channel)
+{
+  if( channel<16 ) m_readBufferLen[channel] = 0;
+}
 
 
 void IECFileDevice::fileTask()
@@ -596,9 +605,9 @@ void IECFileDevice::fileTask()
 #endif
 #ifdef SUPPORT_DOLPHIN
         if( strcmp_P(cmd, PSTR("XQ"))==0 )
-          { dolphinBurstTransmitRequest(); m_channel = 0; handled = true; }
+          { dolphinBurstTransmitRequest(); m_channel = 0; handled = true; m_eoi = false; }
         else if( strcmp_P(cmd, PSTR("XZ"))==0 )
-          { dolphinBurstReceiveRequest(); m_channel = 1; handled = true; }
+          { dolphinBurstReceiveRequest(); m_channel = 1; handled = true; m_eoi = false; }
         else if( strcmp_P(cmd, PSTR("XF+"))==0 )
           { enableDolphinBurstMode(true); setStatus(NULL, 0); handled = true; }
         else if( strcmp_P(cmd, PSTR("XF-"))==0 )

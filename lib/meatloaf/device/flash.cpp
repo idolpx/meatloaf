@@ -349,7 +349,7 @@ bool FlashMStream::open(std::ios_base::openmode mode) {
 
     // The below code will definitely destroy whatever open above does, because it will move the file pointer
     // so I just wrapped it to be called only for in
-    if(isOpen() && mode == std::ios_base::in) {
+    if( isOpen() && ((mode==std::ios_base::in) || (mode==(std::ios_base::in|std::ios_base::out)))  ) {
         //Debug_printv("IStream: past obtain");
         // Set file size
         fseek(handle->file_h, 0, SEEK_END);
@@ -397,12 +397,12 @@ uint32_t FlashMStream::write(const uint8_t *buf, uint32_t size) {
         return 0;
     }
 
-    Debug_printv("buf[%02X] size[%ld]", buf[0], size);
+    //Debug_printv("buf[%02X] size[%ld]", buf[0], size);
 
     // buffer, element size, count, handle
     int result = fwrite((void*) buf, 1, size, handle->file_h );
 
-    Debug_printv("result[%d]", result);
+    //Debug_printv("result[%d]", result);
     return result;
 };
 

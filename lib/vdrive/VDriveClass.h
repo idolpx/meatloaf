@@ -1,0 +1,92 @@
+#ifndef VDRIVE_CLASS
+#define VDRIVE_CLASS
+
+#include <inttypes.h>
+#include <stddef.h>
+
+struct vdrive_s;
+
+class VDrive
+{
+ public:
+  VDrive(uint8_t unit);
+  ~VDrive();
+
+  // creates a new VDrive using disk image in "imagefile", returns NULL
+  // if the image cannot be opened
+  static VDrive *create(uint8_t unit, const char *imagefile, bool readOnly = false);
+
+  // opens a new disk image on the host file system, using the archdep_* functions
+  // to interact with the file system
+  bool openDiskImage(const char *filename, bool readOnly = false);
+
+  // close the disk image currently in use
+  void closeDiskImage();
+
+  // return true if a disk image has been successfuly opened for this drive
+  bool isOk();
+
+  // open a file within the current disk image on the given channel
+  bool openFile(uint8_t channel, const char *name, bool convertNameToPETSCII = false);
+
+  // close the file that is currently open on a channel (if any)
+  bool closeFile(uint8_t channel);
+
+  // close all currently open files on all channels
+  void closeAllChannels();
+
+  // return the number of currently active channels
+  int getNumOpenChannels() { return m_numOpenChannels; }
+
+  // prints a directory listing of the disk image to the log
+  void printDir();
+
+  // return true if the file on the given channel is ok to read and/or write
+  bool isFileOk(uint8_t channel);
+
+  // read data from the file on the given channel. On entry, nbytes should contain
+  // the maximum number of bytes to read, on exit, nbytes contains the number of bytes
+  // actually read (can be different due to error or EOF).
+  // Returns false if an error occurred while reading (EOF is not an error) 
+  // and true otherwise.
+  // The "eoi" parameter will be set to "true" if an EOF condition was encountered
+  // during the current call, otherwise it will remain unchanged.
+  bool read(uint8_t channel, uint8_t *buffer, size_t *nbytes, bool *eoi);
+
+  // read data to the file on the given channel. On entry, nbytes should contain
+  // the number of bytes to write, on exit, nbytes contains the number of bytes
+  // actually written (can be different due to error).
+  // Returns false if an error occurred while writing and true otherwise.
+  bool write(uint8_t channel, uint8_t *buffer, size_t *nbytes);
+
+  // execute the given DOS command, returns true on success false otherwise
+  // returns 0 if there was an error (call getStatusString)
+  //         1 if the command succeeded
+  //         2 if the command succeeded AND there is return data in the status buffer (M-R)
+  //           (call getStatusBuffer to retrieve)
+  int execute(const char *cmd, size_t cmdLen, bool convertToPETSCII = false);
+
+  // returns the current status message from the error message buffer
+  // calling this if read/write/execute fails gives the standard CBMDOS error messages
+  const char *getStatusString();
+
+  // copies the contents of the drive's status buffer to "buf", not exceeding
+  // the given bufSize length.
+  size_t getStatusBuffer(void *buf, size_t bufSize);
+
+  // create and optionally format a new disk image. Parameters
+  // - filename: name of the created image file on the host file system, required
+  // - itype: image type ("d64", "g64", ...), if NULL use extension from filename parameter
+  // - name: disk name and id ("NAME,ID") used when formatting the disk image
+  //         * if NULL, disk image will not be formatted
+  //         * if ",ID" is missing then "00" will be used as ID
+  //  - convertNameToPETSCII: if false then the name argument is assumed to be PETSCII,
+  //    otherwise it will be converted from ASCII to PETSCII
+  static bool createDiskImage(const char *filename, const char *itype, const char *name, bool convertNameToPETSCII);
+
+ private:
+  int m_numOpenChannels;
+  struct vdrive_s *m_drive;
+};
+
+#endif
