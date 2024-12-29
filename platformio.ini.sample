@@ -115,6 +115,7 @@ build_flags =
     ; Service Options
     ;-D ENABLE_ZIMODEM      ; enable Zimodem functionality
     ;-D ENABLE_SSDP         ; enable Simple Service Discovery Protocol service
+    ;-D ENABLE_CONSOLE      ; enable console service
     ;-D ENABLE_DISPLAY      ; enable display service
     ;-D ENABLE_AUDIO        ; enable audio service
 
