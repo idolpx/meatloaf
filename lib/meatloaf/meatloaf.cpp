@@ -141,9 +141,11 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
 #endif
     &archiveFS, // extension-based FS have to be on top to be picked first, otherwise the scheme will pick them!
     &arkFS, &lbrFS,
+#ifndef USE_VDRIVE
     &d64FS, &d71FS, &d80FS, &d81FS, &d82FS, &d90FS, &dnpFS, 
     &g64FS, &nibFS,
     &d8bFS, &dfiFS,
+#endif
     &p00FS,
     &httpFS, &tnfsFS,
     &csipFS, &mlFS,

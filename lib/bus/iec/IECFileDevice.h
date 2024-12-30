@@ -37,20 +37,23 @@ class IECFileDevice : public IECDevice
   virtual void task();
 
   // open file "name" on channel
-  virtual bool open(uint8_t channel, const char *name) { return true; }
+  virtual bool open(uint8_t channel, const char *name) = 0;
 
   // close file on channel
-  virtual void close(uint8_t channel) {}
+  virtual void close(uint8_t channel) = 0;
 
   // write bufferSize bytes to file on channel, returning the number of bytes written
-  // Returning less than bufferSize signals "cannot receive more data" for this file
-  virtual uint8_t write(uint8_t channel, uint8_t *buffer, uint8_t bufferSize) { return 0; }
+  // Returning less than bufferSize signals "cannot receive more data" for this file.
+  // If eoi is true then the sender has signaled that this is the final data for this transmission.
+  virtual uint8_t write(uint8_t channel, uint8_t *buffer, uint8_t bufferSize, bool eoi) = 0;
 
   // read up to bufferSize bytes from file in channel, returning the number of bytes read
   // returning 0 will signal end-of-file to the receiver. Returning 0
   // for the FIRST call after open() signals an error condition
   // (e.g. C64 load command will show "file not found")
-  virtual uint8_t read(uint8_t channel, uint8_t *buffer, uint8_t bufferSize) { return 0; }
+  // If returning a data length >0 then the device may signal end-of-data AFTER transmitting
+  // the data by setting *eoi to true.
+  virtual uint8_t read(uint8_t channel, uint8_t *buffer, uint8_t bufferSize, bool *eoi) = 0;
 
   // called when the bus master reads from channel 15, the status
   // buffer is currently empty and getStatusData() is not overloaded. 
@@ -82,6 +85,11 @@ class IECFileDevice : public IECDevice
   // to be called again the next time the status channel is queried
   void clearStatus();
 
+  // clear the internal read buffer of the given channel, calling this will ensure
+  // that the next TALK command will immediately call "read" to get new data instead 
+  // of first sending the contents of the buffer
+  void clearReadBuffer(uint8_t channel);
+
 #if defined(SUPPORT_EPYX) && defined(SUPPORT_EPYX_SECTOROPS)
   virtual bool epyxReadSector(uint8_t track, uint8_t sector, uint8_t *buffer);
   virtual bool epyxWriteSector(uint8_t track, uint8_t sector, uint8_t *buffer);
@@ -106,7 +114,7 @@ class IECFileDevice : public IECDevice
   void fileTask();
   bool checkMWcmd(uint16_t addr, uint8_t len, uint8_t checksum) const;
 
-  bool    m_opening, m_canServeATN;
+  bool    m_opening, m_eoi, m_canServeATN;
   uint8_t m_channel, m_cmd;
   uint8_t m_writeBuffer[IECFILEDEVICE_WRITE_BUFFER_SIZE];
 
