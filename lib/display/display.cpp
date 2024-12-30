@@ -100,6 +100,9 @@ void Display::service()
     if ( progress < 100 ) {
         show_progress();
     }
+    if ( activity ) {
+        show_activity();
+    }
     update();
 }
 
@@ -151,11 +154,37 @@ void Display::fill_all(CRGB color)
     }
 }
 
+void Display::show_activity()
+{
+    static uint8_t curr_led = 0;
+    static uint8_t curr_dir = 0;
+
+    speed = 25;
+
+    // Set all leds to black
+    fill_all((CRGB){.r=0, .g=0, .b=0});
+
+    // Number of leds to light up
+    ws28xx_pixels[curr_led] = (CRGB){.r=0, .g=100, .b=0};
+
+    if ( curr_dir)
+        curr_led++;
+    else
+        curr_led--;
+
+    if ( (curr_led == 0) || (curr_led == n_of_leds) ) {
+        curr_dir = !curr_dir;
+    }
+
+    update();
+}
+
 void Display::show_progress()
 {
     static bool led_state_off = false;
 
     speed = 25;
+    activity = false;
 
     // Set all leds to black
     fill_all((CRGB){.r=0, .g=0, .b=0});

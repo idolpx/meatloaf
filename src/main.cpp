@@ -41,7 +41,8 @@
 
 
 #ifdef ENABLE_CONSOLE
-#include "console.h"
+#include "../lib/console/ESP32Console.h"
+using namespace ESP32Console;
 Console console;
 #endif
 
@@ -82,11 +83,10 @@ void main_setup()
 
 #ifdef ENABLE_CONSOLE
     //You can change the console prompt before calling begin(). By default it is "ESP32>"
-    //console.setPrompt("meatloaf[%pwd%]# ");
+    console.setPrompt("meatloaf[%pwd%]# ");
 
     //You can change the baud rate and pin numbers similar to Serial.begin() here.
-    //console.setBaudRate(DEBUG_SPEED);
-    //console.start();
+    console.begin(DEBUG_SPEED);
 #else
     Serial.begin(DEBUG_SPEED);
 #endif
@@ -223,6 +223,21 @@ void main_setup()
 #endif
 
     printf("READY.\r\n");
+#ifdef ENABLE_CONSOLE
+    {
+        //Register builtin commands like 'reboot', 'version', or 'meminfo'
+        console.registerSystemCommands();
+
+        //Register network commands
+        console.registerNetworkCommands();
+
+        //Register the VFS specific commands
+        console.registerVFSCommands();
+
+        //Register GPIO commands
+        console.registerGPIOCommands();
+    }
+#endif
 }
 
 /*

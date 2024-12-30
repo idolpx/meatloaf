@@ -146,7 +146,7 @@ bool HTTPMStream::open(std::ios_base::openmode mode) {
         r = _http.GET(url);
 
     if ( r ) {
-        _size = _http._size;
+        _size = ( _http._range_size > 0) ? _http._range_size : _http._size;
     }
 
     return r;
@@ -486,8 +486,9 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
                     meatClient->isFriendlySkipper = true;
                     auto cr = util_tokenize(evt->header_value, '/');
                     if( cr.size() > 1 )
-                        meatClient->_size = std::stoi(cr[1]);
+                        meatClient->_range_size = std::stoi(cr[1]);
                 }
+                //Debug_printv("size[%lu] isFriendlySkipper[%d]", meatClient->_range_size, meatClient->isFriendlySkipper);
             }
             // what can we do UTF8<->PETSCII on this stream?
             if (mstr::equals("Content-Type", evt->header_key, false))
@@ -511,7 +512,7 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
                 std::string value = evt->header_value;
                 if ( mstr::contains( value, (char *)"index.prg" ) )
                 {
-                    Debug_printv("HTTP Directory Listing [%s]", meatClient->url.c_str());
+                    //Debug_printv("HTTP Directory Listing [%s]", meatClient->url.c_str());
                     meatClient->m_isDirectory = true;
                 }
             }

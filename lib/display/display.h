@@ -83,6 +83,7 @@ public:
     Mode mode = MODE_IDLE;
     uint16_t speed = 300;
     uint8_t progress = 100;
+    bool activity = false;
     uint8_t direction = 1;  // 0 = left (RECEIVE), 1 = right (SEND)
     uint8_t brightness = 8;
     uint8_t segment = 0;    // Segment 0 is the first 5 LEDs
