@@ -13,6 +13,8 @@
 #include "../Helpers/PWDHelpers.h"
 #include "../kilo/kilo.h"
 
+#include "string_utils.h"
+
 char *canonicalize_file_name(const char *path);
 
 int cat(int argc, char **argv)
@@ -134,12 +136,20 @@ int ls(int argc, char **argv)
 
     struct dirent *d;
     struct stat st;
+
+    // Add "sd" if we are at the root
+    if ( mstr::equals(path, (char *)"/", false) )
+    {
+        printf("D %8u  sd\r\n", 0);
+    }
+
     while ((d = readdir(dir)) != NULL)
     {
         std::string filename = path;
+        filename += "/";
         filename += d->d_name;
         stat(filename.c_str(), &st);
-        printf("%c %8lu  %s\r\r\n", (S_ISDIR(st.st_mode)) ? 'D':'F', st.st_size, d->d_name);
+        printf("%c %8lu  %s\r\n", (S_ISDIR(st.st_mode)) ? 'D':'F', st.st_size, d->d_name);
     }
 
     closedir(dir);
