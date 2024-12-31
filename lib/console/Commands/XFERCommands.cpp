@@ -11,6 +11,7 @@
 #include <esp_rom_crc.h>
 #include <iostream>
 #include <sstream>
+#include <sys/fcntl.h>
 
 #include "string_utils.h"
 
@@ -28,9 +29,6 @@ int rx(int argc, char **argv)
         return EXIT_SUCCESS;
     }
 
-    // flush stdin
-    fflush(stdin);
-
     char filename[PATH_MAX];
     ESP32Console::console_realpath(argv[1], filename);
     int size = atoi(argv[2]);
@@ -43,26 +41,24 @@ int rx(int argc, char **argv)
         return 2;
     }
 
-    int c = 0;
+    // Receive File
+    int count = 0;
+    uint8_t c = 0;
     int dest_checksum = 0;
-    while (c < size)
+    while (count < size)
     {
-        uint8_t buffer[256];
-        int bytesRead = 0;
-        if ((bytesRead = fread(buffer, 1, 256, stdin)) > 0)
+        if (Serial.available() > 0)
         {
-            // save buffer bytes
-            for (int i = 0; i < bytesRead; i++) {
-                fprintf(file, "%c", buffer[i]);
-            }
+            c = Serial.read();
+            fprintf(file, "%c", c);
 
             // Calculate checksum
-            dest_checksum = esp_rom_crc32_le(dest_checksum, (uint8_t *)buffer, bytesRead);
-
-            c += bytesRead;
+            dest_checksum = esp_rom_crc32_le(dest_checksum, &c, 1);
+            count++;
         }
     }
     fclose(file);
+
 
     std::ostringstream ss;
     ss << std::hex << dest_checksum;

@@ -263,6 +263,9 @@ namespace ESP32Console
             std::string interpolated_line = interpolateLine(line);
             //Debug_printv("Interpolated line: %s\n", interpolated_line.c_str());
 
+            // Read trailing CR
+            int c = Serial.read();
+
             /* Try to run the command */
             int ret;
             esp_err_t err = esp_console_run(interpolated_line.c_str(), &ret);
