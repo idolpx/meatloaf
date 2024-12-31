@@ -151,11 +151,9 @@ uint32_t EspClass::getMaxAllocHeap(void) {
 }
 
 uint32_t EspClass::getPsramSize(void) {
-#ifdef BOARD_HAS_PSRAM
     if (esp_psram_is_initialized()) {
         return heap_caps_get_total_size(MALLOC_CAP_SPIRAM);
     }
-#endif
     return 0;
 }
 

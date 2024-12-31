@@ -21,6 +21,8 @@
 
 #include "../ESP32Console.h"
 
+#include "../../../include/version.h"
+
 #include "Esp.h"
 
 EspClass ESP;
@@ -100,9 +102,10 @@ static int sysInfo(int argc, char **argv)
     esp_chip_info_t info;
     esp_chip_info(&info);
 
-    printf("ESP32Console version: %s\r\n", ESP32CONSOLE_VERSION);
+    printf("Meatloaf v%s\r\n", FW_VERSION);
+//    printf("ESP32Console version: %s\r\n", ESP32CONSOLE_VERSION);
 //    printf("Arduino Core version: %s (%x)\r\n", XTSTR(ARDUINO_ESP32_GIT_DESC), ARDUINO_ESP32_GIT_VER);
-    printf("ESP-IDF Version: %s\r\n", ESP.getSdkVersion());
+    printf("ESP-IDF v%s\r\n", ESP.getSdkVersion());
 
     printf("\r\n");
     printf("Chip info:\r\n");
@@ -126,10 +129,10 @@ static int sysInfo(int argc, char **argv)
     printf("Compilation datetime: " __DATE__ " " __TIME__ "\r\n");
 #endif
 
-    printf("\nReset reason: %s\r\n", getResetReasonStr());
+    //printf("\nReset reason: %s\r\n", getResetReasonStr());
 
-    printf("\r\n");
-    printf("CPU temperature: %.01f °C\r\n", ESP.temperatureRead());
+    //printf("\r\n");
+    //printf("CPU temperature: %.01f °C\r\n", ESP.temperatureRead());
 
     return EXIT_SUCCESS;
 }
@@ -149,9 +152,14 @@ static int meminfo(int argc, char **argv)
     uint32_t min = ESP.getMinFreeHeap() / 1024;
     uint32_t total_free = esp_get_free_heap_size() / 1024;
 
-    printf("Internal Heap: %lu KB free, %lu KB used, (%lu KB total)\r\r\n", free, used, total);
-    printf("Minimum free heap size during uptime was: %lu KB\r\r\n", min);
-    printf("Overall Free Memory: %lu KB\r\r\n", total_free);
+    printf("Internal Heap: %lu KB free, %lu KB used, (%lu KB total)\r\n", free, used, total);
+    printf("Minimum free heap size during uptime was: %lu KB\r\n", min);
+    printf("Overall Free Memory: %lu KB\r\n\r\n", total_free);
+
+    total = ESP.getPsramSize() / 1024;
+    free = ESP.getFreePsram() / 1024;
+    used = total - free;    
+    printf("PSRAM: %lu KB free, %lu KB used, (%lu KB total)\r\n", free, used, total);
     return EXIT_SUCCESS;
 }
 

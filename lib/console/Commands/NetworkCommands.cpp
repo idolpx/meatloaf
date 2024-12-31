@@ -77,6 +77,25 @@ static void on_ping_timeout(esp_ping_handle_t hdl, void *args)
 
 static void on_ping_end(esp_ping_handle_t hdl, void *args)
 {
+    ip_addr_t target_addr;
+	uint32_t transmitted;
+	uint32_t received;
+	uint32_t total_time_ms;
+	esp_ping_get_profile(hdl, ESP_PING_PROF_REQUEST, &transmitted, sizeof(transmitted));
+	esp_ping_get_profile(hdl, ESP_PING_PROF_REPLY, &received, sizeof(received));
+	esp_ping_get_profile(hdl, ESP_PING_PROF_IPADDR, &target_addr, sizeof(target_addr));
+	esp_ping_get_profile(hdl, ESP_PING_PROF_DURATION, &total_time_ms, sizeof(total_time_ms));
+	uint32_t loss = (uint32_t)((1 - ((float)received) / transmitted) * 100);
+	if (IP_IS_V4(&target_addr)) {
+		printf("\n--- %s ping statistics ---", inet_ntoa(*ip_2_ip4(&target_addr)));
+	} else {
+		printf("\n--- %s ping statistics ---", inet6_ntoa(*ip_2_ip6(&target_addr)));
+	}
+	printf("%"PRIu32" packets transmitted, %"PRIu32" received, %"PRIu32"%% packet loss, time %"PRIu32"ms",
+			 transmitted, received, loss, total_time_ms);
+	// delete the ping sessions, so that we clean up all resources and can create a new ping session
+	// we don't have to call delete function in the callback, instead we can call delete function from other tasks
+	esp_ping_delete_session(hdl);
 }
 
 static int ping(int argc, char **argv)
@@ -161,7 +180,7 @@ static int ping(int argc, char **argv)
 
     //Wait for Ctrl+D or Ctr+C or that our task finishes
     //The async tasks decrease number_of_pings, so wait for it to get to 0
-    while((number_of_pings == 0 || seqno < number_of_pings) && c != 4 && c != 3) {
+    while((number_of_pings == 0 || seqno <= number_of_pings) && c != 4 && c != 3) {
         esp_ping_get_profile(ping, ESP_PING_PROF_SEQNO, &seqno, sizeof(seqno));
         c = getc(stdin);
         sleep(50);
@@ -170,19 +189,18 @@ static int ping(int argc, char **argv)
     //Reset flags, so we dont end up destroying our terminal env later, when linenoise takes over again
     fcntl(fileno(stdin), F_SETFL, flags);
 
-    esp_ping_stop(ping);
+    //esp_ping_stop(ping);
+
     //Print total statistics
-    uint32_t transmitted;
-    uint32_t received;
-    uint32_t total_time_ms;
-    esp_ping_get_profile(ping, ESP_PING_PROF_REQUEST, &transmitted, sizeof(transmitted));
-    esp_ping_get_profile(ping, ESP_PING_PROF_REPLY, &received, sizeof(received));
-    esp_ping_get_profile(ping, ESP_PING_PROF_DURATION, &total_time_ms, sizeof(total_time_ms));
-    printf("%lu packets transmitted, %lu received, time %lu ms\r\n", transmitted, received, total_time_ms);
+    // uint32_t transmitted;
+    // uint32_t received;
+    // uint32_t total_time_ms;
+    // esp_ping_get_profile(ping, ESP_PING_PROF_REQUEST, &transmitted, sizeof(transmitted));
+    // esp_ping_get_profile(ping, ESP_PING_PROF_REPLY, &received, sizeof(received));
+    // esp_ping_get_profile(ping, ESP_PING_PROF_DURATION, &total_time_ms, sizeof(total_time_ms));
+    // printf("%lu packets transmitted, %lu received, time %lu ms\r\n", transmitted, received, total_time_ms);
 
-
-
-    esp_ping_delete_session(ping);
+    // esp_ping_delete_session(ping);
 
     return EXIT_SUCCESS;
 }

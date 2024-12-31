@@ -12,6 +12,7 @@
 #include "Commands/NetworkCommands.h"
 #include "Commands/VFSCommands.h"
 #include "Commands/GPIOCommands.h"
+#include "Commands/XFERCommands.h"
 #include "driver/uart.h"
 #include "esp_vfs_dev.h"
 #include "linenoise/linenoise.h"
@@ -71,6 +72,13 @@ namespace ESP32Console
         registerCommand(getDigitalWriteCommand());
         registerCommand(getAnalogReadCommand());
     }
+
+    void Console::registerXFERCommands()
+    {
+        registerCommand(getRXCommand());
+        registerCommand(getTXCommand());
+    }
+
 
     void Console::beginCommon()
     {
@@ -169,7 +177,6 @@ namespace ESP32Console
 
         // Start REPL task
         if (xTaskCreatePinnedToCore(&Console::repl_task, "console_repl", task_stack_size_, this, task_priority_, &task_, 0) != pdTRUE)
-        //if (xTaskCreate(&Console::repl_task, "console_repl", 4096, this, 2, &task_) != pdTRUE)
         {
             Debug_printv("Could not start REPL task!");
         }
@@ -243,14 +250,14 @@ namespace ESP32Console
 
             //Debug_printv("Line received from linenoise: %s\n", line);
 
-            /* Add the command to the history */
-            linenoiseHistoryAdd(line);
+            // /* Add the command to the history */
+            // linenoiseHistoryAdd(line);
             
-            /* Save command history to filesystem */
-            if (console.history_save_path_)
-            {
-                linenoiseHistorySave(console.history_save_path_);
-            }
+            // /* Save command history to filesystem */
+            // if (console.history_save_path_)
+            // {
+            //     linenoiseHistorySave(console.history_save_path_);
+            // }
 
             //Interpolate the input line
             std::string interpolated_line = interpolateLine(line);

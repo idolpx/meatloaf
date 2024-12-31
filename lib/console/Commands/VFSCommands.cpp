@@ -251,8 +251,35 @@ int rm(int argc, char **argv)
     char filename[PATH_MAX];
     ESP32Console::console_realpath(argv[1], filename);
 
-    if(remove(filename)) {
-        fprintf(stderr, "Error deleting %s: %s\r\n", filename, strerror(errno));
+    if ( mstr::endsWith(filename, (char *)"*", false) )
+    {
+        char path[PATH_MAX];
+        ESP32Console::console_realpath(".", path);
+
+        DIR *dir = opendir(path);
+        struct dirent *d;
+        while ((d = readdir(dir)) != NULL)
+        {
+            std::string pattern = filename;
+            std::string match_file = path;
+            match_file += "/";
+            match_file += d->d_name;
+            if ( mstr::compare(pattern, match_file, false) )
+            {
+                printf("%s deleted\r\n", d->d_name);
+                if (remove(match_file.c_str()))
+                {
+                    fprintf(stderr, "Error deleting %s: %s\r\n", filename, strerror(errno));
+                }
+            }
+        }
+        closedir(dir);
+    }
+    else
+    {
+        if(remove(filename)) {
+            fprintf(stderr, "Error deleting %s: %s\r\n", filename, strerror(errno));
+        }
     }
 
     return EXIT_SUCCESS;

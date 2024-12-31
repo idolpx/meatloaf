@@ -236,6 +236,9 @@ void main_setup()
 
         //Register GPIO commands
         console.registerGPIOCommands();
+
+        //Register XFER commands
+        console.registerXFERCommands();
     }
 #endif
 }
