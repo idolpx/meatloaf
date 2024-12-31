@@ -44,7 +44,6 @@ int rx(int argc, char **argv)
     }
 
     int c = 0;
-    int chr;
     int dest_checksum = 0;
     while (c < size)
     {
