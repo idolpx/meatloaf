@@ -75,34 +75,40 @@ int cd(int argc, char **argv)
     // Check if target path is a file
     char resolved[PATH_MAX];
     ESP32Console::console_realpath(path, resolved);
-    FILE *file = fopen(resolved, "r");
+
+    // Get file stats
+    struct stat st;
+    stat(resolved, &st);
+    //Debug_printv("path[%s] resolved[%s]", path, resolved);
 
     // If we can open it, then we can not chdir into it.
-    if (file)
+    //FILE *file = fopen(resolved, "r");
+    //if (file)
+    if(!S_ISDIR(st.st_mode))
     {
-        fclose(file);
-        fprintf(stderr, "Can not cd into a file!\r\n");
+        //fclose(file);
+        fprintf(stderr, "cd: not a directory: %s\r\n", path);
         return 1;
     }
 
-    if (ESP32Console::console_chdir(path))
-    {
-        fprintf(stderr, "Error: %s\r\n", strerror(errno));
-        return 1;
-    }
-
-    const char *pwd = ESP32Console::console_getpwd();
 
     // Check if the new PWD exists, and show a warning if not
-    DIR *dir = opendir(pwd);
+    //const char *pwd = ESP32Console::console_getpwd();
+    DIR *dir = opendir(resolved);
     if (dir)
     {
         closedir(dir);
+
+        if (ESP32Console::console_chdir(path))
+        {
+            fprintf(stderr, "Error: %s\r\n", strerror(errno));
+            return 1;
+        }
     }
-    else if (ENOENT == errno)
-    {
-        fprintf(stderr, "Choosen directory maybe does not exists!\r\n");
-    }
+    // else if (ENOENT == errno)
+    // {
+    //     fprintf(stderr, "cd: no such file or directory: %s\r\n", path);
+    // }
 
     return EXIT_SUCCESS;
 }

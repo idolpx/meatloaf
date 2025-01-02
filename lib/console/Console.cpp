@@ -264,8 +264,9 @@ namespace ESP32Console
             //Debug_printv("Interpolated line: %s\n", interpolated_line.c_str());
 
             // Read trailing CR
-            uint8_t byte;
-            uart_read_bytes(CONSOLE_UART, &byte, 1, MAX_READ_WAIT_TICKS);
+            //uint8_t byte;
+            //uart_read_bytes(CONSOLE_UART, &byte, 1, MAX_READ_WAIT_TICKS);
+            uart_flush(CONSOLE_UART);
 
             /* Try to run the command */
             int ret;
@@ -284,7 +285,7 @@ namespace ESP32Console
             }
             else if (err == ESP_OK && ret != ESP_OK)
             {
-                printf("Command returned non-zero error code: 0x%x (%s)\n", ret, esp_err_to_name(ret));
+                // printf("Command returned non-zero error code: 0x%x (%s)\n", ret, esp_err_to_name(ret));
             }
             else if (err != ESP_OK)
             {

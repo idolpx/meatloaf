@@ -43,11 +43,11 @@ int rx(int argc, char **argv)
 
     // Receive File
     int count = 0;
-    uint8_t byte;
+    uint8_t byte = 0;
     int dest_checksum = 0;
     while (count < size)
     {
-        size_t size;
+        size_t size = 0;
         uart_get_buffered_data_len(CONSOLE_UART, &size);
         if (size > 0)
         {
@@ -94,6 +94,10 @@ int tx(int argc, char **argv)
     stat(filename, &file_stat);
     int size = file_stat.st_size;
 
+    // Receive File
+    uint8_t buffer[256];
+    int bytesRead = 0;
+
     // Calculate checksum
     int src_checksum = 0;
     FILE *file = fopen(filename, "r");
@@ -105,8 +109,6 @@ int tx(int argc, char **argv)
     else
     {
         // Read file 256 bytes at a time and calculate checksum
-        uint8_t buffer[256];
-        int bytesRead = 0;
         while ((bytesRead = fread(buffer, 1, 256, file)) > 0)
         {
             src_checksum = esp_rom_crc32_le(src_checksum, buffer, bytesRead);
@@ -114,12 +116,10 @@ int tx(int argc, char **argv)
         fseek(file, 0, SEEK_SET);
     }
 
-    // send size and checksum
+    // Send size and checksum
     fprintf(stdout, "%d %8x\r\n", size, src_checksum);
 
     // Send file 256 bytes at a time
-    uint8_t buffer[256];
-    int bytesRead = 0;
     while ((bytesRead = fread(buffer, 1, 256, file)) > 0)
     {
         // print buffer bytes
@@ -129,14 +129,15 @@ int tx(int argc, char **argv)
     }
     fclose(file);
 
+    // End file data with CRLF
     fprintf(stdout, "\r\n");
 
     // Read response
-    uint8_t byte;
+    uint8_t byte = 0;
     std::string response;
     while (byte != '\n')
     {
-        size_t size;
+        size_t size = 0;
         uart_get_buffered_data_len(CONSOLE_UART, &size);
         if (size > 0)
         {
@@ -170,5 +171,6 @@ namespace ESP32Console::Commands
 
     const ConsoleCommand getTXCommand()
     {
-        return ConsoleCommand("tx", &tx, "Transmit file");    }
+        return ConsoleCommand("tx", &tx, "Transmit file");
+    }
 }
