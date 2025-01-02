@@ -143,7 +143,7 @@ int tx(int argc, char **argv)
             int result = uart_read_bytes(CONSOLE_UART, &byte, 1, MAX_READ_WAIT_TICKS);
             if (result < 1)
             {
-                fprintf(stdout, "2 Error: Response Timeout\r\n");
+                fprintf(stdout, "3 Error: Response Timeout\r\n");
                 return 3;
             }
 
@@ -165,11 +165,10 @@ namespace ESP32Console::Commands
 {
     const ConsoleCommand getRXCommand()
     {
-        return ConsoleCommand("rx", &rx, "Receive one or more files.");
+        return ConsoleCommand("rx", &rx, "Receive file");
     }
 
     const ConsoleCommand getTXCommand()
     {
-        return ConsoleCommand("tx", &tx, "Send one or more files.");
-    }
+        return ConsoleCommand("tx", &tx, "Transmit file");    }
 }

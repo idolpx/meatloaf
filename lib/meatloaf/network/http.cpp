@@ -223,7 +223,7 @@ bool MeatHttpClient::HEAD(std::string dstUrl) {
 bool MeatHttpClient::processRedirectsAndOpen(uint32_t position, uint32_t size) {
     wasRedirected = false;
 
-    //Debug_printv("reopening url[%s] from position:%d", url.c_str(), range);
+    //Debug_printv("reopening url[%s] from position:%lu", url.c_str(), position);
     lastRC = openAndFetchHeaders(lastMethod, position, size);
 
     if (lastRC == 206)
@@ -247,7 +247,7 @@ bool MeatHttpClient::processRedirectsAndOpen(uint32_t position, uint32_t size) {
     _exists = true;
     _position = position;
 
-    //Debug_printv("size[%d] avail[%d] isFriendlySkipper[%d] isText[%d] httpCode[%d] method[%d]", _size, available(), isFriendlySkipper, isText, lastRC, lastMethod);
+    //Debug_printv("size[%lu] avail[%lu] isFriendlySkipper[%d] isText[%d] httpCode[%d] method[%d]", _size, available(), isFriendlySkipper, isText, lastRC, lastMethod);
 
     return true;
 }
