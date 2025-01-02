@@ -214,7 +214,7 @@ void SystemManager::_net::set_sntp_lastsync()
 void SystemManager::_net::_sntp_time_sync_notification(struct timeval *tv)
 {
     fnSystem.Net.set_sntp_lastsync();
-    Debug_printf("SNTP time sync event: %s\r\n", fnSystem.get_current_time_str());
+    //Debug_printf("SNTP time sync event: %s\r\n", fnSystem.get_current_time_str());
 }
 
 

@@ -264,7 +264,8 @@ namespace ESP32Console
             //Debug_printv("Interpolated line: %s\n", interpolated_line.c_str());
 
             // Read trailing CR
-            int c = Serial.read();
+            uint8_t byte;
+            uart_read_bytes(CONSOLE_UART, &byte, 1, MAX_READ_WAIT_TICKS);
 
             /* Try to run the command */
             int ret;

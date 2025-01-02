@@ -10,6 +10,9 @@
 
 #include "../../include/debug.h"
 
+#define CONSOLE_UART        0
+#define MAX_READ_WAIT_TICKS 200
+
 namespace ESP32Console
 {
     class Console

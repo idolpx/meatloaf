@@ -43,23 +43,28 @@ int rx(int argc, char **argv)
 
     // Receive File
     int count = 0;
-    uint8_t c = 0;
+    uint8_t byte;
     int dest_checksum = 0;
     while (count < size)
     {
-        if (Serial.available() > 0)
+        size_t size;
+        uart_get_buffered_data_len(CONSOLE_UART, &size);
+        if (size > 0)
         {
-            c = Serial.read();
-            fprintf(file, "%c", c);
+            int result = uart_read_bytes(CONSOLE_UART, &byte, 1, MAX_READ_WAIT_TICKS);
+            if (result < 1)
+                break;
+
+            fprintf(file, "%c", byte);
 
             // Calculate checksum
-            dest_checksum = esp_rom_crc32_le(dest_checksum, &c, 1);
+            dest_checksum = esp_rom_crc32_le(dest_checksum, &byte, 1);
             count++;
         }
     }
     fclose(file);
 
-
+    // Check checksum
     std::ostringstream ss;
     ss << std::hex << dest_checksum;
     std::string dest_checksum_str = ss.str();
@@ -125,6 +130,32 @@ int tx(int argc, char **argv)
     fclose(file);
 
     fprintf(stdout, "\r\n");
+
+    // Read response
+    uint8_t byte;
+    std::string response;
+    while (byte != '\n')
+    {
+        size_t size;
+        uart_get_buffered_data_len(CONSOLE_UART, &size);
+        if (size > 0)
+        {
+            int result = uart_read_bytes(CONSOLE_UART, &byte, 1, MAX_READ_WAIT_TICKS);
+            if (result < 1)
+            {
+                fprintf(stdout, "2 Error: Response Timeout\r\n");
+                return 3;
+            }
+
+            response.push_back(byte);
+        }
+    }
+
+    if (!mstr::startsWith(response, "0 OK"))
+    {
+        fprintf(stdout, "2 Error: %s\r\n", response.c_str());
+        return 2;
+    }
 
     return EXIT_SUCCESS;
 }
