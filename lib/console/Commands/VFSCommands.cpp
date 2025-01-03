@@ -11,7 +11,7 @@
 
 #include "../Console.h"
 #include "../Helpers/PWDHelpers.h"
-#include "../kilo/kilo.h"
+#include "../ute/ute.h"
 
 #include "string_utils.h"
 
@@ -146,7 +146,7 @@ int ls(int argc, char **argv)
     // Add "sd" if we are at the root
     if ( mstr::equals(path, (char *)"/", false) )
     {
-        printf("D %8u  sd\r\n", 0);
+        printf("d %8u  sd\r\n", 0);
     }
 
     while ((d = readdir(dir)) != NULL)
@@ -155,7 +155,7 @@ int ls(int argc, char **argv)
         filename += "/";
         filename += d->d_name;
         stat(filename.c_str(), &st);
-        printf("%c %8lu  %s\r\n", (S_ISDIR(st.st_mode)) ? 'D':'F', st.st_size, d->d_name);
+        printf("%c %8lu  %s\r\n", (S_ISDIR(st.st_mode)) ? 'd':'-', st.st_size, d->d_name);
     }
 
     closedir(dir);
@@ -376,6 +376,6 @@ namespace ESP32Console::Commands
 
     const ConsoleCommand getEditCommand()
     {
-        return ConsoleCommand("edit", &ESP32Console::Kilo::kilo, "Edit files");
+        return ConsoleCommand("edit", &ute, "Edit files");
     }
 }

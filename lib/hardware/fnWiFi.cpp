@@ -790,7 +790,7 @@ void WiFiManager::_wifi_event_handler(void *arg, esp_event_base_t event_base,
 
                 std::vector<std::string> network_names = pFnWiFi->get_network_names();
                 std::vector<WiFiManager::stored_wifi> stored_wifis = pFnWiFi->get_stored_wifis();
-                std::vector<stored_wifi> common_names = pFnWiFi->match_stored_with_network_wifis(network_names, stored_wifis);
+                std::vector<WiFiManager::stored_wifi> common_names = pFnWiFi->match_stored_with_network_wifis(network_names, stored_wifis);
 
                 // copy the common names to our manager to iterate over
                 std::copy(common_names.begin(), common_names.end(), std::back_inserter(pFnWiFi->_matched_wifis));

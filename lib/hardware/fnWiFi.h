@@ -65,7 +65,6 @@ private:
     uint16_t _common_index = 0;
     std::vector<stored_wifi> _matched_wifis;
 
-    std::vector<std::string> get_network_names();
     std::vector<stored_wifi> get_stored_wifis();
     std::vector<stored_wifi> match_stored_with_network_wifis(std::vector<std::string> network_names, std::vector<stored_wifi> stored_wifis);
 
@@ -99,6 +98,7 @@ public:
     int get_scan_result(uint8_t index, char ssid[32], uint8_t *rssi = NULL,
                         uint8_t *channel = NULL, char bssid[18] = NULL, uint8_t *encryption = NULL);
     std::string get_network_name_by_crc8(uint8_t crc8);
+    std::vector<std::string> get_network_names();
 
     int32_t localIP();
 };

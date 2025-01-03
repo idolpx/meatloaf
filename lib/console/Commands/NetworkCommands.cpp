@@ -8,7 +8,11 @@
 #include "lwip/sockets.h"
 #include <unistd.h>
 #include <esp_wifi.h>
+#include <esp_crc.h>
 
+#include "fnWiFi.h"
+
+#include "string_utils.h"
 
 // static const char *wlstatus2string(wl_status_t status)
 // {
@@ -239,6 +243,34 @@ static int ipconfig(int argc, char **argv)
     return EXIT_SUCCESS;
 }
 
+static int scan(int argc, char **argv)
+{
+    fnWiFi.scan_networks();
+    printf("Found following networks:\r\n");
+    std::vector<std::string> network_names = fnWiFi.get_network_names();
+    for (std::string _network_name: network_names)
+    {
+        uint8_t c_crc8 = esp_crc8_le(0, (uint8_t *)_network_name.c_str(), _network_name.length());
+        printf("[%03d] - %s\r\n", c_crc8, _network_name.c_str());
+    }
+    return EXIT_SUCCESS;
+}
+
+static int connect(int argc, char **argv)
+{
+    if (argc == 3)
+    {
+        std::string network = argv[1];
+        if (mstr::isNumeric(network)) {
+            // Find SSID by CRC8 Number
+            network = fnWiFi.get_network_name_by_crc8(std::stoi(argv[1]));
+        }
+        return fnWiFi.connect(network.c_str(), argv[2]);
+    }
+
+    return fnWiFi.connect();
+}
+
 namespace ESP32Console::Commands
 {
     const ConsoleCommand getPingCommand()
@@ -249,5 +281,15 @@ namespace ESP32Console::Commands
     const ConsoleCommand getIpconfigCommand()
     {
         return ConsoleCommand("ipconfig", &ipconfig, "Show IP and connection informations");
+    }
+
+    const ConsoleCommand getScanCommand()
+    {
+        return ConsoleCommand("scan", &scan, "Scan for wifi networks");
+    }
+
+    const ConsoleCommand getConnectCommand()
+    {
+        return ConsoleCommand("connect", &connect, "Connect to wifi");
     }
 }
