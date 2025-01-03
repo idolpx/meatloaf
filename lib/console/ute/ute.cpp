@@ -39,24 +39,12 @@
 #define CTRL_KEY(k) ((k) & 0x1f)
 // Empty buffer
 #define ABUF_INIT {NULL, 0}
-// Version code
-#define VERSION "0.1.1"
 // Length of a tab stop
 #define TAB_STOP 4
-// Times to press Ctrl-X before exiting
-#define QUIT_TIMES 2
-// Highlight flags
-#define HL_HIGHLIGHT_NUMBERS (1 << 0)
-#define HL_HIGHLIGHT_STRINGS (1 << 1)
+
 // Status print indicators
 #define NO_STATUS false
 #define STATUS_YES true
-// Max Undo/Redo Operations
-// Set to -1 for unlimited Undo
-// Set to 0 to disable Undo
-#define ACTIONS_LIST_MAX_SIZE 0 // 80
-
-typedef struct ActionList ActionList;
 
 /*** Data section ***/
 
@@ -112,7 +100,9 @@ struct editor_config {
     char* copied_char_buffer;
     struct editor_syntax* syntax;
     struct termios orig_termios;
+#ifdef ENABLE_UNDOREDO
     ActionList* actions;
+#endif
 } ec;
 
 // Having a dynamic buffer will allow us to write only one
@@ -137,19 +127,7 @@ enum editor_key {
 };
 
 
-/*** Edit actions ***/
-enum ActionType {
-    CutLine,
-    PasteLine,
-    FlipUp,
-    FlipDown,
-    NewLine,
-    InsertChar,
-    DelChar,
-};
-typedef enum ActionType ActionType;
-
-#if 0
+#ifdef ENABLE_HIGHLIGHT
 enum editor_highlight {
     HL_NORMAL = 0,
     HL_SL_COMMENT,
@@ -471,7 +449,7 @@ int editorReadKey() {
     while ((nread = read(STDIN_FILENO, &c, 1)) != 1) {
         // Ignoring EAGAIN to make it work on Cygwin.
         if (nread == -1 && errno != EAGAIN)
-            editorSetStatusMessage("Error reading input");
+            die("Error reading input");
     }
 
     // Check escape sequences, if first byte
@@ -483,7 +461,7 @@ int editorReadKey() {
             read(STDIN_FILENO, &seq[1], 1) != 1)
                 return '\x1b';
 
-        editorSetStatusMessage("c[%02X] 0[%02X] 1[%02X]", c, seq[0], seq[1]);
+        //editorSetStatusMessage("c[%02X] 0[%02X] 1[%02X]", c, seq[0], seq[1]);
 
         if (seq[0] == '[') {
             if (seq[1] >= '0' && seq[1] <= '9') {
@@ -644,8 +622,9 @@ void consoleBufferClose() {
     editorClearScreen();
 }
 
+#ifdef ENABLE_HIGHLIGHT
 /*** Syntax highlighting ***/
-#if 0
+
 int isSeparator(int c) {
     // strchr() looks to see if any one of the characters in the first string
     // appear in the second string. If so, it returns a pointer to the
@@ -935,7 +914,9 @@ void editorUpdateRow(editor_row* row) {
     row -> render[idx] = '\0';
     row -> render_size = idx;
 
-    //editorUpdateSyntax(row);
+#ifdef ENABLE_HIGHLIGHT
+    editorUpdateSyntax(row);
+#endif
 }
 
 void editorInsertRow(int at, char* s, size_t line_len) {
@@ -1003,11 +984,13 @@ void editorFlipRow(int dir) {
     ec.row[ec.cursor_y].idx += dir;
     ec.row[ec.cursor_y - dir].idx -= dir;
 
+#ifdef ENABLE_HIGHLIGHT
     int first = (dir == 1) ? ec.cursor_y - 1 : ec.cursor_y;
-    // editorUpdateSyntax(&ec.row[first]);
-    // editorUpdateSyntax(&ec.row[first] + 1);
-    // if (ec.num_rows - ec.cursor_y > 2)
-    //   editorUpdateSyntax(&ec.row[first] + 2);
+    editorUpdateSyntax(&ec.row[first]);
+    editorUpdateSyntax(&ec.row[first] + 1);
+    if (ec.num_rows - ec.cursor_y > 2)
+      editorUpdateSyntax(&ec.row[first] + 2);
+#endif
 
     ec.cursor_y -= dir;
     ec.dirty++;
@@ -1021,10 +1004,14 @@ void editorCopy(bool printStatus) {
 
 void editorCut() {
     editorDelRow(ec.cursor_y);
-    // if (ec.num_rows - ec.cursor_y > 0)
-    //     editorUpdateSyntax(&ec.row[ec.cursor_y]);
-    // if (ec.num_rows - ec.cursor_y > 1)
-    //     editorUpdateSyntax(&ec.row[ec.cursor_y + 1]);
+
+#ifdef ENABLE_HIGHLIGHT
+    if (ec.num_rows - ec.cursor_y > 0)
+        editorUpdateSyntax(&ec.row[ec.cursor_y]);
+    if (ec.num_rows - ec.cursor_y > 1)
+        editorUpdateSyntax(&ec.row[ec.cursor_y + 1]);
+#endif
+
     ec.cursor_x = ec.cursor_y == ec.num_rows ? 0 : ec.row[ec.cursor_y].size;
     editorSetStatusMessage("Content cut");
 }
@@ -1205,7 +1192,9 @@ void editorOpen(char* file_name) {
     while ((line_len = __getline(&line, &line_cap, file)) != -1) {
         // We already know each row represents one line of text, there's no need
         // to keep carriage return and newline characters.
-        if (line_len > 0 && (line[line_len - 1] == '\n' || line[line_len - 1] == '\r'))
+        if (line_len > 0 && line[line_len - 1] == '\n')
+            line_len--;
+        if (line_len > 0 && line[line_len - 1] == '\r')
             line_len--;
         editorInsertRow(ec.num_rows, line, line_len);
     }
@@ -1222,14 +1211,13 @@ void editorSave() {
             editorSetStatusMessage("Save aborted");
             return;
         }
-        //editorSelectSyntaxHighlight();
+#ifdef ENABLE_HIGHLIGHT
+        editorSelectSyntaxHighlight();
+#endif
     }
 
-    // We want to create if it doesn't already exist (O_CREAT flag), giving
-    // 0644 permissions (the standard ones). O_RDWR stands for reading and
-    // writing.
-    //int fd = open(ec.file_name, O_RDWR | O_CREAT, 0644);
-    FILE* fd = fopen(ec.file_name, "wb");
+    // We want to create if it doesn't already exist
+    FILE* fd = fopen(ec.file_name, "w+");
     if (!fd) {
         editorSetStatusMessage("Can't save! I/O error: %s", strerror(errno));
         return;
@@ -1256,6 +1244,7 @@ void editorSave() {
 
 /*** Search section ***/
 
+#ifdef ENABLE_SEARCH
 void editorSearchCallback(char* query, int key) {
     // Index of the row that the last match was on, -1 if there was
     // no last match.
@@ -1263,14 +1252,16 @@ void editorSearchCallback(char* query, int key) {
     // 1 for searching forward and -1 for searching backwards.
     static int direction = 1;
 
-    // static int saved_highlight_line;
-    // static char* saved_hightlight = NULL;
+#ifdef ENABLE_HIGHLIGHT
+    static int saved_highlight_line;
+    static char* saved_hightlight = NULL;
 
-    // if (saved_hightlight) {
-    //     memcpy(ec.row[saved_highlight_line].highlight, saved_hightlight, ec.row[saved_highlight_line].render_size);
-    //     free(saved_hightlight);
-    //     saved_hightlight = NULL;
-    // }
+    if (saved_hightlight) {
+        memcpy(ec.row[saved_highlight_line].highlight, saved_hightlight, ec.row[saved_highlight_line].render_size);
+        free(saved_hightlight);
+        saved_hightlight = NULL;
+    }
+#endif
 
     // Checking if the user pressed Enter or Escape, in which case
     // they are leaving search mode so we return immediately.
@@ -1314,10 +1305,12 @@ void editorSearchCallback(char* query, int key) {
             // be at the very top of the screen.
             ec.row_offset = ec.num_rows;
 
-            // saved_highlight_line = current;
-            // saved_hightlight = (char*)malloc(row -> render_size);
-            // memcpy(saved_hightlight, row -> highlight, row -> render_size);
-            // memset(&row -> highlight[match - row -> render], HL_MATCH, strlen(query));
+#ifdef ENABLE_HIGHLIGHT
+            saved_highlight_line = current;
+            saved_hightlight = (char*)malloc(row -> render_size);
+            memcpy(saved_hightlight, row -> highlight, row -> render_size);
+            memset(&row -> highlight[match - row -> render], HL_MATCH, strlen(query));
+#endif
             break;
         }
     }
@@ -1342,17 +1335,9 @@ void editorSearch() {
         ec.row_offset = saved_row_offset;
     }
 }
+#endif
 
 /*** Action section ***/
-
-typedef struct Action Action;
-struct Action {
-    ActionType t;
-    int cpos_x;
-    int cpos_y;
-    bool cursor_on_tilde;
-    char* string;
-};
 
 Action* createAction(char* str, ActionType t) {
     Action* newAction = (Action*)malloc(sizeof(Action));
@@ -1438,6 +1423,7 @@ void execute(Action* action) {
     }
 }
 
+#ifdef ENABLE_UNDOREDO
 void revert(Action *action) {
     if(!action) return;
     switch(action->t) {
@@ -1511,20 +1497,6 @@ void revert(Action *action) {
         default: break;
     }
 }
-
-typedef struct AListNode AListNode;
-struct AListNode {
-    Action* action;
-    AListNode* next;
-    AListNode* prev;
-};
-
-struct ActionList {
-    AListNode* head;
-    AListNode* tail;
-    AListNode* current;
-    int size;
-};
 
 ActionList* actionListInit() {
     ActionList* list = (ActionList*)malloc(sizeof(ActionList));
@@ -1667,6 +1639,12 @@ void redo() {
         execute(list->current->action);
     }
 }
+#else
+void makeAction(ActionType t, char* str) {
+    Action* newAction = createAction(str, t);
+    execute(newAction);
+}
+#endif
 
 /*** Append buffer section **/
 
@@ -1825,8 +1803,10 @@ void editorDrawRows(struct a_buf* ab) {
                 len = ec.screen_cols;
 
             char* c = &ec.row[file_row].render[ec.col_offset];
+#ifdef ENABLE_HIGHLIGHT
             unsigned char* highlight = &ec.row[file_row].highlight[ec.col_offset];
             int current_color = -1;
+#endif
             int j;
             for (j = 0; j < len; j++) {
                 // Displaying nonprintable characters as (A-Z, @, and ?).
@@ -1835,28 +1815,31 @@ void editorDrawRows(struct a_buf* ab) {
                     abufAppend(ab, "\x1b[7m", 4);
                     abufAppend(ab, &sym, 1);
                     abufAppend(ab, "\x1b[m", 3);
+#ifdef ENABLE_HIGHLIGHT
                     if (current_color != -1) {
                         char buf[16];
                         int c_len = snprintf(buf, sizeof(buf), "\x1b[%dm", current_color);
                         abufAppend(ab, buf, c_len);
                     }
-                // } else if (highlight[j] == HL_NORMAL) {
-                //     if (current_color != -1) {
-                //         abufAppend(ab, "\x1b[39m", 5);
-                //         current_color = -1;
-                //     }
-                //     abufAppend(ab, &c[j], 1);
+                } else if (highlight[j] == HL_NORMAL) {
+                    if (current_color != -1) {
+                        abufAppend(ab, "\x1b[39m", 5);
+                        current_color = -1;
+                    }
+                    abufAppend(ab, &c[j], 1);
+#endif
                 } else {
-                    // int color = editorSyntaxToColor(highlight[j]);
-                    // // We only use escape sequence if the new color is different
-                    // // from the last character's color.
-                    // if (color != current_color) {
-                    //     current_color = color;
-                    //     char buf[16];
-                    //     int c_len = snprintf(buf, sizeof(buf), "\x1b[%dm", color);
-                    //     abufAppend(ab, buf, c_len);
-                    // }
-
+#ifdef ENABLE_HIGHLIGHT
+                    int color = editorSyntaxToColor(highlight[j]);
+                    // We only use escape sequence if the new color is different
+                    // from the last character's color.
+                    if (color != current_color) {
+                        current_color = color;
+                        char buf[16];
+                        int c_len = snprintf(buf, sizeof(buf), "\x1b[%dm", color);
+                        abufAppend(ab, buf, c_len);
+                    }
+#endif
                     abufAppend(ab, &c[j], 1);
                 }
             }
@@ -1996,30 +1979,27 @@ void editorMoveCursor(int key) {
 }
 
 int editorProcessKeypress() {
-    static int quit_times = QUIT_TIMES;
 
     int c = editorReadKey();
-    editorSetStatusMessage("c[%02X]", c);
+    //editorSetStatusMessage("c[%04X] del[%04X]", c, DEL_KEY);
 
     switch (c) {
         case '\r': // Enter key
             makeAction(NewLine, NULL);
             break;
-        case CTRL_KEY('x'):
-            if (ec.dirty && quit_times > 0) {
-                editorSetStatusMessage("Warning! File has unsaved changes. Press Ctrl-Q %d more time%s to exit", quit_times, quit_times > 1 ? "s" : "");
-                quit_times--;
-                return 1;
-            }
-            editorClearScreen();
-            freeAlist();
-            consoleBufferClose();
-            return 0; // EXIT
-        case CTRL_KEY('s'):
         case CTRL_KEY('o'):
             editorSetStatusMessage("Ctrl-O! Trying to save!");
             editorSave();
             break;
+        case CTRL_KEY('x'):
+            if (ec.dirty) {
+                editorSetStatusMessage("Warning! File has unsaved changes. Save Now?");
+                editorRefreshScreen();
+                int c = editorReadKey();
+                if (c == 'y')
+                    editorSave();
+            }
+            return 0; // EXIT
         case CTRL_KEY('e'):
             if (ec.cursor_y > 0 && ec.cursor_y <= ec.num_rows - 1)
                 makeAction(FlipUp, NULL);
@@ -2081,9 +2061,11 @@ int editorProcessKeypress() {
             if (ec.cursor_y < ec.num_rows)
                 ec.cursor_x = ec.row[ec.cursor_y].size;
             break;
+#ifdef ENABLE_SEARCH
         case CTRL_KEY('w'):
             editorSearch();
             break;
+#endif
         case BACKSPACE:
         case CTRL_KEY('h'):
         case DEL_KEY:
@@ -2097,6 +2079,7 @@ int editorProcessKeypress() {
             }
             break;
         case CTRL_KEY('l'):
+            // Resize/redraw the screen
             editorHandleSigwinch();
             break;
         case '\x1b': // Escape key
@@ -2111,18 +2094,19 @@ int editorProcessKeypress() {
                 else makeAction(InsertChar, strndup((char*) &c, 1));
             }
             break;
+#ifdef ENABLE_UNDOREDO
         case CTRL_KEY('z'):
             undo();
             break;
         case CTRL_KEY('y'):
             redo();
             break;
+#endif
         default:
             makeAction(InsertChar, strndup((char*) &c, 1));
             break;
     }
 
-    quit_times = QUIT_TIMES;
     return 1; // OK
 }
 
@@ -2144,7 +2128,9 @@ void initEditor() {
     ec.status_msg_time = 0;
     ec.copied_char_buffer = NULL;
     ec.syntax = NULL;
+#ifdef ENABLE_UNDOREDO
     ec.actions = actionListInit();
+#endif
 
     editorUpdateWindowSize();
     // The SIGWINCH signal is sent to a process when its controlling
@@ -2216,7 +2202,7 @@ int ute(int argc, char* argv[]) {
 
     if (argc != 2)
     {
-        fprintf(stderr, "Usage: edit <filename>\n");
+        fprintf(stderr, "Usage: ute <filename>\n");
         return 1;
     }
 
@@ -2238,8 +2224,11 @@ int ute(int argc, char* argv[]) {
     while (editorProcessKeypress()) {
         editorRefreshScreen();
     }
+    consoleBufferClose();
     editorFreeRows();
+#ifdef ENABLE_UNDOREDO
+    freeAlist();
+#endif
 
-    linenoiseClearScreen();
     return 0;
 }
