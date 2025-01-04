@@ -256,8 +256,9 @@ int rm(int argc, char **argv)
 
     char filename[PATH_MAX];
     ESP32Console::console_realpath(argv[1], filename);
+    //Debug_printv("filename[%s]", filename);
 
-    if ( mstr::endsWith(filename, (char *)"*", false) )
+    if ( strlen(filename) > 1 && filename[strlen(filename) - 1] == '*' )
     {
         char path[PATH_MAX];
         ESP32Console::console_realpath(".", path);
@@ -268,15 +269,19 @@ int rm(int argc, char **argv)
         {
             std::string pattern = filename;
             std::string match_file = path;
-            match_file += "/";
+            if (strlen(path) > 1)
+                match_file += "/";
             match_file += d->d_name;
+            //Debug_printv("pattern[%s] match_file[%s]", pattern.c_str(), match_file.c_str());
             if ( mstr::compare(pattern, match_file, false) )
             {
-                printf("%s deleted\r\n", d->d_name);
                 if (remove(match_file.c_str()))
                 {
-                    fprintf(stderr, "Error deleting %s: %s\r\n", filename, strerror(errno));
+                    fprintf(stderr, "Error removing %s: %s\r\n", filename, strerror(errno));
+                    closedir(dir);
+                    return EXIT_FAILURE;
                 }
+                printf("%s removed\r\n", d->d_name);
             }
         }
         closedir(dir);
@@ -284,8 +289,10 @@ int rm(int argc, char **argv)
     else
     {
         if(remove(filename)) {
-            fprintf(stderr, "Error deleting %s: %s\r\n", filename, strerror(errno));
+            fprintf(stderr, "Error removing %s: %s\r\n", filename, strerror(errno));
+            return EXIT_FAILURE;
         }
+        printf("%s removed\r\n", filename);
     }
 
     return EXIT_SUCCESS;

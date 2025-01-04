@@ -200,8 +200,8 @@ void main_setup()
     DISPLAY.start();
 #endif
 
-#ifdef ENABLE_SOUND
-    mlSoundManager.setup(); // start sound
+#ifdef ENABLE_AUDIO
+    AUDIO.start(); // start sound
 #endif
 
 #ifdef DEBUG

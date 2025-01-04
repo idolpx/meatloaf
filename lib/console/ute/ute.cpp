@@ -2230,5 +2230,6 @@ int ute(int argc, char* argv[]) {
     freeAlist();
 #endif
 
+    linenoiseClearScreen();
     return 0;
 }
