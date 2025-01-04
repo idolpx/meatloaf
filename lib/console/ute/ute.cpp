@@ -1147,9 +1147,10 @@ char* editorRowsToString(size_t* buf_len) {
     // to each one for the newline character we'll add to
     // the end of each line.
     for (j = 0; j < ec.num_rows; j++) {
-        total_len += ec.row[j].size + 1;
+        //total_len += ec.row[j].size + 1; // '\n'
+        total_len += ec.row[j].size + 2;   // '\r\n'
     }
-    *buf_len = total_len;
+    *buf_len = (total_len - 2);
 
     char* buf = (char*)malloc(total_len);
     char* p = buf;
@@ -1158,9 +1159,14 @@ char* editorRowsToString(size_t* buf_len) {
     // row.
     for (j = 0; j < ec.num_rows; j++) {
         memcpy(p, ec.row[j].chars, ec.row[j].size);
-        p += ec.row[j].size;
-        *p = '\n';
-        p++;
+        if ((j + 1) < ec.num_rows) // Don't add CRLF to last row
+        {
+            p += ec.row[j].size;
+            *p = '\r';
+            p++;
+            *p = '\n';
+            p++;
+        }
     }
 
     return buf;
@@ -1175,7 +1181,9 @@ void editorOpen(char* file_name) {
     free(ec.file_name);
     ec.file_name = strdup(file_name);
 
-    //editorSelectSyntaxHighlight();
+#ifdef ENABLE_HIGHLIGHT
+    editorSelectSyntaxHighlight();
+#endif
 
     // If the file dosen't exist, create it, otherwise just open it
     const char *mode = fileExists(file_name) ? "r+" : "w+";
@@ -1743,25 +1751,25 @@ void editorDrawMessageBar(struct a_buf *ab) {
         abufAppend(ab, ec.status_msg, msg_len);
 }
 
-void editorDrawWelcomeMessage(struct a_buf* ab) {
-    char welcome[80];
-    // Using snprintf to truncate message in case the terminal
-    // is too tiny to handle the entire string.
-    int welcome_len = snprintf(welcome, sizeof(welcome),
-        "uTE %s <https://github.com/idolpx/ute>", VERSION);
-    if (welcome_len > ec.screen_cols)
-        welcome_len = ec.screen_cols;
-    // Centering the message.
-    int padding = (ec.screen_cols - welcome_len) / 2;
-    // Remember that everything != 0 is true.
-    if (padding) {
-        abufAppend(ab, "~", 1);
-        padding--;
-    }
-    while (padding--)
-        abufAppend(ab, " ", 1);
-    abufAppend(ab, welcome, welcome_len);
-}
+// void editorDrawWelcomeMessage(struct a_buf* ab) {
+//     char welcome[80];
+//     // Using snprintf to truncate message in case the terminal
+//     // is too tiny to handle the entire string.
+//     int welcome_len = snprintf(welcome, sizeof(welcome),
+//         "uTE %s <https://github.com/idolpx/ute>", VERSION);
+//     if (welcome_len > ec.screen_cols)
+//         welcome_len = ec.screen_cols;
+//     // Centering the message.
+//     int padding = (ec.screen_cols - welcome_len) / 2;
+//     // Remember that everything != 0 is true.
+//     if (padding) {
+//         abufAppend(ab, "~", 1);
+//         padding--;
+//     }
+//     while (padding--)
+//         abufAppend(ab, " ", 1);
+//     abufAppend(ab, welcome, welcome_len);
+// }
 
 // The ... argument makes editorSetStatusMessage() a variadic function,
 // meaning it can take any number of arguments. C's way of dealing with
@@ -1788,9 +1796,9 @@ void editorDrawRows(struct a_buf* ab) {
     for (y = 0; y < ec.screen_rows; y++) {
         int file_row = y + ec.row_offset;
         if(file_row >= ec.num_rows) {
-            if (ec.num_rows == 0 && y == ec.screen_rows / 3)
-                editorDrawWelcomeMessage(ab);
-            else
+            // if (ec.num_rows == 0 && y == ec.screen_rows / 3)
+            //     editorDrawWelcomeMessage(ab);
+            // else
                 abufAppend(ab, "~", 1);
         } else {
             int len = ec.row[file_row].render_size - ec.col_offset;

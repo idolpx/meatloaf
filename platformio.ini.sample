@@ -285,7 +285,6 @@ board = esp32-s3fh4r2
 build_flags =
     ${env.build_flags}
     -D PINMAP_ESP32_S3_ZERO
-    ;-D RGB_LED_STRIP
 
 [env:esp32-s3-super-mini]
 extends = esp32_base
@@ -293,7 +292,6 @@ board = esp32-s3fh4r2
 build_flags =
     ${env.build_flags}
     -D PINMAP_ESP32_S3_SUPER_MINI
-    ;-D RGB_LED_STRIP
 
 ; ESP32-C3
 [env:esp32-c3-super-mini]
