@@ -214,10 +214,10 @@ namespace ESP32Console
 
         /* This message shall be printed here and not earlier as the stdout
          * has just been set above. */
-        printf("\r\n"
-               "Type 'help' to get the list of commands.\r\n"
-               "Use UP/DOWN arrows to navigate through command history.\r\n"
-               "Press TAB when typing command name to auto-complete.\r\n");
+        // printf("\r\n"
+        //        "Type 'help' to get the list of commands.\r\n"
+        //        "Use UP/DOWN arrows to navigate through command history.\r\n"
+        //        "Press TAB when typing command name to auto-complete.\r\n");
 
         // Probe terminal status
         int probe_status = linenoiseProbe();
@@ -226,13 +226,13 @@ namespace ESP32Console
             linenoiseSetDumbMode(1);
         }
 
-        if (linenoiseIsDumbMode())
-        {
-            printf("\r\n"
-                   "Your terminal application does not support escape sequences.\n\n"
-                   "Line editing and history features are disabled.\n\n"
-                   "On Windows, try using Putty instead.\r\n");
-        }
+        // if (linenoiseIsDumbMode())
+        // {
+        //     printf("\r\n"
+        //            "Your terminal application does not support escape sequences.\n\n"
+        //            "Line editing and history features are disabled.\n\n"
+        //            "On Windows, try using Putty instead.\r\n");
+        // }
 
         linenoiseSetMaxLineLen(console.max_cmdline_len_);
         while (true)

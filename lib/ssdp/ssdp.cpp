@@ -15,20 +15,39 @@
 
 SSDPDeviceClass SSDPDevice;
 
-static void ssdp_service_task(void* arg)
+static void ssdp_service_task(void* args)
 {
+	SSDPDeviceClass *d = (SSDPDeviceClass *)args;
     while ( true ) 
     {
-        SSDPDevice.service();
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
+        d->service();
+        vTaskDelay((SSDP_INTERVAL * 1000) / portTICK_PERIOD_MS);
+		//vTaskDelay(5000 / portTICK_PERIOD_MS);
+		//taskYIELD();
     }
 }
 
+void SSDPDeviceClass::notify_timer(void* args)
+{
+	SSDPDeviceClass *d = (SSDPDeviceClass *)args;
+	d->postNotifyALive();
+}
 
 void SSDPDeviceClass::start()
 {
     // Start task
-    xTaskCreatePinnedToCore(ssdp_service_task, "ssdp_service_task", 4096, NULL, 10, NULL, 0);
+    xTaskCreatePinnedToCore(ssdp_service_task, "ssdp_service_task", 4096, this, 5, NULL, 0);
+
+	// // Start notify timer
+	// const esp_timer_create_args_t timer_args = {
+	// 	.callback = &SSDPDeviceClass::notify_timer,
+	// 	.arg = this,
+	// 	.dispatch_method = ESP_TIMER_TASK,
+	// 	.name = "ssdp_notify_timer"
+	// };
+	// esp_timer_handle_t periodic_timer;
+	// esp_timer_create(&timer_args, &periodic_timer);
+	// esp_timer_start_periodic(periodic_timer, (SSDP_INTERVAL * 1000));
 }
 
 SSDPDeviceClass::SSDPDeviceClass() :
@@ -48,13 +67,12 @@ SSDPDeviceClass::SSDPDeviceClass() :
 	m_manufacturerURL[0] = '\0';
 	sprintf(m_schemaURL, "device.xml");
 
-	// Get the base MAC address from different sources
-    uint8_t base_mac_addr[6] = {0};
-    // Get base MAC address from EFUSE BLK0(default option)
-    esp_base_mac_addr_get(base_mac_addr);
+	// // Get the base MAC address from different sources
+    // uint8_t base_mac_addr[6] = {0};
+    // // Get base MAC address from EFUSE BLK0(default option)
+    // esp_base_mac_addr_get(base_mac_addr);
 
-	sprintf(m_uuid, "38323636-4558-4dda-9188-cda0e6%02x%02x%02x",
-		base_mac_addr[3], base_mac_addr[4], base_mac_addr[5]);
+	sprintf(m_uuid, "uuid:meatloaf:ecp:%s", fnWiFi.get_mac_str().c_str());
 
 	for (int i = 0; i < SSDP_QUEUE_SIZE; i++) {
 		m_queue[i].time = 0;
@@ -215,24 +233,22 @@ void SSDPDeviceClass::send(ssdp_send_parameters_t *parameters) {
 			break;
 	}
 
-	std::string uuid = "uuid:" + std::string(m_uuid);
-
 	switch (parameters->udn) {
 		case ROOT_FOR_ALL:
 			uri = "upnp:rootdevice";
-			usn1 = uuid.c_str();
+			usn1 = m_uuid;
 			usn2 = "::";
 			usn3 = "upnp:rootdevice";
 			break;
 		case ROOT_BY_UUID:
-			uri = uuid.c_str();
-			usn1 = uuid.c_str();
+			uri = m_uuid;
+			usn1 = m_uuid;
 			usn2 = "";
 			usn3 = "";
 			break;
 		case ROOT_BY_TYPE:
 			uri = m_deviceType;
-			usn1 = uuid.c_str();
+			usn1 = m_uuid;
 			usn2 = "::";
 			usn3 = m_deviceType;
 			break;
@@ -329,7 +345,7 @@ void SSDPDeviceClass::service() {
 				else if (equals(st.c_str(), "upnp:rootdevice")) {
 					postResponse(ROOT_FOR_ALL, mx);
 				}
-				else if (equals(st.c_str(), ("uuid:" + std::string(m_uuid)).c_str())) {
+				else if (equals(st.c_str(), m_uuid)) {
 					postResponse(ROOT_BY_UUID, mx);
 				}
 				else if (equals(st.c_str(), m_deviceType)) {

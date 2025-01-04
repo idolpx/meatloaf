@@ -73,7 +73,7 @@ esp_err_t cHttpdServer::get_handler(httpd_req_t *httpd_req)
     {
         uri = "/index.html";
     }
-    Debug_printv("uri[%s]", uri.c_str());
+    //Debug_printv("uri[%s]", uri.c_str());
 
     // Remove query string from uri
     uri = uri.substr(0, uri.find("?"));
@@ -547,7 +547,7 @@ void cHttpdServer::send_file(httpd_req_t *req, const char *filename)
     serverstate *pState = (serverstate *)httpd_get_global_user_ctx(req->handle);
     FILE *file = pState->_FS->file_open(fpath.c_str());
 
-    Debug_printv("filename[%s]", filename);
+    //Debug_printv("filename[%s]", filename);
     if (file == nullptr)
     {
         Debug_printv("Failed to open file for sending: [%s]", fpath.c_str());
@@ -583,7 +583,7 @@ void cHttpdServer::send_file_parsed(httpd_req_t *req, const char *filename)
 
     int err = 200;
 
-    Debug_printv("filename[%s]", filename);
+    //Debug_printv("filename[%s]", filename);
 
     // Retrieve server state
     serverstate *pState = (serverstate *)httpd_get_global_user_ctx(req->handle);

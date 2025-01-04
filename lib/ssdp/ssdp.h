@@ -31,7 +31,7 @@
     pip44(ipaddr)
 
 
-#define SSDP_INTERVAL     1200
+#define SSDP_INTERVAL     3600
 #define SSDP_PORT         1900
 //#define SSDP_METHOD_SIZE  10
 //#define SSDP_URI_SIZE     2
@@ -167,6 +167,8 @@ private:
 	ssdp_send_parameters_t m_queue[SSDP_QUEUE_SIZE];
 
 protected:
+	static void notify_timer(void* args);
+
 	bool readLine(std::string &value);
 	bool readKeyValue(std::string &key, std::string &value);
 

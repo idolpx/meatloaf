@@ -7,9 +7,9 @@
 // Version code
 #define VERSION "1.0.1"
 
-//#define ENABLE_HIGHLIGHT
-//#define ENABLE_UNDOREDO
-//#define ENABLE_SEARCH
+#define ENABLE_HIGHLIGHT
+#define ENABLE_UNDOREDO
+#define ENABLE_SEARCH
 
 #ifdef ENABLE_HIGHLIGHT
 // Highlight flags
