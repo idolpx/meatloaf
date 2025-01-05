@@ -31,6 +31,7 @@
 
 #include "../Helpers/PWDHelpers.h"
 #include "linenoise/linenoise.h"
+#include "string_utils.h"
 
 /*** Define section ***/
 
@@ -450,6 +451,13 @@ int editorReadKey() {
         // Ignoring EAGAIN to make it work on Cygwin.
         if (nread == -1 && errno != EAGAIN)
             die("Error reading input");
+    }
+
+    // If we get a carriage return, check for line feed after
+    if (c == '\r') {
+        char c2;
+        read(STDIN_FILENO, &c2, 1);
+        return c;
     }
 
     // Check escape sequences, if first byte
@@ -917,6 +925,8 @@ void editorUpdateRow(editor_row* row) {
 #ifdef ENABLE_HIGHLIGHT
     editorUpdateSyntax(row);
 #endif
+
+    //editorSetStatusMessage("[%s]", mstr::toHex((uint8_t*)row->chars, row->size).c_str());
 }
 
 void editorInsertRow(int at, char* s, size_t line_len) {
@@ -1250,9 +1260,8 @@ void editorSave() {
     return;
 }
 
-/*** Search section ***/
-
 #ifdef ENABLE_SEARCH
+/*** Search section ***/
 void editorSearchCallback(char* query, int key) {
     // Index of the row that the last match was on, -1 if there was
     // no last match.
