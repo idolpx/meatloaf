@@ -20,19 +20,46 @@
 
 char *canonicalize_file_name(const char *path);
 
+std::string read_until(char delimiter)
+{
+    uint8_t byte = 0;
+    std::string response;
+    while (byte != delimiter)
+    {
+        size_t size = 0;
+        uart_get_buffered_data_len(CONSOLE_UART, &size);
+        if (size > 0)
+        {
+            int result = uart_read_bytes(CONSOLE_UART, &byte, 1, MAX_READ_WAIT_TICKS);
+            if (result < 1)
+            {
+                fprintf(stdout, "3 Error: Response Timeout\r\n");
+                return "";
+            }
+
+            if (byte != delimiter)
+                response.push_back(byte);
+        }
+    }
+    return response;
+}
+
 int rx(int argc, char **argv)
 {
-    // rx {filename} {size} {checksum}
-    if (argc != 4)
+    // rx {filename}
+    if (argc != 2)
     {
-        fprintf(stderr, "rx {filename} {size} {checksum}\r\n");
+        fprintf(stderr, "rx {filename}\r\n");
         return EXIT_SUCCESS;
     }
 
     char filename[PATH_MAX];
     ESP32Console::console_realpath(argv[1], filename);
-    int size = atoi(argv[2]);
-    std::string src_checksum = argv[3];
+
+    // get file size and checksum
+    std::string s = read_until(' ');
+    int size = atoi(s.c_str());
+    std::string src_checksum = read_until('\n');
 
     FILE *file = fopen(filename, "w");
     if (file == nullptr)
@@ -133,24 +160,7 @@ int tx(int argc, char **argv)
     fprintf(stdout, "\r\n");
 
     // Read response
-    uint8_t byte = 0;
-    std::string response;
-    while (byte != '\n')
-    {
-        size_t size = 0;
-        uart_get_buffered_data_len(CONSOLE_UART, &size);
-        if (size > 0)
-        {
-            int result = uart_read_bytes(CONSOLE_UART, &byte, 1, MAX_READ_WAIT_TICKS);
-            if (result < 1)
-            {
-                fprintf(stdout, "3 Error: Response Timeout\r\n");
-                return 3;
-            }
-
-            response.push_back(byte);
-        }
-    }
+    std::string response = read_until('\n');
 
     if (!mstr::startsWith(response, "0 OK"))
     {
