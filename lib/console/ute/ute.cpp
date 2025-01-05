@@ -2235,7 +2235,8 @@ int ute(int argc, char* argv[]) {
     initEditor();
     editorOpen(filename);
     enableRawMode();
-    editorSetStatusMessage(" Ctrl-X to exit | Ctrl-O to save");
+    editorSetStatusMessage(" Ctrl-X to exit");
+    //editorSetStatusMessage(" Ctrl-X to exit | Ctrl-O to save");
     editorRefreshScreen();
 
     while (editorProcessKeypress()) {
