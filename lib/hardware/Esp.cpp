@@ -151,30 +151,38 @@ uint32_t EspClass::getMaxAllocHeap(void) {
 }
 
 uint32_t EspClass::getPsramSize(void) {
+#ifdef PSRAM_SIZE
     if (esp_psram_is_initialized()) {
         return heap_caps_get_total_size(MALLOC_CAP_SPIRAM);
     }
+#endif
     return 0;
 }
 
 uint32_t EspClass::getFreePsram(void) {
+#ifdef PSRAM_SIZE
     if (esp_psram_is_initialized()) {
         return heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
     }
+#endif
     return 0;
 }
 
 uint32_t EspClass::getMinFreePsram(void) {
+#ifdef PSRAM_SIZE
     if (esp_psram_is_initialized()) {
         return heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM);
     }
+#endif
     return 0;
 }
 
 uint32_t EspClass::getMaxAllocPsram(void) {
+#ifdef PSRAM_SIZE
     if (esp_psram_is_initialized()) {
         return heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM);
     }
+#endif
     return 0;
 }
 
