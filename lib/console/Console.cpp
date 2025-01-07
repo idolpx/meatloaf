@@ -51,6 +51,7 @@ namespace ESP32Console
         registerCommand(getIpconfigCommand());
         registerCommand(getScanCommand());
         registerCommand(getConnectCommand());
+        registerCommand(getIMPROVCommand());
     }
 
     void Console::registerVFSCommands()
@@ -250,7 +251,7 @@ namespace ESP32Console
                 continue;
             }
 
-            //Debug_printv("Line received from linenoise: %s\n", line);
+            //Debug_printv("Line received from linenoise: [%s]\n", line);
 
             // /* Add the command to the history */
             // linenoiseHistoryAdd(line);
@@ -263,17 +264,15 @@ namespace ESP32Console
 
             //Interpolate the input line
             std::string interpolated_line = interpolateLine(line);
-            //Debug_printv("Interpolated line: %s\n", interpolated_line.c_str());
+            //Debug_printv("Interpolated line: [%s]\n", interpolated_line.c_str());
 
-            // Read trailing CR
-            //uint8_t byte;
-            //uart_read_bytes(CONSOLE_UART, &byte, 1, MAX_READ_WAIT_TICKS);
+            // Flush trailing CR
             uart_flush(CONSOLE_UART);
 
             /* Try to run the command */
             int ret;
             esp_err_t err = esp_console_run(interpolated_line.c_str(), &ret);
-            
+
             //Reset global state
             resetAfterCommands();
 

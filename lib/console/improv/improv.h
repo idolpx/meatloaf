@@ -1,3 +1,7 @@
+// C++ SDK for Improv Wi-Fi
+// https://github.com/improv-wifi/sdk-cpp
+//
+
 #pragma once
 
 #ifdef ARDUINO

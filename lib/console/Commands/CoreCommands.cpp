@@ -9,7 +9,7 @@
 
 static int clear(int argc, char **argv)
 {
-    // If we are on a dumb erminal clearing does not work
+    // If we are on a dumb terminal clearing does not work
     if (linenoiseProbe())
     {
         printf("\r\nYour terminal does not support escape sequences. Clearing screen does not work!\r\n");

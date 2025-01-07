@@ -10,6 +10,9 @@ namespace ESP32Console
         std::string in(in_);
         std::string out = in;
 
+        // Add a space so this can be processed as a command
+        mstr::replaceAll(out, "IMPROV", "improv ");
+
         // Add a space at end of line, this does not change anything for our consoleLine and makes parsing easier
         in = in + " ";
 

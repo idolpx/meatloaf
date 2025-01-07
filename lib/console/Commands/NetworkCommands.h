@@ -11,4 +11,6 @@ namespace ESP32Console::Commands
     const ConsoleCommand getScanCommand();
 
     const ConsoleCommand getConnectCommand();
+
+    const ConsoleCommand getIMPROVCommand();
 }

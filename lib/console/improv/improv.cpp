@@ -96,7 +96,8 @@ bool parse_improv_serial_byte(size_t position, uint8_t byte, const uint8_t *buff
 
     if (type == TYPE_RPC) {
       auto command = parse_improv_data(&buffer[9], data_len, false);
-      return callback(command);
+      //return callback(command);
+      return true;
     }
   }
 

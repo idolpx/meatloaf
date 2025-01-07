@@ -10,9 +10,11 @@
 #include <esp_wifi.h>
 #include <esp_crc.h>
 
+#include "device.h"
 #include "fnWiFi.h"
 
 #include "string_utils.h"
+#include "../improv/improv.h"
 
 // static const char *wlstatus2string(wl_status_t status)
 // {
@@ -55,6 +57,8 @@ const char* wlmode2string(wifi_mode_t mode)
     }
 }
 
+
+// Ping Functions
 static void on_ping_success(esp_ping_handle_t hdl, void *args)
 {
     uint8_t ttl;
@@ -209,11 +213,12 @@ static int ping(int argc, char **argv)
     return EXIT_SUCCESS;
 }
 
+
 static void ipconfig_wlan()
 {
     printf("==== WLAN ====\r\n");
-    // auto status = WiFi.status();
-    // printf("Mode: %s\r\n", wlmode2string(WiFi.getMode()));
+    // auto status = fnWiFi.status();
+    // printf("Mode: %s\r\n", wlmode2string(fnWiFi.getMode()));
     // printf("Status: %s\r\n", wlstatus2string(status));
 
     // if (status == WL_NO_SHIELD) {
@@ -221,12 +226,12 @@ static void ipconfig_wlan()
     // }
     
     // printf("\r\n");
-    // printf("SSID: %s\r\n", WiFi.SSID().c_str());
-    // printf("BSSID: %s\r\n", WiFi.BSSIDstr().c_str());
-    // printf("Channel: %d\r\n", WiFi.channel());
+    // printf("SSID: %s\r\n", fnWiFi.get_current_ssid().c_str());
+    // printf("BSSID: %s\r\n", fnWiFi.get_current_bssid_str().c_str());
+    // //printf("Channel: %d\r\n", fnWiFi.channel());
 
     // printf("\r\n");
-    // printf("IP: %s\r\n", WiFi.localIP().toString().c_str());
+    // printf("IP: %s\r\n", fnWiFi.localIP().toString().c_str());
     // printf("Subnet Mask: %s (/%d)\r\n", WiFi.subnetMask().toString().c_str(), WiFi.subnetCIDR());
     // printf("Gateway: %s\r\n", WiFi.gatewayIP().toString().c_str());
     // printf("IPv6: %s\r\n", WiFi.localIPv6().toString().c_str());
@@ -265,10 +270,228 @@ static int connect(int argc, char **argv)
             // Find SSID by CRC8 Number
             network = fnWiFi.get_network_name_by_crc8(std::stoi(argv[1]));
         }
-        return fnWiFi.connect(network.c_str(), argv[2]);
+        int e = ( fnWiFi.connect(network.c_str(), argv[2]) );
+
+        if ( e == ESP_OK)
+            Meatloaf.persist_wifi(network, argv[2]);
+
+        return e;
     }
 
     return fnWiFi.connect();
+}
+
+
+
+// *** Improv
+
+std::vector<std::string> getLocalUrl() {
+  return {
+    // URL where user can finish onboarding or use device
+    // Recommended to use website hosted by device
+    std::string("http://meatloaf.local")
+  };
+}
+
+void serial_write(std::vector<uint8_t> &data) { 
+    // print buffer bytes
+    for (int i = 0; i < data.size(); i++) {
+        fprintf(stdout, "%c", data[i]);
+    }
+}
+
+
+void set_state(improv::State state) {  
+  
+  std::vector<uint8_t> data = {'I', 'M', 'P', 'R', 'O', 'V'};
+  data.resize(11);
+  data[6] = improv::IMPROV_SERIAL_VERSION;
+  data[7] = improv::TYPE_CURRENT_STATE;
+  data[8] = 1;
+  data[9] = state;
+
+  uint8_t checksum = 0x00;
+  for (uint8_t d : data)
+    checksum += d;
+  data[10] = checksum;
+
+  serial_write(data);
+}
+
+
+void send_response(std::vector<uint8_t> &response) {
+  std::vector<uint8_t> data = {'I', 'M', 'P', 'R', 'O', 'V'};
+  data.resize(9);
+  data[6] = improv::IMPROV_SERIAL_VERSION;
+  data[7] = improv::TYPE_RPC_RESPONSE;
+  data[8] = response.size();
+  data.insert(data.end(), response.begin(), response.end());
+
+  uint8_t checksum = 0x00;
+  for (uint8_t d : data)
+    checksum += d;
+  data.push_back(checksum);
+
+  serial_write(data);
+}
+
+void set_error(improv::Error error) {
+  std::vector<uint8_t> data = {'I', 'M', 'P', 'R', 'O', 'V'};
+  data.resize(11);
+  data[6] = improv::IMPROV_SERIAL_VERSION;
+  data[7] = improv::TYPE_ERROR_STATE;
+  data[8] = 1;
+  data[9] = error;
+
+  uint8_t checksum = 0x00;
+  for (uint8_t d : data)
+    checksum += d;
+  data[10] = checksum;
+
+  serial_write(data);
+}
+
+void getAvailableWifiNetworks() {
+//   int networkNum = WiFi.scanNetworks();
+
+//   for (int id = 0; id < networkNum; ++id) { 
+//     std::vector<uint8_t> data = improv::build_rpc_response(
+//             improv::GET_WIFI_NETWORKS, {WiFi.SSID(id), String(WiFi.RSSI(id)), (WiFi.encryptionType(id) == WIFI_AUTH_OPEN ? "NO" : "YES")}, false);
+//     send_response(data);
+//     sleep(1);
+//   }
+//   //final response
+//   std::vector<uint8_t> data =
+//           improv::build_rpc_response(improv::GET_WIFI_NETWORKS, std::vector<std::string>{}, false);
+//   send_response(data);
+}
+
+bool connectWifi(std::string ssid, std::string password) {
+  uint8_t count = 0;
+
+//   WiFi.begin(ssid.c_str(), password.c_str());
+
+//   while (WiFi.status() != WL_CONNECTED) {
+//     blink_led(500, 1);
+
+//     if (count > MAX_ATTEMPTS_WIFI_CONNECTION) {
+//       WiFi.disconnect();
+//       return false;
+//     }
+//     count++;
+//   }
+
+  return true;
+}
+
+static int improv_c(int argc, char **argv)
+{
+
+    if (argc != 2)
+    {
+        fprintf(stderr, "Usage: improv {data}\n");
+        return 1;
+    }
+
+    uint8_t version = argv[1][0];   // 6
+    uint8_t type = argv[1][1];      // 7
+    uint8_t data_len = argv[1][2];  // 8
+    uint8_t data[data_len] = { 0 };
+    memcpy(data, &argv[1][2], data_len);
+
+    uint8_t checksum = 0xDD; // IMPROV
+    checksum += version;
+    checksum += type;
+    checksum += data_len;
+
+    for (size_t i = 0; i < (data_len + 1); i++)
+        checksum += data[i];
+
+    if (checksum != data[data_len + 1]) {
+        fprintf(stderr, "bad checksum [%02x][%02x]\r\n", (data[data_len + 1]), checksum);
+        return false;
+    }
+
+    if (type != improv::TYPE_RPC) {
+        return false;
+    }
+
+    auto cmd = improv::parse_improv_data(data, data_len, false);
+    // fprintf(stdout, "alldata[%s]", mstr::toHex(argv[1], strlen(argv[1])).c_str());
+    // fprintf(stdout, "   data[%s]", mstr::toHex(argv[1][2], data_len).c_str());
+
+    switch (cmd.command) {
+        case improv::Command::GET_CURRENT_STATE:
+        {
+        //if ((WiFi.status() == WL_CONNECTED)) {
+        if (0) {
+            set_state(improv::State::STATE_PROVISIONED);
+            std::vector<uint8_t> data = improv::build_rpc_response(improv::GET_CURRENT_STATE, getLocalUrl(), false);
+            send_response(data);
+
+        } else {
+            set_state(improv::State::STATE_AUTHORIZED);
+        }
+        
+        break;
+        }
+
+        case improv::Command::WIFI_SETTINGS:
+        {
+        if (cmd.ssid.length() == 0) {
+            set_error(improv::Error::ERROR_INVALID_RPC);
+            break;
+        }
+        
+        set_state(improv::STATE_PROVISIONING);
+        
+        if (connectWifi(cmd.ssid, cmd.password)) {
+
+            //blink_led(100, 3);
+            
+            //TODO: Persist credentials here
+
+            set_state(improv::STATE_PROVISIONED);        
+            std::vector<uint8_t> data = improv::build_rpc_response(improv::WIFI_SETTINGS, getLocalUrl(), false);
+            send_response(data);
+        } else {
+            set_state(improv::STATE_STOPPED);
+            set_error(improv::Error::ERROR_UNABLE_TO_CONNECT);
+        }
+        
+        break;
+        }
+
+        case improv::Command::GET_DEVICE_INFO:
+        {
+        std::vector<std::string> infos = {
+            // Firmware name
+            "meatloaf",
+            // Firmware version
+            "20250106.04",
+            // Hardware chip/variant
+            "ESP32",
+            // Device name
+            "Meatloaf!"
+        };
+        std::vector<uint8_t> data = improv::build_rpc_response(improv::GET_DEVICE_INFO, infos, false);
+        send_response(data);
+        break;
+        }
+
+        case improv::Command::GET_WIFI_NETWORKS:
+        {
+        getAvailableWifiNetworks();
+        break;
+        }
+
+        default: {
+        set_error(improv::ERROR_UNKNOWN_RPC);
+        return false;
+        }
+    }
+
+    return EXIT_SUCCESS;
 }
 
 namespace ESP32Console::Commands
@@ -291,5 +514,10 @@ namespace ESP32Console::Commands
     const ConsoleCommand getConnectCommand()
     {
         return ConsoleCommand("connect", &connect, "Connect to wifi");
+    }
+
+    const ConsoleCommand getIMPROVCommand()
+    {
+        return ConsoleCommand("improv", &improv_c, "Wifi config via IMPROV protocol");
     }
 }
