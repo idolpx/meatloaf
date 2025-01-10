@@ -97,7 +97,8 @@ typedef enum
 
 class iecFuji : public IECDevice
 {
-private:
+//private:
+protected:
     systemBus *_bus;
 
     fujiHost _fnHosts[MAX_HOSTS];
@@ -140,7 +141,7 @@ private:
     // track the last command for the status
     int last_command = -1;
 
-protected:
+//protected:
     virtual void talk(uint8_t secondary) override;
     virtual void listen(uint8_t secondary) override;
     virtual void untalk() override;

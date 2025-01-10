@@ -34,14 +34,8 @@
 /* LEDs */
 #define PIN_LED_WIFI            GPIO_NUM_2  // led.cpp
 #define PIN_LED_BUS             GPIO_NUM_5  // 4 FN
-
-// pins 12-15 are used to interface with the JTAG debugger
-// so leave them alone if we're using JTAG
-#ifndef JTAG
 #define PIN_LED_BT              GPIO_NUM_13
-#else
-#define PIN_LED_BT              GPIO_NUM_5  // LOLIN D32 PRO
-#endif
+#define PIN_LED_RGB             GPIO_NUM_13
 
 /* Audio Output */
 #define PIN_DAC1                GPIO_NUM_25 // samlib.h

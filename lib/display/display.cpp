@@ -74,11 +74,10 @@ void Display::service()
     switch(mode)
     {
         case MODE_IDLE:
-            // MODE_IDLE
-            rotate();
-            break;
         case MODE_SEND:
         case MODE_RECEIVE:
+            // MODE_IDLE
+            rotate();
             break;
         case MODE_STATUS:
             switch( m_statusCode )
@@ -87,6 +86,7 @@ void Display::service()
                 case ST_SCRATCHED      :
                 case ST_SPLASH         :
                     mode = MODE_IDLE;
+                    meatloaf();
                     break;
                 default                :
                     blink();
@@ -100,7 +100,7 @@ void Display::service()
     if ( progress < 100 ) {
         show_progress();
     }
-    if ( activity ) {
+    else if ( activity ) {
         show_activity();
     }
     update();
@@ -156,27 +156,25 @@ void Display::fill_all(CRGB color)
 
 void Display::show_activity()
 {
-    static uint8_t curr_led = 0;
-    static uint8_t curr_dir = 0;
-
-    speed = 25;
+    static uint8_t curr_led = 3;
 
     // Set all leds to black
     fill_all((CRGB){.r=0, .g=0, .b=0});
 
-    // Number of leds to light up
+
+    // // Number of leds to light up
     ws28xx_pixels[curr_led] = (CRGB){.r=0, .g=100, .b=0};
 
-    if ( curr_dir)
+    if ( direction)
         curr_led++;
     else
         curr_led--;
 
-    if ( (curr_led == 0) || (curr_led == n_of_leds) ) {
-        curr_dir = !curr_dir;
-    }
+    if ( (curr_led == 0) )
+        direction = 1;
 
-    update();
+    if (curr_led == (n_of_leds - 1))
+        direction = 0;
 }
 
 void Display::show_progress()
@@ -212,8 +210,6 @@ void Display::show_progress()
     // for (int i = n + 1; i < n_of_leds; i++) {
     //     ws28xx_pixels[i] = (CRGB){.r=0, .g=0, .b=0};
     // }
-
-    update();
 }
 
 esp_err_t Display::update() 
@@ -263,7 +259,7 @@ void Display::start(void)
     idle();
 
     // Start DISPLAY task
-    if ( xTaskCreatePinnedToCore(display_task, "display_task", 1024, this, 5, NULL, 0) != pdTRUE)
+    if ( xTaskCreatePinnedToCore(display_task, "display_task", 1024, this, 4, NULL, 0) != pdTRUE)
     {
         Debug_printv("Could not start DISPLAY task!");
     }

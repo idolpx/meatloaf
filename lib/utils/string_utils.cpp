@@ -360,6 +360,12 @@ namespace mstr {
                         [](unsigned char c) { return ::isdigit(c); });
     }
 
+    bool isNumeric(char *s)
+    {
+        std::string s2 = s;
+        return isNumeric(s2);
+    }
+
     void replaceAll(std::string &s, const std::string &search, const std::string &replace) 
     {
         const size_t size = search.size();

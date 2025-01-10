@@ -25,6 +25,7 @@ std::string CSIPMSessionMgr::readLn() {
     char buffer[80];
     // telnet line ends with 10;
     getline(buffer, 80, 10);
+
     Debug_printv("Inside readln got: '%s'", buffer);
     return std::string((char *)buffer);
 }

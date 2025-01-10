@@ -191,24 +191,24 @@ static int ping(int argc, char **argv)
     while((number_of_pings == 0 || seqno <= number_of_pings) && c != 4 && c != 3) {
         esp_ping_get_profile(ping, ESP_PING_PROF_SEQNO, &seqno, sizeof(seqno));
         c = getc(stdin);
-        sleep(50);
+        sleep(1);
     }
 
     //Reset flags, so we dont end up destroying our terminal env later, when linenoise takes over again
     fcntl(fileno(stdin), F_SETFL, flags);
 
-    //esp_ping_stop(ping);
+    esp_ping_stop(ping);
 
     //Print total statistics
-    // uint32_t transmitted;
-    // uint32_t received;
-    // uint32_t total_time_ms;
-    // esp_ping_get_profile(ping, ESP_PING_PROF_REQUEST, &transmitted, sizeof(transmitted));
-    // esp_ping_get_profile(ping, ESP_PING_PROF_REPLY, &received, sizeof(received));
-    // esp_ping_get_profile(ping, ESP_PING_PROF_DURATION, &total_time_ms, sizeof(total_time_ms));
-    // printf("%lu packets transmitted, %lu received, time %lu ms\r\n", transmitted, received, total_time_ms);
+    uint32_t transmitted;
+    uint32_t received;
+    uint32_t total_time_ms;
+    esp_ping_get_profile(ping, ESP_PING_PROF_REQUEST, &transmitted, sizeof(transmitted));
+    esp_ping_get_profile(ping, ESP_PING_PROF_REPLY, &received, sizeof(received));
+    esp_ping_get_profile(ping, ESP_PING_PROF_DURATION, &total_time_ms, sizeof(total_time_ms));
+    printf("%lu packets transmitted, %lu received, time %lu ms\r\n", transmitted, received, total_time_ms);
 
-    // esp_ping_delete_session(ping);
+    esp_ping_delete_session(ping);
 
     return EXIT_SUCCESS;
 }

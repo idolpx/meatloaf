@@ -8,9 +8,6 @@
 #include <sstream>
 
 
-std::unordered_map<std::string, MFile*> FileBroker::file_repo;
-std::unordered_map<std::string, MStream*> StreamBroker::stream_repo;
-
 #ifdef FLASH_SPIFFS
 #include "esp_spiffs.h"
 #endif
@@ -20,7 +17,7 @@ std::unordered_map<std::string, MStream*> StreamBroker::stream_repo;
 #endif
 
 
-//#include "meat_broker.h"
+#include "meat_broker.h"
 #include "meat_buffer.h"
 //#include "wrappers/directory_stream.h"
 
@@ -79,6 +76,8 @@ std::unordered_map<std::string, MStream*> StreamBroker::stream_repo;
 #include "tape/t64.h"
 #include "tape/tcrt.h"
 
+std::unordered_map<std::string, MFile*> FileBroker::file_repo;
+std::unordered_map<std::string, MStream*> StreamBroker::stream_repo;
 
 /********************************************************
  * MFSOwner implementations

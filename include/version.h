@@ -19,5 +19,5 @@
 
 #define FN_VERSION_FULL "v1.4"
 
-#define FW_VERSION "20250101.01"
+#define FW_VERSION "20250110.01"
 #endif /* _VERSION_H */

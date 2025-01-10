@@ -289,12 +289,15 @@ iecChannelHandlerDir::iecChannelHandlerDir(iecDrive *drive, MFile *dir) : iecCha
   // If SD Card is available and we are at the root path show it as a directory at the top
   if( fnSDFAT.running() && m_dir->url.size() < 2 )
     m_headers.push_back("DIR SD");
+
+  DISPLAY.activity = true;
 }
 
 
 iecChannelHandlerDir::~iecChannelHandlerDir()
 {
   delete m_dir;
+  DISPLAY.activity = false;
 }
 
 

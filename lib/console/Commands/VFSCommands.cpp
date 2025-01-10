@@ -13,6 +13,7 @@
 #include "../Helpers/PWDHelpers.h"
 #include "../ute/ute.h"
 
+#include "device.h"
 #include "string_utils.h"
 
 char *canonicalize_file_name(const char *path);
@@ -334,6 +335,28 @@ int mkdir(int argc, char **argv)
     return EXIT_SUCCESS;
 }
 
+int mount(int argc, char **argv)
+{
+    if (argc != 3)
+    {
+        fprintf(stderr, "mount {device id} {url}\r\n");
+        return EXIT_SUCCESS;
+    }
+
+    if (!mstr::isNumeric(argv[1]))
+    {
+        fprintf(stderr, "device id is not numeric\r\n");
+        return EXIT_SUCCESS;
+    }
+
+    int did = atoi(argv[1]);
+    fprintf(stdout, "Mounted %d -> %s\r\n", did, argv[2]);
+
+    Meatloaf.mount_all();
+
+    return EXIT_SUCCESS;
+}
+
 namespace ESP32Console::Commands
 {
     const ConsoleCommand getCatCommand()
@@ -384,5 +407,10 @@ namespace ESP32Console::Commands
     const ConsoleCommand getEditCommand()
     {
         return ConsoleCommand("edit", &ute, "Edit files");
+    }
+
+    const ConsoleCommand getMountCommand()
+    {
+        return ConsoleCommand("mount", &mount, "Mount url on device id");
     }
 }

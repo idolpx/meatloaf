@@ -38,6 +38,7 @@
 #define PIN_LED_WIFI            GPIO_NUM_2 // led.cpp
 #define PIN_LED_BUS             GPIO_NUM_5
 #define PIN_LED_BT              GPIO_NUM_13
+#define PIN_LED_RGB             GPIO_NUM_13
 
 /* Audio Output */
 #define PIN_DAC1                GPIO_NUM_25 // samlib.h

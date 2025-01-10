@@ -5,6 +5,7 @@
 
 #include <string>
 
+#include "display.h"
 #include "string_utils.h"
 
 static int clear(int argc, char **argv)
@@ -123,6 +124,63 @@ static int declare(int argc, char **argv)
     return EXIT_SUCCESS;
 }
 
+#ifdef ENABLE_DISPLAY
+static int led(int argc, char **argv)
+{
+    if (argc < 2) {
+        fprintf(stderr, "led {idle|send|receive|activity|progress {0-100}|status {1-255}|speed {0-255}}\r\n");
+        return EXIT_FAILURE; 
+    }
+
+    if (mstr::startsWith(argv[1], "idle"))
+    {
+        DISPLAY.idle();
+    }
+    else if (mstr::startsWith(argv[1], "send"))
+    {
+        DISPLAY.send();
+    }
+    else if (mstr::startsWith(argv[1], "receive"))
+    {
+        DISPLAY.receive();
+    }
+    else if (mstr::startsWith(argv[1], "activity"))
+    {
+        DISPLAY.activity = !DISPLAY.activity;
+    }
+    else if (mstr::startsWith(argv[1], "progress"))
+    {
+        if (argc == 3)
+            DISPLAY.progress = atoi(argv[2]);
+        else
+            DISPLAY.idle();
+    }
+    else if (mstr::startsWith(argv[1], "status"))
+    {
+        if (argc == 3)
+            DISPLAY.status(atoi(argv[2]));
+        else
+            DISPLAY.idle();
+    }
+    else if (mstr::startsWith(argv[1], "speed"))
+    {
+        if (argc == 3)
+            DISPLAY.speed = atoi(argv[2]);
+        else
+            DISPLAY.idle();
+    }
+    else if (mstr::startsWith(argv[1], "color"))
+    {
+        if (argc == 3)
+            DISPLAY.speed = atoi(argv[2]);
+        else
+            DISPLAY.idle();
+    }
+
+    return EXIT_SUCCESS;
+}
+#endif
+
 namespace ESP32Console::Commands
 {
     const ConsoleCommand getClearCommand()
@@ -155,4 +213,11 @@ namespace ESP32Console::Commands
     {
         return ConsoleCommand("declare", &declare, "Change enviroment variables");
     }
+
+#ifdef ENABLE_DISPLAY
+    const ConsoleCommand getLEDCommand()
+    {
+        return ConsoleCommand("led", &led, "Change LED display settings");
+    }
+#endif
 }

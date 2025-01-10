@@ -34,6 +34,9 @@ namespace ESP32Console
         registerCommand(getSetMultilineCommand());
         registerCommand(getEnvCommand());
         registerCommand(getDeclareCommand());
+#ifdef ENABLE_DISPLAY
+        registerCommand(getLEDCommand());
+#endif
     }
 
     void Console::registerSystemCommands()
@@ -66,6 +69,7 @@ namespace ESP32Console
         registerCommand(getRMDirCommand());
         registerCommand(getMKDirCommand());
         registerCommand(getEditCommand());
+        registerCommand(getMountCommand());
     }
 
     void Console::registerGPIOCommands()
