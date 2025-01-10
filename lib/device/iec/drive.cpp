@@ -290,14 +290,19 @@ iecChannelHandlerDir::iecChannelHandlerDir(iecDrive *drive, MFile *dir) : iecCha
   if( fnSDFAT.running() && m_dir->url.size() < 2 )
     m_headers.push_back("DIR SD");
 
+#ifdef ENABLE_DISPLAY
   DISPLAY.activity = true;
+#endif
 }
 
 
 iecChannelHandlerDir::~iecChannelHandlerDir()
 {
   delete m_dir;
+
+#ifdef ENABLE_DISPLAY
   DISPLAY.activity = false;
+#endif
 }
 
 
