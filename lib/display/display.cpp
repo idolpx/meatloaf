@@ -80,6 +80,7 @@ void Display::service()
             rotate();
             break;
         case MODE_STATUS:
+            activity = false;
             switch( m_statusCode )
             {
                 case ST_OK             :
