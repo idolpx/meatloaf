@@ -14,6 +14,7 @@
 #include "../ute/ute.h"
 
 #include "device.h"
+#include "meatloaf.h"
 #include "string_utils.h"
 
 char *canonicalize_file_name(const char *path);
@@ -357,6 +358,57 @@ int mount(int argc, char **argv)
     return EXIT_SUCCESS;
 }
 
+int wget(int argc, char **argv)
+{
+    if (argc != 2)
+    {
+        fprintf(stderr, "wget {url}\r\n");
+        return EXIT_SUCCESS;
+    }
+
+    std::string pwd = std::string(ESP32Console::console_getpwd());
+
+    auto f = MFSOwner::File(argv[1]);
+    if (f != nullptr)
+    {
+        auto s = f->getSourceStream();
+
+        std::string outfile = pwd;
+        outfile += f->name;
+
+        Debug_printv("size[%lu] name[%s] url[%s] outfile[%s]", f->size, f->name.c_str(), s->url.c_str(), outfile.c_str());
+
+
+        FILE *file = fopen(outfile.c_str(), "w");
+        if (file == nullptr)
+        {
+            fprintf(stdout, "2 Error: Can't open file!\r\n");
+            return 2;
+        }
+
+        // Receive File
+        int count = 0;
+        uint8_t byte = 0;
+        while (count < s->size())
+        {
+            int result = s->read(&byte, 1);
+            if (result < 1)
+                break;
+
+            fprintf(file, "%c", byte);
+
+            // Show percentage complete in stdout
+            uint8_t percent = (s->position() * 100) / s->size();
+            fprintf(stdout, "Downloading '%s' %d%% [%lu %lu]\r", f->name.c_str(), percent, s->size(), s->position());
+            count++;
+        }
+        fclose(file);
+        fprintf(stdout, "\n");
+    }
+
+    return EXIT_SUCCESS;
+}
+
 namespace ESP32Console::Commands
 {
     const ConsoleCommand getCatCommand()
@@ -412,5 +464,10 @@ namespace ESP32Console::Commands
     const ConsoleCommand getMountCommand()
     {
         return ConsoleCommand("mount", &mount, "Mount url on device id");
+    }
+
+    const ConsoleCommand getWgetCommand()
+    {
+        return ConsoleCommand("wget", &wget, "Download url to file");
     }
 }

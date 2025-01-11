@@ -169,10 +169,13 @@ static int led(int argc, char **argv)
         else
             DISPLAY.idle();
     }
-    else if (mstr::startsWith(argv[1], "color"))
+    else if (mstr::startsWith(argv[1], "pixel"))
     {
-        if (argc == 3)
-            DISPLAY.speed = atoi(argv[2]);
+        // if (argc == 4)
+        //     DISPLAY.set_pixel(atoi(argv[2]), (CRGB)atoi(argv[3]));
+        // else 
+        if (argc == 6)
+            DISPLAY.set_pixel(atoi(argv[2]), atoi(argv[3]), atoi(argv[4]), atoi(argv[5]));
         else
             DISPLAY.idle();
     }

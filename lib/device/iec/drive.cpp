@@ -228,7 +228,7 @@ uint8_t iecChannelHandlerFile::readBufferData()
       Debug_printv("size[%lu] avail[%lu] pos[%lu]", m_stream->size(), m_stream->available(), m_stream->position());
 #ifdef ENABLE_DISPLAY
       // send progress percentage
-      uint32_t percent = (m_stream->position() * 100) / m_stream->size();
+      uint8_t percent = (m_stream->position() * 100) / m_stream->size();
       if( percent>100 ) percent = 100;
       DISPLAY.progress = percent;
 #endif

@@ -18,10 +18,11 @@ MeatHttpClient* HTTPMFile::fromHeader() {
 
         // let's just get the headers so we have some info
         //Debug_printv("Client requesting head");
-        //Debug_printv("before head url[%s]", url.c_str());
+        Debug_printv("before head url[%s]", url.c_str());
         client->HEAD(url);
-        //Debug_printv("after head url[%s]", client->url.c_str());
-        resetURL(client->url);
+        Debug_printv("after head url[%s]", client->url.c_str());
+        if (client->wasRedirected)
+            resetURL(client->url);
     }
     return client;
 }
@@ -55,6 +56,8 @@ MStream* HTTPMFile::getSourceStream(std::ios_base::openmode mode) {
     MStream* istream = new HTTPMStream(url, mode);
     //auto istream = StreamBroker::obtain<HTTPMStream>(url, mode);
     istream->open(mode);
+    resetURL(istream->url);
+    size = istream->size();
 
     return istream;
 }
@@ -147,6 +150,8 @@ bool HTTPMStream::open(std::ios_base::openmode mode) {
 
     if ( r ) {
         _size = ( _http._range_size > 0) ? _http._range_size : _http._size;
+        if ( _http.wasRedirected )
+            url = _http.url;
     }
 
     return r;

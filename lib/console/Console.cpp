@@ -70,6 +70,7 @@ namespace ESP32Console
         registerCommand(getMKDirCommand());
         registerCommand(getEditCommand());
         registerCommand(getMountCommand());
+        registerCommand(getWgetCommand());
     }
 
     void Console::registerGPIOCommands()
