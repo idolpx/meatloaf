@@ -10,11 +10,12 @@ Import("env")
 #exit(0);
 
 # Disable automatic versioning
-if 1:
-    print("Automatic versioning disabled")
+#if 1:
+#    print("Automatic versioning disabled")
+#    exit
 
 # Don't do anything if nothing has changed
-elif len(subprocess.check_output(["git", "diff", "--name-only"], universal_newlines=True)) == 0:
+if len(subprocess.check_output(["git", "diff", "--name-only"], universal_newlines=True)) == 0:
     print("Nothing has changed")
 
 else:
@@ -25,9 +26,9 @@ else:
     
     header_file = "include/version.h"
 
-    ver_date = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    ver_date = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    fw_date = datetime.datetime.utcnow().strftime("%Y%m%d.%H")
+    fw_date = datetime.datetime.now().strftime("%Y%m%d.%H")
 
     rxs = ['^#define FN_VERSION_MAJOR (\w+)', '^#define FN_VERSION_MINOR (\w+)',
            '^(#define FN_VERSION_BUILD)', '^(#define FN_VERSION_DATE)', '^(#define FN_VERSION_FULL)', 

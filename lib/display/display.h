@@ -87,13 +87,16 @@ public:
     uint8_t direction = 1;  // 0 = left (RECEIVE), 1 = right (SEND)
     uint8_t brightness = 8;
     uint8_t segment = 0;    // Segment 0 is the first 5 LEDs
-    uint16_t color = 0x00FF00;
+
+    Display() {
+        add_segment(0, 5);  // Add default segment
+    }
 
     void start(void);
     void service();
     esp_err_t update();
 
-    void idle(void) { mode = MODE_IDLE;  meatloaf(); progress = 100; speed = 1000; direction = 0; };
+    void idle(void) { mode = MODE_IDLE;  meatloaf(); activity = false; progress = 100; speed = 1000; direction = 0; };
     void send(void) { mode = MODE_SEND; direction = 0; };
     void receive(void) { mode = MODE_RECEIVE; direction = 1; };
     void status(uint8_t code) { 

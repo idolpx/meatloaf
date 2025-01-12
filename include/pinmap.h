@@ -28,18 +28,15 @@
 // ESP32 C3
 #include "pinmap/esp32-c3-super-mini.h"
 
-#ifndef RGB_LED_STRIP
+
+
 /* LED Strip NEW */
 #define RGB_LED_DATA_PIN        PIN_LED_RGB
 #define RGB_LED_BRIGHTNESS      15 // max mA the LED can use determines brightness
 #define RGB_LED_COUNT           5
 #define RGB_LED_TYPE            WS2812B
 #define RGB_LED_ORDER           GRB
-// LED order on the strip starting with 0
-#define RGB_LED_WIFI_NUM        0
-#define RGB_LED_BUS_NUM         4
-#define RGB_LED_BT_NUM          2
-#endif
+
 
 #ifdef ENABLE_ZIMODEM
 #define DEFAULT_PIN_DCD GPIO_NUM_14

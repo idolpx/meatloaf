@@ -256,7 +256,7 @@ esp_err_t Display::update()
 
 void Display::start(void)
 {
-    init(PIN_LED_RGB, WS2812B, LED_RGB_COUNT);
+    init(PIN_LED_RGB, WS2812B, RGB_LED_COUNT);
     idle();
 
     // Start DISPLAY task
@@ -273,7 +273,7 @@ void Display::blink(void)
     speed = 100;
 
     led_state_off = !led_state_off;
-    for(int i = 0; i < LED_RGB_COUNT; i++) {
+    for(int i = 0; i < RGB_LED_COUNT; i++) {
         if (led_state_off) 
             ws28xx_pixels[i] = (CRGB){.r=0, .g=0, .b=0};
         else 

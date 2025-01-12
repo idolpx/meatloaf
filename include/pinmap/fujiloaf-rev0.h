@@ -38,16 +38,6 @@
 #define PIN_LED_BT              GPIO_NUM_NC // No BT LED
 #define PIN_LED_RGB             GPIO_NUM_4
 
-/* LED Strip */
-#define LED_RGB_COUNT           5
-#define LED_RGB_BRIGHTNESS      15 // max mA the LED can use determines brightness
-#define LED_RGB_TYPE            WS2812B
-#define LED_RGB_ORDER           GRB
-// LED order on the strip starting with 0
-#define LED_RGB_WIFI_NUM        0
-#define LED_RGB_BUS_NUM         4
-#define LED_RGB_BT_NUM          2
-
 /* Audio Output */
 #define PIN_DAC1                GPIO_NUM_25 // samlib.h
 #define PIN_I2S                 GPIO_NUM_25
