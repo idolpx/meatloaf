@@ -388,18 +388,27 @@ int wget(int argc, char **argv)
 
         // Receive File
         int count = 0;
-        uint8_t byte = 0;
+        uint8_t bytes[256];
         while (count < s->size())
         {
-            int result = s->read(&byte, 1);
-            if (result < 1)
+            int bytes_read = s->read(bytes, 256);
+            if (bytes_read < 1)
+            {
+                if (s->available())
+                    fprintf(stdout, "\nError reading '%s'\r", f->name.c_str());
                 break;
+            }
 
-            fprintf(file, "%c", byte);
+            int bytes_written = fwrite(bytes, 1, bytes_read, file);
+            if (bytes_written != bytes_read)
+            {
+                fprintf(stdout, "\nError writing '%s'\r", f->name.c_str());
+                break;
+            }
 
             // Show percentage complete in stdout
             uint8_t percent = (s->position() * 100) / s->size();
-            fprintf(stdout, "Downloading '%s' %d%% [%lu %lu]\r", f->name.c_str(), percent, s->size(), s->position());
+            fprintf(stdout, "Downloading '%s' %d%% [%lu]\r", f->name.c_str(), percent, s->position());
             count++;
         }
         fclose(file);
