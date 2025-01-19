@@ -26,9 +26,16 @@ systemBus::systemBus() : IECBusHandler(PIN_IEC_ATN, PIN_IEC_CLK_OUT, PIN_IEC_DAT
                                        PIN_IEC_SRQ==GPIO_NUM_NC   ? 0xFF : PIN_IEC_SRQ)
 {
 #ifdef SUPPORT_DOLPHIN
-  setDolphinDosPins(PIN_IEC_PARALLEL_HT, PIN_IEC_PARALLEL_HR, 
-                    PIN_IEC_PARALLEL_D0, PIN_IEC_PARALLEL_D1, PIN_IEC_PARALLEL_D2, PIN_IEC_PARALLEL_D3,
-                    PIN_IEC_PARALLEL_D4, PIN_IEC_PARALLEL_D5, PIN_IEC_PARALLEL_D6, PIN_IEC_PARALLEL_D7);
+#ifdef SUPPORT_DOLPHIN_XRA1405
+  setDolphinDosPins(PIN_PARALLEL_FLAG2 == GPIO_NUM_NC ? 0xFF : PIN_PARALLEL_FLAG2,
+                    PIN_PARALLEL_PC2   == GPIO_NUM_NC ? 0xFF : PIN_PARALLEL_PC2,
+                    PIN_SD_HOST_SCK    == GPIO_NUM_NC ? 0xFF : PIN_SD_HOST_SCK,
+                    PIN_SD_HOST_MOSI   == GPIO_NUM_NC ? 0xFF : PIN_SD_HOST_MOSI,
+                    PIN_SD_HOST_MISO   == GPIO_NUM_NC ? 0xFF : PIN_SD_HOST_MISO,
+                    PIN_XRA1405_CS     == GPIO_NUM_NC ? 0xFF : PIN_XRA1405_CS);
+#else
+#error "Can only support DolphinDos using XRA1405 port expander"
+#endif
 #endif
 }
 

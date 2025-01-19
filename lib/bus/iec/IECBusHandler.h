@@ -77,8 +77,12 @@ class IECBusHandler
 
 #ifdef SUPPORT_DOLPHIN
   // call this BEFORE begin() if you do not want to use the default pins for the DolphinDos cable
+#ifdef SUPPORT_DOLPHIN_XRA1405
+  void setDolphinDosPins(uint8_t pinHT, uint8_t pinHR, uint8_t pinSCK, uint8_t pinCOPI, uint8_t pinCIPO, uint8_t pinCS);
+#else
   void setDolphinDosPins(uint8_t pinHT, uint8_t pinHR, uint8_t pinD0, uint8_t pinD1, uint8_t pinD2, uint8_t pinD3, 
                          uint8_t pinD4, uint8_t pinD5, uint8_t pinD6, uint8_t pinD7);
+#endif
 
   bool enableDolphinDosSupport(IECDevice *dev, bool enable);
   void enableDolphinBurstMode(IECDevice *dev, bool enable);
@@ -139,6 +143,8 @@ class IECBusHandler
   bool transmitDolphinBurst();
   bool receiveDolphinBurst();
 
+  void startParallelTransaction();
+  void endParallelTransaction();
   bool parallelBusHandshakeReceived();
   bool waitParallelBusHandshakeReceived();
   void parallelBusHandshakeTransmit();
@@ -150,20 +156,39 @@ class IECBusHandler
   void enableParallelPins();
   bool isDolphinPin(uint8_t pin);
 
+#ifdef SUPPORT_DOLPHIN_XRA1405
+  uint8_t m_pinDolphinSCK, m_pinDolphinCOPI, m_pinDolphinCIPO, m_pinDolphinCS, m_inTransaction;
+  uint8_t XRA1405_ReadReg(uint8_t reg);
+  void    XRA1405_WriteReg(uint8_t reg, uint8_t data);
+
+#ifdef IOREG_TYPE
+  volatile IOREG_TYPE *m_regDolphinCS;
+  IOREG_TYPE m_bitDolphinCS;
+#endif
+
+#else // !SUPPORT_DOLPHIN_XRA1405
+
+  uint8_t m_pinDolphinParallel[8];
+#ifdef IOREG_TYPE
+  volatile IOREG_TYPE *m_regDolphinParallelMode[8], *m_regDolphinParallelWrite[8];
+  volatile const IOREG_TYPE *m_regDolphinParallelRead[8];
+  IOREG_TYPE m_bitDolphinParallel[8];
+#endif
+
+#endif // SUPPORT_DOLPHIN_XRA1405
+
   uint8_t m_pinDolphinHandshakeTransmit;
   uint8_t m_pinDolphinHandshakeReceive;
-  uint8_t m_dolphinCtr, m_pinDolphinParallel[8];
+  uint8_t m_dolphinCtr;
 
 #ifdef IOREG_TYPE
   volatile IOREG_TYPE *m_regDolphinHandshakeTransmitMode;
-  volatile IOREG_TYPE *m_regDolphinParallelMode[8], *m_regDolphinParallelWrite[8];
-  volatile const IOREG_TYPE *m_regDolphinParallelRead[8];
-  IOREG_TYPE m_bitDolphinHandshakeTransmit, m_bitDolphinParallel[8];
+  IOREG_TYPE m_bitDolphinHandshakeTransmit;
 #if defined(__AVR_ATmega328P__) || defined(__AVR_ATmega2560__)
   IOREG_TYPE m_handshakeReceivedBit = 0;
 #endif
-#endif
-#endif
+#endif // IOREG_TYPE
+#endif // SUPPORT_DOLPHIN
 
 #ifdef SUPPORT_EPYX
   bool receiveEpyxByte(uint8_t &data);
