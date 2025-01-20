@@ -29,7 +29,7 @@
     "arduino",
     "espidf"
   ],
-  "name": "Meatloaf v1",
+  "name": "Meatloaf v1 16MB",
   "upload": {
     "flash_size": "16MB",
     "maximum_ram_size": 327680,

@@ -112,7 +112,7 @@ esp_err_t Display::init(int pin, led_strip_model_t model, int num_of_leds)
     esp_err_t err = ESP_OK;
     n_of_leds = num_of_leds;
     led_model = model;
-    // Insrease if something breaks. values are less than recommended in
+    // Increase if something breaks. values are less than recommended in
     // datasheets but seem stable
     reset_delay = (model == WS2812B) ? 3 : 30;
     // 12 bytes for each led + bytes for initial zero and reset state

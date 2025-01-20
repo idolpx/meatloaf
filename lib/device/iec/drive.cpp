@@ -187,6 +187,10 @@ iecChannelHandlerFile::~iecChannelHandlerFile()
   cps = m_byteCount / (seconds-tseconds);
   Debug_printv("Transport (network/sd) took %0.3f seconds, pure IEC transfers @ %0.2fcps", tseconds, cps);
 
+#ifdef ENABLE_DISPLAY
+    DISPLAY.idle();
+#endif
+
   delete m_stream;
 }
 
@@ -229,7 +233,6 @@ uint8_t iecChannelHandlerFile::readBufferData()
 #ifdef ENABLE_DISPLAY
       // send progress percentage
       uint8_t percent = (m_stream->position() * 100) / m_stream->size();
-      if( percent>100 ) percent = 100;
       DISPLAY.progress = percent;
 #endif
 
@@ -301,7 +304,7 @@ iecChannelHandlerDir::~iecChannelHandlerDir()
   delete m_dir;
 
 #ifdef ENABLE_DISPLAY
-  DISPLAY.activity = false;
+    DISPLAY.idle();
 #endif
 }
 

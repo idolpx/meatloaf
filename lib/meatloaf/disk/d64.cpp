@@ -61,6 +61,12 @@ bool D64MStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
         return false;
     }
 
+    // Check for error info
+    if (error_info)
+    {
+        // Look up error for this track/sector
+    }
+
     track--;
     for (uint8_t index = 0; index < track; ++index)
     {

@@ -32,7 +32,7 @@
       "arduino",
       "espidf"
     ],
-    "name": "Meatloaf S2 Mini",
+    "name": "Meatloaf S2 Mini 4MB",
     "upload": {
       "flash_size": "4MB",
       "maximum_ram_size": 327680,

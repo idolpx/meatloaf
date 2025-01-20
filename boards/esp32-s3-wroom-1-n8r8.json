@@ -25,7 +25,7 @@
     "arduino",
     "espidf"
   ],
-  "name": "ESP32-S3-WROOM-1 N8R8",
+  "name": "Meatloaf ESP32-S3-WROOM-1 N8R8",
   "upload": {
     "flash_size": "8MB",
     "maximum_ram_size": 327680,

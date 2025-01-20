@@ -72,7 +72,7 @@ void iecNetwork::iec_open()
     // Check if the payload is RAW (i.e. from fujinet-lib) by the presence of "01" as the first uint8_t, which can't happen for BASIC.
     // If it is, then the next 2 bytes are the aux1/aux2 values (mode and trans), and the rest is the actual URL.
     // This is an efficiency so we don't have to send a 2nd command to tell it what the parameters should have been. 
-    //BASIC will still need to use "openparams" command, as the OPEN line doesn't have capacity for the parameters (can't use a "," as that's a valid URL character)
+    // BASIC will still need to use "openparams" command, as the OPEN line doesn't have capacity for the parameters (can't use a "," as that's a valid URL character)
     if (payload[0] == 0x01) {
         channel_aux1 = payload[1];
         channel_aux2 = payload[2];
@@ -388,7 +388,7 @@ void iecNetwork::parse_bite()
  
     //bites += "\"";
     //Debug_printv("[%s]", bites.c_str());
-    channel_data.receiveBuffer = bites;
+    channel_data.receiveBuffer = mstr::toPETSCII2(bites);
 }
 
 void iecNetwork::set_translation_mode()

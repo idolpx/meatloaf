@@ -37,7 +37,7 @@
       "arduino",
       "espidf"
     ],
-    "name": "Meatloaf S3 PRO",
+    "name": "Meatloaf S3 PRO 16MB",
     "upload": {
       "flash_size": "16MB",
       "maximum_ram_size": 327680,

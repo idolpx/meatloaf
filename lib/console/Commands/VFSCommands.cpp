@@ -14,6 +14,7 @@
 #include "../ute/ute.h"
 
 #include "device.h"
+#include "display.h"
 #include "meatloaf.h"
 #include "string_utils.h"
 
@@ -389,7 +390,7 @@ int wget(int argc, char **argv)
         // Receive File
         int count = 0;
         uint8_t bytes[256];
-        while (count < s->size())
+        while (true)
         {
             int bytes_read = s->read(bytes, 256);
             if (bytes_read < 1)
@@ -408,12 +409,19 @@ int wget(int argc, char **argv)
 
             // Show percentage complete in stdout
             uint8_t percent = (s->position() * 100) / s->size();
+#ifdef ENABLE_DISPLAY
+            DISPLAY.progress = percent;
+#endif
             fprintf(stdout, "Downloading '%s' %d%% [%lu]\r", f->name.c_str(), percent, s->position());
             count++;
         }
         fclose(file);
         fprintf(stdout, "\n");
     }
+
+#ifdef ENABLE_DISPLAY
+    DISPLAY.idle();
+#endif
 
     return EXIT_SUCCESS;
 }

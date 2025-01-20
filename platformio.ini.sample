@@ -49,6 +49,12 @@ environment = iec-nugget         ; Wemos Lolin D32 Pro                         (
 ; NATIVE UNIT TESTING
 ;environment = native      ; For running tests that don't require embedded hardware
 
+; Set flash size to 4M, 8M, 16M or 32M according to the enviornment you selected above
+;flash_size = 4mb
+;flash_size = 8mb
+flash_size = 16mb
+;flash_size = 32mb
+
 ; Choose SPIFFS or LITTLEFS for the filesystem used on internal flash
 ;flash_filesystem = FLASH_SPIFFS 
 flash_filesystem = FLASH_LITTLEFS
@@ -64,7 +70,7 @@ build_bus      = IEC
 [platformio]
 description = ${meatloaf.description}
 default_envs = ${meatloaf.environment}
-data_dir = data/${meatloaf.build_platform}
+data_dir = data/${meatloaf.build_platform}.${meatloaf.flash_size}
 
 [esp32_base]
 ; Espressif32 PlatformIO Version to use for building

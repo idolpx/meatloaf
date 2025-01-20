@@ -20,7 +20,7 @@
   "frameworks": [
     "espidf"
   ],
-  "name": "Meatloaf ESP32-S2",
+  "name": "Meatloaf ESP32-S2 4MB",
   "upload": {
     "flash_size": "4MB",
     "maximum_ram_size": 524288,
