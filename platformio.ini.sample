@@ -39,6 +39,7 @@ environment = iec-nugget         ; Wemos Lolin D32 Pro                         (
 ; ESP32-S3
 ;environment = esp32-s3-devkitc-1        ; esp32s3 devkitc                      (ESP32-S3 2M/8M PSRAM, 8M/16M/32M Flash)
 ;environment = lolin-s3-pro              ; Wemos Lolin S3 Pro                   (ESP32-S3 8M PSRAM, 16M Flash)
+;environment = lilygo-t-display-s3       ; LilyGO T-Display S3                  (ESP32-S3 8M PSRAM, 16M Flash)
 ;environment = freenove-esp32-s3-wroom-1 ; Freenove ESP32-S3-WROOM-1            (ESP32-S3 8M PSRAM, 16M Flash)
 ;environment = esp32-s3-zero             ;                                      (ESP32-S3 2M PSRAM, 4M Flash)
 ;environment = esp32-s3-super-mini       ;                                      (ESP32-C3 NO PSRAM, 4M Flash)
@@ -278,6 +279,14 @@ build_flags =
     ${env.build_flags}
     -D PINMAP_LOLIN_S3_PRO
     -D NO_BUTTONS
+    -D SD_CARD
+
+[env:lilygo-t-display-s3]
+extends = esp32_base
+board = esp32-s3-wroom-1-n16r8
+build_flags =
+    ${env.build_flags}
+    -D PINMAP_LILYGO_T_DISPLAY_S3
     -D SD_CARD
 
 [env:freenove-esp32-s3-wroom-1]
