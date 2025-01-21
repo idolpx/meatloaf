@@ -1047,7 +1047,7 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                   setStatusCode(ST_FILE_EXISTS);
                 else if( !f->isWritable )
                   setStatusCode(ST_WRITE_PROTECT);
-                else if( !VDrive::createDiskImage(filename.c_str(), NULL, diskname.c_str(), false) )
+                else if( !VDrive::createDiskImage(f->url.c_str(), NULL, diskname.c_str(), false) )
                   setStatusCode(ST_WRITE_ERROR);
                 else
                   setStatusCode(ST_OK);

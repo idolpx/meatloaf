@@ -3737,11 +3737,11 @@ int vdrive_command_memory_read(vdrive_t *vdrive, const uint8_t *buf, uint16_t ad
     }
 
     // reading 02FA/02FB should give number of free blocks
-    if( (addr<=0x02FA && addr+len>=0x02FA) || (addr<=0x02FB && addr+len>=0x02FB) )
+    if( (addr<=0x02FA && addr+len>=0x02FA) || (addr<=0x02FC && addr+len>=0x02FC) )
       {
         unsigned int blocks = vdrive_bam_free_block_count(vdrive);
         vdrive->ram[0x02FA] = blocks & 255;
-        vdrive->ram[0x02FB] = blocks / 256;
+        vdrive->ram[0x02FC] = blocks / 256;
       }
 
     /* move the data */

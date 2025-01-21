@@ -311,7 +311,7 @@ int archdep_ferror(ADFILE *stream)
 {
   int res = (int) ((MStream *) stream)->error();
   DBG(("archdep_ferror: %p %i", stream, res));
-  return 0;
+  return res;
 }
 
 
