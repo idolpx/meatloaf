@@ -116,9 +116,6 @@ uint8_t iecChannelHandler::read(uint8_t *data, uint8_t n)
     }
   else
   {
-#ifdef ENABLE_DISPLAY
-    DISPLAY.idle();
-#endif
     return 0;
   }
 }
@@ -189,6 +186,7 @@ iecChannelHandlerFile::~iecChannelHandlerFile()
 
 #ifdef ENABLE_DISPLAY
     DISPLAY.idle();
+    Debug_printv("Stop Activity");
 #endif
 
   delete m_stream;
@@ -294,6 +292,8 @@ iecChannelHandlerDir::iecChannelHandlerDir(iecDrive *drive, MFile *dir) : iecCha
     m_headers.push_back("DIR SD");
 
 #ifdef ENABLE_DISPLAY
+  Debug_printv("Start Activity");
+  DISPLAY.speed = 100;
   DISPLAY.activity = true;
 #endif
 }
@@ -305,6 +305,7 @@ iecChannelHandlerDir::~iecChannelHandlerDir()
 
 #ifdef ENABLE_DISPLAY
     DISPLAY.idle();
+    Debug_printv("Stop Activity");
 #endif
 }
 
@@ -1369,6 +1370,7 @@ void iecDrive::reset()
 
 #ifdef ENABLE_DISPLAY
   DISPLAY.idle();
+  Debug_printv("Stop Activity");
 #endif
 
   DEBUG_MEM_LEAK;
