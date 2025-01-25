@@ -664,7 +664,6 @@ bool IECBusHandler::attachDevice(IECDevice *dev)
 {
   if( m_numDevices<MAX_DEVICES && findDevice(dev->m_devnr, true)==NULL )
     {
-      m_devices[m_numDevices++] = dev;
       dev->m_handler = this;
       dev->m_sflags &= ~(S_JIFFY_DETECTED|S_JIFFY_BLOCK|S_DOLPHIN_DETECTED|S_DOLPHIN_BURST_TRANSMIT|S_DOLPHIN_BURST_RECEIVE|S_EPYX_HEADER|S_EPYX_LOAD|S_EPYX_SECTOROP);
 #ifdef SUPPORT_DOLPHIN
@@ -675,6 +674,8 @@ bool IECBusHandler::attachDevice(IECDevice *dev)
       // begin() function now, otherwise it will be called in IECBusHandler::begin() 
       if( m_flags!=0xFF ) dev->begin();
 
+      m_devices[m_numDevices] = dev;
+      m_numDevices++;
       return true;
     }
   else
@@ -2638,6 +2639,7 @@ void IECBusHandler::task()
       // P_DONE flag may have gotten set again after it was reset in atnRequest()
       m_flags &= ~P_DONE;
 
+      m_primary = 0;
       if( receiveIECByteATN(m_primary) && ((m_primary == 0x3f) || (m_primary == 0x5f) || (findDevice((unsigned int) m_primary & 0x1f)!=NULL)) )
         {
           // this is either UNLISTEN or UNTALK or we were addressed
@@ -2723,6 +2725,9 @@ void IECBusHandler::task()
           writePinCLK(HIGH);
           writePinDATA(HIGH);
           waitPinATN(HIGH);
+
+          // if someone else was told to start talking then we must stop
+          if( (m_primary & 0xE0)==0x40 ) m_flags &= ~P_TALKING;
 
           // allow ATN to pull DATA low in hardware
           writePinCTRL(LOW);
