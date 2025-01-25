@@ -90,10 +90,10 @@ uint8_t iecChannelHandler::read(uint8_t *data, uint8_t n)
 
       uint8_t st = readBufferData();
       if( st!=ST_OK )
-        {
+      {
           m_drive->setStatusCode(st);
           return 0;
-        }
+      }
     }
 
   // read data from buffer
@@ -228,6 +228,9 @@ uint8_t iecChannelHandlerFile::readBufferData()
   */
     {
       Debug_printv("size[%lu] avail[%lu] pos[%lu]", m_stream->size(), m_stream->available(), m_stream->position());
+      if (m_stream->size() == 0)
+        return ST_FILE_NOT_FOUND;
+
 #ifdef ENABLE_DISPLAY
       // send progress percentage
       uint8_t percent = (m_stream->position() * 100) / m_stream->size();
@@ -810,7 +813,17 @@ uint8_t iecDrive::read(uint8_t channel, uint8_t *data, uint8_t maxDataLen, bool 
           return 0;
         }
       else
-        return handler->read(data, maxDataLen);
+      {
+          uint8_t bytes_read = handler->read(data, maxDataLen);
+          if( m_statusCode==ST_FILE_NOT_FOUND)
+          {
+              Debug_printv("Subdir Change Directory Here! stream[%s] > base[%s]", m_cwd->url.c_str(), m_cwd->base().c_str());
+              m_cwd.reset( MFSOwner::File(m_cwd->base()) );
+          }
+
+          return bytes_read;
+      }
+        
     }
 }
 
@@ -1455,11 +1468,11 @@ void iecDrive::unmount()
 {
     Debug_printv("DRIVE[#%d] UNMOUNT\r\n", m_devnr);
 
-    if (m_cwd != nullptr)
-    {
-      //m_cwd->unmount();
-      device_active = false;
-    }
+    // if (m_cwd != nullptr)
+    // {
+    //   //m_cwd->unmount();
+    //   device_active = false;
+    // }
 }
 
 

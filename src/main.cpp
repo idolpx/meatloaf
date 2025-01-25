@@ -223,23 +223,22 @@ void main_setup()
 #endif
 
     printf("READY.\r\n");
+
 #ifdef ENABLE_CONSOLE
-    {
-        //Register builtin commands like 'reboot', 'version', or 'meminfo'
-        console.registerSystemCommands();
+    //Register builtin commands like 'reboot', 'version', or 'meminfo'
+    console.registerSystemCommands();
 
-        //Register network commands
-        console.registerNetworkCommands();
+    //Register network commands
+    console.registerNetworkCommands();
 
-        //Register the VFS specific commands
-        console.registerVFSCommands();
+    //Register the VFS specific commands
+    console.registerVFSCommands();
 
-        //Register GPIO commands
-        console.registerGPIOCommands();
+    //Register GPIO commands
+    console.registerGPIOCommands();
 
-        //Register XFER commands
-        console.registerXFERCommands();
-    }
+    //Register XFER commands
+    console.registerXFERCommands();
 #endif
 }
 

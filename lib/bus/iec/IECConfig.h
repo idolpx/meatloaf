@@ -38,7 +38,7 @@
 
 // defines the maximum number of devices that the bus handler will be
 // able to support - set to 4 by default but can be increased to up to 30 devices
-#define MAX_DEVICES 20
+#define MAX_DEVICES 30
 
 // sets the default size of the fastload buffer. If this is set to 0 then fastload
 // protocols can only be used if the IECBusHandler::setBuffer() function is

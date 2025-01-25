@@ -388,6 +388,10 @@ void iecFuji::process_basic_commands()
         get_status_basic();
     else if (payload.find("localip") != std::string::npos)
         local_ip();
+    else if (payload.find("enable") != std::string::npos)
+        enable_device_basic();
+    else if (payload.find("disable") != std::string::npos)
+        disable_device_basic();
     else if (payload.find("bptiming") != std::string::npos)
     {
         if ( pt.size() < 3 ) 
@@ -722,6 +726,38 @@ void iecFuji::net_set_ssid_basic(bool store)
     Debug_printv("ssid[%s] pass[%s]", net_config.ssid, net_config.password);
 
     net_set_ssid(store, net_config);
+}
+
+void iecFuji::enable_device_basic()
+{
+    // Strip off the ENABLE: part of the command
+    pt[0] = pt[0].substr(7, std::string::npos);
+
+    // Enable devices
+    for (int i = 0; i < pt.size(); i++) {
+        uint8_t device = atoi(pt[i].c_str());
+        auto d = IEC.findDevice(device, true);
+        if (d) {
+            d->setActive(true);
+            Debug_printv("Enable Device #%d [%d]", device, d->isActive());
+        }
+    }
+}
+
+void iecFuji::disable_device_basic()
+{
+    // Strip off the DISABLE: part of the command
+    pt[0] = pt[0].substr(8, std::string::npos);
+
+    // Disable devices
+    for (int i = 0; i < pt.size(); i++) {
+        uint8_t device = atoi(pt[i].c_str());
+        auto d = IEC.findDevice(device, true);
+        if (d) {
+            d->setActive(false);
+            Debug_printv("Disable Device #%d [%d]", device, d->isActive());
+        }
+    }
 }
 
 void iecFuji::net_set_ssid_raw(bool store)
@@ -1388,7 +1424,7 @@ bool iecFuji::disk_image_umount(uint8_t deviceSlot)
     if (deviceSlot < MAX_DISK_DEVICES)
     {
         _fnDisks[deviceSlot].disk_dev.unmount();
-        _fnDisks[deviceSlot].disk_dev.device_active = false;
+        //_fnDisks[deviceSlot].disk_dev.device_active = false;
         _fnDisks[deviceSlot].reset();
         is_success = true;
     }
