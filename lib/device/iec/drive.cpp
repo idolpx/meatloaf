@@ -625,8 +625,22 @@ bool iecDrive::open(uint8_t channel, const char *cname)
           if( mode == std::ios_base::in )
             {
               // reading directory
-              std::unique_ptr<MFile> entry = std::unique_ptr<MFile>( f->getNextFileInDir() ); 
-              if( entry!=nullptr )
+              bool isProperDir = false;
+              MFile *entry = f->getNextFileInDir();
+              if( entry==nullptr )
+                {
+                  // if we can't open the file stream then assume this is an empty directory
+                  MStream *s = f->getSourceStream(mode);
+                  if( s==nullptr || !s->isOpen() ) isProperDir = true;
+                  delete s;
+                }
+              else
+                {
+                  delete entry;
+                  isProperDir = true;
+                }
+
+              if( isProperDir )
                 {
                   // regular directory
                   f->rewindDirectory();
@@ -635,11 +649,11 @@ bool iecDrive::open(uint8_t channel, const char *cname)
                   m_cwd.reset(MFSOwner::File(f->url));
                   Debug_printv("Reading directory [%s]", f->url.c_str());
                   f = nullptr; // f will be deleted in iecChannelHandlerDir destructor
-                      setStatusCode(ST_OK);
+                  setStatusCode(ST_OK);
                 }
               else
                 {
-                  // can't read file etries => treat directory as file
+                  // can't read file entries => treat directory as file
                   m_cwd.reset(MFSOwner::File(f->url));
                   Debug_printv("Treating directory as file [%s]", f->url.c_str());
                 }
@@ -1210,7 +1224,22 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
         case 'M':
             if ( command[1] == 'D') // Make Directory
             {
-                Debug_printv( "make directory");
+              Debug_printv( "make directory");
+              string path = mstr::toUTF8(command.substr(colon_position + 1));
+              MFile *f = m_cwd->cd( path );
+              if( f!=nullptr )
+                {
+                  if( f->exists() )
+                    setStatusCode(ST_FILE_EXISTS);
+                  else if( !f->isWritable )
+                    setStatusCode(ST_WRITE_PROTECT);
+                  else if( f->mkDir() )
+                    setStatusCode(ST_OK);
+                  else
+                    setStatusCode(ST_WRITE_ERROR);
+
+                  delete f;
+                }
             }
         break;
         case 'P':
@@ -1220,7 +1249,22 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
         case 'R':
             if ( command[1] == 'D') // Remove Directory
             {
-                Debug_printv( "remove directory");
+              Debug_printv( "remove directory");
+              string path = mstr::toUTF8(command.substr(colon_position + 1));
+              MFile *f = m_cwd->cd( path );
+              if( f!=nullptr )
+                {
+                  if( !f->exists() )
+                    setStatusCode(ST_FILE_NOT_FOUND);
+                  else if( !f->isWritable )
+                    setStatusCode(ST_WRITE_PROTECT);
+                  else if( f->rmDir() )
+                    setStatusCode(ST_OK);
+                  else
+                    setStatusCode(ST_WRITE_ERROR);
+
+                  delete f;
+                }
             }
         break;
         case 'S':

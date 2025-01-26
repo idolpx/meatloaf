@@ -113,6 +113,15 @@ bool FlashMFile::mkDir()
     return (rc==0);
 }
 
+bool FlashMFile::rmDir()
+{
+    if (m_isNull) {
+        return false;
+    }
+    int rc = rmdir(std::string(basepath + path).c_str());
+    return (rc==0);
+}
+
 bool FlashMFile::exists()
 {
     if (m_isNull) {
