@@ -44,26 +44,18 @@ static std::string mac2String(uint64_t mac)
 
 static const char *getFlashModeStr()
 {
-#if CONFIG_IDF_TARGET_ESP32S2
-    const uint32_t spi_ctrl = REG_READ(PERIPHS_SPI_FLASH_CTRL);
-#else
-    const uint32_t spi_ctrl = REG_READ(SPI_CTRL_REG(0));
-#endif
-    /* Not all of the following constants are already defined in older versions of spi_reg.h, so do it manually for now*/
-    if (spi_ctrl & BIT(24)) { //SPI_FREAD_QIO
-        return "QIO";
-    } else if (spi_ctrl & BIT(20)) { //SPI_FREAD_QUAD
-        return "QOUT";
-    } else if (spi_ctrl &  BIT(23)) { //SPI_FREAD_DIO
-        return "DIO";
-    } else if (spi_ctrl & BIT(14)) { // SPI_FREAD_DUAL
-        return "DOUT";
-    } else if (spi_ctrl & BIT(13)) { //SPI_FASTRD_MODE
-        return "FAST READ";
-    } else {
-        return "SLOW READ";
+    auto mode = ESP.getFlashChipMode();
+
+    switch(mode)
+    {
+        case FM_QIO: return "QIO";
+        case FM_QOUT: return "QOUT";
+        case FM_DIO: return "DIO";
+        case FM_DOUT: return "DOUT";
+        case FM_FAST_READ: return "FAST READ";
+        case FM_SLOW_READ: return "SLOW READ";
+        default: return "DOUT";
     }
-    return "DOUT";
 }
 
 static const char *getResetReasonStr()

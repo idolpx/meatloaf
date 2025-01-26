@@ -23,9 +23,16 @@
 #include "nvs_flash.h"
 #include "esp_heap_caps.h"
 #include "sdkconfig.h"
-#include "esp32/himem.h"
 #include "dirent.h"
 #include "FS.h"
+
+#ifdef PSRAM_SIZE
+#ifdef CONFIG_IDF_TARGET_ESP32S3
+#include <esp_psram.h>
+#else
+#include <esp32/himem.h>
+#endif
+#endif
 
 #include <cstdint>
 #include <string>
