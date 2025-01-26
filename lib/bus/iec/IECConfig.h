@@ -25,8 +25,8 @@
 #define SUPPORT_JIFFY
 #define SUPPORT_EPYX
 #if defined(PIN_XRA1405_CS) && defined(PIN_PARALLEL_PC2) && defined(PIN_PARALLEL_FLAG2)
-#define SUPPORT_DOLPHIN
-#define SUPPORT_DOLPHIN_XRA1405
+//#define SUPPORT_DOLPHIN
+//#define SUPPORT_DOLPHIN_XRA1405
 #endif
 
 // support Epyx FastLoad sector operations (disk editor, disk copy, file copy)
