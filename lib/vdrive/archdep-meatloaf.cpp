@@ -159,6 +159,8 @@ int archdep_remove(const char *path)
     {
       if( f->exists() && f->remove() )
         res = 0;
+
+      delete f;
     }
 
   return res;
@@ -174,6 +176,8 @@ int archdep_rename(const char *oldpath, const char *newpath)
     {
       if( f->exists() && f->rename(newpath) )
         res = 0;
+
+      delete f;
     }
 
   return res;

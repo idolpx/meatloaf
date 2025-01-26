@@ -1464,6 +1464,7 @@ void iecDrive::set_cwd(std::string path)
             // we were able to creata a VDrive => this is a valid disk image
             Debug_printv("Created VDrive for URL %s", n->url.c_str());
             setStatusCode(ST_OK);
+            delete n;
           }
         else 
 #endif

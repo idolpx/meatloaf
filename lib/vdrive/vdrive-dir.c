@@ -571,6 +571,7 @@ int vdrive_dir_first_directory(vdrive_t *vdrive,
         }
 
         vdrive_dir_find_first_slot(vdrive, (uint8_t *)name, newlen, filetype, &p->dir);
+        lib_free(name);
 
         if (c) {
             while (c < limit) {
