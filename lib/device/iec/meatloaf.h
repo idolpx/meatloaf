@@ -20,6 +20,15 @@ public:
         net_store_ssid(ssid, password);
     }
 
+    void enable(std::string deviceids) {
+        payload = deviceids;
+        enable_device_basic();
+    }
+    void disable(std::string deviceids) {
+        payload = deviceids;
+        disable_device_basic();
+    }
+
     bool mount(int deviceid, std::string url);
 };
 

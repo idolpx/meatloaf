@@ -72,5 +72,13 @@
 #define PIN_MODEM_ENABLE        GPIO_NUM_2  // High = Modem enabled
 #define PIN_MODEM_UP9600        GPIO_NUM_15 // High = UP9600 enabled
 
+
+/* Cassette */
+#define PIN_CASS_MOTOR          GPIO_NUM_39         // VN Cassette Motor is active if high
+#define PIN_CASS_SENSE          PIN_IEC_CLK_IN      // key has been pressed if low
+#define PIN_CASS_WRITE          PIN_IEC_DATA_IN     // DATA IN from 64
+#define PIN_CASS_READ           PIN_IEC_SRQ         // DATA OUT to 64
+
+
 #endif // PINMAP_LOLIN_D32_PRO
 #endif // PINMAP_LOLIN_D32_PRO_H
