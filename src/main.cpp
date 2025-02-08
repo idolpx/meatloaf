@@ -138,16 +138,18 @@ void main_setup()
     fnSystem.digital_write(PIN_MODEM_UP9600, DIGI_LOW); // DISABLE UP9600
     //fnSystem.digital_write(PIN_MODEM_UP9600, DIGI_HIGH); // ENABLE UP9600
 
-    fsFlash.start();
-
-    // Create SYSTEM DIR if it doesn't exist
-    fsFlash.create_path( SYSTEM_DIR );
+    if ( fsFlash.start() )
+    {
+        // Create SYSTEM DIR if it doesn't exist
+        fsFlash.create_path( SYSTEM_DIR );
+    }
 
 #ifdef SD_CARD
-    fnSDFAT.start();
-
-    // Create SYSTEM DIR if it doesn't exist
-    fnSDFAT.create_path( SYSTEM_DIR );
+    if ( fnSDFAT.start() )
+    {
+        // Create SYSTEM DIR if it doesn't exist
+        fnSDFAT.create_path( SYSTEM_DIR );
+    }
 #endif
 
     // setup crypto key - must be done before loading the config

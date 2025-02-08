@@ -196,10 +196,7 @@ bool FileSystemSDFAT::dir_open(const char * path, const char * pattern, uint16_t
 	);
 	bool filter_dirs = have_pattern && pattern[strlen(pattern)-1] == '/';
 	if (filter_dirs) {
-		Debug_printf (
-			"FileSystemSDFAT::dir_open I am %s filtering directories.\n",
-			have_pattern ? "" : "not"
-		);
+		Debug_printf ("FileSystemSDFAT::dir_open I am filtering directories.\n");
 		strlcpy (realpat, pattern, sizeof (realpat));
 		realpat[strlen(realpat)-1] = '\0';
 	}
@@ -728,5 +725,5 @@ bool FileSystemSDFAT::start(const char *sd_path)
 
     return _started;
 }
-
-#endif // !ESP_PLATFORM
+// !ESP_PLATFORM
+#endif

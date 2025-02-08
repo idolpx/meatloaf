@@ -1493,7 +1493,9 @@ void iecDrive::set_cwd(std::string path)
 mediatype_t iecDrive::mount(FILE *f, const char *filename, uint32_t disksize, mediatype_t disk_type)
 {
   Debug_printv("filename[%s], disksize[%lu] disktype[%d]", filename, disksize, disk_type);
-  std::string url = this->m_host->get_basepath();
+  std::string url;
+  if (this->m_host) 
+    url = this->m_host->get_basepath();
   
   mstr::toLower(url);
   if ( url == "sd" )

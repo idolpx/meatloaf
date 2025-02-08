@@ -55,11 +55,17 @@ class IECDevice
   bool enableEpyxFastLoadSupport(bool enable);
 #endif
 
+
+  /**
+   * @brief is device active (turned on?)
+   */
+  bool device_active = true;
+
   // this can be overloaded by derived classes
-  virtual bool isActive() { return m_isActive; }
+  virtual bool isActive() { return device_active; }
 
   // if isActive() is not overloaded then use this to activate/deactivate a device
-  void setActive(bool b) { m_isActive = b; }
+  void setActive(bool b) { device_active = b; }
 
  protected:
   // called when IECBusHandler::begin() is called
@@ -181,7 +187,7 @@ class IECDevice
   void sendSRQ();
 
  protected:
-  bool       m_isActive;
+  //bool       m_isActive;
   uint8_t    m_devnr;
   uint16_t m_sflags;
   IECBusHandler *m_handler;

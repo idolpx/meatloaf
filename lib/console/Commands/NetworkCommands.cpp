@@ -10,7 +10,7 @@
 #include <esp_wifi.h>
 #include <esp_crc.h>
 
-#include "device.h"
+//#include "../device/fuji.h"
 #include "fnWiFi.h"
 
 #include "string_utils.h"
@@ -273,7 +273,7 @@ static int connect(int argc, char **argv)
         int e = ( fnWiFi.connect(network.c_str(), argv[2]) );
 
         if ( e == ESP_OK)
-            Meatloaf.persist_wifi(network, argv[2]);
+            fnWiFi.store_wifi(network, argv[2]);
 
         return e;
     }

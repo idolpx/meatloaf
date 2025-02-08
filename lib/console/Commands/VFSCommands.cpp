@@ -351,10 +351,23 @@ int mount(int argc, char **argv)
         return EXIT_SUCCESS;
     }
 
-    int did = atoi(argv[1]);
-    fprintf(stdout, "Mounted %d -> %s\r\n", did, argv[2]);
+    int did = atoi(argv[1]) - 8;
 
-    Meatloaf.mount_all();
+    char filename[PATH_MAX];
+    ESP32Console::console_realpath(argv[2], filename);
+
+    Debug_printv("device id[%d] url[%s]", did, filename);
+
+    auto drive = Meatloaf.get_disks(did);
+    if (drive != nullptr)
+    {
+        //drive->disk_dev.m_host->mount();
+        drive->disk_dev.mount(NULL, filename, 0);
+    }
+    else
+    {
+        fprintf(stderr, "Error mounting: device #%02d not enabled\r\n", did);
+    }
 
     return EXIT_SUCCESS;
 }

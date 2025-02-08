@@ -156,9 +156,6 @@ protected:
     // is the cmd supported by RAW?
     bool is_supported(uint8_t cmd);
 
-    // helper functions
-    void net_store_ssid(std::string ssid, std::string password);
-
     // 0xFF
     void reset_device();
 

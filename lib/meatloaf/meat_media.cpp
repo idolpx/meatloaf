@@ -247,7 +247,7 @@ uint32_t MMediaStream::write(const uint8_t *buf, uint32_t size) {
 
 // seek = (offset) => this.containerStream.seek(offset + this.media_header_size);
 bool MMediaStream::seek(uint32_t offset) {
-    _position = media_header_size + offset;
+    _position = media_data_offset + offset;
     return containerStream->seek( _position ); 
 }
 // seekCurrent = (offset) => this.containerStream.seekCurrent(offset);

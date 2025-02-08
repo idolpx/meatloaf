@@ -295,7 +295,7 @@ void _tnfs_cache_dump(const char *title, uint8_t *cache, uint32_t cache_size)
 int _tnfs_read_from_cache(tnfsFileHandleInfo *pFHI, uint8_t *dest, uint16_t dest_size, uint16_t *dest_used)
 {
     #ifdef VERBOSE_TNFS
-    Debug_printf("_tnfs_read_from_cache: buffpos=%d, cache_start=%d, cache_avail=%d, dest_size=%d, dest_used=%d\r\n",
+    Debug_printf("_tnfs_read_from_cache: buffpos=%lu, cache_start=%lu, cache_avail=%lu, dest_size=%u, dest_used=%u\r\n",
                  pFHI->cached_pos, pFHI->cache_start, pFHI->cache_available, dest_size, *dest_used);
     #endif
 
@@ -370,7 +370,7 @@ int _tnfs_fill_cache(tnfsMountInfo *m_info, tnfsFileHandleInfo *pFHI)
     // Note that when we're filling the cache, we're dealing with the "real" file position,
     // not the cached_position we also keep track of on behalf of the client
     #ifdef VERBOSE_TNFS
-    Debug_printf("_TNFS_FILL_CACHE fh=%d, file_position=%d\r\n", pFHI->handle_id, pFHI->file_position);
+    Debug_printf("_TNFS_FILL_CACHE fh=%d, file_position=%lu\r\n", pFHI->handle_id, pFHI->file_position);
     #endif
 
     int error = 0;
@@ -416,7 +416,7 @@ int _tnfs_fill_cache(tnfsMountInfo *m_info, tnfsFileHandleInfo *pFHI)
                 bytes_remaining_to_load -= bytes_read;
 
                 #ifdef VERBOSE_TNFS
-                Debug_printf("_tnfs_fill_cache got %u bytes, %u more bytes needed\r\n", bytes_read, bytes_remaining_to_load);
+                Debug_printf("_tnfs_fill_cache got %u bytes, %lu more bytes needed\r\n", bytes_read, bytes_remaining_to_load);
                 #endif
             }
             else if(tnfs_result == TNFS_RESULT_END_OF_FILE)
@@ -1647,7 +1647,7 @@ void _tnfs_debug_packet(const tnfsPacket &pkt, unsigned short payload_size, bool
     Debug_printf("\t[%02x%02x %02x %02x] ", pkt.session_idh, pkt.session_idl, pkt.sequence_num, pkt.command);
     for (int i = 0; i < payload_size; i++)
         Debug_printf("%02x ", pkt.payload[i]);
-    Debug_println("");
+    Debug_println("\r\n");
 #endif
 }
 

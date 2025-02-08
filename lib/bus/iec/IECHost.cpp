@@ -30,7 +30,7 @@ IECDevice::IECDevice(uint8_t devnr)
   m_devnr   = devnr; 
   m_handler = NULL;
   m_sflags  = 0;
-  m_isActive = true;
+  //m_isActive = true;
 }
 
 void IECDevice::setDeviceNumber(uint8_t devnr)

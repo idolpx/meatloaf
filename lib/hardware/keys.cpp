@@ -18,7 +18,6 @@
 #include "fnBluetooth.h"
 
 #include "led.h"
-#include "led_strip.h"
 
 // Global KeyManager object
 KeyManager fnKeyManager;

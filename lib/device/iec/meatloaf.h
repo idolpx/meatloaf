@@ -16,9 +16,6 @@ public:
         payload = command;
         process_basic_commands();
     }
-    void persist_wifi(std::string ssid, std::string password){
-        net_store_ssid(ssid, password);
-    }
 
     void enable(std::string deviceids) {
         payload = deviceids;

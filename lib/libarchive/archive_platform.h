@@ -53,15 +53,15 @@
 // #endif
 
 /* On macOS check for some symbols based on the deployment target version.  */
-#if defined(__APPLE__)
-# undef HAVE_FUTIMENS
-# undef HAVE_UTIMENSAT
-# include <AvailabilityMacros.h>
-# if MAC_OS_X_VERSION_MIN_REQUIRED >= 101300
-#  define HAVE_FUTIMENS 1
-#  define HAVE_UTIMENSAT 1
-# endif
-#endif
+// #if defined(__APPLE__)
+// # undef HAVE_FUTIMENS
+// # undef HAVE_UTIMENSAT
+// # include <AvailabilityMacros.h>
+// # if MAC_OS_X_VERSION_MIN_REQUIRED >= 101300
+// #  define HAVE_FUTIMENS 1
+// #  define HAVE_UTIMENSAT 1
+// # endif
+// #endif
 
 /* For cygwin, to avoid missing LONG, ULONG, PUCHAR, ... definitions */
 #ifdef __CYGWIN__

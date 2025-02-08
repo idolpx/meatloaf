@@ -274,6 +274,9 @@ const char *fujiHost::get_hostname()
 */
 const char *fujiHost::get_basepath()
 {
+    if ( _fs == nullptr )
+        return nullptr;
+
     return _fs->basepath();
 }
 
