@@ -610,11 +610,8 @@ bool iecDrive::open(uint8_t channel, const char *cname)
       if ( name[0] == '$' ) 
         name.clear();
 
-      if ( m_cwd->isPETSCII )
-        name = mstr::toUTF8( name );
-
       // get file
-      MFile *f = m_cwd->cd( name );
+      MFile *f = m_cwd->cd( mstr::toUTF8( name ) );
 
       if( f == nullptr ) // || f->url.empty() )
         {
@@ -1511,6 +1508,8 @@ mediatype_t iecDrive::mount(FILE *f, const char *filename, uint32_t disksize, me
 
   Debug_printv("DRIVE[#%d] URL[%s] MOUNT[%s]", m_devnr, url.c_str(), filename);
 
+  // open is expecting PETSCII
+  url = mstr::toPETSCII2(url);
   this->open( 0, url.c_str() );
 
   return MediaType::discover_mediatype(filename); // MEDIATYPE_UNKNOWN
