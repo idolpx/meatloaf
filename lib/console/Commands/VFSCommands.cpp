@@ -354,7 +354,14 @@ int mount(int argc, char **argv)
     int did = atoi(argv[1]) - 8;
 
     char filename[PATH_MAX];
-    ESP32Console::console_realpath(argv[2], filename);
+    if ( mstr::contains(argv[2], ":") )
+    {
+        strcpy(filename, argv[2]);
+    }
+    else
+    {
+        ESP32Console::console_realpath(argv[2], filename);
+    }
 
     Debug_printv("device id[%d] url[%s]", did, filename);
 
