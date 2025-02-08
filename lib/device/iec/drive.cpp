@@ -610,8 +610,11 @@ bool iecDrive::open(uint8_t channel, const char *cname)
       if ( name[0] == '$' ) 
         name.clear();
 
+      if ( m_cwd->isPETSCII )
+        name = mstr::toUTF8( name );
+
       // get file
-      MFile *f = m_cwd->cd(mstr::toUTF8(name));
+      MFile *f = m_cwd->cd( name );
 
       if( f == nullptr ) // || f->url.empty() )
         {
