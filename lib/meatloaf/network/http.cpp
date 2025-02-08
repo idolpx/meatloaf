@@ -18,6 +18,11 @@ MeatHttpClient* HTTPMFile::fromHeader() {
 
         // let's just get the headers so we have some info
         //Debug_printv("Client requesting head");
+
+        if (mstr::endsWith(url, "*") || mstr::endsWith(url, "$")) {
+            url = mstr::dropLast(url, 1);
+            Debug_printv("url[%s]", url.c_str());
+        }
         Debug_printv("before head url[%s]", url.c_str());
         client->HEAD(url);
         Debug_printv("after head url[%s]", client->url.c_str());
