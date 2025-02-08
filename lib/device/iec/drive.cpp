@@ -1494,18 +1494,22 @@ mediatype_t iecDrive::mount(FILE *f, const char *filename, uint32_t disksize, me
 {
   Debug_printv("filename[%s], disksize[%lu] disktype[%d]", filename, disksize, disk_type);
   std::string url;
-  if (this->m_host) 
-    url = this->m_host->get_basepath();
-  
-  mstr::toLower(url);
-  if ( url == "sd" )
-    url = "//sd";
+
+  if ( !mstr::contains(filename, ":") )
+  {
+    if (this->m_host) 
+      url = this->m_host->get_basepath();
+    
+    mstr::toLower(url);
+    if ( url == "sd" )
+      url = "//sd";
+  }
   url += filename;
-  
+
   Debug_printv("DRIVE[#%d] URL[%s] MOUNT[%s]", m_devnr, url.c_str(), filename);
-  
-  m_cwd.reset( MFSOwner::File( url ) );
-  
+
+  this->open( 0, url.c_str() );
+
   return MediaType::discover_mediatype(filename); // MEDIATYPE_UNKNOWN
 }
 
