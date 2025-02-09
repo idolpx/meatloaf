@@ -147,7 +147,7 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
 #endif
     &p00FS,
     &httpFS, &tnfsFS,
-    &csipFS, &mlFS,
+//    &csipFS, &mlFS,
     &t64FS, &tcrtFS
 //    &ipfsFS, &tcpFS,
 //    &tnfsFS
@@ -199,10 +199,17 @@ MFile* MFSOwner::File(std::shared_ptr<MFile> file) {
 
 
 MFile* MFSOwner::File(std::string path) {
-    // if(mstr::startsWith(path,"cs:", false)) {
-    //     //printf("CServer path found!\r\n");
-    //     return csFS.getFile(path);
-    // }
+
+    if ( mlFS.handles(path) )
+    {
+        path = mlFS.resolve(path);
+    }
+
+    if ( csipFS.handles(path) )
+    {
+        printf("C=Server!\r\n");
+        return csipFS.getFile(path);
+    }
 
     std::vector<std::string> paths = mstr::split(path,'/');
 
@@ -227,18 +234,17 @@ MFile* MFSOwner::File(std::string path) {
         auto endHere = pathIterator;
         pathIterator--;
 
+        auto upperPath = mstr::joinToString(&begin, &pathIterator, "/");
         if(begin == pathIterator) 
         {
-            //Debug_printv("** LOOK DOWN PATH NOT NEEDED   path[%s]", path.c_str());
-            newFile->streamFile = foundFS->getFile(mstr::joinToString(&begin, &pathIterator, "/"));
+            //Debug_printv("** LOOK DOWN PATH NOT NEEDED   path[%s] upperPath[%s]", path.c_str(), upperPath.c_str());
+            newFile->streamFile = foundFS->getFile(upperPath);
         } 
         else 
         {
-            auto upperPath = mstr::joinToString(&begin, &pathIterator, "/");
             //Debug_printv("** LOOK DOWN PATH: %s", upperPath.c_str());
 
             auto upperFS = testScan(begin, end, pathIterator);
-
             if ( upperFS != nullptr )
             {
                 auto wholePath = mstr::joinToString(&begin, &endHere, "/");
@@ -250,7 +256,7 @@ MFile* MFSOwner::File(std::string path) {
             }
             else
             {
-                Debug_printv("WARNING!!!! CONTAINER FAILED FOR: '%s'", upperPath.c_str());
+                //Debug_printv("WARNING!!!! CONTAINER FAILED FOR: '%s'", upperPath.c_str());
             }
         }
 
@@ -272,8 +278,6 @@ MFile* MFSOwner::NewFile(std::string path) {
         Debug_printv("File already exists [%s]", path.c_str());
         return nullptr;
     }
-
-
 
     return newFile;
 }

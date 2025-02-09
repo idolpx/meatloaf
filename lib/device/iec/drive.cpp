@@ -510,6 +510,9 @@ iecDrive::iecDrive(uint8_t devnum) : IECFileDevice(devnum)
   m_statusCode = ST_SPLASH;
   m_statusTrk  = 0;
   m_numOpenChannels = 0;
+
+  m_memory.setROM("dos1541"); // Default to 1541 ROM
+
 #ifdef USE_VDRIVE
   m_vdrive = NULL;
 #endif

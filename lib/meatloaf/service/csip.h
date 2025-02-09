@@ -285,20 +285,18 @@ protected:
 
 class CSIPMFileSystem: public MFileSystem 
 {
+public:
+    static CSIPMSessionMgr session;
+
+    CSIPMFileSystem(): MFileSystem("csip") {};
+
     bool handles(std::string name) {
         return name == "csip:";
     }
-    
-public:
-    CSIPMFileSystem(): MFileSystem("csip") {};
-    static CSIPMSessionMgr session;
+
     MFile* getFile(std::string path) override {
         return new CSIPMFile(path);
     }
-
 };
-
-
-
 
 #endif /* MEATLOAF_SCHEME_CSIP */

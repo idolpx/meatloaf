@@ -94,7 +94,7 @@ class driveMemory
 
  public:
    driveMemory(size_t ramSize = 2048) : ram(ramSize, 0x00) {
-    setROM("dos1541"); // Default to 1541 ROM
+    //setROM("dos1541"); // Default to 1541 ROM
   }
   ~driveMemory() = default;
 
