@@ -339,9 +339,20 @@ int mkdir(int argc, char **argv)
 
 int mount(int argc, char **argv)
 {
-    if (argc != 3)
+    if (argc < 3)
     {
-        fprintf(stderr, "mount {device id} {url}\r\n");
+        //fprintf(stderr, "mount {device id} {url/path/filename}\r\n");
+
+        for (int i = 0; i < MAX_DISK_DEVICES; i++)
+        {
+            // Show device status
+            auto drive = Meatloaf.get_disks(i);
+            if (drive != nullptr)
+            {
+                fprintf(stdout, "#%02d: %s\r\n", i + 8, drive->disk_dev.getCWD().c_str()); //"%d: %s\r\n", drive->disk_dev.getCWD().c_str();
+            }
+        }
+
         return EXIT_SUCCESS;
     }
 

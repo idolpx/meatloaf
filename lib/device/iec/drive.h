@@ -227,6 +227,7 @@ class iecDrive : public IECFileDevice
 
   int     id() { return m_devnr; };
   uint8_t getNumOpenChannels();
+  std::string getCWD() { return m_cwd->url; }
   uint8_t getStatusCode() { return m_statusCode; }
   void    setStatusCode(uint8_t code, uint8_t trk = 0);
   bool    hasError();
