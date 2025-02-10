@@ -95,8 +95,10 @@ typedef enum
 } device_state_t;
 
 
-class iecFuji : public IECDevice
+class iecFuji //: public IECDevice
 {
+friend class iecMeatloaf;
+
 //private:
 protected:
     systemBus *_bus;
@@ -142,16 +144,16 @@ protected:
     int last_command = -1;
 
 //protected:
-    virtual void talk(uint8_t secondary) override;
-    virtual void listen(uint8_t secondary) override;
-    virtual void untalk() override;
-    virtual void unlisten() override;
-    virtual int8_t canWrite() override;
-    virtual int8_t canRead() override;
-    virtual void write(uint8_t data, bool eoi) override;
-    virtual uint8_t read() override;
-    virtual void task() override;
-    virtual void reset() override;
+    // virtual void talk(uint8_t secondary) override;
+    // virtual void listen(uint8_t secondary) override;
+    // virtual void untalk() override;
+    // virtual void unlisten() override;
+    // virtual int8_t canWrite() override;
+    // virtual int8_t canRead() override;
+    // virtual void write(uint8_t data, bool eoi) override;
+    // virtual uint8_t read() override;
+    // virtual void task() override;
+    // virtual void reset() override;
 
     // is the cmd supported by RAW?
     bool is_supported(uint8_t cmd);
@@ -418,7 +420,7 @@ public:
 
     void insert_boot_device(uint8_t d);
 
-    void setup(systemBus *bus);
+    virtual void setup(systemBus *bus);
 
     void image_rotate();
     int get_disk_id(int drive_slot);

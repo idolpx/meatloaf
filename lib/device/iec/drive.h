@@ -240,7 +240,7 @@ class iecDrive : public IECFileDevice
   //virtual bool isActive() { return device_active; }
 
 
- private:
+ protected:
   // open file "name" on channel
   virtual bool open(uint8_t channel, const char *name);
 

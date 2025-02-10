@@ -104,16 +104,17 @@ public:
         m_statusCode = code;
     };
 
+    void set_pixel(uint16_t index, CRGB color);
+    void set_pixel(uint16_t index, uint8_t r, uint8_t g, uint8_t b);
+    void set_pixels(uint16_t index, CRGB *colors, uint16_t count);
+
     // Returns segment index
     uint8_t add_segment(uint8_t index, uint8_t length) { 
         segments.push_back(std::make_pair(index, length)); 
         return segments.size() - 1;
     }
     void clear_segments() { segments.clear(); }
-
-    void set_pixel(uint16_t index, CRGB color);
-    void set_pixel(uint16_t index, uint8_t r, uint8_t g, uint8_t b);
-    void set_pixels(uint16_t index, CRGB *colors, uint16_t count);
+    void set_segment(uint16_t index, CRGB color);
 
 };
 

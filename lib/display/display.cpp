@@ -12,6 +12,7 @@
 
 //#include "WS2812FX/WS2812FX.h"
 
+#define ST_DISPLAY_OFF       255
 #define ST_OK                  0
 #define ST_SCRATCHED           1
 #define ST_WRITE_ERROR        25
@@ -83,6 +84,10 @@ void Display::service()
             activity = false;
             switch( m_statusCode )
             {
+                case ST_DISPLAY_OFF    :
+                    // Set all leds to black
+                    fill_all((CRGB){.r=0, .g=0, .b=0});
+                    break;
                 case ST_OK             :
                 case ST_SCRATCHED      :
                 case ST_SPLASH         :
@@ -147,6 +152,16 @@ esp_err_t Display::init(int pin, led_strip_model_t model, int num_of_leds)
 
 void Display::set_pixel(uint16_t index, CRGB color) { ws28xx_pixels[index] = color; };
 void Display::set_pixel(uint16_t index, uint8_t r, uint8_t g, uint8_t b) { ws28xx_pixels[index] = (CRGB){.r=r, .g=g, .b=b}; };
+
+void Display::set_segment(uint16_t index, CRGB color)
+{
+    int start = segments[index].first;
+    int end = segments[index].second;
+
+    for (int i = start; i < end; i++) {
+        ws28xx_pixels[i] = color;
+    }
+}
 
 void Display::fill_all(CRGB color) 
 {

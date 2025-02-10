@@ -86,7 +86,7 @@ static std::string dataToHexString(uint8_t *data, size_t len)
 
 
 // Constructor
-iecFuji::iecFuji() : IECDevice()
+iecFuji::iecFuji() //: IECDevice()
 {
     // Helpful for debugging
     for (int i = 0; i < MAX_HOSTS; i++)
@@ -129,10 +129,10 @@ void iecFuji::setup(systemBus *bus)
     if (bus->attachDevice(new iecClock(29)))
         Debug_printf("Attached clock device #%d\r\n", 29);
 
-    // FujiNet
-    setDeviceNumber(30); 
-    if (bus->attachDevice(this))
-        Debug_printf("Attached Meatloaf device #%d\r\n", 30);
+    // // FujiNet
+    // setDeviceNumber(30); 
+    // if (bus->attachDevice(this))
+    //     Debug_printf("Attached Meatloaf device #%d\r\n", 30);
 }
 
 void logResponse(const void* data, size_t length)
@@ -161,7 +161,7 @@ void logResponse(const void* data, size_t length)
 
 }
 
-
+#if 0
 void iecFuji::talk(uint8_t secondary)
 {
   // only talk on channel 15
@@ -251,6 +251,7 @@ void iecFuji::reset()
   responseV.clear();
   state = DEVICE_IDLE;
 }
+#endif
 
 
 void iecFuji::process_cmd()
@@ -399,7 +400,6 @@ void iecFuji::process_basic_commands()
 
         //IEC.setBitTiming(pt[1], atoi(pt[2].c_str()), atoi(pt[3].c_str()), atoi(pt[4].c_str()), atoi(pt[5].c_str()));
     }
-
 }
 
 bool iecFuji::is_supported(uint8_t cmd)

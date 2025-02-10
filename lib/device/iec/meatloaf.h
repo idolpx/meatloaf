@@ -1,16 +1,32 @@
 #ifndef MEATLOAF_H
 #define MEATLOAF_H
 
+#include "drive.h"
 #include "fuji.h"
 
-class iecMeatloaf : public iecFuji
+class iecMeatloaf : public iecDrive, public iecFuji
 {
 private:
 
 protected:
 
 public:
-    iecMeatloaf() {};
+    //iecMeatloaf() {};
+
+    void setup(systemBus *bus) override {
+        iecFuji::setup(bus);
+
+        setDeviceNumber(30); 
+        if (bus->attachDevice(this))
+            Debug_printf("Attached Meatloaf device #%d\r\n", 30);
+    }
+
+    void execute(const char *command, uint8_t cmdLen) override {
+        iecDrive::execute(command, cmdLen);
+
+        payload = command;
+        iecFuji::process_cmd();
+    }
 
     void execute(std::string command) {
         payload = command;
@@ -25,8 +41,6 @@ public:
         payload = deviceids;
         disable_device_basic();
     }
-
-    bool mount(int deviceid, std::string url);
 };
 
 extern iecMeatloaf Meatloaf;
