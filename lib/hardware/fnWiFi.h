@@ -22,6 +22,8 @@
 #define WIFI_FAIL_BIT         BIT1
 #define WIFI_NO_IP_YET_BIT    BIT2
 
+#include "tcpsvr.h"
+
 // using namespace std;
 
 class WiFiManager

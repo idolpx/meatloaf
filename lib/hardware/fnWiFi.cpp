@@ -23,6 +23,7 @@
 #include "led.h"
 
 #include "httpd_server.h"
+#include "tcpsvr.h"
 
 #ifdef ENABLE_SSDP
 #include "ssdp.h"
@@ -653,6 +654,7 @@ void WiFiManager::handle_station_stop()
     fnLedManager.set(eLed::LED_WIFI, false);
     oHttpdServer.stop();
     fnSystem.Net.stop_sntp_client();
+    tcp_server.stop();
 }
 
 void add_mdns_services()
@@ -697,6 +699,9 @@ void WiFiManager::_wifi_event_handler(void *arg, esp_event_base_t event_base,
             SSDPDevice.start();
             printf( ANSI_GREEN_BOLD "SSDP Service Started!" ANSI_RESET "\r\n");
 #endif
+
+            // Start TCP Server
+            tcp_server.start();
 
             break;
         case IP_EVENT_STA_LOST_IP:
