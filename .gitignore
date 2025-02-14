@@ -27,6 +27,7 @@ data/BUILD_IEC/.sys/config.ini
 bin/*
 firmware/*
 examples/*
+managed_components/*
 
 .travis.yml
 compile_commands.json
