@@ -13,18 +13,31 @@
     "f_cpu": "240000000L",
     "f_flash": "80000000L",
     "flash_mode": "qio",
-    "hwids": [["0x303A", "0x1001"]],
+    "hwids": [
+      [
+        "0x303A",
+        "0x1001"
+      ]
+    ],
     "mcu": "esp32s3",
     "variant": "esp32s3",
     "partitions": "boards/flash_partitions_4MB.csv"
   },
-  "connectivity": ["wifi", "bluetooth"],
+  "connectivity": [
+    "wifi",
+    "bluetooth"
+  ],
   "debug": {
     "default_tool": "esp-builtin",
-    "onboard_tools": ["esp-builtin"],
+    "onboard_tools": [
+      "esp-builtin"
+    ],
     "openocd_target": "esp32s3.cfg"
   },
-  "frameworks": ["arduino", "espidf"],
+  "frameworks": [
+    "arduino",
+    "espidf"
+  ],
   "name": "Meatloaf ESP32-S3 4MB",
   "upload": {
     "flash_size": "4MB",
