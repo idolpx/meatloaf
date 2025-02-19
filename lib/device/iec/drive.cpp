@@ -1232,12 +1232,21 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
               MFile *f = m_cwd->cd( path );
               if( f!=nullptr )
                 {
+                  Debug_printv("path[%s]", f->path.c_str());
                   if( f->exists() )
                     setStatusCode(ST_FILE_EXISTS);
                   else if( !f->isWritable )
                     setStatusCode(ST_WRITE_PROTECT);
-                  else if( f->mkDir() )
+                  else if( f->format("meatloaf,01") )
+                  {
+                    Debug_printv("format ok");
                     setStatusCode(ST_OK);
+                  }
+                  else if( f->mkDir() )
+                  {
+                    Debug_printv("mkdir ok");
+                    setStatusCode(ST_OK);
+                  }
                   else
                     setStatusCode(ST_WRITE_ERROR);
 

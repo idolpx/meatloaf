@@ -330,6 +330,8 @@ public:
         return new D64MStream(containerIstream);
     }
 
+    bool format(std::string header_info) override;
+
     bool isDirectory() override;
     bool rewindDirectory() override;
     MFile* getNextFileInDir() override;

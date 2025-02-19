@@ -1,6 +1,9 @@
 
 #include "d64.h"
 
+#include <stdio.h>
+#include <fcntl.h>
+
 //#include "meat_broker.h"
 #include "../meat_media.h"
 #include "endianness.h"
@@ -445,7 +448,7 @@ uint32_t D64MStream::writeFile(uint8_t *buf, uint32_t size)
     {
         if (size > available())
             size = available();
-        
+
         // Only read up to the bytes remaining in this sector
         size = std::min(size, (uint32_t) (block_size - sector_offset % block_size));
 
@@ -522,6 +525,32 @@ bool D64MStream::seekPath(std::string path)
 /********************************************************
  * File implementations
  ********************************************************/
+
+ bool D64MFile::format(std::string header_info)
+ {
+     // Open the file in write mode
+     int fd = open(path.c_str(), O_WRONLY | O_CREAT, 0644);
+ 
+     if (fd == -1) {
+         // Handle file opening error
+         return false;
+     }
+ 
+     // Truncate the file to the desired size
+     if (ftruncate(fd, size) == -1) {
+         // Handle file truncation error
+         close(fd);
+         return false;
+     }
+ 
+     // Write the header to the file
+ 
+     // Clear directory track
+ 
+ 
+     close(fd);
+     return true;
+ }
 
 bool D64MFile::isDirectory()
 {

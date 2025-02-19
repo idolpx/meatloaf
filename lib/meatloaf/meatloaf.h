@@ -206,7 +206,7 @@ public:
     virtual MStream* getDecodedStream(std::shared_ptr<MStream> src) = 0;
     virtual MStream* createStream(std::ios_base::openmode) { return nullptr; };
 
-    virtual bool format(std::string header, std::string id);
+    virtual bool format(std::string header_info) { return false; };
 
     MFile* cd(std::string newDir);
     MFile* cdParent(std::string = "");
