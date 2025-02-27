@@ -20,6 +20,7 @@
 #include <map>
 #include <bitset>
 #include <ctime>
+#include <cstring>
 
 #include "../meat_media.h"
 #include "string_utils.h"
@@ -54,7 +55,7 @@ protected:
     };
 
     struct Header {
-        char disk_name[16];
+        char name[16];
         char unused[2];
         char id_dos[5];
     };
@@ -254,7 +255,8 @@ public:
 private:
     void sendListing();
 
-    bool readHeader() override {
+    bool readHeader() override
+    {
         seekSector( 
             partitions[partition].header_track, 
             partitions[partition].header_sector, 
@@ -265,15 +267,32 @@ private:
 
         return false;
     }
-    bool writeHeader() override {
+    bool writeHeader(std::string name, std::string id) override
+    {
         seekSector( 
             partitions[partition].header_track, 
             partitions[partition].header_sector, 
             partitions[partition].header_offset 
         );
+
+        name = mstr::toPETSCII2(name);
+        id = mstr::toPETSCII2(id);
+
+        // Set default values
+        memset(&header, 0xA0, sizeof(header));
+        memcpy(header.id_dos, "\x30\x30\xA0\x32\x41", 5); // "00 2A"
+
+        // Set values
+        memcpy(header.name, name.c_str(), name.size());
+        memcpy(header.id_dos, id.c_str(), id.size());
+        Debug_printv("name[%16s] id_dos[%5s]", header.name, header.id_dos);
         if (writeContainer((uint8_t*)&header, sizeof(header)))
             return true;
-        
+
+        std::string bam_message = "meatloaf!!! https://meatloaf.cc";
+        if (writeContainer((uint8_t*)bam_message.c_str(), sizeof(bam_message)))
+            return true;
+
         return false;
     }
 
@@ -288,6 +307,89 @@ private:
     bool deallocateBlock( uint8_t track, uint8_t sector );
     bool getNextFreeBlock(uint8_t startTrack, uint8_t startSector, uint8_t *foundTrack, uint8_t *foundSector);
     bool isBlockFree(uint8_t track, uint8_t sector);
+    bool initializeBlockAllocationMap()
+    {
+        uint16_t bam_index = 0;
+        uint16_t bam_count = partitions[partition].block_allocation_map.size();
+
+        while (bam_index < bam_count) {
+            seekSector( 
+                partitions[partition].block_allocation_map[bam_index].track, 
+                partitions[partition].block_allocation_map[bam_index].sector, 
+                partitions[partition].block_allocation_map[bam_index].offset 
+            );
+
+            // Set default values
+            uint8_t track = partitions[partition].block_allocation_map[bam_index].start_track;
+            uint8_t end_track = partitions[partition].block_allocation_map[bam_index].end_track;
+            uint8_t byte_count = partitions[partition].block_allocation_map[bam_index].byte_count;
+            byte_count--; // First byte is number of sectors allocated
+
+            // Update BAM for each track
+            for (uint8_t t = track; t <= end_track; t++) {
+                uint8_t sectors = getSectorCount(t);
+                uint8_t data = 0;
+                
+                // First byte is count of free sectors
+                data = sectors;
+                if (!writeContainer((uint8_t*)&data, 1))
+                    return false;
+
+                // Next bytes are the bit map (1 = Free, 0 = Allocated)
+                for (uint8_t i = 0; i < byte_count; i++) {
+                    if ( sectors >= 8 )
+                    {
+                        data = 0xFF;
+                        sectors -= 8;
+                    }
+                    else
+                    {
+                        data = 0x00;
+                        while (sectors > 0) {
+                            data |= 0x01 << (sectors - 1);
+                            sectors--;
+                        }
+                    }
+
+                    if (!writeContainer((uint8_t*)&data, 1))
+                        return false;
+                }
+            }
+            bam_index++;
+        }
+
+        return true;
+    }
+    bool initializeDirectory()
+    {
+        seekSector( 
+            partitions[partition].header_track, 
+            partitions[partition].header_sector, 
+            0
+        );
+
+        // Set default values in sector 0
+        uint8_t track = partitions[partition].directory_track;
+        uint8_t sector = partitions[partition].directory_sector;
+        uint8_t data = 0x41;
+
+        writeContainer((uint8_t*)&track, 1);
+        writeContainer((uint8_t*)&sector, 1);
+        writeContainer((uint8_t*)&data, 1);
+
+        // Set T/S link in first sector to 0x00 0xFF
+        seekSector( 
+            partitions[partition].directory_track,
+            partitions[partition].directory_sector,
+            partitions[partition].directory_offset
+        );
+        data = 0x00;
+        writeContainer((uint8_t*)&data, 1);
+        data = 0xFF;
+        writeContainer((uint8_t*)&data, 1);
+
+        return false;
+    }
 
     // Container
     friend class D8BMFile;

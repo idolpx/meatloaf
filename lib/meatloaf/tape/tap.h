@@ -29,7 +29,7 @@ public:
 
 protected:
     struct Header {
-        char disk_name[24];
+        char name[24];
     };
 
     struct Entry {

@@ -95,7 +95,7 @@ protected:
     std::string file_type_label[12] = { "DEL", "SEQ", "PRG", "USR", "REL", "CBM", "DIR", "SUS", "NAT", "CMD", "CFS", "???" };
 
     virtual bool readHeader() = 0;
-    virtual bool writeHeader() { return false; };
+    virtual bool writeHeader(std::string name, std::string id) { return false; };
 
     virtual bool seekEntry( std::string filename ) { return false; };
     virtual bool seekEntry( uint16_t index ) { return false; };
@@ -171,6 +171,7 @@ public:
 
         // obviously you have to supply STREAMFILE.url to this function!
         if(image_repo.find(url)!=image_repo.end()) {
+            //Debug_printv("stream found!");
             return (T*)image_repo.at(url);
         }
 

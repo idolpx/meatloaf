@@ -1,8 +1,8 @@
 
 #include "d64.h"
 
-#include <stdio.h>
-#include <fcntl.h>
+#include <fstream>
+#include <iostream>
 
 //#include "meat_broker.h"
 #include "../meat_media.h"
@@ -528,28 +528,37 @@ bool D64MStream::seekPath(std::string path)
 
  bool D64MFile::format(std::string header_info)
  {
-     // Open the file in write mode
-     int fd = open(path.c_str(), O_WRONLY | O_CREAT, 0644);
- 
-     if (fd == -1) {
-         // Handle file opening error
-         return false;
-     }
- 
-     // Truncate the file to the desired size
-     if (ftruncate(fd, size) == -1) {
-         // Handle file truncation error
-         close(fd);
-         return false;
-     }
- 
-     // Write the header to the file
- 
-     // Clear directory track
- 
- 
-     close(fd);
-     return true;
+    Debug_printv("header_info[%s] url[%s]", header_info.c_str(), url.c_str());
+
+    // Set the stream file
+    streamFile = MFSOwner::File(url);
+    D64MStream* image = (D64MStream*)streamFile->getSourceStream(std::ios_base::in | std::ios_base::out | std::ios_base::trunc);
+    if (image == nullptr)
+        return false;
+
+    // Clear Block Allocation Map
+    Debug_printv("clear block allocation map");
+    image->initializeBlockAllocationMap();
+
+    // Clear directory track
+    Debug_printv("clear directory track");
+    image->initializeDirectory();
+
+    // Write the header to the file
+    size_t comma = header_info.find(',');
+    std::string diskname = header_info.substr(0,comma);
+    std::string id = header_info.substr(comma+1);
+    Debug_printv("write media header");
+    Debug_printv("name[%s] id[%s]", diskname.c_str(), id.c_str());
+    image->writeHeader(diskname, id);
+
+    // Truncate the file to the desired size
+    image->seek(size - 1);
+    uint8_t data = 0x00;
+    image->write(&data, 1);
+
+    delete image;
+    return true;
  }
 
 bool D64MFile::isDirectory()
@@ -575,7 +584,7 @@ bool D64MFile::rewindDirectory()
     image->readHeader();
 
     // Set Media Info Fields
-    media_header = mstr::format("%.16s", image->header.disk_name);
+    media_header = mstr::format("%.16s", image->header.name);
     mstr::A02Space(media_header);
     media_id = mstr::format("%.5s", image->header.id_dos);
     mstr::A02Space(media_id);
@@ -650,8 +659,7 @@ time_t D64MFile::getCreationTime()
 
 bool D64MFile::exists()
 {
-    // here I'd rather use D64 logic to see if such file name exists in the image!
-    // Debug_printv("here");
-    return true;
+    Debug_printv("exists[%d] url[%s] pathInStream[%s]", streamFile->exists(), streamFile->url.c_str(), streamFile->pathInStream.c_str());
+    return streamFile->exists();
 }
 

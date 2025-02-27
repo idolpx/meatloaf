@@ -181,7 +181,7 @@ bool T64MFile::rewindDirectory() {
     image->readHeader();
 
     // Set Media Info Fields
-    media_header = mstr::format("%.16s", image->header.disk_name);
+    media_header = mstr::format("%.16s", image->header.name);
     media_id = " T64 ";
     media_blocks_free = 0;
     media_block_size = image->block_size;

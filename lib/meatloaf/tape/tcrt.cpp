@@ -217,7 +217,7 @@ bool TCRTMFile::rewindDirectory() {
     image->readHeader();
 
     // Set Media Info Fields
-    media_header = mstr::format("%.16s", image->header.disk_name);
+    media_header = mstr::format("%.16s", image->header.name);
     media_id = "TCRT";
     media_blocks_free = 0;
     media_block_size = image->block_size;

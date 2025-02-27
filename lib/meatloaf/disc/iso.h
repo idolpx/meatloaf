@@ -80,7 +80,7 @@ public:
 
 protected:
     struct Header {
-        char disk_name[16];
+        char name[16];
     };
 
     struct Entry {

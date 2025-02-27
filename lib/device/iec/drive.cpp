@@ -344,11 +344,17 @@ uint8_t iecChannelHandlerDir::readBufferData()
       m_data[5] = 0;
       m_data[6] = 18;
       m_data[7] = '"';
+      Debug_printv("header[%s] id[%s]", m_dir->media_header.c_str(), m_dir->media_id.c_str());
       std::string name = m_dir->media_header.size() ? m_dir->media_header : PRODUCT_ID;
       size_t n = std::min(16, (int) name.size());
       memcpy(m_data+8, name.data(), n);
       while( n<16 ) { m_data[8+n] = ' '; n++; }
-      sprintf((char *) m_data+24, "\" %02i 2A", m_drive->id());
+      m_data[24] = '"';
+      m_data[25] = ' ';
+      if ( m_dir->media_id.size() )
+        memcpy(m_data+26, m_dir->media_id.c_str(), 5); // Use ID and DOS version from media file
+      else
+        sprintf((char *) m_data+26, "%02i 2A", m_drive->id()); // Use drive # as ID in browser mode
       m_len = 32;
       m_headerLine++;
     }
@@ -634,7 +640,8 @@ bool iecDrive::open(uint8_t channel, const char *cname)
                 {
                   // if we can't open the file stream then assume this is an empty directory
                   MStream *s = f->getSourceStream(mode);
-                  if( s==nullptr || !s->isOpen() ) isProperDir = true;
+                  //if( s==nullptr || !s->isOpen() ) isProperDir = true;
+                  if( s!=nullptr && s->isOpen() ) isProperDir = true;
                   delete s;
                 }
               else
@@ -1086,6 +1093,14 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
 #else
             //New();
             Debug_printv( "new (format)");
+            std::string diskname, id;
+            command = command.substr(colon_position + 1);
+            if (!m_cwd->format(command))
+              setStatusCode(ST_WRITE_ERROR);
+            else
+              setStatusCode(ST_OK);
+
+            return;
 #endif
           }
         break;

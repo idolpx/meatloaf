@@ -164,7 +164,7 @@ uint32_t MMediaStream::readContainer(uint8_t *buf, uint32_t size)
 }
 uint32_t MMediaStream::writeContainer(uint8_t *buf, uint32_t size)
 {
-    return containerStream->read(buf, size);
+    return containerStream->write(buf, size);
 }
 
 uint8_t MMediaStream::read() 
@@ -242,7 +242,7 @@ std::string MMediaStream::readStringUntil( uint8_t delimiter )
 }
 
 uint32_t MMediaStream::write(const uint8_t *buf, uint32_t size) {
-    return -1;
+    return containerStream->write(buf, size);
 }
 
 // seek = (offset) => this.containerStream.seek(offset + this.media_header_size);

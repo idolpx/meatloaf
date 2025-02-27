@@ -252,7 +252,14 @@ MFile* MFSOwner::File(std::string path) {
                 //auto cp = mstr::joinToString(&begin, &pathIterator, "/");
                 //Debug_printv("CONTAINER PATH WILL BE: '%s' ", wholePath.c_str());
                 newFile->streamFile = upperFS->getFile(wholePath); // skończy się na d64
+                newFile->isWritable = newFile->streamFile->isWritable;
                 //Debug_printv("CONTAINER: '%s' is in FS [%s]", newFile->streamFile->url.c_str(), upperFS->symbol);
+                if (!newFile->streamFile->exists())
+                {
+                    Debug_printv("Not Found! path[%s]", path.c_str());
+                    // delete newFile;
+                    // return nullptr;
+                }
             }
             else
             {
@@ -402,7 +409,7 @@ MStream* MFile::getSourceStream(std::ios_base::openmode mode) {
     }
 
     // has to return OPENED stream
-    Debug_printv("pathInStream[%s] streamFile[%s]", pathInStream.c_str(), streamFile->url.c_str());
+    //Debug_printv("pathInStream[%s] streamFile[%s]", pathInStream.c_str(), streamFile->url.c_str());
 
     auto sourceStream = streamFile->getSourceStream(mode);
     if ( sourceStream == nullptr )
@@ -414,14 +421,14 @@ MStream* MFile::getSourceStream(std::ios_base::openmode mode) {
     // will be replaced by streamBroker->getSourceStream(streamFile, mode)
     std::shared_ptr<MStream> containerStream(sourceStream); // get its base stream, i.e. zip raw file contents
 
-    Debug_printv("containerStream isRandomAccess[%d] isBrowsable[%d]", containerStream->isRandomAccess(), containerStream->isBrowsable());
+    //Debug_printv("containerStream isRandomAccess[%d] isBrowsable[%d]", containerStream->isRandomAccess(), containerStream->isBrowsable());
 
     // will be replaced by streamBroker->getDecodedStream(this, mode, containerStream)
     MStream* decodedStream(getDecodedStream(containerStream)); // wrap this stream into decoded stream, i.e. unpacked zip files
     decodedStream->url = this->url;
-    Debug_printv("decodedStream isRandomAccess[%d] isBrowsable[%d]", decodedStream->isRandomAccess(), decodedStream->isBrowsable());
+    //Debug_printv("decodedStream isRandomAccess[%d] isBrowsable[%d]", decodedStream->isRandomAccess(), decodedStream->isBrowsable());
 
-    Debug_printv("pathInStream [%s]", pathInStream.c_str());
+    //Debug_printv("pathInStream [%s]", pathInStream.c_str());
 
     if(decodedStream->isRandomAccess() && pathInStream != "")
     {

@@ -167,7 +167,7 @@ bool ARKMFile::rewindDirectory()
     image->readHeader();
 
     // Set Media Info Fields
-    media_header = mstr::format("%.16s", image->header.disk_name.c_str());
+    media_header = mstr::format("%.16s", image->header.name.c_str());
     media_id = image->header.id_dos;
     media_blocks_free = 0;
     media_block_size = image->block_size;

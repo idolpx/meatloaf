@@ -130,11 +130,10 @@ bool FlashMFile::exists()
         return true;
     }
 
-    //Debug_printv( "basepath[%s] path[%s]", basepath.c_str(), path.c_str() );
-
     struct stat st;
     int i = stat(std::string(basepath + path).c_str(), &st);
 
+    //Debug_printv( "exists[%d] basepath[%s] path[%s]", (i==0), basepath.c_str(), path.c_str() );
     return (i == 0);
 }
 
@@ -382,21 +381,21 @@ uint32_t FlashMStream::read(uint8_t* buf, uint32_t size) {
         return 0;
     }
 
-    uint32_t bytesRead = 0;
+    uint32_t count = 0;
     
     if ( size > 0 )
     {
         if ( size > available() )
             size = available();
 
-        bytesRead = fread((void*) buf, 1, size, handle->file_h );
-        // Debug_printv("bytesRead[%d]", bytesRead);
-        // auto hex = mstr::toHex(buf, bytesRead);
+        count = fread((void*) buf, 1, size, handle->file_h );
+        // Debug_printv("count[%d]", count);
+        // auto hex = mstr::toHex(buf, count);
         // Debug_printv("[%s]", hex.c_str());
-        _position += bytesRead;
+        _position += count;
     }
 
-    return bytesRead;
+    return count;
 };
 
 uint32_t FlashMStream::write(const uint8_t *buf, uint32_t size) {
@@ -405,13 +404,14 @@ uint32_t FlashMStream::write(const uint8_t *buf, uint32_t size) {
         return 0;
     }
 
-    //Debug_printv("buf[%02X] size[%ld]", buf[0], size);
+    //Debug_printv("buf[%02X] size[%lu]", buf[0], size);
 
     // buffer, element size, count, handle
-    int result = fwrite((void*) buf, 1, size, handle->file_h );
+    uint32_t count = fwrite((void*) buf, 1, size, handle->file_h );
+    _position += count;
 
-    //Debug_printv("result[%d]", result);
-    return result;
+    //Debug_printv("count[%lu] position[%lu]", count, _position);
+    return count;
 };
 
 

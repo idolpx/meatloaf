@@ -150,7 +150,7 @@ bool TAPMFile::rewindDirectory() {
     image->readHeader();
 
     // Set Media Info Fields
-    media_header = mstr::format("%.24", image->header.disk_name);
+    media_header = mstr::format("%.24", image->header.name);
     media_id = "tap";
     media_blocks_free = 0;
     media_block_size = image->block_size;

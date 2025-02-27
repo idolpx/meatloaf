@@ -32,7 +32,7 @@ public:
 
 protected:
     struct Header {
-        std::string disk_name;
+        std::string name;
         std::string id_dos;
     };
 
