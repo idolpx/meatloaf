@@ -92,7 +92,7 @@ protected:
     size_t entry_count = -1; // Directory list entry count (-1 unknown)
 
     enum open_modes { OPEN_READ, OPEN_WRITE, OPEN_APPEND, OPEN_MODIFY };
-    std::string file_type_label[12] = { "DEL", "SEQ", "PRG", "USR", "REL", "CBM", "DIR", "SUS", "NAT", "CMD", "CFS", "???" };
+    std::string file_type_label[12] = { "DEL", "SEQ", "PRG", "USR", "REL", "CBM", "DIR", "???", "SYS", "NAT", "CMD", "CFS" };
 
     virtual bool readHeader() = 0;
     virtual bool writeHeader(std::string name, std::string id) { return false; };

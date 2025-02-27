@@ -171,13 +171,23 @@ static int led(int argc, char **argv)
     }
     else if (mstr::startsWith(argv[1], "pixel"))
     {
-        // if (argc == 4)
-        //     DISPLAY.set_pixel(atoi(argv[2]), (CRGB)atoi(argv[3]));
-        // else 
-        if (argc == 6)
-            DISPLAY.set_pixel(atoi(argv[2]), atoi(argv[3]), atoi(argv[4]), atoi(argv[5]));
-        else
-            DISPLAY.idle();
+        int i = -1;
+        if (mstr::isNumeric(argv[2]))
+            i = atoi(argv[2]); // pixel index, '*' for all
+        
+
+
+        // if (argc == 6)
+        //     uint16_t index = atoi(argv[2]);
+        //     uint8_t r = atoi(argv[3]);
+        //     uint8_t g = atoi(argv[4]);
+        //     uint8_t b = atoi(argv[5]);
+        //     if (i == -1) // all
+        //         DISPLAY.fill_all((CRGB){.r=r, .g=g, .b=b});
+        //     else
+        //         DISPLAY.set_pixel(index, r, g, b);
+        // else
+        //     DISPLAY.idle();
     }
 
     return EXIT_SUCCESS;

@@ -53,7 +53,7 @@ void TCPServer::task(void *pvParameters)
             Debug_printv("Unable to create socket: errno %d", errno);
             break;
         }
-        Debug_printv("Socket created");
+        //Debug_printv("Socket created");
 
         /* Bind a socket to a specific IP + port */
         bind_err = bind(socket_id, (struct sockaddr *)&destAddr, sizeof(destAddr));
@@ -62,7 +62,7 @@ void TCPServer::task(void *pvParameters)
             Debug_printv("Socket unable to bind: errno %d", errno);
             break;
         }
-        Debug_printv("Socket binded");
+        //Debug_printv("Socket binded");
 
         /* Begin listening for clients on socket */
         listen_error = listen(socket_id, 3);
@@ -71,7 +71,7 @@ void TCPServer::task(void *pvParameters)
             Debug_printv("Error occured during listen: errno %d", errno);
             break;
         }
-        Debug_printv("Socket listening");
+        //Debug_printv("Socket listening");
 
         while (1)
         {
@@ -152,5 +152,5 @@ void TCPServer::start()
 
 void TCPServer::stop()
 {
-    vTaskDelete( NULL );
+    //vTaskDelete( NULL );
 }

@@ -307,10 +307,25 @@ private:
     bool deallocateBlock( uint8_t track, uint8_t sector );
     bool getNextFreeBlock(uint8_t startTrack, uint8_t startSector, uint8_t *foundTrack, uint8_t *foundSector);
     bool isBlockFree(uint8_t track, uint8_t sector);
+
+    bool initializeBlocks()
+    {
+        Debug_printv("initialize blocks");
+        // 1541/1571 Fill Pattern
+        // 0x4B 0x01...
+
+        // 1581 Fill Pattern
+        // 0x00...
+
+        return true;
+    }
+
     bool initializeBlockAllocationMap()
     {
         uint16_t bam_index = 0;
         uint16_t bam_count = partitions[partition].block_allocation_map.size();
+
+        Debug_printv("initialize block allocation map");
 
         while (bam_index < bam_count) {
             seekSector( 
@@ -362,6 +377,7 @@ private:
     }
     bool initializeDirectory()
     {
+        Debug_printv("initialize directory");
         seekSector( 
             partitions[partition].header_track, 
             partitions[partition].header_sector, 

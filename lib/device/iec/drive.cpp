@@ -355,6 +355,7 @@ uint8_t iecChannelHandlerDir::readBufferData()
         memcpy(m_data+26, m_dir->media_id.c_str(), 5); // Use ID and DOS version from media file
       else
         sprintf((char *) m_data+26, "%02i 2A", m_drive->id()); // Use drive # as ID in browser mode
+      m_data[31] = 0;
       m_len = 32;
       m_headerLine++;
     }
@@ -1093,8 +1094,7 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
 #else
             //New();
             Debug_printv( "new (format)");
-            std::string diskname, id;
-            command = command.substr(colon_position + 1);
+            command = mstr::toUTF8(command.substr(colon_position + 1));
             if (!m_cwd->format(command))
               setStatusCode(ST_WRITE_ERROR);
             else

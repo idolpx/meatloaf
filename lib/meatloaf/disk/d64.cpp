@@ -327,6 +327,9 @@ bool D64MStream::seekEntry( uint16_t index )
     // if ( next_track == 0 && next_sector == 0xFF )
     entry_index = index + 1;
 
+    // if (entry.file_type == 0x00 || entry.file_type == 0xFF)
+    //     return false;
+
     return true;
 }
 
@@ -536,12 +539,13 @@ bool D64MStream::seekPath(std::string path)
     if (image == nullptr)
         return false;
 
-    // Clear Block Allocation Map
-    Debug_printv("clear block allocation map");
+    // Initialize Blocks
+    image->initializeBlocks();
+
+    // Initialize Block Allocation Map
     image->initializeBlockAllocationMap();
 
-    // Clear directory track
-    Debug_printv("clear directory track");
+    // Initialize directory
     image->initializeDirectory();
 
     // Write the header to the file

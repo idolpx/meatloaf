@@ -701,6 +701,7 @@ void WiFiManager::_wifi_event_handler(void *arg, esp_event_base_t event_base,
 #endif
 
             // Start TCP Server
+            printf( ANSI_GREEN_BOLD "TCP Server Started! (PORT %d)" ANSI_RESET "\r\n", TCP_SERVER_PORT);
             tcp_server.start();
 
             break;

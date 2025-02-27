@@ -659,8 +659,15 @@ void cHttpdServer::stop()
 {
     if (state.hServer != nullptr)
     {
-        Debug_println("Stopping web service");
-        httpd_stop(state.hServer);
+        Debug_print("Stopping web service...");
+        if (httpd_stop(state.hServer) == ESP_OK)
+        {
+            Debug_println("done!");
+        }
+        else
+        {
+            Debug_println("error!");
+        }
         state._FS = nullptr;
         state.hServer = nullptr;
     }
