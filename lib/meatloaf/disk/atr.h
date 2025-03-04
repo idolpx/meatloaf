@@ -89,11 +89,11 @@ public:
         size = 92176; // Default - 16 byte .atr header + 40 tracks * 18 sectors per track * 128 bytes per sector
     };
 
-    MStream* getDecodedStream(std::shared_ptr<MStream> containerIstream) override
+    MStream* getDecodedStream(std::shared_ptr<MStream> is) override
     {
         Debug_printv("[%s]", url.c_str());
 
-        return new ATRMStream(containerIstream);
+        return new ATRMStream(is);
     }
 };
 

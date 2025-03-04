@@ -1,3 +1,20 @@
+// Meatloaf - A Commodore 64/128 multi-device emulator
+// https://github.com/idolpx/meatloaf
+// Copyright(C) 2020 James Johnston
+//
+// Meatloaf is free software : you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Meatloaf is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
+
 // .ISO - ISO 9660 Optical Disc Image
 //
 // https://docs.fileformat.com/compression/iso/
@@ -95,13 +112,17 @@ protected:
         uint16_t bundle_main_call_address;
     };
 
-    void readHeader() override {
+    bool readHeader() override {
         containerStream->seek(0x18);
         containerStream->read((uint8_t*)&header, sizeof(header));
+        return true;
     }
 
-    bool readEntry( std::string filename ) override;
-    bool readEntry( uint16_t index ) override;
+    bool seekEntry( std::string filename ) override;
+    bool seekEntry( uint16_t index = 0 ) override;
+    bool readEntry( uint16_t index = 0 ) override;
+    bool writeEntry( uint16_t index = 0 ) override;
+
     bool seekPath(std::string path) override;
 
     uint32_t readFile(uint8_t* buf, uint32_t size) override;
@@ -132,18 +153,17 @@ public:
         isDir = is_dir;
 
         media_image = name;
-        isPETSCII = true;
     };
     
     ~ISOMFile() {
         // don't close the stream here! It will be used by shared ptr D64Util to keep reading image params
     }
 
-    MStream* getDecodedStream(std::shared_ptr<MStream> containerIstream) override
+    MStream* getDecodedStream(std::shared_ptr<MStream> is) override
     {
         Debug_printv("[%s]", url.c_str());
 
-        return new ISOMStream(containerIstream);
+        return new ISOMStream(is);
     }
 
     bool isDirectory() override;
@@ -156,7 +176,6 @@ public:
     bool rename(std::string dest) override { return false; };
     time_t getLastWrite() override { return 0; };
     time_t getCreationTime() override { return 0; };
-    uint32_t size() override;
 
     bool isDir = true;
     bool dirIsOpen = false;

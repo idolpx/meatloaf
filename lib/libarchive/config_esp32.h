@@ -226,9 +226,9 @@
 #define HAVE_BZLIB_H 1
 #define HAVE_ZLIB_H 1
 #define HAVE_LZ4_H 1
-//#define HAVE_ZSTD_H 1
-//#define HAVE_LIBLZMA 1
-//#define HAVE_LZMA_H 1
+#define HAVE_ZSTD_H 1
+#define HAVE_LIBLZMA 1
+#define HAVE_LZMA_H 1
 
 // #if __FreeBSD_version >= 800505
 // #define HAVE_LIBLZMA 1

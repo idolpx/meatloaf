@@ -1,3 +1,19 @@
+// Meatloaf - A Commodore 64/128 multi-device emulator
+// https://github.com/idolpx/meatloaf
+// Copyright(C) 2020 James Johnston
+//
+// Meatloaf is free software : you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Meatloaf is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
 #include "archive.h"
 
@@ -93,27 +109,6 @@ int cb_open(struct a *arch, void *userData)
 /********************************************************
  * Streams implementations
  ********************************************************/
-
-ArchiveMStream::ArchiveMStream(std::shared_ptr<MStream> is) : MMediaStream(is)
-{
-    // it should be possible to to pass a password parameter here and somehow
-    // call archive_passphrase_callback(password) from here, right?
-    streamData.srcStream = is;
-    a = archive_read_new();
-    archive_read_support_filter_all(a);
-    archive_read_support_format_all(a);
-    streamData.srcBuffer = new uint8_t[buffSize];
-
-    open(std::ios::in);
-}
-
-ArchiveMStream::~ArchiveMStream()
-{
-    close();
-    if (streamData.srcBuffer != nullptr)
-        delete[] streamData.srcBuffer;
-    Debug_printv("Stream destructor OK!");
-}
 
 bool ArchiveMStream::open(std::ios_base::openmode mode)
 {

@@ -1,3 +1,20 @@
+// Meatloaf - A Commodore 64/128 multi-device emulator
+// https://github.com/idolpx/meatloaf
+// Copyright(C) 2020 James Johnston
+//
+// Meatloaf is free software : you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Meatloaf is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
+
 // .D82 - This is a sector-for-sector copy of an 8250 floppy disk
 //
 // https://vice-emu.sourceforge.io/vice_17.html#SEC363
@@ -98,11 +115,11 @@ public:
         size = 1066496; // Default - 154 tracks no errors
     };
 
-    MStream* getDecodedStream(std::shared_ptr<MStream> containerIstream) override
+    MStream* getDecodedStream(std::shared_ptr<MStream> is) override
     {
         Debug_printv("[%s]", url.c_str());
 
-        return new D82MStream(containerIstream);
+        return new D82MStream(is);
     }
 };
 

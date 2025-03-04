@@ -1,3 +1,21 @@
+
+// Meatloaf - A Commodore 64/128 multi-device emulator
+// https://github.com/idolpx/meatloaf
+// Copyright(C) 2020 James Johnston
+//
+// Meatloaf is free software : you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Meatloaf is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
+
 #ifdef BUILD_IEC
 
 #include "drive.h"
@@ -19,6 +37,7 @@
 #include "display.h"
 
 #include "meat_media.h"
+#include "qrmanager.h"
 
 
 // Buffering data when reading/writing streams because during regular (non-fastloader)
@@ -418,7 +437,7 @@ uint8_t iecChannelHandlerDir::readBufferData()
             ext = "prg";
 
           std::string name = entry->name;
-          if ( !entry->isPETSCII )
+          if ( !m_dir->isPETSCII )
             {
               name = mstr::toPETSCII2( name );
               ext  = mstr::toPETSCII2( ext );
@@ -748,6 +767,9 @@ bool iecDrive::open(uint8_t channel, const char *cname)
                       m_cwd.reset( f->streamFile );
                     }
                 }
+
+              if ( m_statusCode != ST_OK )
+                m_cwd.reset(MFSOwner::File(f->base()));
             }
         }
       
@@ -1349,6 +1371,28 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
             //Error(ERROR_31_SYNTAX_ERROR);
         break;
     }
+
+    // Meatloaf Extended Commands
+    switch ( command[0] )
+    {
+      case 'Q': // Generate QRCode
+        if (command[1] == 'R' && colon_position)
+        {
+            command = command.substr(colon_position + 1);
+            Debug_printv("qrcode data[%s]", command.c_str());
+            command = mstr::toUTF8(command);
+            size_t qr_len = 0;
+            qrManager.encode(command.c_str(), command.length(), 1, 0, &qr_len);
+            qrManager.to_petscii();
+            auto qr = util_hexdump(qrManager.out_buf.data(), qrManager.out_buf.size());
+            Debug_printf("qrcode\r\n%s\r\n", qr.c_str());
+            setStatus((const char*)qrManager.out_buf.data(), qrManager.out_buf.size());
+        }
+      break;
+      default:
+          //Error(ERROR_31_SYNTAX_ERROR);
+      break;
+  }
 }
 
 

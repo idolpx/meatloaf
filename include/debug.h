@@ -27,8 +27,8 @@
     #define Serial fnUartDebug
 
     #define Debug_print(...) printf( __VA_ARGS__ )
-    #define Debug_printf(format, ...) { printf( format, ##__VA_ARGS__ ); }
-    #define Debug_println(...) { printf( __VA_ARGS__ ); printf( "\r\n" ); }
+    #define Debug_printf(...) printf( __VA_ARGS__ )
+    #define Debug_println(...) { printf( __VA_ARGS__ ); printf("\r\n"); }
     #define Debug_printv(format, ...) { printf( ANSI_YELLOW "[%s:%d] %s(): " ANSI_GREEN_BOLD format ANSI_RESET "\r\n", __FILE__, __LINE__, __FUNCTION__, ##__VA_ARGS__);}
 
     #define HEAP_CHECK(x) Debug_printf("HEAP CHECK %s " x "\r\n", heap_caps_check_integrity_all(true) ? "PASSED":"FAILED")

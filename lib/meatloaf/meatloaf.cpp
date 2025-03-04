@@ -1,3 +1,20 @@
+// Meatloaf - A Commodore 64/128 multi-device emulator
+// https://github.com/idolpx/meatloaf
+// Copyright(C) 2020 James Johnston
+//
+// Meatloaf is free software : you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Meatloaf is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
+
 #include "meatloaf.h"
 
 #include <dirent.h>
@@ -211,63 +228,62 @@ MFile* MFSOwner::File(std::string path) {
         return csipFS.getFile(path);
     }
 
+    Debug_printv("Trying to factory path [%s]", path.c_str());
+
     std::vector<std::string> paths = mstr::split(path,'/');
-
-    //Debug_printv("Trying to factory path [%s]", path.c_str());
-
     auto pathIterator = paths.end();
     auto begin = paths.begin();
     auto end = paths.end();
 
-    auto foundFS = testScan(begin, end, pathIterator);
+    auto targetFileSystem = testScan(begin, end, pathIterator);
 
-    if ( foundFS != nullptr )
+    if ( targetFileSystem != nullptr )
     {
-        //Debug_printv("PATH: '%s' is in FS [%s]", path.c_str(), foundFS->symbol);
-        auto newFile = foundFS->getFile(path);
-        //Debug_printv("newFile: '%s'", newFile->url.c_str());
+        Debug_printv("PATH: '%s' is in FS [%s]", path.c_str(), targetFileSystem->symbol);
+        auto targetFile = targetFileSystem->getFile(path);
+        Debug_printv("targetFile: '%s'", targetFile->url.c_str());
 
         pathIterator++;
-        newFile->pathInStream = mstr::joinToString(&pathIterator, &end, "/");
-        //Debug_printv("newFile->pathInStream: '%s'", newFile->pathInStream.c_str());
+        targetFile->pathInStream = mstr::joinToString(&pathIterator, &end, "/");
+        Debug_printv("targetFile->pathInStream: '%s'", targetFile->pathInStream.c_str());
 
         auto endHere = pathIterator;
         pathIterator--;
 
-        auto upperPath = mstr::joinToString(&begin, &pathIterator, "/");
+        auto sourcePath = mstr::joinToString(&begin, &pathIterator, "/");
+        Debug_printv("sourcePath[%s] begin[%s] pathIterator[%s]", sourcePath.c_str(), begin->c_str(), pathIterator->c_str());
         if(begin == pathIterator) 
         {
-            //Debug_printv("** LOOK DOWN PATH NOT NEEDED   path[%s] upperPath[%s]", path.c_str(), upperPath.c_str());
-            newFile->streamFile = foundFS->getFile(upperPath);
+            Debug_printv("** LOOK DOWN PATH NOT NEEDED   path[%s] sourcePath[%s]", path.c_str(), sourcePath.c_str());
+            targetFile->streamFile = targetFileSystem->getFile(sourcePath);
         } 
         else 
         {
-            //Debug_printv("** LOOK DOWN PATH: %s", upperPath.c_str());
+            Debug_printv("** LOOK DOWN PATH: %s", sourcePath.c_str());
 
-            auto upperFS = testScan(begin, end, pathIterator);
-            if ( upperFS != nullptr )
+            auto sourceFileSystem = testScan(begin, end, pathIterator);
+            if ( sourceFileSystem != nullptr )
             {
                 auto wholePath = mstr::joinToString(&begin, &endHere, "/");
+                Debug_printv("wholePath[%s]", wholePath.c_str());
 
-                //auto cp = mstr::joinToString(&begin, &pathIterator, "/");
-                //Debug_printv("CONTAINER PATH WILL BE: '%s' ", wholePath.c_str());
-                newFile->streamFile = upperFS->getFile(wholePath); // skończy się na d64
-                newFile->isWritable = newFile->streamFile->isWritable;
-                //Debug_printv("CONTAINER: '%s' is in FS [%s]", newFile->streamFile->url.c_str(), upperFS->symbol);
-                if (!newFile->streamFile->exists())
+                targetFile->streamFile = sourceFileSystem->getFile(wholePath); // This is for raw access to the stream file
+                targetFile->isWritable = targetFile->streamFile->isWritable; // This stream is writable if the container is writable
+                if (!targetFile->streamFile->exists())
                 {
                     Debug_printv("Not Found! path[%s]", path.c_str());
-                    // delete newFile;
+                    // delete targetFile;
                     // return nullptr;
                 }
+                Debug_printv("targetFile[%s] is in [%s][%s]", targetFile->name.c_str(), sourcePath.c_str(), sourceFileSystem->symbol);
             }
             else
             {
-                //Debug_printv("WARNING!!!! CONTAINER FAILED FOR: '%s'", upperPath.c_str());
+                Debug_printv("WARNING!!!! CONTAINER FAILED FOR: '%s'", sourcePath.c_str());
             }
         }
 
-        return newFile;
+        return targetFile;
     }
 
     Debug_printv("Not Found! path[%s]", path.c_str());
@@ -337,7 +353,7 @@ MFileSystem* MFSOwner::testScan(std::vector<std::string>::iterator &begin, std::
         auto part = *pathIterator;
         mstr::toLower(part);
 
-        //Debug_printv("index[%d] pathIterator[%s] size[%d]", pathIterator, pathIterator->c_str(), pathIterator->size());
+        Debug_printv("pathIterator[%s]", pathIterator->c_str());
 
         auto foundIter=std::find_if(availableFS.begin() + 1, availableFS.end(), [&part](MFileSystem* fs){ 
             //Debug_printv("symbol[%s]", fs->symbol);
@@ -345,7 +361,7 @@ MFileSystem* MFSOwner::testScan(std::vector<std::string>::iterator &begin, std::
         } );
 
         if(foundIter != availableFS.end()) {
-            //Debug_printv("matched part '%s'\r\n", part.c_str());
+            Debug_printv("matched part '%s'", part.c_str());
             return (*foundIter);
         }
     };
@@ -404,7 +420,7 @@ MStream* MFile::getSourceStream(std::ios_base::openmode mode) {
 
     if ( streamFile == nullptr )
     {
-        Debug_printv("null streamFile");
+        Debug_printv("null streamFile for path[%s]", path.c_str());
         return nullptr;
     }
 
@@ -414,7 +430,7 @@ MStream* MFile::getSourceStream(std::ios_base::openmode mode) {
     auto sourceStream = streamFile->getSourceStream(mode);
     if ( sourceStream == nullptr )
     {
-        Debug_printv("null sourceStream");
+        Debug_printv("null sourceStream for path[%s]", path.c_str());
         return nullptr;
     }
 
@@ -428,7 +444,7 @@ MStream* MFile::getSourceStream(std::ios_base::openmode mode) {
     decodedStream->url = this->url;
     //Debug_printv("decodedStream isRandomAccess[%d] isBrowsable[%d]", decodedStream->isRandomAccess(), decodedStream->isBrowsable());
 
-    //Debug_printv("pathInStream [%s]", pathInStream.c_str());
+    Debug_printv("pathInStream [%s]", pathInStream.c_str());
 
     if(decodedStream->isRandomAccess() && pathInStream != "")
     {

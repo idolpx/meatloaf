@@ -1,3 +1,20 @@
+// Meatloaf - A Commodore 64/128 multi-device emulator
+// https://github.com/idolpx/meatloaf
+// Copyright(C) 2020 James Johnston
+//
+// Meatloaf is free software : you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Meatloaf is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
+
 // .7Z, .ARC, .ARK, .BZ2, .GZ, .LHA, .LZH, .LZX, .RAR, .TAR, .TGZ, .XAR, .ZIP - libArchive for Meatloaf!
 //
 // https://stackoverflow.com/questions/22543179/how-to-use-libarchive-properly
@@ -58,8 +75,26 @@ public:
     struct archive *a;
     struct archive_entry *entry;
 
-    ArchiveMStream(std::shared_ptr<MStream> is);
-    ~ArchiveMStream();
+    ArchiveMStream(std::shared_ptr<MStream> is) : MMediaStream(is)
+    {
+        // it should be possible to to pass a password parameter here and somehow
+        // call archive_passphrase_callback(password) from here, right?
+        streamData.srcStream = is;
+        a = archive_read_new();
+        archive_read_support_filter_all(a);
+        archive_read_support_format_all(a);
+        streamData.srcBuffer = new uint8_t[buffSize];
+    
+        open(std::ios::in);
+    }
+    
+    ~ArchiveMStream()
+    {
+        close();
+        if (streamData.srcBuffer != nullptr)
+            delete[] streamData.srcBuffer;
+        Debug_printv("Stream destructor OK!");
+    }
 
 protected:
     bool isOpen() override;
@@ -73,7 +108,7 @@ protected:
 
     virtual bool seek(uint32_t pos) override;
 
-    bool readHeader() override { return false; };
+    bool readHeader() override { Debug_printv("here"); return false; };
     bool seekEntry( std::string filename ) override;
     // bool readEntry( uint16_t index ) override;
 
@@ -115,11 +150,11 @@ public:
         }
     }
 
-    MStream* getDecodedStream(std::shared_ptr<MStream> containerIstream) override
+    MStream* getDecodedStream(std::shared_ptr<MStream> is)
     {
         Debug_printv("[%s]", url.c_str());
-
-        return new ArchiveMStream(containerIstream);
+    
+        return new ArchiveMStream(is);
     }
 
     bool isDirectory() override;
@@ -149,27 +184,35 @@ class ArchiveMFileSystem : public MFileSystem
     };
 
 public:
-    ArchiveMFileSystem() : MFileSystem("arch") {}
+    ArchiveMFileSystem() : MFileSystem("archive") {}
 
     bool handles(std::string fileName)
     {
         return byExtension(
             {
+                ".tar.xz",
+                ".tar.bz2",
+                ".tar.gz",
+                ".tar.z",
+                ".tar.lz"
+                ".tar",
+                ".tgz",
                 ".7z",
-                //".arc",  // Have to find a way to distinquish between PC/C64 ARC file
-                //".ark",  // Have to find a way to distinquish between PC/C64 ARK file
-                ".bz2",
+                ".b1",
                 ".gz",
                 ".lha",
                 ".lzh",
                 ".lzx",
                 ".rar",
-                ".tar",
-                ".tgz",
                 ".xar",
                 ".zip",
-                ".iso"
-             },
+                ".iso",
+                ".lz4",
+                ".cpgz",
+                ".cpio"
+                //".arc",  // Have to find a way to distinquish between PC/C64 ARC file
+                //".ark",  // Have to find a way to distinquish between PC/C64 ARK file
+            },
             fileName
         );
     }

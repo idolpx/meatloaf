@@ -13,7 +13,7 @@
 //             break;
 //         case WSEvent::connected:
 //             isConnected = true;
-//             printf_P(PSTR("GraphqlEsp: Websocket connected. Sending connection init\n"));
+//             printf_P(PSTR("GraphQL: Websocket connected. Sending connection init\n"));
 //             _ws.sendtxt("{\"type\":\"connection_init\",\"payload\":{}}");
 //             /* If I don't send GQEvent::connected, but instead later after receiving connection_ack, 
 //                 CRASH! Why? */
@@ -23,9 +23,9 @@
 //             {
 //                 char* type = parseText((char *)payload, "type");
 //                 if (type) {
-//                     //printf_P(PSTR("GraphqlEsp: type:%s\n"), type);
+//                     //printf_P(PSTR("GraphQL: type:%s\n"), type);
 //                     if (!strncmp_P(type, PSTR("connection_ack"), 14)) { // Connection successfull
-//                         printf_P(PSTR("GraphqlEsp: Got connection_ack\n"));
+//                         printf_P(PSTR("GraphQL: Got connection_ack\n"));
 //                         /* See comment above about the CRASH! */
 //                         //callCallback(GQEvent::connected, nullptr);
 //                         return;
@@ -39,7 +39,7 @@
 //                         return;
 //                     }
 //                 }
-//                 //printf_P(PSTR("GraphqlEsp: ws text:%s\n"),(char*)payload);
+//                 //printf_P(PSTR("GraphQL: ws text:%s\n"),(char*)payload);
 //                 callCallback(GQEvent::data, (char *)payload);
 //             }
 //             break;
@@ -54,38 +54,38 @@
 
 // static int id=1;
 // // Returns id (for matching responses)
-// int GraphqlEsp::gqOperation(const char *oper, const char *data) {
+// int GraphQL::gqOperation(const char *oper, const char *data) {
 //     char buf[1024];
 //     sprintf_P(buf, PSTR("{\"id\":\"%d\",\"type\":\"start\",\"payload\":{\"query\":"
 //                         "\"%s{"
 //                         "%s"
 //                         "}\"}}"), id, oper, data);
-//     printf_P(PSTR("GraphqlEsp: Sending %s: %s\n"), oper, buf);
+//     printf_P(PSTR("GraphQL: Sending %s: %s\n"), oper, buf);
 //     _ws.sendtxt(buf);
 //     return id++;
 // }
 
-// int GraphqlEsp::mutation(const char *data) {
+// int GraphQL::mutation(const char *data) {
 //     return gqOperation("mutation", data);
 // }
 
-// int GraphqlEsp::query(const char *data) {
+// int GraphQL::query(const char *data) {
 //     return gqOperation("query", data);
 // }
 
 
-// int GraphqlEsp::subscription(const char *data) {
+// int GraphQL::subscription(const char *data) {
 //     return gqOperation("subscription", data);
 // }
 
-// void GraphqlEsp::disconnect() {
+// void GraphQL::disconnect() {
 //     _ws.disconnect();
 // }
-// void GraphqlEsp::loop(void) {
+// void GraphQL::loop(void) {
 //     _ws.loop();
 // }
 
-// void GraphqlEsp::callCallback(GQEvent type, char* payload) {
+// void GraphQL::callCallback(GQEvent type, char* payload) {
 //     if (_callback) {
 //         _callback(type, payload);
 //     }
