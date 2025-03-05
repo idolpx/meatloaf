@@ -641,6 +641,7 @@ bool iecDrive::open(uint8_t channel, const char *cname)
 
       // get file
       MFile *f = m_cwd->cd( mstr::toUTF8( name ) );
+      //Debug_printv("isdir[%d] url[%s]", f->isDirectory(), f->url.c_str());
 
       if( f == nullptr ) // || f->url.empty() )
         {

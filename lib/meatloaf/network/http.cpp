@@ -40,9 +40,9 @@ MeatHttpClient* HTTPMFile::fromHeader() {
             url = mstr::dropLast(url, 1);
             Debug_printv("url[%s]", url.c_str());
         }
-        Debug_printv("before head url[%s]", url.c_str());
+        //Debug_printv("before head url[%s]", url.c_str());
         client->HEAD(url);
-        Debug_printv("after head url[%s]", client->url.c_str());
+        //Debug_printv("after head url[%s]", client->url.c_str());
         if (client->wasRedirected)
             resetURL(client->url);
     }
@@ -50,14 +50,14 @@ MeatHttpClient* HTTPMFile::fromHeader() {
 }
 
 bool HTTPMFile::isDirectory() {
-    if(fromHeader()->m_isDirectory)
-        return true;
+    // if(fromHeader()->m_isDirectory)
+    //     return true;
 
-    if(fromHeader()->m_isWebDAV) {
-        // try webdav PROPFIND to get a listing
-        return true;
-    }
-    else
+    // if(fromHeader()->m_isWebDAV) {
+    //     // try webdav PROPFIND to get a listing
+    //     return true;
+    // }
+    // else
         // otherwise return false
         return false;
 }
@@ -249,6 +249,7 @@ bool MeatHttpClient::HEAD(std::string dstUrl) {
 
 bool MeatHttpClient::processRedirectsAndOpen(uint32_t position, uint32_t size) {
     wasRedirected = false;
+    m_isDirectory = false;
 
     //Debug_printv("reopening url[%s] from position:%lu", url.c_str(), position);
     lastRC = openAndFetchHeaders(lastMethod, position, size);
