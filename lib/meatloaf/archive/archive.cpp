@@ -123,7 +123,9 @@ bool ArchiveMStream::open(std::ios_base::openmode mode)
         archive_read_set_callback_data(a, &streamData);
         Debug_printv("== BEGIN Calling open1 on archive instance ==========================");
         int r =  archive_read_open1(a);
-        Debug_printv("archive_format[%s]", archive_format_name(a));
+        // std::string archiveFormat = archive_format_name(a);
+        // std::string archiveCompression = archive_compression_name(a);
+        // Debug_printv("archive format[%s] compression[%s]", archiveFormat.c_str(), archiveCompression.c_str());
         Debug_printv("== END opening archive result=%d! (OK should be 0!) =======================================", r);
 
         //int r = archive_read_open2(a, &streamData, NULL, myRead, myskip, myclose);
