@@ -222,11 +222,13 @@
 #define HAVE_WMEMMOVE 1
 #define TIME_WITH_SYS_TIME 1
 //#define HAVE__GET_TIMEZONE 1
+#define HAVE_EXPAT_H 1
 
 #define HAVE_BZLIB_H 1
 #define HAVE_ZLIB_H 1
 #define HAVE_LZ4_H 1
 #define HAVE_ZSTD_H 1
+#define HAVE_LIBZSTD 1
 #define HAVE_LIBLZMA 1
 #define HAVE_LZMA_H 1
 
@@ -255,18 +257,18 @@
 //#define ARCHIVE_CRYPTO_SHA256_LIBMD 1
 //#define ARCHIVE_CRYPTO_SHA512_LIBMD 1
 
-#define ARCHIVE_CRYPTO_MD5_MBEDTLS 1
-#define ARCHIVE_CRYPTO_SHA1_MBEDTLS 1
-#define ARCHIVE_CRYPTO_SHA256_MBEDTLS 1
+// #define ARCHIVE_CRYPTO_MD5_MBEDTLS 1
+// #define ARCHIVE_CRYPTO_SHA1_MBEDTLS 1
+// #define ARCHIVE_CRYPTO_SHA256_MBEDTLS 1
 
-#define mbedtls_md5_starts mbedtls_md5_starts_ret
-#define mbedtls_md5_update mbedtls_md5_update_ret
-#define mbedtls_md5_finish mbedtls_md5_finish_ret
-#define mbedtls_sha1_starts mbedtls_sha1_starts_ret
-#define mbedtls_sha1_update mbedtls_sha1_update_ret
-#define mbedtls_sha1_finish mbedtls_sha1_finish_ret
-#define mbedtls_sha256_starts mbedtls_sha256_starts_ret
-#define mbedtls_sha256_update mbedtls_sha256_update_ret
-#define mbedtls_sha256_finish mbedtls_sha256_finish_ret
+// #define mbedtls_md5_starts mbedtls_md5_starts_ret
+// #define mbedtls_md5_update mbedtls_md5_update_ret
+// #define mbedtls_md5_finish mbedtls_md5_finish_ret
+// #define mbedtls_sha1_starts mbedtls_sha1_starts_ret
+// #define mbedtls_sha1_update mbedtls_sha1_update_ret
+// #define mbedtls_sha1_finish mbedtls_sha1_finish_ret
+// #define mbedtls_sha256_starts mbedtls_sha256_starts_ret
+// #define mbedtls_sha256_update mbedtls_sha256_update_ret
+// #define mbedtls_sha256_finish mbedtls_sha256_finish_ret
 
 #define SSIZE_MAX SIZE_MAX

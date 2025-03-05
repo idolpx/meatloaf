@@ -153,9 +153,9 @@ struct la_zstream {
 #define PPMD7_DEFAULT_MEM_SIZE	(1 << 24)
 
 struct ppmd_stream {
-	int			 stat;
+	int			 	 stat;
 	CPpmd7			 ppmd7_context;
-	CPpmd7z_RangeEnc	 range_enc;
+	CPpmd7z_RangeEnc range_enc;
 	IByteOut		 byteout;
 	uint8_t			*buff;
 	uint8_t			*buff_ptr;
@@ -181,7 +181,7 @@ struct file {
 #define ATIME_IS_SET	(1<<1)
 #define CTIME_IS_SET	(1<<2)
 #define CRC32_IS_SET	(1<<3)
-#define HAS_STREAM	(1<<4)
+#define HAS_STREAM		(1<<4)
 
 	struct {
 		time_t		 time;
