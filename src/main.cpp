@@ -42,6 +42,15 @@
 #include "../include/pinmap.h"
 #include "../include/debug.h"
 
+#ifdef ENABLE_CONSOLE
+#include "../lib/console/ESP32Console.h"
+    using namespace ESP32Console;
+    Console console;
+#endif
+
+#ifdef ENABLE_DISPLAY
+#include "display.h"
+#endif
 
 #include "device.h"
 #include "keys.h"
@@ -56,15 +65,6 @@
 #include "fnFsSD.h"
 
 
-#ifdef ENABLE_CONSOLE
-#include "../lib/console/ESP32Console.h"
-using namespace ESP32Console;
-Console console;
-#endif
-
-#ifdef ENABLE_DISPLAY
-#include "display.h"
-#endif
 
 //#include "disk-sounds.h"
 

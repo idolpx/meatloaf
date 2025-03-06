@@ -28,14 +28,14 @@ private:
 protected:
 
 public:
-    //iecMeatloaf() {};
+    iecMeatloaf(uint8_t id) : iecDrive(id) {};
 
     void setup(systemBus *bus) override {
         iecFuji::setup(bus);
 
-        setDeviceNumber(30); 
+        //setDeviceNumber(30); 
         if (bus->attachDevice(this))
-            Debug_printf("Attached Meatloaf device #%d\r\n", 30);
+            Debug_printf("Attached Meatloaf device #%d\r\n", id());
     }
 
     void execute(const char *command, uint8_t cmdLen) override {

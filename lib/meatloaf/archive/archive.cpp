@@ -121,19 +121,24 @@ bool ArchiveMStream::open(std::ios_base::openmode mode)
         archive_read_set_close_callback(a, cb_close);
         // archive_read_set_open_callback(mpa->arch, cb_open); - what does it do?
         archive_read_set_callback_data(a, &streamData);
-        Debug_printv("== BEGIN Calling open1 on archive instance ==========================");
-        int r =  archive_read_open1(a);
+
+        int r = archive_read_open1(a);
+        //int r = archive_read_open2(a, &streamData, NULL, myRead, myskip, myclose);
+        if ( r == ARCHIVE_OK )
+        {
+            is_open = true;
+            Debug_printv("*** Archive Opened! (%d)", r);
         // std::string archiveFormat = archive_format_name(a);
         // std::string archiveCompression = archive_compression_name(a);
         // Debug_printv("archive format[%s] compression[%s]", archiveFormat.c_str(), archiveCompression.c_str());
-        Debug_printv("== END opening archive result=%d! (OK should be 0!) =======================================", r);
-
-        //int r = archive_read_open2(a, &streamData, NULL, myRead, myskip, myclose);
-        if (r == ARCHIVE_OK)
-            is_open = true;
+        }
+        else
+        {
+            Debug_printv("*** Error opening archive! (%d)", r);
+        }
     }
     else
-        Debug_printv("Archive already open!");
+        Debug_printv("*** Archive already open!");
 
     return is_open;
 };
@@ -325,10 +330,10 @@ MFile *ArchiveMFile::getNextFileInDir()
             break;
 
         filename = basename(archive_entry_pathname(entry));
-        //Debug_printv("size[%d] empty[%d] pathInStream[%s] filename[%s]", filename.size(), filename.empty(), pathInStream.c_str(), filename.c_str());
+        Debug_printv("size[%d] empty[%d] pathInStream[%s] filename[%s]", filename.size(), filename.empty(), pathInStream.c_str(), filename.c_str());
     } while (filename.empty()); // Skip empty filenames
 
-    //Debug_printv("getNextFileInDir calling archive_read_next_header");
+    Debug_printv("getNextFileInDir calling archive_read_next_header");
     if (filename.size() > 0)
     {
         auto file = MFSOwner::File(streamFile->url + "/" + filename);

@@ -416,10 +416,14 @@ public:
     }
 
     static bool byExtension(const std::vector<std::string> &ext, std::string fileName) {
-        for ( const auto &e : ext )
+        if ( fileName.size() )
         {
-            if ( mstr::endsWith(fileName, e.c_str(), false) )
-                return true;
+            for ( const auto &e : ext )
+            {
+                Debug_printv("comparing [%s] to [%s]", fileName.c_str(), e.c_str());
+                if ( mstr::endsWith(fileName, e.c_str(), false) )
+                    return true;
+            }
         }
 
         return false;
@@ -441,7 +445,7 @@ class MFSOwner {
 public:
     static std::vector<MFileSystem*> availableFS;
 
-    static MFile* File(std::string name);
+    static MFile* File(std::string name, bool default_fs = false);
     static MFile* File(std::shared_ptr<MFile> file);
     static MFile* File(MFile* file);
     static MFile* NewFile(std::string name);

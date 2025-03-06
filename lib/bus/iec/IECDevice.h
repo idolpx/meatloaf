@@ -61,6 +61,8 @@ class IECDevice
    */
   bool device_active = true;
 
+  virtual void init() {};
+
   // this can be overloaded by derived classes
   virtual bool isActive() { return device_active; }
 

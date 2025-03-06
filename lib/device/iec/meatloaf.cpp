@@ -19,6 +19,6 @@
 
 #include "meatloaf.h"
 
-iecMeatloaf Meatloaf; // global meatloaf device object
+iecMeatloaf Meatloaf(30); // global meatloaf device object
 
 #endif /* BUILD_IEC */

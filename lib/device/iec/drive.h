@@ -125,9 +125,9 @@ class driveMemory
 
   bool setROM(std::string filename) { 
     // Check for ROM file in SD Card then Flash
-    auto rom_file = MFSOwner::File("/sd/.rom/" + filename);
+    auto rom_file = MFSOwner::File("/sd/.rom/" + filename, true);
     if (rom_file == nullptr) {
-      rom_file = MFSOwner::File("/.rom/" + filename);
+      rom_file = MFSOwner::File("/.rom/" + filename, true);
     }
     if (rom_file == nullptr) {
       return false;
@@ -237,8 +237,10 @@ class driveMemory
 class iecDrive : public IECFileDevice
 {
  public:
-  iecDrive(uint8_t devnum = 0xFF);
+  iecDrive(uint8_t devnum = 0x00);
   ~iecDrive();
+  void init() override;
+
 
   mediatype_t mount(FILE *f, const char *filename, uint32_t disksize, mediatype_t disk_type = MEDIATYPE_UNKNOWN);
   void unmount();

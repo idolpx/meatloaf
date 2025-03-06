@@ -195,10 +195,10 @@ public:
     }
 
     bool handles(std::string fileName) override {
-        return byExtension(".tcrt", fileName);
+        return byExtension(".iso", fileName);
     }
 
-    ISOMFileSystem(): MFileSystem("tcrt") {};
+    ISOMFileSystem(): MFileSystem("iso") {};
 };
 
 

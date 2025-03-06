@@ -531,19 +531,7 @@ uint8_t iecChannelHandlerDir::readBufferData()
 
 iecDrive::iecDrive(uint8_t devnum) : IECFileDevice(devnum)
 {
-  m_host = nullptr;
-  m_cwd.reset( MFSOwner::File("/") );
-  m_statusCode = ST_SPLASH;
-  m_statusTrk  = 0;
-  m_numOpenChannels = 0;
-
-  m_memory.setROM("dos1541"); // Default to 1541 ROM
-
-#ifdef USE_VDRIVE
-  m_vdrive = NULL;
-#endif
-  for(int i=0; i<16; i++) 
-    m_channels[i] = nullptr;
+  //Debug_printv("id[%d]", devnum);
 }
 
 
@@ -554,6 +542,23 @@ iecDrive::~iecDrive()
       close(i);
 }
 
+void iecDrive::init()
+{
+  Debug_printv("id[%d]", id());
+  m_host = nullptr;
+  m_statusCode = ST_SPLASH;
+  m_statusTrk  = 0;
+  m_numOpenChannels = 0;
+  m_cwd.reset( MFSOwner::File("/", true) );
+
+  m_memory.setROM("dos1541"); // Default to 1541 ROM
+
+#ifdef USE_VDRIVE
+  m_vdrive = NULL;
+#endif
+  for(int i=0; i<16; i++) 
+    m_channels[i] = nullptr;
+}
 
 bool iecDrive::open(uint8_t channel, const char *cname)
 {
@@ -641,7 +646,7 @@ bool iecDrive::open(uint8_t channel, const char *cname)
 
       // get file
       MFile *f = m_cwd->cd( mstr::toUTF8( name ) );
-      //Debug_printv("isdir[%d] url[%s]", f->isDirectory(), f->url.c_str());
+      Debug_printv("isdir[%d] url[%s]", f->isDirectory(), f->url.c_str());
 
       if( f == nullptr ) // || f->url.empty() )
         {
@@ -662,7 +667,11 @@ bool iecDrive::open(uint8_t channel, const char *cname)
                   // if we can't open the file stream then assume this is an empty directory
                   MStream *s = f->getSourceStream(mode);
                   //if( s==nullptr || !s->isOpen() ) isProperDir = true;
-                  if( s!=nullptr && s->isOpen() ) isProperDir = true;
+                  if( s!=nullptr)
+                  {
+                    if( !s->isOpen() )
+                      isProperDir = true;
+                  }
                   delete s;
                 }
               else
