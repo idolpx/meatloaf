@@ -113,7 +113,7 @@ namespace ESP32Console
 
     void Console::begin(int baud, int rxPin, int txPin, uint8_t channel)
     {
-        Debug_printv("Initialize console");
+        //Debug_printv("Initialize console");
 
         if (channel >= SOC_UART_NUM)
         {
