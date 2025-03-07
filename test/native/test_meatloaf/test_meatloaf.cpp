@@ -47,8 +47,8 @@ void test_meatloaf_mfile_properties(void)
     // printf("Port: [%s]\r\n", testMFile->port.c_str());    
     // printf("Path: [%s]\r\n", testMFile->path.c_str());
 
-    // if ( testMFile->streamFile )
-    //     printf("stream src: [%s]\r\n", testMFile->streamFile->url.c_str());
+    // if ( testMFile->sourceFile )
+    //     printf("stream src: [%s]\r\n", testMFile->sourceFile->url.c_str());
 
     // printf("path in stream: [%s]\r\n", testMFile->pathInStream.c_str());
     // printf("File: [%s]\r\n", testMFile->name.c_str());

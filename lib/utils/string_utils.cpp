@@ -681,15 +681,15 @@ namespace mstr {
     {
         //Debug_printv("url[%s] path[%s]", url.c_str(), path.c_str());
         // drop last dir
-        // check if it isn't shorter than streamFile
+        // check if it isn't shorter than sourceFile
         // add plus
         int lastSlash = path.find_last_of('/');
         if ( lastSlash == path.size() - 1 ) {
             lastSlash = path.find_last_of('/', path.size() - 2);
         }
         std::string parent = mstr::dropLast(path, path.size() - lastSlash);
-        // if(parent.length()-streamFile->url.length()>1)
-        //     parent = streamFile->url;
+        // if(parent.length()-sourceFile->url.length()>1)
+        //     parent = sourceFile->url;
         return parent + "/" + plus;
     }
 

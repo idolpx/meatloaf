@@ -195,12 +195,12 @@ public:
     MFile(MFile* path, std::string name);
 
     virtual ~MFile() {
-        if(streamFile != nullptr) {
-        //     Debug_printv("WARNING: streamFile null in '%s' destructor. This MFile was obviously not initialized properly!", url.c_str());
+        if(sourceFile != nullptr) {
+        //     Debug_printv("WARNING: sourceFile null in '%s' destructor. This MFile was obviously not initialized properly!", url.c_str());
         // }
         // else {
             //Debug_printv("Deleting: [%s]", this->url.c_str());
-            delete streamFile;
+            delete sourceFile;
         }
         //Debug_printv("dtor path[%s]", path.c_str());
     };
@@ -255,7 +255,7 @@ public:
         return mstr::isText(extension);
     }
 
-    MFile* streamFile = nullptr;
+    MFile* sourceFile = nullptr;
     std::string pathInStream;
 
     uint32_t size = 0;
@@ -453,7 +453,7 @@ public:
     static MFileSystem* scanPathLeft(std::vector<std::string> paths, std::vector<std::string>::iterator &pathIterator);
 
     static std::string existsLocal( std::string path );
-    static MFileSystem* testScan(std::vector<std::string>::iterator &begin, std::vector<std::string>::iterator &end, std::vector<std::string>::iterator &pathIterator);
+    static MFileSystem* findParentFS(std::vector<std::string>::iterator &begin, std::vector<std::string>::iterator &end, std::vector<std::string>::iterator &pathIterator);
 
 
     static bool mount(std::string name);
@@ -529,7 +529,7 @@ public:
     {
         //Debug_printv("streams[%d] url[%s]", file_repo.size(), url.c_str());
 
-        // obviously you have to supply STREAMFILE.url to this function!
+        // obviously you have to supply sourceFile.url to this function!
         if(file_repo.find(url)!=file_repo.end())
         {
             Debug_printv("Reusing Existing MFile url[%s]", url.c_str());
@@ -585,7 +585,7 @@ public:
     {
         //Debug_printv("streams[%d] url[%s]", stream_repo.size(), url.c_str());
 
-        // obviously you have to supply STREAMFILE.url to this function!
+        // obviously you have to supply sourceFile.url to this function!
         if(stream_repo.find(url)!=stream_repo.end())
         {
             Debug_printv("Reusing Existing Stream url[%s]", url.c_str());

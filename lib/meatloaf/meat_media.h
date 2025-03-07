@@ -185,7 +185,7 @@ public:
     {
         Debug_printv("streams[%d] url[%s]", image_repo.size(), url.c_str());
 
-        // obviously you have to supply STREAMFILE.url to this function!
+        // obviously you have to supply sourceFile.url to this function!
         if(image_repo.find(url)!=image_repo.end()) {
             Debug_printv("stream found!");
             return (T*)image_repo.at(url);

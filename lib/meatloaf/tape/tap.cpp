@@ -156,8 +156,8 @@ bool TAPMFile::isDirectory() {
 
 bool TAPMFile::rewindDirectory() {
     dirIsOpen = true;
-    Debug_printv("streamFile->url[%s]", streamFile->url.c_str());
-    auto image = ImageBroker::obtain<TAPMStream>(streamFile->url);
+    Debug_printv("sourceFile->url[%s]", sourceFile->url.c_str());
+    auto image = ImageBroker::obtain<TAPMStream>(sourceFile->url);
     if ( image == nullptr )
         Debug_printv("image pointer is null");
 
@@ -185,7 +185,7 @@ MFile* TAPMFile::getNextFileInDir() {
         rewindDirectory();
 
     // Get entry pointed to by containerStream
-    auto image = ImageBroker::obtain<TAPMStream>(streamFile->url);
+    auto image = ImageBroker::obtain<TAPMStream>(sourceFile->url);
     if ( image == nullptr )
         goto exit;
 
@@ -193,8 +193,8 @@ MFile* TAPMFile::getNextFileInDir() {
     {
         std::string fileName = mstr::format("%.16s", image->entry.filename);
         mstr::replaceAll(fileName, "/", "\\");
-        //Debug_printv( "entry[%s]", (streamFile->url + "/" + fileName).c_str() );
-        auto file = MFSOwner::File(streamFile->url + "/" + fileName);
+        //Debug_printv( "entry[%s]", (sourceFile->url + "/" + fileName).c_str() );
+        auto file = MFSOwner::File(sourceFile->url + "/" + fileName);
         file->extension = image->decodeType(image->entry.file_type);
         
         return file;

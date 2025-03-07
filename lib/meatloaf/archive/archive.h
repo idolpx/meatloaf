@@ -70,7 +70,7 @@ class ArchiveMStream : public MMediaStream
     bool is_open = false;
 
 public:
-    static const size_t buffSize = 256; // 4096
+    static const size_t buffSize = 4096;
     ArchiveMStreamData streamData;
     struct archive *a;
     struct archive_entry *entry;
@@ -206,6 +206,7 @@ public:
                 ".rar",
                 ".xar",
                 ".zip",
+                ".zst",
                 ".iso",
                 ".lz4",
                 ".cpgz",

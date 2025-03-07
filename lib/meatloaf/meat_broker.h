@@ -46,14 +46,14 @@
 
 // public:
 //     // Method to retrieve MStream instance from cache or create a new one if not found
-//     std::shared_ptr<MStream> getSourceStream(MFile* streamFile, std::ios_base::openmode mode) {
-//         CacheKey key = std::make_pair(streamFile->path, mode);
+//     std::shared_ptr<MStream> getSourceStream(MFile* sourceFile, std::ios_base::openmode mode) {
+//         CacheKey key = std::make_pair(sourceFile->path, mode);
 //         auto it = streamCache.find(key);
 //         if (it != streamCache.end()) {
 //             return it->second; // Found in cache, return the cached instance
 //         } else {
 //             // Not found, create a new instance and cache it
-//             std::shared_ptr<MStream> newStream(streamFile->getSourceStream(mode));
+//             std::shared_ptr<MStream> newStream(sourceFile->getSourceStream(mode));
 //             streamCache[key] = newStream;
 //             return newStream;
 //         }

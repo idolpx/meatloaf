@@ -231,6 +231,7 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
         }
     }
 
+    Debug_println("--------------------------------");
     Debug_printv("Trying to factory path [%s]", path.c_str());
 
     std::vector<std::string> paths = mstr::split(path,'/');
@@ -238,57 +239,59 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
     auto begin = paths.begin();
     auto end = paths.end();
 
-    MFileSystem *targetFileSystem = &defaultFS;
-    if ( !default_fs )
-    {
-        targetFileSystem = testScan(begin, end, pathIterator);
-    }
+    MFileSystem *targetFileSystem = nullptr;
+    if ( default_fs )
+        targetFileSystem = &defaultFS;
+    else
+        targetFileSystem = findParentFS(begin, end, pathIterator);
 
     if ( targetFileSystem != nullptr )
     {
-        Debug_printv("PATH: '%s' is in FS [%s]", path.c_str(), targetFileSystem->symbol);
         auto targetFile = targetFileSystem->getFile(path);
-        Debug_printv("targetFile: '%s'", targetFile->url.c_str());
+        Debug_printv("targetFile[%s] in targetFileSystem[%s]", targetFile->url.c_str(), targetFileSystem->symbol);
 
         // Set path to file in filesystem stream
         targetFile->pathInStream = mstr::joinToString(&pathIterator, &end, "/");
         Debug_printv("targetFile->pathInStream: '%s'", targetFile->pathInStream.c_str());
 
-        auto endHere = pathIterator;
+        end = pathIterator;
         pathIterator--;
-        auto sourcePath = mstr::joinToString(&begin, &pathIterator, "/");
+        std::string sourcePath = targetFile->url;
+        if ( targetFile->pathInStream.size() )
+            sourcePath = mstr::joinToString(&begin, &pathIterator, "/");
+
         Debug_printv("sourcePath[%s] begin[%s] pathIterator[%s]", sourcePath.c_str(), begin->c_str(), pathIterator->c_str());
 
         if(begin == pathIterator) 
         {
             Debug_printv("** LOOK UP PATH NOT NEEDED   path[%s] sourcePath[%s]", path.c_str(), sourcePath.c_str());
-            targetFile->streamFile = targetFileSystem->getFile(sourcePath);
+            targetFile->sourceFile = targetFileSystem->getFile(sourcePath);
         } 
         else 
         {
             Debug_printv("** LOOK UP PATH: %s", sourcePath.c_str());
 
-            // Find the container filesystem
-            MFileSystem *sourceFileSystem = &defaultFS;
-            if ( !default_fs )
-            {
-                sourceFileSystem = testScan(begin, end, pathIterator);
-            }
+            // Find the source filesystem (container)
+            MFileSystem *sourceFileSystem = nullptr;
+            if ( default_fs )
+                sourceFileSystem = &defaultFS;
+            else
+                sourceFileSystem = findParentFS(begin, end, pathIterator);
 
             if ( sourceFileSystem != nullptr )
             {
-                auto wholePath = mstr::joinToString(&begin, &endHere, "/");
+                auto wholePath = mstr::joinToString(&begin, &end, "/");
                 Debug_printv("wholePath[%s]", wholePath.c_str());
 
-                targetFile->streamFile = sourceFileSystem->getFile(wholePath); // This is for raw access to the container stream
-                targetFile->isWritable = targetFile->streamFile->isWritable;   // This stream is writable if the container is writable
-                if (!targetFile->streamFile->exists())
+                targetFile->sourceFile = sourceFileSystem->getFile(wholePath); // This is for raw access to the container stream
+                targetFile->isWritable = targetFile->sourceFile->isWritable;   // This stream is writable if the container is writable
+                if (!targetFile->sourceFile->exists())
                 {
                     Debug_printv("Not Found! path[%s]", path.c_str());
                     // delete targetFile;
                     // return nullptr;
                 }
-                Debug_printv("targetFile[%s] is in [%s][%s]", targetFile->name.c_str(), sourcePath.c_str(), sourceFileSystem->symbol);
+                Debug_printv("sourceFile[%s] is in [%s][%s]", targetFile->sourceFile->name.c_str(), wholePath.c_str(), targetFileSystem->symbol);
             }
             else
             {
@@ -296,6 +299,7 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
             }
         }
 
+        Debug_println("--------------------------------");
         return targetFile;
     }
 
@@ -359,30 +363,34 @@ std::string MFSOwner::existsLocal( std::string path )
     return path;
 }
 
-MFileSystem* MFSOwner::testScan(std::vector<std::string>::iterator &begin, std::vector<std::string>::iterator &end, std::vector<std::string>::iterator &pathIterator) {
+MFileSystem* MFSOwner::findParentFS(std::vector<std::string>::iterator &begin, std::vector<std::string>::iterator &end, std::vector<std::string>::iterator &pathIterator) {
+    uint8_t i = 0;
     while (pathIterator != begin) {
+        i++;
         pathIterator--;
 
         auto part = *pathIterator;
         mstr::toLower(part);
+        if ( !part.size() )
+            break;
 
-        //Debug_printv("pathIterator[%s]", pathIterator->c_str());
+        Debug_printv("pathIterator[%s]", pathIterator->c_str());
 
-        auto foundIter=std::find_if(availableFS.begin() + 1, availableFS.end(), [&part](MFileSystem* fs){ 
+        auto foundFS=std::find_if(availableFS.begin() + 1, availableFS.end(), [&part](MFileSystem* fs){ 
             //Debug_printv("symbol[%s]", fs->symbol);
             return fs->handles(part); 
         } );
 
-        if(foundIter != availableFS.end()) {
-            //Debug_printv("matched part '%s'", part.c_str());
+        if(foundFS != availableFS.end()) {
+            Debug_printv("matched[%s] foundFS[%s]", part.c_str(), (*foundFS)->symbol);
             pathIterator++;
-            return (*foundIter);
+            return (*foundFS);
         }
     };
 
-    auto fs = *availableFS.begin();
+    auto fs = *availableFS.begin();  // The first filesystem in the list is the default
     pathIterator++;
-    //Debug_printv("default [%s]", fs->symbol);
+    Debug_printv("default[%s]", fs->symbol);
     return fs;
 }
 
@@ -433,23 +441,23 @@ bool MFile::operator!=(nullptr_t ptr) {
 
 MStream* MFile::getSourceStream(std::ios_base::openmode mode) {
 
-    if ( streamFile == nullptr )
+    if ( sourceFile == nullptr )
     {
-        Debug_printv("null streamFile for path[%s]", path.c_str());
+        Debug_printv("null sourceFile for path[%s]", path.c_str());
         return nullptr;
     }
 
     // has to return OPENED stream
-    //Debug_printv("pathInStream[%s] streamFile[%s]", pathInStream.c_str(), streamFile->url.c_str());
+    Debug_printv("pathInStream[%s] sourceFile[%s]", pathInStream.c_str(), sourceFile->url.c_str());
 
-    auto sourceStream = streamFile->getSourceStream(mode);
+    auto sourceStream = sourceFile->getSourceStream(mode);
     if ( sourceStream == nullptr )
     {
         Debug_printv("null sourceStream for path[%s]", path.c_str());
         return nullptr;
     }
 
-    // will be replaced by streamBroker->getSourceStream(streamFile, mode)
+    // will be replaced by streamBroker->getSourceStream(sourceFile, mode)
     std::shared_ptr<MStream> containerStream(sourceStream); // get its base stream, i.e. zip raw file contents
 
     //Debug_printv("containerStream isRandomAccess[%d] isBrowsable[%d]", containerStream->isRandomAccess(), containerStream->isBrowsable());
@@ -626,15 +634,15 @@ MFile* MFile::cdLocalParent(std::string plus)
 {
     Debug_printv("url[%s] path[%s] plus[%s]", url.c_str(), path.c_str(), plus.c_str());
     // drop last dir
-    // check if it isn't shorter than streamFile
+    // check if it isn't shorter than sourceFile
     // add plus
     int lastSlash = url.find_last_of('/');
     if ( lastSlash == url.size() - 1 ) {
         lastSlash = url.find_last_of('/', url.size() - 2);
     }
     std::string parent = mstr::dropLast(url, url.size() - lastSlash);
-    if(parent.length()-streamFile->url.length()>1)
-        parent = streamFile->url;
+    if(parent.length()-sourceFile->url.length()>1)
+        parent = sourceFile->url;
     return MFSOwner::File( parent + "/" + plus );
 };
 
@@ -648,11 +656,11 @@ MFile* MFile::cdLocalRoot(std::string plus)
 {
     Debug_printv("url[%s] path[%s] plus[%s]", url.c_str(), path.c_str(), plus.c_str());
 
-    if ( path.empty() || streamFile == nullptr ) {
+    if ( path.empty() || sourceFile == nullptr ) {
         // from here we can go only to flash root!
         return MFSOwner::File( "/" + plus, true );
     }
-    return MFSOwner::File( streamFile->url + "/" + plus );
+    return MFSOwner::File( sourceFile->url + "/" + plus );
 };
 
 // bool MFile::copyTo(MFile* dst) {

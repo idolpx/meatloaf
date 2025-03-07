@@ -406,7 +406,7 @@ uint8_t iecChannelHandlerDir::readBufferData()
       do 
         { 
           entry = std::unique_ptr<MFile>( m_dir->getNextFileInDir() ); 
-          if( entry!=nullptr ) Debug_printv("%s", entry->name.c_str());
+          if( entry!=nullptr ) Debug_printv("[%s]", entry->name.c_str());
         }
       while( entry!=nullptr && entry->name[0] == '.' );
 
@@ -773,8 +773,8 @@ bool iecDrive::open(uint8_t channel, const char *cname)
                     {
                       // Handles media files that may have '/' as part of the filename
                       auto f = MFSOwner::File( new_stream->url );
-                      Debug_printv( "Change Directory Here! istream[%s] > base[%s]", new_stream->url.c_str(), f->streamFile->url.c_str() );
-                      m_cwd.reset( f->streamFile );
+                      Debug_printv( "Change Directory Here! istream[%s] > base[%s]", new_stream->url.c_str(), f->sourceFile->url.c_str() );
+                      m_cwd.reset( f->sourceFile );
                     }
                 }
 

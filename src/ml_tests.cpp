@@ -82,8 +82,8 @@ void dumpFileProperties(MFile* testMFile) {
     Debug_printf("Port: [%s]\r\n", testMFile->port.c_str());    
     Debug_printf("Path: [%s]\r\n", testMFile->path.c_str());
 
-    if ( testMFile->streamFile )
-        Debug_printf("stream src: [%s]\r\n", testMFile->streamFile->url.c_str());
+    if ( testMFile->sourceFile )
+        Debug_printf("stream src: [%s]\r\n", testMFile->sourceFile->url.c_str());
 
     Debug_printf("path in stream: [%s]\r\n", testMFile->pathInStream.c_str());
     Debug_printf("File: [%s]\r\n", testMFile->name.c_str());
