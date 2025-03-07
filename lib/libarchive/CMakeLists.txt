@@ -1,4 +1,13 @@
 
+############################################
+#
+# How to build libarchive
+#
+############################################
+
+if (ANDROID)
+  include_directories(${PROJECT_SOURCE_DIR}/contrib/android/include)
+endif()
 
 # Public headers
 SET(include_HEADERS
@@ -165,5 +174,114 @@ SET(libarchive_SOURCES
   xxhash.c
 )
 
+# Man pages
+SET(libarchive_MANS
+  archive_entry.3
+  archive_entry_acl.3
+  archive_entry_linkify.3
+  archive_entry_misc.3
+  archive_entry_paths.3
+  archive_entry_perms.3
+  archive_entry_stat.3
+  archive_entry_time.3
+  archive_read.3
+  archive_read_add_passphrase.3
+  archive_read_data.3
+  archive_read_disk.3
+  archive_read_extract.3
+  archive_read_filter.3
+  archive_read_format.3
+  archive_read_free.3
+  archive_read_header.3
+  archive_read_new.3
+  archive_read_open.3
+  archive_read_set_options.3
+  archive_util.3
+  archive_write.3
+  archive_write_blocksize.3
+  archive_write_data.3
+  archive_write_disk.3
+  archive_write_filter.3
+  archive_write_finish_entry.3
+  archive_write_format.3
+  archive_write_free.3
+  archive_write_header.3
+  archive_write_new.3
+  archive_write_open.3
+  archive_write_set_options.3
+  archive_write_set_passphrase.3
+  cpio.5
+  libarchive.3
+  libarchive_changes.3
+  libarchive_internals.3
+  libarchive-formats.5
+  mtree.5
+  tar.5
+)
+
+IF(WIN32 AND NOT CYGWIN)
+  LIST(APPEND libarchive_SOURCES archive_entry_copy_bhfi.c)
+  LIST(APPEND libarchive_SOURCES archive_read_disk_windows.c)
+  LIST(APPEND libarchive_SOURCES archive_windows.c)
+  LIST(APPEND libarchive_SOURCES archive_windows.h)
+  LIST(APPEND libarchive_SOURCES archive_write_disk_windows.c)
+  LIST(APPEND libarchive_SOURCES filter_fork_windows.c)
+ENDIF(WIN32 AND NOT CYGWIN)
+
+IF(ARCHIVE_BLAKE2)
+  LIST(APPEND libarchive_SOURCES archive_blake2sp_ref.c)
+  LIST(APPEND libarchive_SOURCES archive_blake2s_ref.c)
+ENDIF(ARCHIVE_BLAKE2)
+
+IF(ARCHIVE_ACL_DARWIN)
+  LIST(APPEND libarchive_SOURCES archive_disk_acl_darwin.c)
+ELSEIF(ARCHIVE_ACL_FREEBSD)
+  LIST(APPEND libarchive_SOURCES archive_disk_acl_freebsd.c)
+ELSEIF(ARCHIVE_ACL_LIBACL)
+  LIST(APPEND libarchive_SOURCES archive_disk_acl_linux.c)
+ELSEIF(ARCHIVE_ACL_SUNOS)
+  LIST(APPEND libarchive_SOURCES archive_disk_acl_sunos.c)
+ENDIF()
+
+# Libarchive is a shared library
+IF(BUILD_SHARED_LIBS)
+  ADD_LIBRARY(archive SHARED ${libarchive_SOURCES} ${include_HEADERS})
+  TARGET_INCLUDE_DIRECTORIES(archive PUBLIC .)
+  TARGET_LINK_LIBRARIES(archive ${ADDITIONAL_LIBS})
+  SET_TARGET_PROPERTIES(archive PROPERTIES 
+                        VERSION ${SOVERSION_FULL}
+                        SOVERSION ${SOVERSION}
+                        MACHO_COMPATIBILITY_VERSION ${MACHO_COMPATIBILITY_VERSION}
+                        MACHO_CURRENT_VERSION ${MACHO_CURRENT_VERSION})
+ENDIF(BUILD_SHARED_LIBS)
+
+# archive_static is a static library
+ADD_LIBRARY(archive_static STATIC ${libarchive_SOURCES} ${include_HEADERS})
+TARGET_INCLUDE_DIRECTORIES(archive_static PUBLIC .)
+TARGET_LINK_LIBRARIES(archive_static ${ADDITIONAL_LIBS})
+SET_TARGET_PROPERTIES(archive_static PROPERTIES COMPILE_DEFINITIONS
+  LIBARCHIVE_STATIC)
+# On Posix systems, libarchive.so and libarchive.a can co-exist.
+IF(NOT WIN32 OR CYGWIN OR NOT BUILD_SHARED_LIBS)
+  SET_TARGET_PROPERTIES(archive_static PROPERTIES OUTPUT_NAME archive)
+ENDIF(NOT WIN32 OR CYGWIN OR NOT BUILD_SHARED_LIBS)
+
+IF(ENABLE_INSTALL)
+  # How to install the libraries
+  IF(BUILD_SHARED_LIBS)
+    INSTALL(TARGETS archive
+            RUNTIME DESTINATION bin
+            LIBRARY DESTINATION lib
+            ARCHIVE DESTINATION lib)
+  ENDIF(BUILD_SHARED_LIBS)
+  INSTALL(TARGETS archive_static
+          RUNTIME DESTINATION bin
+          LIBRARY DESTINATION lib
+          ARCHIVE DESTINATION lib)
+  INSTALL_MAN(${libarchive_MANS})
+  INSTALL(FILES ${include_HEADERS} DESTINATION include)
+ENDIF()
+
+add_subdirectory(test)
 
 idf_component_register( SRCS ${libarchive_SOURCES} INCLUDES ${include_HEADERS} )

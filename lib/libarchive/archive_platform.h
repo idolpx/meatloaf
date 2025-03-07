@@ -38,30 +38,29 @@
 
 /* archive.h and archive_entry.h require this. */
 #define	__LIBARCHIVE_BUILD 1
+#define HAVE_CONFIG_H 1
 
-#include "config_esp32.h"
-
-// #if defined(PLATFORM_CONFIG_H)
-// /* Use hand-built config.h in environments that need it. */
-// #include PLATFORM_CONFIG_H
-// #elif defined(HAVE_CONFIG_H)
-// /* Most POSIX platforms use the 'configure' script to build config.h */
-// #include "config.h"
-// #else
-// /* Warn if the library hasn't been (automatically or manually) configured. */
-// #error Oops: No config.h and no pre-built configuration in archive_platform.h.
-// #endif
+#if defined(PLATFORM_CONFIG_H)
+/* Use hand-built config.h in environments that need it. */
+#include PLATFORM_CONFIG_H
+#elif defined(HAVE_CONFIG_H)
+/* Most POSIX platforms use the 'configure' script to build config.h */
+#include "config.h"
+#else
+/* Warn if the library hasn't been (automatically or manually) configured. */
+#error Oops: No config.h and no pre-built configuration in archive_platform.h.
+#endif
 
 /* On macOS check for some symbols based on the deployment target version.  */
-// #if defined(__APPLE__)
-// # undef HAVE_FUTIMENS
-// # undef HAVE_UTIMENSAT
-// # include <AvailabilityMacros.h>
-// # if MAC_OS_X_VERSION_MIN_REQUIRED >= 101300
-// #  define HAVE_FUTIMENS 1
-// #  define HAVE_UTIMENSAT 1
-// # endif
-// #endif
+#if defined(__APPLE__)
+# undef HAVE_FUTIMENS
+# undef HAVE_UTIMENSAT
+# include <AvailabilityMacros.h>
+# if MAC_OS_X_VERSION_MIN_REQUIRED >= 101300
+#  define HAVE_FUTIMENS 1
+#  define HAVE_UTIMENSAT 1
+# endif
+#endif
 
 /* For cygwin, to avoid missing LONG, ULONG, PUCHAR, ... definitions */
 #ifdef __CYGWIN__

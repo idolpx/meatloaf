@@ -911,7 +911,7 @@ static int	iso9660_finish_entry(struct archive_write *);
 static int	iso9660_close(struct archive_write *);
 static int	iso9660_free(struct archive_write *);
 
-static void	get_system_identitier(char *, size_t);
+static void	get_system_identifier(char *, size_t);
 static void	set_str(unsigned char *, const char *, size_t, char,
 		    const char *);
 static inline int joliet_allowed_char(unsigned char, unsigned char);
@@ -2166,7 +2166,7 @@ iso9660_free(struct archive_write *a)
  * Get the System Identifier
  */
 static void
-get_system_identitier(char *system_id, size_t size)
+get_system_identifier(char *system_id, size_t size)
 {
 #if defined(HAVE_SYS_UTSNAME_H)
 	struct utsname u;
@@ -2506,10 +2506,10 @@ get_gmoffset(struct tm *tm)
 
 #if defined(HAVE__GET_TIMEZONE)
 	_get_timezone(&offset);
-#elif defined(__CYGWIN__) || defined(__MINGW32__) || defined(__BORLANDC__)
+#elif defined(__CYGWIN__) || defined(__MINGW32__) || defined(__BORLANDC__) || defined(__ESP32IDF__)
 	offset = _timezone;
 #else
-	offset = -6; // timezone; // idolpx
+	offset = timezone;
 #endif
 	offset *= -1;
 	if (tm->tm_isdst)
@@ -3872,7 +3872,7 @@ write_VD(struct archive_write *a, struct vdd *vdd)
 	/* Unused Field */
 	set_unused_field_bp(bp, 8, 8);
 	/* System Identifier */
-	get_system_identitier(identifier, sizeof(identifier));
+	get_system_identifier(identifier, sizeof(identifier));
 	r = set_str_a_characters_bp(a, bp, 9, 40, identifier, vdc);
 	if (r != ARCHIVE_OK)
 		return (r);
@@ -4037,7 +4037,7 @@ set_option_info(struct archive_string *info, int *opt, const char *key,
 	case KEY_HEX:
 		d = va_arg(ap, int);
 		archive_string_sprintf(info, "%c%s=%x",
-		    prefix, key, d);
+		    prefix, key, (unsigned int)d);
 		break;
 	}
 	va_end(ap);

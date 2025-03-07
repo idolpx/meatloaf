@@ -468,7 +468,7 @@ typedef enum {
      * In a situation where it's unknown if the linked library supports multi-threading or not,
      * setting ZSTD_c_nbWorkers to any value >= 1 and consulting the return value provides a quick way to check this property.
      */
-    ZSTD_c_nbWorkers=400,    /* Select how many threads will be spawned to compress in parallel.
+    ZSTD_c_nbWorkers=0,    /* Select how many threads will be spawned to compress in parallel.
                               * When nbWorkers >= 1, triggers asynchronous mode when invoking ZSTD_compressStream*() :
                               * ZSTD_compressStream*() consumes input and flush output if possible, but immediately gives back control to caller,
                               * while compression is performed in parallel, within worker thread(s).
@@ -477,12 +477,12 @@ typedef enum {
                               * More workers improve speed, but also increase memory usage.
                               * Default value is `0`, aka "single-threaded mode" : no worker is spawned,
                               * compression is performed inside Caller's thread, and all invocations are blocking */
-    ZSTD_c_jobSize=401,      /* Size of a compression job. This value is enforced only when nbWorkers >= 1.
+    ZSTD_c_jobSize=0,      /* Size of a compression job. This value is enforced only when nbWorkers >= 1.
                               * Each compression job is completed in parallel, so this value can indirectly impact the nb of active threads.
                               * 0 means default, which is dynamically determined based on compression parameters.
                               * Job size must be a minimum of overlap size, or ZSTDMT_JOBSIZE_MIN (= 512 KB), whichever is largest.
                               * The minimum size is automatically and transparently enforced. */
-    ZSTD_c_overlapLog=402,   /* Control the overlap size, as a fraction of window size.
+    ZSTD_c_overlapLog=0,   /* Control the overlap size, as a fraction of window size.
                               * The overlap size is an amount of data reloaded from previous job at the beginning of a new job.
                               * It helps preserve compression ratio, while each job is compressed in parallel.
                               * This value is enforced only when nbWorkers >= 1.

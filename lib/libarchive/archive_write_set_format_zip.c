@@ -453,7 +453,8 @@ archive_write_zip_options(struct archive_write *a, const char *key,
 			zip->threads = sysconf(_SC_NPROCESSORS_ONLN);
 #elif !defined(__CYGWIN__) && defined(_WIN32_WINNT) && _WIN32_WINNT >= 0x0601
 			/* Windows 7 and up */
-			zip->threads = GetActiveProcessorCount(ALL_PROCESSOR_GROUPS);
+			DWORD activeProcs = GetActiveProcessorCount(ALL_PROCESSOR_GROUPS);
+			zip->threads = activeProcs <= SHRT_MAX ? (short)activeProcs : SHRT_MAX;
 #else
 			zip->threads = 1;
 #endif
@@ -739,7 +740,7 @@ archive_write_set_format_zip(struct archive *_a)
 	/* "Unspecified" lets us choose the appropriate compression. */
 	zip->requested_compression = COMPRESSION_UNSPECIFIED;
 	/* Following the 7-zip write support's lead, setting the default
-	 * compression level explicitely to 6 no matter what. */
+	 * compression level explicitly to 6 no matter what. */
 	zip->compression_level = 6;
 	/* Following the xar write support's lead, the default number of
 	 * threads is 1 (i.e. the xz compression, the only one caring about
@@ -807,7 +808,7 @@ archive_write_zip_header(struct archive_write *a, struct archive_entry *entry)
 		__archive_write_entry_filetype_unsupported(
 		    &a->archive, entry, "zip");
 		return ARCHIVE_FAILED;
-	};
+	}
 
 	/* If we're not using Zip64, reject large files. */
 	if (zip->flags & ZIP_FLAG_AVOID_ZIP64) {
@@ -1365,14 +1366,14 @@ archive_write_zip_header(struct archive_write *a, struct archive_entry *entry)
 			? ZSTD_minCLevel() // ZSTD_minCLevel is negative !
 			: (zip->compression_level - 1) * ZSTD_maxCLevel() / 8;
 		zip->stream.zstd.context = ZSTD_createCStream();
-		ret = ZSTD_initCStream(zip->stream.zstd.context, zstd_compression_level);
-		if (ZSTD_isError(ret)) {
+		size_t zret = ZSTD_initCStream(zip->stream.zstd.context, zstd_compression_level);
+		if (ZSTD_isError(zret)) {
 			archive_set_error(&a->archive, ENOMEM,
 			    "Can't init zstd compressor");
 			return (ARCHIVE_FATAL);
 		}
 		/* Asking for the multi-threaded compressor is a no-op in zstd if
-		 * it's not supported, so no need to explicitely check for it */
+		 * it's not supported, so no need to explicitly check for it */
 		ZSTD_CCtx_setParameter(zip->stream.zstd.context, ZSTD_c_nbWorkers, zip->threads);
 		zip->stream.zstd.out.dst = zip->buf;
 		zip->stream.zstd.out.size = zip->len_buf;
@@ -1598,9 +1599,9 @@ archive_write_zip_data(struct archive_write *a, const void *buff, size_t s)
 		zip->stream.zstd.in.size = s;
 		zip->stream.zstd.in.pos = 0;
 		do {
-			ret = ZSTD_compressStream(zip->stream.zstd.context,
+			size_t zret = ZSTD_compressStream(zip->stream.zstd.context,
 				&zip->stream.zstd.out, &zip->stream.zstd.in);
-			if (ZSTD_isError(ret))
+			if (ZSTD_isError(zret))
 				return (ARCHIVE_FATAL);
 			if (zip->stream.zstd.out.pos == zip->stream.zstd.out.size) {
 				if (zip->tctx_valid) {
@@ -1709,7 +1710,7 @@ archive_write_zip_data(struct archive_write *a, const void *buff, size_t s)
 			 * that ZIP's format is missing the uncompressed_size field.
 			 *
 			 * So we need to write a raw LZMA stream, set up for LZMA1
-			 * (i.e. the algoritm variant LZMA Alone uses), which was
+			 * (i.e. the algorithm variant LZMA Alone uses), which was
 			 * done above in the initialisation but first we need to
 			 * write ZIP's LZMA header, as if it were Stored data. Then
 			 * we can use the raw stream as if it were any other. magic1
@@ -1822,7 +1823,9 @@ archive_write_zip_finish_entry(struct archive_write *a)
 {
 	struct zip *zip = a->format_data;
 	int ret;
+#if defined(HAVE_BZLIB_H) || (defined(HAVE_ZSTD_H) && HAVE_ZSTD_compressStream) || HAVE_LZMA_H
 	char finishing;
+#endif
 
 	switch (zip->entry_compression) {
 #ifdef HAVE_ZLIB_H
@@ -1912,10 +1915,10 @@ archive_write_zip_finish_entry(struct archive_write *a)
 		do {
 			size_t remainder;
 
-			ret = ZSTD_endStream(zip->stream.zstd.context, &zip->stream.zstd.out);
-			if (ret == 0)
+			size_t zret = ZSTD_endStream(zip->stream.zstd.context, &zip->stream.zstd.out);
+			if (zret == 0)
 				finishing = 0;
-			else if (ZSTD_isError(ret))
+			else if (ZSTD_isError(zret))
 				return (ARCHIVE_FATAL);
 			remainder = zip->len_buf - (zip->stream.zstd.out.size - zip->stream.zstd.out.pos);
 			if (zip->tctx_valid) {

@@ -420,7 +420,7 @@ public:
         {
             for ( const auto &e : ext )
             {
-                Debug_printv("comparing [%s] to [%s]", fileName.c_str(), e.c_str());
+                //Debug_printv("comparing [%s] to [%s]", fileName.c_str(), e.c_str());
                 if ( mstr::endsWith(fileName, e.c_str(), false) )
                     return true;
             }

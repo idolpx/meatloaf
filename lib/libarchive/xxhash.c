@@ -85,23 +85,6 @@ You can contact the author at :
 #  endif
 #endif
 
-/***************************************
-** Includes & Memory related functions
-****************************************/
-#define XXH_malloc malloc
-#define XXH_free free
-#define XXH_memcpy memcpy
-
-
-static unsigned int	  XXH32 (const void*, unsigned int, unsigned int);
-static void*		  XXH32_init   (unsigned int);
-static XXH_errorcode	  XXH32_update (void*, const void*, unsigned int);
-static unsigned int	  XXH32_digest (void*);
-/*static int		  XXH32_sizeofState(void);*/
-static XXH_errorcode	  XXH32_resetState(void*, unsigned int);
-#define       XXH32_SIZEOFSTATE 48
-typedef struct { long long ll[(XXH32_SIZEOFSTATE+(sizeof(long long)-1))/sizeof(long long)]; } XXH32_stateSpace_t;
-static unsigned int	  XXH32_intermediateDigest (void*);
 
 /***************************************
 ** Basic Types
@@ -120,6 +103,26 @@ static unsigned int	  XXH32_intermediateDigest (void*);
   typedef   signed int       S32;
   typedef unsigned long long U64;
 #endif
+
+
+/***************************************
+** Includes & Memory related functions
+****************************************/
+#define XXH_malloc malloc
+#define XXH_free free
+#define XXH_memcpy memcpy
+
+
+static U32	  XXH32 (const void*, U32, U32);
+static void*		  XXH32_init   (U32);
+static XXH_errorcode	  XXH32_update (void*, const void*, U32);
+static U32	  XXH32_digest (void*);
+/*static int		  XXH32_sizeofState(void);*/
+static XXH_errorcode	  XXH32_resetState(void*, U32);
+#define       XXH32_SIZEOFSTATE 48
+typedef struct { long long ll[(XXH32_SIZEOFSTATE+(sizeof(long long)-1))/sizeof(long long)]; } XXH32_stateSpace_t;
+static U32	  XXH32_intermediateDigest (void*);
+
 
 #if defined(__GNUC__)  && !defined(XXH_USE_UNALIGNED_ACCESS)
 #  define _PACKED __attribute__ ((packed))
@@ -231,7 +234,7 @@ FORCE_INLINE U32 XXH_readLE32(const U32* ptr, XXH_endianess endian) { return XXH
 ** Simple Hash Functions
 ******************************/
 static
-FORCE_INLINE U32 XXH32_endian_align(const void* input, unsigned int len, U32 seed, XXH_endianess endian, XXH_alignment align)
+FORCE_INLINE U32 XXH32_endian_align(const void* input, U32 len, U32 seed, XXH_endianess endian, XXH_alignment align)
 {
     const BYTE* p = (const BYTE*)input;
     const BYTE* bEnd = p + len;
@@ -291,7 +294,7 @@ FORCE_INLINE U32 XXH32_endian_align(const void* input, unsigned int len, U32 see
 }
 
 
-U32 XXH32(const void* input, unsigned int len, U32 seed)
+U32 XXH32(const void* input, U32 len, U32 seed)
 {
 #if 0
     // Simple version, good for code maintenance, but unfortunately slow for small inputs
@@ -431,7 +434,7 @@ FORCE_INLINE XXH_errorcode XXH32_update_endian (void* state_in, const void* inpu
 }
 
 static
-XXH_errorcode XXH32_update (void* state_in, const void* input, unsigned int len)
+XXH_errorcode XXH32_update (void* state_in, const void* input, U32 len)
 {
     XXH_endianess endian_detected = (XXH_endianess)XXH_CPU_LITTLE_ENDIAN;
 

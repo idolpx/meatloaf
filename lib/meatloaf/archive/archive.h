@@ -194,7 +194,7 @@ public:
                 ".tar.bz2",
                 ".tar.gz",
                 ".tar.z",
-                ".tar.lz"
+                ".tar.lz",
                 ".tar",
                 ".tgz",
                 ".7z",

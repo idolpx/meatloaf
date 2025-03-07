@@ -126,15 +126,16 @@ bool ArchiveMStream::open(std::ios_base::openmode mode)
         //int r = archive_read_open2(a, &streamData, NULL, myRead, myskip, myclose);
         if ( r == ARCHIVE_OK )
         {
-            is_open = true;
             Debug_printv("*** Archive Opened! (%d)", r);
         // std::string archiveFormat = archive_format_name(a);
         // std::string archiveCompression = archive_compression_name(a);
         // Debug_printv("archive format[%s] compression[%s]", archiveFormat.c_str(), archiveCompression.c_str());
+            is_open = true;
         }
         else
         {
             Debug_printv("*** Error opening archive! (%d)", r);
+            is_open = false;
         }
     }
     else
