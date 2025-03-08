@@ -272,7 +272,7 @@ MFile* TCRTMFile::getNextFileInDir()
         mstr::replaceAll(filename, "/", "\\");
         //Debug_printv( "entry[%s]", (sourceFile->url + "/" + filename).c_str() );
 
-        auto file = FileBroker::obtain<TCRTMFile>(sourceFile->url + "/" + filename);
+        auto file = MFSOwner::File(sourceFile->url + "/" + filename);
         file->extension = image->decodeType(image->entry.file_type);
         file->size = (image->entry.file_size[0] | (image->entry.file_size[1] << 8) | (image->entry.file_size[2] << 16)) + 2; // 2 bytes for load address
 

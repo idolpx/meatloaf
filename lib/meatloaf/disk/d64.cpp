@@ -643,7 +643,7 @@ MFile *D64MFile::getNextFileInDir()
         mstr::replaceAll(filename, "/", "\\");
         // Debug_printv( "entry[%s]", (sourceFile->url + "/" + filename).c_str() );
 
-        auto file = FileBroker::obtain<D64MFile>(sourceFile->url + "/" + filename);
+        auto file = MFSOwner::File(sourceFile->url + "/" + filename);
         file->extension = image->decodeType(image->entry.file_type);
         file->size = UINT16_FROM_LE_UINT16(image->entry.blocks);
 

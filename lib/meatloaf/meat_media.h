@@ -187,11 +187,11 @@ public:
 
         // obviously you have to supply sourceFile.url to this function!
         if(image_repo.find(url)!=image_repo.end()) {
-            Debug_printv("stream found!");
+            Debug_printv("image found!");
             return (T*)image_repo.at(url);
         }
 
-        // create and add stream to broker if not found
+        // create and add stream to image broker if not found
         auto newFile = MFSOwner::File(url);
 
         T* newStream = (T*)newFile->getSourceStream();

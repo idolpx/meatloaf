@@ -230,7 +230,7 @@ MFile *LBRMFile::getNextFileInDir()
         mstr::replaceAll(filename, "/", "\\");
         //Debug_printv( "entry[%s]", (sourceFile->url + "/" + fileName).c_str() );
 
-        auto file = FileBroker::obtain<LBRMFile>(sourceFile->url + "/" + filename);
+        auto file = MFSOwner::File(sourceFile->url + "/" + filename);
         file->extension = image->entry.type;
         //Debug_printv("entry[%s] ext[%s]", fileName.c_str(), file->extension.c_str());
         

@@ -1504,6 +1504,7 @@ void iecDrive::reset()
 
   IECFileDevice::reset();
 
+  FileBroker::clear();
   ImageBroker::clear();
 
 #ifdef ENABLE_DISPLAY

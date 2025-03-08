@@ -229,7 +229,7 @@ MFile* T64MFile::getNextFileInDir() {
         mstr::replaceAll(filename, "/", "\\");
         //Debug_printv( "entry[%s]", (sourceFile->url + "/" + filename).c_str() );
 
-        auto file = FileBroker::obtain<T64MFile>(sourceFile->url + "/" + filename);
+        auto file = MFSOwner::File(sourceFile->url + "/" + filename);
         file->extension = image->decodeType(image->entry.file_type);
 
         size_t end_address = UINT16_FROM_HILOBYTES(image->entry.end_address[1], image->entry.end_address[0]);

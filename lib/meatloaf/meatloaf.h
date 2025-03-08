@@ -277,10 +277,12 @@ class MFileSystem {
 public:
     MFileSystem(const char* symbol);
     virtual ~MFileSystem() = 0;
-    virtual bool mount() { return true; };
-    virtual bool umount() { return true; };
     virtual bool handles(std::string path) = 0;
     virtual MFile* getFile(std::string path) = 0;
+
+    virtual bool mount() { return true; };
+    virtual bool umount() { return true; };
+
     bool isMounted() {
         return _is_mounted;
     }
@@ -525,43 +527,18 @@ namespace Meat {
 class FileBroker {
     static std::unordered_map<std::string, MFile*> file_repo;
 public:
-    template<class T> static T* obtain(std::string url, MFile* sourceFile) 
-    {
-        //Debug_printv("streams[%d] url[%s]", file_repo.size(), url.c_str());
-
-        // obviously you have to supply sourceFile.url to this function!
+    static MFile* obtain(std::string url) {
         if(file_repo.find(url)!=file_repo.end())
         {
             Debug_printv("Reusing Existing MFile url[%s]", url.c_str());
-            return (T*)file_repo.at(url);
+            return file_repo.at(url);
         }
 
-        // create and add stream to broker if not found
-        Debug_printv("Creating New Stream url[%s]", url.c_str());
-        auto newFile = MFSOwner::File(url);
-
-        if ( newFile != nullptr )
-        {
-            // Are we at the root of the filesystem?
-            if ( newFile->pathInStream == "")
-            {
-                Debug_printv("ROOT FILESYSTEM... CACHING [%s]", url.c_str());
-                file_repo.insert(std::make_pair(url, newFile));
-            }
-            else
-            {
-                Debug_printv("SINGLE FILE... DON'T CACHE [%s]", url.c_str());
-            }
-            
-            return newFile;
-        }
-
-        delete newFile;
         return nullptr;
     }
 
-    static MFile* obtain(std::string url, MFile* sourceFile) {
-        return obtain<MFile>(url, sourceFile);
+    static void add(std::string url, MFile* newFile) {
+        file_repo.insert(std::make_pair(url, newFile));
     }
 
     static void dispose(std::string url) {
@@ -575,6 +552,13 @@ public:
 
     static void validate() {
         
+    }
+
+    static void clear() {
+        std::for_each(file_repo.begin(), file_repo.end(), [](auto& pair) {
+            delete pair.second;
+        });
+        file_repo.clear();
     }
 };
 

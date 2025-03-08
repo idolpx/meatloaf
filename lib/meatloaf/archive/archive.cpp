@@ -337,7 +337,7 @@ MFile *ArchiveMFile::getNextFileInDir()
     Debug_printv("getNextFileInDir calling archive_read_next_header");
     if (filename.size() > 0)
     {
-        auto file = FileBroker::obtain<ArchiveMFile>(sourceFile->url + "/" + filename);
+        auto file = MFSOwner::File(sourceFile->url + "/" + filename);
         file->size = archive_entry_size(entry);
         file->_exists = true;
         return file;
