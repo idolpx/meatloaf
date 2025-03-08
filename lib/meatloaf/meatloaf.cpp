@@ -217,7 +217,7 @@ MFile* MFSOwner::File(std::shared_ptr<MFile> file) {
 
 MFile* MFSOwner::File(std::string path, bool default_fs) {
 
-    if ( !default_fs)
+    if ( !default_fs )
     {
         if ( mlFS.handles(path) )
         {
@@ -239,73 +239,50 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
     auto begin = paths.begin();
     auto end = paths.end();
 
-    MFileSystem *targetFileSystem = nullptr;
-    if ( default_fs )
-        targetFileSystem = &defaultFS;
-    else
-        targetFileSystem = findParentFS(begin, end, pathIterator);
-
-    if ( targetFileSystem != nullptr )
+    MFileSystem *targetFileSystem = &defaultFS;
+    if ( !default_fs )
     {
-        auto targetFile = targetFileSystem->getFile(path);
-        Debug_printv("targetFile[%s] in targetFileSystem[%s]", targetFile->url.c_str(), targetFileSystem->symbol);
-
-        // Set path to file in filesystem stream
-        targetFile->pathInStream = mstr::joinToString(&pathIterator, &end, "/");
-        Debug_printv("targetFile->pathInStream: '%s'", targetFile->pathInStream.c_str());
-
-        end = pathIterator;
-        pathIterator--;
-        std::string sourcePath = targetFile->url;
-        if ( targetFile->pathInStream.size() )
-            sourcePath = mstr::joinToString(&begin, &pathIterator, "/");
-
-        Debug_printv("sourcePath[%s] begin[%s] pathIterator[%s]", sourcePath.c_str(), begin->c_str(), pathIterator->c_str());
-
-        if(begin == pathIterator) 
-        {
-            Debug_printv("** LOOK UP PATH NOT NEEDED   path[%s] sourcePath[%s]", path.c_str(), sourcePath.c_str());
-            targetFile->sourceFile = targetFileSystem->getFile(sourcePath);
-        } 
-        else 
-        {
-            Debug_printv("** LOOK UP PATH: %s", sourcePath.c_str());
-
-            // Find the source filesystem (container)
-            MFileSystem *sourceFileSystem = nullptr;
-            if ( default_fs )
-                sourceFileSystem = &defaultFS;
-            else
-                sourceFileSystem = findParentFS(begin, end, pathIterator);
-
-            if ( sourceFileSystem != nullptr )
-            {
-                auto wholePath = mstr::joinToString(&begin, &end, "/");
-                Debug_printv("wholePath[%s]", wholePath.c_str());
-
-                targetFile->sourceFile = sourceFileSystem->getFile(wholePath); // This is for raw access to the container stream
-                targetFile->isWritable = targetFile->sourceFile->isWritable;   // This stream is writable if the container is writable
-                if (!targetFile->sourceFile->exists())
-                {
-                    Debug_printv("Not Found! path[%s]", path.c_str());
-                    // delete targetFile;
-                    // return nullptr;
-                }
-                Debug_printv("sourceFile[%s] is in [%s][%s]", targetFile->sourceFile->name.c_str(), wholePath.c_str(), targetFileSystem->symbol);
-            }
-            else
-            {
-                Debug_printv("WARNING!!!! CONTAINER FAILED FOR: '%s'", sourcePath.c_str());
-            }
-        }
-
-        Debug_println("--------------------------------");
-        return targetFile;
+        targetFileSystem = findParentFS(begin, end, pathIterator);
     }
 
-    Debug_printv("Not Found! path[%s]", path.c_str());
+    auto targetFile = targetFileSystem->getFile(path);
+    Debug_printv("targetFile[%s] in targetFileSystem[%s]", targetFile->url.c_str(), targetFileSystem->symbol);
 
-    return nullptr;
+    // Set path to file in filesystem stream
+    targetFile->pathInStream = mstr::joinToString(&pathIterator, &end, "/");
+    Debug_printv("targetFile->pathInStream: '%s'", targetFile->pathInStream.c_str());
+
+    end = pathIterator;
+    pathIterator--;
+    auto sourcePath = mstr::joinToString(&begin, &pathIterator, "/");
+    Debug_printv("sourcePath[%s] begin[%s] pathIterator[%s]", sourcePath.c_str(), begin->c_str(), pathIterator->c_str());
+
+    if( begin == pathIterator ) // || !targetFile->pathInStream.size()) 
+    {
+        Debug_printv("** LOOK UP PATH NOT NEEDED   path[%s] sourcePath[%s]", path.c_str(), sourcePath.c_str());
+        targetFile->sourceFile = targetFileSystem->getFile(sourcePath);
+    } 
+    else 
+    {
+        Debug_printv("** LOOK UP PATH: %s", sourcePath.c_str());
+
+        // Find the container filesystem
+        MFileSystem *sourceFileSystem = &defaultFS;
+        if ( !default_fs )
+        {
+            sourceFileSystem = findParentFS(begin, end, pathIterator);
+        }
+
+        auto wholePath = mstr::joinToString(&begin, &end, "/");
+        Debug_printv("wholePath[%s]", wholePath.c_str());
+
+        targetFile->sourceFile = sourceFileSystem->getFile(wholePath); // This is for raw access to the container stream
+        targetFile->isWritable = targetFile->sourceFile->isWritable;   // This stream is writable if the container is writable
+        Debug_printv("sourceFile[%s] is in [%s][%s]", targetFile->sourceFile->name.c_str(), wholePath.c_str(), targetFileSystem->symbol);
+    }
+
+    Debug_println("--------------------------------");
+    return targetFile;
 }
 
 MFile* MFSOwner::NewFile(std::string path) {
@@ -364,27 +341,25 @@ std::string MFSOwner::existsLocal( std::string path )
 }
 
 MFileSystem* MFSOwner::findParentFS(std::vector<std::string>::iterator &begin, std::vector<std::string>::iterator &end, std::vector<std::string>::iterator &pathIterator) {
-    uint8_t i = 0;
     while (pathIterator != begin) {
-        i++;
         pathIterator--;
 
         auto part = *pathIterator;
         mstr::toLower(part);
-        if ( !part.size() )
-            break;
+        if ( part.size() )
+        {
+            Debug_printv("pathIterator[%s]", pathIterator->c_str());
 
-        Debug_printv("pathIterator[%s]", pathIterator->c_str());
+            auto foundFS=std::find_if(availableFS.begin() + 1, availableFS.end(), [&part](MFileSystem* fs){ 
+                //Debug_printv("symbol[%s]", fs->symbol);
+                return fs->handles(part); 
+            } );
 
-        auto foundFS=std::find_if(availableFS.begin() + 1, availableFS.end(), [&part](MFileSystem* fs){ 
-            //Debug_printv("symbol[%s]", fs->symbol);
-            return fs->handles(part); 
-        } );
-
-        if(foundFS != availableFS.end()) {
-            Debug_printv("matched[%s] foundFS[%s]", part.c_str(), (*foundFS)->symbol);
-            pathIterator++;
-            return (*foundFS);
+            if(foundFS != availableFS.end()) {
+                Debug_printv("matched[%s] foundFS[%s]", part.c_str(), (*foundFS)->symbol);
+                pathIterator++;
+                return (*foundFS);
+            }
         }
     };
 
