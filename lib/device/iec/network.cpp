@@ -54,8 +54,8 @@ void iecNetwork::init()
 
 void iecNetwork::iec_open()
 {
-    int channelId = commanddata.channel;
-    auto& channel_data = network_data_map[channelId]; // This will create the channel if it doesn't exist
+    int channel = commanddata.channel;
+    auto& channel_data = network_data_map[channel]; // This will create the channel if it doesn't exist
 
     uint8_t channel_aux1 = 12;
     uint8_t channel_aux2 = channel_data.translationMode; // not sure about this, you can't set this unless you send a command for the channel first, I think it relies on the array being init to 0s
@@ -94,8 +94,8 @@ void iecNetwork::iec_open()
 
     channel_data.channelMode = NetworkData::PROTOCOL;
 
-    cmdFrame.aux1 = (channelId == CHANNEL_LOAD) ? 4 : (channelId == CHANNEL_SAVE) ? 8 : channel_aux1;
-    cmdFrame.aux2 = (channelId == CHANNEL_LOAD || channelId == CHANNEL_SAVE) ? 0 : channel_aux2;
+    cmdFrame.aux1 = (channel == CHANNEL_LOAD) ? 4 : (channel == CHANNEL_SAVE) ? 8 : channel_aux1;
+    cmdFrame.aux2 = (channel == CHANNEL_LOAD || channel == CHANNEL_SAVE) ? 0 : channel_aux2;
 
     // Reset protocol if it exists
     channel_data.protocol.reset();
@@ -154,8 +154,8 @@ void iecNetwork::iec_close()
 {
     Debug_printf("iecNetwork::iec_close(), channel #%d", commanddata.channel);
 
-    int channelId = commanddata.channel;
-    auto& channel_data = network_data_map[channelId];
+    int channel = commanddata.channel;
+    auto& channel_data = network_data_map[channel];
 
     /*
     // setting this status wipes out any other error status set previously
@@ -248,7 +248,8 @@ void iecNetwork::parse_json()
     channel = atoi(pt[1].c_str());
     auto& channel_data = network_data_map[channel];
 
-    channel_data.protocol->status(&ns);
+    if (channel_data.protocol)
+        channel_data.protocol->status(&ns);
 
     if (!channel_data.json->parse())
     {
@@ -341,7 +342,8 @@ void iecNetwork::parse_bite()
         Debug_printv("bite_size[%d]", bite_size);
     }
 
-    channel_data.protocol->status(&ns);
+    if (channel_data.protocol)
+        channel_data.protocol->status(&ns);
 
     // escape chars that would break up INPUT#
     //mstr::replaceAll(*receiveBuffer[channel], ",", "\",\"");
@@ -670,7 +672,8 @@ void iecNetwork::perform_special_80()
     {
         if (channel_data.protocol)
         {
-            channel_data.protocol->status(&ns);
+            if (channel_data.protocol)
+                channel_data.protocol->status(&ns);
             iecStatus.error = ns.error;
             iecStatus.connected = ns.connected;
         }
@@ -689,7 +692,8 @@ void iecNetwork::perform_special_80()
 
     if (channel_data.protocol->special_80((uint8_t *)sp_buf.c_str(), sp_buf.length(), &cmdFrame))
     {
-        channel_data.protocol->status(&ns);
+        if (channel_data.protocol)
+            channel_data.protocol->status(&ns);
         iecStatus.error = ns.error;
         iecStatus.channel = channel;
         iecStatus.connected = ns.connected;
@@ -697,7 +701,8 @@ void iecNetwork::perform_special_80()
     }
     else
     {
-        channel_data.protocol->status(&ns);
+        if (channel_data.protocol)
+            channel_data.protocol->status(&ns);
         iecStatus.error = ns.error;
         iecStatus.channel = channel;
         iecStatus.connected = ns.connected;
@@ -1076,8 +1081,7 @@ uint8_t iecNetwork::write(uint8_t channel, uint8_t *buffer, uint8_t bufferSize, 
 
   //Debug_printv("iecNetwork::write(#%d, %d, %d) = %s", m_devnr, channel, bufferSize, mstr::toHex(buffer, bufferSize).c_str());
 
-  int channelId = commanddata.channel;
-  auto& channel_data = network_data_map[channelId];
+  auto& channel_data = network_data_map[channel];
 
   channel_data.transmitBuffer = string((char *) buffer, bufferSize);
   return transmit(channel_data) ? bufferSize : 0;
@@ -1086,8 +1090,7 @@ uint8_t iecNetwork::write(uint8_t channel, uint8_t *buffer, uint8_t bufferSize, 
 
 uint8_t iecNetwork::read(uint8_t channel, uint8_t *buffer, uint8_t bufferSize, bool *eoi)
 {
-  int channelId = commanddata.channel;
-  auto& channel_data = network_data_map[channelId];
+  auto& channel_data = network_data_map[channel];
 
   if( channel_data.receiveBuffer.size() < bufferSize )
     if( !receive(channel_data, 2048) )
