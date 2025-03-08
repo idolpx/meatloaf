@@ -104,7 +104,7 @@ private:
 class TNFSHandle {
 public:
     //int rc;
-    int16_t file_h = 0;
+    FILE* file_h = nullptr;
 
     TNFSHandle() 
     {
