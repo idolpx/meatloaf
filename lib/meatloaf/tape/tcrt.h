@@ -129,15 +129,15 @@ public:
 class TCRTMFileSystem: public MFileSystem
 {
 public:
-    MFile* getFile(std::string path) override {
-        return new TCRTMFile(path);
-    }
+    TCRTMFileSystem(): MFileSystem("tcrt") {};
 
     bool handles(std::string fileName) override {
         return byExtension(".tcrt", fileName);
     }
 
-    TCRTMFileSystem(): MFileSystem("tcrt") {};
+    MFile* getFile(std::string path) override {
+        return new TCRTMFile(path);
+    }
 };
 
 

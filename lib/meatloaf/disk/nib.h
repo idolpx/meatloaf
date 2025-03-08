@@ -113,9 +113,7 @@ public:
 class NIBMFileSystem: public MFileSystem
 {
 public:
-    MFile* getFile(std::string path) override {
-        return new NIBMFile(path);
-    }
+    NIBMFileSystem(): MFileSystem("nib") {};
 
     bool handles(std::string fileName) override {
         return byExtension(
@@ -128,7 +126,9 @@ public:
         );
     }
 
-    NIBMFileSystem(): MFileSystem("G64") {};
+    MFile* getFile(std::string path) override {
+        return new NIBMFile(path);
+    }
 };
 
 

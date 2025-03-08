@@ -191,10 +191,11 @@ MFile* TAPMFile::getNextFileInDir() {
 
     if ( image->getNextImageEntry() )
     {
-        std::string fileName = mstr::format("%.16s", image->entry.filename);
-        mstr::replaceAll(fileName, "/", "\\");
-        //Debug_printv( "entry[%s]", (sourceFile->url + "/" + fileName).c_str() );
-        auto file = MFSOwner::File(sourceFile->url + "/" + fileName);
+        std::string filename = mstr::format("%.16s", image->entry.filename);
+        mstr::replaceAll(filename, "/", "\\");
+        //Debug_printv( "entry[%s]", (sourceFile->url + "/" + filename).c_str() );
+
+        auto file = FileBroker::obtain<TAPMFile>(sourceFile->url + "/" + filename);
         file->extension = image->decodeType(image->entry.file_type);
         
         return file;

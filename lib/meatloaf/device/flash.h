@@ -28,21 +28,6 @@
 
 #include "../../include/debug.h"
 
-/********************************************************
- * MFileSystem
- ********************************************************/
-
-class FlashMFileSystem: public MFileSystem 
-{
-    bool handles(std::string path) override;
-    
-public:
-    FlashMFileSystem() : MFileSystem("FlashFS") {};
-    MFile* getFile(std::string path) override;
-
-};
-
-
 
 /********************************************************
  * MFile
@@ -172,6 +157,26 @@ protected:
     std::unique_ptr<FlashHandle> handle;
 };
 
+/********************************************************
+ * MFileSystem
+ ********************************************************/
+
+ class FlashMFileSystem: public MFileSystem 
+ {
+ public:
+     FlashMFileSystem() : MFileSystem("flash") {};
+ 
+     bool handles(std::string path) override
+     {
+         return true; // fallback fs, so it must be last on FS list
+     }
+ 
+     MFile* getFile(std::string path) override
+     {
+         //Debug_printv("path[%s]", path.c_str());
+         return new FlashMFile(path);
+     }
+ };
 
 
 #endif // MEATLOAF_DEVICE_FLASH

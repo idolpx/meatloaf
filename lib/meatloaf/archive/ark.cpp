@@ -214,7 +214,8 @@ MFile *ARKMFile::getNextFileInDir()
         // mstr::rtrimA0(filename);
         mstr::replaceAll(filename, "/", "\\");
         //Debug_printv( "entry[%s]", (sourceFile->url + "/" + fileName).c_str() );
-        auto file = MFSOwner::File(sourceFile->url + "/" + filename);
+
+        auto file = FileBroker::obtain<ARKMFile>(sourceFile->url + "/" + filename);
         file->extension = image->decodeType(image->entry.file_type);
         //Debug_printv("entry[%s] ext[%s]", fileName.c_str(), file->extension.c_str());
 

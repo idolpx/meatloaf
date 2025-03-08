@@ -151,9 +151,7 @@ public:
 class G64MFileSystem: public MFileSystem
 {
 public:
-    MFile* getFile(std::string path) override {
-        return new G64MFile(path);
-    }
+G64MFileSystem(): MFileSystem("g64") {};
 
     bool handles(std::string fileName) override {
         return byExtension(
@@ -165,7 +163,9 @@ public:
         );
     }
 
-    G64MFileSystem(): MFileSystem("G64") {};
+    MFile* getFile(std::string path) override {
+        return new G64MFile(path);
+    }
 };
 
 

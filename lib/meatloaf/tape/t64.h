@@ -128,15 +128,15 @@ public:
 class T64MFileSystem: public MFileSystem
 {
 public:
-    MFile* getFile(std::string path) override {
-        return new T64MFile(path);
-    }
+    T64MFileSystem(): MFileSystem("t64") {};
 
     bool handles(std::string fileName) override {
         return byExtension(".t64", fileName);
     }
 
-    T64MFileSystem(): MFileSystem("t64") {};
+    MFile* getFile(std::string path) override {
+        return new T64MFile(path);
+    }
 };
 
 

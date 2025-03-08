@@ -122,15 +122,15 @@ public:
 class LBRMFileSystem: public MFileSystem
 {
 public:
-    MFile* getFile(std::string path) override {
-        return new LBRMFile(path);
-    }
+    LBRMFileSystem(): MFileSystem("lbr") {};
 
     bool handles(std::string fileName) override {
         return byExtension(".lbr", fileName);
     }
 
-    LBRMFileSystem(): MFileSystem("lbr") {};
+    MFile* getFile(std::string path) override {
+        return new LBRMFile(path);
+    }
 };
 
 

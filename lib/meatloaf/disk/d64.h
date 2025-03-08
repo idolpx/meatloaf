@@ -490,10 +490,7 @@ public:
 class D64MFileSystem: public MFileSystem
 {
 public:
-    MFile* getFile(std::string path) override {
-        //Debug_printv("path[%s]", path.c_str());
-        return new D64MFile(path);
-    }
+    D64MFileSystem(): MFileSystem("d64") {};
 
     bool handles(std::string fileName) override {
         //printf("handles w dnp %s %d\r\n", fileName.rfind(".dnp"), fileName.length()-4);
@@ -506,7 +503,10 @@ public:
         );
     }
 
-    D64MFileSystem(): MFileSystem("d64") {};
+    MFile* getFile(std::string path) override {
+        //Debug_printv("path[%s]", path.c_str());
+        return new D64MFile(path);
+    }
 };
 
 

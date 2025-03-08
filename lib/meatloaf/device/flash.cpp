@@ -27,21 +27,6 @@
 #include "peoples_url_parser.h"
 #include "string_utils.h"
 
-/********************************************************
- * MFileSystem implementations
- ********************************************************/
-
-bool FlashMFileSystem::handles(std::string path) 
-{
-    return true; // fallback fs, so it must be last on FS list
-}
-
-MFile* FlashMFileSystem::getFile(std::string path)
-{
-    //Debug_printv("path[%s]", path.c_str());
-    return new FlashMFile(path);
-}
-
 
 /********************************************************
  * MFile implementations

@@ -128,15 +128,15 @@ public:
 class TAPMFileSystem: public MFileSystem
 {
 public:
-    MFile* getFile(std::string path) override {
-        return new TAPMFile(path);
-    }
+    TAPMFileSystem(): MFileSystem("tap") {};
 
     bool handles(std::string fileName) override {
         return byExtension(".tap", fileName);
     }
 
-    TAPMFileSystem(): MFileSystem("tap") {};
+    MFile* getFile(std::string path) override {
+        return new TAPMFile(path);
+    }
 };
 
 

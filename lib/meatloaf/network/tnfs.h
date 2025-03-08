@@ -104,7 +104,7 @@ private:
 class TNFSHandle {
 public:
     //int rc;
-    FILE* file_h = nullptr;
+    int16_t file_h = 0;
 
     TNFSHandle() 
     {
@@ -168,9 +168,8 @@ protected:
 
 class TNFSMFileSystem: public MFileSystem 
 {
-    MFile* getFile(std::string path) override {
-        return new TNFSMFile(path);
-    }
+public:
+    TNFSMFileSystem(): MFileSystem("tnfs") {};
 
     bool handles(std::string name) {
         if ( mstr::equals(name, (char *)"tnfs:", false) )
@@ -178,9 +177,10 @@ class TNFSMFileSystem: public MFileSystem
 
         return false;
     }
-public:
-    TNFSMFileSystem(): MFileSystem("tnfs") {};
 
+    MFile* getFile(std::string path) override {
+        return new TNFSMFile(path);
+    }
 };
 
 

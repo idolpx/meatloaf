@@ -124,15 +124,15 @@ public:
 class D8BMFileSystem: public MFileSystem
 {
 public:
-    MFile* getFile(std::string path) override {
-        return new D8BMFile(path);
-    }
+    D8BMFileSystem(): MFileSystem("d8b") {};
 
     bool handles(std::string fileName) override {
         return byExtension(".d8b", fileName);
     }
 
-    D8BMFileSystem(): MFileSystem("d8b") {};
+    MFile* getFile(std::string path) override {
+        return new D8BMFile(path);
+    }
 };
 
 

@@ -33,6 +33,14 @@
 
 class MLMFileSystem: public MFileSystem
 {
+public:
+    MLMFileSystem(): MFileSystem("meatloaf") {};
+
+    bool handles(std::string name) {
+        std::string pattern = "ml:";
+        return mstr::startsWith(name, pattern.c_str(), false);
+    }
+
     MFile* getFile(std::string path) override {
     //     if ( path.size() == 0 )
     //         return nullptr;
@@ -55,16 +63,8 @@ class MLMFileSystem: public MFileSystem
     //     delete http;
 
     //     Debug_printv("target url[%s]", url.c_str());
-    //     return MFSOwner::File(url);
+    //     return FileBroker::obtain(url);
         return nullptr;
-    }
-
-public:
-    MLMFileSystem(): MFileSystem("meatloaf") {};
-
-    bool handles(std::string name) {
-        std::string pattern = "ml:";
-        return mstr::startsWith(name, pattern.c_str(), false);
     }
 
     std::string resolve(std::string path) {

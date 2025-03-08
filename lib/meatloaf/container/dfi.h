@@ -214,15 +214,15 @@ public:
 class DFIMFileSystem: public MFileSystem
 {
 public:
-    MFile* getFile(std::string path) override {
-        return new DFIMFile(path);
-    }
+    DFIMFileSystem(): MFileSystem("dfi") {};
 
     bool handles(std::string fileName) override {
         return byExtension(".dfi", fileName);
     }
 
-    DFIMFileSystem(): MFileSystem("dfi") {};
+    MFile* getFile(std::string path) override {
+        return new DFIMFile(path);
+    }
 };
 
 

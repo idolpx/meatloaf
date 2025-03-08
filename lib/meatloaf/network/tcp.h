@@ -344,9 +344,8 @@ public:
 
 class TCPMFileSystem: public MFileSystem 
 {
-    MFile* getFile(std::string path) override {
-        return new TCPMFile(path);
-    }
+public:
+    TCPMFileSystem(): MFileSystem("tcp") {};
 
     bool handles(std::string name) {
         if ( mstr::equals(name, (char *)"tcp:", false) )
@@ -354,8 +353,10 @@ class TCPMFileSystem: public MFileSystem
 
         return false;
     }
-public:
-    TCPMFileSystem(): MFileSystem("tcp") {};
+
+    MFile* getFile(std::string path) override {
+        return new TCPMFile(path);
+    }
 };
 
 

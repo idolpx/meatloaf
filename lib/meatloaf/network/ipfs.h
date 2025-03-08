@@ -123,18 +123,18 @@ public:
 
 class IPFSFileSystem: public MFileSystem
 {
-    MFile* getFile(std::string path) override {
-        // Debug_printv("IPFSFileSystem::getFile(%s)", path.c_str());
-        return new IPFSMFile(path);
-    }
+public:
+    IPFSFileSystem(): MFileSystem("ipfs") {};
 
     bool handles(std::string name) {
         std::string pattern = "ipfs:";
         return mstr::startsWith(name, pattern.c_str(), false);
     }
 
-public:
-    IPFSFileSystem(): MFileSystem("ipfs") {};
+    MFile* getFile(std::string path) override {
+        // Debug_printv("IPFSFileSystem::getFile(%s)", path.c_str());
+        return new IPFSMFile(path);
+    }
 };
 
 #endif // MEATLOAF_SCHEME_IPFS

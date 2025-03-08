@@ -55,12 +55,13 @@ protected:
         uint16_t bundle_main_call_address;
     };
 
-    void readHeader() override {
+    bool readHeader() override {
         containerStream->seek(0x18);
         containerStream->read((uint8_t*)&header, sizeof(header));
     }
 
-    bool readEntry( std::string filename ) override;
+    bool seekEntry( std::string filename ) override;
+    bool seekEntry( uint16_t index = 0 ) override;
     bool readEntry( uint16_t index ) override;
     bool seekPath(std::string path) override;
 
@@ -111,7 +112,6 @@ public:
     bool rename(std::string dest) override { return false; };
     time_t getLastWrite() override { return 0; };
     time_t getCreationTime() override { return 0; };
-    uint32_t size() override;
 
     bool isDir = true;
     bool dirIsOpen = false;
@@ -126,15 +126,15 @@ public:
 class CRTMFileSystem: public MFileSystem
 {
 public:
-    MFile* getFile(std::string path) override {
-        return new CRTMFile(path);
-    }
+    CRTMFileSystem(): MFileSystem("crt") {};
 
     bool handles(std::string fileName) override {
         return byExtension(".crt", fileName);
     }
 
-    CRTMFileSystem(): MFileSystem("crt") {};
+    MFile* getFile(std::string path) override {
+        return new CRTMFile(path);
+    }
 };
 
 

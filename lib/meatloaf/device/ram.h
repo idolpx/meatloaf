@@ -195,12 +195,20 @@ private:
 
 class RAMMFileSystem: public MFileSystem 
 {
-    bool handles(std::string path);
-    
 public:
-    RAMMFileSystem() : MFileSystem("HighMemoryFS") {};
-    MFile* getFile(std::string path) override;
+    RAMMFileSystem() : MFileSystem("ram") {};
 
+    bool handles(std::string path) override
+    {
+        std::string pattern = "ram:";
+        return mstr::equals(path, pattern, false);
+    }
+
+    MFile* getFile(std::string path) override
+    {
+        //Debug_printv("path[%s]", path.c_str());
+        return new RAMMFile(path);
+    }
 };
 
 

@@ -303,9 +303,9 @@ protected:
 class CSIPMFileSystem: public MFileSystem 
 {
 public:
-    static CSIPMSessionMgr session;
-
     CSIPMFileSystem(): MFileSystem("csip") {};
+
+    static CSIPMSessionMgr session;
 
     bool handles(std::string name) {
         return name == "csip:";

@@ -190,15 +190,15 @@ public:
 class ISOMFileSystem: public MFileSystem
 {
 public:
-    MFile* getFile(std::string path) override {
-        return new ISOMFile(path);
-    }
+    ISOMFileSystem(): MFileSystem("iso") {};
 
     bool handles(std::string fileName) override {
         return byExtension(".iso", fileName);
     }
 
-    ISOMFileSystem(): MFileSystem("iso") {};
+    MFile* getFile(std::string path) override {
+        return new ISOMFile(path);
+    }
 };
 
 

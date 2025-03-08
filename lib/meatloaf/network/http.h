@@ -222,9 +222,8 @@ private:
 
 class HTTPMFileSystem: public MFileSystem 
 {
-    MFile* getFile(std::string path) override {
-        return new HTTPMFile(path);
-    }
+public:
+    HTTPMFileSystem(): MFileSystem("http") {};
 
     bool handles(std::string name) {
         if ( mstr::equals(name, (char *)"http:", false) )
@@ -235,8 +234,10 @@ class HTTPMFileSystem: public MFileSystem
             
         return false;
     }
-public:
-    HTTPMFileSystem(): MFileSystem("http") {};
+
+    MFile* getFile(std::string path) override {
+        return new HTTPMFile(path);
+    }
 };
 
 

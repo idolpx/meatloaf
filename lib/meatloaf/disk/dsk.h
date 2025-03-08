@@ -96,7 +96,7 @@ public:
 protected:
 
 private:
-    friend class DSKFile;
+    friend class DSKMFile;
 };
 
 
@@ -104,9 +104,9 @@ private:
  * File implementations
  ********************************************************/
 
-class DSKFile: public D64MFile {
+class DSKMFile: public D64MFile {
 public:
-    DSKFile(std::string path, bool is_dir = true) : D64MFile(path, is_dir) {};
+    DSKMFile(std::string path, bool is_dir = true) : D64MFile(path, is_dir) {};
 
     MStream* getDecodedStream(std::shared_ptr<MStream> is) override
     {
@@ -126,9 +126,7 @@ public:
 class DSKFileSystem: public MFileSystem
 {
 public:
-    MFile* getFile(std::string path) override {
-        return new DSKFile(path);
-    }
+    DSKFileSystem(): MFileSystem("dsk") {};
 
     bool handles(std::string fileName) override {
         return byExtension(
@@ -142,7 +140,9 @@ public:
         );
     }
 
-    DSKFileSystem(): MFileSystem("dsk") {};
+    MFile* getFile(std::string path) override {
+        return new DSKMFile(path);
+    }
 };
 
 

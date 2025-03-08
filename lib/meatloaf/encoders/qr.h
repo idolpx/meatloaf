@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
-// ML:// - Meatloaf Server Protocol
+// QR:// - QR Code Generator
 // 
 
 
@@ -31,15 +31,15 @@
 
 class QRMFileSystem: public MFileSystem
 {
-    MFile* getFile(std::string path) override {
-        return nullptr;
-    }
-
 public:
     QRMFileSystem(): MFileSystem("qrcode") {};
 
     bool handles(std::string name) {
         return mstr::startsWith(name, (char *)"qr:", false);
+    }
+
+    MFile* getFile(std::string path) override {
+        return nullptr;
     }
 };
 

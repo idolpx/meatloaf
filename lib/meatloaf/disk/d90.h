@@ -158,9 +158,7 @@ public:
 class D90MFileSystem: public MFileSystem
 {
 public:
-    MFile* getFile(std::string path) override {
-        return new D90MFile(path);
-    }
+    D90MFileSystem(): MFileSystem("d90") {};
 
     bool handles(std::string fileName) override {
         return byExtension(
@@ -172,7 +170,9 @@ public:
         );
     }
 
-    D90MFileSystem(): MFileSystem("d90") {};
+    MFile* getFile(std::string path) override {
+        return new D90MFile(path);
+    }
 };
 
 

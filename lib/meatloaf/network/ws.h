@@ -15,16 +15,16 @@
  * Streams
  ********************************************************/
 
-class CSIOStream: public MStream {
+class WSMStream: public MStream {
 public:
-    CSIOStream(MFile* file, bool isServer) : m_isServer(isServer) {
+    WSMStream(MFile* file, bool isServer) : m_isServer(isServer) {
         // drop ws:// from url and it's OK!
         address = websockets::WSInterfaceString(mstr::drop(file->url, 5).c_str());
         if(!file->port.empty())
             port = std::stoi(file->port);
     }
 
-    ~CSIOStream() {
+    ~WSMStream() {
         close();
     }
 
@@ -126,15 +126,15 @@ protected:
  * File implementations
  ********************************************************/
 
-class WSFile: public MFile {
+class WSMFile: public MFile {
 
 public:
-    WSFile(std::string path): MFile(path) {};
+    WSMFile(std::string path): MFile(path) {};
 
     bool isDirectory() override { return false; }
     MStream* getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override {
         // input stream = SERVER socket
-        return new CSIOStream(this, true);
+        return new WSMStream(this, true);
     }; 
     time_t getLastWrite() override { return 0; };
     time_t getCreationTime() override { return 0; };
@@ -159,16 +159,17 @@ public:
 
 class WSFileSystem: public MFileSystem 
 {
-    MFile* getFile(std::string path) override {
-        return new WSFile(path);
-    }
+public:
+    WSFileSystem(): MFileSystem("ws") {};
 
     bool handles(std::string name) {
         std::string pattern = "ws:";
         return mstr::equals(name, pattern, false);
     }
-public:
-    WSFileSystem(): MFileSystem("ws") {};
+
+    MFile* getFile(std::string path) override {
+        return new WSMFile(path);
+    }
 };
 
 

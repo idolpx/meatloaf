@@ -106,15 +106,15 @@ public:
 class ATRMFileSystem: public MFileSystem
 {
 public:
-    MFile* getFile(std::string path) override {
-        return new ATRMFile(path);
-    }
+    ATRMFileSystem(): MFileSystem("atr") {};
 
     bool handles(std::string fileName) override {
         return byExtension(".atr", fileName);
     }
 
-    ATRMFileSystem(): MFileSystem("atr") {};
+    MFile* getFile(std::string path) override {
+        return new ATRMFile(path);
+    }
 };
 
 

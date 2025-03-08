@@ -15,6 +15,14 @@
 
 class MLFileSystem: public MFileSystem
 {
+public:
+    MLFileSystem(): MFileSystem("webloc") {};
+
+    bool handles(std::string fileName) override {
+        //printf("handles w dnp %s %d\r\n", fileName.rfind(".dnp"), fileName.length()-4);
+        return byExtension( ".webloc", fileName );
+    }
+
     MFile* getFile(std::string path) override {
         if ( path.size() == 0 )
             return nullptr;
@@ -31,16 +39,8 @@ class MLFileSystem: public MFileSystem
         
         //Debug_printv("url[%s]", ml_url.c_str());
         delete(urlParser);
-        return new HttpFile(ml_url);
+        return new HTTPMFile(ml_url);
     }
-
-    bool handles(std::string fileName) override {
-        //printf("handles w dnp %s %d\r\n", fileName.rfind(".dnp"), fileName.length()-4);
-        return byExtension( ".webloc", fileName );
-    }
-
-public:
-    MLFileSystem(): MFileSystem("webloc") {};
 };
 
 

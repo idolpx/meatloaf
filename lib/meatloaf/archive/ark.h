@@ -134,15 +134,15 @@ public:
 class ARKMFileSystem: public MFileSystem
 {
 public:
-    MFile* getFile(std::string path) override {
-        return new ARKMFile(path);
-    }
+    ARKMFileSystem(): MFileSystem("ark") {};
 
     bool handles(std::string fileName) override {
         return byExtension(".ark", fileName);
     }
 
-    ARKMFileSystem(): MFileSystem("ark") {};
+    MFile* getFile(std::string path) override {
+        return new ARKMFile(path);
+    }
 };
 
 

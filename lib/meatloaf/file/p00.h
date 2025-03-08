@@ -130,15 +130,15 @@ public:
 class P00MFileSystem: public MFileSystem
 {
 public:
-    MFile* getFile(std::string path) override {
-        return new P00MFile(path);
-    }
+    P00MFileSystem(): MFileSystem("p00") {};
 
     bool handles(std::string fileName) override {
         return byExtension(".p00", fileName);
     }
 
-    P00MFileSystem(): MFileSystem("p00") {};
+    MFile* getFile(std::string path) override {
+        return new P00MFile(path);
+    }
 };
 
 #endif // MEATLOAF_MEDIA_P00

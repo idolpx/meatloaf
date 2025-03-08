@@ -16,6 +16,7 @@
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
 #include "tnfs.h"
+#include "tnfslibMountInfo.h"
 
 #include "meatloaf.h"
 
@@ -445,17 +446,5 @@ void TNFSHandle::obtain(std::string m_path, std::string mode) {
 
     //Debug_printv("m_path[%s] mode[%s]", m_path.c_str(), mode.c_str());
     file_h = fopen( m_path.c_str(), mode.c_str());
-    // rc = 1;
 
-    //printf("FSTEST: lfs_file_open file rc:%d\r\n",rc);
-
-//     if (rc == LFS_ERR_ISDIR) {
-//         // To support the SD.openNextFile, a null FD indicates to the FlashFSFile this is just
-//         // a directory whose name we are carrying around but which cannot be read or written
-//     } else if (rc == 0) {
-// //        lfs_file_sync(&TNFSMFileSystem::lfsStruct, &file_h);
-//     } else {
-//         Debug_printv("TNFSMFile::open: unknown return code rc=%d path=`%s`\r\n",
-//                rc, m_path.c_str());
-//     }
 }

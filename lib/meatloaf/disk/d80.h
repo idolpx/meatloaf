@@ -113,15 +113,15 @@ public:
 class D80MFileSystem: public MFileSystem
 {
 public:
-    MFile* getFile(std::string path) override {
-        return new D80MFile(path);
-    }
+    D80MFileSystem(): MFileSystem("d80") {};
 
     bool handles(std::string fileName) override {
         return byExtension(".d80", fileName);
     }
 
-    D80MFileSystem(): MFileSystem("d80") {};
+    MFile* getFile(std::string path) override {
+        return new D80MFile(path);
+    }
 };
 
 

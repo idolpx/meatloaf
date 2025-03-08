@@ -42,7 +42,14 @@
 
 class SDFileSystem: public MFileSystem 
 {
-private:
+public:
+    SDFileSystem(): MFileSystem("sd") {};
+
+    bool handles(std::string name) {
+        std::string pattern = "sd:";
+        return mstr::equals(name, pattern, false);
+    }
+
     MFile* getFile(std::string path) override {
         auto url = PeoplesUrlParser::parseURL( path );
 
@@ -50,15 +57,8 @@ private:
         basepath += std::string("/");
         //Debug_printv("basepath[%s] url.path[%s]", basepath.c_str(), url.path.c_str());
 
-        return new FlashMFile( url->path );
+        return new FlashMFile(path);
     }
-
-    bool handles(std::string name) {
-        std::string pattern = "sd:";
-        return mstr::equals(name, pattern, false);
-    }
-public:
-    SDFileSystem(): MFileSystem("sd") {};
 };
 
 

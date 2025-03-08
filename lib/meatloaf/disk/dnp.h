@@ -98,15 +98,15 @@ public:
 class DNPMFileSystem: public MFileSystem
 {
 public:
-    MFile* getFile(std::string path) override {
-        return new DNPMFile(path);
-    }
+    DNPMFileSystem(): MFileSystem("dnp") {};
 
     bool handles(std::string fileName) override {
         return byExtension(".dnp", fileName);
     }
 
-    DNPMFileSystem(): MFileSystem("dnp") {};
+    MFile* getFile(std::string path) override {
+        return new DNPMFile(path);
+    }
 };
 
 
