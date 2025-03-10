@@ -16,8 +16,6 @@ extern "C"
 }
 
 //#define DEBUG_ARCHDEP
-
-
 #ifdef DEBUG_ARCHDEP
 #define DBG(x) log_printf_vdrive  x
 #else
@@ -280,7 +278,7 @@ long int archdep_ftell(ADFILE *stream)
 
 int archdep_fseek(ADFILE *stream, long int offset, int whence)
 {
-  DBG(("archdep_fseek: %p %li %i", stream, whence, offset));
+  DBG(("archdep_fseek: %p %i %li", stream, whence, offset));
   int res = ((MStream *) stream)->seek(offset, whence) ? 0 : -1;
   DBG(("=> %i %lu", res, ((MStream *) stream)->position()));
   return res;
