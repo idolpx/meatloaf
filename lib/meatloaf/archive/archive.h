@@ -25,74 +25,71 @@
 
 #include <archive.h>
 #include <archive_entry.h>
+#include "esp32/himem.h"
 
 #include "../meatloaf.h"
 #include "../meat_media.h"
 
 #include "../../../include/debug.h"
 
-// TODO: check how we can use archive_seek_callback, archive_passphrase_callback etc. to our benefit!
 
-/* Returns pointer and size of next block of data from archive. */
-// The read callback returns the number of bytes read, zero for end-of-file, or a negative failure code as above.
-// It also returns a pointer to the block of data read.
-ssize_t cb_read(struct archive *a, void *__src_stream, const void **buff);
+class Archive
+{
+public:
+  Archive(std::shared_ptr<MStream> srcStream)
+  {
+    m_srcStream = srcStream;
+    m_srcBuffer = nullptr;
+    m_archive   = nullptr;
+  }
+  
+  ~Archive()
+  {
+    close();
+    if (m_srcBuffer != nullptr)
+    {
+      delete m_srcBuffer;
+    }
+  }
 
-/*
-It must return the number of bytes actually skipped, or a negative failure code if skipping cannot be done.
-It can skip fewer bytes than requested but must never skip more.
-Only positive/forward skips will ever be requested.
-If skipping is not provided or fails, libarchive will call the read() function and simply ignore any data that it does not need.
+  bool open(std::ios_base::openmode mode);
+  void close();
 
-* Skips at most request bytes from archive and returns the skipped amount.
-* This may skip fewer bytes than requested; it may even skip zero bytes.
-* If you do skip fewer bytes than requested, libarchive will invoke your
-* read callback and discard data as necessary to make up the full skip.
-*/
-int64_t cb_skip(struct archive *a, void *__src_stream, int64_t request);
+  bool isOpen()         { return m_archive!=nullptr; }
+  archive *getArchive() { return m_archive; }
 
-int64_t cb_seek(struct archive *a, void *userData, int64_t offset, int whence);
-int cb_close(struct archive *a, void *__src_stream);
+private:
+  struct archive *m_archive   = nullptr;
+  uint8_t *m_srcBuffer = nullptr;
+  std::shared_ptr<MStream> m_srcStream = nullptr; // a stream that is able to serve bytes of this archive
 
+  static const size_t m_buffSize = 4096;
+
+  friend ssize_t cb_read(struct archive *, void *userData, const void **buff);
+};
 
 /********************************************************
  * Streams implementations
  ********************************************************/
 
-class ArchiveMStreamData {
-public:
-    uint8_t *srcBuffer = nullptr;
-    std::shared_ptr<MStream> srcStream = nullptr; // a stream that is able to serve bytes of this archive
-};
-
 class ArchiveMStream : public MMediaStream
 {
-    bool is_open = false;
-
 public:
-    static const size_t buffSize = 4096;
-    ArchiveMStreamData streamData;
-    struct archive *a;
     struct archive_entry *entry;
 
     ArchiveMStream(std::shared_ptr<MStream> is) : MMediaStream(is)
     {
-        // it should be possible to to pass a password parameter here and somehow
-        // call archive_passphrase_callback(password) from here, right?
-        streamData.srcStream = is;
-        a = archive_read_new();
-        archive_read_support_filter_all(a);
-        archive_read_support_format_all(a);
-        streamData.srcBuffer = new uint8_t[buffSize];
-    
-        open(std::ios::in);
+        m_archive = new Archive(is);
+        m_haveData = 0;
+        m_mode = std::ios::in;
+        m_dirty = false;
     }
-    
+
     ~ArchiveMStream()
     {
         close();
-        if (streamData.srcBuffer != nullptr)
-            delete[] streamData.srcBuffer;
+        if (m_archive)
+            delete m_archive;
         Debug_printv("Stream destructor OK!");
     }
 
@@ -108,7 +105,7 @@ protected:
 
     virtual bool seek(uint32_t pos) override;
 
-    bool readHeader() override { Debug_printv("here"); return false; };
+    bool readHeader() override { return false; };
     bool seekEntry( std::string filename ) override;
     // bool readEntry( uint16_t index ) override;
 
@@ -119,8 +116,21 @@ protected:
     bool seekPath(std::string path) override;
 
 private:
-    friend class ArchiveMFile;
+    void readArchiveData();
+
+    Archive *m_archive;
+    std::ios_base::openmode m_mode;
+
+    // contains unzipped contents of archive (in HIMEM)
+    int m_haveData;
+    esp_himem_handle_t m_data;
+    bool m_dirty;
+
+    // memory range mapped to HIMEM
+    static esp_himem_rangehandle_t s_range;
+    static int s_rangeUsed;
 };
+
 
 /********************************************************
  * Files implementations
@@ -128,26 +138,16 @@ private:
 
 class ArchiveMFile : public MFile
 {
-    struct archive *getArchive() {
-        ArchiveMStream* as = (ArchiveMStream*)dirStream.get();
-        return as->a;
-    }
-    
-    std::shared_ptr<MStream> dirStream = nullptr; // a stream that is able to serve bytes of this archive
-
 public:
     ArchiveMFile(std::string path) : MFile(path)
     {
-        // media_header = name;
         media_archive = name;
-    };
+    }
 
     ~ArchiveMFile()
     {
-        if (dirStream.get() != nullptr)
-        {
-            dirStream->close();
-        }
+        if (m_archive != nullptr)
+            delete m_archive;
     }
 
     MStream* getDecodedStream(std::shared_ptr<MStream> is)
@@ -169,8 +169,11 @@ public:
     time_t getCreationTime() override { return 0; };
 
     bool isDir = true;
-    bool dirIsOpen = false;
+
+ private:
+    Archive *m_archive = nullptr;
 };
+
 
 /********************************************************
  * FS implementations
@@ -198,7 +201,7 @@ public:
                 ".tar",
                 ".tgz",
                 ".7z",
-                ".b1",
+                ".bz2",
                 ".gz",
                 ".lha",
                 ".lzh",

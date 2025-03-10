@@ -23,173 +23,254 @@
 
 #include "../meatloaf.h"
 
-/* Returns pointer and size of next block of data from archive. */
-// The read callback returns the number of bytes read, zero for end-of-file, or a negative failure code as above.
-// It also returns a pointer to the block of data read.
-// https://github.com/libarchive/libarchive/wiki/LibarchiveIO
-//
-// This callback is just a way to get bytes from srcStream into libarchive for processing
-ssize_t cb_read(struct archive *a, void *userData, const void **buff)
+ssize_t cb_read(struct archive *, void *userData, const void **buff)
 {
-    ArchiveMStreamData *streamData = (ArchiveMStreamData *)userData;
-    // 1. we have to call srcStr.read(...)
-    ssize_t bc = streamData->srcStream->read(streamData->srcBuffer, ArchiveMStream::buffSize);
-    //std::string dump((char*)streamData->srcBuffer, bc);
-    //Debug_printv("libarchive pulling data from src MStream, got bytes:%d", bc);
-    //Debug_printv("Dumping bytes: %s", dump.c_str());
-    // 2. set *buff to the bufer read in 1.
-    *buff = streamData->srcBuffer;
-    // 3. return read bytes count
-    return bc;
+  // Returns pointer and size of next block of data from archive.
+  // The read callback returns the number of bytes read, zero for end-of-file, or a negative failure code as above.
+  // It also returns a pointer to the block of data read.
+  // https://github.com/libarchive/libarchive/wiki/LibarchiveIO
+  Archive *a = (Archive *) userData;
+  *buff = a->m_srcBuffer;
+  return a->m_archive==NULL ? 0 : a->m_srcStream->read(a->m_srcBuffer, a->m_buffSize);
 }
 
-/*
-It must return the number of bytes actually skipped, or a negative failure code if skipping cannot be done.
-It can skip fewer bytes than requested but must never skip more.
-Only positive/forward skips will ever be requested.
-If skipping is not provided or fails, libarchive will call the read() function and simply ignore any data that it does not need.
-
-* Skips at most request bytes from archive and returns the skipped amount.
-* This may skip fewer bytes than requested; it may even skip zero bytes.
-* If you do skip fewer bytes than requested, libarchive will invoke your
-* read callback and discard data as necessary to make up the full skip.
-*/
-// https://github.com/libarchive/libarchive/wiki/LibarchiveIO
-int64_t cb_skip(struct archive *a, void *userData, int64_t request)
+bool Archive::open(std::ios_base::openmode mode)
 {
-    //Debug_printv("bytes[%lld]", request);
-    ArchiveMStreamData *streamData = (ArchiveMStreamData *)userData;
+  // close the archive if it was already open
+  close();
 
-    if (streamData->srcStream->isOpen())
+  Debug_printv("Archive::open");
+  m_srcBuffer = new uint8_t[m_buffSize];
+  m_archive   = archive_read_new();
+
+  archive_read_support_filter_all(m_archive);
+  archive_read_support_format_all(m_archive);
+  archive_read_set_read_callback(m_archive, cb_read);
+  archive_read_set_callback_data(m_archive, this);
+
+  Debug_printv("Calling archive_read_open1");
+  int r = archive_read_open1(m_archive);
+  if( r != ARCHIVE_OK )
     {
-        bool rc = streamData->srcStream->seek(request, SEEK_CUR);
-        return (rc) ? request : ARCHIVE_WARN;
+      Debug_printv("Error opening archive: %d!", r);
+      archive_read_free(m_archive);
+      m_archive = NULL;
     }
-    else
+
+  return isOpen();
+}
+
+void Archive::close()
+{
+  if( m_archive!=NULL )
     {
-        Debug_printv("ERROR! skip failed");
-        return ARCHIVE_FATAL;
+      archive_read_close(m_archive);
+      archive_read_free(m_archive);
+      m_archive = NULL;
     }
 }
-
-int64_t cb_seek(struct archive *a, void *userData, int64_t offset, int whence)
-{
-    //Debug_printv("offset[%lld] whence[%d] (0=begin, 1=curr, 2=end)", offset, whence);
-    ArchiveMStreamData *streamData = (ArchiveMStreamData *)userData;
-
-    if (streamData->srcStream->isOpen())
-    {
-        bool rc = streamData->srcStream->seek(offset, whence);
-        return (rc) ? offset : ARCHIVE_WARN;
-    }
-    else
-    {
-        Debug_printv("ERROR! seek failed");
-        return ARCHIVE_FATAL;
-    }
-}
-
-int cb_close(struct archive *a, void *userData)
-{
-    //ArchiveMStreamData *src_str = (ArchiveMStreamData *)userData;
-    
-    //Debug_printv("Libarch wants to close, but we do nothing here...");
-
-    // do we want to close srcStream here???
-    return (ARCHIVE_OK);
-}
-
-int cb_open(struct a *arch, void *userData)
-{
-    // maybe we can use open for something? Check if stream is open?
-    return (ARCHIVE_OK);
-}
-
 
 /********************************************************
  * Streams implementations
  ********************************************************/
 
+int ArchiveMStream::s_rangeUsed = 0;
+esp_himem_rangehandle_t ArchiveMStream::s_range;
+
+
 bool ArchiveMStream::open(std::ios_base::openmode mode)
 {
-    if (!is_open)
-    {
-        // TODO enable seek only if the stream is random access
-        archive_read_set_read_callback(a, cb_read);
-        archive_read_set_seek_callback(a, cb_seek);
-        archive_read_set_skip_callback(a, cb_skip);
-        archive_read_set_close_callback(a, cb_close);
-        // archive_read_set_open_callback(mpa->arch, cb_open); - what does it do?
-        archive_read_set_callback_data(a, &streamData);
-
-        int r = archive_read_open1(a);
-        //int r = archive_read_open2(a, &streamData, NULL, myRead, myskip, myclose);
-        if ( r == ARCHIVE_OK )
-        {
-            Debug_printv("*** Archive Opened! (%d)", r);
-        // std::string archiveFormat = archive_format_name(a);
-        // std::string archiveCompression = archive_compression_name(a);
-        // Debug_printv("archive format[%s] compression[%s]", archiveFormat.c_str(), archiveCompression.c_str());
-            is_open = true;
-        }
-        else
-        {
-            Debug_printv("*** Error opening archive! (%d)", r);
-            is_open = false;
-        }
-    }
-    else
-        Debug_printv("*** Archive already open!");
-
-    return is_open;
-};
+  m_mode = mode;
+  return m_archive->open(mode);
+}
 
 void ArchiveMStream::close()
-{
-    if (is_open)
     {
-        archive_read_close(a);
-        archive_read_free(a);
-        is_open = false;
+  m_archive->close();
+
+  if (m_haveData > 0)
+        {
+    if (m_dirty)
+    {
+
+      m_dirty = false;
     }
-    //Debug_printv("Close called");
+
+    ESP_ERROR_CHECK(esp_himem_free(m_data));
+    Debug_printv("HIMEM available after free: %lu ", (uint32_t)esp_himem_get_free_size());
+
+    // if this was the last archive in use then free up the mapped range
+    if (s_rangeUsed > 0)
+      s_rangeUsed--;
+    if (s_rangeUsed == 0)
+      esp_himem_free_map_range(s_range);
+  }
+
+  m_haveData = 0;
 }
 
 bool ArchiveMStream::isOpen()
 {
-    return is_open;
-};
+  return m_archive->isOpen();
+}
+
+void ArchiveMStream::readArchiveData()
+{
+  if (m_archive->isOpen() && m_haveData == 0)
+  {
+    // allocate HIMEM memory for archive data (size must be multiple of ESP_HIMEM_BLKSZ);
+    uint32_t size = (_size / ESP_HIMEM_BLKSZ) * ESP_HIMEM_BLKSZ;
+    if (_size > size)
+      size += ESP_HIMEM_BLKSZ;
+
+    Debug_printv("HIMEM physical size: %lu", (uint32_t)esp_himem_get_phys_size());
+    Debug_printv("HIMEM available before alloc: %lu ", (uint32_t)esp_himem_get_free_size());
+
+    esp_err_t status = esp_himem_alloc(size, &m_data);
+    if (status == ESP_OK)
+      m_haveData = 1;
+        else
+        {
+      Debug_printv("Unable to allocate HIMEM memory: %s", esp_err_to_name(status));
+      m_haveData = -1;
+      return;
+    }
+
+    // if mapped range is not yet created then create it now
+    if (s_rangeUsed == 0)
+    {
+      esp_err_t status = esp_himem_alloc_map_range(ESP_HIMEM_BLKSZ, &s_range);
+      if (status != ESP_OK)
+      {
+        Debug_printv("Unable to allocate mapped range for HIMEM: %s", esp_err_to_name(status));
+        ESP_ERROR_CHECK(esp_himem_free(m_data));
+        m_haveData = -1;
+        return;
+        }
+    }
+
+    Debug_printv("HIMEM available after alloc : %lu ", (uint32_t)esp_himem_get_free_size());
+
+    // increment mapped range usage counter
+    s_rangeUsed++;
+
+    Debug_printv("reading %lu bytes from archive", _size);
+
+    size = _size;
+    uint32_t pageStart = 0;
+    while (size > 0)
+    {
+      archive *a = m_archive->getArchive();
+      uint32_t s = std::min(size, (uint32_t)ESP_HIMEM_BLKSZ);
+
+      uint8_t *ptr;
+      ESP_ERROR_CHECK(esp_himem_map(m_data, s_range, pageStart, 0, ESP_HIMEM_BLKSZ, 0, (void **)&ptr));
+      uint32_t r = archive_read_data(a, ptr, s);
+      ESP_ERROR_CHECK(esp_himem_unmap(s_range, ptr, ESP_HIMEM_BLKSZ));
+      if (archive_errno(a) != ARCHIVE_OK || r != s)
+      {
+        if (archive_errno(a) != ARCHIVE_OK)
+        {
+          Debug_printv("archive read error %i: %s", archive_errno(a), archive_error_string(a));
+        }
+        else
+        {
+          Debug_printv("expected to read %lu bytes from archive, got %lu", s, r);
+        }
+
+        ESP_ERROR_CHECK(esp_himem_free(m_data));
+        m_haveData = -1;
+        return;
+      }
+
+      pageStart += s;
+      size -= s;
+    }
+  }
+}
 
 uint32_t ArchiveMStream::read(uint8_t *buf, uint32_t size)
 {
+  readArchiveData();
+
+  if (m_haveData > 0)
+  {
     //Debug_printv("calling read, buff size=[%ld]", size);
 
-    uint64_t zsize = archive_read_data(a, buf, size);
-
-    //Debug_printv("archive returned [%llu] unarchived bytes", zsize);
-    if ( zsize > 0 ) {
-        _position += zsize;
-        return zsize;
-    }
-    else
+    if (_position + size > _size)
+      size = _size - _position;
+    uint32_t numRead = 0;
+    while (size > 0)
     {
-        return 0;
+      uint32_t pageStart = (_position / ESP_HIMEM_BLKSZ) * ESP_HIMEM_BLKSZ;
+      uint32_t offset = _position - pageStart;
+      uint32_t n = std::min(size, (uint32_t)ESP_HIMEM_BLKSZ - offset);
+
+      uint8_t *ptr;
+      ESP_ERROR_CHECK(esp_himem_map(m_data, s_range, pageStart, 0, ESP_HIMEM_BLKSZ, 0, (void **)&ptr));
+      memcpy(buf + numRead, ptr + offset, n);
+      ESP_ERROR_CHECK(esp_himem_unmap(s_range, ptr, ESP_HIMEM_BLKSZ));
+      size -= n;
+      numRead += n;
+      _position += n;
     }
+
+    // Debug_printv("read [%lu] bytes", numRead);
+    return numRead;
+  }
+  else
+    return 0;
 }
 
 uint32_t ArchiveMStream::write(const uint8_t *buf, uint32_t size)
 {
-    return -1;
-}
+  readArchiveData();
 
+  // NOTE: this function can NOT write past the end of the extracted file,
+  //       i.e. it can NOT extend the size of a file, only modify existing data
+  //       However, most disk images (D64, D81, G64 etc) have a fixed size anyways.
+  if (m_haveData > 0)
+  {
+    // Debug_printv("calling write, size=[%ld]", size);
+
+    if (_position + size > _size)
+      size = _size - _position;
+    uint32_t numWritten = 0;
+    while (size > 0)
+    {
+      uint32_t pageStart = (_position / ESP_HIMEM_BLKSZ) * ESP_HIMEM_BLKSZ;
+      uint32_t offset = _position - pageStart;
+      uint32_t n = std::min(size, (uint32_t)ESP_HIMEM_BLKSZ - offset);
+
+      uint8_t *ptr;
+      ESP_ERROR_CHECK(esp_himem_map(m_data, s_range, pageStart, 0, ESP_HIMEM_BLKSZ, 0, (void **)&ptr));
+      memcpy(ptr + offset, buf + numWritten, n);
+      ESP_ERROR_CHECK(esp_himem_unmap(s_range, ptr, ESP_HIMEM_BLKSZ));
+      size -= n;
+      numWritten += n;
+      _position += n;
+    }
+
+    // remember that data was written so we can re-zip the archive
+    if (numWritten > 0)
+      m_dirty = true;
+
+    // Debug_printv("wrote [%lu] bytes", numWritten);
+    return numWritten;
+  }
+  else
+    return 0;
+}
 
 bool ArchiveMStream::seekEntry( std::string filename )
 {
     //Debug_printv( "filename[%s] size[%d]", filename.c_str(), filename.size());
 
     // Read Directory Entries
-    if ( filename.size() > 0 )
+  if ((filename.size() > 0) && (m_archive->isOpen() || m_archive->open(std::ios::in)))
     {
+    archive *a = m_archive->getArchive();
+
         bool found = false;
         bool wildcard =  ( mstr::contains(filename, "*") || mstr::contains(filename, "?") );
         while ( archive_read_next_header(a, &entry) == ARCHIVE_OK )
@@ -227,7 +308,6 @@ bool ArchiveMStream::seekEntry( std::string filename )
                 if ( found )
                 {
                     _size = archive_entry_size(entry);
-                    
                     return true;
                 }
             }
@@ -237,10 +317,8 @@ bool ArchiveMStream::seekEntry( std::string filename )
     }
 
     entry = nullptr;
-
     return false;
 }
-
 
 uint32_t ArchiveMStream::readFile(uint8_t *buf, uint32_t size)
 {
@@ -267,11 +345,15 @@ bool ArchiveMStream::seekPath(std::string path)
     return false;
 }
 
-
-
 bool ArchiveMStream::seek(uint32_t pos)
 {
-    return streamData.srcStream->seek(pos);
+  if( pos < _size )
+    {
+      _position = pos;
+      return true;
+    }
+  else
+    return false;
 }
 
 /********************************************************
@@ -286,58 +368,53 @@ bool ArchiveMFile::isDirectory()
         return true;
     else
         return false;
-};
+}
 
 bool ArchiveMFile::rewindDirectory()
 {
-    if (dirStream.get() != nullptr)
-    {
-        dirStream->close();
-    }
+  // Debug_printv("prepare dir listing");
 
-    Debug_printv("w prepare dir listing");
+  delete m_archive;
+  m_archive = nullptr;
 
-    dirIsOpen = false;
-    dirStream = std::shared_ptr<MStream>(this->getSourceStream());
-
+  std::shared_ptr<MStream> dirStream = std::shared_ptr<MStream>(sourceFile->getSourceStream());
     if (dirStream == nullptr)
     {
         Debug_printv("dirStream is null");
         return false;
     }
-
-    if(dirStream->isOpen())
+  else if (!dirStream->isOpen())
     {
-        dirIsOpen = true;
-        return true;
-    }
-
     Debug_printv("failed to open archive");
     return false;
-
+  }
+  else
+  {
+    m_archive = new Archive(dirStream);
+    return m_archive->open(std::ios::in);
+  }
 }
 
 MFile *ArchiveMFile::getNextFileInDir()
 {
-    if(!dirIsOpen)
-        rewindDirectory();
-
+  if (m_archive != nullptr || rewindDirectory())
+  {
     struct archive_entry *entry;
 
     std::string filename;
     do
     {
-        if (archive_read_next_header(getArchive(), &entry) != ARCHIVE_OK)
+      if (archive_read_next_header(m_archive->getArchive(), &entry) != ARCHIVE_OK)
             break;
 
         filename = basename(archive_entry_pathname(entry));
-        Debug_printv("size[%d] empty[%d] pathInStream[%s] filename[%s]", filename.size(), filename.empty(), pathInStream.c_str(), filename.c_str());
+      // Debug_printv("size[%d] empty[%d] pathInStream[%s] filename[%s]", filename.size(), filename.empty(), pathInStream.c_str(), filename.c_str());
     } while (filename.empty()); // Skip empty filenames
 
-    Debug_printv("getNextFileInDir calling archive_read_next_header");
+    // Debug_printv("getNextFileInDir calling archive_read_next_header");
     if (filename.size() > 0)
     {
-        auto file = MFSOwner::File(sourceFile->url + "/" + filename);
+        MFile *file = MFSOwner::File(sourceFile->url + "/" + filename);
         file->size = archive_entry_size(entry);
         file->_exists = true;
         return file;
@@ -345,8 +422,10 @@ MFile *ArchiveMFile::getNextFileInDir()
     else
     {
         Debug_printv( "END OF DIRECTORY");
-        dirStream->close();
-        dirIsOpen = false;
-        return nullptr;
+      delete m_archive;
+      m_archive = nullptr;
     }
+    }
+
+  return nullptr;
 }
