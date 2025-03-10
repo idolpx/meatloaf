@@ -57,6 +57,10 @@ class MeatHttpClient {
 public:
 
     MeatHttpClient() {
+        init();
+    }
+
+    void init() {
         esp_http_client_config_t config;
         memset(&config, 0, sizeof(config));
         config.url = "https://api.meatloaf.cc/?$";
@@ -74,7 +78,7 @@ public:
         //Debug_printv("HTTP Init url[%s]", url.c_str());
         _http = esp_http_client_init(&config);
     }
-    
+
     ~MeatHttpClient() {
         close();
     }
@@ -102,6 +106,7 @@ public:
     bool open(std::string url, esp_http_client_method_t meth);
     void close();
     void setOnHeader(const std::function<int(char*, char*)> &f);
+    bool flush(uint32_t pos = 0);
     bool seek(uint32_t pos);
     uint32_t read(uint8_t* buf, uint32_t size);
     uint32_t write(const uint8_t* buf, uint32_t size);

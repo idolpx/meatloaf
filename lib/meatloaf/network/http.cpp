@@ -18,6 +18,7 @@
 #include "http.h"
 
 #include <esp_idf_version.h>
+#include <algorithm>
 
 #include "meatloaf.h"
 
@@ -44,7 +45,10 @@ MeatHttpClient* HTTPMFile::fromHeader() {
         client->HEAD(url);
         //Debug_printv("after head url[%s]", client->url.c_str());
         if (client->wasRedirected)
+        {
+            client->flush();
             resetURL(client->url);
+        }
     }
     return client;
 }
@@ -180,6 +184,7 @@ bool HTTPMStream::open(std::ios_base::openmode mode) {
             {
                 url = _http.url;
                 redirect_count--;
+                _http.flush();
             }
         }
     } while ( _http.wasRedirected && redirect_count );
@@ -312,31 +317,64 @@ void MeatHttpClient::setOnHeader(const std::function<int(char*, char*)> &lambda)
     onHeader = lambda;
 }
 
-bool MeatHttpClient::seek(uint32_t pos) {
+bool MeatHttpClient::flush(uint32_t pos) {
 
-    if(isFriendlySkipper) {
+    //Debug_printv("_position[%lu] pos[%lu]", _position, pos);
 
-        if (_is_open) {
-            // Read to end of the stream
-            //Debug_printv("Skipping to end!");
-            while(1)
-            {
-                char c[HTTP_BLOCK_SIZE];
-                int bytes = esp_http_client_read(_http, c, HTTP_BLOCK_SIZE);
-                if ( bytes < HTTP_BLOCK_SIZE )
-                    break;
-            }
-        }
+    if (!_is_open)
+        return false;
 
-        bool op = processRedirectsAndOpen(pos);
+    int count = pos;
+    char c[HTTP_BLOCK_SIZE] = {0};
+    while(1)
+    {
+        int bytes = esp_http_client_read(_http, c, HTTP_BLOCK_SIZE);
 
-        //Debug_printv("SEEK in HTTPMStream %s: range request RC=%d", url.c_str(), lastRC);
+        //Debug_printv("_position[%lu] pos[%lu] count[%u] bytes[%u]", _position, pos, count, bytes);
 
-        if(!op)
+        if(bytes == -1)
             return false;
 
+        if ( pos )
+        {
+            count -= bytes;
+            if ( count == 0 )
+                break;
+        }
+
+        if ( bytes < HTTP_BLOCK_SIZE )
+            break;
+    }
+
+    _position = pos;
+    return true;
+}
+
+
+bool MeatHttpClient::seek(uint32_t pos) {
+
+    auto delta = pos - _position;
+    //Debug_printv("_position[%lu] pos[%lu] delta[%lu]", _position, pos, delta);
+
+    if ( isFriendlySkipper )
+    {
+        // flush to delta
+        if ( !flush(delta) )
+            return false;
+
+        if ( delta > HTTP_BLOCK_SIZE )
+        {
+            // flush the rest
+            //Debug_printv("_position[%lu] pos[%lu] available[%lu]", _position, pos, available());
+            if ( !flush() )
+                return false;
+
+            if ( !processRedirectsAndOpen(pos) )
+                return false;
+        }
+
          // 200 = range not supported! according to https://developer.mozilla.org/en-US/docs/Web/HTTP/Range_requests
-        if(lastRC == 206)
+        if( lastRC == 206 )
         {
             //Debug_printv("Seek successful");
             _position = pos;
@@ -344,38 +382,32 @@ bool MeatHttpClient::seek(uint32_t pos) {
         }
     }
 
-    if(lastMethod == HTTP_METHOD_GET) {
-        Debug_printv("Server doesn't support resume, reading from start and discarding");
+    if ( lastMethod == HTTP_METHOD_GET ) 
+    {
+        //Debug_printv("Server doesn't support resume, reading from start and discarding");
         // server doesn't support resume, so...
-        if(pos<_position || pos == 0) {
+        if( pos < _position || pos == 0 ) {
             // skipping backward let's simply reopen the stream...
-            esp_http_client_close(_http);
-            bool op = open(url, lastMethod);
-            if(!op)
+            close();
+            init();
+
+            if ( !open(url, lastMethod) )
                 return false;
 
-            // and read pos bytes - requires some buffer
-            for(int i = 0; i<pos; i++) {
-                char c;
-                int rc = esp_http_client_read(_http, &c, 1);
-                if(rc == -1)
-                    return false;
-            }
+            // flush response to pos
+            //Debug_printv("pos[%lu]", pos);
+            if ( !flush(pos) )
+                return false;
         }
-        else {
-            auto delta = pos-_position;
-            // skipping forward let's skip a proper amount of bytes - requires some buffer
-            for(int i = 0; i<delta; i++) {
-                char c;
-                int rc = esp_http_client_read(_http, &c, 1);
-                if(rc == -1)
-                    return false;
-            }
+        else 
+        {
+            // flush the delta
+            //Debug_printv("delta[%lu]", delta);
+            if ( !flush(delta) )
+                return false;
         }
 
         _position = pos;
-        Debug_printv("stream opened[%s]", url.c_str());
-
         return true;
     }
     else
@@ -472,10 +504,11 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
 
         status = esp_http_client_get_status_code(_http);
         //Debug_printv("after open rc[%d] status[%d]", rc, status);
-        if ( status < 0 )
+        if ( rc != ESP_OK )
         {
-            Debug_printv("Connection failed... retrying... [%d]", retry);
-            esp_http_client_close(_http);
+            Debug_printv("Connection failed... retrying... [%d] status[%d]", retry, status);
+            close();
+            init();
         }
 
         retry--;
