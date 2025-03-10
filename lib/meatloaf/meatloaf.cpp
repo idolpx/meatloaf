@@ -231,12 +231,12 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
         }
     }
 
-    auto cachedFile = FileBroker::obtain(path);
-    if ( cachedFile )
-    {
-        Debug_printv("Returning cached file [%s]", path.c_str());
-        return cachedFile;
-    }
+    // auto targetFile = FileBroker::obtain(path);
+    // if ( targetFile )
+    // {
+    //     Debug_printv("Returning cached file [%s]", path.c_str());
+    //     return targetFile;
+    // }
 
     Debug_println("--------------------------------");
     Debug_printv("Trying to factory path [%s]", path.c_str());
@@ -299,7 +299,9 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
 
     Debug_println("--------------------------------");
 
-    FileBroker::add(path, targetFile);
+    // if ( targetFile->pathInStream.empty() )
+    //     FileBroker::add(path, targetFile);
+
     return targetFile;
 }
 

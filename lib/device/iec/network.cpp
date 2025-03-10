@@ -1081,6 +1081,7 @@ uint8_t iecNetwork::write(uint8_t channel, uint8_t *buffer, uint8_t bufferSize, 
 
   //Debug_printv("iecNetwork::write(#%d, %d, %d) = %s", m_devnr, channel, bufferSize, mstr::toHex(buffer, bufferSize).c_str());
 
+  //int channelId = commanddata.channel;
   auto& channel_data = network_data_map[channel];
 
   channel_data.transmitBuffer = string((char *) buffer, bufferSize);
@@ -1090,6 +1091,7 @@ uint8_t iecNetwork::write(uint8_t channel, uint8_t *buffer, uint8_t bufferSize, 
 
 uint8_t iecNetwork::read(uint8_t channel, uint8_t *buffer, uint8_t bufferSize, bool *eoi)
 {
+  //int channelId = commanddata.channel;
   auto& channel_data = network_data_map[channel];
 
   if( channel_data.receiveBuffer.size() < bufferSize )

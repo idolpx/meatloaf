@@ -114,7 +114,8 @@ time_t HTTPMFile::getCreationTime() {
 }
 
 bool HTTPMFile::exists() {
-    return fromHeader()->_exists;
+    //return fromHeader()->_exists;
+    return true;
 }
 
 bool HTTPMFile::remove() {
@@ -162,19 +163,26 @@ bool HTTPMFile::isText() {
  ********************************************************/
 bool HTTPMStream::open(std::ios_base::openmode mode) {
     bool r = false;
+    int redirect_count = 3;
 
-    if(mode == (std::ios_base::out | std::ios_base::app))
-        r = _http.PUT(url);
-    else if(mode == std::ios_base::out)
-        r = _http.POST(url);
-    else
-        r = _http.GET(url);
+    do
+    {
+        if(mode == (std::ios_base::out | std::ios_base::app))
+            r = _http.PUT(url);
+        else if(mode == std::ios_base::out)
+            r = _http.POST(url);
+        else
+            r = _http.GET(url);
 
-    if ( r ) {
-        _size = ( _http._range_size > 0) ? _http._range_size : _http._size;
-        if ( _http.wasRedirected )
-            url = _http.url;
-    }
+        if ( r ) {
+            _size = ( _http._range_size > 0) ? _http._range_size : _http._size;
+            if ( _http.wasRedirected )
+            {
+                url = _http.url;
+                redirect_count--;
+            }
+        }
+    } while ( _http.wasRedirected && redirect_count );
 
     return r;
 }
