@@ -239,8 +239,6 @@ class iecDrive : public IECFileDevice
  public:
   iecDrive(uint8_t devnum = 0x00);
   ~iecDrive();
-  void init() override;
-
 
   mediatype_t mount(FILE *f, const char *filename, uint32_t disksize, mediatype_t disk_type = MEDIATYPE_UNKNOWN);
   void unmount();
@@ -261,6 +259,9 @@ class iecDrive : public IECFileDevice
 
 
  protected:
+  // initialize device
+  virtual void begin();
+
   // open file "name" on channel
   virtual bool open(uint8_t channel, const char *name);
 

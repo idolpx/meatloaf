@@ -542,8 +542,10 @@ iecDrive::~iecDrive()
       close(i);
 }
 
-void iecDrive::init()
+void iecDrive::begin()
 {
+  IECFileDevice::begin();
+
   Debug_printv("id[%d]", id());
   m_host = nullptr;
   m_statusCode = ST_SPLASH;
@@ -891,8 +893,8 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
 
   std::string command = std::string(cmd, cmdLen);
 
-  // set status code to OK, failing commands below will set it to the appropriate error code
-  setStatusCode(ST_OK);
+  // set status code to SYNTAX ERROR, commands below will set it to the appropriate status code
+  setStatusCode(ST_SYNTAX_ERROR_31);
 
 #ifdef USE_VDRIVE
   // check whether we are currently operating in "virtual drive" mode
@@ -969,11 +971,6 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
       setStatus((char *) data, 3);
     }
 #endif
-  else
-    {
-      setStatusCode(ST_SYNTAX_ERROR_31);
-      //Debug_printv("Invalid command");
-    }
 
 
     // Drive level commands
@@ -988,7 +985,7 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
       media = atoi((char *) &command[1]);
       colon_position = 2;
     }
-    Debug_printv("media[%d] colon_position[%d]", media, colon_position);
+    Debug_printv("media[%d] colon_position[%d] command[%s]", media, colon_position, command.c_str());
 
     switch ( command[0] )
     {

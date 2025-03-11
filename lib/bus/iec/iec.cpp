@@ -125,6 +125,7 @@ void systemBus::service()
 
 void systemBus::shutdown()
 {
+  printf("IEC systemBus::shutdown()\r\n");
 }
 
 

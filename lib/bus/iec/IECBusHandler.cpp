@@ -675,7 +675,6 @@ bool IECBusHandler::attachDevice(IECDevice *dev)
       if( m_flags!=0xFF ) dev->begin();
 
       m_devices[m_numDevices] = dev;
-      dev->init();
       m_numDevices++;
       return true;
     }
