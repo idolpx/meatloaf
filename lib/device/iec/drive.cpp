@@ -893,8 +893,8 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
 
   std::string command = std::string(cmd, cmdLen);
 
-  // set status code to SYNTAX ERROR, commands below will set it to the appropriate status code
-  setStatusCode(ST_SYNTAX_ERROR_31);
+  // set status code to OK, failing commands below will set it to the appropriate error code
+  setStatusCode(ST_OK);
 
 #ifdef USE_VDRIVE
   // check whether we are currently operating in "virtual drive" mode
@@ -971,7 +971,11 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
       setStatus((char *) data, 3);
     }
 #endif
-
+    else
+    {
+      setStatusCode(ST_SYNTAX_ERROR_31);
+      //Debug_printv("Invalid command");
+    }
 
     // Drive level commands
     // CBM DOS 2.6
