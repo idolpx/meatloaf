@@ -445,10 +445,8 @@ private:
 class D64MFile: public MFile {
 public:
 
-    D64MFile(std::string path, bool is_dir = true): MFile(path)
+    D64MFile(std::string path): MFile(path)
     {
-        isDir = is_dir;
-
         media_image = name;
         isPETSCII = true;
         size = 174848; // Default - 35 tracks no errors

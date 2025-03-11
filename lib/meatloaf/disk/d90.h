@@ -139,7 +139,7 @@ private:
 
 class D90MFile: public D64MFile {
 public:
-    D90MFile(std::string path, bool is_dir = true) : D64MFile(path, is_dir) {};
+    D90MFile(std::string path) : D64MFile(path) {};
 
     MStream* getDecodedStream(std::shared_ptr<MStream> is) override
     {

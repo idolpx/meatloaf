@@ -26,8 +26,6 @@
  */
 #define __LIBARCHIVE_CONFIG_H_INCLUDED 1
 
-#define __ESP32IDF__
-
 // #include <osreldate.h>
 
 // /* FreeBSD 5.0 and later has ACL and extattr support. */

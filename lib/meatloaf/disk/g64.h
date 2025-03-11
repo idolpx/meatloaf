@@ -134,7 +134,7 @@ private:
 
 class G64MFile: public D64MFile {
 public:
-    G64MFile(std::string path, bool is_dir = true) : D64MFile(path, is_dir) {};
+    G64MFile(std::string path) : D64MFile(path) {};
 
     MStream* getDecodedStream(std::shared_ptr<MStream> is) override
     {

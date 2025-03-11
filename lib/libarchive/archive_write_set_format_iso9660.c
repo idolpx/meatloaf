@@ -2506,7 +2506,7 @@ get_gmoffset(struct tm *tm)
 
 #if defined(HAVE__GET_TIMEZONE)
 	_get_timezone(&offset);
-#elif defined(__CYGWIN__) || defined(__MINGW32__) || defined(__BORLANDC__) || defined(__ESP32IDF__)
+#elif defined(__CYGWIN__) || defined(__MINGW32__) || defined(__BORLANDC__) || defined(ESP_PLATFORM)
 	offset = _timezone;
 #else
 	offset = timezone;

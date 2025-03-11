@@ -110,7 +110,7 @@ private:
 
 class D82MFile: public D64MFile {
 public:
-    D82MFile(std::string path, bool is_dir = true) : D64MFile(path, is_dir) 
+    D82MFile(std::string path) : D64MFile(path) 
     {
         size = 1066496; // Default - 154 tracks no errors
     };

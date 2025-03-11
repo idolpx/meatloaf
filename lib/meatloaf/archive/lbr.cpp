@@ -190,7 +190,10 @@ bool LBRMFile::rewindDirectory()
     Debug_printv("sourceFile->url[%s]", sourceFile->url.c_str());
     auto image = ImageBroker::obtain<LBRMStream>(sourceFile->url);
     if (image == nullptr)
+    {
         Debug_printv("image pointer is null");
+        return false;
+    }
 
     image->resetEntryCounter();
 

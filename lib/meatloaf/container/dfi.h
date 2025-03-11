@@ -195,7 +195,7 @@ private:
 
 class DFIMFile: public D64MFile {
 public:
-    DFIMFile(std::string path, bool is_dir = true) : D64MFile(path, is_dir) {};
+    DFIMFile(std::string path) : D64MFile(path) {};
 
     MStream* getDecodedStream(std::shared_ptr<MStream> is) override
     {

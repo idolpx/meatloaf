@@ -145,14 +145,10 @@ bool ARKMStream::seekPath(std::string path)
         containerStream->seek(entry_data_offset);
 
         Debug_printv("File Size: size[%ld] available[%ld] position[%ld]", _size, available(), _position);
-
         return true;
     }
-    else
-    {
-        Debug_printv("Not found! [%s]", path.c_str());
-    }
 
+    Debug_printv("Not found! [%s]", path.c_str());
     return false;
 };
 
@@ -175,7 +171,10 @@ bool ARKMFile::rewindDirectory()
     Debug_printv("sourceFile->url[%s]", sourceFile->url.c_str());
     auto image = ImageBroker::obtain<ARKMStream>(sourceFile->url);
     if (image == nullptr)
+    {
         Debug_printv("image pointer is null");
+        return false;
+    }
 
     image->resetEntryCounter();
 

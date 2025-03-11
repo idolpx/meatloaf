@@ -57,7 +57,7 @@
 #include "archive_read_private.h"
 #include "filter_fork.h"
 
-#if defined(__ESP32IDF__)
+#if defined(ESP_PLATFORM)
 static inline pid_t waitpid_stub() { errno = ENOSYS; return (pid_t)-1; }
 #define waitpid(pid,status,options) waitpid_stub()
 #endif

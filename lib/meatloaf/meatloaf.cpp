@@ -294,7 +294,7 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
             targetFile->sourceFile = sourceFileSystem->getFile(wholePath);
 
         targetFile->isWritable = targetFile->sourceFile->isWritable;   // This stream is writable if the container is writable
-        Debug_printv("sourceFile[%s] is in [%s][%s]", targetFile->sourceFile->name.c_str(), wholePath.c_str(), targetFileSystem->symbol);
+        Debug_printv("sourceFile[%s] is in [%s][%s]", targetFile->sourceFile->name.c_str(), sourcePath.c_str(), sourceFileSystem->symbol);
     }
 
     Debug_println("--------------------------------");
@@ -368,7 +368,7 @@ MFileSystem* MFSOwner::findParentFS(std::vector<std::string>::iterator &begin, s
         mstr::toLower(part);
         if ( part.size() )
         {
-            Debug_printv("pathIterator[%s]", pathIterator->c_str());
+            //Debug_printv("pathIterator[%s]", pathIterator->c_str());
 
             auto foundFS=std::find_if(availableFS.begin() + 1, availableFS.end(), [&part](MFileSystem* fs){ 
                 //Debug_printv("symbol[%s]", fs->symbol);
@@ -376,7 +376,7 @@ MFileSystem* MFSOwner::findParentFS(std::vector<std::string>::iterator &begin, s
             } );
 
             if(foundFS != availableFS.end()) {
-                Debug_printv("matched[%s] foundFS[%s]", part.c_str(), (*foundFS)->symbol);
+                //Debug_printv("matched[%s] foundFS[%s]", part.c_str(), (*foundFS)->symbol);
                 pathIterator++;
                 return (*foundFS);
             }
@@ -385,7 +385,7 @@ MFileSystem* MFSOwner::findParentFS(std::vector<std::string>::iterator &begin, s
 
     auto fs = *availableFS.begin();  // The first filesystem in the list is the default
     pathIterator++;
-    Debug_printv("default[%s]", fs->symbol);
+    //Debug_printv("default[%s]", fs->symbol);
     return fs;
 }
 

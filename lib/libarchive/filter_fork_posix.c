@@ -62,7 +62,7 @@
 #  include <stdlib.h>
 #endif
 #ifdef HAVE_UNISTD_H
-#  include <sys/unistd.h>
+#  include <unistd.h>
 #endif
 
 #include "archive.h"
@@ -74,7 +74,7 @@ int
 __archive_create_child(const char *cmd, int *child_stdin, int *child_stdout,
 		pid_t *out_child)
 {
-#if defined(__ESP32IDF__)
+#if defined(ESP_PLATFORM)
 	printf("__archive_create_child[%s]\r\n", cmd);
 #else
 	pid_t child = -1;

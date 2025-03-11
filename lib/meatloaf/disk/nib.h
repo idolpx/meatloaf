@@ -96,7 +96,7 @@ private:
 
 class NIBMFile: public D64MFile {
 public:
-    NIBMFile(std::string path, bool is_dir = true) : D64MFile(path, is_dir) {};
+    NIBMFile(std::string path) : D64MFile(path) {};
 
     MStream* getDecodedStream(std::shared_ptr<MStream> is) override
     {
