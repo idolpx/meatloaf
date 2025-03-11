@@ -34,6 +34,35 @@ ssize_t cb_read(struct archive *, void *userData, const void **buff)
   return a->m_archive==NULL ? 0 : a->m_srcStream->read(a->m_srcBuffer, a->m_buffSize);
 }
 
+
+int64_t cb_skip(struct archive *, void *userData, int64_t request)
+{
+  // It must return the number of bytes actually skipped, or a negative failure code if skipping cannot be done.
+  // It can skip fewer bytes than requested but must never skip more.
+  // Only positive/forward skips will ever be requested.
+  // If skipping is not provided or fails, libarchive will call the read() function and simply ignore any data that it does not need.
+  //
+  // * Skips at most request bytes from archive and returns the skipped amount.
+  // * This may skip fewer bytes than requested; it may even skip zero bytes.
+  // * If you do skip fewer bytes than requested, libarchive will invoke your
+  // * read callback and discard data as necessary to make up the full skip.
+  //
+  // https://github.com/libarchive/libarchive/wiki/LibarchiveIO
+  //Debug_printv("bytes[%lld]", request);
+  Archive *a = (Archive *) userData;
+
+  if (a->m_archive)
+  {
+      bool rc = a->m_srcStream->seek(request, SEEK_CUR);
+      return (rc) ? request : ARCHIVE_WARN;
+  }
+  else
+  {
+      Debug_printv("ERROR! skip failed");
+      return ARCHIVE_FATAL;
+  }
+}
+
 bool Archive::open(std::ios_base::openmode mode)
 {
   // close the archive if it was already open
@@ -46,6 +75,7 @@ bool Archive::open(std::ios_base::openmode mode)
   archive_read_support_filter_all(m_archive);
   archive_read_support_format_all(m_archive);
   archive_read_set_read_callback(m_archive, cb_read);
+  archive_read_set_skip_callback(m_archive, cb_skip);
   archive_read_set_callback_data(m_archive, this);
 
   Debug_printv("Calling archive_read_open1");

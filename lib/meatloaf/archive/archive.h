@@ -66,6 +66,7 @@ private:
   static const size_t m_buffSize = 4096;
 
   friend ssize_t cb_read(struct archive *, void *userData, const void **buff);
+  friend int64_t cb_skip(struct archive *, void *userData, int64_t request);
 };
 
 /********************************************************
