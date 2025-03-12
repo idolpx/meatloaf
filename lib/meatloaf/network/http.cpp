@@ -26,7 +26,7 @@
 //#include "../../../include/global_defines.h"
 
 /********************************************************
- * File impls
+ * MFile implementations
  ********************************************************/
 
 MeatHttpClient* HTTPMFile::fromHeader() {
@@ -51,19 +51,6 @@ MeatHttpClient* HTTPMFile::fromHeader() {
         }
     }
     return client;
-}
-
-bool HTTPMFile::isDirectory() {
-    // if(fromHeader()->m_isDirectory)
-    //     return true;
-
-    // if(fromHeader()->m_isWebDAV) {
-    //     // try webdav PROPFIND to get a listing
-    //     return true;
-    // }
-    // else
-        // otherwise return false
-        return false;
 }
 
 MStream* HTTPMFile::getSourceStream(std::ios_base::openmode mode) {
@@ -97,6 +84,19 @@ MStream* HTTPMFile::createStream(std::ios_base::openmode mode)
     MStream* istream = new HTTPMStream(url);
     istream->open(mode);
     return istream;
+}
+
+bool HTTPMFile::isDirectory() {
+    // if(fromHeader()->m_isDirectory)
+    //     return true;
+
+    // if(fromHeader()->m_isWebDAV) {
+    //     // try webdav PROPFIND to get a listing
+    //     return true;
+    // }
+    // else
+        // otherwise return false
+        return false;
 }
 
 time_t HTTPMFile::getLastWrite() {

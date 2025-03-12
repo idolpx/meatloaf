@@ -455,14 +455,12 @@ MStream* MFile::getSourceStream(std::ios_base::openmode mode) {
     // will be replaced by streamBroker->getSourceStream(sourceFile, mode)
     std::shared_ptr<MStream> containerStream(sourceStream); // get its base stream, i.e. zip raw file contents
 
-    //Debug_printv("containerStream isRandomAccess[%d] isBrowsable[%d]", containerStream->isRandomAccess(), containerStream->isBrowsable());
+    Debug_printv("containerStream isRandomAccess[%d] isBrowsable[%d] null[%d]", containerStream->isRandomAccess(), containerStream->isBrowsable(), (containerStream == nullptr));
 
     // will be replaced by streamBroker->getDecodedStream(this, mode, containerStream)
     MStream* decodedStream(getDecodedStream(containerStream)); // wrap this stream into decoded stream, i.e. unpacked zip files
     decodedStream->url = this->url;
-    //Debug_printv("decodedStream isRandomAccess[%d] isBrowsable[%d]", decodedStream->isRandomAccess(), decodedStream->isBrowsable());
-
-    Debug_printv("pathInStream [%s]", pathInStream.c_str());
+    Debug_printv("decodedStream isRandomAccess[%d] isBrowsable[%d] null[%d]", decodedStream->isRandomAccess(), decodedStream->isBrowsable(), (decodedStream == nullptr));
 
     if(decodedStream->isRandomAccess() && pathInStream != "")
     {

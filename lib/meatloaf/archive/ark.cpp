@@ -32,7 +32,7 @@ bool ARKMStream::seekEntry( std::string filename )
         size_t index = 1;
         mstr::replaceAll(filename, "\\", "/");
         bool wildcard = (mstr::contains(filename, "*") || mstr::contains(filename, "?"));
-        while (readEntry(index))
+        while (seekEntry(index))
         {
             std::string entryFilename = entry.filename;
             uint8_t i = entryFilename.find_first_of(0xA0);
