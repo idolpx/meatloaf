@@ -53,12 +53,7 @@ class Archive {
     void close();
 
     bool isOpen() { return m_archive != nullptr; }
-    archive *getArchive() {
-        if ( m_archive == NULL )
-             open(std::ios::in);
-
-        return m_archive;
-    }
+    archive *getArchive() { return m_archive; }
 
    private:
     struct archive *m_archive = nullptr;

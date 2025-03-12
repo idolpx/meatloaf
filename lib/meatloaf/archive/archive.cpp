@@ -70,6 +70,7 @@ bool Archive::open(std::ios_base::openmode mode) {
     Debug_printv("Archive::open");
     m_srcBuffer = new uint8_t[m_buffSize];
     m_archive = archive_read_new();
+    m_srcStream->seek(0, SEEK_SET);
 
     archive_read_support_filter_all(m_archive);
     archive_read_support_format_all(m_archive);
@@ -402,6 +403,7 @@ bool ArchiveMFile::rewindDirectory()
         return false;
 
     dirIsOpen = true;
+    image->m_archive->open( std::ios_base::in );
     image->resetEntryCounter();
 
     media_archive = name;
@@ -411,6 +413,8 @@ bool ArchiveMFile::rewindDirectory()
 
 MFile *ArchiveMFile::getNextFileInDir()
 {
+    bool r = false;
+
     if (!dirIsOpen)
         rewindDirectory();
 
@@ -419,7 +423,12 @@ MFile *ArchiveMFile::getNextFileInDir()
     if (image == nullptr)
         goto exit;
 
-    if (image->getNextImageEntry())
+    do
+    {
+        r = image->getNextImageEntry();
+    } while (r && image->entry.filename.empty()); // Don't want empty entries
+
+    if (r)
     {
         std::string filename = image->entry.filename;
         //uint8_t i = filename.find_first_of(0xA0);
@@ -429,6 +438,7 @@ MFile *ArchiveMFile::getNextFileInDir()
         Debug_printv( "entry[%s]", (sourceFile->url + "/" + filename).c_str() );
 
         auto file = MFSOwner::File(sourceFile->url + "/" + filename);
+        file->size = image->entry.size;
         Debug_printv("entry[%s] ext[%s]", file->name.c_str(), file->extension.c_str());
 
         return file;
@@ -436,6 +446,7 @@ MFile *ArchiveMFile::getNextFileInDir()
 
 exit:
     Debug_printv( "END OF DIRECTORY");
+    image->m_archive->close();
     dirIsOpen = false;
     return nullptr;
 }
