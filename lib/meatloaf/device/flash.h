@@ -38,6 +38,7 @@ class FlashMFile: public MFile
 friend class FlashMStream;
 
 public:
+    const bool m_rootfs = true;
     std::string basepath = "";
     
     FlashMFile(std::string path): MFile(path) {

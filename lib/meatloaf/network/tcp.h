@@ -283,9 +283,8 @@ public:
     TCPMFile(std::string path, std::string filename): MFile(path) {};
     ~TCPMFile() override {
     }
-    bool isDirectory() override {
-        return false;
-    }
+
+    const bool m_rootfs = true;
 
     // We are overriding getSourceStream, because obviously - TCP scheme won't be wrapped in anything
     MStream* getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override {
@@ -297,7 +296,7 @@ public:
     } 
 
     // DUMMY return value - we've overriden getSourceStream, so this one won't be even called!
-    MStream* getDecodedStream(std::shared_ptr<MStream> src)
+    MStream* getDecodedStream(std::shared_ptr<MStream> is)
     {
         return nullptr; 
     }
@@ -306,6 +305,10 @@ public:
     {
         MStream* istream = new TCPMStream(url);
         return istream;
+    }
+
+    bool isDirectory() override {
+        return false;
     }
 
     time_t getLastWrite() override {

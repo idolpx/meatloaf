@@ -136,6 +136,7 @@ class RAMMFile: public MFile
 friend class FlashMStream;
 
 public:
+    const bool m_rootfs = true;
     std::string basepath = "";
     
     RAMMFile(std::string path): MFile(path) {

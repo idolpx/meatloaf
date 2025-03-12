@@ -137,17 +137,14 @@ void ArchiveMStream::readArchiveData() {
         uint32_t size = (_size / ESP_HIMEM_BLKSZ) * ESP_HIMEM_BLKSZ;
         if (_size > size) size += ESP_HIMEM_BLKSZ;
 
-        Debug_printv("HIMEM physical size: %lu",
-                     (uint32_t)esp_himem_get_phys_size());
-        Debug_printv("HIMEM available before alloc: %lu ",
-                     (uint32_t)esp_himem_get_free_size());
+        Debug_printv("HIMEM physical size: %lu", (uint32_t)esp_himem_get_phys_size());
+        Debug_printv("HIMEM available before alloc: %lu ", (uint32_t)esp_himem_get_free_size());
 
         esp_err_t status = esp_himem_alloc(size, &m_data);
         if (status == ESP_OK)
             m_haveData = 1;
         else {
-            Debug_printv("Unable to allocate HIMEM memory: %s",
-                         esp_err_to_name(status));
+            Debug_printv("Unable to allocate HIMEM memory: %s", esp_err_to_name(status));
             m_haveData = -1;
             return;
         }
@@ -157,16 +154,14 @@ void ArchiveMStream::readArchiveData() {
             esp_err_t status =
                 esp_himem_alloc_map_range(ESP_HIMEM_BLKSZ, &s_range);
             if (status != ESP_OK) {
-                Debug_printv("Unable to allocate mapped range for HIMEM: %s",
-                             esp_err_to_name(status));
+                Debug_printv("Unable to allocate mapped range for HIMEM: %s", esp_err_to_name(status));
                 ESP_ERROR_CHECK(esp_himem_free(m_data));
                 m_haveData = -1;
                 return;
             }
         }
 
-        Debug_printv("HIMEM available after alloc : %lu ",
-                     (uint32_t)esp_himem_get_free_size());
+        Debug_printv("HIMEM available after alloc : %lu ", (uint32_t)esp_himem_get_free_size());
 
         // increment mapped range usage counter
         s_rangeUsed++;
@@ -180,18 +175,15 @@ void ArchiveMStream::readArchiveData() {
             uint32_t s = std::min(size, (uint32_t)ESP_HIMEM_BLKSZ);
 
             uint8_t *ptr;
-            ESP_ERROR_CHECK(esp_himem_map(m_data, s_range, pageStart, 0,
-                                          ESP_HIMEM_BLKSZ, 0, (void **)&ptr));
+            ESP_ERROR_CHECK(esp_himem_map(m_data, s_range, pageStart, 0, ESP_HIMEM_BLKSZ, 0, (void **)&ptr));
             uint32_t r = archive_read_data(a, ptr, s);
             ESP_ERROR_CHECK(esp_himem_unmap(s_range, ptr, ESP_HIMEM_BLKSZ));
             if (archive_errno(a) != ARCHIVE_OK || r != s) {
                 if (archive_errno(a) != ARCHIVE_OK) {
-                    Debug_printv("archive read error %i: %s", archive_errno(a),
-                                 archive_error_string(a));
+                    Debug_printv("archive read error %i: %s", archive_errno(a), archive_error_string(a));
                 } else {
                     Debug_printv(
-                        "expected to read %lu bytes from archive, got %lu", s,
-                        r);
+                        "expected to read %lu bytes from archive, got %lu", s, r);
                 }
 
                 ESP_ERROR_CHECK(esp_himem_free(m_data));
@@ -214,14 +206,12 @@ uint32_t ArchiveMStream::read(uint8_t *buf, uint32_t size) {
         if (_position + size > _size) size = _size - _position;
         uint32_t numRead = 0;
         while (size > 0) {
-            uint32_t pageStart =
-                (_position / ESP_HIMEM_BLKSZ) * ESP_HIMEM_BLKSZ;
+            uint32_t pageStart = (_position / ESP_HIMEM_BLKSZ) * ESP_HIMEM_BLKSZ;
             uint32_t offset = _position - pageStart;
             uint32_t n = std::min(size, (uint32_t)ESP_HIMEM_BLKSZ - offset);
 
             uint8_t *ptr;
-            ESP_ERROR_CHECK(esp_himem_map(m_data, s_range, pageStart, 0,
-                                          ESP_HIMEM_BLKSZ, 0, (void **)&ptr));
+            ESP_ERROR_CHECK(esp_himem_map(m_data, s_range, pageStart, 0, ESP_HIMEM_BLKSZ, 0, (void **)&ptr));
             memcpy(buf + numRead, ptr + offset, n);
             ESP_ERROR_CHECK(esp_himem_unmap(s_range, ptr, ESP_HIMEM_BLKSZ));
             size -= n;
@@ -248,14 +238,12 @@ uint32_t ArchiveMStream::write(const uint8_t *buf, uint32_t size) {
         if (_position + size > _size) size = _size - _position;
         uint32_t numWritten = 0;
         while (size > 0) {
-            uint32_t pageStart =
-                (_position / ESP_HIMEM_BLKSZ) * ESP_HIMEM_BLKSZ;
+            uint32_t pageStart = (_position / ESP_HIMEM_BLKSZ) * ESP_HIMEM_BLKSZ;
             uint32_t offset = _position - pageStart;
             uint32_t n = std::min(size, (uint32_t)ESP_HIMEM_BLKSZ - offset);
 
             uint8_t *ptr;
-            ESP_ERROR_CHECK(esp_himem_map(m_data, s_range, pageStart, 0,
-                                          ESP_HIMEM_BLKSZ, 0, (void **)&ptr));
+            ESP_ERROR_CHECK(esp_himem_map(m_data, s_range, pageStart, 0, ESP_HIMEM_BLKSZ, 0, (void **)&ptr));
             memcpy(ptr + offset, buf + numWritten, n);
             ESP_ERROR_CHECK(esp_himem_unmap(s_range, ptr, ESP_HIMEM_BLKSZ));
             size -= n;
@@ -270,6 +258,22 @@ uint32_t ArchiveMStream::write(const uint8_t *buf, uint32_t size) {
         return numWritten;
     } else
         return 0;
+}
+
+bool ArchiveMStream::seek(uint32_t pos) {
+    readArchiveData();
+
+    Debug_printv("pos[%lu]", pos);
+
+    if (m_haveData > 0) {
+        if (pos < _size) {
+            _position = pos;
+            return true;
+        } else
+            return false;
+
+    } else
+        return false;
 }
 
 bool ArchiveMStream::seekEntry(std::string filename)
@@ -321,7 +325,10 @@ bool ArchiveMStream::seekEntry(std::string filename)
 
 bool ArchiveMStream::seekEntry( uint16_t index )
 {
-    Debug_printv("entry_count[%d] entry_index[%d] index[%d]", entry_count, entry_index, index);
+    //Debug_printv("entry_count[%d] entry_index[%d] index[%d]", entry_count, entry_index, index);
+
+    if ( !m_archive->isOpen() )
+        return false;
 
     index--;
 
@@ -342,15 +349,17 @@ bool ArchiveMStream::seekEntry( uint16_t index )
 
     entry_index = index + 1;
 
-    Debug_printv("entry_index[%d] filename[%s] size[%lu]", entry_index, entry.filename.c_str(), entry.size);
+    //Debug_printv("entry_index[%d] filename[%s] size[%lu]", entry_index, entry.filename.c_str(), entry.size);
     return true;
 }
 
 
-uint32_t ArchiveMStream::readFile(uint8_t *buf, uint32_t size) {
+uint32_t ArchiveMStream::readFile(uint8_t *buf, uint32_t size) 
+{
     uint32_t bytesRead = 0;
     bytesRead += read(buf, size);
 
+    Debug_printv("size[%lu] bytesRead[%lu] _position[%lu]", size, bytesRead, _position);
     return bytesRead;
 }
 
@@ -374,13 +383,7 @@ bool ArchiveMStream::seekPath(std::string path) {
     return false;
 }
 
-bool ArchiveMStream::seek(uint32_t pos) {
-    if (pos < _size) {
-        _position = pos;
-        return true;
-    } else
-        return false;
-}
+
 
 /********************************************************
  * Files implementations
@@ -435,7 +438,7 @@ MFile *ArchiveMFile::getNextFileInDir()
         //filename = filename.substr(0, i);
         // mstr::rtrimA0(filename);
         //mstr::replaceAll(filename, "/", "\\");
-        Debug_printv( "entry[%s]", (sourceFile->url + "/" + filename).c_str() );
+        //Debug_printv( "entry[%s]", (sourceFile->url + "/" + filename).c_str() );
 
         auto file = MFSOwner::File(sourceFile->url + "/" + filename);
         file->size = image->entry.size;
@@ -445,8 +448,8 @@ MFile *ArchiveMFile::getNextFileInDir()
     }
 
 exit:
-    Debug_printv( "END OF DIRECTORY");
-    image->m_archive->close();
     dirIsOpen = false;
+    image->m_archive->close();
+    Debug_printv( "END OF DIRECTORY" );
     return nullptr;
 }

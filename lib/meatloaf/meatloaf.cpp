@@ -238,7 +238,7 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
     //     return targetFile;
     // }
 
-    Debug_println("--------------------------------");
+    Debug_println("vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv");
     Debug_printv("Trying to factory path [%s]", path.c_str());
 
     std::vector<std::string> paths = mstr::split(path,'/');
@@ -252,11 +252,11 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
         targetFileSystem = findParentFS(begin, end, pathIterator);
     }
 
-    auto targetFile = targetFileSystem->getFile(path);
+    MFile *targetFile = targetFileSystem->getFile(path);
 
     // Set path to file in filesystem stream
     targetFile->pathInStream = mstr::joinToString(&pathIterator, &end, "/");
-    Debug_printv("targetFile->pathInStream: '%s'", targetFile->pathInStream.c_str());
+    Debug_printv("targetFile->pathInStream[%s]", targetFile->pathInStream.c_str());
 
     end = pathIterator;
     pathIterator--;
@@ -297,7 +297,21 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
         Debug_printv("sourceFile[%s] is in [%s][%s]", targetFile->sourceFile->name.c_str(), sourcePath.c_str(), sourceFileSystem->symbol);
     }
 
-    Debug_println("--------------------------------");
+    if (targetFile != nullptr)
+    {
+        if (targetFile->sourceFile != nullptr)
+        {
+            Debug_printv("source good rootfs[%d][%s]", targetFile->sourceFile->m_rootfs, targetFile->sourceFile->url.c_str());
+        }
+        else
+            Debug_printv("source bad");
+        
+        Debug_printv("target good rootfs[%d][%s]", targetFile->m_rootfs, targetFile->url.c_str());
+    }
+    else
+        Debug_printv("target bad");
+
+    Debug_println("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
 
     // if ( targetFile->pathInStream.empty() )
     //     FileBroker::add(path, targetFile);
@@ -361,15 +375,15 @@ std::string MFSOwner::existsLocal( std::string path )
 }
 
 MFileSystem* MFSOwner::findParentFS(std::vector<std::string>::iterator &begin, std::vector<std::string>::iterator &end, std::vector<std::string>::iterator &pathIterator) {
-    while (pathIterator != begin) {
+    while (pathIterator != begin)
+    {
         pathIterator--;
 
         auto part = *pathIterator;
         mstr::toLower(part);
+        //Debug_printv("part[%s]", part.c_str());
         if ( part.size() )
         {
-            //Debug_printv("pathIterator[%s]", pathIterator->c_str());
-
             auto foundFS=std::find_if(availableFS.begin() + 1, availableFS.end(), [&part](MFileSystem* fs){ 
                 //Debug_printv("symbol[%s]", fs->symbol);
                 return fs->handles(part); 
