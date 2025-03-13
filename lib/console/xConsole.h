@@ -21,6 +21,7 @@ namespace ESP32Console
         const char *prompt_ = "ESP32> ";
         const uint32_t task_priority_;
         const BaseType_t task_stack_size_;
+        bool _initialized = false;
 
         uint16_t max_history_len_ = 40;
         const char* history_save_path_ = nullptr;
@@ -35,6 +36,7 @@ namespace ESP32Console
         static void repl_task(void *args);
 
         void beginCommon();
+        size_t _print_number(unsigned long n, uint8_t base);
 
     public:
         /**
@@ -152,5 +154,34 @@ namespace ESP32Console
         void begin(int baud, int rxPin = -1, int txPin = -1, uint8_t channel = 0);
 
         void end();
+
+
+
+
+        size_t write(uint8_t);
+        size_t write(const uint8_t *buffer, size_t size);
+        size_t write(const char *s);
+    
+        size_t write(unsigned long n) { return write((uint8_t)n); };
+        size_t write(long n) { return write((uint8_t)n); };
+        size_t write(unsigned int n) { return write((uint8_t)n); };
+        size_t write(int n) { return write((uint8_t)n); };
+
+        size_t printf(const char *format, ...);
+        size_t printv(const char *format, ...);
+
+        //size_t println(const char *format, ...);
+        size_t println(const char *str);
+        size_t println() { return print("\r\n"); };
+        size_t println(std::string str);
+        size_t println(int num, int base = 10);
+
+        //size_t print(const char *format, ...);
+        size_t print(const char *str);
+        size_t print(const std::string &str);
+        size_t print(int n, int base = 10);
+        size_t print(unsigned int n, int base = 10);
+        size_t print(long n, int base = 10);
+        size_t print(unsigned long n, int base = 10);
     };
 };
