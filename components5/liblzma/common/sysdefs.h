@@ -32,21 +32,21 @@
 // size_t and NULL
 #include <stddef.h>
 
-//#ifdef HAVE_INTTYPES_H
+#ifdef HAVE_INTTYPES_H
 #	include <inttypes.h>
-//#endif
+#endif
 
 // C99 says that inttypes.h always includes stdint.h, but some systems
 // don't do that, and require including stdint.h separately.
-//#ifdef HAVE_STDINT_H
+#ifdef HAVE_STDINT_H
 #	include <stdint.h>
-//#endif
+#endif
 
 // Some pre-C99 systems have SIZE_MAX in limits.h instead of stdint.h. The
 // limits are also used to figure out some macros missing from pre-C99 systems.
-//#ifdef HAVE_LIMITS_H
+#ifdef HAVE_LIMITS_H
 #	include <limits.h>
-//#endif
+#endif
 
 // Be more compatible with systems that have non-conforming inttypes.h.
 // We assume that int is 32-bit and that long is either 32-bit or 64-bit.
@@ -139,31 +139,31 @@
 //
 //    bool baz = (flags & 0x100);
 //
-//#ifdef HAVE_STDBOOL_H
+#ifdef HAVE_STDBOOL_H
 #	include <stdbool.h>
-//#else
-// #	if ! HAVE__BOOL
-// typedef unsigned char _Bool;
-// #	endif
-// #	define bool _Bool
-// #	define false 0
-// #	define true 1
-// #	define __bool_true_false_are_defined 1
-// #endif
+#else
+#	if ! HAVE__BOOL
+typedef unsigned char _Bool;
+#	endif
+#	define bool _Bool
+#	define false 0
+#	define true 1
+#	define __bool_true_false_are_defined 1
+#endif
 
 // string.h should be enough but let's include strings.h and memory.h too if
 // they exists, since that shouldn't do any harm, but may improve portability.
-//#ifdef HAVE_STRING_H
+#ifdef HAVE_STRING_H
 #	include <string.h>
-//#endif
+#endif
 
-//#ifdef HAVE_STRINGS_H
+#ifdef HAVE_STRINGS_H
 #	include <strings.h>
-//#endif
+#endif
 
-//#ifdef HAVE_MEMORY_H
-//#	include <memory.h>
-//#endif
+#ifdef HAVE_MEMORY_H
+#	include <memory.h>
+#endif
 
 
 ////////////

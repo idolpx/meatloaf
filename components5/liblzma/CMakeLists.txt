@@ -36,4 +36,6 @@ file(GLOB CSources ${LIBRARY_DIR}/simple/*.c)
 set(Sources ${Sources} ${CSources})
 set(Headers ${Headers} ${LIBRARY_DIR}/simple)
 
-idf_component_register( SRCS ${Sources} INCLUDE_DIRS ${Headers} )
+idf_component_register( SRCS ${Sources} INCLUDE_DIRS . ${Headers} )
+
+target_compile_options(${COMPONENT_LIB} PRIVATE -DHAVE_CONFIG_H)

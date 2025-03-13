@@ -16,6 +16,8 @@
 //
 ///////////////////////////////////////////////////////////////////////////////
 
+#ifndef HAVE_SMALL
+
 #include "check.h"
 #include "crc_macros.h"
 
@@ -80,3 +82,5 @@ lzma_crc32(const uint8_t *buf, size_t size, uint32_t crc)
 
 	return ~crc;
 }
+
+#endif
