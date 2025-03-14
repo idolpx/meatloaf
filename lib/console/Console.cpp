@@ -22,10 +22,68 @@
 #include "../../include/debug.h"
 #include "string_utils.h"
 
+ESP32Console::Console console;
+
 using namespace ESP32Console::Commands;
 
 namespace ESP32Console
 {
+    /**
+     * @brief Register the given command, using the raw ESP-IDF structure.
+     *
+     * @param cmd The command that should be registered
+     * @return Return true, if the registration was successfull, false if not.
+     */
+    bool Console::registerCommand(const esp_console_cmd_t *cmd)
+    {
+        //Debug_printv("Registering new command %s", cmd->command);
+
+        auto code = esp_console_cmd_register(cmd);
+        if (code != ESP_OK)
+        {
+            Debug_printv("Error registering command (Reason %s)", esp_err_to_name(code));
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * @brief Register the given command
+     *
+     * @param cmd The command that should be registered
+     * @return true If the command was registered successful.
+     * @return false If the command was not registered because of an error.
+     */
+    bool Console::registerCommand(const ConsoleCommandBase &cmd)
+    {
+        auto c = cmd.toCommandStruct();
+        return registerCommand(&c);
+    }
+
+    /**
+     * @brief Registers the given command
+     *
+     * @param command The name under which the command can be called (e.g. "ls"). Must not contain spaces.
+     * @param func A pointer to the function which should be run, when this command is called
+     * @param help A text shown in output of "help" command describing this command. When empty it is not shown in help.
+     * @param hint A text describing the usage of the command in help output
+     * @return true If the command was registered successful.
+     * @return false If the command was not registered because of an error.
+     */
+    bool Console::registerCommand(const char *command, esp_console_cmd_func_t func, const char *help, const char *hint)
+    {
+        const esp_console_cmd_t cmd = {
+            .command = command,
+            .help = help,
+            .hint = hint,
+            .func = func,
+            .argtable = nullptr
+        };
+
+        return registerCommand(&cmd);
+    };
+
     void Console::registerCoreCommands()
     {
         registerCommand(getClearCommand());
@@ -184,9 +242,11 @@ namespace ESP32Console
         beginCommon();
 
         // Start REPL task
+        _initialized = true;
         if (xTaskCreatePinnedToCore(&Console::repl_task, "console_repl", task_stack_size_, this, task_priority_, &task_, 0) != pdTRUE)
         {
             Debug_printv("Could not start REPL task!");
+            _initialized = false;
         }
     }
 
@@ -251,7 +311,7 @@ namespace ESP32Console
             char *line = linenoise(prompt.c_str());
             if (line == NULL)
             {
-                Debug_printv("empty line");
+                //Debug_printv("empty line");
                 /* Ignore empty lines */
                 continue;
             }
@@ -283,7 +343,7 @@ namespace ESP32Console
 
             if (err == ESP_ERR_NOT_FOUND)
             {
-                printf("Unrecognized command\n");
+                fprintf(stdout, "Unrecognized command\n");
             }
             else if (err == ESP_ERR_INVALID_ARG)
             {
@@ -291,11 +351,11 @@ namespace ESP32Console
             }
             else if (err == ESP_OK && ret != ESP_OK)
             {
-                // printf("Command returned non-zero error code: 0x%x (%s)\n", ret, esp_err_to_name(ret));
+                fprintf(stdout, "Command returned non-zero error code: 0x%x (%s)\n", ret, esp_err_to_name(ret));
             }
             else if (err != ESP_OK)
             {
-                printf("Internal error: %s\n", esp_err_to_name(err));
+                fprintf(stdout, "Internal error: %s\n", esp_err_to_name(err));
             }
             /* linenoise allocates line buffer on the heap, so need to free it */
             linenoiseFree(line);
@@ -307,5 +367,184 @@ namespace ESP32Console
 
     void Console::end()
     {
+        // what do we need to do when exiting?
+    }
+
+
+    size_t Console::write(uint8_t c)
+    {
+        int z = uart_write_bytes(uart_channel_, (const char *)&c, 1);
+        // uart_wait_tx_done(_uart_num, MAX_WRITE_BYTE_TICKS);
+        return z;
+    }
+    
+    size_t Console::write(const uint8_t *buffer, size_t size)
+    {
+        int z = uart_write_bytes(uart_channel_, (const char *)buffer, size);
+        // uart_wait_tx_done(_uart_num, MAX_WRITE_BUFFER_TICKS);
+        return z;
+    }
+    
+    size_t Console::write(const char *str)
+    {
+        int z = uart_write_bytes(uart_channel_, str, strlen(str));
+        return z;
+    }
+    
+    
+
+    size_t Console::printf(const char *fmt...)
+    {
+        char *result = nullptr;
+        va_list vargs;
+    
+        if (!_initialized)
+            return -1;
+    
+        va_start(vargs, fmt);
+    
+        int z = vasprintf(&result, fmt, vargs);
+    
+        if (z > 0)
+            uart_write_bytes(uart_channel_, result, z);
+    
+        va_end(vargs);
+    
+        if (result != nullptr)
+            free(result);
+    
+        // uart_wait_tx_done(uart_channel_, MAX_WRITE_BUFFER_TICKS);
+    
+        return z >= 0 ? z : 0;
+    }
+
+    size_t Console::_print_number(unsigned long n, uint8_t base)
+    {
+        char buf[8 * sizeof(long) + 1]; // Assumes 8-bit chars plus zero byte.
+        char *str = &buf[sizeof(buf) - 1];
+    
+        if (!_initialized)
+            return -1;
+    
+        *str = '\0';
+    
+        // prevent crash if called with base == 1
+        if (base < 2)
+            base = 10;
+    
+        do
+        {
+            unsigned long m = n;
+            n /= base;
+            char c = m - base * n;
+            *--str = c < 10 ? c + '0' : c + 'A' - 10;
+        } while (n);
+    
+        return write(str);
+    }
+    
+    size_t Console::print(const char *str)
+    {
+        int z = strlen(str);
+    
+        if (!_initialized)
+            return -1;
+    
+        return uart_write_bytes(uart_channel_, str, z);
+        ;
+    }
+    
+    size_t Console::print(const std::string &str)
+    {
+        if (!_initialized)
+            return -1;
+    
+        return print(str.c_str());
+    }
+    
+    size_t Console::print(int n, int base)
+    {
+        if (!_initialized)
+            return -1;
+    
+        return print((long)n, base);
+    }
+    
+    size_t Console::print(unsigned int n, int base)
+    {
+        if (!_initialized)
+            return -1;
+    
+        return print((unsigned long)n, base);
+    }
+    
+    size_t Console::print(long n, int base)
+    {
+        if (!_initialized)
+            return -1;
+    
+        if (base == 0)
+        {
+            return write(n);
+        }
+        else if (base == 10)
+        {
+            if (n < 0)
+            {
+                int t = print('-');
+                n = -n;
+                return _print_number(n, 10) + t;
+            }
+            return _print_number(n, 10);
+        }
+        else
+        {
+            return _print_number(n, base);
+        }
+    }
+    
+    size_t Console::print(unsigned long n, int base)
+    {
+        if (!_initialized)
+            return -1;
+    
+        if (base == 0)
+        {
+            return write(n);
+        }
+        else
+        {
+            return _print_number(n, base);
+        }
+    }
+    
+    size_t Console::println(const char *str)
+    {
+        if (!_initialized)
+            return -1;
+    
+        size_t n = print(str);
+        n += println();
+        return n;
+    }
+    
+    size_t Console::println(std::string str)
+    {
+        if (!_initialized)
+            return -1;
+    
+        size_t n = print(str);
+        n += println();
+        return n;
+    }
+    
+    size_t Console::println(int num, int base)
+    {
+        if (!_initialized)
+            return -1;
+    
+        size_t n = print(num, base);
+        n += println();
+        return n;
     }
 };

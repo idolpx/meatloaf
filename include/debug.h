@@ -22,14 +22,24 @@
 */
 #ifdef DEBUG
 #ifdef ESP_PLATFORM
+
+#ifdef ENABLE_CONSOLE
+    #include "../lib/console/ESP32Console.h"
+    #define Serial console
+#else
     // Use FujiNet debug serial output
     #include "../lib/hardware/fnUART.h"
     #define Serial fnUartDebug
+#endif
 
-    #define Debug_print(...) printf( __VA_ARGS__ )
-    #define Debug_printf(...) printf( __VA_ARGS__ )
-    #define Debug_println(...) { printf( __VA_ARGS__ ); printf("\r\n"); }
-    #define Debug_printv(format, ...) { printf( ANSI_YELLOW "[%s:%d] %s(): " ANSI_GREEN_BOLD format ANSI_RESET "\r\n", __FILE__, __LINE__, __FUNCTION__, ##__VA_ARGS__);}
+    #define Debug_print(...) Serial.print( __VA_ARGS__ )
+    #define Debug_printf(...) Serial.printf( __VA_ARGS__ )
+    #define Debug_println(...) Serial.println( __VA_ARGS__ )
+
+    #define Debug_printv(format, ...) \
+                Serial.printf(ANSI_YELLOW "[%s:%u] %s(): " ANSI_GREEN_BOLD format ANSI_RESET "\r\n", \
+                  __FILE__, __LINE__, __FUNCTION__, \
+                  ##__VA_ARGS__)
 
     #define HEAP_CHECK(x) Debug_printf("HEAP CHECK %s " x "\r\n", heap_caps_check_integrity_all(true) ? "PASSED":"FAILED")
     #define DEBUG_MEM_LEAK {Debug_printv("Heap[%lu] Low[%lu] Task[%u]", esp_get_free_heap_size(), esp_get_free_internal_heap_size(), uxTaskGetStackHighWaterMark(NULL));}

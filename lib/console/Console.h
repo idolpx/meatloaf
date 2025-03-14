@@ -56,19 +56,7 @@ namespace ESP32Console
          * @param cmd The command that should be registered
          * @return Return true, if the registration was successfull, false if not.
          */
-        bool registerCommand(const esp_console_cmd_t *cmd)
-        {
-            //Debug_printv("Registering new command %s", cmd->command);
-
-            auto code = esp_console_cmd_register(cmd);
-            if (code != ESP_OK)
-            {
-                Debug_printv("Error registering command (Reason %s)", esp_err_to_name(code));
-                return false;
-            }
-
-            return true;
-        }
+        bool registerCommand(const esp_console_cmd_t *cmd);
 
         /**
          * @brief Register the given command
@@ -77,11 +65,7 @@ namespace ESP32Console
          * @return true If the command was registered successful.
          * @return false If the command was not registered because of an error.
          */
-        bool registerCommand(const ConsoleCommandBase &cmd)
-        {
-            auto c = cmd.toCommandStruct();
-            return registerCommand(&c);
-        }
+        bool registerCommand(const ConsoleCommandBase &cmd);
 
         /**
          * @brief Registers the given command
@@ -93,18 +77,7 @@ namespace ESP32Console
          * @return true If the command was registered successful.
          * @return false If the command was not registered because of an error.
          */
-        bool registerCommand(const char *command, esp_console_cmd_func_t func, const char *help, const char *hint = "")
-        {
-            const esp_console_cmd_t cmd = {
-                .command = command,
-                .help = help,
-                .hint = hint,
-                .func = func,
-                .argtable = nullptr
-            };
-
-            return registerCommand(&cmd);
-        };
+        bool registerCommand(const char *command, esp_console_cmd_func_t func, const char *help, const char *hint = "");
 
         void registerCoreCommands();
 
@@ -168,7 +141,6 @@ namespace ESP32Console
         size_t write(int n) { return write((uint8_t)n); };
 
         size_t printf(const char *format, ...);
-        size_t printv(const char *format, ...);
 
         //size_t println(const char *format, ...);
         size_t println(const char *str);
@@ -185,3 +157,5 @@ namespace ESP32Console
         size_t print(unsigned long n, int base = 10);
     };
 };
+
+extern ESP32Console::Console console;

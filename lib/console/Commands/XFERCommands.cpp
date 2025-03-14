@@ -12,6 +12,7 @@
 #include <iostream>
 #include <sstream>
 #include <sys/fcntl.h>
+#include <driver/uart.h>
 
 #include "string_utils.h"
 
