@@ -44,8 +44,6 @@
 
 #ifdef ENABLE_CONSOLE
 #include "../lib/console/ESP32Console.h"
-    using namespace ESP32Console;
-    Console console;
 #endif
 
 #ifdef ENABLE_DISPLAY
