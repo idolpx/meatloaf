@@ -23,6 +23,26 @@
 
 #include "../meatloaf.h"
 
+// int cb_open(struct archive *, void *userData)
+// {
+//     Archive *a = (Archive *) userData;
+
+//     // maybe we can use open for something? Check if stream is open?
+//     a->m_srcStream->seek(0, SEEK_CUR); // move to beginning of stream
+
+//     return (ARCHIVE_OK);
+// }
+
+// int cb_close(struct archive *, void *userData)
+// {
+//     //ArchiveMStreamData *src_str = (ArchiveMStreamData *)userData;
+    
+//     //Debug_printv("Libarch wants to close, but we do nothing here...");
+
+//     // do we want to close srcStream here???
+//     return (ARCHIVE_OK);
+// }
+
 ssize_t cb_read(struct archive *, void *userData, const void **buff) {
     // Returns pointer and size of next block of data from archive.
     // The read callback returns the number of bytes read, zero for end-of-file,
@@ -63,6 +83,26 @@ int64_t cb_skip(struct archive *, void *userData, int64_t request)
   }
 }
 
+
+int64_t cb_seek(struct archive *, void *userData, int64_t offset, int whence)
+{
+    //Debug_printv("offset[%lld] whence[%d] (0=begin, 1=curr, 2=end)", offset, whence);
+    Archive *a = (Archive *) userData;
+
+    if (a->m_archive)
+    {
+        bool rc = a->m_srcStream->seek(offset, whence);
+        return (rc) ? offset : ARCHIVE_WARN;
+    }
+    else
+    {
+        Debug_printv("ERROR! seek failed");
+        return ARCHIVE_FATAL;
+    }
+}
+
+
+
 bool Archive::open(std::ios_base::openmode mode) {
     // close the archive if it was already open
     close();
@@ -74,8 +114,12 @@ bool Archive::open(std::ios_base::openmode mode) {
 
     archive_read_support_filter_all(m_archive);
     archive_read_support_format_all(m_archive);
+
+    //archive_read_set_open_callback(m_archive, cb_open);
+    //archive_read_set_close_callback(m_archive, cb_close);
     archive_read_set_read_callback(m_archive, cb_read);
     archive_read_set_skip_callback(m_archive, cb_skip);
+    archive_read_set_seek_callback(m_archive, cb_seek);
     archive_read_set_callback_data(m_archive, this);
 
     Debug_printv("Calling archive_read_open1");
@@ -442,7 +486,7 @@ MFile *ArchiveMFile::getNextFileInDir()
 
         auto file = MFSOwner::File(sourceFile->url + "/" + filename);
         file->size = image->entry.size;
-        Debug_printv("entry[%s] ext[%s]", file->name.c_str(), file->extension.c_str());
+        Debug_printv("entry[%s] ext[%s] size[%lu]", file->name.c_str(), file->extension.c_str(), file->size);
 
         return file;
     }

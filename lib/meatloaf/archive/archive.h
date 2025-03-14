@@ -62,8 +62,11 @@ class Archive {
 
   static const size_t m_buffSize = 4096;
 
+  //friend int cb_open(struct archive *, void *userData);
+  //friend int cb_close(struct archive *, void *userData);
   friend ssize_t cb_read(struct archive *, void *userData, const void **buff);
   friend int64_t cb_skip(struct archive *, void *userData, int64_t request);
+  friend int64_t cb_seek(struct archive *, void *userData, int64_t offset, int whence);
 };
 
 /********************************************************
