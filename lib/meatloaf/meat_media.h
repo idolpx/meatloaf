@@ -194,7 +194,7 @@ public:
         // create and add stream to image broker if not found
         auto newFile = MFSOwner::File(url);
 
-        Debug_printv("before")
+        Debug_printv("before");
         T* newStream = (T*)newFile->getSourceStream();
         Debug_printv("after");
 
