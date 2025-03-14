@@ -114,8 +114,15 @@ static int sysInfo(int argc, char **argv)
 
     printf("EFuse MAC: %s\r\n", mac2String(ESP.getEfuseMac()).c_str());
 
-    printf("Flash size: %ld MB (mode: %s, speed: %ld MHz)\r\n", ESP.getFlashChipSize() / (1024 * 1024), getFlashModeStr(), ESP.getFlashChipSpeed() / (1024 * 1024));
-    printf("PSRAM size: %ld MB\r\n", ESP.getPsramSize() / (1024 * 1024));
+    printf("Flash size: %lu MB (mode: %s, speed: %lu MHz)\r\n", ESP.getFlashChipSize() / (1024 * 1024), getFlashModeStr(), ESP.getFlashChipSpeed() / (1024 * 1024));
+    printf("PSRAM size: %lu KB\r\n", ESP.getPsramSize() / 1024);
+    printf("HIMEM size: %lu KB\r\n", ESP.getPsramHiMemSize() / 1024);
+    printf("HIMEM free: %lu KB\r\n", ESP.getPsramHiMemFree() / 1024);
+    printf("HIMEM reserved: %lu KB\r\n", ESP.getPsramHiMemReserved() / 1024);
+
+    printf("\r\n");
+    printf("Partition Info\r\n\r\n%s\r\n", ESP.getPartitionInfo().c_str());
+
 
 #ifndef CONFIG_APP_REPRODUCIBLE_BUILD
     printf("Compilation datetime: " __DATE__ " " __TIME__ "\r\n");
@@ -149,9 +156,14 @@ static int meminfo(int argc, char **argv)
     printf("Overall Free Memory: %lu KB\r\n\r\n", total_free);
 
     total = ESP.getPsramSize() / 1024;
-    free = ESP.getFreePsram() / 1024;
+    free = ESP.getPsramFree() / 1024;
     used = total - free;    
     printf("PSRAM: %lu KB free, %lu KB used, (%lu KB total)\r\n", free, used, total);
+
+    total = ESP.getPsramHiMemSize() / 1024;
+    free = ESP.getPsramHiMemFree() / 1024;
+    used = total - free;    
+    printf("HIMEM: %lu KB free, %lu KB used, (%lu KB total)\r\n", free, used, total);
     return EXIT_SUCCESS;
 }
 

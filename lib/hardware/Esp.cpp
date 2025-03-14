@@ -28,6 +28,8 @@
 #include "driver/temperature_sensor.h"
 
 #include <memory>
+#include <sstream>
+#include <iomanip>
 
 #include "esp_sleep.h"
 #include "spi_flash_mmap.h"
@@ -37,10 +39,17 @@ extern "C" {
 }
 // #include <MD5Builder.h>
 
-#include "esp_psram.h"
+#ifdef BOARD_HAS_PSRAM
+#include <esp_psram.h>
+#include <esp32/himem.h>
+#endif
+
 #include "esp_heap_caps.h"
 #include "esp_chip_info.h"
+#include "esp_partition.h"
 #include "esp_flash.h"
+#include "esp_vfs.h"
+#include "vfs/private_include/esp_vfs_private.h"
 #include "esp_mac.h"
 #include "esp_system.h"
 #include "soc/spi_reg.h"
@@ -130,6 +139,38 @@ unsigned long long operator"" _GB(unsigned long long x) {
     return x * 1024 * 1024 * 1024;
 }
 
+
+// Get the string name of type enum values used in this example
+static const char* get_type_str(esp_partition_type_t type)
+{
+    switch(type) {
+        case ESP_PARTITION_TYPE_APP:
+            return "app";
+        case ESP_PARTITION_TYPE_DATA:
+            return "data";
+        default:
+            return "???";
+    }
+}
+
+// Get the string name of subtype enum values used in this example
+static const char* get_subtype_str(esp_partition_subtype_t subtype)
+{
+    switch(subtype) {
+        case ESP_PARTITION_SUBTYPE_DATA_NVS:
+            return "nvs";
+        case ESP_PARTITION_SUBTYPE_DATA_PHY:
+            return "phy";
+        case ESP_PARTITION_SUBTYPE_APP_FACTORY:
+            return "factory";
+        case ESP_PARTITION_SUBTYPE_DATA_FAT:
+            return "fat";
+        default:
+            return "???";
+    }
+}
+
+
 void EspClass::deepSleep(uint64_t time_us) { esp_deep_sleep(time_us); }
 
 void EspClass::restart(void) { esp_restart(); }
@@ -151,7 +192,7 @@ uint32_t EspClass::getMaxAllocHeap(void) {
 }
 
 uint32_t EspClass::getPsramSize(void) {
-#ifdef PSRAM_SIZE
+#ifdef BOARD_HAS_PSRAM
     if (esp_psram_is_initialized()) {
         return heap_caps_get_total_size(MALLOC_CAP_SPIRAM);
     }
@@ -159,8 +200,8 @@ uint32_t EspClass::getPsramSize(void) {
     return 0;
 }
 
-uint32_t EspClass::getFreePsram(void) {
-#ifdef PSRAM_SIZE
+uint32_t EspClass::getPsramFree(void) {
+#ifdef BOARD_HAS_PSRAM
     if (esp_psram_is_initialized()) {
         return heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
     }
@@ -168,8 +209,8 @@ uint32_t EspClass::getFreePsram(void) {
     return 0;
 }
 
-uint32_t EspClass::getMinFreePsram(void) {
-#ifdef PSRAM_SIZE
+uint32_t EspClass::getPsramMinFree(void) {
+#ifdef BOARD_HAS_PSRAM
     if (esp_psram_is_initialized()) {
         return heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM);
     }
@@ -177,10 +218,39 @@ uint32_t EspClass::getMinFreePsram(void) {
     return 0;
 }
 
-uint32_t EspClass::getMaxAllocPsram(void) {
-#ifdef PSRAM_SIZE
+uint32_t EspClass::getPsramMaxAlloc(void) {
+#ifdef BOARD_HAS_PSRAM
     if (esp_psram_is_initialized()) {
         return heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM);
+    }
+#endif
+    return 0;
+}
+
+
+
+uint32_t EspClass::getPsramHiMemSize(void) {
+#ifdef BOARD_HAS_PSRAM
+    if (esp_psram_is_initialized()) {
+        return esp_himem_get_phys_size();
+    }
+#endif
+    return 0;
+}
+
+uint32_t EspClass::getPsramHiMemFree(void) {
+#ifdef BOARD_HAS_PSRAM
+    if (esp_psram_is_initialized()) {
+        return esp_himem_get_free_size();
+    }
+#endif
+    return 0;
+}
+
+uint32_t EspClass::getPsramHiMemReserved(void) {
+#ifdef BOARD_HAS_PSRAM
+    if (esp_psram_is_initialized()) {
+        return esp_himem_reserved_area_size();
     }
 #endif
     return 0;
@@ -477,6 +547,73 @@ bool EspClass::partitionRead(const esp_partition_t *partition, uint32_t offset,
                              uint32_t *data, size_t size) {
     return esp_partition_read(partition, offset, data, size) == ESP_OK;
 }
+
+std::string EspClass::getPartitionInfo() 
+{
+    std::stringstream partitions;
+    partitions << "Flash Partitions:\n";
+    partitions << "label\t\ttype\tsubtype\taddress  \tsize\n";
+    std::string label;
+
+    esp_partition_iterator_t it;
+    it = esp_partition_find(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_ANY, NULL);
+
+    // Loop through all matching partitions, in this case, all with the type 'data' until partition with desired
+    // label is found. Verify if its the same instance as the one found before.
+    for (; it != NULL; it = esp_partition_next(it)) {
+        const esp_partition_t *part = esp_partition_get(it);
+        label = part->label;
+        partitions << label << "\t";
+        if (label.size() < 8) 
+            partitions << "\t";
+        partitions << get_type_str(part->type) << "\t";
+        partitions << get_subtype_str(part->subtype) << "\t";
+        partitions << "0x" << std::uppercase << std::hex << part->address << "  \t";
+        partitions << part->size << "\n";
+    }
+    // Release the partition iterator to release memory allocated for it
+    esp_partition_iterator_release(it);
+
+    it = esp_partition_find(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, NULL);
+
+    // Loop through all matching partitions, in this case, all with the type 'data' until partition with desired
+    // label is found. Verify if its the same instance as the one found before.
+    for (; it != NULL; it = esp_partition_next(it)) {
+        const esp_partition_t *part = esp_partition_get(it);
+        label = part->label;
+        partitions << label << "\t";
+        if (label.size() < 8) 
+            partitions << "\t";
+        partitions << get_type_str(part->type) << "\t";
+        partitions << get_subtype_str(part->subtype) << "\t";
+        partitions << "0x" << std::uppercase << std::hex << part->address << "  \t";
+        partitions << part->size << "\n";
+    }
+
+    // Release the partition iterator to release memory allocated for it
+    esp_partition_iterator_release(it);
+
+    // partitions << "\nVFS Mounts:\npath\tindex\tfd\n";
+    // const vfs_entry_t* vfs;
+    // _lock_acquire(&s_fd_table_lock);
+    // for (int index = 0; index < MAX_FDS; index++) {
+    //     if (s_fd_table[index].vfs_index != -1) {
+    //         vfs = s_vfs[s_fd_table[index].vfs_index];
+    //         if (strcmp(vfs->path_prefix, "")) {
+    //             partitions << vfs->path_prefix << "\t";
+    //         }
+    //         else
+    //             partitions << "\t";
+
+    //         partitions << "0x" << std::hex << index << "\t";
+    //         partitions << "0x" << std::hex << s_fd_table[index].local_fd << "\n";
+    //     }
+    // }
+    // _lock_release(&s_fd_table_lock);
+
+    return partitions.str();
+}
+
 
 uint64_t EspClass::getEfuseMac(void) {
     uint64_t _chipmacid = 0LL;

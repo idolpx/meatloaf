@@ -17,7 +17,7 @@
 
 #include <esp_system.h>
 #include <nvs_flash.h>
-#ifdef PSRAM_SIZE
+#ifdef BOARD_HAS_PSRAM
 #ifdef CONFIG_IDF_TARGET_ESP32S3
 #include <esp_psram.h>
 #else
@@ -114,7 +114,7 @@ void main_setup()
 
     printf( "Starting heap: %lu\r\n", fnSystem.get_free_heap_size() );
 
-#ifdef PSRAM_SIZE
+#ifdef BOARD_HAS_PSRAM
     printf( "PSRAM Size %lu\r\n", fnSystem.get_psram_size() );
 // #ifndef CONFIG_IDF_TARGET_ESP32S3
 //     printf( "himem phys %u\r\n", esp_himem_get_phys_size() );

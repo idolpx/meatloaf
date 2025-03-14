@@ -26,7 +26,7 @@
 #include "dirent.h"
 #include "FS.h"
 
-#ifdef PSRAM_SIZE
+#ifdef BOARD_HAS_PSRAM
 #ifdef CONFIG_IDF_TARGET_ESP32S3
 #include <esp_psram.h>
 #else
