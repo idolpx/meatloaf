@@ -30,10 +30,16 @@ protected:
 public:
     iecMeatloaf(uint8_t id) : iecDrive(id) {};
 
+// Default VDRIVE state
+#ifdef USE_VDRIVE
+    bool use_vdrive = true;
+#else
+    bool use_vdrive = false;
+#endif
+
     void setup(systemBus *bus) override {
         iecFuji::setup(bus);
 
-        //setDeviceNumber(30); 
         if (bus->attachDevice(this))
             Debug_printf("Attached Meatloaf device #%d\r\n", id());
     }

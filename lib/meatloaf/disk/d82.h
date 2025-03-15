@@ -132,7 +132,9 @@ public:
 class D82MFileSystem: public MFileSystem
 {
 public:
-    D82MFileSystem(): MFileSystem("d82") {};
+    D82MFileSystem(): MFileSystem("d82") {
+        vdrive_compatible = true;
+    };
 
     bool handles(std::string fileName) override {
         return byExtension(".d82", fileName);

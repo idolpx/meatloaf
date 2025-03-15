@@ -34,9 +34,9 @@
 #include "../meatloaf/wrappers/directory_stream.h"
 #include "utils.h"
 
-#ifdef USE_VDRIVE
+//#ifdef USE_VDRIVE
 #include "../vdrive/VDriveClass.h"
-#endif
+//#endif
 
 //#include "dos/_dos.h"
 //#include "dos/cbmdos.2.5.h"
@@ -297,9 +297,9 @@ class iecDrive : public IECFileDevice
   std::unique_ptr<MFile> m_cwd;   // current working directory
   iecChannelHandler *m_channels[16];
   uint8_t m_statusCode, m_statusTrk, m_numOpenChannels;
-#ifdef USE_VDRIVE
+//#ifdef USE_VDRIVE
   VDrive   *m_vdrive;
-#endif
+//#endif
   uint32_t  m_byteCount;
   uint64_t  m_timeStart;
 

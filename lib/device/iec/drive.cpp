@@ -30,6 +30,7 @@
 
 #include "make_unique.h"
 
+#include "meatloaf.h"
 #include "fuji.h"
 #include "fnFsSD.h"
 #include "led.h"
@@ -555,9 +556,8 @@ void iecDrive::begin()
 
   m_memory.setROM("dos1541"); // Default to 1541 ROM
 
-#ifdef USE_VDRIVE
   m_vdrive = NULL;
-#endif
+
   for(int i=0; i<16; i++) 
     m_channels[i] = nullptr;
 }
@@ -566,227 +566,236 @@ bool iecDrive::open(uint8_t channel, const char *cname)
 {
   Debug_printv("iecDrive::open(#%d, %d, \"%s\")", m_devnr, channel, cname);
   
-#ifdef USE_VDRIVE
-  if( m_vdrive!=nullptr && (strncmp(cname, "//", 2)==0 || strncmp(cname, "ML:", 3)==0 || strstr(cname, "://")!=NULL) )
+//#ifdef USE_VDRIVE
+    if( Meatloaf.use_vdrive )
     {
-      Debug_printv("Closing VDrive");
-      delete m_vdrive;
-      m_vdrive = NULL;
-    }
-
-  if( m_vdrive!=nullptr )
-    {
-      bool ok = m_vdrive->openFile(channel, cname);
-      Debug_printv("File opened on VDrive");
-      setStatusCode(ok ? ST_OK : ST_VDRIVE);
-      m_timeStart = esp_timer_get_time();
-      m_byteCount = 0;
-      return ok;
-    }
-  else
-#endif
-    {
-  // determine file name
-  std::string name;
-  std::vector<std::string> pt = util_tokenize(std::string(cname), ',');
-  if( pt.size()>0 ) name = pt[0];
-
-  // determine file mode (read/write)
-  bool overwrite = false;
-  std::ios_base::openmode mode = std::ios_base::in;
-  if( channel==1 ) mode = std::ios_base::out;
-  if( pt.size() >= 3 )
-    {
-      if( pt[2]=="R" )
-        mode = std::ios_base::in;
-      else if( pt[2]=="W" )
-        mode = std::ios_base::out;
-    }
-
-  if( mstr::startsWith(name, "@") )
-    {
-      overwrite = true;
-      name = mstr::drop(name, 1);
-    }
-
-  if( mstr::startsWith(name, ":") )
-    {
-      overwrite = true;
-      name = mstr::drop(name, 1);
-    }
-
-  if( mstr::startsWith(name, "0:") )
-    name = mstr::drop(name, 2);
-
-  if( mstr::startsWith(name, "CD") )
-    {
-      name = mstr::drop(name, 2);
-    }
-
-  // file name officially ends at first "shifted space" (0xA0) character
-  size_t i = name.find('\xa0');
-  if( i != std::string::npos ) name = name.substr(0, i);
-
-  Debug_printv("opening channel[%d] m_cwd[%s] name[%s] mode[%s]", channel, m_cwd->url.c_str(), name.c_str(), 
-               mode==std::ios_base::out ? (overwrite ? "replace" : "write") : "read");
-
-  if( name.length()==0 )
-    {
-      Debug_printv("Error: empty file name");
-      setStatusCode(ST_SYNTAX_ERROR_33);
-    }
-  else
-    {
-      if( m_channels[channel] )
+        if (m_vdrive!=nullptr && (strncmp(cname, "//", 2)==0 || strncmp(cname, "ML:", 3)==0 || strstr(cname, "://")!=NULL) )
         {
-          Debug_printv("channel[%d] is already in use, closing it before re-opening", channel);
-          close(channel);
+            Debug_printv("Closing VDrive");
+            delete m_vdrive;
+            m_vdrive = NULL;
+        }
+        if( m_vdrive!=nullptr )
+        {
+            bool ok = m_vdrive->openFile(channel, cname);
+            Debug_printv("File opened on VDrive");
+            setStatusCode(ok ? ST_OK : ST_VDRIVE);
+            m_timeStart = esp_timer_get_time();
+            m_byteCount = 0;
+            return ok;
+        }
+    }
+
+//#endif
+    {
+        // TODO: Use CBM DOS command parser here
+        // determine file name
+        std::string name;
+        std::vector<std::string> pt = util_tokenize(std::string(cname), ',');
+        if( pt.size()>0 ) name = pt[0];
+
+        // determine file mode (read/write)
+        bool overwrite = false;
+        std::ios_base::openmode mode = std::ios_base::in;
+        if( channel==1 ) mode = std::ios_base::out;
+        if( pt.size() >= 3 )
+        {
+            if( pt[2]=="R" )
+                mode = std::ios_base::in;
+            else if( pt[2]=="W" )
+                mode = std::ios_base::out;
         }
 
-      if ( name[0] == '$' ) 
-        name.clear();
-
-      // get file
-      MFile *f = m_cwd->cd( mstr::toUTF8( name ) );
-      Debug_printv("isdir[%d] url[%s]", f->isDirectory(), f->url.c_str());
-
-      if( f == nullptr ) // || f->url.empty() )
+        if( mstr::startsWith(name, "@") )
         {
-          Debug_printv("Error: could not find file system for URL [%s]", name.c_str());
-          setStatusCode(ST_FILE_NOT_FOUND);
-          if( f!=nullptr ) delete f;
-          f = nullptr;
-        }
-      else if( f->isDirectory() )
-        {
-          if( mode == std::ios_base::in )
-            {
-              // reading directory
-              bool isProperDir = false;
-              MFile *entry = f->getNextFileInDir();
-              if( entry==nullptr )
-                {
-                  // if we can't open the file stream then assume this is an empty directory
-                  MStream *s = f->getSourceStream(mode);
-                  //if( s==nullptr || !s->isOpen() ) isProperDir = true;
-                  if( s!=nullptr)
-                  {
-                    if( !s->isOpen() )
-                      isProperDir = true;
-                  }
-                  delete s;
-                }
-              else
-                {
-                  delete entry;
-                  isProperDir = true;
-                }
-
-              if( isProperDir )
-                {
-                  // regular directory
-                  f->rewindDirectory();
-                  m_channels[channel] = new iecChannelHandlerDir(this, f);
-                  m_numOpenChannels++;
-                  m_cwd.reset(MFSOwner::File(f->url));
-                  Debug_printv("Reading directory [%s]", f->url.c_str());
-                  f = nullptr; // f will be deleted in iecChannelHandlerDir destructor
-                  setStatusCode(ST_OK);
-                }
-              else
-                {
-                  // can't read file entries => treat directory as file
-                  m_cwd.reset(MFSOwner::File(f->url));
-                  Debug_printv("Treating directory as file [%s]", f->url.c_str());
-                }
-            }
-          else
-            {
-              // cannot write to directory
-              Debug_printv("Error: attempt to write to directory [%s]", f->url.c_str());
-              setStatusCode(ST_WRITE_PROTECT);
-              delete f;
-              f = nullptr;
-            }
+            overwrite = true;
+            name = mstr::drop(name, 1);
         }
 
-      if( f != nullptr )
+        if( mstr::startsWith(name, ":") )
         {
-          // opening a file
-          if( (mode == std::ios_base::in) && !f->exists() )
+            overwrite = true;
+            name = mstr::drop(name, 1);
+        }
+
+        if( mstr::startsWith(name, "0:") )
+            name = mstr::drop(name, 2);
+
+        if( mstr::startsWith(name, "CD") )
+        {
+            name = mstr::drop(name, 2);
+        }
+
+        // file name officially ends at first "shifted space" (0xA0) character
+        size_t i = name.find('\xa0');
+        if( i != std::string::npos ) name = name.substr(0, i);
+
+        Debug_printv("opening channel[%d] m_cwd[%s] name[%s] mode[%s]", channel, m_cwd->url.c_str(), name.c_str(), 
+                    mode==std::ios_base::out ? (overwrite ? "replace" : "write") : "read");
+
+        if( name.length()==0 )
             {
-              Debug_printv("Error: file doesn't exist [%s]", f->url.c_str());
-              setStatusCode(ST_FILE_NOT_FOUND);
+            Debug_printv("Error: empty file name");
+            setStatusCode(ST_SYNTAX_ERROR_33);
             }
-          else if( (mode == std::ios_base::out) && f->media_image.size()>0 )
+        else
             {
-              Debug_printv("Error: writing to files on disk media not supported [%s]", f->url.c_str());
-              setStatusCode(ST_WRITE_PROTECT);
-            }
-          else if( (mode == std::ios_base::out) && f->exists() && !overwrite )
-            {
-              Debug_printv("Error: file exists [%s]", f->url.c_str());
-              setStatusCode(ST_FILE_EXISTS);
-            }
-#ifdef USE_VDRIVE
-              else if( !f->isDirectory() && (m_vdrive=VDrive::create(m_devnr-8, f->url.c_str()))!=nullptr )
+            if( m_channels[channel] )
                 {
-                  Debug_printv("Created VDrive for URL %s. Loading directory.", f->url.c_str());
-                  delete f;
-                  return m_vdrive->openFile(channel, "$");
+                Debug_printv("channel[%d] is already in use, closing it before re-opening", channel);
+                close(channel);
                 }
-#endif
-          else
-            {
-              MStream *new_stream = f->getSourceStream(mode);
-              
-              if( new_stream==nullptr )
+
+            if ( name[0] == '$' ) 
+                name.clear();
+
+            // get file
+            MFile *f = m_cwd->cd( mstr::toUTF8( name ) );
+            Debug_printv("isdir[%d] url[%s]", f->isDirectory(), f->url.c_str());
+
+            if( f == nullptr ) // || f->url.empty() )
                 {
-                  Debug_printv("Error: could not get stream for file [%s]", f->url.c_str());
-                  setStatusCode(ST_DRIVE_NOT_READY);
+                Debug_printv("Error: could not find file system for URL [%s]", name.c_str());
+                setStatusCode(ST_FILE_NOT_FOUND);
+                if( f!=nullptr ) delete f;
+                f = nullptr;
                 }
-              else if( (mode == std::ios_base::in) && new_stream->size()==0 && !f->isDirectory() )
+            else if( f->isDirectory() )
                 {
-                  Debug_printv("Error: file length is zero [%s]", f->url.c_str());
-                  delete new_stream;
-                  setStatusCode(ST_FILE_NOT_FOUND);
-                }
-              else if( !new_stream->isOpen() )
-                {
-                  Debug_printv("Error: could not open file stream [%s]", f->url.c_str());
-                  delete new_stream;
-                  setStatusCode(ST_DRIVE_NOT_READY);
-                }
-              else
-                {
-                  Debug_printv("Stream created for file [%s]", f->url.c_str());
-                  // new_stream will be deleted in iecChannelHandlerFile destructor
-                  m_channels[channel] = new iecChannelHandlerFile(this, new_stream, f->isDirectory() ? 0x0801 : -1);
-                  m_numOpenChannels++;
-                  setStatusCode(ST_OK);
-          
-                  if( new_stream->has_subdirs )
+                if( mode == std::ios_base::in )
                     {
-                      // Filesystem supports sub directories => set m_cwd to parent directory of file
-                      Debug_printv("Subdir Change Directory Here! stream[%s] > base[%s]", f->url.c_str(), f->base().c_str());
-                      m_cwd.reset(MFSOwner::File(f->base()));
+                    // reading directory
+                    bool isProperDir = false;
+                    MFile *entry = f->getNextFileInDir();
+                    if( entry==nullptr )
+                        {
+                        // if we can't open the file stream then assume this is an empty directory
+                        MStream *s = f->getSourceStream(mode);
+                        //if( s==nullptr || !s->isOpen() ) isProperDir = true;
+                        if( s!=nullptr)
+                        {
+                            if( !s->isOpen() )
+                            isProperDir = true;
+                        }
+                        delete s;
+                        }
+                    else
+                        {
+                        delete entry;
+                        isProperDir = true;
+                        }
+
+                    if( isProperDir )
+                        {
+                        // regular directory
+                        f->rewindDirectory();
+                        m_channels[channel] = new iecChannelHandlerDir(this, f);
+                        m_numOpenChannels++;
+                        m_cwd.reset(MFSOwner::File(f->url));
+                        Debug_printv("Reading directory [%s]", f->url.c_str());
+                        f = nullptr; // f will be deleted in iecChannelHandlerDir destructor
+                        setStatusCode(ST_OK);
+                        }
+                    else
+                        {
+                        // can't read file entries => treat directory as file
+                        m_cwd.reset(MFSOwner::File(f->url));
+                        Debug_printv("Treating directory as file [%s]", f->url.c_str());
+                        }
                     }
-                  else
+                else
                     {
-                      // Handles media files that may have '/' as part of the filename
-                      auto f = MFSOwner::File( new_stream->url );
-                      Debug_printv( "Change Directory Here! istream[%s] > base[%s]", new_stream->url.c_str(), f->sourceFile->url.c_str() );
-                      m_cwd.reset( f->sourceFile );
+                    // cannot write to directory
+                    Debug_printv("Error: attempt to write to directory [%s]", f->url.c_str());
+                    setStatusCode(ST_WRITE_PROTECT);
+                    delete f;
+                    f = nullptr;
                     }
                 }
 
-              if ( m_statusCode != ST_OK )
-                m_cwd.reset(MFSOwner::File(f->base()));
+            if( f != nullptr )
+                {
+                // opening a file
+                if( (mode == std::ios_base::in) && !f->exists() )
+                    {
+                    Debug_printv("Error: file doesn't exist [%s]", f->url.c_str());
+                    setStatusCode(ST_FILE_NOT_FOUND);
+                    }
+                else if( (mode == std::ios_base::out) && f->media_image.size()>0 )
+                    {
+                    Debug_printv("Error: writing to files on disk media not supported [%s]", f->url.c_str());
+                    setStatusCode(ST_WRITE_PROTECT);
+                    }
+                else if( (mode == std::ios_base::out) && f->exists() && !overwrite )
+                    {
+                    Debug_printv("Error: file exists [%s]", f->url.c_str());
+                    setStatusCode(ST_FILE_EXISTS);
+                    }
+//#ifdef USE_VDRIVE
+                else if( Meatloaf.use_vdrive ) 
+                    {
+                        if (  !f->isDirectory() && (m_vdrive=VDrive::create(m_devnr-8, f->url.c_str()))!=nullptr )
+                            {
+                                Debug_printv("Created VDrive for URL %s. Loading directory.", f->url.c_str());
+                                delete f;
+                                return m_vdrive->openFile(channel, "$");
+                            }
+
+                        delete f;
+                        return m_channels[channel]!=NULL;
+                    }
+//#endif
+                else
+                    {
+                    MStream *new_stream = f->getSourceStream(mode);
+                    
+                    if( new_stream==nullptr )
+                        {
+                        Debug_printv("Error: could not get stream for file [%s]", f->url.c_str());
+                        setStatusCode(ST_DRIVE_NOT_READY);
+                        }
+                    else if( (mode == std::ios_base::in) && new_stream->size()==0 && !f->isDirectory() )
+                        {
+                        Debug_printv("Error: file length is zero [%s]", f->url.c_str());
+                        delete new_stream;
+                        setStatusCode(ST_FILE_NOT_FOUND);
+                        }
+                    else if( !new_stream->isOpen() )
+                        {
+                        Debug_printv("Error: could not open file stream [%s]", f->url.c_str());
+                        delete new_stream;
+                        setStatusCode(ST_DRIVE_NOT_READY);
+                        }
+                    else
+                        {
+                        Debug_printv("Stream created for file [%s]", f->url.c_str());
+                        // new_stream will be deleted in iecChannelHandlerFile destructor
+                        m_channels[channel] = new iecChannelHandlerFile(this, new_stream, f->isDirectory() ? 0x0801 : -1);
+                        m_numOpenChannels++;
+                        setStatusCode(ST_OK);
+                
+                        if( new_stream->has_subdirs )
+                            {
+                            // Filesystem supports sub directories => set m_cwd to parent directory of file
+                            Debug_printv("Subdir Change Directory Here! stream[%s] > base[%s]", f->url.c_str(), f->base().c_str());
+                            m_cwd.reset(MFSOwner::File(f->base()));
+                            }
+                        else
+                            {
+                            // Handles media files that may have '/' as part of the filename
+                            auto f = MFSOwner::File( new_stream->url );
+                            Debug_printv( "Change Directory Here! istream[%s] > base[%s]", new_stream->url.c_str(), f->sourceFile->url.c_str() );
+                            m_cwd.reset( f->sourceFile );
+                            }
+                        }
+
+                    if ( m_statusCode != ST_OK )
+                        m_cwd.reset(MFSOwner::File(f->base()));
+                    }
+                }
+            
+            delete f;
             }
-        }
-      
-      delete f;
-    }
 
   return m_channels[channel]!=NULL;
 }
@@ -797,8 +806,8 @@ void iecDrive::close(uint8_t channel)
 {
   Debug_printv("iecDrive::close(#%d, %d)", m_devnr, channel);
 
-#ifdef USE_VDRIVE
-  if( m_vdrive!=nullptr )
+//#ifdef USE_VDRIVE
+  if( Meatloaf.use_vdrive &&  m_vdrive!=nullptr )
     {
       double seconds = (esp_timer_get_time()-m_timeStart) / 1000000.0;
       m_vdrive->closeFile(channel);
@@ -807,7 +816,7 @@ void iecDrive::close(uint8_t channel)
       Debug_printv("Transferred %lu bytes in %0.2f seconds @ %0.2fcps", m_byteCount, seconds, cps);
     }
   else 
-#endif
+//#endif
   if( m_channels[channel] != nullptr )
     {
       delete m_channels[channel];
@@ -821,8 +830,8 @@ void iecDrive::close(uint8_t channel)
 
 uint8_t iecDrive::write(uint8_t channel, uint8_t *data, uint8_t dataLen, bool eoi)
 {
-#ifdef USE_VDRIVE
-  if( m_vdrive!=nullptr )
+//#ifdef USE_VDRIVE
+  if( Meatloaf.use_vdrive && m_vdrive!=nullptr )
     {
       size_t n = dataLen;
       if( !m_vdrive->write(channel, data, &n) )
@@ -834,7 +843,7 @@ uint8_t iecDrive::write(uint8_t channel, uint8_t *data, uint8_t dataLen, bool eo
       return n;
     }
   else
-#endif
+//#endif
     {
       iecChannelHandler *handler = m_channels[channel];
       if( handler==nullptr )
@@ -850,8 +859,8 @@ uint8_t iecDrive::write(uint8_t channel, uint8_t *data, uint8_t dataLen, bool eo
 
 uint8_t iecDrive::read(uint8_t channel, uint8_t *data, uint8_t maxDataLen, bool *eoi)
 { 
-#ifdef USE_VDRIVE
-  if( m_vdrive!=nullptr )
+//#ifdef USE_VDRIVE
+  if( Meatloaf.use_vdrive && m_vdrive!=nullptr )
     {
       size_t n = maxDataLen;
       if( !m_vdrive->read(channel, data, &n, eoi) )
@@ -863,7 +872,7 @@ uint8_t iecDrive::read(uint8_t channel, uint8_t *data, uint8_t maxDataLen, bool 
       return n;
     }
   else
-#endif
+//#endif
     { 
       iecChannelHandler *handler = m_channels[channel];
       if( handler==nullptr )
@@ -889,54 +898,63 @@ uint8_t iecDrive::read(uint8_t channel, uint8_t *data, uint8_t maxDataLen, bool 
 
 void iecDrive::execute(const char *cmd, uint8_t cmdLen)
 {
-  Debug_printv("iecDrive::execute(#%d, \"%s\", %d)", m_devnr, cmd, cmdLen);
+    Debug_printv("iecDrive::execute(#%d, \"%s\", %d)", m_devnr, cmd, cmdLen);
 
-  std::string command = std::string(cmd, cmdLen);
+    std::string command = std::string(cmd, cmdLen);
 
-  // set status code to OK, failing commands below will set it to the appropriate error code
-  setStatusCode(ST_OK);
+    // set status code to OK, failing commands below will set it to the appropriate error code
+    setStatusCode(ST_OK);
 
-#ifdef USE_VDRIVE
-  // check whether we are currently operating in "virtual drive" mode
-  if( m_vdrive!=nullptr )
+    // Activate/Deactivate VDrive mode
+    if( command=="VD+" || command=="VD-" )
     {
-      if( (command=="CD_" || command=="CD:_" || command=="CD.." || command=="CD:.." || command=="CD^" || command=="CD:^") || 
-          (mstr::startsWith(command, "CD:") && (mstr::contains(command, "ML:") || mstr::contains(command, "://"))) )
-        {
-          // exit out of virtual drive
-          Debug_printv("Closing VDrive");
-          delete m_vdrive;
-          m_vdrive = NULL;
+        Meatloaf.use_vdrive = (command[2]=='+');
+        printf("VDrive %sctivated!\r\n", Meatloaf.use_vdrive ? "A" : "Dea");
+        setStatusCode(ST_OK);
+        return;
+    }
 
-          // if we're just going up one directory then we're done, otherwise continue
-          if( command=="CD_" || command=="CD:_" || command=="CD.." || command=="CD:.." )
+//#ifdef USE_VDRIVE
+    // check whether we are currently operating in "virtual drive" mode
+    if( Meatloaf.use_vdrive && m_vdrive!=nullptr )
+    {
+        if( (command=="CD_" || command=="CD:_" || command=="CD.." || command=="CD:.." || command=="CD^" || command=="CD:^") || 
+            (mstr::startsWith(command, "CD:") && (mstr::contains(command, "ML:") || mstr::contains(command, "://"))) )
+        {
+            // exit out of virtual drive
+            Debug_printv("Closing VDrive");
+            delete m_vdrive;
+            m_vdrive = NULL;
+
+            // if we're just going up one directory then we're done, otherwise continue
+            if( command=="CD_" || command=="CD:_" || command=="CD.." || command=="CD:.." )
+                return;
+        }
+        else
+        {
+            // execute command within virtual drive
+            int ok = m_vdrive->execute(cmd, cmdLen);
+            if( ok==2 )
+                {
+                // this was a command that placed its response in the status buffer
+                uint8_t buf[IECFILEDEVICE_STATUS_BUFFER_SIZE];
+                size_t len = m_vdrive->getStatusBuffer(buf, IECFILEDEVICE_STATUS_BUFFER_SIZE);
+                IECFileDevice::setStatus((const char *) buf, len);
+                }
+            else if( !ok )
+                setStatusCode(ST_VDRIVE);
+
+            // when executing a "P" (position relative file) command we need
+            // to clear the read buffer of the channel for which this command
+            // is issued, otherwise remaining characters in the buffer will be
+            // prefixed to the data from the new record
+            if( ok && cmd[0]=='P' && cmdLen>=2 )
+                clearReadBuffer(command[1] & 0x0f);
+            
             return;
         }
-      else
-        {
-          // execute command within virtual drive
-          int ok = m_vdrive->execute(cmd, cmdLen);
-          if( ok==2 )
-            {
-              // this was a command that placed its response in the status buffer
-              uint8_t buf[IECFILEDEVICE_STATUS_BUFFER_SIZE];
-              size_t len = m_vdrive->getStatusBuffer(buf, IECFILEDEVICE_STATUS_BUFFER_SIZE);
-              IECFileDevice::setStatus((const char *) buf, len);
-            }
-          else if( !ok )
-            setStatusCode(ST_VDRIVE);
-
-          // when executing a "P" (position relative file) command we need
-          // to clear the read buffer of the channel for which this command
-          // is issued, otherwise remaining characters in the buffer will be
-          // prefixed to the data from the new record
-          if( ok && cmd[0]=='P' && cmdLen>=2 )
-            clearReadBuffer(command[1] & 0x0f);
-          
-          return;
-        }
     }
-#endif
+//#endif
   
   if( mstr::startsWith(command, "CD") )
     {
@@ -1088,53 +1106,59 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
         break;
         case 'N':
           {
-#ifdef USE_VDRIVE
-            string params = command.substr(colon_position+1);
-            size_t dot = params.find('.');
+//#ifdef USE_VDRIVE
+            if ( Meatloaf.use_vdrive )
+                {
+                string params = command.substr(colon_position+1);
+                size_t dot = params.find('.');
 
-            if( dot==string::npos )
-              {
-                // must have extension to determine image type
-                setStatusCode(ST_SYNTAX_ERROR_31);
-              }
-            else
-              {
-                string filename, diskname, ext;
-                size_t comma = params.find(',');
-                if( comma==string::npos )
-                  {
-                    filename = mstr::toUTF8(params);
-                    diskname = params.substr(0,dot);
-                  }
+                if( dot==string::npos )
+                {
+                    // must have extension to determine image type
+                    setStatusCode(ST_SYNTAX_ERROR_31);
+                }
                 else
-                  {
-                    filename = mstr::toUTF8(params.substr(0, comma));
-                    diskname = params.substr(comma+1);
-                  }
+                {
+                    string filename, diskname, ext;
+                    size_t comma = params.find(',');
+                    if( comma==string::npos )
+                    {
+                        filename = mstr::toUTF8(params);
+                        diskname = params.substr(0,dot);
+                    }
+                    else
+                    {
+                        filename = mstr::toUTF8(params.substr(0, comma));
+                        diskname = params.substr(comma+1);
+                    }
 
-                fnLedManager.set(eLed::LED_BUS, true);
-                MFile *f = m_cwd->cd(filename);
-                if( f->exists() )
-                  setStatusCode(ST_FILE_EXISTS);
-                else if( !f->isWritable )
-                  setStatusCode(ST_WRITE_PROTECT);
-                else if( !VDrive::createDiskImage(f->url.c_str(), NULL, diskname.c_str(), false) )
-                  setStatusCode(ST_WRITE_ERROR);
-                else
-                  setStatusCode(ST_OK);
-                fnLedManager.set(eLed::LED_BUS, false);
-              }
-#else
-            //New();
-            Debug_printv( "new (format)");
-            command = mstr::toUTF8(command.substr(colon_position + 1));
-            if (!m_cwd->format(command))
-              setStatusCode(ST_WRITE_ERROR);
+                    fnLedManager.set(eLed::LED_BUS, true);
+                    MFile *f = m_cwd->cd(filename);
+                    if( f->exists() )
+                    setStatusCode(ST_FILE_EXISTS);
+                    else if( !f->isWritable )
+                    setStatusCode(ST_WRITE_PROTECT);
+                    else if( !VDrive::createDiskImage(f->url.c_str(), NULL, diskname.c_str(), false) )
+                    setStatusCode(ST_WRITE_ERROR);
+                    else
+                    setStatusCode(ST_OK);
+                    fnLedManager.set(eLed::LED_BUS, false);
+                }
+            }
             else
-              setStatusCode(ST_OK);
+            {
+//#else
+                //New();
+                Debug_printv( "new (format)");
+                command = mstr::toUTF8(command.substr(colon_position + 1));
+                if (!m_cwd->format(command))
+                setStatusCode(ST_WRITE_ERROR);
+                else
+                setStatusCode(ST_OK);
 
-            return;
-#endif
+                return;
+            }
+//#endif
           }
         break;
         case 'R':
@@ -1430,11 +1454,12 @@ bool iecDrive::hasError()
 
 uint8_t iecDrive::getNumOpenChannels() 
 { 
-#ifdef USE_VDRIVE
-  return m_vdrive!=nullptr ? m_vdrive->getNumOpenChannels() : m_numOpenChannels;
-#else
-  return m_numOpenChannels;
-#endif
+//#ifdef USE_VDRIVE
+    if ( Meatloaf.use_vdrive )
+        return m_vdrive!=nullptr ? m_vdrive->getNumOpenChannels() : m_numOpenChannels;
+//#else
+    return m_numOpenChannels;
+//#endif
 }
 
 
@@ -1442,8 +1467,8 @@ void iecDrive::getStatus(char *buffer, uint8_t bufferSize)
 {
   Debug_printv("iecDrive::getStatus(#%d)", m_devnr);
 
-#ifdef USE_VDRIVE
-  if( m_statusCode==ST_VDRIVE && m_vdrive!=nullptr )
+//#ifdef USE_VDRIVE
+  if( Meatloaf.use_vdrive && m_statusCode==ST_VDRIVE && m_vdrive!=nullptr )
     {
       strncpy(buffer, m_vdrive->getStatusString(), bufferSize);
       buffer[bufferSize-1] = '\r';
@@ -1453,7 +1478,7 @@ void iecDrive::getStatus(char *buffer, uint8_t bufferSize)
       m_statusTrk  = 0;
       return;
     }
-#endif
+//#endif
 
   const char *msg = NULL;
   switch( m_statusCode )
@@ -1499,9 +1524,9 @@ void iecDrive::reset()
   m_numOpenChannels = 0;
   m_memory.reset();
 
-#ifdef USE_VDRIVE
+//#ifdef USE_VDRIVE
   if( m_vdrive!=nullptr ) m_vdrive->closeAllChannels();
-#endif
+//#endif
 
   IECFileDevice::reset();
 
@@ -1540,18 +1565,31 @@ void iecDrive::set_cwd(std::string path)
 
         Debug_printv("url[%s] isDirectory[%i] haveStream[%i]", n->url.c_str(), isDirectory, haveStream);
 
-#ifdef USE_VDRIVE
-        if( n->exists() && !isDirectory && haveStream &&
-            (m_vdrive=VDrive::create(m_devnr-8, n->url.c_str()))!=nullptr )
-          {
-            // we were able to creata a VDrive => this is a valid disk image
-            Debug_printv("Created VDrive for URL %s", n->url.c_str());
-            setStatusCode(ST_OK);
-            delete n;
-          }
-        else 
-#endif
-        if( n->exists() && (isDirectory || haveStream) )
+//#ifdef USE_VDRIVE
+        if( Meatloaf.use_vdrive )
+        {
+            if( n->exists() && !isDirectory && haveStream &&
+                (m_vdrive=VDrive::create(m_devnr-8, n->url.c_str()))!=nullptr )
+            {
+                // we were able to creata a VDrive => this is a valid disk image
+                Debug_printv("Created VDrive for URL %s", n->url.c_str());
+                setStatusCode(ST_OK);
+                delete n;
+            }
+            else if( n->exists() && (isDirectory || haveStream) )
+            {
+              m_cwd.reset( n );
+              setStatusCode(ST_OK);
+            }
+            else
+            {
+                Debug_printv("Could not create VDrive for URL %s", n->url.c_str());
+                setStatusCode(ST_FILE_NOT_FOUND);
+                delete n;
+            }
+            return;
+        }
+        else if( n->exists() && (isDirectory || haveStream) )
           {
             m_cwd.reset( n );
             setStatusCode(ST_OK);

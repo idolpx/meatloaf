@@ -307,7 +307,7 @@ uint32_t ArchiveMStream::write(const uint8_t *buf, uint32_t size) {
 bool ArchiveMStream::seek(uint32_t pos) {
     readArchiveData();
 
-    Debug_printv("pos[%lu]", pos);
+    //Debug_printv("pos[%lu]", pos);
 
     if (m_haveData > 0) {
         if (pos < _size) {
@@ -338,7 +338,7 @@ bool ArchiveMStream::seekEntry(std::string filename)
             //mstr::rtrimA0(entryFilename);
             //entryFilename = mstr::toUTF8(entryFilename);
 
-            Debug_printv("filename[%s] entry.filename[%s]", filename.c_str(), entryFilename.c_str());
+            //Debug_printv("filename[%s] entry.filename[%s]", filename.c_str(), entryFilename.c_str());
 
             if (filename == entryFilename) // Match exact
             {

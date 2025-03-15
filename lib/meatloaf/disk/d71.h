@@ -129,7 +129,9 @@ public:
 class D71MFileSystem: public MFileSystem
 {
 public:
-    D71MFileSystem(): MFileSystem("d71") {};
+    D71MFileSystem(): MFileSystem("d71") {
+        vdrive_compatible = true;
+    };
 
     bool handles(std::string fileName) override {
         return byExtension(".d71", fileName);

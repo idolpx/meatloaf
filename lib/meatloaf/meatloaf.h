@@ -279,6 +279,9 @@ class MFileSystem {
 public:
     MFileSystem(const char* symbol);
     virtual ~MFileSystem() = 0;
+
+    bool vdrive_compatible = false;
+
     virtual bool handles(std::string path) = 0;
     virtual MFile* getFile(std::string path) = 0;
 

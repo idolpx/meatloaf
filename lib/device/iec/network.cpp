@@ -106,11 +106,11 @@ void iecNetwork::iec_open()
                    [](unsigned char c) { return std::toupper(c); });
 
     // Instantiate protocol based on the scheme
-    Debug_printv("Creating protocol for schema %s", channel_data.urlParser->scheme.c_str());
+    Debug_printv("Creating protocol for schema [%s]", channel_data.urlParser->scheme.c_str());
     channel_data.protocol = std::move(NetworkProtocolFactory::createProtocol(channel_data.urlParser->scheme, channel_data));
 
     if (!channel_data.protocol) {
-        Debug_printf("Invalid protocol: %s", channel_data.urlParser->scheme.c_str());
+        Debug_printv("Invalid protocol: [%s]", channel_data.urlParser->scheme.c_str());
 
         iecStatus.error = NETWORK_ERROR_FILE_NOT_FOUND;
         iecStatus.msg = "file not found";
@@ -152,7 +152,7 @@ void iecNetwork::iec_open()
 
 void iecNetwork::iec_close()
 {
-    Debug_printf("iecNetwork::iec_close(), channel #%d", commanddata.channel);
+    Debug_printv("iecNetwork::iec_close(), channel #%d", commanddata.channel);
 
     int channel = commanddata.channel;
     auto& channel_data = network_data_map[channel];
@@ -275,7 +275,7 @@ void iecNetwork::query_json()
     char reply[80];
     string s;
 
-    Debug_printf("query_json(%s)", payload.c_str());
+    Debug_printv("query_json(%s)", payload.c_str());
 
     if (pt.size() < 2)
     {
@@ -292,7 +292,7 @@ void iecNetwork::query_json()
 
     s = pt.size() == 2 ? "" : pt[2];  // allow empty string if there aren't enough args
 
-    Debug_printf("Channel: %u", channel);
+    Debug_printv("Channel: %u", channel);
 
     channel_data.json->setReadQuery(s, 0);
 
@@ -315,7 +315,7 @@ void iecNetwork::query_json()
     iecStatus.channel = channel;
     iecStatus.connected = true;
     iecStatus.msg = string(reply);
-    Debug_printf("Query set to %s", s.c_str());
+    Debug_printv("Query set to %s", s.c_str());
 }
 
 void iecNetwork::parse_bite()

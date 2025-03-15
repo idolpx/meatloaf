@@ -158,7 +158,9 @@ public:
 class D90MFileSystem: public MFileSystem
 {
 public:
-    D90MFileSystem(): MFileSystem("d90") {};
+    D90MFileSystem(): MFileSystem("d90") {
+        vdrive_compatible = true;
+    };
 
     bool handles(std::string fileName) override {
         return byExtension(

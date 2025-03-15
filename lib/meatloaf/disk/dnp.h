@@ -98,7 +98,9 @@ public:
 class DNPMFileSystem: public MFileSystem
 {
 public:
-    DNPMFileSystem(): MFileSystem("dnp") {};
+    DNPMFileSystem(): MFileSystem("dnp") {
+        vdrive_compatible = true;
+    };
 
     bool handles(std::string fileName) override {
         return byExtension(".dnp", fileName);

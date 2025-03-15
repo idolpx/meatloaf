@@ -11,7 +11,6 @@
 
 #include "../include/global_defines.h"
 #include "../include/debug.h"
-//#include "exprtk.hpp"
 
 #include "fnFsSD.h"
 #include "fnWiFi.h"
@@ -28,6 +27,20 @@
 //#include "fnHttpClient.h"
 #include "fnSystem.h"
 #include "punycode.h"
+
+//#include "exprtk.hpp"
+//#include "tinyexpr.h"
+#include <iostream>
+
+// int test_tinyexpr()
+// {
+//     te_parser tep;
+//     const char *c = "sqrt(5^2+7^2+11^2+(8-2)^2)";
+//     double r = tep.evaluate(c);
+//     std::cout << "The expression:\n\t" <<
+//         c << "\nevaluates to:\n\t" << r << "\n";
+//     return EXIT_SUCCESS;
+// }
 
 //std::unique_ptr<MFile> m_mfile(MFSOwner::File(""));
 
@@ -826,6 +839,7 @@ void runTestsSuite() {
     //testStrings();
 
     //trig_function<double>();
+    //test_tinyexpr();
 
     Debug_println("*** All tests finished ***");
 }

@@ -488,7 +488,9 @@ public:
 class D64MFileSystem: public MFileSystem
 {
 public:
-    D64MFileSystem(): MFileSystem("d64") {};
+    D64MFileSystem(): MFileSystem("d64") {
+        vdrive_compatible = true;
+    };
 
     bool handles(std::string fileName) override {
         //printf("handles w dnp %s %d\r\n", fileName.rfind(".dnp"), fileName.length()-4);
