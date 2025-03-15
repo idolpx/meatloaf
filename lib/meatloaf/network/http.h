@@ -148,14 +148,13 @@ public:
     };
     HTTPMFile(std::string path): MFile(path) { 
         // Debug_printv("constructing http file from url [%s]", url.c_str());
+        m_rootfs = true;
     };
     HTTPMFile(std::string path, std::string filename): MFile(path) {};
     ~HTTPMFile() override {
         if(client != nullptr)
             delete client;
     }
-
-    const bool m_rootfs = true;
 
     MStream* getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override ; // has to return OPENED stream
     MStream* getDecodedStream(std::shared_ptr<MStream> src);

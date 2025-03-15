@@ -205,7 +205,7 @@ public:
         //Debug_printv("dtor path[%s]", path.c_str());
     };
 
-    const bool m_rootfs = false;
+    bool m_rootfs = false;
 
     bool isPETSCII = false;
     bool isWritable = false;

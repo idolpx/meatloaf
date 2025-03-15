@@ -233,9 +233,9 @@ public:
         //parseUrl(path);
         // Debug_printv("path[%s] size[%d]", path.c_str(), size);
         isPETSCII = true;
+        m_rootfs = true;
     };
 
-    const bool m_rootfs = true;
 
     MStream* getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override ; // has to return OPENED stream
     MStream* getDecodedStream(std::shared_ptr<MStream> src) { return src.get(); };

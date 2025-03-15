@@ -36,7 +36,6 @@
 
 class TNFSMFile: public MFile
 {
-friend class TNFSMStream;
 
 public:
     std::string basepath = "";
@@ -52,14 +51,13 @@ public:
         else
             m_isNull = false;
 
+        m_rootfs = true;
         //Debug_printv("basepath[%s] path[%s] valid[%d]", basepath.c_str(), this->path.c_str(), m_isNull);
     };
     ~TNFSMFile() {
         //printf("*** Destroying flashfile %s\r\n", url.c_str());
         closeDir();
     }
-
-    const bool m_rootfs = true;
 
     MStream* getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override ; // has to return OPENED stream
     MStream* getDecodedStream(std::shared_ptr<MStream> src);

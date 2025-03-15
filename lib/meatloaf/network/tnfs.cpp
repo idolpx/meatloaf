@@ -16,6 +16,8 @@
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
 #include "tnfs.h"
+
+#include "tnfslib.h"
 #include "tnfslibMountInfo.h"
 
 #include "meatloaf.h"
@@ -132,17 +134,21 @@ bool TNFSMFile::exists()
 
 
 bool TNFSMFile::remove() {
-    // musi obslugiwac usuwanie plikow i katalogow!
-    if(path.empty())
-        return false;
+    //if(path == nullptr)
+    //    return false;
 
-    int rc = ::remove( std::string(basepath + path).c_str() );
-    if (rc != 0) {
-        Debug_printv("remove: rc=%d path=`%s`\r\n", rc, path.c_str());
-        return false;
-    }
+    // // Figure out if this is a file or directory
+    // tnfsStat tstat;
+    // if(TNFS_RESULT_SUCCESS != tnfs_stat(&_mountinfo, &tstat, path))
+    //     return false;
 
-    return true;
+    // int result;
+    // if(tstat.isDir)
+    //     result = tnfs_rmdir(&_mountinfo, path);
+    // else
+    //     result = tnfs_unlink(&_mountinfo, path);
+
+    return true; //result == TNFS_RESULT_SUCCESS;
 }
 
 

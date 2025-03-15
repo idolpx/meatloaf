@@ -35,10 +35,8 @@
 
 class FlashMFile: public MFile
 {
-friend class FlashMStream;
 
 public:
-    const bool m_rootfs = true;
     std::string basepath = "";
     
     FlashMFile(std::string path): MFile(path) {
@@ -53,6 +51,7 @@ public:
         else
             m_isNull = false;
 
+        m_rootfs = true;
         isWritable = true;
         //Debug_printv("basepath[%s] path[%s] valid[%d]", basepath.c_str(), this->path.c_str(), m_isNull);
     };

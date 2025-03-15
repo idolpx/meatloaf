@@ -271,7 +271,8 @@ protected:
  ********************************************************/
 
 
-class TCPMFile: public MFile {
+class TCPMFile: public MFile 
+{
 
 public:
     TCPMFile() {
@@ -279,12 +280,11 @@ public:
     };
     TCPMFile(std::string path): MFile(path) { 
         Debug_printv("constructing tcp file from url [%s]", url.c_str());
+        m_rootfs = true;
      };
     TCPMFile(std::string path, std::string filename): MFile(path) {};
     ~TCPMFile() override {
     }
-
-    const bool m_rootfs = true;
 
     // We are overriding getSourceStream, because obviously - TCP scheme won't be wrapped in anything
     MStream* getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override {
