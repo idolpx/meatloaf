@@ -19,7 +19,14 @@
 #include "string_utils.h"
 
 char *canonicalize_file_name(const char *path);
-auto currentConsolePath = Meat::New<MFile>("/");
+MFile* currentPath = nullptr;
+
+MFile* getCurrentPath() {
+    if(currentPath == nullptr) {
+        currentPath = MFSOwner::File("/");
+    }
+    return currentPath;
+}
 
 int cat(int argc, char **argv)
 {
@@ -31,7 +38,7 @@ int cat(int argc, char **argv)
 
     for (int n = 1; n < argc; n++)
     {
-        std::unique_ptr<MFile> path(currentConsolePath->cd(argv[n]));
+        std::unique_ptr<MFile> path(getCurrentPath()->cd(argv[n]));
         Meat::iostream istream(path.get());
 
         if(istream.is_open()) {
@@ -55,7 +62,7 @@ int cat(int argc, char **argv)
 
 int pwd(int argc, char **argv)
 {
-    printf("%s\r\n", currentConsolePath->url.c_str());
+    printf("%s\r\n", getCurrentPath()->url.c_str());
     return EXIT_SUCCESS;
 }
 
@@ -77,10 +84,12 @@ int cd(int argc, char **argv)
         path = argv[1];
     }
 
-    std::unique_ptr<MFile> destPath(currentConsolePath->cd(argv[1]));
+    std::unique_ptr<MFile> destPath(getCurrentPath()->cd(argv[1]));
 
-    if(destPath->isDirectory()) {
-        currentConsolePath.reset(currentConsolePath->cd(argv[1]));
+    if(destPath->isDirectory()) {        
+        auto outgoingPath = getCurrentPath();
+        currentPath = outgoingPath->cd(argv[1]);
+        delete outgoingPath;
     } else {
         fprintf(stderr, "cd: not a directory: %s\r\n", path);
         return 1;
@@ -94,11 +103,11 @@ int ls(int argc, char **argv)
     MFile* listPath;
     if (argc == 1)
     {
-        listPath = MFSOwner::File(currentConsolePath->url);
+        listPath = MFSOwner::File(getCurrentPath()->url);
     }
     else if (argc == 2)
     {
-        listPath = currentConsolePath->cd(argv[1]);
+        listPath = getCurrentPath()->cd(argv[1]);
     }
     else
     {
@@ -405,6 +414,7 @@ int wget(int argc, char **argv)
         }
         fclose(file);
         fprintf(stdout, "\n");
+        delete f;
     }
 
 #ifdef ENABLE_DISPLAY
