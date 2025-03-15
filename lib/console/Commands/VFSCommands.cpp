@@ -19,6 +19,14 @@
 #include "string_utils.h"
 
 char *canonicalize_file_name(const char *path);
+MFile* currentPath = nullptr;
+
+MFile* getCurrentPath() {
+    if(currentPath == nullptr) {
+        currentPath = MFSOwner::File("/");
+    }
+    return currentPath;
+}
 
 int cat(int argc, char **argv)
 {
@@ -30,22 +38,23 @@ int cat(int argc, char **argv)
 
     for (int n = 1; n < argc; n++)
     {
-        char filename[PATH_MAX];
-        // We have manually do resolving of . and .., as VFS does not do it
-        ESP32Console::console_realpath(argv[n], filename);
+        std::unique_ptr<MFile> path(getCurrentPath()->cd(argv[n]));
+        Meat::iostream istream(path.get());
 
-        FILE *file = fopen(filename, "r");
-        if (file == nullptr)
-        {
-            fprintf(stderr, "%s %s : %s\r\n", argv[0], filename,
-                    strerror(errno));
-            return errno;
+        if(istream.is_open()) {
+            if(istream.eof()) {
+                fprintf(stderr, "Stream returned EOF!");
+            } else {    
+                while(!istream.eof()) {
+                    char chr = istream.get();
+                    fprintf(stdout, "%c", chr);
+                }        
+            }
+            istream.close();
         }
-
-        int chr;
-        while ((chr = getc(file)) != EOF)
-            fprintf(stdout, "%c", chr);
-        fclose(file);
+        else {
+            fprintf(stderr, "ERROR:%s could not be read!\r\n", path->url.c_str());
+        }
     }
 
     return EXIT_SUCCESS;
@@ -53,7 +62,7 @@ int cat(int argc, char **argv)
 
 int pwd(int argc, char **argv)
 {
-    printf("%s\r\n", ESP32Console::console_getpwd());
+    printf("%s\r\n", getCurrentPath()->url.c_str());
     return EXIT_SUCCESS;
 }
 
@@ -75,57 +84,30 @@ int cd(int argc, char **argv)
         path = argv[1];
     }
 
-    // Check if target path is a file
-    char resolved[PATH_MAX];
-    ESP32Console::console_realpath(path, resolved);
+    std::unique_ptr<MFile> destPath(getCurrentPath()->cd(argv[1]));
 
-    // Get file stats
-    struct stat st;
-    stat(resolved, &st);
-    //Debug_printv("path[%s] resolved[%s]", path, resolved);
-
-    // If we can open it, then we can not chdir into it.
-    //FILE *file = fopen(resolved, "r");
-    //if (file)
-    if(!S_ISDIR(st.st_mode))
-    {
-        //fclose(file);
+    if(destPath->isDirectory()) {        
+        auto outgoingPath = getCurrentPath();
+        currentPath = outgoingPath->cd(argv[1]);
+        delete outgoingPath;
+    } else {
         fprintf(stderr, "cd: not a directory: %s\r\n", path);
         return 1;
     }
-
-
-    // Check if the new PWD exists, and show a warning if not
-    //const char *pwd = ESP32Console::console_getpwd();
-    DIR *dir = opendir(resolved);
-    if (dir)
-    {
-        closedir(dir);
-
-        if (ESP32Console::console_chdir(path))
-        {
-            fprintf(stderr, "Error: %s\r\n", strerror(errno));
-            return 1;
-        }
-    }
-    // else if (ENOENT == errno)
-    // {
-    //     fprintf(stderr, "cd: no such file or directory: %s\r\n", path);
-    // }
 
     return EXIT_SUCCESS;
 }
 
 int ls(int argc, char **argv)
 {
-    char *inpath;
+    MFile* listPath;
     if (argc == 1)
     {
-        inpath = (char *)".";
+        listPath = MFSOwner::File(getCurrentPath()->url);
     }
     else if (argc == 2)
     {
-        inpath = argv[1];
+        listPath = getCurrentPath()->cd(argv[1]);
     }
     else
     {
@@ -133,35 +115,19 @@ int ls(int argc, char **argv)
         return 1;
     }
 
-    char path[PATH_MAX];
-    ESP32Console::console_realpath(inpath, path);
+    std::unique_ptr<MFile> destPath(listPath);
+    std::unique_ptr<MFile> entry(destPath->getNextFileInDir());
 
-    DIR *dir = opendir(path);
-    if (!dir)
-    {
-        fprintf(stderr, "Could not open filepath: %s\r\n", strerror(errno));
+    if(entry.get() == nullptr) {
+        fprintf(stderr, "Could not open directory: %s\r\n", strerror(errno));
         return 1;
     }
 
-    struct dirent *d;
-    struct stat st;
-
-    // Add "sd" if we are at the root
-    if ( mstr::equals(path, (char *)"/", false) )
-    {
-        printf("d %8u  sd\r\n", 0);
+    while(entry.get() != nullptr) {
+        printf("%c %8lu  %s\r\n", (entry->isDirectory()) ? 'd':'-', entry->size, entry->name.c_str());
+        entry.reset(destPath->getNextFileInDir());
     }
 
-    while ((d = readdir(dir)) != NULL)
-    {
-        std::string filename = path;
-        filename += "/";
-        filename += d->d_name;
-        stat(filename.c_str(), &st);
-        printf("%c %8lu  %s\r\n", (S_ISDIR(st.st_mode)) ? 'd':'-', st.st_size, d->d_name);
-    }
-
-    closedir(dir);
     return EXIT_SUCCESS;
 }
 
@@ -448,6 +414,7 @@ int wget(int argc, char **argv)
         }
         fclose(file);
         fprintf(stdout, "\n");
+        delete f;
     }
 
 #ifdef ENABLE_DISPLAY
