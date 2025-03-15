@@ -49,7 +49,7 @@ extern "C" {
 #include "esp_partition.h"
 #include "esp_flash.h"
 #include "esp_vfs.h"
-#include "vfs/private_include/esp_vfs_private.h"
+//#include "vfs/private_"
 #include "esp_mac.h"
 #include "esp_system.h"
 #include "soc/spi_reg.h"
