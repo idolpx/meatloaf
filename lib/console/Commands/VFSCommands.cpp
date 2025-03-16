@@ -8,25 +8,13 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/syslimits.h>
+#include <iostream>
 
 #include "../Console.h"
 #include "../Helpers/PWDHelpers.h"
 #include "../ute/ute.h"
 
-#include "device.h"
-#include "display.h"
-#include "meatloaf.h"
-#include "string_utils.h"
-
-char *canonicalize_file_name(const char *path);
-MFile* currentPath = nullptr;
-
-MFile* getCurrentPath() {
-    if(currentPath == nullptr) {
-        currentPath = MFSOwner::File("/");
-    }
-    return currentPath;
-}
+using namespace ESP32Console;
 
 int cat(int argc, char **argv)
 {
@@ -275,11 +263,10 @@ int rmdir(int argc, char **argv)
         return EXIT_SUCCESS;
     }
 
-    char filename[PATH_MAX];
-    ESP32Console::console_realpath(argv[1], filename);
+    std::unique_ptr<MFile> rd(getCurrentPath()->cd(argv[1]));
 
-    if(rmdir(filename)) {
-        fprintf(stderr, "Error deleting %s: %s\r\n", filename, strerror(errno));
+    if(rd->rmDir()) {
+        fprintf(stderr, "Error deleting %s: %s\r\n", rd->url.c_str(), strerror(errno));
     }
 
     return EXIT_SUCCESS;
@@ -293,11 +280,10 @@ int mkdir(int argc, char **argv)
         return EXIT_SUCCESS;
     }
 
-    char directory[PATH_MAX];
-    ESP32Console::console_realpath(argv[1], directory);
+    std::unique_ptr<MFile> md(getCurrentPath()->cd(argv[1]));
 
-    if(mkdir(directory, 0755)) {
-        fprintf(stderr, "Error creating %s: %s\r\n", directory, strerror(errno));
+    if(md->mkDir()) {
+        fprintf(stderr, "Error creating %s: %s\r\n", md->url.c_str(), strerror(errno));
     }
 
     return EXIT_SUCCESS;
@@ -330,23 +316,19 @@ int mount(int argc, char **argv)
 
     int did = atoi(argv[1]) - 8;
 
-    char filename[PATH_MAX];
-    if ( mstr::contains(argv[2], ":") )
+    std::string filename = argv[2];
+    if ( !mstr::contains(argv[2], ":") )
     {
-        strcpy(filename, argv[2]);
-    }
-    else
-    {
-        ESP32Console::console_realpath(argv[2], filename);
+        filename = "/" +getCurrentPath()->url + "/" + filename;
     }
 
-    Debug_printv("device id[%d] url[%s]", did, filename);
+    Debug_printv("device id[%d] url[%s]", did, filename.c_str());
 
     auto drive = Meatloaf.get_disks(did);
     if (drive != nullptr)
     {
         //drive->disk_dev.m_host->mount();
-        drive->disk_dev.mount(NULL, filename, 0);
+        drive->disk_dev.mount(NULL, filename.c_str(), 0);
     }
     else
     {

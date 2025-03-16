@@ -1,7 +1,17 @@
 #pragma once
 
+#include "device.h"
+#include "display.h"
+#include "meatloaf.h"
+#include "string_utils.h"
+
 namespace ESP32Console
 {
+
+    //char *canonicalize_file_name(const char *path);
+    extern MFile* currentPath;
+
+    MFile* getCurrentPath();
 
     /**
      * @brief Returns the current console process working dir

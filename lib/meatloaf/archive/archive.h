@@ -215,7 +215,9 @@ class ArchiveMFileSystem : public MFileSystem
                 ".iso",
                 ".lz4",
                 ".cpgz",
-                ".cpio"
+                ".cpio",
+                ".rp9",     // Cloanto RetroPlatform Archive (https://www.retroplatform.com/kb/15-122)
+                ".vms"      // Meatloaf Virtual Media Stack!
                 //".arc",  // Have to find a way to distinquish between PC/C64 ARC file
                 //".ark",  // Have to find a way to distinquish between PC/C64 ARK file
             },

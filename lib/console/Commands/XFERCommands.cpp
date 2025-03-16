@@ -19,7 +19,6 @@
 #include "../Console.h"
 #include "../Helpers/PWDHelpers.h"
 
-char *canonicalize_file_name(const char *path);
 
 std::string read_until(char delimiter)
 {

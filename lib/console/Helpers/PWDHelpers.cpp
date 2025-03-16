@@ -11,6 +11,15 @@ namespace ESP32Console
 {
     constexpr char *PWD_DEFAULT = (char*) "/";
 
+    MFile* currentPath = nullptr;
+
+    MFile* getCurrentPath() {
+        if(currentPath == nullptr) {
+            currentPath = MFSOwner::File("/");
+        }
+        return currentPath;
+    }
+
     const char *console_getpwd()
     {
         char *pwd = getenv("PWD");

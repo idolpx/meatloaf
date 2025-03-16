@@ -306,7 +306,7 @@ namespace ESP32Console
             std::string prompt = console.prompt_;
 
             // Insert current PWD into prompt if needed
-            mstr::replaceAll(prompt, "%pwd%", console_getpwd());
+            mstr::replaceAll(prompt, "%pwd%", getCurrentPath()->url);
 
             char *line = linenoise(prompt.c_str());
             if (line == NULL)
