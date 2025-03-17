@@ -226,6 +226,8 @@ void MFile::setupFields() {
     auto begin = paths.begin();
     auto end = paths.end();
 
+    MFileSystem * thisPathFactoringFS = MFSOwner::findParentFS(begin, end, pathIterator);
+
     _pathInStream = mstr::joinToString(&pathIterator, &end, "/");
     end = pathIterator;
     auto containerPath = mstr::joinToString(&begin, &pathIterator, "/");
