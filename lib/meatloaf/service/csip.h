@@ -57,6 +57,7 @@ public:
     }
 
     bool open() {
+        Debug_printv("csstreambuf: open");
         if(m_wifi.isOpen())
             return true;
 
@@ -87,7 +88,7 @@ public:
     }
 
     int underflow() override {
-        Debug_printv("In underflow");
+        //Debug_printv("In underflow");
         if (!m_wifi.isOpen()) {
             Debug_printv("In connection closed");
             close();
@@ -106,7 +107,7 @@ public:
                 wait+=100;
                 readCount = m_wifi.read((uint8_t*)gbuf, 512);
             } 
-            Debug_printv("read success: %d", readCount);
+            //Debug_printv("read success: %d", readCount);
             this->setg(gbuf, gbuf, gbuf + readCount);
         }
         else {
@@ -226,8 +227,13 @@ public:
 class CSIPMFile: public MFile {
 
 public:
-    CSIPMFile(std::string path, size_t size = 0): MFile(path), m_size(size) 
+    CSIPMFile(std::string path, size_t size = 0): MFile(path) 
     {
+        Debug_printv("path[%s] size[%d]", path.c_str(), size);
+        this->size = size;
+        if ( size )
+            isDir = false;
+
         media_blocks_free = 65535;
         //media_block_size = 1; // blocks are already calculated
         //parseUrl(path);
@@ -258,7 +264,6 @@ public:
 
 private:
     bool dirIsImage = false;
-    size_t m_size;
 };
 
 /********************************************************
@@ -309,11 +314,14 @@ public:
 
     static CSIPMSessionMgr session;
 
-    bool handles(std::string name) {
-        return name == "csip:";
+    bool handles(std::string name) 
+    {
+        return mstr::startsWith(name, "csip:", false);
     }
 
-    MFile* getFile(std::string path) override {
+    MFile* getFile(std::string path) override 
+    {
+        Debug_printv("path[%s]", path.c_str());
         return new CSIPMFile(path);
     }
 };
