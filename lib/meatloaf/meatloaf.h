@@ -187,6 +187,11 @@ private:
  ********************************************************/
 
 class MFile : public PeoplesUrlParser {
+private:
+    void setupFields();
+    MFile* _sourceFile = nullptr;
+    std::string _pathInStream;
+
 public:
     MFile() {}; // only for local FS!!!
     MFile(nullptr_t null) : m_isNull(true) {};
@@ -195,12 +200,12 @@ public:
     MFile(MFile* path, std::string name);
 
     virtual ~MFile() {
-        if(sourceFile != nullptr) {
+        if(_sourceFile != nullptr) {
         //     Debug_printv("WARNING: sourceFile null in '%s' destructor. This MFile was obviously not initialized properly!", url.c_str());
         // }
         // else {
             //Debug_printv("Deleting: [%s]", this->url.c_str());
-            delete sourceFile;
+            delete _sourceFile;
         }
         //Debug_printv("dtor path[%s]", path.c_str());
     };
@@ -257,8 +262,8 @@ public:
         return mstr::isText(extension);
     }
 
-    MFile* sourceFile = nullptr;
-    std::string pathInStream;
+    std::string pathInStream();
+    MFile* sourceFile();
 
     uint32_t size = 0;
     uint32_t _exists = true;
@@ -281,6 +286,7 @@ public:
     virtual ~MFileSystem() = 0;
 
     bool vdrive_compatible = false;
+    const char* symbol = nullptr;
 
     virtual bool handles(std::string path) = 0;
     virtual MFile* getFile(std::string path) = 0;
@@ -437,7 +443,6 @@ public:
     }
 
 protected:
-    const char* symbol = nullptr;
     bool _is_mounted = false;
 
     friend class MFSOwner;
