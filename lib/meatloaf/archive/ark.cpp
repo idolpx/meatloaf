@@ -158,8 +158,8 @@ bool ARKMStream::seekPath(std::string path)
 
 bool ARKMFile::isDirectory()
 {
-    // Debug_printv("pathInStream[%s]", pathInStream.c_str());
-    if (pathInStream == "")
+    // Debug_printv("pathInStream[%s]", pathInStream().c_str());
+    if (pathInStream() == "")
         return true;
     else
         return false;
@@ -168,8 +168,8 @@ bool ARKMFile::isDirectory()
 bool ARKMFile::rewindDirectory()
 {
     dirIsOpen = true;
-    Debug_printv("sourceFile->url[%s]", sourceFile->url.c_str());
-    auto image = ImageBroker::obtain<ARKMStream>(sourceFile->url);
+    Debug_printv("sourceFile()->url[%s]", sourceFile()->url.c_str());
+    auto image = ImageBroker::obtain<ARKMStream>(sourceFile()->url);
     if (image == nullptr)
     {
         Debug_printv("image pointer is null");
@@ -201,7 +201,7 @@ MFile *ARKMFile::getNextFileInDir()
         rewindDirectory();
 
     // Get entry pointed to by containerStream
-    auto image = ImageBroker::obtain<ARKMStream>(sourceFile->url);
+    auto image = ImageBroker::obtain<ARKMStream>(sourceFile()->url);
     if (image == nullptr)
         goto exit;
 
@@ -212,9 +212,9 @@ MFile *ARKMFile::getNextFileInDir()
         filename = filename.substr(0, i);
         // mstr::rtrimA0(filename);
         mstr::replaceAll(filename, "/", "\\");
-        //Debug_printv( "entry[%s]", (sourceFile->url + "/" + fileName).c_str() );
+        //Debug_printv( "entry[%s]", (sourceFile()->url + "/" + fileName).c_str() );
 
-        auto file = MFSOwner::File(sourceFile->url + "/" + filename);
+        auto file = MFSOwner::File(sourceFile()->url + "/" + filename);
         file->extension = image->decodeType(image->entry.file_type);
         //Debug_printv("entry[%s] ext[%s]", fileName.c_str(), file->extension.c_str());
 

@@ -338,7 +338,7 @@ bool ArchiveMStream::seekEntry(std::string filename)
             //mstr::rtrimA0(entryFilename);
             //entryFilename = mstr::toUTF8(entryFilename);
 
-            //Debug_printv("filename[%s] entry.filename[%s]", filename.c_str(), entryFilename.c_str());
+            Debug_printv("filename[%s] entry.filename[%s]", filename.c_str(), entryFilename.c_str());
 
             if (filename == entryFilename) // Match exact
             {
@@ -369,7 +369,7 @@ bool ArchiveMStream::seekEntry(std::string filename)
 
 bool ArchiveMStream::seekEntry( uint16_t index )
 {
-    //Debug_printv("entry_count[%d] entry_index[%d] index[%d]", entry_count, entry_index, index);
+    Debug_printv("entry_count[%d] entry_index[%d] index[%d]", entry_count, entry_index, index);
 
     if ( !m_archive->isOpen() )
         return false;
@@ -393,7 +393,7 @@ bool ArchiveMStream::seekEntry( uint16_t index )
 
     entry_index = index + 1;
 
-    //Debug_printv("entry_index[%d] filename[%s] size[%lu]", entry_index, entry.filename.c_str(), entry.size);
+    Debug_printv("entry_index[%d] filename[%s] size[%lu]", entry_index, entry.filename.c_str(), entry.size);
     return true;
 }
 
@@ -435,8 +435,8 @@ bool ArchiveMStream::seekPath(std::string path) {
 
 // archive file is always a directory
 bool ArchiveMFile::isDirectory() {
-    // Debug_printv("pathInStream[%s]", pathInStream.c_str());
-    if (pathInStream == "")
+    // Debug_printv("pathInStream[%s]", pathInStream().c_str());
+    if (pathInStream() == "")
         return true;
     else
         return false;
@@ -444,8 +444,8 @@ bool ArchiveMFile::isDirectory() {
 
 bool ArchiveMFile::rewindDirectory()
 {
-    Debug_printv("sourceFile->url[%s]", sourceFile->url.c_str());
-    auto image = ImageBroker::obtain<ArchiveMStream>(sourceFile->url);
+    Debug_printv("sourceFile()->url[%s]", sourceFile()->url.c_str());
+    auto image = ImageBroker::obtain<ArchiveMStream>(sourceFile()->url);
     if (image == nullptr)
         return false;
 
@@ -466,7 +466,7 @@ MFile *ArchiveMFile::getNextFileInDir()
         rewindDirectory();
 
     // Get entry pointed to by containerStream
-    auto image = ImageBroker::obtain<ArchiveMStream>(sourceFile->url);
+    auto image = ImageBroker::obtain<ArchiveMStream>(sourceFile()->url);
     if (image == nullptr)
         goto exit;
 
@@ -482,9 +482,9 @@ MFile *ArchiveMFile::getNextFileInDir()
         //filename = filename.substr(0, i);
         // mstr::rtrimA0(filename);
         //mstr::replaceAll(filename, "/", "\\");
-        //Debug_printv( "entry[%s]", (sourceFile->url + "/" + filename).c_str() );
+        //Debug_printv( "entry[%s]", (sourceFile()->url + "/" + filename).c_str() );
 
-        auto file = MFSOwner::File(sourceFile->url + "/" + filename);
+        auto file = MFSOwner::File(sourceFile()->url + "/" + filename);
         file->size = image->entry.size;
         Debug_printv("entry[%s] ext[%s] size[%lu]", file->name.c_str(), file->extension.c_str(), file->size);
 

@@ -177,8 +177,8 @@ bool LBRMStream::seekPath(std::string path)
 
 bool LBRMFile::isDirectory()
 {
-    // Debug_printv("pathInStream[%s]", pathInStream.c_str());
-    if (pathInStream == "")
+    // Debug_printv("pathInStream[%s]", pathInStream().c_str());
+    if (pathInStream() == "")
         return true;
     else
         return false;
@@ -187,8 +187,8 @@ bool LBRMFile::isDirectory()
 bool LBRMFile::rewindDirectory()
 {
     dirIsOpen = true;
-    Debug_printv("sourceFile->url[%s]", sourceFile->url.c_str());
-    auto image = ImageBroker::obtain<LBRMStream>(sourceFile->url);
+    Debug_printv("sourceFile()->url[%s]", sourceFile()->url.c_str());
+    auto image = ImageBroker::obtain<LBRMStream>(sourceFile()->url);
     if (image == nullptr)
     {
         Debug_printv("image pointer is null");
@@ -220,7 +220,7 @@ MFile *LBRMFile::getNextFileInDir()
         rewindDirectory();
 
     // Get entry pointed to by containerStream
-    auto image = ImageBroker::obtain<LBRMStream>(sourceFile->url);
+    auto image = ImageBroker::obtain<LBRMStream>(sourceFile()->url);
     if (image == nullptr)
         goto exit;
 
@@ -231,9 +231,9 @@ MFile *LBRMFile::getNextFileInDir()
         filename = filename.substr(0, i);
         // mstr::rtrimA0(filename);
         mstr::replaceAll(filename, "/", "\\");
-        //Debug_printv( "entry[%s]", (sourceFile->url + "/" + fileName).c_str() );
+        //Debug_printv( "entry[%s]", (sourceFile()->url + "/" + fileName).c_str() );
 
-        auto file = MFSOwner::File(sourceFile->url + "/" + filename);
+        auto file = MFSOwner::File(sourceFile()->url + "/" + filename);
         file->extension = image->entry.type;
         //Debug_printv("entry[%s] ext[%s]", fileName.c_str(), file->extension.c_str());
         

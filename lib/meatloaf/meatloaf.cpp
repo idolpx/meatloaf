@@ -640,7 +640,7 @@ MFile* MFile::cdLocalRoot(std::string plus)
 {
     Debug_printv("url[%s] path[%s] plus[%s]", url.c_str(), path.c_str(), plus.c_str());
 
-    if ( path.empty() || sourceFile == nullptr ) {
+    if ( path.empty() || sourceFile() == nullptr ) {
         // from here we can go only to flash root!
         return MFSOwner::File( "/" + plus, true );
     }

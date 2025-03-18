@@ -200,15 +200,15 @@ public:
 
         if ( newStream != nullptr )
         {
-            // Are we at the root of the pathInStream?
-            if ( newFile->pathInStream == "")
-            {
-                Debug_printv("DIRECTORY [%s]", url.c_str());
-            }
-            else
-            {
-                Debug_printv("SINGLE FILE [%s]", url.c_str());
-            }
+            // // Are we at the root of the pathInStream?
+            // if ( newFile->pathInStream() == "")
+            // {
+            //     Debug_printv("DIRECTORY [%s]", url.c_str());
+            // }
+            // else
+            // {
+            //     Debug_printv("SINGLE FILE [%s]", url.c_str());
+            // }
 
             image_repo.insert(std::make_pair(url, newStream));
             return newStream;

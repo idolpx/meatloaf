@@ -595,7 +595,7 @@ public:
         if ( newStream != nullptr )
         {
             // Are we at the root of the filesystem?
-            if ( newFile->pathInStream == "")
+            if ( newFile->pathInStream() == "")
             {
                 Debug_printv("ROOT FILESYSTEM... CACHING [%s]", url.c_str());
                 stream_repo.insert(std::make_pair(url, newStream));

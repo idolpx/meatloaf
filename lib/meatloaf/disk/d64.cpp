@@ -550,8 +550,8 @@ bool D64MStream::seekPath(std::string path)
     Debug_printv("header_info[%s] url[%s]", header_info.c_str(), url.c_str());
 
     // Set the stream file
-    sourceFile = MFSOwner::File(url);
-    D64MStream* image = (D64MStream*)sourceFile->getSourceStream(std::ios_base::in | std::ios_base::out | std::ios_base::trunc);
+    auto newFile = MFSOwner::File(url);
+    D64MStream* image = (D64MStream*)newFile->getSourceStream(std::ios_base::in | std::ios_base::out | std::ios_base::trunc);
     if (image == nullptr)
         return false;
 
@@ -577,14 +577,15 @@ bool D64MStream::seekPath(std::string path)
     uint8_t data = 0x00;
     image->write(&data, 1);
 
+    delete newFile;
     delete image;
     return true;
  }
 
 bool D64MFile::isDirectory()
 {
-    // Debug_printv("pathInStream[%s]", pathInStream.c_str());
-    if (pathInStream == "")
+    // Debug_printv("pathInStream[%s]", pathInStream().c_str());
+    if (pathInStream() == "")
         return true;
     else
         return false;
@@ -593,8 +594,8 @@ bool D64MFile::isDirectory()
 bool D64MFile::rewindDirectory()
 {
     dirIsOpen = true;
-    Debug_printv("sourceFile->url[%s]", sourceFile->url.c_str());
-    auto image = ImageBroker::obtain<D64MStream>(sourceFile->url);
+    Debug_printv("sourceFile()->url[%s]", sourceFile()->url.c_str());
+    auto image = ImageBroker::obtain<D64MStream>(sourceFile()->url);
     if (image == nullptr)
         return false;
 
@@ -624,7 +625,7 @@ MFile *D64MFile::getNextFileInDir()
         rewindDirectory();
 
     // Get entry pointed to by containerStream
-    auto image = ImageBroker::obtain<D64MStream>(sourceFile->url);
+    auto image = ImageBroker::obtain<D64MStream>(sourceFile()->url);
     if (image == nullptr)
         goto exit;
 
@@ -641,9 +642,9 @@ MFile *D64MFile::getNextFileInDir()
 
         // mstr::rtrimA0(filename);
         mstr::replaceAll(filename, "/", "\\");
-        // Debug_printv( "entry[%s]", (sourceFile->url + "/" + filename).c_str() );
+        // Debug_printv( "entry[%s]", (sourceFile()->url + "/" + filename).c_str() );
 
-        auto file = MFSOwner::File(sourceFile->url + "/" + filename);
+        auto file = MFSOwner::File(sourceFile()->url + "/" + filename);
         file->extension = image->decodeType(image->entry.file_type);
         file->size = UINT16_FROM_LE_UINT16(image->entry.blocks);
 
@@ -664,7 +665,7 @@ time_t D64MFile::getLastWrite()
 time_t D64MFile::getCreationTime()
 {
     tm *entry_time = 0;
-    auto stream = ImageBroker::obtain<D64MStream>(sourceFile->url);
+    auto stream = ImageBroker::obtain<D64MStream>(sourceFile()->url);
     if ( stream != nullptr )
     {
         auto entry = stream->entry;
@@ -680,7 +681,7 @@ time_t D64MFile::getCreationTime()
 
 bool D64MFile::exists()
 {
-    Debug_printv("exists[%d] url[%s] pathInStream[%s]", sourceFile->exists(), sourceFile->url.c_str(), sourceFile->pathInStream.c_str());
-    return sourceFile->exists();
+    //Debug_printv("exists[%d] url[%s] pathInStream[%s]", sourceFile()->exists(), sourceFile()->url.c_str(), sourceFile()->pathInStream().c_str());
+    return sourceFile()->exists();
 }
 

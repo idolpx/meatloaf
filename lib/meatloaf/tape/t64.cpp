@@ -178,8 +178,8 @@ bool T64MStream::seekPath(std::string path) {
  ********************************************************/
 
 bool T64MFile::isDirectory() {
-    //Debug_printv("pathInStream[%s]", pathInStream.c_str());
-    if ( pathInStream == "" )
+    //Debug_printv("pathInStream[%s]", pathInStream().c_str());
+    if ( pathInStream() == "" )
         return true;
     else
         return false;
@@ -187,8 +187,8 @@ bool T64MFile::isDirectory() {
 
 bool T64MFile::rewindDirectory() {
     dirIsOpen = true;
-    Debug_printv("sourceFile->url[%s]", sourceFile->url.c_str());
-    auto image = ImageBroker::obtain<T64MStream>(sourceFile->url);
+    Debug_printv("sourceFile()->url[%s]", sourceFile()->url.c_str());
+    auto image = ImageBroker::obtain<T64MStream>(sourceFile()->url);
     if ( image == nullptr )
         Debug_printv("image pointer is null");
 
@@ -216,7 +216,7 @@ MFile* T64MFile::getNextFileInDir() {
         rewindDirectory();
 
     // Get entry pointed to by containerStream
-    auto image = ImageBroker::obtain<T64MStream>(sourceFile->url);
+    auto image = ImageBroker::obtain<T64MStream>(sourceFile()->url);
     if ( image == nullptr )
         goto exit;
 
@@ -227,9 +227,9 @@ MFile* T64MFile::getNextFileInDir() {
         filename = filename.substr(0, (i > 16 ? 16 : i));
         // mstr::rtrimA0(filename);
         mstr::replaceAll(filename, "/", "\\");
-        //Debug_printv( "entry[%s]", (sourceFile->url + "/" + filename).c_str() );
+        //Debug_printv( "entry[%s]", (sourceFile()->url + "/" + filename).c_str() );
 
-        auto file = MFSOwner::File(sourceFile->url + "/" + filename);
+        auto file = MFSOwner::File(sourceFile()->url + "/" + filename);
         file->extension = image->decodeType(image->entry.file_type);
 
         size_t end_address = UINT16_FROM_HILOBYTES(image->entry.end_address[1], image->entry.end_address[0]);
