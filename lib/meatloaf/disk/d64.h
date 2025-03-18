@@ -274,6 +274,7 @@ private:
 
     bool readHeader() override
     {
+        Debug_printv("readHeader");
         seekSector( 
             partitions[partition].header_track, 
             partitions[partition].header_sector, 
@@ -492,7 +493,8 @@ public:
         vdrive_compatible = true;
     };
 
-    bool handles(std::string fileName) override {
+    bool handles(std::string fileName) override 
+    {
         //printf("handles w dnp %s %d\r\n", fileName.rfind(".dnp"), fileName.length()-4);
         return byExtension(
             {
@@ -503,8 +505,9 @@ public:
         );
     }
 
-    MFile* getFile(std::string path) override {
-        //Debug_printv("path[%s]", path.c_str());
+    MFile* getFile(std::string path) override
+    {
+        Debug_printv("path[%s]", path.c_str());
         return new D64MFile(path);
     }
 };

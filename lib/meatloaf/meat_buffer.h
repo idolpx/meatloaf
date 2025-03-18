@@ -127,7 +127,7 @@ namespace Meat
 
         bool is_open() const
         {
-            Debug_printv("is_open");
+            //Debug_printv("is_open");
 
             if (mstream == nullptr)
                 return false;
@@ -194,21 +194,21 @@ namespace Meat
 
                 int readCount = mstream->read((uint8_t *)gbuffer, gbuffer_size);
 
-                Debug_printv("meat buffer underflow, readCount=%d", readCount);
+                //Debug_printv("meat buffer underflow, readCount=%d", readCount);
 
                 // beg, curr, end <=> eback, gptr, egptr
                 if (readCount == _MEAT_NO_DATA_AVAIL)
                 {
                     // if gptr >= egptr - sgetc will call underflow again:
                     //                   gptr     egptr
-                    Debug_printv("meat underflow received _MEAT_NO_DATA_AVAIL!");
+                    //Debug_printv("meat underflow received _MEAT_NO_DATA_AVAIL!");
                     //this->setg(gbuffer, gbuffer, gbuffer); 
 
                     return my_char_traits::nda();
                 }
                 else if (readCount <= 0)
                 {
-                    Debug_printv("--mfilebuf read error or EOF, RC=%d!", readCount);
+                    //Debug_printv("--mfilebuf read error or EOF, RC=%d!", readCount);
                     //this->setg(gbuffer, gbuffer, gbuffer);
                     return std::char_traits<char>::eof();
                 }

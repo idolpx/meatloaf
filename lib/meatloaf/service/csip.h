@@ -229,10 +229,8 @@ class CSIPMFile: public MFile {
 public:
     CSIPMFile(std::string path, size_t size = 0): MFile(path) 
     {
-        Debug_printv("path[%s] size[%d]", path.c_str(), size);
+        //Debug_printv("path[%s] size[%d]", path.c_str(), size);
         this->size = size;
-        if ( size )
-            isDir = false;
 
         media_blocks_free = 65535;
         //media_block_size = 1; // blocks are already calculated

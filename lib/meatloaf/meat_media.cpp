@@ -177,10 +177,12 @@ void MMediaStream::close()
 
 uint32_t MMediaStream::readContainer(uint8_t *buf, uint32_t size)
 {
+    Debug_printv("readContainer[%lu]", size);
     return containerStream->read(buf, size);
 }
 uint32_t MMediaStream::writeContainer(uint8_t *buf, uint32_t size)
 {
+    Debug_printv("writeContainer[%lu]", size);
     return containerStream->write(buf, size);
 }
 
@@ -195,7 +197,7 @@ uint8_t MMediaStream::read()
 uint32_t MMediaStream::read(uint8_t* buf, uint32_t size) {
     uint32_t bytesRead = 0;
 
-    //Debug_printv("seekCalled[%d]", seekCalled);
+    Debug_printv("read[%lu] seekCalled[%d]", size, seekCalled);
     if ( _position >= _size )
         return 0;
 
@@ -207,7 +209,7 @@ uint32_t MMediaStream::read(uint8_t* buf, uint32_t size) {
     }
     else {
         // seekXXX not called - just pipe image bytes, so it can be i.e. copied verbatim
-        bytesRead = readContainer(buf, size);
+        bytesRead = containerStream->read(buf, size); //readContainer(buf, size);
     }
 
     _position += bytesRead;

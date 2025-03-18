@@ -41,11 +41,21 @@ bool CSIPMSessionMgr::establishSession() {
 
 std::string CSIPMSessionMgr::readLn() {
     char buffer[80];
+    std::string line;
     // telnet line ends with 10;
     getline(buffer, 80, 10);
+    line = buffer;
+    // if (line.empty()) {
+    //     usleep(150000000); // 1.5 sec delay if no data
+    //     getline(buffer, 80, 10);
+    // }
+    // line = buffer;
+    if (line.empty()) {
+        line = '\x04';
+    }
 
     //Debug_printv("Inside readln got: '%s'", buffer);
-    return std::string((char *)buffer);
+    return line;
 }
 
 bool CSIPMSessionMgr::sendCommand(std::string command) {
@@ -54,7 +64,7 @@ bool CSIPMSessionMgr::sendCommand(std::string command) {
         printf("CSIP: send command: %s\r\n", command.c_str());
         (*this) << (command+'\r');
         (*this).flush();
-        sleep(1);  // need a delay here
+        sleep(1); // wait for command to execute before trying to read response
         return true;
     }
     else
@@ -297,7 +307,7 @@ bool CSIPMFile::rewindDirectory() {
         Debug_printv("cserver: this is a directory!");
         CSIPMFileSystem::session.sendCommand("disks");
         auto line = CSIPMFileSystem::session.readLn(); // dir header
-        Debug_printv("line[%s]", line.c_str());
+        //Debug_printv("line[%s]", line.c_str());
         if(CSIPMFileSystem::session.is_open() && line.size()) {
             media_header = line.substr(2, line.find_last_of("]")-1);
             media_id = "C=SVR";
@@ -379,7 +389,7 @@ MFile* CSIPMFile::getNextFileInDir() {
 
         // 32 62 91 68 73 83 75 32 84 79 79 76 83 93 13 No more! = > [DISK TOOLS]
 
-        Debug_printv("line[%s]", line.c_str());
+        //Debug_printv("line[%s]", line.c_str());
         if(line.find('\x04')!=std::string::npos) {
             Debug_printv("No more!");
             dirIsOpen = false;
@@ -393,7 +403,7 @@ MFile* CSIPMFile::getNextFileInDir() {
             }
             else {
                 name = line.substr(0, line.length()-1);
-                size = 683;
+                size = (683 * 256);
             }
 
             Debug_printv("url[%s] name[%s] size[%d]", url.c_str(), name.c_str(), size);

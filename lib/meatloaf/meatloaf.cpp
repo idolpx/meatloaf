@@ -244,8 +244,8 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
     //     return targetFile;
     // }
 
-    //Debug_println("vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv");
-    //Debug_printv("Trying to factory path [%s]", path.c_str());
+    Debug_println("vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv");
+    Debug_printv("targetPath[%s]", path.c_str());
 
     std::vector<std::string> paths = mstr::split(path,'/');
     auto pathIterator = paths.end();
@@ -262,16 +262,17 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
 
     // Set path to file in filesystem stream
     targetFile->pathInStream = mstr::joinToString(&pathIterator, &end, "/");
-    //Debug_printv("targetFile->pathInStream[%s]", targetFile->pathInStream.c_str());
 
     end = pathIterator;
     pathIterator--;
+    Debug_printv("targetFile[%s] in targetFileSystem[%s][%s]", targetFile->pathInStream.c_str(), targetFile->url.c_str(), targetFileSystem->symbol);
+
     auto sourcePath = mstr::joinToString(&begin, &pathIterator, "/");
-    //Debug_printv("targetFile[%s] in targetFileSystem[%s][%s]", targetFile->url.c_str(), pathIterator->c_str(), targetFileSystem->symbol);
+    Debug_printv("sourcePath[%s]", sourcePath.c_str());
 
     if( begin == pathIterator )
     {
-        //Debug_printv("** LOOK UP PATH NOT NEEDED   path[%s] sourcePath[%s]", path.c_str(), sourcePath.c_str());
+        Debug_printv("** LOOK UP PATH NOT NEEDED   path[%s] sourcePath[%s]", path.c_str(), sourcePath.c_str());
         auto cachedFile = FileBroker::obtain(sourcePath);
         if ( cachedFile )
             targetFile->sourceFile = cachedFile;
@@ -290,34 +291,34 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
         }
 
         auto wholePath = mstr::joinToString(&begin, &end, "/");
-        //Debug_printv("wholePath[%s]", wholePath.c_str());
+        Debug_printv("wholePath[%s]", wholePath.c_str());
 
         // sourceFile is for raw access to the container stream
         auto cachedFile = FileBroker::obtain(wholePath);
         if ( cachedFile )
             targetFile->sourceFile = cachedFile;
         else
-            targetFile->sourceFile = sourceFileSystem->getFile(wholePath);
+            targetFile->sourceFile = File(wholePath);
 
         targetFile->isWritable = targetFile->sourceFile->isWritable;   // This stream is writable if the container is writable
-        //Debug_printv("sourceFile[%s] is in [%s][%s]", targetFile->sourceFile->name.c_str(), sourcePath.c_str(), sourceFileSystem->symbol);
+        Debug_printv("sourceFile[%s] is in [%s][%s]", targetFile->sourceFile->pathInStream.c_str(), sourcePath.c_str(), sourceFileSystem->symbol);
     }
 
-    // if (targetFile != nullptr)
-    // {
-    //     if (targetFile->sourceFile != nullptr)
-    //     {
-    //         Debug_printv("source good rootfs[%d][%s]", targetFile->sourceFile->m_rootfs, targetFile->sourceFile->url.c_str());
-    //     }
-    //     else
-    //         Debug_printv("source bad");
+    if (targetFile != nullptr)
+    {
+        if (targetFile->sourceFile != nullptr)
+        {
+            Debug_printv("source good rootfs[%d][%s]", targetFile->sourceFile->m_rootfs, targetFile->sourceFile->url.c_str());
+        }
+        else
+            Debug_printv("source bad");
         
-    //     Debug_printv("target good rootfs[%d][%s]", targetFile->m_rootfs, targetFile->url.c_str());
-    // }
-    // else
-    //     Debug_printv("target bad");
+        Debug_printv("target good rootfs[%d][%s]", targetFile->m_rootfs, targetFile->url.c_str());
+    }
+    else
+        Debug_printv("target bad");
 
-    // Debug_println("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
+    Debug_println("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
 
     // if ( targetFile->pathInStream.empty() )
     //     FileBroker::add(path, targetFile);

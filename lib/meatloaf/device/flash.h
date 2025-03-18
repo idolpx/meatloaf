@@ -173,7 +173,7 @@ protected:
  
      MFile* getFile(std::string path) override
      {
-         //Debug_printv("path[%s]", path.c_str());
+         Debug_printv("path[%s]", path.c_str());
          return new FlashMFile(path);
      }
  };

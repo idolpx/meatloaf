@@ -29,18 +29,18 @@
 #include "punycode.h"
 
 //#include "exprtk.hpp"
-//#include "tinyexpr.h"
+#include "tinyexpr.h"
 #include <iostream>
 
-// int test_tinyexpr()
-// {
-//     te_parser tep;
-//     const char *c = "sqrt(5^2+7^2+11^2+(8-2)^2)";
-//     double r = tep.evaluate(c);
-//     std::cout << "The expression:\n\t" <<
-//         c << "\nevaluates to:\n\t" << r << "\n";
-//     return EXIT_SUCCESS;
-// }
+int test_tinyexpr()
+{
+    te_parser tep;
+    const char *c = "sqrt(5^2+7^2+11^2+(8-2)^2)";
+    double r = tep.evaluate(c);
+    std::cout << "The expression:\n\t" <<
+        c << "\nevaluates to:\n\t" << r << "\n";
+    return EXIT_SUCCESS;
+}
 
 //std::unique_ptr<MFile> m_mfile(MFSOwner::File(""));
 
@@ -765,13 +765,13 @@ void runTestsSuite() {
 
     //commodoreServer();
     //seekTest();
-    testFileOutput();
+    //testFileOutput();
     // testPetsciiUtf();
     // testPunycode();
     //detectLeaks();
 
     // ====== Per FS dir, read and write region =======================================
-    runFSTest("/message.zip", "/message.zip/trumpeteer.txt");
+    //runFSTest("/message.zip", "/message.zip/trumpeteer.txt");
     // working, uncomment if you want
     //runFSTest("/.sys", "README"); // TODO - let urlparser drop the last slash!
     //runFSTest("http://c64.meatloaf.cc/roms", "https://www.w3.org/TR/PNG/iso_8859-1.txt");

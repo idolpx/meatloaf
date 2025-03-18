@@ -404,7 +404,7 @@ uint16_t D64MStream::blocksFree()
 
 uint32_t D64MStream::readFile(uint8_t *buf, uint32_t size)
 {
-
+    Debug_printv("readFile(%d)", size);
     if (sector_offset % block_size == 0)
     {
         // We are at the beginning of the block
@@ -450,7 +450,7 @@ uint32_t D64MStream::readFile(uint8_t *buf, uint32_t size)
 
 uint32_t D64MStream::writeFile(uint8_t *buf, uint32_t size)
 {
-
+    Debug_printv("writeFile(%d)", size);
     if (sector_offset % block_size == 0)
     {
         // We are at the beginning of the block
@@ -598,6 +598,7 @@ bool D64MFile::rewindDirectory()
     if (image == nullptr)
         return false;
 
+    Debug_printv("image->url[%s]", image->url.c_str());
     image->resetEntryCounter();
 
     // Read Header

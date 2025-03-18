@@ -183,13 +183,8 @@ class ArchiveMFile : public MFile {
 
 class ArchiveMFileSystem : public MFileSystem
 {
-    MFile *getFile(std::string path)
-    {
-        return new ArchiveMFile(path);
-    };
-
-   public:
-    ArchiveMFileSystem() : MFileSystem("archive") {}
+public:
+    ArchiveMFileSystem() : MFileSystem("archive") {};
 
     bool handles(std::string fileName)
     {
@@ -225,7 +220,11 @@ class ArchiveMFileSystem : public MFileSystem
         );
     }
 
-   private:
+    MFile *getFile(std::string path)
+    {
+        Debug_printv("path[%s]", path.c_str());
+        return new ArchiveMFile(path);
+    };
 };
 
 #endif  // MEATLOAF_ARCHIVE
