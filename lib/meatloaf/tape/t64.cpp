@@ -179,7 +179,7 @@ bool T64MStream::seekPath(std::string path) {
 
 bool T64MFile::isDirectory() {
     //Debug_printv("pathInStream[%s]", pathInStream().c_str());
-    if ( pathInStream() == "" )
+    if ( pathInStream().empty() )
         return true;
     else
         return false;

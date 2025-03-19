@@ -23,6 +23,7 @@
 
 #include "make_unique.h"
 
+#include <sys/stat.h>
 #include <dirent.h>
 #include <string.h>
 
@@ -53,6 +54,16 @@ public:
 
         m_rootfs = true;
         isWritable = true;
+
+        if(isDirectory()) {
+            size = 0;
+        }
+        else {
+            struct stat info;
+            stat( path.c_str(), &info);
+            size = info.st_size;
+        }
+
         //Debug_printv("basepath[%s] path[%s] valid[%d]", basepath.c_str(), this->path.c_str(), m_isNull);
     };
     ~FlashMFile() {

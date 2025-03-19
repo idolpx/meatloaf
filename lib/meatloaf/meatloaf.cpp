@@ -229,13 +229,15 @@ void MFile::setupFields() {
     MFileSystem * thisPathFactoringFS = MFSOwner::findParentFS(begin, end, pathIterator);
 
     _pathInStream = mstr::joinToString(&pathIterator, &end, "/");
+    Debug_printv("pathInStream[%s]", _pathInStream.c_str());
+
     end = pathIterator;
     auto containerPath = mstr::joinToString(&begin, &pathIterator, "/");
     Debug_printv("MFSOwner::File(%s) path for container stream is then: [%s], this needs to be factored as file by CONTAINING FS!", path.c_str(), containerPath.c_str());
 
     MFileSystem *containerFileSystem = &defaultFS;
 
-    if(_pathInStream == "")
+    if(_pathInStream.empty())
     {
         Debug_printv("MFSOwner::File(%s) is the container itself, let's go one up", path.c_str());
         pathIterator--;

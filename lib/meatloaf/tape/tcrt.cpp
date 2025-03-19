@@ -215,7 +215,7 @@ bool TCRTMStream::seekPath(std::string path) {
 
 bool TCRTMFile::isDirectory() {
     //Debug_printv("pathInStream[%s]", pathInStream().c_str());
-    if ( pathInStream() == "" )
+    if ( pathInStream().empty() )
         return true;
     else
         return false;
