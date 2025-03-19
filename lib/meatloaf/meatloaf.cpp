@@ -229,25 +229,24 @@ void MFile::setupFields() {
     MFileSystem * thisPathFactoringFS = MFSOwner::findParentFS(begin, end, pathIterator);
 
     _pathInStream = mstr::joinToString(&pathIterator, &end, "/");
-    Debug_printv("pathInStream[%s]", _pathInStream.c_str());
+    Debug_printv("MFSOwner::setupFields(%s) path relative to '%s' root is: [%s]", path.c_str(), thisPathFactoringFS->symbol, _pathInStream.c_str());
 
     end = pathIterator;
     auto containerPath = mstr::joinToString(&begin, &pathIterator, "/");
-    Debug_printv("MFSOwner::File(%s) path for container stream is then: [%s], this needs to be factored as file by CONTAINING FS!", path.c_str(), containerPath.c_str());
 
     MFileSystem *containerFileSystem = &defaultFS;
 
     if(_pathInStream.empty())
     {
-        Debug_printv("MFSOwner::File(%s) is the container itself, let's go one up", path.c_str());
+        Debug_printv("MFSOwner::setupFields(%s) is the container itself, let's go one up", path.c_str());
         pathIterator--;
     }
 
     if( pathIterator != begin ) {
         containerFileSystem = MFSOwner::findParentFS(begin, end, pathIterator);
     }
-    Debug_printv("MFSOwner::File(%s) container path [%s], will be created by this fs: %s", path.c_str(), containerPath.c_str(), containerFileSystem->symbol);
     _sourceFile = containerFileSystem->getFile(containerPath);
+    Debug_printv("MFSOwner::setupFields(%s) container path [%s], will be created by this fs: %s", path.c_str(), containerPath.c_str(), containerFileSystem->symbol);
 }
 
 std::string MFile::pathInStream() {
@@ -288,7 +287,6 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
     MFile *thisFile = thisPathFactoringFS->getFile(path);
 
     Debug_printv("MFSOwner::File(%s) is created by '%s' FS", path.c_str(), thisPathFactoringFS->symbol);
-    Debug_printv("MFSOwner::File(%s) path relative to '%s' root is: [%s]", path.c_str(), thisPathFactoringFS->symbol, thisFile->_pathInStream.c_str());
 
     return thisFile;
 }
@@ -296,7 +294,7 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
 MFileSystem* MFSOwner::findParentFS(std::vector<std::string>::iterator &begin, std::vector<std::string>::iterator &end, std::vector<std::string>::iterator &pathIterator) {
     while (pathIterator != begin)
     {
-        Debug_printv("MFSOwner::findParentFS - looking one directory up");
+        Debug_printv("MFSOwner::findParentFS - going left the path");
         pathIterator--;
 
         auto part = *pathIterator;
@@ -304,7 +302,6 @@ MFileSystem* MFSOwner::findParentFS(std::vector<std::string>::iterator &begin, s
         Debug_printv("MFSOwner::findParentFS - examining part[%s]", part.c_str());
         if ( part.size() )
         {
-            Debug_printv("MFSOwner::findParentFS - part.size() > 0");
             auto foundFS=std::find_if(availableFS.begin() + 1, availableFS.end(), [&part](MFileSystem* fs){ 
                 //Debug_printv("symbol[%s]", fs->symbol);
                 bool found = fs->handles(part);
@@ -325,6 +322,8 @@ MFileSystem* MFSOwner::findParentFS(std::vector<std::string>::iterator &begin, s
                 pathIterator++;
                 return (*foundFS);
             }
+        } else {
+            Debug_printv("MFSOwner::findParentFS - FINISHED WALKING TO THE LEFT");
         }
     };
 
@@ -463,7 +462,7 @@ MStream* MFile::getSourceStream(std::ios_base::openmode mode) {
 
         if(!foundIt)
         {
-            Debug_printv("path in stream not found");
+            Debug_printv("path in random access stream not found");
             return nullptr;
         }        
     }
@@ -483,7 +482,7 @@ MStream* MFile::getSourceStream(std::ios_base::openmode mode) {
 
             pointedFile = decodedStream->seekNextEntry();
         }
-        Debug_printv("path in stream not found!");
+        Debug_printv("path in browsable stream not found!");
         if(pointedFile.empty())
             return nullptr;
     }
