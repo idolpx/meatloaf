@@ -107,7 +107,7 @@ bool Archive::open(std::ios_base::openmode mode) {
     // close the archive if it was already open
     close();
 
-    Debug_printv("Archive::open");
+    Debug_printv("Archive::open [%s]", m_srcStream->url.c_str());
     m_srcBuffer = new uint8_t[m_buffSize];
     m_archive = archive_read_new();
     m_srcStream->seek(0, SEEK_SET);

@@ -456,6 +456,8 @@ MStream* MFile::getSourceStream(std::ios_base::openmode mode) {
 
     if(decodedStream->isRandomAccess() && pathInStream() != "")
     {
+        Debug_printv("pathInStream[%s]", pathInStream().c_str());
+
         // For files with a browsable random access directory structure
         // d64, d74, d81, dnp, etc.
         bool foundIt = decodedStream->seekPath(this->pathInStream());
