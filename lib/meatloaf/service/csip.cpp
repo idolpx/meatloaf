@@ -53,7 +53,7 @@ bool CSIPMSessionMgr::sendCommand(std::string command) {
     if(establishSession()) {
         printf("CSIP: send command: %s\r\n", c.c_str());
         (*this) << (c+'\r');
-        (*this).flush();
+        (*this).sync();
         return true;
     }
     else

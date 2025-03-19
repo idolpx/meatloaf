@@ -71,7 +71,6 @@
 
 
 #include "bus.h"
-//#include "ml_tests.h"
 
 std::string statusMessage;
 bool initFailed = false;
@@ -231,11 +230,6 @@ void main_setup()
 
 #ifdef DEBUG_TIMING
     Debug_printv( ANSI_GREEN_BOLD "DEBUG_TIMING enabled" ANSI_RESET );
-#endif
-
-#ifdef RUN_TESTS
-    runTestsSuite();
-    // lfs_test();
 #endif
 
     printf("READY.\r\n");

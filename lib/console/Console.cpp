@@ -92,6 +92,7 @@ namespace ESP32Console
         registerCommand(getSetMultilineCommand());
         registerCommand(getEnvCommand());
         registerCommand(getDeclareCommand());
+        registerCommand(getRunCommand());
 #ifdef ENABLE_DISPLAY
         registerCommand(getLEDCommand());
 #endif
