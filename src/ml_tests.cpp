@@ -611,6 +611,17 @@ void testSmartMFile() {
 	Debug_printf("Extension of second one: [%s]\r\n", test2->extension.c_str());
 }
 
+void testNewPaths() {
+    testHeader("Check if file in d64 in zip is sane");
+    auto test1 = Meat::New<MFile>("/sd/subdir/some.zip/disk.d64/file.txt");
+    test1->pathInStream();
+
+    testHeader("Check if file in zip is sane");
+    test1 = Meat::New<MFile>("/sd/subdir/some.zip/file.txt");
+    test1->pathInStream();
+
+}
+
 void testPetsciiUtf() {
     testHeader("TEST PETSCII TO UTF8");
 
@@ -756,11 +767,13 @@ void trig_function()
 #endif
 
 void runTestsSuite() {
+    testNewPaths();
     // Delay waiting for wifi to connect
     // while ( !fnWiFi.connected() )
     // {
     //     fnSystem.delay_microseconds(pdMS_TO_TICKS(1000)); // 1sec between checks
     // }
+
     // fnSystem.delay_microseconds(pdMS_TO_TICKS(5000)); // 5sec after connect
 
     //commodoreServer();

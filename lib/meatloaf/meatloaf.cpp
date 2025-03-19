@@ -294,12 +294,12 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
 MFileSystem* MFSOwner::findParentFS(std::vector<std::string>::iterator &begin, std::vector<std::string>::iterator &end, std::vector<std::string>::iterator &pathIterator) {
     while (pathIterator != begin)
     {
-        Debug_printv("MFSOwner::findParentFS - going left the path");
+        //Debug_printv("MFSOwner::findParentFS - going left the path");
         pathIterator--;
 
         auto part = *pathIterator;
         mstr::toLower(part);
-        Debug_printv("MFSOwner::findParentFS - examining part[%s]", part.c_str());
+        //Debug_printv("MFSOwner::findParentFS - examining part[%s]", part.c_str());
         if ( part.size() )
         {
             auto foundFS=std::find_if(availableFS.begin() + 1, availableFS.end(), [&part](MFileSystem* fs){ 
