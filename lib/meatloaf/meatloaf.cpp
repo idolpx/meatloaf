@@ -243,6 +243,7 @@ void MFile::setupFields() {
     }
 
     if( pathIterator != begin ) {
+        pathIterator--;
         containerFileSystem = MFSOwner::findParentFS(begin, end, pathIterator);
     }
     _sourceFile = containerFileSystem->getFile(containerPath);
