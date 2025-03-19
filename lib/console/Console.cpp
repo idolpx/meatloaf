@@ -118,6 +118,7 @@ namespace ESP32Console
     void Console::registerVFSCommands()
     {
         registerCommand(getCatCommand());
+        registerCommand(getHexCommand());
         registerCommand(getCDCommand());
         registerCommand(getPWDCommand());
         registerCommand(getLsCommand());

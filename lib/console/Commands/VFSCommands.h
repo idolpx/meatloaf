@@ -7,6 +7,8 @@ namespace ESP32Console::Commands
 {
     const ConsoleCommand getCatCommand();
 
+    const ConsoleCommand getHexCommand();
+
     const ConsoleCommand getPWDCommand();
 
     const ConsoleCommand getCDCommand();

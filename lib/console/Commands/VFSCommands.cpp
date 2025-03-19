@@ -48,6 +48,89 @@ int cat(int argc, char **argv)
     return EXIT_SUCCESS;
 }
 
+int hex(int argc, char **argv)
+{
+    if (argc == 1)
+    {
+        fprintf(stderr, "You have to pass at least one file path!\r\n");
+        return EXIT_SUCCESS;
+    }
+
+    for (int n = 1; n < argc; n++)
+    {
+        std::unique_ptr<MFile> path(getCurrentPath()->cd(argv[n]));
+        Meat::iostream istream(path.get());
+
+        if(istream.is_open()) {
+            if(istream.eof()) {
+                fprintf(stderr, "Stream returned EOF!");
+            } else {
+                int c = 0;
+                int address = 0;
+                char b[17] = {0};
+                while(!istream.eof()) 
+                {
+                    char chr = istream.get();
+
+                    if ( c == 0 )
+                    {
+                        fprintf(stdout, "%04X: ", address);
+                        address += 0x10;
+                    }
+
+                    if ( !istream.eof() )
+                    {
+                        fprintf(stdout, "%02X ", chr);
+
+                        // replace non-printable characters
+                        if ( chr < 32 || chr > 126 )
+                            chr = '.';
+
+                        b[c] = chr;
+                    }
+
+                    // add padding
+                    if ( istream.eof() )
+                    {
+                        if ( c <= 0x07 )
+                        {
+                            while ( c++ < 0x08 )
+                                fprintf(stdout, "   ");
+
+                            fprintf(stdout, "| ");
+                            c--;
+                        }
+
+                        while ( c++ < 0x10 )
+                            fprintf(stdout, "   ");
+                    }
+                    else if ( c++ == 0x07 )
+                    {
+                        // add separator
+                        fprintf(stdout, "| ");
+                    }
+
+                    // show line data as ascii
+                    if ( c >= 0x10 )
+                    {
+                        fprintf(stdout, " |%-16s|\r\n", b);
+                        c = 0;
+                        memset(b, 0, sizeof(b));
+                    }
+                }
+                fprintf(stdout, "\r\n");
+                fprintf(stdout, "url[%s] size[%ld]\r\n", path->url.c_str(), path->size);
+            }
+            istream.close();
+        }
+        else {
+            fprintf(stderr, "ERROR:%s could not be read!\r\n", path->url.c_str());
+        }
+    }
+
+    return EXIT_SUCCESS;
+}
+
 int pwd(int argc, char **argv)
 {
     printf("%s\r\n", getCurrentPath()->url.c_str());
@@ -411,6 +494,11 @@ namespace ESP32Console::Commands
     const ConsoleCommand getCatCommand()
     {
         return ConsoleCommand("cat", &cat, "Show the content of one or more files.");
+    }
+
+    const ConsoleCommand getHexCommand()
+    {
+        return ConsoleCommand("hex", &hex, "Show the content of one or more files as hex.");
     }
 
     const ConsoleCommand getPWDCommand()
