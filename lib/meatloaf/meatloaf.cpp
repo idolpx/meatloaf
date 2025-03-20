@@ -247,7 +247,8 @@ void MFile::setupFields() {
         containerFileSystem = MFSOwner::findParentFS(begin, end, pathIterator);
     }
     _sourceFile = containerFileSystem->getFile(containerPath);
-    Debug_printv("MFSOwner::setupFields(%s) container path [%s], will be created by this fs: %s", path.c_str(), containerPath.c_str(), containerFileSystem->symbol);
+    Debug_printv("(%s) container path [%s], will be created by this fs: %s", path.c_str(), containerPath.c_str(), containerFileSystem->symbol);
+    Debug_printv("pathInStream[%s]", _pathInStream.c_str());
 }
 
 std::string MFile::pathInStream() {
@@ -273,7 +274,6 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
 
         if ( csipFS.handles(path) )
         {
-            printf("C=Server!\r\n");
             return csipFS.getFile(path);
         }
     }
@@ -283,11 +283,11 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
     auto begin = paths.begin();
     auto end = paths.end();
 
-    Debug_printv("MFSOwner::File(%s) let's find factoring filesystem of this path", path.c_str());
+    Debug_printv("(%s) let's find factoring filesystem of this path", path.c_str());
     MFileSystem * thisPathFactoringFS = findParentFS(begin, end, pathIterator);
     MFile *thisFile = thisPathFactoringFS->getFile(path);
 
-    Debug_printv("MFSOwner::File(%s) is created by '%s' FS", path.c_str(), thisPathFactoringFS->symbol);
+    Debug_printv("(%s) is created by '%s' FS", path.c_str(), thisPathFactoringFS->symbol);
 
     return thisFile;
 }
@@ -324,7 +324,7 @@ MFileSystem* MFSOwner::findParentFS(std::vector<std::string>::iterator &begin, s
                 return (*foundFS);
             }
         } else {
-            Debug_printv("MFSOwner::findParentFS - FINISHED WALKING TO THE LEFT");
+            Debug_printv("- FINISHED WALKING TO THE LEFT");
         }
     };
 

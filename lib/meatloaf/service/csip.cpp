@@ -51,9 +51,11 @@ bool CSIPMSessionMgr::sendCommand(std::string command) {
     std::string c = mstr::toPETSCII2(command);
     // 13 (CR) sends the command
     if(establishSession()) {
-        printf("CSIP: send command: %s\r\n", c.c_str());
+        Debug_printv("command[%s]", c.c_str());
         (*this) << (c+'\r');
+        (*this).flush();
         (*this).sync();
+        sleep(1);
         return true;
     }
     else
@@ -297,6 +299,9 @@ bool CSIPMFile::rewindDirectory() {
         //Debug_printv("cserver: this is a directory!");
         CSIPMFileSystem::session.sendCommand("disks");
         auto line = CSIPMFileSystem::session.readLn(); // dir header
+        if ( line.empty() )
+            return false;
+
         if(CSIPMFileSystem::session.is_open()) {
             media_header = line.substr(2, line.find_last_of("]")-1);
             media_id = "C=SVR";
@@ -311,12 +316,12 @@ bool CSIPMFile::rewindDirectory() {
 
 MFile* CSIPMFile::getNextFileInDir() {
 
-    Debug_printv("pre rewind");
+    //Debug_printv("pre rewind");
 
     if(!dirIsOpen)
         rewindDirectory();
 
-    Debug_printv("pre dir is open");
+    //Debug_printv("pre dir is open");
 
     if(!dirIsOpen)
         return nullptr;
@@ -328,7 +333,7 @@ MFile* CSIPMFile::getNextFileInDir() {
     if(url.size()>4) // If we are not at root then add additional "/"
         new_url += "/";
 
-    Debug_printv("pre dir is image");
+    //Debug_printv("pre dir is image");
 
     if(dirIsImage) {
         auto line = CSIPMFileSystem::session.readLn();
@@ -394,7 +399,7 @@ MFile* CSIPMFile::getNextFileInDir() {
                 size = 683;
             }
 
-            // Debug_printv("\nurl[%s] name[%s] size[%d]\r\n", url.c_str(), name.c_str(), size);
+            Debug_printv("url[%s] name[%s] size[%d]\r\n", url.c_str(), name.c_str(), size);
             if(name.size() > 0)
             {
                 new_url += name;

@@ -99,7 +99,7 @@ bool D64MStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
     this->track = track;
     this->sector = sector;
 
-    Debug_printv("track[%d] sector[%d] speedZone[%d] sectorOffset[%d]", track, sector, speedZone(track), sectorOffset);
+    //Debug_printv("track[%d] sector[%d] speedZone[%d] sectorOffset[%d]", track, sector, speedZone(track), sectorOffset);
 
     return containerStream->seek((sectorOffset * block_size) + offset);
 }

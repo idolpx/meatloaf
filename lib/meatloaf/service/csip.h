@@ -226,12 +226,13 @@ public:
 class CSIPMFile: public MFile {
 
 public:
-    CSIPMFile(std::string path, size_t size = 0): MFile(path), m_size(size) 
+    CSIPMFile(std::string path, size_t size = 0): MFile(path)
     {
         media_blocks_free = 65535;
+        this->size = size;
         //media_block_size = 1; // blocks are already calculated
         //parseUrl(path);
-        // Debug_printv("path[%s] size[%d]", path.c_str(), size);
+        Debug_printv("path[%s] size[%d]", path.c_str(), size);
         isPETSCII = true;
         m_rootfs = true;
     };
@@ -258,7 +259,6 @@ public:
 
 private:
     bool dirIsImage = false;
-    size_t m_size;
 };
 
 /********************************************************

@@ -72,14 +72,14 @@ int hex(int argc, char **argv)
                 {
                     char chr = istream.get();
 
-                    if ( c == 0 )
-                    {
-                        fprintf(stdout, "%04X: ", address);
-                        address += 0x10;
-                    }
-
                     if ( !istream.eof() )
                     {
+                        if ( c == 0 )
+                        {
+                            fprintf(stdout, "%04X: ", address);
+                            address += 0x10;
+                        }
+
                         fprintf(stdout, "%02X ", chr);
 
                         // replace non-printable characters
@@ -90,7 +90,7 @@ int hex(int argc, char **argv)
                     }
 
                     // add padding
-                    if ( istream.eof() )
+                    if ( istream.eof() && c )
                     {
                         if ( c <= 0x07 )
                         {
@@ -195,7 +195,10 @@ int ls(int argc, char **argv)
     }
 
     while(entry.get() != nullptr) {
-        printf("%c %8lu  %s\r\n", (entry->isDirectory()) ? 'd':'-', entry->size, entry->name.c_str());
+        if ( entry->isPETSCII )
+            entry->name = mstr::toUTF8(entry->name);
+
+        printf("%c %8lu  '%s'\r\n", (entry->isDirectory()) ? 'd':'-', entry->size, entry->name.c_str());
         entry.reset(destPath->getNextFileInDir());
     }
 
