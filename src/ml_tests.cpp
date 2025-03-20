@@ -613,12 +613,17 @@ void testSmartMFile() {
 
 void testNewPaths() {
     testHeader("Check if file in d64 in zip is sane");
-    auto test1 = Meat::New<MFile>("/sd/subdir/some.zip/disk.d64/file.txt");
+    auto test1 = Meat::New<MFile>("/sd/archives/subdir/favorites.zip/dir1/subdir/goonies.d64");
     test1->pathInStream();
 
     testHeader("Check if file in zip is sane");
-    test1 = Meat::New<MFile>("/sd/subdir/some.zip/file.txt");
+    test1 = Meat::New<MFile>("/sd/archives/favorites.zip/goonies.d64");
     test1->pathInStream();
+
+
+    testHeader("Check if file in d64 in zip is sane");
+    test1 = Meat::New<MFile>("/sd/archives/subdir/favorites.zip/dir1/subdir/goonies.d64/file1.prg");
+    test1.reset(test1->sourceFile());
 
 }
 

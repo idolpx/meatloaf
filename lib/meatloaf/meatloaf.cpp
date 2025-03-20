@@ -222,33 +222,22 @@ MFile* MFSOwner::File(std::shared_ptr<MFile> file) {
 
 void MFile::setupFields() {
     std::vector<std::string> paths = mstr::split(path,'/');
-    auto pathIterator = paths.end();
     auto begin = paths.begin();
     auto end = paths.end();
+    auto pathIterator = end-1;
 
+    Debug_printv("calling findParentFS 1 - to skip first enclosing FS", path.c_str());
     MFileSystem * thisPathFactoringFS = MFSOwner::findParentFS(begin, end, pathIterator);
 
-    _pathInStream = mstr::joinToString(&pathIterator, &end, "/");
-    Debug_printv("MFSOwner::setupFields(%s) path relative to '%s' root is: [%s]", path.c_str(), thisPathFactoringFS->symbol, _pathInStream.c_str());
+    auto temp = pathIterator+1;
 
-    end = pathIterator;
-    auto containerPath = mstr::joinToString(&begin, &pathIterator, "/");
+    auto beforeFS = mstr::joinToString(&begin, &temp, "/");
+    auto afterFS = mstr::joinToString(&temp, &end, "/");
 
-    MFileSystem *containerFileSystem = &defaultFS;
+    _pathInStream = afterFS;
+    _sourceFile = MFSOwner::File(beforeFS);    
 
-    if(_pathInStream.empty())
-    {
-        Debug_printv("MFSOwner::setupFields(%s) is the container itself, let's go one up", path.c_str());
-        pathIterator--;
-    }
-
-    if( pathIterator != begin ) {
-        pathIterator--;
-        containerFileSystem = MFSOwner::findParentFS(begin, end, pathIterator);
-    }
-    _sourceFile = containerFileSystem->getFile(containerPath);
-    Debug_printv("(%s) container path [%s], will be created by this fs: %s", path.c_str(), containerPath.c_str(), containerFileSystem->symbol);
-    Debug_printv("pathInStream[%s]", _pathInStream.c_str());
+    Debug_printv("container:[%s] -- path in container:[%s]", beforeFS.c_str(), afterFS.c_str());
 }
 
 std::string MFile::pathInStream() {
@@ -283,11 +272,11 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
     auto begin = paths.begin();
     auto end = paths.end();
 
-    Debug_printv("(%s) let's find factoring filesystem of this path", path.c_str());
+    Debug_printv("(%s) calling findParentFS", path.c_str());
     MFileSystem * thisPathFactoringFS = findParentFS(begin, end, pathIterator);
     MFile *thisFile = thisPathFactoringFS->getFile(path);
 
-    Debug_printv("(%s) is created by '%s' FS", path.c_str(), thisPathFactoringFS->symbol);
+    Debug_printv("(%s) this path will be created by '%s' FS, which will list the contents", path.c_str(), thisPathFactoringFS->symbol);
 
     return thisFile;
 }
@@ -300,7 +289,7 @@ MFileSystem* MFSOwner::findParentFS(std::vector<std::string>::iterator &begin, s
 
         auto part = *pathIterator;
         mstr::toLower(part);
-        //Debug_printv("MFSOwner::findParentFS - examining part[%s]", part.c_str());
+        Debug_printv("MFSOwner::findParentFS - examining part[%s]", part.c_str());
         if ( part.size() )
         {
             auto foundFS=std::find_if(availableFS.begin() + 1, availableFS.end(), [&part](MFileSystem* fs){ 
@@ -319,8 +308,8 @@ MFileSystem* MFSOwner::findParentFS(std::vector<std::string>::iterator &begin, s
             });
 
             if(foundFS != availableFS.end()) {
-                //Debug_printv("matched[%s] foundFS[%s]", part.c_str(), (*foundFS)->symbol);
-                pathIterator++;
+                // Debug_printv("matched[%s] foundFS[%s], should return now", part.c_str(), (*foundFS)->symbol);
+                // pathIterator++;
                 return (*foundFS);
             }
         } else {
@@ -455,9 +444,11 @@ MStream* MFile::getSourceStream(std::ios_base::openmode mode) {
     decodedStream->url = this->url;
     Debug_printv("decodedStream isRandomAccess[%d] isBrowsable[%d] null[%d]", decodedStream->isRandomAccess(), decodedStream->isBrowsable(), (decodedStream == nullptr));
 
-    if(decodedStream->isRandomAccess() && pathInStream() != "")
+    auto pathInStream = this->pathInStream();
+
+    if(decodedStream->isRandomAccess() && pathInStream != "")
     {
-        Debug_printv("pathInStream[%s]", pathInStream().c_str());
+        Debug_printv("pathInStream[%s]", pathInStream.c_str());
 
         // For files with a browsable random access directory structure
         // d64, d74, d81, dnp, etc.
@@ -469,7 +460,7 @@ MStream* MFile::getSourceStream(std::ios_base::openmode mode) {
             return nullptr;
         }        
     }
-    else if(decodedStream->isBrowsable() && pathInStream() != "")
+    else if(decodedStream->isBrowsable() && pathInStream != "")
     {
         // For files with no directory structure
         // tap, crt, tar
