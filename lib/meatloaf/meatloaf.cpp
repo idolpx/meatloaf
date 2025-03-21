@@ -231,10 +231,18 @@ void MFile::setupFields() {
     Debug_printv("calling findParentFS 1 - to skip first enclosing FS", path.c_str());
     MFileSystem * thisPathFactoringFS = MFSOwner::findParentFS(begin, end, pathIterator);
 
-    auto temp = pathIterator+1;
-
-    auto beforeFS = mstr::joinToString(&begin, &temp, "/");
-    auto afterFS = mstr::joinToString(&temp, &end, "/");
+    std::string beforeFS, afterFS;
+    if ( thisPathFactoringFS == &defaultFS )
+    {
+        beforeFS = "/";
+        afterFS = path.substr(1);
+    }
+    else
+    {
+        auto temp = pathIterator+1;
+        beforeFS = mstr::joinToString(&begin, &temp, "/");
+        afterFS = mstr::joinToString(&temp, &end, "/");
+    }
 
     _sourceFile = MFSOwner::File(beforeFS);
     _pathInStream = afterFS;
