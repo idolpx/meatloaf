@@ -245,7 +245,7 @@ void MFile::setupFields() {
     }
 
     _sourceFile = MFSOwner::File(beforeFS);
-    _pathInStream = afterFS;
+    _sourceFile->_pathInStream = afterFS;
 
     Debug_printv("container:[%s] -- path in container:[%s]", beforeFS.c_str(), afterFS.c_str());
     Debug_printv("_sourceFile[%s]", _sourceFile->url.c_str());
@@ -253,9 +253,9 @@ void MFile::setupFields() {
 }
 
 std::string MFile::pathInStream() {
-    Debug_printv("_pathInStream[%s]", _pathInStream.c_str());
-    if(_pathInStream.empty())
-        setupFields();
+    // Debug_printv("_pathInStream[%s]", _pathInStream.c_str());
+    // if(_pathInStream.empty())
+    //     setupFields();
     Debug_printv("_pathInStream[%s]", _pathInStream.c_str());
     return _pathInStream;
 }
