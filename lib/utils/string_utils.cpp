@@ -422,7 +422,7 @@ namespace mstr {
 
         if((*start)>=(*end))
         {
-            //Debug_printv("start >= end");
+            Debug_printv("start >= end");
             return std::string();
         }
             
@@ -434,11 +434,14 @@ namespace mstr {
             if(i<(*end))
                 res+=separator;
 
-            //Debug_printv("a %d res [%s]", i, res.c_str());
+            Debug_printv("a [%d] res [%s]", i, res.c_str());
         }
-        //Debug_printv("res[%s] length[%d] size[%d]", res.c_str(), res.length(), res.size());
 
-        return res.erase(res.length()-1,1);
+        Debug_printv("res[%s] length[%d] size[%d]", res.c_str(), res.length(), res.size());
+        if ( res.length() > 1)
+            res.erase(res.length()-1);
+
+        return res;
     }
 
     std::string joinToString(std::vector<std::string> strings, std::string separator) {

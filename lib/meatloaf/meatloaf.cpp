@@ -221,6 +221,8 @@ MFile* MFSOwner::File(std::shared_ptr<MFile> file) {
 }
 
 void MFile::setupFields() {
+    Debug_printv("path[%s]", path.c_str());
+
     std::vector<std::string> paths = mstr::split(path,'/');
     auto begin = paths.begin();
     auto end = paths.end();
@@ -234,25 +236,33 @@ void MFile::setupFields() {
     auto beforeFS = mstr::joinToString(&begin, &temp, "/");
     auto afterFS = mstr::joinToString(&temp, &end, "/");
 
+    _sourceFile = MFSOwner::File(beforeFS);
     _pathInStream = afterFS;
-    _sourceFile = MFSOwner::File(beforeFS);    
 
     Debug_printv("container:[%s] -- path in container:[%s]", beforeFS.c_str(), afterFS.c_str());
+    Debug_printv("_sourceFile[%s]", _sourceFile->url.c_str());
+    Debug_printv("_pathInStream[%s]", _pathInStream.c_str());
 }
 
 std::string MFile::pathInStream() {
-    if(_pathInStream == "")
+    Debug_printv("_pathInStream[%s]", _pathInStream.c_str());
+    if(_pathInStream.empty())
         setupFields();
+    Debug_printv("_pathInStream[%s]", _pathInStream.c_str());
     return _pathInStream;
 }
 
 MFile* MFile::sourceFile() {
+    Debug_printv("_sourceFile[%s]", (_sourceFile != nullptr) ? "set" : "null");
     if(_sourceFile == nullptr)
         setupFields();
+
+    Debug_printv("_sourceFile[%s]", _sourceFile->url.c_str());
     return _sourceFile;
 }
 
 MFile* MFSOwner::File(std::string path, bool default_fs) {
+    Debug_printv("path[%s]", path.c_str());
 
     if ( !default_fs )
     {
@@ -284,12 +294,12 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
 MFileSystem* MFSOwner::findParentFS(std::vector<std::string>::iterator &begin, std::vector<std::string>::iterator &end, std::vector<std::string>::iterator &pathIterator) {
     while (pathIterator != begin)
     {
-        //Debug_printv("MFSOwner::findParentFS - going left the path");
+        //Debug_printv("going left the path");
         pathIterator--;
 
         auto part = *pathIterator;
         mstr::toLower(part);
-        Debug_printv("MFSOwner::findParentFS - examining part[%s]", part.c_str());
+        Debug_printv("examining part[%s]", part.c_str());
         if ( part.size() )
         {
             auto foundFS=std::find_if(availableFS.begin() + 1, availableFS.end(), [&part](MFileSystem* fs){ 

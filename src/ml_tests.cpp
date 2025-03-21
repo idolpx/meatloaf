@@ -614,21 +614,15 @@ void testSmartMFile() {
 void testNewPaths() {
     testHeader("Check if file in d64 in zip is sane");
     auto test1 = Meat::New<MFile>("/sd/archive/favorites.zip/goonies.d64/program");
-    Debug_printv("pathInStream[%s]", test1->pathInStream().c_str());
-
-    if ( test1 == nullptr )
-        Debug_printv("fail!");
+    Debug_printv("pathInStream()[%s]", test1->pathInStream().c_str());
 
     testHeader("Check if file in zip is fine");
-    test1.reset(test1->sourceFile());
-    Debug_printv("pathInStream[%s]", test1->pathInStream().c_str());
-
-    if ( test1 == nullptr )
-        Debug_printv("fail!");
+    auto test2 = test1->sourceFile();
+    Debug_printv("pathInStream()[%s]", test2->pathInStream().c_str());
 
     testHeader("Check if file in root is fine");
-    test1.reset(test1->sourceFile());
-    Debug_printv("pathInStream[%s]", test1->pathInStream().c_str());
+    auto test3 = test2->sourceFile();
+    Debug_printv("pathInStream()[%s]", test3->pathInStream().c_str());
 }
 
 void testPetsciiUtf() {
