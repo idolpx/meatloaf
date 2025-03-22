@@ -228,7 +228,7 @@ public:
     // has to return OPENED stream
     virtual MStream* getSourceStream(std::ios_base::openmode mode=std::ios_base::in);
     virtual MStream* getDecodedStream(std::shared_ptr<MStream> src) = 0;
-    virtual MStream* createStream(std::ios_base::openmode) { return nullptr; };
+    virtual MStream* createStream(std::ios_base::openmode mode=std::ios_base::in) { return nullptr; };
 
     virtual bool format(std::string header_info) { return false; };
 

@@ -253,9 +253,9 @@ void MFile::setupFields() {
 }
 
 std::string MFile::pathInStream() {
-    // Debug_printv("_pathInStream[%s]", _pathInStream.c_str());
-    // if(_pathInStream.empty())
-    //     setupFields();
+    Debug_printv("_pathInStream[%s]", _pathInStream.c_str());
+    if(_pathInStream.empty())
+        setupFields();
     Debug_printv("_pathInStream[%s]", _pathInStream.c_str());
     return _pathInStream;
 }
@@ -444,6 +444,7 @@ bool MFile::operator!=(nullptr_t ptr) {
 
 MStream* MFile::getSourceStream(std::ios_base::openmode mode) {
     // has to return OPENED stream
+    Debug_printv("sourceFile[%s] isroot[%d]", sourceFile()->url.c_str(), sourceFile()->m_rootfs);
 
     auto sourceStream = sourceFile()->getSourceStream(mode);
     if ( sourceStream == nullptr )

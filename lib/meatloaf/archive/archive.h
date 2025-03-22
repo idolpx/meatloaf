@@ -154,9 +154,11 @@ class ArchiveMFile : public MFile {
     }
 
     MStream *getDecodedStream(std::shared_ptr<MStream> is) {
-        Debug_printv("[%s]", url.c_str());
+        Debug_printv("is.url[%s]", is->url.c_str());
 
-        return new ArchiveMStream(is);
+        auto stream = new ArchiveMStream(is);
+        Debug_printv("stream.url[%s]", stream->url.c_str());
+        return stream;
     }
 
     bool isDirectory() override;
