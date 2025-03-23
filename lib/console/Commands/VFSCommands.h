@@ -34,4 +34,8 @@ namespace ESP32Console::Commands
     const ConsoleCommand getCRC32Command();
 
     const ConsoleCommand getWgetCommand();
+
+    const ConsoleCommand getEnableCommand();
+
+    const ConsoleCommand getDisableCommand();
 }

@@ -118,7 +118,11 @@ void iecFuji::setup(systemBus *bus)
     {
         _fnDisks[i].disk_dev.setDeviceNumber(BUS_DEVICEID_DISK+i);
         if (bus->attachDevice(&_fnDisks[i].disk_dev))
-            Debug_printf("Attached drive device #%d\r\n", BUS_DEVICEID_DISK+i);
+        {
+            bool enabled = Config.get_device_slot_enable(i+1);
+            Debug_printf("Attached drive device #%d %s\r\n", BUS_DEVICEID_DISK+i, (enabled ? "":"[disabled]"));
+            _fnDisks[i].disk_dev.setActive(enabled);
+        }
     }
 
     // 16-19 Network Devices
@@ -728,10 +732,14 @@ void iecFuji::net_set_ssid_basic(bool store)
     net_set_ssid(store, net_config);
 }
 
-void iecFuji::enable_device_basic()
+void iecFuji::enable_device_basic(std::string ids)
 {
-    // Strip off the ENABLE: part of the command
-    pt[0] = pt[0].substr(7, std::string::npos);
+    if(ids.empty()) {
+        // Strip off the ENABLE: part of the command
+        pt[0] = pt[0].substr(7, std::string::npos);
+    } else {
+        pt = util_tokenize(ids, ',');
+    }
 
     // Enable devices
     for (int i = 0; i < pt.size(); i++) {
@@ -739,15 +747,21 @@ void iecFuji::enable_device_basic()
         auto d = IEC.findDevice(device, true);
         if (d) {
             d->setActive(true);
+            Config.store_device_slot_enable((device - 7), true);
             Debug_printv("Enable Device #%d [%d]", device, d->isActive());
         }
     }
+    Config.save();
 }
 
-void iecFuji::disable_device_basic()
+void iecFuji::disable_device_basic(std::string ids)
 {
-    // Strip off the DISABLE: part of the command
-    pt[0] = pt[0].substr(8, std::string::npos);
+    if(ids.empty()) {
+        // Strip off the DISABLE: part of the command
+        pt[0] = pt[0].substr(8, std::string::npos);
+    } else {
+        pt = util_tokenize(ids, ',');
+    }
 
     // Disable devices
     for (int i = 0; i < pt.size(); i++) {
@@ -755,9 +769,11 @@ void iecFuji::disable_device_basic()
         auto d = IEC.findDevice(device, true);
         if (d) {
             d->setActive(false);
+            Config.store_device_slot_enable((device - 7), false);
             Debug_printv("Disable Device #%d [%d]", device, d->isActive());
         }
     }
+    Config.save();
 }
 
 void iecFuji::net_set_ssid_raw(bool store)

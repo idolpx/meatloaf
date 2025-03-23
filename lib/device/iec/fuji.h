@@ -351,8 +351,8 @@ protected:
 
     // Commodore specific
     void local_ip();
-    void enable_device_basic();
-    void disable_device_basic();
+    void enable_device_basic(std::string ids = "");
+    void disable_device_basic(std::string ids = "");
 
     int appkey_size = 64;
     std::map<int, int> mode_to_keysize = {

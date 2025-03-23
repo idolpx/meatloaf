@@ -10,9 +10,11 @@
 #include <sys/syslimits.h>
 #include <iostream>
 
+#include "fnConfig.h"
 #include "../Console.h"
 #include "../Helpers/PWDHelpers.h"
 #include "../ute/ute.h"
+#include "../../device/iec/meatloaf.h"
 
 using namespace ESP32Console;
 
@@ -387,7 +389,7 @@ int mount(int argc, char **argv)
             auto drive = Meatloaf.get_disks(i);
             if (drive != nullptr)
             {
-                fprintf(stdout, "#%02d: %s\r\n", i + 8, drive->disk_dev.getCWD().c_str()); //"%d: %s\r\n", drive->disk_dev.getCWD().c_str();
+                fprintf(stdout, "#%02d: %s %s\r\n", i + 8, drive->disk_dev.getCWD().c_str(), (Config.get_device_slot_enable(i+1) ? "":"[disabled]")); //"%d: %s\r\n", drive->disk_dev.getCWD().c_str();
             }
         }
 
@@ -492,6 +494,33 @@ int wget(int argc, char **argv)
     return EXIT_SUCCESS;
 }
 
+
+int enable(int argc, char **argv)
+{
+    if (argc != 2)
+    {
+        fprintf(stderr, "enable {id_1}|{id_1},{id_2},...\r\n");
+        return EXIT_SUCCESS;
+    }
+
+    Meatloaf.enable(argv[1]);
+
+    return EXIT_SUCCESS;
+}
+
+int disable(int argc, char **argv)
+{
+    if (argc != 2)
+    {
+        fprintf(stderr, "disable {id_1}|{id_1},{id_2},...\r\n");
+        return EXIT_SUCCESS;
+    }
+
+    Meatloaf.disable(argv[1]);
+
+    return EXIT_SUCCESS;
+}
+
 namespace ESP32Console::Commands
 {
     const ConsoleCommand getCatCommand()
@@ -557,5 +586,14 @@ namespace ESP32Console::Commands
     const ConsoleCommand getWgetCommand()
     {
         return ConsoleCommand("wget", &wget, "Download url to file");
+    }
+
+    const ConsoleCommand getEnableCommand()
+    {
+        return ConsoleCommand("enable", &enable, "Enable virtual drive");
+    }
+    const ConsoleCommand getDisableCommand()
+    {
+        return ConsoleCommand("disable", &disable, "Disable virtual drive");
     }
 }
