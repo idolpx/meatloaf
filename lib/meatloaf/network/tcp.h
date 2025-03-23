@@ -46,7 +46,7 @@ public:
             Debug_printv("Unable to create socket: errno %d", errno);
             return false;
         }
-        //Debug_printv("Socket created, connecting to %s:%d", address, port);
+        //Debug_printv("Socket created, connecting to %s:%d (%x)", address, port, dest_addr.sin_addr.s_addr);
 
         int err = connect(sock, (struct sockaddr *)&dest_addr, sizeof(struct sockaddr_in6));
 
@@ -54,7 +54,7 @@ public:
             Debug_printv("Socket unable to connect: errno %d", errno);
             return false;
         }
-        //Debug_printv("After connect for socet");
+        Debug_printv("After connect for socket");
 
         return true;
     }
@@ -351,7 +351,7 @@ public:
     TCPMFileSystem(): MFileSystem("tcp") {};
 
     bool handles(std::string name) {
-        if ( mstr::equals(name, (char *)"tcp:", false) )
+        if ( mstr::startsWith(name, (char *)"tcp:", false) )
             return true;
 
         return false;

@@ -274,6 +274,7 @@ private:
 
     bool readHeader() override
     {
+        //Debug_printv("readHeader");
         seekSector( 
             partitions[partition].header_track, 
             partitions[partition].header_sector, 

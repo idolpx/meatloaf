@@ -40,11 +40,21 @@ bool CSIPMSessionMgr::establishSession() {
 
 std::string CSIPMSessionMgr::readLn() {
     char buffer[80];
+    std::string line;
     // telnet line ends with 10;
     getline(buffer, 80, 10);
+    line = buffer;
+    // if (line.empty()) {
+    //     usleep(150000000); // 1.5 sec delay if no data
+    //     getline(buffer, 80, 10);
+    // }
+    // line = buffer;
+    if (line.empty()) {
+        line = '\x04';
+    }
 
-    Debug_printv("Inside readln got: '%s'", buffer);
-    return std::string((char *)buffer);
+    //Debug_printv("Inside readln got: '%s'", buffer);
+    return line;
 }
 
 bool CSIPMSessionMgr::sendCommand(std::string command) {
@@ -71,7 +81,7 @@ bool CSIPMSessionMgr::isOK() {
 
     bool equals = strncmp("00 - OK\x0d", reply.c_str(), 7);
 
-    //Debug_printv("Testing of OK, got:'%s', %d", reply.c_str(), equals);
+    Debug_printv("ok[%s] equals[%d]", reply.c_str(), equals);
 
     return equals;
 }
@@ -94,7 +104,6 @@ bool CSIPMSessionMgr::traversePath(MFile* path) {
             return false;
     }
 
-    Debug_printv("here");
     if(isOK()) {
         Debug_printv("path[%s]", path->path.c_str());
         if(path->path.compare("/") == 0) {
@@ -268,11 +277,11 @@ bool CSIPMFile::rewindDirectory() {
         return false;
 
 
-    Debug_printv("pre traverse path");
+    //Debug_printv("pre traverse path");
 
     if(!CSIPMFileSystem::session.traversePath(this)) return false;
 
-    Debug_printv("post traverse path");
+    //Debug_printv("post traverse path");
 
     if(mstr::endsWith(path, ".d64", false))
     {
@@ -281,7 +290,7 @@ bool CSIPMFile::rewindDirectory() {
         Debug_printv("cserver: this is a d64 img, sending $ command!");
         CSIPMFileSystem::session.sendCommand("$");
         auto line = CSIPMFileSystem::session.readLn(); // mounted image name
-        if(CSIPMFileSystem::session.is_open()) {
+        if(CSIPMFileSystem::session.is_open() && line.size()) {
             dirIsOpen = true;
             media_image = line.substr(5);
             line = CSIPMFileSystem::session.readLn(); // dir header
@@ -296,13 +305,11 @@ bool CSIPMFile::rewindDirectory() {
     {
         dirIsImage = false;
         // to list directory contents we use
-        //Debug_printv("cserver: this is a directory!");
+        Debug_printv("cserver: this is a directory!");
         CSIPMFileSystem::session.sendCommand("disks");
         auto line = CSIPMFileSystem::session.readLn(); // dir header
-        if ( line.empty() )
-            return false;
-
-        if(CSIPMFileSystem::session.is_open()) {
+        //Debug_printv("line[%s]", line.c_str());
+        if(CSIPMFileSystem::session.is_open() && line.size()) {
             media_header = line.substr(2, line.find_last_of("]")-1);
             media_id = "C=SVR";
             dirIsOpen = true;
@@ -330,7 +337,7 @@ MFile* CSIPMFile::getNextFileInDir() {
     size_t size;
     std::string new_url = url;
 
-    if(url.size()>4) // If we are not at root then add additional "/"
+    if(url.size()>8) // If we are not at root then add additional "/"
         new_url += "/";
 
     //Debug_printv("pre dir is image");
@@ -383,6 +390,7 @@ MFile* CSIPMFile::getNextFileInDir() {
 
         // 32 62 91 68 73 83 75 32 84 79 79 76 83 93 13 No more! = > [DISK TOOLS]
 
+        //Debug_printv("line[%s]", line.c_str());
         if(line.find('\x04')!=std::string::npos) {
             Debug_printv("No more!");
             dirIsOpen = false;
@@ -396,14 +404,15 @@ MFile* CSIPMFile::getNextFileInDir() {
             }
             else {
                 name = line.substr(0, line.length()-1);
-                size = 683;
+                size = (683 * 256);
             }
 
-            Debug_printv("url[%s] name[%s] size[%d]\r\n", url.c_str(), name.c_str(), size);
+            Debug_printv("url[%s] name[%s] size[%d]", url.c_str(), name.c_str(), size);
             if(name.size() > 0)
             {
                 new_url += name;
-                return new CSIPMFile(new_url, size);                
+                Debug_printv("new_url[%s]", new_url.c_str());
+                return new CSIPMFile(new_url, size);
             }
             else
                 return nullptr;

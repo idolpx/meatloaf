@@ -243,6 +243,15 @@ MFile* FlashMFile::getNextFileInDir()
         auto file = new FlashMFile(entry_name);
         file->extension = " " + file->extension;
 
+        if(file->isDirectory()) {
+            file->size = 0;
+        }
+        else {
+            struct stat info;
+            stat( std::string(entry_name).c_str(), &info);
+            file->size = info.st_size;
+        }
+
         return file;
     }
     else

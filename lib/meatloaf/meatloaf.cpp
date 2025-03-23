@@ -446,7 +446,12 @@ MStream* MFile::getSourceStream(std::ios_base::openmode mode) {
     // has to return OPENED stream
     Debug_printv("sourceFile[%s] isroot[%d]", sourceFile()->url.c_str(), sourceFile()->m_rootfs);
 
-    auto sourceStream = sourceFile()->getSourceStream(mode);
+    MStream* sourceStream = nullptr;
+    if ( !m_rootfs )
+        sourceStream = sourceFile()->getSourceStream(mode);
+    else
+        sourceStream = createStream();
+
     if ( sourceStream == nullptr )
     {
         Debug_printv("UNFORTUNATELY recursive call returned NULL!, bailing out");

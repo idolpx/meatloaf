@@ -87,14 +87,14 @@ MStream* HTTPMFile::createStream(std::ios_base::openmode mode)
 }
 
 bool HTTPMFile::isDirectory() {
-    // if(fromHeader()->m_isDirectory)
-    //     return true;
+    if(fromHeader()->m_isDirectory)
+        return true;
 
-    // if(fromHeader()->m_isWebDAV) {
-    //     // try webdav PROPFIND to get a listing
-    //     return true;
-    // }
-    // else
+    if(fromHeader()->m_isWebDAV) {
+        // try webdav PROPFIND to get a listing
+        return true;
+    }
+    else
         // otherwise return false
         return false;
 }
@@ -187,7 +187,7 @@ bool HTTPMStream::open(std::ios_base::openmode mode) {
                 _http.flush();
             }
         }
-    } while ( _http.wasRedirected && redirect_count );
+    } while ( _http.wasRedirected && _http.disableAutoRedirect && redirect_count );
 
     return r;
 }
@@ -301,6 +301,16 @@ bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
     return processRedirectsAndOpen(0);
 };
 
+// void MeatHttpClient::cancel() {
+//     if(_http != nullptr) {
+//         if ( _is_open ) {
+//             esp_http_client_cancel_request(_http);
+//         }
+//         Debug_printv("HTTP Cancel");
+//     }
+//     _is_open = false;
+// }
+
 void MeatHttpClient::close() {
     if(_http != nullptr) {
         if ( _is_open ) {
@@ -330,7 +340,7 @@ bool MeatHttpClient::flush(uint32_t pos) {
     {
         int bytes = esp_http_client_read(_http, c, HTTP_BLOCK_SIZE);
 
-        //Debug_printv("_position[%lu] pos[%lu] count[%u] bytes[%u]", _position, pos, count, bytes);
+        Debug_printv("_position[%lu] pos[%lu] count[%u] bytes[%u]", _position, pos, count, bytes);
 
         if(bytes == -1)
             return false;
