@@ -7,6 +7,7 @@
 
 #include "display.h"
 #include "string_utils.h"
+#include "../../../src/ml_tests.h"
 
 static int clear(int argc, char **argv)
 {
@@ -124,6 +125,29 @@ static int declare(int argc, char **argv)
     return EXIT_SUCCESS;
 }
 
+static int run(int argc, char **argv)
+{
+    if (argc < 2) {
+        fprintf(stderr, "run {test}\r\n");
+        return EXIT_FAILURE; 
+    }
+
+    if (mstr::startsWith(argv[1], "test"))
+    {
+        runTestsSuite();
+    }
+    // else if (mstr::startsWith(argv[1], "send"))
+    // {
+    //     DISPLAY.send();
+    // }
+    else
+    {
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
+}
+
 #ifdef ENABLE_DISPLAY
 static int led(int argc, char **argv)
 {
@@ -189,10 +213,16 @@ static int led(int argc, char **argv)
         // else
         //     DISPLAY.idle();
     }
+    else
+    {
+        return EXIT_FAILURE;
+    }
 
     return EXIT_SUCCESS;
 }
 #endif
+
+
 
 namespace ESP32Console::Commands
 {
@@ -225,6 +255,11 @@ namespace ESP32Console::Commands
     const ConsoleCommand getDeclareCommand()
     {
         return ConsoleCommand("declare", &declare, "Change enviroment variables");
+    }
+
+    const ConsoleCommand getRunCommand()
+    {
+        return ConsoleCommand("run", &run, "Run a command");
     }
 
 #ifdef ENABLE_DISPLAY

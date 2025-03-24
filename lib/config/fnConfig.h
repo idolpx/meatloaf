@@ -240,6 +240,7 @@ public:
     bool get_cpm_enabled(){ return _cpm.cpm_enabled; };
 
     // ENABLE/DISABLE DEVICE SLOTS
+    bool get_device_slot_enable(uint8_t slot);
     bool get_device_slot_enable_1();
     bool get_device_slot_enable_2();
     bool get_device_slot_enable_3();
@@ -248,6 +249,7 @@ public:
     bool get_device_slot_enable_6();
     bool get_device_slot_enable_7();
     bool get_device_slot_enable_8();
+    void store_device_slot_enable(uint8_t slot, bool enabled);
     void store_device_slot_enable_1(bool enabled);
     void store_device_slot_enable_2(bool enabled);
     void store_device_slot_enable_3(bool enabled);

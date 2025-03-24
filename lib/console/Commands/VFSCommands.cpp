@@ -10,9 +10,11 @@
 #include <sys/syslimits.h>
 #include <iostream>
 
+#include "fnConfig.h"
 #include "../Console.h"
 #include "../Helpers/PWDHelpers.h"
 #include "../ute/ute.h"
+#include "../../device/iec/meatloaf.h"
 
 using namespace ESP32Console;
 
@@ -37,6 +39,89 @@ int cat(int argc, char **argv)
                     char chr = istream.get();
                     fprintf(stdout, "%c", chr);
                 }        
+            }
+            istream.close();
+        }
+        else {
+            fprintf(stderr, "ERROR:%s could not be read!\r\n", path->url.c_str());
+        }
+    }
+
+    return EXIT_SUCCESS;
+}
+
+int hex(int argc, char **argv)
+{
+    if (argc == 1)
+    {
+        fprintf(stderr, "You have to pass at least one file path!\r\n");
+        return EXIT_SUCCESS;
+    }
+
+    for (int n = 1; n < argc; n++)
+    {
+        std::unique_ptr<MFile> path(getCurrentPath()->cd(argv[n]));
+        Meat::iostream istream(path.get());
+
+        if(istream.is_open()) {
+            if(istream.eof()) {
+                fprintf(stderr, "Stream returned EOF!");
+            } else {
+                int c = 0;
+                int address = 0;
+                char b[17] = {0};
+                while(!istream.eof()) 
+                {
+                    char chr = istream.get();
+
+                    if ( !istream.eof() )
+                    {
+                        if ( c == 0 )
+                        {
+                            fprintf(stdout, "%04X: ", address);
+                            address += 0x10;
+                        }
+
+                        fprintf(stdout, "%02X ", chr);
+
+                        // replace non-printable characters
+                        if ( chr < 32 || chr > 126 )
+                            chr = '.';
+
+                        b[c] = chr;
+                    }
+
+                    // add padding
+                    if ( istream.eof() && c )
+                    {
+                        if ( c <= 0x07 )
+                        {
+                            while ( c++ < 0x08 )
+                                fprintf(stdout, "   ");
+
+                            fprintf(stdout, "| ");
+                            c--;
+                        }
+
+                        while ( c++ < 0x10 )
+                            fprintf(stdout, "   ");
+                    }
+                    else if ( c++ == 0x07 )
+                    {
+                        // add separator
+                        fprintf(stdout, "| ");
+                    }
+
+                    // show line data as ascii
+                    if ( c >= 0x10 )
+                    {
+                        fprintf(stdout, " |%-16s|\r\n", b);
+                        c = 0;
+                        memset(b, 0, sizeof(b));
+                    }
+                }
+                fprintf(stdout, "\r\n");
+                fprintf(stdout, "url[%s] size[%ld]\r\n", path->url.c_str(), path->size);
             }
             istream.close();
         }
@@ -112,7 +197,10 @@ int ls(int argc, char **argv)
     }
 
     while(entry.get() != nullptr) {
-        printf("%c %8lu  %s\r\n", (entry->isDirectory()) ? 'd':'-', entry->size, entry->name.c_str());
+        if ( entry->isPETSCII )
+            entry->name = mstr::toUTF8(entry->name);
+
+        printf("%c %8lu  '%s'\r\n", (entry->isDirectory()) ? 'd':'-', entry->size, entry->name.c_str());
         entry.reset(destPath->getNextFileInDir());
     }
 
@@ -301,7 +389,7 @@ int mount(int argc, char **argv)
             auto drive = Meatloaf.get_disks(i);
             if (drive != nullptr)
             {
-                fprintf(stdout, "#%02d: %s\r\n", i + 8, drive->disk_dev.getCWD().c_str()); //"%d: %s\r\n", drive->disk_dev.getCWD().c_str();
+                fprintf(stdout, "#%02d: %s %s\r\n", i + 8, drive->disk_dev.getCWD().c_str(), (Config.get_device_slot_enable(i+1) ? "":"[disabled]")); //"%d: %s\r\n", drive->disk_dev.getCWD().c_str();
             }
         }
 
@@ -406,11 +494,43 @@ int wget(int argc, char **argv)
     return EXIT_SUCCESS;
 }
 
+
+int enable(int argc, char **argv)
+{
+    if (argc != 2)
+    {
+        fprintf(stderr, "enable {id_1}|{id_1},{id_2},...\r\n");
+        return EXIT_SUCCESS;
+    }
+
+    Meatloaf.enable(argv[1]);
+
+    return EXIT_SUCCESS;
+}
+
+int disable(int argc, char **argv)
+{
+    if (argc != 2)
+    {
+        fprintf(stderr, "disable {id_1}|{id_1},{id_2},...\r\n");
+        return EXIT_SUCCESS;
+    }
+
+    Meatloaf.disable(argv[1]);
+
+    return EXIT_SUCCESS;
+}
+
 namespace ESP32Console::Commands
 {
     const ConsoleCommand getCatCommand()
     {
         return ConsoleCommand("cat", &cat, "Show the content of one or more files.");
+    }
+
+    const ConsoleCommand getHexCommand()
+    {
+        return ConsoleCommand("hex", &hex, "Show the content of one or more files as hex.");
     }
 
     const ConsoleCommand getPWDCommand()
@@ -466,5 +586,14 @@ namespace ESP32Console::Commands
     const ConsoleCommand getWgetCommand()
     {
         return ConsoleCommand("wget", &wget, "Download url to file");
+    }
+
+    const ConsoleCommand getEnableCommand()
+    {
+        return ConsoleCommand("enable", &enable, "Enable virtual drive");
+    }
+    const ConsoleCommand getDisableCommand()
+    {
+        return ConsoleCommand("disable", &disable, "Disable virtual drive");
     }
 }

@@ -92,6 +92,7 @@ namespace ESP32Console
         registerCommand(getSetMultilineCommand());
         registerCommand(getEnvCommand());
         registerCommand(getDeclareCommand());
+        registerCommand(getRunCommand());
 #ifdef ENABLE_DISPLAY
         registerCommand(getLEDCommand());
 #endif
@@ -118,6 +119,7 @@ namespace ESP32Console
     void Console::registerVFSCommands()
     {
         registerCommand(getCatCommand());
+        registerCommand(getHexCommand());
         registerCommand(getCDCommand());
         registerCommand(getPWDCommand());
         registerCommand(getLsCommand());
@@ -129,6 +131,8 @@ namespace ESP32Console
         registerCommand(getEditCommand());
         registerCommand(getMountCommand());
         registerCommand(getWgetCommand());
+        registerCommand(getEnableCommand());
+        registerCommand(getDisableCommand());
     }
 
     void Console::registerGPIOCommands()

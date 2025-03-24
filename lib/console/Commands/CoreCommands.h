@@ -16,6 +16,8 @@ namespace ESP32Console::Commands
 
     const ConsoleCommand getDeclareCommand();
 
+    const ConsoleCommand getRunCommand();
+
 #ifdef ENABLE_DISPLAY
     const ConsoleCommand getLEDCommand();
 #endif
