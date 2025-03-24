@@ -57,7 +57,7 @@ bool TNFSMFile::pathValid(std::string path)
 
 bool TNFSMFile::isDirectory()
 {
-    if(path=="/" || path=="")
+    if(path=="/" || path.empty())
         return true;
 
     struct stat info;

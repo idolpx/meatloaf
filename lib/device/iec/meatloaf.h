@@ -57,12 +57,10 @@ public:
     }
 
     void enable(std::string deviceids) {
-        payload = deviceids;
-        enable_device_basic();
+        enable_device_basic(deviceids);
     }
     void disable(std::string deviceids) {
-        payload = deviceids;
-        disable_device_basic();
+        disable_device_basic(deviceids);
     }
 };
 
