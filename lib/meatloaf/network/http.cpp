@@ -45,13 +45,11 @@ MeatHttpClient* HTTPMFile::fromHeader() {
         client->HEAD(url);
         //Debug_printv("after head url[%s]", client->url.c_str());
         if (client->wasRedirected)
-        {
-            client->flush();
             resetURL(client->url);
-        }
     }
     return client;
 }
+
 
 MStream* HTTPMFile::getSourceStream(std::ios_base::openmode mode) {
     // has to return OPENED stream
@@ -118,7 +116,7 @@ time_t HTTPMFile::getCreationTime() {
 }
 
 bool HTTPMFile::exists() {
-    //return fromHeader()->_exists;
+    return fromHeader()->_exists;
     return true;
 }
 
@@ -167,10 +165,7 @@ bool HTTPMFile::isText() {
  ********************************************************/
 bool HTTPMStream::open(std::ios_base::openmode mode) {
     bool r = false;
-    int redirect_count = 3;
 
-    do
-    {
         if(mode == (std::ios_base::out | std::ios_base::app))
             r = _http.PUT(url);
         else if(mode == std::ios_base::out)
@@ -181,13 +176,8 @@ bool HTTPMStream::open(std::ios_base::openmode mode) {
         if ( r ) {
             _size = ( _http._range_size > 0) ? _http._range_size : _http._size;
             if ( _http.wasRedirected )
-            {
                 url = _http.url;
-                redirect_count--;
-                _http.flush();
-            }
         }
-    } while ( _http.wasRedirected && redirect_count );
 
     return r;
 }
@@ -301,6 +291,16 @@ bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
     return processRedirectsAndOpen(0);
 };
 
+// void MeatHttpClient::cancel() {
+//     if(_http != nullptr) {
+//         if ( _is_open ) {
+//             esp_http_client_cancel_request(_http);
+//         }
+//         Debug_printv("HTTP Cancel");
+//     }
+//     _is_open = false;
+// }
+
 void MeatHttpClient::close() {
     if(_http != nullptr) {
         if ( _is_open ) {
@@ -330,7 +330,7 @@ bool MeatHttpClient::flush(uint32_t pos) {
     {
         int bytes = esp_http_client_read(_http, c, HTTP_BLOCK_SIZE);
 
-        //Debug_printv("_position[%lu] pos[%lu] count[%u] bytes[%u]", _position, pos, count, bytes);
+        Debug_printv("_position[%lu] pos[%lu] count[%u] bytes[%u]", _position, pos, count, bytes);
 
         if(bytes == -1)
             return false;
@@ -350,24 +350,42 @@ bool MeatHttpClient::flush(uint32_t pos) {
     return true;
 }
 
-
 bool MeatHttpClient::seek(uint32_t pos) {
 
-    auto delta = pos - _position;
-    //Debug_printv("_position[%lu] pos[%lu] delta[%lu]", _position, pos, delta);
+    if(isFriendlySkipper) {
 
-    if ( isFriendlySkipper )
-    {
-        // flush to delta
-        if ( !flush(delta) )
+        if (_is_open) {
+            // Read to end of the stream
+            //Debug_printv("Skipping to end!");
+            while(1)
+            {
+                        char c[HTTP_BLOCK_SIZE];
+                int bytes = esp_http_client_read(_http, c, HTTP_BLOCK_SIZE);
+                if ( bytes < HTTP_BLOCK_SIZE )
+                    break;
+            }
+        }
+
+        uint32_t delta = pos - _position;
+
+        bool op = processRedirectsAndOpen(pos);
+
+        //Debug_printv("SEEK in HTTPMStream %s: range request RC=%d", url.c_str(), lastRC);
+
+        if(!op)
             return false;
 
         if ( delta > HTTP_BLOCK_SIZE )
         {
             // flush the rest
             //Debug_printv("_position[%lu] pos[%lu] available[%lu]", _position, pos, available());
-            if ( !flush() )
-                return false;
+            int rc = 0;
+            do {
+                char c;
+                rc = esp_http_client_read(_http, &c, 1);
+                if(rc == -1)
+                    return false;
+            } while(rc);
 
             if ( !processRedirectsAndOpen(pos) )
                 return false;
@@ -394,20 +412,28 @@ bool MeatHttpClient::seek(uint32_t pos) {
             if ( !open(url, lastMethod) )
                 return false;
 
-            // flush response to pos
-            //Debug_printv("pos[%lu]", pos);
-            if ( !flush(pos) )
-                return false;
+            // and read pos bytes - requires some buffer
+            for(int i = 0; i<pos; i++) {
+                char c;
+                int rc = esp_http_client_read(_http, &c, 1);
+                if(rc == -1)
+                    return false;
+            }
         }
-        else 
-        {
-            // flush the delta
-            //Debug_printv("delta[%lu]", delta);
-            if ( !flush(delta) )
+        else {
+            auto delta = pos-_position;
+            // skipping forward let's skip a proper amount of bytes - requires some buffer
+            for(int i = 0; i<delta; i++) {
+                char c;
+                int rc = esp_http_client_read(_http, &c, 1);
+                if(rc == -1)
                 return false;
+            }
         }
 
         _position = pos;
+        Debug_printv("stream opened[%s]", url.c_str());
+
         return true;
     }
     else

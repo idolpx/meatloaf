@@ -68,6 +68,7 @@ public:
         config.user_agent = USER_AGENT;
         config.method = HTTP_METHOD_GET;
         config.timeout_ms = 10000;
+        config.disable_auto_redirect = disableAutoRedirect;
         config.max_redirection_count = 10;
         config.event_handler = _http_event_handler;
         config.user_data = this;
@@ -104,6 +105,7 @@ public:
 
     bool processRedirectsAndOpen(uint32_t position, uint32_t size = HTTP_BLOCK_SIZE);
     bool open(std::string url, esp_http_client_method_t meth);
+    //void cancel();
     void close();
     void setOnHeader(const std::function<int(char*, char*)> &f);
     bool flush(uint32_t pos = 0);
@@ -127,6 +129,7 @@ public:
     bool m_isDirectory = false;
     bool isText = false;
     bool isFriendlySkipper = false;
+    bool disableAutoRedirect = false;
     bool wasRedirected = false;
     std::string url;
 

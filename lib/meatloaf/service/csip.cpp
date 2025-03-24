@@ -407,11 +407,11 @@ MFile* CSIPMFile::getNextFileInDir() {
                 size = (683 * 256);
             }
 
-            Debug_printv("url[%s] name[%s] size[%d]", url.c_str(), name.c_str(), size);
+            //Debug_printv("url[%s] name[%s] size[%d]", url.c_str(), name.c_str(), size);
             if(name.size() > 0)
             {
                 new_url += name;
-                Debug_printv("new_url[%s]", new_url.c_str());
+                //Debug_printv("new_url[%s]", new_url.c_str());
                 return new CSIPMFile(new_url, size);
             }
             else
