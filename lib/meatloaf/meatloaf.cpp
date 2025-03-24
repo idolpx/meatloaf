@@ -232,7 +232,6 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
 
         if ( csipFS.handles(path) )
         {
-            printf("C=Server!\r\n");
             return csipFS.getFile(path);
         }
     }
@@ -561,7 +560,7 @@ MFile* MFile::cd(std::string newDir)
         {
             // user entered: CD:.. or CD..
             // means: go up one directory
-            return cdParent();
+            return cdParent(mstr::drop(newDir,2));
         }
         else 
         {
@@ -630,7 +629,7 @@ MFile* MFile::cd(std::string newDir)
 
 MFile* MFile::cdParent(std::string plus) 
 {
-    Debug_printv("url[%s] path[%s] plus[%s]", url.c_str(), path.c_str(), plus.c_str());
+    //Debug_printv("url[%s] path[%s] plus[%s]", url.c_str(), path.c_str(), plus.c_str());
 
     // drop last dir
     // add plus
@@ -641,50 +640,67 @@ MFile* MFile::cdParent(std::string plus)
     }
     else 
     {
-        int lastSlash = url.find_last_of('/');
-        if ( lastSlash == url.size() - 1 ) 
+        int lastSlash = path.find_last_of('/');
+        if ( lastSlash == path.size() - 1 ) 
         {
-            lastSlash = url.find_last_of('/', url.size() - 2);
+            if ( lastSlash == 0 )
+                return MFSOwner::File("/", true);
+
+            lastSlash = path.find_last_of('/', path.size() - 2);
         }
-        std::string newDir = mstr::dropLast(url, url.size() - lastSlash);
+        std::string newDir = mstr::dropLast(path, path.size() - lastSlash);
         if(!plus.empty())
             newDir+= ("/" + plus);
 
-        return MFSOwner::File(newDir);
+        path = newDir;
+        rebuildUrl();
+        //Debug_printv("url[%s]", url.c_str());
+
+        return MFSOwner::File(url);
     }
 };
 
 MFile* MFile::cdLocalParent(std::string plus) 
 {
-    Debug_printv("url[%s] path[%s] plus[%s]", url.c_str(), path.c_str(), plus.c_str());
+    //Debug_printv("url[%s] path[%s] plus[%s]", url.c_str(), path.c_str(), plus.c_str());
     // drop last dir
     // check if it isn't shorter than sourceFile
     // add plus
-    int lastSlash = url.find_last_of('/');
-    if ( lastSlash == url.size() - 1 ) {
-        lastSlash = url.find_last_of('/', url.size() - 2);
+    int lastSlash = path.find_last_of('/');
+    if ( lastSlash == path.size() - 1 ) {
+        lastSlash = path.find_last_of('/', path.size() - 2);
     }
-    std::string parent = mstr::dropLast(url, url.size() - lastSlash);
-    if(parent.length()-sourceFile->url.length()>1)
-        parent = sourceFile->url;
-    return MFSOwner::File( parent + "/" + plus );
+    std::string parent = mstr::dropLast(path, path.size() - lastSlash);
+    if(parent.length()-sourceFile->path.length()>1)
+        parent = sourceFile->path;
+
+    if(!plus.empty())
+        parent+= ("/" + plus);
+
+    path = parent;
+    rebuildUrl();
+
+    return MFSOwner::File(url);
 };
 
 MFile* MFile::cdRoot(std::string plus) 
 {
-    Debug_printv("url[%s] path[%s] plus[%s]", url.c_str(), path.c_str(), plus.c_str());
+    //Debug_printv("url[%s] path[%s] plus[%s]", url.c_str(), path.c_str(), plus.c_str());
     return MFSOwner::File( "/" + plus, true );
 };
 
 MFile* MFile::cdLocalRoot(std::string plus) 
 {
-    Debug_printv("url[%s] path[%s] plus[%s]", url.c_str(), path.c_str(), plus.c_str());
+    //Debug_printv("url[%s] path[%s] plus[%s]", url.c_str(), path.c_str(), plus.c_str());
 
     if ( path.empty() || sourceFile == nullptr ) {
         // from here we can go only to flash root!
-        return MFSOwner::File( "/" + plus );
+        path = "/" + plus;
+    } else {
+        path = sourceFile->path + "/" + plus;
     }
-    return MFSOwner::File( sourceFile->url + "/" + plus );
+    rebuildUrl();
+    return MFSOwner::File( url );
 };
 
 // bool MFile::copyTo(MFile* dst) {
