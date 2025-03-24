@@ -30,9 +30,8 @@
 CSIPMSessionMgr CSIPMFileSystem::session;
 
 bool CSIPMSessionMgr::establishSession() {
-    //Debug_printv("In establishSession");
     if(!buf.is_open()) {
-        currentDir = "csip://";
+        currentDir = "csip:/";
         buf.open();
     }
     
@@ -59,12 +58,14 @@ std::string CSIPMSessionMgr::readLn() {
 }
 
 bool CSIPMSessionMgr::sendCommand(std::string command) {
+    std::string c = mstr::toPETSCII2(command);
     // 13 (CR) sends the command
     if(establishSession()) {
-        printf("CSIP: send command: %s\r\n", command.c_str());
-        (*this) << (command+'\r');
+        Debug_printv("command[%s]", c.c_str());
+        (*this) << (c+'\r');
         (*this).flush();
-        sleep(1); // wait for command to execute before trying to read response
+        (*this).sync();
+        sleep(1);
         return true;
     }
     else
@@ -76,7 +77,7 @@ bool CSIPMSessionMgr::isOK() {
 
     auto reply = readLn();
     // for(int i = 0 ; i<reply.length(); i++)
-    //      Debug_printv("'%d'", reply[i]);
+    //     Debug_printv("'%d'", reply[i]);
 
     bool equals = strncmp("00 - OK\x0d", reply.c_str(), 7);
 
@@ -89,7 +90,7 @@ bool CSIPMSessionMgr::traversePath(MFile* path) {
     // tricky. First we have to
     // CF / - to go back to root
 
-    Debug_printv("Traversing path: [%s]", path->path.c_str());
+    //Debug_printv("Traversing path: [%s]", path->path.c_str());
 
     if(buf.is_open()) {
         // if we are still connected we can smart change dir by just going up or down

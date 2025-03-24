@@ -404,7 +404,7 @@ uint16_t D64MStream::blocksFree()
 
 uint32_t D64MStream::readFile(uint8_t *buf, uint32_t size)
 {
-    Debug_printv("readFile(%d)", size);
+    //Debug_printv("readFile(%d)", size);
     if (sector_offset % block_size == 0)
     {
         // We are at the beginning of the block
@@ -550,8 +550,8 @@ bool D64MStream::seekPath(std::string path)
     Debug_printv("header_info[%s] url[%s]", header_info.c_str(), url.c_str());
 
     // Set the stream file
-    sourceFile = MFSOwner::File(url);
-    D64MStream* image = (D64MStream*)sourceFile->getSourceStream(std::ios_base::in | std::ios_base::out | std::ios_base::trunc);
+    auto newFile = MFSOwner::File(url);
+    D64MStream* image = (D64MStream*)newFile->getSourceStream(std::ios_base::in | std::ios_base::out | std::ios_base::trunc);
     if (image == nullptr)
         return false;
 
@@ -577,6 +577,7 @@ bool D64MStream::seekPath(std::string path)
     uint8_t data = 0x00;
     image->write(&data, 1);
 
+    delete newFile;
     delete image;
     return true;
  }

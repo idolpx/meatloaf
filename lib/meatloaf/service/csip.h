@@ -57,7 +57,7 @@ public:
     }
 
     bool open() {
-        Debug_printv("csstreambuf: open");
+        //Debug_printv("csstreambuf: open");
         if(m_wifi.isOpen())
             return true;
 
@@ -227,7 +227,7 @@ public:
 class CSIPMFile: public MFile {
 
 public:
-    CSIPMFile(std::string path, size_t size = 0): MFile(path) 
+    CSIPMFile(std::string path, size_t size = 0): MFile(path)
     {
         //Debug_printv("path[%s] size[%d]", path.c_str(), size);
         this->size = size;
@@ -235,7 +235,7 @@ public:
         media_blocks_free = 65535;
         //media_block_size = 1; // blocks are already calculated
         //parseUrl(path);
-        // Debug_printv("path[%s] size[%d]", path.c_str(), size);
+        Debug_printv("path[%s] size[%d]", path.c_str(), size);
         isPETSCII = true;
         m_rootfs = true;
     };

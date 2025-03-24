@@ -83,6 +83,12 @@ namespace Meat
             // Debug_println("In filebuf open pre reset mistream");
             mstream.reset(mfile->getSourceStream(mode));
 
+            if (mstream == nullptr)
+            {
+                Debug_println("getSourceStream returned null!");
+                return nullptr;
+            }
+
             if (mstream->isOpen())
             {
                 // Debug_println("In filebuf open success!");

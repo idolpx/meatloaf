@@ -258,7 +258,7 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
         targetFileSystem = findParentFS(begin, end, pathIterator);
     }
 
-    MFile *targetFile = targetFileSystem->getFile(path);
+    auto targetFile = targetFileSystem->getFile(path);
 
     // Set path to file in filesystem stream
     targetFile->pathInStream = mstr::joinToString(&pathIterator, &end, "/");
@@ -298,7 +298,7 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
         if ( cachedFile )
             targetFile->sourceFile = cachedFile;
         else
-            targetFile->sourceFile = File(wholePath);
+            targetFile->sourceFile = sourceFileSystem->getFile(wholePath);
 
         targetFile->isWritable = targetFile->sourceFile->isWritable;   // This stream is writable if the container is writable
         Debug_printv("sourceFile[%s] is in [%s][%s]", targetFile->sourceFile->pathInStream.c_str(), sourcePath.c_str(), sourceFileSystem->symbol);
@@ -682,7 +682,7 @@ MFile* MFile::cdLocalRoot(std::string plus)
 
     if ( path.empty() || sourceFile == nullptr ) {
         // from here we can go only to flash root!
-        return MFSOwner::File( "/" + plus, true );
+        return MFSOwner::File( "/" + plus );
     }
     return MFSOwner::File( sourceFile->url + "/" + plus );
 };
