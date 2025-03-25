@@ -1135,13 +1135,13 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                     fnLedManager.set(eLed::LED_BUS, true);
                     MFile *f = m_cwd->cd(filename);
                     if( f->exists() )
-                    setStatusCode(ST_FILE_EXISTS);
+                      setStatusCode(ST_FILE_EXISTS);
                     else if( !f->isWritable )
-                    setStatusCode(ST_WRITE_PROTECT);
+                      setStatusCode(ST_WRITE_PROTECT);
                     else if( !VDrive::createDiskImage(f->url.c_str(), NULL, diskname.c_str(), false) )
-                    setStatusCode(ST_WRITE_ERROR);
+                      setStatusCode(ST_WRITE_ERROR);
                     else
-                    setStatusCode(ST_OK);
+                      setStatusCode(ST_OK);
                     fnLedManager.set(eLed::LED_BUS, false);
                 }
             }

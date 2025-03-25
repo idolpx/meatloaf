@@ -22,7 +22,7 @@ int cat(int argc, char **argv)
 {
     if (argc == 1)
     {
-        fprintf(stderr, "You have to pass at least one file path!\r\n");
+        Serial.printf("You have to pass at least one file path!\r\n");
         return EXIT_SUCCESS;
     }
 
@@ -33,17 +33,17 @@ int cat(int argc, char **argv)
 
         if(istream.is_open()) {
             if(istream.eof()) {
-                fprintf(stderr, "Stream returned EOF!");
+                Serial.print("Stream returned EOF!");
             } else {    
                 while(!istream.eof()) {
                     char chr = istream.get();
-                    fprintf(stdout, "%c", chr);
+                    Serial.printf("%c", chr);
                 }        
             }
             istream.close();
         }
         else {
-            fprintf(stderr, "ERROR:%s could not be read!\r\n", path->url.c_str());
+            Serial.printf("ERROR:%s could not be read!\r\n", path->url.c_str());
         }
     }
 
@@ -54,7 +54,7 @@ int hex(int argc, char **argv)
 {
     if (argc == 1)
     {
-        fprintf(stderr, "You have to pass at least one file path!\r\n");
+        Serial.printf("You have to pass at least one file path!\r\n");
         return EXIT_SUCCESS;
     }
 
@@ -65,7 +65,7 @@ int hex(int argc, char **argv)
 
         if(istream.is_open()) {
             if(istream.eof()) {
-                fprintf(stderr, "Stream returned EOF!");
+                Serial.printf("Stream returned EOF!");
             } else {
                 int c = 0;
                 int address = 0;
@@ -78,11 +78,11 @@ int hex(int argc, char **argv)
                     {
                         if ( c == 0 )
                         {
-                            fprintf(stdout, "%04X: ", address);
+                            Serial.printf("%04X: ", address);
                             address += 0x10;
                         }
 
-                        fprintf(stdout, "%02X ", chr);
+                        Serial.printf("%02X ", chr);
 
                         // replace non-printable characters
                         if ( chr < 32 || chr > 126 )
@@ -97,36 +97,36 @@ int hex(int argc, char **argv)
                         if ( c <= 0x07 )
                         {
                             while ( c++ < 0x08 )
-                                fprintf(stdout, "   ");
+                                Serial.printf("   ");
 
-                            fprintf(stdout, "| ");
+                            Serial.printf("| ");
                             c--;
                         }
 
                         while ( c++ < 0x10 )
-                            fprintf(stdout, "   ");
+                            Serial.printf("   ");
                     }
                     else if ( c++ == 0x07 )
                     {
                         // add separator
-                        fprintf(stdout, "| ");
+                        Serial.printf("| ");
                     }
 
                     // show line data as ascii
                     if ( c >= 0x10 )
                     {
-                        fprintf(stdout, " |%-16s|\r\n", b);
+                        Serial.printf(" |%-16s|\r\n", b);
                         c = 0;
                         memset(b, 0, sizeof(b));
                     }
                 }
-                fprintf(stdout, "\r\n");
-                fprintf(stdout, "url[%s] size[%ld]\r\n", path->url.c_str(), path->size);
+                Serial.printf("\r\n");
+                Serial.printf("url[%s] size[%ld]\r\n", path->url.c_str(), path->size);
             }
             istream.close();
         }
         else {
-            fprintf(stderr, "ERROR:%s could not be read!\r\n", path->url.c_str());
+            Serial.printf("ERROR:%s could not be read!\r\n", path->url.c_str());
         }
     }
 
@@ -135,7 +135,7 @@ int hex(int argc, char **argv)
 
 int pwd(int argc, char **argv)
 {
-    printf("%s\r\n", getCurrentPath()->url.c_str());
+    Serial.printf("%s\r\n", getCurrentPath()->url.c_str());
     return EXIT_SUCCESS;
 }
 
@@ -148,7 +148,7 @@ int cd(int argc, char **argv)
         path = getenv("HOME");
         if (!path)
         {
-            fprintf(stderr, "No HOME env variable set!\r\n");
+            Serial.printf("No HOME env variable set!\r\n");
             return EXIT_FAILURE;
         }
     }
@@ -164,7 +164,7 @@ int cd(int argc, char **argv)
         currentPath = outgoingPath->cd(argv[1]);
         delete outgoingPath;
     } else {
-        fprintf(stderr, "cd: not a directory: %s\r\n", path);
+        Serial.printf("cd: not a directory: %s\r\n", path);
         return 1;
     }
 
@@ -184,7 +184,7 @@ int ls(int argc, char **argv)
     }
     else
     {
-        printf("You can pass only one filename!\r\n");
+        Serial.printf("You can pass only one filename!\r\n");
         return 1;
     }
 
@@ -192,7 +192,7 @@ int ls(int argc, char **argv)
     std::unique_ptr<MFile> entry(destPath->getNextFileInDir());
 
     if(entry.get() == nullptr) {
-        fprintf(stderr, "Could not open directory: %s\r\n", strerror(errno));
+        Serial.printf("Could not open directory: %s\r\n", strerror(errno));
         return 1;
     }
 
@@ -200,7 +200,7 @@ int ls(int argc, char **argv)
         if ( entry->isPETSCII )
             entry->name = mstr::toUTF8(entry->name);
 
-        printf("%c %8lu  '%s'\r\n", (entry->isDirectory()) ? 'd':'-', entry->size, entry->name.c_str());
+        Serial.printf("%c %8lu  '%s'\r\n", (entry->isDirectory()) ? 'd':'-', entry->size, entry->name.c_str());
         entry.reset(destPath->getNextFileInDir());
     }
 
@@ -211,7 +211,7 @@ int mv(int argc, char **argv)
 {
     if (argc != 3)
     {
-        fprintf(stderr, "Syntax is mv [ORIGIN] [TARGET]\r\n");
+        Serial.printf("Syntax is mv [ORIGIN] [TARGET]\r\n");
         return 1;
     }
 
@@ -224,7 +224,7 @@ int mv(int argc, char **argv)
     // Do rename
     if (rename(old_name, new_name))
     {
-        printf("Error moving: %s\r\n", strerror(errno));
+        Serial.printf("Error moving: %s\r\n", strerror(errno));
         return EXIT_FAILURE;
     }
 
@@ -236,7 +236,7 @@ int cp(int argc, char **argv)
     //TODO: Shows weird error message
     if (argc != 3)
     {
-        fprintf(stderr, "Syntax is cp [ORIGIN] [TARGET]\r\n");
+        Serial.printf("Syntax is cp [ORIGIN] [TARGET]\r\n");
         return 1;
     }
 
@@ -250,7 +250,7 @@ int cp(int argc, char **argv)
     FILE *origin = fopen(old_name, "r");
     if (!origin)
     {
-        fprintf(stderr, "Error opening origin file: %s\r\n", strerror(errno));
+        Serial.printf("Error opening origin file: %s\r\n", strerror(errno));
         return 1;
     }
 
@@ -258,7 +258,7 @@ int cp(int argc, char **argv)
     if (!target)
     {
         fclose(origin);
-        fprintf(stderr, "Error opening target file: %s\r\n", strerror(errno));
+        Serial.printf("Error opening target file: %s\r\n", strerror(errno));
         return 1;
     }
 
@@ -270,7 +270,7 @@ int cp(int argc, char **argv)
     while ((buffer = getc(origin)) != EOF)
     {
         if(fputc(buffer, target) == EOF) {
-            fprintf(stderr, "Error writing: %s\r\n", strerror(errno));
+            Serial.printf("Error writing: %s\r\n", strerror(errno));
             fclose(origin); fclose(target);
             return 1;
         }
@@ -279,7 +279,7 @@ int cp(int argc, char **argv)
     error = errno;
     if (error && !feof(origin))
     {
-        fprintf(stderr, "Error copying: %s\r\n", strerror(error));
+        Serial.printf("Error copying: %s\r\n", strerror(error));
         fclose(origin);
         fclose(target);
         return 1;
@@ -295,7 +295,7 @@ int rm(int argc, char **argv)
 {
     if (argc != 2)
     {
-        fprintf(stderr, "You have to pass exactly one file. Syntax rm [FILE]\r\n");
+        Serial.printf("You have to pass exactly one file. Syntax rm [FILE]\r\n");
         return EXIT_SUCCESS;
     }
 
@@ -322,11 +322,11 @@ int rm(int argc, char **argv)
             {
                 if (remove(match_file.c_str()))
                 {
-                    fprintf(stderr, "Error removing %s: %s\r\n", filename, strerror(errno));
+                    Serial.printf("Error removing %s: %s\r\n", filename, strerror(errno));
                     closedir(dir);
                     return EXIT_FAILURE;
                 }
-                printf("%s removed\r\n", d->d_name);
+                Serial.printf("%s removed\r\n", d->d_name);
             }
         }
         closedir(dir);
@@ -334,10 +334,10 @@ int rm(int argc, char **argv)
     else
     {
         if(remove(filename)) {
-            fprintf(stderr, "Error removing %s: %s\r\n", filename, strerror(errno));
+            Serial.printf("Error removing %s: %s\r\n", filename, strerror(errno));
             return EXIT_FAILURE;
         }
-        printf("%s removed\r\n", filename);
+        Serial.printf("%s removed\r\n", filename);
     }
 
     return EXIT_SUCCESS;
@@ -347,14 +347,14 @@ int rmdir(int argc, char **argv)
 {
     if (argc != 2)
     {
-        fprintf(stderr, "You have to pass exactly one file. Syntax rmdir [DIRECTORY]\r\n");
+        Serial.printf("You have to pass exactly one file. Syntax rmdir [DIRECTORY]\r\n");
         return EXIT_SUCCESS;
     }
 
     std::unique_ptr<MFile> rd(getCurrentPath()->cd(argv[1]));
 
     if(rd->rmDir()) {
-        fprintf(stderr, "Error deleting %s: %s\r\n", rd->url.c_str(), strerror(errno));
+        Serial.printf("Error deleting %s: %s\r\n", rd->url.c_str(), strerror(errno));
     }
 
     return EXIT_SUCCESS;
@@ -364,14 +364,14 @@ int mkdir(int argc, char **argv)
 {
     if (argc != 2)
     {
-        fprintf(stderr, "You have to pass exactly one file. Syntax mkdir [DIRECTORY]\r\n");
+        Serial.printf("You have to pass exactly one file. Syntax mkdir [DIRECTORY]\r\n");
         return EXIT_SUCCESS;
     }
 
     std::unique_ptr<MFile> md(getCurrentPath()->cd(argv[1]));
 
     if(md->mkDir()) {
-        fprintf(stderr, "Error creating %s: %s\r\n", md->url.c_str(), strerror(errno));
+        Serial.printf("Error creating %s: %s\r\n", md->url.c_str(), strerror(errno));
     }
 
     return EXIT_SUCCESS;
@@ -381,7 +381,7 @@ int mount(int argc, char **argv)
 {
     if (argc < 3)
     {
-        //fprintf(stderr, "mount {device id} {url/path/filename}\r\n");
+        //Serial.printf("mount {device id} {url/path/filename}\r\n");
 
         for (int i = 0; i < MAX_DISK_DEVICES; i++)
         {
@@ -389,7 +389,7 @@ int mount(int argc, char **argv)
             auto drive = Meatloaf.get_disks(i);
             if (drive != nullptr)
             {
-                fprintf(stdout, "#%02d: %s %s\r\n", i + 8, drive->disk_dev.getCWD().c_str(), (Config.get_device_slot_enable(i+1) ? "":"[disabled]")); //"%d: %s\r\n", drive->disk_dev.getCWD().c_str();
+                Serial.printf("#%02d: %s %s\r\n", i + 8, drive->disk_dev.getCWD().c_str(), (Config.get_device_slot_enable(i+1) ? "":"[disabled]")); //"%d: %s\r\n", drive->disk_dev.getCWD().c_str();
             }
         }
 
@@ -398,7 +398,7 @@ int mount(int argc, char **argv)
 
     if (!mstr::isNumeric(argv[1]))
     {
-        fprintf(stderr, "device id is not numeric\r\n");
+        Serial.printf("device id is not numeric\r\n");
         return EXIT_SUCCESS;
     }
 
@@ -420,7 +420,7 @@ int mount(int argc, char **argv)
     }
     else
     {
-        fprintf(stderr, "Error mounting: device #%02d not enabled\r\n", did);
+        Serial.printf("Error mounting: device #%02d not enabled\r\n", did);
     }
 
     return EXIT_SUCCESS;
@@ -430,7 +430,7 @@ int wget(int argc, char **argv)
 {
     if (argc != 2)
     {
-        fprintf(stderr, "wget {url}\r\n");
+        Serial.printf("wget {url}\r\n");
         return EXIT_SUCCESS;
     }
 
@@ -450,7 +450,7 @@ int wget(int argc, char **argv)
         FILE *file = fopen(outfile.c_str(), "w");
         if (file == nullptr)
         {
-            fprintf(stdout, "2 Error: Can't open file!\r\n");
+            Serial.printf("2 Error: Can't open file!\r\n");
             return 2;
         }
 
@@ -463,14 +463,14 @@ int wget(int argc, char **argv)
             if (bytes_read < 1)
             {
                 if (s->available())
-                    fprintf(stdout, "\nError reading '%s'\r", f->name.c_str());
+                    Serial.printf("\nError reading '%s'\r", f->name.c_str());
                 break;
             }
 
             int bytes_written = fwrite(bytes, 1, bytes_read, file);
             if (bytes_written != bytes_read)
             {
-                fprintf(stdout, "\nError writing '%s'\r", f->name.c_str());
+                Serial.printf("\nError writing '%s'\r", f->name.c_str());
                 break;
             }
 
@@ -479,11 +479,11 @@ int wget(int argc, char **argv)
 #ifdef ENABLE_DISPLAY
             DISPLAY.progress = percent;
 #endif
-            fprintf(stdout, "Downloading '%s' %d%% [%lu]\r", f->name.c_str(), percent, s->position());
+            Serial.printf("Downloading '%s' %d%% [%lu]\r", f->name.c_str(), percent, s->position());
             count++;
         }
         fclose(file);
-        fprintf(stdout, "\n");
+        Serial.printf("\n");
         delete f;
     }
 
@@ -499,7 +499,7 @@ int enable(int argc, char **argv)
 {
     if (argc != 2)
     {
-        fprintf(stderr, "enable {id_1}|{id_1},{id_2},...\r\n");
+        Serial.printf("enable {id_1}|{id_1},{id_2},...\r\n");
         return EXIT_SUCCESS;
     }
 
@@ -512,7 +512,7 @@ int disable(int argc, char **argv)
 {
     if (argc != 2)
     {
-        fprintf(stderr, "disable {id_1}|{id_1},{id_2},...\r\n");
+        Serial.printf("disable {id_1}|{id_1},{id_2},...\r\n");
         return EXIT_SUCCESS;
     }
 

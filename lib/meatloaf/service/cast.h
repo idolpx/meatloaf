@@ -10,4 +10,5 @@
 // https://github.com/eriklax/c8tsender/tree/master
 // https://github.com/cast-web/protocol
 // https://github.com/thibauts/node-castv2-client
-//
+// https://github.com/Aymkdn/assistant-freebox-cloud/wiki/Google-TV-(aka-Android-TV)-Remote-Control-(v2)
+// 

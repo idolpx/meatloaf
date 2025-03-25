@@ -99,7 +99,7 @@ void TCPServer::task(void *pvParameters)
             while(1)
             {
                 //Debug_printv("Waiting for data");
-                send("meatloaf[/]# ");
+                //send("meatloaf[/]# ");
                 bytes_received = recv(client_socket, rx_buffer, sizeof(rx_buffer) - 1, 0);
                 //Debug_printv("Received Data");
 
@@ -126,7 +126,7 @@ void TCPServer::task(void *pvParameters)
 
                     rx_buffer[bytes_received] = 0; // Null-terminate whatever we received and treat like a string
                     //Debug_printv("Received %d bytes from %s:", bytes_received, addr_str);
-                    Debug_printf("%s", rx_buffer);
+                    //Debug_printf("%s", rx_buffer);
 
                     // Clear rx_buffer, and fill with zero's
                     bzero(rx_buffer, sizeof(rx_buffer));
@@ -135,6 +135,7 @@ void TCPServer::task(void *pvParameters)
             }
         }
     }
+    close(socket_id);
     vTaskDelete(NULL);
 }
 

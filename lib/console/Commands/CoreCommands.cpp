@@ -14,7 +14,7 @@ static int clear(int argc, char **argv)
     // If we are on a dumb terminal clearing does not work
     if (linenoiseProbe())
     {
-        printf("\r\nYour terminal does not support escape sequences. Clearing screen does not work!\r\n");
+        Serial.printf("\r\nYour terminal does not support escape sequences. Clearing screen does not work!\r\n");
         return EXIT_FAILURE;
     }
 
@@ -26,9 +26,9 @@ static int echo(int argc, char **argv)
 {
     for (int n = 1; n<argc; n++)
     {
-        printf("%s ", argv[n]);
+        Serial.printf("%s ", argv[n]);
     }
-    printf("\r\n");
+    Serial.printf("\r\n");
 
     return EXIT_SUCCESS;
 }
@@ -37,7 +37,7 @@ static int set_multiline_mode(int argc, char **argv)
 {
     if (argc != 2)
     {
-        printf("You have to give 'on' or 'off' as an argument!\r\n");
+        Serial.printf("You have to give 'on' or 'off' as an argument!\r\n");
         return EXIT_FAILURE;
     }
 
@@ -56,11 +56,11 @@ static int set_multiline_mode(int argc, char **argv)
     }
     else
     {
-        printf("Unknown option. Pass 'on' or 'off' (without quotes)!\r\n");
+        Serial.printf("Unknown option. Pass 'on' or 'off' (without quotes)!\r\n");
         return EXIT_FAILURE;
     }
 
-    printf("Multiline mode set.\r\n");
+    Serial.printf("Multiline mode set.\r\n");
 
     return EXIT_SUCCESS;
 }
@@ -75,13 +75,13 @@ static int history(int argc, char **argv)
         if (strcasecmp(argv[1], "-c"))
         { // When -c option was detected clear history.
             linenoiseHistorySetMaxLen(0);
-            printf("History cleared!\r\n");
+            Serial.printf("History cleared!\r\n");
             linenoiseHistorySetMaxLen(10);
             return EXIT_SUCCESS;
         }
         else
         {
-            printf("Invalid argument. Use -c to clear history.\r\n");
+            Serial.printf("Invalid argument. Use -c to clear history.\r\n");
 
             return EXIT_FAILURE;
         }
@@ -108,7 +108,7 @@ static int env(int argc, char **argv)
 
     for (; *s; s++)
     {
-        printf("%s\r\n", *s);
+        Serial.printf("%s\r\n", *s);
     }
     return EXIT_SUCCESS;
 }
@@ -116,7 +116,7 @@ static int env(int argc, char **argv)
 static int declare(int argc, char **argv)
 {
     if (argc != 3) {
-        fprintf(stderr, "Syntax: declare VAR short OR declare VARIABLE \"Long Value\"\r\n");
+        Serial.printf("Syntax: declare VAR short OR declare VARIABLE \"Long Value\"\r\n");
         return EXIT_FAILURE; 
     }
 
@@ -128,7 +128,7 @@ static int declare(int argc, char **argv)
 static int run(int argc, char **argv)
 {
     if (argc < 2) {
-        fprintf(stderr, "run {test}\r\n");
+        Serial.printf("run {test}\r\n");
         return EXIT_FAILURE; 
     }
 
@@ -152,7 +152,7 @@ static int run(int argc, char **argv)
 static int led(int argc, char **argv)
 {
     if (argc < 2) {
-        fprintf(stderr, "led {idle|send|receive|activity|progress {0-100}|status {1-255}|speed {0-255}}\r\n");
+        Serial.printf("led {idle|send|receive|activity|progress {0-100}|status {1-255}|speed {0-255}}\r\n");
         return EXIT_FAILURE; 
     }
 

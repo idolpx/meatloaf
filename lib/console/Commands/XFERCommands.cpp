@@ -18,7 +18,7 @@
 
 #include "../Console.h"
 #include "../Helpers/PWDHelpers.h"
-
+#include "../../include/debug.h"
 
 std::string read_until(char delimiter)
 {
@@ -33,7 +33,7 @@ std::string read_until(char delimiter)
             int result = uart_read_bytes(CONSOLE_UART, &byte, 1, MAX_READ_WAIT_TICKS);
             if (result < 1)
             {
-                fprintf(stdout, "3 Error: Response Timeout\r\n");
+                Serial.printf("3 Error: Response Timeout\r\n");
                 return "";
             }
 
@@ -49,7 +49,7 @@ int rx(int argc, char **argv)
     // rx {filename}
     if (argc != 2)
     {
-        fprintf(stderr, "rx {filename}\r\n");
+        Serial.printf("rx {filename}\r\n");
         return EXIT_SUCCESS;
     }
 
@@ -64,7 +64,7 @@ int rx(int argc, char **argv)
     FILE *file = fopen(filename, "w");
     if (file == nullptr)
     {
-        fprintf(stdout, "2 Error: Can't open file!\r\n");
+        Serial.printf("2 Error: Can't open file!\r\n");
         return 2;
     }
 
@@ -97,11 +97,11 @@ int rx(int argc, char **argv)
     std::string dest_checksum_str = ss.str();
     if ( !mstr::compare(dest_checksum_str, src_checksum) )
     {
-        fprintf(stdout, "2 Error: Checksum mismatch!\r\n");
+        Serial.printf("2 Error: Checksum mismatch!\r\n");
         return 2;
     }
 
-    fprintf(stdout, "0 OK\r\n");
+    Serial.printf("0 OK\r\n");
     return EXIT_SUCCESS;
 }
 
@@ -110,7 +110,7 @@ int tx(int argc, char **argv)
     // tx {filename}
     if (argc != 2)
     {
-        fprintf(stderr, "tx {filename}\r\n");
+        Serial.printf("tx {filename}\r\n");
         return EXIT_SUCCESS;
     }
 
@@ -130,7 +130,7 @@ int tx(int argc, char **argv)
     FILE *file = fopen(filename, "r");
     if (file == nullptr)
     {
-        fprintf(stdout, "2 Error: Can't open file!\r\n");
+        Serial.printf("2 Error: Can't open file!\r\n");
         return 2;
     }
     else
@@ -144,27 +144,27 @@ int tx(int argc, char **argv)
     }
 
     // Send size and checksum
-    fprintf(stdout, "%d %8x\r\n", size, src_checksum);
+    Serial.printf("%d %8x\r\n", size, src_checksum);
 
     // Send file 256 bytes at a time
     while ((bytesRead = fread(buffer, 1, 256, file)) > 0)
     {
         // print buffer bytes
         for (int i = 0; i < bytesRead; i++) {
-            fprintf(stdout, "%c", buffer[i]);
+            Serial.printf("%c", buffer[i]);
         }
     }
     fclose(file);
 
     // End file data with CRLF
-    fprintf(stdout, "\r\n");
+    Serial.printf("\r\n");
 
     // Read response
     std::string response = read_until('\n');
 
     if (!mstr::startsWith(response, "0 OK"))
     {
-        fprintf(stdout, "2 Error: %s\r\n", response.c_str());
+        Serial.printf("2 Error: %s\r\n", response.c_str());
         return 2;
     }
 

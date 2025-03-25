@@ -13,7 +13,7 @@ static int _pinmode(int argc, char **argv)
 {
     // if (argc != 3)
     // {
-    //     printf("You have to pass a pin number and mode. Syntax: pinMode [GPIO] [MODE]\r\n");
+    //     Serial.printf("You have to pass a pin number and mode. Syntax: pinMode [GPIO] [MODE]\r\n");
     //     return 1;
     // }
 
@@ -28,12 +28,12 @@ static int _pinmode(int argc, char **argv)
     // }
     // catch (std::invalid_argument ex)
     // {
-    //     fprintf(stderr, "Invalid argument for pin: %s\r\n", ex.what());
+    //     Serial.Serial.printf("Invalid argument for pin: %s\r\n", ex.what());
     //     return 1;
     // }
 
     // if (pin > 255 || !digitalPinIsValid(pin)) {
-    //     fprintf(stderr, "%d is not a GPIO pin\r\n", pin);
+    //     Serial.Serial.printf("%d is not a GPIO pin\r\n", pin);
     //     return 1;
     // }
 
@@ -61,11 +61,11 @@ static int _pinmode(int argc, char **argv)
     // }
     // else
     // {
-    //     fprintf(stderr, "Invalid mode: Allowed modes are INPUT, OUTPUT, INPUT_PULLUP, INPUT_PULLDOWN, OUTPUT_OPEN_DRAIN\r\n");
+    //     Serial.Serial.printf("Invalid mode: Allowed modes are INPUT, OUTPUT, INPUT_PULLUP, INPUT_PULLDOWN, OUTPUT_OPEN_DRAIN\r\n");
     // }
 
     // pinMode(pin, mode);
-    // printf("Mode set successful.\r\n");
+    // Serial.printf("Mode set successful.\r\n");
 
     return 0;
 }
@@ -74,7 +74,7 @@ static int _digitalWrite(int argc, char** argv)
 {
     // if (argc != 3)
     // {
-    //     printf("You have to pass an pin number and level. Syntax: digitalWrite [GPIO] [Level]\r\n");
+    //     Serial.printf("You have to pass an pin number and level. Syntax: digitalWrite [GPIO] [Level]\r\n");
     //     return 1;
     // }
 
@@ -89,12 +89,12 @@ static int _digitalWrite(int argc, char** argv)
     // }
     // catch (std::invalid_argument ex)
     // {
-    //     fprintf(stderr, "Invalid argument for pin: %s\r\n", ex.what());
+    //     Serial.Serial.printf("Invalid argument for pin: %s\r\n", ex.what());
     //     return 1;
     // }
 
     // if (pin > 255 || !digitalPinCanOutput(pin)) {
-    //     fprintf(stderr, "%d is not a GPIO pin\r\n", pin);
+    //     Serial.Serial.printf("%d is not a GPIO pin\r\n", pin);
     //     return 1;
     // }
 
@@ -109,11 +109,11 @@ static int _digitalWrite(int argc, char** argv)
     //     mode = LOW;
     // } else
     // {
-    //     fprintf(stderr, "Invalid mode: Allowed levels are HIGH, LOW, 0 and 1\r\n");
+    //     Serial.Serial.printf("Invalid mode: Allowed levels are HIGH, LOW, 0 and 1\r\n");
     // }
 
     // pinMode(pin, mode);
-    // printf("Output set successful.\r\n");
+    // Serial.printf("Output set successful.\r\n");
 
     return 0;
 }
@@ -122,7 +122,7 @@ static int _digitalRead(int argc, char** argv)
 {
     // if (argc != 2)
     // {
-    //     printf("You have to pass an pin number to read\r\n");
+    //     Serial.printf("You have to pass an pin number to read\r\n");
     //     return 1;
     // }
 
@@ -136,23 +136,23 @@ static int _digitalRead(int argc, char** argv)
     // }
     // catch (std::invalid_argument ex)
     // {
-    //     fprintf(stderr, "Invalid argument for pin: %s\r\n", ex.what());
+    //     Serial.Serial.printf("Invalid argument for pin: %s\r\n", ex.what());
     //     return 1;
     // }
 
     // if (pin > 255 || !digitalPinCanOutput(pin)) {
-    //     fprintf(stderr, "%d is not a GPIO pin\r\n", pin);
+    //     Serial.Serial.printf("%d is not a GPIO pin\r\n", pin);
     //     return 1;
     // }
 
     // auto level = digitalRead(pin);
 
     // if(level == HIGH) {
-    //     printf("HIGH\r\n");
+    //     Serial.printf("HIGH\r\n");
     // } else if(level == LOW) {
-    //     printf("LOW\r\n");
+    //     Serial.printf("LOW\r\n");
     // } else {
-    //     fprintf(stderr, "Unknown state (%u) of pin %u!\r\n", level, pin);
+    //     Serial.Serial.printf("Unknown state (%u) of pin %u!\r\n", level, pin);
     //     return 1;
     // }
 
@@ -163,7 +163,7 @@ static int _analogRead(int argc, char** argv)
 {
     // if (argc != 2)
     // {
-    //     printf("You have to pass an pin number to read\r\n");
+    //     Serial.printf("You have to pass an pin number to read\r\n");
     //     return 1;
     // }
 
@@ -177,18 +177,18 @@ static int _analogRead(int argc, char** argv)
     // }
     // catch (std::invalid_argument ex)
     // {
-    //     fprintf(stderr, "Invalid argument for pin: %s\r\n", ex.what());
+    //     Serial.Serial.printf("Invalid argument for pin: %s\r\n", ex.what());
     //     return 1;
     // }
 
     // if (pin > 255 || digitalPinToAnalogChannel(pin) == -1) {
-    //     fprintf(stderr, "%d is not a ADC pin\r\n", pin);
+    //     Serial.Serial.printf("%d is not a ADC pin\r\n", pin);
     //     return 1;
     // }
 
     // auto value = analogReadMilliVolts(pin);
     
-    // printf("%u mV\r\n", value);
+    // Serial.printf("%u mV\r\n", value);
 
     return 0;
 }

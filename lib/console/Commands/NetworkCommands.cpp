@@ -16,6 +16,8 @@
 #include "string_utils.h"
 #include "../improv/improv.h"
 
+#include "../../include/debug.h"
+
 // static const char *wlstatus2string(wl_status_t status)
 // {
 //     switch (status)
@@ -70,7 +72,7 @@ static void on_ping_success(esp_ping_handle_t hdl, void *args)
     esp_ping_get_profile(hdl, ESP_PING_PROF_IPADDR, &target_addr, sizeof(target_addr));
     esp_ping_get_profile(hdl, ESP_PING_PROF_SIZE, &recv_len, sizeof(recv_len));
     esp_ping_get_profile(hdl, ESP_PING_PROF_TIMEGAP, &elapsed_time, sizeof(elapsed_time));
-    printf("%lu bytes from %s icmp_seq=%d ttl=%d time=%lu ms\r\n",
+    Serial.printf("%lu bytes from %s icmp_seq=%d ttl=%d time=%lu ms\r\n",
            recv_len, inet_ntoa(target_addr.u_addr.ip4), seqno, ttl, elapsed_time);
 }
 
@@ -80,7 +82,7 @@ static void on_ping_timeout(esp_ping_handle_t hdl, void *args)
     ip_addr_t target_addr;
     esp_ping_get_profile(hdl, ESP_PING_PROF_SEQNO, &seqno, sizeof(seqno));
     esp_ping_get_profile(hdl, ESP_PING_PROF_IPADDR, &target_addr, sizeof(target_addr));
-    printf("From %s icmp_seq=%u timeout\r\n", inet_ntoa(target_addr.u_addr.ip4), seqno);
+    Serial.printf("From %s icmp_seq=%u timeout\r\n", inet_ntoa(target_addr.u_addr.ip4), seqno);
 }
 
 static void on_ping_end(esp_ping_handle_t hdl, void *args)
@@ -95,11 +97,11 @@ static void on_ping_end(esp_ping_handle_t hdl, void *args)
 	esp_ping_get_profile(hdl, ESP_PING_PROF_DURATION, &total_time_ms, sizeof(total_time_ms));
 	uint32_t loss = (uint32_t)((1 - ((float)received) / transmitted) * 100);
 	if (IP_IS_V4(&target_addr)) {
-		printf("\n--- %s ping statistics ---", inet_ntoa(*ip_2_ip4(&target_addr)));
+		Serial.printf("\n--- %s ping statistics ---", inet_ntoa(*ip_2_ip4(&target_addr)));
 	} else {
-		printf("\n--- %s ping statistics ---", inet6_ntoa(*ip_2_ip6(&target_addr)));
+		Serial.printf("\n--- %s ping statistics ---", inet6_ntoa(*ip_2_ip6(&target_addr)));
 	}
-	printf("%"PRIu32" packets transmitted, %"PRIu32" received, %"PRIu32"%% packet loss, time %"PRIu32"ms",
+	Serial.printf("%"PRIu32" packets transmitted, %"PRIu32" received, %"PRIu32"%% packet loss, time %"PRIu32"ms",
 			 transmitted, received, loss, total_time_ms);
 	// delete the ping sessions, so that we clean up all resources and can create a new ping session
 	// we don't have to call delete function in the callback, instead we can call delete function from other tasks
@@ -118,15 +120,15 @@ static int ping(int argc, char **argv)
                 number_of_pings = atoi(optarg);
                 break;
             case '?':
-                printf("Unknown option: %c\r\n", optopt);
+                Serial.printf("Unknown option: %c\r\n", optopt);
                 break;
             case ':':
-                printf("Missing arg for %c\r\n", optopt);
+                Serial.printf("Missing arg for %c\r\n", optopt);
                 break;
 
             default:
-                fprintf(stderr, "Usage: ping -n 5 [HOSTNAME]\r\n");
-                fprintf(stderr, "-n: The number of pings. 0 means infinite. Can be aborted with Ctrl+D or Ctrl+C.");
+                Serial.printf("Usage: ping -n 5 [HOSTNAME]\r\n");
+                Serial.printf("-n: The number of pings. 0 means infinite. Can be aborted with Ctrl+D or Ctrl+C.");
                 return 1;
         }
     }
@@ -135,7 +137,7 @@ static int ping(int argc, char **argv)
 
     //Get hostname
     if (argind >= argc) {
-        fprintf(stderr, "You need to pass an hostname!\r\n");
+        Serial.printf("You need to pass an hostname!\r\n");
         return EXIT_FAILURE;
     }
 
@@ -150,7 +152,7 @@ static int ping(int argc, char **argv)
     auto result = getaddrinfo(hostname, NULL, &hint, &res);
 
     if (result) {
-        fprintf(stderr, "Could not resolve hostname! (getaddrinfo returned %d)\r\n", result);
+        Serial.printf("Could not resolve hostname! (getaddrinfo returned %d)\r\n", result);
         return 1;
     }
 
@@ -206,7 +208,7 @@ static int ping(int argc, char **argv)
     esp_ping_get_profile(ping, ESP_PING_PROF_REQUEST, &transmitted, sizeof(transmitted));
     esp_ping_get_profile(ping, ESP_PING_PROF_REPLY, &received, sizeof(received));
     esp_ping_get_profile(ping, ESP_PING_PROF_DURATION, &total_time_ms, sizeof(total_time_ms));
-    printf("%lu packets transmitted, %lu received, time %lu ms\r\n", transmitted, received, total_time_ms);
+    Serial.printf("%lu packets transmitted, %lu received, time %lu ms\r\n", transmitted, received, total_time_ms);
 
     esp_ping_delete_session(ping);
 
@@ -216,30 +218,30 @@ static int ping(int argc, char **argv)
 
 static void ipconfig_wlan()
 {
-    printf("==== WLAN ====\r\n");
+    Serial.printf("==== WLAN ====\r\n");
     // auto status = fnWiFi.status();
-    // printf("Mode: %s\r\n", wlmode2string(fnWiFi.getMode()));
-    // printf("Status: %s\r\n", wlstatus2string(status));
+    // Serial.printf("Mode: %s\r\n", wlmode2string(fnWiFi.getMode()));
+    // Serial.printf("Status: %s\r\n", wlstatus2string(status));
 
     // if (status == WL_NO_SHIELD) {
     //     return;
     // }
     
-    // printf("\r\n");
-    // printf("SSID: %s\r\n", fnWiFi.get_current_ssid().c_str());
-    // printf("BSSID: %s\r\n", fnWiFi.get_current_bssid_str().c_str());
-    // //printf("Channel: %d\r\n", fnWiFi.channel());
+    // Serial.printf("\r\n");
+    // Serial.printf("SSID: %s\r\n", fnWiFi.get_current_ssid().c_str());
+    // Serial.printf("BSSID: %s\r\n", fnWiFi.get_current_bssid_str().c_str());
+    // //Serial.printf("Channel: %d\r\n", fnWiFi.channel());
 
-    // printf("\r\n");
-    // printf("IP: %s\r\n", fnWiFi.localIP().toString().c_str());
-    // printf("Subnet Mask: %s (/%d)\r\n", WiFi.subnetMask().toString().c_str(), WiFi.subnetCIDR());
-    // printf("Gateway: %s\r\n", WiFi.gatewayIP().toString().c_str());
-    // printf("IPv6: %s\r\n", WiFi.localIPv6().toString().c_str());
+    // Serial.printf("\r\n");
+    // Serial.printf("IP: %s\r\n", fnWiFi.localIP().toString().c_str());
+    // Serial.printf("Subnet Mask: %s (/%d)\r\n", WiFi.subnetMask().toString().c_str(), WiFi.subnetCIDR());
+    // Serial.printf("Gateway: %s\r\n", WiFi.gatewayIP().toString().c_str());
+    // Serial.printf("IPv6: %s\r\n", WiFi.localIPv6().toString().c_str());
     
-    // printf("\r\n");
-    // printf("Hostname: %s\r\n", WiFi.getHostname());
-    // printf("DNS1: %s\r\n", WiFi.dnsIP(0).toString().c_str());
-    // printf("DNS2: %s\r\n", WiFi.dnsIP(0).toString().c_str());
+    // Serial.printf("\r\n");
+    // Serial.printf("Hostname: %s\r\n", WiFi.getHostname());
+    // Serial.printf("DNS1: %s\r\n", WiFi.dnsIP(0).toString().c_str());
+    // Serial.printf("DNS2: %s\r\n", WiFi.dnsIP(0).toString().c_str());
 }
 
 static int ipconfig(int argc, char **argv)
@@ -251,12 +253,12 @@ static int ipconfig(int argc, char **argv)
 static int scan(int argc, char **argv)
 {
     fnWiFi.scan_networks();
-    printf("Found following networks:\r\n");
+    Serial.printf("Found following networks:\r\n");
     std::vector<std::string> network_names = fnWiFi.get_network_names();
     for (std::string _network_name: network_names)
     {
         uint8_t c_crc8 = esp_crc8_le(0, (uint8_t *)_network_name.c_str(), _network_name.length());
-        printf("[%03d] - %s\r\n", c_crc8, _network_name.c_str());
+        Serial.printf("[%03d] - %s\r\n", c_crc8, _network_name.c_str());
     }
     return EXIT_SUCCESS;
 }
@@ -296,7 +298,7 @@ std::vector<std::string> getLocalUrl() {
 void serial_write(std::vector<uint8_t> &data) { 
     // print buffer bytes
     for (int i = 0; i < data.size(); i++) {
-        fprintf(stdout, "%c", data[i]);
+        Serial.printf("%c", data[i]);
     }
 }
 
@@ -389,7 +391,7 @@ static int improv_c(int argc, char **argv)
 
     if (argc != 2)
     {
-        fprintf(stderr, "Usage: improv {data}\n");
+        Serial.printf("Usage: improv {data}\n");
         return 1;
     }
 
@@ -408,7 +410,7 @@ static int improv_c(int argc, char **argv)
         checksum += data[i];
 
     if (checksum != data[data_len + 1]) {
-        fprintf(stderr, "bad checksum [%02x][%02x]\r\n", (data[data_len + 1]), checksum);
+        Serial.printf("bad checksum [%02x][%02x]\r\n", (data[data_len + 1]), checksum);
         return false;
     }
 
@@ -417,8 +419,8 @@ static int improv_c(int argc, char **argv)
     }
 
     auto cmd = improv::parse_improv_data(data, data_len, false);
-    // fprintf(stdout, "alldata[%s]", mstr::toHex(argv[1], strlen(argv[1])).c_str());
-    // fprintf(stdout, "   data[%s]", mstr::toHex(argv[1][2], data_len).c_str());
+    // Serial.printf("alldata[%s]", mstr::toHex(argv[1], strlen(argv[1])).c_str());
+    // Serial.printf("   data[%s]", mstr::toHex(argv[1][2], data_len).c_str());
 
     switch (cmd.command) {
         case improv::Command::GET_CURRENT_STATE:

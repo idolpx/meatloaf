@@ -22,6 +22,8 @@
 #include "../../include/debug.h"
 #include "string_utils.h"
 
+#include "tcpsvr.h"
+
 ESP32Console::Console console;
 
 using namespace ESP32Console::Commands;
@@ -312,6 +314,7 @@ namespace ESP32Console
             // Insert current PWD into prompt if needed
             mstr::replaceAll(prompt, "%pwd%", getCurrentPath()->url);
 
+            tcp_server.send(prompt);
             char *line = linenoise(prompt.c_str());
             if (line == NULL)
             {
@@ -340,6 +343,7 @@ namespace ESP32Console
 
             /* Try to run the command */
             int ret;
+            tcp_server.send(interpolated_line + "\n");
             esp_err_t err = esp_console_run(interpolated_line.c_str(), &ret);
 
             //Reset global state
@@ -347,7 +351,9 @@ namespace ESP32Console
 
             if (err == ESP_ERR_NOT_FOUND)
             {
-                fprintf(stdout, "Unrecognized command\n");
+                std::string t = "Unrecognized command\n";
+                tcp_server.send(t);
+                fprintf(stdout, t.c_str());
             }
             else if (err == ESP_ERR_INVALID_ARG)
             {
@@ -379,6 +385,7 @@ namespace ESP32Console
     {
         int z = uart_write_bytes(uart_channel_, (const char *)&c, 1);
         // uart_wait_tx_done(_uart_num, MAX_WRITE_BYTE_TICKS);
+        tcp_server.send((char *)c);
         return z;
     }
     
@@ -386,12 +393,14 @@ namespace ESP32Console
     {
         int z = uart_write_bytes(uart_channel_, (const char *)buffer, size);
         // uart_wait_tx_done(_uart_num, MAX_WRITE_BUFFER_TICKS);
+        tcp_server.send((char *)buffer);
         return z;
     }
     
     size_t Console::write(const char *str)
     {
         int z = uart_write_bytes(uart_channel_, str, strlen(str));
+        tcp_server.send(str);
         return z;
     }
     
@@ -409,8 +418,10 @@ namespace ESP32Console
     
         int z = vasprintf(&result, fmt, vargs);
     
-        if (z > 0)
+        if (z > 0) {
             uart_write_bytes(uart_channel_, result, z);
+            tcp_server.send(result);
+        }
     
         va_end(vargs);
     
@@ -453,7 +464,8 @@ namespace ESP32Console
     
         if (!_initialized)
             return -1;
-    
+        
+        tcp_server.send(str);
         return uart_write_bytes(uart_channel_, str, z);
         ;
     }
