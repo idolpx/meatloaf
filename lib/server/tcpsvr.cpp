@@ -17,6 +17,11 @@
 #include "lwip/dns.h"
 
 #include "../../include/debug.h"
+#include "string_utils.h"
+
+#ifdef ENABLE_CONSOLE
+#include "../lib/console/ESP32Console.h"
+#endif
 
 #define MESSAGE "Welcome to Meatloaf!\r\n"
 #define LISTENQ 2
@@ -35,6 +40,8 @@ void TCPServer::task(void *pvParameters)
     int socket_id;
     int bind_err;
     int listen_error;
+
+    std::string line;
 
     while (1)
     {
@@ -124,13 +131,25 @@ void TCPServer::task(void *pvParameters)
                         inet_ntoa_r(((struct sockaddr_in *)&sourceAddr)->sin_addr.s_addr, addr_str, sizeof(addr_str) - 1);
                     }
 
-                    rx_buffer[bytes_received] = 0; // Null-terminate whatever we received and treat like a string
+                    line += std::string(rx_buffer);
+                    //send("[" + mstr::toHex(line) + "]");
+
+                    // break line on newline and send to console
+                    if (mstr::endsWith(line, "\r") || mstr::endsWith(line, "\n"))
+                    {
+                        mstr::rtrim(line);
+                        console.execute(line.c_str());
+                        line.clear();
+                    } else if (line[0] == 0xFF) {
+                        line.clear();
+                    }
+
+                    //rx_buffer[bytes_received] = 0; // Null-terminate whatever we received and treat like a string
                     //Debug_printv("Received %d bytes from %s:", bytes_received, addr_str);
                     //Debug_printf("%s", rx_buffer);
 
                     // Clear rx_buffer, and fill with zero's
                     bzero(rx_buffer, sizeof(rx_buffer));
-
                 }
             }
         }

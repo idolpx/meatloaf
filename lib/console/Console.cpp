@@ -380,6 +380,45 @@ namespace ESP32Console
         // what do we need to do when exiting?
     }
 
+    void Console::execute(const char *command)
+    {
+        //Debug_printv("Executing command: [%s]\n", command);
+
+        //Interpolate the input line
+        std::string interpolated_line = interpolateLine(command);
+        //Debug_printv("Interpolated line: [%s]\n", interpolated_line.c_str());
+
+        /* Try to run the command */
+        int ret;
+        esp_err_t err = esp_console_run(interpolated_line.c_str(), &ret);
+
+        //Reset global state
+        resetAfterCommands();
+
+        if (err == ESP_ERR_NOT_FOUND)
+        {
+            std::string t = "Unrecognized command\n";
+            tcp_server.send(t);
+            printf(t.c_str());
+        }
+        else if (err == ESP_ERR_INVALID_ARG)
+        {
+            // command was empty
+        }
+        else if (err == ESP_OK && ret != ESP_OK)
+        {
+            printf("Command returned non-zero error code: 0x%x (%s)\n", ret, esp_err_to_name(ret));
+        }
+        else if (err != ESP_OK)
+        {
+            printf("Internal error: %s\n", esp_err_to_name(err));
+        }
+
+        // Insert current PWD into prompt if needed
+        std::string prompt = console.prompt_;
+        mstr::replaceAll(prompt, "%pwd%", getCurrentPath()->url);
+        printf(prompt.c_str());
+    }
 
     size_t Console::write(uint8_t c)
     {

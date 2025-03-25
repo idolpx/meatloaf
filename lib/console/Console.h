@@ -33,6 +33,8 @@ namespace ESP32Console
 
         TaskHandle_t task_;
 
+        //QueueHandle_t queue;
+        //std::vector<std::string> queue_lines;
         static void repl_task(void *args);
 
         void beginCommon();
@@ -42,7 +44,10 @@ namespace ESP32Console
         /**
          * @brief Create a new ESP32Console with the default parameters
          */
-        Console(const uint32_t task_stack_size = 8192, const BaseType_t task_priority = 4, int max_cmdline_len = 256, int max_cmdline_args = 8) : task_priority_(task_priority), task_stack_size_(task_stack_size), max_cmdline_len_(max_cmdline_len), max_cmdline_args_(max_cmdline_args){};
+        Console(const uint32_t task_stack_size = 8192, const BaseType_t task_priority = 4, int max_cmdline_len = 256, int max_cmdline_args = 8) : task_priority_(task_priority), task_stack_size_(task_stack_size), max_cmdline_len_(max_cmdline_len), max_cmdline_args_(max_cmdline_args)
+        {
+            //queue = xQueueCreate( 10, sizeof( int ) );
+        };
 
         ~Console()
         {
@@ -128,7 +133,7 @@ namespace ESP32Console
 
         void end();
 
-
+        void execute(const char *command);
 
 
         size_t write(uint8_t);
