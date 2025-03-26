@@ -613,34 +613,35 @@ void testSmartMFile() {
 }
 
 void testNewPaths() {
-    testHeader("Check if file in d64 in zip is sane");
-    auto test1 = Meat::New<MFile>("/sd/archive/favorites.zip/goonies.d64/program");
-    Debug_printv("path[%s]", test1->url.c_str());
-    Debug_printv("sourceFile[%s] sourceFile->pathInStream[%s]", test1->sourceFile()->url.c_str(), test1->sourceFile()->pathInStream().c_str());
+    testHeader("Check if zip file in root is fine");
+    auto zipFile = Meat::New<MFile>("/sd/favorites.zip");
+    //auto zipFile = d64inZip->sourceFile();
 
-    testHeader("Check if file in zip is fine");
-    auto test2 = test1->sourceFile();
-    Debug_printv("path[%s]", test2->url.c_str());
-    Debug_printv("sourceFile[%s] sourceFile->pathInStream[%s]", test2->sourceFile()->url.c_str(), test2->sourceFile()->pathInStream().c_str());
-
-    testHeader("Check if file in root is fine");
-    auto test3 = test2->sourceFile();
-    Debug_printv("path[%s]", test3->url.c_str());
-    Debug_printv("sourceFile[%s] sourceFile->pathInStream[%s]", test3->sourceFile()->url.c_str(), test3->sourceFile()->pathInStream().c_str());
-
-    testHeader("Create stream and read first 256 bytes");
+    testHeader("Read bytes from zip");
     uint8_t bytes[256] = { 0 };
-    auto stream = test1->getSourceStream();
+    auto stream = zipFile->getSourceStream();
     stream->read(bytes, 256);
-    Debug_printf("test1.stream\n%s\n", util_hexdump(bytes, 256).c_str());
+    Debug_printf("*** zipFile stream\n%s\n", util_hexdump(bytes, 256).c_str());
+    stream->close();
 
-    stream = test2->getSourceStream();
-    stream->read(bytes, 256);
-    Debug_printf("test2.stream\n%s\n", util_hexdump(bytes, 256).c_str());
+    testHeader("Check if d64 in zip is fine");
+    auto d64inZip = Meat::New<MFile>("/sd/favorites.zip/goonies.d64");
+    //auto d64inZip = inD64->sourceFile();
 
-    stream = test3->getSourceStream();
+    testHeader("Read bytes from d64 in zip");
+    stream = d64inZip->getSourceStream();
     stream->read(bytes, 256);
-    Debug_printf("test3.stream\n%s\n", util_hexdump(bytes, 256).c_str());
+    Debug_printf("*** d64 in Zip stream\n%s\n", util_hexdump(bytes, 256).c_str());
+    stream->close();
+
+    testHeader("Check if file in d64 in zip is sane");
+    auto inD64 = Meat::New<MFile>("/sd/favorites.zip/goonies.d64/the goonies+");
+
+    testHeader("Read bytes from prg in d64 in zip");
+    stream = inD64->getSourceStream();
+    stream->read(bytes, 256);
+    Debug_printf("*** a file in d64 stream\n%s\n", util_hexdump(bytes, 256).c_str());
+    stream->close();
 }
 
 void testPetsciiUtf() {

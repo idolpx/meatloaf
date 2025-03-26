@@ -52,7 +52,6 @@ public:
         else
             m_isNull = false;
 
-        m_rootfs = true;
         isWritable = true;
 
         if(isDirectory()) {

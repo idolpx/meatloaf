@@ -220,22 +220,45 @@ MFile* MFSOwner::File(std::shared_ptr<MFile> file) {
     return File(file->url);
 }
 
-void MFile::setupFields() {
+std::string MFile::pathInStream() {
+    return _pathInStream;
+}
+
+MFile* MFile::sourceFile() {
+    return _sourceFile;
+}
+
+MFile* MFSOwner::File(std::string path) {
     Debug_printv("path[%s]", path.c_str());
+
+    // if ( !default_fs )
+    // {
+    //     if ( mlFS.handles(path) )
+    //     {
+    //         path = mlFS.resolve(path);
+    //     }
+
+    //     if ( csipFS.handles(path) )
+    //     {
+    //         return csipFS.getFile(path);
+    //     }
+    // }
+
+    //Debug_printv("path[%s]", path.c_str());
 
     std::vector<std::string> paths = mstr::split(path,'/');
     auto begin = paths.begin();
     auto end = paths.end();
     auto pathIterator = end-1;
 
-    Debug_printv("calling findParentFS 1 - to skip first enclosing FS", path.c_str());
+    // Debug_printv("calling findParentFS 1 - to skip first enclosing FS", path.c_str());
     MFileSystem * thisPathFactoringFS = MFSOwner::findParentFS(begin, end, pathIterator);
 
     std::string beforeFS, afterFS;
     if ( thisPathFactoringFS == &defaultFS )
     {
-        beforeFS = "/";
-        afterFS = path.substr(1);
+        beforeFS = path;
+        afterFS = "";
     }
     else
     {
@@ -243,59 +266,19 @@ void MFile::setupFields() {
         beforeFS = mstr::joinToString(&begin, &temp, "/");
         afterFS = mstr::joinToString(&temp, &end, "/");
     }
-
-    _sourceFile = MFSOwner::File(beforeFS);
-    _sourceFile->_pathInStream = afterFS;
-
-    Debug_printv("container:[%s] -- path in container:[%s]", beforeFS.c_str(), afterFS.c_str());
-    Debug_printv("_sourceFile[%s]", _sourceFile->url.c_str());
-    Debug_printv("_pathInStream[%s]", _pathInStream.c_str());
-}
-
-std::string MFile::pathInStream() {
-    Debug_printv("_pathInStream[%s]", _pathInStream.c_str());
-    if(_pathInStream.empty())
-        setupFields();
-    Debug_printv("_pathInStream[%s]", _pathInStream.c_str());
-    return _pathInStream;
-}
-
-MFile* MFile::sourceFile() {
-    Debug_printv("_sourceFile[%s]", (_sourceFile != nullptr) ? "set" : "null");
-    if(_sourceFile == nullptr)
-        setupFields();
-
-    Debug_printv("_sourceFile[%s]", _sourceFile->url.c_str());
-    return _sourceFile;
-}
-
-MFile* MFSOwner::File(std::string path, bool default_fs) {
-    Debug_printv("path[%s]", path.c_str());
-
-    if ( !default_fs )
-    {
-        if ( mlFS.handles(path) )
-        {
-            path = mlFS.resolve(path);
-        }
-
-        if ( csipFS.handles(path) )
-        {
-            return csipFS.getFile(path);
-        }
-    }
-
-    std::vector<std::string> paths = mstr::split(path,'/');
-    auto pathIterator = paths.end();
-    auto begin = paths.begin();
-    auto end = paths.end();
-
-    Debug_printv("(%s) calling findParentFS", path.c_str());
-    MFileSystem * thisPathFactoringFS = findParentFS(begin, end, pathIterator);
+    
     MFile *thisFile = thisPathFactoringFS->getFile(path);
 
-    Debug_printv("(%s) this path will be created by '%s' FS, which will list the contents", path.c_str(), thisPathFactoringFS->symbol);
+    thisFile->_sourceFile = thisPathFactoringFS->getFile(beforeFS);
+    thisFile->_sourceFile->_pathInStream = afterFS;
 
+    Debug_printv("File initialization\n%s\n fs: %s\n ss:%s\n ss_pis:%s", 
+        thisFile->url.c_str(),
+        thisPathFactoringFS->symbol, 
+        thisFile->_sourceFile->url.c_str(), 
+        thisFile->_sourceFile->_pathInStream.c_str()
+    );
+    
     return thisFile;
 }
 
@@ -307,7 +290,7 @@ MFileSystem* MFSOwner::findParentFS(std::vector<std::string>::iterator &begin, s
 
         auto part = *pathIterator;
         mstr::toLower(part);
-        Debug_printv("examining part[%s]", part.c_str());
+        //Debug_printv("examining part[%s]", part.c_str());
         if ( part.size() )
         {
             auto foundFS=std::find_if(availableFS.begin() + 1, availableFS.end(), [&part](MFileSystem* fs){ 
@@ -331,7 +314,7 @@ MFileSystem* MFSOwner::findParentFS(std::vector<std::string>::iterator &begin, s
                 return (*foundFS);
             }
         } else {
-            Debug_printv("- FINISHED WALKING TO THE LEFT");
+            //Debug_printv("- FINISHED WALKING TO THE LEFT");
         }
     };
 
@@ -444,19 +427,16 @@ bool MFile::operator!=(nullptr_t ptr) {
 
 MStream* MFile::getSourceStream(std::ios_base::openmode mode) {
     // has to return OPENED stream
-    Debug_printv("sourceFile[%s] isroot[%d]", sourceFile()->url.c_str(), sourceFile()->m_rootfs);
 
-    MStream* sourceStream = nullptr;
-    if ( !m_rootfs )
-        sourceStream = sourceFile()->getSourceStream(mode);
-    else
-        sourceStream = createStream();
-
+    MStream* sourceStream = sourceFile()->getSourceStream(mode);
     if ( sourceStream == nullptr )
     {
         Debug_printv("UNFORTUNATELY recursive call returned NULL!, bailing out");
         return nullptr;
     }
+
+    Debug_printv("sourceFile[%s], pis=[%s] getting upper steam", sourceFile()->url.c_str(), _pathInStream.c_str());
+
 
     // will be replaced by streamBroker->getSourceStream(sourceFile, mode)
     std::shared_ptr<MStream> containerStream(sourceStream); // get its base stream, i.e. zip raw file contents
@@ -616,7 +596,7 @@ MFile* MFile::cdParent(std::string plus)
     if(path.empty()) 
     {
         // from here we can go only to flash root!
-        return MFSOwner::File("/", true);
+        return MFSOwner::File("/");
     }
     else 
     {
@@ -652,7 +632,7 @@ MFile* MFile::cdLocalParent(std::string plus)
 MFile* MFile::cdRoot(std::string plus) 
 {
     Debug_printv("url[%s] path[%s] plus[%s]", url.c_str(), path.c_str(), plus.c_str());
-    return MFSOwner::File( "/" + plus, true );
+    return MFSOwner::File( "/" + plus );
 };
 
 MFile* MFile::cdLocalRoot(std::string plus) 
@@ -661,7 +641,7 @@ MFile* MFile::cdLocalRoot(std::string plus)
 
     if ( path.empty() || sourceFile() == nullptr ) {
         // from here we can go only to flash root!
-        return MFSOwner::File( "/" + plus, true );
+        return MFSOwner::File( "/" + plus );
     }
     return MFSOwner::File( sourceFile()->url + "/" + plus );
 };

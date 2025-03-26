@@ -210,8 +210,6 @@ public:
         //Debug_printv("dtor path[%s]", path.c_str());
     };
 
-    bool m_rootfs = false;
-
     bool isPETSCII = false;
     bool isWritable = false;
     std::string media_header;
@@ -457,7 +455,7 @@ class MFSOwner {
 public:
     static std::vector<MFileSystem*> availableFS;
 
-    static MFile* File(std::string name, bool default_fs = false);
+    static MFile* File(std::string name);
     static MFile* File(std::shared_ptr<MFile> file);
     static MFile* File(MFile* file);
     static MFile* NewFile(std::string name);

@@ -51,7 +51,6 @@ public:
         else
             m_isNull = false;
 
-        m_rootfs = true;
         //Debug_printv("basepath[%s] path[%s] valid[%d]", basepath.c_str(), this->path.c_str(), m_isNull);
     };
     ~TNFSMFile() {

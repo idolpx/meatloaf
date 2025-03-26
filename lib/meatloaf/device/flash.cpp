@@ -71,9 +71,9 @@ MStream* FlashMFile::getSourceStream(std::ios_base::openmode mode)
     std::string full_path = basepath + path;
     MStream* istream = new FlashMStream(full_path, mode);
     //auto istream = StreamBroker::obtain<FlashMStream>(full_path, mode);
-    //Debug_printv("FlashMFile::getSourceStream() 3, not null=%d", istream != nullptr);
+    Debug_printv("FlashMFile::getSourceStream() 3 for %s, not null=%d", full_path.c_str(), istream != nullptr);
     istream->open(mode);   
-    //Debug_printv("FlashMFile::getSourceStream() 4");
+    Debug_printv("FlashMFile::getSourceStream() 4, is_open=%d", istream->isOpen());
     return istream;
 }
 
@@ -83,6 +83,7 @@ MStream* FlashMFile::getDecodedStream(std::shared_ptr<MStream> is) {
 
 MStream* FlashMFile::createStream(std::ios_base::openmode mode)
 {
+    Debug_printv("flash FS is creating input stream");
     std::string full_path = basepath + path;
     MStream* istream = new FlashMStream(full_path, mode);
     return istream;

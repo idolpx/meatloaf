@@ -280,7 +280,6 @@ public:
     };
     TCPMFile(std::string path): MFile(path) { 
         Debug_printv("constructing tcp file from url [%s]", url.c_str());
-        m_rootfs = true;
      };
     TCPMFile(std::string path, std::string filename): MFile(path) {};
     ~TCPMFile() override {

@@ -552,7 +552,7 @@ void iecDrive::begin()
   m_statusCode = ST_SPLASH;
   m_statusTrk  = 0;
   m_numOpenChannels = 0;
-  m_cwd.reset( MFSOwner::File("/", true) );
+  m_cwd.reset( MFSOwner::File("/") );
 
   m_memory.setROM("dos1541"); // Default to 1541 ROM
 

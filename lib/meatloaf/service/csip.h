@@ -237,7 +237,6 @@ public:
         //parseUrl(path);
         Debug_printv("path[%s] size[%d]", path.c_str(), size);
         isPETSCII = true;
-        m_rootfs = true;
     };
 
 
