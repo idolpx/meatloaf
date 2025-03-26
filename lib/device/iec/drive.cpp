@@ -777,7 +777,7 @@ bool iecDrive::open(uint8_t channel, const char *cname)
                         if( new_stream->has_subdirs )
                             {
                             // Filesystem supports sub directories => set m_cwd to parent directory of file
-                            Debug_printv("Subdir Change Directory Here! stream[%s] > base[%s]", f->url.c_str(), f->base().c_str());
+                            Debug_printv( "Subdir Change Directory Here! stream[%s] > base[%s]", f->url.c_str(), f->base().c_str() );
                             m_cwd.reset(MFSOwner::File(f->base()));
                             }
                         else
@@ -1630,8 +1630,9 @@ mediatype_t iecDrive::mount(FILE *f, const char *filename, uint32_t disksize, me
   Debug_printv("DRIVE[#%d] URL[%s] MOUNT[%s]", m_devnr, url.c_str(), filename);
 
   // open is expecting PETSCII
-  url = mstr::toPETSCII2(url);
-  this->open( 0, url.c_str() );
+  //url = mstr::toPETSCII2(url);
+  //this->open( 0, url.c_str() );
+  m_cwd.reset(m_cwd->cd(url));
 
   return MediaType::discover_mediatype(filename); // MEDIATYPE_UNKNOWN
 }

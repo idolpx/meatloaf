@@ -198,11 +198,11 @@ public:
         T* newStream = (T*)newFile->getSourceStream();
         Debug_printv("after  " ANSI_WHITE_BACKGROUND "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
 
-        Debug_printv("newFile->sourceFile url[%s] pathInStream[%s]", newFile->sourceFile->url.c_str(), newFile->sourceFile->pathInStream.c_str());
-        Debug_printv("newStream url[%s]", newStream->url.c_str());
-
         if ( newStream != nullptr )
         {
+            Debug_printv("newFile->sourceFile url[%s] pathInStream[%s]", newFile->sourceFile->url.c_str(), newFile->sourceFile->pathInStream.c_str());
+            Debug_printv("newStream url[%s]", newStream->url.c_str());
+    
             // Are we at the root of the pathInStream?
             if ( newFile->pathInStream == "")
             {

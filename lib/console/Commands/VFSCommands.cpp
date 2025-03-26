@@ -160,9 +160,7 @@ int cd(int argc, char **argv)
     std::unique_ptr<MFile> destPath(getCurrentPath()->cd(argv[1]));
 
     if(destPath->isDirectory()) {        
-        auto outgoingPath = getCurrentPath();
-        currentPath = outgoingPath->cd(argv[1]);
-        delete outgoingPath;
+        currentPath = destPath.release();
     } else {
         Serial.printf("cd: not a directory: %s\r\n", path);
         return 1;
@@ -379,7 +377,7 @@ int mkdir(int argc, char **argv)
 
 int mount(int argc, char **argv)
 {
-    if (argc < 3)
+    if (argc < 2)
     {
         //Serial.printf("mount {device id} {url/path/filename}\r\n");
 
@@ -402,12 +400,22 @@ int mount(int argc, char **argv)
         return EXIT_SUCCESS;
     }
 
+    // Device ID
     int did = atoi(argv[1]) - 8;
 
-    std::string filename = argv[2];
-    if ( !mstr::contains(argv[2], ":") )
+    std::string filename = "^" + getCurrentPath()->url;
+    if ( argc > 2 )
     {
-        filename = "/" +getCurrentPath()->url + "/" + filename;
+        // Use current path + filename
+        if ( mstr::contains(argv[2], ":") )
+        {
+            filename = argv[2];
+        }
+        else
+        {
+            filename += "/";
+            filename += argv[2];
+        }
     }
 
     Debug_printv("device id[%d] url[%s]", did, filename.c_str());
@@ -415,7 +423,6 @@ int mount(int argc, char **argv)
     auto drive = Meatloaf.get_disks(did);
     if (drive != nullptr)
     {
-        //drive->disk_dev.m_host->mount();
         drive->disk_dev.mount(NULL, filename.c_str(), 0);
     }
     else

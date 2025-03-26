@@ -578,12 +578,6 @@ MFile* MFile::cd(std::string newDir)
         // means: change to a dir in root of stream
         return cdLocalRoot(mstr::drop(newDir,2));
     }
-    else if(newDir[0]=='/') 
-    {
-        // user entered: CD:/DIR or CD/DIR
-        // means: go to a directory in the same directory as this one
-        return cdParent(mstr::drop(newDir,1));
-    }
     else if(newDir[0]=='^') // {CBM UP ARROW}
     {
         // user entered: CD:^ or CD^ 
@@ -593,6 +587,8 @@ MFile* MFile::cd(std::string newDir)
     else 
     {
         //newDir = mstr::toUTF8( newDir );
+        if ( newDir[0]=='/' )
+            newDir = mstr::drop(newDir,1);
 
         // Add new directory to path
         if ( !mstr::endsWith(url, "/") && newDir.size() )
@@ -629,7 +625,7 @@ MFile* MFile::cd(std::string newDir)
 
 MFile* MFile::cdParent(std::string plus) 
 {
-    //Debug_printv("url[%s] path[%s] plus[%s]", url.c_str(), path.c_str(), plus.c_str());
+    Debug_printv("url[%s] path[%s] plus[%s]", url.c_str(), path.c_str(), plus.c_str());
 
     // drop last dir
     // add plus
@@ -649,8 +645,8 @@ MFile* MFile::cdParent(std::string plus)
             lastSlash = path.find_last_of('/', path.size() - 2);
         }
         std::string newDir = mstr::dropLast(path, path.size() - lastSlash);
-        if(!plus.empty())
-            newDir+= ("/" + plus);
+        if( plus.size() )
+            newDir += "/" + plus;
 
         path = newDir;
         rebuildUrl();
@@ -662,7 +658,7 @@ MFile* MFile::cdParent(std::string plus)
 
 MFile* MFile::cdLocalParent(std::string plus) 
 {
-    //Debug_printv("url[%s] path[%s] plus[%s]", url.c_str(), path.c_str(), plus.c_str());
+    Debug_printv("url[%s] path[%s] plus[%s]", url.c_str(), path.c_str(), plus.c_str());
     // drop last dir
     // check if it isn't shorter than sourceFile
     // add plus
@@ -675,7 +671,7 @@ MFile* MFile::cdLocalParent(std::string plus)
         parent = sourceFile->path;
 
     if(!plus.empty())
-        parent+= ("/" + plus);
+        parent += "/" + plus;
 
     path = parent;
     rebuildUrl();
@@ -685,21 +681,25 @@ MFile* MFile::cdLocalParent(std::string plus)
 
 MFile* MFile::cdRoot(std::string plus) 
 {
-    //Debug_printv("url[%s] path[%s] plus[%s]", url.c_str(), path.c_str(), plus.c_str());
+    Debug_printv("url[%s] path[%s] plus[%s]", url.c_str(), path.c_str(), plus.c_str());
     return MFSOwner::File( "/" + plus, true );
 };
 
 MFile* MFile::cdLocalRoot(std::string plus) 
 {
-    //Debug_printv("url[%s] path[%s] plus[%s]", url.c_str(), path.c_str(), plus.c_str());
+    Debug_printv("url[%s] path[%s] plus[%s]", url.c_str(), path.c_str(), plus.c_str());
 
     if ( path.empty() || sourceFile == nullptr ) {
         // from here we can go only to flash root!
-        path = "/" + plus;
+        path = "/";
     } else {
-        path = sourceFile->path + "/" + plus;
+        path = sourceFile->path;
     }
+    if ( plus.size() )
+        path += "/" + plus;
+
     rebuildUrl();
+    Debug_printv("url[%s]", url.c_str());
     return MFSOwner::File( url );
 };
 

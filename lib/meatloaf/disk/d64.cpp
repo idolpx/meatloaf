@@ -584,8 +584,8 @@ bool D64MStream::seekPath(std::string path)
 
 bool D64MFile::isDirectory()
 {
-    // Debug_printv("pathInStream[%s]", pathInStream.c_str());
-    if (pathInStream == "")
+    //Debug_printv("pathInStream[%s]", pathInStream.c_str());
+    if (pathInStream.empty())
         return true;
     else
         return false;
