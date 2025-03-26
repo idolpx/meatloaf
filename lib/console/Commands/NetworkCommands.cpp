@@ -63,6 +63,7 @@ const char* wlmode2string(wifi_mode_t mode)
 // Ping Functions
 static void on_ping_success(esp_ping_handle_t hdl, void *args)
 {
+    //Debug_printv("on_ping_success");
     uint8_t ttl;
     uint16_t seqno;
     uint32_t elapsed_time, recv_len;
@@ -72,12 +73,13 @@ static void on_ping_success(esp_ping_handle_t hdl, void *args)
     esp_ping_get_profile(hdl, ESP_PING_PROF_IPADDR, &target_addr, sizeof(target_addr));
     esp_ping_get_profile(hdl, ESP_PING_PROF_SIZE, &recv_len, sizeof(recv_len));
     esp_ping_get_profile(hdl, ESP_PING_PROF_TIMEGAP, &elapsed_time, sizeof(elapsed_time));
-    Serial.printf("%lu bytes from %s icmp_seq=%d ttl=%d time=%lu ms\r\n",
+    Serial.printf("%lu bytes from %s: icmp_seq=%d ttl=%d time=%lu ms\r\n",
            recv_len, inet_ntoa(target_addr.u_addr.ip4), seqno, ttl, elapsed_time);
 }
 
 static void on_ping_timeout(esp_ping_handle_t hdl, void *args)
 {
+    //Debug_printv("on_ping_timeout");
     uint16_t seqno;
     ip_addr_t target_addr;
     esp_ping_get_profile(hdl, ESP_PING_PROF_SEQNO, &seqno, sizeof(seqno));
@@ -87,6 +89,7 @@ static void on_ping_timeout(esp_ping_handle_t hdl, void *args)
 
 static void on_ping_end(esp_ping_handle_t hdl, void *args)
 {
+    //Debug_printv("on_ping_end");
     ip_addr_t target_addr;
 	uint32_t transmitted;
 	uint32_t received;
@@ -97,11 +100,11 @@ static void on_ping_end(esp_ping_handle_t hdl, void *args)
 	esp_ping_get_profile(hdl, ESP_PING_PROF_DURATION, &total_time_ms, sizeof(total_time_ms));
 	uint32_t loss = (uint32_t)((1 - ((float)received) / transmitted) * 100);
 	if (IP_IS_V4(&target_addr)) {
-		Serial.printf("\n--- %s ping statistics ---", inet_ntoa(*ip_2_ip4(&target_addr)));
+		Serial.printf("\n--- %s ping statistics", inet_ntoa(*ip_2_ip4(&target_addr)));
 	} else {
-		Serial.printf("\n--- %s ping statistics ---", inet6_ntoa(*ip_2_ip6(&target_addr)));
+		Serial.printf("\n--- %s ping statistics", inet6_ntoa(*ip_2_ip6(&target_addr)));
 	}
-	Serial.printf("%"PRIu32" packets transmitted, %"PRIu32" received, %"PRIu32"%% packet loss, time %"PRIu32"ms",
+	Serial.printf(" ---\n%"PRIu32" packets transmitted, %"PRIu32" received, %"PRIu32"%% packet loss, time %"PRIu32"ms\n",
 			 transmitted, received, loss, total_time_ms);
 	// delete the ping sessions, so that we clean up all resources and can create a new ping session
 	// we don't have to call delete function in the callback, instead we can call delete function from other tasks
@@ -177,6 +180,7 @@ static int ping(int argc, char **argv)
     esp_ping_handle_t ping;
     esp_ping_new_session(&ping_config, &cbs, &ping);
 
+    Serial.printf("PING %s (%s) 56(84) bytes of data.\r\n", hostname, inet_ntoa(*ip_2_ip4(&target_addr)));
     esp_ping_start(ping);
 
     char c = 0;
@@ -189,28 +193,17 @@ static int ping(int argc, char **argv)
     fcntl(fileno(stdin), F_SETFL, flags | O_NONBLOCK);
 
     //Wait for Ctrl+D or Ctr+C or that our task finishes
-    //The async tasks decrease number_of_pings, so wait for it to get to 0
-    while((number_of_pings == 0 || seqno <= number_of_pings) && c != 4 && c != 3) {
+    while((number_of_pings == 0 || seqno < number_of_pings) && c != 4 && c != 3) {
         esp_ping_get_profile(ping, ESP_PING_PROF_SEQNO, &seqno, sizeof(seqno));
         c = getc(stdin);
         sleep(1);
+        //Debug_printv("number_of_pings[%d] seqno[%d]\r\n", number_of_pings, seqno);
     }
 
     //Reset flags, so we dont end up destroying our terminal env later, when linenoise takes over again
     fcntl(fileno(stdin), F_SETFL, flags);
 
     esp_ping_stop(ping);
-
-    //Print total statistics
-    uint32_t transmitted;
-    uint32_t received;
-    uint32_t total_time_ms;
-    esp_ping_get_profile(ping, ESP_PING_PROF_REQUEST, &transmitted, sizeof(transmitted));
-    esp_ping_get_profile(ping, ESP_PING_PROF_REPLY, &received, sizeof(received));
-    esp_ping_get_profile(ping, ESP_PING_PROF_DURATION, &total_time_ms, sizeof(total_time_ms));
-    Serial.printf("%lu packets transmitted, %lu received, time %lu ms\r\n", transmitted, received, total_time_ms);
-
-    esp_ping_delete_session(ping);
 
     return EXIT_SUCCESS;
 }

@@ -383,6 +383,8 @@ namespace ESP32Console
     void Console::execute(const char *command)
     {
         //Debug_printv("Executing command: [%s]\n", command);
+        lprint(command);
+        lprint("\n");
 
         //Interpolate the input line
         std::string interpolated_line = interpolateLine(command);
@@ -417,7 +419,7 @@ namespace ESP32Console
         // Insert current PWD into prompt if needed
         std::string prompt = console.prompt_;
         mstr::replaceAll(prompt, "%pwd%", getCurrentPath()->url);
-        printf(prompt.c_str());
+        print(prompt.c_str());
     }
 
     size_t Console::write(uint8_t c)
@@ -443,7 +445,24 @@ namespace ESP32Console
         return z;
     }
     
+    size_t Console::lprint(const char *str)
+    {
+        int z = strlen(str);
     
+        if (!_initialized)
+            return -1;
+
+        return uart_write_bytes(uart_channel_, str, z);
+        ;
+    }
+    
+    size_t Console::lprint(const std::string &str)
+    {
+        if (!_initialized)
+            return -1;
+    
+        return lprint(str.c_str());
+    }
 
     size_t Console::printf(const char *fmt...)
     {

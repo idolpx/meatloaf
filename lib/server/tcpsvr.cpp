@@ -115,6 +115,7 @@ void TCPServer::task(void *pvParameters)
                 {
                     Debug_printv("Waiting for data");
                     vTaskDelay(100 / portTICK_PERIOD_MS);
+                    break;
                 }
                 // Connection closed
                 else if (bytes_received == 0)
@@ -152,6 +153,7 @@ void TCPServer::task(void *pvParameters)
                     bzero(rx_buffer, sizeof(rx_buffer));
                 }
             }
+            close(client_socket);
         }
     }
     close(socket_id);

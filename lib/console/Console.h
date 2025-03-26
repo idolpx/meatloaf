@@ -145,6 +145,9 @@ namespace ESP32Console
         size_t write(unsigned int n) { return write((uint8_t)n); };
         size_t write(int n) { return write((uint8_t)n); };
 
+        size_t lprint(const char *str);
+        size_t lprint(const std::string &str);
+
         size_t printf(const char *format, ...);
 
         //size_t println(const char *format, ...);
