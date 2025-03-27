@@ -185,10 +185,11 @@ private:
 /********************************************************
  * Universal file
  ********************************************************/
+class MFileSystem;
 
 class MFile : public PeoplesUrlParser {
 private:
-    void setupFields();
+    void setupFields(MFileSystem* factoringFS);
     MFile* _sourceFile = nullptr;
     std::string _pathInStream;
 

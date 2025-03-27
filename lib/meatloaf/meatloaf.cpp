@@ -221,11 +221,56 @@ MFile* MFSOwner::File(std::shared_ptr<MFile> file) {
 }
 
 std::string MFile::pathInStream() {
+    if(_sourceFile == nullptr) {
+        Debug_printv("Creating pathInStream for %s via pathInStream call", url.c_str());
+        setupFields(nullptr);
+    }        
     return _pathInStream;
 }
 
 MFile* MFile::sourceFile() {
+    if(_sourceFile == nullptr) {
+        Debug_printv("Creating sourceFile for %s via sourceFile call", url.c_str());
+        setupFields(nullptr);
+    }        
     return _sourceFile;
+}
+
+void MFile::setupFields(MFileSystem* factoringFS) {
+    auto path = this->url;
+
+    std::vector<std::string> paths = mstr::split(path,'/');
+    auto begin = paths.begin();
+    auto end = paths.end();
+    auto pathIterator = end-1;
+
+    // Debug_printv("calling findParentFS 1 - to skip first enclosing FS", path.c_str());
+    MFileSystem* thisPathFactoringFS = (factoringFS == nullptr) ? MFSOwner::findParentFS(begin, end, pathIterator) : factoringFS;
+
+    std::string beforeFS, afterFS;
+    if ( thisPathFactoringFS == &defaultFS )
+    {
+        beforeFS = path;
+        afterFS = "";
+    }
+    else
+    {
+        auto temp = pathIterator+1;
+        beforeFS = mstr::joinToString(&begin, &temp, "/");
+        afterFS = mstr::joinToString(&temp, &end, "/");
+    }
+    
+    // MFile *thisFile = thisPathFactoringFS->getFile(path);
+
+    this->_sourceFile = thisPathFactoringFS->getFile(beforeFS);
+    this->_sourceFile->_pathInStream = afterFS;
+
+    Debug_printv("Fields initialized to:\n%s\n fs: %s\n ss:%s\n ss_pis:%s", 
+        this->url.c_str(),
+        thisPathFactoringFS->symbol, 
+        this->_sourceFile->url.c_str(), 
+        this->_sourceFile->_pathInStream.c_str()
+    );
 }
 
 MFile* MFSOwner::File(std::string path) {
@@ -254,30 +299,32 @@ MFile* MFSOwner::File(std::string path) {
     // Debug_printv("calling findParentFS 1 - to skip first enclosing FS", path.c_str());
     MFileSystem * thisPathFactoringFS = MFSOwner::findParentFS(begin, end, pathIterator);
 
-    std::string beforeFS, afterFS;
-    if ( thisPathFactoringFS == &defaultFS )
-    {
-        beforeFS = path;
-        afterFS = "";
-    }
-    else
-    {
-        auto temp = pathIterator+1;
-        beforeFS = mstr::joinToString(&begin, &temp, "/");
-        afterFS = mstr::joinToString(&temp, &end, "/");
-    }
-    
     MFile *thisFile = thisPathFactoringFS->getFile(path);
+    thisFile->setupFields(thisPathFactoringFS);
 
-    thisFile->_sourceFile = thisPathFactoringFS->getFile(beforeFS);
-    thisFile->_sourceFile->_pathInStream = afterFS;
+    // std::string beforeFS, afterFS;
+    // if ( thisPathFactoringFS == &defaultFS )
+    // {
+    //     beforeFS = path;
+    //     afterFS = "";
+    // }
+    // else
+    // {
+    //     auto temp = pathIterator+1;
+    //     beforeFS = mstr::joinToString(&begin, &temp, "/");
+    //     afterFS = mstr::joinToString(&temp, &end, "/");
+    // }
+    
 
-    Debug_printv("File initialization\n%s\n fs: %s\n ss:%s\n ss_pis:%s", 
-        thisFile->url.c_str(),
-        thisPathFactoringFS->symbol, 
-        thisFile->_sourceFile->url.c_str(), 
-        thisFile->_sourceFile->_pathInStream.c_str()
-    );
+    // thisFile->_sourceFile = thisPathFactoringFS->getFile(beforeFS);
+    // thisFile->_sourceFile->_pathInStream = afterFS;
+
+    // Debug_printv("File initialization\n%s\n fs: %s\n ss:%s\n ss_pis:%s", 
+    //     thisFile->url.c_str(),
+    //     thisPathFactoringFS->symbol, 
+    //     thisFile->_sourceFile->url.c_str(), 
+    //     thisFile->_sourceFile->_pathInStream.c_str()
+    // );
     
     return thisFile;
 }
@@ -428,6 +475,7 @@ bool MFile::operator!=(nullptr_t ptr) {
 MStream* MFile::getSourceStream(std::ios_base::openmode mode) {
     // has to return OPENED stream
 
+    Debug_printv("Attempting to call [%s]->getSourceStream()", sourceFile()->url.c_str());
     MStream* sourceStream = sourceFile()->getSourceStream(mode);
     if ( sourceStream == nullptr )
     {
