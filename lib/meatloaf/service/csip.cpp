@@ -406,6 +406,7 @@ MFile* CSIPMFile::getNextFileInDir() {
                 name = line.substr(0, line.length()-1);
                 size = (683 * 256);
             }
+            name = mstr::toPETSCII2(name);
 
             //Debug_printv("url[%s] name[%s] size[%d]", url.c_str(), name.c_str(), size);
             if(name.size() > 0)

@@ -108,7 +108,7 @@ static void on_ping_end(esp_ping_handle_t hdl, void *args)
 			 transmitted, received, loss, total_time_ms);
 	// delete the ping sessions, so that we clean up all resources and can create a new ping session
 	// we don't have to call delete function in the callback, instead we can call delete function from other tasks
-	esp_ping_delete_session(hdl);
+	// esp_ping_delete_session(hdl);
 }
 
 static int ping(int argc, char **argv)
@@ -188,22 +188,25 @@ static int ping(int argc, char **argv)
     uint16_t seqno;
     esp_ping_get_profile(ping, ESP_PING_PROF_SEQNO, &seqno, sizeof(seqno));
     
-    //Make stdin input non blocking so we can query for input AND check ping seqno
-    int flags = fcntl(fileno(stdin), F_GETFL, 0);
-    fcntl(fileno(stdin), F_SETFL, flags | O_NONBLOCK);
+    // //Make stdin input non blocking so we can query for input AND check ping seqno
+    // int flags = fcntl(fileno(stdin), F_GETFL, 0);
+    // fcntl(fileno(stdin), F_SETFL, flags | O_NONBLOCK);
 
     //Wait for Ctrl+D or Ctr+C or that our task finishes
-    while((number_of_pings == 0 || seqno < number_of_pings) && c != 4 && c != 3) {
+    //while((number_of_pings == 0 || seqno < number_of_pings) && c != 4 && c != 3) {
+    while((seqno < number_of_pings)) {
         esp_ping_get_profile(ping, ESP_PING_PROF_SEQNO, &seqno, sizeof(seqno));
-        c = getc(stdin);
+        //c = getc(stdin);
         sleep(1);
         //Debug_printv("number_of_pings[%d] seqno[%d]\r\n", number_of_pings, seqno);
     }
 
-    //Reset flags, so we dont end up destroying our terminal env later, when linenoise takes over again
-    fcntl(fileno(stdin), F_SETFL, flags);
+    // //Reset flags, so we dont end up destroying our terminal env later, when linenoise takes over again
+    // fcntl(fileno(stdin), F_SETFL, flags);
 
+    esp_ping_delete_session(ping);
     esp_ping_stop(ping);
+    //Debug_printv("Done! number_of_pings[%d] seqno[%d]\r\n", number_of_pings, seqno);
 
     return EXIT_SUCCESS;
 }

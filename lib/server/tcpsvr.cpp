@@ -141,7 +141,7 @@ void TCPServer::task(void *pvParameters)
                         mstr::rtrim(line);
                         console.execute(line.c_str());
                         line.clear();
-                    } else if (line[0] == 0xFF) {
+                    } else if (line[0] == 0xBF || line[0] == 0xEF || line[0] == 0xFF) {
                         line.clear();
                     }
 
