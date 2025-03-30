@@ -29,9 +29,10 @@
 #include "punycode.h"
 
 //#include "exprtk.hpp"
-#include "tinyexpr.h"
+//#include "tinyexpr.h"
 #include <iostream>
 
+#if 0
 int test_tinyexpr()
 {
     te_parser tep;
@@ -41,6 +42,7 @@ int test_tinyexpr()
         c << "\nevaluates to:\n\t" << r << "\n";
     return EXIT_SUCCESS;
 }
+#endif
 
 //std::unique_ptr<MFile> m_mfile(MFSOwner::File(""));
 
