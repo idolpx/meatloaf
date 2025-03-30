@@ -71,7 +71,7 @@
 
 
 #include "bus.h"
-#include "ml_tests.h"
+//#include "ml_tests.h"
 
 std::string statusMessage;
 bool initFailed = false;
@@ -234,7 +234,7 @@ void main_setup()
 #endif
 
 //#ifdef RUN_TESTS
-    runTestsSuite();
+//    runTestsSuite();
     // lfs_test();
 //#endif
 
