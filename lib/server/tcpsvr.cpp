@@ -20,7 +20,7 @@
 #include "string_utils.h"
 
 #ifdef ENABLE_CONSOLE
-#include "../lib/console/ESP32Console.h"
+#include "../console/ESP32Console.h"
 #endif
 
 #define MESSAGE "Welcome to Meatloaf!\r\n"
