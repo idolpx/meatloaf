@@ -151,7 +151,9 @@ public:
 class G64MFileSystem: public MFileSystem
 {
 public:
-G64MFileSystem(): MFileSystem("g64") {};
+    G64MFileSystem(): MFileSystem("g64") {
+        vdrive_compatible = true;
+    };
 
     bool handles(std::string fileName) override {
         return byExtension(
