@@ -731,22 +731,15 @@ bool iecDrive::open(uint8_t channel, const char *cname)
                     Debug_printv("Error: file exists [%s]", f->url.c_str());
                     setStatusCode(ST_FILE_EXISTS);
                     }
-//#ifdef USE_VDRIVE
-                else if( Meatloaf.use_vdrive ) 
-                    {
-                        if (  !f->isDirectory() && (m_vdrive=VDrive::create(m_devnr-8, f->url.c_str()))!=nullptr )
-                            {
-                                Debug_printv("Created VDrive for URL %s. Loading directory.", f->url.c_str());
-                                delete f;
-                                return m_vdrive->openFile(channel, "$");
-                            }
-
-                        delete f;
-                        return m_channels[channel]!=NULL;
-                    }
-//#endif
                 else
                     {
+                      if( Meatloaf.use_vdrive && !f->isDirectory() && (m_vdrive=VDrive::create(m_devnr-8, f->url.c_str()))!=nullptr )
+                        {
+                          Debug_printv("Created VDrive for URL %s. Loading directory.", f->url.c_str());
+                          delete f;
+                          return m_vdrive->openFile(channel, "$");
+                        }
+
                     MStream *new_stream = f->getSourceStream(mode);
                     
                     if( new_stream==nullptr )
