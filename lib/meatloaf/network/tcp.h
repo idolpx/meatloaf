@@ -124,7 +124,7 @@ class MeatSocketServer {
 
     void start(int p) {
         port = p;
-        xTaskCreate(tcp_server_task, "tcp_server", 4096, (void*)this, 5, NULL);
+        xTaskCreatePinnedToCore(tcp_server_task, "tcp_server", 4096, (void*)this, 5, NULL, 0);
     }
 
     void shutdown() {

@@ -10,6 +10,7 @@
 //#include <archive_entry.h>
 
 #include "../include/global_defines.h"
+#include "../include/pinmap.h"
 #include "../include/debug.h"
 
 #include "fnFsSD.h"
@@ -31,6 +32,8 @@
 //#include "exprtk.hpp"
 #include "tinyexpr.h"
 #include <iostream>
+
+//#include "ps2dev.h"
 
 int test_tinyexpr()
 {
@@ -840,6 +843,10 @@ void runTestsSuite() {
 
     //trig_function<double>();
     //test_tinyexpr();
+
+    // ps2dev::PS2Keyboard keyboard(PIN_KB_CLK, PIN_KB_DATA);
+    // keyboard.begin();
+    // keyboard.type("Meatloaf loves you!!!");
 
     Debug_println("*** All tests finished ***");
 }

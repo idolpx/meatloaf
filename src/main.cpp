@@ -50,6 +50,15 @@
 #include "display.h"
 #endif
 
+#ifdef ENABLE_BLUETOOTH
+#include <c64b.h>
+#endif
+
+#ifdef ENABLE_PS2
+#include "ps2_keyboard.h"
+ps2dev::PS2Keyboard keyboard(PIN_KB_CLK, PIN_KB_DATA);
+#endif
+
 #include "device.h"
 #include "keys.h"
 #include "led.h"
@@ -267,6 +276,18 @@ extern "C"
     {
         // Call our setup routine
         main_setup();
+
+#ifdef ENABLE_BLUETOOTH
+        // Setup Bluetooth
+        bt_setup();
+#endif
+
+#ifdef ENABLE_PS2
+        keyboard.begin();
+        keyboard.type("Meatloaf loves you!!!");
+        Debug_printv("Keyboard initialized!");
+#endif
+
 
         // Delete app_main() task since we no longer need it
         vTaskDelete(NULL);
