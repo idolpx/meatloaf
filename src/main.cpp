@@ -80,7 +80,7 @@ ps2dev::PS2Keyboard keyboard(PIN_KB_CLK, PIN_KB_DATA);
 
 
 #include "bus.h"
-#include "ml_tests.h"
+//#include "ml_tests.h"
 
 std::string statusMessage;
 bool initFailed = false;
@@ -243,7 +243,7 @@ void main_setup()
 #endif
 
 //#ifdef RUN_TESTS
-    runTestsSuite();
+//    runTestsSuite();
     // lfs_test();
 //#endif
 
