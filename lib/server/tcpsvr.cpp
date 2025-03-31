@@ -6,7 +6,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_wifi.h"
-#include "esp_event_loop.h"
+#include "esp_event.h"
 #include "freertos/event_groups.h"
 #include "esp_system.h"
 #include "esp_log.h"
@@ -175,4 +175,12 @@ void TCPServer::start()
 void TCPServer::stop()
 {
     //vTaskDelete( NULL );
+}
+
+void TCPServer::send(std::string data)
+{
+    if (client_socket > 0)
+    {
+        write(client_socket, data.c_str(), data.length());
+    }
 }

@@ -4,13 +4,14 @@
 
 #include "ConsoleCommandBase.h"
 
+#include "driver/uart.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "linenoise/linenoise.h"
 
 #include "../../include/debug.h"
 
-#define CONSOLE_UART        0
+#define CONSOLE_UART        UART_NUM_0
 #define MAX_READ_WAIT_TICKS 200
 
 namespace ESP32Console
@@ -29,7 +30,7 @@ namespace ESP32Console
         const size_t max_cmdline_len_;
         const size_t max_cmdline_args_;
 
-        uint8_t uart_channel_;
+        uart_port_t uart_channel_;
 
         TaskHandle_t task_;
 
@@ -129,7 +130,7 @@ namespace ESP32Console
          * @param txPin The pin to use for TX
          * @param channel The number of the UART to use
          */
-        void begin(int baud, int rxPin = -1, int txPin = -1, uint8_t channel = 0);
+        void begin(int baud, int rxPin = -1, int txPin = -1, uart_port_t channel = UART_NUM_0);
 
         void end();
 

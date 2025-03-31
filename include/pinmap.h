@@ -38,6 +38,11 @@
 #define RGB_LED_TYPE            WS2812B
 #define RGB_LED_ORDER           GRB
 
+/* PS/2 Keyboard Output */
+#ifndef PIN_KB_CLK
+#define PIN_KB_CLK              GPIO_NUM_NC;
+#define PIN_KB_DATA             GPIO_NUM_NC;
+#endif
 
 #ifdef ENABLE_ZIMODEM
 #define DEFAULT_PIN_DCD GPIO_NUM_14

@@ -175,7 +175,7 @@ namespace ESP32Console
         registerCoreCommands();
     }
 
-    void Console::begin(int baud, int rxPin, int txPin, uint8_t channel)
+    void Console::begin(int baud, int rxPin, int txPin, uart_port_t channel)
     {
         //Debug_printv("Initialize console");
 
@@ -400,7 +400,6 @@ namespace ESP32Console
         if (err == ESP_ERR_NOT_FOUND)
         {
             std::string t = "Unrecognized command\n";
-            tcp_server.send(t);
             printf(t.c_str());
         }
         else if (err == ESP_ERR_INVALID_ARG)
@@ -453,7 +452,6 @@ namespace ESP32Console
             return -1;
 
         return uart_write_bytes(uart_channel_, str, z);
-        ;
     }
     
     size_t Console::lprint(const std::string &str)
@@ -525,7 +523,6 @@ namespace ESP32Console
         
         tcp_server.send(str);
         return uart_write_bytes(uart_channel_, str, z);
-        ;
     }
     
     size_t Console::print(const std::string &str)
@@ -591,7 +588,7 @@ namespace ESP32Console
             return _print_number(n, base);
         }
     }
-    
+
     size_t Console::println(const char *str)
     {
         if (!_initialized)

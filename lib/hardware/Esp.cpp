@@ -265,7 +265,8 @@ uint16_t EspClass::getChipRevision(void) {
 const char *EspClass::getChipModel(void) {
 #if CONFIG_IDF_TARGET_ESP32
     uint32_t chip_ver =
-        REG_GET_FIELD(EFUSE_BLK0_RDATA3_REG, EFUSE_RD_CHIP_VER_PKG);
+        //REG_GET_FIELD(EFUSE_BLK0_RDATA3_REG, EFUSE_RD_CHIP_VER_PKG);
+        REG_GET_FIELD(EFUSE_BLK0_RDATA3_REG, EFUSE_RD_CHIP_PACKAGE);
     uint32_t pkg_ver = chip_ver & 0x7;
     switch (pkg_ver) {
         case EFUSE_RD_CHIP_VER_PKG_ESP32D0WDQ6:

@@ -30,7 +30,7 @@ std::string read_until(char delimiter)
         uart_get_buffered_data_len(CONSOLE_UART, &size);
         if (size > 0)
         {
-            int result = uart_read_bytes(CONSOLE_UART, &byte, 1, MAX_READ_WAIT_TICKS);
+            int result = uart_read_bytes((uart_port_t)CONSOLE_UART, &byte, 1, MAX_READ_WAIT_TICKS);
             if (result < 1)
             {
                 Serial.printf("3 Error: Response Timeout\r\n");
@@ -75,10 +75,10 @@ int rx(int argc, char **argv)
     while (count < size)
     {
         size_t size = 0;
-        uart_get_buffered_data_len(CONSOLE_UART, &size);
+        uart_get_buffered_data_len((uart_port_t)CONSOLE_UART, &size);
         if (size > 0)
         {
-            int result = uart_read_bytes(CONSOLE_UART, &byte, 1, MAX_READ_WAIT_TICKS);
+            int result = uart_read_bytes((uart_port_t)CONSOLE_UART, &byte, 1, MAX_READ_WAIT_TICKS);
             if (result < 1)
                 break;
 

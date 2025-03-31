@@ -16,13 +16,7 @@ public:
     void start();
     void stop();
 
-    static void send(std::string data)
-    {
-        if (client_socket > 0)
-        {
-            write(client_socket, data.c_str(), data.length());
-        }
-    }
+    static void send(std::string data);
 };
 
 extern TCPServer tcp_server;

@@ -42,6 +42,10 @@
 #define PIN_DAC1                GPIO_NUM_25 // samlib.h
 #define PIN_I2S                 GPIO_NUM_25
 
+/* PS/2 Keyboard Output */
+#define PIN_KB_CLK              GPIO_NUM_16
+#define PIN_KB_DATA             GPIO_NUM_17
+
 // Reset line is available
 #define IEC_HAS_RESET
 

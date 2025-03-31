@@ -172,12 +172,12 @@ void TNFSMFile::openDir(std::string apath)
     }
     
     // Debug_printv("path[%s]", apath.c_str());
-    if(apath.empty()) {
-        dir = opendir( "/" );
-    }
-    else {
-        dir = opendir( apath.c_str() );
-    }
+    // if(apath.empty()) {
+    //     dir = opendir( "/" );
+    // }
+    // else {
+    //     dir = opendir( apath.c_str() );
+    // }
 
     dirOpened = true;
     if ( dir == NULL ) {
@@ -194,120 +194,123 @@ void TNFSMFile::openDir(std::string apath)
 
 void TNFSMFile::closeDir() 
 {
-    if(dirOpened) {
-        closedir( dir );
-        dirOpened = false;
-    }
+    // if(dirOpened) {
+    //     closedir( dir );
+    //     dirOpened = false;
+    // }
 }
 
 
 bool TNFSMFile::rewindDirectory()
 {
-    _valid = false;
-    rewinddir( dir );
+    // _valid = false;
+    // rewinddir( dir );
 
-    // // Skip the . and .. entries
-    // struct dirent* dirent = NULL;
-    // dirent = readdir( dir );
-    // dirent = readdir( dir );
+    // // // Skip the . and .. entries
+    // // struct dirent* dirent = NULL;
+    // // dirent = readdir( dir );
+    // // dirent = readdir( dir );
 
-    return (dir != NULL) ? true: false;
+    // return (dir != NULL) ? true: false;
+    return true;
 }
 
 
 MFile* TNFSMFile::getNextFileInDir()
 {
-    // Debug_printv("base[%s] path[%s]", basepath.c_str(), path.c_str());
-    if(!dirOpened)
-        openDir(std::string(basepath + path).c_str());
+    // // Debug_printv("base[%s] path[%s]", basepath.c_str(), path.c_str());
+    // if(!dirOpened)
+    //     openDir(std::string(basepath + path).c_str());
 
-    if(dir == nullptr)
-        return nullptr;
+    // if(dir == nullptr)
+    //     return nullptr;
 
-    struct dirent* dirent = NULL;
-    do
-    {
-        dirent = readdir( dir );
-    } while ( dirent != NULL && mstr::startsWith(dirent->d_name, ".") ); // Skip hidden files
+    // struct dirent* dirent = NULL;
+    // do
+    // {
+    //     dirent = readdir( dir );
+    // } while ( dirent != NULL && mstr::startsWith(dirent->d_name, ".") ); // Skip hidden files
 
-    if ( dirent != NULL )
-    {
-        //Debug_printv("path[%s] name[%s]", this->path.c_str(), dirent->d_name);
-        std::string entry_name = this->path + ((this->path == "/") ? "" : "/") + std::string(dirent->d_name);
+    // if ( dirent != NULL )
+    // {
+    //     //Debug_printv("path[%s] name[%s]", this->path.c_str(), dirent->d_name);
+    //     std::string entry_name = this->path + ((this->path == "/") ? "" : "/") + std::string(dirent->d_name);
 
-        auto file = new TNFSMFile(entry_name);
-        file->extension = " " + file->extension;
+    //     auto file = new TNFSMFile(entry_name);
+    //     file->extension = " " + file->extension;
 
-        if(file->isDirectory()) {
-            file->size = 0;
-        }
-        else {
-            struct stat info;
-            stat( std::string(entry_name).c_str(), &info);
-            file->size = info.st_size;
-        }
+    //     if(file->isDirectory()) {
+    //         file->size = 0;
+    //     }
+    //     else {
+    //         struct stat info;
+    //         stat( std::string(entry_name).c_str(), &info);
+    //         file->size = info.st_size;
+    //     }
 
-        return file;
-    }
-    else
-    {
-        closeDir();
-        return nullptr;
-    }
+    //     return file;
+    // }
+    // else
+    // {
+    //     closeDir();
+    //     return nullptr;
+    // }
+    return nullptr;
 }
 
 
 bool TNFSMFile::readEntry( std::string filename )
 {
-    DIR* d;
-    std::string apath = (basepath + pathToFile()).c_str();
-    if (apath.empty()) {
-        apath = "/";
-    }
+    // DIR* d;
+    // std::string apath = (basepath + pathToFile()).c_str();
+    // if (apath.empty()) {
+    //     apath = "/";
+    // }
 
-    Debug_printv( "path[%s] filename[%s] size[%d]", apath.c_str(), filename.c_str(), filename.size());
+    // Debug_printv( "path[%s] filename[%s] size[%d]", apath.c_str(), filename.c_str(), filename.size());
 
-    d = opendir( apath.c_str() );
-    if(d == nullptr)
-        return false;
+    // d = opendir( apath.c_str() );
+    // if(d == nullptr)
+    //     return false;
 
-    // Read Directory Entries
-    struct dirent* dirent = NULL;
-    if ( filename.size() > 0 )
-    {
-        while ( (dirent = readdir( d )) != NULL )
-        {
-            std::string entryFilename = dirent->d_name;
+    // // Read Directory Entries
+    // struct dirent* dirent = NULL;
+    // if ( filename.size() > 0 )
+    // {
+    //     while ( (dirent = readdir( d )) != NULL )
+    //     {
+    //         std::string entryFilename = dirent->d_name;
 
-            Debug_printv("path[%s] filename[%s] entry.filename[%.16s]", apath.c_str(), filename.c_str(), entryFilename.c_str());
+    //         Debug_printv("path[%s] filename[%s] entry.filename[%.16s]", apath.c_str(), filename.c_str(), entryFilename.c_str());
 
-            // Read Entry From Stream
-            if (filename == "*")
-            {
-                filename = entryFilename;
-                closedir( d );
-                return true;
-            }
-            else if ( filename == entryFilename )
-            {
-                closedir( d );
-                return true;
-            }
-            else if ( mstr::compare(filename, entryFilename) )
-            {
-                // Set filename to this filename
-                Debug_printv( "Found! file[%s] -> entry[%s]", filename.c_str(), entryFilename.c_str() );
-                resetURL(apath + "/" + std::string(dirent->d_name));
-                closedir( d );
-                return true;
-            }
-        }
+    //         // Read Entry From Stream
+    //         if (filename == "*")
+    //         {
+    //             filename = entryFilename;
+    //             closedir( d );
+    //             return true;
+    //         }
+    //         else if ( filename == entryFilename )
+    //         {
+    //             closedir( d );
+    //             return true;
+    //         }
+    //         else if ( mstr::compare(filename, entryFilename) )
+    //         {
+    //             // Set filename to this filename
+    //             Debug_printv( "Found! file[%s] -> entry[%s]", filename.c_str(), entryFilename.c_str() );
+    //             resetURL(apath + "/" + std::string(dirent->d_name));
+    //             closedir( d );
+    //             return true;
+    //         }
+    //     }
 
-        Debug_printv( "Not Found! file[%s]", filename.c_str() );
-    }
+    //     Debug_printv( "Not Found! file[%s]", filename.c_str() );
+    // }
 
-    closedir( d );
-    return false;
+    // closedir( d );
+    // return false;
+    return true;
 }
 
 
@@ -340,25 +343,25 @@ uint32_t TNFSMStream::write(const uint8_t *buf, uint32_t size) {
 
 
 bool TNFSMStream::open(std::ios_base::openmode mode) {
-    if(isOpen())
-        return true;
+    // if(isOpen())
+    //     return true;
 
-    //Debug_printv("IStream: trying to open flash fs, calling isOpen");
+    // //Debug_printv("IStream: trying to open flash fs, calling isOpen");
 
-    //Debug_printv("IStream: wasn't open, calling obtain");
-    handle->obtain(localPath, "r");
+    // //Debug_printv("IStream: wasn't open, calling obtain");
+    // handle->obtain(localPath, "r");
 
-    if(isOpen()) {
-        //Debug_printv("IStream: past obtain");
-        // Set file size
-        fseek(handle->file_h, 0, SEEK_END);
-        //Debug_printv("IStream: past fseek 1");
-        _size = ftell(handle->file_h);
-        //Debug_printv("IStream: past ftell");
-        fseek(handle->file_h, 0, SEEK_SET);
-        //Debug_printv("IStream: past fseek 2");
-        return true;
-    }
+    // if(isOpen()) {
+    //     //Debug_printv("IStream: past obtain");
+    //     // Set file size
+    //     fseek(handle->file_h, 0, SEEK_END);
+    //     //Debug_printv("IStream: past fseek 1");
+    //     _size = ftell(handle->file_h);
+    //     //Debug_printv("IStream: past ftell");
+    //     fseek(handle->file_h, 0, SEEK_SET);
+    //     //Debug_printv("IStream: past fseek 2");
+    //     return true;
+    // }
     return false;
 };
 
@@ -452,5 +455,4 @@ void TNFSHandle::obtain(std::string m_path, std::string mode) {
 
     //Debug_printv("m_path[%s] mode[%s]", m_path.c_str(), mode.c_str());
     file_h = fopen( m_path.c_str(), mode.c_str());
-
 }

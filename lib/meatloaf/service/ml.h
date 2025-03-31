@@ -69,7 +69,7 @@ public:
 
     std::string resolve(std::string path) {
         if ( path.size() == 0 )
-            return nullptr;
+            return "";
 
         //Debug_printv("MLFileSystem::getFile(%s)", path.c_str());
         auto urlParser = PeoplesUrlParser::parseURL( path );
