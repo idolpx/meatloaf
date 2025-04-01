@@ -1644,4 +1644,19 @@ void iecDrive::unmount()
 }
 
 
+#if defined(SUPPORT_EPYX) && defined(SUPPORT_EPYX_SECTOROPS)
+bool iecDrive::epyxReadSector(uint8_t track, uint8_t sector, uint8_t *buffer)
+{
+  return m_vdrive==nullptr ? false : m_vdrive->readSector(track, sector, buffer);
+}
+
+
+bool iecDrive::epyxWriteSector(uint8_t track, uint8_t sector, uint8_t *buffer)
+{
+  return m_vdrive==nullptr ? false : m_vdrive->writeSector(track, sector, buffer);
+}
+#endif
+
+
+
 #endif /* BUILD_IEC */

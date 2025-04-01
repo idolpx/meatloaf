@@ -292,6 +292,11 @@ class iecDrive : public IECFileDevice
   // called on falling edge of RESET line
   virtual void reset();
 
+#if defined(SUPPORT_EPYX) && defined(SUPPORT_EPYX_SECTOROPS)
+  virtual bool epyxReadSector(uint8_t track, uint8_t sector, uint8_t *buffer);
+  virtual bool epyxWriteSector(uint8_t track, uint8_t sector, uint8_t *buffer);
+#endif
+
   void set_cwd(std::string path);
 
   std::unique_ptr<MFile> m_cwd;   // current working directory

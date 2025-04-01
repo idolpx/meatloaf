@@ -34,7 +34,7 @@
 // at least 256 bytes. Note that the "bufferSize" argument is a byte and therefore
 // capped at 255 bytes. Make sure the buffer itself has >=256 bytes and use a 
 // bufferSize argument of 255 or less
-//#define SUPPORT_EPYX_SECTOROPS
+#define SUPPORT_EPYX_SECTOROPS
 
 // defines the maximum number of devices that the bus handler will be
 // able to support - set to 4 by default but can be increased to up to 30 devices
