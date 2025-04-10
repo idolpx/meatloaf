@@ -1,13 +1,13 @@
 
 #include "keys.h"
 
-#ifdef PSRAM_SIZE
-#ifdef CONFIG_IDF_TARGET_ESP32S3
-#include <esp_psram.h>
-#else
-#include <esp32/himem.h>
-#endif
-#endif
+// #ifdef BOARD_HAS_PSRAM
+// #ifdef CONFIG_IDF_TARGET_ESP32S3
+// #include <esp_psram.h>
+// #else
+// #include <esp32/himem.h>
+// #endif
+// #endif
 
 #include "../../include/debug.h"
 #include "../../include/pinmap.h"

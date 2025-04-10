@@ -1,5 +1,12 @@
 #include <string>
-// #include <esp32/himem.h>
+
+#ifdef BOARD_HAS_PSRAM
+#include <esp_psram.h>
+#ifdef CONFIG_IDF_TARGET_ESP32
+#include <esp32/himem.h>
+#endif
+#endif
+
 #include "../include/debug.h"
 
 void testHeader(std::string testName);

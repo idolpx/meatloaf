@@ -104,7 +104,7 @@ static void on_ping_end(esp_ping_handle_t hdl, void *args)
 	} else {
 		Serial.printf("\n--- %s ping statistics", inet6_ntoa(*ip_2_ip6(&target_addr)));
 	}
-	Serial.printf(" ---\n%"PRIu32" packets transmitted, %"PRIu32" received, %"PRIu32"%% packet loss, time %"PRIu32"ms\n",
+	Serial.printf(" ---\n%lu packets transmitted, %lu received, %lu%% packet loss, time %lums\n",
 			 transmitted, received, loss, total_time_ms);
 	// delete the ping sessions, so that we clean up all resources and can create a new ping session
 	// we don't have to call delete function in the callback, instead we can call delete function from other tasks
@@ -183,8 +183,6 @@ static int ping(int argc, char **argv)
     Serial.printf("PING %s (%s) 56(84) bytes of data.\r\n", hostname, inet_ntoa(*ip_2_ip4(&target_addr)));
     esp_ping_start(ping);
 
-    char c = 0;
-    
     uint16_t seqno;
     esp_ping_get_profile(ping, ESP_PING_PROF_SEQNO, &seqno, sizeof(seqno));
     

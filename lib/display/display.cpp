@@ -62,7 +62,7 @@ static spi_settings_t spi_settings = {
             .clock_speed_hz = (int)(3.2 * 1000 * 1000), // Clock out at 3.2 MHz
             .spics_io_num = -1,                  // CS pin
             .flags = SPI_DEVICE_TXBIT_LSBFIRST,
-            .queue_size = 1,
+            .queue_size = 7,
         },
     .buscfg =
         {
@@ -283,6 +283,7 @@ esp_err_t Display::update()
         .tx_buffer = dma_buffer,
     };
     err = spi_device_transmit(spi_settings.spi, &tx_conf);
+    //err = spi_device_queue_trans(spi_settings.spi, &tx_conf, portMAX_DELAY);
     return err;
 }
 
@@ -292,7 +293,7 @@ void Display::start(void)
     idle();
 
     // Start DISPLAY task
-    if ( xTaskCreatePinnedToCore(display_task, "display_task", 1024, this, 4, NULL, 0) != pdTRUE)
+    if ( xTaskCreatePinnedToCore(display_task, "display_task", 2048, this, 4, NULL, 0) != pdTRUE)
     {
         Debug_printv("Could not start DISPLAY task!");
     }

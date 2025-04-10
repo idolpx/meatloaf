@@ -284,7 +284,7 @@ const std::string substitute_tag(const std::string &tag)
     }
 
     int drive_slot, host_slot;
-    char disk_id;
+    //char disk_id;
 
     // Provide a replacement value
     switch (tagid)

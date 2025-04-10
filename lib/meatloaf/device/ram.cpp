@@ -22,7 +22,13 @@
 #include "esp_system.h"
 #include "nvs_flash.h"
 #include "esp_heap_caps.h"
-#include "esp32/himem.h"
+#ifdef BOARD_HAS_PSRAM
+#ifdef CONFIG_IDF_TARGET_ESP32S3
+#include <esp_psram.h>
+#else
+#include <esp32/himem.h>
+#endif
+#endif
 
 
 //Fill memory with pseudo-random data generated from the given seed.

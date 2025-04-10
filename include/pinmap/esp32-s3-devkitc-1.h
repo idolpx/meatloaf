@@ -1,7 +1,8 @@
 #ifndef ESP32S3_DEVKITC_1_H
 #define ESP32S3_DEVKITC_1_H
 
-// https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/hw-reference/esp32s3/user-guide-devkitc-1.html
+// https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32s3/esp32-s3-devkitc-1/index.html
+// https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32s3/_images/ESP32-S3_DevKitC-1_pinlayout.jpg
 
 #ifdef PINMAP_ESP32S3_DEVKITC_1
 
@@ -10,41 +11,46 @@
 #define PSRAM_SIZE              8
 
 /* SD Card */
-#define PIN_CARD_DETECT         GPIO_NUM_12 // fnSystem.h
-#define PIN_CARD_DETECT_FIX     GPIO_NUM_15 // fnSystem.h
+#define PIN_CARD_DETECT         GPIO_NUM_NC // fnSystem.h
+#define PIN_CARD_DETECT_FIX     GPIO_NUM_NC // fnSystem.h
 
-#define PIN_SD_HOST_CS          GPIO_NUM_4
-#define PIN_SD_HOST_MISO        GPIO_NUM_19
-#define PIN_SD_HOST_MOSI        GPIO_NUM_12
-#define PIN_SD_HOST_SCK         GPIO_NUM_18
+#define PIN_SD_HOST_CS          GPIO_NUM_46
+#define PIN_SD_HOST_MISO        GPIO_NUM_13
+#define PIN_SD_HOST_MOSI        GPIO_NUM_11
+#define PIN_SD_HOST_SCK         GPIO_NUM_12
 
 /* UART */
-#define PIN_UART0_RX            GPIO_NUM_3  // fnUART.cpp
-#define PIN_UART0_TX            GPIO_NUM_1
-#define PIN_UART1_RX            GPIO_NUM_9
-#define PIN_UART1_TX            GPIO_NUM_10
-#define PIN_UART2_RX            GPIO_NUM_33
-#define PIN_UART2_TX            GPIO_NUM_21
+#define PIN_UART0_RX            GPIO_NUM_44  // fnUART.cpp
+#define PIN_UART0_TX            GPIO_NUM_43
+#define PIN_UART1_RX            GPIO_NUM_NC
+#define PIN_UART1_TX            GPIO_NUM_NC
+#define PIN_UART2_RX            GPIO_NUM_NC
+#define PIN_UART2_TX            GPIO_NUM_NC
 
 /* Buttons */
 #define PIN_BUTTON_A            GPIO_NUM_0  // keys.cpp
-#define PIN_BUTTON_B            GPIO_NUM_34
-#define PIN_BUTTON_C            GPIO_NUM_14
+#define PIN_BUTTON_B            GPIO_NUM_NC
+#define PIN_BUTTON_C            GPIO_NUM_NC
 
 /* LEDs */
-#define PIN_LED_WIFI            GPIO_NUM_4 // led.cpp
-#define PIN_LED_BUS             GPIO_NUM_48 // 4 FN
-
-// pins 12-15 are used to interface with the JTAG debugger
-// so leave them alone if we're using JTAG
-#ifndef JTAG
-#define PIN_LED_BT              GPIO_NUM_13
-#else
-#define PIN_LED_BT              GPIO_NUM_5  // LOLIN D32 PRO
-#endif
+#define PIN_LED_WIFI            GPIO_NUM_5   // led.cpp
+#define PIN_LED_BUS             GPIO_NUM_NC
+#define PIN_LED_BT              GPIO_NUM_NC
+#define PIN_LED_RGB             GPIO_NUM_48
 
 /* Audio Output */
-#define PIN_DAC1                GPIO_NUM_25 // samlib.h
+#define PIN_DAC1                GPIO_NUM_NC // samlib.h
+#define PIN_I2S                 GPIO_NUM_42
+
+/* I2C GPIO Expander */
+#define PIN_GPIOX_SDA           GPIO_NUM_9
+#define PIN_GPIOX_SCL           GPIO_NUM_10
+#define PIN_GPIOX_INT           GPIO_NUM_41
+#define GPIOX_ADDRESS           0x20  // PCF8575
+//#define GPIOX_ADDRESS           0x24  // PCA9673
+#define GPIOX_SPEED             400   // PCF8575 - 400Khz
+//#define GPIOX_SPEED             1000  // PCA9673 - 1000Khz / 1Mhz
+
 
 /* Commodore IEC Pins */
 // CLK & DATA lines in/out are split between two pins
@@ -53,51 +59,23 @@
 // Line values are inverted (7406 Hex Inverter Buffer)
 //#define IEC_INVERTED_LINES
 
-#define IEC_HAS_RESET // Reset line is available
+// Reset line is available
+#define IEC_HAS_RESET
+                                                //            WIRING
+                                                //  C64    DIN6    D32Pro       S3PRO   TFT
+#define PIN_IEC_ATN             GPIO_NUM_4      //  ATN    3       A T-LED 32      10 (PURPLE)
+#define PIN_IEC_CLK_IN          GPIO_NUM_5      //  CLK    4       A T-RST 33      8  (BROWN)
+#define PIN_IEC_CLK_OUT         GPIO_NUM_5      //
+#define PIN_IEC_DATA_IN         GPIO_NUM_6      //  DATA   5       T-CS 14         2  (BLACK)
+#define PIN_IEC_DATA_OUT        GPIO_NUM_6      //
+#define PIN_IEC_SRQ             GPIO_NUM_7      //  SRQ    1       T-DC 27         7  (ORANGE)
+#define PIN_IEC_RESET           GPIO_NUM_8      //  RESET  6       A 32            N/C
+                                                //  GND    2       GND             9  (GREY)
 
-// // CBM IEC Serial Port
-// #define PIN_IEC_ATN             GPIO_NUM_39      // SIO 7  - CMD  - Command
-// #define PIN_IEC_SRQ             GPIO_NUM_26      // SIO 13 - INT  - Interrupt
-// #define PIN_IEC_RESET           GPIO_NUM_22      // SIO 9  - PROC - Proceed
-//                                                  // SIO 4 & 6 - GND - Ground
-
-// // IEC_SPLIT_LINES
-// #ifndef IEC_SPLIT_LINES
-// // NOT SPLIT - Bidirectional Lines
-// #define PIN_IEC_CLK_IN          GPIO_NUM_27      // SIO 1  - CKI  - Clock Input
-// #define PIN_IEC_CLK_OUT         GPIO_NUM_27      // SIO 1  - CKI  - Clock Input
-// #define PIN_IEC_DATA_IN         GPIO_NUM_21      // SIO 3  - DI   - Data Input
-// #define PIN_IEC_DATA_OUT        GPIO_NUM_21      // SIO 3  - DI   - Data Input
-// #else
-// // SPLIT - Seperate Input & Output lines
-// #define PIN_IEC_CLK_IN          GPIO_NUM_32      // SIO 2  - CKO  - Clock Output
-// #define PIN_IEC_CLK_OUT         GPIO_NUM_27      // SIO 1  - CKI  - Clock Input
-// #define PIN_IEC_DATA_IN         GPIO_NUM_33      // SIO 5  - DO   - Data Output
-// #define PIN_IEC_DATA_OUT        GPIO_NUM_21      // SIO 3  - DI   - Data Input
-// #endif
-
-
-#define PIN_IEC_RESET           GPIO_NUM_13
-#define PIN_IEC_ATN             GPIO_NUM_12
-#define PIN_IEC_CLK_IN          GPIO_NUM_11
-#define PIN_IEC_CLK_OUT         GPIO_NUM_11
-#define PIN_IEC_DATA_IN         GPIO_NUM_10
-#define PIN_IEC_DATA_OUT        GPIO_NUM_10
-#define PIN_IEC_SRQ             GPIO_NUM_9
-// GND - Be sure to connect GND of the IEC cable to GND on the ESP module
 
 /* Modem/Parallel Switch */
 #define PIN_MODEM_ENABLE        GPIO_NUM_2  // High = Modem enabled
 #define PIN_MODEM_UP9600        GPIO_NUM_15 // High = UP9600 enabled
-
-/* I2C GPIO Expander */
-#define PIN_GPIOX_SDA           GPIO_NUM_21
-#define PIN_GPIOX_SCL           GPIO_NUM_22
-#define PIN_GPIOX_INT           GPIO_NUM_34
-//#define GPIOX_ADDRESS           0x20  // PCF8575
-#define GPIOX_ADDRESS           0x24  // PCA9673
-//#define GPIOX_SPEED             400   // PCF8575 - 400Khz
-#define GPIOX_SPEED             1000  // PCA9673 - 1000Khz / 1Mhz
 
 #endif // PINMAP_ESP32S3_DEVKITC_1
 #endif // ESP32S3_DEVKITC_1_H

@@ -30,7 +30,13 @@
 #include "../../../include/debug.h"
 #include "../meat_media.h"
 #include "../meatloaf.h"
-#include "esp32/himem.h"
+
+#ifdef BOARD_HAS_PSRAM
+#include <esp_psram.h>
+#ifdef CONFIG_IDF_TARGET_ESP32
+#include <esp32/himem.h>
+#endif
+#endif
 
 class Archive {
    public:
@@ -126,14 +132,19 @@ class ArchiveMStream : public MMediaStream {
     Archive *m_archive;
     std::ios_base::openmode m_mode;
 
-    // contains unzipped contents of archive (in HIMEM)
     int m_haveData;
-    esp_himem_handle_t m_data;
     bool m_dirty;
+
+#if defined(CONFIG_IDF_TARGET_ESP32) && defined(BOARD_HAS_PSRAM)
+    // contains unzipped contents of archive (in HIMEM)
+    esp_himem_handle_t m_data;
 
     // memory range mapped to HIMEM
     static esp_himem_rangehandle_t s_range;
     static int s_rangeUsed;
+#else
+    uint8_t *m_data;
+#endif
 
     friend class ArchiveMFile;
 };

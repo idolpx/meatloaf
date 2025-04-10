@@ -145,8 +145,10 @@ void Archive::close() {
  * Streams implementations
  ********************************************************/
 
+#if defined(CONFIG_IDF_TARGET_ESP32) && defined(BOARD_HAS_PSRAM)
 int ArchiveMStream::s_rangeUsed = 0;
 esp_himem_rangehandle_t ArchiveMStream::s_range;
+#endif
 
 bool ArchiveMStream::open(std::ios_base::openmode mode) {
     m_mode = mode;
@@ -161,12 +163,16 @@ void ArchiveMStream::close() {
             m_dirty = false;
         }
 
+#if defined(CONFIG_IDF_TARGET_ESP32) && defined(BOARD_HAS_PSRAM)
         ESP_ERROR_CHECK(esp_himem_free(m_data));
         Debug_printv("HIMEM available after free: %lu ", (uint32_t)esp_himem_get_free_size());
 
         // if this was the last archive in use then free up the mapped range
         if (s_rangeUsed > 0) s_rangeUsed--;
         if (s_rangeUsed == 0) esp_himem_free_map_range(s_range);
+#else
+        delete[] m_data;
+#endif
     }
 
     m_haveData = 0;
@@ -176,6 +182,8 @@ bool ArchiveMStream::isOpen() { return m_archive->isOpen(); }
 
 void ArchiveMStream::readArchiveData() {
     if (m_archive->isOpen() && m_haveData == 0) {
+
+#if defined(CONFIG_IDF_TARGET_ESP32) && defined(BOARD_HAS_PSRAM)
         // allocate HIMEM memory for archive data (size must be multiple of
         // ESP_HIMEM_BLKSZ);
         uint32_t size = (_size / ESP_HIMEM_BLKSZ) * ESP_HIMEM_BLKSZ;
@@ -209,13 +217,19 @@ void ArchiveMStream::readArchiveData() {
 
         // increment mapped range usage counter
         s_rangeUsed++;
+#else
+        m_data = new uint8_t[_size];
+        m_haveData = 1;
+#endif
 
         Debug_printv("reading %lu bytes from archive", _size);
+        archive *a = m_archive->getArchive();
 
+#if defined(CONFIG_IDF_TARGET_ESP32) && defined(BOARD_HAS_PSRAM)
         size = _size;
         uint32_t pageStart = 0;
         while (size > 0) {
-            archive *a = m_archive->getArchive();
+            
             uint32_t s = std::min(size, (uint32_t)ESP_HIMEM_BLKSZ);
 
             uint8_t *ptr;
@@ -238,6 +252,19 @@ void ArchiveMStream::readArchiveData() {
             pageStart += s;
             size -= s;
         }
+#else
+        uint32_t r = archive_read_data(a, m_data, _size);
+        if (archive_errno(a) != ARCHIVE_OK || r != _size) {
+            if (archive_errno(a) != ARCHIVE_OK) {
+                Debug_printv("archive read error %i: %s", archive_errno(a), archive_error_string(a));
+            } else {
+                Debug_printv("expected to read %lu bytes from archive, got %lu", _size, r);
+            }
+            delete[] m_data;
+            m_haveData = -1;
+            return;
+        }
+#endif
     }
 }
 
@@ -247,9 +274,11 @@ uint32_t ArchiveMStream::read(uint8_t *buf, uint32_t size) {
     if (m_haveData > 0) {
         // Debug_printv("calling read, buff size=[%ld]", size);
 
+#if defined(CONFIG_IDF_TARGET_ESP32) && defined(BOARD_HAS_PSRAM)
         if (_position + size > _size) size = _size - _position;
         uint32_t numRead = 0;
         while (size > 0) {
+
             uint32_t pageStart = (_position / ESP_HIMEM_BLKSZ) * ESP_HIMEM_BLKSZ;
             uint32_t offset = _position - pageStart;
             uint32_t n = std::min(size, (uint32_t)ESP_HIMEM_BLKSZ - offset);
@@ -265,6 +294,12 @@ uint32_t ArchiveMStream::read(uint8_t *buf, uint32_t size) {
 
         // Debug_printv("read [%lu] bytes", numRead);
         return numRead;
+
+#else
+        memcpy(buf, m_data + _position, size);
+        _position += size;
+        return size;
+#endif
     } else
         return 0;
 }
@@ -281,6 +316,8 @@ uint32_t ArchiveMStream::write(const uint8_t *buf, uint32_t size) {
 
         if (_position + size > _size) size = _size - _position;
         uint32_t numWritten = 0;
+
+#if defined(CONFIG_IDF_TARGET_ESP32) && defined(BOARD_HAS_PSRAM)
         while (size > 0) {
             uint32_t pageStart = (_position / ESP_HIMEM_BLKSZ) * ESP_HIMEM_BLKSZ;
             uint32_t offset = _position - pageStart;
@@ -294,6 +331,11 @@ uint32_t ArchiveMStream::write(const uint8_t *buf, uint32_t size) {
             numWritten += n;
             _position += n;
         }
+#else
+        memcpy(m_data + _position, buf, size);
+        _position += size;
+        numWritten = size;
+#endif
 
         // remember that data was written so we can re-zip the archive
         if (numWritten > 0) m_dirty = true;

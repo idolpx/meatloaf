@@ -76,8 +76,9 @@ data_dir = data/${meatloaf.build_platform}.${meatloaf.flash_size}
 [esp32_base]
 ; Espressif32 PlatformIO Version to use for building
 ; https://github.com/platformio/platform-espressif32/releases
-platform = espressif32 @ 6.3.2
-;platform = espressif32 @ 6.9.0
+;platform = espressif32 @ 6.3.2
+;platform = espressif32 @ 6.6.0 ;works
+platform = espressif32 @ 6.10.0
 framework = espidf
 board_build.filesystem = littlefs
 test_filter = embedded/*

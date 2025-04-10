@@ -1,4 +1,5 @@
 #pragma once
+#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 
 #include "./ConsoleCommand.h"
 #include "esp_console.h"

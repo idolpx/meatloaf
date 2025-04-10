@@ -1,9 +1,8 @@
 #ifndef PINMAP_ESP32_S3_SUPER_MINI_H
 #define PINMAP_ESP32_S3_SUPER_MINI_H
 
-// https://www.waveshare.com/esp32-s3-zero.htm
-// https://www.waveshare.com/wiki/ESP32-S3-Zero
-// https://files.waveshare.com/wiki/ESP32-S3-Zero/ESP32-S3-Zero-Sch.pdf
+// https://www.espboards.dev/esp32/esp32-s3-super-mini/
+// https://ae01.alicdn.com/kf/S47f3120f532e4c78811801f40c8208aaD.png
 // https://www.espressif.com.cn/sites/default/files/documentation/esp32-s3_datasheet_en.pdf
 // https://randomnerdtutorials.com/esp32-s3-devkitc-pinout-guide/
 
@@ -18,7 +17,7 @@
 #define PIN_SD_HOST_MISO        GPIO_NUM_13
 #define PIN_SD_HOST_MOSI        GPIO_NUM_11
 #define PIN_SD_HOST_SCK         GPIO_NUM_12
-#define PIN_CARD_DETECT         GPIO_NUM_45
+#define PIN_CARD_DETECT         GPIO_NUM_NC
 
 /* UART */
 #define PIN_UART0_RX            GPIO_NUM_44  // fnUART.cpp
@@ -43,6 +42,10 @@
 #define PIN_DAC1                GPIO_NUM_NC  // samlib.h
 #define PIN_I2S                 GPIO_NUM_39
 
+/* PS/2 Keyboard Output */
+#define PIN_KB_CLK              GPIO_NUM_16
+#define PIN_KB_DATA             GPIO_NUM_17
+
 /* I2C GPIO Expander */
 #define PIN_GPIOX_SDA           GPIO_NUM_17
 #define PIN_GPIOX_SCL           GPIO_NUM_18
@@ -66,8 +69,8 @@
                                                 //      GND    2
 
 /* Modem/Parallel Switch */
-#define PIN_MODEM_ENABLE        GPIO_NUM_40  // High = Modem enabled
-#define PIN_MODEM_UP9600        GPIO_NUM_41  // High = UP9600 enabled
+#define PIN_MODEM_ENABLE        GPIO_NUM_NC //40  // High = Modem enabled
+#define PIN_MODEM_UP9600        GPIO_NUM_NC //41  // High = UP9600 enabled
 
 #endif // PINMAP_ESP32_S3_SUPER_MINI
 #endif // PINMAP_ESP32_S3_SUPER_MINI_H
