@@ -336,3 +336,15 @@ int VDrive::execute(const char *cmd, size_t cmdLen, bool convertToPETSCII)
   else
     return 0;
 }
+
+
+bool VDrive::readSector(uint32_t track, uint32_t sector, uint8_t *buf)
+{
+  return vdrive_read_sector(m_drive, buf, track, sector)==CBMDOS_IPE_OK;
+}
+
+
+bool VDrive::writeSector(uint32_t track, uint32_t sector, const uint8_t *buf)
+{
+  return vdrive_write_sector(m_drive, buf, track, sector)==CBMDOS_IPE_OK;
+}

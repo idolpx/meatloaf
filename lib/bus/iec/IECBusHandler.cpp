@@ -2325,11 +2325,31 @@ bool IECBusHandler::receiveIECByteATN(uint8_t &data)
   // release DATA ("ready-for-data")
   writePinDATA(HIGH);
 
+#if defined(SUPPORT_EPYX) && defined(SUPPORT_EPYX_SECTOROPS)
+  // wait for sender to set CLK=0 ("ready-to-send")
+  if( !waitPinCLK(LOW, 200) )
+    {
+      // sender did not set CLK=0 within 200us after we set DATA=1, it is signaling EOI
+      // => acknowledge we received it by setting DATA=0 for 80us
+      // note that EOI is not really used under ATN but may still be signaled, for example
+      // the EPYX FastLoad cartridge's sector read/write function may signal EOI under ATN
+      writePinDATA(LOW);
+      if( !waitTimeout(80) ) return false;
+      writePinDATA(HIGH);
+
+      // keep waiting for CLK=0
+      // must wait indefinitely since other devices may be holding DATA low until
+      // they are ready but bus master will start sending as soon as all devices
+      // have released DATA
+      if( !waitPinCLK(LOW, 0) ) return false;
+    }
+#else
   // wait for CLK=0
   // must wait indefinitely since other devices may be holding DATA low until
   // they are ready, bus master will start sending as soon as all devices have
   // released DATA
   if( !waitPinCLK(LOW, 0) ) return false;
+#endif
 
   // receive data bits
   data = 0;
@@ -2411,9 +2431,8 @@ bool IECBusHandler::receiveIECByte(bool canWriteOk)
       // exit if waitPinCLK returned because of falling edge on ATN
       if( !readPinATN() ) { interrupts(); return false; }
 
-      // sender did not set CLK=0 within 200us after we set DATA=1
-      // => it is signaling EOI (not so if we are under ATN)
-      // acknowledge we received it by setting DATA=0 for 80us
+      // sender did not set CLK=0 within 200us after we set DATA=1, it is signaling EOI
+      // => acknowledge we received it by setting DATA=0 for 80us
       eoi = true;
       writePinDATA(LOW);
       if( !waitTimeout(80) ) { interrupts(); return false; }

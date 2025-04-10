@@ -53,7 +53,7 @@ class VDrive
   // during the current call, otherwise it will remain unchanged.
   bool read(uint8_t channel, uint8_t *buffer, size_t *nbytes, bool *eoi);
 
-  // read data to the file on the given channel. On entry, nbytes should contain
+  // write data to the file on the given channel. On entry, nbytes should contain
   // the number of bytes to write, on exit, nbytes contains the number of bytes
   // actually written (can be different due to error).
   // Returns false if an error occurred while writing and true otherwise.
@@ -73,6 +73,14 @@ class VDrive
   // copies the contents of the drive's status buffer to "buf", not exceeding
   // the given bufSize length.
   size_t getStatusBuffer(void *buf, size_t bufSize);
+
+  // read sector data from the disk image and place it in "buf"
+  // "buf" must have a size of at least 256 bytes
+  bool readSector(uint32_t track, uint32_t sector, uint8_t *buf);
+
+  // write data from "buf" into a sector on the disk image
+  // "buf" must have a size of at least 256 bytes
+  bool writeSector(uint32_t track, uint32_t sector, const uint8_t *buf);
 
   // create and optionally format a new disk image. Parameters
   // - filename: name of the created image file on the host file system, required
