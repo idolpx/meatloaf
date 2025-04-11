@@ -2,17 +2,17 @@
 #ifndef PINMAP_H
 #define PINMAP_H
 
-// ESP32 WROOM-32
-#include "pinmap/ttgo-t1.h"
-#include "pinmap/esp-wroom-32.h"
-#include "pinmap/esp-wroom-32-pi1541.h"
-
 // ESP32 WROVER-E
 #include "pinmap/lolin-d32-pro.h"
 #include "pinmap/iec-nugget.h"
 #include "pinmap/fujiloaf-rev0.h"
 #include "pinmap/fujinet-v1.6.h"
 #include "pinmap/fujiapple-rev0.h"
+
+// ESP32 WROOM-32
+#include "pinmap/esp-wroom32.h"
+#include "pinmap/esp-wroom32-pi1541.h"
+#include "pinmap/ttgo-t1.h"
 
 // ESP32 S2
 #include "pinmap/lolin-s2-mini.h"

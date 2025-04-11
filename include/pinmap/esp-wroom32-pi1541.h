@@ -1,9 +1,9 @@
-#ifndef PINMAP_WROOM_32_H
-#define PINMAP_WROOM_32_H
+#ifndef PINMAP_WROOM32_1541_H
+#define PINMAP_WROOM32_1541_H
 
 // https://www.espressif.com.cn/sites/default/files/documentation/esp32-wroom-32_datasheet_en.pdf
 
-#ifdef PINMAP_WROOM
+#ifdef PINMAP_WROOM32_1541
 
 // ESP32-WROOM-32
 #define FLASH_SIZE              4
@@ -32,8 +32,8 @@
 #define PIN_BUTTON_C            GPIO_NUM_14
 
 /* LEDs */
-#define PIN_LED_WIFI            GPIO_NUM_2 // led.cpp
-#define PIN_LED_BUS             GPIO_NUM_5 // 4 FN
+#define PIN_LED_WIFI            GPIO_NUM_2  // led.cpp
+#define PIN_LED_BUS             GPIO_NUM_5  // 4 FN
 #define PIN_LED_BT              GPIO_NUM_13
 #define PIN_LED_RGB             GPIO_NUM_13
 
@@ -70,13 +70,13 @@
 // #define PIN_IEC_DATA_OUT        GPIO_NUM_21      // SIO 3  - DI   - Data Input
 // #endif
 
-#define PIN_IEC_ATN             GPIO_NUM_32
-#define PIN_IEC_CLK_IN          GPIO_NUM_23
-#define PIN_IEC_CLK_OUT         GPIO_NUM_23
-#define PIN_IEC_DATA_IN         GPIO_NUM_25
-#define PIN_IEC_DATA_OUT        GPIO_NUM_25
+#define PIN_IEC_ATN             GPIO_NUM_34
+#define PIN_IEC_CLK_IN          GPIO_NUM_39
+#define PIN_IEC_CLK_OUT         GPIO_NUM_32
+#define PIN_IEC_DATA_IN         GPIO_NUM_35
+#define PIN_IEC_DATA_OUT        GPIO_NUM_33
 #define PIN_IEC_SRQ             GPIO_NUM_26
-#define PIN_IEC_RESET           GPIO_NUM_34
+#define PIN_IEC_RESET           GPIO_NUM_36
 // GND - Be sure to connect GND of the IEC cable to GND on the ESP module
 
 /* Modem/Parallel Switch */
@@ -89,8 +89,8 @@
 #define PIN_GPIOX_INT           GPIO_NUM_34
 //#define GPIOX_ADDRESS           0x20  // PCF8575
 #define GPIOX_ADDRESS           0x24  // PCA9673
-//#define GPIOX_SPEED            400   // PCF8575 - 400Khz
-#define GPIOX_SPEED            1000  // PCA9673 - 1000Khz / 1Mhz
+//#define GPIOX_SPEED             400   // PCF8575 - 400Khz
+#define GPIOX_SPEED             1000  // PCA9673 - 1000Khz / 1Mhz
 
-#endif // PINMAP_WROOM
-#endif // PINMAP_WROOM_32_H
+#endif // PINMAP_WROOM32_1541
+#endif // PINMAP_WROOM32_1541_H

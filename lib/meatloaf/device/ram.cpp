@@ -8,7 +8,7 @@
 */
 
 #include "sdkconfig.h"
-#ifndef CONFIG_IDF_TARGET_ESP32S3
+#if defined(CONFIG_IDF_TARGET_ESP32) && defined(BOARD_HAS_PSRAM)
 
 #include "ram.h"
 

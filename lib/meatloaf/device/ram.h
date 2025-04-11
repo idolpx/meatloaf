@@ -10,7 +10,7 @@
 #ifndef MEATLOAF_HIMEMFS_H
 #define MEATLOAF_HIMEMFS_H
 
-#ifndef CONFIG_IDF_TARGET_ESP32S3
+#if defined(CONFIG_IDF_TARGET_ESP32) && defined(BOARD_HAS_PSRAM)
 
 #include <stdio.h>
 #include <stdbool.h>

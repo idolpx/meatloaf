@@ -5,9 +5,6 @@
     },
     "core": "esp32",
     "extra_flags": [
-      "-DARDUINO_LOLIN_D32_PRO",
-      "-DBOARD_HAS_PSRAM",
-      "-mfix-esp32-psram-cache-issue"
     ],
     "f_cpu": "240000000L",
     "f_flash": "40000000L",
@@ -23,7 +20,7 @@
     "can"
   ],
   "debug": {
-    "openocd_board": "esp32-wrover.cfg"
+    "openocd_board": "esp32-woom32.cfg"
   },
   "frameworks": [
     "arduino",
