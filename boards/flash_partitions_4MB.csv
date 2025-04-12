@@ -1,7 +1,7 @@
 # Name,   Type, SubType, Offset,   Size,    Flags
 # Non-Volitile Storage  28kb
-nvs,      data, nvs,     0x9000,   0x7000,          
+nvs,      data, nvs,     0x9000,   0x7000,
 # Meatloaf Firmware     3mb
 meatloaf, app,  factory, 0x10000,  0x300000,
 # Flash Storage         960kb
-flash,    data, spiffs,  0x310000, 0xF0000,         # 960k
+flash,    data, spiffs,  0x310000, 0xF0000,
