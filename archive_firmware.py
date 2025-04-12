@@ -82,7 +82,7 @@ def makezip(source, target, env):
 
         # Filename variables
         environment_name = config['meatloaf']['environment'].split()[0]
-        firmware_date = datetime.utcnow().strftime("%Y%m%d.%H")
+        firmware_date = datetime.now().strftime("%Y%m%d.%H")
         releasefile = firmdir+"/release.json"
         firmwarezip = firmdir+"/meatloaf."+environment_name+"."+firmware_date+".zip"
 
@@ -99,6 +99,7 @@ def makezip(source, target, env):
             print('Failed to delete %s. Reason: %s' % (firmwarezip, e))
 
         # Create release JSON
+        flash_size = config['meatloaf']['flash_size'].split()[0]
         json_contents = """{
     "version": "%s",
     "version_date": "%s",
@@ -109,7 +110,7 @@ def makezip(source, target, env):
     [
 """ % (version['FN_VERSION_FULL'], version['FN_VERSION_DATE'], version['BUILD_DATE'], version['FN_VERSION_DESC'], version['FN_VERSION_BUILD'])
 
-        if config[environment]['board'] == "esp32-4mb":
+        if flash_size == "4mb":
             json_contents += """        {
             "filename": "bootloader.bin",
             "offset": "0x1000"
@@ -129,7 +130,7 @@ def makezip(source, target, env):
     ]
 }
 """
-        elif config[environment]['board'] == "esp32-8mb":
+        elif flash_size == "8mb":
             json_contents += """        {
             "filename": "bootloader.bin",
             "offset": "0x1000"
@@ -149,7 +150,7 @@ def makezip(source, target, env):
     ]
 }
 """
-        elif config[environment]['board'] == "esp32-16mb":
+        elif flash_size == "16mb":
             json_contents += """        {
             "filename": "bootloader.bin",
             "offset": "0x1000"
