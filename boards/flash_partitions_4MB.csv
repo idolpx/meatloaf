@@ -1,5 +1,4 @@
-# Name,   Type, SubType, Offset,   Size,   Flags
-nvs,      data, nvs,     0x9000,   0x5000,
-phy_init, data, phy,     0xf000,   0x1000,
-meatloaf, app,  factory, 0x10000,  0x300000,
-flash,    data, spiffs,  0x310000, 0xF0000,
+# Name,   Type, SubType, Offset,   Size,    Flags
+nvs,      data, nvs,     0x9000,   0x7000,          # 28k
+meatloaf, app,  factory, 0x10000,  0x300000,        # 3m
+flash,    data, spiffs,  0x310000, 0xF0000,         # 960k
