@@ -234,6 +234,8 @@ board = esp32-wroom32
 build_flags =
     ${env.build_flags}
     -D PINMAP_WROOM32
+    -D NO_BUTTONS
+    -D SD_CARD
 
 [env:esp32-wroom32-pi1541]
 extends = esp32_base
