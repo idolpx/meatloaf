@@ -251,6 +251,12 @@ static unsigned long timer_start_us;
 
 // delayMicroseconds on some platforms does not work if called when interrupts are disabled
 // => define a version that does work on all supported platforms
+#if defined(ARDUINO_ARCH_RP2040)
+static void __no_inline_not_in_flash_func(delayMicrosecondsISafe)(uint16_t t)
+{
+  busy_wait_at_least_cycles((clock_get_hz(clk_sys)/1000000) * t);
+}
+#else
 static IRAM_ATTR void delayMicrosecondsISafe(uint16_t t)
 {
   timer_init();
@@ -259,6 +265,7 @@ static IRAM_ATTR void delayMicrosecondsISafe(uint16_t t)
   timer_wait_until(t);
   timer_stop();
 }
+#endif
 
 
 // -----------------------------------------------------------------------------------------
@@ -291,6 +298,27 @@ static IRAM_ATTR void delayMicrosecondsISafe(uint16_t t)
 
 IECBusHandler *IECBusHandler::s_bushandler = NULL;
 
+#ifdef USE_LINE_DRIVERS
+
+void IRAM_ATTR IECBusHandler::writePinCLK(bool v)
+{
+#ifdef USE_INVERTED_LINE_DRIVERS
+  digitalWriteFastExt(m_pinCLKout, m_regCLKwrite, m_bitCLKout, !v);
+#else
+  digitalWriteFastExt(m_pinCLKout, m_regCLKwrite, m_bitCLKout, v);
+#endif
+}
+
+void IRAM_ATTR IECBusHandler::writePinDATA(bool v)
+{
+#ifdef USE_INVERTED_LINE_DRIVERS
+  digitalWriteFastExt(m_pinDATAout, m_regDATAwrite, m_bitDATAout, !v);
+#else
+  digitalWriteFastExt(m_pinDATAout, m_regDATAwrite, m_bitDATAout, v);
+#endif
+}
+
+#else
 
 void IRAM_ATTR IECBusHandler::writePinCLK(bool v)
 {
@@ -308,14 +336,13 @@ void IRAM_ATTR IECBusHandler::writePinDATA(bool v)
   // - switch pun to OUTPUT mode (LOW output) for false
   pinModeFastExt(m_pinDATA, m_regDATAmode, m_bitDATA, v ? INPUT : OUTPUT);
 }
-
+#endif
 
 void IRAM_ATTR IECBusHandler::writePinCTRL(bool v)
 {
   if( m_pinCTRL!=0xFF )
     digitalWrite(m_pinCTRL, v);
 }
-
 
 bool IRAM_ATTR IECBusHandler::readPinATN()
 {
@@ -506,15 +533,29 @@ void IECBusHandler::sendSRQ()
 {
   if( m_pinSRQ!=0xFF )
     {
+#if !defined(USE_LINE_DRIVERS)
       digitalWrite(m_pinSRQ, LOW);
       pinMode(m_pinSRQ, OUTPUT);
       delayMicrosecondsISafe(1);
       pinMode(m_pinSRQ, INPUT);
+#elif defined(USE_INVERTED_LINE_DRIVERS)
+      digitalWrite(m_pinSRQ, HIGH);
+      delayMicrosecondsISafe(1);
+      digitalWrite(m_pinSRQ, LOW);
+#else
+      digitalWrite(m_pinSRQ, LOW);
+      delayMicrosecondsISafe(1);
+      digitalWrite(m_pinSRQ, HIGH);
+#endif
     }
 }
 
 
+#ifdef USE_LINE_DRIVERS
+IECBusHandler::IECBusHandler(uint8_t pinATN, uint8_t pinCLK, uint8_t pinCLKout, uint8_t pinDATA, uint8_t pinDATAout, uint8_t pinRESET, uint8_t pinCTRL, uint8_t pinSRQ)
+#else
 IECBusHandler::IECBusHandler(uint8_t pinATN, uint8_t pinCLK, uint8_t pinDATA, uint8_t pinRESET, uint8_t pinCTRL, uint8_t pinSRQ)
+#endif
 #if defined(SUPPORT_DOLPHIN)
 #if defined(SUPPORT_DOLPHIN_XRA1405)
 #if defined(ESP_PLATFORM)
@@ -586,6 +627,10 @@ IECBusHandler::IECBusHandler(uint8_t pinATN, uint8_t pinCLK, uint8_t pinDATA, ui
   m_pinRESET     = pinRESET;
   m_pinCTRL      = pinCTRL;
   m_pinSRQ       = pinSRQ;
+#ifdef USE_LINE_DRIVERS
+  m_pinCLKout    = pinCLKout;
+  m_pinDATAout   = pinDATAout;
+#endif
 
 #if defined(SUPPORT_JIFFY) || defined(SUPPORT_EPYX) || defined(SUPPORT_DOLPHIN)
 #if IEC_DEFAULT_FASTLOAD_BUFFER_SIZE>0
@@ -609,6 +654,10 @@ IECBusHandler::IECBusHandler(uint8_t pinATN, uint8_t pinCLK, uint8_t pinDATA, ui
   m_regDATAread  = portInputRegister(digitalPinToPort(pinDATA));
   m_regDATAwrite = portOutputRegister(digitalPinToPort(pinDATA));
   m_regDATAmode  = portModeRegister(digitalPinToPort(pinDATA));
+#ifdef USE_LINE_DRIVERS
+  m_bitCLKout    = digitalPinToBitMask(pinCLKout);
+  m_bitDATAout   = digitalPinToBitMask(pinDATAout);
+#endif
 #endif
 
   m_atnInterrupt = digitalPinToInterrupt(m_pinATN);
@@ -619,16 +668,28 @@ void IECBusHandler::begin()
 {
   JDEBUGI();
 
+#if defined(USE_LINE_DRIVERS)
+  pinMode(m_pinCLKout,  OUTPUT);
+  pinMode(m_pinDATAout, OUTPUT);
+  writePinCLK(HIGH);
+  writePinDATA(HIGH);
+  if( m_pinSRQ<0xFF )
+    {
+      pinMode(m_pinSRQ, OUTPUT);
+      digitalWrite(m_pinSRQ, HIGH);
+    }
+#else
   // set pins to output 0 (when in output mode)
   pinMode(m_pinCLK,  OUTPUT); digitalWrite(m_pinCLK, LOW); 
   pinMode(m_pinDATA, OUTPUT); digitalWrite(m_pinDATA, LOW); 
+  if( m_pinSRQ<0xFF ) pinMode(m_pinSRQ,   INPUT);
+#endif
 
   pinMode(m_pinATN,   INPUT);
   pinMode(m_pinCLK,   INPUT);
   pinMode(m_pinDATA,  INPUT);
   if( m_pinCTRL<0xFF )  pinMode(m_pinCTRL,  OUTPUT);
   if( m_pinRESET<0xFF ) pinMode(m_pinRESET, INPUT);
-  if( m_pinSRQ<0xFF )   pinMode(m_pinSRQ,   INPUT);
   m_flags = 0;
 
   // allow ATN to pull DATA low in hardware
@@ -1239,6 +1300,9 @@ bool IECBusHandler::enableDolphinDosSupport(IECDevice *dev, bool enable)
   if( enable && m_bufferSize>=DOLPHIN_PREBUFFER_BYTES && 
       !isDolphinPin(m_pinATN)   && !isDolphinPin(m_pinCLK) && !isDolphinPin(m_pinDATA) && 
       !isDolphinPin(m_pinRESET) && !isDolphinPin(m_pinCTRL) && 
+#ifdef USE_LINE_DRIVERS
+      !isDolphinPin(m_pinCLKout) && !isDolphinPin(m_pinDATAout) &&
+#endif
 #ifdef SUPPORT_DOLPHIN_XRA1405
       m_pinDolphinCS!=0xFF && m_pinDolphinSCK!=0xFF && m_pinDolphinCOPI!=0xFF && m_pinDolphinCIPO!=0xFF &&
 #else
@@ -2326,10 +2390,14 @@ bool IECBusHandler::receiveIECByteATN(uint8_t &data)
   writePinDATA(HIGH);
 
 #if defined(SUPPORT_EPYX) && defined(SUPPORT_EPYX_SECTOROPS)
+  // other devices on the bus may be holding DATA low, the bus master
+  // starts its 200us timeout (see below) once DATA goes high.
+  if( !waitPinDATA(HIGH, 0) ) return false;
+
   // wait for sender to set CLK=0 ("ready-to-send")
   if( !waitPinCLK(LOW, 200) )
     {
-      // sender did not set CLK=0 within 200us after we set DATA=1, it is signaling EOI
+      // sender did not set CLK=0 within 200us after DATA went high, it is signaling EOI
       // => acknowledge we received it by setting DATA=0 for 80us
       // note that EOI is not really used under ATN but may still be signaled, for example
       // the EPYX FastLoad cartridge's sector read/write function may signal EOI under ATN

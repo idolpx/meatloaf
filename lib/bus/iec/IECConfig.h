@@ -20,6 +20,15 @@
 #define IECCONFIG_H
 #include "../../include/pinmap.h"
 
+// un-comment this if you are using open-collector drivers for the CLK/DATA
+// lines (e.g. a 74LS07). If so, the IECBusHandler constructor requires
+// two extra pins for the CLK/DATA output signals
+//#define USE_LINE_DRIVERS
+
+// un-comment this IN ADDITION to USE_LINE_DRIVERS if you are using inverted
+// line drivers (such as 74LS06)
+//#define USE_INVERTED_LINE_DRIVERS
+
 // comment or un-comment these #defines to completely enable/disable support
 // for the corresponding fast-load protocols
 #define SUPPORT_JIFFY
@@ -34,7 +43,7 @@
 // at least 256 bytes. Note that the "bufferSize" argument is a byte and therefore
 // capped at 255 bytes. Make sure the buffer itself has >=256 bytes and use a 
 // bufferSize argument of 255 or less
-//#define SUPPORT_EPYX_SECTOROPS
+#define SUPPORT_EPYX_SECTOROPS
 
 // defines the maximum number of devices that the bus handler will be
 // able to support - set to 4 by default but can be increased to up to 30 devices
