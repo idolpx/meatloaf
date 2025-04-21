@@ -13,7 +13,7 @@ Overall, Meatloaf is a valuable tool for Commodore enthusiasts as it provides a 
 
 How is it even possible? Read more here: [Link](doc/howisitpossible.md)
 
-Some Meatloaf code is used for the Commodore [FujiNet](https://github.com/FujiNetWIFI/fujinet-firmware) and some FujiNet code is also used in Meatloaf.
+Some Meatloaf code is used for the Commodore [FujiNet](https://github.com/FujiNetWIFI/fujinet-firmware) and some FujiNet code is also used in Meatloaf.<br/>
 Meatloaf will remain focused on Commodore but the features that make sense will be merged into FujiNet.
 
 ## A cloud disk drive
