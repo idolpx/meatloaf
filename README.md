@@ -1,7 +1,5 @@
 [![Meatloaf (C64/C128/VIC20/+4)](images/meatloaf.logo.png)](https://meatloaf.cc)
 
-This is the ESP32 version of [Meatloaf](https://github.com/idolpx/meatloaf) intended for the [FujiNet](https://github.com/FujiNetWIFI/) bring-up on the Commodore 64.
-
 # What is Meatloaf?
 
 "Meatloaf" for Commodore computers is not a game or software application. Instead, it's a hardware device designed to enhance the functionality of the classic computer. Here's what it does:
@@ -20,7 +18,7 @@ How is it even possible? Read more here: [Link](doc/howisitpossible.md)
 While one can say Meatloaf is just another Commodore IEC Serial Floppy Drive similar to SD2IEC and its clones, Meatloaf is in fact much more than that, as it allows you to load not only local files stored on its internal flash file system or SD card, but also files from any URL you can imagine, straight into your Commodore computer without any additional software. For example you can load a game from some web server:
 
 ```BASIC
-LOAD"HTTP://C64.ORG/GAMES_AZ/H/H.E.R.O.PRG",8
+LOAD"HTTP://C64.MEATLOAF.CC/GAMES/H.E.R.O.PRG",8
 ```
 
 Or from a D64 image on your own Windows/Samba server (all known CBM image formats supported):
@@ -32,7 +30,7 @@ LOAD"SMB://STORAGE/C64/FAVORITES/PIRATES/PIRATES_A.D64/*",8
 Or even straight from a D64 image residing inside ZIP archive that is located somewhere on the Internet:
 
 ```BASIC
-LOAD"HTTP://C64WAREZ.NET/DROPZONE/FRESH_WAREZ.ZIP/GTA64.D64/START.PRG",8
+LOAD"HTTP://C64.MEATLOAF.CC/COLLECTION/BACKBIT/M/MARS SAGA.D81/START.PRG",8
 ```
 
 ## A NAS with WebDAV
