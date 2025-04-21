@@ -13,6 +13,9 @@ Overall, Meatloaf is a valuable tool for Commodore enthusiasts as it provides a 
 
 How is it even possible? Read more here: [Link](doc/howisitpossible.md)
 
+Some Meatloaf code is used for the Commodore [FujiNet](https://github.com/FujiNetWIFI/fujinet-firmware) and some FujiNet code is also used in Meatloaf.
+Meatloaf will remain focused on Commodore but the features that make sense will be merged into FujiNet.
+
 ## A cloud disk drive
 
 While one can say Meatloaf is just another Commodore IEC Serial Floppy Drive similar to SD2IEC and its clones, Meatloaf is in fact much more than that, as it allows you to load not only local files stored on its internal flash file system or SD card, but also files from any URL you can imagine, straight into your Commodore computer without any additional software. For example you can load a game from some web server:
