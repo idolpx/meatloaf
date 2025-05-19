@@ -139,7 +139,9 @@ void TCPServer::task(void *pvParameters)
                     if (mstr::endsWith(line, "\r") || mstr::endsWith(line, "\n"))
                     {
                         mstr::rtrim(line);
+#ifdef ENABLE_CONSOLE
                         console.execute(line.c_str());
+#endif
                         line.clear();
                     } else if (line[0] == 0xBF || line[0] == 0xEF || line[0] == 0xFF) {
                         line.clear();
