@@ -816,7 +816,9 @@ void iecDrive::close(uint8_t channel)
       m_channels[channel] = nullptr;
       if( m_numOpenChannels>0 ) m_numOpenChannels--;
       Debug_printv("Channel %d closed.", channel);
+#ifdef DEBUG
       DEBUG_MEM_LEAK;
+#endif
     }
 }
 
@@ -1531,7 +1533,9 @@ void iecDrive::reset()
   Debug_printv("Stop Activity");
 #endif
 
+#ifdef DEBUG
   DEBUG_MEM_LEAK;
+#endif
 }
 
 

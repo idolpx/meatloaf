@@ -21,34 +21,35 @@ description = Meatloaf Commodore to ESP32 WiFi Multifunction Firmware
 ; GPIO pin assignments are located in the include/pinmap/ directory for reference
 
 ; ESP32-WROVER
-;environment = iec-nugget                ; Wemos Lolin D32 Pro                         (ESP32-WROVER 8M PSRAM, 4M/8M/16M Flash)
-;environment = lolin-d32-pro             ; Wemos Lolin D32 Pro                         (ESP32-WROVER 8M PSRAM, 4M/8M/16M Flash)
-;environment = fujiapple-rev0            ; FujiApple REV0 with esp32-devkitc           (ESP32-WROVER 8M PSRAM, 8M Flash)
-;environment = fujinet-v16               ; FujiNet v1.6                                (ESP32-WROVER 8M PSRAM, 16M Flash)
-;environment = fujiloaf-rev0             ; Meatloaf / FujiNet REV0 board, aka Fujiloaf (ESP32-WROVER 8M PSRAM, 16M Flash)
+;environment = iec-nugget                   ; Wemos Lolin D32 Pro                         (ESP32-WROVER 8M PSRAM, 4M/8M/16M Flash)
+;environment = lolin-d32-pro                ; Wemos Lolin D32 Pro                         (ESP32-WROVER 8M PSRAM, 4M/8M/16M Flash)
+;environment = fujiapple-rev0               ; FujiApple REV0 with esp32-devkitc           (ESP32-WROVER 8M PSRAM, 8M Flash)
+;environment = fujinet-v16                  ; FujiNet v1.6                                (ESP32-WROVER 8M PSRAM, 16M Flash)
+;environment = fujiloaf-rev0                ; Meatloaf / FujiNet REV0 board, aka Fujiloaf (ESP32-WROVER 8M PSRAM, 16M Flash)
 
 ; ESP32-WROOM
-;environment = esp32-wroom32             ; generic esp32-wroom32 board                 (ESP32-WROOM32 NO PSRAM, 4M/8M/16M Flash)
-;environment = esp32-wroom32-pi1541      ; generic esp32-wroom32 board with pi1541     (ESP32-WROOM32 NO PSRAM, 4M/8M/16M Flash)
-;environment = ttgo-t1                   ; Lilygo TTGO T1 V1.3                         (ESP32 NO PSRAM, 4M Flash)
+;environment = esp32-wroom32                ; generic esp32-wroom32 board                 (ESP32-WROOM32 NO PSRAM, 4M/8M/16M Flash)
+;environment = esp32-wroom32-pi1541         ; generic esp32-wroom32 board with pi1541     (ESP32-WROOM32 NO PSRAM, 4M/8M/16M Flash)
+;environment = ttgo-t1                      ; Lilygo TTGO T1 V1.3                         (ESP32 NO PSRAM, 4M Flash)
 
 ; EXPERIMENTAL
 ; ESP32-S2
-;environment = lolin-s2-mini             ; Wemos Lolin S2 Mini                         (ESP32-S2 2M PSRAM, 4M Flash)
+;environment = lolin-s2-mini                ; Wemos Lolin S2 Mini                         (ESP32-S2 2M PSRAM, 4M Flash)
 
 ; ESP32-S3
-;environment = esp32-s3-devkitc-1        ; esp32s3 devkitc                             (ESP32-S3 2M/8M PSRAM, 8M/16M/32M Flash)
-;environment = lolin-s3-pro              ; Wemos Lolin S3 Pro                          (ESP32-S3 8M PSRAM, 16M Flash)
-;environment = lilygo-t-display-s3       ; LilyGO T-Display S3                         (ESP32-S3 8M PSRAM, 16M Flash)
-;environment = freenove-esp32-s3-wroom-1 ; Freenove ESP32-S3-WROOM-1                   (ESP32-S3 8M PSRAM, 16M Flash)
-;environment = esp32-s3-zero             ;                                             (ESP32-S3 2M PSRAM, 4M Flash)
-;environment = esp32-s3-super-mini       ;                                             (ESP32-S3 2M PSRAM, 4M Flash)
+;environment = esp32-s3-devkitc-1           ; esp32s3 devkitc                             (ESP32-S3 2M/8M PSRAM, 8M/16M/32M Flash)
+;environment = lolin-s3-pro                 ; Wemos Lolin S3 Pro                          (ESP32-S3 8M PSRAM, 16M Flash)
+;environment = lilygo-t-display-s3          ; LilyGO T-Display S3                         (ESP32-S3 8M PSRAM, 16M Flash)
+;environment = freenove-esp32-s3-wroom-1    ; Freenove ESP32-S3-WROOM-1                   (ESP32-S3 8M PSRAM, 16M Flash)
+;environment = esp32-s3-zero                ;                                             (ESP32-S3 2M PSRAM, 4M Flash)
+;environment = esp32-s3-super-mini          ;                                             (ESP32-S3 2M PSRAM, 4M Flash)
+;environment = adafruit_feather_esp32s3_tft ; Adafruit ESP32-S3 TFT Feather               (ESP32-S3 2M PSRAM, 4M Flash)
 
 ; ESP32-C3
-;environment = esp32-c3-super-mini       ;                                             (ESP32-C3 NO PSRAM, 4M Flash)
+;environment = esp32-c3-super-mini          ;                                             (ESP32-C3 NO PSRAM, 4M Flash)
 
 ; NATIVE UNIT TESTING
-;environment = native                    ; For running tests that don't require embedded hardware
+;environment = native                       ; For running tests that don't require embedded hardware
 
 ; Set flash size to 4M, 8M, 16M or 32M according to the enviornment you selected above
 ;flash_size = 4mb
@@ -57,7 +58,7 @@ flash_size = 16mb
 ;flash_size = 32mb
 
 ; Choose SPIFFS or LITTLEFS for the filesystem used on internal flash
-;flash_filesystem = FLASH_SPIFFS 
+;flash_filesystem = FLASH_SPIFFS
 flash_filesystem = FLASH_LITTLEFS
 
 ; Set default WiFi credentials
@@ -149,6 +150,7 @@ build_flags =
 
     ; DEBUG Options
     -D DEBUG_SPEED=${env.monitor_speed}
+    ;-D DELAY_START_MILLIS=2000 ; allow time to connect to USB serial device
     ;-D DATA_STREAM
     ;-D VERBOSE_TNFS
     ;-D VERBOSE_DISK
@@ -313,6 +315,14 @@ board = esp32-s3fh4r2
 build_flags =
     ${env.build_flags}
     -D PINMAP_ESP32_S3_SUPER_MINI
+    -D NO_BUTTONS
+
+[env:adafruit_feather_esp32s3_tft]
+extends = esp32_base
+board =  esp32-s3fh4r2
+build_flags =
+    ${env.build_flags}
+    -D PINMAP_ADAFRUIT_FEATHER_ESP32S3_TFT
     -D NO_BUTTONS
 
 ; ESP32-C3

@@ -105,6 +105,10 @@ void main_setup()
 
     unsigned long startms = fnSystem.millis();
 
+#ifdef DELAY_START_MILLIS
+    vTaskDelay(DELAY_START_MILLIS / portTICK_PERIOD_MS);
+#endif
+
 #ifdef ENABLE_CONSOLE
     //You can change the console prompt before calling begin(). By default it is "ESP32>"
     console.setPrompt("meatloaf[%pwd%]# ");
@@ -145,8 +149,8 @@ void main_setup()
     }
     ESP_ERROR_CHECK(e);
 
-    // Enable GPIO Interrupt Service Routine
-    gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
+    // // Enable GPIO Interrupt Service Routine
+    // gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
 
     fnSystem.check_hardware_ver();
     printf("Detected Hardware Version: %s\r\n", fnSystem.get_hardware_ver_str());
@@ -154,13 +158,15 @@ void main_setup()
     fnKeyManager.setup();
     fnLedManager.setup();
 
-    // Enable/Disable Modem/Parallel Mode on Userport
-    fnSystem.set_pin_mode(PIN_MODEM_ENABLE, gpio_mode_t::GPIO_MODE_OUTPUT);
-    fnSystem.digital_write(PIN_MODEM_ENABLE, DIGI_LOW); // DISABLE Modem
-    //fnSystem.digital_write(PIN_MODEM_ENABLE, DIGI_HIGH); // ENABLE Modem
-    fnSystem.set_pin_mode(PIN_MODEM_UP9600, gpio_mode_t::GPIO_MODE_OUTPUT);
-    fnSystem.digital_write(PIN_MODEM_UP9600, DIGI_LOW); // DISABLE UP9600
-    //fnSystem.digital_write(PIN_MODEM_UP9600, DIGI_HIGH); // ENABLE UP9600
+    if (PIN_MODEM_ENABLE != GPIO_NUM_NC && PIN_MODEM_UP9600 != GPIO_NUM_NC) {
+        // Enable/Disable Modem/Parallel Mode on Userport
+        fnSystem.set_pin_mode(PIN_MODEM_ENABLE, gpio_mode_t::GPIO_MODE_OUTPUT);
+        fnSystem.digital_write(PIN_MODEM_ENABLE, DIGI_LOW); // DISABLE Modem
+        //fnSystem.digital_write(PIN_MODEM_ENABLE, DIGI_HIGH); // ENABLE Modem
+        fnSystem.set_pin_mode(PIN_MODEM_UP9600, gpio_mode_t::GPIO_MODE_OUTPUT);
+        fnSystem.digital_write(PIN_MODEM_UP9600, DIGI_LOW); // DISABLE UP9600
+        //fnSystem.digital_write(PIN_MODEM_UP9600, DIGI_HIGH); // ENABLE UP9600
+    }
 
     if ( fsFlash.start() )
     {

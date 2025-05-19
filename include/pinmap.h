@@ -25,6 +25,7 @@
 #include "pinmap/nodemcu-esp-s3-12k-kit.h"
 #include "pinmap/esp32-s3-zero.h"
 #include "pinmap/esp32-s3-super-mini.h"
+#include "pinmap/adafruit_feather_esp32s3_tft.h"
 
 // ESP32 C3
 #include "pinmap/esp32-c3-super-mini.h"

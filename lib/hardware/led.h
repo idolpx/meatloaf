@@ -1,6 +1,7 @@
 #ifndef LED_H
 #define LED_H
 
+#include "fnSystem.h"
 #include "../../include/pinmap.h"
 
 enum eLed
@@ -22,7 +23,7 @@ public:
 
 private:
     bool mLedState[eLed::LED_COUNT] = { 0 };
-    int mLedPin[eLed::LED_COUNT];
+    gpio_num_t mLedPin[eLed::LED_COUNT];
 };
 
 extern LedManager fnLedManager;
