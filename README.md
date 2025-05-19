@@ -99,14 +99,26 @@ Meatloaf is not limited to be just your standard drive 8, you can configure it t
 CityXen! - https://www.youtube.com/watch?v=QXQjwKSVHjo
 
 
-Visual studio code, and the platformio addon installed from the vscode store required.
+[Visual Studio Code](https://code.visualstudio.com/), and the
+[PlatformIO IDE](https://marketplace.visualstudio.com/items?itemName=platformio.platformio-ide)
+extension installed from the vscode store required.
 
-- clone this repo
-- Copy platformio.ini.sample to platformio.ini
-- Edit platformio.ini to match your device and default wifi settings
-- Upload filesystem image by clicking the alien head on left panel and selecting `lolin d32 pro` then `Platform` and then `Build Filesystem Image` and `Upload Filesystem Image` (this has to be done only once!)
-- Build & Upload firmware by clicking the alien head on left panel and selecting `lolin d32 pro` then `General` and then `Upload and Monitor` (It will take a while to compile and upload)
-- Meatloaf should now be running on the device!
+1.  Initial setup & configuration
+    1.  Clone this repo
+    2.  Copy `platformio.ini.sample` to `platformio.ini`
+    3.  Edit `platformio.ini` to match your device and default wifi settings
+
+2.  Build & upload the filesystem image (this has to be done only once!)
+    1.  Click the alien head on left panel
+    2.  Select `lolin d32 pro` then `Platform` and then `Build Filesystem Image`
+    3.  Select `lolin d32 pro` then `Platform` and then `Upload Filesystem Image`
+
+3.  Build & Upload the firmware
+    1.  Clicking the alien head on left panel
+    2.  Select `lolin d32 pro` then `General` and then `Upload and Monitor`
+    3.  (It will take a while to compile and upload)
+
+Meatloaf should now be running on the device!
 
 ## Getting a listing of a HTTP server
 
