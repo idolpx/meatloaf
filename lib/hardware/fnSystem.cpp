@@ -1065,13 +1065,15 @@ void SystemManager::check_hardware_ver()
     {
         // v1.6.1 fixed/changed card detect pin
         _hardware_version = 4;
-        setup_card_detect(PIN_CARD_DETECT_FIX);
+        if (PIN_CARD_DETECT != GPIO_NUM_NC)
+            setup_card_detect(PIN_CARD_DETECT_FIX);
     }
     else if (upcheck == downcheck)
     {
         // v1.6
         _hardware_version = 3;
-        setup_card_detect(PIN_CARD_DETECT);
+    if (PIN_CARD_DETECT != GPIO_NUM_NC)
+            setup_card_detect(PIN_CARD_DETECT);
     }
     else if (fnSystem.digital_read(PIN_BUTTON_C) == DIGI_HIGH)
     {
@@ -1218,14 +1220,16 @@ void SystemManager::check_hardware_ver()
     a2no3state = true;
     Debug_printf("FujiApple NO3STATE force enabled\r\n");
 #   endif
-    setup_card_detect(PIN_CARD_DETECT); // enable SD card detect
+    if (PIN_CARD_DETECT != GPIO_NUM_NC)
+        setup_card_detect(PIN_CARD_DETECT); // enable SD card detect
 #elif defined(BUILD_MAC)
 /*  Mac 68k
     Only Rev0
 */
     _hardware_version = 1;
     safe_reset_gpio = PIN_BUTTON_C;
-    setup_card_detect(PIN_CARD_DETECT); // enable SD card detect
+    if (PIN_CARD_DETECT != GPIO_NUM_NC)
+        setup_card_detect(PIN_CARD_DETECT); // enable SD card detect
 #elif defined(BUILD_IEC)
     /*  Commodore
     */
@@ -1242,7 +1246,8 @@ void SystemManager::check_hardware_ver()
     /* No Safe Reset */
     _hardware_version = 3;
 #   endif
-    setup_card_detect(PIN_CARD_DETECT); // enable SD card detect
+    if (PIN_CARD_DETECT != GPIO_NUM_NC)
+        setup_card_detect(PIN_CARD_DETECT); // enable SD card detect
 #elif defined(BUILD_LYNX)
     /* Atari Lynx
     */
@@ -1252,13 +1257,15 @@ void SystemManager::check_hardware_ver()
     _hardware_version = 1;
     safe_reset_gpio = PIN_BUTTON_C;
 #   endif
-    setup_card_detect(PIN_CARD_DETECT); // enable SD card detect
+    if (PIN_CARD_DETECT != GPIO_NUM_NC)
+        setup_card_detect(PIN_CARD_DETECT); // enable SD card detect
 #elif defined(BUILD_RS232)
     /* RS232
     */
     _hardware_version = 1;
     safe_reset_gpio = PIN_BUTTON_C;
-    setup_card_detect(PIN_CARD_DETECT); // enable SD card detect
+    if (PIN_CARD_DETECT != GPIO_NUM_NC)
+        setup_card_detect(PIN_CARD_DETECT); // enable SD card detect
 #elif defined(BUILD_RC2014)
     /* RC2014
     */
@@ -1269,7 +1276,8 @@ void SystemManager::check_hardware_ver()
     */
     _hardware_version = 1;
     safe_reset_gpio = PIN_BUTTON_C;
-    setup_card_detect(PIN_CARD_DETECT); // enable SD card detect
+    if (PIN_CARD_DETECT != GPIO_NUM_NC)
+        setup_card_detect(PIN_CARD_DETECT); // enable SD card detect
 #endif /* BUILD_COCO */
 
 #else
