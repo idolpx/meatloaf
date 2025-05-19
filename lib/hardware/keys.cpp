@@ -22,7 +22,7 @@
 // Global KeyManager object
 KeyManager fnKeyManager;
 
-static int mButtonPin[eKey::KEY_COUNT] = {PIN_BUTTON_A, PIN_BUTTON_B, PIN_BUTTON_C};
+static gpio_num_t mButtonPin[eKey::KEY_COUNT] = {PIN_BUTTON_A, PIN_BUTTON_B, PIN_BUTTON_C};
 
 void KeyManager::setup()
 {
