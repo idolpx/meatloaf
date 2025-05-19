@@ -105,6 +105,10 @@ void main_setup()
 
     unsigned long startms = fnSystem.millis();
 
+#ifdef DELAY_START_MILLIS
+    vTaskDelay(DELAY_START_MILLIS / portTICK_PERIOD_MS);
+#endif
+
 #ifdef ENABLE_CONSOLE
     //You can change the console prompt before calling begin(). By default it is "ESP32>"
     console.setPrompt("meatloaf[%pwd%]# ");

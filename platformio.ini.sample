@@ -150,6 +150,7 @@ build_flags =
 
     ; DEBUG Options
     -D DEBUG_SPEED=${env.monitor_speed}
+    ;-D DELAY_START_MILLIS=2000 ; allow time to connect to USB serial device
     ;-D DATA_STREAM
     ;-D VERBOSE_TNFS
     ;-D VERBOSE_DISK
