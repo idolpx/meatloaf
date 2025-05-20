@@ -11,7 +11,7 @@
 
 Overall, Meatloaf is a valuable tool for Commodore enthusiasts as it provides a convenient and versatile way to load software, access a vast library of disk images, and connect to online communities, all without the need for physical floppy disks or additional hardware.
 
-How is it even possible? Read more here: [Link](doc/howisitpossible.md)
+How is it even possible? Read more here: [Link](docs/howisitpossible.md)
 
 Some Meatloaf code is used for the Commodore [FujiNet](https://github.com/FujiNetWIFI/fujinet-firmware) and some FujiNet code is also used in Meatloaf.<br/>
 Meatloaf will remain focused on Commodore but the features that make sense will be merged into FujiNet.
@@ -128,4 +128,4 @@ Please read the [Meatloaf Wiki](https://github.com/idolpx/meatloaf/wiki/Using-Yo
 
 # Advanced documentation
 
-Adding new file systems to Meatloaf: [Link](doc/filesystems.md)
+Adding new file systems to Meatloaf: [Link](docs/filesystems.md)
