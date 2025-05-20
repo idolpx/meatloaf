@@ -1,0 +1,9 @@
+# Name,  Type, SubType,  Offset,   Size,    Flags
+# Non-Volitile Storage
+nvs,     data, nvs,      0x9000,   28K,
+# Main Application
+main,    app,  factory,  0x10000,  10M,
+# Update Application
+update,  app,  ota_0,    0xA10000, 384K,
+# Flash Storage
+storage, data, littlefs, 0xA70000, 5696K,

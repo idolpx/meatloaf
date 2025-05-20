@@ -14,7 +14,7 @@
     "flash_mode": "dio",
     "mcu": "esp32",
     "variant": "esp32",
-    "partitions": "boards/flash_partitions_16MB.csv"
+    "partitions": "boards/partitions.8m.csv"
   },
   "connectivity": [
     "wifi",
@@ -29,11 +29,11 @@
     "arduino",
     "espidf"
   ],
-  "name": "Meatloaf v1 16MB",
+  "name": "Meatloaf v1 8MB",
   "upload": {
-    "flash_size": "16MB",
+    "flash_size": "8MB",
     "maximum_ram_size": 327680,
-    "maximum_size": 16777216,
+    "maximum_size": 8388608,
     "protocols": [
       "esptool",
       "espota",
@@ -43,5 +43,5 @@
     "speed": 460800
   },
   "url": "https://github.com/idolpx/meatloaf-specialty",
-  "vendor": "Meatloaf Project"
+  "vendor": "Meatloaf CBM"
 }

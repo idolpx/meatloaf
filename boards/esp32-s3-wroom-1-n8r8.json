@@ -16,7 +16,7 @@
     "flash_mode": "qio",
     "mcu": "esp32s3",
     "variant": "esp32s3",
-    "partitions": "boards/flash_partitions_8MB.csv"
+    "partitions": "boards/partitions.8m.csv"
   },
   "connectivity": [
     "wifi",
@@ -39,6 +39,6 @@
     "require_upload_port": true,
     "speed": 460800
   },
-  "url": "https://github.com/idolpx/meatloaf-specialty",
-  "vendor": "Meatloaf Project"
+  "url": "https://github.com/idolpx/meatloaf",
+  "vendor": "Meatloaf CBM"
 }
