@@ -52,10 +52,10 @@ description = Meatloaf Commodore to ESP32 WiFi Multifunction Firmware
 ;environment = native                       ; For running tests that don't require embedded hardware
 
 ; Set flash size to 4M, 8M, 16M or 32M according to the enviornment you selected above
-;flash_size = 4mb
-;flash_size = 8mb
-flash_size = 16mb
-;flash_size = 32mb
+;flash_size = 4m
+;flash_size = 8m
+flash_size = 16m
+;flash_size = 32m
 
 ; Choose SPIFFS or LITTLEFS for the filesystem used on internal flash
 ;flash_filesystem = FLASH_SPIFFS
@@ -182,7 +182,7 @@ build_flags =
 ; ESP32-WROVER
 [env:fujiloaf-rev0]
 extends = esp32_base
-board = esp32-wrover-16mb
+board = esp32-wrover-16m
 build_flags =
     ${env.build_flags}
     -D PINMAP_FUJILOAF_REV0
@@ -197,7 +197,7 @@ build_flags =
 
 [env:lolin-d32-pro]
 extends = esp32_base
-board = esp32-wrover-16mb
+board = esp32-wrover-16m
 build_flags =
     ${env.build_flags}
     -D PINMAP_LOLIN_D32_PRO
@@ -206,7 +206,7 @@ build_flags =
 
 [env:iec-nugget]
 extends = esp32_base
-board = esp32-wrover-16mb
+board = esp32-wrover-16m
 build_flags =
     ${env.build_flags}
     -D PINMAP_IEC_NUGGET
@@ -215,7 +215,7 @@ build_flags =
 
 [env:fujiapple-rev0]
 extends = esp32_base
-board = esp32-wrover-8mb
+board = esp32-wrover-8m
 build_flags =
     ${env.build_flags}
     -D PINMAP_A2_REV0
@@ -223,7 +223,7 @@ build_flags =
 
 [env:fujinet-v16]
 extends = esp32_base
-board = esp32-wrover-8mb
+board = esp32-wrover-8m
 build_flags =
     ${env.build_flags}
     -D PINMAP_FN_16
