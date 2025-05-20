@@ -35,7 +35,6 @@
 #include "nvs_flash.h"
 #include "mbedtls/sha256.h"
 
-
 // nvs_handle_t _nvs_handle;
 // sdmmc_card_t *sdcard_info = NULL;
 

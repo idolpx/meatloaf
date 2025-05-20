@@ -14,13 +14,18 @@
 //
 // You should have received a copy of the GNU General Public License
 // along with MLFF. If not, see <http://www.gnu.org/licenses/>.
+#ifndef MLFF_H
+#define MLFF_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include <stdint.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include "esp_err.h"
-
 
 #define TAG "MLFF"
 #define BUFFER_SIZE 4096
@@ -45,3 +50,9 @@ static void get_partition_name_from_path(const char *path, char *out_name, size_
 static esp_err_t get_file_sha256(FILE *file, size_t file_size, unsigned char *sha256, bool compare_stored);
 static esp_err_t flash_write_file(const char *sd_file_path, const char *partition_name);
 void mlff_update(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // MLFF_H
