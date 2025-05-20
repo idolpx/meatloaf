@@ -224,7 +224,7 @@ static esp_err_t flash_write_file(const char *sd_file_path, const char *partitio
 
     // Validate file size against partition
     if (file_size > partition->size) {
-        ESP_LOGE(TAG, "File size (%zu) exceeds partition size (%u) for %s", file_size, partition->size, partition_name);
+        ESP_LOGE(TAG, "File size (%zu) exceeds partition size (%lu) for %s", file_size, partition->size, partition_name);
         ret = ESP_ERR_INVALID_SIZE;
         goto cleanup;
     }
@@ -291,7 +291,7 @@ write_bin:
         // Log progress
         uint32_t progress = (total_written * 100) / file_size;
         if (progress / PROGRESS_INTERVAL > last_progress) {
-            ESP_LOGI(TAG, "%u%% (%zu/%zu bytes)", progress, total_written, file_size);
+            ESP_LOGI(TAG, "%lu%% (%zu/%zu bytes)", progress, total_written, file_size);
             last_progress = progress / PROGRESS_INTERVAL;
         }
     }
