@@ -16,6 +16,7 @@
 #include "../Helpers/PWDHelpers.h"
 #include "../ute/ute.h"
 #include "../../device/iec/meatloaf.h"
+#include "mlff.h
 
 typedef struct {
     uint8_t gpio_miso;
@@ -571,6 +572,9 @@ int update(int argc, char **argv)
         goto fail_exit;
     }
     nvs_close(_nvs_handle);
+
+    Serial.println("Checking for new 'update' app...");
+    mlff_update();
 
     Serial.println("Rebooting for update...");
     esp_restart();
