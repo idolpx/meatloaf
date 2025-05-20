@@ -32,12 +32,15 @@
 
 
 
-/* LED Strip NEW */
+/* LED Strip */
 #define RGB_LED_DATA_PIN        PIN_LED_RGB
 #define RGB_LED_BRIGHTNESS      15 // max mA the LED can use determines brightness
 #define RGB_LED_COUNT           5
 #define RGB_LED_TYPE            WS2812B
 #define RGB_LED_ORDER           GRB
+#ifndef PIN_LED_RGB_PWR
+#define PIN_LED_RGB_PWR         GPIO_NUM_NC
+#endif
 
 /* PS/2 Keyboard Output */
 #ifndef PIN_KB_CLK

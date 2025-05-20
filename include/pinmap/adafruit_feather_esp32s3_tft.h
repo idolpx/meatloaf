@@ -20,8 +20,8 @@
 #define PIN_CARD_DETECT         GPIO_NUM_NC
 
 /* UART */
-#define PIN_UART0_RX            GPIO_NUM_NC  // fnUART.cpp
-#define PIN_UART0_TX            GPIO_NUM_NC
+#define PIN_UART0_RX            GPIO_NUM_44  // fnUART.cpp
+#define PIN_UART0_TX            GPIO_NUM_43
 #define PIN_UART1_RX            GPIO_NUM_NC
 #define PIN_UART1_TX            GPIO_NUM_NC
 #define PIN_UART2_RX            GPIO_NUM_NC
@@ -35,8 +35,9 @@
 /* LEDs */
 #define PIN_LED_WIFI            GPIO_NUM_NC  // led.cpp
 #define PIN_LED_BT              GPIO_NUM_NC
-#define PIN_LED_BUS             GPIO_NUM_NC
-#define PIN_LED_RGB             GPIO_NUM_NC
+#define PIN_LED_BUS             GPIO_NUM_13
+#define PIN_LED_RGB             GPIO_NUM_33
+#define PIN_LED_RGB_PWR         GPIO_NUM_34
 
 /* Audio Output */
 #define PIN_DAC1                GPIO_NUM_NC  // samlib.h
