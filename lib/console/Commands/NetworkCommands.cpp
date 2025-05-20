@@ -100,11 +100,11 @@ static void on_ping_end(esp_ping_handle_t hdl, void *args)
 	esp_ping_get_profile(hdl, ESP_PING_PROF_DURATION, &total_time_ms, sizeof(total_time_ms));
 	uint32_t loss = (uint32_t)((1 - ((float)received) / transmitted) * 100);
 	if (IP_IS_V4(&target_addr)) {
-		Serial.printf("\n--- %s ping statistics", inet_ntoa(*ip_2_ip4(&target_addr)));
+		Serial.printf("\r\n--- %s ping statistics", inet_ntoa(*ip_2_ip4(&target_addr)));
 	} else {
-		Serial.printf("\n--- %s ping statistics", inet6_ntoa(*ip_2_ip6(&target_addr)));
+		Serial.printf("\r\n--- %s ping statistics", inet6_ntoa(*ip_2_ip6(&target_addr)));
 	}
-	Serial.printf(" ---\n%lu packets transmitted, %lu received, %lu%% packet loss, time %lums\n",
+	Serial.printf(" ---\r\n%lu packets transmitted, %lu received, %lu%% packet loss, time %lums\r\n",
 			 transmitted, received, loss, total_time_ms);
 	// delete the ping sessions, so that we clean up all resources and can create a new ping session
 	// we don't have to call delete function in the callback, instead we can call delete function from other tasks
