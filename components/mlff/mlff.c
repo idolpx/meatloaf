@@ -24,8 +24,8 @@
 #include <sys/stat.h>
 #include <dirent.h>
 
-#include "esp_err.h"
-#include "esp_log.h"
+//#include "esp_err.h"
+//#include "esp_log.h"
 //#include "esp_log_color.h"
 #include "esp_vfs_fat.h"
 //#include "driver/sdspi_host.h"
@@ -133,7 +133,7 @@ static esp_err_t get_file_sha256(FILE *file, size_t file_size, unsigned char *sh
     // Allocate buffer
     buffer = (uint8_t *)malloc(BUFFER_SIZE);
     if (!buffer) {
-        ESP_LOGE(TAG, "Failed to allocate buffer");
+        printf("Failed to allocate buffer\r\n");
         ret = ESP_ERR_NO_MEM;
         goto cleanup;
     }
@@ -150,7 +150,7 @@ static esp_err_t get_file_sha256(FILE *file, size_t file_size, unsigned char *sh
         if (bytes_to_read > BUFFER_SIZE) bytes_to_read = BUFFER_SIZE;
         size_t bytes_read = fread(buffer, 1, bytes_to_read, file);
         if (bytes_read != bytes_to_read) {
-            ESP_LOGE(TAG, "Failed to read file data: expected %zu, read %zu", bytes_to_read, bytes_read);
+            printf("Failed to read file data: expected %zu, read %zu\r\n", bytes_to_read, bytes_read);
             ret = ESP_FAIL;
             goto cleanup;
         }
@@ -164,23 +164,23 @@ static esp_err_t get_file_sha256(FILE *file, size_t file_size, unsigned char *sh
 
     char sha256_str[65];
     sha256_to_string(sha256, sha256_str);
-    ESP_LOGI(TAG, "FILE CALCULATED SHA256: %s", sha256_str);
+    printf("FILE CALCULATED SHA256: %s\r\n", sha256_str);
 
     // Read last 32 bytes for stored SHA256
     if (compare_stored)
     {
         size_t bytes_read = fread(stored_sha256, 1, 32, file);
         if (bytes_read != 32) {
-            ESP_LOGE(TAG, "Failed to read stored SHA256: expected 32, read %zu", bytes_read);
+            printf("Failed to read stored SHA256: expected 32, read %zu\r\n", bytes_read);
             ret = ESP_FAIL;
             goto cleanup;
         }
         sha256_to_string(stored_sha256, sha256_str);
-        ESP_LOGI(TAG, "FILE STORED SHA256    : %s", sha256_str);
+        printf("FILE STORED SHA256    : %s\r\n", sha256_str);
 
         // Compare SHA256 hashes
         if (memcmp(sha256, stored_sha256, 32) != 0) {
-            ESP_LOGE(TAG, "SHA256 hashes do not match");
+            printf("SHA256 hashes do not match\r\n");
             ret = ESP_FAIL;
         }
     }
@@ -203,7 +203,7 @@ static esp_err_t flash_write_file(const char *sd_file_path, const char *partitio
     // Open SD card file
     sd_file = fopen(sd_file_path, "rb");
     if (!sd_file) {
-        ESP_LOGE(TAG, "Failed to open SD file %s", sd_file_path);
+        printf("Failed to open SD file %s\r\n", sd_file_path);
         ret = ESP_FAIL;
         goto cleanup;
     }
@@ -216,14 +216,14 @@ static esp_err_t flash_write_file(const char *sd_file_path, const char *partitio
     // Find partition
     partition = esp_partition_find_first(ESP_PARTITION_TYPE_ANY, ESP_PARTITION_SUBTYPE_ANY, partition_name);
     if (!partition) {
-        ESP_LOGE(TAG, "Partition %s not found", partition_name);
+        printf("Partition %s not found\r\n", partition_name);
         ret = ESP_ERR_NOT_FOUND;
         goto cleanup;
     }
 
     // Validate file size against partition
     if (file_size > partition->size) {
-        ESP_LOGE(TAG, "File size (%zu) exceeds partition size (%lu) for %s", file_size, partition->size, partition_name);
+        printf("File size (%zu) exceeds partition size (%lu) for %s\r\n", file_size, partition->size, partition_name);
         ret = ESP_ERR_INVALID_SIZE;
         goto cleanup;
     }
@@ -237,36 +237,36 @@ static esp_err_t flash_write_file(const char *sd_file_path, const char *partitio
         ret = get_file_sha256(sd_file, file_size, sd_sha256, true);
     }
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to get file SHA256: %s", esp_err_to_name(ret));
+        printf("Failed to get file SHA256: %s\r\n", esp_err_to_name(ret));
         goto cleanup;
     }
     ret = esp_partition_get_sha256(partition, flash_sha256);
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to get partition SHA256: %s", esp_err_to_name(ret));
+        printf("Failed to get partition SHA256: %s\r\n", esp_err_to_name(ret));
         goto write_bin;
     }
     sha256_to_string(flash_sha256, sha256_str);
-    ESP_LOGI(TAG, "PARTITION SHA256      : %s", sha256_str);
+    printf("PARTITION SHA256      : %s\r\n", sha256_str);
 
     // Compare SHA256
     if (memcmp(sd_sha256, flash_sha256, 32) == 0) {
-        ESP_LOGI(TAG, "File & Partition SHA256 match. Skipping write...");
+        printf("File & Partition SHA256 match. Skipping write...\r\n");
         goto cleanup;
     }
 
 write_bin:
     // Erase partition
-    ESP_LOGI(TAG, "Erasing partition '%s'...", partition_name);
+    printf("Erasing partition '%s'...\r\n", partition_name);
     ret = esp_partition_erase_range(partition, 0, partition->size);
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to erase partition %s: %s", partition_name, esp_err_to_name(ret));
+        printf("Failed to erase partition %s: %s\r\n", partition_name, esp_err_to_name(ret));
         goto cleanup;
     }
 
     // Allocate buffer
     buffer = (uint8_t *)malloc(BUFFER_SIZE);
     if (!buffer) {
-        ESP_LOGE(TAG, "Failed to allocate buffer for %s", sd_file_path);
+        printf("Failed to allocate buffer for %s\r\n", sd_file_path);
         ret = ESP_ERR_NO_MEM;
         goto cleanup;
     }
@@ -275,14 +275,14 @@ write_bin:
     size_t total_written = 0;
     uint32_t last_progress = 0;
     rewind(sd_file);
-    ESP_LOGI(TAG, "Writing '%s' to partition '%s'", sd_file_path, partition_name);
+    printf("Writing '%s' to partition '%s'\r\n", sd_file_path, partition_name);
     while (total_written < file_size) {
         size_t bytes_read = fread(buffer, 1, BUFFER_SIZE, sd_file);
         if (bytes_read == 0) break;
 
         ret = esp_partition_write(partition, total_written, buffer, bytes_read);
         if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to write to partition %s: %s", partition_name, esp_err_to_name(ret));
+            printf("Failed to write to partition %s: %s\r\n", partition_name, esp_err_to_name(ret));
             goto cleanup;
         }
         total_written += bytes_read;
@@ -290,24 +290,24 @@ write_bin:
         // Log progress
         uint32_t progress = (total_written * 100) / file_size;
         if (progress / PROGRESS_INTERVAL > last_progress) {
-            ESP_LOGI(TAG, "%lu%% (%zu/%zu bytes)", progress, total_written, file_size);
+            printf("%lu%% (%zu/%zu bytes)\r\n", progress, total_written, file_size);
             last_progress = progress / PROGRESS_INTERVAL;
         }
     }
 
     // Verify partition data with progress
-    ESP_LOGI(TAG, "Verifying partition '%s'...", partition_name);
+    printf("Verifying partition '%s'...\r\n", partition_name);
     ret = esp_partition_get_sha256(partition, flash_sha256);
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to get partition SHA256: %s", esp_err_to_name(ret));
+        printf("Failed to get partition SHA256: %s\r\n", esp_err_to_name(ret));
         goto cleanup;
     }
     sha256_to_string(flash_sha256, sha256_str);
-    ESP_LOGI(TAG, "PARTITION SHA256      : %s", sha256_str);
+    printf("PARTITION SHA256      : %s\r\n", sha256_str);
 
     // Compare SHA256
     if (memcmp(sd_sha256, flash_sha256, 32) != 0) {
-        ESP_LOGE(TAG, "Verification failed: SHA256 mismatch");
+        printf("Verification failed: SHA256 mismatch\r\n");
         ret = ESP_FAIL;
     } else {
         // Rename the .bin file on SD
@@ -315,19 +315,19 @@ write_bin:
         strcpy(new_sd_file_path, sd_file_path);
         strcat(new_sd_file_path, ".ok");
         if (rename(sd_file_path, new_sd_file_path) != 0) {
-            ESP_LOGE(TAG, "Failed to rename %s to %s", sd_file_path, new_sd_file_path);
+            printf("Failed to rename %s to %s\r\n", sd_file_path, new_sd_file_path);
             ret = ESP_FAIL;
             goto cleanup;
         }
 
         // // Delete the .bin file on SD
         // if (unlink(sd_file_path) != 0) {
-        //     ESP_LOGE(TAG, "Failed to delete %s from SD card", sd_file_path);
+        //     printf("Failed to delete %s from SD card", sd_file_path);
         //     ret = ESP_FAIL;
         //     goto cleanup;
         // }
 
-        ESP_LOGI(TAG, "Successfully wrote, verified '%s' (%zu bytes) to partition '%s'", sd_file_path, total_written, partition_name);
+        printf("Successfully wrote, verified '%s' (%zu bytes) to partition '%s'\r\n", sd_file_path, total_written, partition_name);
     }
 
 cleanup:
@@ -370,7 +370,7 @@ void mlff_update(void) {
 
     DIR *dir = opendir(FIRMWARE_PATH);
     if (!dir) {
-        ESP_LOGE(TAG, "Failed to open SD card directory %s", FIRMWARE_PATH);
+        printf("Failed to open SD card directory %s\r\n", FIRMWARE_PATH);
         //esp_vfs_fat_sdcard_unmount(SD_MOUNT_POINT, sdcard_info);
         goto fail_exit;
     }
@@ -380,26 +380,26 @@ void mlff_update(void) {
     char partition_name[MAX_NAME_LEN];
     int file_count = 0;
 
-    ESP_LOGI(TAG, "Searching for 'update.bin' in '%s'", FIRMWARE_PATH);
+    printf("Searching for 'update.*.bin' in '%s'\r\n", FIRMWARE_PATH);
     while ((entry = readdir(dir)) != NULL) {
         // Check if file ends with .bin (case-insensitive)
-        //const char *ext = strrchr(entry->d_name, '.');
-        if (strncasecmp(entry->d_name, "update", 6) == 0) {
+        const char *ext = strrchr(entry->d_name, '.');
+        if (ext && strcasecmp(ext, ".bin") == 0 && strncasecmp(entry->d_name, "update", 6) == 0) {
             snprintf(file_path, MAX_PATH_LEN, "%s/%s", FIRMWARE_PATH, entry->d_name);
             struct stat st;
             if (stat(file_path, &st) == 0 && S_ISREG(st.st_mode)) {
                 get_partition_name_from_path(file_path, partition_name, MAX_NAME_LEN);
-                ESP_LOGI(TAG, "File found: '%s', using partition name: '%s'", file_path, partition_name);
+                printf("File found: '%s', using partition name: '%s'\r\n", file_path, partition_name);
                 esp_err_t ret = flash_write_file(file_path, partition_name);
                 if (ret == ESP_OK) {
-                    ESP_LOGI(TAG, "Successfully processed '%s'", file_path);
+                    printf("Successfully processed '%s'\r\n", file_path);
                     file_count++;
                 } else {
-                    ESP_LOGE(TAG, "Failed to process '%s'", file_path);
+                    printf("Failed to process '%s'\r\n", file_path);
                 }
             }
         } else if (strlen(entry->d_name) > 0) {
-            ESP_LOGI(TAG, "Skipping '%s'", entry->d_name);
+            printf("Skipping '%s'\r\n", entry->d_name);
         }
     }
     closedir(dir);
