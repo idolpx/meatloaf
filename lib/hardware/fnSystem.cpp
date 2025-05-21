@@ -222,6 +222,9 @@ void SystemManager::set_pin_mode(gpio_num_t pin, gpio_mode_t mode, pull_updown_t
 // Set DIGI_LOW or DIGI_HIGH
 void IRAM_ATTR SystemManager::digital_write(gpio_num_t pin, uint8_t val)
 {
+    if (pin == GPIO_NUM_NC)
+        return;
+
 #ifdef ESP_PLATFORM
     if (val)
     {

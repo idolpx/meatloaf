@@ -384,7 +384,7 @@ void mlff_update(void) {
     while ((entry = readdir(dir)) != NULL) {
         // Check if file ends with .bin (case-insensitive)
         //const char *ext = strrchr(entry->d_name, '.');
-        if (strcasecmp(entry->d_name, "update.bin") == 0) {
+        if (strncasecmp(entry->d_name, "update", 6) == 0) {
             snprintf(file_path, MAX_PATH_LEN, "%s/%s", FIRMWARE_PATH, entry->d_name);
             struct stat st;
             if (stat(file_path, &st) == 0 && S_ISREG(st.st_mode)) {
@@ -398,6 +398,8 @@ void mlff_update(void) {
                     ESP_LOGE(TAG, "Failed to process '%s'", file_path);
                 }
             }
+        } else if (strlen(entry->d_name) > 0) {
+            ESP_LOGI(TAG, "Skipping '%s'", entry->d_name);
         }
     }
     closedir(dir);
