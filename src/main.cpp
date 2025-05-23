@@ -92,7 +92,7 @@ bool initFailed = false;
 
 void main_shutdown_handler()
 {
-    Debug_printf("Shutdown handler called");
+    Debug_println("Shutdown handler called.");
     // Give devices an opportunity to clean up before rebooting
 
     IEC.shutdown();
@@ -124,17 +124,17 @@ void main_setup()
     printf( ANSI_BLUE_BACKGROUND "   " PLATFORM_DETAILS "    " ANSI_RESET_NL );
     printf( ANSI_BLUE_BACKGROUND "------------------------------" ANSI_RESET_NL "\r\n" );
 
-    printf( "Meatloaf %s Started @ %lu\r\n", fnSystem.get_fujinet_version(), startms );
+    //printf( "Meatloaf %s Started @ %lu\r\n", fnSystem.get_fujinet_version(), startms );
 
-    printf( "Starting heap: %lu\r\n", fnSystem.get_free_heap_size() );
+    printf( "RAM  : %lu\r\n", fnSystem.get_free_heap_size() );
 
 #ifdef BOARD_HAS_PSRAM
-    printf( "PSRAM Size %lu\r\n", fnSystem.get_psram_size() );
-// #ifndef CONFIG_IDF_TARGET_ESP32S3
-//     printf( "himem phys %u\r\n", esp_himem_get_phys_size() );
-//     printf( "himem free %u\r\n", esp_himem_get_free_size() );
-//     printf( "himem reserved %u\r\n", esp_himem_reserved_area_size() );
-// #endif
+    printf( "PSRAM: %lu\r\n", fnSystem.get_psram_size() );
+#ifdef CONFIG_IDF_TARGET_ESP32
+    printf( "HIMEM: %lu\r\n", esp_himem_get_phys_size() );
+    //printf( "HIMEM free %u\r\n", esp_himem_get_free_size() );
+    //printf( "HIMEM reserved %u\r\n", esp_himem_reserved_area_size() );
+#endif
 #endif
 
     // Install a reboot handler
