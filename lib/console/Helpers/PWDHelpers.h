@@ -18,7 +18,7 @@ namespace ESP32Console
      *
      * @return const char*
      */
-    const char *console_getpwd();
+    //const char *console_getpwd();
 
     /**
      * @brief Resolves the given path using the console process working dir
@@ -27,6 +27,6 @@ namespace ESP32Console
      */
     const char *console_realpath(const char *path, char *resolvedPath);
 
-    int console_chdir(const char *path);
+    //int console_chdir(const char *path);
 
 }

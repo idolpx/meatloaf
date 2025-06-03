@@ -236,7 +236,7 @@ bool FileSystemLittleFS::start()
         #ifdef DEBUG
         Debug_printv("Failed to mount LittleFS partition, err = %d\r\n", e);
         #endif
-        _started = false;
+        //_started = false;
     }
     else
     {
@@ -252,6 +252,36 @@ bool FileSystemLittleFS::start()
     }
 
     return _started;
+}
+
+
+bool FileSystemLittleFS::stop()
+{
+    if(!_started)
+        return true;
+
+    esp_err_t e = esp_vfs_littlefs_unregister("storage");
+
+    if (e != ESP_OK)
+    {
+        #ifdef DEBUG
+        Debug_printv("Failed to unmount LittleFS partition, err = %d\r\n", e);
+        #endif
+    }
+    else
+    {
+        _started = false;
+    #ifdef DEBUG        
+        Debug_println("LittleFS unmounted.");
+        /*
+        size_t total = 0, used = 0;
+        esp_littlefs_info(NULL, &total, &used);
+        Debug_printv("  partition size: %u, used: %u, free: %u\r\n", total, used, total-used);
+        */
+    #endif
+    }
+
+    return !_started;
 }
 
 #endif // FLASH_LITTLEFS

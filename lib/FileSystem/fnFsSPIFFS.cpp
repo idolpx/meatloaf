@@ -160,11 +160,7 @@ bool FileSystemSPIFFS::start()
 
     // Set our basepath
 #ifdef ESP_PLATFORM
-#ifndef BUILD_IEC
-    strlcpy(_basepath, "/spiffs", sizeof(_basepath));
-#else
     strlcpy(_basepath, "", sizeof(_basepath));
-#endif
 // ESP_PLATFORM
 #else
 // !ESP_PLATFORM
@@ -202,6 +198,35 @@ bool FileSystemSPIFFS::start()
     }
 
     return _started;
+}
+
+bool FileSystemSPIFFS::stop()
+{
+    if(!_started)
+        return true;
+
+#ifdef ESP_PLATFORM
+    esp_err_t e = esp_vfs_spiffs_unregister("storage");
+
+    if (e != ESP_OK)
+    {
+        Debug_printf("Failed to unmount SPIFFS partition, err = %d\r\n", e);
+    }
+    else
+#endif // ESP_PLATFORM
+    {
+        _started = false;
+        Debug_println("SPIFFS unmounted.");
+    #ifdef DEBUG
+        /*
+        size_t total = 0, used = 0;
+        esp_spiffs_info(NULL, &total, &used);
+        Debug_printf("  partition size: %u, used: %u, free: %u\r\n", total, used, total-used);
+        */
+    #endif
+    }
+
+    return !_started;
 }
 
 #endif // FLASH_SPIFFS

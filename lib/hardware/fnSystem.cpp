@@ -135,6 +135,15 @@ static void setup_card_detect(gpio_num_t pin)
     if (pin == GPIO_NUM_NC)
         return;
 
+    static bool interrupt_initialized = false;
+
+    if (pin >= SOC_GPIO_PIN_COUNT) return;
+
+    if (!interrupt_initialized) {
+        esp_err_t err = gpio_install_isr_service(0 /* ESP_INTR_FLAG_IRAM */);
+        interrupt_initialized = (err == ESP_OK) || (err == ESP_ERR_INVALID_STATE);
+    }
+
     // Create a queue to handle card detect event from ISR
     card_detect_evt_queue = xQueueCreate(10, sizeof(gpio_num_t));
     // Start card detect task

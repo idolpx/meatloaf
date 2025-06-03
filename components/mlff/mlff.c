@@ -31,6 +31,7 @@
 //#include "driver/sdspi_host.h"
 //#include "driver/spi_common.h"
 //#include "sdmmc_cmd.h"
+//#include "esp_flash.h"
 #include "esp_partition.h"
 #include "nvs_flash.h"
 #include "mbedtls/sha256.h"
@@ -196,7 +197,7 @@ static esp_err_t flash_write_file(const char *sd_file_path, const char *partitio
     esp_err_t ret = ESP_OK;
     FILE *sd_file = NULL;
     uint8_t *buffer = NULL;
-    const esp_partition_t *partition = NULL;
+    esp_partition_t *partition = NULL;
     unsigned char sd_sha256[32], flash_sha256[32];
     char sha256_str[65];
 
@@ -213,13 +214,46 @@ static esp_err_t flash_write_file(const char *sd_file_path, const char *partitio
     size_t file_size = ftell(sd_file);
     rewind(sd_file);
 
-    // Find partition
-    partition = esp_partition_find_first(ESP_PARTITION_TYPE_ANY, ESP_PARTITION_SUBTYPE_ANY, partition_name);
+    partition = esp_partition_find_first(ESP_PARTITION_TYPE_ANY, ESP_PARTITION_SUBTYPE_ANY, NULL);
+    if (strcasecmp(partition_name, "bootloader") == 0)
+    {
+        // Set bootloader partition
+        partition->address = 0x1000;
+        partition->size = 0x8000;
+        partition->erase_size = 0x1000;
+        partition->type = ESP_PARTITION_TYPE_BOOTLOADER;
+        partition->subtype = ESP_PARTITION_SUBTYPE_BOOTLOADER_PRIMARY;
+        strcpy(partition->label, partition_name);
+    }
+    else if (strcasecmp(partition_name, "partitions") == 0)
+    {
+        // Set partition table partition
+        partition->address = 0x8000;
+        partition->size = 0x1000;
+        partition->erase_size = 0x1000;
+        partition->type = ESP_PARTITION_TYPE_PARTITION_TABLE;
+        partition->subtype = ESP_PARTITION_SUBTYPE_PARTITION_TABLE_PRIMARY;
+        strcpy(partition->label, partition_name);
+    }
+    else
+    {
+        // Find partition by name
+        partition = esp_partition_find_first(ESP_PARTITION_TYPE_ANY, ESP_PARTITION_SUBTYPE_ANY, partition_name);
+    }
+
     if (!partition) {
-        printf("Partition %s not found\r\n", partition_name);
+        printf("Partition '%s' not found\r\n", partition_name);
         ret = ESP_ERR_NOT_FOUND;
         goto cleanup;
     }
+
+    // Partition details
+    printf("Partition Label: %s\r\n", partition->label);
+    printf("Partition Type: 0x%02x\r\n", partition->type);
+    printf("Partition Subtype: 0x%02x\r\n", partition->subtype);
+    printf("Partition Address: 0x%08lx\r\n", partition->address);
+    printf("Partition Size: 0x%08lx\r\n", partition->size);
+    printf("Partition Erase Size: 0x%08lx\r\n", partition->erase_size);
 
     // Validate file size against partition
     if (file_size > partition->size) {
@@ -230,7 +264,7 @@ static esp_err_t flash_write_file(const char *sd_file_path, const char *partitio
 
     // Compare File & Partition SHA256
     //ESP_LOGI(TAG, "Compare File & Partition SHA256...");
-    if ( partition->type == ESP_PARTITION_TYPE_DATA )
+    if ( partition->type > ESP_PARTITION_TYPE_APP )
     {
         ret = get_file_sha256(sd_file, file_size, sd_sha256, false);
     } else {
@@ -240,34 +274,43 @@ static esp_err_t flash_write_file(const char *sd_file_path, const char *partitio
         printf("Failed to get file SHA256: %s\r\n", esp_err_to_name(ret));
         goto cleanup;
     }
-    ret = esp_partition_get_sha256(partition, flash_sha256);
-    if (ret != ESP_OK) {
-        printf("Failed to get partition SHA256: %s\r\n", esp_err_to_name(ret));
-        goto write_bin;
-    }
-    sha256_to_string(flash_sha256, sha256_str);
-    printf("PARTITION SHA256      : %s\r\n", sha256_str);
+    if ( partition->type == ESP_PARTITION_TYPE_APP )
+    {
+        ret = esp_partition_get_sha256(partition, flash_sha256);
+        if (ret != ESP_OK) {
+            printf("Failed to get partition SHA256: %s\r\n", esp_err_to_name(ret));
+            goto write_bin;
+        }
+        sha256_to_string(flash_sha256, sha256_str);
+        printf("PARTITION SHA256      : %s\r\n", sha256_str);
 
-    // Compare SHA256
-    if (memcmp(sd_sha256, flash_sha256, 32) == 0) {
-        printf("File & Partition SHA256 match. Skipping write...\r\n");
-        goto cleanup;
+        // Compare SHA256
+        if (memcmp(sd_sha256, flash_sha256, 32) == 0) {
+            printf("File & Partition SHA256 match. Skipping write...\r\n");
+            goto cleanup;
+        }
     }
+
 
 write_bin:
-    // Erase partition
-    printf("Erasing partition '%s'...\r\n", partition_name);
-    ret = esp_partition_erase_range(partition, 0, partition->size);
-    if (ret != ESP_OK) {
-        printf("Failed to erase partition %s: %s\r\n", partition_name, esp_err_to_name(ret));
-        goto cleanup;
-    }
-
     // Allocate buffer
     buffer = (uint8_t *)malloc(BUFFER_SIZE);
     if (!buffer) {
         printf("Failed to allocate buffer for %s\r\n", sd_file_path);
         ret = ESP_ERR_NO_MEM;
+        goto cleanup;
+    }
+
+    // Erase partition
+    printf("Erasing partition '%s'...\r\n", partition_name);
+    // if ( partition->type < ESP_PARTITION_TYPE_BOOTLOADER )
+    // {
+         ret = esp_partition_erase_range(partition, 0, partition->size);
+    // } else {
+    //    ret = esp_flash_erase_region(partition->flash_chip, partition->address, partition->size);
+    //}
+    if (ret != ESP_OK) {
+        printf("Failed to erase partition %s: %s\r\n", partition_name, esp_err_to_name(ret));
         goto cleanup;
     }
 
@@ -280,11 +323,20 @@ write_bin:
         size_t bytes_read = fread(buffer, 1, BUFFER_SIZE, sd_file);
         if (bytes_read == 0) break;
 
-        ret = esp_partition_write(partition, total_written, buffer, bytes_read);
-        if (ret != ESP_OK) {
-            printf("Failed to write to partition %s: %s\r\n", partition_name, esp_err_to_name(ret));
-            goto cleanup;
-        }
+        // if ( partition->type < ESP_PARTITION_TYPE_BOOTLOADER )
+        // {
+            ret = esp_partition_write(partition, total_written, buffer, bytes_read);
+            if (ret != ESP_OK) {
+                printf("Failed to write to partition %s: %s\r\n", partition_name, esp_err_to_name(ret));
+                goto cleanup;
+            }
+        // } else {
+        //     ret = esp_flash_write(partition->flash_chip, buffer, partition->address + total_written, bytes_read);
+        //     if (ret != ESP_OK) {
+        //         printf("Failed to write to flash: %s\r\n", esp_err_to_name(ret));
+        //         goto cleanup;
+        //     }
+        // }
         total_written += bytes_read;
 
         // Log progress
@@ -295,15 +347,20 @@ write_bin:
         }
     }
 
-    // Verify partition data with progress
-    printf("Verifying partition '%s'...\r\n", partition_name);
-    ret = esp_partition_get_sha256(partition, flash_sha256);
-    if (ret != ESP_OK) {
-        printf("Failed to get partition SHA256: %s\r\n", esp_err_to_name(ret));
-        goto cleanup;
+    if ( partition->type < ESP_PARTITION_TYPE_BOOTLOADER )
+    {
+        // Verify partition data with progress
+        printf("Verifying partition '%s'...\r\n", partition_name);
+        ret = esp_partition_get_sha256(partition, flash_sha256);
+        if (ret != ESP_OK) {
+            printf("Failed to get partition SHA256: %s\r\n", esp_err_to_name(ret));
+            goto cleanup;
+        }
+        sha256_to_string(flash_sha256, sha256_str);
+        printf("PARTITION SHA256      : %s\r\n", sha256_str);
+    } else {
+        memcpy(flash_sha256, sd_sha256, 32);
     }
-    sha256_to_string(flash_sha256, sha256_str);
-    printf("PARTITION SHA256      : %s\r\n", sha256_str);
 
     // Compare SHA256
     if (memcmp(sd_sha256, flash_sha256, 32) != 0) {
@@ -380,11 +437,11 @@ void mlff_update(void) {
     char partition_name[MAX_NAME_LEN];
     int file_count = 0;
 
-    printf("Searching for 'update.*.bin' in '%s'\r\n", FIRMWARE_PATH);
+    printf("Searching for '.bin' files in '%s'\r\n", FIRMWARE_PATH);
     while ((entry = readdir(dir)) != NULL) {
         // Check if file ends with .bin (case-insensitive)
         const char *ext = strrchr(entry->d_name, '.');
-        if (ext && strcasecmp(ext, ".bin") == 0 && strncasecmp(entry->d_name, "update", 6) == 0) {
+        if (ext && strcasecmp(ext, ".bin") == 0 && strncasecmp(entry->d_name, "main", 4) != 0) {
             snprintf(file_path, MAX_PATH_LEN, "%s/%s", FIRMWARE_PATH, entry->d_name);
             struct stat st;
             if (stat(file_path, &st) == 0 && S_ISREG(st.st_mode)) {

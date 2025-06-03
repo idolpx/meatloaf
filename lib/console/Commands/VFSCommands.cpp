@@ -11,6 +11,7 @@
 #include <iostream>
 #include "nvs_flash.h"
 
+#include "fsFlash.h"
 #include "fnConfig.h"
 #include "../Console.h"
 #include "../Helpers/PWDHelpers.h"
@@ -308,7 +309,7 @@ int rm(int argc, char **argv)
 
     char filename[PATH_MAX];
     ESP32Console::console_realpath(argv[1], filename);
-    //Debug_printv("filename[%s]", filename);
+    Debug_printv("argv[1][%s] filename[%s]", argv[1], filename);
 
     if ( strlen(filename) > 1 && filename[strlen(filename) - 1] == '*' )
     {
@@ -324,7 +325,7 @@ int rm(int argc, char **argv)
             if (strlen(path) > 1)
                 match_file += "/";
             match_file += d->d_name;
-            //Debug_printv("pattern[%s] match_file[%s]", pattern.c_str(), match_file.c_str());
+            Debug_printv("pattern[%s] match_file[%s]", pattern.c_str(), match_file.c_str());
             if ( mstr::compare(pattern, match_file, false) )
             {
                 if (remove(match_file.c_str()))
@@ -450,7 +451,7 @@ int wget(int argc, char **argv)
         return EXIT_SUCCESS;
     }
 
-    std::string pwd = std::string(ESP32Console::console_getpwd());
+    std::string pwd = getCurrentPath()->url;
 
     auto f = MFSOwner::File(argv[1]);
     if (f != nullptr)
@@ -572,6 +573,10 @@ int update(int argc, char **argv)
         goto fail_exit;
     }
     nvs_close(_nvs_handle);
+
+    // Stop flash filesystem
+    Serial.printf("Stopping flash filesystem...\r\n");
+    fsFlash.stop();
 
     Serial.println("Checking for new 'update' app...");
     mlff_update();
