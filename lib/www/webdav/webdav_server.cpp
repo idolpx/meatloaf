@@ -256,7 +256,7 @@ int Server::doGet(Request &req, Response &resp)
 
     std::string s = path + std::to_string(sb.st_mtime);
 
-    resp.setHeader("Content-Length", sb.st_size);
+    //resp.setHeader("Content-Length", sb.st_size);
     resp.setHeader("ETag", mstr::sha1(s));
     resp.setHeader("Last-Modified", formatTime(sb.st_mtime));
 
@@ -301,7 +301,7 @@ int Server::doHead(Request &req, Response &resp)
 
     std::string s = path + std::to_string(sb.st_mtime);
 
-    resp.setHeader("Content-Length", sb.st_size);
+    //resp.setHeader("Content-Length", sb.st_size);
     resp.setHeader("ETag", mstr::sha1(s));
     resp.setHeader("Last-Modified", formatTime(sb.st_mtime));
 

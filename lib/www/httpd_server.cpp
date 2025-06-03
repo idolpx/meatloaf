@@ -97,12 +97,12 @@ esp_err_t cHttpdServer::get_handler(httpd_req_t *httpd_req)
     // Remove query string from uri
     uri = uri.substr(0, uri.find("?"));
 
-    // Ignore OSX/WIN junk files
-    if (mstr::isJunk(uri))
-    {
-        send_http_error(httpd_req, 404);
-    }
-    else
+    // // Ignore OSX/WIN junk files
+    // if (mstr::isJunk(uri))
+    // {
+    //     send_http_error(httpd_req, 404);
+    // }
+    // else
     {
         send_file(httpd_req, uri.c_str());
     }
@@ -239,15 +239,15 @@ esp_err_t cHttpdServer::webdav_handler(httpd_req_t *httpd_req)
 
     //Debug_printv("url[%s]", httpd_req->uri);
 
-    // Ignore OSX junk files
-    std::string uri = httpd_req->uri;
-    if ( mstr::isJunk(uri) )
-    {
-        resp.setStatus(404); // Not Found
-        resp.flushHeaders();
-        resp.closeBody();
-        return ESP_OK;
-    }
+    // // Ignore OSX/WIN junk files
+    // std::string uri = httpd_req->uri;
+    // if ( mstr::isJunk(uri) )
+    // {
+    //     resp.setStatus(404); // Not Found
+    //     resp.flushHeaders();
+    //     resp.closeBody();
+    //     return ESP_OK;
+    // }
 
     if ( !req.parseRequest() )
     {
