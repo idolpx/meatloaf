@@ -108,7 +108,6 @@ public:
     //void cancel();
     void close();
     void setOnHeader(const std::function<int(char*, char*)> &f);
-    bool flush(uint32_t pos = 0);
     bool seek(uint32_t pos);
     uint32_t read(uint8_t* buf, uint32_t size);
     uint32_t write(const uint8_t* buf, uint32_t size);
@@ -118,6 +117,10 @@ public:
 
     uint32_t available() {
         return _size - _position;
+    }
+
+    bool complete() {
+        return esp_http_client_is_complete_data_received(_http);
     }
 
     uint32_t _size = 0;
@@ -209,6 +212,11 @@ protected:
 
     uint32_t read(uint8_t* buf, uint32_t size) override;
     uint32_t write(const uint8_t *buf, uint32_t size) override;
+
+    // bool eos() override {
+    //     Debug_printv("complete[%d]", _http.complete());
+    //     return _http.complete();
+    // }
 
     virtual bool seek(uint32_t pos);
 

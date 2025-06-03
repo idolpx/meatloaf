@@ -317,39 +317,6 @@ void MeatHttpClient::setOnHeader(const std::function<int(char*, char*)> &lambda)
     onHeader = lambda;
 }
 
-bool MeatHttpClient::flush(uint32_t pos) {
-
-    //Debug_printv("_position[%lu] pos[%lu]", _position, pos);
-
-    if (!_is_open)
-        return false;
-
-    int count = pos;
-    char c[HTTP_BLOCK_SIZE] = {0};
-    while(1)
-    {
-        int bytes = esp_http_client_read(_http, c, HTTP_BLOCK_SIZE);
-
-        Debug_printv("_position[%lu] pos[%lu] count[%u] bytes[%u]", _position, pos, count, bytes);
-
-        if(bytes == -1)
-            return false;
-
-        if ( pos )
-        {
-            count -= bytes;
-            if ( count == 0 )
-                break;
-        }
-
-        if ( bytes < HTTP_BLOCK_SIZE )
-            break;
-    }
-
-    _position = pos;
-    return true;
-}
-
 bool MeatHttpClient::seek(uint32_t pos) {
 
     if(isFriendlySkipper) {
@@ -360,10 +327,16 @@ bool MeatHttpClient::seek(uint32_t pos) {
             while(1)
             {
                         char c[HTTP_BLOCK_SIZE];
-                int bytes = esp_http_client_read(_http, c, HTTP_BLOCK_SIZE);
-                if ( bytes < HTTP_BLOCK_SIZE )
+            int bytes = esp_http_client_read(_http, c, HTTP_BLOCK_SIZE);
+            if ( bytes < HTTP_BLOCK_SIZE )
                     break;
             }
+
+            // esp_err_t err;
+            // int *len = 0;
+            // err = esp_http_client_flush_response(_http, len);
+            // if(err != ESP_OK)
+            //     return false;
         }
 
         uint32_t delta = pos - _position;
@@ -379,6 +352,7 @@ bool MeatHttpClient::seek(uint32_t pos) {
         {
             // flush the rest
             //Debug_printv("_position[%lu] pos[%lu] available[%lu]", _position, pos, available());
+
             int rc = 0;
             do {
                 char c;
@@ -386,6 +360,12 @@ bool MeatHttpClient::seek(uint32_t pos) {
                 if(rc == -1)
                     return false;
             } while(rc);
+
+            // esp_err_t err;
+            // int *len = 0;
+            // err = esp_http_client_flush_response(_http, len);
+            // if(err != ESP_OK)
+            //     return false;
 
             if ( !processRedirectsAndOpen(pos) )
                 return false;
@@ -449,7 +429,7 @@ uint32_t MeatHttpClient::read(uint8_t* buf, uint32_t size) {
 
     if (_is_open) {
         //Debug_printv("Reading HTTP Stream!");
-        auto bytesRead= esp_http_client_read(_http, (char *)buf, size );
+        auto bytesRead = esp_http_client_read(_http, (char *)buf, size);
         
         if (bytesRead >= 0) {
             _position+=bytesRead;
