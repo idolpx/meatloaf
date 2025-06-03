@@ -129,9 +129,9 @@ void main_setup()
     printf( "RAM  : %lu\r\n", fnSystem.get_free_heap_size() );
 
 #ifdef BOARD_HAS_PSRAM
-    printf( "PSRAM: %lu\r\n", fnSystem.get_psram_size() );
+    //printf( "PSRAM: %lu\r\n", fnSystem.get_psram_size() );
 #ifdef CONFIG_IDF_TARGET_ESP32
-    printf( "HIMEM: %lu\r\n", esp_himem_get_phys_size() );
+    printf( "HIMEM: %u\r\n", esp_himem_get_phys_size() );
     //printf( "HIMEM free %u\r\n", esp_himem_get_free_size() );
     //printf( "HIMEM reserved %u\r\n", esp_himem_reserved_area_size() );
 #endif
