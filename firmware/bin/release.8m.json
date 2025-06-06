@@ -1,0 +1,26 @@
+    [
+        {
+            "filename": "bootloader.bin",
+            "offset": "0x1000"
+        },
+        {
+            "filename": "partitions.bin",
+            "offset": "0x8000"
+        },
+        {
+            "filename": "nvs.bin",
+            "offset": "0x9000"
+        },
+        {
+            "filename": "main.bin",
+            "offset": "0x10000"
+        },
+        {
+            "filename": "update.bin",
+            "offset": "0x510000"
+        },
+        {
+            "filename": "storage.bin",
+            "offset": "0x570000"
+        }
+    ]
