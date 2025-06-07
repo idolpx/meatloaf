@@ -1,14 +1,14 @@
 # Create a compressed ZIP file of meatloaf firmware
 # for use with the meatloaf web flaser
 
-Import("env")
-
-platform = env.PioPlatform()
-
 import sys, os, configparser, shutil, re, subprocess
 from os.path import join
 from datetime import datetime
 from zipfile import ZipFile
+
+Import("env")
+
+#platform = env.PioPlatform()
 
 print("Build firmware ZIP enabled")
 
@@ -21,9 +21,9 @@ print(f"Reading from config file {ini_file}")
 
 def makezip(source, target, env):
     # Create the 'firmware' output dir if it doesn't exist
-    firmdir = 'firmware'
-    if not os.path.exists(firmdir):
-        os.makedirs(firmdir)
+    firmware_dir = 'firmware'
+    if not os.path.exists(firmware_dir):
+        os.makedirs(firmware_dir)
 
     # Make sure all the files are built and ready to zip
     zipit = True
@@ -75,16 +75,16 @@ def makezip(source, target, env):
         version['FN_VERSION_BUILD'] = version_build
         version['BUILD_DATE'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # Copy filesystem image to firmware folder
-        try:
-            shutil.copy(env.subst("$BUILD_DIR/littlefs.bin"), firmdir+"/filesystem.bin")
-        except: pass
-
         # Filename variables
         environment_name = config['meatloaf']['environment'].split()[0]
         firmware_date = datetime.now().strftime("%Y%m%d.%H")
-        releasefile = firmdir+"/release.json"
-        firmwarezip = firmdir+"/meatloaf."+environment_name+"."+firmware_date+".zip"
+        releasefile = firmware_dir+"/release.json"
+        firmwarezip = firmware_dir+"/meatloaf."+environment_name+"."+firmware_date+".zip"
+
+        # Copy filesystem image to firmware folder
+        try:
+            shutil.copy(env.subst("$BUILD_DIR/littlefs.bin"), firmware_dir+"/filesystem.bin")
+        except: pass
 
         # Clean the firmware output dir
         try:
@@ -107,81 +107,37 @@ def makezip(source, target, env):
     "description": "%s",
     "git_commit": "%s",
     "files":
-    [
-""" % (version['FN_VERSION_FULL'], version['FN_VERSION_DATE'], version['BUILD_DATE'], version['FN_VERSION_DESC'], version['FN_VERSION_BUILD'])
+""" % (version['FN_VERSION_FULL'], 
+       version['FN_VERSION_DATE'], 
+       version['BUILD_DATE'], 
+       version['FN_VERSION_DESC'].replace('"', '\\"').strip(),
+       version['FN_VERSION_BUILD'])
+        
+        # Read the template file
+        release_template = join(firmware_dir, "bin", f"release.{flash_size}.json") 
+        with open(release_template, 'r') as file:
+            json_contents += file.read()
 
-        if flash_size == "4mb":
-            json_contents += """        {
-            "filename": "bootloader.bin",
-            "offset": "0x1000"
-        },
-        {
-            "filename": "partitions.bin",
-            "offset": "0x8000"
-        },
-        {
-            "filename": "firmware.bin",
-            "offset": "0x10000"
-        },
-        {
-            "filename": "filesystem.bin",
-            "offset": "0x250000"
-        }
-    ]
-}
-"""
-        elif flash_size == "8mb":
-            json_contents += """        {
-            "filename": "bootloader.bin",
-            "offset": "0x1000"
-        },
-        {
-            "filename": "partitions.bin",
-            "offset": "0x8000"
-        },
-        {
-            "filename": "firmware.bin",
-            "offset": "0x10000"
-        },
-        {
-            "filename": "filesystem.bin",
-            "offset": "0x600000"
-        }
-    ]
-}
-"""
-        elif flash_size == "16mb":
-            json_contents += """        {
-            "filename": "bootloader.bin",
-            "offset": "0x1000"
-        },
-        {
-            "filename": "partitions.bin",
-            "offset": "0x8000"
-        },
-        {
-            "filename": "firmware.bin",
-            "offset": "0x10000"
-        },
-        {
-            "filename": "filesystem.bin",
-            "offset": "0x910000"
-        }
-    ]
-}
-"""
+        json_contents += """
+}"""
         # Save Release JSON
         with open('firmware/release.json', 'w') as f:
             f.write(json_contents)
 
         # Create the ZIP File
+        chip_name = "esp32"
+        if environment_name.find("esp32-s3") != -1:
+            chip_name = "esp32s3"
+
         try:
             with ZipFile(firmwarezip, 'w') as zip_object:
-                zip_object.write(env.subst("$BUILD_DIR/bootloader.bin"), "bootloader.bin")
+                zip_object.write(f"{firmware_dir}/release.json", "release.json")
+                zip_object.write(f"{firmware_dir}/bin/bootloader.{chip_name}.{flash_size}.bin", "bootloader.bin")
                 zip_object.write(env.subst("$BUILD_DIR/partitions.bin"), "partitions.bin")
-                zip_object.write(env.subst("$BUILD_DIR/firmware.bin"), "firmware.bin")
-                zip_object.write(firmdir+"/filesystem.bin", "filesystem.bin")
-                zip_object.write("firmware/release.json", "release.json")
+                #zip_object.write(f"{firmware_dir}/bin/nvs.bin", "nvs.bin")
+                zip_object.write(env.subst("$BUILD_DIR/firmware.bin"), "main.bin")
+                zip_object.write(f"{firmware_dir}/bin/update.{chip_name}.{flash_size}.bin", "update.bin")
+                zip_object.write(f"{firmware_dir}/filesystem.bin", "storage.bin")
         finally: 
             print("*" * 80)
             print("*")
