@@ -152,16 +152,14 @@ uint32_t TCRTMStream::readFile(uint8_t* buf, uint32_t size) {
 
     if ( _position < 2)
     {
-        //Debug_printv("send load address[%4X]", _load_address);
-
-        buf[0] = _load_address[_position];
-        bytesRead = size;
-        // if ( size > 1 )
-        // {
-        //     buf[0] = m_load_address[0];
-        //     buf[1] = m_load_address[1];
-        //     bytesRead += containerStream->read(buf, size);
-        // }
+        //Debug_printv("position[%d] load00[%d] load01[%d]", _position, _load_address[0], _load_address[1]);
+        if ( size > 1 )
+        {
+            buf[0] = _load_address[0];
+            buf[1] = _load_address[1];
+            bytesRead += containerStream->read(buf+2, size - 2);
+        }
+        bytesRead += 2;
     }
     else
     {

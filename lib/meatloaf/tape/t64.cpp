@@ -113,7 +113,7 @@ uint32_t T64MStream::readFile(uint8_t* buf, uint32_t size) {
 
     if ( _position < 2)
     {
-        Debug_printv("position[%d] load00[%d] load01[%d]", _position, _load_address[0], _load_address[1]);
+        //Debug_printv("position[%d] load00[%d] load01[%d]", _position, _load_address[0], _load_address[1]);
         if ( size > 1 )
         {
             buf[0] = _load_address[0];
