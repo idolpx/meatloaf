@@ -113,16 +113,14 @@ uint32_t T64MStream::readFile(uint8_t* buf, uint32_t size) {
 
     if ( _position < 2)
     {
-        //Debug_printv("position[%d] load00[%d] load01[%d]", _position, _load_address[0], _load_address[1]);
-
-        buf[0] = _load_address[_position];
-        bytesRead = size;
-        // if ( size > 1 )
-        // {
-        //     buf[0] = m_load_address[0];
-        //     buf[1] = m_load_address[1];
-        //     bytesRead += containerStream->read(buf, size);
-        // }
+        Debug_printv("position[%d] load00[%d] load01[%d]", _position, _load_address[0], _load_address[1]);
+        if ( size > 1 )
+        {
+            buf[0] = _load_address[0];
+            buf[1] = _load_address[1];
+            bytesRead += containerStream->read(buf+2, size - 2);
+        }
+        bytesRead += 2;
     }
     else
     {
@@ -145,17 +143,15 @@ bool T64MStream::seekPath(std::string path) {
     {
         //auto entry = containerImage->entry;
         auto type = decodeType(entry.file_type).c_str();
-        uint32_t start_address = UINT16_FROM_HILOBYTES(entry.start_address[1], entry.start_address[0]);
-        uint32_t end_address = UINT16_FROM_HILOBYTES(entry.end_address[1], entry.end_address[0]);
-        uint32_t data_offset = UINT32_FROM_LE_UINT32(entry.data_offset);
-        Debug_printv("filename [%.16s] type[%s] start_address[%lu] end_address[%lu] data_offset[%lu]", entry.filename, type, start_address, end_address, data_offset);
+        Debug_printv("filename [%.16s] type[%s] start_address[%lu] end_address[%lu] data_offset[%lu]", entry.filename, type, entry.start_address, entry.end_address, entry.data_offset);
 
         // Calculate file size
-        _size = ( end_address - start_address ) + 2; // 2 bytes for load address
+        _size = ( entry.end_address - entry.start_address ) + 2; // 2 bytes for load address
 
         // Load Address
-        _load_address[0] = entry.start_address[0];
-        _load_address[1] = entry.start_address[1];
+        _load_address[0] = entry.start_address & 0xFF;
+        _load_address[1] = entry.start_address & 0xFF00;
+        Debug_printv("load00[%d] load01[%d]", _load_address[0], _load_address[1]);
 
         // Set position to beginning of file
         _position = 0;
@@ -231,12 +227,9 @@ MFile* T64MFile::getNextFileInDir() {
 
         auto file = MFSOwner::File(sourceFile->url + "/" + filename);
         file->extension = image->decodeType(image->entry.file_type);
+        file->size = ( image->entry.end_address - image->entry.start_address ) + 2; // 2 bytes for load address
 
-        size_t end_address = UINT16_FROM_HILOBYTES(image->entry.end_address[1], image->entry.end_address[0]);
-        size_t start_address = UINT16_FROM_HILOBYTES(image->entry.start_address[1], image->entry.start_address[0]);
-        file->size = ( end_address - start_address ) + 2; // 2 bytes for load address
-
-        Debug_printv( "entry[%s] ext[%s]", filename.c_str(), file->extension.c_str() );
+        Debug_printv( "entry[%s] ext[%s] size[%lu]", filename.c_str(), file->extension.c_str(), file->size);
         
         return file;
     }

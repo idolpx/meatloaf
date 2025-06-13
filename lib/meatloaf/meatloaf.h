@@ -247,6 +247,7 @@ public:
     virtual uint64_t getAvailableSpace();
 
     virtual uint32_t blocks() {
+        //Debug_printv("size[%d] media_block_size[%d]", size, media_block_size);
         if ( size > 0 && size < media_block_size )
             return 1;
         else
