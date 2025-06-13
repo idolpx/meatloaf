@@ -647,7 +647,9 @@ MFile *D64MFile::getNextFileInDir()
 
         auto file = MFSOwner::File(sourceFile->url + "/" + filename);
         file->extension = image->decodeType(image->entry.file_type);
-        file->size = UINT16_FROM_LE_UINT16(image->entry.blocks);
+        file->size = image->entry.blocks * image->block_size;
+
+        //Debug_printv("entry[%s] ext[%s] size[%lu]", filename.c_str(), file->extension.c_str(), file->size);
 
         return file;
     }
