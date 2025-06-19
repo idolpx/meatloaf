@@ -9,7 +9,6 @@
 #include <sys/types.h>
 #include <sys/syslimits.h>
 #include <iostream>
-#include "nvs_flash.h"
 
 #include "fsFlash.h"
 #include "fnConfig.h"
@@ -18,13 +17,6 @@
 #include "../ute/ute.h"
 #include "../../device/iec/meatloaf.h"
 #include "mlff.h"
-
-typedef struct {
-    uint8_t gpio_miso;
-    uint8_t gpio_mosi;
-    uint8_t gpio_sck;
-    uint8_t gpio_cs;
-} sdcard_pins_t;
 
 using namespace ESP32Console;
 
@@ -513,79 +505,16 @@ int wget(int argc, char **argv)
 
 int update(int argc, char **argv)
 {
-    nvs_handle_t _nvs_handle;
-    sdcard_pins_t sdcard_pins_c = {0}, sdcard_pins_nvs = {0};
-    size_t length = sizeof(sdcard_pins_c);
-
-    sdcard_pins_c.gpio_cs = PIN_SD_HOST_CS;
-    sdcard_pins_c.gpio_miso = PIN_SD_HOST_MISO;
-    sdcard_pins_c.gpio_mosi = PIN_SD_HOST_MOSI;
-    sdcard_pins_c.gpio_sck = PIN_SD_HOST_SCK;
-
-    // Initialize NVS
-    esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        ret = nvs_flash_erase();
-        if (ret == ESP_OK) {
-            ret = nvs_flash_init();
-        }
-    }
-    if (ret != ESP_OK) {
-        Serial.printf("Failed to initialize NVS: %s\r\n", esp_err_to_name(ret));
-        goto fail_exit;
-    }
-
-    // Open NVS
-    Serial.printf("Opening NVS namespace...\r\n");
-    ret = nvs_open((const char *)"system", NVS_READWRITE, &_nvs_handle);
-    if (ret != ESP_OK) {
-        Serial.printf("Failed to open NVS namespace: %s\r\n", esp_err_to_name(ret));
-        goto fail_exit;
-    }
-
-    ret = nvs_set_u8(_nvs_handle, (const char *)"update", 1);
-    if (ret != ESP_OK) {
-        Serial.printf("Failed to set NVS update key: %s\r\n", esp_err_to_name(ret));
-        goto fail_exit;
-    }
-
-    // Check to make sure SD card pins are set in NVS
-    ret = nvs_get_blob(_nvs_handle, "sdcard_pins", &sdcard_pins_nvs, &length);
-    if (ret != ESP_OK) {
-        Serial.printf("Failed to get sdcard_pins from NVS: %s\r\n", esp_err_to_name(ret));
-    }
-    Serial.printf("CUR cs[%d] mosi[%d] miso[%d] sck[%d]\r\n", sdcard_pins_c.gpio_cs, sdcard_pins_c.gpio_mosi, sdcard_pins_c.gpio_miso, sdcard_pins_c.gpio_sck);
-    Serial.printf("NVS cs[%d] mosi[%d] miso[%d] sck[%d]\r\n", sdcard_pins_nvs.gpio_cs, sdcard_pins_nvs.gpio_mosi, sdcard_pins_nvs.gpio_miso, sdcard_pins_nvs.gpio_sck);
-
-    // Update SD card pins in NVS if they are different
-    if (memcmp(&sdcard_pins_c, &sdcard_pins_nvs, sizeof(sdcard_pins_c)) != 0) {
-        Serial.println("sdcard_pins changed, writing to NVS...");
-        ret = nvs_set_blob(_nvs_handle, "sdcard_pins", &sdcard_pins_c, sizeof(sdcard_pins_c));
-        if (ret != ESP_OK) {
-            Serial.printf("Failed to set sdcard_pins to NVS: %s\r\n", esp_err_to_name(ret));
-            goto fail_exit;
-        }
-    }
-
-    ret = nvs_commit(_nvs_handle);
-    if (ret != ESP_OK) {
-        Serial.printf("Failed to commit NVS: %s\r\n", esp_err_to_name(ret));
-        goto fail_exit;
-    }
-    nvs_close(_nvs_handle);
-
     // Stop flash filesystem
     Serial.printf("Stopping flash filesystem...\r\n");
     fsFlash.stop();
 
     Serial.println("Checking for new 'update' app...");
-    mlff_update();
+    mlff_update(PIN_SD_HOST_CS, PIN_SD_HOST_MISO, PIN_SD_HOST_MOSI, PIN_SD_HOST_SCK);
 
     Serial.println("Rebooting for update...");
     esp_restart();
 
-fail_exit:
-    nvs_close(_nvs_handle);
     return EXIT_SUCCESS;
 }
 
