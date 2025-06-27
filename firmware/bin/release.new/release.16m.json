@@ -8,11 +8,19 @@
             "offset": "0x8000"
         },
         {
-            "filename": "firmware.bin",
+            "filename": "nvs.bin",
+            "offset": "0x9000"
+        },
+        {
+            "filename": "main.bin",
             "offset": "0x10000"
         },
         {
-            "filename": "filesystem.bin",
+            "filename": "update.bin",
+            "offset": "0xA10000"
+        },
+        {
+            "filename": "storage.bin",
             "offset": "0xA70000"
         }
     ]
