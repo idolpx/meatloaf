@@ -60,16 +60,16 @@
 
 // Reset line is available
 #define IEC_HAS_RESET
-                                                //            WIRING
-                                                //  C64    DIN6    D32Pro          TFT
-#define PIN_IEC_ATN             GPIO_NUM_4      //  ATN    3       A T-LED 32      10 (PURPLE)
-#define PIN_IEC_CLK_IN          GPIO_NUM_5      //  CLK    4       A T-RST 33      8  (BROWN)
+                                                //    WIRING
+                                                //  C64    DIN6
+#define PIN_IEC_ATN             GPIO_NUM_4      //  ATN    3
+#define PIN_IEC_CLK_IN          GPIO_NUM_5      //  CLK    4
 #define PIN_IEC_CLK_OUT         GPIO_NUM_5      //
-#define PIN_IEC_DATA_IN         GPIO_NUM_6      //  DATA   5       T-CS 14         2  (BLACK)
+#define PIN_IEC_DATA_IN         GPIO_NUM_6      //  DATA   5
 #define PIN_IEC_DATA_OUT        GPIO_NUM_6      //
-#define PIN_IEC_SRQ             GPIO_NUM_7      //  SRQ    1       T-DC 27         7  (ORANGE)
-#define PIN_IEC_RESET           GPIO_NUM_8     //  RESET  6       A 32            N/C
-                                                //  GND    2       GND             9  (GREY)
+#define PIN_IEC_SRQ             GPIO_NUM_7      //  SRQ    1
+#define PIN_IEC_RESET           GPIO_NUM_8      //  RESET  6
+//                            SIDE OF SD SLOT   //  GND    2
 
 /* Modem/Parallel Switch */
 /* Unused with Nugget    */
