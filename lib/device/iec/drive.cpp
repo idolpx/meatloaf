@@ -414,14 +414,14 @@ uint8_t iecChannelHandlerDir::readBufferData()
       if( entry != nullptr )
         {
           // directory entry
-          uint16_t size = entry->blocks();
+          uint16_t blocks = entry->blocks();
           m_data[m_len++] = 1;
           m_data[m_len++] = 1;
-          m_data[m_len++] = size&255;
-          m_data[m_len++] = size/256;
-          if( size<10 )    m_data[m_len++] = ' ';
-          if( size<100 )   m_data[m_len++] = ' ';
-          if( size<1000 )  m_data[m_len++] = ' ';
+          m_data[m_len++] = blocks&255;
+          m_data[m_len++] = blocks/256;
+          if( blocks<10 )    m_data[m_len++] = ' ';
+          if( blocks<100 )   m_data[m_len++] = ' ';
+          if( blocks<1000 )  m_data[m_len++] = ' ';
 
           std::string ext = entry->extension;
           mstr::ltrim(ext);
