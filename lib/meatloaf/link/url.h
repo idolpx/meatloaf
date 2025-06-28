@@ -30,10 +30,10 @@
  * FS
  ********************************************************/
 
-class MLFileSystem: public MFileSystem
+class URLMFileSystem: public MFileSystem
 {
 public:
-    MLFileSystem(): MFileSystem("url") {};
+    URLMFileSystem(): MFileSystem("url") {};
 
     bool handles(std::string fileName) override {
         //printf("handles w dnp %s %d\r\n", fileName.rfind(".dnp"), fileName.length()-4);
