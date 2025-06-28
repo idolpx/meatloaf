@@ -23,21 +23,27 @@ chip_name = "esp32"
 flash_size = "4m"
 
 def image_info(filename):
+    """
+    https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/system/app_image_format.html
+    """
     with open(filename, "rb") as f:
         try:
             common_header = f.read(8)
-            print(f"Common: [{' '.join(format(x, '02x').upper() for x in common_header)}]")
+            print(f"Common: [{' '.join(format(x, '02X') for x in common_header)}]")
             magic = common_header[0]
             spi_size = common_header[3]
 
             extended_header = f.read(16)
-            print(f"Extended: [{' '.join(format(x, '02x').upper() for x in extended_header)}]")
+            print(f"Extended: [{' '.join(format(x, '02X') for x in extended_header)}]")
             chip_id = int.from_bytes(extended_header[4:5], "little")
+
+            print(f"magic 0x{magic:02X}, spi_size 0x{spi_size:02X}, chip_id 0x{chip_id:02X}")
         except IndexError:
             print("File is empty")
 
         if magic not in [0xE9, 0xEA]:
             print(f"This is not a valid image (invalid magic number: {magic:#x})")
+            exit(0)
 
         if chip_id == 0x09:
             chip_name == "esp32s3"
