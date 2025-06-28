@@ -505,14 +505,13 @@ int wget(int argc, char **argv)
 
 int update(int argc, char **argv)
 {
-    // Stop flash filesystem
     Serial.printf("Stopping flash filesystem...\r\n");
     fsFlash.stop();
 
-    Serial.println("Checking for new 'update' app...");
+    Serial.println("Flash bin files from '/sd/.bin/'");
     mlff_update(PIN_SD_HOST_CS, PIN_SD_HOST_MISO, PIN_SD_HOST_MOSI, PIN_SD_HOST_SCK);
 
-    Serial.println("Rebooting for update...");
+    Serial.println("Reboot to run update app and flash 'main.*.bin'...");
     esp_restart();
 
     return EXIT_SUCCESS;
