@@ -19,6 +19,35 @@ if env["PROJECT_CONFIG"] is not None:
 
 print(f"Reading from config file {ini_file}")
 
+chip_name = "esp32"
+flash_size = "4m"
+
+def image_info(filename):
+    with open(filename, "rb") as f:
+        try:
+            common_header = f.read(8)
+            print(f"Common: [{' '.join(format(x, '02x').upper() for x in common_header)}]")
+            magic = common_header[0]
+            spi_size = common_header[3]
+
+            extended_header = f.read(16)
+            print(f"Extended: [{' '.join(format(x, '02x').upper() for x in extended_header)}]")
+            chip_id = int.from_bytes(extended_header[4:5], "little")
+        except IndexError:
+            print("File is empty")
+
+        if magic not in [0xE9, 0xEA]:
+            print(f"This is not a valid image (invalid magic number: {magic:#x})")
+
+        if chip_id == 0x09:
+            chip_name == "esp32s3"
+
+        if spi_size >= 0x30:
+            flash_size = "8m"
+        elif spi_size >= 0x40:
+            flash_size = "16m"
+
+
 def makezip(source, target, env):
     # Create the 'firmware' output dir if it doesn't exist
     firmware_dir = 'firmware'
@@ -80,10 +109,12 @@ def makezip(source, target, env):
         firmware_date = datetime.now().strftime("%Y%m%d.%H")
         releasefile = firmware_dir+"/release.json"
         firmwarezip = firmware_dir+"/meatloaf."+environment_name+"."+firmware_date+".zip"
-        flash_size = config['meatloaf']['flash_size'].split()[0]
-        chip_name = "esp32"
-        if environment_name.find("esp32-s3") != -1:
-            chip_name = "esp32s3"
+
+        image_info(env.subst("$BUILD_DIR/firmware.bin"))
+        # flash_size = config['meatloaf']['flash_size'].split()[0]
+        # chip_name = "esp32"
+        # if environment_name.find("esp32-s3") != -1:
+        #     chip_name = "esp32s3"
 
         # Copy filesystem image to firmware folder
         try:
