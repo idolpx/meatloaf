@@ -515,6 +515,7 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
             Debug_printv("Connection failed... retrying... [%d] status[%d]", retry, status);
             close();
             init();
+            status=-1; // change status to allow retries under certain conditions
         }
 
         retry--;
