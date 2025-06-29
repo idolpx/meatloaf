@@ -255,8 +255,8 @@ bool CSIPMFile::isDirectory() {
     return false;
 };
 
-MStream* CSIPMFile::getSourceStream(std::ios_base::openmode mode) {
-    MStream* istream = new CSIPMStream(url);
+std::shared_ptr<MStream> CSIPMFile::getSourceStream(std::ios_base::openmode mode) {
+    std::shared_ptr<MStream> istream = std::make_shared<CSIPMStream>(url);
     //auto istream = StreamBroker::obtain<CSIPMStream>(url, mode);
     istream->open(mode);   
     return istream;
@@ -264,9 +264,9 @@ MStream* CSIPMFile::getSourceStream(std::ios_base::openmode mode) {
 
 
 
-MStream* CSIPMFile::createStream(std::ios_base::openmode mode)
+std::shared_ptr<MStream> CSIPMFile::createStream(std::ios_base::openmode mode)
 {
-    MStream* istream = new CSIPMStream(url);
+    std::shared_ptr<MStream> istream = std::make_shared<CSIPMStream>(url);
     return istream;
 }
 

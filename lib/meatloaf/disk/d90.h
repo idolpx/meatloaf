@@ -141,11 +141,11 @@ class D90MFile: public D64MFile {
 public:
     D90MFile(std::string path) : D64MFile(path) {};
 
-    MStream* getDecodedStream(std::shared_ptr<MStream> is) override
+    std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> is) override
     {
         Debug_printv("[%s]", url.c_str());
 
-        return new D90MStream(is);
+        return std::make_shared<D90MStream>(is);
     }
 };
 

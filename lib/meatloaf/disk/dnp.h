@@ -81,11 +81,11 @@ class DNPMFile: public D64MFile {
 public:
     DNPMFile(std::string path) : D64MFile(path) {};
 
-    MStream* getDecodedStream(std::shared_ptr<MStream> is) override
+    std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> is) override
     {
         Debug_printv("[%s]", url.c_str());
 
-        return new DNPMStream(is);
+        return std::make_shared<DNPMStream>(is);
     }
 };
 

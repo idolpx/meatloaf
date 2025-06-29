@@ -551,7 +551,7 @@ bool D64MStream::seekPath(std::string path)
 
     // Set the stream file
     auto newFile = MFSOwner::File(url);
-    D64MStream* image = (D64MStream*)newFile->getSourceStream(std::ios_base::in | std::ios_base::out | std::ios_base::trunc);
+    std::shared_ptr<D64MStream> image = std::static_pointer_cast<D64MStream>(newFile->getSourceStream(std::ios_base::in | std::ios_base::out | std::ios_base::trunc));
     if (image == nullptr)
         return false;
 
@@ -578,7 +578,7 @@ bool D64MStream::seekPath(std::string path)
     image->write(&data, 1);
 
     delete newFile;
-    delete image;
+    //delete image;
     return true;
  }
 

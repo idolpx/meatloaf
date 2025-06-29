@@ -272,21 +272,37 @@ public:
 private:
     void sendListing();
 
+    // bool readHeader() override
+    // {
+    //     //Debug_printv("readHeader");
+    //     seekSector( 
+    //         partitions[partition].header_track, 
+    //         partitions[partition].header_sector, 
+    //         partitions[partition].header_offset 
+    //     );
+    //     if (readContainer((uint8_t*)&header, sizeof(header)))
+    //         return true;
+
+    //     return false;
+    // }
     bool readHeader() override
     {
-        //Debug_printv("readHeader");
-        seekSector( 
-            partitions[partition].header_track, 
-            partitions[partition].header_sector, 
-            partitions[partition].header_offset 
-        );
-        if (readContainer((uint8_t*)&header, sizeof(header)))
-            return true;
-
-        return false;
+        if (partitions.empty() || partition >= partitions.size()) {
+            Debug_printv("Invalid partition index: %d", partition);
+            return false;
+        }
+        return seekSector(partitions[partition].header_track, 
+                        partitions[partition].header_sector, 
+                        partitions[partition].header_offset) &&
+            readContainer((uint8_t*)&header, sizeof(header));
     }
+
     bool writeHeader(std::string name, std::string id) override
     {
+        if (partitions.empty() || partition >= partitions.size()) {
+            Debug_printv("Invalid partition index: %d", partition);
+            return false;
+        }
         seekSector( 
             partitions[partition].header_track, 
             partitions[partition].header_sector, 
@@ -393,36 +409,68 @@ private:
 
         return true;
     }
+    // bool initializeDirectory()
+    // {
+    //     Debug_printv("initialize directory");
+    //     seekSector( 
+    //         partitions[partition].header_track, 
+    //         partitions[partition].header_sector, 
+    //         0
+    //     );
+
+    //     // Set default values in sector 0
+    //     uint8_t track = partitions[partition].directory_track;
+    //     uint8_t sector = partitions[partition].directory_sector;
+    //     uint8_t data = 0x41;
+
+    //     writeContainer((uint8_t*)&track, 1);
+    //     writeContainer((uint8_t*)&sector, 1);
+    //     writeContainer((uint8_t*)&data, 1);
+
+    //     // Set T/S link in first sector to 0x00 0xFF
+    //     seekSector( 
+    //         partitions[partition].directory_track,
+    //         partitions[partition].directory_sector,
+    //         partitions[partition].directory_offset
+    //     );
+    //     data = 0x00;
+    //     writeContainer((uint8_t*)&data, 1);
+    //     data = 0xFF;
+    //     writeContainer((uint8_t*)&data, 1);
+
+    //     // Clear directory entries (e.g., 8 entries per sector)
+    //     uint8_t emptyEntry[32] = {0}; // 32 bytes per entry
+    //     for (int i = 0; i < 8; i++) {
+    //         if (!writeContainer(emptyEntry, 32)) return false;
+    //     }
+
+    //     return true;
+    // }
     bool initializeDirectory()
     {
         Debug_printv("initialize directory");
-        seekSector( 
-            partitions[partition].header_track, 
-            partitions[partition].header_sector, 
-            0
-        );
-
-        // Set default values in sector 0
+        if (!seekSector(partitions[partition].header_track, partitions[partition].header_sector, 0)) {
+            return false;
+        }
         uint8_t track = partitions[partition].directory_track;
         uint8_t sector = partitions[partition].directory_sector;
-        uint8_t data = 0x41;
-
-        writeContainer((uint8_t*)&track, 1);
-        writeContainer((uint8_t*)&sector, 1);
-        writeContainer((uint8_t*)&data, 1);
-
-        // Set T/S link in first sector to 0x00 0xFF
-        seekSector( 
-            partitions[partition].directory_track,
-            partitions[partition].directory_sector,
-            partitions[partition].directory_offset
-        );
-        data = 0x00;
-        writeContainer((uint8_t*)&data, 1);
+        uint8_t data = 0x41; // DOS version
+        if (!writeContainer(&track, 1) || !writeContainer(&sector, 1) || !writeContainer(&data, 1)) {
+            return false;
+        }
+        if (!seekSector(partitions[partition].directory_track, partitions[partition].directory_sector, partitions[partition].directory_offset)) {
+            return false;
+        }
+        data = 0x00; // End of directory chain
+        if (!writeContainer(&data, 1)) return false;
         data = 0xFF;
-        writeContainer((uint8_t*)&data, 1);
-
-        return false;
+        if (!writeContainer(&data, 1)) return false;
+        // Clear directory entries (e.g., 8 entries per sector)
+        uint8_t emptyEntry[32] = {0}; // 32 bytes per entry
+        for (int i = 0; i < 8; i++) {
+            if (!writeContainer(emptyEntry, 32)) return false;
+        }
+        return true;
     }
 
     // Container
@@ -457,11 +505,11 @@ public:
         // don't close the stream here! It will be used by shared ptr D64Util to keep reading image params
     }
 
-    MStream* getDecodedStream(std::shared_ptr<MStream> is) override
+    std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> is) override
     {
         // Debug_printv("[%s]", url.c_str());
-
-        return new D64MStream(is);
+        if (!is) return nullptr;
+            return std::make_shared<D64MStream>(is);
     }
 
     bool format(std::string header_info) override;

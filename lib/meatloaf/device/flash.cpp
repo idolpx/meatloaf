@@ -66,10 +66,10 @@ bool FlashMFile::isDirectory()
 }
 
 
-MStream* FlashMFile::getSourceStream(std::ios_base::openmode mode)
+std::shared_ptr<MStream> FlashMFile::getSourceStream(std::ios_base::openmode mode)
 {
     std::string full_path = basepath + path;
-    MStream* istream = new FlashMStream(full_path, mode);
+    std::shared_ptr<MStream> istream = std::make_shared<FlashMStream>(full_path, mode);
     //auto istream = StreamBroker::obtain<FlashMStream>(full_path, mode);
     //Debug_printv("FlashMFile::getSourceStream() 3, not null=%d", istream != nullptr);
     istream->open(mode);   
@@ -77,14 +77,14 @@ MStream* FlashMFile::getSourceStream(std::ios_base::openmode mode)
     return istream;
 }
 
-MStream* FlashMFile::getDecodedStream(std::shared_ptr<MStream> is) {
-    return is.get(); // we don't have to process this stream in any way, just return the original stream
+std::shared_ptr<MStream> FlashMFile::getDecodedStream(std::shared_ptr<MStream> is) {
+    return is; // we don't have to process this stream in any way, just return the original stream
 }
 
-MStream* FlashMFile::createStream(std::ios_base::openmode mode)
+std::shared_ptr<MStream> FlashMFile::createStream(std::ios_base::openmode mode)
 {
     std::string full_path = basepath + path;
-    MStream* istream = new FlashMStream(full_path, mode);
+    std::shared_ptr<MStream> istream = std::make_shared<FlashMStream>(full_path, mode);
     return istream;
 }
 

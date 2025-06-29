@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
-#include "tnfs.h"
+#include "smb.h"
 
 #include "tnfslib.h"
 #include "tnfslibMountInfo.h"
@@ -33,7 +33,7 @@
  * MFile implementations
  ********************************************************/
 
-bool TNFSMFile::pathValid(std::string path) 
+bool SMBMFile::pathValid(std::string path) 
 {
     auto apath = std::string(basepath + path).c_str();
     while (*apath) {
@@ -55,7 +55,7 @@ bool TNFSMFile::pathValid(std::string path)
     return true;
 }
 
-bool TNFSMFile::isDirectory()
+bool SMBMFile::isDirectory()
 {
     if(path=="/" || path.empty())
         return true;
@@ -65,30 +65,30 @@ bool TNFSMFile::isDirectory()
     return S_ISDIR(info.st_mode);
 }
 
-std::shared_ptr<MStream> TNFSMFile::getSourceStream(std::ios_base::openmode mode)
+std::shared_ptr<MStream> SMBMFile::getSourceStream(std::ios_base::openmode mode)
 {
     std::string full_path = basepath + path;
-    std::shared_ptr<MStream> istream = std::make_shared<TNFSMStream>(full_path);
-    //auto istream = StreamBroker::obtain<TNFSMStream>(full_path, mode);
-    //Debug_printv("TNFSMFile::getSourceStream() 3, not null=%d", istream != nullptr);
+    std::shared_ptr<MStream> istream = std::make_shared<SMBMStream>(full_path);
+    //auto istream = StreamBroker::obtain<SMBMStream>(full_path, mode);
+    //Debug_printv("SMBMFile::getSourceStream() 3, not null=%d", istream != nullptr);
     istream->open(mode);   
-    //Debug_printv("TNFSMFile::getSourceStream() 4");
+    //Debug_printv("SMBMFile::getSourceStream() 4");
     return istream;
 }
 
-std::shared_ptr<MStream> TNFSMFile::getDecodedStream(std::shared_ptr<MStream> is) {
+std::shared_ptr<MStream> SMBMFile::getDecodedStream(std::shared_ptr<MStream> is) {
     return is; // we don't have to process this stream in any way, just return the original stream
 }
 
-std::shared_ptr<MStream> TNFSMFile::createStream(std::ios_base::openmode mode)
+std::shared_ptr<MStream> SMBMFile::createStream(std::ios_base::openmode mode)
 {
     std::string full_path = basepath + path;
-    std::shared_ptr<MStream> istream = std::make_shared<TNFSMStream>(full_path);
+    std::shared_ptr<MStream> istream = std::make_shared<SMBMStream>(full_path);
     istream->open(mode);
     return istream;
 }
 
-time_t TNFSMFile::getLastWrite()
+time_t SMBMFile::getLastWrite()
 {
     struct stat info;
     stat( std::string(basepath + path).c_str(), &info);
@@ -97,7 +97,7 @@ time_t TNFSMFile::getLastWrite()
     return ftime;
 }
 
-time_t TNFSMFile::getCreationTime()
+time_t SMBMFile::getCreationTime()
 {
     struct stat info;
     stat( std::string(basepath + path).c_str(), &info);
@@ -106,7 +106,7 @@ time_t TNFSMFile::getCreationTime()
     return ftime;
 }
 
-bool TNFSMFile::mkDir()
+bool SMBMFile::mkDir()
 {
     if (m_isNull) {
         return false;
@@ -115,7 +115,7 @@ bool TNFSMFile::mkDir()
     return (rc==0);
 }
 
-bool TNFSMFile::exists()
+bool SMBMFile::exists()
 {
     if (m_isNull) {
         return false;
@@ -133,13 +133,13 @@ bool TNFSMFile::exists()
 }
 
 
-bool TNFSMFile::remove() {
+bool SMBMFile::remove() {
     //if(path == nullptr)
     //    return false;
 
     // // Figure out if this is a file or directory
     // tnfsStat tstat;
-    // if(TNFS_RESULT_SUCCESS != tnfs_stat(&_mountinfo, &tstat, path))
+    // if(SMB_RESULT_SUCCESS != tnfs_stat(&_mountinfo, &tstat, path))
     //     return false;
 
     // int result;
@@ -148,11 +148,11 @@ bool TNFSMFile::remove() {
     // else
     //     result = tnfs_unlink(&_mountinfo, path);
 
-    return true; //result == TNFS_RESULT_SUCCESS;
+    return true; //result == SMB_RESULT_SUCCESS;
 }
 
 
-bool TNFSMFile::rename(std::string pathTo) {
+bool SMBMFile::rename(std::string pathTo) {
     if(pathTo.empty())
         return false;
 
@@ -164,7 +164,7 @@ bool TNFSMFile::rename(std::string pathTo) {
 }
 
 
-void TNFSMFile::openDir(std::string apath) 
+void SMBMFile::openDir(std::string apath) 
 {
     if (!isDirectory()) { 
         dirOpened = false;
@@ -192,7 +192,7 @@ void TNFSMFile::openDir(std::string apath)
 }
 
 
-void TNFSMFile::closeDir() 
+void SMBMFile::closeDir() 
 {
     // if(dirOpened) {
     //     closedir( dir );
@@ -201,7 +201,7 @@ void TNFSMFile::closeDir()
 }
 
 
-bool TNFSMFile::rewindDirectory()
+bool SMBMFile::rewindDirectory()
 {
     // _valid = false;
     // rewinddir( dir );
@@ -216,7 +216,7 @@ bool TNFSMFile::rewindDirectory()
 }
 
 
-MFile* TNFSMFile::getNextFileInDir()
+MFile* SMBMFile::getNextFileInDir()
 {
     // // Debug_printv("base[%s] path[%s]", basepath.c_str(), path.c_str());
     // if(!dirOpened)
@@ -236,7 +236,7 @@ MFile* TNFSMFile::getNextFileInDir()
     //     //Debug_printv("path[%s] name[%s]", this->path.c_str(), dirent->d_name);
     //     std::string entry_name = this->path + ((this->path == "/") ? "" : "/") + std::string(dirent->d_name);
 
-    //     auto file = new TNFSMFile(entry_name);
+    //     auto file = new SMBMFile(entry_name);
     //     file->extension = " " + file->extension;
 
     //     if(file->isDirectory()) {
@@ -259,7 +259,7 @@ MFile* TNFSMFile::getNextFileInDir()
 }
 
 
-bool TNFSMFile::readEntry( std::string filename )
+bool SMBMFile::readEntry( std::string filename )
 {
     // DIR* d;
     // std::string apath = (basepath + pathToFile()).c_str();
@@ -318,7 +318,7 @@ bool TNFSMFile::readEntry( std::string filename )
 /********************************************************
  * MStream implementations
  ********************************************************/
-uint32_t TNFSMStream::write(const uint8_t *buf, uint32_t size) {
+uint32_t SMBMStream::write(const uint8_t *buf, uint32_t size) {
     if (!isOpen() || !buf) {
         return 0;
     }
@@ -342,7 +342,7 @@ uint32_t TNFSMStream::write(const uint8_t *buf, uint32_t size) {
  ********************************************************/
 
 
-bool TNFSMStream::open(std::ios_base::openmode mode) {
+bool SMBMStream::open(std::ios_base::openmode mode) {
     // if(isOpen())
     //     return true;
 
@@ -365,11 +365,11 @@ bool TNFSMStream::open(std::ios_base::openmode mode) {
     return false;
 };
 
-void TNFSMStream::close() {
+void SMBMStream::close() {
     if(isOpen()) handle->dispose();
 };
 
-uint32_t TNFSMStream::read(uint8_t* buf, uint32_t size) {
+uint32_t SMBMStream::read(uint8_t* buf, uint32_t size) {
     if (!isOpen() || !buf) {
         Debug_printv("Not open");
         return 0;
@@ -385,7 +385,7 @@ uint32_t TNFSMStream::read(uint8_t* buf, uint32_t size) {
     return bytesRead;
 };
 
-bool TNFSMStream::seek(uint32_t pos) {
+bool SMBMStream::seek(uint32_t pos) {
     // Debug_printv("pos[%d]", pos);
         if (!isOpen()) {
         Debug_printv("Not open");
@@ -394,7 +394,7 @@ bool TNFSMStream::seek(uint32_t pos) {
     return ( fseek( handle->file_h, pos, SEEK_SET ) ) ? true : false;
 };
 
-bool TNFSMStream::seek(uint32_t pos, int mode) {
+bool SMBMStream::seek(uint32_t pos, int mode) {
     // Debug_printv("pos[%d] mode[%d]", pos, mode);
     if (!isOpen()) {
         Debug_printv("Not open");
@@ -403,7 +403,7 @@ bool TNFSMStream::seek(uint32_t pos, int mode) {
     return ( fseek( handle->file_h, pos, mode ) ) ? true: false;
 }
 
-bool TNFSMStream::isOpen() {
+bool SMBMStream::isOpen() {
     // Debug_printv("Inside isOpen, handle notnull:%d", handle != nullptr);
     auto temp = handle != nullptr && handle->file_h != nullptr;
     // Debug_printv("returning");
@@ -411,15 +411,15 @@ bool TNFSMStream::isOpen() {
 }
 
 /********************************************************
- * TNFSHandle implementations
+ * SMBHandle implementations
  ********************************************************/
 
 
-TNFSHandle::~TNFSHandle() {
+SMBHandle::~SMBHandle() {
     dispose();
 }
 
-void TNFSHandle::dispose() {
+void SMBHandle::dispose() {
     //Debug_printv("file_h[%d]", file_h);
     if (file_h != nullptr) {
 
@@ -429,7 +429,7 @@ void TNFSHandle::dispose() {
     }
 }
 
-void TNFSHandle::obtain(std::string m_path, std::string mode) {
+void SMBHandle::obtain(std::string m_path, std::string mode) {
 
     //printf("*** Atempting opening flash  handle'%s'\r\n", m_path.c_str());
 

@@ -304,23 +304,23 @@ public:
     }
 
     // We are overriding getSourceStream, because obviously - TCP scheme won't be wrapped in anything
-    MStream* getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override {
+    std::shared_ptr<MStream> getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override {
         // has to return OPENED streamm
-        MStream* istream = new TCPMStream(url);
+        std::shared_ptr<MStream> istream = std::make_shared<TCPMStream>(url);
         //auto istream = StreamBroker::obtain<TCPMStream>(url, mode);
         //istream->open(std::ios_base::openmode mode);
         return istream;
     } 
 
     // DUMMY return value - we've overriden getSourceStream, so this one won't be even called!
-    MStream* getDecodedStream(std::shared_ptr<MStream> is)
+    std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> is)
     {
         return nullptr; 
     }
 
-    MStream* createStream(std::ios_base::openmode mode) override
+    std::shared_ptr<MStream> createStream(std::ios_base::openmode mode) override
     {
-        MStream* istream = new TCPMStream(url);
+        std::shared_ptr<MStream> istream = std::make_shared<TCPMStream>(url);
         return istream;
     }
 

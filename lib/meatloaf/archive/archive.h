@@ -164,10 +164,10 @@ class ArchiveMFile : public MFile {
         if (m_archive != nullptr) delete m_archive;
     }
 
-    MStream *getDecodedStream(std::shared_ptr<MStream> is) {
+    std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> is) {
         Debug_printv("[%s]", url.c_str());
 
-        return new ArchiveMStream(is);
+        return std::make_shared<ArchiveMStream>(is);
     }
 
     bool isDirectory() override;

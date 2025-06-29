@@ -190,7 +190,7 @@ ADFILE *archdep_fnofile()
 
 ADFILE *archdep_fopen(const char* filename, const char* mode)
 {
-  MStream *res = NULL;
+  std::shared_ptr<MStream> res = NULL;
 
   DBG(("archdep_fopen: %s %s", filename, mode));
 
@@ -217,7 +217,7 @@ ADFILE *archdep_fopen(const char* filename, const char* mode)
       delete f;
     }
 
-  return res;
+  return res.get();
 }
 
 

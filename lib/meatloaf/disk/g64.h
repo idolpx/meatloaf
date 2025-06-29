@@ -136,9 +136,9 @@ class G64MFile: public D64MFile {
 public:
     G64MFile(std::string path) : D64MFile(path) {};
 
-    MStream* getDecodedStream(std::shared_ptr<MStream> is) override
+    std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> is) override
     {
-        return new G64MStream(is);
+        return std::make_shared<G64MStream>(is);
     }
 };
 

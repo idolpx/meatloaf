@@ -95,7 +95,7 @@
 #include "tape/tcrt.h"
 
 std::unordered_map<std::string, MFile*> FileBroker::file_repo;
-std::unordered_map<std::string, MStream*> StreamBroker::stream_repo;
+std::unordered_map<std::string, std::shared_ptr<MStream>> StreamBroker::stream_repo;
 
 /********************************************************
  * MFSOwner implementations
@@ -464,7 +464,7 @@ bool MFile::operator!=(nullptr_t ptr) {
     return m_isNull;
 }
 
-MStream* MFile::getSourceStream(std::ios_base::openmode mode) {
+std::shared_ptr<MStream> MFile::getSourceStream(std::ios_base::openmode mode) {
 
     if ( sourceFile == nullptr )
     {
@@ -488,7 +488,7 @@ MStream* MFile::getSourceStream(std::ios_base::openmode mode) {
     Debug_printv("containerStream isRandomAccess[%d] isBrowsable[%d] null[%d]", containerStream->isRandomAccess(), containerStream->isBrowsable(), (containerStream == nullptr));
 
     // will be replaced by streamBroker->getDecodedStream(this, mode, containerStream)
-    MStream* decodedStream(getDecodedStream(containerStream)); // wrap this stream into decoded stream, i.e. unpacked zip files
+    std::shared_ptr<MStream> decodedStream(getDecodedStream(containerStream)); // wrap this stream into decoded stream, i.e. unpacked zip files
     decodedStream->url = this->url;
     Debug_printv("decodedStream isRandomAccess[%d] isBrowsable[%d] null[%d]", decodedStream->isRandomAccess(), decodedStream->isBrowsable(), (decodedStream == nullptr));
 

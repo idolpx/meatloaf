@@ -112,11 +112,11 @@ public:
         size = 819200; // Default - 80 tracks no errors
     };
 
-    MStream* getDecodedStream(std::shared_ptr<MStream> is) override
+    std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> is) override
     {
         //Debug_printv("[%s]", url.c_str());
 
-        return new D81MStream(is);
+        return std::make_shared<D81MStream>(is);
     }
 
     bool mkDir() override { return false; };

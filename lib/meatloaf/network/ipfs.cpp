@@ -21,10 +21,10 @@
 #include "../../../include/debug.h"
 
 
-MStream* IPFSMFile::getSourceStream(std::ios_base::openmode mode) {
+std::shared_ptr<MStream> IPFSMFile::getSourceStream(std::ios_base::openmode mode) {
     // has to return OPENED stream
     //Debug_printv("[%s]", url.c_str());
-    MStream* istream = new IPFSMStream(url);
+    std::shared_ptr<MStream> istream = std::make_shared<IPFSMStream>(url);
     istream->open(mode);   
     return istream;
 }; 

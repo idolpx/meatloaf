@@ -98,7 +98,7 @@ public:
     };
     ~IPFSMFile() {};
 
-    MStream* getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override; // file on IPFS server = standard HTTP file available via GET
+    std::shared_ptr<MStream> getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override; // file on IPFS server = standard HTTP file available via GET
 };
 
 

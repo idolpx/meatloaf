@@ -240,9 +240,9 @@ public:
     };
 
 
-    MStream* getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override ; // has to return OPENED stream
-    MStream* getDecodedStream(std::shared_ptr<MStream> src) { return src.get(); };
-    MStream* createStream(std::ios_base::openmode mode) override;
+    std::shared_ptr<MStream> getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override ; // has to return OPENED stream
+    std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> src) { return src; };
+    std::shared_ptr<MStream> createStream(std::ios_base::openmode mode) override;
 
     //MFile* cd(std::string newDir);
     bool isDirectory() override;

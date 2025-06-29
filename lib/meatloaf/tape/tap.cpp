@@ -139,10 +139,10 @@ bool TAPMStream::seekPath(std::string path) {
  * File implementations
  ********************************************************/
 
-MStream* TAPMFile::getDecodedStream(std::shared_ptr<MStream> is) {
+std::shared_ptr<MStream> TAPMFile::getDecodedStream(std::shared_ptr<MStream> is) {
     Debug_printv("[%s]", url.c_str());
 
-    return new TAPMStream(is);
+    return std::make_shared<TAPMStream>(is);
 }
 
 

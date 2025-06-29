@@ -26,15 +26,15 @@
 //     return false;
 // }
 
-// MStream* WebDAVFile::getSourceStream() {
+// std::shared_ptr<MStream> WebDAVFile::getSourceStream() {
 //     // has to return OPENED stream
 //     Debug_printv("[%s]", url.c_str());
-//     MStream* istream = new WebDAVIStream(url);
+//     std::shared_ptr<MStream> istream = WebDAVIStream(url);
 //     istream->open();
 //     return istream;
 // }
 
-// MStream* WebDAVFile::getDecodedStream(std::shared_ptr<MStream> is) {
+// std::shared_ptr<MStream> WebDAVFile::getDecodedStream(std::shared_ptr<MStream> is) {
 //     return is.get(); // we've overriden istreamfunction, so this one won't be used
 // }
 

@@ -179,23 +179,23 @@ private:
  * Utility implementations
  ********************************************************/
 class ImageBroker {
-    static std::unordered_map<std::string, MMediaStream*> image_repo;
+    static std::unordered_map<std::string, std::shared_ptr<MMediaStream>> image_repo;
 public:
-    template<class T> static T* obtain(std::string url) 
+    template<class T> static std::shared_ptr<T> obtain(std::string url) 
     {
         Debug_printv("streams[%d] url[%s]", image_repo.size(), url.c_str());
 
         // obviously you have to supply sourceFile.url to this function!
         if(image_repo.find(url)!=image_repo.end()) {
             Debug_printv("stream found!");
-            return (T*)image_repo.at(url);
+            return std::static_pointer_cast<T>(image_repo.at(url));
         }
 
         // create and add stream to image broker if not found
         auto newFile = MFSOwner::File(url);
 
         Debug_printv("before " ANSI_WHITE_BACKGROUND "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv");
-        T* newStream = (T*)newFile->getSourceStream();
+        std::shared_ptr<T> newStream = std::static_pointer_cast<T>(newFile->getSourceStream());
         Debug_printv("after  " ANSI_WHITE_BACKGROUND "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
 
         if ( newStream != nullptr )
@@ -222,7 +222,7 @@ public:
         return nullptr;
     }
 
-    static MMediaStream* obtain(std::string url) {
+    static std::shared_ptr<MMediaStream> obtain(std::string url) {
         return obtain<MMediaStream>(url);
     }
 
@@ -230,7 +230,7 @@ public:
         if(image_repo.find(url)!=image_repo.end()) {
             auto toDelete = image_repo.at(url);
             image_repo.erase(url);
-            delete toDelete;
+            //delete toDelete;
         }
         Debug_printv("streams[%d]", image_repo.size());
     }
@@ -240,9 +240,9 @@ public:
     }
 
     static void clear() {
-        std::for_each(image_repo.begin(), image_repo.end(), [](auto& pair) {
-            delete pair.second;
-        });
+        // std::for_each(image_repo.begin(), image_repo.end(), [](auto& pair) {
+        //     delete pair.second;
+        // });
         image_repo.clear();
     }
 };

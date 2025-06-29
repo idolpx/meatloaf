@@ -195,13 +195,13 @@ public:
     MFile(MFile* path, std::string name);
 
     virtual ~MFile() {
-        if(sourceFile != nullptr) {
+//        if(sourceFile != nullptr) {
         //     Debug_printv("WARNING: sourceFile null in '%s' destructor. This MFile was obviously not initialized properly!", url.c_str());
         // }
         // else {
             //Debug_printv("Deleting: [%s]", this->url.c_str());
-            delete sourceFile;
-        }
+//            delete sourceFile;
+//        }
         //Debug_printv("dtor path[%s]", path.c_str());
     };
 
@@ -221,9 +221,9 @@ public:
     // bool copyTo(MFile* dst);
 
     // has to return OPENED stream
-    virtual MStream* getSourceStream(std::ios_base::openmode mode=std::ios_base::in);
-    virtual MStream* getDecodedStream(std::shared_ptr<MStream> src) = 0;
-    virtual MStream* createStream(std::ios_base::openmode) { return nullptr; };
+    virtual std::shared_ptr<MStream> getSourceStream(std::ios_base::openmode mode=std::ios_base::in);
+    virtual std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> src) = 0;
+    virtual std::shared_ptr<MStream> createStream(std::ios_base::openmode) { return nullptr; };
 
     virtual bool format(std::string header_info) { return false; };
 
@@ -531,6 +531,7 @@ namespace Meat {
  ********************************************************/
 
 class FileBroker {
+    //static std::unordered_map<std::string, MFile*> file_repo;
     static std::unordered_map<std::string, MFile*> file_repo;
 public:
     static MFile* obtain(std::string url) {
@@ -561,17 +562,17 @@ public:
     }
 
     static void clear() {
-        std::for_each(file_repo.begin(), file_repo.end(), [](auto& pair) {
-            delete pair.second;
-        });
+        // std::for_each(file_repo.begin(), file_repo.end(), [](auto& pair) {
+        //     delete pair.second;
+        // });
         file_repo.clear();
     }
 };
 
 class StreamBroker {
-    static std::unordered_map<std::string, MStream*> stream_repo;
+    static std::unordered_map<std::string, std::shared_ptr<MStream>> stream_repo;
 public:
-    template<class T> static T* obtain(std::string url, std::ios_base::openmode mode) 
+    template<class T> static std::shared_ptr<T> obtain(std::string url, std::ios_base::openmode mode) 
     {
         //Debug_printv("streams[%d] url[%s]", stream_repo.size(), url.c_str());
 
@@ -579,14 +580,14 @@ public:
         if(stream_repo.find(url)!=stream_repo.end())
         {
             Debug_printv("Reusing Existing Stream url[%s]", url.c_str());
-            return (T*)stream_repo.at(url);
+            return stream_repo.at(url);
         }
 
         // create and add stream to broker if not found
         Debug_printv("Creating New Stream url[%s]", url.c_str());
         auto newFile = MFSOwner::File(url);
 
-        T* newStream = (T*)newFile->createStream(mode);
+        std::shared_ptr<T> newStream = newFile->createStream(mode);
 
         if ( newStream != nullptr )
         {
@@ -608,7 +609,7 @@ public:
         return nullptr;
     }
 
-    static MStream* obtain(std::string url, std::ios_base::openmode mode) {
+    static std::shared_ptr<MStream> obtain(std::string url, std::ios_base::openmode mode) {
         return obtain<MStream>(url, mode);
     }
 
@@ -616,7 +617,7 @@ public:
         if(stream_repo.find(url)!=stream_repo.end()) {
             auto toDelete = stream_repo.at(url);
             stream_repo.erase(url);
-            delete toDelete;
+            //delete toDelete;
         }
         Debug_printv("streams[%d]", stream_repo.size());
     }

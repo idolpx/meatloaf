@@ -59,9 +59,9 @@ public:
         closeDir();
     }
 
-    MStream* getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override ; // has to return OPENED stream
-    MStream* getDecodedStream(std::shared_ptr<MStream> src);
-    MStream* createStream(std::ios_base::openmode mode) override;
+    std::shared_ptr<MStream> getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override ; // has to return OPENED stream
+    std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> src);
+    std::shared_ptr<MStream> createStream(std::ios_base::openmode mode) override;
 
     bool isDirectory() override;
     time_t getLastWrite() override ;

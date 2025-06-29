@@ -43,7 +43,8 @@ namespace Meat
     template <class charT, class traits = my_char_traits>
     class mfilebuf : public std::basic_filebuf<charT, traits>
     {
-        std::unique_ptr<MStream> mstream;
+        //std::unique_ptr<MStream> mstream;
+        std::shared_ptr<MStream> mstream;
         std::unique_ptr<MFile> mfile;
 
         static const size_t gbuffer_size = 2048;
@@ -81,7 +82,8 @@ namespace Meat
         std::filebuf *doOpen(std::ios_base::openmode mode)
         {
             // Debug_println("In filebuf open pre reset mistream");
-            mstream.reset(mfile->getSourceStream(mode));
+            //mstream.reset(mfile->getSourceStream(mode));
+            mstream = mfile->getSourceStream(mode);
 
             if (mstream == nullptr)
             {

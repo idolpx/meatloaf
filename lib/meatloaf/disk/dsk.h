@@ -108,11 +108,11 @@ class DSKMFile: public D64MFile {
 public:
     DSKMFile(std::string path, bool is_dir = true) : D64MFile(path, is_dir) {};
 
-    MStream* getDecodedStream(std::shared_ptr<MStream> is) override
+    std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> is) override
     {
         Debug_printv("[%s]", url.c_str());
 
-        return new DSKIStream(is);
+        return std::make_shared<DSKIStream>(is);
     }
 
 };

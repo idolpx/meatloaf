@@ -102,7 +102,7 @@ public:
         // don't close the stream here! It will be used by shared ptr D64Util to keep reading image params
     }
 
-    MStream* getDecodedStream(std::shared_ptr<MStream> is) override;
+    std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> is) override;
 
     bool isDirectory() override;
     bool rewindDirectory() override;

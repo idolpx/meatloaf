@@ -29,10 +29,10 @@
  * MFile implementations
  ********************************************************/
 
-MeatHttpClient* HTTPMFile::fromHeader() {
+std::shared_ptr<MeatHttpClient> HTTPMFile::fromHeader() {
     if(client == nullptr) {
         //Debug_printv("Client was not present, creating");
-        client = new MeatHttpClient();
+        client = std::make_shared<MeatHttpClient>();
 
         // let's just get the headers so we have some info
         //Debug_printv("Client requesting head");
@@ -51,7 +51,7 @@ MeatHttpClient* HTTPMFile::fromHeader() {
 }
 
 
-MStream* HTTPMFile::getSourceStream(std::ios_base::openmode mode) {
+std::shared_ptr<MStream> HTTPMFile::getSourceStream(std::ios_base::openmode mode) {
     // has to return OPENED stream
     //Debug_printv("Input stream requested: [%s]", url.c_str());
 
@@ -64,7 +64,7 @@ MStream* HTTPMFile::getSourceStream(std::ios_base::openmode mode) {
     // headers["Accept"] = "*/*";
     // headers["Accept-Encoding"] = "gzip, deflate";
     // etc.
-    MStream* istream = new HTTPMStream(url, mode);
+    std::shared_ptr<MStream> istream = std::make_shared<HTTPMStream>(url, mode);
     //auto istream = StreamBroker::obtain<HTTPMStream>(url, mode);
     istream->open(mode);
     resetURL(istream->url);
@@ -73,13 +73,13 @@ MStream* HTTPMFile::getSourceStream(std::ios_base::openmode mode) {
     return istream;
 }
 
-MStream* HTTPMFile::getDecodedStream(std::shared_ptr<MStream> is) {
-    return is.get(); // DUMMY return value - we've overriden istreamfunction, so this one won't be used
+std::shared_ptr<MStream> HTTPMFile::getDecodedStream(std::shared_ptr<MStream> is) {
+    return is; // DUMMY return value - we've overriden istreamfunction, so this one won't be used
 }
 
-MStream* HTTPMFile::createStream(std::ios_base::openmode mode)
+std::shared_ptr<MStream> HTTPMFile::createStream(std::ios_base::openmode mode)
 {
-    MStream* istream = new HTTPMStream(url);
+    std::shared_ptr<MStream> istream = std::make_shared<HTTPMStream>(url);
     istream->open(mode);
     return istream;
 }

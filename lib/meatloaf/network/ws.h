@@ -132,9 +132,9 @@ public:
     WSMFile(std::string path): MFile(path) {};
 
     bool isDirectory() override { return false; }
-    MStream* getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override {
+    std::shared_ptr<MStream> getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override {
         // input stream = SERVER socket
-        return new WSMStream(this, true);
+        return std::make_shared<WSMStream>(this, true);
     }; 
     time_t getLastWrite() override { return 0; };
     time_t getCreationTime() override { return 0; };
@@ -142,10 +142,10 @@ public:
     MFile* getNextFileInDir() override { return nullptr; };
     bool mkDir() override { return false; };
     bool exists() override { return false; };
-    size_t size() override { return 0; };
+    //size_t size() override { return 0; };
     bool remove() override { return false; };
     bool rename(std::string dest) { return false; };
-    MStream* getDecodedStream(std::shared_ptr<MStream> src) {
+    std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> src) {
         return nullptr;
     };
 

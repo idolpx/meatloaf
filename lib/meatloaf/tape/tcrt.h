@@ -98,11 +98,11 @@ public:
         // don't close the stream here! It will be used by shared ptr D64Util to keep reading image params
     }
 
-    MStream* getDecodedStream(std::shared_ptr<MStream> is) override
+    std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> is) override
     {
         Debug_printv("[%s]", url.c_str());
 
-        return new TCRTMStream(is);
+        return std::make_shared<TCRTMStream>(is);
     }
 
     bool isDirectory() override;

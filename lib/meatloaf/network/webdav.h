@@ -37,7 +37,7 @@ public:
     WebDAVMFile(std::string path): HTTPMFile(path) {};
 
     bool isDirectory() override;
-    MStream* getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override ; // has to return OPENED stream
+    std::shared_ptr<MStream> getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override ; // has to return OPENED stream
     time_t getLastWrite() override ;
     time_t getCreationTime() override ;
     bool rewindDirectory() override { return false; };
@@ -47,7 +47,7 @@ public:
 
     bool remove() override { return false; };
     bool rename(std::string dest) { return false; };
-    MStream* getDecodedStream(std::shared_ptr<MStream> src);
+    std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> src);
     //void addHeader(const String& name, const String& value, bool first = false, bool replace = true);
 };
 

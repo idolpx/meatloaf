@@ -17,7 +17,7 @@
 
 #include "meat_media.h"
 
-std::unordered_map<std::string, MMediaStream*> ImageBroker::image_repo;
+std::unordered_map<std::string, std::shared_ptr<MMediaStream>>ImageBroker::image_repo;
 
 // Utility Functions
 

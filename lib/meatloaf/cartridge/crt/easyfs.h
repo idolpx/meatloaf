@@ -21,8 +21,8 @@
 //
 
 
-#ifndef MEATLOAF_MEDIA_TCRT
-#define MEATLOAF_MEDIA_TCRT
+#ifndef MEATLOAF_MEDIA_EFCRT
+#define MEATLOAF_MEDIA_EFCRT
 
 #include "meatloaf.h"
 #include "meat_media.h"
@@ -32,11 +32,11 @@
  * Streams
  ********************************************************/
 
-class TCRTMStream : public MMediaStream {
+class EFCRTMStream : public MMediaStream {
     // override everything that requires overriding here
 
 public:
-    TCRTMStream(std::shared_ptr<MStream> is) : MMediaStream(is) {};
+    EFCRTMStream(std::shared_ptr<MStream> is) : MMediaStream(is) {};
 
 protected:
     struct Header {
@@ -72,7 +72,7 @@ protected:
     std::string decodeType(uint8_t file_type, bool show_hidden = false) override;
 
 private:
-    friend class TCRTMFile;
+    friend class EFCRTMFile;
 };
 
 
@@ -80,25 +80,25 @@ private:
  * File implementations
  ********************************************************/
 
-class TCRTMFile: public MFile {
+class EFCRTMFile: public MFile {
 public:
 
-    TCRTMFile(std::string path, bool is_dir = true): MFile(path) {
+    EFCRTMFile(std::string path, bool is_dir = true): MFile(path) {
         isDir = is_dir;
 
         media_image = name;
         isPETSCII = true;
     };
     
-    ~TCRTMFile() {
+    ~EFCRTMFile() {
         // don't close the stream here! It will be used by shared ptr D64Util to keep reading image params
     }
 
-    MStream* getDecodedStream(std::shared_ptr<MStream> is) override
+    std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> is) override
     {
         Debug_printv("[%s]", url.c_str());
 
-        return new TCRTMStream(is);
+        return std::make_shared<EFCRTMStream>(is);
     }
 
     bool isDirectory() override;
@@ -118,4 +118,4 @@ public:
 };
 
 
-#endif /* MEATLOAF_MEDIA_TCRT */
+#endif /* MEATLOAF_MEDIA_EFCRT */
