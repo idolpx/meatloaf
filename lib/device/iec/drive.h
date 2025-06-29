@@ -56,7 +56,7 @@ class iecChannelHandler
 
   virtual uint8_t writeBufferData() = 0;
   virtual uint8_t readBufferData()  = 0;
-  virtual MStream *getStream() { return nullptr; };
+  virtual std::shared_ptr<MStream> getStream() { return nullptr; };
 
  protected:
   iecDrive *m_drive;
@@ -68,15 +68,15 @@ class iecChannelHandler
 class iecChannelHandlerFile : public iecChannelHandler
 {
  public: 
-  iecChannelHandlerFile(iecDrive *drive, MStream *stream, int fixLoadAddress = -1);
+  iecChannelHandlerFile(iecDrive *drive, std::shared_ptr<MStream> stream, int fixLoadAddress = -1);
   virtual ~iecChannelHandlerFile();
 
   virtual uint8_t readBufferData();
   virtual uint8_t writeBufferData();
-  virtual MStream *getStream() override { return m_stream; };
+  virtual std::shared_ptr<MStream> getStream() override { return m_stream; };
 
  private:
-  MStream  *m_stream;
+  std::shared_ptr<MStream> m_stream;
   int       m_fixLoadAddress;
   uint32_t  m_byteCount;
   uint64_t  m_timeStart, m_transportTimeUS;
@@ -108,7 +108,7 @@ class driveMemory
   std::vector<uint8_t> ram;         // 0000-07FF  RAM
   // uint8_t via1[1024] = { 0x00 }; // 1800-1BFF  6522 VIA1
   // uint8_t via2[1024] = { 0x00 }; // 1C00-1FFF  6522 VIA2
-  std::unique_ptr<MStream> rom;     // C000-FFFF  ROM 16KB
+  std::shared_ptr<MStream> rom;     // C000-FFFF  ROM 16KB
 
  public:
    driveMemory(size_t ramSize = 2048) : ram(ramSize, 0x00) {
@@ -133,7 +133,8 @@ class driveMemory
       return false;
     }
 
-    rom.reset(rom_file->getSourceStream());
+    //rom.reset(rom_file->getSourceStream());
+    rom = rom_file->getSourceStream();
     if (!rom) {
       return false;
     }

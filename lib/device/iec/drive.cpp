@@ -177,7 +177,7 @@ uint8_t iecChannelHandler::write(uint8_t *data, uint8_t n)
 // -------------------------------------------------------------------------------------------------
 
 
-iecChannelHandlerFile::iecChannelHandlerFile(iecDrive *drive, MStream *stream, int fixLoadAddress) : iecChannelHandler(drive)
+iecChannelHandlerFile::iecChannelHandlerFile(iecDrive *drive, std::shared_ptr<MStream> stream, int fixLoadAddress) : iecChannelHandler(drive)
 {
   m_stream = stream;
   m_fixLoadAddress = fixLoadAddress;
@@ -209,7 +209,7 @@ iecChannelHandlerFile::~iecChannelHandlerFile()
     Debug_printv("Stop Activity");
 #endif
 
-  delete m_stream;
+  //delete m_stream;
 }
 
 
@@ -670,14 +670,14 @@ bool iecDrive::open(uint8_t channel, const char *cname)
                     if( entry==nullptr )
                         {
                         // if we can't open the file stream then assume this is an empty directory
-                        MStream *s = f->getSourceStream(mode);
+                        std::shared_ptr<MStream> s = f->getSourceStream(mode);
                         //if( s==nullptr || !s->isOpen() ) isProperDir = true;
                         if( s!=nullptr)
                         {
                             if( !s->isOpen() )
                             isProperDir = true;
                         }
-                        delete s;
+                        //delete s;
                         }
                     else
                         {
@@ -740,7 +740,7 @@ bool iecDrive::open(uint8_t channel, const char *cname)
                           return m_vdrive->openFile(channel, "$");
                         }
 
-                    MStream *new_stream = f->getSourceStream(mode);
+                    std::shared_ptr<MStream> new_stream = f->getSourceStream(mode);
                     
                     if( new_stream==nullptr )
                         {
@@ -750,13 +750,13 @@ bool iecDrive::open(uint8_t channel, const char *cname)
                     else if( (mode == std::ios_base::in) && new_stream->size()==0 && !f->isDirectory() )
                         {
                         Debug_printv("Error: file length is zero [%s]", f->url.c_str());
-                        delete new_stream;
+                        //delete new_stream;
                         setStatusCode(ST_FILE_NOT_FOUND);
                         }
                     else if( !new_stream->isOpen() )
                         {
                         Debug_printv("Error: could not open file stream [%s]", f->url.c_str());
-                        delete new_stream;
+                        //delete new_stream;
                         setStatusCode(ST_DRIVE_NOT_READY);
                         }
                     else
@@ -1556,9 +1556,9 @@ void iecDrive::set_cwd(std::string path)
         bool isDirectory = n->isDirectory();
 
         // check whether we can get a stream
-        MStream *s = n->exists() ? n->getSourceStream() : nullptr; 
+        std::shared_ptr<MStream> s = n->exists() ? n->getSourceStream() : nullptr; 
         bool haveStream = (s!=nullptr);
-        if( s ) delete s;
+        //if( s ) delete s;
 
         Debug_printv("url[%s] isDirectory[%i] haveStream[%i]", n->url.c_str(), isDirectory, haveStream);
 
