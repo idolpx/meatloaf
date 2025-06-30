@@ -755,9 +755,9 @@ uint64_t MFile::getAvailableSpace()
     {
         size_t total = 0, used = 0;
 #ifdef FLASH_SPIFFS
-        esp_spiffs_info("flash", &total, &used);
+        esp_spiffs_info("storage", &total, &used);
 #elif FLASH_LITTLEFS
-        esp_littlefs_info("flash", &total, &used);
+        esp_littlefs_info("storage", &total, &used);
 #endif
         size_t free = total - used;
         //Debug_printv("total[%d] used[%d] free[%d]", total, used, free);
