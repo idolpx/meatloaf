@@ -145,7 +145,7 @@ bool HTTPMFile::rewindDirectory() {
     return false; 
 };
 
-MFile* HTTPMFile::getNextFileInDir() { 
+MFile *HTTPMFile::getNextFileInDir() { 
     Debug_printv("");
     if(fromHeader()->m_isWebDAV) {
         // we can try if this is webdav, then
@@ -491,9 +491,9 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
     //Debug_printv("--- PRE OPEN");
     int status = 0;
     esp_err_t rc;
-    int retry = 5;
-    do
-    {
+    // int retry = 5;
+    // do
+    // {
         rc = esp_http_client_open(_http, 0); // or open? It's not entirely clear...
 
         if (rc == ESP_OK)
@@ -512,14 +512,13 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
         //Debug_printv("after open rc[%d] status[%d]", rc, status);
         if ( rc != ESP_OK )
         {
-            Debug_printv("Connection failed... retrying... [%d] status[%d]", retry, status);
-            close();
-            init();
-            status=-1; // change status to allow retries under certain conditions
+            Debug_printv("Connection failed... status[%d]", status);
+            //close();
+            //init();
         }
 
-        retry--;
-    } while ( status < 0 && retry > 0 );
+    //     retry--;
+    // } while ( status < 0 && retry > 0 );
 
     //Debug_printv("--- PRE GET STATUS CODE");
     return status;

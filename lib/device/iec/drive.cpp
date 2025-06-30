@@ -311,8 +311,13 @@ iecChannelHandlerDir::iecChannelHandlerDir(iecDrive *drive, MFile *dir) : iecCha
   if( m_headers.size()>0 ) m_headers.push_back("NFO ----------------");
   
   // If SD Card is available and we are at the root path show it as a directory at the top
-  if( fnSDFAT.running() && m_dir->url.size() < 2 )
-    m_headers.push_back("DIR SD");
+  if(m_dir->url.size() < 2 ) {
+    if( fnSDFAT.running() )
+      m_headers.push_back("DIR SD");
+    
+    // This will be used to browse the network
+    // m_headers.push_back("DIR NETWORK");
+  }
 
 #ifdef ENABLE_DISPLAY
   Debug_printv("Start Activity");

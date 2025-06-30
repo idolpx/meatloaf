@@ -41,7 +41,7 @@ public:
     time_t getLastWrite() override ;
     time_t getCreationTime() override ;
     bool rewindDirectory() override { return false; };
-    MFile* getNextFileInDir() override { return nullptr; };
+    MFile *getNextFileInDir() override { return nullptr; };
     bool mkDir() override { return false; };
     bool exists() override ;
 
@@ -97,7 +97,7 @@ public:
         return mstr::equals(name, pattern, false);
     }
 
-    MFile* getFile(std::string path) override {
+    MFile *getFile(std::string path) override {
         return new WebDAVMFile(path);
     }
 };

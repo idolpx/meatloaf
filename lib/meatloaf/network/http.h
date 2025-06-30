@@ -170,7 +170,7 @@ public:
     time_t getLastWrite() override ;
     time_t getCreationTime() override ;
     bool rewindDirectory() override ;
-    MFile* getNextFileInDir() override ;
+    MFile *getNextFileInDir() override ;
     bool mkDir() override ;
     bool exists() override ;
 
@@ -252,7 +252,7 @@ public:
         return false;
     }
 
-    MFile* getFile(std::string path) override {
+    MFile *getFile(std::string path) override {
         return new HTTPMFile(path);
     }
 };

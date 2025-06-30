@@ -71,14 +71,14 @@ public:
         closeDir();
     }
 
-    //MFile* cd(std::string newDir);
+    //MFile *cd(std::string newDir);
     bool isDirectory() override;
     std::shared_ptr<MStream> getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override ; // has to return OPENED stream
     std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> src);
     std::shared_ptr<MStream> createStream(std::ios_base::openmode mode) override;
 
     bool rewindDirectory() override;
-    MFile* getNextFileInDir() override;
+    MFile *getNextFileInDir() override;
     bool mkDir() override;
     bool rmDir() override;
     bool exists() override;
@@ -182,7 +182,7 @@ protected:
          return true; // fallback fs, so it must be last on FS list
      }
  
-     MFile* getFile(std::string path) override
+     MFile *getFile(std::string path) override
      {
          //Debug_printv("path[%s]", path.c_str());
          return new FlashMFile(path);

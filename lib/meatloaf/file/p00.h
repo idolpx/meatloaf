@@ -108,7 +108,7 @@ public:
 
     bool isDirectory() override { return false; };;
     bool rewindDirectory() override { return false; };;
-    MFile* getNextFileInDir() override { return nullptr; };;
+    MFile *getNextFileInDir() override { return nullptr; };;
     bool mkDir() override { return false; };
 
     bool exists() override { return true; };
@@ -136,7 +136,7 @@ public:
         return byExtension(".p00", fileName);
     }
 
-    MFile* getFile(std::string path) override {
+    MFile *getFile(std::string path) override {
         return new P00MFile(path);
     }
 };

@@ -220,7 +220,7 @@ public:
         return byExtension(".dfi", fileName);
     }
 
-    MFile* getFile(std::string path) override {
+    MFile *getFile(std::string path) override {
         return new DFIMFile(path);
     }
 };

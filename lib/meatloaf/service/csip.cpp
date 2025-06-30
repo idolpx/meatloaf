@@ -86,7 +86,7 @@ bool CSIPMSessionMgr::isOK() {
     return equals;
 }
 
-bool CSIPMSessionMgr::traversePath(MFile* path) {
+bool CSIPMSessionMgr::traversePath(MFile *path) {
     // tricky. First we have to
     // CF / - to go back to root
 
@@ -321,7 +321,7 @@ bool CSIPMFile::rewindDirectory() {
     }
 };
 
-MFile* CSIPMFile::getNextFileInDir() {
+MFile *CSIPMFile::getNextFileInDir() {
 
     //Debug_printv("pre rewind");
 

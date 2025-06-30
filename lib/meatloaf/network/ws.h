@@ -17,7 +17,7 @@
 
 class WSMStream: public MStream {
 public:
-    WSMStream(MFile* file, bool isServer) : m_isServer(isServer) {
+    WSMStream(MFile *file, bool isServer) : m_isServer(isServer) {
         // drop ws:// from url and it's OK!
         address = websockets::WSInterfaceString(mstr::drop(file->url, 5).c_str());
         if(!file->port.empty())
@@ -139,7 +139,7 @@ public:
     time_t getLastWrite() override { return 0; };
     time_t getCreationTime() override { return 0; };
     bool rewindDirectory() override { return false; };
-    MFile* getNextFileInDir() override { return nullptr; };
+    MFile *getNextFileInDir() override { return nullptr; };
     bool mkDir() override { return false; };
     bool exists() override { return false; };
     //size_t size() override { return 0; };
@@ -167,7 +167,7 @@ public:
         return mstr::equals(name, pattern, false);
     }
 
-    MFile* getFile(std::string path) override {
+    MFile *getFile(std::string path) override {
         return new WSMFile(path);
     }
 };

@@ -244,7 +244,7 @@ bool TCRTMFile::rewindDirectory() {
     return true;
 }
 
-MFile* TCRTMFile::getNextFileInDir() 
+MFile *TCRTMFile::getNextFileInDir() 
 {
     bool r = false;
 

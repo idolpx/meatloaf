@@ -129,7 +129,7 @@ public:
         return byExtension(".atr", fileName);
     }
 
-    MFile* getFile(std::string path) override {
+    MFile *getFile(std::string path) override {
         return new ATRMFile(path);
     }
 };

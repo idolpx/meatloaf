@@ -516,7 +516,7 @@ public:
 
     bool isDirectory() override;
     bool rewindDirectory() override;
-    MFile* getNextFileInDir() override;
+    MFile *getNextFileInDir() override;
 
     bool exists() override;
     bool remove() override { return false; };
@@ -552,7 +552,7 @@ public:
         );
     }
 
-    MFile* getFile(std::string path) override {
+    MFile *getFile(std::string path) override {
         //Debug_printv("path[%s]", path.c_str());
         return new D64MFile(path);
     }

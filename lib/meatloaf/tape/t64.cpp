@@ -206,7 +206,7 @@ bool T64MFile::rewindDirectory() {
     return true;
 }
 
-MFile* T64MFile::getNextFileInDir() {
+MFile *T64MFile::getNextFileInDir() {
 
     if(!dirIsOpen)
         rewindDirectory();

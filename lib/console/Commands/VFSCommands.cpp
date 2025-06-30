@@ -173,7 +173,7 @@ int cd(int argc, char **argv)
 
 int ls(int argc, char **argv)
 {
-    MFile* listPath;
+    MFile *listPath;
     if (argc == 1)
     {
         listPath = MFSOwner::File(getCurrentPath()->url);

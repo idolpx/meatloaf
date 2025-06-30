@@ -337,7 +337,7 @@ public:
     bool rewindDirectory() override  {
         return false;
     }
-    MFile* getNextFileInDir() override {
+    MFile *getNextFileInDir() override {
         return nullptr;
     }
     bool mkDir() override {
@@ -374,7 +374,7 @@ public:
         return false;
     }
 
-    MFile* getFile(std::string path) override {
+    MFile *getFile(std::string path) override {
         return new TCPMFile(path);
     }
 };

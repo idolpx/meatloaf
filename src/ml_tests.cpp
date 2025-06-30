@@ -89,7 +89,7 @@ void testHeader(std::string testName) {
 //     }
 // }
 
-void dumpFileProperties(MFile* testMFile) {
+void dumpFileProperties(MFile *testMFile) {
     Debug_printf("\n\n* %s File properties\r\n", testMFile->url.c_str());
     Debug_printf("Url: %s, isDir = %d\r\n", testMFile->url.c_str(), testMFile->isDirectory());
     Debug_printf("Scheme: [%s]\r\n", testMFile->scheme.c_str());
@@ -110,7 +110,7 @@ void dumpFileProperties(MFile* testMFile) {
     Debug_printf("-------------------------------\r\n");
 }
 
-void testDirectory(MFile* dir, bool verbose=false) {
+void testDirectory(MFile *dir, bool verbose=false) {
     testHeader("A directory");
 
     LeakDetector ld("Dir lister");
@@ -175,7 +175,7 @@ void testDirectoryStandard(std::string path) {
 }
 
 
-void testRecursiveDir(MFile* file, std::string indent) {
+void testRecursiveDir(MFile *file, std::string indent) {
     if(file->isDirectory()) {
         std::unique_ptr<MFile> entry(file->getNextFileInDir());
 
@@ -195,7 +195,7 @@ void testRecursiveDir(MFile* file, std::string indent) {
     }
 }
 
-void testCopy(MFile* srcFile, MFile* dstFile) {
+void testCopy(MFile *srcFile, MFile *dstFile) {
     // testHeader("Copy file to destination");
 
     // Debug_printf("FROM:%s\nTO:%s\r\n", srcFile->url.c_str(), dstFile->url.c_str());
@@ -213,7 +213,7 @@ void dumpParts(std::vector<std::string> v) {
         Debug_printf("%s::",(*i).c_str());
 }
 
-void testPaths(MFile* testFile, std::string subDir) {
+void testPaths(MFile *testFile, std::string subDir) {
     testHeader("Path ops");
     //std::shared_ptr<MFile> testFile(MFSOwner::File("http://somneserver.com/utilities/disk tools/cie.dnp/subdir/CIE+SERIAL"));
     dumpFileProperties(testFile);
@@ -436,7 +436,7 @@ void httpStream(char *url)
 //     }
 // }
 
-void testJson(MFile* srcFile, MFile* dstFile) {
+void testJson(MFile *srcFile, MFile *dstFile) {
     // testHeader("C++ stream wrappers");
 
     // StaticJsonDocument<512> m_device;
@@ -506,7 +506,7 @@ void testJson(MFile* srcFile, MFile* dstFile) {
 }
 
 
-void testReader(MFile* srcFile) {
+void testReader(MFile *srcFile) {
     testHeader("TEST reading using C++ API");
 
     Debug_printf(" * Read test for %s\r\n", srcFile->url.c_str());
@@ -534,7 +534,7 @@ void testReader(MFile* srcFile) {
 
 }
 
-void testWriter(MFile* dstFile) {
+void testWriter(MFile *dstFile) {
     testHeader("TEST writing using C++ API");
     
     Debug_printf(" * Write test for %s\r\n", dstFile->url.c_str());

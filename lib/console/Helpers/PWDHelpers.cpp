@@ -11,9 +11,9 @@ namespace ESP32Console
 {
     constexpr char *PWD_DEFAULT = (char*) "/";
 
-    MFile* currentPath = nullptr;
+    MFile *currentPath = nullptr;
 
-    MFile* getCurrentPath() {
+    MFile *getCurrentPath() {
         if(currentPath == nullptr) {
             currentPath = MFSOwner::File("/");
         }

@@ -41,7 +41,7 @@ public:
         return mstr::startsWith(name, pattern.c_str(), false);
     }
 
-    MFile* getFile(std::string path) override {
+    MFile *getFile(std::string path) override {
     //     if ( path.size() == 0 )
     //         return nullptr;
 

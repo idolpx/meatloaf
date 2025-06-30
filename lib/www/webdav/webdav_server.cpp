@@ -140,6 +140,14 @@ int Server::sendPropResponse(Response &resp, std::string path, int recurse)
 
     if (r.isCollection && recurse > 0)
     {
+        // If we are at root and SD card is mounted send entry
+        if (path == "/")
+        {
+            i = stat("/sd", &sb);
+            if (i == 0)
+                sendPropResponse(resp, "/sd", recurse - 1);
+        }
+
         DIR *dir = opendir(path.c_str());
         if (dir)
         {
@@ -156,15 +164,6 @@ int Server::sendPropResponse(Response &resp, std::string path, int recurse)
             }
             closedir(dir);
         }
-
-        // If we are at root and SD card is mounted send entry
-        if (path == "/")
-        {
-            i = stat("/sd", &sb);
-            if (i == 0)
-                sendPropResponse(resp, "/sd", recurse - 1);
-        }
-
     }
 
     return 0;

@@ -216,7 +216,7 @@ bool SMBMFile::rewindDirectory()
 }
 
 
-MFile* SMBMFile::getNextFileInDir()
+MFile *SMBMFile::getNextFileInDir()
 {
     // // Debug_printv("base[%s] path[%s]", basepath.c_str(), path.c_str());
     // if(!dirOpened)

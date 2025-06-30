@@ -192,7 +192,7 @@ public:
     MFile(nullptr_t null) : m_isNull(true) {};
     MFile(std::string path);
     MFile(std::string path, std::string name);
-    MFile(MFile* path, std::string name);
+    MFile(MFile *path, std::string name);
 
     virtual ~MFile() {
 //        if(sourceFile != nullptr) {
@@ -218,7 +218,7 @@ public:
 
     bool operator!=(nullptr_t ptr);
 
-    // bool copyTo(MFile* dst);
+    // bool copyTo(MFile *dst);
 
     // has to return OPENED stream
     virtual std::shared_ptr<MStream> getSourceStream(std::ios_base::openmode mode=std::ios_base::in);
@@ -227,15 +227,15 @@ public:
 
     virtual bool format(std::string header_info) { return false; };
 
-    MFile* cd(std::string newDir);
-    MFile* cdParent(std::string = "");
-    MFile* cdLocalParent(std::string);
-    MFile* cdRoot(std::string);
-    MFile* cdLocalRoot(std::string);
+    MFile *cd(std::string newDir);
+    MFile *cdParent(std::string = "");
+    MFile *cdLocalParent(std::string);
+    MFile *cdRoot(std::string);
+    MFile *cdLocalRoot(std::string);
 
     virtual bool isDirectory() = 0;
     virtual bool rewindDirectory() = 0 ;
-    virtual MFile* getNextFileInDir() = 0 ;
+    virtual MFile *getNextFileInDir() = 0 ;
 
     virtual bool mkDir() { return false; };
     virtual bool rmDir() { return false; };
@@ -258,7 +258,7 @@ public:
         return mstr::isText(extension);
     }
 
-    MFile* sourceFile = nullptr;
+    MFile *sourceFile = nullptr;
     std::string pathInStream;
 
     uint32_t size = 0;
@@ -284,7 +284,7 @@ public:
     bool vdrive_compatible = false;
 
     virtual bool handles(std::string path) = 0;
-    virtual MFile* getFile(std::string path) = 0;
+    virtual MFile *getFile(std::string path) = 0;
 
     virtual bool mount() { return true; };
     virtual bool umount() { return true; };
@@ -453,10 +453,10 @@ class MFSOwner {
 public:
     static std::vector<MFileSystem*> availableFS;
 
-    static MFile* File(std::string name, bool default_fs = false);
-    static MFile* File(std::shared_ptr<MFile> file);
-    static MFile* File(MFile* file);
-    static MFile* NewFile(std::string name);
+    static MFile *File(std::string name, bool default_fs = false);
+    static MFile *File(std::shared_ptr<MFile> file);
+    static MFile *File(MFile *file);
+    static MFile *NewFile(std::string name);
 
     static MFileSystem* scanPathLeft(std::vector<std::string> paths, std::vector<std::string>::iterator &pathIterator);
 
@@ -508,18 +508,18 @@ namespace Meat {
     */
     template<class MFile>
         typename _Unique_mf::_Single_file
-        New(MFile* mFile) {
+        New(MFile *mFile) {
             return std::unique_ptr<MFile>(MFSOwner::File(mFile->url));
         }
 
     /**
-    *  @brief  Wraps MFile* into unique_ptr<MFile> so it closes itself as required
+    *  @brief  Wraps MFile *into unique_ptr<MFile> so it closes itself as required
     *  @param  file  The url to the file.
     *  @return  @c unique_ptr<MFile>
     */
     template<class MFile>
         typename _Unique_mf::_Single_file
-        Wrap(MFile* file) {
+        Wrap(MFile *file) {
             return std::unique_ptr<MFile>(file);
         }
 
@@ -534,7 +534,7 @@ class FileBroker {
     //static std::unordered_map<std::string, MFile*> file_repo;
     static std::unordered_map<std::string, MFile*> file_repo;
 public:
-    static MFile* obtain(std::string url) {
+    static MFile *obtain(std::string url) {
         if(file_repo.find(url)!=file_repo.end())
         {
             Debug_printv("Reusing Existing MFile url[%s]", url.c_str());
@@ -544,7 +544,7 @@ public:
         return nullptr;
     }
 
-    static void add(std::string url, MFile* newFile) {
+    static void add(std::string url, MFile *newFile) {
         file_repo.insert(std::make_pair(url, newFile));
     }
 
