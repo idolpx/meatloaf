@@ -172,7 +172,7 @@ public:
         );
     }
 
-    MFile *getFile(std::string path) override {
+    MFile* getFile(std::string path) override {
         return new D90MFile(path);
     }
 };

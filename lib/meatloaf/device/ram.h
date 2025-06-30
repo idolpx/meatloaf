@@ -158,13 +158,13 @@ public:
         closeDir();
     }
 
-    //MFile *cd(std::string newDir);
+    //MFile* cd(std::string newDir);
     bool isDirectory() override;
     std::shared_ptr<MStream> getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override ; // has to return OPENED stream
     std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> src);
 
     bool rewindDirectory() override;
-    MFile *getNextFileInDir() override;
+    MFile* getNextFileInDir() override;
     bool mkDir() override;
     bool exists() override;
     bool remove() override;
@@ -205,7 +205,7 @@ public:
         return mstr::equals(path, pattern, false);
     }
 
-    MFile *getFile(std::string path) override
+    MFile* getFile(std::string path) override
     {
         //Debug_printv("path[%s]", path.c_str());
         return new RAMMFile(path);

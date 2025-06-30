@@ -40,7 +40,7 @@ public:
         return byExtension( ".webloc", fileName );
     }
 
-    MFile *getFile(std::string path) override {
+    MFile* getFile(std::string path) override {
         if ( path.size() == 0 )
             return nullptr;
 

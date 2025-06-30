@@ -50,7 +50,7 @@ public:
         return mstr::equals(name, pattern, false);
     }
 
-    MFile *getFile(std::string path) override {
+    MFile* getFile(std::string path) override {
         auto url = PeoplesUrlParser::parseURL( path );
 
         std::string basepath = _filesystem.basepath();

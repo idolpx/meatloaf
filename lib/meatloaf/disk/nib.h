@@ -126,7 +126,7 @@ public:
         );
     }
 
-    MFile *getFile(std::string path) override {
+    MFile* getFile(std::string path) override {
         return new NIBMFile(path);
     }
 };

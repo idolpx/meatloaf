@@ -137,7 +137,7 @@ public:
         return byExtension(".d71", fileName);
     }
 
-    MFile *getFile(std::string path) override {
+    MFile* getFile(std::string path) override {
         return new D71MFile(path);
     }
 };

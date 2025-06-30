@@ -107,7 +107,7 @@ public:
 
     bool isDirectory() override;
     bool rewindDirectory() override;
-    MFile *getNextFileInDir() override;
+    MFile* getNextFileInDir() override;
     bool mkDir() override { return false; };
 
     bool exists() override { return true; };
@@ -135,7 +135,7 @@ public:
         return byExtension(".tcrt", fileName);
     }
 
-    MFile *getFile(std::string path) override {
+    MFile* getFile(std::string path) override {
         return new TCRTMFile(path);
     }
 };

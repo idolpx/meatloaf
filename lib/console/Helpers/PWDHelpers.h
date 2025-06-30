@@ -9,9 +9,9 @@ namespace ESP32Console
 {
 
     //char *canonicalize_file_name(const char *path);
-    extern MFile *currentPath;
+    extern MFile* currentPath;
 
-    MFile *getCurrentPath();
+    MFile* getCurrentPath();
 
     /**
      * @brief Returns the current console process working dir

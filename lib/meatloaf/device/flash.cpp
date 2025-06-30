@@ -219,7 +219,7 @@ bool FlashMFile::rewindDirectory()
 }
 
 
-MFile *FlashMFile::getNextFileInDir()
+MFile* FlashMFile::getNextFileInDir()
 {
     // Debug_printv("base[%s] path[%s]", basepath.c_str(), path.c_str());
     if(!dirOpened)

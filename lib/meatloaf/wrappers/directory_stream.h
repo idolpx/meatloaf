@@ -86,7 +86,7 @@ public:
             : std::char_traits<char>::to_int_type(*this->gptr());
     };
 
-    size_t fileToBasicV2(MFile *file, long flags = 0L) {
+    size_t fileToBasicV2(MFile* file, long flags = 0L) {
         // convert MFile to ASCII line
         // we can use some additional FLAGS, i.e. for various CBM-style long directory format (they contain creation date and other info!)
         return lineToBuffer(69,"directory entry line in ASCII"); // return length of BASIC line written to the buffer

@@ -106,7 +106,7 @@ public:
         return byExtension(".dnp", fileName);
     }
 
-    MFile *getFile(std::string path) override {
+    MFile* getFile(std::string path) override {
         return new DNPMFile(path);
     }
 };

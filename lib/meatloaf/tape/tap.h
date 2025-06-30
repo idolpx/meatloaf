@@ -106,7 +106,7 @@ public:
 
     bool isDirectory() override;
     bool rewindDirectory() override;
-    MFile *getNextFileInDir() override;
+    MFile* getNextFileInDir() override;
     bool mkDir() override { return false; };
 
     bool exists() override { return true; };
@@ -134,7 +134,7 @@ public:
         return byExtension(".tap", fileName);
     }
 
-    MFile *getFile(std::string path) override {
+    MFile* getFile(std::string path) override {
         return new TAPMFile(path);
     }
 };

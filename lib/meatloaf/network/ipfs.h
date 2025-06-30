@@ -131,7 +131,7 @@ public:
         return mstr::startsWith(name, pattern.c_str(), false);
     }
 
-    MFile *getFile(std::string path) override {
+    MFile* getFile(std::string path) override {
         // Debug_printv("IPFSFileSystem::getFile(%s)", path.c_str());
         return new IPFSMFile(path);
     }

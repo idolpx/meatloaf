@@ -212,16 +212,16 @@ bool MFSOwner::umount(std::string name) {
     return true;
 }
 
-MFile *MFSOwner::File(MFile *file) {
+MFile* MFSOwner::File(MFile* file) {
     return File(file->url);
 }
 
-MFile *MFSOwner::File(std::shared_ptr<MFile> file) {
+MFile* MFSOwner::File(std::shared_ptr<MFile> file) {
     return File(file->url);
 }
 
 
-MFile *MFSOwner::File(std::string path, bool default_fs) {
+MFile* MFSOwner::File(std::string path, bool default_fs) {
 
     if ( !default_fs )
     {
@@ -325,7 +325,7 @@ MFile *MFSOwner::File(std::string path, bool default_fs) {
     return targetFile;
 }
 
-MFile *MFSOwner::NewFile(std::string path) {
+MFile* MFSOwner::NewFile(std::string path) {
 
     auto newFile = File(path);
     if ( newFile != nullptr )
@@ -454,7 +454,7 @@ MFile::MFile(std::string path, std::string name) : MFile(path + "/" + name) {
     }
 }
 
-MFile::MFile(MFile *path, std::string name) : MFile(path->path + "/" + name) {
+MFile::MFile(MFile* path, std::string name) : MFile(path->path + "/" + name) {
     if(mstr::startsWith(name, "xn--")) {
         this->path = path->path + "/" + U8Char::fromPunycode(name);
     }
@@ -530,7 +530,7 @@ std::shared_ptr<MStream> MFile::getSourceStream(std::ios_base::openmode mode) {
 };
 
 
-MFile *MFile::cd(std::string newDir) 
+MFile* MFile::cd(std::string newDir) 
 {
     Debug_printv("cd[%s]", newDir.c_str());
 
@@ -595,7 +595,7 @@ MFile *MFile::cd(std::string newDir)
             url.push_back('/');
 
         // Add new directory to path
-        MFile *newPath = MFSOwner::File(url + newDir);
+        MFile* newPath = MFSOwner::File(url + newDir);
 
         if(mstr::endsWith(newDir, ".url", false)) {
             // we need to get actual url
@@ -623,7 +623,7 @@ MFile *MFile::cd(std::string newDir)
 };
 
 
-MFile *MFile::cdParent(std::string plus) 
+MFile* MFile::cdParent(std::string plus) 
 {
     Debug_printv("url[%s] path[%s] plus[%s]", url.c_str(), path.c_str(), plus.c_str());
 
@@ -656,7 +656,7 @@ MFile *MFile::cdParent(std::string plus)
     }
 };
 
-MFile *MFile::cdLocalParent(std::string plus) 
+MFile* MFile::cdLocalParent(std::string plus) 
 {
     Debug_printv("url[%s] path[%s] plus[%s]", url.c_str(), path.c_str(), plus.c_str());
     // drop last dir
@@ -679,13 +679,13 @@ MFile *MFile::cdLocalParent(std::string plus)
     return MFSOwner::File(url);
 };
 
-MFile *MFile::cdRoot(std::string plus) 
+MFile* MFile::cdRoot(std::string plus) 
 {
     Debug_printv("url[%s] path[%s] plus[%s]", url.c_str(), path.c_str(), plus.c_str());
     return MFSOwner::File( "/" + plus, true );
 };
 
-MFile *MFile::cdLocalRoot(std::string plus) 
+MFile* MFile::cdLocalRoot(std::string plus) 
 {
     Debug_printv("url[%s] path[%s] plus[%s]", url.c_str(), path.c_str(), plus.c_str());
 
@@ -703,7 +703,7 @@ MFile *MFile::cdLocalRoot(std::string plus)
     return MFSOwner::File( url );
 };
 
-// bool MFile::copyTo(MFile *dst) {
+// bool MFile::copyTo(MFile* dst) {
 //     Debug_printv("in copyTo\r\n");
 //     Meat::iostream istream(this);
 //     Meat::iostream ostream(dst);

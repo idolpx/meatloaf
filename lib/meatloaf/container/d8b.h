@@ -130,7 +130,7 @@ public:
         return byExtension(".d8b", fileName);
     }
 
-    MFile *getFile(std::string path) override {
+    MFile* getFile(std::string path) override {
         return new D8BMFile(path);
     }
 };

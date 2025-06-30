@@ -38,7 +38,7 @@ public:
         return mstr::startsWith(name, (char *)"qr:", false);
     }
 
-    MFile *getFile(std::string path) override {
+    MFile* getFile(std::string path) override {
         return nullptr;
     }
 };

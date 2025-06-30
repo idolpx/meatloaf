@@ -216,7 +216,7 @@ bool TNFSMFile::rewindDirectory()
 }
 
 
-MFile *TNFSMFile::getNextFileInDir()
+MFile* TNFSMFile::getNextFileInDir()
 {
     // // Debug_printv("base[%s] path[%s]", basepath.c_str(), path.c_str());
     // if(!dirOpened)

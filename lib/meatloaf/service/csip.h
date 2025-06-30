@@ -183,7 +183,7 @@ protected:
 
     bool sendCommand(std::string);
     
-    bool traversePath(MFile *path);
+    bool traversePath(MFile* path);
 
     bool isOK();
 
@@ -244,10 +244,10 @@ public:
     std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> src) { return src; };
     std::shared_ptr<MStream> createStream(std::ios_base::openmode mode) override;
 
-    //MFile *cd(std::string newDir);
+    //MFile* cd(std::string newDir);
     bool isDirectory() override;
     bool rewindDirectory() override;
-    MFile *getNextFileInDir() override;
+    MFile* getNextFileInDir() override;
     bool mkDir() override ;
 
     bool exists() override;
@@ -316,7 +316,7 @@ public:
         return mstr::startsWith(name, "csip:", false);
     }
 
-    MFile *getFile(std::string path) override 
+    MFile* getFile(std::string path) override 
     {
         Debug_printv("path[%s]", path.c_str());
         return new CSIPMFile(path);

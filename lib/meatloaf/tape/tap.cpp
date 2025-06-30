@@ -179,7 +179,7 @@ bool TAPMFile::rewindDirectory() {
     return true;
 }
 
-MFile *TAPMFile::getNextFileInDir() {
+MFile* TAPMFile::getNextFileInDir() {
 
     if(!dirIsOpen)
         rewindDirectory();
