@@ -195,13 +195,13 @@ public:
     MFile(MFile* path, std::string name);
 
     virtual ~MFile() {
-//        if(sourceFile != nullptr) {
+        if(sourceFile != nullptr) {
         //     Debug_printv("WARNING: sourceFile null in '%s' destructor. This MFile was obviously not initialized properly!", url.c_str());
         // }
         // else {
             //Debug_printv("Deleting: [%s]", this->url.c_str());
-//            delete sourceFile;
-//        }
+            delete sourceFile;
+        }
         //Debug_printv("dtor path[%s]", path.c_str());
     };
 
@@ -530,100 +530,108 @@ namespace Meat {
  * Utility implementations
  ********************************************************/
 
-class FileBroker {
-    //static std::unordered_map<std::string, MFile*> file_repo;
-    static std::unordered_map<std::string, MFile*> file_repo;
-public:
-    static MFile* obtain(std::string url) {
-        if(file_repo.find(url)!=file_repo.end())
-        {
-            Debug_printv("Reusing Existing MFile url[%s]", url.c_str());
-            return file_repo.at(url);
-        }
+// class FileBroker {
+//     //static std::unordered_map<std::string, MFile*> file_repo;
+//     static std::unordered_map<std::string, MFile*> file_repo;
+// public:
+//     static MFile* obtain(std::string url) {
+//         if(file_repo.find(url)!=file_repo.end())
+//         {
+//             Debug_printv("Reusing Existing MFile url[%s]", url.c_str());
+//             return file_repo.at(url);
+//         }
 
-        return nullptr;
-    }
+//         return nullptr;
+//     }
 
-    static void add(std::string url, MFile* newFile) {
-        file_repo.insert(std::make_pair(url, newFile));
-    }
+//     static void add(std::string url, MFile* newFile) {
+//         file_repo.insert(std::make_pair(url, newFile));
+//     }
 
-    static void dispose(std::string url) {
-        if(file_repo.find(url)!=file_repo.end()) {
-            auto toDelete = file_repo.at(url);
-            file_repo.erase(url);
-            delete toDelete;
-        }
-        Debug_printv("streams[%d]", file_repo.size());
-    }
+//     static void dispose(std::string url) {
+//         if(file_repo.find(url)!=file_repo.end()) {
+//             auto toDelete = file_repo.at(url);
+//             file_repo.erase(url);
+//             delete toDelete;
+//         }
+//         Debug_printv("streams[%d]", file_repo.size());
+//     }
 
-    static void validate() {
+//     static void validate() {
         
-    }
+//     }
 
-    static void clear() {
-        // std::for_each(file_repo.begin(), file_repo.end(), [](auto& pair) {
-        //     delete pair.second;
-        // });
-        file_repo.clear();
-    }
-};
+//     static void clear() {
+//         // std::for_each(file_repo.begin(), file_repo.end(), [](auto& pair) {
+//         //     delete pair.second;
+//         // });
+//         file_repo.clear();
+//     }
+// };
 
-class StreamBroker {
-    static std::unordered_map<std::string, std::shared_ptr<MStream>> stream_repo;
-public:
-    template<class T> static std::shared_ptr<T> obtain(std::string url, std::ios_base::openmode mode) 
-    {
-        //Debug_printv("streams[%d] url[%s]", stream_repo.size(), url.c_str());
+// class StreamBroker {
+//     static std::unordered_map<std::string, std::shared_ptr<MStream>> stream_repo;
+// public:
+//     template<class T> static std::shared_ptr<T> obtain(std::string url, std::ios_base::openmode mode) 
+//     {
+//         //Debug_printv("streams[%d] url[%s]", stream_repo.size(), url.c_str());
 
-        // obviously you have to supply sourceFile.url to this function!
-        if(stream_repo.find(url)!=stream_repo.end())
-        {
-            Debug_printv("Reusing Existing Stream url[%s]", url.c_str());
-            return stream_repo.at(url);
-        }
+//         // obviously you have to supply sourceFile.url to this function!
+//         if(stream_repo.find(url)!=stream_repo.end())
+//         {
+//             Debug_printv("Reusing Existing Stream url[%s]", url.c_str());
+//             return stream_repo.at(url);
+//         }
 
-        // create and add stream to broker if not found
-        Debug_printv("Creating New Stream url[%s]", url.c_str());
-        auto newFile = MFSOwner::File(url);
+//         // create and add stream to broker if not found
+//         Debug_printv("Creating New Stream url[%s]", url.c_str());
+//         auto newFile = MFSOwner::File(url);
 
-        std::shared_ptr<T> newStream = newFile->createStream(mode);
+//         std::shared_ptr<T> newStream = newFile->createStream(mode);
 
-        if ( newStream != nullptr )
-        {
-            // Are we at the root of the filesystem?
-            if ( newFile->pathInStream == "")
-            {
-                Debug_printv("ROOT FILESYSTEM... CACHING [%s]", url.c_str());
-                stream_repo.insert(std::make_pair(url, newStream));
-            }
-            else
-            {
-                Debug_printv("SINGLE FILE... DON'T CACHE [%s]", url.c_str());
-            }
+//         if ( newStream != nullptr )
+//         {
+//             // Are we at the root of the filesystem?
+//             if ( newFile->pathInStream == "")
+//             {
+//                 Debug_printv("ROOT FILESYSTEM... CACHING [%s]", url.c_str());
+//                 stream_repo.insert(std::make_pair(url, newStream));
+//             }
+//             else
+//             {
+//                 Debug_printv("SINGLE FILE... DON'T CACHE [%s]", url.c_str());
+//             }
             
-            return newStream;
-        }
+//             return newStream;
+//         }
 
-        delete newFile;
-        return nullptr;
-    }
+//         delete newFile;
+//         return nullptr;
+//     }
 
-    static std::shared_ptr<MStream> obtain(std::string url, std::ios_base::openmode mode) {
-        return obtain<MStream>(url, mode);
-    }
+//     static std::shared_ptr<MStream> obtain(std::string url, std::ios_base::openmode mode) {
+//         return obtain<MStream>(url, mode);
+//     }
 
-    static void dispose(std::string url) {
-        if(stream_repo.find(url)!=stream_repo.end()) {
-            auto toDelete = stream_repo.at(url);
-            stream_repo.erase(url);
-            //delete toDelete;
-        }
-        Debug_printv("streams[%d]", stream_repo.size());
-    }
+//     static void dispose(std::string url) {
+//         if(stream_repo.find(url)!=stream_repo.end()) {
+//             auto toDelete = stream_repo.at(url);
+//             stream_repo.erase(url);
+//             //delete toDelete;
+//         }
+//         Debug_printv("streams[%d]", stream_repo.size());
+//     }
 
-    static void validate() {
+//     static void validate() {
         
-    }
-};
+//     }
+
+//     static void clear() {
+//         // std::for_each(file_repo.begin(), file_repo.end(), [](auto& pair) {
+//         //     delete pair.second;
+//         // });
+//         stream_repo.clear();
+//     }
+// };
+
 #endif // MEATLOAF_FILE

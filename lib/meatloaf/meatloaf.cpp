@@ -94,8 +94,8 @@
 #include "tape/t64.h"
 #include "tape/tcrt.h"
 
-std::unordered_map<std::string, MFile*> FileBroker::file_repo;
-std::unordered_map<std::string, std::shared_ptr<MStream>> StreamBroker::stream_repo;
+//std::unordered_map<std::string, MFile*> FileBroker::file_repo;
+//std::unordered_map<std::string, std::shared_ptr<MStream>> StreamBroker::stream_repo;
 
 /********************************************************
  * MFSOwner implementations
@@ -272,10 +272,10 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
     if( begin == pathIterator )
     {
         Debug_printv("** LOOK UP PATH NOT NEEDED   path[%s] sourcePath[%s]", path.c_str(), sourcePath.c_str());
-        auto cachedFile = FileBroker::obtain(sourcePath);
-        if ( cachedFile )
-            targetFile->sourceFile = cachedFile;
-        else
+        // auto cachedFile = FileBroker::obtain(sourcePath);
+        // if ( cachedFile )
+        //     targetFile->sourceFile = cachedFile;
+        // else
             targetFile->sourceFile = targetFileSystem->getFile(sourcePath);
     } 
     else 
@@ -293,10 +293,10 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
         Debug_printv("wholePath[%s]", wholePath.c_str());
 
         // sourceFile is for raw access to the container stream
-        auto cachedFile = FileBroker::obtain(wholePath);
-        if ( cachedFile )
-            targetFile->sourceFile = cachedFile;
-        else
+        // auto cachedFile = FileBroker::obtain(wholePath);
+        // if ( cachedFile )
+        //     targetFile->sourceFile = cachedFile;
+        // else
             targetFile->sourceFile = sourceFileSystem->getFile(wholePath);
 
         targetFile->isWritable = targetFile->sourceFile->isWritable;   // This stream is writable if the container is writable

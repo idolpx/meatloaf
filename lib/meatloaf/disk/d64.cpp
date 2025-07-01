@@ -618,7 +618,7 @@ bool D64MFile::rewindDirectory()
     return true;
 }
 
-MFile *D64MFile::getNextFileInDir()
+MFile* D64MFile::getNextFileInDir()
 {
     bool r = false;
 

@@ -278,6 +278,8 @@ uint8_t iecChannelHandlerFile::readBufferData()
           uint64_t t = esp_timer_get_time();
           m_len += m_stream->read(m_data+m_len, BUFFER_SIZE-m_len);
           m_transportTimeUS += (esp_timer_get_time()-t);
+          //if (m_stream->eos() || m_stream->error())
+          //  break;
         }
 
       m_byteCount += m_len;
@@ -680,7 +682,7 @@ bool iecDrive::open(uint8_t channel, const char *cname)
                         if( s!=nullptr)
                         {
                             if( !s->isOpen() )
-                            isProperDir = true;
+                              isProperDir = true;
                         }
                         //delete s;
                         }
@@ -795,8 +797,8 @@ bool iecDrive::open(uint8_t channel, const char *cname)
             delete f;
             }
 
-  return m_channels[channel]!=NULL;
-}
+      return m_channels[channel]!=NULL;
+    }
 }
 
 
@@ -1530,8 +1532,10 @@ void iecDrive::reset()
 
   IECFileDevice::reset();
 
-  FileBroker::clear();
+
   ImageBroker::clear();
+  //FileBroker::clear();
+  //StreamBroker::clear();
 
 #ifdef ENABLE_DISPLAY
   DISPLAY.idle();
