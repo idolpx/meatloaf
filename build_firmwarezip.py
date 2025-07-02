@@ -19,8 +19,6 @@ if env["PROJECT_CONFIG"] is not None:
 
 print(f"Reading from config file {ini_file}")
 
-chip_name = "esp32"
-flash_size = "4m"
 
 def image_info(filename):
     """
@@ -60,6 +58,8 @@ def image_info(filename):
             flash_size = "4m"
 
         print(f"Chip name: {chip_name}, Flash size: {flash_size}")
+
+        return chip_name, flash_size
 
 def makezip(source, target, env):
     # Create the 'firmware' output dir if it doesn't exist
@@ -123,11 +123,7 @@ def makezip(source, target, env):
         releasefile = firmware_dir+"/release.json"
         firmwarezip = firmware_dir+"/meatloaf."+environment_name+"."+firmware_date+".zip"
 
-        image_info(env.subst("$BUILD_DIR/firmware.bin"))
-        # flash_size = config['meatloaf']['flash_size'].split()[0]
-        # chip_name = "esp32"
-        # if environment_name.find("esp32-s3") != -1:
-        #     chip_name = "esp32s3"
+        chip_name, flash_size = image_info(env.subst("$BUILD_DIR/firmware.bin"))
 
         # Copy filesystem image to firmware folder
         try:

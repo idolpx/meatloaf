@@ -1,9 +1,17 @@
-import datetime
-import re
-import subprocess
-import sys
+import datetime, re, subprocess, sys, configparser
 
 Import("env")
+
+ini_file = 'platformio.ini'
+# this is specified with "-c /path/to/your.ini" when running pio
+if env["PROJECT_CONFIG"] is not None:
+    ini_file = env["PROJECT_CONFIG"]
+
+print(f"Reading from config file {ini_file}")
+
+config = configparser.ConfigParser()
+config.read(ini_file)
+environment = config['meatloaf']['environment'].split()[0]
 
 # Need to run this command in the PIO virtual environment
 #env.Execute("$PYTHONEXE -m pip list --format=json --disable-pip-version-check");
@@ -25,6 +33,7 @@ else:
         ver_build = "NOGIT"
     
     header_file = "include/version.h"
+    version_file = "version.txt"
 
     ver_date = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -71,4 +80,11 @@ else:
         else:
             fout.write(line)
 
+    fout.close()
+
+    # Write version.txt
+    version_txt = ver_maj + "." + ver_min + "." + ver_build + "." + environment
+    print(version_txt)
+    fout = open(version_file, "w")
+    fout.write(version_txt)
     fout.close()
