@@ -125,9 +125,9 @@ class driveMemory
 
   bool setROM(std::string filename) { 
     // Check for ROM file in SD Card then Flash
-    auto rom_file = MFSOwner::File("/sd/.rom/" + filename, true);
+    std::unique_ptr<MFile> rom_file(MFSOwner::File("/sd/.rom/" + filename, true));
     if (rom_file == nullptr) {
-      rom_file = MFSOwner::File("/.rom/" + filename, true);
+      rom_file.reset(MFSOwner::File("/.rom/" + filename, true));
     }
     if (rom_file == nullptr) {
       return false;

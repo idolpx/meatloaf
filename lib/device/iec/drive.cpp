@@ -278,6 +278,8 @@ uint8_t iecChannelHandlerFile::readBufferData()
           uint64_t t = esp_timer_get_time();
           m_len += m_stream->read(m_data+m_len, BUFFER_SIZE-m_len);
           m_transportTimeUS += (esp_timer_get_time()-t);
+          if (m_stream->error())
+              return ST_DRIVE_NOT_READY;
         }
 
       m_byteCount += m_len;
@@ -680,7 +682,7 @@ bool iecDrive::open(uint8_t channel, const char *cname)
                         if( s!=nullptr)
                         {
                             if( !s->isOpen() )
-                            isProperDir = true;
+                              isProperDir = true;
                         }
                         //delete s;
                         }
@@ -795,8 +797,8 @@ bool iecDrive::open(uint8_t channel, const char *cname)
             delete f;
             }
 
-  return m_channels[channel]!=NULL;
-}
+      return m_channels[channel]!=NULL;
+    }
 }
 
 
@@ -821,9 +823,7 @@ void iecDrive::close(uint8_t channel)
       m_channels[channel] = nullptr;
       if( m_numOpenChannels>0 ) m_numOpenChannels--;
       Debug_printv("Channel %d closed.", channel);
-#ifdef DEBUG
-      DEBUG_MEM_LEAK;
-#endif
+      Debug_memory();
     }
 }
 
@@ -1530,17 +1530,17 @@ void iecDrive::reset()
 
   IECFileDevice::reset();
 
-  FileBroker::clear();
+
   ImageBroker::clear();
+  //FileBroker::clear();
+  //StreamBroker::clear();
 
 #ifdef ENABLE_DISPLAY
   DISPLAY.idle();
   Debug_printv("Stop Activity");
 #endif
 
-#ifdef DEBUG
-  DEBUG_MEM_LEAK;
-#endif
+  Debug_memory();
 }
 
 
@@ -1561,7 +1561,7 @@ void iecDrive::set_cwd(std::string path)
         bool isDirectory = n->isDirectory();
 
         // check whether we can get a stream
-        std::shared_ptr<MStream> s = n->exists() ? n->getSourceStream() : nullptr; 
+        std::shared_ptr<MStream> s = n->exists() ? n->getSourceStream() : nullptr;
         bool haveStream = (s!=nullptr);
         //if( s ) delete s;
 

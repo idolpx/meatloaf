@@ -41,8 +41,8 @@
                   __FILE__, __LINE__, __FUNCTION__, \
                   ##__VA_ARGS__)
 
+    #define Debug_memory() {Debug_printv("Heap[%lu] Low[%lu] Task[%u]", esp_get_free_heap_size(), esp_get_free_internal_heap_size(), uxTaskGetStackHighWaterMark(NULL));}
     #define HEAP_CHECK(x) Debug_printf("HEAP CHECK %s " x "\r\n", heap_caps_check_integrity_all(true) ? "PASSED":"FAILED")
-    #define DEBUG_MEM_LEAK {Debug_printv("Heap[%lu] Low[%lu] Task[%u]", esp_get_free_heap_size(), esp_get_free_internal_heap_size(), uxTaskGetStackHighWaterMark(NULL));}
 #else
     // Use util_debug_printf() helper function
     #include <utils.h>
@@ -52,6 +52,7 @@
     #define Debug_println(...) util_debug_printf("%s\r\n", __VA_ARGS__)
     #define Debug_printv(format, ...) {util_debug_printf( ANSI_YELLOW "[%s:%u] %s(): " ANSI_GREEN_BOLD format ANSI_RESET "\r\n", __FILE__, __LINE__, __FUNCTION__, ##__VA_ARGS__);}
 
+    #define Debug_memory()
     #define HEAP_CHECK(x) Debug_printf("HEAP CHECK %s " x "\r\n", heap_caps_check_integrity_all(true) ? "PASSED":"FAILED")
 #endif
 #endif // DEBUG
@@ -68,6 +69,7 @@
     #define Debug_println(...)
     #define Debug_printv(format, ...)
 
+    #define Debug_memory()
     #define HEAP_CHECK(x)
 #endif // !DEBUG
 

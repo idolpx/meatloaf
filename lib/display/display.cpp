@@ -91,6 +91,11 @@ void Display::service()
 {
     switch(mode)
     {
+        case MODE_CLEAR:
+            activity = false; progress = 100; speed = 1000; direction = 0;
+            mode = MODE_IDLE;
+            meatloaf();
+            break;
         case MODE_IDLE:
         case MODE_SEND:
         case MODE_RECEIVE:
@@ -293,7 +298,7 @@ void Display::start(void)
     idle();
 
     // Start DISPLAY task
-    if ( xTaskCreatePinnedToCore(display_task, "display_task", 2048, this, 4, NULL, 0) != pdTRUE)
+    if ( xTaskCreatePinnedToCore(display_task, "display_task", 4096, this, 4, NULL, 0) != pdTRUE)
     {
         Debug_printv("Could not start DISPLAY task!");
     }

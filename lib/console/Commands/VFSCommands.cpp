@@ -445,7 +445,7 @@ int wget(int argc, char **argv)
 
     std::string pwd = getCurrentPath()->url;
 
-    auto f = MFSOwner::File(argv[1]);
+    std::unique_ptr<MFile>f(MFSOwner::File(argv[1]));
     if (f != nullptr)
     {
         auto s = f->getSourceStream();
@@ -493,7 +493,7 @@ int wget(int argc, char **argv)
         }
         fclose(file);
         Serial.printf("\n");
-        delete f;
+        //delete f;
     }
 
 #ifdef ENABLE_DISPLAY

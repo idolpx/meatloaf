@@ -83,7 +83,7 @@ public:
             ml_url += "#" + urlParser->fragment;
         Debug_printv("ml_url[%s]", ml_url.c_str());
 
-        auto http = new HTTPMFile(ml_url);
+        MFile* http = new HTTPMFile(ml_url);
         auto reader = http->getSourceStream();
         auto url = reader->url;
         delete http;

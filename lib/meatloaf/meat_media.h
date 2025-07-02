@@ -188,11 +188,12 @@ public:
         // obviously you have to supply sourceFile.url to this function!
         if(image_repo.find(url)!=image_repo.end()) {
             Debug_printv("stream found!");
+            Debug_memory();
             return std::static_pointer_cast<T>(image_repo.at(url));
         }
 
         // create and add stream to image broker if not found
-        auto newFile = MFSOwner::File(url);
+        std::unique_ptr<MFile> newFile(MFSOwner::File(url));
 
         Debug_printv("before " ANSI_WHITE_BACKGROUND "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv");
         std::shared_ptr<T> newStream = std::static_pointer_cast<T>(newFile->getSourceStream());
@@ -218,7 +219,6 @@ public:
         }
 
         Debug_printv("fail!");
-        delete newFile;
         return nullptr;
     }
 

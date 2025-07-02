@@ -19,8 +19,6 @@ if env["PROJECT_CONFIG"] is not None:
 
 print(f"Reading from config file {ini_file}")
 
-chip_name = "esp32"
-flash_size = "4m"
 
 def image_info(filename):
     """
@@ -45,14 +43,23 @@ def image_info(filename):
             print(f"This is not a valid image (invalid magic number: {magic:#x})")
             exit(0)
 
-        if chip_id == 0x09:
-            chip_name == "esp32s3"
+        if chip_id == 0x00:
+            chip_name = "esp32"
+        elif chip_id == 0x09:
+            chip_name = "esp32s3"
 
-        if spi_size >= 0x30:
-            flash_size = "8m"
+        if spi_size >= 0x50:
+            flash_size = "32m"
         elif spi_size >= 0x40:
             flash_size = "16m"
+        elif spi_size >= 0x30:
+            flash_size = "8m"
+        elif spi_size >= 0x20:
+            flash_size = "4m"
 
+        print(f"Chip name: {chip_name}, Flash size: {flash_size}")
+
+        return chip_name, flash_size
 
 def makezip(source, target, env):
     # Create the 'firmware' output dir if it doesn't exist
@@ -116,11 +123,7 @@ def makezip(source, target, env):
         releasefile = firmware_dir+"/release.json"
         firmwarezip = firmware_dir+"/meatloaf."+environment_name+"."+firmware_date+".zip"
 
-        image_info(env.subst("$BUILD_DIR/firmware.bin"))
-        # flash_size = config['meatloaf']['flash_size'].split()[0]
-        # chip_name = "esp32"
-        # if environment_name.find("esp32-s3") != -1:
-        #     chip_name = "esp32s3"
+        chip_name, flash_size = image_info(env.subst("$BUILD_DIR/firmware.bin"))
 
         # Copy filesystem image to firmware folder
         try:
@@ -153,6 +156,10 @@ def makezip(source, target, env):
         release_template = join(firmware_dir, "bin", f"release.{flash_size}.json") 
         with open(release_template, 'r') as file:
             json_contents['files'] += json.load(file)
+
+        # Set the bootloader offset
+        if chip_name == "esp32s3":
+            json_contents['files'][0]["offset"] = "0x0000"
 
         # Save Release JSON
         with open('firmware/release.json', 'w') as f:

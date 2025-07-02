@@ -71,6 +71,7 @@ class Display
 {
 
     enum Mode {
+        MODE_CLEAR   = -2,
         MODE_STATUS  = -1,
         MODE_IDLE    = 0,
         MODE_SEND    = 1,
@@ -112,13 +113,10 @@ public:
     void service();
     esp_err_t update();
 
-    void idle(void) { mode = MODE_IDLE;  meatloaf(); activity = false; progress = 100; speed = 1000; direction = 0; };
+    void idle(void) { mode = MODE_CLEAR; };
     void send(void) { mode = MODE_SEND; direction = 0; };
     void receive(void) { mode = MODE_RECEIVE; direction = 1; };
-    void status(uint8_t code) { 
-        mode = MODE_STATUS;
-        m_statusCode = code;
-    };
+    void status(uint8_t code) { mode = MODE_STATUS; m_statusCode = code; };
 
     void set_pixel(uint16_t index, CRGB color);
     void set_pixel(uint16_t index, uint8_t r, uint8_t g, uint8_t b);
