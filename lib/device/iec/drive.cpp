@@ -278,8 +278,8 @@ uint8_t iecChannelHandlerFile::readBufferData()
           uint64_t t = esp_timer_get_time();
           m_len += m_stream->read(m_data+m_len, BUFFER_SIZE-m_len);
           m_transportTimeUS += (esp_timer_get_time()-t);
-          //if (m_stream->eos() || m_stream->error())
-          //  break;
+          if (m_stream->error())
+              return ST_DRIVE_NOT_READY;
         }
 
       m_byteCount += m_len;
