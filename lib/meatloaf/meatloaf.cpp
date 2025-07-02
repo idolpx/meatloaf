@@ -223,6 +223,9 @@ MFile* MFSOwner::File(std::shared_ptr<MFile> file) {
 
 MFile* MFSOwner::File(std::string path, bool default_fs) {
 
+    if ( path.empty() )
+        return nullptr;
+
     if ( !default_fs )
     {
         if ( mlFS.handles(path) )
@@ -235,13 +238,6 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
             return csipFS.getFile(path);
         }
     }
-
-    // auto targetFile = FileBroker::obtain(path);
-    // if ( targetFile )
-    // {
-    //     Debug_printv("Returning cached file [%s]", path.c_str());
-    //     return targetFile;
-    // }
 
     Debug_println("vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv");
     Debug_printv("targetPath[%s]", path.c_str());
@@ -272,11 +268,7 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
     if( begin == pathIterator )
     {
         Debug_printv("** LOOK UP PATH NOT NEEDED   path[%s] sourcePath[%s]", path.c_str(), sourcePath.c_str());
-        // auto cachedFile = FileBroker::obtain(sourcePath);
-        // if ( cachedFile )
-        //     targetFile->sourceFile = cachedFile;
-        // else
-            targetFile->sourceFile = targetFileSystem->getFile(sourcePath);
+        targetFile->sourceFile = targetFileSystem->getFile(sourcePath);
     } 
     else 
     {
@@ -293,11 +285,7 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
         Debug_printv("wholePath[%s]", wholePath.c_str());
 
         // sourceFile is for raw access to the container stream
-        // auto cachedFile = FileBroker::obtain(wholePath);
-        // if ( cachedFile )
-        //     targetFile->sourceFile = cachedFile;
-        // else
-            targetFile->sourceFile = sourceFileSystem->getFile(wholePath);
+        targetFile->sourceFile = sourceFileSystem->getFile(wholePath);
 
         targetFile->isWritable = targetFile->sourceFile->isWritable;   // This stream is writable if the container is writable
         Debug_printv("sourceFile[%s] is in [%s][%s]", targetFile->sourceFile->pathInStream.c_str(), sourcePath.c_str(), sourceFileSystem->symbol);
@@ -318,9 +306,6 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
         Debug_printv("target bad");
 
     Debug_println("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
-
-    // if ( targetFile->pathInStream.empty() )
-    //     FileBroker::add(path, targetFile);
 
     return targetFile;
 }

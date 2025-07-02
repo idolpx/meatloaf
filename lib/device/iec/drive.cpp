@@ -823,9 +823,7 @@ void iecDrive::close(uint8_t channel)
       m_channels[channel] = nullptr;
       if( m_numOpenChannels>0 ) m_numOpenChannels--;
       Debug_printv("Channel %d closed.", channel);
-#ifdef DEBUG
-      DEBUG_MEM_LEAK;
-#endif
+      Debug_memory();
     }
 }
 
@@ -1542,9 +1540,7 @@ void iecDrive::reset()
   Debug_printv("Stop Activity");
 #endif
 
-#ifdef DEBUG
-  DEBUG_MEM_LEAK;
-#endif
+  Debug_memory();
 }
 
 
@@ -1565,7 +1561,7 @@ void iecDrive::set_cwd(std::string path)
         bool isDirectory = n->isDirectory();
 
         // check whether we can get a stream
-        std::shared_ptr<MStream> s = n->exists() ? n->getSourceStream() : nullptr; 
+        std::shared_ptr<MStream> s = n->exists() ? n->getSourceStream() : nullptr;
         bool haveStream = (s!=nullptr);
         //if( s ) delete s;
 

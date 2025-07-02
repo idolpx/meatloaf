@@ -188,7 +188,7 @@ public:
         // obviously you have to supply sourceFile.url to this function!
         if(image_repo.find(url)!=image_repo.end()) {
             Debug_printv("stream found!");
-            DEBUG_MEM_LEAK;
+            Debug_memory();
             return std::static_pointer_cast<T>(image_repo.at(url));
         }
 

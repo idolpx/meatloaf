@@ -178,7 +178,7 @@ bool HTTPMStream::open(std::ios_base::openmode mode) {
     if ( _http.wasRedirected )
         url = _http.url;
 
-    Debug_printv("r[%d] size[%d] url[%s] hurl[%s]", r, _size, url.c_str(), _http.url.c_str());
+    //Debug_printv("r[%d] size[%d] url[%s] hurl[%s]", r, _size, url.c_str(), _http.url.c_str());
 
     return r;
 }
