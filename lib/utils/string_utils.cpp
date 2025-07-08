@@ -554,10 +554,27 @@ namespace mstr {
     std::string sha1(const std::string &s)
     {
         unsigned char hash[21] = { 0x00 };
-        mbedtls_sha1((const unsigned char *)s.c_str(), s.length(), hash);
+
+#if defined(mbedtls_sha1_ret)
+        // Use the newer mbedtls API
+        int ret = mbedtls_sha1_ret((const unsigned char *)s.c_str(), s.length(), hash);
+        if (ret != 0) {
+            Debug_printf("mbedtls_sha1 failed with error code %d\n", ret);
+            return "";
+        }
+#else
+        // Use the legacy mbedtls API
+        int ret = mbedtls_sha1((const unsigned char *)s.c_str(), s.length(), hash);
+        if (ret != 0) {
+            Debug_printf("mbedtls_sha1 failed with error code %d\n", ret);
+            return "";
+        }
+#endif
+        // These lines were commented in the original code
         // unsigned char output[64];
         // size_t outlen;
         // mbedtls_base64_encode(output, 64, &outlen, hash, 20);
+        
         std::string o(reinterpret_cast< char const* >(hash));
         return toHex(o);
     }
