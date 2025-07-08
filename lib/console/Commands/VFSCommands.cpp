@@ -196,6 +196,10 @@ int ls(int argc, char **argv)
         return 1;
     }
 
+    // If sd card is mounted and we are at root
+    if( fnSDFAT.running() && getCurrentPath()->url.size() == 1 )
+        Serial.printf("d %8lu  'sd'\r\n", 0);
+
     while(entry.get() != nullptr) {
         if ( entry->isPETSCII )
             entry->name = mstr::toUTF8(entry->name);
