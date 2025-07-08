@@ -141,7 +141,7 @@ void LedStrip::setup()
         FastLED.setMaxPowerInVoltsAndMilliamps(5, LED_BRIGHTNESS);
 
         // Start the LED Task
-        xTaskCreatePinnedToCore(&ledStripTask, "LEDStripTask", 4000, NULL, 5, NULL, 0);
+        xTaskCreatePinnedToCore(&ledStripTask, "ledstrip", 4000, NULL, 5, NULL, 0);
 
         // Taste the Rainbow at startup
         oLedStrip.startRainbow(3);

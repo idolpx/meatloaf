@@ -171,7 +171,7 @@ bool MMediaStream::open(std::ios_base::openmode mode)
 
 void MMediaStream::close()
 {
-    //Debug_printv("Heap[%lu]", esp_get_free_heap_size());
+    Debug_memory();
 }
 
 

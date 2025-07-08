@@ -36,7 +36,7 @@ void SSDPDeviceClass::notify_timer(void* args)
 void SSDPDeviceClass::start()
 {
     // Start task
-    xTaskCreatePinnedToCore(ssdp_service_task, "ssdp_service_task", 4096, this, 5, NULL, 0);
+    xTaskCreatePinnedToCore(ssdp_service_task, "ssdpd", 4096, this, 5, NULL, 0);
 
 	// // Start notify timer
 	// const esp_timer_create_args_t timer_args = {

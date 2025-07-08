@@ -1,3 +1,21 @@
+// Meatloaf - A Commodore 64/128 multi-device emulator
+// https://github.com/idolpx/meatloaf
+// Copyright(C) 2020 James Johnston
+//
+// Meatloaf is free software : you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Meatloaf is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
+
+#if defined(ENABLE_CONSOLE) && defined(ENABLE_CONSOLE_TCP)
 #include "tcpsvr.h"
 
 #include <stdio.h>
@@ -19,15 +37,14 @@
 #include "../../include/debug.h"
 #include "string_utils.h"
 
-#ifdef ENABLE_CONSOLE
 #include "../console/ESP32Console.h"
-#endif
 
 #define MESSAGE "Welcome to Meatloaf!\r\n"
 #define LISTENQ 2
 
 TCPServer tcp_server;
-int TCPServer::client_socket = -1;
+int TCPServer::_client_socket = -1;
+bool TCPServer::_shutdown = false;
 
 void TCPServer::task(void *pvParameters)
 {
@@ -37,13 +54,13 @@ void TCPServer::task(void *pvParameters)
     int addr_family;        // Ipv4 address protocol variable
 
     int ip_protocol;
-    int socket_id;
-    int bind_err;
-    int listen_error;
+    int socket_id = 0;
+    int bind_err = 0;
+    int listen_error = 0;
 
     std::string line;
 
-    while (1)
+    while (!_shutdown)
     {
         struct sockaddr_in destAddr;
         destAddr.sin_addr.s_addr = htonl(INADDR_ANY);     //Change hostname to network byte order
@@ -80,13 +97,13 @@ void TCPServer::task(void *pvParameters)
         }
         //Debug_printv("Socket listening");
 
-        while (1)
+        while (!_shutdown)
         {
             struct sockaddr_in sourceAddr; // Large enough for IPv4
             socklen_t addrLen = sizeof(sourceAddr);
             /* Accept connection to incoming client */
-            client_socket = accept(socket_id, (struct sockaddr *)&sourceAddr, &addrLen);
-            if (client_socket < 0)
+            _client_socket = accept(socket_id, (struct sockaddr *)&sourceAddr, &addrLen);
+            if (_client_socket < 0)
             {
                 Debug_printv("Unable to accept connection: errno %d", errno);
                 break;
@@ -94,20 +111,20 @@ void TCPServer::task(void *pvParameters)
             Debug_printv("Socket accepted");
 
             // Send Welcome message
-            write(client_socket, MESSAGE, strlen(MESSAGE));
+            write(_client_socket, MESSAGE, strlen(MESSAGE));
 
             //Optionally set O_NONBLOCK
             //If O_NONBLOCK is set then recv() will return, otherwise it will stall until data is received or the connection is lost.
-            //fcntl(client_socket,F_SETFL,O_NONBLOCK);
+            //fcntl(_client_socket,F_SETFL,O_NONBLOCK);
 
             // Clear rx_buffer, and fill with zero's
             bzero(rx_buffer, sizeof(rx_buffer));
             vTaskDelay(500 / portTICK_PERIOD_MS);
-            while(1)
+            while(!_shutdown)
             {
                 //Debug_printv("Waiting for data");
                 //send("meatloaf[/]# ");
-                bytes_received = recv(client_socket, rx_buffer, sizeof(rx_buffer) - 1, 0);
+                bytes_received = recv(_client_socket, rx_buffer, sizeof(rx_buffer) - 1, 0);
                 //Debug_printv("Received Data");
 
                 // Error occured during receiving
@@ -139,9 +156,7 @@ void TCPServer::task(void *pvParameters)
                     if (mstr::endsWith(line, "\r") || mstr::endsWith(line, "\n"))
                     {
                         mstr::rtrim(line);
-#ifdef ENABLE_CONSOLE
-                        console.execute(line.c_str());
-#endif
+                        console.execute(line.c_str());  // replace with receive() callback
                         line.clear();
                     } else if (line[0] == 0xBF || line[0] == 0xEF || line[0] == 0xFF) {
                         line.clear();
@@ -155,7 +170,7 @@ void TCPServer::task(void *pvParameters)
                     bzero(rx_buffer, sizeof(rx_buffer));
                 }
             }
-            close(client_socket);
+            close(_client_socket);
         }
     }
     close(socket_id);
@@ -164,11 +179,11 @@ void TCPServer::task(void *pvParameters)
 
 
 void TCPServer::start()
-{    
-    //xTaskCreate(&TCPServer::task,"tcp_server",4096,NULL,5,NULL);
+{
+    _shutdown = false;
 
     // Start tcp server task
-    if (xTaskCreatePinnedToCore(&TCPServer::task, "tcp_server", 4096, NULL, 5, NULL, 0) != pdTRUE)
+    if (xTaskCreatePinnedToCore(&TCPServer::task, "console_tcp", 4096, NULL, 5, NULL, 0) != pdTRUE)
     {
         Debug_printv("Could not start tcp server task!");
     }
@@ -176,13 +191,15 @@ void TCPServer::start()
 
 void TCPServer::stop()
 {
-    //vTaskDelete( NULL );
+    _shutdown = true;
 }
 
 void TCPServer::send(std::string data)
 {
-    if (client_socket > 0)
+    if (_client_socket > 0)
     {
-        write(client_socket, data.c_str(), data.length());
+        write(_client_socket, data.c_str(), data.length());
     }
 }
+
+#endif // ENABLE_CONSOLE && ENABLE_CONSOLE_TCP

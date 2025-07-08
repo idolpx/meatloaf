@@ -791,7 +791,7 @@ FILE *SystemManager::make_tempfile(char *result_filename)
 // Copy file from source filesystem/filename to destination filesystem/name using optional buffer_hint for buffer size
 size_t SystemManager::copy_file(FileSystem *source_fs, const char *source_filename, FileSystem *dest_fs, const char *dest_filename, size_t buffer_hint)
 {
-    Debug_printf("copy_file \"%s\" -> \"%s\"\r\n", source_filename, dest_filename);
+    Debug_printf("copy_file \"%s%s\" -> \"%s%s\"\r\n", source_fs->basepath(), source_filename, dest_fs->basepath(), dest_filename);
 
     FILE *fin = source_fs->file_open(source_filename);
     if (fin == nullptr)

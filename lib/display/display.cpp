@@ -298,7 +298,7 @@ void Display::start(void)
     idle();
 
     // Start DISPLAY task
-    if ( xTaskCreatePinnedToCore(display_task, "display_task", 4096, this, 4, NULL, 0) != pdTRUE)
+    if ( xTaskCreatePinnedToCore(display_task, "display_rgb", 4096, this, 4, NULL, 0) != pdTRUE)
     {
         Debug_printv("Could not start DISPLAY task!");
     }

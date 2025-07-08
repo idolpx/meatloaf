@@ -2618,7 +2618,7 @@ bool IECBusHandler::transmitIECByte(uint8_t numData)
 
   // wait for receiver to signal "busy"
   if( !waitPinDATA(LOW) ) return false;
-  
+
   return true;
 }
 
