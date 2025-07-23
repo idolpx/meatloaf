@@ -90,7 +90,7 @@ void systemBus::setup()
     // Start task
     // Create a new high-priority task to handle the main service loop
     // This is assigned to CPU1; the WiFi task ends up on CPU0
-    xTaskCreatePinnedToCore(ml_iec_intr_task, "ml_iec_intr_task", MAIN_STACKSIZE, NULL, MAIN_PRIORITY, NULL, MAIN_CPUAFFINITY);
+    xTaskCreatePinnedToCore(ml_iec_intr_task, "bus_iec", MAIN_STACKSIZE, NULL, MAIN_PRIORITY, NULL, MAIN_CPUAFFINITY);
 
 }
 
