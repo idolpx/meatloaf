@@ -36,6 +36,14 @@
 #define INTERRUPT_FCN_ARG
 #endif
 
+// fastload sub-protocols (used in IECFileDevice)
+#define IEC_FL_PROT_NONE    0
+#define IEC_FL_PROT_LOAD    1
+#define IEC_FL_PROT_SAVE    2
+#define IEC_FL_PROT_HEADER  3
+#define IEC_FL_PROT_SECTOR  4
+#define IEC_FL_PROT_LOADIMG 5
+
 class IECDevice;
 
 class IECBusHandler
@@ -45,7 +53,11 @@ class IECBusHandler
   // (e.g. 2 or 3 on the Arduino UNO), if not then make sure the task() function
   // gets called at least once evey millisecond, otherwise "device not present" 
   // errors may result
+#ifdef IEC_USE_LINE_DRIVERS
+  IECBusHandler(uint8_t pinATN, uint8_t pinCLKin, uint8_t pinCLKout, uint8_t pinDATAin, uint8_t pinDATAout, uint8_t pinRESET = 0xFF, uint8_t pinCTRL = 0xFF, uint8_t pinSRQ = 0xFF);
+#else
   IECBusHandler(uint8_t pinATN, uint8_t pinCLK, uint8_t pinDATA, uint8_t pinRESET = 0xFF, uint8_t pinCTRL = 0xFF, uint8_t pinSRQ = 0xFF);
+#endif
 
   // must be called once at startup before the first call to "task", devnr
   // is the IEC bus device number that this device should react to
@@ -60,34 +72,29 @@ class IECBusHandler
   // ok but bus communication will be slower if called less frequently.
   void task();
 
-#if (defined(SUPPORT_JIFFY) || defined(SUPPORT_DOLPHIN) || defined(SUPPORT_EPYX)) && !defined(IEC_DEFAULT_FASTLOAD_BUFFER_SIZE)
+#if !defined(IEC_DEFAULT_FASTLOAD_BUFFER_SIZE)
   // if IEC_DEFAULT_FASTLOAD_BUFFER_SIZE is set to 0 then the buffer space used
   // by fastload protocols can be set dynamically using the setBuffer function.
   void setBuffer(uint8_t *buffer, uint8_t bufferSize);
 #endif
 
-#ifdef SUPPORT_JIFFY 
-  bool enableJiffyDosSupport(IECDevice *dev, bool enable);
+  static uint8_t getSupportedFastLoaders();
+  static bool isFastLoaderSupported(uint8_t loader);
+  bool enableFastLoader(IECDevice *dev, uint8_t protocol, bool enable);
+  void fastLoadRequest(uint8_t loader, uint8_t request);
+
+#ifdef IEC_FP_DOLPHIN
+  void enableDolphinBurstMode(IECDevice *dev, bool enable);
 #endif
 
-#ifdef SUPPORT_EPYX
-  bool enableEpyxFastLoadSupport(IECDevice *dev, bool enable);
-  void epyxLoadRequest(IECDevice *dev);
-#endif
-
-#ifdef SUPPORT_DOLPHIN
-  // call this BEFORE begin() if you do not want to use the default pins for the DolphinDos cable
-#ifdef SUPPORT_DOLPHIN_XRA1405
-  void setDolphinDosPins(uint8_t pinHT, uint8_t pinHR, uint8_t pinSCK, uint8_t pinCOPI, uint8_t pinCIPO, uint8_t pinCS);
+#ifdef IEC_SUPPORT_PARALLEL
+  // call this BEFORE begin() if you do not want to use the default pins for the parallel cable
+#ifdef IEC_SUPPORT_PARALLEL_XRA1405
+  void setParallelPins(uint8_t pinHT, uint8_t pinHR, uint8_t pinSCK, uint8_t pinCOPI, uint8_t pinCIPO, uint8_t pinCS);
 #else
-  void setDolphinDosPins(uint8_t pinHT, uint8_t pinHR, uint8_t pinD0, uint8_t pinD1, uint8_t pinD2, uint8_t pinD3, 
+  void setParallelPins(uint8_t pinHT, uint8_t pinHR, uint8_t pinD0, uint8_t pinD1, uint8_t pinD2, uint8_t pinD3, 
                          uint8_t pinD4, uint8_t pinD5, uint8_t pinD6, uint8_t pinD7);
 #endif
-
-  bool enableDolphinDosSupport(IECDevice *dev, bool enable);
-  void enableDolphinBurstMode(IECDevice *dev, bool enable);
-  void dolphinBurstReceiveRequest(IECDevice *dev);
-  void dolphinBurstTransmitRequest(IECDevice *dev);
 #endif
 
   IECDevice *findDevice(uint8_t devnr, bool includeInactive = false);
@@ -96,11 +103,14 @@ class IECBusHandler
   void sendSRQ();
 
   IECDevice *m_currentDevice;
-  IECDevice *m_devices[MAX_DEVICES];
+  IECDevice *m_devices[IEC_MAX_DEVICES];
 
   uint8_t m_numDevices;
   int  m_atnInterrupt;
   uint8_t m_pinATN, m_pinCLK, m_pinDATA, m_pinRESET, m_pinSRQ, m_pinCTRL;
+#ifdef IEC_USE_LINE_DRIVERS
+  uint8_t m_pinCLKout, m_pinDATAout;
+#endif
 
  private:
   inline bool readPinATN();
@@ -118,6 +128,8 @@ class IECBusHandler
   bool receiveIECByteATN(uint8_t &data);
   bool receiveIECByte(bool canWriteOk);
   bool transmitIECByte(uint8_t numData);
+  void handleFastLoadProtocols();
+  void handleATNSequence();
 
   volatile uint16_t m_timeoutDuration; 
   volatile uint32_t m_timeoutStart;
@@ -129,82 +141,113 @@ class IECBusHandler
   volatile IOREG_TYPE *m_regCLKwrite, *m_regCLKmode, *m_regDATAwrite, *m_regDATAmode;
   volatile const IOREG_TYPE *m_regATNread, *m_regCLKread, *m_regDATAread, *m_regRESETread;
   IOREG_TYPE m_bitATN, m_bitCLK, m_bitDATA, m_bitRESET;
+#ifdef IEC_USE_LINE_DRIVERS
+  IOREG_TYPE m_bitCLKout, m_bitDATAout;
+#endif
 #endif
 
-#ifdef SUPPORT_JIFFY 
+#ifdef IEC_FP_JIFFY 
   bool receiveJiffyByte(bool canWriteOk);
   bool transmitJiffyByte(uint8_t numData);
   bool transmitJiffyBlock(uint8_t *buffer, uint8_t numBytes);
 #endif
 
-#ifdef SUPPORT_DOLPHIN
+#ifdef IEC_FP_SPEEDDOS
+  bool transmitSpeedDosByte(uint8_t numData);
+  bool receiveSpeedDosByte(bool canWriteOk);
+  bool transmitSpeedDosFile();
+  bool transmitSpeedDosParallelByte(uint8_t data);
+#endif
+
+
+#ifdef IEC_FP_DOLPHIN
   bool transmitDolphinByte(uint8_t numData);
   bool receiveDolphinByte(bool canWriteOk);
   bool transmitDolphinBurst();
   bool receiveDolphinBurst();
+#endif
 
+#ifdef IEC_SUPPORT_PARALLEL
   void startParallelTransaction();
   void endParallelTransaction();
   bool parallelBusHandshakeReceived();
   bool waitParallelBusHandshakeReceived();
+  bool waitParallelBusHandshakeReceivedISafe(bool exitOnCLKchange = false);
   void parallelBusHandshakeTransmit();
   void setParallelBusModeInput();
   void setParallelBusModeOutput();
-  bool parallelCableDetect();
   uint8_t readParallelData();
   void writeParallelData(uint8_t data);
+  bool checkParallelPins();
   void enableParallelPins();
-  bool isDolphinPin(uint8_t pin);
+  bool isParallelPin(uint8_t pin);
 
-#ifdef SUPPORT_DOLPHIN_XRA1405
-  uint8_t m_pinDolphinSCK, m_pinDolphinCOPI, m_pinDolphinCIPO, m_pinDolphinCS, m_inTransaction;
+#ifdef IEC_SUPPORT_PARALLEL_XRA1405
+  uint8_t m_pinParallelSCK, m_pinParallelCOPI, m_pinParallelCIPO, m_pinParallelCS, m_inTransaction;
   uint8_t XRA1405_ReadReg(uint8_t reg);
   void    XRA1405_WriteReg(uint8_t reg, uint8_t data);
 
 #ifdef IOREG_TYPE
-  volatile IOREG_TYPE *m_regDolphinCS;
-  IOREG_TYPE m_bitDolphinCS;
+  volatile IOREG_TYPE *m_regParallelCS;
+  IOREG_TYPE m_bitParallelCS;
 #endif
 
-#else // !SUPPORT_DOLPHIN_XRA1405
+#else // !IEC_SUPPORT_PARALLEL_XRA1405
 
-  uint8_t m_pinDolphinParallel[8];
+  uint8_t m_pinParallel[8];
 #ifdef IOREG_TYPE
-  volatile IOREG_TYPE *m_regDolphinParallelMode[8], *m_regDolphinParallelWrite[8];
-  volatile const IOREG_TYPE *m_regDolphinParallelRead[8];
-  IOREG_TYPE m_bitDolphinParallel[8];
+  volatile IOREG_TYPE *m_regParallelMode[8], *m_regParallelWrite[8];
+  volatile const IOREG_TYPE *m_regParallelRead[8];
+  IOREG_TYPE m_bitParallel[8];
 #endif
 
-#endif // SUPPORT_DOLPHIN_XRA1405
+#endif // IEC_SUPPORT_PARALLEL_XRA1405
 
-  uint8_t m_pinDolphinHandshakeTransmit;
-  uint8_t m_pinDolphinHandshakeReceive;
-  uint8_t m_dolphinCtr;
+  uint8_t m_pinParallelHandshakeTransmit;
+  uint8_t m_pinParallelHandshakeReceive;
+  uint8_t m_bufferCtr;
 
 #ifdef IOREG_TYPE
-  volatile IOREG_TYPE *m_regDolphinHandshakeTransmitMode;
-  IOREG_TYPE m_bitDolphinHandshakeTransmit;
+  volatile IOREG_TYPE *m_regParallelHandshakeTransmitMode;
+  IOREG_TYPE m_bitParallelHandshakeTransmit;
 #if defined(__AVR_ATmega328P__) || defined(__AVR_ATmega2560__)
-  IOREG_TYPE m_handshakeReceivedBit = 0;
+  IOREG_TYPE m_bitParallelhandshakeReceived = 0;
 #endif
 #endif // IOREG_TYPE
-#endif // SUPPORT_DOLPHIN
+#endif // IEC_SUPPORT_PARALLEL
 
-#ifdef SUPPORT_EPYX
+#ifdef IEC_FP_EPYX
   bool receiveEpyxByte(uint8_t &data);
   bool transmitEpyxByte(uint8_t data);
   bool receiveEpyxHeader();
   bool transmitEpyxBlock();
-#ifdef SUPPORT_EPYX_SECTOROPS
+#ifdef IEC_FP_EPYX_SECTOROPS
   bool startEpyxSectorCommand(uint8_t command);
   bool finishEpyxSectorCommand();
 #endif
 #endif
+
+#ifdef IEC_FP_FC3
+  void transmitFC3Bytes(uint8_t *data);
+  bool receiveFC3Byte(uint8_t *data);
+  bool transmitFC3Block();
+  bool transmitFC3ImageBlock();
+  bool receiveFC3Block();
+#endif
   
-#if defined(SUPPORT_JIFFY) || defined(SUPPORT_DOLPHIN) || defined(SUPPORT_EPYX)
+#ifdef IEC_FP_AR6
+  bool transmitAR6Byte(uint8_t data);
+  bool receiveAR6Byte(uint8_t *data);
+  bool transmitAR6Block();
+  bool receiveAR6Block();
+#endif
+  
+#if defined(IEC_SUPPORT_FASTLOAD)
   uint8_t m_bufferSize;
 #if IEC_DEFAULT_FASTLOAD_BUFFER_SIZE>0
-#if defined(SUPPORT_EPYX) && defined(SUPPORT_EPYX_SECTOROPS)
+#if defined(IEC_FP_FC3)
+  uint8_t  m_buffer[260];
+#elif (defined(IEC_FP_EPYX) && defined(IEC_FP_EPYX_SECTOROPS)) || defined(IEC_FP_AR6)
   uint8_t  m_buffer[256];
 #else
   uint8_t  m_buffer[IEC_DEFAULT_FASTLOAD_BUFFER_SIZE];

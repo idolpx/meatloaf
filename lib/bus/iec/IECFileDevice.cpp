@@ -78,6 +78,8 @@ void dbg_data(uint8_t data)
 #define IFD_WRITE 4
 
 
+struct MWSignature { uint16_t address; uint8_t len; uint8_t checksum; };
+
 IECFileDevice::IECFileDevice(uint8_t devnr) : 
   IECDevice(devnr)
 {
@@ -91,27 +93,45 @@ void IECFileDevice::begin()
 #if DEBUG>0
   /*if( !Serial )*/ Serial.begin(115200);
   for(int i=0; !Serial && i<5; i++) delay(1000);
-  Serial.print(F("START:IECFileDevice, devnr=")); Serial.println(m_devnr);
+  Serial.print(F("START:IECFileDevice, devnr=")); Serial.println(m_devnr); Serial.flush();
 #endif
   
   bool ok;
-#ifdef SUPPORT_JIFFY
-  ok = IECDevice::enableJiffyDosSupport(true);
+#ifdef IEC_FP_JIFFY
+  ok = IECDevice::enableFastLoader(IEC_FP_JIFFY, true);
 #if DEBUG>0
   Serial.print(F("JiffyDos support ")); Serial.println(ok ? F("enabled") : F("disabled"));
 #endif
 #endif
-#ifdef SUPPORT_DOLPHIN
-  ok = IECDevice::enableDolphinDosSupport(true);
+#ifdef IEC_FP_DOLPHIN
+  ok = IECDevice::enableFastLoader(IEC_FP_DOLPHIN, true);
 #if DEBUG>0
   Serial.print(F("DolphinDos support ")); Serial.println(ok ? F("enabled") : F("disabled"));
 #endif
 #endif
-#ifdef SUPPORT_EPYX
-  ok = IECDevice::enableEpyxFastLoadSupport(true);
-  m_epyxCtr = 0;
+#ifdef IEC_FP_SPEEDDOS
+  ok = IECDevice::enableFastLoader(IEC_FP_SPEEDDOS, true);
+#if DEBUG>0
+  Serial.print(F("SpeedDos support ")); Serial.println(ok ? F("enabled") : F("disabled"));
+#endif
+#endif
+#ifdef IEC_FP_EPYX
+  ok = IECDevice::enableFastLoader(IEC_FP_EPYX, true);
 #if DEBUG>0
   Serial.print(F("Epyx FastLoad support ")); Serial.println(ok ? F("enabled") : F("disabled"));
+#endif
+#endif
+#ifdef IEC_FP_FC3
+  ok = IECDevice::enableFastLoader(IEC_FP_FC3, true);
+#if DEBUG>0
+  Serial.print(F("Final Cartridge 3 support ")); Serial.println(ok ? F("enabled") : F("disabled"));
+#endif
+#endif
+#ifdef IEC_FP_AR6
+  ok = IECDevice::enableFastLoader(IEC_FP_AR6, true);
+#if DEBUG>0
+  Serial.print(F("Action Replay 6 support ")); Serial.println(ok ? F("enabled") : F("disabled"));
+  m_ar6detect = 0;
 #endif
 #endif
 
@@ -122,6 +142,7 @@ void IECFileDevice::begin()
   m_cmd = IFD_NONE;
   m_channel = 0xFF;
   m_opening = false;
+  m_uploadCtr = 0;
 
   // calling fileTask() may result in significant time spent accessing the
   // disk during which we can not respond to ATN requests within the required
@@ -186,7 +207,7 @@ int8_t IECFileDevice::canRead()
           m_statusBufferLen = getStatusData(m_statusBuffer, IECFILEDEVICE_STATUS_BUFFER_SIZE);
 #if DEBUG>0
           Serial.print(F("STATUS")); 
-#if MAX_DEVICES>1
+#if IEC_MAX_DEVICES>1
           Serial.write('#'); Serial.print(m_devnr);
 #endif
           Serial.write(':'); Serial.write(' ');
@@ -260,7 +281,7 @@ uint8_t IECFileDevice::read(uint8_t *buffer, uint8_t bufferSize)
 {
   uint8_t res = 0;
 
-  // get data from our own 2-uint8_t buffer (if any)
+  // get data from our own 2-byte buffer (if any)
   // properly deal with the case where bufferSize==1
   while( m_readBufferLen[m_channel]>0 && res<bufferSize )
     {
@@ -279,7 +300,7 @@ uint8_t IECFileDevice::read(uint8_t *buffer, uint8_t bufferSize)
 #endif
       res += n;
     }
-  
+
   return res;
 }
 
@@ -367,6 +388,11 @@ void IECFileDevice::talk(uint8_t secondary)
 
   m_channel = secondary & 0x0F;
   m_eoi = false;
+
+  // Final Cartridge 3 sends TALK->CLOSE->UNLISTEN when
+  // interrupting a DOS"$" command
+  if( m_channel!=15 && (secondary & 0xF0) == 0xE0 )
+    m_cmd = IFD_CLOSE;
 }
 
 
@@ -411,13 +437,7 @@ void IECFileDevice::unlisten()
 
   if( m_channel==15 )
     {
-      if( m_writeBufferLen>0 )
-        {
-          if( m_writeBuffer[m_writeBufferLen-1]==13 ) m_writeBufferLen--;
-          m_writeBuffer[m_writeBufferLen]=0;
-          m_cmd = IFD_EXEC;
-        }
-
+      if( m_writeBufferLen>0 ) m_cmd = IFD_EXEC;
       m_channel = 0xFF;
     }
   else if( m_opening )
@@ -435,7 +455,7 @@ void IECFileDevice::unlisten()
 }
 
 
-#if defined(SUPPORT_EPYX) && defined(SUPPORT_EPYX_SECTOROPS)
+#if defined(IEC_FP_EPYX) && defined(IEC_FP_EPYX_SECTOROPS)
 bool IECFileDevice::epyxReadSector(uint8_t track, uint8_t sector, uint8_t *buffer)
 {
 #if DEBUG>0
@@ -508,6 +528,34 @@ void IECFileDevice::clearReadBuffer(uint8_t channel)
 
 void IECFileDevice::fileTask()
 {
+#ifdef IEC_FP_AR6
+  if( m_cmd!=IFD_NONE )
+    {
+      // Unfortunately when writing a file, Action Replay 6 sends two extra bytes (0x00 and 0x01)
+      // via the regular protocol BEFORE switching to the fast-save protocol. At that point we
+      // don't know whether this will become an actual AR6 fast-save operation. 
+      // But we can't wait whether maybe the actual fast-save sequence (M-W,M-E) will arrive later
+      // because doing so could mess with regular "save" operations.
+      // So we assume this is an AR6 fast-save if we detect the following sequence:
+      // - memory read at 0xFFFE (we answer with "3" - identifying as 1581 drive)
+      // - open file with channel number>0 (i.e. not loading)
+      // - send exactly 0x00 and 0x01 in one LISTEN/UNLISTEN transaction as the first data for the file.
+      // If this sequence is detected, we discard those extra bytes.
+      if( m_ar6detect==0 && m_cmd==IFD_EXEC && strncmp_P((const char *) m_writeBuffer, PSTR("M-R\xfe\xff\x01"), 6)==0 )
+        m_ar6detect = 1;
+      else if( m_ar6detect==1 && m_cmd==IFD_OPEN && m_channel>0 )
+        m_ar6detect = 2;
+      else if( m_ar6detect==2 && m_cmd==IFD_WRITE && m_writeBufferLen==2 && m_writeBuffer[0]==0 && m_writeBuffer[1]==1 )
+        {
+          m_writeBufferLen = 0;
+          m_cmd = IFD_NONE;
+          m_ar6detect = 0;
+        }
+      else if( m_ar6detect!=0 )
+        m_ar6detect = 0;
+    }
+#endif
+
   switch( m_cmd )
     {
     case IFD_OPEN:
@@ -516,7 +564,7 @@ void IECFileDevice::fileTask()
         for(uint8_t i=0; m_writeBuffer[i]; i++) dbg_data(m_writeBuffer[i]);
         dbg_print_data();
         Serial.print(F("OPEN #")); 
-#if MAX_DEVICES>1
+#if IEC_MAX_DEVICES>1
         Serial.print(m_devnr); Serial.write('#');
 #endif
         Serial.print(m_channel); Serial.print(F(": ")); Serial.println((const char *) m_writeBuffer);
@@ -534,7 +582,7 @@ void IECFileDevice::fileTask()
 #if DEBUG>0
         dbg_print_data();
         Serial.print(F("CLOSE #")); 
-#if MAX_DEVICES>1
+#if IEC_MAX_DEVICES>1
         Serial.print(m_devnr); Serial.write('#');
 #endif
         Serial.println(m_channel);
@@ -564,7 +612,7 @@ void IECFileDevice::fileTask()
         const char *cmd = (const char *) m_writeBuffer;
 
 #if DEBUG>0
-#if defined(SUPPORT_DOLPHIN)
+#ifdef IEC_FP_DOLPHIN
         // Printing debug output here may delay our response to DolphinDos
         // 'XQ' and 'XZ' commands (burst mode request) too long and cause
         // the C64 to time out, causing the transmission to hang
@@ -576,50 +624,209 @@ void IECFileDevice::fileTask()
             Serial.print(F("EXECUTE: ")); Serial.println(cmd);
           }
 #endif
-#ifdef SUPPORT_EPYX
-        if     ( m_epyxCtr== 0 && checkMWcmd(0x0180, 0x20, 0x2E) )
-          { m_epyxCtr = 11; handled = true; }
-        else if( m_epyxCtr==11 && checkMWcmd(0x01A0, 0x20, 0xA5) )
-          { m_epyxCtr = 12; handled = true; }
-        else if( m_epyxCtr==12 && strncmp_P(cmd, PSTR("M-E\xa2\x01"), 5)==0 )
-          { m_epyxCtr = 99; handled = true; } // EPYX V1
-        else if( m_epyxCtr== 0 && checkMWcmd(0x0180, 0x19, 0x53) )
-          { m_epyxCtr = 21; handled = true; }
-        else if( m_epyxCtr==21 && checkMWcmd(0x0199, 0x19, 0xA6) )
-          { m_epyxCtr = 22; handled = true; }
-        else if( m_epyxCtr==22 && checkMWcmd(0x01B2, 0x19, 0x8F) )
-          { m_epyxCtr = 23; handled = true; }
-        else if( m_epyxCtr==23 && strncmp_P(cmd, PSTR("M-E\xa9\x01"), 5)==0 )
-          { m_epyxCtr = 99; handled = true; } // EPYX V2 or V3
-        else
-          m_epyxCtr = 0;
+#ifdef IEC_FP_EPYX
+        static const struct MWSignature epyxV1sig[2] PROGMEM   = 
+          { {0x0180, 0x20, 0x2E}, {0x01A0, 0x20, 0xA5} };
+        static const struct MWSignature epyxV2V3sig[3] PROGMEM = 
+          { {0x0180, 0x19, 0x53}, {0x0199, 0x19, 0xA6}, {0x01B2, 0x19, 0x8F} };
 
-        if( m_epyxCtr==99 )
+        if( checkMWcmds(epyxV1sig, 2, 10) || checkMWcmds(epyxV2V3sig, 3, 20) )
+          handled = true;
+        else if( m_uploadCtr==12 && strncmp_P(cmd, PSTR("M-E\xa2\x01"), 5)==0 )
+          m_uploadCtr = 99;
+        else if( m_uploadCtr==23 && strncmp_P(cmd, PSTR("M-E\xa9\x01"), 5)==0 )
+          m_uploadCtr = 99;
+
+        if( m_uploadCtr==99 )
           {
 #if DEBUG>0
             Serial.println(F("EPYX FASTLOAD DETECTED"));
 #endif
-            epyxLoadRequest();
-            m_epyxCtr = 0;
+            fastLoadRequest(IEC_FP_EPYX, IEC_FL_PROT_HEADER);
+            m_uploadCtr = 0;
+            handled = true;
           }
 #endif
-#ifdef SUPPORT_DOLPHIN
-        if( strcmp_P(cmd, PSTR("XQ"))==0 )
-          { dolphinBurstTransmitRequest(); m_channel = 0; handled = true; m_eoi = false; }
-        else if( strcmp_P(cmd, PSTR("XZ"))==0 )
-          { dolphinBurstReceiveRequest(); m_channel = 1; handled = true; m_eoi = false; }
-        else if( strcmp_P(cmd, PSTR("XF+"))==0 )
+#ifdef IEC_FP_AR6
+        static const struct MWSignature ar6LoadSig[9] PROGMEM = 
+          { {0x500,0x23,0x8c}, {0x523,0x23,0xa8}, {0x546,0x23,0x93}, {0x569,0x23,0x0f},
+            {0x58c,0x23,0xea}, {0x5af,0x23,0x94}, {0x5d2,0x23,0x6a}, {0x5f5,0x23,0xb2},
+            {0x618,0x23,0xbc} };
+
+        static const struct MWSignature ar6SaveSig[12] PROGMEM = 
+          { {0x59b,0x23,0xe3}, {0x5be,0x23,0x35}, {0x5e1,0x23,0x3c}, {0x604,0x23,0x2c},
+            {0x627,0x23,0xe0}, {0x64a,0x23,0x0e}, {0x66d,0x23,0xd7}, {0x690,0x23,0x03},
+            {0x6b3,0x23,0xb8}, {0x6d6,0x23,0xad}, {0x6f9,0x23,0x38}, {0x71c,0x23,0x8c} };
+
+        // Action Replay 6 reads $FFFE to determine drive type. We return 3 which identifies
+        // us as a 1581 drive. The 1581 fastloader is very much more suited for our needs.
+        // The 1541 fastloader transfers the whole directory track (18) to the C64 and then
+        // the C64 finds the file to load, i.e. it never actually transmits the name of the
+        // file to load to the drive, which obviously can't work for us here.
+        if( strncmp_P(cmd, PSTR("M-R\xfe\xff\x01"), 6)==0 )
+          {
+            // returning 0x03 when reading $FFFE identifies this as a 1581 drive
+            m_statusBuffer[0] = 0x03;
+            m_statusBufferLen = 1;
+            handled = true;
+          }
+        else if( checkMWcmds(ar6LoadSig, 9, 180) )
+          handled = true;
+        else if( checkMWcmds(ar6SaveSig, 12, 190) )
+          handled = true;
+        else if( m_uploadCtr==189 && strncmp_P(cmd, PSTR("M-E\x00\x05"), 5)==0 )
+          {
+#if DEBUG>0
+            Serial.println(F("ACTION REPLAY 6 FASTLOAD DETECTED"));
+#endif
+            fastLoadRequest(IEC_FP_AR6, IEC_FL_PROT_LOAD);
+            m_uploadCtr = 0;
+            handled = true;
+            m_eoi = false;
+            m_channel = 0;
+          }
+        else if( m_uploadCtr==202 && strncmp_P(cmd, PSTR("M-E\xf4\x05"), 5)==0 )
+          {
+#if DEBUG>0
+            Serial.println(F("ACTION REPLAY 6 FASTSAVE DETECTED"));
+#endif
+            fastLoadRequest(IEC_FP_AR6, IEC_FL_PROT_SAVE);
+            m_uploadCtr = 0;
+            handled = true;
+            m_eoi = false;
+            m_channel = 1;
+          }
+#endif
+#ifdef IEC_FP_FC3
+        static const struct MWSignature fc3LoadSig[16] PROGMEM =
+          { {0x400,0x20,0xb0}, {0x420,0x20,0x6a}, {0x440,0x20,0x51}, {0x460,0x20,0x0a},
+            {0x480,0x20,0x61}, {0x4a0,0x20,0x9b}, {0x4c0,0x20,0x18}, {0x4e0,0x20,0x0b},
+            {0x500,0x20,0xb7}, {0x520,0x20,0xb7}, {0x540,0x20,0xf7}, {0x560,0x20,0x8f},
+            {0x580,0x20,0x6b}, {0x5a0,0x20,0x5d}, {0x5c0,0x20,0x7b}, {0x5e0,0x20,0x52} };
+
+        static const struct MWSignature fc3LoadImageSig[16] PROGMEM =
+          { {0x400,0x20,0x23}, {0x420,0x20,0xfc}, {0x440,0x20,0x25}, {0x460,0x20,0xcd},
+            {0x480,0x20,0x4d}, {0x4a0,0x20,0xc2}, {0x4c0,0x20,0x9e}, {0x4e0,0x20,0x5a},
+            {0x500,0x20,0xc9}, {0x520,0x20,0xb2}, {0x540,0x20,0x5c}, {0x560,0x20,0x8a},
+            {0x580,0x20,0xc5}, {0x5a0,0x20,0x02}, {0x5c0,0x20,0xae}, {0x5e0,0x20,0x2d} };
+
+        static const struct MWSignature fc3SaveSig[16] PROGMEM =
+          { {0x500,0x20,0x16}, {0x520,0x20,0x7e}, {0x540,0x20,0xe1}, {0x560,0x20,0xd8},
+            {0x580,0x20,0xf2}, {0x5a0,0x20,0xe2}, {0x5c0,0x20,0xa3}, {0x5e0,0x20,0x2e},
+            {0x600,0x20,0x27}, {0x620,0x20,0x09}, {0x640,0x20,0xfc}, {0x660,0x20,0x8e},
+            {0x680,0x20,0xaf}, {0x6a0,0x20,0xe0}, {0x6c0,0x20,0xc9}, {0x6e0,0x20,0xa4} };
+
+        if( checkMWcmds(fc3LoadSig, 16, 120) )
+          handled = true;
+        else if( checkMWcmds(fc3LoadImageSig, 16, 140) )
+          handled = true;
+        else if( checkMWcmds(fc3SaveSig, 16, 160) )
+          handled = true;
+        else if( m_uploadCtr==136 && strncmp_P(cmd, PSTR("M-E\x9a\x05"), 5)==0 )
+          {
+#if DEBUG>0
+            Serial.println(F("FINAL CARTRIDGE 3 FASTLOAD DETECTED"));
+#endif
+            fastLoadRequest(IEC_FP_FC3, IEC_FL_PROT_LOAD);
+            m_uploadCtr = 0;
+            handled = true;
+            m_eoi = false;
+            m_channel = 0;
+          }
+        else if( m_uploadCtr==156 && strncmp_P(cmd, PSTR("M-E\x03\x04"), 5)==0 )
+          {
+#if DEBUG>0
+            Serial.println(F("FINAL CARTRIDGE 3 SNAPSHOT FASTLOAD DETECTED"));
+#endif
+            fastLoadRequest(IEC_FP_FC3, IEC_FL_PROT_LOADIMG);
+            m_uploadCtr = 0;
+            handled = true;
+            m_eoi = false;
+            m_channel = 0;
+          }
+        else if( m_uploadCtr==176 && strncmp_P(cmd, PSTR("M-E\x9c\x05"), 5)==0 )
+          {
+#if DEBUG>0
+            Serial.println(F("FINAL CARTRIDGE 3 FASTSAVE DETECTED"));
+#endif
+            fastLoadRequest(IEC_FP_FC3, IEC_FL_PROT_SAVE);
+            m_uploadCtr = 0;
+            handled = true;
+            m_eoi = false;
+            m_channel = 0;
+          }
+#endif
+#ifdef IEC_FP_SPEEDDOS
+        static const struct MWSignature speedDosLoadSig[18] PROGMEM =
+          { {0x300,0x1e,0xc9}, {0x31e,0x1e,0xe9}, {0x33c,0x1e,0xb9}, {0x35a,0x1e,0x4d},
+            {0x378,0x1e,0x5c}, {0x396,0x1e,0x96}, {0x3b4,0x1e,0x39}, {0x3d2,0x1e,0xde},
+            {0x3f0,0x1e,0x0d}, {0x40e,0x1e,0xaf}, {0x42c,0x1e,0x1e}, {0x44a,0x1e,0xf6},
+            {0x468,0x1e,0xd2}, {0x486,0x1e,0x1b}, {0x4a4,0x1e,0x5f}, {0x4c2,0x1e,0x96},
+            {0x4e0,0x1e,0x53}, {0x4fe,0x1e,0x16} };
+
+        if( checkMWcmds(speedDosLoadSig, 18, 100) )
+          handled = true;
+        else if( m_uploadCtr==118 && strncmp_P(cmd, PSTR("M-E\x03\x03"), 5)==0 )
+          {
+#if DEBUG>0
+            Serial.println(F("SPEEDDOS FASTLOAD DETECTED"));
+#endif
+            fastLoadRequest(IEC_FP_SPEEDDOS, IEC_FL_PROT_LOAD);
+            m_uploadCtr = 0;
+            handled = true;
+            m_eoi = false;
+            m_channel = 0;
+          }
+#endif
+#ifdef IEC_FP_DOLPHIN
+        if( m_writeBufferLen==2 && strncmp_P(cmd, PSTR("XQ"), 2)==0 )
+          { fastLoadRequest(IEC_FP_DOLPHIN, IEC_FL_PROT_LOAD);
+            m_channel = 0; handled = true; m_eoi = false; }
+        else if( m_writeBufferLen==2 && strncmp_P(cmd, PSTR("XZ"), 2)==0 )
+          { fastLoadRequest(IEC_FP_DOLPHIN, IEC_FL_PROT_SAVE);
+            m_channel = 1; handled = true; m_eoi = false; }
+        else if( m_writeBufferLen==3 && strncmp_P(cmd, PSTR("XF+"), 2)==0 )
           { enableDolphinBurstMode(true); setStatus(NULL, 0); handled = true; }
-        else if( strcmp_P(cmd, PSTR("XF-"))==0 )
+        else if( m_writeBufferLen==3 && strncmp_P(cmd, PSTR("XF-"), 2)==0 )
           { enableDolphinBurstMode(false); setStatus(NULL, 0); handled = true; }
 #endif
-        if( !handled ) execute(cmd, m_writeBufferLen);
+        if( !handled )
+          {
+            if( m_writeBuffer[m_writeBufferLen-1]==13 ) m_writeBufferLen--;
+            m_writeBuffer[m_writeBufferLen]=0;
+            execute(cmd, m_writeBufferLen);
+            m_uploadCtr = 0;
+          }
+
         m_writeBufferLen = 0;
         break;
       }
     }
 
   m_cmd = IFD_NONE;
+}
+
+
+bool IECFileDevice::checkMWcmds(const struct MWSignature *sig, uint8_t sigLen, uint8_t offset)
+{
+  if( m_uploadCtr==0 && 
+      checkMWcmd(pgm_read_word_near(&(sig[0].address)),
+                 pgm_read_byte_near(&(sig[0].len)),
+                 pgm_read_byte_near(&(sig[0].checksum))) )
+    {
+      m_uploadCtr = offset+1;
+      return true;
+    }
+  else if( m_uploadCtr >= offset && m_uploadCtr < offset+sigLen && 
+           checkMWcmd(pgm_read_word_near(&(sig[m_uploadCtr-offset].address)),
+                      pgm_read_byte_near(&(sig[m_uploadCtr-offset].len)),
+                      pgm_read_byte_near(&(sig[m_uploadCtr-offset].checksum))) )
+    {
+      m_uploadCtr++;
+      return true;
+    }
+  else
+    return false;
 }
 
 
@@ -636,6 +843,7 @@ bool IECFileDevice::checkMWcmd(uint16_t addr, uint8_t len, uint8_t checksum) con
   // check checksum
   uint8_t c = 0;
   for(uint8_t i=0; i<len; i++) c += m_writeBuffer[6+i];
+
   return c==checksum;
 }
 
@@ -644,7 +852,7 @@ void IECFileDevice::setStatus(const char *data, uint8_t dataLen)
 {
 #if DEBUG>0
   Serial.print(F("SETSTATUS ")); 
-#if MAX_DEVICES>1
+#if IEC_MAX_DEVICES>1
   Serial.write('#'); Serial.print(m_devnr); Serial.write(' ');
 #endif
   Serial.println(dataLen);
@@ -665,7 +873,7 @@ void IECFileDevice::clearStatus()
 void IECFileDevice::reset()
 {
 #if DEBUG>0
-#if MAX_DEVICES>1
+#if IEC_MAX_DEVICES>1
   Serial.write('#'); Serial.print(m_devnr); Serial.write(' ');
 #endif
   Serial.println(F("RESET"));
@@ -678,10 +886,7 @@ void IECFileDevice::reset()
   m_channel = 0xFF;
   m_cmd = IFD_NONE;
   m_opening = false;
-
-#ifdef SUPPORT_EPYX
-  m_epyxCtr = 0;
-#endif
+  m_uploadCtr = 0;
 
   IECDevice::reset();
 }

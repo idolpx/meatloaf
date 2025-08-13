@@ -501,7 +501,7 @@ uint8_t iecChannelHandlerDir::readBufferData()
       else
         {
           // no more entries => footer
-#ifdef SUPPORT_DOLPHIN
+#ifdef IEC_FP_DOLPHIN
           // DolphinDos' MultiDubTwo copy program needs the "BLOCKS FREE" footer line, otherwise it aborts when reading source
           uint32_t free = m_dir->media_image.size() ? m_dir->media_blocks_free : std::min((int) m_dir->getAvailableSpace()/254, 65535);
           m_data[0] = 1;
@@ -960,24 +960,38 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
     {
       set_cwd(mstr::drop(command, 2));
     }
-#ifdef SUPPORT_JIFFY
+#ifdef IEC_FP_JIFFY
   else if( command=="EJ+" || command=="EJ-" )
     {
-      enableJiffyDosSupport(command[2]=='+');
+      enableFastLoader(IEC_FP_JIFFY, command[2]=='+');
       setStatusCode(ST_OK);
     }
 #endif  
-#ifdef SUPPORT_EPYX
+#ifdef IEC_FP_EPYX
   else if( command=="EE+" || command=="EE-" )
     {
-      enableEpyxFastLoadSupport(command[2]=='+');
+      enableFastLoader(IEC_FP_EPYX, command[2]=='+');
       setStatusCode(ST_OK);
     }
 #endif  
-#ifdef SUPPORT_DOLPHIN
+#ifdef IEC_FP_AR6
+  else if( command=="EA+" || command=="EA-" )
+    {
+      enableFastLoader(IEC_FP_AR6, command[2]=='+');
+      setStatusCode(ST_OK);
+    }
+#endif
+#ifdef IEC_FP_FC3
+  else if( command=="EF+" || command=="EF-" )
+    {
+      enableFastLoader(IEC_FP_FC3, command[2]=='+');
+      setStatusCode(ST_OK);
+    }
+#endif
+#ifdef IEC_FP_DOLPHIN
   else if( command=="ED+" || command=="ED-" )
     {
-      enableDolphinDosSupport(command[2]=='+');
+      enableFastLoader(IEC_FP_DOLPHIN, command[2]=='+');
       setStatusCode(ST_OK);
     }
   else if( command == "M-R\xfa\x02\x03" )
@@ -1653,7 +1667,7 @@ void iecDrive::unmount()
 }
 
 
-#if defined(SUPPORT_EPYX) && defined(SUPPORT_EPYX_SECTOROPS)
+#if defined(IEC_FP_EPYX) && defined(IEC_FP_EPYX_SECTOROPS)
 bool iecDrive::epyxReadSector(uint8_t track, uint8_t sector, uint8_t *buffer)
 {
   return m_vdrive==nullptr ? false : m_vdrive->readSector(track, sector, buffer);

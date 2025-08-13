@@ -44,9 +44,9 @@
 #define PIN_DAC1                GPIO_NUM_25 // samlib.h
 
 /* Parallel cable */
-#define PIN_XRA1405_CS          GPIO_NUM_21
-#define PIN_PARALLEL_PC2        GPIO_NUM_27
-#define PIN_PARALLEL_FLAG2      GPIO_NUM_22
+//#define PIN_XRA1405_CS          GPIO_NUM_21
+//#define PIN_PARALLEL_PC2        GPIO_NUM_27
+//#define PIN_PARALLEL_FLAG2      GPIO_NUM_22
 
 /* Commodore IEC Pins */
 // CLK & DATA lines in/out are split between two pins

@@ -20,21 +20,31 @@
 
 systemBus IEC;
 
-systemBus::systemBus() : IECBusHandler(PIN_IEC_ATN, PIN_IEC_CLK_OUT, PIN_IEC_DATA_OUT,
-                                       PIN_IEC_RESET==GPIO_NUM_NC ? 0xFF : PIN_IEC_RESET,
-                                       0xFF,
-                                       PIN_IEC_SRQ==GPIO_NUM_NC   ? 0xFF : PIN_IEC_SRQ)
-{
-#ifdef SUPPORT_DOLPHIN
-#ifdef SUPPORT_DOLPHIN_XRA1405
-  setDolphinDosPins(PIN_PARALLEL_FLAG2 == GPIO_NUM_NC ? 0xFF : PIN_PARALLEL_FLAG2,
-                    PIN_PARALLEL_PC2   == GPIO_NUM_NC ? 0xFF : PIN_PARALLEL_PC2,
-                    PIN_SD_HOST_SCK    == GPIO_NUM_NC ? 0xFF : PIN_SD_HOST_SCK,
-                    PIN_SD_HOST_MOSI   == GPIO_NUM_NC ? 0xFF : PIN_SD_HOST_MOSI,
-                    PIN_SD_HOST_MISO   == GPIO_NUM_NC ? 0xFF : PIN_SD_HOST_MISO,
-                    PIN_XRA1405_CS     == GPIO_NUM_NC ? 0xFF : PIN_XRA1405_CS);
+systemBus::systemBus() : 
+  IECBusHandler(PIN_IEC_ATN, 
+#ifdef IEC_USE_LINE_DRIVERS
+                PIN_IEC_CLK_IN, PIN_IEC_CLK_OUT, PIN_IEC_DATA_IN, PIN_IEC_DATA_OUT,
 #else
-#error "Can only support DolphinDos using XRA1405 port expander"
+                PIN_IEC_CLK_OUT, PIN_IEC_DATA_OUT,
+#endif
+#ifdef IEC_HAS_RESET
+                PIN_IEC_RESET==GPIO_NUM_NC ? 0xFF : PIN_IEC_RESET,
+#else
+                0xFF,
+#endif
+                0xFF,
+                PIN_IEC_SRQ==GPIO_NUM_NC   ? 0xFF : PIN_IEC_SRQ)
+{
+#ifdef IEC_SUPPORT_PARALLEL
+#ifdef IEC_SUPPORT_PARALLEL_XRA1405
+  setParallelPins(PIN_PARALLEL_FLAG2 == GPIO_NUM_NC ? 0xFF : PIN_PARALLEL_FLAG2,
+                  PIN_PARALLEL_PC2   == GPIO_NUM_NC ? 0xFF : PIN_PARALLEL_PC2,
+                  PIN_SD_HOST_SCK    == GPIO_NUM_NC ? 0xFF : PIN_SD_HOST_SCK,
+                  PIN_SD_HOST_MOSI   == GPIO_NUM_NC ? 0xFF : PIN_SD_HOST_MOSI,
+                  PIN_SD_HOST_MISO   == GPIO_NUM_NC ? 0xFF : PIN_SD_HOST_MISO,
+                  PIN_XRA1405_CS     == GPIO_NUM_NC ? 0xFF : PIN_XRA1405_CS);
+#else
+#error "Can only support DolphinDos/SpeedDos using XRA1405 port expander"
 #endif
 #endif
 }
@@ -62,14 +72,23 @@ void systemBus::setup()
 {
   Debug_printf("IEC systemBus::setup()\r\n");
   begin();
-#ifdef SUPPORT_JIFFY
+#ifdef IEC_FP_JIFFY
   Debug_printf("JiffyDOS protocol supported\r\n");
 #endif
-#ifdef SUPPORT_EPYX
+#ifdef IEC_FP_EPYX
   Debug_printf("Epyx FastLoad protocol supported\r\n");
 #endif
-#ifdef SUPPORT_DOLPHIN
+#ifdef IEC_FP_DOLPHIN
   Debug_printf("DolphinDOS protocol supported\r\n");
+#endif
+#ifdef IEC_FP_FC3
+  Debug_printf("Final Cartridge 3 protocol supported\r\n");
+#endif
+#ifdef IEC_FP_AR6
+  Debug_printf("Action Replay 6 protocol supported\r\n");
+#endif
+#ifdef IEC_FP_SPEEDDOS
+  Debug_printf("SpeedDOS protocol supported\r\n");
 #endif
 
 //     // initial pin modes in GPIO

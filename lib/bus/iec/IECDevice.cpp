@@ -27,10 +27,12 @@
 
 IECDevice::IECDevice(uint8_t devnr) 
 { 
-  m_devnr   = devnr; 
-  m_handler = NULL;
-  m_sflags  = 0;
-  //m_isActive = true;
+  m_devnr      = devnr; 
+  m_handler    = NULL;
+  m_isActive   = true;
+  m_flEnabled  = 0;
+  m_flFlags    = 0;
+  m_flProtocol = IEC_FL_PROT_NONE;
 }
 
 void IECDevice::setDeviceNumber(uint8_t devnr)
@@ -39,59 +41,59 @@ void IECDevice::setDeviceNumber(uint8_t devnr)
 }
 
 
-void IECDevice::sendSRQ() 
-{ 
-  if( m_handler ) m_handler->sendSRQ(); 
-}
-
-
-#ifdef SUPPORT_JIFFY
-bool IECDevice::enableJiffyDosSupport(bool enable)
+void IECDevice::sendSRQ()
 {
-  return m_handler ? m_handler->enableJiffyDosSupport(this, enable) : false;
+  if( m_handler ) m_handler->sendSRQ();
 }
-#endif
 
-
-#ifdef SUPPORT_DOLPHIN 
-bool IECDevice::enableDolphinDosSupport(bool enable)
+bool IECDevice::enableFastLoader(uint8_t loader, bool enable)
 {
-  return m_handler ? m_handler->enableDolphinDosSupport(this, enable) : false;
+  // cancel any current fast-load activities
+  m_flProtocol = IEC_FL_PROT_NONE;
+
+  if( loader<=7 && m_handler!=NULL )
+    {
+      // must set the bit BEFORE calling IECBusHandler::enableFastLoader, otherwise
+      // "enableParallelPins()" will not be called for parallel loaders.
+      if( enable )
+        m_flEnabled |= bit(loader);
+      else 
+        m_flEnabled &= ~bit(loader);
+
+      if( !m_handler->enableFastLoader(this, loader, enable) ) 
+        m_flEnabled &= ~bit(loader);
+    }
+
+  return (m_flEnabled & bit(loader))!=0;
 }
 
+bool IECDevice::isFastLoaderEnabled(uint8_t loader)
+{
+  return loader<=7 && (m_flEnabled & bit(loader))!=0;
+}
+
+bool IECDevice::fastLoadRequest(uint8_t loader, uint8_t request)
+{
+  if( m_handler!=NULL && isFastLoaderEnabled(loader) )
+    {
+      m_flProtocol = (loader<<3) | request;
+      m_handler->fastLoadRequest(loader, request);
+      return true;
+    }
+  else
+    return false;
+}
+
+#ifdef IEC_FP_DOLPHIN 
 void IECDevice::enableDolphinBurstMode(bool enable)
 {
   if( m_handler ) m_handler->enableDolphinBurstMode(this, enable);
 }
-
-void IECDevice::dolphinBurstReceiveRequest()
-{
-  if( m_handler ) m_handler->dolphinBurstReceiveRequest(this);
-}
-
-void IECDevice::dolphinBurstTransmitRequest()
-{
-  if( m_handler ) m_handler->dolphinBurstTransmitRequest(this);
-}
 #endif
-
-#ifdef SUPPORT_EPYX
-bool IECDevice::enableEpyxFastLoadSupport(bool enable)
-{
-  return m_handler ? m_handler->enableEpyxFastLoadSupport(this, enable) : false;
-}
-
-void IECDevice::epyxLoadRequest()
-{
-  if( m_handler ) m_handler->epyxLoadRequest(this);
-}
-
-#endif  
-
 
 // default implementation of "buffer read" function which can/should be overridden
 // (for efficiency) by devices using the JiffyDos, Epyx FastLoad or DolphinDos protocol
-#if defined(SUPPORT_JIFFY) || defined(SUPPORT_EPYX) || defined(SUPPORT_DOLPHIN)
+#if defined(IEC_FP_JIFFY) || defined(IEC_FP_EPYX) || defined(IEC_FP_DOLPHIN) || defined(IEC_FP_SPEEDDOS) || defined(IEC_FP_FC3) || defined(IEC_FP_AR6)
 uint8_t IECDevice::read(uint8_t *buffer, uint8_t bufferSize)
 { 
   uint8_t i;
@@ -111,7 +113,7 @@ uint8_t IECDevice::read(uint8_t *buffer, uint8_t bufferSize)
 #endif
 
 
-#if defined(SUPPORT_DOLPHIN)
+#if defined(IEC_FP_DOLPHIN) || defined(IEC_FP_FC3) || defined(IEC_FP_AR6)
 // default implementation of "buffer write" function which can/should be overridden
 // (for efficiency) by devices using the DolphinDos protocol
 uint8_t IECDevice::write(uint8_t *buffer, uint8_t bufferSize, bool eoi)

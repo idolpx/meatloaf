@@ -90,7 +90,7 @@ class IECFileDevice : public IECDevice
   // of first sending the contents of the buffer
   void clearReadBuffer(uint8_t channel);
 
-#if defined(SUPPORT_EPYX) && defined(SUPPORT_EPYX_SECTOROPS)
+#if defined(IEC_FP_EPYX) && defined(IEC_FP_EPYX_SECTOROPS)
   virtual bool epyxReadSector(uint8_t track, uint8_t sector, uint8_t *buffer);
   virtual bool epyxWriteSector(uint8_t track, uint8_t sector, uint8_t *buffer);
 #endif
@@ -113,19 +113,19 @@ class IECFileDevice : public IECDevice
   void emptyWriteBuffer();
   void fileTask();
   bool checkMWcmd(uint16_t addr, uint8_t len, uint8_t checksum) const;
+  bool checkMWcmds(const struct MWSignature *sig, uint8_t sigLen, uint8_t offset);
 
   bool    m_opening, m_eoi, m_canServeATN;
-  uint8_t m_channel, m_cmd;
+  uint8_t m_channel, m_cmd, m_uploadCtr;
+#if defined(IEC_FP_AR6)
+  uint8_t m_ar6detect;
+#endif
   uint8_t m_writeBuffer[IECFILEDEVICE_WRITE_BUFFER_SIZE];
 
   uint8_t m_readBuffer[15][2];
   uint8_t m_statusBufferLen, m_statusBufferPtr, m_writeBufferLen;
   int8_t  m_readBufferLen[15];
   char    m_statusBuffer[IECFILEDEVICE_STATUS_BUFFER_SIZE];
-
-#ifdef SUPPORT_EPYX
-  uint8_t m_epyxCtr;
-#endif
 };
 
 

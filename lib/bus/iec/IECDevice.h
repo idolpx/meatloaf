@@ -38,34 +38,16 @@ class IECDevice
   // call this to change the device number
   void setDeviceNumber(uint8_t devnr);
 
-#ifdef SUPPORT_JIFFY 
-  // call this to enable or disable JiffyDOS support for your device.
-  bool enableJiffyDosSupport(bool enable);
-#endif
-
-#ifdef SUPPORT_DOLPHIN 
-  // call this to enable or disable DolphinDOS support for your device.
-  // this function will fail if any of the pins used for ATN/CLK/DATA/RESET
-  // are the same as the pins used for the parallel cable
-  bool enableDolphinDosSupport(bool enable);
-#endif
-
-#ifdef SUPPORT_EPYX
-  // call this to enable or disable Expyx FastLoad support for your device. 
-  bool enableEpyxFastLoadSupport(bool enable);
-#endif
-
-
-  /**
-   * @brief is device active (turned on?)
-   */
-  bool device_active = true;
-
+  // call this to enable or disable support for the various fast-load protocols
+  // for your device.
+  bool enableFastLoader(uint8_t protocol, bool enable);
+  bool isFastLoaderEnabled(uint8_t loader);
+  
   // this can be overloaded by derived classes
-  virtual bool isActive() { return device_active; }
+  virtual bool isActive() { return m_isActive; }
 
   // if isActive() is not overloaded then use this to activate/deactivate a device
-  void setActive(bool b) { device_active = b; }
+  void setActive(bool b) { m_isActive = b; }
 
  protected:
   // called when IECBusHandler::begin() is called
@@ -123,7 +105,7 @@ class IECDevice
   // read() is allowed to take an indefinite amount of time
   virtual uint8_t read() { return 0; }
 
-#if defined(SUPPORT_JIFFY) || defined(SUPPORT_DOLPHIN)
+#if defined(IEC_FP_JIFFY) || defined(IEC_FP_DOLPHIN) || defined(IEC_FP_SPEEDDOS) || defined(IEC_FP_AR6)
   // called when the device is sending data using JiffyDOS byte-by-byte protocol
   // peek() will only be called if the last call to canRead() returned >0
   // peek() should return the next character that will be read with read()
@@ -131,7 +113,7 @@ class IECDevice
   virtual uint8_t peek() { return 0; }
 #endif
 
-#ifdef SUPPORT_DOLPHIN
+#if defined(IEC_FP_DOLPHIN) || defined(IEC_FP_FC3) || defined(IEC_FP_AR6)
   // called when the device is sending data using the DolphinDos burst transfer (SAVE protocol)
   // should write all the data in the buffer and return the number of bytes written
   // returning less than bufferSize signals an error condition
@@ -143,7 +125,7 @@ class IECDevice
   virtual uint8_t write(uint8_t *buffer, uint8_t bufferSize, bool eoi);
 #endif
 
-#if defined(SUPPORT_JIFFY) || defined(SUPPORT_DOLPHIN) || defined(SUPPORT_EPYX)
+#if defined(IEC_FP_JIFFY) || defined(IEC_FP_DOLPHIN) || defined(IEC_FP_SPEEDDOS) || defined(IEC_FP_EPYX) || defined(IEC_FP_FC3) || defined(IEC_FP_AR6)
   // called when the device is sending data using the JiffyDOS block transfer
   // or DolphinDos burst transfer (LOAD protocols)
   // - should fill the buffer with as much data as possible (up to bufferSize)
@@ -155,41 +137,31 @@ class IECDevice
   virtual uint8_t read(uint8_t *buffer, uint8_t bufferSize);
 #endif
 
-#if defined(SUPPORT_EPYX) && defined(SUPPORT_EPYX_SECTOROPS)
+#if defined(IEC_FP_EPYX) && defined(IEC_FP_EPYX_SECTOROPS)
   // these functions are experimental, they are called when the Epyx Cartridge uses
   // sector read/write operations (disk editor, disk copy or file copy).
   virtual bool epyxReadSector(uint8_t track, uint8_t sector, uint8_t *buffer)  { return false; }
   virtual bool epyxWriteSector(uint8_t track, uint8_t sector, uint8_t *buffer) { return false; }
 #endif
 
-#ifdef SUPPORT_DOLPHIN 
+#ifdef IEC_FP_DOLPHIN 
   // call this to enable or disable DolphinDOS burst transmission mode
   // On the 1541, this gets enabled/disabled by the "XF+"/"XF-" command
   // (the IECFileDevice class handles this automatically)
   void enableDolphinBurstMode(bool enable);
-
-  // call this when a DolphinDOS burst recive request ("XZ") is received
-  // on the command channel (the IECFileDevice class handles this automatically)
-  void dolphinBurstReceiveRequest();
-
-  // call this when a DolphinDOS burst transmit request ("XQ") is received
-  // on the command channel (the IECFileDevice class handles this automatically)
-  void dolphinBurstTransmitRequest();
 #endif
 
-#ifdef SUPPORT_EPYX
-  // call this after receiving the EPYX fast-load routine upload (via M-W and M-E)
-  // (the IECFileDevice class handles this automatically)
-  void epyxLoadRequest();
-#endif
+  bool fastLoadRequest(uint8_t loader, uint8_t request);
 
   // send pulse on SRQ line (if SRQ pin was set in IECBusHandler constructor)
   void sendSRQ();
 
  protected:
-  //bool       m_isActive;
+  bool       m_isActive;
   uint8_t    m_devnr;
-  uint16_t m_sflags;
+  uint8_t    m_flEnabled;  // bit-mask for which fast-loaders are enabled (IEC_FP_* in IECConfig.h)
+  uint32_t   m_flFlags;    // internal fast-loader flags
+  uint8_t    m_flProtocol; // currently active fast-load protocol
   IECBusHandler *m_handler;
 };
 
