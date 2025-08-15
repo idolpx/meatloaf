@@ -230,16 +230,16 @@ class IECBusHandler
 #ifdef IEC_FP_FC3
   void transmitFC3Bytes(uint8_t *data);
   bool receiveFC3Byte(uint8_t *data);
-  bool transmitFC3Block();
-  bool transmitFC3ImageBlock();
-  bool receiveFC3Block();
+  int8_t transmitFC3Block();
+  int8_t transmitFC3ImageBlock();
+  int8_t receiveFC3Block();
 #endif
   
 #ifdef IEC_FP_AR6
   bool transmitAR6Byte(uint8_t data);
   bool receiveAR6Byte(uint8_t *data);
-  bool transmitAR6Block();
-  bool receiveAR6Block();
+  int8_t transmitAR6Block();
+  int8_t receiveAR6Block();
 #endif
   
 #if defined(IEC_SUPPORT_FASTLOAD)

@@ -2771,7 +2771,7 @@ bool RAMFUNC(IECBusHandler::receiveFC3Byte)(uint8_t *pdata)
   JDEBUG0();
 
   // sender releases DATA and pulls CLK low 58us after CLK high
-  timer_wait_until(61);
+  if( !waitPinCLK(LOW) ) return false;
   timer_stop();
 
   *pdata = data;
@@ -2780,7 +2780,7 @@ bool RAMFUNC(IECBusHandler::receiveFC3Byte)(uint8_t *pdata)
 
 #pragma GCC pop_options
 
-bool RAMFUNC(IECBusHandler::transmitFC3Block)()
+int8_t RAMFUNC(IECBusHandler::transmitFC3Block)()
 {
   m_inTask = false;
   if( m_buffer[1]==0 )
@@ -2813,13 +2813,13 @@ bool RAMFUNC(IECBusHandler::transmitFC3Block)()
   writePinCLK(LOW);
   
   // wait for confirmation (DATA low)
-  if( !waitPinDATA(LOW, 0) ) return false;
+  if( !waitPinDATA(LOW, 0) ) return -1;
   
   // release CLK
   writePinCLK(HIGH);
 
   // wait for DATA high
-  if( !waitPinDATA(HIGH, 0) ) return false;
+  if( !waitPinDATA(HIGH, 0) ) return -1;
   
   noInterrupts();
 
@@ -2856,7 +2856,7 @@ bool RAMFUNC(IECBusHandler::transmitFC3Block)()
 }
 
 
-bool RAMFUNC(IECBusHandler::transmitFC3ImageBlock)()
+int8_t RAMFUNC(IECBusHandler::transmitFC3ImageBlock)()
 {
   m_inTask = false;
   uint8_t n = m_currentDevice->read(m_buffer+3, 254);
@@ -2879,13 +2879,13 @@ bool RAMFUNC(IECBusHandler::transmitFC3ImageBlock)()
       writePinCLK(LOW);
       
       // wait for confirmation (DATA low)
-      if( !waitPinDATA(LOW, 0) ) { interrupts(); return false; }
+      if( !waitPinDATA(LOW, 0) ) { interrupts(); return -1; }
       
       // release CLK
       writePinCLK(HIGH);
       
       // wait for DATA high
-      if( !waitPinDATA(HIGH, 0) ) { interrupts(); return false; }
+      if( !waitPinDATA(HIGH, 0) ) { interrupts(); return -1; }
   
       // transmit 4-byte tuple
       transmitFC3Bytes(data);
@@ -2900,12 +2900,12 @@ bool RAMFUNC(IECBusHandler::transmitFC3ImageBlock)()
 
   interrupts();
 
-  // return true if more blocks to transmit
-  return m_buffer[2]==0;
+  // return 1 if more blocks to transmit, otherwise 0
+  return m_buffer[2]==0 ? 1 : 0;
 }
 
 
-bool RAMFUNC(IECBusHandler::receiveFC3Block)()
+int8_t RAMFUNC(IECBusHandler::receiveFC3Block)()
 {
   noInterrupts();
 
@@ -2914,13 +2914,13 @@ bool RAMFUNC(IECBusHandler::receiveFC3Block)()
   
   // receive block data length
   uint8_t len;
-  if( !receiveFC3Byte(&len) ) { interrupts(); return false; }
+  if( !receiveFC3Byte(&len) ) { interrupts(); return -1; }
 
   // receive block data
   uint8_t n = len==0 ? 254 : len-1;
   for(uint8_t i=0; i<n; i++)
     if( !receiveFC3Byte(m_buffer+i) ) 
-      { interrupts(); return false; }
+      { interrupts(); return -1; }
 
   // signal "not ready"
   writePinDATA(LOW);
@@ -2932,9 +2932,9 @@ bool RAMFUNC(IECBusHandler::receiveFC3Block)()
   
   // send data to device
   if( m_currentDevice->write(m_buffer, n, eoi)==n )
-    return !eoi;
+    return eoi ? 0 : 1;
   else
-    return false;
+    return -1;
 }
 
 
@@ -2996,14 +2996,13 @@ bool RAMFUNC(IECBusHandler::transmitAR6Byte)(uint8_t data)
   timer_wait_until(36);
 
   // pull CLK low ("not ready") and release DATA
-  timer_stop();
   writePinCLK(LOW);
   writePinDATA(HIGH);
 
   interrupts();
 
-  // receiver pulls CLK low ("not ready") 38us after DATA high
-  timer_wait_until(40);
+  // receiver pulls DATA low ("not ready") 38us after DATA high
+  if( !waitPinDATA(LOW) ) return false;
   timer_stop();
 
   return true;
@@ -3068,7 +3067,7 @@ bool RAMFUNC(IECBusHandler::receiveAR6Byte)(uint8_t *pdata)
   interrupts();
 
   // sender releases CLK and pulls DATA low 57us after CLK high
-  if( !waitPinDATA(LOW, 0) ) return false;
+  if( !waitPinDATA(LOW) ) return false;
   timer_stop();
 
   *pdata = data;
@@ -3078,7 +3077,7 @@ bool RAMFUNC(IECBusHandler::receiveAR6Byte)(uint8_t *pdata)
 #pragma GCC pop_options
 
 
-bool RAMFUNC(IECBusHandler::transmitAR6Block)()
+int8_t RAMFUNC(IECBusHandler::transmitAR6Block)()
 {
   uint8_t n;
 
@@ -3090,24 +3089,24 @@ bool RAMFUNC(IECBusHandler::transmitAR6Block)()
   else
     n = m_currentDevice->read(m_buffer, 254);
 
-  if( !transmitAR6Byte(n) ) return false;
+  if( !transmitAR6Byte(n) ) return -1;
 
   for(uint8_t i=0; i<n; i++)
     if( !transmitAR6Byte(m_buffer[i]) ) 
-      return false;
+      return -1;
 
   // next block number
   m_buffer[255]++;
 
-  return n!=0;
+  return n==0 ? 0 : 1;
 }
 
 
-bool RAMFUNC(IECBusHandler::receiveAR6Block)()
+int8_t RAMFUNC(IECBusHandler::receiveAR6Block)()
 {
   for(uint16_t i=0; i<256; i++)
     if( !receiveAR6Byte(m_buffer+i) )
-      return false;
+      return -1;
   
   // first byte of block is number of blocks to receive AFTER this one
   // it that is 0 then second byte is number of valid bytes within this block (+2)
@@ -3116,9 +3115,9 @@ bool RAMFUNC(IECBusHandler::receiveAR6Block)()
 
   // send data to device
   if( m_currentDevice->write(m_buffer+2, n, eoi)==n )
-    return !eoi;
+    return eoi ? 0 : 1;
   else
-    return false;
+    return -1;
 }
 
 #endif
@@ -3751,7 +3750,7 @@ void IECBusHandler::handleFastLoadProtocols()
             {
               m_currentDevice = m_devices[devidx];
               m_timeoutDuration = 0;
-              if( !transmitFC3Block() )
+              if( transmitFC3Block()!=1 )
                 {
                   // either end-of-data or transmission error => we are done
                   m_currentDevice->m_flProtocol = IEC_FL_PROT_NONE;
@@ -3761,7 +3760,7 @@ void IECBusHandler::handleFastLoadProtocols()
             {
               m_currentDevice = m_devices[devidx];
               m_timeoutDuration = 0;
-              if( !transmitFC3ImageBlock() )
+              if( transmitFC3ImageBlock()!=1 )
                 {
                   // either end-of-data or transmission error => we are done
                   m_currentDevice->m_flProtocol = IEC_FL_PROT_NONE;
@@ -3770,15 +3769,16 @@ void IECBusHandler::handleFastLoadProtocols()
           else if( (loader==IEC_FP_FC3) && (protocol==IEC_FL_PROT_SAVE) && ((m_timeoutDuration==0) || (micros()-m_timeoutStart)>m_timeoutDuration) )
             {
               m_currentDevice = m_devices[devidx];
-              if( !receiveFC3Block() )
+              int8_t res = receiveFC3Block();
+              if( res!=1 )
                 {
                   // either no more operations or transmission error => we are done
                   writePinCLK(HIGH);
                   writePinDATA(HIGH);
                   m_currentDevice->m_flProtocol = IEC_FL_PROT_NONE;
 
-                  // close the file (usually the host sends these but not after fast save)
-                  m_currentDevice->listen(0xE0);
+                  // close the file (usually the host sends these but not after fast-save)
+                  m_currentDevice->listen(0xE1);
                   m_currentDevice->unlisten();
                 }
             }
@@ -3791,18 +3791,27 @@ void IECBusHandler::handleFastLoadProtocols()
             {
               m_currentDevice = m_devices[devidx];
               m_timeoutDuration = 0;
-              if( !transmitAR6Block() )
+
+              int8_t res = transmitAR6Block();
+              if( res!=1 )
                 {
                   // either end-of-data or transmission error => we are done
                   writePinCLK(HIGH);
                   writePinDATA(HIGH);
                   m_currentDevice->m_flProtocol = IEC_FL_PROT_NONE;
+
+                  if( res<0 )
+                    {
+                      // close the file (usually the host sends these but not if the transfer was interrupted)
+                      m_currentDevice->listen(0xE0);
+                      m_currentDevice->unlisten();
+                    }
                 }
             }
           else if( (loader==IEC_FP_AR6) && (protocol==IEC_FL_PROT_SAVE) && ((m_timeoutDuration==0) || (micros()-m_timeoutStart)>m_timeoutDuration) )
             {
               m_currentDevice = m_devices[devidx];
-              if( !receiveAR6Block() )
+              if( receiveAR6Block()!=1 )
                 {
                   // either no more blocks or transmission error => we are done
                   writePinCLK(HIGH);
