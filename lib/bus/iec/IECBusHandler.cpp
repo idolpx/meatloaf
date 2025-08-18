@@ -1403,8 +1403,8 @@ bool RAMFUNC(IECBusHandler::receiveJiffyByte)(bool canWriteOk)
   // NOTE: this must be in a blocking loop since the sender starts transmitting
   // the byte immediately after setting CLK high. If we exit the "task" function then
   // we may not get back here in time to receive.
-#ifdef ESP_PLATFORM
   while( !digitalReadFastExt(m_pinCLK, m_regCLKread, m_bitCLK) && digitalReadFastExt(m_pinATN, m_regATNread, m_bitATN) )
+#ifdef ESP_PLATFORM
     if( !timer_less_than(IWDT_FEED_TIME) )
       {
         // briefly enable interrupts to "feed" the WDT, otherwise we'll get re-booted
@@ -1412,7 +1412,7 @@ bool RAMFUNC(IECBusHandler::receiveJiffyByte)(bool canWriteOk)
         timer_reset();
       }
 #else
-  while( !digitalReadFastExt(m_pinCLK, m_regCLKread, m_bitCLK) && digitalReadFastExt(m_pinATN, m_regATNread, m_bitATN) );
+    {}
 #endif
 
   // start timer (on AVR, lag from CLK high to timer start is between 700...1700ns)
@@ -1510,8 +1510,8 @@ bool RAMFUNC(IECBusHandler::transmitJiffyByte)(uint8_t numData)
   // NOTE: this must be in a blocking loop since the receiver receives the data
   // immediately after setting DATA high. If we exit the "task" function then
   // we may not get back here in time to transmit.
-#ifdef ESP_PLATFORM
   while( !digitalReadFastExt(m_pinDATA, m_regDATAread, m_bitDATA) && digitalReadFastExt(m_pinATN, m_regATNread, m_bitATN) )
+#ifdef ESP_PLATFORM
     if( !timer_less_than(IWDT_FEED_TIME) )
       {
         // briefly enable interrupts to "feed" the WDT, otherwise we'll get re-booted
@@ -1519,7 +1519,7 @@ bool RAMFUNC(IECBusHandler::transmitJiffyByte)(uint8_t numData)
         timer_reset();
       }
 #else
-  while( !digitalReadFastExt(m_pinDATA, m_regDATAread, m_bitDATA) && digitalReadFastExt(m_pinATN, m_regATNread, m_bitATN) );
+    {}
 #endif
 
   // start timer (on AVR, lag from DATA high to timer start is between 700...1700ns)
@@ -1668,8 +1668,8 @@ bool RAMFUNC(IECBusHandler::transmitJiffyBlock)(uint8_t *buffer, uint8_t numByte
       // NOTE: this must be in a blocking loop since the receiver receives the data
       // immediately after setting DATA high. If we exit the "task" function then
       // we may not get back here in time to transmit.
-#ifdef ESP_PLATFORM
       while( digitalReadFastExt(m_pinDATA, m_regDATAread, m_bitDATA) && digitalReadFastExt(m_pinATN, m_regATNread, m_bitATN) )
+#ifdef ESP_PLATFORM
         if( !timer_less_than(IWDT_FEED_TIME) )
           {
             // briefly enable interrupts to "feed" the WDT, otherwise we'll get re-booted
@@ -1677,7 +1677,7 @@ bool RAMFUNC(IECBusHandler::transmitJiffyBlock)(uint8_t *buffer, uint8_t numByte
             timer_reset();
           }
 #else
-      while( digitalReadFastExt(m_pinDATA, m_regDATAread, m_bitDATA) && digitalReadFastExt(m_pinATN, m_regATNread, m_bitATN) );
+        {}
 #endif
 
       // start timer (on AVR, lag from DATA low to timer start is between 700...1700ns)
@@ -2301,8 +2301,8 @@ bool RAMFUNC(IECBusHandler::transmitEpyxByte)(uint8_t data)
   // NOTE: this must be in a blocking loop since the sender starts transmitting
   // the byte immediately after setting CLK high. If we exit the "task" function then
   // we may not get back here in time to receive.
-#ifdef ESP_PLATFORM
   while( !digitalReadFastExt(m_pinDATA, m_regDATAread, m_bitDATA) && digitalReadFastExt(m_pinATN, m_regATNread, m_bitATN) )
+#ifdef ESP_PLATFORM
     if( !timer_less_than(IWDT_FEED_TIME) )
       {
         // briefly enable interrupts to "feed" the WDT, otherwise we'll get re-booted
@@ -2310,7 +2310,7 @@ bool RAMFUNC(IECBusHandler::transmitEpyxByte)(uint8_t data)
         timer_reset();
       }
 #else
-  while( !digitalReadFastExt(m_pinDATA, m_regDATAread, m_bitDATA) && digitalReadFastExt(m_pinATN, m_regATNread, m_bitATN) );
+    {}
 #endif
   
   // start timer
@@ -2731,11 +2731,17 @@ bool RAMFUNC(IECBusHandler::receiveFC3Byte)(uint8_t *pdata)
   timer_init();
   timer_reset();
 
-#if defined(__AVR__)
-  // on (slow) use a tight loop so we don't lose too much time before starting the timer
-  while( !digitalReadFastExt(m_pinCLK, m_regCLKread, m_bitCLK) && digitalReadFastExt(m_pinATN, m_regATNread, m_bitATN) );
+  // wait (indefinitely) for CLK high
+  while( !digitalReadFastExt(m_pinCLK, m_regCLKread, m_bitCLK) && digitalReadFastExt(m_pinATN, m_regATNread, m_bitATN) )
+#ifdef ESP_PLATFORM
+    if( !timer_less_than(IWDT_FEED_TIME) )
+      {
+        // briefly enable interrupts to "feed" the WDT, otherwise we'll get re-booted
+        interrupts(); noInterrupts();
+        timer_reset();
+      }
 #else
-  waitPinCLK(HIGH, 0);
+    {}
 #endif
   timer_start();
 
@@ -2959,11 +2965,17 @@ bool RAMFUNC(IECBusHandler::transmitAR6Byte)(uint8_t data)
   // release CLK (signal "ready")
   writePinCLK(HIGH);
 
-#if defined(__AVR__)
-  // on (slow) AVR use a tight loop so we don't lose too much time before starting the timer
-  while( !digitalReadFastExt(m_pinDATA, m_regDATAread, m_bitDATA) && digitalReadFastExt(m_pinATN, m_regATNread, m_bitATN) );
+  // wait (indefinitely) for DATA high
+  while( !digitalReadFastExt(m_pinDATA, m_regDATAread, m_bitDATA) && digitalReadFastExt(m_pinATN, m_regATNread, m_bitATN) )
+#ifdef ESP_PLATFORM
+    if( !timer_less_than(IWDT_FEED_TIME) )
+      {
+        // briefly enable interrupts to "feed" the WDT, otherwise we'll get re-booted
+        interrupts(); noInterrupts();
+        timer_reset();
+      }
 #else
-  waitPinDATA(HIGH, 0);
+    {}
 #endif
   timer_start();
 
@@ -3021,11 +3033,17 @@ bool RAMFUNC(IECBusHandler::receiveAR6Byte)(uint8_t *pdata)
   writePinCLK(HIGH);
 
   JDEBUG1();
-#if defined(__AVR__)
-  // on (slow) AVR use a tight loop so we don't lose too much time before starting the timer
-  while( !digitalReadFastExt(m_pinDATA, m_regDATAread, m_bitDATA) && digitalReadFastExt(m_pinATN, m_regATNread, m_bitATN) );
+  // wait (indefinitely) for DATA high
+  while( !digitalReadFastExt(m_pinDATA, m_regDATAread, m_bitDATA) && digitalReadFastExt(m_pinATN, m_regATNread, m_bitATN) )
+#ifdef ESP_PLATFORM
+    if( !timer_less_than(IWDT_FEED_TIME) )
+      {
+        // briefly enable interrupts to "feed" the WDT, otherwise we'll get re-booted
+        interrupts(); noInterrupts();
+        timer_reset();
+      }
 #else
-  waitPinDATA(HIGH, 0);
+    {}
 #endif
   timer_start();
   JDEBUG0();
