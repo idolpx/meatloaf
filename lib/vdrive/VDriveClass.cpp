@@ -176,7 +176,10 @@ bool VDrive::openFile(uint8_t channel, const char *name, bool convertNameToPETSC
 {
   bool res = false;
 
-  bool wasInUse = m_drive->buffers[channel].mode!=BUFFER_NOT_IN_USE;
+  // vdrive_iec_open returns a "NO CHANNEL" error if the channel is already open by Commodore
+  // drives don't do that. They just re-open the channel with the new file name.
+  if( m_drive->buffers[channel].mode!=BUFFER_NOT_IN_USE )
+    closeFile(channel);
 
   if( convertNameToPETSCII )
     {
@@ -188,8 +191,9 @@ bool VDrive::openFile(uint8_t channel, const char *name, bool convertNameToPETSC
   else
     res = vdrive_iec_open(m_drive, (uint8_t *) name, (unsigned int) strlen(name), channel, NULL)==0;
 
-  bool isInUse = m_drive->buffers[channel].mode!=BUFFER_NOT_IN_USE;
-  if( !wasInUse && isInUse ) m_numOpenChannels++;
+  if( m_drive->buffers[channel].mode!=BUFFER_NOT_IN_USE )
+    m_numOpenChannels++;
+
   return res;
 }
 
