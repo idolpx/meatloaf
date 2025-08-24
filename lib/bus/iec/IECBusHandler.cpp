@@ -59,7 +59,8 @@
 #define timer_start()        TCCR1B |= bit(CS11)
 #define timer_stop()         TCCR1B &= ~bit(CS11)
 #define timer_less_than(us)  (TCNT1L < ((uint8_t) (2*(us))))
-#define timer_wait_until(us) while( timer_less_than(us) )
+#define timer_not_equal(us)  (TCNT1L != uint8_t(uint32_t(2*(us))))
+#define timer_wait_until(us) while( timer_not_equal(us) )
 #else
 // use 8-bit timer 2 with /8 prescaler
 #define timer_init()         { TCCR2A=0; TCCR2B=0; }
@@ -67,7 +68,8 @@
 #define timer_start()        TCCR2B |= bit(CS21)
 #define timer_stop()         TCCR2B &= ~bit(CS21)
 #define timer_less_than(us)  (TCNT2 < ((uint8_t) (2*(us))))
-#define timer_wait_until(us) while( timer_less_than(us) )
+#define timer_not_equal(us)  (TCNT2 != uint8_t(uint16_t(2*(us))))
+#define timer_wait_until(us) while( timer_not_equal(us) )
 #endif
 
 //NOTE: Must disable IEC_FP_DOLPHIN/IEC_FP_SPEEDDOS, otherwise no pins left for debugging (except Mega)
@@ -92,7 +94,7 @@ static uint16_t timer_ticks_diff(uint16_t t0, uint16_t t1) { return ((t0 < t1) ?
 #define timer_reset()        timer_start_ticks = R_AGT0->AGT
 #define timer_start()        timer_start_ticks = R_AGT0->AGT
 #define timer_stop()         while(0)
-#define timer_less_than(us)  (timer_ticks_diff(timer_start_ticks, R_AGT0->AGT) < ((int) (us*3)))
+#define timer_less_than(us)  (timer_ticks_diff(timer_start_ticks, R_AGT0->AGT) < ((int) ((us)*3)))
 #define timer_wait_until(us) while( timer_less_than(us) )
 
 #ifdef JDEBUG
@@ -113,13 +115,13 @@ static uint32_t timer_ticks_diff(uint32_t t0, uint32_t t1) { return ((t0 < t1) ?
 #define timer_reset()        timer_start_ticks = SysTick->VAL;
 #define timer_start()        timer_start_ticks = SysTick->VAL;
 #define timer_stop()         while(0)
-#define timer_less_than(us)  (timer_ticks_diff(timer_start_ticks, SysTick->VAL) < ((int) (us*84)))
+#define timer_less_than(us)  (timer_ticks_diff(timer_start_ticks, SysTick->VAL) < ((int) ((us)*84)))
 #define timer_wait_until(us) while( timer_less_than(us) )
 
 #ifdef JDEBUG
 #define JDEBUGI() pinMode(2, OUTPUT)
-#define JDEBUG0() digitalWriteFast(2, LOW);
-#define JDEBUG1() digitalWriteFast(2, HIGH);
+#define JDEBUG0() REG_PIOB_CODR = 1<<25
+#define JDEBUG1() REG_PIOB_SODR = 1<<25
 #endif
 
 // ---------------- Raspberry Pi Pico
@@ -132,7 +134,7 @@ static unsigned long timer_start_us;
 #define timer_reset()        timer_start_us = time_us_32()
 #define timer_start()        timer_start_us = time_us_32()
 #define timer_stop()         while(0)
-#define timer_less_than(us)  ((time_us_32()-timer_start_us) < ((int) (us+0.5)))
+#define timer_less_than(us)  ((time_us_32()-timer_start_us) < ((int) ((us)+0.5)))
 #define timer_wait_until(us) while( timer_less_than(us) )
 
 #ifdef JDEBUG
@@ -145,28 +147,25 @@ static unsigned long timer_start_us;
 
 #elif defined(ESP_PLATFORM)
 
+// using esp_cpu_get_cycle_count() instead of esp_timer_get_time() works much
+// better in timing-critical code since it translates into a single CPU instruction
+// instead of a library call that may introduce short delays due to flash ROM access
+// conflicts with the other core.
 #if ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(5, 0, 0)
 #include "esp_clk.h"
 #define esp_cpu_cycle_count_t uint32_t
 #define esp_cpu_get_cycle_count esp_cpu_get_ccount
 #define esp_rom_get_cpu_ticks_per_us() (esp_clk_cpu_freq()/1000000)
 #endif
-static DRAM_ATTR esp_cpu_cycle_count_t timer_start_cycles, timer_cycles_per_us;
-#define timer_init()         timer_cycles_per_us = esp_rom_get_cpu_ticks_per_us()
+static DRAM_ATTR esp_cpu_cycle_count_t timer_start_cycles, timer_cycles_per_us_div2;
+#define timer_init()         timer_cycles_per_us_div2 = esp_rom_get_cpu_ticks_per_us()/2;
 #define timer_reset()        timer_start_cycles = esp_cpu_get_cycle_count()
 #define timer_start()        timer_start_cycles = esp_cpu_get_cycle_count()
 #define timer_stop()         while(0)
-#define timer_less_than(us)  ((esp_cpu_get_cycle_count()-timer_start_cycles) < (uint32_t(us+0.5)*timer_cycles_per_us))
-#define timer_wait_until(us) timer_wait_until_(us+0.5)
-FORCE_INLINE_ATTR void timer_wait_until_(uint32_t us)
-{
-  // using esp_cpu_get_cycle_count() instead of esp_timer_get_time() works much
-  // better in timing-critical code since it translates into a single CPU instruction
-  // instead of a library call that may introduce short delays due to flash ROM access
-  // conflicts with the other core
-  esp_cpu_cycle_count_t to = us * timer_cycles_per_us;
-  while( (esp_cpu_get_cycle_count()-timer_start_cycles) < to );
-}
+#define timer_less_than(us)  ((esp_cpu_get_cycle_count()-timer_start_cycles) < ((uint32_t((us)*2)*timer_cycles_per_us_div2)))
+#define timer_wait_until(us) \
+  { esp_cpu_cycle_count_t to = uint32_t((us)*2) * timer_cycles_per_us_div2; \
+    while( (esp_cpu_get_cycle_count()-timer_start_cycles) < to ); }
 
 // interval in which we need to feed the interrupt WDT to stop it from re-booting the system
 #define IWDT_FEED_TIME ((CONFIG_ESP_INT_WDT_TIMEOUT_MS-10)*1000)
@@ -193,7 +192,7 @@ static unsigned long timer_start_us;
 #define timer_reset()        timer_start_us = micros()
 #define timer_start()        timer_start_us = micros()
 #define timer_stop()         while(0)
-#define timer_less_than(us)  ((micros()-timer_start_us) < ((int) (us+0.5)))
+#define timer_less_than(us)  ((micros()-timer_start_us) < ((int) ((us)+0.5)))
 #define timer_wait_until(us) while( timer_less_than(us) )
 
 #if defined(JDEBUG) && defined(ESP_PLATFORM)
@@ -316,7 +315,7 @@ void RAMFUNC(IECBusHandler::writePinCLK)(bool v)
 {
   // Emulate open collector behavior: 
   // - switch pin to INPUT  mode (high-Z output) for true
-  // - switch pun to OUTPUT mode (LOW output) for false
+  // - switch pin to OUTPUT mode (LOW output) for false
   pinModeFastExt(m_pinCLK, m_regCLKmode, m_bitCLK, v ? INPUT : OUTPUT);
 }
 
@@ -325,7 +324,7 @@ void RAMFUNC(IECBusHandler::writePinDATA)(bool v)
 {
   // Emulate open collector behavior: 
   // - switch pin to INPUT  mode (high-Z output) for true
-  // - switch pun to OUTPUT mode (LOW output) for false
+  // - switch pin to OUTPUT mode (LOW output) for false
   pinModeFastExt(m_pinDATA, m_regDATAmode, m_bitDATA, v ? INPUT : OUTPUT);
 }
 #endif
@@ -2662,6 +2661,39 @@ bool RAMFUNC(IECBusHandler::transmitEpyxBlock)()
 
 void RAMFUNC(IECBusHandler::transmitFC3Bytes)(uint8_t *data)
 {
+  // In the following table, the "Cycle" column for PAL/NTSC gives the cycle number
+  // counted from the beginning of the "CLK low" detection loop on the C64 (at $9962),
+  // i.e.the fastest case where CLK is already low when it is read.
+  // The loop itself takes 7 cycles for each iteration which introduces a 7-cycle
+  // variation between when each bit may be read.
+  //
+  // The "read time" column for each bit shows the earliest and latest time after
+  // "CLK low" that the C64 may read the given bits. The "write" column is the time
+  // at which the NEXT bits should be written and "margin" gives the amount of time
+  // after the write time before the bits are read. Note that because of the 7-cycle
+  // variation and different timing between NTSC and PAL, the margins are very small.
+  // Note that FC3 code has one extra NOP in the receive code on NTSC (before bits 2+3)
+  // to (somewhat) balance out the faster clock speed.
+  //
+  //               ----- PAL -----   ---- NTSC ----  -- read time --
+  // Byte | Bits | Cycle |     us | Cycle |    us       min      max | write | margin
+  //    1 | 0+1  |  13   |  13.19 |  13   |  12.71 |  12.71 |  20.30 |  20.5 | 4.87
+  //    1 | 2+3  |  25   |  25.37 |  27   |  26.40 |  25.37 |  33.24 |  33.5 | 4.05
+  //    1 | 4+5  |  37   |  37.55 |  39   |  38.13 |  37.55 |  44.98 |  45.5 | 4.23
+  //    1 | 6+7  |  49   |  49.73 |  51   |  49.87 |  49.73 |  56.84 |  57.5 | 6.06
+  //    2 | 0+1  |  63   |  63.94 |  65   |  63.56 |  63.56 |  71.05 |  71.5 | 4.62
+  //    2 | 2+3  |  75   |  76.12 |  79   |  77.24 |  76.12 |  84.09 |  84.5 | 3.80
+  //    2 | 4+5  |  87   |  88.30 |  91   |  88.98 |  88.30 |  95.82 |  96.5 | 3.98
+  //    2 | 6+7  |  99   | 100.48 | 103   | 100.71 | 100.48 | 107.59 | 108.5 | 5.90
+  //    3 | 0+1  | 113   | 114.69 | 117   | 114.40 | 114.40 | 121.80 | 122.5 | 4.37
+  //    3 | 0+1  | 125   | 126.87 | 131   | 128.09 | 126.87 | 134.93 | 135.5 | 3.55
+  //    3 | 2+3  | 137   | 139.05 | 143   | 139.82 | 139.05 | 146.67 | 147.5 | 3.73
+  //    3 | 4+5  | 149   | 151.23 | 155   | 151.56 | 151.23 | 158.40 | 159.5 | 5.74
+  //    4 | 0+1  | 163   | 165.44 | 169   | 165.24 | 165.24 | 172.55 | 173   | 4.62
+  //    4 | 2+3  | 175   | 177.62 | 183   | 178.93 | 177.62 | 185.78 | 186   | 3.80
+  //    4 | 4+5  | 187   | 189.80 | 195   | 190.67 | 189.80 | 197.51 | 198   | 3.98
+  //    4 | 6+7  | 199   | 201.98 | 207   | 202.40 | 201.98 | 209.24 | 210   |
+
 #define FC3_TRANSMIT_BYTE(b, t) \
   JDEBUG0();                    \
   writePinCLK( b & bit(0));     \
@@ -2672,52 +2704,49 @@ void RAMFUNC(IECBusHandler::transmitFC3Bytes)(uint8_t *data)
   writePinCLK( b & bit(2));     \
   writePinDATA(b & bit(3));     \
   JDEBUG1();                    \
-  timer_wait_until(t+12);       \
+  timer_wait_until(t+13);       \
   JDEBUG0();                    \
   writePinCLK( b & bit(4));     \
   writePinDATA(b & bit(5));     \
   JDEBUG1();                    \
-  timer_wait_until(t+24);       \
+  timer_wait_until(t+25);       \
   JDEBUG0();                    \
   writePinCLK( b & bit(6));     \
   writePinDATA(b & bit(7));     \
   JDEBUG1();                    \
-  timer_wait_until(t+36);
+  timer_wait_until(t+37);
 
   timer_init();
   timer_reset();
 
   // signal "ready" by pulling CLK low
   // At this point the receiver is in a fairly tight loop waiting for CLK low (9962-9966)
-  // but since each cycle of the loop takes 7us there is a 7us variance in when the
+  // but since each cycle of the loop takes 7 cycles there is up to 7.1us variance in when the
   // loop is exited and therefore when the transmitted data below is actually read.
   writePinCLK(LOW);
   timer_start();
 
-#ifdef ARDUINO_ARCH_RP2040
-  // PiPico timer resolution is only 1us, so if we try to wait 8us it may end up 
-  // being just slightly more than 7us. However, RP is fast so we can wait some extra
-  // cycles and still have the CLK/DATA signals updated in time.
-  timer_wait_until(10);
-  FC3_TRANSMIT_BYTE(data[0], 23+  0); // receiver starts reading 13-20us after CLK low
-  FC3_TRANSMIT_BYTE(data[1], 23+ 51); // each byte takes 51 us to transmit
-  FC3_TRANSMIT_BYTE(data[2], 23+102);
-  FC3_TRANSMIT_BYTE(data[3], 23+153);
-  timer_wait_until(23+204);
-#else
-  // Other architectures have more precise timers so we can be time more closely
-  // (and for some - like UNO - we NEED to switch earlier because otherwise 
-  // updating CLK/DATA will take too long
+  // make sure the C64 has seen our CLK low
   timer_wait_until(8);
-  FC3_TRANSMIT_BYTE(data[0], 21+  0); // receiver starts reading 13-20us after CLK low
-  FC3_TRANSMIT_BYTE(data[1], 21+ 51); // each byte takes 51 us to transmit
-  // on some platforms (UNO) the high resolution timer can only count up to 127
-  // we call timer_reset() at timer value 21+51+36=108
-  timer_reset();
-  FC3_TRANSMIT_BYTE(data[2], 21+102-108);
-  FC3_TRANSMIT_BYTE(data[3], 21+153-108);
-  timer_wait_until(21+204-108);
+
+#if defined(__AVR__)
+  // On AVR we need to start TRANSMIT_BYTE early because of the slow processor
+  // (takes time to get from timer_wait_until() to set the CLK/DATA pins)
+#define FC3_OFFSET -1
+#elif defined(ARDUINO_ARCH_RP2040)
+  // PiPico timer resolution is only 1us, so if we try to wait 10us it may end up 
+  // being just slightly more than 9us. However, it is fast so we can wait some
+  // extra cycles and still have the CLK/DATA signals updated in time.
+#define FC3_OFFSET 1.5
+#else
+#define FC3_OFFSET 0
 #endif
+
+  // transmit four bytes (for timing values see table above)
+  FC3_TRANSMIT_BYTE(data[0],  20.5 + FC3_OFFSET);
+  FC3_TRANSMIT_BYTE(data[1],  71.5 + FC3_OFFSET);
+  FC3_TRANSMIT_BYTE(data[2], 122.5 + FC3_OFFSET);
+  FC3_TRANSMIT_BYTE(data[3], 173   + FC3_OFFSET);
 
   // release CLK
   writePinCLK(HIGH);

@@ -744,8 +744,9 @@ void IECFileDevice::fileTask()
             m_eoi = false;
             m_channel = 0;
           }
-        else if( m_uploadCtr==176 && strncmp_P(cmd, PSTR("M-E\x9c\x05"), 5)==0 )
+        else if( m_uploadCtr==176 && (strncmp_P(cmd, PSTR("M-E\x9c\x05"), 5)==0 || strncmp_P(cmd, PSTR("M-E\xaf\x05"), 5)==0) )
           {
+            // 059c entry address for PAL, 05af for NTSC (slightly different timing)
 #if DEBUG>0
             Serial.println(F("FINAL CARTRIDGE 3 FASTSAVE DETECTED"));
 #endif
@@ -753,7 +754,7 @@ void IECFileDevice::fileTask()
             m_uploadCtr = 0;
             handled = true;
             m_eoi = false;
-            m_channel = 0;
+            m_channel = 1;
           }
 #endif
 #ifdef IEC_FP_SPEEDDOS
