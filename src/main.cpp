@@ -152,6 +152,7 @@ void main_setup()
     fnSystem.check_hardware_ver();
     printf("Detected Hardware Version: %s\r\n", fnSystem.get_hardware_ver_str());
 
+    // Setup hardware
     fnKeyManager.setup();
     fnLedManager.setup();
 
@@ -165,6 +166,8 @@ void main_setup()
         //fnSystem.digital_write(PIN_MODEM_UP9600, DIGI_HIGH); // ENABLE UP9600
     }
 
+    // Initialize the FileSystem
+    printf("Initializing FileSystem\r\n");
     if ( fsFlash.start() )
     {
         // Create SYSTEM DIR if it doesn't exist
@@ -226,7 +229,9 @@ void main_setup()
 #endif
 
 #ifdef ENABLE_DISPLAY
-    DISPLAY.start();
+    LEDS.start();
+    //LEDS.show_image( (char *)WWW_ROOT "/assets/logo.png" );
+    LCD.show_image( (char *)WWW_ROOT "/assets/logo.l.png" );
 #endif
 
 #ifdef ENABLE_AUDIO

@@ -490,7 +490,7 @@ int wget(int argc, char **argv)
             // Show percentage complete in stdout
             uint8_t percent = (s->position() * 100) / s->size();
 #ifdef ENABLE_DISPLAY
-            DISPLAY.progress = percent;
+            LEDS.progress = percent;
 #endif
             Serial.printf("Downloading '%s' %d%% [%lu]\r", f->name.c_str(), percent, s->position());
             count++;
@@ -501,7 +501,7 @@ int wget(int argc, char **argv)
     }
 
 #ifdef ENABLE_DISPLAY
-    DISPLAY.idle();
+    LEDS.idle();
 #endif
 
     return EXIT_SUCCESS;

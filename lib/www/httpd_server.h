@@ -24,7 +24,6 @@
 
 #include "fnFS.h"
 
-//#define http_FILE_ROOT "/sd/.www/"
 #define http_SEND_BUFF_SIZE 512 // Used when sending files in chunks
 #define http_RECV_BUFF_SIZE 512 // Used when receiving POST data from client
 

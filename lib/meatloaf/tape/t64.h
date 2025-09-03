@@ -36,10 +36,20 @@ class T64MStream : public MMediaStream {
     // override everything that requires overriding here
 
 public:
-    T64MStream(std::shared_ptr<MStream> is) : MMediaStream(is) { };
+    T64MStream(std::shared_ptr<MStream> is) : MMediaStream(is)
+    {
+        // Read Header
+        readHeader();
+
+        //Debug_printv("name[%16s] entry_count[%d]", header.name, header.entry_count);
+    };
 
 protected:
     struct Header {
+        uint16_t version;
+        uint16_t entry_max;
+        uint16_t entry_count;
+        uint16_t unused;
         char name[24];
     };
 
@@ -55,8 +65,8 @@ protected:
     };
 
     bool readHeader() override {
-        containerStream->seek(0x28);
-        if (containerStream->read((uint8_t*)&header, 24))
+        containerStream->seek(0x20);
+        if (containerStream->read((uint8_t*)&header, 32))
             return true;
         
         return false;

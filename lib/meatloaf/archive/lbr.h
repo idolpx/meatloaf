@@ -37,7 +37,11 @@ class LBRMStream : public MMediaStream {
     // override everything that requires overriding here
 
 public:
-    LBRMStream(std::shared_ptr<MStream> is) : MMediaStream(is) {
+    LBRMStream(std::shared_ptr<MStream> is) : MMediaStream(is)
+    {
+        // Read Header
+        readHeader();
+
         loadEntries();
     };
 

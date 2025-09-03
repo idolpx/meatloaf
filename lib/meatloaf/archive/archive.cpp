@@ -382,21 +382,9 @@ bool ArchiveMStream::seekEntry(std::string filename)
 
             //Debug_printv("filename[%s] entry.filename[%s]", filename.c_str(), entryFilename.c_str());
 
-            if (filename == entryFilename) // Match exact
+            if ( mstr::compareFilename(filename, entryFilename, wildcard) )
             {
                 return true;
-            }
-            else if (wildcard) // Wildcard Match
-            {
-                if (filename == "*") // Match first PRG
-                {
-                    filename = entryFilename;
-                    return true;
-                }
-                else if (mstr::compare(filename, entryFilename)) // X?XX?X* Wildcard match
-                {
-                    return true;
-                }
             }
 
             index++;

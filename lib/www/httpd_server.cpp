@@ -441,9 +441,9 @@ httpd_handle_t cHttpdServer::start_server(serverstate &state)
     };
 
     // Set the default folder for http docs
-    httpdocs = "/.www/";
-    if (exists("/sd/.www"))
-        httpdocs = "/sd/.www/";
+    httpdocs = WWW_ROOT "/";
+    if (exists("/sd" WWW_ROOT))
+        httpdocs = "/sd" WWW_ROOT "/";
 
     if (httpd_start(&(state.hServer), &config) == ESP_OK)
     {

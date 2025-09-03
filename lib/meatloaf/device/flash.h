@@ -94,14 +94,14 @@ protected:
     DIR* dir;
     bool dirOpened = false;
 
-private:
     virtual void openDir(std::string path);
     virtual void closeDir();
 
+    virtual bool pathValid(std::string path);
     bool _valid;
     std::string _pattern;
 
-    bool pathValid(std::string path);
+private:
 };
 
 

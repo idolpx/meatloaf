@@ -230,34 +230,23 @@ bool D64MStream::seekEntry( std::string filename )
         bool wildcard = (mstr::contains(filename, "*") || mstr::contains(filename, "?"));
         while (seekEntry(index))
         {
+            if (wildcard && !(entry.file_type & 0b00000111)) // Skip non-PRG files
+            {
+                index++;
+                continue;
+            }
+
             std::string entryFilename = entry.filename;
             uint8_t i = entryFilename.find_first_of(0xA0);
             entryFilename = entryFilename.substr(0, i);
-            //mstr::rtrimA0(entryFilename);
             entryFilename = mstr::toUTF8(entryFilename);
 
             //Debug_printv("index[%d] track[%d] sector[%d] filename[%s] entry.filename[%.16s]", index, track, sector, filename.c_str(), entryFilename.c_str());
-
             //Debug_printv("filename[%s] entry[%s]", filename.c_str(), entryFilename.c_str());
 
-            if (filename == entryFilename) // Match exact
+            if ( mstr::compareFilename(filename, entryFilename, wildcard) )
             {
                 return true;
-            }
-            else if (wildcard) // Wildcard Match
-            {
-                if (filename == "*") // Match first PRG
-                {
-                    if (entry.file_type & 0b00000111)
-                    {
-                        filename = entryFilename;
-                        return true;
-                    }
-                }
-                else if (mstr::compare(filename, entryFilename)) // X?XX?X* Wildcard match
-                {
-                    return true;
-                }
             }
 
             index++;
@@ -602,9 +591,6 @@ bool D64MFile::rewindDirectory()
     Debug_printv("image->url[%s]", image->url.c_str());
     image->resetEntryCounter();
 
-    // Read Header
-    image->readHeader();
-
     // Set Media Info Fields
     media_header = mstr::format("%.16s", image->header.name);
     mstr::A02Space(media_header);
@@ -640,7 +626,6 @@ MFile* D64MFile::getNextFileInDir()
         std::string filename = image->entry.filename;
         uint8_t i = filename.find_first_of(0xA0);
         filename = filename.substr(0, i);
-
         // mstr::rtrimA0(filename);
         mstr::replaceAll(filename, "/", "\\");
         // Debug_printv( "entry[%s]", (sourceFile->url + "/" + filename).c_str() );

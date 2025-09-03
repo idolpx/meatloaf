@@ -21,6 +21,9 @@
 #include "meatloaf.h"
 
 #include "fnFS.h"
+#include "fnFsTNFS.h"
+#include "fnFileTNFS.h"
+#include "../device/flash.h"
 
 #include "../../../include/debug.h"
 
@@ -34,13 +37,24 @@
  * MFile
  ********************************************************/
 
-class TNFSMFile: public MFile
+class TNFSMFile: public FlashMFile
 {
 
 public:
     std::string basepath = "";
     
-    TNFSMFile(std::string path) {
+    TNFSMFile(std::string path): FlashMFile(path) {
+
+        Debug_printv("url[%s]", url.c_str());
+        if (!_fs->start(host.c_str()))
+        {
+            Debug_printv("Failed to mount %s", host.c_str());
+            m_isNull = true;
+            return;
+        }
+
+        // Set our basepath to match the TNFS basepath
+        basepath = _fs->basepath();
 
         // Find full filename for wildcard
         if (mstr::contains(name, "?") || mstr::contains(name, "*"))
@@ -52,111 +66,110 @@ public:
             m_isNull = false;
 
         m_rootfs = true;
-        //Debug_printv("basepath[%s] path[%s] valid[%d]", basepath.c_str(), this->path.c_str(), m_isNull);
+        Debug_printv("basepath[%s] path[%s] valid[%d]", basepath.c_str(), this->path.c_str(), m_isNull);
     };
-    ~TNFSMFile() {
-        //printf("*** Destroying flashfile %s\r\n", url.c_str());
-        closeDir();
-    }
+    // ~TNFSMFile() {
+    //     Debug_printv("*** Destroying TNFSMFile [%s]", url.c_str());
+    //     closeDir();
+    // }
 
-    std::shared_ptr<MStream> getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override ; // has to return OPENED stream
-    std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> src);
-    std::shared_ptr<MStream> createStream(std::ios_base::openmode mode) override;
+//     std::shared_ptr<MStream> getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override ; // has to return OPENED stream
+//     std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> src);
+//     std::shared_ptr<MStream> createStream(std::ios_base::openmode mode) override;
 
-    bool isDirectory() override;
-    time_t getLastWrite() override ;
-    time_t getCreationTime() override ;
-    bool rewindDirectory() override ;
-    MFile* getNextFileInDir() override ;
-    bool mkDir() override ;
-    bool exists() override ;
+//     bool isDirectory() override;
+//     time_t getLastWrite() override ;
+//     time_t getCreationTime() override ;
+//     bool rewindDirectory() override ;
+//     MFile* getNextFileInDir() override ;
+//     bool mkDir() override ;
+//     bool exists() override ;
 
-    bool remove() override ;
-    bool rename(std::string dest);
+//     bool remove() override ;
+//     bool rename(std::string dest);
 
 
-    bool readEntry( std::string filename );
+//     bool readEntry( std::string filename );
 
-protected:
-    DIR* dir;
-    bool dirOpened = false;
+// protected:
+//     DIR* dir;
+//     bool dirOpened = false;
 
 private:
-    FileSystem *_fs = nullptr;
+    std::unique_ptr<FileSystemTNFS> _fs = std::make_unique<FileSystemTNFS>();
 
-    virtual void openDir(std::string path);
-    virtual void closeDir();
+//     virtual void openDir(std::string path);
+//     virtual void closeDir();
 
-    bool _valid;
-    std::string _pattern;
+//     bool _valid;
+//     std::string _pattern;
 
-    bool pathValid(std::string path);
-
+//     bool pathValid(std::string path);
 };
 
 
-/********************************************************
- * TNFSHandle
- ********************************************************/
+// /********************************************************
+//  * TNFSHandle
+//  ********************************************************/
 
-class TNFSHandle {
-public:
-    //int rc;
-    FILE* file_h = nullptr;
+// class TNFSHandle {
+// public:
+//     //int rc;
+//     FILE* file_h = nullptr;
 
-    TNFSHandle() 
-    {
-        //Debug_printv("*** Creating flash handle");
-        memset(&file_h, 0, sizeof(file_h));
-    };
-    ~TNFSHandle();
-    void obtain(std::string localPath, std::string mode);
-    void dispose();
+//     TNFSHandle() 
+//     {
+//         //Debug_printv("*** Creating flash handle");
+//         memset(&file_h, 0, sizeof(file_h));
+//     };
+//     ~TNFSHandle();
+//     void obtain(std::string localPath, std::string mode);
+//     void dispose();
 
-private:
-    int flags = 0;
-};
+// private:
+//     int flags = 0;
+// };
 
 
 /********************************************************
  * MStream I
  ********************************************************/
 
-class TNFSMStream: public MStream {
+class TNFSMStream: public FlashMStream {
 public:
-    TNFSMStream(std::string& path) {
-        localPath = path;
-        handle = std::make_unique<TNFSHandle>();
-        url = path;
+    TNFSMStream(std::string& path, std::ios_base::openmode m): FlashMStream(path, m) {
+        //localPath = path;
+        //handle = std::make_unique<TNFSHandle>();
+        //url = path;
     }
-    ~TNFSMStream() override {
-        close();
-    }
+    // ~TNFSMStream() override {
+    //     close();
+    // }
 
-    // MStream methods
-    bool isOpen();
-    bool isBrowsable() override { return false; };
-    bool isRandomAccess() override { return true; };
+//     // MStream methods
+//     bool isOpen();
+//     bool isBrowsable() override { return false; };
+//     bool isRandomAccess() override { return true; };
 
-    bool open(std::ios_base::openmode mode) override;
-    void close() override;
+//     bool open(std::ios_base::openmode mode) override;
+//     void close() override;
 
-    uint32_t read(uint8_t* buf, uint32_t size) override;
-    uint32_t write(const uint8_t *buf, uint32_t size) override;
+//     uint32_t read(uint8_t* buf, uint32_t size) override;
+//     uint32_t write(const uint8_t *buf, uint32_t size) override;
 
-    virtual bool seek(uint32_t pos) override;
-    virtual bool seek(uint32_t pos, int mode) override;    
+//     virtual bool seek(uint32_t pos) override;
+//     virtual bool seek(uint32_t pos, int mode) override;    
 
-    virtual bool seekPath(std::string path) override {
-        Debug_printv( "path[%s]", path.c_str() );
-        return false;
-    }
+//     virtual bool seekPath(std::string path) override {
+//         Debug_printv( "path[%s]", path.c_str() );
+//         return false;
+//     }
 
 
-protected:
-    std::string localPath;
+// protected:
+//     std::string localPath;
 
-    std::unique_ptr<TNFSHandle> handle;
+    //std::unique_ptr<TNFSHandle> handle;
 };
 
 

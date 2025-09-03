@@ -88,6 +88,9 @@ public:
         partitions.push_back(p);
         sectorsPerTrack = { 17, 18, 19, 21 };
 
+        // Read Header
+        readHeader();
+
         // this.size = data.media_data.length;
         // switch (this.size + this.media_header_size) {
         uint32_t size = containerStream->size();

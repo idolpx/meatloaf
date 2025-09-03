@@ -46,34 +46,21 @@ bool T64MStream::seekEntry( std::string filename )
     {
         size_t index = 1;
         mstr::replaceAll(filename, "\\", "/");
-        bool wildcard =  ( mstr::contains(filename, "*") || mstr::contains(filename, "?") );
+        bool wildcard = ( mstr::contains(filename, "*") || mstr::contains(filename, "?") );
         while ( seekEntry( index ) )
         {
             std::string entryFilename = entry.filename;
-            uint8_t i = entryFilename.find_first_of(0x20); // (in PETASCII, padded with $20, not $A0)
-            entryFilename = entryFilename.substr(0, (i > 16 ? 16 : i));
+            entryFilename = entryFilename.substr(0, 16);
+            //uint8_t i = entryFilename.find_first_of(0x20); // (in PETASCII, padded with $20, not $A0)
+            //entryFilename = entryFilename.substr(0, (i > 16 ? 16 : i));
             //mstr::rtrimA0(entryFilename);
             entryFilename = mstr::toUTF8(entryFilename);
 
             Debug_printv("filename[%s] entry.filename[%s]", filename.c_str(), entryFilename.c_str());
 
-            if ( filename == entryFilename ) // Match exact
+            if ( mstr::compareFilename(filename, entryFilename, wildcard) )
             {
                 return true;
-            }
-            else if ( wildcard ) // Wildcard Match
-            {
-                if (filename == "*") // Match first entry
-                {
-                    filename = entryFilename;
-                    return true;
-                }
-                else if ( mstr::compare(filename, entryFilename) ) // X?XX?X* Wildcard match
-                {
-                    // Set filename to this filename
-                    Debug_printv( "Found! file[%s] -> entry[%s]", filename.c_str(), entryFilename.c_str() );
-                    return true;
-                }
             }
 
             index++;
@@ -87,6 +74,9 @@ bool T64MStream::seekEntry( std::string filename )
 
 bool T64MStream::seekEntry( uint16_t index )
 {
+    if ( index > header.entry_count )
+        return false;
+
     // Calculate Sector offset & Entry offset
     index--;
     uint16_t entryOffset = 0x40 + (index * sizeof(entry));
@@ -97,14 +87,10 @@ bool T64MStream::seekEntry( uint16_t index )
     containerStream->seek(entryOffset);
     containerStream->read((uint8_t *)&entry, sizeof(entry));
 
-    //Debug_printv("r[%d] file_type[%02X] file_name[%.16s]", r, entry.file_type, entry.filename);
+    //Debug_printv("index[%d] file_type[%02X] file_name[%.16s]", index, entry.file_type, entry.filename);
 
-    //if ( next_track == 0 && next_sector == 0xFF )
     entry_index = index + 1;    
-    if ( entry.file_type == 0x00 )
-        return false;
-    else
-        return true;
+    return true;
 }
 
 
@@ -185,13 +171,10 @@ bool T64MFile::rewindDirectory() {
     dirIsOpen = true;
     Debug_printv("sourceFile->url[%s]", sourceFile->url.c_str());
     auto image = ImageBroker::obtain<T64MStream>(sourceFile->url);
-    if ( image == nullptr )
-        Debug_printv("image pointer is null");
+    if (image == nullptr)
+        return false;
 
     image->resetEntryCounter();
-
-    // Read Header
-    image->readHeader();
 
     // Set Media Info Fields
     media_header = mstr::format("%.16s", image->header.name);
@@ -219,8 +202,9 @@ MFile* T64MFile::getNextFileInDir() {
     if ( image->getNextImageEntry() )
     {
         std::string filename = image->entry.filename;
-        uint8_t i = filename.find_first_of(0x20); // (in PETASCII, padded with $20, not $A0)
-        filename = filename.substr(0, (i > 16 ? 16 : i));
+        filename = filename.substr(0, 16);
+        //uint8_t i = filename.find_first_of(0x20); // (in PETASCII, padded with $20, not $A0)
+        //filename = filename.substr(0, (i > 16 ? 16 : i));
         // mstr::rtrimA0(filename);
         mstr::replaceAll(filename, "/", "\\");
         //Debug_printv( "entry[%s]", (sourceFile->url + "/" + filename).c_str() );

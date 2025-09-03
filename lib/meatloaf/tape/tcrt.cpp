@@ -82,35 +82,21 @@ bool TCRTMStream::seekEntry( std::string filename )
     {
         size_t index = 1;
         mstr::replaceAll(filename, "\\", "/");
-        bool wildcard =  ( mstr::contains(filename, "*") || mstr::contains(filename, "?") );
+        bool wildcard = ( mstr::contains(filename, "*") || mstr::contains(filename, "?") );
         while ( seekEntry( index ) )
         {
             std::string entryFilename = entry.filename;
-            //uint8_t i = entryFilename.find_first_of(0x00); // padded with NUL (0x00)
             entryFilename = entryFilename.substr(0, 16);
+            //uint8_t i = entryFilename.find_first_of(0x00); // padded with NUL (0x00)
+            //entryFilename = entryFilename.substr(0, (i > 16 ? 16 : i))
             //mstr::rtrimA0(entryFilename);
             entryFilename = mstr::toUTF8(entryFilename);
 
             //Debug_printv("index[%d] filename[%s] entry.filename[%s] entry.file_type[%d]", index, filename.c_str(), entryFilename.c_str(), entry.file_type);
 
-            if ( filename == entryFilename ) // Match exact
+            if ( mstr::compareFilename(filename, entryFilename, wildcard) )
             {
                 return true;
-            }
-            else if ( wildcard ) // Wildcard Match
-            {
-                if (filename == "*") // Match first PRG
-                {
-                    if (entry.file_type < 0xFE) // Skip system files
-                    {
-                        filename = entryFilename;
-                        return true;
-                    }
-                }
-                else if ( mstr::compare(filename, entryFilename) ) // X?XX?X* Wildcard match
-                {
-                    return true;
-                }
             }
 
             index++;
@@ -223,13 +209,10 @@ bool TCRTMFile::rewindDirectory() {
     dirIsOpen = true;
     Debug_printv("sourceFile->url[%s]", sourceFile->url.c_str());
     auto image = ImageBroker::obtain<TCRTMStream>(sourceFile->url);
-    if ( image == nullptr )
-        Debug_printv("image pointer is null");
+    if (image == nullptr)
+        return false;
 
     image->resetEntryCounter();
-
-    // Read Header
-    image->readHeader();
 
     // Set Media Info Fields
     media_header = mstr::format("%.16s", image->header.name);
@@ -264,8 +247,9 @@ MFile* TCRTMFile::getNextFileInDir()
     if ( r )
     {
         std::string filename = image->entry.filename;
+        //filename = filename.substr(0, 16);
         //uint8_t i = filename.find_first_of(0x00); // padded with NUL (0x00)
-        filename = filename.substr(0, 16);
+        //filename = filename.substr(0, (i > 16 ? 16 : i));
         // mstr::rtrimA0(filename);
         mstr::replaceAll(filename, "/", "\\");
         //Debug_printv( "entry[%s]", (sourceFile->url + "/" + filename).c_str() );

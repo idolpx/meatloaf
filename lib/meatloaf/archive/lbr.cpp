@@ -89,21 +89,9 @@ bool LBRMStream::seekEntry( std::string filename )
 
             Debug_printv("filename[%s] entry.filename[%s]", filename.c_str(), entryFilename.c_str());
 
-            if (filename == entryFilename) // Match exact
+            if ( mstr::compareFilename(filename, entryFilename, wildcard) )
             {
                 return true;
-            }
-            else if (wildcard) // Wildcard Match
-            {
-                if (filename == "*") // Match first PRG
-                {
-                    filename = entryFilename;
-                    return true;
-                }
-                else if (mstr::compare(filename, entryFilename)) // X?XX?X* Wildcard match
-                {
-                    return true;
-                }
             }
 
             index++;
@@ -190,15 +178,9 @@ bool LBRMFile::rewindDirectory()
     Debug_printv("sourceFile->url[%s]", sourceFile->url.c_str());
     auto image = ImageBroker::obtain<LBRMStream>(sourceFile->url);
     if (image == nullptr)
-    {
-        Debug_printv("image pointer is null");
         return false;
-    }
 
     image->resetEntryCounter();
-
-    // Read Header
-    image->readHeader();
 
     // Set Media Info Fields
     media_header = mstr::format("%.16s", image->header.name.c_str());

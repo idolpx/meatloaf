@@ -20,9 +20,7 @@
 /*
   Debugging Macros
 */
-#ifdef DEBUG
 #ifdef ESP_PLATFORM
-
 #ifdef ENABLE_CONSOLE
     #include "../lib/console/ESP32Console.h"
     #define Serial console
@@ -31,7 +29,10 @@
     #include "../lib/hardware/fnUART.h"
     #define Serial fnUartDebug
 #endif
+#endif
 
+#ifdef DEBUG
+#ifdef ESP_PLATFORM
     #define Debug_print(...) Serial.print( __VA_ARGS__ )
     #define Debug_printf(...) Serial.printf( __VA_ARGS__ )
     #define Debug_println(...) Serial.println( __VA_ARGS__ )
@@ -55,15 +56,7 @@
     #define Debug_memory()
     #define HEAP_CHECK(x) Debug_printf("HEAP CHECK %s " x "\r\n", heap_caps_check_integrity_all(true) ? "PASSED":"FAILED")
 #endif
-#endif // DEBUG
-
-#ifndef DEBUG
-#ifdef ESP_PLATFORM
-    // Use FujiNet debug serial output
-    #include "../lib/hardware/fnUART.h"
-    #define Serial fnUartDebug
-#endif
-
+#else
     #define Debug_print(...)
     #define Debug_printf(...)
     #define Debug_println(...)

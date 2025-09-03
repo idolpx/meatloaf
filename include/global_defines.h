@@ -26,6 +26,7 @@
 #define USER_AGENT "MEATLOAF/" FW_VERSION " (" PLATFORM_DETAILS ")"
 
 #define SYSTEM_DIR "/.sys"
+#define WWW_ROOT   "/.www"
 
 #define HOSTNAME "meatloaf"
 #define SERVER_PORT 80   // HTTPd & WebDAV Server Port

@@ -81,8 +81,10 @@ public:
     bool has_subdirs = true;
     const size_t block_size = 2048;
 
-    ISOMStream(std::shared_ptr<MStream> is) : MMediaStream(is) {
-
+    ISOMStream(std::shared_ptr<MStream> is) : MMediaStream(is)
+    {
+        // Read Header
+        readHeader();
 
         uint32_t size = containerStream->size();
         switch (size + media_header_size) 

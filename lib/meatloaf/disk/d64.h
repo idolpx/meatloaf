@@ -135,6 +135,9 @@ public:
         partitions.push_back(p);
         sectorsPerTrack = { 17, 18, 19, 21 };
 
+        // Read Header
+        readHeader();
+
         uint32_t size = containerStream->size();
         switch (size + media_header_size) 
         {
@@ -269,22 +272,7 @@ public:
     uint8_t next_sector = 0;
     uint8_t sector_offset = 0;
 
-private:
-    void sendListing();
-
-    // bool readHeader() override
-    // {
-    //     //Debug_printv("readHeader");
-    //     seekSector( 
-    //         partitions[partition].header_track, 
-    //         partitions[partition].header_sector, 
-    //         partitions[partition].header_offset 
-    //     );
-    //     if (readContainer((uint8_t*)&header, sizeof(header)))
-    //         return true;
-
-    //     return false;
-    // }
+protected:
     bool readHeader() override
     {
         if (partitions.empty() || partition >= partitions.size()) {
@@ -297,6 +285,7 @@ private:
             readContainer((uint8_t*)&header, sizeof(header));
     }
 
+private:
     bool writeHeader(std::string name, std::string id) override
     {
         if (partitions.empty() || partition >= partitions.size()) {

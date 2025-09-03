@@ -65,6 +65,9 @@ public:
         //block_allocation_map = { {18, 0, 0x04, 1, 35, 4}, {53, 0, 0x00, 36, 70, 3} };
         //sectorsPerTrack = { 17, 18, 19, 21 };
 
+        // Read Header
+        readHeader();
+
         containerStream->read((uint8_t*)&gcr_header, sizeof(gcr_header));
 
         Debug_printv("signature[%s] version[%d] track_count[%d] track_size[%d]", gcr_header.signature, gcr_header.version, gcr_header.track_count, gcr_header.track_size);

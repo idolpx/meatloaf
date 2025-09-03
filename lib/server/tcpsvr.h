@@ -25,6 +25,7 @@
 class TCPServer 
 {
 private:
+    static int _server_socket;
     static int _client_socket;
     static bool _shutdown;
     static void task(void *pvParameters);

@@ -43,6 +43,7 @@
 #define LISTENQ 2
 
 TCPServer tcp_server;
+int TCPServer::_server_socket = -1;
 int TCPServer::_client_socket = -1;
 bool TCPServer::_shutdown = false;
 
@@ -54,7 +55,6 @@ void TCPServer::task(void *pvParameters)
     int addr_family;        // Ipv4 address protocol variable
 
     int ip_protocol;
-    int socket_id = 0;
     int bind_err = 0;
     int listen_error = 0;
 
@@ -71,8 +71,8 @@ void TCPServer::task(void *pvParameters)
         inet_ntoa_r(destAddr.sin_addr, addr_str, sizeof(addr_str) - 1);
 
         /* Create TCP socket*/
-        socket_id = socket(addr_family, SOCK_STREAM, ip_protocol);
-        if (socket_id < 0)
+        _server_socket = socket(addr_family, SOCK_STREAM, ip_protocol);
+        if (_server_socket < 0)
         {
             Debug_printv("Unable to create socket: errno %d", errno);
             break;
@@ -80,7 +80,7 @@ void TCPServer::task(void *pvParameters)
         //Debug_printv("Socket created");
 
         /* Bind a socket to a specific IP + port */
-        bind_err = bind(socket_id, (struct sockaddr *)&destAddr, sizeof(destAddr));
+        bind_err = bind(_server_socket, (struct sockaddr *)&destAddr, sizeof(destAddr));
         if (bind_err != 0)
         {
             Debug_printv("Socket unable to bind: errno %d", errno);
@@ -89,7 +89,7 @@ void TCPServer::task(void *pvParameters)
         //Debug_printv("Socket binded");
 
         /* Begin listening for clients on socket */
-        listen_error = listen(socket_id, 3);
+        listen_error = listen(_server_socket, 3);
         if (listen_error != 0)
         {
             Debug_printv("Error occured during listen: errno %d", errno);
@@ -102,7 +102,7 @@ void TCPServer::task(void *pvParameters)
             struct sockaddr_in sourceAddr; // Large enough for IPv4
             socklen_t addrLen = sizeof(sourceAddr);
             /* Accept connection to incoming client */
-            _client_socket = accept(socket_id, (struct sockaddr *)&sourceAddr, &addrLen);
+            _client_socket = accept(_server_socket, (struct sockaddr *)&sourceAddr, &addrLen);
             if (_client_socket < 0)
             {
                 Debug_printv("Unable to accept connection: errno %d", errno);
@@ -173,8 +173,9 @@ void TCPServer::task(void *pvParameters)
             close(_client_socket);
         }
     }
-    close(socket_id);
+    close(_server_socket);
     vTaskDelete(NULL);
+    Debug_printv("TCP Server task ended");
 }
 
 
@@ -191,7 +192,13 @@ void TCPServer::start()
 
 void TCPServer::stop()
 {
+    Debug_printv("Stopping tcp server task");
     _shutdown = true;
+
+    // close(_client_socket);
+    // close(_server_socket);
+    vTaskDelete(NULL);
+    Debug_printv("TCP Server task ended");
 }
 
 void TCPServer::send(std::string data)

@@ -46,7 +46,7 @@ class SMBMFile: public MFile
 public:
     std::string basepath = "";
     
-    SMBMFile(std::string path) {
+    SMBMFile(std::string path): MFile(path) {
 
         // Find full filename for wildcard
         if (mstr::contains(name, "?") || mstr::contains(name, "*"))

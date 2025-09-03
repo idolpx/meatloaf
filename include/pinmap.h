@@ -1,3 +1,6 @@
+
+#include <soc/gpio_num.h>
+
 /* Meatloaf Hardware Pin Mapping */
 #ifndef PINMAP_H
 #define PINMAP_H
@@ -22,6 +25,7 @@
 #include "pinmap/lolin-s3-pro.h"
 #include "pinmap/lilygo-t-display-s3.h"
 #include "pinmap/freenove-esp32-s3-wroom.h"
+#include "pinmap/esp32-1732s019.h"
 #include "pinmap/nodemcu-esp-s3-12k-kit.h"
 #include "pinmap/esp32-s3-zero.h"
 #include "pinmap/esp32-s3-super-mini.h"
@@ -33,6 +37,9 @@
 
 
 /* LED Strip */
+#ifndef PIN_LED_RGB
+#define PIN_LED_RGB             GPIO_NUM_NC // No RGB LED
+#endif
 #define RGB_LED_DATA_PIN        PIN_LED_RGB
 #define RGB_LED_BRIGHTNESS      15 // max mA the LED can use determines brightness
 #define RGB_LED_COUNT           5

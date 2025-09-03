@@ -205,7 +205,7 @@ iecChannelHandlerFile::~iecChannelHandlerFile()
   Debug_printv("Transport (network/sd) took %0.3f seconds, pure IEC transfers @ %0.2fcps", tseconds, cps);
 
 #ifdef ENABLE_DISPLAY
-    DISPLAY.idle();
+    LEDS.idle();
     Debug_printv("Stop Activity");
 #endif
 
@@ -254,7 +254,7 @@ uint8_t iecChannelHandlerFile::readBufferData()
 #ifdef ENABLE_DISPLAY
       // send progress percentage
       uint8_t percent = (m_stream->position() * 100) / m_stream->size();
-      DISPLAY.progress = percent;
+      LEDS.progress = percent;
 #endif
 
       if( m_fixLoadAddress>=0 && m_stream->position()==0 )
@@ -323,8 +323,8 @@ iecChannelHandlerDir::iecChannelHandlerDir(iecDrive *drive, MFile *dir) : iecCha
 
 #ifdef ENABLE_DISPLAY
   Debug_printv("Start Activity");
-  DISPLAY.speed = 100;
-  DISPLAY.activity = true;
+  LEDS.speed = 100;
+  LEDS.activity = true;
 #endif
 }
 
@@ -334,7 +334,7 @@ iecChannelHandlerDir::~iecChannelHandlerDir()
   delete m_dir;
 
 #ifdef ENABLE_DISPLAY
-    DISPLAY.idle();
+    LEDS.idle();
     Debug_printv("Stop Activity");
 #endif
 }
@@ -1455,7 +1455,7 @@ void iecDrive::setStatusCode(uint8_t code, uint8_t trk)
   clearStatus();
 
 #ifdef ENABLE_DISPLAY
-  DISPLAY.status( code );
+  LEDS.status( code );
 #endif
 }
 
@@ -1520,7 +1520,7 @@ void iecDrive::getStatus(char *buffer, uint8_t bufferSize)
   m_statusTrk  = 0;
 
 #ifdef ENABLE_DISPLAY
-  DISPLAY.status( ST_OK );
+  LEDS.status( ST_OK );
 #endif
 }
 
@@ -1550,7 +1550,7 @@ void iecDrive::reset()
   //StreamBroker::clear();
 
 #ifdef ENABLE_DISPLAY
-  DISPLAY.idle();
+  LEDS.idle();
   Debug_printv("Stop Activity");
 #endif
 

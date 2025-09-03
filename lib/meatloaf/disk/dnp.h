@@ -62,6 +62,9 @@ public:
         partitions.push_back(p);
         sectorsPerTrack = { 256 };
         has_subdirs = true;
+
+        // Read Header
+        readHeader();
     };
 
     virtual uint8_t speedZone(uint8_t track) override { return 0; };

@@ -261,6 +261,30 @@ namespace mstr {
         return true; /* matched completely */
     }
 
+    bool compareFilename(std::string &filename, std::string &entry, bool wildcard, bool case_sensitive)
+    {
+        if ( filename == entry ) // Match exact
+        {
+            return true;
+        }
+        else if ( wildcard ) // Wildcard Match
+        {
+            if (filename == "*") // Match first entry
+            {
+                filename = entry;
+                return true;
+            }
+            else if ( mstr::compare(filename, entry, case_sensitive) ) // X?XX?X* Wildcard match
+            {
+                // Set filename to this filename
+                Debug_printv( "Found! file[%s] -> entry[%s]", filename.c_str(), entry.c_str() );
+                filename = entry;
+                return true;
+            }
+        }
+        return false;
+    }
+
     // convert to lowercase (in place)
     void toLower(std::string &s)
     {
@@ -554,27 +578,10 @@ namespace mstr {
     std::string sha1(const std::string &s)
     {
         unsigned char hash[21] = { 0x00 };
-
-#if defined(mbedtls_sha1_ret)
-        // Use the newer mbedtls API
-        int ret = mbedtls_sha1_ret((const unsigned char *)s.c_str(), s.length(), hash);
-        if (ret != 0) {
-            Debug_printf("mbedtls_sha1 failed with error code %d\n", ret);
-            return "";
-        }
-#else
-        // Use the legacy mbedtls API
-        int ret = mbedtls_sha1((const unsigned char *)s.c_str(), s.length(), hash);
-        if (ret != 0) {
-            Debug_printf("mbedtls_sha1 failed with error code %d\n", ret);
-            return "";
-        }
-#endif
-        // These lines were commented in the original code
+        mbedtls_sha1((const unsigned char *)s.c_str(), s.length(), hash);
         // unsigned char output[64];
         // size_t outlen;
         // mbedtls_base64_encode(output, 64, &outlen, hash, 20);
-        
         std::string o(reinterpret_cast< char const* >(hash));
         return toHex(o);
     }

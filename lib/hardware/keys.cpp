@@ -101,7 +101,8 @@ void KeyManager::setup()
     // Start a new task to check the status of the buttons
     #define KEYS_STACKSIZE 4096
     #define KEYS_PRIORITY 1
-    xTaskCreate(_keystate_task, "fnKeys", KEYS_STACKSIZE, this, KEYS_PRIORITY, nullptr);
+    //xTaskCreate(_keystate_task, "fnKeys", KEYS_STACKSIZE, this, KEYS_PRIORITY, nullptr);
+    xTaskCreatePinnedToCore(_keystate_task, "fnKeys", KEYS_STACKSIZE, this, KEYS_PRIORITY, nullptr, 0);
 }
 
 

@@ -299,7 +299,7 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
         }
         else
             Debug_printv("source bad");
-        
+
         Debug_printv("target good rootfs[%d][%s]", targetFile->m_rootfs, targetFile->url.c_str());
     }
     else

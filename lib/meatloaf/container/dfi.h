@@ -153,6 +153,9 @@ public:
         partitions.push_back(p);
         sectorsPerTrack = { 256 };
 
+        // Read Header
+        readHeader();
+
         // // The header's size is 256 bytes, that's exactly one sector. The header is
         // // always the first sector in the image (track 1, sector 0).
         // //

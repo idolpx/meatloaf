@@ -138,7 +138,7 @@ static int run(int argc, char **argv)
     }
     // else if (mstr::startsWith(argv[1], "send"))
     // {
-    //     DISPLAY.send();
+    //     LEDS.send();
     // }
     else
     {
@@ -158,40 +158,40 @@ static int led(int argc, char **argv)
 
     if (mstr::startsWith(argv[1], "idle"))
     {
-        DISPLAY.idle();
+        LEDS.idle();
     }
     else if (mstr::startsWith(argv[1], "send"))
     {
-        DISPLAY.send();
+        LEDS.send();
     }
     else if (mstr::startsWith(argv[1], "receive"))
     {
-        DISPLAY.receive();
+        LEDS.receive();
     }
     else if (mstr::startsWith(argv[1], "activity"))
     {
-        DISPLAY.activity = !DISPLAY.activity;
+        LEDS.activity = !LEDS.activity;
     }
     else if (mstr::startsWith(argv[1], "progress"))
     {
         if (argc == 3)
-            DISPLAY.progress = atoi(argv[2]);
+            LEDS.progress = atoi(argv[2]);
         else
-            DISPLAY.idle();
+            LEDS.idle();
     }
     else if (mstr::startsWith(argv[1], "status"))
     {
         if (argc == 3)
-            DISPLAY.status(atoi(argv[2]));
+            LEDS.status(atoi(argv[2]));
         else
-            DISPLAY.idle();
+            LEDS.idle();
     }
     else if (mstr::startsWith(argv[1], "speed"))
     {
         if (argc == 3)
-            DISPLAY.speed = atoi(argv[2]);
+            LEDS.speed = atoi(argv[2]);
         else
-            DISPLAY.idle();
+            LEDS.idle();
     }
     else if (mstr::startsWith(argv[1], "pixel"))
     {
@@ -207,11 +207,11 @@ static int led(int argc, char **argv)
         //     uint8_t g = atoi(argv[4]);
         //     uint8_t b = atoi(argv[5]);
         //     if (i == -1) // all
-        //         DISPLAY.fill_all((CRGB){.r=r, .g=g, .b=b});
+        //         LEDS.fill_all((CRGB){.r=r, .g=g, .b=b});
         //     else
-        //         DISPLAY.set_pixel(index, r, g, b);
+        //         LEDS.set_pixel(index, r, g, b);
         // else
-        //     DISPLAY.idle();
+        //     LEDS.idle();
     }
     else
     {

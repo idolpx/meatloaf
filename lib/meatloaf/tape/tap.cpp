@@ -39,26 +39,14 @@ bool TAPMStream::seekEntry( std::string filename )
             entryFilename = entryFilename.substr(0, i);
             //mstr::rtrimA0(entryFilename);
             entryFilename = mstr::toUTF8(entryFilename);
-            Debug_printv("filename[%s] entry.filename[%.16s]", filename.c_str(), entryFilename.c_str());
 
-            // Read Entry From Stream
-            if (filename == entryFilename) // Match exact
+            //Debug_printv("filename[%s] entry.filename[%.16s]", filename.c_str(), entryFilename.c_str());
+
+            if ( mstr::compareFilename(filename, entryFilename, wildcard) )
             {
                 return true;
             }
-            else if (wildcard) // Wildcard Match
-            {
-                if (filename == "*") // Match first PRG
-                {
-                    filename = entryFilename;
-                    return true;
-                }
-                else if ( mstr::compare(filename, entryFilename) )
-                {
-                    // Move stream pointer to start track/sector
-                    return true;
-                }
-            }
+
             index++;
         }
     }
@@ -158,13 +146,10 @@ bool TAPMFile::rewindDirectory() {
     dirIsOpen = true;
     Debug_printv("sourceFile->url[%s]", sourceFile->url.c_str());
     auto image = ImageBroker::obtain<TAPMStream>(sourceFile->url);
-    if ( image == nullptr )
-        Debug_printv("image pointer is null");
+    if (image == nullptr)
+        return false;
 
     image->resetEntryCounter();
-
-    // Read Header
-    image->readHeader();
 
     // Set Media Info Fields
     media_header = mstr::format("%.24", image->header.name);

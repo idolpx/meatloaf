@@ -42,7 +42,11 @@ class TAPMStream : public MMediaStream {
     // override everything that requires overriding here
 
 public:
-    TAPMStream(std::shared_ptr<MStream> is) : MMediaStream(is) { };
+    TAPMStream(std::shared_ptr<MStream> is) : MMediaStream(is)
+    {
+        // Read Header
+        readHeader();
+    };
 
 protected:
     struct Header {

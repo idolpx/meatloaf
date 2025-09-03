@@ -290,29 +290,14 @@ bool FlashMFile::readEntry( std::string filename )
             // Read Entry From Stream
             if ( dirent->d_type != DT_DIR ) // Only want to match files not directories
             {
-                // Read Entry From Stream
-                if ( filename == entryFilename ) // Match exact
+                if ( mstr::compareFilename(filename, entryFilename, wildcard) )
                 {
                     found = true;
-                }
-                else if ( wildcard )
-                {
-                    if (filename == "*") // Match first entry
-                    {
-                        filename = entryFilename;
-                        found = true;
-                    }
-                    else if ( mstr::compare(filename, entryFilename) ) // X?XX?X* Wildcard match
-                    {
-                        // Set filename to this filename
-                        Debug_printv( "Found! file[%s] -> entry[%s]", filename.c_str(), entryFilename.c_str() );
-                        resetURL(apath + "/" + entryFilename);
-                        found = true;
-                    }
                 }
 
                 if ( found )
                 {
+                    resetURL(apath + "/" + entryFilename);
                     _exists = true;
                     closedir( d );
                     return true;

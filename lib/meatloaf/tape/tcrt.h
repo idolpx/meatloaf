@@ -36,7 +36,11 @@ class TCRTMStream : public MMediaStream {
     // override everything that requires overriding here
 
 public:
-    TCRTMStream(std::shared_ptr<MStream> is) : MMediaStream(is) {};
+    TCRTMStream(std::shared_ptr<MStream> is) : MMediaStream(is)
+    {
+        // Read Header
+        readHeader();
+    };
 
 protected:
     struct Header {
