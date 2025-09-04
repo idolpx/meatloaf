@@ -67,9 +67,11 @@
 #include "disk/d81.h"
 #include "disk/d82.h"
 #include "disk/d90.h"
-#include "disk/dnp.h"
 #include "disk/g64.h"
 #include "disk/nib.h"
+
+// Hard Drive
+#include "hd/dnp.h"
 
 // File
 #include "file/p00.h"
@@ -517,7 +519,7 @@ std::shared_ptr<MStream> MFile::getSourceStream(std::ios_base::openmode mode) {
 
 MFile* MFile::cd(std::string newDir) 
 {
-    Debug_printv("cd[%s]", newDir.c_str());
+    Debug_printv("url[%s] cd[%s]", url.c_str(), newDir.c_str());
 
     // OK to clarify - coming here there should be ONLY path or magicSymbol-path combo!
     // NO "cd:xxxxx", no "/cd:xxxxx" ALLOWED here! ******************

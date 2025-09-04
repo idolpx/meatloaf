@@ -15,8 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
-// .DHD - CMD Hard drive image format
+// .HDD - IDE64 Filesystem 0.11 revision 5 © 2001-2003 by Soci/Singular (Commodore File System)
 //
-// https://sourceforge.net/p/vice-emu/patches/253/
-// https://www.pipesup.ca/cmdhd-in-vice/
+// https://singularcrew.hu/idedos/cfs.html
 //

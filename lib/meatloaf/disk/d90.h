@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
-// .D90 - The D90 image is bit-for-bit copy of the hard drives in the D9090 and D9060
+// .D90, .D60 - The D90 image is bit-for-bit copy of the hard drives in the D9090 and D9060
 //
 // https://vice-emu.sourceforge.io/vice_16.html#SEC429
 // http://www.baltissen.org/newhtm/diskimag.htm
@@ -86,7 +86,8 @@ public:
         };
         partitions.clear();
         partitions.push_back(p);
-        sectorsPerTrack = { 17, 18, 19, 21 };
+        sectorsPerTrack = { 32 };
+        dos_rom = "dos9000";
 
         // Read Header
         readHeader();

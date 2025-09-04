@@ -19,6 +19,8 @@
 #define TCP_SERVER_H
 
 #include <string>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 #define TCP_SERVER_PORT 23 // 3000
 
@@ -29,6 +31,8 @@ private:
     static int _client_socket;
     static bool _shutdown;
     static void task(void *pvParameters);
+
+    static TaskHandle_t _htask;
 
 public:
     void start();

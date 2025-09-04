@@ -637,7 +637,11 @@ bool iecDrive::open(uint8_t channel, const char *cname)
         size_t i = name.find('\xa0');
         if( i != std::string::npos ) name = name.substr(0, i);
 
-        Debug_printv("opening channel[%d] m_cwd[%s] name[%s] mode[%s]", channel, m_cwd->url.c_str(), name.c_str(), 
+        if ( m_cwd == nullptr )
+          Debug_printv("opening channel[%d] m_cwd[NULL] name[%s] mode[%s]", channel, name.c_str(), 
+                    mode==std::ios_base::out ? (overwrite ? "replace" : "write") : "read");
+        else
+          Debug_printv("opening channel[%d] m_cwd[%s] name[%s] mode[%s]", channel, m_cwd->url.c_str(), name.c_str(), 
                     mode==std::ios_base::out ? (overwrite ? "replace" : "write") : "read");
 
         if( name.length()==0 )
@@ -1563,6 +1567,9 @@ void iecDrive::set_cwd(std::string path)
     // Isolate path
     if ( mstr::startsWith(path, ":") || mstr::startsWith(path, " " ) )
       path = mstr::drop(path, 1);
+
+    if ( !path.size() )
+      path = "/";
 
     Debug_printv("path[%s]", path.c_str());
     path = mstr::toUTF8( path );

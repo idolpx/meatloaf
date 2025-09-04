@@ -46,6 +46,7 @@ TCPServer tcp_server;
 int TCPServer::_server_socket = -1;
 int TCPServer::_client_socket = -1;
 bool TCPServer::_shutdown = false;
+TaskHandle_t TCPServer::_htask = NULL;
 
 void TCPServer::task(void *pvParameters)
 {
@@ -174,7 +175,7 @@ void TCPServer::task(void *pvParameters)
         }
     }
     close(_server_socket);
-    vTaskDelete(NULL);
+    vTaskDelete(_htask);
     Debug_printv("TCP Server task ended");
 }
 
@@ -184,7 +185,7 @@ void TCPServer::start()
     _shutdown = false;
 
     // Start tcp server task
-    if (xTaskCreatePinnedToCore(&TCPServer::task, "console_tcp", 4096, NULL, 5, NULL, 0) != pdTRUE)
+    if (xTaskCreatePinnedToCore(&TCPServer::task, "console_tcp", 4096, NULL, 5, &_htask, 0) != pdTRUE)
     {
         Debug_printv("Could not start tcp server task!");
     }
@@ -197,7 +198,7 @@ void TCPServer::stop()
 
     // close(_client_socket);
     // close(_server_socket);
-    vTaskDelete(NULL);
+    vTaskDelete(_htask);
     Debug_printv("TCP Server task ended");
 }
 
