@@ -20,6 +20,7 @@
 #include "Test.h"
 #include "TNFS.h"
 #include "UDP.h"
+#include "SD.h"
 
 class NetworkProtocolFactory
 {
@@ -37,6 +38,7 @@ public:
 			{"TEST",   [](NetworkData &d) -> std::unique_ptr<NetworkProtocol> { return std::make_unique<NetworkProtocolTest>(&d.receiveBuffer, &d.transmitBuffer, &d.specialBuffer); }},
 			{"TNFS",   [](NetworkData &d) -> std::unique_ptr<NetworkProtocol> { return std::make_unique<NetworkProtocolTNFS>(&d.receiveBuffer, &d.transmitBuffer, &d.specialBuffer); }},
 			{"UDP",    [](NetworkData &d) -> std::unique_ptr<NetworkProtocol> { return std::make_unique<NetworkProtocolUDP>(&d.receiveBuffer, &d.transmitBuffer, &d.specialBuffer); }},
+			{"SD",    [](NetworkData &d) -> std::unique_ptr<NetworkProtocol> { return std::make_unique<NetworkProtocolSD>(&d.receiveBuffer, &d.transmitBuffer, &d.specialBuffer); }},
 		};
 
 		std::string scheme_upper = scheme;

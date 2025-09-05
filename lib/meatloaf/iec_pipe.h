@@ -21,7 +21,7 @@
 #include "meat_buffer.h"
 
 #include "../../../include/cbm_defines.h"
-#include "wrappers/iec_buffer.h"
+#include "wrapper/iec_buffer.h"
 
 /*
 This is the main IEC named channel abstraction. Meatloaf keeps an array/map of these as long as they're alive

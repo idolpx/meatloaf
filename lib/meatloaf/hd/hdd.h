@@ -18,4 +18,5 @@
 // .HDD - IDE64 Filesystem 0.11 revision 5 © 2001-2003 by Soci/Singular (Commodore File System)
 //
 // https://singularcrew.hu/idedos/cfs.html
+// https://singularcrew.hu/ide64warez/site/other-OS/Windows/fusecfs-2.0.4-win.zip
 //

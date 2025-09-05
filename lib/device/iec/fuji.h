@@ -8,6 +8,7 @@
 #include "network.h"
 #include "cassette.h"
 #include "fnWiFi.h"
+#include "display.h"
 
 #include "../fuji/fujiHost.h"
 #include "../fuji/fujiDisk.h"
@@ -318,7 +319,9 @@ protected:
     void set_boot_config_raw();
 
     // 0xD8
-    void copy_file();
+    void copy_file(std::string source, std::string destination);
+    void copy_file_basic();
+    void copy_file_raw();
 
     // 0xD6
     void set_boot_mode(uint8_t boot_device, bool should_boot_config);
@@ -349,6 +352,9 @@ protected:
     void hash_clear();
     void hash_clear_raw();
 
+    // 0x10 FUJICMD_UPDATE_FIRMWARE
+    void update_firmware();
+
     // Commodore specific
     void local_ip();
     void enable_device_basic(std::string ids = "");
@@ -371,6 +377,10 @@ protected:
         iecStatus.msg = msg;
         iecStatus.connected = connected;
         iecStatus.channel = channel;
+
+#ifdef ENABLE_DISPLAY
+  LEDS.status( error );
+#endif
     }
 
     // TODO: does this need to translate the message to PETSCII?

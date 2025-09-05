@@ -378,7 +378,7 @@ bool ArchiveMStream::seekEntry(std::string filename)
             //uint8_t i = entryFilename.find_first_of(0xA0);
             //entryFilename = entryFilename.substr(0, i);
             //mstr::rtrimA0(entryFilename);
-            //entryFilename = mstr::toUTF8(entryFilename);
+            entryFilename = mstr::toUTF8(entryFilename);
 
             //Debug_printv("filename[%s] entry.filename[%s]", filename.c_str(), entryFilename.c_str());
 

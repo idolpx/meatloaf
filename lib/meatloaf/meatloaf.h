@@ -23,12 +23,8 @@
 #include <vector>
 #include <fstream>
 #include <ctime>
-//#include <unordered_map>
 
 #include "../../include/debug.h"
-
-//#include "wrappers/iec_buffer.h"
-
 
 #include "peoples_url_parser.h"
 #include "string_utils.h"
@@ -167,18 +163,20 @@ public:
     virtual bool seekSector( uint8_t track, uint8_t sector, uint8_t offset = 0 ) { return false; };
     virtual bool seekSector( std::vector<uint8_t> trackSectorOffset ) { return false; };
 
-private:
+// private:
 
-    // DEVICE
-    friend class FlashMFile;
+//     // DEVICE
+//     friend class FlashMFile;
 
-    // NETWORK
-    friend class HTTPMFile;
-    friend class TNFSMFile;
+//     // NETWORK
+//     friend class HTTPMFile;
+//     friend class TNFSMFile;
 
-    // SERVICE
-    friend class CSIPMFile;
-    friend class TCPMFile;
+//     // SERVICE
+//     friend class CSIPMFile;
+//     friend class TCPMFile;
+
+//     friend class QRMFile;
 };
 
 
@@ -452,6 +450,7 @@ protected:
 class MFSOwner {
 public:
     static std::vector<MFileSystem*> availableFS;
+    static std::vector<MFileSystem*> availableELLPSW;
 
     static MFile* File(std::string name, bool default_fs = false);
     static MFile* File(std::shared_ptr<MFile> file);

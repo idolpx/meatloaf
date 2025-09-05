@@ -37,13 +37,18 @@
 
 #include "meat_broker.h"
 #include "meat_buffer.h"
-//#include "wrappers/directory_stream.h"
 
 #include "string_utils.h"
 #include "peoples_url_parser.h"
 
 #include "MIOException.h"
 #include "../../include/debug.h"
+
+
+
+// Device
+#include "device/flash.h"
+#include "device/sd.h"
 
 // Archive
 #include "archive/archive.h"
@@ -56,9 +61,8 @@
 #include "container/d8b.h"
 #include "container/dfi.h"
 
-// Device
-#include "device/flash.h"
-#include "device/sd.h"
+// File
+#include "file/p00.h"
 
 // Disk
 #include "disk/d64.h"
@@ -70,14 +74,12 @@
 #include "disk/g64.h"
 #include "disk/nib.h"
 
-// Hard Drive
+// Hard Disk
 #include "hd/dnp.h"
 
-// File
-#include "file/p00.h"
-
-// Link
-// Loaders
+// Tape
+#include "tape/t64.h"
+#include "tape/tcrt.h"
 
 // Network
 #include "network/http.h"
@@ -86,15 +88,18 @@
 // #include "network/smb.h"
 // #include "network/ws.h"
 
-// Scanners
-
 // Service
 #include "service/csip.h"
 #include "service/ml.h"
 
-// Tape
-#include "tape/t64.h"
-#include "tape/tcrt.h"
+
+// Encoder
+#include "encoder/qrcode.h"
+
+// Link
+// Loader
+// Parser
+// Scanner
 
 //std::unordered_map<std::string, MFile*> FileBroker::file_repo;
 //std::unordered_map<std::string, std::shared_ptr<MStream>> StreamBroker::stream_repo;
@@ -104,6 +109,8 @@
  ********************************************************/
 
 // initialize other filesystems here
+
+// Device
 FlashMFileSystem defaultFS;
 #ifdef SD_CARD
 SDFileSystem sdFS;
@@ -131,9 +138,15 @@ D80MFileSystem d80FS;
 D81MFileSystem d81FS;
 D82MFileSystem d82FS;
 D90MFileSystem d90FS;
-DNPMFileSystem dnpFS;
 G64MFileSystem g64FS;
 NIBMFileSystem nibFS;
+
+// Hard Disk
+DNPMFileSystem dnpFS;
+
+// Tape
+T64MFileSystem t64FS;
+TCRTMFileSystem tcrtFS;
 
 // Network
 HTTPMFileSystem httpFS;
@@ -146,36 +159,51 @@ TNFSMFileSystem tnfsFS;
 CSIPMFileSystem csipFS;
 MLMFileSystem mlFS;
 
-// Tape
-T64MFileSystem t64FS;
-TCRTMFileSystem tcrtFS;
-
+// Encoders
+QRMFileSystem qrcEncoder;
 
 // put all available filesystems in this array - first matching system gets the file!
 // fist in list is default
 std::vector<MFileSystem*> MFSOwner::availableFS { 
-    &defaultFS,
+
+    // Device
+    &defaultFS,     // Flash Filesystem
 #ifdef SD_CARD
     &sdFS,
 #endif
-    &archiveFS, // extension-based FS have to be on top to be picked first, otherwise the scheme will pick them!
+
+    // Archive
+    &archiveFS,     // extension-based FS have to be on top to be picked first, otherwise the scheme will pick them!
     &arkFS, &lbrFS,
-//#ifndef USE_VDRIVE
-    &d64FS, &d71FS, &d80FS, &d81FS, &d82FS, &d90FS, &dnpFS, 
-    &g64FS,
-//  &p64FS,
-//#endif
-    &nibFS,
+
+    // Container
     &d8bFS, &dfiFS,
 
+    // Disk
+    &d64FS, &d71FS, &d80FS, &d81FS, &d82FS, &d90FS,
+    &g64FS, &nibFS,
+
+    // Hard Disk
+    &dnpFS,
+
+    // Tape
     &t64FS, &tcrtFS,
 
+    // File
     &p00FS,
 
+    // Network
     &httpFS, &tnfsFS,
-//    &csipFS, &mlFS,
-//    &ipfsFS, &tcpFS,
-//    &tnfsFS
+    //&ipfsFS, &tcpFS,
+
+};
+
+std::vector<MFileSystem*> MFSOwner::availableELLPSW {
+    // Service
+    &csipFS,
+
+    // Encoders
+    &qrcEncoder
 };
 
 bool MFSOwner::mount(std::string name) {
@@ -230,14 +258,22 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
 
     if ( !default_fs )
     {
+        // If this is a ML Short Code then resolve it
         if ( mlFS.handles(path) )
         {
             path = mlFS.resolve(path);
         }
-
-        if ( csipFS.handles(path) )
+        else
         {
-            return csipFS.getFile(path);
+            // Check for Encoder/Link/Loader/Scanner/Wrapper
+            for(auto i = availableELLPSW.begin() + 1; i < availableELLPSW.end() ; i ++) {
+                auto ellpsw = (*i);
+
+                Debug_printv("Checking symbol[%s]", ellpsw->symbol);
+                if(ellpsw->handles(path)) {
+                    return ellpsw->getFile(path);
+                }
+            }
         }
     }
 
