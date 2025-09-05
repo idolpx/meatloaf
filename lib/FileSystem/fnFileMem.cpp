@@ -1,6 +1,8 @@
 
 #include <errno.h>
 #include <string.h>
+#include <cstring>
+#include <string.h>
 
 #include "fnFileMem.h"
 #include "../../include/debug.h"

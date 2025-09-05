@@ -40,28 +40,14 @@
 #include "meat_media.h"
 #include "qrmanager.h"
 
+#include "../../include/cbm_defines.h"
+
 
 // Buffering data when reading/writing streams because during regular (non-fastloader)
 // tranmissions, the read/write functions are called for each single byte at a time and
 // reading/writing MStream one byte at a time can be time consuming.
 // To be safe, BUFFER_SIZE should always be >=256
 #define BUFFER_SIZE 512
-
-
-#define ST_OK                  0
-#define ST_SCRATCHED           1
-#define ST_WRITE_ERROR        25
-#define ST_WRITE_PROTECT      26
-#define ST_SYNTAX_ERROR_31    31
-#define ST_SYNTAX_ERROR_33    33
-#define ST_FILE_NOT_OPEN      61
-#define ST_FILE_NOT_FOUND     62
-#define ST_FILE_EXISTS        63
-#define ST_FILE_TYPE_MISMATCH 64
-#define ST_NO_CHANNEL         70
-#define ST_SPLASH             73
-#define ST_DRIVE_NOT_READY    74
-#define ST_VDRIVE             255
 
 
 static bool isMatch(std::string name, std::string pattern)
@@ -230,7 +216,7 @@ uint8_t iecChannelHandlerFile::writeBufferData()
       if( n<m_len )
         {
           Debug_printv("Error: write failed: n[%d] < m_len[%d]", n, m_len);
-          return ST_WRITE_ERROR;
+          return ST_WRITE_VERIFY;
         }
     }
   
@@ -556,7 +542,7 @@ void iecDrive::begin()
 
   Debug_printv("id[%d]", id());
   m_host = nullptr;
-  m_statusCode = ST_SPLASH;
+  m_statusCode = ST_DOSVERSION;
   m_statusTrk  = 0;
   m_numOpenChannels = 0;
   m_cwd.reset( MFSOwner::File("/", true) );
@@ -647,7 +633,7 @@ bool iecDrive::open(uint8_t channel, const char *cname)
         if( name.length()==0 )
             {
             Debug_printv("Error: empty file name");
-            setStatusCode(ST_SYNTAX_ERROR_33);
+            setStatusCode(ST_SYNTAX_BAD_NAME);
             }
         else
             {
@@ -718,7 +704,7 @@ bool iecDrive::open(uint8_t channel, const char *cname)
                     {
                     // cannot write to directory
                     Debug_printv("Error: attempt to write to directory [%s]", f->url.c_str());
-                    setStatusCode(ST_WRITE_PROTECT);
+                    setStatusCode(ST_WRITE_PROTECT_ON);
                     delete f;
                     f = nullptr;
                     }
@@ -735,7 +721,7 @@ bool iecDrive::open(uint8_t channel, const char *cname)
                 else if( (mode == std::ios_base::out) && f->media_image.size()>0 )
                     {
                     Debug_printv("Error: writing to files on disk media not supported [%s]", f->url.c_str());
-                    setStatusCode(ST_WRITE_PROTECT);
+                    setStatusCode(ST_WRITE_PROTECT_ON);
                     }
                 else if( (mode == std::ios_base::out) && f->exists() && !overwrite )
                     {
@@ -914,7 +900,6 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
     {
         Meatloaf.use_vdrive = (command[2]=='+');
         printf("VDrive %sctivated!\r\n", Meatloaf.use_vdrive ? "A" : "Dea");
-        setStatusCode(ST_OK);
         return;
     }
 
@@ -968,35 +953,35 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
   else if( command=="EJ+" || command=="EJ-" )
     {
       enableFastLoader(IEC_FP_JIFFY, command[2]=='+');
-      setStatusCode(ST_OK);
+      //setStatusCode(ST_OK);
     }
 #endif  
 #ifdef IEC_FP_EPYX
   else if( command=="EE+" || command=="EE-" )
     {
       enableFastLoader(IEC_FP_EPYX, command[2]=='+');
-      setStatusCode(ST_OK);
+      //setStatusCode(ST_OK);
     }
 #endif  
 #ifdef IEC_FP_AR6
   else if( command=="EA+" || command=="EA-" )
     {
       enableFastLoader(IEC_FP_AR6, command[2]=='+');
-      setStatusCode(ST_OK);
+      //setStatusCode(ST_OK);
     }
 #endif
 #ifdef IEC_FP_FC3
   else if( command=="EF+" || command=="EF-" )
     {
       enableFastLoader(IEC_FP_FC3, command[2]=='+');
-      setStatusCode(ST_OK);
+      //setStatusCode(ST_OK);
     }
 #endif
 #ifdef IEC_FP_DOLPHIN
   else if( command=="ED+" || command=="ED-" )
     {
       enableFastLoader(IEC_FP_DOLPHIN, command[2]=='+');
-      setStatusCode(ST_OK);
+      //setStatusCode(ST_OK);
     }
   else if( command == "M-R\xfa\x02\x03" )
     {
@@ -1009,7 +994,7 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
 #endif
     else
     {
-      setStatusCode(ST_SYNTAX_ERROR_31);
+      setStatusCode(ST_SYNTAX_INVALID);
       //Debug_printv("Invalid command");
     }
 
@@ -1046,7 +1031,7 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                     {
                         auto stream = channel->getStream();
                         stream->position( pti[1] );
-                        setStatusCode(ST_OK);
+                        //setStatusCode(ST_OK);
                     }
                     return;
                 }
@@ -1118,7 +1103,7 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
 
                     // Execute detected fast loader
                 }
-                setStatusCode(ST_OK);
+                //setStatusCode(ST_OK);
                 return;
             }
         break;
@@ -1133,7 +1118,7 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                 if( dot==string::npos )
                 {
                     // must have extension to determine image type
-                    setStatusCode(ST_SYNTAX_ERROR_31);
+                    setStatusCode(ST_SYNTAX_INVALID);
                 }
                 else
                 {
@@ -1155,9 +1140,9 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                     if( f->exists() )
                       setStatusCode(ST_FILE_EXISTS);
                     else if( !f->isWritable )
-                      setStatusCode(ST_WRITE_PROTECT);
+                      setStatusCode(ST_WRITE_PROTECT_ON);
                     else if( !VDrive::createDiskImage(f->url.c_str(), NULL, diskname.c_str(), false) )
-                      setStatusCode(ST_WRITE_ERROR);
+                      setStatusCode(ST_WRITE_VERIFY);
                     else
                       setStatusCode(ST_OK);
                     fnLedManager.set(eLed::LED_BUS, false);
@@ -1170,9 +1155,9 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                 Debug_printv( "new (format)");
                 command = mstr::toUTF8(command.substr(colon_position + 1));
                 if (!m_cwd->format(command))
-                setStatusCode(ST_WRITE_ERROR);
-                else
-                setStatusCode(ST_OK);
+                  setStatusCode(ST_WRITE_VERIFY);
+                //else
+                //  setStatusCode(ST_OK);
 
                 return;
             }
@@ -1235,14 +1220,14 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                 {
                     auto stream = channel->getStream();
                     stream->seekSector( pti[2], pti[3] );
-                    setStatusCode(ST_OK);
+                    //setStatusCode(ST_OK);
                     return;
                 }
             }
             else if (command[1] == 'I' && command.size() == 2) // UI
             {
               Debug_printv( "warm reset");
-              setStatusCode(ST_SPLASH);
+              setStatusCode(ST_DOSVERSION);
               return;
             }
             else if (command[1] == 'J') // UJ
@@ -1276,7 +1261,7 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                 Debug_printv( "C64 Bus Speed");
                 // Set IEC Data Valid timing to 60us
               }
-              setStatusCode(ST_OK);
+              //setStatusCode(ST_OK);
               return;
             }
         break;
@@ -1326,19 +1311,19 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                   if( f->exists() )
                     setStatusCode(ST_FILE_EXISTS);
                   else if( !f->isWritable )
-                    setStatusCode(ST_WRITE_PROTECT);
+                    setStatusCode(ST_WRITE_PROTECT_ON);
                   else if( f->format("meatloaf,01") )
                   {
                     Debug_printv("format ok");
-                    setStatusCode(ST_OK);
+                    //setStatusCode(ST_OK);
                   }
                   else if( f->mkDir() )
                   {
                     Debug_printv("mkdir ok");
-                    setStatusCode(ST_OK);
+                    //setStatusCode(ST_OK);
                   }
                   else
-                    setStatusCode(ST_WRITE_ERROR);
+                    setStatusCode(ST_WRITE_VERIFY);
 
                   delete f;
                 }
@@ -1359,11 +1344,9 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                   if( !f->exists() )
                     setStatusCode(ST_FILE_NOT_FOUND);
                   else if( !f->isWritable )
-                    setStatusCode(ST_WRITE_PROTECT);
-                  else if( f->rmDir() )
-                    setStatusCode(ST_OK);
-                  else
-                    setStatusCode(ST_WRITE_ERROR);
+                    setStatusCode(ST_WRITE_PROTECT_ON);
+                  else if( !f->rmDir() )
+                    setStatusCode(ST_WRITE_VERIFY);
 
                   delete f;
                 }
@@ -1410,7 +1393,7 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                     setStatusCode(ST_FILE_NOT_FOUND);
                     break;
                 }
-                setStatusCode(ST_OK);
+                //setStatusCode(ST_OK);
             }
             // XS:{name} / XS
             // XW
@@ -1426,26 +1409,15 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
     }
 
     // Meatloaf Extended Commands
-    switch ( command[0] )
-    {
-      case 'Q': // Generate QRCode
-        if (command[1] == 'R' && colon_position)
-        {
-            command = command.substr(colon_position + 1);
-            Debug_printv("qrcode data[%s]", command.c_str());
-            command = mstr::toUTF8(command);
-            size_t qr_len = 0;
-            qrManager.encode(command.c_str(), command.length(), 1, 0, &qr_len);
-            qrManager.to_petscii();
-            auto qr = util_hexdump(qrManager.out_buf.data(), qrManager.out_buf.size());
-            Debug_printf("qrcode\r\n%s\r\n", qr.c_str());
-            setStatus((const char*)qrManager.out_buf.data(), qrManager.out_buf.size());
-        }
-      break;
-      default:
-          //Error(ERROR_31_SYNTAX_ERROR);
-      break;
-  }
+    // switch ( command[0] )
+    // {
+    //   case 'Q': // Generate QRCode
+
+    //   break;
+    //   default:
+    //       //Error(ERROR_31_SYNTAX_ERROR);
+    //   break;
+    // }
 }
 
 
@@ -1466,7 +1438,7 @@ void iecDrive::setStatusCode(uint8_t code, uint8_t trk)
 
 bool iecDrive::hasError()
 {
-  return (m_statusCode>=20) && (m_statusCode!=ST_SPLASH);
+  return (m_statusCode>=20) && (m_statusCode!=ST_DOSVERSION);
 }
 
 
@@ -1501,20 +1473,20 @@ void iecDrive::getStatus(char *buffer, uint8_t bufferSize)
   const char *msg = NULL;
   switch( m_statusCode )
     {
-    case ST_OK             : msg = " OK"; break;
-    case ST_SCRATCHED      : msg = "FILES SCRATCHED"; break;
-    case ST_WRITE_ERROR    : msg = "WRITE ERROR"; break;
-    case ST_WRITE_PROTECT  : msg = "WRITE PROTECT"; break;
-    case ST_SYNTAX_ERROR_31:
-    case ST_SYNTAX_ERROR_33: msg = "SYNTAX ERROR"; break;
-    case ST_FILE_NOT_FOUND : msg = "FILE NOT FOUND"; break;
-    case ST_FILE_NOT_OPEN  : msg = "FILE NOT OPEN"; break;
-    case ST_FILE_EXISTS    : msg = "FILE EXISTS"; break;
-    case ST_SPLASH         : msg = PRODUCT_ID " " FW_VERSION; break;
-    case ST_NO_CHANNEL     : msg = "NO CHANNEL"; break;
-    case ST_DRIVE_NOT_READY: msg = "DRIVE NOT READY"; break;
-    case ST_FILE_TYPE_MISMATCH: msg = "FILE TYPE MISMATCH"; break;
-    default                : msg = "UNKNOWN ERROR"; break;
+    case ST_OK                  : msg = " OK"; break;
+    case ST_SCRATCHED           : msg = "FILES SCRATCHED"; break;
+    case ST_WRITE_VERIFY        : msg = "WRITE ERROR"; break;
+    case ST_WRITE_PROTECT_ON       : msg = "WRITE PROTECT"; break;
+    case ST_SYNTAX_INVALID      : msg = "INVALID COMMAND"; break;
+    case ST_SYNTAX_BAD_NAME      : msg = "INVALID FILENAME"; break;
+    case ST_FILE_NOT_FOUND      : msg = "FILE NOT FOUND"; break;
+    case ST_FILE_NOT_OPEN       : msg = "FILE NOT OPEN"; break;
+    case ST_FILE_EXISTS         : msg = "FILE EXISTS"; break;
+    case ST_DOSVERSION          : msg = PRODUCT_ID " " FW_VERSION; break;
+    case ST_NO_CHANNEL          : msg = "NO CHANNEL"; break;
+    case ST_DRIVE_NOT_READY     : msg = "DRIVE NOT READY"; break;
+    case ST_FILE_TYPE_MISMATCH  : msg = "FILE TYPE MISMATCH"; break;
+    default                     : msg = "UNKNOWN ERROR"; break;
     }
 
   snprintf(buffer, bufferSize, "%02d,%s,%02d,00\r", m_statusCode, msg, m_statusTrk);
@@ -1533,7 +1505,7 @@ void iecDrive::getStatus(char *buffer, uint8_t bufferSize)
 void iecDrive::reset()
 {
   Debug_printv("iecDrive::reset(#%d)", m_devnr);
-  setStatusCode(ST_SPLASH);
+  setStatusCode(ST_DOSVERSION);
 
   // close all open channels
   for(int i=0; i<16; i++)
@@ -1625,7 +1597,7 @@ void iecDrive::set_cwd(std::string path)
           }
       }
     else
-      setStatusCode(ST_SYNTAX_ERROR_31);
+      setStatusCode(ST_SYNTAX_INVALID);
 }
 
 

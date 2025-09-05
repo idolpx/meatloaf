@@ -30,8 +30,8 @@
 #include "../../media/media.h"
 #include "../meatloaf/meatloaf.h"
 #include "../meatloaf/meat_buffer.h"
-#include "../meatloaf/wrappers/iec_buffer.h"
-#include "../meatloaf/wrappers/directory_stream.h"
+#include "../meatloaf/wrapper/iec_buffer.h"
+#include "../meatloaf/wrapper/directory_stream.h"
 #include "utils.h"
 
 //#ifdef USE_VDRIVE

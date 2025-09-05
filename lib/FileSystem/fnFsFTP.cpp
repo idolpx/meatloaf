@@ -1,6 +1,7 @@
 
 #include "fnFsFTP.h"
 
+#include <string.h>
 #include "compat_string.h"
 
 #include "../../include/debug.h"

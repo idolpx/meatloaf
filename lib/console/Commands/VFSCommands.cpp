@@ -173,7 +173,7 @@ int cd(int argc, char **argv)
 
 int ls(int argc, char **argv)
 {
-    MFile* listPath;
+    MFile* listPath = nullptr;
     if (argc == 1)
     {
         listPath = MFSOwner::File(getCurrentPath()->url);
@@ -182,18 +182,13 @@ int ls(int argc, char **argv)
     {
         listPath = getCurrentPath()->cd(argv[1]);
     }
-    else
-    {
-        Serial.printf("You can pass only one filename!\r\n");
-        return 1;
-    }
 
     std::unique_ptr<MFile> destPath(listPath);
     std::unique_ptr<MFile> entry(destPath->getNextFileInDir());
 
     if(entry.get() == nullptr) {
-        Serial.printf("Could not open directory: %s\r\n", strerror(errno));
-        return 1;
+        // Empty directory
+        return EXIT_SUCCESS;
     }
 
     // If sd card is mounted and we are at root

@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <cstdio>
 #include <cstring>
+#include <string.h>
 
 #include "fnFS.h"
 #include "compat_string.h"

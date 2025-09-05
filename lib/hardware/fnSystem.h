@@ -140,6 +140,7 @@ public:
     const char *get_current_time_str();
     void update_timezone(const char *timezone);
     void update_hostname(const char *hostname);
+    void update_firmware();
 
     const char *get_fujinet_version(bool shortVersionOnly = false);
 
@@ -151,6 +152,7 @@ public:
     void yield();
 
     size_t copy_file(FileSystem *source_fs, const char *source_filename, FileSystem *dest_fs, const char *dest_filename, size_t buffer_hint = FILE_COPY_BUFFERSIZE);
+    size_t copy_file(std::string source, std::string destination, size_t buffer_hint = FILE_COPY_BUFFERSIZE);
     FILE *make_tempfile(FileSystem *fs, char *result_filename);
     FILE *make_tempfile(char *result_filename);
     void delete_tempfile(FileSystem *fs, const char *filename);

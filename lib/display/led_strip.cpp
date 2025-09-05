@@ -27,23 +27,10 @@
 #include "../../include/global_defines.h"
 #include "../../include/pinmap.h"
 #include "../../include/debug.h"
+#include "../../include/cbm_defines.h"
 
 //#include "WS2812FX/WS2812FX.h"
 
-#define ST_DISPLAY_OFF       255
-#define ST_OK                  0
-#define ST_SCRATCHED           1
-#define ST_WRITE_ERROR        25
-#define ST_WRITE_PROTECT      26
-#define ST_SYNTAX_ERROR_31    31
-#define ST_SYNTAX_ERROR_33    33
-#define ST_FILE_NOT_OPEN      61
-#define ST_FILE_NOT_FOUND     62
-#define ST_FILE_EXISTS        63
-#define ST_FILE_TYPE_MISMATCH 64
-#define ST_NO_CHANNEL         70
-#define ST_SPLASH             73
-#define ST_DRIVE_NOT_READY    74
 
 DisplayLEDs LEDS;
 
@@ -118,7 +105,7 @@ void DisplayLEDs::service()
                     break;
                 case ST_OK             :
                 case ST_SCRATCHED      :
-                case ST_SPLASH         :
+                case ST_DOSVERSION     :
                     mode = MODE_IDLE;
                     meatloaf();
                     break;

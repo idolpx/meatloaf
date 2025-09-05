@@ -30,6 +30,8 @@
 #endif
 #include <soc/rtc.h>
 
+#include <mlff.h>
+
 // ESP_PLATFORM
 #else
 // !ESP_PLATFORM
@@ -57,6 +59,7 @@
 #include "fsFlash.h"
 #include "fnFsSD.h"
 #include "fnWiFi.h"
+#include "NetworkProtocolFactory.h"
 
 #ifdef BUILD_APPLE
 #define BUS_CLASS IWM
@@ -514,6 +517,18 @@ void SystemManager::update_hostname(const char *hostname)
     }
 }
 
+void SystemManager::update_firmware()
+{
+    Serial.printf("Stopping flash filesystem...\r\n");
+    fsFlash.stop();
+
+    Serial.println("Flash bin files from '/sd/.bin/'");
+    mlff_update(PIN_SD_HOST_CS, PIN_SD_HOST_MISO, PIN_SD_HOST_MOSI, PIN_SD_HOST_SCK);
+
+    Serial.println("Reboot to run update app and flash 'main.*.bin'...");
+    reboot();
+}
+
 const char *SystemManager::get_current_time_str()
 {
     time_t tt = time(nullptr);
@@ -832,6 +847,48 @@ size_t SystemManager::copy_file(FileSystem *source_fs, const char *source_filena
 
     return result;
 }
+
+size_t SystemManager::copy_file(std::string source, std::string destination, size_t buffer_hint)
+{
+    // NetworkData source_data, destination_data;
+    // source_data.urlParser = std::move(PeoplesUrlParser::parseURL(source));
+    // destination_data.urlParser = std::move(PeoplesUrlParser::parseURL(destination));
+
+    // Debug_printv("Creating protocol for source schema [%s]", source_data.urlParser->scheme.c_str());
+    // std::unique_ptr<NetworkProtocol> source_file;
+    // source_file = std::move(NetworkProtocolFactory::createProtocol(source_data.urlParser->scheme, source_data));
+
+    // Debug_printv("Creating protocol for destination schema [%s]", destination_data.urlParser->scheme.c_str());
+    // std::unique_ptr<NetworkProtocol> destination_file;
+    // destination_file = std::move(NetworkProtocolFactory::createProtocol(source_data.urlParser->scheme, source_data));
+
+    // NetworkStatus *source_status, *destination_status;
+
+    // size_t result = 0;
+    // source_file->status(source_status);
+    // destination_file->status(destination_status);
+    // do
+    // {
+    //     int byte_count = source_file->read(buffer_hint);
+    //     source_file->status(source_status);
+    //     if ( source_status->error )
+    //         return 0;
+
+    //     destination_data.transmitBuffer = source_data.receiveBuffer;
+    //     destination_file->write(byte_count);
+
+    //     destination_file->status(destination_status);
+    //     if ( destination_status->error )
+    //         return 0;
+
+    //     result += byte_count;
+    // } 
+    // while( source_status->connected && destination_status->connected );
+
+    // return result;
+    return 0;
+}
+
 
 // From esp32-hal-dac.c
 /*
