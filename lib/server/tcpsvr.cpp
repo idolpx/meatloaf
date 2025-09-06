@@ -176,7 +176,8 @@ void TCPServer::task(void *pvParameters)
     }
     close(_server_socket);
     vTaskDelete(_htask);
-    Debug_printv("TCP Server task ended");
+    Debug_printv("TCP Server task ended (task)");
+    _htask = NULL;
 }
 
 
@@ -194,12 +195,17 @@ void TCPServer::start()
 void TCPServer::stop()
 {
     Debug_printv("Stopping tcp server task");
-    _shutdown = true;
 
-    // close(_client_socket);
-    // close(_server_socket);
-    vTaskDelete(_htask);
-    Debug_printv("TCP Server task ended");
+    if (_client_socket > 0)
+        close(_client_socket);
+    if (_server_socket > 0)
+        close(_server_socket);
+    if (_htask != NULL)
+        vTaskDelete(_htask);
+
+    Debug_printv("TCP Server task ended (stop)");
+    _htask = NULL;
+    _shutdown = true;
 }
 
 void TCPServer::send(std::string data)
