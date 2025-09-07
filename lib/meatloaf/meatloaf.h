@@ -421,15 +421,28 @@ public:
         return mstr::endsWith(fileName, ext, false);
     }
 
-    static bool byExtension(const std::vector<std::string> &ext, std::string fileName) {
+    static bool byExtension(const std::vector<std::string> &ext, std::string fileName, bool wildcard = false) {
         if ( fileName.size() )
         {
-            std::string extension = fileName.substr(fileName.find_last_of("."));
+            std::string extension;
+            if ( fileName.contains("."))
+                extension = fileName.substr(fileName.find_last_of("."));
+            else
+                return false;
+
             for ( const auto &e : ext )
             {
-                //Debug_printv("comparing [%s] to [%s]", fileName.c_str(), e.c_str());
-                if ( mstr::compare(e, extension, false) )
-                    return true;
+                //Debug_printv("comparing [%s][%s] to [%s] wildcard[%d]", fileName.c_str(), extension.c_str(), e.c_str(), wildcard);
+                if ( wildcard )
+                {
+                    if ( mstr::compare(e, extension, false) )
+                        return true;
+                }
+                else
+                {
+                    if ( mstr::endsWith(extension, e.c_str(), false) )
+                        return true;
+                }
             }
         }
 

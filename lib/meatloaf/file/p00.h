@@ -133,7 +133,14 @@ public:
     P00MFileSystem(): MFileSystem("p00") {};
 
     bool handles(std::string fileName) override {
-        return byExtension(".p00", fileName);
+        return byExtension(
+            {
+                ".p??",
+                ".s??",
+                ".r??"
+            }, 
+            fileName, true
+        );
     }
 
     MFile* getFile(std::string path) override {
