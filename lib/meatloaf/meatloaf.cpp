@@ -752,7 +752,6 @@ MFile* MFile::cdLocalRoot(std::string plus)
 // };
 
 bool MFile::exists() { 
-    Debug_printv("here!");
     return _exists; 
 };
 

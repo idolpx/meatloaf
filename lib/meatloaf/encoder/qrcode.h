@@ -23,6 +23,7 @@
 #define MEATLOAF_SCHEME_QRCODE
 
 #include <string>
+#include <vector>
 #include "qrmanager.h"
 #include "meatloaf.h"
 #include "utils.h"
@@ -34,17 +35,43 @@
  
  class QRMStream: public MStream 
  {
+    std::vector<uint8_t> qrcode;
 
     uint32_t generate(std::string data)
     {
-        Debug_printv("qrcode data[%s]", data.c_str());
-        size_t qr_len = 0;
-        qrManager.encode(data.c_str(), data.length(), 0, 0, &qr_len);
-        qrManager.to_petscii();
-        auto qr = util_hexdump(qrManager.out_buf.data(), qrManager.out_buf.size());
-        Debug_printf("qrcode\r\n%s\r\n", qr.c_str());
+        uint8_t version = 0; // default version
+        uint8_t ecc = 0;     // default ecc
+        auto d = util_tokenize(data, '/');
+        if ( d.size() > 1 ) {
+            version = atoi(d[0].c_str());
 
-        return qr_len;
+            if ( d.size() > 2) {
+                ecc = atoi(d[1].c_str());
+                data = d[2];
+            }
+            else
+            {
+                data = d[1];
+            }
+        }
+
+        //Debug_printv("qrcode version[%d] ecc[%d] data[%s]", version, (qr_ecc_t)ecc, data.c_str());
+        // uint16_t len = data.size();
+        // void *b45data = malloc(len * 3);
+        // void *b45data_len = malloc(sizeof(uint16_t));
+        // qrcode_encodeBase45((unsigned char*)b45data, (uint16_t*)&b45data_len, (unsigned char*)data.c_str(), len);
+        // data = (char*)b45data;
+        // free(b45data);
+
+        qrcode.clear();
+        qrcode.shrink_to_fit();
+        QRManager qrManager = QRManager(version, (qr_ecc_t)ecc, QR_OUTPUT_MODE_PETSCII);
+        qrcode = qrManager.encode(data.c_str());
+
+        //auto qr = util_hexdump(qrcode.data(), qrcode.size());
+        //Debug_printf("qrcode [%d]\r\n%s\r\n", qrcode.size(), qr.c_str());
+
+        return qrcode.size();
     }
 
  public:
@@ -66,9 +93,13 @@
         if (size > (_size - _position)) {
             size = _size - _position;
         }
-        memcpy(buf, (qrManager.out_buf.data() + _position), size);
+        if (size < 1)
+            return 0;
+
+        memcpy(buf, (qrcode.data() + _position), size);
         _position += size;
         Debug_printv("position[%d] size[%d]", _position, size);
+
         return size;
      };
      uint32_t write(const uint8_t *buf, uint32_t size) override 

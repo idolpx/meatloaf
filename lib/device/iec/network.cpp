@@ -383,7 +383,7 @@ void iecNetwork::parse_bite()
 
         // Add CR if there isn't one already
         if ( len == bite_size)
-             bites += "\r\"";
+             bites += "\r";
 
         count++;
     } while ( end < channel_data.receiveBuffer.size() );

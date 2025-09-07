@@ -236,7 +236,7 @@ namespace mstr {
         return contains(ss1, s2, case_sensitive);
     }
 
-    bool compare(std::string &s1, std::string &s2, bool case_sensitive)
+    bool compare(const std::string &s1, const std::string &s2, bool case_sensitive)
     {
         unsigned int index;
 

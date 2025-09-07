@@ -424,10 +424,11 @@ public:
     static bool byExtension(const std::vector<std::string> &ext, std::string fileName) {
         if ( fileName.size() )
         {
+            std::string extension = fileName.substr(fileName.find_last_of("."));
             for ( const auto &e : ext )
             {
                 //Debug_printv("comparing [%s] to [%s]", fileName.c_str(), e.c_str());
-                if ( mstr::endsWith(fileName, e.c_str(), false) )
+                if ( mstr::compare(e, extension, false) )
                     return true;
             }
         }
