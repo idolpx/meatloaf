@@ -1366,6 +1366,44 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
             {
                 Debug_printv( "time"); // RTC support
                 //Error(ERROR_31_SYNTAX_ERROR);	// T-R and T-W not implemented yet
+                if (command[2] == 'R')
+                {
+                  if(command[3] == 'A')
+                  {
+                    Debug_printv("read ascii format");
+                  }
+                  else if(command[3] == 'I')
+                  {
+                    Debug_printv("read ISO-8601 format");
+                  }
+                  else if(command[3] == 'D')
+                  {
+                    Debug_printv("read decimal format");
+                  }
+                  else if(command[3] == 'B')
+                  {
+                    Debug_printv("read BCD format");
+                  }
+                }
+                else if (command[2] == 'W')
+                {
+                  if(command[3] == 'A')
+                  {
+                    Debug_printv("write ascii format");
+                  }
+                  else if(command[3] == 'I')
+                  {
+                    Debug_printv("write ISO-8601 format");
+                  }
+                  else if(command[3] == 'D')
+                  {
+                    Debug_printv("write decimal format");
+                  }
+                  else if(command[3] == 'B')
+                  {
+                    Debug_printv("write BCD format");
+                  }
+                }
             }
         break;
         case 'W':
