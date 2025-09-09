@@ -49,6 +49,7 @@ public:
         qrcode.ecc = ecc;
 
         output_mode = mode;
+        code = std::vector<uint8_t>();
     };
     ~QRManager() {
         free(qrcode.modules);
@@ -66,7 +67,7 @@ public:
     * Returned buffer consists of a 1 or 0 for each QR module, indicating
     * whether it is on (black) or off (white).
     */
-    std::vector<uint8_t> encode(const void* data, uint16_t length = 0, uint8_t version = 0, qr_ecc_t ecc = QR_ECC_LOW);;
+    std::vector<uint8_t> encode(const void* input = nullptr, uint16_t length = 0, uint8_t version = 0, qr_ecc_t ecc = QR_ECC_LOW);;
 
     /**
     * to_ansi - Convert QR code in out_buf to ATASCII
@@ -121,9 +122,14 @@ public:
     std::vector<uint8_t> to_petscii(void);
 
     uint8_t version() { return qrcode.version; }
+    void version(uint8_t v) { qrcode.version = v; }
     qr_ecc_t ecc() { return (qr_ecc_t)qrcode.ecc; }
+    void ecc(qr_ecc_t e) { qrcode.ecc = e; }
     uint8_t size() { return qrcode.size; }
     ouput_mode_t output_mode = QR_OUTPUT_MODE_BINARY;
+
+    std::string data;
+    std::vector<uint8_t> code;
 };
 
 #endif /* QRCODE_MANAGER_H */

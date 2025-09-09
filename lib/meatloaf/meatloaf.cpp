@@ -95,6 +95,7 @@
 
 // Encoder
 #include "encoder/qrcode.h"
+#include "encoder/hash.h"
 
 // Link
 // Loader
@@ -161,6 +162,7 @@ MLMFileSystem mlFS;
 
 // Encoders
 QRMFileSystem qrcEncoder;
+HashMFileSystem hashEncoder;
 
 // put all available filesystems in this array - first matching system gets the file!
 // fist in list is default
@@ -203,7 +205,7 @@ std::vector<MFileSystem*> MFSOwner::availableELLPSW {
     &csipFS,
 
     // Encoders
-    &qrcEncoder
+    &qrcEncoder, &hashEncoder
 };
 
 bool MFSOwner::mount(std::string name) {
@@ -258,7 +260,7 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
 
     if ( !default_fs )
     {
-        // If this is a ML Short Code then resolve it
+        // If this is a ML Short Code, resolve it!
         if ( mlFS.handles(path) )
         {
             path = mlFS.resolve(path);

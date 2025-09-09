@@ -12,61 +12,79 @@
 
 #include "qrcode.h"
 
-std::vector<uint8_t> QRManager::encode(const void* data, uint16_t length, uint8_t version, qr_ecc_t ecc)
+std::vector<uint8_t> QRManager::encode(const void* input, uint16_t length, uint8_t version, qr_ecc_t ecc)
 {
+    code = std::vector<uint8_t>();
+
     if (version)
         qrcode.version = version;
 
     if (ecc)
         qrcode.ecc = ecc;
 
+    if (input == nullptr && data.size() == 0)
+        return code;
+
+    if (input != nullptr)
+    {
+        if (length)
+            data = std::string((char*)input, length);
+        else
+            data = std::string((char*)input);
+
+        printf("input[%s]\n", (char*)input);
+    }
+    printf("data[%s]\n", data.c_str());
+
     int8_t err = 0;
-    if (length)
+    if (length > 0)
     {
         //printf("bytes[%d]\n", length);
-        err = qrcode_initBytes(&qrcode, (uint8_t*)data, length);
+        err = qrcode_initBytes(&qrcode, (uint8_t*)data.c_str(), length);
     }
     else
     {
         //printf("text[%s]\n", (char*)data);
-        err = qrcode_initText(&qrcode, (char*)data);
+        err = qrcode_initText(&qrcode, (char*)data.c_str());
     }
     if (err != 0) {
         // Error!
         //printf("error[%d]\n", err);
-        return std::vector<uint8_t>();
+        return code;
     }
 
-    // auto encoded = to_ansi();
-    // printf("%s\n", encoded.data());
+    auto encoded = to_ansi();
+    printf("%s\n", encoded.data());
 
     //printf("version[%d] ecc[%d] mode[%d] output_mode[%d]\n", qrcode.version, qrcode.ecc, qrcode.mode, output_mode);
     switch (output_mode) {
         case QR_OUTPUT_MODE_ANSI:
             //printf("ansi\n");
-            return to_ansi();
+            code = to_ansi();
             break;
         case QR_OUTPUT_MODE_BITMAP:
             //printf("bitmap\n");
-            return to_bitmap();
+            code =  to_bitmap();
             break;
         case QR_OUTPUT_MODE_SVG:
             //printf("svg\n");
-            return to_svg();
+            code =  to_svg();
             break;
         case QR_OUTPUT_MODE_ATASCII:
             //printf("atascii\n");
-            return to_atascii();
+            code =  to_atascii();
             break;
         case QR_OUTPUT_MODE_PETSCII:
             //printf("petscii\n");
-            return to_petscii();
+            code =  to_petscii();
             break;
         case QR_OUTPUT_MODE_BINARY:
         default:
             //printf("binary\n");
-            return to_binary();
+            code =  to_binary();
     }
+
+    return code;
 }
 
 std::vector<uint8_t> QRManager::to_ansi() {

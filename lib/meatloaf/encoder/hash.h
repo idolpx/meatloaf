@@ -19,12 +19,12 @@
 // 
 
 
-#ifndef MEATLOAF_SCHEME_QRCODE
-#define MEATLOAF_SCHEME_QRCODE
+#ifndef MEATLOAF_SCHEME_HASH
+#define MEATLOAF_SCHEME_HASH
 
 #include <string>
 #include <vector>
-#include "qrmanager.h"
+#include "../../encoding/hash.h"
 #include "meatloaf.h"
 #include "utils.h"
 
@@ -33,55 +33,49 @@
   * MStream I
   ********************************************************/
  
- class QRMStream: public MStream 
+ class HashMStream: public MStream 
  {
-    std::vector<uint8_t> qrcode;
+    std::string hash;
 
     uint32_t generate(std::string data)
     {
-        uint8_t version = 0; // default version
-        uint8_t ecc = 0;     // default ecc
+        std::string algorithm = "MD5"; // MD5, SHA1, SHA224, SHA256, SHA384, SHA512
+        std::string key; // If specified HMAC Message Digest is returned instead
         auto d = util_tokenize(data, '/');
         if ( d.size() > 1 ) {
-            version = atoi(d[0].c_str());
+            algorithm = d[0];
+            mstr::toUpper(algorithm);
 
             if ( d.size() > 2) {
-                ecc = atoi(d[1].c_str());
+                key = d[1].c_str();
                 data = d[2];
             }
             else
             {
+                key.clear();
+                key.shrink_to_fit();
                 data = d[1];
             }
         }
 
-        //Debug_printv("qrcode version[%d] ecc[%d] data[%s]", version, (qr_ecc_t)ecc, data.c_str());
-        // uint16_t len = data.size();
-        // void *b45data = malloc(len * 3);
-        // void *b45data_len = malloc(sizeof(uint16_t));
-        // qrcode_encodeBase45((unsigned char*)b45data, (uint16_t*)&b45data_len, (unsigned char*)data.c_str(), len);
-        // data = (char*)b45data;
-        // free(b45data);
+        Debug_printv("hash algoritm[%s] key[%s] data[%s]", algorithm.c_str(), key.c_str(), data.c_str());
+        hash.clear();
+        hash.shrink_to_fit();
+        hasher.key = key;
+        hasher.add_data(data);
+        hasher.compute(hasher.from_string(algorithm), true);
 
-        qrcode.clear();
-        qrcode.shrink_to_fit();
-        QRManager qrManager = QRManager(version, (qr_ecc_t)ecc, QR_OUTPUT_MODE_PETSCII);
+        hash = hasher.output_hex();
+        mstr::toUpper(hash);
+        Debug_printf("hash[%s]\r\n", hash.c_str());
 
-        //qrcode = qrManager.encode(data.c_str());
-
-        qrManager.data = data;
-        qrcode = qrManager.encode();
-
-        //auto qr = util_hexdump(qrcode.data(), qrcode.size());
-        //Debug_printf("qrcode [%d]\r\n%s\r\n", qrcode.size(), qr.c_str());
-
-        return qrcode.size();
+        return hash.size();
     }
 
  public:
-     QRMStream(std::string &path, std::ios_base::openmode m) {
+     HashMStream(std::string &path, std::ios_base::openmode m) {
         //url = path;
-        path = mstr::drop(path, 4); // drop "QR:/"
+        path = mstr::drop(path, 6); // drop "HASH:/"
         _size = generate(path);
      }
  
@@ -100,7 +94,7 @@
         if (size < 1)
             return 0;
 
-        memcpy(buf, (qrcode.data() + _position), size);
+        memcpy(buf, (hash.data() + _position), size);
         _position += size;
         Debug_printv("position[%d] size[%d]", _position, size);
 
@@ -121,18 +115,18 @@
   * MFile
   ********************************************************/
  
-class QRMFile: public MFile
+class HashMFile: public MFile
 {
 public:
     
-    QRMFile(std::string path): MFile(path)
+    HashMFile(std::string path): MFile(path)
     {
         Debug_printv("path[%s]", this->path.c_str());
     };
 
     std::shared_ptr<MStream> getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override 
     {
-        std::shared_ptr<MStream> istream = std::make_shared<QRMStream>(url, mode);
+        std::shared_ptr<MStream> istream = std::make_shared<HashMStream>(url, mode);
         size = istream->size();
         return istream;
     };
@@ -153,18 +147,18 @@ public:
  * MFileSystem
  ********************************************************/
 
-class QRMFileSystem: public MFileSystem
+class HashMFileSystem: public MFileSystem
 {
 public:
-    QRMFileSystem(): MFileSystem("qrcode") {};
+    HashMFileSystem(): MFileSystem("hash") {};
 
     bool handles(std::string name) {
-        return mstr::startsWith(name, (char *)"qr:", false);
+        return mstr::startsWith(name, (char *)"hash:", false);
     }
 
     MFile* getFile(std::string path) override {
-        return new QRMFile(path);
+        return new HashMFile(path);
     }
 };
 
-#endif // MEATLOAF_SCHEME_QRCODE
+#endif // MEATLOAF_SCHEME_HASH
