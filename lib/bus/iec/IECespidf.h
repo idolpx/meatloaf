@@ -74,7 +74,7 @@ static void attachInterrupt(uint8_t pin, interruptFcn userFunc, gpio_int_type_t 
 {
   static bool interrupt_initialized = false;
 
-  if (pin >= SOC_GPIO_PIN_COUNT) return;
+  if (pin >= SOC_GPIO_PIN_COUNT || pin == GPIO_NUM_NC) return;
 
   if (!interrupt_initialized) {
     esp_err_t err = gpio_install_isr_service(0 /* ESP_INTR_FLAG_IRAM */);
@@ -91,6 +91,7 @@ static void attachInterrupt(uint8_t pin, interruptFcn userFunc, gpio_int_type_t 
 
 static void detachInterrupt(uint8_t pin)
 {
+  if (pin >= SOC_GPIO_PIN_COUNT || pin == GPIO_NUM_NC) return;
   gpio_isr_handler_remove((gpio_num_t)pin);
   gpio_set_intr_type((gpio_num_t)pin, GPIO_INTR_DISABLE);
 }

@@ -51,35 +51,35 @@
 #include "device/sd.h"
 
 // Archive
-#include "archive/archive.h"
-#include "archive/ark.h"
-#include "archive/lbr.h"
+#include "media/archive/archive.h"
+#include "media/archive/ark.h"
+#include "media/archive/lbr.h"
 
 // Cartridge
 
 // Container
-#include "container/d8b.h"
-#include "container/dfi.h"
+#include "media/container/d8b.h"
+#include "media/container/dfi.h"
 
 // File
-#include "file/p00.h"
+#include "media/file/p00.h"
 
 // Disk
-#include "disk/d64.h"
-#include "disk/d71.h"
-#include "disk/d80.h"
-#include "disk/d81.h"
-#include "disk/d82.h"
-#include "disk/d90.h"
-#include "disk/g64.h"
-#include "disk/nib.h"
+#include "media/disk/d64.h"
+#include "media/disk/d71.h"
+#include "media/disk/d80.h"
+#include "media/disk/d81.h"
+#include "media/disk/d82.h"
+#include "media/disk/d90.h"
+#include "media/disk/g64.h"
+#include "media/disk/nib.h"
 
 // Hard Disk
-#include "hd/dnp.h"
+#include "media/hd/dnp.h"
 
 // Tape
-#include "tape/t64.h"
-#include "tape/tcrt.h"
+#include "media/tape/t64.h"
+#include "media/tape/tcrt.h"
 
 // Network
 #include "network/http.h"
@@ -93,9 +93,11 @@
 #include "service/ml.h"
 
 
-// Encoder
-#include "encoder/qrcode.h"
-#include "encoder/hash.h"
+// Codec
+#include "codec/qr.h"
+
+// Hash
+#include "hash/hash.h"
 
 // Link
 // Loader
@@ -160,7 +162,7 @@ TNFSMFileSystem tnfsFS;
 CSIPMFileSystem csipFS;
 MLMFileSystem mlFS;
 
-// Encoders
+// Codec
 QRMFileSystem qrcEncoder;
 HashMFileSystem hashEncoder;
 
@@ -204,7 +206,7 @@ std::vector<MFileSystem*> MFSOwner::availableELLPSW {
     // Service
     &csipFS,
 
-    // Encoders
+    // Codec
     &qrcEncoder, &hashEncoder
 };
 

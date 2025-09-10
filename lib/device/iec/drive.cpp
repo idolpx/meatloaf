@@ -948,40 +948,41 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
   if( mstr::startsWith(command, "CD") )
     {
       set_cwd(mstr::drop(command, 2));
+      return;
     }
 #ifdef IEC_FP_JIFFY
   else if( command=="EJ+" || command=="EJ-" )
     {
       enableFastLoader(IEC_FP_JIFFY, command[2]=='+');
-      //setStatusCode(ST_OK);
+      return;
     }
 #endif  
 #ifdef IEC_FP_EPYX
   else if( command=="EE+" || command=="EE-" )
     {
       enableFastLoader(IEC_FP_EPYX, command[2]=='+');
-      //setStatusCode(ST_OK);
+      return;
     }
 #endif  
 #ifdef IEC_FP_AR6
   else if( command=="EA+" || command=="EA-" )
     {
       enableFastLoader(IEC_FP_AR6, command[2]=='+');
-      //setStatusCode(ST_OK);
+      return;
     }
 #endif
 #ifdef IEC_FP_FC3
   else if( command=="EF+" || command=="EF-" )
     {
       enableFastLoader(IEC_FP_FC3, command[2]=='+');
-      //setStatusCode(ST_OK);
+      return;
     }
 #endif
 #ifdef IEC_FP_DOLPHIN
   else if( command=="ED+" || command=="ED-" )
     {
       enableFastLoader(IEC_FP_DOLPHIN, command[2]=='+');
-      //setStatusCode(ST_OK);
+      return;
     }
   else if( command == "M-R\xfa\x02\x03" )
     {
@@ -990,13 +991,14 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
       m_statusCode = ST_OK;
       uint8_t data[3] = {0x98, 0, 0x02};
       setStatus((char *) data, 3);
+      return;
     }
 #endif
-    else
-    {
-      setStatusCode(ST_SYNTAX_INVALID);
-      //Debug_printv("Invalid command");
-    }
+    // else
+    // {
+    //   setStatusCode(ST_SYNTAX_INVALID);
+    //   //Debug_printv("Invalid command");
+    // }
 
     // Drive level commands
     // CBM DOS 2.6
@@ -1156,8 +1158,6 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                 command = mstr::toUTF8(command.substr(colon_position + 1));
                 if (!m_cwd->format(command))
                   setStatusCode(ST_WRITE_VERIFY);
-                //else
-                //  setStatusCode(ST_OK);
 
                 return;
             }
@@ -1220,7 +1220,6 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                 {
                     auto stream = channel->getStream();
                     stream->seekSector( pti[2], pti[3] );
-                    //setStatusCode(ST_OK);
                     return;
                 }
             }
@@ -1282,12 +1281,12 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
             {
                 Debug_printv( "change partition");
                 //ChangeDevice();
+                return;
             }
-            else if ( command[1] == 'D') // Change Directory
-            {
-                Debug_printv( "change directory");
-                //set_prefix();
-            }
+            // else if ( command[1] == 'D') // Change Directory
+            // {
+            //     set_cwd(mstr::drop(command, 2));
+            // }
         break;
         case 'E':
             if (command[1] == '-')
@@ -1327,11 +1326,31 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
 
                   delete f;
                 }
+                else
+                {
+                  setStatusCode(ST_WRITE_VERIFY);
+                }
+              return;
             }
         break;
         case 'P':
-            Debug_printv( "position");
-            //Error(ERROR_31_SYNTAX_ERROR);	// P not implemented yet
+            {
+                command = mstr::drop(command, 1);
+                std::vector<uint8_t> pti = util_tokenize_uint8(command);
+                Debug_printv("position channel[%d] hi[%d] mid[%d] low[%d]", pti[0], pti[1], pti[2], pti[3]);
+                auto channel = m_channels[(uint8_t)pti[0]];
+                if ( channel != nullptr )
+                {
+                    auto stream = channel->getStream();
+                    uint32_t pos = (pti[1] * 65536) + (pti[2] * 256) + pti[3];
+                    stream->seek( pos );
+                }
+                else
+                {
+                    setStatusCode(ST_NO_CHANNEL);
+                }
+                return;
+            }
         break;
         case 'R':
             if ( command[1] == 'D') // Remove Directory
@@ -1350,6 +1369,7 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
 
                   delete f;
                 }
+              return;
             }
         break;
         case 'S':
@@ -1404,6 +1424,7 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                     Debug_printv("write BCD format");
                   }
                 }
+              return;
             }
         break;
         case 'W':
@@ -1432,6 +1453,7 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                     break;
                 }
                 //setStatusCode(ST_OK);
+                return;
             }
             // XS:{name} / XS
             // XW
@@ -1456,6 +1478,8 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
     //       //Error(ERROR_31_SYNTAX_ERROR);
     //   break;
     // }
+
+    setStatusCode(ST_SYNTAX_INVALID);
 }
 
 

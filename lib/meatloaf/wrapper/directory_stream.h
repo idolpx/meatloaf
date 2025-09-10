@@ -4,7 +4,7 @@
 #include <memory>
 #include <fstream>
 #if HOST_OS==win32
-#include "../meatloaf.h"
+#include "meatloaf.h"
 #else
 #include "meatloaf.h"
 #endif
