@@ -562,7 +562,7 @@ std::string EspClass::getPartitionInfo()
     std::string label;
 
     esp_partition_iterator_t it;
-    it = esp_partition_find(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_ANY, NULL);
+    it = esp_partition_find(ESP_PARTITION_TYPE_ANY, ESP_PARTITION_SUBTYPE_ANY, NULL);
 
     // Loop through all matching partitions, in this case, all with the type 'data' until partition with desired
     // label is found. Verify if its the same instance as the one found before.
@@ -579,43 +579,6 @@ std::string EspClass::getPartitionInfo()
     }
     // Release the partition iterator to release memory allocated for it
     esp_partition_iterator_release(it);
-
-    it = esp_partition_find(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, NULL);
-
-    // Loop through all matching partitions, in this case, all with the type 'data' until partition with desired
-    // label is found. Verify if its the same instance as the one found before.
-    for (; it != NULL; it = esp_partition_next(it)) {
-        const esp_partition_t *part = esp_partition_get(it);
-        label = part->label;
-        partitions << label << "\t";
-        if (label.size() < 8) 
-            partitions << "\t";
-        partitions << get_type_str(part->type) << "\t";
-        partitions << get_subtype_str(part->subtype) << "\t";
-        partitions << "0x" << std::uppercase << std::hex << part->address << "  \t";
-        partitions << part->size << "\n";
-    }
-
-    // Release the partition iterator to release memory allocated for it
-    esp_partition_iterator_release(it);
-
-    // partitions << "\nVFS Mounts:\npath\tindex\tfd\n";
-    // const vfs_entry_t* vfs;
-    // _lock_acquire(&s_fd_table_lock);
-    // for (int index = 0; index < MAX_FDS; index++) {
-    //     if (s_fd_table[index].vfs_index != -1) {
-    //         vfs = s_vfs[s_fd_table[index].vfs_index];
-    //         if (strcmp(vfs->path_prefix, "")) {
-    //             partitions << vfs->path_prefix << "\t";
-    //         }
-    //         else
-    //             partitions << "\t";
-
-    //         partitions << "0x" << std::hex << index << "\t";
-    //         partitions << "0x" << std::hex << s_fd_table[index].local_fd << "\n";
-    //     }
-    // }
-    // _lock_release(&s_fd_table_lock);
 
     return partitions.str();
 }

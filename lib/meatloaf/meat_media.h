@@ -110,7 +110,7 @@ protected:
     enum open_modes { OPEN_READ, OPEN_WRITE, OPEN_APPEND, OPEN_MODIFY };
     std::string file_type_label[12] = { "DEL", "SEQ", "PRG", "USR", "REL", "CBM", "DIR", "???", "SYS", "NAT", "CMD", "CFS" };
 
-    virtual bool readHeader() = 0;
+    virtual bool readHeader() { return true; }
     virtual bool writeHeader(std::string name, std::string id) { return false; };
 
     virtual bool seekEntry( std::string filename ) { return false; };
@@ -166,6 +166,7 @@ private:
     friend class D90MFile;
 
     // FILE
+    friend class PRGMFile;
     friend class P00MFile;
 
     // CASSETTE TAPE

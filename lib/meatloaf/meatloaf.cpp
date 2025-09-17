@@ -62,6 +62,7 @@
 #include "media/container/dfi.h"
 
 // File
+#include "media/file/prg.h"
 #include "media/file/p00.h"
 
 // Disk
@@ -132,6 +133,7 @@ D8BMFileSystem d8bFS;
 DFIMFileSystem dfiFS;
 
 // File
+PRGMFileSystem prgFS;
 P00MFileSystem p00FS;
 
 // Disk
@@ -194,6 +196,7 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
     &t64FS, &tcrtFS,
 
     // File
+    &prgFS,         // needs to be on top to be picked first
     &p00FS,
 
     // Network

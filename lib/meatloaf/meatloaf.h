@@ -231,17 +231,17 @@ public:
     MFile* cdRoot(std::string);
     MFile* cdLocalRoot(std::string);
 
-    virtual bool isDirectory() = 0;
-    virtual bool rewindDirectory() = 0 ;
-    virtual MFile* getNextFileInDir() = 0 ;
+    virtual bool isDirectory() { return false; };
+    virtual bool rewindDirectory() { return false; };
+    virtual MFile* getNextFileInDir() { return nullptr; };
 
     virtual bool mkDir() { return false; };
     virtual bool rmDir() { return false; };
     virtual bool exists();
-    virtual bool remove() = 0;
-    virtual bool rename(std::string dest) = 0;    
-    virtual time_t getLastWrite() = 0 ;
-    virtual time_t getCreationTime() = 0 ;
+    virtual bool remove() { return false; };
+    virtual bool rename(std::string dest) { return false; };
+    virtual time_t getLastWrite() { return 0; };
+    virtual time_t getCreationTime() { return 0; };
     virtual uint64_t getAvailableSpace();
 
     virtual uint32_t blocks() {

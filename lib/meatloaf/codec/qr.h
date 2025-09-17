@@ -17,7 +17,7 @@
 
 // QR: - QR Code Generator
 // 
-// qr://{version}/{ecc}/{output}/{data}
+// qr:{version}/{ecc}/{output}/{data}
 //
 // version: 0-40    0 = Automatically select minimum version to fit data
 // ecc:     0-3     ECC_LOW, ECC_MEDIUM, ECC_QUARTILE, ECC_HIGH
