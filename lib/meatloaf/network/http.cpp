@@ -485,10 +485,13 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
     }
 
     // Set Range Header
-    char str[40];
-    snprintf(str, sizeof str, "bytes=%lu-%lu", position, (position + size + 5));
-    esp_http_client_set_header(_http, "Range", str);
-    //Debug_printv("seeking range[%s] url[%s]", str, url.c_str());
+    if ( method == HTTP_METHOD_GET )
+    {
+        char str[40];
+        snprintf(str, sizeof str, "bytes=%lu-%lu", position, (position + size + 5));
+        esp_http_client_set_header(_http, "Range", str);
+        //Debug_printv("seeking range[%s] url[%s]", str, url.c_str());
+    }
 
     // POST
     // const char *post_data = "{\"field1\":\"value1\"}";
