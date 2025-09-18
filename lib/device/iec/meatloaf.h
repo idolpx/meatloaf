@@ -45,10 +45,11 @@ public:
     }
 
     void execute(const char *command, uint8_t cmdLen) override {
-        iecDrive::execute(command, cmdLen);
 
         payload = command;
-        iecFuji::process_cmd();
+        iecFuji::process_cmd(); // process FujiNet commands
+        //if (iecFuji::iecStatus.err != ST_OK)
+            iecDrive::execute(command, cmdLen); // process CBM DOS commands
     }
 
     void execute(std::string command) {

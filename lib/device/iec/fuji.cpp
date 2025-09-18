@@ -14,6 +14,7 @@
 
 #include "string_utils.h"
 #include "../../../include/debug.h"
+#include "../../../include/cbm_defines.h"
 
 #include "fnSystem.h"
 #include "fnConfig.h"
@@ -166,101 +167,14 @@ void logResponse(const void* data, size_t length)
 
 }
 
-#if 0
-void iecFuji::talk(uint8_t secondary)
-{
-  // only talk on channel 15
-  if( (secondary & 0x0F)==15 )
-    {
-      state = DEVICE_TALK;
-      responsePtr = 0;
-    }
-}
-
-
-void iecFuji::listen(uint8_t secondary)
-{
-  // only listen on channel 15
-  if( (secondary & 0x0F)==15 )
-    {
-      state = DEVICE_LISTEN;
-      payload.clear();
-    }
-}
-
-
-void iecFuji::untalk()
-{
-  state = DEVICE_IDLE;
-}
-
-
-void iecFuji::unlisten()
-{
-  if( state == DEVICE_LISTEN )
-    state = DEVICE_ACTIVE;
-}
-
-
-int8_t iecFuji::canWrite()
-{
-  return state==DEVICE_LISTEN ? 1 : 0;
-}
-
-
-int8_t iecFuji::canRead()
-{
-  if( state == DEVICE_TALK )
-    return std::min((size_t) 2, responseV.size()-responsePtr);
-  else
-    return 0;
-}
-
-
-void iecFuji::write(uint8_t data, bool eoi)
-{
-  payload += char(data);
-}
-
-
-uint8_t iecFuji::read()
-{
-  // we should never get here if responsePtr>=responseV.size() because
-  // then canRead would have returned 0, but better safe than sorry
-  return responsePtr < responseV.size() ? responseV[responsePtr++] : 0;
-}
-
-
-void iecFuji::task()
-{
-  // this gets called whenever the IEC bus is NOT in a time-sensitive state.
-  // Any possibly time-comsuming tasks should be processed within here.
-
-  // first call the underlying class task function
-  IECDevice::task();
-  
-  if( state==DEVICE_ACTIVE )
-    {
-      if( payload.size()>0 ) process_cmd();
-      state = DEVICE_IDLE;
-    }
-}
-
-
-void iecFuji::reset()
-{
-  IECDevice::reset();
-  current_fuji_cmd = -1;
-  last_command = -1;
-  response.clear();
-  responseV.clear();
-  state = DEVICE_IDLE;
-}
-#endif
-
 
 void iecFuji::process_cmd()
 {
+#ifdef ENABLE_DISPLAY
+  LEDS.activity = true;
+#endif
+  Debug_printv("command: %s", dataToHexString((uint8_t *) payload.data(), payload.size()).c_str());
+
   responseV.clear();
   response.clear();
   is_raw_command = false;
@@ -805,7 +719,7 @@ void iecFuji::net_set_ssid_raw(bool store)
 void iecFuji::net_get_wifi_status_raw()
 {
     responseV.push_back(net_get_wifi_status());
-    set_fuji_iec_status(0, "");
+    set_fuji_iec_status(ST_OK, "");
 }
 
 void iecFuji::net_get_wifi_status_basic()

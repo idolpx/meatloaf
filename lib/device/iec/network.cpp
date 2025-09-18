@@ -12,6 +12,7 @@
 
 #include "../../include/debug.h"
 #include "../../hardware/led.h"
+#include "display.h"
 
 #include "utils.h"
 
@@ -792,6 +793,10 @@ void iecNetwork::set_status(bool is_binary)
     iecStatus.error = NETWORK_ERROR_SUCCESS;
     iecStatus.msg = "Active status channel set.";
     iecStatus.channel = active_status_channel;
+
+#ifdef ENABLE_DISPLAY
+  LEDS.status( iecStatus.error );
+#endif
 }
 
 void iecNetwork::set_prefix()
@@ -1109,6 +1114,10 @@ uint8_t iecNetwork::read(uint8_t channel, uint8_t *buffer, uint8_t bufferSize, b
 
 void iecNetwork::execute(const char *cmd, uint8_t cmdLen)
 {
+#ifdef ENABLE_DISPLAY
+  LEDS.activity = true;
+#endif
+
   Debug_printv("iecNetwork::execute(#%d, \"%s\", %d)", m_devnr, cmd, cmdLen);
 
   payload = std::string(cmd, cmdLen);

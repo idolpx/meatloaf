@@ -144,18 +144,6 @@ protected:
     // track the last command for the status
     int last_command = -1;
 
-//protected:
-    // virtual void talk(uint8_t secondary) override;
-    // virtual void listen(uint8_t secondary) override;
-    // virtual void untalk() override;
-    // virtual void unlisten() override;
-    // virtual int8_t canWrite() override;
-    // virtual int8_t canRead() override;
-    // virtual void write(uint8_t data, bool eoi) override;
-    // virtual uint8_t read() override;
-    // virtual void task() override;
-    // virtual void reset() override;
-
     // is the cmd supported by RAW?
     bool is_supported(uint8_t cmd);
 

@@ -888,6 +888,10 @@ uint8_t iecDrive::read(uint8_t channel, uint8_t *data, uint8_t maxDataLen, bool 
 
 void iecDrive::execute(const char *cmd, uint8_t cmdLen)
 {
+#ifdef ENABLE_DISPLAY
+    LEDS.activity = true;
+#endif
+
     Debug_printv("iecDrive::execute(#%d, \"%s\", %d)", m_devnr, cmd, cmdLen);
 
     std::string command = std::string(cmd, cmdLen);

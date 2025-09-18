@@ -417,6 +417,17 @@ public:
         return extension;
     }
 
+    static bool isIgnored(const char* ext)
+    {
+        std::vector<std::string> ignored = { ".prg", ".php" };
+        for ( const auto &e : ignored )
+        {
+            if ( mstr::endsWith(ext, e.c_str(), false) )
+                return true;
+        }
+        return false;
+    }
+
     static bool byExtension(const char* ext, std::string fileName) {
         return mstr::endsWith(fileName, ext, false);
     }
@@ -428,6 +439,9 @@ public:
             if ( fileName.contains("."))
                 extension = fileName.substr(fileName.find_last_of("."));
             else
+                return false;
+
+            if ( isIgnored(extension.c_str()))
                 return false;
 
             for ( const auto &e : ext )
