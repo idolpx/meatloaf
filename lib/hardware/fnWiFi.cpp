@@ -656,7 +656,9 @@ void WiFiManager::handle_station_stop()
     fnLedManager.set(eLed::LED_WIFI, false);
     oHttpdServer.stop();
     fnSystem.Net.stop_sntp_client();
+#ifdef ENABLE_CONSOLE_TCP
     tcp_server.stop();
+#endif
 }
 
 void add_mdns_services()
@@ -702,10 +704,11 @@ void WiFiManager::_wifi_event_handler(void *arg, esp_event_base_t event_base,
             printf( ANSI_GREEN_BOLD "SSDP Service Started!" ANSI_RESET "\r\n");
 #endif
 
+#ifdef ENABLE_CONSOLE_TCP
             // Start TCP Server
             printf( ANSI_GREEN_BOLD "TCP Server Started! (PORT %d)" ANSI_RESET "\r\n", TCP_SERVER_PORT);
             tcp_server.start();
-
+#endif
             break;
         case IP_EVENT_STA_LOST_IP:
             Debug_println("IP_EVENT_STA_LOST_IP");

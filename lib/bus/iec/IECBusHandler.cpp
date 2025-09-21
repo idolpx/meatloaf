@@ -26,7 +26,7 @@
 #if defined(ARDUINO)
 #include <Arduino.h>
 #elif defined(ESP_PLATFORM)
-#include "IECespidf.h"
+#include "../../../include/esp-idf-arduino.h"
 #endif
 
 #ifndef ESP_IDF_VERSION_VAL
@@ -789,7 +789,7 @@ void IECBusHandler::setBuffer(uint8_t *buffer, uint8_t bufferSize)
 #ifdef IEC_SUPPORT_PARALLEL_XRA1405
 
 #if defined(ESP_PLATFORM) && !defined(ARDUINO)
-#include "IECespidf-spi.h"
+#include "../../../include/esp-idf-spi.h"
 #else
 #include "SPI.h"
 #endif

@@ -13,11 +13,12 @@
 
 #ifdef BUILD_IEC
 #include "iec/iec.h"
-#include "iec/ieee-488.h"
-#include "iec/userport.h"
+#include "userport/userport.h"
+#include "gpib/gpib.h"
 #define SYSTEM_BUS IEC
 #define FN_BUS_PORT fnUartBUS  // TBD
 #endif
+
 
 #ifdef BUILD_ADAM
 #include "adamnet/adamnet.h"

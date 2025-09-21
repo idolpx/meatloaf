@@ -16,6 +16,7 @@
 #include "pinmap/esp-wroom32.h"
 #include "pinmap/esp-wroom32-pi1541.h"
 #include "pinmap/ttgo-t1.h"
+#include "pinmap/petdiskmaxv2.h"
 
 // ESP32 S2
 #include "pinmap/lolin-s2-mini.h"
@@ -34,7 +35,10 @@
 // ESP32 C3
 #include "pinmap/esp32-c3-super-mini.h"
 
-
+#ifndef PIN_MODEM_ENABLE
+#define PIN_MODEM_ENABLE        GPIO_NUM_NC  // High = Modem enabled
+#define PIN_MODEM_UP9600        GPIO_NUM_NC  // High = UP9600 enabled
+#endif
 
 /* LED Strip */
 #ifndef PIN_LED_RGB

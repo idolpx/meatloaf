@@ -1,5 +1,11 @@
-#ifndef IEC_H
-#define IEC_H
+//
+// https://www.pagetable.com/?p=1023
+// https://ia601902.us.archive.org/9/items/PET_and_the_GPIB_Bus_1980_McGraw-Hill/PET_and_the_GPIB_Bus_1980_McGraw-Hill.pdf
+// https://www.youtube.com/watch?v=EEtETGfL_VE
+//
+
+#ifndef GPIB_H
+#define GPIB_H
 
 #include <cstdint>
 #include <forward_list>
@@ -19,8 +25,8 @@
 #include "../../../include/debug.h"
 #include "../../../include/pinmap.h"
 
-#include "IECDevice.h"
-#include "IECBusHandler.h"
+#include "GPIBDevice.h"
+#include "GPIBBusHandler.h"
 
 #define BUS_DEVICEID_GLOBAL     0   // Addresses all devices
 #define BUS_DEVICEID_PRINTER    4   // 4-7
@@ -33,32 +39,32 @@
 /**
  * @brief The command frame
  */
-union cmdFrame_t
-{
-    struct
-    {
-        uint8_t device;
-        uint8_t comnd;
-        uint8_t aux1;
-        uint8_t aux2;
-        uint8_t cksum;
-    };
-    struct
-    {
-        uint32_t commanddata;
-        uint8_t checksum;
-    } __attribute__((packed));
-};
+// union cmdFrame_t
+// {
+//     struct
+//     {
+//         uint8_t device;
+//         uint8_t comnd;
+//         uint8_t aux1;
+//         uint8_t aux2;
+//         uint8_t cksum;
+//     };
+//     struct
+//     {
+//         uint32_t commanddata;
+//         uint8_t checksum;
+//     } __attribute__((packed));
+// };
 
 
 /**
  * @class systemBus
  * @brief the system bus that all virtualDevices attach to.
  */
-class systemBus : public IECBusHandler
+class ieee488Bus : public GPIBBusHandler
 {
 public:
-    systemBus();
+    ieee488Bus();
 
     /**
      * @brief called in main.cpp to set up the bus.
@@ -91,6 +97,6 @@ public:
 /**
  * @brief Return
  */
-extern systemBus IEC;
+extern ieee488Bus GPIB;
 
-#endif /* IEC_H */
+#endif /* GPIB_H */

@@ -113,7 +113,7 @@ void iecFuji::setup(systemBus *bus)
 
     // 04-07 Printers / Plotters
     if (bus->attachDevice(ptr))
-        Debug_printf("Attached printer device #%d\r\n", 4);
+        Debug_printf("Attached printer device #%d\r\n", BUS_DEVICEID_PRINTER);
 
     // 08-15 Drives
     for (int i = 0; i < MAX_DISK_DEVICES; i++)
@@ -128,8 +128,8 @@ void iecFuji::setup(systemBus *bus)
     }
 
     // 16-19 Network Devices
-    if (bus->attachDevice(new iecNetwork(16)))     // 16-19 Network Devices
-        Debug_printf("Attached network device #%d\r\n", 16);
+    if (bus->attachDevice(new iecNetwork(BUS_DEVICEID_NETWORK)))     // 16-19 Network Devices
+        Debug_printf("Attached network device #%d\r\n", BUS_DEVICEID_NETWORK);
 
     //Serial.print("CPM "); bus->addDevice(new iecCpm(), 20);             // 20-29 Other
     if (bus->attachDevice(new iecClock(29)))

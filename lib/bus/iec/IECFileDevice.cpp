@@ -22,7 +22,7 @@
 #if defined(ARDUINO)
 #include <Arduino.h>
 #elif defined(ESP_PLATFORM)
-#include "IECespidf.h"
+#include "../../../include/esp-idf-arduino.h"
 #endif
 
 #define DEBUG 0

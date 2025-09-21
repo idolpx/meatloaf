@@ -44,9 +44,10 @@
 #define PIN_DAC1                GPIO_NUM_25 // samlib.h
 
 /* Parallel cable */
-//#define PIN_XRA1405_CS          GPIO_NUM_21
-//#define PIN_PARALLEL_PC2        GPIO_NUM_27
-//#define PIN_PARALLEL_FLAG2      GPIO_NUM_22
+#define PIN_XRA1405_CS          GPIO_NUM_21
+#define PIN_PARALLEL_PA2        GPIO_NUM_26   // Direction: HIGH = C64 => ESP, LOW = ESP => C64
+#define PIN_PARALLEL_PC2        GPIO_NUM_27   // Handshake: C64 => ESP (ack/strobe: byte read from/written to port) (rising edge)
+#define PIN_PARALLEL_FLAG2      GPIO_NUM_22   // Handshake: ESP => C64 (ack/strobe: byte read from/written to port) (falling edge)
 
 /* Commodore IEC Pins */
 // CLK & DATA lines in/out are split between two pins
@@ -66,6 +67,19 @@
 #define PIN_IEC_SRQ             GPIO_NUM_26
 #define PIN_IEC_RESET           GPIO_NUM_34
 // GND - Be sure to connect GND of the IEC cable to GND on the ESP module
+
+// IEEE-488
+#define PIN_GPIB_ATN         PIN_IEC_ATN         // Attention
+#define PIN_GPIB_DAV         PIN_IEC_CLK_OUT     // Data Valid
+#define PIN_GPIB_NRFD        PIN_IEC_DATA_IN     // Not Ready For Data
+#define PIN_GPIB_NDAC        PIN_PARALLEL_FLAG2  // No Data Accepted
+#define PIN_GPIB_EOI         PIN_PARALLEL_PC2    // End Or Identify
+
+#define PIN_GPIB_REN         GPIO_NUM_NC         // Remote Enable
+#define PIN_GPIB_SRQ         PIN_IEC_SRQ         // Service Request
+#define PIN_GPIB_IFC         PIN_IEC_RESET       // Interface Clear (RESET)
+
+#define PIN_GPIB_DATADIR     PIN_PARALLEL_PA2
 
 
 /* Modem/Parallel Switch */
