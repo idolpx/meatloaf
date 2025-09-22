@@ -1,5 +1,6 @@
 // -----------------------------------------------------------------------------
 // Copyright (C) 2023 David Hansel
+// GPIB Support added by James Johnston
 //
 // This implementation is based on the code used in the VICE emulator.
 // The corresponding code in VICE (src/serial/serial-iec-device.c) was 
@@ -20,7 +21,7 @@
 // Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA
 // -----------------------------------------------------------------------------
 
-#include "GPIBBusHandler.h"
+#include "GPIBusHandler.h"
 #include "GPIBDevice.h"
 
 #if defined(ARDUINO)
@@ -283,9 +284,9 @@ static void RAMFUNC(delayMicrosecondsISafe)(uint16_t t)
 #define TC_NDAC_HIGH 6
 
 
-GPIBBusHandler *GPIBBusHandler::s_bushandler = NULL;
+GPIBusHandler *GPIBusHandler::s_bushandler = NULL;
 
-void RAMFUNC(GPIBBusHandler::writePinDAV)(bool v)
+void RAMFUNC(GPIBusHandler::writePinDAV)(bool v)
 {
 #ifdef GPIB_USE_INVERTED_LINE_DRIVERS
   digitalWriteFastExt(m_pinNRFD, m_regNRFDwrite, m_bitNRFD, !v);
@@ -294,7 +295,7 @@ void RAMFUNC(GPIBBusHandler::writePinDAV)(bool v)
 #endif
 }
 
-void RAMFUNC(GPIBBusHandler::writePinNRFD)(bool v)
+void RAMFUNC(GPIBusHandler::writePinNRFD)(bool v)
 {
 #ifdef GPIB_USE_INVERTED_LINE_DRIVERS
   digitalWriteFastExt(m_pinEOI, m_regEOIwrite, m_bitEOI, !v);
@@ -303,7 +304,7 @@ void RAMFUNC(GPIBBusHandler::writePinNRFD)(bool v)
 #endif
 }
 
-void RAMFUNC(GPIBBusHandler::writePinNDAC)(bool v)
+void RAMFUNC(GPIBusHandler::writePinNDAC)(bool v)
 {
 #ifdef GPIB_USE_INVERTED_LINE_DRIVERS
   digitalWriteFastExt(m_pinNDAC, m_regNDACwrite, m_bitNDAC, !v);
@@ -312,7 +313,7 @@ void RAMFUNC(GPIBBusHandler::writePinNDAC)(bool v)
 #endif
 }
 
-void RAMFUNC(GPIBBusHandler::writePinEOI)(bool v)
+void RAMFUNC(GPIBusHandler::writePinEOI)(bool v)
 {
 #ifdef GPIB_USE_INVERTED_LINE_DRIVERS
   digitalWriteFastExt(m_pinEOI, m_regEOIwrite, m_bitEOI, !v);
@@ -321,47 +322,47 @@ void RAMFUNC(GPIBBusHandler::writePinEOI)(bool v)
 #endif
 }
 
-void RAMFUNC(GPIBBusHandler::writePinCTRL)(bool v)
+void RAMFUNC(GPIBusHandler::writePinCTRL)(bool v)
 {
   if( m_pinCTRL!=0xFF )
     digitalWrite(m_pinCTRL, v);
 }
 
-bool RAMFUNC(GPIBBusHandler::readPinATN)()
+bool RAMFUNC(GPIBusHandler::readPinATN)()
 {
   return digitalReadFastExt(m_pinATN, m_regATNread, m_bitATN)!=0;
 }
 
 
-bool RAMFUNC(GPIBBusHandler::readPinDAV)()
+bool RAMFUNC(GPIBusHandler::readPinDAV)()
 {
   return digitalReadFastExt(m_pinDAV, m_regDAVread, m_bitDAV)!=0;
 }
 
 
-bool RAMFUNC(GPIBBusHandler::readPinNRFD)()
+bool RAMFUNC(GPIBusHandler::readPinNRFD)()
 {
   return digitalReadFastExt(m_pinNRFD, m_regNRFDread, m_bitNRFD)!=0;
 }
 
-bool RAMFUNC(GPIBBusHandler::readPinNDAC)()
+bool RAMFUNC(GPIBusHandler::readPinNDAC)()
 {
   return digitalReadFastExt(m_pinNDAC, m_regNDACread, m_bitNDAC)!=0;
 }
 
-bool RAMFUNC(GPIBBusHandler::readPinEOI)()
+bool RAMFUNC(GPIBusHandler::readPinEOI)()
 {
   return digitalReadFastExt(m_pinEOI, m_regEOIread, m_bitEOI)!=0;
 }
 
-bool RAMFUNC(GPIBBusHandler::readPinRESET)()
+bool RAMFUNC(GPIBusHandler::readPinRESET)()
 {
   if( m_pinRESET==0xFF ) return true;
   return digitalReadFastExt(m_pinRESET, m_regRESETread, m_bitRESET)!=0;
 }
 
 
-bool GPIBBusHandler::waitTimeout(uint16_t timeout, uint8_t cond)
+bool GPIBusHandler::waitTimeout(uint16_t timeout, uint8_t cond)
 {
   // This function may be called in code where interrupts are disabled.
   // Calling micros() when interrupts are disabled does not work on all
@@ -426,7 +427,7 @@ bool GPIBBusHandler::waitTimeout(uint16_t timeout, uint8_t cond)
 }
 
 
-void GPIBBusHandler::waitPinATN(bool state)
+void GPIBusHandler::waitPinATN(bool state)
 {
 #ifdef ESP_PLATFORM
   // waiting indefinitely with interrupts disabled on ESP32 is bad because
@@ -446,7 +447,7 @@ void GPIBBusHandler::waitPinATN(bool state)
 #endif
 }
 
-bool GPIBBusHandler::waitPinNDAC(bool state, uint16_t timeout)
+bool GPIBusHandler::waitPinNDAC(bool state, uint16_t timeout)
 {
   // (if timeout is not given it defaults to 1000us)
   // if ATN changes (i.e. our internal ATN state no longer matches the ATN signal line)
@@ -487,7 +488,7 @@ bool GPIBBusHandler::waitPinNDAC(bool state, uint16_t timeout)
   return state || (m_flags & P_ATN) || readPinATN();
 }
 
-bool GPIBBusHandler::waitPinNRFD(bool state, uint16_t timeout)
+bool GPIBusHandler::waitPinNRFD(bool state, uint16_t timeout)
 {
   // (if timeout is not given it defaults to 1000us)
   // if ATN changes (i.e. our internal ATN state no longer matches the ATN signal line)
@@ -529,7 +530,7 @@ bool GPIBBusHandler::waitPinNRFD(bool state, uint16_t timeout)
 }
 
 
-bool GPIBBusHandler::waitPinDAV(bool state, uint16_t timeout)
+bool GPIBusHandler::waitPinDAV(bool state, uint16_t timeout)
 {
   // (if timeout is not given it defaults to 1000us)
   // if ATN changes (i.e. our internal ATN state no longer matches the ATN signal line)
@@ -568,7 +569,7 @@ bool GPIBBusHandler::waitPinDAV(bool state, uint16_t timeout)
 }
 
 
-void GPIBBusHandler::sendSRQ()
+void GPIBusHandler::sendSRQ()
 {
   if( m_pinSRQ!=0xFF )
     {
@@ -590,7 +591,7 @@ void GPIBBusHandler::sendSRQ()
 }
 
 
-GPIBBusHandler::GPIBBusHandler(uint8_t pinATN, uint8_t pinDAV, uint8_t pinNRFD, uint8_t pinNDAC, uint8_t pinEOI, uint8_t pinRESET, uint8_t pinCTRL, uint8_t pinSRQ)
+GPIBusHandler::GPIBusHandler(uint8_t pinATN, uint8_t pinDAV, uint8_t pinNRFD, uint8_t pinNDAC, uint8_t pinEOI, uint8_t pinRESET, uint8_t pinCTRL, uint8_t pinSRQ)
 #if defined(GPIB_SUPPORT_PARALLEL_XRA1405)
 #if defined(ESP_PLATFORM)
   // ESP32
@@ -672,7 +673,7 @@ GPIBBusHandler::GPIBBusHandler(uint8_t pinATN, uint8_t pinDAV, uint8_t pinNRFD, 
 }
 
 
-void GPIBBusHandler::begin()
+void GPIBusHandler::begin()
 {
   JDEBUGI();
 
@@ -718,19 +719,19 @@ void GPIBBusHandler::begin()
 }
 
 
-bool GPIBBusHandler::canServeATN() 
+bool GPIBusHandler::canServeATN() 
 { 
   return (m_pinCTRL!=0xFF) || (m_atnInterrupt != NOT_AN_INTERRUPT); 
 }
 
 
-bool GPIBBusHandler::inTransaction()
+bool GPIBusHandler::inTransaction()
 {
   return (m_flags & (P_LISTENING|P_TALKING))!=0;
 }
 
 
-bool GPIBBusHandler::attachDevice(GPIBDevice *dev)
+bool GPIBusHandler::attachDevice(GPIBDevice *dev)
 {
   if( m_numDevices<GPIB_MAX_DEVICES && findDevice(dev->m_devnr, true)==NULL )
     {
@@ -740,8 +741,8 @@ bool GPIBBusHandler::attachDevice(GPIBDevice *dev)
 #ifdef GPIB_SUPPORT_PARALLEL
       enableParallelPins();
 #endif
-      // if GPIBBusHandler::begin() has been called already then call the device's
-      // begin() function now, otherwise it will be called in GPIBBusHandler::begin() 
+      // if GPIBusHandler::begin() has been called already then call the device's
+      // begin() function now, otherwise it will be called in GPIBusHandler::begin() 
       if( m_flags!=0xFF ) dev->begin();
 
       m_devices[m_numDevices] = dev;
@@ -753,7 +754,7 @@ bool GPIBBusHandler::attachDevice(GPIBDevice *dev)
 }
 
 
-bool GPIBBusHandler::detachDevice(GPIBDevice *dev)
+bool GPIBusHandler::detachDevice(GPIBDevice *dev)
 {
   for(uint8_t i=0; i<m_numDevices; i++)
     if( dev == m_devices[i] )
@@ -771,7 +772,7 @@ bool GPIBBusHandler::detachDevice(GPIBDevice *dev)
 }
 
 
-GPIBDevice *GPIBBusHandler::findDevice(uint8_t devnr, bool includeInactive)
+GPIBDevice *GPIBusHandler::findDevice(uint8_t devnr, bool includeInactive)
 {
   for(uint8_t i=0; i<m_numDevices; i++)
     if( devnr == m_devices[i]->m_devnr && (includeInactive || m_devices[i]->isActive()) )
@@ -781,7 +782,7 @@ GPIBDevice *GPIBBusHandler::findDevice(uint8_t devnr, bool includeInactive)
 }
 
 
-void RAMFUNC(GPIBBusHandler::atnInterruptFcn)(INTERRUPT_FCN_ARG)
+void RAMFUNC(GPIBusHandler::atnInterruptFcn)(INTERRUPT_FCN_ARG)
 { 
   if( s_bushandler!=NULL && !s_bushandler->m_inTask & ((s_bushandler->m_flags & P_ATN)==0) )
     s_bushandler->atnRequest();
@@ -803,7 +804,7 @@ void RAMFUNC(GPIBBusHandler::atnInterruptFcn)(INTERRUPT_FCN_ARG)
 #pragma GCC push_options
 #pragma GCC optimize ("O2")
 
-uint8_t RAMFUNC(GPIBBusHandler::XRA1405_ReadReg)(uint8_t reg)
+uint8_t RAMFUNC(GPIBusHandler::XRA1405_ReadReg)(uint8_t reg)
 {
   startParallelTransaction();
   digitalWriteFastExt(m_pinParallelCS, m_regParallelCS, m_bitParallelCS, LOW);
@@ -813,7 +814,7 @@ uint8_t RAMFUNC(GPIBBusHandler::XRA1405_ReadReg)(uint8_t reg)
   return res;
 }
 
-void RAMFUNC(GPIBBusHandler::XRA1405_WriteReg)(uint8_t reg, uint8_t data)
+void RAMFUNC(GPIBusHandler::XRA1405_WriteReg)(uint8_t reg, uint8_t data)
 {
   startParallelTransaction();
   digitalWriteFastExt(m_pinParallelCS, m_regParallelCS, m_bitParallelCS, LOW);
@@ -829,7 +830,7 @@ void RAMFUNC(GPIBBusHandler::XRA1405_WriteReg)(uint8_t reg, uint8_t data)
 
 #ifdef GPIB_SUPPORT_PARALLEL_XRA1405
 
-void GPIBBusHandler::setParallelPins(uint8_t pinSCK, uint8_t pinCOPI, uint8_t pinCIPO, uint8_t pinCS)
+void GPIBusHandler::setParallelPins(uint8_t pinSCK, uint8_t pinCOPI, uint8_t pinCIPO, uint8_t pinCS)
 {
   m_pinParallelCOPI = pinCOPI;
   m_pinParallelCIPO = pinCIPO;
@@ -839,7 +840,7 @@ void GPIBBusHandler::setParallelPins(uint8_t pinSCK, uint8_t pinCOPI, uint8_t pi
 
 #else
 
-void GPIBBusHandler::setParallelPins(uint8_t pinD0, uint8_t pinD1, uint8_t pinD2, uint8_t pinD3, uint8_t pinD4, uint8_t pinD5, uint8_t pinD6, uint8_t pinD7)
+void GPIBusHandler::setParallelPins(uint8_t pinD0, uint8_t pinD1, uint8_t pinD2, uint8_t pinD3, uint8_t pinD4, uint8_t pinD5, uint8_t pinD6, uint8_t pinD7)
 {
   m_pinParallel[0] = pinD0;
   m_pinParallel[1] = pinD1;
@@ -853,7 +854,7 @@ void GPIBBusHandler::setParallelPins(uint8_t pinD0, uint8_t pinD1, uint8_t pinD2
 
 #endif
 
-bool GPIBBusHandler::checkParallelPins()
+bool GPIBusHandler::checkParallelPins()
 {
   return (m_bufferSize>=PARALLEL_PREBUFFER_BYTES && 
           !isParallelPin(m_pinATN)   && !isParallelPin(m_pinDAV) && !isParallelPin(m_pinNDAC) && 
@@ -871,7 +872,7 @@ bool GPIBBusHandler::checkParallelPins()
   );
 }
 
-bool GPIBBusHandler::isParallelPin(uint8_t pin)
+bool GPIBusHandler::isParallelPin(uint8_t pin)
 {
 #ifdef GPIB_SUPPORT_PARALLEL_XRA1405
   if( pin==m_pinParallelCS || pin==m_pinParallelCOPI || pin==m_pinParallelCIPO || pin==m_pinParallelSCK )
@@ -886,7 +887,7 @@ bool GPIBBusHandler::isParallelPin(uint8_t pin)
 }
 
 
-void GPIBBusHandler::enableParallelPins()
+void GPIBusHandler::enableParallelPins()
 {
     // at least one device uses the parallel cable
 #if defined(IOREG_TYPE)
@@ -928,7 +929,7 @@ void GPIBBusHandler::enableParallelPins()
 }
 
 
-void RAMFUNC(GPIBBusHandler::startParallelTransaction)()
+void RAMFUNC(GPIBusHandler::startParallelTransaction)()
 {
 #ifdef GPIB_SUPPORT_PARALLEL_XRA1405
   if( m_inTransaction==0 )
@@ -946,7 +947,7 @@ void RAMFUNC(GPIBBusHandler::startParallelTransaction)()
 }
 
 
-void RAMFUNC(GPIBBusHandler::endParallelTransaction)()
+void RAMFUNC(GPIBusHandler::endParallelTransaction)()
 {
 #ifdef GPIB_SUPPORT_PARALLEL_XRA1405
   if( m_inTransaction==1 ) SPI.endTransaction();
@@ -957,7 +958,7 @@ void RAMFUNC(GPIBBusHandler::endParallelTransaction)()
 
 #pragma GCC push_options
 #pragma GCC optimize ("O2")
-uint8_t RAMFUNC(GPIBBusHandler::readParallelData)()
+uint8_t RAMFUNC(GPIBusHandler::readParallelData)()
 {
   uint8_t res = 0;
 #ifdef GPIB_SUPPORT_PARALLEL_XRA1405
@@ -977,7 +978,7 @@ uint8_t RAMFUNC(GPIBBusHandler::readParallelData)()
 }
 
 
-void RAMFUNC(GPIBBusHandler::writeParallelData)(uint8_t data)
+void RAMFUNC(GPIBusHandler::writeParallelData)(uint8_t data)
 {
 #ifdef GPIB_SUPPORT_PARALLEL_XRA1405
   XRA1405_WriteReg(0x02, data); // OCR1, GPIO Output Control Register for P0-P7
@@ -995,7 +996,7 @@ void RAMFUNC(GPIBBusHandler::writeParallelData)(uint8_t data)
 }
 
 
-void RAMFUNC(GPIBBusHandler::setParallelBusModeInput)()
+void RAMFUNC(GPIBusHandler::setParallelBusModeInput)()
 {
 #ifdef GPIB_SUPPORT_PARALLEL_XRA1405
   XRA1405_WriteReg(0x06, 0xFF); // GCR1, GPIO Configuration Register for P0-P7
@@ -1007,7 +1008,7 @@ void RAMFUNC(GPIBBusHandler::setParallelBusModeInput)()
 }
 
 
-void RAMFUNC(GPIBBusHandler::setParallelBusModeOutput)()
+void RAMFUNC(GPIBusHandler::setParallelBusModeOutput)()
 {
 #ifdef GPIB_SUPPORT_PARALLEL_XRA1405
   XRA1405_WriteReg(0x06, 0x00); // GCR1, GPIO Configuration Register for P0-P7
@@ -1023,7 +1024,7 @@ void RAMFUNC(GPIBBusHandler::setParallelBusModeOutput)()
 // ------------------------------------  IEEE-488 protocol support routines  ------------------------------------  
 
 
-bool RAMFUNC(GPIBBusHandler::receiveGPIBByteATN)(uint8_t &data)
+bool RAMFUNC(GPIBusHandler::receiveGPIBByteATN)(uint8_t &data)
 {
   // wait for DAV=1
   if( !waitPinDAV(HIGH, 0) ) return false;
@@ -1053,7 +1054,7 @@ bool RAMFUNC(GPIBBusHandler::receiveGPIBByteATN)(uint8_t &data)
 }
 
 
-bool RAMFUNC(GPIBBusHandler::receiveGPIBByte)(bool canWriteOk)
+bool RAMFUNC(GPIBusHandler::receiveGPIBByte)(bool canWriteOk)
 {
   // NOTE: we only get here if sender has already signaled ready-to-send
   // by releasing DAV
@@ -1091,7 +1092,7 @@ bool RAMFUNC(GPIBBusHandler::receiveGPIBByte)(bool canWriteOk)
 }
 
 
-bool RAMFUNC(GPIBBusHandler::transmitGPIBByte)(uint8_t numData)
+bool RAMFUNC(GPIBusHandler::transmitGPIBByte)(uint8_t numData)
 {
   noInterrupts();
 
@@ -1139,7 +1140,7 @@ bool RAMFUNC(GPIBBusHandler::transmitGPIBByte)(uint8_t numData)
 
 // called when a falling edge on ATN is detected, either by the pin change
 // interrupt handler or by polling within the microTask function
-void RAMFUNC(GPIBBusHandler::atnRequest)()
+void RAMFUNC(GPIBusHandler::atnRequest)()
 {
   // check if ATN is actually LOW, if not then just return (stray interrupt request)
   if( readPinATN() ) return;
@@ -1178,7 +1179,7 @@ void RAMFUNC(GPIBBusHandler::atnRequest)()
 }
 
 
-void RAMFUNC(GPIBBusHandler::handleATNSequence)()
+void RAMFUNC(GPIBusHandler::handleATNSequence)()
 {
   // no more interrupts until the ATN sequence is finished. If we allowed interrupts
   // and a long interrupt occurred close to the end of the sequence then we may miss
@@ -1274,7 +1275,7 @@ void RAMFUNC(GPIBBusHandler::handleATNSequence)()
 
 
 
-void GPIBBusHandler::task()
+void GPIBusHandler::task()
 {
   // don't do anything if begin() hasn't been called yet
   if( m_flags==0xFF ) return;

@@ -31,6 +31,7 @@ description = Meatloaf Commodore to ESP32 WiFi Multifunction Firmware
 ;environment = esp32-wroom32                ; generic esp32-wroom32 board                 (ESP32-WROOM32 NO PSRAM, 4M/8M/16M Flash)
 ;environment = esp32-wroom32-pi1541         ; generic esp32-wroom32 board with pi1541     (ESP32-WROOM32 NO PSRAM, 4M/8M/16M Flash)
 ;environment = ttgo-t1                      ; Lilygo TTGO T1 V1.3                         (ESP32 NO PSRAM, 4M Flash)
+;environment = petdiskmaxv2                 ; PETDisk MAX V2.9                            (ESP32 NO PSRAM, 4M Flash)
 
 ; EXPERIMENTAL
 ; ESP32-S2
@@ -68,7 +69,6 @@ wifi_pass = "meatloaf"
 
 ; Required flags, leave as is
 build_platform = BUILD_IEC
-build_bus      = IEC
 
 [platformio]
 description = ${meatloaf.description}
@@ -124,6 +124,9 @@ build_flags =
     ;-D IEC_SPLIT_LINES     ; hardware uses seperate input/output lines
     ;-D IEC_INVERTED_LINES  ; hardware inverts the signals
 
+    ; GPIB IEEE-488 Hardware Options
+    ;-D ENABLE_GPIB
+
     ; Other Hardware Options
     ;-D NO_BUTTONS          ; if your hardware has no physical buttons
     ;-D SD_CARD             ; if your hardware has an sd card slot
@@ -143,12 +146,6 @@ build_flags =
     ;-D GPIOX_PCF8575
     ;-D GPIOX_MCP23017
     ;-D GPIOX_XRA1405
-
-    ; Protocol Support
-    ;-D JIFFYDOS
-
-    ; Component Options
-    ;-D QRCODEVERSION=8
 
     ; DEBUG Options
     -D DEBUG_SPEED=${env.monitor_speed}
@@ -257,6 +254,15 @@ board = esp32-wroom32
 build_flags =
     ${env.build_flags}
     -D PINMAP_TTGO_T1
+    -D SD_CARD
+
+[env:petdiskmaxv2]
+extends = esp32_base
+board = esp32-wroom32
+build_flags =
+    ${env.build_flags}
+    -D PINMAP_PETDISKMAXV2
+    -D ENABLE_IEEE488
     -D SD_CARD
 
 ; ESP32-S2

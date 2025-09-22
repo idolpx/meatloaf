@@ -1,5 +1,6 @@
 // -----------------------------------------------------------------------------
 // Copyright (C) 2023 David Hansel
+// GPIB Support added by James Johnston
 //
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -40,15 +41,15 @@
 
 class GPIBDevice;
 
-class GPIBBusHandler
+class GPIBusHandler
 {
  public:
   // pinATN should preferrably be a pin that can handle external interrupts
   // (e.g. 2 or 3 on the Arduino UNO), if not then make sure the task() function
   // gets called at least once evey millisecond, otherwise "device not present" 
   // errors may result
-  GPIBBusHandler(uint8_t pinATN, uint8_t pinDAV, uint8_t pinNRFD, uint8_t pinNDAC, uint8_t pinEOI, uint8_t pinRESET = 0xFF, uint8_t pinCTRL = 0xFF, uint8_t pinSRQ = 0xFF);
-  //GPIBBusHandler(uint8_t pinATN, uint8_t pinCLK, uint8_t pinCLKout, uint8_t pinDATAin, uint8_t pinDATAout, uint8_t pinRESET = 0xFF, uint8_t pinCTRL = 0xFF, uint8_t pinSRQ = 0xFF);
+  GPIBusHandler(uint8_t pinATN, uint8_t pinDAV, uint8_t pinNRFD, uint8_t pinNDAC, uint8_t pinEOI, uint8_t pinRESET = 0xFF, uint8_t pinCTRL = 0xFF, uint8_t pinSRQ = 0xFF);
+  //GPIBusHandler(uint8_t pinATN, uint8_t pinCLK, uint8_t pinCLKout, uint8_t pinDATAin, uint8_t pinDATAout, uint8_t pinRESET = 0xFF, uint8_t pinCTRL = 0xFF, uint8_t pinSRQ = 0xFF);
 
   // must be called once at startup before the first call to "task", devnr
   // is the GPIB bus device number that this device should react to
@@ -162,7 +163,7 @@ class GPIBBusHandler
   uint8_t m_bufferSize;
   uint8_t *m_buffer;
 
-  static GPIBBusHandler *s_bushandler;
+  static GPIBusHandler *s_bushandler;
   static void atnInterruptFcn(INTERRUPT_FCN_ARG);
 };
 

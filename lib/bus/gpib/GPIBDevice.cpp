@@ -1,5 +1,6 @@
 // -----------------------------------------------------------------------------
 // Copyright (C) 2024 David Hansel
+// GPIB Support added by James Johnston
 //
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -17,7 +18,7 @@
 // -----------------------------------------------------------------------------
 
 #include "GPIBDevice.h"
-#include "GPIBBusHandler.h"
+#include "GPIBusHandler.h"
 
 #if defined(ARDUINO)
 #include <Arduino.h>
@@ -46,48 +47,3 @@ void GPIBDevice::sendSRQ()
   if( m_handler ) m_handler->sendSRQ();
 }
 
-
-
-
-// default implementation of "buffer read" function which can/should be overridden
-// (for efficiency) by devices using the JiffyDos, Epyx FastLoad or DolphinDos protocol
-#if defined(GPIB_FP_JIFFY) || defined(GPIB_FP_EPYX) || defined(GPIB_FP_DOLPHIN) || defined(GPIB_FP_SPEEDDOS) || defined(GPIB_FP_FC3) || defined(GPIB_FP_AR6)
-uint8_t GPIBDevice::read(uint8_t *buffer, uint8_t bufferSize)
-{ 
-  uint8_t i;
-  for(i=0; i<bufferSize; i++)
-    {
-      int8_t n;
-      while( (n = canRead())<0 );
-
-      if( n==0 )
-        break;
-      else
-        buffer[i] = read();
-    }
-
-  return i;
-}
-#endif
-
-
-#if defined(GPIB_FP_DOLPHIN) || defined(GPIB_FP_FC3) || defined(GPIB_FP_AR6)
-// default implementation of "buffer write" function which can/should be overridden
-// (for efficiency) by devices using the DolphinDos protocol
-uint8_t GPIBDevice::write(uint8_t *buffer, uint8_t bufferSize, bool eoi)
-{
-  uint8_t i;
-  for(i=0; i<bufferSize; i++)
-    {
-      int8_t n;
-      while( (n = canWrite())<0 );
-      
-      if( n==0 )
-        break;
-      else
-        write(buffer[i], eoi && (i==bufferSize-1));
-    }
-  
-  return i;
-}
-#endif

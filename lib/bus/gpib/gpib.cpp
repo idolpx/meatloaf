@@ -1,3 +1,20 @@
+// Meatloaf - A Commodore 64/128 multi-device emulator
+// https://github.com/idolpx/meatloaf
+// Copyright(C) 2020 James Johnston
+//
+// Meatloaf is free software : you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+// 
+// Meatloaf is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+// 
+// You should have received a copy of the GNU General Public License
+// along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
+
 #ifdef ENABLE_GPIB
 
 #include "gpib.h"
@@ -18,10 +35,10 @@
 #define MAIN_PRIORITY	 17
 #define MAIN_CPUAFFINITY 1
 
-ieee488Bus GPIB;
+gpiBus GPIB;
 
-ieee488Bus::ieee488Bus() : 
-  GPIBBusHandler(PIN_GPIB_ATN, 
+gpiBus::gpiBus() : 
+  GPIBusHandler(PIN_GPIB_ATN, 
                 PIN_GPIB_DAV, PIN_GPIB_NRFD, PIN_GPIB_NDAC, PIN_GPIB_EOI,
                 PIN_GPIB_IFC==GPIO_NUM_NC ? 0xFF : PIN_GPIB_IFC,
                 0xFF,
@@ -41,7 +58,7 @@ ieee488Bus::ieee488Bus() :
 #endif
 }
 
-static void ml_ieee488_intr_task(void* arg)
+static void ml_gpib_intr_task(void* arg)
 {
     while ( true )
     {
@@ -60,9 +77,9 @@ static void ml_ieee488_intr_task(void* arg)
 //     return;
 // }
 
-void ieee488Bus::setup()
+void gpiBus::setup()
 {
-  Debug_printf("GPIB ieee488Bus::setup()\r\n");
+  Debug_printf("GPIB gpiBus::setup()\r\n");
   begin();
 
 //     // initial pin modes in GPIO
@@ -83,12 +100,12 @@ void ieee488Bus::setup()
     // Start task
     // Create a new high-priority task to handle the main service loop
     // This is assigned to CPU1; the WiFi task ends up on CPU0
-    xTaskCreatePinnedToCore(ml_ieee488_intr_task, "bus_ieee488", MAIN_STACKSIZE, NULL, MAIN_PRIORITY, NULL, MAIN_CPUAFFINITY);
+    xTaskCreatePinnedToCore(ml_gpib_intr_task, "bus_gpib", MAIN_STACKSIZE, NULL, MAIN_PRIORITY, NULL, MAIN_CPUAFFINITY);
 
 }
 
 
-void ieee488Bus::service()
+void gpiBus::service()
 {
   task();
   
@@ -116,9 +133,9 @@ void ieee488Bus::service()
 }
 
 
-void ieee488Bus::shutdown()
+void gpiBus::shutdown()
 {
-  printf("GPIB ieee488Bus::shutdown()\r\n");
+  printf("GPIB gpiBus::shutdown()\r\n");
 }
 
 

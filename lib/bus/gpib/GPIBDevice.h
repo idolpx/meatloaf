@@ -1,5 +1,6 @@
 // -----------------------------------------------------------------------------
 // Copyright (C) 2024 David Hansel
+// GPIB Support added by James Johnston
 //
 // This program is free software; you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -22,11 +23,11 @@
 #include "GPIBConfig.h"
 #include <stdint.h>
 
-class GPIBBusHandler;
+class GPIBusHandler;
 
 class GPIBDevice
 {
- friend class GPIBBusHandler;
+ friend class GPIBusHandler;
 
  public:
   // pinATN should preferrably be a pin that can handle external interrupts
@@ -37,11 +38,6 @@ class GPIBDevice
 
   // call this to change the device number
   void setDeviceNumber(uint8_t devnr);
-
-  // call this to enable or disable support for the various fast-load protocols
-  // for your device.
-  bool enableFastLoader(uint8_t protocol, bool enable);
-  bool isFastLoaderEnabled(uint8_t loader);
   
   // this can be overloaded by derived classes
   virtual bool isActive() { return m_isActive; }
@@ -105,54 +101,6 @@ class GPIBDevice
   // read() is allowed to take an indefinite amount of time
   virtual uint8_t read() { return 0; }
 
-#if defined(GPIB_FP_JIFFY) || defined(GPIB_FP_DOLPHIN) || defined(GPIB_FP_SPEEDDOS) || defined(GPIB_FP_AR6)
-  // called when the device is sending data using JiffyDOS byte-by-byte protocol
-  // peek() will only be called if the last call to canRead() returned >0
-  // peek() should return the next character that will be read with read()
-  // peek() is allowed to take an indefinite amount of time
-  virtual uint8_t peek() { return 0; }
-#endif
-
-#if defined(GPIB_FP_DOLPHIN) || defined(GPIB_FP_FC3) || defined(GPIB_FP_AR6)
-  // called when the device is sending data using the DolphinDos burst transfer (SAVE protocol)
-  // should write all the data in the buffer and return the number of bytes written
-  // returning less than bufferSize signals an error condition
-  // the "eoi" parameter will be "true" if sender signaled that this is the final part of the transmission
-  // write() is allowed to take an indefinite amount of time
-  // the default implementation within GPIBDevice uses the canWrite() and write(data,eoi) functions,
-  // which is not efficient.
-  // it is highly recommended to override this function in devices supporting DolphinDos
-  virtual uint8_t write(uint8_t *buffer, uint8_t bufferSize, bool eoi);
-#endif
-
-#if defined(GPIB_FP_JIFFY) || defined(GPIB_FP_DOLPHIN) || defined(GPIB_FP_SPEEDDOS) || defined(GPIB_FP_EPYX) || defined(GPIB_FP_FC3) || defined(GPIB_FP_AR6)
-  // called when the device is sending data using the JiffyDOS block transfer
-  // or DolphinDos burst transfer (LOAD protocols)
-  // - should fill the buffer with as much data as possible (up to bufferSize)
-  // - must return the number of bytes put into the buffer
-  // read() is allowed to take an indefinite amount of time
-  // the default implementation within GPIBDevice uses the canRead() and read() functions,
-  // which is not efficient.
-  // it is highly recommended to override this function in devices supporting JiffyDos or DolphinDos.
-  virtual uint8_t read(uint8_t *buffer, uint8_t bufferSize);
-#endif
-
-#if defined(GPIB_FP_EPYX) && defined(GPIB_FP_EPYX_SECTOROPS)
-  // these functions are experimental, they are called when the Epyx Cartridge uses
-  // sector read/write operations (disk editor, disk copy or file copy).
-  virtual bool epyxReadSector(uint8_t track, uint8_t sector, uint8_t *buffer)  { return false; }
-  virtual bool epyxWriteSector(uint8_t track, uint8_t sector, uint8_t *buffer) { return false; }
-#endif
-
-#ifdef GPIB_FP_DOLPHIN 
-  // call this to enable or disable DolphinDOS burst transmission mode
-  // On the 1541, this gets enabled/disabled by the "XF+"/"XF-" command
-  // (the GPIBFileDevice class handles this automatically)
-  void enableDolphinBurstMode(bool enable);
-#endif
-
-  bool fastLoadRequest(uint8_t loader, uint8_t request);
-
   // send pulse on SRQ line (if SRQ pin was set in GPIBBusHandler constructor)
   void sendSRQ();
 
@@ -162,7 +110,7 @@ class GPIBDevice
   uint8_t    m_flEnabled;  // bit-mask for which fast-loaders are enabled (GPIB_FP_* in GPIBConfig.h)
   uint32_t   m_flFlags;    // internal fast-loader flags
   uint8_t    m_flProtocol; // currently active fast-load protocol
-  GPIBBusHandler *m_handler;
+  GPIBusHandler *m_handler;
 };
 
 #endif
