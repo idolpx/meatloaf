@@ -17,6 +17,7 @@
 #include "pinmap/esp-wroom32-pi1541.h"
 #include "pinmap/ttgo-t1.h"
 #include "pinmap/petdiskmaxv2.h"
+#include "pinmap/wic64.h"
 
 // ESP32 S2
 #include "pinmap/lolin-s2-mini.h"

@@ -37,7 +37,7 @@
     "use_1200bps_touch": true,
     "wait_for_upload_port": true,
     "require_upload_port": true,
-    "speed": 460800
+    "speed": 2000000
   },
   "url": "https://github.com/idolpx/meatloaf",
   "vendor": "Meatloaf CBM"

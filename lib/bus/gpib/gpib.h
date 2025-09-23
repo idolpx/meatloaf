@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
-//
+// GPIB/IEEE-488 (General Purpose Interface Bus)
 // https://www.pagetable.com/?p=1023
 // https://ia601902.us.archive.org/9/items/PET_and_the_GPIB_Bus_1980_McGraw-Hill/PET_and_the_GPIB_Bus_1980_McGraw-Hill.pdf
 // https://www.youtube.com/watch?v=EEtETGfL_VE
