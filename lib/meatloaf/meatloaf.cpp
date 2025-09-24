@@ -287,7 +287,7 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
         else
         {
             // Check for Encoder/Link/Loader/Scanner/Wrapper
-            for(auto i = availableELLPSW.begin() + 1; i < availableELLPSW.end() ; i ++) {
+            for(auto i = availableELLPSW.begin(); i < availableELLPSW.end() ; i ++) {
                 auto ellpsw = (*i);
 
                 Debug_printv("Checking symbol[%s]", ellpsw->symbol);
