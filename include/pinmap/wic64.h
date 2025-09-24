@@ -38,6 +38,7 @@
 #define PIN_LED_BT              GPIO_NUM_NC
 #define PIN_LED_BUS             GPIO_NUM_NC
 #define PIN_LED_RGB             GPIO_NUM_NC
+#define LEDS_INVERTED           1
 
 /* LCD */
 #define LCD_SSD1306
@@ -71,18 +72,18 @@
 #define PIN_IEC_RESET           GPIO_NUM_34     //  RESET  6       A 34            N/C
                                                 //  GND    2       GND             9  (GREY)
 
-#define PIN_USERPORT_PA2        GPIO_NUM_27     // Direction: HIGH = C64 => ESP, LOW = ESP => C64
-#define PIN_USERPORT_PC2        GPIO_NUM_14     // Handshake: C64 => ESP (ack/strobe: byte read from/written to port) (rising edge)
-#define PIN_USERPORT_FLAG2      GPIO_NUM_26     // Handshake: ESP => C64 (ack/strobe: byte read from/written to port) (falling edge)
+#define PIN_PARALLEL_PA2        GPIO_NUM_27     // Direction: HIGH = C64 => ESP, LOW = ESP => C64
+#define PIN_PARALLEL_PC2        GPIO_NUM_14     // Handshake: C64 => ESP (ack/strobe: byte read from/written to port) (rising edge)
+#define PIN_PARALLEL_FLAG2      GPIO_NUM_26     // Handshake: ESP => C64 (ack/strobe: byte read from/written to port) (falling edge)
 
-#define PIN_USERPORT_PB0        GPIO_NUM_16
-#define PIN_USERPORT_PB1        GPIO_NUM_17
-#define PIN_USERPORT_PB2        GPIO_NUM_18
-#define PIN_USERPORT_PB3        GPIO_NUM_19
-#define PIN_USERPORT_PB4        GPIO_NUM_21
-#define PIN_USERPORT_PB5        GPIO_NUM_22
-#define PIN_USERPORT_PB6        GPIO_NUM_23
-#define PIN_USERPORT_PB7        GPIO_NUM_25
+#define PIN_PARALLEL_DATA0        GPIO_NUM_16
+#define PIN_PARALLEL_DATA1        GPIO_NUM_17
+#define PIN_PARALLEL_DATA2        GPIO_NUM_18
+#define PIN_PARALLEL_DATA3        GPIO_NUM_19
+#define PIN_PARALLEL_DATA4        GPIO_NUM_21
+#define PIN_PARALLEL_DATA5        GPIO_NUM_22
+#define PIN_PARALLEL_DATA6        GPIO_NUM_23
+#define PIN_PARALLEL_DATA7        GPIO_NUM_25
 
 #endif // PINMAP_WIC64
 #endif // PINMAP_WIC64_H

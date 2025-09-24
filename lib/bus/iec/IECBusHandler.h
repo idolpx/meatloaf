@@ -159,7 +159,6 @@ class IECBusHandler
   bool transmitSpeedDosParallelByte(uint8_t data);
 #endif
 
-
 #ifdef IEC_FP_DOLPHIN
   bool transmitDolphinByte(uint8_t numData);
   bool receiveDolphinByte(bool canWriteOk);
@@ -182,6 +181,10 @@ class IECBusHandler
   void enableParallelPins();
   bool isParallelPin(uint8_t pin);
 
+  uint8_t m_pinParallelHandshakeTransmit;
+  uint8_t m_pinParallelHandshakeReceive;
+  uint8_t m_bufferCtr;
+
 #ifdef IEC_SUPPORT_PARALLEL_XRA1405
   uint8_t m_pinParallelSCK, m_pinParallelCOPI, m_pinParallelCIPO, m_pinParallelCS, m_inTransaction;
   uint8_t XRA1405_ReadReg(uint8_t reg);
@@ -202,10 +205,6 @@ class IECBusHandler
 #endif
 
 #endif // IEC_SUPPORT_PARALLEL_XRA1405
-
-  uint8_t m_pinParallelHandshakeTransmit;
-  uint8_t m_pinParallelHandshakeReceive;
-  uint8_t m_bufferCtr;
 
 #ifdef IOREG_TYPE
   volatile IOREG_TYPE *m_regParallelHandshakeTransmitMode;

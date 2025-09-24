@@ -314,8 +314,9 @@ namespace ESP32Console
 
             // Insert current PWD into prompt if needed
             mstr::replaceAll(prompt, "%pwd%", getCurrentPath()->url);
-
+#ifdef ENABLE_CONSOLE_TCP
             tcp_server.send(prompt);
+#endif
             char *line = linenoise(prompt.c_str());
             if (line == NULL)
             {
@@ -344,7 +345,9 @@ namespace ESP32Console
 
             /* Try to run the command */
             int ret;
+#ifdef ENABLE_CONSOLE_TCP
             tcp_server.send(interpolated_line + "\n");
+#endif
             esp_err_t err = esp_console_run(interpolated_line.c_str(), &ret);
 
             //Reset global state
@@ -353,7 +356,9 @@ namespace ESP32Console
             if (err == ESP_ERR_NOT_FOUND)
             {
                 std::string t = "Unrecognized command\n";
+#ifdef ENABLE_CONSOLE_TCP
                 tcp_server.send(t);
+#endif
                 fprintf(stdout, t.c_str());
             }
             else if (err == ESP_ERR_INVALID_ARG)
@@ -426,7 +431,9 @@ namespace ESP32Console
     {
         int z = uart_write_bytes(uart_channel_, (const char *)&c, 1);
         // uart_wait_tx_done(_uart_num, MAX_WRITE_BYTE_TICKS);
+#ifdef ENABLE_CONSOLE_TCP
         tcp_server.send((char *)c);
+#endif
         return z;
     }
     
@@ -434,14 +441,18 @@ namespace ESP32Console
     {
         int z = uart_write_bytes(uart_channel_, (const char *)buffer, size);
         // uart_wait_tx_done(_uart_num, MAX_WRITE_BUFFER_TICKS);
+#ifdef ENABLE_CONSOLE_TCP
         tcp_server.send((char *)buffer);
+#endif
         return z;
     }
     
     size_t Console::write(const char *str)
     {
         int z = uart_write_bytes(uart_channel_, str, strlen(str));
+#ifdef ENABLE_CONSOLE_TCP
         tcp_server.send(str);
+#endif
         return z;
     }
     
@@ -477,7 +488,10 @@ namespace ESP32Console
     
         if (z > 0) {
             uart_write_bytes(uart_channel_, result, z);
+
+#ifdef ENABLE_CONSOLE_TCP
             tcp_server.send(result);
+#endif
         }
     
         va_end(vargs);
@@ -521,8 +535,10 @@ namespace ESP32Console
     
         if (!_initialized)
             return -1;
-        
+
+#ifdef ENABLE_CONSOLE_TCP
         tcp_server.send(str);
+#endif
         return uart_write_bytes(uart_channel_, str, z);
     }
     

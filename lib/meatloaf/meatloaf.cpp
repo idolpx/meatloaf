@@ -27,9 +27,7 @@
 
 #ifdef FLASH_SPIFFS
 #include "esp_spiffs.h"
-#endif
-
-#ifdef FLASH_LITTLEFS
+#else
 #include "esp_littlefs.h"
 #endif
 
@@ -50,10 +48,21 @@
 #include "device/flash.h"
 #include "device/sd.h"
 
+#ifndef MIN_CONFIG
 // Archive
 #include "media/archive/archive.h"
 #include "media/archive/ark.h"
 #include "media/archive/lbr.h"
+
+// Service
+#include "service/csip.h"
+
+// Network
+#include "network/tnfs.h"
+// #include "network/ipfs.h"
+// #include "network/smb.h"
+// #include "network/ws.h"
+#endif
 
 // Cartridge
 
@@ -83,13 +92,8 @@
 
 // Network
 #include "network/http.h"
-#include "network/tnfs.h"
-// #include "network/ipfs.h"
-// #include "network/smb.h"
-// #include "network/ws.h"
 
 // Service
-#include "service/csip.h"
 #include "service/ml.h"
 
 
@@ -119,11 +123,21 @@ FlashMFileSystem defaultFS;
 SDFileSystem sdFS;
 #endif
 
-
+#ifndef MIN_CONFIG
 // Archive
 ArchiveMFileSystem archiveFS;
 ARKMFileSystem arkFS;
 LBRMFileSystem lbrFS;
+
+// Service
+CSIPMFileSystem csipFS;
+
+// Network
+TNFSMFileSystem tnfsFS;
+// IPFSFileSystem ipfsFS;
+// TcpFileSystem tcpFS;
+//WSFileSystem wsFS;
+#endif
 
 // Cartridge
 
@@ -153,13 +167,8 @@ TCRTMFileSystem tcrtFS;
 
 // Network
 HTTPMFileSystem httpFS;
-TNFSMFileSystem tnfsFS;
-// IPFSFileSystem ipfsFS;
-// TcpFileSystem tcpFS;
-//WSFileSystem wsFS;
 
 // Service
-CSIPMFileSystem csipFS;
 MLMFileSystem mlFS;
 
 // Codec
@@ -176,9 +185,11 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
     &sdFS,
 #endif
 
+#ifndef MIN_CONFIG
     // Archive
     &archiveFS,     // extension-based FS have to be on top to be picked first, otherwise the scheme will pick them!
     &arkFS, &lbrFS,
+#endif
 
     // Container
     &d8bFS, &dfiFS,
@@ -198,14 +209,19 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
     &p00FS,
 
     // Network
-    &httpFS, &tnfsFS,
+    &httpFS,
+#ifndef MIN_CONFIG
+    &tnfsFS,
     //&ipfsFS, &tcpFS,
+#endif
 
 };
 
 std::vector<MFileSystem*> MFSOwner::availableELLPSW {
     // Service
+#ifndef MIN_CONFIG
     &csipFS,
+#endif
 
     // Codec
     &qrcEncoder, &hashEncoder

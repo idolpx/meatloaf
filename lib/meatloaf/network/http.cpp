@@ -473,7 +473,7 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
 
     // Set URL and Method
     mstr::replaceAll(url, " ", "%20");
-    //Debug_printv("url[%s]", url.c_str());
+    //Debug_printv("method[%d] url[%s]", method, url.c_str());
     esp_http_client_set_url(_http, url.c_str());
     esp_http_client_set_method(_http, method);
 

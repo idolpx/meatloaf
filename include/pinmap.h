@@ -1,9 +1,14 @@
-
-#include <soc/gpio_num.h>
-
 /* Meatloaf Hardware Pin Mapping */
 #ifndef PINMAP_H
 #define PINMAP_H
+
+#include <soc/gpio_num.h>
+
+// Defaults
+#include "pinmap_defaults.h"
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmacro-redefined"
 
 // ESP32 WROVER-E
 #include "pinmap/lolin-d32-pro.h"
@@ -36,42 +41,8 @@
 // ESP32 C3
 #include "pinmap/esp32-c3-super-mini.h"
 
-#ifndef PIN_MODEM_ENABLE
-#define PIN_MODEM_ENABLE        GPIO_NUM_NC  // High = Modem enabled
-#define PIN_MODEM_UP9600        GPIO_NUM_NC  // High = UP9600 enabled
-#endif
-
-/* LED Strip */
-#ifndef PIN_LED_RGB
-#define PIN_LED_RGB             GPIO_NUM_NC // No RGB LED
-#endif
-#define RGB_LED_DATA_PIN        PIN_LED_RGB
-#define RGB_LED_BRIGHTNESS      15 // max mA the LED can use determines brightness
-#define RGB_LED_COUNT           5
-#define RGB_LED_TYPE            WS2812B
-#define RGB_LED_ORDER           GRB
-#ifndef PIN_LED_RGB_PWR
-#define PIN_LED_RGB_PWR         GPIO_NUM_NC
-#endif
-
-/* PS/2 Keyboard Output */
-#ifndef PIN_KB_CLK
-#define PIN_KB_CLK              GPIO_NUM_NC;
-#define PIN_KB_DATA             GPIO_NUM_NC;
-#endif
-
-#ifdef ENABLE_ZIMODEM
-#define DEFAULT_PIN_DCD GPIO_NUM_14
-#define DEFAULT_PIN_CTS GPIO_NUM_13
-#define DEFAULT_PIN_RTS GPIO_NUM_15 // unused
-#define DEFAULT_PIN_RI  GPIO_NUM_32
-#define DEFAULT_PIN_DSR GPIO_NUM_12
-#define DEFAULT_PIN_DTR GPIO_NUM_27
-#endif
-
-
-#ifndef PIN_DEBUG
 #define PIN_DEBUG		PIN_IEC_SRQ
-#endif
+
+#pragma GCC diagnostic pop
 
 #endif // PINMAP_H

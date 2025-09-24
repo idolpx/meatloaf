@@ -156,6 +156,7 @@ void main_setup()
     fnKeyManager.setup();
     fnLedManager.setup();
 
+#ifndef MIN_CONFIG
     if (PIN_MODEM_ENABLE != GPIO_NUM_NC && PIN_MODEM_UP9600 != GPIO_NUM_NC) {
         // Enable/Disable Modem/Parallel Mode on Userport
         fnSystem.set_pin_mode(PIN_MODEM_ENABLE, gpio_mode_t::GPIO_MODE_OUTPUT);
@@ -165,6 +166,7 @@ void main_setup()
         fnSystem.digital_write(PIN_MODEM_UP9600, DIGI_LOW); // DISABLE UP9600
         //fnSystem.digital_write(PIN_MODEM_UP9600, DIGI_HIGH); // ENABLE UP9600
     }
+#endif
 
     // Initialize the FileSystem
     printf("Initializing FileSystem\r\n");
@@ -256,8 +258,6 @@ void main_setup()
     // lfs_test();
 //#endif
 
-    printf("READY.\r\n");
-
 #ifdef ENABLE_CONSOLE
     //Register builtin commands like 'reboot', 'version', or 'meminfo'
     console.registerSystemCommands();
@@ -274,6 +274,8 @@ void main_setup()
     //Register XFER commands
     console.registerXFERCommands();
 #endif
+
+    printf("READY.\r\n");
 }
 
 /*

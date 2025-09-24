@@ -39,10 +39,15 @@
 #define IEC_FP_EPYX      1 // EPYX FastLoad
 #define IEC_FP_FC3       2 // Final Cartridge 3
 #define IEC_FP_AR6       3 // Action Replay 6
-#if defined(PIN_XRA1405_CS) && defined(PIN_PARALLEL_PC2) && defined(PIN_PARALLEL_FLAG2)
+#if defined(PIN_PARALLEL_PC2) && defined(PIN_PARALLEL_FLAG2)
 #define IEC_FP_DOLPHIN   4 // Dolphin Dos
 #define IEC_FP_SPEEDDOS  5 // Speed Dos
+#ifdef PIN_PARALLEL_PA2
+#define PARALLEL_WIC64   6 // WiC64 Protocol Available
+#endif
+#ifdef PIN_XRA1405_CS
 #define IEC_SUPPORT_PARALLEL_XRA1405 // Use XRA1405 port extender for parallel cable
+#endif
 #endif
 
 // convenience macro, IEC_SUPPORT_FASTLOAD is defined if any fast-load protocols

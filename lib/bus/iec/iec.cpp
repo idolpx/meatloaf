@@ -61,7 +61,17 @@ systemBus::systemBus() :
                   PIN_SD_HOST_MISO   == GPIO_NUM_NC ? 0xFF : PIN_SD_HOST_MISO,
                   PIN_XRA1405_CS     == GPIO_NUM_NC ? 0xFF : PIN_XRA1405_CS);
 #else
-#error "Can only support DolphinDos/SpeedDos using XRA1405 port expander"
+//#error "Can only support DolphinDos/SpeedDos using XRA1405 port expander"
+  setParallelPins(PIN_PARALLEL_FLAG2 == GPIO_NUM_NC ? 0xFF : PIN_PARALLEL_FLAG2,
+                  PIN_PARALLEL_PC2   == GPIO_NUM_NC ? 0xFF : PIN_PARALLEL_PC2,
+                  PIN_PARALLEL_DATA0,
+                  PIN_PARALLEL_DATA1,
+                  PIN_PARALLEL_DATA2,
+                  PIN_PARALLEL_DATA3,
+                  PIN_PARALLEL_DATA4,
+                  PIN_PARALLEL_DATA5,
+                  PIN_PARALLEL_DATA6,
+                  PIN_PARALLEL_DATA7);
 #endif
 #endif
 }

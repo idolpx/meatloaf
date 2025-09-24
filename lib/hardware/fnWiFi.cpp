@@ -654,7 +654,9 @@ void WiFiManager::handle_station_stop()
 {
     _connected = false;
     fnLedManager.set(eLed::LED_WIFI, false);
+#ifndef MIN_CONFIG
     oHttpdServer.stop();
+#endif
     fnSystem.Net.stop_sntp_client();
 #ifdef ENABLE_CONSOLE_TCP
     tcp_server.stop();
@@ -689,6 +691,7 @@ void WiFiManager::_wifi_event_handler(void *arg, esp_event_base_t event_base,
             fnLedManager.set(eLed::LED_WIFI, true);
             fnSystem.Net.start_sntp_client();
 
+#ifndef MIN_CONFIG
             // Start Web / WebDAV Server
             oHttpdServer.start();
 
@@ -697,6 +700,7 @@ void WiFiManager::_wifi_event_handler(void *arg, esp_event_base_t event_base,
             mdns_hostname_set(Config.get_general_devicename().c_str());
             add_mdns_services();
             printf( ANSI_GREEN_BOLD "mDNS Service Started!" ANSI_RESET "\r\n");
+#endif
 
 #ifdef ENABLE_SSDP
             // Start SSDP Service

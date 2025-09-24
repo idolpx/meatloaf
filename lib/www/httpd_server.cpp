@@ -15,6 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
+#ifndef MIN_CONFIG
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 
 #include "httpd_server.h"
@@ -691,3 +692,5 @@ void cHttpdServer::stop()
         state.hServer = nullptr;
     }
 }
+
+#endif

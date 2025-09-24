@@ -16,9 +16,15 @@
 
 #include "hash.h"
 
+#ifndef MIN_CONFIG
 #define MAX_HOSTS 8
 #define MAX_DISK_DEVICES 8
 #define MAX_NETWORK_DEVICES 4
+#else
+#define MAX_HOSTS 1
+#define MAX_DISK_DEVICES 1
+#define MAX_NETWORK_DEVICES 1
+#endif
 
 // only in BASIC:
 #define MAX_APPKEY_LEN 64
