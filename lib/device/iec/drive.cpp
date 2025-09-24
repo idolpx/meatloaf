@@ -242,6 +242,7 @@ uint8_t iecChannelHandlerFile::readBufferData()
       uint8_t percent = (m_stream->position() * 100) / m_stream->size();
       LEDS.progress = percent;
 #endif
+      fnLedManager.toggle(eLed::LED_BUS);
 
       if( m_fixLoadAddress>=0 && m_stream->position()==0 )
         {
@@ -558,7 +559,12 @@ void iecDrive::begin()
 bool iecDrive::open(uint8_t channel, const char *cname)
 {
   Debug_printv("iecDrive::open(#%d, %d, \"%s\")", m_devnr, channel, cname);
-  
+
+#ifdef ENABLE_DISPLAY
+    LEDS.activity = true;
+#endif
+    fnLedManager.toggle(eLed::LED_BUS);
+
 //#ifdef USE_VDRIVE
     if( Meatloaf.use_vdrive )
     {
@@ -815,6 +821,10 @@ void iecDrive::close(uint8_t channel)
       Debug_printv("Channel %d closed.", channel);
       Debug_memory();
     }
+
+#ifdef ENABLE_DISPLAY
+    LEDS.activity = false;
+#endif
 }
 
 

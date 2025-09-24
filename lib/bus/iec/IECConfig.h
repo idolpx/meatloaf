@@ -43,7 +43,7 @@
 #define IEC_FP_DOLPHIN   4 // Dolphin Dos
 #define IEC_FP_SPEEDDOS  5 // Speed Dos
 #ifdef PIN_PARALLEL_PA2
-#define PARALLEL_WIC64   6 // WiC64 Protocol Available
+#define IEC_FP_WIC64     6 // WiC64 Protocol Available
 #endif
 #ifdef PIN_XRA1405_CS
 #define IEC_SUPPORT_PARALLEL_XRA1405 // Use XRA1405 port extender for parallel cable

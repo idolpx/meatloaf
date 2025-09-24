@@ -4,12 +4,6 @@
 
 #include <soc/gpio_num.h>
 
-// Defaults
-#include "pinmap_defaults.h"
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmacro-redefined"
-
 // ESP32 WROVER-E
 #include "pinmap/lolin-d32-pro.h"
 #include "pinmap/iec-nugget.h"
@@ -41,8 +35,7 @@
 // ESP32 C3
 #include "pinmap/esp32-c3-super-mini.h"
 
-#define PIN_DEBUG		PIN_IEC_SRQ
-
-#pragma GCC diagnostic pop
+// Defaults
+#include "pinmap_defaults.h"
 
 #endif // PINMAP_H

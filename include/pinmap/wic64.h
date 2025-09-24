@@ -36,7 +36,7 @@
 /* LEDs */
 #define PIN_LED_WIFI            GPIO_NUM_2
 #define PIN_LED_BT              GPIO_NUM_NC
-#define PIN_LED_BUS             GPIO_NUM_NC
+#define PIN_LED_BUS             GPIO_NUM_2
 #define PIN_LED_RGB             GPIO_NUM_NC
 #define LEDS_INVERTED           1
 

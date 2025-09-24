@@ -181,10 +181,6 @@ class IECBusHandler
   void enableParallelPins();
   bool isParallelPin(uint8_t pin);
 
-  uint8_t m_pinParallelHandshakeTransmit;
-  uint8_t m_pinParallelHandshakeReceive;
-  uint8_t m_bufferCtr;
-
 #ifdef IEC_SUPPORT_PARALLEL_XRA1405
   uint8_t m_pinParallelSCK, m_pinParallelCOPI, m_pinParallelCIPO, m_pinParallelCS, m_inTransaction;
   uint8_t XRA1405_ReadReg(uint8_t reg);
@@ -195,7 +191,15 @@ class IECBusHandler
   IOREG_TYPE m_bitParallelCS;
 #endif
 
+  uint8_t m_pinParallelHandshakeTransmit;
+  uint8_t m_pinParallelHandshakeReceive;
+  uint8_t m_bufferCtr;
+
 #else // !IEC_SUPPORT_PARALLEL_XRA1405
+
+  uint8_t m_pinParallelHandshakeTransmit;
+  uint8_t m_pinParallelHandshakeReceive;
+  uint8_t m_bufferCtr;
 
   uint8_t m_pinParallel[8];
 #ifdef IOREG_TYPE
