@@ -35,6 +35,10 @@
 
 #include <dirent.h>
 #include <string.h>
+#include <fcntl.h>
+
+// Helper function declarations
+bool parseSMBPath(const std::string& path, std::string& server, std::string& share, std::string& filepath);
 
 
 /********************************************************
@@ -45,24 +49,60 @@ class SMBMFile: public MFile
 {
 public:
     std::string basepath = "";
+    std::string share = "";
     
     SMBMFile(std::string path): MFile(path) {
+        // Initialize SMB context
+        _smb = smb2_init_context();
+        if (!_smb) {
+            Debug_printv("Failed to initialize SMB context");
+            m_isNull = true;
+            return;
+        }
+
+        // Set SMB2 version
+        smb2_set_version(_smb, SMB2_VERSION_ANY);
+
+        // show url info
+        dump();
+
+        // extract share from path
+        auto parts = smb2_parse_url(_smb, mRawUrl.c_str());
+        share = parts->share;
+        path = parts->path;
+        smb2_destroy_url(parts);
+        Debug_printv("share[%s] path[%s]", share.c_str(), path.c_str());
+
+        // Connect to server/share
+        // if (user.size())
+        //     smb2_set_user(_smb, user.c_str());
+        if (password.size())
+            smb2_set_password(_smb, password.c_str());
+
+        if (smb2_connect_share(_smb, host.c_str(), share.c_str(), user.c_str()) < 0) {
+            Debug_printv("Failed to connect to %s/%s: %s", host.c_str(), path.c_str(), smb2_get_error(_smb));
+            m_isNull = true;
+            return;
+        }
 
         // Find full filename for wildcard
         if (mstr::contains(name, "?") || mstr::contains(name, "*"))
             readEntry( name );
 
-        if (!pathValid(path.c_str()))
+        if (!pathValid(this->path.c_str()))
             m_isNull = true;
         else
             m_isNull = false;
 
         m_rootfs = true;
-        //Debug_printv("basepath[%s] path[%s] valid[%d]", basepath.c_str(), this->path.c_str(), m_isNull);
+        Debug_printv("SMB path[%s] valid[%d]", this->path.c_str(), !m_isNull);
     };
     ~SMBMFile() {
-        //printf("*** Destroying flashfile %s\r\n", url.c_str());
         closeDir();
+        if (_smb) {
+            smb2_destroy_context(_smb);
+            _smb = nullptr;
+        }
     }
 
     std::shared_ptr<MStream> getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override ; // has to return OPENED stream
@@ -84,11 +124,10 @@ public:
     bool readEntry( std::string filename );
 
 protected:
-    DIR* dir;
     bool dirOpened = false;
 
     struct smb2_context *_smb;
-    struct smb2fh *_handle;
+    struct smb2dir *_handle_dir;
 
 private:
     FileSystem *_fs = nullptr;
@@ -110,16 +149,17 @@ private:
 
 class SMBHandle {
 public:
-    //int rc;
-    FILE* file_h = nullptr;
+    struct smb2_context *_smb = nullptr;
+    struct smb2fh *_handle = nullptr;
 
-    SMBHandle() 
+    SMBHandle()
     {
-        //Debug_printv("*** Creating flash handle");
-        memset(&file_h, 0, sizeof(file_h));
+        //Debug_printv("*** Creating SMB handle");
+        _smb = nullptr;
+        _handle = nullptr;
     };
     ~SMBHandle();
-    void obtain(std::string localPath, std::string mode);
+    void obtain(std::string localPath, int smb_mode);
     void dispose();
 
 private:
@@ -173,13 +213,13 @@ protected:
  * MFileSystem
  ********************************************************/
 
-class SMBMFileSystem: public MFileSystem 
+class SMBMFileSystem: public MFileSystem
 {
 public:
-    SMBMFileSystem(): MFileSystem("tnfs") {};
+    SMBMFileSystem(): MFileSystem("smb") {};
 
     bool handles(std::string name) {
-        if ( mstr::equals(name, (char *)"tnfs:", false) )
+        if ( mstr::equals(name, (char *)"smb:", false) )
             return true;
 
         return false;

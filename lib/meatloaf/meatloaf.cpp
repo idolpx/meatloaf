@@ -92,6 +92,7 @@
 
 // Network
 #include "network/http.h"
+#include "network/smb.h"
 
 // Service
 #include "service/ml.h"
@@ -134,6 +135,7 @@ CSIPMFileSystem csipFS;
 
 // Network
 TNFSMFileSystem tnfsFS;
+SMBMFileSystem smbFS;
 // IPFSFileSystem ipfsFS;
 // TcpFileSystem tcpFS;
 //WSFileSystem wsFS;
@@ -211,7 +213,7 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
     // Network
     &httpFS,
 #ifndef MIN_CONFIG
-    &tnfsFS,
+    &tnfsFS, &smbFS
     //&ipfsFS, &tcpFS,
 #endif
 
@@ -327,7 +329,8 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
     if( begin == pathIterator )
     {
         Debug_printv("** LOOK UP PATH NOT NEEDED   path[%s] sourcePath[%s]", path.c_str(), sourcePath.c_str());
-        targetFile->sourceFile = targetFileSystem->getFile(sourcePath);
+        if ( sourcePath.size() )
+            targetFile->sourceFile = targetFileSystem->getFile(sourcePath);
     } 
     else 
     {

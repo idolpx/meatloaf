@@ -67,8 +67,8 @@ public:
         printf("mRawUrl: %s\r\n", mRawUrl.c_str());
         printf("url:     %s\r\n", url.c_str());
         printf("scheme: %s\r\n", scheme.c_str());
-        printf("user pass: %s -- %s\r\n", user.c_str(), password.c_str());
-        printf("host port: %s -- %s\r\n", host.c_str(), port.c_str());
+        printf("user pass: %s:%s\r\n", user.c_str(), password.c_str());
+        printf("host port: %s:%s\r\n", host.c_str(), port.c_str());
         printf("path: %s\r\n", path.c_str());
         printf("pathToFile: %s\r\n", pathToFile().c_str());
         printf("name: %s\r\n", name.c_str());
