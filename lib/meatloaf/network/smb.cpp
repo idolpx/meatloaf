@@ -32,35 +32,21 @@
  * Helper Functions
  ********************************************************/
 
-bool parseSMBPath(const std::string& path, std::string& server, std::string& share, std::string& filepath) {
-    // Expected format: smb://server/share/path/to/file
-    if (!mstr::startsWith(path, "smb://")) {
-        return false;
-    }
-
-    std::string remaining = path.substr(6); // Remove "smb://"
+bool parseSMBPath(const std::string& path, std::string& share, std::string& share_path) {
 
     // Find server
-    size_t pos = remaining.find('/');
+    size_t pos = path.find('/', 1);
     if (pos == std::string::npos) {
-        return false;
-    }
-    server = remaining.substr(0, pos);
-    remaining = remaining.substr(pos + 1);
-
-    // Find share
-    pos = remaining.find('/');
-    if (pos == std::string::npos) {
-        share = remaining;
-        filepath = "/";
+        share = path.substr(1);
+        share_path = "";
     } else {
-        share = remaining.substr(0, pos);
-        filepath = "/" + remaining.substr(pos + 1);
+        share = path.substr(1, pos - 1);
+        share_path = "/" + path.substr(pos + 1);
     }
 
-    Debug_printv("Parsed SMB path - Server: %s, Share: %s, File: %s", server.c_str(), share.c_str(), filepath.c_str());
     return true;
 }
+
 
 /********************************************************
  * MFile implementations
@@ -82,8 +68,8 @@ bool SMBMFile::pathValid(std::string path)
 
 bool SMBMFile::isDirectory()
 {
-    Debug_printv("path[%s]", path);
-    if(path=="/" || path.empty())
+    Debug_printv("path[%s] len[%d]", share_path.c_str(), share_path.size());
+    if(share_path=="/" || share_path.empty())
         return true;
 
     if (!_smb) {
@@ -91,7 +77,7 @@ bool SMBMFile::isDirectory()
     }
 
     struct smb2_stat_64 st;
-    if (smb2_stat(_smb, std::string(basepath + path).c_str(), &st) < 0) {
+    if (smb2_stat(_smb, std::string(basepath + share_path).c_str(), &st) < 0) {
         return false;
     }
 
@@ -123,7 +109,7 @@ time_t SMBMFile::getLastWrite()
     }
 
     struct smb2_stat_64 st;
-    if (smb2_stat(_smb, std::string(basepath + path).c_str(), &st) < 0) {
+    if (smb2_stat(_smb, std::string(basepath + share_path).c_str(), &st) < 0) {
         return 0;
     }
 
@@ -137,7 +123,7 @@ time_t SMBMFile::getCreationTime()
     }
 
     struct smb2_stat_64 st;
-    if (smb2_stat(_smb, std::string(basepath + path).c_str(), &st) < 0) {
+    if (smb2_stat(_smb, std::string(basepath + share_path).c_str(), &st) < 0) {
         return 0;
     }
 
@@ -150,7 +136,7 @@ bool SMBMFile::mkDir()
         return false;
     }
 
-    int rc = smb2_mkdir(_smb, std::string(basepath + path).c_str());
+    int rc = smb2_mkdir(_smb, std::string(basepath + share_path).c_str());
     return (rc == 0);
 }
 
@@ -159,12 +145,12 @@ bool SMBMFile::exists()
     if (m_isNull || !_smb) {
         return false;
     }
-    if (path=="/" || path=="") {
+    if (share_path=="/" || share_path=="") {
         return true;
     }
 
     struct smb2_stat_64 st;
-    int rc = smb2_stat(_smb, std::string(basepath + path).c_str(), &st);
+    int rc = smb2_stat(_smb, std::string(basepath + share_path).c_str(), &st);
     return (rc == 0);
 }
 
@@ -176,9 +162,9 @@ bool SMBMFile::remove() {
 
     // Check if it's a directory or file
     if (isDirectory()) {
-        return smb2_rmdir(_smb, std::string(basepath + path).c_str()) == 0;
+        return smb2_rmdir(_smb, std::string(basepath + share_path).c_str()) == 0;
     } else {
-        return smb2_unlink(_smb, std::string(basepath + path).c_str()) == 0;
+        return smb2_unlink(_smb, std::string(basepath + share_path).c_str()) == 0;
     }
 }
 
@@ -188,7 +174,7 @@ bool SMBMFile::rename(std::string pathTo) {
         return false;
     }
 
-    int rc = smb2_rename(_smb, std::string(basepath + path).c_str(), std::string(basepath + pathTo).c_str());
+    int rc = smb2_rename(_smb, std::string(basepath + share_path).c_str(), std::string(basepath + pathTo).c_str());
     return (rc == 0);
 }
 
@@ -204,7 +190,7 @@ void SMBMFile::openDir(std::string apath)
     closeDir();
 
     // Open the directory for listing
-    std::string dirPath = apath.empty() ? path : apath;
+    std::string dirPath = apath.empty() ? share_path : apath;
     _handle_dir = smb2_opendir(_smb, dirPath.c_str());
     dirOpened = (_handle_dir != nullptr);
 
@@ -230,7 +216,7 @@ bool SMBMFile::rewindDirectory()
 
     // Close and reopen directory to reset position
     closeDir();
-    openDir(path);
+    openDir(share_path);
 
     return dirOpened;
 }
@@ -239,7 +225,7 @@ bool SMBMFile::rewindDirectory()
 MFile* SMBMFile::getNextFileInDir()
 {
     if(!dirOpened || !_handle_dir || !_smb) {
-        openDir(std::string(basepath + path).c_str());
+        openDir(std::string(basepath + share_path).c_str());
         if (!dirOpened) {
             return nullptr;
         }
@@ -256,10 +242,10 @@ MFile* SMBMFile::getNextFileInDir()
     } while (ent->name[0] == '.' && (ent->name[1] == '\0' || (ent->name[1] == '.' && ent->name[2] == '\0')));
 
     if (ent != nullptr) {
-        name = ent->name;
-        rebuildUrl();
 
-        auto file = new SMBMFile(url);
+        Debug_printv("url[%s] entry[%s]", mRawUrl.c_str(), ent->name);
+
+        auto file = new SMBMFile(url + "/" + ent->name);
         file->extension = " " + file->extension;
 
         // Set size and type information
@@ -283,7 +269,7 @@ bool SMBMFile::readEntry( std::string filename )
         return false;
     }
 
-    std::string searchPath = path.substr(0, path.find_last_of('/'));
+    std::string searchPath = share_path.substr(0, share_path.find_last_of('/'));
     if (searchPath.empty()) {
         searchPath = "/";
     }
@@ -306,7 +292,7 @@ bool SMBMFile::readEntry( std::string filename )
             continue;
         }
 
-        Debug_printv("path[%s] filename[%s] entry.filename[%.16s]", searchPath.c_str(), filename.c_str(), entryFilename.c_str());
+        Debug_printv("share[%s] path[%s] filename[%s] entry.filename[%.16s]", share.c_str(), searchPath.c_str(), filename.c_str(), entryFilename.c_str());
 
         // Check for matches
         if (filename == "*") {
@@ -505,7 +491,7 @@ void SMBHandle::obtain(std::string m_path, int smb_mode) {
     // Parse the path to extract server, share, and file path
     // Expected format: smb://server/share/path/to/file
     std::string server, share, filepath;
-    if (!parseSMBPath(m_path, server, share, filepath)) {
+    if (!parseSMBPath(m_path, share, filepath)) {
         Debug_printv("Invalid SMB path: %s", m_path.c_str());
         dispose();
         return;

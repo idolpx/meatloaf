@@ -121,10 +121,12 @@ class MeatSocketServer {
     bool isAlive = false;
     int port = 0;
     uint8_t iecPort = 0;
+    TaskHandle_t *htask = nullptr;
 
     void start(int p) {
         port = p;
-        xTaskCreatePinnedToCore(tcp_server_task, "tcp_server", 4096, (void*)this, 5, NULL, 0);
+        std::string tcp_svr_name = "tcp_svr_" + std::to_string(p);
+        xTaskCreatePinnedToCore(tcp_server_task, tcp_svr_name.c_str(), 4096, (void*)this, 5, htask, 0);
     }
 
     void shutdown() {

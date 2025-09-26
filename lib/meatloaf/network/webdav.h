@@ -40,15 +40,14 @@ public:
     std::shared_ptr<MStream> getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override ; // has to return OPENED stream
     time_t getLastWrite() override ;
     time_t getCreationTime() override ;
-    bool rewindDirectory() override { return false; };
-    MFile* getNextFileInDir() override { return nullptr; };
-    bool mkDir() override { return false; };
-    bool exists() override ;
+    bool rewindDirectory() override;
+    MFile* getNextFileInDir() override;
+    bool mkDir() override;
+    bool exists() override;
 
-    bool remove() override { return false; };
-    bool rename(std::string dest) { return false; };
+    bool remove() override;
+    bool rename(std::string dest);
     std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> src);
-    //void addHeader(const String& name, const String& value, bool first = false, bool replace = true);
 };
 
 
@@ -78,7 +77,6 @@ protected:
     std::string url;
     bool _is_open;
 
-//    WiFiClient m_file;
 	MeatHttpClient m_http;
 };
 

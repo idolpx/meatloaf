@@ -38,8 +38,7 @@
 #include <fcntl.h>
 
 // Helper function declarations
-bool parseSMBPath(const std::string& path, std::string& server, std::string& share, std::string& filepath);
-
+bool parseSMBPath(const std::string& path, std::string& share, std::string& share_path);
 
 /********************************************************
  * MFile
@@ -50,6 +49,7 @@ class SMBMFile: public MFile
 public:
     std::string basepath = "";
     std::string share = "";
+    std::string share_path = "";
     
     SMBMFile(std::string path): MFile(path) {
         // Initialize SMB context
@@ -63,24 +63,16 @@ public:
         // Set SMB2 version
         smb2_set_version(_smb, SMB2_VERSION_ANY);
 
-        // show url info
-        dump();
-
         // extract share from path
-        auto parts = smb2_parse_url(_smb, mRawUrl.c_str());
-        share = parts->share;
-        path = parts->path;
-        smb2_destroy_url(parts);
-        Debug_printv("share[%s] path[%s]", share.c_str(), path.c_str());
+        parseSMBPath(this->path, share, share_path);
+        Debug_printv("path[%s] share[%s] share_path[%s]", this->path.c_str(), share.c_str(), share_path.c_str());
 
         // Connect to server/share
-        // if (user.size())
-        //     smb2_set_user(_smb, user.c_str());
         if (password.size())
             smb2_set_password(_smb, password.c_str());
 
         if (smb2_connect_share(_smb, host.c_str(), share.c_str(), user.c_str()) < 0) {
-            Debug_printv("Failed to connect to %s/%s: %s", host.c_str(), path.c_str(), smb2_get_error(_smb));
+            Debug_printv("error[%s] host[%s] share[%s] path[%s]", smb2_get_error(_smb), host.c_str(), share.c_str(), share_path.c_str());
             m_isNull = true;
             return;
         }
