@@ -325,37 +325,6 @@ public:
         std::shared_ptr<MStream> istream = std::make_shared<TCPMStream>(url);
         return istream;
     }
-
-    bool isDirectory() override {
-        return false;
-    }
-
-    time_t getLastWrite() override {
-        return 0;
-    }
-    time_t getCreationTime() override {
-        return 0;
-    }
-    bool rewindDirectory() override  {
-        return false;
-    }
-    MFile* getNextFileInDir() override {
-        return nullptr;
-    }
-    bool mkDir() override {
-        return false;
-    }
-    bool exists() override {
-        return true;
-    }
-
-    bool remove() override {
-        return false;
-    }
-    bool isText() override {
-        return false;
-    }
-    bool rename(std::string dest) { return false; };
 };
 
 

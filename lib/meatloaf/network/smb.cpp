@@ -26,7 +26,8 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-
+int SMBMFile::is_finished = 0;
+std::vector<std::string> SMBMFile::shares;
 
 /********************************************************
  * Helper Functions
@@ -51,6 +52,47 @@ bool parseSMBPath(const std::string& path, std::string& share, std::string& shar
 /********************************************************
  * MFile implementations
  ********************************************************/
+
+void SMBMFile::share_enumerate_cb(struct smb2_context *smb2, int status, void *command_data, void *private_data)
+{
+    struct srvsvc_netshareenumall_rep *rep = reinterpret_cast<struct srvsvc_netshareenumall_rep*>(command_data);
+    int i;
+
+    if (status) {
+        printf("failed to enumerate shares (%s) %s\n", strerror(-status), smb2_get_error(smb2));
+        return;
+    }
+
+    printf("Number of shares:%lu\n", rep->ctr->ctr1.count);
+    for (i = 0; i < rep->ctr->ctr1.count; i++) {
+        printf("%-20s %-20s", rep->ctr->ctr1.array[i].name,
+            rep->ctr->ctr1.array[i].comment);
+        shares.push_back(rep->ctr->ctr1.array[i].name);
+        if ((rep->ctr->ctr1.array[i].type & 3) == SHARE_TYPE_DISKTREE) {
+            printf(" DISKTREE");
+        }
+        if ((rep->ctr->ctr1.array[i].type & 3) == SHARE_TYPE_PRINTQ) {
+            printf(" PRINTQ");
+        }
+        if ((rep->ctr->ctr1.array[i].type & 3) == SHARE_TYPE_DEVICE) {
+            printf(" DEVICE");
+        }
+        if ((rep->ctr->ctr1.array[i].type & 3) == SHARE_TYPE_IPC) {
+            printf(" IPC");
+        }
+        if (rep->ctr->ctr1.array[i].type & SHARE_TYPE_TEMPORARY) {
+            printf(" TEMPORARY");
+        }
+        if (rep->ctr->ctr1.array[i].type & SHARE_TYPE_HIDDEN) {
+            printf(" HIDDEN");
+        }
+        printf("\n");
+    }
+
+    smb2_free_data(smb2, rep);
+
+    is_finished = 1;
+}
 
 bool SMBMFile::pathValid(std::string path)
 {
@@ -207,6 +249,7 @@ void SMBMFile::openDir(std::string apath)
     std::string dirPath = apath.empty() ? share_path : apath;
     _handle_dir = smb2_opendir(_smb, dirPath.c_str());
     dirOpened = (_handle_dir != nullptr);
+    entry_index = 0;
 
     Debug_printv("openDir path[%s] opened[%d]", dirPath.c_str(), dirOpened);
 }
@@ -214,59 +257,80 @@ void SMBMFile::openDir(std::string apath)
 
 void SMBMFile::closeDir()
 {
-    if(dirOpened && _handle_dir) {
+    if(_smb && _handle_dir) {
         smb2_closedir(_smb, _handle_dir);
-        _handle_dir = nullptr;
-        dirOpened = false;
     }
+    _handle_dir = nullptr;
+    dirOpened = false;
 }
 
 
 bool SMBMFile::rewindDirectory()
 {
-    if (!_smb || !dirOpened) {
+    if (!_smb) {
         return false;
     }
 
-    // Close and reopen directory to reset position
-    closeDir();
-    openDir(share_path);
+    if (!share.empty()) {
+        // Close and reopen directory to reset position
+        openDir(std::string(basepath + share_path).c_str());
+    } else {
+        dirOpened = true;
+        entry_index = 0;
+    }
 
+    Debug_printv("dirOpened[%d] entry_index[%d] share_path[%s]", dirOpened, entry_index, share_path.c_str());
     return dirOpened;
 }
 
 
 MFile* SMBMFile::getNextFileInDir()
 {
-    if(!dirOpened || !_handle_dir || !_smb) {
-        openDir(std::string(basepath + share_path).c_str());
-        if (!dirOpened) {
-            return nullptr;
-        }
+    Debug_printv("dirOpened[%d] entry_index[%d] share[%s] share_path[%s]", dirOpened, entry_index, share.c_str(), share_path.c_str());
+    if (!dirOpened) {
+        rewindDirectory();
     }
 
-    struct smb2dirent *ent;
-    do {
-        ent = smb2_readdir(_smb, _handle_dir);
-        if (ent == nullptr) {
-            closeDir();
-            return nullptr;
+    std::string ent_name = "";
+    uint32_t ent_type = 0;
+    uint64_t ent_size = 0;
+    if (!share.empty()) {
+        struct smb2dirent *ent;
+        do {
+            ent = smb2_readdir(_smb, _handle_dir);
+            if (ent == nullptr) {
+                ent_name.clear();
+                break;
+            }
+            ent_name = ent->name;
+            ent_type = ent->st.smb2_type;
+            ent_size = ent->st.smb2_size;
+            // Skip hidden files and current/parent directory entries
+        } while (ent->name[0] == '.' && (ent->name[1] == '\0' || (ent->name[1] == '.' && ent->name[2] == '\0')));
+        Debug_printv("FILES ent_name[%s] ent_type[%d] ent_size[%llu]", ent_name.c_str(), ent_type, ent_size);
+    } else {
+        if (entry_index < shares.size()) {
+            ent_name = shares[entry_index];
+            ent_type = SMB2_TYPE_DIRECTORY;
+        } else {
+            ent_name.clear();
         }
-        // Skip hidden files and current/parent directory entries
-    } while (ent->name[0] == '.' && (ent->name[1] == '\0' || (ent->name[1] == '.' && ent->name[2] == '\0')));
+        entry_index++;
+        Debug_printv("SHARES ent_name[%s] ent_type[%d] ent_size[%llu]", ent_name.c_str(), ent_type, ent_size);
+    }
 
-    if (ent != nullptr) {
+    if (!ent_name.empty()) {
 
-        Debug_printv("url[%s] entry[%s]", mRawUrl.c_str(), ent->name);
+        Debug_printv("url[%s] entry[%s] index[%d]", mRawUrl.c_str(), ent_name.c_str(), entry_index);
 
-        auto file = new SMBMFile(url + "/" + ent->name);
+        auto file = new SMBMFile(url + "/" + ent_name);
         file->extension = " " + file->extension;
 
         // Set size and type information
-        if (ent->st.smb2_type == SMB2_TYPE_DIRECTORY) {
+        if (ent_type == SMB2_TYPE_DIRECTORY) {
             file->size = 0;
         } else {
-            file->size = ent->st.smb2_size;
+            file->size = ent_size;
         }
 
         return file;
@@ -364,12 +428,10 @@ uint32_t SMBMStream::write(const uint8_t *buf, uint32_t size) {
 };
 
 
-/********************************************************
- * MIStreams implementations
- ********************************************************/
-
-
 bool SMBMStream::open(std::ios_base::openmode mode) {
+
+    Debug_printv("mode[%d]", mode);
+
     if(isOpen())
         return true;
 
@@ -389,24 +451,31 @@ bool SMBMStream::open(std::ios_base::openmode mode) {
         smb_mode = O_RDONLY;
     }
 
-    handle->obtain(url, smb_mode);
+    std::string share, share_path;
+    parseSMBPath(url, share, share_path);
+    if (!share_path.empty()) {
+        handle->obtain(url, smb_mode);
 
-    if(isOpen()) {
-        // Get file size using SMB2 stat
-        struct smb2_stat_64 st;
-        if (smb2_fstat(handle->_smb, handle->_handle, &st) == 0) {
-            _size = st.smb2_size;
+        if(isOpen()) {
+            // Get file size using SMB2 stat
+            struct smb2_stat_64 st;
+            if (smb2_fstat(handle->_smb, handle->_handle, &st) == 0) {
+                _size = st.smb2_size;
+            }
+            return true;
         }
-        return true;
+        return false;
     }
-    return false;
+
+    Debug_printv("smb_mode[%d]", smb_mode);
+    return true;
 };
 
 void SMBMStream::close() {
-    if(isOpen()) {
-        handle->dispose();
-        _position = 0;
-    }
+    // if(isOpen()) {
+    //     handle->dispose();
+    //     _position = 0;
+    // }
 };
 
 uint32_t SMBMStream::read(uint8_t* buf, uint32_t size) {
@@ -493,14 +562,7 @@ void SMBHandle::dispose() {
 }
 
 void SMBHandle::obtain(std::string m_path, int smb_mode) {
-    dispose(); // Clean up any existing connection
-
-    // Create SMB2 context
-    _smb = smb2_init_context();
-    if (!_smb) {
-        Debug_printv("Failed to init SMB2 context");
-        return;
-    }
+    //dispose(); // Clean up any existing connection
 
     // Parse the path to extract server, share, and file path
     // Expected format: smb://server/share/path/to/file

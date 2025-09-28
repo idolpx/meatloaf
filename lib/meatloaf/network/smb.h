@@ -25,7 +25,10 @@
 
 #include "meatloaf.h"
 
-#include <smb2/libsmb2.h>
+#include <smb2.h>
+#include <libsmb2.h>
+#include <libsmb2-raw.h>
+#include <sys/poll.h>
 
 #include "fnFS.h"
 
@@ -73,10 +76,40 @@ public:
         if (password.size())
             smb2_set_password(_smb, password.c_str());
 
-        if (smb2_connect_share(_smb, host.c_str(), share.c_str(), user.c_str()) < 0) {
+        if (smb2_connect_share(_smb, host.c_str(), (share.empty() ? "IPC$" : share.c_str()), user.c_str()) < 0) {
             Debug_printv("error[%s] host[%s] share[%s] path[%s]", smb2_get_error(_smb), host.c_str(), share.c_str(), share_path.c_str());
-            m_isNull = true;
-            return;
+            if (!share_path.empty()) {
+                m_isNull = true;
+                return;
+            }
+        }
+        if (share.empty())
+        {
+            Debug_printv("ENUMERATE path[%s] share[%s] share_path[%s]", this->path.c_str(), share.c_str(), share_path.c_str());
+            // Enumerate shares
+            struct pollfd pfd;
+            if (smb2_share_enum_async(_smb, share_enumerate_cb, NULL) != 0) {
+                printf("smb2_share_enum failed. %s\n", smb2_get_error(_smb));
+                exit(10);
+            }
+
+            while (!is_finished) {
+                pfd.fd = smb2_get_fd(_smb);
+                pfd.events = smb2_which_events(_smb);
+
+                if (poll(&pfd, 1, 1000) < 0) {
+                    printf("Poll failed");
+                    exit(10);
+                }
+                if (pfd.revents == 0) {
+                        continue;
+                }
+                if (smb2_service(_smb, pfd.revents) < 0) {
+                    printf("smb2_service failed with : %s\n",
+                                    smb2_get_error(_smb));
+                    break;
+                }
+            }
         }
 
         // Find full filename for wildcard
@@ -119,8 +152,8 @@ public:
 protected:
     bool dirOpened = false;
 
-    struct smb2_context *_smb;
-    struct smb2dir *_handle_dir;
+    struct smb2_context *_smb = nullptr;
+    struct smb2dir *_handle_dir = nullptr;
 
 private:
     virtual void openDir(std::string path);
@@ -128,6 +161,10 @@ private:
 
     bool pathValid(std::string path);
 
+    int entry_index;
+    static int is_finished;
+    static std::vector<std::string> shares;
+    static void share_enumerate_cb(struct smb2_context *smb2, int status, void *command_data, void *private_data);
 };
 
 
@@ -145,6 +182,13 @@ public:
         //Debug_printv("*** Creating SMB handle");
         _smb = nullptr;
         _handle = nullptr;
+
+        // Create SMB2 context
+        _smb = smb2_init_context();
+        if (!_smb) {
+            Debug_printv("Failed to init SMB2 context");
+            return;
+        }
     };
     ~SMBHandle();
     void obtain(std::string localPath, int smb_mode);

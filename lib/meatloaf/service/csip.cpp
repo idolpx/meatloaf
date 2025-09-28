@@ -27,9 +27,9 @@
 // fajna sciezka do sprawdzenia:
 // utilities/disk tools/cie.d64
 
-CSIPMSessionMgr CSIPMFileSystem::session;
+CSIPMSession CSIPMFileSystem::session;
 
-bool CSIPMSessionMgr::establishSession() {
+bool CSIPMSession::establish() {
     if(!buf.is_open()) {
         currentDir = "csip:/";
         buf.open();
@@ -38,7 +38,7 @@ bool CSIPMSessionMgr::establishSession() {
     return buf.is_open();
 }
 
-std::string CSIPMSessionMgr::readLn() {
+std::string CSIPMSession::readLn() {
     char buffer[80];
     std::string line;
     // telnet line ends with 10;
@@ -57,10 +57,10 @@ std::string CSIPMSessionMgr::readLn() {
     return line;
 }
 
-bool CSIPMSessionMgr::sendCommand(std::string command) {
+bool CSIPMSession::sendCommand(std::string command) {
     std::string c = mstr::toPETSCII2(command);
     // 13 (CR) sends the command
-    if(establishSession()) {
+    if(establish()) {
         Debug_printv("command[%s]", c.c_str());
         (*this) << (c+'\r');
         (*this).flush();
@@ -72,7 +72,7 @@ bool CSIPMSessionMgr::sendCommand(std::string command) {
         return false;
 }
 
-bool CSIPMSessionMgr::isOK() {
+bool CSIPMSession::isOK() {
     // auto a = readLn();
 
     auto reply = readLn();
@@ -86,7 +86,7 @@ bool CSIPMSessionMgr::isOK() {
     return equals;
 }
 
-bool CSIPMSessionMgr::traversePath(MFile* path) {
+bool CSIPMSession::traversePath(MFile* path) {
     // tricky. First we have to
     // CF / - to go back to root
 

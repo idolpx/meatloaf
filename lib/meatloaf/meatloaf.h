@@ -64,6 +64,30 @@ static const std::ios_base::iostate ndabit = _MEAT_NO_DATA_AVAIL;
 // TCP_CLENT_SOCKET = clear bit 5
 // TCP_SERVER_SOCKET = set bit 5
 
+/********************************************************
+ * Session manager
+ ********************************************************/
+
+class MSession : public std::iostream {
+    std::string m_url;
+
+protected:
+    virtual bool establish() = 0;
+    virtual bool keep_alive() = 0;
+
+public:
+    MSession(std::string url = "") {
+        m_url = url;
+    };
+    ~MSession() {};
+
+    friend class MFile;
+    friend class MStream;
+};
+
+/********************************************************
+ * Universal stream
+ ********************************************************/
 class MStream 
 {
 protected:
@@ -281,12 +305,13 @@ public:
 
     bool vdrive_compatible = false;
 
+    static MSession session;
+
     virtual bool handles(std::string path) = 0;
     virtual MFile* getFile(std::string path) = 0;
 
     virtual bool mount() { return true; }
     virtual bool umount() { return true; }
-    virtual bool keepAlive() { return true; }
 
     bool isMounted() {
         return _is_mounted;

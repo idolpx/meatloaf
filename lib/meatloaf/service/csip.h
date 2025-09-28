@@ -164,14 +164,14 @@ public:
         }  
     };
 
-    friend class CSIPMSessionMgr;
+    friend class CSIPMSession;
 };
 
 /********************************************************
  * Session manager
  ********************************************************/
 
-class CSIPMSessionMgr : public std::iostream {
+class CSIPMSession : public std::iostream {
     std::string m_user;
     std::string m_pass;
     csstreambuf buf;
@@ -179,7 +179,8 @@ class CSIPMSessionMgr : public std::iostream {
 protected:
     std::string currentDir;
 
-    bool establishSession();
+    bool establish();
+    bool keep_alive();
 
     bool sendCommand(std::string);
     
@@ -190,10 +191,10 @@ protected:
     std::string readLn();
 
 public:
-    CSIPMSessionMgr(std::string user = "", std::string pass = "") : std::iostream(&buf), m_user(user), m_pass(pass)
+    CSIPMSession(std::string user = "", std::string pass = "") : std::iostream(&buf), m_user(user), m_pass(pass)
     {};
 
-    ~CSIPMSessionMgr() {
+    ~CSIPMSession() {
         sendCommand("quit");
     };
 
@@ -252,9 +253,6 @@ public:
 
     bool exists() override;
     bool remove() override;
-    bool rename(std::string dest) { return false; };
-    time_t getLastWrite() override { return 0; };
-    time_t getCreationTime() override { return 0; };
 
     bool isDir = true;
     bool dirIsOpen = false;
@@ -309,7 +307,7 @@ class CSIPMFileSystem: public MFileSystem
 public:
     CSIPMFileSystem(): MFileSystem("csip") {};
 
-    static CSIPMSessionMgr session;
+    static CSIPMSession session;
 
     bool handles(std::string name) 
     {
