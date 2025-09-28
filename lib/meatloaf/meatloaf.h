@@ -284,8 +284,9 @@ public:
     virtual bool handles(std::string path) = 0;
     virtual MFile* getFile(std::string path) = 0;
 
-    virtual bool mount() { return true; };
-    virtual bool umount() { return true; };
+    virtual bool mount() { return true; }
+    virtual bool umount() { return true; }
+    virtual bool keepAlive() { return true; }
 
     bool isMounted() {
         return _is_mounted;
@@ -295,22 +296,6 @@ public:
     static std::string byContent(const char* header) 
     {
         std::string extension;
-
-        // // Open File for reading
-        // std::ifstream file(fileName, std::ios::binary | std::ios::ate);
-
-        // // Get first 16 bytes
-        // file.seekg(0, std::ios::beg);
-        // std::string header(16, ' ');
-        // file.read(&header[0], 16);
-
-        // // Get file size
-        // file.seekg(0, std::ios::end);
-        // uint32_t fileSize = file.tellg();
-        // file.seekg(0, std::ios::beg);
-
-        // // Close file
-        // file.close();
 
         // Determine file type by file header
         // https://en.wikipedia.org/wiki/List_of_file_signatures
@@ -478,7 +463,7 @@ protected:
 class MFSOwner {
 public:
     static std::vector<MFileSystem*> availableFS;
-    static std::vector<MFileSystem*> availableELLPSW;
+    static std::vector<MFileSystem*> availableOther;
 
     static MFile* File(std::string name, bool default_fs = false);
     static MFile* File(std::shared_ptr<MFile> file);

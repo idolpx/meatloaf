@@ -41,7 +41,7 @@ bool parseSMBPath(const std::string& path, std::string& share, std::string& shar
         share_path = "";
     } else {
         share = path.substr(1, pos - 1);
-        share_path = "/" + path.substr(pos + 1);
+        share_path = path.substr(pos + 1);
     }
 
     return true;
@@ -128,6 +128,20 @@ time_t SMBMFile::getCreationTime()
     }
 
     return st.smb2_ctime;
+}
+
+uint64_t SMBMFile::getAvailableSpace()
+{
+    if (!_smb) {
+        Debug_printv("_smb not available");
+        return 0;
+    }
+
+    // Get bytes free
+    struct smb2_statvfs status;
+    smb2_statvfs(_smb, share_path.c_str(), &status);
+    Debug_printv("size[%llu] blocks[%llu] free[%llu] avail[%llu]", status.f_bsize, status.f_blocks, status.f_bfree, status.f_bavail);
+    return (status.f_bfree * status.f_bsize);
 }
 
 bool SMBMFile::mkDir()
@@ -375,7 +389,7 @@ bool SMBMStream::open(std::ios_base::openmode mode) {
         smb_mode = O_RDONLY;
     }
 
-    handle->obtain(localPath, smb_mode);
+    handle->obtain(url, smb_mode);
 
     if(isOpen()) {
         // Get file size using SMB2 stat

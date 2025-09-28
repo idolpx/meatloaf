@@ -30,7 +30,7 @@
 
 /* Buttons */
 #define PIN_BUTTON_A            GPIO_NUM_0
-#define PIN_BUTTON_B            GPIO_NUM_33
+#define PIN_BUTTON_B            GPIO_NUM_NC
 #define PIN_BUTTON_C            GPIO_NUM_NC
 
 /* LEDs */

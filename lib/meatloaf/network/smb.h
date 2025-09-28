@@ -52,6 +52,8 @@ public:
     std::string share_path = "";
     
     SMBMFile(std::string path): MFile(path) {
+        m_rootfs = true;
+
         // Initialize SMB context
         _smb = smb2_init_context();
         if (!_smb) {
@@ -86,7 +88,6 @@ public:
         else
             m_isNull = false;
 
-        m_rootfs = true;
         Debug_printv("SMB path[%s] valid[%d]", this->path.c_str(), !m_isNull);
     };
     ~SMBMFile() {
@@ -102,16 +103,16 @@ public:
     std::shared_ptr<MStream> createStream(std::ios_base::openmode mode) override;
 
     bool isDirectory() override;
-    time_t getLastWrite() override ;
-    time_t getCreationTime() override ;
-    bool rewindDirectory() override ;
-    MFile* getNextFileInDir() override ;
-    bool mkDir() override ;
-    bool exists() override ;
+    time_t getLastWrite() override;
+    time_t getCreationTime() override;
+    uint64_t getAvailableSpace() override;
+    bool rewindDirectory() override;
+    MFile* getNextFileInDir() override;
+    bool mkDir() override;
+    bool exists() override;
 
-    bool remove() override ;
+    bool remove() override;
     bool rename(std::string dest);
-
 
     bool readEntry( std::string filename );
 
@@ -122,13 +123,8 @@ protected:
     struct smb2dir *_handle_dir;
 
 private:
-    FileSystem *_fs = nullptr;
-
     virtual void openDir(std::string path);
     virtual void closeDir();
-
-    bool _valid;
-    std::string _pattern;
 
     bool pathValid(std::string path);
 
@@ -166,7 +162,6 @@ private:
 class SMBMStream: public MStream {
 public:
     SMBMStream(std::string& path) {
-        localPath = path;
         handle = std::make_unique<SMBHandle>();
         url = path;
     }
@@ -195,8 +190,6 @@ public:
 
 
 protected:
-    std::string localPath;
-
     std::unique_ptr<SMBHandle> handle;
 };
 

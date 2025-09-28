@@ -219,7 +219,7 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
 
 };
 
-std::vector<MFileSystem*> MFSOwner::availableELLPSW {
+std::vector<MFileSystem*> MFSOwner::availableOther {
     // Service
 #ifndef MIN_CONFIG
     &csipFS,
@@ -289,7 +289,7 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
         else
         {
             // Check for Encoder/Link/Loader/Scanner/Wrapper
-            for(auto i = availableELLPSW.begin(); i < availableELLPSW.end() ; i ++) {
+            for(auto i = availableOther.begin(); i < availableOther.end() ; i ++) {
                 auto ellpsw = (*i);
 
                 Debug_printv("Checking symbol[%s]", ellpsw->symbol);
