@@ -160,7 +160,9 @@ bool FlashMFile::rename(std::string pathTo) {
     if(pathTo.empty())
         return false;
 
-    int rc = ::rename( std::string(basepath + path).c_str(), std::string(basepath + pathTo).c_str() );
+    pathTo = basepath + pathToFile() + pathTo;
+    Debug_printv("from[%s] to[%s]", std::string(basepath + path).c_str(), pathTo.c_str());
+    int rc = ::rename( std::string(basepath + path).c_str(), pathTo.c_str() );
     if (rc != 0) {
         return false;
     }

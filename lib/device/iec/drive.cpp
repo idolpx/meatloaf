@@ -283,6 +283,8 @@ iecChannelHandlerDir::iecChannelHandlerDir(iecDrive *drive, MFile *dir) : iecCha
   m_dir = dir;
   m_headerLine = 1;
   
+  std::string scheme = m_dir->scheme;
+  scheme = mstr::toPETSCII2(scheme);
   std::string url = m_dir->host;
   url = mstr::toPETSCII2(url);
   std::string path = m_dir->path;
@@ -293,7 +295,7 @@ iecChannelHandlerDir::iecChannelHandlerDir(iecDrive *drive, MFile *dir) : iecCha
   image = mstr::toPETSCII2(image);
   
   m_headers.clear();
-  if( url.size()>0 )     addExtraInfo("URL", url);
+  if( url.size()>0 )     addExtraInfo(scheme, url);
   if( path.size()>1 )    addExtraInfo("PATH", path);
   if( archive.size()>1 ) addExtraInfo("ARCHIVE", archive);
   if( image.size()>0 )   addExtraInfo("IMAGE", image);
@@ -347,6 +349,8 @@ uint8_t iecChannelHandlerDir::writeBufferData()
 
 uint8_t iecChannelHandlerDir::readBufferData()
 {
+  fnLedManager.toggle(eLed::LED_BUS);
+
   if( m_headerLine==1 )
     {
       // main header line
@@ -654,7 +658,8 @@ bool iecDrive::open(uint8_t channel, const char *cname)
 
             // get file
             MFile *f = m_cwd->cd( mstr::toUTF8( name ) );
-            Debug_printv("isdir[%d] url[%s]", f->isDirectory(), f->url.c_str());
+            bool is_dir = f->isDirectory();
+            Debug_printv("isdir[%d] url[%s]", is_dir, f->url.c_str());
 
             if( f == nullptr ) // || f->url.empty() )
                 {
@@ -663,7 +668,7 @@ bool iecDrive::open(uint8_t channel, const char *cname)
                 if( f!=nullptr ) delete f;
                 f = nullptr;
                 }
-            else if( f->isDirectory() )
+            else if( is_dir )
                 {
                 if( mode == std::ios_base::in )
                     {
@@ -736,7 +741,7 @@ bool iecDrive::open(uint8_t channel, const char *cname)
                     }
                 else
                     {
-                      if( Meatloaf.use_vdrive && !f->isDirectory() && (m_vdrive=VDrive::create(m_devnr-8, f->url.c_str()))!=nullptr )
+                      if( Meatloaf.use_vdrive && !is_dir && (m_vdrive=VDrive::create(m_devnr-8, f->url.c_str()))!=nullptr )
                         {
                           Debug_printv("Created VDrive for URL %s. Loading directory.", f->url.c_str());
                           delete f;
@@ -750,7 +755,7 @@ bool iecDrive::open(uint8_t channel, const char *cname)
                         Debug_printv("Error: could not get stream for file [%s]", f->url.c_str());
                         setStatusCode(ST_DRIVE_NOT_READY);
                         }
-                    else if( (mode == std::ios_base::in) && new_stream->size()==0 && !f->isDirectory() )
+                    else if( (mode == std::ios_base::in) && new_stream->size()==0 && !is_dir )
                         {
                         Debug_printv("Error: file length is zero [%s]", f->url.c_str());
                         //delete new_stream;
@@ -766,7 +771,7 @@ bool iecDrive::open(uint8_t channel, const char *cname)
                         {
                         Debug_printv("Stream created for file [%s]", f->url.c_str());
                         // new_stream will be deleted in iecChannelHandlerFile destructor
-                        m_channels[channel] = new iecChannelHandlerFile(this, new_stream, f->isDirectory() ? 0x0801 : -1);
+                        m_channels[channel] = new iecChannelHandlerFile(this, new_stream, is_dir ? 0x0801 : -1);
                         m_numOpenChannels++;
                         setStatusCode(ST_OK);
                 
@@ -1183,6 +1188,41 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
             {
                 Debug_printv( "rename file");
                 // Rename();
+                command = command.substr(colon_position + 1);
+                command = mstr::toUTF8(command);
+                auto parts = mstr::split(command, '=');
+
+                if( parts.size() != 2 )
+                  {
+                    setStatusCode(ST_SYNTAX_INVALID);
+                    return;
+                  }
+
+                uint8_t n = 0;
+                MFile *dir = MFSOwner::File(m_cwd->url);
+                if( dir!=nullptr )
+                  {
+                    if( dir->isDirectory() )
+                      {
+                        std::unique_ptr<MFile> entry;
+                        while( (entry=std::unique_ptr<MFile>(m_cwd->getNextFileInDir()))!=nullptr )
+                          {
+                            if( isMatch(entry->name, parts[1]) )
+                              {
+                                entry->rename(parts[0]);
+                                Debug_printv("Renamed '%s' to '%s'", parts[1].c_str(), parts[0].c_str());
+                                n++;
+                                break;
+                              }
+                          }
+                      }
+                    delete dir;
+                  }
+
+                if ( n == 0 )
+                  setStatusCode(ST_FILE_NOT_FOUND);
+
+                return;
             }
         break;
         case 'S': // Scratch
