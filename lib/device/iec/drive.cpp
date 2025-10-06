@@ -913,6 +913,8 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
 
     // set status code to OK, failing commands below will set it to the appropriate error code
     setStatusCode(ST_OK);
+    if ( cmdLen == 0 )
+      return;
 
     // Activate/Deactivate VDrive mode
     if( command=="VD+" || command=="VD-" )

@@ -106,16 +106,8 @@ public:
         return std::make_shared<P00MStream>(is);
     }
 
-    bool isDirectory() override { return false; };;
     bool rewindDirectory() override { return false; };;
     MFile* getNextFileInDir() override { return nullptr; };;
-    bool mkDir() override { return false; };
-
-    bool exists() override { return true; };
-    bool remove() override { return false; };
-    bool rename(std::string dest) override { return false; };
-    time_t getLastWrite() override { return 0; };
-    time_t getCreationTime() override { return 0; };
 
     bool isDir = false;
     bool dirIsOpen = false;

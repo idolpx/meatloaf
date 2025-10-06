@@ -571,14 +571,6 @@ bool D64MStream::seekPath(std::string path)
     return true;
  }
 
-bool D64MFile::isDirectory()
-{
-    //Debug_printv("pathInStream[%s]", pathInStream.c_str());
-    if (pathInStream.empty())
-        return true;
-    else
-        return false;
-};
 
 bool D64MFile::rewindDirectory()
 {
@@ -634,7 +626,7 @@ MFile* D64MFile::getNextFileInDir()
         file->extension = image->decodeType(image->entry.file_type);
         file->size = image->entry.blocks * image->block_size;
 
-        //Debug_printv("entry[%s] ext[%s] size[%lu]", filename.c_str(), file->extension.c_str(), file->size);
+        Debug_printv("entry[%s] ext[%s] size[%lu]", filename.c_str(), file->extension.c_str(), file->size);
 
         return file;
     }
@@ -669,7 +661,11 @@ time_t D64MFile::getCreationTime()
 
 bool D64MFile::exists()
 {
-    Debug_printv("exists[%d] url[%s] pathInStream[%s]", sourceFile->exists(), sourceFile->url.c_str(), sourceFile->pathInStream.c_str());
-    return sourceFile->exists();
+    Debug_printv("url[%s]", sourceFile->url.c_str());
+    auto stream = ImageBroker::obtain<D64MStream>(sourceFile->url);
+    if ( stream != nullptr )
+        return true;
+
+    return false;
 }
 

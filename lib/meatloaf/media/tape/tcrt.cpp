@@ -197,14 +197,6 @@ bool TCRTMStream::seekPath(std::string path) {
  * File implementations
  ********************************************************/
 
-bool TCRTMFile::isDirectory() {
-    //Debug_printv("pathInStream[%s]", pathInStream.c_str());
-    if ( pathInStream == "" )
-        return true;
-    else
-        return false;
-};
-
 bool TCRTMFile::rewindDirectory() {
     dirIsOpen = true;
     Debug_printv("sourceFile->url[%s]", sourceFile->url.c_str());

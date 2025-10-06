@@ -44,7 +44,7 @@ class Archive {
         m_srcStream = srcStream;
         m_srcBuffer = nullptr;
         m_archive = nullptr;
-        Debug_printv("Archive constructor");
+        Debug_printv("Archive constructor url[%s]", srcStream->url.c_str());
     }
 
     ~Archive() {
@@ -87,7 +87,7 @@ class ArchiveMStream : public MMediaStream {
         m_haveData = 0;
         m_mode = std::ios::in;
         m_dirty = false;
-        Debug_printv("ArchiveMStream constructor");
+        Debug_printv("ArchiveMStream constructor url[%s]", containerStream->url.c_str());
     }
 
     ~ArchiveMStream() {
@@ -170,16 +170,8 @@ class ArchiveMFile : public MFile {
         return std::make_shared<ArchiveMStream>(is);
     }
 
-    bool isDirectory() override;
     bool rewindDirectory() override;
     MFile *getNextFileInDir() override;
-    bool mkDir() override { return false; };
-
-    bool exists() override { return true; };
-    bool remove() override { return false; };
-    bool rename(std::string dest) override { return false; };
-    time_t getLastWrite() override { return 0; };
-    time_t getCreationTime() override { return 0; };
 
     bool isDir = true;
     bool dirIsOpen = false;

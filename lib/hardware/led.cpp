@@ -36,13 +36,13 @@ void LedManager::setup()
     fnSystem.digital_write(PIN_LED_WIFI, DIGI_HIGH);
 #else
     fnSystem.set_pin_mode(PIN_LED_BUS, gpio_mode_t::GPIO_MODE_OUTPUT);
-    fnSystem.digital_write(PIN_LED_BUS, DIGI_HIGH);
+    fnSystem.digital_write(PIN_LED_BUS, (LEDS_INVERTED ? DIGI_HIGH : DIGI_LOW));
 
     fnSystem.set_pin_mode(PIN_LED_BT, gpio_mode_t::GPIO_MODE_OUTPUT);
-    fnSystem.digital_write(PIN_LED_BT, DIGI_HIGH);
+    fnSystem.digital_write(PIN_LED_BT, (LEDS_INVERTED ? DIGI_HIGH : DIGI_LOW));
 
     fnSystem.set_pin_mode(PIN_LED_WIFI, gpio_mode_t::GPIO_MODE_OUTPUT);
-    fnSystem.digital_write(PIN_LED_WIFI, DIGI_HIGH);
+    fnSystem.digital_write(PIN_LED_WIFI, (LEDS_INVERTED ? DIGI_HIGH : DIGI_LOW));
     
     fnSystem.set_pin_mode(PIN_LED_RGB_PWR, gpio_mode_t::GPIO_MODE_OUTPUT);
     fnSystem.digital_write(PIN_LED_RGB_PWR, DIGI_HIGH);
@@ -80,7 +80,8 @@ void LedManager::set(eLed led, bool on)
         else
             fnSystem.digital_write(mLedPin[led], (on ? DIGI_LOW : DIGI_HIGH));
 #else
-        fnSystem.digital_write(mLedPin[led], (on ? DIGI_LOW : DIGI_HIGH));
+        on = (LEDS_INVERTED ? !on : on);
+        fnSystem.digital_write(mLedPin[led], (on ? DIGI_HIGH : DIGI_LOW));
 #endif
     }
 #endif // ESP_PLATFORM

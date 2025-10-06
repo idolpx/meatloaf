@@ -255,7 +255,19 @@ public:
     MFile* cdRoot(std::string);
     MFile* cdLocalRoot(std::string);
 
-    virtual bool isDirectory() { return false; };
+    virtual bool isDirectory() {
+        if (sourceFile == nullptr)
+        {
+            Debug_printv("null sourceFile for path[%s]", path.c_str());
+            return true;
+        }
+
+        Debug_printv("pathInStream[%s] sourcePathInStream[%s]", pathInStream.c_str(), sourceFile->pathInStream.c_str());
+        if (pathInStream.empty())
+            return true;
+        else
+            return false;
+    };
     virtual bool rewindDirectory() { return false; };
     virtual MFile* getNextFileInDir() { return nullptr; };
 
@@ -498,7 +510,7 @@ public:
     static MFileSystem* scanPathLeft(std::vector<std::string> paths, std::vector<std::string>::iterator &pathIterator);
 
     static std::string existsLocal( std::string path );
-    static MFileSystem* findParentFS(std::vector<std::string>::iterator &begin, std::vector<std::string>::iterator &end, std::vector<std::string>::iterator &pathIterator);
+    static MFileSystem* findParentFS(std::vector<std::string>::iterator &begin, std::vector<std::string>::iterator &pathIterator);
 
 
     static bool mount(std::string name);

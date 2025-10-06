@@ -159,14 +159,6 @@ bool T64MStream::seekPath(std::string path) {
  * File implementations
  ********************************************************/
 
-bool T64MFile::isDirectory() {
-    //Debug_printv("pathInStream[%s]", pathInStream.c_str());
-    if ( pathInStream == "" )
-        return true;
-    else
-        return false;
-};
-
 bool T64MFile::rewindDirectory() {
     dirIsOpen = true;
     Debug_printv("sourceFile->url[%s]", sourceFile->url.c_str());

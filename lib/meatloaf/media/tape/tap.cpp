@@ -134,14 +134,6 @@ std::shared_ptr<MStream> TAPMFile::getDecodedStream(std::shared_ptr<MStream> is)
 }
 
 
-bool TAPMFile::isDirectory() {
-    //Debug_printv("pathInStream[%s]", pathInStream.c_str());
-    if ( pathInStream == "" )
-        return true;
-    else
-        return false;
-};
-
 bool TAPMFile::rewindDirectory() {
     dirIsOpen = true;
     Debug_printv("sourceFile->url[%s]", sourceFile->url.c_str());

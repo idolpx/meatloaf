@@ -378,9 +378,9 @@ bool ArchiveMStream::seekEntry(std::string filename)
             //uint8_t i = entryFilename.find_first_of(0xA0);
             //entryFilename = entryFilename.substr(0, i);
             //mstr::rtrimA0(entryFilename);
-            entryFilename = mstr::toUTF8(entryFilename);
+            //entryFilename = mstr::toUTF8(entryFilename);
 
-            //Debug_printv("filename[%s] entry.filename[%s]", filename.c_str(), entryFilename.c_str());
+            Debug_printv("filename[%s] entry.filename[%s]", filename.c_str(), entryFilename.c_str());
 
             if ( mstr::compareFilename(filename, entryFilename, wildcard) )
             {
@@ -462,15 +462,6 @@ bool ArchiveMStream::seekPath(std::string path) {
 /********************************************************
  * Files implementations
  ********************************************************/
-
-// archive file is always a directory
-bool ArchiveMFile::isDirectory() {
-    // Debug_printv("pathInStream[%s]", pathInStream.c_str());
-    if (pathInStream == "")
-        return true;
-    else
-        return false;
-}
 
 bool ArchiveMFile::rewindDirectory()
 {

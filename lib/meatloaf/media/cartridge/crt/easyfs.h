@@ -101,17 +101,8 @@ public:
         return std::make_shared<EFCRTMStream>(is);
     }
 
-    bool isDirectory() override;
     bool rewindDirectory() override;
     MFile* getNextFileInDir() override;
-    bool mkDir() override { return false; };
-
-    bool exists() override { return true; };
-    bool remove() override { return false; };
-    bool rename(std::string dest) override { return false; };
-    time_t getLastWrite() override { return 0; };
-    time_t getCreationTime() override { return 0; };
-    uint32_t size() override;
 
     bool isDir = true;
     bool dirIsOpen = false;

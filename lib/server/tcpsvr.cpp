@@ -194,7 +194,7 @@ void TCPServer::start()
 
 void TCPServer::stop()
 {
-    Debug_printv("Stopping tcp server task");
+    Debug_printf("Stopping tcp server...");
 
     if (_client_socket > 0)
         close(_client_socket);
@@ -203,7 +203,7 @@ void TCPServer::stop()
     if (_htask != NULL)
         vTaskDelete(_htask);
 
-    Debug_printv("TCP Server task ended (stop)");
+    Debug_printf("done!\r\n");
     _htask = NULL;
     _shutdown = true;
 }

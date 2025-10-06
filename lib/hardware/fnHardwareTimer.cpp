@@ -77,7 +77,7 @@ void HardwareTimer::config()
   //     uint32_t divider;               /*!< Counter clock divider */
   // } timer_config_t;
 
-#if defined(CONFIG_IDF_TARGET_ESP32S3)
+#if defined(CONFIG_IDF_TARGET_ESP32S3) || defined(CONFIG_IDF_TARGET_ESP32C3)
 
 fn_config.direction = GPTIMER_COUNT_UP,
 fn_config.clk_src = GPTIMER_CLK_SRC_APB;

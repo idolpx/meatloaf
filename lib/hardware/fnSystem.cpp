@@ -14,6 +14,7 @@
 # include <driver/dac.h>
 #endif
 #include <esp_idf_version.h>
+#include <esp_app_desc.h>
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
 #include <esp_chip_info.h>
 #include <hal/gpio_ll.h>
@@ -604,6 +605,8 @@ const char *SystemManager::get_target_platform_str()
 const char *SystemManager::get_fujinet_version(bool shortVersionOnly)
 {
 #ifdef ESP_PLATFORM
+    const esp_app_desc_t *app_info = esp_app_get_description();
+    Debug_printv("version[%s] date[%s]", app_info->version, app_info->date);
     if (shortVersionOnly)
         return FN_VERSION_FULL;
     else

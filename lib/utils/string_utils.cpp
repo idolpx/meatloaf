@@ -417,6 +417,11 @@ namespace mstr {
     {
         const size_t size = search.size();
         bool size_match = ( size == replace.size() );
+
+        //Debug_printv("replaceAll search[%s] replace[%s] size[%d] size_match[%d]", search.c_str(), replace.c_str(), size, size_match);
+        if ( size == 0 )
+            return;
+
         for( size_t pos = 0; ; pos += replace.size() ) {
             // Locate the substring to replace
             pos = s.find( search, pos );
@@ -477,7 +482,6 @@ namespace mstr {
 
             //Debug_printv("a %d res [%s]", i, res.c_str());
         }
-        //Debug_printv("res[%s] length[%d] size[%d]", res.c_str(), res.length(), res.size());
 
         //Debug_printv("res[%s] length[%d] size[%d]", res.c_str(), res.length(), res.size());
         if ( res.length() > 1)

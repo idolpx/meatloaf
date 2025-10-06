@@ -6,7 +6,7 @@
 
 #if defined(CONFIG_IDF_TARGET_ESP32)
 #include "driver/timer.h"
-#elif defined(CONFIG_IDF_TARGET_ESP32S3)
+#elif defined(CONFIG_IDF_TARGET_ESP32S3) || defined(CONFIG_IDF_TARGET_ESP32C3)
 #include "driver/gptimer.h"
 #else
 #error "neither esp32 or s3"
@@ -20,7 +20,7 @@
 
 #if defined(CONFIG_IDF_TARGET_ESP32)
 #define TIMER_DIVIDER         (2)  //  Hardware timer clock divider
-#elif defined(CONFIG_IDF_TARGET_ESP32S3)
+#elif defined(CONFIG_IDF_TARGET_ESP32S3) || defined(CONFIG_IDF_TARGET_ESP32C3)
 #define TIMER_DIVIDER         (8)  //  Hardware timer clock divider
 #endif
 
@@ -42,7 +42,7 @@ private:
   } fn_timer;
 
 
-#if defined(CONFIG_IDF_TARGET_ESP32S3)
+#if defined(CONFIG_IDF_TARGET_ESP32S3) || defined(CONFIG_IDF_TARGET_ESP32C3)
 gptimer_handle_t gptimer;
 gptimer_config_t fn_config;
 //gptimer_alarm_config_t alarm_config;
@@ -53,7 +53,7 @@ timer_config_t fn_config;
 public:
   void config();
 
-#if defined(CONFIG_IDF_TARGET_ESP32S3)
+#if defined(CONFIG_IDF_TARGET_ESP32S3) || defined(CONFIG_IDF_TARGET_ESP32C3)
 
   void reset() { gptimer_set_raw_count(gptimer, 0); };
   void latch() {};

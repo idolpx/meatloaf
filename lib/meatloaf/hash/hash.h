@@ -131,15 +131,6 @@ public:
         return istream;
     };
     std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> is) override { return is; };
-
-    bool isDirectory() override { return false; };
-    bool rewindDirectory() override { return false; };
-    MFile* getNextFileInDir() override { return nullptr; };
-
-    bool remove() override { return false; };
-    bool rename(std::string dest) { return false; };
-    time_t getLastWrite() override { return 0; };
-    time_t getCreationTime() override { return 0; };
  };
 
  

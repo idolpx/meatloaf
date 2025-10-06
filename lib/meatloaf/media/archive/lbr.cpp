@@ -163,15 +163,6 @@ bool LBRMStream::seekPath(std::string path)
  * File implementations
  ********************************************************/
 
-bool LBRMFile::isDirectory()
-{
-    // Debug_printv("pathInStream[%s]", pathInStream.c_str());
-    if (pathInStream == "")
-        return true;
-    else
-        return false;
-};
-
 bool LBRMFile::rewindDirectory()
 {
     dirIsOpen = true;

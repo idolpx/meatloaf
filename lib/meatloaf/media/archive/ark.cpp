@@ -144,15 +144,6 @@ bool ARKMStream::seekPath(std::string path)
  * File implementations
  ********************************************************/
 
-bool ARKMFile::isDirectory()
-{
-    // Debug_printv("pathInStream[%s]", pathInStream.c_str());
-    if (pathInStream == "")
-        return true;
-    else
-        return false;
-};
-
 bool ARKMFile::rewindDirectory()
 {
     dirIsOpen = true;

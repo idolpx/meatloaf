@@ -206,7 +206,7 @@ public:
             Debug_printv("newStream url[%s]", newStream->url.c_str());
     
             // Are we at the root of the pathInStream?
-            if ( newFile->pathInStream == "")
+            if ( newFile->sourceFile->pathInStream.empty() )
             {
                 Debug_printv("DIRECTORY [%s]", url.c_str());
             }
