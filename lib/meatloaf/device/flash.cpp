@@ -69,11 +69,13 @@ bool FlashMFile::isDirectory()
 std::shared_ptr<MStream> FlashMFile::getSourceStream(std::ios_base::openmode mode)
 {
     std::string full_path = basepath + path;
+    if ( pathInStream.size() )
+        full_path = full_path + "/" + pathInStream;
+
     std::shared_ptr<MStream> istream = std::make_shared<FlashMStream>(full_path, mode);
     //auto istream = StreamBroker::obtain<FlashMStream>(full_path, mode);
-    //Debug_printv("FlashMFile::getSourceStream() 3, not null=%d", istream != nullptr);
+    Debug_printv( ANSI_CYAN_BOLD_HIGH_INTENSITY "basepath[%s] path[%s] pathInStream[%s] mode[%d]", basepath.c_str(), path.c_str(), pathInStream.c_str(), mode);
     istream->open(mode);   
-    //Debug_printv("FlashMFile::getSourceStream() 4");
     return istream;
 }
 
@@ -324,29 +326,30 @@ bool FlashMStream::open(std::ios_base::openmode mode) {
     if(isOpen())
         return true;
 
-    //Debug_printv("IStream: trying to open flash fs, calling isOpen");
-
-    //Debug_printv("IStream: wasn't open, calling obtain");
+    //Debug_printv("trying to open flash fs [%s] mode[%d]", url.c_str(), mode);
     if(mode == std::ios_base::in)
-        handle->obtain(localPath, "r");
+        handle->obtain(url, "r");
     else if(mode == std::ios_base::out) {
-        Debug_printv("FlashMStream: ok, we are in write mode!");
-        handle->obtain(localPath, "w");
+        //Debug_printv("ok, we are in write mode!");
+        handle->obtain(url, "w");
     }
     else if(mode == std::ios_base::app)
-        handle->obtain(localPath, "a");
+        handle->obtain(url, "a");
     else if(mode == (std::ios_base::in | std::ios_base::out))
-        handle->obtain(localPath, "r+");
+        handle->obtain(url, "r+");
     else if(mode == (std::ios_base::in | std::ios_base::app))
-        handle->obtain(localPath, "a+");
+        handle->obtain(url, "a+");
     else if(mode == (std::ios_base::in | std::ios_base::out | std::ios_base::trunc))
-        handle->obtain(localPath, "w+");
+        handle->obtain(url, "w+");
     else if(mode == (std::ios_base::in | std::ios_base::out | std::ios_base::app))
-        handle->obtain(localPath, "a+");
+        handle->obtain(url, "a+");
+
+    if (!isOpen())
+        return false;
 
     // The below code will definitely destroy whatever open above does, because it will move the file pointer
     // so I just wrapped it to be called only for in
-    if( isOpen() && ((mode==std::ios_base::in) || (mode==(std::ios_base::in|std::ios_base::out)))  ) {
+    if( mode==std::ios_base::in || (mode==(std::ios_base::in|std::ios_base::out))) {
         //Debug_printv("IStream: past obtain");
         // Set file size
         fseek(handle->file_h, 0, SEEK_END);
@@ -356,9 +359,9 @@ bool FlashMStream::open(std::ios_base::openmode mode) {
         //Debug_printv("IStream: past ftell");
         fseek(handle->file_h, 0, SEEK_SET);
         //Debug_printv("IStream: past fseek 2");
-        return true;
     }
-    return false;
+
+    return true;
 };
 
 void FlashMStream::close() {
@@ -443,7 +446,7 @@ void FlashHandle::dispose() {
 
 void FlashHandle::obtain(std::string m_path, std::string mode) {
 
-    //printf("*** Atempting opening flash  handle'%s'\r\n", m_path.c_str());
+    //Debug_printv("*** Atempting opening flash  handle [%s]", m_path.c_str());
 
     if ((mode[0] == 'w') && strchr(m_path.c_str(), '/')) {
         // For file creation, silently make subdirs as needed.  If any fail,

@@ -83,11 +83,12 @@ class ArchiveMStream : public MMediaStream {
    public:
 
     ArchiveMStream(std::shared_ptr<MStream> is) : MMediaStream(is) {
-        m_archive = new Archive(containerStream);
+        Debug_printv("Creating Archive object url[%s]", is->url.c_str());
+        m_archive = new Archive(is);
         m_haveData = 0;
         m_mode = std::ios::in;
         m_dirty = false;
-        Debug_printv("ArchiveMStream constructor url[%s]", containerStream->url.c_str());
+        Debug_printv("constructor url[%s]", is->url.c_str());
     }
 
     ~ArchiveMStream() {
@@ -158,14 +159,16 @@ class ArchiveMFile : public MFile {
     ArchiveMFile(std::string path) : MFile(path)
     {
         media_archive = name;
+        Debug_printv("constructor url[%s]", path.c_str());
     }
 
     ~ArchiveMFile() {
         if (m_archive != nullptr) delete m_archive;
     }
 
-    std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> is) {
-        Debug_printv("[%s]", url.c_str());
+    std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> is) override
+    {
+        Debug_printv("[%s]", is->url.c_str());
 
         return std::make_shared<ArchiveMStream>(is);
     }

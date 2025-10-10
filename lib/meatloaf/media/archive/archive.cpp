@@ -380,7 +380,7 @@ bool ArchiveMStream::seekEntry(std::string filename)
             //mstr::rtrimA0(entryFilename);
             //entryFilename = mstr::toUTF8(entryFilename);
 
-            Debug_printv("filename[%s] entry.filename[%s]", filename.c_str(), entryFilename.c_str());
+            //Debug_printv("filename[%s] entry.filename[%s]", filename.c_str(), entryFilename.c_str());
 
             if ( mstr::compareFilename(filename, entryFilename, wildcard) )
             {
@@ -465,8 +465,8 @@ bool ArchiveMStream::seekPath(std::string path) {
 
 bool ArchiveMFile::rewindDirectory()
 {
-    Debug_printv("sourceFile->url[%s]", sourceFile->url.c_str());
-    auto image = ImageBroker::obtain<ArchiveMStream>(sourceFile->url);
+    Debug_printv("url[%s] sourceFile->url[%s]", url.c_str(), sourceFile->url.c_str());
+    auto image = ImageBroker::obtain<ArchiveMStream>("archive", url);
     if (image == nullptr)
         return false;
 
@@ -487,7 +487,7 @@ MFile *ArchiveMFile::getNextFileInDir()
         rewindDirectory();
 
     // Get entry pointed to by containerStream
-    auto image = ImageBroker::obtain<ArchiveMStream>(sourceFile->url);
+    auto image = ImageBroker::obtain<ArchiveMStream>("archive", url);
     if (image == nullptr)
         goto exit;
 

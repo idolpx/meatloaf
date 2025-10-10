@@ -269,8 +269,8 @@ private:
 class CSIPMStream: public MStream {
 
 public:
-    CSIPMStream(std::string path) {
-        url = path;
+    CSIPMStream(std::string path): MStream(path) {
+        //url = path;
     }
     ~CSIPMStream() {
         close();

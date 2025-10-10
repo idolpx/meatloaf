@@ -233,8 +233,8 @@ class MeatSocketServer {
 class TCPMStream: public MStream {
 
 public:
-    TCPMStream(std::string path) {
-        url = path;
+    TCPMStream(std::string path): MStream(path) {
+        //url = path;
     };
     ~TCPMStream() {
         close();

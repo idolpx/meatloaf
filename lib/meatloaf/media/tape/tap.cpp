@@ -136,8 +136,8 @@ std::shared_ptr<MStream> TAPMFile::getDecodedStream(std::shared_ptr<MStream> is)
 
 bool TAPMFile::rewindDirectory() {
     dirIsOpen = true;
-    Debug_printv("sourceFile->url[%s]", sourceFile->url.c_str());
-    auto image = ImageBroker::obtain<TAPMStream>(sourceFile->url);
+    Debug_printv("url[%s] sourceFile->url[%s]", url.c_str(), sourceFile->url.c_str());
+    auto image = ImageBroker::obtain<TAPMStream>("tap", url);
     if (image == nullptr)
         return false;
 
@@ -162,7 +162,7 @@ MFile* TAPMFile::getNextFileInDir() {
         rewindDirectory();
 
     // Get entry pointed to by containerStream
-    auto image = ImageBroker::obtain<TAPMStream>(sourceFile->url);
+    auto image = ImageBroker::obtain<TAPMStream>("tap", url);
     if ( image == nullptr )
         goto exit;
 
@@ -172,7 +172,7 @@ MFile* TAPMFile::getNextFileInDir() {
         mstr::replaceAll(filename, "/", "\\");
         //Debug_printv( "entry[%s]", (sourceFile->url + "/" + filename).c_str() );
 
-        auto file = MFSOwner::File(sourceFile->url + "/" + filename);
+        auto file = MFSOwner::File(url + "/" + filename);
         file->extension = image->decodeType(image->entry.file_type);
         
         return file;

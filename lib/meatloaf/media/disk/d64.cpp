@@ -534,8 +534,8 @@ bool D64MStream::seekPath(std::string path)
  * File implementations
  ********************************************************/
 
- bool D64MFile::format(std::string header_info)
- {
+bool D64MFile::format(std::string header_info)
+{
     Debug_printv("header_info[%s] url[%s]", header_info.c_str(), url.c_str());
 
     // Set the stream file
@@ -569,14 +569,14 @@ bool D64MStream::seekPath(std::string path)
     delete newFile;
     //delete image;
     return true;
- }
+}
 
 
 bool D64MFile::rewindDirectory()
 {
     dirIsOpen = true;
-    Debug_printv("sourceFile->url[%s]", sourceFile->url.c_str());
-    auto image = ImageBroker::obtain<D64MStream>(sourceFile->url);
+    Debug_printv("url[%s] sourceFile->url[%s]", url.c_str(), sourceFile->url.c_str());
+    auto image = ImageBroker::obtain<D64MStream>("d64", url);
     if (image == nullptr)
         return false;
 
@@ -584,9 +584,11 @@ bool D64MFile::rewindDirectory()
     image->resetEntryCounter();
 
     // Set Media Info Fields
-    media_header = mstr::format("%.16s", image->header.name);
+    //Debug_printv("name[%s]", image->header.name);
+    //Debug_printv("id_dos[%s]", image->header.id_dos);
+    media_header = image->header.name; //mstr::format("%.16s", image->header.name);
     mstr::A02Space(media_header);
-    media_id = mstr::format("%.5s", image->header.id_dos);
+    media_id = image->header.id_dos; //mstr::format("%.5s", image->header.id_dos);
     mstr::A02Space(media_id);
     media_blocks_free = image->blocksFree();
     media_block_size = image->block_size;
@@ -604,7 +606,7 @@ MFile* D64MFile::getNextFileInDir()
         rewindDirectory();
 
     // Get entry pointed to by containerStream
-    auto image = ImageBroker::obtain<D64MStream>(sourceFile->url);
+    auto image = ImageBroker::obtain<D64MStream>("d64", url);
     if (image == nullptr)
         goto exit;
 
@@ -620,13 +622,13 @@ MFile* D64MFile::getNextFileInDir()
         filename = filename.substr(0, i);
         // mstr::rtrimA0(filename);
         mstr::replaceAll(filename, "/", "\\");
-        // Debug_printv( "entry[%s]", (sourceFile->url + "/" + filename).c_str() );
+        Debug_printv( "entry[%s]", (url + "/" + filename).c_str() );
 
-        auto file = MFSOwner::File(sourceFile->url + "/" + filename);
+        auto file = MFSOwner::File(url + "/" + filename);
         file->extension = image->decodeType(image->entry.file_type);
         file->size = image->entry.blocks * image->block_size;
 
-        Debug_printv("entry[%s] ext[%s] size[%lu]", filename.c_str(), file->extension.c_str(), file->size);
+        Debug_printv("name[%s] ext[%s] size[%lu]", file->name.c_str(), file->extension.c_str(), file->size);
 
         return file;
     }
@@ -644,25 +646,26 @@ time_t D64MFile::getLastWrite()
 
 time_t D64MFile::getCreationTime()
 {
-    tm *entry_time = 0;
-    auto stream = ImageBroker::obtain<D64MStream>(sourceFile->url);
+    // Use a stack-allocated tm to avoid dereferencing a null pointer.
+    std::tm entry_time = {};
+    auto stream = ImageBroker::obtain<D64MStream>("d64", url);
     if ( stream != nullptr )
     {
         auto entry = stream->entry;
-        entry_time->tm_year = entry.year + 1900;
-        entry_time->tm_mon = entry.month;
-        entry_time->tm_mday = entry.day;
-        entry_time->tm_hour = entry.hour;
-        entry_time->tm_min = entry.minute;
+        entry_time.tm_year = entry.year + 1900;
+        entry_time.tm_mon = entry.month;
+        entry_time.tm_mday = entry.day;
+        entry_time.tm_hour = entry.hour;
+        entry_time.tm_min = entry.minute;
     }
 
-    return mktime(entry_time);
+    return mktime(&entry_time);
 }
 
 bool D64MFile::exists()
 {
-    Debug_printv("url[%s]", sourceFile->url.c_str());
-    auto stream = ImageBroker::obtain<D64MStream>(sourceFile->url);
+    Debug_printv("url[%s] sourceFile->url[%s]", url.c_str(), sourceFile->url.c_str());
+    auto stream = ImageBroker::obtain<D64MStream>("d64", url);
     if ( stream != nullptr )
         return true;
 

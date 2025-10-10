@@ -39,6 +39,7 @@
 #define PIN_LED_BT              GPIO_NUM_NC
 #define PIN_LED_BUS             GPIO_NUM_5
 #define PIN_LED_RGB             GPIO_NUM_13
+#define LEDS_INVERTED           1
 
 /* Audio Output */
 #define PIN_DAC1                GPIO_NUM_25 // samlib.h

@@ -35,7 +35,9 @@ class P00MStream : public MMediaStream {
 public:
     P00MStream(std::shared_ptr<MStream> is) : MMediaStream(is) {
         entry_count = 1;
-        seekNextEntry();
+        readHeader();
+        _size = ( containerStream->size() - sizeof(header) );
+        Debug_printv("name[%s] size[%d]", header.filename, _size);
     };
 
 protected:
@@ -54,27 +56,31 @@ protected:
 
         return false;
     }
-    bool getNextImageEntry() override {
-        if ( entry_index == 0 ) {
-            entry_index = 1;
-            readHeader();
 
-            _size = ( containerStream->size() - sizeof(header) );
+    // bool getNextImageEntry() override {
+    //     if ( entry_index == 0 ) {
+    //         entry_index = 1;
+    //         readHeader();
 
-            return true;
-        }
-        return false;
-    }
+    //         _size = ( containerStream->size() - sizeof(header) );
 
-    // For files with no directory structure
-    // tap, crt, tar
-    std::string seekNextEntry() override {
-        seekCalled = true;
-        if ( getNextImageEntry() ) {
-            return header.filename;
-        }
-        return "";
-    };
+    //         return true;
+    //     }
+    //     return false;
+    // }
+
+    // // For files with no directory structure
+    // // tap, crt, tar
+    // std::string seekNextEntry() override {
+    //     seekCalled = true;
+    //     if ( getNextImageEntry() ) {
+    //         return header.filename;
+    //     }
+    //     return "";
+    // };
+
+    bool isRandomAccess() override { return false; };
+    bool isBrowsable() override { return false; };
 
     uint32_t readFile(uint8_t* buf, uint32_t size) override;
     uint32_t writeFile(uint8_t* buf, uint32_t size) override { return 0; };
@@ -106,8 +112,9 @@ public:
         return std::make_shared<P00MStream>(is);
     }
 
-    bool rewindDirectory() override { return false; };;
-    MFile* getNextFileInDir() override { return nullptr; };;
+    bool isDirectory() override { return false; };
+    bool rewindDirectory() override { return false; };
+    MFile* getNextFileInDir() override { return nullptr; };
 
     bool isDir = false;
     bool dirIsOpen = false;

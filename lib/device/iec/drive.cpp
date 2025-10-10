@@ -44,7 +44,7 @@
 
 
 // Buffering data when reading/writing streams because during regular (non-fastloader)
-// tranmissions, the read/write functions are called for each single byte at a time and
+// transmissions, the read/write functions are called for each single byte at a time and
 // reading/writing MStream one byte at a time can be time consuming.
 // To be safe, BUFFER_SIZE should always be >=256
 #define BUFFER_SIZE 512
@@ -405,12 +405,17 @@ uint8_t iecChannelHandlerDir::readBufferData()
       do 
         { 
           entry = std::unique_ptr<MFile>( m_dir->getNextFileInDir() ); 
-          if( entry!=nullptr ) Debug_printv("[%s]", entry->name.c_str());
+          if( entry!=nullptr )
+          {
+            Debug_printv("[%s]", entry->name.c_str());
+          }
         }
       while( entry!=nullptr && entry->name[0] == '.' );
 
       if( entry != nullptr )
         {
+          //Debug_printv( ANSI_WHITE_BOLD "blocks[%lu] name[%s] ext[%s]", entry->blocks(), entry->name.c_str(), entry->extension.c_str());
+
           // directory entry
           uint16_t blocks = entry->blocks();
           m_data[m_len++] = 1;

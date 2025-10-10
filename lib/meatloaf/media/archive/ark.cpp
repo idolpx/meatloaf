@@ -147,8 +147,8 @@ bool ARKMStream::seekPath(std::string path)
 bool ARKMFile::rewindDirectory()
 {
     dirIsOpen = true;
-    Debug_printv("sourceFile->url[%s]", sourceFile->url.c_str());
-    auto image = ImageBroker::obtain<ARKMStream>(sourceFile->url);
+    Debug_printv("url[%s] sourceFile->url[%s]", url.c_str(), sourceFile->url.c_str());
+    auto image = ImageBroker::obtain<ARKMStream>("ark", url);
     if (image == nullptr)
         return false;
 
@@ -174,7 +174,7 @@ MFile *ARKMFile::getNextFileInDir()
         rewindDirectory();
 
     // Get entry pointed to by containerStream
-    auto image = ImageBroker::obtain<ARKMStream>(sourceFile->url);
+    auto image = ImageBroker::obtain<ARKMStream>("ark", url);
     if (image == nullptr)
         goto exit;
 

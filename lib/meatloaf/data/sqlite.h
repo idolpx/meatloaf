@@ -132,7 +132,7 @@ public:
         size = istream->size();
         return istream;
     };
-    std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> is) override { return is; };
+    std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> is): MStream(is->url) override { return is; };
  };
 
  

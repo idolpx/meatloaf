@@ -189,11 +189,11 @@ public:
 class HTTPMStream: public MStream {
 
 public:
-    HTTPMStream(std::string path) {
-        url = path;
+    HTTPMStream(std::string path): MStream(path) {
+        //url = path;
     };
-    HTTPMStream(std::string path, std::ios_base::openmode m) {
-        url = path;
+    HTTPMStream(std::string path, std::ios_base::openmode m): MStream(path) {
+        //url = path;
         mode = m;
     };
 
@@ -201,7 +201,6 @@ public:
         close();
     };
 
-protected:
     // MStream methods
     bool isOpen() override;
     bool isBrowsable() override { return false; };

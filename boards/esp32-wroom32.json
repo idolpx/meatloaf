@@ -37,7 +37,7 @@
       "ftdi"
     ],
     "require_upload_port": true,
-    "speed": 2000000
+    "speed": 921600
   },
   "url": "https://github.com/idolpx/meatloaf",
   "vendor": "Meatloaf CBM"

@@ -205,9 +205,9 @@ private:
 
 class SMBMStream: public MStream {
 public:
-    SMBMStream(std::string& path) {
+    SMBMStream(std::string& path): MStream(path) {
         handle = std::make_unique<SMBHandle>();
-        url = path;
+        //url = path;
     }
     ~SMBMStream() override {
         close();

@@ -140,10 +140,10 @@ private:
 
 class FTPMStream: public MStream {
 public:
-    FTPMStream(std::string& path) {
+    FTPMStream(std::string& path): MStream(path) {
         localPath = path;
         handle = std::make_unique<FTPHandle>();
-        url = path;
+        //url = path;
     }
     ~FTPMStream() override {
         close();

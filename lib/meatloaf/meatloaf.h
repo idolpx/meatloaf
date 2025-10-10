@@ -76,7 +76,7 @@ protected:
     virtual bool keep_alive() = 0;
 
 public:
-    MSession(std::string url = "") {
+    MSession(std::string url = "") : std::iostream(nullptr) {
         m_url = url;
     };
     ~MSession() {};
@@ -97,6 +97,10 @@ protected:
     uint8_t _error = 0;
 
 public:
+    MStream(std::string path) {
+        url = path;
+        //Debug_printv("url[%s]", url.c_str());
+    };
     virtual ~MStream() {
         //Debug_printv("dstr url[%s]", url.c_str());
     };
@@ -228,6 +232,7 @@ public:
     };
 
     bool m_rootfs = false;
+    std::string type;
 
     bool isPETSCII = false;
     bool isWritable = false;
@@ -457,8 +462,12 @@ public:
     static bool byExtension(const std::vector<std::string> &ext, std::string fileName, bool wildcard = false) {
         if ( fileName.size() )
         {
+            // exclude hidden files/folders
+            if (fileName[0] == '.')
+                return false;
+
             std::string extension;
-            if ( fileName.contains("."))
+            if ( fileName.find(".") != std::string::npos )
                 extension = fileName.substr(fileName.find_last_of("."));
             else
                 return false;

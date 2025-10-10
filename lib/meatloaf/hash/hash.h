@@ -72,21 +72,21 @@
         return hash.size();
     }
 
- public:
-     HashMStream(std::string &path, std::ios_base::openmode m) {
+public:
+    HashMStream(std::string &path, std::ios_base::openmode m): MStream(path) {
         //url = path;
         path = mstr::drop(path, 6); // drop "HASH:/"
         _size = generate(path);
-     }
- 
+    }
+
      // MStream methods
-     bool isOpen() override { return true; };
- 
-     bool open(std::ios_base::openmode mode) override { return true; };
-     void close() override {};
- 
-     uint32_t read(uint8_t* buf, uint32_t size) override
-     {
+    bool isOpen() override { return true; };
+
+    bool open(std::ios_base::openmode mode) override { return true; };
+    void close() override {};
+
+    uint32_t read(uint8_t* buf, uint32_t size) override
+    {
         Debug_printv("position[%d] size[%d]", _position, size);
         if (size > (_size - _position)) {
             size = _size - _position;
@@ -99,22 +99,23 @@
         Debug_printv("position[%d] size[%d]", _position, size);
 
         return size;
-     };
-     uint32_t write(const uint8_t *buf, uint32_t size) override 
-     {
+    };
+
+    uint32_t write(const uint8_t *buf, uint32_t size) override 
+    {
         char *s = reinterpret_cast<char*>(const_cast<uint8_t*>(buf));
         _position = 0;
         return generate(std::string(s, size));
     };
- 
+
     bool seek(uint32_t pos) override { return position(pos); };
- };
+};
 
 
- /********************************************************
-  * MFile
-  ********************************************************/
- 
+/********************************************************
+ * MFile
+ ********************************************************/
+
 class HashMFile: public MFile
 {
 public:
@@ -131,9 +132,9 @@ public:
         return istream;
     };
     std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> is) override { return is; };
- };
+};
 
- 
+
 /********************************************************
  * MFileSystem
  ********************************************************/

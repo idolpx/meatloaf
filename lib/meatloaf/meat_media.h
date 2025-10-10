@@ -37,18 +37,17 @@
 class MMediaStream: public MStream {
 
 public:
-    MMediaStream(std::shared_ptr<MStream> is) {
+    MMediaStream(std::shared_ptr<MStream> is): MStream(is->url) {
         containerStream = is;
         _is_open = true;
         has_subdirs = false;
+        //Debug_printv("url[%s]", url.c_str());
     }
 
     ~MMediaStream() {
         //Debug_printv("close");
         close();
     }
-
-    std::string url;
 
     void reset() override {
         seekCalled = false;
@@ -182,19 +181,22 @@ private:
 class ImageBroker {
     static std::unordered_map<std::string, std::shared_ptr<MMediaStream>> image_repo;
 public:
-    template<class T> static std::shared_ptr<T> obtain(std::string url) 
+    template<class T> static std::shared_ptr<T> obtain(std::string type, std::string url) 
     {
-        Debug_printv("streams[%d] url[%s]", image_repo.size(), url.c_str());
+        std::string key = type + url;
+        Debug_printv("streams[%lu] url[%s]", image_repo.size(), url.c_str());
+        Debug_printv("key[%s]", key.c_str());
 
         // obviously you have to supply sourceFile.url to this function!
-        if(image_repo.find(url)!=image_repo.end()) {
-            Debug_printv("stream found!");
-            Debug_memory();
-            return std::static_pointer_cast<T>(image_repo.at(url));
+        if(image_repo.find(key)!=image_repo.end()) {
+            Debug_printv("stream found! type[%s] url[%s]", type.c_str(), url.c_str());
+            return std::static_pointer_cast<T>(image_repo.at(key));
         }
 
         // create and add stream to image broker if not found
-        std::unique_ptr<MFile> newFile(MFSOwner::File(url));
+        Debug_printv("Creating New Stream type[%s] url[%s]", type.c_str(), url.c_str());
+        auto newFile = MFSOwner::File(url);
+        Debug_printv("newFile[%s] newFile->pathInStream[%s]", newFile->url.c_str(), newFile->pathInStream.c_str());
 
         Debug_printv("before " ANSI_WHITE_BACKGROUND "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv");
         std::shared_ptr<T> newStream = std::static_pointer_cast<T>(newFile->getSourceStream());
@@ -203,19 +205,20 @@ public:
         if ( newStream != nullptr )
         {
             Debug_printv("newFile->sourceFile url[%s] pathInStream[%s]", newFile->sourceFile->url.c_str(), newFile->sourceFile->pathInStream.c_str());
-            Debug_printv("newStream url[%s]", newStream->url.c_str());
+            Debug_printv("newStream type[%s] url[%s]", type.c_str(), newStream->url.c_str());
     
             // Are we at the root of the pathInStream?
-            if ( newFile->sourceFile->pathInStream.empty() )
+            if ( newFile->pathInStream.empty() )
             {
-                Debug_printv("DIRECTORY [%s]", url.c_str());
+                Debug_printv("DIRECTORY [%s]", key.c_str());
             }
             else
             {
-                Debug_printv("SINGLE FILE [%s]", url.c_str());
+                Debug_printv("SINGLE FILE [%s]", key.c_str());
             }
 
-            image_repo.insert(std::make_pair(url, newStream));
+            Debug_printv("image count[%lu]", image_repo.size());
+            image_repo.insert(std::make_pair(key, newStream));
             return newStream;
         }
 
@@ -223,8 +226,8 @@ public:
         return nullptr;
     }
 
-    static std::shared_ptr<MMediaStream> obtain(std::string url) {
-        return obtain<MMediaStream>(url);
+    static std::shared_ptr<MMediaStream> obtain(std::string type, std::string url) {
+        return obtain<MMediaStream>(type, url);
     }
 
     static void dispose(std::string url) {
@@ -245,6 +248,13 @@ public:
         //     delete pair.second;
         // });
         image_repo.clear();
+    }
+
+    static void dump() {
+        Debug_printv("streams[%d]", image_repo.size());
+        for(auto& pair : image_repo) {
+            Debug_printv("key[%s] stream[%s]", pair.first.c_str(), pair.second->url.c_str());
+        }
     }
 };
 

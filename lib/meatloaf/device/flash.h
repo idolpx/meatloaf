@@ -120,7 +120,7 @@ public:
         memset(&file_h, 0, sizeof(file_h));
     };
     ~FlashHandle();
-    void obtain(std::string localPath, std::string mode);
+    void obtain(std::string path, std::string mode);
     void dispose();
 
 private:
@@ -134,11 +134,11 @@ private:
 
 class FlashMStream: public MStream {
 public:
-    FlashMStream(std::string& path, std::ios_base::openmode m) {
-        localPath = path;
+    FlashMStream(std::string& path, std::ios_base::openmode m): MStream(path) {
         mode = m;
         handle = std::make_unique<FlashHandle>();
         //url = path;
+        //Debug_printv("url[%s] mode[%d]", url.c_str(), mode);
     }
     ~FlashMStream() override {
         close();
@@ -164,7 +164,6 @@ public:
 
 
 protected:
-    std::string localPath;
     std::unique_ptr<FlashHandle> handle;
 };
 
