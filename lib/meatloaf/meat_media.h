@@ -183,8 +183,11 @@ class ImageBroker {
 public:
     template<class T> static std::shared_ptr<T> obtain(std::string type, std::string url) 
     {
-        std::string key = type + url;
-        Debug_printv("streams[%lu] url[%s]", image_repo.size(), url.c_str());
+        auto newFile = std::unique_ptr<MFile>(MFSOwner::File(url));
+        Debug_printv("newFile[%s] newFile->pathInStream[%s]", newFile->url.c_str(), newFile->pathInStream.c_str());
+        Debug_printv("sourceFile[%s] sourceFile->pathInStream[%s]", (newFile->sourceFile != nullptr) ? newFile->sourceFile->url.c_str() : "nullptr", (newFile->sourceFile != nullptr) ? newFile->sourceFile->pathInStream.c_str() : "nullptr");
+
+        std::string key = type + newFile->sourceFile->url;
         Debug_printv("key[%s]", key.c_str());
 
         // obviously you have to supply sourceFile.url to this function!
@@ -195,8 +198,6 @@ public:
 
         // create and add stream to image broker if not found
         Debug_printv("Creating New Stream type[%s] url[%s]", type.c_str(), url.c_str());
-        auto newFile = MFSOwner::File(url);
-        Debug_printv("newFile[%s] newFile->pathInStream[%s]", newFile->url.c_str(), newFile->pathInStream.c_str());
 
         Debug_printv("before " ANSI_WHITE_BACKGROUND "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv");
         std::shared_ptr<T> newStream = std::static_pointer_cast<T>(newFile->getSourceStream());
@@ -208,7 +209,7 @@ public:
             Debug_printv("newStream type[%s] url[%s]", type.c_str(), newStream->url.c_str());
     
             // Are we at the root of the pathInStream?
-            if ( newFile->pathInStream.empty() )
+            if ( newFile->isDirectory() )
             {
                 Debug_printv("DIRECTORY [%s]", key.c_str());
             }

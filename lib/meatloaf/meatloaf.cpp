@@ -568,7 +568,7 @@ std::shared_ptr<MStream> MFile::getSourceStream(std::ios_base::openmode mode) {
             Debug_printv("path in stream not found");
             return nullptr;
         }        
-        decodedStream->url += "/" + pathInStream;
+        //decodedStream->url += "/" + pathInStream;
     }
     else if(decodedStream->isBrowsable() && pathInStream.size() > 0)
     {
