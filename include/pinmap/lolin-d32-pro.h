@@ -45,10 +45,12 @@
 #define PIN_DAC1                GPIO_NUM_25 // samlib.h
 
 /* Parallel cable */
+#ifdef ENABLE_PARALLEL
 #define PIN_XRA1405_CS          GPIO_NUM_21
 #define PIN_PARALLEL_PA2        GPIO_NUM_26   // Direction: HIGH = C64 => ESP, LOW = ESP => C64
 #define PIN_PARALLEL_PC2        GPIO_NUM_27   // Handshake: C64 => ESP (ack/strobe: byte read from/written to port) (rising edge)
 #define PIN_PARALLEL_FLAG2      GPIO_NUM_22   // Handshake: ESP => C64 (ack/strobe: byte read from/written to port) (falling edge)
+#endif
 
 /* Commodore IEC Pins */
 // CLK & DATA lines in/out are split between two pins

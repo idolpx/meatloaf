@@ -125,7 +125,7 @@ bool Archive::open(std::ios_base::openmode mode) {
     Debug_printv("Calling archive_read_open1");
     int r = archive_read_open1(m_archive);
     if (r != ARCHIVE_OK) {
-        Debug_printv("Error opening archive: %d!", r);
+        Debug_printv("Error opening archive: %d! [%s]", r, archive_error_string(m_archive));
         archive_read_free(m_archive);
         m_archive = NULL;
     }

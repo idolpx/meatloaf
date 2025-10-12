@@ -72,6 +72,7 @@
 #define PIN_IEC_RESET           GPIO_NUM_34     //  RESET  6       A 34            N/C
                                                 //  GND    2       GND             9  (GREY)
 
+                                                
 #define PIN_PARALLEL_PA2        GPIO_NUM_27     // Direction: HIGH = C64 => ESP, LOW = ESP => C64
 #define PIN_PARALLEL_PC2        GPIO_NUM_14     // Handshake: C64 => ESP (ack/strobe: byte read from/written to port) (rising edge)
 #define PIN_PARALLEL_FLAG2      GPIO_NUM_26     // Handshake: ESP => C64 (ack/strobe: byte read from/written to port) (falling edge)

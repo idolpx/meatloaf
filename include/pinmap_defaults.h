@@ -8,7 +8,7 @@
 #define PIN_DEBUG		PIN_IEC_SRQ
 
 #ifndef LEDS_INVERTED
-#define LEDS_INVERTED           0
+#define LEDS_INVERTED           1
 #endif
 
 // Commodore User Port Serial/Parallel Mode

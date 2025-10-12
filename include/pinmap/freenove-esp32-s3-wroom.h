@@ -43,6 +43,7 @@
 #define PIN_I2S                 GPIO_NUM_42
 
 /* I2C GPIO Expander */
+#ifdef PARALLEL_BUS
 #define PIN_GPIOX_SDA           GPIO_NUM_9
 #define PIN_GPIOX_SCL           GPIO_NUM_10
 #define PIN_GPIOX_INT           GPIO_NUM_41
@@ -50,6 +51,7 @@
 //#define GPIOX_ADDRESS           0x24  // PCA9673
 #define GPIOX_SPEED             400   // PCF8575 - 400Khz
 //#define GPIOX_SPEED             1000  // PCA9673 - 1000Khz / 1Mhz
+#endif
 
 /* Commodore IEC Pins */
 // CLK & DATA lines in/out are split between two pins

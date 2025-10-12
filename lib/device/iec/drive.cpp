@@ -830,6 +830,7 @@ void iecDrive::close(uint8_t channel)
       if( m_numOpenChannels>0 ) m_numOpenChannels--;
       Debug_printv("Channel %d closed.", channel);
       Debug_memory();
+      ImageBroker::dump();
     }
 
 #ifdef ENABLE_DISPLAY

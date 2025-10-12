@@ -78,10 +78,8 @@ public:
 
         if (smb2_connect_share(_smb, host.c_str(), (share.empty() ? "IPC$" : share.c_str()), user.c_str()) < 0) {
             Debug_printv("error[%s] host[%s] share[%s] path[%s]", smb2_get_error(_smb), host.c_str(), share.c_str(), share_path.c_str());
-            if (!share_path.empty()) {
-                m_isNull = true;
-                return;
-            }
+            m_isNull = true;
+            return;
         }
         if (share.empty())
         {
