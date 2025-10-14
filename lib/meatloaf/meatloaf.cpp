@@ -349,8 +349,8 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
             sourceFileSystem = findParentFS(begin, pathIterator);
         }
 
-
-        if( (sourceFileSystem == &defaultFS) && sourcePathInStream.size() )
+        // If the target is a root filesystem, then the sourcePathInStream is part of the sourcePath
+        if( (targetFile->isRootFS) && sourcePathInStream.size() )
         {
             sourcePath += "/" + sourcePathInStream;
             sourcePathInStream.clear();
@@ -358,8 +358,9 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
         }
         else
         {
-        targetFile->sourceFile = File(sourcePath);
-        targetFile->sourceFile->pathInStream = sourcePathInStream;
+            // Recursively get the source file
+            targetFile->sourceFile = File(sourcePath);
+            targetFile->sourceFile->pathInStream = sourcePathInStream;
         }
         Debug_printv( ANSI_RED_BOLD "sourcePath[%s] sourcePathInStream[%s]", sourcePath.c_str(), sourcePathInStream.c_str());
 
@@ -372,12 +373,12 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
     {
         if (targetFile->sourceFile != nullptr)
         {
-            Debug_printv("source good rootfs[%d][%s][%s]", targetFile->sourceFile->m_rootfs, targetFile->sourceFile->url.c_str(), targetFile->sourceFile->pathInStream.c_str());
+            Debug_printv("source good rootfs[%d][%s][%s]", targetFile->sourceFile->isRootFS, targetFile->sourceFile->url.c_str(), targetFile->sourceFile->pathInStream.c_str());
         }
         else
             Debug_printv("source bad");
 
-        Debug_printv("target good rootfs[%d][%s][%s]", targetFile->m_rootfs, targetFile->url.c_str(), targetFile->pathInStream.c_str());
+        Debug_printv("target good rootfs[%d][%s][%s]", targetFile->isRootFS, targetFile->url.c_str(), targetFile->pathInStream.c_str());
     }
     else
         Debug_printv("target bad");

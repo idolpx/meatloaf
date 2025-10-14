@@ -55,7 +55,7 @@ public:
     std::string share_path = "";
     
     SMBMFile(std::string path): MFile(path) {
-        m_rootfs = true;
+        isRootFS = true;
 
         // Initialize SMB context
         _smb = smb2_init_context();

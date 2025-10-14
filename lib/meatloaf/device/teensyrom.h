@@ -98,7 +98,7 @@
 //     {
 //         Debug_printv("path[%s]", this->path.c_str());
 
-//         m_rootfs = true;
+//         isRootFS = true;
 //         isWritable = true;
 //     };
 

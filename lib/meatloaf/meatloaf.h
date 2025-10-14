@@ -231,7 +231,7 @@ public:
         //Debug_printv("dtor path[%s]", path.c_str());
     };
 
-    bool m_rootfs = false;
+    bool isRootFS = false;
     std::string type;
 
     bool isPETSCII = false;
