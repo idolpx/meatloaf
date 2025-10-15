@@ -52,7 +52,6 @@ public:
         else
             m_isNull = false;
 
-        isRootFS = true;
         isWritable = true;
 
         if(isDirectory()) {
@@ -171,22 +170,24 @@ protected:
  * MFileSystem
  ********************************************************/
 
- class FlashMFileSystem: public MFileSystem 
- {
- public:
-     FlashMFileSystem() : MFileSystem("flash") {};
- 
-     bool handles(std::string path) override
-     {
-         return true; // fallback fs, so it must be last on FS list
-     }
- 
-     MFile* getFile(std::string path) override
-     {
-         //Debug_printv("path[%s]", path.c_str());
-         return new FlashMFile(path);
-     }
- };
+class FlashMFileSystem: public MFileSystem 
+{
+public:
+    FlashMFileSystem() : MFileSystem("flash") {
+        isRootFS = true;
+    };
+
+    bool handles(std::string path) override
+    {
+        return true; // fallback fs, so it must be last on FS list
+    }
+
+    MFile* getFile(std::string path) override
+    {
+        //Debug_printv("path[%s]", path.c_str());
+        return new FlashMFile(path);
+    }
+};
 
 
 #endif // MEATLOAF_DEVICE_FLASH

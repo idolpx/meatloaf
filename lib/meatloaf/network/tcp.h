@@ -299,8 +299,7 @@ public:
     };
     TCPMFile(std::string path): MFile(path) { 
         Debug_printv("constructing tcp file from url [%s]", url.c_str());
-        isRootFS = true;
-     };
+    };
     TCPMFile(std::string path, std::string filename): MFile(path) {};
     ~TCPMFile() override {
     }
@@ -336,7 +335,9 @@ public:
 class TCPMFileSystem: public MFileSystem 
 {
 public:
-    TCPMFileSystem(): MFileSystem("tcp") {};
+    TCPMFileSystem(): MFileSystem("tcp") {
+        isRootFS = true;
+    };
 
     bool handles(std::string name) {
         if ( mstr::startsWith(name, (char *)"tcp:", false) )

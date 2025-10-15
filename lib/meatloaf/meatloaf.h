@@ -231,7 +231,6 @@ public:
         //Debug_printv("dtor path[%s]", path.c_str());
     };
 
-    bool isRootFS = false;
     std::string type;
 
     bool isPETSCII = false;
@@ -320,6 +319,7 @@ public:
     MFileSystem(const char* symbol);
     virtual ~MFileSystem() = 0;
 
+    bool isRootFS = false;
     bool vdrive_compatible = false;
 
     static MSession session;

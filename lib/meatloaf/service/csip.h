@@ -237,7 +237,6 @@ public:
         //media_block_size = 1; // blocks are already calculated
         //parseUrl(path);
         //Debug_printv("path[%s] size[%d]", path.c_str(), size);
-        isRootFS = true;
     };
 
 
@@ -305,7 +304,9 @@ protected:
 class CSIPMFileSystem: public MFileSystem 
 {
 public:
-    CSIPMFileSystem(): MFileSystem("csip") {};
+    CSIPMFileSystem(): MFileSystem("csip") {
+        isRootFS = true;
+    };
 
     static CSIPMSession session;
 

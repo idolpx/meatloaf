@@ -55,7 +55,6 @@ public:
     std::string share_path = "";
     
     SMBMFile(std::string path): MFile(path) {
-        isRootFS = true;
 
         // Initialize SMB context
         _smb = smb2_init_context();
@@ -243,7 +242,9 @@ protected:
 class SMBMFileSystem: public MFileSystem
 {
 public:
-    SMBMFileSystem(): MFileSystem("smb") {};
+    SMBMFileSystem(): MFileSystem("smb") {
+        isRootFS = true;
+    };
 
     bool handles(std::string name) {
         if ( mstr::equals(name, (char *)"smb:", false) )

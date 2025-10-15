@@ -154,7 +154,6 @@ public:
     };
     HTTPMFile(std::string path): MFile(path) { 
         // Debug_printv("constructing http file from url [%s]", url.c_str());
-        isRootFS = true;
     };
     HTTPMFile(std::string path, std::string filename): MFile(path) {};
     ~HTTPMFile() override {
@@ -239,7 +238,9 @@ private:
 class HTTPMFileSystem: public MFileSystem 
 {
 public:
-    HTTPMFileSystem(): MFileSystem("http") {};
+    HTTPMFileSystem(): MFileSystem("http") {
+        isRootFS = true;
+    };
 
     bool handles(std::string name) {
         if ( mstr::equals(name, (char *)"http:", false) )

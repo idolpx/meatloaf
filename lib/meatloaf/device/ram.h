@@ -149,7 +149,6 @@ public:
         else
             m_isNull = false;
 
-        isRootFS = true;
         isWritable = true;
         //Debug_printv("basepath[%s] path[%s] valid[%d]", basepath.c_str(), this->path.c_str(), m_isNull);
     };
@@ -197,7 +196,9 @@ private:
 class RAMMFileSystem: public MFileSystem 
 {
 public:
-    RAMMFileSystem() : MFileSystem("ram") {};
+    RAMMFileSystem() : MFileSystem("ram") {
+        isRootFS = true;
+    };
 
     bool handles(std::string path) override
     {

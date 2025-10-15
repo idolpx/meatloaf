@@ -67,7 +67,6 @@ public:
         else
             m_isNull = false;
 
-        isRootFS = true;
         //Debug_printv("basepath[%s] path[%s] valid[%d]", basepath.c_str(), this->path.c_str(), m_isNull);
     };
     ~FTPMFile() {
@@ -183,7 +182,9 @@ protected:
 class FTPMFileSystem: public MFileSystem 
 {
 public:
-    FTPMFileSystem(): MFileSystem("tnfs") {};
+    FTPMFileSystem(): MFileSystem("tnfs") {
+        isRootFS = true;
+    };
 
     bool handles(std::string name) {
         if ( mstr::equals(name, (char *)"tnfs:", false) )

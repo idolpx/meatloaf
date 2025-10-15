@@ -65,7 +65,6 @@ public:
         else
             m_isNull = false;
 
-        isRootFS = true;
         Debug_printv("basepath[%s] path[%s] valid[%d]", basepath.c_str(), this->path.c_str(), m_isNull);
     };
     // ~TNFSMFile() {
@@ -180,7 +179,9 @@ public:
 class TNFSMFileSystem: public MFileSystem 
 {
 public:
-    TNFSMFileSystem(): MFileSystem("tnfs") {};
+    TNFSMFileSystem(): MFileSystem("tnfs") {
+        isRootFS = true;
+    };
 
     bool handles(std::string name) {
         if ( mstr::equals(name, (char *)"tnfs:", false) )

@@ -98,7 +98,6 @@
 //     {
 //         Debug_printv("path[%s]", this->path.c_str());
 
-//         isRootFS = true;
 //         isWritable = true;
 //     };
 
@@ -128,7 +127,9 @@
 // class TRMFileSystem: public MFileSystem
 // {
 // public:
-//     TRMFileSystem(): MFileSystem("teensyrom") {};
+//     TRMFileSystem(): MFileSystem("teensyrom") {
+//        isRootFS = true;
+//};
 
 //     bool handles(std::string name) {
 //         return mstr::startsWith(name, (char *)"tr:", false);
