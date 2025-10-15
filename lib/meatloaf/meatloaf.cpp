@@ -320,8 +320,6 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
     // targetFile is for access to the file in the container stream
     auto sourcePath = mstr::joinToString(&begin, &pathIterator, "/");
     auto sourcePathInStream = mstr::joinToString(&pathIterator, &end, "/");
-    targetFile = targetFileSystem->getFile(path);
-    targetFile->type = targetFileSystem->symbol;
 
     end = pathIterator;
     pathIterator--;
@@ -329,10 +327,19 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
     if( begin == pathIterator )
     {
         Debug_printv("** LOOK UP PATH NOT NEEDED   path[%s]", path.c_str());
+        targetFile = targetFileSystem->getFile(path);
+        targetFile->pathInStream = sourcePathInStream;
+        targetFile->type = targetFileSystem->symbol;
+        targetFile->sourceFile = targetFileSystem->getFile(path);
+        targetFile->sourceFile->pathInStream = sourcePathInStream;
+        targetFile->sourceFile->type = targetFileSystem->symbol;
+        targetFile->sourceFile->isWritable = targetFile->isWritable;   // This stream is writable if the container is writable
         Debug_printv( ANSI_WHITE_BOLD "targetPathInStream[%s] is in sourcePath[%s][%s]", targetFile->pathInStream.c_str(), path.c_str(), targetFileSystem->symbol);
     } 
-    else 
+    else
     {
+        targetFile = targetFileSystem->getFile(sourcePath);
+        targetFile->type = targetFileSystem->symbol;
         targetFile->pathInStream = sourcePathInStream;
         Debug_printv( ANSI_WHITE_BOLD "targetPathInStream[%s] is in sourcePath[%s][%s]", targetFile->pathInStream.c_str(), sourcePath.c_str(), targetFileSystem->symbol);
 
@@ -352,8 +359,8 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
         // If the target is a root filesystem, then the sourcePathInStream is part of the sourcePath
         if( (targetFileSystem->isRootFS) && sourcePathInStream.size() )
         {
-            sourcePath += "/" + sourcePathInStream;
-            sourcePathInStream.clear();
+            //sourcePath += "/" + sourcePathInStream;
+            //sourcePathInStream.clear();
             targetFile->sourceFile = sourceFileSystem->getFile(sourcePath);
         }
         else

@@ -52,19 +52,19 @@
 
 static bool isMatch(std::string name, std::string pattern)
 {
-  signed char found = -1;
-  
-  for(uint8_t i=0; found<0; i++)
+    signed char found = -1;
+    
+    for(uint8_t i=0; found<0; i++)
     {
-      if( pattern[i]=='*' )
-        found = 1;
-      else if( pattern[i]==0 || name[i]==0 )
-        found = (pattern[i]==name[i]) ? 1 : 0;
-      else if( pattern[i]!='?' && pattern[i]!=name[i] && !(name[i]=='~' && (pattern[i] & 0xFF)==0xFF) )
-        found = 0;
+        if( pattern[i]=='*' )
+            found = 1;
+        else if( pattern[i]==0 || name[i]==0 )
+            found = (pattern[i]==name[i]) ? 1 : 0;
+        else if( pattern[i]!='?' && pattern[i]!=name[i] && !(name[i]=='~' && (pattern[i] & 0xFF)==0xFF) )
+            found = 0;
     }
-  
-  return found==1;
+
+    return found==1;
 }
 
 
@@ -73,90 +73,90 @@ static bool isMatch(std::string name, std::string pattern)
 
 iecChannelHandler::iecChannelHandler(iecDrive *drive)
 { 
-  m_drive = drive;
-  m_data = new uint8_t[BUFFER_SIZE]; 
-  m_len = 0; 
-  m_ptr = 0; 
+    m_drive = drive;
+    m_data = new uint8_t[BUFFER_SIZE];
+    m_len = 0;
+    m_ptr = 0;
 }
 
 
 iecChannelHandler::~iecChannelHandler()
 { 
-  delete [] m_data; 
+    delete [] m_data; 
 }
 
 
 uint8_t iecChannelHandler::read(uint8_t *data, uint8_t n)
 {
-  // if buffer is empty then re-fill it
-  if( m_ptr >= m_len )
+    // if buffer is empty then re-fill it
+    if( m_ptr >= m_len )
     {
-      m_ptr = 0;
-      m_len = 0;
+        m_ptr = 0;
+        m_len = 0;
 
-      uint8_t st = readBufferData();
-      if( st!=ST_OK )
-      {
-          m_drive->setStatusCode(st);
-          return 0;
-      }
-    }
-
-  // read data from buffer
-  if( m_ptr < m_len )
-    {
-      if( n==1 )
+        uint8_t st = readBufferData();
+        if( st!=ST_OK )
         {
-          // common case during regular (non-fastloader) load
-          data[0] = m_data[m_ptr++];
-          return 1;
-        }
-      else
-        {
-          // copy as much data as possible
-          n = std::min((size_t) n, (size_t) (m_len - m_ptr));
-          memcpy(data, m_data + m_ptr, n);
-          m_ptr += n;
-          return n;
+            m_drive->setStatusCode(st);
+            return 0;
         }
     }
-  else
-  {
-    return 0;
-  }
+
+    // read data from buffer
+    if( m_ptr < m_len )
+    {
+        if( n==1 )
+        {
+            // common case during regular (non-fastloader) load
+            data[0] = m_data[m_ptr++];
+            return 1;
+        }
+        else
+        {
+            // copy as much data as possible
+            n = std::min((size_t) n, (size_t) (m_len - m_ptr));
+            memcpy(data, m_data + m_ptr, n);
+            m_ptr += n;
+            return n;
+        }
+    }
+    else
+    {
+        return 0;
+    }
 }
 
 
 uint8_t iecChannelHandler::write(uint8_t *data, uint8_t n)
 {
-  // if buffer is full then empty it
-  if( m_len+n > BUFFER_SIZE )
+    // if buffer is full then empty it
+    if( m_len+n > BUFFER_SIZE )
     {
-      uint8_t st = writeBufferData();
-      if( st!=ST_OK )
+        uint8_t st = writeBufferData();
+        if( st!=ST_OK )
         {
-          m_drive->setStatusCode(st);
-          return 0;
+            m_drive->setStatusCode(st);
+            return 0;
         }
 
-      m_ptr = 0;
-      m_len = 0;
+        m_ptr = 0;
+        m_len = 0;
     }
 
-  // write data to buffer
-  if( n==1 )
+    // write data to buffer
+    if( n==1 )
     {
-      // common case during regular (non-fastloader) save
-      m_data[m_len++] = data[0];
+        // common case during regular (non-fastloader) save
+        m_data[m_len++] = data[0];
     }
-  else
+    else
     {
-      // copy data
-      memcpy(m_data + m_len, data, n);
-      m_len += n;
+        // copy data
+        memcpy(m_data + m_len, data, n);
+        m_len += n;
     }
 
-  return n;
+    return n;
 }
 
 
@@ -165,30 +165,30 @@ uint8_t iecChannelHandler::write(uint8_t *data, uint8_t n)
 
 iecChannelHandlerFile::iecChannelHandlerFile(iecDrive *drive, std::shared_ptr<MStream> stream, int fixLoadAddress) : iecChannelHandler(drive)
 {
-  m_stream = stream;
-  m_fixLoadAddress = fixLoadAddress;
-  m_timeStart = esp_timer_get_time();
-  m_byteCount = 0;
-  m_transportTimeUS = 0;
+    m_stream = stream;
+    m_fixLoadAddress = fixLoadAddress;
+    m_timeStart = esp_timer_get_time();
+    m_byteCount = 0;
+    m_transportTimeUS = 0;
 }
 
 
 iecChannelHandlerFile::~iecChannelHandlerFile()
 {
-  double seconds = (esp_timer_get_time()-m_timeStart) / 1000000.0;
+    double seconds = (esp_timer_get_time()-m_timeStart) / 1000000.0;
 
-  if( m_stream->mode == std::ios_base::out && m_len>0 )
-    writeBufferData();
+    if( m_stream->mode == std::ios_base::out && m_len>0 )
+        writeBufferData();
 
-  m_stream->close();
-  Debug_printv("Stream closed.");
+    m_stream->close();
+    Debug_printv("Stream closed.");
 
-  double cps = m_byteCount / seconds;
-  Debug_printv("%s %lu bytes in %0.2f seconds @ %0.2fcps", m_stream->mode == std::ios_base::in ? "Sent" : "Received", m_byteCount, seconds, cps);
+    double cps = m_byteCount / seconds;
+    Debug_printv("%s %lu bytes in %0.2f seconds @ %0.2fcps", m_stream->mode == std::ios_base::in ? "Sent" : "Received", m_byteCount, seconds, cps);
 
-  double tseconds = m_transportTimeUS / 1000000.0;
-  cps = m_byteCount / (seconds-tseconds);
-  Debug_printv("Transport (network/sd) took %0.3f seconds, pure IEC transfers @ %0.2fcps", tseconds, cps);
+    double tseconds = m_transportTimeUS / 1000000.0;
+    cps = m_byteCount / (seconds-tseconds);
+    Debug_printv("Transport (network/sd) took %0.3f seconds, pure IEC transfers @ %0.2fcps", tseconds, cps);
 
 #ifdef ENABLE_DISPLAY
     LEDS.idle();
@@ -201,78 +201,78 @@ iecChannelHandlerFile::~iecChannelHandlerFile()
 
 uint8_t iecChannelHandlerFile::writeBufferData()
 {
-  /*
-  // if m_stream is within a disk image then m_stream->mode does not get initialized properly!
-  if( m_stream->mode != std::ios_base::out )
-    return ST_FILE_TYPE_MISMATCH;
-  else
-  */
+    /*
+    // if m_stream is within a disk image then m_stream->mode does not get initialized properly!
+    if( m_stream->mode != std::ios_base::out )
+        return ST_FILE_TYPE_MISMATCH;
+    else
+    */
     {
-      Debug_printv("bufferSize[%d]", m_len);
-      uint64_t t = esp_timer_get_time();
-      size_t n = m_stream->write(m_data, m_len);
-      m_transportTimeUS += (esp_timer_get_time()-t);
-      m_byteCount += n;
-      if( n<m_len )
+        Debug_printv("bufferSize[%d]", m_len);
+        uint64_t t = esp_timer_get_time();
+        size_t n = m_stream->write(m_data, m_len);
+        m_transportTimeUS += (esp_timer_get_time()-t);
+        m_byteCount += n;
+        if( n<m_len )
         {
-          Debug_printv("Error: write failed: n[%d] < m_len[%d]", n, m_len);
-          return ST_WRITE_VERIFY;
+            Debug_printv("Error: write failed: n[%d] < m_len[%d]", n, m_len);
+            return ST_WRITE_VERIFY;
         }
     }
-  
-  return ST_OK;
+
+    return ST_OK;
 }
 
 
 uint8_t iecChannelHandlerFile::readBufferData()
 {
-  /*
-  // if m_stream is within a disk image then m_stream->mode does not get initialized properly!
-  if( m_stream->mode != std::ios_base::in )
-    return ST_FILE_TYPE_MISMATCH;
-  else
-  */
+    /*
+    // if m_stream is within a disk image then m_stream->mode does not get initialized properly!
+    if( m_stream->mode != std::ios_base::in )
+        return ST_FILE_TYPE_MISMATCH;
+    else
+    */
     {
-      Debug_printv("size[%lu] avail[%lu] pos[%lu]", m_stream->size(), m_stream->available(), m_stream->position());
-      if (m_stream->size() == 0)
-        return ST_FILE_NOT_FOUND;
+        Debug_printv("size[%lu] avail[%lu] pos[%lu]", m_stream->size(), m_stream->available(), m_stream->position());
+        if (m_stream->size() == 0)
+            return ST_FILE_NOT_FOUND;
 
 #ifdef ENABLE_DISPLAY
-      // send progress percentage
-      uint8_t percent = (m_stream->position() * 100) / m_stream->size();
-      LEDS.progress = percent;
+        // send progress percentage
+        uint8_t percent = (m_stream->position() * 100) / m_stream->size();
+        LEDS.progress = percent;
 #endif
-      fnLedManager.toggle(eLed::LED_BUS);
+        fnLedManager.toggle(eLed::LED_BUS);
 
-      if( m_fixLoadAddress>=0 && m_stream->position()==0 )
+        if( m_fixLoadAddress>=0 && m_stream->position()==0 )
         {
-          uint64_t t = esp_timer_get_time();
-          m_len = m_stream->read(m_data, BUFFER_SIZE);
-          m_transportTimeUS += (esp_timer_get_time()-t);
-          if( m_len>=2 )
-            {
-              m_data[0] = (m_fixLoadAddress & 0x00FF);
-              m_data[1] = (m_fixLoadAddress & 0xFF00) >> 8;
-            }
-          m_fixLoadAddress = -1;
+            uint64_t t = esp_timer_get_time();
+            m_len = m_stream->read(m_data, BUFFER_SIZE);
+            m_transportTimeUS += (esp_timer_get_time()-t);
+            if( m_len>=2 )
+                {
+                m_data[0] = (m_fixLoadAddress & 0x00FF);
+                m_data[1] = (m_fixLoadAddress & 0xFF00) >> 8;
+                }
+            m_fixLoadAddress = -1;
         }
-      else
-        m_len = 0;
+        else
+            m_len = 0;
 
-      // try to fill buffer
-      while( m_len<BUFFER_SIZE && !m_stream->eos() )
+        // try to fill buffer
+        while( m_len<BUFFER_SIZE && !m_stream->eos() )
         {
-          uint64_t t = esp_timer_get_time();
-          m_len += m_stream->read(m_data+m_len, BUFFER_SIZE-m_len);
-          m_transportTimeUS += (esp_timer_get_time()-t);
-          if (m_stream->error())
-              return ST_DRIVE_NOT_READY;
+            uint64_t t = esp_timer_get_time();
+            m_len += m_stream->read(m_data+m_len, BUFFER_SIZE-m_len);
+            m_transportTimeUS += (esp_timer_get_time()-t);
+            if (m_stream->error())
+                    return ST_DRIVE_NOT_READY;
         }
 
-      m_byteCount += m_len;
+        m_byteCount += m_len;
     }
 
-  return ST_OK;
+    return ST_OK;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -280,47 +280,47 @@ uint8_t iecChannelHandlerFile::readBufferData()
 
 iecChannelHandlerDir::iecChannelHandlerDir(iecDrive *drive, MFile *dir) : iecChannelHandler(drive)
 {
-  m_dir = dir;
-  m_headerLine = 1;
-  
-  std::string scheme = m_dir->scheme;
-  scheme = mstr::toPETSCII2(scheme);
-  std::string url = m_dir->host;
-  url = mstr::toPETSCII2(url);
-  std::string path = m_dir->path;
-  path = mstr::toPETSCII2(path);
-  std::string archive = m_dir->media_archive;
-  archive = mstr::toPETSCII2(archive);
-  std::string image = m_dir->media_image;
-  image = mstr::toPETSCII2(image);
-  
-  m_headers.clear();
-  if( url.size()>0 )     addExtraInfo(scheme, url);
-  if( path.size()>1 )    addExtraInfo("PATH", path);
-  if( archive.size()>1 ) addExtraInfo("ARCHIVE", archive);
-  if( image.size()>0 )   addExtraInfo("IMAGE", image);
-  if( m_headers.size()>0 ) m_headers.push_back("NFO ----------------");
-  
-  // If SD Card is available and we are at the root path show it as a directory at the top
-  if(m_dir->url.size() < 2 ) {
-    if( fnSDFAT.running() )
-      m_headers.push_back("DIR SD");
+    m_dir = dir;
+    m_headerLine = 1;
     
-    // This will be used to browse the network
-    // m_headers.push_back("DIR NETWORK");
-  }
+    std::string scheme = m_dir->scheme;
+    scheme = mstr::toPETSCII2(scheme);
+    std::string url = m_dir->host;
+    url = mstr::toPETSCII2(url);
+    std::string path = m_dir->path;
+    path = mstr::toPETSCII2(path);
+    std::string archive = m_dir->media_archive;
+    archive = mstr::toPETSCII2(archive);
+    std::string image = m_dir->media_image;
+    image = mstr::toPETSCII2(image);
+    
+    m_headers.clear();
+    if( url.size()>0 )     addExtraInfo(scheme, url);
+    if( path.size()>1 )    addExtraInfo("PATH", path);
+    if( archive.size()>1 ) addExtraInfo("ARCHIVE", archive);
+    if( image.size()>0 )   addExtraInfo("IMAGE", image);
+    if( m_headers.size()>0 ) m_headers.push_back("NFO ----------------");
+
+    // If SD Card is available and we are at the root path show it as a directory at the top
+    if(m_dir->url.size() < 2 ) {
+        if( fnSDFAT.running() )
+            m_headers.push_back("DIR SD");
+    
+        // This will be used to browse the network
+        // m_headers.push_back("DIR NETWORK");
+    }
 
 #ifdef ENABLE_DISPLAY
-  Debug_printv("Start Activity");
-  LEDS.speed = 100;
-  LEDS.activity = true;
+    Debug_printv("Start Activity");
+    LEDS.speed = 100;
+    LEDS.activity = true;
 #endif
 }
 
 
 iecChannelHandlerDir::~iecChannelHandlerDir()
 {
-  delete m_dir;
+    delete m_dir;
 
 #ifdef ENABLE_DISPLAY
     LEDS.idle();
@@ -331,202 +331,209 @@ iecChannelHandlerDir::~iecChannelHandlerDir()
 
 void iecChannelHandlerDir::addExtraInfo(std::string title, std::string text)
 {
-  m_headers.push_back("NFO ["+title+"]");
-  while( text.size()>0 )
+    m_headers.push_back("NFO ["+title+"]");
+    while( text.size()>0 )
     {
-      std::string s = text.substr(0, 16);
-      m_headers.push_back("NFO "+s);
-      text.erase(0, s.size());
+        std::string s = text.substr(0, 16);
+        m_headers.push_back("NFO "+s);
+        text.erase(0, s.size());
     }
 }
 
 
 uint8_t iecChannelHandlerDir::writeBufferData()
 {
-  return ST_FILE_TYPE_MISMATCH;
+    return ST_FILE_TYPE_MISMATCH;
 }
 
 
 uint8_t iecChannelHandlerDir::readBufferData()
 {
-  fnLedManager.toggle(eLed::LED_BUS);
+    fnLedManager.toggle(eLed::LED_BUS);
 
-  if( m_headerLine==1 )
+    if( m_headerLine==1 )
     {
-      // main header line
-      m_data[0] = 0x01;
-      m_data[1] = 0x08;
-      m_data[2] = 1;
-      m_data[3] = 1;
-      m_data[4] = 0;
-      m_data[5] = 0;
-      m_data[6] = 18;
-      m_data[7] = '"';
-      Debug_printv("header[%s] id[%s]", m_dir->media_header.c_str(), m_dir->media_id.c_str());
-      std::string name = m_dir->media_header.size() ? m_dir->media_header : PRODUCT_ID;
-      size_t n = std::min(16, (int) name.size());
-      memcpy(m_data+8, name.data(), n);
-      while( n<16 ) { m_data[8+n] = ' '; n++; }
-      m_data[24] = '"';
-      m_data[25] = ' ';
-      if ( m_dir->media_id.size() )
-        memcpy(m_data+26, m_dir->media_id.c_str(), 5); // Use ID and DOS version from media file
-      else
-        sprintf((char *) m_data+26, "%02i 2A", m_drive->id()); // Use drive # as ID in browser mode
-      m_data[31] = 0;
-      m_len = 32;
-      m_headerLine++;
+        // main header line
+        m_data[0] = 0x01;
+        m_data[1] = 0x08;
+        m_data[2] = 1;
+        m_data[3] = 1;
+        m_data[4] = 0;
+        m_data[5] = 0;
+        m_data[6] = 18;
+        m_data[7] = '"';
+        Debug_printv("header[%s] id[%s]", m_dir->media_header.c_str(), m_dir->media_id.c_str());
+        std::string name = m_dir->media_header.size() ? m_dir->media_header : PRODUCT_ID;
+        size_t n = std::min(16, (int) name.size());
+        memcpy(m_data+8, name.data(), n);
+        while( n<16 ) { m_data[8+n] = ' '; n++; }
+        m_data[24] = '"';
+        m_data[25] = ' ';
+        if ( m_dir->media_id.size() )
+            memcpy(m_data+26, m_dir->media_id.c_str(), 5); // Use ID and DOS version from media file
+        else
+            sprintf((char *) m_data+26, "%02i 2A", m_drive->id()); // Use drive # as ID in browser mode
+        m_data[31] = 0;
+        m_len = 32;
+        m_headerLine++;
     }
-  else if( m_headerLine-2 < m_headers.size() )
+    else if( m_headerLine-2 < m_headers.size() )
     {
-      // Send Extra INFO
-      m_data[0] = 1;
-      m_data[1] = 1;
-      m_data[2] = 0;
-      m_data[3] = 0;
+        // Send Extra INFO
+        m_data[0] = 1;
+        m_data[1] = 1;
+        m_data[2] = 0;
+        m_data[3] = 0;
 
-      std::string name = m_headers[m_headerLine-2];
-      std::string ext  = name.substr(0, 3);
+        std::string name = m_headers[m_headerLine-2];
+        std::string ext  = name.substr(0, 3);
 
-      name = "   \"" + name.substr(4, 16) + "\"";
-      if( name.size()<21 ) name += std::string(21-name.size(), ' ');
-      name += " " + ext + "  ";
-      strcpy((char *) m_data+4, name.c_str());
-      m_data[31] = 0;
-      m_len = 32;
-      m_headerLine++;
+        name = "   \"" + name.substr(4, 16) + "\"";
+        if( name.size()<21 ) name += std::string(21-name.size(), ' ');
+        name += " " + ext + "  ";
+        strcpy((char *) m_data+4, name.c_str());
+        m_data[31] = 0;
+        m_len = 32;
+        m_headerLine++;
     }
-  else if( m_headerLine < 0xFF )
+    else if( m_headerLine < 0xFF )
     {
-      // file entries
-      std::unique_ptr<MFile> entry; 
+        // file entries
+        std::unique_ptr<MFile> entry; 
 
-      // skip over files starting with "."
-      do 
+        // skip over files starting with "."
+        do 
         { 
-          entry = std::unique_ptr<MFile>( m_dir->getNextFileInDir() ); 
-          if( entry!=nullptr )
-          {
-            Debug_printv("[%s]", entry->name.c_str());
-          }
+            entry = std::unique_ptr<MFile>( m_dir->getNextFileInDir() ); 
+            if( entry!=nullptr )
+            {
+                Debug_printv("[%s][%s]", entry->name.c_str(), entry->pathInStream.c_str());
+            }
         }
-      while( entry!=nullptr && entry->name[0] == '.' );
+        while( entry!=nullptr && entry->name[0] == '.' );
 
-      if( entry != nullptr )
+        if( entry != nullptr )
         {
-          //Debug_printv( ANSI_WHITE_BOLD "blocks[%lu] name[%s] ext[%s]", entry->blocks(), entry->name.c_str(), entry->extension.c_str());
+            //Debug_printv( ANSI_WHITE_BOLD "blocks[%lu] name[%s] ext[%s]", entry->blocks(), entry->name.c_str(), entry->extension.c_str());
 
-          // directory entry
-          uint16_t blocks = entry->blocks();
-          m_data[m_len++] = 1;
-          m_data[m_len++] = 1;
-          m_data[m_len++] = blocks&255;
-          m_data[m_len++] = blocks/256;
-          if( blocks<10 )    m_data[m_len++] = ' ';
-          if( blocks<100 )   m_data[m_len++] = ' ';
-          if( blocks<1000 )  m_data[m_len++] = ' ';
-
-          std::string ext = entry->extension;
-          mstr::ltrim(ext);
-          if( entry->isDirectory() )
-            ext = "dir";
-          else if( ext.length()>0 )
-            {
-              if( ext.size()>3 )
-                ext = ext.substr(0, 3);
-              else
-                ext += std::string(3-ext.size(), ' ');
-            }
-          else
-            ext = "prg";
-
-          std::string name = entry->name;
-          if ( !m_dir->isPETSCII )
-            {
-              name = mstr::toPETSCII2( name );
-              ext  = mstr::toPETSCII2( ext );
-            }
-          mstr::replaceAll(name, "\\", "/");
-          
-          // File name
-          m_data[m_len++] = '"';
-
-          // C64 compatibale name
-          {
-            size_t n = std::min(16, (int) name.size());
-            memcpy(m_data+m_len, name.data(), n);
-            m_len += n;
-            m_data[m_len++] = '"';
-
-            // Extension gap
-            n = 17-n;
-            while(n-->0) m_data[m_len++] = ' ';
+            // directory entry
+            uint16_t blocks = entry->blocks();
+            m_data[m_len++] = 1;
+            m_data[m_len++] = 1;
+            m_data[m_len++] = blocks&255;
+            m_data[m_len++] = blocks/256;
+            if( blocks<10 )    m_data[m_len++] = ' ';
+            if( blocks<100 )   m_data[m_len++] = ' ';
+            if( blocks<1000 )  m_data[m_len++] = ' ';
 
             // Extension
-            memcpy(m_data+m_len, ext.data(), 3);
-            m_len+=3;
-            while( m_len<31 ) m_data[m_len++] = ' ';
+            std::string ext = entry->extension;
+            mstr::ltrim(ext);
+            if( entry->isDirectory() )
+            {
+                ext = "dir";
+            }
+            else if( ext.length()>0 )
+            {
+                if( ext.size()>3 )
+                    ext = ext.substr(0, 3);
+                else
+                    ext += std::string(3-ext.size(), ' ');
+            }
+            else
+            {
+                ext = "prg";
+            }
+
+            // File name
+            std::string name = entry->pathInStream;
+            if ( name.empty() )
+                name = entry->name;
+
+            if ( !m_dir->isPETSCII )
+            {
+                name = mstr::toPETSCII2( name );
+                ext  = mstr::toPETSCII2( ext );
+            }
+            mstr::replaceAll(name, "\\", "/");
+            m_data[m_len++] = '"';
+
+            // C64 compatibale filename (16+3 chars)
+            {
+                size_t n = std::min(16, (int) name.size());
+                memcpy(m_data+m_len, name.data(), n);
+                m_len += n;
+                m_data[m_len++] = '"';
+
+                // Extension gap
+                n = 17-n;
+                while(n-->0) m_data[m_len++] = ' ';
+
+                // Extension
+                memcpy(m_data+m_len, ext.data(), 3);
+                m_len+=3;
+                while( m_len<31 ) m_data[m_len++] = ' ';
+                m_data[31] = 0;
+                m_len = 32;
+            }
+
+            // // Full long filename (up to 30 chars)
+            // {
+            //   size_t n = (int) name.size();
+            //   memcpy(m_data+m_len, name.data(), n);
+
+            //   m_len += n;
+            //   m_data[m_len++] = '"';
+
+            //   // Extension gap
+            //   if (n<16)
+            //   {
+            //     n = 17-n;
+            //     while(n-->0) m_data[m_len++] = ' ';
+            //   }
+            //   else
+            //     m_data[m_len++] = ' ';
+
+            //   // Extension
+            //   memcpy(m_data+m_len, ext.data(), 3);
+            //   m_len+=3;
+            //   m_data[m_len++] = ' ';
+            //   m_data[m_len++] = 0;
+            // }
+        }
+        else
+        {
+            // no more entries => footer
+#ifdef IEC_FP_DOLPHIN
+            // DolphinDos' MultiDubTwo copy program needs the "BLOCKS FREE" footer line, otherwise it aborts when reading source
+            uint32_t free = m_dir->media_image.size() ? m_dir->media_blocks_free : std::min((int) m_dir->getAvailableSpace()/254, 65535);
+            m_data[0] = 1;
+            m_data[1] = 1;
+            m_data[2] = free&255;
+            m_data[3] = free/256;
+            strcpy((char *) m_data+4, "BLOCKS FREE.");
+#else
+            uint32_t free = m_dir->media_image.size() ? m_dir->media_blocks_free : 0;
+            m_data[0] = 1;
+            m_data[1] = 1;
+            m_data[2] = free&255;
+            m_data[3] = free/256;
+            if( m_dir->media_image.size() )
+                strcpy((char *) m_data+4, "BLOCKS FREE.");
+            else
+                sprintf((char *) m_data+4, CBM_DELETE CBM_DELETE "%sBYTES FREE.", mstr::formatBytes(m_dir->getAvailableSpace()).c_str());
+#endif
+            int n = 4+strlen((char *) m_data+4);
+            while( n<29 ) m_data[n++]=' ';
+            m_data[29] = 0;
+            m_data[30] = 0;
             m_data[31] = 0;
             m_len = 32;
-          }
-
-          // // Full long name
-          // {
-          //   size_t n = (int) name.size();
-          //   memcpy(m_data+m_len, name.data(), n);
-
-          //   m_len += n;
-          //   m_data[m_len++] = '"';
-
-          //   // Extension gap
-          //   if (n<16)
-          //   {
-          //     n = 17-n;
-          //     while(n-->0) m_data[m_len++] = ' ';
-          //   }
-          //   else
-          //     m_data[m_len++] = ' ';
-
-          //   // Extension
-          //   memcpy(m_data+m_len, ext.data(), 3);
-          //   m_len+=3;
-          //   m_data[m_len++] = ' ';
-          //   m_data[m_len++] = 0;
-          // }
-        }
-      else
-        {
-          // no more entries => footer
-#ifdef IEC_FP_DOLPHIN
-          // DolphinDos' MultiDubTwo copy program needs the "BLOCKS FREE" footer line, otherwise it aborts when reading source
-          uint32_t free = m_dir->media_image.size() ? m_dir->media_blocks_free : std::min((int) m_dir->getAvailableSpace()/254, 65535);
-          m_data[0] = 1;
-          m_data[1] = 1;
-          m_data[2] = free&255;
-          m_data[3] = free/256;
-          strcpy((char *) m_data+4, "BLOCKS FREE.");
-#else
-          uint32_t free = m_dir->media_image.size() ? m_dir->media_blocks_free : 0;
-          m_data[0] = 1;
-          m_data[1] = 1;
-          m_data[2] = free&255;
-          m_data[3] = free/256;
-          if( m_dir->media_image.size() )
-            strcpy((char *) m_data+4, "BLOCKS FREE.");
-          else
-            sprintf((char *) m_data+4, CBM_DELETE CBM_DELETE "%sBYTES FREE.", mstr::formatBytes(m_dir->getAvailableSpace()).c_str());
-#endif
-          int n = 4+strlen((char *) m_data+4);
-          while( n<29 ) m_data[n++]=' ';
-          m_data[29] = 0;
-          m_data[30] = 0;
-          m_data[31] = 0;
-          m_len = 32;
-          m_headerLine = 0xFF;
+            m_headerLine = 0xFF;
         }
     }
 
-  return ST_OK;
+    return ST_OK;
 }
 
 
@@ -541,33 +548,33 @@ iecDrive::iecDrive(uint8_t devnum) : IECFileDevice(devnum)
 
 iecDrive::~iecDrive()
 {
-  for(int i=0; i<16; i++)
-    if( m_channels[i]!=nullptr )
-      close(i);
+    for(int i=0; i<16; i++)
+        if( m_channels[i]!=nullptr )
+            close(i);
 }
 
 void iecDrive::begin()
 {
-  IECFileDevice::begin();
+    IECFileDevice::begin();
 
-  Debug_printv("id[%d]", id());
-  m_host = nullptr;
-  m_statusCode = ST_DOSVERSION;
-  m_statusTrk  = 0;
-  m_numOpenChannels = 0;
-  m_cwd.reset( MFSOwner::File("/", true) );
+    Debug_printv("id[%d]", id());
+    m_host = nullptr;
+    m_statusCode = ST_DOSVERSION;
+    m_statusTrk  = 0;
+    m_numOpenChannels = 0;
+    m_cwd.reset( MFSOwner::File("/", true) );
 
-  m_memory.setROM("dos1541"); // Default to 1541 ROM
+    m_memory.setROM("dos1541"); // Default to 1541 ROM
 
-  m_vdrive = NULL;
+    m_vdrive = NULL;
 
-  for(int i=0; i<16; i++) 
-    m_channels[i] = nullptr;
+    for(int i=0; i<16; i++) 
+        m_channels[i] = nullptr;
 }
 
 bool iecDrive::open(uint8_t channel, const char *cname)
 {
-  Debug_printv("iecDrive::open(#%d, %d, \"%s\")", m_devnr, channel, cname);
+    Debug_printv("iecDrive::open(#%d, %d, \"%s\")", m_devnr, channel, cname);
 
 #ifdef ENABLE_DISPLAY
     LEDS.activity = true;
@@ -783,13 +790,13 @@ bool iecDrive::open(uint8_t channel, const char *cname)
                         m_numOpenChannels++;
                         setStatusCode(ST_OK);
 
-                        Debug_printv( "url[%s] pathInStream[%s] sf_url[%s]", f->url.c_str(), f->pathInStream.c_str(), f->sourceFile->url.c_str() );
-                        if( new_stream->has_subdirs )
-                        {
-                            // Filesystem supports sub directories => set m_cwd to parent directory of file
-                            Debug_printv( "Subdir Change Directory Here! stream[%s] > base[%s]", f->url.c_str(), f->base().c_str() );
-                            m_cwd.reset(MFSOwner::File(f->base()));
-                        }
+                        // Debug_printv( "url[%s] pathInStream[%s] sf_url[%s]", f->url.c_str(), f->pathInStream.c_str(), f->sourceFile->url.c_str() );
+                        // if( new_stream->has_subdirs )
+                        // {
+                        //     // Filesystem supports sub directories => set m_cwd to parent directory of file
+                        //     Debug_printv( "Subdir Change Directory Here! stream[%s] > base[%s]", f->url.c_str(), f->base().c_str() );
+                        //     m_cwd.reset(MFSOwner::File(f->base()));
+                        // }
                         // else
                         // {
                         //     // Handles media files that may have '/' as part of the filename

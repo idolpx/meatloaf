@@ -919,8 +919,8 @@ void iecFuji::copy_file_raw()
 
 void iecFuji::copy_file(std::string source, std::string destination)
 {
-    std::unique_ptr<MFile>in_file(MFSOwner::File(source));
-    std::unique_ptr<MFile>out_file(MFSOwner::File(destination));
+    std::unique_ptr<MFile> in_file(MFSOwner::File(source));
+    std::unique_ptr<MFile> out_file(MFSOwner::File(destination));
 
     // If destination is a directory then save with source filename
     if ( out_file->isDirectory() )

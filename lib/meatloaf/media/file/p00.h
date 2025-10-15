@@ -134,9 +134,9 @@ public:
     bool handles(std::string fileName) override {
         return byExtension(
             {
-                ".p??",
-                ".s??",
-                ".r??"
+                ".p00",
+                ".s00",
+                ".r00"
             }, 
             fileName, true
         );

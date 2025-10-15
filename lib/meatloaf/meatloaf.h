@@ -380,8 +380,8 @@ public:
 
 
         else if ( mstr::startsWith(header, "PK\x03\x04") ||
-             mstr::startsWith(header, "PK\x05\x06") ||
-             mstr::startsWith(header, "PK\x07\x08") )
+                  mstr::startsWith(header, "PK\x05\x06") ||
+                  mstr::startsWith(header, "PK\x07\x08") )
             extension = ".zip";
         else if ( mstr::startsWith(header, "Rar!\x1A\x07"))
             extension = ".rar";
@@ -514,6 +514,7 @@ public:
     static MFile* File(std::string name, bool default_fs = false);
     static MFile* File(std::shared_ptr<MFile> file);
     static MFile* File(MFile* file);
+    //static MFile* SourceFile(MFile* file);
     static MFile* NewFile(std::string name);
 
     static MFileSystem* scanPathLeft(std::vector<std::string> paths, std::vector<std::string>::iterator &pathIterator);

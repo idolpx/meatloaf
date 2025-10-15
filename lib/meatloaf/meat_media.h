@@ -188,6 +188,8 @@ public:
         Debug_printv("sourceFile[%s] sourceFile->pathInStream[%s]", (newFile->sourceFile != nullptr) ? newFile->sourceFile->url.c_str() : "nullptr", (newFile->sourceFile != nullptr) ? newFile->sourceFile->pathInStream.c_str() : "nullptr");
 
         std::string key = type + newFile->sourceFile->url;
+        if ( newFile->sourceFile->pathInStream.size() && newFile->sourceFile->pathInStream != "/" )
+            key += "/" + newFile->sourceFile->pathInStream;
         Debug_printv("key[%s]", key.c_str());
 
         // obviously you have to supply sourceFile.url to this function!
