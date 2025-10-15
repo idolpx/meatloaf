@@ -181,18 +181,18 @@ iecChannelHandlerFile::~iecChannelHandlerFile()
         writeBufferData();
 
     m_stream->close();
-    Debug_printv("Stream closed.");
+    //Debug_printv("Stream closed.");
 
     double cps = m_byteCount / seconds;
-    Debug_printv("%s %lu bytes in %0.2f seconds @ %0.2fcps", m_stream->mode == std::ios_base::in ? "Sent" : "Received", m_byteCount, seconds, cps);
+    //Debug_printv("%s %lu bytes in %0.2f seconds @ %0.2fcps", m_stream->mode == std::ios_base::in ? "Sent" : "Received", m_byteCount, seconds, cps);
 
     double tseconds = m_transportTimeUS / 1000000.0;
     cps = m_byteCount / (seconds-tseconds);
-    Debug_printv("Transport (network/sd) took %0.3f seconds, pure IEC transfers @ %0.2fcps", tseconds, cps);
+    //Debug_printv("Transport (network/sd) took %0.3f seconds, pure IEC transfers @ %0.2fcps", tseconds, cps);
 
 #ifdef ENABLE_DISPLAY
     LEDS.idle();
-    Debug_printv("Stop Activity");
+    //Debug_printv("Stop Activity");
 #endif
 
   //delete m_stream;
@@ -671,7 +671,7 @@ bool iecDrive::open(uint8_t channel, const char *cname)
             // get file
             MFile *f = m_cwd->cd( mstr::toUTF8( name ) );
             bool is_dir = f->isDirectory();
-            Debug_printv("isdir[%d] url[%s]", is_dir, f->url.c_str());
+            //Debug_printv("isdir[%d] url[%s]", is_dir, f->url.c_str());
 
             if (f == nullptr)  // || f->url.empty() )
             {
@@ -687,7 +687,7 @@ bool iecDrive::open(uint8_t channel, const char *cname)
                     // reading directory
                     bool isProperDir = false;
                     MFile *entry = f->getNextFileInDir();
-                    Debug_printv("First entry in directory [%s] is [%s] cwd[%s]", f->url.c_str(), entry==nullptr ? "NULL" : entry->name.c_str(), m_cwd->url.c_str());
+                    //Debug_printv("First entry in directory [%s] is [%s] cwd[%s]", f->url.c_str(), entry==nullptr ? "NULL" : entry->name.c_str(), m_cwd->url.c_str());
                     if( entry==nullptr )
                     {
                         // if we can't open the file stream then assume this is an empty directory
@@ -826,7 +826,7 @@ bool iecDrive::open(uint8_t channel, const char *cname)
 
 void iecDrive::close(uint8_t channel)
 {
-    Debug_printv("iecDrive::close(#%d, %d)", m_devnr, channel);
+    //Debug_printv("iecDrive::close(#%d, %d)", m_devnr, channel);
 
 //#ifdef USE_VDRIVE
     if( Meatloaf.use_vdrive &&  m_vdrive!=nullptr )
@@ -844,7 +844,7 @@ void iecDrive::close(uint8_t channel)
         delete m_channels[channel];
         m_channels[channel] = nullptr;
         if( m_numOpenChannels>0 ) m_numOpenChannels--;
-        Debug_printv("Channel %d closed.", channel);
+        //Debug_printv("Channel %d closed.", channel);
         ImageBroker::validate();
         ImageBroker::dump();
         Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "id[%d] cwd[%s]", m_devnr, m_cwd==nullptr ? "NULL" : m_cwd->url.c_str());

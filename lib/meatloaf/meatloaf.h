@@ -266,7 +266,7 @@ public:
             return true;
         }
 
-        Debug_printv("pathInStream[%s] sourcePathInStream[%s]", pathInStream.c_str(), sourceFile->pathInStream.c_str());
+        //Debug_printv("pathInStream[%s] sourcePathInStream[%s]", pathInStream.c_str(), sourceFile->pathInStream.c_str());
         if (pathInStream.empty() || pathInStream == "/")
             return true;
         else

@@ -186,48 +186,48 @@ public:
     template<class T> static std::shared_ptr<T> obtain(std::string type, std::string url) 
     {
         auto newFile = std::unique_ptr<MFile>(MFSOwner::File(url));
-        Debug_printv("newFile[%s] newFile->pathInStream[%s]", newFile->url.c_str(), newFile->pathInStream.c_str());
-        Debug_printv("sourceFile[%s] sourceFile->pathInStream[%s]", (newFile->sourceFile != nullptr) ? newFile->sourceFile->url.c_str() : "nullptr", (newFile->sourceFile != nullptr) ? newFile->sourceFile->pathInStream.c_str() : "nullptr");
+        //Debug_printv("newFile[%s] newFile->pathInStream[%s]", newFile->url.c_str(), newFile->pathInStream.c_str());
+        //Debug_printv("sourceFile[%s] sourceFile->pathInStream[%s]", (newFile->sourceFile != nullptr) ? newFile->sourceFile->url.c_str() : "nullptr", (newFile->sourceFile != nullptr) ? newFile->sourceFile->pathInStream.c_str() : "nullptr");
 
         std::string key = type + newFile->sourceFile->url;
         if ( newFile->sourceFile->pathInStream.size() && newFile->sourceFile->pathInStream != "/" )
             key += "/" + newFile->sourceFile->pathInStream;
-        Debug_printv("key[%s]", key.c_str());
+        //Debug_printv("key[%s]", key.c_str());
 
         // obviously you have to supply sourceFile.url to this function!
         if(image_repo.find(key)!=image_repo.end()) {
-            Debug_printv("stream found! type[%s] url[%s]", type.c_str(), url.c_str());
+            //Debug_printv("stream found! type[%s] url[%s]", type.c_str(), url.c_str());
             return std::static_pointer_cast<T>(image_repo.at(key));
         }
 
         // create and add stream to image broker if not found
-        Debug_printv("Creating New Stream type[%s] url[%s]", type.c_str(), url.c_str());
+        //Debug_printv("Creating New Stream type[%s] url[%s]", type.c_str(), url.c_str());
 
-        Debug_printv("before " ANSI_WHITE_BACKGROUND "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv");
+        //Debug_printv("before " ANSI_WHITE_BACKGROUND "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv");
         std::shared_ptr<T> newStream = std::static_pointer_cast<T>(newFile->getSourceStream());
-        Debug_printv("after  " ANSI_WHITE_BACKGROUND "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
+        //Debug_printv("after  " ANSI_WHITE_BACKGROUND "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
 
         if ( newStream != nullptr )
         {
-            Debug_printv("newFile->sourceFile url[%s] pathInStream[%s]", newFile->sourceFile->url.c_str(), newFile->sourceFile->pathInStream.c_str());
-            Debug_printv("newStream type[%s] url[%s]", type.c_str(), newStream->url.c_str());
+            //Debug_printv("newFile->sourceFile url[%s] pathInStream[%s]", newFile->sourceFile->url.c_str(), newFile->sourceFile->pathInStream.c_str());
+            //Debug_printv("newStream type[%s] url[%s]", type.c_str(), newStream->url.c_str());
     
             // Are we at the root of the pathInStream?
-            if ( newFile->isDirectory() )
-            {
-                Debug_printv("DIRECTORY [%s]", key.c_str());
-            }
-            else
-            {
-                Debug_printv("SINGLE FILE [%s]", key.c_str());
-            }
+            // if ( newFile->isDirectory() )
+            // {
+            //     Debug_printv("DIRECTORY [%s]", key.c_str());
+            // }
+            // else
+            // {
+            //     Debug_printv("SINGLE FILE [%s]", key.c_str());
+            // }
 
-            Debug_printv("image count[%lu]", image_repo.size());
+            //Debug_printv("image count[%lu]", image_repo.size());
             image_repo.insert(std::make_pair(key, newStream));
             return newStream;
         }
 
-        Debug_printv("fail!");
+        //Debug_printv("fail!");
         return nullptr;
     }
 
@@ -241,13 +241,13 @@ public:
             image_repo.erase(url);
             //delete toDelete;
         }
-        Debug_printv("streams[%d]", image_repo.size());
+        //Debug_printv("streams[%d]", image_repo.size());
     }
 
     static void validate() {
 
         for(auto& pair : image_repo) {
-            Debug_printv("key[%s] stream[%s]", pair.first.c_str(), pair.second->url.c_str());
+            //Debug_printv("key[%s] stream[%s]", pair.first.c_str(), pair.second->url.c_str());
         
             bool found = false;
             for (int i = 0; i < MAX_DISK_DEVICES; i++)
@@ -259,7 +259,7 @@ public:
                     auto cwd = drive->disk_dev.getCWD();
                     if ( cwd[cwd.size() - 1] == '/' )
                         cwd = cwd.substr(0, cwd.size() - 1);
-                    Debug_printv("id[%d] key[%s] cwd[%s]", i + 8, pair.first.c_str(), cwd.c_str());
+                    //Debug_printv("id[%d] key[%s] cwd[%s]", i + 8, pair.first.c_str(), cwd.c_str());
                     if (mstr::endsWith(pair.first, cwd.c_str()))
                     {
                         found = true;
@@ -271,7 +271,7 @@ public:
             // 
             if ( !found )
             {
-                Debug_printv("DISPOSING key[%s] stream[%s]", pair.first.c_str(), pair.second->url.c_str());
+                //Debug_printv("DISPOSING key[%s] stream[%s]", pair.first.c_str(), pair.second->url.c_str());
                 image_repo.erase(pair.first);
             }
         }

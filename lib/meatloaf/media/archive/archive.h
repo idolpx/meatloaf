@@ -159,7 +159,7 @@ class ArchiveMFile : public MFile {
     ArchiveMFile(std::string path) : MFile(path)
     {
         media_archive = name;
-        Debug_printv("constructor url[%s]", path.c_str());
+        //Debug_printv("constructor url[%s]", path.c_str());
     }
 
     ~ArchiveMFile() {
@@ -168,7 +168,7 @@ class ArchiveMFile : public MFile {
 
     std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> is) override
     {
-        Debug_printv("[%s]", is->url.c_str());
+        //Debug_printv("[%s]", is->url.c_str());
 
         return std::make_shared<ArchiveMStream>(is);
     }

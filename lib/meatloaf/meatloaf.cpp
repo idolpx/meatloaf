@@ -294,15 +294,15 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
 
                 //Debug_printv("Checking symbol[%s]", ellpsw->symbol);
                 if(ellpsw->handles(path)) {
-                    Debug_printv("Found other FS for symbol[%s]", ellpsw->symbol);
+                    //Debug_printv("Found other FS for symbol[%s]", ellpsw->symbol);
                     return ellpsw->getFile(path);
                 }
             }
         }
     }
 
-    Debug_println("vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv");
-    Debug_printv("targetPath[%s]", path.c_str());
+    //Debug_println("vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv");
+    //Debug_printv("targetPath[%s]", path.c_str());
 
     std::vector<std::string> paths = mstr::split(path,'/');
     auto pathIterator = paths.end();
@@ -313,7 +313,7 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
     MFileSystem *targetFileSystem = &defaultFS;
     if ( !default_fs )
     {
-        Debug_printv("Finding Target FS for path[%s]", path.c_str());
+        //Debug_printv("Finding Target FS for path[%s]", path.c_str());
         targetFileSystem = findParentFS(begin, pathIterator);
     }
 
@@ -326,25 +326,24 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
 
     if( begin == pathIterator )
     {
-        Debug_printv("** LOOK UP PATH NOT NEEDED   path[%s]", path.c_str());
+        //Debug_printv("** LOOK UP PATH NOT NEEDED   path[%s]", path.c_str());
         targetFile = targetFileSystem->getFile(path);
-        targetFile->pathInStream = sourcePathInStream;
+        //targetFile->pathInStream = sourcePathInStream;
         targetFile->type = targetFileSystem->symbol;
         targetFile->sourceFile = targetFileSystem->getFile(path);
         targetFile->sourceFile->pathInStream = sourcePathInStream;
         targetFile->sourceFile->type = targetFileSystem->symbol;
         targetFile->sourceFile->isWritable = targetFile->isWritable;   // This stream is writable if the container is writable
-        Debug_printv( ANSI_WHITE_BOLD "targetPathInStream[%s] is in sourcePath[%s][%s]", targetFile->pathInStream.c_str(), path.c_str(), targetFileSystem->symbol);
+        //Debug_printv( ANSI_WHITE_BOLD "targetPathInStream[%s] is in sourcePath[%s][%s]", targetFile->pathInStream.c_str(), path.c_str(), targetFileSystem->symbol);
     } 
     else
     {
         targetFile = targetFileSystem->getFile(sourcePath);
         targetFile->type = targetFileSystem->symbol;
         targetFile->pathInStream = sourcePathInStream;
-        Debug_printv( ANSI_WHITE_BOLD "targetPathInStream[%s] is in sourcePath[%s][%s]", targetFile->pathInStream.c_str(), sourcePath.c_str(), targetFileSystem->symbol);
+        //Debug_printv( ANSI_WHITE_BOLD "targetPathInStream[%s] is in sourcePath[%s][%s]", targetFile->pathInStream.c_str(), sourcePath.c_str(), targetFileSystem->symbol);
 
-        //path = sourcePath;
-        Debug_printv("** LOOK UP PATH: %s", sourcePath.c_str());
+        //Debug_printv("** LOOK UP PATH: %s", sourcePath.c_str());
 
         // Find the container filesystem
         MFileSystem *sourceFileSystem = &defaultFS;
@@ -352,7 +351,7 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
         {
             sourcePath = mstr::joinToString(&begin, &pathIterator, "/");
             sourcePathInStream = mstr::joinToString(&pathIterator, &end, "/");
-            Debug_printv("Finding Source FS for sourcePath[%s]", sourcePath.c_str());
+            //Debug_printv("Finding Source FS for sourcePath[%s]", sourcePath.c_str());
             sourceFileSystem = findParentFS(begin, pathIterator);
         }
 
@@ -369,28 +368,28 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
             targetFile->sourceFile = File(sourcePath);
             targetFile->sourceFile->pathInStream = sourcePathInStream;
         }
-        Debug_printv( ANSI_RED_BOLD "sourcePath[%s] sourcePathInStream[%s]", sourcePath.c_str(), sourcePathInStream.c_str());
+        //Debug_printv( ANSI_RED_BOLD "sourcePath[%s] sourcePathInStream[%s]", sourcePath.c_str(), sourcePathInStream.c_str());
 
         targetFile->sourceFile->type = sourceFileSystem->symbol;
         targetFile->isWritable = targetFile->sourceFile->isWritable;   // This stream is writable if the container is writable
-        Debug_printv( ANSI_WHITE_BOLD "sourcePathInStream[%s] is in sourcePath[%s][%s]", sourcePathInStream.c_str(), sourcePath.c_str(), sourceFileSystem->symbol);
+        //Debug_printv( ANSI_WHITE_BOLD "sourcePathInStream[%s] is in sourcePath[%s][%s]", sourcePathInStream.c_str(), sourcePath.c_str(), sourceFileSystem->symbol);
 
-        if (targetFile->sourceFile != nullptr)
-        {
-            Debug_printv("source good rootfs[%d][%s][%s]", sourceFileSystem->isRootFS, targetFile->sourceFile->url.c_str(), targetFile->sourceFile->pathInStream.c_str());
-        }
-        else
-            Debug_printv("source bad");
+        // if (targetFile->sourceFile != nullptr)
+        // {
+        //     Debug_printv("source good rootfs[%d][%s][%s]", sourceFileSystem->isRootFS, targetFile->sourceFile->url.c_str(), targetFile->sourceFile->pathInStream.c_str());
+        // }
+        // else
+        //     Debug_printv("source bad");
     }
 
-    if (targetFile != nullptr)
-    {
-        Debug_printv("target good rootfs[%d][%s][%s]", targetFileSystem->isRootFS, targetFile->url.c_str(), targetFile->pathInStream.c_str());
-    }
-    else
-        Debug_printv("target bad");
+    // if (targetFile != nullptr)
+    // {
+    //     Debug_printv("target good rootfs[%d][%s][%s]", targetFileSystem->isRootFS, targetFile->url.c_str(), targetFile->pathInStream.c_str());
+    // }
+    // else
+    //     Debug_printv("target bad");
 
-    Debug_println("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
+    // Debug_println("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
 
     return targetFile;
 }
@@ -539,32 +538,32 @@ std::shared_ptr<MStream> MFile::getSourceStream(std::ios_base::openmode mode) {
 
     if ( sourceFile == nullptr )
     {
-        Debug_printv("null sourceFile for path[%s]", path.c_str());
+        //Debug_printv("null sourceFile for path[%s]", path.c_str());
         return nullptr;
     }
 
     // has to return OPENED stream
-    Debug_printv( ANSI_CYAN_BOLD_HIGH_INTENSITY "sourceFile[%s] pathInStream[%s]", sourceFile->url.c_str(), pathInStream.c_str());
+    //Debug_printv( ANSI_CYAN_BOLD_HIGH_INTENSITY "sourceFile[%s] pathInStream[%s]", sourceFile->url.c_str(), pathInStream.c_str());
 
     auto sourceStream = sourceFile->getSourceStream(mode);
     if ( sourceStream == nullptr )
     {
-        Debug_printv("null sourceStream for path[%s]", path.c_str());
+        //Debug_printv("null sourceStream for path[%s]", path.c_str());
         return nullptr;
     }
 
     // will be replaced by streamBroker->getSourceStream(sourceFile, mode)
     std::shared_ptr<MStream> containerStream(sourceStream); // get its base stream, i.e. zip raw file contents
-    Debug_printv("containerStream isRandomAccess[%d] isBrowsable[%d] null[%s]", containerStream->isRandomAccess(), containerStream->isBrowsable(), (containerStream == nullptr) ? "null" : "good");
-    Debug_printv("containerStream url[%s]", containerStream->url.c_str());
+    //Debug_printv("containerStream isRandomAccess[%d] isBrowsable[%d] null[%s]", containerStream->isRandomAccess(), containerStream->isBrowsable(), (containerStream == nullptr) ? "null" : "good");
+    //Debug_printv("containerStream url[%s]", containerStream->url.c_str());
 
     // will be replaced by streamBroker->getDecodedStream(this, mode, containerStream)
     std::shared_ptr<MStream> decodedStream(getDecodedStream(containerStream)); // wrap this stream into decoded stream, i.e. unpacked zip files
-    Debug_printv("decodedStream isRandomAccess[%d] isBrowsable[%d] null[%s]", decodedStream->isRandomAccess(), decodedStream->isBrowsable(), (decodedStream == nullptr) ? "null" : "good");
-    Debug_printv("decodedStream url[%s]", decodedStream->url.c_str());
+    //Debug_printv("decodedStream isRandomAccess[%d] isBrowsable[%d] null[%s]", decodedStream->isRandomAccess(), decodedStream->isBrowsable(), (decodedStream == nullptr) ? "null" : "good");
+    //Debug_printv("decodedStream url[%s]", decodedStream->url.c_str());
 
 
-    Debug_printv("pathInStream[%s]", pathInStream.c_str());
+    //Debug_printv("pathInStream[%s]", pathInStream.c_str());
     if(decodedStream->isRandomAccess() && pathInStream.size() > 0)
     {
         // For files with a browsable random access directory structure
@@ -573,7 +572,7 @@ std::shared_ptr<MStream> MFile::getSourceStream(std::ios_base::openmode mode) {
 
         if(!foundIt)
         {
-            Debug_printv("path in stream not found");
+            //Debug_printv("path in stream not found");
             return nullptr;
         }        
         //decodedStream->url += "/" + pathInStream;
@@ -588,18 +587,18 @@ std::shared_ptr<MStream> MFile::getSourceStream(std::ios_base::openmode mode) {
         {
             if(mstr::compare(pathInStream, pointedFile))
             {
-                Debug_printv("returning decodedStream 1 [%s]", decodedStream->url.c_str());
+                //Debug_printv("returning decodedStream 1 [%s]", decodedStream->url.c_str());
                 return decodedStream;
             }
 
             pointedFile = decodedStream->seekNextEntry();
         }
-        Debug_printv("path in stream not found!");
+        //Debug_printv("path in stream not found!");
         if(pointedFile.empty())
             return nullptr;
     }
 
-    Debug_printv("returning decodedStream 2 [%s][%s]", decodedStream->url.c_str(), pathInStream.c_str());
+    //Debug_printv("returning decodedStream 2 [%s][%s]", decodedStream->url.c_str(), pathInStream.c_str());
     return decodedStream;
 };
 

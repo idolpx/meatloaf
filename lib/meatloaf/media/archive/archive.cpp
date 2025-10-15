@@ -507,7 +507,7 @@ MFile *ArchiveMFile::getNextFileInDir()
 
         auto file = MFSOwner::File(sourceFile->url + "/" + filename);
         file->size = image->entry.size;
-        Debug_printv("entry[%s] ext[%s] size[%lu]", file->name.c_str(), file->extension.c_str(), file->size);
+        //Debug_printv("entry[%s] ext[%s] size[%lu]", file->name.c_str(), file->extension.c_str(), file->size);
 
         return file;
     }
@@ -515,6 +515,6 @@ MFile *ArchiveMFile::getNextFileInDir()
 exit:
     dirIsOpen = false;
     image->m_archive->close();
-    Debug_printv( "END OF DIRECTORY" );
+    //Debug_printv( "END OF DIRECTORY" );
     return nullptr;
 }

@@ -575,12 +575,12 @@ bool D64MFile::format(std::string header_info)
 bool D64MFile::rewindDirectory()
 {
     dirIsOpen = true;
-    Debug_printv("url[%s] sourceFile->url[%s]", url.c_str(), sourceFile->url.c_str());
+    //Debug_printv("url[%s] sourceFile->url[%s]", url.c_str(), sourceFile->url.c_str());
     auto image = ImageBroker::obtain<D64MStream>("d64", url);
     if (image == nullptr)
         return false;
 
-    Debug_printv("image->url[%s]", image->url.c_str());
+    //Debug_printv("image->url[%s]", image->url.c_str());
     image->resetEntryCounter();
 
     // Set Media Info Fields
@@ -622,13 +622,13 @@ MFile* D64MFile::getNextFileInDir()
         filename = filename.substr(0, i);
         // mstr::rtrimA0(filename);
         mstr::replaceAll(filename, "/", "\\");
-        Debug_printv( "entry[%s]", (url + "/" + filename).c_str() );
+        //Debug_printv( "entry[%s]", (url + "/" + filename).c_str() );
 
         auto file = MFSOwner::File(url + "/" + filename);
         file->extension = image->decodeType(image->entry.file_type);
         file->size = image->entry.blocks * image->block_size;
 
-        Debug_printv("name[%s] ext[%s] size[%lu]", file->name.c_str(), file->extension.c_str(), file->size);
+        //Debug_printv("name[%s] ext[%s] size[%lu]", file->name.c_str(), file->extension.c_str(), file->size);
 
         return file;
     }
@@ -664,7 +664,7 @@ time_t D64MFile::getCreationTime()
 
 bool D64MFile::exists()
 {
-    Debug_printv("url[%s] sourceFile->url[%s]", url.c_str(), sourceFile->url.c_str());
+    //Debug_printv("url[%s] sourceFile->url[%s]", url.c_str(), sourceFile->url.c_str());
     auto stream = ImageBroker::obtain<D64MStream>("d64", url);
     if ( stream != nullptr )
         return true;
