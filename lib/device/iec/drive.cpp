@@ -845,9 +845,10 @@ void iecDrive::close(uint8_t channel)
         m_channels[channel] = nullptr;
         if( m_numOpenChannels>0 ) m_numOpenChannels--;
         Debug_printv("Channel %d closed.", channel);
-        Debug_memory();
+        ImageBroker::validate();
         ImageBroker::dump();
         Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "id[%d] cwd[%s]", m_devnr, m_cwd==nullptr ? "NULL" : m_cwd->url.c_str());
+        Debug_memory();
     }
 
 #ifdef ENABLE_DISPLAY

@@ -27,6 +27,8 @@
 
 #include "../../include/debug.h"
 
+#include "../device/iec/meatloaf.h"
+#include "../device/iec/fuji.h"
 #include "string_utils.h"
 
 
@@ -243,7 +245,36 @@ public:
     }
 
     static void validate() {
+
+        for(auto& pair : image_repo) {
+            Debug_printv("key[%s] stream[%s]", pair.first.c_str(), pair.second->url.c_str());
         
+            bool found = false;
+            for (int i = 0; i < MAX_DISK_DEVICES; i++)
+            {
+                // Show device status
+                auto drive = Meatloaf.get_disks(i);
+                if (drive != nullptr )
+                {
+                    auto cwd = drive->disk_dev.getCWD();
+                    if ( cwd[cwd.size() - 1] == '/' )
+                        cwd = cwd.substr(0, cwd.size() - 1);
+                    Debug_printv("id[%d] cwd[%s] url[%s]", i + 8, cwd.c_str(), pair.second->url.c_str());
+                    if (mstr::endsWith(cwd, pair.second->url.c_str()))
+                    {
+                        found = true;
+                        break;
+                    }
+                }
+            }
+
+            // 
+            if ( !found )
+            {
+                Debug_printv("DISPOSING key[%s] stream[%s]", pair.first.c_str(), pair.second->url.c_str());
+                image_repo.erase(pair.first);
+            }
+        }
     }
 
     static void clear() {
