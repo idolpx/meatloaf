@@ -446,9 +446,9 @@ uint8_t iecChannelHandlerDir::readBufferData()
             }
 
             // File name
-            std::string name = entry->pathInStream;
-            if ( name.empty() )
-                name = entry->name;
+            std::string name = entry->name;
+            if ( !mstr::contains(entry->pathInStream, name.c_str()) && entry->pathInStream.size() )
+                name = entry->pathInStream;
 
             if ( !m_dir->isPETSCII )
             {
