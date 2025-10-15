@@ -259,8 +259,8 @@ public:
                     auto cwd = drive->disk_dev.getCWD();
                     if ( cwd[cwd.size() - 1] == '/' )
                         cwd = cwd.substr(0, cwd.size() - 1);
-                    Debug_printv("id[%d] cwd[%s] url[%s]", i + 8, cwd.c_str(), pair.second->url.c_str());
-                    if (mstr::endsWith(cwd, pair.second->url.c_str()))
+                    Debug_printv("id[%d] key[%s] cwd[%s]", i + 8, pair.first.c_str(), cwd.c_str());
+                    if (mstr::endsWith(pair.first, cwd.c_str()))
                     {
                         found = true;
                         break;
