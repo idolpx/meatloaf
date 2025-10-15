@@ -404,7 +404,7 @@ int mount(int argc, char **argv)
     // Device ID
     int did = atoi(argv[1]) - 8;
 
-    std::string filename = "^" + getCurrentPath()->url;
+    std::string filename = getCurrentPath()->url;
     if ( argc > 2 )
     {
         // Use current path + filename
