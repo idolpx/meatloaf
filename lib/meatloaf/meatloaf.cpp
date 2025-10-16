@@ -755,7 +755,10 @@ MFile* MFile::cdLocalParent(std::string plus)
 MFile* MFile::cdRoot(std::string plus) 
 {
     Debug_printv("url[%s] path[%s] plus[%s]", url.c_str(), path.c_str(), plus.c_str());
-    return MFSOwner::File( "/" + plus, true );
+    if ( plus[0] != '/' )
+        plus = "/" + plus;
+
+    return MFSOwner::File( plus, true );
 };
 
 MFile* MFile::cdLocalRoot(std::string plus) 

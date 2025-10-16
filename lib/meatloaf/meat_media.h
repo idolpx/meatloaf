@@ -253,13 +253,20 @@ public:
             for (int i = 0; i < MAX_DISK_DEVICES; i++)
             {
                 // Show device status
+                //Debug_printv("Validating disk device id[%d]", i + 8);
                 auto drive = Meatloaf.get_disks(i);
                 if (drive != nullptr )
                 {
                     auto cwd = drive->disk_dev.getCWD();
+
+                    // remove trailing slash
                     if ( cwd[cwd.size() - 1] == '/' )
                         cwd = cwd.substr(0, cwd.size() - 1);
-                    //Debug_printv("id[%d] key[%s] cwd[%s]", i + 8, pair.first.c_str(), cwd.c_str());
+
+                    if ( cwd.empty() )
+                        continue;
+
+                    //Debug_printv("id[%d] key[%s] cwd[%s] found[%d]", i + 8, pair.first.c_str(), cwd.c_str(), found);
                     if (mstr::endsWith(pair.first, cwd.c_str()))
                     {
                         found = true;
@@ -268,10 +275,10 @@ public:
                 }
             }
 
-            // 
+            //Debug_printv("found[%d]", found);
             if ( !found )
             {
-                //Debug_printv("DISPOSING key[%s] stream[%s]", pair.first.c_str(), pair.second->url.c_str());
+                Debug_printv("DISPOSING key[%s] stream[%s]", pair.first.c_str(), pair.second->url.c_str());
                 image_repo.erase(pair.first);
             }
         }
