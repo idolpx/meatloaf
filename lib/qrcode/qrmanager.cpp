@@ -32,9 +32,9 @@ std::vector<uint8_t> QRManager::encode(const void* input, uint16_t length, uint8
         else
             data = std::string((char*)input);
 
-        printf("input[%s]\n", (char*)input);
+        //printf("input[%s]\n", (char*)input);
     }
-    printf("data[%s]\n", data.c_str());
+    //printf("data[%s]\n", data.c_str());
 
     int8_t err = 0;
     if (length > 0)

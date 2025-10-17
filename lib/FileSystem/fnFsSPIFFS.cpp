@@ -160,7 +160,11 @@ bool FileSystemSPIFFS::start()
 
     // Set our basepath
 #ifdef ESP_PLATFORM
+#ifndef BUILD_IEC
+    strlcpy(_basepath, "/spiffs", sizeof(_basepath));
+#else
     strlcpy(_basepath, "", sizeof(_basepath));
+#endif
 // ESP_PLATFORM
 #else
 // !ESP_PLATFORM
@@ -170,10 +174,10 @@ bool FileSystemSPIFFS::start()
 
 #ifdef ESP_PLATFORM
     esp_vfs_spiffs_conf_t conf = {
-      .base_path = _basepath,
-      .partition_label = "storage",
-      .max_files = 10, // from SPIFFS.h
-      .format_if_mount_failed = false
+        .base_path = _basepath,
+        .partition_label = "storage",
+        .max_files = 10, // from SPIFFS.h
+        .format_if_mount_failed = false
     };
     
     esp_err_t e = esp_vfs_spiffs_register(&conf);
@@ -181,7 +185,7 @@ bool FileSystemSPIFFS::start()
     if (e != ESP_OK)
     {
         Debug_printf("Failed to mount SPIFFS partition, err = %d\r\n", e);
-        _started = false;
+        //_started = false;
     }
     else
 #endif // ESP_PLATFORM

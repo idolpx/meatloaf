@@ -29,7 +29,6 @@
 #include "ssdp.h"
 #endif
 
-
 // Global object to manage WiFi
 WiFiManager fnWiFi;
 

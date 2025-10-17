@@ -61,7 +61,7 @@ static int _pinmode(int argc, char **argv)
     // }
     // else
     // {
-    //     Serial.Serial.printf("Invalid mode: Allowed modes are INPUT, OUTPUT, INPUT_PULLUP, INPUT_PULLDOWN, OUTPUT_OPEN_DRAIN\r\n");
+    //     Serial.printf("Invalid mode: Allowed modes are INPUT, OUTPUT, INPUT_PULLUP, INPUT_PULLDOWN, OUTPUT_OPEN_DRAIN\r\n");
     // }
 
     // pinMode(pin, mode);

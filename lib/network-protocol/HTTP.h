@@ -3,7 +3,7 @@
 
 #include <expat.h>
 
-#include "WEBDAV.h"
+#include "WebDAV.h"
 #include "FS.h"
 
 #ifdef ESP_PLATFORM

@@ -4,7 +4,6 @@
 #include <net/if.h>
 #include <pwd.h>
 #include <glob.h>
-#include <string.h>
 
 #if !defined(GLOB_NOMATCH)
 #define GLOB_NOMATCH -3

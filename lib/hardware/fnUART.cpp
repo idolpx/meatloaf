@@ -4,6 +4,7 @@
 
 
 #include "fnUART.h"
+#include "fnSystem.h"
 
 #include <soc/uart_reg.h>
 #include <hal/gpio_types.h>
@@ -46,24 +47,23 @@ void UARTManager::begin(int baud)
         end();
     }
 
-    uart_config_t uart_config =
-        {
-            .baud_rate = baud,
-            .data_bits = UART_DATA_8_BITS,
+    uart_config_t uart_config;
+    memset(&uart_config, 0, sizeof(uart_config));
+    uart_config.baud_rate = baud;
+    uart_config.data_bits = UART_DATA_8_BITS;
 #ifdef BUILD_LYNX
-            .parity = UART_PARITY_ODD,
+    uart_config.parity = UART_PARITY_ODD;
 #else
-            .parity = UART_PARITY_DISABLE,
+    uart_config.parity = UART_PARITY_DISABLE;
 #endif /* BUILD_LYNX */
-            .stop_bits = UART_STOP_BITS_1,
-            .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
-            .rx_flow_ctrl_thresh = 122, // No idea what this is for, but shouldn't matter if flow ctrl is disabled?
+    uart_config.stop_bits = UART_STOP_BITS_1;
+    uart_config.flow_ctrl = UART_HW_FLOWCTRL_DISABLE;
+    uart_config.rx_flow_ctrl_thresh = 122; // No idea what this is for, but shouldn't matter if flow ctrl is disabled?
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
-            .source_clk = UART_SCLK_DEFAULT
+    uart_config.source_clk = UART_SCLK_DEFAULT;
 #else
-            .use_ref_tick = false       // ?
+    uart_config.use_ref_tick = false;       // ?
 #endif
-        };
 
     // This works around an obscure hardware bug where resetting UART2 causes the TX to become corrupted
     // when the FIFO is reset by this function. Blame me for it -Thom
@@ -116,7 +116,29 @@ void UARTManager::begin(int baud)
 #ifndef PINMAP_COCO_CART           // do not invert for coco carts
 #ifndef PINMAP_FOENIX_OS9_D32PRO  // do not invert for Foenix
     if (_uart_num == 2)
-        uart_set_line_inverse(_uart_num, UART_SIGNAL_TXD_INV | UART_SIGNAL_RXD_INV);
+    {
+        // Start in DRIVEWIRE mode
+        // Set the initial buad rate based on which ROM image is selected by the A14/A15 dip switch on Rev000 or newer.
+        // If using an older Rev0 or Rev00 board, you will need to pull PIN_EPROM_A14 (IO36) up to 3.3V or 5V via a 10K
+        // resistor to have it default to the previous default of 57600 baud otherwise they will both read as low and you
+        // will get 38400 baud.
+        
+        fnSystem.set_pin_mode(PIN_EPROM_A14, gpio_mode_t::GPIO_MODE_INPUT, SystemManager::pull_updown_t::PULL_NONE);
+        fnSystem.set_pin_mode(PIN_EPROM_A15, gpio_mode_t::GPIO_MODE_INPUT, SystemManager::pull_updown_t::PULL_NONE);
+
+        if  (fnSystem.digital_read(PIN_EPROM_A14) == DIGI_HIGH && fnSystem.digital_read(PIN_EPROM_A15) == DIGI_HIGH)
+        {
+
+            // uart_set_line_inverse(_uart_num, UART_SIGNAL_TXD_INV | UART_SIGNAL_RXD_INV);
+            uart_set_line_inverse(_uart_num, UART_SIGNAL_RXD_INV);
+
+            Debug_printf("Dragon mode, set uart %d to RXD inverse.\r\n", _uart_num);
+        }
+        else
+        {
+            uart_set_line_inverse(_uart_num, UART_SIGNAL_TXD_INV | UART_SIGNAL_RXD_INV);
+        }
+    }
 #endif /* PINMAP_FOENIX_OS9_D32PRO */
 #endif /* PINMAP_COCO_CART */
 #endif /* BUILD_COCO */

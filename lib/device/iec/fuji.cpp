@@ -74,16 +74,16 @@ bool _validate_device_slot(uint8_t slot, const char *dmsg)
 
 static std::string dataToHexString(uint8_t *data, size_t len)
 {
-  std::string res;
-  char buf[10];
-  
-  for(size_t i=0; i<len; i++)
-    {
-      sprintf(buf, "%02X ", data[i]);
-      res += buf;
-    }
-  
-  return res;
+    std::string res;
+    char buf[10];
+    
+    for(size_t i=0; i<len; i++)
+        {
+        sprintf(buf, "%02X ", data[i]);
+        res += buf;
+        }
+    
+    return res;
 }
 
 
@@ -176,56 +176,56 @@ void logResponse(const void* data, size_t length)
 void iecFuji::process_cmd()
 {
 #ifdef ENABLE_DISPLAY
-  LEDS.activity = true;
+    LEDS.activity = true;
 #endif
-  Debug_printv("command: %s", dataToHexString((uint8_t *) payload.data(), payload.size()).c_str());
+    Debug_printv("command: %s", dataToHexString((uint8_t *) payload.data(), payload.size()).c_str());
 
-  responseV.clear();
-  response.clear();
-  is_raw_command = false;
-  if (current_fuji_cmd == -1) {
-    // this is a new command being sent
-    is_raw_command = (payload.size() == 2 && payload[0] == 0x01); // marker uint8_t
-    if (is_raw_command) {
-      Debug_printv("RAW command: %s", dataToHexString((uint8_t *) payload.data(), payload.size()).c_str());
-      
-      if (!is_supported(payload[1])) {
-        Debug_printv("ERROR: Unsupported cmd: x%02x, ignoring\r\n", payload[1]);
-        last_command = payload[1];
-        set_fuji_iec_status(DEVICE_ERROR, "Unrecognised command");
-        return;
-      }
-      // Debug_printf("RAW COMMAND - trying immediate action on it\r\n");
-      // if it is an immediate command (no parameters), current_fuji_cmd will be reset to -1,
-      // otherwise, it stays set until further data is received to process it
-      current_fuji_cmd = payload[1];
-      last_command = current_fuji_cmd;
-      process_immediate_raw_cmds();
-    } else if (payload.size() > 0) {
-      // "IEC: [EF] (E0 CLOSE  15 CHANNEL)" happens with an UNLISTEN, which has no command, so we can skip it to save trying BASIC commands
-      Debug_printv("BASIC command: %s", payload.c_str());
-      process_basic_commands();
-    }
-  } else {
-    // we're in the middle of some data, let's continue
-    // Debug_printf("IN CMD, processing data\r\n");
-    Debug_printv("RAW data: %s", dataToHexString((uint8_t *) payload.data(), payload.size()).c_str());
-    process_raw_cmd_data();
-  }
-
-  if (!responseV.empty() && is_raw_command) {
-    // only send raw back for a raw command, thus code can set "response", but we won't send it back as that's BASIC response
-    Debug_printv("RAW response: %s", dataToHexString(responseV.data(), responseV.size()).c_str());
-  }
-  else if(!response.empty() && !is_raw_command) {
-    // only send string response back for basic command
-    Debug_printv("BASIC response: %s", response.c_str());
-    responseV.assign(response.begin(), response.end());
+    responseV.clear();
     response.clear();
-  }
-  else {
-    Debug_printv("NO response");
-  }
+    is_raw_command = false;
+    if (current_fuji_cmd == -1) {
+        // this is a new command being sent
+        is_raw_command = (payload.size() == 2 && payload[0] == 0x01); // marker uint8_t
+        if (is_raw_command) {
+        Debug_printv("RAW command: %s", dataToHexString((uint8_t *) payload.data(), payload.size()).c_str());
+        
+        if (!is_supported(payload[1])) {
+            Debug_printv("ERROR: Unsupported cmd: x%02x, ignoring\r\n", payload[1]);
+            last_command = payload[1];
+            set_fuji_iec_status(DEVICE_ERROR, "Unrecognised command");
+            return;
+        }
+        // Debug_printf("RAW COMMAND - trying immediate action on it\r\n");
+        // if it is an immediate command (no parameters), current_fuji_cmd will be reset to -1,
+        // otherwise, it stays set until further data is received to process it
+        current_fuji_cmd = payload[1];
+        last_command = current_fuji_cmd;
+        process_immediate_raw_cmds();
+        } else if (payload.size() > 0) {
+        // "IEC: [EF] (E0 CLOSE  15 CHANNEL)" happens with an UNLISTEN, which has no command, so we can skip it to save trying BASIC commands
+        Debug_printv("BASIC command: %s", payload.c_str());
+        process_basic_commands();
+        }
+    } else {
+        // we're in the middle of some data, let's continue
+        // Debug_printf("IN CMD, processing data\r\n");
+        Debug_printv("RAW data: %s", dataToHexString((uint8_t *) payload.data(), payload.size()).c_str());
+        process_raw_cmd_data();
+    }
+
+    if (!responseV.empty() && is_raw_command) {
+        // only send raw back for a raw command, thus code can set "response", but we won't send it back as that's BASIC response
+        Debug_printv("RAW response: %s", dataToHexString(responseV.data(), responseV.size()).c_str());
+    }
+    else if(!response.empty() && !is_raw_command) {
+        // only send string response back for basic command
+        Debug_printv("BASIC response: %s", response.c_str());
+        responseV.assign(response.begin(), response.end());
+        response.clear();
+    }
+    else {
+        Debug_printv("NO response");
+    }
 }
 
 
@@ -260,9 +260,9 @@ void iecFuji::process_basic_commands()
     else if (payload.find("scan") != std::string::npos)
         net_scan_networks_basic();
     else if (payload.find("wifienable") != std::string::npos)
-      { Config.store_wifi_enabled(true); Config.save(); }
+        { Config.store_wifi_enabled(true); Config.save(); }
     else if (payload.find("wifidisable") != std::string::npos)
-      { Config.store_wifi_enabled(false); Config.save(); }
+        { Config.store_wifi_enabled(false); Config.save(); }
     else if (payload.find("wifistatus") != std::string::npos)
         net_get_wifi_status_basic();
     else if (payload.find("mounthost") != std::string::npos)
@@ -278,10 +278,10 @@ void iecFuji::process_basic_commands()
     else if (payload.find("closedir") != std::string::npos)
         close_directory_basic();
     else if (payload.find("gethost") != std::string::npos ||
-             payload.find("flh") != std::string::npos)
+            payload.find("flh") != std::string::npos)
         read_host_slots_basic();
     else if (payload.find("puthost") != std::string::npos ||
-             payload.find("fhost") != std::string::npos)
+            payload.find("fhost") != std::string::npos)
         write_host_slots_basic();
     else if (payload.find("getdrive") != std::string::npos)
         read_device_slots_basic();
@@ -313,6 +313,18 @@ void iecFuji::process_basic_commands()
         get_status_basic();
     else if (payload.find("localip") != std::string::npos)
         local_ip();
+    // else if (payload.find("netmask") != std::string::npos)
+    //     netmask();
+    // else if (payload.find("gateway") != std::string::npos)
+    //     gateway();
+    // else if (payload.find("dnsip") != std::string::npos)
+    //     dns_ip();
+    // else if (payload.find("macaddress") != std::string::npos)
+    //     mac_address();
+    // else if (payload.find("bssid") != std::string::npos)
+    //     bssid();
+    // else if (payload.find("fnversion") != std::string::npos)
+    //     fn_version();
     else if (payload.find("enable") != std::string::npos)
         enable_device_basic();
     else if (payload.find("disable") != std::string::npos)
@@ -1887,6 +1899,14 @@ void iecFuji::get_host_prefix()
     // TODO IMPLEMENT
 }
 
+// Public method to update host in specific slot
+fujiHost *iecFuji::set_slot_hostname(int host_slot, char *hostname)
+{
+    _fnHosts[host_slot].set_hostname(hostname);
+    _populate_config_from_slots();
+    return &_fnHosts[host_slot];
+}
+
 void iecFuji::read_device_slots_basic()
 {
     Debug_println("Fuji cmd: READ DEVICE SLOT");
@@ -2237,13 +2257,13 @@ std::vector<std::string> iecFuji::tokenize_basic_command(std::string command)
 {
     Debug_printf("Tokenizing basic command: %s\r\n", command.c_str());
 
-    // Replace the first ":" with "," for easy tokenization. 
+    // Replace the first ":" with "," for easy tokenization.
     // Assume it is fine to change the payload at this point.
     // Technically, "COMMAND,Param1,Param2" will work the smae, if ":" is not in a param value
     size_t endOfCommand = command.find(':');
     if (endOfCommand != std::string::npos)
         command.replace(endOfCommand,1,",");
-    
+
     std::vector<std::string> result =  util_tokenize(command, ',');
     return result;
 
@@ -2468,7 +2488,7 @@ std::string iecFuji::process_directory_entry(uint8_t maxlen, uint8_t addtlopts) 
 }
 
 std::string iecFuji::read_directory_entry(uint8_t maxlen, uint8_t addtlopts) {
-    return process_directory_entry(maxlen, addtlopts);    
+    return process_directory_entry(maxlen, addtlopts);
 }
 
 void iecFuji::hash_input_raw()

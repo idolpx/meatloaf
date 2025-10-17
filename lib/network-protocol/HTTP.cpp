@@ -2,6 +2,9 @@
  * HTTP implementation
  */
 
+#define VERBOSE_HTTP 1
+#define VERBOSE_PROTOCOL 1
+
 #include <cstring>
 
 #include "HTTP.h"
@@ -10,6 +13,7 @@
 
 #include "status_error_codes.h"
 #include "utils.h"
+#include "string_utils.h"
 #include "compat_string.h"
 
 #include <vector>
@@ -20,12 +24,12 @@
 Aux1 values
 ===========
 
-4 = GET, no headers, just grab data.
+4 = GET, with filename translation, URL encoding.
 5 = DELETE, no headers
 6 = PROPFIND, WebDAV directory
 8 = PUT, write data to server, XIO used to toggle headers to get versus data write
 9 = DELETE, with headers
-12 = GET, write sets headers to fetch, read grabs data
+12 = GET, pure and unmolested
 13 = POST, write sends post data to server, read grabs response, XIO used to change write behavior, toggle headers to get or headers to set.
 14 = PUT, write sends post data to server, read grabs response, XIO used to change write behavior, toggle headers to get or headers to set.
 DELETE, MKCOL, RMCOL, COPY, MOVE, are all handled via idempotent XIO commands.
@@ -110,8 +114,6 @@ bool NetworkProtocolHTTP::special_set_channel_mode(cmdFrame_t *cmdFrame)
         err = true;
     }
 
-    Debug_printv("cmd[%c] aux1[%d] aux2[%d] mode[%d]", cmdFrame->comnd, cmdFrame->aux1, cmdFrame->aux2, httpChannelMode);
-
     return err;
 }
 
@@ -119,25 +121,24 @@ bool NetworkProtocolHTTP::open_file_handle()
 {
 #ifdef VERBOSE_PROTOCOL
     Debug_printv("NetworkProtocolHTTP::open_file_handle() aux1[%d]\r\n", aux1_open);
-    Debug_printv("aux1_open[%d] aux2_open[%d]", aux1_open, aux2_open);
 #endif
     error = NETWORK_ERROR_SUCCESS;
 
     switch (aux1_open)
     {
-    case 4:  // GET with no headers, filename resolve
-    case 12: // GET with ability to set headers, no filename resolve.
+    case PROTOCOL_OPEN_READ:        // GET with no headers, filename resolve
+    case PROTOCOL_OPEN_READWRITE:   // GET with ability to set headers, no filename resolve.
         httpOpenMode = GET;
         break;
-    case 8: // WRITE, filename resolve, ignored if not found.
+    case PROTOCOL_OPEN_WRITE:       // WRITE, filename resolve, ignored if not found.
         httpOpenMode = PUT;
         break;
-    case 5: // DELETE with no headers
-    case 9: // DELETE with ability to set headers
+    case PROTOCOL_OPEN_HTTP_DELETE: // DELETE with no headers
+    case PROTOCOL_OPEN_APPEND:      // DELETE with ability to set headers
         httpOpenMode = DELETE;
         break;
-    case 13: // POST can set headers, also no filename resolve
-    case 14: // PUT with ability to set headers, no filename resolve
+    case PROTOCOL_OPEN_HTTP_POST:   // POST can set headers, also no filename resolve
+    case PROTOCOL_OPEN_HTTP_PUT:    // PUT with ability to set headers, no filename resolve
         httpOpenMode = POST;
         break;
     default:
@@ -321,14 +322,13 @@ bool NetworkProtocolHTTP::mount(PeoplesUrlParser *url)
         url->rebuildUrl();
     }
 
-#if 0
-    // this would allow to make path like "Homesoft Collection" (entered by user, not encoded) working
-    // but it currently breaks any URL using query component (e.g. query from lobby client: ?platform=atari)
-    // the issue is in url parser as it leaves query part in path component, it needs to be fixed first
-    std::string encoded = mstr::urlEncode(url->path);
-    url->path = encoded;
-    url->rebuildUrl();
-#endif
+    if (aux1_open == 4 || aux1_open == 8)
+    {
+        // We are opening a file, URL encode the path.
+        std::string encoded = mstr::urlEncode(url->path);
+        url->path = encoded;
+        url->rebuildUrl();
+    }
 
     return !client->begin(url->url);
 }
@@ -443,11 +443,7 @@ bool NetworkProtocolHTTP::status_file(NetworkStatus *status)
     {
     case DATA:
     {
-#ifdef ESP_PLATFORM
-        if (!fromInterrupt && resultCode == 0)
-#else
-        if (!fromInterrupt && (resultCode == 0 || (!client->is_transaction_done() && client->available() == 0)))
-#endif
+        if (!fromInterrupt && resultCode == 0 && aux1_open != OPEN_MODE_HTTP_PUT_H)
         {
 #ifdef VERBOSE_PROTOCOL
             Debug_printf("calling http_transaction\r\n");
@@ -565,7 +561,7 @@ bool NetworkProtocolHTTP::close_file_handle()
 
     if (client != nullptr)
     {
-        if (httpOpenMode == PUT)
+        if (httpOpenMode == PUT || aux1_open == OPEN_MODE_HTTP_PUT_H)
             http_transaction();
         client->close();
         fserror_to_error();
@@ -670,7 +666,6 @@ bool NetworkProtocolHTTP::write_file_handle_set_header(uint8_t *buf, unsigned sh
 
 bool NetworkProtocolHTTP::write_file_handle_send_post_data(uint8_t *buf, unsigned short len)
 {
-    Debug_printv("mode[%d] buf[%s]", httpOpenMode, buf);
     if (httpOpenMode != POST)
     {
         error = NETWORK_ERROR_INVALID_COMMAND;
@@ -683,15 +678,14 @@ bool NetworkProtocolHTTP::write_file_handle_send_post_data(uint8_t *buf, unsigne
 
 bool NetworkProtocolHTTP::write_file_handle_data(uint8_t *buf, unsigned short len)
 {
-    Debug_printv("mode[%d] buf[%s]", httpOpenMode, buf);
-    if (httpOpenMode != PUT)
+    if (httpOpenMode == PUT || aux1_open == OPEN_MODE_HTTP_PUT_H)
     {
-        error = NETWORK_ERROR_INVALID_COMMAND;
-        return true;
+        postData += std::string((char *)buf, len);
+        return false; // come back here later.
     }
 
-    postData += std::string((char *)buf, len);
-    return false; // come back here later.
+    error = NETWORK_ERROR_INVALID_COMMAND;
+    return true;
 }
 
 bool NetworkProtocolHTTP::stat()
@@ -741,14 +735,13 @@ void NetworkProtocolHTTP::http_transaction()
         client->create_empty_stored_headers(collect_headers);
     }
 
-    Debug_printv("mode[%d] aux1_open[%d] aux2_open[%d]", httpOpenMode, aux1_open, aux2_open);
     switch (httpOpenMode)
     {
     case GET:
         resultCode = client->GET();
         break;
     case POST:
-        if (aux1_open == 14)
+        if (aux1_open == OPEN_MODE_HTTP_PUT_H)
             resultCode = client->PUT(postData.c_str(), postData.size());
         else
             resultCode = client->POST(postData.c_str(), postData.size());
@@ -776,6 +769,9 @@ void NetworkProtocolHTTP::http_transaction()
 
     fserror_to_error();
     fileSize = bodySize = client->available();
+#ifdef VERBOSE_PROTOCOL
+    Debug_printf("NetworkProtocolHTTP::http_transaction() done, resultCode=%d, fileSize=%u\r\n", resultCode, fileSize);
+#endif
 }
 
 bool NetworkProtocolHTTP::rename(PeoplesUrlParser *url, cmdFrame_t *cmdFrame)

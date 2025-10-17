@@ -152,7 +152,6 @@ public:
     void yield();
 
     size_t copy_file(FileSystem *source_fs, const char *source_filename, FileSystem *dest_fs, const char *dest_filename, size_t buffer_hint = FILE_COPY_BUFFERSIZE);
-    size_t copy_file(std::string source, std::string destination, size_t buffer_hint = FILE_COPY_BUFFERSIZE);
     FILE *make_tempfile(FileSystem *fs, char *result_filename);
     FILE *make_tempfile(char *result_filename);
     void delete_tempfile(FileSystem *fs, const char *filename);

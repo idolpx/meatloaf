@@ -42,7 +42,6 @@
 
 #include "../../include/cbm_defines.h"
 
-
 // Buffering data when reading/writing streams because during regular (non-fastloader)
 // transmissions, the read/write functions are called for each single byte at a time and
 // reading/writing MStream one byte at a time can be time consuming.

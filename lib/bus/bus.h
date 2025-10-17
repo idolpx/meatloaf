@@ -19,7 +19,6 @@
 #define FN_BUS_PORT fnUartBUS  // TBD
 #endif
 
-
 #ifdef BUILD_ADAM
 #include "adamnet/adamnet.h"
 #define SYSTEM_BUS AdamNet

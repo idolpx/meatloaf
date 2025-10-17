@@ -186,10 +186,10 @@ static int ping(int argc, char **argv)
     uint16_t seqno;
     esp_ping_get_profile(ping, ESP_PING_PROF_SEQNO, &seqno, sizeof(seqno));
     
-    // //Make stdin input non blocking so we can query for input AND check ping seqno
-    // int flags = fcntl(fileno(stdin), F_GETFL, 0);
-    // fcntl(fileno(stdin), F_SETFL, flags | O_NONBLOCK);
+    //Make stdin input non blocking so we can query for input AND check ping seqno
 
+    //Wait for Ctrl+D or Ctr+C or that our task finishes
+    //The async tasks decrease number_of_pings, so wait for it to get to 0
     //Wait for Ctrl+D or Ctr+C or that our task finishes
     //while((number_of_pings == 0 || seqno < number_of_pings) && c != 4 && c != 3) {
     while((seqno < number_of_pings)) {
@@ -199,9 +199,9 @@ static int ping(int argc, char **argv)
         //Debug_printv("number_of_pings[%d] seqno[%d]\r\n", number_of_pings, seqno);
     }
 
-    // //Reset flags, so we dont end up destroying our terminal env later, when linenoise takes over again
-    // fcntl(fileno(stdin), F_SETFL, flags);
+    //Reset flags, so we dont end up destroying our terminal env later, when linenoise takes over again
 
+    //Print total statistics
     esp_ping_delete_session(ping);
     esp_ping_stop(ping);
     //Debug_printv("Done! number_of_pings[%d] seqno[%d]\r\n", number_of_pings, seqno);

@@ -341,12 +341,9 @@ bool FNJSON::parse()
     }
 
     // Debug_printf("S: %s\r\n", _parseBuffer.c_str());
-
     // only try and parse the buffer if it has data. Empty response doesn't need parsing.
     if (!_parseBuffer.empty())
     {
-        std::string b = util_hexdump(_parseBuffer.c_str(), _parseBuffer.size());
-        Debug_printf("%s", b.c_str());
         _json = cJSON_Parse(_parseBuffer.c_str());
     }
 

@@ -224,7 +224,7 @@ void main_setup()
     //     //IEC.enabled = true;
     // }
 
-#ifdef PARALLEL_BUS
+#ifdef PARALLEL_BUS_X
     // Setup Parallel Bus
     PARALLEL.setup();
     printf( ANSI_GREEN_BOLD "Parallel Bus Initialized" ANSI_RESET "\r\n" );

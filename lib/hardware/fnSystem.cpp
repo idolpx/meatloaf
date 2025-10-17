@@ -11,7 +11,7 @@
 #if CONFIG_IDF_TARGET_ESP32S3
 # include <hal/gpio_ll.h>
 #else
-# include <driver/dac.h>
+//# include <driver/dac.h>
 #endif
 #include <esp_idf_version.h>
 #include <esp_app_desc.h>
@@ -22,7 +22,7 @@
 #include "esp_adc/adc_cali.h"
 #include "esp_adc/adc_cali_scheme.h"
 #define ADC_WIDTH_12Bit ADC_BITWIDTH_12
-#define ADC_ATTEN_11db ADC_ATTEN_DB_11
+#define ADC_ATTEN_11db ADC_ATTEN_DB_12
 #else
 #include <driver/adc.h>
 #include <esp_adc_cal.h>
@@ -60,6 +60,7 @@
 #include "fsFlash.h"
 #include "fnFsSD.h"
 #include "fnWiFi.h"
+#include "fnLedStrip.h"
 #include "NetworkProtocolFactory.h"
 
 #ifdef BUILD_APPLE
@@ -112,12 +113,20 @@ static void card_detect_intr_task(void *arg)
     // Assert valid initial card status
     vTaskDelay(1);
     // Set card status before we enter the infinite loop
+#ifdef CARD_DETECT_HIGH
+    int card_detect_status = !gpio_get_level((gpio_num_t)(int)arg);
+#else
     int card_detect_status = gpio_get_level((gpio_num_t)(int)arg);
+#endif
 
     for (;;) {
         gpio_num_t gpio_num;
         if(xQueueReceive(card_detect_evt_queue, &gpio_num, portMAX_DELAY)) {
+#ifdef CARD_DETECT_HIGH
+            int level = !gpio_get_level(gpio_num);
+#else
             int level = gpio_get_level(gpio_num);
+#endif
             if (card_detect_status == level) {
                 printf("SD Card detect ignored (debounce)\r\n");
             }
@@ -136,18 +145,6 @@ static void card_detect_intr_task(void *arg)
 
 static void setup_card_detect(gpio_num_t pin)
 {
-    if (pin == GPIO_NUM_NC)
-        return;
-
-    static bool interrupt_initialized = false;
-
-    if (pin >= SOC_GPIO_PIN_COUNT) return;
-
-    if (!interrupt_initialized) {
-        esp_err_t err = gpio_install_isr_service(0 /* ESP_INTR_FLAG_IRAM */);
-        interrupt_initialized = (err == ESP_OK) || (err == ESP_ERR_INVALID_STATE);
-    }
-
     // Create a queue to handle card detect event from ISR
     card_detect_evt_queue = xQueueCreate(10, sizeof(gpio_num_t));
     // Start card detect task
@@ -181,6 +178,8 @@ SystemManager::SystemManager()
     memset(_currenttime_string,0,sizeof(_currenttime_string));
 #ifndef ESP_PLATFORM
     memset(_uname_string, 0, sizeof(_uname_string));
+#else    
+    ledstrip_found = fnLedStrip.present();
 #endif
     _hardware_version=0;
 }
@@ -673,10 +672,9 @@ int SystemManager::get_sio_voltage()
     }
 #else
     adc_oneshot_unit_handle_t adc1_handle;
-    adc_oneshot_unit_init_cfg_t init_config1 = {
-         .unit_id = ADC_UNIT_1,
-         .ulp_mode = ADC_ULP_MODE_DISABLE,
-    };
+    adc_oneshot_unit_init_cfg_t init_config1 {};
+    init_config1.unit_id = ADC_UNIT_1;
+    init_config1.ulp_mode = ADC_ULP_MODE_DISABLE;
 
     adc_oneshot_chan_cfg_t config = {
          .atten = ADC_ATTEN_11db,
@@ -698,11 +696,10 @@ int SystemManager::get_sio_voltage()
 #endif
 
 #if ADC_CALI_SCHEME_LINE_FITTING_SUPPORTED
-    adc_cali_line_fitting_config_t cali_config = {
-       .unit_id = ADC_UNIT_1,
-       .atten = ADC_ATTEN_11db,
-       .bitwidth = ADC_WIDTH_12Bit,
-    };
+    adc_cali_line_fitting_config_t cali_config {};
+    cali_config.unit_id = ADC_UNIT_1;
+    cali_config.atten = ADC_ATTEN_11db;
+    cali_config.bitwidth = ADC_WIDTH_12Bit;
     adc_cali_create_scheme_line_fitting(&cali_config, &adc_cali_handle);
 #endif
 
@@ -769,7 +766,7 @@ FILE *SystemManager::make_tempfile(FileSystem *fs, char *result_filename)
     else
         fname = buff;
 
-    sprintf(fname, "%08u", (unsigned)ms);
+    snprintf(fname, 9, "%08u", (unsigned)ms);
     return fs->file_open(fname, "wb+");
 }
 
@@ -850,48 +847,6 @@ size_t SystemManager::copy_file(FileSystem *source_fs, const char *source_filena
 
     return result;
 }
-
-size_t SystemManager::copy_file(std::string source, std::string destination, size_t buffer_hint)
-{
-    // NetworkData source_data, destination_data;
-    // source_data.urlParser = std::move(PeoplesUrlParser::parseURL(source));
-    // destination_data.urlParser = std::move(PeoplesUrlParser::parseURL(destination));
-
-    // Debug_printv("Creating protocol for source schema [%s]", source_data.urlParser->scheme.c_str());
-    // std::unique_ptr<NetworkProtocol> source_file;
-    // source_file = std::move(NetworkProtocolFactory::createProtocol(source_data.urlParser->scheme, source_data));
-
-    // Debug_printv("Creating protocol for destination schema [%s]", destination_data.urlParser->scheme.c_str());
-    // std::unique_ptr<NetworkProtocol> destination_file;
-    // destination_file = std::move(NetworkProtocolFactory::createProtocol(source_data.urlParser->scheme, source_data));
-
-    // NetworkStatus *source_status, *destination_status;
-
-    // size_t result = 0;
-    // source_file->status(source_status);
-    // destination_file->status(destination_status);
-    // do
-    // {
-    //     int byte_count = source_file->read(buffer_hint);
-    //     source_file->status(source_status);
-    //     if ( source_status->error )
-    //         return 0;
-
-    //     destination_data.transmitBuffer = source_data.receiveBuffer;
-    //     destination_file->write(byte_count);
-
-    //     destination_file->status(destination_status);
-    //     if ( destination_status->error )
-    //         return 0;
-
-    //     result += byte_count;
-    // } 
-    // while( source_status->connected && destination_status->connected );
-
-    // return result;
-    return 0;
-}
-
 
 // From esp32-hal-dac.c
 /*
@@ -1081,6 +1036,9 @@ const char *SystemManager::get_hardware_ver_str()
     case 1 :
         return "RS232 Prototype";
         break;
+    case 2 :
+        return "RS232 Rev1 ESP32S3";
+        break;
 #elif defined(BUILD_RC2014)
     /* RC2014 */
     case 1 :
@@ -1111,7 +1069,8 @@ void SystemManager::check_hardware_ver()
 
 #ifdef PINMAP_ESP32S3
 
-    setup_card_detect(PIN_CARD_DETECT);
+    if (PIN_CARD_DETECT != GPIO_NUM_NC)
+        setup_card_detect(PIN_CARD_DETECT);
     _hardware_version = 4;
 
 #endif /* PINMAP_ESP32S3 */
@@ -1168,6 +1127,7 @@ void SystemManager::check_hardware_ver()
     */  
     _hardware_version = 1;
     safe_reset_gpio = PIN_BUTTON_C;
+    setup_card_detect(PIN_CARD_DETECT);
 #elif defined(BUILD_APPLE)
     /*  Apple II
         Check all the madness :zany_face:
@@ -1333,9 +1293,15 @@ void SystemManager::check_hardware_ver()
 #elif defined(BUILD_RS232)
     /* RS232
     */
+#if CONFIG_IDF_TARGET_ESP32S3
+    _hardware_version = 2;
+    safe_reset_gpio = PIN_BUTTON_C;
+    setup_card_detect(PIN_CARD_DETECT); // enable SD card detect
+#else
     _hardware_version = 1;
     safe_reset_gpio = PIN_BUTTON_C;
     setup_card_detect(PIN_CARD_DETECT); // enable SD card detect
+#endif
 #elif defined(BUILD_RC2014)
     /* RC2014
     */
