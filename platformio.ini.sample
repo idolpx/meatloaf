@@ -41,8 +41,9 @@ description = Meatloaf Commodore to ESP32 WiFi Multifunction Firmware
 ; ESP32-S3
 ;environment = esp32-s3-devkitc-1           ; esp32s3 devkitc                             (ESP32-S3 2M/8M PSRAM, 8M/16M/32M Flash)
 ;environment = lolin-s3-pro                 ; Wemos Lolin S3 Pro                          (ESP32-S3 8M PSRAM, 16M Flash)
-;environment = lilygo-t-display-s3          ; LilyGO T-Display S3                         (ESP32-S3 8M PSRAM, 16M Flash)
+;environment = foenix-s3-pro                 ; Wemos Lolin S3 Pro                          (ESP32-S3 8M PSRAM, 16M Flash)
 ;environment = freenove-esp32-s3-wroom-1    ; Freenove ESP32-S3-WROOM-1                   (ESP32-S3 8M PSRAM, 16M Flash)
+;environment = lilygo-t-display-s3          ; LilyGO T-Display S3                         (ESP32-S3 8M PSRAM, 16M Flash)
 ;environment = esp32-1732s019               ; ESP32-1732S019 ST7789.                      (ESP32-S3 8M PSRAM, 16M Flash)
 ;environment = esp32-s3-zero                ;                                             (ESP32-S3 2M PSRAM, 4M Flash)
 ;environment = esp32-s3-super-mini          ;                                             (ESP32-S3 2M PSRAM, 4M Flash)
@@ -57,7 +58,7 @@ description = Meatloaf Commodore to ESP32 WiFi Multifunction Firmware
 ; Set flash size to 4M, 8M, 16M or 32M according to the enviornment you selected above
 ;flash_size = 4m
 ;flash_size = 8m
-flash_size = 16m
+;flash_size = 16m
 ;flash_size = 32m
 
 ; Choose SPIFFS or LITTLEFS for the filesystem used on internal flash
@@ -244,6 +245,8 @@ board = esp32-wroom32
 build_flags =
     ${env.build_flags}
     -D PINMAP_WROOM32
+    -D ENABLE_CONSOLE
+    -D MIN_CONFIG
 
 [env:esp32-wroom32-pi1541]
 extends = esp32_base
@@ -254,6 +257,8 @@ build_flags =
     -D NO_BUTTONS
     -D IEC_SPLIT_LINES
     -D IEC_INVERTED_LINES
+    -D ENABLE_CONSOLE
+    -D MIN_CONFIG
 
 [env:ttgo-t1]
 extends = esp32_base
@@ -262,6 +267,8 @@ build_flags =
     ${env.build_flags}
     -D PINMAP_TTGO_T1
     -D SD_CARD
+    -D ENABLE_CONSOLE
+    -D MIN_CONFIG
 
 [env:petdiskmaxv2]
 extends = esp32_base
@@ -272,6 +279,8 @@ build_flags =
     -D NO_BUTTONS
     -D SD_CARD
     -D ENABLE_GPIB
+    -D ENABLE_CONSOLE
+    -D MIN_CONFIG
 
 [env:wic64]
 extends = esp32_base
@@ -281,7 +290,7 @@ build_flags =
     -D PINMAP_WIC64
     -D ENABLE_CONSOLE
     -D MIN_CONFIG
-    ;-D PARALLEL_BUS
+    -D PARALLEL_BUS
 
 ; ESP32-S2
 [env:lolin-s2-mini]
@@ -310,12 +319,12 @@ build_flags =
     -D ENABLE_CONSOLE
     -D ENABLE_CONSOLE_TCP
 
-[env:lilygo-t-display-s3]
+[env:foenix-s3-pro]
 extends = esp32_base
 board = esp32-s3-wroom-1-n16r8
 build_flags =
     ${env.build_flags}
-    -D PINMAP_LILYGO_T_DISPLAY_S3
+    -D PINMAP_LOLIN_S3_PRO
     -D SD_CARD
     -D ENABLE_DISPLAY
     -D ENABLE_CONSOLE
@@ -327,6 +336,17 @@ board = esp32-s3-wroom-1-n16r8
 build_flags = 
     ${env.build_flags}
     -D PINMAP_FREENOVE_ESP32S3
+    -D SD_CARD
+    -D ENABLE_DISPLAY
+    -D ENABLE_CONSOLE
+    -D ENABLE_CONSOLE_TCP
+
+[env:lilygo-t-display-s3]
+extends = esp32_base
+board = esp32-s3-wroom-1-n16r8
+build_flags =
+    ${env.build_flags}
+    -D PINMAP_LILYGO_T_DISPLAY_S3
     -D SD_CARD
     -D ENABLE_DISPLAY
     -D ENABLE_CONSOLE
@@ -377,6 +397,7 @@ build_flags =
     -D ENABLE_CONSOLE
     -D ENABLE_CONSOLE_TCP
 
+
 ; ESP32-C3
 [env:esp32-c3-super-mini]
 extends = esp32_base
@@ -384,3 +405,6 @@ board = esp32-c3fn4
 build_flags =
     ${env.build_flags}
     -D PINMAP_ESP32_C3_SUPER_MINI
+    -D NO_BUTTONS
+    -D ENABLE_CONSOLE
+    -D MIN_CONFIG
