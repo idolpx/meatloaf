@@ -137,14 +137,6 @@ void Hash::compute_md5() {
         return;
     }
 
-#if 0
-    md5_context_t ctx;
-    esp_rom_md5_init(&ctx);
-    esp_rom_md5_update(&ctx, accumulated_data.data(), accumulated_data.size());
-    hash_output.resize(16);
-    esp_rom_md5_final((uint8_t*)&hash_output.data(), &ctx);
-#else
-
     hash_output.resize(16);
     mbedtls_md5((const unsigned char *)accumulated_data.data(), accumulated_data.size(), hash_output.data());
 
@@ -155,7 +147,6 @@ void Hash::compute_md5() {
     // hash_output.resize(16);
     // mbedtls_md5_finish(&ctx, hash_output.data());
     // mbedtls_md5_free(&ctx);
-#endif
 }
 
 void Hash::compute_sha1() {

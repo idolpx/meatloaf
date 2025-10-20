@@ -20,31 +20,28 @@
 /*
   Debugging Macros
 */
+#ifdef DEBUG
 #ifdef ESP_PLATFORM
 #ifdef ENABLE_CONSOLE
     #include "../lib/console/ESP32Console.h"
     #define Serial console
-#else
+#else // ENABLE_CONSOLE
     // Use FujiNet debug serial output
     #include "../lib/hardware/fnUART.h"
     #define Serial fnUartDebug
-#endif
-#endif
-
-#ifdef DEBUG
-#ifdef ESP_PLATFORM
+#endif // !ENABLE_CONSOLE
     #define Debug_print(...) Serial.print( __VA_ARGS__ )
     #define Debug_printf(...) Serial.printf( __VA_ARGS__ )
     #define Debug_println(...) Serial.println( __VA_ARGS__ )
 
     #define Debug_printv(format, ...) \
                 Serial.printf(ANSI_YELLOW "[%s:%u] %s(): " ANSI_GREEN_BOLD format ANSI_RESET "\r\n", \
-                  __FILE__, __LINE__, __FUNCTION__, \
-                  ##__VA_ARGS__)
+                    __FILE__, __LINE__, __FUNCTION__, \
+                    ##__VA_ARGS__)
 
     #define Debug_memory() {Debug_printv("Heap[%lu] Low[%lu] Task[%u]", esp_get_free_heap_size(), esp_get_free_internal_heap_size(), uxTaskGetStackHighWaterMark(NULL));}
     #define HEAP_CHECK(x) Debug_printf("HEAP CHECK %s " x "\r\n", heap_caps_check_integrity_all(true) ? "PASSED":"FAILED")
-#else
+#else // ESP_PLATFORM
     // Use util_debug_printf() helper function
     #include <utils.h>
 
@@ -55,8 +52,17 @@
 
     #define Debug_memory()
     #define HEAP_CHECK(x) Debug_printf("HEAP CHECK %s " x "\r\n", heap_caps_check_integrity_all(true) ? "PASSED":"FAILED")
-#endif
-#else
+#endif // !ESP_PLATFORM
+#else  // DEBUG
+#ifdef ENABLE_CONSOLE
+    #include "../lib/console/ESP32Console.h"
+    #define Serial console
+#else // ENABLE_CONSOLE
+    // Use FujiNet debug serial output
+    #include "../lib/hardware/fnUART.h"
+    #define Serial fnUartDebug
+#endif // !ENABLE_CONSOLE
+
     #define Debug_print(...)
     #define Debug_printf(...)
     #define Debug_println(...)

@@ -545,6 +545,7 @@ void iecFuji::process_immediate_raw_cmds()
         break;
     case FUJICMD_UPDATE_FIRMWARE:
         update_firmware();
+        break;
     default:
         // not an immediate command, so exit without changing current_fuji_cmd, as we need to be sent data
         was_immediate_cmd = false;

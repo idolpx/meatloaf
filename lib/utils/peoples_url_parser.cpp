@@ -55,7 +55,6 @@ void PeoplesUrlParser::processAuthorityPath(std::string authorityPath) {
         // keep the rest (incl. query) in path, it will be processed by processPath()
         path = authorityPath.substr(pos);
     }
-
 }
 
 void PeoplesUrlParser::processUserPass(std::string userPass) {
