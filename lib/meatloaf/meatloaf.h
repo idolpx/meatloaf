@@ -302,6 +302,15 @@ public:
     uint32_t size = 0;
     uint32_t _exists = true;
 
+    void dump() {
+        static int index = 0;
+        printf("index[%d] url[%s][%s][%s]\r\n", index, url.c_str(), pathInStream.c_str(), type.c_str());
+        index++;
+        if ( sourceFile != nullptr )
+            sourceFile->dump();
+        index--;
+    }
+
 protected:
     bool m_isNull;
 

@@ -65,6 +65,9 @@ std::shared_ptr<MStream> HTTPMFile::getSourceStream(std::ios_base::openmode mode
     // headers["Accept"] = "*/*";
     // headers["Accept-Encoding"] = "gzip, deflate";
     // etc.
+    if ( pathInStream.size() )
+        url += "/" + pathInStream;
+
     std::shared_ptr<MStream> istream = std::make_shared<HTTPMStream>(url, mode);
     //auto istream = StreamBroker::obtain<HTTPMStream>(url, mode);
     istream->open(mode);
@@ -231,22 +234,22 @@ bool HTTPMStream::isOpen() {
  * Meat HTTP client impls
  ********************************************************/
 bool MeatHttpClient::GET(std::string dstUrl) {
-    Debug_printv("GET");
+    Debug_printv("GET url[%s]", dstUrl.c_str());
     return open(dstUrl, HTTP_METHOD_GET);
 }
 
 bool MeatHttpClient::POST(std::string dstUrl) {
-    Debug_printv("POST");
+    Debug_printv("POST url[%s]", dstUrl.c_str());
     return open(dstUrl, HTTP_METHOD_POST);
 }
 
 bool MeatHttpClient::PUT(std::string dstUrl) {
-    Debug_printv("PUT");
+    Debug_printv("PUT url[%s]", dstUrl.c_str());
     return open(dstUrl, HTTP_METHOD_PUT);
 }
 
 bool MeatHttpClient::HEAD(std::string dstUrl) {
-    Debug_printv("HEAD");
+    Debug_printv("HEAD url[%s]", dstUrl.c_str());
     bool rc = open(dstUrl, HTTP_METHOD_HEAD);
     return rc;
 }

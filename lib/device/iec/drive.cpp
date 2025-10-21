@@ -180,7 +180,7 @@ iecChannelHandlerFile::~iecChannelHandlerFile()
         writeBufferData();
 
     m_stream->close();
-    //Debug_printv("Stream closed.");
+    Debug_printv("Stream closed.");
 
     double cps = m_byteCount / seconds;
     Debug_printv("%s %lu bytes in %0.2f seconds @ %0.2fcps", m_stream->mode == std::ios_base::in ? "Sent" : "Received", m_byteCount, seconds, cps);
@@ -556,7 +556,7 @@ void iecDrive::begin()
 {
     IECFileDevice::begin();
 
-    Debug_printv("id[%d]", id());
+    //Debug_printv("id[%d]", id());
     m_host = nullptr;
     m_statusCode = ST_DOSVERSION;
     m_statusTrk  = 0;
@@ -671,7 +671,7 @@ bool iecDrive::open(uint8_t channel, const char *cname)
             Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Changing directory to [%s][%s]", m_cwd->url.c_str(), name.c_str());
             MFile *f = m_cwd->cd( mstr::toUTF8( name ) );
             bool is_dir = f->isDirectory();
-            Debug_printv("isdir[%d] url[%s]", is_dir, f->url.c_str());
+            Debug_printv("isdir[%d] url[%s][%s]", is_dir, f->url.c_str(), f->pathInStream.c_str());
 
             if (f == nullptr)  // || f->url.empty() )
             {
@@ -789,24 +789,22 @@ bool iecDrive::open(uint8_t channel, const char *cname)
                         m_channels[channel] = new iecChannelHandlerFile(this, new_stream, is_dir ? 0x0801 : -1);
                         m_numOpenChannels++;
                         setStatusCode(ST_OK);
+                        m_cwd.reset(MFSOwner::File(f->url));
 
-                        Debug_printv( "url[%s] pathInStream[%s] sf_url[%s]", f->url.c_str(), f->pathInStream.c_str(), f->sourceFile->url.c_str() );
-                        if ( f->scheme.size() > 0 )
-                        {
-                            if( new_stream->has_subdirs )
-                            {
-                                // Filesystem supports sub directories => set m_cwd to parent directory of file
-                                Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Subdir Change Directory Here! stream[%s] > base[%s]", f->url.c_str(), f->base().c_str() );
-                                m_cwd.reset(MFSOwner::File(f->base()));
-                            }
-                            else
-                            {
-                                // Handles media files that may have '/' as part of the filename
-                                f = MFSOwner::File( new_stream->url );
-                                Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Change Directory Here! istream[%s] url[%s] > sourceFile[%s]", new_stream->url.c_str(), f->url.c_str(), f->sourceFile->url.c_str() );
-                                m_cwd.reset(MFSOwner::File(f->sourceFile));
-                            }
-                        }
+                        // Debug_printv( "url[%s] pathInStream[%s]", f->url.c_str(), f->pathInStream.c_str() );
+                        // if( new_stream->has_subdirs )
+                        // {
+                        //     // Filesystem supports sub directories => set m_cwd to parent directory of file
+                        //     Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Subdir Change Directory Here! stream[%s] > f[%s]", new_stream->url.c_str(), f->url.c_str() );
+                        //     m_cwd.reset(MFSOwner::File(f->url));
+                        // }
+                        // else
+                        // {
+                        //     // Handles media files that may have '/' as part of the filename
+                        //     f = MFSOwner::File( new_stream->url );
+                        //     Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Change Directory Here! stream[%s] > f[%s]", new_stream->url.c_str(), f->url.c_str() );
+                        //     m_cwd.reset(MFSOwner::File(f->sourceFile));
+                        // }
                     }
 
                     if ( m_statusCode != ST_OK )
@@ -817,6 +815,7 @@ bool iecDrive::open(uint8_t channel, const char *cname)
                 }
 
                 Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "m_cwd[%s]", m_cwd==nullptr ? "NULL" : m_cwd->url.c_str());
+                m_cwd->dump();
             }
             
             delete f;
@@ -852,6 +851,7 @@ void iecDrive::close(uint8_t channel)
         ImageBroker::dump();
         Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "id[%d] cwd[%s]", m_devnr, m_cwd==nullptr ? "NULL" : m_cwd->url.c_str());
         Debug_memory();
+        m_cwd->dump();
     }
 
 #ifdef ENABLE_DISPLAY

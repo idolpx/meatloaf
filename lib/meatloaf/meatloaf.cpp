@@ -330,10 +330,6 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
         targetFile = targetFileSystem->getFile(path);
         //targetFile->pathInStream = sourcePathInStream;
         targetFile->type = targetFileSystem->symbol;
-        targetFile->sourceFile = targetFileSystem->getFile(path);
-        targetFile->sourceFile->pathInStream = sourcePathInStream;
-        targetFile->sourceFile->type = targetFileSystem->symbol;
-        targetFile->sourceFile->isWritable = targetFile->isWritable;   // This stream is writable if the container is writable
         //Debug_printv( ANSI_WHITE_BOLD "targetPathInStream[%s] is in sourcePath[%s][%s]", targetFile->pathInStream.c_str(), path.c_str(), targetFileSystem->symbol);
     } 
     else
@@ -607,12 +603,6 @@ MFile* MFile::cd(std::string newDir)
 {
     Debug_printv("url[%s] cd[%s]", url.c_str(), newDir.c_str());
 
-    // OK to clarify - coming here there should be ONLY path or magicSymbol-path combo!
-    // NO "cd:xxxxx", no "/cd:xxxxx" ALLOWED here! ******************
-    //
-    // if you want to support LOAD"CDxxxxxx" just parse/drop the CD BEFORE calling this function
-    // and call it ONLY with the path you want to change into!
-
     if(newDir.find(':') != std::string::npos) 
     {
         // I can only guess we're CDing into another url scheme, this means we're changing whole path
@@ -669,6 +659,8 @@ MFile* MFile::cd(std::string newDir)
 
         // Add new directory to path
         MFile* newPath = MFSOwner::File(url + newDir);
+        Debug_printv("url[%s][%s]", newPath->url.c_str(), newPath->pathInStream.c_str());
+        newPath->dump();
 
         if(mstr::endsWith(newDir, ".url", false)) {
             // we need to get actual url

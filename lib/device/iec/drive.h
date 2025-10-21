@@ -138,7 +138,7 @@ class driveMemory
     if (!rom) {
       return false;
     }
-    Debug_printv("Drive ROM Loaded file[%s] size[%lu]", rom_file->url.c_str(), rom->size());
+    printf("Drive ROM Loaded file[%s] size[%lu]\r\n", rom_file->url.c_str(), rom->size());
     return true;
   }
 

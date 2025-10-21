@@ -74,7 +74,7 @@ std::shared_ptr<MStream> FlashMFile::getSourceStream(std::ios_base::openmode mod
 
     std::shared_ptr<MStream> istream = std::make_shared<FlashMStream>(full_path, mode);
     //auto istream = StreamBroker::obtain<FlashMStream>(full_path, mode);
-    Debug_printv( ANSI_CYAN_BOLD_HIGH_INTENSITY "basepath[%s] path[%s] pathInStream[%s] mode[%d]", basepath.c_str(), path.c_str(), pathInStream.c_str(), mode);
+    //Debug_printv( ANSI_CYAN_BOLD_HIGH_INTENSITY "basepath[%s] path[%s] pathInStream[%s] mode[%d]", basepath.c_str(), path.c_str(), pathInStream.c_str(), mode);
     istream->open(mode);   
     return istream;
 }
