@@ -24,8 +24,9 @@
 // ESP32 S3
 #include "pinmap/esp32-s3-devkitc-1.h"
 #include "pinmap/lolin-s3-pro.h"
-#include "pinmap/lilygo-t-display-s3.h"
+#include "pinmap/foenix-s3-ml.h"
 #include "pinmap/freenove-esp32-s3-wroom.h"
+#include "pinmap/lilygo-t-display-s3.h"
 #include "pinmap/esp32-1732s019.h"
 #include "pinmap/nodemcu-esp-s3-12k-kit.h"
 #include "pinmap/esp32-s3-zero.h"
