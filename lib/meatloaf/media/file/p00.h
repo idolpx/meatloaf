@@ -57,32 +57,18 @@ protected:
         return false;
     }
 
-    // bool getNextImageEntry() override {
-    //     if ( entry_index == 0 ) {
-    //         entry_index = 1;
-    //         readHeader();
-
-    //         _size = ( containerStream->size() - sizeof(header) );
-
-    //         return true;
-    //     }
-    //     return false;
-    // }
-
-    // // For files with no directory structure
-    // // tap, crt, tar
-    // std::string seekNextEntry() override {
-    //     seekCalled = true;
-    //     if ( getNextImageEntry() ) {
-    //         return header.filename;
-    //     }
-    //     return "";
-    // };
-
+    // This is a single load format so both of these are false
     bool isRandomAccess() override { return false; };
     bool isBrowsable() override { return false; };
 
-    uint32_t readFile(uint8_t* buf, uint32_t size) override;
+    uint32_t readFile(uint8_t* buf, uint32_t size) override {
+        uint32_t bytesRead = 0;
+
+        bytesRead += containerStream->read(buf, size);
+        _position += bytesRead;
+
+        return bytesRead;
+    }
     uint32_t writeFile(uint8_t* buf, uint32_t size) override { return 0; };
 
     Header header;

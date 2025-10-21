@@ -789,7 +789,15 @@ bool iecDrive::open(uint8_t channel, const char *cname)
                         m_channels[channel] = new iecChannelHandlerFile(this, new_stream, is_dir ? 0x0801 : -1);
                         m_numOpenChannels++;
                         setStatusCode(ST_OK);
-                        m_cwd.reset(MFSOwner::File(f->url));
+
+                        if ( new_stream->isRandomAccess() || new_stream->isBrowsable() )
+                        {
+                            m_cwd.reset(MFSOwner::File(f->url));
+                        }
+                        else
+                        {
+                            m_cwd.reset(MFSOwner::File(f->base()));
+                        }
 
                         // Debug_printv( "url[%s] pathInStream[%s]", f->url.c_str(), f->pathInStream.c_str() );
                         // if( new_stream->has_subdirs )
