@@ -33,14 +33,17 @@
 
 #include "../../../include/debug.h"
 #include "../../include/global_defines.h"
+
 //#include "../../include/version.h"
+//#define PRODUCT_ID "MEATLOAF CBM"
+//#define PLATFORM_DETAILS "C64; 6510; 2; NTSC; EN;" // Make configurable. This will help server side to select appropriate content.
+//#define USER_AGENT "MEATLOAF/" FN_VERSION_FULL " (" PLATFORM_DETAILS ")"
+
+
 #include "utils.h"
 
 #define HTTP_BLOCK_SIZE 256
 
-//#define PRODUCT_ID "MEATLOAF CBM"
-//#define PLATFORM_DETAILS "C64; 6510; 2; NTSC; EN;" // Make configurable. This will help server side to select appropriate content.
-//#define USER_AGENT "MEATLOAF/" FN_VERSION_FULL " (" PLATFORM_DETAILS ")"
 
 class MeatHttpClient {
     esp_http_client_handle_t _http = nullptr;

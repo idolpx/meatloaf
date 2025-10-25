@@ -62,14 +62,17 @@
 // Reset line is available
 #define IEC_HAS_RESET
 
-#define PIN_IEC_ATN             GPIO_NUM_32
-#define PIN_IEC_CLK_IN          GPIO_NUM_33
-#define PIN_IEC_CLK_OUT         GPIO_NUM_33
-#define PIN_IEC_DATA_IN         GPIO_NUM_25
-#define PIN_IEC_DATA_OUT        GPIO_NUM_25
-#define PIN_IEC_SRQ             GPIO_NUM_26
-#define PIN_IEC_RESET           GPIO_NUM_34
-// GND - Be sure to connect GND of the IEC cable to GND on the ESP module
+                                                //            WIRING
+                                                //  C64    DIN6    D32Pro          TFT
+#define PIN_IEC_ATN             GPIO_NUM_32     //  ATN    3       A T-LED 32      10 (PURPLE)
+#define PIN_IEC_CLK_IN          GPIO_NUM_33     //  CLK    4       A T-RST 33      8  (BROWN)
+#define PIN_IEC_CLK_OUT         GPIO_NUM_33     //
+#define PIN_IEC_DATA_IN         GPIO_NUM_25     //  DATA   5       T-CS 14         2  (BLACK)
+#define PIN_IEC_DATA_OUT        GPIO_NUM_25     //
+#define PIN_IEC_SRQ             GPIO_NUM_26     //  SRQ    1       T-DC 27         7  (ORANGE)
+#define PIN_IEC_RESET           GPIO_NUM_34     //  RESET  6       A 34            N/C
+                                                //  GND    2       GND             9  (GREY)
+
 
 // IEEE-488
 #define PIN_GPIB_ATN         PIN_IEC_ATN         // Attention

@@ -47,7 +47,7 @@ class iecDrive;
 
 class iecChannelHandler
 {
- public:
+public:
   iecChannelHandler(iecDrive *drive);
   virtual ~iecChannelHandler();
 
@@ -58,7 +58,7 @@ class iecChannelHandler
   virtual uint8_t readBufferData()  = 0;
   virtual std::shared_ptr<MStream> getStream() { return nullptr; };
 
- protected:
+protected:
   iecDrive *m_drive;
   uint8_t  *m_data;
   size_t    m_len, m_ptr;
@@ -67,7 +67,7 @@ class iecChannelHandler
 
 class iecChannelHandlerFile : public iecChannelHandler
 {
- public: 
+public: 
   iecChannelHandlerFile(iecDrive *drive, std::shared_ptr<MStream> stream, int fixLoadAddress = -1);
   virtual ~iecChannelHandlerFile();
 
@@ -75,7 +75,7 @@ class iecChannelHandlerFile : public iecChannelHandler
   virtual uint8_t writeBufferData();
   virtual std::shared_ptr<MStream> getStream() override { return m_stream; };
 
- private:
+private:
   std::shared_ptr<MStream> m_stream;
   int       m_fixLoadAddress;
   uint32_t  m_byteCount;
@@ -85,14 +85,14 @@ class iecChannelHandlerFile : public iecChannelHandler
 
 class iecChannelHandlerDir : public iecChannelHandler
 {
- public: 
+public: 
   iecChannelHandlerDir(iecDrive *drive, MFile *dir);
   virtual ~iecChannelHandlerDir();
 
   virtual uint8_t readBufferData();
   virtual uint8_t writeBufferData();
 
- private:
+private:
   void addExtraInfo(std::string title, std::string text);
   
   MFile   *m_dir;
@@ -103,15 +103,15 @@ class iecChannelHandlerDir : public iecChannelHandler
 
 class driveMemory
 {
- private:
+private:
   // TODO: Utilize ESP32 HighMemory API to access unused 4MB of PSRAM
   std::vector<uint8_t> ram;         // 0000-07FF  RAM
   // uint8_t via1[1024] = { 0x00 }; // 1800-1BFF  6522 VIA1
   // uint8_t via2[1024] = { 0x00 }; // 1C00-1FFF  6522 VIA2
   std::shared_ptr<MStream> rom;     // C000-FFFF  ROM 16KB
 
- public:
-   driveMemory(size_t ramSize = 2048) : ram(ramSize, 0x00) {
+public:
+  driveMemory(size_t ramSize = 2048) : ram(ramSize, 0x00) {
     //setROM("dos1541"); // Default to 1541 ROM
   }
   ~driveMemory() = default;
@@ -237,7 +237,7 @@ class driveMemory
 
 class iecDrive : public IECFileDevice
 {
- public:
+public:
   iecDrive(uint8_t devnum = 0x00);
   ~iecDrive();
 
@@ -259,7 +259,7 @@ class iecDrive : public IECFileDevice
   //virtual bool isActive() { return device_active; }
 
 
- protected:
+protected:
   // initialize device
   virtual void begin();
 

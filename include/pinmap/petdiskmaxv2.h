@@ -54,14 +54,14 @@
 
 #define PIN_GPIB_DATADIR     GPIO_NUM_15
 
-#define PIN_GPIB_DATA0       GPIO_NUM_32
-#define PIN_GPIB_DATA1       GPIO_NUM_33
-#define PIN_GPIB_DATA2       GPIO_NUM_25
-#define PIN_GPIB_DATA3       GPIO_NUM_26
-#define PIN_GPIB_DATA4       GPIO_NUM_27
-#define PIN_GPIB_DATA5       GPIO_NUM_14
-#define PIN_GPIB_DATA6       GPIO_NUM_12
-#define PIN_GPIB_DATA7       GPIO_NUM_13
+#define PIN_PARALLEL_DATA0       GPIO_NUM_32
+#define PIN_PARALLEL_DATA1       GPIO_NUM_33
+#define PIN_PARALLEL_DATA2       GPIO_NUM_25
+#define PIN_PARALLEL_DATA3       GPIO_NUM_26
+#define PIN_PARALLEL_DATA4       GPIO_NUM_27
+#define PIN_PARALLEL_DATA5       GPIO_NUM_14
+#define PIN_PARALLEL_DATA6       GPIO_NUM_12
+#define PIN_PARALLEL_DATA7       GPIO_NUM_13
 
 // The eight DIO lines carry the data bytes.
 // The NRFD, DAV and NDAC lines are used to perform handshaking.

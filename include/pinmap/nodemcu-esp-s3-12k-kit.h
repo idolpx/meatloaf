@@ -17,10 +17,10 @@
 #define PIN_CARD_DETECT         GPIO_NUM_NC // fnSystem.h
 #define PIN_CARD_DETECT_FIX     GPIO_NUM_NC // fnSystem.h
 
-#define PIN_SD_HOST_CS          GPIO_NUM_46
-#define PIN_SD_HOST_MISO        GPIO_NUM_13
-#define PIN_SD_HOST_MOSI        GPIO_NUM_11
-#define PIN_SD_HOST_SCK         GPIO_NUM_12
+#define PIN_SD_HOST_CS          GPIO_NUM_41
+#define PIN_SD_HOST_MISO        GPIO_NUM_40  // SD_DATA (MISO/DAT0/DATA OUT)
+#define PIN_SD_HOST_MOSI        GPIO_NUM_38  // SD_CMD (MOSI/CMD/DATA IN)
+#define PIN_SD_HOST_SCK         GPIO_NUM_39  // SD_CLK (SCK/CLK)
 
 /* UART */
 #define PIN_UART0_RX            GPIO_NUM_44  // fnUART.cpp
@@ -37,8 +37,11 @@
 
 /* LEDs */
 #define PIN_LED_WIFI            GPIO_NUM_5   // led.cpp
-#define PIN_LED_BUS             GPIO_NUM_NC
-#define PIN_LED_BT              GPIO_NUM_NC
+#define PIN_LED_BUS             GPIO_NUM_38
+#define PIN_LED_BT              GPIO_NUM_39
+#define PIN_LED_R               GPIO_NUM_5
+#define PIN_LED_G               GPIO_NUM_6
+#define PIN_LED_B               GPIO_NUM_7
 
 /* Audio Output */
 #define PIN_DAC1                GPIO_NUM_NC // samlib.h
@@ -53,16 +56,16 @@
 
 // Reset line is available
 #define IEC_HAS_RESET
-                                                //            WIRING
-                                                //  C64    DIN6    D32Pro          TFT
-#define PIN_IEC_ATN             GPIO_NUM_4      //  ATN    3       A T-LED 32      10 (PURPLE)
-#define PIN_IEC_CLK_IN          GPIO_NUM_5      //  CLK    4       A T-RST 33      8  (BROWN)
-#define PIN_IEC_CLK_OUT         GPIO_NUM_5      //
-#define PIN_IEC_DATA_IN         GPIO_NUM_6      //  DATA   5       T-CS 14         2  (BLACK)
-#define PIN_IEC_DATA_OUT        GPIO_NUM_6      //
-#define PIN_IEC_SRQ             GPIO_NUM_7      //  SRQ    1       T-DC 27         7  (ORANGE)
-#define PIN_IEC_RESET           GPIO_NUM_15     //  RESET  6       A 32            N/C
-                                                //  GND    2       GND             9  (GREY)
+                                                //    WIRING
+                                                //  C64    DIN6
+#define PIN_IEC_ATN             GPIO_NUM_4      //  ATN    3
+#define PIN_IEC_CLK_IN          GPIO_NUM_11     //  CLK    4
+#define PIN_IEC_CLK_OUT         GPIO_NUM_11     //
+#define PIN_IEC_DATA_IN         GPIO_NUM_13     //  DATA   5
+#define PIN_IEC_DATA_OUT        GPIO_NUM_13     //
+#define PIN_IEC_SRQ             GPIO_NUM_14     //  SRQ    1
+#define PIN_IEC_RESET           GPIO_NUM_8      //  RESET  6
+                                                //  GND    2
 
 
 /* Modem/Parallel Switch */

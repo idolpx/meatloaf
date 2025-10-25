@@ -78,10 +78,10 @@
  * @class systemBus
  * @brief the system bus that all virtualDevices attach to.
  */
-class gpiBus : public GPIBusHandler
+class GPIBus : public GPIBusHandler
 {
 public:
-    gpiBus();
+    GPIBus();
 
     /**
      * @brief called in main.cpp to set up the bus.
@@ -104,7 +104,7 @@ public:
      */
     bool getShuttingDown() { return shuttingDown; }
 
- private:
+private:
     /**
      * @brief is device shutting down?
      */
@@ -114,6 +114,6 @@ public:
 /**
  * @brief Return
  */
-extern gpiBus GPIB;
+extern GPIBus GPIB;
 
 #endif /* GPIB_H */

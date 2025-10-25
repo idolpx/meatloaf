@@ -35,17 +35,17 @@
 #define MAIN_PRIORITY	 17
 #define MAIN_CPUAFFINITY 1
 
-gpiBus GPIB;
+GPIBus GPIB;
 
-gpiBus::gpiBus() : 
+GPIBus::GPIBus() : 
   GPIBusHandler(PIN_GPIB_ATN, 
                 PIN_GPIB_DAV, PIN_GPIB_NRFD, PIN_GPIB_NDAC, PIN_GPIB_EOI,
                 PIN_GPIB_IFC==GPIO_NUM_NC ? 0xFF : PIN_GPIB_IFC,
                 0xFF,
                 PIN_GPIB_SRQ==GPIO_NUM_NC   ? 0xFF : PIN_GPIB_SRQ)
 {
-#ifdef GPIB_SUPPORT_PARALLEL
-#ifdef GPIB_SUPPORT_PARALLEL_XRA1405
+#ifdef IEC_SUPPORT_PARALLEL
+#ifdef IEC_SUPPORT_PARALLEL_XRA1405
   setParallelPins(PIN_PARALLEL_FLAG2 == GPIO_NUM_NC ? 0xFF : PIN_PARALLEL_FLAG2,
                   PIN_PARALLEL_PC2   == GPIO_NUM_NC ? 0xFF : PIN_PARALLEL_PC2,
                   PIN_SD_HOST_SCK    == GPIO_NUM_NC ? 0xFF : PIN_SD_HOST_SCK,
@@ -53,7 +53,17 @@ gpiBus::gpiBus() :
                   PIN_SD_HOST_MISO   == GPIO_NUM_NC ? 0xFF : PIN_SD_HOST_MISO,
                   PIN_XRA1405_CS     == GPIO_NUM_NC ? 0xFF : PIN_XRA1405_CS);
 #else
-#error "Can only support DolphinDos/SpeedDos using XRA1405 port expander"
+//#error "Can only support DolphinDos/SpeedDos using XRA1405 port expander"
+  setParallelPins(PIN_PARALLEL_FLAG2 == GPIO_NUM_NC ? 0xFF : PIN_PARALLEL_FLAG2,
+                  PIN_PARALLEL_PC2   == GPIO_NUM_NC ? 0xFF : PIN_PARALLEL_PC2,
+                  PIN_PARALLEL_DATA0,
+                  PIN_PARALLEL_DATA1,
+                  PIN_PARALLEL_DATA2,
+                  PIN_PARALLEL_DATA3,
+                  PIN_PARALLEL_DATA4,
+                  PIN_PARALLEL_DATA5,
+                  PIN_PARALLEL_DATA6,
+                  PIN_PARALLEL_DATA7);
 #endif
 #endif
 }
@@ -77,9 +87,9 @@ static void ml_gpib_intr_task(void* arg)
 //     return;
 // }
 
-void gpiBus::setup()
+void GPIBus::setup()
 {
-  Debug_printf("GPIB gpiBus::setup()\r\n");
+  Debug_printf("GPIB GPIBus::setup()\r\n");
   begin();
 
 //     // initial pin modes in GPIO
@@ -105,7 +115,7 @@ void gpiBus::setup()
 }
 
 
-void gpiBus::service()
+void GPIBus::service()
 {
   task();
   
@@ -133,9 +143,9 @@ void gpiBus::service()
 }
 
 
-void gpiBus::shutdown()
+void GPIBus::shutdown()
 {
-  printf("GPIB gpiBus::shutdown()\r\n");
+  printf("GPIB GPIBus::shutdown()\r\n");
 }
 
 

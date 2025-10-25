@@ -5,6 +5,10 @@
 
 #include "fnFsSD.h"
 
+#include <string>
+
+#define PRINTER_OUTFILE "/paper.pdf"
+
 // TODO: Combine html_printer.cpp/h and file_printer.cpp/h
 
 // I think the way we're using this value is as a switch to tell the printer
@@ -32,6 +36,7 @@ protected:
     FileSystem *_FS = nullptr;
     FILE * _file = nullptr;
     paper_t _paper_type = RAW;
+    std::string _paper_file = PRINTER_OUTFILE;
     bool _eol_bypass = false;
 
     // ATARI THINGS
@@ -87,6 +92,11 @@ public:
 
     uint8_t getEOL() { return _eol; }
 
+    bool setPaperFile(std::string filename)
+    {
+        _paper_file = filename;
+        return true;
+    }
 };
 
 #endif // PRINTER_EMU_H

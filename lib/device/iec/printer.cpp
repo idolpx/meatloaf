@@ -19,6 +19,14 @@
 
 constexpr const char *const iecPrinter::printer_model_str[PRINTER_INVALID];
 
+// Constructor just sets a default printer type
+iecPrinter::iecPrinter(uint8_t devnum, FileSystem *filesystem, printer_type print_type) : IECDevice(devnum)
+{
+    _storage = filesystem;
+    set_printer_type(print_type);
+    device_active = true;
+}
+
 iecPrinter::~iecPrinter()
 {
     delete _pptr;
@@ -86,14 +94,6 @@ void iecPrinter::set_printer_type(iecPrinter::printer_type printer_type)
     }
 
     _pptr->initPrinter(_storage);
-}
-
-// Constructor just sets a default printer type
-iecPrinter::iecPrinter(uint8_t devnum, FileSystem *filesystem, printer_type print_type) : IECDevice(devnum)
-{
-    _storage = filesystem;
-    set_printer_type(print_type);
-    device_active = true;
 }
 
 void iecPrinter::shutdown()

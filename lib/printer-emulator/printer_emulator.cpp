@@ -4,8 +4,6 @@
 
 #include "fsFlash.h"
 
-#define PRINTER_OUTFILE "/paper"
-
 // initialzie printer by creating an output file
 void printer_emu::initPrinter(FileSystem *fs)
 {

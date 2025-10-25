@@ -183,11 +183,11 @@ iecChannelHandlerFile::~iecChannelHandlerFile()
     Debug_printv("Stream closed.");
 
     double cps = m_byteCount / seconds;
-    Debug_printv("%s %lu bytes in %0.2f seconds @ %0.2fcps", m_stream->mode == std::ios_base::in ? "Sent" : "Received", m_byteCount, seconds, cps);
+    Debug_printv("%s %lu bytes in %0.2f seconds @ %0.2f B/s", m_stream->mode == std::ios_base::in ? "Sent" : "Received", m_byteCount, seconds, cps);
 
     double tseconds = m_transportTimeUS / 1000000.0;
     cps = m_byteCount / (seconds-tseconds);
-    Debug_printv("Transport (network/sd) took %0.3f seconds, pure IEC transfers @ %0.2fcps", tseconds, cps);
+    Debug_printv("Transport (network/sd) took %0.3f seconds, pure IEC transfers @ %0.2f B/s", tseconds, cps);
 
 #ifdef ENABLE_DISPLAY
     LEDS.idle();
@@ -645,11 +645,15 @@ bool iecDrive::open(uint8_t channel, const char *cname)
         if( i != std::string::npos ) name = name.substr(0, i);
 
         if ( m_cwd == nullptr )
+        {
             Debug_printv("opening channel[%d] m_cwd[NULL] name[%s] mode[%s]", channel, name.c_str(), 
                     mode==std::ios_base::out ? (overwrite ? "replace" : "write") : "read");
+        }
         else
+        {
             Debug_printv("opening channel[%d] m_cwd[%s] name[%s] mode[%s]", channel, m_cwd->url.c_str(), name.c_str(), 
                     mode==std::ios_base::out ? (overwrite ? "replace" : "write") : "read");
+        }
 
         if( name.length()==0 )
         {
@@ -724,6 +728,7 @@ bool iecDrive::open(uint8_t channel, const char *cname)
                         // can't read file entries => treat directory as file
                         Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Treating directory as file [%s]", f->url.c_str());
                         m_cwd.reset(MFSOwner::File(f->url));
+                        Debug_printv("Treating directory as file [%s]", f->url.c_str());
                     }
                 }
                 else
@@ -790,12 +795,15 @@ bool iecDrive::open(uint8_t channel, const char *cname)
                         m_numOpenChannels++;
                         setStatusCode(ST_OK);
 
+                        Debug_printv("isDir[%d] isRandomAccess[%d] isBrowsable[%d]", is_dir, new_stream->isRandomAccess(), new_stream->isBrowsable());
                         if ( new_stream->isRandomAccess() || new_stream->isBrowsable() )
                         {
+                            Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "url[%s]", f->url.c_str() );
                             m_cwd.reset(MFSOwner::File(f->url));
                         }
                         else
                         {
+                            Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "base[%s]", f->base().c_str() );
                             m_cwd.reset(MFSOwner::File(f->base()));
                         }
 
@@ -845,7 +853,7 @@ void iecDrive::close(uint8_t channel)
         m_vdrive->closeFile(channel);
         Debug_printv("File closed on VDrive");
         double cps = m_byteCount / seconds;
-        Debug_printv("Transferred %lu bytes in %0.2f seconds @ %0.2fcps", m_byteCount, seconds, cps);
+        Debug_printv("Transferred %lu bytes in %0.2f seconds @ %0.2f B/s", m_byteCount, seconds, cps);
     }
     else 
 //#endif
