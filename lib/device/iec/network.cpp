@@ -102,10 +102,6 @@ void iecNetwork::iec_open()
     channel_data.protocol.reset();
     channel_data.urlParser = std::move(PeoplesUrlParser::parseURL(channel_data.deviceSpec));
 
-    // Convert scheme to uppercase
-    std::transform(channel_data.urlParser->scheme.begin(), channel_data.urlParser->scheme.end(), channel_data.urlParser->scheme.begin(), 
-                   [](unsigned char c) { return std::toupper(c); });
-
     // Instantiate protocol based on the scheme
     Debug_printv("Creating protocol for schema [%s]", channel_data.urlParser->scheme.c_str());
     channel_data.protocol = std::move(NetworkProtocolFactory::createProtocol(channel_data.urlParser->scheme, channel_data));
