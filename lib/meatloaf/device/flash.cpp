@@ -34,7 +34,7 @@
 
 bool FlashMFile::pathValid(std::string path) 
 {
-    auto apath = std::string(basepath + path).c_str();
+    auto apath = fullPath().c_str();
     while (*apath) {
         const char *slash = strchr(apath, '/');
         if (!slash) {
@@ -61,21 +61,19 @@ bool FlashMFile::isDirectory()
         return true;
 
     struct stat info;
-    stat( std::string(basepath + path).c_str(), &info);
+    stat( fullPath().c_str(), &info);
     return S_ISDIR(info.st_mode);
 }
 
 
 std::shared_ptr<MStream> FlashMFile::getSourceStream(std::ios_base::openmode mode)
 {
-    std::string full_path = basepath + path;
-    if ( pathInStream.size() )
-        full_path = full_path + "/" + pathInStream;
+    std::string full_path = fullPath();
 
     std::shared_ptr<MStream> istream = std::make_shared<FlashMStream>(full_path, mode);
     //auto istream = StreamBroker::obtain<FlashMStream>(full_path, mode);
-    //Debug_printv( ANSI_CYAN_BOLD_HIGH_INTENSITY "basepath[%s] path[%s] pathInStream[%s] mode[%d]", basepath.c_str(), path.c_str(), pathInStream.c_str(), mode);
-    istream->open(mode);   
+    Debug_printv( ANSI_CYAN_BOLD_HIGH_INTENSITY "basepath[%s] path[%s] pathInStream[%s] mode[%d]", basepath.c_str(), path.c_str(), pathInStream.c_str(), mode);
+    istream->open(mode);
     return istream;
 }
 
@@ -93,7 +91,7 @@ std::shared_ptr<MStream> FlashMFile::createStream(std::ios_base::openmode mode)
 time_t FlashMFile::getLastWrite()
 {
     struct stat info;
-    stat( std::string(basepath + path).c_str(), &info);
+    stat(fullPath().c_str(), &info);
 
     time_t ftime = info.st_mtime; // Time of last modification
     return ftime;
@@ -102,7 +100,7 @@ time_t FlashMFile::getLastWrite()
 time_t FlashMFile::getCreationTime()
 {
     struct stat info;
-    stat( std::string(basepath + path).c_str(), &info);
+    stat(fullPath().c_str(), &info);
 
     time_t ftime = info.st_ctime; // Time of last status change
     return ftime;
@@ -113,7 +111,7 @@ bool FlashMFile::mkDir()
     if (m_isNull) {
         return false;
     }
-    int rc = mkdir(std::string(basepath + path).c_str(), ALLPERMS);
+    int rc = mkdir(fullPath().c_str(), ALLPERMS);
     return (rc==0);
 }
 
@@ -122,7 +120,7 @@ bool FlashMFile::rmDir()
     if (m_isNull) {
         return false;
     }
-    int rc = rmdir(std::string(basepath + path).c_str());
+    int rc = rmdir(fullPath().c_str());
     return (rc==0);
 }
 
@@ -136,9 +134,9 @@ bool FlashMFile::exists()
     }
 
     struct stat st;
-    int i = stat(std::string(basepath + path).c_str(), &st);
+    int i = stat(fullPath().c_str(), &st);
 
-    //Debug_printv( "exists[%d] basepath[%s] path[%s]", (i==0), basepath.c_str(), path.c_str() );
+    Debug_printv( "exists[%d] fullpath[%s]", (i==0), fullPath().c_str() );
     return (i == 0);
 }
 
@@ -148,7 +146,7 @@ bool FlashMFile::remove() {
     if(path.empty())
         return false;
 
-    int rc = ::remove( std::string(basepath + path).c_str() );
+    int rc = ::remove( fullPath().c_str() );
     if (rc != 0) {
         Debug_printv("remove: rc=%d path=`%s`\r\n", rc, path.c_str());
         return false;
@@ -163,8 +161,8 @@ bool FlashMFile::rename(std::string pathTo) {
         return false;
 
     pathTo = basepath + pathToFile() + pathTo;
-    Debug_printv("from[%s] to[%s]", std::string(basepath + path).c_str(), pathTo.c_str());
-    int rc = ::rename( std::string(basepath + path).c_str(), pathTo.c_str() );
+    Debug_printv("from[%s] to[%s]", fullPath().c_str(), pathTo.c_str());
+    int rc = ::rename( fullPath().c_str(), pathTo.c_str() );
     if (rc != 0) {
         return false;
     }
@@ -227,7 +225,7 @@ MFile* FlashMFile::getNextFileInDir()
 {
     // Debug_printv("base[%s] path[%s]", basepath.c_str(), path.c_str());
     if(!dirOpened)
-        openDir(std::string(basepath + path).c_str());
+        openDir(fullPath().c_str());
 
     if(dir == nullptr)
         return nullptr;
@@ -268,7 +266,7 @@ MFile* FlashMFile::getNextFileInDir()
 
 bool FlashMFile::readEntry( std::string filename )
 {
-    std::string apath = (basepath + pathToFile()).c_str();
+    std::string apath = fullPath().c_str();
     if (apath.empty()) {
         apath = "/";
     }
@@ -326,7 +324,7 @@ bool FlashMStream::open(std::ios_base::openmode mode) {
     if(isOpen())
         return true;
 
-    //Debug_printv("trying to open flash fs [%s] mode[%d]", url.c_str(), mode);
+    Debug_printv("trying to open flash fs [%s] mode[%d]", url.c_str(), mode);
     if(mode == std::ios_base::in)
         handle->obtain(url, "r");
     else if(mode == std::ios_base::out) {

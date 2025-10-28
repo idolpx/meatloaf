@@ -97,6 +97,13 @@ protected:
     virtual void closeDir();
 
     virtual bool pathValid(std::string path);
+    std::string fullPath()
+    {
+        std::string full_path = basepath + path;
+        if ( pathInStream.size() )
+            full_path = full_path + "/" + pathInStream;
+        return full_path;
+    }
     bool _valid;
     std::string _pattern;
 

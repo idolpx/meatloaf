@@ -688,29 +688,32 @@ bool iecDrive::open(uint8_t channel, const char *cname)
             {
                 if( mode == std::ios_base::in )
                 {
-                    // reading directory
-                    bool isProperDir = false;
+                    // // reading directory
+                    // bool isProperDir = false;
                     MFile *entry = f->getNextFileInDir();
-                    //Debug_printv("First entry in directory [%s] is [%s] cwd[%s]", f->url.c_str(), entry==nullptr ? "NULL" : entry->name.c_str(), m_cwd->url.c_str());
-                    if( entry==nullptr )
-                    {
-                        // if we can't open the file stream then assume this is an empty directory
-                        std::shared_ptr<MStream> s = f->getSourceStream(mode);
-                        //if( s==nullptr || !s->isOpen() ) isProperDir = true;
-                        if( s!=nullptr)
-                        {
-                            if( !s->isOpen() )
-                                isProperDir = true;
-                        }
-                        //delete s;
-                    }
-                    else
-                    {
-                        delete entry;
-                        isProperDir = true;
-                    }
+                    Debug_printv("First entry in directory [%s] is [%s] cwd[%s]", f->url.c_str(), entry==nullptr ? "NULL" : entry->name.c_str(), m_cwd->url.c_str());
+                    // if( entry==nullptr )
+                    // {
+                    //     // if we can't open the file stream then assume this is an empty directory
+                    //     std::shared_ptr<MStream> s = f->getSourceStream(mode);
+                    //     //if( s==nullptr || !s->isOpen() ) isProperDir = true;
+                    //     Debug_printv("stream for directory [%s] is [%s]", f->url.c_str(), s==nullptr ? "NULL" : (s->isOpen() ? "OPEN" : "CLOSED"));
+                    //     if( s!=nullptr)
+                    //     {
+                    //         if( s->isOpen() )
+                    //             isProperDir = true;
+                    //     }
+                    //     //delete s;
+                    // }
+                    // else
+                    // {
+                    //     Debug_printv("Directory [%s] first entry is [%s]", f->url.c_str(), entry->name.c_str());
+                    //     delete entry;
+                    //     isProperDir = true;
+                    // }
 
-                    if( isProperDir )
+                    // Debug_printv("isProperDir[%d]", isProperDir);
+                    // if( isProperDir )
                     {
                         Debug_printv("Opening directory for reading [%s]", f->url.c_str());
                         // regular directory
@@ -723,13 +726,13 @@ bool iecDrive::open(uint8_t channel, const char *cname)
                         f = nullptr; // f will be deleted in iecChannelHandlerDir destructor
                         setStatusCode(ST_OK);
                     }
-                    else
-                    {
-                        // can't read file entries => treat directory as file
-                        Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Treating directory as file [%s]", f->url.c_str());
-                        m_cwd.reset(MFSOwner::File(f->url));
-                        Debug_printv("Treating directory as file [%s]", f->url.c_str());
-                    }
+                    // else
+                    // {
+                    //     // can't read file entries => treat directory as file
+                    //     Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Treating directory as file [%s]", f->url.c_str());
+                    //     m_cwd.reset(MFSOwner::File(f->url));
+                    //     Debug_printv("Treating directory as file [%s]", f->url.c_str());
+                    // }
                 }
                 else
                 {
@@ -1401,33 +1404,59 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
         case 'M':
             if ( command[1] == 'D') // Make Directory
             {
-                Debug_printv( "make directory");
                 string path = mstr::toUTF8(command.substr(colon_position + 1));
+                Debug_printv( "make directory path[%s]", path.c_str());
                 MFile *f = m_cwd->cd( path );
                 if( f!=nullptr )
+                {
+                    bool created = false;
+                    if( f->sourceFile!=nullptr )
                     {
-                    Debug_printv("path[%s]", f->path.c_str());
-                    if( f->exists() )
-                        setStatusCode(ST_FILE_EXISTS);
-                    else if( !f->isWritable )
-                        setStatusCode(ST_WRITE_PROTECT_ON);
-                    else if( f->format("meatloaf,01") )
-                    {
-                        Debug_printv("format ok");
-                        //setStatusCode(ST_OK);
+                        if( f->sourceFile->exists() )
+                        {
+                            Debug_printv("directory exists");
+                            setStatusCode(ST_FILE_EXISTS);
+                        }
+                        else if( !f->sourceFile->isWritable )
+                        {
+                            Debug_printv("not writable");
+                            setStatusCode(ST_WRITE_PROTECT_ON);
+                        }
+                        else if( f->format("meatloaf,01") )
+                        {
+                            Debug_printv("format ok");
+                            created = true;
+                        }
                     }
-                    else if( f->mkDir() )
+
+                    if ( !created )
                     {
-                        Debug_printv("mkdir ok");
-                        //setStatusCode(ST_OK);
+                        if( f->exists() )
+                        {
+                            Debug_printv("directory exists");
+                            setStatusCode(ST_FILE_EXISTS);
+                        }
+                        else if( !f->isWritable )
+                        {
+                            Debug_printv("not writable");
+                            setStatusCode(ST_WRITE_PROTECT_ON);
+                        }
+                        else if( f->mkDir() )
+                        {
+                            Debug_printv("mkdir ok");
+                        }
+                        else
+                        {
+                            Debug_printv("make directory failed");
+                            setStatusCode(ST_WRITE_VERIFY);
+                        }
                     }
-                    else
-                        setStatusCode(ST_WRITE_VERIFY);
 
                     delete f;
                 }
                 else
                 {
+                    Debug_printv("make directory failed");
                     setStatusCode(ST_WRITE_VERIFY);
                 }
                 return;
