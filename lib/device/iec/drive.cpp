@@ -1069,15 +1069,15 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
 
     // Drive level commands
     // CBM DOS 2.6
-    uint8_t media = 0; // N:, N0:, S:, S0, I:, I0:, etc
-    uint8_t colon_position = 0;
+    uint8_t media = 0; 
+    // N:, NEW:, N0:, NEW0:, S:, S0, I:, I0:, etc
+    size_t colon_position = command.find_first_of(':');
+    if (colon_position == std::string::npos)
+        colon_position = 0;
 
-    if (command[1] == ':') 
-        colon_position = 1;
-    else if (command[2] == ':')
+    if (colon_position > 2)
     {
-        media = atoi((char *) &command[1]);
-        colon_position = 2;
+        media = atoi((char *) &command[colon_position - 1]);
     }
     Debug_printv("media[%d] colon_position[%d] command[%s]", media, colon_position, command.c_str());
 
@@ -1104,9 +1104,51 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                     }
                     return;
                 }
-                // B-A allocate bit in BAM not implemented
-                // B-F free bit in BAM not implemented
-                // B-E block execute impossible at this level of emulation!
+                // B-R read block
+                else if (command[2] == 'R')
+                {
+                    Debug_printv( "read block");
+                    command = mstr::drop(command, 3);
+                    mstr::trim(command);
+                    mstr::replaceAll(command, "  ", " ");
+                    std::vector<uint8_t> pti = util_tokenize_uint8(command);
+                    Debug_printv("command[%s] channel[%d] media[%d] track[%d] sector[%d]", command.c_str(), pti[0], pti[1], pti[2], pti[3]);
+
+                    auto channel = m_channels[pti[0]];
+                    if ( channel != nullptr )
+                    {
+                        auto stream = channel->getStream();
+                        stream->seekSector( pti[2], pti[3] );
+                        uint8_t size;
+                        stream->read(&size, 1);
+                        uint8_t *data = (uint8_t *) malloc(size);
+                        //memset(data, 0, size);
+                        stream->read(data, size);
+                        setStatus((char *) data, size);
+                        free(data);
+                        return;
+                    }
+                }
+                // B-W write block
+                else if (command[2] == 'W')
+                {
+                    Debug_printv( "write block");
+                }
+                // B-A allocate block in BAM
+                else if (command[2] == 'A')
+                {
+                    Debug_printv( "allocate bit in BAM");
+                }
+                // B-F free block in BAM
+                else if (command[2] == 'F')
+                {
+                    Debug_printv( "free bit in BAM");
+                }
+                // B-E block execute
+                else if (command[2] == 'E')
+                {
+                    Debug_printv( "block execute");
+                }
             }
             //Error(ERROR_31_SYNTAX_ERROR);
             Debug_printv( "block/buffer");
@@ -1569,6 +1611,7 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
             // X{0-7}={0-15}
             // XD?
             // XJ+ / XJ-
+            // XF+ / XF-
             // X
             // XR:{name}
             if (command[1] == 'R' && colon_position)
