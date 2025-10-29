@@ -1075,7 +1075,7 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
     if (colon_position == std::string::npos)
         colon_position = 0;
 
-    if (colon_position > 2)
+    if (colon_position > 1)
     {
         media = atoi((char *) &command[colon_position - 1]);
     }
@@ -1641,15 +1641,24 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
     }
 
     // Meatloaf Extended Commands
-    // switch ( command[0] )
-    // {
-    //   case 'Q': // Generate QRCode
-
-    //   break;
-    //   default:
-    //       //Error(ERROR_31_SYNTAX_ERROR);
-    //   break;
-    // }
+    command = mstr::toUTF8(command);
+    auto pt = util_tokenize(command, ':');
+    if ( pt[0] == "auth" )
+    {
+        if( pt.size() == 2 )
+        {
+            auto creds = util_tokenize(pt[1], ',');
+            if( creds.size() == 2 )
+            {
+                Debug_printv("Setting authorization for url[%s] user[%s] pass[%s]", m_cwd->url.c_str(), creds[0].c_str(), creds[1].c_str());
+                m_cwd->user = creds[0];
+                m_cwd->password = creds[1];
+                m_cwd->rebuildUrl();
+                //setStatusCode(ST_OK);
+                return;
+            }
+        }
+    }
 
     setStatusCode(ST_SYNTAX_INVALID);
 }

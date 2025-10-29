@@ -125,6 +125,8 @@ public:
         Debug_printv("path[%s]", this->path.c_str());
     };
 
+    bool isDirectory() override { return false; };
+
     std::shared_ptr<MStream> getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override 
     {
         std::shared_ptr<MStream> istream = std::make_shared<HashMStream>(url, mode);

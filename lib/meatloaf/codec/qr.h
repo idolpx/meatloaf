@@ -35,12 +35,12 @@
 #include "utils.h"
 
 
- /********************************************************
-  * MStream I
-  ********************************************************/
- 
- class QRMStream: public MStream 
- {
+/********************************************************
+ * MStream I
+ ********************************************************/
+
+class QRMStream: public MStream 
+{
     std::vector<uint8_t> qrcode;
 
     uint32_t generate(std::string data)
@@ -140,6 +140,8 @@ public:
     {
         Debug_printv("path[%s]", path.c_str());
     };
+
+    bool isDirectory() override { return false; };
 
     std::shared_ptr<MStream> getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override 
     {
