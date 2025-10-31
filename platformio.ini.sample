@@ -93,7 +93,7 @@ extra_scripts =
 [env]
 ; Common settings for all enivornments
 build_type = debug ;debug ;release
-lib_ldf_mode = deep+ ; off chain deep chain+ deep+
+lib_ldf_mode = off ; off chain deep chain+ deep+
 upload_speed = 2000000 ;460800 ;921600
 ;upload_port = COM1 ; Windows
 ;upload_port = /dev/ttyUSB0 ; Linux
