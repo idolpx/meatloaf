@@ -137,6 +137,7 @@ enum IECChannels
 #define ST_DRIVE_NOT_READY       74     // TYPICALLY IN THIS EMULATION COULD ALSO MEAN: NOT SUPPORTED ON THIS FILE SYSTEM.
 #define ST_FORMAT_ERROR          75
 #define ST_PARTITION_ILLEGAL     77     // 1581
+#define ST_BUFFER_TOO_SMALL      78     // Direct Access Buffer Too Small
 
 #define ST_NOT_EMPTY             80     // DIR TO REMOVE NOT EMPTY
 #define ST_PERMISSION_DENIED     81     // PERMISSION DENIED
