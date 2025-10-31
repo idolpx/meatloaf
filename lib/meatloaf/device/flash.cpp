@@ -266,7 +266,7 @@ MFile* FlashMFile::getNextFileInDir()
 
 bool FlashMFile::readEntry( std::string filename )
 {
-    std::string apath = fullPath().c_str();
+    std::string apath = basepath + pathToFile();
     if (apath.empty()) {
         apath = "/";
     }
