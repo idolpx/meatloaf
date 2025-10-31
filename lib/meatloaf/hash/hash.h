@@ -67,7 +67,7 @@
 
         hash = hasher.output_hex();
         mstr::toUpper(hash);
-        Debug_printf("hash[%s]\r\n", hash.c_str());
+        Debug_printv("hash[%s]", hash.c_str());
 
         return hash.size();
     }

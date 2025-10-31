@@ -119,7 +119,7 @@ void Hash::compute(Algorithm algorithm, bool clear_data) {
     if (clear_data) {
         clear();
     }
-    printf("hash[%s]\n", output_hex().c_str());
+    //printf("hash[%s]\n", output_hex().c_str());
 }
 
 std::vector<uint8_t> Hash::output_binary() const {
@@ -131,7 +131,7 @@ std::string Hash::output_hex() const {
 }
 
 void Hash::compute_md5() {
-    printf("md5\n");
+    //printf("md5\n");
     if (!key.empty()) {
         compute_md(MBEDTLS_MD_MD5, 16);
         return;
@@ -150,7 +150,7 @@ void Hash::compute_md5() {
 }
 
 void Hash::compute_sha1() {
-    printf("sha1\n");
+    //printf("sha1\n");
     if (!key.empty()) {
         compute_md(MBEDTLS_MD_SHA1, 20);
         return;
@@ -169,7 +169,7 @@ void Hash::compute_sha1() {
 }
 
 void Hash::compute_sha256(int is224) {
-    printf("sha256\n");
+    //printf("sha256\n");
     if (!key.empty()) {
         if (is224)
             compute_md(MBEDTLS_MD_SHA224, 28);
@@ -194,7 +194,7 @@ void Hash::compute_sha256(int is224) {
 }
 
 void Hash::compute_sha512(int is384) {
-    printf("sha512\n");
+    //printf("sha512\n");
     if (!key.empty()) {
         if (is384)
             compute_md(MBEDTLS_MD_SHA384, 48);
@@ -219,7 +219,7 @@ void Hash::compute_sha512(int is384) {
 }
 
 void Hash::compute_md(mbedtls_md_type_t md_type, uint8_t size) {
-    printf("hmac\n");
+    //printf("hmac\n");
 
     hash_output.resize(size);
     mbedtls_md_hmac(
