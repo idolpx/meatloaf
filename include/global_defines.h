@@ -23,7 +23,7 @@
 
 #define PRODUCT_ID "MEATLOAF CBM"
 #define PLATFORM_DETAILS "C64; 6510; 2; NTSC; EN;" // Make configurable. This will help server side to select appropriate content.
-#define USER_AGENT "MEATLOAF/" FW_VERSION " (" PLATFORM_DETAILS ")"
+//#define USER_AGENT "MEATLOAF/" FW_VERSION " (" PLATFORM_DETAILS ")"
 
 #define SYSTEM_DIR "/.sys"
 #define WWW_ROOT   "/.www"
