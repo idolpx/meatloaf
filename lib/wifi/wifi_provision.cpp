@@ -462,8 +462,13 @@ void wifi_prov_main(void)
 #ifdef CONFIG_EXAMPLE_REPROVISIONING
         wifi_prov_mgr_disable_auto_stop(1000);
 #endif
+        /* Setup security and credentials */
+        wifi_prov_security_t security = WIFI_PROV_SECURITY_1;  /* Using security version 1 */
+        const char *pop = "abcd1234";     /* Proof of possession */
+        const char *username = NULL;       /* No username needed for security version 1 */
+
         /* Start provisioning service */
-        ESP_ERROR_CHECK(wifi_prov_mgr_start_provisioning(security, (const void *) sec_params, service_name, service_key));
+        ESP_ERROR_CHECK(wifi_prov_mgr_start_provisioning(security, (const void *)pop, service_name, service_key));
 
         /* The handler for the optional endpoint created above.
          * This call must be made after starting the provisioning, and only if the endpoint
