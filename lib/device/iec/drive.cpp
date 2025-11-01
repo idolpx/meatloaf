@@ -24,10 +24,6 @@
 #include <sstream>
 #include <unordered_map>
 
-#include "../../include/global_defines.h"
-#include "../../include/debug.h"
-#include "../../include/cbm_defines.h"
-
 #include "make_unique.h"
 
 #include "meatloaf.h"
@@ -40,7 +36,10 @@
 #include "meat_media.h"
 #include "qrmanager.h"
 
-#include "../../include/cbm_defines.h"
+#include "../../../include/global_defines.h"
+#include "../../../include/debug.h"
+#include "../../../include/version.h"
+#include "../../../include/cbm_defines.h"
 
 // Buffering data when reading/writing streams because during regular (non-fastloader)
 // transmissions, the read/write functions are called for each single byte at a time and

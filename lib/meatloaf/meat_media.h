@@ -110,6 +110,13 @@ protected:
 
     enum open_modes { OPEN_READ, OPEN_WRITE, OPEN_APPEND, OPEN_MODIFY };
     std::string file_type_label[12] = { "DEL", "SEQ", "PRG", "USR", "REL", "CBM", "DIR", "???", "SYS", "NAT", "CMD", "CFS" };
+    std::unordered_map<std::string, std::string> partition_type_label = { 
+        {"N", "NATIVE"},
+        {"4", "1541"},
+        {"7", "1571"},
+        {"8", "1581"},
+        {"C", "1581 CP/M"}
+    };
 
     virtual bool readHeader() { return true; }
     virtual bool writeHeader(std::string name, std::string id) { return false; };

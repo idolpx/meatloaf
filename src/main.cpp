@@ -40,8 +40,10 @@
 // ESP_ERROR_CHECK( heap_trace_init_standalone(trace_record, NUM_RECORDS) );
 
 #include "../include/global_defines.h"
-#include "../include/pinmap.h"
 #include "../include/debug.h"
+#include "../include/version.h"
+#include "../include/pinmap.h"
+
 
 #ifdef ENABLE_CONSOLE
 #include "../lib/console/ESP32Console.h"

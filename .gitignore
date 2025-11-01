@@ -32,3 +32,4 @@ managed_components/*
 .travis.yml
 compile_commands.json
 dependencies.lock
+components.staged/*
