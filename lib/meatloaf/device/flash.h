@@ -47,6 +47,7 @@ public:
         if (mstr::contains(name, "?") || mstr::contains(name, "*"))
             readEntry( name );
 
+        //Debug_printv("url[%s] path[%s] name[%s]", url.c_str(), path.c_str(), name.c_str());
         if (!pathValid(path.c_str()))
             m_isNull = true;
         else

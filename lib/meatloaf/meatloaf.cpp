@@ -649,7 +649,7 @@ MFile* MFile::cd(std::string newDir)
     }
     else 
     {
-        //newDir = mstr::toUTF8( newDir );
+        //Debug_printv("url[%s] newDir[%s]", url.c_str(), newDir.c_str());
         if ( newDir[0]=='/' )
             newDir = mstr::drop(newDir,1);
 
@@ -658,6 +658,7 @@ MFile* MFile::cd(std::string newDir)
             url.push_back('/');
 
         // Add new directory to path
+        //Debug_printv("url[%s] newDir[%s]", url.c_str(), newDir.c_str());
         MFile* newPath = MFSOwner::File(url + newDir);
         Debug_printv("url[%s][%s]", newPath->url.c_str(), newPath->pathInStream.c_str());
         newPath->dump();

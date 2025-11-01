@@ -61,7 +61,7 @@ bool FlashMFile::isDirectory()
         return true;
 
     struct stat info;
-    stat( fullPath().c_str(), &info);
+    stat(fullPath().c_str(), &info);
     return S_ISDIR(info.st_mode);
 }
 
@@ -299,7 +299,12 @@ bool FlashMFile::readEntry( std::string filename )
 
                 if ( found )
                 {
-                    resetURL(apath + "/" + entryFilename);
+                    //resetURL(apath + "/" + entryFilename);
+                    if ( apath != "/" )
+                        apath += "/";
+                    
+                    resetURL(apath + entryFilename);
+                    //Debug_printv( "Found! file[%s] url[%s]", name.c_str(), url.c_str() );
                     _exists = true;
                     closedir( d );
                     return true;
