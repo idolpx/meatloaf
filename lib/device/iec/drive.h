@@ -116,7 +116,7 @@ public:
   }
   ~driveMemory() = default;
 
-  uint16_t mw_hash = 0;
+  uint16_t mw_hash = 0xFFFF;
 
   bool setRAM(size_t ramSize) {
     ram.resize(ramSize, 0x00);
@@ -192,10 +192,8 @@ public:
         return;
       }
       memcpy(&ram[addr], data, len);
-      Debug_printv("RAM write %04X:%s [%d]", addr, mstr::toHex(data, len).c_str(), len);
-      printf("%s",util_hexdump((const uint8_t *)ram.data(), ram.size()).c_str());
-
       mw_hash = esp_rom_crc16_le(mw_hash, data, len);
+      Debug_printv("RAM write %04X:%s [%d] crc[%04X]", addr, mstr::toHex(data, len).c_str(), len, mw_hash);
     }
   }
 
@@ -209,7 +207,8 @@ public:
 
       // ram + addr
       Debug_printv("RAM execute %04X", addr);
-      mw_hash = 0;
+      printf("%s",util_hexdump((const uint8_t *)ram.data(), ram.size()).c_str());
+      mw_hash = 0xFFFF;
     }
 
     // ROM

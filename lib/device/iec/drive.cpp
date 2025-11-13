@@ -1190,12 +1190,12 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                 {
                     command = mstr::drop(command, 3); // Drop M-W
                     uint16_t address = (command[0] | command[1] << 8);
-                    uint8_t size = command[2]; // Limited to 34 data bytes per command
+                    size_t size = command[2]; // Limited to 34 data bytes per command
 
                     command = mstr::drop(command, 3); // Drop address, size
-                    std::string code = mstr::toHex(command);
+                    std::string code = mstr::toHex((const uint8_t *)command.c_str(), size);
                     
-                    Debug_printv("Memory Write address[%04X][%s]", address, code.c_str());
+                    Debug_printv("Memory Write [%04X][%d]:[%s]", address, size, code.c_str());
 
                     m_memory.write(address, (const uint8_t *)command.c_str(), size);
                 }
@@ -1351,8 +1351,10 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
         case 'U':
             Debug_printv( "user 01a2b");
             //User();
-            if (command[1] == '1') // User 1
+            if (command[1] == '1' || command[1] == '2') // User 1 & 2
             {
+                // Block Read if 1, Write if 2
+                bool read = command[1] == '1';
                 command = mstr::drop(command, 3);
                 mstr::trim(command);
                 mstr::replaceAll(command, "  ", " ");
@@ -1364,13 +1366,36 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                 {
                     auto stream = channel->getStream();
                     stream->seekSector( pti[2], pti[3] );
+                    if ( read )
+                    {
+                        Debug_printv("Block-Read");
+                        return;
+                    }
+
+                    // Write Block
+                    Debug_printv("Block-Write");
                     return;
                 }
             }
-            else if (command[1] == 'I' && command.size() == 2) // UI
+            else if ((command[1] >= '3' && command[1] <= '9') || (command[1] >= 'C' && command[1] <= 'H')) // U3-U9, UC-UH
+            {
+                //Debug_printv("U%C [%02x] 3[%02x]", command[1], command[1], '3');
+                uint8_t offset = command[1] - '3';
+                if (offset > 5)
+                {
+                    //Debug_printv("U%C [%02x] C[%02x]", command[1], command[1], 'C');
+                    offset = command[1] - 'C';
+                }
+                offset = (offset * 3);
+                //Debug_printv( "U%c, offset %02x", command[1], offset);
+                m_memory.execute(0x0500 + offset);
+                return;
+            }
+            else if ((command[1] == '9' || command[1] == 'I') && command.size() == 2) // U9, UI
             {
                 Debug_printv( "warm reset");
                 setStatusCode(ST_DOSVERSION);
+                m_memory.execute(0xFFFA);
                 return;
             }
             else if (command[1] == 'J') // UJ
