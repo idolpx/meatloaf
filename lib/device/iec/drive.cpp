@@ -1606,6 +1606,20 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                         Debug_printv("read BCD format");
                         len = TimeConverter::toBcdTime(tinfo, buf, IECFILEDEVICE_STATUS_BUFFER_SIZE);
                     }
+                    else if(command[3] == 'Z')
+                    {
+                        std::string tz;
+                        char* tz_value = getenv("TZ");
+                        if (tz_value != nullptr) {
+                            tz = tz_value;
+                        } else {
+                            tz = "UTC"; // Set a default value
+                        }
+                        Debug_printv("read TIMEZONE [%s]", tz.c_str());
+                        tz = mstr::toPETSCII2(tz);
+                        len = tz.size();
+                        memcpy(buf, tz.data(), len);
+                    }
                     IECFileDevice::setStatus((const char *) buf, len);
                 }
                 else if (command[2] == 'W')
@@ -1625,6 +1639,20 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                     else if(command[3] == 'B')
                     {
                         Debug_printv("write BCD format");
+                    }
+                    else if(command[3] == 'Z')
+                    {
+                        if (colon_position)
+                            command = command.substr(colon_position + 1);
+                        else
+                            command = mstr::drop(command, 4);
+                        command = mstr::toUTF8(command);
+                        mstr::trim(command);
+                        mstr::replaceAll(command, " ", "_");
+                        Debug_printv("write TIMEZONE [%s]", command.c_str());
+
+                        setenv("TZ", command.c_str(), 1);
+                        tzset(); // Assign the local timezone from setenv
                     }
                 }
                 return;
