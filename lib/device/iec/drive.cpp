@@ -32,6 +32,7 @@
 #include "led.h"
 #include "utils.h"
 #include "display.h"
+#include "time_converter.h"
 
 #include "meat_media.h"
 #include "qrmanager.h"
@@ -1576,44 +1577,58 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
         case 'T':
             if (command[1] == '-')
             {
-                Debug_printv( "time"); // RTC support
+                time_t tt = time(nullptr);
+                struct tm *tinfo = localtime(&tt);
+                
+                uint8_t buf[IECFILEDEVICE_STATUS_BUFFER_SIZE];
+                size_t len = 0;
+
                 //Error(ERROR_31_SYNTAX_ERROR);	// T-R and T-W not implemented yet
                 if (command[2] == 'R')
                 {
                     if(command[3] == 'A')
                     {
                         Debug_printv("read ascii format");
+                        len = TimeConverter::toAsciiTime(tinfo, buf, IECFILEDEVICE_STATUS_BUFFER_SIZE);
                     }
                     else if(command[3] == 'I')
                     {
                         Debug_printv("read ISO-8601 format");
+                        len = TimeConverter::toIsoTime(tinfo, buf, IECFILEDEVICE_STATUS_BUFFER_SIZE);
                     }
                     else if(command[3] == 'D')
                     {
                         Debug_printv("read decimal format");
+                        len = TimeConverter::toDecimalTime(tinfo, buf, IECFILEDEVICE_STATUS_BUFFER_SIZE);
                     }
                     else if(command[3] == 'B')
                     {
                         Debug_printv("read BCD format");
+                        len = TimeConverter::toBcdTime(tinfo, buf, IECFILEDEVICE_STATUS_BUFFER_SIZE);
                     }
+                    IECFileDevice::setStatus((const char *) buf, len);
                 }
                 else if (command[2] == 'W')
                 {
                     if(command[3] == 'A')
                     {
                         Debug_printv("write ascii format");
+                        setStatusCode(ST_OK);
                     }
                     else if(command[3] == 'I')
                     {
                         Debug_printv("write ISO-8601 format");
+                        setStatusCode(ST_OK);
                     }
                     else if(command[3] == 'D')
                     {
                         Debug_printv("write decimal format");
+                        setStatusCode(ST_OK);
                     }
                     else if(command[3] == 'B')
                     {
                         Debug_printv("write BCD format");
+                        setStatusCode(ST_OK);
                     }
                 }
                 return;
