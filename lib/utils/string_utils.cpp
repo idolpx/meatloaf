@@ -237,29 +237,63 @@ namespace mstr {
         return contains(ss1, s2, case_sensitive);
     }
 
-    bool compare(const std::string &s1, const std::string &s2, bool case_sensitive)
-    {
-        unsigned int index;
 
-        for (index = 0; index < s1.size(); index++) {
-            switch ((unsigned char)s1[index]) {
-                case '*':
-                    return true; /* rest is not interesting, it's a match */
-                case '?':
-                    if ((unsigned char)s2[index] == 0xa0) {
-                        return false; /* wildcard, but the other is too short */
-                    }
-                    break;
-                case 0xa0: /* This one ends, let's see if the other as well */
-                    return ((unsigned char)s2[index] == 0xa0);
-                default:
-                    if (s1[index] != s2[index]) {
-                        return false; /* does not match */
-                    }
-            }
+    bool compare(const std::string& pattern,   // may contain ? and *
+                const std::string& text,
+                bool case_sensitive)
+    {
+        // Helper: compare two chars (case-sensitive or not)
+        auto eq = [&](char a, char b) -> bool {
+            if (case_sensitive) return a == b;
+            return std::tolower(static_cast<unsigned char>(a)) ==
+                std::tolower(static_cast<unsigned char>(b));
+        };
+
+        const size_t n = pattern.size();
+        const size_t m = text.size();
+
+        // dp[i][j] == true  means  pattern[0..i) matches text[0..j)
+        // We use two 1-D arrays to save space (prev / curr)
+        bool* prev = new bool[m + 1]{};
+        bool* curr = new bool[m + 1]{};
+
+        prev[0] = true;                     // empty pattern matches empty text
+
+        // Initialise first row (pattern may start with '*')
+        for (size_t j = 1; j <= m; ++j) prev[j] = false;
+        for (size_t i = 1; i <= n; ++i) {
+            if (pattern[i - 1] == '*')
+                prev[0] = prev[0];          // '*' can match zero chars
+            else
+                prev[0] = false;
         }
 
-        return true; /* matched completely */
+        for (size_t i = 1; i <= n; ++i) {
+            curr[0] = (pattern[i - 1] == '*') ? prev[0] : false;
+
+            for (size_t j = 1; j <= m; ++j) {
+                if (pattern[i - 1] == '*') {
+                    // * matches zero chars  OR  one or more chars
+                    bool zero = prev[j];                 // skip '*'
+                    bool one  = curr[j - 1];             // consume one char
+                    curr[j] = zero || one;
+                }
+                else if (pattern[i - 1] == '?') {
+                    // '?' matches exactly one char
+                    curr[j] = prev[j - 1];
+                }
+                else {
+                    // ordinary char – must match (case-insensitive if requested)
+                    curr[j] = eq(pattern[i - 1], text[j - 1]) && prev[j - 1];
+                }
+            }
+            std::swap(prev, curr);          // prev becomes the just-filled row
+        }
+
+        bool result = prev[m];
+        delete[] prev;
+        delete[] curr;
+        return result;
     }
 
     bool compareFilename(std::string &filename, std::string &entry, bool wildcard, bool case_sensitive)
