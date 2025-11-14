@@ -1193,9 +1193,9 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                     size_t size = command[2]; // Limited to 34 data bytes per command
 
                     command = mstr::drop(command, 3); // Drop address, size
-                    std::string code = mstr::toHex((const uint8_t *)command.c_str(), size);
-                    
-                    Debug_printv("Memory Write [%04X][%d]:[%s]", address, size, code.c_str());
+
+                    //std::string code = mstr::toHex((const uint8_t *)command.c_str(), size);
+                    //Debug_printv("Memory Write [%04X][%d]:[%s]", address, size, code.c_str());
 
                     m_memory.write(address, (const uint8_t *)command.c_str(), size);
                 }
@@ -1207,7 +1207,7 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                     Debug_printv("Memory Execute address[%04X][%s]", address, code.c_str());
 
                     // Compare m_mw_hash to known software fastload hashes
-                    Debug_printv("M-W Hash [%02X]", m_memory.mw_hash);
+                    Debug_printv("Final M-W Hash [%02X]", m_memory.mw_hash);
 
                     m_memory.execute(address);
 
@@ -1349,12 +1349,10 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
             }
         break;
         case 'U':
-            Debug_printv( "user 01a2b");
-            //User();
-            if (command[1] == '1' || command[1] == '2') // User 1 & 2
+            if (command[1] == '1' || command[1] == '2' || command[1] == 'A' || command[1] == 'B') // U1/UA, U2/UB
             {
-                // Block Read if 1, Write if 2
-                bool read = command[1] == '1';
+                // Block Read if 1/A, Write if 2/B
+                bool read = (command[1] == '1' || command[1] == 'A');
                 command = mstr::drop(command, 3);
                 mstr::trim(command);
                 mstr::replaceAll(command, "  ", " ");
@@ -1379,7 +1377,6 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
             }
             else if ((command[1] >= '3' && command[1] <= '9') || (command[1] >= 'C' && command[1] <= 'H')) // U3-U9, UC-UH
             {
-                //Debug_printv("U%C [%02x] 3[%02x]", command[1], command[1], '3');
                 uint8_t offset = command[1] - '3';
                 if (offset > 5)
                 {
