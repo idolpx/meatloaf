@@ -1613,22 +1613,18 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                     if(command[3] == 'A')
                     {
                         Debug_printv("write ascii format");
-                        setStatusCode(ST_OK);
                     }
                     else if(command[3] == 'I')
                     {
                         Debug_printv("write ISO-8601 format");
-                        setStatusCode(ST_OK);
                     }
                     else if(command[3] == 'D')
                     {
                         Debug_printv("write decimal format");
-                        setStatusCode(ST_OK);
                     }
                     else if(command[3] == 'B')
                     {
                         Debug_printv("write BCD format");
-                        setStatusCode(ST_OK);
                     }
                 }
                 return;

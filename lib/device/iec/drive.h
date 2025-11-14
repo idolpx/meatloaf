@@ -162,17 +162,23 @@ public:
     }
 
     // ROM
-    if ( rom )
+    if ( addr >= 0x8000 )
     {
-      if ( addr >= 0x8000 )
+      if ( addr >= 0xC000 )
+        addr -= 0xC000;
+      else if ( addr >= 0x8000 )
+        addr -= 0x8000; // ROM Mirror
+
+      if ( rom )
       {
-        if ( addr >= 0xC000 )
-          addr -= 0xC000;
-        else if ( addr >= 0x8000 )
-          addr -= 0x8000; // ROM Mirror
-      
+        // Read ROM from file
         rom->seek(addr, SEEK_SET);
         return rom->read(data, len);
+      }
+      else
+      {
+        // Handle known ROM address reads
+        return 0;
       }
     }
 
@@ -192,7 +198,7 @@ public:
         return;
       }
       memcpy(&ram[addr], data, len);
-      mw_hash = esp_rom_crc16_le(mw_hash, data, len);
+      mw_hash = esp_rom_crc16_be(mw_hash, data, len);
       Debug_printv("RAM write %04X:%s [%d] crc[%04X]", addr, mstr::toHex(data, len).c_str(), len, mw_hash);
     }
   }
@@ -231,6 +237,7 @@ public:
 
   void reset() {
     ram.assign(ram.size(), 0x00);
+    mw_hash = 0xFFFF;
   }
 };
 
