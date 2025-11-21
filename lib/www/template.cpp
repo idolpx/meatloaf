@@ -389,7 +389,7 @@ const std::string substitute_tag(const std::string &tag)
             } else
                 resultstream << "No Virtual Printer";
 #endif /* BUILD_ADAM */
-#if defined( BUILD_ATARI ) || defined( BUILD_APPLE ) || defined( BUILD_IEC )
+#if defined( BUILD_ATARI ) || defined( BUILD_APPLE ) || defined( BUILD_IEC ) || defined( BUILD_GPIB )
             resultstream << fnPrinters.get_ptr(0)->getPrinterPtr()->modelname();
 #endif
         }
@@ -404,7 +404,7 @@ const std::string substitute_tag(const std::string &tag)
             } else
                 resultstream << "";
 #endif/* BUILD_ADAM */
-#if defined( BUILD_ATARI ) || defined( BUILD_APPLE ) || defined( BUILD_IEC )
+#if defined( BUILD_ATARI ) || defined( BUILD_APPLE ) || defined( BUILD_IEC ) || defined( BUILD_GPIB )
             resultstream << (fnPrinters.get_port(0) + 1);
 #endif
         }

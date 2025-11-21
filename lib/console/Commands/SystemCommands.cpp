@@ -2,6 +2,7 @@
 
 #include <cstring>
 
+#include <freertos/task.h>
 #include <esp_partition.h>
 #include <esp_ota_ops.h>
 #include <esp_system.h>

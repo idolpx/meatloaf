@@ -1,4 +1,4 @@
-#ifdef BUILD_IEC
+#if defined(BUILD_IEC) || defined(BUILD_GPIB)
 
 #include "printerlist.h"
 

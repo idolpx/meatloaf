@@ -56,32 +56,32 @@
 /**
  * @brief The command frame
  */
-// union cmdFrame_t
-// {
-//     struct
-//     {
-//         uint8_t device;
-//         uint8_t comnd;
-//         uint8_t aux1;
-//         uint8_t aux2;
-//         uint8_t cksum;
-//     };
-//     struct
-//     {
-//         uint32_t commanddata;
-//         uint8_t checksum;
-//     } __attribute__((packed));
-// };
+union cmdFrame_t
+{
+    struct
+    {
+        uint8_t device;
+        uint8_t comnd;
+        uint8_t aux1;
+        uint8_t aux2;
+        uint8_t cksum;
+    };
+    struct
+    {
+        uint32_t commanddata;
+        uint8_t checksum;
+    } __attribute__((packed));
+};
 
 
 /**
  * @class systemBus
  * @brief the system bus that all virtualDevices attach to.
  */
-class GPIBus : public GPIBusHandler
+class systemBus : public GPIBusHandler
 {
 public:
-    GPIBus();
+    systemBus();
 
     /**
      * @brief called in main.cpp to set up the bus.
@@ -114,6 +114,6 @@ private:
 /**
  * @brief Return
  */
-extern GPIBus GPIB;
+extern systemBus GPIB;
 
 #endif /* GPIB_H */

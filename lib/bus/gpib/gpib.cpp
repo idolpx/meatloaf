@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
-#ifdef ENABLE_GPIB
+#ifdef BUILD_GPIB
 
 #include "gpib.h"
 #include "../../device/iec/meatloaf.h"
@@ -35,28 +35,16 @@
 #define MAIN_PRIORITY	 17
 #define MAIN_CPUAFFINITY 1
 
-GPIBus GPIB;
+systemBus GPIB;
 
-GPIBus::GPIBus() : 
+systemBus::systemBus() : 
   GPIBusHandler(PIN_GPIB_ATN, 
                 PIN_GPIB_DAV, PIN_GPIB_NRFD, PIN_GPIB_NDAC, PIN_GPIB_EOI,
                 PIN_GPIB_IFC==GPIO_NUM_NC ? 0xFF : PIN_GPIB_IFC,
                 0xFF,
                 PIN_GPIB_SRQ==GPIO_NUM_NC   ? 0xFF : PIN_GPIB_SRQ)
 {
-#ifdef IEC_SUPPORT_PARALLEL
-#ifdef IEC_SUPPORT_PARALLEL_XRA1405
-  setParallelPins(PIN_PARALLEL_FLAG2 == GPIO_NUM_NC ? 0xFF : PIN_PARALLEL_FLAG2,
-                  PIN_PARALLEL_PC2   == GPIO_NUM_NC ? 0xFF : PIN_PARALLEL_PC2,
-                  PIN_SD_HOST_SCK    == GPIO_NUM_NC ? 0xFF : PIN_SD_HOST_SCK,
-                  PIN_SD_HOST_MOSI   == GPIO_NUM_NC ? 0xFF : PIN_SD_HOST_MOSI,
-                  PIN_SD_HOST_MISO   == GPIO_NUM_NC ? 0xFF : PIN_SD_HOST_MISO,
-                  PIN_XRA1405_CS     == GPIO_NUM_NC ? 0xFF : PIN_XRA1405_CS);
-#else
-//#error "Can only support DolphinDos/SpeedDos using XRA1405 port expander"
-  setParallelPins(PIN_PARALLEL_FLAG2 == GPIO_NUM_NC ? 0xFF : PIN_PARALLEL_FLAG2,
-                  PIN_PARALLEL_PC2   == GPIO_NUM_NC ? 0xFF : PIN_PARALLEL_PC2,
-                  PIN_PARALLEL_DATA0,
+  setParallelPins(PIN_PARALLEL_DATA0,
                   PIN_PARALLEL_DATA1,
                   PIN_PARALLEL_DATA2,
                   PIN_PARALLEL_DATA3,
@@ -64,8 +52,6 @@ GPIBus::GPIBus() :
                   PIN_PARALLEL_DATA5,
                   PIN_PARALLEL_DATA6,
                   PIN_PARALLEL_DATA7);
-#endif
-#endif
 }
 
 static void ml_gpib_intr_task(void* arg)
@@ -87,9 +73,9 @@ static void ml_gpib_intr_task(void* arg)
 //     return;
 // }
 
-void GPIBus::setup()
+void systemBus::setup()
 {
-  Debug_printf("GPIB GPIBus::setup()\r\n");
+  Debug_printf("GPIB systemBus::setup()\r\n");
   begin();
 
 //     // initial pin modes in GPIO
@@ -115,7 +101,7 @@ void GPIBus::setup()
 }
 
 
-void GPIBus::service()
+void systemBus::service()
 {
   task();
   
@@ -143,10 +129,10 @@ void GPIBus::service()
 }
 
 
-void GPIBus::shutdown()
+void systemBus::shutdown()
 {
-  printf("GPIB GPIBus::shutdown()\r\n");
+  printf("GPIB systemBus::shutdown()\r\n");
 }
 
 
-#endif /* ENABLE_GPIB */
+#endif /* BUILD_GPIB */

@@ -13,7 +13,7 @@
 # include "rs232/diskTypeImg.h"
 #endif
 
-#ifdef BUILD_IEC
+#if defined(BUILD_IEC) || defined(BUILD_GPIB)
 # include "cbm/mediaType.h"
 #endif
 

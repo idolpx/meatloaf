@@ -110,7 +110,7 @@ std::string FNJSON::processString(std::string in)
         }
     }
 
-#ifdef BUILD_IEC
+#if defined(BUILD_IEC) || defined(BUILD_GPIB)
     // TODO: fix translations. There needs to be the ability to decide if we translate the TRANSMIT to internet and RECEIVE back to the host separately.
     // Can't set _protocol->translation_mode to PETSCII to mark the incoming for changes, as that affects outgoing chars too. They need to be split
     // if (_protocol->translation_mode == 4) {
@@ -228,7 +228,7 @@ std::string FNJSON::getValue(cJSON *item)
     }
     else if (cJSON_IsObject(item))
     {
-        #ifdef BUILD_IEC
+        #if defined(BUILD_IEC) || defined(BUILD_GPIB)
             // Set line ending when returning multiple values
             setLineEnding("\x0a");
         #endif

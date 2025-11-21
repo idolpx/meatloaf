@@ -46,7 +46,7 @@ protected:
 public:
     const char *modelname()  override 
     { 
-        #ifdef BUILD_IEC
+        #if defined(BUILD_IEC) || defined(BUILD_GPIB)
             return iecPrinter::printer_model_str[iecPrinter::PRINTER_COMMODORE_MPS803];
         #elif BUILD_ATARI
             return sioPrinter::printer_model_str[sioPrinter::PRINTER_ATARI_820];

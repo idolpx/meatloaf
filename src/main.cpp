@@ -97,7 +97,7 @@ void main_shutdown_handler()
     Debug_println("Shutdown handler called.");
     // Give devices an opportunity to clean up before rebooting
 
-    IEC.shutdown();
+    SYSTEM_BUS.shutdown();
 }
 
 // Initial setup
@@ -193,10 +193,15 @@ void main_setup()
     Config.load();
 
     // Setup IEC Bus
-    IEC.setup();
+    SYSTEM_BUS.setup();
+#ifdef BUILD_IEC
     printf(ANSI_GREEN_BOLD "IEC Bus Initialized" ANSI_RESET "\r\n");
+#endif
+#ifdef BUILD_GPIB
+    printf(ANSI_GREEN_BOLD "GPIB Bus Initialized" ANSI_RESET "\r\n");
+#endif
 
-    Meatloaf.setup(&IEC);
+    Meatloaf.setup(&SYSTEM_BUS);
     // {
     //     // Add devices to bus
     //     FileSystem *ptrfs = fnSDFAT.running() ? (FileSystem *)&fnSDFAT : (FileSystem *)&fsFlash;

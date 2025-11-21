@@ -16,7 +16,11 @@
 // You should have received a copy of the GNU General Public License
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
-#ifdef BUILD_IEC
+#if defined(BUILD_IEC) || defined(BUILD_GPIB)
+
+#ifdef BUILD_GPIB
+#define IECFILEDEVICE_STATUS_BUFFER_SIZE GPIBFILEDEVICE_STATUS_BUFFER_SIZE
+#endif
 
 #include "drive.h"
 
@@ -539,7 +543,7 @@ uint8_t iecChannelHandlerDir::readBufferData()
 // -------------------------------------------------------------------------------------------------
 
 
-iecDrive::iecDrive(uint8_t devnum) : IECFileDevice(devnum)
+iecDrive::iecDrive(uint8_t devnum) : SystemFileDevice(devnum)
 {
   //Debug_printv("id[%d]", devnum);
 }
@@ -554,7 +558,7 @@ iecDrive::~iecDrive()
 
 void iecDrive::begin()
 {
-    IECFileDevice::begin();
+    SystemFileDevice::begin();
 
     //Debug_printv("id[%d]", id());
     m_host = nullptr;
@@ -995,7 +999,7 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                 // this was a command that placed its response in the status buffer
                 uint8_t buf[IECFILEDEVICE_STATUS_BUFFER_SIZE];
                 size_t len = m_vdrive->getStatusBuffer(buf, IECFILEDEVICE_STATUS_BUFFER_SIZE);
-                IECFileDevice::setStatus((const char *) buf, len);
+                SystemFileDevice::setStatus((const char *) buf, len);
                 }
             else if( !ok )
                 setStatusCode(ST_VDRIVE);
@@ -1620,7 +1624,7 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
                         len = tz.size();
                         memcpy(buf, tz.data(), len);
                     }
-                    IECFileDevice::setStatus((const char *) buf, len);
+                    SystemFileDevice::setStatus((const char *) buf, len);
                 }
                 else if (command[2] == 'W')
                 {
@@ -1653,6 +1657,7 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
 
                         setenv("TZ", command.c_str(), 1);
                         tzset(); // Assign the local timezone from setenv
+                        
                     }
                 }
                 return;
@@ -1821,7 +1826,7 @@ void iecDrive::reset()
     if( m_vdrive!=nullptr ) m_vdrive->closeAllChannels();
     //#endif
 
-    IECFileDevice::reset();
+    SystemFileDevice::reset();
 
 
     ImageBroker::clear();

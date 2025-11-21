@@ -26,7 +26,16 @@
 #include <unordered_map>
 #include <esp_rom_crc.h>
 
+#ifdef BUILD_IEC
 #include "../../bus/iec/IECFileDevice.h"
+#define SystemFileDevice IECFileDevice
+#endif  // BUILD_IEC
+#ifdef BUILD_GPIB
+#include "../../bus/gpib/GPIBFileDevice.h"
+#define SystemFileDevice GPIBFileDevice
+#endif  // BUILD_GPIB
+
+
 #include "../../media/media.h"
 #include "../meatloaf/meatloaf.h"
 #include "../meatloaf/meat_buffer.h"
@@ -241,7 +250,7 @@ public:
   }
 };
 
-class iecDrive : public IECFileDevice
+class iecDrive : public SystemFileDevice
 {
 public:
   iecDrive(uint8_t devnum = 0x00);

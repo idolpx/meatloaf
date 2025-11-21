@@ -57,7 +57,7 @@
     rs232CPM sioZ;
 #endif
 
-#ifdef BUILD_IEC
+#if defined(BUILD_IEC) || defined(BUILD_GPIB)
 # include "iec/clock.h"
 # include "iec/cpm.h"
 # include "iec/drive.h"

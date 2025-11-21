@@ -1,3 +1,4 @@
+#ifdef ENABLE_SSDP
 
 #include "ssdp.h"
 
@@ -421,3 +422,4 @@ void SSDPDeviceClass::setTTL(const uint8_t ttl) {
 }
 
 
+#endif // ENABLE_SSDP

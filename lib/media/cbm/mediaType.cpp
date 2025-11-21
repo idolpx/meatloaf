@@ -1,4 +1,4 @@
-#ifdef BUILD_IEC
+#if defined(BUILD_IEC) || defined(BUILD_GPIB)
 
 #include "mediaType.h"
 
@@ -61,4 +61,4 @@ mediatype_t MediaType::discover_mediatype(const char *filename)
     return MEDIATYPE_UNKNOWN;
 }
 
-#endif /* BUILD_IEC */
+#endif /* BUILD_IEC or BUILD_GPIB */

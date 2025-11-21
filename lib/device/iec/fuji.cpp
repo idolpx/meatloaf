@@ -1,4 +1,4 @@
-#ifdef BUILD_IEC
+#if defined(BUILD_IEC) || defined(BUILD_GPIB)
 
 #include "fuji.h"
 #include "../../../include/cbm_defines.h"
@@ -685,7 +685,7 @@ void iecFuji::enable_device_basic(std::string ids)
     // Enable devices
     for (int i = 0; i < pt.size(); i++) {
         uint8_t device = atoi(pt[i].c_str());
-        auto d = IEC.findDevice(device, true);
+        auto d = SYSTEM_BUS.findDevice(device, true);
         if (d) {
             d->setActive(true);
             Config.store_device_slot_enable((device - 7), true);
@@ -707,7 +707,7 @@ void iecFuji::disable_device_basic(std::string ids)
     // Disable devices
     for (int i = 0; i < pt.size(); i++) {
         uint8_t device = atoi(pt[i].c_str());
-        auto d = IEC.findDevice(device, true);
+        auto d = SYSTEM_BUS.findDevice(device, true);
         if (d) {
             d->setActive(false);
             Config.store_device_slot_enable((device - 7), false);

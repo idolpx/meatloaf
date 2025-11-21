@@ -1,4 +1,4 @@
-#ifdef BUILD_IEC
+#if defined(BUILD_IEC) || defined(BUILD_GPIB)
 
 #include "printer.h"
 
@@ -20,7 +20,7 @@
 constexpr const char *const iecPrinter::printer_model_str[PRINTER_INVALID];
 
 // Constructor just sets a default printer type
-iecPrinter::iecPrinter(uint8_t devnum, FileSystem *filesystem, printer_type print_type) : IECDevice(devnum)
+iecPrinter::iecPrinter(uint8_t devnum, FileSystem *filesystem, printer_type print_type) : SystemDevice(devnum)
 {
     _storage = filesystem;
     set_printer_type(print_type);

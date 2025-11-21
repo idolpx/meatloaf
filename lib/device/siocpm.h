@@ -9,7 +9,7 @@
 # include "rs232/rs232cpm.h"
 #endif
 
-#ifdef BUILD_IEC
+#if defined(BUILD_IEC) || defined(BUILD_GPIB)
 # include "iec/cpm.h"
 #endif
 

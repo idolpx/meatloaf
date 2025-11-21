@@ -1,9 +1,9 @@
-#ifdef BUILD_IEC
+#if defined(BUILD_IEC) || defined(BUILD_GPIB)
 
 #include "clock.h"
 #include "string_utils.h"
 
-iecClock::iecClock(uint8_t devnr) : IECDevice(devnr)
+iecClock::iecClock(uint8_t devnr) : SystemDevice(devnr)
 {
     ts = 0;
     payload.clear();

@@ -25,7 +25,7 @@
 #define DEVICE_TYPE macFloppy
 #endif
 
-#ifdef BUILD_IEC
+#if defined(BUILD_IEC) || defined(BUILD_GPIB)
 #include "iec/drive.h"
 #define DEVICE_TYPE iecDrive
 #endif

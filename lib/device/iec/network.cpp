@@ -1,4 +1,4 @@
-#ifdef BUILD_IEC
+#if defined(BUILD_IEC) || defined(BUILD_GPIB)
 /**
  * N: Firmware
  */
@@ -29,7 +29,7 @@
 // #include "SMB.h"
 
 
-iecNetwork::iecNetwork(uint8_t devnr) : IECFileDevice(devnr)
+iecNetwork::iecNetwork(uint8_t devnr) : SystemFileDevice(devnr)
 {
   init();
 }
@@ -1204,13 +1204,13 @@ void iecNetwork::reset()
   init();
 
   // process reset in parent class
-  IECFileDevice::reset();
+  SystemFileDevice::reset();
 }
 
 
 void iecNetwork::task()
 {
-  IECFileDevice::task();
+  SystemFileDevice::task();
 
   static uint32_t nextSRQ = 0;
   NetworkStatus ns;

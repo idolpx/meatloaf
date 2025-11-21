@@ -14,9 +14,12 @@
 #ifdef BUILD_IEC
 #include "iec/iec.h"
 #include "userport/userport.h"
-#include "gpib/gpib.h"
 #define SYSTEM_BUS IEC
-#define FN_BUS_PORT fnUartBUS  // TBD
+#endif
+
+#ifdef BUILD_GPIB
+#include "gpib/gpib.h"
+#define SYSTEM_BUS GPIB
 #endif
 
 #ifdef BUILD_ADAM

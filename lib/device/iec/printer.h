@@ -1,4 +1,3 @@
-#ifdef BUILD_IEC
 #ifndef IEC_PRINTER_H
 #define IEC_PRINTER_H
 
@@ -6,7 +5,16 @@
 
 
 #include "../../bus/bus.h"
+
+#ifdef BUILD_IEC
 #include "../../bus/iec/IECDevice.h"
+#define SystemDevice IECDevice
+#endif  // BUILD_IEC
+#ifdef BUILD_GPIB
+#include "../../bus/gpib/GPIBDevice.h"
+#define SystemDevice GPIBDevice
+#endif  // BUILD_GPIB
+
 #include "../printer-emulator/printer_emulator.h"
 
 #include "fnFS.h"
@@ -14,7 +22,7 @@
 
 #define PRINTER_UNSUPPORTED "Unsupported"
 
-class iecPrinter : public IECDevice
+class iecPrinter : public SystemDevice
 {
 protected:
     printer_emu *_pptr = nullptr;
@@ -117,4 +125,3 @@ private:
 
 
 #endif // IEC_PRINTER_H
-#endif // BUILD_IEC
