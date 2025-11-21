@@ -125,6 +125,17 @@ uint8_t U8Char::toPetscii() {
     
     return c;
 }
+// uint8_t U8Char::toPetscii() {
+//     // but if we want to support conversion of many more UTF8 characters to PETSCII, 
+//     // we can use this code instead of the simple range conversion above.
+//     for (size_t i = 0; i < 256; ++i) {
+//         if (utf8map[i] == ch) {
+//             return static_cast<uint8_t>(i);
+//         }
+//     }
+
+//     return static_cast<uint8_t>(missing);
+// }
 
 // for punycode we need utf8 converted to uint32_t 
 // workflows:
