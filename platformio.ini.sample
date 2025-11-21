@@ -71,6 +71,7 @@ wifi_pass = "meatloaf"
 
 ; Required flags, leave as is
 build_platform = BUILD_IEC
+;build_platform = BUILD_GPIB
 
 [platformio]
 description = ${meatloaf.description}
@@ -125,9 +126,6 @@ build_flags =
     ; These options are also useful for reusing a PI1541 Hat with Meatloaf
     ;-D IEC_SPLIT_LINES     ; hardware uses seperate input/output lines
     ;-D IEC_INVERTED_LINES  ; hardware inverts the signals
-
-    ; GPIB IEEE-488 Hardware Options
-    ;-D ENABLE_GPIB
 
     ; Other Hardware Options
     ;-D NO_BUTTONS          ; if your hardware has no physical buttons
@@ -278,7 +276,6 @@ build_flags =
     -D PINMAP_PETDISKMAXV2
     -D NO_BUTTONS
     -D SD_CARD
-    -D ENABLE_GPIB
     -D ENABLE_CONSOLE
     -D MIN_CONFIG
 

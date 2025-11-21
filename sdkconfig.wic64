@@ -2216,6 +2216,11 @@ CONFIG_LITTLEFS_ASSERTS=y
 # end of LittleFS
 
 #
+# libsodium
+#
+# end of libsodium
+
+#
 # mDNS
 #
 CONFIG_MDNS_MAX_INTERFACES=3
