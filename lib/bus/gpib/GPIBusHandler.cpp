@@ -690,14 +690,18 @@ void GPIBusHandler::begin()
     }
 #else
   // set pins to output 0 (when in output mode)
-  pinMode(m_pinDAV,  OUTPUT); digitalWrite(m_pinDAV, LOW); 
-  pinMode(m_pinNDAC, OUTPUT); digitalWrite(m_pinNDAC, LOW); 
-  if( m_pinSRQ<0xFF ) pinMode(m_pinSRQ,   INPUT);
+  pinMode(m_pinNRFD, OUTPUT); digitalWrite(m_pinNRFD, LOW);
+  pinMode(m_pinNDAC, OUTPUT); digitalWrite(m_pinNDAC, LOW);
+  if( m_pinSRQ<0xFF )
+    {
+      pinMode(m_pinSRQ, OUTPUT);
+      digitalWrite(m_pinSRQ, HIGH);
+    }
 #endif
 
   pinMode(m_pinATN,   INPUT);
   pinMode(m_pinDAV,   INPUT);
-  pinMode(m_pinNDAC,  INPUT);
+  pinMode(m_pinEOI,  INPUT);
   if( m_pinCTRL<0xFF )  pinMode(m_pinCTRL,  OUTPUT);
   if( m_pinRESET<0xFF ) pinMode(m_pinRESET, INPUT);
   m_flags = 0;
