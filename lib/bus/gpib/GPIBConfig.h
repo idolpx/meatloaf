@@ -61,6 +61,6 @@
 
 // convenience macro, GPIB_SUPPORT_PARALLEL is defined if any of the supported
 // fast-load protocols use a parallel cable
-//#define GPIB_SUPPORT_PARALLEL
+#define GPIB_SUPPORT_PARALLEL
 
 #endif

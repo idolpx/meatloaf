@@ -289,18 +289,18 @@ GPIBusHandler *GPIBusHandler::s_bushandler = NULL;
 void RAMFUNC(GPIBusHandler::writePinDAV)(bool v)
 {
 #ifdef GPIB_USE_INVERTED_LINE_DRIVERS
-  digitalWriteFastExt(m_pinNRFD, m_regNRFDwrite, m_bitNRFD, !v);
+  digitalWriteFastExt(m_pinDAV, m_regDAVwrite, m_bitDAV, !v);
 #else
-  digitalWriteFastExt(m_pinNRFD, m_regNRFDwrite, m_bitNRFD, v);
+  digitalWriteFastExt(m_pinDAV, m_regDAVwrite, m_bitDAV, v);
 #endif
 }
 
 void RAMFUNC(GPIBusHandler::writePinNRFD)(bool v)
 {
 #ifdef GPIB_USE_INVERTED_LINE_DRIVERS
-  digitalWriteFastExt(m_pinEOI, m_regEOIwrite, m_bitEOI, !v);
+  digitalWriteFastExt(m_pinNRFD, m_regNRFDwrite, m_bitNRFD, !v);
 #else
-  digitalWriteFastExt(m_pinEOI, m_regEOIwrite, m_bitEOI, v);
+  digitalWriteFastExt(m_pinNRFD, m_regNRFDwrite, m_bitNRFD, v);
 #endif
 }
 
@@ -380,25 +380,23 @@ bool GPIBusHandler::waitTimeout(uint16_t timeout, uint8_t cond)
         case TC_DAV_LOW:
           if( readPinDAV()  == LOW  ) return true;
           break;
-
         case TC_DAV_HIGH:
           if( readPinDAV()  == HIGH ) return true;
           break;
+
         case TC_NRFD_LOW:
           if( readPinNRFD() == LOW  ) return true;
           break;
-
         case TC_NRFD_HIGH:
           if( readPinNRFD() == HIGH ) return true;
           break;
+
         case TC_NDAC_LOW:
           if( readPinNDAC() == LOW  ) return true;
           break;
-
         case TC_NDAC_HIGH:
           if( readPinNDAC() == HIGH ) return true;
           break;
-
         }
 
       if( ((m_flags & P_ATN)!=0) == readPinATN() )
@@ -652,21 +650,31 @@ GPIBusHandler::GPIBusHandler(uint8_t pinATN, uint8_t pinDAV, uint8_t pinNRFD, ui
   m_bufferSize = 128;
 
 #ifdef IOREG_TYPE
-  m_bitRESET     = digitalPinToBitMask(pinRESET);
-  m_regRESETread = portInputRegister(digitalPinToPort(pinRESET));
   m_bitATN       = digitalPinToBitMask(pinATN);
   m_regATNread   = portInputRegister(digitalPinToPort(pinATN));
+
   m_bitDAV       = digitalPinToBitMask(pinDAV);
   m_regDAVread   = portInputRegister(digitalPinToPort(pinDAV));
   m_regDAVwrite  = portOutputRegister(digitalPinToPort(pinDAV));
   m_regDAVmode   = portModeRegister(digitalPinToPort(pinDAV));
+
   m_bitNRFD      = digitalPinToBitMask(pinNRFD);
   m_regNRFDread  = portInputRegister(digitalPinToPort(pinNRFD));
   m_regNRFDwrite = portOutputRegister(digitalPinToPort(pinNRFD));
   m_regNRFDmode  = portModeRegister(digitalPinToPort(pinNRFD));
 
   m_bitNDAC      = digitalPinToBitMask(pinNDAC);
+  m_regNDACread  = portInputRegister(digitalPinToPort(pinNDAC));
+  m_regNDACwrite = portOutputRegister(digitalPinToPort(pinNDAC));
+  m_regNDACmode  = portModeRegister(digitalPinToPort(pinNDAC));
+
   m_bitEOI       = digitalPinToBitMask(pinEOI);
+  m_regEOIread   = portInputRegister(digitalPinToPort(pinEOI));
+  m_regEOIwrite  = portOutputRegister(digitalPinToPort(pinEOI));
+  m_regEOImode   = portModeRegister(digitalPinToPort(pinEOI));
+
+  m_bitRESET     = digitalPinToBitMask(pinRESET);
+  m_regRESETread = portInputRegister(digitalPinToPort(pinRESET));
 #endif
 
   m_atnInterrupt = digitalPinToInterrupt(m_pinATN);
@@ -679,6 +687,7 @@ void GPIBusHandler::begin()
 
 #if defined(GPIB_USE_LINE_DRIVERS)
   pinMode(m_pinNRFD,  OUTPUT);
+  pinMode(m_pinNDAC,  OUTPUT);
   pinMode(m_pinEOI, OUTPUT);
   writePinDAV(HIGH);
   writePinNRFD(HIGH);
@@ -861,9 +870,10 @@ void GPIBusHandler::setParallelPins(uint8_t pinD0, uint8_t pinD1, uint8_t pinD2,
 bool GPIBusHandler::checkParallelPins()
 {
   return (m_bufferSize>=PARALLEL_PREBUFFER_BYTES && 
-          !isParallelPin(m_pinATN)   && !isParallelPin(m_pinDAV) && !isParallelPin(m_pinNDAC) && 
+          !isParallelPin(m_pinATN)   && !isParallelPin(m_pinDAV) && 
+          !isParallelPin(m_pinNRFD) && !isParallelPin(m_pinNDAC) && 
           !isParallelPin(m_pinRESET) && !isParallelPin(m_pinCTRL) && 
-          !isParallelPin(m_pinNRFD) && !isParallelPin(m_pinEOI) &&
+          !isParallelPin(m_pinEOI) &&
 
 #ifdef GPIB_SUPPORT_PARALLEL_XRA1405
           m_pinParallelCS!=0xFF && m_pinParallelSCK!=0xFF && m_pinParallelCOPI!=0xFF && m_pinParallelCIPO!=0xFF

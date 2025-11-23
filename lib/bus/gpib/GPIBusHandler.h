@@ -88,7 +88,7 @@ class GPIBusHandler
 
   uint8_t m_numDevices;
   int  m_atnInterrupt;
-  uint8_t m_pinATN, m_pinDAV, m_pinNRFD, m_pinNDAC, m_pinEOI, m_pinRESET, m_pinSRQ, m_pinCTRL;
+  uint8_t m_pinATN, m_pinDAV, m_pinNRFD, m_pinNDAC, m_pinEOI, m_pinRESET, m_pinCTRL, m_pinSRQ;
 
  private:
   inline bool readPinATN();
@@ -121,8 +121,9 @@ class GPIBusHandler
   uint8_t m_primary, m_secondary;
 
 #ifdef IOREG_TYPE
-  volatile IOREG_TYPE *m_regDAVwrite, *m_regDAVmode, *m_regNRFDwrite, *m_regNRFDmode;
-  volatile IOREG_TYPE *m_regNDACwrite, *m_regNDACmode, *m_regEOIwrite, *m_regEOImode;
+  volatile IOREG_TYPE *m_regDAVwrite, *m_regDAVmode;
+  volatile IOREG_TYPE *m_regNRFDwrite, *m_regNRFDmode, *m_regNDACwrite, *m_regNDACmode;
+  volatile IOREG_TYPE *m_regEOIwrite, *m_regEOImode;
   volatile const IOREG_TYPE *m_regATNread, *m_regDAVread, *m_regNRFDread, *m_regNDACread, *m_regEOIread, *m_regRESETread;
   IOREG_TYPE m_bitATN, m_bitDAV, m_bitNRFD, m_bitNDAC, m_bitEOI, m_bitRESET;
 #endif
