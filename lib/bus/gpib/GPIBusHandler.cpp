@@ -1076,6 +1076,8 @@ bool RAMFUNC(GPIBusHandler::receiveGPIBByte)(bool canWriteOk)
 
   noInterrupts();
 
+  setParallelBusModeInput();
+
   // release NRFD ("not ready for data")
   writePinNRFD(HIGH);
 
@@ -1127,6 +1129,8 @@ bool RAMFUNC(GPIBusHandler::transmitGPIBByte)(uint8_t numData)
   //    (e.g. "File not found" for LOAD)
   if( numData==0 ) { interrupts(); return false; }
 
+  setParallelBusModeOutput();
+
   interrupts();
 
   // get the data byte from the device
@@ -1138,6 +1142,7 @@ bool RAMFUNC(GPIBusHandler::transmitGPIBByte)(uint8_t numData)
 
   // signal "data valid" (DAV=0)
   writePinDAV(LOW);
+
 
   // wait for receiver to signal "data received"
   if( !waitPinNDAC(HIGH) ) return false;
