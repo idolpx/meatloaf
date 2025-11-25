@@ -49,8 +49,8 @@
 #define PIN_GPIB_EOI         GPIO_NUM_22 // End Or Identify
 
 #define PIN_GPIB_REN         GPIO_NUM_NC // Remote Enable (IEEE-488 enabled if pulled low)
-#define PIN_GPIB_SRQ         GPIO_NUM_15 // Service Request
-#define PIN_GPIB_IFC         GPIO_NUM_16 // Interface Clear (RESET)
+#define PIN_GPIB_SRQ         GPIO_NUM_NC // Service Request
+#define PIN_GPIB_IFC         GPIO_NUM_NC // Interface Clear (RESET)
 
 #define PIN_GPIB_DATADIR     GPIO_NUM_15
 
