@@ -43,13 +43,10 @@ systemBus::systemBus() :
                 PIN_GPIB_NRFD,
                 PIN_GPIB_NDAC,
                 PIN_GPIB_EOI,
-#ifdef IEC_HAS_RESET
-                PIN_IEC_RESET==GPIO_NUM_NC ? 0xFF : PIN_IEC_RESET,
-#else
+                PIN_GPIB_IFC==GPIO_NUM_NC ? 0xFF : PIN_GPIB_IFC,
                 0xFF,
-#endif
-                0xFF,
-                PIN_GPIB_SRQ==GPIO_NUM_NC   ? 0xFF : PIN_GPIB_SRQ
+                PIN_GPIB_SRQ==GPIO_NUM_NC   ? 0xFF : PIN_GPIB_SRQ,
+                PIN_GPIB_DATADIR==GPIO_NUM_NC ? 0xFF : PIN_GPIB_DATADIR
   )
 {
   setParallelPins(PIN_PARALLEL_DATA0,
@@ -85,17 +82,6 @@ void systemBus::setup()
 {
   Debug_printf("GPIB systemBus::setup()\r\n");
   begin();
-
-//     // initial pin modes in GPIO
-//     init_gpio(PIN_GPIB_ATN);
-//     init_gpio(PIN_GPIB_DAV);
-//     init_gpio(PIN_GPIB_EOI);
-//     init_gpio(PIN_GPIB_DATA_IN);
-//     init_gpio(PIN_GPIB_DATA_OUT);
-//     init_gpio(PIN_GPIB_SRQ);
-// #ifdef GPIB_HAS_RESET
-//     init_gpio(PIN_GPIB_IFC);
-// #endif
 
 #ifdef GPIB_INVERTED_LINES
 #warning intr_type likely needs to be fixed!

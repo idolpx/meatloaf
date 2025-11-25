@@ -322,6 +322,15 @@ void RAMFUNC(GPIBusHandler::writePinEOI)(bool v)
 #endif
 }
 
+void RAMFUNC(GPIBusHandler::writePinSRQ)(bool v)
+{
+#ifdef GPIB_USE_INVERTED_LINE_DRIVERS
+  digitalWriteFastExt(m_pinSRQ, m_regSRQwrite, m_bitSRQ, !v);
+#else
+  digitalWriteFastExt(m_pinSRQ, m_regSRQwrite, m_bitSRQ, v);
+#endif
+}
+
 void RAMFUNC(GPIBusHandler::writePinCTRL)(bool v)
 {
   if( m_pinCTRL!=0xFF )
@@ -353,6 +362,11 @@ bool RAMFUNC(GPIBusHandler::readPinNDAC)()
 bool RAMFUNC(GPIBusHandler::readPinEOI)()
 {
   return digitalReadFastExt(m_pinEOI, m_regEOIread, m_bitEOI)!=0;
+}
+
+bool RAMFUNC(GPIBusHandler::readPinSRQ)()
+{
+  return digitalReadFastExt(m_pinSRQ, m_regSRQread, m_bitSRQ)!=0;
 }
 
 bool RAMFUNC(GPIBusHandler::readPinRESET)()
@@ -589,7 +603,7 @@ void GPIBusHandler::sendSRQ()
 }
 
 
-GPIBusHandler::GPIBusHandler(uint8_t pinATN, uint8_t pinDAV, uint8_t pinNRFD, uint8_t pinNDAC, uint8_t pinEOI, uint8_t pinRESET, uint8_t pinCTRL, uint8_t pinSRQ)
+GPIBusHandler::GPIBusHandler(uint8_t pinATN, uint8_t pinDAV, uint8_t pinNRFD, uint8_t pinNDAC, uint8_t pinEOI, uint8_t pinRESET, uint8_t pinCTRL, uint8_t pinSRQ, uint8_t pinDDR)
 #if defined(GPIB_SUPPORT_PARALLEL_XRA1405)
 #if defined(ESP_PLATFORM)
   // ESP32
@@ -645,6 +659,7 @@ GPIBusHandler::GPIBusHandler(uint8_t pinATN, uint8_t pinDAV, uint8_t pinNRFD, ui
   m_pinRESET     = pinRESET;
   m_pinCTRL      = pinCTRL;
   m_pinSRQ       = pinSRQ;
+  m_pinDDR       = pinDDR;    // Data Direction Register
 
   m_buffer = NULL;
   m_bufferSize = 128;
@@ -672,6 +687,11 @@ GPIBusHandler::GPIBusHandler(uint8_t pinATN, uint8_t pinDAV, uint8_t pinNRFD, ui
   m_regEOIread   = portInputRegister(digitalPinToPort(pinEOI));
   m_regEOIwrite  = portOutputRegister(digitalPinToPort(pinEOI));
   m_regEOImode   = portModeRegister(digitalPinToPort(pinEOI));
+
+  m_bitSRQ       = digitalPinToBitMask(pinSRQ);
+  m_regSRQread   = portInputRegister(digitalPinToPort(pinSRQ));
+  m_regSRQwrite  = portOutputRegister(digitalPinToPort(pinSRQ));
+  m_regSRQmode   = portModeRegister(digitalPinToPort(pinSRQ));
 
   m_bitRESET     = digitalPinToBitMask(pinRESET);
   m_regRESETread = portInputRegister(digitalPinToPort(pinRESET));
@@ -705,6 +725,11 @@ void GPIBusHandler::begin()
     {
       pinMode(m_pinSRQ, OUTPUT);
       digitalWrite(m_pinSRQ, HIGH);
+    }
+  if( m_pinDDR<0xFF )
+    {
+      pinMode(m_pinDDR, OUTPUT);
+      digitalWrite(m_pinDDR, LOW);
     }
 #endif
 
@@ -1012,6 +1037,11 @@ void RAMFUNC(GPIBusHandler::writeParallelData)(uint8_t data)
 
 void RAMFUNC(GPIBusHandler::setParallelBusModeInput)()
 {
+  if ( m_dataDirection == PARALLEL_DATA_INPUT )
+    return; // already in input mode
+
+  digitalWrite(m_pinDDR, LOW);
+  m_dataDirection = PARALLEL_DATA_INPUT;
 #ifdef GPIB_SUPPORT_PARALLEL_XRA1405
   XRA1405_WriteReg(0x06, 0xFF); // GCR1, GPIO Configuration Register for P0-P7
 #else
@@ -1024,6 +1054,11 @@ void RAMFUNC(GPIBusHandler::setParallelBusModeInput)()
 
 void RAMFUNC(GPIBusHandler::setParallelBusModeOutput)()
 {
+  if ( m_dataDirection == PARALLEL_DATA_OUTPUT )
+    return; // already in output mode
+
+  digitalWrite(m_pinDDR, HIGH);
+  m_dataDirection = PARALLEL_DATA_OUTPUT;
 #ifdef GPIB_SUPPORT_PARALLEL_XRA1405
   XRA1405_WriteReg(0x06, 0x00); // GCR1, GPIO Configuration Register for P0-P7
 #else
@@ -1042,6 +1077,8 @@ bool RAMFUNC(GPIBusHandler::receiveGPIBByteATN)(uint8_t &data)
 {
   // wait for DAV=1
   if( !waitPinDAV(HIGH, 0) ) return false;
+
+  setParallelBusModeInput();
 
   // release NRFD ("not ready for data")
   writePinNRFD(HIGH);
@@ -1112,6 +1149,8 @@ bool RAMFUNC(GPIBusHandler::transmitGPIBByte)(uint8_t numData)
 {
   noInterrupts();
 
+  setParallelBusModeOutput();
+
   // signal "ready-to-send" (DAV=1)
   writePinDAV(HIGH);
   
@@ -1128,8 +1167,6 @@ bool RAMFUNC(GPIBusHandler::transmitGPIBByte)(uint8_t numData)
   // => aborting at this stage will signal the error condition to the receiver
   //    (e.g. "File not found" for LOAD)
   if( numData==0 ) { interrupts(); return false; }
-
-  setParallelBusModeOutput();
 
   interrupts();
 
