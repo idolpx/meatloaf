@@ -331,6 +331,15 @@ void RAMFUNC(GPIBusHandler::writePinSRQ)(bool v)
 #endif
 }
 
+void RAMFUNC(GPIBusHandler::writePinDDR)(bool v)
+{
+#ifdef GPIB_USE_INVERTED_LINE_DRIVERS
+  digitalWriteFastExt(m_pinDDR, m_regDDRwrite, m_bitDDR, !v);
+#else
+  digitalWriteFastExt(m_pinDDR, m_regDDRwrite, m_bitDDR, v);
+#endif
+}
+
 void RAMFUNC(GPIBusHandler::writePinCTRL)(bool v)
 {
   if( m_pinCTRL!=0xFF )
@@ -367,6 +376,11 @@ bool RAMFUNC(GPIBusHandler::readPinEOI)()
 bool RAMFUNC(GPIBusHandler::readPinSRQ)()
 {
   return digitalReadFastExt(m_pinSRQ, m_regSRQread, m_bitSRQ)!=0;
+}
+
+bool RAMFUNC(GPIBusHandler::readPinDDR)()
+{
+  return digitalReadFastExt(m_pinDDR, m_regDDRread, m_bitDDR)!=0;
 }
 
 bool RAMFUNC(GPIBusHandler::readPinRESET)()
@@ -693,6 +707,11 @@ GPIBusHandler::GPIBusHandler(uint8_t pinATN, uint8_t pinDAV, uint8_t pinNRFD, ui
   m_regSRQwrite  = portOutputRegister(digitalPinToPort(pinSRQ));
   m_regSRQmode   = portModeRegister(digitalPinToPort(pinSRQ));
 
+  m_bitDDR       = digitalPinToBitMask(pinDDR);
+  m_regDDRread   = portInputRegister(digitalPinToPort(pinDDR));
+  m_regDDRwrite  = portOutputRegister(digitalPinToPort(pinDDR));
+  m_regDDRmode   = portModeRegister(digitalPinToPort(pinDDR));
+
   m_bitRESET     = digitalPinToBitMask(pinRESET);
   m_regRESETread = portInputRegister(digitalPinToPort(pinRESET));
 #endif
@@ -719,17 +738,17 @@ void GPIBusHandler::begin()
     }
 #else
   // set pins to output 0 (when in output mode)
-  pinMode(m_pinNRFD, OUTPUT); digitalWrite(m_pinNRFD, LOW);
-  pinMode(m_pinNDAC, OUTPUT); digitalWrite(m_pinNDAC, LOW);
+  pinMode(m_pinNRFD, OUTPUT); writePinNRFD(LOW);
+  pinMode(m_pinNDAC, OUTPUT); writePinNDAC(LOW);
   if( m_pinSRQ<0xFF )
     {
       pinMode(m_pinSRQ, OUTPUT);
-      digitalWrite(m_pinSRQ, HIGH);
+      writePinSRQ(HIGH);
     }
   if( m_pinDDR<0xFF )
     {
       pinMode(m_pinDDR, OUTPUT);
-      digitalWrite(m_pinDDR, LOW);
+      writePinDDR(LOW);
     }
 #endif
 
@@ -1040,7 +1059,7 @@ void RAMFUNC(GPIBusHandler::setParallelBusModeInput)()
   if ( m_dataDirection == PARALLEL_DATA_INPUT )
     return; // already in input mode
 
-  digitalWrite(m_pinDDR, LOW);
+  writePinDDR(LOW);
   m_dataDirection = PARALLEL_DATA_INPUT;
 #ifdef GPIB_SUPPORT_PARALLEL_XRA1405
   XRA1405_WriteReg(0x06, 0xFF); // GCR1, GPIO Configuration Register for P0-P7
@@ -1057,7 +1076,7 @@ void RAMFUNC(GPIBusHandler::setParallelBusModeOutput)()
   if ( m_dataDirection == PARALLEL_DATA_OUTPUT )
     return; // already in output mode
 
-  digitalWrite(m_pinDDR, HIGH);
+  writePinDDR(HIGH);
   m_dataDirection = PARALLEL_DATA_OUTPUT;
 #ifdef GPIB_SUPPORT_PARALLEL_XRA1405
   XRA1405_WriteReg(0x06, 0x00); // GCR1, GPIO Configuration Register for P0-P7
@@ -1083,7 +1102,7 @@ bool RAMFUNC(GPIBusHandler::receiveGPIBByteATN)(uint8_t &data)
   // release NRFD ("not ready for data")
   writePinNRFD(HIGH);
   // release NDAC ("no data accepted")
-  writePinNDAC(HIGH);
+  writePinNDAC(LOW);
 
   // wait for DAV=0
   // must wait indefinitely since other devices may be holding NRFD low until
@@ -1094,12 +1113,11 @@ bool RAMFUNC(GPIBusHandler::receiveGPIBByteATN)(uint8_t &data)
   // receive data bits
   data = readParallelData();
 
-  // Acknowledge receipt by pulling NDAC low
-  writePinNDAC(LOW);
-  // Release NRFD
-  writePinNRFD(HIGH);
+  // Acknowledge receipt by releasing NDAC
+  writePinNDAC(HIGH);
+  // pull NRFD
+  writePinNRFD(LOW);
 
-  // Wait for DAV to be released?
 
   return true;
 }
@@ -1109,7 +1127,9 @@ bool RAMFUNC(GPIBusHandler::receiveGPIBByte)(bool canWriteOk)
 {
   // NOTE: we only get here if sender has already signaled ready-to-send
   // by releasing DAV
-  bool eoi = false;
+
+  // check for EOI
+  bool eoi = readPinEOI();
 
   noInterrupts();
 
@@ -1117,9 +1137,8 @@ bool RAMFUNC(GPIBusHandler::receiveGPIBByte)(bool canWriteOk)
 
   // release NRFD ("not ready for data")
   writePinNRFD(HIGH);
-
-  // check for EOI
-  eoi = readPinEOI();
+  // release NDAC ("no data accepted")
+  writePinNDAC(LOW);
 
   // receive data bits
   uint8_t data = readParallelData();
@@ -1128,10 +1147,11 @@ bool RAMFUNC(GPIBusHandler::receiveGPIBByte)(bool canWriteOk)
 
   if( canWriteOk )
     {
-      // acknowledge receipt by pulling NDAC low
-      writePinNDAC(LOW);
-      // release NRFD
-      writePinNRFD(HIGH);
+      // acknowledge receipt by releasing NDAC low
+      writePinNDAC(HIGH);
+      // pull NRFD
+      writePinNRFD(LOW);
+
 
       // pass received data on to the device
       m_currentDevice->write(data, eoi);
@@ -1283,6 +1303,7 @@ void RAMFUNC(GPIBusHandler::handleATNSequence)()
               // now set DAV=0 and NRFD=1
               writePinDAV(LOW);
               writePinNRFD(HIGH);
+              writePinNDAC(HIGH);
                   
               // wait 80us before transmitting first byte of data
               delayMicrosecondsISafe(80);
@@ -1306,9 +1327,10 @@ void RAMFUNC(GPIBusHandler::handleATNSequence)()
           
       if( !(m_flags & (P_LISTENING | P_TALKING)) )
         {
-          // we're neither listening nor talking => release DAV/NRFD
+          // we're neither listening nor talking => release DAV/NRFD/NDAC
           writePinDAV(HIGH);
           writePinNRFD(HIGH);
+          writePinNDAC(HIGH);
         }
     }
   else
@@ -1317,6 +1339,7 @@ void RAMFUNC(GPIBusHandler::handleATNSequence)()
       delayMicrosecondsISafe(150);
       writePinDAV(HIGH);
       writePinNRFD(HIGH);
+      writePinNDAC(HIGH);
       waitPinATN(HIGH);
 
       // if someone else was told to start talking then we must stop
@@ -1348,9 +1371,10 @@ void GPIBusHandler::task()
       // falling edge on RESET pin
       m_flags = 0;
       
-      // release DAV and NRFD, allow ATN to pull NRFD low in hardware
+      // release DAV, NRFD, NDAC, allow ATN to pull NRFD low in hardware
       writePinDAV(HIGH);
       writePinNRFD(HIGH);
+      writePinNDAC(HIGH);
       writePinCTRL(LOW);
 
       // call "reset" function for attached devices
@@ -1439,10 +1463,10 @@ void GPIBusHandler::task()
   // ------------------ transmitting data -------------------
 
   if( (m_flags & (P_ATN|P_TALKING|P_DONE))==P_TALKING && (m_currentDevice!=NULL) )
-   {
+    {
      // we are not under ATN, are in "talking" mode and not done with the transaction
 
-       {
+      {
         // check if we can read (also gives devices a chance to
         // execute time-consuming tasks while bus master waits for ready-to-send)
         GPIBDevice *dev = m_currentDevice;
@@ -1476,8 +1500,8 @@ void GPIBusHandler::task()
                 m_flags |= P_DONE;
               }
           }
-       }
-   }
+      }
+    }
 
   // allow the interrupt handler to call atnRequest() again
   m_inTask = false;

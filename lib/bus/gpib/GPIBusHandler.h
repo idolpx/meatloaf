@@ -100,12 +100,14 @@ class GPIBusHandler
   inline bool readPinNDAC();
   inline bool readPinEOI();
   inline bool readPinSRQ();
+  inline bool readPinDDR();
   inline bool readPinRESET();
   inline void writePinDAV(bool v);
   inline void writePinNRFD(bool v);
   inline void writePinNDAC(bool v);
   inline void writePinEOI(bool v);
   inline void writePinSRQ(bool v);
+  inline void writePinDDR(bool v);
   void writePinCTRL(bool v);
   bool waitTimeout(uint16_t timeout, uint8_t cond = 0);
   bool waitPinEOI(bool state, uint16_t timeout = 1000);
@@ -130,8 +132,9 @@ class GPIBusHandler
   volatile IOREG_TYPE *m_regDAVwrite, *m_regDAVmode;
   volatile IOREG_TYPE *m_regNRFDwrite, *m_regNRFDmode, *m_regNDACwrite, *m_regNDACmode;
   volatile IOREG_TYPE *m_regEOIwrite, *m_regEOImode, *m_regSRQwrite, *m_regSRQmode;
-  volatile const IOREG_TYPE *m_regATNread, *m_regDAVread, *m_regNRFDread, *m_regNDACread, *m_regEOIread, *m_regSRQread, *m_regRESETread;
-  IOREG_TYPE m_bitATN, m_bitDAV, m_bitNRFD, m_bitNDAC, m_bitEOI, m_bitSRQ, m_bitRESET;
+  volatile IOREG_TYPE *m_regDDRwrite, *m_regDDRmode;
+  volatile const IOREG_TYPE *m_regATNread, *m_regDAVread, *m_regNRFDread, *m_regNDACread, *m_regEOIread, *m_regSRQread, *m_regDDRread, *m_regRESETread;
+  IOREG_TYPE m_bitATN, m_bitDAV, m_bitNRFD, m_bitNDAC, m_bitEOI, m_bitSRQ, m_bitDDR, m_bitRESET;
 #endif
 
 
