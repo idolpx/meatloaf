@@ -672,8 +672,18 @@ bool iecDrive::open(uint8_t channel, const char *cname)
                 close(channel);
             }
 
-            if ( name[0] == '$' ) 
-                name.clear();
+            // Handle CMD-style directory filters by preserving them in URL
+            if ( name[0] == '$' ) {
+                // Check if this is a CMD-style filter (e.g., $=P, $GAME*, $=P:GAME*)
+                if (name.length() > 1 && (name[1] == '=' || isalnum(name[1]))) {
+                    // This looks like a CMD filter - preserve it for the server
+                    Debug_printv("CMD filter detected: [%s]", name.c_str());
+                    // Don't clear the name - let the server handle CMD filtering
+                } else {
+                    // Plain "$" - traditional directory listing
+                    name.clear();
+                }
+            }
 
             // get file
             Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Changing directory to [%s][%s]", m_cwd->url.c_str(), name.c_str());
