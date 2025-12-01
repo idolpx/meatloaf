@@ -20,6 +20,9 @@
 #include "../Helpers/PWDHelpers.h"
 #include "../../include/debug.h"
 
+#define ChunkSize              64   //bytes to send in chunk before ack
+#define ChunkAckChar          '+'   //char sent to ack chunk
+
 std::string read_until(char delimiter)
 {
     uint8_t byte = 0;
@@ -91,6 +94,7 @@ int rx(int argc, char **argv)
             // Calculate checksum
             dest_checksum = esp_rom_crc32_le(dest_checksum, &byte, 1);
             count++;
+            if (count % ChunkSize == 0 || count == size) Serial.printf("%c", ChunkAckChar); // send ack character after every chunk
         }
     }
     fclose(file);
