@@ -80,7 +80,11 @@ int rx(int argc, char **argv)
         {
             int result = uart_read_bytes((uart_port_t)CONSOLE_UART, &byte, 1, MAX_READ_WAIT_TICKS);
             if (result < 1)
-                break;
+            {
+                Serial.printf("3 Error: Receive Timeout at %lu bytes\r\n", count);
+                fclose(file);
+                return 3;
+            }    
 
             fprintf(file, "%c", byte);
 
