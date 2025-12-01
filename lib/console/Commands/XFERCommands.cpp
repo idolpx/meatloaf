@@ -74,9 +74,9 @@ int rx(int argc, char **argv)
     int dest_checksum = 0;
     while (count < size)
     {
-        size_t size = 0;
-        uart_get_buffered_data_len((uart_port_t)CONSOLE_UART, &size);
-        if (size > 0)
+        size_t datalen = 0;
+        uart_get_buffered_data_len((uart_port_t)CONSOLE_UART, &datalen);
+        if (datalen > 0)
         {
             int result = uart_read_bytes((uart_port_t)CONSOLE_UART, &byte, 1, MAX_READ_WAIT_TICKS);
             if (result < 1)
