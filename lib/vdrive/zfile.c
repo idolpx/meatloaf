@@ -199,7 +199,10 @@ static char *try_uncompress_with_miniz(const char *zipfilename)
         }
 
       if( res==NULL || archdep_file_exists(res) )
-        res = archdep_tmpnam();
+        {
+          if( res!=NULL ) lib_free(res);
+          res = archdep_tmpnam();
+        }
 
       ZDEBUG(("try_uncompress_with_miniz: extracting file %s", res));
       if( !mz_zip_reader_extract_to_file(&zip_archive, idx, res, 0) )

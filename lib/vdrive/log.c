@@ -37,176 +37,34 @@
 #include "log.h"
 #include "util.h"
 
-#ifdef DBGLOGGING
-#define DBG(x) printf x
-#else
-#define DBG(x)
-#endif
+#define MAX_LOGS 10
+static const char *logs[MAX_LOGS] = {NULL};
 
-#ifdef USE_VICE_THREAD
-/*
- * It was observed that stdout logging from the UI thread under Windows
- * wasn't reliable, possibly only when the vice mainlock has not been
- * obtained.
- *
- * This lock serialises access to logging functions without requiring
- * ownership of the main lock.
- *
- *******************************************************************
- * ANY NEW NON-STATIC FUNCTIONS NEED CALLS TO LOCK() and UNLOCK(). *
- *******************************************************************
- */
-
-#include <pthread.h>
-static pthread_mutex_t log_lock;
-
-#define LOCK() { log_init_locks(); pthread_mutex_lock(&log_lock); }
-#define UNLOCK() { pthread_mutex_unlock(&log_lock); }
-#define UNLOCK_AND_RETURN_INT(i) { int result = (i); UNLOCK(); return result; }
-
-#else /* #ifdef USE_VICE_THREAD */
-
-#define LOCK()
-#define UNLOCK()
-#define UNLOCK_AND_RETURN_INT(i) return (i)
-
-#endif /* #ifdef USE_VICE_THREAD */
-
-static int log_locks_initialized = 0;
-static void log_init_locks(void);
-
-static char **logs = NULL;
-static log_t num_logs = 0;
-
-static int log_limit_early = -1; /* -1 means not set */
-
-/* resources */
-
-static int log_limit = LOG_LIMIT_DEBUG; /* before the default is set, we want all messages */
-
-static int log_to_stdout = 1;
-static int log_colorize = 1;
-
-/* ------------------------------------------------------------------------- */
-
-int log_set_limit(int n)
-{
-    LOCK();
-
-    if ((n < 0) || (n > 0xff)) {
-        UNLOCK_AND_RETURN_INT(-1);
-    }
-
-    log_limit = n;
-    UNLOCK_AND_RETURN_INT(0);
-}
-
-/* called by code that is executed *before* the resources are registered */
-int log_set_limit_early(int n)
-{
-    LOCK();
-
-    log_limit = n;
-    log_limit_early = n;
-
-    UNLOCK_AND_RETURN_INT(0);
-}
-
-static void log_init_locks(void)
-{
-    if (log_locks_initialized == 0) {
-#ifdef USE_VICE_THREAD
-        pthread_mutexattr_t lock_attributes;
-        pthread_mutexattr_init(&lock_attributes);
-        pthread_mutexattr_settype(&lock_attributes, PTHREAD_MUTEX_RECURSIVE);
-        pthread_mutex_init(&log_lock, &lock_attributes);
-#endif
-        log_locks_initialized = 1;
-    }
-    return;
-}
-
-/* called via main_program()->archdep_init() */
-int log_early_init(int argc, char **argv)
-{
-    int i;
-
-    log_init_locks();
-
-    DBG(("log_early_init: %d %s\n", argc, argv[0]));
-    if (argc > 1) {
-        for (i = 1; i < argc; i++) {
-            DBG(("log_early_init: %d %s\n", i, argv[i]));
-            if ((strcmp("-verbose", argv[i]) == 0) || (strcmp("--verbose", argv[i]) == 0)) {
-                log_set_limit_early(LOG_LIMIT_VERBOSE);
-                break;
-            } else if ((strcmp("-silent", argv[i]) == 0) || (strcmp("--silent", argv[i]) == 0)) {
-                log_set_limit_early(LOG_LIMIT_SILENT);
-                break;
-            } else if ((strcmp("-debug", argv[i]) == 0) || (strcmp("--debug", argv[i]) == 0)) {
-                log_set_limit_early(LOG_LIMIT_DEBUG);
-                break;
-            }
-        }
-    }
-    return 0;
-}
-
-/******************************************************************************/
-
-/******************************************************************************/
 
 log_t log_open(const char *id)
 {
-    log_t new_log = 0;
-    log_t i;
+  for(log_t i=0; i<MAX_LOGS; i++)
+    if( logs[i]==NULL )
+      {
+        logs[i]=id;
+        return i;
+      }
 
-    LOCK();
-    for (i = 0; i < num_logs; i++) {
-        if (logs[i] == NULL) {
-            new_log = i;
-            break;
-        }
-    }
-    if (i == num_logs) {
-        new_log = num_logs++;
-        logs = lib_realloc(logs, sizeof(*logs) * num_logs);
-    }
-
-    logs[new_log] = lib_strdup(id);
-
-    UNLOCK_AND_RETURN_INT(new_log);
+  return LOG_DEFAULT;
 }
+
 
 int log_close(log_t log)
 {
-    LOCK();
-
-    /*printf("log_close(%s) = %d\n", logs[(unsigned int)log], (int)log);*/
-    if (logs[(unsigned int)log] == NULL) {
-        UNLOCK_AND_RETURN_INT(-1);
-    }
-
-    lib_free(logs[(unsigned int)log]);
-    logs[(unsigned int)log] = NULL;
-
-    UNLOCK_AND_RETURN_INT(0);
+  if(log>=0 && log<MAX_LOGS)
+    logs[log] = NULL;
+  return 0;
 }
 
 void log_close_all(void)
 {
-    log_t i;
-
-    LOCK();
-
-    for (i = 0; i < num_logs; i++) {
-        log_close(i);
-    }
-
-    lib_free(logs);
-    logs = NULL;
-
-    UNLOCK();
+  for(log_t i=0; i<MAX_LOGS; i++)
+    logs[i]=NULL;
 }
 
 /******************************************************************************/
@@ -251,9 +109,9 @@ static int log_helper(log_t log, unsigned int level, const char *format,
 {
     static const char * const level_strings[8] = {
         "",             /* LOG_LEVEL_NONE */
-        LOG_COL_LRED "Fatal" LOG_COL_OFF " - ",     /* LOG_LEVEL_FATAL */
-        LOG_COL_LRED "Error" LOG_COL_OFF " - ",     /* LOG_LEVEL_ERROR */
-        LOG_COL_LMAGENTA "Warning" LOG_COL_OFF " - ",   /* LOG_LEVEL_WARNING */
+        "Fatal - ",     /* LOG_LEVEL_FATAL */
+        "Error - ",     /* LOG_LEVEL_ERROR */
+        "Warning - ",   /* LOG_LEVEL_WARNING */
         "",             /* LOG_LEVEL_INFO */
         "",             /* LOG_LEVEL_VERBOSE */
         "",             /* LOG_LEVEL_DEBUG */
@@ -266,58 +124,29 @@ static int log_helper(log_t log, unsigned int level, const char *format,
     int rc = 0;
     char *pretxt = NULL;
     char *logtxt = NULL;
-    char *nocolorpre = NULL;
-    char *nocolortxt = NULL;
     char *terminalpre = NULL;
     char *terminaltxt = NULL;
 
-    /* exit early if there is no log enabled */
-    if ((log_limit < level) ||
-        ((log_to_stdout == 0) )) {
-        return 0;
-    }
-
     if (logi != LOG_DEFAULT) {
-        if ((logs == NULL) || (logi < 0) || (logi >= num_logs) || (logs[logi] == NULL)) {
-            DBG(("log_helper: internal error (invalid id or closed log), message follows:\n"));
-            logi = LOG_DEFAULT;
-        }
+      if ((logi < 0) || (logi >= MAX_LOGS) || (logs[logi] == NULL)) {
+        logi = LOG_DEFAULT;
+      }
     }
 
     /* prepend the log_t prefix, and the loglevel string */
     if ((logi == LOG_DEFAULT) || (*logs[logi] == '\0')) {
         pretxt = lib_msprintf("%s", lvlstr);
     } else {
-        pretxt = lib_msprintf(LOG_COL_LWHITE "%s" LOG_COL_OFF ": %s", logs[logi], lvlstr);
+        pretxt = lib_msprintf("%s: %s", logs[logi], lvlstr);
     }
     /* build the log string */
     logtxt = lib_mvsprintf(format, ap);
 
-    if (log_colorize) {
-        terminalpre = pretxt;
-        terminaltxt = logtxt;
-    } else {
-        terminalpre = nocolorpre;
-        terminaltxt = nocolortxt;
-    }
-
-    if (log_to_stdout) {
-        /* FIXME: we should force colors off here, if the standard logger goes
-                  into a file (because stdout was redirected) */
-        if (archdep_default_logger_is_terminal() == 0) {
-            terminalpre = nocolorpre;
-            terminaltxt = nocolortxt;
-        }
-        /* output to stdout */
-        if (log_archdep(terminalpre, terminaltxt) < 0) {
-            rc = -1;
-        }
-    }
+    if( log_archdep(pretxt, logtxt) < 0 )
+      rc = -1;
 
     lib_free(pretxt);
     lib_free(logtxt);
-    lib_free(nocolorpre);
-    lib_free(nocolortxt);
     return rc;
 }
 
@@ -330,13 +159,10 @@ int log_out(log_t log, unsigned int level, const char *format, ...)
     va_list ap;
     int rc;
 
-    LOCK();
-
     va_start(ap, format);
     rc = log_helper(log, level, format, ap);
     va_end(ap);
-
-    UNLOCK_AND_RETURN_INT(rc);
+    return rc;
 }
 
 int log_message(log_t log, const char *format, ...)
@@ -344,13 +170,10 @@ int log_message(log_t log, const char *format, ...)
     va_list ap;
     int rc;
 
-    LOCK();
-
     va_start(ap, format);
     rc = log_helper(log, LOG_LEVEL_INFO, format, ap);
     va_end(ap);
-
-    UNLOCK_AND_RETURN_INT(rc);
+    return rc;
 }
 
 int log_warning(log_t log, const char *format, ...)
@@ -358,13 +181,10 @@ int log_warning(log_t log, const char *format, ...)
     va_list ap;
     int rc;
 
-    LOCK();
-
     va_start(ap, format);
     rc = log_helper(log, LOG_LEVEL_WARNING, format, ap);
     va_end(ap);
-
-    UNLOCK_AND_RETURN_INT(rc);
+    return rc;
 }
 
 int log_error(log_t log, const char *format, ...)
@@ -372,13 +192,10 @@ int log_error(log_t log, const char *format, ...)
     va_list ap;
     int rc;
 
-    LOCK();
-
     va_start(ap, format);
     rc = log_helper(log, LOG_LEVEL_ERROR, format, ap);
     va_end(ap);
-
-    UNLOCK_AND_RETURN_INT(rc);
+    return rc;
 }
 
 int log_fatal(log_t log, const char *format, ...)
@@ -386,13 +203,10 @@ int log_fatal(log_t log, const char *format, ...)
     va_list ap;
     int rc;
 
-    LOCK();
-
     va_start(ap, format);
     rc = log_helper(log, LOG_LEVEL_FATAL, format, ap);
     va_end(ap);
-
-    UNLOCK_AND_RETURN_INT(rc);
+    return rc;
 }
 
 int log_verbose(log_t log, const char *format, ...)
@@ -400,13 +214,10 @@ int log_verbose(log_t log, const char *format, ...)
     va_list ap;
     int rc = 0;
 
-    LOCK();
-
     va_start(ap, format);
     rc = log_helper(log, LOG_LEVEL_VERBOSE, format, ap);
     va_end(ap);
-
-    UNLOCK_AND_RETURN_INT(rc);
+    return rc;
 }
 
 int log_debug(log_t log, const char *format, ...)
@@ -414,13 +225,10 @@ int log_debug(log_t log, const char *format, ...)
     va_list ap;
     int rc = 0;
 
-    LOCK();
-
     va_start(ap, format);
     rc = log_helper(log, LOG_LEVEL_DEBUG, format, ap);
     va_end(ap);
-
-    UNLOCK_AND_RETURN_INT(rc);
+    return rc;
 }
 
 int log_printf_vdrive(const char *format, ...)
@@ -428,11 +236,8 @@ int log_printf_vdrive(const char *format, ...)
     va_list ap;
     int rc;
 
-    LOCK();
-
     va_start(ap, format);
     rc = log_helper(LOG_DEFAULT, LOG_LEVEL_DEBUG, format, ap);
     va_end(ap);
-
-    UNLOCK_AND_RETURN_INT(rc);
+    return rc;
 }

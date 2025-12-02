@@ -465,8 +465,14 @@ static int disk_image_check_for_gcr(disk_image_t *image)
         return 0;
     }
 
+
     image->tracks = header[9] / 2;
     image->max_half_tracks = header[9];
+
+    uint16_t id;
+    if( fsimage_gcr_read_disk_id(image, 18, 0, &id)==CBMDOS_IPE_OK )
+      image->id = id;
+
     disk_image_check_log(image, "GCR");
     return 1;
 }

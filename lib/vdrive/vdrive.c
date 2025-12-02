@@ -63,9 +63,6 @@
 #include "vdrive-internal.h"
 #include "vdrive-rel.h"
 #include "vdrive.h"
-#if 0
-#include "uiapi.h"
-#endif
 
 static log_t vdrive_log = LOG_DEFAULT;
 
@@ -79,6 +76,12 @@ void vdrive_init(void)
     vdrive_internal_init();
     vdrive_rel_init();
 }
+
+static int mem_is_within_drive_ram(vdrive_t *vdrive, uint8_t *p)
+{
+  return p>=vdrive->ram && p<(vdrive->ram+DRIVE_RAMSIZE);
+}
+
 
 /* ------------------------------------------------------------------------- */
 /*
@@ -95,19 +98,30 @@ void vdrive_init(void)
     FIXME: ideally this logic should allocate memory from a common drive memory
            array, which then can be used properly for M-R too
 */
-void vdrive_alloc_buffer(bufferinfo_t *p, int mode)
+void vdrive_alloc_buffer(vdrive_t *vdrive, bufferinfo_t *p, int bufnum, int mode)
 {
     size_t size = 256;
 
-    if (p->buffer == NULL) {
+    if( bufnum>=0 && bufnum<5 && (0x0300+256*bufnum)<DRIVE_RAMSIZE  )
+      {
+        /* requested buffer is within drive RAM, if previous buffer mem was allocated
+           then free it, then set buffer start into drive RAM */
+        if( p->buffer!=NULL && !mem_is_within_drive_ram(vdrive, p->buffer) ) free(p->buffer);
+        p->buffer = vdrive->ram + 0x0300 + 256*bufnum;
+      }
+    else if( p->buffer==NULL || mem_is_within_drive_ram(vdrive, p->buffer) )
+      {
         /* first time actually allocate memory, and clear it */
         p->buffer = lib_malloc(size);
         memset(p->buffer, 0, size);
-    } else {
+      }
+    else
+      {
         /* any other time, just adjust the size of the buffer */
         p->buffer = lib_realloc(p->buffer, size);
-    }
+      }
     p->mode = mode;
+    p->bufnum = bufnum;
 }
 
 void vdrive_free_buffer(bufferinfo_t *p)
@@ -149,13 +163,13 @@ int vdrive_device_setup(vdrive_t *vdrive, unsigned int unit)
     }
 
     /* init command channel */
-    vdrive_alloc_buffer(&(vdrive->buffers[15]), BUFFER_COMMAND_CHANNEL);
+    vdrive_alloc_buffer(vdrive, &(vdrive->buffers[15]), -1, BUFFER_COMMAND_CHANNEL);
     vdrive_command_set_error(vdrive, CBMDOS_IPE_DOS_VERSION, 0, 0);
 
     vdrive->d90toggle = 0;
     vdrive->dir_part = 0;
     vdrive->last_code = CBMDOS_IPE_OK;
-
+    vdrive->mem_buf_next_byte_override = -1;
     return 0;
 }
 
@@ -163,13 +177,13 @@ void vdrive_device_shutdown(vdrive_t *vdrive)
 {
     unsigned int i;
     bufferinfo_t *p;
-
     if (vdrive != NULL) {
         /* de-init buffers */
         for (i = 0; i < 16; i++) {
             p = &(vdrive->buffers[i]);
             vdrive_free_buffer(p);
-            lib_free(p->buffer);
+            if( p->buffer!=NULL && !mem_is_within_drive_ram(vdrive, p->buffer) )
+	      lib_free(p->buffer);
             p->buffer = NULL;
         }
     }
@@ -256,6 +270,18 @@ void vdrive_close_all_channels(vdrive_t *vdrive)
         }
     }
 }
+
+
+void vdrive_reset_last_track_sector(vdrive_t *vdrive)
+{
+  /* reset "last file" pointers for 1541 */
+  if( VDRIVE_IS_1541(vdrive) )
+    {
+      vdrive->ram[0x007E] = 0; // track
+      vdrive->ram[0x026F] = 0; // sector
+    }
+}
+
 
 /* ------------------------------------------------------------------------- */
 
@@ -425,7 +451,7 @@ int vdrive_attach_image(disk_image_t *image, unsigned int unit,
     switch (image->type) {
         case DISK_IMAGE_TYPE_D64:
             vdrive->image_format = VDRIVE_IMAGE_FORMAT_1541;
-            vdrive->num_tracks = NUM_TRACKS_1541;
+            vdrive->num_tracks = image->tracks>NUM_TRACKS_1541 ? EXT_TRACKS_1541 : NUM_TRACKS_1541;
             vdrive->bam_size = 0x100;
             vdrive->current_offset = 0;
             break;
@@ -461,7 +487,7 @@ int vdrive_attach_image(disk_image_t *image, unsigned int unit,
             break;
         case DISK_IMAGE_TYPE_G64:
             vdrive->image_format = VDRIVE_IMAGE_FORMAT_1541;
-            vdrive->num_tracks = NUM_TRACKS_1541;
+            vdrive->num_tracks = image->tracks>NUM_TRACKS_1541 ? EXT_TRACKS_1541 : NUM_TRACKS_1541;
             vdrive->bam_size = 0x100;
             vdrive->current_offset = 0;
             break;
@@ -574,6 +600,9 @@ int vdrive_attach_image(disk_image_t *image, unsigned int unit,
         /* all good, set selected partition */
         vdrive->selected_part = vdrive->current_part;
     }
+
+    /* reset "last file" pointers for 1541 */
+    vdrive_reset_last_track_sector(vdrive);
 
 #if 0
     /* read whole bam to ensure image is good */

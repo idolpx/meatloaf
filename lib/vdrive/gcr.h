@@ -64,8 +64,11 @@ typedef struct gcr_header_s {
 
 void gcr_convert_sector_to_GCR(const uint8_t *buffer, uint8_t *ptr, const gcr_header_t *header,
                                int gap, int sync, enum fdc_err_e error_code);
-enum fdc_err_e gcr_read_sector(const disk_track_t *raw, uint8_t *data, uint8_t sector);
-enum fdc_err_e gcr_write_sector(disk_track_t *raw, const uint8_t *data, uint8_t sector);
+enum fdc_err_e gcr_read_sector(const disk_track_t *raw, uint8_t *data, uint8_t sector, int32_t id);
+enum fdc_err_e gcr_write_sector(disk_track_t *raw, const uint8_t *data, uint8_t sector, int32_t id);
+
+enum fdc_err_e gcr_read_track_number(const disk_track_t *raw, uint8_t *track);
+enum fdc_err_e gcr_read_sector_id(const disk_track_t *raw, uint16_t *id, uint8_t sector);
 
 gcr_t *gcr_create_image(void);
 void gcr_destroy_image(gcr_t *gcr);

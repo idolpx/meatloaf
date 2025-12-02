@@ -26,7 +26,7 @@
  *
  */
 
-/* #define DEBUG_GCR */
+//#define DEBUG_GCR
 
 #ifdef DEBUG_GCR
 #define DBG(_x_) log_printf_vdrive  _x_
@@ -229,12 +229,12 @@ static void gcr_decode_block(const disk_track_t *raw, int p, uint8_t *buf, int n
     }
 }
 
-static int gcr_find_sector_header(const disk_track_t *raw, uint8_t sector)
+static int gcr_read_sector_header(const disk_track_t *raw, uint8_t *header, int sector, uint16_t *pid)
 {
-    uint8_t header[4];
-    int p, p2;
+    uint8_t cs;
+    int p2, id, i;
+    static int p = 0;
 
-    p = 0;
     p2 = -CBMDOS_FDC_ERR_SYNC;
     for (;; ) {
         p = gcr_find_sync(raw, p, raw->size * 8);
@@ -244,13 +244,23 @@ static int gcr_find_sector_header(const disk_track_t *raw, uint8_t sector)
         if (p2 < 0) {
             p2 = p;
         }
-        gcr_decode_block(raw, p, header, 1);
+        gcr_decode_block(raw, p, header, 2);
+        if (header[0] == 0x08 ) 
+          {
+            DBG(("GCR: header @ %5i: %02X %02X %02X %02X %02X %02X %02X %02X", 
+                 p, header[0], header[1], header[2], header[3], header[4], header[5], header[6], header[7]));
 
-        if (header[0] == 0x08 && header[2] == sector) {
-            /* Track, checksum or ID's are not checked here */
-            DBG(("GCR: shift: %d hdr: %02x %02x sec:%02d trk:%02d", shift, header[0], header[1], header[2], header[3]));
-            return p;
-        }
+            cs = (((header[1] ^ header[2]) ^ header[3]) ^ header[4]) ^ header[5];
+            id = header[4] * 256 + header[5];
+            DBG(("GCR: header info : track=%i, sector=%i, checksum=%02X, id=%04X",
+                 header[3], header[2], cs, id));
+            if( pid ) *pid = id;
+
+            if( cs!=0 )
+              return -CBMDOS_FDC_ERR_HCHECK;
+            else if( sector<0 || (header[2] == sector) )
+              return p;
+          }
     }
     if (p2 < 0) {
         return p2;
@@ -258,15 +268,57 @@ static int gcr_find_sector_header(const disk_track_t *raw, uint8_t sector)
     return -CBMDOS_FDC_ERR_HEADER;
 }
 
-fdc_err_t gcr_read_sector(const disk_track_t *raw, uint8_t *data, uint8_t sector)
+
+static int gcr_find_sector_header(const disk_track_t *raw, uint8_t sector, uint16_t *pid)
+{
+  uint8_t header[8];
+  return gcr_read_sector_header(raw, header, sector, pid);
+}
+
+
+fdc_err_t gcr_read_sector_id(const disk_track_t *raw, uint16_t *id, uint8_t sector)
+{
+  int p = gcr_find_sector_header(raw, sector, id);
+  if (p < 0) {
+    return -p;
+  }
+  else
+    return CBMDOS_FDC_ERR_OK;
+}
+
+
+fdc_err_t gcr_read_track_number(const disk_track_t *raw, uint8_t *track)
+{
+  uint8_t header[8];
+  int p = gcr_read_sector_header(raw, header, -1, NULL);
+  if( p<0 )
+    {
+      DBG(("GCR: cannot read track number, error=%i", -p));
+      return -p;
+    }
+  else
+    {
+      DBG(("GCR: track number from header is %i", header[3]));
+      *track = header[3];
+      return CBMDOS_FDC_ERR_OK;
+    }
+}
+
+
+fdc_err_t gcr_read_sector(const disk_track_t *raw, uint8_t *data, uint8_t sector, int32_t id)
 {
     uint8_t buffer[260];
     uint8_t b;
+    uint16_t sid;
     int i, p;
 
-    p = gcr_find_sector_header(raw, sector);
+    p = gcr_find_sector_header(raw, sector, &sid);
     if (p < 0) {
         return -p;
+    }
+    else if (id>=0 && id!=sid) {
+      DBG(("GCR: id mismatch: expected %02X, found %02X", id, sid));
+      return CBMDOS_FDC_ERR_ID;
     }
 
     p = gcr_find_sync(raw, p, 500 * 8);
@@ -289,16 +341,20 @@ fdc_err_t gcr_read_sector(const disk_track_t *raw, uint8_t *data, uint8_t sector
     return b ? CBMDOS_FDC_ERR_DCHECK : CBMDOS_FDC_ERR_OK;
 }
 
-fdc_err_t gcr_write_sector(disk_track_t *raw, const uint8_t *data, uint8_t sector)
+fdc_err_t gcr_write_sector(disk_track_t *raw, const uint8_t *data, uint8_t sector, int32_t id)
 {
     uint8_t buffer[260], *offset, *buf;
     uint8_t *end = raw->data + raw->size;
     uint8_t gcr[5], chksum, b;
+    uint16_t sid;
     int i, j, shift, p;
 
-    p = gcr_find_sector_header(raw, sector);
+    p = gcr_find_sector_header(raw, sector, &sid);
     if (p < 0) {
         return -p;
+    }
+    else if (id>=0 && id!=sid) {
+      return CBMDOS_FDC_ERR_ID;
     }
 
     p = gcr_find_sync(raw, p, 500 * 8);

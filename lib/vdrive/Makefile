@@ -6,10 +6,10 @@ OBJECTS=lib.o log.o util.o cbmfile.o rawfile.o charset.o cbmdos.o \
         diskcontents.o diskcontents-block.o imagecontents.o cbmimage.o \
         vdrive.o vdrive-iec.o vdrive-command.o vdrive-bam.o vdrive-dir.o vdrive-rel.o vdrive-internal.o \
         diskimage.o fsimage.o fsimage-p64.o fsimage-dxx.o fsimage-gcr.o fsimage-create.o fsimage-probe.o fsimage-check.o \
-        gcr.o p64.o zfile.o archdep-win.o
+        gcr.o p64.o zfile.o archdep-pc.o minz.o
 
-vdrive.exe: $(OBJECTS) $(CPPOBJECTS)
-	g++ $(OBJECTS) $(CPPOBJECTS) -o vdrive.exe
+vdrive: $(OBJECTS) $(CPPOBJECTS)
+	g++ $(CDEFS) $(OBJECTS) $(CPPOBJECTS) -o vdrive
 
 $(OBJECTS): %.o: %.c
 	gcc -c $(CDEFS) $< -o $@
@@ -18,7 +18,7 @@ $(CPPOBJECTS): %.oo: %.cpp
 	g++ -c $(CDEFS) $< -o $@
 
 clean:
-	rm -f $(OBJECTS) $(CPPOBJECTS) *~ vdrive.exe
+	rm -f $(OBJECTS) $(CPPOBJECTS) *~ vdrive vdrive.exe
 
 deps:
 	gcc -MM *.c *.cpp >> Makefile
@@ -28,7 +28,7 @@ deps:
 # The following list of dependencies can be created by typing "make deps"
 # --------------------------------------------------------------------------------------------------
 
-archdep-win.o: archdep-win.c archdep.h lib.h types.h log.h
+archdep-pc.o: archdep-pc.c archdep.h lib.h types.h log.h
 cbmdos.o: cbmdos.c cbmdos.h types.h lib.h log.h
 cbmfile.o: cbmfile.c archdep.h cbmdos.h types.h charset.h fileio.h lib.h \
  log.h rawfile.h cbmfile.h
@@ -98,8 +98,8 @@ vdrive-rel.o: vdrive-rel.c cbmdos.h types.h diskimage.h archdep.h p64.h \
 zfile.o: zfile.c archdep.h lib.h types.h log.h util.h zfile.h miniz.h
 archdep-arduino.o: archdep-arduino.cpp
 archdep-meatloaf.o: archdep-meatloaf.cpp
-main.oo: main.cpp VDriveClass.h
-VDriveClass.oo: VDriveClass.cpp VDriveClass.h lib.h types.h log.h util.h \
- archdep.h charset.h fileio.h vdrive.h vdrive-dir.h cbmdos.h \
- vdrive-command.h vdrive-iec.h cbmimage.h diskimage.h p64.h p64config.h \
- diskcontents.h diskcontents-block.h imagecontents.h
+main.o: main.cpp VDriveClass.h
+VDriveClass.o: VDriveClass.cpp VDriveClass.h util.h types.h archdep.h \
+ charset.h vdrive.h vdrive-dir.h cbmdos.h vdrive-command.h vdrive-iec.h \
+ cbmimage.h diskimage.h p64.h p64config.h lib.h log.h \
+ diskcontents-block.h imagecontents.h

@@ -20,6 +20,9 @@ class VDrive
   // to interact with the file system
   bool openDiskImage(const char *filename, bool readOnly = false);
 
+  // returns the filename of the currently open disk image (NULL if nothing opened)
+  const char *getDiskImageFilename();
+
   // close the disk image currently in use
   void closeDiskImage();
 
@@ -27,7 +30,9 @@ class VDrive
   bool isOk();
 
   // open a file within the current disk image on the given channel
-  bool openFile(uint8_t channel, const char *name, bool convertNameToPETSCII = false);
+  // nameLen is the length of the file name in bytes, if -1 then assume null-terminated name
+  // if convertToPETSCII is true convert name from ASCII to PETSCII encoding before opening
+  bool openFile(uint8_t channel, const char *name, int nameLen = -1, bool convertNameToPETSCII = false);
 
   // close the file that is currently open on a channel (if any)
   bool closeFile(uint8_t channel);
@@ -70,9 +75,14 @@ class VDrive
   // calling this if read/write/execute fails gives the standard CBMDOS error messages
   const char *getStatusString();
 
+  // returns the current status code according to the error message buffer
+  // returns -1 if the content of the error message buffer does not start with "NN," (N=digit)
+  int getStatusCode();
+
   // copies the contents of the drive's status buffer to "buf", not exceeding
-  // the given bufSize length.
-  size_t getStatusBuffer(void *buf, size_t bufSize);
+  // the given bufSize length. If given, "eoi" will be set to true/false
+  // depending on whether all information from the buffer has been read
+  size_t getStatusBuffer(void *buf, size_t bufSize, bool *eoi = NULL);
 
   // read sector data from the disk image and place it in "buf"
   // "buf" must have a size of at least 256 bytes
@@ -93,6 +103,8 @@ class VDrive
   static bool createDiskImage(const char *filename, const char *itype, const char *name, bool convertNameToPETSCII);
 
  private:
+  void countOpenChannels();
+
   int m_numOpenChannels;
   struct vdrive_s *m_drive;
 };

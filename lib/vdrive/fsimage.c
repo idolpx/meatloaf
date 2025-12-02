@@ -196,6 +196,49 @@ int fsimage_close(disk_image_t *image)
 
 /*-----------------------------------------------------------------------*/
 
+int fsimage_read_sector_id(const disk_image_t *image, uint8_t *buf, const disk_addr_t *dadr)
+{
+    int res = CBMDOS_IPE_NOT_READY;
+    fsimage_t *fsimage;
+
+    fsimage = image->media.fsimage;
+
+    if (fsimage == NULL || !archdep_fisopen(fsimage->fd) ) {
+        log_error(fsimage_log, "Attempt to read without disk image.");
+    }
+    else {
+      switch (image->type) {
+
+      case DISK_IMAGE_TYPE_D64:
+        {
+          // D64 image does not store disk ID on a per-block basis => use disk ID from BAM
+          disk_addr_t bamadr;
+          bamadr.track = 18;
+          bamadr.sector = 0;
+          uint8_t bam[256];
+          res = fsimage_dxx_read_sector(image, bam, &bamadr);
+          buf[0] = bam[BAM_ID_1541];
+          buf[1] = bam[BAM_ID_1541+1];
+          break;
+        }
+        
+      case DISK_IMAGE_TYPE_G64:
+      case DISK_IMAGE_TYPE_G71:
+        {
+          uint16_t id;
+          res = fsimage_gcr_read_disk_id(image, dadr->track, dadr->sector, &id);
+          buf[0] = id & 255;
+          buf[1] = id / 256;
+          break;
+        }
+      }
+    }
+
+    return res;
+}
+
+/*-----------------------------------------------------------------------*/
+
 int fsimage_read_sector(const disk_image_t *image, uint8_t *buf, const disk_addr_t *dadr)
 {
     fsimage_t *fsimage;

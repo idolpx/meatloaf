@@ -993,9 +993,9 @@ void iecNetwork::set_open_params()
 }
 
 
-bool iecNetwork::open(uint8_t channel, const char *name)
+bool iecNetwork::open(uint8_t channel, const char *name, uint8_t nameLen)
 {
-  Debug_printv("iecNetwork::open(#%d, %d, \"%s\")", m_devnr, channel, name);
+  Debug_printv("iecNetwork::open(#%d, %d, \"%s\", %d)", m_devnr, channel, nameLen);
 
   commanddata.channel = channel;
   payload = std::string(name);
@@ -1108,15 +1108,15 @@ uint8_t iecNetwork::read(uint8_t channel, uint8_t *buffer, uint8_t bufferSize, b
 }
 
 
-void iecNetwork::execute(const char *cmd, uint8_t cmdLen)
+void iecNetwork::execute(const char *cmd)
 {
 #ifdef ENABLE_DISPLAY
   LEDS.activity = true;
 #endif
 
-  Debug_printv("iecNetwork::execute(#%d, \"%s\", %d)", m_devnr, cmd, cmdLen);
+  Debug_printv("iecNetwork::execute(#%d, \"%s\")", m_devnr, cmd);
 
-  payload = std::string(cmd, cmdLen);
+  payload = std::string(cmd);
   clean_transform_petscii_to_ascii(payload);
   pt = util_tokenize(payload, ',');
   iec_command();
@@ -1124,7 +1124,7 @@ void iecNetwork::execute(const char *cmd, uint8_t cmdLen)
 }
 
 
-uint8_t iecNetwork::getStatusData(char *buffer, uint8_t bufferSize)
+uint8_t iecNetwork::getStatusData(char *buffer, uint8_t bufferSize, bool *eoi)
 {
   Debug_printv("iecNetwork::getStatusData(#%d, %d)", m_devnr, bufferSize);
 
@@ -1155,7 +1155,8 @@ uint8_t iecNetwork::getStatusData(char *buffer, uint8_t bufferSize)
           iecStatus.channel = 0;
           iecStatus.connected = 0;
           iecStatus.msg = "ok";
-          
+
+          *eoi = true;
           return strlen(buffer);
         }
     }
@@ -1182,6 +1183,7 @@ uint8_t iecNetwork::getStatusData(char *buffer, uint8_t bufferSize)
       } else {
         snprintf(buffer, bufferSize, "%u,%u,%u", ns.rxBytesWaiting, ns.connected, ns.error);
         Debug_printf("Sending status for active channel #%d: %s\r\n", active_status_channel, buffer);
+        *eoi = true;
         return strlen(buffer);
       }
     }

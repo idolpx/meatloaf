@@ -105,7 +105,7 @@ static unsigned int vdrive_dir_name_match(uint8_t *slot, uint8_t *nslot, int len
         return 0;
     }
 
-    return cbmdos_parse_wildcard_compare(nslot, &slot[SLOT_NAME_OFFSET]);
+    return cbmdos_parse_wildcard_compare(nslot, length, &slot[SLOT_NAME_OFFSET]);
 }
 
 void vdrive_dir_free_chain(vdrive_t *vdrive, int t, int s)
@@ -159,7 +159,7 @@ static uint8_t *find_next_directory_sector(vdrive_dir_context_t *dir,
 }
 
 
-void vdrive_dir_create_slot(bufferinfo_t *p, uint8_t *realname,
+void vdrive_dir_create_slot(struct vdrive_s *vdrive, bufferinfo_t *p, uint8_t *realname,
                             int reallength, int filetype)
 {
     p->slot = lib_calloc(1, 32);
@@ -170,7 +170,7 @@ void vdrive_dir_create_slot(bufferinfo_t *p, uint8_t *realname,
 #endif
     p->slot[SLOT_TYPE_OFFSET] = filetype;       /* unclosed */
 
-    vdrive_alloc_buffer(p, BUFFER_SEQUENTIAL);
+    vdrive_alloc_buffer(vdrive, p, -1, BUFFER_SEQUENTIAL);
     p->bufptr = 2;
     return;
 }
@@ -643,7 +643,7 @@ int vdrive_dir_first_directory(vdrive_t *vdrive,
 
         /* start address */
         *l++ = 1;
-        *l++ = 4;
+        *l++ = 8; // DH: should be 4 but 8 is better for LOAD"$",8,1
 
     } else {
 
@@ -869,7 +869,7 @@ void vdrive_dir_part_find_first_slot(vdrive_t *vdrive, const uint8_t *name,
     dir->buffer[1] = 0;
 }
 
-static unsigned int vdrive_dir_part_name_match(uint8_t *slot, uint8_t *nslot, int type)
+static unsigned int vdrive_dir_part_name_match(uint8_t *slot, uint8_t *nslot, int length, int type)
 {
     if (!slot[PSLOT_TYPE]) {
         return 0;
@@ -879,7 +879,7 @@ static unsigned int vdrive_dir_part_name_match(uint8_t *slot, uint8_t *nslot, in
         return 0;
     }
 
-    return cbmdos_parse_wildcard_compare(nslot, &slot[PSLOT_NAME]);
+    return cbmdos_parse_wildcard_compare(nslot, length, &slot[PSLOT_NAME]);
 }
 
 uint8_t *vdrive_dir_part_find_next_slot(vdrive_dir_context_t *dir)
@@ -920,6 +920,7 @@ uint8_t *vdrive_dir_part_find_next_slot(vdrive_dir_context_t *dir)
         }
         if (vdrive_dir_part_name_match(&dir->buffer[dir->slot * 32],
                                   dir->find_nslot,
+                                       dir->find_length,
                                   dir->find_type)) {
             memcpy(return_slot, &dir->buffer[dir->slot * 32], 32);
             return return_slot;

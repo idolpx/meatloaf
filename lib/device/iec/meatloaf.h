@@ -44,17 +44,11 @@ public:
             Debug_printf("Attached Meatloaf device #%d\r\n", id());
     }
 
-    void execute(const char *command, uint8_t cmdLen) override {
-
-        payload = command;
+    void executeData(const uint8_t *data, uint8_t dataLen) override {
+      payload = std::string((const char *) data, dataLen);
         iecFuji::process_cmd(); // process FujiNet commands
         //if (iecFuji::iecStatus.err != ST_OK)
-            iecDrive::execute(command, cmdLen); // process CBM DOS commands
-    }
-
-    void execute(std::string command) {
-        payload = command;
-        process_basic_commands();
+        iecDrive::executeData(data, dataLen); // process CBM DOS commands
     }
 
     void enable(std::string deviceids) {

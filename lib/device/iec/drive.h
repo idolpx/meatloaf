@@ -265,6 +265,7 @@ public:
   uint8_t getStatusCode() { return m_statusCode; }
   void    setStatusCode(uint8_t code, uint8_t trk = 0);
   bool    hasError();
+  bool    hasMemExeError();
 
   fujiHost *m_host;
 
@@ -279,7 +280,7 @@ protected:
   virtual void begin();
 
   // open file "name" on channel
-  virtual bool open(uint8_t channel, const char *name);
+  virtual bool open(uint8_t channel, const char *name, uint8_t nameLen);
 
   // close file on channel
   virtual void close(uint8_t channel);
@@ -297,13 +298,11 @@ protected:
   // called when the bus master reads from channel 15 and the status
   // buffer is currently empty. this should populate buffer with an appropriate 
   // status message bufferSize is the maximum allowed length of the message
+  virtual uint8_t getStatusData(char *buffer, uint8_t bufferSize, bool *eoi);
   virtual void getStatus(char *buffer, uint8_t bufferSize);
 
   // called when the bus master sends data (i.e. a command) to channel 15
-  // command is a 0-terminated string representing the command to execute
-  // commandLen contains the full length of the received command (useful if
-  // the command itself may contain zeros)
-  virtual void execute(const char *command, uint8_t cmdLen);
+  virtual void executeData(const uint8_t *data, uint8_t dataLen);
 
   // called on falling edge of RESET line
   virtual void reset();

@@ -74,7 +74,7 @@ int fsimage_dxx_write_half_track(disk_image_t *image, unsigned int half_track,
 
     buffer = lib_calloc(max_sector, 256);
     for (sector = 0; sector < max_sector; sector++) {
-        rf = gcr_read_sector(raw, &buffer[sector * 256], (uint8_t)sector);
+        rf = gcr_read_sector(raw, &buffer[sector * 256], (uint8_t)sector, -1);
         if (rf != CBMDOS_FDC_ERR_OK) {
             log_error(fsimage_dxx_log,
                       "Could not find data sector of T:%u S:%u.",
@@ -349,7 +349,7 @@ int fsimage_dxx_read_sector(const disk_image_t *image, uint8_t *buf, const disk_
     if (sectors < 0) {
         log_error(fsimage_dxx_log, "Track %u, Sector %u out of bounds.",
                   dadr->track, dadr->sector);
-        return -1;
+        return CBMDOS_IPE_ILLEGAL_TRACK_OR_SECTOR;
     }
 
     offset = sectors * 256;
@@ -383,7 +383,7 @@ int fsimage_dxx_read_sector(const disk_image_t *image, uint8_t *buf, const disk_
                 rf = fsimage->error_info.map ? fsimage->error_info.map[sectors] : CBMDOS_FDC_ERR_OK;
             }
         } else {
-            rf = gcr_read_sector(&image->gcr->tracks[(dadr->track * 2) - 2], buf, (uint8_t)dadr->sector);
+            rf = gcr_read_sector(&image->gcr->tracks[(dadr->track * 2) - 2], buf, (uint8_t)dadr->sector, -1);
             /* HACK: if the image has an error map, and the "FDC" did not detect an
             error in the GCR stream, use the error from the error map instead.
             FIXME: what should really be done is encoding the errors from the
@@ -457,7 +457,7 @@ int fsimage_dxx_write_sector(disk_image_t *image, const uint8_t *buf, const disk
         return -1;
     }
     if (image->gcr != NULL) {
-        gcr_write_sector(&image->gcr->tracks[(dadr->track * 2) - 2], buf, (uint8_t)dadr->sector);
+      gcr_write_sector(&image->gcr->tracks[(dadr->track * 2) - 2], buf, (uint8_t)dadr->sector, -1);
     }
 
     if ((fsimage->error_info.map != NULL)

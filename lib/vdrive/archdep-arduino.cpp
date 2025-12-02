@@ -15,6 +15,7 @@ extern "C"
 }
 
 //#define DEBUG_ARCHDEP
+#define Serial Serial1
 
 #ifdef DEBUG_ARCHDEP
 #define DBG(x) Serial.printf x
@@ -23,9 +24,20 @@ extern "C"
 #endif
 
 
+uint32_t archdep_get_available_heap()
+{
+#ifdef ARDUINO_ARCH_RP2040
+  extern char __StackLimit, __bss_end__;
+  struct mallinfo m = mallinfo();
+  return (&__StackLimit - &__bss_end__) - m.uordblks;
+#else
+  return 0;
+#endif
+}
+
 int archdep_default_logger(const char *level_string, const char *txt)
 {
-  if( Serial ) Serial.println(txt);
+  if( Serial ) { Serial.println(txt); Serial.flush(); }
   return 0;
 }
 
@@ -83,7 +95,7 @@ int archdep_access(const char *pathname, int mode)
         }
     }
 
-  DBG(("archdep_access: %s %i %i\n", pathname, mode, res));
+  DBG(("archdep_access: %s %i %i\r\n", pathname, mode, res));
   return res;
 }
 
@@ -100,7 +112,7 @@ int archdep_stat(const char *filename, size_t *len, unsigned int *isdir)
       if( isdir ) *isdir = f.isDir() ? 1 : 0;
     }
 
-  DBG(("archdep_stat: %s %i %i\n", filename, len ? *len : -1, isdir ? *isdir : -1));
+  DBG(("archdep_stat: %s %i %i\r\n", filename, len ? *len : -1, isdir ? *isdir : -1));
   return res;
 }
 
@@ -115,7 +127,7 @@ bool archdep_file_exists(const char *path)
       dir.close();
     }
 
-  DBG(("archdep_file_exists: %s %i\n", path, res));
+  DBG(("archdep_file_exists: %s %i\r\n", path, res));
   return res;
 }
 
@@ -123,7 +135,7 @@ bool archdep_file_exists(const char *path)
 char *archdep_tmpnam()
 {
   char *res = lib_strdup("tmpfile");
-  DBG(("archdep_tmpnam: %s\n", res));
+  DBG(("archdep_tmpnam: %s\r\n", res));
   return res;
 }
 
@@ -131,7 +143,7 @@ char *archdep_tmpnam()
 off_t archdep_file_size(ADFILE *stream)
 {
   uint32_t s = ((SdFile *) stream)->fileSize();
-  DBG(("archdep_file_size: %p %u\n", stream, s));
+  DBG(("archdep_file_size: %p %u\r\n", stream, s));
   return (off_t) s;
 }
 
@@ -163,7 +175,7 @@ int archdep_remove(const char *path)
       dir.close();
     }
   
-  DBG(("archdep_remove: %s %i\n", path, res));
+  DBG(("archdep_remove: %s %i\r\n", path, res));
   return res;
 }
 
@@ -182,7 +194,6 @@ ADFILE *archdep_fnofile()
 
 ADFILE *archdep_fopen(const char* filename, const char* mode)
 {
-  ADFILE *res = NULL;
   DBG(("archdep_fopen: %s %s ", filename, mode));
 
   oflag_t flags = 0;
@@ -198,19 +209,20 @@ ADFILE *archdep_fopen(const char* filename, const char* mode)
     flags = O_RDWR | O_AT_END;
 
   SdFile *f = new SdFile();
-  if( f->open(filename, flags) )
-    res = (ADFILE *) f;
-  else
-    delete f; 
+  if( !f->open(filename, flags) )
+    {
+      delete f;
+      f = NULL;
+    }
 
-  DBG(("=> %p\n", f));
-  return res;
+  DBG(("=> %p\r\n", f));
+  return (ADFILE *) f;
 }
 
 
 int archdep_fclose(ADFILE *file)
 {
-  DBG(("archdep_fclose: %p\n", file));
+  DBG(("archdep_fclose: %p\r\n", file));
   SdFile *f = (SdFile *) file;
   if( f!=NULL ) { f->close(); delete f; }
   return 0;
@@ -221,7 +233,7 @@ size_t archdep_fread(void* buffer, size_t size, size_t count, ADFILE *stream)
 {
   DBG(("archdep_fread: %p %u %u ", stream, size, count));
   size_t n = ((SdFile *) stream)->read(buffer, size*count);
-  DBG(("=> %i %u %u\n", ((SdFile *) stream)->getError(), n, n/size));
+  DBG(("=> %i %u %u\r\n", ((SdFile *) stream)->getError(), n, n/size));
   return n/size;
 }
 
@@ -236,7 +248,7 @@ size_t archdep_fwrite(const void* buffer, size_t size, size_t count, ADFILE *str
 {
   DBG(("archdep_write: %p %u %u ", stream, size, count));
   size_t n = ((SdFile *) stream)->write(buffer, size*count);
-  DBG(("=> %i %u %u\n", ((SdFile *) stream)->getError(), n, n/size));
+  DBG(("=> %i %u %u\r\n", ((SdFile *) stream)->getError(), n, n/size));
   return n/size;
 }
 
@@ -244,7 +256,7 @@ size_t archdep_fwrite(const void* buffer, size_t size, size_t count, ADFILE *str
 long int archdep_ftell(ADFILE *stream)
 {
   long int pos = ((SdFile *) stream)->curPosition();
-  DBG(("archdep_ftell: %p %li\n", stream, pos));
+  DBG(("archdep_ftell: %p %li\r\n", stream, pos));
   return pos;
 }
 
@@ -252,7 +264,7 @@ long int archdep_ftell(ADFILE *stream)
 int archdep_fseek(ADFILE *stream, long int offset, int whence)
 {
   SdFile *f = (SdFile *) stream;
-  DBG(("archdep_fseek: %p %li %i ", stream, whence, offset));
+  DBG(("archdep_fseek: %p %li %i ", stream, offset, whence));
 
   switch( whence )
     {
@@ -261,7 +273,7 @@ int archdep_fseek(ADFILE *stream, long int offset, int whence)
     case SEEK_END: f->seekEnd(offset); break;
     }
 
-  DBG(("=> %i %lu\n", 0, f->curPosition()));
+  DBG(("=> %lu\r\n", f->curPosition()));
   return 0;
 }
 

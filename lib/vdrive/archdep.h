@@ -26,14 +26,14 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-#ifdef WIN32
-typedef FILE ADFILE;
-#elif defined(ARDUINO)
+#if defined(ARDUINO)
 typedef void ADFILE;
 #elif defined(ESP_PLATFORM)
 // Meatloaf (handles compression on its own)
 #define ARCHDEP_NO_MINIZ
 typedef void ADFILE;
+#elif defined(__GNUC__)
+typedef FILE ADFILE;
 #else
 #error "unsupported platform"
 #endif
@@ -138,6 +138,8 @@ int  archdep_access(const char *pathname, int mode);
 archdep_dir_t *archdep_opendir(const char *path, int mode);
 const char *archdep_readdir(archdep_dir_t *dir);
 void archdep_closedir(archdep_dir_t *dir);
+
+uint32_t archdep_get_available_heap();
 
 #ifdef __cplusplus
 }

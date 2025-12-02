@@ -69,6 +69,7 @@ int fsimage_read_gcr_image(const disk_image_t *image)
             memset(image->gcr->tracks[half_track].data, 0, image->gcr->tracks[half_track].size);
         }
     }
+
     return 0;
 }
 /*-----------------------------------------------------------------------*/
@@ -129,45 +130,86 @@ int fsimage_gcr_read_half_track(const disk_image_t *image, unsigned int half_tra
     fsimage_t *fsimage;
     uint16_t max_track_length;
     uint8_t num_half_tracks;
+    unsigned int orig_half_track = half_track;
 
     fsimage = image->media.fsimage;
 
     raw->data = NULL;
     raw->size = 0;
 
-    offset = fsimage_gcr_seek_half_track(fsimage, half_track, &max_track_length, &num_half_tracks);
+    while( raw->data==NULL )
+      {
+        offset = fsimage_gcr_seek_half_track(fsimage, half_track, &max_track_length, &num_half_tracks);
 
-    if (offset < 0) {
-        return -1;
-    }
-
-    if (offset != 0) {
-        if (util_fpread(fsimage->fd, buf, 2, offset) < 0) {
-            log_error(fsimage_gcr_log, "Could not read GCR disk image.");
-            return -1;
+        if (offset < 0) {
+          return -1;
         }
 
-        track_len = util_le_buf_to_word(buf);
+        if (offset != 0) {
+          if (util_fpread(fsimage->fd, buf, 2, offset) < 0) {
+            log_error(fsimage_gcr_log, "Could not read GCR disk image.");
+            return -1;
+          }
 
-        if ((track_len < 1) || (track_len > max_track_length)) {
+          track_len = util_le_buf_to_word(buf);
+
+          if ((track_len < 1) || (track_len > max_track_length)) {
             log_error(fsimage_gcr_log,
                       "Track field length %u is not supported.",
                       track_len);
             return -1;
-        }
+          }
 
-        raw->data = lib_calloc(1, track_len);
-        raw->size = track_len;
+          raw->data = lib_calloc(1, track_len);
+          raw->size = track_len;
 
-        if (archdep_fread(raw->data, track_len, 1, fsimage->fd) < 1) {
+          if (archdep_fread(raw->data, track_len, 1, fsimage->fd) < 1) {
             log_error(fsimage_gcr_log, "Could not read GCR disk image.");
             return -1;
+          }
+        } else {
+          raw->size = disk_image_raw_track_size(image->type, half_track / 2);
+          raw->data = lib_malloc(raw->size);
+          memset(raw->data, 0x55, raw->size);
         }
-    } else {
-        raw->size = disk_image_raw_track_size(image->type, half_track / 2);
-        raw->data = lib_malloc(raw->size);
-        memset(raw->data, 0x55, raw->size);
-    }
+
+        /* the following can be #if 0'd to skip looking for actual track number */
+#if 1
+        static int current_half_track = -1;
+        if( half_track != current_half_track )
+          {
+            uint8_t track;
+
+            /* read track number in first header found on this track */
+            fdc_err_t rf = gcr_read_track_number(raw, &track);
+
+            /* if a header was found and track number is different from expected
+               then set next_half_track to where we expect the actual track */
+            unsigned int next_half_track;
+            if( rf==CBMDOS_FDC_ERR_OK )
+              next_half_track = half_track + ((int) half_track - (int) 2*track);
+            else
+              next_half_track = half_track;
+
+            /* if next_half_track does not match half_track then repeat the loop
+               to read next_half_track */
+            if( next_half_track!=half_track && next_half_track!=orig_half_track )
+              {
+                log_error(fsimage_gcr_log,
+                          "Track number mismatch: expected %u, found %u, now reading track %u.",
+                          half_track/2, track, next_half_track/2);
+
+                half_track = next_half_track;
+                lib_free(raw->data);
+                raw->data = NULL;
+                raw->size = 0;
+              }
+            else
+              current_half_track = half_track;
+          }
+#endif
+      }
+    
     return 0;
 }
 
@@ -280,6 +322,7 @@ static int fsimage_gcr_write_track(disk_image_t *image, unsigned int track,
     return fsimage_gcr_write_half_track(image, track << 1, raw);
 }
 
+
 /*-----------------------------------------------------------------------*/
 /* Read a sector from the GCR disk image.  */
 
@@ -302,41 +345,16 @@ int fsimage_gcr_read_sector(const disk_image_t *image, uint8_t *buf, const disk_
         if (raw.data == NULL) {
             return CBMDOS_IPE_NOT_READY;
         }
-        rf = gcr_read_sector(&raw, buf, (uint8_t)dadr->sector);
+        rf = gcr_read_sector(&raw, buf, (uint8_t)dadr->sector, image->id);
         lib_free(raw.data);
     } else {
-        rf = gcr_read_sector(&image->gcr->tracks[(dadr->track * 2) - 2], buf, (uint8_t)dadr->sector);
+       rf = gcr_read_sector(&image->gcr->tracks[(dadr->track * 2) - 2], buf, (uint8_t)dadr->sector, image->id);
     }
     if (rf != CBMDOS_FDC_ERR_OK) {
         log_error(fsimage_gcr_log,
                   "Cannot find track: %u sector: %u within GCR image.",
                   dadr->track, dadr->sector);
-        switch (rf) {
-            case CBMDOS_FDC_ERR_HEADER:
-                return CBMDOS_IPE_READ_ERROR_BNF; /* 20 */
-            case CBMDOS_FDC_ERR_SYNC:
-                return CBMDOS_IPE_READ_ERROR_SYNC; /* 21 */
-            case CBMDOS_FDC_ERR_NOBLOCK:
-                return CBMDOS_IPE_READ_ERROR_DATA; /* 22 */
-            case CBMDOS_FDC_ERR_DCHECK:
-                return CBMDOS_IPE_READ_ERROR_CHK; /* 23 */
-            case CBMDOS_FDC_ERR_VERIFY:
-                return CBMDOS_IPE_WRITE_ERROR_VER; /* 25 */
-            case CBMDOS_FDC_ERR_WPROT:
-                return CBMDOS_IPE_WRITE_PROTECT_ON; /* 26 */
-            case CBMDOS_FDC_ERR_HCHECK:
-                return CBMDOS_IPE_READ_ERROR_BCHK; /* 27 */
-            case CBMDOS_FDC_ERR_BLENGTH:
-                return CBMDOS_IPE_WRITE_ERROR_BIG; /* 28 */
-            case CBMDOS_FDC_ERR_ID:
-                return CBMDOS_IPE_DISK_ID_MISMATCH; /* 29 */
-            case CBMDOS_FDC_ERR_DRIVE:
-                return CBMDOS_IPE_NOT_READY;    /* 74 */
-            case CBMDOS_FDC_ERR_DECODE:
-                return CBMDOS_IPE_READ_ERROR_GCR; /* 24 */
-            default:
-                return CBMDOS_IPE_NOT_READY;
-        }
+        return cbmdos_fdc_error_to_cbmdos_error(rf);
     }
     return CBMDOS_IPE_OK;
 }
@@ -361,7 +379,7 @@ int fsimage_gcr_write_sector(disk_image_t *image, const uint8_t *buf,
             || raw.data == NULL) {
             return -1;
         }
-        if (gcr_write_sector(&raw, buf, (uint8_t)dadr->sector) != CBMDOS_FDC_ERR_OK) {
+        if (gcr_write_sector(&raw, buf, (uint8_t)dadr->sector, image->id) != CBMDOS_FDC_ERR_OK) {
             log_error(fsimage_gcr_log,
                       "Could not find track %u sector %u in disk image",
                       dadr->track, dadr->sector);
@@ -374,7 +392,7 @@ int fsimage_gcr_write_sector(disk_image_t *image, const uint8_t *buf,
         }
         lib_free(raw.data);
     } else {
-        if (gcr_write_sector(&image->gcr->tracks[(dadr->track * 2) - 2], buf, (uint8_t)dadr->sector) != CBMDOS_FDC_ERR_OK) {
+        if (gcr_write_sector(&image->gcr->tracks[(dadr->track * 2) - 2], buf, (uint8_t)dadr->sector, image->id) != CBMDOS_FDC_ERR_OK) {
             log_error(fsimage_gcr_log,
                       "Could not find track %u sector %u in disk image",
                       dadr->track, dadr->sector);
@@ -395,4 +413,27 @@ int fsimage_gcr_write_sector(disk_image_t *image, const uint8_t *buf,
 void fsimage_gcr_init(void)
 {
     fsimage_gcr_log = log_open("Filesystem Image GCR");
+}
+
+
+int fsimage_gcr_read_disk_id(const struct disk_image_s *image, uint8_t track, uint8_t sector, uint16_t *id)
+{
+  fdc_err_t rf;
+
+  if (image->gcr == NULL) 
+    {
+      disk_track_t raw;
+      if( fsimage_gcr_read_track(image, track, &raw) < 0 )
+        return CBMDOS_IPE_NOT_READY;
+
+      if (raw.data == NULL)
+        return CBMDOS_IPE_NOT_READY;
+      
+      rf = gcr_read_sector_id(&raw, id, sector);
+      lib_free(raw.data);
+    }
+  else 
+    rf = gcr_read_sector_id(&image->gcr->tracks[(track * 2) - 2], id, sector);
+
+  return cbmdos_fdc_error_to_cbmdos_error(rf);
 }

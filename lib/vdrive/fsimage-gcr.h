@@ -47,4 +47,6 @@ int fsimage_gcr_read_half_track(const struct disk_image_s *image,
 int fsimage_gcr_write_half_track(struct disk_image_s *image,
                                  unsigned int half_track, const struct disk_track_s *raw);
 
+int fsimage_gcr_read_disk_id(const struct disk_image_s *image, uint8_t track, uint8_t sector, uint16_t *id);
+
 #endif

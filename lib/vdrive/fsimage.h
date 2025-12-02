@@ -56,6 +56,8 @@ void fsimage_media_destroy(struct disk_image_s *image);
 
 int fsimage_open(struct disk_image_s *image);
 int fsimage_close(struct disk_image_s *image);
+int fsimage_read_sector_id(const disk_image_t *image, uint8_t *buf, 
+                           const disk_addr_t *dadr);
 int fsimage_read_sector(const struct disk_image_s *image, uint8_t *buf,
                         const struct disk_addr_s *dadr);
 int fsimage_write_sector(struct disk_image_s *image, const uint8_t *buf,

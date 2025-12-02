@@ -16,13 +16,19 @@ extern "C"
 }
 
 //#define DEBUG_ARCHDEP
+
+
 #ifdef DEBUG_ARCHDEP
-#define DBG(x) Debug_printv  x
+#define DBG(x) log_printf_vdrive  x
 #else
 #define DBG(x)
 #endif
 
-#define GET_MSTREAM(f) (((std::shared_ptr<MStream> *) f)->get())
+
+uint32_t archdep_get_available_heap()
+{
+  return 0;
+}
 
 
 int archdep_default_logger(const char *level_string, const char *txt)
@@ -122,12 +128,12 @@ char *archdep_tmpnam()
 }
 
 
-off_t archdep_file_size(ADFILE *file)
+off_t archdep_file_size(ADFILE *stream)
 {
   uint32_t s;
 
-  s = GET_MSTREAM(file)->size();
-  DBG(("archdep_file_size: %p %li", file, s));
+  s = ((std::shared_ptr<MStream> *) stream)->get()->size();
+  DBG(("archdep_file_size: %p %li", stream, s));
 
   return (off_t) s;
 }
@@ -192,7 +198,7 @@ ADFILE *archdep_fnofile()
 
 ADFILE *archdep_fopen(const char* filename, const char* mode)
 {
-  ADFILE *res = NULL;
+  std::shared_ptr<MStream> *res = NULL;
 
   DBG(("archdep_fopen: %s %s", filename, mode));
 
@@ -213,39 +219,35 @@ ADFILE *archdep_fopen(const char* filename, const char* mode)
       else if( strcmp(mode, MODE_APPEND_READ_WRITE)==0  )
         omode = (std::ios_base::in | std::ios_base::out | std::ios_base::app);
 
-      // f->getSourceStream() returns a std::shared_ptr. We have to pass the ADFILE
-      // through the C code portions of the vdrive implementation which cannot deal
-      // with pointers to C++ templates.
-      // We cannot create a copy of the MStream object since MStream does not have
-      // a copy constructor. If we just use the MStream pointer then the underlying
-      // object gets deleted once the last shared_ptr is deleted, causing crashes.
-      // So we have to create a pointer to a std::shared_ptr<MStream> object.
-      res = (ADFILE *) (new std::shared_ptr<MStream>(f->getSourceStream(omode)));
-
-      DBG(("archdep_fopen: file=%p, mode=%lu", res, (unsigned long) omode));
+      // we need a simple void pointer that we can return to the C code
+      // we can't just get() the MStream* from the shared_ptr since it will be
+      // destroyed once the shared_ptr gets deleted. 
+      // so we must create a pointer to a shared_ptr object - the shared_ptr
+      // gets deleted in archdep_fclose() once we're done and that will then 
+      // destroy the MStream
+      res = new std::shared_ptr<MStream>(f->getSourceStream(omode));
+      DBG(("archdep_fopen: stream=%p, mode=%lu", res, (unsigned long) omode));
 
       delete f;
     }
-else
-  { DBG(("archdep_fopen: cannot open file")); }
 
   return res;
 }
 
 
-int archdep_fclose(ADFILE *file)
+int archdep_fclose(ADFILE *stream)
 {
-  DBG(("archdep_fclose: %p", file));
-  delete (std::shared_ptr<MStream> *) file;
+  DBG(("archdep_fclose: %p", stream));
+  delete (std::shared_ptr<MStream> *) stream;
   return 0;
 }
 
 
-size_t archdep_fread(void* buffer, size_t size, size_t count, ADFILE *file)
+size_t archdep_fread(void* buffer, size_t size, size_t count, ADFILE *stream)
 {
-  DBG(("archdep_fread: %p %u %u", file, size, count));
+  DBG(("archdep_fread: %p %u %u", stream, size, count));
 
-  MStream *s = GET_MSTREAM(file);
+  MStream *s = ((std::shared_ptr<MStream> *) stream)->get();
   size_t pos = 0;
   count = size*count;
   while( count>0 && s->available()>0 && s->error()==0 )
@@ -260,11 +262,11 @@ size_t archdep_fread(void* buffer, size_t size, size_t count, ADFILE *file)
 }
 
 
-size_t archdep_fwrite(const void* buffer, size_t size, size_t count, ADFILE *file)
+size_t archdep_fwrite(const void* buffer, size_t size, size_t count, ADFILE *stream)
 {
-  DBG(("archdep_fwrite: %p %u %u", file, size, count));
+  DBG(("archdep_fwrite: %p %u %u", stream, size, count));
 
-  MStream *s = GET_MSTREAM(file);
+  MStream *s = ((std::shared_ptr<MStream> *) stream)->get();
   size_t pos = 0;
   count = size*count;
   while( count>0 && s->error()==0 )
@@ -279,25 +281,25 @@ size_t archdep_fwrite(const void* buffer, size_t size, size_t count, ADFILE *fil
 }
 
 
-long int archdep_ftell(ADFILE *file)
+long int archdep_ftell(ADFILE *stream)
 {
-  DBG(("archdep_ftell: %p", file));
-  long int res = (long int) GET_MSTREAM(file)->position();
+  DBG(("archdep_ftell: %p", stream));
+  long int res = (long int) ((std::shared_ptr<MStream> *) stream)->get()->position();
   DBG(("=> %li", res));
   return res;
 }
 
 
-int archdep_fseek(ADFILE *file, long int offset, int whence)
+int archdep_fseek(ADFILE *stream, long int offset, int whence)
 {
-  DBG(("archdep_fseek: %p %i %li", file, whence, offset));
-  int res = GET_MSTREAM(file)->seek(offset, whence) ? 0 : -1;
-  DBG(("=> %i %lu", res, GET_MSTREAM(file)->position()));
+  DBG(("archdep_fseek: %p %li %i", stream, whence, offset));
+  int res = ((std::shared_ptr<MStream> *) stream)->get()->seek(offset, whence) ? 0 : -1;
+  DBG(("=> %i %lu", res, ((std::shared_ptr<MStream> *) stream)->get()->position()));
   return res;
 }
 
 
-int archdep_fflush(ADFILE *file)
+int archdep_fflush(ADFILE *stream)
 {
   return 0;
 }
@@ -311,21 +313,20 @@ void archdep_frewind(ADFILE *file)
 
 int archdep_fisopen(ADFILE *file)
 {
-  return file!=NULL && GET_MSTREAM(file)!=NULL;
+  return file!=NULL;
 }
 
 
 int archdep_fissame(ADFILE *file1, ADFILE *file2)
 {
-  DBG(("archdep_fissame: %p %p", file1, file2));
-  return file1==file2;
+  return (file1==file2);
 }
 
 
-int archdep_ferror(ADFILE *file)
+int archdep_ferror(ADFILE *stream)
 {
-  int res = (int) GET_MSTREAM(file)->error();
-  DBG(("archdep_ferror: %p %i", file, res));
+  int res = (int) ((std::shared_ptr<MStream> *) stream)->get()->error();
+  DBG(("archdep_ferror: %p %i", stream, res));
   return res;
 }
 

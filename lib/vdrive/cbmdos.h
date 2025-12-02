@@ -77,6 +77,8 @@
 #define CBMDOS_IPE_NOT_EMPTY               80  /* dir to remove not empty */
 #define CBMDOS_IPE_PERMISSION              81  /* permission denied */
 
+#define CBMDOS_IPE_MEMEXE_NOT_SUPPORTED    99  /* emulation error: we don't support TDE */
+
 /* CBM DOS File Types */
 #define CBMDOS_FT_DEL         0       /* should match FILEIO_TYPE_xxx */
 #define CBMDOS_FT_SEQ         1
@@ -162,10 +164,13 @@ const char *cbmdos_errortext(unsigned int code);
 const char *cbmdos_filetype_get(unsigned int filetype);
 
 unsigned int cbmdos_parse_wildcard_check(const char *name, unsigned int len);
-unsigned int cbmdos_parse_wildcard_compare(const uint8_t *name1, const uint8_t *name2);
+unsigned int cbmdos_parse_wildcard_compare(const uint8_t *name1, int name1_length, const uint8_t *name2);
 uint8_t *cbmdos_dir_slot_create(const char *name, unsigned int len);
 
 unsigned int cbmdos_command_parse(cbmdos_cmd_parse_t *cmd_parse);
 unsigned int cbmdos_command_parse_plus(cbmdos_cmd_parse_plus_t *cmd_parse);
+
+int cbmdos_fdc_error_to_cbmdos_error(fdc_err_t rf);
+fdc_err_t cbmdos_error_to_fdc_error(int rf);
 
 #endif

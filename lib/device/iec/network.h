@@ -91,12 +91,12 @@ public:
 
 protected:
     virtual void task() override;
-    virtual bool open(uint8_t channel, const char *name) override;
+    virtual bool open(uint8_t channel, const char *name, uint8_t nameLen) override;
     virtual void close(uint8_t channel) override;
     virtual uint8_t write(uint8_t channel, uint8_t *buffer, uint8_t bufferSize, bool eoi) override;
     virtual uint8_t read(uint8_t channel, uint8_t *buffer, uint8_t bufferSize, bool *eoi) override;
-    virtual void execute(const char *command, uint8_t cmdLen) override;
-    virtual uint8_t getStatusData(char *buffer, uint8_t bufferSize) override;
+    virtual void execute(const char *command) override;
+    virtual uint8_t getStatusData(char *buffer, uint8_t bufferSize, bool *eoi) override;
     virtual void reset() override;
 
 private:

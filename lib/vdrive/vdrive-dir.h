@@ -82,7 +82,7 @@ uint8_t *vdrive_dir_find_next_slot(vdrive_dir_context_t *dir);
 void vdrive_dir_no_a0_pads(uint8_t *ptr, int l);
 int vdrive_dir_filetype(const uint8_t *name, int length);
 void vdrive_dir_remove_slot(vdrive_dir_context_t *dir);
-void vdrive_dir_create_slot(struct bufferinfo_s *p, uint8_t *realname, int reallength, int filetype);
+void vdrive_dir_create_slot(struct vdrive_s *vdrive, struct bufferinfo_s *p, uint8_t *realname, int reallength, int filetype);
 void vdrive_dir_free_chain(struct vdrive_s *vdrive, int t, int s);
 void vdrive_dir_updatetime(struct vdrive_s *vdrive, uint8_t *slot);
 uint8_t *vdrive_dir_part_find_next_slot(vdrive_dir_context_t *dir);

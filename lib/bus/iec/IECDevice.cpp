@@ -11,7 +11,7 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 //
-// You should have received a copy of the GNU General Public License
+// You should have receikved a copy of the GNU General Public License
 // along with this program; if not, write to the Free Software Foundation,
 // Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA
 // -----------------------------------------------------------------------------
@@ -77,7 +77,7 @@ bool IECDevice::fastLoadRequest(uint8_t loader, uint8_t request)
   if( m_handler!=NULL && isFastLoaderEnabled(loader) )
     {
       m_flProtocol = (loader<<3) | request;
-      m_handler->fastLoadRequest(loader, request);
+      m_handler->fastLoadRequest(this, loader, request);
       return true;
     }
   else

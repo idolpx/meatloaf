@@ -61,9 +61,9 @@
                                          PETSCII, 16 bytes, padded with 0xa0 */
 #define BAM_ID_1541            162  /**< offset in BAM of the disk ID in
                                          PETSCII, 2 bytes for standard DOS */
-#define BAM_EXT_BIT_MAP_1541   192  /**< BAM bitmap entries for tracks 36-40 for
+#define BAM_EXT_BIT_MAP_1541   172  /**< BAM bitmap entries for tracks 36-40 for
                                          extended floppies, only valid for
-                                         SpeedDOS */
+                                         DolphinDos (SpeedDOS=192, PrlogicDOS=144) */
 
 
 /* CBM 2040 constants */

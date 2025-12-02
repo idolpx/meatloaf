@@ -144,11 +144,12 @@ void systemBus::service()
 {
   task();
   
-  bool error = false, active = false;
+  bool error = false, memExeError = false, active = false;
   for(int i = 0; i < MAX_DISK_DEVICES; i++)
     {
       iecDrive *d = &(Meatloaf.get_disks(i)->disk_dev);
       error  |= d->hasError();
+      memExeError |= d->hasMemExeError();
       active |= d->getNumOpenChannels()>0;
     }
 
@@ -156,7 +157,7 @@ void systemBus::service()
     {
       static bool     flashState = false;
       static uint32_t prevFlash  = 0;
-      if( (fnSystem.millis()-prevFlash) > 250 )
+      if( (fnSystem.millis()-prevFlash) > (memExeError ? 100 : 250) )
         {
           flashState = !flashState;
           fnLedManager.set(eLed::LED_BUS, flashState);

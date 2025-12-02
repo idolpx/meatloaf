@@ -855,18 +855,21 @@ int vdrive_rel_open(vdrive_t *vdrive, unsigned int secondary,
     int newrelfile = 0;
 
     if (p->slot) {
+#ifdef DEBUG_DRIVE
         log_debug(LOG_DEFAULT,
             "Open existing REL file '%s' with record length %u on channel %u.",
             cmd_parse->file, cmd_parse->recordlength, secondary);
+#endif
         /* Follow through to function. */
         if (vdrive_rel_open_existing(vdrive, secondary)) {
             return SERIAL_ERROR;
         }
     } else if (cmd_parse->recordlength > 0) {
+#ifdef DEBUG_DRIVE
         log_debug(LOG_DEFAULT,
             "Open new REL file '%s' with record length %u on channel %u.",
             cmd_parse->file, cmd_parse->recordlength, secondary);
-
+#endif
         /* abort if we are in read only mode */
         if (VDRIVE_IS_READONLY(vdrive)) {
             vdrive_command_set_error(vdrive, CBMDOS_IPE_WRITE_PROTECT_ON, 0, 0);
@@ -880,9 +883,11 @@ int vdrive_rel_open(vdrive_t *vdrive, unsigned int secondary,
         /* set a flag so we can expand the rel file to 1 record later. */
         newrelfile++;
     } else {
+#ifdef DEBUG_DRIVE
         log_debug(LOG_DEFAULT,
             "Open non-existing REL file '%s' with unspecified record length on channel %u.",
             cmd_parse->file, secondary);
+#endif
         vdrive_command_set_error(vdrive, CBMDOS_IPE_NOT_FOUND, 0, 0);
         return SERIAL_ERROR;
     }
@@ -1104,10 +1109,10 @@ static int vdrive_rel_position_internal(vdrive_t *vdrive, unsigned int secondary
 
     /* Fill the rest of the currently written record. */
     vdrive_rel_fillrecord(vdrive, secondary);
-
+#ifdef DEBUG_DRIVE
     log_debug(LOG_DEFAULT, "Requested position %u, %u on channel %u.",
             record, position, secondary);
-
+#endif
     /* locate the track, sector and sector offset of record */
     vdrive_rel_track_sector(vdrive, secondary, record, &track, &sector, &rec_start);
 
@@ -1511,9 +1516,9 @@ out:
 int vdrive_rel_close(vdrive_t *vdrive, unsigned int secondary)
 {
     bufferinfo_t *p = &(vdrive->buffers[secondary]);
-
+#ifdef DEBUG_DRIVE
     log_debug(LOG_DEFAULT, "VDrive REL close channel %u.", secondary);
-
+#endif
     vdrive_iec_switch(vdrive, p);
 
     /* Fill the rest of the currently written record. */
@@ -1596,9 +1601,10 @@ void vdrive_rel_listen(vdrive_t *vdrive, unsigned int secondary)
                 }
             }
         }
+#ifdef DEBUG_DRIVE
         log_debug(LOG_DEFAULT, "Forced from write to position %u, 0 on channel %u.",
                 p->record, secondary);
-
+#endif
 #if 0
         vdrive_iec_unswitch(vdrive, p);
 #endif

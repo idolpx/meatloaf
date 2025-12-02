@@ -11,7 +11,7 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 //
-// You should have received a copy of the GNU General Public License
+// You should have receikved a copy of the GNU General Public License
 // along with this program; if not, write to the Free Software Foundation,
 // Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA
 // -----------------------------------------------------------------------------
@@ -81,7 +81,7 @@ class IECBusHandler
   static uint8_t getSupportedFastLoaders();
   static bool isFastLoaderSupported(uint8_t loader);
   bool enableFastLoader(IECDevice *dev, uint8_t protocol, bool enable);
-  void fastLoadRequest(uint8_t loader, uint8_t request);
+  void fastLoadRequest(IECDevice *dev, uint8_t loader, uint8_t request);
 
 #ifdef IEC_FP_DOLPHIN
   void enableDolphinBurstMode(IECDevice *dev, bool enable);
@@ -159,6 +159,7 @@ class IECBusHandler
   bool transmitSpeedDosParallelByte(uint8_t data);
 #endif
 
+
 #ifdef IEC_FP_DOLPHIN
   bool transmitDolphinByte(uint8_t numData);
   bool receiveDolphinByte(bool canWriteOk);
@@ -191,15 +192,7 @@ class IECBusHandler
   IOREG_TYPE m_bitParallelCS;
 #endif
 
-  uint8_t m_pinParallelHandshakeTransmit;
-  uint8_t m_pinParallelHandshakeReceive;
-  uint8_t m_bufferCtr;
-
 #else // !IEC_SUPPORT_PARALLEL_XRA1405
-
-  uint8_t m_pinParallelHandshakeTransmit;
-  uint8_t m_pinParallelHandshakeReceive;
-  uint8_t m_bufferCtr;
 
   uint8_t m_pinParallel[8];
 #ifdef IOREG_TYPE
@@ -209,6 +202,10 @@ class IECBusHandler
 #endif
 
 #endif // IEC_SUPPORT_PARALLEL_XRA1405
+
+  uint8_t m_pinParallelHandshakeTransmit;
+  uint8_t m_pinParallelHandshakeReceive;
+  uint8_t m_bufferCtr;
 
 #ifdef IOREG_TYPE
   volatile IOREG_TYPE *m_regParallelHandshakeTransmitMode;
@@ -239,9 +236,9 @@ class IECBusHandler
 #endif
   
 #ifdef IEC_FP_AR6
-  bool transmitAR6Byte(uint8_t data);
+  bool transmitAR6Byte(uint8_t data, bool ar6Protocol);
   bool receiveAR6Byte(uint8_t *data);
-  int8_t transmitAR6Block();
+  int8_t transmitAR6Block(bool ar6Protocol);
   int8_t receiveAR6Block();
 #endif
   

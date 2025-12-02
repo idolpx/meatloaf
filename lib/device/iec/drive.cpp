@@ -53,6 +53,41 @@
 #define BUFFER_SIZE 512
 
 
+#if 1
+static const char *getCStringLog(std::string s)
+{
+  size_t i, len = s.length();
+  for(i=0; i<len && isprint(s[i]); i++);
+
+  if( i==len )
+    return s.c_str();
+  else
+    {
+      static const char* digits = "0123456789ABCDEF";
+      static std::string ss;
+      ss.clear();
+      for(i=0; i<len; i++)
+        {
+          if( isprint(s[i]) ) 
+            ss += s[i];
+          else
+            {
+              uint8_t d = (uint8_t) s[i];
+              ss += "[";
+              ss += digits[d/16];
+              ss += digits[d&15];
+              ss += "]";
+            }
+        }
+      
+      return ss.c_str();
+    }
+}
+#else
+#define getCStringLog(s) (s).c_str()
+#endif
+
+
 static bool isMatch(std::string name, std::string pattern)
 {
     signed char found = -1;
@@ -461,6 +496,7 @@ uint8_t iecChannelHandlerDir::readBufferData()
             mstr::replaceAll(name, "\\", "/");
             m_data[m_len++] = '"';
 
+#if 0
             // C64 compatibale filename (16+3 chars)
             {
                 size_t n = std::min(16, (int) name.size());
@@ -479,30 +515,31 @@ uint8_t iecChannelHandlerDir::readBufferData()
                 m_data[31] = 0;
                 m_len = 32;
             }
+#else
+            // Full long filename (up to 30 chars)
+            {
+              size_t n = (int) name.size();
+              memcpy(m_data+m_len, name.data(), n);
 
-            // // Full long filename (up to 30 chars)
-            // {
-            //   size_t n = (int) name.size();
-            //   memcpy(m_data+m_len, name.data(), n);
+              m_len += n;
+              m_data[m_len++] = '"';
 
-            //   m_len += n;
-            //   m_data[m_len++] = '"';
+              // Extension gap
+              if (n<16)
+                {
+                  n = 17-n;
+                  while(n-->0) m_data[m_len++] = ' ';
+                }
+              else
+                m_data[m_len++] = ' ';
 
-            //   // Extension gap
-            //   if (n<16)
-            //   {
-            //     n = 17-n;
-            //     while(n-->0) m_data[m_len++] = ' ';
-            //   }
-            //   else
-            //     m_data[m_len++] = ' ';
-
-            //   // Extension
-            //   memcpy(m_data+m_len, ext.data(), 3);
-            //   m_len+=3;
-            //   m_data[m_len++] = ' ';
-            //   m_data[m_len++] = 0;
-            // }
+              // Extension
+              memcpy(m_data+m_len, ext.data(), 3);
+              m_len+=3;
+              m_data[m_len++] = ' ';
+              m_data[m_len++] = 0;
+            }
+#endif
         }
         else
         {
@@ -575,7 +612,7 @@ void iecDrive::begin()
         m_channels[i] = nullptr;
 }
 
-bool iecDrive::open(uint8_t channel, const char *cname)
+bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
 {
     Debug_printv("iecDrive::open(#%d, %d, \"%s\")", m_devnr, channel, cname);
 
@@ -595,7 +632,7 @@ bool iecDrive::open(uint8_t channel, const char *cname)
         }
         if( m_vdrive!=nullptr )
         {
-            bool ok = m_vdrive->openFile(channel, cname);
+            bool ok = m_vdrive->openFile(channel, cname, nameLen);
             Debug_printv("File opened on VDrive");
             setStatusCode(ok ? ST_OK : ST_VDRIVE);
             m_timeStart = esp_timer_get_time();
@@ -853,6 +890,10 @@ void iecDrive::close(uint8_t channel)
 {
     //Debug_printv("iecDrive::close(#%d, %d)", m_devnr, channel);
 
+  // 1541 drive clears status when closing a channel
+  IECFileDevice::clearStatus();
+  setStatusCode(ST_OK);
+
 //#ifdef USE_VDRIVE
     if( Meatloaf.use_vdrive &&  m_vdrive!=nullptr )
     {
@@ -950,20 +991,25 @@ uint8_t iecDrive::read(uint8_t channel, uint8_t *data, uint8_t maxDataLen, bool 
     }
 }
 
-
-void iecDrive::execute(const char *cmd, uint8_t cmdLen)
+// we override the "executeData" because some commands may include NUL or CR characters which 
+// may not work in the text-based "execute" function. Note that while commands handled here
+// are all text-based, M-R and M-W commands passed on to the VDrive may contain binary data.
+void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
 {
 #ifdef ENABLE_DISPLAY
     LEDS.activity = true;
 #endif
 
-    Debug_printv("iecDrive::execute(#%d, \"%s\", %d)", m_devnr, cmd, cmdLen);
+    // create regular string from the data we were passed
+    std::string command = std::string((const char *) data, dataLen);
+    if( command.length()>0 && command.back()==0x0d ) command = command.substr(0, command.length()-1);
 
-    std::string command = std::string(cmd, cmdLen);
+    Debug_printv("iecDrive::execute(#%d, \"%s\", %d)", m_devnr, getCStringLog(command), dataLen);
 
     // set status code to OK, failing commands below will set it to the appropriate error code
+    IECFileDevice::clearStatus();
     setStatusCode(ST_OK);
-    if ( cmdLen == 0 )
+    if ( dataLen == 0 )
         return;
 
     // Activate/Deactivate VDrive mode
@@ -992,26 +1038,31 @@ void iecDrive::execute(const char *cmd, uint8_t cmdLen)
         }
         else
         {
-            // execute command within virtual drive
-            int ok = m_vdrive->execute(cmd, cmdLen);
-            if( ok==2 )
+          // execute command within virtual drive
+          if( m_vdrive->execute((const char *) data, dataLen)==0 )
+            setStatusCode(ST_VDRIVE);
+          
+          // when executing commands that read data into a buffer or reposition
+          // the pointer we need to clear our read buffer of the channel for which
+          // this command is issued, otherwise remaining characters in the buffer 
+          // will be prefixed to the data from the new record or buffer location
+          if( data[0]=='P' && dataLen>=2 )
+            clearReadBuffer(data[1] & 0x0f);
+          else if( memcmp(data, "U1", 2)==0 || memcmp(data, "B-P", 3)==0 || memcmp(data, "B-R", 3)==0 )
+            {
+              int i = data[0]=='U' ? 2 : 3;
+              while( i<dataLen && !isdigit(data[i]) ) i++;
+              if( i<dataLen )
                 {
-                // this was a command that placed its response in the status buffer
-                uint8_t buf[IECFILEDEVICE_STATUS_BUFFER_SIZE];
-                size_t len = m_vdrive->getStatusBuffer(buf, IECFILEDEVICE_STATUS_BUFFER_SIZE);
-                SystemFileDevice::setStatus((const char *) buf, len);
-                }
-            else if( !ok )
-                setStatusCode(ST_VDRIVE);
+                  uint8_t channel = data[i]-'0';
+                  if( i+1<dataLen && isdigit(data[i+1]) )
+                    channel = 10*channel + (data[i+1]-'0');
 
-            // when executing a "P" (position relative file) command we need
-            // to clear the read buffer of the channel for which this command
-            // is issued, otherwise remaining characters in the buffer will be
-            // prefixed to the data from the new record
-            if( ok && cmd[0]=='P' && cmdLen>=2 )
-                clearReadBuffer(command[1] & 0x0f);
-            
-            return;
+                  clearReadBuffer(channel);
+                }
+            }
+          
+          return;
         }
     }
 //#endif
@@ -1750,6 +1801,12 @@ bool iecDrive::hasError()
 }
 
 
+bool iecDrive::hasMemExeError()
+{
+    return (m_statusCode==ST_VDRIVE) && (m_vdrive!=NULL) && (m_vdrive->getStatusCode()==99);
+}
+
+
 uint8_t iecDrive::getNumOpenChannels() 
 { 
 //#ifdef USE_VDRIVE
@@ -1761,23 +1818,39 @@ uint8_t iecDrive::getNumOpenChannels()
 }
 
 
+uint8_t iecDrive::getStatusData(char *buffer, uint8_t bufferSize, bool *eoi)
+{ 
+  uint8_t res;
+  Debug_printv("iecDrive::getStatus(#%d)", m_devnr);
+
+  // if we have an active VDrive then just return its status
+  if( m_vdrive!=NULL )
+    {
+      m_statusCode = ST_OK;
+      res = m_vdrive->getStatusBuffer(buffer, bufferSize, eoi);
+    }
+  else
+    {
+      // IECFileDevice::getStatusData will in turn call iecDrive::getStatus()
+      getStatus(buffer, bufferSize);
+      res = strlen(buffer);
+      *eoi = true;
+    }
+
+  m_statusCode = ST_OK;
+  m_statusTrk  = 0;
+  
+#ifdef ENABLE_DISPLAY
+  LEDS.status( ST_OK );
+#endif
+
+  Debug_printv("status: %s", getCStringLog(std::string(buffer, res)));
+  return res;
+}
+
+
 void iecDrive::getStatus(char *buffer, uint8_t bufferSize)
 {
-    Debug_printv("iecDrive::getStatus(#%d)", m_devnr);
-
-//#ifdef USE_VDRIVE
-    if( Meatloaf.use_vdrive && m_statusCode==ST_VDRIVE && m_vdrive!=nullptr )
-    {
-        strncpy(buffer, m_vdrive->getStatusString(), bufferSize);
-        buffer[bufferSize-1] = '\r';
-
-        Debug_printv("vdrive-status: %s", buffer);
-        m_statusCode = ST_OK;
-        m_statusTrk  = 0;
-        return;
-    }
-//#endif
-
     const char *msg = NULL;
     switch( m_statusCode )
     {
@@ -1798,16 +1871,7 @@ void iecDrive::getStatus(char *buffer, uint8_t bufferSize)
     }
 
     snprintf(buffer, bufferSize, "%02d,%s,%02d,00\r", m_statusCode, msg, m_statusTrk);
-
-    Debug_printv("status: %s", buffer);
-    m_statusCode = ST_OK;
-    m_statusTrk  = 0;
-
-#ifdef ENABLE_DISPLAY
-    LEDS.status( ST_OK );
-#endif
 }
-
 
 
 void iecDrive::reset()
@@ -1823,7 +1887,12 @@ void iecDrive::reset()
     m_memory.reset();
 
     //#ifdef USE_VDRIVE
-    if( m_vdrive!=nullptr ) m_vdrive->closeAllChannels();
+    if( m_vdrive!=nullptr ) 
+      {
+        m_vdrive->closeAllChannels();
+        m_vdrive->execute("UJ", 2, false);
+      }
+
     //#endif
 
     SystemFileDevice::reset();

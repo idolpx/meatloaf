@@ -546,6 +546,7 @@ disk_image_t *disk_image_create(void)
 {
     disk_image_t *image = lib_malloc(sizeof *image);
     image->p64 = NULL;
+    image->id = 0xFFFFFFFF;
     return image;
 }
 
@@ -644,6 +645,22 @@ int disk_image_close(disk_image_t *image)
 }
 
 /*-----------------------------------------------------------------------*/
+
+int disk_image_read_sector_id(const disk_image_t *image, uint8_t *buf, const disk_addr_t *dadr)
+{
+    int rc = 0;
+
+    switch (image->device) {
+        case DISK_IMAGE_DEVICE_FS:
+            rc = fsimage_read_sector_id(image, buf, dadr);
+            break;
+        default:
+            log_error(disk_image_log, "Unknown image device %u.", image->device);
+            rc = -1;
+    }
+
+    return rc;
+}
 
 int disk_image_read_sector(const disk_image_t *image, uint8_t *buf, const disk_addr_t *dadr)
 {

@@ -38,6 +38,7 @@
 #define VDRIVE_PART_SUPPORTED(a) (vdrive->ptype[a]>=1 && vdrive->ptype[a]<=4)
 #define VDRIVE_IS_FD(a) (a->image && (a->image->type == DISK_IMAGE_TYPE_D1M || a->image->type == DISK_IMAGE_TYPE_D2M || a->image->type == DISK_IMAGE_TYPE_D4M ))
 #define VDRIVE_IS_HD(a) (a->image && (a->image->type == DISK_IMAGE_TYPE_DHD))
+#define VDRIVE_IS_1541(a) (a->image && ((a->image->type == DISK_IMAGE_TYPE_D64) || (a->image->type == DISK_IMAGE_TYPE_G64 )))
 #define VDRIVE_IS_READONLY(a) (a->image_mode > 0)
 
 /* High level disk formats.
@@ -72,7 +73,7 @@
         *((p)++) = ((val) >> 8) & 0xff; \
     } while (0)
 
-#define DRIVE_RAMSIZE           0x400
+#define DRIVE_RAMSIZE           0x800
 
 #define BAM_MAXSIZE (VDRIVE_BAM_MAX_STATES * 256)
 
@@ -92,6 +93,7 @@ typedef struct bufferinfo_s {
     unsigned int readmode; /* Is this channel for reading or writing */
     uint8_t *buffer;          /* Use this to save data */
     uint8_t *slot;            /* Save data for directory-slot */
+    int8_t bufnum;         /* buffer number of this buffer (-1 means unspecified) */
     unsigned int bufptr;   /* Use this to save/read data to disk */
     unsigned int track;    /* which track is allocated for this sector */
     unsigned int sector;   /*   (for write files only) */
@@ -182,19 +184,13 @@ typedef struct vdrive_s {
     int dir_part;              /* which drive to show first when doing group dirs */
     int dir_count;             /* how many drives are left when doing group dirs */
     int last_code;             /* for command channel status string */
+    int mem_buf_next_byte_override; /* if >=0, then send this the next time a byte is read from this buffer */
 
     unsigned int bam_size;
     uint8_t *bam;              /* Disk header blk (if any) followed by BAM blocks */
     bufferinfo_t buffers[16];
 
-    /* Memory read command buffer.  */
-    uint8_t mem_buf[256];
-    unsigned int mem_length;
-
-    /* removed side sector data and placed it in buffer structure */
-    /* BYTE *side_sector; */
-
-    uint8_t ram[0x8000];
+    uint8_t ram[DRIVE_RAMSIZE];
 } vdrive_t;
 
 /* Actually, serial-code errors ... */
@@ -236,12 +232,13 @@ int vdrive_attach_image(struct disk_image_s *image, unsigned int unit, unsigned 
 void vdrive_detach_image(struct disk_image_s *image, unsigned int unit, unsigned int drive, vdrive_t *vdrive);
 void vdrive_close_all_channels(vdrive_t *vdrive);
 void vdrive_close_all_channels_partition(vdrive_t *vdrive, int part);
+void vdrive_reset_last_track_sector(vdrive_t *vdrive);
 int vdrive_get_max_sectors(vdrive_t *vdrive, unsigned int track);
 int vdrive_get_max_sectors_per_head(vdrive_t *vdrive, unsigned int track);
 void vdrive_get_last_read(unsigned int *track, unsigned int *sector, uint8_t **buffer);
 void vdrive_set_last_read(unsigned int track, unsigned int sector, uint8_t *buffer);
 
-void vdrive_alloc_buffer(struct bufferinfo_s *p, int mode);
+void vdrive_alloc_buffer(vdrive_t *vdrive, struct bufferinfo_s *p, int bufnum, int mode);
 void vdrive_free_buffer(struct bufferinfo_s *p);
 void vdrive_set_disk_geometry(vdrive_t *vdrive);
 int vdrive_read_sector(vdrive_t *vdrive, uint8_t *buf, unsigned int track, unsigned int sector);

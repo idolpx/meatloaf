@@ -11,6 +11,8 @@ extern "C"
 #include "diskimage.h"
 #include "diskcontents-block.h"
 #include "imagecontents.h"
+#include "fsimage.h"
+#include <ctype.h>
 }
 
 
@@ -165,6 +167,14 @@ bool VDrive::createDiskImage(const char *filename, const char *itype, const char
 }
 
 
+const char *VDrive::getDiskImageFilename()
+{
+  if( m_drive->image!=NULL && m_drive->image->media.fsimage!=NULL )
+    return m_drive->image->media.fsimage->name;
+  else
+    return NULL;
+}
+
 
 bool VDrive::isOk()
 {
@@ -172,7 +182,7 @@ bool VDrive::isOk()
 }
 
 
-bool VDrive::openFile(uint8_t channel, const char *name, bool convertNameToPETSCII)
+bool VDrive::openFile(uint8_t channel, const char *name, int nameLen, bool convertNameToPETSCII)
 {
   bool res = false;
 
@@ -181,30 +191,27 @@ bool VDrive::openFile(uint8_t channel, const char *name, bool convertNameToPETSC
   if( m_drive->buffers[channel].mode!=BUFFER_NOT_IN_USE )
     closeFile(channel);
 
+  if( nameLen<0 ) nameLen = strlen(name);
+
   if( convertNameToPETSCII )
     {
       char *pname = lib_strdup(name);
       charset_petconvstring((uint8_t *)pname, CONVERT_TO_PETSCII);
-      res = vdrive_iec_open(m_drive, (uint8_t *) pname, (unsigned int) strlen(pname), channel, NULL)==0;
+      res = vdrive_iec_open(m_drive, (uint8_t *) pname, (unsigned int) nameLen, channel, NULL)==0;
       lib_free(pname);
     }
   else
-    res = vdrive_iec_open(m_drive, (uint8_t *) name, (unsigned int) strlen(name), channel, NULL)==0;
+    res = vdrive_iec_open(m_drive, (uint8_t *) name, (unsigned int) nameLen, channel, NULL)==0;
 
-  if( m_drive->buffers[channel].mode!=BUFFER_NOT_IN_USE )
-    m_numOpenChannels++;
-
+  countOpenChannels();
   return res;
 }
 
 
 bool VDrive::closeFile(uint8_t channel)
 {
-  bool wasInUse = m_drive->buffers[channel].mode!=BUFFER_NOT_IN_USE;
   bool res = vdrive_iec_close(m_drive, channel)==SERIAL_OK;
-  bool isInUse = m_drive->buffers[channel].mode!=BUFFER_NOT_IN_USE;
-
-  if( wasInUse && !isInUse ) m_numOpenChannels--;
+  countOpenChannels();
   return res;
 }
 
@@ -248,7 +255,7 @@ bool VDrive::read(uint8_t channel, uint8_t *buffer, size_t *nbytes, bool *eoi)
           return false;
         }
     }
-
+  
   *nbytes = i;
   return true;
 }
@@ -309,13 +316,37 @@ const char *VDrive::getStatusString()
 }
 
 
-size_t VDrive::getStatusBuffer(void *buf, size_t bufSize)
+int VDrive::getStatusCode()
+{
+  if( m_drive->buffers[15].length>=2 && 
+      isdigit(m_drive->buffers[15].buffer[0]) &&
+      isdigit(m_drive->buffers[15].buffer[1]) &&
+      m_drive->buffers[15].buffer[2]==',' )
+    return (m_drive->buffers[15].buffer[0]-'0')*10 + (m_drive->buffers[15].buffer[1]-'0');
+  else
+    return -1;
+}
+
+
+size_t VDrive::getStatusBuffer(void *buf, size_t bufSize, bool *eoi)
 {
   // buffer[].length points to the last byte instead of giving the true length
   size_t len = m_drive->buffers[15].length+1;
-  if( bufSize<len ) len = bufSize;
-  memcpy(buf, m_drive->buffers[15].buffer, len);
-  return len;
+  if( bufSize<len )
+    {
+      memcpy(buf, m_drive->buffers[15].buffer, bufSize);
+      memmove(m_drive->buffers[15].buffer, m_drive->buffers[15].buffer+bufSize, len-bufSize);
+      m_drive->buffers[15].length -= bufSize;
+      if( eoi ) *eoi = false;
+      return bufSize;
+    }
+  else
+    {
+      memcpy(buf, m_drive->buffers[15].buffer, len);
+      vdrive_command_set_error(m_drive, 0, 0, 0);
+      if( eoi ) *eoi = true;
+      return len;
+    }
 }
 
 
@@ -330,8 +361,10 @@ int VDrive::execute(const char *cmd, size_t cmdLen, bool convertToPETSCII)
     }
 
   int vres = vdrive_command_execute(m_drive, (uint8_t *) (pcmd==NULL ? cmd : pcmd), (unsigned int)cmdLen);
-
   if( pcmd!=NULL ) lib_free(pcmd);
+
+  // some commands (e.g. "I") may close channels
+  countOpenChannels();
 
   if( vres==0 )
     return 1;
@@ -351,4 +384,13 @@ bool VDrive::readSector(uint32_t track, uint32_t sector, uint8_t *buf)
 bool VDrive::writeSector(uint32_t track, uint32_t sector, const uint8_t *buf)
 {
   return vdrive_write_sector(m_drive, buf, track, sector)==CBMDOS_IPE_OK;
+}
+
+
+void VDrive::countOpenChannels()
+{
+  m_numOpenChannels = 0;
+  for(uint8_t i=0; i<15; i++)
+    if( m_drive->buffers[i].mode!=BUFFER_NOT_IN_USE )
+      m_numOpenChannels++;
 }

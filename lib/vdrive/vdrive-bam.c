@@ -627,12 +627,12 @@ int vdrive_bam_allocate_chain(vdrive_t *vdrive, unsigned int t, unsigned int s)
         /* Check for illegal track or sector.  */
         if (disk_image_check_sector(vdrive->image, t, s) < 0) {
             vdrive_command_set_error(vdrive, CBMDOS_IPE_ILLEGAL_TRACK_OR_SECTOR,
-                                     s, t);
+                                     t, s);
             return CBMDOS_IPE_ILLEGAL_TRACK_OR_SECTOR;
         }
         if (!vdrive_bam_allocate_sector(vdrive, t, s)) {
             /* The real drive does not seem to catch this error.  */
-            vdrive_command_set_error(vdrive, CBMDOS_IPE_NO_BLOCK, s, t);
+            vdrive_command_set_error(vdrive, CBMDOS_IPE_NO_BLOCK, t, s);
             return CBMDOS_IPE_NO_BLOCK;
         }
         rc = vdrive_read_sector(vdrive, tmp, t, s);
@@ -661,12 +661,12 @@ int vdrive_bam_allocate_chain_255(vdrive_t *vdrive, unsigned int t, unsigned int
         /* Check for illegal track or sector.  */
         if (disk_image_check_sector(vdrive->image, t, s) < 0) {
             vdrive_command_set_error(vdrive, CBMDOS_IPE_ILLEGAL_TRACK_OR_SECTOR,
-                                     s, t);
+                                     t, s);
             return CBMDOS_IPE_ILLEGAL_TRACK_OR_SECTOR;
         }
         if (!vdrive_bam_allocate_sector(vdrive, t, s)) {
             /* The real drive does not seem to catch this error.  */
-            vdrive_command_set_error(vdrive, CBMDOS_IPE_NO_BLOCK, s, t);
+            vdrive_command_set_error(vdrive, CBMDOS_IPE_NO_BLOCK, t, s);
             return CBMDOS_IPE_NO_BLOCK;
         }
         rc = vdrive_read_sector(vdrive, tmp, t, s);
@@ -1574,5 +1574,14 @@ void vdrive_bam_setup_bam(vdrive_t *vdrive)
         default:
             log_error(LOG_DEFAULT, "Unknown disk type %u.  Cannot locate BAM.",
                     vdrive->image_format);
+    }
+
+  // 1541 has disk id in RAM at $12 and $16
+  if( VDRIVE_IS_1541(vdrive) )
+    {
+      uint8_t id[2] = {0, 0};
+      vdrive_bam_int_get_disk_id(vdrive, id);
+      vdrive->ram[0x12] = vdrive->ram[0x16] = id[0];
+      vdrive->ram[0x13] = vdrive->ram[0x17] = id[1];
     }
 }

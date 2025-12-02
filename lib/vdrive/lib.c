@@ -40,6 +40,69 @@
 
 /*----------------------------------------------------------------------------*/
 
+#if 0
+#include "archdep.h"
+
+static void lib_log_heap(const char *msg, uint32_t mem1, uint32_t s, uint32_t mem2, const char *p)
+{
+  static char buf[100];
+  snprintf(buf, 100, "%s: %u -- %u --> %u : %p", msg, mem1, s, mem2, p);
+  buf[99]=0;
+  archdep_default_logger("", buf);
+}
+
+void *lib_malloc(size_t size)
+{
+  uint32_t mem1 = archdep_get_available_heap();
+  void *res = malloc(size);
+  uint32_t mem2 = archdep_get_available_heap();
+  lib_log_heap("lib_malloc ", mem1, size, mem2, res);
+  return res;
+}
+
+
+void *lib_calloc(size_t nmemb, size_t size)
+{
+  uint32_t mem1 = archdep_get_available_heap();
+  void *res = calloc(nmemb, size);
+  uint32_t mem2 = archdep_get_available_heap();
+  lib_log_heap("lib_calloc ", mem1, nmemb*size, mem2, res);
+  return res;
+}
+
+
+void *lib_realloc(void *ptr, size_t size)
+{
+  uint32_t mem1 = archdep_get_available_heap();
+  void *res = realloc(ptr, size);
+  uint32_t mem2 = archdep_get_available_heap();
+  lib_log_heap("lib_realloc", mem1, size, mem2, res);
+  return res;
+}
+
+
+void lib_free(void *ptr)
+{
+  if( ptr!=NULL )
+    {
+      uint32_t mem1 = archdep_get_available_heap();
+      free(ptr);
+      uint32_t mem2 = archdep_get_available_heap();
+      lib_log_heap("lib_free   ", mem1, 0, mem2, ptr);
+    }
+}
+
+
+char *lib_strdup(const char *str)
+{
+  uint32_t mem1 = archdep_get_available_heap();
+  char *res = strdup(str);
+  uint32_t mem2 = archdep_get_available_heap();
+  lib_log_heap("lib_strdup ", mem1, strlen(str)+1, mem2, res);
+  return res;
+}
+
+#else
 
 void *lib_malloc(size_t size)
 {
@@ -70,6 +133,7 @@ char *lib_strdup(const char *str)
   return strdup(str);
 }
 
+#endif
 
 char *lib_mvsprintf(const char *fmt, va_list ap)
 {

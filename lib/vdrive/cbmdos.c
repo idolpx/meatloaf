@@ -77,12 +77,14 @@ static const cbmdos_errortext_t cbmdos_error_messages[] =
     { 70, "NO CHANNEL" },
     { 71, "DIRECTORY ERROR" },
     { 72, "DISK FULL" },
+    //{ 73, "CBM DOS V2.6 1541" },
     { 73, "VIRTUAL DRIVE EMULATION V3.5" }, /* The program version */
     { 74, "DRIVE NOT READY" },
     { 75, "FORMAT ERROR" },
     { 77, "SELECTED PARTITION ILLEGAL" },   /* 1581 */
     { 80, "DIRECTORY NOT EMPTY" },
     { 81, "PERMISSION DENIED" },
+    { 99, "M-E NOT SUPPORTED" },
     { 255, NULL }
 };
 
@@ -125,30 +127,53 @@ unsigned int cbmdos_parse_wildcard_check(const char *name, unsigned int len)
     return 0;
 }
 
-unsigned int cbmdos_parse_wildcard_compare(const uint8_t *name1, const uint8_t *name2)
+unsigned int cbmdos_parse_wildcard_compare(const uint8_t *pattern, int pattern_length, const uint8_t *dirname)
 {
+    /* modeled after code in C1541 ROM at $C50A:
+       C505   LDY #$03      ; start Y (file name char index) at 3
+       C507   JMP $C51D
+       C50A   LDA $0200,X   ; get pattern char
+       C50D   CMP ($94),Y   ; compare to file name char
+       C50F   BEQ $C51B     ; if equal => next character
+       C511   CMP #$3F      ; is pattern a "?"
+       C513   BNE $C4E7     ; jump if not (NO match)
+       C515   LDA ($94),Y   ; get file name char
+       C517   CMP #$A0      ; is it a shift-space?
+       C519   BEQ $C4E7     ; jump if so (NO match)
+       C51B   INX           ; advance pattern char
+       C51C   INY           ; advance file name char
+       C51D   CPX $0276     ; compare X to pattern length (pattern length is capped at 16)
+       C520   BCS $C52B     ; jump if X>=pattern length (done comparing)
+       C522   LDA $0200,X   ; get pattern char
+       C525   CMP #$2A      ; is it a "*"
+       C527   BEQ $C535     ; jump if so (found match)
+       C529   BNE $C50A     ; loop (jump always)
+       C52B   CPY #$13      ; compare Y to 16+3 (end of file name)
+       C52D   BCS $C535     ; jump if Y>=end of file name (found match)
+       C52F   LDA ($94),Y   ; get file name char
+       C531   CMP #$A0      ; is it shift-space?
+       C533   BNE $C4E7     ; jump if not (NO match)
+       C535   ...           ; found match */
+
     unsigned int index;
+    for(index=0; index<CBMDOS_SLOT_NAME_LENGTH; index++)
+      {
+        if( index >= pattern_length )
+          return dirname[index]==0xA0;
+        else if( pattern[index]=='*' )
+          return 1;
 
-    for (index = 0; index < CBMDOS_SLOT_NAME_LENGTH; index++) {
-        switch (name1[index]) {
-            case '*':
-                return 1; /* rest is not interesting, it's a match */
-            case '?':
-                if (name2[index] == 0xa0) {
-                    return 0; /* wildcard, but the other is too short */
-                }
-                break;
-            case 0xa0: /* This one ends, let's see if the other as well */
-                return (name2[index] == 0xa0);
-            default:
-                if (name1[index] != name2[index]) {
-                    return 0; /* does not match */
-                }
+        if( pattern[index]!=dirname[index] ) {
+          if( pattern[index]!='?' )
+            return 0;
+          else if( dirname[index]==0xA0 )
+            return 0;
         }
-    }
+      }
 
-    return 1; /* matched completely */
+    return 1;
 }
+
 
 uint8_t *cbmdos_dir_slot_create(const char *name, unsigned int len)
 {
@@ -396,14 +421,16 @@ unsigned int cbmdos_command_parse_plus(cbmdos_cmd_parse_plus_t *cmd_parse)
         if (p2 && *p == '@') {
             special = 1;
         }
-        if (p2 || special) {
+        if ((p2 && p2!=p) || special) {
             /* check for anything before unit/partition number (@,&), but not a '/' */
             if (*p != '/' && (*p < '0' || *p > '9')) {
                 p1 = p;
                 /* wait for numbers to appear */
                 if (special) {
                     /* compensate for CMD $*=P and $*=T syntax */
-                    if (*p == '$' && (p + 2) < limit && *(p + 1) == '='
+                    if( *p == '#' && p+1<limit && *(p+1)>='0' && *(p+1)<='9' ) {
+                        p++;
+                    } else if (*p == '$' && (p + 2) < limit && *(p + 1) == '='
                         && (*(p + 2) == 'P' || *(p + 2) == 'T') ) {
                         p += 2;
                     } else if (!p2 && *p == '$' && (p + 1) < limit
@@ -413,7 +440,7 @@ unsigned int cbmdos_command_parse_plus(cbmdos_cmd_parse_plus_t *cmd_parse)
                     }
                     p++;
                 } else {
-                    while (p < limit && (*p < '0' || *p > '9')) {
+                    while (p <= p2 && (*p < '0' || *p > '9')) {
                         p++;
                     }
                 }
@@ -522,7 +549,8 @@ unsigned int cbmdos_command_parse_plus(cbmdos_cmd_parse_plus_t *cmd_parse)
                         cmd_parse->readmode = CBMDOS_FAM_APPEND;
                         break;
                     default:
-                        return CBMDOS_IPE_INVAL;
+                      { /* CBM DOS just ignores invalid characters, not an error
+                           return CBMDOS_IPE_INVAL; */ }
                 }
                 p++;
                 /* skip extra characters after first ','; ",sequential,write" is allowed for example */
@@ -552,7 +580,7 @@ unsigned int cbmdos_command_parse_plus(cbmdos_cmd_parse_plus_t *cmd_parse)
             special++;
             if (p + 1 < limit) {
                 if (p[0] == 'U'
-                    && (p[1] == '1' || p[1] == 'A' || p[1] == '2' || p[1] == 'B')) {
+                    && (p[1] == '1' || p[1] == 0x01 || p[1] == 'A' || p[1] == '2' || p[1] == 0x02 || p[1] == 'B')) {
                     special = 0;
                 }
                 if (p[0] == 'M' && p[1] == 'D') {
@@ -624,7 +652,7 @@ unsigned int cbmdos_command_parse_plus(cbmdos_cmd_parse_plus_t *cmd_parse)
                     break;
                 }
                 /* get out the moment we see a delimiter */
-                if (*p == ':' || *p == ' ' || *p == 29 ) {
+                if (*p == ':' || *p == ' ' || *p == 29 || (special && (*p == ',' || *p==';')) ) {
                     break;
                 }
                 if (!special) {
@@ -639,7 +667,7 @@ unsigned int cbmdos_command_parse_plus(cbmdos_cmd_parse_plus_t *cmd_parse)
                     break;
                 }
                 /* get out the moment we see a delimiter */
-                if (*p == ':' || *p == ' ' || *p == 29 ) {
+                if (*p == ':' || *p == ' ' || *p == 29 || (special && (*p == ',' || *p==';')) ) {
                     break;
                 }
                 if (!special) {
@@ -657,6 +685,12 @@ unsigned int cbmdos_command_parse_plus(cbmdos_cmd_parse_plus_t *cmd_parse)
             cmd_parse->abbrv = lib_calloc(1, cmd_parse->abbrvlength + 1);
             memcpy(cmd_parse->abbrv, temp, cmd_parse->abbrvlength);
             cmd_parse->abbrv[cmd_parse->abbrvlength] = 0;
+
+            if( (cmd_parse->commandlength>1) && (cmd_parse->command[0])=='U' && cmd_parse->command[1]>=0x01 && cmd_parse->command[1]<=0x09 )
+              cmd_parse->command[1] += '0';
+
+            if( special && (*p == ',' || *p == ';') )
+              p++;
         }
 
         if (p >= limit) {
@@ -704,7 +738,7 @@ unsigned int cbmdos_command_parse_plus(cbmdos_cmd_parse_plus_t *cmd_parse)
         p1 = p;
         p = memchr(p1, '=', limit - p1);
 
-        if( !special ) {
+        if( !special && cmd_parse->command[0]!='B' ) {
         p2 = memchr(p1, ',', limit - p1);
         if (p && p2 && (p2 < p)) {
             p = p2;
@@ -730,4 +764,72 @@ unsigned int cbmdos_command_parse_plus(cbmdos_cmd_parse_plus_t *cmd_parse)
     }
 
     return CBMDOS_IPE_OK;
+}
+
+
+int cbmdos_fdc_error_to_cbmdos_error(fdc_err_t rf)
+{
+  switch (rf)
+    {
+    case CBMDOS_FDC_ERR_OK:
+      return CBMDOS_IPE_OK;
+    case CBMDOS_FDC_ERR_HEADER:
+      return CBMDOS_IPE_READ_ERROR_BNF; /* 20 */
+    case CBMDOS_FDC_ERR_SYNC:
+      return CBMDOS_IPE_READ_ERROR_SYNC; /* 21 */
+    case CBMDOS_FDC_ERR_NOBLOCK:
+      return CBMDOS_IPE_READ_ERROR_DATA; /* 22 */
+    case CBMDOS_FDC_ERR_DCHECK:
+      return CBMDOS_IPE_READ_ERROR_CHK; /* 23 */
+    case CBMDOS_FDC_ERR_VERIFY:
+      return CBMDOS_IPE_WRITE_ERROR_VER; /* 25 */
+    case CBMDOS_FDC_ERR_WPROT:
+      return CBMDOS_IPE_WRITE_PROTECT_ON; /* 26 */
+    case CBMDOS_FDC_ERR_HCHECK:
+      return CBMDOS_IPE_READ_ERROR_BCHK; /* 27 */
+    case CBMDOS_FDC_ERR_BLENGTH:
+      return CBMDOS_IPE_WRITE_ERROR_BIG; /* 28 */
+    case CBMDOS_FDC_ERR_ID:
+      return CBMDOS_IPE_DISK_ID_MISMATCH; /* 29 */
+    case CBMDOS_FDC_ERR_DRIVE:
+      return CBMDOS_IPE_NOT_READY;    /* 74 */
+    case CBMDOS_FDC_ERR_DECODE:
+      return CBMDOS_IPE_READ_ERROR_GCR; /* 24 */
+    default:
+      return CBMDOS_IPE_NOT_READY;
+    }
+}
+
+
+fdc_err_t cbmdos_error_to_fdc_error(int rf)
+{
+  switch (rf)
+    {
+    case CBMDOS_IPE_OK:
+      return CBMDOS_FDC_ERR_OK;
+    case CBMDOS_IPE_READ_ERROR_BNF: /* 20 */
+      return CBMDOS_FDC_ERR_HEADER;
+    case CBMDOS_IPE_READ_ERROR_SYNC: /* 21 */
+      return CBMDOS_FDC_ERR_SYNC;
+    case CBMDOS_IPE_READ_ERROR_DATA: /* 22 */
+      return CBMDOS_FDC_ERR_NOBLOCK;
+    case CBMDOS_IPE_READ_ERROR_CHK: /* 23 */
+      return CBMDOS_FDC_ERR_DCHECK;
+    case CBMDOS_IPE_WRITE_ERROR_VER: /* 25 */
+      return CBMDOS_FDC_ERR_VERIFY;
+    case CBMDOS_IPE_WRITE_PROTECT_ON: /* 26 */
+      return CBMDOS_FDC_ERR_WPROT;
+    case CBMDOS_IPE_READ_ERROR_BCHK: /* 27 */
+      return CBMDOS_FDC_ERR_HCHECK;
+    case CBMDOS_IPE_WRITE_ERROR_BIG: /* 28 */
+      return CBMDOS_FDC_ERR_BLENGTH;
+    case CBMDOS_IPE_DISK_ID_MISMATCH: /* 29 */
+      return CBMDOS_FDC_ERR_ID;
+    case CBMDOS_IPE_NOT_READY:    /* 74 */
+      return CBMDOS_FDC_ERR_DRIVE;
+    case CBMDOS_IPE_READ_ERROR_GCR: /* 24 */
+      return CBMDOS_FDC_ERR_DECODE;
+    default:
+      return CBMDOS_FDC_ERR_DRIVE;
+    }
 }
