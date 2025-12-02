@@ -432,7 +432,7 @@ namespace ESP32Console
         int z = uart_write_bytes(uart_channel_, (const char *)&c, 1);
         // uart_wait_tx_done(_uart_num, MAX_WRITE_BYTE_TICKS);
 #ifdef ENABLE_CONSOLE_TCP
-        tcp_server.send((char *)c);
+        tcp_server.send(std::string((const char *)&c, 1));
 #endif
         return z;
     }
