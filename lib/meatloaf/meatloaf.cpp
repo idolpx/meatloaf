@@ -53,15 +53,14 @@
 #include "media/archive/archive.h"
 #include "media/archive/ark.h"
 #include "media/archive/lbr.h"
+#include "media/archive/lnx.h"
 
 // Service
 #include "service/csip.h"
 
 // Network
 #include "network/tnfs.h"
-// #include "network/ipfs.h"
-// #include "network/smb.h"
-// #include "network/ws.h"
+#include "network/smb.h"
 #endif
 
 // Cartridge
@@ -85,6 +84,7 @@
 
 // Hard Disk
 #include "media/hd/dnp.h"
+#include "media/hd/hdd.h"
 
 // Tape
 #include "media/tape/t64.h"
@@ -92,7 +92,8 @@
 
 // Network
 #include "network/http.h"
-#include "network/smb.h"
+// #include "network/ipfs.h"
+// #include "network/ws.h"
 
 // Service
 #include "service/ml.h"
@@ -129,6 +130,7 @@ SDFileSystem sdFS;
 ArchiveMFileSystem archiveFS;
 ARKMFileSystem arkFS;
 LBRMFileSystem lbrFS;
+LNXMFileSystem lnxFS;
 
 // Service
 CSIPMFileSystem csipFS;
@@ -136,9 +138,6 @@ CSIPMFileSystem csipFS;
 // Network
 TNFSMFileSystem tnfsFS;
 SMBMFileSystem smbFS;
-// IPFSFileSystem ipfsFS;
-// TcpFileSystem tcpFS;
-//WSFileSystem wsFS;
 #endif
 
 // Cartridge
@@ -162,6 +161,7 @@ NIBMFileSystem nibFS;
 
 // Hard Disk
 DNPMFileSystem dnpFS;
+HDDMFileSystem hddFS;
 
 // Tape
 T64MFileSystem t64FS;
@@ -169,6 +169,9 @@ TCRTMFileSystem tcrtFS;
 
 // Network
 HTTPMFileSystem httpFS;
+// IPFSFileSystem ipfsFS;
+// TcpFileSystem tcpFS;
+//WSFileSystem wsFS;
 
 // Service
 MLMFileSystem mlFS;
@@ -190,7 +193,7 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
 #ifndef MIN_CONFIG
     // Archive
     &archiveFS,     // extension-based FS have to be on top to be picked first, otherwise the scheme will pick them!
-    &arkFS, &lbrFS,
+    &arkFS, &lbrFS, &lnxFS,
 #endif
 
     // Container
@@ -201,7 +204,7 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
     &g64FS, &nibFS,
 
     // Hard Disk
-    &dnpFS,
+    &dnpFS, &hddFS,
 
     // Tape
     &t64FS, &tcrtFS,

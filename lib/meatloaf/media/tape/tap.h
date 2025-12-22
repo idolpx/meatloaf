@@ -26,6 +26,16 @@
 // https://web.archive.org/web/20191021114418/http://www.subchristsoftware.com:80/finaltap.htm
 //
 
+//   Future Enhancements
+//   For full TAP support, the analyzeTapeData() method should be enhanced to:
+//   1. Decode pulses to bits: Use timing thresholds to determine 0/1 bits
+//   2. Find sync bytes: Look for standard C64 tape sync pattern (0x89...)
+//   3. Parse tape headers: Extract filename, type, load address
+//   4. Extract file data: Follow data blocks with checksums
+//   5. Support turbo loaders: Handle non-standard pulse timings
+//   6. Multiple files: TAP can contain multiple programs
+
+// TODO: Add full emulation of tape counter (Absolute and relative) that allows to load tapes asking to reset the counter and the to rewind to 0. Positioning is very reliable and rewind to zero can be either manual (REW) or with an instant-execution functionality.
 
 #ifndef MEATLOAF_MEDIA_TAP
 #define MEATLOAF_MEDIA_TAP
@@ -38,50 +48,108 @@
  * Streams
  ********************************************************/
 
-class TAPMStream : public MMediaStream {
-    // override everything that requires overriding here
+class TAPMStream : public MStream {
 
 public:
-    TAPMStream(std::shared_ptr<MStream> is) : MMediaStream(is)
+    TAPMStream(std::shared_ptr<MStream> containerStream) : MStream(containerStream->url)
     {
-        // Read Header
-        readHeader();
+        this->containerStream = containerStream;
+
+        // Read TAP header
+        if (!readHeader())
+        {
+            Debug_printv("Failed to read TAP header");
+            return;
+        }
+
+        // Analyze tape data to find files
+        analyzeTapeData();
+    };
+
+    // TAP file header (20 bytes)
+    struct TAPHeader {
+        char signature[12];     // "C64-TAPE-RAW"
+        uint8_t version;        // $00 or $01
+        uint8_t reserved[3];    // Reserved for future use
+        uint32_t data_size;     // Size of pulse data (little-endian)
+    } __attribute__((packed));
+
+    // Detected tape file entry
+    struct TapeFile {
+        std::string filename;
+        uint8_t file_type;
+        uint32_t data_offset;       // Offset in cached data
+        uint32_t data_length;       // Length of file data
+        uint16_t start_address;     // Load address
+        uint16_t end_address;       // End address
+        std::vector<uint8_t> cached_data;  // Decoded file data (cached during analysis)
     };
 
 protected:
     struct Header {
-        char name[24];
+        std::string signature;
+        uint8_t version;
+        uint32_t data_size;
     };
 
     struct Entry {
-        uint8_t entry_type;
+        std::string filename;
         uint8_t file_type;
+        uint32_t data_offset;
+        uint32_t data_length;
         uint16_t start_address;
         uint16_t end_address;
-        uint16_t free_1;
-        uint32_t data_offset;
-        uint32_t free_2;
-        char filename[16];
     };
 
-    bool readHeader() override {
-        Debug_printv("here");
-        containerStream->seek(0x28);
-        if (containerStream->read((uint8_t*)&header, sizeof(header)))
-            return true;
+    std::shared_ptr<MStream> containerStream;
+    TAPHeader tap_header;
+    std::vector<TapeFile> tape_files;
+    uint32_t pulse_data_start;      // Offset where pulse data begins
+    uint32_t current_file_index = 0;
 
-        return false;
-    }
-
-    bool seekEntry( std::string filename ) override;
-    bool seekEntry( uint16_t index ) override;
-
-    uint32_t readFile(uint8_t* buf, uint32_t size) override;
-    uint32_t writeFile(uint8_t* buf, uint32_t size) override { return 0; };
-    bool seekPath(std::string path) override;
+    // TAP decoding state
+    uint32_t tap_position;          // Current position in TAP data
+    static const uint16_t kernal_thresholds[2];  // Pulse duration thresholds: 426, 616
+    static const uint8_t kernal_pilot_sequence[9];  // 137,136,135,134,133,132,131,130,129
 
     Header header;
     Entry entry;
+
+    bool readHeader();
+    void analyzeTapeData();
+
+    // TAP decoding functions (adapted from wav-prg)
+    bool readTAPPulse(uint32_t& pulse);
+    bool pulseToBit(uint8_t pulse1, uint8_t pulse2, uint8_t& bit);
+    bool getPulseBit(uint8_t& bit);
+    bool getByte(uint8_t& byte);
+    bool getByteWithSync(uint8_t& byte, bool allow_short_first);
+    bool findSync();
+    bool readTapeHeader(uint8_t& file_type, std::string& filename, uint16_t& start_addr, uint16_t& end_addr);
+    bool readDataBlock(uint8_t* buffer, uint16_t max_size, uint16_t& bytes_read);
+
+    // TAP is browseable (can list files) but not random access (sequential tape data)
+    bool isBrowsable() override { return true; };
+    bool isRandomAccess() override {
+        // If IDX file present, could be random access
+        // TODO: Check for .idx companion file logic here (not implemented)
+        return false;
+    };
+
+    // MStream required methods
+    bool isOpen() override { return containerStream != nullptr && containerStream->isOpen(); };
+    bool open(std::ios_base::openmode mode) override { return containerStream->open(mode); };
+    void close() override { if (containerStream) containerStream->close(); };
+    bool seek(uint32_t pos) override;
+
+    uint32_t read(uint8_t* buf, uint32_t size) override;
+    uint32_t write(const uint8_t* buf, uint32_t size) override { return 0; };
+
+    // Sequential access for TAP files
+    std::string seekNextEntry() override;
+
+    // Random access if IDX file present
+    bool seekPath(std::string path) override;
 
 private:
     friend class TAPMFile;
@@ -97,13 +165,14 @@ public:
 
     TAPMFile(std::string path, bool is_dir = true): MFile(path) {
         isDir = is_dir;
-
         media_image = name;
-        //mstr::toUTF8(media_image);
+        isPETSCII = true;
     };
-    
+
     ~TAPMFile() {
-        // don't close the stream here! It will be used by shared ptr D64Util to keep reading image params
+        // Close the cached stream
+        if (cached_stream)
+            cached_stream->close();
     }
 
     std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> is) override;
@@ -113,6 +182,9 @@ public:
 
     bool isDir = true;
     bool dirIsOpen = false;
+
+private:
+    std::shared_ptr<TAPMStream> cached_stream;  // Cached decoded stream
 };
 
 
@@ -127,7 +199,14 @@ public:
     TAPMFileSystem(): MFileSystem("tap") {};
 
     bool handles(std::string fileName) override {
-        return byExtension(".tap", fileName);
+        return byExtension({
+            ".tap",
+            ".idx",  // https://www.luigidifraia.com/technical-info/
+            ".wav",  // Some TAPs are stored in WAV containers
+            ".tzx"   // https://worldofspectrum.org/faq/reference/formats.htm
+        },
+            fileName
+        );
     }
 
     MFile* getFile(std::string path) override {

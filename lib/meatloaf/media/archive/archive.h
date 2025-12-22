@@ -31,7 +31,7 @@
 #include "meat_media.h"
 #include "meatloaf.h"
 
-#ifdef BOARD_HAS_PSRAM
+#ifdef CONFIG_SPIRAM
 #include <esp_psram.h>
 #ifdef CONFIG_IDF_TARGET_ESP32
 #include <esp32/himem.h>
@@ -136,7 +136,7 @@ class ArchiveMStream : public MMediaStream {
     int m_haveData;
     bool m_dirty;
 
-#if defined(CONFIG_IDF_TARGET_ESP32) && defined(BOARD_HAS_PSRAM)
+#if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
     // contains unzipped contents of archive (in HIMEM)
     esp_himem_handle_t m_data;
 

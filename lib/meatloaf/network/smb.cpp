@@ -25,6 +25,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <errno.h>
 
 int SMBMFile::is_finished = 0;
 std::vector<std::string> SMBMFile::shares;
@@ -408,14 +409,27 @@ bool SMBMFile::readEntry( std::string filename )
  * MStream implementations
  ********************************************************/
 uint32_t SMBMStream::write(const uint8_t *buf, uint32_t size) {
-    if (!isOpen() || !buf || !handle->_smb || !handle->_handle) {
+    if (!buf) {
+        Debug_printv("Null buffer");
+        _error = EINVAL;
+        return 0;
+    }
+
+    if (!isOpen() || !handle->_smb || !handle->_handle) {
+        Debug_printv("Stream not open or invalid handles");
+        _error = EBADF;
+        return 0;
+    }
+
+    if (size == 0) {
         return 0;
     }
 
     int result = smb2_write(handle->_smb, handle->_handle, buf, size);
 
     if (result < 0) {
-        Debug_printv("write rc=%d\r\n", result);
+        Debug_printv("SMB write error: %s (rc=%d)", smb2_get_error(handle->_smb), result);
+        _error = -result;
         return 0;
     }
 
@@ -429,11 +443,29 @@ uint32_t SMBMStream::write(const uint8_t *buf, uint32_t size) {
 
 
 bool SMBMStream::open(std::ios_base::openmode mode) {
+    Debug_printv("Opening SMB stream url[%s] mode[%d]", url.c_str(), mode);
 
-    Debug_printv("mode[%d]", mode);
-
-    if(isOpen())
+    if(isOpen()) {
+        Debug_printv("Stream already open");
         return true;
+    }
+
+    // Validate URL
+    if (url.empty()) {
+        Debug_printv("Empty URL");
+        _error = EINVAL;
+        return false;
+    }
+
+    // Parse path to get share and file path
+    std::string share, share_path;
+    parseSMBPath(url, share, share_path);
+
+    if (share_path.empty()) {
+        Debug_printv("No file path specified in URL");
+        _error = EINVAL;
+        return false;
+    }
 
     // Determine SMB2 open mode
     int smb_mode = 0;
@@ -451,43 +483,60 @@ bool SMBMStream::open(std::ios_base::openmode mode) {
         smb_mode = O_RDONLY;
     }
 
-    std::string share, share_path;
-    parseSMBPath(url, share, share_path);
-    if (!share_path.empty()) {
-        handle->obtain(url, smb_mode);
+    Debug_printv("SMB open mode[0x%X]", smb_mode);
 
-        if(isOpen()) {
-            // Get file size using SMB2 stat
-            struct smb2_stat_64 st;
-            if (smb2_fstat(handle->_smb, handle->_handle, &st) == 0) {
-                _size = st.smb2_size;
-            }
-            return true;
-        }
+    // Open the file via SMBHandle
+    handle->obtain(url, smb_mode);
+
+    if (!isOpen()) {
+        Debug_printv("Failed to open SMB stream");
         return false;
     }
 
-    Debug_printv("smb_mode[%d]", smb_mode);
+    // Get file size using SMB2 stat
+    struct smb2_stat_64 st;
+    if (smb2_fstat(handle->_smb, handle->_handle, &st) == 0) {
+        _size = st.smb2_size;
+        Debug_printv("File size: %u bytes", _size);
+    } else {
+        Debug_printv("Warning: Could not get file size: %s", smb2_get_error(handle->_smb));
+        _size = 0;
+    }
+
+    _position = 0;
     return true;
 };
 
 void SMBMStream::close() {
-    // if(isOpen()) {
-    //     handle->dispose();
-    //     _position = 0;
-    // }
+    if(isOpen()) {
+        handle->dispose();
+        _position = 0;
+        _size = 0;
+    }
 };
 
 uint32_t SMBMStream::read(uint8_t* buf, uint32_t size) {
-    if (!isOpen() || !buf || !handle->_smb || !handle->_handle) {
-        Debug_printv("Not open or invalid handles");
+    if (!buf) {
+        Debug_printv("Null buffer");
+        _error = EINVAL;
+        return 0;
+    }
+
+    if (!isOpen() || !handle->_smb || !handle->_handle) {
+        Debug_printv("Stream not open or invalid handles");
+        _error = EBADF;
+        return 0;
+    }
+
+    if (size == 0) {
         return 0;
     }
 
     int bytesRead = smb2_read(handle->_smb, handle->_handle, buf, size);
 
     if (bytesRead < 0) {
-        Debug_printv("read rc=%d\r\n", bytesRead);
+        Debug_printv("SMB read error: %s (rc=%d)", smb2_get_error(handle->_smb), bytesRead);
+        _error = -bytesRead;
         return 0;
     }
 
@@ -497,12 +546,15 @@ uint32_t SMBMStream::read(uint8_t* buf, uint32_t size) {
 
 bool SMBMStream::seek(uint32_t pos) {
     if (!isOpen() || !handle->_smb || !handle->_handle) {
-        Debug_printv("Not open");
+        Debug_printv("Stream not open");
+        _error = EBADF;
         return false;
     }
 
     int64_t result = smb2_lseek(handle->_smb, handle->_handle, pos, SEEK_SET, NULL);
     if (result < 0) {
+        Debug_printv("SMB seek error: %s (rc=%lld)", smb2_get_error(handle->_smb), result);
+        _error = -result;
         return false;
     }
 
@@ -512,27 +564,20 @@ bool SMBMStream::seek(uint32_t pos) {
 
 bool SMBMStream::seek(uint32_t pos, int mode) {
     if (!isOpen() || !handle->_smb || !handle->_handle) {
-        Debug_printv("Not open");
+        Debug_printv("Stream not open");
+        _error = EBADF;
         return false;
     }
 
     int64_t result = smb2_lseek(handle->_smb, handle->_handle, pos, mode, NULL);
     if (result < 0) {
+        Debug_printv("SMB seek error: %s (rc=%lld)", smb2_get_error(handle->_smb), result);
+        _error = -result;
         return false;
     }
 
-    // Update position based on seek mode
-    switch(mode) {
-        case SEEK_SET:
-            _position = pos;
-            break;
-        case SEEK_CUR:
-            _position += pos;
-            break;
-        case SEEK_END:
-            _position = _size + pos;
-            break;
-    }
+    // Update position based on actual result from lseek
+    _position = (uint32_t)result;
 
     return true;
 }
@@ -562,22 +607,40 @@ void SMBHandle::dispose() {
 }
 
 void SMBHandle::obtain(std::string m_path, int smb_mode) {
-    //dispose(); // Clean up any existing connection
-
-    // Parse the path to extract server, share, and file path
-    // Expected format: smb://server/share/path/to/file
-    std::string server, share, filepath;
-    if (!parseSMBPath(m_path, share, filepath)) {
-        Debug_printv("Invalid SMB path: %s", m_path.c_str());
+    // Parse the URL to extract all components
+    // Expected format: smb://[user[:password]@]server/share/path/to/file
+    auto parser = PeoplesUrlParser::parseURL(m_path);
+    if (!parser || parser->scheme != "smb") {
+        Debug_printv("Invalid SMB URL: %s", m_path.c_str());
         dispose();
         return;
     }
 
+    std::string server = parser->host;
+    std::string user = parser->user;
+    std::string password = parser->password;
+    std::string share, filepath;
+
+    if (!parseSMBPath(parser->path, share, filepath)) {
+        Debug_printv("Invalid SMB path: %s", parser->path.c_str());
+        dispose();
+        return;
+    }
+
+    Debug_printv("Connecting to server[%s] share[%s] filepath[%s] user[%s]",
+                 server.c_str(), share.c_str(), filepath.c_str(), user.c_str());
+
     // Set SMB2 version
     smb2_set_version(_smb, SMB2_VERSION_ANY);
 
-    // Connect to server
-    if (smb2_connect_share(_smb, server.c_str(), share.c_str(), nullptr) < 0) {
+    // Set credentials if provided
+    if (!password.empty()) {
+        smb2_set_password(_smb, password.c_str());
+    }
+
+    // Connect to server/share
+    const char* username = user.empty() ? nullptr : user.c_str();
+    if (smb2_connect_share(_smb, server.c_str(), share.c_str(), username) < 0) {
         Debug_printv("Failed to connect to %s/%s: %s", server.c_str(), share.c_str(), smb2_get_error(_smb));
         dispose();
         return;

@@ -1017,7 +1017,7 @@ int tnfs_stat(tnfsMountInfo *m_info, tnfsStat *filestat, const char *filepath)
 
     int len = _tnfs_adjust_with_full_path(m_info, (char *)packet.payload, filepath, sizeof(packet.payload));
 
-    // Debug_printf("TNFS stat: \"%s\"\r\n", (char *)packet.payload);
+    //Debug_printf("TNFS stat: \"%s\"\r\n", (char *)packet.payload);
 
 #define OFFSET_STAT_FILEMODE 1
 #define OFFSET_STAT_UID 3
@@ -1045,11 +1045,10 @@ int tnfs_stat(tnfsMountInfo *m_info, tnfsStat *filestat, const char *filepath)
             filestat->m_time = TNFS_UINT32_FROM_LOHI_BYTEPTR(packet.payload + OFFSET_STAT_MTIME);
             filestat->c_time = TNFS_UINT32_FROM_LOHI_BYTEPTR(packet.payload + OFFSET_STAT_CTIME);
 
-            /*
-            Debug_printf("\ttnfs_stat: mode: %ho, uid: %hu, gid: %hu, dir: %d, size: %u, atime: 0x%04x, mtime: 0x%04x, ctime: 0x%04x\r\n",
-                filemode, uid, gid,
-                filestat->isDir ? 1 : 0, filestat->filesize, filestat->a_time, filestat->m_time, filestat->c_time );
-            */
+            // Debug_printf("\ttnfs_stat: mode: %ho, uid: %hu, gid: %hu, dir: %d, size: %u, atime: 0x%04x, mtime: 0x%04x, ctime: 0x%04x\r\n",
+            //     filestat->mode, uid, gid,
+            //     filestat->isDir ? 1 : 0, filestat->filesize, filestat->a_time, filestat->m_time, filestat->c_time );
+
         }
         __END_IGNORE_UNUSEDVARS
         return packet.payload[0];
@@ -1599,6 +1598,15 @@ int _tnfs_adjust_with_full_path(tnfsMountInfo *m_info, char *buffer, const char 
     // Use the cwd to bulid the full path
     strlcpy(buffer, m_info->current_working_directory, bufflen);
 
+    // If source is an absolute path, use it directly (ignore cwd).
+    if (source[0] == '/') {
+        // Ensure it fits in the buffer
+        if ((int)strlen(source) >= bufflen)
+            return -1;
+        strlcpy(buffer, source, bufflen);
+        return strlen(buffer);
+    }
+
     // Figure out whether or not we need to add a slash
     int ll;
     ll = strlen(buffer);
@@ -1612,12 +1620,8 @@ int _tnfs_adjust_with_full_path(tnfsMountInfo *m_info, char *buffer, const char 
         buffer[ll] = '/';
         buffer[++ll] = '\0';
     }
-    if (needs_slash == false && dir_slash)
-    {
-        buffer[--ll] = '\0';
-    }
 
-    // Finally copy the source filepath
+    // Finally copy the source filepath (relative path appended to cwd)
     strlcpy(buffer + ll, source, bufflen - ll);
 
     // And return the new length because that ends up being useful

@@ -31,6 +31,7 @@
 #include "make_unique.h"
 
 #include "meatloaf.h"
+#include "meat_session.h"
 #include "fuji.h"
 #include "fnFsSD.h"
 #include "led.h"
@@ -1897,10 +1898,9 @@ void iecDrive::reset()
 
     SystemFileDevice::reset();
 
-
+    // clear all image and session brokers
     ImageBroker::clear();
-    //FileBroker::clear();
-    //StreamBroker::clear();
+    SessionBroker::clear();
 
 #ifdef ENABLE_DISPLAY
     LEDS.idle();

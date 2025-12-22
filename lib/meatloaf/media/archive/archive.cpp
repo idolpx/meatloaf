@@ -23,6 +23,13 @@
 
 #include "meatloaf.h"
 
+// HIMEM is only available on original ESP32 with SPIRAM (not S2, S3, C3, etc.)
+#if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
+// Include HIMEM allocator for LZMA decompression (.7z files)
+#include <esp32_himem_allocator.h>
+#define USE_ESP32_HIMEM 1
+#endif
+
 // int cb_open(struct archive *, void *userData)
 // {
 //     Archive *a = (Archive *) userData;
@@ -51,52 +58,67 @@ ssize_t cb_read(struct archive *, void *userData, const void **buff) {
     // https://github.com/libarchive/libarchive/wiki/LibarchiveIO
     Archive *a = (Archive *)userData;
     *buff = a->m_srcBuffer;
-  return a->m_archive==NULL ? 0 : a->m_srcStream->read(a->m_srcBuffer, a->m_buffSize);
+    return a->m_archive==NULL ? 0 : a->m_srcStream->read(a->m_srcBuffer, a->m_buffSize);
 }
 
 
 int64_t cb_skip(struct archive *, void *userData, int64_t request)
 {
-  // It must return the number of bytes actually skipped, or a negative failure code if skipping cannot be done.
-  // It can skip fewer bytes than requested but must never skip more.
-  // Only positive/forward skips will ever be requested.
-  // If skipping is not provided or fails, libarchive will call the read() function and simply ignore any data that it does not need.
-  //
-  // * Skips at most request bytes from archive and returns the skipped amount.
-  // * This may skip fewer bytes than requested; it may even skip zero bytes.
-  // * If you do skip fewer bytes than requested, libarchive will invoke your
-  // * read callback and discard data as necessary to make up the full skip.
-  //
-  // https://github.com/libarchive/libarchive/wiki/LibarchiveIO
-  //Debug_printv("bytes[%lld]", request);
-  Archive *a = (Archive *) userData;
+    // It must return the number of bytes actually skipped, or a negative failure code if skipping cannot be done.
+    // It can skip fewer bytes than requested but must never skip more.
+    // Only positive/forward skips will ever be requested.
+    // If skipping is not provided or fails, libarchive will call the read() function and simply ignore any data that it does not need.
+    //
+    // * Skips at most request bytes from archive and returns the skipped amount.
+    // * This may skip fewer bytes than requested; it may even skip zero bytes.
+    // * If you do skip fewer bytes than requested, libarchive will invoke your
+    // * read callback and discard data as necessary to make up the full skip.
+    //
+    // https://github.com/libarchive/libarchive/wiki/LibarchiveIO
+    Archive *a = (Archive *) userData;
 
-  if (a->m_archive)
-  {
-      bool rc = a->m_srcStream->seek(request, SEEK_CUR);
-      return (rc) ? request : ARCHIVE_WARN;
-  }
-  else
-  {
-      Debug_printv("ERROR! skip failed");
-      return ARCHIVE_FATAL;
-  }
+    if (a->m_archive)
+    {
+        uint32_t old_pos = a->m_srcStream->position();
+        bool rc = a->m_srcStream->seek(request, SEEK_CUR);
+        if (rc) {
+            // Return actual bytes skipped (may differ from request if seek is clamped)
+            int64_t skipped = a->m_srcStream->position() - old_pos;
+            Debug_printv("skip request[%lld] old_pos[%u] new_pos[%u] skipped[%lld]",
+                         request, old_pos, a->m_srcStream->position(), skipped);
+            return skipped;
+        }
+        Debug_printv("ERROR! skip failed: request[%lld]", request);
+        return ARCHIVE_WARN;
+    }
+    else
+    {
+        Debug_printv("ERROR! skip failed - no archive");
+        return ARCHIVE_FATAL;
+    }
 }
 
 
 int64_t cb_seek(struct archive *, void *userData, int64_t offset, int whence)
 {
-    //Debug_printv("offset[%lld] whence[%d] (0=begin, 1=curr, 2=end)", offset, whence);
     Archive *a = (Archive *) userData;
 
     if (a->m_archive)
     {
         bool rc = a->m_srcStream->seek(offset, whence);
-        return (rc) ? offset : ARCHIVE_WARN;
+        if (rc) {
+            // Must return the resulting absolute position, not the offset
+            // This is critical for .7z files which require accurate positioning
+            int64_t pos = a->m_srcStream->position();
+            Debug_printv("seek offset[%lld] whence[%d] -> pos[%lld]", offset, whence, pos);
+            return pos;
+        }
+        Debug_printv("ERROR! seek failed: offset[%lld] whence[%d]", offset, whence);
+        return ARCHIVE_WARN;
     }
     else
     {
-        Debug_printv("ERROR! seek failed");
+        Debug_printv("ERROR! seek failed - no archive");
         return ARCHIVE_FATAL;
     }
 }
@@ -108,6 +130,16 @@ bool Archive::open(std::ios_base::openmode mode) {
     close();
 
     Debug_printv("Archive::open [%s]", m_srcStream->url.c_str());
+
+#if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
+    // Initialize HIMEM allocator for LZMA decompression (.7z support)
+    static bool himem_initialized = false;
+    if (!himem_initialized) {
+        esp32_himem_allocator_init();
+        himem_initialized = true;
+    }
+#endif
+
     m_srcBuffer = new uint8_t[m_buffSize];
     m_archive = archive_read_new();
     m_srcStream->seek(0, SEEK_SET);
@@ -145,7 +177,7 @@ void Archive::close() {
  * Streams implementations
  ********************************************************/
 
-#if defined(CONFIG_IDF_TARGET_ESP32) && defined(BOARD_HAS_PSRAM)
+#if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
 int ArchiveMStream::s_rangeUsed = 0;
 esp_himem_rangehandle_t ArchiveMStream::s_range;
 #endif
@@ -163,7 +195,7 @@ void ArchiveMStream::close() {
             m_dirty = false;
         }
 
-#if defined(CONFIG_IDF_TARGET_ESP32) && defined(BOARD_HAS_PSRAM)
+#if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
         ESP_ERROR_CHECK(esp_himem_free(m_data));
         Debug_printv("HIMEM available after free: %lu ", (uint32_t)esp_himem_get_free_size());
 
@@ -183,7 +215,7 @@ bool ArchiveMStream::isOpen() { return m_archive->isOpen(); }
 void ArchiveMStream::readArchiveData() {
     if (m_archive->isOpen() && m_haveData == 0) {
 
-#if defined(CONFIG_IDF_TARGET_ESP32) && defined(BOARD_HAS_PSRAM)
+#if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
         // allocate HIMEM memory for archive data (size must be multiple of
         // ESP_HIMEM_BLKSZ);
         uint32_t size = (_size / ESP_HIMEM_BLKSZ) * ESP_HIMEM_BLKSZ;
@@ -225,7 +257,7 @@ void ArchiveMStream::readArchiveData() {
         Debug_printv("reading %lu bytes from archive", _size);
         archive *a = m_archive->getArchive();
 
-#if defined(CONFIG_IDF_TARGET_ESP32) && defined(BOARD_HAS_PSRAM)
+#if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
         size = _size;
         uint32_t pageStart = 0;
         while (size > 0) {
@@ -274,7 +306,7 @@ uint32_t ArchiveMStream::read(uint8_t *buf, uint32_t size) {
     if (m_haveData > 0) {
         // Debug_printv("calling read, buff size=[%ld]", size);
 
-#if defined(CONFIG_IDF_TARGET_ESP32) && defined(BOARD_HAS_PSRAM)
+#if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
         if (_position + size > _size) size = _size - _position;
         uint32_t numRead = 0;
         while (size > 0) {
@@ -317,7 +349,7 @@ uint32_t ArchiveMStream::write(const uint8_t *buf, uint32_t size) {
         if (_position + size > _size) size = _size - _position;
         uint32_t numWritten = 0;
 
-#if defined(CONFIG_IDF_TARGET_ESP32) && defined(BOARD_HAS_PSRAM)
+#if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
         while (size > 0) {
             uint32_t pageStart = (_position / ESP_HIMEM_BLKSZ) * ESP_HIMEM_BLKSZ;
             uint32_t offset = _position - pageStart;

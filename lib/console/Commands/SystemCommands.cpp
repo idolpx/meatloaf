@@ -116,7 +116,7 @@ static int sysInfo(int argc, char **argv)
     Serial.printf("EFuse MAC: %s\r\n", mac2String(ESP.getEfuseMac()).c_str());
 
     Serial.printf("Flash size: %lu MB (mode: %s, speed: %lu MHz)\r\n", ESP.getFlashChipSize() / (1024 * 1024), getFlashModeStr(), ESP.getFlashChipSpeed() / (1024 * 1024));
-#if defined(BOARD_HAS_PSRAM)
+#if defined(CONFIG_SPIRAM)
     Serial.printf("PSRAM size: %lu KB\r\n", ESP.getPsramSize() / 1024);
 #if defined(CONFIG_IDF_TARGET_ESP32)
     Serial.printf("HIMEM size: %lu KB\r\n", ESP.getPsramHiMemSize() / 1024);
@@ -160,7 +160,7 @@ static int meminfo(int argc, char **argv)
     Serial.printf("Minimum free heap size during uptime was: %lu KB\r\n", min);
     Serial.printf("Overall Free Memory: %lu KB\r\n\r\n", total_free);
 
-#if defined(BOARD_HAS_PSRAM)
+#if defined(CONFIG_SPIRAM)
     total = ESP.getPsramSize() / 1024;
     free = ESP.getPsramFree() / 1024;
     used = total - free;    

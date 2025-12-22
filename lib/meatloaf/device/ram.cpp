@@ -8,7 +8,7 @@
 */
 
 #include "sdkconfig.h"
-#if defined(CONFIG_IDF_TARGET_ESP32) && defined(BOARD_HAS_PSRAM)
+#if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
 
 #include "ram.h"
 
@@ -22,7 +22,7 @@
 #include "esp_system.h"
 #include "nvs_flash.h"
 #include "esp_heap_caps.h"
-#ifdef BOARD_HAS_PSRAM
+#ifdef CONFIG_SPIRAM
 #ifdef CONFIG_IDF_TARGET_ESP32S3
 #include <esp_psram.h>
 #else

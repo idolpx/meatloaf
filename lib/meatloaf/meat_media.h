@@ -105,18 +105,13 @@ protected:
 
     size_t media_header_size = 0x00;
     size_t media_data_offset = 0x00;
-    size_t entry_index = 0;  // Currently selected directory entry (0 no selection)
-    size_t entry_count = -1; // Directory list entry count (-1 unknown)
+    size_t entry_index = 0;     // Currently selected directory entry (0 no selection)
+    size_t entry_count = -1;    // Directory list entry count (-1 unknown)
+    size_t partition_index = 0; // Currently selected partition (0 no selection)
 
     enum open_modes { OPEN_READ, OPEN_WRITE, OPEN_APPEND, OPEN_MODIFY };
     std::string file_type_label[12] = { "DEL", "SEQ", "PRG", "USR", "REL", "CBM", "DIR", "???", "SYS", "NAT", "CMD", "CFS" };
-    std::unordered_map<std::string, std::string> partition_type_label = { 
-        {"N", "NATIVE"},
-        {"4", "1541"},
-        {"7", "1571"},
-        {"8", "1581"},
-        {"C", "1581 CP/M"}
-    };
+    std::string partition_type_label[9] = { "", "NAT", "41", "71", "81", "C81", "PRN", "FOR", "SYS" };
 
     virtual bool readHeader() { return true; }
     virtual bool writeHeader(std::string name, std::string id) { return false; };
