@@ -44,8 +44,8 @@
 
 #define PIN_GPIB_ATN         GPIO_NUM_5  // Attention
 #define PIN_GPIB_DAV         GPIO_NUM_21 // Data Valid
-#define PIN_GPIB_NRFD        GPIO_NUM_17 // Not Ready For Data
-#define PIN_GPIB_NDAC        GPIO_NUM_16 // No Data Accepted
+#define PIN_GPIB_NRFD        GPIO_NUM_16 // Not Ready For Data
+#define PIN_GPIB_NDAC        GPIO_NUM_17 // No Data Accepted
 #define PIN_GPIB_EOI         GPIO_NUM_22 // End Or Identify
 
 #define PIN_GPIB_REN         GPIO_NUM_NC // Remote Enable (IEEE-488 enabled if pulled low)
