@@ -729,8 +729,8 @@ int tnfs_opendirx(tnfsMountInfo *m_info, const char *directory, uint8_t sortopts
     int pathlen = _tnfs_adjust_with_full_path(m_info,
         (char *)(packet.payload + pathoffset), directory, sizeof(packet.payload) - pathoffset);
 
-    Debug_printf("TNFS open directory: sortopts=0x%02x diropts=0x%02x maxresults=0x%04x pattern=\"%s\" path=\"%s\"\r\n",
-     sortopts, diropts, maxresults, (char *)(packet.payload + OFFSET_OPENDIRX_PATTERN), (char *)(packet.payload + pathoffset));
+    // Debug_printf("TNFS open directory: sortopts=0x%02x diropts=0x%02x maxresults=0x%04x pattern=\"%s\" path=\"%s\"\r\n",
+    //  sortopts, diropts, maxresults, (char *)(packet.payload + OFFSET_OPENDIRX_PATTERN), (char *)(packet.payload + pathoffset));
 
     if (_tnfs_transaction(m_info, packet, pathoffset + pathlen + 1))
     {
@@ -738,7 +738,7 @@ int tnfs_opendirx(tnfsMountInfo *m_info, const char *directory, uint8_t sortopts
         {
             m_info->dir_handle = packet.payload[1];
             m_info->dir_entries = TNFS_UINT16_FROM_LOHI_BYTEPTR(packet.payload + 2);
-            Debug_printf("Directory opened, handle ID: %hd, entries: %u\r\n", m_info->dir_handle, m_info->dir_entries);
+            //Debug_printf("Directory opened, handle ID: %hd, entries: %u\r\n", m_info->dir_handle, m_info->dir_entries);
         }
         return packet.payload[0];
     }

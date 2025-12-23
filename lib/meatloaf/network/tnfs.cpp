@@ -109,7 +109,7 @@ bool TNFSMSession::keep_alive() {
  ********************************************************/
 
 TNFSMFile::TNFSMFile(std::string path): MFile(path) {
-    Debug_printv("url[%s] host[%s] path[%s]", url.c_str(), host.c_str(), this->path.c_str());
+    //Debug_printv("url[%s] host[%s] path[%s]", url.c_str(), host.c_str(), this->path.c_str());
 
     // Obtain or create TNFS session via SessionBroker
     uint16_t tnfs_port = port.empty() ? TNFS_DEFAULT_PORT : std::stoi(port);
@@ -128,13 +128,13 @@ TNFSMFile::TNFSMFile(std::string path): MFile(path) {
         return;
     }
 
-    // Change to the requested directory if provided
-    if (!this->path.empty() && this->path != "/") {
-        int result = tnfs_chdir(mountinfo, this->path.c_str());
-        if (result != TNFS_RESULT_SUCCESS) {
-            Debug_printv("Warning: Could not change to directory %s: error %d", this->path.c_str(), result);
-        }
-    }
+    // // Change to the requested directory if provided
+    // if (!this->path.empty() && this->path != "/") {
+    //     int result = tnfs_chdir(mountinfo, this->path.c_str());
+    //     if (result != TNFS_RESULT_SUCCESS) {
+    //         Debug_printv("Warning: Could not change to directory %s: error %d", this->path.c_str(), result);
+    //     }
+    // }
 
     // Find full filename for wildcard
     if (mstr::contains(name, "?") || mstr::contains(name, "*")) {
@@ -147,7 +147,7 @@ TNFSMFile::TNFSMFile(std::string path): MFile(path) {
         m_isNull = false;
     }
 
-    Debug_printv("TNFS path[%s] valid[%d]", this->path.c_str(), !m_isNull);
+    //Debug_printv("TNFS path[%s] valid[%d]", this->path.c_str(), !m_isNull);
 }
 
 TNFSMFile::~TNFSMFile() {
@@ -353,12 +353,12 @@ bool TNFSMFile::rewindDirectory() {
     // Close and reopen directory to reset position
     openDir(path);
 
-    Debug_printv("dirOpened[%d] entry_index[%d] path[%s]", dirOpened, entry_index, path.c_str());
+    //Debug_printv("dirOpened[%d] entry_index[%d] path[%s]", dirOpened, entry_index, path.c_str());
     return dirOpened;
 }
 
 MFile* TNFSMFile::getNextFileInDir() {
-    Debug_printv("dirOpened[%d] entry_index[%d] path[%s]", dirOpened, entry_index, path.c_str());
+    //Debug_printv("dirOpened[%d] entry_index[%d] path[%s]", dirOpened, entry_index, path.c_str());
 
     if (!dirOpened) {
         rewindDirectory();
@@ -393,7 +393,7 @@ MFile* TNFSMFile::getNextFileInDir() {
         return getNextFileInDir();
     }
 
-    Debug_printv("entry[%s] isDir[%d] size[%u]", entry_name, filestat.isDir, filestat.filesize);
+    //Debug_printv("entry[%s] isDir[%d] size[%u]", entry_name, filestat.isDir, filestat.filesize);
 
     // Build full path
     std::string fullPath = url;
