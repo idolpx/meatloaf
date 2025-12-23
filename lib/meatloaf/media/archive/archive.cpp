@@ -23,12 +23,12 @@
 
 #include "meatloaf.h"
 
-// HIMEM is only available on original ESP32 with SPIRAM (not S2, S3, C3, etc.)
-#if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
-// Include HIMEM allocator for LZMA decompression (.7z files)
-#include <esp32_himem_allocator.h>
-#define USE_ESP32_HIMEM 1
-#endif
+// // HIMEM is only available on original ESP32 with SPIRAM (not S2, S3, C3, etc.)
+// #if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
+// // Include HIMEM allocator for LZMA decompression (.7z files)
+// #include <esp32_himem_allocator.h>
+// #define USE_ESP32_HIMEM 1
+// #endif
 
 // int cb_open(struct archive *, void *userData)
 // {
@@ -84,8 +84,8 @@ int64_t cb_skip(struct archive *, void *userData, int64_t request)
         if (rc) {
             // Return actual bytes skipped (may differ from request if seek is clamped)
             int64_t skipped = a->m_srcStream->position() - old_pos;
-            Debug_printv("skip request[%lld] old_pos[%u] new_pos[%u] skipped[%lld]",
-                         request, old_pos, a->m_srcStream->position(), skipped);
+            // Debug_printv("skip request[%lld] old_pos[%u] new_pos[%u] skipped[%lld]",
+            //              request, old_pos, a->m_srcStream->position(), skipped);
             return skipped;
         }
         Debug_printv("ERROR! skip failed: request[%lld]", request);
@@ -110,7 +110,7 @@ int64_t cb_seek(struct archive *, void *userData, int64_t offset, int whence)
             // Must return the resulting absolute position, not the offset
             // This is critical for .7z files which require accurate positioning
             int64_t pos = a->m_srcStream->position();
-            Debug_printv("seek offset[%lld] whence[%d] -> pos[%lld]", offset, whence, pos);
+            //Debug_printv("seek offset[%lld] whence[%d] -> pos[%lld]", offset, whence, pos);
             return pos;
         }
         Debug_printv("ERROR! seek failed: offset[%lld] whence[%d]", offset, whence);
@@ -131,14 +131,14 @@ bool Archive::open(std::ios_base::openmode mode) {
 
     Debug_printv("Archive::open [%s]", m_srcStream->url.c_str());
 
-#if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
-    // Initialize HIMEM allocator for LZMA decompression (.7z support)
-    static bool himem_initialized = false;
-    if (!himem_initialized) {
-        esp32_himem_allocator_init();
-        himem_initialized = true;
-    }
-#endif
+// #if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
+//     // Initialize HIMEM allocator for LZMA decompression (.7z support)
+//     static bool himem_initialized = false;
+//     if (!himem_initialized) {
+//         esp32_himem_allocator_init();
+//         himem_initialized = true;
+//     }
+// #endif
 
     m_srcBuffer = new uint8_t[m_buffSize];
     m_archive = archive_read_new();
