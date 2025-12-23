@@ -651,14 +651,14 @@ uint32_t TNFSMStream::read(uint8_t* buf, uint32_t size) {
 
         int result = tnfs_read(handle->_mountinfo.get(), handle->_handle, buf + total_read, chunk_size, &bytes_read);
 
-        if (result != TNFS_RESULT_SUCCESS) {
+        if (result == TNFS_RESULT_SUCCESS || (result == TNFS_RESULT_END_OF_FILE && bytes_read > 0)) {
+            total_read += bytes_read;
+            _position += bytes_read;
+        } else {
             Debug_printv("TNFS read error: %d", result);
             _error = tnfs_code_to_errno(result);
             break;
         }
-
-        total_read += bytes_read;
-        _position += bytes_read;
 
         // EOF or short read
         if (bytes_read < chunk_size) {
@@ -725,8 +725,8 @@ bool TNFSMStream::seek(uint32_t pos) {
     }
 
     uint32_t new_position = 0;
-    // Skip cache to ensure accurate seek position
-    int result = tnfs_lseek(handle->_mountinfo.get(), handle->_handle, pos, SEEK_SET, &new_position, true);
+    // Use default TNFS caching behavior (skip_cache = false by default)
+    int result = tnfs_lseek(handle->_mountinfo.get(), handle->_handle, pos, SEEK_SET, &new_position);
 
     if (result != TNFS_RESULT_SUCCESS) {
         Debug_printv("TNFS seek error: %d", result);
@@ -747,8 +747,8 @@ bool TNFSMStream::seek(uint32_t pos, int mode) {
     }
 
     uint32_t new_position = 0;
-    // Skip cache to ensure accurate seek position
-    int result = tnfs_lseek(handle->_mountinfo.get(), handle->_handle, pos, mode, &new_position, true);
+    // Use default TNFS caching behavior (skip_cache = false by default)
+    int result = tnfs_lseek(handle->_mountinfo.get(), handle->_handle, pos, mode, &new_position);
 
     if (result != TNFS_RESULT_SUCCESS) {
         Debug_printv("TNFS seek error: %d", result);
