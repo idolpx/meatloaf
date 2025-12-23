@@ -328,20 +328,10 @@ private:
     bool writeBlock( uint8_t track, uint8_t sector, std::string data );
     bool allocateBlock( uint8_t track, uint8_t sector );
     bool deallocateBlock( uint8_t track, uint8_t sector );
-    bool getNextFreeBlock(uint8_t startTrack, uint8_t startSector, uint8_t *foundTrack, uint8_t *foundSector);
+    bool getNextFreeBlock(uint8_t startTrack, uint8_t startSector, uint8_t *foundTrack, uint8_t *foundSector, bool forDirectory = false);
     bool isBlockFree(uint8_t track, uint8_t sector);
 
-    bool initializeBlocks()
-    {
-        Debug_printv("initialize blocks");
-        // 1541/1571 Fill Pattern
-        // 0x4B 0x01...
-
-        // 1581 Fill Pattern
-        // 0x00...
-
-        return true;
-    }
+    bool initializeBlocks();
 
     bool initializeBlockAllocationMap()
     {

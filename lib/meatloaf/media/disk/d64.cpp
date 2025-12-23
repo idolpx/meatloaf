@@ -60,7 +60,7 @@ bool D64MStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
 {
     uint16_t sectorOffset = 0;
 
-    //Debug_printv("track[%d] sector[%d] offset[%d]", track, sector, offset);
+    Debug_printv("track[%d] sector[%d] offset[%d]", track, sector, offset);
 
     // Is this a valid track?
     uint16_t c = partitions[partition].block_allocation_map.size() - 1;
@@ -111,97 +111,278 @@ bool D64MStream::seekSector(std::vector<uint8_t> trackSectorOffset)
 
 std::string D64MStream::readBlock(uint8_t track, uint8_t sector)
 {
-    return "";
+    if (!seekSector(track, sector, 0))
+        return "";
+
+    uint8_t buffer[block_size];
+    uint32_t bytesRead = readContainer(buffer, block_size);
+
+    if (bytesRead != block_size)
+    {
+        Debug_printv("Failed to read full block: track[%d] sector[%d] bytesRead[%d]", track, sector, bytesRead);
+        return "";
+    }
+
+    return std::string((char*)buffer, block_size);
 }
 
 bool D64MStream::writeBlock(uint8_t track, uint8_t sector, std::string data)
 {
+    if (!seekSector(track, sector, 0))
+        return false;
+
+    // Ensure data is exactly block_size, pad with zeros if needed
+    if (data.size() < block_size)
+        data.resize(block_size, 0x00);
+
+    uint32_t bytesWritten = writeContainer((uint8_t*)data.c_str(), block_size);
+
+    if (bytesWritten != block_size)
+    {
+        Debug_printv("Failed to write full block: track[%d] sector[%d] bytesWritten[%d]", track, sector, bytesWritten);
+        return false;
+    }
+
     return true;
 }
 
 bool D64MStream::allocateBlock(uint8_t track, uint8_t sector)
 {
-    // int offset;
-    // byte bitmask;
+    // Calculate offsets
+    int free_count_offset = (track - 1) * 4 + 4;      // offset to free count byte
+    int bitmask_offset = free_count_offset + 1;       // Move to Bitmask
+    bitmask_offset += (sector >> 3);                   // move to the correct byte (sector div 8)
 
-    // offset = (track-1) * 4 + 4;							// offset to correct Track-Info
-    // if (bam->GetRawSector()[offset] > 0)
-    // {
-    // 	bam->GetRawSector()[offset] -= 1;				// reduce free Sectors
-    // }
-    // offset++;											// Move to Bitmask
-    // offset += (sector >> 3);							// move to the correct byte (sector div 8)
-    // bitmask = (byte)(1 << (sector % 8));				// generate Bitmask for Sector
-    // if ((bam->GetRawSector()[offset] & bitmask) == 0)	// was already set to 'used' ?
-    // {
-    // 	return false;
-    // }
-    // bitmask ^= 255;										// invert bitmask (0 means "Sector is used")
-    // bam->GetRawSector()[offset] &= bitmask;				// clear bit in BAM
-    // WriteSector(bam);									// Write back to Image
+    // Read the entire BAM sector
+    uint8_t bam_sector[block_size];
+    if (!seekSector(
+            partitions[partition].block_allocation_map[0].track,
+            partitions[partition].block_allocation_map[0].sector,
+            0))
+        return false;
+
+    if (readContainer(bam_sector, block_size) != block_size)
+        return false;
+
+    // Get the base offset within the BAM sector
+    int base_offset = partitions[partition].block_allocation_map[0].offset;
+
+    // Check if sector is already allocated
+    uint8_t bitmask = (uint8_t)(1 << (sector % 8));
+    if ((bam_sector[base_offset + bitmask_offset] & bitmask) == 0)
+    {
+        Debug_printv("Block already allocated: track[%d] sector[%d]", track, sector);
+        return false;  // Already allocated
+    }
+
+    // Decrease free sector count
+    if (bam_sector[base_offset + free_count_offset] > 0)
+        bam_sector[base_offset + free_count_offset] -= 1;
+
+    // Clear bit in BAM (0 means "Sector is used")
+    bam_sector[base_offset + bitmask_offset] &= ~bitmask;
+
+    // Write BAM sector back
+    if (!seekSector(
+            partitions[partition].block_allocation_map[0].track,
+            partitions[partition].block_allocation_map[0].sector,
+            0))
+        return false;
+
+    if (writeContainer(bam_sector, block_size) != block_size)
+        return false;
+
     return true;
 }
 
 bool D64MStream::deallocateBlock(uint8_t track, uint8_t sector)
 {
-    // int offset;
-    // byte bitmask;
+    // Calculate offsets
+    int free_count_offset = (track - 1) * 4 + 4;      // offset to free count byte
+    int bitmask_offset = free_count_offset + 1;       // Move to Bitmask
+    bitmask_offset += (sector >> 3);                   // move to the correct byte (sector div 8)
 
-    // offset = (track - 1) * 4 + 4;						// offset to correct Track-Info
-    // bam->GetRawSector()[offset] += 1;					// increase free Sectors
-    // offset++;											// Move to Bitmask
-    // offset += (sector >> 3);							// move to the correct byte (sector div 8)
-    // bitmask = (byte)(1 << (sector % 8));				// generate Bitmask for Sector
-    // if ((bam->GetRawSector()[offset] & bitmask) == 1)	// Sector already free ?
-    // {
-    // 	return false;
-    // }
-    // bam->GetRawSector()[offset] |= bitmask;				// clear bit in BAM (1 means "Sector is free")
-    // WriteSector(bam);									// Write back to Image
+    // Read the entire BAM sector
+    uint8_t bam_sector[block_size];
+    if (!seekSector(
+            partitions[partition].block_allocation_map[0].track,
+            partitions[partition].block_allocation_map[0].sector,
+            0))
+        return false;
+
+    if (readContainer(bam_sector, block_size) != block_size)
+        return false;
+
+    // Get the base offset within the BAM sector
+    int base_offset = partitions[partition].block_allocation_map[0].offset;
+
+    // Check if sector is already free
+    uint8_t bitmask = (uint8_t)(1 << (sector % 8));
+    if ((bam_sector[base_offset + bitmask_offset] & bitmask) == bitmask)
+    {
+        Debug_printv("Block already free: track[%d] sector[%d]", track, sector);
+        return false;  // Already free
+    }
+
+    // Increase free sector count
+    bam_sector[base_offset + free_count_offset] += 1;
+
+    // Set bit in BAM (1 means "Sector is free")
+    bam_sector[base_offset + bitmask_offset] |= bitmask;
+
+    // Write BAM sector back
+    if (!seekSector(
+            partitions[partition].block_allocation_map[0].track,
+            partitions[partition].block_allocation_map[0].sector,
+            0))
+        return false;
+
+    if (writeContainer(bam_sector, block_size) != block_size)
+        return false;
+
     return true;
 }
 
-bool D64MStream::getNextFreeBlock(uint8_t startTrack, uint8_t startSector, uint8_t *foundTrack, uint8_t *foundSector)
+bool D64MStream::initializeBlocks()
+{
+    Debug_printv("initialize blocks");
+
+    // 1541/1571 Fill Pattern: 0x4B followed by 0x01 bytes
+    // This fills all blocks with the standard CBM DOS empty pattern
+
+    uint8_t fill_block[block_size];
+    fill_block[0] = 0x4B;  // First byte is 0x4B
+    memset(&fill_block[1], 0x01, block_size - 1);  // Rest is 0x01
+
+    // Fill all blocks in all tracks
+    for (uint8_t t = 1; t <= getTrackCount(); t++)
+    {
+        uint8_t sectors = getSectorCount(t);
+        for (uint8_t s = 0; s < sectors; s++)
+        {
+            // Skip the directory track (track 18) - it will be initialized separately
+            if (t == partitions[partition].header_track)
+                continue;
+
+            if (!seekSector(t, s, 0))
+            {
+                Debug_printv("Failed to seek track[%d] sector[%d]", t, s);
+                return false;
+            }
+
+            if (writeContainer(fill_block, block_size) != block_size)
+            {
+                Debug_printv("Failed to write block track[%d] sector[%d]", t, s);
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+bool D64MStream::getNextFreeBlock(uint8_t startTrack, uint8_t startSector, uint8_t *foundTrack, uint8_t *foundSector, bool forDirectory)
 {
     uint8_t track, sector;
     bool found = false;
     bool wrapped = false;
     track = startTrack;
-
     sector = startSector;
+
+    // Select appropriate interleave: index 0 for directory (3), index 1 for files (10)
+    uint8_t interleave_value = interleave[forDirectory ? 0 : 1];
+
+    uint8_t sectorsChecked = 0;
+    uint8_t maxSectorsPerTrack = getSectorCount(track);
+
     while (!found)
     {
-        if (!isBlockFree(track, sector))
+        // Check if current sector is free
+        if (isBlockFree(track, sector))
         {
-            if (sector == startSector && track == startTrack)
-            {
-                sector++; // Skip StartSector
-                if (wrapped)
-                {
-                    break; // already wrapped, exit (no free sector found)
-                }
-            }
-            else
-            {
-                sector++;
-            }
+            found = true;
+            break;
+        }
 
-            if (sector > getSectorCount(track))
+        // Apply interleave to find next sector to check
+        sector += interleave_value;
+
+        // Handle sector wraparound on current track
+        if (sector >= getSectorCount(track))
+        {
+            sector = sector % getSectorCount(track);
+            sectorsChecked++;
+
+            // If we've checked all sectors on this track, move to next track
+            if (sectorsChecked >= getSectorCount(track))
             {
                 track++;
                 sector = 0;
+                sectorsChecked = 0;
+
+                // Handle track wraparound
                 if (track > getTrackCount())
                 {
+                    if (wrapped)
+                    {
+                        // We've already wrapped once and still no free block found
+                        *foundTrack = 0;
+                        *foundSector = 0;
+                        return false;
+                    }
                     track = 1; // Start from the beginning
                     wrapped = true;
                 }
+
+                // Skip directory track when allocating file blocks
+                if (track == partitions[partition].directory_track && !forDirectory)
+                {
+                    track++;
+                    if (track > getTrackCount())
+                    {
+                        track = 1;
+                    }
+                }
+
+                maxSectorsPerTrack = getSectorCount(track);
             }
         }
         else
         {
-            found = true;
+            sectorsChecked++;
+
+            // If we've checked all sectors on this track with interleave, move to next track
+            if (sectorsChecked >= getSectorCount(track))
+            {
+                track++;
+                sector = 0;
+                sectorsChecked = 0;
+
+                if (track > getTrackCount())
+                {
+                    if (wrapped)
+                    {
+                        *foundTrack = 0;
+                        *foundSector = 0;
+                        return false;
+                    }
+                    track = 1;
+                    wrapped = true;
+                }
+
+                // Skip directory track when allocating file blocks
+                if (track == partitions[partition].directory_track && !forDirectory)
+                {
+                    track++;
+                    if (track > getTrackCount())
+                    {
+                        track = 1;
+                    }
+                }
+            }
         }
     }
+
     *foundTrack = track;
     *foundSector = sector;
     return found;
@@ -209,15 +390,27 @@ bool D64MStream::getNextFreeBlock(uint8_t startTrack, uint8_t startSector, uint8
 
 bool D64MStream::isBlockFree(uint8_t track, uint8_t sector)
 {
-    // int offset;
-    // byte bitmask;
+    // Calculate BAM offset for this track
+    int offset = (track - 1) * 4 + 4;           // offset to correct Track-Info
+    offset++;                                     // Move to Bitmask (skip free count byte)
+    offset += (sector >> 3);                      // move to the correct byte (sector div 8)
 
-    // offset = (track-1) * 4 + 4;                 // offset to correct Track-Info
-    // offset++;									// Move to Bitmask
-    // offset += (sector >> 3);                    // move to the correct byte (sector div 8)
-    // bitmask = (byte)(1 << (sector % 8));        // generate Bitmask for Sector
-    // return (bam->GetRawSector()[offset] & bitmask) == bitmask;
-    return true;
+    // Seek to BAM location and read the bitmask byte
+    if (!seekSector(
+            partitions[partition].block_allocation_map[0].track,
+            partitions[partition].block_allocation_map[0].sector,
+            partitions[partition].block_allocation_map[0].offset + offset))
+        return false;
+
+    uint8_t bitmask_byte;
+    if (readContainer(&bitmask_byte, 1) != 1)
+        return false;
+
+    // Generate bitmask for this sector
+    uint8_t bitmask = (uint8_t)(1 << (sector % 8));
+
+    // Check if bit is set (1 = free, 0 = allocated)
+    return (bitmask_byte & bitmask) == bitmask;
 }
 
 bool D64MStream::seekEntry( std::string filename )
@@ -450,18 +643,18 @@ uint32_t D64MStream::writeFile(uint8_t *buf, uint32_t size)
         //Debug_printv("next_track[%d] next_sector[%d] sector_offset[%d]", next_track, next_sector, sector_offset);
     }
 
-    uint32_t bytesRead = 0;
+    uint32_t bytesWritten = 0;
 
     if (size > 0)
     {
         if (size > available())
             size = available();
 
-        // Only read up to the bytes remaining in this sector
+        // Only write up to the bytes remaining in this sector
         size = std::min(size, (uint32_t) (block_size - sector_offset % block_size));
 
-        bytesRead += readContainer(buf, size);
-        sector_offset += bytesRead;
+        bytesWritten += writeContainer(buf, size);
+        sector_offset += bytesWritten;
 
         if (next_track && sector_offset % block_size == 0)
         {
@@ -475,12 +668,12 @@ uint32_t D64MStream::writeFile(uint8_t *buf, uint32_t size)
         }
     }
 
-    // if ( !bytesRead )
+    // if ( !bytesWritten )
     // {
     //     sector_offset = 0;
     // }
 
-    return bytesRead;
+    return bytesWritten;
 }
 
 bool D64MStream::seekPath(std::string path)
