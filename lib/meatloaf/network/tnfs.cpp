@@ -173,7 +173,7 @@ bool TNFSMFile::pathValid(std::string path) {
 }
 
 bool TNFSMFile::isDirectory() {
-    Debug_printv("path[%s] len[%d]", path.c_str(), path.size());
+    //Debug_printv("path[%s] len[%d]", path.c_str(), path.size());
 
     if (path == "/" || path.empty()) {
         return true;
