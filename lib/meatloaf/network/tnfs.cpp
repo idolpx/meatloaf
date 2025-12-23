@@ -151,37 +151,13 @@ TNFSMFile::TNFSMFile(std::string path): MFile(path) {
 }
 
 TNFSMFile::~TNFSMFile() {
+    // Close any open directory handle
     closeDir();
-
-    // Unmount directory-specific mountinfo if it exists
-    if (_dir_mountinfo) {
-        tnfs_umount(_dir_mountinfo.get());
-        _dir_mountinfo.reset();
-    }
 
     // Session is managed by SessionBroker, don't unmount here
     _session.reset();
 }
 
-tnfsMountInfo* TNFSMFile::getDirMountInfo() {
-    // Create directory mountinfo on first use
-    if (!_dir_mountinfo && _session && _session->isConnected()) {
-        uint16_t tnfs_port = port.empty() ? TNFS_DEFAULT_PORT : std::stoi(port);
-        _dir_mountinfo = std::make_unique<tnfsMountInfo>(host.c_str(), tnfs_port);
-
-        // Mount using the directory-specific mountinfo
-        int result = tnfs_mount(_dir_mountinfo.get());
-        if (result != TNFS_RESULT_SUCCESS) {
-            Debug_printv("Failed to mount directory-specific TNFS connection: error %d", result);
-            _dir_mountinfo.reset();
-            return nullptr;
-        }
-
-        Debug_printv("Created directory-specific mount for %s:%d", host.c_str(), tnfs_port);
-    }
-
-    return _dir_mountinfo.get();
-}
 
 bool TNFSMFile::pathValid(std::string path) {
     if (path.empty() || path.length() > TNFS_MAX_FILELEN) {
@@ -329,7 +305,7 @@ bool TNFSMFile::rename(std::string pathTo) {
 }
 
 void TNFSMFile::openDir(std::string apath) {
-    tnfsMountInfo* mountinfo = getDirMountInfo();
+    tnfsMountInfo* mountinfo = getMountInfo();
     if (!isDirectory() || !mountinfo) {
         dirOpened = false;
         return;
@@ -338,21 +314,34 @@ void TNFSMFile::openDir(std::string apath) {
     // Close any previously opened directory
     closeDir();
 
-    // Open the directory for listing
+    // Open the directory for listing using shared session
     std::string dirPath = apath.empty() ? path : apath;
     int result = tnfs_opendirx(mountinfo, dirPath.c_str());
-    dirOpened = (result == TNFS_RESULT_SUCCESS);
-    entry_index = 0;
+    if (result == TNFS_RESULT_SUCCESS) {
+        dirOpened = true;
+        _dir_handle = mountinfo->dir_handle; // Save our handle
+        entry_index = 0;
+    } else {
+        dirOpened = false;
+        _dir_handle = 0xFFFF;
+    }
 
-    Debug_printv("openDir path[%s] opened[%d] result[%d]", dirPath.c_str(), dirOpened, result);
+    Debug_printv("openDir path[%s] opened[%d] handle[%d] result[%d]",
+                 dirPath.c_str(), dirOpened, _dir_handle, result);
 }
 
 void TNFSMFile::closeDir() {
-    tnfsMountInfo* mountinfo = getDirMountInfo();
-    if (mountinfo && mountinfo->dir_handle != TNFS_INVALID_HANDLE) {
-        tnfs_closedir(mountinfo);
+    tnfsMountInfo* mountinfo = getMountInfo();
+    if (mountinfo && dirOpened && _dir_handle != 0xFFFF) {
+        // Only close if the current handle in mountinfo matches ours
+        // This prevents closing another TNFSMFile's directory
+        if (mountinfo->dir_handle == _dir_handle) {
+            tnfs_closedir(mountinfo);
+            Debug_printv("Closed directory handle[%d]", _dir_handle);
+        }
     }
     dirOpened = false;
+    _dir_handle = 0xFFFF;
 }
 
 bool TNFSMFile::rewindDirectory() {
@@ -370,9 +359,18 @@ MFile* TNFSMFile::getNextFileInDir() {
         rewindDirectory();
     }
 
-    tnfsMountInfo* mountinfo = getDirMountInfo();
+    tnfsMountInfo* mountinfo = getMountInfo();
     if (!mountinfo) {
         return nullptr;
+    }
+
+    // Verify we still have our directory handle active
+    if (_dir_handle == 0xFFFF || mountinfo->dir_handle != _dir_handle) {
+        Debug_printv("Directory handle mismatch - reopening");
+        rewindDirectory();
+        if (!dirOpened) {
+            return nullptr;
+        }
     }
 
     tnfsStat filestat;
@@ -408,7 +406,7 @@ MFile* TNFSMFile::getNextFileInDir() {
 }
 
 bool TNFSMFile::readEntry(std::string filename) {
-    tnfsMountInfo* mountinfo = getDirMountInfo();
+    tnfsMountInfo* mountinfo = getMountInfo();
     if (!mountinfo || filename.empty()) {
         return false;
     }
@@ -420,10 +418,14 @@ bool TNFSMFile::readEntry(std::string filename) {
 
     Debug_printv("path[%s] filename[%s]", searchPath.c_str(), filename.c_str());
 
+    // Open directory using shared session
     int result = tnfs_opendirx(mountinfo, searchPath.c_str());
     if (result != TNFS_RESULT_SUCCESS) {
         return false;
     }
+
+    // Save our handle for this search
+    uint16_t search_handle = mountinfo->dir_handle;
 
     tnfsStat filestat;
     char entry_name[TNFS_MAX_FILELEN];
@@ -457,7 +459,10 @@ bool TNFSMFile::readEntry(std::string filename) {
         }
     }
 
-    tnfs_closedir(mountinfo);
+    // Close directory if we still have our handle
+    if (mountinfo->dir_handle == search_handle) {
+        tnfs_closedir(mountinfo);
+    }
 
     if (!found) {
         Debug_printv("Not Found! file[%s]", filename.c_str());
@@ -530,7 +535,7 @@ void TNFSHandle::obtain(std::string m_url, std::ios_base::openmode mode) {
 
     std::string server = parser->host;
     uint16_t port = parser->port.empty() ? TNFS_DEFAULT_PORT : std::stoi(parser->port);
-    std::string filepath = parser->path;
+    std::string filepath = parser->path;  // path already includes the filename
 
     Debug_printv("Connecting to server[%s] port[%d] filepath[%s]", server.c_str(), port, filepath.c_str());
 
@@ -552,9 +557,9 @@ void TNFSHandle::obtain(std::string m_url, std::ios_base::openmode mode) {
     uint16_t create_perms = TNFS_CREATEPERM_S_IRUSR | TNFS_CREATEPERM_S_IWUSR |
                             TNFS_CREATEPERM_S_IRGRP | TNFS_CREATEPERM_S_IROTH;
 
-    Debug_printv("Opening file[%s] mode[0x%X] perms[0x%X]", filepath.c_str(), tnfs_mode, create_perms);
+    Debug_printv("Opening filepath[%s] mode[0x%X] perms[0x%X]", filepath.c_str(), tnfs_mode, create_perms);
 
-    // Open the file
+    // Open the file - use filepath (path only), not m_url (full URL with protocol)
     result = tnfs_open(_mountinfo.get(), filepath.c_str(), tnfs_mode, create_perms, &_handle);
     if (result != TNFS_RESULT_SUCCESS) {
         Debug_printv("Failed to open file %s: error %d", filepath.c_str(), result);
@@ -570,8 +575,37 @@ void TNFSHandle::obtain(std::string m_url, std::ios_base::openmode mode) {
  * MStream implementations
  ********************************************************/
 
+uint16_t TNFSMStream::mapOpenMode(std::ios_base::openmode mode) {
+    uint16_t tnfs_mode = 0;
+
+    // Map read/write modes
+    if ((mode & std::ios_base::in) && (mode & std::ios_base::out)) {
+        tnfs_mode = TNFS_OPENMODE_READWRITE;
+    } else if (mode & std::ios_base::out) {
+        tnfs_mode = TNFS_OPENMODE_WRITE;
+    } else {
+        tnfs_mode = TNFS_OPENMODE_READ;
+    }
+
+    // Map additional flags for write modes
+    if (mode & std::ios_base::out) {
+        if (mode & std::ios_base::trunc) {
+            tnfs_mode |= TNFS_OPENMODE_WRITE_TRUNCATE | TNFS_OPENMODE_WRITE_CREATE;
+        }
+        if (mode & std::ios_base::app) {
+            tnfs_mode |= TNFS_OPENMODE_WRITE_APPEND;
+        }
+        // Create file if it doesn't exist (unless exclusive flag would be set)
+        if (!(mode & std::ios_base::trunc)) {
+            tnfs_mode |= TNFS_OPENMODE_WRITE_CREATE;
+        }
+    }
+
+    return tnfs_mode;
+}
+
 bool TNFSMStream::isOpen() {
-    return handle != nullptr && handle->_mountinfo != nullptr && handle->_handle != TNFS_INVALID_HANDLE;
+    return _session && _session->isConnected() && _handle != TNFS_INVALID_HANDLE;
 }
 
 bool TNFSMStream::open(std::ios_base::openmode mode) {
@@ -589,38 +623,66 @@ bool TNFSMStream::open(std::ios_base::openmode mode) {
         return false;
     }
 
-    Debug_printv("TNFS open mode[0x%X]", mode);
-
-    // Open the file via TNFSHandle
-    handle->obtain(url, mode);
-
-    if (!isOpen()) {
-        Debug_printv("Failed to open TNFS stream");
+    // Parse URL
+    auto parser = PeoplesUrlParser::parseURL(url);
+    if (!parser || parser->scheme != "tnfs") {
+        Debug_printv("Invalid TNFS URL: %s", url.c_str());
+        _error = EINVAL;
         return false;
     }
 
-    // Get file size using TNFS stat
-    if (handle->_mountinfo) {
-        auto parser = PeoplesUrlParser::parseURL(url);
-        if (parser) {
-            tnfsStat filestat;
-            if (tnfs_stat(handle->_mountinfo.get(), &filestat, parser->path.c_str()) == TNFS_RESULT_SUCCESS) {
-                _size = filestat.filesize;
-                Debug_printv("File size: %u bytes", _size);
-            } else {
-                Debug_printv("Warning: Could not get file size");
-                _size = 0;
-            }
-        }
+    // Obtain or create TNFS session via SessionBroker
+    uint16_t tnfs_port = parser->port.empty() ? TNFS_DEFAULT_PORT : std::stoi(parser->port);
+    _session = SessionBroker::obtain<TNFSMSession>(parser->host, tnfs_port);
+
+    if (!_session || !_session->isConnected()) {
+        Debug_printv("Failed to obtain TNFS session for %s:%d", parser->host.c_str(), tnfs_port);
+        _error = ECONNREFUSED;
+        return false;
+    }
+
+    // Map open mode
+    uint16_t tnfs_mode = mapOpenMode(mode);
+
+    // Default permissions for new files
+    uint16_t create_perms = TNFS_CREATEPERM_S_IRUSR | TNFS_CREATEPERM_S_IWUSR |
+                            TNFS_CREATEPERM_S_IRGRP | TNFS_CREATEPERM_S_IROTH;
+
+    Debug_printv("Opening file[%s] mode[0x%X] perms[0x%X]", parser->path.c_str(), tnfs_mode, create_perms);
+
+    // Open the file using the shared session's mountinfo
+    tnfsMountInfo* mountinfo = _session->getMountInfo();
+    int result = tnfs_open(mountinfo, parser->path.c_str(), tnfs_mode, create_perms, &_handle);
+    if (result != TNFS_RESULT_SUCCESS) {
+        Debug_printv("Failed to open file %s: error %d", parser->path.c_str(), result);
+        _error = tnfs_code_to_errno(result);
+        _session.reset();
+        return false;
+    }
+
+    // Get file size
+    tnfsStat filestat;
+    if (tnfs_stat(mountinfo, &filestat, parser->path.c_str()) == TNFS_RESULT_SUCCESS) {
+        _size = filestat.filesize;
+        Debug_printv("File size: %u bytes", _size);
+    } else {
+        Debug_printv("Warning: Could not get file size");
+        _size = 0;
     }
 
     _position = 0;
+    Debug_printv("Successfully opened TNFS file: %s (handle=%d)", url.c_str(), _handle);
     return true;
 }
 
 void TNFSMStream::close() {
     if (isOpen()) {
-        handle->dispose();
+        tnfsMountInfo* mountinfo = _session->getMountInfo();
+        if (mountinfo && _handle != TNFS_INVALID_HANDLE) {
+            tnfs_close(mountinfo, _handle);
+            _handle = TNFS_INVALID_HANDLE;
+        }
+        _session.reset();
         _position = 0;
         _size = 0;
     }
@@ -643,13 +705,19 @@ uint32_t TNFSMStream::read(uint8_t* buf, uint32_t size) {
         return 0;
     }
 
+    tnfsMountInfo* mountinfo = _session->getMountInfo();
+    if (!mountinfo) {
+        _error = EBADF;
+        return 0;
+    }
+
     // TNFS has a maximum read size per request
     uint32_t total_read = 0;
     while (total_read < size) {
         uint16_t chunk_size = std::min((uint32_t)TNFS_MAX_READWRITE_PAYLOAD, size - total_read);
         uint16_t bytes_read = 0;
 
-        int result = tnfs_read(handle->_mountinfo.get(), handle->_handle, buf + total_read, chunk_size, &bytes_read);
+        int result = tnfs_read(mountinfo, _handle, buf + total_read, chunk_size, &bytes_read);
 
         if (result == TNFS_RESULT_SUCCESS || (result == TNFS_RESULT_END_OF_FILE && bytes_read > 0)) {
             total_read += bytes_read;
@@ -686,13 +754,19 @@ uint32_t TNFSMStream::write(const uint8_t *buf, uint32_t size) {
         return 0;
     }
 
+    tnfsMountInfo* mountinfo = _session->getMountInfo();
+    if (!mountinfo) {
+        _error = EBADF;
+        return 0;
+    }
+
     // TNFS has a maximum write size per request
     uint32_t total_written = 0;
     while (total_written < size) {
         uint16_t chunk_size = std::min((uint32_t)TNFS_MAX_READWRITE_PAYLOAD, size - total_written);
         uint16_t bytes_written = 0;
 
-        int result = tnfs_write(handle->_mountinfo.get(), handle->_handle,
+        int result = tnfs_write(mountinfo, _handle,
                                 (uint8_t*)(buf + total_written), chunk_size, &bytes_written);
 
         if (result != TNFS_RESULT_SUCCESS) {
@@ -724,9 +798,15 @@ bool TNFSMStream::seek(uint32_t pos) {
         return false;
     }
 
+    tnfsMountInfo* mountinfo = _session->getMountInfo();
+    if (!mountinfo) {
+        _error = EBADF;
+        return false;
+    }
+
     uint32_t new_position = 0;
     // Use default TNFS caching behavior (skip_cache = false by default)
-    int result = tnfs_lseek(handle->_mountinfo.get(), handle->_handle, pos, SEEK_SET, &new_position);
+    int result = tnfs_lseek(mountinfo, _handle, pos, SEEK_SET, &new_position);
 
     if (result != TNFS_RESULT_SUCCESS) {
         Debug_printv("TNFS seek error: %d", result);
@@ -746,9 +826,15 @@ bool TNFSMStream::seek(uint32_t pos, int mode) {
         return false;
     }
 
+    tnfsMountInfo* mountinfo = _session->getMountInfo();
+    if (!mountinfo) {
+        _error = EBADF;
+        return false;
+    }
+
     uint32_t new_position = 0;
     // Use default TNFS caching behavior (skip_cache = false by default)
-    int result = tnfs_lseek(handle->_mountinfo.get(), handle->_handle, pos, mode, &new_position);
+    int result = tnfs_lseek(mountinfo, _handle, pos, mode, &new_position);
 
     if (result != TNFS_RESULT_SUCCESS) {
         Debug_printv("TNFS seek error: %d", result);

@@ -87,13 +87,10 @@ public:
 protected:
     bool dirOpened = false;
     std::shared_ptr<TNFSMSession> _session;
-    std::unique_ptr<tnfsMountInfo> _dir_mountinfo;  // Separate mountinfo for directory operations
+    uint16_t _dir_handle = 0xFFFF;  // Directory handle for this instance
 
     // Helper to get mount info from session
     tnfsMountInfo* getMountInfo() { return _session ? _session->getMountInfo() : nullptr; }
-
-    // Helper to get directory mountinfo (creates on demand)
-    tnfsMountInfo* getDirMountInfo();
 
 private:
     void openDir(std::string path);
@@ -130,7 +127,6 @@ private:
 class TNFSMStream: public MStream {
 public:
     TNFSMStream(std::string& path): MStream(path) {
-        handle = std::make_unique<TNFSHandle>();
     }
     ~TNFSMStream() override {
         close();
@@ -156,7 +152,11 @@ public:
     }
 
 protected:
-    std::unique_ptr<TNFSHandle> handle;
+    std::shared_ptr<TNFSMSession> _session;
+    int16_t _handle = TNFS_INVALID_HANDLE;
+
+private:
+    uint16_t mapOpenMode(std::ios_base::openmode mode);
 };
 
 
