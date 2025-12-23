@@ -586,11 +586,11 @@ std::shared_ptr<MStream> MFile::getSourceStream(std::ios_base::openmode mode) {
 
         while (!pointedFile.empty())
         {
-            if(mstr::compare(pathInStream, pointedFile))
-            {
-                //Debug_printv("returning decodedStream 1 [%s]", decodedStream->url.c_str());
-                return decodedStream;
-            }
+                if(mstr::compare(pathInStream, pointedFile))
+                {
+                    //Debug_printv("returning decodedStream 1 [%s]", decodedStream->url.c_str());
+                    return std::make_shared<BufferedMStream>(decodedStream);
+                }
 
             pointedFile = decodedStream->seekNextEntry();
         }
@@ -600,7 +600,7 @@ std::shared_ptr<MStream> MFile::getSourceStream(std::ios_base::openmode mode) {
     }
 
     //Debug_printv("returning decodedStream 2 [%s][%s]", decodedStream->url.c_str(), pathInStream.c_str());
-    return decodedStream;
+    return std::make_shared<BufferedMStream>(decodedStream);
 };
 
 

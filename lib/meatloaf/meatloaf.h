@@ -23,6 +23,8 @@
 #include <vector>
 #include <fstream>
 #include <ctime>
+#include <algorithm>
+#include <cstring>
 
 #include "../../include/debug.h"
 
@@ -185,6 +187,203 @@ public:
 //     friend class TCPMFile;
 
 //     friend class QRMFile;
+};
+
+/**
+ * Buffered wrapper around any MStream. Provides an input buffer
+ * that is refilled from the underlying stream and an optional
+ * lazy output buffer that collects writes and flushes when full
+ * or on demand. This wrapper does not change existing stream
+ * implementations; it delegates to them.
+ */
+class BufferedMStream : public MStream {
+public:
+    static const size_t DEFAULT_IN_BUF = 2048;
+    static const size_t DEFAULT_OUT_BUF = 512;
+
+    BufferedMStream(std::shared_ptr<MStream> src, size_t inBuf = DEFAULT_IN_BUF, size_t outBuf = 0)
+        : MStream(src ? src->url : std::string()), inner(src), inBufSize(inBuf), outBufSize(outBuf)
+    {
+        inBufData.resize(inBufSize);
+        if (outBufSize)
+            outBufData.resize(outBufSize);
+        _size = inner ? inner->size() : 0;
+        _position = inner ? inner->position() : 0;
+    }
+
+    virtual ~BufferedMStream() {
+        flushOut();
+    }
+
+    bool isOpen() override {
+        return inner && inner->isOpen();
+    }
+
+    bool isBrowsable() override { return inner ? inner->isBrowsable() : false; }
+    bool isRandomAccess() override { return inner ? inner->isRandomAccess() : false; }
+
+    bool open(std::ios_base::openmode m) override {
+        if (!inner) return false;
+        mode = m;
+        return inner->open(m);
+    }
+
+    void close() override {
+        flushOut();
+        if (inner) inner->close();
+    }
+
+    uint32_t read(uint8_t* buf, uint32_t size) override {
+        if (!inner || !isOpen() || size == 0) return 0;
+
+        // Determine how many bytes we are allowed to return.
+        // If caller requests more than one byte, reserve one byte
+        // in the underlying stream (used to signal EOF). When the
+        // caller asks for exactly one byte, return that last byte.
+        uint32_t total = 0;
+        uint32_t allowed = size;
+
+        if (size > 1) {
+            // sync underlying position so available() is accurate
+            if (!inner->seek(_position)) return 0;
+            uint32_t availAll = inner->available();
+            if (availAll == 0) return 0; // nothing available
+            if (availAll <= 1) return 0; // only the final signaling byte remains, keep it
+            allowed = std::min<uint32_t>(size, availAll - 1);
+        } else {
+            // size == 1, we should deliver one byte even if it's the last
+            allowed = 1;
+        }
+
+        while (total < allowed) {
+            if (_position >= inStart && _position < inEnd) {
+                uint32_t offset = (uint32_t)(_position - inStart);
+                uint32_t avail = (uint32_t)(inEnd - _position);
+                uint32_t toCopy = std::min<uint32_t>(avail, allowed - total);
+                // When reserving one byte globally, ensure we don't consume
+                // the last byte from this buffer chunk if it represents the
+                // final allowed byte. The global 'allowed' cap above already
+                // enforces this, so standard copy is fine.
+                if (toCopy > 0) {
+                    memcpy(buf + total, inBufData.data() + offset, toCopy);
+                    total += toCopy;
+                    _position += toCopy;
+                }
+                // If nothing copied because buffer had only the reserved byte,
+                // fall through to refill logic.
+                if (toCopy == 0)
+                    ;
+                else
+                    continue;
+            }
+
+            // refill buffer from underlying stream starting at _position
+            if (!inner->seek(_position)) {
+                break;
+            }
+            int rc = inner->read(inBufData.data(), (uint32_t)inBufSize);
+            if (rc == 0) break;
+            if ((uint32_t)rc == (uint32_t)_MEAT_NO_DATA_AVAIL) {
+                break;
+            }
+            if (rc < 0) break;
+
+            inStart = _position;
+            inEnd = inStart + rc;
+
+            // If we're reserving one byte globally and this refill only
+            // produced a single byte, do not consume it now.
+            if (size > 1 && (uint32_t)rc <= 1) {
+                break;
+            }
+        }
+
+        return total;
+    }
+
+    uint32_t write(const uint8_t* buf, uint32_t size) override {
+        if (!inner || !isOpen()) return 0;
+
+        // if no out buffering requested, write directly
+        if (outBufSize == 0) {
+            if (!inner->seek(_position)) return 0;
+            uint32_t rc = inner->write(buf, size);
+            _position += rc;
+            _size = std::max<uint32_t>(_size, _position);
+            return rc;
+        }
+
+        uint32_t written = 0;
+        while (written < size) {
+            uint32_t space = (uint32_t)(outBufSize - outFill);
+            if (space == 0) {
+                if (!flushOut()) break;
+                space = (uint32_t)(outBufSize - outFill);
+                if (space == 0) break;
+            }
+            uint32_t toCopy = std::min<uint32_t>(space, size - written);
+            memcpy(outBufData.data() + outFill, buf + written, toCopy);
+            outFill += toCopy;
+            written += toCopy;
+            _position += toCopy;
+            _size = std::max<uint32_t>(_size, _position);
+        }
+
+        return written;
+    }
+
+    bool seek(uint32_t pos) override {
+        // seeking for write must flush pending output
+        if (outFill > 0) {
+            if (!flushOut()) return false;
+        }
+
+        // if seek within input buffer, just update position
+        if (pos >= inStart && pos < inEnd) {
+            _position = pos;
+            return true;
+        }
+
+        // invalidate input buffer and seek underlying
+        inStart = inEnd = 0;
+        _position = pos;
+        if (inner) return inner->seek(pos);
+        return false;
+    }
+
+    // delegate other optional ops
+    bool seekPath(std::string path) override { return inner ? inner->seekPath(path) : false; }
+    std::string seekNextEntry() override { return inner ? inner->seekNextEntry() : std::string(); }
+    bool seekBlock(uint64_t index, uint8_t offset = 0) override { return inner ? inner->seekBlock(index, offset) : false; }
+    bool seekSector(uint8_t track, uint8_t sector, uint8_t offset = 0) override { return inner ? inner->seekSector(track, sector, offset) : false; }
+
+    // flush any pending output buffer
+    bool flushOut() {
+        if (!inner) return false;
+        if (outFill == 0) return true;
+
+        // ensure underlying at correct position for write
+        uint32_t writePos = _position - outFill;
+        if (!inner->seek(writePos)) return false;
+        uint32_t rc = inner->write(outBufData.data(), outFill);
+        if (rc != outFill) return false;
+        outFill = 0;
+        return true;
+    }
+
+protected:
+    std::shared_ptr<MStream> inner;
+
+    // input buffer
+    std::vector<uint8_t> inBufData;
+    size_t inBufSize = 0;
+    uint32_t inStart = 0; // absolute stream position of buffer start
+    uint32_t inEnd = 0;   // absolute stream position of buffer end (one past last)
+
+    // optional output buffer
+    std::vector<uint8_t> outBufData;
+    size_t outBufSize = 0;
+    uint32_t outFill = 0;
 };
 
 
