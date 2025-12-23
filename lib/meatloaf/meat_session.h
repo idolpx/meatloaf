@@ -153,14 +153,14 @@ public:
 
         // Return existing session if found
         if (session_repo.find(key) != session_repo.end()) {
-            Debug_printv("Session found: %s", key.c_str());
+            //Debug_printv("Session found: %s", key.c_str());
             auto session = std::static_pointer_cast<T>(session_repo.at(key));
             session->updateActivity();
             return session;
         }
 
         // Create new session
-        Debug_printv("Creating new session: %s", key.c_str());
+        //Debug_printv("Creating new session: %s", key.c_str());
         auto newSession = std::make_shared<T>(host, port);
 
         if (newSession->connect()) {

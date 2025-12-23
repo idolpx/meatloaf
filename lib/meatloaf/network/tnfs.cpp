@@ -128,13 +128,13 @@ TNFSMFile::TNFSMFile(std::string path): MFile(path) {
         return;
     }
 
-    // // Change to the requested directory if provided
-    // if (!this->path.empty() && this->path != "/") {
-    //     int result = tnfs_chdir(mountinfo, this->path.c_str());
-    //     if (result != TNFS_RESULT_SUCCESS) {
-    //         Debug_printv("Warning: Could not change to directory %s: error %d", this->path.c_str(), result);
-    //     }
-    // }
+    // Change to the requested directory if provided
+    if (!this->path.empty() && this->path != "/") {
+        int result = tnfs_chdir(mountinfo, this->path.c_str());
+        if (result != TNFS_RESULT_SUCCESS) {
+            Debug_printv("Warning: Could not change to directory %s: error %d", this->path.c_str(), result);
+        }
+    }
 
     // Find full filename for wildcard
     if (mstr::contains(name, "?") || mstr::contains(name, "*")) {
@@ -194,6 +194,11 @@ bool TNFSMFile::isDirectory() {
 }
 
 std::shared_ptr<MStream> TNFSMFile::getSourceStream(std::ios_base::openmode mode) {
+
+    // Add pathInStream to URL if specified
+    if ( pathInStream.size() )
+        url += "/" + pathInStream;
+
     std::shared_ptr<MStream> istream = std::make_shared<TNFSMStream>(url);
     istream->open(mode);
     return istream;
@@ -664,7 +669,7 @@ bool TNFSMStream::open(std::ios_base::openmode mode) {
     tnfsStat filestat;
     if (tnfs_stat(mountinfo, &filestat, parser->path.c_str()) == TNFS_RESULT_SUCCESS) {
         _size = filestat.filesize;
-        Debug_printv("File size: %u bytes", _size);
+        //Debug_printv("File size: %u bytes", _size);
     } else {
         Debug_printv("Warning: Could not get file size");
         _size = 0;
@@ -710,6 +715,8 @@ uint32_t TNFSMStream::read(uint8_t* buf, uint32_t size) {
         _error = EBADF;
         return 0;
     }
+
+    //Debug_printv("size[%u] position[%u] file[%s] url[%s]", size, _position, mountinfo->mountpath, url.c_str());
 
     // TNFS has a maximum read size per request
     uint32_t total_read = 0;
@@ -815,7 +822,7 @@ bool TNFSMStream::seek(uint32_t pos) {
     }
 
     _position = new_position;
-    Debug_printv("Seek to pos[%u] -> new_position[%u]", pos, new_position);
+    //Debug_printv("Seek to pos[%u] -> new_position[%u]", pos, new_position);
     return true;
 }
 

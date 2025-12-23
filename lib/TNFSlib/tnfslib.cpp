@@ -210,7 +210,7 @@ int tnfs_open(tnfsMountInfo *m_info, const char *filepath, uint16_t open_mode, u
     // Store the path we used as part of our file handle info
     strlcpy(pFileInf->filename, (const char *)&packet.payload[offset_filename], TNFS_MAX_FILELEN);
 
-    Debug_printf("TNFS open file: \"%s\" (0x%04x, 0x%04x)\r\n", (char *)&packet.payload[offset_filename], open_mode, create_perms);
+    //Debug_printf("TNFS open file: \"%s\" (0x%04x, 0x%04x)\r\n", (char *)&packet.payload[offset_filename], open_mode, create_perms);
 
     // Offset to filename + filename length + zero terminator
     int result = -1;
@@ -234,7 +234,7 @@ int tnfs_open(tnfsMountInfo *m_info, const char *filepath, uint16_t open_mode, u
                 else if (open_mode & TNFS_OPENMODE_WRITE_TRUNCATE)
                     pFileInf->file_size = 0;
             }
-            Debug_printf("File opened, handle ID: %hd, size: %lu, pos: %lu\r\n", *file_handle, pFileInf->file_size, pFileInf->file_position);
+            //Debug_printf("File opened, handle ID: %hd, size: %lu, pos: %lu\r\n", *file_handle, pFileInf->file_size, pFileInf->file_position);
         }
         result = packet.payload[0];
     }
