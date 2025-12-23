@@ -729,8 +729,10 @@ int tnfs_opendirx(tnfsMountInfo *m_info, const char *directory, uint8_t sortopts
     int pathlen = _tnfs_adjust_with_full_path(m_info,
         (char *)(packet.payload + pathoffset), directory, sizeof(packet.payload) - pathoffset);
 
-    // Debug_printf("TNFS open directory: sortopts=0x%02x diropts=0x%02x maxresults=0x%04x pattern=\"%s\" path=\"%s\"\r\n",
-    //  sortopts, diropts, maxresults, (char *)(packet.payload + OFFSET_OPENDIRX_PATTERN), (char *)(packet.payload + pathoffset));
+#ifdef VERBOSE_TNFS
+    Debug_printf("TNFS open directory: sortopts=0x%02x diropts=0x%02x maxresults=0x%04x pattern=\"%s\" path=\"%s\"\r\n",
+      sortopts, diropts, maxresults, (char *)(packet.payload + OFFSET_OPENDIRX_PATTERN), (char *)(packet.payload + pathoffset));
+#endif
 
     if (_tnfs_transaction(m_info, packet, pathoffset + pathlen + 1))
     {
@@ -755,7 +757,7 @@ void _readdirx_fill_response(tnfsDirCacheEntry *pCached, tnfsStat *filestat, cha
 
     strlcpy(dir_entry, pCached->entryname, dir_entry_len);
 
-#ifdef DEBUG
+#ifdef VERBOSE_TNFS
     {
         char t_m[80];
         char t_c[80];
@@ -787,7 +789,9 @@ int tnfs_readdirx(tnfsMountInfo *m_info, tnfsStat *filestat, char *dir_entry, in
     tnfsDirCacheEntry *pCached = m_info->next_dircache_entry();
     if(pCached != nullptr)
     {
+#ifdef VERBOSE_TNFS
         Debug_print("tnfs_readdirx responding from cached entry\r\n");
+#endif
         _readdirx_fill_response(pCached, filestat, dir_entry, dir_entry_len);
         return 0;
     }
@@ -795,7 +799,9 @@ int tnfs_readdirx(tnfsMountInfo *m_info, tnfsStat *filestat, char *dir_entry, in
     // If the cache was empty and the EOF flag was set, just respond with an EOF error
     if(m_info->get_dircache_eof() == true)
     {
+#ifdef VERBOSE_TNFS
         Debug_print("tnfs_readdirx returning EOF based on cached value\r\n");
+#endif
         return TNFS_RESULT_END_OF_FILE;
     }
 
@@ -826,7 +832,9 @@ int tnfs_readdirx(tnfsMountInfo *m_info, tnfsStat *filestat, char *dir_entry, in
             if(response_status & TNFS_READDIRX_STATUS_EOF)
                 m_info->set_dircache_eof();
 
+#ifdef VERBOSE_TNFS
             Debug_printf("tnfs_readdirx resp_count=%hu, dirpos=%hu, status=%hu\r\n", response_count, dirpos, response_status);
+#endif
 
             // Fill our directory cache using the returned values
             int current_offset = 5;
@@ -862,7 +870,9 @@ int tnfs_readdirx(tnfsMountInfo *m_info, tnfsStat *filestat, char *dir_entry, in
             }
 
             int loaded = m_info->count_dircache();
+#ifdef VERBOSE_TNFS
             Debug_printf("tnfs_readdirx cached %d entries\r\n", loaded);
+#endif
             // Now that we've cached our entries, return the first one
             if(loaded > 0)
                 _readdirx_fill_response(m_info->next_dircache_entry(), filestat, dir_entry, dir_entry_len);
