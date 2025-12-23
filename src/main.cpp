@@ -18,7 +18,7 @@
 #include <esp_system.h>
 #include <nvs_flash.h>
 
-#ifdef BOARD_HAS_PSRAM
+#ifdef CONFIG_SPIRAM
 #include <esp_psram.h>
 #ifdef CONFIG_IDF_TARGET_ESP32
 #include <esp32/himem.h>
@@ -83,6 +83,7 @@ ps2dev::PS2Keyboard keyboard(PIN_KB_CLK, PIN_KB_DATA);
 
 
 #include "bus.h"
+#include "meat_session.h"
 //#include "ml_tests.h"
 
 std::string statusMessage;
@@ -97,6 +98,7 @@ void main_shutdown_handler()
     Debug_println("Shutdown handler called.");
     // Give devices an opportunity to clean up before rebooting
 
+    SessionBroker::shutdown();
     SYSTEM_BUS.shutdown();
 }
 
@@ -130,7 +132,7 @@ void main_setup()
 
     printf( "RAM  : %lu\r\n", fnSystem.get_free_heap_size() );
 
-#ifdef BOARD_HAS_PSRAM
+#ifdef CONFIG_SPIRAM
     //printf( "PSRAM: %lu\r\n", fnSystem.get_psram_size() );
 #ifdef CONFIG_IDF_TARGET_ESP32
     printf( "HIMEM: %u\r\n", esp_himem_get_phys_size() );
@@ -255,6 +257,9 @@ void main_setup()
 
     // Set up the WiFi adapter
     fnWiFi.start();
+
+    // Start SessionBroker service task on CPU0
+    SessionBroker::setup();
 
 #ifdef DEBUG_TIMING
     Debug_printv( ANSI_GREEN_BOLD "DEBUG_TIMING enabled" ANSI_RESET );

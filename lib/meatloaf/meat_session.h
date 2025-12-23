@@ -23,6 +23,8 @@
 #include <unordered_map>
 #include <vector>
 #include <chrono>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 #include "../../include/debug.h"
 
@@ -100,9 +102,50 @@ class SessionBroker {
 private:
     static std::unordered_map<std::string, std::shared_ptr<MSession>> session_repo;
     static std::chrono::steady_clock::time_point last_keep_alive_check;
-    static bool timer_initialized;
+    static bool task_running;
+
+    // FreeRTOS task function
+    static void session_service_task(void* arg) {
+        Debug_printv("SessionBroker task started on core %d", xPortGetCoreID());
+        while (task_running) {
+            service();
+            vTaskDelay(pdMS_TO_TICKS(1000)); // Check every 1 second
+        }
+        vTaskDelete(NULL);
+    }
 
 public:
+    // Initialize and start the SessionBroker service task
+    // This creates a FreeRTOS task on CPU0 to periodically call service()
+    static void setup() {
+        if (task_running) {
+            Debug_printv("SessionBroker task already running");
+            return;
+        }
+
+        task_running = true;
+        Debug_printv("Starting SessionBroker service task");
+
+        // Create task on CPU0 (same core as WiFi)
+        // Lower priority than IEC bus task
+        xTaskCreatePinnedToCore(
+            session_service_task,    // Task function
+            "session_broker",        // Task name
+            4096,                    // Stack size
+            NULL,                    // Parameters
+            5,                       // Priority (lower than IEC bus priority 17)
+            NULL,                    // Task handle
+            0                        // Core 0 (WiFi core)
+        );
+    }
+
+    // Stop the SessionBroker service task
+    static void shutdown() {
+        Debug_printv("Stopping SessionBroker service task");
+        task_running = false;
+        clear();
+    }
+
     // Obtain a session (creates if doesn't exist, returns existing if found)
     template<class T>
     static std::shared_ptr<T> obtain(std::string host, uint16_t port = 0) {
