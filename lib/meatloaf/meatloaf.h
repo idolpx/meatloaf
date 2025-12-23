@@ -236,65 +236,32 @@ public:
     uint32_t read(uint8_t* buf, uint32_t size) override {
         if (!inner || !isOpen() || size == 0) return 0;
 
-        // Determine how many bytes we are allowed to return.
-        // If caller requests more than one byte, reserve one byte
-        // in the underlying stream (used to signal EOF). When the
-        // caller asks for exactly one byte, return that last byte.
         uint32_t total = 0;
-        uint32_t allowed = size;
 
-        if (size > 1) {
-            // sync underlying position so available() is accurate
-            if (!inner->seek(_position)) return 0;
-            uint32_t availAll = inner->available();
-            if (availAll == 0) return 0; // nothing available
-            if (availAll <= 1) return 0; // only the final signaling byte remains, keep it
-            allowed = std::min<uint32_t>(size, availAll - 1);
-        } else {
-            // size == 1, we should deliver one byte even if it's the last
-            allowed = 1;
-        }
-
-        while (total < allowed) {
+        while (total < size) {
+            // if position is within buffer
             if (_position >= inStart && _position < inEnd) {
                 uint32_t offset = (uint32_t)(_position - inStart);
                 uint32_t avail = (uint32_t)(inEnd - _position);
-                uint32_t toCopy = std::min<uint32_t>(avail, allowed - total);
-                // When reserving one byte globally, ensure we don't consume
-                // the last byte from this buffer chunk if it represents the
-                // final allowed byte. The global 'allowed' cap above already
-                // enforces this, so standard copy is fine.
-                if (toCopy > 0) {
-                    memcpy(buf + total, inBufData.data() + offset, toCopy);
-                    total += toCopy;
-                    _position += toCopy;
+                uint32_t toCopy = std::min<uint32_t>(avail, size - total);
+                memcpy(buf + total, inBufData.data() + offset, toCopy);
+                total += toCopy;
+                _position += toCopy;
+            } else {
+                // need to refill buffer from underlying stream
+                if (!inner->seek(_position)) {
+                    break;
                 }
-                // If nothing copied because buffer had only the reserved byte,
-                // fall through to refill logic.
-                if (toCopy == 0)
-                    ;
-                else
-                    continue;
-            }
+                int rc = inner->read(inBufData.data(), (uint32_t)inBufSize);
+                if (rc == 0) break;
+                if ((uint32_t)rc == (uint32_t)_MEAT_NO_DATA_AVAIL) {
+                    // underlying stream reports no data available right now
+                    break;
+                }
+                if (rc < 0) break;
 
-            // refill buffer from underlying stream starting at _position
-            if (!inner->seek(_position)) {
-                break;
-            }
-            int rc = inner->read(inBufData.data(), (uint32_t)inBufSize);
-            if (rc == 0) break;
-            if ((uint32_t)rc == (uint32_t)_MEAT_NO_DATA_AVAIL) {
-                break;
-            }
-            if (rc < 0) break;
-
-            inStart = _position;
-            inEnd = inStart + rc;
-
-            // If we're reserving one byte globally and this refill only
-            // produced a single byte, do not consume it now.
-            if (size > 1 && (uint32_t)rc <= 1) {
-                break;
+                inStart = _position;
+                inEnd = inStart + rc;
             }
         }
 
