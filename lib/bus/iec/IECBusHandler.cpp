@@ -265,6 +265,29 @@ static void RAMFUNC(delayMicrosecondsISafe)(uint16_t t)
 #endif
 }
 
+// Read helper used for sending data: attempt to read up to bufferSize-1
+// bytes so that one byte can be kept available for EOI signaling.
+uint8_t IECBusHandler::readForSend(uint8_t *buffer, uint8_t bufferSize)
+{
+  if (!m_currentDevice || bufferSize == 0) return 0;
+
+  // If caller only wants one byte, deliver it
+  if (bufferSize == 1) {
+    return m_currentDevice->read(buffer, 1);
+  }
+
+  // Request one less than available to keep last byte back for EOI
+  uint8_t want = bufferSize - 1;
+  uint8_t n = m_currentDevice->read(buffer, want);
+
+  // If nothing returned, try to read one byte (final byte)
+  if (n == 0) {
+    return m_currentDevice->read(buffer, 1);
+  }
+
+  return n;
+}
+
 
 // define digitalReadFastExtIEC according to whether IEC lines are inverted or not
 #if defined(IEC_USE_LINE_DRIVERS) && defined(IEC_USE_INVERTED_INPUTS)
@@ -2030,7 +2053,7 @@ bool IECBusHandler::transmitDolphinBurst()
 
   // get data from the device and transmit it
   uint8_t n;
-  while( (n=m_currentDevice->read(m_buffer, m_bufferSize))>0 )
+  while( (n=readForSend(m_buffer, m_bufferSize))>0 )
     {
       startParallelTransaction();
       for(uint8_t i=0; i<n; i++)
@@ -2256,7 +2279,10 @@ bool IECBusHandler::transmitSpeedDosFile()
 
   // get remaining data from the device and transmit it
   uint8_t n;
-  while( (n=m_currentDevice->read(m_buffer+offset, m_bufferSize-offset)+offset)>0 )
+  while(true) {
+    uint8_t readn = readForSend(m_buffer+offset, m_bufferSize-offset);
+    n = readn + offset;
+    if (n==0) break;
     {
       startParallelTransaction();
       if( !transmitSpeedDosParallelByte(n+1) )
@@ -2642,7 +2668,7 @@ bool RAMFUNC(IECBusHandler::transmitEpyxBlock)()
 
   // get data
   m_inTask = false;
-  uint8_t n = m_currentDevice->read(m_buffer, m_bufferSize);
+  uint8_t n = readForSend(m_buffer, m_bufferSize);
   m_inTask = true;
   if( (m_flags & P_ATN) || !readPinATN() ) return false;
 
@@ -2852,7 +2878,7 @@ int8_t RAMFUNC(IECBusHandler::transmitFC3Block)()
       // If there are more blocks to transmit then n must be 0, otherwise it must
       // be one more than the number of data bytes in this block 
       // (n+3 because of the repeated load address)
-      uint8_t n = m_currentDevice->read(m_buffer+5, 253);
+      uint8_t n = readForSend(m_buffer+5, 253);
       m_buffer[2] = (n==253) ? 0 : n+3;
     }
   else
@@ -2862,7 +2888,7 @@ int8_t RAMFUNC(IECBusHandler::transmitFC3Block)()
       // If there is more data (i.e. blocks) to transmit then n must be 0, otherwise it must
       // be one more than the number of data bytes in this block (n+1 because of the extra data byte)
       m_buffer[3] = m_buffer[257];
-      uint8_t n = m_currentDevice->read(m_buffer+4, 254);
+      uint8_t n = readForSend(m_buffer+4, 254);
       m_buffer[2] = (n==254) ? 0 : n+2;
     }
 
@@ -2921,7 +2947,7 @@ int8_t RAMFUNC(IECBusHandler::transmitFC3Block)()
 int8_t RAMFUNC(IECBusHandler::transmitFC3ImageBlock)()
 {
   m_inTask = false;
-  uint8_t n = m_currentDevice->read(m_buffer+3, 254);
+  uint8_t n = readForSend(m_buffer+3, 254);
   m_buffer[2] = (n==254) ? 0 : n+1;
   m_inTask = true;
   
@@ -3198,9 +3224,9 @@ int8_t RAMFUNC(IECBusHandler::transmitAR6Block)(bool ar6Protocol)
   // regular IEC protocol but the fast loader expects the file to "start over".
   // It discards the first two butes so we don't really have to send the same values.
   if( m_buffer[255]==0 )
-    n = m_currentDevice->read(m_buffer+2, 252) + 2;
+    n = readForSend(m_buffer+2, 252) + 2;
   else
-    n = m_currentDevice->read(m_buffer, 254);
+    n = readForSend(m_buffer, 254);
 
   if( !transmitAR6Byte(n, ar6Protocol) ) return -1;
 
@@ -4111,11 +4137,11 @@ void IECBusHandler::task()
 
 #ifdef IEC_FP_JIFFY
      if( (m_currentDevice->m_flFlags & S_JIFFY_BLOCK)!=0 )
-       {
-         // JiffyDOS block transfer mode
-         m_inTask = false;
-         uint8_t numData = m_currentDevice->read(m_buffer, m_bufferSize);
-         m_inTask = true;
+         {
+           // JiffyDOS block transfer mode
+           m_inTask = false;
+           uint8_t numData = readForSend(m_buffer, m_bufferSize);
+           m_inTask = true;
 
          // delay to make sure receiver sees our CLK LOW and enters "new data block" state.
          // If a possible VIC "bad line" occurs right after reading bits 6+7 it may take

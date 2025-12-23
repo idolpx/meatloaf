@@ -131,6 +131,9 @@ class IECBusHandler
   void handleFastLoadProtocols();
   void handleATNSequence();
 
+  // read helper that preserves one byte for EOI signaling when sending
+  uint8_t readForSend(uint8_t *buffer, uint8_t bufferSize);
+
   volatile uint16_t m_timeoutDuration; 
   volatile uint32_t m_timeoutStart;
   volatile bool m_inTask;
