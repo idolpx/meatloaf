@@ -29,6 +29,7 @@
 #include <libsmb2.h>
 #include <libsmb2-raw.h>
 #include <sys/poll.h>
+#include <map>
 
 #include "fnFS.h"
 
@@ -36,12 +37,150 @@
 
 #include "make_unique.h"
 
+#include "meat_session.h"
+
 #include <dirent.h>
 #include <string.h>
 #include <fcntl.h>
 
 // Helper function declarations
 bool parseSMBPath(const std::string& path, std::string& share, std::string& share_path);
+
+/********************************************************
+ * SMBMSession - SMB Session Management
+ ********************************************************/
+
+class SMBMSession : public MSession {
+public:
+    SMBMSession(std::string host, uint16_t port = 445) : MSession(host, port) {
+        Debug_printv("SMBMSession created for %s:%d", host.c_str(), port);
+    }
+    ~SMBMSession() override {
+        Debug_printv("SMBMSession destroyed for %s:%d", host.c_str(), port);
+        disconnect();
+    }
+
+    // Set credentials for this session
+    void setCredentials(const std::string& user, const std::string& password) {
+        _user = user;
+        _password = password;
+    }
+
+    bool connect() override {
+        if (connected) return true;
+        
+        // Initialize SMB context for IPC$ (share enumeration)
+        _smb = smb2_init_context();
+        if (!_smb) {
+            Debug_printv("Failed to initialize SMB context for %s:%d", host.c_str(), port);
+            connected = false;
+            return false;
+        }
+
+        // Set SMB2 version
+        smb2_set_version(_smb, SMB2_VERSION_ANY);
+
+        // Set credentials if available
+        if (!_password.empty()) {
+            smb2_set_password(_smb, _password.c_str());
+        }
+
+        // Try to connect to the server
+        // We connect to IPC$ share for session-only purposes (listing shares)
+        const char* user_ptr = _user.empty() ? nullptr : _user.c_str();
+        if (smb2_connect_share(_smb, host.c_str(), "IPC$", user_ptr) < 0) {
+            Debug_printv("Failed to connect to %s:%d: %s", host.c_str(), port, smb2_get_error(_smb));
+            if (_smb) {
+                smb2_destroy_context(_smb);
+                _smb = nullptr;
+            }
+            connected = false;
+            return false;
+        }
+
+        connected = true;
+        updateActivity();
+        Debug_printv("Connected to SMB server at %s:%d", host.c_str(), port);
+        return true;
+    }
+
+    void disconnect() override {
+        if (!connected) return;
+        
+        if (_smb) {
+            smb2_destroy_context(_smb);
+            _smb = nullptr;
+        }
+        
+        // Disconnect all share contexts
+        for (auto& pair : _share_contexts) {
+            if (pair.second) {
+                smb2_destroy_context(pair.second);
+            }
+        }
+        _share_contexts.clear();
+        
+        connected = false;
+        Debug_printv("Disconnected from SMB server at %s:%d", host.c_str(), port);
+    }
+
+    bool keep_alive() override {
+        if (!connected || !_smb) return false;
+        
+        // For SMB, we can check connection by attempting a simple echo operation
+        // or by checking the connection state
+        // For now, we'll consider the connection alive if smb context exists
+        updateActivity();
+        return true;
+    }
+
+    struct smb2_context* getContext() { return _smb; }
+    
+    // Get or create a context for a specific share
+    struct smb2_context* getShareContext(const std::string& share) {
+        if (share.empty() || share == "IPC$") {
+            return _smb;  // Use IPC$ context for share enumeration
+        }
+        
+        // Check if we already have a context for this share
+        auto it = _share_contexts.find(share);
+        if (it != _share_contexts.end() && it->second != nullptr) {
+            Debug_printv("Reusing existing context for share: %s", share.c_str());
+            return it->second;
+        }
+        
+        // Create a new context for this share
+        Debug_printv("Creating new context for share: %s with user: %s", share.c_str(), _user.c_str());
+        struct smb2_context* smb = smb2_init_context();
+        if (!smb) {
+            Debug_printv("Failed to initialize SMB context for share %s", share.c_str());
+            return nullptr;
+        }
+        
+        smb2_set_version(smb, SMB2_VERSION_ANY);
+        
+        // Set credentials for this share connection
+        if (!_password.empty()) {
+            smb2_set_password(smb, _password.c_str());
+        }
+        
+        const char* user_ptr = _user.empty() ? nullptr : _user.c_str();
+        if (smb2_connect_share(smb, host.c_str(), share.c_str(), user_ptr) < 0) {
+            Debug_printv("Failed to connect to share %s: %s", share.c_str(), smb2_get_error(smb));
+            smb2_destroy_context(smb);
+            return nullptr;
+        }
+        
+        _share_contexts[share] = smb;
+        return smb;
+    }
+
+private:
+    std::string _user;
+    std::string _password;
+    struct smb2_context* _smb = nullptr;
+    std::map<std::string, struct smb2_context*> _share_contexts;  // Per-share contexts
+};
 
 /********************************************************
  * MFile
@@ -56,55 +195,55 @@ public:
     
     SMBMFile(std::string path): MFile(path) {
 
-        // Initialize SMB context
-        _smb = smb2_init_context();
-        if (!_smb) {
-            Debug_printv("Failed to initialize SMB context");
+        // Obtain or create SMB session via SessionBroker
+        uint16_t smb_port = port.empty() ? 445 : std::stoi(port);
+        _session = SessionBroker::obtain<SMBMSession>(host, smb_port);
+
+        if (!_session || !_session->isConnected()) {
+            Debug_printv("Failed to obtain SMB session for %s:%d", host.c_str(), smb_port);
             m_isNull = true;
             return;
         }
 
-        // Set SMB2 version
-        smb2_set_version(_smb, SMB2_VERSION_ANY);
+        // Set credentials on the session if available
+        if (!user.empty() || !password.empty()) {
+            _session->setCredentials(user, password);
+        }
 
         // extract share from path
         parseSMBPath(this->path, share, share_path);
         Debug_printv("path[%s] share[%s] share_path[%s]", this->path.c_str(), share.c_str(), share_path.c_str());
 
-        // Connect to server/share
-        if (password.size())
-            smb2_set_password(_smb, password.c_str());
-
-        if (smb2_connect_share(_smb, host.c_str(), (share.empty() ? "IPC$" : share.c_str()), user.c_str()) < 0) {
-            Debug_printv("error[%s] host[%s] share[%s] path[%s]", smb2_get_error(_smb), host.c_str(), share.c_str(), share_path.c_str());
-            m_isNull = true;
-            return;
-        }
-        if (share.empty())
-        {
+        // If no share specified, enumerate available shares
+        if (share.empty()) {
             Debug_printv("ENUMERATE path[%s] share[%s] share_path[%s]", this->path.c_str(), share.c_str(), share_path.c_str());
-            // Enumerate shares
-            struct pollfd pfd;
-            if (smb2_share_enum_async(_smb, share_enumerate_cb, NULL) != 0) {
-                printf("smb2_share_enum failed. %s\n", smb2_get_error(_smb));
-                exit(10);
-            }
+            auto smb = getSMB();
+            if (smb) {
+                // Clear previous share list
+                shares.clear();
+                is_finished = 0;
+                
+                struct pollfd pfd;
+                if (smb2_share_enum_async(smb, share_enumerate_cb, NULL) != 0) {
+                    Debug_printv("smb2_share_enum failed: %s", smb2_get_error(smb));
+                } else {
+                    // Wait for enumeration to complete
+                    while (!is_finished) {
+                        pfd.fd = smb2_get_fd(smb);
+                        pfd.events = smb2_which_events(smb);
 
-            while (!is_finished) {
-                pfd.fd = smb2_get_fd(_smb);
-                pfd.events = smb2_which_events(_smb);
-
-                if (poll(&pfd, 1, 1000) < 0) {
-                    printf("Poll failed");
-                    exit(10);
-                }
-                if (pfd.revents == 0) {
-                        continue;
-                }
-                if (smb2_service(_smb, pfd.revents) < 0) {
-                    printf("smb2_service failed with : %s\n",
-                                    smb2_get_error(_smb));
-                    break;
+                        if (poll(&pfd, 1, 1000) < 0) {
+                            Debug_printv("Poll failed");
+                            break;
+                        }
+                        if (pfd.revents == 0) {
+                            continue;
+                        }
+                        if (smb2_service(smb, pfd.revents) < 0) {
+                            Debug_printv("smb2_service failed: %s", smb2_get_error(smb));
+                            break;
+                        }
+                    }
                 }
             }
         }
@@ -122,10 +261,6 @@ public:
     };
     ~SMBMFile() {
         closeDir();
-        if (_smb) {
-            smb2_destroy_context(_smb);
-            _smb = nullptr;
-        }
     }
 
     std::shared_ptr<MStream> getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override ; // has to return OPENED stream
@@ -149,8 +284,17 @@ public:
 protected:
     bool dirOpened = false;
 
-    struct smb2_context *_smb = nullptr;
+    std::shared_ptr<SMBMSession> _session;
     struct smb2dir *_handle_dir = nullptr;
+
+    // Helper to get SMB context from session - use share-specific context if available
+    struct smb2_context* getSMB() { 
+        if (!_session) return nullptr;
+        if (!share.empty()) {
+            return _session->getShareContext(share);
+        }
+        return _session->getContext();
+    }
 
 private:
     virtual void openDir(std::string path);
@@ -171,27 +315,18 @@ private:
 
 class SMBHandle {
 public:
-    struct smb2_context *_smb = nullptr;
-    struct smb2fh *_handle = nullptr;
-
-    SMBHandle()
-    {
+    SMBHandle() : _session(nullptr), _handle(nullptr) {
         //Debug_printv("*** Creating SMB handle");
-        _smb = nullptr;
-        _handle = nullptr;
-
-        // Create SMB2 context
-        _smb = smb2_init_context();
-        if (!_smb) {
-            Debug_printv("Failed to init SMB2 context");
-            return;
-        }
     };
     ~SMBHandle();
     void obtain(std::string localPath, int smb_mode);
     void dispose();
 
+    struct smb2_context* getSMB() { return _session ? _session->getContext() : nullptr; }
+
 private:
+    std::shared_ptr<SMBMSession> _session;
+    struct smb2fh *_handle = nullptr;
     int flags = 0;
 };
 
@@ -203,8 +338,13 @@ private:
 class SMBMStream: public MStream {
 public:
     SMBMStream(std::string& path): MStream(path) {
-        handle = std::make_unique<SMBHandle>();
-        //url = path;
+        // Obtain or create SMB session via SessionBroker
+        // Parse URL to get host and port
+        auto parser = PeoplesUrlParser::parseURL(path);
+        if (parser && parser->scheme == "smb") {
+            uint16_t smb_port = parser->port.empty() ? 445 : std::stoi(parser->port);
+            _session = SessionBroker::obtain<SMBMSession>(parser->host, smb_port);
+        }
     }
     ~SMBMStream() override {
         close();
@@ -231,7 +371,10 @@ public:
 
 
 protected:
-    std::unique_ptr<SMBHandle> handle;
+    std::shared_ptr<SMBMSession> _session;
+    struct smb2fh *_handle = nullptr;
+
+    struct smb2_context* getSMB() { return _session ? _session->getContext() : nullptr; }
 };
 
 

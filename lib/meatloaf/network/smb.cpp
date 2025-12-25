@@ -102,7 +102,7 @@ bool SMBMFile::pathValid(std::string path)
     }
 
     // Check if SMB context is available
-    if (!_smb) {
+    if (!getSMB()) {
         return false;
     }
 
@@ -115,12 +115,13 @@ bool SMBMFile::isDirectory()
     if(share_path=="/" || share_path.empty())
         return true;
 
-    if (!_smb) {
+    auto smb = getSMB();
+    if (!smb) {
         return false;
     }
 
     struct smb2_stat_64 st;
-    if (smb2_stat(_smb, std::string(basepath + share_path).c_str(), &st) < 0) {
+    if (smb2_stat(smb, std::string(basepath + share_path).c_str(), &st) < 0) {
         return false;
     }
 
@@ -147,12 +148,13 @@ std::shared_ptr<MStream> SMBMFile::createStream(std::ios_base::openmode mode)
 
 time_t SMBMFile::getLastWrite()
 {
-    if (!_smb) {
+    auto smb = getSMB();
+    if (!smb) {
         return 0;
     }
 
     struct smb2_stat_64 st;
-    if (smb2_stat(_smb, std::string(basepath + share_path).c_str(), &st) < 0) {
+    if (smb2_stat(smb, std::string(basepath + share_path).c_str(), &st) < 0) {
         return 0;
     }
 
@@ -161,12 +163,13 @@ time_t SMBMFile::getLastWrite()
 
 time_t SMBMFile::getCreationTime()
 {
-    if (!_smb) {
+    auto smb = getSMB();
+    if (!smb) {
         return 0;
     }
 
     struct smb2_stat_64 st;
-    if (smb2_stat(_smb, std::string(basepath + share_path).c_str(), &st) < 0) {
+    if (smb2_stat(smb, std::string(basepath + share_path).c_str(), &st) < 0) {
         return 0;
     }
 
@@ -175,31 +178,34 @@ time_t SMBMFile::getCreationTime()
 
 uint64_t SMBMFile::getAvailableSpace()
 {
-    if (!_smb) {
-        Debug_printv("_smb not available");
+    auto smb = getSMB();
+    if (!smb) {
+        Debug_printv("SMB context not available");
         return 0;
     }
 
     // Get bytes free
     struct smb2_statvfs status;
-    smb2_statvfs(_smb, share_path.c_str(), &status);
+    smb2_statvfs(smb, share_path.c_str(), &status);
     Debug_printv("size[%llu] blocks[%llu] free[%llu] avail[%llu]", status.f_bsize, status.f_blocks, status.f_bfree, status.f_bavail);
     return (status.f_bfree * status.f_bsize);
 }
 
 bool SMBMFile::mkDir()
 {
-    if (m_isNull || !_smb) {
+    auto smb = getSMB();
+    if (m_isNull || !smb) {
         return false;
     }
 
-    int rc = smb2_mkdir(_smb, std::string(basepath + share_path).c_str());
+    int rc = smb2_mkdir(smb, std::string(basepath + share_path).c_str());
     return (rc == 0);
 }
 
 bool SMBMFile::exists()
 {
-    if (m_isNull || !_smb) {
+    auto smb = getSMB();
+    if (m_isNull || !smb) {
         return false;
     }
     if (share_path=="/" || share_path=="") {
@@ -207,38 +213,42 @@ bool SMBMFile::exists()
     }
 
     struct smb2_stat_64 st;
-    int rc = smb2_stat(_smb, std::string(basepath + share_path).c_str(), &st);
+    int rc = smb2_stat(smb, std::string(basepath + share_path).c_str(), &st);
     return (rc == 0);
 }
 
 
 bool SMBMFile::remove() {
-    if (!_smb) {
+    auto smb = getSMB();
+    if (!smb) {
         return false;
     }
 
     // Check if it's a directory or file
     if (isDirectory()) {
-        return smb2_rmdir(_smb, std::string(basepath + share_path).c_str()) == 0;
+        return smb2_rmdir(smb, std::string(basepath + share_path).c_str()) == 0;
     } else {
-        return smb2_unlink(_smb, std::string(basepath + share_path).c_str()) == 0;
+        return smb2_unlink(smb, std::string(basepath + share_path).c_str()) == 0;
     }
 }
 
 
 bool SMBMFile::rename(std::string pathTo) {
-    if(pathTo.empty() || !_smb) {
+    auto smb = getSMB();
+    if(pathTo.empty() || !smb) {
         return false;
     }
 
-    int rc = smb2_rename(_smb, std::string(basepath + share_path).c_str(), std::string(basepath + pathTo).c_str());
+    int rc = smb2_rename(smb, std::string(basepath + share_path).c_str(), std::string(basepath + pathTo).c_str());
     return (rc == 0);
 }
 
 
 void SMBMFile::openDir(std::string apath)
 {
-    if (!isDirectory() || !_smb) {
+    auto smb = getSMB();
+    if (!isDirectory() || !smb) {
+        Debug_printv("openDir failed: isDirectory[%d] smb[%p]", isDirectory(), smb);
         dirOpened = false;
         return;
     }
@@ -248,7 +258,18 @@ void SMBMFile::openDir(std::string apath)
 
     // Open the directory for listing
     std::string dirPath = apath.empty() ? share_path : apath;
-    _handle_dir = smb2_opendir(_smb, dirPath.c_str());
+    
+    // For smb2_opendir, we can use empty string for root or "."
+    // Try empty string first (root of share)
+    if (dirPath.empty()) {
+        dirPath = "";
+    }
+    
+    Debug_printv("openDir calling smb2_opendir with path[%s] (empty=%d)", dirPath.c_str(), dirPath.empty());
+    _handle_dir = smb2_opendir(smb, dirPath.empty() ? "" : dirPath.c_str());
+    if (!_handle_dir) {
+        Debug_printv("smb2_opendir failed: %s", smb2_get_error(smb));
+    }
     dirOpened = (_handle_dir != nullptr);
     entry_index = 0;
 
@@ -258,8 +279,9 @@ void SMBMFile::openDir(std::string apath)
 
 void SMBMFile::closeDir()
 {
-    if(_smb && _handle_dir) {
-        smb2_closedir(_smb, _handle_dir);
+    auto smb = getSMB();
+    if(smb && _handle_dir) {
+        smb2_closedir(smb, _handle_dir);
     }
     _handle_dir = nullptr;
     dirOpened = false;
@@ -268,13 +290,14 @@ void SMBMFile::closeDir()
 
 bool SMBMFile::rewindDirectory()
 {
-    if (!_smb) {
+    auto smb = getSMB();
+    if (!smb) {
         return false;
     }
 
     if (!share.empty()) {
         // Close and reopen directory to reset position
-        openDir(std::string(basepath + share_path).c_str());
+        openDir(share_path);
     } else {
         dirOpened = true;
         entry_index = 0;
@@ -296,9 +319,10 @@ MFile* SMBMFile::getNextFileInDir()
     uint32_t ent_type = 0;
     uint64_t ent_size = 0;
     if (!share.empty()) {
+        auto smb = getSMB();
         struct smb2dirent *ent;
         do {
-            ent = smb2_readdir(_smb, _handle_dir);
+            ent = smb2_readdir(smb, _handle_dir);
             if (ent == nullptr) {
                 ent_name.clear();
                 break;
@@ -344,7 +368,8 @@ MFile* SMBMFile::getNextFileInDir()
 
 bool SMBMFile::readEntry( std::string filename )
 {
-    if (!_smb || filename.empty()) {
+    auto smb = getSMB();
+    if (!smb || filename.empty()) {
         return false;
     }
 
@@ -355,7 +380,7 @@ bool SMBMFile::readEntry( std::string filename )
 
     Debug_printv( "path[%s] filename[%s]", searchPath.c_str(), filename.c_str());
 
-    struct smb2dir* dirHandle = smb2_opendir(_smb, searchPath.c_str());
+    struct smb2dir* dirHandle = smb2_opendir(smb, searchPath.c_str());
     if (dirHandle == nullptr) {
         return false;
     }
@@ -363,7 +388,7 @@ bool SMBMFile::readEntry( std::string filename )
     struct smb2dirent *ent;
     bool found = false;
 
-    while ((ent = smb2_readdir(_smb, dirHandle)) != nullptr) {
+    while ((ent = smb2_readdir(smb, dirHandle)) != nullptr) {
         std::string entryFilename = ent->name;
 
         // Skip hidden files and directory entries
@@ -394,7 +419,7 @@ bool SMBMFile::readEntry( std::string filename )
         }
     }
 
-    smb2_closedir(_smb, dirHandle);
+    smb2_closedir(smb, dirHandle);
 
     if (!found) {
         Debug_printv( "Not Found! file[%s]", filename.c_str() );
@@ -415,7 +440,8 @@ uint32_t SMBMStream::write(const uint8_t *buf, uint32_t size) {
         return 0;
     }
 
-    if (!isOpen() || !handle->_smb || !handle->_handle) {
+    auto smb = getSMB();
+    if (!isOpen() || !smb || !_handle) {
         Debug_printv("Stream not open or invalid handles");
         _error = EBADF;
         return 0;
@@ -425,10 +451,10 @@ uint32_t SMBMStream::write(const uint8_t *buf, uint32_t size) {
         return 0;
     }
 
-    int result = smb2_write(handle->_smb, handle->_handle, buf, size);
+    int result = smb2_write(smb, _handle, buf, size);
 
     if (result < 0) {
-        Debug_printv("SMB write error: %s (rc=%d)", smb2_get_error(handle->_smb), result);
+        Debug_printv("SMB write error: %s (rc=%d)", smb2_get_error(smb), result);
         _error = -result;
         return 0;
     }
@@ -457,9 +483,30 @@ bool SMBMStream::open(std::ios_base::openmode mode) {
         return false;
     }
 
+    // Parse URL to get host, port, share and file path
+    auto parser = PeoplesUrlParser::parseURL(url);
+    if (!parser || parser->scheme != "smb") {
+        Debug_printv("Invalid SMB URL: %s", url.c_str());
+        _error = EINVAL;
+        return false;
+    }
+
+    std::string server = parser->host;
+    std::string user = parser->user;
+    std::string password = parser->password;
+    uint16_t smb_port = parser->port.empty() ? 445 : std::stoi(parser->port);
+
+    // Obtain SMB session via SessionBroker
+    _session = SessionBroker::obtain<SMBMSession>(server, smb_port);
+    if (!_session || !_session->isConnected()) {
+        Debug_printv("Failed to obtain SMB session for %s:%d", server.c_str(), smb_port);
+        _error = EACCES;
+        return false;
+    }
+
     // Parse path to get share and file path
     std::string share, share_path;
-    parseSMBPath(url, share, share_path);
+    parseSMBPath(parser->path, share, share_path);
 
     if (share_path.empty()) {
         Debug_printv("No file path specified in URL");
@@ -483,23 +530,30 @@ bool SMBMStream::open(std::ios_base::openmode mode) {
         smb_mode = O_RDONLY;
     }
 
-    Debug_printv("SMB open mode[0x%X]", smb_mode);
+    Debug_printv("SMB open mode[0x%X] share[%s] path[%s]", smb_mode, share.c_str(), share_path.c_str());
 
-    // Open the file via SMBHandle
-    handle->obtain(url, smb_mode);
+    auto smb = getSMB();
+    if (!smb) {
+        Debug_printv("Failed to get SMB context");
+        _error = EACCES;
+        return false;
+    }
 
-    if (!isOpen()) {
-        Debug_printv("Failed to open SMB stream");
+    // Open the file
+    _handle = smb2_open(smb, share_path.c_str(), smb_mode);
+    if (!_handle) {
+        Debug_printv("Failed to open file: %s", smb2_get_error(smb));
+        _error = EACCES;
         return false;
     }
 
     // Get file size using SMB2 stat
     struct smb2_stat_64 st;
-    if (smb2_fstat(handle->_smb, handle->_handle, &st) == 0) {
+    if (smb2_fstat(smb, _handle, &st) == 0) {
         _size = st.smb2_size;
         Debug_printv("File size: %u bytes", _size);
     } else {
-        Debug_printv("Warning: Could not get file size: %s", smb2_get_error(handle->_smb));
+        Debug_printv("Warning: Could not get file size: %s", smb2_get_error(smb));
         _size = 0;
     }
 
@@ -509,7 +563,11 @@ bool SMBMStream::open(std::ios_base::openmode mode) {
 
 void SMBMStream::close() {
     if(isOpen()) {
-        handle->dispose();
+        auto smb = getSMB();
+        if (smb && _handle) {
+            smb2_close(smb, _handle);
+        }
+        _handle = nullptr;
         _position = 0;
         _size = 0;
     }
@@ -522,7 +580,8 @@ uint32_t SMBMStream::read(uint8_t* buf, uint32_t size) {
         return 0;
     }
 
-    if (!isOpen() || !handle->_smb || !handle->_handle) {
+    auto smb = getSMB();
+    if (!isOpen() || !smb || !_handle) {
         Debug_printv("Stream not open or invalid handles");
         _error = EBADF;
         return 0;
@@ -532,10 +591,10 @@ uint32_t SMBMStream::read(uint8_t* buf, uint32_t size) {
         return 0;
     }
 
-    int bytesRead = smb2_read(handle->_smb, handle->_handle, buf, size);
+    int bytesRead = smb2_read(smb, _handle, buf, size);
 
     if (bytesRead < 0) {
-        Debug_printv("SMB read error: %s (rc=%d)", smb2_get_error(handle->_smb), bytesRead);
+        Debug_printv("SMB read error: %s (rc=%d)", smb2_get_error(smb), bytesRead);
         _error = -bytesRead;
         return 0;
     }
@@ -545,15 +604,16 @@ uint32_t SMBMStream::read(uint8_t* buf, uint32_t size) {
 };
 
 bool SMBMStream::seek(uint32_t pos) {
-    if (!isOpen() || !handle->_smb || !handle->_handle) {
+    auto smb = getSMB();
+    if (!isOpen() || !smb || !_handle) {
         Debug_printv("Stream not open");
         _error = EBADF;
         return false;
     }
 
-    int64_t result = smb2_lseek(handle->_smb, handle->_handle, pos, SEEK_SET, NULL);
+    int64_t result = smb2_lseek(smb, _handle, pos, SEEK_SET, NULL);
     if (result < 0) {
-        Debug_printv("SMB seek error: %s (rc=%lld)", smb2_get_error(handle->_smb), result);
+        Debug_printv("SMB seek error: %s (rc=%lld)", smb2_get_error(smb), result);
         _error = -result;
         return false;
     }
@@ -563,15 +623,16 @@ bool SMBMStream::seek(uint32_t pos) {
 };
 
 bool SMBMStream::seek(uint32_t pos, int mode) {
-    if (!isOpen() || !handle->_smb || !handle->_handle) {
+    auto smb = getSMB();
+    if (!isOpen() || !smb || !_handle) {
         Debug_printv("Stream not open");
         _error = EBADF;
         return false;
     }
 
-    int64_t result = smb2_lseek(handle->_smb, handle->_handle, pos, mode, NULL);
+    int64_t result = smb2_lseek(smb, _handle, pos, mode, NULL);
     if (result < 0) {
-        Debug_printv("SMB seek error: %s (rc=%lld)", smb2_get_error(handle->_smb), result);
+        Debug_printv("SMB seek error: %s (rc=%lld)", smb2_get_error(smb), result);
         _error = -result;
         return false;
     }
@@ -583,7 +644,7 @@ bool SMBMStream::seek(uint32_t pos, int mode) {
 }
 
 bool SMBMStream::isOpen() {
-    return handle != nullptr && handle->_smb != nullptr && handle->_handle != nullptr;
+    return _session != nullptr && _session->isConnected() && _handle != nullptr;
 }
 
 /********************************************************
@@ -596,14 +657,14 @@ SMBHandle::~SMBHandle() {
 }
 
 void SMBHandle::dispose() {
-    if (_handle != nullptr && _smb != nullptr) {
-        smb2_close(_smb, _handle);
+    if (_handle != nullptr && _session && _session->isConnected()) {
+        auto smb = _session->getContext();
+        if (smb) {
+            smb2_close(smb, _handle);
+        }
         _handle = nullptr;
     }
-    if (_smb != nullptr) {
-        smb2_destroy_context(_smb);
-        _smb = nullptr;
-    }
+    _session.reset();
 }
 
 void SMBHandle::obtain(std::string m_path, int smb_mode) {
@@ -619,6 +680,7 @@ void SMBHandle::obtain(std::string m_path, int smb_mode) {
     std::string server = parser->host;
     std::string user = parser->user;
     std::string password = parser->password;
+    uint16_t smb_port = parser->port.empty() ? 445 : std::stoi(parser->port);
     std::string share, filepath;
 
     if (!parseSMBPath(parser->path, share, filepath)) {
@@ -630,26 +692,25 @@ void SMBHandle::obtain(std::string m_path, int smb_mode) {
     Debug_printv("Connecting to server[%s] share[%s] filepath[%s] user[%s]",
                  server.c_str(), share.c_str(), filepath.c_str(), user.c_str());
 
-    // Set SMB2 version
-    smb2_set_version(_smb, SMB2_VERSION_ANY);
-
-    // Set credentials if provided
-    if (!password.empty()) {
-        smb2_set_password(_smb, password.c_str());
+    // Obtain SMB session via SessionBroker
+    _session = SessionBroker::obtain<SMBMSession>(server, smb_port);
+    if (!_session || !_session->isConnected()) {
+        Debug_printv("Failed to obtain SMB session for %s:%d", server.c_str(), smb_port);
+        dispose();
+        return;
     }
 
-    // Connect to server/share
-    const char* username = user.empty() ? nullptr : user.c_str();
-    if (smb2_connect_share(_smb, server.c_str(), share.c_str(), username) < 0) {
-        Debug_printv("Failed to connect to %s/%s: %s", server.c_str(), share.c_str(), smb2_get_error(_smb));
+    auto smb = _session->getContext();
+    if (!smb) {
+        Debug_printv("Failed to get SMB context");
         dispose();
         return;
     }
 
     // Open the file
-    _handle = smb2_open(_smb, filepath.c_str(), smb_mode);
+    _handle = smb2_open(smb, filepath.c_str(), smb_mode);
     if (!_handle) {
-        Debug_printv("Failed to open file %s: %s", filepath.c_str(), smb2_get_error(_smb));
+        Debug_printv("Failed to open file %s: %s", filepath.c_str(), smb2_get_error(smb));
         dispose();
         return;
     }
