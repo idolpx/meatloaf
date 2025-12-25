@@ -123,6 +123,9 @@ public:
     virtual uint16_t dir_tell() = 0;
     // Sets current position in directory stream. Returns false on error.
     virtual bool dir_seek(uint16_t position) = 0;
+
+    // Some filesystems may need to do something to keep the connection alive
+    virtual bool keep_alive() { return true; }
 };
 
 #endif //_FN_FS_

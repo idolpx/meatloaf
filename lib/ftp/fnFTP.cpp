@@ -1231,3 +1231,187 @@ void fnFTP::STOR(string path)
     Debug_printf("fnFTP::STOR(%s)\r\n",path.c_str());
     control->write("STOR " + path + "\r\n");
 }
+
+bool fnFTP::keep_alive()
+{
+    if (!control->connected())
+    {
+        Debug_printf("fnFTP::keep_alive() attempted while not logged in. Aborting.\r\n");
+        return true;
+    }
+
+    NOOP();
+    if (parse_response())
+    {
+        Debug_printf("fnFTP::keep_alive - timeout\r\n");
+        return false;
+    }
+
+    if (is_positive_completion_reply())
+    {
+        Debug_printf("fnFTP::keep_alive - successful\r\n");
+        return true;
+    }
+    else
+    {
+        Debug_printf("fnFTP::keep_alive - error: %s\r\n", controlResponse.c_str());
+        return false;
+    }
+}
+
+void fnFTP::NOOP()
+{
+    Debug_printf("fnFTP::NOOP\r\n");
+    control->write("NOOP\r\n");
+}
+
+bool fnFTP::delete_file(string path)
+{
+    if (!control->connected())
+    {
+        Debug_printf("fnFTP::delete_file(%s) attempted while not logged in. Aborting.\r\n", path.c_str());
+        return true;
+    }
+
+    DELE(path);
+    if (parse_response())
+    {
+        Debug_printf("fnFTP::delete_file - timeout\r\n");
+        return true;
+    }
+
+    if (is_positive_completion_reply())
+    {
+        Debug_printf("fnFTP::delete_file - file deleted\r\n");
+        return false;
+    }
+    else
+    {
+        Debug_printf("fnFTP::delete_file - error: %s\r\n", controlResponse.c_str());
+        return true;
+    }
+}
+
+bool fnFTP::rename_file(string pathFrom, string pathTo)
+{
+    if (!control->connected())
+    {
+        Debug_printf("fnFTP::rename_file(%s -> %s) attempted while not logged in. Aborting.\r\n", pathFrom.c_str(), pathTo.c_str());
+        return true;
+    }
+
+    RNFR(pathFrom);
+    if (parse_response())
+    {
+        Debug_printf("fnFTP::rename_file - timeout on RNFR\r\n");
+        return true;
+    }
+
+    if (!is_positive_intermediate_reply())
+    {
+        Debug_printf("fnFTP::rename_file - RNFR error: %s\r\n", controlResponse.c_str());
+        return true;
+    }
+
+    RNTO(pathTo);
+    if (parse_response())
+    {
+        Debug_printf("fnFTP::rename_file - timeout on RNTO\r\n");
+        return true;
+    }
+
+    if (is_positive_completion_reply())
+    {
+        Debug_printf("fnFTP::rename_file - file renamed\r\n");
+        return false;
+    }
+    else
+    {
+        Debug_printf("fnFTP::rename_file - RNTO error: %s\r\n", controlResponse.c_str());
+        return true;
+    }
+}
+
+bool fnFTP::make_directory(string path)
+{
+    if (!control->connected())
+    {
+        Debug_printf("fnFTP::make_directory(%s) attempted while not logged in. Aborting.\r\n", path.c_str());
+        return true;
+    }
+
+    MKD(path);
+    if (parse_response())
+    {
+        Debug_printf("fnFTP::make_directory - timeout\r\n");
+        return true;
+    }
+
+    if (is_positive_completion_reply())
+    {
+        Debug_printf("fnFTP::make_directory - directory created\r\n");
+        return false;
+    }
+    else
+    {
+        Debug_printf("fnFTP::make_directory - error: %s\r\n", controlResponse.c_str());
+        return true;
+    }
+}
+
+bool fnFTP::remove_directory(string path)
+{
+    if (!control->connected())
+    {
+        Debug_printf("fnFTP::remove_directory(%s) attempted while not logged in. Aborting.\r\n", path.c_str());
+        return true;
+    }
+
+    RMD(path);
+    if (parse_response())
+    {
+        Debug_printf("fnFTP::remove_directory - timeout\r\n");
+        return true;
+    }
+
+    if (is_positive_completion_reply())
+    {
+        Debug_printf("fnFTP::remove_directory - directory removed\r\n");
+        return false;
+    }
+    else
+    {
+        Debug_printf("fnFTP::remove_directory - error: %s\r\n", controlResponse.c_str());
+        return true;
+    }
+}
+
+void fnFTP::DELE(string path)
+{
+    Debug_printf("fnFTP::DELE(%s)\r\n", path.c_str());
+    control->write("DELE " + path + "\r\n");
+}
+
+void fnFTP::RNFR(string pathFrom)
+{
+    Debug_printf("fnFTP::RNFR(%s)\r\n", pathFrom.c_str());
+    control->write("RNFR " + pathFrom + "\r\n");
+}
+
+void fnFTP::RNTO(string pathTo)
+{
+    Debug_printf("fnFTP::RNTO(%s)\r\n", pathTo.c_str());
+    control->write("RNTO " + pathTo + "\r\n");
+}
+
+void fnFTP::MKD(string path)
+{
+    Debug_printf("fnFTP::MKD(%s)\r\n", path.c_str());
+    control->write("MKD " + path + "\r\n");
+}
+
+void fnFTP::RMD(string path)
+{
+    Debug_printf("fnFTP::RMD(%s)\r\n", path.c_str());
+    control->write("RMD " + path + "\r\n");
+}

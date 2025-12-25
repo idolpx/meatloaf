@@ -316,6 +316,81 @@ private:
      */
     void STOR(string path);
 
+    /**
+     * @brief ask server to get size of file at path
+     * @param path path to file
+     */
+    void SIZE(string path);
+
+    /**
+     * @brief send NOOP command to server
+     */
+    void NOOP();
+
+public:
+    /**
+     * Delete file on FTP server
+     * @param path path to file to delete.
+     * @return TRUE if error, FALSE if successful.
+     */
+    bool delete_file(string path);
+
+    /**
+     * Rename file on FTP server
+     * @param pathFrom original file path
+     * @param pathTo new file path
+     * @return TRUE if error, FALSE if successful.
+     */
+    bool rename_file(string pathFrom, string pathTo);
+
+    /**
+     * Create directory on FTP server
+     * @param path path of directory to create.
+     * @return TRUE if error, FALSE if successful.
+     */
+    bool make_directory(string path);
+
+    /**
+     * Remove directory on FTP server
+     * @param path path of directory to remove.
+     * @return TRUE if error, FALSE if successful.
+     */
+    bool remove_directory(string path);
+
+    /**
+     * Send NOOP command as lightweight keep-alive
+     * @return TRUE on success, FALSE on error.
+     */
+    bool keep_alive();
+
+protected:
+    /**
+     * @brief send DEL (or DELE) command to server to delete file
+     * @param path path of file to delete.
+     */
+    void DELE(string path);
+
+    /**
+     * @brief send RNFR/RNTO commands to server to rename file
+     * @param pathFrom original path
+     * @param pathTo new path
+     */
+    void RNFR(string pathFrom);
+    void RNTO(string pathTo);
+
+    /**
+     * @brief send MKD command to server to make directory
+     * @param path path of directory to create.
+     */
+    void MKD(string path);
+
+    /**
+     * @brief send RMD command to server to remove directory
+     * @param path path of directory to remove.
+     */
+    void RMD(string path);
+
+private:
 };
 
 #endif /* FNFTP_H */

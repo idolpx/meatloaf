@@ -59,6 +59,7 @@
 #include "service/csip.h"
 
 // Network
+#include "network/ftp.h"
 #include "network/tnfs.h"
 #include "network/smb.h"
 #endif
@@ -137,6 +138,7 @@ LNXMFileSystem lnxFS;
 CSIPMFileSystem csipFS;
 
 // Network
+FTPMFileSystem ftpFS;
 TNFSMFileSystem tnfsFS;
 SMBMFileSystem smbFS;
 #endif
@@ -218,7 +220,7 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
     // Network
     &httpFS,
 #ifndef MIN_CONFIG
-    &tnfsFS, &smbFS
+    &ftpFS, &tnfsFS, &smbFS
     //&ipfsFS, &tcpFS,
 #endif
 

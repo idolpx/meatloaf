@@ -80,18 +80,69 @@ bool FileSystemFTP::start(const char *url, const char *user, const char *passwor
 
 bool FileSystemFTP::exists(const char *path)
 {
-    // TODO
-    return false;
+    if (!_started || path == nullptr)
+        return false;
+
+    Debug_printf("FileSystemFTP::exists(\"%s\")\n", path);
+
+    // Check if path is a directory
+    if (is_dir(path))
+        return true;
+
+    // Try to open the file
+    if (_ftp->open_file(path, false) == 0)  // open_file returns 0 on success
+    {
+        Debug_printf("File exists\n");
+        _ftp->close();
+        return true;
+    }
+    else
+    {
+        Debug_printf("File does not exist\n");
+        return false;
+    }
 }
 
 bool FileSystemFTP::remove(const char *path)
 {
-    return false;
+    if (!_started || path == nullptr)
+        return false;
+
+    Debug_printf("FileSystemFTP::remove(\"%s\")\n", path);
+
+    // Attempt to delete the file
+    // delete_file returns FALSE on success, TRUE on error
+    if (!_ftp->delete_file(path))
+    {
+        Debug_printf("File deleted successfully\n");
+        return true;
+    }
+    else
+    {
+        Debug_printf("Failed to delete file\n");
+        return false;
+    }
 }
 
 bool FileSystemFTP::rename(const char *pathFrom, const char *pathTo)
 {
-    return false;
+    if (!_started || pathFrom == nullptr || pathTo == nullptr)
+        return false;
+
+    Debug_printf("FileSystemFTP::rename(\"%s\" -> \"%s\")\n", pathFrom, pathTo);
+
+    // Attempt to rename the file
+    // rename_file returns FALSE on success, TRUE on error
+    if (!_ftp->rename_file(pathFrom, pathTo))
+    {
+        Debug_printf("File renamed successfully\n");
+        return true;
+    }
+    else
+    {
+        Debug_printf("Failed to rename file\n");
+        return false;
+    }
 }
 
 FILE  *FileSystemFTP::file_open(const char *path, const char *mode)
@@ -215,8 +266,72 @@ FileHandler *FileSystemFTP::cache_file(const char *path, const char *mode)
 
 bool FileSystemFTP::is_dir(const char *path)
 {
-    // TODO
-    return false;
+    if (!_started || path == nullptr)
+        return false;
+
+    Debug_printf("FileSystemFTP::is_dir(\"%s\")\n", path);
+
+    // Try to open the path as a directory
+    bool res = _ftp->open_directory(path, "");
+    
+    if (res == 0)  // open_directory returns 0 on success
+    {
+        Debug_printf("Path is a directory\n");
+        return true;
+    }
+    else
+    {
+        Debug_printf("Path is not a directory\n");
+        return false;
+    }
+}
+
+bool FileSystemFTP::mkdir(const char* path)
+{
+    if (!_started || path == nullptr)
+        return false;
+
+    Debug_printf("FileSystemFTP::mkdir(\"%s\")\n", path);
+
+    // Attempt to create the directory
+    // make_directory returns FALSE on success, TRUE on error
+    if (!_ftp->make_directory(path))
+    {
+        Debug_printf("Directory created successfully\n");
+        return true;
+    }
+    else
+    {
+        Debug_printf("Failed to create directory\n");
+        return false;
+    }
+}
+
+bool FileSystemFTP::rmdir(const char* path)
+{
+    if (!_started || path == nullptr)
+        return false;
+
+    Debug_printf("FileSystemFTP::rmdir(\"%s\")\n", path);
+
+    // Attempt to remove the directory
+    // remove_directory returns FALSE on success, TRUE on error
+    if (!_ftp->remove_directory(path))
+    {
+        Debug_printf("Directory removed successfully\n");
+        return true;
+    }
+    else
+    {
+        Debug_printf("Failed to remove directory\n");
+        return false;
+    }
+}
+
+bool FileSystemFTP::dir_exists(const char* path)
+{
+    // dir_exists is essentially the same as is_dir for FTP
+    return is_dir(path);
 }
 
 bool FileSystemFTP::dir_open(const char  *path, const char *pattern, uint16_t diropts)
@@ -306,4 +421,14 @@ uint16_t FileSystemFTP::dir_tell()
 bool FileSystemFTP::dir_seek(uint16_t pos)
 {
     return _dircache.seek(pos);
+}
+
+bool FileSystemFTP::keep_alive()
+{
+    if (!_started)
+        return false;
+
+    // Send NOOP command as lightweight keep-alive
+    bool res = _ftp->keep_alive();
+    return res;
 }

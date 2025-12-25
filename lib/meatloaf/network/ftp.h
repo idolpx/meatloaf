@@ -21,182 +21,186 @@
 #define MEATLOAF_DEVICE_FTP
 
 #include "meatloaf.h"
-
-#include "fnFS.h"
-#include "fnFsFTP.h"
-#include "fnFTP.h"
-
-#include "../../../include/debug.h"
-
-#include "make_unique.h"
+#include "meat_session.h"
 
 #include <dirent.h>
 #include <string.h>
 
+#include "../../../include/debug.h"
+#include "../../FileSystem/fnFile.h"
+#include "../../FileSystem/fnFsFTP.h"
+
+#include "make_unique.h"
+
+/********************************************************
+ * MSession - FTP Session Management
+ ********************************************************/
+
+class FTPMSession : public MSession {
+   public:
+    FTPMSession(std::string host, uint16_t port = 21) : MSession(host, port) {
+        Debug_printv("FTPMSession created for %s:%d", host.c_str(), port);
+    }
+    ~FTPMSession() override {
+        Debug_printv("FTPMSession destroyed for %s:%d", host.c_str(), port);
+        disconnect();
+    }
+
+    bool connect() override {
+        if (connected) return true;
+        _fs = std::make_unique<FileSystemFTP>();
+        // Build base URL
+        std::string base = std::string("ftp://") + host;
+        if (port != 21) base += ":" + std::to_string(port);
+
+        if (!_fs->start(base.c_str())) {
+            Debug_printv("Failed to start FTP filesystem for %s:%d",
+                         host.c_str(), port);
+            connected = false;
+            return false;
+        }
+        connected = true;
+        updateActivity();
+        return true;
+    }
+
+    void disconnect() override {
+        if (!connected) return;
+        if (_fs) {
+            _fs->dir_close();
+        }
+        _fs.reset();
+        connected = false;
+    }
+
+    bool keep_alive() override {
+        if (!connected || !_fs) return false;
+        // Send NOOP command as lightweight keep-alive
+        bool res = _fs->keep_alive();
+        updateActivity();
+        return res;
+    }
+
+    FileSystemFTP* fs() { return _fs.get(); }
+
+   private:
+    std::unique_ptr<FileSystemFTP> _fs;
+};
 
 /********************************************************
  * MFile
  ********************************************************/
 
-class FTPMFile: public MFile
-{
-
-public:
+class FTPMFile : public MFile {
+   public:
     std::string basepath = "";
-    
-    FTPMFile(std::string path): MFile(path) {
 
-        Debug_printv("path[%s]", path.c_str());
-        Debug_printv("host[%s]", host.c_str());
-        Debug_printv("port[%s]", port.c_str());
-        Debug_printv("user[%s]", user.c_str());
-        Debug_printv("password[%s]", password.c_str());
-        if (!_fsFTP->start(host.c_str()))
-        {
-            Debug_printv("Failed to mount %s:%s", host.c_str(), port.c_str());
+    FTPMFile(std::string path) : MFile(path) {
+        // Obtain or create FTP session via SessionBroker
+        uint16_t ftp_port = port.empty() ? 21 : std::stoi(port);
+        _session = SessionBroker::obtain<FTPMSession>(host, ftp_port);
+
+        if (!_session || !_session->isConnected()) {
+            Debug_printv("Failed to obtain FTP session for %s:%d", host.c_str(), ftp_port);
             m_isNull = true;
             return;
         }
 
         // Find full filename for wildcard
         if (mstr::contains(name, "?") || mstr::contains(name, "*"))
-            readEntry( name );
+            readEntry(name);
 
         if (!pathValid(path.c_str()))
             m_isNull = true;
         else
             m_isNull = false;
-
-        //Debug_printv("basepath[%s] path[%s] valid[%d]", basepath.c_str(), this->path.c_str(), m_isNull);
     };
     ~FTPMFile() {
-        Debug_printv("*** Destroying FTPMFile [%s]", url.c_str());
-        closeDir();
+        //Debug_printv("*** Destroying FTPMFile [%s]", url.c_str());
+        //closeDir();
     }
 
-    std::shared_ptr<MStream> getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override ; // has to return OPENED stream
+    std::shared_ptr<MStream> getSourceStream(std::ios_base::openmode mode = std::ios_base::in) override;  // has to return OPENED stream
     std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> src);
     std::shared_ptr<MStream> createStream(std::ios_base::openmode mode) override;
 
     bool isDirectory() override;
-    time_t getLastWrite() override ;
-    time_t getCreationTime() override ;
-    bool rewindDirectory() override ;
-    MFile* getNextFileInDir() override ;
-    bool mkDir() override ;
-    bool exists() override ;
+    time_t getLastWrite() override;
+    time_t getCreationTime() override;
+    bool rewindDirectory() override;
+    MFile* getNextFileInDir() override;
+    bool mkDir() override;
+    bool exists() override;
 
-    bool remove() override ;
+    bool remove() override;
     bool rename(std::string dest);
 
+    bool readEntry(std::string filename);
 
-    bool readEntry( std::string filename );
-
-protected:
-    DIR* dir;
+   protected:
     bool dirOpened = false;
+    std::shared_ptr<FTPMSession> _session;
 
-private:
-    FileSystem *_fs = nullptr;
+    // Helper to get FTP filesystem from session
+    FileSystemFTP* getFS() { return _session ? _session->fs() : nullptr; }
 
+   private:
     virtual void openDir(std::string path);
     virtual void closeDir();
 
-    bool _valid;
-    std::string _pattern;
-
     bool pathValid(std::string path);
-    std::unique_ptr<FileSystemFTP> _fsFTP;
 };
-
-
-/********************************************************
- * FTPHandle
- ********************************************************/
-
-class FTPHandle {
-public:
-    //int rc;
-    FILE* file_h = nullptr;
-
-    FTPHandle() 
-    {
-        //Debug_printv("*** Creating flash handle");
-        memset(&file_h, 0, sizeof(file_h));
-    };
-    ~FTPHandle();
-    void obtain(std::string localPath, std::string mode);
-    void dispose();
-
-private:
-    int flags = 0;
-};
-
 
 /********************************************************
  * MStream I
  ********************************************************/
 
-class FTPMStream: public MStream {
-public:
-    FTPMStream(std::string& path): MStream(path) {
-        localPath = path;
-        handle = std::make_unique<FTPHandle>();
-        //url = path;
-    }
-    ~FTPMStream() override {
-        close();
-    }
+// forward declare impl
+struct FTPMStream_impl_access;
+
+class FTPMStream : public MStream {
+   public:
+    FTPMStream(std::string& path) : MStream(path), _impl(nullptr) {}
+    ~FTPMStream() override { close(); }
 
     // MStream methods
-    bool isOpen();
-    // bool isBrowsable() override { return false; };
-    // bool isRandomAccess() override { return true; };
+    bool isOpen() override;
+    bool isBrowsable() override { return false; }
+    bool isRandomAccess() override { return true; }
 
     bool open(std::ios_base::openmode mode) override;
     void close() override;
 
     uint32_t read(uint8_t* buf, uint32_t size) override;
-    uint32_t write(const uint8_t *buf, uint32_t size) override;
+    uint32_t write(const uint8_t* buf, uint32_t size) override;
 
-    virtual bool seek(uint32_t pos) override;
-    virtual bool seek(uint32_t pos, int mode) override;    
+    bool seek(uint32_t pos) override;
+    bool seek(uint32_t pos, int mode) override;
 
-    virtual bool seekPath(std::string path) override {
-        Debug_printv( "path[%s]", path.c_str() );
+    bool seekPath(std::string path) override {
+        Debug_printv("path[%s]", path.c_str());
         return false;
     }
 
-
-protected:
-    std::string localPath;
-
-    std::unique_ptr<FTPHandle> handle;
+   protected:
+    FTPMStream_impl_access* _impl;
 };
-
 
 /********************************************************
  * MFileSystem
  ********************************************************/
 
-class FTPMFileSystem: public MFileSystem 
-{
-public:
-    FTPMFileSystem(): MFileSystem("tnfs") {
-        isRootFS = true;
-    };
+class FTPMFileSystem : public MFileSystem {
+   public:
+    FTPMFileSystem() : MFileSystem("ftp") { isRootFS = true; };
 
     bool handles(std::string name) {
-        if ( mstr::equals(name, (char *)"tnfs:", false) )
-            return true;
+        if (mstr::equals(name, (char*)"ftp:", false)) return true;
 
         return false;
     }
 
-    MFile* getFile(std::string path) override {
-        return new FTPMFile(path);
-    }
+    MFile* getFile(std::string path) override { return new FTPMFile(path); }
 };
 
-
-#endif // MEATLOAF_DEVICE_FTP
+#endif  // MEATLOAF_DEVICE_FTP
