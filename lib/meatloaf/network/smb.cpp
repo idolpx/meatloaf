@@ -27,7 +27,9 @@
 #include <fcntl.h>
 #include <errno.h>
 
-int SMBMFile::is_finished = 0;
+// Static members for share enumeration
+std::vector<std::string> SMBMSession::_shares_temp;
+int SMBMSession::_enum_finished = 0;
 std::vector<std::string> SMBMFile::shares;
 
 /********************************************************
@@ -53,47 +55,6 @@ bool parseSMBPath(const std::string& path, std::string& share, std::string& shar
 /********************************************************
  * MFile implementations
  ********************************************************/
-
-void SMBMFile::share_enumerate_cb(struct smb2_context *smb2, int status, void *command_data, void *private_data)
-{
-    struct srvsvc_netshareenumall_rep *rep = reinterpret_cast<struct srvsvc_netshareenumall_rep*>(command_data);
-    int i;
-
-    if (status) {
-        printf("failed to enumerate shares (%s) %s\n", strerror(-status), smb2_get_error(smb2));
-        return;
-    }
-
-    printf("Number of shares:%lu\n", rep->ctr->ctr1.count);
-    for (i = 0; i < rep->ctr->ctr1.count; i++) {
-        printf("%-20s %-20s", rep->ctr->ctr1.array[i].name,
-            rep->ctr->ctr1.array[i].comment);
-        shares.push_back(rep->ctr->ctr1.array[i].name);
-        if ((rep->ctr->ctr1.array[i].type & 3) == SHARE_TYPE_DISKTREE) {
-            printf(" DISKTREE");
-        }
-        if ((rep->ctr->ctr1.array[i].type & 3) == SHARE_TYPE_PRINTQ) {
-            printf(" PRINTQ");
-        }
-        if ((rep->ctr->ctr1.array[i].type & 3) == SHARE_TYPE_DEVICE) {
-            printf(" DEVICE");
-        }
-        if ((rep->ctr->ctr1.array[i].type & 3) == SHARE_TYPE_IPC) {
-            printf(" IPC");
-        }
-        if (rep->ctr->ctr1.array[i].type & SHARE_TYPE_TEMPORARY) {
-            printf(" TEMPORARY");
-        }
-        if (rep->ctr->ctr1.array[i].type & SHARE_TYPE_HIDDEN) {
-            printf(" HIDDEN");
-        }
-        printf("\n");
-    }
-
-    smb2_free_data(smb2, rep);
-
-    is_finished = 1;
-}
 
 bool SMBMFile::pathValid(std::string path)
 {
@@ -304,6 +265,7 @@ bool SMBMFile::rewindDirectory()
     } else {
         dirOpened = true;
         entry_index = 0;
+        shares = _session->getShares();
     }
 
     Debug_printv("dirOpened[%d] entry_index[%d] share_path[%s]", dirOpened, entry_index, share_path.c_str());
@@ -542,6 +504,16 @@ bool SMBMStream::open(std::ios_base::openmode mode) {
     }
 
     Debug_printv("SMB open mode[0x%X] share[%s] path[%s]", smb_mode, share.c_str(), share_path.c_str());
+
+    // Get share context if we have a specific share
+    if (!share.empty()) {
+        _share_context = _session->getShareContext(share);
+        if (!_share_context) {
+            Debug_printv("Failed to get share context for: %s", share.c_str());
+            _error = EACCES;
+            return false;
+        }
+    }
 
     auto smb = getSMB();
     if (!smb) {

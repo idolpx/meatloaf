@@ -142,10 +142,10 @@ public:
             return _smb;  // Use IPC$ context for share enumeration
         }
         
-        // Check if we already have a context for this share
+        // Check if we already have a cached context for this share
         auto it = _share_contexts.find(share);
         if (it != _share_contexts.end() && it->second != nullptr) {
-            //Debug_printv("Reusing existing context for share: %s", share.c_str());
+            Debug_printv("Cache hit for share: %s, returning cached context", share.c_str());
             return it->second;
         }
         
@@ -171,8 +171,105 @@ public:
             return nullptr;
         }
         
+        // Cache the context for future use
         _share_contexts[share] = smb;
+        Debug_printv("Cached context for share: %s", share.c_str());
+        
         return smb;
+    }
+    
+    // Get list of shares on this server (cached after first enumeration)
+    const std::vector<std::string>& getShares() {
+        if (!_shares_enumerated) {
+            enumerateShares();
+        }
+        return _shares_list;
+    }
+
+private:
+    static std::vector<std::string> _shares_temp;  // Temporary storage during enumeration
+    static int _enum_finished;
+    
+    static void share_enumerate_cb(struct smb2_context *smb2, int status, void *command_data, void *private_data) {
+        struct srvsvc_netshareenumall_rep *rep = reinterpret_cast<struct srvsvc_netshareenumall_rep*>(command_data);
+        
+        if (status) {
+            Debug_printv("Share enumeration failed: %s", smb2_get_error(smb2));
+            _enum_finished = 1;
+            return;
+        }
+
+        if (rep && rep->ctr && rep->ctr->ctr1.count > 0) {
+            Debug_printv("Enumerated %lu shares", rep->ctr->ctr1.count);
+            std::string share_type = "";
+            for (uint32_t i = 0; i < rep->ctr->ctr1.count; i++) {
+
+                // Determine share type
+                if ((rep->ctr->ctr1.array[i].type & 3) == SHARE_TYPE_DISKTREE) {
+                    share_type = "DISKTREE";
+                }
+                if ((rep->ctr->ctr1.array[i].type & 3) == SHARE_TYPE_PRINTQ) {
+                    share_type = "PRINTQ";
+                }
+                if ((rep->ctr->ctr1.array[i].type & 3) == SHARE_TYPE_DEVICE) {
+                    share_type = "DEVICE";
+                }
+                if ((rep->ctr->ctr1.array[i].type & 3) == SHARE_TYPE_IPC) {
+                    share_type = "IPC";
+                }
+                if (rep->ctr->ctr1.array[i].type & SHARE_TYPE_TEMPORARY) {
+                    share_type += " TEMPORARY";
+                }
+                if (rep->ctr->ctr1.array[i].type & SHARE_TYPE_HIDDEN) {
+                    share_type += " HIDDEN";
+                }
+
+                Debug_printv("Found share:[%s] %s - %s", share_type.c_str(), rep->ctr->ctr1.array[i].name, rep->ctr->ctr1.array[i].comment);
+                if ((rep->ctr->ctr1.array[i].type & 3) == SHARE_TYPE_DISKTREE) { // SMB2_SHARE_TYPE_DISKTREE
+                    _shares_temp.push_back(rep->ctr->ctr1.array[i].name);
+                }
+            }
+            smb2_free_data(smb2, rep);
+        }
+        
+        _enum_finished = 1;
+    }
+    
+    void enumerateShares() {
+        if (!_smb) return;
+        
+        _shares_list.clear();
+        _shares_enumerated = true;
+        _shares_temp.clear();
+        _enum_finished = 0;
+        
+        if (smb2_share_enum_async(_smb, share_enumerate_cb, nullptr) != 0) {
+            Debug_printv("smb2_share_enum_async failed: %s", smb2_get_error(_smb));
+            return;
+        }
+        
+        // Wait for enumeration to complete
+        struct pollfd pfd;
+        while (!_enum_finished) {
+            pfd.fd = smb2_get_fd(_smb);
+            pfd.events = smb2_which_events(_smb);
+
+            if (poll(&pfd, 1, 1000) < 0) {
+                Debug_printv("Poll failed during share enumeration");
+                break;
+            }
+            if (pfd.revents == 0) {
+                continue;
+            }
+            if (smb2_service(_smb, pfd.revents) < 0) {
+                Debug_printv("smb2_service failed: %s", smb2_get_error(_smb));
+                break;
+            }
+        }
+        
+        // Copy temp list to permanent list
+        _shares_list = _shares_temp;
+        _shares_temp.clear();
     }
 
 private:
@@ -180,6 +277,8 @@ private:
     std::string _password;
     struct smb2_context* _smb = nullptr;
     std::map<std::string, struct smb2_context*> _share_contexts;  // Per-share contexts
+    std::vector<std::string> _shares_list;  // Cached list of shares
+    bool _shares_enumerated = false;  // Flag to track if shares have been enumerated
 };
 
 /********************************************************
@@ -214,37 +313,13 @@ public:
         parseSMBPath(this->path, share, share_path);
         Debug_printv("path[%s] share[%s] share_path[%s]", this->path.c_str(), share.c_str(), share_path.c_str());
 
-        // If no share specified, enumerate available shares
-        if (share.empty()) {
-            Debug_printv("ENUMERATE path[%s] share[%s] share_path[%s]", this->path.c_str(), share.c_str(), share_path.c_str());
-            auto smb = getSMB();
-            if (smb) {
-                // Clear previous share list
-                shares.clear();
-                is_finished = 0;
-                
-                struct pollfd pfd;
-                if (smb2_share_enum_async(smb, share_enumerate_cb, NULL) != 0) {
-                    Debug_printv("smb2_share_enum failed: %s", smb2_get_error(smb));
-                } else {
-                    // Wait for enumeration to complete
-                    while (!is_finished) {
-                        pfd.fd = smb2_get_fd(smb);
-                        pfd.events = smb2_which_events(smb);
-
-                        if (poll(&pfd, 1, 1000) < 0) {
-                            Debug_printv("Poll failed");
-                            break;
-                        }
-                        if (pfd.revents == 0) {
-                            continue;
-                        }
-                        if (smb2_service(smb, pfd.revents) < 0) {
-                            Debug_printv("smb2_service failed: %s", smb2_get_error(smb));
-                            break;
-                        }
-                    }
-                }
+        // Create/obtain share context if we have a specific share
+        if (!share.empty()) {
+            _share_context = _session->getShareContext(share);
+            if (!_share_context) {
+                Debug_printv("Failed to get share context for: %s", share.c_str());
+                m_isNull = true;
+                return;
             }
         }
 
@@ -261,6 +336,8 @@ public:
     };
     ~SMBMFile() {
         closeDir();
+        // Don't destroy share context - it's owned and cached by SMBMSession
+        _share_context = nullptr;
     }
 
     std::shared_ptr<MStream> getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override ; // has to return OPENED stream
@@ -285,15 +362,16 @@ protected:
     bool dirOpened = false;
 
     std::shared_ptr<SMBMSession> _session;
+    struct smb2_context* _share_context = nullptr;  // Share-specific context owned by session
     struct smb2dir *_handle_dir = nullptr;
 
-    // Helper to get SMB context from session - use share-specific context if available
+    // Helper to get SMB context - use the share context if available, otherwise IPC$
     struct smb2_context* getSMB() { 
-        if (!_session) return nullptr;
-        if (!share.empty()) {
-            return _session->getShareContext(share);
+        if (_share_context) {
+            return _share_context;  // Use pre-obtained share context
         }
-        return _session->getContext();
+        if (!_session) return nullptr;
+        return _session->getContext();  // Fall back to IPC$ context for share enumeration
     }
 
 private:
@@ -303,9 +381,7 @@ private:
     bool pathValid(std::string path);
 
     int entry_index;
-    static int is_finished;
-    static std::vector<std::string> shares;
-    static void share_enumerate_cb(struct smb2_context *smb2, int status, void *command_data, void *private_data);
+    static std::vector<std::string> shares;  // Local share list during enumeration
 };
 
 
@@ -348,6 +424,8 @@ public:
     }
     ~SMBMStream() override {
         close();
+        // Don't destroy share context - it's owned and cached by SMBMSession
+        _share_context = nullptr;
     }
 
     // MStream methods
@@ -374,14 +452,14 @@ protected:
     std::shared_ptr<SMBMSession> _session;
     struct smb2fh *_handle = nullptr;
     std::string _share;  // Store the share name for context selection
+    struct smb2_context* _share_context = nullptr;  // Share-specific context owned by this stream
 
     struct smb2_context* getSMB() { 
-        if (!_session) return nullptr;
-        // Use the share-specific context if we have a share name
-        if (!_share.empty()) {
-            return _session->getShareContext(_share);
+        if (_share_context) {
+            return _share_context;  // Use our own share context
         }
-        return _session->getContext();
+        if (!_session) return nullptr;
+        return _session->getContext();  // Fall back to IPC$ context
     }
 };
 
