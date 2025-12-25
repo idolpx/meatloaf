@@ -250,13 +250,19 @@ uint64_t TNFSMFile::getAvailableSpace() {
         return 0;
     }
 
-    uint32_t free_bytes;
-    if (tnfs_free(mountinfo, &free_bytes) != TNFS_RESULT_SUCCESS) {
-        Debug_printv("tnfs_free failed");
-        return 0;
+    uint64_t free_bytes;
+    if (tnfs_free_bytes(mountinfo, &free_bytes) != TNFS_RESULT_SUCCESS) {
+        // Fallback to tnfs_free if tnfs_free_bytes is not supported
+        if (tnfs_free(mountinfo, (uint32_t*)&free_bytes) != TNFS_RESULT_SUCCESS) {
+            Debug_printv("tnfs_free failed");
+            return 0;
+        }
+        Debug_printv("before free[%u]", free_bytes);
+        free_bytes = free_bytes * 1024;  // Convert from KB to bytes
+        Debug_printv(" after free[%u]", free_bytes);
+        return free_bytes;
     }
 
-    Debug_printv("free[%u]", free_bytes);
     return free_bytes;
 }
 

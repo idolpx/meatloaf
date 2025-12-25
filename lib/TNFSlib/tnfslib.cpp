@@ -1152,8 +1152,8 @@ int tnfs_size(tnfsMountInfo *m_info, uint32_t *size)
         return -1;
 
     tnfsPacket packet;
-    packet.command = TNFS_CMD_SIZE;
 
+    packet.command = TNFS_CMD_SIZE;
     if (_tnfs_transaction(m_info, packet, 0))
     {
         if (packet.payload[0] == 0)
@@ -1162,6 +1162,27 @@ int tnfs_size(tnfsMountInfo *m_info, uint32_t *size)
         }
         return packet.payload[0];
     }
+
+    return -1;
+}
+
+int tnfs_size_bytes(tnfsMountInfo *m_info, uint64_t *size)
+{
+    if (m_info == nullptr || size == nullptr)
+        return -1;
+
+    tnfsPacket packet;
+
+    packet.command = TNFS_CMD_SIZE_BYTES;
+    if (_tnfs_transaction(m_info, packet, 0))
+    {
+        if (packet.payload[0] == 0)
+        {
+            *size = TNFS_UINT64_FROM_LOHI_BYTEPTR(packet.payload + 1);
+        }
+        return packet.payload[0];
+    }
+
     return -1;
 }
 
@@ -1176,8 +1197,8 @@ int tnfs_free(tnfsMountInfo *m_info, uint32_t *size)
         return -1;
 
     tnfsPacket packet;
-    packet.command = TNFS_CMD_FREE;
 
+    packet.command = TNFS_CMD_FREE;
     if (_tnfs_transaction(m_info, packet, 0))
     {
         if (packet.payload[0] == 0)
@@ -1186,6 +1207,27 @@ int tnfs_free(tnfsMountInfo *m_info, uint32_t *size)
         }
         return packet.payload[0];
     }
+
+    return -1;
+}
+
+int tnfs_free_bytes(tnfsMountInfo *m_info, uint64_t *size)
+{
+    if (m_info == nullptr || size == nullptr)
+        return -1;
+
+    tnfsPacket packet;
+
+    packet.command = TNFS_CMD_FREE_BYTES;
+    if (_tnfs_transaction(m_info, packet, 0))
+    {
+        if (packet.payload[0] == 0)
+        {
+            *size = TNFS_UINT64_FROM_LOHI_BYTEPTR(packet.payload + 1);
+        }
+        return packet.payload[0];
+    }
+
     return -1;
 }
 
@@ -1295,7 +1337,10 @@ bool _tnfs_tcp_send(tnfsMountInfo *m_info, tnfsPacket &pkt, uint16_t payload_siz
         if (m_info->host_ip != IPADDR_NONE)
             success = tcp->connect(m_info->host_ip, m_info->port, TNFS_TIMEOUT);
         else
+        {
             success = tcp->connect(m_info->hostname, m_info->port, TNFS_TIMEOUT);
+            m_info->host_ip = tcp->remoteIP();
+        }
         if (!success)
         {
             Debug_println("Can't connect to the TCP server");
@@ -1320,7 +1365,10 @@ bool _tnfs_udp_do_send(fnUDP *udp, tnfsMountInfo *m_info, tnfsPacket &pkt, uint1
     if (m_info->host_ip != IPADDR_NONE)
         sent = udp->beginPacket(m_info->host_ip, m_info->port);
     else
+    {
         sent = udp->beginPacket(m_info->hostname, m_info->port);
+        m_info->host_ip = udp->remoteIP();
+    }
 
     if (sent)
     {
