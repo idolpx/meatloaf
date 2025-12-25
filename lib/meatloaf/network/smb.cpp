@@ -128,9 +128,12 @@ bool SMBMFile::isDirectory()
     return st.smb2_type == SMB2_TYPE_DIRECTORY;
 }
 
-std::shared_ptr<MStream> SMBMFile::getSourceStream(std::ios_base::openmode mode)
-{
-    std::shared_ptr<MStream> istream = std::make_shared<SMBMStream>(path);
+std::shared_ptr<MStream> SMBMFile::getSourceStream(std::ios_base::openmode mode) {
+    // Add pathInStream to URL if specified
+    if ( pathInStream.size() )
+        url += "/" + pathInStream;
+
+    std::shared_ptr<MStream> istream = std::make_shared<SMBMStream>(url);
     istream->open(mode);
     return istream;
 }
@@ -141,7 +144,7 @@ std::shared_ptr<MStream> SMBMFile::getDecodedStream(std::shared_ptr<MStream> is)
 
 std::shared_ptr<MStream> SMBMFile::createStream(std::ios_base::openmode mode)
 {
-    std::shared_ptr<MStream> istream = std::make_shared<SMBMStream>(path);
+    std::shared_ptr<MStream> istream = std::make_shared<SMBMStream>(url);
     istream->open(mode);
     return istream;
 }
@@ -187,7 +190,7 @@ uint64_t SMBMFile::getAvailableSpace()
     // Get bytes free
     struct smb2_statvfs status;
     smb2_statvfs(smb, share_path.c_str(), &status);
-    Debug_printv("size[%llu] blocks[%llu] free[%llu] avail[%llu]", status.f_bsize, status.f_blocks, status.f_bfree, status.f_bavail);
+    //Debug_printv("size[%llu] blocks[%llu] free[%llu] avail[%llu]", status.f_bsize, status.f_blocks, status.f_bfree, status.f_bavail);
     return (status.f_bfree * status.f_bsize);
 }
 
@@ -504,9 +507,17 @@ bool SMBMStream::open(std::ios_base::openmode mode) {
         return false;
     }
 
+    // Set credentials on the session if available
+    if (!user.empty() || !password.empty()) {
+        _session->setCredentials(user, password);
+    }
+
     // Parse path to get share and file path
     std::string share, share_path;
     parseSMBPath(parser->path, share, share_path);
+    
+    // Store share for getSMB() to use the correct context
+    _share = share;
 
     if (share_path.empty()) {
         Debug_printv("No file path specified in URL");
@@ -539,7 +550,7 @@ bool SMBMStream::open(std::ios_base::openmode mode) {
         return false;
     }
 
-    // Open the file
+    // Open the file with the share_path as-is
     _handle = smb2_open(smb, share_path.c_str(), smb_mode);
     if (!_handle) {
         Debug_printv("Failed to open file: %s", smb2_get_error(smb));

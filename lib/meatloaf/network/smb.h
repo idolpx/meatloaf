@@ -145,7 +145,7 @@ public:
         // Check if we already have a context for this share
         auto it = _share_contexts.find(share);
         if (it != _share_contexts.end() && it->second != nullptr) {
-            Debug_printv("Reusing existing context for share: %s", share.c_str());
+            //Debug_printv("Reusing existing context for share: %s", share.c_str());
             return it->second;
         }
         
@@ -373,8 +373,16 @@ public:
 protected:
     std::shared_ptr<SMBMSession> _session;
     struct smb2fh *_handle = nullptr;
+    std::string _share;  // Store the share name for context selection
 
-    struct smb2_context* getSMB() { return _session ? _session->getContext() : nullptr; }
+    struct smb2_context* getSMB() { 
+        if (!_session) return nullptr;
+        // Use the share-specific context if we have a share name
+        if (!_share.empty()) {
+            return _session->getShareContext(_share);
+        }
+        return _session->getContext();
+    }
 };
 
 
