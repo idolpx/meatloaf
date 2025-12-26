@@ -37,6 +37,11 @@
 // Returns a uint32 value from the little-endian version
 #define UINT32_FROM_LE_UINT32(_ui32) \
     ((_ui32 >> 24 & 0x000000FF) | (_ui32 >> 8 & 0x0000FF00) | (_ui32 << 8 & 0x00FF0000) | (_ui32 << 24 & 0xFF000000))
+// Returns a uint64 value from the little-endian version
+#define UINT64_FROM_LE_UINT64(_ui64) \
+    ((_ui64 >> 56 & 0x00000000000000FFULL) | (_ui64 >> 40 & 0x000000000000FF00ULL) | (_ui64 >> 24 & 0x0000000000FF0000ULL) | \
+     (_ui64 >> 8  & 0x00000000FF000000ULL) | (_ui64 << 8  & 0x000000FF00000000ULL) | (_ui64 << 24 & 0x0000FF0000000000ULL) | \
+     (_ui64 << 40 & 0x00FF000000000000ULL) | (_ui64 << 56 & 0xFF00000000000000ULL))
 
 // Returns the high byte (MSB) of a uint16 value
 #define HIBYTE_FROM_UINT16(value) ((uint8_t)((value >> 8) & 0xFF))

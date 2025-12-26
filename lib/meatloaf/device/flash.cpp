@@ -292,7 +292,7 @@ bool FlashMFile::readEntry( std::string filename )
             // Read Entry From Stream
             if ( dirent->d_type != DT_DIR ) // Only want to match files not directories
             {
-                if ( mstr::compareFilename(filename, entryFilename, wildcard) )
+                if ( mstr::compareFilename(entryFilename, filename, wildcard) )
                 {
                     found = true;
                 }

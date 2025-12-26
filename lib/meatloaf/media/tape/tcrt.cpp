@@ -94,7 +94,7 @@ bool TCRTMStream::seekEntry( std::string filename )
 
             //Debug_printv("index[%d] filename[%s] entry.filename[%s] entry.file_type[%d]", index, filename.c_str(), entryFilename.c_str(), entry.file_type);
 
-            if ( mstr::compareFilename(filename, entryFilename, wildcard) )
+            if ( mstr::compareFilename(entryFilename, filename, wildcard) )
             {
                 return true;
             }

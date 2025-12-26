@@ -375,7 +375,7 @@ bool SMBMFile::readEntry( std::string filename )
             found = true;
             break;
         }
-        else if (mstr::compare(filename, entryFilename)) {
+        else if (mstr::compare(entryFilename, filename)) {
             Debug_printv( "Found! file[%s] -> entry[%s]", filename.c_str(), entryFilename.c_str() );
             name = entryFilename;
             rebuildUrl();

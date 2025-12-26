@@ -39,7 +39,7 @@ extern "C" {
 }
 // #include <MD5Builder.h>
 
-#ifdef BOARD_HAS_PSRAM
+#ifdef CONFIG_SPIRAM
 #include <esp_psram.h>
 #ifdef CONFIG_IDF_TARGET_ESP32
 #include <esp32/himem.h>
@@ -194,7 +194,7 @@ uint32_t EspClass::getMaxAllocHeap(void) {
 }
 
 uint32_t EspClass::getPsramSize(void) {
-#if defined(BOARD_HAS_PSRAM)
+#if defined(CONFIG_SPIRAM)
     if (esp_psram_is_initialized()) {
         return heap_caps_get_total_size(MALLOC_CAP_SPIRAM);
     }
@@ -203,7 +203,7 @@ uint32_t EspClass::getPsramSize(void) {
 }
 
 uint32_t EspClass::getPsramFree(void) {
-#if defined(BOARD_HAS_PSRAM)
+#if defined(CONFIG_SPIRAM)
     if (esp_psram_is_initialized()) {
         return heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
     }
@@ -212,7 +212,7 @@ uint32_t EspClass::getPsramFree(void) {
 }
 
 uint32_t EspClass::getPsramMinFree(void) {
-#if defined(BOARD_HAS_PSRAM)
+#if defined(CONFIG_SPIRAM)
     if (esp_psram_is_initialized()) {
         return heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM);
     }
@@ -221,7 +221,7 @@ uint32_t EspClass::getPsramMinFree(void) {
 }
 
 uint32_t EspClass::getPsramMaxAlloc(void) {
-#if defined(BOARD_HAS_PSRAM)
+#if defined(CONFIG_SPIRAM)
     if (esp_psram_is_initialized()) {
         return heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM);
     }
@@ -232,7 +232,7 @@ uint32_t EspClass::getPsramMaxAlloc(void) {
 
 
 uint32_t EspClass::getPsramHiMemSize(void) {
-#if defined(CONFIG_IDF_TARGET_ESP32) && defined(BOARD_HAS_PSRAM)
+#if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
     if (esp_psram_is_initialized()) {
         return esp_himem_get_phys_size();
     }
@@ -241,7 +241,7 @@ uint32_t EspClass::getPsramHiMemSize(void) {
 }
 
 uint32_t EspClass::getPsramHiMemFree(void) {
-#if defined(CONFIG_IDF_TARGET_ESP32) && defined(BOARD_HAS_PSRAM)
+#if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
     if (esp_psram_is_initialized()) {
         return esp_himem_get_free_size();
     }
@@ -250,7 +250,7 @@ uint32_t EspClass::getPsramHiMemFree(void) {
 }
 
 uint32_t EspClass::getPsramHiMemReserved(void) {
-#if defined(CONFIG_IDF_TARGET_ESP32) && defined(BOARD_HAS_PSRAM)
+#if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
     if (esp_psram_is_initialized()) {
         return esp_himem_reserved_area_size();
     }

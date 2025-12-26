@@ -1,7 +1,7 @@
 
 #include "keys.h"
 
-// #ifdef BOARD_HAS_PSRAM
+// #ifdef CONFIG_SPIRAM
 // #ifdef CONFIG_IDF_TARGET_ESP32S3
 // #include <esp_psram.h>
 // #else

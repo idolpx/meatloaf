@@ -438,7 +438,7 @@ std::string MFSOwner::existsLocal( std::string path )
                 while ((ent = readdir (dir)) != NULL) {
                     // Debug_printv( "%s\r\n", ent->d_name );
                     e = ent->d_name;
-                    if ( mstr::compare( name, e ) )
+                    if ( mstr::compare( e, name ) )
                     {
                         path = ( p + "/" + e );
                         break;
@@ -588,7 +588,7 @@ std::shared_ptr<MStream> MFile::getSourceStream(std::ios_base::openmode mode) {
 
         while (!pointedFile.empty())
         {
-            if(mstr::compare(pathInStream, pointedFile))
+            if(mstr::compare(pointedFile, pathInStream))
             {
                 //Debug_printv("returning decodedStream 1 [%s]", decodedStream->url.c_str());
                 return decodedStream;

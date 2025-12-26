@@ -89,7 +89,7 @@ bool LBRMStream::seekEntry( std::string filename )
 
             Debug_printv("filename[%s] entry.filename[%s]", filename.c_str(), entryFilename.c_str());
 
-            if ( mstr::compareFilename(filename, entryFilename, wildcard) )
+            if ( mstr::compareFilename(entryFilename, filename, wildcard) )
             {
                 return true;
             }

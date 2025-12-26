@@ -467,7 +467,7 @@ public:
                 //Debug_printv("comparing [%s][%s] to [%s] wildcard[%d]", fileName.c_str(), extension.c_str(), e.c_str(), wildcard);
                 if ( wildcard )
                 {
-                    if ( mstr::compare(e, extension, false) )
+                    if ( mstr::compare(extension, e, false) )
                         return true;
                 }
                 else

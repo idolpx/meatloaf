@@ -195,7 +195,7 @@ bool HDDMStream::seekEntry(std::string filename)
 
         Debug_printv("Comparing: %s vs %s", filename.c_str(), entryFilename.c_str());
 
-        if (mstr::compareFilename(filename, entryFilename, wildcard))
+        if (mstr::compareFilename(entryFilename, filename, wildcard))
         {
             Debug_printv("Found match: %s", entryFilename.c_str());
             return true;

@@ -26,12 +26,10 @@
 #include "dirent.h"
 #include "FS.h"
 
-#ifdef CONFIG_SPIRAM
 #ifdef CONFIG_IDF_TARGET_ESP32S3
 #include <esp_psram.h>
 #else
 #include <esp32/himem.h>
-#endif
 #endif
 
 #include <cstdint>

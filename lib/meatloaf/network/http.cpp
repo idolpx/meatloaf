@@ -601,7 +601,8 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
             else if(mstr::equals("Location", evt->header_key, false))
             {
                 Debug_printv("* This page redirects from '%s' to '%s'", meatClient->url.c_str(), evt->header_value);
-                if ( mstr::startsWith(evt->header_value, (char *)"http") )
+                //if ( mstr::compare(evt->header_value, "*://*") )
+                if ( mstr::contains(evt->header_value, (char *)"://") )
                 {
                     //Debug_printv("match");
                     meatClient->url = evt->header_value;
