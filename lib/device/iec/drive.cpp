@@ -759,14 +759,21 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                     {
                         Debug_printv("Opening directory for reading [%s]", f->url.c_str());
                         // regular directory
-                        f->rewindDirectory();
-                        m_channels[channel] = new iecChannelHandlerDir(this, f);
-                        m_numOpenChannels++;
-                        Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Change Directory Here! channel[%d] numChannels[%d] dir[%s]", channel, m_numOpenChannels, f->url.c_str());
-                        m_cwd.reset(MFSOwner::File(f->url));
-                        Debug_printv("Reading directory [%s]", f->url.c_str());
+                        if (!f->rewindDirectory())
+                        {
+                            Debug_printv("Error: could not set current working directory to [%s]. Permission denied.", f->url.c_str());
+                            setStatusCode(ST_PERMISSION_DENIED);
+                        }
+                        else
+                        {
+                            m_channels[channel] = new iecChannelHandlerDir(this, f);
+                            m_numOpenChannels++;
+                            Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Change Directory Here! channel[%d] numChannels[%d] dir[%s]", channel, m_numOpenChannels, f->url.c_str());
+                            m_cwd.reset(MFSOwner::File(f->url));
+                            Debug_printv("Reading directory [%s]", f->url.c_str());
+                            setStatusCode(ST_OK);
+                        }
                         f = nullptr; // f will be deleted in iecChannelHandlerDir destructor
-                        setStatusCode(ST_OK);
                     }
                     // else
                     // {

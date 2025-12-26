@@ -16,6 +16,10 @@
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
 // FTP:// - File Transfer Protocol
+//
+// https://en.wikipedia.org/wiki/File_Transfer_Protocol
+// https://www.ietf.org/archive/id/draft-bryan-ftp-range-01.html
+//
 
 #ifndef MEATLOAF_DEVICE_FTP
 #define MEATLOAF_DEVICE_FTP

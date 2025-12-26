@@ -535,7 +535,7 @@ bool SMBMStream::open(std::ios_base::openmode mode) {
     struct smb2_stat_64 st;
     if (smb2_fstat(smb, _handle, &st) == 0) {
         _size = st.smb2_size;
-        Debug_printv("File size: %u bytes", _size);
+        //Debug_printv("File size: %u bytes", _size);
     } else {
         Debug_printv("Warning: Could not get file size: %s", smb2_get_error(smb));
         _size = 0;
