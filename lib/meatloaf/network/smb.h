@@ -145,7 +145,7 @@ public:
         // Check if we already have a cached context for this share
         auto it = _share_contexts.find(share);
         if (it != _share_contexts.end() && it->second != nullptr) {
-            Debug_printv("Cache hit for share: %s, returning cached context", share.c_str());
+            //Debug_printv("Cache hit for share: %s, returning cached context", share.c_str());
             return it->second;
         }
         
@@ -250,14 +250,19 @@ private:
         
         // Wait for enumeration to complete
         struct pollfd pfd;
-        while (!_enum_finished) {
+        int poll_count = 0;
+        const int MAX_POLLS = 100;  // Prevent infinite loops
+        
+        while (!_enum_finished && poll_count < MAX_POLLS) {
             pfd.fd = smb2_get_fd(_smb);
             pfd.events = smb2_which_events(_smb);
 
-            if (poll(&pfd, 1, 1000) < 0) {
+            if (poll(&pfd, 1, 100) < 0) {  // Reduced timeout to 100ms
                 Debug_printv("Poll failed during share enumeration");
                 break;
             }
+            poll_count++;
+            
             if (pfd.revents == 0) {
                 continue;
             }
@@ -267,9 +272,14 @@ private:
             }
         }
         
+        if (poll_count >= MAX_POLLS) {
+            Debug_printv("Enumeration polling timeout - hit max polls");
+        }
+        
         // Copy temp list to permanent list
         _shares_list = _shares_temp;
         _shares_temp.clear();
+        Debug_printv("Share enumeration complete: %lu shares cached", _shares_list.size());
     }
 
 private:
@@ -293,6 +303,7 @@ public:
     std::string share_path = "";
     
     SMBMFile(std::string path): MFile(path) {
+        //Debug_printv("url[%s] host[%s] path[%s]", url.c_str(), host.c_str(), this->path.c_str());
 
         // Obtain or create SMB session via SessionBroker
         uint16_t smb_port = port.empty() ? 445 : std::stoi(port);
@@ -311,7 +322,7 @@ public:
 
         // extract share from path
         parseSMBPath(this->path, share, share_path);
-        Debug_printv("path[%s] share[%s] share_path[%s]", this->path.c_str(), share.c_str(), share_path.c_str());
+        //Debug_printv("path[%s] share[%s] share_path[%s]", this->path.c_str(), share.c_str(), share_path.c_str());
 
         // Create/obtain share context if we have a specific share
         if (!share.empty()) {
@@ -332,7 +343,7 @@ public:
         else
             m_isNull = false;
 
-        Debug_printv("SMB path[%s] valid[%d]", this->path.c_str(), !m_isNull);
+        //Debug_printv("SMB path[%s] valid[%d]", this->path.c_str(), !m_isNull);
     };
     ~SMBMFile() {
         closeDir();

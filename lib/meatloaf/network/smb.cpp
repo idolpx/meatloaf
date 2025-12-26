@@ -94,6 +94,7 @@ std::shared_ptr<MStream> SMBMFile::getSourceStream(std::ios_base::openmode mode)
     if ( pathInStream.size() )
         url += "/" + pathInStream;
 
+    Debug_printv("url[%s] mode[%d]", url.c_str(), mode);
     std::shared_ptr<MStream> istream = std::make_shared<SMBMStream>(url);
     istream->open(mode);
     return istream;

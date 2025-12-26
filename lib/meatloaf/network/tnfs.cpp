@@ -128,14 +128,6 @@ TNFSMFile::TNFSMFile(std::string path): MFile(path) {
         return;
     }
 
-    // // Change to the requested directory if provided
-    // if (!this->path.empty() && this->path != "/") {
-    //     int result = tnfs_chdir(mountinfo, this->path.c_str());
-    //     if (result != TNFS_RESULT_SUCCESS) {
-    //         Debug_printv("Warning: Could not change to directory %s: error %d", this->path.c_str(), result);
-    //     }
-    // }
-
     // Find full filename for wildcard
     if (mstr::contains(name, "?") || mstr::contains(name, "*")) {
         readEntry(name);
