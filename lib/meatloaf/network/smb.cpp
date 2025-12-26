@@ -72,7 +72,7 @@ bool SMBMFile::pathValid(std::string path)
 
 bool SMBMFile::isDirectory()
 {
-    Debug_printv("path[%s] len[%d]", share_path.c_str(), share_path.size());
+    //Debug_printv("path[%s] len[%d]", share_path.c_str(), share_path.size());
     if(share_path=="/" || share_path.empty())
         return true;
 
@@ -269,14 +269,14 @@ bool SMBMFile::rewindDirectory()
         shares = _session->getShares();
     }
 
-    Debug_printv("dirOpened[%d] entry_index[%d] share_path[%s]", dirOpened, entry_index, share_path.c_str());
+    //Debug_printv("dirOpened[%d] entry_index[%d] share_path[%s]", dirOpened, entry_index, share_path.c_str());
     return dirOpened;
 }
 
 
 MFile* SMBMFile::getNextFileInDir()
 {
-    Debug_printv("dirOpened[%d] entry_index[%d] share[%s] share_path[%s]", dirOpened, entry_index, share.c_str(), share_path.c_str());
+    //Debug_printv("dirOpened[%d] entry_index[%d] share[%s] share_path[%s]", dirOpened, entry_index, share.c_str(), share_path.c_str());
     if (!dirOpened) {
         rewindDirectory();
     }
@@ -298,7 +298,7 @@ MFile* SMBMFile::getNextFileInDir()
             ent_size = ent->st.smb2_size;
             // Skip hidden files and current/parent directory entries
         } while (ent->name[0] == '.' && (ent->name[1] == '\0' || (ent->name[1] == '.' && ent->name[2] == '\0')));
-        Debug_printv("FILES ent_name[%s] ent_type[%d] ent_size[%llu]", ent_name.c_str(), ent_type, ent_size);
+        //Debug_printv("FILES ent_name[%s] ent_type[%d] ent_size[%llu]", ent_name.c_str(), ent_type, ent_size);
     } else {
         if (entry_index < shares.size()) {
             ent_name = shares[entry_index];
@@ -307,12 +307,12 @@ MFile* SMBMFile::getNextFileInDir()
             ent_name.clear();
         }
         entry_index++;
-        Debug_printv("SHARES ent_name[%s] ent_type[%d] ent_size[%llu]", ent_name.c_str(), ent_type, ent_size);
+        //Debug_printv("SHARES ent_name[%s] ent_type[%d] ent_size[%llu]", ent_name.c_str(), ent_type, ent_size);
     }
 
     if (!ent_name.empty()) {
 
-        Debug_printv("url[%s] entry[%s] index[%d]", mRawUrl.c_str(), ent_name.c_str(), entry_index);
+        //Debug_printv("url[%s] entry[%s] index[%d]", mRawUrl.c_str(), ent_name.c_str(), entry_index);
 
         auto file = new SMBMFile(url + "/" + ent_name);
         file->extension = " " + file->extension;

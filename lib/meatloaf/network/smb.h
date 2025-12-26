@@ -105,7 +105,6 @@ public:
     }
 
     void disconnect() override {
-        if (!connected) return;
         
         if (_smb) {
             smb2_destroy_context(_smb);
