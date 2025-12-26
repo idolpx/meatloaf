@@ -57,6 +57,10 @@ public:
     // Send keep-alive to maintain the connection
     virtual bool keep_alive() = 0;
 
+    // Some sessions might need to refresh
+    // SSDP, DNS-SD, DIAL, SMB SHARES, etc.
+    virtual bool refresh() { return true; }
+
     // Check if session is connected
     virtual bool isConnected() const { return connected; }
 
