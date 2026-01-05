@@ -20,6 +20,9 @@
 #include "../Helpers/PWDHelpers.h"
 #include "../../include/debug.h"
 
+#define ChunkSize              64   //bytes to send in chunk before ack
+#define ChunkAckChar          '+'   //char sent to ack chunk
+
 std::string read_until(char delimiter)
 {
     uint8_t byte = 0;
@@ -74,19 +77,24 @@ int rx(int argc, char **argv)
     int dest_checksum = 0;
     while (count < size)
     {
-        size_t size = 0;
-        uart_get_buffered_data_len((uart_port_t)CONSOLE_UART, &size);
-        if (size > 0)
+        size_t datalen = 0;
+        uart_get_buffered_data_len((uart_port_t)CONSOLE_UART, &datalen);
+        if (datalen > 0)
         {
             int result = uart_read_bytes((uart_port_t)CONSOLE_UART, &byte, 1, MAX_READ_WAIT_TICKS);
             if (result < 1)
-                break;
+            {
+                Serial.printf("3 Error: Receive Timeout at %lu bytes\r\n", count);
+                fclose(file);
+                return 3;
+            }    
 
             fprintf(file, "%c", byte);
 
             // Calculate checksum
             dest_checksum = esp_rom_crc32_le(dest_checksum, &byte, 1);
             count++;
+            if (count % ChunkSize == 0 || count == size) Serial.printf("%c", ChunkAckChar); // send ack character after every chunk
         }
     }
     fclose(file);
