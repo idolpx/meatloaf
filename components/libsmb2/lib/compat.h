@@ -19,14 +19,7 @@
 #ifndef _COMPAT_H_
 #define _COMPAT_H_
 
-#if defined(ESP_PLATFORM)
-
-#include "lwip/netdb.h"
-#include "lwip/sockets.h"
-
-#endif // ESP_PLATFORM
-
-#if defined(PICO_PLATFORM)
+#ifdef PICO_PLATFORM
 
 #include "lwip/netdb.h"
 #include "lwip/sockets.h"

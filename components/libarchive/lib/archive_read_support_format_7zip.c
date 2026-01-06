@@ -55,6 +55,12 @@
 #include "archive_read_private.h"
 #include "archive_endian.h"
 
+// // HIMEM is only available on original ESP32 with SPIRAM (not S2, S3, C3, etc.)
+// #if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
+// #include "../esp32/esp32_himem_allocator.h"
+// //#define USE_ESP32_HIMEM 1
+// #endif
+
 #ifndef HAVE_ZLIB_H
 #include "archive_crc32.h"
 #endif
@@ -1256,8 +1262,14 @@ init_decompression(struct archive_read *a, struct _7zip *zip,
 			filters[fi].id = LZMA_FILTER_LZMA1;
 		filters[fi].options = NULL;
 		ff = &filters[fi];
+// #ifdef USE_ESP32_HIMEM
+// 		/* Use ESP32 HIMEM allocator for LZMA to access upper 4MB PSRAM */
+// 		r = lzma_properties_decode(&filters[fi], &esp32_himem_lzma_allocator,
+// 		    coder1->properties, (size_t)coder1->propertiesSize);
+// #else
 		r = lzma_properties_decode(&filters[fi], NULL,
 		    coder1->properties, (size_t)coder1->propertiesSize);
+//#endif
 		if (r != LZMA_OK) {
 			set_error(a, r);
 			return (ARCHIVE_FAILED);
@@ -1266,6 +1278,10 @@ init_decompression(struct archive_read *a, struct _7zip *zip,
 
 		filters[fi].id = LZMA_VLI_UNKNOWN;
 		filters[fi].options = NULL;
+// #ifdef USE_ESP32_HIMEM
+// 		/* Set ESP32 HIMEM allocator for LZMA stream */
+// 		zip->lzstream.allocator = &esp32_himem_lzma_allocator;
+// #endif
 		r = lzma_raw_decoder(&(zip->lzstream), filters);
 		free(ff->options);
 		if (r != LZMA_OK) {

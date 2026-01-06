@@ -311,7 +311,11 @@ static int
 gzip_bidder_init(struct archive_read_filter *self)
 {
 	struct private_data *state;
+#if defined(ESP_PLATFORM)
+	static const size_t out_block_size = 255;
+#else
 	static const size_t out_block_size = 64 * 1024;
+#endif
 	void *out_block;
 
 	self->code = ARCHIVE_FILTER_GZIP;
@@ -359,6 +363,12 @@ consume_header(struct archive_read_filter *self)
 	/* Initialize compression library. */
 	state->stream.next_in = (unsigned char *)(uintptr_t)
 	    __archive_read_filter_ahead(self->upstream, 1, &avail);
+	if (state->stream.next_in == NULL || avail <= 0) {
+		archive_set_error(&self->archive->archive,
+		    ARCHIVE_ERRNO_MISC,
+		    "No compressed data available");
+		return (ARCHIVE_FATAL);
+	}
 	state->stream.avail_in = (uInt)avail;
 	ret = inflateInit2(&(state->stream),
 	    -15 /* Don't check for zlib header */);
@@ -461,7 +471,8 @@ gzip_filter_read(struct archive_read_filter *self, const void **p)
 		 * it so, hence this ugly cast. */
 		state->stream.next_in = (unsigned char *)(uintptr_t)
 		    __archive_read_filter_ahead(self->upstream, 1, &avail_in);
-		if (state->stream.next_in == NULL) {
+		/* Validate avail_in before using it */
+		if (state->stream.next_in == NULL || avail_in <= 0) {
 			archive_set_error(&self->archive->archive,
 			    ARCHIVE_ERRNO_MISC,
 			    "truncated gzip input");

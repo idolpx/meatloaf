@@ -183,7 +183,11 @@ bzip2_reader_vtable = {
 static int
 bzip2_reader_init(struct archive_read_filter *self)
 {
+#if defined(ESP_PLATFORM)
+	static const size_t out_block_size = 255;
+#else
 	static const size_t out_block_size = 64 * 1024;
+#endif
 	void *out_block;
 	struct private_data *state;
 

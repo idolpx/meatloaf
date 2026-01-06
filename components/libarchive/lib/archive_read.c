@@ -532,6 +532,7 @@ archive_read_open1(struct archive *_a)
 
 	/* Ensure libarchive starts from the first node in a multivolume set */
 	client_switch_proxy(a->filter, 0);
+	//printf("a->client.dataset[0].begin_position = %lld\n", a->client.dataset[0].begin_position);
 	return (e);
 }
 
