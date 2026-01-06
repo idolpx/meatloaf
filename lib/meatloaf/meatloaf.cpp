@@ -62,6 +62,7 @@
 #include "network/ftp.h"
 #include "network/tnfs.h"
 #include "network/smb.h"
+#include "network/nfs.h"
 #endif
 
 // Cartridge
@@ -101,8 +102,12 @@
 #include "service/ml.h"
 
 
+#ifndef MIN_CONFIG
 // Codec
 #include "codec/qr.h"
+
+// Data
+#include "data/json.h"
 
 // Hash
 #include "hash/hash.h"
@@ -111,6 +116,7 @@
 // Loader
 // Parser
 // Scanner
+#endif
 
 //std::unordered_map<std::string, MFile*> FileBroker::file_repo;
 //std::unordered_map<std::string, std::shared_ptr<MStream>> StreamBroker::stream_repo;
@@ -141,6 +147,7 @@ CSIPMFileSystem csipFS;
 FTPMFileSystem ftpFS;
 TNFSMFileSystem tnfsFS;
 SMBMFileSystem smbFS;
+NFSMFileSystem nfsFS;
 #endif
 
 // Cartridge
@@ -180,9 +187,14 @@ HTTPMFileSystem httpFS;
 // Service
 MLMFileSystem mlFS;
 
+#ifndef MIN_CONFIG
 // Codec
 QRMFileSystem qrcEncoder;
 HashMFileSystem hashEncoder;
+
+// Data
+JSONMFileSystem jsonFS;
+#endif
 
 // put all available filesystems in this array - first matching system gets the file!
 // fist in list is default
@@ -220,7 +232,7 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
     // Network
     &httpFS,
 #ifndef MIN_CONFIG
-    &ftpFS, &tnfsFS, &smbFS
+    &ftpFS, &tnfsFS, &smbFS, &nfsFS,
     //&ipfsFS, &tcpFS,
 #endif
 
@@ -230,10 +242,13 @@ std::vector<MFileSystem*> MFSOwner::availableOther {
     // Service
 #ifndef MIN_CONFIG
     &csipFS,
-#endif
 
     // Codec
-    &qrcEncoder, &hashEncoder
+    &qrcEncoder, &hashEncoder,
+
+    // Data
+    &jsonFS
+#endif
 };
 
 bool MFSOwner::mount(std::string name) {

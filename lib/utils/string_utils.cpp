@@ -670,7 +670,10 @@ namespace mstr {
         while ( n >= 1 );
 
         n = size / std::pow(1024, --i);
-        return format("%.2f %s", n, byteSuffixes[i].c_str());
+        if (i == 0)
+            return "0 ";
+        else
+            return format("%.2f %s", n, byteSuffixes[i].c_str());
     }
 
 
