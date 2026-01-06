@@ -288,6 +288,10 @@ void NFSMFile::openDir(std::string apath)
 
 void NFSMFile::closeDir()
 {
+    if (!_handle_dir) {
+        return;  // Already closed
+    }
+    
     auto nfs = getNFS();
     if(nfs && _handle_dir) {
         nfs_closedir(nfs, _handle_dir);

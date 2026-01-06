@@ -73,6 +73,13 @@ public:
             return false;
         }
 
+        // Disable directory caching to prevent memory leaks on ESP32
+        nfs_set_dircache(_nfs, 0);
+        
+        // Reduce buffer sizes for ESP32 memory constraints
+        nfs_set_readmax(_nfs, 255);   // Default is 65536
+        nfs_set_writemax(_nfs, 255);  // Default is 65536
+
         // Don't mount yet - just establish connection
         // Mount will happen when accessing specific exports
         connected = true;
@@ -85,14 +92,15 @@ public:
         // Disconnect all export contexts
         for (auto& pair : _export_contexts) {
             if (pair.second) {
-                nfs_umount(pair.second);
+                // Only try to unmount if the context appears valid
+                // Skip unmount to avoid crashes with partially initialized contexts
                 nfs_destroy_context(pair.second);
             }
         }
         _export_contexts.clear();
         
         if (_nfs) {
-            nfs_umount(_nfs);
+            // Only destroy the context, don't try to unmount as it may not have been mounted
             nfs_destroy_context(_nfs);
             _nfs = nullptr;
         }
@@ -131,6 +139,13 @@ public:
             Debug_printv("Failed to initialize NFS context for export %s", export_path.c_str());
             return nullptr;
         }
+
+        // Disable directory caching to prevent memory leaks on ESP32
+        nfs_set_dircache(nfs, 0);
+        
+        // Reduce buffer sizes for ESP32 memory constraints
+        nfs_set_readmax(nfs, 255);   // Default is 65536
+        nfs_set_writemax(nfs, 255);  // Default is 65536
 
         // Mount the specific export
         std::string mount_path = export_path;
