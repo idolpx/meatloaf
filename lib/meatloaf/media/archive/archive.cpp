@@ -146,6 +146,7 @@ bool Archive::open(std::ios_base::openmode mode) {
 
     archive_read_support_filter_all(m_archive);
     archive_read_support_format_all(m_archive);
+    archive_read_support_format_raw(m_archive);  // Support single compressed files like .gz
 
     //archive_read_set_open_callback(m_archive, cb_open);
     //archive_read_set_close_callback(m_archive, cb_close);
@@ -412,7 +413,7 @@ bool ArchiveMStream::seekEntry(std::string filename)
             //mstr::rtrimA0(entryFilename);
             //entryFilename = mstr::toUTF8(entryFilename);
 
-            //Debug_printv("filename[%s] entry.filename[%s]", filename.c_str(), entryFilename.c_str());
+            Debug_printv("filename[%s] entry.filename[%s]", filename.c_str(), entryFilename.c_str());
 
             if ( mstr::compareFilename(entryFilename, filename, wildcard) )
             {
@@ -451,11 +452,39 @@ bool ArchiveMStream::seekEntry( uint16_t index )
     if ( S_ISREG(type) ) {
         entry.filename = basename(archive_entry_pathname(a_entry));
         entry.size = archive_entry_size(a_entry);
+        
+        // For compressed files without known size (e.g., .gz in raw format),
+        // archive_entry_size() may return 0. We need to determine actual size
+        // by reading the data.
+        if (entry.size == 0 || entry.size == (uint64_t)-1) {
+            // Count actual decompressed bytes by reading through the data
+            const void* buff;
+            size_t size;
+            int64_t offset;
+            uint64_t total = 0;
+            
+            while (archive_read_data_block(a, &buff, &size, &offset) == ARCHIVE_OK) {
+                total += size;
+            }
+            
+            entry.size = total;
+            
+            // Must reopen the archive to reset read position for actual data extraction
+            m_archive->close();
+            m_archive->open(std::ios_base::in);
+            
+            // Re-read to get back to this entry
+            a = m_archive->getArchive();
+            if (archive_read_next_header(a, &a_entry) != ARCHIVE_OK) {
+                entry.size = 0;
+                return false;
+            }
+        }
     }
 
     entry_index = index + 1;
 
-    //Debug_printv("entry_index[%d] filename[%s] size[%lu]", entry_index, entry.filename.c_str(), entry.size);
+    Debug_printv("entry_index[%d] filename[%s] size[%lu]", entry_index, entry.filename.c_str(), entry.size);
     return true;
 }
 
