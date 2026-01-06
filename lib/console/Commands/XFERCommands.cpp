@@ -95,7 +95,7 @@ int rx(int argc, char **argv)
     std::ostringstream ss;
     ss << std::hex << dest_checksum;
     std::string dest_checksum_str = ss.str();
-    if ( !mstr::compare(dest_checksum_str, src_checksum) )
+    if ( !mstr::equals(src_checksum, dest_checksum_str ) )
     {
         Serial.printf("2 Error: Checksum mismatch!\r\n");
         return 2;
