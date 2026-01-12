@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <map>
+#include <string>
 #include "../model/IImageData.h"
 
 class OrderedDither {

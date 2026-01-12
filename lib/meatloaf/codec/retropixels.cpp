@@ -20,6 +20,7 @@
 // Include MFileSystem owner for creating files from URLs
 #include "meatloaf.h"
 #include "string_utils.h"
+#include "../../include/global_defines.h"
 
 // Include RetroPixels headers
 #define STB_IMAGE_IMPLEMENTATION
@@ -38,6 +39,13 @@
 #include "io/C64Writer.h"
 #include "profiles/Palettes.h"
 #include "profiles/GraphicModes.h"
+#include "profiles/ColorSpaces.h"
+
+// External palette declarations
+extern Palette colodore;
+extern Palette pepto;
+extern Palette deekay;
+extern Palette PALette;
 
 /********************************************************
  * Helper Functions
@@ -46,46 +54,51 @@
 static const Palette& getPalette(RetroPixelsPalette palette) {
     switch (palette) {
         case RetroPixelsPalette::PALETTE:
-            return retropixels::Palettes::palette();
+            return PALette;
         case RetroPixelsPalette::COLODORE:
-            return retropixels::Palettes::colodore();
+            return colodore;
         case RetroPixelsPalette::PEPTO:
-            return retropixels::Palettes::pepto();
+            return pepto;
         case RetroPixelsPalette::DEEKAY:
-            return retropixels::Palettes::deekay();
+            return deekay;
         default:
-            return retropixels::Palettes::colodore();
+            return colodore;
     }
 }
 
-static const GraphicMode& getGraphicMode(RetroPixelsFormat format) {
+static std::shared_ptr<PixelImage> getPixelImage(RetroPixelsFormat format) {
+    std::map<std::string, std::any> props;
+    
     switch (format) {
         case RetroPixelsFormat::KOALA:
-            return retropixels::GraphicModes::koala();
+            props["hires"] = false;
+            props["nomaps"] = false;
+            return GraphicModes::bitmap(props);
+            
         case RetroPixelsFormat::ARTSTUDIO:
-            return retropixels::GraphicModes::artStudio();
+            props["hires"] = true;
+            props["nomaps"] = false;
+            return GraphicModes::bitmap(props);
+            
         case RetroPixelsFormat::FLI:
-            return retropixels::GraphicModes::fli();
+            props["hires"] = false;
+            return GraphicModes::fli(props);
+            
         case RetroPixelsFormat::AFLI:
-            return retropixels::GraphicModes::afli();
+            props["hires"] = true;
+            return GraphicModes::fli(props);
+            
         case RetroPixelsFormat::SPRITEPAD:
-            return retropixels::GraphicModes::spritePad();
+            props["rows"] = 1;
+            props["columns"] = 1;
+            props["hires"] = false;
+            props["nomaps"] = false;
+            return GraphicModes::sprites(props);
+            
         default:
-            return retropixels::GraphicModes::koala();
-    }
-}
-
-static retropixels::ScaleMode getScaleMode(RetroPixelsScale scale) {
-    switch (scale) {
-        case RetroPixelsScale::NONE:
-            return retropixels::ScaleMode::NONE;
-        case RetroPixelsScale::FILL:
-            return retropixels::ScaleMode::FILL;
-        case RetroPixelsScale::FIT:
-            // FIT not directly supported, use FILL as fallback
-            return retropixels::ScaleMode::FILL;
-        default:
-            return retropixels::ScaleMode::FILL;
+            props["hires"] = false;
+            props["nomaps"] = false;
+            return GraphicModes::bitmap(props);
     }
 }
 
@@ -114,8 +127,10 @@ static std::string parseRetroPixelsUrl(const std::string& url_str, RetroPixelsCo
         for (const auto& param : params) {
             std::vector<std::string> kv = mstr::split(param, '=');
             if (kv.size() == 2) {
-                std::string key = mstr::toLower(kv[0]);
-                std::string value = mstr::toLower(kv[1]);
+                std::string key = kv[0];
+                std::string value = kv[1];
+                mstr::toLower(key);
+                mstr::toLower(value);
                 
                 if (key == "format") {
                     if (value == "koala") config.format = RetroPixelsFormat::KOALA;
@@ -242,9 +257,13 @@ bool RetroPixelsMStream::convertImage()
         return false;
     }
     
-    try {
-        // Read source image data
-        uint32_t source_size = _source_stream->size();
+    // Read source image data
+    uint32_t source_size = _source_stream->size();
+    if (source_size == 0) {
+        Debug_printv("Source stream is empty");
+        return false;
+    }
+    {
         std::vector<uint8_t> source_data(source_size);
         
         _source_stream->seek(0);
@@ -278,46 +297,71 @@ bool RetroPixelsMStream::convertImage()
         memcpy(imageData.data.data(), img_data, width * height * 4);
         stbi_image_free(img_data);
         
-        // Get graphic mode and palette
-        const GraphicMode& mode = getGraphicMode(_config.format);
+        // Get pixel image and palette
+        auto pixelImagePtr = getPixelImage(_config.format);
+        if (!pixelImagePtr) {
+            Debug_printv("Failed to create pixel image");
+            return false;
+        }
         const Palette& palette = getPalette(_config.palette);
-        
-        // Scale image if needed
-        retropixels::ScaleMode scaleMode = getScaleMode(_config.scale);
         
         // TODO: Implement proper scaling with stb_image_resize2
         // For now, we'll create the image as-is
         
-        // Create ordered dither
-        std::unique_ptr<OrderedDither> dither;
+        // Create ordered dither using presets
+        std::string ditherPreset;
+        int ditherRadius = 8; // default depth
         switch (_config.dither) {
             case RetroPixelsDither::BAYER2X2:
-                dither = std::make_unique<OrderedDither>(2);
+                ditherPreset = "bayer2x2";
+                ditherRadius = 2;
                 break;
             case RetroPixelsDither::BAYER4X4:
-                dither = std::make_unique<OrderedDither>(4);
+                ditherPreset = "bayer4x4";
+                ditherRadius = 4;
                 break;
             case RetroPixelsDither::BAYER8X8:
-                dither = std::make_unique<OrderedDither>(8);
+                ditherPreset = "bayer8x8";
+                ditherRadius = 8;
                 break;
             case RetroPixelsDither::NONE:
             default:
-                dither = nullptr;
+                ditherPreset = "none";
                 break;
         }
         
+        // Apply dither if needed
+        if (_config.dither != RetroPixelsDither::NONE) {
+            auto ditherIt = OrderedDither::presets.find(ditherPreset);
+            if (ditherIt != OrderedDither::presets.end()) {
+                OrderedDither ditherer(ditherIt->second, ditherRadius);
+                ditherer.dither(imageData);
+            }
+        }
+        
+        // Create colorspace function - default to oklab
+        auto colorspaceIt = ColorSpace::ColorSpaces.find("oklab");
+        if (colorspaceIt == ColorSpace::ColorSpaces.end()) {
+            Debug_printv("oklab colorspace not found, using rgb");
+            colorspaceIt = ColorSpace::ColorSpaces.find("rgb");
+        }
+        
+        auto colorspaceFunc = colorspaceIt->second;
+        std::function<std::vector<double>(const std::vector<int>&)> colorspaceWrapper = 
+            [colorspaceFunc](const std::vector<int>& pixel) -> std::vector<double> {
+                std::vector<double> pixelDouble(pixel.begin(), pixel.end());
+                return colorspaceFunc(pixelDouble);
+            };
+        
         // Create quantizer and converter
-        Quantizer quantizer(palette, dither.get());
+        Quantizer quantizer(palette, colorspaceWrapper);
         Converter converter(quantizer);
         
-        // Create pixel image for conversion
-        PixelImage pixelImage(mode);
-        
         // Convert the image
-        converter.convert(imageData, pixelImage);
+        converter.convert(imageData, *pixelImagePtr);
         
         // Convert to binary format
-        auto binaryFormat = toBinary(pixelImage);
+        auto binaryFormat = toBinary(*pixelImagePtr);
         if (!binaryFormat) {
             Debug_printv("Failed to create binary format");
             return false;
@@ -329,12 +373,18 @@ bool RetroPixelsMStream::convertImage()
         // Wrap in PRG with viewer if requested
         if (_config.outputPrg) {
             std::string formatName = binaryFormat->getFormatName();
-            std::string viewerFile = _config.viewerPath + formatName + ".prg";
+            std::string viewerFile = "/sd" + _config.viewerPath + formatName + ".prg";
             
             Debug_printv("Wrapping in PRG with viewer: %s", viewerFile.c_str());
             
-            // Try to open viewer file using MFile
+            // Try to open viewer file using MFile from SD card
             auto viewerMFile = MFSOwner::File(viewerFile);
+            if (!viewerMFile) {
+                // Try to open viewer file using MFile from flash
+                viewerFile = _config.viewerPath + formatName + ".prg";
+                viewerMFile = MFSOwner::File(viewerFile);
+            }
+
             if (viewerMFile && viewerMFile->exists()) {
                 auto viewerStream = viewerMFile->getSourceStream(std::ios_base::in);
                 if (viewerStream && viewerStream->open(std::ios_base::in)) {
@@ -372,11 +422,7 @@ bool RetroPixelsMStream::convertImage()
         
         Debug_printv("Conversion successful: %d bytes", _size);
         return true;
-        
-    } catch (const std::exception& e) {
-        Debug_printv("Exception during conversion: %s", e.what());
-        return false;
-    }
+    }  // End of scope block
 }
 
 uint32_t RetroPixelsMStream::size()
@@ -416,7 +462,7 @@ uint32_t RetroPixelsMStream::write(const uint8_t *buf, uint32_t size)
 {
     // Parse URL from buffer
     std::string url_str(reinterpret_cast<const char*>(buf), size);
-    url_str = mstr::trim(url_str);
+    mstr::trim(url_str);
     
     Debug_printv("Converting image from URL: %s", url_str.c_str());
     

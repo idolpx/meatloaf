@@ -29,6 +29,7 @@
 #include <vector>
 #include <memory>
 #include "meatloaf.h"
+#include "global_defines.h"
 
 // Forward declarations for RetroPixels types
 namespace retropixels {

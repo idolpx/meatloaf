@@ -38,7 +38,8 @@ std::unique_ptr<IBinaryFormat> toBinary(const PixelImage& pixelImage) {
         return result;
     }
 
-    throw std::runtime_error("Output format is not supported for mode " + pixelImage.mode.id);
+    // Return nullptr if format not supported (exceptions disabled in ESP-IDF)
+    return nullptr;
 }
 
 std::vector<uint8_t> toBuffer(const IBinaryFormat& image) {

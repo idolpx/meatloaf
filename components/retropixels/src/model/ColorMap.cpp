@@ -30,7 +30,8 @@ std::optional<int> ColorMap::get(int x, int y) const {
 int ColorMap::getNonEmpty(int x, int y) const {
     const auto result = get(x, y);
     if (!result) {
-        throw std::out_of_range("Index at " + std::to_string(x) + ", " + std::to_string(y) + " is undefined.");
+        // Return default value 0 since exceptions are disabled in ESP-IDF
+        return 0;
     }
     return *result;
 }

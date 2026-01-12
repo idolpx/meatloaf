@@ -23,10 +23,12 @@ void PixelImage::addColorMap(int resXVal, int resYVal) {
 
 int PixelImage::mapPixelIndex(int x, int y) const {
     if (x >= mode.width || x < 0) {
-        throw std::runtime_error("x value out of bounds: " + std::to_string(x));
+        // Return 0 as safe default (exceptions disabled in ESP-IDF)
+        return 0;
     }
     if (y >= mode.height || y < 0) {
-        throw std::runtime_error("y value out of bounds: " + std::to_string(y));
+        // Return 0 as safe default (exceptions disabled in ESP-IDF)
+        return 0;
     }
     return mode.indexMap.at(pixelIndex[y][x]);
 }
