@@ -19,6 +19,8 @@
 // Wrapper for RetroPixels component
 // URL format: retropixels:<source_url>#format=koala&palette=colodore&dither=bayer4x4&scale=fill
 // Example: retropixels:http://server/image.jpg?size=large#format=koala&palette=colodore
+// PRG format: retropixels:http://server/image.jpg#format=prg (creates executable with viewer)
+// PRG with base: retropixels:http://server/image.jpg#format=prg&baseformat=fli&palette=pepto
 
 #ifndef MEATLOAF_CODEC_RETROPIXELS
 #define MEATLOAF_CODEC_RETROPIXELS
@@ -47,7 +49,8 @@ enum class RetroPixelsFormat {
     ARTSTUDIO,    // .art - Art Studio
     FLI,          // .fli - FLI Picture
     AFLI,         // .afli - AFLI Picture
-    SPRITEPAD     // .spd - SpritePad
+    SPRITEPAD,    // .spd - SpritePad
+    PRG           // .prg - Executable with viewer
 };
 
 enum class RetroPixelsPalette {
@@ -78,6 +81,8 @@ struct RetroPixelsConfig {
     RetroPixelsPalette palette = RetroPixelsPalette::COLODORE;
     RetroPixelsDither dither = RetroPixelsDither::BAYER4X4;
     RetroPixelsScale scale = RetroPixelsScale::FILL;
+    bool outputPrg = false;  // If true, wrap output in PRG with viewer
+    std::string viewerPath = SYSTEM_DIR "/loader/retropixels/";  // Path to viewer binaries
 };
 
 /********************************************************

@@ -123,6 +123,10 @@ static std::string parseRetroPixelsUrl(const std::string& url_str, RetroPixelsCo
                     else if (value == "fli") config.format = RetroPixelsFormat::FLI;
                     else if (value == "afli") config.format = RetroPixelsFormat::AFLI;
                     else if (value == "spritepad" || value == "spd") config.format = RetroPixelsFormat::SPRITEPAD;
+                    else if (value == "prg") {
+                        config.format = RetroPixelsFormat::KOALA;  // Default to koala for PRG
+                        config.outputPrg = true;
+                    }
                 }
                 else if (key == "palette") {
                     if (value == "palette") config.palette = RetroPixelsPalette::PALETTE;
@@ -140,6 +144,13 @@ static std::string parseRetroPixelsUrl(const std::string& url_str, RetroPixelsCo
                     if (value == "none") config.scale = RetroPixelsScale::NONE;
                     else if (value == "fill") config.scale = RetroPixelsScale::FILL;
                     else if (value == "fit") config.scale = RetroPixelsScale::FIT;
+                }
+                else if (key == "baseformat") {
+                    // When outputPrg=true, this specifies the underlying format
+                    if (value == "koala") config.format = RetroPixelsFormat::KOALA;
+                    else if (value == "artstudio" || value == "art") config.format = RetroPixelsFormat::ARTSTUDIO;
+                    else if (value == "fli") config.format = RetroPixelsFormat::FLI;
+                    else if (value == "afli") config.format = RetroPixelsFormat::AFLI;
                 }
             }
         }
@@ -197,6 +208,11 @@ void RetroPixelsMStream::close()
 
 std::string RetroPixelsMStream::getFormatExtension()
 {
+    // If outputting PRG, always return .prg
+    if (_config.outputPrg) {
+        return ".prg";
+    }
+    
     switch (_config.format) {
         case RetroPixelsFormat::KOALA:
             return ".kla";
@@ -208,6 +224,8 @@ std::string RetroPixelsMStream::getFormatExtension()
             return ".afli";
         case RetroPixelsFormat::SPRITEPAD:
             return ".spd";
+        case RetroPixelsFormat::PRG:
+            return ".prg";
         default:
             return ".kla";
     }
@@ -307,6 +325,46 @@ bool RetroPixelsMStream::convertImage()
         
         // Convert to buffer
         _output_buffer = toBuffer(*binaryFormat);
+        
+        // Wrap in PRG with viewer if requested
+        if (_config.outputPrg) {
+            std::string formatName = binaryFormat->getFormatName();
+            std::string viewerFile = _config.viewerPath + formatName + ".prg";
+            
+            Debug_printv("Wrapping in PRG with viewer: %s", viewerFile.c_str());
+            
+            // Try to open viewer file using MFile
+            auto viewerMFile = MFSOwner::File(viewerFile);
+            if (viewerMFile && viewerMFile->exists()) {
+                auto viewerStream = viewerMFile->getSourceStream(std::ios_base::in);
+                if (viewerStream && viewerStream->open(std::ios_base::in)) {
+                    uint32_t viewerSize = viewerStream->size();
+                    
+                    // Read viewer into temporary buffer
+                    std::vector<uint8_t> viewerCode(viewerSize);
+                    uint32_t bytesRead = viewerStream->read(viewerCode.data(), viewerSize);
+                    viewerStream->close();
+                    
+                    if (bytesRead == viewerSize) {
+                        // Prepend viewer code to output buffer
+                        std::vector<uint8_t> prgBuffer;
+                        prgBuffer.reserve(viewerSize + _output_buffer.size());
+                        prgBuffer.insert(prgBuffer.end(), viewerCode.begin(), viewerCode.end());
+                        prgBuffer.insert(prgBuffer.end(), _output_buffer.begin(), _output_buffer.end());
+                        _output_buffer = std::move(prgBuffer);
+                        
+                        Debug_printv("PRG created: viewer=%d bytes, data=%d bytes, total=%d bytes", 
+                                    viewerSize, _output_buffer.size() - viewerSize, _output_buffer.size());
+                    } else {
+                        Debug_printv("Failed to read viewer file completely: read %d of %d bytes", bytesRead, viewerSize);
+                    }
+                } else {
+                    Debug_printv("Failed to open viewer stream");
+                }
+            } else {
+                Debug_printv("Viewer file not found: %s (PRG wrapping disabled)", viewerFile.c_str());
+            }
+        }
         
         _size = _output_buffer.size();
         _position = 0;
