@@ -1,0 +1,29 @@
+idf_component_register(
+    SRCS 
+        "src/conversion/Converter.cpp"
+        "src/conversion/OrderedDither.cpp"
+        "src/conversion/Quantizer.cpp"
+        "src/io/AFLIPicture.cpp"
+        "src/io/ArtStudioPicture.cpp"
+        "src/io/C64Layout.cpp"
+        "src/io/C64Writer.cpp"
+        "src/io/Debugger.cpp"
+        "src/io/FLIPicture.cpp"
+        "src/io/KoalaPicture.cpp"
+        "src/io/SpritePad.cpp"
+        "src/model/ColorMap.cpp"
+        "src/model/GraphicMode.cpp"
+        "src/model/IImageData.cpp"
+        "src/model/Palette.cpp"
+        "src/model/PixelImage.cpp"
+        "src/model/Pixels.cpp"
+        "src/prepost/Image.cpp"
+        "src/prepost/ImageUtils.cpp"
+        "src/profiles/ColorSpaces.cpp"
+        "src/profiles/GraphicModes.cpp"
+        "src/profiles/Palettes.cpp"
+    INCLUDE_DIRS 
+        "include"
+        "src"
+    REQUIRES
+)
