@@ -27,8 +27,7 @@
 #endif
 
 // Include RetroPixels headers
-#define STB_IMAGE_IMPLEMENTATION
-#define STB_IMAGE_RESIZE_IMPLEMENTATION
+// Note: STB_IMAGE_IMPLEMENTATION is already defined in components/retropixels/src/prepost/ImageUtils.cpp
 #include "stb_image.h"
 #include "stb_image_resize2.h"
 
@@ -307,66 +306,19 @@ bool RetroPixelsMStream::convertImage()
         }
         
         Debug_printv("Loaded image: %dx%d, channels=%d", width, height, channels);
-#ifdef ESP_PLATFORM
         Debug_printv("Free heap after image load: %d bytes", heap_caps_get_free_size(MALLOC_CAP_8BIT));
-#endif
         
-        // Get target dimensions based on format
-        int target_width = 160;  // Koala default (multicolor)
-        int target_height = 200;
-        
-        // Adjust target width for hires formats
-        if (_config.format == RetroPixelsFormat::ARTSTUDIO || _config.format == RetroPixelsFormat::AFLI) {
-            target_width = 320;  // Hires formats
-        }
-        
-        // Resize image if needed using stb_image_resize2
-        unsigned char* resized_data = img_data;
-        int final_width = width;
-        int final_height = height;
-        
-        if (width != target_width || height != target_height) {
-            Debug_printv("Resizing image from %dx%d to %dx%d", width, height, target_width, target_height);
-            
-            resized_data = (unsigned char*)malloc(target_width * target_height * 4);
-            if (!resized_data) {
-                Debug_printv("Failed to allocate memory for resized image");
-                stbi_image_free(img_data);
-                return false;
+        // Create Image from loaded data
+        Image image(width, height);
+        for (int y = 0; y < height; ++y) {
+            for (int x = 0; x < width; ++x) {
+                int index = (y * width + x) * 4;
+                image.setPixel(x, y, {img_data[index], img_data[index + 1], img_data[index + 2], img_data[index + 3]});
             }
-            
-            // Use stbir_resize with good quality settings
-            if (!stbir_resize_uint8_linear(
-                img_data, width, height, 0,
-                resized_data, target_width, target_height, 0,
-                STBIR_RGBA)) {
-                Debug_printv("Failed to resize image");
-                free(resized_data);
-                stbi_image_free(img_data);
-                return false;
-            }
-            
-            stbi_image_free(img_data);  // Free original
-            img_data = nullptr;
-            final_width = target_width;
-            final_height = target_height;
-            
-            Debug_printv("Image resized successfully to %dx%d", final_width, final_height);
         }
+        stbi_image_free(img_data);
         
-        // Create IImageData from loaded/resized image
-        IImageData imageData(final_width, final_height);
-        memcpy(imageData.data.data(), resized_data, final_width * final_height * 4);
-        
-        if (resized_data != img_data) {
-            free(resized_data);
-        } else {
-            stbi_image_free(img_data);
-        }
-        
-#ifdef ESP_PLATFORM
-        Debug_printv("Free heap after IImageData: %d bytes", heap_caps_get_free_size(MALLOC_CAP_8BIT));
-#endif
+        Debug_printv("Free heap after Image creation: %d bytes", heap_caps_get_free_size(MALLOC_CAP_8BIT));
         
         // Get pixel image and palette
         Debug_printv("Creating pixel image for format %d", (int)_config.format);
@@ -375,43 +327,51 @@ bool RetroPixelsMStream::convertImage()
             Debug_printv("Failed to create pixel image");
             return false;
         }
-#ifdef ESP_PLATFORM
         Debug_printv("Free heap after getPixelImage: %d bytes", heap_caps_get_free_size(MALLOC_CAP_8BIT));
-#endif
         const Palette& palette = getPalette(_config.palette);
         
-        // TODO: Implement proper scaling with stb_image_resize2
-        // For now, we'll create the image as-is
-        
-        // Create ordered dither using presets
-        std::string ditherPreset;
-        int ditherRadius = 8; // default depth
-        switch (_config.dither) {
-            case RetroPixelsDither::BAYER2X2:
-                ditherPreset = "bayer2x2";
-                ditherRadius = 2;
-                break;
-            case RetroPixelsDither::BAYER4X4:
-                ditherPreset = "bayer4x4";
-                ditherRadius = 4;
-                break;
-            case RetroPixelsDither::BAYER8X8:
-                ditherPreset = "bayer8x8";
-                ditherRadius = 8;
-                break;
-            case RetroPixelsDither::NONE:
-            default:
-                ditherPreset = "none";
-                break;
+        // Apply scaling based on config
+        retropixels::ScaleMode scaleMode = retropixels::ScaleMode::FILL;
+        if (_config.scale == RetroPixelsScale::NONE) {
+            scaleMode = retropixels::ScaleMode::NONE;
+            retropixels::crop(image, pixelImagePtr->mode);
+        } else if (_config.scale == RetroPixelsScale::FILL) {
+            scaleMode = retropixels::ScaleMode::FILL;
+            retropixels::cropFill(image, pixelImagePtr->mode);
+        } else if (_config.scale == RetroPixelsScale::FIT) {
+            scaleMode = retropixels::ScaleMode::FILL; // Use FILL for fit as well
+            retropixels::cropFill(image, pixelImagePtr->mode);
         }
         
-        // Apply dither if needed
+        Debug_printv("Image scaled to %dx%d", image.width, image.height);
+        
+        // Create ordered dither using presets and apply if needed
         if (_config.dither != RetroPixelsDither::NONE) {
+            std::string ditherPreset;
+            int ditherRadius = 8; // default depth
+            switch (_config.dither) {
+                case RetroPixelsDither::BAYER2X2:
+                    ditherPreset = "bayer2x2";
+                    ditherRadius = 2;
+                    break;
+                case RetroPixelsDither::BAYER4X4:
+                    ditherPreset = "bayer4x4";
+                    ditherRadius = 4;
+                    break;
+                case RetroPixelsDither::BAYER8X8:
+                    ditherPreset = "bayer8x8";
+                    ditherRadius = 8;
+                    break;
+                default:
+                    ditherPreset = "none";
+                    break;
+            }
+            
             Debug_printv("Applying dither: %s", ditherPreset.c_str());
             auto ditherIt = OrderedDither::presets.find(ditherPreset);
             if (ditherIt != OrderedDither::presets.end()) {
                 OrderedDither ditherer(ditherIt->second, ditherRadius);
-                ditherer.dither(imageData);
+                ditherer.dither(image);
             }
         }
         
@@ -437,7 +397,7 @@ bool RetroPixelsMStream::convertImage()
         
         // Convert the image
         Debug_printv("Converting image...");
-        converter.convert(imageData, *pixelImagePtr);
+        converter.convert(image, *pixelImagePtr);
         
         // Convert to binary format
         Debug_printv("Converting to binary format...");
@@ -504,7 +464,6 @@ bool RetroPixelsMStream::convertImage()
         return true;
     }  // End of scope block
 }
-
 uint32_t RetroPixelsMStream::size()
 {
     static uint32_t base_size = 0;
@@ -664,12 +623,6 @@ uint32_t RetroPixelsMStream::write(const uint8_t *buf, uint32_t size)
 
 bool RetroPixelsMStream::seek(uint32_t pos)
 {
-    if (!_converted) {
-        if (!convertImage()) {
-            return false;
-        }
-    }
-    
     if (pos > _size) {
         pos = _size;
     }
@@ -710,5 +663,6 @@ std::shared_ptr<MStream> RetroPixelsMFile::getSourceStream(std::ios_base::openmo
     // Wrap it in RetroPixelsMStream
     auto retroStream = std::make_shared<RetroPixelsMStream>(sourceStream, _config);
     size = retroStream->size();
+    parseURL(pathInStream);
     return retroStream;
 }
