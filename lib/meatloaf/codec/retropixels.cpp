@@ -268,6 +268,7 @@ bool RetroPixelsMStream::convertImage()
     Debug_printv("Free heap: %d bytes, required: %d bytes", free_heap, min_required);
     if (free_heap < min_required) {
         Debug_printv("Insufficient memory for image conversion");
+        _error = 1;
         return false;
     }
 #endif
@@ -276,6 +277,7 @@ bool RetroPixelsMStream::convertImage()
     uint32_t source_size = _source_stream->size();
     if (source_size == 0) {
         Debug_printv("Source stream is empty");
+        _error = 1;
         return false;
     }
     {
@@ -286,6 +288,7 @@ bool RetroPixelsMStream::convertImage()
         
         if (bytes_read != source_size) {
             Debug_printv("Failed to read source data: read %d of %d bytes", bytes_read, source_size);
+            _error = 1;
             return false;
         }
         
@@ -302,6 +305,7 @@ bool RetroPixelsMStream::convertImage()
         
         if (!img_data) {
             Debug_printv("Failed to decode image: %s", stbi_failure_reason());
+            _error = 1;
             return false;
         }
         
@@ -325,6 +329,7 @@ bool RetroPixelsMStream::convertImage()
         auto pixelImagePtr = getPixelImage(_config.format);
         if (!pixelImagePtr) {
             Debug_printv("Failed to create pixel image");
+            _error = 1;
             return false;
         }
         Debug_printv("Free heap after getPixelImage: %d bytes", heap_caps_get_free_size(MALLOC_CAP_8BIT));
@@ -404,6 +409,7 @@ bool RetroPixelsMStream::convertImage()
         auto binaryFormat = toBinary(*pixelImagePtr);
         if (!binaryFormat) {
             Debug_printv("Failed to create binary format");
+            _error = 1;
             return false;
         }
         
