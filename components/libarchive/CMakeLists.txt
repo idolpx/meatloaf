@@ -6,7 +6,7 @@ file(GLOB SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/lib/*.c)
 list(APPEND SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/esp32/esp32_himem_allocator.c)
 
 idf_component_register(
-  INCLUDE_DIRS . esp32 lib
+  INCLUDE_DIRS . lib
   SRCS ${SOURCES}
   REQUIRES bzip2 expat liblzma lz4 lzma zlib zstd esp_psram
 )
