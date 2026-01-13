@@ -15,11 +15,15 @@ class Quantizer {
 private:
     const std::function<std::vector<double>(const std::vector<int>&)> colorspace;
     const Palette& palette;
+    mutable std::vector<std::vector<double>> paletteCache; // Cache converted palette colors
+    mutable bool cacheInitialized;
+
+    void initializePaletteCache() const;
 
 public:
     Quantizer(const Palette& palette, const std::function<std::vector<double>(const std::vector<int>&)>& colorspace);
 
-    double distance(const std::vector<int>& realPixel, int paletteIndex) const;
+    double distanceSquared(const std::vector<int>& realPixel, int paletteIndex) const;
     int quantizePixel(const std::vector<int>& pixel) const;
     std::vector<int> quantizeImage(const IImageData& image) const;
 };

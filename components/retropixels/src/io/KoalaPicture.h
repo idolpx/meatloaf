@@ -11,7 +11,7 @@ class KoalaPicture : public IBinaryFormat {
 public:
     KoalaPicture();
 
-    std::string getFormatName() const override { return "Koala"; }
+    std::string getFormatName() const override { return "koala"; }
     std::string getDefaultExtension() const override { return "kla"; }
 
     void fromPixelImage(const PixelImage& pixelImage) override;

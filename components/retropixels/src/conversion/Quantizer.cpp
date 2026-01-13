@@ -1,39 +1,54 @@
 #include "Quantizer.h"
 
 Quantizer::Quantizer(const Palette& palette, const std::function<std::vector<double>(const std::vector<int>&)>& colorspace)
-    : colorspace(colorspace), palette(palette) {}
+    : colorspace(colorspace), palette(palette), cacheInitialized(false) {}
 
-double Quantizer::distance(const std::vector<int>& realPixel, int paletteIndex) const {
-    const std::vector<double> realPixelConverted = colorspace(realPixel);
-    const std::vector<int>& palettePixelInt = palette.colors[paletteIndex];
+void Quantizer::initializePaletteCache() const {
+    if (cacheInitialized) return;
     
-    // Convert palette pixel int to double
-    std::vector<double> palettePixel(palettePixelInt.size());
-    for (size_t i = 0; i < palettePixelInt.size(); ++i) {
-        palettePixel[i] = static_cast<double>(palettePixelInt[i]);
+    // Pre-convert all palette colors to the target colorspace
+    paletteCache.resize(palette.colors.size());
+    for (size_t i = 0; i < palette.colors.size(); ++i) {
+        paletteCache[i] = colorspace(palette.colors[i]);
+    }
+    cacheInitialized = true;
+}
+
+double Quantizer::distanceSquared(const std::vector<int>& realPixel, int paletteIndex) const {
+    if (!cacheInitialized) {
+        initializePaletteCache();
     }
     
-    // Apply colorspace conversion to palette pixel
-    std::vector<double> palettePixelConverted = colorspace(palettePixelInt);
+    // Convert input pixel once
+    const std::vector<double> realPixelConverted = colorspace(realPixel);
+    
+    // Use cached converted palette color
+    const std::vector<double>& palettePixelConverted = paletteCache[paletteIndex];
 
+    // Calculate squared distance (avoid sqrt for speed)
     double sum = 0.0;
     for (size_t i = 0; i < realPixelConverted.size() && i < palettePixelConverted.size(); ++i) {
         const double diff = realPixelConverted[i] - palettePixelConverted[i];
         sum += diff * diff;
     }
 
-    return std::sqrt(sum);
+    return sum;
 }
 
 int Quantizer::quantizePixel(const std::vector<int>& pixel) const {
+    if (!cacheInitialized) {
+        initializePaletteCache();
+    }
+    
     int bestIndex = 0;
-    double minDistance = std::numeric_limits<double>::max();
+    double minDistSq = std::numeric_limits<double>::max();
 
+    // Loop over enabled palette indices
     for (size_t i = 0; i < palette.enabled.size(); ++i) {
         const int index = palette.enabled[i];
-        const double dist = distance(pixel, index);
-        if (dist < minDistance) {
-            minDistance = dist;
+        const double distSq = distanceSquared(pixel, index);
+        if (distSq < minDistSq) {
+            minDistSq = distSq;
             bestIndex = index;
         }
     }
@@ -42,7 +57,12 @@ int Quantizer::quantizePixel(const std::vector<int>& pixel) const {
 }
 
 std::vector<int> Quantizer::quantizeImage(const IImageData& image) const {
+    if (!cacheInitialized) {
+        initializePaletteCache();
+    }
+    
     std::vector<int> result(image.width * image.height);
+    const int totalPixels = image.width * image.height;
 
     for (int y = 0; y < image.height; ++y) {
         for (int x = 0; x < image.width; ++x) {

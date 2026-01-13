@@ -39,7 +39,8 @@ $(OBJDIR)/%.o: $(SRC_DIR)/%.cpp | $(DIRS)
 clean:
 	rm -rf $(OBJDIR)
 	rm -f $(OUTDIR)/$(TARGET)
-	rm paintface.kla
+	rm -f paintface.kla
+	rm -f paintface.prg
 	@echo "Cleaned build artifacts (preserved viewer files)"
 
 install: all
@@ -54,6 +55,7 @@ test: all
 	@echo "Testing $(TARGET)..."
 	@if [ -f "paintface.jpg" ]; then \
 		$(OUTDIR)/$(TARGET) -i paintface.jpg -o paintface.kla --overwrite; \
+		$(OUTDIR)/$(TARGET) -i paintface.jpg -o paintface.prg -f prg --overwrite; \
 		echo "Test completed - output: paintface.kla"; \
 	else \
 		echo "Warning: No test image found at 'paintface.jpg'"; \

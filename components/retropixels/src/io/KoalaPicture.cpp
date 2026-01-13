@@ -11,7 +11,7 @@ KoalaPicture::KoalaPicture() {
 void KoalaPicture::fromPixelImage(const PixelImage& pixelImage) {
     // Koala format expects 160x200 logical pixels (320x200 physical for multicolor)
     if (pixelImage.mode.width != 160 || pixelImage.mode.height != 200) {
-        // Return early if dimensions are wrong (exceptions disabled in ESP-IDF)
+        printf("Error: PixelImage dimensions must be 160x200 for Koala format.\r\n");
         return;
     }
 
@@ -28,7 +28,7 @@ void KoalaPicture::fromPixelImage(const PixelImage& pixelImage) {
 void KoalaPicture::read(const std::vector<uint8_t>& arrayBuffer) {
     constexpr size_t expectedSize = 10003;
     if (arrayBuffer.size() < expectedSize) {
-        // Return early if buffer too small (exceptions disabled in ESP-IDF)
+        printf("Error: Buffer size too small.");
         return;
     }
 

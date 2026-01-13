@@ -22,6 +22,10 @@
 #include "string_utils.h"
 #include "../../include/global_defines.h"
 
+#ifdef ESP_PLATFORM
+#include <esp_heap_caps.h>
+#endif
+
 // Include RetroPixels headers
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
@@ -184,6 +188,7 @@ RetroPixelsMStream::RetroPixelsMStream(std::shared_ptr<MStream> source, RetroPix
     : MStream(source->url), _source_stream(source), _config(config), _converted(false)
 {
     Debug_printv("source[%s]", source->url.c_str());
+    _size = size();
 }
 
 RetroPixelsMStream::~RetroPixelsMStream()
@@ -257,6 +262,17 @@ bool RetroPixelsMStream::convertImage()
         return false;
     }
     
+    // Check available memory before attempting conversion
+#ifdef ESP_PLATFORM
+    size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+    size_t min_required = 200000; // Require at least 200KB free
+    Debug_printv("Free heap: %d bytes, required: %d bytes", free_heap, min_required);
+    if (free_heap < min_required) {
+        Debug_printv("Insufficient memory for image conversion");
+        return false;
+    }
+#endif
+    
     // Read source image data
     uint32_t source_size = _source_stream->size();
     if (source_size == 0) {
@@ -291,18 +307,77 @@ bool RetroPixelsMStream::convertImage()
         }
         
         Debug_printv("Loaded image: %dx%d, channels=%d", width, height, channels);
+#ifdef ESP_PLATFORM
+        Debug_printv("Free heap after image load: %d bytes", heap_caps_get_free_size(MALLOC_CAP_8BIT));
+#endif
         
-        // Create IImageData from loaded image
-        IImageData imageData(width, height);
-        memcpy(imageData.data.data(), img_data, width * height * 4);
-        stbi_image_free(img_data);
+        // Get target dimensions based on format
+        int target_width = 160;  // Koala default (multicolor)
+        int target_height = 200;
+        
+        // Adjust target width for hires formats
+        if (_config.format == RetroPixelsFormat::ARTSTUDIO || _config.format == RetroPixelsFormat::AFLI) {
+            target_width = 320;  // Hires formats
+        }
+        
+        // Resize image if needed using stb_image_resize2
+        unsigned char* resized_data = img_data;
+        int final_width = width;
+        int final_height = height;
+        
+        if (width != target_width || height != target_height) {
+            Debug_printv("Resizing image from %dx%d to %dx%d", width, height, target_width, target_height);
+            
+            resized_data = (unsigned char*)malloc(target_width * target_height * 4);
+            if (!resized_data) {
+                Debug_printv("Failed to allocate memory for resized image");
+                stbi_image_free(img_data);
+                return false;
+            }
+            
+            // Use stbir_resize with good quality settings
+            if (!stbir_resize_uint8_linear(
+                img_data, width, height, 0,
+                resized_data, target_width, target_height, 0,
+                STBIR_RGBA)) {
+                Debug_printv("Failed to resize image");
+                free(resized_data);
+                stbi_image_free(img_data);
+                return false;
+            }
+            
+            stbi_image_free(img_data);  // Free original
+            img_data = nullptr;
+            final_width = target_width;
+            final_height = target_height;
+            
+            Debug_printv("Image resized successfully to %dx%d", final_width, final_height);
+        }
+        
+        // Create IImageData from loaded/resized image
+        IImageData imageData(final_width, final_height);
+        memcpy(imageData.data.data(), resized_data, final_width * final_height * 4);
+        
+        if (resized_data != img_data) {
+            free(resized_data);
+        } else {
+            stbi_image_free(img_data);
+        }
+        
+#ifdef ESP_PLATFORM
+        Debug_printv("Free heap after IImageData: %d bytes", heap_caps_get_free_size(MALLOC_CAP_8BIT));
+#endif
         
         // Get pixel image and palette
+        Debug_printv("Creating pixel image for format %d", (int)_config.format);
         auto pixelImagePtr = getPixelImage(_config.format);
         if (!pixelImagePtr) {
             Debug_printv("Failed to create pixel image");
             return false;
         }
+#ifdef ESP_PLATFORM
+        Debug_printv("Free heap after getPixelImage: %d bytes", heap_caps_get_free_size(MALLOC_CAP_8BIT));
+#endif
         const Palette& palette = getPalette(_config.palette);
         
         // TODO: Implement proper scaling with stb_image_resize2
@@ -332,6 +407,7 @@ bool RetroPixelsMStream::convertImage()
         
         // Apply dither if needed
         if (_config.dither != RetroPixelsDither::NONE) {
+            Debug_printv("Applying dither: %s", ditherPreset.c_str());
             auto ditherIt = OrderedDither::presets.find(ditherPreset);
             if (ditherIt != OrderedDither::presets.end()) {
                 OrderedDither ditherer(ditherIt->second, ditherRadius);
@@ -346,6 +422,7 @@ bool RetroPixelsMStream::convertImage()
             colorspaceIt = ColorSpace::ColorSpaces.find("rgb");
         }
         
+        Debug_printv("Using colorspace %s", colorspaceIt->first.c_str());
         auto colorspaceFunc = colorspaceIt->second;
         std::function<std::vector<double>(const std::vector<int>&)> colorspaceWrapper = 
             [colorspaceFunc](const std::vector<int>& pixel) -> std::vector<double> {
@@ -354,13 +431,16 @@ bool RetroPixelsMStream::convertImage()
             };
         
         // Create quantizer and converter
+        Debug_printv("Creating quantizer and converter...");
         Quantizer quantizer(palette, colorspaceWrapper);
         Converter converter(quantizer);
         
         // Convert the image
+        Debug_printv("Converting image...");
         converter.convert(imageData, *pixelImagePtr);
         
         // Convert to binary format
+        Debug_printv("Converting to binary format...");
         auto binaryFormat = toBinary(*pixelImagePtr);
         if (!binaryFormat) {
             Debug_printv("Failed to create binary format");
@@ -375,8 +455,6 @@ bool RetroPixelsMStream::convertImage()
             std::string formatName = binaryFormat->getFormatName();
             std::string viewerFile = "/sd" + _config.viewerPath + formatName + ".prg";
             
-            Debug_printv("Wrapping in PRG with viewer: %s", viewerFile.c_str());
-            
             // Try to open viewer file using MFile from SD card
             auto viewerMFile = MFSOwner::File(viewerFile);
             if (!viewerMFile) {
@@ -384,6 +462,8 @@ bool RetroPixelsMStream::convertImage()
                 viewerFile = _config.viewerPath + formatName + ".prg";
                 viewerMFile = MFSOwner::File(viewerFile);
             }
+
+            Debug_printv("Wrapping in PRG with viewer: %s", viewerFile.c_str());
 
             if (viewerMFile && viewerMFile->exists()) {
                 auto viewerStream = viewerMFile->getSourceStream(std::ios_base::in);
@@ -427,12 +507,87 @@ bool RetroPixelsMStream::convertImage()
 
 uint32_t RetroPixelsMStream::size()
 {
-    if (!_converted) {
-        if (!convertImage()) {
-            return 0;
-        }
+    static uint32_t base_size = 0;
+    if (base_size != 0) {
+        return base_size;
     }
-    return _size;
+
+    // If we've already converted, return the actual size
+    if (_converted) {
+        return _size;
+    }
+    
+    // Return known fixed sizes for C64 formats to avoid expensive conversion
+    // These are the standard sizes for each format
+    switch (_config.format) {
+        case RetroPixelsFormat::KOALA:
+            base_size = 10003;  // 2 load addr + 8000 bitmap + 1000 screen + 1000 color + 1 bg
+            break;
+        case RetroPixelsFormat::ARTSTUDIO:
+            base_size = 9009;   // 2 load addr + 8000 bitmap + 1000 screen + 7 (border + unused)
+            break;
+        case RetroPixelsFormat::FLI:
+            base_size = 17474;  // FLI format size
+            break;
+        case RetroPixelsFormat::AFLI:
+            base_size = 19178;  // AFLI format size
+            break;
+        case RetroPixelsFormat::SPRITEPAD:
+            base_size = 200;    // Approximate size for single sprite
+            break;
+        default:
+            base_size = 10003;  // Default to Koala
+            break;
+    }
+    
+    // If outputting PRG, add viewer size
+    if (_config.outputPrg) {
+        // Determine format name for viewer
+        std::string formatName;
+        switch (_config.format) {
+            case RetroPixelsFormat::KOALA:
+                formatName = "koala";
+                break;
+            case RetroPixelsFormat::ARTSTUDIO:
+                formatName = "artstudio";
+                break;
+            case RetroPixelsFormat::FLI:
+                formatName = "fli";
+                break;
+            case RetroPixelsFormat::AFLI:
+                formatName = "afli";
+                break;
+            case RetroPixelsFormat::SPRITEPAD:
+                formatName = "spritepad";
+                break;
+            default:
+                formatName = "koala";
+                break;
+        }
+        
+        // Try to get viewer file size
+        std::string viewerFile = "/sd" + _config.viewerPath + formatName + ".prg";
+        auto viewerMFile = MFSOwner::File(viewerFile);
+        if (!viewerMFile || !viewerMFile->exists()) {
+            // Try flash location
+            viewerFile = _config.viewerPath + formatName + ".prg";
+            viewerMFile = MFSOwner::File(viewerFile);
+        }
+        
+        if (viewerMFile && viewerMFile->exists()) {
+            auto viewerStream = viewerMFile->getSourceStream(std::ios_base::in);
+            if (viewerStream) {
+                uint32_t viewer_size = viewerStream->size();
+                //Debug_printv("Viewer size for %s: %d bytes", formatName.c_str(), viewer_size);
+                return base_size + viewer_size;
+            }
+        }
+        
+        // If viewer not found, just return base size
+        Debug_printv("Viewer file not found: %s", viewerFile.c_str());
+    }
+    
+    return base_size;
 }
 
 uint32_t RetroPixelsMStream::read(uint8_t* buf, uint32_t size)
@@ -530,15 +685,16 @@ bool RetroPixelsMStream::seek(uint32_t pos)
 RetroPixelsMFile::RetroPixelsMFile(std::string path, RetroPixelsConfig config)
     : MFile(path), _config(config)
 {
-    Debug_printv("path[%s]", path.c_str());
-    
     // Parse URL and extract configuration
     pathInStream = parseRetroPixelsUrl(path, _config);
+    parseURL(pathInStream);
+    Debug_printv("path[%s] pathInStream[%s]", path.c_str(), pathInStream.c_str());
 }
 
 std::shared_ptr<MStream> RetroPixelsMFile::getSourceStream(std::ios_base::openmode mode)
 {
     // Get the source file's stream
+    Debug_printv("Opening source file: url[%s] pathInStream[%s]", url.c_str(), pathInStream.c_str());
     auto sourceFile = MFSOwner::File(pathInStream);
     if (!sourceFile) {
         Debug_printv("Failed to open source file: %s", pathInStream.c_str());

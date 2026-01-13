@@ -22,7 +22,7 @@ namespace retropixels
         uint8_t* data = stbi_load(filename.c_str(), &width, &height, &channels, 4); // Force 4 channels (RGBA)
         
         if (!data) {
-            // Return empty image if load fails (exceptions disabled in ESP-IDF)
+            printf("Error: Could not read image file.\r\n");
             return Image(0, 0);
         }
 
@@ -284,7 +284,7 @@ namespace retropixels
     // Cropping function
     void crop(Image& image, const GraphicMode& graphicMode) {
         if (image.width < graphicMode.width || image.height < graphicMode.height) {
-            // Return early if image too small (exceptions disabled in ESP-IDF)
+            printf("Error: Image size is too small for the graphic mode.\r\n");
             return;
         }
 

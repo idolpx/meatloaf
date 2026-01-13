@@ -77,7 +77,7 @@ Options parseArguments(int argc, char* argv[]) {
 // Check if we can overwrite a file
 void checkOverwrite(const std::string& filename, bool overwrite) {
     if (fs::exists(filename) && !overwrite) {
-        // Return early if file exists and no overwrite (exceptions disabled in ESP-IDF)
+        printf("Output file '%s' already exists. Use --overwrite to force.\r\n", filename.c_str());
         return;
     }
 }
@@ -102,8 +102,8 @@ void saveExecutable(PixelImage& pixelImage, const std::string& outFile, const st
         std::string installedPath = "/usr/local/share/retropixels/target/c64/" + binary->getFormatName() + ".prg";
         viewer.open(installedPath, std::ios::binary);
         if (!viewer) {
-            // Return empty vector if viewer not found (exceptions disabled in ESP-IDF)
-            return std::vector<uint8_t>();
+            printf("Executable format is not supported for '%s'\r\n", binary->getFormatName().c_str());
+            return;
         }
     }
 
@@ -121,7 +121,7 @@ int main(int argc, char* argv[]) {
         Options options = parseArguments(argc, argv);
 
         if (!fs::exists(options.infile)) {
-            // Return early if input file doesn't exist (exceptions disabled in ESP-IDF)
+            printf("Input file does not exist: %s\r\n", options.infile.c_str());
             return 1;
         }
 
@@ -141,15 +141,15 @@ int main(int argc, char* argv[]) {
         } else if (options.mode == "sprites") {
             pixelImage = GraphicModes::sprites(props);
         } else {
-            // Use bitmap as default if unknown mode (exceptions disabled in ESP-IDF)
-            pixelImage = GraphicModes::bitmap(props);
+            printf("Unknown graphicMode: %s\r\n", options.mode.c_str());
+            return 1;
         }
 
         // Get dither preset
         auto ditherPresetIt = OrderedDither::presets.find(options.ditherMode);
         if (ditherPresetIt == OrderedDither::presets.end()) {
-            // Use bayer4x4 as default if unknown (exceptions disabled in ESP-IDF)
-            ditherPresetIt = OrderedDither::presets.find("bayer4x4");
+            printf("Unknown ditherMode: %s\r\n", options.ditherMode.c_str());
+            return 1;
         }
         OrderedDither ditherer(ditherPresetIt->second, options.ditherRadius);
 
@@ -166,15 +166,15 @@ int main(int argc, char* argv[]) {
         } else if (options.palette == "PALette") {
             palette = &PALette;
         } else {
-            // Use colodore as default if unknown (exceptions disabled in ESP-IDF)
-            palette = &colodore;
+            printf("Unknown palette: %s\r\n", options.palette.c_str());
+            return 1;
         }
 
         // Get colorspace
         auto colorspaceIt = ColorSpace::ColorSpaces.find(options.colorspace);
         if (colorspaceIt == ColorSpace::ColorSpaces.end()) {
-            // Use rgb as default if unknown (exceptions disabled in ESP-IDF)
-            colorspaceIt = ColorSpace::ColorSpaces.find("rgb");
+            printf("Unknown colorspace: %s\r\n", options.colorspace.c_str());
+            return 1;
         }
         
         // Wrap the colorspace function to convert from int to double

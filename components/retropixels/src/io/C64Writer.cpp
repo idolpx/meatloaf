@@ -38,7 +38,7 @@ std::unique_ptr<IBinaryFormat> toBinary(const PixelImage& pixelImage) {
         return result;
     }
 
-    // Return nullptr if format not supported (exceptions disabled in ESP-IDF)
+    printf("Output format is not supported for mode '%s'.\r\n", pixelImage.mode.id.c_str());
     return nullptr;
 }
 

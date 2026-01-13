@@ -43,7 +43,7 @@ std::vector<int> peek(const IImageData& imageData, int x, int y) {
 int coordsToIndex(const IImageData& imageData, int x, int y) {
     int index = y * (imageData.width * 4) + x * 4;
     if (index < 0 || index >= static_cast<int>(imageData.data.size())) {
-        // Return 0 as safe default (exceptions disabled in ESP-IDF)
+        printf("Index out of bounds\r\n");
         return 0;
     }
     return index;

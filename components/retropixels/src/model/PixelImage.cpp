@@ -23,11 +23,11 @@ void PixelImage::addColorMap(int resXVal, int resYVal) {
 
 int PixelImage::mapPixelIndex(int x, int y) const {
     if (x >= mode.width || x < 0) {
-        // Return 0 as safe default (exceptions disabled in ESP-IDF)
+        printf("x value out of bounds: %d\r\n", x);
         return 0;
     }
     if (y >= mode.height || y < 0) {
-        // Return 0 as safe default (exceptions disabled in ESP-IDF)
+        printf("y value out of bounds: %d\r\n", y);
         return 0;
     }
     return mode.indexMap.at(pixelIndex[y][x]);

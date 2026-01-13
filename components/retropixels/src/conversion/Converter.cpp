@@ -28,7 +28,7 @@ void Converter::mapToExistingColorMap(PixelImage& image, int x, int y, const std
         if (paletteIndexOpt.has_value()) {
             int paletteIndex = paletteIndexOpt.value();
             if (paletteIndex != -1) {
-                double distance = quantizer.distance(realColor, paletteIndex);
+                double distance = quantizer.distanceSquared(realColor, paletteIndex);
                 if (distance < minDistance) {
                     minDistance = distance;
                     closestMap = static_cast<int>(i);
@@ -60,7 +60,7 @@ void Converter::extractColorMap(std::vector<int>& quantizedImage, ColorMap& toCo
     toColorMap.forEachCell([&](int x, int y) {
         std::vector<int> colorIndices;
 
-        if (toColorMap.get(x, y) == -1) {
+        if (!toColorMap.get(x, y).has_value()) {
             toColorMap.forEachPixelInCell(x, y, [&](int xx, int yy) {
                 int pixel = quantizedImage[xx + yy * imageWidth];
                 if (pixel != -1) {
