@@ -108,14 +108,25 @@ extension installed from the vscode store required.
     2.  Copy `platformio.ini.sample` to `platformio.ini`
     3.  Edit `platformio.ini` to match your device and default wifi settings
 
+2.  Load the project tasks for your specific board
+    1.  Click the PlatformIO alien head on left panel
+    2.  Under PROJECT TASKS, click on your specific board, for example `lolin d32 pro`
+        - The board-specific project environment briefly expands with default tasks
+        - Wait for the "PlatformIO: Loading tasks..." message at the bottom to go away
+        - The board-specific project environment collapses automatically
+    3.  Click on your specific board a second time
+        - This time the section will remain expanded, with the correct tasks loaded
+    
 2.  Build & upload the filesystem image (this has to be done only once!)
     1.  Click the alien head on left panel
-    2.  Select `lolin d32 pro` then `Platform` and then `Build Filesystem Image`
-    3.  Select `lolin d32 pro` then `Platform` and then `Upload Filesystem Image`
+    2.  Under PROJECT TASKS, click on your specific board, for example `lolin d32 pro`
+    3.  Click `Platform`, then `Build Filesystem Image`
+    4.  Click `Platform`, then `Upload Filesystem Image`
 
 3.  Build & Upload the firmware
-    1.  Clicking the alien head on left panel
-    2.  Select `lolin d32 pro` then `General` and then `Upload and Monitor`
+    1.  Click the alien head on left panel
+    2.  Under PROJECT TASKS, click on your specific board, for example `lolin d32 pro`
+    3.  Click `General`, then `Upload and Monitor`
     3.  (It will take a while to compile and upload)
 
 Meatloaf should now be running on the device!
