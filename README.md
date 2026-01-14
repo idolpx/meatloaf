@@ -117,13 +117,13 @@ extension installed from the vscode store required.
     3.  Click on your specific board a second time
         - This time the section will remain expanded, with the correct tasks loaded
     
-2.  Build & upload the filesystem image (this has to be done only once!)
+3.  Build & upload the filesystem image (this has to be done only once!)
     1.  Click the alien head on left panel
     2.  Under PROJECT TASKS, click on your specific board, for example `lolin d32 pro`
     3.  Click `Platform`, then `Build Filesystem Image`
     4.  Click `Platform`, then `Upload Filesystem Image`
 
-3.  Build & Upload the firmware
+4.  Build & Upload the firmware
     1.  Click the alien head on left panel
     2.  Under PROJECT TASKS, click on your specific board, for example `lolin d32 pro`
     3.  Click `General`, then `Upload and Monitor`
