@@ -100,6 +100,7 @@
 
 // Service
 #include "service/ml.h"
+#include "service/mqtt.h"
 
 
 #ifndef MIN_CONFIG
@@ -143,6 +144,7 @@ LNXMFileSystem lnxFS;
 
 // Service
 CSIPMFileSystem csipFS;
+MQTTMFileSystem mqttFS;
 
 // Network
 FTPMFileSystem ftpFS;
