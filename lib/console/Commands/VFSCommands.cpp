@@ -183,6 +183,7 @@ int ls(int argc, char **argv)
         listPath = getCurrentPath()->cd(argv[1]);
     }
 
+    Debug_printv("ls path[%s]", listPath->url.c_str());
     std::unique_ptr<MFile> destPath(listPath);
     std::unique_ptr<MFile> entry(destPath->getNextFileInDir());
 
@@ -317,7 +318,7 @@ int rm(int argc, char **argv)
                 match_file += "/";
             match_file += d->d_name;
             Debug_printv("pattern[%s] match_file[%s]", pattern.c_str(), match_file.c_str());
-            if ( mstr::compare(pattern, match_file, false) )
+            if ( mstr::compare(match_file, pattern, false) )
             {
                 if (remove(match_file.c_str()))
                 {
