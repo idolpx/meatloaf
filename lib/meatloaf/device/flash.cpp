@@ -136,7 +136,7 @@ bool FlashMFile::exists()
     struct stat st;
     int i = stat(fullPath().c_str(), &st);
 
-    Debug_printv( "exists[%d] fullpath[%s]", (i==0), fullPath().c_str() );
+    //Debug_printv( "exists[%d] fullpath[%s]", (i==0), fullPath().c_str() );
     return (i == 0);
 }
 

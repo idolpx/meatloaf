@@ -16,6 +16,9 @@
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
 #include "meat_media.h"
+#include <esp_task_wdt.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 std::unordered_map<std::string, std::shared_ptr<MMediaStream>>ImageBroker::image_repo;
 
@@ -178,7 +181,11 @@ void MMediaStream::close()
 uint32_t MMediaStream::readContainer(uint8_t *buf, uint32_t size)
 {
     //Debug_printv("readContainer[%lu]", size);
-    return containerStream->read(buf, size);
+    uint32_t bytesRead = containerStream->read(buf, size);
+    if (bytesRead < size) {
+        Debug_printv("WARNING: Short read - requested %lu, got %lu", size, bytesRead);
+    }
+    return bytesRead;
 }
 uint32_t MMediaStream::writeContainer(uint8_t *buf, uint32_t size)
 {
@@ -282,18 +289,57 @@ uint32_t MMediaStream::seekFileSize( uint8_t start_track, uint8_t start_sector )
     seekSector(start_track, start_sector);
 
     size_t blocks = 0; 
+    const size_t MAX_BLOCKS = 10000;  // Safety limit
     do
     {
-        printf("t[%d] s[%d] b[%d]\r", start_track, start_sector, blocks);
-        readContainer(&start_track, 1);
-        readContainer(&start_sector, 1);
+        // This causes watchdog resets to be missed on long files. Leave commented unless used for debugging.
+        //console.printf("t[%d] s[%d] b[%d]\r", start_track, start_sector, blocks);
+        
+        // Safety check for runaway loops
+        if (blocks >= MAX_BLOCKS) {
+            Debug_printv("ERROR: Block chain too long (>%d blocks), aborting", MAX_BLOCKS);
+            break;
+        }
+        
+        // Validate containerStream is still valid before reading
+        if (!containerStream) {
+            Debug_printv("FATAL: containerStream became NULL at block %d!", blocks);
+            break;
+        }
+        
+        // Read track and sector link - MUST check return values!
+        uint32_t track_bytes = readContainer(&start_track, 1);
+        uint32_t sector_bytes = readContainer(&start_sector, 1);
+        
+        // If we couldn't read the link bytes, the stream has failed
+        if (track_bytes != 1 || sector_bytes != 1) {
+            Debug_printv("ERROR: Failed to read block chain link at block %d (read %lu/%lu bytes)", 
+                        blocks, track_bytes, sector_bytes);
+            // Stream error - best to abort here
+            break;
+        }
+        
         blocks++;
+        
+        // Yield to other tasks every 10 blocks to prevent watchdog timeout
+        // and feed watchdog every 100 blocks
+        if (blocks % 10 == 0) {
+            vTaskDelay(1);  // Yield to scheduler
+            if (blocks % 100 == 0) {
+                // Try to reset watchdog, ignore errors if task not subscribed
+                esp_err_t err = esp_task_wdt_reset();
+                if (err != ESP_OK && blocks == 100) {
+                    Debug_printv("Note: Task not subscribed to watchdog (this is OK)");
+                }
+            }
+        }
+        
         if ( start_track > 0 )
             if ( !seekSector( start_track, start_sector ) )
                 break;
     } while ( start_track > 0 );
     blocks--;
     uint32_t size = (blocks * (block_size - 2)) + start_sector - 1;
-    printf("File size is [%lu] bytes...\r\n", size);
+    console.printf("File size is [%lu] bytes...\r\n", size);
     return size;
 };

@@ -63,6 +63,7 @@ int rx(int argc, char **argv)
     std::string s = read_until(' ');
     int size = atoi(s.c_str());
     std::string src_checksum = read_until('\n');
+    mstr::trim(src_checksum);
 
     FILE *file = fopen(filename, "w");
     if (file == nullptr)
@@ -103,9 +104,9 @@ int rx(int argc, char **argv)
     std::ostringstream ss;
     ss << std::hex << dest_checksum;
     std::string dest_checksum_str = ss.str();
-    if ( !mstr::compare(src_checksum, dest_checksum_str ) )
+    if ( !mstr::equals(src_checksum, dest_checksum_str ) )
     {
-        Serial.printf("2 Error: Checksum mismatch!\r\n");
+        Serial.printf("2 Error: Checksum mismatch! src[%s][%d] != dest[%s][%d]\r\n", src_checksum.c_str(), src_checksum.length(), dest_checksum_str.c_str(), dest_checksum_str.length());
         return 2;
     }
 

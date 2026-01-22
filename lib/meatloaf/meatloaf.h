@@ -201,6 +201,7 @@ public:
     MFile(MFile* path, std::string name);
 
     virtual ~MFile() {
+        //Debug_printv("~MFile dtor for path[%s]", path.c_str());
         if(sourceFile != nullptr) {
         //     Debug_printv("WARNING: sourceFile null in '%s' destructor. This MFile was obviously not initialized properly!", url.c_str());
         // }
@@ -208,6 +209,21 @@ public:
             //Debug_printv("Deleting: [%s]", this->url.c_str());
             delete sourceFile;
         }
+        
+        // Explicitly clear all string members to prevent fragmentation
+        type.clear();
+        media_header.clear();
+        media_id.clear();
+        media_archive.clear();
+        media_image.clear();
+        
+        // Shrink to fit to release memory
+        type.shrink_to_fit();
+        media_header.shrink_to_fit();
+        media_id.shrink_to_fit();
+        media_archive.shrink_to_fit();
+        media_image.shrink_to_fit();
+        
         //Debug_printv("dtor path[%s]", path.c_str());
     };
 

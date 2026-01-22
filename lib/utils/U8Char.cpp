@@ -114,29 +114,30 @@ std::string U8Char::toUtf8() {
     }
 }
 
-uint8_t U8Char::toPetscii() {
-    // we only need to convert standard ascii values 0-255 to petscii, everything else is "missing". This only needs to be done in 2 ranges, no need for map
-    if (ch > 255) return missing;
-
-    uint8_t c = (uint8_t) ch;
-    if ((c > 0x40) && (c < 0x5B))
-        c += 0x20;
-    else if ((c > 0x60) && (c < 0x7B))
-        c -= 0x20;
-    
-    return c;
-}
 // uint8_t U8Char::toPetscii() {
-//     // but if we want to support conversion of many more UTF8 characters to PETSCII, 
-//     // we can use this code instead of the simple range conversion above.
-//     for (size_t i = 0; i < 256; ++i) {
-//         if (utf8map[i] == ch) {
-//             return static_cast<uint8_t>(i);
-//         }
-//     }
+//     // we only need to convert standard ascii values 0-255 to petscii, everything else is "missing". This only needs to be done in 2 ranges, no need for map
+//     if (ch > 255) return missing;
 
-//     return static_cast<uint8_t>(missing);
+//     uint8_t c = (uint8_t) ch;
+//     if ((c > 0x40) && (c < 0x5B))
+//         c += 0x20;
+//     else if ((c > 0x60) && (c < 0x7B))
+//         c -= 0x20;
+    
+//     return c;
 // }
+
+uint8_t U8Char::toPetscii() {
+    // but if we want to support conversion of many more UTF8 characters to PETSCII, 
+    // we can use this code instead of the simple range conversion above.
+    for (size_t i = 0; i < 256; ++i) {
+        if (utf8map[i] == ch) {
+            return static_cast<uint8_t>(i);
+        }
+    }
+
+    return static_cast<uint8_t>(missing);
+}
 
 // for punycode we need utf8 converted to uint32_t 
 // workflows:

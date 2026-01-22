@@ -858,16 +858,21 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                         setStatusCode(ST_OK);
 
                         Debug_printv("isDir[%d] isRandomAccess[%d] isBrowsable[%d]", is_dir, new_stream->isRandomAccess(), new_stream->isBrowsable());
-                        //if ( new_stream->isRandomAccess() || new_stream->isBrowsable() )
-                        if ( is_dir || new_stream->isRandomAccess() || new_stream->isBrowsable() )
+                        // We have to handle HTTP/HTTPS URLs differently because they might represent directories or files
+                        if ( f->scheme == "http" || f->scheme == "https" )
                         {
-                            Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "url[%s]", f->url.c_str() );
-                            m_cwd.reset(MFSOwner::File(f->url));
-                        }
-                        else
-                        {
-                            Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "base[%s]", f->base().c_str() );
-                            m_cwd.reset(MFSOwner::File(f->base()));
+                            if ( new_stream->isRandomAccess() || new_stream->isBrowsable() )
+                            {
+                                // This was a directory.  Set m_cwd to the directory
+                                Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "url[%s]", f->url.c_str() );
+                                m_cwd.reset(MFSOwner::File(f->url));
+                            }
+                            else
+                            {
+                                // This was a file.  Set m_cwd to the files parent directory
+                                Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "base[%s]", f->base().c_str() );
+                                m_cwd.reset(MFSOwner::File(f->base()));
+                            }
                         }
 
                         // Debug_printv( "url[%s] pathInStream[%s]", f->url.c_str(), f->pathInStream.c_str() );
@@ -886,7 +891,7 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                         // }
                     }
 
-                    if ( m_statusCode != ST_OK )
+                    if ( m_statusCode != ST_OK && m_statusCode != ST_DRIVE_NOT_READY )
                     {
                         Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Change Directory Here! url[%s] > base[%s]", f->url.c_str(), f->base().c_str() );
                         m_cwd.reset(MFSOwner::File(f->base()));

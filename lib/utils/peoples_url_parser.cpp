@@ -225,8 +225,6 @@ void PeoplesUrlParser::resetURL(const std::string u) {
 
     //Debug_printv("Before [%s]", url.c_str());
 
-    auto byColon = mstr::split(url, ':', 2);
-
     scheme = "";
     path = "";
     user = "";
@@ -239,8 +237,10 @@ void PeoplesUrlParser::resetURL(const std::string u) {
     query = "";
     fragment = "";
 
+    auto byColon = mstr::split(url, ':', 2);
+
     std::string pastTheScheme;
-    if(byColon.size()==1) {
+    if (byColon.size()==1) {
         // no scheme
         pastTheScheme = byColon[0];
     }
@@ -297,22 +297,28 @@ std::string PeoplesUrlParser::rebuildUrl(void)
 }
 
 
-// void dump() {
-//     printf("scheme: %s\r\n", scheme.c_str());
-//     printf("user pass: %s -- %s\r\n", user.c_str(), pass.c_str());
-//     printf("host port: %s -- %s\r\n", host.c_str(), port.c_str());
-//     printf("path: %s\r\n", path.c_str());
-//     printf("name: %s\r\n", name.c_str());
-//     printf("extension: %s\r\n", extension.c_str());
-//     printf("root: %s\r\n", root().c_str());
-//     printf("base: %s\r\n", base().c_str());
-//     printf("pathToFile: %s\r\n", pathToFile().c_str());
-// }
-
 bool PeoplesUrlParser::isValidUrl()
 {
 #ifdef VERBOSE_HTTP
     dump();
 #endif
     return !scheme.empty() && !(path.empty() && port.empty());
+}
+
+
+void PeoplesUrlParser::dump() {
+    printf("mRawUrl: %s\r\n", mRawUrl.c_str());
+    printf("url:     %s\r\n", url.c_str());
+    printf("scheme: %s\r\n", scheme.c_str());
+    printf("user pass: %s:%s\r\n", user.c_str(), password.c_str());
+    printf("host port: %s:%s\r\n", host.c_str(), port.c_str());
+    printf("path: %s\r\n", path.c_str());
+    printf("pathToFile: %s\r\n", pathToFile().c_str());
+    printf("name: %s\r\n", name.c_str());
+    printf("base_name: %s\r\n", base_name.c_str());
+    printf("extension: %s\r\n", extension.c_str());
+    printf("root: %s\r\n", root().c_str());
+    printf("base: %s\r\n", base().c_str());
+    printf("query: %s\r\n", query.c_str());
+    printf("fragment: %s\r\n\r\n", fragment.c_str());
 }
