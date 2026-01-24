@@ -127,6 +127,7 @@ protected:
     bool findSync();
     bool readTapeHeader(uint8_t& file_type, std::string& filename, uint16_t& start_addr, uint16_t& end_addr);
     bool readDataBlock(uint8_t* buffer, uint16_t max_size, uint16_t& bytes_read);
+    bool skipDataBlock(uint16_t max_size, uint16_t& bytes_skipped, uint32_t& data_start_position);
 
     // TAP is browseable (can list files) but not random access (sequential tape data)
     bool isBrowsable() override { return true; };

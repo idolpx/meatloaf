@@ -73,8 +73,8 @@ void TAPMStream::analyzeTapeData()
     // Reset position to start of pulse data
     tap_position = pulse_data_start;
 
-    // Try to decode files from tape
-    Debug_printv("Analyzing TAP pulse data, size: %d bytes", header.data_size);
+    // Build index of files on tape (fast - no data decoding)
+    Debug_printv("Indexing TAP files, pulse data size: %d bytes", header.data_size);
 
     while (tap_position < pulse_data_start + header.data_size)
     {
@@ -96,9 +96,6 @@ void TAPMStream::analyzeTapeData()
             continue;  // Try to find next file
         }
 
-        Debug_printv("Found file: '%s' Type:%02X Start:%04X End:%04X",
-            filename.c_str(), file_type, start_addr, end_addr);
-
         // Calculate expected data size
         uint16_t data_size = (end_addr >= start_addr) ? (end_addr - start_addr) : 0;
 
@@ -109,38 +106,36 @@ void TAPMStream::analyzeTapeData()
             continue;
         }
 
-        // Try to read data block
-        uint8_t temp_buffer[65536];  // Max 64K
-        uint16_t bytes_read = 0;
+        // Skip over data block and record its position
+        uint16_t bytes_length = 0;
+        uint32_t data_offset = 0;
 
-        if (!readDataBlock(temp_buffer, data_size, bytes_read))
+        if (!skipDataBlock(data_size, bytes_length, data_offset))
         {
-            Debug_printv("Failed to read data block");
+            Debug_printv("Failed to skip data block");
             continue;
         }
 
-        // Create tape file entry and cache the decoded data
+        // Create tape file index entry (no data cached)
         TapeFile file;
         file.filename = filename;
         file.file_type = file_type;
-        file.data_offset = 0;  // Offset within cached_data
-        file.data_length = bytes_read;
+        file.data_offset = data_offset;  // Position in TAP where data starts
+        file.data_length = bytes_length;
         file.start_address = start_addr;
-        file.end_address = start_addr + bytes_read;
-
-        // Cache the decoded data
-        file.cached_data.assign(temp_buffer, temp_buffer + bytes_read);
+        file.end_address = start_addr + bytes_length;
+        // Note: cached_data is empty - data will be decoded on-demand
 
         tape_files.push_back(file);
 
-        Debug_printv("Successfully decoded file: %s (%d bytes)",
-            filename.c_str(), bytes_read);
+        Debug_printv("Indexed file: '%s' Type:%02X Offset:%u Length:%u Addr:%04X-%04X",
+            filename.c_str(), file_type, data_offset, bytes_length, start_addr, file.end_address);
     }
 
     if (tape_files.empty())
     {
         // Fallback: provide access to raw TAP data
-        Debug_printv("No files decoded, providing raw TAP access");
+        Debug_printv("No files indexed, providing raw TAP access");
 
         TapeFile raw_file;
         raw_file.filename = "RAW.TAP";
@@ -154,7 +149,7 @@ void TAPMStream::analyzeTapeData()
     }
     else
     {
-        Debug_printv("Successfully decoded %d file(s) from tape", tape_files.size());
+        Debug_printv("Successfully indexed %d file(s) from tape", tape_files.size());
     }
 }
 
@@ -427,6 +422,32 @@ bool TAPMStream::readDataBlock(uint8_t* buffer, uint16_t max_size, uint16_t& byt
     return bytes_read > 0;
 }
 
+// Skip over data block without reading it (for fast indexing)
+bool TAPMStream::skipDataBlock(uint16_t max_size, uint16_t& bytes_skipped, uint32_t& data_start_position)
+{
+    bytes_skipped = 0;
+    data_start_position = tap_position;
+
+    // Skip data bytes until EOF marker or max size
+    while (bytes_skipped < max_size)
+    {
+        uint8_t byte;
+        if (!getByteWithSync(byte, false))
+        {
+            // Could be EOF marker or end of block
+            break;
+        }
+
+        bytes_skipped++;
+    }
+
+    // Try to skip checksum byte
+    uint8_t checksum_byte;
+    getByteWithSync(checksum_byte, false);
+
+    return bytes_skipped > 0;
+}
+
 std::string TAPMStream::seekNextEntry()
 {
     // Return next file from tape
@@ -492,10 +513,39 @@ uint32_t TAPMStream::read(uint8_t* buf, uint32_t size)
     if (size == 0)
         return 0;
 
-    // Check if we have a current file with cached data
+    // Check if we have a current file
     if (current_file_index > 0 && current_file_index <= tape_files.size())
     {
         TapeFile& file = tape_files[current_file_index - 1];
+
+        // If data not cached yet, decode it on-demand
+        if (file.cached_data.empty() && file.data_length > 0 && file.data_length < 65536)
+        {
+            Debug_printv("Decoding file data on-demand: %s (%d bytes)", 
+                file.filename.c_str(), file.data_length);
+            
+            // Save current position and seek to file data
+            uint32_t saved_position = tap_position;
+            tap_position = file.data_offset;
+            
+            // Decode the data
+            uint8_t temp_buffer[65536];
+            uint16_t bytes_read = 0;
+            
+            if (readDataBlock(temp_buffer, file.data_length, bytes_read))
+            {
+                // Cache the decoded data
+                file.cached_data.assign(temp_buffer, temp_buffer + bytes_read);
+                Debug_printv("Cached %d bytes for %s", bytes_read, file.filename.c_str());
+            }
+            else
+            {
+                Debug_printv("Failed to decode data on-demand");
+            }
+            
+            // Restore position
+            tap_position = saved_position;
+        }
 
         if (!file.cached_data.empty())
         {
@@ -515,7 +565,7 @@ uint32_t TAPMStream::read(uint8_t* buf, uint32_t size)
         }
     }
 
-    // Fallback: read raw TAP data from container stream
+    // Fallback: read raw TAP data from container stream (for RAW.TAP entry)
     containerStream->seek(entry.data_offset + _position);
     uint32_t bytesRead = containerStream->read(buf, size);
     _position += bytesRead;

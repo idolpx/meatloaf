@@ -21,9 +21,90 @@
 #include <algorithm>
 
 #include "meatloaf.h"
+#include "meat_session.h"
 
 #include "../../../include/debug.h"
 //#include "../../../include/global_defines.h"
+
+/********************************************************
+ * HTTPMSession implementation
+ ********************************************************/
+
+HTTPMSession::HTTPMSession(std::string host, uint16_t port)
+    : MSession(host, port), _user_agent(USER_AGENT) {
+    Debug_printv("HTTPMSession created for %s:%d", host.c_str(), port);
+
+    // Initialize HTTP client configuration
+    memset(&_config, 0, sizeof(_config));
+    _config.auth_type = HTTP_AUTH_TYPE_BASIC;
+    _config.user_agent = _user_agent.c_str();
+    _config.method = HTTP_METHOD_GET;
+    _config.timeout_ms = 10000;
+    _config.disable_auto_redirect = false;
+    _config.max_redirection_count = 10;
+    _config.event_handler = nullptr; // Will be set by individual clients
+    _config.user_data = nullptr;
+    _config.keep_alive_enable = _keep_alive_enabled;
+    _config.keep_alive_idle = 5;
+    _config.keep_alive_interval = 5;
+
+    // For HTTPS, we might need additional SSL configuration
+    if (isSecure()) {
+        _config.transport_type = HTTP_TRANSPORT_OVER_SSL;
+        _config.skip_cert_common_name_check = true; // For development/testing
+    } else {
+        _config.transport_type = HTTP_TRANSPORT_OVER_TCP;
+    }
+}
+
+HTTPMSession::~HTTPMSession() {
+    Debug_printv("HTTPMSession destroyed for %s:%d", host.c_str(), port);
+    disconnect();
+}
+
+bool HTTPMSession::connect() {
+    if (connected) {
+        return true;
+    }
+
+    Debug_printv("HTTPMSession connecting to %s:%d", host.c_str(), port);
+
+    // HTTP doesn't maintain persistent connections like other protocols
+    // We consider it "connected" as long as the server is reachable
+    // The actual connection establishment happens in individual HTTP requests
+
+    connected = true;
+    updateActivity();
+    return true;
+}
+
+void HTTPMSession::disconnect() {
+    if (!connected) {
+        return;
+    }
+
+    Debug_printv("HTTPMSession disconnecting from %s:%d", host.c_str(), port);
+
+    // HTTP doesn't maintain persistent connections to close
+    // Individual HTTP clients will handle their own cleanup
+
+    connected = false;
+}
+
+bool HTTPMSession::keep_alive() {
+    if (!connected) {
+        return false;
+    }
+
+    // HTTP keep-alive is handled at the individual request level
+    // by the esp_http_client with keep_alive_enable = true
+    updateActivity();
+    return true;
+}
+
+esp_http_client_config_t* HTTPMSession::getClientConfig() {
+    return &_config;
+}
 
 /********************************************************
  * MFile implementations
@@ -168,6 +249,32 @@ bool HTTPMFile::isText() {
  * Istream impls
  ********************************************************/
 bool HTTPMStream::open(std::ios_base::openmode mode) {
+    if (isOpen()) {
+        close();
+    }
+
+    this->mode = mode;
+
+    // Parse URL to get session
+    auto parser = PeoplesUrlParser::parseURL(url);
+    if (!parser || (parser->scheme != "http" && parser->scheme != "https")) {
+        Debug_printv("Invalid HTTP URL: %s", url.c_str());
+        _error = EINVAL;
+        return false;
+    }
+
+    // Get session
+    uint16_t http_port = parser->port.empty() ? (parser->scheme == "https" ? 443 : 80) : std::stoi(parser->port);
+    _session = SessionBroker::obtain<HTTPMSession>(parser->host, http_port);
+    if (!_session || !_session->isConnected()) {
+        Debug_printv("Failed to get HTTP session for %s:%d", parser->host.c_str(), http_port);
+        _error = ECONNREFUSED;
+        return false;
+    }
+
+    // Initialize HTTP client with session config
+    _http.init(_session);
+
     bool r = false;
 
     if(mode == (std::ios_base::out | std::ios_base::app))

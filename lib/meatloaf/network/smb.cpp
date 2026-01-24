@@ -143,6 +143,12 @@ time_t SMBMFile::getCreationTime()
 
 uint64_t SMBMFile::getAvailableSpace()
 {
+    // If no export is mounted, return 0
+    if (share_path.empty()) {
+        Debug_printv("No share mounted, returning 0");
+        return 0;
+    }
+
     auto smb = getSMB();
     if (!smb) {
         Debug_printv("SMB context not available");

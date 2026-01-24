@@ -194,7 +194,7 @@ void DisplayLEDs::show_activity()
     fill_all((CRGB){.r=0, .g=0, .b=0});
 
 
-    // // Number of leds to light up
+    // Number of leds to light up
     ws28xx_pixels[curr_led] = (CRGB){.r=0, .g=100, .b=0};
 
     if ( direction)
@@ -292,7 +292,7 @@ void DisplayLEDs::start(void)
     idle();
 
     // Start DISPLAY task
-    if ( xTaskCreatePinnedToCore(display_task, "display_rgb", 4096, this, 4, NULL, 0) != pdTRUE)
+    if ( xTaskCreatePinnedToCore(display_task, "display_rgb", 8192, this, 4, NULL, 0) != pdTRUE)
     {
         Debug_printv("Could not start DISPLAY task!");
     }

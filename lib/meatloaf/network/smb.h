@@ -31,6 +31,11 @@
 #include <sys/poll.h>
 #include <map>
 
+// SMB2 Security modes (from libsmb2)
+#define SMB2_SEC_UNDEFINED 0
+#define SMB2_SEC_NTLMSSP   1
+#define SMB2_SEC_KRB5      2
+
 #include "fnFS.h"
 
 #include "../../../include/debug.h"
@@ -68,7 +73,7 @@ public:
 
     bool connect() override {
         if (connected) return true;
-        
+
         // Initialize SMB context for IPC$ (share enumeration)
         _smb = smb2_init_context();
         if (!_smb) {
@@ -77,18 +82,30 @@ public:
             return false;
         }
 
-        // Set SMB2 version
+        // Set SMB2 version - try SMB3 first, fall back to SMB2
         smb2_set_version(_smb, SMB2_VERSION_ANY);
 
-        // Set credentials if available
+        // Let the library negotiate the authentication method
+        // Some servers don't like forced NTLMSSP and prefer negotiation
+        smb2_set_authentication(_smb, SMB2_SEC_UNDEFINED);
+
+        // Set domain to empty string for local accounts
+        smb2_set_domain(_smb, "");
+
+        // Set username first (before setting password)
+        if (!_user.empty()) {
+            smb2_set_user(_smb, _user.c_str());
+        }
+
+        // Set password after username
         if (!_password.empty()) {
             smb2_set_password(_smb, _password.c_str());
         }
 
         // Try to connect to the server
         // We connect to IPC$ share for session-only purposes (listing shares)
-        const char* user_ptr = _user.empty() ? nullptr : _user.c_str();
-        if (smb2_connect_share(_smb, host.c_str(), "IPC$", user_ptr) < 0) {
+        // Note: Don't pass user to smb2_connect_share, we already set it with smb2_set_user
+        if (smb2_connect_share(_smb, host.c_str(), "IPC$", nullptr) < 0) {
             Debug_printv("Failed to connect to %s:%d: %s", host.c_str(), port, smb2_get_error(_smb));
             if (_smb) {
                 smb2_destroy_context(_smb);
@@ -100,7 +117,7 @@ public:
 
         connected = true;
         updateActivity();
-        Debug_printv("Connected to SMB server at %s:%d", host.c_str(), port);
+        Debug_printv("Connected to SMB server at %s:%d (user: %s)", host.c_str(), port, _user.c_str());
         return true;
     }
 
@@ -149,22 +166,32 @@ public:
         }
         
         // Create a new context for this share
-        Debug_printv("Creating new context for share: %s with user: %s", share.c_str(), _user.c_str());
+        //Debug_printv("Creating new context for share: %s with user: %s", share.c_str(), _user.c_str());
         struct smb2_context* smb = smb2_init_context();
         if (!smb) {
             Debug_printv("Failed to initialize SMB context for share %s", share.c_str());
             return nullptr;
         }
-        
+
+        // Set SMB2 version - try SMB3 first, fall back to SMB2
         smb2_set_version(smb, SMB2_VERSION_ANY);
-        
-        // Set credentials for this share connection
+
+        // Let the library negotiate the authentication method
+        // Some servers don't like forced NTLMSSP and prefer negotiation
+        smb2_set_authentication(smb, SMB2_SEC_UNDEFINED);
+
+        // Set username first (before setting password)
+        if (!_user.empty()) {
+            smb2_set_user(smb, _user.c_str());
+        }
+
+        // Set password after username
         if (!_password.empty()) {
             smb2_set_password(smb, _password.c_str());
         }
-        
-        const char* user_ptr = _user.empty() ? nullptr : _user.c_str();
-        if (smb2_connect_share(smb, host.c_str(), share.c_str(), user_ptr) < 0) {
+
+        // Connect to share (don't pass user, we already set it with smb2_set_user)
+        if (smb2_connect_share(smb, host.c_str(), share.c_str(), nullptr) < 0) {
             Debug_printv("Failed to connect to share %s: %s", share.c_str(), smb2_get_error(smb));
             smb2_destroy_context(smb);
             return nullptr;
@@ -172,7 +199,7 @@ public:
         
         // Cache the context for future use
         _share_contexts[share] = smb;
-        Debug_printv("Cached context for share: %s", share.c_str());
+        //Debug_printv("Cached context for share: %s", share.c_str());
         
         return smb;
     }

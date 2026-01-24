@@ -23,6 +23,7 @@
 #define MEATLOAF_SCHEME_CSIP
 
 #include "meatloaf.h"
+#include "meat_session.h"
 #include "network/tcp.h"
 
 #include "fnSystem.h"
@@ -30,6 +31,8 @@
 
 #include "utils.h"
 #include "string_utils.h"
+
+#include "make_unique.h"
 
 #include <streambuf>
 #include <istream>
@@ -39,18 +42,21 @@
  ********************************************************/
 
 class csstreambuf : public std::streambuf {
-    char* gbuf;
-    char* pbuf;
+    char* gbuf = nullptr;
+    char* pbuf = nullptr;
+    std::string server_host;
+    uint16_t server_port;
 
 protected:
     MeatSocket m_wifi;
 
 public:
-    csstreambuf() {}
+    csstreambuf(std::string host = "commodoreserver.com", uint16_t port = 1541)
+        : server_host(host), server_port(port) {}
 
     ~csstreambuf() {
         close();
-    }      
+    }
 
     bool is_open() {
         return (m_wifi.isOpen());
@@ -61,8 +67,9 @@ public:
         if(m_wifi.isOpen())
             return true;
 
-        int rc = m_wifi.open("commodoreserver.com", 1541);
-        printf("csstreambuf: connect to cserver returned: %d\r\n", rc);
+        int rc = m_wifi.open(server_host.c_str(), server_port);
+        printf("csstreambuf: connect to %s:%d returned: %d\r\n",
+               server_host.c_str(), server_port, rc);
 
         if(rc == 1) {
             if(gbuf == nullptr)
@@ -171,34 +178,23 @@ public:
  * Session manager
  ********************************************************/
 
-class CSIPMSession : public std::iostream {
-    std::string m_user;
-    std::string m_pass;
-    csstreambuf buf;
+class CSIPMSession : public MSession, public std::iostream {
+public:
+    CSIPMSession(std::string host = "commodoreserver.com", uint16_t port = 1541);
+    ~CSIPMSession() override;
 
-protected:
-    std::string currentDir;
+    // MSession interface implementation
+    bool connect() override;
+    void disconnect() override;
+    bool keep_alive() override;
 
-    bool establish();
-    bool keep_alive();
-
-    bool sendCommand(std::string);
-    
-    bool traversePath(MFile* path);
-
+    // CSIP-specific methods
+    bool sendCommand(const std::string& command);
+    bool traversePath(std::string path);
     bool isOK();
-
     std::string readLn();
 
-public:
-    CSIPMSession(std::string user = "", std::string pass = "") : std::iostream(&buf), m_user(user), m_pass(pass)
-    {};
-
-    ~CSIPMSession() {
-        sendCommand("quit");
-    };
-
-    // read/write are used only by MStream
+    // Stream access methods for CSIPMStream
     size_t receive(uint8_t* buffer, size_t size) {
         if(buf.is_open())
             return buf.m_wifi.read(buffer, size);
@@ -206,7 +202,6 @@ public:
             return 0;
     }
 
-    // read/write are used only by MStream
     size_t send(const uint8_t* buffer, size_t size) {
         if(buf.is_open())
             return buf.m_wifi.write(buffer, size);
@@ -214,9 +209,15 @@ public:
             return 0;
     }
 
-    bool is_open() {
-        return buf.is_open();
-    }
+    std::string getCurrentDir() const { return currentDir; }
+
+protected:
+    csstreambuf buf;  // Must be declared first for initialization order
+    std::string m_user;
+    std::string m_pass;
+    std::string currentDir;
+
+    bool establish();
 
     friend class CSIPMFile;
     friend class CSIPMStream;
@@ -226,58 +227,49 @@ public:
  * File implementations
  ********************************************************/
 class CSIPMFile: public MFile {
-
 public:
-    CSIPMFile(std::string path, size_t size = 0): MFile(path)
-    {
-        //Debug_printv("path[%s] size[%d]", path.c_str(), size);
-        this->size = size;
+    CSIPMFile(std::string path, size_t size = 0);
+    ~CSIPMFile();
 
-        media_blocks_free = 65535;
-        //media_block_size = 1; // blocks are already calculated
-        //parseUrl(path);
-        //Debug_printv("path[%s] size[%d]", path.c_str(), size);
-    };
-
-
-    std::shared_ptr<MStream> getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override ; // has to return OPENED stream
-    std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> src) { return src; };
+    std::shared_ptr<MStream> getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override;
+    std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> src) override { return src; };
     std::shared_ptr<MStream> createStream(std::ios_base::openmode mode) override;
 
-    //MFile* cd(std::string newDir);
     bool isDirectory() override;
     bool rewindDirectory() override;
     MFile* getNextFileInDir() override;
-    bool mkDir() override ;
+    bool mkDir() override;
 
     bool exists() override;
     bool remove() override;
 
-    bool isDir = true;
-    bool dirIsOpen = false;
+    // Accessor for session (used by CSIPMStream)
+    std::shared_ptr<CSIPMSession> getSession() { return _session; }
 
-private:
+protected:
+    std::shared_ptr<CSIPMSession> _session;
+    bool dirIsOpen = false;
     bool dirIsImage = false;
+
+    friend class CSIPMStream;
 };
 
 /********************************************************
  * Streams
  ********************************************************/
 
-//
 class CSIPMStream: public MStream {
-
 public:
-    CSIPMStream(std::string path): MStream(path) {
-        //url = path;
+    CSIPMStream(std::string& path): MStream(path) {
     }
-    ~CSIPMStream() {
+    ~CSIPMStream() override {
         close();
     }
+
     // MStream methods
     bool isOpen() override;
-    // bool isBrowsable() override { return false; };
-    // bool isRandomAccess() override { return true; };
+    bool isBrowsable() override { return false; };
+    bool isRandomAccess() override { return false; };
 
     bool open(std::ios_base::openmode mode) override;
     void close() override;
@@ -285,14 +277,13 @@ public:
     uint32_t read(uint8_t* buf, uint32_t size) override;
     uint32_t write(const uint8_t *buf, uint32_t size) override;
 
-    virtual bool seek(uint32_t pos) {
+    bool seek(uint32_t pos) override {
         return false;
     };
 
-
 protected:
-    std::string url;
-    bool _is_open;
+    std::shared_ptr<CSIPMSession> _session;
+    bool _is_open = false;
 };
 
 
@@ -307,8 +298,6 @@ public:
     CSIPMFileSystem(): MFileSystem("csip") {
         isRootFS = true;
     };
-
-    static CSIPMSession session;
 
     bool handles(std::string name) 
     {

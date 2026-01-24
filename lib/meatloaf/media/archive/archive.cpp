@@ -458,14 +458,18 @@ bool ArchiveMStream::seekEntry( uint16_t index )
         // by reading the data.
         if (entry.size == 0 || entry.size == (uint64_t)-1) {
             // Count actual decompressed bytes by reading through the data
-            const void* buff;
+            uint8_t buff[256] = {0};
             size_t size;
-            int64_t offset;
+            //int64_t offset;
             uint64_t total = 0;
             
-            while (archive_read_data_block(a, &buff, &size, &offset) == ARCHIVE_OK) {
+            // while (archive_read_data_block(a, &buff, &size, &offset) == ARCHIVE_OK) {
+            //     total += size;
+            // }
+            do {
+                size = archive_read_data(a, &buff, 255);
                 total += size;
-            }
+            } while (size > 0);
             
             entry.size = total;
             

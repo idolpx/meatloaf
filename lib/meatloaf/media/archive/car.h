@@ -18,4 +18,10 @@
 //
 // .CAR - C64OS archive file
 //
+// https://c64os.com/c64os/c64archiver/
+// https://github.com/OpCoders-Inc/c64os-dev/blob/main/include/v1.08/os/s/c64archive.t
+// https://github.com/RebeccaRGB/c64os-devtools/blob/main/tools/c64archive.py
+
+// The V1 format can be completely ignored, it was only used during the betas of C64 OS, pre v1.0 of the OS's release. 
+// The V2 format was and is used now, and the V3 format is identical to the V2 format, except that a 4-byte CRC32 of the entire file is tacked on the end of the file.
 

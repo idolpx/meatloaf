@@ -36,7 +36,6 @@ public:
     MLFileSystem(): MFileSystem("webloc") {};
 
     bool handles(std::string fileName) override {
-        //printf("handles w dnp %s %d\r\n", fileName.rfind(".dnp"), fileName.length()-4);
         return byExtension( ".webloc", fileName );
     }
 
@@ -44,18 +43,24 @@ public:
         if ( path.size() == 0 )
             return nullptr;
 
+        Debug_printv("path[%s]", path.c_str());
+
         // Read URL file
+        auto reader = Meat::New<MFile>(path);
+        auto istream = reader->getSourceStream();
 
-        //Debug_printv("MLFileSystem::getFile(%s)", path.c_str());
-        PeoplesUrlParser *urlParser = PeoplesUrlParser::parseURL( path );
-        std::string code = mstr::toUTF8(urlParser->name);
+        //istream->readUntil("<string>");
+        uint8_t start = istream->position();
+        //istream->readUntil("</string>");
+        uint8_t end = istream->position() - 9; // length of </string>
 
-        //Debug_printv("url[%s]", urlParser.name.c_str());
-        std::string ml_url = "https://api.meatloaf.cc/?" + code;
-        //Debug_printv("ml_url[%s]", ml_url.c_str());
-        
-        //Debug_printv("url[%s]", ml_url.c_str());
-        delete(urlParser);
+        uint8_t url[end - start + 1];
+        istream->seek(start);
+        istream->read(url, end - start);
+
+        Debug_printv("url[%s]", url);
+        std::string ml_url((char *)url);
+
         return new HTTPMFile(ml_url);
     }
 };

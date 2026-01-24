@@ -22,19 +22,75 @@
 #include "make_unique.h"
 
 /********************************************************
- * Client impls
+ * MSession implementations
  ********************************************************/
-// fajna sciezka do sprawdzenia:
-// utilities/disk tools/cie.d64
 
-CSIPMSession CSIPMFileSystem::session;
+CSIPMSession::CSIPMSession(std::string host, uint16_t port)
+    : MSession(host, port), std::iostream(&buf), buf(host, port), m_user(""), m_pass(""), currentDir("csip:/")
+{
+    Debug_printv("CSIPMSession created for %s:%d", host.c_str(), port);
+}
+
+CSIPMSession::~CSIPMSession() {
+    Debug_printv("CSIPMSession destroyed for %s:%d", host.c_str(), port);
+    disconnect();
+}
+
+bool CSIPMSession::connect() {
+    if (connected) {
+        Debug_printv("Already connected to %s:%d", host.c_str(), port);
+        return true;
+    }
+
+    if (!buf.is_open()) {
+        currentDir = "csip:/";
+        if (!buf.open()) {
+            Debug_printv("Failed to open connection to %s:%d", host.c_str(), port);
+            connected = false;
+            return false;
+        }
+    }
+
+    Debug_printv("Successfully connected to %s:%d", host.c_str(), port);
+    connected = true;
+    updateActivity();
+    return true;
+}
+
+void CSIPMSession::disconnect() {
+    if (!connected) {
+        return;
+    }
+
+    Debug_printv("Disconnecting from %s:%d", host.c_str(), port);
+    sendCommand("quit");
+    buf.close();
+    connected = false;
+}
+
+bool CSIPMSession::keep_alive() {
+    if (!connected || !buf.is_open()) {
+        return false;
+    }
+
+    // Send a lightweight command to keep the connection alive
+    // Using "cf ." to stay in current directory as a keep-alive
+    if (sendCommand("cf .")) {
+        updateActivity();
+        return true;
+    }
+
+    Debug_printv("Keep-alive failed for %s:%d", host.c_str(), port);
+    connected = false;
+    return false;
+}
 
 bool CSIPMSession::establish() {
     if(!buf.is_open()) {
         currentDir = "csip:/";
         buf.open();
     }
-    
+
     return buf.is_open();
 }
 
@@ -57,7 +113,7 @@ std::string CSIPMSession::readLn() {
     return line;
 }
 
-bool CSIPMSession::sendCommand(std::string command) {
+bool CSIPMSession::sendCommand(const std::string& command) {
     std::string c = mstr::toPETSCII2(command);
     // 13 (CR) sends the command
     if(establish()) {
@@ -86,121 +142,120 @@ bool CSIPMSession::isOK() {
     return equals;
 }
 
-bool CSIPMSession::traversePath(MFile* path) {
+bool CSIPMSession::traversePath(std::string path) {
     // tricky. First we have to
     // CF / - to go back to root
 
-    //Debug_printv("Traversing path: [%s]", path->path.c_str());
+    Debug_printv("Traversing path: path[%s]", path.c_str());
 
-    if(buf.is_open()) {
-        // if we are still connected we can smart change dir by just going up or down
-        // but for time being, we stick to traversing from root
-        if(!sendCommand("cf /"))
-            return false;
-    }
-    else {
-        // if we aren't, change dir to root (alos connects the session);
-        if(!sendCommand("cf /"))
-            return false;
-    }
+    if(mstr::endsWith(path, ".d64", false)) 
+    {
+        // THEN we have to mount the image INSERT image_name
+        sendCommand("insert " + path);
 
-    if(isOK()) {
-        Debug_printv("path[%s]", path->path.c_str());
-        if(path->path.compare("/") == 0) {
-            currentDir = path->url;
+        // disk image is the end, so return
+        if(isOK()) {
+            currentDir = path;
             return true;
         }
-
-        std::vector<std::string> chopped = mstr::split(path->path, '/');
-
-        //MFile::parsePath(&chopped, path->path); - nope this doessn't work and crases in the loop!
-
-        Debug_printv("Before loop");
-        //Debug_printv("Chopped size:%d\r\n", chopped.size());
-        fnSystem.delay(500);
-
-        for(size_t i = 1; i < chopped.size(); i++) {
-            //Debug_printv("Before chopped deref");
-
-            auto part = chopped[i];
-            
-            //Debug_printv("traverse path part: [%s]\r\n", part.c_str());
-            if(mstr::endsWith(part, ".d64", false)) 
-            {
-                // THEN we have to mount the image INSERT image_name
-                sendCommand("insert "+part);
-
-                // disk image is the end, so return
-                if(isOK()) {
-                    currentDir = path->url;
-                    return true;
-                }
-                else {
-                    // or: ?500 - DISK NOT FOUND.
-                    return false;
-                }
-            }
-            else 
-            {
-                // CF xxx - to browse into subsequent dirs
-                sendCommand("cf "+part);
-                if(!isOK()) {
-                    // or: ?500 - CANNOT CHANGE TO dupa
-                    return false;
-                }
-            }
+        else {
+            // or: ?500 - DISK NOT FOUND.
+            return false;
         }
-        
-        currentDir = path->url;
-        return true;
     }
-    else
-        return false; // shouldn't really happen, right?
+
+    // CF xxx - to browse into subsequent dirs
+    sendCommand("cf " + path);
+    if(!isOK()) {
+        // or: ?500 - CANNOT CHANGE TO dupa
+        return false;
+    }
+
+    return true;
 }
 
 /********************************************************
- * I Stream impls
+ * MFile implementations
+ ********************************************************/
+
+CSIPMFile::CSIPMFile(std::string path, size_t filesize): MFile(path) {
+    Debug_printv("path[%s] size[%d]", path.c_str(), filesize);
+    this->size = filesize;
+
+    media_blocks_free = 65535;
+
+    // Obtain or create CSIP session via SessionBroker
+    // CSIP always uses commodoreserver.com:1541
+    _session = SessionBroker::obtain<CSIPMSession>("commodoreserver.com", 1541);
+
+    if (!_session || !_session->isConnected()) {
+        Debug_printv("Failed to obtain CSIP session");
+        m_isNull = true;
+        return;
+    }
+
+    m_isNull = false;
+}
+
+CSIPMFile::~CSIPMFile() {
+    // Session is managed by SessionBroker, don't disconnect here
+    _session.reset();
+}
+
+/********************************************************
+ * MStream implementations
  ********************************************************/
 
 
 void CSIPMStream::close() {
     _is_open = false;
-};
+    if (_session) {
+        _session.reset();
+    }
+}
 
 bool CSIPMStream::open(std::ios_base::openmode mode) {
-    auto file = std::make_unique<CSIPMFile>(url);
     _is_open = false;
 
-    if(file->isDirectory())
-        return false; // or do we want to stream whole d64 image? :D
+    // Obtain or create CSIP session via SessionBroker
+    // CSIP always uses commodoreserver.com:1541
+    _session = SessionBroker::obtain<CSIPMSession>("commodoreserver.com", 1541);
 
-    if(CSIPMFileSystem::session.traversePath(file.get())) {
-        // should we allow loading of * in any directory?
-        // then we can LOAD and get available count from first 2 bytes in (LH) endian
-        // name here MUST BE UPPER CASE
-        // trim spaces from right of name too
-        mstr::rtrimA0(file->name);
-        //mstr::toPETSCII2(file->name);
-        CSIPMFileSystem::session.sendCommand("load "+file->name);
-        // read first 2 bytes with size, low first, but may also reply with: ?500 - ERROR
-        uint8_t buffer[2] = { 0, 0 };
-        read(buffer, 2);
-        // hmmm... should we check if they're "?5" for error?!
-        if(buffer[0]=='?' && buffer[1]=='5') {
-            Debug_printv("CSIP: open file failed");
-            CSIPMFileSystem::session.readLn();
-            _is_open = false;
-        }
-        else {
-            _size = buffer[0] + buffer[1]*256; // put len here
-            // if everything was ok
-            printf("CSIP: file open, size: %lu\r\n", _size);
-            _is_open = true;
-        }
+    if (!_session || !_session->isConnected()) {
+        Debug_printv("Failed to obtain CSIP session for %s", url.c_str());
+        return false;
+    }
+
+    auto parser = PeoplesUrlParser::parseURL(url);
+    std::string full_path = parser->path;
+    if ( parser->name.length() )
+        full_path += "/" + parser->name;
+
+    // should we allow loading of * in any directory?
+    // then we can LOAD and get available count from first 2 bytes in (LH) endian
+    // name here MUST BE UPPER CASE
+    // trim spaces from right of name too
+    mstr::rtrimA0(full_path);
+    //mstr::toPETSCII2(file->name);
+    _session->sendCommand("load " + full_path);
+    // read first 2 bytes with size, low first, but may also reply with: ?500 - ERROR
+    uint8_t buffer[2] = { 0, 0 };
+    read(buffer, 2);
+    // hmmm... should we check if they're "?5" for error?!
+    if(buffer[0]=='?' && buffer[1]=='5') {
+        Debug_printv("CSIP: open file failed");
+        _session->readLn();
+        _is_open = false;
+    }
+    else {
+        _size = buffer[0] + buffer[1]*256; // put len here
+        // if everything was ok
+        printf("CSIP: file open, size: %lu\r\n", _size);
+        _is_open = true;
     }
 
     return _is_open;
-};
+}
 
 // MStream methods
 
@@ -209,16 +264,20 @@ uint32_t CSIPMStream::write(const uint8_t *buf, uint32_t size) {
 }
 
 uint32_t CSIPMStream::read(uint8_t* buf, uint32_t size)  {
-    uint32_t bytesRead = CSIPMFileSystem::session.receive(buf, size);
-    _position+=bytesRead;
+    if (!_session || !_session->isConnected()) {
+        return 0;
+    }
+
+    uint32_t bytesRead = _session->receive(buf, size);
+    _position += bytesRead;
 
     Debug_printv("size[%lu] bytesRead[%lu] _position[%lu]", size, bytesRead, _position);
 
     return bytesRead;
-};
+}
 
 bool CSIPMStream::isOpen() {
-    return _is_open;
+    return _is_open && _session && _session->isConnected();
 }
 
 
@@ -270,16 +329,20 @@ std::shared_ptr<MStream> CSIPMFile::createStream(std::ios_base::openmode mode)
     return istream;
 }
 
-bool CSIPMFile::rewindDirectory() {    
+bool CSIPMFile::rewindDirectory() {
     dirIsOpen = false;
 
     if(!isDirectory())
         return false;
 
+    if (!_session || !_session->isConnected()) {
+        Debug_printv("No valid session available");
+        return false;
+    }
 
     //Debug_printv("pre traverse path");
 
-    if(!CSIPMFileSystem::session.traversePath(this)) return false;
+    if(!_session->traversePath(path)) return false;
 
     //Debug_printv("post traverse path");
 
@@ -288,12 +351,12 @@ bool CSIPMFile::rewindDirectory() {
         dirIsImage = true;
         // to list image contents we have to run
         Debug_printv("cserver: this is a d64 img, sending $ command!");
-        CSIPMFileSystem::session.sendCommand("$");
-        auto line = CSIPMFileSystem::session.readLn(); // mounted image name
-        if(CSIPMFileSystem::session.is_open() && line.size()) {
+        _session->sendCommand("$");
+        auto line = _session->readLn(); // mounted image name
+        if(_session->isConnected() && line.size()) {
             dirIsOpen = true;
             media_image = line.substr(5);
-            line = CSIPMFileSystem::session.readLn(); // dir header
+            line = _session->readLn(); // dir header
             media_header = line.substr(2, line.find_last_of("\""));
             media_id = line.substr(line.find_last_of("\"")+2);
             return true;
@@ -301,25 +364,25 @@ bool CSIPMFile::rewindDirectory() {
         else
             return false;
     }
-    else 
+    else
     {
         dirIsImage = false;
         // to list directory contents we use
         Debug_printv("cserver: this is a directory!");
-        CSIPMFileSystem::session.sendCommand("disks");
-        auto line = CSIPMFileSystem::session.readLn(); // dir header
+        _session->sendCommand("disks");
+        auto line = _session->readLn(); // dir header
         //Debug_printv("line[%s]", line.c_str());
-        if(CSIPMFileSystem::session.is_open() && line.size()) {
+        if(_session->isConnected() && line.size()) {
             media_header = line.substr(2, line.find_last_of("]")-1);
             media_id = "C=SVR";
             dirIsOpen = true;
 
             return true;
         }
-        else 
+        else
             return false;
     }
-};
+}
 
 MFile* CSIPMFile::getNextFileInDir() {
 
@@ -333,6 +396,10 @@ MFile* CSIPMFile::getNextFileInDir() {
     if(!dirIsOpen)
         return nullptr;
 
+    if (!_session || !_session->isConnected()) {
+        return nullptr;
+    }
+
     std::string name;
     size_t size;
     std::string new_url = url;
@@ -343,7 +410,7 @@ MFile* CSIPMFile::getNextFileInDir() {
     //Debug_printv("pre dir is image");
 
     if(dirIsImage) {
-        auto line = CSIPMFileSystem::session.readLn();
+        auto line = _session->readLn();
         Debug_printv("next file in dir got %s", line.c_str());
         // 'ot line:'0 ␒"CIE�������������" 00�2A�
         // 'ot line:'2   "CIE+SERIAL      " PRG   2049
@@ -373,7 +440,7 @@ MFile* CSIPMFile::getNextFileInDir() {
             return new CSIPMFile(new_url, size);
         }
     } else {
-        auto line = CSIPMFileSystem::session.readLn();
+        auto line = _session->readLn();
         // Got line:''
         // Got line:''
         // 'ot line:'FAST-TESTER DELUXE EXCESS.D64

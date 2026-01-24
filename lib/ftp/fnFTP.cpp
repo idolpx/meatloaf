@@ -953,9 +953,18 @@ bool fnFTP::read_directory(string &name, long &filesize, bool &is_dir)
     return dirBuffer.eof();
 }
 
-bool fnFTP::read_file(uint8_t *buf, unsigned short len)
+bool fnFTP::read_file(uint8_t *buf, unsigned short len, unsigned long range_begin, unsigned long range_end)
 {
-    //Debug_printf("fnFTP::read_file(%p, %u)\r\n", buf, len);
+    //Debug_printf("fnFTP::read_file(%p, %u, %lu, %lu)\r\n", buf, len, range_begin, range_end);
+    
+    // If range parameters are provided and different from current, send RANG command
+    if ((range_begin > 0 || range_end > 0) && (range_begin != _range_begin || range_end != _range_end))
+    {
+        RANG(range_begin, range_end);
+        _range_begin = range_begin;
+        _range_end = range_end;
+    }
+    
     if (!data->connected() && data->available() == 0)
     {
         Debug_printf("fnFTP::read_file(%p,%u) - data socket not connected, aborting.\r\n", buf, len);
@@ -1060,6 +1069,9 @@ bool fnFTP::parse_response()
     controlResponse = string((char *)respBuf, num_read);
     _statusCode = atoi(controlResponse.substr(0, 3).c_str());
     Debug_printf("fnFTP::parse_response() - %d, \"%s\"\r\n", _statusCode, controlResponse.c_str());
+
+    if (_statusCode >= 400)
+        return true;
 
     return false; // ok
 }
@@ -1230,6 +1242,16 @@ void fnFTP::STOR(string path)
 {
     Debug_printf("fnFTP::STOR(%s)\r\n",path.c_str());
     control->write("STOR " + path + "\r\n");
+}
+
+void fnFTP::RANG(unsigned long start, unsigned long end)
+{
+    Debug_printf("fnFTP::RANG(%lu,%lu)\r\n", start, end);
+    control->write("RANG " + std::to_string(start) + "-" + std::to_string(end) + "\r\n");
+    if (parse_response())
+    {
+        Debug_printf("fnFTP::RANG - error response from server\r\n");
+    }
 }
 
 bool fnFTP::keep_alive()

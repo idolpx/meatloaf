@@ -41,8 +41,39 @@
 
 
 #include "utils.h"
+#include "meat_session.h"
 
 #define HTTP_BLOCK_SIZE 256
+
+
+/********************************************************
+ * MSession - HTTP Session Management
+ ********************************************************/
+
+class HTTPMSession : public MSession {
+public:
+    HTTPMSession(std::string host, uint16_t port = 80); // Default HTTP port is 80
+    ~HTTPMSession() override;
+
+    bool connect() override;
+    void disconnect() override;
+    bool keep_alive() override;
+
+    // Get HTTP client configuration for this session
+    esp_http_client_config_t* getClientConfig();
+
+    // Check if this session supports HTTPS
+    bool isSecure() const { return this->port == 443; }
+
+private:
+    esp_http_client_config_t _config;
+    bool _keep_alive_enabled = true;
+    std::string _user_agent;
+};
+
+/********************************************************
+ * HTTP Client
+ ********************************************************/
 
 
 class MeatHttpClient {
@@ -81,6 +112,22 @@ public:
 
         //Debug_printv("HTTP Init url[%s]", url.c_str());
         _http = esp_http_client_init(&config);
+    }
+
+    void init(std::shared_ptr<HTTPMSession> session) {
+        if (!session) {
+            init(); // Fall back to default init
+            return;
+        }
+
+        esp_http_client_config_t* config = session->getClientConfig();
+        // Copy the config and set session-specific values
+        esp_http_client_config_t session_config = *config;
+        session_config.event_handler = _http_event_handler;
+        session_config.user_data = this;
+        session_config.disable_auto_redirect = disableAutoRedirect;
+
+        _http = esp_http_client_init(&session_config);
     }
 
     ~MeatHttpClient() {
@@ -150,12 +197,23 @@ public:
 class HTTPMFile: public MFile {
     std::shared_ptr<MeatHttpClient> fromHeader();
     std::shared_ptr<MeatHttpClient> client = nullptr;
+    std::shared_ptr<HTTPMSession> _session = nullptr;
 
 public:
     HTTPMFile() {
         Debug_printv("C++, if you try to call this, be damned!");
     };
     HTTPMFile(std::string path): MFile(path) { 
+        // Obtain or create HTTP session via SessionBroker
+        uint16_t http_port = port.empty() ? (scheme == "https" ? 443 : 80) : std::stoi(port);
+        _session = SessionBroker::obtain<HTTPMSession>(host, http_port);
+        
+        if (!_session || !_session->isConnected()) {
+            Debug_printv("Failed to obtain HTTP session for %s:%d", host.c_str(), http_port);
+            m_isNull = true;
+            return;
+        }
+        
         // Debug_printv("constructing http file from url [%s]", url.c_str());
     };
     HTTPMFile(std::string path, std::string filename): MFile(path) {};
@@ -227,6 +285,7 @@ public:
     }
 
     MeatHttpClient _http;
+    std::shared_ptr<HTTPMSession> _session = nullptr;
 
 private:
     friend class HTTPMFile;

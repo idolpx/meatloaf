@@ -78,9 +78,11 @@ public:
      * Read file from data socket into buffer.
      * @param buf target buffer
      * @param len length of target buffer
+     * @param range_begin optional start byte position for partial file read (0 = no range)
+     * @param range_end optional end byte position for partial file read (0 = no range)
      * @return TRUE if error, FALSE if successful.
      */
-    bool read_file(uint8_t* buf, unsigned short len);
+    bool read_file(uint8_t* buf, unsigned short len, unsigned long range_begin = 0, unsigned long range_end = 0);
 
     /**
      * Write file from buffer into data socket.
@@ -317,6 +319,13 @@ private:
     void STOR(string path);
 
     /**
+     * @brief send RANG command to server for partial file transfer (RFC 3659)
+     * @param start start byte position
+     * @param end end byte position
+     */
+    void RANG(unsigned long start, unsigned long end);
+
+    /**
      * @brief ask server to get size of file at path
      * @param path path to file
      */
@@ -391,6 +400,15 @@ protected:
     void RMD(string path);
 
 private:
+    /**
+     * Range start position for partial file transfer
+     */
+    unsigned long _range_begin = 0;
+
+    /**
+     * Range end position for partial file transfer
+     */
+    unsigned long _range_end = 0;
 };
 
 #endif /* FNFTP_H */
