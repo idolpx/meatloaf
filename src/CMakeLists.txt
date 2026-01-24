@@ -97,6 +97,7 @@ FILE(GLOB_RECURSE SOURCES
     ${CMAKE_SOURCE_DIR}/lib/qrcode/*.c
     ${CMAKE_SOURCE_DIR}/lib/qrcode/*.cpp
     ${CMAKE_SOURCE_DIR}/lib/sam/*.c
+    ${CMAKE_SOURCE_DIR}/lib/sam/*.cpp
     ${CMAKE_SOURCE_DIR}/lib/server/*.cpp
     ${CMAKE_SOURCE_DIR}/lib/ssdp/*.cpp
     ${CMAKE_SOURCE_DIR}/lib/task/*.cpp
