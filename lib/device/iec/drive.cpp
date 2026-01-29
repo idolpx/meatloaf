@@ -874,20 +874,26 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                                 m_cwd.reset(MFSOwner::File(f->base()));
                             }
                         }
-
-                        // Debug_printv( "url[%s] pathInStream[%s]", f->url.c_str(), f->pathInStream.c_str() );
-                        // if( new_stream->has_subdirs )
-                        // {
-                        //     // Filesystem supports sub directories => set m_cwd to parent directory of file
-                        //     Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Subdir Change Directory Here! stream[%s] > f[%s]", new_stream->url.c_str(), f->url.c_str() );
-                        //     m_cwd.reset(MFSOwner::File(f->url));
-                        // }
                         // else
                         // {
-                        //     // Handles media files that may have '/' as part of the filename
-                        //     f = MFSOwner::File( new_stream->url );
-                        //     Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Change Directory Here! stream[%s] > f[%s]", new_stream->url.c_str(), f->url.c_str() );
-                        //     m_cwd.reset(MFSOwner::File(f->sourceFile));
+                        //     // This was a file.  Set m_cwd to the files parent directory
+                        //     Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "base[%s]", f->base().c_str() );
+                        //     m_cwd.reset(MFSOwner::File(f->base()));
+
+                        //     // Debug_printv( "url[%s] pathInStream[%s]", f->url.c_str(), f->pathInStream.c_str() );
+                        //     // if( new_stream->has_subdirs )
+                        //     // {
+                        //     //     Filesystem supports sub directories => set m_cwd to parent directory of file
+                        //     //     Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Subdir Change Directory Here! stream[%s] > f[%s]", new_stream->url.c_str(), f->url.c_str() );
+                        //     //     m_cwd.reset(MFSOwner::File(f->url));
+                        //     // }
+                        //     // else
+                        //     // {
+                        //     //     Handles media files that may have '/' as part of the filename
+                        //     //     f = MFSOwner::File( new_stream->url );
+                        //     //     Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Change Directory Here! stream[%s] > f[%s]", new_stream->url.c_str(), f->url.c_str() );
+                        //     //     m_cwd.reset(MFSOwner::File(f->sourceFile));
+                        //     // }
                         // }
                     }
 
