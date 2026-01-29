@@ -87,7 +87,6 @@ void FSPMSession::disconnect() {
 }
 
 bool FSPMSession::keep_alive() {
-    std::lock_guard<std::mutex> lock(_session_mutex);
     
     // Check if connected and session is valid
     if (!connected) {
@@ -151,12 +150,12 @@ FSPMFile::FSPMFile(std::string path) : MFile(path) {
         m_isNull = false;
     }
 
-    Debug_printv("FSPMFile created for %s", path.c_str());
+    //Debug_printv("FSPMFile created for %s", path.c_str());
 }
 
 FSPMFile::~FSPMFile() {
     closeDir();
-    Debug_printv("FSPMFile destroyed for %s", path.c_str());
+    //Debug_printv("FSPMFile destroyed for %s", path.c_str());
 }
 
 std::shared_ptr<MStream> FSPMFile::getSourceStream(std::ios_base::openmode mode) {
@@ -175,11 +174,13 @@ std::shared_ptr<MStream> FSPMFile::getDecodedStream(std::shared_ptr<MStream> src
 }
 
 std::shared_ptr<MStream> FSPMFile::createStream(std::ios_base::openmode mode) {
-    return std::make_shared<FSPMStream>(path);
+    std::shared_ptr<MStream> istream = std::make_shared<FSPMStream>(url);
+    istream->open(mode);
+    return istream;
 }
 
 bool FSPMFile::isDirectory() {
-    Debug_printv("path[%s] pathInStream[%s]", path.c_str(), pathInStream.c_str());
+    //Debug_printv("path[%s] pathInStream[%s]", path.c_str(), pathInStream.c_str());
     if (path == "/" || path.empty()) {
         return true;
     }
@@ -220,8 +221,7 @@ uint64_t FSPMFile::getAvailableSpace() {
 }
 
 bool FSPMFile::rewindDirectory() {
-    closeDir();
-    openDir(pathInStream);
+    openDir(path);
     _current_entry = 0;
     return dirOpened;
 }
@@ -239,6 +239,11 @@ MFile* FSPMFile::getNextFileInDir() {
         while (fsp_readdir_native(_dir_handle, &entry, &result) == 0 && result) {
             _dir_entries.push_back(entry);
         }
+
+        // Sort entries by name
+        std::sort(_dir_entries.begin(), _dir_entries.end(), [](const FSP_RDENTRY& a, const FSP_RDENTRY& b) {
+            return strcmp(a.name, b.name) < 0;
+        });
     }
 
     // Return next entry
@@ -326,8 +331,64 @@ bool FSPMFile::rename(std::string dest) {
 }
 
 bool FSPMFile::readEntry(std::string filename) {
-    // Not implemented for FSP
-    return false;
+    if (filename.empty() || !pathValid(path)) {
+        return false;
+    }
+
+    std::string searchPath = pathToFile();
+    if (searchPath.empty()) {
+        searchPath = "/";
+    }
+
+    Debug_printv("path[%s] filename[%s]", searchPath.c_str(), filename.c_str());
+
+    // Open directory
+    FSP_DIR* dir_handle = fsp_opendir(getSession(), searchPath.c_str());
+    if (!dir_handle) {
+        Debug_printv("Failed to open directory: %s", searchPath.c_str());
+        return false;
+    }
+
+    FSP_RDENTRY entry;
+    FSP_RDENTRY* result;
+    bool found = false;
+
+    while (fsp_readdir_native(dir_handle, &entry, &result) == 0 && result) {
+        std::string entryFilename = entry.name;
+
+        // Skip hidden files and directory entries
+        if (entryFilename[0] == '.') {
+            continue;
+        }
+
+        Debug_printv("path[%s] filename[%s] entry[%s]", searchPath.c_str(), filename.c_str(), entryFilename.c_str());
+
+        // Check for matches
+        if (filename == "*") {
+            name = entryFilename;
+            rebuildUrl();
+            found = true;
+            break;
+        } else if (filename == entryFilename) {
+            found = true;
+            break;
+        } else if (mstr::compare(entryFilename, filename)) {
+            Debug_printv("Found! file[%s] -> entry[%s]", filename.c_str(), entryFilename.c_str());
+            name = entryFilename;
+            rebuildUrl();
+            found = true;
+            break;
+        }
+    }
+
+    // Close directory
+    fsp_closedir(dir_handle);
+
+    if (!found) {
+        Debug_printv("Not Found! file[%s]", filename.c_str());
+    }
+
+    return found;
 }
 
 void FSPMFile::openDir(std::string path) {
