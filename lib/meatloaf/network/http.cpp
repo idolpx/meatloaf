@@ -587,6 +587,34 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
     if ( url.size() < 5)
         return 0;
 
+    // If there's an active request, finish it cleanly before starting a new one
+    // This allows keep-alive to reuse the TCP connection
+    if (_http != nullptr && _is_open) {
+        // Check if there's unread data and flush it efficiently
+        // Use esp_http_client_is_complete_data_received() to avoid unnecessary reads
+        if (!esp_http_client_is_complete_data_received(_http)) {
+            // Flush remaining data in reasonably-sized chunks
+            static char discard_buffer[1024];
+            int total_discarded = 0;
+            int bytes_read;
+            // Limit to prevent hanging on very large responses
+            const int MAX_DISCARD = 32768; // 32KB max
+            do {
+                int chunk_size = (total_discarded + sizeof(discard_buffer) > MAX_DISCARD) 
+                    ? (MAX_DISCARD - total_discarded) : sizeof(discard_buffer);
+                if (chunk_size <= 0) break;
+                
+                bytes_read = esp_http_client_read(_http, discard_buffer, chunk_size);
+                if (bytes_read > 0) {
+                    total_discarded += bytes_read;
+                }
+            } while (bytes_read > 0 && total_discarded < MAX_DISCARD);
+        }
+        
+        // Don't call esp_http_client_close() - that breaks keep-alive
+        _is_open = false;
+    }
+
     // Set URL and Method
     mstr::replaceAll(url, " ", "%20");
     //Debug_printv("method[%d] url[%s]", method, url.c_str());
