@@ -175,6 +175,13 @@ bool MMediaStream::open(std::ios_base::openmode mode)
 void MMediaStream::close()
 {
     Debug_memory();
+    
+    // Close the container stream to release resources
+    if (containerStream) {
+        containerStream->close();
+    }
+    
+    _is_open = false;
 }
 
 
