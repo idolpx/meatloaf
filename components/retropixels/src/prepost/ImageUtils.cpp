@@ -145,25 +145,12 @@ namespace retropixels
         return static_cast<uint8_t>(std::max(0.0, std::min(255.0, result)));
     }
 
-    // Resize an image using Jimp's bicubic interpolation algorithm
+    // Resize an image using Jimp's bicubic interpolation algorithm (memory-optimized)
     Image resizeImage(const Image& inputImage, int newWidth, int newHeight) {
         int wSrc = inputImage.width;
         int hSrc = inputImage.height;
         int wDst = newWidth;
         int hDst = newHeight;
-
-        // Flatten source data
-        std::vector<uint8_t> bufSrc(wSrc * hSrc * 4);
-        for (int y = 0; y < hSrc; ++y) {
-            for (int x = 0; x < wSrc; ++x) {
-                int index = (y * wSrc + x) * 4;
-                auto pixel = inputImage.getPixel(x, y);
-                bufSrc[index] = pixel[0];
-                bufSrc[index + 1] = pixel[1];
-                bufSrc[index + 2] = pixel[2];
-                bufSrc[index + 3] = pixel[3];
-            }
-        }
 
         // Calculate intermediate dimensions
         int wM = std::max(1, wSrc / wDst);
@@ -171,92 +158,113 @@ namespace retropixels
         int hM = std::max(1, hSrc / hDst);
         int hDst2 = hDst * hM;
 
-        // Pass 1 - interpolate rows (horizontal pass)
-        std::vector<uint8_t> buf1(wDst2 * hSrc * 4);
+        // Use flat buffer for output instead of Image to save memory
+        std::vector<uint8_t> outputBuffer(wDst * hDst * 4);
+
+        // Keep only one row cache for horizontal interpolation
+        std::vector<uint8_t> horzRow(wDst2 * 4);
         
-        for (int i = 0; i < hSrc; i++) {
+        // Keep 4 rows for vertical interpolation window
+        std::vector<uint8_t> vertWindow[4];
+        for (int i = 0; i < 4; i++) {
+            vertWindow[i].resize(wDst2 * 4);
+        }
+        int windowRow[4] = {-1, -1, -1, -1};
+        int windowIdx = 0;
+        
+        // Helper to generate a horizontally-interpolated row
+        auto generateHorzRow = [&](int srcY, std::vector<uint8_t>& dest) {
             for (int j = 0; j < wDst2; j++) {
                 double x = j * (wSrc - 1.0) / wDst2;
                 int xPos = static_cast<int>(std::floor(x));
                 double t = x - xPos;
-                int srcPos = (i * wSrc + xPos) * 4;
-                int buf1Pos = (i * wDst2 + j) * 4;
-
+                
+                auto p0 = inputImage.getPixel(std::max(0, xPos - 1), srcY);
+                auto p1 = inputImage.getPixel(xPos, srcY);
+                auto p2 = inputImage.getPixel(std::min(wSrc - 1, xPos + 1), srcY);
+                auto p3 = inputImage.getPixel(std::min(wSrc - 1, xPos + 2), srcY);
+                
                 for (int k = 0; k < 4; k++) {
-                    int kPos = srcPos + k;
-                    int x0 = xPos > 0 ? bufSrc[kPos - 4] : 2 * bufSrc[kPos] - bufSrc[kPos + 4];
-                    int x1 = bufSrc[kPos];
-                    int x2 = bufSrc[kPos + 4];
-                    int x3 = xPos < wSrc - 2 ? bufSrc[kPos + 8] : 2 * bufSrc[kPos + 4] - bufSrc[kPos];
-                    buf1[buf1Pos + k] = interpolateCubic(std::max(0, std::min(255, x0)), 
-                                                          x1, x2, 
-                                                          std::max(0, std::min(255, x3)), t);
+                    dest[j * 4 + k] = interpolateCubic(p0[k], p1[k], p2[k], p3[k], t);
                 }
             }
-        }
-
-        // Pass 2 - interpolate columns (vertical pass)
-        std::vector<uint8_t> buf2(wDst2 * hDst2 * 4);
+        };
         
-        for (int i = 0; i < hDst2; i++) {
-            for (int j = 0; j < wDst2; j++) {
-                double y = i * (hSrc - 1.0) / hDst2;
-                int yPos = static_cast<int>(std::floor(y));
-                double t = y - yPos;
-                int buf1Pos = (yPos * wDst2 + j) * 4;
-                int buf2Pos = (i * wDst2 + j) * 4;
-
-                for (int k = 0; k < 4; k++) {
-                    int kPos = buf1Pos + k;
-                    int y0 = yPos > 0 ? buf1[kPos - wDst2 * 4] : 2 * buf1[kPos] - buf1[kPos + wDst2 * 4];
-                    int y1 = buf1[kPos];
-                    int y2 = buf1[kPos + wDst2 * 4];
-                    int y3 = yPos < hSrc - 2 ? buf1[kPos + wDst2 * 8] : 2 * buf1[kPos + wDst2 * 4] - buf1[kPos];
-                    buf2[buf2Pos + k] = interpolateCubic(std::max(0, std::min(255, y0)), 
-                                                          y1, y2, 
-                                                          std::max(0, std::min(255, y3)), t);
-                }
+        // Helper to ensure a row is in the vertical window
+        auto ensureRowInWindow = [&](int srcY) -> int {
+            // Check if already in window
+            for (int i = 0; i < 4; i++) {
+                if (windowRow[i] == srcY) return i;
             }
-        }
-
-        // Pass 3 - scale to final destination (box filter if needed)
-        std::vector<uint8_t> bufDst(wDst * hDst * 4);
-        int m = wM * hM;
+            // Generate and add to window (LRU replacement)
+            int idx = windowIdx;
+            generateHorzRow(srcY, vertWindow[idx]);
+            windowRow[idx] = srcY;
+            windowIdx = (windowIdx + 1) % 4;
+            return idx;
+        };
         
-        if (m > 1) {
-            // Average pixels in blocks
-            for (int i = 0; i < hDst; i++) {
-                for (int j = 0; j < wDst; j++) {
-                    int r = 0, g = 0, b = 0, a = 0;
+        // Process each block for final output
+        for (int outY = 0; outY < hDst; outY++) {
+            for (int outX = 0; outX < wDst; outX++) {
+                int r = 0, g = 0, b = 0, a = 0;
+                int pixelCount = 0;
+                
+                // Average over the block
+                for (int dy = 0; dy < hM; dy++) {
+                    int srcRow = outY * hM + dy;
+                    if (srcRow >= hDst2) continue;
                     
-                    for (int y = 0; y < hM; y++) {
-                        for (int x = 0; x < wM; x++) {
-                            int idx = ((i * hM + y) * wDst2 + (j * wM + x)) * 4;
-                            r += buf2[idx];
-                            g += buf2[idx + 1];
-                            b += buf2[idx + 2];
-                            a += buf2[idx + 3];
+                    double yy = srcRow * (hSrc - 1.0) / hDst2;
+                    int yyPos = static_cast<int>(std::floor(yy));
+                    double tt = yy - yyPos;
+                    
+                    // Ensure we have the 4 rows we need for vertical interpolation
+                    int idx0 = ensureRowInWindow(std::max(0, yyPos - 1));
+                    int idx1 = ensureRowInWindow(yyPos);
+                    int idx2 = ensureRowInWindow(std::min(hSrc - 1, yyPos + 1));
+                    int idx3 = ensureRowInWindow(std::min(hSrc - 1, yyPos + 2));
+                    
+                    for (int dx = 0; dx < wM; dx++) {
+                        int srcCol = outX * wM + dx;
+                        if (srcCol >= wDst2) continue;
+                        
+                        // Vertical interpolation
+                        int pos = srcCol * 4;
+                        for (int k = 0; k < 4; k++) {
+                            int y0 = vertWindow[idx0][pos + k];
+                            int y1 = vertWindow[idx1][pos + k];
+                            int y2 = vertWindow[idx2][pos + k];
+                            int y3 = vertWindow[idx3][pos + k];
+                            
+                            int val = interpolateCubic(y0, y1, y2, y3, tt);
+                            
+                            if (k == 0) r += val;
+                            else if (k == 1) g += val;
+                            else if (k == 2) b += val;
+                            else a += val;
                         }
+                        pixelCount++;
                     }
-                    
-                    int dstPos = (i * wDst + j) * 4;
-                    bufDst[dstPos] = r / m;
-                    bufDst[dstPos + 1] = g / m;
-                    bufDst[dstPos + 2] = b / m;
-                    bufDst[dstPos + 3] = a / m;
+                }
+                
+                // Set the output pixel in flat buffer
+                if (pixelCount > 0) {
+                    int outIdx = (outY * wDst + outX) * 4;
+                    outputBuffer[outIdx] = r / pixelCount;
+                    outputBuffer[outIdx + 1] = g / pixelCount;
+                    outputBuffer[outIdx + 2] = b / pixelCount;
+                    outputBuffer[outIdx + 3] = a / pixelCount;
                 }
             }
-        } else {
-            // Direct copy
-            bufDst = buf2;
         }
 
-        // Create output image
+        // Create output image and populate pixel-by-pixel to avoid memory spike
         Image outputImage(wDst, hDst);
         for (int y = 0; y < hDst; ++y) {
             for (int x = 0; x < wDst; ++x) {
-                int index = (y * wDst + x) * 4;
-                outputImage.setPixel(x, y, {bufDst[index], bufDst[index + 1], bufDst[index + 2], bufDst[index + 3]});
+                int idx = (y * wDst + x) * 4;
+                outputImage.setPixel(x, y, {outputBuffer[idx], outputBuffer[idx + 1], outputBuffer[idx + 2], outputBuffer[idx + 3]});
             }
         }
 
@@ -288,15 +296,29 @@ namespace retropixels
             return;
         }
 
+        int targetWidth = graphicMode.width;
+        int targetHeight = graphicMode.height;
+        
         if (graphicMode.pixelWidth != 1) {
-            int newWidth = image.width / graphicMode.pixelWidth;
-            image.width = newWidth;
+            targetWidth = image.width / graphicMode.pixelWidth;
         }
 
-        image.pixels.resize(graphicMode.height);
-        for (auto& row : image.pixels) {
-            row.resize(graphicMode.width);
+        // Crop by copying relevant portion to new buffer
+        std::vector<uint8_t> newData(targetWidth * targetHeight * 4);
+        for (int y = 0; y < targetHeight && y < image.height; ++y) {
+            for (int x = 0; x < targetWidth && x < image.width; ++x) {
+                int srcIdx = (y * image.width + x) * 4;
+                int dstIdx = (y * targetWidth + x) * 4;
+                newData[dstIdx] = image.data[srcIdx];
+                newData[dstIdx + 1] = image.data[srcIdx + 1];
+                newData[dstIdx + 2] = image.data[srcIdx + 2];
+                newData[dstIdx + 3] = image.data[srcIdx + 3];
+            }
         }
+        
+        image.width = targetWidth;
+        image.height = targetHeight;
+        image.data = std::move(newData);
     }
 
     // Resizing function to fill the target dimensions
@@ -335,7 +357,6 @@ namespace retropixels
         
         image.width = final.width;
         image.height = final.height;
-        image.pixels = std::move(final.pixels);
         image.data = std::move(final.data);
     }
 }
