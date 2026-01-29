@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
-// NFS - Network File System
+// NFS:// - Network File System
 // https://en.wikipedia.org/wiki/Network_File_System
 // 
 // https://github.com/sahlberg/libnfs

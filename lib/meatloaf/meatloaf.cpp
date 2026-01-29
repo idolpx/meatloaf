@@ -63,6 +63,7 @@
 #include "network/tnfs.h"
 #include "network/smb.h"
 #include "network/nfs.h"
+#include "network/fsp.h"
 #endif
 
 // Cartridge
@@ -95,12 +96,14 @@
 
 // Network
 #include "network/http.h"
+// #include "network/sftp.h"  // Disabled: libssh component lacks SFTP source files
 // #include "network/ipfs.h"
 // #include "network/ws.h"
 
 // Service
 #include "service/ml.h"
 #include "service/mqtt.h"
+#include "service/nsd.h"
 
 
 #ifndef MIN_CONFIG
@@ -145,12 +148,14 @@ LNXMFileSystem lnxFS;
 // Service
 CSIPMFileSystem csipFS;
 MQTTMFileSystem mqttFS;
+NSDMFileSystem nsdFS;
 
 // Network
 FTPMFileSystem ftpFS;
 TNFSMFileSystem tnfsFS;
 SMBMFileSystem smbFS;
 NFSMFileSystem nfsFS;
+FSPMFileSystem fspFS;
 #endif
 
 // Cartridge
@@ -183,6 +188,7 @@ TCRTMFileSystem tcrtFS;
 
 // Network
 HTTPMFileSystem httpFS;
+// SFTPMFileSystem sftpFS;  // Disabled: libssh component lacks SFTP source files
 // IPFSFileSystem ipfsFS;
 // TcpFileSystem tcpFS;
 //WSFileSystem wsFS;
@@ -236,15 +242,20 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
     // Network
     &httpFS,
 #ifndef MIN_CONFIG
-    &ftpFS, &tnfsFS, &smbFS, &nfsFS,
+    &ftpFS, &tnfsFS, &smbFS, &nfsFS, &fspFS,
     //&ipfsFS, &tcpFS,
+#endif
+
+#ifndef MIN_CONFIG
+    // Service
+    &nsdFS, &mqttFS,
 #endif
 
 };
 
 std::vector<MFileSystem*> MFSOwner::availableOther {
-    // Service
 #ifndef MIN_CONFIG
+    // Service
     &csipFS,
 
     // Codec

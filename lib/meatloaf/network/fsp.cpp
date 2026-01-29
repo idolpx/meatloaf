@@ -44,6 +44,8 @@ FSPMSession::~FSPMSession() {
 }
 
 bool FSPMSession::connect() {
+    std::lock_guard<std::mutex> lock(_session_mutex);
+    
     if (connected) {
         Debug_printv("Already connected to %s:%d", host.c_str(), port);
         return true;
@@ -69,6 +71,8 @@ bool FSPMSession::connect() {
 }
 
 void FSPMSession::disconnect() {
+    std::lock_guard<std::mutex> lock(_session_mutex);
+    
     if (!connected) {
         return;
     }
@@ -83,13 +87,31 @@ void FSPMSession::disconnect() {
 }
 
 bool FSPMSession::keep_alive() {
-    if (!connected || !_session) {
+    std::lock_guard<std::mutex> lock(_session_mutex);
+    
+    // Check if connected and session is valid
+    if (!connected) {
+        Debug_printv("Keep-alive skipped - not connected: %s:%d", host.c_str(), port);
+        return false;
+    }
+
+    if (!_session) {
+        Debug_printv("Keep-alive skipped - null session: %s:%d", host.c_str(), port);
+        connected = false;  // Mark as disconnected if session is null
+        return false;
+    }
+
+    // Get raw pointer and validate before use
+    FSP_SESSION* session_ptr = _session.get();
+    if (!session_ptr) {
+        Debug_printv("Keep-alive skipped - invalid session pointer: %s:%d", host.c_str(), port);
+        connected = false;
         return false;
     }
 
     // Try to stat the root directory as a keep-alive operation
     struct stat sb;
-    if (fsp_stat(_session.get(), "/", &sb) == 0) {
+    if (fsp_stat(session_ptr, "/", &sb) == 0) {
         Debug_printv("Keep-alive for %s:%d successful", host.c_str(), port);
         updateActivity();
         return true;
@@ -106,7 +128,10 @@ bool FSPMSession::keep_alive() {
 
 FSPMFile::FSPMFile(std::string path) : MFile(path) {
     // Obtain or create FSP session via SessionBroker
-    uint16_t fsp_port = port.empty() ? FSP_DEFAULT_PORT : std::stoi(port);
+    uint16_t fsp_port = FSP_DEFAULT_PORT;
+    if (!port.empty()) {
+        fsp_port = std::stoi(port);
+    }
     _session = SessionBroker::obtain<FSPMSession>(host, fsp_port);
 
     if (!_session || !_session->isConnected()) {
@@ -135,7 +160,14 @@ FSPMFile::~FSPMFile() {
 }
 
 std::shared_ptr<MStream> FSPMFile::getSourceStream(std::ios_base::openmode mode) {
-    return std::make_shared<FSPMStream>(path);
+    // Add pathInStream to URL if specified
+    if ( pathInStream.size() )
+        url += "/" + pathInStream;
+
+    Debug_printv("url[%s] mode[%d]", url.c_str(), mode);
+    std::shared_ptr<MStream> istream = std::make_shared<FSPMStream>(url);
+    istream->open(mode);
+    return istream;
 }
 
 std::shared_ptr<MStream> FSPMFile::getDecodedStream(std::shared_ptr<MStream> src) {
@@ -147,12 +179,17 @@ std::shared_ptr<MStream> FSPMFile::createStream(std::ios_base::openmode mode) {
 }
 
 bool FSPMFile::isDirectory() {
+    Debug_printv("path[%s] pathInStream[%s]", path.c_str(), pathInStream.c_str());
+    if (path == "/" || path.empty()) {
+        return true;
+    }
+
     if (!pathValid(path)) {
         return false;
     }
 
     struct stat sb;
-    if (fsp_stat(getSession(), pathInStream.c_str(), &sb) != 0) {
+    if (fsp_stat(getSession(), path.c_str(), &sb) != 0) {
         return false;
     }
 
@@ -206,7 +243,8 @@ MFile* FSPMFile::getNextFileInDir() {
 
     // Return next entry
     if (_current_entry < _dir_entries.size()) {
-        std::string entryName = _dir_entries[_current_entry].name;
+        const FSP_RDENTRY& entry = _dir_entries[_current_entry];
+        std::string entryName = entry.name;
         std::string fullPath = pathInStream;
         if (!fullPath.empty() && fullPath.back() != '/') {
             fullPath += "/";
@@ -216,8 +254,24 @@ MFile* FSPMFile::getNextFileInDir() {
         _current_entry++;
 
         // Create new FSPMFile for this entry
-        std::string url = "fsp://" + host + ":" + port + fullPath;
-        return new FSPMFile(url);
+        std::string url = "fsp://" + host;
+        if (!port.empty()) {
+            url += ":" + port;
+        }
+        // Ensure path starts with /
+        if (fullPath.empty() || fullPath[0] != '/') {
+            url += "/";
+        }
+        url += fullPath;
+        
+        FSPMFile* file = new FSPMFile(url);
+        
+        // Set file size for regular files (not directories)
+        if (entry.type != FSP_RDTYPE_DIR) {
+            file->size = entry.size;
+        }
+        
+        return file;
     }
 
     return nullptr;
@@ -362,7 +416,17 @@ bool FSPMStream::open(std::ios_base::openmode mode) {
         return false;
     }
 
-    Debug_printv("Opened FSP file: %s", parser->path.c_str());
+    // Get file size
+    struct stat sb;
+    if (fsp_stat(_session->getSession(), parser->path.c_str(), &sb) == 0) {
+        _size = sb.st_size;
+        Debug_printv("Opened FSP file: %s (size: %u)", parser->path.c_str(), _size);
+    } else {
+        Debug_printv("Opened FSP file: %s (size unknown)", parser->path.c_str());
+        _size = 0;
+    }
+    
+    _position = 0;
     return true;
 }
 
@@ -372,6 +436,9 @@ void FSPMStream::close() {
         _file_handle = nullptr;
         Debug_printv("Closed FSP file");
     }
+    _session.reset();
+    _position = 0;
+    _size = 0;
 }
 
 uint32_t FSPMStream::read(uint8_t* buf, uint32_t size) {
@@ -380,6 +447,7 @@ uint32_t FSPMStream::read(uint8_t* buf, uint32_t size) {
     }
 
     size_t bytes_read = fsp_fread(buf, 1, size, _file_handle);
+    _position += bytes_read;
     return bytes_read;
 }
 
@@ -389,6 +457,12 @@ uint32_t FSPMStream::write(const uint8_t *buf, uint32_t size) {
     }
 
     size_t bytes_written = fsp_fwrite(buf, 1, size, _file_handle);
+    _position += bytes_written;
+    
+    if (_position > _size) {
+        _size = _position;
+    }
+    
     return bytes_written;
 }
 
@@ -401,5 +475,17 @@ bool FSPMStream::seek(uint32_t pos, int mode) {
         return false;
     }
 
-    return fsp_fseek(_file_handle, pos, mode) == 0;
+    if (fsp_fseek(_file_handle, pos, mode) == 0) {
+        // Update position based on seek mode
+        if (mode == SEEK_SET) {
+            _position = pos;
+        } else if (mode == SEEK_CUR) {
+            _position += pos;
+        } else if (mode == SEEK_END) {
+            _position = _size + pos;
+        }
+        return true;
+    }
+    
+    return false;
 }

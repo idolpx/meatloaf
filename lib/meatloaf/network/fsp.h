@@ -18,6 +18,7 @@
 // FSP:// - File Service Protocol
 // https://fsp.sourceforge.net/
 
+
 #ifndef MEATLOAF_NETWORK_FSP
 #define MEATLOAF_NETWORK_FSP
 
@@ -34,6 +35,7 @@ extern "C" {
 
 #include <dirent.h>
 #include <string.h>
+#include <mutex>
 
 
 
@@ -56,6 +58,7 @@ public:
 private:
     std::unique_ptr<FSP_SESSION> _session;
     std::string _password; // FSP password (empty by default)
+    std::mutex _session_mutex; // Protect session operations from concurrent access
 };
 
 

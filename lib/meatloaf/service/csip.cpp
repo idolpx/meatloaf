@@ -179,7 +179,7 @@ bool CSIPMSession::traversePath(std::string path) {
  ********************************************************/
 
 CSIPMFile::CSIPMFile(std::string path, size_t filesize): MFile(path) {
-    Debug_printv("path[%s] size[%d]", path.c_str(), filesize);
+    //Debug_printv("path[%s] size[%d]", path.c_str(), filesize);
     this->size = filesize;
 
     media_blocks_free = 65535;
@@ -411,7 +411,7 @@ MFile* CSIPMFile::getNextFileInDir() {
 
     if(dirIsImage) {
         auto line = _session->readLn();
-        Debug_printv("next file in dir got %s", line.c_str());
+        //Debug_printv("next file in dir got %s", line.c_str());
         // 'ot line:'0 ␒"CIE�������������" 00�2A�
         // 'ot line:'2   "CIE+SERIAL      " PRG   2049
         // 'ot line:'1   "CIE-SYS31801    " PRG   2049
@@ -434,7 +434,7 @@ MFile* CSIPMFile::getNextFileInDir() {
             name = line.substr(5,15);
             size = atoi(line.substr(0, line.find_first_of(" ")).c_str());
             mstr::rtrim(name);
-            Debug_printv("xx: %s -- %s %d", line.c_str(), name.c_str(), size);
+            //Debug_printv("xx: %s -- %s %d", line.c_str(), name.c_str(), size);
             //return new CSIPMFile(path() +"/"+ name);
             new_url += name;
             return new CSIPMFile(new_url, size);
