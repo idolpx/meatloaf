@@ -95,6 +95,12 @@ public:
     }
 
     void init() {
+        // Clean up existing client if present to prevent handle leak
+        if (_http != nullptr) {
+            esp_http_client_cleanup(_http);
+            _http = nullptr;
+        }
+        
         esp_http_client_config_t config;
         memset(&config, 0, sizeof(config));
         config.url = "https://api.meatloaf.cc/?$";
@@ -118,6 +124,12 @@ public:
         if (!session) {
             init(); // Fall back to default init
             return;
+        }
+
+        // Clean up existing client if present to prevent handle leak
+        if (_http != nullptr) {
+            esp_http_client_cleanup(_http);
+            _http = nullptr;
         }
 
         esp_http_client_config_t* config = session->getClientConfig();
@@ -205,6 +217,7 @@ public:
     };
     HTTPMFile(std::string path): MFile(path) { 
         // Obtain or create HTTP session via SessionBroker
+        // Use default ports if not specified: 443 for https, 80 for http
         uint16_t http_port = port.empty() ? (scheme == "https" ? 443 : 80) : std::stoi(port);
         _session = SessionBroker::obtain<HTTPMSession>(host, http_port);
         
@@ -218,8 +231,15 @@ public:
     };
     HTTPMFile(std::string path, std::string filename): MFile(path) {};
     ~HTTPMFile() override {
-        // if(client != nullptr)
-        //     delete client;
+        // Explicitly close and reset client to free resources
+        if (client) {
+            client->close();
+            client.reset();
+        }
+        // Reset session reference
+        if (_session) {
+            _session.reset();
+        }
     }
 
     std::shared_ptr<MStream> getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override ; // has to return OPENED stream

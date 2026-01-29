@@ -36,6 +36,12 @@ HTTPMSession::HTTPMSession(std::string host, uint16_t port)
 
     // Initialize HTTP client configuration
     memset(&_config, 0, sizeof(_config));
+    
+    // Set host and port - required for esp_http_client_init
+    _config.host = host.c_str();
+    _config.port = port;
+    _config.path = "/";  // Default path
+    
     _config.auth_type = HTTP_AUTH_TYPE_BASIC;
     _config.user_agent = _user_agent.c_str();
     _config.method = HTTP_METHOD_GET;
@@ -263,7 +269,7 @@ bool HTTPMStream::open(std::ios_base::openmode mode) {
         return false;
     }
 
-    // Get session
+    // Get session - use default ports if not specified
     uint16_t http_port = parser->port.empty() ? (parser->scheme == "https" ? 443 : 80) : std::stoi(parser->port);
     _session = SessionBroker::obtain<HTTPMSession>(parser->host, http_port);
     if (!_session || !_session->isConnected()) {

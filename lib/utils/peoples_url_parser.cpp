@@ -201,6 +201,9 @@ std::string PeoplesUrlParser::base(void)
 
 
 uint16_t PeoplesUrlParser::getPort() {
+    if(port.size() == 0)
+        return 0;
+
     return std::stoi(port);
 }
 
