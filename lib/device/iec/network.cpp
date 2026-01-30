@@ -388,7 +388,8 @@ void iecNetwork::parse_bite()
  
     //bites += "\"";
     //Debug_printv("[%s]", bites.c_str());
-    channel_data.receiveBuffer = mstr::toPETSCII2(bites);
+    //clean_transform_ascii_to_petscii(bites);
+    //channel_data.receiveBuffer = mstr::toPETSCII2(bites);
 }
 
 void iecNetwork::set_translation_mode()
@@ -1028,7 +1029,7 @@ bool iecNetwork::transmit(NetworkData &channel_data)
     // force incoming data from HOST to fixed ascii
     // Debug_printv("[1] DATA: >%s< [%s]", channel_data.transmitBuffer.c_str(), mstr::toHex(channel_data.transmitBuffer).c_str());
     //clean_transform_petscii_to_ascii(channel_data.transmitBuffer);
-    channel_data.transmitBuffer = mstr::toUTF8(channel_data.transmitBuffer);
+    //channel_data.transmitBuffer = mstr::toUTF8(channel_data.transmitBuffer);
     // Debug_printv("[2] DATA: >%s< [%s]", channel_data.transmitBuffer.c_str(), mstr::toHex(channel_data.transmitBuffer).c_str());
     
     Debug_printf("Received %u bytes. Transmitting.", channel_data.transmitBuffer.length());
