@@ -874,6 +874,12 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                                 m_cwd.reset(MFSOwner::File(f->base()));
                             }
                         }
+                        else
+                        {
+                            // This was a directory.  Set m_cwd to the directory
+                            Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "url[%s]", f->url.c_str() );
+                            m_cwd.reset(MFSOwner::File(f->url));
+                        }
                         // else
                         // {
                         //     // This was a file.  Set m_cwd to the files parent directory
