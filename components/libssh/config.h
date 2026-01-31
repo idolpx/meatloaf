@@ -43,7 +43,6 @@ enum ssh_config_opcode_e {
     SOC_MACS,
     SOC_COMPRESSION,
     SOC_TIMEOUT,
-    SOC_PROTOCOL,
     SOC_STRICTHOSTKEYCHECK,
     SOC_KNOWNHOSTS,
     SOC_PROXYCOMMAND,
@@ -61,8 +60,13 @@ enum ssh_config_opcode_e {
     SOC_KBDINTERACTIVEAUTHENTICATION,
     SOC_PASSWORDAUTHENTICATION,
     SOC_PUBKEYAUTHENTICATION,
-    SOC_PUBKEYACCEPTEDTYPES,
+    SOC_PUBKEYACCEPTEDKEYTYPES,
     SOC_REKEYLIMIT,
+    SOC_IDENTITYAGENT,
+    SOC_IDENTITIESONLY,
+    SOC_CONTROLMASTER,
+    SOC_CONTROLPATH,
+    SOC_CERTIFICATE,
 
     SOC_MAX /* Keep this one last in the list */
 };
@@ -134,14 +138,14 @@ enum ssh_config_opcode_e {
 /* Define to 1 if you have the <stdint.h> header file. */
 #define HAVE_STDINT_H 1
 
+/* Define to 1 if you have the <ifaddrs.h> header file. */
+//#define HAVE_IFADDRS_H 1
+
 /* Define to 1 if you have the <openssl/aes.h> header file. */
 /* #undef HAVE_OPENSSL_AES_H */
 
 /* Define to 1 if you have the <wspiapi.h> header file. */
-/* #undef HAVE_WSPIAPI_H */
-
-/* Define to 1 if you have the <openssl/blowfish.h> header file. */
-/* #undef HAVE_OPENSSL_BLOWFISH_H */
+//#define HAVE_WSPIAPI_H 1
 
 /* Define to 1 if you have the <openssl/des.h> header file. */
 /* #undef HAVE_OPENSSL_DES_H */
@@ -156,23 +160,26 @@ enum ssh_config_opcode_e {
 /* #undef HAVE_OPENSSL_ECDSA_H */
 
 /* Define to 1 if you have the <pthread.h> header file. */
-/* #undef HAVE_PTHREAD_H */
+#define HAVE_PTHREAD_H 1
 
-/* Define to 1 if you have eliptic curve cryptography in openssl */
+/* Define to 1 if you have elliptic curve cryptography in openssl */
 /* #undef HAVE_OPENSSL_ECC */
 
-/* Define to 1 if you have eliptic curve cryptography in gcrypt */
+/* Define to 1 if you have elliptic curve cryptography in gcrypt */
 /* #undef HAVE_GCRYPT_ECC */
 
-/* Define to 1 if you have eliptic curve cryptography */
+/* Define to 1 if you have elliptic curve cryptography */
 #define HAVE_ECC 1
 
 /* Define to 1 if you have DSA */
 /* #undef HAVE_DSA */
 #define HAVE_DSA 1
 
-/* Define to 1 if you have gl_flags as a glob_t sturct member */
+/* Define to 1 if you have gl_flags as a glob_t struct member */
 #define HAVE_GLOB_GL_FLAGS_MEMBER 1
+
+/* Define to 1 if you have gcrypt with ChaCha20/Poly1305 support */
+//#define HAVE_GCRYPT_CHACHA_POLY 1
 
 /* Define to 1 if you have OpenSSL with Ed25519 support */
 /* #undef HAVE_OPENSSL_ED25519 */
@@ -182,38 +189,14 @@ enum ssh_config_opcode_e {
 
 /*************************** FUNCTIONS ***************************/
 
-/* Define to 1 if you have the `EVP_aes128_ctr' function. */
-/* #undef HAVE_OPENSSL_EVP_AES_CTR */
+/* Define to 1 if you have the `EVP_chacha20' function. */
+//#define HAVE_OPENSSL_EVP_CHACHA20 1
 
-/* Define to 1 if you have the `EVP_aes128_cbc' function. */
-/* #undef HAVE_OPENSSL_EVP_AES_CBC */
-
-/* Define to 1 if you have the `EVP_aes128_gcm' function. */
-/* #undef HAVE_OPENSSL_EVP_AES_GCM */
-
-/* Define to 1 if you have the `CRYPTO_THREADID_set_callback' function. */
-/* #undef HAVE_OPENSSL_CRYPTO_THREADID_SET_CALLBACK */
-
-/* Define to 1 if you have the `CRYPTO_ctr128_encrypt' function. */
-/* #undef HAVE_OPENSSL_CRYPTO_CTR128_ENCRYPT */
-
-/* Define to 1 if you have the `EVP_CIPHER_CTX_new' function. */
-/* #undef HAVE_OPENSSL_EVP_CIPHER_CTX_NEW */
-
-/* Define to 1 if you have the `EVP_KDF_CTX_new_id' function. */
-/* #undef HAVE_OPENSSL_EVP_KDF_CTX_NEW_ID */
+/* Define to 1 if you have the `EVP_KDF_CTX_new_id' or `EVP_KDF_CTX_new` function. */
+//#define HAVE_OPENSSL_EVP_KDF_CTX 1
 
 /* Define to 1 if you have the `FIPS_mode' function. */
-/* #undef HAVE_OPENSSL_FIPS_MODE */
-
-/* Define to 1 if you have the `EVP_DigestSign' function. */
-/* #undef HAVE_OPENSSL_EVP_DIGESTSIGN */
-
-/* Define to 1 if you have the `EVP_DigestVerify' function. */
-/* #undef HAVE_OPENSSL_EVP_DIGESTVERIFY */
-
-/* Define to 1 if you have the `OPENSSL_ia32cap_loc' function. */
-/* #undef HAVE_OPENSSL_IA32CAP_LOC */
+//#define HAVE_OPENSSL_FIPS_MODE 1
 
 /* Define to 1 if you have the `snprintf' function. */
 #define HAVE_SNPRINTF 1
@@ -285,7 +268,10 @@ enum ssh_config_opcode_e {
 /* #undef HAVE_SECURE_ZERO_MEMORY */
 
 /* Define to 1 if you have the `cmocka_set_test_filter' function. */
-/* #undef HAVE_CMOCKA_SET_TEST_FILTER */
+//#define HAVE_CMOCKA_SET_TEST_FILTER 1
+
+/* Define to 1 if we have support for blowfish */
+//#define HAVE_BLOWFISH 1
 
 /*************************** LIBRARIES ***************************/
 
@@ -311,6 +297,7 @@ enum ssh_config_opcode_e {
 
 #define HAVE_FALLTHROUGH_ATTRIBUTE 1
 #define HAVE_UNUSED_ATTRIBUTE 1
+#define HAVE_WEAK_ATTRIBUTE 1
 
 #define HAVE_CONSTRUCTOR_ATTRIBUTE 1
 #define HAVE_DESTRUCTOR_ATTRIBUTE 1
@@ -326,7 +313,7 @@ enum ssh_config_opcode_e {
 /* #undef WITH_GSSAPI */
 
 /* Define to 1 if you want to enable ZLIB */
-/* #undef WITH_ZLIB */
+#define WITH_ZLIB 1
 
 /* Define to 1 if you want to enable SFTP */
 /* #undef WITH_SFTP */
@@ -337,6 +324,14 @@ enum ssh_config_opcode_e {
 
 /* Define to 1 if you want to enable DH group exchange algorithms */
 #define WITH_GEX 1
+
+/* Define to 1 if you want to enable insecure none cipher and MAC */
+//#define WITH_INSECURE_NONE 1
+
+/* Define to 1 if you want to allow libssh to execute arbitrary commands from
+ * configuration files or options (match exec, proxy commands and OpenSSH-based
+ * proxy-jumps). */
+//#define WITH_EXEC 1
 
 /* Define to 1 if you want to enable blowfish cipher support */
 /* #undef WITH_BLOWFISH_CIPHER */
@@ -357,7 +352,13 @@ enum ssh_config_opcode_e {
 #define DEBUG_CALLTRACE 1
 
 /* Define to 1 if you want to enable NaCl support */
-/* #undef WITH_NACL */
+//#define WITH_NACL 1
+
+/* Define to 1 if you want to enable PKCS #11 URI support */
+//#define WITH_PKCS11_URI 1
+
+/* Define to 1 if we want to build a support for PKCS #11 provider. */
+//#define WITH_PKCS11_PROVIDER 1
 
 /*************************** ENDIAN *****************************/
 
