@@ -56,7 +56,15 @@ public:
     FSP_SESSION* getSession() { return _session.get(); }
 
 private:
-    std::unique_ptr<FSP_SESSION> _session;
+    // Custom deleter for FSP_SESSION since fsp_close_session() frees the pointer
+    struct FSPSessionDeleter {
+        void operator()(FSP_SESSION* s) const {
+            if (s) {
+                fsp_close_session(s);
+            }
+        }
+    };
+    std::unique_ptr<FSP_SESSION, FSPSessionDeleter> _session;
     std::string _password; // FSP password (empty by default)
     std::mutex _session_mutex; // Protect session operations from concurrent access
 };

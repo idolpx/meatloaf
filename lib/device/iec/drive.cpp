@@ -862,20 +862,7 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                         setStatusCode(ST_OK);
 
                         Debug_printv("isDir[%d] isRandomAccess[%d] isBrowsable[%d]", is_dir, new_stream->isRandomAccess(), new_stream->isBrowsable());
-                        // We have to handle HTTP/HTTPS URLs differently because they might represent directories or files
-                        if ( f->scheme == "http" || f->scheme == "https" )
-                        {
-                            if ( new_stream->isRandomAccess() || new_stream->isBrowsable() )
-                            {
-                                is_dir = true; // This was a directory
-                            }
-                            else
-                            {
-                                is_dir = false; // This was a file
-                            }
-                        }
-
-                        if (is_dir )
+                        if ( new_stream->isRandomAccess() || new_stream->isBrowsable() )
                         {
                             // This was a directory.  Set m_cwd to the directory
                             Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "dir url[%s]", f->url.c_str() );
@@ -888,12 +875,7 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                             m_cwd.reset(MFSOwner::File(f->base()));
                         }
 
-                        // else
                         // {
-                        //     // This was a file.  Set m_cwd to the files parent directory
-                        //     Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "base[%s]", f->base().c_str() );
-                        //     m_cwd.reset(MFSOwner::File(f->base()));
-
                         //     // Debug_printv( "url[%s] pathInStream[%s]", f->url.c_str(), f->pathInStream.c_str() );
                         //     // if( new_stream->has_subdirs )
                         //     // {

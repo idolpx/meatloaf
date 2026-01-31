@@ -57,7 +57,7 @@ bool FSPMSession::connect() {
     }
 
     // Open FSP session
-    _session = std::unique_ptr<FSP_SESSION>(fsp_open_session(host.c_str(), port, _password.c_str()));
+    _session.reset(fsp_open_session(host.c_str(), port, _password.c_str()));
     if (!_session) {
         Debug_printv("Failed to open FSP session to %s:%d", host.c_str(), port);
         connected = false;
@@ -79,7 +79,7 @@ void FSPMSession::disconnect() {
 
     if (_session) {
         Debug_printv("Closing FSP session to %s:%d", host.c_str(), port);
-        fsp_close_session(_session.get());
+        // unique_ptr deleter will call fsp_close_session() which frees the pointer
         _session.reset();
     }
 
