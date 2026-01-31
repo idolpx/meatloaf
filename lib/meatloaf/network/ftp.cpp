@@ -15,19 +15,19 @@ struct FTPMStream_impl_access {
 
 // FTPMFile implementations
 
-bool FTPMFile::pathValid(std::string apath) {
-    if (apath.empty()) return false;
-    if (apath == "/") return true;
-    FileSystemFTP* fs = getFS();
-    if (!fs) return false;
-    return fs->exists(apath.c_str());
-}
+// bool FTPMFile::pathValid(std::string apath) {
+//     if (apath.empty()) return false;
+//     if (apath == "/") return true;
+//     FileSystemFTP* fs = getFS();
+//     if (!fs) return false;
+//     return fs->exists(apath.c_str());
+// }
 
 void FTPMFile::openDir(std::string apath) {
     FileSystemFTP* fs = getFS();
     if (!fs) return;
     if (apath.empty()) apath = path.empty() ? "/" : path;
-    dirOpened = fs->dir_open(apath.c_str(), "", 0);
+    dirOpened = fs->dir_open(apath.c_str(), "", DIR_OPTION_UNSORTED);
 }
 
 void FTPMFile::closeDir() {
@@ -38,6 +38,7 @@ void FTPMFile::closeDir() {
 }
 
 bool FTPMFile::isDirectory() {
+    if (is_dir > -1) return is_dir;
     if (path.empty() || path == "/") return true;
     FileSystemFTP* fs = getFS();
     if (!fs) return false;
@@ -84,7 +85,9 @@ MFile* FTPMFile::getNextFileInDir() {
     full += de->filename;
     auto file = new FTPMFile(full);
     file->extension = std::string(" ") + file->extension;
-    file->size = de->isDir ? 0 : de->size;
+    //file->size = de->isDir ? 0 : de->size;
+    file->size = de->size;
+    file->is_dir = de->isDir;
     return file;
 }
 

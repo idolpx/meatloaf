@@ -56,6 +56,7 @@ bool FlashMFile::pathValid(std::string path)
 
 bool FlashMFile::isDirectory()
 {
+    if (is_dir > -1) return is_dir;
     //Debug_printv("path[%s]", path.c_str());
     if(path=="/" || path.empty())
         return true;

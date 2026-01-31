@@ -72,6 +72,7 @@ bool SMBMFile::pathValid(std::string path)
 
 bool SMBMFile::isDirectory()
 {
+    if (is_dir > -1) return is_dir;
     //Debug_printv("path[%s] len[%d]", share_path.c_str(), share_path.size());
     if(share_path=="/" || share_path.empty())
         return true;

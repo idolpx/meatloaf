@@ -107,6 +107,7 @@ bool NFSMFile::pathValid(std::string path)
 
 bool NFSMFile::isDirectory()
 {
+    if (is_dir > -1) return is_dir;
     if(file_path=="/" || file_path.empty())
         return true;
 
@@ -372,7 +373,8 @@ MFile* NFSMFile::getNextFileInDir()
         file->extension = " " + file->extension;
 
         // Set size and type information
-        if (S_ISDIR(ent_mode)) {
+        file->is_dir = S_ISDIR(ent_mode);
+        if (file->is_dir) {
             file->size = 0;
         } else {
             file->size = ent_size;

@@ -187,6 +187,7 @@ std::shared_ptr<MStream> FSPMFile::createStream(std::ios_base::openmode mode) {
 }
 
 bool FSPMFile::isDirectory() {
+    if (is_dir > -1) return is_dir;
     //Debug_printv("path[%s] pathInStream[%s]", path.c_str(), pathInStream.c_str());
     if (path == "/" || path.empty()) {
         return true;

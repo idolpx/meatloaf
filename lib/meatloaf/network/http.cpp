@@ -176,6 +176,7 @@ std::shared_ptr<MStream> HTTPMFile::createStream(std::ios_base::openmode mode)
 }
 
 bool HTTPMFile::isDirectory() {
+    // if (is_dir > -1) return is_dir;
     // if(fromHeader()->m_isDirectory)
     //     return true;
 

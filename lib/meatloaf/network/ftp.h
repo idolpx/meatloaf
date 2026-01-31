@@ -114,9 +114,9 @@ class FTPMFile : public MFile {
         if (mstr::contains(name, "?") || mstr::contains(name, "*"))
             readEntry(name);
 
-        if (!pathValid(path.c_str()))
-            m_isNull = true;
-        else
+        // if (!pathValid(path.c_str()))
+        //     m_isNull = true;
+        // else
             m_isNull = false;
     };
     ~FTPMFile() {
@@ -152,7 +152,7 @@ class FTPMFile : public MFile {
     virtual void openDir(std::string path);
     virtual void closeDir();
 
-    bool pathValid(std::string path);
+    //bool pathValid(std::string path);
 };
 
 /********************************************************

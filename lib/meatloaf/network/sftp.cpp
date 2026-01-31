@@ -304,6 +304,7 @@ bool SFTPMFile::pathValid(std::string path) {
 }
 
 bool SFTPMFile::isDirectory() {
+    if (is_dir > -1) return is_dir;
     if (!_session || !_session->connect()) {
         return false;
     }

@@ -58,7 +58,7 @@ bool TAPMStream::readHeader()
     // Store header info
     header.signature = std::string(tap_header.signature, 12);
     header.version = tap_header.version;
-    header.data_size = UINT32_FROM_LE_UINT32(tap_header.data_size);
+    header.data_size = tap_header.data_size;
 
     pulse_data_start = sizeof(TAPHeader);
 

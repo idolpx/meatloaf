@@ -638,7 +638,7 @@ std::shared_ptr<MStream> MFile::getSourceStream(std::ios_base::openmode mode) {
 
 MFile* MFile::cd(std::string newDir) 
 {
-    Debug_printv("url[%s] cd[%s]", url.c_str(), newDir.c_str());
+    Debug_printv("url[%s] cd[%s] hex[%s]", url.c_str(), newDir.c_str(), mstr::toHex(newDir).c_str());
 
     if(newDir.find(':') != std::string::npos) 
     {

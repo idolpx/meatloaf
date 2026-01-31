@@ -286,6 +286,7 @@ bool CSIPMStream::isOpen() {
  ********************************************************/
 
 bool CSIPMFile::isDirectory() {
+    if (is_dir > -1) return is_dir;
     // if penultimate part is .d64 - it is a file
     // otherwise - false
 
