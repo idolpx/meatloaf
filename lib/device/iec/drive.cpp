@@ -857,7 +857,7 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                     {
                         Debug_printv("Stream created for file [%s] pathInStream[%s]", f->url.c_str(), f->pathInStream.c_str());
                         // new_stream will be deleted in iecChannelHandlerFile destructor
-                        m_channels[channel] = new iecChannelHandlerFile(this, new_stream, is_dir ? 0x0801 : -1);
+                        m_channels[channel] = new iecChannelHandlerFile(this, new_stream, is_dir ? 0x0801 : -1); // 0x0801 = overrides load address to start of basic for C64
                         m_numOpenChannels++;
                         setStatusCode(ST_OK);
 
@@ -867,23 +867,27 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                         {
                             if ( new_stream->isRandomAccess() || new_stream->isBrowsable() )
                             {
-                                // This was a directory.  Set m_cwd to the directory
-                                Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "url[%s]", f->url.c_str() );
-                                m_cwd.reset(MFSOwner::File(f->url));
+                                is_dir = true; // This was a directory
                             }
                             else
                             {
-                                // This was a file.  Set m_cwd to the files parent directory
-                                Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "base[%s]", f->base().c_str() );
-                                m_cwd.reset(MFSOwner::File(f->base()));
+                                is_dir = false; // This was a file
                             }
+                        }
+
+                        if (is_dir )
+                        {
+                            // This was a directory.  Set m_cwd to the directory
+                            Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "dir url[%s]", f->url.c_str() );
+                            m_cwd.reset(MFSOwner::File(f->url));
                         }
                         else
                         {
-                            // Set m_cwd to current MFile
-                            Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "url[%s]", f->url.c_str() );
-                            m_cwd.reset(MFSOwner::File(f->url));
+                            // This was a file.  Set m_cwd to the parent directory
+                            Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "file base[%s]", f->base().c_str() );
+                            m_cwd.reset(MFSOwner::File(f->base()));
                         }
+
                         // else
                         // {
                         //     // This was a file.  Set m_cwd to the files parent directory
