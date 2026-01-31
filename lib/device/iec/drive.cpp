@@ -491,7 +491,9 @@ uint8_t iecChannelHandlerDir::readBufferData()
 
             if ( !m_dir->isPETSCII )
             {
+                name = U8Char::encodeACE(name);
                 name = mstr::toPETSCII2( name );
+                ext  = U8Char::encodeACE(ext);
                 ext  = mstr::toPETSCII2( ext );
             }
             mstr::replaceAll(name, "\\", "/");
@@ -725,7 +727,9 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
 
             // get file
             Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Changing directory to [%s][%s] hex[%s]", m_cwd->url.c_str(), name.c_str(), mstr::toHex(name).c_str());
-            MFile *f = m_cwd->cd( mstr::toUTF8( name ) );
+            name = mstr::toUTF8(name);
+            name = U8Char::decodeACE(name);
+            MFile *f = m_cwd->cd(name);
             bool is_dir = f->isDirectory();
             Debug_printv("isdir[%d] url[%s][%s]", is_dir, f->url.c_str(), f->pathInStream.c_str());
 
