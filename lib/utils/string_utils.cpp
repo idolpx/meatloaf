@@ -348,11 +348,12 @@ namespace mstr {
     std::string toUTF8(const std::string &petsciiInput)
     {
         std::string utf8string;
-        for(char petscii : petsciiInput) {
-            if(petscii > 0)
-            {
-                U8Char u8char(petscii);
-                utf8string+=u8char.toUtf8();
+        // iterate by index and use unsigned values so bytes >= 0x80 are handled correctly
+        for (size_t i = 0; i < petsciiInput.size(); ++i) {
+            uint8_t petscii = static_cast<uint8_t>(petsciiInput[i]);
+            if (petscii != 0) {
+                U8Char u8char(static_cast<char>(petscii));
+                utf8string += u8char.toUtf8();
             }
         }
         return utf8string;
