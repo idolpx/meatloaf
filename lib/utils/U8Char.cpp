@@ -180,19 +180,23 @@ std::string U8Char::fromUnicode32(uint32_t* input_unicode32, size_t input_length
 std::string U8Char::toPunycode(std::string utf8String) {
     uint32_t asU32[1024];
     char asPunycode[1024];
-    size_t dstlen = sizeof asPunycode;
-    size_t n_converted;
+    size_t dstlen = sizeof asPunycode; // capacity in bytes for punycode output
     U8Char temp(' ');
 
-    size_t conv_len = temp.toUnicode32(utf8String, asU32, sizeof asU32);
-    n_converted = punycode_encode(asU32, conv_len, asPunycode, &dstlen);    
-    return std::string(asPunycode, n_converted);
+    // pass max output length in elements
+    size_t conv_len = temp.toUnicode32(utf8String, asU32, sizeof asU32 / sizeof asU32[0]);
+    // punycode_encode will set dstlen to the number of bytes actually written
+    punycode_encode(asU32, conv_len, asPunycode, &dstlen);
+    return std::string(asPunycode, dstlen);
 }
 
 
 std::string U8Char::fromPunycode(std::string punycodeString) {
+    if (punycodeString.empty()) return std::string();
+
     uint32_t asU32[1024];
-    size_t dstlen = sizeof asU32;
+    // capacity in number of uint32_t elements
+    size_t dstlen = sizeof asU32 / sizeof asU32[0];
     U8Char temp(' ');
 
     punycode_decode(punycodeString.c_str(), punycodeString.length(), asU32, &dstlen);

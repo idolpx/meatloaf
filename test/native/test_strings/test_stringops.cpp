@@ -1,6 +1,7 @@
 #include "unity.h"
 
 #include "punycode.h"
+#include "lib/utils/U8Char.h"
 #include <string>
 #include "../lib/utils/string_utils.cpp"
 
@@ -34,36 +35,57 @@ void test_PetsciiUtf() {
 }
 
 void test_Punycode() {
-    // https://www.name.com/punycode-converter
-    // https://r12a.github.io/app-conversion/
-    // https://onlinetools.com/unicode/convert-unicode-to-hex
+    // Canonical decode for known label "bücher" -> "bcher-kva"
+    TEST_ASSERT_EQUAL_STRING("bücher", U8Char::fromPunycode("bcher-kva").c_str());
 
-    //std::string chinese = "文件档案名";
-    const uint32_t chineseAsUnicode[] = {0x6587, 0x4ef6, 0x6843, 0x684c, 0x540d};
-    char asPunycode[256];
-    size_t dstlen = sizeof asPunycode;
-    // size_t punycode_encode(const uint32_t *const src, const size_t srclen, char *const dst, size_t *const dstlen)
-    punycode_encode(chineseAsUnicode, 5, asPunycode, &dstlen);
-    std::string punycode(asPunycode, dstlen);
-    // Debug_printv("Chinese U32 as punycode:'%s'\n", punycode.c_str());
-    // std::string asUnicode = U8Char::fromPunycode(punycode);
-    // Debug_printv("Chinese UTF8 from the above punycode:'%s'\n", asUnicode.c_str());
+    // Strict encode should match canonical punycode
+    TEST_ASSERT_EQUAL_STRING("bcher-kva", U8Char::toPunycode(u8"bücher").c_str());
 
-//     std::string punycode2 = U8Char::toPunycode(asUnicode);
-//     Debug_printv("Chinese text as from punycode again:'%s'\n", punycode2.c_str());
+    // Chinese round-trip (should round-trip; failure indicates a decode bug)
+    std::string chinese = u8"文件档案名";
+    std::string puny = U8Char::toPunycode(chinese);
+    TEST_ASSERT_TRUE(puny.size() > 0);
+    std::string decoded = U8Char::fromPunycode(puny);
+    TEST_ASSERT_EQUAL_STRING(chinese.c_str(), decoded.c_str());
 
+    // ASCII-only basic label should preserve value (note: punycode may append delimiter)
+    TEST_ASSERT_EQUAL_STRING("example-", U8Char::toPunycode("example").c_str());
+    TEST_ASSERT_EQUAL_STRING("example", U8Char::fromPunycode("example-").c_str());
 
-    // uint32_t asU32[1024];
-    //char asPunycode[1024];
-    //dstlen = sizeof asPunycode;
-    // size_t n_converted;
-    // U8Char temp(' ');
+    // Mixed Latin-1 (ñ) strict round-trip and canonical punycode
+    TEST_ASSERT_EQUAL_STRING("maana-pta", U8Char::toPunycode(u8"mañana").c_str());
+    TEST_ASSERT_EQUAL_STRING(u8"mañana", U8Char::fromPunycode(U8Char::toPunycode(u8"mañana")).c_str());
 
-    // Debug_printv("Calling toUnicode32\n");
-    // size_t conv_len = temp.toUnicode32(asUnicode, asU32, sizeof asU32);
-    // Debug_printv("Conv len=%d, encoding now...\n", conv_len);
-    // n_converted = punycode_encode(asU32, conv_len, asPunycode, &dstlen);    
+    // Long string of repeated non-ASCII characters should round-trip
+    std::string long_e;
+    for (int i = 0; i < 200; ++i) long_e += u8"é";
+    std::string long_puny = U8Char::toPunycode(long_e);
+    TEST_ASSERT_TRUE(long_puny.size() > 0);
+    std::string long_dec = U8Char::fromPunycode(long_puny);
+    TEST_ASSERT_EQUAL_STRING(long_e.c_str(), long_dec.c_str());
 
+    // Non-BMP characters (emoji) are not representable by the current U8Char implementation;
+    // ensure encoder/decoder do not crash and behavior is deterministic
+    std::string emoji = "\xF0\x9F\x98\x8A"; // U+1F60A
+    TEST_ASSERT_EQUAL_STRING("-", U8Char::toPunycode(emoji).c_str());
+    TEST_ASSERT_EQUAL_STRING("", U8Char::fromPunycode("-").c_str());
+
+    // Invalid bytes should be rejected by decoder
+    TEST_ASSERT_EQUAL_STRING("", U8Char::fromPunycode("\xFF").c_str());
+
+    // Empty handling
+    TEST_ASSERT_EQUAL_STRING("", U8Char::toPunycode("").c_str());
+    TEST_ASSERT_EQUAL_STRING("", U8Char::fromPunycode("").c_str());
+}
+
+void process()
+{
+    UNITY_BEGIN();
+
+    RUN_TEST(test_PetsciiUtf);
+    RUN_TEST(test_Punycode);
+
+    UNITY_END();
 }
 
 void process()
