@@ -27,10 +27,7 @@
 
 extern "C" {
 #include <libssh/libssh.h>
-#include <libssh/config.h>
-#ifdef WITH_SFTP
 #include <libssh/sftp.h>
-#endif
 }
 
 #include "../../../include/debug.h"

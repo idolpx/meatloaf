@@ -100,6 +100,13 @@ bool FSPMSession::keep_alive() {
         return false;
     }
 
+    // Try to acquire lock - if busy, skip keep-alive to avoid interfering with active operations
+    if (!_session_mutex.try_lock()) {
+        Debug_printv("Keep-alive skipped - session busy: %s:%d", host.c_str(), port);
+        return true; // Return true because session is active (busy = alive)
+    }
+    std::lock_guard<std::mutex> lock(_session_mutex, std::adopt_lock);
+
     // Get raw pointer and validate before use
     FSP_SESSION* session_ptr = _session.get();
     if (!session_ptr) {

@@ -587,25 +587,25 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
     if ( url.size() < 5)
         return 0;
 
-    // If there's an active request, finish it cleanly before starting a new one
-    // This allows keep-alive to reuse the TCP connection
-    if (_http != nullptr && _is_open) {
-        // Check if there's unread data and flush it efficiently
-        if (!esp_http_client_is_complete_data_received(_http)) {
-            // Flush remaining data in chunks to complete the request
-            char discard_buffer[256];  // Stack allocated for thread safety
-            int bytes_read;
+    // // If there's an active request, finish it cleanly before starting a new one
+    // // This allows keep-alive to reuse the TCP connection
+    // if (_http != nullptr && _is_open) {
+    //     // Check if there's unread data and flush it efficiently
+    //     if (!esp_http_client_is_complete_data_received(_http)) {
+    //         // Flush remaining data in chunks to complete the request
+    //         char discard_buffer[256];  // Stack allocated for thread safety
+    //         int bytes_read;
             
-            do {
-                int chunk_size = sizeof(discard_buffer);
+    //         do {
+    //             int chunk_size = sizeof(discard_buffer);
                 
-                bytes_read = esp_http_client_read(_http, discard_buffer, chunk_size);
-            } while (bytes_read > 0);
-        }
+    //             bytes_read = esp_http_client_read(_http, discard_buffer, chunk_size);
+    //         } while (bytes_read > 0);
+    //     }
         
-        // Don't call esp_http_client_close() - that breaks keep-alive
-        _is_open = false;
-    }
+    //     // Don't call esp_http_client_close() - that breaks keep-alive
+    //     _is_open = false;
+    // }
 
     // Set URL and Method
     mstr::replaceAll(url, " ", "%20");
