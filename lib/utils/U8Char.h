@@ -44,6 +44,10 @@ public:
     std::string fromUnicode32(uint32_t* input_unicode32, size_t input_length);
     static std::string toPunycode(std::string utf8String);
     static std::string fromPunycode(std::string punycodeString);
+    // ACE wrappers: encode input UTF-8 to ACE-prefixed punycode if non-ASCII chars present
+    static std::string encodeACE(std::string utf8String);
+    // Decode ACE-prefixed punycode (checks for 'xn--' prefix case-insensitively) and return decoded UTF-8 or original string
+    static std::string decodeACE(std::string aceOrPunycode);
 
     // This is a reverse lookup map used to quickly find the petascci code from the ch value, making it O(1) complexity
     // static std::unordered_map<char16_t, uint8_t> ch_to_petascii_map;

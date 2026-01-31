@@ -1,5 +1,7 @@
 #include "U8Char.h"
 #include "punycode.h"
+#include <algorithm>
+#include <cctype>
 
 // from https://style64.org/petscii/
 
@@ -201,4 +203,30 @@ std::string U8Char::fromPunycode(std::string punycodeString) {
 
     punycode_decode(punycodeString.c_str(), punycodeString.length(), asU32, &dstlen);
     return temp.fromUnicode32(asU32, dstlen);
+}
+
+// Encode UTF-8 string to ACE-prefixed punycode if it contains non-ASCII bytes; otherwise return original string
+std::string U8Char::encodeACE(std::string utf8String) {
+    bool hasNonAscii = false;
+    for (unsigned char c : utf8String) {
+        if (c > 0x7f) { hasNonAscii = true; break; }
+    }
+    if (!hasNonAscii) return utf8String;
+
+    std::string puny = U8Char::toPunycode(utf8String);
+    if (puny.empty()) return utf8String; // if encoding failed, return original
+    return std::string("xn--") + puny;
+}
+
+// Decode ACE-prefixed punycode (case-insensitive 'xn--' prefix). If prefix not present, return original input.
+std::string U8Char::decodeACE(std::string aceOrPunycode) {
+    if (aceOrPunycode.size() >= 4) {
+        std::string prefix = aceOrPunycode.substr(0,4);
+        std::transform(prefix.begin(), prefix.end(), prefix.begin(), [](unsigned char c){ return (char)std::tolower(c); });
+        if (prefix == "xn--") {
+            std::string rest = aceOrPunycode.substr(4);
+            return U8Char::fromPunycode(rest);
+        }
+    }
+    return aceOrPunycode;
 }
