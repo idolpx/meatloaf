@@ -1,1 +1,1 @@
-// AFP:// - Apple File Protocol
+// AFP:// - Apple Filing Protocol

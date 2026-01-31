@@ -15,6 +15,10 @@
 // You should have received a copy of the GNU General Public License
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
+// TCP:// - Transmission Control Protocol
+// https://en.wikipedia.org/wiki/Transmission_Control_Protocol
+//
+
 #ifndef MEATLOAF_SCHEME_TCP
 #define MEATLOAF_SCHEME_TCP
 
