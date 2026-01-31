@@ -659,11 +659,11 @@ int fsp_readdir_r(FSP_DIR *dir,struct dirent *entry, struct dirent **result)
         fentry.namlen-=rc;
     }
 
-#if defined(HAVE_DIRENT_FILENO) && !defined(CONFIG_IDF_TARGET_ESP32)
+#if defined(HAVE_DIRENT_FILENO) && !defined(ESP_PLATFORM)
     entry->d_fileno = 10;
 #endif    
     /* ESP32 newlib doesn't have d_reclen, d_namlen */
-#ifndef CONFIG_IDF_TARGET_ESP32
+#ifndef ESP_PLATFORM
     entry->d_reclen = fentry.reclen;
 #endif
     strncpy(entry->d_name,fentry.name,MAXNAMLEN);
@@ -671,7 +671,7 @@ int fsp_readdir_r(FSP_DIR *dir,struct dirent *entry, struct dirent **result)
     if (fentry.namlen >= MAXNAMLEN)
     {
         entry->d_name[MAXNAMLEN] = '\0';
-#ifdef HAVE_DIRENT_NAMLEN && !defined(CONFIG_IDF_TARGET_ESP32)
+#ifdef HAVE_DIRENT_NAMLEN && !defined(ESP_PLATFORM)
         entry->d_namlen = MAXNAMLEN;
     } else
     {
