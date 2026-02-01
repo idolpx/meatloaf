@@ -130,6 +130,7 @@ protected:
     bool dirOpened;
     size_t dir_index;
     std::vector<DiscoveredService> cached_services;
+    std::vector<std::string> cached_service_types;  // For root directory listing
     
     void parseUrl();
     void refreshServiceList();

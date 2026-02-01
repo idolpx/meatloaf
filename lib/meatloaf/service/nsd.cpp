@@ -89,9 +89,7 @@ bool NSDMSession::discoverServices(const std::string& service_type, const std::s
                  service_type.c_str(), proto.c_str(), timeout_ms);
 
     // Clear previous results when starting new discovery
-    if (service_type.empty()) {
-        clearCache();
-    }
+    clearCache();
     
     const char* query_proto = proto.empty() ? "_tcp" : proto.c_str();
     
@@ -102,14 +100,15 @@ bool NSDMSession::discoverServices(const std::string& service_type, const std::s
         mdns_result_t *type_results = nullptr;
         esp_err_t err = mdns_query_ptr("_services._dns-sd", "_udp", timeout_ms, 50, &type_results);
         
+        Debug_printv("Meta-query result: err=%d, results=%p", err, type_results);
+        
         if (err != ESP_OK) {
-            Debug_printv("Service type query failed: %d", err);
-            return false;
-        }
-
-        if (!type_results) {
-            Debug_printv("No service types found");
-            return false;
+            Debug_printv("Service type query failed: ESP error code %d (0x%x)", err, err);
+            Debug_printv("  ESP_ERR_NOT_FOUND=0x%x, ESP_ERR_NO_MEM=0x%x, ESP_ERR_INVALID_ARG=0x%x", 
+                        ESP_ERR_NOT_FOUND, ESP_ERR_NO_MEM, ESP_ERR_INVALID_ARG);
+        } else if (!type_results) {
+            Debug_printv("Meta-query succeeded but returned no results");
+            Debug_printv("This is normal - many devices don't advertise _services._dns-sd._udp");
         }
 
         // Extract service types from results
@@ -304,8 +303,15 @@ void NSDMFile::parseUrl() {
     std::string path_str = url;
     
     // Remove nsd:// prefix
-    if (mstr::startsWith(path_str, "nsd:/")) {
+    if (mstr::startsWith(path_str, "nsd://")) {
+        path_str = path_str.substr(6);
+    } else if (mstr::startsWith(path_str, "nsd:/")) {
         path_str = path_str.substr(5);
+    }
+    
+    // Remove leading slash if present
+    if (!path_str.empty() && path_str[0] == '/') {
+        path_str = path_str.substr(1);
     }
     
     // Split by /
@@ -338,24 +344,31 @@ void NSDMFile::refreshServiceList() {
         return;
     }
     
-    // Extract protocol from service_type if present
-    std::string proto = "_udp";
-    std::string type = service_type;
-    
-    size_t proto_pos = service_type.find('.');
-    if (proto_pos != std::string::npos) {
-        type = service_type.substr(0, proto_pos);
-        proto = service_type.substr(proto_pos + 1);
-    }
-    
-    // Discover services
-    _session->discoverServices(type, proto, 6000);
-    
-    // Get filtered list
+    // At root level (nsd:/), discover all services and get service types
     if (service_type.empty()) {
-        cached_services = _session->getDiscoveredServices();
+        Debug_printv("Root directory - discovering all services to get types");
+        _session->discoverServices("", "_udp", 6000);
+        cached_service_types = _session->getServiceTypes();
+        cached_services.clear();
+        Debug_printv("Found %d unique service types", cached_service_types.size());
     } else {
+        // In a service type directory, get instances of that type
+        std::string proto = "_tcp";  // Default to TCP
+        std::string type = service_type;
+        
+        size_t proto_pos = service_type.find('.');
+        if (proto_pos != std::string::npos) {
+            type = service_type.substr(0, proto_pos);
+            proto = service_type.substr(proto_pos + 1);
+        }
+        
+        Debug_printv("Service type directory - discovering instances of %s.%s", type.c_str(), proto.c_str());
+        // Discover services of this specific type
+        _session->discoverServices(type, proto, 6000);
+        // Then filter to get only this type
         cached_services = _session->getServicesOfType(type);
+        cached_service_types.clear();
+        Debug_printv("Found %d instances of %s", cached_services.size(), type.c_str());
     }
 }
 
@@ -390,6 +403,22 @@ MFile* NSDMFile::getNextFileInDir() {
         rewindDirectory();
     }
     
+    // At root level, return service type directories
+    if (service_type.empty()) {
+        if (dir_index >= cached_service_types.size()) {
+            dirOpened = false;
+            return nullptr;
+        }
+        
+        const auto& type = cached_service_types[dir_index++];
+        std::string file_path = "nsd://" + type;
+        
+        NSDMFile* file = new NSDMFile(file_path);
+        Debug_printv("Returning service type directory: %s", file_path.c_str());
+        return file;
+    }
+    
+    // In a service type directory, return service instances
     if (dir_index >= cached_services.size()) {
         dirOpened = false;
         return nullptr;
@@ -397,17 +426,11 @@ MFile* NSDMFile::getNextFileInDir() {
     
     const auto& service = cached_services[dir_index++];
     
-    // Create file entry for this service
-    std::string file_path = "nsd://";
-    if (!service_type.empty()) {
-        file_path += service_type + "/";
-    } else {
-        file_path += service.service_type + "." + service.proto + "/";
-    }
-    file_path += service.getDisplayName();
+    // Create file entry for this service instance
+    std::string file_path = "nsd://" + service_type + "/" + service.getDisplayName();
     
     NSDMFile* file = new NSDMFile(file_path);
-    
+    Debug_printv("Returning service instance: %s", file_path.c_str());
     return file;
 }
 
