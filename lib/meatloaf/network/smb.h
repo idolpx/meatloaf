@@ -24,6 +24,7 @@
 #define MEATLOAF_DEVICE_SMB
 
 #include "meatloaf.h"
+#include "service/nsd.h"
 
 #include <smb2.h>
 #include <libsmb2.h>
@@ -85,9 +86,8 @@ public:
         // Set SMB2 version - try SMB3 first, fall back to SMB2
         smb2_set_version(_smb, SMB2_VERSION_ANY);
 
-        // Let the library negotiate the authentication method
-        // Some servers don't like forced NTLMSSP and prefer negotiation
-        smb2_set_authentication(_smb, SMB2_SEC_UNDEFINED);
+        // Force NTLMSSP authentication - Kerberos not available on ESP32
+        smb2_set_authentication(_smb, SMB2_SEC_NTLMSSP);
 
         // Set domain to empty string for local accounts
         smb2_set_domain(_smb, "");
@@ -176,9 +176,8 @@ public:
         // Set SMB2 version - try SMB3 first, fall back to SMB2
         smb2_set_version(smb, SMB2_VERSION_ANY);
 
-        // Let the library negotiate the authentication method
-        // Some servers don't like forced NTLMSSP and prefer negotiation
-        smb2_set_authentication(smb, SMB2_SEC_UNDEFINED);
+        // Force NTLMSSP authentication - Kerberos not available on ESP32
+        smb2_set_authentication(smb, SMB2_SEC_NTLMSSP);
 
         // Set username first (before setting password)
         if (!_user.empty()) {
@@ -510,6 +509,7 @@ class SMBMFileSystem: public MFileSystem
 public:
     SMBMFileSystem(): MFileSystem("smb") {
         isRootFS = true;
+        service_type = "_smb._tcp";
     };
 
     bool handles(std::string name) {
@@ -520,6 +520,13 @@ public:
     }
 
     MFile* getFile(std::string path) override {
+        // If host is not specified, search for service records
+        auto parser = PeoplesUrlParser::parseURL(path);
+        if (parser->host.empty()) {
+            path = "nsd://" + service_type;
+            return new NSDMFile(path);
+        }
+
         return new SMBMFile(path);
     }
 };

@@ -364,7 +364,7 @@ void NSDMFile::refreshServiceList() {
         
         Debug_printv("Service type directory - discovering instances of %s.%s", type.c_str(), proto.c_str());
         // Discover services of this specific type
-        _session->discoverServices(type, proto, 6000);
+        _session->discoverServices(type, proto, 2000);
         // Then filter to get only this type
         cached_services = _session->getServicesOfType(type);
         cached_service_types.clear();
@@ -516,7 +516,7 @@ void NSDMStream::generateContent() {
     }
     
     // Discover services
-    _session->discoverServices(type, proto, 6000);
+    _session->discoverServices(type, proto, 2000);
     
     if (instance_name.empty()) {
         // List all services of this type

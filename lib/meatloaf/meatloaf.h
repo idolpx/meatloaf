@@ -327,6 +327,7 @@ public:
 
     bool isRootFS = false;
     bool vdrive_compatible = false;
+    std::string service_type;   // DNS-SD service type
 
     virtual bool handles(std::string path) = 0;
     virtual MFile* getFile(std::string path) = 0;
