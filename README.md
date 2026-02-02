@@ -95,6 +95,10 @@ Meatloaf is not limited to be just your standard drive 8, you can configure it t
 
 ## Build and installation
 
+See [Build Meatloaf](https://github.com/idolpx/meatloaf/wiki/Build-Meatloaf) for detailed instructions for making your own Meatloaf.
+
+Or, have Deadline show you how:
+
 [![Load Commodore Files Over The Internet!?! - How To Build A Meatloaf](https://img.youtube.com/vi/QXQjwKSVHjo/maxresdefault.jpg)](https://www.youtube.com/watch?v=QXQjwKSVHjo)
 CityXen! - https://www.youtube.com/watch?v=QXQjwKSVHjo
 
