@@ -95,6 +95,10 @@ Meatloaf is not limited to be just your standard drive 8, you can configure it t
 
 ## Build and installation
 
+See [Build Meatloaf](https://github.com/idolpx/meatloaf/wiki/Build-Meatloaf) for detailed instructions for making your own Meatloaf.
+
+Or, have Deadline show you how:
+
 [![Load Commodore Files Over The Internet!?! - How To Build A Meatloaf](https://img.youtube.com/vi/QXQjwKSVHjo/maxresdefault.jpg)](https://www.youtube.com/watch?v=QXQjwKSVHjo)
 CityXen! - https://www.youtube.com/watch?v=QXQjwKSVHjo
 
@@ -106,8 +110,17 @@ extension installed from the vscode store required.
 1.  Initial setup & configuration
     1.  Clone this repo
     2.  Copy `platformio.ini.sample` to `platformio.ini`
-    3.  Edit `platformio.ini` to match your device and default wifi settings
-
+    3.  Edit `platformio.ini` to match your device and default wifi settings:
+        1. Find the `;environment = …` line for the dev board you have. Uncomment
+           this line by removing the semicolon (;) at the beginning of the line.
+        2. Determine how much flash memory your dev board has and uncomment the
+           corresponding `;flash_size = …` line.
+        4. Optionally, update the `wifi_ssid = "…"` and `wifi_pass = "…"`. To
+           change these values from BASIC using the `OPEN` command, see
+           [Using your Meatloaf](https://github.com/idolpx/meatloaf/wiki/Using-Your-Meatloaf#connect-to-your-wifi).
+        5. If you're using a dev board that's not one of the documented ones,
+           you may need to review and update other settings for your board.
+           Consider creating a new environment file for your board.
 2.  Load the project tasks for your specific board
     1.  Click the PlatformIO alien head on left panel
     2.  Under PROJECT TASKS, click on your specific board, for example `lolin d32 pro`
