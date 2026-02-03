@@ -85,22 +85,25 @@ bool FileSystemFTP::exists(const char *path)
 
     Debug_printf("FileSystemFTP::exists(\"%s\")\n", path);
 
-    // Check if path is a directory
-    if (is_dir(path))
-        return true;
-
-    // Try to open the file
-    if (_ftp->open_file(path, false) == 0)  // open_file returns 0 on success
+    // Use LIST to check if path exists (works for both files and directories)
+    bool res = _ftp->open_directory(path, "");
+    
+    if (res != 0)  // open_directory returns 0 on success
     {
-        Debug_printf("File exists\n");
-        _ftp->close();
-        return true;
-    }
-    else
-    {
-        Debug_printf("File does not exist\n");
+        Debug_printf("Path does not exist\n");
         return false;
     }
+
+    // Read at least one entry to confirm it exists
+    string filename;
+    long filesz;
+    bool is_directory;
+    
+    res = _ftp->read_directory(filename, filesz, is_directory);
+    bool exists = (res == false && !filename.empty());
+    
+    Debug_printf("Path %s\n", exists ? "exists" : "does not exist");
+    return exists;
 }
 
 bool FileSystemFTP::remove(const char *path)
@@ -258,7 +261,9 @@ FileHandler *FileSystemFTP::cache_file(const char *path, const char *mode)
     else
     {
         Debug_println("File data retrieved");
+        Debug_println("Calling FileCache::reopen");
         fh = FileCache::reopen(fc, mode);
+        Debug_printf("FileCache::reopen returned: %p\n", fh);
     }
     return fh;
 }

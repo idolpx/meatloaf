@@ -180,6 +180,7 @@ bool FTPMStream::open(std::ios_base::openmode mode) {
 
 #ifndef FNIO_IS_STDIO
     _impl->fh = fs->filehandler_open(parser->path.c_str(), mstr);
+    Debug_printv("After filehandler_open");
 #else
     _impl->fh = nullptr;
     Debug_printv("FTP file_open not supported - FTP needs filehandler_open");
@@ -198,11 +199,13 @@ bool FTPMStream::open(std::ios_base::openmode mode) {
     }
 
     // Get file size by seeking to end
+    Debug_printv("Seeking to get file size");
     _impl->fh->seek(0, SEEK_END);
     long fsz = _impl->fh->tell();
     _impl->fh->seek(0, SEEK_SET);
     _size = fsz > 0 ? (uint32_t)fsz : 0;
     _position = 0;
+    Debug_printv("FTP stream open complete, size=%u", _size);
     return true;
 }
 
