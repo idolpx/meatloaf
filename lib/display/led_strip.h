@@ -23,6 +23,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <vector>
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 
 #include "../../include/global_defines.h"
 #include "../../include/pinmap.h"
@@ -77,6 +79,7 @@ private:
 
     //BaseType_t m_task_handle;
     uint8_t m_statusCode = 0;
+    SemaphoreHandle_t spi_mutex = nullptr;
     esp_err_t init(int pin, led_strip_model_t model, int num_of_leds);
 
     // Array of segements that contain index and length

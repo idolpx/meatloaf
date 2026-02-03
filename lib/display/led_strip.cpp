@@ -78,6 +78,7 @@ static void display_task(void *args)
 DisplayLEDs::DisplayLEDs()
 {
     add_segment(0, 5);  // Add default segment
+    spi_mutex = xSemaphoreCreateMutex();
 }
 
 void DisplayLEDs::service()
@@ -281,7 +282,14 @@ esp_err_t DisplayLEDs::update()
         .length = (size_t)(dma_buf_size * 8),
         .tx_buffer = dma_buffer,
     };
-    err = spi_device_transmit(spi_settings.spi, &tx_conf);
+    
+    // Protect SPI transmission with mutex to prevent concurrent access
+    if (spi_mutex != nullptr && xSemaphoreTake(spi_mutex, portMAX_DELAY) == pdTRUE) {
+        err = spi_device_transmit(spi_settings.spi, &tx_conf);
+        xSemaphoreGive(spi_mutex);
+    } else {
+        err = ESP_ERR_TIMEOUT;
+    }
     //err = spi_device_queue_trans(spi_settings.spi, &tx_conf, portMAX_DELAY);
     return err;
 }
