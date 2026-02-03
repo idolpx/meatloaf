@@ -1027,7 +1027,7 @@ void iecFuji::mount_all()
             Debug_printf("Selecting '%s' from host #%u as %s on D%u:\r\n",
                          disk.filename, disk.host_slot, flag, i + 1);
 
-            disk.fileh = host.file_open(disk.filename, disk.filename, sizeof(disk.filename), flag);
+            disk.fileh = host.fnfile_open(disk.filename, disk.filename, sizeof(disk.filename), flag);
 
             if (disk.fileh == nullptr)
             {
@@ -2372,7 +2372,7 @@ bool iecFuji::disk_image_mount(uint8_t ds, uint8_t mode)
     // TODO: Refactor along with mount disk image.
     disk.disk_dev.m_host = &host;
 
-    disk.fileh = host.file_open(disk.filename, disk.filename, sizeof(disk.filename), flag);
+    disk.fileh = host.fnfile_open(disk.filename, disk.filename, sizeof(disk.filename), flag);
 
     if (disk.fileh == nullptr)
     {

@@ -274,16 +274,55 @@ bool FileSystemFTP::is_dir(const char *path)
     // Try to open the path as a directory
     bool res = _ftp->open_directory(path, "");
     
-    if (res == 0)  // open_directory returns 0 on success
+    if (res != 0)  // open_directory returns 0 on success
     {
-        Debug_printf("Path is a directory\n");
-        return true;
-    }
-    else
-    {
-        Debug_printf("Path is not a directory\n");
+        Debug_printf("Failed to LIST path\n");
         return false;
     }
+
+    // Read the first entry to check if it's a directory
+    // For a file, LIST returns a single entry with is_dir=false
+    // For a directory, LIST returns its contents
+    string filename;
+    long filesz;
+    bool is_directory;
+    
+    res = _ftp->read_directory(filename, filesz, is_directory);
+    if (res == false && !filename.empty())
+    {
+        // Successfully read an entry
+        // If the filename matches the path (or just the basename), it's listing the file itself
+        // Some servers return full path, others return just basename
+        
+        if (strcmp(path, filename.c_str()) == 0)
+        {
+            // Full path matches - it's listing the file itself
+            Debug_printf("Path is %s (is_dir=%d)\n", is_directory ? "a directory" : "a file", is_directory);
+            return is_directory;
+        }
+        
+        const char *last_slash = strrchr(path, '/');
+        const char *basename = last_slash ? last_slash + 1 : path;
+        
+        const char *file_last_slash = strrchr(filename.c_str(), '/');
+        const char *file_basename = file_last_slash ? file_last_slash + 1 : filename.c_str();
+        
+        if (strcmp(basename, file_basename) == 0)
+        {
+            // Basename matches - it's listing the file itself
+            Debug_printf("Path is %s (is_dir=%d)\n", is_directory ? "a directory" : "a file", is_directory);
+            return is_directory;
+        }
+        else
+        {
+            // Different name - it's listing directory contents
+            Debug_printf("Path is a directory (listing contents)\n");
+            return true;
+        }
+    }
+    
+    Debug_printf("Could not determine if path is directory\n");
+    return false;
 }
 
 bool FileSystemFTP::mkdir(const char* path)

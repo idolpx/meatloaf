@@ -187,6 +187,7 @@ class FTPMStream : public MStream {
     }
 
    protected:
+    std::shared_ptr<FTPMSession> _session;
     FTPMStream_impl_access* _impl;
 };
 

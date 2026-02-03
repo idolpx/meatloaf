@@ -943,13 +943,13 @@ bool fnFTP::read_directory(string &name, long &filesize, bool &is_dir)
     if (line.empty())
         return true;
 
-    //Debug_printf("fnFTP::read_directory - %s\r\n",line.c_str());
+    Debug_printf("fnFTP::read_directory - %s\r\n",line.c_str());
     line = line.substr(0, line.size() - 1);
     ftpparse(&parse, (char *)line.c_str(), line.length());
     name = string(parse.name ? parse.name : "???");
     filesize = parse.size;
     is_dir = (parse.flagtrycwd == 1);
-    Debug_printf("Name: \"%s\" size: %lu\r\n", name.c_str(), filesize);
+    Debug_printf("Name: \"%s\" size: %lu is_dir: %d\r\n", name.c_str(), filesize, is_dir);
     return dirBuffer.eof();
 }
 

@@ -3,7 +3,7 @@
 
 #include <cstddef>
 
-#if defined(BUILD_ATARI) || defined(BUILD_APPLE) || defined(BUILD_COCO) || defined(BUILD_RS232)
+#if defined(BUILD_ATARI) || defined(BUILD_APPLE) || defined(BUILD_COCO) || defined(BUILD_RS232) || defined(BUILD_IEC)
   // ATARI and APPLE was already ported to use fnio
   // set FNIO_IS_STDIO to force stdio
 

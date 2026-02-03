@@ -19,6 +19,7 @@
 // https://www.c64-wiki.com/wiki/Fast_serial_bus_protocol
 // https://a1bert.kapsi.fi/Dev/burst/
 // https://web.archive.org/web/20220125025330/https://sites.google.com/site/h2obsession/CBM/C128/fast-serial-for-uiec
+// https://github.com/GideonZ/1541ultimate/issues/60
 //
 
 // #ifndef PROTOCOL_CPBFASTSERIAL_H

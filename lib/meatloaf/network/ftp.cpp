@@ -9,8 +9,11 @@
 
 // Define the stream impl struct
 struct FTPMStream_impl_access {
-    std::unique_ptr<FileSystemFTP> fs;
-    FILE* fh = nullptr;  // Use FILE* instead of FileHandler*
+#ifdef FNIO_IS_STDIO
+    FILE* fh = nullptr;
+#else
+    FileHandler* fh = nullptr;
+#endif
 };
 
 // FTPMFile implementations
@@ -145,21 +148,17 @@ bool FTPMStream::open(std::ios_base::openmode mode) {
         return false;
     }
 
-    _impl = new FTPMStream_impl_access();
-    _impl->fs = std::make_unique<FileSystemFTP>();
+    // Obtain or create FTP session via SessionBroker
+    uint16_t ftp_port = parser->port.empty() ? 21 : std::stoi(parser->port);
+    _session = SessionBroker::obtain<FTPMSession>(parser->host, ftp_port);
 
-    std::string base = std::string("ftp://") + parser->host;
-    if (!parser->port.empty()) base += ":" + parser->port;
-
-    if (!_impl->fs->start(
-            base.c_str(), parser->user.empty() ? nullptr : parser->user.c_str(),
-            parser->password.empty() ? nullptr : parser->password.c_str())) {
-        Debug_printv("Failed to login to FTP: %s", parser->host.c_str());
+    if (!_session || !_session->isConnected()) {
+        Debug_printv("Failed to obtain FTP session for %s:%d", parser->host.c_str(), ftp_port);
         _error = ECONNREFUSED;
-        delete _impl;
-        _impl = nullptr;
         return false;
     }
+
+    _impl = new FTPMStream_impl_access();
 
     const char* mstr = FILE_READ;
     if (mode & std::ios_base::out) {
@@ -169,7 +168,27 @@ bool FTPMStream::open(std::ios_base::openmode mode) {
             mstr = FILE_WRITE;
     }
 
-    _impl->fh = _impl->fs->file_open(parser->path.c_str(), mstr);
+    // Use the shared session's filesystem
+    FileSystemFTP* fs = _session->fs();
+    if (!fs) {
+        Debug_printv("Session has no filesystem");
+        _error = ECONNREFUSED;
+        delete _impl;
+        _impl = nullptr;
+        return false;
+    }
+
+#ifndef FNIO_IS_STDIO
+    _impl->fh = fs->filehandler_open(parser->path.c_str(), mstr);
+#else
+    _impl->fh = nullptr;
+    Debug_printv("FTP file_open not supported - FTP needs filehandler_open");
+    _error = ENOTSUP;
+    delete _impl;
+    _impl = nullptr;
+    return false;
+#endif
+
     if (!_impl->fh) {
         Debug_printv("Failed to open FTP file for %s", parser->path.c_str());
         _error = ENOENT;
@@ -178,9 +197,10 @@ bool FTPMStream::open(std::ios_base::openmode mode) {
         return false;
     }
 
-    // For FTP, we don't know the file size without additional STAT calls
-    // Use FileSystem::filesize() to get the size from FILE*
-    long fsz = FileSystem::filesize(_impl->fh);
+    // Get file size by seeking to end
+    _impl->fh->seek(0, SEEK_END);
+    long fsz = _impl->fh->tell();
+    _impl->fh->seek(0, SEEK_SET);
     _size = fsz > 0 ? (uint32_t)fsz : 0;
     _position = 0;
     return true;
@@ -189,12 +209,16 @@ bool FTPMStream::open(std::ios_base::openmode mode) {
 void FTPMStream::close() {
     if (!_impl) return;
     if (_impl->fh) {
+#ifdef FNIO_IS_STDIO
         fclose(_impl->fh);
+#else
+        _impl->fh->close();
+#endif
         _impl->fh = nullptr;
     }
-    _impl->fs.reset();
     delete _impl;
     _impl = nullptr;
+    _session.reset();
 }
 
 uint32_t FTPMStream::read(uint8_t* buf, uint32_t size) {
@@ -202,7 +226,11 @@ uint32_t FTPMStream::read(uint8_t* buf, uint32_t size) {
         _error = EBADF;
         return 0;
     }
+#ifdef FNIO_IS_STDIO
     size_t rd = fread(buf, 1, size, _impl->fh);
+#else
+    size_t rd = _impl->fh->read(buf, 1, size);
+#endif
     _position += rd;
     return (uint32_t)rd;
 }
@@ -212,7 +240,11 @@ uint32_t FTPMStream::write(const uint8_t* buf, uint32_t size) {
         _error = EBADF;
         return 0;
     }
+#ifdef FNIO_IS_STDIO
     size_t wr = fwrite(buf, 1, size, _impl->fh);
+#else
+    size_t wr = _impl->fh->write(buf, 1, size);
+#endif
     _position += wr;
     if (_position > _size) _size = _position;
     return (uint32_t)wr;
@@ -230,12 +262,21 @@ bool FTPMStream::seek(uint32_t pos, int mode) {
         whence = SEEK_CUR;
     else if (mode == SEEK_END)
         whence = SEEK_END;
+#ifdef FNIO_IS_STDIO
     int res = fseek(_impl->fh, (long)pos, whence);
     if (res != 0) {
         _error = EIO;
         return false;
     }
     long t = ftell(_impl->fh);
+#else
+    int res = _impl->fh->seek((long)pos, whence);
+    if (res != 0) {
+        _error = EIO;
+        return false;
+    }
+    long t = _impl->fh->tell();
+#endif
     if (t >= 0) _position = (uint32_t)t;
     return true;
 }

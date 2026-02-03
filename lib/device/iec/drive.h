@@ -256,7 +256,7 @@ public:
   iecDrive(uint8_t devnum = 0x00);
   ~iecDrive();
 
-  mediatype_t mount(FILE *f, const char *filename, uint32_t disksize, mediatype_t disk_type = MEDIATYPE_UNKNOWN);
+  mediatype_t mount(fnFile *f, const char *filename, uint32_t disksize, mediatype_t disk_type = MEDIATYPE_UNKNOWN);
   void unmount();
 
   int     id() { return m_devnr; };
