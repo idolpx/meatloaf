@@ -28,7 +28,7 @@
  ********************************************************/
 
 NSDMSession::NSDMSession(std::string host, uint16_t port) 
-    : MSession(host, port), mdns_initialized(false), cache_timestamp_ms(0) {
+    : MSession(host, port), cache_timestamp_ms(0), mdns_initialized(false) {
     Debug_printv("NSDMSession created");
 }
 
