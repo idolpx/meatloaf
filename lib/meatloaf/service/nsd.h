@@ -22,6 +22,12 @@ extern "C" {
 #include "mdns.h"
 }
 
+// Forward declarations to avoid circular dependencies
+class SMBMFile;
+class HTTPMFile;
+class SFTPMFile;
+class AFPMFile;
+
 #include "../../../include/debug.h"
 #include "make_unique.h"
 #include "string_utils.h"
@@ -83,6 +89,8 @@ public:
     void clearCache();
     
     uint32_t cache_timestamp_ms;  // Public for NSDMFile access
+    std::vector<DiscoveredService> cached_services;
+    std::vector<std::string> cached_service_types;  // For root directory listing
 
 private:
     bool mdns_initialized;
@@ -131,8 +139,6 @@ protected:
     // Directory iteration state
     bool dirOpened;
     size_t dir_index;
-    std::vector<DiscoveredService> cached_services;
-    std::vector<std::string> cached_service_types;  // For root directory listing
     
     void parseUrl();
     void refreshServiceList();
@@ -199,10 +205,7 @@ public:
         return mstr::startsWith(name, pattern.c_str(), false);
     }
 
-    MFile* getFile(std::string path) override {
-        return new NSDMFile(path);
-    }
-
+    MFile* getFile(std::string path) override;
 };
 
 

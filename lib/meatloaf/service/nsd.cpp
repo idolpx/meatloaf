@@ -17,11 +17,48 @@
 
 #include "nsd.h"
 
+#include "network/afp.h"
+#include "network/http.h"
+#include "network/sftp.h"
+#include "network/smb.h"
+
 #include <esp_log.h>
 #include <arpa/inet.h>
 #include <sstream>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+
+/********************************************************
+ * NSDMFileSystem Implementation
+ ********************************************************/
+
+MFile* NSDMFileSystem::getFile(std::string path) {
+    // If an instance name is specified, use it
+    auto parser = PeoplesUrlParser::parseURL(path);
+    parser->dump();
+    if (!parser->path.empty()) {
+        std::string instance_name = parser->name;
+
+        Debug_printv("NSD instance name: %s", instance_name.c_str());
+
+        // Get or create session - use dummy host since NSD is local
+        auto _session = SessionBroker::obtain<NSDMSession>("nsd", 0);
+        
+        // Find service
+        DiscoveredService* service = _session->findServiceByInstance(instance_name);
+        if (service) {
+            Debug_printv("NSD service found: %s, instance: %s, service type: %s", service->getDisplayName().c_str(), instance_name.c_str(), service->service_type.c_str());
+
+            // Generate URL for service by service type
+            if ( service->service_type == "_smb" ) {
+                path = "smb://" + service->addresses[0] + "/";
+                return new SMBMFile(path);
+            }
+        }
+    }
+
+    return new NSDMFile(path);
+}
 
 /********************************************************
  * NSDMSession Implementation
@@ -237,6 +274,7 @@ DiscoveredService* NSDMSession::findServiceByInstance(const std::string& instanc
     std::lock_guard<std::mutex> lock(services_mutex);
     
     for (auto& service : discovered_services) {
+        Debug_printv("Checking service: %s, instance: %s", service.getDisplayName().c_str(), instance_name.c_str()); 
         if (service.instance_name == instance_name || service.hostname == instance_name) {
             return &service;
         }
@@ -275,6 +313,9 @@ std::vector<DiscoveredService> NSDMSession::getServicesOfType(const std::string&
 void NSDMSession::clearCache() {
     std::lock_guard<std::mutex> lock(services_mutex);
     discovered_services.clear();
+    cached_services.clear();
+    cached_service_types.clear();
+    cache_timestamp_ms = 0;
 }
 
 
@@ -350,7 +391,7 @@ void NSDMFile::refreshServiceList() {
     uint32_t now_ms = xTaskGetTickCount() * portTICK_PERIOD_MS;
     uint32_t cache_age = (_session->cache_timestamp_ms > 0) ? (now_ms - _session->cache_timestamp_ms) : 0;
     
-    if (_session->cache_timestamp_ms > 0 && cache_age < 5000) {
+    if (_session->cached_services.size() && _session->cache_timestamp_ms > 0 && cache_age < 5000) {
         Debug_printv("Using cached service list (age: %u ms)", cache_age);
         return;
     }
@@ -361,9 +402,9 @@ void NSDMFile::refreshServiceList() {
     if (service_type.empty()) {
         Debug_printv("Root directory - discovering all services to get types");
         _session->discoverServices("", "_udp", 6000);
-        cached_service_types = _session->getServiceTypes();
-        cached_services.clear();
-        Debug_printv("Found %d unique service types", cached_service_types.size());
+        _session->cached_service_types = _session->getServiceTypes();
+        _session->cached_services.clear();
+        Debug_printv("Found %d unique service types", _session->cached_service_types.size());
     } else {
         // In a service type directory, get instances of that type
         std::string proto = "_tcp";  // Default to TCP
@@ -379,9 +420,9 @@ void NSDMFile::refreshServiceList() {
         // Discover services of this specific type
         _session->discoverServices(type, proto, 3000);
         // Then filter to get only this type
-        cached_services = _session->getServicesOfType(type);
-        cached_service_types.clear();
-        Debug_printv("Found %d instances of %s", cached_services.size(), type.c_str());
+        _session->cached_services = _session->getServicesOfType(type);
+        _session->cached_service_types.clear();
+        Debug_printv("Found %d instances of %s", _session->cached_services.size(), type.c_str());
     }
     
     // Update cache timestamp
@@ -390,7 +431,8 @@ void NSDMFile::refreshServiceList() {
 
 bool NSDMFile::isDirectory() {
     // It's a directory if no instance is specified
-    return instance_name.empty();
+    //return instance_name.empty();
+    return true;
 }
 
 bool NSDMFile::exists() {
@@ -421,12 +463,12 @@ MFile* NSDMFile::getNextFileInDir() {
     
     // At root level, return service type directories
     if (service_type.empty()) {
-        if (dir_index >= cached_service_types.size()) {
+        if (dir_index >= _session->cached_service_types.size()) {
             dirOpened = false;
             return nullptr;
         }
         
-        const auto& type = cached_service_types[dir_index++];
+        const auto& type = _session->cached_service_types[dir_index++];
         std::string file_path = "nsd://" + type;
         
         NSDMFile* file = new NSDMFile(file_path);
@@ -435,12 +477,12 @@ MFile* NSDMFile::getNextFileInDir() {
     }
     
     // In a service type directory, return service instances
-    if (dir_index >= cached_services.size()) {
+    if (dir_index >= _session->cached_services.size()) {
         dirOpened = false;
         return nullptr;
     }
     
-    const auto& service = cached_services[dir_index++];
+    const auto& service = _session->cached_services[dir_index++];
     
     // Create file entry for this service instance
     std::string file_path = "nsd://" + service_type + "/" + service.getDisplayName();
