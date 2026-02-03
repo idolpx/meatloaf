@@ -746,8 +746,8 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                 {
                     // // reading directory
                     // bool isProperDir = false;
-                    std::unique_ptr<MFile> entry(f->getNextFileInDir());
-                    Debug_printv("First entry in directory [%s] is [%s] cwd[%s]", f->url.c_str(), entry==nullptr ? "NULL" : entry->name.c_str(), m_cwd->url.c_str());
+                    // std::unique_ptr<MFile> entry(f->getNextFileInDir());
+                    // Debug_printv("First entry in directory [%s] is [%s] cwd[%s]", f->url.c_str(), entry==nullptr ? "NULL" : entry->name.c_str(), m_cwd->url.c_str());
                     // if( entry==nullptr )
                     // {
                     //     // if we can't open the file stream then assume this is an empty directory
