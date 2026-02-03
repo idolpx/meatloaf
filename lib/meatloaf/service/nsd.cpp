@@ -35,11 +35,11 @@
 MFile* NSDMFileSystem::getFile(std::string path) {
     // If an instance name is specified, use it
     auto parser = PeoplesUrlParser::parseURL(path);
-    parser->dump();
+    //parser->dump();
     if (!parser->path.empty()) {
         std::string instance_name = parser->name;
 
-        Debug_printv("NSD instance name: %s", instance_name.c_str());
+        //Debug_printv("NSD instance name: %s", instance_name.c_str());
 
         // Get or create session - use dummy host since NSD is local
         auto _session = SessionBroker::obtain<NSDMSession>("nsd", 0);
@@ -47,11 +47,12 @@ MFile* NSDMFileSystem::getFile(std::string path) {
         // Find service
         DiscoveredService* service = _session->findServiceByInstance(instance_name);
         if (service) {
-            Debug_printv("NSD service found: %s, instance: %s, service type: %s", service->getDisplayName().c_str(), instance_name.c_str(), service->service_type.c_str());
+            //Debug_printv("NSD service found: %s, instance: %s, service type: %s", service->getDisplayName().c_str(), instance_name.c_str(), service->service_type.c_str());
 
             // Generate URL for service by service type
             if ( service->service_type == "_smb" ) {
                 path = "smb://" + service->addresses[0] + "/";
+                SessionBroker::dispose("nsd", 0);
                 return new SMBMFile(path);
             }
         }
@@ -274,7 +275,7 @@ DiscoveredService* NSDMSession::findServiceByInstance(const std::string& instanc
     std::lock_guard<std::mutex> lock(services_mutex);
     
     for (auto& service : discovered_services) {
-        Debug_printv("Checking service: %s, instance: %s", service.getDisplayName().c_str(), instance_name.c_str()); 
+        //Debug_printv("Checking service: %s, instance: %s", service.getDisplayName().c_str(), instance_name.c_str()); 
         if (service.instance_name == instance_name || service.hostname == instance_name) {
             return &service;
         }

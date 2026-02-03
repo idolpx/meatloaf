@@ -1893,6 +1893,7 @@ void iecDrive::getStatus(char *buffer, uint8_t bufferSize)
         case ST_NO_CHANNEL          : msg = "NO CHANNEL"; break;
         case ST_DRIVE_NOT_READY     : msg = "DRIVE NOT READY"; break;
         case ST_FILE_TYPE_MISMATCH  : msg = "FILE TYPE MISMATCH"; break;
+        case ST_PERMISSION_DENIED   : msg = "PERMISSION DENIED"; break;
         default                     : msg = "UNKNOWN ERROR"; break;
     }
 
