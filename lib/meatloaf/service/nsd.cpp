@@ -20,13 +20,15 @@
 #include <esp_log.h>
 #include <arpa/inet.h>
 #include <sstream>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 /********************************************************
  * NSDMSession Implementation
  ********************************************************/
 
 NSDMSession::NSDMSession(std::string host, uint16_t port) 
-    : MSession(host, port), mdns_initialized(false) {
+    : MSession(host, port), mdns_initialized(false), cache_timestamp_ms(0) {
     Debug_printv("NSDMSession created");
 }
 
@@ -344,6 +346,17 @@ void NSDMFile::refreshServiceList() {
         return;
     }
     
+    // Check if cache is still valid (less than 5 seconds old)
+    uint32_t now_ms = xTaskGetTickCount() * portTICK_PERIOD_MS;
+    uint32_t cache_age = (_session->cache_timestamp_ms > 0) ? (now_ms - _session->cache_timestamp_ms) : 0;
+    
+    if (_session->cache_timestamp_ms > 0 && cache_age < 5000) {
+        Debug_printv("Using cached service list (age: %u ms)", cache_age);
+        return;
+    }
+    
+    Debug_printv("Refreshing service list (cache age: %u ms)", cache_age);
+    
     // At root level (nsd:/), discover all services and get service types
     if (service_type.empty()) {
         Debug_printv("Root directory - discovering all services to get types");
@@ -364,12 +377,15 @@ void NSDMFile::refreshServiceList() {
         
         Debug_printv("Service type directory - discovering instances of %s.%s", type.c_str(), proto.c_str());
         // Discover services of this specific type
-        _session->discoverServices(type, proto, 2000);
+        _session->discoverServices(type, proto, 3000);
         // Then filter to get only this type
         cached_services = _session->getServicesOfType(type);
         cached_service_types.clear();
         Debug_printv("Found %d instances of %s", cached_services.size(), type.c_str());
     }
+    
+    // Update cache timestamp
+    _session->cache_timestamp_ms = xTaskGetTickCount() * portTICK_PERIOD_MS;
 }
 
 bool NSDMFile::isDirectory() {
@@ -516,7 +532,7 @@ void NSDMStream::generateContent() {
     }
     
     // Discover services
-    _session->discoverServices(type, proto, 2000);
+    _session->discoverServices(type, proto, 3000);
     
     if (instance_name.empty()) {
         // List all services of this type

@@ -81,6 +81,8 @@ public:
     
     // Clear cached results
     void clearCache();
+    
+    uint32_t cache_timestamp_ms;  // Public for NSDMFile access
 
 private:
     bool mdns_initialized;
