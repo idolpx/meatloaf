@@ -58,9 +58,13 @@ bool FileSystemFTP::start(const char *url, const char *user, const char *passwor
         return false;
     }
 
+    // Store credentials for reconnection
+    _username = (user == nullptr ? "anonymous" : user);
+    _password = (password == nullptr ? "fujinet@fujinet.online" : password);
+
     res = _ftp->login(
-        user == nullptr ? "anonymous" : user,
-        password == nullptr ? "fujinet@fujinet.online" : password,
+        _username.c_str(),
+        _password.c_str(),
         _url->host,
         _url->port.empty() ? 21 : atoi(_url->port.c_str())
     );
@@ -380,7 +384,7 @@ bool FileSystemFTP::dir_exists(const char* path)
 
 bool FileSystemFTP::dir_open(const char  *path, const char *pattern, uint16_t diropts)
 {
-    if(!_started)
+    if (!ensure_connected())
         return false;
 
     Debug_printf("FileSystemFTP::dir_open(\"%s\", \"%s\", %u)\n", path ? path : "", pattern ? pattern : "", diropts);
@@ -474,5 +478,42 @@ bool FileSystemFTP::keep_alive()
 
     // Send NOOP command as lightweight keep-alive
     bool res = _ftp->keep_alive();
+    
+    if (!res) {
+        Debug_printf("FTP keep_alive failed - marking session as disconnected\n");
+        _started = false;
+    }
+    
     return res;
+}
+
+bool FileSystemFTP::ensure_connected()
+{
+    if (_started) {
+        return true;  // Already connected
+    }
+    
+    if (!_url || !_ftp) {
+        Debug_printf("Cannot reconnect - missing URL or FTP client\n");
+        return false;
+    }
+    
+    Debug_printf("Attempting to reconnect to FTP server: %s\n", _url->host.c_str());
+    
+    // Attempt to reconnect using stored credentials
+    bool res = _ftp->login(
+        _username.c_str(),
+        _password.c_str(),
+        _url->host,
+        _url->port.empty() ? 21 : atoi(_url->port.c_str())
+    );
+    
+    if (res) {
+        Debug_printf("Failed to reconnect to FTP server\n");
+        return false;
+    }
+    
+    Debug_printf("Successfully reconnected to FTP server\n");
+    _started = true;
+    return true;
 }

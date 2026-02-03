@@ -20,6 +20,10 @@ private:
     // FTP client
     fnFTP *_ftp;
 
+    // stored credentials for reconnection
+    std::string _username;
+    std::string _password;
+
     // directory cache
     char _last_dir[MAX_PATHLEN];
     DirCache _dircache;
@@ -57,6 +61,10 @@ public:
 
     bool keep_alive() override;
 
+private:
+    bool ensure_connected();  // Check connection and reconnect if needed
+
+public:
 #ifndef FNIO_IS_STDIO
     FileHandler *cache_file(const char *path, const char *mode);
 #endif
