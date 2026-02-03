@@ -24,6 +24,7 @@
 
 #include "meatloaf.h"
 #include "meat_session.h"
+#include "service/nsd.h"
 
 extern "C" {
 #include <libssh/libssh.h>
@@ -167,6 +168,7 @@ class SFTPMFileSystem: public MFileSystem
 public:
     SFTPMFileSystem(): MFileSystem("sftp") {
         isRootFS = true;
+        service_type = "_sftp-ssh._tcp";
     };
 
     bool handles(std::string name) {
@@ -174,6 +176,13 @@ public:
     }
 
     MFile* getFile(std::string path) override {
+        // If host is not specified, search for service records
+        auto parser = PeoplesUrlParser::parseURL(path);
+        if (parser->host.empty()) {
+            path = "nsd://" + service_type;
+            return new NSDMFile(path);
+        }
+
         return new SFTPMFile(path);
     }
 };

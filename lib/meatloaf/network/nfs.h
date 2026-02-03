@@ -26,6 +26,8 @@
 #define MEATLOAF_DEVICE_NFS
 
 #include "meatloaf.h"
+#include "meat_session.h"
+#include "service/nsd.h"
 
 #include <nfsc/libnfs.h>
 #include <nfsc/libnfs-raw.h>
@@ -38,8 +40,6 @@
 #include "../../../include/debug.h"
 
 #include "make_unique.h"
-
-#include "meat_session.h"
 
 #include <dirent.h>
 #include <string.h>

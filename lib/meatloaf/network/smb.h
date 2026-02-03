@@ -24,6 +24,7 @@
 #define MEATLOAF_DEVICE_SMB
 
 #include "meatloaf.h"
+#include "meat_session.h"
 #include "service/nsd.h"
 
 #include <smb2.h>
@@ -42,8 +43,6 @@
 #include "../../../include/debug.h"
 
 #include "make_unique.h"
-
-#include "meat_session.h"
 
 #include <dirent.h>
 #include <string.h>

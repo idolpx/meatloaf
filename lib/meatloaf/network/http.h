@@ -26,6 +26,8 @@
 #define MEATLOAF_SCHEME_HTTP
 
 #include "meatloaf.h"
+#include "meat_session.h"
+#include "service/nsd.h"
 
 #include <esp_http_client.h>
 #include <functional>
@@ -41,7 +43,6 @@
 
 
 #include "utils.h"
-#include "meat_session.h"
 
 #define HTTP_BLOCK_SIZE 256
 
@@ -322,6 +323,9 @@ class HTTPMFileSystem: public MFileSystem
 public:
     HTTPMFileSystem(): MFileSystem("http") {
         isRootFS = true;
+        service_type = "_http._tcp";
+        //service_type = "_http-alt._tcp";
+        //service_type = "_webdav._tcp";
     };
 
     bool handles(std::string name) {
@@ -335,6 +339,13 @@ public:
     }
 
     MFile* getFile(std::string path) override {
+        // If host is not specified, search for service records
+        auto parser = PeoplesUrlParser::parseURL(path);
+        if (parser->host.empty()) {
+            path = "nsd://" + service_type;
+            return new NSDMFile(path);
+        }
+
         return new HTTPMFile(path);
     }
 };
