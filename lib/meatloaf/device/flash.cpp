@@ -210,13 +210,9 @@ void FlashMFile::closeDir()
 
 bool FlashMFile::rewindDirectory()
 {
-    _valid = false;
-    rewinddir( dir );
+    openDir(fullPath());
 
-    // // Skip the . and .. entries
-    // struct dirent* dirent = NULL;
-    // dirent = readdir( dir );
-    // dirent = readdir( dir );
+    rewinddir( dir );
 
     return (dir != NULL) ? true: false;
 }
@@ -225,8 +221,8 @@ bool FlashMFile::rewindDirectory()
 MFile* FlashMFile::getNextFileInDir()
 {
     // Debug_printv("base[%s] path[%s]", basepath.c_str(), path.c_str());
-    if(!dirOpened)
-        openDir(fullPath().c_str());
+    if (!dirOpened)
+        rewindDirectory();
 
     if(dir == nullptr)
         return nullptr;

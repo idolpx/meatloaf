@@ -105,7 +105,6 @@ protected:
             full_path = full_path + "/" + pathInStream;
         return full_path;
     }
-    bool _valid;
     std::string _pattern;
 
 private:
