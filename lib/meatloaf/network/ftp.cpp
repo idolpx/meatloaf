@@ -87,10 +87,12 @@ MFile* FTPMFile::getNextFileInDir() {
     if (!mstr::endsWith(full, "/")) full += "/";
     full += de->filename;
     auto file = new FTPMFile(full);
+    file->name = de->filename;
     file->extension = std::string(" ") + file->extension;
     //file->size = de->isDir ? 0 : de->size;
     file->size = de->size;
     file->is_dir = de->isDir;
+    //Debug_printv("url[%s] full[%s] filename[%s] ext[%s]", url.c_str(), full.c_str(), de->filename, file->extension.c_str());
     return file;
 }
 

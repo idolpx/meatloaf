@@ -84,7 +84,7 @@ bool FileSystemFTP::start(const char *url, const char *user, const char *passwor
 
 bool FileSystemFTP::exists(const char *path)
 {
-    if (!_started || path == nullptr)
+    if (!ensure_connected() || path == nullptr)
         return false;
 
     Debug_printf("FileSystemFTP::exists(\"%s\")\n", path);
@@ -169,6 +169,8 @@ FileHandler *FileSystemFTP::filehandler_open(const char *path, const char *mode)
 // Return FileHandler* on success (memory or SD file), nullptr on error
 FileHandler *FileSystemFTP::cache_file(const char *path, const char *mode)
 {
+    Debug_printf("FileSystemFTP::cache_file(\"%s\", \"%s\")\n", path, mode);
+
     // Try SD cache first
     FileHandler *fh = FileCache::open(_url->mRawUrl.c_str(), path, mode);
     if (fh != nullptr)
@@ -188,7 +190,6 @@ FileHandler *FileSystemFTP::cache_file(const char *path, const char *mode)
     }
 
     // Retrieve FTP data
-    int tmout_counter = 1 + FTP_TIMEOUT / 50;
     bool cancel = false;
     int available;
 
@@ -210,22 +211,18 @@ FileHandler *FileSystemFTP::cache_file(const char *path, const char *mode)
 
         if (available == 0)
         {
-            if (--tmout_counter == 0)
-            {
-                // no data & no control message
-                Debug_println("FileSystemFTP::cache_file - Timeout");
-                cancel = true;
-                break;
-            }
-            fnSystem.delay(50); // wait for more data or control message
+            break;
         }
         else if (available > 0)
         {
-            Debug_printf("data available: %d\n", available);
+            Debug_printv("before available: %d", available);
             while (available > 0)
             {
+                if (!_ftp->data_connected()) // done
+                    break;
+
                 // Read FTP data
-                int to_read = available > sizeof(buf) ? sizeof(buf) : available;
+                int to_read = available > COPY_BLK_SIZE ? COPY_BLK_SIZE : available;
                 if (_ftp->read_file(buf, to_read))
                 {
                     Debug_println("FileSystemFTP::cache_file - FTP read failed");
@@ -241,8 +238,9 @@ FileHandler *FileSystemFTP::cache_file(const char *path, const char *mode)
                 }
                 // Next chunk
                 available = _ftp->data_available();
+                Debug_printv("available: %d, to_read: %d", available, to_read);
             }
-            tmout_counter = 1 + FTP_TIMEOUT / 50; // reset timeout counter
+            Debug_printv("after available: %d", available);
         }
         else if (available < 0)
         {
@@ -250,11 +248,15 @@ FileHandler *FileSystemFTP::cache_file(const char *path, const char *mode)
             cancel = true;
         }
     }
+    Debug_printv("File data retrieval complete");
+
     // Release copy buffer
     free(buf);
 
     // Close FTP client
+    Debug_printv("Closing FTP client");
     _ftp->close();
+    Debug_printv("FTP client closed");
 
     if (cancel)
     {
@@ -275,7 +277,7 @@ FileHandler *FileSystemFTP::cache_file(const char *path, const char *mode)
 
 bool FileSystemFTP::is_dir(const char *path)
 {
-    if (!_started || path == nullptr)
+    if (!ensure_connected() || path == nullptr)
         return false;
 
     Debug_printf("FileSystemFTP::is_dir(\"%s\")\n", path);
