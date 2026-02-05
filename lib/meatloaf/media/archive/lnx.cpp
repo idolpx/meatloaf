@@ -275,6 +275,7 @@ bool LNXMFile::rewindDirectory()
     media_header = name;
     std::string ext = "." + extension;
     mstr::replaceAll(media_header, ext, "");
+    media_header = mstr::toPETSCII2(media_header);
 
     //media_id = "";
     media_blocks_free = 0;

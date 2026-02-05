@@ -178,7 +178,7 @@ bool LBRMFile::rewindDirectory()
     media_id = image->header.id_dos;
     media_blocks_free = 0;
     media_block_size = image->block_size;
-    media_image = name;
+    media_archive = name;
     // mstr::toUTF8(media_image);
 
     Debug_printv("media_header[%s] media_id[%s] media_blocks_free[%d] media_block_size[%d] media_image[%s]", media_header.c_str(), media_id.c_str(), media_blocks_free, media_block_size, media_image.c_str());
