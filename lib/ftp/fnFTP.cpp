@@ -1032,6 +1032,11 @@ bool fnFTP::data_connected()
     return _expect_control_response || data->connected();
 }
 
+bool fnFTP::control_connected()
+{
+    return control != nullptr && control->connected();
+}
+
 /** FTP UTILITY FUNCTIONS **********************************************************************/
 
 bool fnFTP::parse_response()
@@ -1267,7 +1272,7 @@ bool fnFTP::keep_alive()
     if (!control->connected())
     {
         Debug_printf("fnFTP::keep_alive() attempted while not logged in. Aborting.\r\n");
-        return true;
+        return false;
     }
 
     NOOP();

@@ -323,14 +323,23 @@ iecChannelHandlerDir::iecChannelHandlerDir(iecDrive *drive, MFile *dir) : iecCha
     m_headerLine = 1;
     
     std::string scheme = m_dir->scheme;
-    scheme = mstr::toPETSCII2(scheme);
     std::string url = m_dir->host;
-    url = mstr::toPETSCII2(url);
     std::string path = m_dir->path;
-    path = mstr::toPETSCII2(path);
     std::string archive = m_dir->media_archive;
-    archive = mstr::toPETSCII2(archive);
     std::string image = m_dir->media_image;
+    if (image.size() > 0) {
+        mstr::replaceAll(path, image, "");
+        mstr::drop(path, 1);
+    }
+    if (archive.size() > 0) {
+        mstr::replaceAll(path, archive, "");
+        mstr::drop(path, 1);
+    }
+
+    scheme = mstr::toPETSCII2(scheme);
+    url = mstr::toPETSCII2(url);
+    path = mstr::toPETSCII2(path);
+    archive = mstr::toPETSCII2(archive);
     image = mstr::toPETSCII2(image);
     
     m_headers.clear();

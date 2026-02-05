@@ -115,6 +115,11 @@ public:
      */
     bool data_connected();
 
+    /**
+     * @brief return if control connection is active
+     * @return TRUE if connected, FALSE if disconnected
+     */
+    bool control_connected();
 
     /**
      * Recovery FTP connection.

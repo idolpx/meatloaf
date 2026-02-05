@@ -29,10 +29,10 @@ void LNXMStream::skipBasicLoader()
     // We'll search for the LNX header signature "LYNX" instead of hardcoding offset
     containerStream->seek(0);
 
-    uint8_t buffer[256];
-    uint32_t bytesRead = containerStream->read(buffer, 256);
+    uint8_t buffer[254];
+    uint32_t bytesRead = containerStream->read(buffer, 254);
 
-    // Search for "LYNX" signature in first 256 bytes
+    // Search for "LYNX" signature in first 254 bytes
     for (uint32_t i = 0; i < bytesRead - 4; i++)
     {
         if (buffer[i] == 'L' && buffer[i+1] == 'Y' && buffer[i+2] == 'N' && buffer[i+3] == 'X')
@@ -70,11 +70,8 @@ bool LNXMStream::readHeader()
     header.entry_count = atoi(count.c_str());
     entry_count = header.entry_count;
 
-    // Read creator information (optional)
-    header.creator = readUntil(0x0D);
-
-    Debug_printv("signature[%s] dir_blocks[%d] entry_count[%d] creator[%s]",
-        header.signature.c_str(), header.directory_blocks, header.entry_count, header.creator.c_str());
+    Debug_printv("signature[%s] dir_blocks[%d] entry_count[%d]",
+        header.signature.c_str(), header.directory_blocks, header.entry_count);
 
     return true;
 }
@@ -84,8 +81,7 @@ int8_t LNXMStream::loadEntries()
     // Skip to start of directory entries (after header padding to 254-byte boundary)
     // The directory starts at next 254-byte block boundary
     uint32_t current_pos = containerStream->position();
-    uint32_t dir_start = ((current_pos + block_size - 1) / block_size) * block_size;
-    containerStream->seek(dir_start);
+    uint32_t dir_start = current_pos;
 
     Debug_printv("Loading %d entries from offset[%d]", entry_count, dir_start);
 
@@ -98,6 +94,7 @@ int8_t LNXMStream::loadEntries()
         containerStream->read(filename_buf, 16);
         filename_buf[16] = '\0';
         e.filename = std::string((char*)filename_buf, 16);
+        mstr::rtrimA0(e.filename);
 
         // Skip CR after filename
         containerStream->read(filename_buf, 1);  // CR
@@ -143,7 +140,7 @@ int8_t LNXMStream::loadEntries()
 
     // Calculate file data start offset
     // Files start after directory blocks (aligned to 254-byte boundaries)
-    uint32_t data_start = dir_start + (header.directory_blocks * block_size);
+    uint32_t data_start = header.directory_blocks * block_size;
 
     // Assign offsets to each entry
     uint32_t offset = data_start;
@@ -275,11 +272,14 @@ bool LNXMFile::rewindDirectory()
     image->resetEntryCounter();
 
     // Set Media Info Fields
-    media_header = "LYNX ARCHIVE";
-    media_id = mstr::format("%.16s", image->header.creator.c_str());
+    media_header = name;
+    std::string ext = "." + extension;
+    mstr::replaceAll(media_header, ext, "");
+
+    //media_id = "";
     media_blocks_free = 0;
     media_block_size = image->block_size;
-    media_image = name;
+    media_archive = name;
 
     Debug_printv("media_header[%s] media_id[%s] media_blocks_free[%d] media_block_size[%d] media_image[%s]",
         media_header.c_str(), media_id.c_str(), media_blocks_free, media_block_size, media_image.c_str());
@@ -293,7 +293,8 @@ MFile *LNXMFile::getNextFileInDir()
         rewindDirectory();
 
     // Get entry pointed to by containerStream
-    auto image = ImageBroker::obtain<LNXMStream>("lnx", sourceFile->url);
+    // Use our own URL (the archive file) rather than sourceFile->url
+    auto image = ImageBroker::obtain<LNXMStream>("lnx", url);
     if (image == nullptr)
         goto exit;
 

@@ -52,7 +52,6 @@ protected:
         std::string signature;
         uint16_t directory_blocks;
         uint16_t entry_count;
-        std::string creator;
     };
 
     struct Entry {
@@ -94,8 +93,6 @@ public:
 
     LNXMFile(std::string path, bool is_dir = true): MFile(path) {
         isDir = is_dir;
-
-        media_image = name;
         isPETSCII = true;
     };
 

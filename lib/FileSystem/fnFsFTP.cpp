@@ -491,18 +491,30 @@ bool FileSystemFTP::keep_alive()
 
 bool FileSystemFTP::ensure_connected()
 {
+    // Check if we're actually connected at the FTP protocol level
+    if (_started && _ftp && _ftp->control_connected()) {
+        return true;  // Already connected and verified
+    }
+    
+    // If we thought we were connected but aren't, mark as disconnected
     if (_started) {
-        return true;  // Already connected
+        Debug_printf("FTP control connection lost, attempting reconnect\n");
+        _started = false;
     }
     
     if (!_url || !_ftp) {
-        Debug_printf("Cannot reconnect - missing URL or FTP client\n");
+        Debug_printf("Cannot connect - missing URL or FTP client\n");
         return false;
     }
     
-    Debug_printf("Attempting to reconnect to FTP server: %s\n", _url->host.c_str());
+    if (_username.empty()) {
+        Debug_printf("Cannot connect - credentials not set (start() was never called)\n");
+        return false;
+    }
     
-    // Attempt to reconnect using stored credentials
+    Debug_printf("Attempting to connect to FTP server: %s\n", _url->host.c_str());
+    
+    // Attempt to connect using stored credentials
     bool res = _ftp->login(
         _username.c_str(),
         _password.c_str(),
@@ -511,11 +523,11 @@ bool FileSystemFTP::ensure_connected()
     );
     
     if (res) {
-        Debug_printf("Failed to reconnect to FTP server\n");
+        Debug_printf("Failed to connect to FTP server\n");
         return false;
     }
     
-    Debug_printf("Successfully reconnected to FTP server\n");
+    Debug_printf("Successfully connected to FTP server\n");
     _started = true;
     return true;
 }
