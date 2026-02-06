@@ -119,7 +119,7 @@ bool LBRMStream::seekEntry( uint16_t index )
 uint32_t LBRMStream::readFile(uint8_t *buf, uint32_t size)
 {
     uint32_t bytesRead = 0;
-    bytesRead += containerStream->read(buf, size);
+    bytesRead += readContainer(buf, size);
 
     return bytesRead;
 }
@@ -193,7 +193,7 @@ MFile *LBRMFile::getNextFileInDir()
         rewindDirectory();
 
     // Get entry pointed to by containerStream
-    auto image = ImageBroker::obtain<LBRMStream>("lbr", sourceFile->url);
+    auto image = ImageBroker::obtain<LBRMStream>("lbr", url);
     if (image == nullptr)
         goto exit;
 
@@ -206,7 +206,7 @@ MFile *LBRMFile::getNextFileInDir()
         mstr::replaceAll(filename, "/", "\\");
         //Debug_printv( "entry[%s]", (sourceFile->url + "/" + fileName).c_str() );
 
-        auto file = MFSOwner::File(sourceFile->url + "/" + filename);
+        auto file = MFSOwner::File(url + "/" + filename);
         file->extension = image->entry.type;
         //Debug_printv("entry[%s] ext[%s]", fileName.c_str(), file->extension.c_str());
         

@@ -85,7 +85,7 @@ bool ARKMStream::seekEntry( uint16_t index )
 uint32_t ARKMStream::readFile(uint8_t *buf, uint32_t size)
 {
     uint32_t bytesRead = 0;
-    bytesRead += containerStream->read(buf, size);
+    bytesRead += readContainer(buf, size);
 
     return bytesRead;
 }

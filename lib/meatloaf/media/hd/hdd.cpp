@@ -67,7 +67,7 @@ bool HDDMStream::readHeader()
 {
     // Read boot sector (sector 0)
     containerStream->seek(0);
-    if (containerStream->read((uint8_t*)&boot_sector, sizeof(BootSector)) != sizeof(BootSector))
+    if (readContainer((uint8_t*)&boot_sector, sizeof(BootSector)) != sizeof(BootSector))
     {
         Debug_printv("Failed to read boot sector");
         return false;
@@ -108,7 +108,7 @@ bool HDDMStream::readPartitionDirectory()
     Debug_printv("Reading partition directory at LBA %d", part_dir_lba);
 
     containerStream->seek(part_dir_lba * block_size);
-    if (containerStream->read((uint8_t*)partitions, sizeof(partitions)) != sizeof(partitions))
+    if (readContainer((uint8_t*)partitions, sizeof(partitions)) != sizeof(partitions))
     {
         Debug_printv("Failed to read partition directory");
         return false;
@@ -167,7 +167,7 @@ bool HDDMStream::selectPartition(uint8_t partition_num)
 bool HDDMStream::readDirectorySector(uint32_t lba)
 {
     containerStream->seek(lba * block_size);
-    if (containerStream->read((uint8_t*)&current_dir, sizeof(DirectorySector)) != sizeof(DirectorySector))
+    if (readContainer((uint8_t*)&current_dir, sizeof(DirectorySector)) != sizeof(DirectorySector))
     {
         Debug_printv("Failed to read directory sector at LBA %d", lba);
         return false;
@@ -273,7 +273,7 @@ uint32_t HDDMStream::readDataSector(uint32_t lba, uint8_t* buf, uint32_t size)
         size = block_size;
 
     containerStream->seek(lba * block_size);
-    return containerStream->read(buf, size);
+    return readContainer(buf, size);
 }
 
 bool HDDMStream::readDataTree(Pointer tree_ptr, uint32_t offset, uint8_t* buf, uint32_t size, uint32_t& bytes_read)
@@ -381,7 +381,7 @@ MFile* HDDMFile::getNextFileInDir()
     if (!dirIsOpen)
         rewindDirectory();
 
-    auto image = ImageBroker::obtain<HDDMStream>("hdd", sourceFile->url);
+    auto image = ImageBroker::obtain<HDDMStream>("hdd", url);
     if (image == nullptr)
         goto exit;
 
@@ -390,7 +390,7 @@ MFile* HDDMFile::getNextFileInDir()
         std::string filename = image->entry.filename;
         mstr::replaceAll(filename, "/", "\\");
 
-        auto file = MFSOwner::File(sourceFile->url + "/" + filename);
+        auto file = MFSOwner::File(url + "/" + filename);
         file->extension = image->entry.type;
         file->size = image->entry.size;
 

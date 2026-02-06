@@ -30,7 +30,7 @@ void LNXMStream::skipBasicLoader()
     containerStream->seek(0);
 
     uint8_t buffer[254];
-    uint32_t bytesRead = containerStream->read(buffer, 254);
+    uint32_t bytesRead = readContainer(buffer, 254);
 
     // Search for "LYNX" signature in first 254 bytes
     for (uint32_t i = 0; i < bytesRead - 4; i++)
@@ -91,13 +91,13 @@ int8_t LNXMStream::loadEntries()
 
         // Read filename (16 chars, PETASCII, padded with $A0)
         uint8_t filename_buf[17];
-        containerStream->read(filename_buf, 16);
+        readContainer(filename_buf, 16);
         filename_buf[16] = '\0';
         e.filename = std::string((char*)filename_buf, 16);
         mstr::rtrimA0(e.filename);
 
         // Skip CR after filename
-        containerStream->read(filename_buf, 1);  // CR
+        readContainer(filename_buf, 1);  // CR
 
         // Read block count (ASCII number)
         std::string block_count = readUntil(0x0D);
@@ -215,7 +215,7 @@ uint32_t LNXMStream::readFile(uint8_t *buf, uint32_t size)
 
     if (size > 0)
     {
-        bytesRead += containerStream->read(buf, size);
+        bytesRead += readContainer(buf, size);
         _position += bytesRead;
     }
 

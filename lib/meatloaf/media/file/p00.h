@@ -51,7 +51,7 @@ protected:
 
     bool readHeader() override {
         containerStream->seek(0x00);
-        if (containerStream->read((uint8_t*)&header, sizeof(header)))
+        if (readContainer((uint8_t*)&header, sizeof(header)))
             return true;
 
         return false;
@@ -64,7 +64,7 @@ protected:
     uint32_t readFile(uint8_t* buf, uint32_t size) override {
         uint32_t bytesRead = 0;
 
-        bytesRead += containerStream->read(buf, size);
+        bytesRead += readContainer(buf, size);
         _position += bytesRead;
 
         return bytesRead;
