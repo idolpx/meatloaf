@@ -90,7 +90,11 @@ bool TCRTMStream::seekEntry( std::string filename )
             //uint8_t i = entryFilename.find_first_of(0x00); // padded with NUL (0x00)
             //entryFilename = entryFilename.substr(0, (i > 16 ? 16 : i))
             //mstr::rtrimA0(entryFilename);
-            entryFilename = mstr::toUTF8(entryFilename);
+            //entryFilename = mstr::toUTF8(entryFilename);
+            
+            // TCRT uses PETSCII Uppercase in the lower range
+            // UTF8 won't translate correctly so we translate to ASCII here
+            util_petscii_to_ascii_str(entryFilename);
 
             //Debug_printv("index[%d] filename[%s] entry.filename[%s] entry.file_type[%d]", index, filename.c_str(), entryFilename.c_str(), entry.file_type);
 
@@ -118,7 +122,7 @@ bool TCRTMStream::seekEntry( uint16_t index )
     //Debug_printv("index[%d] entryOffset[%d] entry_index[%d]", (index + 1), entryOffset, entry_index);
 
     containerStream->seek(entryOffset);
-    containerStream->read((uint8_t *)&entry, sizeof(entry));
+    readContainer((uint8_t *)&entry, sizeof(entry));
 
     //uint32_t file_start_address = (0xD8 + (entry.file_start_address[0] << 8 | entry.file_start_address[1] << 16));
     //uint32_t file_size = (entry.file_size[0] | (entry.file_size[1] << 8) | (entry.file_size[2] << 16)) + 2; // 2 bytes for load address
@@ -143,13 +147,13 @@ uint32_t TCRTMStream::readFile(uint8_t* buf, uint32_t size) {
         {
             buf[0] = _load_address[0];
             buf[1] = _load_address[1];
-            bytesRead += containerStream->read(buf+2, size - 2);
+            bytesRead += readContainer(buf+2, size - 2);
         }
         bytesRead += 2;
     }
     else
     {
-        bytesRead += containerStream->read(buf, size);
+        bytesRead += readContainer(buf, size);
     }
 
     return bytesRead;

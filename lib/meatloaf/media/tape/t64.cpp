@@ -85,7 +85,7 @@ bool T64MStream::seekEntry( uint16_t index )
     //Debug_printv("index[%d] sectorOffset[%d] entryOffset[%d] entry_index[%d]", index, sectorOffset, entryOffset, entry_index);
 
     containerStream->seek(entryOffset);
-    containerStream->read((uint8_t *)&entry, sizeof(entry));
+    readContainer((uint8_t *)&entry, sizeof(entry));
 
     //Debug_printv("index[%d] file_type[%02X] file_name[%.16s]", index, entry.file_type, entry.filename);
 
@@ -104,13 +104,13 @@ uint32_t T64MStream::readFile(uint8_t* buf, uint32_t size) {
         {
             buf[0] = _load_address[0];
             buf[1] = _load_address[1];
-            bytesRead += containerStream->read(buf+2, size - 2);
+            bytesRead += readContainer(buf+2, size - 2);
         }
         bytesRead += 2;
     }
     else
     {
-        bytesRead += containerStream->read(buf, size);
+        bytesRead += readContainer(buf, size);
     }
 
     return bytesRead;

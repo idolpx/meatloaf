@@ -61,7 +61,7 @@ protected:
 
     bool readHeader() override {
         containerStream->seek(0x18);
-        if (containerStream->read((uint8_t*)&header, sizeof(header)))
+        if (readContainer((uint8_t*)&header, sizeof(header)))
             return true;
 
         return false;
