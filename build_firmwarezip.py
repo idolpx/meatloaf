@@ -12,13 +12,15 @@ Import("env")
 
 print("Build firmware ZIP enabled")
 
-ini_file = 'platformio.ini'
-# this is specified with "-c /path/to/your.ini" when running pio
-if env["PROJECT_CONFIG"] is not None:
-    ini_file = env["PROJECT_CONFIG"]
+# ini_file = 'platformio.ini'
+# # this is specified with "-c /path/to/your.ini" when running pio
+# if env["PROJECT_CONFIG"] is not None:
+#     ini_file = env["PROJECT_CONFIG"]
 
-print(f"Reading from config file {ini_file}")
+# print(f"Reading from config file {ini_file}")
 
+environment_name = env["PIOENV"]
+print(f"Creating firmware ZIP for environment: {environment_name}")
 
 def image_info(filename):
     """
@@ -62,6 +64,8 @@ def image_info(filename):
         return chip_name, flash_size
 
 def makezip(source, target, env):
+    global environment_name
+
     # Create the 'firmware' output dir if it doesn't exist
     firmware_dir = 'firmware'
     if not os.path.exists(firmware_dir):
@@ -80,15 +84,18 @@ def makezip(source, target, env):
         zipit = False
     if not os.path.exists(env.subst("$BUILD_DIR/littlefs.bin")):
         print("\033[1;31mLittleFS not available to archive in firmware zip, building...\033[1;37m")
-        os.system("pio run -t buildfs")
+        os.system("pio run -t buildfs -e " + environment_name)
         zipit = False
 
     if zipit == True:
-        # Get the build_board variable
-        config = configparser.ConfigParser()
-        config.read(ini_file)
-        environment = "env:"+config['meatloaf']['environment'].split()[0]
-        print(f"Creating firmware zip for Meatloaf ESP32 Board: {config[environment]['board']}")
+        # # Get the build_board variable
+        # config = configparser.ConfigParser()
+        # config.read(ini_file)
+        # environment = "env:"+config['meatloaf']['environment'].split()[0]
+        # print(f"Creating firmware zip for Meatloaf ESP32 Board: {config[environment]['board']}")
+
+        #board = env.BoardConfig().get('name')
+        print(f"Creating firmware zip for Meatloaf ESP32 Board: {environment_name}")
 
         # Get version information
         with open("include/version.h", "r") as file:
@@ -118,7 +125,7 @@ def makezip(source, target, env):
         version['BUILD_DATE'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         # Filename variables
-        environment_name = config['meatloaf']['environment'].split()[0]
+        # environment_name = config['meatloaf']['environment'].split()[0]
         firmware_date = datetime.now().strftime("%Y%m%d.%H")
         releasefile = firmware_dir+"/release.json"
         firmwarezip = firmware_dir+"/meatloaf."+environment_name+"."+firmware_date+".zip"
@@ -160,6 +167,8 @@ def makezip(source, target, env):
         # Set the bootloader offset
         if chip_name == "esp32s3":
             json_contents['files'][0]["offset"] = "0x0000"
+        else:
+            json_contents['files'][0]["offset"] = "0x1000"
 
         # Save Release JSON
         with open('firmware/release.json', 'w') as f:
@@ -175,13 +184,13 @@ def makezip(source, target, env):
 
                 # New archive files
                 #zip_object.write(f"{firmware_dir}/bin/nvs.bin", "nvs.bin")
-                #zip_object.write(env.subst("$BUILD_DIR/firmware.bin"), "main.bin")
-                #zip_object.write(f"{firmware_dir}/bin/update.{chip_name}.{flash_size}.bin", "update.bin")
-                #zip_object.write(f"{firmware_dir}/filesystem.bin", "storage.bin")
+                zip_object.write(env.subst("$BUILD_DIR/firmware.bin"), "main.bin")
+                zip_object.write(f"{firmware_dir}/bin/update.{chip_name}.{flash_size}.bin", "update.bin")
+                zip_object.write(f"{firmware_dir}/filesystem.bin", "storage.bin")
 
                 # Old archive files
-                zip_object.write(env.subst("$BUILD_DIR/firmware.bin"), "firmware.bin")
-                zip_object.write(f"{firmware_dir}/filesystem.bin", "filesystem.bin")
+                #zip_object.write(env.subst("$BUILD_DIR/firmware.bin"), "firmware.bin")
+                #zip_object.write(f"{firmware_dir}/filesystem.bin", "filesystem.bin")
         finally: 
             print("*" * 80)
             print("*")

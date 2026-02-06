@@ -2,16 +2,19 @@ import datetime, re, subprocess, sys, configparser
 
 Import("env")
 
-ini_file = 'platformio.ini'
-# this is specified with "-c /path/to/your.ini" when running pio
-if env["PROJECT_CONFIG"] is not None:
-    ini_file = env["PROJECT_CONFIG"]
+# ini_file = 'platformio.ini'
+# # this is specified with "-c /path/to/your.ini" when running pio
+# if env["PROJECT_CONFIG"] is not None:
+#     ini_file = env["PROJECT_CONFIG"]
 
-print(f"Reading from config file {ini_file}")
+#print(f"Reading from config file {ini_file}")
 
-config = configparser.ConfigParser()
-config.read(ini_file)
-environment = config['meatloaf']['environment'].split()[0]
+#config = configparser.ConfigParser()
+#config.read(ini_file)
+#environment = config['meatloaf']['environment'].split()[0]
+
+environment_name = env["PIOENV"]
+print(f"Setting build version for environment: {environment_name}")
 
 # Need to run this command in the PIO virtual environment
 #env.Execute("$PYTHONEXE -m pip list --format=json --disable-pip-version-check");
@@ -83,7 +86,7 @@ else:
     fout.close()
 
     # Write version.txt
-    version_txt = ver_maj + "." + ver_min + "." + ver_build + "." + environment
+    version_txt = ver_maj + "." + ver_min + "." + ver_build + "." + environment_name
     print(version_txt)
     fout = open(version_file, "w")
     fout.write(version_txt)

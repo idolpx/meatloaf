@@ -153,6 +153,9 @@ void main_setup()
     }
     ESP_ERROR_CHECK(e);
 
+    // Install GPIO ISR service before any GPIO operations
+    gpio_install_isr_service(0);
+
     fnSystem.check_hardware_ver();
     printf("Detected Hardware Version: %s\r\n", fnSystem.get_hardware_ver_str());
 
