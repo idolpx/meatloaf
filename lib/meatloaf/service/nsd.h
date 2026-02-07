@@ -95,6 +95,7 @@ public:
 private:
     bool mdns_initialized;
     std::vector<DiscoveredService> discovered_services;
+    std::vector<std::string> discovered_service_types;
     mutable std::mutex services_mutex;
     
     // Helper to parse mDNS results

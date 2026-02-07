@@ -232,6 +232,7 @@ public:
 
         // Remove failed sessions
         for (const auto& key : to_remove) {
+            Debug_printv("Removing session: %s", key.c_str());
             dispose(key);
         }
 

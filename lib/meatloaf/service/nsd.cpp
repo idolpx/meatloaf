@@ -152,41 +152,30 @@ bool NSDMSession::discoverServices(const std::string& service_type, const std::s
         }
 
         // Extract service types from results
-        std::vector<std::pair<std::string, std::string>> service_types;
+        std::lock_guard<std::mutex> lock(services_mutex);
+        discovered_service_types.clear();
         for (mdns_result_t* r = type_results; r != nullptr; r = r->next) {
+            // Debug_printv("Meta-query result: instance_name='%s', hostname='%s', port=%d, addr=%p", 
+            //             r->instance_name ? r->instance_name : "NULL",
+            //             r->hostname ? r->hostname : "NULL", 
+            //             r->port,
+            //             r->addr);
             if (r->instance_name) {
                 // instance_name contains the full service type (e.g., "_http._tcp")
                 std::string full_type = r->instance_name;
-                Debug_printv("Found service type: %s", full_type.c_str());
+                //Debug_printv("Found service type: %s", full_type.c_str());
                 
-                // Parse to extract service name and protocol
-                size_t dot_pos = full_type.rfind('.');
-                if (dot_pos != std::string::npos) {
-                    std::string svc_proto = full_type.substr(dot_pos + 1);  // e.g., "_tcp"
-                    std::string svc_name = full_type.substr(0, dot_pos);    // e.g., "_http"
-                    service_types.push_back({svc_name, svc_proto});
-                }
+                discovered_service_types.push_back(full_type);
             }
         }
         mdns_query_results_free(type_results);
 
-        Debug_printv("Stage 2: Querying %d service types for instances", service_types.size());
+        // Sort and remove duplicates
+        std::sort(discovered_service_types.begin(), discovered_service_types.end());
+        //discovered_service_types.erase(std::unique(discovered_service_types.begin(), discovered_service_types.end()), discovered_service_types.end());
 
-        // Query each service type for actual instances
-        for (const auto& [svc_name, svc_proto] : service_types) {
-            Debug_printv("Querying service: %s.%s", svc_name.c_str(), svc_proto.c_str());
-            
-            mdns_result_t *svc_results = nullptr;
-            err = mdns_query_ptr(svc_name.c_str(), svc_proto.c_str(), timeout_ms / 3, 20, &svc_results);
-            
-            if (err == ESP_OK && svc_results) {
-                parseResults(svc_results);
-                mdns_query_results_free(svc_results);
-            }
-        }
-
-        Debug_printv("Total discovered %d service instances", discovered_services.size());
-        return discovered_services.size() > 0;
+        Debug_printv("Found %d service types", discovered_service_types.size());
+        return !discovered_service_types.empty();
     }
     
     // Query for specific service type
@@ -203,6 +192,14 @@ bool NSDMSession::discoverServices(const std::string& service_type, const std::s
     if (results) {
         parseResults(results);
         mdns_query_results_free(results);
+
+        // Sort discovered services by display name
+        std::lock_guard<std::mutex> lock(services_mutex);
+        std::sort(discovered_services.begin(), discovered_services.end(),
+                  [](const DiscoveredService& a, const DiscoveredService& b) {
+                      return a.getDisplayName() < b.getDisplayName();
+                  });
+
         Debug_printv("Discovered %d services", discovered_services.size());
         return true;
     }
@@ -287,10 +284,21 @@ DiscoveredService* NSDMSession::findServiceByInstance(const std::string& instanc
 std::vector<std::string> NSDMSession::getServiceTypes() const {
     std::lock_guard<std::mutex> lock(services_mutex);
     
+    if (!discovered_service_types.empty()) {
+        return discovered_service_types;
+    }
+    
     std::vector<std::string> types;
     for (const auto& service : discovered_services) {
-        std::string type = service.service_type + "." + service.proto;
-        if (std::find(types.begin(), types.end(), type) == types.end()) {
+        std::string type;
+        if (service.service_type == "_services._dns-sd") {
+            // This is from a meta-query, instance_name contains the service type
+            type = service.instance_name;
+        } else {
+            // Normal service discovery
+            type = service.service_type + "." + service.proto;
+        }
+        if (!type.empty() && std::find(types.begin(), types.end(), type) == types.end()) {
             types.push_back(type);
         }
     }
@@ -314,6 +322,7 @@ std::vector<DiscoveredService> NSDMSession::getServicesOfType(const std::string&
 void NSDMSession::clearCache() {
     std::lock_guard<std::mutex> lock(services_mutex);
     discovered_services.clear();
+    discovered_service_types.clear();
     cached_services.clear();
     cached_service_types.clear();
     cache_timestamp_ms = 0;
@@ -325,7 +334,7 @@ void NSDMSession::clearCache() {
  ********************************************************/
 
 NSDMFile::NSDMFile(std::string path) : MFile(path), dirOpened(false), dir_index(0) {
-    Debug_printv("NSDMFile created: %s", path.c_str());
+    //Debug_printv("NSDMFile created: %s", path.c_str());
     
     // Get or create session - use dummy host since NSD is local
     _session = SessionBroker::obtain<NSDMSession>("nsd", 0);
@@ -334,7 +343,7 @@ NSDMFile::NSDMFile(std::string path) : MFile(path), dirOpened(false), dir_index(
 }
 
 NSDMFile::~NSDMFile() {
-    Debug_printv("NSDMFile destroyed");
+    //Debug_printv("NSDMFile destroyed");
 }
 
 void NSDMFile::parseUrl() {
@@ -378,8 +387,8 @@ void NSDMFile::parseUrl() {
         service_type.pop_back();
     }
     
-    Debug_printv("Parsed URL - service_type: '%s', instance_name: '%s'", 
-                 service_type.c_str(), instance_name.c_str());
+    // Debug_printv("Parsed URL - service_type: '%s', instance_name: '%s'", 
+    //              service_type.c_str(), instance_name.c_str());
 }
 
 void NSDMFile::refreshServiceList() {
@@ -400,9 +409,9 @@ void NSDMFile::refreshServiceList() {
     Debug_printv("Refreshing service list (cache age: %u ms)", cache_age);
     
     // At root level (nsd:/), discover all services and get service types
-    if (service_type.empty()) {
+    if (service_type.empty() || mstr::startsWith(service_type, "_services")) {
         Debug_printv("Root directory - discovering all services to get types");
-        _session->discoverServices("", "_udp", 6000);
+        _session->discoverServices("", "_udp", 3000);
         _session->cached_service_types = _session->getServiceTypes();
         _session->cached_services.clear();
         Debug_printv("Found %d unique service types", _session->cached_service_types.size());
@@ -411,7 +420,7 @@ void NSDMFile::refreshServiceList() {
         std::string proto = "_tcp";  // Default to TCP
         std::string type = service_type;
         
-        size_t proto_pos = service_type.find('.');
+        size_t proto_pos = service_type.rfind('.');
         if (proto_pos != std::string::npos) {
             type = service_type.substr(0, proto_pos);
             proto = service_type.substr(proto_pos + 1);
@@ -470,10 +479,10 @@ MFile* NSDMFile::getNextFileInDir() {
         }
         
         const auto& type = _session->cached_service_types[dir_index++];
-        std::string file_path = "nsd://" + type;
+        std::string file_path = "nsd:///" + type;
         
         NSDMFile* file = new NSDMFile(file_path);
-        Debug_printv("Returning service type directory: %s", file_path.c_str());
+        //Debug_printv("Returning service type directory: %s", file_path.c_str());
         return file;
     }
     
@@ -489,7 +498,7 @@ MFile* NSDMFile::getNextFileInDir() {
     std::string file_path = "nsd://" + service_type + "/" + service.getDisplayName();
     
     NSDMFile* file = new NSDMFile(file_path);
-    Debug_printv("Returning service instance: %s", file_path.c_str());
+    //Debug_printv("Returning service instance: %s", file_path.c_str());
     return file;
 }
 
@@ -568,7 +577,7 @@ void NSDMStream::generateContent() {
     std::string proto = "_udp";
     std::string type = service_type;
     
-    size_t proto_pos = service_type.find('.');
+    size_t proto_pos = service_type.rfind('.');
     if (proto_pos != std::string::npos) {
         type = service_type.substr(0, proto_pos);
         proto = service_type.substr(proto_pos + 1);
