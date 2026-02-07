@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
-#include "nsd.h"
+#include "service/mdns.h"
 
 #include "network/afp.h"
 #include "network/http.h"
@@ -25,57 +25,64 @@
 #include <esp_log.h>
 #include <arpa/inet.h>
 #include <sstream>
+#include <string>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
 /********************************************************
- * NSDMFileSystem Implementation
+ * MDNSMFileSystem Implementation
  ********************************************************/
 
-MFile* NSDMFileSystem::getFile(std::string path) {
+MFile* MDNSMFileSystem::getFile(std::string path) {
     // If an instance name is specified, use it
     auto parser = PeoplesUrlParser::parseURL(path);
     //parser->dump();
     if (!parser->path.empty()) {
         std::string instance_name = parser->name;
 
-        //Debug_printv("NSD instance name: %s", instance_name.c_str());
+        //Debug_printv("MDNS instance name: %s", instance_name.c_str());
 
-        // Get or create session - use dummy host since NSD is local
-        auto _session = SessionBroker::obtain<NSDMSession>("nsd", 0);
-        
-        // Find service
-        DiscoveredService* service = _session->findServiceByInstance(instance_name);
-        if (service) {
-            //Debug_printv("NSD service found: %s, instance: %s, service type: %s", service->getDisplayName().c_str(), instance_name.c_str(), service->service_type.c_str());
+        // If we have an instance name, try to find the specific service
+        if (!instance_name.empty()) {
+            // Get or create session - use dummy host since MDNS is local
+            auto _session = SessionBroker::obtain<MDNSMSession>("mdns", 0);
+            
+            // Find service
+            DiscoveredService* service = _session->findServiceByInstance(instance_name);
+            if (service) {
+                //Debug_printv("MDNS service found: %s, instance: %s, service type: %s", service->getDisplayName().c_str(), instance_name.c_str(), service->service_type.c_str());
 
-            // Generate URL for service by service type
-            if ( service->service_type == "_smb" ) {
-                path = "smb://" + service->addresses[0] + "/";
-                SessionBroker::dispose("nsd", 0);
-                return new SMBMFile(path);
+                // Generate URL for service by service type
+                if ( service->service_type == "_smb" ) {
+                    if (!service->addresses.empty()) {
+                        path = "smb://" + service->addresses[0] + "/";
+                        SessionBroker::dispose("mdns", 0);
+                        return new SMBMFile(path);
+                    }
+                }
             }
+            SessionBroker::dispose("mdns", 0);
         }
     }
 
-    return new NSDMFile(path);
+    return new MDNSMFile(path);
 }
 
 /********************************************************
- * NSDMSession Implementation
+ * MDNSMSession Implementation
  ********************************************************/
 
-NSDMSession::NSDMSession(std::string host, uint16_t port) 
+MDNSMSession::MDNSMSession(std::string host, uint16_t port) 
     : MSession(host, port), cache_timestamp_ms(0), mdns_initialized(false) {
-    Debug_printv("NSDMSession created");
+    Debug_printv("MDNSMSession created");
 }
 
-NSDMSession::~NSDMSession() {
+MDNSMSession::~MDNSMSession() {
     disconnect();
-    Debug_printv("NSDMSession destroyed");
+    Debug_printv("MDNSMSession destroyed");
 }
 
-bool NSDMSession::connect() {
+bool MDNSMSession::connect() {
     if (connected) {
         return true;
     }
@@ -95,7 +102,7 @@ bool NSDMSession::connect() {
     return true;
 }
 
-void NSDMSession::disconnect() {
+void MDNSMSession::disconnect() {
     if (!connected) {
         return;
     }
@@ -108,10 +115,10 @@ void NSDMSession::disconnect() {
     }
 
     connected = false;
-    Debug_printv("NSD session disconnected");
+    Debug_printv("MDNS session disconnected");
 }
 
-bool NSDMSession::keep_alive() {
+bool MDNSMSession::keep_alive() {
     if (!connected) {
         return connect();
     }
@@ -120,7 +127,7 @@ bool NSDMSession::keep_alive() {
     return true;
 }
 
-bool NSDMSession::discoverServices(const std::string& service_type, const std::string& proto, uint32_t timeout_ms) {
+bool MDNSMSession::discoverServices(const std::string& service_type, const std::string& proto, uint32_t timeout_ms) {
     if (!connect()) {
         return false;
     }
@@ -208,7 +215,7 @@ bool NSDMSession::discoverServices(const std::string& service_type, const std::s
     return false;
 }
 
-void NSDMSession::parseResults(mdns_result_t* results) {
+void MDNSMSession::parseResults(mdns_result_t* results) {
     std::lock_guard<std::mutex> lock(services_mutex);
     
     // Don't clear - we may be accumulating results from multiple queries
@@ -263,12 +270,12 @@ void NSDMSession::parseResults(mdns_result_t* results) {
     }
 }
 
-std::vector<DiscoveredService> NSDMSession::getDiscoveredServices() const {
+std::vector<DiscoveredService> MDNSMSession::getDiscoveredServices() const {
     std::lock_guard<std::mutex> lock(services_mutex);
     return discovered_services;
 }
 
-DiscoveredService* NSDMSession::findServiceByInstance(const std::string& instance_name) {
+DiscoveredService* MDNSMSession::findServiceByInstance(const std::string& instance_name) {
     std::lock_guard<std::mutex> lock(services_mutex);
     
     for (auto& service : discovered_services) {
@@ -281,7 +288,7 @@ DiscoveredService* NSDMSession::findServiceByInstance(const std::string& instanc
     return nullptr;
 }
 
-std::vector<std::string> NSDMSession::getServiceTypes() const {
+std::vector<std::string> MDNSMSession::getServiceTypes() const {
     std::lock_guard<std::mutex> lock(services_mutex);
     
     if (!discovered_service_types.empty()) {
@@ -306,7 +313,7 @@ std::vector<std::string> NSDMSession::getServiceTypes() const {
     return types;
 }
 
-std::vector<DiscoveredService> NSDMSession::getServicesOfType(const std::string& service_type) const {
+std::vector<DiscoveredService> MDNSMSession::getServicesOfType(const std::string& service_type) const {
     std::lock_guard<std::mutex> lock(services_mutex);
     
     std::vector<DiscoveredService> filtered;
@@ -319,7 +326,7 @@ std::vector<DiscoveredService> NSDMSession::getServicesOfType(const std::string&
     return filtered;
 }
 
-void NSDMSession::clearCache() {
+void MDNSMSession::clearCache() {
     std::lock_guard<std::mutex> lock(services_mutex);
     discovered_services.clear();
     discovered_service_types.clear();
@@ -330,35 +337,35 @@ void NSDMSession::clearCache() {
 
 
 /********************************************************
- * NSDMFile Implementation
+ * MDNSMFile Implementation
  ********************************************************/
 
-NSDMFile::NSDMFile(std::string path) : MFile(path), dirOpened(false), dir_index(0) {
-    //Debug_printv("NSDMFile created: %s", path.c_str());
+MDNSMFile::MDNSMFile(std::string path) : MFile(path), dirOpened(false), dir_index(0) {
+    //Debug_printv("MDNSMFile created: %s", path.c_str());
     
-    // Get or create session - use dummy host since NSD is local
-    _session = SessionBroker::obtain<NSDMSession>("nsd", 0);
+    // Get or create session - use dummy host since MDNS is local
+    _session = SessionBroker::obtain<MDNSMSession>("mdns", 0);
     
     parseUrl();
 }
 
-NSDMFile::~NSDMFile() {
-    //Debug_printv("NSDMFile destroyed");
+MDNSMFile::~MDNSMFile() {
+    //Debug_printv("MDNSMFile destroyed");
 }
 
-void NSDMFile::parseUrl() {
-    // URL format: nsd://[service_type]/[instance_name]
+void MDNSMFile::parseUrl() {
+    // URL format: mdns://[service_type]/[instance_name]
     // Examples:
-    //   nsd://              - list all services
-    //   nsd://_http._tcp/   - list all HTTP services
-    //   nsd://_http._tcp/MyServer - get info about MyServer HTTP service
+    //   mdns://              - list all services
+    //   mdns://_http._tcp/   - list all HTTP services
+    //   mdns://_http._tcp/MyServer - get info about MyServer HTTP service
     
     std::string path_str = url;
     
-    // Remove nsd:// prefix
-    if (mstr::startsWith(path_str, "nsd://")) {
+    // Remove mdns:// prefix
+    if (mstr::startsWith(path_str, "mdns://")) {
         path_str = path_str.substr(6);
-    } else if (mstr::startsWith(path_str, "nsd:/")) {
+    } else if (mstr::startsWith(path_str, "mdns:/")) {
         path_str = path_str.substr(5);
     }
     
@@ -387,13 +394,27 @@ void NSDMFile::parseUrl() {
         service_type.pop_back();
     }
     
+    // Add leading "_" if missing from service_type
+    if (!service_type.empty() && service_type[0] != '_') {
+        service_type = "_" + service_type;
+    }
+    
+    // Reconstruct URL with proper format
+    url = "mdns://";
+    if (!service_type.empty()) {
+        url += service_type;
+        if (!instance_name.empty()) {
+            url += "/" + instance_name;
+        }
+    }
+    
     // Debug_printv("Parsed URL - service_type: '%s', instance_name: '%s'", 
     //              service_type.c_str(), instance_name.c_str());
 }
 
-void NSDMFile::refreshServiceList() {
+void MDNSMFile::refreshServiceList() {
     if (!_session || !_session->connect()) {
-        Debug_printv("Failed to connect NSD session");
+        Debug_printv("Failed to connect MDNS session");
         return;
     }
     
@@ -401,14 +422,15 @@ void NSDMFile::refreshServiceList() {
     uint32_t now_ms = xTaskGetTickCount() * portTICK_PERIOD_MS;
     uint32_t cache_age = (_session->cache_timestamp_ms > 0) ? (now_ms - _session->cache_timestamp_ms) : 0;
     
-    if (_session->cached_services.size() && _session->cache_timestamp_ms > 0 && cache_age < 5000) {
+    if ((_session->cached_services.size() || _session->cached_service_types.size()) && 
+        _session->cache_timestamp_ms > 0 && cache_age < 5000) {
         Debug_printv("Using cached service list (age: %u ms)", cache_age);
         return;
     }
     
     Debug_printv("Refreshing service list (cache age: %u ms)", cache_age);
     
-    // At root level (nsd:/), discover all services and get service types
+    // At root level (mdns:/), discover all services and get service types
     if (service_type.empty() || mstr::startsWith(service_type, "_services")) {
         Debug_printv("Root directory - discovering all services to get types");
         _session->discoverServices("", "_udp", 3000);
@@ -439,13 +461,13 @@ void NSDMFile::refreshServiceList() {
     _session->cache_timestamp_ms = xTaskGetTickCount() * portTICK_PERIOD_MS;
 }
 
-bool NSDMFile::isDirectory() {
+bool MDNSMFile::isDirectory() {
     // It's a directory if no instance is specified
     //return instance_name.empty();
     return true;
 }
 
-bool NSDMFile::exists() {
+bool MDNSMFile::exists() {
     if (!_session || !_session->connect()) {
         return false;
     }
@@ -459,14 +481,26 @@ bool NSDMFile::exists() {
     return _session->findServiceByInstance(instance_name) != nullptr;
 }
 
-bool NSDMFile::rewindDirectory() {
+bool MDNSMFile::rewindDirectory() {
     dir_index = 0;
     dirOpened = true;
     refreshServiceList();
+
+    // Set Media Info Fields
+    media_header = "NETWORK EXPLORER";
+    media_id = "{{id}} ";
+    if (path.size() == 1) {
+        media_id += std::to_string(_session->discovered_service_types.size()); // Number of service types as "ID"
+    } else {
+        media_id += std::to_string(_session->discovered_service_types.size()); // Number of service types as "ID"
+    }
+
+    Debug_printv("media_header[%s] media_id[%s]", media_header.c_str(), media_id.c_str());
+
     return true;
 }
 
-MFile* NSDMFile::getNextFileInDir() {
+MFile* MDNSMFile::getNextFileInDir() {
     if (!dirOpened) {
         rewindDirectory();
     }
@@ -479,9 +513,9 @@ MFile* NSDMFile::getNextFileInDir() {
         }
         
         const auto& type = _session->cached_service_types[dir_index++];
-        std::string file_path = "nsd:///" + type;
+        std::string file_path = "mdns:///" + type; // This requires the extra /
         
-        NSDMFile* file = new NSDMFile(file_path);
+        MDNSMFile* file = new MDNSMFile(file_path);
         //Debug_printv("Returning service type directory: %s", file_path.c_str());
         return file;
     }
@@ -495,20 +529,20 @@ MFile* NSDMFile::getNextFileInDir() {
     const auto& service = _session->cached_services[dir_index++];
     
     // Create file entry for this service instance
-    std::string file_path = "nsd://" + service_type + "/" + service.getDisplayName();
+    std::string file_path = "mdns://" + service_type + "/" + service.getDisplayName();
     
-    NSDMFile* file = new NSDMFile(file_path);
+    MDNSMFile* file = new MDNSMFile(file_path);
     //Debug_printv("Returning service instance: %s", file_path.c_str());
     return file;
 }
 
-uint32_t NSDMFile::size() {
+uint32_t MDNSMFile::size() {
     if (instance_name.empty()) {
         return 0; // Directory has no size
     }
     
     // Size is the length of the service information text
-    auto stream = std::static_pointer_cast<NSDMStream>(createStream(std::ios_base::in));
+    auto stream = std::static_pointer_cast<MDNSMStream>(createStream(std::ios_base::in));
     if (stream) {
         return stream->size();
     }
@@ -516,34 +550,34 @@ uint32_t NSDMFile::size() {
     return 0;
 }
 
-std::shared_ptr<MStream> NSDMFile::getSourceStream(std::ios_base::openmode mode) {
+std::shared_ptr<MStream> MDNSMFile::getSourceStream(std::ios_base::openmode mode) {
     return createStream(mode);
 }
 
-std::shared_ptr<MStream> NSDMFile::createStream(std::ios_base::openmode mode) {
-    return std::make_shared<NSDMStream>(url);
+std::shared_ptr<MStream> MDNSMFile::createStream(std::ios_base::openmode mode) {
+    return std::make_shared<MDNSMStream>(url);
 }
 
 
 /********************************************************
- * NSDMStream Implementation
+ * MDNSMStream Implementation
  ********************************************************/
 
-NSDMStream::NSDMStream(std::string path) 
+MDNSMStream::MDNSMStream(std::string path) 
     : MStream(path), _is_open(false), _position(0) {
-    Debug_printv("NSDMStream created: %s", path.c_str());
+    Debug_printv("MDNSMStream created: %s", path.c_str());
     
-    // Get or create session - use dummy host since NSD is local
-    _session = SessionBroker::obtain<NSDMSession>("nsd", 0);
+    // Get or create session - use dummy host since MDNS is local
+    _session = SessionBroker::obtain<MDNSMSession>("mdns", 0);
     
     parseUrl();
 }
 
-void NSDMStream::parseUrl() {
-    // Same parsing as NSDMFile
+void MDNSMStream::parseUrl() {
+    // Same parsing as MDNSMFile
     std::string path_str = url;
     
-    if (mstr::startsWith(path_str, "nsd://")) {
+    if (mstr::startsWith(path_str, "mdns://")) {
         path_str = path_str.substr(6);
     }
     
@@ -565,11 +599,11 @@ void NSDMStream::parseUrl() {
     }
 }
 
-void NSDMStream::generateContent() {
+void MDNSMStream::generateContent() {
     content.clear();
     
     if (!_session || !_session->connect()) {
-        content = "Error: Failed to connect to NSD service\n";
+        content = "Error: Failed to connect to MDNS service\n";
         return;
     }
     
@@ -665,16 +699,16 @@ void NSDMStream::generateContent() {
     }
 }
 
-bool NSDMStream::isOpen() {
+bool MDNSMStream::isOpen() {
     return _is_open;
 }
 
-bool NSDMStream::open(std::ios_base::openmode mode) {
+bool MDNSMStream::open(std::ios_base::openmode mode) {
     if (_is_open) {
         return true;
     }
     
-    Debug_printv("Opening NSD stream: %s", url.c_str());
+    Debug_printv("Opening MDNS stream: %s", url.c_str());
     
     // Generate content
     generateContent();
@@ -685,16 +719,16 @@ bool NSDMStream::open(std::ios_base::openmode mode) {
     return true;
 }
 
-void NSDMStream::close() {
+void MDNSMStream::close() {
     if (_is_open) {
         content.clear();
         _position = 0;
         _is_open = false;
-        Debug_printv("NSD stream closed");
+        Debug_printv("MDNS stream closed");
     }
 }
 
-uint32_t NSDMStream::read(uint8_t* buf, uint32_t size) {
+uint32_t MDNSMStream::read(uint8_t* buf, uint32_t size) {
     if (!_is_open) {
         if (!open(std::ios_base::in)) {
             return 0;
@@ -712,12 +746,12 @@ uint32_t NSDMStream::read(uint8_t* buf, uint32_t size) {
     return bytes_to_read;
 }
 
-uint32_t NSDMStream::write(const uint8_t *buf, uint32_t size) {
-    // NSD is read-only
+uint32_t MDNSMStream::write(const uint8_t *buf, uint32_t size) {
+    // MDNS is read-only
     return 0;
 }
 
-bool NSDMStream::seek(uint32_t pos) {
+bool MDNSMStream::seek(uint32_t pos) {
     if (pos <= content.size()) {
         _position = pos;
         return true;

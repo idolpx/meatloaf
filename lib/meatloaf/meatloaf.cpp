@@ -103,7 +103,7 @@
 // Service
 #include "service/ml.h"
 #include "service/mqtt.h"
-#include "service/nsd.h"
+#include "service/mdns.h"
 
 
 #ifndef MIN_CONFIG
@@ -148,7 +148,7 @@ LNXMFileSystem lnxFS;
 // Service
 CSIPMFileSystem csipFS;
 MQTTMFileSystem mqttFS;
-NSDMFileSystem nsdFS;
+MDNSMFileSystem mdnsFS;
 
 // Network
 FTPMFileSystem ftpFS;
@@ -248,7 +248,7 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
 
 #ifndef MIN_CONFIG
     // Service
-    &nsdFS, &mqttFS,
+    &mdnsFS, &mqttFS,
 #endif
 
 };
@@ -666,6 +666,26 @@ MFile* MFile::cd(std::string newDir)
     }
     else if(newDir[0]=='_') // {CBM LEFT ARROW}
     {
+        // Special case: if we're at filesystem root (path.empty()) and target starts with '_',
+        // treat it as navigation within current filesystem, not "go up"
+        if (path.size() == 1) {
+            // At filesystem root, navigate to subdirectory
+            std::string newPath = url;
+            // For MDNS and similar filesystems, don't add extra '/' at root
+            if (mstr::startsWith(url, "mdns://")) {
+                newPath += newDir; // Keep the '_'
+            } else {
+                if (!mstr::endsWith(newPath, "/")) {
+                    newPath += "/";
+                }
+                newPath += newDir; // Keep the '_'
+            }
+            if (!mstr::endsWith(newPath, "/")) {
+                newPath += "/";
+            }
+            return MFSOwner::File(newPath);
+        }
+        
         // user entered: CD:_ or CD_ 
         // means: go up one directory
 

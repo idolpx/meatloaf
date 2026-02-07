@@ -148,7 +148,9 @@ private:
 class MQTTMFileSystem: public MFileSystem
 {
 public:
-    MQTTMFileSystem(): MFileSystem("mqtt") {};
+    MQTTMFileSystem(): MFileSystem("mqtt") {
+        isRootFS = true;
+    };
 
     bool handles(std::string name) {
         std::string pattern = "mqtt:";

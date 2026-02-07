@@ -402,13 +402,13 @@ uint8_t iecChannelHandlerDir::readBufferData()
     if( m_headerLine==1 )
     {
         // main header line
-        m_data[0] = 0x01;
-        m_data[1] = 0x08;
-        m_data[2] = 1;
-        m_data[3] = 1;
-        m_data[4] = 0;
-        m_data[5] = 0;
-        m_data[6] = 18;
+        m_data[0] = 0x01;   // Load Address low byte
+        m_data[1] = 0x08;   // Load Address high byte
+        m_data[2] = 1;      // BASIC line pointer low byte
+        m_data[3] = 1;      // BASIC line pointer high byte
+        m_data[4] = 0;      // Partition number low byte
+        m_data[5] = 0;      // Partition number high byte
+        m_data[6] = 18;     // REVERSE ON
         m_data[7] = '"';
         Debug_printv("header[%s] id[%s]", m_dir->media_header.c_str(), m_dir->media_id.c_str());
         std::string name = m_dir->media_header.size() ? m_dir->media_header : PRODUCT_ID;
@@ -418,9 +418,21 @@ uint8_t iecChannelHandlerDir::readBufferData()
         m_data[24] = '"';
         m_data[25] = ' ';
         if ( m_dir->media_id.size() )
+        {
+            mstr::replaceAll(m_dir->media_id, "{{id}}", mstr::format("%02i", m_drive->id()));
+            // Make sure media_id is at most 5 chars to fit in the browser line
+            if (m_dir->media_id.size() > 5) {
+                m_dir->media_id = m_dir->media_id.substr(0, 5);
+            } else if ( m_dir->media_id.size() < 5 ) {
+                // pad with spaces if media_id is less than 5 chars to keep the browser line aligned
+                m_dir->media_id += std::string(5 - m_dir->media_id.size(), ' ');
+            }
             memcpy(m_data+26, m_dir->media_id.c_str(), 5); // Use ID and DOS version from media file
+        }
         else
+        {
             sprintf((char *) m_data+26, "%02i 2A", m_drive->id()); // Use drive # as ID in browser mode
+        }
         m_data[31] = 0;
         m_len = 32;
         m_headerLine++;
@@ -428,10 +440,10 @@ uint8_t iecChannelHandlerDir::readBufferData()
     else if( m_headerLine-2 < m_headers.size() )
     {
         // Send Extra INFO
-        m_data[0] = 1;
-        m_data[1] = 1;
-        m_data[2] = 0;
-        m_data[3] = 0;
+        m_data[0] = 1;  // BASIC line pointer low byte
+        m_data[1] = 1;  // BASIC line pointer high byte
+        m_data[2] = 0;  // Block count low byte
+        m_data[3] = 0;  // Block count high byte
 
         std::string name = m_headers[m_headerLine-2];
         std::string ext  = name.substr(0, 3);
@@ -466,10 +478,10 @@ uint8_t iecChannelHandlerDir::readBufferData()
 
             // directory entry
             uint16_t blocks = entry->blocks();
-            m_data[m_len++] = 1;
-            m_data[m_len++] = 1;
-            m_data[m_len++] = blocks&255;
-            m_data[m_len++] = blocks/256;
+            m_data[m_len++] = 1;  // BASIC line pointer low byte
+            m_data[m_len++] = 1;  // BASIC line pointer low byte
+            m_data[m_len++] = blocks&255;  // Block count low byte
+            m_data[m_len++] = blocks/256;  // Block count high byte
             if( blocks<10 )    m_data[m_len++] = ' ';
             if( blocks<100 )   m_data[m_len++] = ' ';
             if( blocks<1000 )  m_data[m_len++] = ' ';
@@ -481,7 +493,7 @@ uint8_t iecChannelHandlerDir::readBufferData()
             {
                 ext = "dir";
             }
-            else if( ext.length()>0 )
+            else if( ext.length()>0 )  // Enhanced directory entries with real file extension
             {
                 if( ext.size()>3 )
                     ext = ext.substr(0, 3);

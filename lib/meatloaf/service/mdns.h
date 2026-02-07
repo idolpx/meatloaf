@@ -1,4 +1,4 @@
-// NSD:// - Network Service Discovery
+// MDNS:// - mDNS (Multicast DNS) Network Service Discovery
 // DNS-SD, SSDP, Bonjour, DIAL, Zeroconf
 //
 // https://en.wikipedia.org/wiki/Zero-configuration_networking
@@ -12,14 +12,14 @@
 // https://github.com/tronikos/androidtvremote2/tree/main
 // 
 
-#ifndef MEATLOAF_SERVICE_NSD
-#define MEATLOAF_SERVICE_NSD
+#ifndef MEATLOAF_SERVICE_MDNS
+#define MEATLOAF_SERVICE_MDNS
 
 #include "meatloaf.h"
 #include "meat_session.h"
 
 extern "C" {
-#include "mdns.h"
+#include <mdns.h> // ESP-IDF mDNS API
 }
 
 // Forward declarations to avoid circular dependencies
@@ -66,13 +66,13 @@ struct DiscoveredService {
 };
 
 /********************************************************
- * MSession - NSD Session Management
+ * MSession - MDNS Session Management
  ********************************************************/
 
-class NSDMSession : public MSession {
+class MDNSMSession : public MSession {
 public:
-    NSDMSession(std::string host = "nsd", uint16_t port = 0);
-    ~NSDMSession() override;
+    MDNSMSession(std::string host = "mdns", uint16_t port = 0);
+    ~MDNSMSession() override;
 
     bool connect() override;
     void disconnect() override;
@@ -88,7 +88,7 @@ public:
     // Clear cached results
     void clearCache();
     
-    uint32_t cache_timestamp_ms;  // Public for NSDMFile access
+    uint32_t cache_timestamp_ms;  // Public for MDNSMFile access
     std::vector<DiscoveredService> cached_services;
     std::vector<std::string> cached_service_types;  // For root directory listing
 
@@ -101,20 +101,20 @@ private:
     // Helper to parse mDNS results
     void parseResults(mdns_result_t* results);
     
-    friend class NSDMFile;
-    friend class NSDMStream;
+    friend class MDNSMFile;
+    friend class MDNSMStream;
 };
 
 
 /********************************************************
- * MFile - NSD File (represents discovered services)
+ * MFile - MDNS File (represents discovered services)
  ********************************************************/
 
-class NSDMFile: public MFile
+class MDNSMFile: public MFile
 {
 public:
-    NSDMFile(std::string path);
-    ~NSDMFile() override;
+    MDNSMFile(std::string path);
+    ~MDNSMFile() override;
 
     std::shared_ptr<MStream> getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override;
     std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> src) override { return src; };
@@ -133,7 +133,7 @@ public:
     uint32_t size();
 
 protected:
-    std::shared_ptr<NSDMSession> _session;
+    std::shared_ptr<MDNSMSession> _session;
     std::string service_type;     // Target service type (empty = all)
     std::string instance_name;    // Specific instance (empty = list all)
     
@@ -144,19 +144,19 @@ protected:
     void parseUrl();
     void refreshServiceList();
     
-    friend class NSDMStream;
+    friend class MDNSMStream;
 };
 
 
 /********************************************************
- * MStream - NSD Stream (service information)
+ * MStream - MDNS Stream (service information)
  ********************************************************/
 
-class NSDMStream: public MStream
+class MDNSMStream: public MStream
 {
 public:
-    NSDMStream(std::string path);
-    ~NSDMStream() override {
+    MDNSMStream(std::string path);
+    ~MDNSMStream() override {
         close();
     }
 
@@ -177,7 +177,7 @@ public:
     uint32_t position() override { return _position; };
 
 private:
-    std::shared_ptr<NSDMSession> _session;
+    std::shared_ptr<MDNSMSession> _session;
     std::string service_type;
     std::string instance_name;
     
@@ -188,21 +188,23 @@ private:
     void parseUrl();
     void generateContent();   // Generate text representation of service(s)
     
-    friend class NSDMFile;
+    friend class MDNSMFile;
 };
 
 
 /********************************************************
- * MFileSystem - NSD Filesystem
+ * MFileSystem - MDNS Filesystem
  ********************************************************/
 
-class NSDMFileSystem: public MFileSystem
+class MDNSMFileSystem: public MFileSystem
 {
 public:
-    NSDMFileSystem(): MFileSystem("nsd") {};
+    MDNSMFileSystem(): MFileSystem("mdns") {
+        isRootFS = true;
+    };
 
     bool handles(std::string name) {
-        std::string pattern = "nsd:";
+        std::string pattern = "mdns:";
         return mstr::startsWith(name, pattern.c_str(), false);
     }
 
@@ -210,4 +212,4 @@ public:
 };
 
 
-#endif // MEATLOAF_SERVICE_NSD
+#endif // MEATLOAF_SERVICE_MDNS
