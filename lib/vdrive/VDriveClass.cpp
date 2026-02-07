@@ -182,6 +182,30 @@ bool VDrive::isOk()
 }
 
 
+int VDrive::getFileNumBlocks(const char *name, bool convertNameToPETSCII)
+{
+  vdrive_dir_context_t dir;
+
+  if( convertNameToPETSCII )
+    {
+      char *pname = lib_strdup(name);
+      charset_petconvstring((uint8_t *)pname, CONVERT_TO_PETSCII);
+      vdrive_dir_find_first_slot(m_drive, (const uint8_t *) pname, (unsigned int) strlen(pname), CBMDOS_FT_DEL, &dir);
+      lib_free(pname);
+    }
+  else
+    vdrive_dir_find_first_slot(m_drive, (const uint8_t *) name, (unsigned int) strlen(name), CBMDOS_FT_DEL, &dir);
+
+  // find first non-DEL file that matches the pattern (same as LOAD would do)
+  uint8_t *slot;
+  do 
+    { slot = vdrive_dir_find_next_slot_limited(&dir, 144); }
+  while( slot && ((slot[SLOT_TYPE_OFFSET] & 0x07) == CBMDOS_FT_DEL) );
+
+  return slot ? slot[SLOT_NR_BLOCKS] | (slot[SLOT_NR_BLOCKS + 1] << 8) : -1;
+}
+
+
 bool VDrive::openFile(uint8_t channel, const char *name, int nameLen, bool convertNameToPETSCII)
 {
   bool res = false;

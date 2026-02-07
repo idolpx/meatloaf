@@ -79,6 +79,7 @@ int vdrive_dir_first_directory(struct vdrive_s *vdrive, struct cbmdos_cmd_parse_
 int vdrive_dir_next_directory(struct vdrive_s *vdrive, struct bufferinfo_s *b);
 void vdrive_dir_find_first_slot(struct vdrive_s *vdrive, const uint8_t *name, int length, unsigned int type, vdrive_dir_context_t *dir);
 uint8_t *vdrive_dir_find_next_slot(vdrive_dir_context_t *dir);
+uint8_t *vdrive_dir_find_next_slot_limited(vdrive_dir_context_t *dir, int search_max_slots);
 void vdrive_dir_no_a0_pads(uint8_t *ptr, int l);
 int vdrive_dir_filetype(const uint8_t *name, int length);
 void vdrive_dir_remove_slot(vdrive_dir_context_t *dir);
