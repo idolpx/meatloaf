@@ -26,6 +26,7 @@
 #include "lwip/netdb.h"
 
 #include "meatloaf.h"
+#include "meat_session.h"
 
 #include "../../include/debug.h"
 
@@ -115,6 +116,63 @@ public:
     bool isOpen() {
         return sock != -1;
     }
+};
+
+/********************************************************
+ * MSession - TCP Session Management
+ ********************************************************/
+
+class TCPMSession : public MSession {
+public:
+    TCPMSession(std::string host, uint16_t port = 0) : MSession(host, port) {
+        Debug_printv("TCPMSession created for %s:%d", host.c_str(), port);
+    }
+    ~TCPMSession() override {
+        Debug_printv("TCPMSession destroyed for %s:%d", host.c_str(), port);
+        disconnect();
+    }
+
+    bool connect() override {
+        if (connected) return true;
+        if (port == 0) {
+            Debug_printv("TCPMSession connect failed: port is 0 for host %s", host.c_str());
+            connected = false;
+            return false;
+        }
+
+        if (!_socket.open(host.c_str(), port)) {
+            Debug_printv("TCPMSession connect failed for %s:%d", host.c_str(), port);
+            connected = false;
+            return false;
+        }
+
+        connected = true;
+        updateActivity();
+        return true;
+    }
+
+    void disconnect() override {
+        if (!connected) return;
+        if (_socket.isOpen()) {
+            _socket.close();
+        }
+        connected = false;
+    }
+
+    bool keep_alive() override {
+        if (!connected) return false;
+        if (!_socket.isOpen()) {
+            connected = false;
+            return false;
+        }
+        updateActivity();
+        return true;
+    }
+
+    MeatSocket* socket() { return &_socket; }
+
+private:
+    MeatSocket _socket;
 };
 
 //
@@ -263,29 +321,59 @@ public:
     }
 
     void close() override {
-        socket.close();
+        if (_session) {
+            _session->disconnect();
+            _session.reset();
+        }
     }
 
     bool open(std::ios_base::openmode mode) override {
-        auto p = PeoplesUrlParser::parseURL( url );
-        return socket.open(p->host.c_str(), p->getPort());
+        if (isOpen()) {
+            return true;
+        }
+
+        auto p = PeoplesUrlParser::parseURL(url);
+        if (!p) {
+            Debug_printv("TCPMStream: failed to parse URL [%s]", url.c_str());
+            return false;
+        }
+
+        uint16_t tcp_port = p->getPort();
+        _session = SessionBroker::obtain<TCPMSession>(p->host, tcp_port);
+        if (!_session) {
+            Debug_printv("TCPMStream: failed to obtain session for %s:%d", p->host.c_str(), tcp_port);
+            return false;
+        }
+
+        if (!_session->connect()) {
+            Debug_printv("TCPMStream: failed to connect to %s:%d", p->host.c_str(), tcp_port);
+            _session.reset();
+            return false;
+        }
+
+        return true;
     }
 
     // MStream methods
     uint32_t read(uint8_t* buf, uint32_t size) override {
-        return socket.read(buf, size);
+        if (!isOpen() && !open(std::ios_base::in)) {
+            return 0;
+        }
+        return _session->socket()->read(buf, size);
     }
     uint32_t write(const uint8_t *buf, uint32_t size) override {
-        return socket.write(buf, size);
+        if (!isOpen() && !open(std::ios_base::out)) {
+            return 0;
+        }
+        return _session->socket()->write(buf, size);
     }
 
     bool isOpen() {
-        return socket.isOpen();
+        return _session && _session->isConnected() && _session->socket()->isOpen();
     }
 
 protected:
-    MeatSocket socket;
-    std::string url;
+    std::shared_ptr<TCPMSession> _session;
 };
 
 
@@ -310,23 +398,16 @@ public:
 
     // We are overriding getSourceStream, because obviously - TCP scheme won't be wrapped in anything
     std::shared_ptr<MStream> getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override {
-        // has to return OPENED streamm
-        std::shared_ptr<MStream> istream = std::make_shared<TCPMStream>(url);
-        //auto istream = StreamBroker::obtain<TCPMStream>(url, mode);
-        //istream->open(std::ios_base::openmode mode);
-        return istream;
+        return createStream(mode);
     } 
 
-    // DUMMY return value - we've overriden getSourceStream, so this one won't be even called!
-    std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> is)
-    {
-        return nullptr; 
+    std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> src) override {
+        return src;
     }
 
     std::shared_ptr<MStream> createStream(std::ios_base::openmode mode) override
     {
-        std::shared_ptr<MStream> istream = std::make_shared<TCPMStream>(url);
-        return istream;
+        return std::make_shared<TCPMStream>(url);
     }
 };
 

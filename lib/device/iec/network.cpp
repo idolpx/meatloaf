@@ -18,15 +18,6 @@
 
 #include "status_error_codes.h"
 #include "NetworkProtocolFactory.h"
-// #include "TCP.h"
-// #include "UDP.h"
-// #include "Test.h"
-// #include "Telnet.h"
-// #include "TNFS.h"
-// #include "FTP.h"
-// #include "HTTP.h"
-// #include "SSH.h"
-// #include "SMB.h"
 
 
 iecNetwork::iecNetwork(uint8_t devnr) : SystemFileDevice(devnr)
@@ -381,15 +372,15 @@ void iecNetwork::parse_bite()
 
         // Add CR if there isn't one already
         if ( len == bite_size)
-             bites += "\r";
+            bites += "\r";
 
         count++;
     } while ( end < channel_data.receiveBuffer.size() );
- 
+
     //bites += "\"";
     //Debug_printv("[%s]", bites.c_str());
     //clean_transform_ascii_to_petscii(bites);
-    //channel_data.receiveBuffer = mstr::toPETSCII2(bites);
+    channel_data.receiveBuffer = mstr::toPETSCII2(bites);
 }
 
 void iecNetwork::set_translation_mode()
@@ -793,7 +784,7 @@ void iecNetwork::set_status(bool is_binary)
     iecStatus.channel = active_status_channel;
 
 #ifdef ENABLE_DISPLAY
-  LEDS.status( iecStatus.error );
+    LEDS.status( iecStatus.error );
 #endif
 }
 

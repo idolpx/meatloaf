@@ -413,7 +413,7 @@ bool ArchiveMStream::seekEntry(std::string filename)
             //mstr::rtrimA0(entryFilename);
             //entryFilename = mstr::toUTF8(entryFilename);
 
-            Debug_printv("filename[%s] entry.filename[%s]", filename.c_str(), entryFilename.c_str());
+            //Debug_printv("filename[%s] entry.filename[%s]", filename.c_str(), entryFilename.c_str());
 
             if ( mstr::compareFilename(entryFilename, filename, wildcard) )
             {
@@ -488,7 +488,7 @@ bool ArchiveMStream::seekEntry( uint16_t index )
 
     entry_index = index + 1;
 
-    Debug_printv("entry_index[%d] filename[%s] size[%lu]", entry_index, entry.filename.c_str(), entry.size);
+    //Debug_printv("entry_index[%d] filename[%s] size[%lu]", entry_index, entry.filename.c_str(), entry.size);
     return true;
 }
 
