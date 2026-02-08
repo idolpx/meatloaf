@@ -668,7 +668,7 @@ MFile* MFile::cd(std::string newDir)
     {
         // Special case: if we're at filesystem root (path.empty()) and target starts with '_',
         // treat it as navigation within current filesystem, not "go up"
-        if (path.size() == 1) {
+        if (path.size() == 1 && newDir.size() > 1) {
             // At filesystem root, navigate to subdirectory
             std::string newPath = url;
             // For MDNS and similar filesystems, don't add extra '/' at root

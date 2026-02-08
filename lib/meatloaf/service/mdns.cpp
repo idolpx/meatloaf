@@ -65,8 +65,7 @@ MFile* MDNSMFileSystem::getFile(std::string path) {
                     }
                 } 
 #ifdef WITH_SFTP
-                else if (service->service_type == "_sftp" || service->service_type == "_sftp-ssh" || service->service_type == "_sftp-ssh._tcp" || service->service_type == "_ssh" ||
-                         service->service_type == "_sftp._tcp" || service->service_type == "_ssh._tcp") {
+                else if (service->service_type == "_sftp-ssh") {
                     if (!service->addresses.empty()) {
                         path = "sftp://" + service->addresses[0] + "/";
                         file = new SFTPMFile(path);
@@ -206,6 +205,14 @@ bool MDNSMSession::discoverServices(const std::string& service_type, const std::
         // Sort and remove duplicates
         std::sort(discovered_service_types.begin(), discovered_service_types.end());
         //discovered_service_types.erase(std::unique(discovered_service_types.begin(), discovered_service_types.end()), discovered_service_types.end());
+
+        // Filter to only include types that match a string
+        std::string filter = "_adisk_http-alt_nfs_sftp-ssh_smb_webdav";
+        discovered_service_types.erase(std::remove_if(discovered_service_types.begin(), discovered_service_types.end(),
+            [&filter](const std::string& type) {
+                std::string base_type = type.substr(0, type.find("._"));
+                return filter.find(base_type) == std::string::npos;
+            }), discovered_service_types.end());
 
         Debug_printv("Found %d service types", discovered_service_types.size());
         return !discovered_service_types.empty();
