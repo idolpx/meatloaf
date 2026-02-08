@@ -37,7 +37,15 @@ uint32_t archdep_get_available_heap()
 
 int archdep_default_logger(const char *level_string, const char *txt)
 {
-  if( Serial ) { Serial.println(txt); Serial.flush(); }
+  if( Serial ) {
+    Serial.println(txt);
+#ifndef __SAM3X8E__
+    // On Arduino DUE "Serial" evaluates to "true" even if Serial is not
+    // initialized and then hangs during Serial.flush()
+    Serial.flush();
+#endif
+  }
+
   return 0;
 }
 

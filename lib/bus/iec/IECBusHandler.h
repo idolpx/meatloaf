@@ -125,7 +125,7 @@ class IECBusHandler
   bool waitPinCLK(bool state, uint16_t timeout = 1000);
   void waitPinATN(bool state);
   void atnRequest();
-  bool receiveIECByteATN(uint8_t &data);
+  bool receiveIECByteATN(uint8_t &data, uint8_t bytenum);
   bool receiveIECByte(bool canWriteOk);
   bool transmitIECByte(uint8_t numData);
   void handleFastLoadProtocols();

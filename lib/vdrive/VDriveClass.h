@@ -43,6 +43,9 @@ class VDrive
   // return the number of currently active channels
   int getNumOpenChannels() { return m_numOpenChannels; }
 
+  // return the number of blocks for the given file, or -1 if not found
+  int getFileNumBlocks(const char *name, bool convertNameToPETSCII = false);
+
   // prints a directory listing of the disk image to the log
   void printDir();
 

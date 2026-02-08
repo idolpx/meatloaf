@@ -25,6 +25,9 @@
 #include "../../../include/esp-idf-arduino.h"
 #endif
 
+// DEBUG==0 => debug logging disabled
+// DEBUG==1 => debug logging enabled, default on, can be disabled by calling IECFileDevice::setLogging()
+// DEBUG==2 => debug logging enabled, default off, can be enabled by calling IECFileDevice::setLogging()
 #define DEBUG 0
 
 #if DEBUG>0
@@ -38,6 +41,7 @@ static void print_hex(uint8_t data)
 
 
 static uint8_t dbgbuf[16], dbgnum = 0;
+bool dbglogdata = (DEBUG==1);
 
 static void dbg_print_data()
 {
@@ -64,8 +68,11 @@ static void dbg_print_data()
 
 static void dbg_data(uint8_t data)
 {
-  dbgbuf[dbgnum++] = data;
-  if( dbgnum==16 ) dbg_print_data();
+  if( dbglogdata )
+    {
+      dbgbuf[dbgnum++] = data;
+      if( dbgnum==16 ) dbg_print_data();
+    }
 }
 
 static void logStatus(uint8_t devnr, const char *data, uint8_t dataLen)
@@ -81,9 +88,9 @@ static void logStatus(uint8_t devnr, const char *data, uint8_t dataLen)
       for(uint8_t i=0; i<dataLen; i++)
         {
           if( isprint(data[i]) )
-            Serial.write(data[i]);
+            Serial.print(data[i]);
           else
-            { Serial.write('['); print_hex(data[i]); Serial.write(']'); }
+            { Serial.print("["); print_hex(data[i]); Serial.print("]"); }
         }
     }
   Serial.println();
@@ -109,12 +116,20 @@ IECFileDevice::IECFileDevice(uint8_t devnr) :
 }
 
 
+void IECFileDevice::setLogging(bool enable)
+{
+#if DEBUG>0
+  dbglogdata = enable;
+#endif
+}
+
+
 void IECFileDevice::begin()
 {
 #if DEBUG>0
-  /*if( !Serial )*/ //Serial.begin(115200);
-  //for(int i=0; !Serial && i<5; i++) delay(1000);
-  Serial.print(F("START:IECFileDevice, devnr=")); Serial.println(m_devnr);
+  /*if( !Serial )*/ Serial.begin(115200);
+  for(int i=0; !Serial && i<5; i++) delay(1000);
+  Serial.print(F("START:IECFileDevice, devnr=")); Serial.println(m_devnr); Serial.flush();
 #endif
   
   bool ok;
@@ -212,7 +227,7 @@ void IECFileDevice::executeData(const uint8_t *data, uint8_t len)
     {
       // in most cases executeData() will be called because it was not overloaded, so data==m_writeBuffer
       // but we have to account for the case where this could be called with some different data
-      m_writeBufferLen = min(len, IECFILEDEVICE_WRITE_BUFFER_SIZE-1);
+      m_writeBufferLen = min(len, (uint8_t) (IECFILEDEVICE_WRITE_BUFFER_SIZE-1));
       memmove(m_writeBuffer, data, m_writeBufferLen);
     }
 
@@ -519,6 +534,7 @@ bool IECFileDevice::epyxReadSector(uint8_t track, uint8_t sector, uint8_t *buffe
   Serial.print("Read track "); Serial.print(track); Serial.print(" sector "); Serial.println(sector);
   for(int i=0; i<256; i++) dbg_data(buffer[i]);
   dbg_print_data();
+  Serial.flush();
   return true;
 #else
   return false;
@@ -530,7 +546,7 @@ bool IECFileDevice::epyxWriteSector(uint8_t track, uint8_t sector, uint8_t *buff
 {
 #if DEBUG>0
   dbg_print_data();
-  Serial.print("Write track "); Serial.print(track); Serial.print(" sector "); Serial.println(sector);
+  Serial.print("Write track "); Serial.print(track); Serial.print(" sector "); Serial.println(sector); Serial.flush();
   for(int i=0; i<256; i++) dbg_data(buffer[i]);
   dbg_print_data();
   return true;
@@ -675,7 +691,7 @@ void IECFileDevice::fileTask()
             for(uint8_t i=0; i<m_writeBufferLen; i++) dbg_data(m_writeBuffer[i]);
             dbg_print_data();
             Serial.print(F("EXECUTE: "));
-            for(uint8_t i=0; i<m_writeBufferLen; i++) { print_hex(m_writeBuffer[i]); Serial.write(' '); }
+            for(uint8_t i=0; i<m_writeBufferLen; i++) { print_hex(m_writeBuffer[i]); Serial.print(' '); }
             Serial.println();
           }
 #endif
@@ -705,7 +721,9 @@ bool IECFileDevice::isFastLoaderRequest(const char *cmd)
   static const struct MWSignature epyxV2V3sig[3] PROGMEM =
     { {0x0180, 0x19, 0x53}, {0x0199, 0x19, 0xA6}, {0x01B2, 0x19, 0x8F} };
 
-  if( checkMWcmds(epyxV1sig, 2, 10) || checkMWcmds(epyxV2V3sig, 3, 20) )
+  if( !isFastLoaderEnabled(IEC_FP_EPYX) )
+    { /* Epyx FastLoad is disabled */ }
+  else if( checkMWcmds(epyxV1sig, 2, 10) || checkMWcmds(epyxV2V3sig, 3, 20) )
     return true;
   else if( m_uploadCtr==12 && strncmp_P(cmd, PSTR("M-E\xa2\x01"), 5)==0 )
     m_uploadCtr = 99;
@@ -745,7 +763,9 @@ bool IECFileDevice::isFastLoaderRequest(const char *cmd)
   // The 1541 fastloader transfers the whole directory track (18) to the C64 and then
   // the C64 finds the file to load, i.e. it never actually transmits the name of the
   // file to load to the drive, which obviously can't work for us here.
-  if( strncmp_P(cmd, PSTR("M-R\xfe\xff\x01"), 6)==0 )
+  if( !isFastLoaderEnabled(IEC_FP_AR6) )
+    { /* Action Replay 6 is disabled */ }
+  else if( strncmp_P(cmd, PSTR("M-R\xfe\xff\x01"), 6)==0 )
     {
       // returning 0x03 when reading $FFFE identifies this as a 1581 drive
       char data = 0x03;
@@ -818,7 +838,9 @@ bool IECFileDevice::isFastLoaderRequest(const char *cmd)
       {0x600,0x20,0x27}, {0x620,0x20,0x09}, {0x640,0x20,0xfc}, {0x660,0x20,0x8e},
       {0x680,0x20,0xaf}, {0x6a0,0x20,0xe0}, {0x6c0,0x20,0xc9}, {0x6e0,0x20,0xa4} };
 
-  if( checkMWcmds(fc3LoadSig, 16, 120) )
+  if( !isFastLoaderEnabled(IEC_FP_FC3) )
+    { /* Final Cartridge 3 is disabled */ }
+  else if( checkMWcmds(fc3LoadSig, 16, 120) )
     return true;
   else if( checkMWcmds(fc3LoadImageSig, 16, 140) )
     return true;
@@ -870,7 +892,9 @@ bool IECFileDevice::isFastLoaderRequest(const char *cmd)
       {0x468,0x1e,0xd2}, {0x486,0x1e,0x1b}, {0x4a4,0x1e,0x5f}, {0x4c2,0x1e,0x96},
       {0x4e0,0x1e,0x53}, {0x4fe,0x1e,0x16} };
 
-  if( checkMWcmds(speedDosLoadSig, 18, 100) )
+  if( !isFastLoaderEnabled(IEC_FP_SPEEDDOS) )
+    { /* SpeedDos is disabled */ }
+  else if( checkMWcmds(speedDosLoadSig, 18, 100) )
     return true;
   else if( m_uploadCtr==118 && strncmp_P(cmd, PSTR("M-E\x03\x03"), 5)==0 )
     {
@@ -888,7 +912,9 @@ bool IECFileDevice::isFastLoaderRequest(const char *cmd)
   // --------------------------- Dolphin DOS ----------------------------
 
 #ifdef IEC_FP_DOLPHIN
-  if( m_writeBufferLen==2 && strncmp_P(cmd, PSTR("XQ"), 2)==0 )
+  if( !isFastLoaderEnabled(IEC_FP_DOLPHIN) )
+    { /* DolphinDos is disabled */ }
+  else if( m_writeBufferLen==2 && strncmp_P(cmd, PSTR("XQ"), 2)==0 )
     {
       fastLoadRequest(IEC_FP_DOLPHIN, IEC_FL_PROT_LOAD);
       m_channel = 0;

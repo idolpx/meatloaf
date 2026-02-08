@@ -259,7 +259,14 @@ static unsigned int date_to_int(int year, int month, int day, int hour, int minu
     return a;
 }
 
+
 uint8_t *vdrive_dir_find_next_slot(vdrive_dir_context_t *dir)
+{
+  return vdrive_dir_find_next_slot_limited(dir, -1);
+}
+
+
+uint8_t *vdrive_dir_find_next_slot_limited(vdrive_dir_context_t *dir, int search_max_slots)
 {
     static uint8_t return_slot[32];
     vdrive_t *vdrive = dir->vdrive;
@@ -312,8 +319,14 @@ uint8_t *vdrive_dir_find_next_slot(vdrive_dir_context_t *dir)
             /* time_low is initially 0, and time_high is initially largest,
                 so it should always match for most uses. */
             if (t >= dir->time_low && t <= dir->time_high)
+              {
                 return return_slot;
+              }
         }
+
+        if( search_max_slots>0 && --search_max_slots==0 )
+          return NULL;
+
     } while (1);
 
 #ifdef DEBUG_DRIVE
@@ -700,10 +713,18 @@ int vdrive_dir_next_directory(vdrive_t *vdrive, bufferinfo_t *b)
 {
     uint8_t *l, *p;
     int blocks, i;
+    int have_wildcard = cbmdos_parse_wildcard_check((const char *) b->dir.find_nslot, b->dir.find_length);
 
     b->small = 0;
 
     while ((p = vdrive_dir_find_next_slot(&b->dir))) {
+        /* if there were no wildcards then stop looking for more files
+           after the first match (important if the directory has an endless loop) */
+        if( !have_wildcard ) {
+            b->dir.slot = 8;
+            b->dir.buffer[0] = 0;
+          }
+
         if (p[SLOT_TYPE_OFFSET]) {
             l = b->buffer + b->bufptr;
 

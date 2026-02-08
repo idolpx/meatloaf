@@ -93,6 +93,7 @@ int archdep_access(const char *pathname, int mode)
   else
     res = -1;
 
+  DBG(("archdep_access: %s mode=%i => %i", pathname, mode, res));
   return res;
 }
 
@@ -112,6 +113,7 @@ int archdep_stat(const char *filename, size_t *len, unsigned int *isdir)
   else
     res = -1;
 
+  DBG(("archdep_stat: %s %i isDir=%i", filename, res, *isdir));
   return res;
 }
 
@@ -226,8 +228,14 @@ ADFILE *archdep_fopen(const char* filename, const char* mode)
       // gets deleted in archdep_fclose() once we're done and that will then 
       // destroy the MStream
       res = new std::shared_ptr<MStream>(f->getSourceStream(omode));
-      DBG(("archdep_fopen: stream=%p, mode=%lu", res, (unsigned long) omode));
 
+      if( res->get()==NULL )
+        {
+          delete res;
+          res = NULL;
+        }
+
+      DBG(("archdep_fopen: stream=%p, mode=%lu", res, (unsigned long) omode));
       delete f;
     }
 

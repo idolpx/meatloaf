@@ -291,6 +291,7 @@ int vdrive_command_execute(vdrive_t *vdrive, const uint8_t *buf,
 
                     case 'I': /* UI */
                     case '9': /* U9 */
+                    case ';': /* U; */
                         if (cmd.commandlength == 3 && (cmd.command[2] == '-' || cmd.command[2] == '+')) {
                             status = CBMDOS_IPE_OK; /* Set IEC bus speed */
                             goto out;
@@ -3554,6 +3555,8 @@ int vdrive_command_memory_write(vdrive_t *vdrive, const uint8_t *buf, uint16_t a
         return vdrive_command_set_error(vdrive, CBMDOS_IPE_SYNTAX, 0, 0);
     }
 
+    log_warning(vdrive_command_log, "M-W %04x %u (might need TDE)", addr, len);
+
     /* only to RAM */
     if (addr >= 0x8000) {
         goto out;
@@ -3798,6 +3801,7 @@ int vdrive_command_memory_read(vdrive_t *vdrive, const uint8_t *buf, uint16_t ad
                 switch( a )
                   {
                   case 0xFEA0: p->buffer[i] = 0x0D; break;
+                  case 0xFFFD: p->buffer[i] = 0xEA; break;
                   case 0xFFFE: p->buffer[i] = 0x67; break;
                   case 0xFFFF: p->buffer[i] = 0xFE; break;
                   default    : p->buffer[i] = 0xFF; break;

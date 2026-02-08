@@ -104,6 +104,10 @@ class IECFileDevice : public IECDevice
   // of first sending the contents of the buffer
   void clearReadBuffer(uint8_t channel);
 
+  // if #define DEBUG is non-zero in IECFileDevice.cpp then this controls whether
+  // transmitted or received data is begin logged (logging reduces performance)
+  void setLogging(bool enable);
+
 #if defined(IEC_FP_EPYX) && defined(IEC_FP_EPYX_SECTOROPS)
   virtual bool epyxReadSector(uint8_t track, uint8_t sector, uint8_t *buffer);
   virtual bool epyxWriteSector(uint8_t track, uint8_t sector, uint8_t *buffer);

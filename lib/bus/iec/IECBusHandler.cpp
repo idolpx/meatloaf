@@ -586,9 +586,9 @@ IECBusHandler::IECBusHandler(uint8_t pinATN, uint8_t pinCLK, uint8_t pinDATA, ui
 #else // !IEC_SUPPORT_PARALLEL_XRA1405
 #if defined(ESP_PLATFORM)
   // ESP32
-: m_pinParallel{13,14,15,16,17,25,26,27},
-  m_pinParallelHandshakeTransmit(4),
-  m_pinParallelHandshakeReceive(36)
+: m_pinParallelHandshakeTransmit(4),
+  m_pinParallelHandshakeReceive(36),
+  m_pinParallel{13,14,15,16,17,25,26,27}
 #elif defined(ARDUINO_ARCH_RP2040)
   // Raspberry Pi Pico
 : m_pinParallelHandshakeTransmit(6),
@@ -3243,7 +3243,7 @@ int8_t RAMFUNC(IECBusHandler::receiveAR6Block)()
 // ------------------------------------  IEC protocol support routines  ------------------------------------  
 
 
-bool RAMFUNC(IECBusHandler::receiveIECByteATN)(uint8_t &data)
+bool RAMFUNC(IECBusHandler::receiveIECByteATN)(uint8_t &data, uint8_t bytenum)
 {
 #if defined(IEC_FP_SPEEDDOS)
   // SpeedDos protocol detection
@@ -3252,7 +3252,7 @@ bool RAMFUNC(IECBusHandler::receiveIECByteATN)(uint8_t &data)
   //      if received pull outgoing parallel handshake signal LOW to confirm
   //  LOW->HIGH edge on ATN or CLK, 
   //      if so then timeout, host does not support SpeedDos
-  if( &data==&m_secondary )
+  if( bytenum==2 )
     {
       JDEBUG1();
       IECDevice *dev = findDevice(m_primary & 0x1F);
@@ -3327,12 +3327,11 @@ bool RAMFUNC(IECBusHandler::receiveIECByteATN)(uint8_t &data)
   data = 0;
   for(uint8_t i=0; i<8; i++)
     {
-      // wait for CLK=1, signaling data is ready
       JDEBUG1();
 
 #ifdef IEC_FP_JIFFY
       // JiffyDos protocol detection
-      if( (i==7) && (&data==&m_primary) && !waitPinCLK(HIGH, 200) )
+      if( (i==7) && (bytenum==1) && !waitPinCLK(HIGH, 200) )
         {
           IECDevice *dev = findDevice((data>>1)&0x1F);
           JDEBUG0();
@@ -3351,6 +3350,7 @@ bool RAMFUNC(IECBusHandler::receiveIECByteATN)(uint8_t &data)
         }
 #endif
 
+      // wait for CLK=1, signaling data is ready
       if( !waitPinCLK(HIGH) ) return false;
       JDEBUG0();
 
@@ -3373,7 +3373,7 @@ bool RAMFUNC(IECBusHandler::receiveIECByteATN)(uint8_t &data)
   //  LOW->HIGH edge on ATN or CLK,
   //      if so then timeout, host does not support DolphinDos
 
-  if( &data==&m_secondary )
+  if( bytenum==2 )
     {
       IECDevice *dev = findDevice(m_primary & 0x1F);
       if( dev!=NULL && dev->isFastLoaderEnabled(IEC_FP_DOLPHIN) )
@@ -3499,7 +3499,7 @@ bool RAMFUNC(IECBusHandler::transmitIECByte)(uint8_t numData)
   // After opening a file to load, Action Replay 6 reads the first 2 bytes (load address)
   // but then signals "ready" (DATA high) again before pulling ATN low which makes us
   // read and discard the third byte if we don't use peek() here
-  uint8_t data = m_currentDevice->peek();
+  uint8_t data = m_currentDevice->isFastLoaderEnabled(IEC_FP_AR6) ? m_currentDevice->peek() : m_currentDevice->read();
 #else
   uint8_t data = m_currentDevice->read();
 #endif
@@ -3535,7 +3535,7 @@ bool RAMFUNC(IECBusHandler::transmitIECByte)(uint8_t numData)
 
 #ifdef IEC_FP_AR6
   // discard previously read data byte
-  m_currentDevice->read();
+  if( m_currentDevice->isFastLoaderEnabled(IEC_FP_AR6) ) m_currentDevice->read();
 #endif
   
   return true;
@@ -3603,28 +3603,50 @@ void RAMFUNC(IECBusHandler::handleATNSequence)()
   // P_DONE flag may have gotten set again after it was reset in atnRequest()
   m_flags &= ~P_DONE;
 
+  // bytenum counts the byte number within this ATN sequence,
+  // used in receiveIECByteATN for fastloader detection
+  uint8_t bytenum = 1;
+
   m_primary = 0;
-  if( receiveIECByteATN(m_primary) && ((m_primary == 0x3f) || (m_primary == 0x5f) || (findDevice((unsigned int) m_primary & 0x1f)!=NULL)) )
+  if( receiveIECByteATN(m_primary, bytenum) && ((m_primary == 0x3f) || (m_primary == 0x5f) || (findDevice((unsigned int) m_primary & 0x1f)!=NULL)) )
     {
       // this is either UNLISTEN or UNTALK or we were addressed
       // => receive the secondary address, assume 0 if not sent
-      if( (m_primary == 0x3f) || (m_primary == 0x5f) || !receiveIECByteATN(m_secondary) ) m_secondary = 0;
-
-      // wait until either ATN or CLK is released
-      // TODO: should this be more generic? Is the host allowed to
-      //       address multiple devices within the same ATN sequence?
-      if( waitPinCLK(HIGH, 0) )
+      uint8_t data;
+      while( m_primary!=0x3f && m_primary!=0x5f && !readPinATN() && receiveIECByteATN(data, ++bytenum) )
         {
-          // CLK released => host might issue an UNTALK/UNLISTEN right after TALK/LISTEN
-          // (e.g. in game "tracer sanction")
-          uint8_t p = 0;
-          if( receiveIECByteATN(p) && (p==0x3f || p==0x5f) ) m_primary = 0;
-
-          // wait until ATN is finally released
-          waitPinATN(HIGH);
+          // some games send multiple primary address bytes ("gwendolyn") or
+          // send UNLISTEN after LISTEN ("tracer sanction"), within the same ATN sequence
+          if( (data & 0xF0)==0xE0 )
+            {
+              // the 1541 ROM processes CLOSE requests immdediately while still
+              // handling the ATN sequence ($E8CE in 1541 ROM), all other requests are handled
+              // after the ATN sequence finishes. Used in game "tracer sanction".
+              IECDevice *dev = findDevice(m_primary & 0x1F);
+              if( dev!=NULL )
+                {
+                  dev->listen(data);
+                  m_flags &= ~P_TALKING;
+                  m_flags |= P_LISTENING;
+                  m_secondary = data;
+                }
+            }
+          else if( (data & 0x60)==0x60 )
+            {
+              // 1541 ROM stops processing after receiving secondary address (except CLOSE)
+              m_secondary = data;
+              break;
+            }
+          else if( data==0x3f || data==0x5f )
+            m_primary = data;
+          else if( ((data & 0x20)==0x20 || (data & 0x40)==0x40) && (data & 0x0f)==(m_primary & 0x0f) )
+            { m_primary = data; m_secondary = 0; }
+          else
+            break;
         }
 
-      // ATN was released
+      // make sure ATN has been released
+      waitPinATN(HIGH);
       m_flags &= ~P_ATN;
 
       // allow ATN to pull DATA low in hardware
@@ -3655,9 +3677,10 @@ void RAMFUNC(IECBusHandler::handleATNSequence)()
           IECDevice *dev = findDevice(m_primary & 0x1F);
           if( dev!=NULL )
             {
-              // we were told to listen
+              // we were told to listen - note that for CLOSE
+              // (secondary=0xEx) the listen() call was aready made above
               m_currentDevice = dev;
-              m_currentDevice->listen(m_secondary);
+              if( (m_secondary & 0xF0)!=0xE0 ) m_currentDevice->listen(m_secondary);
               m_flags &= ~P_TALKING;
               m_flags |= P_LISTENING;
 #ifdef IEC_FP_DOLPHIN

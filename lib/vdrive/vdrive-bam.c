@@ -120,6 +120,10 @@ static int vdrive_bam_read_bam_block(vdrive_t *vdrive, unsigned int block)
             if (vdrive->bam_tracks[block] >= 0 ) {
                 err = vdrive_read_sector(vdrive, vdrive->bam + (block << 8),
                          vdrive->bam_tracks[block], vdrive->bam_sectors[block]);
+
+                /* 1541 writes a copy of the BAM to buffer 4 ($700-$7ff) when reading it */
+                if( vdrive->image_format == VDRIVE_IMAGE_FORMAT_1541 )
+                  memcpy(vdrive->ram+0x700, vdrive->bam, 256);
             } else {
                 log_error(LOG_DEFAULT, "Trying to read beyond BAM limit (offset=0x%x).",
                     block << 8);

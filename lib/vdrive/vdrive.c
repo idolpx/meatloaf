@@ -1013,6 +1013,9 @@ int vdrive_write_sector(vdrive_t *vdrive, const uint8_t *buf, unsigned int track
         return CBMDOS_IPE_NOT_READY;
     }
 
+    if( VDRIVE_IS_1541(vdrive) && vdrive->bam!=NULL && vdrive->bam_size>2 && vdrive->bam[2]!=0x41 )
+      return CBMDOS_IPE_DOS_VERSION;
+
 #if 0
     ui_display_drive_track(vdrive->unit - 8, 0, dadr.track * 2);
 #endif
