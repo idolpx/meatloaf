@@ -86,9 +86,10 @@ bool TCRTMStream::seekEntry( std::string filename )
         while ( seekEntry( index ) )
         {
             std::string entryFilename = entry.filename;
-            entryFilename = entryFilename.substr(0, 16);
-            //uint8_t i = entryFilename.find_first_of(0x00); // padded with NUL (0x00)
-            //entryFilename = entryFilename.substr(0, (i > 16 ? 16 : i))
+            //entryFilename = entryFilename.substr(0, 16);
+
+            uint8_t i = entryFilename.find_first_of(static_cast<char>(0x00)); // padded with NUL (0x00)
+            entryFilename = entryFilename.substr(0, (i > 16 ? 16 : i));
             //mstr::rtrimA0(entryFilename);
             //entryFilename = mstr::toUTF8(entryFilename);
             
@@ -96,7 +97,7 @@ bool TCRTMStream::seekEntry( std::string filename )
             // UTF8 won't translate correctly so we translate to ASCII here
             util_petscii_to_ascii_str(entryFilename);
 
-            //Debug_printv("index[%d] filename[%s] entry.filename[%s] entry.file_type[%d]", index, filename.c_str(), entryFilename.c_str(), entry.file_type);
+            Debug_printv("index[%d] filename[%s] entry.filename[%s] entry.file_type[%d]", index, filename.c_str(), entryFilename.c_str(), entry.file_type);
 
             if ( mstr::compareFilename(entryFilename, filename, wildcard) )
             {
@@ -246,6 +247,8 @@ MFile* TCRTMFile::getNextFileInDir()
         //filename = filename.substr(0, 16);
         //uint8_t i = filename.find_first_of(0x00); // padded with NUL (0x00)
         //filename = filename.substr(0, (i > 16 ? 16 : i));
+        uint8_t i = filename.find_first_of(static_cast<char>(0x00)); // padded with NUL (0x00)
+        filename = filename.substr(0, (i > 16 ? 16 : i));
         // mstr::rtrimA0(filename);
         mstr::replaceAll(filename, "/", "\\");
         //Debug_printv( "entry[%s]", (sourceFile->url + "/" + filename).c_str() );
