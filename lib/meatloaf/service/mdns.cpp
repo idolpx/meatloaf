@@ -19,7 +19,10 @@
 
 #include "network/afp.h"
 #include "network/http.h"
+#include "network/nfs.h"
+#ifdef WITH_SFTP
 #include "network/sftp.h"
+#endif
 #include "network/smb.h"
 
 #include <esp_log.h>
@@ -53,18 +56,41 @@ MFile* MDNSMFileSystem::getFile(std::string path) {
                 //Debug_printv("MDNS service found: %s, instance: %s, service type: %s", service->getDisplayName().c_str(), instance_name.c_str(), service->service_type.c_str());
 
                 // Generate URL for service by service type
-                if ( service->service_type == "_smb" ) {
+                MFile* file = nullptr;
+                std::string path;
+                if (service->service_type == "_nfs") {
+                    if (!service->addresses.empty()) {
+                        path = "nfs://" + service->addresses[0] + "/";
+                        file = new NFSMFile(path);
+                    }
+                } 
+#ifdef WITH_SFTP
+                else if (service->service_type == "_sftp" || service->service_type == "_sftp-ssh" || service->service_type == "_sftp-ssh._tcp" || service->service_type == "_ssh" ||
+                         service->service_type == "_sftp._tcp" || service->service_type == "_ssh._tcp") {
+                    if (!service->addresses.empty()) {
+                        path = "sftp://" + service->addresses[0] + "/";
+                        file = new SFTPMFile(path);
+                    }
+                } 
+#endif
+                else if (service->service_type == "_smb") {
                     if (!service->addresses.empty()) {
                         path = "smb://" + service->addresses[0] + "/";
-                        SessionBroker::dispose("mdns", 0);
-                        return new SMBMFile(path);
+                        file = new SMBMFile(path);
                     }
+                } else {
+                    Debug_printv("Unsupported service type: %s", service->service_type.c_str());
+                }
+                SessionBroker::dispose("mdns", 0);
+                if (file) {
+                    Debug_printv("Created file for service: %s at %s", service->getDisplayName().c_str(), path.c_str());
+                    return file;
                 }
             }
-            SessionBroker::dispose("mdns", 0);
         }
     }
 
+    SessionBroker::dispose("mdns", 0);
     return new MDNSMFile(path);
 }
 
@@ -318,7 +344,17 @@ std::vector<DiscoveredService> MDNSMSession::getServicesOfType(const std::string
     
     std::vector<DiscoveredService> filtered;
     for (const auto& service : discovered_services) {
-        if (service.service_type == service_type) {
+        // Check both the base type and the full type with protocol
+        bool type_matches = (service.service_type == service_type || 
+                           service.service_type == service_type + "._tcp" ||
+                           service.service_type == service_type + "._udp");
+        
+        // Exclude services where the instance name matches the service type (avoid listing the type itself as an instance)
+        bool is_not_type_entry = (service.instance_name != service_type &&
+                                service.instance_name != service_type + "._tcp" &&
+                                service.instance_name != service_type + "._udp");
+        
+        if (type_matches && is_not_type_entry) {
             filtered.push_back(service);
         }
     }
@@ -454,7 +490,12 @@ void MDNSMFile::refreshServiceList() {
         // Then filter to get only this type
         _session->cached_services = _session->getServicesOfType(type);
         _session->cached_service_types.clear();
-        Debug_printv("Found %d instances of %s", _session->cached_services.size(), type.c_str());
+        
+        Debug_printv("Found %d instances of %s:", _session->cached_services.size(), type.c_str());
+        for (const auto& svc : _session->cached_services) {
+            Debug_printv("  Instance: '%s', Type: '%s', Host: '%s'", 
+                        svc.instance_name.c_str(), svc.service_type.c_str(), svc.hostname.c_str());
+        }
     }
     
     // Update cache timestamp
@@ -490,9 +531,11 @@ bool MDNSMFile::rewindDirectory() {
     media_header = "NETWORK EXPLORER";
     media_id = "{{id}} ";
     if (path.size() == 1) {
-        media_id += std::to_string(_session->discovered_service_types.size()); // Number of service types as "ID"
+        media_partition = _session->discovered_service_types.size();
+        media_id += mstr::format("%02i", media_partition); // Number of service types as "ID"
     } else {
-        media_id += std::to_string(_session->discovered_service_types.size()); // Number of service types as "ID"
+        media_partition = _session->discovered_services.size();
+        media_id += mstr::format("%02i", media_partition); // Number of services as "ID"
     }
 
     Debug_printv("media_header[%s] media_id[%s]", media_header.c_str(), media_id.c_str());

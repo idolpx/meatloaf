@@ -10,6 +10,7 @@
 // https://www.w3.org/TR/remote-playback/
 // https://developer.spotify.com/documentation/commercial-hardware/implementation/guides/zeroconf
 // https://github.com/tronikos/androidtvremote2/tree/main
+// https://en.wikipedia.org/wiki/Zero-configuration_networking
 // 
 
 #ifndef MEATLOAF_SERVICE_MDNS
@@ -21,12 +22,6 @@
 extern "C" {
 #include <mdns.h> // ESP-IDF mDNS API
 }
-
-// Forward declarations to avoid circular dependencies
-class SMBMFile;
-class HTTPMFile;
-class SFTPMFile;
-class AFPMFile;
 
 #include "../../../include/debug.h"
 #include "make_unique.h"

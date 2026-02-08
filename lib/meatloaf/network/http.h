@@ -27,7 +27,7 @@
 
 #include "meatloaf.h"
 #include "meat_session.h"
-#include "service/nsd.h"
+#include "service/mdns.h"
 
 #include <esp_http_client.h>
 #include <functional>
@@ -342,8 +342,8 @@ public:
         // If host is not specified, search for service records
         auto parser = PeoplesUrlParser::parseURL(path);
         if (parser->host.empty()) {
-            path = "nsd://" + service_type;
-            return new NSDMFile(path);
+            path = "mdns://" + service_type;
+            return new MDNSMFile(path);
         }
 
         return new HTTPMFile(path);

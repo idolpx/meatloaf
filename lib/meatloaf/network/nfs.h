@@ -27,7 +27,7 @@
 
 #include "meatloaf.h"
 #include "meat_session.h"
-#include "service/nsd.h"
+#include "service/mdns.h"
 
 #include <nfsc/libnfs.h>
 #include <nfsc/libnfs-raw.h>
@@ -360,6 +360,7 @@ class NFSMFileSystem: public MFileSystem
 public:
     NFSMFileSystem(): MFileSystem("nfs") {
         isRootFS = true;
+        service_type = "_nfs._tcp";
     };
 
     bool handles(std::string name) {
@@ -370,6 +371,12 @@ public:
     }
 
     MFile* getFile(std::string path) override {
+        // If host is not specified, search for service records
+        auto parser = PeoplesUrlParser::parseURL(path);
+        if (parser->host.empty()) {
+            path = "mdns://" + service_type;
+            return new MDNSMFile(path);
+        }
         return new NFSMFile(path);
     }
 };

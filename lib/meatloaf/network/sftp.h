@@ -24,7 +24,7 @@
 
 #include "meatloaf.h"
 #include "meat_session.h"
-#include "service/nsd.h"
+#include "service/mdns.h"
 
 extern "C" {
 #include <libssh/libssh.h>
@@ -179,8 +179,8 @@ public:
         // If host is not specified, search for service records
         auto parser = PeoplesUrlParser::parseURL(path);
         if (parser->host.empty()) {
-            path = "nsd://" + service_type;
-            return new NSDMFile(path);
+            path = "mdns://" + service_type;
+            return new MDNSMFile(path);
         }
 
         return new SFTPMFile(path);

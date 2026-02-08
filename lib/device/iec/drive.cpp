@@ -406,7 +406,7 @@ uint8_t iecChannelHandlerDir::readBufferData()
         m_data[1] = 0x08;   // Load Address high byte
         m_data[2] = 1;      // BASIC line pointer low byte
         m_data[3] = 1;      // BASIC line pointer high byte
-        m_data[4] = 0;      // Partition number low byte
+        m_data[4] = m_dir->media_partition;      // Partition number low byte
         m_data[5] = 0;      // Partition number high byte
         m_data[6] = 18;     // REVERSE ON
         m_data[7] = '"';
@@ -801,10 +801,22 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                         }
                         else
                         {
+                            MFile* normalized = MFSOwner::File(f->url);
+                            if (!mstr::startsWith(f->url, normalized->url.c_str()))
+                            {
+                                delete f;
+                                f = normalized;
+                            }
+                            else
+                            {
+                                delete normalized;
+                            }
+
                             m_channels[channel] = new iecChannelHandlerDir(this, f);
                             m_numOpenChannels++;
                             Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Change Directory Here! channel[%d] numChannels[%d] dir[%s]", channel, m_numOpenChannels, f->url.c_str());
                             m_cwd.reset(MFSOwner::File(f->url));
+                            Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "f.url[%s] m_cwd[%s]", f->url.c_str(), m_cwd->url.c_str());
                             Debug_printv("Reading directory [%s]", f->url.c_str());
                             setStatusCode(ST_OK);
                         }
