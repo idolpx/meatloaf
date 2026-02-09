@@ -51,6 +51,8 @@
  * MSession - HTTP Session Management
  ********************************************************/
 
+class MeatHttpClient; // Forward declaration
+
 class HTTPMSession : public MSession {
 public:
     HTTPMSession(std::string host, uint16_t port = 80); // Default HTTP port is 80
@@ -65,6 +67,8 @@ public:
 
     // Check if this session supports HTTPS
     bool isSecure() const { return this->port == 443; }
+
+    std::shared_ptr<MeatHttpClient> client;
 
 private:
     esp_http_client_config_t _config;
@@ -121,19 +125,13 @@ public:
         _http = esp_http_client_init(&config);
     }
 
-    void init(std::shared_ptr<HTTPMSession> session) {
-        if (!session) {
-            init(); // Fall back to default init
-            return;
-        }
-
+    void init(esp_http_client_config_t* config) {
         // Clean up existing client if present to prevent handle leak
         if (_http != nullptr) {
             esp_http_client_cleanup(_http);
             _http = nullptr;
         }
 
-        esp_http_client_config_t* config = session->getClientConfig();
         // Copy the config and set session-specific values
         esp_http_client_config_t session_config = *config;
         session_config.event_handler = _http_event_handler;
@@ -232,11 +230,7 @@ public:
     };
     HTTPMFile(std::string path, std::string filename): MFile(path) {};
     ~HTTPMFile() override {
-        // Explicitly close and reset client to free resources
-        if (client) {
-            client->close();
-            client.reset();
-        }
+        // Client is managed by the session, do not close here
         // Reset session reference
         if (_session) {
             _session.reset();

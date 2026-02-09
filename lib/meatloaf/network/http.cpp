@@ -61,6 +61,10 @@ HTTPMSession::HTTPMSession(std::string host, uint16_t port)
     } else {
         _config.transport_type = HTTP_TRANSPORT_OVER_TCP;
     }
+
+    // Initialize the client
+    client = std::make_shared<MeatHttpClient>();
+    client->init(&_config);
 }
 
 HTTPMSession::~HTTPMSession() {
@@ -102,10 +106,13 @@ bool HTTPMSession::keep_alive() {
         return false;
     }
 
-    // HTTP keep-alive is handled at the individual request level
-    // by the esp_http_client with keep_alive_enable = true
-    updateActivity();
-    return true;
+    // Perform a HEAD request to keep the connection alive
+    std::string root_url = (isSecure() ? "https://" : "http://") + host + ":" + std::to_string(port) + "/";
+    bool result = client->HEAD(root_url);
+    if (result) {
+        updateActivity();
+    }
+    return result;
 }
 
 esp_http_client_config_t* HTTPMSession::getClientConfig() {
@@ -118,8 +125,7 @@ esp_http_client_config_t* HTTPMSession::getClientConfig() {
 
 std::shared_ptr<MeatHttpClient> HTTPMFile::fromHeader() {
     if(client == nullptr) {
-        //Debug_printv("Client was not present, creating");
-        client = std::make_shared<MeatHttpClient>();
+        client = _session->client;
 
         // let's just get the headers so we have some info
         //Debug_printv("Client requesting head");
@@ -280,7 +286,7 @@ bool HTTPMStream::open(std::ios_base::openmode mode) {
     }
 
     // Initialize HTTP client with session config
-    _http.init(_session);
+    _http.init(_session->getClientConfig());
 
     bool r = false;
 
@@ -395,7 +401,12 @@ bool MeatHttpClient::processRedirectsAndOpen(uint32_t position, uint32_t size) {
     {
         isFriendlySkipper = true;
     }
-    else if(lastRC > 399 || _error != 0)
+    else if (lastRC == 520)
+    {
+        // Unknown Error from Cloudflare, often happens when trying to do range requests on servers that don't support them, so we can try to recover by doing a normal GET and skipping the bytes ourselves
+        Debug_printv("Received 520, trying to recover by doing a normal GET");
+    }
+    else if (lastRC > 399 || _error != 0)
     {
         Debug_printv("opening stream failed, httpCode=%d", lastRC);
         _error = lastRC;

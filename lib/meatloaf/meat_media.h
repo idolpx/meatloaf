@@ -237,6 +237,14 @@ public:
         return obtain<MMediaStream>(type, url);
     }
 
+    static bool exists(std::string url) {
+        if(image_repo.find(url)!=image_repo.end()) {
+            return true;
+        }
+        //Debug_printv("streams[%d]", image_repo.size());
+        return false;
+    }
+
     static void dispose(std::string url) {
         if(image_repo.find(url)!=image_repo.end()) {
             auto toDelete = image_repo.at(url);
@@ -277,7 +285,6 @@ public:
                 }
             }
 
-            //Debug_printv("found[%d]", found);
             if ( !found )
             {
                 Debug_printv("DISPOSING key[%s] stream[%s]", pair.first.c_str(), pair.second->url.c_str());
