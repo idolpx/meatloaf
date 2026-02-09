@@ -626,7 +626,7 @@ void iecDrive::begin()
     m_statusCode = ST_DOSVERSION;
     m_statusTrk  = 0;
     m_numOpenChannels = 0;
-    m_cwd.reset( MFSOwner::File("/", true) );
+    set_cwd("/");
 
     m_memory.setROM("dos1541"); // Default to 1541 ROM
 
@@ -815,7 +815,8 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                             m_channels[channel] = new iecChannelHandlerDir(this, f);
                             m_numOpenChannels++;
                             Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Change Directory Here! channel[%d] numChannels[%d] dir[%s]", channel, m_numOpenChannels, f->url.c_str());
-                            m_cwd.reset(MFSOwner::File(f->url));
+                            //m_cwd.reset(MFSOwner::File(f->url));
+                            set_cwd(f->url);
                             Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "f.url[%s] m_cwd[%s]", f->url.c_str(), m_cwd->url.c_str());
                             Debug_printv("Reading directory [%s]", f->url.c_str());
                             setStatusCode(ST_OK);
@@ -899,13 +900,15 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                         {
                             // This was a directory.  Set m_cwd to the directory
                             Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "dir url[%s]", f->url.c_str() );
-                            m_cwd.reset(MFSOwner::File(f->url));
+                            //m_cwd.reset(MFSOwner::File(f->url));
+                            set_cwd(f->url);
                         }
                         else
                         {
                             // This was a file.  Set m_cwd to the parent directory
                             Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "file base[%s]", f->base().c_str() );
-                            m_cwd.reset(MFSOwner::File(f->base()));
+                            //m_cwd.reset(MFSOwner::File(f->base()));
+                            set_cwd(f->base());
                         }
 
                         // {
@@ -929,7 +932,8 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                     if ( m_statusCode != ST_OK && m_statusCode != ST_DRIVE_NOT_READY )
                     {
                         Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Change Directory Here! url[%s] > base[%s]", f->url.c_str(), f->base().c_str() );
-                        m_cwd.reset(MFSOwner::File(f->base()));
+                        //m_cwd.reset(MFSOwner::File(f->base()));
+                        set_cwd(f->base());
                     }
                 }
 
@@ -949,9 +953,9 @@ void iecDrive::close(uint8_t channel)
 {
     //Debug_printv("iecDrive::close(#%d, %d)", m_devnr, channel);
 
-  // 1541 drive clears status when closing a channel
-  IECFileDevice::clearStatus();
-  setStatusCode(ST_OK);
+    // 1541 drive clears status when closing a channel
+    IECFileDevice::clearStatus();
+    setStatusCode(ST_OK);
 
 //#ifdef USE_VDRIVE
     if( Meatloaf.use_vdrive &&  m_vdrive!=nullptr )
@@ -1041,7 +1045,8 @@ uint8_t iecDrive::read(uint8_t channel, uint8_t *data, uint8_t maxDataLen, bool 
             if( m_statusCode==ST_FILE_NOT_FOUND)
             {
                 Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Subdir Change Directory Here! stream[%s] > base[%s]", m_cwd->url.c_str(), m_cwd->base().c_str());
-                m_cwd.reset( MFSOwner::File(m_cwd->base()) );
+                //m_cwd.reset( MFSOwner::File(m_cwd->base()) );
+                set_cwd(m_cwd->base());
             }
 
             return bytes_read;
@@ -1097,37 +1102,40 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
         }
         else
         {
-          // execute command within virtual drive
-          if( m_vdrive->execute((const char *) data, dataLen)==0 )
-            setStatusCode(ST_VDRIVE);
-          
-          // when executing commands that read data into a buffer or reposition
-          // the pointer we need to clear our read buffer of the channel for which
-          // this command is issued, otherwise remaining characters in the buffer 
-          // will be prefixed to the data from the new record or buffer location
-          if( data[0]=='P' && dataLen>=2 )
-            clearReadBuffer(data[1] & 0x0f);
-          else if( memcmp(data, "U1", 2)==0 || memcmp(data, "B-P", 3)==0 || memcmp(data, "B-R", 3)==0 )
+            // execute command within virtual drive
+            if( m_vdrive->execute((const char *) data, dataLen)==0 )
             {
-              int i = data[0]=='U' ? 2 : 3;
-              while( i<dataLen && !isdigit(data[i]) ) i++;
-              if( i<dataLen )
-                {
-                  uint8_t channel = data[i]-'0';
-                  if( i+1<dataLen && isdigit(data[i+1]) )
-                    channel = 10*channel + (data[i+1]-'0');
-
-                  clearReadBuffer(channel);
-                }
+                setStatusCode(ST_VDRIVE);
             }
-          
-          return;
+            
+            // when executing commands that read data into a buffer or reposition
+            // the pointer we need to clear our read buffer of the channel for which
+            // this command is issued, otherwise remaining characters in the buffer 
+            // will be prefixed to the data from the new record or buffer location
+            if( data[0]=='P' && dataLen>=2 )
+                clearReadBuffer(data[1] & 0x0f);
+            else if( memcmp(data, "U1", 2)==0 || memcmp(data, "B-P", 3)==0 || memcmp(data, "B-R", 3)==0 )
+                {
+                int i = data[0]=='U' ? 2 : 3;
+                while( i<dataLen && !isdigit(data[i]) ) i++;
+                if( i<dataLen )
+                    {
+                    uint8_t channel = data[i]-'0';
+                    if( i+1<dataLen && isdigit(data[i+1]) )
+                        channel = 10*channel + (data[i+1]-'0');
+
+                    clearReadBuffer(channel);
+                    }
+                }
+            
+            return;
         }
     }
 //#endif
 
     if( mstr::startsWith(command, "CD") )
     {
+        command = mstr::toUTF8(command);
         set_cwd(mstr::drop(command, 2));
         return;
     }
@@ -1526,7 +1534,8 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
                 }
                 Debug_printv( "hard reset");
                 reset();
-                m_cwd.reset(m_cwd->cd("^")); // reset to flash root
+                //m_cwd.reset(m_cwd->cd("^")); // reset to flash root
+                set_cwd("^");
                 return;
             }
             else if (command[1] == 'I' && command.size() == 3) // UI+/-
@@ -1558,7 +1567,13 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
     switch ( command[0] )
     {
         case 'C':
-            if ( command[1] == 'P') // Change Partition
+            if ( command[1] == 'P') // Change Partition text
+            {
+                Debug_printv( "change partition");
+                //ChangeDevice();
+                return;
+            }
+            else if ( command[1] == 'p') // Change Partition binary
             {
                 Debug_printv( "change partition");
                 //ChangeDevice();
@@ -1948,10 +1963,10 @@ void iecDrive::reset()
 
     //#ifdef USE_VDRIVE
     if( m_vdrive!=nullptr ) 
-      {
+    {
         m_vdrive->closeAllChannels();
         m_vdrive->execute("UJ", 2, false);
-      }
+    }
 
     //#endif
 
@@ -1980,10 +1995,22 @@ void iecDrive::set_cwd(std::string path)
         path = "/";
 
     Debug_printv("path[%s]", path.c_str());
-    path = mstr::toUTF8( path );
 
-    Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Changing directory to [%s][%s]", m_cwd->url.c_str(), path.c_str());
-    MFile *n = m_cwd->cd( path );
+    if (m_cwd == nullptr) {
+        Debug_printv("m_cwd is null, resetting to root");
+        m_cwd.reset(MFSOwner::File("/", true));
+    }
+
+    Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Changing directory to [%s][%s]", m_cwd ? m_cwd->url.c_str() : "<null>", path.c_str());
+    if ( m_cwd->url == path)
+    {
+        Debug_printv("Already in directory [%s]", path.c_str());
+        setStatusCode(ST_OK);
+        return;
+    }
+
+
+    MFile *n = m_cwd ? m_cwd->cd( path ) : nullptr;
     if( n != nullptr )
     {
         // bug in HTTPMFile: must call isDirectory() before getSourceStream(), otherwise 
@@ -2039,9 +2066,9 @@ void iecDrive::set_cwd(std::string path)
 
 
 /* Mount Disk
-   We determine the type of image based on the filename extension.
-   If the disk_type value passed is not MEDIATYPE_UNKNOWN then that's used instead.
-   Return value is MEDIATYPE_UNKNOWN in case of failure.
+    We determine the type of image based on the filename extension.
+    If the disk_type value passed is not MEDIATYPE_UNKNOWN then that's used instead.
+    Return value is MEDIATYPE_UNKNOWN in case of failure.
 */
 mediatype_t iecDrive::mount(fnFile *f, const char *filename, uint32_t disksize, mediatype_t disk_type)
 {
@@ -2065,7 +2092,8 @@ mediatype_t iecDrive::mount(fnFile *f, const char *filename, uint32_t disksize, 
     //url = mstr::toPETSCII2(url);
     //this->open( 0, url.c_str() );
     Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Reset directory to [%s]", url.c_str());
-    m_cwd.reset(m_cwd->cd(url));
+    //m_cwd.reset(m_cwd->cd(url));
+    set_cwd(url);
 
     return MediaType::discover_mediatype(filename); // MEDIATYPE_UNKNOWN
 }
