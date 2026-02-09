@@ -726,6 +726,10 @@ MFile* MFile::cd(std::string newDir)
     else 
     {
         //Debug_printv("url[%s] newDir[%s]", url.c_str(), newDir.c_str());
+        if (newDir[0] == '/' && !url.empty() && url[0] == '/') {
+            // Absolute local path; don't append to current URL
+            return MFSOwner::File(newDir);
+        }
         if ( newDir[0]=='/' )
             newDir = mstr::drop(newDir,1);
 
