@@ -482,7 +482,14 @@ namespace Meat
             : __iostream_type(0), _M_filebuf()
         {
             this->init(&_M_filebuf);
-            this->open(fi->url.c_str(), __mode);
+            // Include pathInStream in URL so MFSOwner::File() can recover it
+            std::string fullUrl = fi->url;
+            if (!fi->pathInStream.empty()) {
+                if (fullUrl.back() != '/')
+                    fullUrl += '/';
+                fullUrl += fi->pathInStream;
+            }
+            this->open(fullUrl.c_str(), __mode);
         }
 
 #if __cplusplus >= 201103L
