@@ -181,6 +181,7 @@ void main_setup()
     {
         // Create SYSTEM DIR if it doesn't exist
         fsFlash.create_path( SYSTEM_DIR );
+        fsFlash.create_path(SYSTEM_DIR "/ssh");
     }
 
 #ifdef SD_CARD
@@ -188,6 +189,7 @@ void main_setup()
     {
         // Create SYSTEM DIR if it doesn't exist
         fnSDFAT.create_path( SYSTEM_DIR );
+        fnSDFAT.create_path(SYSTEM_DIR "/ssh");
     }
 #endif
 

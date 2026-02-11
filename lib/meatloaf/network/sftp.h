@@ -36,8 +36,6 @@ extern "C" {
 #include <memory>
 #include <string>
 
-// Only compile SFTP support if libssh has it available
-#ifdef WITH_SFTP
 
 /********************************************************
  * MSession - SFTP Session Management
@@ -186,7 +184,5 @@ public:
         return new SFTPMFile(path);
     }
 };
-
-#endif // WITH_SFTP
 
 #endif // MEATLOAF_NETWORK_SFTP

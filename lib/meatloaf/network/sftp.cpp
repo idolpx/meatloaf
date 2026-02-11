@@ -17,11 +17,9 @@
 
 #include "sftp.h"
 
-// Only compile SFTP support if libssh has it available
-#ifdef WITH_SFTP
-
 #include "meatloaf.h"
 #include "../../../include/debug.h"
+#include "../../../include/global_defines.h"
 
 #include <sys/stat.h>
 #include <unistd.h>
@@ -55,7 +53,7 @@ void SFTPMSession::setPrivateKey(const std::string& keypath) {
 
 bool SFTPMSession::connect() {
     if (connected) {
-        Debug_printv("Already connected to %s:%d", host.c_str(), port);
+        //Debug_printv("Already connected to %s:%d", host.c_str(), port);
         return true;
     }
 
@@ -69,10 +67,14 @@ bool SFTPMSession::connect() {
     // Set connection options
     ssh_options_set(ssh_handle, SSH_OPTIONS_HOST, host.c_str());
     ssh_options_set(ssh_handle, SSH_OPTIONS_PORT, &port);
-    
-    if (!username.empty()) {
-        ssh_options_set(ssh_handle, SSH_OPTIONS_USER, username.c_str());
-    }
+
+    // Point libssh at our flash filesystem for ssh_config/known_hosts
+    ssh_options_set(ssh_handle, SSH_OPTIONS_SSH_DIR, SYSTEM_DIR "/ssh");
+
+    // Always set a username — ESP32 has no local user system, so
+    // ssh_get_local_username() returns NULL and ssh_options_apply() fails.
+    const char *user = username.empty() ? "root" : username.c_str();
+    ssh_options_set(ssh_handle, SSH_OPTIONS_USER, user);
 
     // Connect to SSH server
     int rc = ssh_connect(ssh_handle);
@@ -88,18 +90,18 @@ bool SFTPMSession::connect() {
 
     // Authenticate
     bool authenticated = false;
-    
-    // Try public key authentication first if key is provided
-    if (!private_key_path.empty()) {
-        authenticated = authenticatePublicKey();
-    }
-    
-    // Try password authentication if public key failed or not provided
-    if (!authenticated && !password.empty()) {
+
+    // If password was provided in the URL, use password authentication
+    if (!password.empty()) {
         authenticated = authenticatePassword();
     }
 
-    // Try "none" authentication as fallback (some servers allow this)
+    // Otherwise try public key authentication (looks for keys in SSH_DIR)
+    if (!authenticated) {
+        authenticated = authenticatePublicKey();
+    }
+
+    // Try "none" authentication as last resort (some servers allow this)
     if (!authenticated) {
         rc = ssh_userauth_none(ssh_handle, nullptr);
         if (rc == SSH_AUTH_SUCCESS) {
@@ -159,14 +161,14 @@ bool SFTPMSession::authenticatePassword() {
 }
 
 bool SFTPMSession::authenticatePublicKey() {
-    if (private_key_path.empty() || ssh_handle == nullptr) {
+    if (ssh_handle == nullptr) {
         return false;
     }
 
-    // Try auto authentication with default keys
+    // Try auto authentication — searches SSH_DIR for id_rsa, id_ecdsa, etc.
     int rc = ssh_userauth_publickey_auto(ssh_handle, nullptr, nullptr);
     if (rc == SSH_AUTH_SUCCESS) {
-        Debug_printv("Authenticated with public key (auto)");
+        Debug_printv("Authenticated with public key");
         return true;
     }
 
@@ -217,42 +219,27 @@ bool SFTPMSession::keep_alive() {
  ********************************************************/
 
 SFTPMFile::SFTPMFile(std::string path): MFile(path) {
-    Debug_printv("SFTPMFile created: url[%s] host[%s] path[%s]", 
-                 url.c_str(), host.c_str(), this->path.c_str());
-
-    // Parse credentials from URL if present (sftp://user:pass@host/path)
-    std::string username, password;
-    size_t at_pos = host.find('@');
-    if (at_pos != std::string::npos) {
-        std::string userinfo = host.substr(0, at_pos);
-        host = host.substr(at_pos + 1);
-        
-        size_t colon_pos = userinfo.find(':');
-        if (colon_pos != std::string::npos) {
-            username = userinfo.substr(0, colon_pos);
-            password = userinfo.substr(colon_pos + 1);
-        } else {
-            username = userinfo;
-        }
-    }
+    //Debug_printv("SFTPMFile created: url[%s] host[%s] path[%s]", url.c_str(), host.c_str(), this->path.c_str());
 
     // Obtain or create SFTP session via SessionBroker
+    // Note: user/password are already parsed by PeoplesUrlParser
     uint16_t sftp_port = port.empty() ? 22 : std::stoi(port);
-    _session = SessionBroker::obtain<SFTPMSession>(host, sftp_port);
 
+    // Set credentials before obtain() so they're available when connect() is called
+    std::string key = host + ":" + std::to_string(sftp_port);
+    _session = SessionBroker::find<SFTPMSession>(key);
     if (!_session) {
-        Debug_printv("Failed to obtain SFTP session for %s:%d", host.c_str(), sftp_port);
-        m_isNull = true;
-        return;
-    }
-
-    // Set credentials if provided
-    if (!username.empty()) {
-        _session->setCredentials(username, password);
-    }
-
-    if (!_session->isConnected()) {
-        Debug_printv("SFTP session not connected, will connect on first access");
+        _session = std::make_shared<SFTPMSession>(host, sftp_port);
+        if (!user.empty()) {
+            _session->setCredentials(user, password);
+        }
+        if (!_session->connect()) {
+            Debug_printv("Failed to connect SFTP session for %s:%d", host.c_str(), sftp_port);
+            _session.reset();
+            m_isNull = true;
+            return;
+        }
+        SessionBroker::add(key, _session);
     }
 
     // Validate path
@@ -262,7 +249,7 @@ SFTPMFile::SFTPMFile(std::string path): MFile(path) {
         m_isNull = false;
     }
 
-    Debug_printv("SFTP path[%s] valid[%d]", this->path.c_str(), !m_isNull);
+    //Debug_printv("SFTP path[%s] valid[%d]", this->path.c_str(), !m_isNull);
 }
 
 SFTPMFile::~SFTPMFile() {
@@ -616,21 +603,9 @@ bool SFTPMStream::open(std::ios_base::openmode mode) {
     }
     
     // Parse credentials from URL if present
-    std::string username, password;
+    std::string username = parser->user;
+    std::string password = parser->password;
     std::string host_str = parser->host;
-    size_t at_pos = host_str.find('@');
-    if (at_pos != std::string::npos) {
-        std::string userinfo = host_str.substr(0, at_pos);
-        host_str = host_str.substr(at_pos + 1);
-        
-        size_t colon_pos = userinfo.find(':');
-        if (colon_pos != std::string::npos) {
-            username = userinfo.substr(0, colon_pos);
-            password = userinfo.substr(colon_pos + 1);
-        } else {
-            username = userinfo;
-        }
-    }
 
     // Obtain or create SFTP session
     uint16_t sftp_port = parser->port.empty() ? 22 : std::stoi(parser->port);
@@ -758,4 +733,3 @@ bool SFTPMStream::seek(uint32_t pos, int mode) {
     return true;
 }
 
-#endif // WITH_SFTP

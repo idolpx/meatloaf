@@ -10,7 +10,7 @@ list(FILTER SOURCES EXCLUDE REGEX "/dh_crypto\\.c$")
 list(FILTER SOURCES EXCLUDE REGEX "/md_crypto\\.c$")
 list(FILTER SOURCES EXCLUDE REGEX "/ecdh_crypto\\.c$")
 list(FILTER SOURCES EXCLUDE REGEX "/pki_crypto\\.c$")
-list(FILTER SOURCES EXCLUDE REGEX "/pki_container_openssh\\.c$")
+# list(FILTER SOURCES EXCLUDE REGEX "/pki_container_openssh\\.c$")  # Enable OpenSSH key support for SFTP
 list(FILTER SOURCES EXCLUDE REGEX "/libgcrypt\\.c$")
 list(FILTER SOURCES EXCLUDE REGEX "/libcrypto\\.c$")
 list(FILTER SOURCES EXCLUDE REGEX "/libcrypto-compat\\.c$")

@@ -60,6 +60,7 @@
 
 // Network
 #include "network/ftp.h"
+#include "network/sftp.h"
 #include "network/tnfs.h"
 #include "network/smb.h"
 #include "network/nfs.h"
@@ -96,7 +97,6 @@
 
 // Network
 #include "network/http.h"
-// #include "network/sftp.h"  // Disabled: libssh component lacks SFTP source files
 // #include "network/ipfs.h"
 // #include "network/ws.h"
 
@@ -152,6 +152,7 @@ MDNSMFileSystem mdnsFS;
 
 // Network
 FTPMFileSystem ftpFS;
+SFTPMFileSystem sftpFS;
 TNFSMFileSystem tnfsFS;
 SMBMFileSystem smbFS;
 NFSMFileSystem nfsFS;
@@ -188,7 +189,6 @@ TCRTMFileSystem tcrtFS;
 
 // Network
 HTTPMFileSystem httpFS;
-// SFTPMFileSystem sftpFS;  // Disabled: libssh component lacks SFTP source files
 // IPFSFileSystem ipfsFS;
 // TcpFileSystem tcpFS;
 //WSFileSystem wsFS;
@@ -242,7 +242,7 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
     // Network
     &httpFS,
 #ifndef MIN_CONFIG
-    &ftpFS, &tnfsFS, &smbFS, &nfsFS, &fspFS,
+    &ftpFS, &sftpFS, &tnfsFS, &smbFS, &nfsFS, &fspFS,
     //&ipfsFS, &tcpFS,
 #endif
 

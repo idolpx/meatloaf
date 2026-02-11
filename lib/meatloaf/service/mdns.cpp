@@ -20,9 +20,7 @@
 #include "network/afp.h"
 #include "network/http.h"
 #include "network/nfs.h"
-#ifdef WITH_SFTP
 #include "network/sftp.h"
-#endif
 #include "network/smb.h"
 
 #include <esp_log.h>
@@ -64,14 +62,12 @@ MFile* MDNSMFileSystem::getFile(std::string path) {
                         file = new NFSMFile(path);
                     }
                 } 
-#ifdef WITH_SFTP
                 else if (service->service_type == "_sftp-ssh") {
                     if (!service->addresses.empty()) {
                         path = "sftp://" + service->addresses[0] + "/";
                         file = new SFTPMFile(path);
                     }
                 } 
-#endif
                 else if (service->service_type == "_smb") {
                     if (!service->addresses.empty()) {
                         path = "smb://" + service->addresses[0] + "/";

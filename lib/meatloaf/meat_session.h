@@ -151,17 +151,31 @@ public:
         clear();
     }
 
+    // Find an existing session by key (does not create)
+    template<class T>
+    static std::shared_ptr<T> find(const std::string& key) {
+        if (session_repo.find(key) != session_repo.end()) {
+            return std::static_pointer_cast<T>(session_repo.at(key));
+        }
+        return nullptr;
+    }
+
+    // Add a session to the repo
+    static void add(const std::string& key, std::shared_ptr<MSession> session) {
+        session_repo.insert(std::make_pair(key, session));
+        session->updateActivity();
+    }
+
     // Obtain a session (creates if doesn't exist, returns existing if found)
     template<class T>
     static std::shared_ptr<T> obtain(std::string host, uint16_t port = 0) {
         std::string key = host + ":" + std::to_string(port);
 
         // Return existing session if found
-        if (session_repo.find(key) != session_repo.end()) {
-            //Debug_printv("Session found: %s", key.c_str());
-            auto session = std::static_pointer_cast<T>(session_repo.at(key));
-            session->updateActivity();
-            return session;
+        auto existing = find<T>(key);
+        if (existing) {
+            existing->updateActivity();
+            return existing;
         }
 
         // Create new session
@@ -169,8 +183,7 @@ public:
         auto newSession = std::make_shared<T>(host, port);
 
         if (newSession->connect()) {
-            session_repo.insert(std::make_pair(key, newSession));
-            newSession->updateActivity();
+            add(key, newSession);
             return newSession;
         }
 
