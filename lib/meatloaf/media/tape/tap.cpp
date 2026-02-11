@@ -641,6 +641,7 @@ MFile* TAPMFile::getNextFileInDir()
     mstr::replaceAll(filename, "/", "\\");
 
     auto file = MFSOwner::File(url + "/" + filename);
+    file->name = filename;  // Use actual entry name, not container image name
     file->extension = "TAP";
     file->size = cached_stream->entry.data_length;
 

@@ -413,7 +413,7 @@ bool ArchiveMStream::seekEntry(std::string filename)
             //mstr::rtrimA0(entryFilename);
             //entryFilename = mstr::toUTF8(entryFilename);
 
-            //Debug_printv("filename[%s] entry.filename[%s]", filename.c_str(), entryFilename.c_str());
+            Debug_printv("filename[%s] entry.filename[%s]", filename.c_str(), entryFilename.c_str());
 
             if ( mstr::compareFilename(entryFilename, filename, wildcard) )
             {
@@ -456,7 +456,7 @@ bool ArchiveMStream::seekEntry( uint16_t index )
         // For compressed files without known size (e.g., .gz in raw format),
         // archive_entry_size() may return 0. We need to determine actual size
         // by reading the data.
-        if (entry.size == 0 || entry.size == (uint64_t)-1) {
+        if (entry.size == 0) {
             // Count actual decompressed bytes by reading through the data
             uint8_t buff[256] = {0};
             size_t size;
@@ -571,6 +571,7 @@ MFile *ArchiveMFile::getNextFileInDir()
         //Debug_printv( "entry[%s]", (sourceFile->url + "/" + filename).c_str() );
 
         auto file = MFSOwner::File(sourceFile->url + "/" + filename);
+        file->name = filename;  // Use actual entry name, not container image name
         file->size = image->entry.size;
         //Debug_printv("entry[%s] ext[%s] size[%lu]", file->name.c_str(), file->extension.c_str(), file->size);
 

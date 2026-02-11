@@ -818,6 +818,7 @@ MFile* D64MFile::getNextFileInDir()
         //Debug_printv( "entry[%s]", (url + "/" + filename).c_str() );
 
         auto file = MFSOwner::File(url + "/" + filename);
+        file->name = filename;  // Use actual CBM entry name, not container image name
         file->extension = image->decodeType(image->entry.file_type);
         file->size = image->entry.blocks * image->block_size;
 

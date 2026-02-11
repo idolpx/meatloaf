@@ -391,6 +391,7 @@ MFile* HDDMFile::getNextFileInDir()
         mstr::replaceAll(filename, "/", "\\");
 
         auto file = MFSOwner::File(url + "/" + filename);
+        file->name = filename;  // Use actual entry name, not container image name
         file->extension = image->entry.type;
         file->size = image->entry.size;
 

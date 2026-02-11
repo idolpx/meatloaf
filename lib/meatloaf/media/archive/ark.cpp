@@ -188,6 +188,7 @@ MFile *ARKMFile::getNextFileInDir()
         //Debug_printv( "entry[%s]", (sourceFile->url + "/" + fileName).c_str() );
 
         auto file = MFSOwner::File(sourceFile->url + "/" + filename);
+        file->name = filename;  // Use actual entry name, not container image name
         file->extension = image->decodeType(image->entry.file_type);
         //Debug_printv("entry[%s] ext[%s]", fileName.c_str(), file->extension.c_str());
 

@@ -202,6 +202,7 @@ MFile* T64MFile::getNextFileInDir() {
         //Debug_printv( "entry[%s]", (sourceFile->url + "/" + filename).c_str() );
 
         auto file = MFSOwner::File(url + "/" + filename);
+        file->name = filename;  // Use actual entry name, not container image name
         file->extension = image->decodeType(image->entry.file_type);
         file->size = ( image->entry.end_address - image->entry.start_address ) + 2; // 2 bytes for load address
 

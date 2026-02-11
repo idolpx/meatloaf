@@ -307,6 +307,7 @@ MFile *LNXMFile::getNextFileInDir()
         mstr::replaceAll(filename, "/", "\\");
 
         auto file = MFSOwner::File(sourceFile->url + "/" + filename);
+        file->name = filename;  // Use actual entry name, not container image name
         file->extension = image->entry.type;
         file->size = image->entry.size;
 

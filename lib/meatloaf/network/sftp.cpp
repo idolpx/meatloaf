@@ -279,8 +279,8 @@ bool SFTPMFile::pathValid(std::string path) {
         return false;
     }
 
-    // Check if path exists
-    sftp_attributes attrs = sftp_stat(sftp, path.c_str());
+    // Check if path exists (lstat so symlinks themselves are valid)
+    sftp_attributes attrs = sftp_lstat(sftp, path.c_str());
     if (attrs == nullptr) {
         Debug_printv("Path does not exist: %s", path.c_str());
         return false;
@@ -456,7 +456,7 @@ MFile* SFTPMFile::getNextFileInDir() {
     }
     entry_path += attrs->name;
 
-    Debug_printv("Directory entry: %s (type=%d)", entry_path.c_str(), attrs->type);
+    //Debug_printv("Directory entry: %s (type=%d)", entry_path.c_str(), attrs->type);
 
     SFTPMFile* file = new SFTPMFile(entry_path);
     
@@ -465,6 +465,7 @@ MFile* SFTPMFile::getNextFileInDir() {
         sftp_attributes_free(file->current_attrs);
     }
     file->current_attrs = attrs;
+    file->size = attrs->size;
 
     return file;
 }
@@ -547,7 +548,21 @@ std::shared_ptr<MStream> SFTPMFile::getDecodedStream(std::shared_ptr<MStream> sr
 }
 
 std::shared_ptr<MStream> SFTPMFile::createStream(std::ios_base::openmode mode) {
-    return std::make_shared<SFTPMStream>(url);
+    std::string streamUrl = url;
+    if (!pathInStream.empty()) {
+        if (!mstr::endsWith(streamUrl, "/")) {
+            streamUrl += "/";
+        }
+        streamUrl += pathInStream;
+    }
+
+    Debug_printv("Creating SFTP stream for URL: %s", streamUrl.c_str());
+    auto stream = std::make_shared<SFTPMStream>(streamUrl);
+    if (!stream->open(mode)) {
+        Debug_printv("Failed to open SFTP stream: %s", streamUrl.c_str());
+        return nullptr;
+    }
+    return stream;
 }
 
 
@@ -601,29 +616,22 @@ bool SFTPMStream::open(std::ios_base::openmode mode) {
         Debug_printv("Failed to parse URL: %s", url.c_str());
         return false;
     }
-    
-    // Parse credentials from URL if present
-    std::string username = parser->user;
-    std::string password = parser->password;
+
+    // Find or create SFTP session (credentials set before connect)
     std::string host_str = parser->host;
-
-    // Obtain or create SFTP session
     uint16_t sftp_port = parser->port.empty() ? 22 : std::stoi(parser->port);
-    _session = SessionBroker::obtain<SFTPMSession>(host_str, sftp_port);
-
+    std::string key = host_str + ":" + std::to_string(sftp_port);
+    _session = SessionBroker::find<SFTPMSession>(key);
     if (!_session) {
-        Debug_printv("Failed to obtain SFTP session");
-        return false;
-    }
-
-    // Set credentials if provided
-    if (!username.empty()) {
-        _session->setCredentials(username, password);
-    }
-
-    if (!_session->connect()) {
-        Debug_printv("Failed to connect SFTP session");
-        return false;
+        _session = std::make_shared<SFTPMSession>(host_str, sftp_port);
+        if (!parser->user.empty()) {
+            _session->setCredentials(parser->user, parser->password);
+        }
+        if (!_session->connect()) {
+            Debug_printv("Failed to connect SFTP session");
+            return false;
+        }
+        SessionBroker::add(key, _session);
     }
 
     sftp_session sftp = _session->getSFTPSession();
@@ -638,7 +646,7 @@ bool SFTPMStream::open(std::ios_base::openmode mode) {
 
     _file_handle = sftp_open(sftp, parser->path.c_str(), access, file_mode);
     if (_file_handle == nullptr) {
-        Debug_printv("Failed to open file: %s - error: %d", 
+        Debug_printv("Failed to open file: %s - error: %d",
                      parser->path.c_str(), sftp_get_error(sftp));
         return false;
     }
