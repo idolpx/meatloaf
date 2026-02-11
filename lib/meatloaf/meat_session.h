@@ -24,6 +24,7 @@
 #include <vector>
 #include <chrono>
 #include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 #include <freertos/task.h>
 
 #include "../../include/debug.h"
@@ -107,6 +108,14 @@ private:
     static std::unordered_map<std::string, std::shared_ptr<MSession>> session_repo;
     static std::chrono::steady_clock::time_point last_keep_alive_check;
     static bool task_running;
+    static SemaphoreHandle_t _mutex;
+
+    static void lock() {
+        if (_mutex) xSemaphoreTake(_mutex, portMAX_DELAY);
+    }
+    static void unlock() {
+        if (_mutex) xSemaphoreGive(_mutex);
+    }
 
     // FreeRTOS task function
     static void session_service_task(void* arg) {
@@ -118,6 +127,15 @@ private:
         vTaskDelete(NULL);
     }
 
+    // Internal dispose by key (no lock, caller must hold mutex)
+    static void disposeByKey(const std::string& key) {
+        auto it = session_repo.find(key);
+        if (it != session_repo.end()) {
+            Debug_printv("Disposing session: %s", key.c_str());
+            session_repo.erase(it);
+        }
+    }
+
 public:
     // Initialize and start the SessionBroker service task
     // This creates a FreeRTOS task on CPU0 to periodically call service()
@@ -125,6 +143,10 @@ public:
         if (task_running) {
             Debug_printv("SessionBroker task already running");
             return;
+        }
+
+        if (!_mutex) {
+            _mutex = xSemaphoreCreateMutex();
         }
 
         task_running = true;
@@ -148,22 +170,32 @@ public:
     static void shutdown() {
         Debug_printv("Stopping SessionBroker service task");
         task_running = false;
-        clear();
+        lock();
+        session_repo.clear();
+        unlock();
     }
 
     // Find an existing session by key (does not create)
     template<class T>
     static std::shared_ptr<T> find(const std::string& key) {
-        if (session_repo.find(key) != session_repo.end()) {
-            return std::static_pointer_cast<T>(session_repo.at(key));
+        lock();
+        auto it = session_repo.find(key);
+        if (it != session_repo.end()) {
+            auto session = std::static_pointer_cast<T>(it->second);
+            session->updateActivity();  // Keep session alive while in use
+            unlock();
+            return session;
         }
+        unlock();
         return nullptr;
     }
 
     // Add a session to the repo
     static void add(const std::string& key, std::shared_ptr<MSession> session) {
+        lock();
         session_repo.insert(std::make_pair(key, session));
         session->updateActivity();
+        unlock();
     }
 
     // Obtain a session (creates if doesn't exist, returns existing if found)
@@ -174,12 +206,10 @@ public:
         // Return existing session if found
         auto existing = find<T>(key);
         if (existing) {
-            existing->updateActivity();
             return existing;
         }
 
-        // Create new session
-        //Debug_printv("Creating new session: %s", key.c_str());
+        // Create new session (outside lock — connect() is slow)
         auto newSession = std::make_shared<T>(host, port);
 
         if (newSession->connect()) {
@@ -191,22 +221,22 @@ public:
         return nullptr;
     }
 
-    // Dispose of a session
-    static void dispose(std::string host, uint16_t port = 0) {
+    // Dispose of a session by host and port
+    static void dispose(std::string host, uint16_t port) {
         std::string key = host + ":" + std::to_string(port);
-        if (session_repo.find(key) != session_repo.end()) {
-            Debug_printv("Disposing session: %s", key.c_str());
-            session_repo.erase(key);
-        }
+        lock();
+        disposeByKey(key);
+        unlock();
+    }
+
+    // Dispose of a session by key
+    static void dispose(const std::string& key) {
+        lock();
+        disposeByKey(key);
+        unlock();
     }
 
     // Process keep-alive for all sessions
-    // IMPORTANT: This method should be called periodically from the main event loop
-    // Recommended integration points:
-    //   - In src/main.cpp main loop (every iteration or on a timer)
-    //   - As a FreeRTOS task (xTaskCreate with appropriate priority)
-    //   - In the systemBus service loop
-    // Example: SessionBroker::service(); // Call every main loop iteration
     static void service() {
         auto now = std::chrono::steady_clock::now();
         auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_keep_alive_check);
@@ -218,51 +248,63 @@ public:
 
         last_keep_alive_check = now;
 
-        // Iterate through all sessions
+        // Collect sessions that need keep-alive or removal under lock
         std::vector<std::string> to_remove;
+        std::vector<std::pair<std::string, std::shared_ptr<MSession>>> to_check;
 
+        lock();
         for (auto& pair : session_repo) {
             auto& session = pair.second;
 
             if (!session->isConnected()) {
-                // Mark disconnected sessions for removal
                 to_remove.push_back(pair.first);
                 continue;
             }
 
-            // Check if keep-alive is needed
             uint32_t idle_time = session->getIdleTime();
             if (idle_time >= session->getKeepAliveInterval()) {
-                Debug_printv("Sending keep-alive to: %s (idle: %ums)",
-                           pair.first.c_str(), idle_time);
+                to_check.push_back(pair);
+            }
+        }
+        unlock();
 
-                if (!session->keep_alive()) {
-                    Debug_printv("Keep-alive failed for: %s", pair.first.c_str());
-                    to_remove.push_back(pair.first);
-                }
+        // Run keep-alive checks outside the lock (network I/O)
+        for (auto& pair : to_check) {
+            Debug_printv("Sending keep-alive to: %s (idle: %ums)",
+                       pair.first.c_str(), pair.second->getIdleTime());
+
+            if (!pair.second->keep_alive()) {
+                Debug_printv("Keep-alive failed for: %s", pair.first.c_str());
+                to_remove.push_back(pair.first);
             }
         }
 
         // Remove failed sessions
-        for (const auto& key : to_remove) {
-            Debug_printv("Removing session: %s", key.c_str());
-            dispose(key);
-        }
-
         if (!to_remove.empty()) {
+            lock();
+            for (const auto& key : to_remove) {
+                Debug_printv("Removing session: %s", key.c_str());
+                disposeByKey(key);
+            }
             Debug_printv("Active sessions: %d", session_repo.size());
+            unlock();
         }
     }
 
     // Get session count
     static size_t count() {
-        return session_repo.size();
+        lock();
+        size_t c = session_repo.size();
+        unlock();
+        return c;
     }
 
     // Clear all sessions
     static void clear() {
+        lock();
         Debug_printv("Clearing all sessions");
         session_repo.clear();
+        unlock();
     }
 };
 

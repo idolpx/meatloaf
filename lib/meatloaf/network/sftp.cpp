@@ -682,12 +682,20 @@ void SFTPMStream::close() {
 
 uint32_t SFTPMStream::read(uint8_t* buf, uint32_t size) {
     if (!isOpen() && !open(std::ios_base::in)) {
+        Debug_printv("Read failed: stream not open");
         return 0;
+    }
+
+    if (_session) {
+        _session->updateActivity();
     }
 
     ssize_t bytes = sftp_read(_file_handle, buf, size);
     if (bytes < 0) {
-        Debug_printv("Read error: %d", sftp_get_error(_session->getSFTPSession()));
+        int err = _session ? sftp_get_error(_session->getSFTPSession()) : -1;
+        Debug_printv("Read error: %d at pos=%u size=%u filesize=%u connected=%d",
+                     err, _position, size, _size,
+                     _session ? _session->isConnected() : 0);
         return 0;
     }
 
@@ -723,8 +731,12 @@ bool SFTPMStream::seek(uint32_t pos, int mode) {
         return false;
     }
 
+    if (_session) {
+        _session->updateActivity();
+    }
+
     uint64_t new_pos = pos;
-    
+
     if (mode == SEEK_CUR) {
         new_pos = _position + pos;
     } else if (mode == SEEK_END) {

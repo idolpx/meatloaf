@@ -21,3 +21,4 @@
 std::unordered_map<std::string, std::shared_ptr<MSession>> SessionBroker::session_repo;
 std::chrono::steady_clock::time_point SessionBroker::last_keep_alive_check = std::chrono::steady_clock::now();
 bool SessionBroker::task_running = false;
+SemaphoreHandle_t SessionBroker::_mutex = nullptr;
