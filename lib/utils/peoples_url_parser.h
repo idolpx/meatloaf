@@ -63,6 +63,9 @@ public:
     std::string rebuildUrl(void);
     bool isValidUrl();
 
+    std::string queryValue(const std::string& key, bool caseInsensitive = true) const;
+    std::string fragmentValue(const std::string& key, bool caseInsensitive = true) const;
+
     void dump();
 
 };

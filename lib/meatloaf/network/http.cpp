@@ -158,14 +158,20 @@ std::shared_ptr<MStream> HTTPMFile::getSourceStream(std::ios_base::openmode mode
     // headers["Accept"] = "*/*";
     // headers["Accept-Encoding"] = "gzip, deflate";
     // etc.
-    if ( pathInStream.size() )
-        url += "/" + pathInStream;
+    std::string requestUrl = buildRequestUrl();
+    auto istream = openStreamWithCache(
+        requestUrl,
+        mode,
+        [](const std::string& openUrl, std::ios_base::openmode openMode) -> std::shared_ptr<MStream> {
+            std::string mutableUrl = openUrl;
+            auto stream = std::make_shared<HTTPMStream>(mutableUrl, openMode);
+            stream->open(openMode);
+            return stream;
+        });
 
-    std::shared_ptr<MStream> istream = std::make_shared<HTTPMStream>(url, mode);
-    //auto istream = StreamBroker::obtain<HTTPMStream>(url, mode);
-    istream->open(mode);
-    resetURL(istream->url);
-    size = istream->size();
+    if (istream != nullptr && mstr::startsWith(istream->url, "http")) {
+        resetURL(istream->url);
+    }
 
     return istream;
 }

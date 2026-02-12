@@ -23,6 +23,7 @@
 #include <algorithm>
 #include <vector>
 #include <sstream>
+#include <cerrno>
 
 
 #ifdef FLASH_SPIFFS
@@ -38,6 +39,8 @@
 
 #include "string_utils.h"
 #include "peoples_url_parser.h"
+#include "utils.h"
+#include "../encoding/hash.h"
 
 #include "MIOException.h"
 #include "../../include/debug.h"
@@ -125,6 +128,88 @@
 
 //std::unordered_map<std::string, MFile*> FileBroker::file_repo;
 //std::unordered_map<std::string, std::shared_ptr<MStream>> StreamBroker::stream_repo;
+
+namespace {
+struct CacheFragmentFlags {
+    bool enabled = false;
+    bool force_refresh = false;
+    bool has_cache_flags = false;
+};
+
+CacheFragmentFlags parse_cache_fragment(const std::string& url) {
+    CacheFragmentFlags flags;
+    auto parser = PeoplesUrlParser::parseURL(url);
+    if (!parser || parser->fragment.empty()) {
+        return flags;
+    }
+
+    std::string cacheValue = parser->fragmentValue("cache");
+    if (!cacheValue.empty()) {
+        flags.has_cache_flags = true;
+        if (util_tolower(cacheValue) == "sd") {
+            flags.enabled = true;
+        }
+    }
+
+    std::string refreshValue = parser->fragmentValue("refresh");
+    if (!refreshValue.empty()) {
+        flags.has_cache_flags = true;
+        if (util_string_value_is_true(refreshValue)) {
+            flags.force_refresh = true;
+        }
+    }
+
+    std::string forceValue = parser->fragmentValue("force");
+    if (!forceValue.empty()) {
+        flags.has_cache_flags = true;
+        if (util_string_value_is_true(forceValue)) {
+            flags.force_refresh = true;
+        }
+    }
+
+    return flags;
+}
+
+std::string strip_cache_fragment_from_url(const std::string& url) {
+    CacheFragmentFlags flags = parse_cache_fragment(url);
+    if (!flags.has_cache_flags) {
+        return url;
+    }
+
+    auto parser = PeoplesUrlParser::parseURL(url);
+    if (!parser) {
+        return url;
+    }
+
+    parser->fragment.clear();
+    parser->fragment.shrink_to_fit();
+    return parser->rebuildUrl();
+}
+
+bool ensure_dir(const std::string& path) {
+    if (path.empty()) {
+        return false;
+    }
+
+    struct stat info;
+    if (stat(path.c_str(), &info) == 0) {
+        return S_ISDIR(info.st_mode);
+    }
+
+    if (mkdir(path.c_str(), ALLPERMS) == 0) {
+        return true;
+    }
+
+    return errno == EEXIST;
+}
+
+std::string hash_url_sha256(const std::string& url) {
+    hasher.clear();
+    hasher.add_data(url);
+    hasher.compute(Hash::Algorithm::SHA256, true);
+    return hasher.output_hex();
+}
+}
 
 /********************************************************
  * MFSOwner implementations
@@ -565,6 +650,90 @@ MFile::MFile(MFile* path, std::string name) : MFile(path->path + "/" + name) {
 
 bool MFile::operator!=(nullptr_t ptr) {
     return m_isNull;
+}
+
+std::string MFile::buildRequestUrl() const {
+    std::string requestUrl = strip_cache_fragment_from_url(url);
+    if (pathInStream.size()) {
+        if (!mstr::endsWith(requestUrl, "/")) {
+            requestUrl += "/";
+        }
+        requestUrl += pathInStream;
+    }
+    return requestUrl;
+}
+
+bool MFile::isCacheEnabled(std::ios_base::openmode mode) const {
+    auto flags = parse_cache_fragment(url);
+    return mode == std::ios_base::in && flags.enabled;
+}
+
+bool MFile::isCacheForceRefresh() const {
+    return parse_cache_fragment(url).force_refresh;
+}
+
+std::shared_ptr<MStream> MFile::openStreamWithCache(
+    const std::string& requestUrl,
+    std::ios_base::openmode mode,
+    const std::function<std::shared_ptr<MStream>(const std::string&, std::ios_base::openmode)>& opener) {
+#ifdef SD_CARD
+    CacheFragmentFlags cacheFlags = parse_cache_fragment(url);
+    if (mode == std::ios_base::in && cacheFlags.enabled) {
+        std::string cacheRoot = "/sd/.cache";
+        std::string hashDir = hash_url_sha256(requestUrl);
+        std::string cacheDir = cacheRoot + "/" + hashDir;
+        std::string cacheName = name.empty() ? "media.bin" : name;
+        std::string cachePath = cacheDir + "/" + cacheName;
+
+        if (ensure_dir(cacheRoot) && ensure_dir(cacheDir)) {
+            if (!cacheFlags.force_refresh) {
+                std::unique_ptr<MFile> cacheFile(MFSOwner::File(cachePath));
+                if (cacheFile && cacheFile->exists()) {
+                    auto cacheStream = cacheFile->getSourceStream(std::ios_base::in);
+                    if (cacheStream != nullptr) {
+                        size = cacheStream->size();
+                        return cacheStream;
+                    }
+                }
+            }
+
+            auto remoteStream = opener(requestUrl, mode);
+            if (remoteStream != nullptr && remoteStream->isOpen()) {
+                std::unique_ptr<MFile> writeFile(MFSOwner::File(cachePath));
+                auto writeStream = writeFile ? writeFile->getSourceStream(std::ios_base::out) : nullptr;
+                if (writeStream != nullptr) {
+                    std::vector<uint8_t> buffer(1024);
+                    while (true) {
+                        uint32_t readCount = remoteStream->read(buffer.data(), buffer.size());
+                        if (readCount == 0) {
+                            break;
+                        }
+                        writeStream->write(buffer.data(), readCount);
+                    }
+                    writeStream->close();
+                }
+                remoteStream->close();
+
+                std::unique_ptr<MFile> cachedFile(MFSOwner::File(cachePath));
+                auto cacheStream = cachedFile ? cachedFile->getSourceStream(std::ios_base::in) : nullptr;
+                if (cacheStream != nullptr) {
+                    size = cacheStream->size();
+                    return cacheStream;
+                }
+            }
+        }
+    }
+#else
+    __IGNORE_UNUSED_VAR(requestUrl);
+    __IGNORE_UNUSED_VAR(mode);
+    __IGNORE_UNUSED_VAR(opener);
+#endif
+
+    auto stream = opener(requestUrl, mode);
+    if (stream != nullptr) {
+        size = stream->size();
+    }
+    return stream;
 }
 
 std::shared_ptr<MStream> MFile::getSourceStream(std::ios_base::openmode mode) {

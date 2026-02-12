@@ -35,6 +35,7 @@ extern "C" {
 
 #include <memory>
 #include <string>
+#include <unordered_map>
 
 
 /********************************************************
@@ -43,6 +44,16 @@ extern "C" {
 
 class SFTPMSession : public MSession {
 public:
+    // Cached file data shared across streams
+    struct CachedFile {
+        uint8_t* data;
+        uint32_t size;
+        CachedFile(uint8_t* d, uint32_t s) : data(d), size(s) {}
+        ~CachedFile() { if (data) free(data); }
+        CachedFile(const CachedFile&) = delete;
+        CachedFile& operator=(const CachedFile&) = delete;
+    };
+
     SFTPMSession(std::string host, uint16_t port = 22);
     ~SFTPMSession() override;
 
@@ -52,7 +63,7 @@ public:
 
     // Get the SSH session handle
     ssh_session getSSHSession() { return ssh_handle; }
-    
+
     // Get the SFTP session handle
     sftp_session getSFTPSession() { return sftp_handle; }
 
@@ -60,16 +71,23 @@ public:
     void setCredentials(const std::string& username, const std::string& password);
     void setPrivateKey(const std::string& keypath);
 
+    // File cache — persists across stream instances
+    std::shared_ptr<CachedFile> getCachedFile(const std::string& path);
+    void cacheFile(const std::string& path, std::shared_ptr<CachedFile> file);
+    void clearFileCache();
+
 private:
     ssh_session ssh_handle = nullptr;
     sftp_session sftp_handle = nullptr;
-    
+
     std::string username;
     std::string password;
     std::string private_key_path;
-    
+
     bool authenticatePassword();
     bool authenticatePublicKey();
+
+    std::unordered_map<std::string, std::shared_ptr<CachedFile>> file_cache;
 };
 
 
@@ -150,6 +168,14 @@ public:
 protected:
     std::shared_ptr<SFTPMSession> _session;
     sftp_file _file_handle = nullptr;
+
+    // Full-file buffer for container image random access
+    // sftp_seek64 + sftp_read has issues with libssh read-ahead buffering
+    // Buffer is cached in the session so subsequent opens reuse it
+    static constexpr uint32_t BUFFER_THRESHOLD = 1024 * 1024; // 1MB
+    std::shared_ptr<SFTPMSession::CachedFile> _cached_file;
+    bool _buffered = false;
+    bool bufferEntireFile();
 
 private:
     uint32_t mapOpenMode(std::ios_base::openmode mode);

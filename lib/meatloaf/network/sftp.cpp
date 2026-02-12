@@ -21,6 +21,8 @@
 #include "../../../include/debug.h"
 #include "../../../include/global_defines.h"
 
+#include <cstdlib>
+#include <cstring>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -53,8 +55,13 @@ void SFTPMSession::setPrivateKey(const std::string& keypath) {
 
 bool SFTPMSession::connect() {
     if (connected) {
-        //Debug_printv("Already connected to %s:%d", host.c_str(), port);
-        return true;
+        if (ssh_handle == nullptr || sftp_handle == nullptr || ssh_is_connected(ssh_handle) == 0) {
+            Debug_printv("SFTP session stale, reconnecting %s:%d", host.c_str(), port);
+            disconnect();
+        } else {
+            //Debug_printv("Already connected to %s:%d", host.c_str(), port);
+            return true;
+        }
     }
 
     // Create SSH session
@@ -176,10 +183,28 @@ bool SFTPMSession::authenticatePublicKey() {
     return false;
 }
 
-void SFTPMSession::disconnect() {
-    if (!connected) {
-        return;
+std::shared_ptr<SFTPMSession::CachedFile> SFTPMSession::getCachedFile(const std::string& path) {
+    auto it = file_cache.find(path);
+    if (it != file_cache.end()) {
+        return it->second;
     }
+    return nullptr;
+}
+
+void SFTPMSession::cacheFile(const std::string& path, std::shared_ptr<CachedFile> file) {
+    file_cache[path] = file;
+    Debug_printv("Cached file: %s (%u bytes), cache entries: %d", path.c_str(), file->size, file_cache.size());
+}
+
+void SFTPMSession::clearFileCache() {
+    if (!file_cache.empty()) {
+        Debug_printv("Clearing file cache (%d entries)", file_cache.size());
+        file_cache.clear();
+    }
+}
+
+void SFTPMSession::disconnect() {
+    clearFileCache();
 
     if (sftp_handle != nullptr) {
         Debug_printv("Closing SFTP session for %s:%d", host.c_str(), port);
@@ -282,7 +307,7 @@ bool SFTPMFile::pathValid(std::string path) {
     // Check if path exists (lstat so symlinks themselves are valid)
     sftp_attributes attrs = sftp_lstat(sftp, path.c_str());
     if (attrs == nullptr) {
-        Debug_printv("Path does not exist: %s", path.c_str());
+        //Debug_printv("Path does not exist: %s", path.c_str());
         return false;
     }
 
@@ -540,7 +565,18 @@ bool SFTPMFile::rename(std::string dest) {
 }
 
 std::shared_ptr<MStream> SFTPMFile::getSourceStream(std::ios_base::openmode mode) {
-    return createStream(mode);
+    std::string requestUrl = buildRequestUrl();
+    return openStreamWithCache(
+        requestUrl,
+        mode,
+        [](const std::string& openUrl, std::ios_base::openmode openMode) -> std::shared_ptr<MStream> {
+            std::string mutableUrl = openUrl;
+            auto stream = std::make_shared<SFTPMStream>(mutableUrl);
+            if (!stream->open(openMode)) {
+                return nullptr;
+            }
+            return stream;
+        });
 }
 
 std::shared_ptr<MStream> SFTPMFile::getDecodedStream(std::shared_ptr<MStream> src) {
@@ -571,7 +607,7 @@ std::shared_ptr<MStream> SFTPMFile::createStream(std::ios_base::openmode mode) {
  ********************************************************/
 
 bool SFTPMStream::isOpen() {
-    return _file_handle != nullptr;
+    return _file_handle != nullptr || _buffered;
 }
 
 uint32_t SFTPMStream::mapOpenMode(std::ios_base::openmode mode) {
@@ -632,6 +668,12 @@ bool SFTPMStream::open(std::ios_base::openmode mode) {
             return false;
         }
         SessionBroker::add(key, _session);
+    } else if (!_session->isConnected()) {
+        if (!_session->connect()) {
+            Debug_printv("Failed to reconnect SFTP session");
+            SessionBroker::dispose(key);
+            return false;
+        }
     }
 
     sftp_session sftp = _session->getSFTPSession();
@@ -662,6 +704,68 @@ bool SFTPMStream::open(std::ios_base::openmode mode) {
     }
 
     Debug_printv("Opened SFTP file: %s (size=%u)", parser->path.c_str(), _size);
+
+    // Buffer entire file for read-only access to small files (container images)
+    // sftp_seek64 + sftp_read has issues with libssh read-ahead buffering on ESP32
+    if ((mode & std::ios_base::in) && !(mode & std::ios_base::out) &&
+        _size > 0 && _size <= BUFFER_THRESHOLD) {
+        if (bufferEntireFile()) {
+            Debug_printv("Buffered %u bytes into memory", _size);
+        }
+    }
+
+    return true;
+}
+
+bool SFTPMStream::bufferEntireFile() {
+    // Check session cache first
+    auto parser = PeoplesUrlParser::parseURL(url);
+    std::string cache_key = parser ? parser->path : url;
+
+    if (_session) {
+        _cached_file = _session->getCachedFile(cache_key);
+        if (_cached_file) {
+            Debug_printv("Using cached file: %s (%u bytes)", cache_key.c_str(), _cached_file->size);
+            sftp_close(_file_handle);
+            _file_handle = nullptr;
+            _buffered = true;
+            _position = 0;
+            return true;
+        }
+    }
+
+    // Download the file
+    uint8_t* data = (uint8_t*)malloc(_size);
+    if (!data) {
+        Debug_printv("Failed to allocate %u bytes for file buffer", _size);
+        return false;
+    }
+
+    uint32_t total = 0;
+    while (total < _size) {
+        uint32_t chunk = _size - total;
+        if (chunk > 32768) chunk = 32768;
+        ssize_t bytes = sftp_read(_file_handle, data + total, chunk);
+        if (bytes <= 0) {
+            Debug_printv("Buffer read failed at offset %u", total);
+            free(data);
+            return false;
+        }
+        total += bytes;
+    }
+
+    // Close SFTP file handle — no longer needed
+    sftp_close(_file_handle);
+    _file_handle = nullptr;
+
+    // Store in session cache for reuse by other streams
+    _cached_file = std::make_shared<SFTPMSession::CachedFile>(data, _size);
+    if (_session) {
+        _session->cacheFile(cache_key, _cached_file);
+    }
+
+    _buffered = true;
+    _position = 0;
     return true;
 }
 
@@ -671,6 +775,10 @@ void SFTPMStream::close() {
     }
 
     Debug_printv("Closing SFTP stream");
+
+    // Release reference — data stays alive in session cache
+    _cached_file.reset();
+    _buffered = false;
 
     if (_file_handle) {
         sftp_close(_file_handle);
@@ -684,6 +792,16 @@ uint32_t SFTPMStream::read(uint8_t* buf, uint32_t size) {
     if (!isOpen() && !open(std::ios_base::in)) {
         Debug_printv("Read failed: stream not open");
         return 0;
+    }
+
+    // Serve from session-cached buffer if available
+    if (_buffered && _cached_file) {
+        if (_position >= _size) return 0;
+        uint32_t avail = _size - _position;
+        if (size > avail) size = avail;
+        memcpy(buf, _cached_file->data + _position, size);
+        _position += size;
+        return size;
     }
 
     if (_session) {
@@ -741,6 +859,12 @@ bool SFTPMStream::seek(uint32_t pos, int mode) {
         new_pos = _position + pos;
     } else if (mode == SEEK_END) {
         new_pos = _size + pos;
+    }
+
+    // Buffered mode: just update position
+    if (_buffered) {
+        _position = new_pos;
+        return true;
     }
 
     int rc = sftp_seek64(_file_handle, new_pos);

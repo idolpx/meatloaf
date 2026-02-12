@@ -187,14 +187,16 @@ bool TNFSMFile::isDirectory() {
 }
 
 std::shared_ptr<MStream> TNFSMFile::getSourceStream(std::ios_base::openmode mode) {
-
-    // Add pathInStream to URL if specified
-    if ( pathInStream.size() )
-        url += "/" + pathInStream;
-
-    std::shared_ptr<MStream> istream = std::make_shared<TNFSMStream>(url);
-    istream->open(mode);
-    return istream;
+    std::string requestUrl = buildRequestUrl();
+    return openStreamWithCache(
+        requestUrl,
+        mode,
+        [](const std::string& openUrl, std::ios_base::openmode openMode) -> std::shared_ptr<MStream> {
+            std::string mutableUrl = openUrl;
+            auto stream = std::make_shared<TNFSMStream>(mutableUrl);
+            stream->open(openMode);
+            return stream;
+        });
 }
 
 std::shared_ptr<MStream> TNFSMFile::getDecodedStream(std::shared_ptr<MStream> src) {

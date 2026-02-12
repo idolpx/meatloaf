@@ -166,14 +166,17 @@ FSPMFile::~FSPMFile() {
 }
 
 std::shared_ptr<MStream> FSPMFile::getSourceStream(std::ios_base::openmode mode) {
-    // Add pathInStream to URL if specified
-    if ( pathInStream.size() )
-        url += "/" + pathInStream;
-
-    Debug_printv("url[%s] mode[%d]", url.c_str(), mode);
-    std::shared_ptr<MStream> istream = std::make_shared<FSPMStream>(url);
-    istream->open(mode);
-    return istream;
+    std::string requestUrl = buildRequestUrl();
+    Debug_printv("url[%s] mode[%d]", requestUrl.c_str(), mode);
+    return openStreamWithCache(
+        requestUrl,
+        mode,
+        [](const std::string& openUrl, std::ios_base::openmode openMode) -> std::shared_ptr<MStream> {
+            std::string mutableUrl = openUrl;
+            auto stream = std::make_shared<FSPMStream>(mutableUrl);
+            stream->open(openMode);
+            return stream;
+        });
 }
 
 std::shared_ptr<MStream> FSPMFile::getDecodedStream(std::shared_ptr<MStream> src) {

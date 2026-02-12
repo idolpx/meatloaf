@@ -24,9 +24,16 @@
 std::shared_ptr<MStream> IPFSMFile::getSourceStream(std::ios_base::openmode mode) {
     // has to return OPENED stream
     //Debug_printv("[%s]", url.c_str());
-    std::shared_ptr<MStream> istream = std::make_shared<IPFSMStream>(url);
-    istream->open(mode);   
-    return istream;
+    std::string requestUrl = buildRequestUrl();
+    return openStreamWithCache(
+        requestUrl,
+        mode,
+        [](const std::string& openUrl, std::ios_base::openmode openMode) -> std::shared_ptr<MStream> {
+            std::string mutableUrl = openUrl;
+            auto stream = std::make_shared<IPFSMStream>(mutableUrl);
+            stream->open(openMode);
+            return stream;
+        });
 }; 
 
 

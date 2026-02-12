@@ -23,6 +23,7 @@
 #include <vector>
 #include <fstream>
 #include <ctime>
+#include <functional>
 
 #include "../../include/debug.h"
 
@@ -311,6 +312,14 @@ public:
 
 protected:
     bool m_isNull;
+
+    std::string buildRequestUrl() const;
+    bool isCacheEnabled(std::ios_base::openmode mode) const;
+    bool isCacheForceRefresh() const;
+    std::shared_ptr<MStream> openStreamWithCache(
+        const std::string& requestUrl,
+        std::ios_base::openmode mode,
+        const std::function<std::shared_ptr<MStream>(const std::string&, std::ios_base::openmode)>& opener);
 
 friend class MFSOwner;
 };

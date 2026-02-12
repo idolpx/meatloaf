@@ -50,11 +50,16 @@ bool FTPMFile::isDirectory() {
 
 std::shared_ptr<MStream> FTPMFile::getSourceStream(
     std::ios_base::openmode mode) {
-    if (pathInStream.size()) url += "/" + pathInStream;
-
-    std::shared_ptr<MStream> s = std::make_shared<FTPMStream>(url);
-    s->open(mode);
-    return s;
+    std::string requestUrl = buildRequestUrl();
+    return openStreamWithCache(
+        requestUrl,
+        mode,
+        [](const std::string& openUrl, std::ios_base::openmode openMode) -> std::shared_ptr<MStream> {
+            std::string mutableUrl = openUrl;
+            auto stream = std::make_shared<FTPMStream>(mutableUrl);
+            stream->open(openMode);
+            return stream;
+        });
 }
 
 std::shared_ptr<MStream> FTPMFile::getDecodedStream(

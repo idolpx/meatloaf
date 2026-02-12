@@ -29,6 +29,29 @@
 
 #include "string_utils.h"
 
+namespace {
+std::string get_value_from_pairs(const std::string& data, const std::string& key, bool caseInsensitive) {
+    if (data.empty() || key.empty()) {
+        return "";
+    }
+
+    std::string matchKey = caseInsensitive ? util_tolower(key) : key;
+    auto parts = util_tokenize(data, '&');
+    for (const auto& part : parts) {
+        auto kv = util_tokenize(part, '=');
+        if (kv.size() < 2) {
+            continue;
+        }
+        std::string candidateKey = caseInsensitive ? util_tolower(kv[0]) : kv[0];
+        if (candidateKey == matchKey) {
+            return kv[1];
+        }
+    }
+
+    return "";
+}
+}
+
 void PeoplesUrlParser::processHostPort(std::string hostPort) {
     auto byColon = mstr::split(hostPort,':',2);
     host = byColon[0];
@@ -131,12 +154,22 @@ void PeoplesUrlParser::processPath()
     // remove query and fragment part from path
     path = path.substr(0, pos);
 
-    // file name (without path), empty for directory
-    auto pathParts = mstr::split(path, '/');
-    if(pathParts.size() > 1)
-        name = *(--pathParts.end());
+    // CBM DOS seperates filename from path with ':', so we need to check for that as well
+    pos = path.find(":");
+    if (pos != std::string::npos)
+    {
+        path = path.substr(0, pos);
+        name = path.substr(pos + 1);
+    }
     else
-        name = path;
+    {
+        // file name (without path), empty for directory
+        auto pathParts = mstr::split(path, '/');
+        if(pathParts.size() > 1)
+            name = *(--pathParts.end());
+        else
+            name = path;
+    }
 
     // file extension
     auto nameParts = mstr::split(name, '.');
@@ -306,6 +339,16 @@ bool PeoplesUrlParser::isValidUrl()
     dump();
 #endif
     return !scheme.empty() && !(path.empty() && port.empty());
+}
+
+std::string PeoplesUrlParser::queryValue(const std::string& key, bool caseInsensitive) const
+{
+    return get_value_from_pairs(query, key, caseInsensitive);
+}
+
+std::string PeoplesUrlParser::fragmentValue(const std::string& key, bool caseInsensitive) const
+{
+    return get_value_from_pairs(fragment, key, caseInsensitive);
 }
 
 
