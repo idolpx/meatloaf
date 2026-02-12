@@ -23,6 +23,7 @@
 #include <unordered_map>
 #include <vector>
 #include <chrono>
+#include <cstdlib>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include <freertos/task.h>
@@ -35,6 +36,16 @@
 
 class MSession {
 public:
+    // Cached file data shared across streams — persists for the session lifetime
+    struct CachedFile {
+        uint8_t* data;
+        uint32_t size;
+        CachedFile(uint8_t* d, uint32_t s) : data(d), size(s) {}
+        ~CachedFile() { if (data) free(data); }
+        CachedFile(const CachedFile&) = delete;
+        CachedFile& operator=(const CachedFile&) = delete;
+    };
+
     MSession(std::string host, uint16_t port = 0)
         : host(host), port(port), connected(false),
           last_activity(std::chrono::steady_clock::now()),
@@ -90,12 +101,34 @@ public:
         keep_alive_interval = interval_ms;
     }
 
+    // File cache — avoids re-downloading files for random-access container I/O
+    std::shared_ptr<CachedFile> getCachedFile(const std::string& path) {
+        auto it = file_cache.find(path);
+        if (it != file_cache.end()) {
+            return it->second;
+        }
+        return nullptr;
+    }
+
+    void cacheFile(const std::string& path, std::shared_ptr<CachedFile> file) {
+        file_cache[path] = file;
+        Debug_printv("Cached file: %s (%u bytes), cache entries: %d", path.c_str(), file->size, file_cache.size());
+    }
+
+    void clearFileCache() {
+        if (!file_cache.empty()) {
+            Debug_printv("Clearing file cache (%d entries)", file_cache.size());
+            file_cache.clear();
+        }
+    }
+
 protected:
     std::string host;
     uint16_t port;
     bool connected;
     std::chrono::steady_clock::time_point last_activity;
     uint32_t keep_alive_interval;  // in milliseconds
+    std::unordered_map<std::string, std::shared_ptr<CachedFile>> file_cache;
 };
 
 

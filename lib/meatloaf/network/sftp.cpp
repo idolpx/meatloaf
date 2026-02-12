@@ -57,7 +57,11 @@ bool SFTPMSession::connect() {
     if (connected) {
         if (ssh_handle == nullptr || sftp_handle == nullptr || ssh_is_connected(ssh_handle) == 0) {
             Debug_printv("SFTP session stale, reconnecting %s:%d", host.c_str(), port);
-            disconnect();
+            // Tear down stale handles directly — keep connected=true during
+            // reconnection so the service task doesn't race and remove us
+            clearFileCache();
+            if (sftp_handle) { sftp_free(sftp_handle); sftp_handle = nullptr; }
+            if (ssh_handle) { ssh_disconnect(ssh_handle); ssh_free(ssh_handle); ssh_handle = nullptr; }
         } else {
             //Debug_printv("Already connected to %s:%d", host.c_str(), port);
             return true;
@@ -68,6 +72,7 @@ bool SFTPMSession::connect() {
     ssh_handle = ssh_new();
     if (ssh_handle == nullptr) {
         Debug_printv("Failed to create SSH session");
+        connected = false;
         return false;
     }
 
@@ -86,10 +91,11 @@ bool SFTPMSession::connect() {
     // Connect to SSH server
     int rc = ssh_connect(ssh_handle);
     if (rc != SSH_OK) {
-        Debug_printv("Failed to connect to SSH server %s:%d - %s", 
+        Debug_printv("Failed to connect to SSH server %s:%d - %s",
                      host.c_str(), port, ssh_get_error(ssh_handle));
         ssh_free(ssh_handle);
         ssh_handle = nullptr;
+        connected = false;
         return false;
     }
 
@@ -122,6 +128,7 @@ bool SFTPMSession::connect() {
         ssh_disconnect(ssh_handle);
         ssh_free(ssh_handle);
         ssh_handle = nullptr;
+        connected = false;
         return false;
     }
 
@@ -132,6 +139,7 @@ bool SFTPMSession::connect() {
         ssh_disconnect(ssh_handle);
         ssh_free(ssh_handle);
         ssh_handle = nullptr;
+        connected = false;
         return false;
     }
 
@@ -143,6 +151,7 @@ bool SFTPMSession::connect() {
         ssh_disconnect(ssh_handle);
         ssh_free(ssh_handle);
         ssh_handle = nullptr;
+        connected = false;
         return false;
     }
 
@@ -181,26 +190,6 @@ bool SFTPMSession::authenticatePublicKey() {
 
     Debug_printv("Public key authentication failed: %s", ssh_get_error(ssh_handle));
     return false;
-}
-
-std::shared_ptr<SFTPMSession::CachedFile> SFTPMSession::getCachedFile(const std::string& path) {
-    auto it = file_cache.find(path);
-    if (it != file_cache.end()) {
-        return it->second;
-    }
-    return nullptr;
-}
-
-void SFTPMSession::cacheFile(const std::string& path, std::shared_ptr<CachedFile> file) {
-    file_cache[path] = file;
-    Debug_printv("Cached file: %s (%u bytes), cache entries: %d", path.c_str(), file->size, file_cache.size());
-}
-
-void SFTPMSession::clearFileCache() {
-    if (!file_cache.empty()) {
-        Debug_printv("Clearing file cache (%d entries)", file_cache.size());
-        file_cache.clear();
-    }
 }
 
 void SFTPMSession::disconnect() {
@@ -653,11 +642,25 @@ bool SFTPMStream::open(std::ios_base::openmode mode) {
         return false;
     }
 
-    // Find or create SFTP session (credentials set before connect)
     std::string host_str = parser->host;
     uint16_t sftp_port = parser->port.empty() ? 22 : std::stoi(parser->port);
     std::string key = host_str + ":" + std::to_string(sftp_port);
+
+    // Check session cache first — no connection needed if file is already buffered
     _session = SessionBroker::find<SFTPMSession>(key);
+    if (_session && (mode & std::ios_base::in) && !(mode & std::ios_base::out)) {
+        _cached_file = _session->getCachedFile(parser->path);
+        if (_cached_file) {
+            Debug_printv("Using cached file: %s (%u bytes)", parser->path.c_str(), _cached_file->size);
+            _size = _cached_file->size;
+            _position = 0;
+            _buffered = true;
+            this->mode = mode;
+            return true;
+        }
+    }
+
+    // Not cached — need a live SFTP connection
     if (!_session) {
         _session = std::make_shared<SFTPMSession>(host_str, sftp_port);
         if (!parser->user.empty()) {
@@ -695,7 +698,7 @@ bool SFTPMStream::open(std::ios_base::openmode mode) {
 
     this->mode = mode;
     _position = 0;
-    
+
     // Get file size
     sftp_attributes attrs = sftp_fstat(_file_handle);
     if (attrs) {
@@ -759,7 +762,7 @@ bool SFTPMStream::bufferEntireFile() {
     _file_handle = nullptr;
 
     // Store in session cache for reuse by other streams
-    _cached_file = std::make_shared<SFTPMSession::CachedFile>(data, _size);
+    _cached_file = std::make_shared<MSession::CachedFile>(data, _size);
     if (_session) {
         _session->cacheFile(cache_key, _cached_file);
     }
