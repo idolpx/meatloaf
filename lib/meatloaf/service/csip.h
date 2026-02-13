@@ -196,25 +196,31 @@ public:
 
     // Stream access methods for CSIPMStream
     size_t receive(uint8_t* buffer, size_t size) {
-        if(buf.is_open())
-            return buf.m_wifi.read(buffer, size);
-        else
-            return 0;
+        if (buf.is_open()) {
+            size_t readCount = buf.m_wifi.read(buffer, size);
+            if (readCount > 0) {
+                updateActivity();
+            }
+            return readCount;
+        }
+        return 0;
     }
 
     size_t send(const uint8_t* buffer, size_t size) {
-        if(buf.is_open())
-            return buf.m_wifi.write(buffer, size);
-        else
-            return 0;
+        if (buf.is_open()) {
+            size_t written = buf.m_wifi.write(buffer, size);
+            if (written > 0) {
+                updateActivity();
+            }
+            return written;
+        }
+        return 0;
     }
 
     std::string getCurrentDir() const { return currentDir; }
 
 protected:
     csstreambuf buf;  // Must be declared first for initialization order
-    std::string m_user;
-    std::string m_pass;
     std::string currentDir;
 
     bool establish();
@@ -250,6 +256,7 @@ protected:
     std::shared_ptr<CSIPMSession> _session;
     bool dirIsOpen = false;
     bool dirIsImage = false;
+    bool dirHoldsIo = false;
 
     friend class CSIPMStream;
 };
@@ -284,6 +291,7 @@ public:
 protected:
     std::shared_ptr<CSIPMSession> _session;
     bool _is_open = false;
+    bool _holds_io = false;
 };
 
 

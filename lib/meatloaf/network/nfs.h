@@ -54,7 +54,9 @@ bool parseNFSPath(const std::string& path, std::string& export_path, std::string
 
 class NFSMSession : public MSession {
 public:
-    NFSMSession(std::string host, uint16_t port = 2049) : MSession(host, port) {
+    NFSMSession(std::string host, uint16_t port = 2049)
+        : MSession("nfs://" + host + ":" + std::to_string(port), host, port)
+    {
         Debug_printv("NFSMSession created for %s:%d", host.c_str(), port);
     }
     ~NFSMSession() override {
@@ -171,7 +173,6 @@ public:
 private:
     void enumerateExports();
 
-private:
     struct nfs_context* _nfs = nullptr;
     std::map<std::string, struct nfs_context*> _export_contexts;  // Per-export contexts
     std::vector<std::string> _exports_list;  // Cached list of exports

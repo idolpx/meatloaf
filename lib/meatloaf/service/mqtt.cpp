@@ -27,7 +27,8 @@
  ********************************************************/
 
 MQTTMSession::MQTTMSession(std::string host, uint16_t port, std::string client_id)
-    : MSession(host, port), client_id(client_id) {
+    : MSession("mqtt://" + host + ":" + std::to_string(port), host, port), client_id(client_id)
+{
     if (this->client_id.empty()) {
         // Generate a unique client ID
         this->client_id = "meatloaf_" + std::to_string(random());
@@ -57,8 +58,8 @@ bool MQTTMSession::connect() {
     mqtt_cfg.broker.address.uri = ("mqtt://" + host + ":" + std::to_string(port)).c_str();
     mqtt_cfg.credentials.client_id = client_id.c_str();
     
-    if (!username.empty()) {
-        mqtt_cfg.credentials.username = username.c_str();
+    if (!user.empty()) {
+        mqtt_cfg.credentials.username = user.c_str();
     }
     if (!password.empty()) {
         mqtt_cfg.credentials.authentication.password = password.c_str();

@@ -64,8 +64,6 @@ private:
     ssh_session ssh_handle = nullptr;
     sftp_session sftp_handle = nullptr;
 
-    std::string username;
-    std::string password;
     std::string private_key_path;
 
     bool authenticatePassword();

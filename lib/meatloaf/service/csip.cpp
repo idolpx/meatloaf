@@ -26,7 +26,8 @@
  ********************************************************/
 
 CSIPMSession::CSIPMSession(std::string host, uint16_t port)
-    : MSession(host, port), std::iostream(&buf), buf(host, port), m_user(""), m_pass(""), currentDir("csip:/")
+    : MSession("csip://" + host + ":" + std::to_string(port), host, port),
+      std::iostream(&buf), buf(host, port), currentDir("csip:/")
 {
     Debug_printv("CSIPMSession created for %s:%d", host.c_str(), port);
 }
@@ -52,6 +53,11 @@ bool CSIPMSession::connect() {
     }
 
     Debug_printv("Successfully connected to %s:%d", host.c_str(), port);
+    // If username and password were provided in the URL, login
+    if ( !user.empty() && !password.empty() ) {
+        sendCommand("user " + user + ", " + password);
+    }
+
     connected = true;
     updateActivity();
     return true;
@@ -73,11 +79,13 @@ bool CSIPMSession::keep_alive() {
         return false;
     }
 
-    // Send a lightweight command to keep the connection alive
-    // Using "cf ." to stay in current directory as a keep-alive
-    if (sendCommand("cf .")) {
-        updateActivity();
-        return true;
+    // Send a lightweight command and consume its response to keep the stream in sync
+    if (sendCommand("cf /")) {
+        bool ok = isOK();
+        if (ok) {
+            updateActivity();
+            return true;
+        }
     }
 
     Debug_printv("Keep-alive failed for %s:%d", host.c_str(), port);
@@ -98,14 +106,22 @@ std::string CSIPMSession::readLn() {
     char buffer[80];
     std::string line;
     // telnet line ends with 10;
-    getline(buffer, 80, 10);
-    line = buffer;
-    // if (line.empty()) {
-    //     usleep(150000000); // 1.5 sec delay if no data
-    //     getline(buffer, 80, 10);
-    // }
-    // line = buffer;
-    if (line.empty()) {
+    for (int attempt = 0; attempt < 3; ++attempt) {
+        getline(buffer, 80, 10);
+        line = buffer;
+        if (!line.empty()) {
+            break;
+        }
+        fnSystem.delay(50);
+    }
+
+    if (!line.empty() && line.back() == '\r') {
+        line.pop_back();
+    }
+
+    if (!line.empty()) {
+        updateActivity();
+    } else {
         line = '\x04';
     }
 
@@ -121,6 +137,7 @@ bool CSIPMSession::sendCommand(const std::string& command) {
         (*this) << (c+'\r');
         (*this).flush();
         (*this).sync();
+        updateActivity();
         sleep(1);
         return true;
     }
@@ -129,17 +146,54 @@ bool CSIPMSession::sendCommand(const std::string& command) {
 }
 
 bool CSIPMSession::isOK() {
-    // auto a = readLn();
+    auto trimReply = [](const std::string& line) {
+        size_t start = 0;
+        while (start < line.size()) {
+            char c = line[start];
+            if (c != ' ' && c != '\t' && c != '\r' && c != '>') {
+                break;
+            }
+            ++start;
+        }
+        size_t end = line.size();
+        while (end > start) {
+            char c = line[end - 1];
+            if (c != ' ' && c != '\t' && c != '\r') {
+                break;
+            }
+            --end;
+        }
+        return line.substr(start, end - start);
+    };
 
-    auto reply = readLn();
-    // for(int i = 0 ; i<reply.length(); i++)
-    //     Debug_printv("'%d'", reply[i]);
+    std::string reply;
+    for (int attempt = 0; attempt < 10; ++attempt) {
+        reply = readLn();
+        if (reply.size() == 1 && reply[0] == '\x04') {
+            continue;
+        }
 
-    bool equals = strncmp("00 - OK\x0d", reply.c_str(), 7);
+        auto trimmed = trimReply(reply);
+        if (trimmed.empty()) {
+            continue;
+        }
 
-    Debug_printv("ok[%s] equals[%d]", reply.c_str(), equals);
+        if (trimmed.find("00 - OK") != std::string::npos) {
+            Debug_printv("ok[%s] equals[0]", reply.c_str());
+            return true;
+        }
 
-    return equals;
+        if (trimmed[0] == '?' || trimmed.find("ERROR") != std::string::npos) {
+            Debug_printv("ok[%s] equals[1]", reply.c_str());
+            return false;
+        }
+
+        Debug_printv("ok[%s] equals[1]", reply.c_str());
+        return false;
+    }
+
+    Debug_printv("ok[] equals[1]");
+    return false;
 }
 
 bool CSIPMSession::traversePath(std::string path) {
@@ -148,8 +202,14 @@ bool CSIPMSession::traversePath(std::string path) {
 
     Debug_printv("Traversing path: path[%s]", path.c_str());
 
-    if(mstr::endsWith(path, ".d64", false)) 
+    if(mstr::endsWith(path, ".d64", false))
     {
+        // Already mounted? Skip INSERT
+        if (mstr::equals(currentDir, path, false)) {
+            Debug_printv("D64 already inserted: [%s]", path.c_str());
+            return true;
+        }
+
         // THEN we have to mount the image INSERT image_name
         sendCommand("insert " + path);
 
@@ -186,7 +246,18 @@ CSIPMFile::CSIPMFile(std::string path, size_t filesize): MFile(path) {
 
     // Obtain or create CSIP session via SessionBroker
     // CSIP always uses commodoreserver.com:1541
-    _session = SessionBroker::obtain<CSIPMSession>("commodoreserver.com", 1541);
+    std::string sessionKey = "csip://commodoreserver.com:1541";
+    _session = SessionBroker::find<CSIPMSession>(sessionKey);
+    if (!_session) {
+        _session = std::make_shared<CSIPMSession>("commodoreserver.com", 1541);
+        if (_session->connect()) {
+            SessionBroker::add(sessionKey, _session);
+            _session->user = user;
+            _session->password = password;
+        } else {
+            _session.reset();
+        }
+    }
 
     if (!_session || !_session->isConnected()) {
         Debug_printv("Failed to obtain CSIP session");
@@ -194,11 +265,16 @@ CSIPMFile::CSIPMFile(std::string path, size_t filesize): MFile(path) {
         return;
     }
 
+    isPETSCII = true;
     m_isNull = false;
 }
 
 CSIPMFile::~CSIPMFile() {
     // Session is managed by SessionBroker, don't disconnect here
+    if (dirHoldsIo && _session) {
+        _session->releaseIO();
+        dirHoldsIo = false;
+    }
     _session.reset();
 }
 
@@ -210,6 +286,10 @@ CSIPMFile::~CSIPMFile() {
 void CSIPMStream::close() {
     _is_open = false;
     if (_session) {
+        if (_holds_io) {
+            _session->releaseIO();
+            _holds_io = false;
+        }
         _session.reset();
     }
 }
@@ -219,25 +299,59 @@ bool CSIPMStream::open(std::ios_base::openmode mode) {
 
     // Obtain or create CSIP session via SessionBroker
     // CSIP always uses commodoreserver.com:1541
-    _session = SessionBroker::obtain<CSIPMSession>("commodoreserver.com", 1541);
+    std::string sessionKey = "csip://commodoreserver.com:1541";
+    _session = SessionBroker::find<CSIPMSession>(sessionKey);
+    if (!_session) {
+        _session = std::make_shared<CSIPMSession>("commodoreserver.com", 1541);
+        if (_session->connect()) {
+            SessionBroker::add(sessionKey, _session);
+        } else {
+            _session.reset();
+        }
+    }
 
     if (!_session || !_session->isConnected()) {
         Debug_printv("Failed to obtain CSIP session for %s", url.c_str());
         return false;
     }
 
+    _session->acquireIO();
+    _holds_io = true;
+
     auto parser = PeoplesUrlParser::parseURL(url);
     std::string full_path = parser->path;
-    if ( parser->name.length() )
-        full_path += "/" + parser->name;
+    if (parser->name.length()) {
+        std::string suffix = "/" + parser->name;
+        if (!mstr::endsWith(full_path, suffix.c_str(), false)) {
+            full_path += suffix;
+        }
+    }
 
     // should we allow loading of * in any directory?
     // then we can LOAD and get available count from first 2 bytes in (LH) endian
     // name here MUST BE UPPER CASE
     // trim spaces from right of name too
     mstr::rtrimA0(full_path);
-    //mstr::toPETSCII2(file->name);
-    _session->sendCommand("load " + full_path);
+
+    // Check if path goes through a D64 container image - must INSERT it first
+    std::string load_target = full_path;
+    std::string lower_path = full_path;
+    for (auto& c : lower_path) c = tolower(c);
+    size_t d64_sep = lower_path.find(".d64/");
+    if (d64_sep != std::string::npos) {
+        std::string container_path = full_path.substr(0, d64_sep + 4);
+        load_target = full_path.substr(d64_sep + 5);
+        if (!_session->traversePath(container_path)) {
+            Debug_printv("CSIP: failed to mount image [%s]", container_path.c_str());
+            if (_holds_io) {
+                _session->releaseIO();
+                _holds_io = false;
+            }
+            return false;
+        }
+    }
+
+    _session->sendCommand("load " + load_target);
     // read first 2 bytes with size, low first, but may also reply with: ?500 - ERROR
     uint8_t buffer[2] = { 0, 0 };
     read(buffer, 2);
@@ -249,9 +363,15 @@ bool CSIPMStream::open(std::ios_base::openmode mode) {
     }
     else {
         _size = buffer[0] + buffer[1]*256; // put len here
+        _position = 0;
         // if everything was ok
         printf("CSIP: file open, size: %lu\r\n", _size);
         _is_open = true;
+    }
+
+    if (!_is_open && _holds_io) {
+        _session->releaseIO();
+        _holds_io = false;
     }
 
     return _is_open;
@@ -268,10 +388,18 @@ uint32_t CSIPMStream::read(uint8_t* buf, uint32_t size)  {
         return 0;
     }
 
+    // Don't read past end of file
+    if (_size > 0 && _position >= _size) {
+        return 0;
+    }
+    if (_size > 0 && size > _size - _position) {
+        size = _size - _position;
+    }
+
     uint32_t bytesRead = _session->receive(buf, size);
     _position += bytesRead;
 
-    Debug_printv("size[%lu] bytesRead[%lu] _position[%lu]", size, bytesRead, _position);
+    Debug_printv("size[%lu] bytesRead[%lu] _position[%lu] _size[%lu]", size, bytesRead, _position, _size);
 
     return bytesRead;
 }
@@ -332,6 +460,10 @@ std::shared_ptr<MStream> CSIPMFile::createStream(std::ios_base::openmode mode)
 
 bool CSIPMFile::rewindDirectory() {
     dirIsOpen = false;
+    if (dirHoldsIo && _session) {
+        _session->releaseIO();
+        dirHoldsIo = false;
+    }
 
     if(!isDirectory())
         return false;
@@ -356,10 +488,28 @@ bool CSIPMFile::rewindDirectory() {
         auto line = _session->readLn(); // mounted image name
         if(_session->isConnected() && line.size()) {
             dirIsOpen = true;
-            media_image = line.substr(5);
+            if (!dirHoldsIo) {
+                _session->acquireIO();
+                dirHoldsIo = true;
+            }
+            if (line.size() > 5) {
+                media_image = line.substr(5);
+            } else {
+                media_image.clear();
+            }
             line = _session->readLn(); // dir header
-            media_header = line.substr(2, line.find_last_of("\""));
-            media_id = line.substr(line.find_last_of("\"")+2);
+            auto last_quote = line.find_last_of("\"");
+            if (last_quote != std::string::npos && last_quote >= 2) {
+                media_header = line.substr(2, last_quote - 1);
+                if (last_quote + 2 <= line.size()) {
+                    media_id = line.substr(last_quote + 2);
+                } else {
+                    media_id.clear();
+                }
+            } else {
+                media_header.clear();
+                media_id.clear();
+            }
             return true;
         }
         else
@@ -374,9 +524,18 @@ bool CSIPMFile::rewindDirectory() {
         auto line = _session->readLn(); // dir header
         //Debug_printv("line[%s]", line.c_str());
         if(_session->isConnected() && line.size()) {
-            media_header = line.substr(2, line.find_last_of("]")-1);
+            auto last_bracket = line.find_last_of("]");
+            if (last_bracket != std::string::npos && last_bracket >= 2) {
+                media_header = line.substr(2, last_bracket - 1);
+            } else {
+                media_header.clear();
+            }
             media_id = "C=SVR";
             dirIsOpen = true;
+            if (!dirHoldsIo) {
+                _session->acquireIO();
+                dirHoldsIo = true;
+            }
 
             return true;
         }
@@ -410,8 +569,10 @@ MFile* CSIPMFile::getNextFileInDir() {
 
     //Debug_printv("pre dir is image");
 
+    auto line = _session->readLn();
+    //Debug_printv("line[%s]", line.c_str());
+
     if(dirIsImage) {
-        auto line = _session->readLn();
         //Debug_printv("next file in dir got %s", line.c_str());
         // 'ot line:'0 ␒"CIE�������������" 00�2A�
         // 'ot line:'2   "CIE+SERIAL      " PRG   2049
@@ -424,24 +585,32 @@ MFile* CSIPMFile::getNextFileInDir() {
         if(line.find('\x04')!=std::string::npos) {
             Debug_printv("No more!");
             dirIsOpen = false;
+            if (dirHoldsIo && _session) {
+                _session->releaseIO();
+                dirHoldsIo = false;
+            }
             return nullptr;
         }
         if(line.find("BLOCKS FREE.")!=std::string::npos) {
             media_blocks_free = atoi(line.substr(0, line.find_first_of(" ")).c_str());
             dirIsOpen = false;
+            if (dirHoldsIo && _session) {
+                _session->releaseIO();
+                dirHoldsIo = false;
+            }
             return nullptr;
         }
         else {
-            name = line.substr(5,15);
+            name = line.substr(5,16);
             size = atoi(line.substr(0, line.find_first_of(" ")).c_str());
             mstr::rtrim(name);
+            mstr::replaceAll(name, "/", "\\");
             //Debug_printv("xx: %s -- %s %d", line.c_str(), name.c_str(), size);
             //return new CSIPMFile(path() +"/"+ name);
             new_url += name;
             return new CSIPMFile(new_url, size);
         }
     } else {
-        auto line = _session->readLn();
         // Got line:''
         // Got line:''
         // 'ot line:'FAST-TESTER DELUXE EXCESS.D64
@@ -462,20 +631,23 @@ MFile* CSIPMFile::getNextFileInDir() {
         if(line.find('\x04')!=std::string::npos) {
             Debug_printv("No more!");
             dirIsOpen = false;
+            if (dirHoldsIo && _session) {
+                _session->releaseIO();
+                dirHoldsIo = false;
+            }
             return nullptr;
         }
         else {
 
             if((*line.begin())=='[') {
-                name = line.substr(1,line.length()-3);
+                name = line.substr(1,line.length()-2);
                 size = 0;
             }
             else {
-                name = line.substr(0, line.length()-1);
+                name = line;
                 size = (683 * 256);
             }
-            name = mstr::toPETSCII2(name);
-
+            mstr::rtrim(name);
             //Debug_printv("url[%s] name[%s] size[%d]", url.c_str(), name.c_str(), size);
             if(name.size() > 0)
             {

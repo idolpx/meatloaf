@@ -32,7 +32,7 @@
  ********************************************************/
 
 TNFSMSession::TNFSMSession(std::string host, uint16_t port)
-    : MSession(host, port)
+    : MSession("tnfs://" + host + ":" + std::to_string(port), host, port)
 {
     Debug_printv("TNFSMSession created for %s:%d", host.c_str(), port);
     _mountinfo = std::make_unique<tnfsMountInfo>(host.c_str(), port);
@@ -678,6 +678,7 @@ bool TNFSMStream::open(std::ios_base::openmode mode) {
 
     _position = 0;
     Debug_printv("Successfully opened TNFS file: %s (handle=%d)", url.c_str(), _handle);
+    _session->acquireIO();
     return true;
 }
 
@@ -688,6 +689,7 @@ void TNFSMStream::close() {
             tnfs_close(mountinfo, _handle);
             _handle = TNFS_INVALID_HANDLE;
         }
+        _session->releaseIO();
         _session.reset();
         _position = 0;
         _size = 0;

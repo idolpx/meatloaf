@@ -32,7 +32,7 @@
  ********************************************************/
 
 FSPMSession::FSPMSession(std::string host, uint16_t port)
-    : MSession(host, port)
+    : MSession("fsp://" + host + ":" + std::to_string(port), host, port)
 {
     Debug_printv("FSPMSession created for %s:%d", host.c_str(), port);
     _password = ""; // Empty password by default
@@ -499,6 +499,7 @@ bool FSPMStream::open(std::ios_base::openmode mode) {
     }
     
     _position = 0;
+    _session->acquireIO();
     return true;
 }
 
@@ -507,6 +508,9 @@ void FSPMStream::close() {
         fsp_fclose(_file_handle);
         _file_handle = nullptr;
         Debug_printv("Closed FSP file");
+    }
+    if (_session) {
+        _session->releaseIO();
     }
     _session.reset();
     _position = 0;

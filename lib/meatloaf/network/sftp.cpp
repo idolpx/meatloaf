@@ -34,7 +34,7 @@
  ********************************************************/
 
 SFTPMSession::SFTPMSession(std::string host, uint16_t port)
-    : MSession(host, port)
+    : MSession("sftp://" + host + ":" + std::to_string(port), host, port)
 {
     Debug_printv("SFTPMSession created for %s:%d", host.c_str(), port);
 }
@@ -45,8 +45,8 @@ SFTPMSession::~SFTPMSession() {
 }
 
 void SFTPMSession::setCredentials(const std::string& user, const std::string& pass) {
-    username = user;
-    password = pass;
+    this->user = user;
+    this->password = pass;
 }
 
 void SFTPMSession::setPrivateKey(const std::string& keypath) {
@@ -85,8 +85,8 @@ bool SFTPMSession::connect() {
 
     // Always set a username — ESP32 has no local user system, so
     // ssh_get_local_username() returns NULL and ssh_options_apply() fails.
-    const char *user = username.empty() ? "root" : username.c_str();
-    ssh_options_set(ssh_handle, SSH_OPTIONS_USER, user);
+    const char *ssh_user = user.empty() ? "root" : user.c_str();
+    ssh_options_set(ssh_handle, SSH_OPTIONS_USER, ssh_user);
 
     // Connect to SSH server
     int rc = ssh_connect(ssh_handle);
@@ -240,7 +240,7 @@ SFTPMFile::SFTPMFile(std::string path): MFile(path) {
     uint16_t sftp_port = port.empty() ? 22 : std::stoi(port);
 
     // Set credentials before obtain() so they're available when connect() is called
-    std::string key = host + ":" + std::to_string(sftp_port);
+    std::string key = "sftp://" + host + ":" + std::to_string(sftp_port);
     _session = SessionBroker::find<SFTPMSession>(key);
     if (!_session) {
         _session = std::make_shared<SFTPMSession>(host, sftp_port);
@@ -644,7 +644,7 @@ bool SFTPMStream::open(std::ios_base::openmode mode) {
 
     std::string host_str = parser->host;
     uint16_t sftp_port = parser->port.empty() ? 22 : std::stoi(parser->port);
-    std::string key = host_str + ":" + std::to_string(sftp_port);
+    std::string key = "sftp://" + host_str + ":" + std::to_string(sftp_port);
 
     // Check session cache first — no connection needed if file is already buffered
     _session = SessionBroker::find<SFTPMSession>(key);
@@ -656,6 +656,7 @@ bool SFTPMStream::open(std::ios_base::openmode mode) {
             _position = 0;
             _buffered = true;
             this->mode = mode;
+            _session->acquireIO();
             return true;
         }
     }
@@ -715,6 +716,9 @@ bool SFTPMStream::open(std::ios_base::openmode mode) {
         if (bufferEntireFile()) {
             Debug_printv("Buffered %u bytes into memory", _size);
         }
+    }
+    if (_session) {
+        _session->acquireIO();
     }
 
     return true;
@@ -778,6 +782,10 @@ void SFTPMStream::close() {
     }
 
     Debug_printv("Closing SFTP stream");
+
+    if (_session) {
+        _session->releaseIO();
+    }
 
     // Release reference — data stays alive in session cache
     _cached_file.reset();

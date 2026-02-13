@@ -124,7 +124,9 @@ public:
 
 class TCPMSession : public MSession {
 public:
-    TCPMSession(std::string host, uint16_t port = 0) : MSession(host, port) {
+    TCPMSession(std::string host, uint16_t port = 0)
+        : MSession("tcp://" + host + ":" + std::to_string(port), host, port)
+    {
         Debug_printv("TCPMSession created for %s:%d", host.c_str(), port);
     }
     ~TCPMSession() override {
@@ -322,6 +324,7 @@ public:
 
     void close() override {
         if (_session) {
+            _session->releaseIO();
             _session->disconnect();
             _session.reset();
         }
@@ -350,6 +353,8 @@ public:
             _session.reset();
             return false;
         }
+
+        _session->acquireIO();
 
         return true;
     }

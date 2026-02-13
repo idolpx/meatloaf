@@ -63,6 +63,7 @@ int hex(int argc, char **argv)
     for (int n = 1; n < argc; n++)
     {
         std::unique_ptr<MFile> path(getCurrentPath()->cd(argv[n]));
+        //Debug_printv("Opening file for hex: %s", path->url.c_str());
         Meat::iostream istream(path.get());
 
         if(istream.is_open()) {

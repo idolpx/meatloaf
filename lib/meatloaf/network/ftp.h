@@ -42,7 +42,9 @@
 
 class FTPMSession : public MSession {
    public:
-    FTPMSession(std::string host, uint16_t port = 21) : MSession(host, port) {
+    FTPMSession(std::string host, uint16_t port = 21)
+        : MSession("ftp://" + host + ":" + std::to_string(port), host, port)
+    {
         Debug_printv("FTPMSession created for %s:%d", host.c_str(), port);
     }
     ~FTPMSession() override {

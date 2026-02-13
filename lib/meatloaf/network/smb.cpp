@@ -552,6 +552,9 @@ bool SMBMStream::open(std::ios_base::openmode mode) {
     }
 
     _position = 0;
+    if (_session) {
+        _session->acquireIO();
+    }
     return true;
 };
 
@@ -564,6 +567,9 @@ void SMBMStream::close() {
         _handle = nullptr;
         _position = 0;
         _size = 0;
+    }
+    if (_session) {
+        _session->releaseIO();
     }
 };
 

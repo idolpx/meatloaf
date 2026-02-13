@@ -213,6 +213,9 @@ bool FTPMStream::open(std::ios_base::openmode mode) {
     _size = fsz > 0 ? (uint32_t)fsz : 0;
     _position = 0;
     Debug_printv("FTP stream open complete, size=%u", _size);
+    if (_session) {
+        _session->acquireIO();
+    }
     return true;
 }
 
@@ -228,6 +231,9 @@ void FTPMStream::close() {
     }
     delete _impl;
     _impl = nullptr;
+    if (_session) {
+        _session->releaseIO();
+    }
     _session.reset();
 }
 

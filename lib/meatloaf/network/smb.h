@@ -57,7 +57,8 @@ bool parseSMBPath(const std::string& path, std::string& share, std::string& shar
 
 class SMBMSession : public MSession {
 public:
-    SMBMSession(std::string host, uint16_t port = 445) : MSession(host, port) {
+    SMBMSession(std::string host, uint16_t port = 445)
+        : MSession("smb://" + host + ":" + std::to_string(port), host, port) {
         Debug_printv("SMBMSession created for %s:%d", host.c_str(), port);
     }
     ~SMBMSession() override {

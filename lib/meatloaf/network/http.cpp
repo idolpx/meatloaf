@@ -31,7 +31,9 @@
  ********************************************************/
 
 HTTPMSession::HTTPMSession(std::string host, uint16_t port)
-    : MSession(host, port), _user_agent(USER_AGENT) {
+    : MSession((port == 443 ? "https://" : "http://") + host + ":" + std::to_string(port), host, port),
+    _user_agent(USER_AGENT) 
+{
     Debug_printv("HTTPMSession created for %s:%d", host.c_str(), port);
 
     // Initialize HTTP client configuration
@@ -309,11 +311,18 @@ bool HTTPMStream::open(std::ios_base::openmode mode) {
 
     //Debug_printv("r[%d] size[%d] url[%s] hurl[%s]", r, _size, url.c_str(), _http.url.c_str());
 
+    if (r && _session) {
+        _session->acquireIO();
+    }
+
     return r;
 }
 
 void HTTPMStream::close() {
     //Debug_printv("CLOSE called explicitly on this HTTP stream!");
+    if (_session) {
+        _session->releaseIO();
+    }
     _http.close();
 }
 
@@ -707,7 +716,17 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
             //         Debug_printv("Accept-Ranges: %s",evt->header_value);
             //     }
             // }
-            if (mstr::equals("Content-Range", evt->header_key, false))
+            if ( mstr::equals("DAV", evt->header_key, false) )
+            {
+                if ( mstr::contains(evt->header_value, (char *)"1") )
+                {
+                    Debug_printv("WebDAV support detected!");
+                    if(meatClient != nullptr) {
+                        meatClient->m_isWebDAV = true;
+                    }
+                }
+            }
+            else if (mstr::equals("Content-Range", evt->header_key, false))
             {
                 //Debug_printv("Content-Range: %s",evt->header_value);
                 if(meatClient != nullptr) {
@@ -719,7 +738,7 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
                 //Debug_printv("size[%lu] isFriendlySkipper[%d]", meatClient->_range_size, meatClient->isFriendlySkipper);
             }
             // what can we do UTF8<->PETSCII on this stream?
-            if (mstr::equals("Content-Type", evt->header_key, false))
+            else if (mstr::equals("Content-Type", evt->header_key, false))
             {
                 std::string asString = evt->header_value;
                 bool isText = mstr::isText(asString);

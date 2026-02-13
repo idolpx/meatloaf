@@ -65,8 +65,6 @@ public:
 private:
     esp_mqtt_client_handle_t mqtt_client = nullptr;
     std::string client_id;
-    std::string username;
-    std::string password;
     
     std::queue<esp_mqtt_event_t*> message_queue;
     std::mutex queue_mutex;

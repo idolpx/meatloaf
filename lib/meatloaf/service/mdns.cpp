@@ -24,6 +24,7 @@
 #include "network/smb.h"
 
 #include <esp_log.h>
+#include <esp_wifi.h>
 #include <arpa/inet.h>
 #include <sstream>
 #include <string>
@@ -76,7 +77,7 @@ MFile* MDNSMFileSystem::getFile(std::string path) {
                 } else {
                     Debug_printv("Unsupported service type: %s", service->service_type.c_str());
                 }
-                SessionBroker::dispose("mdns", 0);
+                SessionBroker::dispose("mdns://mdns:0");
                 if (file) {
                     Debug_printv("Created file for service: %s at %s", service->getDisplayName().c_str(), path.c_str());
                     return file;
@@ -85,7 +86,7 @@ MFile* MDNSMFileSystem::getFile(std::string path) {
         }
     }
 
-    SessionBroker::dispose("mdns", 0);
+    SessionBroker::dispose("mdns://mdns:0");
     return new MDNSMFile(path);
 }
 
@@ -93,8 +94,8 @@ MFile* MDNSMFileSystem::getFile(std::string path) {
  * MDNSMSession Implementation
  ********************************************************/
 
-MDNSMSession::MDNSMSession(std::string host, uint16_t port) 
-    : MSession(host, port), cache_timestamp_ms(0), mdns_initialized(false) {
+MDNSMSession::MDNSMSession(std::string host, uint16_t port)
+    : MSession("mdns://" + host + ":" + std::to_string(port), host, port), cache_timestamp_ms(0), mdns_initialized(false) {
     Debug_printv("MDNSMSession created");
 }
 
@@ -129,9 +130,15 @@ void MDNSMSession::disconnect() {
     }
 
     clearCache();
-    
+
     if (mdns_initialized) {
-        mdns_free();
+        // Guard: mdns_free() asserts on internal semaphore that gets freed
+        // when WiFi stack tears down (e.g., during esp_restart()).
+        // Only call mdns_free() if WiFi is still up.
+        wifi_mode_t mode;
+        if (esp_wifi_get_mode(&mode) == ESP_OK) {
+            mdns_free();
+        }
         mdns_initialized = false;
     }
 
@@ -202,13 +209,13 @@ bool MDNSMSession::discoverServices(const std::string& service_type, const std::
         std::sort(discovered_service_types.begin(), discovered_service_types.end());
         //discovered_service_types.erase(std::unique(discovered_service_types.begin(), discovered_service_types.end()), discovered_service_types.end());
 
-        // Filter to only include types that match a string
-        std::string filter = "_adisk_http-alt_nfs_sftp-ssh_smb_webdav";
-        discovered_service_types.erase(std::remove_if(discovered_service_types.begin(), discovered_service_types.end(),
-            [&filter](const std::string& type) {
-                std::string base_type = type.substr(0, type.find("._"));
-                return filter.find(base_type) == std::string::npos;
-            }), discovered_service_types.end());
+        // // Filter to only include types that match a string
+        // std::string filter = "_adisk_http-alt_nfs_sftp-ssh_smb_webdav";
+        // discovered_service_types.erase(std::remove_if(discovered_service_types.begin(), discovered_service_types.end(),
+        //     [&filter](const std::string& type) {
+        //         std::string base_type = type.substr(0, type.find("._"));
+        //         return filter.find(base_type) == std::string::npos;
+        //     }), discovered_service_types.end());
 
         Debug_printv("Found %d service types", discovered_service_types.size());
         return !discovered_service_types.empty();

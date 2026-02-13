@@ -24,6 +24,7 @@
 #include <vector>
 #include <chrono>
 #include <cstdlib>
+#include <atomic>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include <freertos/task.h>
@@ -46,16 +47,16 @@ public:
         CachedFile& operator=(const CachedFile&) = delete;
     };
 
-    MSession(std::string host, uint16_t port = 0)
-        : host(host), port(port), connected(false),
+    MSession(std::string key, std::string host = "", uint16_t port = 0)
+        : key(key), host(host), port(port), connected(false),
           last_activity(std::chrono::steady_clock::now()),
           keep_alive_interval(30000) // Default 30 seconds
     {
-        Debug_printv("MSession created for %s:%d", host.c_str(), port);
+        Debug_printv("MSession created: %s", key.c_str());
     }
 
     virtual ~MSession() {
-        Debug_printv("MSession destroyed for %s:%d", host.c_str(), port);
+        Debug_printv("MSession destroyed: %s", key.c_str());
         // Don't call disconnect() here - it's pure virtual
         // Derived classes should call disconnect() in their destructors
     }
@@ -76,10 +77,8 @@ public:
     // Check if session is connected
     virtual bool isConnected() const { return connected; }
 
-    // Get unique key for this session
-    virtual std::string getKey() const {
-        return host + ":" + std::to_string(port);
-    }
+    // Get unique key for this session (scheme://host:port)
+    std::string getKey() const { return key; }
 
     // Get time since last activity in milliseconds
     uint32_t getIdleTime() const {
@@ -99,6 +98,22 @@ public:
     // Set keep-alive interval in milliseconds
     void setKeepAliveInterval(uint32_t interval_ms) {
         keep_alive_interval = interval_ms;
+    }
+
+    void acquireIO() {
+        io_active.fetch_add(1, std::memory_order_relaxed);
+        updateActivity();
+    }
+
+    void releaseIO() {
+        uint32_t current = io_active.load(std::memory_order_relaxed);
+        if (current > 0) {
+            io_active.fetch_sub(1, std::memory_order_relaxed);
+        }
+    }
+
+    bool isBusy() const {
+        return io_active.load(std::memory_order_relaxed) > 0;
     }
 
     // File cache — avoids re-downloading files for random-access container I/O
@@ -123,12 +138,16 @@ public:
     }
 
 protected:
+    std::string key;  // scheme://host:port
     std::string host;
     uint16_t port;
+    std::string user;
+    std::string password;
     bool connected;
     std::chrono::steady_clock::time_point last_activity;
     uint32_t keep_alive_interval;  // in milliseconds
     std::unordered_map<std::string, std::shared_ptr<CachedFile>> file_cache;
+    std::atomic<uint32_t> io_active{0};
 };
 
 
@@ -234,7 +253,9 @@ public:
     // Obtain a session (creates if doesn't exist, returns existing if found)
     template<class T>
     static std::shared_ptr<T> obtain(std::string host, uint16_t port = 0) {
-        std::string key = host + ":" + std::to_string(port);
+        // Create session to get the canonical key (scheme://host:port)
+        auto newSession = std::make_shared<T>(host, port);
+        std::string key = newSession->getKey();
 
         // Return existing session if found
         auto existing = find<T>(key);
@@ -242,9 +263,7 @@ public:
             return existing;
         }
 
-        // Create new session (outside lock — connect() is slow)
-        auto newSession = std::make_shared<T>(host, port);
-
+        // Connect the new session (outside lock — connect() is slow)
         if (newSession->connect()) {
             add(key, newSession);
             return newSession;
@@ -252,14 +271,6 @@ public:
 
         Debug_printv("Failed to create session: %s", key.c_str());
         return nullptr;
-    }
-
-    // Dispose of a session by host and port
-    static void dispose(std::string host, uint16_t port) {
-        std::string key = host + ":" + std::to_string(port);
-        lock();
-        disposeByKey(key);
-        unlock();
     }
 
     // Dispose of a session by key
@@ -291,6 +302,10 @@ public:
 
             if (!session->isConnected()) {
                 to_remove.push_back(pair.first);
+                continue;
+            }
+
+            if (session->isBusy()) {
                 continue;
             }
 
