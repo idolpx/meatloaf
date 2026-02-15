@@ -399,7 +399,7 @@ uint32_t CSIPMStream::read(uint8_t* buf, uint32_t size)  {
     uint32_t bytesRead = _session->receive(buf, size);
     _position += bytesRead;
 
-    Debug_printv("size[%lu] bytesRead[%lu] _position[%lu] _size[%lu]", size, bytesRead, _position, _size);
+    //Debug_printv("size[%lu] bytesRead[%lu] _position[%lu] _size[%lu]", size, bytesRead, _position, _size);
 
     return bytesRead;
 }
@@ -463,6 +463,11 @@ bool CSIPMFile::rewindDirectory() {
     if (dirHoldsIo && _session) {
         _session->releaseIO();
         dirHoldsIo = false;
+    }
+
+    // Strip trailing slash for proper D64 detection (but preserve root "/")
+    while (path.size() > 1 && path.back() == '/') {
+        path.pop_back();
     }
 
     if(!isDirectory())
