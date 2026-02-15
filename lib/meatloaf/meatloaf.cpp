@@ -100,6 +100,7 @@
 
 // Network
 #include "network/http.h"
+#include "network/tcp.h"
 // #include "network/ipfs.h"
 // #include "network/ws.h"
 
@@ -274,6 +275,7 @@ TCRTMFileSystem tcrtFS;
 
 // Network
 HTTPMFileSystem httpFS;
+TCPMFileSystem tcpFS;
 // IPFSFileSystem ipfsFS;
 // TcpFileSystem tcpFS;
 //WSFileSystem wsFS;
@@ -325,7 +327,7 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
     &p00FS,
 
     // Network
-    &httpFS,
+    &httpFS, &tcpFS,
 #ifndef MIN_CONFIG
     &ftpFS, &sftpFS, &tnfsFS, &smbFS, &nfsFS, &fspFS,
     //&ipfsFS, &tcpFS,
