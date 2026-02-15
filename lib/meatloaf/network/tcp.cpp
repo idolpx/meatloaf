@@ -7,10 +7,10 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <string.h>
-// ioctl for FIONREAD
 #include <sys/ioctl.h>
 
 #include "compat_inet.h"
+
 
 // --- TCPMSession ---
 TCPMSession::TCPMSession(std::string host, uint16_t port)
@@ -89,7 +89,6 @@ void TCPMSession::disconnect()
 
 bool TCPMSession::keep_alive()
 {
-    // simple check: return true if connected
     return connected;
 }
 
@@ -150,7 +149,6 @@ void TCPMSession::setBlocking(bool b)
 
 bool TCPMSession::listen(uint16_t port, int backlog)
 {
-    // Create a listening socket bound to all interfaces
     int s = socket(AF_INET, SOCK_STREAM, 0);
     if (s < 0) {
         Debug_printv("TCP listen socket failed: %d", compat_getsockerr());
@@ -213,6 +211,8 @@ int TCPMSession::acceptClient()
     return clientfd;
 }
 
+
+
 // --- TCPMFile ---
 TCPMFile::TCPMFile(std::string path): MFile(path)
 {
@@ -243,6 +243,8 @@ bool TCPMFile::exists()
 {
     return true;
 }
+
+
 
 // --- TCPMStream ---
 TCPMStream::TCPMStream(std::string path): MStream(path)
@@ -321,6 +323,8 @@ uint32_t TCPMStream::write(const uint8_t *buf, uint32_t size)
     }
     return (uint32_t)r;
 }
+
+
 
 // --- TCPMFileSystem ---
 bool TCPMFileSystem::handles(std::string name)
