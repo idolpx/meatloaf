@@ -55,7 +55,14 @@ bool CSIPMSession::connect() {
     Debug_printv("Successfully connected to %s:%d", host.c_str(), port);
     // If username and password were provided in the URL, login
     if ( !user.empty() && !password.empty() ) {
+        Debug_printv("Logging in as %s:%s", user.c_str(), password.c_str());
         sendCommand("user " + user + ", " + password);
+        bool ok = isOK();
+        if (!ok) {
+            Debug_printv("Login failed for %s:%d", host.c_str(), port);
+            connected = false;
+            return false;
+        }
     }
 
     connected = true;
@@ -179,26 +186,25 @@ bool CSIPMSession::isOK() {
         }
 
         if (trimmed.find("00 - OK") != std::string::npos) {
-            Debug_printv("ok[%s] equals[0]", reply.c_str());
+            Debug_printv("ok[%s]", reply.c_str());
             return true;
         }
 
-        if (trimmed[0] == '?' || trimmed.find("ERROR") != std::string::npos) {
-            Debug_printv("ok[%s] equals[1]", reply.c_str());
-            return false;
+        if (trimmed.find("00 - WELCOME") != std::string::npos) {
+            Debug_printv("ok[%s]", reply.c_str());
+            reply = readLn();
+            Debug_printv("ok[%s]", reply.c_str());
+            reply = readLn();
+            Debug_printv("ok[%s]", reply.c_str());
+            return true;
         }
-
-        Debug_printv("ok[%s] equals[1]", reply.c_str());
-        return false;
     }
 
-    Debug_printv("ok[] equals[1]");
+    Debug_printv("ok[%s]", reply.c_str());
     return false;
 }
 
 bool CSIPMSession::traversePath(std::string path) {
-    // tricky. First we have to
-    // CF / - to go back to root
 
     Debug_printv("Traversing path: path[%s]", path.c_str());
 
@@ -250,10 +256,10 @@ CSIPMFile::CSIPMFile(std::string path, size_t filesize): MFile(path) {
     _session = SessionBroker::find<CSIPMSession>(sessionKey);
     if (!_session) {
         _session = std::make_shared<CSIPMSession>("commodoreserver.com", 1541);
+        _session->user = host;
+        _session->password = port;
         if (_session->connect()) {
             SessionBroker::add(sessionKey, _session);
-            _session->user = user;
-            _session->password = password;
         } else {
             _session.reset();
         }
@@ -263,6 +269,22 @@ CSIPMFile::CSIPMFile(std::string path, size_t filesize): MFile(path) {
         Debug_printv("Failed to obtain CSIP session");
         m_isNull = true;
         return;
+    }
+
+    // Change user or logout
+    //Debug_printv("user[%s] password[%s] s.user[%s] s.password[%s]", host.c_str(), port.c_str(), _session->user.c_str(), _session->password.c_str());
+    if ( host != _session->user || port != _session->password ) {
+        _session->user = host;
+        _session->password = port;
+        if ( host.empty() || port.empty() ) {
+            _session->sendCommand("logout");
+        } else {
+            _session->sendCommand("login " + host + ", " + port);
+        }
+        bool ok = _session->isOK();
+        if (!ok) {
+            Debug_printv("LOGIN/LOGOUT failed!");
+        }
     }
 
     isPETSCII = true;
@@ -328,7 +350,7 @@ bool CSIPMStream::open(std::ios_base::openmode mode) {
     }
 
     // should we allow loading of * in any directory?
-    // then we can LOAD and get available count from first 2 bytes in (LH) endian
+    // then we can LOAD and get available count from first 2 bytes in little endian
     // name here MUST BE UPPER CASE
     // trim spaces from right of name too
     mstr::rtrimA0(full_path);
@@ -446,7 +468,7 @@ bool CSIPMFile::isDirectory() {
 std::shared_ptr<MStream> CSIPMFile::getSourceStream(std::ios_base::openmode mode) {
     std::shared_ptr<MStream> istream = std::make_shared<CSIPMStream>(url);
     //auto istream = StreamBroker::obtain<CSIPMStream>(url, mode);
-    istream->open(mode);   
+    istream->open(mode);
     return istream;
 };
 
@@ -608,6 +630,7 @@ MFile* CSIPMFile::getNextFileInDir() {
         else {
             name = line.substr(5,16);
             size = atoi(line.substr(0, line.find_first_of(" ")).c_str());
+            size = size * 256; // convert blocks to bytes
             mstr::rtrim(name);
             mstr::replaceAll(name, "/", "\\");
             //Debug_printv("xx: %s -- %s %d", line.c_str(), name.c_str(), size);
