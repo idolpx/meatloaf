@@ -26,6 +26,7 @@ description = Meatloaf Commodore to ESP32 WiFi Multifunction Firmware
 ;environment = fujiapple-rev0               ; FujiApple REV0 with esp32-devkitc           (ESP32-WROVER 8M PSRAM, 8M Flash)
 ;environment = fujinet-v16                  ; FujiNet v1.6                                (ESP32-WROVER 8M PSRAM, 16M Flash)
 ;environment = fujiloaf-rev0                ; Meatloaf / FujiNet REV0 board, aka Fujiloaf (ESP32-WROVER 8M PSRAM, 16M Flash)
+;environment = freenove-esp32-cam           ; Freenove ESP32 CAM Board                    (ESP32-WROVER-E 8M PSRAM, 4M Flash)
 
 ; ESP32-WROOM32
 ;environment = esp32-wroom32                ; generic esp32-wroom32 board                 (ESP32-WROOM32 NO PSRAM, 4M/8M/16M Flash)
@@ -81,9 +82,7 @@ data_dir = data/${meatloaf.build_platform}.${meatloaf.flash_size}
 [esp32_base]
 ; Espressif32 PlatformIO Version to use for building
 ; https://github.com/platformio/platform-espressif32/releases
-;platform = espressif32 @ 6.3.2
-;platform = espressif32 @ 6.6.0 ;works
-platform = espressif32 @ 6.10.0
+platform = espressif32 @ 6.12.0
 framework = espidf
 board_build.filesystem = littlefs
 test_filter = embedded/*
@@ -92,7 +91,7 @@ extra_scripts =
 ;    post:build_firmwarezip.py
 
 [env]
-; Common settings for all enivornments
+; Common settings for all environments
 build_type = debug ;debug ;release
 lib_ldf_mode = off ; off chain deep chain+ deep+
 upload_speed = 2000000 ;460800 ;921600
@@ -235,6 +234,18 @@ build_flags =
     ${env.build_flags}
     -D PINMAP_FN_16
     -D SD_CARD
+
+[env:freenove-esp32-cam]
+extends = esp32_base
+board = freenove_esp32_wrover
+board_build.partitions = boards/partitions.4m.csv
+build_flags =
+    ${env.build_flags}
+    -D PINMAP_FREENOVE_ESP32_CAM
+    -D NO_BUTTONS
+    -D SD_CARD
+    -D ENABLE_CONSOLE
+    -D ENABLE_CONSOLE_TCP
 
 ; ESP32-WROOM32
 [env:esp32-wroom32]
