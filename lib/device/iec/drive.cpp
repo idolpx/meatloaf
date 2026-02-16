@@ -702,7 +702,11 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
 
         if( mstr::startsWith(name, "CD") )
         {
-            name = mstr::drop(name, 2);
+            if ( name.size() > 2 )
+                // Handle CD command in LOAD but filename could start with CD,
+                // so only treat it as CD if it's followed by a separator character, back, up, or path
+                if (name[2] == ':' || name[2] == '_' || name[2] == '^' || name[2] == '/')
+                    name = mstr::drop(name, 2);
         }
 
         // file name officially ends at first "shifted space" (0xA0) character
