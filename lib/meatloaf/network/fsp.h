@@ -52,6 +52,9 @@ public:
     void disconnect() override;
     bool keep_alive() override;
 
+    // Get the scheme for this session type
+    static std::string getScheme() { return "fsp"; }
+
     // Get the FSP session for operations
     FSP_SESSION* getSession() { return _session.get(); }
 

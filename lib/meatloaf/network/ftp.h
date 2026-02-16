@@ -52,6 +52,9 @@ class FTPMSession : public MSession {
         disconnect();
     }
 
+    // Get the scheme for this session type
+    static std::string getScheme() { return "ftp"; }
+
     bool connect() override {
         if (connected) return true;
         _fs = std::make_unique<FileSystemFTP>();

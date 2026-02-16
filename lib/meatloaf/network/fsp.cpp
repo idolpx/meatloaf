@@ -118,7 +118,7 @@ bool FSPMSession::keep_alive() {
     // Try to stat the root directory as a keep-alive operation
     struct stat sb;
     if (fsp_stat(session_ptr, "/", &sb) == 0) {
-        Debug_printv("Keep-alive for %s:%d successful", host.c_str(), port);
+        //Debug_printv("Keep-alive for %s:%d successful", host.c_str(), port);
         updateActivity();
         return true;
     }
@@ -190,22 +190,28 @@ std::shared_ptr<MStream> FSPMFile::createStream(std::ios_base::openmode mode) {
 }
 
 bool FSPMFile::isDirectory() {
+    //Debug_printv("isDirectory() called for path[%s] is_dir[%d]", path.c_str(), is_dir);
     if (is_dir > -1) return is_dir;
     //Debug_printv("path[%s] pathInStream[%s]", path.c_str(), pathInStream.c_str());
     if (path == "/" || path.empty()) {
+        //Debug_printv("isDirectory() root path - returning true");
         return true;
     }
 
     if (!pathValid(path)) {
+        Debug_printv("isDirectory() path not valid - returning false");
         return false;
     }
 
     struct stat sb;
     if (fsp_stat(getSession(), path.c_str(), &sb) != 0) {
+        Debug_printv("isDirectory() fsp_stat failed - returning false");
         return false;
     }
 
-    return S_ISDIR(sb.st_mode);
+    bool result = S_ISDIR(sb.st_mode);
+    //Debug_printv("isDirectory() result[%d]", result);
+    return result;
 }
 
 time_t FSPMFile::getLastWrite() {
@@ -232,13 +238,23 @@ uint64_t FSPMFile::getAvailableSpace() {
 }
 
 bool FSPMFile::rewindDirectory() {
+    Debug_printv("rewindDirectory() called for path[%s]", path.c_str());
     openDir(path);
     _current_entry = 0;
+    Debug_printv("rewindDirectory() result: dirOpened[%d]", dirOpened);
     return dirOpened;
 }
 
 MFile* FSPMFile::getNextFileInDir() {
+    //Debug_printv("getNextFileInDir() called - dirOpened[%d]", dirOpened);
+
+    if (!dirOpened) {
+        Debug_printv("Directory not opened yet, calling rewindDirectory()");
+        rewindDirectory();
+    }
+
     if (!dirOpened || !_dir_handle) {
+        Debug_printv("getNextFileInDir() failed - dirOpened[%d] _dir_handle[%p]", dirOpened, _dir_handle);
         return nullptr;
     }
 
@@ -285,6 +301,9 @@ MFile* FSPMFile::getNextFileInDir() {
         // Set file size for regular files (not directories)
         if (entry.type != FSP_RDTYPE_DIR) {
             file->size = entry.size;
+            file->is_dir = false;
+        } else {
+            file->is_dir = true;
         }
         
         return file;
@@ -422,7 +441,7 @@ void FSPMFile::closeDir() {
     if (_dir_handle) {
         fsp_closedir(_dir_handle);
         _dir_handle = nullptr;
-        Debug_printv("Closed FSP directory");
+        //Debug_printv("Closed FSP directory");
     }
     dirOpened = false;
     _dir_entries.clear();

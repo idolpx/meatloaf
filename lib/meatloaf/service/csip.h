@@ -188,6 +188,9 @@ public:
     void disconnect() override;
     bool keep_alive() override;
 
+    // Get the scheme for this session type
+    static std::string getScheme() { return "csip"; }
+
     // CSIP-specific methods
     bool sendCommand(const std::string& command);
     bool traversePath(std::string path);

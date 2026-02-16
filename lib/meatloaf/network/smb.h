@@ -66,6 +66,9 @@ public:
         disconnect();
     }
 
+    // Get the scheme for this session type
+    static std::string getScheme() { return "smb"; }
+
     // Set credentials for this session
     void setCredentials(const std::string& user, const std::string& password) {
         _user = user;

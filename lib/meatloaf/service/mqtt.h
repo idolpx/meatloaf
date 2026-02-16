@@ -49,6 +49,9 @@ public:
     void disconnect() override;
     bool keep_alive() override;
 
+    // Get the scheme for this session type
+    static std::string getScheme() { return "mqtt"; }
+
     // MQTT-specific methods
     bool publish(const std::string& topic, const std::string& payload, int qos = 0, bool retain = false);
     bool subscribe(const std::string& topic, int qos = 0);

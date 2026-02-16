@@ -45,6 +45,9 @@ public:
 		disconnect();
 	}
 
+	// Get the scheme for this session type
+	static std::string getScheme() { return "irc"; }
+
 	bool connect() override {
 		if (connected) return true;
 

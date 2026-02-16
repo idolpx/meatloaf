@@ -65,6 +65,9 @@ public:
     void disconnect() override;
     bool keep_alive() override;
 
+    // Get the scheme for this session type
+    static std::string getScheme() { return "http"; }
+
     // Get HTTP client configuration for this session
     esp_http_client_config_t* getClientConfig();
 

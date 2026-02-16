@@ -50,6 +50,9 @@ public:
     void disconnect() override;
     bool keep_alive() override;
 
+    // Get the scheme for this session type
+    static std::string getScheme() { return "sftp"; }
+
     // Get the SSH session handle
     ssh_session getSSHSession() { return ssh_handle; }
 

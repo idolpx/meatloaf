@@ -160,6 +160,7 @@ private:
     static std::unordered_map<std::string, std::shared_ptr<MSession>> session_repo;
     static std::chrono::steady_clock::time_point last_keep_alive_check;
     static bool task_running;
+    static bool system_shutdown;  // Flag to indicate system is shutting down
     static SemaphoreHandle_t _mutex;
 
     static void lock() {
@@ -221,10 +222,16 @@ public:
     // Stop the SessionBroker service task
     static void shutdown() {
         Debug_printv("Stopping SessionBroker service task");
+        system_shutdown = true;  // Set shutdown flag BEFORE clearing sessions
         task_running = false;
         lock();
         session_repo.clear();
         unlock();
+    }
+
+    // Check if system is shutting down
+    static bool isShuttingDown() {
+        return system_shutdown;
     }
 
     // Find an existing session by key (does not create)
@@ -253,9 +260,9 @@ public:
     // Obtain a session (creates if doesn't exist, returns existing if found)
     template<class T>
     static std::shared_ptr<T> obtain(std::string host, uint16_t port = 0) {
-        // Create session to get the canonical key (scheme://host:port)
-        auto newSession = std::make_shared<T>(host, port);
-        std::string key = newSession->getKey();
+        // Construct key directly from scheme, host, and port to avoid creating temporary session
+        std::string scheme = T::getScheme();  // e.g., "tnfs", "csip", "ftp"
+        std::string key = scheme + "://" + host + ":" + std::to_string(port);
 
         // Return existing session if found
         auto existing = find<T>(key);
@@ -263,7 +270,8 @@ public:
             return existing;
         }
 
-        // Connect the new session (outside lock — connect() is slow)
+        // Create and connect new session
+        auto newSession = std::make_shared<T>(host, port);
         if (newSession->connect()) {
             add(key, newSession);
             return newSession;

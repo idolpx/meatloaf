@@ -134,6 +134,9 @@ public:
         disconnect();
     }
 
+    // Get the scheme for this session type
+    static std::string getScheme() { return "tcp"; }
+
     bool connect() override {
         if (connected) return true;
         if (port == 0) {

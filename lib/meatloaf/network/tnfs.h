@@ -48,6 +48,9 @@ public:
     void disconnect() override;
     bool keep_alive() override;
 
+    // Get the scheme for this session type
+    static std::string getScheme() { return "tnfs"; }
+
     // Get the mount info for TNFS operations
     tnfsMountInfo* getMountInfo() { return _mountinfo.get(); }
 

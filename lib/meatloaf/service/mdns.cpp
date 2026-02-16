@@ -132,12 +132,17 @@ void MDNSMSession::disconnect() {
     clearCache();
 
     if (mdns_initialized) {
-        // Guard: mdns_free() asserts on internal semaphore that gets freed
-        // when WiFi stack tears down (e.g., during esp_restart()).
-        // Only call mdns_free() if WiFi is still up.
-        wifi_mode_t mode;
-        if (esp_wifi_get_mode(&mode) == ESP_OK) {
-            mdns_free();
+        // Guard: Skip mdns_free() during system shutdown to avoid accessing
+        // already-freed ESP-IDF internal structures (semaphores, etc.)
+        if (SessionBroker::isShuttingDown()) {
+            Debug_printv("Skipping mdns_free() during system shutdown");
+        } else {
+            // Additional guard: mdns_free() asserts on internal semaphore that gets freed
+            // when WiFi stack tears down. Only call mdns_free() if WiFi is still up.
+            wifi_mode_t mode;
+            if (esp_wifi_get_mode(&mode) == ESP_OK) {
+                mdns_free();
+            }
         }
         mdns_initialized = false;
     }

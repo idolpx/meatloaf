@@ -73,6 +73,9 @@ public:
     void disconnect() override;
     bool keep_alive() override;
 
+    // Get the scheme for this session type
+    static std::string getScheme() { return "mdns"; }
+
     // Service discovery operations
     bool discoverServices(const std::string& service_type = "", const std::string& proto = "_tcp", uint32_t timeout_ms = 5000);
     std::vector<DiscoveredService> getDiscoveredServices() const;
