@@ -161,6 +161,15 @@ bool Archive::open(std::ios_base::openmode mode) {
         Debug_printv("Error opening archive: %d! [%s]", r, archive_error_string(m_archive));
         archive_read_free(m_archive);
         m_archive = NULL;
+    } else {
+        Debug_printv("Archive opened successfully");
+        const char* format_name = archive_format_name(m_archive);
+        Debug_printv("Archive format: %s", format_name ? format_name : "(null)");
+        Debug_printv("Archive filter count: %d", archive_filter_count(m_archive));
+        if (archive_filter_count(m_archive) > 0) {
+            const char* filter_name = archive_filter_name(m_archive, 0);
+            Debug_printv("Archive filter 0: %s", filter_name ? filter_name : "(null)");
+        }
     }
 
     return isOpen();
@@ -305,7 +314,7 @@ uint32_t ArchiveMStream::read(uint8_t *buf, uint32_t size) {
     readArchiveData();
 
     if (m_haveData > 0) {
-        // Debug_printv("calling read, buff size=[%ld]", size);
+        //Debug_printv("calling read, buff size=[%ld]", size);
 
 #if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
         if (_position + size > _size) size = _size - _position;
@@ -329,6 +338,7 @@ uint32_t ArchiveMStream::read(uint8_t *buf, uint32_t size) {
         return numRead;
 
 #else
+        if (_position + size > _size) size = _size - _position;
         memcpy(buf, m_data + _position, size);
         _position += size;
         return size;
@@ -432,10 +442,19 @@ bool ArchiveMStream::seekEntry(std::string filename)
 
 bool ArchiveMStream::seekEntry( uint16_t index )
 {
-    //Debug_printv("entry_count[%d] entry_index[%d] index[%d]", entry_count, entry_index, index);
+    Debug_printv("entry_count[%d] entry_index[%d] index[%d] m_isCompressedOnly[%d]", entry_count, entry_index, index, m_isCompressedOnly);
 
-    if ( !m_archive->isOpen() )
+    if ( !m_archive->isOpen() ) {
+        Debug_printv("ERROR: archive not open");
         return false;
+    }
+
+    // For compressed-only files, there's only one entry
+    // If we're being asked for index > 1, return false immediately
+    if (m_isCompressedOnly && index > 1) {
+        Debug_printv("Compressed-only file has only one entry, index %d is out of bounds", index);
+        return false;
+    }
 
     index--;
 
@@ -444,15 +463,91 @@ bool ArchiveMStream::seekEntry( uint16_t index )
 
     archive *a = m_archive->getArchive();
 
-    if ( archive_read_next_header(a, &a_entry) != ARCHIVE_OK )
+    int r = archive_read_next_header(a, &a_entry);
+    Debug_printv("archive_read_next_header returned: %d", r);
+
+    // Special handling for compressed-only files (e.g., standalone .gz, .bz2 files)
+    // These have compression filters but no archive format, so archive_read_next_header returns EOF
+    if (r == ARCHIVE_EOF && index == 0 && archive_filter_count(a) > 1) {
+        Debug_printv("Detected compressed-only file (no archive format)");
+
+        // Mark this as a compressed-only file so we don't try to read more entries
+        m_isCompressedOnly = true;
+
+        // Derive filename from archive URL by removing compression extension
+        std::string archivePath = url;
+
+        // Extract filename from path
+        size_t lastSlash = archivePath.find_last_of("/\\");
+        std::string filename = (lastSlash != std::string::npos)
+            ? archivePath.substr(lastSlash + 1)
+            : archivePath;
+
+        // Remove compression extension
+        const char* compressionExts[] = {".gz", ".bz2", ".xz", ".lz", ".z", ".zst", ".lz4"};
+        for (const char* ext : compressionExts) {
+            if (mstr::endsWith(filename, ext, false)) {
+                filename = filename.substr(0, filename.length() - strlen(ext));
+                break;
+            }
+        }
+
+        entry.filename = filename;
+        Debug_printv("Synthesized filename: %s", entry.filename.c_str());
+
+        // For compressed-only files, we can't easily determine the decompressed size
+        // without reading through the entire file. For now, set size to 0.
+        // The actual size will be determined when the file is accessed.
+        // Alternative: could read compressed file size, but that's not the decompressed size.
+        entry.size = 0;
+        Debug_printv("Size set to 0 (will be determined on access)");
+
+        entry_index = 1;
+        return true;
+    }
+
+    if ( r != ARCHIVE_OK ) {
+        if (r == ARCHIVE_EOF) {
+            Debug_printv("End of archive reached");
+        } else {
+            Debug_printv("ERROR reading header: %s", archive_error_string(a));
+        }
         return false;
+    }
 
     // Check filetype
     const mode_t type = archive_entry_filetype(a_entry);
+    Debug_printv("entry filetype: 0x%x, S_ISREG=%d", type, S_ISREG(type));
     if ( S_ISREG(type) ) {
-        entry.filename = basename(archive_entry_pathname(a_entry));
+        const char* pathname = archive_entry_pathname(a_entry);
+
+        // For raw compressed files (.gz, .bz2, etc.), pathname may be NULL or empty
+        // In this case, derive filename from archive URL by removing compression extension
+        if (pathname == nullptr || pathname[0] == '\0') {
+            std::string archivePath = url;
+
+            // Extract filename from path
+            size_t lastSlash = archivePath.find_last_of("/\\");
+            std::string filename = (lastSlash != std::string::npos)
+                ? archivePath.substr(lastSlash + 1)
+                : archivePath;
+
+            // Remove compression extension
+            const char* compressionExts[] = {".gz", ".bz2", ".xz", ".lz", ".z", ".zst", ".lz4"};
+            for (const char* ext : compressionExts) {
+                if (mstr::endsWith(filename, ext, false)) {
+                    filename = filename.substr(0, filename.length() - strlen(ext));
+                    break;
+                }
+            }
+
+            entry.filename = filename;
+        } else {
+            entry.filename = basename(pathname);
+        }
+
         entry.size = archive_entry_size(a_entry);
-        
+
         // For compressed files without known size (e.g., .gz in raw format),
         // archive_entry_size() may return 0. We need to determine actual size
         // by reading the data.
@@ -462,7 +557,7 @@ bool ArchiveMStream::seekEntry( uint16_t index )
             size_t size;
             //int64_t offset;
             uint64_t total = 0;
-            
+
             // while (archive_read_data_block(a, &buff, &size, &offset) == ARCHIVE_OK) {
             //     total += size;
             // }
@@ -470,13 +565,13 @@ bool ArchiveMStream::seekEntry( uint16_t index )
                 size = archive_read_data(a, &buff, 255);
                 total += size;
             } while (size > 0);
-            
+
             entry.size = total;
-            
+
             // Must reopen the archive to reset read position for actual data extraction
             m_archive->close();
             m_archive->open(std::ios_base::in);
-            
+
             // Re-read to get back to this entry
             a = m_archive->getArchive();
             if (archive_read_next_header(a, &a_entry) != ARCHIVE_OK) {
@@ -488,7 +583,7 @@ bool ArchiveMStream::seekEntry( uint16_t index )
 
     entry_index = index + 1;
 
-    //Debug_printv("entry_index[%d] filename[%s] size[%lu]", entry_index, entry.filename.c_str(), entry.size);
+    Debug_printv("entry_index[%d] filename[%s] size[%lu]", entry_index, entry.filename.c_str(), entry.size);
     return true;
 }
 
@@ -546,6 +641,7 @@ bool ArchiveMFile::rewindDirectory()
 
 MFile *ArchiveMFile::getNextFileInDir()
 {
+    Debug_printv("getNextFileInDir() called, dirIsOpen=%d", dirIsOpen);
     bool r = false;
 
     if (!dirIsOpen)
@@ -553,17 +649,22 @@ MFile *ArchiveMFile::getNextFileInDir()
 
     // Get entry pointed to by containerStream
     auto image = ImageBroker::obtain<ArchiveMStream>("archive", url);
-    if (image == nullptr)
+    if (image == nullptr) {
+        Debug_printv("ERROR: ImageBroker returned nullptr");
         goto exit;
+    }
 
+    Debug_printv("Calling getNextImageEntry()");
     do
     {
         r = image->getNextImageEntry();
+        Debug_printv("getNextImageEntry() returned %d, filename=[%s]", r, r ? image->entry.filename.c_str() : "");
     } while (r && image->entry.filename.empty()); // Don't want empty entries
 
     if (r)
     {
         std::string filename = image->entry.filename;
+        Debug_printv("Found entry: filename=[%s] size=%lu", filename.c_str(), image->entry.size);
         //uint8_t i = filename.find_first_of(0xA0);
         //filename = filename.substr(0, i);
         // mstr::rtrimA0(filename);
@@ -579,8 +680,8 @@ MFile *ArchiveMFile::getNextFileInDir()
     }
 
 exit:
+    Debug_printv("END OF DIRECTORY - no more entries");
     dirIsOpen = false;
     image->m_archive->close();
-    //Debug_printv( "END OF DIRECTORY" );
     return nullptr;
 }

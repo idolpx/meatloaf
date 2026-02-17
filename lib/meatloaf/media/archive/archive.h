@@ -88,6 +88,7 @@ class ArchiveMStream : public MMediaStream {
         m_haveData = 0;
         m_mode = std::ios::in;
         m_dirty = false;
+        m_isCompressedOnly = false;
         Debug_printv("constructor url[%s]", is->url.c_str());
     }
 
@@ -135,6 +136,7 @@ class ArchiveMStream : public MMediaStream {
 
     int m_haveData;
     bool m_dirty;
+    bool m_isCompressedOnly;  // True for standalone compressed files like .gz, .bz2 (single entry only)
 
 #if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
     // contains unzipped contents of archive (in HIMEM)
@@ -160,6 +162,8 @@ class ArchiveMFile : public MFile {
     {
         media_archive = name;
         //Debug_printv("constructor url[%s]", path.c_str());
+
+        isPETSCII = true;
     }
 
     ~ArchiveMFile() {
