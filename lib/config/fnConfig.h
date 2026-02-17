@@ -542,13 +542,13 @@ private:
     struct device_enable_info
     {
         bool device_1_enabled = true;
-        bool device_2_enabled = true;
-        bool device_3_enabled = true;
-        bool device_4_enabled = true;
-        bool device_5_enabled = true;
-        bool device_6_enabled = true;
-        bool device_7_enabled = true;
-        bool device_8_enabled = true;
+        bool device_2_enabled = false;
+        bool device_3_enabled = false;
+        bool device_4_enabled = false;
+        bool device_5_enabled = false;
+        bool device_6_enabled = false;
+        bool device_7_enabled = false;
+        bool device_8_enabled = false;
         bool apetime = true;
         bool pclink = true;
     };

@@ -906,6 +906,12 @@ MFile* MFile::cd(std::string newDir)
         if ( !mstr::endsWith(url, "/") && newDir.size() )
             url.push_back('/');
 
+        // Network Explorer
+        if ( url == "/" && newDir == "network") {
+            url = "mdns://";
+            newDir = "";
+        }
+
         // Add new directory to path
         //Debug_printv("url[%s] newDir[%s]", url.c_str(), newDir.c_str());
         MFile* newPath = MFSOwner::File(url + newDir);

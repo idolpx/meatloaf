@@ -194,8 +194,13 @@ int ls(int argc, char **argv)
     }
 
     // If sd card is mounted and we are at root
-    if( fnSDFAT.running() && getCurrentPath()->url.size() == 1 )
-        Serial.printf("d %8lu  'sd'\r\n", 0);
+    if( getCurrentPath()->url.size() == 1 )
+    {
+        if ( fnSDFAT.running() )
+            Serial.printf("d %8lu  'sd'\r\n", 0);
+
+        Serial.printf("d %8lu  'network'\r\n", 0);
+    }
 
     while(entry.get() != nullptr) {
         if ( entry->isPETSCII )

@@ -355,7 +355,7 @@ iecChannelHandlerDir::iecChannelHandlerDir(iecDrive *drive, MFile *dir) : iecCha
             m_headers.push_back("DIR SD");
     
         // This will be used to browse the network
-        // m_headers.push_back("DIR NETWORK");
+        m_headers.push_back("DIR NETWORK");
     }
 
 #ifdef ENABLE_DISPLAY
