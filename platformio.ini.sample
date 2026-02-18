@@ -237,7 +237,7 @@ build_flags =
 
 [env:freenove-esp32-cam]
 extends = esp32_base
-board = freenove_esp32_wrover
+board = esp32-wrover-4m
 board_build.partitions = boards/partitions.4m.csv
 build_flags =
     ${env.build_flags}
