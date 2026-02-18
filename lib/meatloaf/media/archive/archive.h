@@ -162,8 +162,6 @@ class ArchiveMFile : public MFile {
     {
         media_archive = name;
         //Debug_printv("constructor url[%s]", path.c_str());
-
-        isPETSCII = true;
     }
 
     ~ArchiveMFile() {
