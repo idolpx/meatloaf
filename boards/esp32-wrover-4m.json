@@ -31,7 +31,7 @@
     "arduino",
     "espidf"
   ],
-  "name": "Freenove ESP32-Wrover",
+  "name": "Meatloaf v1 4MB",
   "upload": {
     "flash_size": "4MB",
     "maximum_ram_size": 327680,
@@ -43,6 +43,6 @@
     "require_upload_port": true,
     "speed": 460800
   },
-  "url": "https://store.freenove.com/products/fnk0060",
-  "vendor": "Freenove"
+  "url": "https://github.com/idolpx/meatloaf",
+  "vendor": "Meatloaf CBM"
 }

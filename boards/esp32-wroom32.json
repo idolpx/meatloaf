@@ -11,7 +11,7 @@
     "flash_mode": "dio",
     "mcu": "esp32",
     "variant": "esp32",
-    "partitions": "boards/partitions.4m.csv"
+    "partitions": "boards/partitions.4m.noupdates.csv"
   },
   "connectivity": [
     "wifi",
