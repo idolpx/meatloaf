@@ -255,6 +255,11 @@ bool ArchiveMStream::ensureData() {
 
     // Get or extract the entry data
     m_cachedEntry = m_session->getEntry(entry.filename, m_archive->getArchive(), _size);
+    if (m_cachedEntry) {
+        // Data is now cached in ArchiveMSession — close the archive handle
+        // to release libarchive buffers and the source stream (SD file handle)
+        m_archive->close();
+    }
     return (m_cachedEntry != nullptr);
 }
 

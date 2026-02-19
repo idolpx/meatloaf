@@ -30,6 +30,7 @@
 #include "../../../include/debug.h"
 #include "meat_media.h"
 #include "meatloaf.h"
+#include "meat_session.h"
 
 
 class Archive {
