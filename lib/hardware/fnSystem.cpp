@@ -147,14 +147,19 @@ static void card_detect_intr_task(void *arg)
 
 static void setup_card_detect(gpio_num_t pin)
 {
-    // Create a queue to handle card detect event from ISR
-    card_detect_evt_queue = xQueueCreate(10, sizeof(gpio_num_t));
-    // Start card detect task
-    xTaskCreate(card_detect_intr_task, "card_detect_intr_task", 2048, (void *)pin, 10, NULL);
-    // Enable interrupt for card detection
-    fnSystem.set_pin_mode(pin, gpio_mode_t::GPIO_MODE_INPUT, SystemManager::pull_updown_t::PULL_NONE, GPIO_INTR_ANYEDGE);
-    // Add the card detect handler
-    gpio_isr_handler_add(pin, card_detect_isr_handler, (void *)pin);
+    if (PIN_CARD_DETECT != GPIO_NUM_NC) {
+        // Create a queue to handle card detect event from ISR
+        card_detect_evt_queue = xQueueCreate(10, sizeof(gpio_num_t));
+        // Start card detect task
+        xTaskCreate(card_detect_intr_task, "card_detect_intr_task", 2048, (void *)pin, 10, NULL);
+        // Enable interrupt for card detection
+        fnSystem.set_pin_mode(pin, gpio_mode_t::GPIO_MODE_INPUT, SystemManager::pull_updown_t::PULL_NONE, GPIO_INTR_ANYEDGE);
+        // Add the card detect handler
+        gpio_isr_handler_add(pin, card_detect_isr_handler, (void *)pin);
+    } else
+    {
+        Debug_println("SD Card detect pin is N/C, so not seting up an ISR to check it.\r\n");
+    }
 }
 // ESP_PLATFORM
 #else
@@ -521,14 +526,19 @@ void SystemManager::update_hostname(const char *hostname)
 
 void SystemManager::update_firmware()
 {
+#if(NO_UPDATES)
+    Serial.printf("Not updating; live updates disabled.\r\n");
+#else
     Serial.printf("Stopping flash filesystem...\r\n");
     fsFlash.stop();
 
+    // TODO:  Add support for SDMMC.
     Serial.println("Flash bin files from '/sd/.bin/'");
     mlff_update(PIN_SD_HOST_CS, PIN_SD_HOST_MISO, PIN_SD_HOST_MOSI, PIN_SD_HOST_SCK);
 
     Serial.println("Reboot to run update app and flash 'main.*.bin'...");
     reboot();
+#endif
 }
 
 const char *SystemManager::get_current_time_str()

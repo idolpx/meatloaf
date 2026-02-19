@@ -630,6 +630,8 @@ bool FileSystemSDFAT::start()
 
 #ifdef SDMMC_HOST_WIDTH
 
+    Debug_printf("FileSystemSDFAT::start();  Configured to use SDMMC.\r\n");
+
     sdmmc_host_t host_config = SDMMC_HOST_DEFAULT();
 
     sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
@@ -640,17 +642,29 @@ bool FileSystemSDFAT::start()
     slot_config.d1  = PIN_SD_HOST_D1;
     slot_config.d2  = PIN_SD_HOST_D2;
     slot_config.d3  = PIN_SD_HOST_D3;
-    slot_config.wp  = PIN_SD_HOST_WP;
+    slot_config.wp  = GPIO_NUM_NC;
+
+#if SDMMC_PULL_UP
+    Debug_printf("FileSystemSDFAT::start();  Pulling up lines to help the SD-card slot wake up.\r\n");
+
+	// This tells the ESP32 to electrically "pull" the lines high, which SD cards require to wake up.
+	slot_config.flags |= SDMMC_SLOT_FLAG_INTERNAL_PULLUP;
+#endif
 
     esp_err_t e = esp_vfs_fat_sdmmc_mount(_basepath, &host_config, &slot_config, &mount_config, &sdcard_info);
 
 #if SDMMC_HOST_WP_LEVEL
+
+    Debug_printf("FileSystemSDFAT::start();  Overriding write-protect routing.\r\n", _basepath);
+
     // Override WP routing of GPIO to SDMMC peripheral in order to omit inversion - the original routing is located at
     // https://github.com/espressif/esp-idf/blob/51772f4fb5c2bbe25b60b4a51d707fa2afd3ac75/components/driver/sdmmc/sdmmc_host.c#L508-L510
     esp_rom_gpio_connect_in_signal(PIN_SD_HOST_WP, sdmmc_slot_info[host_config.slot].write_protect, false);
 #endif
 
 #else /* SDMMC_HOST_WIDTH */
+
+    Debug_printf("Configured to use SDSPI.\r\n");
 
     // Set up a configuration to the SD host interface
     sdmmc_host_t host_config = SDSPI_HOST_DEFAULT(); 
