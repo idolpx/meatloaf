@@ -511,14 +511,19 @@ int wget(int argc, char **argv)
 
 int update(int argc, char **argv)
 {
+#if(NO_UPDATES)
+    Serial.printf("Not updating; live updates disabled.\r\n");
+#else
     Serial.printf("Stopping flash filesystem...\r\n");
     fsFlash.stop();
 
+    // TODO:  Add support for SDMMC.
     Serial.println("Flash bin files from '/sd/.bin/'");
     mlff_update(PIN_SD_HOST_CS, PIN_SD_HOST_MISO, PIN_SD_HOST_MOSI, PIN_SD_HOST_SCK);
 
     Serial.println("Reboot to run update app and flash 'main.*.bin'...");
     esp_restart();
+#endif
 
     return EXIT_SUCCESS;
 }

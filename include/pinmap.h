@@ -10,6 +10,7 @@
 #include "pinmap/fujiloaf-rev0.h"
 #include "pinmap/fujinet-v1.6.h"
 #include "pinmap/fujiapple-rev0.h"
+#include "pinmap/freenove-esp32-cam.h"
 
 // ESP32 WROOM-32
 #include "pinmap/esp-wroom32.h"
