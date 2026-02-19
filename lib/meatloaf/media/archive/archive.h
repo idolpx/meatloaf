@@ -49,9 +49,6 @@ class Archive {
 
     ~Archive() {
         close();
-        if (m_srcBuffer != nullptr) {
-            delete m_srcBuffer;
-        }
         Debug_printv("Archive destructor");
     }
 
@@ -60,11 +57,13 @@ class Archive {
 
     bool isOpen() { return m_archive != nullptr; }
     archive *getArchive() { return m_archive; }
+    bool hasCompressionFilter() { return m_hasCompressionFilter; }
 
    private:
     struct archive *m_archive = nullptr;
     uint8_t *m_srcBuffer = nullptr;
     std::shared_ptr<MStream> m_srcStream = nullptr;  // a stream that is able to serve bytes of this archive
+    bool m_hasCompressionFilter = false;  // True when gzip/bz2/xz/etc filter is active (disables raw seeking)
 
   static const size_t m_buffSize = 4096;
 

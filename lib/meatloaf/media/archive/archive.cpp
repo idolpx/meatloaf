@@ -79,6 +79,13 @@ int64_t cb_skip(struct archive *, void *userData, int64_t request)
 
     if (a->m_archive)
     {
+        // When compression filters are active (gzip, bz2, xz, etc.), raw seeking
+        // corrupts the decompressor state. Return 0 to force libarchive to use
+        // read-based skipping through the decompression pipeline instead.
+        if (a->hasCompressionFilter()) {
+            return 0;
+        }
+
         uint32_t old_pos = a->m_srcStream->position();
         bool rc = a->m_srcStream->seek(request, SEEK_CUR);
         if (rc) {
@@ -105,6 +112,18 @@ int64_t cb_seek(struct archive *, void *userData, int64_t offset, int whence)
 
     if (a->m_archive)
     {
+        // When compression filters are active, only allow rewinding to start.
+        // Other seeks would corrupt the decompressor state.
+        // This check is skipped during archive_read_open1() (before filters are detected)
+        // so ZIP format detection (which needs SEEK_END) still works.
+        if (a->hasCompressionFilter()) {
+            if (whence == SEEK_SET && offset == 0) {
+                bool rc = a->m_srcStream->seek(0, SEEK_SET);
+                return rc ? 0 : ARCHIVE_FATAL;
+            }
+            return ARCHIVE_FATAL;
+        }
+
         bool rc = a->m_srcStream->seek(offset, whence);
         if (rc) {
             // Must return the resulting absolute position, not the offset
@@ -165,11 +184,15 @@ bool Archive::open(std::ios_base::openmode mode) {
         Debug_printv("Archive opened successfully");
         const char* format_name = archive_format_name(m_archive);
         Debug_printv("Archive format: %s", format_name ? format_name : "(null)");
-        Debug_printv("Archive filter count: %d", archive_filter_count(m_archive));
-        if (archive_filter_count(m_archive) > 0) {
+        int filter_count = archive_filter_count(m_archive);
+        Debug_printv("Archive filter count: %d", filter_count);
+        if (filter_count > 0) {
             const char* filter_name = archive_filter_name(m_archive, 0);
             Debug_printv("Archive filter 0: %s", filter_name ? filter_name : "(null)");
         }
+        // filter_count > 1 means a compression filter is present (filter 0 is always "none")
+        m_hasCompressionFilter = (filter_count > 1);
+        Debug_printv("hasCompressionFilter: %d", m_hasCompressionFilter);
     }
 
     return isOpen();
@@ -181,6 +204,11 @@ void Archive::close() {
         archive_read_free(m_archive);
         m_archive = NULL;
     }
+    if (m_srcBuffer != nullptr) {
+        delete[] m_srcBuffer;
+        m_srcBuffer = nullptr;
+    }
+    m_hasCompressionFilter = false;
 }
 
 /********************************************************
@@ -314,7 +342,7 @@ uint32_t ArchiveMStream::read(uint8_t *buf, uint32_t size) {
     readArchiveData();
 
     if (m_haveData > 0) {
-        //Debug_printv("calling read, buff size=[%ld]", size);
+        // Debug_printv("calling read, buff size=[%ld]", size);
 
 #if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
         if (_position + size > _size) size = _size - _position;
@@ -510,7 +538,15 @@ bool ArchiveMStream::seekEntry( uint16_t index )
         if (r == ARCHIVE_EOF) {
             Debug_printv("End of archive reached");
         } else {
-            Debug_printv("ERROR reading header: %s", archive_error_string(a));
+            // Suppress expected end-of-archive errors from compressed streams
+            const char* err_str = archive_error_string(a);
+            if (err_str && (strstr(err_str, "Truncated") ||
+                           strstr(err_str, "decompression failed") ||
+                           strstr(err_str, "bad header checksum"))) {
+                Debug_printv("End of compressed archive");
+            } else {
+                Debug_printv("ERROR reading header: %s", err_str ? err_str : "(unknown)");
+            }
         }
         return false;
     }
@@ -680,8 +716,8 @@ MFile *ArchiveMFile::getNextFileInDir()
     }
 
 exit:
-    Debug_printv("END OF DIRECTORY - no more entries");
     dirIsOpen = false;
     image->m_archive->close();
+    //Debug_printv( "END OF DIRECTORY" );
     return nullptr;
 }
