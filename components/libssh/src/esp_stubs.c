@@ -22,4 +22,12 @@ int encode_current_tty_opts(unsigned char *buf, size_t buflen)
     return 1; /* Length of 1 byte (just the terminator) */
 }
 
+/* Stub for if_nametoindex - Network interface indexing not needed on ESP-IDF */
+unsigned int if_nametoindex(const char *ifname)
+{
+    /* Return 0 to indicate interface not found */
+    (void)ifname;
+    return 0;
+}
+
 #endif /* ESP_PLATFORM */
