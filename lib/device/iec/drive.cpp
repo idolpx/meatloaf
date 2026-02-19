@@ -2017,14 +2017,18 @@ void iecDrive::set_cwd(std::string path)
     MFile *n = m_cwd ? m_cwd->cd( path ) : nullptr;
     if( n != nullptr )
     {
-        // bug in HTTPMFile: must call isDirectory() before getSourceStream(), otherwise 
+        // bug in HTTPMFile: must call isDirectory() before getSourceStream(), otherwise
         // getSourceStream() call will hang for several seconds for HTTP files
         bool isDirectory = n->isDirectory();
 
-        // check whether we can get a stream
-        std::shared_ptr<MStream> s = n->exists() ? n->getSourceStream() : nullptr;
-        bool haveStream = (s!=nullptr);
-        //if( s ) delete s;
+        // Only create a stream for non-directory files (needed for VDrive check).
+        // For directories, isDirectory alone is sufficient for the conditions below,
+        // and creating a stream is expensive (extracts data from archives, etc.)
+        bool haveStream = false;
+        if ( !isDirectory && n->exists() ) {
+            std::shared_ptr<MStream> s = n->getSourceStream();
+            haveStream = (s != nullptr);
+        }
 
         Debug_printv("url[%s] isDirectory[%i] haveStream[%i]", n->url.c_str(), isDirectory, haveStream);
 

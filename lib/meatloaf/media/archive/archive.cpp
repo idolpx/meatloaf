@@ -211,14 +211,10 @@ void Archive::close() {
     m_hasCompressionFilter = false;
 }
 
-/********************************************************
- * Streams implementations
- ********************************************************/
 
-#if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
-int ArchiveMStream::s_rangeUsed = 0;
-esp_himem_rangehandle_t ArchiveMStream::s_range;
-#endif
+/********************************************************
+ * ArchiveMStream implementation
+ ********************************************************/
 
 bool ArchiveMStream::open(std::ios_base::openmode mode) {
     m_mode = mode;
@@ -228,209 +224,68 @@ bool ArchiveMStream::open(std::ios_base::openmode mode) {
 void ArchiveMStream::close() {
     m_archive->close();
 
-    if (m_haveData > 0) {
-        if (m_dirty) {
-            m_dirty = false;
-        }
-
-#if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
-        ESP_ERROR_CHECK(esp_himem_free(m_data));
-        Debug_printv("HIMEM available after free: %lu ", (uint32_t)esp_himem_get_free_size());
-
-        // if this was the last archive in use then free up the mapped range
-        if (s_rangeUsed > 0) s_rangeUsed--;
-        if (s_rangeUsed == 0) esp_himem_free_map_range(s_range);
-#else
-        delete[] m_data;
-#endif
+    if (m_session) {
+        m_session->releaseIO();
+        m_session.reset();
     }
-
-    m_haveData = 0;
+    m_cachedEntry.reset();
 }
 
 bool ArchiveMStream::isOpen() { return m_archive->isOpen(); }
 
-void ArchiveMStream::readArchiveData() {
-    if (m_archive->isOpen() && m_haveData == 0) {
-
-#if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
-        // allocate HIMEM memory for archive data (size must be multiple of
-        // ESP_HIMEM_BLKSZ);
-        uint32_t size = (_size / ESP_HIMEM_BLKSZ) * ESP_HIMEM_BLKSZ;
-        if (_size > size) size += ESP_HIMEM_BLKSZ;
-
-        Debug_printv("HIMEM physical size: %lu", (uint32_t)esp_himem_get_phys_size());
-        Debug_printv("HIMEM available before alloc: %lu ", (uint32_t)esp_himem_get_free_size());
-
-        esp_err_t status = esp_himem_alloc(size, &m_data);
-        if (status == ESP_OK)
-            m_haveData = 1;
-        else {
-            Debug_printv("Unable to allocate HIMEM memory: %s", esp_err_to_name(status));
-            m_haveData = -1;
-            return;
-        }
-
-        // if mapped range is not yet created then create it now
-        if (s_rangeUsed == 0) {
-            esp_err_t status =
-                esp_himem_alloc_map_range(ESP_HIMEM_BLKSZ, &s_range);
-            if (status != ESP_OK) {
-                Debug_printv("Unable to allocate mapped range for HIMEM: %s", esp_err_to_name(status));
-                ESP_ERROR_CHECK(esp_himem_free(m_data));
-                m_haveData = -1;
-                return;
-            }
-        }
-
-        Debug_printv("HIMEM available after alloc : %lu ", (uint32_t)esp_himem_get_free_size());
-
-        // increment mapped range usage counter
-        s_rangeUsed++;
-#else
-        m_data = new uint8_t[_size];
-        m_haveData = 1;
-#endif
-
-        Debug_printv("reading %lu bytes from archive", _size);
-        archive *a = m_archive->getArchive();
-
-#if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
-        size = _size;
-        uint32_t pageStart = 0;
-        while (size > 0) {
-            
-            uint32_t s = std::min(size, (uint32_t)ESP_HIMEM_BLKSZ);
-
-            uint8_t *ptr;
-            ESP_ERROR_CHECK(esp_himem_map(m_data, s_range, pageStart, 0, ESP_HIMEM_BLKSZ, 0, (void **)&ptr));
-            uint32_t r = archive_read_data(a, ptr, s);
-            ESP_ERROR_CHECK(esp_himem_unmap(s_range, ptr, ESP_HIMEM_BLKSZ));
-            if (archive_errno(a) != ARCHIVE_OK || r != s) {
-                if (archive_errno(a) != ARCHIVE_OK) {
-                    Debug_printv("archive read error %i: %s", archive_errno(a), archive_error_string(a));
-                } else {
-                    Debug_printv(
-                        "expected to read %lu bytes from archive, got %lu", s, r);
-                }
-
-                ESP_ERROR_CHECK(esp_himem_free(m_data));
-                m_haveData = -1;
-                return;
-            }
-
-            pageStart += s;
-            size -= s;
-        }
-#else
-        uint32_t r = archive_read_data(a, m_data, _size);
-        if (archive_errno(a) != ARCHIVE_OK || r != _size) {
-            if (archive_errno(a) != ARCHIVE_OK) {
-                Debug_printv("archive read error %i: %s", archive_errno(a), archive_error_string(a));
-            } else {
-                Debug_printv("expected to read %lu bytes from archive, got %lu", _size, r);
-            }
-            delete[] m_data;
-            m_haveData = -1;
-            return;
-        }
-#endif
+bool ArchiveMStream::ensureData() {
+    if (m_cachedEntry && m_cachedEntry->isAllocated()) {
+        return true;
     }
+
+    if (!m_archive->isOpen()) {
+        Debug_printv("ERROR: archive not open");
+        return false;
+    }
+
+    // Find or create ArchiveMSession via SessionBroker
+    std::string sessionKey = "archive://" + url;
+    m_session = SessionBroker::find<ArchiveMSession>(sessionKey);
+    if (!m_session) {
+        m_session = std::make_shared<ArchiveMSession>(url);
+        m_session->connect();
+        SessionBroker::add(sessionKey, m_session);
+    }
+    m_session->acquireIO();
+
+    // Get or extract the entry data
+    m_cachedEntry = m_session->getEntry(entry.filename, m_archive->getArchive(), _size);
+    return (m_cachedEntry != nullptr);
 }
 
 uint32_t ArchiveMStream::read(uint8_t *buf, uint32_t size) {
-    readArchiveData();
+    if (!ensureData()) return 0;
 
-    if (m_haveData > 0) {
-        // Debug_printv("calling read, buff size=[%ld]", size);
-
-#if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
-        if (_position + size > _size) size = _size - _position;
-        uint32_t numRead = 0;
-        while (size > 0) {
-
-            uint32_t pageStart = (_position / ESP_HIMEM_BLKSZ) * ESP_HIMEM_BLKSZ;
-            uint32_t offset = _position - pageStart;
-            uint32_t n = std::min(size, (uint32_t)ESP_HIMEM_BLKSZ - offset);
-
-            uint8_t *ptr;
-            ESP_ERROR_CHECK(esp_himem_map(m_data, s_range, pageStart, 0, ESP_HIMEM_BLKSZ, 0, (void **)&ptr));
-            memcpy(buf + numRead, ptr + offset, n);
-            ESP_ERROR_CHECK(esp_himem_unmap(s_range, ptr, ESP_HIMEM_BLKSZ));
-            size -= n;
-            numRead += n;
-            _position += n;
-        }
-
-        // Debug_printv("read [%lu] bytes", numRead);
-        return numRead;
-
-#else
-        if (_position + size > _size) size = _size - _position;
-        memcpy(buf, m_data + _position, size);
-        _position += size;
-        return size;
-#endif
-    } else
-        return 0;
+    uint32_t numRead = m_cachedEntry->read(_position, buf, size);
+    _position += numRead;
+    return numRead;
 }
 
 uint32_t ArchiveMStream::write(const uint8_t *buf, uint32_t size) {
-    readArchiveData();
+    if (!ensureData()) return 0;
 
     // NOTE: this function can NOT write past the end of the extracted file,
     //       i.e. it can NOT extend the size of a file, only modify existing
-    //       data However, most disk images (D64, D81, G64 etc) have a fixed
-    //       size anyways.
-    if (m_haveData > 0) {
-        // Debug_printv("calling write, size=[%ld]", size);
-
-        if (_position + size > _size) size = _size - _position;
-        uint32_t numWritten = 0;
-
-#if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
-        while (size > 0) {
-            uint32_t pageStart = (_position / ESP_HIMEM_BLKSZ) * ESP_HIMEM_BLKSZ;
-            uint32_t offset = _position - pageStart;
-            uint32_t n = std::min(size, (uint32_t)ESP_HIMEM_BLKSZ - offset);
-
-            uint8_t *ptr;
-            ESP_ERROR_CHECK(esp_himem_map(m_data, s_range, pageStart, 0, ESP_HIMEM_BLKSZ, 0, (void **)&ptr));
-            memcpy(ptr + offset, buf + numWritten, n);
-            ESP_ERROR_CHECK(esp_himem_unmap(s_range, ptr, ESP_HIMEM_BLKSZ));
-            size -= n;
-            numWritten += n;
-            _position += n;
-        }
-#else
-        memcpy(m_data + _position, buf, size);
-        _position += size;
-        numWritten = size;
-#endif
-
-        // remember that data was written so we can re-zip the archive
-        if (numWritten > 0) m_dirty = true;
-
-        // Debug_printv("wrote [%lu] bytes", numWritten);
-        return numWritten;
-    } else
-        return 0;
+    //       data. Most disk images (D64, D81, G64 etc) have a fixed size.
+    uint32_t numWritten = m_cachedEntry->write(_position, buf, size);
+    if (numWritten > 0) m_cachedEntry->dirty = true;
+    _position += numWritten;
+    return numWritten;
 }
 
 bool ArchiveMStream::seek(uint32_t pos) {
-    readArchiveData();
+    if (!ensureData()) return false;
 
-    //Debug_printv("pos[%lu]", pos);
-
-    if (m_haveData > 0) {
-        if (pos < _size) {
-            _position = pos;
-            return true;
-        } else
-            return false;
-
-    } else
-        return false;
+    if (pos < _size) {
+        _position = pos;
+        return true;
+    }
+    return false;
 }
 
 bool ArchiveMStream::seekEntry(std::string filename)
@@ -640,6 +495,25 @@ bool ArchiveMStream::seekPath(std::string path) {
 
     entry_index = 0;
 
+    // Check if this entry is already cached in ArchiveMSession — avoids
+    // re-opening the archive (which can fail if DMA memory is exhausted)
+    std::string sessionKey = "archive://" + url;
+    auto session = SessionBroker::find<ArchiveMSession>(sessionKey);
+    if (session) {
+        auto cached = session->getCachedFile(path);
+        if (cached) {
+            Debug_printv("Cache hit in seekPath for: %s (%u bytes)", path.c_str(), cached->size);
+            entry.filename = path;
+            entry.size = cached->size;
+            _size = cached->size;
+            _position = 0;
+            m_session = session;
+            m_cachedEntry = cached;
+            m_session->acquireIO();
+            return true;
+        }
+    }
+
     if (seekEntry(path)) {
         Debug_printv("entry[%s]", entry.filename.c_str());
         _size = entry.size;
@@ -656,7 +530,7 @@ bool ArchiveMStream::seekPath(std::string path) {
 
 
 /********************************************************
- * Files implementations
+ * ArchiveMFile Implementation
  ********************************************************/
 
 bool ArchiveMFile::rewindDirectory()

@@ -808,11 +808,9 @@ uint32_t SFTPMStream::read(uint8_t* buf, uint32_t size) {
     // Serve from session-cached buffer if available
     if (_buffered && _cached_file) {
         if (_position >= _size) return 0;
-        uint32_t avail = _size - _position;
-        if (size > avail) size = avail;
-        memcpy(buf, _cached_file->data + _position, size);
-        _position += size;
-        return size;
+        uint32_t n = _cached_file->read(_position, buf, size);
+        _position += n;
+        return n;
     }
 
     if (_session) {

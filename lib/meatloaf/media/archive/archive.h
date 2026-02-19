@@ -31,12 +31,6 @@
 #include "meat_media.h"
 #include "meatloaf.h"
 
-#ifdef CONFIG_SPIRAM
-#include <esp_psram.h>
-#ifdef CONFIG_IDF_TARGET_ESP32
-#include <esp32/himem.h>
-#endif
-#endif
 
 class Archive {
    public:
@@ -74,8 +68,64 @@ class Archive {
   friend int64_t cb_seek(struct archive *, void *userData, int64_t offset, int whence);
 };
 
+
 /********************************************************
- * Streams implementations
+ * ArchiveMSession Implementation
+ ********************************************************/
+
+class ArchiveMSession : public MSession {
+public:
+    ArchiveMSession(const std::string& archiveUrl)
+        : MSession("archive://" + archiveUrl, "", 0)
+    {
+        setKeepAliveInterval(0);  // disable keep-alive for archive sessions
+    }
+
+    ~ArchiveMSession() {
+        disconnect();
+    }
+
+    static std::string getScheme() { return "archive"; }
+
+    bool connect() override {
+        connected = true;
+        return true;
+    }
+
+    void disconnect() override {
+        clearFileCache();
+        connected = false;
+    }
+
+    bool keep_alive() override {
+        return true;  // No network to maintain
+    }
+
+    // Get or extract an archive entry, caching the result
+    std::shared_ptr<CachedFile> getEntry(const std::string& entryPath, struct archive* a, uint32_t entrySize) {
+        // Check cache first
+        auto cached = getCachedFile(entryPath);
+        if (cached) {
+            Debug_printv("Cache hit for entry: %s (%u bytes)", entryPath.c_str(), cached->size);
+            return cached;
+        }
+
+        // Extract from archive into new CachedFile
+        Debug_printv("Extracting entry: %s (%u bytes)", entryPath.c_str(), entrySize);
+        auto cf = std::make_shared<CachedFile>(entrySize);
+        if (!cf->loadFromArchive(a, entrySize)) {
+            Debug_printv("Failed to extract entry: %s", entryPath.c_str());
+            return nullptr;
+        }
+
+        cacheFile(entryPath, cf);
+        return cf;
+    }
+};
+
+
+/********************************************************
+ * ArchiveMStream implementations
  ********************************************************/
 
 class ArchiveMStream : public MMediaStream {
@@ -84,9 +134,7 @@ class ArchiveMStream : public MMediaStream {
     ArchiveMStream(std::shared_ptr<MStream> is) : MMediaStream(is) {
         Debug_printv("Creating Archive object url[%s]", is->url.c_str());
         m_archive = new Archive(is);
-        m_haveData = 0;
         m_mode = std::ios::in;
-        m_dirty = false;
         m_isCompressedOnly = false;
         Debug_printv("constructor url[%s]", is->url.c_str());
     }
@@ -128,31 +176,21 @@ class ArchiveMStream : public MMediaStream {
     bool seekPath(std::string path) override;
 
    private:
-    void readArchiveData();
+    bool ensureData();
 
     Archive *m_archive;
     std::ios_base::openmode m_mode;
 
-    int m_haveData;
-    bool m_dirty;
     bool m_isCompressedOnly;  // True for standalone compressed files like .gz, .bz2 (single entry only)
 
-#if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
-    // contains unzipped contents of archive (in HIMEM)
-    esp_himem_handle_t m_data;
-
-    // memory range mapped to HIMEM
-    static esp_himem_rangehandle_t s_range;
-    static int s_rangeUsed;
-#else
-    uint8_t *m_data;
-#endif
+    std::shared_ptr<ArchiveMSession> m_session;
+    std::shared_ptr<MSession::CachedFile> m_cachedEntry;
 
     friend class ArchiveMFile;
 };
 
 /********************************************************
- * Files implementations
+ * ArchiveMFile Implementation
  ********************************************************/
 
 class ArchiveMFile : public MFile {
@@ -185,7 +223,7 @@ class ArchiveMFile : public MFile {
 };
 
 /********************************************************
- * FS implementations
+ * ArchiveMFileSystem Implementation
  ********************************************************/
 
 class ArchiveMFileSystem : public MFileSystem

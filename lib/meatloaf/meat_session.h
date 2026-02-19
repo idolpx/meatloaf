@@ -24,12 +24,23 @@
 #include <vector>
 #include <chrono>
 #include <cstdlib>
+#include <cstring>
+#include <algorithm>
 #include <atomic>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include <freertos/task.h>
 
+#ifdef CONFIG_SPIRAM
+#include <esp_psram.h>
+#ifdef CONFIG_IDF_TARGET_ESP32
+#include <esp32/himem.h>
+#endif
+#endif
+
 #include "../../include/debug.h"
+
+struct archive;  // Forward declaration for libarchive
 
 /********************************************************
  * Base Session Class
@@ -38,13 +49,42 @@
 class MSession {
 public:
     // Cached file data shared across streams — persists for the session lifetime
+    // Supports both direct heap access and HIMEM page-mapped access on ESP32+SPIRAM
     struct CachedFile {
-        uint8_t* data;
         uint32_t size;
-        CachedFile(uint8_t* d, uint32_t s) : data(d), size(s) {}
-        ~CachedFile() { if (data) free(data); }
+        bool dirty;
+
+        // Construct with known size (call allocate() separately)
+        CachedFile(uint32_t s);
+
+        // Construct with pre-allocated data (for SFTP direct buffer handoff)
+        CachedFile(uint8_t* d, uint32_t s);
+
+        ~CachedFile();
         CachedFile(const CachedFile&) = delete;
         CachedFile& operator=(const CachedFile&) = delete;
+
+        // Allocate backing storage (HIMEM on ESP32+SPIRAM, heap otherwise)
+        bool allocate();
+        bool isAllocated() const;
+
+        // Read/write with automatic HIMEM page mapping
+        uint32_t read(uint32_t offset, uint8_t* buf, uint32_t count);
+        uint32_t write(uint32_t offset, const uint8_t* buf, uint32_t count);
+
+        // Load data directly from a libarchive handle into backing store
+        bool loadFromArchive(struct archive* a, uint32_t fileSize);
+
+    private:
+        void freeStorage();
+
+#if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
+        esp_himem_handle_t m_handle;
+        bool m_useHimem;
+        static esp_himem_rangehandle_t s_range;
+        static int s_rangeUsed;
+#endif
+        uint8_t* m_data;  // heap pointer (used when HIMEM unavailable or on non-ESP32)
     };
 
     MSession(std::string key, std::string host = "", uint16_t port = 0)
@@ -95,7 +135,7 @@ public:
     // Get keep-alive interval in milliseconds
     uint32_t getKeepAliveInterval() const { return keep_alive_interval; }
 
-    // Set keep-alive interval in milliseconds
+    // Set keep-alive interval in milliseconds (0 = disabled)
     void setKeepAliveInterval(uint32_t interval_ms) {
         keep_alive_interval = interval_ms;
     }
@@ -307,6 +347,10 @@ public:
         lock();
         for (auto& pair : session_repo) {
             auto& session = pair.second;
+
+            if (!session->getKeepAliveInterval()) {
+                continue; // Skip sessions with no keep-alive interval
+            }
 
             if (!session->isConnected()) {
                 to_remove.push_back(pair.first);
