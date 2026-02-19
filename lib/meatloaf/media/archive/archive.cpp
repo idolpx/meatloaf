@@ -218,11 +218,14 @@ void Archive::close() {
 
 bool ArchiveMStream::open(std::ios_base::openmode mode) {
     m_mode = mode;
+    if (!m_archive) return false;
     return m_archive->open(mode);
 }
 
 void ArchiveMStream::close() {
-    m_archive->close();
+    if (m_archive) {
+        m_archive->close();
+    }
 
     if (m_session) {
         m_session->releaseIO();
@@ -231,7 +234,10 @@ void ArchiveMStream::close() {
     m_cachedEntry.reset();
 }
 
-bool ArchiveMStream::isOpen() { return m_archive->isOpen(); }
+bool ArchiveMStream::isOpen() {
+    // Open if archive handle is active OR if we have cached data
+    return (m_archive && m_archive->isOpen()) || (m_cachedEntry && m_cachedEntry->isAllocated());
+}
 
 bool ArchiveMStream::ensureData() {
     if (m_cachedEntry && m_cachedEntry->isAllocated()) {
@@ -256,9 +262,11 @@ bool ArchiveMStream::ensureData() {
     // Get or extract the entry data
     m_cachedEntry = m_session->getEntry(entry.filename, m_archive->getArchive(), _size);
     if (m_cachedEntry) {
-        // Data is now cached in ArchiveMSession — close the archive handle
-        // to release libarchive buffers and the source stream (SD file handle)
-        m_archive->close();
+        // Data is now cached in ArchiveMSession — release the entire source chain
+        // (libarchive buffers, source stream, SD file handle) to free memory
+        delete m_archive;
+        m_archive = nullptr;
+        containerStream.reset();
     }
     return (m_cachedEntry != nullptr);
 }

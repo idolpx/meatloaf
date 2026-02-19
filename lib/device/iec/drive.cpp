@@ -468,6 +468,12 @@ uint8_t iecChannelHandlerDir::readBufferData()
             if( entry!=nullptr )
             {
                 Debug_printv("[%s][%s]", entry->name.c_str(), entry->pathInStream.c_str());
+
+                // filter directory listing here
+                // by name pattern
+                // by type (DIR/PRG/SEQ/USR/DEL)
+                // by size
+                // by date
             }
         }
         while( entry!=nullptr && entry->name[0] == '.' );
@@ -485,28 +491,11 @@ uint8_t iecChannelHandlerDir::readBufferData()
             if( blocks<10 )    m_data[m_len++] = ' ';
             if( blocks<100 )   m_data[m_len++] = ' ';
             if( blocks<1000 )  m_data[m_len++] = ' ';
-
-            // Extension
-            std::string ext = entry->extension;
-            mstr::ltrim(ext);
-            if( entry->isDirectory() )
-            {
-                ext = "dir";
-            }
-            else if( ext.length()>0 )  // Enhanced directory entries with real file extension
-            {
-                if( ext.size()>3 )
-                    ext = ext.substr(0, 3);
-                else
-                    ext += std::string(3-ext.size(), ' ');
-            }
-            else
-            {
-                ext = "prg";
-            }
+            m_data[m_len++] = '"';
 
             // File name
             std::string name = entry->name;
+            std::string ext = entry->extension;
             if ( !mstr::contains(entry->pathInStream, name.c_str()) && entry->pathInStream.size() )
                 name = entry->pathInStream;
 
@@ -518,7 +507,24 @@ uint8_t iecChannelHandlerDir::readBufferData()
                 ext  = mstr::toPETSCII2( ext );
             }
             mstr::replaceAll(name, "\\", "/");
-            m_data[m_len++] = '"';
+
+            // Extension
+            mstr::ltrim(ext);
+            if( entry->isDirectory() )
+            {
+                ext = "DIR";
+            }
+            else if( ext.length()>0 )  // Enhanced directory entries with real file extension
+            {
+                if( ext.size()>3 )
+                    ext = ext.substr(0, 3);
+                else
+                    ext += std::string(3-ext.size(), ' ');
+            }
+            else
+            {
+                ext = "PRG";
+            }
 
 #if 0
             // C64 compatibale filename (16+3 chars)
@@ -799,6 +805,7 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                         Debug_printv("Opening directory for reading [%s]", f->url.c_str());
                         // regular directory
                         if (!f->rewindDirectory())
+                        //if (!f->rewindDirectory(filter, sort))
                         {
                             Debug_printv("Error: could not set current working directory to [%s]. Permission denied.", f->url.c_str());
                             setStatusCode(ST_PERMISSION_DENIED);
@@ -865,9 +872,14 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                 }
                 else
                 {
-                    if( Meatloaf.use_vdrive && !is_dir && (m_vdrive=VDrive::create(m_devnr-8, f->url.c_str()))!=nullptr )
+                    std::string full_path = f->url;
+                    if ( f->pathInStream.size() )
+                        full_path += "/" + f->pathInStream;
+
+                    Debug_printv( ANSI_RED_BOLD_HIGH_INTENSITY "VDrive Opening file [%s] mode[%s]", full_path.c_str(), mode==std::ios_base::in ? "read" : "write");
+                    if( Meatloaf.use_vdrive && !is_dir && (m_vdrive=VDrive::create(m_devnr-8, full_path.c_str()))!=nullptr )
                     {
-                        Debug_printv("Created VDrive for URL %s. Loading directory.", f->url.c_str());
+                        Debug_printv("Created VDrive for URL %s. Loading directory.", full_path.c_str());
                         delete f;
                         return m_vdrive->openFile(channel, "$");
                     }

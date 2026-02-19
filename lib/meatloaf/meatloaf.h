@@ -271,6 +271,7 @@ public:
             return false;
     };
     virtual bool rewindDirectory() { return false; };
+    //virtual bool rewindDirectory(std::string filter = "", std::string sort = "") { return false; };
     virtual MFile* getNextFileInDir() { return nullptr; };
 
     virtual bool mkDir() { return false; };
