@@ -31,42 +31,14 @@
  ********************************************************/
 
 HTTPMSession::HTTPMSession(std::string host, uint16_t port)
-    : MSession((port == 443 ? "https://" : "http://") + host + ":" + std::to_string(port), host, port),
-    _user_agent(USER_AGENT) 
+    : MSession((port == 443 ? "https://" : "http://") + host + ":" + std::to_string(port), host, port)
 {
     Debug_printv("HTTPMSession created for %s:%d", host.c_str(), port);
 
-    // Initialize HTTP client configuration
-    memset(&_config, 0, sizeof(_config));
-    
-    // Set host and port - required for esp_http_client_init
-    _config.host = host.c_str();
-    _config.port = port;
-    _config.path = "/";  // Default path
-    
-    _config.auth_type = HTTP_AUTH_TYPE_BASIC;
-    _config.user_agent = _user_agent.c_str();
-    _config.method = HTTP_METHOD_GET;
-    _config.timeout_ms = 10000;
-    _config.disable_auto_redirect = false;
-    _config.max_redirection_count = 10;
-    _config.event_handler = nullptr; // Will be set by individual clients
-    _config.user_data = nullptr;
-    _config.keep_alive_enable = _keep_alive_enabled;
-    _config.keep_alive_idle = 5;
-    _config.keep_alive_interval = 5;
-
-    // For HTTPS, we might need additional SSL configuration
-    if (isSecure()) {
-        _config.transport_type = HTTP_TRANSPORT_OVER_SSL;
-        _config.skip_cert_common_name_check = true; // For development/testing
-    } else {
-        _config.transport_type = HTTP_TRANSPORT_OVER_TCP;
-    }
-
-    // Initialize the client
+    // MeatHttpClient handles its own initialization and configuration
     client = std::make_shared<MeatHttpClient>();
-    client->init(&_config);
+
+    keep_alive_interval = 0; // Disable keep-alive timer — HTTP sessions reused for same host:port
 }
 
 HTTPMSession::~HTTPMSession() {
@@ -81,10 +53,6 @@ bool HTTPMSession::connect() {
 
     Debug_printv("HTTPMSession connecting to %s:%d", host.c_str(), port);
 
-    // HTTP doesn't maintain persistent connections like other protocols
-    // We consider it "connected" as long as the server is reachable
-    // The actual connection establishment happens in individual HTTP requests
-
     connected = true;
     updateActivity();
     return true;
@@ -97,9 +65,6 @@ void HTTPMSession::disconnect() {
 
     Debug_printv("HTTPMSession disconnecting from %s:%d", host.c_str(), port);
 
-    // HTTP doesn't maintain persistent connections to close
-    // Individual HTTP clients will handle their own cleanup
-
     connected = false;
 }
 
@@ -108,17 +73,7 @@ bool HTTPMSession::keep_alive() {
         return false;
     }
 
-    // Perform a HEAD request to keep the connection alive
-    std::string root_url = (isSecure() ? "https://" : "http://") + host + ":" + std::to_string(port) + "/";
-    bool result = client->HEAD(root_url);
-    if (result) {
-        updateActivity();
-    }
-    return result;
-}
-
-esp_http_client_config_t* HTTPMSession::getClientConfig() {
-    return &_config;
+    return true;
 }
 
 /********************************************************
@@ -292,9 +247,6 @@ bool HTTPMStream::open(std::ios_base::openmode mode) {
         _error = ECONNREFUSED;
         return false;
     }
-
-    // Initialize HTTP client with session config
-    _http.init(_session->getClientConfig());
 
     bool r = false;
 

@@ -51,38 +51,6 @@
 
 
 /********************************************************
- * MSession - HTTP Session Management
- ********************************************************/
-
-class MeatHttpClient; // Forward declaration
-
-class HTTPMSession : public MSession {
-public:
-    HTTPMSession(std::string host, uint16_t port = 80); // Default HTTP port is 80
-    ~HTTPMSession() override;
-
-    bool connect() override;
-    void disconnect() override;
-    bool keep_alive() override;
-
-    // Get the scheme for this session type
-    static std::string getScheme() { return "http"; }
-
-    // Get HTTP client configuration for this session
-    esp_http_client_config_t* getClientConfig();
-
-    // Check if this session supports HTTPS
-    bool isSecure() const { return this->port == 443; }
-
-    std::shared_ptr<MeatHttpClient> client;
-
-private:
-    esp_http_client_config_t _config;
-    bool _keep_alive_enabled = true;
-    std::string _user_agent;
-};
-
-/********************************************************
  * HTTP Client
  ********************************************************/
 
@@ -111,7 +79,7 @@ public:
             esp_http_client_cleanup(_http);
             _http = nullptr;
         }
-        
+
         esp_http_client_config_t config;
         memset(&config, 0, sizeof(config));
         config.url = "https://api.meatloaf.cc/?$";
@@ -126,25 +94,10 @@ public:
         config.keep_alive_enable = true;
         config.keep_alive_idle = 5;
         config.keep_alive_interval = 5;
+        config.skip_cert_common_name_check = true;
 
         //Debug_printv("HTTP Init url[%s]", url.c_str());
         _http = esp_http_client_init(&config);
-    }
-
-    void init(esp_http_client_config_t* config) {
-        // Clean up existing client if present to prevent handle leak
-        if (_http != nullptr) {
-            esp_http_client_cleanup(_http);
-            _http = nullptr;
-        }
-
-        // Copy the config and set session-specific values
-        esp_http_client_config_t session_config = *config;
-        session_config.event_handler = _http_event_handler;
-        session_config.user_data = this;
-        session_config.disable_auto_redirect = disableAutoRedirect;
-
-        _http = esp_http_client_init(&session_config);
     }
 
     ~MeatHttpClient() {
@@ -207,9 +160,31 @@ public:
 };
 
 /********************************************************
- * File implementations
+ * HTTPMSession - HTTP Session Management
  ********************************************************/
 
+class HTTPMSession : public MSession {
+public:
+    HTTPMSession(std::string host, uint16_t port = 80); // Default HTTP port is 80
+    ~HTTPMSession() override;
+
+    bool connect() override;
+    void disconnect() override;
+    bool keep_alive() override;
+
+    // Get the scheme for this session type
+    static std::string getScheme() { return "http"; }
+
+    // Check if this session supports HTTPS
+    bool isSecure() const { return this->port == 443; }
+
+    std::shared_ptr<MeatHttpClient> client;
+};
+
+
+/********************************************************
+ * HTTPMFile implementation
+ ********************************************************/
 
 class HTTPMFile: public MFile {
     std::shared_ptr<MeatHttpClient> fromHeader();
@@ -264,7 +239,7 @@ public:
 
 
 /********************************************************
- * Streams
+ * HTTPMStream Implementation
  ********************************************************/
 
 class HTTPMStream: public MStream {
@@ -315,7 +290,7 @@ private:
 
 
 /********************************************************
- * FS
+ * HTTPMFileSystem Implementation
  ********************************************************/
 
 class HTTPMFileSystem: public MFileSystem 
