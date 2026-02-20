@@ -129,15 +129,8 @@
 //std::unordered_map<std::string, MFile*> FileBroker::file_repo;
 //std::unordered_map<std::string, std::shared_ptr<MStream>> StreamBroker::stream_repo;
 
-namespace {
-struct CacheFragmentFlags {
-    bool enabled = false;
-    bool force_refresh = false;
-    bool has_cache_flags = false;
-};
-
-CacheFragmentFlags parse_cache_fragment(const std::string& url) {
-    CacheFragmentFlags flags;
+CacheOptions parse_cache_fragment(const std::string& url) {
+    CacheOptions flags;
     auto parser = PeoplesUrlParser::parseURL(url);
     if (!parser || parser->fragment.empty()) {
         return flags;
@@ -145,15 +138,16 @@ CacheFragmentFlags parse_cache_fragment(const std::string& url) {
 
     std::string cacheValue = parser->fragmentValue("cache");
     if (!cacheValue.empty()) {
-        flags.has_cache_flags = true;
-        if (util_tolower(cacheValue) == "sd") {
-            flags.enabled = true;
+        cacheValue = util_tolower(cacheValue);
+        if (cacheValue == "ram") {
+            flags.store = CACHE_RAM;
+        } else if (cacheValue == "sd") {
+            flags.store = CACHE_SD;
         }
     }
 
     std::string refreshValue = parser->fragmentValue("refresh");
     if (!refreshValue.empty()) {
-        flags.has_cache_flags = true;
         if (util_string_value_is_true(refreshValue)) {
             flags.force_refresh = true;
         }
@@ -161,7 +155,6 @@ CacheFragmentFlags parse_cache_fragment(const std::string& url) {
 
     std::string forceValue = parser->fragmentValue("force");
     if (!forceValue.empty()) {
-        flags.has_cache_flags = true;
         if (util_string_value_is_true(forceValue)) {
             flags.force_refresh = true;
         }
@@ -171,8 +164,8 @@ CacheFragmentFlags parse_cache_fragment(const std::string& url) {
 }
 
 std::string strip_cache_fragment_from_url(const std::string& url) {
-    CacheFragmentFlags flags = parse_cache_fragment(url);
-    if (!flags.has_cache_flags) {
+    CacheOptions flags = parse_cache_fragment(url);
+    if (flags.store == CACHE_NONE) {
         return url;
     }
 
@@ -186,6 +179,7 @@ std::string strip_cache_fragment_from_url(const std::string& url) {
     return parser->rebuildUrl();
 }
 
+namespace {
 bool ensure_dir(const std::string& path) {
     if (path.empty()) {
         return false;
@@ -665,7 +659,7 @@ std::string MFile::buildRequestUrl() const {
 
 bool MFile::isCacheEnabled(std::ios_base::openmode mode) const {
     auto flags = parse_cache_fragment(url);
-    return mode == std::ios_base::in && flags.enabled;
+    return mode == std::ios_base::in && flags.store == CACHE_SD;
 }
 
 bool MFile::isCacheForceRefresh() const {
@@ -675,16 +669,18 @@ bool MFile::isCacheForceRefresh() const {
 std::shared_ptr<MStream> MFile::openStreamWithCache(
     const std::string& requestUrl,
     std::ios_base::openmode mode,
-    const std::function<std::shared_ptr<MStream>(const std::string&, std::ios_base::openmode)>& opener) {
+    const std::function<std::shared_ptr<MStream>(const std::string&, std::ios_base::openmode)>& opener,
+    const CacheOptions* overrideFlags) {
 #ifdef SD_CARD
-    CacheFragmentFlags cacheFlags = parse_cache_fragment(url);
-    if (mode == std::ios_base::in && cacheFlags.enabled) {
+    CacheOptions cacheFlags = overrideFlags ? *overrideFlags : parse_cache_fragment(url);
+    if (mode == std::ios_base::in && cacheFlags.store == CACHE_SD) {
         std::string cacheRoot = "/sd/.cache";
         std::string hashDir = hash_url_sha256(requestUrl);
         std::string cacheDir = cacheRoot + "/" + hashDir;
         std::string cacheName = name.empty() ? "media.bin" : name;
         std::string cachePath = cacheDir + "/" + cacheName;
 
+        Debug_printv("root[%s] dir[%s] path[%s]", cacheRoot.c_str(), cacheDir.c_str(), cachePath.c_str());
         if (ensure_dir(cacheRoot) && ensure_dir(cacheDir)) {
             if (!cacheFlags.force_refresh) {
                 std::unique_ptr<MFile> cacheFile(MFSOwner::File(cachePath));
@@ -697,6 +693,8 @@ std::shared_ptr<MStream> MFile::openStreamWithCache(
                 }
             }
 
+            // Cache not found or force refresh requested, fetch remote
+            Debug_printv("Fetching remote for caching: %s", requestUrl.c_str());
             auto remoteStream = opener(requestUrl, mode);
             if (remoteStream != nullptr && remoteStream->isOpen()) {
                 std::unique_ptr<MFile> writeFile(MFSOwner::File(cachePath));
@@ -718,6 +716,7 @@ std::shared_ptr<MStream> MFile::openStreamWithCache(
                 auto cacheStream = cachedFile ? cachedFile->getSourceStream(std::ios_base::in) : nullptr;
                 if (cacheStream != nullptr) {
                     size = cacheStream->size();
+                    Debug_printv("Returning cached stream: %s", cachePath.c_str());
                     return cacheStream;
                 }
             }
@@ -729,6 +728,8 @@ std::shared_ptr<MStream> MFile::openStreamWithCache(
     __IGNORE_UNUSED_VAR(opener);
 #endif
 
+    // No caching, just open directly
+    Debug_printv("Opening without cache: %s", requestUrl.c_str());
     auto stream = opener(requestUrl, mode);
     if (stream != nullptr) {
         size = stream->size();

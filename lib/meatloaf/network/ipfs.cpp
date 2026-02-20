@@ -38,7 +38,7 @@ std::shared_ptr<MStream> IPFSMFile::getSourceStream(std::ios_base::openmode mode
 
 
 bool IPFSMStream::open(std::ios_base::openmode mode) {
-    return _http.GET(url);
+    return _session->client->GET(url);
 };
 
 bool IPFSMStream::seek(uint32_t pos) {

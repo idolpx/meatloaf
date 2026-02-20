@@ -501,16 +501,9 @@ uint32_t ArchiveMStream::readFile(uint8_t *buf, uint32_t size)
     return bytesRead;
 }
 
-bool ArchiveMStream::seekPath(std::string path) {
-    Debug_printv("seekPath called for path: %s", path.c_str());
-
-    seekCalled = true;
-
-    entry_index = 0;
-
+bool ArchiveMStream::seekCachedFile(const std::string sessionKey, const std::string path) {
     // Check if this entry is already cached in ArchiveMSession — avoids
     // re-opening the archive (which can fail if DMA memory is exhausted)
-    std::string sessionKey = "archive://" + url;
     auto session = SessionBroker::find<ArchiveMSession>(sessionKey);
     if (session) {
         auto cached = session->getCachedFile(path);
@@ -525,6 +518,22 @@ bool ArchiveMStream::seekPath(std::string path) {
             m_session->acquireIO();
             return true;
         }
+    }
+    return false;
+}
+
+bool ArchiveMStream::seekPath(std::string path) {
+    Debug_printv("seekPath called for path: %s", path.c_str());
+
+    seekCalled = true;
+
+    entry_index = 0;
+
+    // Check if this entry is already cached in ArchiveMSession — avoids
+    // re-opening the archive (which can fail if DMA memory is exhausted)
+    std::string sessionKey = "archive://" + url;
+    if (seekCachedFile(sessionKey, path)) {
+        return true;
     }
 
     if (seekEntry(path)) {

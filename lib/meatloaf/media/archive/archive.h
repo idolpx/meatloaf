@@ -175,6 +175,7 @@ class ArchiveMStream : public MMediaStream {
     uint32_t readFile(uint8_t *buf, uint32_t size) override;
     uint32_t writeFile(uint8_t *buf, uint32_t size) override { return 0; };
     bool seekPath(std::string path) override;
+    bool seekCachedFile(const std::string sessionKey, const std::string path);
 
    private:
     bool ensureData();

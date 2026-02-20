@@ -89,7 +89,8 @@ public:
         delete http;
 
         // Release session for api.meatloaf.cc
-        SessionBroker::dispose("https://api.meatloaf.cc:443");
+        // Key format matches SessionBroker::obtain() which uses HTTPMSession::getScheme() ("http")
+        SessionBroker::dispose("http://api.meatloaf.cc:443");
 
         Debug_printv("target url[%s]", url.c_str());
         return url;

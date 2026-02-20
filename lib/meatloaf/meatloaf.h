@@ -190,6 +190,24 @@ public:
 
 
 /********************************************************
+ * Cache Options
+ ********************************************************/
+
+enum cache_type_t {
+    CACHE_NONE = 0,
+    CACHE_RAM = 1,
+    CACHE_SD = 2,
+};
+
+struct CacheOptions {
+    cache_type_t store = CACHE_NONE;
+    bool force_refresh = false;
+};
+
+CacheOptions parse_cache_fragment(const std::string& url);
+std::string strip_cache_fragment_from_url(const std::string& url);
+
+/********************************************************
  * Universal file
  ********************************************************/
 
@@ -320,7 +338,8 @@ protected:
     std::shared_ptr<MStream> openStreamWithCache(
         const std::string& requestUrl,
         std::ios_base::openmode mode,
-        const std::function<std::shared_ptr<MStream>(const std::string&, std::ios_base::openmode)>& opener);
+        const std::function<std::shared_ptr<MStream>(const std::string&, std::ios_base::openmode)>& opener,
+        const CacheOptions* overrideFlags = nullptr);
 
 friend class MFSOwner;
 };

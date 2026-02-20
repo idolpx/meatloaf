@@ -116,6 +116,7 @@ std::shared_ptr<MStream> HTTPMFile::getSourceStream(std::ios_base::openmode mode
     // headers["Accept-Encoding"] = "gzip, deflate";
     // etc.
     std::string requestUrl = buildRequestUrl();
+    Debug_printv("Request URL: %s", requestUrl.c_str());
     auto istream = openStreamWithCache(
         requestUrl,
         mode,
