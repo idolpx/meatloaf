@@ -811,24 +811,24 @@ MFile* MFile::cd(std::string newDir)
 
     if(newDir.find(':') != std::string::npos) 
     {
-        // Check if this is a wrapper scheme with a relative path
-        size_t firstColon = newDir.find(':');
-        std::string wrapperScheme = newDir.substr(0, firstColon + 1);  // e.g., "retropixels:"
-        std::string wrappedPath = newDir.substr(firstColon + 1);
+        // // Check if this is a wrapper scheme with a relative path
+        // size_t firstColon = newDir.find(':');
+        // std::string wrapperScheme = newDir.substr(0, firstColon + 1);  // e.g., "retropixels:"
+        // std::string wrappedPath = newDir.substr(firstColon + 1);
         
-        // If the wrapped path doesn't contain a scheme and isn't absolute, it's relative
-        if(wrappedPath.find(':') == std::string::npos && 
-           !wrappedPath.empty() && 
-           wrappedPath[0] != '/') 
-        {
-            // Prepend current directory to make it absolute
-            std::string currentPath = url;
-            if(!mstr::endsWith(currentPath, "/")) {
-                currentPath.push_back('/');
-            }
-            newDir = wrapperScheme + currentPath + wrappedPath;
-            Debug_printv("Adjusted wrapper path: [%s]", newDir.c_str());
-        }
+        // // If the wrapped path doesn't contain a scheme and isn't absolute, it's relative
+        // if(wrappedPath.find(':') == std::string::npos && 
+        //    !wrappedPath.empty() && 
+        //    wrappedPath[0] != '/') 
+        // {
+        //     // Prepend current directory to make it absolute
+        //     std::string currentPath = url;
+        //     if(!mstr::endsWith(currentPath, "/")) {
+        //         currentPath.push_back('/');
+        //     }
+        //     newDir = wrapperScheme + currentPath + wrappedPath;
+        //     Debug_printv("Adjusted wrapper path: [%s]", newDir.c_str());
+        // }
         
         // I can only guess we're CDing into another url scheme, this means we're changing whole path
         return MFSOwner::File(newDir);

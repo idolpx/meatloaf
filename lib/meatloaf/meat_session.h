@@ -227,6 +227,7 @@ private:
             Debug_printv("Disposing session: %s", key.c_str());
             session_repo.erase(it);
         }
+        Debug_memory();
     }
 
 public:
@@ -405,6 +406,13 @@ public:
         Debug_printv("Clearing all sessions");
         session_repo.clear();
         unlock();
+    }
+
+    static void dump() {
+        Debug_printv("sessions[%d]", session_repo.size());
+        for(auto& pair : session_repo) {
+            Debug_printv("key[%s]", pair.first.c_str());
+        }
     }
 };
 

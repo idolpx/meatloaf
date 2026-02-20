@@ -312,7 +312,7 @@ protected:
   virtual bool epyxWriteSector(uint8_t track, uint8_t sector, uint8_t *buffer);
 #endif
 
-  void set_cwd(std::string path);
+  void set_cwd(std::string path, bool verified = false);
 
   std::unique_ptr<MFile> m_cwd;   // current working directory
   iecChannelHandler *m_channels[16];

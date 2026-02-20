@@ -853,6 +853,6 @@ bool TNFSMStream::seek(uint32_t pos, int mode) {
     }
 
     _position = new_position;
-    Debug_printv("Seek pos[%u] mode[%d] -> new_position[%u]", pos, mode, new_position);
+    //Debug_printv("Seek pos[%u] mode[%d] -> new_position[%u]", pos, mode, new_position);
     return true;
 }

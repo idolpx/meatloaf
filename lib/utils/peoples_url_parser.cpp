@@ -158,8 +158,8 @@ void PeoplesUrlParser::processPath()
     pos = path.find(":");
     if (pos != std::string::npos)
     {
-        path = path.substr(0, pos);
         name = path.substr(pos + 1);
+        path = path.substr(0, pos);
     }
     else
     {

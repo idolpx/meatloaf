@@ -201,6 +201,18 @@ bool CSIPMSession::isOK() {
     }
 
     Debug_printv("ok[%s]", reply.c_str());
+
+    // If reply is empty, read the rest of the lines to clear the buffer
+    if (reply.empty()) {
+        for (int i = 0; i < 5; ++i) {
+            reply = readLn();
+            if (reply.empty() || (reply.size() == 1 && reply[0] == '\x04')) {
+                break;
+            }
+            Debug_printv("ok[%s]", reply.c_str());
+        }
+    }
+
     return false;
 }
 

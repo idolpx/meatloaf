@@ -27,7 +27,6 @@
 #include "network/tcp.h"
 
 #include "fnSystem.h"
-#include "fnTcpClient.h"
 
 #include "utils.h"
 #include "string_utils.h"

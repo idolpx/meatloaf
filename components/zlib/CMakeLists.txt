@@ -13,5 +13,4 @@ target_compile_definitions(${COMPONENT_LIB} PRIVATE HAVE_MATH_H)
 target_compile_definitions(${COMPONENT_LIB} PRIVATE HAVE_CTYPE_H)
 target_compile_definitions(${COMPONENT_LIB} PRIVATE HAVE_UNISTD_H)
 target_compile_definitions(${COMPONENT_LIB} PRIVATE HAVE_ERRNO_H)
-target_compile_definitions(${COMPONENT_LIB} PRIVATE ZLIB_DEBUG)
 

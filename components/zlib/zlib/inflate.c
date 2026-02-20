@@ -85,7 +85,7 @@
 #include "inflate.h"
 #include "inffast.h"
 
-#include <stdio.h>
+//#include <stdio.h>
 
 #ifdef MAKEFIXED
 #  ifndef BUILDFIXED
@@ -1263,12 +1263,7 @@ int ZEXPORT inflate(z_streamp strm, int flush) {
     if (((in == 0 && out == 0) || flush == Z_FINISH) && ret == Z_OK)
         ret = Z_BUF_ERROR;
 
-#ifdef DEBUG_ZLIB
-    if (strm->state != Z_NULL && strm->msg != Z_NULL)
-        printf("inflate: ret[%d] msg[%s]\n", ret, strm->msg);
-    else
-        printf("inflate: ret[%d]\n", ret);
-#endif
+    //printf("inflate: ret[%d] msg[%s]", ret, strm->msg);
     return ret;
 }
 

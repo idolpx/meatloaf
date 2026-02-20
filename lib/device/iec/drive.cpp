@@ -827,7 +827,7 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                             m_numOpenChannels++;
                             Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Change Directory Here! channel[%d] numChannels[%d] dir[%s]", channel, m_numOpenChannels, f->url.c_str());
                             //m_cwd.reset(MFSOwner::File(f->url));
-                            set_cwd(f->url);
+                            set_cwd(f->url, true);
                             Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "f.url[%s] m_cwd[%s]", f->url.c_str(), m_cwd->url.c_str());
                             Debug_printv("Reading directory [%s]", f->url.c_str());
                             setStatusCode(ST_OK);
@@ -872,11 +872,12 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                 }
                 else
                 {
+                    // VDrive needs full path including pathInStream
                     std::string full_path = f->url;
                     if ( f->pathInStream.size() )
                         full_path += "/" + f->pathInStream;
 
-                    Debug_printv( ANSI_RED_BOLD_HIGH_INTENSITY "VDrive Opening file [%s] mode[%s]", full_path.c_str(), mode==std::ios_base::in ? "read" : "write");
+                    //Debug_printv( ANSI_RED_BOLD_HIGH_INTENSITY "VDrive Opening file [%s] mode[%s]", full_path.c_str(), mode==std::ios_base::in ? "read" : "write");
                     if( Meatloaf.use_vdrive && !is_dir && (m_vdrive=VDrive::create(m_devnr-8, full_path.c_str()))!=nullptr )
                     {
                         Debug_printv("Created VDrive for URL %s. Loading directory.", full_path.c_str());
@@ -917,14 +918,14 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                             // This was a directory.  Set m_cwd to the directory
                             Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "dir url[%s]", f->url.c_str() );
                             //m_cwd.reset(MFSOwner::File(f->url));
-                            set_cwd(f->url);
+                            set_cwd(f->url, true);
                         }
                         else
                         {
                             // This was a file.  Set m_cwd to the parent directory
                             Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "file base[%s]", f->base().c_str() );
                             //m_cwd.reset(MFSOwner::File(f->base()));
-                            set_cwd(f->base());
+                            set_cwd(f->base(), true);
                         }
 
                         // {
@@ -992,9 +993,10 @@ void iecDrive::close(uint8_t channel)
         //Debug_printv("Channel %d closed.", channel);
         ImageBroker::validate();
         ImageBroker::dump();
+        SessionBroker::dump();
         Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "id[%d] cwd[%s]", m_devnr, m_cwd==nullptr ? "NULL" : m_cwd->url.c_str());
-        Debug_memory();
         m_cwd->dump();
+        Debug_memory();
     }
 
 #ifdef ENABLE_DISPLAY
@@ -2001,7 +2003,7 @@ void iecDrive::reset()
 }
 
 
-void iecDrive::set_cwd(std::string path)
+void iecDrive::set_cwd(std::string path, bool verified)
 {
     // Isolate path
     if ( mstr::startsWith(path, ":") || mstr::startsWith(path, " ") )
@@ -2025,6 +2027,19 @@ void iecDrive::set_cwd(std::string path)
         return;
     }
 
+    // When verified=true, the caller already checked that the path is valid.
+    // Skip expensive verification (isDirectory, exists, getSourceStream) that
+    // creates redundant HTTP connections for network URLs.
+    if (verified) {
+        MFile *n = MFSOwner::File(path);
+        if (n != nullptr) {
+            m_cwd.reset(n);
+            setStatusCode(ST_OK);
+        } else {
+            setStatusCode(ST_FILE_NOT_FOUND);
+        }
+        return;
+    }
 
     MFile *n = m_cwd ? m_cwd->cd( path ) : nullptr;
     if( n != nullptr )
