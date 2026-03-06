@@ -133,7 +133,7 @@ class GPIBusHandler
   volatile IOREG_TYPE *m_regNRFDwrite, *m_regNRFDmode, *m_regNDACwrite, *m_regNDACmode;
   volatile IOREG_TYPE *m_regEOIwrite, *m_regEOImode, *m_regSRQwrite, *m_regSRQmode;
   volatile IOREG_TYPE *m_regDDRwrite, *m_regDDRmode;
-  volatile const IOREG_TYPE *m_regATNread, *m_regDAVread, *m_regNRFDread, *m_regNDACread, *m_regEOIread, *m_regSRQread, *m_regDDRread, *m_regRESETread;
+  volatile const IOREG_TYPE *m_regATNread, *m_regDAVread, *m_regNRFDread, *m_regNDACread, *m_regEOIread, *m_regRESETread, *m_regSRQread, *m_regDDRread;
   IOREG_TYPE m_bitATN, m_bitDAV, m_bitNRFD, m_bitNDAC, m_bitEOI, m_bitSRQ, m_bitDDR, m_bitRESET;
 #endif
 

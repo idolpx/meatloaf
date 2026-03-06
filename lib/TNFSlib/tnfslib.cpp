@@ -1678,6 +1678,10 @@ int _tnfs_adjust_with_full_path(tnfsMountInfo *m_info, char *buffer, const char 
         buffer[ll] = '/';
         buffer[++ll] = '\0';
     }
+    if (needs_slash == false && dir_slash)
+    {
+        buffer[--ll] = '\0';
+    }
 
     // Finally copy the source filepath (relative path appended to cwd)
     strlcpy(buffer + ll, source, bufflen - ll);

@@ -16,11 +16,11 @@
 
 class Base64 {
 private:
-    static inline const char base64_table[65] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    static inline const char base64_url_table[65] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    const char base64_table[65] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    const char base64_url_table[65] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
-    static std::unique_ptr<char[]> base64_gen_encode(const unsigned char* src, size_t len, size_t* out_len, const char* table, int add_pad);
-    static std::unique_ptr<unsigned char[]> base64_gen_decode(const char* src, size_t len, size_t* out_len, const char* table);
+    std::unique_ptr<char[]> base64_gen_encode(const unsigned char* src, size_t len, size_t* out_len, const char* table, int add_pad);
+    std::unique_ptr<unsigned char[]> base64_gen_decode(const char* src, size_t len, size_t* out_len, const char* table);
 
 public:
     /**
@@ -35,8 +35,8 @@ public:
      * nul terminated to make it easier to use as a C string. The nul terminator is
      * not included in out_len.
      */
-    static std::unique_ptr<char[]> encode(const void* src, size_t len, size_t* out_len);
-    static std::unique_ptr<char[]> url_encode(const void* src, size_t len, size_t* out_len);
+    std::unique_ptr<char[]> encode(const void* src, size_t len, size_t* out_len);
+    std::unique_ptr<char[]> url_encode(const void* src, size_t len, size_t* out_len);
 
     /**
      * base64_decode - Base64 decode
@@ -47,8 +47,8 @@ public:
      * or nullptr on failure
      *
      */
-    static std::unique_ptr<unsigned char[]> decode(const char* src, size_t len, size_t* out_len);
-    static std::unique_ptr<unsigned char[]> url_decode(const char* src, size_t len, size_t* out_len);
+    std::unique_ptr<unsigned char[]> decode(const char* src, size_t len, size_t* out_len);
+    std::unique_ptr<unsigned char[]> url_decode(const char* src, size_t len, size_t* out_len);
 
     std::string get_buffer() const { return base64_buffer; }
     void set_buffer(const std::string& buffer) { base64_buffer = buffer; }

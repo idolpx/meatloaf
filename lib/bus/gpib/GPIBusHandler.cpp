@@ -729,17 +729,22 @@ void GPIBusHandler::begin()
   pinMode(m_pinNDAC,  OUTPUT);
   pinMode(m_pinEOI, OUTPUT);
   writePinDAV(HIGH);
-  writePinNRFD(HIGH);
-  writePinNDAC(HIGH);
+  writePinNRFD(LOW);
+  writePinNDAC(LOW);
   if( m_pinSRQ<0xFF )
     {
       pinMode(m_pinSRQ, OUTPUT);
-      digitalWrite(m_pinSRQ, HIGH);
+      writePinSRQ(LOW);
+    }
+  if( m_pinDDR<0xFF )
+    {
+      pinMode(m_pinDDR, OUTPUT);
+      writePinDDR(HIGH);
     }
 #else
   // set pins to output 0 (when in output mode)
-  pinMode(m_pinNRFD, OUTPUT); writePinNRFD(LOW);
-  pinMode(m_pinNDAC, OUTPUT); writePinNDAC(LOW);
+  pinMode(m_pinNRFD, OUTPUT); writePinNRFD(HIGH);
+  pinMode(m_pinNDAC, OUTPUT); writePinNDAC(HIGH);
   if( m_pinSRQ<0xFF )
     {
       pinMode(m_pinSRQ, OUTPUT);
@@ -754,7 +759,7 @@ void GPIBusHandler::begin()
 
   pinMode(m_pinATN,   INPUT);
   pinMode(m_pinDAV,   INPUT);
-  pinMode(m_pinEOI,  INPUT);
+  pinMode(m_pinEOI,  OUTPUT); writePinEOI(HIGH);
   if( m_pinCTRL<0xFF )  pinMode(m_pinCTRL,  OUTPUT);
   if( m_pinRESET<0xFF ) pinMode(m_pinRESET, INPUT);
   m_flags = 0;
@@ -773,6 +778,12 @@ void GPIBusHandler::begin()
   // call begin() function for all attached devices
   for(uint8_t i=0; i<m_numDevices; i++)
     m_devices[i]->begin();
+
+  printf("GPIBusHandler created: ATN=%u, DAV=%u, NRFD=%u, NDAC=%u, EOI=%u, RESET=%u, CTRL=%u, SRQ=%u, DDR=%u\n",
+      m_pinATN, m_pinDAV, m_pinNRFD, m_pinNDAC, m_pinEOI, m_pinRESET, m_pinCTRL, m_pinSRQ, m_pinDDR);
+  printf("Parallel Pins: DATA1=%u, DATA2=%u, DATA3=%u, DATA4=%u, DATA5=%u, DATA6=%u, DATA7=%u, DATA8=%u\n",
+      m_pinParallel[0], m_pinParallel[1], m_pinParallel[2], m_pinParallel[3],
+      m_pinParallel[4], m_pinParallel[5], m_pinParallel[6], m_pinParallel[7]);
 }
 
 
@@ -1094,30 +1105,32 @@ void RAMFUNC(GPIBusHandler::setParallelBusModeOutput)()
 
 bool RAMFUNC(GPIBusHandler::receiveGPIBByteATN)(uint8_t &data)
 {
+
   // wait for DAV=1
   if( !waitPinDAV(HIGH, 0) ) return false;
-
+  
   setParallelBusModeInput();
 
+  writePinEOI(LOW);
   // release NRFD ("not ready for data")
-  writePinNRFD(HIGH);
+  writePinNRFD(LOW);
   // release NDAC ("no data accepted")
-  writePinNDAC(LOW);
+  writePinNDAC(HIGH);
 
   // wait for DAV=0
   // must wait indefinitely since other devices may be holding NRFD low until
   // they are ready, bus master will start sending as soon as all devices have
   // released NRFD
   if( !waitPinDAV(LOW, 0) ) return false;
+  writePinEOI(HIGH);
 
   // receive data bits
   data = readParallelData();
 
   // Acknowledge receipt by releasing NDAC
-  writePinNDAC(HIGH);
+  writePinNDAC(LOW);
   // pull NRFD
-  writePinNRFD(LOW);
-
+  writePinNRFD(HIGH);
 
   return true;
 }
@@ -1133,14 +1146,13 @@ bool RAMFUNC(GPIBusHandler::receiveGPIBByte)(bool canWriteOk)
 
   noInterrupts();
 
-  setParallelBusModeInput();
-
   // release NRFD ("not ready for data")
   writePinNRFD(HIGH);
   // release NDAC ("no data accepted")
   writePinNDAC(LOW);
 
   // receive data bits
+  setParallelBusModeInput();
   uint8_t data = readParallelData();
 
   interrupts();
@@ -1169,8 +1181,6 @@ bool RAMFUNC(GPIBusHandler::transmitGPIBByte)(uint8_t numData)
 {
   noInterrupts();
 
-  setParallelBusModeOutput();
-
   // signal "ready-to-send" (DAV=1)
   writePinDAV(HIGH);
   
@@ -1195,6 +1205,7 @@ bool RAMFUNC(GPIBusHandler::transmitGPIBByte)(uint8_t numData)
 
   // transmit the byte
   // set data on DATA lines
+  setParallelBusModeOutput();
   writeParallelData(data);
 
   // signal "data valid" (DAV=0)
@@ -1243,7 +1254,8 @@ void RAMFUNC(GPIBusHandler::atnRequest)()
   
   // set NRFD=0 ("I am here").  If nobody on the bus does this within 1ms,
   // busmaster will assume that "Device not present" 
-  writePinNRFD(LOW);
+  // writePinNRFD(LOW);
+  // writePinNDAC(HIGH);
 
   // disable the hardware that allows ATN to pull NRFD low
   writePinCTRL(HIGH);
@@ -1289,6 +1301,7 @@ void RAMFUNC(GPIBusHandler::handleATNSequence)()
 
           // set NRFD=0 ("I am here")
           writePinNRFD(LOW);
+          writePinNDAC(HIGH);
         }
       else if( (m_primary & 0xE0)==0x40 && (m_currentDevice = findDevice(m_primary & 0x1F))!=NULL )
         {

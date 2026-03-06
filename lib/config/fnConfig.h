@@ -450,11 +450,7 @@ private:
     struct general_info
     {
         std::string devicename = "Meatloaf";
-#ifdef ESP_PLATFORM
         int hsio_index = HSIO_INVALID_INDEX;
-#else
-        int hsio_index = HSIO_DISABLED_INDEX;
-#endif
         std::string timezone;
         bool rotation_sounds = true;
         bool config_enabled = true;
