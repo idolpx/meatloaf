@@ -558,9 +558,10 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
     if ( url.size() < 5)
         return 0;
 
-    // Close the previous request before starting a new one.
-    // esp_http_client_close() ends the HTTP request without destroying the handle;
-    // keep-alive is maintained at the TCP level — the connection is preserved.
+    // Close any previous active request before starting a new one.
+    // For GET/PUT/POST: esp_http_client_close() is sufficient because the response buffer
+    // (raw_data/raw_len) is cleaned up by esp_http_client_read() during normal body reads.
+    // For HEAD: see below — we use init() instead of close() to handle this case.
     if (_http != nullptr && _is_open) {
         esp_http_client_close(_http);
         _is_open = false;
@@ -583,7 +584,7 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
     if ( method == HTTP_METHOD_GET )
     {
         char str[40];
-        snprintf(str, sizeof str, "bytes=%lu-%lu", position, (position + size + 5));
+        snprintf(str, sizeof str, "bytes=%" PRIu32 "-%" PRIu32, position, (position + size + 5));
         esp_http_client_set_header(_http, "Range", str);
         //Debug_printv("seeking range[%s] url[%s]", str, url.c_str());
     }
@@ -610,6 +611,21 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
 
         status = esp_http_client_get_status_code(_http);
         //Debug_printv("after open rc[%d] status[%d]", rc, status);
+
+        // For HEAD: fully reinitialize the client after fetching headers.
+        // esp_http_client_close() alone does NOT reset raw_data/orig_raw_data in the
+        // response buffer. If body data was cached during fetch_headers (e.g., from an
+        // internally-followed 3xx redirect response body), it persists across close().
+        // The next request's http_on_body then asserts raw_data == orig_raw_data → CRASH.
+        // init() calls esp_http_client_cleanup() which frees orig_raw_data and zeros the
+        // buffer pointers, giving the next request a fully clean slate.
+        // _is_open stays false for HEAD — the subsequent GET opens a fresh connection.
+        if (method == HTTP_METHOD_HEAD) {
+            init();
+        } else {
+            _is_open = true;
+        }
+
         return status;
 
         //Debug_printv("--- PRE GET STATUS CODE");
@@ -665,7 +681,7 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
                     meatClient->isFriendlySkipper = true;
                     auto cr = util_tokenize(evt->header_value, '/');
                     if( cr.size() > 1 )
-                        meatClient->_range_size = std::stoi(cr[1]);
+                        meatClient->_range_size = std::stoul(cr[1]);
                 }
                 //Debug_printv("size[%lu] isFriendlySkipper[%d]", meatClient->_range_size, meatClient->isFriendlySkipper);
             }
@@ -698,7 +714,7 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
             else if(mstr::equals("Content-Length", evt->header_key, false))
             {
                 //Debug_printv("* Content len present '%s'", evt->header_value);
-                meatClient->_size = std::stoi(evt->header_value);
+                meatClient->_size = atol(evt->header_value);
             }
             else if(mstr::equals("Location", evt->header_key, false))
             {
