@@ -80,23 +80,13 @@ bool HTTPMSession::keep_alive() {
  * MFile implementations
  ********************************************************/
 
-std::shared_ptr<MeatHttpClient> HTTPMFile::fromHeader() {
-    if(client == nullptr) {
-        client = _session->client;
-
-        // let's just get the headers so we have some info
-        //Debug_printv("Client requesting head");
-
-        // if (mstr::endsWith(url, "*") || mstr::endsWith(url, "$")) {
-        //     url = mstr::dropLast(url, 1);
-        //     Debug_printv("url[%s]", url.c_str());
-        // }
-
-        //Debug_printv("before head url[%s]", url.c_str());
+std::shared_ptr<MeatHttpClient> HTTPMFile::getClient() {
+    auto client = _session->client;
+    if(!_headersFetched) {
         client->HEAD(url);
-        //Debug_printv("after head url[%s]", client->url.c_str());
         if (client->wasRedirected)
             resetURL(client->url);
+        _headersFetched = true;
     }
     return client;
 }
@@ -147,10 +137,10 @@ std::shared_ptr<MStream> HTTPMFile::createStream(std::ios_base::openmode mode)
 
 bool HTTPMFile::isDirectory() {
     // if (is_dir > -1) return is_dir;
-    // if(fromHeader()->m_isDirectory)
+    // if(getClient()->m_isDirectory)
     //     return true;
 
-    // if(fromHeader()->m_isWebDAV) {
+    // if(getClient()->m_isWebDAV) {
     //     // try webdav PROPFIND to get a listing
     //     return true;
     // }
@@ -160,7 +150,7 @@ bool HTTPMFile::isDirectory() {
 }
 
 time_t HTTPMFile::getLastWrite() {
-    if(fromHeader()->m_isWebDAV) {
+    if(getClient()->m_isWebDAV) {
         return 0;
     }
     else
@@ -169,7 +159,7 @@ time_t HTTPMFile::getLastWrite() {
 }
 
 time_t HTTPMFile::getCreationTime() {
-    if(fromHeader()->m_isWebDAV) {
+    if(getClient()->m_isWebDAV) {
         return 0;
     }
     else
@@ -178,12 +168,12 @@ time_t HTTPMFile::getCreationTime() {
 }
 
 bool HTTPMFile::exists() {
-    return fromHeader()->_exists;
+    return getClient()->_exists;
     return true;
 }
 
 bool HTTPMFile::remove() {
-    if(fromHeader()->m_isWebDAV) {
+    if(getClient()->m_isWebDAV) {
         // PROPPATCH allows deletion
         return false;
     }
@@ -191,7 +181,7 @@ bool HTTPMFile::remove() {
 }
 
 bool HTTPMFile::mkDir() {
-    if(fromHeader()->m_isWebDAV) {
+    if(getClient()->m_isWebDAV) {
         // MKCOL creates dir
         return false;
     }
@@ -199,7 +189,7 @@ bool HTTPMFile::mkDir() {
 }
 
 bool HTTPMFile::rewindDirectory() {
-    if(fromHeader()->m_isWebDAV) { 
+    if(getClient()->m_isWebDAV) { 
         // we can try if this is webdav, then
         // PROPFIND allows listing dir
         return false;
@@ -209,7 +199,7 @@ bool HTTPMFile::rewindDirectory() {
 
 MFile* HTTPMFile::getNextFileInDir() { 
     Debug_printv("");
-    if(fromHeader()->m_isWebDAV) {
+    if(getClient()->m_isWebDAV) {
         // we can try if this is webdav, then
         // PROPFIND allows listing dir
         return nullptr;
@@ -219,7 +209,7 @@ MFile* HTTPMFile::getNextFileInDir() {
 
 
 bool HTTPMFile::isText() {
-    return fromHeader()->isText;
+    return getClient()->isText;
 }
 
 /********************************************************
@@ -249,20 +239,21 @@ bool HTTPMStream::open(std::ios_base::openmode mode) {
         return false;
     }
 
+    auto& client = *_session->client;
     bool r = false;
 
     if(mode == (std::ios_base::out | std::ios_base::app))
-        r = _http.PUT(url);
+        r = client.PUT(url);
     else if(mode == std::ios_base::out)
-        r = _http.POST(url);
+        r = client.POST(url);
     else
-        r = _http.GET(url);
+        r = client.GET(url);
 
-    _size = ( _http._range_size > 0) ? _http._range_size : _http._size;
-    if ( _http.wasRedirected )
-        url = _http.url;
+    _size = ( client._range_size > 0) ? client._range_size : client._size;
+    if ( client.wasRedirected )
+        url = client.url;
 
-    //Debug_printv("r[%d] size[%d] url[%s] hurl[%s]", r, _size, url.c_str(), _http.url.c_str());
+    //Debug_printv("r[%d] size[%d] url[%s] hurl[%s]", r, _size, url.c_str(), client.url.c_str());
 
     if (r && _session) {
         _session->acquireIO();
@@ -276,18 +267,18 @@ void HTTPMStream::close() {
     if (_session) {
         _session->releaseIO();
     }
-    _http.close();
+    // client stays alive in session for reuse
 }
 
 bool HTTPMStream::seek(uint32_t pos) {
-    if ( !_http._is_open )
+    if ( !_session->client->_is_open )
     {
         Debug_printv("error");
         _error = 1;
         return false;
     }
 
-    return _http.seek(pos);
+    return _session->client->seek(pos);
 }
 
 uint32_t HTTPMStream::read(uint8_t* buf, uint32_t size) {
@@ -298,23 +289,23 @@ uint32_t HTTPMStream::read(uint8_t* buf, uint32_t size) {
         if ( size > available() )
             size = available();
 
-        bytesRead = _http.read(buf, size);
+        bytesRead = _session->client->read(buf, size);
         _position += bytesRead;
-        _error = _http._error;
+        _error = _session->client->_error;
     }
 
     return bytesRead;
 };
 
 uint32_t HTTPMStream::write(const uint8_t *buf, uint32_t size) {
-    uint32_t bytesWritten = _http.write(buf, size);
+    uint32_t bytesWritten = _session->client->write(buf, size);
     _position += bytesWritten;
     return bytesWritten;
 }
 
 
 bool HTTPMStream::isOpen() {
-    return _http._is_open;
+    return _session && _session->client && _session->client->_is_open;
 };
 
 
@@ -567,25 +558,13 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
     if ( url.size() < 5)
         return 0;
 
-    // // If there's an active request, finish it cleanly before starting a new one
-    // // This allows keep-alive to reuse the TCP connection
-    // if (_http != nullptr && _is_open) {
-    //     // Check if there's unread data and flush it efficiently
-    //     if (!esp_http_client_is_complete_data_received(_http)) {
-    //         // Flush remaining data in chunks to complete the request
-    //         char discard_buffer[256];  // Stack allocated for thread safety
-    //         int bytes_read;
-            
-    //         do {
-    //             int chunk_size = sizeof(discard_buffer);
-                
-    //             bytes_read = esp_http_client_read(_http, discard_buffer, chunk_size);
-    //         } while (bytes_read > 0);
-    //     }
-        
-    //     // Don't call esp_http_client_close() - that breaks keep-alive
-    //     _is_open = false;
-    // }
+    // Close the previous request before starting a new one.
+    // esp_http_client_close() ends the HTTP request without destroying the handle;
+    // keep-alive is maintained at the TCP level — the connection is preserved.
+    if (_http != nullptr && _is_open) {
+        esp_http_client_close(_http);
+        _is_open = false;
+    }
 
     // Set URL and Method
     mstr::replaceAll(url, " ", "%20");

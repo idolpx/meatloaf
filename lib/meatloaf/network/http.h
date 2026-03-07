@@ -60,6 +60,8 @@ class MeatHttpClient {
     static esp_err_t _http_event_handler(esp_http_client_event_t *evt);
     int openAndFetchHeaders(esp_http_client_method_t method, uint32_t position, uint32_t size = HTTP_BLOCK_SIZE);
     esp_http_client_method_t lastMethod;
+
+    // Callback for HTTP headers received during the request; can be set by users of this class to handle headers as needed
     std::function<int(char*, char*)> onHeader = [] (char* key, char* value){ 
         //Debug_printv("HTTP_EVENT_ON_HEADER, key=%s, value=%s", key, value);
         return 0; 
@@ -113,7 +115,7 @@ public:
         }
         return false;
     }
-    std::string readHeader(std::string header)
+    std::string getHeader(std::string header)
     {
         return headers[header];
     }
@@ -187,9 +189,9 @@ public:
  ********************************************************/
 
 class HTTPMFile: public MFile {
-    std::shared_ptr<MeatHttpClient> fromHeader();
-    std::shared_ptr<MeatHttpClient> client = nullptr;
+    std::shared_ptr<MeatHttpClient> getClient();
     std::shared_ptr<HTTPMSession> _session = nullptr;
+    bool _headersFetched = false;
 
 public:
     HTTPMFile() {
@@ -243,7 +245,6 @@ public:
  ********************************************************/
 
 class HTTPMStream: public MStream {
-
 public:
     HTTPMStream(std::string path): MStream(path) {
         //url = path;
@@ -280,7 +281,7 @@ public:
         return false;
     }
 
-    MeatHttpClient _http;
+protected:
     std::shared_ptr<HTTPMSession> _session = nullptr;
 
 private:

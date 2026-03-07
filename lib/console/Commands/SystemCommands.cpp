@@ -174,6 +174,7 @@ static int meminfo(int argc, char **argv)
 #endif
 #endif
 
+    Debug_memory();
     return EXIT_SUCCESS;
 }
 
