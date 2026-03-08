@@ -411,7 +411,7 @@ public:
     static void dump() {
         Debug_printv("sessions[%d]", session_repo.size());
         for(auto& pair : session_repo) {
-            Debug_printv("key[%s]", pair.first.c_str());
+            Debug_printv("key[%s] size[%d]", pair.first.c_str(), sizeof(*pair.second));
         }
     }
 };

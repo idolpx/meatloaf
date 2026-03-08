@@ -303,7 +303,7 @@ public:
     static void dump() {
         Debug_printv("streams[%d]", image_repo.size());
         for(auto& pair : image_repo) {
-            Debug_printv("key[%s] stream[%s]", pair.first.c_str(), pair.second->url.c_str());
+            Debug_printv("key[%s] stream[%s] size[%d]", pair.first.c_str(), pair.second->url.c_str(), sizeof(*pair.second));
         }
     }
 };

@@ -332,13 +332,6 @@ uint32_t MMediaStream::seekFileSize( uint8_t start_track, uint8_t start_sector )
         // and feed watchdog every 100 blocks
         if (blocks % 10 == 0) {
             vTaskDelay(1);  // Yield to scheduler
-            if (blocks % 100 == 0) {
-                // Try to reset watchdog, ignore errors if task not subscribed
-                esp_err_t err = esp_task_wdt_reset();
-                if (err != ESP_OK && blocks == 100) {
-                    Debug_printv("Note: Task not subscribed to watchdog (this is OK)");
-                }
-            }
         }
         
         if ( start_track > 0 )

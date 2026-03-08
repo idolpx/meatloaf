@@ -52,6 +52,9 @@
 #include "device/sd.h"
 
 #ifndef MIN_CONFIG
+// Device
+#include "device/i2c.h"
+
 // Archive
 #include "media/archive/archive.h"
 #include "media/archive/ark.h"
@@ -218,6 +221,9 @@ SDFileSystem sdFS;
 #endif
 
 #ifndef MIN_CONFIG
+// Device
+I2CMFileSystem i2cFS;
+
 // Archive
 ArchiveMFileSystem archiveFS;
 ARKMFileSystem arkFS;
@@ -296,6 +302,9 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
 #endif
 
 #ifndef MIN_CONFIG
+    // Device
+    &i2cFS,
+
     // Archive
     &archiveFS,     // extension-based FS have to be on top to be picked first, otherwise the scheme will pick them!
     &arkFS, &lbrFS, &lnxFS,
