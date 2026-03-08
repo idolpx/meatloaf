@@ -300,7 +300,7 @@ uint32_t MMediaStream::seekFileSize( uint8_t start_track, uint8_t start_sector )
     do
     {
         // This causes watchdog resets to be missed on long files. Leave commented unless used for debugging.
-        //console.printf("t[%d] s[%d] b[%d]\r", start_track, start_sector, blocks);
+        console.printf("t[%d] s[%d] b[%d]\r", start_track, start_sector, blocks);
         
         // Safety check for runaway loops
         if (blocks >= MAX_BLOCKS) {
