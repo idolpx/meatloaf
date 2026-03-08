@@ -248,10 +248,11 @@ public:
 
         // Create task on CPU0 (same core as WiFi)
         // Lower priority than IEC bus task
+        // Increased stack size to 8192 for HTTP/TNFS network session operations
         xTaskCreatePinnedToCore(
             session_service_task,    // Task function
             "session_broker",        // Task name
-            4096,                    // Stack size
+            8192,                    // Stack size
             NULL,                    // Parameters
             5,                       // Priority (lower than IEC bus priority 17)
             NULL,                    // Task handle
