@@ -19,6 +19,8 @@
 
 #include <esp_idf_version.h>
 #include <algorithm>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 #include "meatloaf.h"
 #include "meat_session.h"
@@ -341,11 +343,17 @@ bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
     isFriendlySkipper = false;
     _size = 0;
     _range_size = 0;
-    // Reinitialize the handle so each new file access starts with a clean raw_data buffer.
-    // esp_http_client_close() alone does NOT reset raw_data/orig_raw_data — only cleanup() does.
-    // If the previous range response left unread body bytes in raw_data (e.g., partial read before
-    // a new open()), the next fetch_headers() triggers http_on_body which asserts raw_data == orig_raw_data.
-    init();
+    // Drain any buffered body bytes from the previous request on this shared handle.
+    // Reading until esp_http_client_read() returns <=0 drains raw_len to 0, which causes
+    // ESP-IDF to call cached_buf_cleanup() internally, resetting raw_data == orig_raw_data.
+    // This prevents the http_on_body assertion without destroying the handle via cleanup(),
+    // which risks use-after-free from lwIP keep-alive timers referencing freed socket state.
+    if (_http != nullptr && _is_open) {
+        char drain_buf[HTTP_BLOCK_SIZE];
+        while (esp_http_client_read(_http, drain_buf, HTTP_BLOCK_SIZE) > 0) {}
+        esp_http_client_close(_http);
+        _is_open = false;
+    }
 
     return processRedirectsAndOpen(0);
 };
@@ -372,11 +380,9 @@ bool MeatHttpClient::processRedirectsAndOpen(uint32_t position, uint32_t size) {
         }
 
         if (lastRC >= 300 && lastRC <= 399) {
-            // Re-initialize the handle before following the redirect. The 3xx response body
-            // may have been cached in raw_data; a fresh handle ensures http_on_body won't
-            // assert raw_data == orig_raw_data when the redirect target's body arrives.
-            // The Location header handler has already updated `url` with the redirect target.
-            init();
+            // Location header handler already updated `url` to the redirect target.
+            // The next openAndFetchHeaders() call will drain+close the 3xx response
+            // body before opening the new connection — no cleanup() needed here.
         }
     } while (lastRC >= 300 && lastRC <= 399);
 
@@ -468,29 +474,35 @@ bool MeatHttpClient::seek(uint32_t pos) {
         //Debug_printv("Server doesn't support resume, reading from start and discarding");
         // server doesn't support resume, so...
         if( pos < _position || pos == 0 ) {
-            // skipping backward let's simply reopen the stream...
-            close();
-            init();
-
+            // Reopen from start — open() drains+closes the current connection without
+            // calling cleanup(), avoiding use-after-free from lwIP keep-alive timers.
             if ( !open(url, lastMethod) )
                 return false;
 
-            // and read pos bytes - requires some buffer
-            for(int i = 0; i<pos; i++) {
-                char c;
-                int rc = esp_http_client_read(_http, &c, 1);
-                if(rc == -1)
+            // skip pos bytes in HTTP_BLOCK_SIZE chunks to avoid per-byte UART contention
+            uint32_t remaining = pos;
+            while (remaining > 0) {
+                char buf[HTTP_BLOCK_SIZE];
+                uint32_t toRead = (remaining < HTTP_BLOCK_SIZE) ? remaining : HTTP_BLOCK_SIZE;
+                int rc = esp_http_client_read(_http, buf, (int)toRead);
+                if (rc <= 0)
                     return false;
+                remaining -= (uint32_t)rc;
+                vTaskDelay(0);  // yield to scheduler between chunks
             }
         }
         else {
-            auto delta = pos-_position;
-            // skipping forward let's skip a proper amount of bytes - requires some buffer
-            for(int i = 0; i<delta; i++) {
-                char c;
-                int rc = esp_http_client_read(_http, &c, 1);
-                if(rc == -1)
-                return false;
+            auto delta = pos - _position;
+            // skip forward in HTTP_BLOCK_SIZE chunks to avoid per-byte UART contention
+            uint32_t remaining = delta;
+            while (remaining > 0) {
+                char buf[HTTP_BLOCK_SIZE];
+                uint32_t toRead = (remaining < HTTP_BLOCK_SIZE) ? remaining : HTTP_BLOCK_SIZE;
+                int rc = esp_http_client_read(_http, buf, (int)toRead);
+                if (rc <= 0)
+                    return false;
+                remaining -= (uint32_t)rc;
+                vTaskDelay(0);  // yield to scheduler between chunks
             }
         }
 
@@ -549,11 +561,13 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
     if ( url.size() < 5)
         return 0;
 
-    // Close any previous active request before starting a new one.
-    // For GET/PUT/POST: esp_http_client_close() is sufficient because the response buffer
-    // (raw_data/raw_len) is cleaned up by esp_http_client_read() during normal body reads.
-    // For HEAD: see below — we use init() instead of close() to handle this case.
+    // Drain and close any previous active request before starting a new one.
+    // Draining until esp_http_client_read() returns <=0 empties raw_len to 0, which causes
+    // ESP-IDF to call cached_buf_cleanup() internally. This resets raw_data == orig_raw_data
+    // so the next fetch_headers() call doesn't trigger the http_on_body assertion.
     if (_http != nullptr && _is_open) {
+        char drain_buf[HTTP_BLOCK_SIZE];
+        while (esp_http_client_read(_http, drain_buf, HTTP_BLOCK_SIZE) > 0) {}
         esp_http_client_close(_http);
         _is_open = false;
     }
@@ -710,7 +724,7 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
             }
             else if(mstr::equals("Location", evt->header_key, false))
             {
-                Debug_printv("* This page redirects from '%s' to '%s'", meatClient->url.c_str(), evt->header_value);
+                //Debug_printv("* This page redirects from '%s' to '%s'", meatClient->url.c_str(), evt->header_value);
                 //if ( mstr::compare(evt->header_value, "*://*") )
                 if ( mstr::contains(evt->header_value, (char *)"://") )
                 {
@@ -733,7 +747,7 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
                     }
                 }
 
-                Debug_printv("new url '%s'", meatClient->url.c_str());
+                //Debug_printv("new url '%s'", meatClient->url.c_str());
                 meatClient->wasRedirected = true;
             }
 
