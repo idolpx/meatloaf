@@ -618,16 +618,14 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
         status = esp_http_client_get_status_code(_http);
         //Debug_printv("after open rc[%d] status[%d]", rc, status);
 
-        // For HEAD: fully reinitialize the client after fetching headers.
-        // esp_http_client_close() alone does NOT reset raw_data/orig_raw_data in the
-        // response buffer. If body data was cached during fetch_headers (e.g., from an
-        // internally-followed 3xx redirect response body), it persists across close().
-        // The next request's http_on_body then asserts raw_data == orig_raw_data → CRASH.
-        // init() calls esp_http_client_cleanup() which frees orig_raw_data and zeros the
-        // buffer pointers, giving the next request a fully clean slate.
-        // _is_open stays false for HEAD — the subsequent GET opens a fresh connection.
+        // For HEAD: close without cleanup(). HEAD responses have no body, so raw_data
+        // is never populated — no http_on_body assertion risk, no drain needed.
+        // Using close() instead of init()/cleanup() avoids the use-after-free crash:
+        // cleanup() frees the socket handle while lwIP keep-alive timers still reference
+        // it, leading to heap corruption and StoreProhibited at the next context switch.
+        // _is_open stays false — the subsequent GET will call open() on the same handle.
         if (method == HTTP_METHOD_HEAD) {
-            init();
+            esp_http_client_close(_http);
         } else {
             _is_open = true;
         }
