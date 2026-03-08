@@ -28,90 +28,92 @@
 #include "meat_media.h"
 
 
-/********************************************************
- * Streams
- ********************************************************/
+// /********************************************************
+//  * Streams
+//  ********************************************************/
 
-class CRTMStream : public MMediaStream {
-    // override everything that requires overriding here
+// class CRTMStream : public MMediaStream {
+//     // override everything that requires overriding here
 
-public:
-    CRTMStream(std::shared_ptr<MStream> is) : MMediaStream(is)
-    {
-        // Read Header
-        readHeader();
-    };
+// public:
+//     CRTMStream(std::shared_ptr<MStream> is) : MMediaStream(is)
+//     {
+//         // Read Header
+//         readHeader();
+//     };
 
-protected:
-    struct Header {
-        char name[16];
-    };
+// protected:
+//     struct Header {
+//         char name[16];
+//     };
 
-    struct Entry {
-        char filename[16];
-        uint8_t file_type;
-        uint8_t file_start_address[2]; // from tcrt file system at 0xD8
-        uint8_t file_size[3];
-        uint8_t file_load_address[2];
-        uint16_t bundle_compatibility;
-        uint16_t bundle_main_start;
-        uint16_t bundle_main_length;
-        uint16_t bundle_main_call_address;
-    };
+//     struct Entry {
+//         char filename[16];
+//         uint8_t file_type;
+//         uint8_t file_start_address[2]; // from tcrt file system at 0xD8
+//         uint8_t file_size[3];
+//         uint8_t file_load_address[2];
+//         uint16_t bundle_compatibility;
+//         uint16_t bundle_main_start;
+//         uint16_t bundle_main_length;
+//         uint16_t bundle_main_call_address;
+//     };
 
-    bool readHeader() override {
-        containerStream->seek(0x18);
-        containerStream->read((uint8_t*)&header, sizeof(header));
-    }
+//     bool readHeader() override {
+//         containerStream->seek(0x18);
+//         containerStream->read((uint8_t*)&header, sizeof(header));
+//         return true;
+//     }
 
-    bool seekEntry( std::string filename ) override;
-    bool seekEntry( uint16_t index = 0 ) override;
-    bool readEntry( uint16_t index ) override;
-    bool seekPath(std::string path) override;
+//     bool seekEntry( std::string filename ) override;
+//     bool seekEntry( uint16_t index = 0 ) override;
+//     bool readEntry( uint16_t index ) override;
+//     bool seekPath(std::string path) override;
 
-    uint32_t readFile(uint8_t* buf, uint32_t size) override;
+//     uint32_t readFile(uint8_t* buf, uint32_t size) override;
+//     uint32_t writeFile(uint8_t* buf, uint32_t size) override { return 0; };
 
-    Header header;
-    Entry entry;
+//     Header header;
+//     Entry entry;
 
-    std::string decodeType(uint8_t file_type, bool show_hidden = false) override;
+//     std::string decodeType(uint8_t file_type, bool show_hidden = false) override;
 
-private:
-    friend class CRTMFile;
-};
+// private:
+//     friend class CRTMFile;
+// };
 
 
-/********************************************************
- * File implementations
- ********************************************************/
+// /********************************************************
+//  * File implementations
+//  ********************************************************/
 
-class CRTMFile: public MFile {
-public:
+// class CRTMFile: public MFile {
+// public:
 
-    CRTMFile(std::string path, bool is_dir = true): MFile(path) {
-        isDir = is_dir;
+//     CRTMFile(std::string path, bool is_dir = true): MFile(path) {
+//         isDir = is_dir;
 
-        media_image = name;
-        isPETSCII = true;
-    };
+//         media_image = name;
+//         isPETSCII = true;
+//     };
     
-    ~CRTMFile() {
-        // don't close the stream here! It will be used by shared ptr D64Util to keep reading image params
-    }
+//     ~CRTMFile() {
+//         // don't close the stream here! It will be used by shared ptr D64Util to keep reading image params
+//     }
 
-    std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> is) override
-    {
-        Debug_printv("[%s]", url.c_str());
+//     std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> is) override
+//     {
+//         Debug_printv("[%s]", url.c_str());
 
-        return std::make_shared<CRTMStream>(is);
-    }
+//         return std::make_shared<CRTMStream>(is);
+//     }
 
-    bool rewindDirectory() override;
-    MFile* getNextFileInDir() override;
+//     bool rewindDirectory() override;
+//     MFile* getNextFileInDir() override;
 
-    bool isDir = true;
-    bool dirIsOpen = false;
-};
+//     bool isDir = true;
+//     bool dirIsOpen = false;
+// };
 
 
 
@@ -125,11 +127,29 @@ public:
     CRTMFileSystem(): MFileSystem("crt") {};
 
     bool handles(std::string fileName) override {
-        return byExtension(".crt", fileName);
+        return byExtension({
+            ".crt",
+            ".bin"
+        }, fileName);
     }
 
     MFile* getFile(std::string path) override {
-        return new CRTMFile(path);
+
+        if ( mstr::endsWith(path, ".bin", false) )
+        {
+            // .bin
+            Debug_printv("Transferring ROM image to One ROM!");
+        }
+        else
+        {
+            // .crt
+            Debug_printv("Transferring CRT image to configured CARTRIDGE! (C64U, TeensyROM, PCC64)");
+        }
+
+        Debug_printv("path[%s]", path.c_str());
+
+        // This always returns nullptr, because the system is reset after transfer to launch
+        return nullptr;
     }
 };
 

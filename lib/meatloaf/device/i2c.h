@@ -51,7 +51,11 @@
 #  if defined(PIN_GPIOX_SDA) && (PIN_GPIOX_SDA != GPIO_NUM_NC)
 #    define I2C_ML_SDA  PIN_GPIOX_SDA
 #  else
+#ifndef CONFIG_IDF_TARGET_ESP32S3
 #    define I2C_ML_SDA  GPIO_NUM_21
+#else
+#    define I2C_ML_SDA  GPIO_NUM_18
+#endif
 #  endif
 #endif
 
@@ -59,7 +63,11 @@
 #  if defined(PIN_GPIOX_SCL) && (PIN_GPIOX_SCL != GPIO_NUM_NC)
 #    define I2C_ML_SCL  PIN_GPIOX_SCL
 #  else
+#ifndef CONFIG_IDF_TARGET_ESP32S3
 #    define I2C_ML_SCL  GPIO_NUM_22
+#else
+#    define I2C_ML_SCL  GPIO_NUM_19
+#endif
 #  endif
 #endif
 

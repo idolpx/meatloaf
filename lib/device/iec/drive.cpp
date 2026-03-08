@@ -761,204 +761,205 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
             name = mstr::toUTF8(name);
             name = U8Char::decodeACE(name);
             MFile *f = m_cwd->cd(name);
-            bool is_dir = f->isDirectory();
-            Debug_printv("isdir[%d] url[%s][%s]", is_dir, f->url.c_str(), f->pathInStream.c_str());
-
-            if (f == nullptr)  // || f->url.empty() )
+            if (f == nullptr)
             {
                 Debug_printv("Error: could not find file system for URL [%s]", name.c_str());
                 setStatusCode(ST_FILE_NOT_FOUND);
-                if (f != nullptr) delete f;
-                f = nullptr;
             }
-            else if (is_dir)
+            else
             {
-                if( mode == std::ios_base::in )
-                {
-                    // // reading directory
-                    // bool isProperDir = false;
-                    // std::unique_ptr<MFile> entry(f->getNextFileInDir());
-                    // Debug_printv("First entry in directory [%s] is [%s] cwd[%s]", f->url.c_str(), entry==nullptr ? "NULL" : entry->name.c_str(), m_cwd->url.c_str());
-                    // if( entry==nullptr )
-                    // {
-                    //     // if we can't open the file stream then assume this is an empty directory
-                    //     std::shared_ptr<MStream> s = f->getSourceStream(mode);
-                    //     //if( s==nullptr || !s->isOpen() ) isProperDir = true;
-                    //     Debug_printv("stream for directory [%s] is [%s]", f->url.c_str(), s==nullptr ? "NULL" : (s->isOpen() ? "OPEN" : "CLOSED"));
-                    //     if( s!=nullptr)
-                    //     {
-                    //         if( s->isOpen() )
-                    //             isProperDir = true;
-                    //     }
-                    //     //delete s;
-                    // }
-                    // else
-                    // {
-                    //     Debug_printv("Directory [%s] first entry is [%s]", f->url.c_str(), entry->name.c_str());
-                    //     delete entry;
-                    //     isProperDir = true;
-                    // }
+                bool is_dir = f->isDirectory();
+                Debug_printv("isdir[%d] url[%s][%s]", is_dir, f->url.c_str(), f->pathInStream.c_str());
 
-                    // Debug_printv("isProperDir[%d]", isProperDir);
-                    // if( isProperDir )
+                if (is_dir)
+                {
+                    if( mode == std::ios_base::in )
                     {
-                        Debug_printv("Opening directory for reading [%s]", f->url.c_str());
-                        // regular directory
-                        if (!f->rewindDirectory())
-                        //if (!f->rewindDirectory(filter, sort))
+                        // // reading directory
+                        // bool isProperDir = false;
+                        // std::unique_ptr<MFile> entry(f->getNextFileInDir());
+                        // Debug_printv("First entry in directory [%s] is [%s] cwd[%s]", f->url.c_str(), entry==nullptr ? "NULL" : entry->name.c_str(), m_cwd->url.c_str());
+                        // if( entry==nullptr )
+                        // {
+                        //     // if we can't open the file stream then assume this is an empty directory
+                        //     std::shared_ptr<MStream> s = f->getSourceStream(mode);
+                        //     //if( s==nullptr || !s->isOpen() ) isProperDir = true;
+                        //     Debug_printv("stream for directory [%s] is [%s]", f->url.c_str(), s==nullptr ? "NULL" : (s->isOpen() ? "OPEN" : "CLOSED"));
+                        //     if( s!=nullptr)
+                        //     {
+                        //         if( s->isOpen() )
+                        //             isProperDir = true;
+                        //     }
+                        //     //delete s;
+                        // }
+                        // else
+                        // {
+                        //     Debug_printv("Directory [%s] first entry is [%s]", f->url.c_str(), entry->name.c_str());
+                        //     delete entry;
+                        //     isProperDir = true;
+                        // }
+
+                        // Debug_printv("isProperDir[%d]", isProperDir);
+                        // if( isProperDir )
                         {
-                            Debug_printv("Error: could not set current working directory to [%s]. Permission denied.", f->url.c_str());
-                            setStatusCode(ST_PERMISSION_DENIED);
-                        }
-                        else
-                        {
-                            MFile* normalized = MFSOwner::File(f->url);
-                            if (!mstr::startsWith(f->url, normalized->url.c_str()))
+                            Debug_printv("Opening directory for reading [%s]", f->url.c_str());
+                            // regular directory
+                            if (!f->rewindDirectory())
+                            //if (!f->rewindDirectory(filter, sort))
                             {
-                                delete f;
-                                f = normalized;
+                                Debug_printv("Error: could not set current working directory to [%s]. Permission denied.", f->url.c_str());
+                                setStatusCode(ST_PERMISSION_DENIED);
                             }
                             else
                             {
-                                delete normalized;
+                                MFile* normalized = MFSOwner::File(f->url);
+                                if (!mstr::startsWith(f->url, normalized->url.c_str()))
+                                {
+                                    delete f;
+                                    f = normalized;
+                                }
+                                else
+                                {
+                                    delete normalized;
+                                }
+
+                                m_channels[channel] = new iecChannelHandlerDir(this, f);
+                                m_numOpenChannels++;
+                                Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Change Directory Here! channel[%d] numChannels[%d] dir[%s]", channel, m_numOpenChannels, f->url.c_str());
+                                //m_cwd.reset(MFSOwner::File(f->url));
+                                set_cwd(f->url, true);
+                                Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "f.url[%s] m_cwd[%s]", f->url.c_str(), m_cwd->url.c_str());
+                                Debug_printv("Reading directory [%s]", f->url.c_str());
+                                setStatusCode(ST_OK);
                             }
-
-                            m_channels[channel] = new iecChannelHandlerDir(this, f);
-                            m_numOpenChannels++;
-                            Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Change Directory Here! channel[%d] numChannels[%d] dir[%s]", channel, m_numOpenChannels, f->url.c_str());
-                            //m_cwd.reset(MFSOwner::File(f->url));
-                            set_cwd(f->url, true);
-                            Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "f.url[%s] m_cwd[%s]", f->url.c_str(), m_cwd->url.c_str());
-                            Debug_printv("Reading directory [%s]", f->url.c_str());
-                            setStatusCode(ST_OK);
+                            f = nullptr; // f will be deleted in iecChannelHandlerDir destructor
                         }
-                        f = nullptr; // f will be deleted in iecChannelHandlerDir destructor
-                    }
-                    // else
-                    // {
-                    //     // can't read file entries => treat directory as file
-                    //     Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Treating directory as file [%s]", f->url.c_str());
-                    //     m_cwd.reset(MFSOwner::File(f->url));
-                    //     Debug_printv("Treating directory as file [%s]", f->url.c_str());
-                    // }
-                }
-                else
-                {
-                    // cannot write to directory
-                    Debug_printv("Error: attempt to write to directory [%s]", f->url.c_str());
-                    setStatusCode(ST_WRITE_PROTECT_ON);
-                    delete f;
-                    f = nullptr;
-                }
-            }
-
-            if( f != nullptr )
-            {
-                // opening a file
-                if( (mode == std::ios_base::in) && !f->exists() )
-                {
-                    Debug_printv("Error: file doesn't exist [%s]", f->url.c_str());
-                    setStatusCode(ST_FILE_NOT_FOUND);
-                }
-                else if( (mode == std::ios_base::out) && f->media_image.size()>0 )
-                {
-                    Debug_printv("Error: writing to files on disk media not supported [%s]", f->url.c_str());
-                    setStatusCode(ST_WRITE_PROTECT_ON);
-                }
-                else if( (mode == std::ios_base::out) && f->exists() && !overwrite )
-                {
-                    Debug_printv("Error: file exists [%s]", f->url.c_str());
-                    setStatusCode(ST_FILE_EXISTS);
-                }
-                else
-                {
-                    // VDrive needs full path including pathInStream
-                    std::string full_path = f->url;
-                    if ( f->pathInStream.size() )
-                        full_path += "/" + f->pathInStream;
-
-                    //Debug_printv( ANSI_RED_BOLD_HIGH_INTENSITY "VDrive Opening file [%s] mode[%s]", full_path.c_str(), mode==std::ios_base::in ? "read" : "write");
-                    if( Meatloaf.use_vdrive && !is_dir && (m_vdrive=VDrive::create(m_devnr-8, full_path.c_str()))!=nullptr )
-                    {
-                        Debug_printv("Created VDrive for URL %s. Loading directory.", full_path.c_str());
-                        delete f;
-                        return m_vdrive->openFile(channel, "$");
-                    }
-
-                    std::shared_ptr<MStream> new_stream = f->getSourceStream(mode);
-                    
-                    if( new_stream==nullptr )
-                    {
-                        Debug_printv("Error: could not get stream for file [%s]", f->url.c_str());
-                        setStatusCode(ST_DRIVE_NOT_READY);
-                    }
-                    else if( (mode == std::ios_base::in) && new_stream->size()==0 && !is_dir )
-                    {
-                        Debug_printv("Error: file length is zero [%s]", f->url.c_str());
-                        //delete new_stream;
-                        setStatusCode(ST_FILE_NOT_FOUND);
-                    }
-                    else if( !new_stream->isOpen() )
-                    {
-                        Debug_printv("Error: could not open file stream [%s]", f->url.c_str());
-                        //delete new_stream;
-                        setStatusCode(ST_DRIVE_NOT_READY);
+                        // else
+                        // {
+                        //     // can't read file entries => treat directory as file
+                        //     Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Treating directory as file [%s]", f->url.c_str());
+                        //     m_cwd.reset(MFSOwner::File(f->url));
+                        //     Debug_printv("Treating directory as file [%s]", f->url.c_str());
+                        // }
                     }
                     else
                     {
-                        Debug_printv("Stream created for file [%s] pathInStream[%s]", f->url.c_str(), f->pathInStream.c_str());
-                        // new_stream will be deleted in iecChannelHandlerFile destructor
-                        m_channels[channel] = new iecChannelHandlerFile(this, new_stream, is_dir ? 0x0801 : -1); // 0x0801 = overrides load address to start of basic for C64
-                        m_numOpenChannels++;
-                        setStatusCode(ST_OK);
-
-                        Debug_printv("isDir[%d] isRandomAccess[%d] isBrowsable[%d]", is_dir, new_stream->isRandomAccess(), new_stream->isBrowsable());
-                        if ( new_stream->isRandomAccess() || new_stream->isBrowsable() )
-                        {
-                            // This was a directory.  Set m_cwd to the directory
-                            Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "dir url[%s]", f->url.c_str() );
-                            //m_cwd.reset(MFSOwner::File(f->url));
-                            set_cwd(f->url, true);
-                        }
-                        else
-                        {
-                            // This was a file.  Set m_cwd to the parent directory
-                            Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "file base[%s]", f->base().c_str() );
-                            //m_cwd.reset(MFSOwner::File(f->base()));
-                            set_cwd(f->base(), true);
-                        }
-
-                        // {
-                        //     // Debug_printv( "url[%s] pathInStream[%s]", f->url.c_str(), f->pathInStream.c_str() );
-                        //     // if( new_stream->has_subdirs )
-                        //     // {
-                        //     //     Filesystem supports sub directories => set m_cwd to parent directory of file
-                        //     //     Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Subdir Change Directory Here! stream[%s] > f[%s]", new_stream->url.c_str(), f->url.c_str() );
-                        //     //     m_cwd.reset(MFSOwner::File(f->url));
-                        //     // }
-                        //     // else
-                        //     // {
-                        //     //     Handles media files that may have '/' as part of the filename
-                        //     //     f = MFSOwner::File( new_stream->url );
-                        //     //     Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Change Directory Here! stream[%s] > f[%s]", new_stream->url.c_str(), f->url.c_str() );
-                        //     //     m_cwd.reset(MFSOwner::File(f->sourceFile));
-                        //     // }
-                        // }
-                    }
-
-                    if ( m_statusCode != ST_OK && m_statusCode != ST_DRIVE_NOT_READY )
-                    {
-                        Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Change Directory Here! url[%s] > base[%s]", f->url.c_str(), f->base().c_str() );
-                        //m_cwd.reset(MFSOwner::File(f->base()));
-                        set_cwd(f->base());
+                        // cannot write to directory
+                        Debug_printv("Error: attempt to write to directory [%s]", f->url.c_str());
+                        setStatusCode(ST_WRITE_PROTECT_ON);
+                        delete f;
+                        f = nullptr;
                     }
                 }
 
-                Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "m_cwd[%s]", m_cwd==nullptr ? "NULL" : m_cwd->url.c_str());
-                m_cwd->dump();
+                if( f != nullptr )
+                {
+                    // opening a file
+                    if( (mode == std::ios_base::in) && !f->exists() )
+                    {
+                        Debug_printv("Error: file doesn't exist [%s]", f->url.c_str());
+                        setStatusCode(ST_FILE_NOT_FOUND);
+                    }
+                    else if( (mode == std::ios_base::out) && f->media_image.size()>0 )
+                    {
+                        Debug_printv("Error: writing to files on disk media not supported [%s]", f->url.c_str());
+                        setStatusCode(ST_WRITE_PROTECT_ON);
+                    }
+                    else if( (mode == std::ios_base::out) && f->exists() && !overwrite )
+                    {
+                        Debug_printv("Error: file exists [%s]", f->url.c_str());
+                        setStatusCode(ST_FILE_EXISTS);
+                    }
+                    else
+                    {
+                        // VDrive needs full path including pathInStream
+                        std::string full_path = f->url;
+                        if ( f->pathInStream.size() )
+                            full_path += "/" + f->pathInStream;
+
+                        //Debug_printv( ANSI_RED_BOLD_HIGH_INTENSITY "VDrive Opening file [%s] mode[%s]", full_path.c_str(), mode==std::ios_base::in ? "read" : "write");
+                        if( Meatloaf.use_vdrive && !is_dir && (m_vdrive=VDrive::create(m_devnr-8, full_path.c_str()))!=nullptr )
+                        {
+                            Debug_printv("Created VDrive for URL %s. Loading directory.", full_path.c_str());
+                            delete f;
+                            return m_vdrive->openFile(channel, "$");
+                        }
+
+                        std::shared_ptr<MStream> new_stream = f->getSourceStream(mode);
+                        
+                        if( new_stream==nullptr )
+                        {
+                            Debug_printv("Error: could not get stream for file [%s]", f->url.c_str());
+                            setStatusCode(ST_DRIVE_NOT_READY);
+                        }
+                        else if( (mode == std::ios_base::in) && new_stream->size()==0 && !is_dir )
+                        {
+                            Debug_printv("Error: file length is zero [%s]", f->url.c_str());
+                            //delete new_stream;
+                            setStatusCode(ST_FILE_NOT_FOUND);
+                        }
+                        else if( !new_stream->isOpen() )
+                        {
+                            Debug_printv("Error: could not open file stream [%s]", f->url.c_str());
+                            //delete new_stream;
+                            setStatusCode(ST_DRIVE_NOT_READY);
+                        }
+                        else
+                        {
+                            Debug_printv("Stream created for file [%s] pathInStream[%s]", f->url.c_str(), f->pathInStream.c_str());
+                            // new_stream will be deleted in iecChannelHandlerFile destructor
+                            m_channels[channel] = new iecChannelHandlerFile(this, new_stream, is_dir ? 0x0801 : -1); // 0x0801 = overrides load address to start of basic for C64
+                            m_numOpenChannels++;
+                            setStatusCode(ST_OK);
+
+                            Debug_printv("isDir[%d] isRandomAccess[%d] isBrowsable[%d]", is_dir, new_stream->isRandomAccess(), new_stream->isBrowsable());
+                            if ( new_stream->isRandomAccess() || new_stream->isBrowsable() )
+                            {
+                                // This was a directory.  Set m_cwd to the directory
+                                Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "dir url[%s]", f->url.c_str() );
+                                //m_cwd.reset(MFSOwner::File(f->url));
+                                set_cwd(f->url, true);
+                            }
+                            else
+                            {
+                                // This was a file.  Set m_cwd to the parent directory
+                                Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "file base[%s]", f->base().c_str() );
+                                //m_cwd.reset(MFSOwner::File(f->base()));
+                                set_cwd(f->base(), true);
+                            }
+
+                            // {
+                            //     // Debug_printv( "url[%s] pathInStream[%s]", f->url.c_str(), f->pathInStream.c_str() );
+                            //     // if( new_stream->has_subdirs )
+                            //     // {
+                            //     //     Filesystem supports sub directories => set m_cwd to parent directory of file
+                            //     //     Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Subdir Change Directory Here! stream[%s] > f[%s]", new_stream->url.c_str(), f->url.c_str() );
+                            //     //     m_cwd.reset(MFSOwner::File(f->url));
+                            //     // }
+                            //     // else
+                            //     // {
+                            //     //     Handles media files that may have '/' as part of the filename
+                            //     //     f = MFSOwner::File( new_stream->url );
+                            //     //     Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Change Directory Here! stream[%s] > f[%s]", new_stream->url.c_str(), f->url.c_str() );
+                            //     //     m_cwd.reset(MFSOwner::File(f->sourceFile));
+                            //     // }
+                            // }
+                        }
+
+                        if ( m_statusCode != ST_OK && m_statusCode != ST_DRIVE_NOT_READY )
+                        {
+                            Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Change Directory Here! url[%s] > base[%s]", f->url.c_str(), f->base().c_str() );
+                            //m_cwd.reset(MFSOwner::File(f->base()));
+                            set_cwd(f->base());
+                        }
+                    }
+
+                    Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "m_cwd[%s]", m_cwd==nullptr ? "NULL" : m_cwd->url.c_str());
+                    m_cwd->dump();
+                }
+                
+                delete f;
             }
-            
-            delete f;
         }
 
         return m_channels[channel]!=NULL;

@@ -50,6 +50,11 @@ I2CMSession::~I2CMSession() {
 bool I2CMSession::connect() {
     if (connected) return true;
 
+    if (I2C_ML_SDA == GPIO_NUM_NC || I2C_ML_SCL == GPIO_NUM_NC) {
+        Debug_printv("I2C session: SDA/SCL pins not configured for this board");
+        return false;
+    }
+
     i2c_config_t conf = {};
     conf.mode             = I2C_MODE_MASTER;
     conf.sda_io_num       = I2C_ML_SDA;
