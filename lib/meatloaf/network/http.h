@@ -81,6 +81,7 @@ public:
             esp_http_client_cleanup(_http);
             _http = nullptr;
         }
+        _is_open = false;
 
         esp_http_client_config_t config;
         memset(&config, 0, sizeof(config));
@@ -154,7 +155,7 @@ public:
     bool m_isDirectory = false;
     bool isText = false;
     bool isFriendlySkipper = false;
-    bool disableAutoRedirect = false;
+    bool disableAutoRedirect = true;
     bool wasRedirected = false;
     std::string url;
 

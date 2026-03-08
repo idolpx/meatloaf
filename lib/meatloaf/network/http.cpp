@@ -337,6 +337,15 @@ bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
     url = dstUrl;
     lastMethod = meth;
     _error = 0;
+    // Reset state for new file operation — MeatHttpClient is shared across files on the same host:port
+    isFriendlySkipper = false;
+    _size = 0;
+    _range_size = 0;
+    // Reinitialize the handle so each new file access starts with a clean raw_data buffer.
+    // esp_http_client_close() alone does NOT reset raw_data/orig_raw_data — only cleanup() does.
+    // If the previous range response left unread body bytes in raw_data (e.g., partial read before
+    // a new open()), the next fetch_headers() triggers http_on_body which asserts raw_data == orig_raw_data.
+    init();
 
     return processRedirectsAndOpen(0);
 };
@@ -354,6 +363,21 @@ bool MeatHttpClient::processRedirectsAndOpen(uint32_t position, uint32_t size) {
 
         //Debug_printv("opening url[%s] from position:%lu", url.c_str(), position);
         lastRC = openAndFetchHeaders(lastMethod, position, size);
+
+        // openAndFetchHeaders returns 0 when esp_http_client_open() fails (connection error).
+        // Without this check, processRedirectsAndOpen incorrectly sets _is_open = true below.
+        if (lastRC == 0) {
+            Debug_printv("connection failed");
+            return false;
+        }
+
+        if (lastRC >= 300 && lastRC <= 399) {
+            // Re-initialize the handle before following the redirect. The 3xx response body
+            // may have been cached in raw_data; a fresh handle ensures http_on_body won't
+            // assert raw_data == orig_raw_data when the redirect target's body arrives.
+            // The Location header handler has already updated `url` with the redirect target.
+            init();
+        }
     } while (lastRC >= 300 && lastRC <= 399);
 
     if (lastRC == 206)
@@ -414,62 +438,29 @@ bool MeatHttpClient::seek(uint32_t pos) {
     if(isFriendlySkipper) {
 
         if (_is_open) {
-            // Read to end of the stream
-            //Debug_printv("Skipping to end!");
+            // Drain remaining bytes from the current range response.
+            // Read in HTTP_BLOCK_SIZE chunks to minimize esp_http_client_read call overhead.
             while(1)
             {
-                        char c[HTTP_BLOCK_SIZE];
-            int bytes = esp_http_client_read(_http, c, HTTP_BLOCK_SIZE);
-            if ( bytes < HTTP_BLOCK_SIZE )
+                char c[HTTP_BLOCK_SIZE];
+                int bytes = esp_http_client_read(_http, c, HTTP_BLOCK_SIZE);
+                if ( bytes < HTTP_BLOCK_SIZE )
                     break;
             }
-
-            // esp_err_t err;
-            // int *len = 0;
-            // err = esp_http_client_flush_response(_http, len);
-            // if(err != ESP_OK)
-            //     return false;
         }
 
-        uint32_t delta = pos - _position;
-
-        bool op = processRedirectsAndOpen(pos);
-
-        //Debug_printv("SEEK in HTTPMStream %s: range request RC=%d", url.c_str(), lastRC);
-
-        if(!op)
+        // Make a single range request directly to the target position.
+        // After this call we are positioned at exactly pos and ready to read.
+        if ( !processRedirectsAndOpen(pos) )
             return false;
 
-        if ( delta > HTTP_BLOCK_SIZE )
-        {
-            // flush the rest
-            //Debug_printv("_position[%lu] pos[%lu] available[%lu]", _position, pos, available());
-
-            int rc = 0;
-            do {
-                char c;
-                rc = esp_http_client_read(_http, &c, 1);
-                if(rc == -1)
-                    return false;
-            } while(rc);
-
-            // esp_err_t err;
-            // int *len = 0;
-            // err = esp_http_client_flush_response(_http, len);
-            // if(err != ESP_OK)
-            //     return false;
-
-            if ( !processRedirectsAndOpen(pos) )
-                return false;
-        }
-
-         // 200 = range not supported! according to https://developer.mozilla.org/en-US/docs/Web/HTTP/Range_requests
+        // 200 = range not supported per https://developer.mozilla.org/en-US/docs/Web/HTTP/Range_requests
         if( lastRC == 206 )
         {
-            //Debug_printv("Seek successful");
             _position = pos;
             return true;
         }
+        // Server returned 200 (doesn't support ranges) — fall through to sequential seek.
     }
 
     if ( lastMethod == HTTP_METHOD_GET ) 
@@ -603,9 +594,10 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
         //Debug_printv("--- PRE FETCH HEADERS");
 
         int64_t lengthResp = esp_http_client_fetch_headers(_http);
-        if(_size == -1 && lengthResp > 0) {
-            // only if we aren't chunked!
-            _size = lengthResp;
+        // _size is set by the Content-Length event handler; lengthResp here is
+        // redundant for normal responses, but covers chunked encoding (no Content-Length header).
+        if (_size == 0 && lengthResp > 0) {
+            _size = (uint32_t)lengthResp;
             _position = position;
         }
 
