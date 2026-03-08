@@ -11,6 +11,7 @@
 
 #include <stddef.h>
 #include <string.h>
+#include <esp_idf_version.h>
 
 /* Stub for encode_current_tty_opts - TTY options not supported on ESP-IDF */
 int encode_current_tty_opts(unsigned char *buf, size_t buflen)
@@ -22,6 +23,7 @@ int encode_current_tty_opts(unsigned char *buf, size_t buflen)
     return 1; /* Length of 1 byte (just the terminator) */
 }
 
+#if ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(5, 5, 0)
 /* Stub for if_nametoindex - Network interface indexing not needed on ESP-IDF */
 unsigned int if_nametoindex(const char *ifname)
 {
@@ -29,5 +31,6 @@ unsigned int if_nametoindex(const char *ifname)
     (void)ifname;
     return 0;
 }
+#endif
 
 #endif /* ESP_PLATFORM */
