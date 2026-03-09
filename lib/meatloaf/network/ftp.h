@@ -176,6 +176,7 @@ class FTPMStream : public MStream {
     bool isOpen() override;
     // bool isBrowsable() override { return false; };
     // bool isRandomAccess() override { return false; };
+    bool isNetwork() override { return true; };
 
     bool open(std::ios_base::openmode mode) override;
     void close() override;

@@ -300,6 +300,7 @@ class MeatSocketServer {
 class TCPMStream: public MStream {
 
 public:
+    bool isNetwork() override { return true; };
     TCPMStream(std::string path): MStream(path) {
         //url = path;
     };

@@ -74,6 +74,7 @@
 #endif
 
 // Cartridge
+#include "media/cartridge/crt.h"
 
 // Container
 #include "media/container/d8b.h"
@@ -245,6 +246,7 @@ FSPMFileSystem fspFS;
 #endif
 
 // Cartridge
+CRTMFileSystem crtFS;
 
 // Container
 D8BMFileSystem d8bFS;
@@ -309,6 +311,9 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
     &archiveFS,     // extension-based FS have to be on top to be picked first, otherwise the scheme will pick them!
     &arkFS, &lbrFS, &lnxFS,
 #endif
+
+    // Cartridge
+    &crtFS,
 
     // Container
     &d8bFS, &dfiFS,
@@ -925,6 +930,10 @@ MFile* MFile::cd(std::string newDir)
         // Add new directory to path
         //Debug_printv("url[%s] newDir[%s]", url.c_str(), newDir.c_str());
         MFile* newPath = MFSOwner::File(url + newDir);
+        if (newPath == nullptr) {
+            return nullptr;
+        }
+
         Debug_printv("url[%s][%s]", newPath->url.c_str(), newPath->pathInStream.c_str());
         newPath->dump();
 

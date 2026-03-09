@@ -97,7 +97,7 @@ bool TCRTMStream::seekEntry( std::string filename )
             // UTF8 won't translate correctly so we translate to ASCII here
             util_petscii_to_ascii_str(entryFilename);
 
-            Debug_printv("index[%d] filename[%s] entry.filename[%s] entry.file_type[%d]", index, filename.c_str(), entryFilename.c_str(), entry.file_type);
+            //Debug_printv("index[%d] filename[%s] entry.filename[%s] entry.file_type[%d]", index, filename.c_str(), entryFilename.c_str(), entry.file_type);
 
             if ( mstr::compareFilename(entryFilename, filename, wildcard) )
             {

@@ -39,6 +39,7 @@
 
 class WSMStream: public MStream {
 public:
+    bool isNetwork() override { return true; };
     WSMStream(MFile* file, bool isServer) : m_isServer(isServer) {
         // drop ws:// from url and it's OK!
         address = websockets::WSInterfaceString(mstr::drop(file->url, 5).c_str());

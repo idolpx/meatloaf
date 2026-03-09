@@ -156,6 +156,7 @@ private:
 
 class IRCMStream : public MStream {
 public:
+    bool isNetwork() override { return true; };
 	IRCMStream(std::string path) : MStream(path) {
 	}
 	~IRCMStream() override {

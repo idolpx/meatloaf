@@ -57,6 +57,7 @@ public:
     NFSMSession(std::string host, uint16_t port = 2049)
         : MSession("nfs://" + host + ":" + std::to_string(port), host, port)
     {
+        keep_alive_interval = 0; // Disable keep-alive — NFS is stateless (NFSv3); no server-side ping needed
         Debug_printv("NFSMSession created for %s:%d", host.c_str(), port);
     }
     ~NFSMSession() override {
@@ -324,6 +325,7 @@ public:
     bool isOpen() override;
     // bool isBrowsable() override { return false; };
     // bool isRandomAccess() override { return false; };
+    bool isNetwork() override { return true; };
 
     bool open(std::ios_base::openmode mode) override;
     void close() override;

@@ -189,9 +189,9 @@ uint32_t MMediaStream::readContainer(uint8_t *buf, uint32_t size)
 {
     //Debug_printv("readContainer[%lu]", size);
     uint32_t bytesRead = containerStream->read(buf, size);
-    if (bytesRead < size) {
-        Debug_printv("WARNING: Short read - requested %lu, got %lu", size, bytesRead);
-    }
+    // if (bytesRead < size) {
+    //     Debug_printv("WARNING: Short read - requested %lu, got %lu", size, bytesRead);
+    // }
     return bytesRead;
 }
 uint32_t MMediaStream::writeContainer(uint8_t *buf, uint32_t size)
@@ -211,9 +211,9 @@ uint8_t MMediaStream::read()
 uint32_t MMediaStream::read(uint8_t* buf, uint32_t size) {
     uint32_t bytesRead = 0;
 
-    //Debug_printv("read[%lu] seekCalled[%d]", size, seekCalled);
-    if ( _position >= _size )
-        return 0;
+    //Debug_printv("read[%lu] seekCalled[%d] _position[%lu] _size[%lu]", size, seekCalled, _position, _size);
+    // if ( _position >= _size )
+    //     return 0;
 
     if(seekCalled) {
         // if we have the stream set to a specific file already, either via seekNextEntry or seekPath, return bytes of the file here
@@ -300,7 +300,7 @@ uint32_t MMediaStream::seekFileSize( uint8_t start_track, uint8_t start_sector )
     do
     {
         // This causes watchdog resets to be missed on long files. Leave commented unless used for debugging.
-        console.printf("t[%d] s[%d] b[%d]\r", start_track, start_sector, blocks);
+        //console.printf("t[%d] s[%d] b[%d]\r", start_track, start_sector, blocks);
         
         // Safety check for runaway loops
         if (blocks >= MAX_BLOCKS) {
@@ -331,7 +331,7 @@ uint32_t MMediaStream::seekFileSize( uint8_t start_track, uint8_t start_sector )
         // Yield to other tasks every 10 blocks to prevent watchdog timeout
         // and feed watchdog every 100 blocks
         if (blocks % 10 == 0) {
-            vTaskDelay(1);  // Yield to scheduler
+            vTaskDelay(0);  // Yield to scheduler
         }
         
         if ( start_track > 0 )
@@ -340,6 +340,6 @@ uint32_t MMediaStream::seekFileSize( uint8_t start_track, uint8_t start_sector )
     } while ( start_track > 0 );
     blocks--;
     uint32_t size = (blocks * (block_size - 2)) + start_sector - 1;
-    console.printf("File size is [%lu] bytes...\r\n", size);
+    Debug_printv("File size is [%lu] bytes...", size);
     return size;
 };

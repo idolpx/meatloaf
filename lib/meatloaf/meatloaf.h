@@ -135,6 +135,7 @@ public:
     virtual bool isOpen() = 0;
     virtual bool isBrowsable() { return false; };
     virtual bool isRandomAccess() { return false; };
+    virtual bool isNetwork() { return false; }; // Override to true in network stream classes
 
     virtual bool open(std::ios_base::openmode mode) = 0;
     virtual void close() = 0;

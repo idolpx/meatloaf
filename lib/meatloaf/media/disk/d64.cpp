@@ -586,7 +586,7 @@ uint16_t D64MStream::blocksFree()
 
 uint32_t D64MStream::readFile(uint8_t *buf, uint32_t size)
 {
-    //Debug_printv("readFile(%d)", size);
+    //Debug_printv("readFile(%lu) sector_offset[%d] pos[%lu]", size, sector_offset, _position);
     if (sector_offset % block_size == 0)
     {
         // We are at the beginning of the block
@@ -594,7 +594,28 @@ uint32_t D64MStream::readFile(uint8_t *buf, uint32_t size)
         readContainer((uint8_t *)&next_track, 1);
         readContainer((uint8_t *)&next_sector, 1);
         sector_offset += 2;
-        //Debug_printv("next_track[%d] next_sector[%d] sector_offset[%d]", next_track, next_sector, sector_offset);
+        //Debug_printv("next_track[%d] next_sector[%d] rb[%lu/%lu]", next_track, next_sector, rb1, rb2);
+        if ( next_track == 0 )
+        {
+            // End of file reached.
+            // next_sector = byte offset of last used byte (1-indexed from sector start,
+            // so data = bytes 2..next_sector = next_sector-1 data bytes). Match seekFileSize().
+            uint32_t lastBlockBytes = (next_sector > 1) ? (uint32_t)(next_sector - 1) : 0;
+            if ( available() > lastBlockBytes )
+            {
+                _size = _position + lastBlockBytes;
+                Debug_printv("End of file reached, adjusting size to [%lu] available[%lu]", _size, available());
+            }
+        }
+        else
+        {
+            // Not end of file, _size should be at least the current position + bytes available in this block
+            if ( available() == 0 )
+            {
+                _size += (block_size - 2);
+                Debug_printv("Adjusting size to [%lu] available[%lu]", _size, available());
+            }
+        }
     }
 
     uint32_t bytesRead = 0;
@@ -706,12 +727,20 @@ bool D64MStream::seekPath(std::string path)
         // Calculate file size
         uint8_t t = entry.start_track;
         uint8_t s = entry.start_sector;
-        _size = seekFileSize(t, s);
+        //if (containerStream && containerStream->isNetwork()) {
+            // For network streams, skip the expensive block-chain walk (hundreds of RPCs).
+            // entry.blocks * (block_size-2) always >= actual byte size, so the chain-end
+            // marker (track=0) fires before _size is reached — safe upper bound.
+            _size = (uint32_t)entry.blocks * (block_size - 2);
+            Debug_printv("Network stream: using blocks[%d] → size[%lu]", entry.blocks, _size);
+        //} else {
+        //    _size = seekFileSize(t, s);
+        //}
 
         // Set position to beginning of file
         bool r = seekSector(t, s);
 
-        //Debug_printv("blocks[%d] size[%d] available[%d] r[%d]", entry.blocks, _size, available(), r);
+        Debug_printv("blocks[%d] size[%d] available[%d] r[%d]", entry.blocks, _size, available(), r);
 
         return r;
     }
