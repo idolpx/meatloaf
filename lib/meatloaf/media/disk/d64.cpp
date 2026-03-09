@@ -603,15 +603,13 @@ uint32_t D64MStream::readFile(uint8_t *buf, uint32_t size)
             uint32_t lastBlockBytes = (next_sector > 1) ? (uint32_t)(next_sector - 1) : 0;
             if ( available() > lastBlockBytes )
             {
+                // End of file reached, adjust _size to reflect actual file size based on last block byte count
                 _size = _position + lastBlockBytes;
                 Debug_printv("End of file reached, adjusting size to [%lu] available[%lu]", _size, available());
             }
-        }
-        else
-        {
-            // Not end of file, _size should be at least the current position + bytes available in this block
-            if ( available() == 0 )
+            else if ( available() == 0 )
             {
+                // Not end of file, _size should be at least the current position + bytes available in this block
                 _size += (block_size - 2);
                 Debug_printv("Adjusting size to [%lu] available[%lu]", _size, available());
             }
