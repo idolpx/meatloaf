@@ -806,9 +806,9 @@ bool D64MFile::rewindDirectory()
     // Set Media Info Fields
     //Debug_printv("name[%s]", image->header.name);
     //Debug_printv("id_dos[%s]", image->header.id_dos);
-    media_header = image->header.name; //mstr::format("%.16s", image->header.name);
+    media_header = mstr::format("%.16s", image->header.name);
     mstr::A02Space(media_header);
-    media_id = image->header.id_dos; //mstr::format("%.5s", image->header.id_dos);
+    media_id = mstr::format("%.5s", image->header.id_dos);
     mstr::A02Space(media_id);
     media_blocks_free = image->blocksFree();
     media_block_size = image->block_size;
