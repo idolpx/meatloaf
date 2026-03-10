@@ -306,13 +306,16 @@ uint8_t iecChannelHandlerFile::readBufferData()
             m_transportTimeUS += (esp_timer_get_time()-t);
             if (got == 0) break;  // prevent infinite loop if stream returns 0 (e.g. seek past EOF)
             m_len += got;
-            if (m_stream->error())
-                    return ST_DRIVE_NOT_READY;
+            if (m_stream->error()) {
+                Debug_printv("Error: read failed: got[%d]", got);
+                return ST_DRIVE_NOT_READY;
+            }
         }
 
         m_byteCount += m_len;
     }
 
+    //Debug_printv("bufferSize[%d]", m_len);
     return ST_OK;
 }
 

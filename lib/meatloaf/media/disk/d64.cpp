@@ -730,7 +730,7 @@ bool D64MStream::seekPath(std::string path)
             // entry.blocks * (block_size-2) always >= actual byte size, so the chain-end
             // marker (track=0) fires before _size is reached — safe upper bound.
             _size = (uint32_t)entry.blocks * (block_size - 2);
-            Debug_printv("Network stream: using blocks[%d] → size[%lu]", entry.blocks, _size);
+            //Debug_printv("Network stream: using blocks[%d] → size[%lu]", entry.blocks, _size);
         //} else {
         //    _size = seekFileSize(t, s);
         //}
@@ -806,9 +806,9 @@ bool D64MFile::rewindDirectory()
     // Set Media Info Fields
     //Debug_printv("name[%s]", image->header.name);
     //Debug_printv("id_dos[%s]", image->header.id_dos);
-    media_header = image->header.name; //mstr::format("%.16s", image->header.name);
+    media_header = mstr::format("%.16s", image->header.name);
     mstr::A02Space(media_header);
-    media_id = image->header.id_dos; //mstr::format("%.5s", image->header.id_dos);
+    media_id = mstr::format("%.5s", image->header.id_dos);
     mstr::A02Space(media_id);
     media_blocks_free = image->blocksFree();
     media_block_size = image->block_size;

@@ -246,7 +246,7 @@ FSPMFileSystem fspFS;
 #endif
 
 // Cartridge
-CRTMFileSystem crtFS;
+//CRTMFileSystem crtFS;
 
 // Container
 D8BMFileSystem d8bFS;
@@ -313,7 +313,7 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
 #endif
 
     // Cartridge
-    &crtFS,
+    //&crtFS,
 
     // Container
     &d8bFS, &dfiFS,

@@ -121,11 +121,12 @@ public:
 
     virtual bool eos()  {
         //Debug_printv("_size[%d] _available[%d] _position[%d]", _size, available(), _position);
-        if ( available() <= 0 )
-            return true;
+        if ( available() > 0 )
+            return false;
         
-        return false;
+        return true;
     }
+
     virtual void reset() 
     {
         _size = block_size;
