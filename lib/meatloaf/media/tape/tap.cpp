@@ -336,6 +336,7 @@ bool TAPMStream::findSync()
         if (getByteWithSync(byte, true))
         {
             // Successfully found a sync byte
+            Debug_printv("Found sync byte: %02X at position %d", byte, tap_position);
             return true;
         }
 
@@ -343,6 +344,7 @@ bool TAPMStream::findSync()
         tap_position += 1;
     }
 
+    Debug_printv("Failed to find sync after %d attempts", search_count);
     return false;
 }
 

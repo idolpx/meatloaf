@@ -730,7 +730,7 @@ bool D64MStream::seekPath(std::string path)
             // entry.blocks * (block_size-2) always >= actual byte size, so the chain-end
             // marker (track=0) fires before _size is reached — safe upper bound.
             _size = (uint32_t)entry.blocks * (block_size - 2);
-            Debug_printv("Network stream: using blocks[%d] → size[%lu]", entry.blocks, _size);
+            //Debug_printv("Network stream: using blocks[%d] → size[%lu]", entry.blocks, _size);
         //} else {
         //    _size = seekFileSize(t, s);
         //}
