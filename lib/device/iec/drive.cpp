@@ -273,13 +273,22 @@ uint8_t iecChannelHandlerFile::readBufferData()
     */
     {
         Debug_printv("size[%lu] avail[%lu] pos[%lu]", m_stream->size(), m_stream->available(), m_stream->position());
-        if (m_stream->size() == 0)
-            return ST_FILE_NOT_FOUND;
+        // if (m_stream->size() == 0)
+        //     return ST_FILE_NOT_FOUND;
 
 #ifdef ENABLE_DISPLAY
-        // send progress percentage
-        uint8_t percent = (m_stream->position() * 100) / m_stream->size();
-        LEDS.progress = percent;
+        if ( m_stream->size() > 0)
+        {
+            // send progress percentage
+            uint8_t percent = (m_stream->position() * 100) / m_stream->size();
+            LEDS.progress = percent;
+        }
+        else
+        {
+            // we don't know the size of the stream, so just show activity without progress
+            LEDS.speed = 100;
+            LEDS.activity = true;
+        }
 #endif
         fnLedManager.toggle(eLed::LED_BUS);
 
@@ -299,7 +308,7 @@ uint8_t iecChannelHandlerFile::readBufferData()
             m_len = 0;
 
         // try to fill buffer
-        while( m_len<BUFFER_SIZE && !m_stream->eos() )
+        do 
         {
             uint64_t t = esp_timer_get_time();
             uint32_t got = m_stream->read(m_data+m_len, BUFFER_SIZE-m_len);
@@ -310,7 +319,7 @@ uint8_t iecChannelHandlerFile::readBufferData()
                 Debug_printv("Error: read failed: got[%d]", got);
                 return ST_DRIVE_NOT_READY;
             }
-        }
+        } while( m_len<BUFFER_SIZE && !m_stream->eos() );
 
         m_byteCount += m_len;
     }
@@ -897,12 +906,12 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                             Debug_printv("Error: could not get stream for file [%s]", f->url.c_str());
                             setStatusCode(ST_DRIVE_NOT_READY);
                         }
-                        else if( (mode == std::ios_base::in) && new_stream->size()==0 && !is_dir )
-                        {
-                            Debug_printv("Error: file length is zero [%s]", f->url.c_str());
-                            //delete new_stream;
-                            setStatusCode(ST_FILE_NOT_FOUND);
-                        }
+                        // else if( (mode == std::ios_base::in) && new_stream->size()==0 && !is_dir )
+                        // {
+                        //     Debug_printv("Error: file length is zero [%s]", f->url.c_str());
+                        //     //delete new_stream;
+                        //     setStatusCode(ST_FILE_NOT_FOUND);
+                        // }
                         else if( !new_stream->isOpen() )
                         {
                             Debug_printv("Error: could not open file stream [%s]", f->url.c_str());

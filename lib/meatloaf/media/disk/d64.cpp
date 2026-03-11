@@ -435,7 +435,7 @@ bool D64MStream::seekEntry( std::string filename )
             entryFilename = mstr::toUTF8(entryFilename);
 
             //Debug_printv("index[%d] track[%d] sector[%d] filename[%s] entry.filename[%.16s]", index, track, sector, filename.c_str(), entryFilename.c_str());
-            //Debug_printv("filename[%s] entry[%s]", filename.c_str(), entryFilename.c_str());
+            Debug_printv("filename[%s] entry[%s]", filename.c_str(), entryFilename.c_str());
 
             if ( mstr::compareFilename(entryFilename, filename, wildcard) )
             {
@@ -594,25 +594,32 @@ uint32_t D64MStream::readFile(uint8_t *buf, uint32_t size)
         readContainer((uint8_t *)&next_track, 1);
         readContainer((uint8_t *)&next_sector, 1);
         sector_offset += 2;
-        //Debug_printv("next_track[%d] next_sector[%d] rb[%lu/%lu]", next_track, next_sector, rb1, rb2);
+
+        //Debug_printv("next_track[%d] next_sector[%d]", next_track, next_sector);
         if ( next_track == 0 )
         {
-            // End of file reached.
+            // End of file reached
             // next_sector = byte offset of last used byte (1-indexed from sector start,
             // so data = bytes 2..next_sector = next_sector-1 data bytes). Match seekFileSize().
             uint32_t lastBlockBytes = (next_sector > 1) ? (uint32_t)(next_sector - 1) : 0;
+
+            // Adjust _size to reflect actual file size based on last block byte count
             if ( available() > lastBlockBytes )
             {
-                // End of file reached, adjust _size to reflect actual file size based on last block byte count
                 _size = _position + lastBlockBytes;
                 Debug_printv("End of file reached, adjusting size to [%lu] available[%lu]", _size, available());
             }
             else if ( available() == 0 )
             {
-                // Not end of file, _size should be at least the current position + bytes available in this block
-                _size += (block_size - 2);
-                Debug_printv("Adjusting size to [%lu] available[%lu]", _size, available());
+                _size += lastBlockBytes;
+                Debug_printv("End of file reached with 0 available bytes, adjusting size to [%lu]", _size);
             }
+        }
+        else if ( available() == 0 )
+        {
+            // Not end of file, _size should be at least the current position + bytes available in this block
+            _size += (block_size - 2);
+            Debug_printv("Adjusting size to [%lu] available[%lu]", _size, available());
         }
     }
 
