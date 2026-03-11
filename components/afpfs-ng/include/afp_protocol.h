@@ -274,7 +274,7 @@ enum {
 #define kFPInsideTrashErr -5044
 #define kFPPwdNeedsChangeErr -5045
 #define kFPPwdPolicyErr -5046
-#define kFPDiskQuotaExceeded –5047 
+#define kFPDiskQuotaExceeded -5047
 
 
 

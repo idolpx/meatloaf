@@ -6,7 +6,10 @@
 #include <pthread.h>
 #include <netdb.h>
 #ifdef ESP_PLATFORM
-// ESP-IDF doesn't have statvfs, provide minimal stub
+// ESP-IDF doesn't have statvfs in sys/statvfs.h; provide a minimal stub
+// unless another component (e.g. libnfs) has already defined the struct.
+#ifndef _STATVFS_DEFINED
+#define _STATVFS_DEFINED
 struct statvfs {
     unsigned long f_bsize;    /* Filesystem block size */
     unsigned long f_frsize;   /* Fragment size */
@@ -20,6 +23,7 @@ struct statvfs {
     unsigned long f_flag;     /* Mount flags */
     unsigned long f_namemax;  /* Maximum filename length */
 };
+#endif /* _STATVFS_DEFINED */
 #else
 #include <sys/statvfs.h>
 #endif
