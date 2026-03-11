@@ -70,6 +70,7 @@
 #include "network/tnfs.h"
 #include "network/smb.h"
 #include "network/nfs.h"
+#include "network/afp.h"
 #include "network/fsp.h"
 #endif
 
@@ -242,6 +243,7 @@ SFTPMFileSystem sftpFS;
 TNFSMFileSystem tnfsFS;
 SMBMFileSystem smbFS;
 NFSMFileSystem nfsFS;
+AFPMFileSystem afpFS;
 FSPMFileSystem fspFS;
 #endif
 
@@ -335,7 +337,7 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
     // Network
     &httpFS,
 #ifndef MIN_CONFIG
-    &ftpFS, &sftpFS, &tnfsFS, &smbFS, &nfsFS, &fspFS,
+    &ftpFS, &sftpFS, &tnfsFS, &smbFS, &nfsFS, &afpFS, &fspFS,
     //&ipfsFS, &tcpFS,
 #endif
 
