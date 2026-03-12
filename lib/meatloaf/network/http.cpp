@@ -529,13 +529,18 @@ uint32_t MeatHttpClient::read(uint8_t* buf, uint32_t size) {
         if (bytesRead >= 0) {
             _position+=bytesRead;
 
-            if (bytesRead < size)
+            // Only restart the request (for range-based paging) when:
+            // - We got a partial read (bytesRead > 0 but < size), AND
+            // - The response is NOT chunked (chunked has no fixed size; 0-byte
+            //   read means EOF, not "range exhausted").
+            if (bytesRead > 0 && bytesRead < size && !esp_http_client_is_chunked_response(_http))
                 openAndFetchHeaders(lastMethod, _position);
         }
+
+        //Debug_printv("size[%d] bytesRead[%d] _position[%d]", size, bytesRead, _position);
         if (bytesRead < 0)
             return 0;
 
-        //Debug_printv("size[%d] bytesRead[%d] _position[%d]", size, bytesRead, _position);
         return bytesRead;
     }
     return 0;
@@ -775,24 +780,9 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
 
         case HTTP_EVENT_ON_DATA: // Occurs multiple times when receiving body data from the server. MAY BE SKIPPED IF BODY IS EMPTY!
             //Debug_printv("HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
-            {
-                // int status = esp_http_client_get_status_code(meatClient->_http);
-
-                // if ((status == HttpStatus_Found || status == HttpStatus_MovedPermanently || status == 303) /*&& client->_redirect_count < (client->_max_redirects - 1)*/)
-                // {
-                //     //Debug_printv("HTTP_EVENT_ON_DATA: Redirect response body, ignoring");
-                // }
-                // else {
-                //     //Debug_printv("HTTP_EVENT_ON_DATA: Got response body");
-                // }
-
-
-                if (esp_http_client_is_chunked_response(evt->client)) {
-                    int len;
-                    esp_http_client_get_chunk_length(evt->client, &len);
-                    meatClient->_size = len;
-                    //Debug_printv("HTTP_EVENT_ON_DATA: Got chunked response, chunklen=%d, contentlen[%d]", len, meatClient->_size);
-                }
+            if (esp_http_client_is_chunked_response(evt->client)) {
+                meatClient->_size += evt->data_len;
+                //Debug_printv("HTTP_EVENT_ON_DATA: chunked, added %d, total _size=%lu", evt->data_len, meatClient->_size);
             }
             break;
 

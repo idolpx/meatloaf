@@ -271,6 +271,17 @@ public:
     uint32_t read(uint8_t* buf, uint32_t size) override;
     uint32_t write(const uint8_t *buf, uint32_t size) override;
 
+    // For chunked responses _size grows as chunks arrive and equals _position after
+    // each read, so the base available() would return 0 even with more data pending.
+    // Return HTTP_BLOCK_SIZE as a hint when the connection is open but not yet complete.
+    uint32_t available() override {
+        if (_size > _position)
+            return _size - _position;
+        if (isOpen() && !_session->client->complete())
+            return HTTP_BLOCK_SIZE;
+        return 0;
+    }
+
     // bool eos() override {
     //     Debug_printv("complete[%d]", _http.complete());
     //     return _http.complete();
