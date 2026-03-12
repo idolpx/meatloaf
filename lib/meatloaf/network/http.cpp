@@ -218,9 +218,9 @@ bool HTTPMFile::isText() {
  * Istream impls
  ********************************************************/
 bool HTTPMStream::open(std::ios_base::openmode mode) {
-    if (isOpen()) {
-        close();
-    }
+    // if (isOpen()) {
+    //     close();
+    // }
 
     this->mode = mode;
 
@@ -344,16 +344,17 @@ bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
     _size = 0;
     _range_size = 0;
 
-    // Drain any buffered body bytes from the previous request on this shared handle.
-    // Reading until esp_http_client_read() returns <=0 drains raw_len to 0, which causes
-    // ESP-IDF to call cached_buf_cleanup() internally, resetting raw_data == orig_raw_data.
-    // This prevents the http_on_body assertion without destroying the handle via cleanup(),
-    // which risks use-after-free from lwIP keep-alive timers referencing freed socket state.
-    if (_http != nullptr && _is_open) {
-        int *bytes = 0;
-        esp_http_client_flush_response(_http, bytes);
-        Debug_printv("Flushed %d bytes from previous response to prepare for new request", *bytes);
-        _is_open = false;
+    // Reset the HTTP client handle before starting a new request.
+    // esp_http_client_cached_buf_cleanup() resets raw_data == orig_raw_data, which is
+    // required before the next esp_http_client_fetch_headers() call. If a previous
+    // response cached body bytes during header fetch, raw_data may have been advanced
+    // past orig_raw_data; the next http_on_body callback asserts they are equal.
+    // esp_http_client_flush_response() does not help when is_chunk_complete is already
+    // true and raw_len is 0 — the cleanup is never triggered. Re-initializing the handle
+    // via init() calls esp_http_client_cleanup() which calls cached_buf_cleanup(), then
+    // creates a fresh handle with raw_data == orig_raw_data == NULL.
+    if (_is_open) {
+        init();
     }
 
     return processRedirectsAndOpen(0);
@@ -446,9 +447,9 @@ bool MeatHttpClient::seek(uint32_t pos) {
 
         if (_is_open) {
             // Drain remaining bytes from the current range response.
-            int *bytes = 0;
-            esp_http_client_flush_response(_http, bytes);
-            Debug_printv("Flushed %d bytes to skip to position %lu", *bytes, pos);
+            int bytes = 0;
+            esp_http_client_flush_response(_http, &bytes);
+            Debug_printv("Flushed %d bytes to skip to position %lu", bytes, pos);
         }
 
         // Make a single range request directly to the target position.
@@ -565,14 +566,10 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
     if ( url.size() < 5)
         return 0;
 
-    // // Drain and close any previous active request before starting a new one.
-    // // Draining until esp_http_client_read() returns <=0 empties raw_len to 0, which causes
-    // // ESP-IDF to call cached_buf_cleanup() internally. This resets raw_data == orig_raw_data
-    // // so the next fetch_headers() call doesn't trigger the http_on_body assertion.
+    // // Drain any previous active request before starting a new one.
     // if (_http != nullptr && _is_open) {
-    //     char drain_buf[HTTP_BLOCK_SIZE];
-    //     while (esp_http_client_read(_http, drain_buf, HTTP_BLOCK_SIZE) > 0) {}
-    //     _is_open = false;
+    //     int bytes = 0;
+    //     esp_http_client_flush_response(_http, &bytes);
     // }
 
     // Set URL and Method
@@ -623,16 +620,9 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
 
         // // For HEAD: close without cleanup(). HEAD responses have no body, so raw_data
         // // is never populated — no http_on_body assertion risk, no drain needed.
-        // // Using close() instead of init()/cleanup() avoids the use-after-free crash:
-        // // cleanup() frees the socket handle while lwIP keep-alive timers still reference
-        // // it, leading to heap corruption and StoreProhibited at the next context switch.
-        // // _is_open stays false — the subsequent GET will call open() on the same handle.
-        // if (method == HTTP_METHOD_HEAD) {
-        //     esp_http_client_close(_http);
-        // } else {
-        //     _is_open = true;
-        // }
-
+        if (method != HTTP_METHOD_HEAD) {
+            _is_open = true;
+        }
         return status;
 
         //Debug_printv("--- PRE GET STATUS CODE");
