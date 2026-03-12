@@ -343,15 +343,16 @@ bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
     isFriendlySkipper = false;
     _size = 0;
     _range_size = 0;
+
     // Drain any buffered body bytes from the previous request on this shared handle.
     // Reading until esp_http_client_read() returns <=0 drains raw_len to 0, which causes
     // ESP-IDF to call cached_buf_cleanup() internally, resetting raw_data == orig_raw_data.
     // This prevents the http_on_body assertion without destroying the handle via cleanup(),
     // which risks use-after-free from lwIP keep-alive timers referencing freed socket state.
     if (_http != nullptr && _is_open) {
-        char drain_buf[HTTP_BLOCK_SIZE];
-        while (esp_http_client_read(_http, drain_buf, HTTP_BLOCK_SIZE) > 0) {}
-        esp_http_client_close(_http);
+        int *bytes = 0;
+        esp_http_client_flush_response(_http, bytes);
+        Debug_printv("Flushed %d bytes from previous response to prepare for new request", *bytes);
         _is_open = false;
     }
 
@@ -445,14 +446,9 @@ bool MeatHttpClient::seek(uint32_t pos) {
 
         if (_is_open) {
             // Drain remaining bytes from the current range response.
-            // Read in HTTP_BLOCK_SIZE chunks to minimize esp_http_client_read call overhead.
-            while(1)
-            {
-                char c[HTTP_BLOCK_SIZE];
-                int bytes = esp_http_client_read(_http, c, HTTP_BLOCK_SIZE);
-                if ( bytes < HTTP_BLOCK_SIZE )
-                    break;
-            }
+            int *bytes = 0;
+            esp_http_client_flush_response(_http, bytes);
+            Debug_printv("Flushed %d bytes to skip to position %lu", *bytes, pos);
         }
 
         // Make a single range request directly to the target position.
@@ -476,6 +472,9 @@ bool MeatHttpClient::seek(uint32_t pos) {
         if( pos < _position || pos == 0 ) {
             // Reopen from start — open() drains+closes the current connection without
             // calling cleanup(), avoiding use-after-free from lwIP keep-alive timers.
+            //close();
+            //init();
+        
             if ( !open(url, lastMethod) )
                 return false;
 
@@ -566,16 +565,15 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
     if ( url.size() < 5)
         return 0;
 
-    // Drain and close any previous active request before starting a new one.
-    // Draining until esp_http_client_read() returns <=0 empties raw_len to 0, which causes
-    // ESP-IDF to call cached_buf_cleanup() internally. This resets raw_data == orig_raw_data
-    // so the next fetch_headers() call doesn't trigger the http_on_body assertion.
-    if (_http != nullptr && _is_open) {
-        char drain_buf[HTTP_BLOCK_SIZE];
-        while (esp_http_client_read(_http, drain_buf, HTTP_BLOCK_SIZE) > 0) {}
-        esp_http_client_close(_http);
-        _is_open = false;
-    }
+    // // Drain and close any previous active request before starting a new one.
+    // // Draining until esp_http_client_read() returns <=0 empties raw_len to 0, which causes
+    // // ESP-IDF to call cached_buf_cleanup() internally. This resets raw_data == orig_raw_data
+    // // so the next fetch_headers() call doesn't trigger the http_on_body assertion.
+    // if (_http != nullptr && _is_open) {
+    //     char drain_buf[HTTP_BLOCK_SIZE];
+    //     while (esp_http_client_read(_http, drain_buf, HTTP_BLOCK_SIZE) > 0) {}
+    //     _is_open = false;
+    // }
 
     // Set URL and Method
     mstr::replaceAll(url, " ", "%20");
@@ -623,17 +621,17 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
         status = esp_http_client_get_status_code(_http);
         //Debug_printv("after open rc[%d] status[%d]", rc, status);
 
-        // For HEAD: close without cleanup(). HEAD responses have no body, so raw_data
-        // is never populated — no http_on_body assertion risk, no drain needed.
-        // Using close() instead of init()/cleanup() avoids the use-after-free crash:
-        // cleanup() frees the socket handle while lwIP keep-alive timers still reference
-        // it, leading to heap corruption and StoreProhibited at the next context switch.
-        // _is_open stays false — the subsequent GET will call open() on the same handle.
-        if (method == HTTP_METHOD_HEAD) {
-            esp_http_client_close(_http);
-        } else {
-            _is_open = true;
-        }
+        // // For HEAD: close without cleanup(). HEAD responses have no body, so raw_data
+        // // is never populated — no http_on_body assertion risk, no drain needed.
+        // // Using close() instead of init()/cleanup() avoids the use-after-free crash:
+        // // cleanup() frees the socket handle while lwIP keep-alive timers still reference
+        // // it, leading to heap corruption and StoreProhibited at the next context switch.
+        // // _is_open stays false — the subsequent GET will call open() on the same handle.
+        // if (method == HTTP_METHOD_HEAD) {
+        //     esp_http_client_close(_http);
+        // } else {
+        //     _is_open = true;
+        // }
 
         return status;
 
