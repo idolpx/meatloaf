@@ -8,7 +8,6 @@
 #include <esp_vfs.h>
 #include <errno.h>
 #include <filesystem>
-#include <string.h>
 
 #include "esp_littlefs.h"
 
