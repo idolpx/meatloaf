@@ -936,8 +936,10 @@ MFile* MFile::cd(std::string newDir)
             return nullptr;
         }
 
+#ifdef DEBUG
         Debug_printv("url[%s][%s]", newPath->url.c_str(), newPath->pathInStream.c_str());
         newPath->dump();
+#endif
 
         if(mstr::endsWith(newDir, ".url", false)) {
             // we need to get actual url

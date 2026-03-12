@@ -1,0 +1,38 @@
+menu "ESP HTTP client"
+
+
+    config ESP_HTTP_CLIENT_ENABLE_HTTPS
+        bool "Enable https"
+        default y
+        help
+            This option will enable https protocol by linking esp-tls library and initializing SSL transport
+
+    config ESP_HTTP_CLIENT_ENABLE_BASIC_AUTH
+        bool "Enable HTTP Basic Authentication"
+        default n
+        help
+            This option will enable HTTP Basic Authentication. It is disabled by default as Basic
+            auth uses unencrypted encoding, so it introduces a vulnerability when not using TLS
+
+    config ESP_HTTP_CLIENT_ENABLE_DIGEST_AUTH
+        bool "Enable HTTP Digest Authentication"
+        default n
+        help
+            This option will enable HTTP Digest Authentication. It is enabled by default, but use of this
+            configuration is not recommended as the password can be derived from the exchange, so it introduces
+            a vulnerability when not using TLS
+
+    config ESP_HTTP_CLIENT_ENABLE_CUSTOM_TRANSPORT
+        bool "Enable custom transport"
+        default n
+        help
+            This option will enable injection of a custom tcp_transport handle, so the http operation
+            will be performed on top of the user defined transport abstraction (if configured)
+
+    config ESP_HTTP_CLIENT_EVENT_POST_TIMEOUT
+        int "Time in millisecond to wait for posting event"
+        default 2000
+        help
+            This config option helps in setting the time in millisecond to wait for event to be posted to the
+            system default event loop. Set it to -1 if you need to set timeout to portMAX_DELAY.
+endmenu

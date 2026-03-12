@@ -607,19 +607,19 @@ uint32_t D64MStream::readFile(uint8_t *buf, uint32_t size)
             if ( available() > lastBlockBytes )
             {
                 _size = _position + lastBlockBytes;
-                Debug_printv("End of file reached, adjusting size to [%lu] available[%lu]", _size, available());
+                //Debug_printv("End of file reached, adjusting size to [%lu] available[%lu]", _size, available());
             }
             else if ( available() == 0 )
             {
                 _size += lastBlockBytes;
-                Debug_printv("End of file reached with 0 available bytes, adjusting size to [%lu]", _size);
+                //Debug_printv("End of file reached with 0 available bytes, adjusting size to [%lu]", _size);
             }
         }
         else if ( available() == 0 )
         {
             // Not end of file, _size should be at least the current position + bytes available in this block
             _size += (block_size - 2);
-            Debug_printv("Adjusting size to [%lu] available[%lu]", _size, available());
+            //Debug_printv("Adjusting size to [%lu] available[%lu]", _size, available());
         }
     }
 

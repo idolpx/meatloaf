@@ -449,7 +449,7 @@ bool MeatHttpClient::seek(uint32_t pos) {
             // Drain remaining bytes from the current range response.
             int bytes = 0;
             esp_http_client_flush_response(_http, &bytes);
-            Debug_printv("Flushed %d bytes to skip to position %lu", bytes, pos);
+            //Debug_printv("Flushed %d bytes to skip to position %lu", bytes, pos);
         }
 
         // Make a single range request directly to the target position.
