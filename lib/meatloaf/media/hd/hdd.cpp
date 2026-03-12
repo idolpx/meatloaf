@@ -364,8 +364,8 @@ bool HDDMFile::rewindDirectory()
     image->resetEntryCounter();
 
     // Set Media Info Fields
-    media_header = image->header.disk_label;
-    media_id = image->header.id;
+    media_header = mstr::format("%.16s", image->header.disk_label);
+    media_id = mstr::format("%.5s", image->header.id);
     media_blocks_free = 0;  // TODO: Calculate from bitmap
     media_block_size = image->block_size;
     media_image = name;

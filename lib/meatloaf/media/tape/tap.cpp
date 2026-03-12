@@ -610,13 +610,12 @@ bool TAPMFile::rewindDirectory()
 
     // Set Media Info Fields
     media_header = "C64 TAPE";
-    media_id = mstr::format("TAP V%d", cached_stream->header.version);
+    media_id = mstr::format("V%d", cached_stream->header.version);
     media_blocks_free = 0;
     media_block_size = cached_stream->block_size;
     media_image = name;
 
-    Debug_printv("media_header[%s] media_id[%s]",
-        media_header.c_str(), media_id.c_str());
+    Debug_printv("media_header[%s] media_id[%s]", media_header.c_str(), media_id.c_str());
 
     return true;
 }
