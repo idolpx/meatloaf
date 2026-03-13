@@ -426,8 +426,14 @@ bool ArchiveMStream::seekEntry( uint16_t index )
         const char* pathname = archive_entry_pathname(a_entry);
 
         // For raw compressed files (.gz, .bz2, etc.), pathname may be NULL or empty
-        // In this case, derive filename from archive URL by removing compression extension
-        if (pathname == nullptr || pathname[0] == '\0') {
+        // (libarchive raw format sets "data" but other formats may leave it null).
+        // Derive filename from archive URL by removing compression extension.
+        // Also track whether this is a raw/compressed-only entry so we can force
+        // a byte-count scan below (archive_entry_size() returns the COMPRESSED file
+        // size for these entries, not the decompressed size).
+        bool isRawCompressedEntry = (pathname == nullptr || pathname[0] == '\0' ||
+                                     strcmp(pathname, "data") == 0);
+        if (isRawCompressedEntry) {
             std::string archivePath = url;
 
             // Extract filename from path
@@ -452,25 +458,23 @@ bool ArchiveMStream::seekEntry( uint16_t index )
 
         entry.size = archive_entry_size(a_entry);
 
-        // For compressed files without known size (e.g., .gz in raw format),
-        // archive_entry_size() may return 0. We need to determine actual size
-        // by reading the data.
-        if (entry.size == 0) {
+        // For raw compressed entries (standalone .gz, .bz2, etc.) archive_entry_size()
+        // returns the COMPRESSED file size, not the decompressed size.  Always scan
+        // through the decompressed data to get the true size.  Also scan when the
+        // reported size is 0 (size unknown).
+        if (entry.size == 0 || isRawCompressedEntry) {
             // Count actual decompressed bytes by reading through the data
             uint8_t buff[256] = {0};
-            size_t size;
-            //int64_t offset;
+            ssize_t nread;
             uint64_t total = 0;
 
-            // while (archive_read_data_block(a, &buff, &size, &offset) == ARCHIVE_OK) {
-            //     total += size;
-            // }
             do {
-                size = archive_read_data(a, &buff, 255);
-                total += size;
-            } while (size > 0);
+                nread = archive_read_data(a, &buff, sizeof(buff) - 1);
+                if (nread > 0) total += (uint64_t)nread;
+            } while (nread > 0);
 
-            entry.size = total;
+            entry.size = (uint32_t)total;
+            Debug_printv("Counted decompressed size: %lu bytes", entry.size);
 
             // Must reopen the archive to reset read position for actual data extraction
             m_archive->close();
