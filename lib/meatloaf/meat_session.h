@@ -25,6 +25,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
+#include <ios>
 #include <algorithm>
 #include <atomic>
 #include <freertos/FreeRTOS.h>
@@ -49,8 +50,10 @@ class MStream;  // Forward declaration
 class MSession {
 public:
     // Cached file data shared across streams — persists for the session lifetime
-    // Supports both direct heap access and HIMEM page-mapped access on ESP32+SPIRAM
-    struct CachedFile {
+    // Supports RAM (heap/HIMEM) and SD card backing stores.
+    struct CachedFile : public std::enable_shared_from_this<CachedFile> {
+        enum class Store { RAM, SD };
+
         uint32_t size;
         bool dirty;
 
@@ -72,8 +75,26 @@ public:
         uint32_t read(uint32_t offset, uint8_t* buf, uint32_t count);
         uint32_t write(uint32_t offset, const uint8_t* buf, uint32_t count);
 
-        // Load data from any MStream into backing store
-        bool loadFromStream(MStream* stream, uint32_t fileSize);
+        // Load data from any MStream into backing store.
+        // For SD-backed files: fileSize=0 streams until EOF.
+        bool loadFromStream(MStream* stream, uint32_t fileSize = 0);
+
+        // Create an SD-backed CachedFile at the given SD path.
+        // isAllocated() checks for file existence on SD.
+        // loadFromStream() writes data to SD; openStream() returns a stream to read it.
+        static std::shared_ptr<CachedFile> forSD(const std::string& sdPath);
+
+        // Open a stream over this CachedFile (RAM or SD-backed).
+        // RAM-backed returns a CachedFileStream; SD-backed opens via MFSOwner.
+        // Returns nullptr on failure.
+        std::shared_ptr<MStream> openStream(std::ios_base::openmode mode = std::ios_base::in);
+
+        // Global RAM cache keyed by request URL — call getRAMCached/setRAMCached
+        // from openStreamWithCache() to cache any MStream in RAM.
+        static std::shared_ptr<CachedFile> getRAMCached(const std::string& key);
+        static void setRAMCached(const std::string& key, std::shared_ptr<CachedFile> cf);
+        // Pass empty key to clear entire RAM cache.
+        static void clearRAMCached(const std::string& key = "");
 
         // Generic HIMEM-aware loader — fill backing store via a callable
         // reader signature: uint32_t reader(uint8_t* buf, uint32_t n)
@@ -112,6 +133,11 @@ public:
 
     private:
         void freeStorage();
+
+        Store m_store;
+        std::string m_sdPath;  // SD-backed only
+
+        static std::unordered_map<std::string, std::shared_ptr<CachedFile>> s_ramCache;
 
 #if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
         esp_himem_handle_t m_handle;

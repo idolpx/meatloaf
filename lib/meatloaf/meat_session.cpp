@@ -19,6 +19,10 @@
 
 #include "meatloaf.h"
 
+#include <sys/stat.h>
+#include <cstdio>
+#include <cerrno>
+
 // Initialize static members — SessionBroker
 std::unordered_map<std::string, std::shared_ptr<MSession>> SessionBroker::session_repo;
 std::chrono::steady_clock::time_point SessionBroker::last_keep_alive_check = std::chrono::steady_clock::now();
@@ -32,12 +36,77 @@ esp_himem_rangehandle_t MSession::CachedFile::s_range;
 int MSession::CachedFile::s_rangeUsed = 0;
 #endif
 
+// Initialize static members — CachedFile RAM cache
+std::unordered_map<std::string, std::shared_ptr<MSession::CachedFile>> MSession::CachedFile::s_ramCache;
+
+/********************************************************
+ * CachedFileStream — RAM-backed CachedFile as an MStream
+ ********************************************************/
+
+namespace {
+class CachedFileStream : public MStream {
+public:
+    CachedFileStream(std::shared_ptr<MSession::CachedFile> cf)
+        : MStream(""), m_cf(cf)
+    {
+        _size = cf->size;
+        _position = 0;
+    }
+
+    bool isOpen() override { return m_cf && m_cf->isAllocated(); }
+    bool open(std::ios_base::openmode) override { return isOpen(); }
+    void close() override {}
+    bool isRandomAccess() override { return true; }
+    bool isBrowsable() override { return false; }
+
+    uint32_t read(uint8_t* buf, uint32_t count) override {
+        if (!m_cf) return 0;
+        uint32_t n = m_cf->read(_position, buf, count);
+        _position += n;
+        return n;
+    }
+
+    uint32_t write(const uint8_t* buf, uint32_t count) override {
+        if (!m_cf) return 0;
+        uint32_t n = m_cf->write(_position, buf, count);
+        _position += n;
+        return n;
+    }
+
+    bool seek(uint32_t pos) override {
+        if (!m_cf || pos > _size) return false;
+        _position = pos;
+        return true;
+    }
+
+private:
+    std::shared_ptr<MSession::CachedFile> m_cf;
+};
+} // namespace
+
+/********************************************************
+ * CachedFile SD helpers (file-scoped)
+ ********************************************************/
+
+static bool session_ensure_dir(const std::string& path) {
+    if (path.empty()) return true;
+    struct stat info;
+    if (stat(path.c_str(), &info) == 0) return S_ISDIR(info.st_mode);
+    if (mkdir(path.c_str(), 0755) == 0) return true;
+    return errno == EEXIST;
+}
+
+static std::string session_parent_dir(const std::string& path) {
+    size_t pos = path.rfind('/');
+    return (pos == std::string::npos) ? "" : path.substr(0, pos);
+}
+
 /********************************************************
  * CachedFile Implementation
  ********************************************************/
 
 MSession::CachedFile::CachedFile(uint32_t s)
-    : size(s), dirty(false), m_data(nullptr)
+    : size(s), dirty(false), m_data(nullptr), m_store(Store::RAM)
 {
 #if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
     m_useHimem = false;
@@ -46,7 +115,7 @@ MSession::CachedFile::CachedFile(uint32_t s)
 }
 
 MSession::CachedFile::CachedFile(uint8_t* d, uint32_t s)
-    : size(s), dirty(false), m_data(d)
+    : size(s), dirty(false), m_data(d), m_store(Store::RAM)
 {
 #if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
     m_useHimem = false;
@@ -59,6 +128,7 @@ MSession::CachedFile::~CachedFile() {
 }
 
 void MSession::CachedFile::freeStorage() {
+    if (m_store == Store::SD) return;  // SD cache is persistent; don't delete on destruction
 #if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
     if (m_useHimem) {
         ESP_ERROR_CHECK(esp_himem_free(m_handle));
@@ -77,6 +147,11 @@ void MSession::CachedFile::freeStorage() {
 }
 
 bool MSession::CachedFile::allocate() {
+    if (m_store == Store::SD) {
+        // For SD, just ensure the parent directory exists
+        std::string parentDir = session_parent_dir(m_sdPath);
+        return session_ensure_dir(parentDir);
+    }
 #if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
     // Try HIMEM first
     uint32_t himemSize = (size / ESP_HIMEM_BLKSZ) * ESP_HIMEM_BLKSZ;
@@ -116,6 +191,11 @@ heap_alloc:
 }
 
 bool MSession::CachedFile::isAllocated() const {
+    if (m_store == Store::SD) {
+        if (m_sdPath.empty()) return false;
+        struct stat info;
+        return stat(m_sdPath.c_str(), &info) == 0 && S_ISREG(info.st_mode);
+    }
 #if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
     if (m_useHimem) return true;
 #endif
@@ -123,6 +203,15 @@ bool MSession::CachedFile::isAllocated() const {
 }
 
 uint32_t MSession::CachedFile::read(uint32_t offset, uint8_t* buf, uint32_t count) {
+    if (m_store == Store::SD) {
+        if (m_sdPath.empty() || count == 0) return 0;
+        FILE* f = fopen(m_sdPath.c_str(), "rb");
+        if (!f) return 0;
+        if (fseek(f, (long)offset, SEEK_SET) != 0) { fclose(f); return 0; }
+        size_t r = fread(buf, 1, count, f);
+        fclose(f);
+        return (uint32_t)r;
+    }
     if (offset >= size) return 0;
     if (offset + count > size) count = size - offset;
     if (count == 0) return 0;
@@ -152,6 +241,19 @@ uint32_t MSession::CachedFile::read(uint32_t offset, uint8_t* buf, uint32_t coun
 }
 
 uint32_t MSession::CachedFile::write(uint32_t offset, const uint8_t* buf, uint32_t count) {
+    if (m_store == Store::SD) {
+        if (m_sdPath.empty() || count == 0) return 0;
+        // File must already exist (created by loadFromStream); open for update
+        FILE* f = fopen(m_sdPath.c_str(), "r+b");
+        if (!f) return 0;
+        if (fseek(f, (long)offset, SEEK_SET) != 0) { fclose(f); return 0; }
+        size_t w = fwrite(buf, 1, count, f);
+        fclose(f);
+        uint32_t newEnd = offset + (uint32_t)w;
+        if (newEnd > size) size = newEnd;
+        dirty = true;
+        return (uint32_t)w;
+    }
     if (offset >= size) return 0;
     if (offset + count > size) count = size - offset;
     if (count == 0) return 0;
@@ -181,7 +283,96 @@ uint32_t MSession::CachedFile::write(uint32_t offset, const uint8_t* buf, uint32
 }
 
 bool MSession::CachedFile::loadFromStream(MStream* stream, uint32_t fileSize) {
+    if (m_store == Store::SD) {
+        std::string parentDir = session_parent_dir(m_sdPath);
+        if (!parentDir.empty() && !session_ensure_dir(parentDir)) {
+            Debug_printv("Failed to create SD cache dir: %s", parentDir.c_str());
+            return false;
+        }
+        FILE* f = fopen(m_sdPath.c_str(), "wb");
+        if (!f) {
+            Debug_printv("Failed to open SD cache file for writing: %s", m_sdPath.c_str());
+            return false;
+        }
+        uint8_t buf[1024];
+        uint32_t total = 0;
+        uint32_t remaining = fileSize;
+        while (true) {
+            uint32_t toRead = (remaining > 0)
+                ? std::min(remaining, (uint32_t)sizeof(buf))
+                : (uint32_t)sizeof(buf);
+            uint32_t r = stream->read(buf, toRead);
+            if (r == 0) break;
+            fwrite(buf, 1, r, f);
+            total += r;
+            if (remaining > 0) {
+                remaining -= r;
+                if (remaining == 0) break;
+            }
+        }
+        fclose(f);
+        size = total;
+        Debug_printv("Cached %u bytes to SD: %s", total, m_sdPath.c_str());
+        return total > 0 || fileSize == 0;
+    }
+    // RAM path: if fileSize is unknown (0), buffer into a vector first
+    if (fileSize == 0) {
+        std::vector<uint8_t> buf;
+        uint8_t tmp[1024];
+        while (true) {
+            uint32_t r = stream->read(tmp, sizeof(tmp));
+            if (r == 0) break;
+            buf.insert(buf.end(), tmp, tmp + r);
+        }
+        if (buf.empty()) return false;
+        size = (uint32_t)buf.size();
+        if (!allocate()) return false;
+        write(0, buf.data(), size);
+        Debug_printv("Cached %u bytes to RAM", size);
+        return true;
+    }
     return loadViaReader(fileSize, [stream](uint8_t* buf, uint32_t n) {
         return stream->read(buf, n);
     });
+}
+
+std::shared_ptr<MSession::CachedFile> MSession::CachedFile::forSD(const std::string& sdPath) {
+    auto cf = std::make_shared<CachedFile>(0u);
+    cf->m_store = Store::SD;
+    cf->m_sdPath = sdPath;
+    return cf;
+}
+
+std::shared_ptr<MStream> MSession::CachedFile::openStream(std::ios_base::openmode mode) {
+    if (m_store == Store::RAM) {
+        if (!isAllocated()) return nullptr;
+        return std::make_shared<CachedFileStream>(shared_from_this());
+    }
+    // SD-backed
+    if (m_sdPath.empty()) return nullptr;
+    std::unique_ptr<MFile> f(MFSOwner::File(m_sdPath));
+    if (!f) return nullptr;
+    auto stream = f->getSourceStream(mode);
+    if (stream) size = stream->size();
+    return stream;
+}
+
+std::shared_ptr<MSession::CachedFile> MSession::CachedFile::getRAMCached(const std::string& key) {
+    auto it = s_ramCache.find(key);
+    return (it != s_ramCache.end()) ? it->second : nullptr;
+}
+
+void MSession::CachedFile::setRAMCached(const std::string& key, std::shared_ptr<CachedFile> cf) {
+    s_ramCache[key] = cf;
+    Debug_printv("RAM cache stored: %s (%u bytes)", key.c_str(), cf->size);
+}
+
+void MSession::CachedFile::clearRAMCached(const std::string& key) {
+    if (key.empty()) {
+        Debug_printv("Clearing entire RAM cache (%zu entries)", s_ramCache.size());
+        s_ramCache.clear();
+    } else {
+        s_ramCache.erase(key);
+        Debug_printv("Cleared RAM cache for: %s", key.c_str());
+    }
 }

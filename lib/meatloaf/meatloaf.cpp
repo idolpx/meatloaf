@@ -16,6 +16,7 @@
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
 #include "meatloaf.h"
+#include "meat_session.h"
 
 #include <dirent.h>
 #include <sys/stat.h>
@@ -687,8 +688,44 @@ std::shared_ptr<MStream> MFile::openStreamWithCache(
     std::ios_base::openmode mode,
     const std::function<std::shared_ptr<MStream>(const std::string&, std::ios_base::openmode)>& opener,
     const CacheOptions* overrideFlags) {
-#ifdef SD_CARD
     CacheOptions cacheFlags = overrideFlags ? *overrideFlags : parse_cache_fragment(url);
+
+    // ---- RAM cache (no SD_CARD dependency) -----------------------------------
+    if (mode == std::ios_base::in && cacheFlags.store == CACHE_RAM) {
+        if (cacheFlags.force_refresh) {
+            MSession::CachedFile::clearRAMCached(requestUrl);
+        } else {
+            auto cached = MSession::CachedFile::getRAMCached(requestUrl);
+            if (cached) {
+                auto cacheStream = cached->openStream(std::ios_base::in);
+                if (cacheStream) {
+                    size = cacheStream->size();
+                    Debug_printv("RAM cache hit: %s (%u bytes)", requestUrl.c_str(), size);
+                    return cacheStream;
+                }
+            }
+        }
+
+        Debug_printv("Fetching remote for RAM caching: %s", requestUrl.c_str());
+        auto remoteStream = opener(requestUrl, mode);
+        if (remoteStream != nullptr && remoteStream->isOpen()) {
+            auto cf = std::make_shared<MSession::CachedFile>(0u);
+            if (cf->loadFromStream(remoteStream.get(), 0)) {
+                MSession::CachedFile::setRAMCached(requestUrl, cf);
+                remoteStream->close();
+                auto cacheStream = cf->openStream(std::ios_base::in);
+                if (cacheStream) {
+                    size = cacheStream->size();
+                    return cacheStream;
+                }
+            }
+            remoteStream->close();
+        }
+        // Fall through to direct open if RAM cache population failed
+    }
+
+#ifdef SD_CARD
+    // ---- SD cache ------------------------------------------------------------
     if (mode == std::ios_base::in && cacheFlags.store == CACHE_SD) {
         std::string cacheRoot = "/sd/.cache";
         std::string hashDir = hash_url_sha256(requestUrl);
@@ -697,45 +734,29 @@ std::shared_ptr<MStream> MFile::openStreamWithCache(
         std::string cachePath = cacheDir + "/" + cacheName;
 
         Debug_printv("root[%s] dir[%s] path[%s]", cacheRoot.c_str(), cacheDir.c_str(), cachePath.c_str());
-        if (ensure_dir(cacheRoot) && ensure_dir(cacheDir)) {
-            if (!cacheFlags.force_refresh) {
-                std::unique_ptr<MFile> cacheFile(MFSOwner::File(cachePath));
-                if (cacheFile && cacheFile->exists()) {
-                    auto cacheStream = cacheFile->getSourceStream(std::ios_base::in);
-                    if (cacheStream != nullptr) {
-                        size = cacheStream->size();
-                        return cacheStream;
-                    }
-                }
+        auto cf = MSession::CachedFile::forSD(cachePath);
+
+        if (!cacheFlags.force_refresh && cf->isAllocated()) {
+            auto cacheStream = cf->openStream(std::ios_base::in);
+            if (cacheStream != nullptr) {
+                size = cacheStream->size();
+                return cacheStream;
             }
+        }
 
-            // Cache not found or force refresh requested, fetch remote
-            Debug_printv("Fetching remote for caching: %s", requestUrl.c_str());
-            auto remoteStream = opener(requestUrl, mode);
-            if (remoteStream != nullptr && remoteStream->isOpen()) {
-                std::unique_ptr<MFile> writeFile(MFSOwner::File(cachePath));
-                auto writeStream = writeFile ? writeFile->getSourceStream(std::ios_base::out) : nullptr;
-                if (writeStream != nullptr) {
-                    std::vector<uint8_t> buffer(1024);
-                    while (true) {
-                        uint32_t readCount = remoteStream->read(buffer.data(), buffer.size());
-                        if (readCount == 0) {
-                            break;
-                        }
-                        writeStream->write(buffer.data(), readCount);
-                    }
-                    writeStream->close();
-                }
+        Debug_printv("Fetching remote for SD caching: %s", requestUrl.c_str());
+        auto remoteStream = opener(requestUrl, mode);
+        if (remoteStream != nullptr && remoteStream->isOpen()) {
+            if (cf->loadFromStream(remoteStream.get(), 0)) {
                 remoteStream->close();
-
-                std::unique_ptr<MFile> cachedFile(MFSOwner::File(cachePath));
-                auto cacheStream = cachedFile ? cachedFile->getSourceStream(std::ios_base::in) : nullptr;
+                auto cacheStream = cf->openStream(std::ios_base::in);
                 if (cacheStream != nullptr) {
                     size = cacheStream->size();
-                    Debug_printv("Returning cached stream: %s", cachePath.c_str());
+                    Debug_printv("Returning SD cached stream: %s", cachePath.c_str());
                     return cacheStream;
                 }
             }
+            remoteStream->close();
         }
     }
 #else
@@ -744,7 +765,7 @@ std::shared_ptr<MStream> MFile::openStreamWithCache(
     __IGNORE_UNUSED_VAR(opener);
 #endif
 
-    // No caching, just open directly
+    // ---- No caching / fallback -----------------------------------------------
     Debug_printv("Opening without cache: %s", requestUrl.c_str());
     auto stream = opener(requestUrl, mode);
     if (stream != nullptr) {
