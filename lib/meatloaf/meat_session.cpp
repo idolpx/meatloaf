@@ -106,7 +106,7 @@ static std::string session_parent_dir(const std::string& path) {
  ********************************************************/
 
 MSession::CachedFile::CachedFile(uint32_t s)
-    : size(s), dirty(false), m_data(nullptr), m_store(Store::RAM)
+    : size(s), dirty(false), m_store(Store::RAM), m_data(nullptr)
 {
 #if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
     m_useHimem = false;
@@ -115,7 +115,7 @@ MSession::CachedFile::CachedFile(uint32_t s)
 }
 
 MSession::CachedFile::CachedFile(uint8_t* d, uint32_t s)
-    : size(s), dirty(false), m_data(d), m_store(Store::RAM)
+    : size(s), dirty(false), m_store(Store::RAM), m_data(d)
 {
 #if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
     m_useHimem = false;
