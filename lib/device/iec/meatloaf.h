@@ -40,8 +40,9 @@ public:
     void setup(systemBus *bus) override {
         iecFuji::setup(bus);
 
-        if (bus->attachDevice(this))
+        if (bus->attachDevice(this)) {
             Debug_printf("Attached Meatloaf device #%d\r\n", id());
+        }
     }
 
     void executeData(const uint8_t *data, uint8_t dataLen) override {

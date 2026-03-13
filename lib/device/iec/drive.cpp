@@ -643,15 +643,14 @@ void iecDrive::begin()
 
     //Debug_printv("id[%d]", id());
     m_host = nullptr;
-    m_statusCode = ST_DOSVERSION;
-    m_statusTrk  = 0;
-    m_numOpenChannels = 0;
-    set_cwd("/");
 
+    set_cwd("/");
     m_memory.setROM("dos1541"); // Default to 1541 ROM
 
     m_vdrive = NULL;
 
+    setStatusCode(ST_DOSVERSION);
+    m_numOpenChannels = 0;
     for(int i=0; i<16; i++) 
         m_channels[i] = nullptr;
 }
@@ -968,8 +967,10 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                         }
                     }
 
+#ifdef DEBUG
                     Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "m_cwd[%s]", m_cwd==nullptr ? "NULL" : m_cwd->url.c_str());
                     m_cwd->dump();
+#endif
                 }
                 
                 delete f;
@@ -1007,11 +1008,13 @@ void iecDrive::close(uint8_t channel)
         if( m_numOpenChannels>0 ) m_numOpenChannels--;
         //Debug_printv("Channel %d closed.", channel);
         ImageBroker::validate();
+#ifdef DEBUG
         ImageBroker::dump();
         SessionBroker::dump();
         Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "id[%d] cwd[%s]", m_devnr, m_cwd==nullptr ? "NULL" : m_cwd->url.c_str());
         m_cwd->dump();
         Debug_memory();
+#endif
     }
 
 #ifdef ENABLE_DISPLAY
