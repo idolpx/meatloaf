@@ -471,8 +471,11 @@ gzip_filter_read(struct archive_read_filter *self, const void **p)
 		 * it so, hence this ugly cast. */
 		state->stream.next_in = (unsigned char *)(uintptr_t)
 		    __archive_read_filter_ahead(self->upstream, 1, &avail_in);
-		/* Validate avail_in before using it */
-		if (state->stream.next_in == NULL || avail_in <= 0) {
+		/* Validate avail_in before using it.
+		 * avail_in < 0 means an upstream read error (ssize_t error code).
+		 * avail_in == 0 is valid: zlib may still have internally buffered
+		 * data to flush via inflate() even with no new input available. */
+		if (state->stream.next_in == NULL || avail_in < 0) {
 			archive_set_error(&self->archive->archive,
 			    ARCHIVE_ERRNO_MISC,
 			    "truncated gzip input");
