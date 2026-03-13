@@ -17,7 +17,7 @@
 
 #include "meat_session.h"
 
-#include <archive.h>
+#include "meatloaf.h"
 
 // Initialize static members — SessionBroker
 std::unordered_map<std::string, std::shared_ptr<MSession>> SessionBroker::session_repo;
@@ -180,49 +180,8 @@ uint32_t MSession::CachedFile::write(uint32_t offset, const uint8_t* buf, uint32
     return count;
 }
 
-bool MSession::CachedFile::loadFromArchive(struct archive* a, uint32_t fileSize) {
-    size = fileSize;
-    if (!allocate()) return false;
-
-    Debug_printv("Reading %u bytes from archive", fileSize);
-
-#if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
-    if (m_useHimem) {
-        uint32_t remaining = fileSize;
-        uint32_t pageStart = 0;
-        while (remaining > 0) {
-            uint32_t s = std::min(remaining, (uint32_t)ESP_HIMEM_BLKSZ);
-
-            uint8_t* ptr;
-            ESP_ERROR_CHECK(esp_himem_map(m_handle, s_range, pageStart, 0, ESP_HIMEM_BLKSZ, 0, (void**)&ptr));
-            uint32_t r = archive_read_data(a, ptr, s);
-            ESP_ERROR_CHECK(esp_himem_unmap(s_range, ptr, ESP_HIMEM_BLKSZ));
-
-            if (archive_errno(a) != ARCHIVE_OK || r != s) {
-                if (archive_errno(a) != ARCHIVE_OK) {
-                    Debug_printv("archive read error %i: %s", archive_errno(a), archive_error_string(a));
-                } else {
-                    Debug_printv("expected to read %u bytes from archive, got %u", s, r);
-                }
-                freeStorage();
-                return false;
-            }
-
-            pageStart += s;
-            remaining -= s;
-        }
-        return true;
-    }
-#endif
-    uint32_t r = archive_read_data(a, m_data, fileSize);
-    if (archive_errno(a) != ARCHIVE_OK || r != fileSize) {
-        if (archive_errno(a) != ARCHIVE_OK) {
-            Debug_printv("archive read error %i: %s", archive_errno(a), archive_error_string(a));
-        } else {
-            Debug_printv("expected to read %u bytes from archive, got %u", fileSize, r);
-        }
-        freeStorage();
-        return false;
-    }
-    return true;
+bool MSession::CachedFile::loadFromStream(MStream* stream, uint32_t fileSize) {
+    return loadViaReader(fileSize, [stream](uint8_t* buf, uint32_t n) {
+        return stream->read(buf, n);
+    });
 }

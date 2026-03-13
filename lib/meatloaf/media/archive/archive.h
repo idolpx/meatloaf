@@ -102,6 +102,21 @@ public:
         return true;  // No network to maintain
     }
 
+    // Extract archive entry data into a CachedFile using loadViaReader
+    bool loadEntryFromArchive(std::shared_ptr<CachedFile>& cf, struct archive* a, uint32_t entrySize) {
+        return cf->loadViaReader(entrySize, [a](uint8_t* buf, uint32_t n) -> uint32_t {
+            la_ssize_t r = archive_read_data(a, buf, n);
+            if (archive_errno(a) != ARCHIVE_OK) {
+                Debug_printv("archive read error %i: %s", archive_errno(a), archive_error_string(a));
+                return 0;
+            }
+            if ((uint32_t)r != n) {
+                Debug_printv("expected to read %u bytes from archive, got %zd", n, r);
+            }
+            return (uint32_t)r;
+        });
+    }
+
     // Get or extract an archive entry, caching the result
     std::shared_ptr<CachedFile> getEntry(const std::string& entryPath, struct archive* a, uint32_t entrySize) {
         // Check cache first
@@ -114,7 +129,7 @@ public:
         // Extract from archive into new CachedFile
         Debug_printv("Extracting entry: %s (%u bytes)", entryPath.c_str(), entrySize);
         auto cf = std::make_shared<CachedFile>(entrySize);
-        if (!cf->loadFromArchive(a, entrySize)) {
+        if (!loadEntryFromArchive(cf, a, entrySize)) {
             Debug_printv("Failed to extract entry: %s", entryPath.c_str());
             return nullptr;
         }

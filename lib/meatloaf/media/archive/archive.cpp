@@ -161,7 +161,9 @@ bool Archive::open(std::ios_base::openmode mode) {
 
     m_srcBuffer = new uint8_t[m_buffSize];
     m_archive = archive_read_new();
-    m_srcStream->seek(0, SEEK_SET);
+    Debug_printv("pre-seek pos[%lu]", (unsigned long)m_srcStream->position());
+    bool seekOk = m_srcStream->seek(0, SEEK_SET);
+    Debug_printv("post-seek pos[%lu] seekOk[%d]", (unsigned long)m_srcStream->position(), (int)seekOk);
 
     archive_read_support_filter_all(m_archive);
     archive_read_support_format_all(m_archive);
@@ -474,7 +476,9 @@ bool ArchiveMStream::seekEntry( uint16_t index )
             } while (nread > 0);
 
             entry.size = (uint32_t)total;
-            Debug_printv("Counted decompressed size: %lu bytes", entry.size);
+            Debug_printv("Counted decompressed size: %lu bytes (loop exit nread=%d, archive_error='%s')",
+                entry.size, (int)nread,
+                archive_error_string(a) ? archive_error_string(a) : "none");
 
             // Must reopen the archive to reset read position for actual data extraction
             m_archive->close();

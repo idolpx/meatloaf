@@ -40,7 +40,7 @@
 
 #include "../../include/debug.h"
 
-struct archive;  // Forward declaration for libarchive
+class MStream;  // Forward declaration
 
 /********************************************************
  * Base Session Class
@@ -72,8 +72,43 @@ public:
         uint32_t read(uint32_t offset, uint8_t* buf, uint32_t count);
         uint32_t write(uint32_t offset, const uint8_t* buf, uint32_t count);
 
-        // Load data directly from a libarchive handle into backing store
-        bool loadFromArchive(struct archive* a, uint32_t fileSize);
+        // Load data from any MStream into backing store
+        bool loadFromStream(MStream* stream, uint32_t fileSize);
+
+        // Generic HIMEM-aware loader — fill backing store via a callable
+        // reader signature: uint32_t reader(uint8_t* buf, uint32_t n)
+        template<typename ReaderFn>
+        bool loadViaReader(uint32_t fileSize, ReaderFn&& reader) {
+            size = fileSize;
+            if (!allocate()) return false;
+            Debug_printv("Reading %u bytes", fileSize);
+#if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
+            if (m_useHimem) {
+                uint32_t remaining = fileSize;
+                uint32_t pageStart = 0;
+                while (remaining > 0) {
+                    uint32_t s = std::min(remaining, (uint32_t)ESP_HIMEM_BLKSZ);
+                    uint8_t* ptr;
+                    ESP_ERROR_CHECK(esp_himem_map(m_handle, s_range, pageStart, 0, ESP_HIMEM_BLKSZ, 0, (void**)&ptr));
+                    uint32_t r = reader(ptr, s);
+                    ESP_ERROR_CHECK(esp_himem_unmap(s_range, ptr, ESP_HIMEM_BLKSZ));
+                    if (r != s) {
+                        freeStorage();
+                        return false;
+                    }
+                    pageStart += s;
+                    remaining -= s;
+                }
+                return true;
+            }
+#endif
+            uint32_t r = reader(m_data, fileSize);
+            if (r != fileSize) {
+                freeStorage();
+                return false;
+            }
+            return true;
+        }
 
     private:
         void freeStorage();
