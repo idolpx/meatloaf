@@ -541,6 +541,8 @@ bool ArchiveMStream::seekPath(std::string path) {
         _size = entry.size;
         _position = 0;
 
+        if (!ensureData()) return false;
+
         Debug_printv("File Size: size[%ld] available[%ld] position[%ld]", _size, available(), _position);
         return true;
     }
