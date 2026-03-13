@@ -562,26 +562,26 @@ uint8_t iecChannelHandlerDir::readBufferData()
 #else
             // Full long filename (up to 30 chars)
             {
-              size_t n = (int) name.size();
-              memcpy(m_data+m_len, name.data(), n);
+                size_t n = (int) name.size();
+                memcpy(m_data+m_len, name.data(), n);
 
-              m_len += n;
-              m_data[m_len++] = '"';
+                m_len += n;
+                m_data[m_len++] = '"';
 
-              // Extension gap
-              if (n<16)
-                {
-                  n = 17-n;
-                  while(n-->0) m_data[m_len++] = ' ';
-                }
-              else
+                // Extension gap
+                if (n<16)
+                    {
+                    n = 17-n;
+                    while(n-->0) m_data[m_len++] = ' ';
+                    }
+                else
+                    m_data[m_len++] = ' ';
+
+                // Extension
+                memcpy(m_data+m_len, ext.data(), 3);
+                m_len+=3;
                 m_data[m_len++] = ' ';
-
-              // Extension
-              memcpy(m_data+m_len, ext.data(), 3);
-              m_len+=3;
-              m_data[m_len++] = ' ';
-              m_data[m_len++] = 0;
+                m_data[m_len++] = 0;
             }
 #endif
         }
@@ -2080,11 +2080,18 @@ void iecDrive::set_cwd(std::string path, bool verified)
 //#ifdef USE_VDRIVE
         if( Meatloaf.use_vdrive )
         {
+            // Build the full path for VDrive: for entries inside containers (e.g. a D81 inside a
+            // ZIP), n->url is the container URL and n->pathInStream is the entry path.
+            // VDrive uses MFSOwner::File() internally, so the combined URL resolves correctly.
+            std::string vdrive_url = n->url;
+            if (!n->pathInStream.empty())
+                vdrive_url += "/" + n->pathInStream;
+
             if( n->exists() && !isDirectory && haveStream &&
-                (m_vdrive=VDrive::create(m_devnr-8, n->url.c_str()))!=nullptr )
+                (m_vdrive=VDrive::create(m_devnr-8, vdrive_url.c_str()))!=nullptr )
             {
                 // we were able to creata a VDrive => this is a valid disk image
-                Debug_printv("Created VDrive for URL %s", n->url.c_str());
+                Debug_printv("Created VDrive for URL %s", vdrive_url.c_str());
                 setStatusCode(ST_OK);
                 delete n;
             }

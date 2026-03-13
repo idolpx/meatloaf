@@ -49,7 +49,8 @@ public:
       payload = std::string((const char *) data, dataLen);
         iecFuji::process_cmd(); // process FujiNet commands
         //if (iecFuji::iecStatus.err != ST_OK)
-        iecDrive::executeData(data, dataLen); // process CBM DOS commands
+        if ( response.empty() && responseV.empty() )
+            iecDrive::executeData(data, dataLen); // process CBM DOS commands
     }
 
     void enable(std::string deviceids) {
