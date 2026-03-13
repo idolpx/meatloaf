@@ -283,6 +283,8 @@ namespace ESP32Console::Commands
 {
     const ConsoleCommand getRestartCommand()
     {
+        ConsoleCommand("reset", &restart, NULL);
+        ConsoleCommand("reboot", &restart, NULL);
         return ConsoleCommand("restart", &restart, "Restart / Reboot the system");
     }
 

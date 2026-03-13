@@ -457,7 +457,7 @@ int wget(int argc, char **argv)
         auto s = f->getSourceStream();
 
         std::string outfile = pwd;
-        outfile += f->name;
+        outfile += "/" + f->name;
 
         Debug_printv("size[%lu] name[%s] url[%s] outfile[%s]", f->size, f->name.c_str(), s->url.c_str(), outfile.c_str());
 
