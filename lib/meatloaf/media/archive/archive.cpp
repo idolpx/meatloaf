@@ -461,34 +461,66 @@ bool ArchiveMStream::seekEntry( uint16_t index )
         entry.size = archive_entry_size(a_entry);
 
         // For raw compressed entries (standalone .gz, .bz2, etc.) archive_entry_size()
-        // returns the COMPRESSED file size, not the decompressed size.  Always scan
-        // through the decompressed data to get the true size.  Also scan when the
-        // reported size is 0 (size unknown).
+        // returns the COMPRESSED file size, not the decompressed size.  Determine
+        // the true decompressed size and reset the archive for data extraction.
         if (entry.size == 0 || isRawCompressedEntry) {
-            // Count actual decompressed bytes by reading through the data
-            uint8_t buff[256] = {0};
-            ssize_t nread;
-            uint64_t total = 0;
+            bool sizeKnown = false;
 
-            do {
-                nread = archive_read_data(a, &buff, sizeof(buff) - 1);
-                if (nread > 0) total += (uint64_t)nread;
-            } while (nread > 0);
+            // For .gz files: read the ISIZE field from the gzip trailer (last 4 bytes).
+            // ISIZE = decompressed size mod 2^32 — exact for files < 4 GB.
+            // This avoids reading through all the compressed data (which exhauts the
+            // source stream and can cause Z_DATA_ERROR on the subsequent reopen).
+            if (mstr::endsWith(url, ".gz", false)) {
+                uint32_t srcSize = (uint32_t)containerStream->size();
+                Debug_printv("gzip ISIZE check: srcSize=%lu", (unsigned long)srcSize);
+                if (srcSize >= 18) {  // min valid gzip: 10 header + 2 deflate + 8 trailer
+                    m_archive->close();
+                    if (containerStream->seek(srcSize - 4, SEEK_SET)) {
+                        uint8_t trailer[4] = {0};
+                        if (containerStream->read(trailer, 4) == 4) {
+                            entry.size = ((uint32_t)trailer[0])       |
+                                         ((uint32_t)trailer[1] << 8)  |
+                                         ((uint32_t)trailer[2] << 16) |
+                                         ((uint32_t)trailer[3] << 24);
+                            sizeKnown = (entry.size > 0);
+                            Debug_printv("gzip ISIZE trailer: %lu bytes", (unsigned long)entry.size);
+                        }
+                    }
+                    // Reopen archive; Archive::open() seeks containerStream back to 0
+                    m_archive->open(std::ios_base::in);
+                    a = m_archive->getArchive();
+                    if (archive_read_next_header(a, &a_entry) != ARCHIVE_OK) {
+                        entry.size = 0;
+                        return false;
+                    }
+                }
+            }
 
-            entry.size = (uint32_t)total;
-            Debug_printv("Counted decompressed size: %lu bytes (loop exit nread=%d, archive_error='%s')",
-                entry.size, (int)nread,
-                archive_error_string(a) ? archive_error_string(a) : "none");
+            if (!sizeKnown) {
+                // Fallback: count actual decompressed bytes by reading through the data.
+                // Used for non-gz compressed formats (.bz2, .xz, etc.) or when ISIZE read fails.
+                uint8_t buff[256] = {0};
+                ssize_t nread;
+                uint64_t total = 0;
 
-            // Must reopen the archive to reset read position for actual data extraction
-            m_archive->close();
-            m_archive->open(std::ios_base::in);
+                do {
+                    nread = archive_read_data(a, &buff, sizeof(buff) - 1);
+                    if (nread > 0) total += (uint64_t)nread;
+                } while (nread > 0);
 
-            // Re-read to get back to this entry
-            a = m_archive->getArchive();
-            if (archive_read_next_header(a, &a_entry) != ARCHIVE_OK) {
-                entry.size = 0;
-                return false;
+                entry.size = (uint32_t)total;
+                Debug_printv("Counted decompressed size: %lu bytes (loop exit nread=%d, archive_error='%s')",
+                    entry.size, (int)nread,
+                    archive_error_string(a) ? archive_error_string(a) : "none");
+
+                // Reopen to reset read position for actual data extraction
+                m_archive->close();
+                m_archive->open(std::ios_base::in);
+                a = m_archive->getArchive();
+                if (archive_read_next_header(a, &a_entry) != ARCHIVE_OK) {
+                    entry.size = 0;
+                    return false;
+                }
             }
         }
     }
