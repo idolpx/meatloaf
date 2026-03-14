@@ -60,10 +60,7 @@ ssize_t cb_read(struct archive *, void *userData, const void **buff) {
     Archive *a = (Archive *)userData;
     *buff = a->m_srcBuffer;
     if (a->m_archive == NULL) return 0;
-    uint32_t pos_before = (uint32_t)a->m_srcStream->position();
     ssize_t n = (ssize_t)a->m_srcStream->read(a->m_srcBuffer, a->m_buffSize);
-    fprintf(stderr, "[cb_read] pos_before=%lu pos_after=%lu read=%d\n",
-            (unsigned long)pos_before, (unsigned long)a->m_srcStream->position(), (int)n);
     return n;
 }
 

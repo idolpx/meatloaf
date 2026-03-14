@@ -521,9 +521,6 @@ gzip_filter_read(struct archive_read_filter *self, const void **p)
 		ret = inflate(&(state->stream), 0);
 		ssize_t bc_ptr  = (ssize_t)(state->stream.next_in - next_in_pre);
 		ssize_t bc_avail = (ssize_t)(avail_in_before - state->stream.avail_in);
-		fprintf(stderr, "[gfr] ret=%d avail_in_before=%u avail_in_after=%u avail_out_after=%u bc_ptr=%zd bc_avail=%zd\n",
-		    ret, (unsigned)avail_in_before, (unsigned)state->stream.avail_in,
-		    (unsigned)state->stream.avail_out, bc_ptr, bc_avail);
 		if (ret == Z_STREAM_END)
 			bytes_consumed = bc_ptr;
 		else
