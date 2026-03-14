@@ -28,6 +28,7 @@
 #ifdef HAVE_ERRNO_H
 #include <errno.h>
 #endif
+#include <stdio.h>
 #ifdef HAVE_STDLIB_H
 #include <stdlib.h>
 #endif
@@ -489,50 +490,64 @@ gzip_filter_read(struct archive_read_filter *self, const void **p)
 			avail_in = max_in;
 		state->stream.avail_in = (uInt)avail_in;
 
-		/* Decompress and consume some of that data. */
+		/* Cap avail_in to the actual number of valid bytes in the
+		 * upstream filter.  On ESP32, __archive_read_filter_ahead may
+		 * return an avail_in value that exceeds the data truly present
+		 * in the client/copy buffers (observed as UINT_MAX), causing
+		 * inflate to read past the end of valid compressed bytes at
+		 * chunk boundaries and produce corrupt output.  Clamping to
+		 * upstream->avail + upstream->client_avail is always safe: it
+		 * reflects exactly how many compressed bytes can be consumed
+		 * without triggering another cb_read call. */
 		{
-		uInt avail_in_pre = state->stream.avail_in;
-		ret = inflate(&(state->stream), 0);
-		if (ret == Z_STREAM_END || ret != Z_OK) {
-			fprintf(stderr, "inflate ret=%d avail_in_pre=%u avail_in_post=%u ssize_avail_in=%d\n",
-			    ret, avail_in_pre, state->stream.avail_in, (int)avail_in);
+			size_t actual_avail =
+			    self->upstream->avail +
+			    self->upstream->client_avail;
+			if (actual_avail > 0 &&
+			    state->stream.avail_in > (uInt)actual_avail)
+				state->stream.avail_in = (uInt)actual_avail;
 		}
+
+		/* Decompress and consume some of that data.
+		 *
+		 * Use avail_in subtraction at Z_OK (no wrapping at Z_OK on ESP32).
+		 * At Z_STREAM_END, avail_in wraps to 0xFFFFFFCD on ESP32 zlib, so
+		 * use pointer arithmetic instead (next_in advances past the deflate
+		 * stream into the gzip trailer; pointer difference is always correct). */
+		ssize_t bytes_consumed;
+		{
+		const unsigned char *next_in_pre = state->stream.next_in;
+		uInt avail_in_before = state->stream.avail_in;
+		ret = inflate(&(state->stream), 0);
+		ssize_t bc_ptr  = (ssize_t)(state->stream.next_in - next_in_pre);
+		ssize_t bc_avail = (ssize_t)(avail_in_before - state->stream.avail_in);
+		fprintf(stderr, "[gfr] ret=%d avail_in_before=%u avail_in_after=%u avail_out_after=%u bc_ptr=%zd bc_avail=%zd\n",
+		    ret, (unsigned)avail_in_before, (unsigned)state->stream.avail_in,
+		    (unsigned)state->stream.avail_out, bc_ptr, bc_avail);
+		if (ret == Z_STREAM_END)
+			bytes_consumed = bc_ptr;
+		else
+			bytes_consumed = bc_avail;
 		}
 		switch (ret) {
 		case Z_OK: /* Decompressor made some progress. */
 			__archive_read_filter_consume(self->upstream,
-			    avail_in - state->stream.avail_in);
+			    (size_t)bytes_consumed);
 			break;
 		case Z_STREAM_END: /* Found end of stream. */
-			/* avail_in_post must be <= avail_in_pre: inflate cannot invent bytes.
-			 * If it is larger, zlib or memory corruption produced a bogus value.
-			 * Recover by assuming exactly 8 bytes remain (the gzip trailer);
-			 * this leaves the upstream positioned correctly for consume_trailer. */
-			{
-				ssize_t remaining_in;
-				if (state->stream.avail_in <= (uInt)avail_in) {
-					remaining_in = (ssize_t)state->stream.avail_in;
-				} else {
-					/* bogus avail_in_post — assume gzip trailer (8 bytes) remains */
-					remaining_in = (avail_in >= 8) ? 8 : avail_in;
-				}
-				ssize_t consumed_in = avail_in - remaining_in;
-				fprintf(stderr, "gzip Z_STREAM_END: avail_in_pre=%u avail_in_post=%u ssize_avail_in=%d remaining=%d consumed=%d\n",
-				    (uInt)avail_in, state->stream.avail_in, (int)avail_in,
-				    (int)remaining_in, (int)consumed_in);
-				__archive_read_filter_consume(self->upstream, (size_t)consumed_in);
-			}
+			/* next_in now points past the deflate stream to the gzip
+			 * trailer.  Consume exactly what inflate read, leaving
+			 * the 8-byte trailer in the upstream for consume_trailer. */
+			__archive_read_filter_consume(self->upstream,
+			    (size_t)bytes_consumed);
 			/* Consume the stream trailer; release the
 			 * decompression library. */
 			ret = consume_trailer(self);
-			fprintf(stderr, "gzip consume_trailer ret=%d\n", ret);
 			if (ret < ARCHIVE_OK)
 				return (ret);
 			break;
 		default:
 			/* Return an error. */
-			fprintf(stderr, "gzip inflate error: ret=%d total_out=%lu\n",
-			    ret, (unsigned long)state->total_out);
 			archive_set_error(&self->archive->archive,
 			    ARCHIVE_ERRNO_MISC,
 			    "gzip decompression failed");

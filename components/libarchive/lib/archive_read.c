@@ -1542,6 +1542,12 @@ advance_file_pointer(struct archive_read_filter *filter, int64_t request)
 	if (filter->fatal)
 		return (-1);
 
+	/* Log when request exceeds available data (would trigger skip). */
+	if (request > (int64_t)(filter->avail + filter->client_avail))
+		fprintf(stderr, "[afp0] request=%lld avail=%zu client_avail=%zu (WILL SKIP %lld)\n",
+		    (long long)request, (size_t)filter->avail, (size_t)filter->client_avail,
+		    (long long)(request - (int64_t)(filter->avail + filter->client_avail)));
+
 	/* Use up the copy buffer first. */
 	if (filter->avail > 0) {
 		min = (size_t)minimum(request, (int64_t)filter->avail);
@@ -1563,6 +1569,10 @@ advance_file_pointer(struct archive_read_filter *filter, int64_t request)
 	}
 	if (request == 0)
 		return (total_bytes_skipped);
+
+	fprintf(stderr, "[afp1] request=%lld avail=%zu client_avail=%zu can_skip=%d\n",
+	    (long long)request, (size_t)filter->avail,
+	    (size_t)filter->client_avail, filter->can_skip);
 
 	/* If there's an optimized skip function, use it. */
 	if (filter->can_skip != 0) {

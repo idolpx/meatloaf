@@ -275,9 +275,10 @@ void HTTPMStream::close() {
 bool HTTPMStream::seek(uint32_t pos) {
     if ( !_session->client->_is_open )
     {
-        Debug_printv("error");
-        _error = 1;
-        return false;
+        if ( !_session->client->reopen() ) {
+            _error = 1;
+            return false;
+        }
     }
 
     return _session->client->seek(pos);
@@ -345,20 +346,16 @@ bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
     _range_size = 0;
 
     // Reset the HTTP client handle before starting a new request.
-    // esp_http_client_cached_buf_cleanup() resets raw_data == orig_raw_data, which is
-    // required before the next esp_http_client_fetch_headers() call. If a previous
-    // response cached body bytes during header fetch, raw_data may have been advanced
-    // past orig_raw_data; the next http_on_body callback asserts they are equal.
-    // esp_http_client_flush_response() does not help when is_chunk_complete is already
-    // true and raw_len is 0 — the cleanup is never triggered. Re-initializing the handle
-    // via init() calls esp_http_client_cleanup() which calls cached_buf_cleanup(), then
-    // creates a fresh handle with raw_data == orig_raw_data == NULL.
     if (_is_open) {
         init();
     }
 
     return processRedirectsAndOpen(0);
 };
+
+bool MeatHttpClient::reopen() {
+    return open(url, lastMethod);
+}
 
 bool MeatHttpClient::processRedirectsAndOpen(uint32_t position, uint32_t size) {
     wasRedirected = false;
@@ -402,6 +399,10 @@ bool MeatHttpClient::processRedirectsAndOpen(uint32_t position, uint32_t size) {
         Debug_printv("opening stream failed, httpCode=%d", lastRC);
         _error = lastRC;
         _is_open = false;
+
+        // Reset client on error
+        init();
+
         return false;
     }
 
@@ -447,9 +448,7 @@ bool MeatHttpClient::seek(uint32_t pos) {
 
         if (_is_open) {
             // Drain remaining bytes from the current range response.
-            int bytes = 0;
-            esp_http_client_flush_response(_http, &bytes);
-            //Debug_printv("Flushed %d bytes to skip to position %lu", bytes, pos);
+            flush(0);
         }
 
         // Make a single range request directly to the target position.
@@ -471,39 +470,17 @@ bool MeatHttpClient::seek(uint32_t pos) {
         //Debug_printv("Server doesn't support resume, reading from start and discarding");
         // server doesn't support resume, so...
         if( pos < _position || pos == 0 ) {
-            // Reopen from start — open() drains+closes the current connection without
-            // calling cleanup(), avoiding use-after-free from lwIP keep-alive timers.
-            //close();
-            //init();
-        
-            if ( !open(url, lastMethod) )
+            if ( !reopen() )
                 return false;
 
             // skip pos bytes in HTTP_BLOCK_SIZE chunks to avoid per-byte UART contention
             uint32_t remaining = pos;
-            while (remaining > 0) {
-                char buf[HTTP_BLOCK_SIZE];
-                uint32_t toRead = (remaining < HTTP_BLOCK_SIZE) ? remaining : HTTP_BLOCK_SIZE;
-                int rc = esp_http_client_read(_http, buf, (int)toRead);
-                if (rc <= 0)
-                    return false;
-                remaining -= (uint32_t)rc;
-                vTaskDelay(0);  // yield to scheduler between chunks
-            }
+            flush ( remaining );
         }
         else {
             auto delta = pos - _position;
             // skip forward in HTTP_BLOCK_SIZE chunks to avoid per-byte UART contention
             uint32_t remaining = delta;
-            while (remaining > 0) {
-                char buf[HTTP_BLOCK_SIZE];
-                uint32_t toRead = (remaining < HTTP_BLOCK_SIZE) ? remaining : HTTP_BLOCK_SIZE;
-                int rc = esp_http_client_read(_http, buf, (int)toRead);
-                if (rc <= 0)
-                    return false;
-                remaining -= (uint32_t)rc;
-                vTaskDelay(0);  // yield to scheduler between chunks
-            }
         }
 
         _position = pos;
@@ -513,6 +490,34 @@ bool MeatHttpClient::seek(uint32_t pos) {
     }
     else
         return false;
+}
+
+bool MeatHttpClient::flush(uint32_t numBytes) {
+    if (_http == nullptr) {
+        return false;
+    }
+
+    if ( numBytes == 0) {
+        // Flush all remaining bytes in the response body
+        int bytes = 0;
+        esp_http_client_flush_response(_http, &bytes);
+        //Debug_printv("Flushed %d bytes to complete response", bytes);
+        return true;
+    }
+
+    uint32_t flushed = 0;
+    while (numBytes > 0) {
+        char buf[HTTP_BLOCK_SIZE];
+        uint32_t toRead = (numBytes < HTTP_BLOCK_SIZE) ? numBytes : HTTP_BLOCK_SIZE;
+        int rc = esp_http_client_read(_http, buf, (int)toRead);
+        if (rc < 0)
+            return false;
+
+        numBytes -= (uint32_t)rc;
+        flushed += (uint32_t)rc;
+        //Debug_printv("Flushed %d bytes, %d remaining", rc, numBytes);
+    }
+    return true;
 }
 
 uint32_t MeatHttpClient::read(uint8_t* buf, uint32_t size) {
@@ -565,12 +570,6 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
 
     if ( url.size() < 5)
         return 0;
-
-    // // Drain any previous active request before starting a new one.
-    // if (_http != nullptr && _is_open) {
-    //     int bytes = 0;
-    //     esp_http_client_flush_response(_http, &bytes);
-    // }
 
     // Set URL and Method
     mstr::replaceAll(url, " ", "%20");

@@ -17,6 +17,7 @@
 
 #include "archive.h"
 
+#include <stdio.h>
 #include <archive.h>
 #include <archive_entry.h>
 #include <string.h>
@@ -58,7 +59,12 @@ ssize_t cb_read(struct archive *, void *userData, const void **buff) {
     // https://github.com/libarchive/libarchive/wiki/LibarchiveIO
     Archive *a = (Archive *)userData;
     *buff = a->m_srcBuffer;
-    return a->m_archive==NULL ? 0 : a->m_srcStream->read(a->m_srcBuffer, a->m_buffSize);
+    if (a->m_archive == NULL) return 0;
+    uint32_t pos_before = (uint32_t)a->m_srcStream->position();
+    ssize_t n = (ssize_t)a->m_srcStream->read(a->m_srcBuffer, a->m_buffSize);
+    fprintf(stderr, "[cb_read] pos_before=%lu pos_after=%lu read=%d\n",
+            (unsigned long)pos_before, (unsigned long)a->m_srcStream->position(), (int)n);
+    return n;
 }
 
 
@@ -149,15 +155,6 @@ bool Archive::open(std::ios_base::openmode mode) {
     close();
 
     Debug_printv("Archive::open [%s]", m_srcStream->url.c_str());
-
-// #if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
-//     // Initialize HIMEM allocator for LZMA decompression (.7z support)
-//     static bool himem_initialized = false;
-//     if (!himem_initialized) {
-//         esp32_himem_allocator_init();
-//         himem_initialized = true;
-//     }
-// #endif
 
     m_srcBuffer = new uint8_t[m_buffSize];
     m_archive = archive_read_new();
@@ -492,6 +489,15 @@ bool ArchiveMStream::seekEntry( uint16_t index )
                     if (archive_read_next_header(a, &a_entry) != ARCHIVE_OK) {
                         entry.size = 0;
                         return false;
+                    }
+                    // Use the filename embedded in the gzip header (FNAME field) if present.
+                    // gzip_read_header() runs during archive_read_next_header and overrides
+                    // the raw format's "data" pathname with the stored name, if any.
+                    const char* embeddedName = archive_entry_pathname(a_entry);
+                    if (embeddedName && embeddedName[0] != '\0' &&
+                        strcmp(embeddedName, "data") != 0) {
+                        entry.filename = basename(embeddedName);
+                        Debug_printv("gzip embedded filename: %s", entry.filename.c_str());
                     }
                 }
             }

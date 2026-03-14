@@ -128,10 +128,12 @@ public:
 
     bool processRedirectsAndOpen(uint32_t position, uint32_t size = HTTP_BLOCK_SIZE);
     bool open(std::string url, esp_http_client_method_t meth);
+    bool reopen();
     //void cancel();
     void close();
     void setOnHeader(const std::function<int(char*, char*)> &f);
     bool seek(uint32_t pos);
+    bool flush(uint32_t numBytes = 0); // Flush all remaining bytes if 0
     uint32_t read(uint8_t* buf, uint32_t size);
     uint32_t write(const uint8_t* buf, uint32_t size);
 
