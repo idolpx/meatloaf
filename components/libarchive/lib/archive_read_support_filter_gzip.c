@@ -28,7 +28,6 @@
 #ifdef HAVE_ERRNO_H
 #include <errno.h>
 #endif
-#include <stdio.h>
 #ifdef HAVE_STDLIB_H
 #include <stdlib.h>
 #endif
@@ -312,11 +311,7 @@ static int
 gzip_bidder_init(struct archive_read_filter *self)
 {
 	struct private_data *state;
-#if defined(ESP_PLATFORM)
-	static const size_t out_block_size = 255;
-#else
-	static const size_t out_block_size = 64 * 1024;
-#endif
+	static const size_t out_block_size = OUT_BLOCK_SIZE;
 	void *out_block;
 
 	self->code = ARCHIVE_FILTER_GZIP;
