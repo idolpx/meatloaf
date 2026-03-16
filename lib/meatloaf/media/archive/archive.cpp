@@ -627,7 +627,7 @@ bool ArchiveMStream::seekPath(std::string path) {
 
     // Check if this entry is already cached in ArchiveMSession — avoids
     // re-opening the archive (which can fail if DMA memory is exhausted)
-    std::string sessionKey = "archive://" + url;
+    std::string sessionKey = "archive:" + url;
     if (seekCachedFile(sessionKey, path)) {
         return true;
     }

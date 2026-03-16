@@ -77,7 +77,7 @@ class Archive {
 class ArchiveMSession : public MSession {
 public:
     ArchiveMSession(const std::string& archiveUrl)
-        : MSession("archive://" + archiveUrl, "", 0)
+        : MSession("archive:" + archiveUrl, "", 0)
     {
         setKeepAliveInterval(0);  // disable keep-alive for archive sessions
     }
@@ -250,12 +250,12 @@ class ArchiveMFile : public MFile {
     // Single-file compressed archives are transparent: directory operations delegate
     // directly to the inner file so the compression layer is invisible to the user.
     bool isSingleFileCompression() const {
-        static const char* multiFileExts[] = {
-            ".tar.gz", ".tgz", ".tar.bz2", ".tar.xz", ".tar.lz", ".tar.z", ".cpgz", nullptr
-        };
-        for (int i = 0; multiFileExts[i]; i++) {
-            if (mstr::endsWith(name, multiFileExts[i], false)) return false;
-        }
+        // static const char* multiFileExts[] = {
+        //     ".tar.gz", ".tgz", ".tar.bz2", ".tar.xz", ".tar.lz", ".tar.z", ".cpgz", nullptr
+        // };
+        // for (int i = 0; multiFileExts[i]; i++) {
+        //     if (mstr::endsWith(name, multiFileExts[i], false)) return false;
+        // }
         static const char* singleFileExts[] = {
             ".gz", ".bz2", ".xz", ".lz", ".z", ".zst", ".lz4", nullptr
         };
@@ -286,10 +286,24 @@ class ArchiveMFile : public MFile {
     }
 
     bool isDirectory() override {
+        if (!pathInStream.empty()) {
+            // pathInStream names a specific entry inside the archive.
+            // For single-file compressed archives, any entry path is a plain file
+            // (the inner container handles its own directory operations).
+            if (isSingleFileCompression()) return false;
+            // For multi-file archives (.zip, .7z, etc.), ask what type the entry
+            // itself is by resolving its name as a standalone file.
+            // e.g. "qix" → FlashMFile → isDirectory()=false (plain PRG)
+            //      "castlewolf.d64" → D64MFile → isDirectory()=true (disk image)
+            auto tmp = MFSOwner::File(pathInStream);
+            if (tmp) {
+                bool dir = tmp->isDirectory();
+                delete tmp;
+                return dir;
+            }
+            return false;
+        }
         if (isSingleFileCompression()) {
-            // Non-empty pathInStream means the drive is looking for a specific file/pattern
-            // *inside* the inner container (e.g. "*" or "LOADER") — that's a file, not a dir.
-            if (!pathInStream.empty()) return false;
             auto inner = getInnerFile();
             if (inner) return inner->isDirectory();
         }
