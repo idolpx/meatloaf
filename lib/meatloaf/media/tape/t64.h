@@ -98,9 +98,8 @@ public:
 
     T64MFile(std::string path, bool is_dir = true): MFile(path) {
         isDir = is_dir;
-
-        media_image = name;
         isPETSCII = true;
+        media_image = name;
     };
     
     ~T64MFile() {

@@ -87,6 +87,7 @@ public:
     LBRMFile(std::string path, bool is_dir = true): MFile(path) {
         isDir = is_dir;
         isPETSCII = true;
+        media_archive = name;
     };
     
     ~LBRMFile() {

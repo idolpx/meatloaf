@@ -612,6 +612,7 @@ bool ArchiveMFile::rewindDirectory()
     image->resetEntryCounter();
 
     media_archive = name;
+    Debug_printv("Archive opened: [%s]", media_archive.c_str());
 
     return true;
 }

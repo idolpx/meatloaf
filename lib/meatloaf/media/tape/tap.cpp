@@ -614,6 +614,8 @@ bool TAPMFile::rewindDirectory()
     media_blocks_free = 0;
     media_block_size = cached_stream->block_size;
     media_image = name;
+    if ( !sourceFile->media_archive.empty() )
+        media_archive = sourceFile->media_archive;
 
     Debug_printv("media_header[%s] media_id[%s]", media_header.c_str(), media_id.c_str());
 

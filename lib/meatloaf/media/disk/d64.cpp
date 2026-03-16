@@ -820,7 +820,8 @@ bool D64MFile::rewindDirectory()
     media_blocks_free = image->blocksFree();
     media_block_size = image->block_size;
     media_image = name;
-    // mstr::toUTF8(media_image);
+    if ( !sourceFile->media_archive.empty() )
+        media_archive = sourceFile->media_archive;
 
     return true;
 }
