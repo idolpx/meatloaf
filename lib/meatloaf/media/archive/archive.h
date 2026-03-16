@@ -225,6 +225,23 @@ class ArchiveMFile : public MFile {
 
     std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> is) override
     {
+        if (isSingleFileCompression() && !pathInStream.empty()) {
+            std::string innerFilename = getInnerFilename();
+            // If pathInStream is NOT the inner compressed file itself, it refers to a file
+            // INSIDE the inner container (e.g. LOADER inside mars saga.d81 inside .d81.gz).
+            // Build InnerFormatStream(ArchiveMStream(is)) so the caller's seekPath()
+            // resolves against the inner container format (D81, D64, etc.), not the gz.
+            if (!mstr::compareFilename(pathInStream, innerFilename, false)) {
+                auto archiveStream = std::make_shared<ArchiveMStream>(is);
+                if (archiveStream->seekPath(innerFilename)) {
+                    auto inner = getInnerFile();
+                    if (inner) {
+                        auto innerStream = inner->getDecodedStream(archiveStream);
+                        if (innerStream) return innerStream;
+                    }
+                }
+            }
+        }
         return std::make_shared<ArchiveMStream>(is);
     }
 
@@ -270,6 +287,9 @@ class ArchiveMFile : public MFile {
 
     bool isDirectory() override {
         if (isSingleFileCompression()) {
+            // Non-empty pathInStream means the drive is looking for a specific file/pattern
+            // *inside* the inner container (e.g. "*" or "LOADER") — that's a file, not a dir.
+            if (!pathInStream.empty()) return false;
             auto inner = getInnerFile();
             if (inner) return inner->isDirectory();
         }
