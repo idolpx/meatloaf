@@ -23,8 +23,11 @@
 #define PRODUCT_ID "MEATLOAF CBM"
 #define PLATFORM_DETAILS "C64; 6510; 2; NTSC; EN;" // Make configurable. This will help server side to select appropriate content.
 
-#define SYSTEM_DIR "/.sys"
-#define WWW_ROOT   "/.www"
+#define BIN_DIR     "/.bin"
+#define CACHE_DIR   "/.cache"
+#define ROM_DIR     "/.rom"
+#define SYSTEM_DIR  "/.sys"
+#define WWW_ROOT    "/.www"
 
 #define HOSTNAME "meatloaf"
 #define SERVER_PORT 80   // HTTPd & WebDAV Server Port
