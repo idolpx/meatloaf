@@ -47,7 +47,7 @@ class Archive {
         Debug_printv("Archive destructor");
     }
 
-    bool open(std::ios_base::openmode mode);
+    bool open(std::ios_base::openmode mode, bool rawOnly = false);
     void close();
 
     bool isOpen() { return m_archive != nullptr; }
@@ -220,13 +220,60 @@ class ArchiveMFile : public MFile {
 
     ~ArchiveMFile() {
         if (m_archive != nullptr) delete m_archive;
+        if (m_innerFile != nullptr) delete m_innerFile;
     }
 
     std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> is) override
     {
-        //Debug_printv("[%s]", is->url.c_str());
-
         return std::make_shared<ArchiveMStream>(is);
+    }
+
+    // Returns true if this archive is a single-file compression (.gz, .bz2, etc.)
+    // as opposed to a multi-file archive (.tar.gz, .zip, .7z, etc.).
+    // Single-file compressed archives are transparent: directory operations delegate
+    // directly to the inner file so the compression layer is invisible to the user.
+    bool isSingleFileCompression() const {
+        static const char* multiFileExts[] = {
+            ".tar.gz", ".tgz", ".tar.bz2", ".tar.xz", ".tar.lz", ".tar.z", ".cpgz", nullptr
+        };
+        for (int i = 0; multiFileExts[i]; i++) {
+            if (mstr::endsWith(name, multiFileExts[i], false)) return false;
+        }
+        static const char* singleFileExts[] = {
+            ".gz", ".bz2", ".xz", ".lz", ".z", ".zst", ".lz4", nullptr
+        };
+        for (int i = 0; singleFileExts[i]; i++) {
+            if (mstr::endsWith(name, singleFileExts[i], false)) return true;
+        }
+        return false;
+    }
+
+    // Strip the outermost compression extension to get the inner filename.
+    std::string getInnerFilename() const {
+        static const char* exts[] = {".gz", ".bz2", ".xz", ".lz", ".z", ".zst", ".lz4", nullptr};
+        for (int i = 0; exts[i]; i++) {
+            if (mstr::endsWith(name, exts[i], false)) {
+                return name.substr(0, name.length() - strlen(exts[i]));
+            }
+        }
+        return name;
+    }
+
+    // Lazily create/return the inner MFile (e.g. D81MFile for a .d81.gz).
+    MFile* getInnerFile() {
+        if (!m_innerFile) {
+            m_innerFile = MFSOwner::File(url + "/" + getInnerFilename());
+            isPETSCII = m_innerFile->isPETSCII;
+        }
+        return m_innerFile;
+    }
+
+    bool isDirectory() override {
+        if (isSingleFileCompression()) {
+            auto inner = getInnerFile();
+            if (inner) return inner->isDirectory();
+        }
+        return isDir;
     }
 
     bool rewindDirectory() override;
@@ -237,6 +284,7 @@ class ArchiveMFile : public MFile {
 
    private:
     Archive *m_archive = nullptr;
+    MFile   *m_innerFile = nullptr;
 };
 
 /********************************************************

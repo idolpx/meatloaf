@@ -147,11 +147,11 @@ int64_t cb_seek(struct archive *, void *userData, int64_t offset, int whence)
 
 
 
-bool Archive::open(std::ios_base::openmode mode) {
+bool Archive::open(std::ios_base::openmode mode, bool rawOnly) {
     // close the archive if it was already open
     close();
 
-    Debug_printv("Archive::open [%s]", m_srcStream->url.c_str());
+    Debug_printv("Archive::open [%s] rawOnly[%d]", m_srcStream->url.c_str(), rawOnly);
 
     m_srcBuffer = new uint8_t[m_buffSize];
     m_archive = archive_read_new();
@@ -159,9 +159,19 @@ bool Archive::open(std::ios_base::openmode mode) {
     bool seekOk = m_srcStream->seek(0, SEEK_SET);
     Debug_printv("post-seek pos[%lu] seekOk[%d]", (unsigned long)m_srcStream->position(), (int)seekOk);
 
-    archive_read_support_filter_all(m_archive);
-    archive_read_support_format_all(m_archive);
-    archive_read_support_format_raw(m_archive);  // Support single compressed files like .gz
+    if (rawOnly) {
+        // Only add decompression filters + raw format — no competing archive formats.
+        // This guarantees archive_read_next_header() returns ARCHIVE_OK (synthetic raw
+        // entry) for single compressed files (.gz, .bz2, etc.) whose decompressed content
+        // looks like an unknown format and causes ARCHIVE_EOF when all formats compete.
+        archive_read_support_filter_all(m_archive);
+        archive_read_support_format_raw(m_archive);
+        m_hasCompressionFilter = true;
+    } else {
+        archive_read_support_filter_all(m_archive);
+        archive_read_support_format_all(m_archive);
+        archive_read_support_format_raw(m_archive);  // Support single compressed files like .gz
+    }
 
     //archive_read_set_open_callback(m_archive, cb_open);
     //archive_read_set_close_callback(m_archive, cb_close);
@@ -178,17 +188,19 @@ bool Archive::open(std::ios_base::openmode mode) {
         m_archive = NULL;
     } else {
         Debug_printv("Archive opened successfully");
-        const char* format_name = archive_format_name(m_archive);
-        Debug_printv("Archive format: %s", format_name ? format_name : "(null)");
-        int filter_count = archive_filter_count(m_archive);
-        Debug_printv("Archive filter count: %d", filter_count);
-        if (filter_count > 0) {
-            const char* filter_name = archive_filter_name(m_archive, 0);
-            Debug_printv("Archive filter 0: %s", filter_name ? filter_name : "(null)");
+        if (!rawOnly) {
+            const char* format_name = archive_format_name(m_archive);
+            Debug_printv("Archive format: %s", format_name ? format_name : "(null)");
+            int filter_count = archive_filter_count(m_archive);
+            Debug_printv("Archive filter count: %d", filter_count);
+            if (filter_count > 0) {
+                const char* filter_name = archive_filter_name(m_archive, 0);
+                Debug_printv("Archive filter 0: %s", filter_name ? filter_name : "(null)");
+            }
+            // filter_count > 1 means a compression filter is present (filter 0 is always "none")
+            m_hasCompressionFilter = (filter_count > 1);
+            Debug_printv("hasCompressionFilter: %d", m_hasCompressionFilter);
         }
-        // filter_count > 1 means a compression filter is present (filter 0 is always "none")
-        m_hasCompressionFilter = (filter_count > 1);
-        Debug_printv("hasCompressionFilter: %d", m_hasCompressionFilter);
     }
 
     return isOpen();
@@ -240,13 +252,34 @@ bool ArchiveMStream::ensureData() {
         return true;
     }
 
-    if (!m_archive->isOpen()) {
+    if (m_isCompressedOnly) {
+        // For single compressed files (no multi-entry archive format), the standard open()
+        // results in ARCHIVE_EOF on archive_read_next_header() because all format detectors
+        // compete and none wins for the decompressed content.  Reopen with rawOnly=true so
+        // the raw format is the sole competitor and always produces a synthetic header entry,
+        // then advance past that header so archive_read_data() can stream the bytes.
+        if (!m_archive) {
+            Debug_printv("ERROR: archive object is null for %s", entry.filename.c_str());
+            return false;
+        }
+        if (!m_archive->open(m_mode, true)) {
+            Debug_printv("ERROR: failed to open raw-only archive for %s", entry.filename.c_str());
+            return false;
+        }
+        struct archive_entry *ae = nullptr;
+        if (archive_read_next_header(m_archive->getArchive(), &ae) != ARCHIVE_OK) {
+            Debug_printv("ERROR: raw-only header read failed for %s", entry.filename.c_str());
+            return false;
+        }
+        Debug_printv("raw-only header OK, proceeding with extraction of %s (%lu bytes)",
+                     entry.filename.c_str(), (unsigned long)_size);
+    } else if (!m_archive || !m_archive->isOpen()) {
         Debug_printv("ERROR: archive not open");
         return false;
     }
 
     // Find or create ArchiveMSession via SessionBroker
-    std::string sessionKey = "archive://" + url;
+    std::string sessionKey = "archive:" + url;
     m_session = SessionBroker::find<ArchiveMSession>(sessionKey);
     if (!m_session) {
         m_session = std::make_shared<ArchiveMSession>(url);
@@ -387,12 +420,32 @@ bool ArchiveMStream::seekEntry( uint16_t index )
         entry.filename = filename;
         Debug_printv("Synthesized filename: %s", entry.filename.c_str());
 
-        // For compressed-only files, we can't easily determine the decompressed size
-        // without reading through the entire file. For now, set size to 0.
-        // The actual size will be determined when the file is accessed.
-        // Alternative: could read compressed file size, but that's not the decompressed size.
+        // Determine decompressed size via gzip ISIZE trailer (last 4 bytes of .gz file).
+        // ISIZE = decompressed size mod 2^32 — exact for files < 4 GB.
+        // We close the libarchive handle (which held gzip state) and seek containerStream
+        // directly; ensureData() will reopen with rawOnly=true for actual extraction.
         entry.size = 0;
-        Debug_printv("Size set to 0 (will be determined on access)");
+        if (mstr::endsWith(url, ".gz", false) && containerStream) {
+            uint32_t srcSize = (uint32_t)containerStream->size();
+            Debug_printv("gzip ISIZE check: srcSize=%lu", (unsigned long)srcSize);
+            if (srcSize >= 18) {  // min valid gzip: 10 header + 2 deflate + 8 trailer
+                m_archive->close();
+                if (containerStream->seek(srcSize - 4, SEEK_SET)) {
+                    uint8_t trailer[4] = {0};
+                    if (containerStream->read(trailer, 4) == 4) {
+                        entry.size = ((uint32_t)trailer[0])       |
+                                     ((uint32_t)trailer[1] << 8)  |
+                                     ((uint32_t)trailer[2] << 16) |
+                                     ((uint32_t)trailer[3] << 24);
+                        Debug_printv("gzip ISIZE: %lu bytes", (unsigned long)entry.size);
+                    }
+                }
+                // Leave archive closed — ensureData() will call openRaw() for extraction
+            }
+        }
+        if (entry.size == 0) {
+            Debug_printv("Size unknown (non-gz or ISIZE read failed); will be determined on extraction");
+        }
 
         entry_index = 1;
         return true;
@@ -602,6 +655,28 @@ bool ArchiveMStream::seekPath(std::string path) {
 
 bool ArchiveMFile::rewindDirectory()
 {
+    // Single-file compressed archives (.d81.gz, .prg.gz, etc.) are transparent:
+    // delegate to the inner file so the compression layer is invisible.
+    if (isSingleFileCompression()) {
+        auto inner = getInnerFile();
+        if (inner) {
+            Debug_printv("single-file compression: delegating rewindDirectory to [%s]", inner->url.c_str());
+            dirIsOpen = true;
+            bool result = inner->rewindDirectory();
+            if ( result )
+            {
+                media_header = m_innerFile->media_header;
+                media_id = m_innerFile->media_id;
+                media_image = m_innerFile->media_image;
+                media_partition = m_innerFile->media_partition;
+                media_blocks_free = m_innerFile->media_blocks_free;
+                media_block_size = m_innerFile->media_block_size;
+            }
+            return result;
+        }
+        return false;
+    }
+
     Debug_printv("url[%s] sourceFile->url[%s]", url.c_str(), sourceFile->url.c_str());
     auto image = ImageBroker::obtain<ArchiveMStream>("archive", url);
     if (image == nullptr)
@@ -620,6 +695,15 @@ bool ArchiveMFile::rewindDirectory()
 MFile *ArchiveMFile::getNextFileInDir()
 {
     Debug_printv("getNextFileInDir() called, dirIsOpen=%d", dirIsOpen);
+
+    // Delegate to inner file for single-file compressed archives
+    if (isSingleFileCompression()) {
+        auto inner = getInnerFile();
+        if (inner) return inner->getNextFileInDir();
+        dirIsOpen = false;
+        return nullptr;
+    }
+
     bool r = false;
 
     if (!dirIsOpen)
@@ -643,16 +727,10 @@ MFile *ArchiveMFile::getNextFileInDir()
     {
         std::string filename = image->entry.filename;
         Debug_printv("Found entry: filename=[%s] size=%lu", filename.c_str(), image->entry.size);
-        //uint8_t i = filename.find_first_of(0xA0);
-        //filename = filename.substr(0, i);
-        // mstr::rtrimA0(filename);
-        //mstr::replaceAll(filename, "/", "\\");
-        //Debug_printv( "entry[%s]", (sourceFile->url + "/" + filename).c_str() );
 
         auto file = MFSOwner::File(sourceFile->url + "/" + filename);
         file->name = filename;  // Use actual entry name, not container image name
         file->size = image->entry.size;
-        //Debug_printv("entry[%s] ext[%s] size[%lu]", file->name.c_str(), file->extension.c_str(), file->size);
 
         return file;
     }
@@ -660,6 +738,5 @@ MFile *ArchiveMFile::getNextFileInDir()
 exit:
     dirIsOpen = false;
     image->m_archive->close();
-    //Debug_printv( "END OF DIRECTORY" );
     return nullptr;
 }

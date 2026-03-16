@@ -341,12 +341,12 @@ iecChannelHandlerDir::iecChannelHandlerDir(iecDrive *drive, MFile *dir) : iecCha
     std::string path = m_dir->path;
     std::string archive = m_dir->media_archive;
     std::string image = m_dir->media_image;
-    if (image.size() > 0) {
-        mstr::replaceAll(path, image, "");
-        mstr::drop(path, 1);
-    }
     if (archive.size() > 0) {
         mstr::replaceAll(path, archive, "");
+        mstr::drop(path, 1);
+    }
+    if (image.size() > 0) {
+        mstr::replaceAll(path, image, "");
         mstr::drop(path, 1);
     }
     mstr::replaceAll(path, "//", "/");
