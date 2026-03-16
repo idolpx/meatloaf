@@ -54,6 +54,25 @@
 #include "archive_blake2.h"
 #endif
 
+/* ESP32: prefer PSRAM for large window buffers so decompression of archives
+ * with multi-megabyte dictionaries does not exhaust the small internal heap. */
+#ifdef __XTENSA__
+#include "esp_heap_caps.h"
+static void* rar5_calloc_psram(size_t n, size_t size) {
+	void* p = heap_caps_calloc(n, size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+	if(!p) p = calloc(n, size);
+	return p;
+}
+static void* rar5_realloc_psram(void* ptr, size_t size) {
+	void* p = heap_caps_realloc(ptr, size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+	if(!p) p = realloc(ptr, size);
+	return p;
+}
+#else
+#define rar5_calloc_psram(n, size)       calloc(n, size)
+#define rar5_realloc_psram(ptr, size)    realloc(ptr, size)
+#endif
+
 /*#define CHECK_CRC_ON_SOLID_SKIP*/
 /*#define DONT_FAIL_ON_CRC_ERROR*/
 /*#define DEBUG*/
@@ -1894,7 +1913,7 @@ static int process_head_file(struct archive_read* a, struct rar5* rar,
 		 * that its size will match new window_size. */
 
 		uint8_t* new_window_buf =
-			realloc(rar->cstate.window_buf, (size_t) window_size);
+			(uint8_t*) rar5_realloc_psram(rar->cstate.window_buf, (size_t) window_size);
 
 		if(!new_window_buf) {
 			archive_set_error(&a->archive, ARCHIVE_ERRNO_PROGRAMMER,
@@ -2569,8 +2588,8 @@ static void init_unpack(struct rar5* rar) {
 	free(rar->cstate.filtered_buf);
 
 	if(rar->cstate.window_size > 0) {
-		rar->cstate.window_buf = calloc(1, rar->cstate.window_size);
-		rar->cstate.filtered_buf = calloc(1, rar->cstate.window_size);
+		rar->cstate.window_buf = rar5_calloc_psram(1, rar->cstate.window_size);
+		rar->cstate.filtered_buf = rar5_calloc_psram(1, rar->cstate.window_size);
 	} else {
 		rar->cstate.window_buf = NULL;
 		rar->cstate.filtered_buf = NULL;
@@ -3867,6 +3886,13 @@ static int do_uncompress_file(struct archive_read* a) {
 		}
 
 		rar->cstate.initialized = 1;
+	}
+
+	/* init_unpack returns void; check that its allocations succeeded. */
+	if(rar->cstate.window_size > 0 && rar->cstate.window_buf == NULL) {
+		archive_set_error(&a->archive, ARCHIVE_ERRNO_PROGRAMMER,
+		    "Not enough memory to allocate RAR5 decompression window buffer.");
+		return ARCHIVE_FATAL;
 	}
 
 	/* Don't allow extraction if window_size is invalid. */
