@@ -349,6 +349,7 @@ iecChannelHandlerDir::iecChannelHandlerDir(iecDrive *drive, MFile *dir) : iecCha
         mstr::replaceAll(path, archive, "");
         mstr::drop(path, 1);
     }
+    mstr::replaceAll(path, "//", "/");
 
     scheme = mstr::toPETSCII2(scheme);
     url = mstr::toPETSCII2(url);
