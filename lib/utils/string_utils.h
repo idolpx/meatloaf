@@ -74,6 +74,8 @@ namespace mstr {
     void urlDecode(char *s, size_t size, bool alter_pluses);
     void urlDecode(char *s, size_t size);
 
+    std::string crc32(const std::string &s);
+    std::string sha256(const std::string& s);
     std::string sha1(const std::string &s);
 
     // void toASCII(std::string &s);

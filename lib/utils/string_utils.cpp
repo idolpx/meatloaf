@@ -26,9 +26,11 @@
 #include <mbedtls/version.h>
 #include <mbedtls/sha1.h>
 #include <mbedtls/base64.h>
+#include <esp_rom_crc.h>
 
 //#include "../../include/petscii.h"
 #include "../../include/debug.h"
+#include "../meatloaf/hash/hash.h"
 #include "U8Char.h"
 
 
@@ -609,6 +611,21 @@ namespace mstr {
         std::string result(buffer);
         delete[] buffer;
         return result;
+    }
+
+    std::string crc32(const std::string &s) {
+        uint32_t crc = 0;
+        crc = esp_rom_crc32_le(0, reinterpret_cast<const unsigned char*>(s.c_str()), s.size());
+        std::stringstream ss;
+        ss << std::hex << crc;
+        return ss.str();
+    }
+
+    std::string sha256(const std::string& s) {
+        hasher.clear();
+        hasher.add_data(s);
+        hasher.compute(Hash::Algorithm::SHA256, true);
+        return hasher.output_hex();
     }
 
     std::string sha1(const std::string &s)

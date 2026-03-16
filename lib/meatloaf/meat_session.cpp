@@ -18,6 +18,7 @@
 #include "meat_session.h"
 
 #include "meatloaf.h"
+#include "fnFsSD.h"
 
 #include <sys/stat.h>
 #include <cstdio>

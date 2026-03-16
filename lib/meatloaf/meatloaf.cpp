@@ -45,6 +45,7 @@
 
 #include "MIOException.h"
 #include "../../include/debug.h"
+#include "../../include/global_defines.h"
 
 
 
@@ -170,6 +171,7 @@ CacheOptions parse_cache_fragment(const std::string& url) {
 }
 
 std::string strip_cache_fragment_from_url(const std::string& url) {
+    Debug_printv("url[%s]", url.c_str());
     CacheOptions flags = parse_cache_fragment(url);
     if (flags.store == CACHE_NONE) {
         return url;
@@ -185,31 +187,6 @@ std::string strip_cache_fragment_from_url(const std::string& url) {
     return parser->rebuildUrl();
 }
 
-namespace {
-bool ensure_dir(const std::string& path) {
-    if (path.empty()) {
-        return false;
-    }
-
-    struct stat info;
-    if (stat(path.c_str(), &info) == 0) {
-        return S_ISDIR(info.st_mode);
-    }
-
-    if (mkdir(path.c_str(), ALLPERMS) == 0) {
-        return true;
-    }
-
-    return errno == EEXIST;
-}
-
-std::string hash_url_sha256(const std::string& url) {
-    hasher.clear();
-    hasher.add_data(url);
-    hasher.compute(Hash::Algorithm::SHA256, true);
-    return hasher.output_hex();
-}
-}
 
 /********************************************************
  * MFSOwner implementations
@@ -727,13 +704,18 @@ std::shared_ptr<MStream> MFile::openStreamWithCache(
 #ifdef SD_CARD
     // ---- SD cache ------------------------------------------------------------
     if (mode == std::ios_base::in && cacheFlags.store == CACHE_SD) {
-        std::string cacheRoot = "/sd/.cache";
-        std::string hashDir = hash_url_sha256(requestUrl);
+        std::string cacheRoot = CACHE_DIR;
+        if ( !host.empty() ) cacheRoot += "/" + host;
+        std::string hashDir = mstr::crc32(requestUrl);
         std::string cacheDir = cacheRoot + "/" + hashDir;
-        std::string cacheName = name.empty() ? "media.bin" : name;
-        std::string cachePath = cacheDir + "/" + cacheName;
+        fnSDFAT.create_path( cacheDir.c_str() );  // Ensure the directory exists
+        cacheDir = "/sd" + cacheDir; // Adjust for SD card mount point
 
-        Debug_printv("root[%s] dir[%s] path[%s]", cacheRoot.c_str(), cacheDir.c_str(), cachePath.c_str());
+        // Set cache path to destination file
+        std::string cachePath = cacheDir + "/" + name;
+
+        ::PeoplesUrlParser::dump(); // Show url parts
+        Debug_printv("url[%s] root[%s] dir[%s] path[%s]", url.c_str(), cacheRoot.c_str(), cacheDir.c_str(), cachePath.c_str());
         auto cf = MSession::CachedFile::forSD(cachePath);
 
         if (!cacheFlags.force_refresh && cf->isAllocated()) {
