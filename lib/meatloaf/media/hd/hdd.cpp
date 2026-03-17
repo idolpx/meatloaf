@@ -320,7 +320,6 @@ uint32_t HDDMStream::readFile(uint8_t* buf, uint32_t size)
     // Full implementation would traverse the tree structure properly
     if (readDataTree(entry.data_tree, _position, buf, size, bytes_read))
     {
-        _position += bytes_read;
         return bytes_read;
     }
 

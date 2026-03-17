@@ -65,7 +65,6 @@ protected:
         uint32_t bytesRead = 0;
 
         bytesRead += readContainer(buf, size);
-        _position += bytesRead;
 
         return bytesRead;
     }

@@ -216,7 +216,6 @@ uint32_t LNXMStream::readFile(uint8_t *buf, uint32_t size)
     if (size > 0)
     {
         bytesRead += readContainer(buf, size);
-        _position += bytesRead;
     }
 
     return bytesRead;
