@@ -5,6 +5,9 @@
 
 #include "../../include/debug.h"
 
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+
 #include "fnSystem.h"
 #include "fnFileCache.h"
 
@@ -211,7 +214,13 @@ FileHandler *FileSystemFTP::cache_file(const char *path, const char *mode)
 
         if (available == 0)
         {
-            break;
+            // No bytes in TCP receive buffer right now, but the data connection
+            // is still open — the server is still sending.  Busy-wait on the
+            // data_connected() check at the top of the loop rather than exiting
+            // early.  Without this, large files that span multiple TCP segments
+            // get truncated when the receive window empties between bursts.
+            vTaskDelay(1);
+            continue;
         }
         else if (available > 0)
         {

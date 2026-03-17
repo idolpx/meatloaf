@@ -433,11 +433,17 @@ bool ArchiveMStream::seekEntry( uint16_t index )
                 if (containerStream->seek(srcSize - 4, SEEK_SET)) {
                     uint8_t trailer[4] = {0};
                     if (containerStream->read(trailer, 4) == 4) {
-                        entry.size = ((uint32_t)trailer[0])       |
-                                     ((uint32_t)trailer[1] << 8)  |
-                                     ((uint32_t)trailer[2] << 16) |
-                                     ((uint32_t)trailer[3] << 24);
-                        Debug_printv("gzip ISIZE: %lu bytes", (unsigned long)entry.size);
+                        uint32_t isizeVal = ((uint32_t)trailer[0])       |
+                                            ((uint32_t)trailer[1] << 8)  |
+                                            ((uint32_t)trailer[2] << 16) |
+                                            ((uint32_t)trailer[3] << 24);
+                        static const uint32_t MAX_SANE_ISIZE = 8u * 1024u * 1024u; // 8 MB
+                        if (isizeVal > 0 && isizeVal <= MAX_SANE_ISIZE) {
+                            entry.size = isizeVal;
+                            Debug_printv("gzip ISIZE: %lu bytes", (unsigned long)entry.size);
+                        } else {
+                            Debug_printv("gzip ISIZE %lu out of range — ignoring", (unsigned long)isizeVal);
+                        }
                     }
                 }
                 // Leave archive closed — ensureData() will call openRaw() for extraction
@@ -529,8 +535,22 @@ bool ArchiveMStream::seekEntry( uint16_t index )
                                          ((uint32_t)trailer[1] << 8)  |
                                          ((uint32_t)trailer[2] << 16) |
                                          ((uint32_t)trailer[3] << 24);
-                            sizeKnown = (entry.size > 0);
-                            Debug_printv("gzip ISIZE trailer: %lu bytes", (unsigned long)entry.size);
+                            // Sanity check: the ISIZE field in gzip is only reliable when
+                            // the file was written by a conformant tool with a known size.
+                            // Streaming compressors (pigz --synchronous, etc.) may write 0.
+                            // More dangerously, files created with non-standard tools may
+                            // write garbage. If the claimed size exceeds a sane maximum for
+                            // Commodore disk images (largest real image: D90 ~8 MB), treat
+                            // the field as untrustworthy and fall through to byte counting.
+                            static const uint32_t MAX_SANE_ISIZE = 8u * 1024u * 1024u; // 8 MB
+                            if (entry.size > MAX_SANE_ISIZE) {
+                                Debug_printv("gzip ISIZE %lu exceeds 8 MB cap — field is corrupt or streaming; falling back to byte count", (unsigned long)entry.size);
+                                entry.size = 0;
+                                sizeKnown = false;
+                            } else {
+                                sizeKnown = (entry.size > 0);
+                                Debug_printv("gzip ISIZE trailer: %lu bytes", (unsigned long)entry.size);
+                            }
                         }
                     }
                     // Reopen archive; Archive::open() seeks containerStream back to 0
@@ -638,6 +658,13 @@ bool ArchiveMStream::seekPath(std::string path) {
         _position = 0;
 
         if (!ensureData()) return false;
+
+        // Correct _size from the actual cached data if seekEntry() underestimated
+        // (e.g. byte-count on a non-compressed source gave a wrong/truncated result)
+        if (m_cachedEntry && m_cachedEntry->size > _size) {
+            Debug_printv("correcting _size from %ld to %ld (cache)", _size, m_cachedEntry->size);
+            _size = m_cachedEntry->size;
+        }
 
         Debug_printv("File Size: size[%ld] available[%ld] position[%ld]", _size, available(), _position);
         return true;

@@ -711,8 +711,12 @@ std::shared_ptr<MStream> MFile::openStreamWithCache(
         fnSDFAT.create_path( cacheDir.c_str() );  // Ensure the directory exists
         cacheDir = "/sd" + cacheDir; // Adjust for SD card mount point
 
-        // Set cache path to destination file
-        std::string cachePath = cacheDir + "/" + name;
+        // Set cache path to destination file.
+        size_t _lastSlash = requestUrl.find_last_of('/');
+        std::string _cacheFilename = (_lastSlash != std::string::npos)
+            ? requestUrl.substr(_lastSlash + 1)
+            : name;
+        std::string cachePath = cacheDir + "/" + _cacheFilename;
 
         ::PeoplesUrlParser::dump(); // Show url parts
         Debug_printv("url[%s] root[%s] dir[%s] path[%s]", url.c_str(), cacheRoot.c_str(), cacheDir.c_str(), cachePath.c_str());
