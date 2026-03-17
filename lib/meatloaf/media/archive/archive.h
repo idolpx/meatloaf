@@ -117,6 +117,29 @@ public:
         });
     }
 
+    // Find a cached entry by exact path or wildcard pattern.
+    // Returns {key, CachedFile} on hit, {empty, nullptr} on miss.
+    std::pair<std::string, std::shared_ptr<CachedFile>> findEntry(const std::string& path) {
+        // Exact match first
+        auto cached = getCachedFile(path);
+        if (cached) return {path, cached};
+
+        // Wildcard match
+        bool wildcard = (path.find('*') != std::string::npos || path.find('?') != std::string::npos);
+        if (wildcard) {
+            for (auto& kv : file_cache) {
+                std::string key = kv.first;
+                std::string pat = path;
+                if (mstr::compareFilename(key, pat, true)) {
+                    Debug_printv("Wildcard cache hit: path[%s] -> key[%s] (%u bytes)",
+                        path.c_str(), kv.first.c_str(), kv.second->size);
+                    return {kv.first, kv.second};
+                }
+            }
+        }
+        return {"", nullptr};
+    }
+
     // Get or extract an archive entry, caching the result
     std::shared_ptr<CachedFile> getEntry(const std::string& entryPath, struct archive* a, uint32_t entrySize) {
         // Check cache first

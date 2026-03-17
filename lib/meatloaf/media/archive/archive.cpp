@@ -619,13 +619,14 @@ uint32_t ArchiveMStream::readFile(uint8_t *buf, uint32_t size)
 
 bool ArchiveMStream::seekCachedFile(const std::string sessionKey, const std::string path) {
     // Check if this entry is already cached in ArchiveMSession — avoids
-    // re-opening the archive (which can fail if DMA memory is exhausted)
+    // re-opening the archive (which can fail if DMA memory is exhausted).
+    // Uses wildcard-aware lookup so "seekPath("*")" hits a cached "Elite.d64" entry.
     auto session = SessionBroker::find<ArchiveMSession>(sessionKey);
     if (session) {
-        auto cached = session->getCachedFile(path);
+        auto [key, cached] = session->findEntry(path);
         if (cached) {
-            Debug_printv("Cache hit in seekPath for: %s (%u bytes)", path.c_str(), cached->size);
-            entry.filename = path;
+            Debug_printv("Cache hit in seekPath for: path[%s] key[%s] (%u bytes)", path.c_str(), key.c_str(), cached->size);
+            entry.filename = key;
             entry.size = cached->size;
             _size = cached->size;
             _position = 0;
