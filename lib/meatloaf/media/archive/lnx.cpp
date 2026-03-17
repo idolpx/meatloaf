@@ -309,6 +309,7 @@ MFile *LNXMFile::getNextFileInDir()
         file->name = filename;  // Use actual entry name, not container image name
         file->extension = image->entry.type;
         file->size = image->entry.size;
+        file->is_dir = 0;
 
         Debug_printv("entry[%s] ext[%s] size[%d]", filename.c_str(), file->extension.c_str(), file->size);
 

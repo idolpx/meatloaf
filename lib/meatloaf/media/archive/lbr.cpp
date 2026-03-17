@@ -210,6 +210,7 @@ MFile *LBRMFile::getNextFileInDir()
         file->name = filename;  // Use actual entry name, not container image name
         file->extension = image->entry.type;
         //Debug_printv("entry[%s] ext[%s]", fileName.c_str(), file->extension.c_str());
+        file->is_dir = 0;
         
         return file;
     }
