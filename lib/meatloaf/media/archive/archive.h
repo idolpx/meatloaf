@@ -225,20 +225,33 @@ class ArchiveMFile : public MFile {
 
     std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> is) override
     {
-        if (isSingleFileCompression() && !pathInStream.empty()) {
+        if (isSingleFileCompression()) {
             std::string innerFilename = getInnerFilename();
-            // If pathInStream is NOT the inner compressed file itself, it refers to a file
-            // INSIDE the inner container (e.g. LOADER inside mars saga.d81 inside .d81.gz).
-            // Build InnerFormatStream(ArchiveMStream(is)) so the caller's seekPath()
-            // resolves against the inner container format (D81, D64, etc.), not the gz.
-            if (!mstr::compareFilename(pathInStream, innerFilename, false)) {
-                auto archiveStream = std::make_shared<ArchiveMStream>(is);
-                if (archiveStream->seekPath(innerFilename)) {
-                    auto inner = getInnerFile();
-                    if (inner) {
-                        auto innerStream = inner->getDecodedStream(archiveStream);
-                        if (innerStream) return innerStream;
+            if (!pathInStream.empty()) {
+                // If pathInStream is NOT the inner compressed file itself, it refers to a file
+                // INSIDE the inner container (e.g. LOADER inside mars saga.d81 inside .d81.gz).
+                // Build InnerFormatStream(ArchiveMStream(is)) so the caller's seekPath()
+                // resolves against the inner container format (D81, D64, etc.), not the gz.
+                if (!mstr::compareFilename(pathInStream, innerFilename, false)) {
+                    auto archiveStream = std::make_shared<ArchiveMStream>(is);
+                    if (archiveStream->seekPath("*")) {
+                        auto inner = getInnerFile();
+                        if (inner) {
+                            auto innerStream = inner->getDecodedStream(archiveStream);
+                            if (innerStream) return innerStream;
+                        }
                     }
+                }
+            } else {
+                // Empty pathInStream: user is loading the .gz file directly (e.g. LOAD "game.prg.gz").
+                // MFile::getSourceStream() only calls seekPath() when pathInStream is non-empty,
+                // so we must seek the single inner entry here to produce a ready-to-read stream.
+                auto archiveStream = std::make_shared<ArchiveMStream>(is);
+                if (archiveStream->seekPath("*")) {
+                    Debug_printv("url[%s] base[%s] inner[%s]", url.c_str(), base().c_str(), innerFilename.c_str());
+                    Debug_printv("stream->url[%s]", archiveStream->url.c_str());
+                    resetURL(base());
+                    return archiveStream;
                 }
             }
         }

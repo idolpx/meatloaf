@@ -694,7 +694,7 @@ bool ArchiveMFile::rewindDirectory()
 
 MFile *ArchiveMFile::getNextFileInDir()
 {
-    Debug_printv("getNextFileInDir() called, dirIsOpen=%d", dirIsOpen);
+    //Debug_printv("getNextFileInDir() called, dirIsOpen=%d", dirIsOpen);
 
     // Delegate to inner file for single-file compressed archives
     if (isSingleFileCompression()) {
