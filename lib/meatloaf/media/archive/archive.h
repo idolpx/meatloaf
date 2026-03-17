@@ -357,7 +357,7 @@ public:
                 ".7z",
                 ".bz2",
                 ".gz",
-                ".lha",
+                ".lha",    // Have to find a way to distinquish between PC/C64 LHA/LXH/SFX file
                 ".lzh",
                 ".lzx",
                 ".rar",
@@ -368,8 +368,8 @@ public:
                 ".lz4",
                 ".cpgz",
                 ".cpio",
-                ".rp9",     // Cloanto RetroPlatform Archive (https://www.retroplatform.com/kb/15-122)
-                ".vms"      // Meatloaf Virtual Media Stack!
+                ".rp9",    // Cloanto RetroPlatform Archive (https://www.retroplatform.com/kb/15-122)
+                ".vms"     // Meatloaf Virtual Media Stack!
                 //".arc",  // Have to find a way to distinquish between PC/C64 ARC file
                 //".ark",  // Have to find a way to distinquish between PC/C64 ARK file
             },

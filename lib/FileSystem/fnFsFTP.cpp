@@ -184,6 +184,10 @@ FileHandler *FileSystemFTP::cache_file(const char *path, const char *mode)
     if (fc == nullptr)
         return nullptr;
 
+    // Get file size from FTP server
+    size_t filesize = _ftp->get_file_size(path);
+    Debug_printf("File size reported by server: %llu bytes\n", filesize);
+
     // Open FTP file
     Debug_println("Initiating file RETR");
     if (_ftp->open_file(path, false))
@@ -239,17 +243,24 @@ FileHandler *FileSystemFTP::cache_file(const char *path, const char *mode)
                     break;
                 }
                 // Write cache file
-                if (FileCache::write(fc, buf, to_read) < to_read)
+                int written = FileCache::write(fc, buf, to_read);
+                filesize -= written;
+                if (written < to_read)
                 {
                     Debug_printf("FileSystemFTP::cache_file - Cache write failed\n");
                     cancel = true;
                     break;
                 }
+                
                 // Next chunk
                 available = _ftp->data_available();
                 Debug_printv("available: %d, to_read: %d", available, to_read);
             }
             Debug_printv("after available: %d", available);
+
+            Debug_printv("Remaining filesize: %d", (int)filesize);
+            if (filesize == 0)
+                break;
         }
         else if (available < 0)
         {
