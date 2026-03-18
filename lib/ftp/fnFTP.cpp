@@ -781,7 +781,7 @@ bool fnFTP::reconnect()
     return login(username, password, hostname, control_port);
 }
 
-size_t fnFTP::get_file_size(string path)
+int32_t fnFTP::get_file_size(string path)
 {
     if (!control->connected())
     {
@@ -795,20 +795,20 @@ size_t fnFTP::get_file_size(string path)
     if (parse_response())
     {
         Debug_printf("Timed out waiting for 213 response.\r\n");
-        return 0;
+        return -1;
     }
 
-    if (is_positive_completion_reply() && is_informational())
+    if (status() == 213)
     {
         // Parse size from response
-        size_t size = strtoull(controlResponse.substr(4).c_str(), nullptr, 10);
-        Debug_printf("File size of %s is %llu bytes.\r\n", path.c_str(), size);
+        int32_t size = strtoull(controlResponse.substr(4).c_str(), nullptr, 10);
+        Debug_printf("File size of %s is %lu bytes.\r\n", path.c_str(), size);
         return size;
     }
     else
     {
         Debug_printf("Could not get file size. Response was: %s\r\n", controlResponse.c_str());
-        return 0;
+        return -1;
     }
 }
 

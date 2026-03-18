@@ -987,10 +987,6 @@ void iecDrive::close(uint8_t channel)
 {
     //Debug_printv("iecDrive::close(#%d, %d)", m_devnr, channel);
 
-    // 1541 drive clears status when closing a channel
-    IECFileDevice::clearStatus();
-    setStatusCode(ST_OK);
-
 //#ifdef USE_VDRIVE
     if( Meatloaf.use_vdrive &&  m_vdrive!=nullptr )
     {

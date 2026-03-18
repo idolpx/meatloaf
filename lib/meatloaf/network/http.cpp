@@ -571,6 +571,13 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
     if ( url.size() < 5)
         return 0;
 
+    // static esp_err_t esp_http_client_prepare(esp_http_client_handle_t client)
+    // {
+    // // Reset the response buffer before each new request to ensure raw_data == orig_raw_data.
+    // esp_http_client_cached_buf_cleanup(client->response->buffer);
+    // // Also unconditionally reset raw_len.
+    // client->response->buffer->raw_len = 0;
+
     // Set URL and Method
     mstr::replaceAll(url, " ", "%20");
     //Debug_printv("method[%d] url[%s]", method, url.c_str());

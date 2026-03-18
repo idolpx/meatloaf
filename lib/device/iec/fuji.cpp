@@ -235,8 +235,10 @@ void iecFuji::local_ip()
 {
     fnSystem.Net.get_ip4_info(cfg.localIP, cfg.netmask, cfg.gateway);
     std::ostringstream ss;
-    ss << cfg.localIP[0] << "." << cfg.localIP[1] << "." << cfg.localIP[2] << "." << cfg.localIP[3];
-    set_fuji_iec_status(0, ss.str());
+    // Output the IP address as string
+    ss << (int)cfg.localIP[0] << "." << (int)cfg.localIP[1] << "." << (int)cfg.localIP[2] << "." << (int)cfg.localIP[3];
+    //set_fuji_iec_status(0, ss.str());
+    response = ss.str();
 }
 
 
@@ -247,6 +249,7 @@ void iecFuji::process_basic_commands()
     payload = mstr::toUTF8(payload);
     pt = util_tokenize(payload, ',');
 
+    Debug_printv("payload[%s]", payload.c_str());
     if (payload.find("adapterconfig") != std::string::npos)
         get_adapter_config_basic();
     else if (payload.find("setssid") != std::string::npos)

@@ -130,9 +130,9 @@ public:
     /**
      * @brief get size of file at path
      * @param path path to file
-     * @return size of file in bytes, or 0 on error.
+     * @return size of file in bytes, or -1 on error.
      */
-    size_t get_file_size(string path);
+    int32_t get_file_size(string path);
 
 protected:
 private:

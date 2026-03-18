@@ -48,9 +48,14 @@ public:
     void executeData(const uint8_t *data, uint8_t dataLen) override {
       payload = std::string((const char *) data, dataLen);
         iecFuji::process_cmd(); // process FujiNet commands
-        //if (iecFuji::iecStatus.err != ST_OK)
-        if ( response.empty() && responseV.empty() )
+
+        if ( !responseV.empty() )
+        {
+            setStatus((const char *)responseV.data(), responseV.size());
+        }
+        else
             iecDrive::executeData(data, dataLen); // process CBM DOS commands
+
     }
 
     void enable(std::string deviceids) {

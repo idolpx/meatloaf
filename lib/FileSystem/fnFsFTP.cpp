@@ -185,8 +185,8 @@ FileHandler *FileSystemFTP::cache_file(const char *path, const char *mode)
         return nullptr;
 
     // Get file size from FTP server
-    size_t filesize = _ftp->get_file_size(path);
-    Debug_printf("File size reported by server: %llu bytes\n", filesize);
+    int32_t filesize = _ftp->get_file_size(path);
+    Debug_printf("File size reported by server: %lu bytes\n", filesize);
 
     // Open FTP file
     Debug_println("Initiating file RETR");
@@ -228,7 +228,6 @@ FileHandler *FileSystemFTP::cache_file(const char *path, const char *mode)
         }
         else if (available > 0)
         {
-            Debug_printv("before available: %d", available);
             while (available > 0)
             {
                 if (!_ftp->data_connected()) // done
@@ -238,7 +237,7 @@ FileHandler *FileSystemFTP::cache_file(const char *path, const char *mode)
                 int to_read = available > COPY_BLK_SIZE ? COPY_BLK_SIZE : available;
                 if (_ftp->read_file(buf, to_read))
                 {
-                    Debug_println("FileSystemFTP::cache_file - FTP read failed");
+                    //Debug_println("FileSystemFTP::cache_file - FTP read failed");
                     cancel = true;
                     break;
                 }
@@ -247,36 +246,28 @@ FileHandler *FileSystemFTP::cache_file(const char *path, const char *mode)
                 filesize -= written;
                 if (written < to_read)
                 {
-                    Debug_printf("FileSystemFTP::cache_file - Cache write failed\n");
+                    //Debug_printf("FileSystemFTP::cache_file - Cache write failed\n");
                     cancel = true;
                     break;
                 }
-                
                 // Next chunk
                 available = _ftp->data_available();
-                Debug_printv("available: %d, to_read: %d", available, to_read);
             }
-            Debug_printv("after available: %d", available);
 
-            Debug_printv("Remaining filesize: %d", (int)filesize);
             if (filesize == 0)
                 break;
         }
         else if (available < 0)
         {
-            Debug_println("FileSystemFTP::cache_file - something went wrong");
+            //Debug_println("FileSystemFTP::cache_file - something went wrong");
             cancel = true;
         }
     }
-    Debug_printv("File data retrieval complete");
-
     // Release copy buffer
     free(buf);
 
     // Close FTP client
-    Debug_printv("Closing FTP client");
     _ftp->close();
-    Debug_printv("FTP client closed");
 
     if (cancel)
     {
@@ -287,9 +278,7 @@ FileHandler *FileSystemFTP::cache_file(const char *path, const char *mode)
     else
     {
         Debug_println("File data retrieved");
-        Debug_println("Calling FileCache::reopen");
         fh = FileCache::reopen(fc, mode);
-        Debug_printf("FileCache::reopen returned: %p\n", fh);
     }
     return fh;
 }
