@@ -328,7 +328,7 @@ std::string Server::formatTime(time_t t)
     struct tm *lt = localtime(&t);
     // <D:getlastmodified>Tue, 22 Aug 2023 02:37:31 GMT</D:getlastmodified>
     // strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", lt);
-    strftime(buf, sizeof(buf), "%a, %d %b %Y %H:%M:%S %Z", lt);
+    strftime(buf, sizeof(buf), "%a, %d %b %Y %H:%M:%S GMT", lt);
 
     return std::string(buf);
 }
@@ -547,8 +547,10 @@ int Server::doGet(Request &req, Response &resp)
     std::string s = path + std::to_string(sb.st_mtime);
 
     //resp.setHeader("Content-Length", sb.st_size);
+    resp.setStatus(200);
     resp.setHeader("ETag", mstr::sha1(s));
     resp.setHeader("Last-Modified", formatTime(sb.st_mtime));
+    resp.flushHeaders();
 
     ret = 0;
 

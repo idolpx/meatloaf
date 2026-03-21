@@ -26,5 +26,8 @@ void Response::setHeader(std::string header, size_t value) {
 void Response::flushHeaders() {
     for (const auto &h: headers)
         writeHeader(h.first.c_str(), h.second.c_str());
-    headers.clear();
+    // Do NOT clear headers here. httpd_resp_set_hdr() stores raw pointers without
+    // copying — the strings must remain alive until the response is fully transmitted
+    // (i.e. until the first sendChunk/closeBody call). The map is cleaned up naturally
+    // when the Response object goes out of scope at the end of the handler.
 }
