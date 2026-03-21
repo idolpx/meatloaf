@@ -41,3 +41,4 @@ components.staged/*
 **/CLAUDE.md
 
 deploy.*
+sdkconfig.*

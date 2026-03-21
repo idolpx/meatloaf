@@ -11,6 +11,7 @@
 #include <sys/stat.h>
 #include <cctype>
 #include <iomanip>
+#include <vector>
 
 #include <esp_http_server.h>
 
@@ -19,40 +20,306 @@
 
 using namespace WebDav;
 
+static std::string toLowerCopy(std::string value)
+{
+    for (char &ch : value)
+        ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+    return value;
+}
+
+static std::string getLeafName(const std::string &path)
+{
+    if (path.empty())
+        return "";
+
+    size_t end = path.size();
+    while (end > 1 && path[end - 1] == '/')
+        end--;
+
+    size_t slashPos = path.rfind('/', end - 1);
+    if (slashPos == std::string::npos)
+        return path.substr(0, end);
+
+    return path.substr(slashPos + 1, end - slashPos - 1);
+}
+
+static bool isJunkLeafName(const std::string &leafName)
+{
+    if (leafName.empty())
+        return false;
+
+    std::string lowerLeaf = toLowerCopy(leafName);
+
+    if (lowerLeaf.rfind("._", 0) == 0)
+        return true;
+
+    if (lowerLeaf == ".ds_store" ||
+        lowerLeaf == "desktop.ini" ||
+        lowerLeaf == "thumbs.db" ||
+        lowerLeaf == "thumbs.ini" ||
+        lowerLeaf == ".fseventsd" ||
+        lowerLeaf == ".temporaryitems" ||
+        lowerLeaf == ".trashes" ||
+        lowerLeaf == ".volumeicon.icns")
+        return true;
+
+    if (lowerLeaf.rfind(".spotlight-v", 0) == 0)
+        return true;
+
+    return false;
+}
+
+static bool isFilteredJunkPath(const std::string &path)
+{
+    return isJunkLeafName(getLeafName(path));
+}
+
+static void discardRequestBody(Request &req)
+{
+    int remaining = req.getContentLength();
+    if (remaining <= 0)
+        return;
+
+    char buffer[512];
+    while (remaining > 0)
+    {
+        int r = req.readBody(buffer, std::min(remaining, static_cast<int>(sizeof(buffer))));
+        if (r <= 0)
+            break;
+
+        remaining -= r;
+    }
+}
+
+static bool normalizeAbsolutePath(const std::string &input, std::string &normalized)
+{
+    if (input.empty() || input[0] != '/')
+        return false;
+
+    std::vector<std::string> segments;
+    std::string token;
+
+    auto flushToken = [&]() -> bool {
+        if (token.empty() || token == ".")
+        {
+            token.clear();
+            return true;
+        }
+
+        if (token == "..")
+        {
+            if (segments.empty())
+                return false;
+
+            segments.pop_back();
+            token.clear();
+            return true;
+        }
+
+        segments.push_back(token);
+        token.clear();
+        return true;
+    };
+
+    for (char ch : input)
+    {
+        if (ch == '\\')
+            ch = '/';
+
+        if (ch == '/')
+        {
+            if (!flushToken())
+                return false;
+            continue;
+        }
+
+        token.push_back(ch);
+    }
+
+    if (!flushToken())
+        return false;
+
+    normalized = "/";
+    for (size_t i = 0; i < segments.size(); i++)
+    {
+        if (i > 0)
+            normalized += '/';
+        normalized += segments[i];
+    }
+
+    return true;
+}
+
+static void splitPathSegments(const std::string &path, std::vector<std::string> &segments)
+{
+    std::string token;
+
+    for (char ch : path)
+    {
+        if (ch == '/')
+        {
+            if (!token.empty())
+            {
+                segments.push_back(token);
+                token.clear();
+            }
+            continue;
+        }
+
+        token.push_back(ch);
+    }
+
+    if (!token.empty())
+        segments.push_back(token);
+}
+
+static bool resolveUnderRoot(const std::string &normalizedRoot, const std::string &relativePath, std::string &resolved)
+{
+    if (normalizedRoot.empty() || normalizedRoot[0] != '/')
+        return false;
+
+    if (relativePath.empty() || relativePath[0] != '/')
+        return false;
+
+    std::vector<std::string> segments;
+    splitPathSegments(normalizedRoot, segments);
+    const size_t rootDepth = segments.size();
+
+    std::string token;
+    for (char ch : relativePath)
+    {
+        if (ch == '\\')
+            ch = '/';
+
+        if (ch == '/')
+        {
+            if (token.empty() || token == ".")
+            {
+                token.clear();
+                continue;
+            }
+
+            if (token == "..")
+            {
+                if (segments.size() <= rootDepth)
+                    return false;
+                segments.pop_back();
+                token.clear();
+                continue;
+            }
+
+            segments.push_back(token);
+            token.clear();
+            continue;
+        }
+
+        token.push_back(ch);
+    }
+
+    if (!token.empty() && token != ".")
+    {
+        if (token == "..")
+        {
+            if (segments.size() <= rootDepth)
+                return false;
+            segments.pop_back();
+        }
+        else
+        {
+            segments.push_back(token);
+        }
+    }
+
+    resolved = "/";
+    for (size_t i = 0; i < segments.size(); i++)
+    {
+        if (i > 0)
+            resolved += '/';
+        resolved += segments[i];
+    }
+
+    return true;
+}
+
+static bool isInsideRoot(const std::string &path, const std::string &root)
+{
+    if (root == "/")
+        return !path.empty() && path[0] == '/';
+
+    if (path.size() < root.size())
+        return false;
+
+    if (path.compare(0, root.size(), root) != 0)
+        return false;
+
+    return path.size() == root.size() || path[root.size()] == '/';
+}
+
 Server::Server(std::string rootURI, std::string rootPath) : rootURI(rootURI), rootPath(rootPath)  {}
 
 std::string Server::uriToPath(std::string uri)
 {
-    if ( rootURI == rootPath )
-    return mstr::urlDecode(uri);
+    std::string normalizedRootPath;
+    if (!normalizeAbsolutePath(rootPath, normalizedRootPath))
+        return "";
 
-    if (uri.find(rootURI) != 0)
-        return rootPath;
+    std::string normalizedRootUri;
+    if (!normalizeAbsolutePath(rootURI, normalizedRootUri))
+        return "";
 
-    std::string path = rootPath + uri.substr(rootURI.length());
-    mstr::replaceAll(path, "//", "/");
-    //Debug_printv("uri[%s] path[%s]", uri.c_str(), path.c_str());
-    if ( path.length() > 1 )
-    {
-        while (path.substr(path.length() - 1, 1) == "/")
-            path = path.substr(0, path.length() - 1);
-    }
-    //Debug_printv("uri[%s] path[%s]", uri.c_str(), path.c_str());
-    return mstr::urlDecode(path);
+    std::string decodedUri = mstr::urlDecode(uri);
+    std::string normalizedUri;
+    if (!normalizeAbsolutePath(decodedUri, normalizedUri))
+        return "";
+
+    bool uriMatchesRoot = false;
+    if (normalizedRootUri == "/")
+        uriMatchesRoot = true;
+    else if (normalizedUri.compare(0, normalizedRootUri.size(), normalizedRootUri) == 0)
+        uriMatchesRoot = (normalizedUri.size() == normalizedRootUri.size()) ||
+                         (normalizedUri[normalizedRootUri.size()] == '/');
+
+    if (!uriMatchesRoot)
+        return "";
+
+    std::string relativePath = normalizedUri.substr(normalizedRootUri.size());
+    if (relativePath.empty())
+        relativePath = "/";
+    else if (relativePath[0] != '/')
+        relativePath = "/" + relativePath;
+
+    std::string resolvedPath;
+    if (!resolveUnderRoot(normalizedRootPath, relativePath, resolvedPath))
+        return "";
+
+    return resolvedPath;
 }
 
 std::string Server::pathToURI(std::string path)
 {
-    if ( rootURI == rootPath )
-        return mstr::urlEncode(path);;
+    std::string normalizedRootPath;
+    std::string normalizedRootUri;
+    std::string normalizedPath;
 
-    if (path.find(rootPath) != 0)
+    if (!normalizeAbsolutePath(rootPath, normalizedRootPath) ||
+        !normalizeAbsolutePath(rootURI, normalizedRootUri) ||
+        !normalizeAbsolutePath(path, normalizedPath))
         return "";
 
-    const char *sep = path[rootPath.length()] == '/' ? "" : "/";
-    std::string uri = rootURI + sep + path.substr(rootPath.length());
+    if (!isInsideRoot(normalizedPath, normalizedRootPath))
+        return "";
 
-    return mstr::urlEncode(uri);
+    if (normalizedRootUri == normalizedRootPath)
+        return mstr::urlEncode(normalizedPath);
+
+    std::string suffix = normalizedPath.substr(normalizedRootPath.size());
+    if (suffix.empty())
+        return mstr::urlEncode(normalizedRootUri);
+
+    if (normalizedRootUri == "/")
+        return mstr::urlEncode(suffix);
+
+    return mstr::urlEncode(normalizedRootUri + suffix);
 }
 
 std::string Server::formatTime(time_t t)
@@ -159,6 +426,9 @@ int Server::sendPropResponse(Response &resp, std::string path, int recurse)
                     strcmp(de->d_name, "..") == 0)
                     continue;
 
+                if (isJunkLeafName(de->d_name))
+                    continue;
+
                 std::string rpath = path + "/" + de->d_name;
                 sendPropResponse(resp, rpath, recurse - 1);
             }
@@ -177,6 +447,15 @@ int Server::doCopy(Request &req, Response &resp)
 
     std::string source = uriToPath(req.getPath());
     std::string destination = uriToPath(req.getDestination());
+
+    if (source.empty() || destination.empty())
+        return 403;
+
+    if (isFilteredJunkPath(source) || isFilteredJunkPath(destination))
+    {
+        bool destinationExists = access(destination.c_str(), F_OK) == 0;
+        return destinationExists ? 204 : 201;
+    }
 
     Debug_printv("req[%s] source[%s]", req.getPath().c_str(), source.c_str());
 
@@ -224,6 +503,12 @@ int Server::doDelete(Request &req, Response &resp)
 
     std::string path = uriToPath(req.getPath());
 
+    if (path.empty())
+        return 403;
+
+    if (isFilteredJunkPath(path))
+        return 204;
+
     Debug_printv("req[%s] path[%s]", req.getPath().c_str(), path.c_str());
 
     int ret = rm_rf(path.c_str());
@@ -236,6 +521,12 @@ int Server::doDelete(Request &req, Response &resp)
 int Server::doGet(Request &req, Response &resp)
 {
     std::string path = uriToPath(req.getPath());
+
+    if (path.empty())
+        return 403;
+
+    if (isFilteredJunkPath(path))
+        return 404;
 
     Debug_printv("req[%s] path[%s]", req.getPath().c_str(), path.c_str());
 
@@ -290,6 +581,12 @@ int Server::doGet(Request &req, Response &resp)
 int Server::doHead(Request &req, Response &resp)
 {
     std::string path = uriToPath(req.getPath());
+
+    if (path.empty())
+        return 403;
+
+    if (isFilteredJunkPath(path))
+        return 404;
 
     Debug_printv("req[%s] path[%s]", req.getPath().c_str(), path.c_str());
 
@@ -350,6 +647,12 @@ int Server::doMkcol(Request &req, Response &resp)
 
     std::string path = uriToPath(req.getPath());
 
+    if (path.empty())
+        return 403;
+
+    if (isFilteredJunkPath(path))
+        return 201;
+
     Debug_printv("req[%s] path[%s]", req.getPath().c_str(), path.c_str());
 
     int ret = mkdir(path.c_str(), 0755);
@@ -375,6 +678,8 @@ int Server::doMove(Request &req, Response &resp)
         return 400;
 
     std::string source = uriToPath(req.getPath());
+    if (source.empty())
+        return 403;
 
     Debug_printv("req[%s] source[%s]", req.getPath().c_str(), source.c_str());
 
@@ -384,6 +689,15 @@ int Server::doMove(Request &req, Response &resp)
         return 404;
 
     std::string destination = uriToPath(req.getDestination());
+    if (destination.empty())
+        return 403;
+
+    if (isFilteredJunkPath(source) || isFilteredJunkPath(destination))
+    {
+        bool destinationExists = access(destination.c_str(), F_OK) == 0;
+        return destinationExists ? 204 : 201;
+    }
+
     bool destinationExists = access(destination.c_str(), F_OK) == 0;
 
     if (destinationExists)
@@ -396,23 +710,27 @@ int Server::doMove(Request &req, Response &resp)
 
     ret = rename(source.c_str(), destination.c_str());
 
-    switch (ret)
+    if (ret == 0)
     {
-    case 0:
         if (destinationExists)
             return 204;
 
         return 201;
+    }
 
-    case -ENOENT:
+    int err = errno;
+
+    switch (err)
+    {
+    case ENOENT:
         return 409;
 
-    case -ENOSPC:
+    case ENOSPC:
         return 507;
 
-    case -ENOTDIR:
-    case -EISDIR:
-    case -EEXIST:
+    case ENOTDIR:
+    case EISDIR:
+    case EEXIST:
         return 412;
 
     default:
@@ -429,6 +747,12 @@ int Server::doOptions(Request &req, Response &resp)
 int Server::doPropfind(Request &req, Response &resp)
 {
     std::string path = uriToPath(req.getPath());
+
+    if (path.empty())
+        return 403;
+
+    if (isFilteredJunkPath(path))
+        return 404;
 
     //Debug_printv("req[%s] path[%s]", req.getPath().c_str(), path.c_str());
 
@@ -476,6 +800,17 @@ int Server::doProppatch(Request &req, Response &resp)
 int Server::doPut(Request &req, Response &resp)
 {
     std::string path = uriToPath(req.getPath());
+
+    if (path.empty())
+        return 403;
+
+    if (isFilteredJunkPath(path))
+    {
+        struct stat sb;
+        bool exists = stat(path.c_str(), &sb) == 0;
+        discardRequestBody(req);
+        return exists ? 200 : 201;
+    }
 
     Debug_printv("req[%s] path[%s]", req.getPath().c_str(), path.c_str());
 
