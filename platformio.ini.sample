@@ -327,12 +327,12 @@ build_flags =
     -D ENABLE_CONSOLE
     -D ENABLE_CONSOLE_TCP
 
-[env:foenix-s3-pro]
+[env:foenix-s3-ml]
 extends = esp32_base
 board = esp32-s3-wroom-1-n16r8
 build_flags =
     ${env.build_flags}
-    -D PINMAP_LOLIN_S3_PRO
+    -D PINMAP_FOENIX_S3_ML
     -D SD_CARD
     -D ENABLE_DISPLAY
     -D ENABLE_CONSOLE
