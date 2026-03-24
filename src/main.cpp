@@ -140,6 +140,7 @@ void main_setup()
     //printf( "HIMEM reserved %u\r\n", esp_himem_reserved_area_size() );
 #endif
 #endif
+    Debug_memory();
 
     // Install a reboot handler
     esp_register_shutdown_handler(main_shutdown_handler);
@@ -181,15 +182,19 @@ void main_setup()
     {
         // Create SYSTEM DIR if it doesn't exist
         fsFlash.create_path( SYSTEM_DIR );
-        fsFlash.create_path(SYSTEM_DIR "/ssh");
+        fsFlash.create_path( SYSTEM_DIR "/ssh" );
     }
 
 #ifdef SD_CARD
     if ( fnSDFAT.start() )
     {
-        // Create SYSTEM DIR if it doesn't exist
+        // Create directories if they doesn't exist
+        fnSDFAT.create_path( BIN_DIR );
+        fnSDFAT.create_path( CACHE_DIR );
+        fnSDFAT.create_path( ROM_DIR );
+
         fnSDFAT.create_path( SYSTEM_DIR );
-        fnSDFAT.create_path(SYSTEM_DIR "/ssh");
+        fnSDFAT.create_path( SYSTEM_DIR "/ssh" );
     }
 #endif
 
@@ -293,6 +298,7 @@ void main_setup()
 #endif
 
     printf("READY.\r\n");
+    Debug_memory();
 }
 
 /*
