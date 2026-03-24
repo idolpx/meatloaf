@@ -279,6 +279,12 @@ void main_setup()
     //Register builtin commands like 'reboot', 'version', or 'meminfo'
     console.registerSystemCommands();
 
+    //Register display commands
+    console.registerDisplayCommands();
+
+    //Register IEC bus commands
+    console.registerIECCommands();
+
     //Register network commands
     console.registerNetworkCommands();
 
