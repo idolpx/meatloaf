@@ -116,6 +116,10 @@ class IECBusHandler
   uint8_t m_pinCLKout, m_pinDATAout;
 #endif
 
+ // IECHost acts as bus master and needs direct access to the low-level
+  // pin control, wait, and timing methods.
+  friend class IECHost;
+
  private:
   inline bool readPinATN();
   inline bool readPinCLK();
