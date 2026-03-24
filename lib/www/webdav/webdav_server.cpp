@@ -325,7 +325,7 @@ std::string Server::pathToURI(std::string path)
 std::string Server::formatTime(time_t t)
 {
     char buf[32];
-    struct tm *lt = localtime(&t);
+    struct tm *lt = gmtime(&t);
     // <D:getlastmodified>Tue, 22 Aug 2023 02:37:31 GMT</D:getlastmodified>
     // strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", lt);
     strftime(buf, sizeof(buf), "%a, %d %b %Y %H:%M:%S GMT", lt);
@@ -610,16 +610,18 @@ int Server::doLock(Request &req, Response &resp)
 {
     Debug_printv("req[%s]", req.getPath().c_str());
 
+    static const char *lockToken = "opaquelocktoken:26e57cb3-834d-191a-00de-000042bdecf9";
+
     resp.setStatus(200);
     resp.setContentType("application/xml;charset=utf-8");
-    resp.setHeader("Lock-Token", "urn:uuid:26e57cb3-834d-191a-00de-000042bdecf9");
+    resp.setHeader("Lock-Token", std::string("<") + lockToken + ">");
     resp.flushHeaders();
 
     resp.sendChunk("<?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n");
 
     std::ostringstream s;
 
-    s << "<D:prop xmls:D=\"DAV:\">\r\n";
+    s << "<D:prop xmlns:D=\"DAV:\">\r\n";
     s << "<D:lockdiscovery>\r\n";
     s << "<D:activelock>\r\n";
     s << "<D:locktype><D:write/></D:locktype>\r\n";
@@ -628,7 +630,7 @@ int Server::doLock(Request &req, Response &resp)
     s << "<D:owner><a:href xmlns:a=\"DAV:\">http://meatloaf.cc</a:href></D:owner>\r\n";
     s << "<D:timeout>Second-600</D:timeout>\r\n";
     s << "<D:locktoken>\r\n";
-    s << "<D:href>opaquelocktoken:89f0e324-e19d-4efd-bafe-e383829cf5a8</D:href>\r\n";
+    s << "<D:href>" << lockToken << "</D:href>\r\n";
     s << "</D:locktoken>\r\n";
     s << "</D:activelock>\r\n";
     s << "</D:lockdiscovery>\r\n";
@@ -786,17 +788,50 @@ int Server::doPropfind(Request &req, Response &resp)
 
 int Server::doProppatch(Request &req, Response &resp)
 {
-    // std::string path = uriToPath(req.getPath());
+    std::string path = uriToPath(req.getPath());
 
-    // Debug_printv("req[%s] path[%s]", req.getPath().c_str(), path.c_str());
+    if (path.empty())
+        return 403;
 
-    // bool exists = access(path.c_str(), R_OK) == 0;
+    if (isFilteredJunkPath(path))
+    {
+        discardRequestBody(req);
+        return 404;
+    }
 
-    // if (!exists)
-    //     return 404;
+    struct stat sb;
+    if (stat(path.c_str(), &sb) != 0)
+    {
+        discardRequestBody(req);
+        return 404;
+    }
 
-    // return 501;
-    return doPropfind(req, resp);
+    discardRequestBody(req);
+
+    std::string href = pathToURI(path);
+    if (href.empty())
+        return 403;
+
+    resp.setStatus(207);
+    resp.setContentType("application/xml;charset=utf-8");
+    resp.flushHeaders();
+
+    std::ostringstream s;
+    s << "<?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n";
+    s << "<D:multistatus xmlns:D=\"DAV:\">\r\n";
+    s << "<D:response>\r\n";
+    xmlElement(s, "D:href", href.c_str());
+    s << "<D:propstat>\r\n";
+    s << "<D:prop/>\r\n";
+    xmlElement(s, "D:status", "HTTP/1.1 200 OK");
+    s << "</D:propstat>\r\n";
+    s << "</D:response>\r\n";
+    s << "</D:multistatus>\r\n";
+
+    resp.sendChunk(s.str().c_str());
+    resp.closeChunk();
+
+    return 207;
 }
 
 int Server::doPut(Request &req, Response &resp)
@@ -870,6 +905,6 @@ int Server::doPut(Request &req, Response &resp)
 int Server::doUnlock(Request &req, Response &resp)
 {
     Debug_printv("req[%s]", req.getPath().c_str());
-    resp.setHeader("Lock-Token", "urn:uuid:26e57cb3-834d-191a-00de-000042bdecf9");
+    resp.setHeader("Lock-Token", "<opaquelocktoken:26e57cb3-834d-191a-00de-000042bdecf9>");
     return 204;
 }
