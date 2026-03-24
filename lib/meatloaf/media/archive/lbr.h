@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
-// .LBR - LiBRary containers
+// .LBR - LiBRary container
 //
 // https://ist.uwaterloo.ca/~schepers/formats/LBR.TXT
 // https://github.com/talas/lbrtool

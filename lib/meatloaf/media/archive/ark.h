@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
-// .ARK - ARKive containers
+// .ARK - ARKive container
 // .SRK - Compressed ARKive archives (very rare)
 //
 // https://ist.uwaterloo.ca/~schepers/formats/ARK-SRK.TXT
