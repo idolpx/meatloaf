@@ -617,6 +617,8 @@ IECBusHandler::IECBusHandler(uint8_t pinATN, uint8_t pinCLK, uint8_t pinDATA, ui
 {
   m_numDevices = 0;
   m_inTask     = false;
+  m_hostMode   = false;
+  m_atnInterruptEnabled = false;
   m_flags      = 0xFF; // 0xFF means: begin() has not yet been called
   m_currentDevice = NULL;
 
@@ -710,6 +712,7 @@ void IECBusHandler::begin()
 #else
       attachInterrupt(m_atnInterrupt, atnInterruptFcn, FALLING);
 #endif
+    m_atnInterruptEnabled = true;
     }
 
   // call begin() function for all attached devices
@@ -727,6 +730,34 @@ bool IECBusHandler::canServeATN()
 bool IECBusHandler::inTransaction()
 {
   return (m_flags & (P_LISTENING|P_TALKING))!=0;
+}
+
+
+void IECBusHandler::setATNInterruptEnabled(bool enable)
+{
+  if( m_atnInterrupt==NOT_AN_INTERRUPT || s_bushandler!=this )
+    {
+      m_atnInterruptEnabled = false;
+      return;
+    }
+
+  if( enable==m_atnInterruptEnabled )
+    return;
+
+  if( enable )
+    {
+#if defined(IEC_USE_LINE_DRIVERS) && defined(IEC_USE_INVERTED_INPUTS)
+      attachInterrupt(m_atnInterrupt, atnInterruptFcn, RISING);
+#else
+      attachInterrupt(m_atnInterrupt, atnInterruptFcn, FALLING);
+#endif
+      m_atnInterruptEnabled = true;
+    }
+  else
+    {
+      detachInterrupt(m_atnInterrupt);
+      m_atnInterruptEnabled = false;
+    }
 }
 
 
@@ -3978,6 +4009,9 @@ void IECBusHandler::task()
 {
   // don't do anything if begin() hasn't been called yet
   if( m_flags==0xFF ) return;
+
+  if( m_hostMode )
+    return;
 
   // prevent interrupt handler from calling atnRequest()
   m_inTask = true;

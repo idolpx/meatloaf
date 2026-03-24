@@ -281,19 +281,27 @@ void main_setup()
 //#endif
 
 #ifdef ENABLE_CONSOLE
-    //Register builtin commands like 'reboot', 'version', or 'meminfo'
+    // Core commands (clear, echo, history, etc.) are registered in Console::beginCommon().
+
+    // System commands
     console.registerSystemCommands();
 
-    //Register network commands
+    // Display commands
+    console.registerDisplayCommands();
+
+    // IEC bus commands
+    console.registerIECCommands();
+
+    // Network commands
     console.registerNetworkCommands();
 
-    //Register the VFS specific commands
+    // VFS commands
     console.registerVFSCommands();
 
-    //Register GPIO commands
+    // GPIO commands
     console.registerGPIOCommands();
 
-    //Register XFER commands
+    // Transfer commands
     console.registerXFERCommands();
 #endif
 

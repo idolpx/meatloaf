@@ -81,6 +81,11 @@ DisplayLEDs::DisplayLEDs()
     spi_mutex = xSemaphoreCreateMutex();
 }
 
+static inline uint8_t scale_channel(uint8_t value, uint8_t brightness)
+{
+    return static_cast<uint8_t>((static_cast<uint16_t>(value) * brightness + 127) / 255);
+}
+
 void DisplayLEDs::service()
 {
     switch(mode)
@@ -144,6 +149,9 @@ esp_err_t DisplayLEDs::init(int pin, led_strip_model_t model, int num_of_leds)
         return ESP_ERR_NO_MEM;
     }
 
+    pixel_brightness.assign(n_of_leds, 255);
+    global_brightness = 255;
+
     spi_settings.buscfg.mosi_io_num = pin;
     spi_settings.buscfg.max_transfer_sz = dma_buf_size;
     err = spi_bus_initialize(spi_settings.host, &spi_settings.buscfg,
@@ -169,6 +177,35 @@ esp_err_t DisplayLEDs::init(int pin, led_strip_model_t model, int num_of_leds)
 
 void DisplayLEDs::set_pixel(uint16_t index, CRGB color) { ws28xx_pixels[index] = color; };
 void DisplayLEDs::set_pixel(uint16_t index, uint8_t r, uint8_t g, uint8_t b) { ws28xx_pixels[index] = (CRGB){.r=r, .g=g, .b=b}; };
+
+void DisplayLEDs::set_pixels(uint16_t index, CRGB *colors, uint16_t count)
+{
+    if (colors == nullptr || index >= n_of_leds || count == 0)
+        return;
+
+    uint16_t available = static_cast<uint16_t>(n_of_leds - index);
+    uint16_t length = (count < available) ? count : available;
+    memcpy(&ws28xx_pixels[index], colors, sizeof(CRGB) * length);
+}
+
+void DisplayLEDs::set_brightness(uint8_t value)
+{
+    global_brightness = value;
+}
+
+void DisplayLEDs::set_pixel_brightness(uint16_t index, uint8_t value)
+{
+    if (index >= pixel_brightness.size())
+        return;
+
+    pixel_brightness[index] = value;
+}
+
+void DisplayLEDs::set_all_pixel_brightness(uint8_t value)
+{
+    for (size_t i = 0; i < pixel_brightness.size(); i++)
+        pixel_brightness[i] = value;
+}
 
 void DisplayLEDs::set_segment(uint16_t index, CRGB color)
 {
@@ -253,7 +290,15 @@ esp_err_t DisplayLEDs::update()
     dma_buffer[n++] = 0;
     for (int i = 0; i < n_of_leds; i++) {
         // Data you want to write to each LEDs
-        uint32_t temp = ws28xx_pixels[i].num;
+        uint8_t per_led = (i < pixel_brightness.size()) ? pixel_brightness[i] : 255;
+        uint8_t effective_brightness = scale_channel(per_led, global_brightness);
+
+        CRGB scaled;
+        scaled.r = scale_channel(ws28xx_pixels[i].r, effective_brightness);
+        scaled.g = scale_channel(ws28xx_pixels[i].g, effective_brightness);
+        scaled.b = scale_channel(ws28xx_pixels[i].b, effective_brightness);
+
+        uint32_t temp = scaled.num;
         if (led_model == WS2815) {
             // Red
             dma_buffer[n++] = timing_bits[0x0f & (temp >> 4)];

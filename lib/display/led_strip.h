@@ -84,6 +84,8 @@ private:
 
     // Array of segements that contain index and length
     std::vector<std::pair<uint8_t, uint8_t>> segments;
+    std::vector<uint8_t> pixel_brightness;
+    uint8_t global_brightness = 255;
 
     // Use properties to change state and let the task call these functions
     void show_progress();
@@ -127,6 +129,9 @@ public:
     void set_pixel(uint16_t index, CRGB color);
     void set_pixel(uint16_t index, uint8_t r, uint8_t g, uint8_t b);
     void set_pixels(uint16_t index, CRGB *colors, uint16_t count);
+    void set_brightness(uint8_t value);
+    void set_pixel_brightness(uint16_t index, uint8_t value);
+    void set_all_pixel_brightness(uint8_t value);
 
     // Returns segment index
     uint8_t add_segment(uint8_t index, uint8_t length) { 

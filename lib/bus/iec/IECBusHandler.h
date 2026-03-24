@@ -101,6 +101,10 @@ class IECBusHandler
   bool canServeATN();
   bool inTransaction();
   void sendSRQ();
+  void setATNInterruptEnabled(bool enable);
+  bool isATNInterruptEnabled() const { return m_atnInterruptEnabled; }
+  void setHostMode(bool enable) { m_hostMode = enable; }
+  bool isHostMode() const { return m_hostMode; }
 
   IECDevice *m_currentDevice;
   IECDevice *m_devices[IEC_MAX_DEVICES];
@@ -134,6 +138,8 @@ class IECBusHandler
   volatile uint16_t m_timeoutDuration; 
   volatile uint32_t m_timeoutStart;
   volatile bool m_inTask;
+  volatile bool m_hostMode;
+  bool m_atnInterruptEnabled;
   volatile uint8_t m_flags;
   uint8_t m_primary, m_secondary;
 

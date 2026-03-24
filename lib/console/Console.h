@@ -89,6 +89,10 @@ namespace ESP32Console
 
         void registerSystemCommands();
 
+        void registerDisplayCommands();
+
+        void registerIECCommands();
+
         void registerNetworkCommands();
 
         void registerVFSCommands();

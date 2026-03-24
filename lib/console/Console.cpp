@@ -8,7 +8,9 @@
 #include "esp_log.h"
 
 #include "Commands/CoreCommands.h"
+#include "Commands/DisplayCommands.h"
 #include "Commands/SystemCommands.h"
+#include "Commands/IECCommands.h"
 #include "Commands/NetworkCommands.h"
 #include "Commands/VFSCommands.h"
 #include "Commands/GPIOCommands.h"
@@ -95,9 +97,6 @@ namespace ESP32Console
         registerCommand(getEnvCommand());
         registerCommand(getDeclareCommand());
         registerCommand(getRunCommand());
-#ifdef ENABLE_DISPLAY
-        registerCommand(getLEDCommand());
-#endif
     }
 
     void Console::registerSystemCommands()
@@ -107,6 +106,18 @@ namespace ESP32Console
         registerCommand(getMemInfoCommand());
         registerCommand(getTaskInfoCommand());
         registerCommand(getDateCommand());
+    }
+
+    void Console::registerDisplayCommands()
+    {
+#ifdef ENABLE_DISPLAY
+        registerCommand(getLEDCommand());
+#endif
+    }
+
+    void Console::registerIECCommands()
+    {
+        registerCommand(getIECDetectCommand());
     }
 
     void ESP32Console::Console::registerNetworkCommands()

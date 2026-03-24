@@ -82,6 +82,58 @@ bool exists(std::string path)
     return (i == 0);
 }
 
+static bool should_trace_webdav_method(http_method method)
+{
+    switch (method)
+    {
+    case HTTP_OPTIONS:
+    case HTTP_PROPFIND:
+    case HTTP_PROPPATCH:
+    case HTTP_LOCK:
+    case HTTP_UNLOCK:
+    case HTTP_PUT:
+    case HTTP_MKCOL:
+    case HTTP_MOVE:
+    case HTTP_COPY:
+    case HTTP_DELETE:
+        return true;
+    default:
+        return false;
+    }
+}
+
+static void trace_webdav_header(WebDav::Request &req, const char *name)
+{
+    std::string value = req.getHeader(name);
+    if (!value.empty())
+        Debug_printv("dav.hdr %s: %s", name, value.c_str());
+}
+
+static void trace_webdav_request(httpd_req_t *httpd_req, WebDav::Request &req)
+{
+    if (!should_trace_webdav_method((http_method)httpd_req->method))
+        return;
+
+    Debug_printv("dav.trace method[%s] uri[%s] len[%d]", http_method_str((enum http_method)httpd_req->method), httpd_req->uri, httpd_req->content_len);
+
+    trace_webdav_header(req, "Host");
+    trace_webdav_header(req, "User-Agent");
+    trace_webdav_header(req, "Depth");
+    trace_webdav_header(req, "Destination");
+    trace_webdav_header(req, "Overwrite");
+    trace_webdav_header(req, "Translate");
+    trace_webdav_header(req, "If");
+    trace_webdav_header(req, "Lock-Token");
+    trace_webdav_header(req, "Timeout");
+    trace_webdav_header(req, "Expect");
+    trace_webdav_header(req, "Content-Type");
+    trace_webdav_header(req, "Content-Length");
+
+    std::string authorization = req.getHeader("Authorization");
+    if (!authorization.empty())
+        Debug_printv("dav.hdr Authorization: <present>");
+}
+
 /* Our URI handler function to be called during GET /uri request */
 esp_err_t cHttpdServer::get_handler(httpd_req_t *httpd_req)
 {
@@ -258,11 +310,12 @@ esp_err_t cHttpdServer::webdav_handler(httpd_req_t *httpd_req)
         return ESP_OK;
     }
 
-    // httpd_resp_set_hdr(httpd_req, "Access-Control-Allow-Origin", "*");
+    // httpd_rßesp_set_hdr(httpd_req, "Access-Control-Allow-Origin", "*");
     // httpd_resp_set_hdr(httpd_req, "Access-Control-Allow-Headers", "*");
     // httpd_resp_set_hdr(httpd_req, "Access-Control-Allow-Methods", "*");
 
-    //Debug_printv("%d %s[%s]", httpd_req->method, http_method_str((enum http_method)httpd_req->method), httpd_req->uri);
+    Debug_printv("%d %s[%s]", httpd_req->method, http_method_str((enum http_method)httpd_req->method), httpd_req->uri);
+    trace_webdav_request(httpd_req, req);
 
     switch (httpd_req->method)
     {
@@ -301,6 +354,8 @@ esp_err_t cHttpdServer::webdav_handler(httpd_req_t *httpd_req)
         break;
     case HTTP_PROPPATCH:
         ret = server->doProppatch(req, resp);
+        if (ret == 207)
+            return ESP_OK;
         break;
     case HTTP_PUT:
         ret = server->doPut(req, resp);

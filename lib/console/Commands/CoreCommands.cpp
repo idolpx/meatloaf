@@ -5,7 +5,6 @@
 
 #include <string>
 
-#include "display.h"
 #include "string_utils.h"
 #include "../../../src/ml_tests.h"
 
@@ -148,82 +147,6 @@ static int run(int argc, char **argv)
     return EXIT_SUCCESS;
 }
 
-#ifdef ENABLE_DISPLAY
-static int led(int argc, char **argv)
-{
-    if (argc < 2) {
-        Serial.printf("led {idle|send|receive|activity|progress {0-100}|status {1-255}|speed {0-255}}\r\n");
-        return EXIT_FAILURE; 
-    }
-
-    if (mstr::startsWith(argv[1], "idle"))
-    {
-        LEDS.idle();
-    }
-    else if (mstr::startsWith(argv[1], "send"))
-    {
-        LEDS.send();
-    }
-    else if (mstr::startsWith(argv[1], "receive"))
-    {
-        LEDS.receive();
-    }
-    else if (mstr::startsWith(argv[1], "activity"))
-    {
-        LEDS.activity = !LEDS.activity;
-    }
-    else if (mstr::startsWith(argv[1], "progress"))
-    {
-        if (argc == 3)
-            LEDS.progress = atoi(argv[2]);
-        else
-            LEDS.idle();
-    }
-    else if (mstr::startsWith(argv[1], "status"))
-    {
-        if (argc == 3)
-            LEDS.status(atoi(argv[2]));
-        else
-            LEDS.idle();
-    }
-    else if (mstr::startsWith(argv[1], "speed"))
-    {
-        if (argc == 3)
-            LEDS.speed = atoi(argv[2]);
-        else
-            LEDS.idle();
-    }
-    else if (mstr::startsWith(argv[1], "pixel"))
-    {
-        int i = -1;
-        if (mstr::isNumeric(argv[2]))
-            i = atoi(argv[2]); // pixel index, '*' for all
-        
-
-
-        // if (argc == 6)
-        //     uint16_t index = atoi(argv[2]);
-        //     uint8_t r = atoi(argv[3]);
-        //     uint8_t g = atoi(argv[4]);
-        //     uint8_t b = atoi(argv[5]);
-        //     if (i == -1) // all
-        //         LEDS.fill_all((CRGB){.r=r, .g=g, .b=b});
-        //     else
-        //         LEDS.set_pixel(index, r, g, b);
-        // else
-        //     LEDS.idle();
-    }
-    else
-    {
-        return EXIT_FAILURE;
-    }
-
-    return EXIT_SUCCESS;
-}
-#endif
-
-
-
 namespace ESP32Console::Commands
 {
     const ConsoleCommand getClearCommand()
@@ -261,11 +184,4 @@ namespace ESP32Console::Commands
     {
         return ConsoleCommand("run", &run, "Run a command");
     }
-
-#ifdef ENABLE_DISPLAY
-    const ConsoleCommand getLEDCommand()
-    {
-        return ConsoleCommand("led", &led, "Change LED display settings");
-    }
-#endif
 }
