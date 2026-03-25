@@ -1,6 +1,10 @@
 #include "IECCommands.h"
 
-#include "../../bus/iec/iec_host.h"
+#include "../../bus/iec/IECHost.h"
+#include "../../bus/iec/iec.h"
+#include "../Console.h"
+
+#include <cstdlib>
 
 static int iecdetect(int argc, char **argv)
 {
@@ -41,7 +45,10 @@ static int iecdetect(int argc, char **argv)
 
     Serial.printf("Scanning IEC devices in range %u-%u ...\r\n", first, last);
 
-    const auto &devices = IECHOST.discoverDevices(first, last);
+    IECHost host(IEC);
+    host.scanBus(first, last);
+
+    const auto &devices = host.getDevices();
     if (devices.empty())
     {
         Serial.printf("No IEC devices discovered.\r\n");
@@ -52,7 +59,7 @@ static int iecdetect(int argc, char **argv)
     for (const auto &entry : devices)
     {
         const auto &device = entry.second;
-        Serial.printf("  #%u  %s\r\n", device.deviceID, device.status.c_str());
+        Serial.printf("  #%u  %s\r\n", entry.first, device.status);
     }
 
     return EXIT_SUCCESS;

@@ -314,7 +314,7 @@ void iecFuji::process_basic_commands()
         mount_all();
     else if (payload.find("fujistatus") != std::string::npos)
         get_status_basic();
-    else if (payload.find("localip") != std::string::npos)
+    else if (payload.find("ocalip") != std::string::npos)
         local_ip();
     // else if (payload.find("netmask") != std::string::npos)
     //     netmask();
