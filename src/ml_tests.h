@@ -1,6 +1,6 @@
 #include <string>
 
-#ifdef BOARD_HAS_PSRAM
+#ifdef CONFIG_SPIRAM
 #include <esp_psram.h>
 #ifdef CONFIG_IDF_TARGET_ESP32
 #include <esp32/himem.h>
