@@ -345,7 +345,6 @@ void Server::sendMultiStatusResponse(Response &resp, MultiStatusResponse &msr)
     s << "<D:response>\r\n";
     xmlElement(s, "D:href", msr.href.c_str());
     s << "<D:propstat>\r\n";
-    xmlElement(s, "D:status", msr.status.c_str());
 
     s << "<D:prop>\r\n";
     for (const auto &p : msr.props)
@@ -354,6 +353,7 @@ void Server::sendMultiStatusResponse(Response &resp, MultiStatusResponse &msr)
     xmlElement(s, "D:resourcetype", msr.isCollection ? "<D:collection/>" : "");
     s << "</D:prop>\r\n";
 
+    xmlElement(s, "D:status", msr.status.c_str());
     s << "</D:propstat>\r\n";
     s << "</D:response>\r\n";
 

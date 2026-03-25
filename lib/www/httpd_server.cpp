@@ -464,7 +464,7 @@ httpd_handle_t cHttpdServer::start_server(serverstate &state)
     config.stack_size = 8192;
     config.max_uri_handlers = 16;
     config.max_resp_headers = 16;
-    config.keep_alive_enable = true;
+    config.keep_alive_enable = false; // Send Connection: close so WebDAV clients free sockets immediately
     config.uri_match_fn = httpd_uri_match_wildcard;
 
     //  Keep a reference to our object
