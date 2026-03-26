@@ -42,3 +42,4 @@ components.staged/*
 
 deploy.*
 sdkconfig.*
+version.txt
