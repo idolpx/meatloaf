@@ -1,18 +1,22 @@
     [
         {
             "filename": "bootloader.bin",
-            "offset": "0x1000"
+            "offset": "0x0000"
         },
         {
             "filename": "partitions.bin",
             "offset": "0x8000"
         },
         {
-            "filename": "firmware.bin",
+            "filename": "main.bin",
             "offset": "0x10000"
         },
         {
-            "filename": "filesystem.bin",
+            "filename": "update.bin",
+            "offset": "0x2E0000"
+        },
+        {
+            "filename": "storage.bin",
             "offset": "0x340000"
         }
     ]

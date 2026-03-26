@@ -31,6 +31,7 @@
 #include <esp_http_server.h>
 #include <esp_log.h>
 #include <sys/stat.h>
+#include <sys/socket.h>
 //#include <cstdlib>
 #include <sstream>
 
@@ -447,6 +448,17 @@ void cHttpdServer::custom_global_ctx_free(void *ctx)
     // We could do something fancy here, but we don't need to do anything
 }
 
+// Set SO_LINGER(0) on each accepted socket so closing sends TCP RST instead
+// of going through TIME_WAIT. Without this, rapid sequential WebDAV requests
+// (e.g. Windows Explorer navigating directories) accumulate sockets in
+// TIME_WAIT and exhaust CONFIG_LWIP_MAX_SOCKETS (10) within ~10 requests.
+static esp_err_t httpd_open_fn(httpd_handle_t hd, int sockfd)
+{
+    struct linger so_linger = { .l_onoff = 1, .l_linger = 0 };
+    setsockopt(sockfd, SOL_SOCKET, SO_LINGER, &so_linger, sizeof(so_linger));
+    return ESP_OK;
+}
+
 httpd_handle_t cHttpdServer::start_server(serverstate &state)
 {
     if (!fnWiFi.connected())
@@ -464,7 +476,9 @@ httpd_handle_t cHttpdServer::start_server(serverstate &state)
     config.stack_size = 8192;
     config.max_uri_handlers = 16;
     config.max_resp_headers = 16;
+    config.max_open_sockets = 8;      // Leave headroom in lwIP pool for WiFi/mDNS/listen socket
     config.keep_alive_enable = false; // Send Connection: close so WebDAV clients free sockets immediately
+    config.open_fn = httpd_open_fn;   // SO_LINGER=0: RST on close, bypasses TIME_WAIT
     config.uri_match_fn = httpd_uri_match_wildcard;
 
     //  Keep a reference to our object
