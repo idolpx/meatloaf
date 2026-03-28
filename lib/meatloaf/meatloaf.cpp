@@ -74,6 +74,7 @@
 #include "network/nfs.h"
 #include "network/afp.h"
 #include "network/fsp.h"
+#include "network/iscsi.h"
 #endif
 
 // Cartridge
@@ -223,6 +224,7 @@ SMBMFileSystem smbFS;
 NFSMFileSystem nfsFS;
 AFPMFileSystem afpFS;
 FSPMFileSystem fspFS;
+ISCSIMFileSystem iscsiFS;
 #endif
 
 // Cartridge
@@ -315,7 +317,7 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
     // Network
     &httpFS,
 #ifndef MIN_CONFIG
-    &ftpFS, &sftpFS, &tnfsFS, &smbFS, &nfsFS, &afpFS, &fspFS,
+    &ftpFS, &sftpFS, &tnfsFS, &smbFS, &nfsFS, &afpFS, &fspFS, &iscsiFS,
     //&ipfsFS, &tcpFS,
 #endif
 

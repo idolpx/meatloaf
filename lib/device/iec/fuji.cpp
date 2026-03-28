@@ -603,13 +603,15 @@ void iecFuji::net_scan_networks_raw()
 
 void iecFuji::net_scan_result_basic()
 {
+    Debug_printv("pt size: %d", pt.size());
     if (pt.size() != 2) {
         return;
     }
     util_remove_spaces(pt[1]);
     int i = atoi(pt[1].c_str());
     scan_result_t result = net_scan_result(i);
-    response = std::to_string(result.rssi) + ",\"" + std::string(result.ssid) + "\"";
+    response = std::to_string(result.rssi) + "," + mstr::toPETSCII2(result.ssid);
+    Debug_printv("Scan result for index %d is: rssi[%d] ssid[%s]", i, result.rssi, result.ssid);
     set_fuji_iec_status(0, "ok");
 }
 

@@ -45,8 +45,48 @@ public:
         }
     }
 
+    // // open file "name" on channel
+    // bool open(uint8_t channel, const char *name, uint8_t nameLen) override {
+    //     payload = std::string((const char *) name, nameLen);
+    //     iecFuji::process_cmd(); // process FujiNet commands
+
+    //     if ( !responseV.empty() )
+    //     {
+    //         // new_stream will be deleted in iecChannelHandlerFile destructor
+    //         m_channels[channel] = new iecChannelHandlerFile(this, cmd_stream);  // Stream command response
+    //         m_numOpenChannels++;
+    //         setStatusCode(ST_OK);
+
+    //         m_channels[channel]->writeBufferData(); // preload buffer
+    //         setStatus((const char *)responseV.data(), responseV.size());
+    //     }
+    //     else
+    //         iecDrive::open(channel, name, nameLen); // process file open
+    // }
+
+    // // close file on channel
+    // void close(uint8_t channel) override {
+
+    // }
+
+    // // write bufferSize bytes to file on channel, returning the number of bytes written
+    // // Returning less than bufferSize signals "cannot receive more data" for this file
+    // uint8_t write(uint8_t channel, uint8_t *buffer, uint8_t bufferSize, bool eoi) {
+
+    // }
+
+    // // read up to bufferSize bytes from file in channel, returning the number of bytes read
+    // // returning 0 will signal end-of-file to the receiver. Returning 0
+    // // for the FIRST call after open() signals an error condition
+    // // (e.g. C64 load command will show "file not found")
+    // uint8_t read(uint8_t channel, uint8_t *buffer, uint8_t bufferSize, bool *eoi) override {
+
+    //     iecDrive::getStatusData((char *)buffer, bufferSize, eoi);
+
+    // }
+
     void executeData(const uint8_t *data, uint8_t dataLen) override {
-      payload = std::string((const char *) data, dataLen);
+        payload = std::string((const char *) data, dataLen);
         iecFuji::process_cmd(); // process FujiNet commands
 
         if ( !responseV.empty() )
