@@ -314,7 +314,7 @@ lz4_allocate_out_block(struct archive_read_filter *self)
 		state->out_block = out_block;
 	}
 	if (!state->flags.block_independence)
-		memset(state->out_block, 0, 64 * 1024);
+		memset(state->out_block, 0, OUT_BLOCK_SIZE);
 	return (ARCHIVE_OK);
 }
 
