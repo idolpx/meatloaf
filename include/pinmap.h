@@ -38,6 +38,9 @@
 // ESP32 C3
 #include "pinmap/esp32-c3-super-mini.h"
 
+// ESP32 P4
+#include "pinmap/waveshare-p4-module-dev-kit.h"
+
 // Defaults
 #include "pinmap_defaults.h"
 

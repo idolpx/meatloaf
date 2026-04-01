@@ -4,7 +4,7 @@
 // https://www.waveshare.com/esp32-s3-zero.htm
 // https://www.waveshare.com/wiki/ESP32-S3-Zero
 // https://files.waveshare.com/wiki/ESP32-S3-Zero/ESP32-S3-Zero-Sch.pdf
-// https://www.espressif.com.cn/sites/default/files/documentation/esp32-s3_datasheet_en.pdf
+// https://www.espressif.com/sites/default/files/documentation/esp32-s3_datasheet_en.pdf
 // https://randomnerdtutorials.com/esp32-s3-devkitc-pinout-guide/
 
 #ifdef PINMAP_ESP32_S3_ZERO

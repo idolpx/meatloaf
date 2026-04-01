@@ -1,7 +1,7 @@
 #ifndef PINMAP_WROOM32_1541_H
 #define PINMAP_WROOM32_1541_H
 
-// https://www.espressif.com.cn/sites/default/files/documentation/esp32-wroom-32_datasheet_en.pdf
+// https://www.espressif.com/sites/default/files/documentation/esp32-wroom-32_datasheet_en.pdf
 
 #ifdef PINMAP_WROOM32_1541
 

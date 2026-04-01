@@ -2,7 +2,7 @@
 #define PINMAP_FREENOVE_ESP32S3_H
 
 // https://github.com/Freenove/Freenove_ESP32_S3_WROOM_Board
-// https://www.espressif.com.cn/sites/default/files/documentation/esp32-s3-wroom-1_wroom-1u_datasheet_en.pdf
+// https://www.espressif.com/sites/default/files/documentation/esp32-s3-wroom-1_wroom-1u_datasheet_en.pdf
 
 #ifdef PINMAP_FREENOVE_ESP32S3
 

@@ -5,7 +5,7 @@
 // https://www.surenoo.com/products/23377371
 // https://github.com/OttoMeister/ESP32-1732S019
 // http://pan.jczn1688.com/directlink/1/ESP32%20module/1.9inch_ESP32-1732S019.zip
-// https://www.espressif.com.cn/sites/default/files/documentation/esp32-s3-wroom-1_wroom-1u_datasheet_en.pdf
+// https://www.espressif.com/sites/default/files/documentation/esp32-s3-wroom-1_wroom-1u_datasheet_en.pdf
 
 #ifdef PINMAP_ESP32_1732S019
 

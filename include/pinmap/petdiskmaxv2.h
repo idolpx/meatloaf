@@ -2,7 +2,7 @@
 #define PINMAP_PETDISKMAXV2_H
 
 // https://bitfixer.com/product/petdisk-max/
-// https://www.espressif.com.cn/sites/default/files/documentation/esp32-wroom-32_datasheet_en.pdf
+// https://www.espressif.com/sites/default/files/documentation/esp32-wroom-32_datasheet_en.pdf
 
 #ifdef PINMAP_PETDISKMAXV2
 

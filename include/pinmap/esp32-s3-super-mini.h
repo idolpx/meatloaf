@@ -3,7 +3,7 @@
 
 // https://www.espboards.dev/esp32/esp32-s3-super-mini/
 // https://ae01.alicdn.com/kf/S47f3120f532e4c78811801f40c8208aaD.png
-// https://www.espressif.com.cn/sites/default/files/documentation/esp32-s3_datasheet_en.pdf
+// https://www.espressif.com/sites/default/files/documentation/esp32-s3_datasheet_en.pdf
 // https://randomnerdtutorials.com/esp32-s3-devkitc-pinout-guide/
 
 #ifdef PINMAP_ESP32_S3_SUPER_MINI

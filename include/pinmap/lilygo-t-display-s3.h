@@ -6,7 +6,7 @@
 // https://github.com/Xinyuan-LilyGO/T-Display-S3
 // https://github.com/Xinyuan-LilyGO/T-Display-S3/blob/main/image/T-DISPLAY-S3.jpg
 // https://github.com/Xinyuan-LilyGO/T-Display-S3/blob/main/schematic/T_Display_S3.pdf
-// https://www.espressif.com.cn/sites/default/files/documentation/esp32-s3_datasheet_en.pdf
+// https://www.espressif.com/sites/default/files/documentation/esp32-s3_datasheet_en.pdf
 
 #ifdef PINMAP_LILYGO_T_DISPLAY_S3
 
