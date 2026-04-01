@@ -1,0 +1,606 @@
+/*
+   Copyright (C) 2010 by Ronnie Sahlberg <ronniesahlberg@gmail.com>
+
+   This program is free software; you can redistribute it and/or modify
+   it under the terms of the GNU Lesser General Public License as published by
+   the Free Software Foundation; either version 2.1 of the License, or
+   (at your option) any later version.
+
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU Lesser General Public License for more details.
+
+   You should have received a copy of the GNU Lesser General Public License
+   along with this program; if not, see <http://www.gnu.org/licenses/>.
+*/
+#if defined(_WIN32)
+#include "win32/win32_compat.h"
+#else
+#include <unistd.h>
+#endif
+
+#ifdef HAVE_SYS_SOCKET_H
+#include <sys/socket.h>
+#endif
+
+#ifdef HAVE_NETINET_IN_H
+#include <netinet/in.h>
+#endif
+
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <time.h>
+#include "slist.h"
+#include "iscsi.h"
+#include "iscsi-private.h"
+#include "scsi-lowlevel.h"
+
+struct connect_task {
+	iscsi_command_cb cb;
+	void *private_data;
+	int lun;
+	int num_uas;
+};
+
+static void
+iscsi_connect_cb(struct iscsi_context *iscsi, int status, void *command_data,
+		 void *private_data);
+
+
+/* During a reconnect all new SCSI commands are normally deferred to the
+ * old context and not actually issued until we have completed the re-connect
+ * and switched the contexts.
+ * This is what we want most of the time. However, IF we want to send TURs
+ * during the reconnect to eat all the UAs, then we want to send them out
+ * on this temporary context and NOT just queue them for until later.
+ * Hence this function.
+ *
+ * By setting ->old_iscsi temporarily to NULL when we are creating the TUR
+ * we avoid the check in iscsi_scsi_command_async() that otehrwise will try
+ * to defer this command until later.
+ */
+static struct scsi_task *
+iscsi_testunitready_connect(struct iscsi_context *iscsi, int lun,
+			    iscsi_command_cb cb, void *private_data)
+{
+	struct scsi_task *task;
+	struct iscsi_context *old_iscsi = iscsi->old_iscsi;
+
+	iscsi->old_iscsi = NULL;
+	task = iscsi_testunitready_task(iscsi, lun, cb, private_data);
+	iscsi->old_iscsi = old_iscsi;
+
+	return task;
+}
+
+static struct scsi_task *
+iscsi_inquiry_task_connect(struct iscsi_context *iscsi, int lun, int evpd, int page_code,
+                           int maxsize, iscsi_command_cb cb, void *private_data)
+{
+	struct scsi_task *task;
+	struct iscsi_context *old_iscsi = iscsi->old_iscsi;
+
+	iscsi->old_iscsi = NULL;
+
+	task = iscsi_inquiry_task(iscsi, lun, evpd, page_code, maxsize, cb, private_data);
+
+	iscsi->old_iscsi = old_iscsi;
+
+	return task;
+}
+
+static void
+iscsi_inquiry_page_0x80_cb(struct iscsi_context *iscsi, int status,
+		       void *command_data, void *private_data)
+{
+	struct connect_task *ct = private_data;
+	struct scsi_task *task = command_data;
+	struct scsi_inquiry_unit_serial_number *inq;
+
+	if (!status) {
+		inq = scsi_datain_unmarshall(task);
+		if (inq != NULL) {
+			if (!iscsi->unit_serial_number[0]) {
+				ISCSI_LOG(iscsi, 2, "unit serial number is [%s]", inq->usn);
+				strncpy(iscsi->unit_serial_number, inq->usn, MAX_STRING_SIZE);
+			} else if (strncmp(iscsi->unit_serial_number, inq->usn, MAX_STRING_SIZE)) {
+				iscsi_set_error(iscsi, "unit serial number mismatch. got [%s] expected [%s]",
+												inq->usn, iscsi->unit_serial_number);
+				status = 1;
+			} else {
+				ISCSI_LOG(iscsi, 2, "successfully validated unit serial number [%s]", inq->usn);
+			}
+		} else {
+			iscsi_set_error(iscsi, "iscsi_inquiry_task datain_unmarshall failed. could not read vpd page 0x80.");
+			status = 1;
+		}
+	} else {
+		iscsi_set_error(iscsi, "iscsi_inquiry_task failed. could not read vpd page 0x80.");
+	}
+
+	ct->cb(iscsi, status?SCSI_STATUS_ERROR:SCSI_STATUS_GOOD, NULL, ct->private_data);
+	scsi_free_scsi_task(task);
+	iscsi_free(iscsi, ct);
+}
+
+static void
+iscsi_inquiry_page_0x0_cb(struct iscsi_context *iscsi, int status,
+		       void *command_data, void *private_data)
+{
+	struct connect_task *ct = private_data;
+	struct scsi_task *task = command_data;
+	struct scsi_inquiry_standard *inq;
+
+	if (!status) {
+		inq = scsi_datain_unmarshall(task);
+		if (inq != NULL) {
+			ISCSI_LOG(iscsi, 2, "type [%s] vendor [%s] product [%s] rev [%s]",
+			          scsi_devtype_to_str(inq->device_type), inq->vendor_identification,
+			          inq->product_identification, inq->product_revision_level);
+			if (!inq->rmb && inq->device_type == SCSI_INQUIRY_PERIPHERAL_DEVICE_TYPE_DIRECT_ACCESS) {
+				if (iscsi_inquiry_task_connect(iscsi, ct->lun, 1, 0x80, MAX_STRING_SIZE + 4,
+				                               iscsi_inquiry_page_0x80_cb, ct) != NULL) {
+					return;
+				}
+				iscsi_set_error(iscsi, "iscsi_inquiry_task for evpd 0x80 failed.");
+				status = 1;
+			}
+		} else {
+			iscsi_set_error(iscsi, "iscsi_inquiry_task datain_unmarshall failed. could not read vpd page 0x0.");
+			status = 1;
+		}
+	} else {
+		iscsi_set_error(iscsi, "iscsi_inquiry_task failed. could not read vpd page 0x0.");
+	}
+
+	ct->cb(iscsi, status?SCSI_STATUS_ERROR:SCSI_STATUS_GOOD, NULL, ct->private_data);
+	scsi_free_scsi_task(task);
+	iscsi_free(iscsi, ct);
+}
+
+static void
+iscsi_testunitready_cb(struct iscsi_context *iscsi, int status,
+		       void *command_data, void *private_data)
+{
+	struct connect_task *ct = private_data;
+	struct scsi_task *task = command_data;
+
+	if (status != 0) {
+		if (task->sense.key == SCSI_SENSE_UNIT_ATTENTION) {
+			/* This is just the normal unitattention/busreset
+			 * you always get just after a fresh login. Try
+			 * again. Instead of enumerating all of them we
+			 * assume that there will be at most 10 or else
+			 * there is something broken.
+			 */
+			ct->num_uas++;
+			if (ct->num_uas > 10) {
+				iscsi_set_error(iscsi, "iscsi_testunitready "
+						"Too many UnitAttentions "
+						"during login.");
+				ct->cb(iscsi, SCSI_STATUS_ERROR, NULL,
+				       ct->private_data);
+				iscsi_free(iscsi, ct);
+				scsi_free_scsi_task(task);
+				return;
+			}
+			if (iscsi_testunitready_connect(iscsi, ct->lun,
+							iscsi_testunitready_cb,
+							ct) == NULL) {
+				iscsi_set_error(iscsi, "iscsi_testunitready "
+						"failed.");
+				ct->cb(iscsi, SCSI_STATUS_ERROR, NULL,
+				       ct->private_data);
+				iscsi_free(iscsi, ct);
+			}
+			scsi_free_scsi_task(task);
+			return;
+		}
+	}
+
+	/* Don't fail the login just because there is no medium in the device */
+	if (status != 0
+	&& task->sense.key == SCSI_SENSE_NOT_READY
+	&& (task->sense.ascq == SCSI_SENSE_ASCQ_MEDIUM_NOT_PRESENT
+	 || task->sense.ascq == SCSI_SENSE_ASCQ_MEDIUM_NOT_PRESENT_TRAY_CLOSED
+	 || task->sense.ascq == SCSI_SENSE_ASCQ_MEDIUM_NOT_PRESENT_TRAY_OPEN)) {
+		status = 0;
+	}
+
+	/* Don't fail the login just because the medium is reserved */
+	if (status == SCSI_STATUS_RESERVATION_CONFLICT) {
+		status = 0;
+	}
+
+	/* Don't fail the login just because there is a sanitize in progress */
+	if (status != 0
+	&& task->sense.key == SCSI_SENSE_NOT_READY
+	    && task->sense.ascq == SCSI_SENSE_ASCQ_SANITIZE_IN_PROGRESS) {
+		status = 0;
+	}
+
+	if (status != 0) {
+		ct->cb(iscsi, SCSI_STATUS_ERROR, NULL,
+		       ct->private_data);
+		scsi_free_scsi_task(task);
+		iscsi_free(iscsi, ct);
+		return;
+	}
+
+	if (iscsi_inquiry_task_connect(iscsi, ct->lun, 0, 0, 96,
+	                               iscsi_inquiry_page_0x0_cb, ct) == NULL) {
+		iscsi_set_error(iscsi, "iscsi_inquiry_task for vpd 0x0 failed.");
+		ct->cb(iscsi, SCSI_STATUS_ERROR, NULL, ct->private_data);
+		iscsi_free(iscsi, ct);
+	}
+}
+
+static void
+iscsi_login_cb(struct iscsi_context *iscsi, int status, void *command_data,
+	       void *private_data)
+{
+	struct connect_task *ct = private_data;
+
+	if (status == SCSI_STATUS_REDIRECT && iscsi->target_address[0]) {
+		iscsi_disconnect(iscsi);
+		if (iscsi->bind_interfaces[0]) iscsi_decrement_iface_rr();
+		if (iscsi_connect_async(iscsi, iscsi->target_address, iscsi_connect_cb, iscsi->connect_data) != 0) {
+			iscsi_free(iscsi, ct);
+			return;
+		}
+		return;
+	}
+
+	if (status != 0) {
+		ct->cb(iscsi, SCSI_STATUS_ERROR, NULL, ct->private_data);
+		iscsi_free(iscsi, ct);
+		return;
+	}
+
+	/* If the application has requested no UA on reconnect OR if this is
+	   the initial connection attempt then we need to consume any/all
+	   UAs that might be present.
+	*/
+	if (iscsi->no_ua_on_reconnect || (ct->lun != -1 && !iscsi->old_iscsi)) {
+		if (iscsi_testunitready_connect(iscsi, ct->lun,
+						iscsi_testunitready_cb,
+						ct) == NULL) {
+			iscsi_set_error(iscsi, "iscsi_testunitready_async failed.");
+			ct->cb(iscsi, SCSI_STATUS_ERROR, NULL, ct->private_data);
+			iscsi_free(iscsi, ct);
+		}
+	} else if (ct->lun != -1) {
+		if (iscsi_inquiry_task_connect(iscsi, ct->lun, 0, 0, 96,
+						iscsi_inquiry_page_0x0_cb,
+						ct) == NULL) {
+			iscsi_set_error(iscsi, "iscsi_inquiry_task for vpd 0x0 failed.");
+			ct->cb(iscsi, SCSI_STATUS_ERROR, NULL, ct->private_data);
+			iscsi_free(iscsi, ct);
+		}
+	} else {
+		ct->cb(iscsi, SCSI_STATUS_GOOD, NULL, ct->private_data);
+		iscsi_free(iscsi, ct);
+		return;
+	}
+}
+
+static void
+iscsi_connect_cb(struct iscsi_context *iscsi, int status, void *command_data,
+		 void *private_data)
+{
+	struct connect_task *ct = private_data;
+
+	if (status != 0) {
+		iscsi_set_error(iscsi, "Failed to connect to iSCSI socket. "
+				"%s", iscsi_get_error(iscsi));
+		ct->cb(iscsi, SCSI_STATUS_ERROR, NULL, ct->private_data);
+		iscsi_free(iscsi, ct);
+		return;
+	}
+
+	if (iscsi_login_async(iscsi, iscsi_login_cb, ct) != 0) {
+		iscsi_set_error(iscsi, "iscsi_login_async failed: %s",
+				iscsi_get_error(iscsi));
+		ct->cb(iscsi, SCSI_STATUS_ERROR, NULL, ct->private_data);
+		iscsi_free(iscsi, ct);
+	}
+}
+
+
+int
+iscsi_full_connect_async(struct iscsi_context *iscsi, const char *portal,
+			 int lun, iscsi_command_cb cb, void *private_data)
+{
+	struct connect_task *ct;
+
+	iscsi->lun = lun;
+	if (iscsi->portal != portal) {
+		strncpy(iscsi->portal, portal, MAX_STRING_SIZE);
+	}
+
+	ct = iscsi_malloc(iscsi, sizeof(struct connect_task));
+	if (ct == NULL) {
+		iscsi_set_error(iscsi, "Out-of-memory. Failed to allocate "
+				"connect_task structure.");
+		return -ENOMEM;
+	}
+	ct->cb           = cb;
+	ct->lun          = lun;
+	ct->num_uas      = 0;
+	ct->private_data = private_data;
+	if (iscsi_connect_async(iscsi, portal, iscsi_connect_cb, ct) != 0) {
+		iscsi_free(iscsi, ct);
+		return -ENOMEM;
+	}
+	return 0;
+}
+
+/* Set auto reconnect status. If state !0  then we will not reconnect
+   automatically upon session failure.
+*/
+void iscsi_set_noautoreconnect(struct iscsi_context *iscsi, int state)
+{
+	iscsi->no_auto_reconnect = state;
+
+	/* If the session was dropped while auto reconnect was disabled
+	   then we explicitely reconnect here again.
+	 */
+	if (!state && iscsi->reconnect_deferred) {
+		iscsi->reconnect_deferred = 0;
+		iscsi_reconnect(iscsi);
+	}
+}
+
+/* Set ua reconnect status. The default is that we just reconnect and then
+   any/all UAs that are generated by the target will be passed back to the
+   application.
+
+   For test applications it can be more convenient to just reconnect
+   and have any UAs be consumed and ignored by the library.
+*/
+void iscsi_set_no_ua_on_reconnect(struct iscsi_context *iscsi, int state)
+{
+	iscsi->no_ua_on_reconnect = state;
+}
+
+void iscsi_set_reconnect_max_retries(struct iscsi_context *iscsi, int count)
+{
+	iscsi->reconnect_max_retries = count;
+}
+
+void iscsi_defer_reconnect(struct iscsi_context *iscsi)
+{
+	iscsi->reconnect_deferred = 1;
+
+	ISCSI_LOG(iscsi, 2, "reconnect deferred, cancelling all tasks");
+
+	iscsi_cancel_pdus(iscsi);
+}
+
+void iscsi_reconnect_cb(struct iscsi_context *iscsi, int status,
+                        void *command_data, void *private_data)
+{
+	struct iscsi_context *old_iscsi;
+        struct iscsi_pdu *tmp = NULL;
+
+	if (status != SCSI_STATUS_GOOD) {
+		int backoff = ++iscsi->old_iscsi->retry_cnt;
+		if (backoff > 10) {
+			backoff += rand() % 10;
+			backoff -= 5;
+		}
+		if (backoff > 30) {
+			backoff = 30;
+		}
+		if (iscsi->reconnect_max_retries != -1 &&
+		    iscsi->old_iscsi->retry_cnt > iscsi->reconnect_max_retries) {
+			/* we will exit iscsi_service with -1 the next time we enter it. */
+			backoff = 0;
+		}
+		ISCSI_LOG(iscsi, 1, "reconnect try %d failed, waiting %d seconds", iscsi->old_iscsi->retry_cnt, backoff);
+		iscsi->next_reconnect = time(NULL) + backoff;
+		iscsi->pending_reconnect = 1;
+		return;
+	}
+
+	old_iscsi = iscsi->old_iscsi;
+	iscsi->old_iscsi = NULL;
+
+        iscsi_mt_spin_lock(&iscsi->iscsi_lock);
+	while (old_iscsi->outqueue) {
+		struct iscsi_pdu *pdu = old_iscsi->outqueue;
+		ISCSI_LIST_REMOVE(&old_iscsi->outqueue, pdu);
+		ISCSI_LIST_ADD_END(&old_iscsi->waitpdu, pdu);
+	}
+        tmp = old_iscsi->waitpdu;
+        old_iscsi->waitpdu = NULL;
+        iscsi_mt_spin_unlock(&iscsi->iscsi_lock);
+
+	while (tmp) {
+		struct iscsi_pdu *pdu = tmp;
+
+		ISCSI_LIST_REMOVE(&tmp, pdu);
+		if (pdu->itt == 0xffffffff) {
+			iscsi->drv->free_pdu(old_iscsi, pdu);
+			continue;
+		}
+
+		if (pdu->flags & ISCSI_PDU_DROP_ON_RECONNECT) {
+			/*
+			 * We only want to re-queue SCSI COMMAND PDUs.
+			 * All other PDUs are discarded at this point.
+			 * This includes DATA-OUT, NOP and task management.
+			 */
+			if (pdu->callback) {
+				pdu->callback(iscsi, SCSI_STATUS_CANCELLED,
+				              NULL, pdu->private_data);
+			}
+			iscsi->drv->free_pdu(old_iscsi, pdu);
+			continue;
+		}
+
+		scsi_task_reset_iov(&pdu->scsi_cbdata.task->iovector_in);
+		scsi_task_reset_iov(&pdu->scsi_cbdata.task->iovector_out);
+
+		/* We pass NULL as 'd' since any databuffer has already
+		 * been converted to a task-> iovector first time this
+		 * PDU was sent.
+		 */
+		if (iscsi_scsi_command_async(iscsi, pdu->lun,
+					     pdu->scsi_cbdata.task,
+					     pdu->scsi_cbdata.callback,
+					     NULL,
+					     pdu->scsi_cbdata.private_data)) {
+			/* not much we can really do at this point */
+		}
+		iscsi->drv->free_pdu(old_iscsi, pdu);
+	}
+
+        iscsi_mt_spin_lock(&iscsi->iscsi_lock);
+	if (old_iscsi->incoming != NULL) {
+		iscsi_free_iscsi_in_pdu(old_iscsi, old_iscsi->incoming);
+	}
+
+	if (old_iscsi->outqueue_current != NULL && old_iscsi->outqueue_current->flags & ISCSI_PDU_DELETE_WHEN_SENT) {
+		iscsi->drv->free_pdu(old_iscsi, old_iscsi->outqueue_current);
+	}
+        iscsi_mt_spin_unlock(&iscsi->iscsi_lock);
+
+	iscsi_free(old_iscsi, old_iscsi->opaque);
+
+	iscsi->mallocs += old_iscsi->mallocs;
+	iscsi->frees += old_iscsi->frees;
+
+	free(old_iscsi);
+
+	/* avoid a reconnect faster than 3 seconds */
+	iscsi->next_reconnect = time(NULL) + 3;
+
+	ISCSI_LOG(iscsi, 2, "reconnect was successful");
+
+	iscsi->pending_reconnect = 0;
+}
+
+static int reconnect(struct iscsi_context *iscsi, int force)
+{
+	struct iscsi_context *tmp_iscsi;
+
+	/* if there is already a deferred reconnect do not try again */
+	if (iscsi->reconnect_deferred) {
+		ISCSI_LOG(iscsi, 2, "reconnect initiated, but reconnect is already deferred");
+		return -1;
+	}
+
+	/* This is mainly for tests, where we do not want to automatically
+	   reconnect but rather want the commands to fail with an error
+	   if the target drops the session.
+	 */
+	if (iscsi->no_auto_reconnect) {
+		iscsi_defer_reconnect(iscsi);
+		return 0;
+	}
+
+	if (iscsi->old_iscsi && !iscsi->pending_reconnect && !force) {
+		return 0;
+	}
+
+	if (time(NULL) < iscsi->next_reconnect) {
+		iscsi->pending_reconnect = 1;
+		return 0;
+	}
+
+	if (iscsi->reconnect_max_retries != -1 && iscsi->old_iscsi &&
+	    iscsi->old_iscsi->retry_cnt > iscsi->reconnect_max_retries) {
+		iscsi_defer_reconnect(iscsi);
+		return -1;
+	}
+
+	tmp_iscsi = iscsi_create_context(iscsi->initiator_name);
+	if (tmp_iscsi == NULL) {
+		ISCSI_LOG(iscsi, 2, "failed to create new context for reconnection");
+		return -1;
+	}
+
+	/* default transport is initialized as TCP in iscsi_create_context,
+	   we have to overwrite transport in new iscsi as old iscsi.
+	 */
+	if (iscsi_init_transport(tmp_iscsi, iscsi->transport)) {
+		ISCSI_LOG(iscsi, 2, "failed to initializing transport for reconnection");
+		return -1;
+	}
+
+	ISCSI_LOG(iscsi, 2, "reconnect initiated");
+
+	iscsi_set_targetname(tmp_iscsi, iscsi->target_name);
+
+	iscsi_set_header_digest(tmp_iscsi, iscsi->want_header_digest);
+	iscsi_set_data_digest(tmp_iscsi, iscsi->want_data_digest);
+
+	iscsi_set_initiator_username_pwd(tmp_iscsi, iscsi->user, iscsi->passwd);
+	iscsi_set_target_username_pwd(tmp_iscsi, iscsi->target_user, iscsi->target_passwd);
+
+	iscsi_set_session_type(tmp_iscsi, ISCSI_SESSION_NORMAL);
+
+	tmp_iscsi->lun = iscsi->lun;
+
+	strncpy(tmp_iscsi->portal, iscsi->portal, MAX_STRING_SIZE);
+
+	strncpy(tmp_iscsi->bind_interfaces, iscsi->bind_interfaces, MAX_STRING_SIZE);
+	tmp_iscsi->bind_interfaces_cnt = iscsi->bind_interfaces_cnt;
+
+	strncpy(tmp_iscsi->unit_serial_number, iscsi->unit_serial_number, MAX_STRING_SIZE);
+
+	tmp_iscsi->log_level = iscsi->log_level;
+	tmp_iscsi->log_fn = iscsi->log_fn;
+	tmp_iscsi->tcp_user_timeout = iscsi->tcp_user_timeout;
+	tmp_iscsi->tcp_keepidle = iscsi->tcp_keepidle;
+	tmp_iscsi->tcp_keepcnt = iscsi->tcp_keepcnt;
+	tmp_iscsi->tcp_keepintvl = iscsi->tcp_keepintvl;
+	tmp_iscsi->tcp_syncnt = iscsi->tcp_syncnt;
+	tmp_iscsi->cache_allocations = iscsi->cache_allocations;
+	tmp_iscsi->scsi_timeout = iscsi->scsi_timeout;
+	tmp_iscsi->no_ua_on_reconnect = iscsi->no_ua_on_reconnect;
+	tmp_iscsi->fd_dup_cb = iscsi->fd_dup_cb;
+	tmp_iscsi->fd_dup_opaque = iscsi->fd_dup_opaque;
+
+	tmp_iscsi->reconnect_max_retries = iscsi->reconnect_max_retries;
+
+	if (iscsi->old_iscsi) {
+		iscsi_free(iscsi, iscsi->opaque);
+
+		iscsi->old_iscsi->mallocs += iscsi->mallocs;
+		iscsi->old_iscsi->frees += iscsi->frees;
+		tmp_iscsi->old_iscsi = iscsi->old_iscsi;
+	} else {
+		tmp_iscsi->old_iscsi = malloc(sizeof(struct iscsi_context));
+		if (!tmp_iscsi->old_iscsi) {
+			free(tmp_iscsi);
+			return -1;
+		}
+		memcpy(tmp_iscsi->old_iscsi, iscsi, sizeof(struct iscsi_context));
+	}
+	memcpy(iscsi, tmp_iscsi, sizeof(struct iscsi_context));
+	free(tmp_iscsi);
+
+	return iscsi_full_connect_async(iscsi, iscsi->portal,
+	                                iscsi->lun, iscsi_reconnect_cb, NULL);
+}
+
+int iscsi_reconnect(struct iscsi_context *iscsi)
+{
+	return reconnect(iscsi, 0);
+}
+
+int iscsi_force_reconnect(struct iscsi_context *iscsi)
+{
+	return reconnect(iscsi, 1);
+}
+
+void iscsi_reset_next_reconnect(struct iscsi_context *iscsi)
+{
+	ISCSI_LOG(iscsi, 1, "reset iscsi next_reconnect");
+	iscsi->next_reconnect = time(NULL);
+}
