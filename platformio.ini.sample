@@ -53,6 +53,9 @@ description = Meatloaf Commodore to ESP32 WiFi Multifunction Firmware
 ; ESP32-C3
 ;environment = esp32-c3-super-mini          ;                                             (ESP32-C3 NO PSRAM, 4M Flash)
 
+; ESP32-P4
+;environment = waveshare-p4-module-dev-kit   ; Waveshare ESP32-P4-Module-Dev-Kit           (ESP32-P4 32M PSRAM, 16M Flash)
+
 ; NATIVE UNIT TESTING
 ;environment = native                       ; For running tests that don't require embedded hardware
 
@@ -416,3 +419,15 @@ build_flags =
     -D NO_BUTTONS
     -D ENABLE_CONSOLE
     -D MIN_CONFIG
+
+; ESP32-P4
+[env:waveshare-p4-module-dev-kit]
+extends = esp32_base
+board = esp32-p4nrw32
+build_flags =
+    ${env.build_flags}
+    -D PINMAP_WAVESHARE_P4_MODULE_DEV_KIT
+    -D SD_CARD
+    -D ENABLE_DISPLAY
+    -D ENABLE_CONSOLE
+    -D ENABLE_CONSOLE_TCP

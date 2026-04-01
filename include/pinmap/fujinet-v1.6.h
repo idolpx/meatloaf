@@ -3,7 +3,7 @@
 #define PINMAP_FUJINET_V1_6_H
 
 // https://github.com/FujiNetWIFI/fujinet-firmware/wiki/Official-Hardware-Versions
-// https://www.espressif.com.cn/sites/default/files/documentation/esp32-wrover-e_esp32-wrover-ie_datasheet_en.pdf
+// https://www.espressif.com/sites/default/files/documentation/esp32-wrover-e_esp32-wrover-ie_datasheet_en.pdf
 
 #ifdef PINMAP_FN_16
 

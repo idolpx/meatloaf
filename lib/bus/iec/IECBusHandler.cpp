@@ -168,7 +168,7 @@ static DRAM_ATTR esp_cpu_cycle_count_t timer_start_cycles, timer_cycles_per_us_d
     while( (esp_cpu_get_cycle_count()-timer_start_cycles) < to ); }
 
 // interval in which we need to feed the interrupt WDT to stop it from re-booting the system
-#define IWDT_FEED_TIME ((CONFIG_ESP_INT_WDT_TIMEOUT_MS-10)*1000)
+#define IWDT_FEED_TIME ((CONFIG_ESP_INT_WDT_TIMEOUT_MS-50)*1000)
 
 // keep track whether interrupts are enabled or not (see comments in waitPinDATA/waitPinCLK)
 static bool haveInterrupts = true;
@@ -1898,7 +1898,7 @@ bool IECBusHandler::receiveDolphinByte(bool canWriteOk)
 }
 
 
-bool IECBusHandler::transmitDolphinByte(uint8_t numData)
+bool RAMFUNC(IECBusHandler::transmitDolphinByte)(uint8_t numData)
 {
   // Note: receiver starts a 50us timeout after setting DATA high
   // (ready-to-receive) waiting for CLK low (data valid). If we take
@@ -1907,6 +1907,7 @@ bool IECBusHandler::transmitDolphinByte(uint8_t numData)
   // - disable interrupts between setting CLK high and setting CLK low
   // - get the data byte to send before setting CLK high
   // - wait for DATA high in a blocking loop
+  // - place this function in RAM for platforms that need/support it
   uint8_t data = numData>0 ? m_currentDevice->peek() : 0xFF;
 
   startParallelTransaction();

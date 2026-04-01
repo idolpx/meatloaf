@@ -2,7 +2,7 @@
 #ifndef PINMAP_FUJILOAF_REV0_H
 #define PINMAP_FUJILOAF_REV0_H
 
-// https://www.espressif.com.cn/sites/default/files/documentation/esp32-wrover-e_esp32-wrover-ie_datasheet_en.pdf
+// https://www.espressif.com/sites/default/files/documentation/esp32-wrover-e_esp32-wrover-ie_datasheet_en.pdf
 
 #ifdef PINMAP_FUJILOAF_REV0
 

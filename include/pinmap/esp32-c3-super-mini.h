@@ -2,7 +2,7 @@
 #define PINMAP_ESP32_C3_SUPER_MINI_H
 
 // https://github.com/sidharthmohannair/Tutorial-ESP32-C3-Super-Mini
-// https://www.espressif.com.cn/sites/default/files/documentation/esp32-c3_datasheet_en.pdf
+// https://www.espressif.com/sites/default/files/documentation/esp32-c3_datasheet_en.pdf
 
 #ifdef PINMAP_ESP32_C3_SUPER_MINI
 

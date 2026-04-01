@@ -4,7 +4,7 @@
 
 // https://www.wemos.cc/en/latest/s2/s2_mini.html
 // https://www.wemos.cc/en/latest/_static/files/sch_s2_mini_v1.0.0.pdf
-// https://www.espressif.com.cn/sites/default/files/documentation/esp32-s2_datasheet_en.pdf
+// https://www.espressif.com/sites/default/files/documentation/esp32-s2_datasheet_en.pdf
 
 #ifdef PINMAP_LOLIN_S2_MINI
 

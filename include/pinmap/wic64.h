@@ -3,7 +3,7 @@
 
 // https://wic64.net/web/
 // https://www.espboards.dev/esp32/esp32doit-devkit-v1/
-// https://www.espressif.com.cn/sites/default/files/documentation/esp32-wroom-32_datasheet_en.pdf
+// https://www.espressif.com/sites/default/files/documentation/esp32-wroom-32_datasheet_en.pdf
 
 #ifdef PINMAP_WIC64
 

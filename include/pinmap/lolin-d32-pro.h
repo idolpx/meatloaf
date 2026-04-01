@@ -4,7 +4,7 @@
 
 // https://www.wemos.cc/en/latest/d32/d32_pro.html
 // https://www.wemos.cc/en/latest/_static/files/sch_d32_pro_v2.0.0.pdf
-// https://www.espressif.com.cn/sites/default/files/documentation/esp32-wrover-e_esp32-wrover-ie_datasheet_en.pdf
+// https://www.espressif.com/sites/default/files/documentation/esp32-wrover-e_esp32-wrover-ie_datasheet_en.pdf
 
 #ifdef PINMAP_LOLIN_D32_PRO
 

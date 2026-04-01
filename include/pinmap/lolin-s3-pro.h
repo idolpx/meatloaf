@@ -4,7 +4,7 @@
 
 // https://www.wemos.cc/en/latest/s3/s3_pro.html
 // https://www.wemos.cc/en/latest/_static/files/sch_s3_pro_v1.0.0.pdf
-// https://www.espressif.com.cn/sites/default/files/documentation/esp32-s3-wroom-1_wroom-1u_datasheet_en.pdf
+// https://www.espressif.com/sites/default/files/documentation/esp32-s3-wroom-1_wroom-1u_datasheet_en.pdf
 
 #ifdef PINMAP_LOLIN_S3_PRO
 
