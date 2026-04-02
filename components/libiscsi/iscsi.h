@@ -1,0 +1,6 @@
+#ifndef MEATLOAF_LIBISCSI_PUBLIC_ISCSI_H
+#define MEATLOAF_LIBISCSI_PUBLIC_ISCSI_H
+
+#include "include/iscsi.h"
+
+#endif // MEATLOAF_LIBISCSI_PUBLIC_ISCSI_H
