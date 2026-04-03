@@ -1986,6 +1986,14 @@ void iecDrive::getStatus(char *buffer, uint8_t bufferSize)
     {
         case ST_OK                  : msg = " OK"; break;
         case ST_SCRATCHED           : msg = "FILES SCRATCHED"; break;
+
+        case ST_READ_NO_HEADER      :
+        case ST_READ_NO_SYNC        :
+        case ST_READ_NO_DATA        :
+        case ST_READ_CHECKSUM       :
+        case ST_READ_ERROR_GCR      : 
+            msg = "READ ERROR"; break;
+
         case ST_WRITE_VERIFY        : msg = "WRITE ERROR"; break;
         case ST_WRITE_PROTECT_ON    : msg = "WRITE PROTECT"; break;
         case ST_SYNTAX_INVALID      : msg = "INVALID COMMAND"; break;
