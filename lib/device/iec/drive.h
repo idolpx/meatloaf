@@ -292,7 +292,7 @@ public:
   uint8_t getNumOpenChannels();
   std::string getCWD() { return m_cwd->url; }
   uint8_t getStatusCode() { return m_statusCode; }
-  void    setStatusCode(uint8_t code, uint8_t trk = 0);
+  void    setStatusCode(uint8_t code, uint8_t trk = 0, uint8_t sec = 0);
   bool    hasError();
   bool    hasMemExeError();
 
@@ -345,7 +345,7 @@ protected:
 
   std::unique_ptr<MFile> m_cwd;   // current working directory
   iecChannelHandler *m_channels[16];
-  uint8_t m_statusCode, m_statusTrk, m_numOpenChannels;
+  uint8_t m_statusCode, m_statusTrk, m_statusSec, m_numOpenChannels;
 //#ifdef USE_VDRIVE
   VDrive   *m_vdrive;
 //#endif

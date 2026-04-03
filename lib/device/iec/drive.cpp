@@ -1051,6 +1051,7 @@ uint8_t iecDrive::write(uint8_t channel, uint8_t *data, uint8_t dataLen, bool eo
 
 uint8_t iecDrive::read(uint8_t channel, uint8_t *data, uint8_t maxDataLen, bool *eoi)
 { 
+    Debug_printv("channel[%d] maxDataLen[%d]", channel, maxDataLen);
 //#ifdef USE_VDRIVE
     if( Meatloaf.use_vdrive && m_vdrive!=nullptr )
     {
@@ -1066,9 +1067,10 @@ uint8_t iecDrive::read(uint8_t channel, uint8_t *data, uint8_t maxDataLen, bool 
     else
 //#endif
     { 
-      iecChannelHandler *handler = m_channels[channel];
+        iecChannelHandler *handler = m_channels[channel];
         if( handler==nullptr )
         {
+            Debug_printv("Error: attempt to read from unopened channel[%d]", channel);
             if( m_statusCode==ST_OK ) setStatusCode(ST_FILE_NOT_OPEN);
             return 0;
         }
@@ -1082,6 +1084,7 @@ uint8_t iecDrive::read(uint8_t channel, uint8_t *data, uint8_t maxDataLen, bool 
                 set_cwd(m_cwd->base());
             }
 
+            Debug_printv("Read %d bytes from channel[%d]", bytes_read, channel);
             return bytes_read;
         }
         
@@ -1519,7 +1522,25 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
                 if ( channel != nullptr )
                 {
                     auto stream = channel->getStream();
-                    stream->seekSector( pti[2], pti[3] );
+                    if (stream == nullptr)
+                    {
+                        // TODO: Check for C128 Auto boot and if track/sector is 1/0
+
+                        // if ( m_cwd->url == "/" )
+                        // {
+                        //     Debug_printv("Error: block read/write commands not supported on root directory");
+                        //     setStatusCode(ST_PERMISSION_DENIED, pti[2], pti[3]);
+                        //     return;
+                        // }
+                        Debug_printv("Error: channel[%d] stream is null", pti[0]);
+                        setStatusCode(ST_READ_NO_SYNC, pti[2], pti[3]);
+                        return;
+                    }
+                    else
+                    {
+                        // For block read/write commands, the drive needs to seek to the specified track and sector before reading/writing the block.  This is because some fast loaders expect the drive to update its internal track and sector registers on seek, which are then used for subsequent read/write commands that don't specify track and sector.
+                        stream->seekSector( pti[2], pti[3] );
+                    }
                     if ( read )
                     {
                         Debug_printv("Block-Read");
@@ -1887,11 +1908,12 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
 }
 
 
-void iecDrive::setStatusCode(uint8_t code, uint8_t trk)
+void iecDrive::setStatusCode(uint8_t code, uint8_t trk, uint8_t sec)
 {
     //Debug_printv("code[%d]", code);
     m_statusCode = code;
     m_statusTrk  = trk;
+    m_statusSec  = sec;
 
     // clear current status buffer to force a call to getStatus()
     clearStatus();
@@ -1946,6 +1968,7 @@ uint8_t iecDrive::getStatusData(char *buffer, uint8_t bufferSize, bool *eoi)
 
   m_statusCode = ST_OK;
   m_statusTrk  = 0;
+  m_statusSec  = 0;
   
 #ifdef ENABLE_DISPLAY
   LEDS.status( ST_OK );
@@ -1978,7 +2001,7 @@ void iecDrive::getStatus(char *buffer, uint8_t bufferSize)
         default                     : msg = "UNKNOWN ERROR"; break;
     }
 
-    snprintf(buffer, bufferSize, "%02d,%s,%02d,00\r", m_statusCode, msg, m_statusTrk);
+    snprintf(buffer, bufferSize, "%02d,%s,%02d,%02d\r", m_statusCode, msg, m_statusTrk, m_statusSec);
 }
 
 

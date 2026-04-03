@@ -106,7 +106,7 @@ void TCPServer::task(void *pvParameters)
             _client_socket = accept(_server_socket, (struct sockaddr *)&sourceAddr, &addrLen);
             if (_client_socket < 0)
             {
-                Debug_printv("Unable to accept connection: errno %d", errno);
+                //Debug_printv("Unable to accept connection: errno %d", errno);
                 break;
             }
             Debug_printv("Socket accepted");
@@ -175,9 +175,9 @@ void TCPServer::task(void *pvParameters)
         }
     }
     close(_server_socket);
-    vTaskDelete(_htask);
-    Debug_printv("TCP Server task ended (task)");
-    _htask = NULL;
+    //Debug_printv("TCP Server task ended (task)");
+    _htask = NULL;       // Clear before self-delete so stop() won't double-delete
+    vTaskDelete(NULL);   // Self-delete (NULL = calling task)
 }
 
 
@@ -200,12 +200,11 @@ void TCPServer::stop()
         close(_client_socket);
     if (_server_socket > 0)
         close(_server_socket);
-    if (_htask != NULL)
-        vTaskDelete(_htask);
+
+    _shutdown = true;
+    vTaskDelay(500 / portTICK_PERIOD_MS); // give some time for task to exit
 
     Debug_printf("done!\r\n");
-    _htask = NULL;
-    _shutdown = true;
 }
 
 void TCPServer::send(std::string data)
