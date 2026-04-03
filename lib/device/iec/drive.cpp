@@ -1051,7 +1051,7 @@ uint8_t iecDrive::write(uint8_t channel, uint8_t *data, uint8_t dataLen, bool eo
 
 uint8_t iecDrive::read(uint8_t channel, uint8_t *data, uint8_t maxDataLen, bool *eoi)
 { 
-    Debug_printv("channel[%d] maxDataLen[%d]", channel, maxDataLen);
+    //Debug_printv("channel[%d] maxDataLen[%d]", channel, maxDataLen);
 //#ifdef USE_VDRIVE
     if( Meatloaf.use_vdrive && m_vdrive!=nullptr )
     {
@@ -1084,7 +1084,7 @@ uint8_t iecDrive::read(uint8_t channel, uint8_t *data, uint8_t maxDataLen, bool 
                 set_cwd(m_cwd->base());
             }
 
-            Debug_printv("Read %d bytes from channel[%d]", bytes_read, channel);
+            //Debug_printv("Read %d bytes from channel[%d]", bytes_read, channel);
             return bytes_read;
         }
         
