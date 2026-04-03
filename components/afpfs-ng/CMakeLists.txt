@@ -1,7 +1,8 @@
 file(GLOB_RECURSE SRCS "lib/*.c" "esp32/*.c")
 
 idf_component_register(SRCS ${SRCS}
-                       INCLUDE_DIRS . include esp32)
+                       INCLUDE_DIRS . include esp32
+                       REQUIRES mbedtls esp_system)
 
 # Force-include the ESP32 compat header into every afpfs-ng source file.
 # This gives loop.c the pselect() prototype without modifying library sources.

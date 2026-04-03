@@ -38,7 +38,8 @@
 /* #undef HAVE_LIBFUSE */
 
 /* Define to 1 if you have the `gcrypt' library (-lgcrypt). */
-//#define HAVE_LIBGCRYPT 1
+/* ESP32: provided by esp32/gcrypt.h shim (mbedTLS + CAST5) */
+#define HAVE_LIBGCRYPT 1
 
 /* Define to 1 if you have the `gmp' library (-lgmp). */
 #define HAVE_LIBGMP 1

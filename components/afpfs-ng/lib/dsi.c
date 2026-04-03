@@ -816,12 +816,16 @@ process_packet:
 	case DSI_DSIAttention:
 		{
 			pthread_t thread;
+			pthread_attr_t attr;
+			pthread_attr_init(&attr);
+			pthread_attr_setstacksize(&attr, 8192);
 			memcpy( server->attention_buffer,
 				server->incoming_buffer,
 				server->data_read);
 			server->attention_len=server->data_read;
-			pthread_create(&thread,NULL,
+			pthread_create(&thread, &attr,
 				dsi_incoming_attention,server);
+			pthread_attr_destroy(&attr);
 		}
 		break;
 	default:

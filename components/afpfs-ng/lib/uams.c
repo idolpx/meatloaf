@@ -8,6 +8,7 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include "dsi.h"
 #include "afp.h"
 #include "utils.h"
@@ -18,6 +19,14 @@
 #include <gcrypt.h>
 #include <assert.h>	/* for assert() */
 #endif /* HAVE_LIBGCRYPT */
+
+/* Debug helper: print first N bytes of a buffer as hex */
+static void dhx2_hexdump(const char *label, const void *buf, int n) {
+	const unsigned char *p = (const unsigned char *)buf;
+	printf("dhx2 %s:", label);
+	for (int i = 0; i < n; i++) printf(" %02x", p[i]);
+	printf("\n");
+}
 
 struct afp_uam {
 	unsigned int bitmap;
@@ -830,6 +839,8 @@ static int dhx2_login(struct afp_server *server, char *username, char *passwd) {
 	if (K_hash == NULL)
 		goto dhx2_noctx_fail;
 	gcry_md_hash_buffer(GCRY_MD_MD5, K_hash, K_binary, bignum_len);
+	dhx2_hexdump("K_binary[0..7]", K_binary, 8);
+	dhx2_hexdump("K_hash", K_hash, 16);
 	/* FIXME: To support the Reconnect UAM, we need to stash this key
 	 * somewhere in the session data. We'll worry about doing that
 	 * later, but this would be a prime spot to do that. */
@@ -837,6 +848,7 @@ static int dhx2_login(struct afp_server *server, char *username, char *passwd) {
 	/* Use an internal gcrypt function to create the random number, so
 	 * we can do things (more) portably... */
 	gcry_create_nonce(nonce_binary, sizeof(nonce_binary));
+	dhx2_hexdump("nonce_a", nonce_binary, 16);
 
 	/* Set up our encryption context. */
 	ctxerror = gcry_cipher_open(&ctx, GCRY_CIPHER_CAST5,
@@ -920,8 +932,12 @@ static int dhx2_login(struct afp_server *server, char *username, char *passwd) {
 	/* Compare our incremented nonce to the server's incremented copy
 	 * of our original nonce value; if they don't match, something
 	 * terrible has happened. */
-	if (memcmp(nonce_binary, d, 16) != 0)
-		assert("nonce check failed while running dhx2 authentication");
+	dhx2_hexdump("nonce_a+1(expected)", nonce_binary, 16);
+	dhx2_hexdump("nonce_a+1(server)",   d, 16);
+	if (memcmp(nonce_binary, d, 16) != 0) {
+		printf("dhx2 NONCE MISMATCH - CAST5 or DH key exchange is wrong!\n");
+		/* assert would crash; log and continue so server gives us the real error */
+	}
 
 	d += sizeof(nonce_binary);
 
@@ -951,6 +967,7 @@ static int dhx2_login(struct afp_server *server, char *username, char *passwd) {
 	}
 	d += sizeof(nonce_binary);
 	/* Copy the user's password into the plaintext buffer. */
+	printf("dhx2 passwd: [%s] len=%d\n", passwd, (int)strlen(passwd));
 	strncpy(d, passwd, 256);
 
 	/* Set the initialization vector for client->server transfer. */

@@ -13,6 +13,9 @@
 #include <stdlib.h>
 #include <getopt.h>
 #include <unistd.h>
+#ifdef ESP_PLATFORM
+#include "esp_heap_caps.h"
+#endif
 #include <sys/time.h>
 #include <signal.h>
 
@@ -178,9 +181,32 @@ static void * afp_main_quick_startup_thread(void * other)
 int afp_main_quick_startup(pthread_t * thread)
 {
 	pthread_t loop_thread;
-	pthread_create(&loop_thread,NULL,afp_main_quick_startup_thread,NULL);
-	if (thread) 
-		memcpy(thread,&loop_thread,sizeof(pthread_t));
+	pthread_attr_t attr;
+	pthread_attr_init(&attr);
+
+#define AFP_LOOP_STACK_SIZE 8192
+#ifdef ESP_PLATFORM
+	/* Allocate the loop thread stack from PSRAM to avoid exhausting the
+	 * small internal-RAM pool.  The default 3072-byte stack was too small
+	 * (overflows during dsi_recv/mbedtls bignum), and 8 KB from internal
+	 * RAM causes pthread_cond_init failures later due to IRAM exhaustion.
+	 * CONFIG_SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY must be enabled. */
+	void *psram_stack = heap_caps_malloc(AFP_LOOP_STACK_SIZE,
+	                                     MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+	if (psram_stack) {
+		pthread_attr_setstack(&attr, psram_stack, AFP_LOOP_STACK_SIZE);
+	} else {
+		/* Fall back to internal RAM at a smaller size */
+		pthread_attr_setstacksize(&attr, 6144);
+	}
+#else
+	pthread_attr_setstacksize(&attr, AFP_LOOP_STACK_SIZE);
+#endif
+
+	pthread_create(&loop_thread, &attr, afp_main_quick_startup_thread, NULL);
+	pthread_attr_destroy(&attr);
+	if (thread)
+		memcpy(thread, &loop_thread, sizeof(pthread_t));
 	return 0;
 }
 

@@ -8,10 +8,12 @@
 #include <signal.h>
 #include <errno.h>
 #include <string.h>
+#include <unistd.h>
 #include <sys/socket.h>
 
 #include "afp.h"
 #include "dsi.h"
+#include "dsi_protocol.h"
 #include "utils.h"
 #include "uams_def.h"
 #include "codepage.h"
@@ -77,6 +79,18 @@ struct afp_server * afp_server_full_connect (void * priv, struct afp_connection_
 		}
 		afp_server_remove(tmpserver);
 		goto error;
+	}
+	/* Send DSICloseSession before disconnecting.  If we just close the
+	 * TCP socket without this, macOS AFP treats the abrupt disconnect as
+	 * a misbehaving client and sends an AFPATTN_SHUTDOWN attention packet
+	 * to our very next connection, killing authentication before it starts.
+	 * A clean close + brief pause lets macOS settle before we reconnect. */
+	{
+		struct dsi_header close_hdr;
+		dsi_setup_header(tmpserver, &close_hdr, DSI_DSICloseSession);
+		dsi_send(tmpserver, (char*)&close_hdr, sizeof(close_hdr),
+		         DSI_DONT_WAIT, 0, NULL);
+		usleep(100000); /* 100 ms - allow macOS to process the close */
 	}
 	loop_disconnect(tmpserver);
 
