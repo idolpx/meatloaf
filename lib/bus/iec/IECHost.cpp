@@ -117,7 +117,7 @@ bool IECHost::hBeginATN()
     m_bus.writePinDATA(true);   // release DATA
 
     // Devices pull DATA LOW within 1 ms to acknowledge ATN
-    if (!m_bus.waitPinDATA(false, 1000)) {
+    if (!m_bus.waitPinDATA(LOW, 1000)) {
         hReleaseATN();
         m_bus.writePinCLK(true);
         m_bus.writePinDATA(true);
@@ -154,16 +154,16 @@ bool IECHost::hSendByte(uint8_t data, bool eoi,
         // Hold CLK HIGH >200 µs to signal End-Of-Indicator
         if (!m_bus.waitTimeout(250)) return false;
         // Device acknowledges EOI by DATA LOW then DATA HIGH
-        if (!m_bus.waitPinDATA(false, 1000)) return false;
-        if (!m_bus.waitPinDATA(true,  1000)) return false;
+        if (!m_bus.waitPinDATA(LOW, 1000)) return false;
+        if (!m_bus.waitPinDATA(HIGH,  1000)) return false;
     }
 
     // Step 3: device pulls DATA LOW ("ready for data")
-    if (!m_bus.waitPinDATA(false, 1000)) return false;
+    if (!m_bus.waitPinDATA(LOW, 1000)) return false;
 
     // Step 4: send 8 bits, LSB first
     for (uint8_t i = 0; i < 8; i++) {
-        m_bus.writePinCLK(false);              // CLK LOW = data not valid
+        m_bus.writePinCLK(LOW);              // CLK LOW = data not valid
         m_bus.writePinDATA((data & 1) != 0);   // set bit
         data >>= 1;
 
@@ -178,16 +178,16 @@ bool IECHost::hSendByte(uint8_t data, bool eoi,
             if (!m_bus.waitTimeout(80)) return false;   // Tpr = 80 µs
         }
 
-        m_bus.writePinCLK(true);                   // CLK HIGH = data valid
+        m_bus.writePinCLK(HIGH);                   // CLK HIGH = data valid
         if (!m_bus.waitTimeout(70)) return false;  // Tpa = 70 µs
     }
 
     // Step 5: CLK LOW, release DATA
-    m_bus.writePinCLK(false);
-    m_bus.writePinDATA(true);
+    m_bus.writePinCLK(LOW);
+    m_bus.writePinDATA(HIGH);
 
     // Step 6: device pulls DATA LOW to acknowledge receipt
-    if (!m_bus.waitPinDATA(false, 1000)) return false;
+    if (!m_bus.waitPinDATA(LOW, 1000)) return false;
 
     return true;
 }
@@ -383,70 +383,61 @@ bool IRAM_ATTR IECHost::hJiffySendByte(uint8_t data, bool eoi)
     portENABLE_INTERRUPTS();
 
     // Wait for device to acknowledge (DATA LOW)
-    if (!m_bus.waitPinDATA(false, 1000)) return false;
+    if (!m_bus.waitPinDATA(LOW, 1000)) return false;
 
     return true;
 }
 
 // ---------------------------------------------------------------------------
-// probeDevice — detect presence and negotiate fast protocol.
+// probeDevice — detect whether a device with address devnr is on the bus.
 //
-// 1. Send TALK | devnr under ATN; probe for JiffyDOS by delaying CLK >200 µs
-//    on the last bit of the primary address byte.
-// 2. After ATN release, watch for the device to take over CLK (talker turn-around).
-// 3. If JiffyDOS was acknowledged, record it; otherwise standard IEC.
-// 4. Clean up with UNTALK.
+// IEC listener-based probe:
+//   1. Assert ATN; all devices acknowledge by pulling DATA LOW.
+//      If nothing responds, the bus is empty — return false immediately.
+//   2. Send LISTEN | devnr under ATN to address the specific device.
+//   3. Release ATN.
+//   4. Check DATA: the addressed listener holds DATA LOW (listener holdoff).
+//      Unaddressed devices release DATA.  DATA LOW → device present.
+//   5. Broadcast UNLISTEN under ATN to release the listener cleanly.
 // ---------------------------------------------------------------------------
 
 bool IECHost::probeDevice(uint8_t devnr)
 {
     enterHostMode();
 
+    // Assert ATN; if no device responds within 1 ms the bus is empty
     if (!hBeginATN()) {
         exitHostMode();
         return false;
     }
 
-    // Send TALK | devnr — probe for JiffyDOS on this byte
-    bool jiffyAck = false;
-    bool ok = hSendByte(IEC_CMD_TALK | (devnr & 0x1F), false,
-                        /*probeJiffy=*/true, &jiffyAck);
-
-    // Release ATN — talker turn-around
-    hReleaseATN();
+    // Address the specific device as a listener under ATN
+    bool ok = hSendByte(IEC_CMD_LISTEN | (devnr & 0x1F), false);
 
     bool present = false;
     if (ok) {
-        // Host releases CLK; a present device claims the bus by pulling CLK LOW
-        m_bus.writePinCLK(true);
-
-        uint32_t t0 = micros();
-        while ((micros() - t0) < 1000) {
-            if (!m_bus.readPinCLK()) { present = true; break; }
-        }
+        // Allow the bus to settle then sample DATA.
+        // DATA LOW = addressed device is in listener holdoff = device present.
+        // DATA HIGH = no device at this address held the line.
+        present = m_bus.waitPinDATA(LOW, 1000);  // confirm DATA LOW is stable
     }
 
-    // UNTALK — assert ATN to abort the talk sequence cleanly
-    hAssertATN();
-    m_bus.writePinCLK(false);
-    m_bus.waitPinDATA(false, 1000);  // re-ack (brief)
-    hSendByte(IEC_CMD_UNTALK, false);
     hReleaseATN();
-    m_bus.writePinCLK(true);
-    m_bus.writePinDATA(true);
+    delayMicroseconds(20);   // Tbb: ≥20 µs before first CLK transition
+    hBeginATN();
+
+    // UNLISTEN — broadcast cleanup so the listener is released
+    hSendByte(IEC_CMD_UNLISTEN, false);
+    hReleaseATN();
 
     exitHostMode();
 
     if (present) {
-        uint8_t prot = IEC_HOST_PROT_NONE;
-        if (jiffyAck)
-            prot = IEC_HOST_PROT_JIFFY;
-        // Future: probe SpeedDOS / DolphinDOS via parallel handshake here
-
         auto it = m_devices.find(devnr);
         if (it != m_devices.end()) {
             it->second.present  = true;
-            it->second.protocol = prot;
+            it->second.protocol = IEC_HOST_PROT_NONE;
+            // Future: run JiffyDOS / SpeedDOS / DolphinDOS protocol negotiation here
         }
     }
 
@@ -606,12 +597,12 @@ uint8_t IECHost::readStatus(uint8_t devnr, char* buf, uint8_t bufSize)
 
     // UNTALK
     hAssertATN();
-    m_bus.writePinCLK(false);
-    m_bus.waitPinDATA(false, 1000);
+    m_bus.writePinCLK(LOW);
+    m_bus.waitPinDATA(LOW, 1000);
     hSendByte(IEC_CMD_UNTALK, false);
     hReleaseATN();
-    m_bus.writePinCLK(true);
-    m_bus.writePinDATA(true);
+    m_bus.writePinCLK(HIGH);
+    m_bus.writePinDATA(HIGH);
 
     exitHostMode();
     return count;
@@ -774,12 +765,12 @@ uint8_t IECHost::readData(uint8_t devnr, uint8_t channel,
 
     // UNTALK
     hAssertATN();
-    m_bus.writePinCLK(false);
-    m_bus.waitPinDATA(false, 1000);
+    m_bus.writePinCLK(LOW);
+    m_bus.waitPinDATA(LOW, 1000);
     hSendByte(IEC_CMD_UNTALK, false);
     hReleaseATN();
-    m_bus.writePinCLK(true);
-    m_bus.writePinDATA(true);
+    m_bus.writePinCLK(HIGH);
+    m_bus.writePinDATA(HIGH);
 
     exitHostMode();
     return count;

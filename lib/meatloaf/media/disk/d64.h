@@ -276,6 +276,7 @@ public:
 protected:
     bool readHeader() override
     {
+        memset(&header, 0, sizeof(header));
         if (partitions.empty() || partition >= partitions.size()) {
             Debug_printv("Invalid partition index: %d", partition);
             return false;
@@ -497,6 +498,7 @@ public:
     bool rewindDirectory() override;
     MFile* getNextFileInDir() override;
 
+    bool isDirectory() override;
     bool exists() override;
     bool remove() override { return false; };
     bool rename(std::string dest) override { return false; };

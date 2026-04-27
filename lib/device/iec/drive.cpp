@@ -1894,6 +1894,9 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
     // Meatloaf Extended Commands
     command = mstr::toUTF8(command);
     auto pt = util_tokenize(command, ':');
+
+    // TODO: iecdetect - Detect physical devices on the bus and disable virtual devices with same ID
+
     if ( pt[0] == "auth" )
     {
         if( pt.size() == 2 )

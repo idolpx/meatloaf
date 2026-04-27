@@ -143,6 +143,8 @@ protected:
     virtual uint32_t writeContainer(uint8_t *buf, uint32_t size);
     virtual uint32_t readFile(uint8_t* buf, uint32_t size) = 0;
     virtual uint32_t writeFile(uint8_t* buf, uint32_t size) = 0;
+
+    virtual bool isDirectory(uint8_t file_type);
     virtual std::string decodeType(uint8_t file_type, bool show_hidden = false);
     virtual std::string decodeType(std::string file_type);
     virtual std::string decodeGEOSType(uint8_t geos_file_structure, uint8_t geos_file_type);

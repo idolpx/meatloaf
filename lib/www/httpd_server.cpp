@@ -759,39 +759,40 @@ void cHttpdServer::send_file_parsed(httpd_req_t *req, const char *filename)
 }
 
 // Send some meaningful(?) error message to client.
-// NOTE: Must NOT call send_file() or send_file_parsed() — those call back into
-// send_http_error() and create infinite recursion when the SD card is OOM.
+// NOTE: Must NOT call send_file()
 void cHttpdServer::send_http_error(httpd_req_t *req, int errnum)
 {
     std::string error_path = httpdocs + "error/" + std::to_string(errnum) + ".html";
     Debug_printv("Error %d, looking for error page [%s]", errnum, error_path.c_str());
 
-    serverstate *pState = (serverstate *)httpd_get_global_user_ctx(req->handle);
-    FILE *file = pState->_FS->file_open(error_path.c_str());
+    send_file_parsed(req, error_path.c_str());
 
-    if (file != nullptr)
-    {
-        set_file_content_type(req, error_path.c_str());
-        char *buf = (char *)psram_malloc(http_SEND_BUFF_SIZE);
-        if (buf != nullptr)
-        {
-            size_t count = 0;
-            do {
-                count = fread(buf, 1, http_SEND_BUFF_SIZE, file);
-                httpd_resp_send_chunk(req, buf, count);
-            } while (count > 0);
-            free(buf);
-        }
-        fclose(file);
-    }
-    else
-    {
-        // Fallback: plain text — no further recursion possible
-        httpd_resp_set_type(req, "text/plain");
-        char msg[16];
-        snprintf(msg, sizeof(msg), "Error %d", errnum);
-        httpd_resp_send(req, msg, strlen(msg));
-    }
+    // serverstate *pState = (serverstate *)httpd_get_global_user_ctx(req->handle);
+    // FILE *file = pState->_FS->file_open(error_path.c_str());
+
+    // if (file != nullptr)
+    // {
+    //     set_file_content_type(req, error_path.c_str());
+    //     char *buf = (char *)psram_malloc(http_SEND_BUFF_SIZE);
+    //     if (buf != nullptr)
+    //     {
+    //         size_t count = 0;
+    //         do {
+    //             count = fread(buf, 1, http_SEND_BUFF_SIZE, file);
+    //             httpd_resp_send_chunk(req, buf, count);
+    //         } while (count > 0);
+    //         free(buf);
+    //     }
+    //     fclose(file);
+    // }
+    // else
+    // {
+    //     // Fallback: plain text — no further recursion possible
+    //     httpd_resp_set_type(req, "text/plain");
+    //     char msg[16];
+    //     snprintf(msg, sizeof(msg), "Error %d", errnum);
+    //     httpd_resp_send(req, msg, strlen(msg));
+    // }
 }
 
 void cHttpdServer::websocket_send_all(const char* data, size_t len)

@@ -278,13 +278,17 @@ public:
     MFile* cdLocalRoot(std::string);
 
     virtual bool isDirectory() {
+        Debug_printv("isDirectory path[%s] is_dir[%d]", path.c_str(), is_dir);
+        if (is_dir != -1)
+            return is_dir == 1;
+
         if (sourceFile == nullptr)
         {
             Debug_printv("null sourceFile for path[%s]", path.c_str());
             return true;
         }
 
-        //Debug_printv("pathInStream[%s] sourcePathInStream[%s]", pathInStream.c_str(), sourceFile->pathInStream.c_str());
+        Debug_printv("pathInStream[%s] sourcePathInStream[%s]", pathInStream.c_str(), sourceFile->pathInStream.c_str());
         if (pathInStream.empty() || pathInStream == "/")
             return true;
         else

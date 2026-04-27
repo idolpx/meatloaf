@@ -391,9 +391,9 @@ bool D64MStream::getNextFreeBlock(uint8_t startTrack, uint8_t startSector, uint8
 bool D64MStream::isBlockFree(uint8_t track, uint8_t sector)
 {
     // Calculate BAM offset for this track
-    int offset = (track - 1) * 4 + 4;           // offset to correct Track-Info
-    offset++;                                     // Move to Bitmask (skip free count byte)
-    offset += (sector >> 3);                      // move to the correct byte (sector div 8)
+    int offset = (track - 1) * 4 + 4;       // offset to correct Track-Info
+    offset++;                               // Move to Bitmask (skip free count byte)
+    offset += (sector >> 3);                // move to the correct byte (sector div 8)
 
     // Seek to BAM location and read the bitmask byte
     if (!seekSector(
@@ -859,8 +859,9 @@ MFile* D64MFile::getNextFileInDir()
         file->name = filename;  // Use actual CBM entry name, not container image name
         file->extension = image->decodeType(image->entry.file_type);
         file->size = image->entry.blocks * image->block_size;
+        file->is_dir = image->isDirectory(image->entry.file_type);
 
-        //Debug_printv("name[%s] ext[%s] size[%lu]", file->name.c_str(), file->extension.c_str(), file->size);
+        Debug_printv("name[%s] ext[%s] size[%lu] is_dir[%d]", file->name.c_str(), file->extension.c_str(), file->size, file->is_dir);
 
         return file;
     }
@@ -892,6 +893,24 @@ time_t D64MFile::getCreationTime()
     }
 
     return mktime(&entry_time);
+}
+
+bool D64MFile::isDirectory()
+{
+    // Use cached value if set (e.g. by getNextFileInDir)
+    if (is_dir != -1)
+        return is_dir == 1;
+
+    // Container root is always a directory
+    if (pathInStream.empty() || pathInStream == "/")
+        return true;
+
+    // Look up entry in the container to check its file type
+    auto stream = ImageBroker::obtain<D64MStream>("d64", url);
+    if (stream != nullptr && stream->seekEntry(pathInStream))
+        return stream->isDirectory(stream->entry.file_type);
+
+    return false;
 }
 
 bool D64MFile::exists()

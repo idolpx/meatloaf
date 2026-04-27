@@ -24,6 +24,15 @@ std::unordered_map<std::string, std::shared_ptr<MMediaStream>>ImageBroker::image
 
 // Utility Functions
 
+bool MMediaStream::isDirectory(uint8_t file_type) {
+    Debug_printv("file_type[%d]", file_type);
+    
+    if ( (file_type & 0b00000111) > 0x04 )
+        return true;
+
+    return false;
+}
+
 std::string MMediaStream::decodeType(uint8_t file_type, bool show_hidden)
 {
     //bool hidden = false;
