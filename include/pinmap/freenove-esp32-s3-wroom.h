@@ -53,6 +53,14 @@
 //#define GPIOX_SPEED             1000  // PCA9673 - 1000Khz / 1Mhz
 #endif
 
+/* Ethernet W5500 */
+#define PIN_ETHERNET_CS         GPIO_NUM_37
+#define PIN_ETHERNET_MISO       GPIO_NUM_19  // SD_DATA (MISO/DAT0/DATA OUT)
+#define PIN_ETHERNET_MOSI       GPIO_NUM_23  // SD_CMD (MOSI/CMD/DATA IN)
+#define PIN_ETHERNET_SCK        GPIO_NUM_18  // SD_CLK (SCK/CLK)
+#define PIN_ETHERNET_INT        GPIO_NUM_13
+#define PIN_ETHERNET_RESET      GPIO_NUM_14
+
 /* Commodore IEC Pins */
 // CLK & DATA lines in/out are split between two pins
 //#define IEC_SPLIT_LINES
