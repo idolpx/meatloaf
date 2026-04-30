@@ -54,11 +54,12 @@
 #endif
 
 /* Ethernet W5500 */
-#define PIN_ETHERNET_CS         GPIO_NUM_37
-#define PIN_ETHERNET_MISO       GPIO_NUM_19  // SD_DATA (MISO/DAT0/DATA OUT)
-#define PIN_ETHERNET_MOSI       GPIO_NUM_23  // SD_CMD (MOSI/CMD/DATA IN)
-#define PIN_ETHERNET_SCK        GPIO_NUM_18  // SD_CLK (SCK/CLK)
-#define PIN_ETHERNET_INT        GPIO_NUM_13
+// https://www.pusr.com/download/ES1/USR-ES1-EN%20V1.3.pdf
+#define PIN_ETHERNET_CS         GPIO_NUM_19
+#define PIN_ETHERNET_MISO       GPIO_NUM_20  // SD_DATA (MISO/DAT0/DATA OUT)
+#define PIN_ETHERNET_MOSI       GPIO_NUM_21  // SD_CMD (MOSI/CMD/DATA IN)
+#define PIN_ETHERNET_SCK        GPIO_NUM_47  // SD_CLK (SCK/CLK)
+#define PIN_ETHERNET_INT        GPIO_NUM_45
 #define PIN_ETHERNET_RESET      GPIO_NUM_14
 
 /* Commodore IEC Pins */
