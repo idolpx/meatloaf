@@ -69,6 +69,11 @@ protected:
         uint8_t directory_track;
         uint8_t directory_sector;
         uint8_t directory_offset;
+        uint8_t parent_header_track;
+        uint8_t parent_header_sector;
+        uint8_t parent_entry_track;
+        uint8_t parent_entry_sector;
+        uint8_t parent_entry_offset;
         std::vector<BlockAllocationMap> block_allocation_map;
     };
 
@@ -124,13 +129,18 @@ public:
         };
 
         Partition p = {
-            18,    // track
-            0,     // sector
+            18,    // header_track
+            0,     // header_sector
             0x90,  // header_offset
             18,    // directory_track
             1,     // directory_sector
             0x00,  // directory_offset
-            b      // block_allocation_map
+            0,     // parent_header_track
+            0,     // parent_header_sector
+            0,     // parent_entry_track
+            0,     // parent_entry_sector
+            0,     // parent_entry_offset
+            b     // block_allocation_map
         };
         partitions.clear();
         partitions.push_back(p);
@@ -252,7 +262,7 @@ public:
     }
     uint16_t getTrackCount()
     {
-        return partitions[0].block_allocation_map[0].end_track;
+        return partitions[partition].block_allocation_map[0].end_track;
     }
 
     virtual bool seekPath(std::string path) override;
@@ -263,10 +273,10 @@ public:
     Entry entry;        // Directory entry data
 
     uint8_t partition = 0;
-    uint64_t block = 0;
     uint8_t track = 0;
     uint8_t sector = 0;
     uint8_t offset = 0;
+    uint64_t block = 0;
     uint64_t blocks_free = 0;
 
     uint8_t next_track = 0;

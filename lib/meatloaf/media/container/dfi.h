@@ -147,6 +147,11 @@ public:
             1,     // directory_track
             4,     // directory_sector
             0x00,  // directory_offset
+            0,     // parent_header_track
+            0,     // parent_header_sector
+            0,     // parent_entry_track
+            0,     // parent_entry_sector
+            0,     // parent_entry_offset
             b      // block_allocation_map
         };
         partitions.clear();
