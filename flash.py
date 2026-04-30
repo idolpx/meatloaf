@@ -68,7 +68,7 @@ def main():
     parser.add_argument("-f", "--filesystem", action='store_true', help="Flash filesystem")
     args = parser.parse_args()
 
-    command = f"esptool.py -b {upload_speed} write_flash "
+    command = f"esptool -b {upload_speed} write-flash "
 
     if args.all:
         if (mcu == "esp32"):

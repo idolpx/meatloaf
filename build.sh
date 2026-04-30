@@ -104,7 +104,7 @@ fi
 
 if [ ${SHOW_MONITOR} -eq 1 ] ; then
   # The device monitor hard codes to using platformio.ini for its values, let's grab all the data it would use directly from the named ini.
-  # This is useful if you use a different ini file to platformio.ini. (Currently they are the same file in meatloaf project)
+  # This is useful if you use a different ini file to platformio.ini. (Currently they are the same file in Meatloaf CBM)
   MONITOR_PORT=$(grep ^monitor_port $INI_FILE | cut -d= -f2 | cut -d\; -f1 | awk '{print $1}')
   MONITOR_SPEED=$(grep ^monitor_speed $INI_FILE | cut -d= -f2 | cut -d\; -f1 | awk '{print $1}')
   MONITOR_FILTERS=$(grep ^monitor_filters $INI_FILE | cut -d= -f2 | cut -d\; -f1 | tr ',' '\n' | sed 's/^ *//; s/ *$//' | awk '{printf("-f %s ", $1)}')  
