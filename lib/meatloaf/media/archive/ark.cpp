@@ -35,7 +35,8 @@ bool ARKMStream::seekEntry( std::string filename )
         while (seekEntry(index))
         {
             std::string entryFilename = entry.filename;
-            uint8_t i = entryFilename.find_first_of(0xA0);
+            size_t i = entryFilename.find_first_of(0xA0);
+            if (i == std::string::npos || i > 16) i = 16;
             entryFilename = entryFilename.substr(0, i);
             //mstr::rtrimA0(entryFilename);
             entryFilename = mstr::toUTF8(entryFilename);
@@ -181,7 +182,8 @@ MFile *ARKMFile::getNextFileInDir()
     if (image->getNextImageEntry())
     {
         std::string filename = image->entry.filename;
-        uint8_t i = filename.find_first_of(0xA0);
+        size_t i = filename.find_first_of(0xA0);
+        if (i == std::string::npos || i > 16) i = 16;
         filename = filename.substr(0, i);
         // mstr::rtrimA0(filename);
         mstr::replaceAll(filename, "/", "\\");

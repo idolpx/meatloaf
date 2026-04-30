@@ -60,7 +60,7 @@ public:
         };
         partitions.clear();
         partitions.push_back(p);
-        sectorsPerTrack = { 255 };
+        sectorsPerTrack = { 256 };
         has_subdirs = true;
 
         // Read Header

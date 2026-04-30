@@ -356,7 +356,7 @@ private:
             byte_count--; // First byte is number of sectors allocated
 
             // Update BAM for each track
-            for (uint8_t t = track; t <= end_track; t++) {
+            for (uint16_t t = track; t <= end_track; t++) {
                 uint8_t sectors = getSectorCount(t);
                 uint8_t data = 0;
                 

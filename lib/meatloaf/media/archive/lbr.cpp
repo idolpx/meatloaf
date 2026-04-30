@@ -81,8 +81,9 @@ bool LBRMStream::seekEntry( std::string filename )
         bool wildcard = (mstr::contains(filename, "*") || mstr::contains(filename, "?"));
         while (readEntry(index))
         {
-            std::string entryFilename = entry.filename.c_str();
-            uint8_t i = entryFilename.find_first_of(0xA0);
+            std::string entryFilename = entry.filename;
+            size_t i = entryFilename.find_first_of(0xA0);
+            if (i == std::string::npos || i > 16) i = 16;
             entryFilename = entryFilename.substr(0, i);
             //mstr::rtrimA0(entryFilename);
             entryFilename = mstr::toUTF8(entryFilename);
@@ -199,8 +200,9 @@ MFile *LBRMFile::getNextFileInDir()
 
     if (image->getNextImageEntry())
     {
-        std::string filename = image->entry.filename;
-        uint8_t i = filename.find_first_of(0xA0);
+        std::string filename = image->entry.filename.c_str();
+        size_t i = filename.find_first_of(0xA0);
+        if (i == std::string::npos || i > 16) i = 16;
         filename = filename.substr(0, i);
         // mstr::rtrimA0(filename);
         mstr::replaceAll(filename, "/", "\\");
