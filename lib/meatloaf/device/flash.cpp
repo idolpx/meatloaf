@@ -239,7 +239,7 @@ MFile* FlashMFile::getNextFileInDir()
     do
     {
         dirent = readdir( dir );
-    } while ( dirent != NULL && mstr::startsWith(dirent->d_name, ".") ); // Skip hidden files
+    } while ( dirent != NULL ); // Skip hidden files
     
     if ( dirent != NULL )
     {
@@ -249,14 +249,19 @@ MFile* FlashMFile::getNextFileInDir()
         auto file = new FlashMFile(entry_name);
         file->extension.insert(0, 1, ' ');
 
-        if(file->isDirectory()) {
+        if( file->isDirectory() ) {
             file->size = 0;
+            file->is_dir = 1;
         }
         else {
             struct stat info;
             stat( std::string(entry_name).c_str(), &info);
             file->size = info.st_size;
+            file->is_dir = 0;
         }
+
+        if ( mstr::startsWith(dirent->d_name, ".") )
+            file->is_hidden = 1;
 
         return file;
     }

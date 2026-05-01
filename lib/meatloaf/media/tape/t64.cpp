@@ -206,6 +206,7 @@ MFile* T64MFile::getNextFileInDir() {
         file->name = filename;  // Use actual entry name, not container image name
         file->extension = image->decodeType(image->entry.file_type);
         file->size = ( image->entry.end_address - image->entry.start_address ) + 2; // 2 bytes for load address
+        file->is_dir = 0;
 
         Debug_printv( "entry[%s] ext[%s] size[%lu]", filename.c_str(), file->extension.c_str(), file->size);
         

@@ -839,10 +839,7 @@ MFile* D64MFile::getNextFileInDir()
     if (image == nullptr)
         goto exit;
 
-    do
-    {
-        r = image->getNextImageEntry();
-    } while (r && (image->entry.file_type & 0b00000111) == 0x00); // Skip hidden files
+    r = image->getNextImageEntry();
 
     if (r)
     {
@@ -862,6 +859,8 @@ MFile* D64MFile::getNextFileInDir()
         file->extension = image->decodeType(image->entry.file_type);
         file->size = image->entry.blocks * image->block_size;
         file->is_dir = image->isDirectory(image->entry.file_type);
+        if ( (image->entry.file_type & 0b00000111) == 0x00 )  // DEL files are hidden
+            file->is_hidden = 1;
 
         Debug_printv("name[%s] ext[%s][%02X] size[%lu] is_dir[%d]", file->name.c_str(), file->extension.c_str(), image->entry.file_type, file->size, file->is_dir);
 

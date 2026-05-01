@@ -379,12 +379,12 @@ MFile* NFSMFile::getNextFileInDir()
         file->extension.insert(0, 1, ' ');
 
         // Set size and type information
-        file->is_dir = S_ISDIR(ent_mode);
         if (file->is_dir) {
             file->size = 0;
         } else {
             file->size = ent_size;
         }
+        file->is_dir = S_ISDIR(ent_mode);
 
         return file;
     }

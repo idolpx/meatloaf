@@ -322,9 +322,10 @@ MFile* ISCSIMFile::getNextFileInDir()
         const std::string& iqn = targets[_dir_index++];
         std::string entry_url  = url + "/" + iqn;
         auto* file = new ISCSIMFile(entry_url);
-        file->is_dir = 1;
-        file->size   = 0;
         file->name   = iqn;
+        file->size   = 0;
+        file->is_dir = 1;
+
         return file;
     }
 

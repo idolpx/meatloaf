@@ -336,6 +336,7 @@ MFile* SMBMFile::getNextFileInDir()
         } else {
             file->size = ent_size;
         }
+        file->is_dir = (ent_type == SMB2_TYPE_DIRECTORY) ? 1 : 0;
 
         return file;
     }

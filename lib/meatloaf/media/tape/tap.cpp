@@ -647,6 +647,7 @@ MFile* TAPMFile::getNextFileInDir()
     file->name = filename;  // Use actual entry name, not container image name
     file->extension = "TAP";
     file->size = cached_stream->entry.data_length;
+    file->is_dir = 0;
 
     Debug_printv("Entry: %s Size:%d", filename.c_str(), file->size);
 

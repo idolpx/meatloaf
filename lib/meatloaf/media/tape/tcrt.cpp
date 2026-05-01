@@ -237,10 +237,7 @@ MFile* TCRTMFile::getNextFileInDir()
     if ( image == nullptr )
         goto exit;
 
-    do
-    {
-        r = image->getNextImageEntry();
-    } while ( r && image->entry.file_type >= 0xFE); // Skip SYSTEM files
+    r = image->getNextImageEntry();
     
     if ( r )
     {
@@ -258,6 +255,9 @@ MFile* TCRTMFile::getNextFileInDir()
         file->name = filename;  // Use actual entry name, not container image name
         file->extension = image->decodeType(image->entry.file_type);
         file->size = (image->entry.file_size[0] | (image->entry.file_size[1] << 8) | (image->entry.file_size[2] << 16)) + 2; // 2 bytes for load address
+        file->is_dir = 0;
+        if ( image->entry.file_type == 0xFE )
+            file->is_hidden = 1;
 
         return file;
     }

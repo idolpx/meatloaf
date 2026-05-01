@@ -480,6 +480,7 @@ MFile* SFTPMFile::getNextFileInDir() {
     }
     file->current_attrs = attrs;
     file->size = attrs->size;
+    file->is_dir = (attrs->type == SSH_FILEXFER_TYPE_DIRECTORY) ? 1 : 0;
 
     return file;
 }
