@@ -480,12 +480,11 @@ uint8_t iecChannelHandlerDir::readBufferData()
     else if( m_headerLine < 0xFF )
     {
         // file entries
-        std::unique_ptr<MFile> entry; 
-
-        // skip over files starting with "."
+        std::unique_ptr<MFile> entry;
         bool skip = false;
         do 
         { 
+            skip = false;
             entry = std::unique_ptr<MFile>( m_dir->getNextFileInDir() ); 
             if( entry!=nullptr )
             {
