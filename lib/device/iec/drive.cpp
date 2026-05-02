@@ -483,6 +483,7 @@ uint8_t iecChannelHandlerDir::readBufferData()
         std::unique_ptr<MFile> entry; 
 
         // skip over files starting with "."
+        bool skip = false;
         do 
         { 
             entry = std::unique_ptr<MFile>( m_dir->getNextFileInDir() ); 
@@ -495,9 +496,14 @@ uint8_t iecChannelHandlerDir::readBufferData()
                 // by type (DIR/PRG/SEQ/USR/DEL)
                 // by size
                 // by date
+
+                if ( entry->is_hidden )
+                    skip = true;
+                else if ( mstr::isJunk(entry->name) )
+                    skip = true;
             }
         }
-        while( entry!=nullptr && entry->name[0] == '.' );
+        while( entry!=nullptr && skip == true );
 
         if( entry != nullptr )
         {
