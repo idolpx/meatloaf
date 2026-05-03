@@ -69,9 +69,9 @@ public:
         has_subdirs = true;
 
         // Read Header
-        Debug_printv("Reading header");
+        //Debug_printv("Reading header");
         readHeader();
-        Debug_printv("header[%16s]", header.name);
+        //Debug_printv("header[%.16s]", header.name);
 
         // Read this offset to get t/s link to start of directory
         seek(0x100);

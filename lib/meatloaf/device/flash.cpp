@@ -236,11 +236,7 @@ MFile* FlashMFile::getNextFileInDir()
 
     // Debug_printv("before readdir(), dir not null:%d", dir != nullptr);
     struct dirent* dirent = NULL;
-    do
-    {
-        dirent = readdir( dir );
-    } while ( dirent != NULL ); // Skip hidden files
-    
+    dirent = readdir( dir );
     if ( dirent != NULL )
     {
         //Debug_printv("path[%s] name[%s]", this->path.c_str(), dirent->d_name);
@@ -260,7 +256,7 @@ MFile* FlashMFile::getNextFileInDir()
             file->is_dir = 0;
         }
 
-        if ( mstr::startsWith(dirent->d_name, ".") )
+        if ( dirent->d_name[0] == '.')
             file->is_hidden = 1;
 
         return file;

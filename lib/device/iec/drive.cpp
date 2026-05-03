@@ -488,7 +488,7 @@ uint8_t iecChannelHandlerDir::readBufferData()
             entry = std::unique_ptr<MFile>( m_dir->getNextFileInDir() ); 
             if( entry!=nullptr )
             {
-                Debug_printv("[%s][%s]", entry->name.c_str(), entry->pathInStream.c_str());
+                //Debug_printv("[%s][%s]", entry->name.c_str(), entry->pathInStream.c_str());
 
                 // filter directory listing here
                 // by name pattern
@@ -500,6 +500,8 @@ uint8_t iecChannelHandlerDir::readBufferData()
                     skip = true;
                 else if ( mstr::isJunk(entry->name) )
                     skip = true;
+
+                //Debug_printv("name[%s] skip[%d]", entry->name.c_str(), skip);
             }
         }
         while( entry!=nullptr && skip == true );

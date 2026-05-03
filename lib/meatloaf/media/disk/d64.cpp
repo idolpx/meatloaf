@@ -60,7 +60,7 @@ bool D64MStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
 {
     uint16_t sectorOffset = 0;
 
-    Debug_printv("track[%d] sector[%d] offset[%d]", track, sector, offset);
+    //Debug_printv("track[%d] sector[%d] offset[%d]", track, sector, offset);
 
     // Is this a valid track?
     uint16_t c = partitions[partition].block_allocation_map.size() - 1;
@@ -90,7 +90,7 @@ bool D64MStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
     for (uint8_t index = 0; index < track; ++index)
     {
         sectorOffset += getSectorCount(index + 1);
-        Debug_printv("track[%d] speedZone[%d] secotorsPerTrack[%d] sectorOffset[%d]", (index + 1), speedZone(index), getSectorCount(index + 1), sectorOffset);
+        //Debug_printv("track[%d] speedZone[%d] secotorsPerTrack[%d] sectorOffset[%d]", (index + 1), speedZone(index), getSectorCount(index + 1), sectorOffset);
     }
     track++;
     sectorOffset += sector;
@@ -99,7 +99,7 @@ bool D64MStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
     this->track = track;
     this->sector = sector;
 
-    Debug_printv("track[%d] sector[%d] speedZone[%d] sectorOffset[%d]", track, sector, speedZone(track), sectorOffset);
+    //Debug_printv("track[%d] sector[%d] speedZone[%d] sectorOffset[%d]", track, sector, speedZone(track), sectorOffset);
 
     return containerStream->seek((sectorOffset * block_size) + offset);
 }
@@ -465,8 +465,8 @@ bool D64MStream::seekEntry( uint16_t index )
     uint16_t sectorOffset = index / 8;
     uint16_t entryOffset = (index % 8) * 32;
 
-    Debug_printv("----------");
-    Debug_printv("index[%d] sectorOffset[%d] entryOffset[%d] entry_index[%d]", index, sectorOffset, entryOffset, entry_index);
+    //Debug_printv("----------");
+    //Debug_printv("index[%d] sectorOffset[%d] entryOffset[%d] entry_index[%d]", index, sectorOffset, entryOffset, entry_index);
 
     if (index == 0 || index != entry_index)
     {
@@ -483,7 +483,7 @@ bool D64MStream::seekEntry( uint16_t index )
         {
             if (next_track)
             {
-                Debug_printv("next_track[%d] next_sector[%d]", entry.next_track, entry.next_sector);
+                //Debug_printv("next_track[%d] next_sector[%d]", entry.next_track, entry.next_sector);
                 if (!seekSector(entry.next_track, entry.next_sector))
                     return false;
             }
@@ -492,7 +492,7 @@ bool D64MStream::seekEntry( uint16_t index )
             next_track = entry.next_track;
             next_sector = entry.next_sector;
 
-            Debug_printv("sectorOffset[%d] -> track[%d] sector[%d]", sectorOffset, track, sector);
+            //Debug_printv("sectorOffset[%d] -> track[%d] sector[%d]", sectorOffset, track, sector);
 
         } while (sectorOffset-- > 0);
         if (!seekSector(track, sector, entryOffset))
@@ -505,7 +505,7 @@ bool D64MStream::seekEntry( uint16_t index )
             if (next_track == 0)
                 return false;
 
-            Debug_printv("Follow link track[%d] sector[%d] entryOffset[%d]", next_track, next_sector, entryOffset);
+            //Debug_printv("Follow link track[%d] sector[%d] entryOffset[%d]", next_track, next_sector, entryOffset);
             if (!seekSector(next_track, next_sector, entryOffset))
                 return false;
         }
@@ -521,7 +521,7 @@ bool D64MStream::seekEntry( uint16_t index )
     }
 
     std::string e = mstr::toHex((uint8_t *)&entry, sizeof(entry));
-    Debug_printv("file_type[%02X] file_name[%.16s] entry[%s]", entry.file_type, entry.filename, e.c_str());
+    //Debug_printv("file_type[%02X] file_name[%.16s] entry[%s]", entry.file_type, entry.filename, e.c_str());
 
     // if ( next_track == 0 && next_sector == 0xFF )
     entry_index = index + 1;
@@ -862,7 +862,7 @@ MFile* D64MFile::getNextFileInDir()
         if ( (image->entry.file_type & 0b00000111) == 0x00 )  // DEL files are hidden
             file->is_hidden = 1;
 
-        Debug_printv("name[%s] ext[%s][%02X] size[%lu] is_dir[%d]", file->name.c_str(), file->extension.c_str(), image->entry.file_type, file->size, file->is_dir);
+        Debug_printv("name[%s] ext[%s][%02X] size[%lu] is_dir[%d] is_hidden[%d]", file->name.c_str(), file->extension.c_str(), image->entry.file_type, file->size, file->is_dir, file->is_hidden);
 
         return file;
     }
