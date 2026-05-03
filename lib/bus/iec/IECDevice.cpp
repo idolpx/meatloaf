@@ -40,6 +40,10 @@ void IECDevice::setDeviceNumber(uint8_t devnr)
   m_devnr = devnr;
 }
 
+uint8_t IECDevice::getDeviceNumber() const
+{
+  return m_devnr;
+}
 
 void IECDevice::sendSRQ()
 {

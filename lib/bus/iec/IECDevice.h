@@ -37,6 +37,7 @@ class IECDevice
 
   // call this to change the device number
   void setDeviceNumber(uint8_t devnr);
+  uint8_t getDeviceNumber() const;
 
   // call this to enable or disable support for the various fast-load protocols
   // for your device.

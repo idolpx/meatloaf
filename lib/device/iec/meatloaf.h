@@ -45,6 +45,15 @@ public:
         }
     }
 
+    void reset() override {
+        iecDrive::reset();
+        iecFuji::reset_device();
+
+        // if device is not active, reboot
+        if ( !m_isActive )
+            fnSystem.reboot();
+    }
+
     // // open file "name" on channel
     // bool open(uint8_t channel, const char *name, uint8_t nameLen) override {
     //     payload = std::string((const char *) name, nameLen);

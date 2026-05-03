@@ -329,9 +329,15 @@ void iecFuji::process_basic_commands()
     // else if (payload.find("fnversion") != std::string::npos)
     //     fn_version();
     else if (payload.find("enable") != std::string::npos)
-        enable_device_basic();
+    {
+        if (payload.size() > 7)
+            enable_device_basic();
+    }
     else if (payload.find("disable") != std::string::npos)
-        disable_device_basic();
+    {
+        if (payload.size() > 8)
+            disable_device_basic();
+    }
     else if (payload.find("copy") != std::string::npos)
         copy_file_basic();
     else if (payload.find("update") != std::string::npos)
@@ -698,15 +704,32 @@ void iecFuji::enable_device_basic(std::string ids)
         }
     }
     Config.save();
+    response = "ok";
+    set_fuji_iec_status(0, response);
 }
 
 void iecFuji::disable_device_basic(std::string ids)
 {
+    Debug_printv("ids[%s]", ids.c_str());
     if(ids.empty()) {
         // Strip off the DISABLE: part of the command
         pt[0] = pt[0].substr(8, std::string::npos);
     } else {
         pt = util_tokenize(ids, ',');
+    }
+
+    // Disable all devices
+    if (pt[0] == "*") {
+        for (int i = 0; i < 31; i++) {
+            auto d = SYSTEM_BUS.findDevice(i, true);
+            if (d) {
+                d->setActive(false);
+                Debug_printv("Disable Device #%d [%d]", d->getDeviceNumber(), d->isActive());
+            }
+        }
+        response = "ok";
+        set_fuji_iec_status(0, response);
+        return;
     }
 
     // Disable devices
@@ -720,6 +743,8 @@ void iecFuji::disable_device_basic(std::string ids)
         }
     }
     Config.save();
+    response = "ok";
+    set_fuji_iec_status(0, response);
 }
 
 void iecFuji::net_set_ssid_raw(bool store)
