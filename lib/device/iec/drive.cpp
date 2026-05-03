@@ -950,10 +950,18 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                             }
                             else
                             {
-                                // This was a file.  Set m_cwd to the parent directory
-                                Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "file base[%s]", f->base().c_str() );
-                                //m_cwd.reset(MFSOwner::File(f->base()));
-                                set_cwd(f->base(), true);
+                                // This was a file.  Set m_cwd to the directory containing it.
+                                // If the file is inside a container (D64/D81/DNP etc.), pathInStream
+                                // is non-empty and f->url is the container — stay there.
+                                // Otherwise f->base() gives the parent directory on the filesystem.
+                                if (f->pathInStream.size()) {
+                                    Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "file in container, staying at [%s]", f->url.c_str() );
+                                    set_cwd(f->url, true);
+                                } else {
+                                    Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "file base[%s]", f->base().c_str() );
+                                    //m_cwd.reset(MFSOwner::File(f->base()));
+                                    set_cwd(f->base(), true);
+                                }
                             }
 
                             // {
@@ -976,9 +984,13 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
 
                         if ( m_statusCode != ST_OK && m_statusCode != ST_DRIVE_NOT_READY )
                         {
-                            Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Change Directory Here! url[%s] > base[%s]", f->url.c_str(), f->base().c_str() );
-                            //m_cwd.reset(MFSOwner::File(f->base()));
-                            set_cwd(f->base());
+                            if (f->pathInStream.size()) {
+                                Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "file in container, staying at [%s]", f->url.c_str() );
+                                set_cwd(f->url);
+                            } else {
+                                Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Change Directory Here! url[%s] > base[%s]", f->url.c_str(), f->base().c_str() );
+                                set_cwd(f->base());
+                            }
                         }
                     }
 
