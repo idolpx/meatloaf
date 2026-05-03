@@ -585,25 +585,33 @@ void cHttpdServer::set_file_content_type(httpd_req_t *req, const char *filepath)
 void cHttpdServer::send_file(httpd_req_t *req, const char *filename)
 {
     // Build the full file path
-    std::string fpath = httpdocs;
+    std::string fpath;
     // Trim any '/' prefix before adding it to the base directory
+    Debug_printv("filename[%s]", filename);
     if ( !exists(filename) )
     {
         while (*filename == '/')
             filename++;
     }
-    fpath += filename;
+    fpath = filename;
+    if ( !exists(fpath) )
+        fpath = httpdocs + std::string(filename);
 
     // Retrieve server state
     serverstate *pState = (serverstate *)httpd_get_global_user_ctx(req->handle);
 
-    //Debug_printv("is_dir[%d] fpath[%s]", pState->_FS->is_dir(fpath.c_str()), fpath.c_str());
+    Debug_printv("is_dir[%d] fpath[%s]", pState->_FS->is_dir(fpath.c_str()), fpath.c_str());
+
+    // If filename is just '/', serve index.html
+    std::string default_index = "index.html";
+    if (fpath.size() == 1 && fpath[0] == '/')
+        fpath = httpdocs + default_index;
 
     // If filename is a directory, look for index.html within it
-    if (fpath.back() == '/')
-        fpath += "index.html";
+    else if (fpath.back() == '/')
+        fpath += default_index;
     else if (pState->_FS->is_dir(fpath.c_str()))
-        fpath += "/index.html";
+        fpath += "/" + default_index;
 
     // Handle file differently if it's one of the types we parse
     if (is_parsable(get_extension(filename)))
@@ -626,7 +634,7 @@ void cHttpdServer::send_file(httpd_req_t *req, const char *filename)
         // Set the expected length of the content
         char hdrval[10];
         snprintf(hdrval, 10, "%ld", FileSystem::filesize(file));
-        httpd_resp_set_hdr(req, "Content-Length", hdrval);
+        //httpd_resp_set_hdr(req, "Content-Length", hdrval);
 
         // Send the file content out in chunks (buffer in PSRAM to spare internal RAM)
         char *buf = (char *)psram_malloc(http_SEND_BUFF_SIZE);
