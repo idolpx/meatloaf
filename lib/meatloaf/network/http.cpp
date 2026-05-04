@@ -537,9 +537,17 @@ uint32_t MeatHttpClient::read(uint8_t* buf, uint32_t size) {
             // Only restart the request (for range-based paging) when:
             // - We got a partial read (bytesRead > 0 but < size), AND
             // - The response is NOT chunked (chunked has no fixed size; 0-byte
-            //   read means EOF, not "range exhausted").
-            if (bytesRead > 0 && bytesRead < size && !esp_http_client_is_chunked_response(_http))
-                openAndFetchHeaders(lastMethod, _position);
+            //   read means EOF, not "range exhausted"), AND
+            // - We haven't already consumed all expected bytes (guard against
+            //   requesting a range past EOF, which causes a 416 response; the
+            //   server may keep the keep-alive connection open without a
+            //   Content-Length on the error body, causing esp_http_client_read()
+            //   to block forever waiting for a body that never arrives).
+            if (bytesRead > 0 && bytesRead < size && !esp_http_client_is_chunked_response(_http)) {
+                uint32_t totalSize = (_range_size > 0) ? _range_size : 0;
+                if (totalSize == 0 || _position < totalSize)
+                    openAndFetchHeaders(lastMethod, _position);
+            }
         }
 
         //Debug_printv("size[%d] bytesRead[%d] _position[%d]", size, bytesRead, _position);

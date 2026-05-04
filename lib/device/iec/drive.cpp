@@ -297,29 +297,25 @@ uint8_t iecChannelHandlerFile::readBufferData()
 #endif
         fnLedManager.toggle(eLed::LED_BUS);
 
-        if( m_fixLoadAddress>=0 && m_stream->position()==0 )
-        {
-            uint64_t t = esp_timer_get_time();
-            m_len = m_stream->read(m_data, BUFFER_SIZE);
-            m_transportTimeUS += (esp_timer_get_time()-t);
-            if( m_len>=2 )
-            {
-                m_data[0] = (m_fixLoadAddress & 0x00FF);
-                m_data[1] = (m_fixLoadAddress & 0xFF00) >> 8;
-            }
-            m_fixLoadAddress = -1;
-        }
-        else
-            m_len = 0;
-
         // try to fill buffer
+        m_len = 0;
         do 
         {
             uint64_t t = esp_timer_get_time();
             uint32_t got = m_stream->read(m_data+m_len, BUFFER_SIZE-m_len);
             m_transportTimeUS += (esp_timer_get_time()-t);
+
             if (got == 0) break;  // prevent infinite loop if stream returns 0 (e.g. seek past EOF)
             m_len += got;
+
+            // if m_fixLoadAddress is set, adjust the first two bytes
+            if( m_fixLoadAddress>=0 && m_stream->position()==0 && m_len>=2 )
+            {
+                m_data[0] = (m_fixLoadAddress & 0x00FF);
+                m_data[1] = (m_fixLoadAddress & 0xFF00) >> 8;
+                m_fixLoadAddress = -1;
+            }
+
             if (m_stream->error()) {
                 Debug_printv("Error: read failed: got[%d]", got);
                 return ST_DRIVE_NOT_READY;
