@@ -47,9 +47,9 @@ public:
 
     void reset() override {
         iecDrive::reset();
-        iecFuji::reset_device();
 
         // if device is not active, reboot
+        //Debug_printv("active[%d]", m_isActive);
         if ( !m_isActive )
             fnSystem.reboot();
     }
