@@ -590,6 +590,12 @@ uint32_t D64MStream::readFile(uint8_t *buf, uint32_t size)
     //Debug_printv("readFile(%lu) sector_offset[%d] pos[%lu]", size, sector_offset, _position);
     if (sector_offset % block_size == 0)
     {
+        // If we previously read a block header with next_track==0 (EOF) and the last block
+        // was fully used, sector_offset lands here again. Guard against reading garbage bytes
+        // from the container as if they were a new block header.
+        if (sector_offset > 0 && next_track == 0)
+            return 0;
+
         // We are at the beginning of the block
         // Read track/sector link
         readContainer((uint8_t *)&next_track, 1);
