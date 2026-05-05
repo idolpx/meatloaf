@@ -292,9 +292,12 @@ uint32_t HTTPMStream::read(uint8_t* buf, uint32_t size) {
         if ( size > available() )
             size = available();
 
-        bytesRead = _session->client->read(buf, size);
-        _position += bytesRead;
-        _error = _session->client->_error;
+        if ( size > 0 )
+        {
+            bytesRead = _session->client->read(buf, size);
+            _position += bytesRead;
+            _error = _session->client->_error;
+        }
     }
 
     return bytesRead;
@@ -345,10 +348,11 @@ bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
     _size = 0;
     _range_size = 0;
 
-    // Reset the HTTP client handle before starting a new request.
-    if (_is_open) {
-        init();
-    }
+    // Always reset the HTTP client handle before a new request.
+    // After HEAD, _is_open is false (HEAD doesn't set it), so the conditional check
+    // would skip init() for the subsequent GET — leaving the handle with stale response
+    // buffer state (raw_data != orig_raw_data) that causes esp_http_client_read() to block.
+    init();
 
     return processRedirectsAndOpen(0);
 };
