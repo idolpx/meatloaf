@@ -738,7 +738,17 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
                 if ( mstr::contains(evt->header_value, (char *)"://") )
                 {
                     //Debug_printv("match");
-                    meatClient->url = evt->header_value;
+                    auto origParsed = PeoplesUrlParser::parseURL(meatClient->url);
+                    auto newParsed = PeoplesUrlParser::parseURL(evt->header_value);
+                    // Re-inject credentials if the redirect URL has none but the original did,
+                    // and both URLs target the same host (e.g. redirect strips user:pass@host).
+                    if (newParsed->user.empty() && !origParsed->user.empty() && newParsed->host == origParsed->host) {
+                        newParsed->user = origParsed->user;
+                        newParsed->password = origParsed->password;
+                        meatClient->url = newParsed->rebuildUrl();
+                    } else {
+                        meatClient->url = evt->header_value;
+                    }
                 }
                 else
                 {
@@ -770,15 +780,25 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
         case HTTP_EVENT_REDIRECT:
 
             Debug_printv("* This page redirects from '%s' to '%s'", meatClient->url.c_str(), evt->header_value);
-            if ( mstr::startsWith(evt->header_value, (char *)"http") )
+            if ( mstr::startsWith(evt->header_value, (char *)"://") )
             {
                 //Debug_printv("match");
-                meatClient->url = evt->header_value;
+                auto origParsed = PeoplesUrlParser::parseURL(meatClient->url);
+                auto newParsed = PeoplesUrlParser::parseURL(evt->header_value);
+                // Re-inject credentials if the redirect URL has none but the original did,
+                // and both URLs target the same host (e.g. redirect strips user:pass@host).
+                if (newParsed->user.empty() && !origParsed->user.empty() && newParsed->host == origParsed->host) {
+                    newParsed->user = origParsed->user;
+                    newParsed->password = origParsed->password;
+                    meatClient->url = newParsed->rebuildUrl();
+                } else {
+                    meatClient->url = evt->header_value;
+                }
             }
             else
             {
                 //Debug_printv("no match");
-                meatClient->url += evt->header_value;                    
+                meatClient->url += evt->header_value;
             }
             meatClient->wasRedirected = true;
             break;
