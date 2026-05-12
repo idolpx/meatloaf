@@ -76,6 +76,7 @@ public:
         partitions.clear();
         partitions.push_back(p);
         sectorsPerTrack = { 40 };
+        interleave = { 1, 1 }; // Directory, File
         has_subdirs = true;
         dos_rom = "dos1581";
 

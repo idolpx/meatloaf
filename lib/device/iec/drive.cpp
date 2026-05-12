@@ -504,7 +504,7 @@ uint8_t iecChannelHandlerDir::readBufferData()
 
         if( entry != nullptr )
         {
-            Debug_printv( ANSI_WHITE_BOLD "blocks[%lu] name[%s] ext[%s]", entry->blocks(), entry->name.c_str(), entry->extension.c_str());
+            //Debug_printv( ANSI_WHITE_BOLD "blocks[%lu] name[%s] ext[%s]", entry->blocks(), entry->name.c_str(), entry->extension.c_str());
 
             // directory entry
             uint16_t blocks = entry->blocks();
@@ -529,7 +529,6 @@ uint8_t iecChannelHandlerDir::readBufferData()
                 Debug_printv("original name[%s] ext[%s]", name.c_str(), ext.c_str());
                 name = U8Char::encodeACE(name);
                 name = mstr::toPETSCII2( name );
-                mstr::replaceAll(name, "\\", "/");
 
                 ext  = U8Char::encodeACE(ext);
                 ext  = mstr::toPETSCII2( ext );
@@ -549,8 +548,14 @@ uint8_t iecChannelHandlerDir::readBufferData()
                     ext = "PRG";
                 }
                 ext = " " + ext + " "; // Clear closed and locked status display
-                Debug_printv("converted name[%s] ext[%s]", name.c_str(), ext.c_str());
+                //Debug_printv("converted name[%s] ext[%s]", name.c_str(), ext.c_str());
             }
+            else
+            {
+                // unescape slashes
+                mstr::replaceAll(name, "\\", "/");
+            }
+
 
 #if 0
             // C64 compatibale filename (16+3 chars)
@@ -596,7 +601,7 @@ uint8_t iecChannelHandlerDir::readBufferData()
                 m_data[m_len++] = ' ';
                 m_data[m_len++] = 0;
 
-                Debug_printv("data[%s] name[%s] ext[%s]", m_data, name.c_str(), ext.c_str());
+                //Debug_printv("data[%s] name[%s] ext[%s]", m_data, name.c_str(), ext.c_str());
             }
 #endif
         }
