@@ -504,12 +504,12 @@ uint8_t iecChannelHandlerDir::readBufferData()
 
         if( entry != nullptr )
         {
-            //Debug_printv( ANSI_WHITE_BOLD "blocks[%lu] name[%s] ext[%s]", entry->blocks(), entry->name.c_str(), entry->extension.c_str());
+            Debug_printv( ANSI_WHITE_BOLD "blocks[%lu] name[%s] ext[%s]", entry->blocks(), entry->name.c_str(), entry->extension.c_str());
 
             // directory entry
             uint16_t blocks = entry->blocks();
             m_data[m_len++] = 1;  // BASIC line pointer low byte
-            m_data[m_len++] = 1;  // BASIC line pointer low byte
+            m_data[m_len++] = 1;  // BASIC line pointer high byte
             m_data[m_len++] = blocks&255;  // Block count low byte
             m_data[m_len++] = blocks/256;  // Block count high byte
             if( blocks<10 )    m_data[m_len++] = ' ';
@@ -523,31 +523,33 @@ uint8_t iecChannelHandlerDir::readBufferData()
             if ( !mstr::contains(entry->pathInStream, name.c_str()) && entry->pathInStream.size() )
                 name = entry->pathInStream;
 
+            // Convert to PETSCII and set extension
             if ( !m_dir->isPETSCII )
             {
+                Debug_printv("original name[%s] ext[%s]", name.c_str(), ext.c_str());
                 name = U8Char::encodeACE(name);
                 name = mstr::toPETSCII2( name );
+                mstr::replaceAll(name, "\\", "/");
+
                 ext  = U8Char::encodeACE(ext);
                 ext  = mstr::toPETSCII2( ext );
-            }
-            mstr::replaceAll(name, "\\", "/");
-
-            // Extension
-            mstr::ltrim(ext);
-            if( entry->isDirectory() )
-            {
-                ext = "DIR";
-            }
-            else if( ext.length()>0 )  // Enhanced directory entries with real file extension
-            {
-                if( ext.size()>3 )
-                    ext = ext.substr(0, 3);
+                if( ext.size() )  // Enhanced directory entries with real file extension
+                {
+                    if( ext.size() >= 3 )
+                        ext = ext.substr(0, 3);
+                    else
+                        ext += std::string(3 - ext.size(), ' ');
+                }
+                else if( entry->isDirectory() )
+                {
+                    ext = "DIR";
+                }
                 else
-                    ext += std::string(3-ext.size(), ' ');
-            }
-            else
-            {
-                ext = "PRG";
+                {
+                    ext = "PRG";
+                }
+                ext = " " + ext + " "; // Clear closed and locked status display
+                Debug_printv("converted name[%s] ext[%s]", name.c_str(), ext.c_str());
             }
 
 #if 0
@@ -580,18 +582,21 @@ uint8_t iecChannelHandlerDir::readBufferData()
 
                 // Extension gap
                 if (n<16)
-                    {
-                    n = 17-n;
+                {
+                    n = 16-n;
                     while(n-->0) m_data[m_len++] = ' ';
-                    }
-                else
-                    m_data[m_len++] = ' ';
+                }
+                // else
+                //     m_data[m_len++] = ' ';
 
-                // Extension
-                memcpy(m_data+m_len, ext.data(), 3);
-                m_len+=3;
+                // C64 Media includes closed and locked status in extension
+                // * + Extension + <
+                memcpy(m_data+m_len, ext.data(), 5);
+                m_len+=5;
                 m_data[m_len++] = ' ';
                 m_data[m_len++] = 0;
+
+                Debug_printv("data[%s] name[%s] ext[%s]", m_data, name.c_str(), ext.c_str());
             }
 #endif
         }
@@ -601,17 +606,17 @@ uint8_t iecChannelHandlerDir::readBufferData()
 #ifdef IEC_FP_DOLPHIN
             // DolphinDos' MultiDubTwo copy program needs the "BLOCKS FREE" footer line, otherwise it aborts when reading source
             uint32_t free = m_dir->media_image.size() ? m_dir->media_blocks_free : std::min((int) m_dir->getAvailableSpace()/254, 65535);
-            m_data[0] = 1;
-            m_data[1] = 1;
-            m_data[2] = free&255;
-            m_data[3] = free/256;
+            m_data[0] = 1;          // BASIC line pointer low byte
+            m_data[1] = 1;          // BASIC line pointer high byte
+            m_data[2] = free&255;   // Block count low byte
+            m_data[3] = free/256;   // Block count high byte
             strcpy((char *) m_data+4, "BLOCKS FREE.");
 #else
             uint32_t free = m_dir->media_image.size() ? m_dir->media_blocks_free : 0;
-            m_data[0] = 1;
-            m_data[1] = 1;
-            m_data[2] = free&255;
-            m_data[3] = free/256;
+            m_data[0] = 1;          // BASIC line pointer low byte
+            m_data[1] = 1;          // BASIC line pointer high byte
+            m_data[2] = free&255;   // Block count low byte
+            m_data[3] = free/256;   // Block count high byte
             if( m_dir->media_image.size() )
                 strcpy((char *) m_data+4, "BLOCKS FREE.");
             else
@@ -619,9 +624,9 @@ uint8_t iecChannelHandlerDir::readBufferData()
 #endif
             int n = 4+strlen((char *) m_data+4);
             while( n<29 ) m_data[n++]=' ';
-            m_data[29] = 0;
-            m_data[30] = 0;
-            m_data[31] = 0;
+            m_data[29] = 0;  // End of program
+            m_data[30] = 0;  // End of program
+            m_data[31] = 0;  // End of program
             m_len = 32;
             m_headerLine = 0xFF;
         }
