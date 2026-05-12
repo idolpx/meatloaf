@@ -376,7 +376,6 @@ MFile* NFSMFile::getNextFileInDir()
         entryUrl.reserve(url.size() + 1 + ent_name.size());
         entryUrl = url; entryUrl += '/'; entryUrl += ent_name;
         auto file = new NFSMFile(entryUrl);
-        file->extension.insert(0, 1, ' ');
 
         // Set size and type information
         if (file->is_dir) {

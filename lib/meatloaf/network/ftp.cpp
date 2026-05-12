@@ -98,7 +98,6 @@ MFile* FTPMFile::getNextFileInDir() {
     full += de->filename;
     auto file = new FTPMFile(full);
     file->name = de->filename;
-    file->extension.insert(0, 1, ' ');
     //file->size = de->isDir ? 0 : de->size;
     file->size = de->size;
     file->is_dir = de->isDir;

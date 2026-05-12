@@ -450,7 +450,6 @@ MFile* AFPMFile::getNextFileInDir()
 
     auto file = new AFPMFile(url + "/" + ent_name);
     file->name      = ent_name;
-    file->extension = " " + file->extension;
     file->size      = (uint32_t)ent_size;
     file->is_dir    = ent_isdir ? 1 : 0;
 

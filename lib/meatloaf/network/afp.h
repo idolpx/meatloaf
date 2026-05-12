@@ -33,6 +33,7 @@ extern "C" {
 #include <afp.h>
 #include <midlevel.h>
 #include <libafpclient.h>
+#include <uams_def.h>
 }
 
 #include <map>
@@ -127,16 +128,28 @@ public:
 
     AFPMFile(std::string path) : MFile(path) {
         uint16_t afp_port = port.empty() ? AFP_DEFAULT_PORT : std::stoi(port);
-        _session = SessionBroker::obtain<AFPMSession>(host, afp_port);
+        std::string key = "afp://" + host + ":" + std::to_string(afp_port);
+
+        // Try to find an existing connected session first.
+        _session = SessionBroker::find<AFPMSession>(key);
+
+        if (!_session) {
+            // New session: credentials must be set BEFORE connect() so that
+            // afp_server_full_connect() picks them up for DHX/DHX2 auth.
+            auto newSession = std::make_shared<AFPMSession>(host, afp_port);
+            if (!user.empty() || !password.empty())
+                newSession->setCredentials(user, password);
+            if (newSession->connect()) {
+                SessionBroker::add(key, newSession);
+                _session = newSession;
+            }
+        }
 
         if (!_session || !_session->isConnected()) {
             Debug_printv("Failed to obtain AFP session for %s:%d", host.c_str(), afp_port);
             m_isNull = true;
             return;
         }
-
-        if (!user.empty() || !password.empty())
-            _session->setCredentials(user, password);
 
         parseAFPPath(this->path, volume_name, file_path);
 

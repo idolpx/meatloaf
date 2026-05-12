@@ -243,7 +243,6 @@ MFile* FlashMFile::getNextFileInDir()
         std::string entry_name = this->path + ((this->path == "/") ? "" : "/") + std::string(dirent->d_name);
 
         auto file = new FlashMFile(entry_name);
-        file->extension.insert(0, 1, ' ');
 
         if( file->isDirectory() ) {
             file->size = 0;
