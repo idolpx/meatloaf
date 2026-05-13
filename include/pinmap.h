@@ -28,6 +28,7 @@
 #include "pinmap/foenix-s3-ml.h"
 #include "pinmap/freenove-esp32-s3-wroom.h"
 #include "pinmap/lilygo-t-display-s3.h"
+#include "pinmap/pocket-dongle-s3.h"
 #include "pinmap/esp32-1732s019.h"
 #include "pinmap/nodemcu-esp-s3-12k-kit.h"
 #include "pinmap/esp32-s3-zero.h"
