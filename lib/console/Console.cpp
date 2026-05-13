@@ -16,7 +16,11 @@
 #include "Commands/GPIOCommands.h"
 #include "Commands/XFERCommands.h"
 #include "driver/uart.h"
-#include "esp_vfs_dev.h"
+#include "driver/uart_vfs.h"
+#ifdef CONFIG_IDF_TARGET_ESP32S3
+#include "driver/usb_serial_jtag.h"
+#include "driver/usb_serial_jtag_vfs.h"
+#endif
 #include "linenoise/linenoise.h"
 #include "Helpers/PWDHelpers.h"
 #include "Helpers/InputParser.h"
@@ -191,6 +195,31 @@ namespace ESP32Console
     {
         //Debug_printv("Initialize console");
 
+        /* Drain stdout before reconfiguring it */
+        fflush(stdout);
+        fsync(fileno(stdout));
+
+        /* Disable buffering on stdin */
+        setvbuf(stdin, NULL, _IONBF, 0);
+
+        /* Enable non-blocking mode on stdin and stdout */
+        fcntl(fileno(stdout), F_SETFL, 0);
+        fcntl(fileno(stdin), F_SETFL, 0);
+
+#ifdef CONFIG_IDF_TARGET_ESP32S3
+        /* Use USB CDC (Serial/JTAG) driver on ESP32-S3 */
+        usb_serial_jtag_vfs_set_rx_line_endings(ESP_LINE_ENDINGS_CR);
+        usb_serial_jtag_vfs_set_tx_line_endings(ESP_LINE_ENDINGS_CRLF);
+
+        usb_serial_jtag_driver_config_t usb_serial_jtag_config = {
+            .tx_buffer_size = 1024,
+            .rx_buffer_size = 1024,
+        };
+        ESP_ERROR_CHECK(usb_serial_jtag_driver_install(&usb_serial_jtag_config));
+
+        /* Tell VFS to use USB Serial/JTAG driver */
+        usb_serial_jtag_vfs_use_driver();
+#else
         if (channel >= SOC_UART_NUM)
         {
             Debug_printv("Serial number is invalid, please use numers from 0 to %u", SOC_UART_NUM - 1);
@@ -204,22 +233,10 @@ namespace ESP32Console
             uart_driver_delete(channel);
         }
 
-        /* Drain stdout before reconfiguring it */
-        fflush(stdout);
-        fsync(fileno(stdout));
-
-        /* Disable buffering on stdin */
-        setvbuf(stdin, NULL, _IONBF, 0);
-
         /* Minicom, screen, idf_monitor send CR when ENTER key is pressed */
-        esp_vfs_dev_uart_port_set_rx_line_endings(channel, ESP_LINE_ENDINGS_CR);
+        uart_vfs_dev_port_set_rx_line_endings(channel, ESP_LINE_ENDINGS_CR);
         /* Move the caret to the beginning of the next line on '\n' */
-        esp_vfs_dev_uart_port_set_tx_line_endings(channel, ESP_LINE_ENDINGS_CRLF);
-
-        /* Enable non-blocking mode on stdin and stdout */
-        fcntl(fileno(stdout), F_SETFL, 0);
-        fcntl(fileno(stdin), F_SETFL, 0);
-
+        uart_vfs_dev_port_set_tx_line_endings(channel, ESP_LINE_ENDINGS_CRLF);
 
         /* Configure UART. Note that REF_TICK is used so that the baud rate remains
          * correct while APB frequency is changing in light sleep mode.
@@ -231,7 +248,6 @@ namespace ESP32Console
             .stop_bits = UART_STOP_BITS_1,
             .source_clk = UART_SCLK_DEFAULT,
         };
-    
 
         ESP_ERROR_CHECK(uart_param_config(channel, &uart_config));
 
@@ -247,7 +263,8 @@ namespace ESP32Console
         ESP_ERROR_CHECK(uart_driver_install(channel, 256, 0, 0, NULL, 0));
 
         /* Tell VFS to use UART driver */
-        esp_vfs_dev_uart_use_driver(channel);
+        uart_vfs_dev_use_driver(channel);
+#endif
 
         esp_console_config_t console_config = {
             .max_cmdline_length = max_cmdline_len_,
@@ -349,10 +366,6 @@ namespace ESP32Console
 
             //Interpolate the input line
             std::string interpolated_line = interpolateLine(line);
-            //Debug_printv("Interpolated line: [%s]\n", interpolated_line.c_str());
-
-            // Flush trailing CR
-            uart_flush(CONSOLE_UART);
 
             /* Try to run the command */
             int ret;
@@ -444,8 +457,7 @@ namespace ESP32Console
 
     size_t Console::write(uint8_t c)
     {
-        int z = uart_write_bytes(uart_channel_, (const char *)&c, 1);
-        // uart_wait_tx_done(_uart_num, MAX_WRITE_BYTE_TICKS);
+        int z = fwrite(&c, 1, 1, stdout);
 #ifdef ENABLE_CONSOLE_TCP
         tcp_server.send(std::string((const char *)&c, 1));
 #endif
@@ -454,8 +466,7 @@ namespace ESP32Console
     
     size_t Console::write(const uint8_t *buffer, size_t size)
     {
-        int z = uart_write_bytes(uart_channel_, (const char *)buffer, size);
-        // uart_wait_tx_done(_uart_num, MAX_WRITE_BUFFER_TICKS);
+        int z = fwrite(buffer, 1, size, stdout);
 #ifdef ENABLE_CONSOLE_TCP
         tcp_server.send((char *)buffer);
 #endif
@@ -464,7 +475,7 @@ namespace ESP32Console
     
     size_t Console::write(const char *str)
     {
-        int z = uart_write_bytes(uart_channel_, str, strlen(str));
+        int z = fwrite(str, 1, strlen(str), stdout);
 #ifdef ENABLE_CONSOLE_TCP
         tcp_server.send(str);
 #endif
@@ -478,7 +489,7 @@ namespace ESP32Console
         if (!_initialized)
             return -1;
 
-        return uart_write_bytes(uart_channel_, str, z);
+        return fwrite(str, 1, z, stdout);
     }
     
     size_t Console::lprint(const std::string &str)
@@ -491,30 +502,13 @@ namespace ESP32Console
 
     size_t Console::printf(const char *fmt...)
     {
-        char *result = nullptr;
-        va_list vargs;
-    
         if (!_initialized)
             return -1;
     
+        va_list vargs;
         va_start(vargs, fmt);
-    
-        int z = vasprintf(&result, fmt, vargs);
-    
-        if (z > 0) {
-            uart_write_bytes(uart_channel_, result, z);
-
-#ifdef ENABLE_CONSOLE_TCP
-            tcp_server.send(result);
-#endif
-        }
-    
+        int z = vfprintf(stdout, fmt, vargs);
         va_end(vargs);
-    
-        if (result != nullptr)
-            free(result);
-    
-        // uart_wait_tx_done(uart_channel_, MAX_WRITE_BUFFER_TICKS);
     
         return z >= 0 ? z : 0;
     }
@@ -554,7 +548,7 @@ namespace ESP32Console
 #ifdef ENABLE_CONSOLE_TCP
         tcp_server.send(str);
 #endif
-        return uart_write_bytes(uart_channel_, str, z);
+        return fwrite(str, 1, z, stdout);
     }
     
     size_t Console::print(const std::string &str)
