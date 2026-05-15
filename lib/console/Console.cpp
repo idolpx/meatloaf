@@ -27,6 +27,7 @@
 
 #include "../../include/debug.h"
 #include "string_utils.h"
+#include "console_settings.h"
 
 #include "tcpsvr.h"
 
@@ -170,6 +171,10 @@ namespace ESP32Console
 
     void Console::beginCommon()
     {
+        // Match ESP-IDF console example defaults for line editing behavior.
+        linenoiseSetMultiLine(1);
+        linenoiseAllowEmpty(false);
+
         /* Tell linenoise where to get command completions and hints */
         linenoiseSetCompletionCallback(&esp_console_get_completion);
         linenoiseSetHintsCallback((linenoiseHintsCallback *)&esp_console_get_hint);
@@ -195,84 +200,16 @@ namespace ESP32Console
     {
         //Debug_printv("Initialize console");
 
-        /* Drain stdout before reconfiguring it */
-        fflush(stdout);
-        fsync(fileno(stdout));
+        (void)baud;
+        (void)rxPin;
+        (void)txPin;
+        (void)channel;
 
-        /* Disable buffering on stdin */
-        setvbuf(stdin, NULL, _IONBF, 0);
+        // Use shared ESP-IDF style console setup for peripheral + stdio behavior.
+        initialize_console_peripheral();
 
-        /* Enable non-blocking mode on stdin and stdout */
-        fcntl(fileno(stdout), F_SETFL, 0);
-        fcntl(fileno(stdin), F_SETFL, 0);
-
-#ifdef CONFIG_IDF_TARGET_ESP32S3
-        /* Use USB CDC (Serial/JTAG) driver on ESP32-S3 */
-        usb_serial_jtag_vfs_set_rx_line_endings(ESP_LINE_ENDINGS_CR);
-        usb_serial_jtag_vfs_set_tx_line_endings(ESP_LINE_ENDINGS_CRLF);
-
-        usb_serial_jtag_driver_config_t usb_serial_jtag_config = {
-            .tx_buffer_size = 1024,
-            .rx_buffer_size = 1024,
-        };
-        ESP_ERROR_CHECK(usb_serial_jtag_driver_install(&usb_serial_jtag_config));
-
-        /* Tell VFS to use USB Serial/JTAG driver */
-        usb_serial_jtag_vfs_use_driver();
-#else
-        if (channel >= SOC_UART_NUM)
-        {
-            Debug_printv("Serial number is invalid, please use numers from 0 to %u", SOC_UART_NUM - 1);
-            return;
-        }
-
-        this->uart_channel_ = channel;
-
-        //Reinit the UART driver if the channel was already in use
-        if (uart_is_driver_installed(channel)) {
-            uart_driver_delete(channel);
-        }
-
-        /* Minicom, screen, idf_monitor send CR when ENTER key is pressed */
-        uart_vfs_dev_port_set_rx_line_endings(channel, ESP_LINE_ENDINGS_CR);
-        /* Move the caret to the beginning of the next line on '\n' */
-        uart_vfs_dev_port_set_tx_line_endings(channel, ESP_LINE_ENDINGS_CRLF);
-
-        /* Configure UART. Note that REF_TICK is used so that the baud rate remains
-         * correct while APB frequency is changing in light sleep mode.
-         */
-        const uart_config_t uart_config = {
-            .baud_rate = baud,
-            .data_bits = UART_DATA_8_BITS,
-            .parity = UART_PARITY_DISABLE,
-            .stop_bits = UART_STOP_BITS_1,
-            .source_clk = UART_SCLK_DEFAULT,
-        };
-
-        ESP_ERROR_CHECK(uart_param_config(channel, &uart_config));
-
-        // Set the correct pins for the UART of needed
-        if (rxPin > 0 || txPin > 0) {
-            if (rxPin < 0 || txPin < 0) {
-                Debug_printv("Both rxPin and txPin has to be passed!");
-            }
-            uart_set_pin(channel, txPin, rxPin, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
-        }
-
-        /* Install UART driver for interrupt-driven reads and writes */
-        ESP_ERROR_CHECK(uart_driver_install(channel, 256, 0, 0, NULL, 0));
-
-        /* Tell VFS to use UART driver */
-        uart_vfs_dev_use_driver(channel);
-#endif
-
-        esp_console_config_t console_config = {
-            .max_cmdline_length = max_cmdline_len_,
-            .max_cmdline_args = max_cmdline_args_,
-            .hint_color = 333333
-        };
-
-        ESP_ERROR_CHECK(esp_console_init(&console_config));
+        // Initialize linenoise + esp_console using the shared settings module.
+        initialize_console_library(history_save_path_);
 
         beginCommon();
 
@@ -320,12 +257,8 @@ namespace ESP32Console
         //        "Use UP/DOWN arrows to navigate through command history.\r\n"
         //        "Press TAB when typing command name to auto-complete.\r\n");
 
-        // Probe terminal status
-        int probe_status = linenoiseProbe();
-        if (probe_status)
-        {
-            linenoiseSetDumbMode(1);
-        }
+        // Do not force dumb mode here. On some USB monitor setups this causes
+        // rapid empty reads and prompt flooding.
 
         // if (linenoiseIsDumbMode())
         // {
@@ -334,6 +267,14 @@ namespace ESP32Console
         //            "Line editing and history features are disabled.\n\n"
         //            "On Windows, try using Putty instead.\r\n");
         // }
+
+        // Keep stdin in blocking mode inside the REPL task to avoid a prompt spin
+        // when USB CDC reconnects briefly return no data.
+        int stdin_flags = fcntl(fileno(stdin), F_GETFL, 0);
+        if (stdin_flags >= 0)
+        {
+            fcntl(fileno(stdin), F_SETFL, stdin_flags & ~O_NONBLOCK);
+        }
 
         linenoiseSetMaxLineLen(console.max_cmdline_len_);
         while (true)
@@ -348,8 +289,18 @@ namespace ESP32Console
             char *line = linenoise(prompt.c_str());
             if (line == NULL)
             {
-                //Debug_printv("empty line");
-                /* Ignore empty lines */
+                // Avoid tight-looping when input is temporarily unavailable.
+                vTaskDelay(pdMS_TO_TICKS(50));
+                continue;
+            }
+
+            // Ignore empty/whitespace-only input lines.
+            std::string raw_line = line;
+            mstr::trim(raw_line);
+            if (raw_line.empty())
+            {
+                linenoiseFree(line);
+                vTaskDelay(pdMS_TO_TICKS(20));
                 continue;
             }
 
@@ -365,7 +316,7 @@ namespace ESP32Console
             // }
 
             //Interpolate the input line
-            std::string interpolated_line = interpolateLine(line);
+            std::string interpolated_line = interpolateLine(raw_line.c_str());
 
             /* Try to run the command */
             int ret;
@@ -417,12 +368,24 @@ namespace ESP32Console
 
     void Console::execute(const char *command)
     {
+        if (command == nullptr)
+        {
+            return;
+        }
+
+        std::string command_str = command;
+        mstr::trim(command_str);
+        if (command_str.empty())
+        {
+            return;
+        }
+
         //Debug_printv("Executing command: [%s]\n", command);
-        lprint(command);
+        lprint(command_str);
         lprint("\n");
 
         //Interpolate the input line
-        std::string interpolated_line = interpolateLine(command);
+        std::string interpolated_line = interpolateLine(command_str.c_str());
         //Debug_printv("Interpolated line: [%s]\n", interpolated_line.c_str());
 
         /* Try to run the command */
