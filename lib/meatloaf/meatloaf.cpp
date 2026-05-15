@@ -870,7 +870,7 @@ MFile* MFile::cd(std::string newDir)
             return MFSOwner::File(newPath);
         }
         
-        // user entered: CD:_ or CD_ 
+        // user entered: CD:_ or CD_
         // means: go up one directory
 
         // user entered: CD:_DIR or CD_DIR
@@ -987,6 +987,26 @@ MFile* MFile::cdParent(std::string plus)
             lastSlash = path.find_last_of('/', path.size() - 2);
         }
         std::string newDir = mstr::dropLast(path, path.size() - lastSlash);
+
+        // Strip leading / from plus, then consume any _ (CBM ←) characters as
+        // additional "go up" steps — resolves _/_/dir by walking the path string
+        // directly rather than creating intermediate MFile objects.
+        if (!plus.empty() && plus[0] == '/')
+            plus = mstr::drop(plus, 1);
+
+        while (!plus.empty() && plus[0] == '_') {
+            plus = mstr::drop(plus, 1);          // consume the _
+            if (!plus.empty() && plus[0] == '/')
+                plus = mstr::drop(plus, 1);      // consume the separator
+            // go up one more level in newDir
+            auto ls = newDir.rfind('/');
+            if (ls == std::string::npos || ls == 0) {
+                newDir = "";
+                break;
+            }
+            newDir = newDir.substr(0, ls);
+        }
+
         if (!plus.empty()) { newDir += '/'; newDir += plus; }
 
         path = newDir;

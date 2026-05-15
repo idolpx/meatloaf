@@ -76,16 +76,31 @@ public:
         //std::string code = mstr::toUTF8(urlParser->name);
 
         //Debug_printv("url[%s]", urlParser.name.c_str());
-        std::string ml_url = "https://api.meatloaf.cc/?" + urlParser->name;
+        urlParser->dump();
+
+        std::string code;
+        std::string code_path;
+        size_t pos = urlParser->mRawUrl.find('/');
+        if ( pos != std::string::npos ) {
+            code = urlParser->mRawUrl.substr(0, pos);
+            code = mstr::drop(code, 3); // drop "ml:"
+            code_path = urlParser->mRawUrl.substr(pos);
+        } else {
+            code = urlParser->name;
+        }
+
+        std::string ml_url = "https://api.meatloaf.cc/?" + code;
         if ( urlParser->query.size() > 0)
             ml_url += "&" + urlParser->query;
         if ( urlParser->fragment.size() > 0)
             ml_url += "#" + urlParser->fragment;
-        Debug_printv("ml_url[%s]", ml_url.c_str());
+        Debug_printv("code[%s] code_path[%s] ml_url[%s]", code.c_str(), code_path.c_str(), ml_url.c_str());
 
         MFile* http = new HTTPMFile(ml_url);
         auto reader = http->getSourceStream();
         auto url = reader->url;
+        if ( code_path.size() > 0)
+            url += code_path;
         delete http;
 
         // Release session for api.meatloaf.cc
