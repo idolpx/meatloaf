@@ -173,7 +173,11 @@ namespace ESP32Console
     {
         // Match ESP-IDF console example defaults for line editing behavior.
         linenoiseSetMultiLine(1);
-        linenoiseAllowEmpty(false);
+        // Allow empty lines so linenoise returns "" instead of re-printing the
+        // prompt internally. The REPL loop's own empty-line guard handles them,
+        // preventing a double-prompt when the terminal sends \r\n (which produces
+        // two newlines after ESP_LINE_ENDINGS_CR RX mapping).
+        linenoiseAllowEmpty(true);
 
         /* Tell linenoise where to get command completions and hints */
         linenoiseSetCompletionCallback(&esp_console_get_completion);
@@ -300,11 +304,11 @@ namespace ESP32Console
             if (raw_line.empty())
             {
                 linenoiseFree(line);
-                vTaskDelay(pdMS_TO_TICKS(20));
                 continue;
             }
 
-            //Debug_printv("Line received from linenoise: [%s]\n", line);
+            //Debug_printv("Line received from linenoise: [%s]", line);
+            fprintf(stdout, ANSI_YELLOW "[%s:%u] %s(): " ANSI_GREEN_BOLD "line[%s] size[%d]" ANSI_RESET "\r\n", __FILE__, __LINE__, __FUNCTION__, line, strlen(line));
 
             // /* Add the command to the history */
             // linenoiseHistoryAdd(line);
@@ -412,10 +416,6 @@ namespace ESP32Console
             printf("Internal error: %s\n", esp_err_to_name(err));
         }
 
-        // Insert current PWD into prompt if needed
-        std::string prompt = console.prompt_;
-        mstr::replaceAll(prompt, "%pwd%", getCurrentPath()->url);
-        print(prompt.c_str());
     }
 
     size_t Console::write(uint8_t c)
