@@ -15,29 +15,11 @@
 #define PIN_CARD_DETECT         GPIO_NUM_NC // fnSystem.h
 #define PIN_CARD_DETECT_FIX     GPIO_NUM_NC // fnSystem.h
 
-// #define PIN_SD_HOST_CS          GPIO_NUM_47
-// #define PIN_SD_HOST_MISO        GPIO_NUM_16
-// #define PIN_SD_HOST_MOSI        GPIO_NUM_18
-// #define PIN_SD_HOST_SCK         GPIO_NUM_17
+#define PIN_SD_HOST_CS          GPIO_NUM_47
+#define PIN_SD_HOST_MISO        GPIO_NUM_16
+#define PIN_SD_HOST_MOSI        GPIO_NUM_18
+#define PIN_SD_HOST_SCK         GPIO_NUM_17
 
-// /* SD Card */
-// #define PIN_CARD_DETECT         GPIO_NUM_NC // fnSystem.h
-// //#define PIN_CARD_DETECT_FIX     GPIO_NUM_NC // fnSystem.h
-
-#define SDMMC_HOST_WIDTH        1           // 1-bit mode (D0) to avoid conflict with LED (D1) and Strapping (D2)
-#define SDMMC_PULL_UP			true
-
-#define PIN_SD_HOST_CLK         GPIO_NUM_17 // ADC2_CH5/HSPI_CLK/TOUCH6/SDMMC MTDI
-#define PIN_SD_HOST_CMD         GPIO_NUM_18 // ADC2_CH3/Strapping MTDO/TOUCH3/HSPI_CS/SDMMC CMD
-#define PIN_SD_HOST_D0          GPIO_NUM_16 // ADC2_CH2/Boot Mode/TOUCH2/LED IO2/SDMMC DATA
-#define PIN_SD_HOST_D1          GPIO_NUM_NC  // ADC2_CH0/CAM_Y2/TOUCH0
-#define PIN_SD_HOST_D2          GPIO_NUM_NC // ADC2_CH5/HSPI_MISO/TOUCH5/Strapping MTDI
-#define PIN_SD_HOST_D3          GPIO_NUM_47 // ADC2_CH4/HSPI_MOSI/TOUCH4
-#define PIN_SD_HOST_WP          GPIO_NUM_NC
-// Clk_pin: gpio17 
-// Cmd_pin: gpio18 # Mosi 
-// Data0_pin: gpio16 # Miso 
-// Data3_pin: gpio47 # Cs
 
 /* UART */
 #define PIN_UART0_RX            GPIO_NUM_44  // fnUART.cpp
@@ -61,6 +43,8 @@
 /* LCD */
 // .96in ST7735 - 160x80
 # define LCD_HOST SPI2_HOST
+# define LCD_WIDTH 80
+# define LCD_HEIGHT 160
 # define PIN_LCD_SCLK           GPIO_NUM_10
 # define PIN_LCD_MOSI           GPIO_NUM_11
 # define PIN_LCD_CS             GPIO_NUM_12
