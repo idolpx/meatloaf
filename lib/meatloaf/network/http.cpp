@@ -19,6 +19,7 @@
 
 #include <esp_idf_version.h>
 #include <algorithm>
+#include <cstring>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
@@ -265,7 +266,18 @@ bool HTTPMStream::open(std::ios_base::openmode mode) {
 }
 
 void HTTPMStream::close() {
-    //Debug_printv("CLOSE called explicitly on this HTTP stream!");
+    Debug_printv("HTTPMStream::close called, mode=%d", mode);
+    // Write mode: mode & out bit (0x10), OR explicit out, OR combined in|out (mode > 0 && !in-only)
+    // std::ios_base::out = 0x10, std::ios_base::in = 0x01, std::ios_base::in|std::ios_base::out = 0x03
+    bool isWriteMode = (mode & 0x10) || (mode == std::ios_base::out) || (mode == (std::ios_base::in | std::ios_base::out));
+    Debug_printv("isWriteMode=%d (mode=%d, out_bit=%d, eq_out=%d, eq_in_out=%d)",
+        isWriteMode, mode, (mode & 0x10), (mode == std::ios_base::out), (mode == (std::ios_base::in | std::ios_base::out)));
+    if (isWriteMode && _session && _session->client) {
+        Debug_printv("Closing write-mode stream, sending POST request");
+        auto client = _session->client.get();
+        // Send the POST request and receive response - close() handles all of this
+        client->close();
+    }
     if (_session) {
         _session->releaseIO();
     }
@@ -289,6 +301,37 @@ uint32_t HTTPMStream::read(uint8_t* buf, uint32_t size) {
 
     if ( size > 0 )
     {
+        Debug_printv("HTTPMStream::read called, mode=%d", mode);
+
+        // If stream was opened for write mode, need to switch to read mode
+        // by completing the POST request and reading the response
+        bool isWriteMode = (mode & 0x10) || (mode == std::ios_base::out);
+        if (isWriteMode && _session && _session->client) {
+            Debug_printv("Switching from write mode to read mode");
+            auto client = _session->client.get();
+
+            // If POST was already sent (close was called previously), just switch mode
+            // Check BOTH postResponse and preservedPostResponse since close() moves data there
+            bool hasResponse = (!client->postBuffer.empty()) ||
+                              (!client->postResponse.empty()) ||
+                              (!client->preservedPostResponse.empty());
+
+            if (!hasResponse) {
+                Debug_printv("POST already sent, reading from existing response");
+            } else if (!client->postBuffer.empty()) {
+                // Send the POST request with buffered body and read response
+                Debug_printv("Sending POST request...");
+                client->close();  // This sends POST and reads response into postResponse buffer
+            }
+
+            // Switch stream mode so C64 sees it as readable
+            mode = std::ios_base::in;
+            // _size is already set from the POST response
+            _position = 0;
+            Debug_printv("After POST: _size=%u, postResponse.size=%u, preservedPostResponse.size=%u",
+                _size, (uint32_t)client->postResponse.size(), (uint32_t)client->preservedPostResponse.size());
+        }
+
         if ( size > available() )
             size = available();
 
@@ -304,8 +347,12 @@ uint32_t HTTPMStream::read(uint8_t* buf, uint32_t size) {
 };
 
 uint32_t HTTPMStream::write(const uint8_t *buf, uint32_t size) {
-    uint32_t bytesWritten = _session->client->write(buf, size);
-    _position += bytesWritten;
+    Debug_printv("HTTPMStream::write called, size=%u, client=%p", size, _session ? _session->client.get() : nullptr);
+    uint32_t bytesWritten = 0;
+    if (_session && _session->client) {
+        bytesWritten = _session->client->write(buf, size);
+        _position += bytesWritten;
+    }
     return bytesWritten;
 }
 
@@ -320,7 +367,9 @@ bool HTTPMStream::isOpen() {
  ********************************************************/
 bool MeatHttpClient::GET(std::string dstUrl) {
     Debug_printv("GET url[%s]", dstUrl.c_str());
-    return open(dstUrl, HTTP_METHOD_GET);
+    bool result = open(dstUrl, HTTP_METHOD_GET);
+    Debug_printv("GET result: %d, _is_open=%d", result, _is_open);
+    return result;
 }
 
 bool MeatHttpClient::POST(std::string dstUrl) {
@@ -340,6 +389,7 @@ bool MeatHttpClient::HEAD(std::string dstUrl) {
 }
 
 bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
+    Debug_printv("open called, url=%s, method=%d", dstUrl.c_str(), meth);
     url = dstUrl;
     lastMethod = meth;
     _error = 0;
@@ -348,13 +398,44 @@ bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
     _size = 0;
     _range_size = 0;
 
+    // Save POST response data before init() clears it
+    // We want to return POST response data on subsequent GET operations
+    uint32_t savedSize = 0;
+    std::vector<uint8_t> savedResponse;
+    Debug_printv("open: postResponse.size=%u, preservedPostResponse.size=%u, preservedPostResponseSize=%u, method=%d",
+        (uint32_t)postResponse.size(), (uint32_t)preservedPostResponse.size(), preservedPostResponseSize, meth);
+    // Check both postResponse and preservedPostResponse
+    if (!preservedPostResponse.empty() && meth == HTTP_METHOD_GET) {
+        savedResponse = std::move(preservedPostResponse);
+        savedSize = preservedPostResponseSize;
+        preservedPostResponseSize = 0;  // Reset after use
+        Debug_printv("Preserving POST response: %u bytes", savedSize);
+    } else if (!postResponse.empty() && meth == HTTP_METHOD_GET) {
+        savedResponse = std::move(postResponse);
+        savedSize = (uint32_t)savedResponse.size();
+        Debug_printv("Preserving POST response from postResponse: %u bytes", savedSize);
+    }
+
     // Always reset the HTTP client handle before a new request.
     // After HEAD, _is_open is false (HEAD doesn't set it), so the conditional check
     // would skip init() for the subsequent GET — leaving the handle with stale response
     // buffer state (raw_data != orig_raw_data) that causes esp_http_client_read() to block.
     init();
 
-    return processRedirectsAndOpen(0);
+    // If we had a POST response saved, restore it for this GET
+    if (!savedResponse.empty()) {
+        postResponse = std::move(savedResponse);
+        _is_open = true;
+        _size = savedSize;
+        _position = 0;
+        Debug_printv("Restored POST response: %u bytes", _size);
+        return true;
+    }
+
+    Debug_printv("open: calling processRedirectsAndOpen");
+    bool result = processRedirectsAndOpen(0);
+    Debug_printv("open: processRedirectsAndOpen returned %d, _is_open=%d", result, _is_open);
+    return result;
 };
 
 bool MeatHttpClient::reopen() {
@@ -362,6 +443,7 @@ bool MeatHttpClient::reopen() {
 }
 
 bool MeatHttpClient::processRedirectsAndOpen(uint32_t position, uint32_t size) {
+    Debug_printv("processRedirectsAndOpen: position=%u, size=%u", position, size);
     wasRedirected = false;
     m_isDirectory = false;
 
@@ -403,6 +485,11 @@ bool MeatHttpClient::processRedirectsAndOpen(uint32_t position, uint32_t size) {
         Debug_printv("opening stream failed, httpCode=%d", lastRC);
         _error = lastRC;
         _is_open = false;
+        // Only set _exists=true for successful responses (2xx)
+        // For 404 and other errors, the file doesn't exist
+        _exists = false;
+        // Clear any pending POST body data
+        postBuffer.clear();
 
         // Reset client on error
         init();
@@ -431,15 +518,46 @@ bool MeatHttpClient::processRedirectsAndOpen(uint32_t position, uint32_t size) {
 // }
 
 void MeatHttpClient::close() {
+    Debug_printv("close called, _http=%p, _is_open=%d, postBuffer.size=%u, postResponse.size=%u",
+        _http, _is_open, (uint32_t)postBuffer.size(), (uint32_t)postResponse.size());
     if(_http != nullptr) {
         if ( _is_open ) {
+            // For POST/PUT, we need to send the buffered body data
+            if (!postBuffer.empty()) {
+                Debug_printv("Sending POST body (%u bytes) from buffer", (uint32_t)postBuffer.size());
+                // Set the post field data
+                esp_http_client_set_post_field(_http, (char*)postBuffer.data(), postBuffer.size());
+                // Complete the request (sends body and receives response)
+                // Response body data is captured via HTTP_EVENT_ON_DATA
+                int performResult = esp_http_client_perform(_http);
+                Debug_printv("esp_http_client_perform result: %d", performResult);
+                Debug_printv("POST response captured via events: %u bytes", (uint32_t)postResponse.size());
+
+                // Set _size from the captured response
+                _size = (uint32_t)postResponse.size();
+                postBuffer.clear();
+            }
             esp_http_client_close(_http);
         }
         esp_http_client_cleanup(_http);
         Debug_printv("HTTP Close and Cleanup");
         _http = nullptr;
     }
-    _is_open = false;
+    // ALWAYS preserve postResponse so it survives subsequent operations, even if called multiple times
+    if (!postResponse.empty()) {
+        uint32_t responseSize = (uint32_t)postResponse.size();
+        preservedPostResponse = std::move(postResponse);
+        // Also preserve _size for the next operation
+        if (preservedPostResponseSize == 0) {
+            preservedPostResponseSize = _size;
+        }
+        Debug_printv("PRESERVED: responseSize=%u, preservedPostResponse.size=%u, preservedPostResponseSize=%u",
+            responseSize, (uint32_t)preservedPostResponse.size(), preservedPostResponseSize);
+    } else {
+        Debug_printv("NOT PRESERVED: postResponse is empty");
+    }
+    // Note: _is_open stays true if we have postResponse to read
+    // It will be set to false when postResponse is exhausted
 }
 
 void MeatHttpClient::setOnHeader(const std::function<int(char*, char*)> &lambda) {
@@ -497,15 +615,19 @@ bool MeatHttpClient::seek(uint32_t pos) {
 }
 
 bool MeatHttpClient::flush(uint32_t numBytes) {
+    Debug_printv("flush called, numBytes=%u, _http=%p", numBytes, _http);
     if (_http == nullptr) {
+        Debug_printv("flush: _http is null");
         return false;
     }
 
-    if ( numBytes == 0) {
-        // Flush all remaining bytes in the response body
+    // For POST/PUT, the buffered body must be sent before draining the response.
+    // Let close() handle sending the POST body - flush() only drains the response here.
+    if (numBytes == 0) {
+        // Drain the remaining response body so the connection is clean
         int bytes = 0;
         esp_http_client_flush_response(_http, &bytes);
-        //Debug_printv("Flushed %d bytes to complete response", bytes);
+        Debug_printv("Flushed %d bytes to complete response", bytes);
         return true;
     }
 
@@ -514,17 +636,34 @@ bool MeatHttpClient::flush(uint32_t numBytes) {
         char buf[HTTP_BLOCK_SIZE];
         uint32_t toRead = (numBytes < HTTP_BLOCK_SIZE) ? numBytes : HTTP_BLOCK_SIZE;
         int rc = esp_http_client_read(_http, buf, (int)toRead);
-        if (rc < 0)
+        if (rc < 0) {
+            Debug_printv("flush: read error %d", rc);
             return false;
+        }
 
         numBytes -= (uint32_t)rc;
         flushed += (uint32_t)rc;
-        //Debug_printv("Flushed %d bytes, %d remaining", rc, numBytes);
     }
     return true;
 }
 
 uint32_t MeatHttpClient::read(uint8_t* buf, uint32_t size) {
+    // Check if we have a POST response buffer to read from
+    if (!postResponse.empty()) {
+        uint32_t available = (uint32_t)postResponse.size() - _position;
+        if (available == 0) {
+            // All response data consumed, mark as complete
+            _is_open = false;
+            postResponse.clear();
+            Debug_printv("POST response fully consumed");
+            return 0;
+        }
+        uint32_t toRead = (size < available) ? size : available;
+        memcpy(buf, postResponse.data() + _position, toRead);
+        _position += toRead;
+        Debug_printv("Read %u bytes from POST response buffer (pos=%u/%u)", toRead, _position, (uint32_t)postResponse.size());
+        return toRead;
+    }
 
     if (!_is_open) {
         Debug_printv("Opening HTTP Stream!");
@@ -534,7 +673,7 @@ uint32_t MeatHttpClient::read(uint8_t* buf, uint32_t size) {
     if (_is_open) {
         //Debug_printv("Reading HTTP Stream!");
         auto bytesRead = esp_http_client_read(_http, (char *)buf, size);
-        
+
         if (bytesRead >= 0) {
             _position+=bytesRead;
 
@@ -564,21 +703,28 @@ uint32_t MeatHttpClient::read(uint8_t* buf, uint32_t size) {
 };
 
 uint32_t MeatHttpClient::write(const uint8_t* buf, uint32_t size) {
-    if (!_is_open) 
+    Debug_printv("MeatHttpClient::write called, _is_open=%d, size=%u", _is_open, size);
+    if (!_is_open)
     {
+        Debug_printv("Client not open, trying header parsing");
         if ( setHeader( (char *)buf ) )
             return size;
     }
     else
     {
-        auto bytesWritten= esp_http_client_write(_http, (char *)buf, size );
-        _position+=bytesWritten;
-        return bytesWritten;        
+        // For POST/PUT, buffer the data for sending later
+        // We'll send it all at once when close() is called
+        postBuffer.insert(postBuffer.end(), buf, buf + size);
+        Debug_printv("Buffered %u bytes, total buffer size: %u", size, (uint32_t)postBuffer.size());
+        _position += size;
+        return size;
     }
     return 0;
 };
 
 int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_t position, uint32_t size) {
+
+    Debug_printv("openAndFetchHeaders: method=%d, position=%u, size=%u, url=%s", method, position, size, url.c_str());
 
     if ( url.size() < 5)
         return 0;
@@ -623,27 +769,27 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
     rc = esp_http_client_open(_http, 0);
     if (rc == ESP_OK)
     {
-        //Debug_printv("--- PRE FETCH HEADERS");
-
-        int64_t lengthResp = esp_http_client_fetch_headers(_http);
-        // _size is set by the Content-Length event handler; lengthResp here is
-        // redundant for normal responses, but covers chunked encoding (no Content-Length header).
-        if (_size == 0 && lengthResp > 0) {
-            _size = (uint32_t)lengthResp;
-            _position = position;
+        // For GET/HEAD, fetch headers immediately
+        if (method == HTTP_METHOD_GET || method == HTTP_METHOD_HEAD)
+        {
+            int64_t lengthResp = esp_http_client_fetch_headers(_http);
+            if (_size == 0 && lengthResp > 0) {
+                _size = (uint32_t)lengthResp;
+                _position = position;
+            }
+            status = esp_http_client_get_status_code(_http);
+            if (method != HTTP_METHOD_HEAD) {
+                _is_open = true;
+            }
+            return status;
         }
-
-        status = esp_http_client_get_status_code(_http);
-        //Debug_printv("after open rc[%d] status[%d]", rc, status);
-
-        // // For HEAD: close without cleanup(). HEAD responses have no body, so raw_data
-        // // is never populated — no http_on_body assertion risk, no drain needed.
-        if (method != HTTP_METHOD_HEAD) {
+        else
+        {
+            // For POST/PUT, openAndFetchHeaders returns without fetching response
+            // This allows write() to send body data first
             _is_open = true;
+            return 200;
         }
-        return status;
-
-        //Debug_printv("--- PRE GET STATUS CODE");
     }
 
     Debug_printv("Connection failed...");
@@ -805,7 +951,19 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
 #endif
 
         case HTTP_EVENT_ON_DATA: // Occurs multiple times when receiving body data from the server. MAY BE SKIPPED IF BODY IS EMPTY!
-            //Debug_printv("HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
+            Debug_printv("HTTP_EVENT_ON_DATA: len=%d", evt->data_len);
+            if (evt->data_len > 0 && evt->data != nullptr) {
+                // Append response data to postResponse buffer for POST responses
+                if (meatClient->lastMethod == HTTP_METHOD_POST || meatClient->lastMethod == HTTP_METHOD_PUT) {
+                    meatClient->postResponse.insert(
+                        meatClient->postResponse.end(),
+                        (uint8_t*)evt->data,
+                        (uint8_t*)evt->data + evt->data_len
+                    );
+                    Debug_printv("HTTP_EVENT_ON_DATA: saved %d bytes to postResponse (total %u)",
+                        evt->data_len, (uint32_t)meatClient->postResponse.size());
+                }
+            }
             if (esp_http_client_is_chunked_response(evt->client)) {
                 meatClient->_size += evt->data_len;
                 //Debug_printv("HTTP_EVENT_ON_DATA: chunked, added %d, total _size=%lu", evt->data_len, meatClient->_size);
