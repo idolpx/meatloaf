@@ -94,17 +94,19 @@ namespace mstr {
     {
         std::vector<std::string> names = {
             // OSX
-            "/._",
-            "/.DS_Store",
-            "/.fseventsd",
-            "/.Spotlight-V",
-            "/.TemporaryItems",
-            "/.Trashes",
-            "/.VolumeIcon.icns",
+            "._",
+            ".DS_Store",
+            ".fseventsd",
+            ".Spotlight-V",
+            ".TemporaryItems",
+            ".Trashes",
+            ".VolumeIcon.icns",
 
             // Windows
-            "/Desktop.ini",
-            "/Thumbs.ini"
+            "Desktop.ini",
+            "Thumbs.db",
+            "System Volume Information",
+            "$Recycle.bin",
         };
 
         for (auto it = begin (names); it != end (names); ++it) {

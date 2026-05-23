@@ -826,3 +826,66 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
     }
     return ESP_OK;
 }
+
+#include <fstream>
+#include <sstream>
+#include <sys/stat.h>
+
+static std::string g_ca_cert;
+static bool g_ca_cert_loaded = false;
+
+static void load_ca_cert_from_flash() {
+    if (g_ca_cert_loaded) return;
+    g_ca_cert_loaded = true;
+    const char *ca_path = "/.sys/cert.pem";
+    struct stat st;
+    if (stat(ca_path, &st) == 0 && st.st_size > 0) {
+        std::ifstream f(ca_path);
+        if (f) {
+            std::stringstream buf;
+            buf << f.rdbuf();
+            g_ca_cert = buf.str();
+            Debug_printv("Loaded CA cert from %s (%d bytes)", ca_path, (int)g_ca_cert.size());
+        }
+    } else {
+        Debug_printv("CA cert file not found: %s", ca_path);
+    }
+}
+
+void MeatHttpClient::init() {
+    // Clean up existing client if present to prevent handle leak
+    if (_http != nullptr) {
+        esp_http_client_cleanup(_http);
+        _http = nullptr;
+    }
+    _is_open = false;
+
+    esp_http_client_config_t config;
+    memset(&config, 0, sizeof(config));
+    config.url = "https://api.meatloaf.cc/?$";
+    config.auth_type = HTTP_AUTH_TYPE_BASIC;
+    config.user_agent = USER_AGENT;
+    config.method = HTTP_METHOD_GET;
+    config.timeout_ms = 10000;
+    config.disable_auto_redirect = disableAutoRedirect;
+    config.max_redirection_count = 10;
+    config.event_handler = _http_event_handler;
+    config.user_data = this;
+    config.keep_alive_enable = true;
+    config.keep_alive_idle = 5;
+    config.keep_alive_interval = 5;
+    config.skip_cert_common_name_check = true;
+
+    // Universal CA cert loading
+    load_ca_cert_from_flash();
+    if (!g_ca_cert.empty()) {
+        config.cert_pem = g_ca_cert.c_str();
+        config.skip_cert_common_name_check = false;
+    } else {
+        Debug_printv("No CA cert loaded, skipping cert validation!");
+        config.skip_cert_common_name_check = true;
+    }
+
+    //Debug_printv("HTTP Init url[%s]", url.c_str());
+    _http = esp_http_client_init(&config);
+}

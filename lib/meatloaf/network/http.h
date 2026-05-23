@@ -75,33 +75,7 @@ public:
         init();
     }
 
-    void init() {
-        // Clean up existing client if present to prevent handle leak
-        if (_http != nullptr) {
-            esp_http_client_cleanup(_http);
-            _http = nullptr;
-        }
-        _is_open = false;
-
-        esp_http_client_config_t config;
-        memset(&config, 0, sizeof(config));
-        config.url = "https://api.meatloaf.cc/?$";
-        config.auth_type = HTTP_AUTH_TYPE_BASIC;
-        config.user_agent = USER_AGENT;
-        config.method = HTTP_METHOD_GET;
-        config.timeout_ms = 10000;
-        config.disable_auto_redirect = disableAutoRedirect;
-        config.max_redirection_count = 10;
-        config.event_handler = _http_event_handler;
-        config.user_data = this;
-        config.keep_alive_enable = true;
-        config.keep_alive_idle = 5;
-        config.keep_alive_interval = 5;
-        config.skip_cert_common_name_check = true;
-
-        //Debug_printv("HTTP Init url[%s]", url.c_str());
-        _http = esp_http_client_init(&config);
-    }
+    void init();
 
     ~MeatHttpClient() {
         close();
