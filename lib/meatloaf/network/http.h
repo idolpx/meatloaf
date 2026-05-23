@@ -70,6 +70,17 @@ class MeatHttpClient {
     std::map<std::string, std::string> headers;
 
 public:
+    // Buffer for POST/PUT body data when streaming
+    std::vector<uint8_t> postBuffer;
+
+    // Buffer for POST response body to be read by C64 after POST completes
+    std::vector<uint8_t> postResponse;
+
+    // Preserved POST response that survives init() - used when switching from POST to GET
+    std::vector<uint8_t> preservedPostResponse;
+
+    // Preserved size of the POST response (since preservedPostResponse may be moved)
+    uint32_t preservedPostResponseSize = 0;
 
     MeatHttpClient() {
         init();
@@ -78,7 +89,13 @@ public:
     void init();
 
     ~MeatHttpClient() {
-        close();
+        // Don't call close() here - it may cause double-cleanup issues.
+        // close() should be called explicitly before destruction.
+        // If _http is still valid, do minimal cleanup.
+        if (_http != nullptr) {
+            esp_http_client_cleanup(_http);
+            _http = nullptr;
+        }
     }
 
     bool setHeader(const std::string header) {
@@ -251,9 +268,15 @@ public:
     // each read, so the base available() would return 0 even with more data pending.
     // Return HTTP_BLOCK_SIZE as a hint when the connection is open but not yet complete.
     uint32_t available() override {
+        // Check if we have POST response data to read
+        if (_session && _session->client && !_session->client->postResponse.empty()) {
+            uint32_t respAvail = (uint32_t)_session->client->postResponse.size() - _session->client->_position;
+            if (respAvail > 0) return respAvail;
+        }
         if (_size > _position)
             return _size - _position;
-        if (isOpen() && !_session->client->complete())
+        // Check if connection is still open and has more data coming
+        if (isOpen() && _session && _session->client && !_session->client->complete())
             return HTTP_BLOCK_SIZE;
         return 0;
     }

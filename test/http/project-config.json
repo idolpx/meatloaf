@@ -1,0 +1,13 @@
+{
+    "name": "http_test",
+    "description": "Project c64-chat-client",
+    "toolkit": "basic",
+    "sources": [
+        "http_put_test.bas"
+    ],
+    "build": "debug",
+    "definitions": [],
+    "includes": [],
+    "args": [],
+    "compiler": ""
+}
