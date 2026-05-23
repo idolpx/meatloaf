@@ -74,6 +74,7 @@ FILE(GLOB_RECURSE SOURCES
     ${CMAKE_SOURCE_DIR}/lib/compat/*.c
     ${CMAKE_SOURCE_DIR}/lib/config/*.cpp
 
+    ${CMAKE_SOURCE_DIR}/lib/console/*.c
     ${CMAKE_SOURCE_DIR}/lib/console/*.cpp
     ${CMAKE_SOURCE_DIR}/lib/console/console_settings.c
     ${CMAKE_SOURCE_DIR}/lib/console/Commands/*.cpp
