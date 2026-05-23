@@ -831,7 +831,13 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
 #include <sstream>
 #include <sys/stat.h>
 
-static std::string g_ca_cert;
+
+#include <esp_heap_caps.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+static char* g_ca_cert = nullptr;
+static size_t g_ca_cert_len = 0;
 static bool g_ca_cert_loaded = false;
 
 static void load_ca_cert_from_flash() {
@@ -840,12 +846,22 @@ static void load_ca_cert_from_flash() {
     const char *ca_path = "/.sys/cert.pem";
     struct stat st;
     if (stat(ca_path, &st) == 0 && st.st_size > 0) {
-        std::ifstream f(ca_path);
-        if (f) {
-            std::stringstream buf;
-            buf << f.rdbuf();
-            g_ca_cert = buf.str();
-            Debug_printv("Loaded CA cert from %s (%d bytes)", ca_path, (int)g_ca_cert.size());
+        int fd = open(ca_path, O_RDONLY);
+        if (fd >= 0) {
+            g_ca_cert_len = st.st_size;
+            // Try to allocate in PSRAM first, fallback to default heap
+            g_ca_cert = (char*)heap_caps_malloc(g_ca_cert_len + 1, MALLOC_CAP_SPIRAM);
+            if (!g_ca_cert) {
+                g_ca_cert = (char*)heap_caps_malloc(g_ca_cert_len + 1, MALLOC_CAP_DEFAULT);
+            }
+            if (g_ca_cert) {
+                ssize_t n = read(fd, g_ca_cert, g_ca_cert_len);
+                g_ca_cert[g_ca_cert_len] = '\0';
+                Debug_printv("Loaded CA cert from %s (%d bytes, read %d)", ca_path, (int)g_ca_cert_len, (int)n);
+            } else {
+                Debug_printv("Failed to allocate CA cert buffer (%d bytes)", (int)g_ca_cert_len);
+            }
+            close(fd);
         }
     } else {
         Debug_printv("CA cert file not found: %s", ca_path);
@@ -876,10 +892,11 @@ void MeatHttpClient::init() {
     config.keep_alive_interval = 5;
     config.skip_cert_common_name_check = true;
 
-    // Universal CA cert loading
+
+    // Universal CA cert loading (PSRAM)
     load_ca_cert_from_flash();
-    if (!g_ca_cert.empty()) {
-        config.cert_pem = g_ca_cert.c_str();
+    if (g_ca_cert && g_ca_cert_len > 0) {
+        config.cert_pem = g_ca_cert;
         config.skip_cert_common_name_check = false;
     } else {
         Debug_printv("No CA cert loaded, skipping cert validation!");
