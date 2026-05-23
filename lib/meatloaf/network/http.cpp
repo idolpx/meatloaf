@@ -301,7 +301,7 @@ uint32_t HTTPMStream::read(uint8_t* buf, uint32_t size) {
 
     if ( size > 0 )
     {
-        Debug_printv("HTTPMStream::read called, mode=%d", mode);
+        //Debug_printv("HTTPMStream::read called, mode=%d", mode);
 
         // If stream was opened for write mode, need to switch to read mode
         // by completing the POST request and reading the response
@@ -368,7 +368,7 @@ bool HTTPMStream::isOpen() {
 bool MeatHttpClient::GET(std::string dstUrl) {
     Debug_printv("GET url[%s]", dstUrl.c_str());
     bool result = open(dstUrl, HTTP_METHOD_GET);
-    Debug_printv("GET result: %d, _is_open=%d", result, _is_open);
+    //Debug_printv("GET result: %d, _is_open=%d", result, _is_open);
     return result;
 }
 
@@ -389,7 +389,7 @@ bool MeatHttpClient::HEAD(std::string dstUrl) {
 }
 
 bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
-    Debug_printv("open called, url=%s, method=%d", dstUrl.c_str(), meth);
+    //Debug_printv("open called, url=%s, method=%d", dstUrl.c_str(), meth);
     url = dstUrl;
     lastMethod = meth;
     _error = 0;
@@ -402,8 +402,8 @@ bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
     // We want to return POST response data on subsequent GET operations
     uint32_t savedSize = 0;
     std::vector<uint8_t> savedResponse;
-    Debug_printv("open: postResponse.size=%u, preservedPostResponse.size=%u, preservedPostResponseSize=%u, method=%d",
-        (uint32_t)postResponse.size(), (uint32_t)preservedPostResponse.size(), preservedPostResponseSize, meth);
+    //Debug_printv("open: postResponse.size=%u, preservedPostResponse.size=%u, preservedPostResponseSize=%u, method=%d",
+    //    (uint32_t)postResponse.size(), (uint32_t)preservedPostResponse.size(), preservedPostResponseSize, meth);
     // Check both postResponse and preservedPostResponse
     if (!preservedPostResponse.empty() && meth == HTTP_METHOD_GET) {
         savedResponse = std::move(preservedPostResponse);
@@ -432,9 +432,9 @@ bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
         return true;
     }
 
-    Debug_printv("open: calling processRedirectsAndOpen");
+    //Debug_printv("open: calling processRedirectsAndOpen");
     bool result = processRedirectsAndOpen(0);
-    Debug_printv("open: processRedirectsAndOpen returned %d, _is_open=%d", result, _is_open);
+    //Debug_printv("open: processRedirectsAndOpen returned %d, _is_open=%d", result, _is_open);
     return result;
 };
 
@@ -443,7 +443,7 @@ bool MeatHttpClient::reopen() {
 }
 
 bool MeatHttpClient::processRedirectsAndOpen(uint32_t position, uint32_t size) {
-    Debug_printv("processRedirectsAndOpen: position=%u, size=%u", position, size);
+    //Debug_printv("processRedirectsAndOpen: position=%u, size=%u", position, size);
     wasRedirected = false;
     m_isDirectory = false;
 
@@ -518,8 +518,8 @@ bool MeatHttpClient::processRedirectsAndOpen(uint32_t position, uint32_t size) {
 // }
 
 void MeatHttpClient::close() {
-    Debug_printv("close called, _http=%p, _is_open=%d, postBuffer.size=%u, postResponse.size=%u",
-        _http, _is_open, (uint32_t)postBuffer.size(), (uint32_t)postResponse.size());
+    //Debug_printv("close called, _http=%p, _is_open=%d, postBuffer.size=%u, postResponse.size=%u",
+    //    _http, _is_open, (uint32_t)postBuffer.size(), (uint32_t)postResponse.size());
     if(_http != nullptr) {
         if ( _is_open ) {
             // For POST/PUT, we need to send the buffered body data
@@ -951,7 +951,7 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
 #endif
 
         case HTTP_EVENT_ON_DATA: // Occurs multiple times when receiving body data from the server. MAY BE SKIPPED IF BODY IS EMPTY!
-            Debug_printv("HTTP_EVENT_ON_DATA: len=%d", evt->data_len);
+            //Debug_printv("HTTP_EVENT_ON_DATA: len=%d", evt->data_len);
             if (evt->data_len > 0 && evt->data != nullptr) {
                 // Append response data to postResponse buffer for POST responses
                 if (meatClient->lastMethod == HTTP_METHOD_POST || meatClient->lastMethod == HTTP_METHOD_PUT) {
@@ -960,8 +960,8 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
                         (uint8_t*)evt->data,
                         (uint8_t*)evt->data + evt->data_len
                     );
-                    Debug_printv("HTTP_EVENT_ON_DATA: saved %d bytes to postResponse (total %u)",
-                        evt->data_len, (uint32_t)meatClient->postResponse.size());
+                    //Debug_printv("HTTP_EVENT_ON_DATA: saved %d bytes to postResponse (total %u)",
+                    //    evt->data_len, (uint32_t)meatClient->postResponse.size());
                 }
             }
             if (esp_http_client_is_chunked_response(evt->client)) {
