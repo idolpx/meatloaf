@@ -724,7 +724,7 @@ uint32_t MeatHttpClient::write(const uint8_t* buf, uint32_t size) {
 
 int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_t position, uint32_t size) {
 
-    Debug_printv("openAndFetchHeaders: method=%d, position=%u, size=%u, url=%s", method, position, size, url.c_str());
+    //Debug_printv("openAndFetchHeaders: method=%d, position=%u, size=%u, url=%s", method, position, size, url.c_str());
 
     if ( url.size() < 5)
         return 0;
@@ -745,7 +745,6 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
     // Set Headers
     for (const auto& pair : headers) {
         Debug_printv("%s:%s", pair.first.c_str(), pair.second.c_str());
-        std::cout << pair.first << ": " << pair.second << std::endl;
         esp_http_client_set_header(_http, pair.first.c_str(), pair.second.c_str());
     }
 
@@ -1036,7 +1035,10 @@ void MeatHttpClient::init() {
 
     esp_http_client_config_t config;
     memset(&config, 0, sizeof(config));
-    config.url = "https://api.meatloaf.cc/?$";
+    // Use the actual request URL so esp_http_client_init allocates the correct transport
+    // (TCP for http://, TCP+TLS for https://) without a later scheme-switch in set_url.
+    // Fall back to plain HTTP when url is not yet set (constructor call).
+    config.url = url.empty() ? "http://localhost/" : url.c_str();
     config.auth_type = HTTP_AUTH_TYPE_BASIC;
     config.user_agent = USER_AGENT;
     config.method = HTTP_METHOD_GET;
