@@ -135,6 +135,9 @@ uint8_t iecChannelHandler::read(uint8_t *data, uint8_t n)
     // if buffer is empty then re-fill it
     if( m_ptr >= m_len )
     {
+        // stream already confirmed exhausted — don't call readBufferData again
+        if( m_eos ) return 0;
+
         m_ptr = 0;
         m_len = 0;
 
@@ -142,6 +145,15 @@ uint8_t iecChannelHandler::read(uint8_t *data, uint8_t n)
         if( st!=ST_OK )
         {
             m_drive->setStatusCode(st);
+            return 0;
+        }
+        // If readBufferData filled nothing, stream is exhausted — latch EOS here
+        // rather than relying on m_stream->eos() which can be transiently inconsistent
+        // (e.g. HTTP complete() flag racing with the ESP-IDF event loop).
+        if( m_len == 0 )
+        {
+            Debug_printv("EOS latched: m_ptr[%d] m_len[%d]", m_ptr, m_len);
+            m_eos = true;
             return 0;
         }
     }
@@ -277,7 +289,7 @@ uint8_t iecChannelHandlerFile::readBufferData()
     else
     */
     {
-        Debug_printv("size[%lu] avail[%lu] pos[%lu]", m_stream->size(), m_stream->available(), m_stream->position());
+        Debug_printv("size[%lu] avail[%lu] pos[%lu] eos[%d] error[%d]", m_stream->size(), m_stream->available(), m_stream->position(), m_stream->eos(), m_stream->error());
         // if (m_stream->size() == 0)
         //     return ST_FILE_NOT_FOUND;
 
@@ -305,7 +317,17 @@ uint8_t iecChannelHandlerFile::readBufferData()
             uint32_t got = m_stream->read(m_data+m_len, BUFFER_SIZE-m_len);
             m_transportTimeUS += (esp_timer_get_time()-t);
 
-            if (got == 0) break;  // prevent infinite loop if stream returns 0 (e.g. seek past EOF)
+            if (got == 0) {
+                // Print diagnostics if stuck
+                //Debug_printv("read returned 0: eos[%d] error[%d]", m_stream->eos(), m_stream->error());
+                // If at end-of-stream or error, break to avoid infinite loop
+                if (m_stream->eos() || m_stream->error()) {
+                    break;
+                }
+                // Otherwise, yield and retry (could add a retry limit here)
+                vTaskDelay(1);
+                continue;
+            }
             m_len += got;
 
             // if m_fixLoadAddress is set, adjust the first two bytes
@@ -323,6 +345,11 @@ uint8_t iecChannelHandlerFile::readBufferData()
         } while( m_len<BUFFER_SIZE && !m_stream->eos() );
 
         m_byteCount += m_len;
+
+        // If we filled nothing, the stream is exhausted (do-while broke on eos/error).
+        // Latch without re-querying m_stream->eos() — HTTP complete() can be transiently false.
+        if( m_len == 0 )
+            m_eos = true;
     }
 
     //Debug_printv("bufferSize[%d]", m_len);
@@ -1112,7 +1139,6 @@ uint8_t iecDrive::read(uint8_t channel, uint8_t *data, uint8_t maxDataLen, bool 
             if( m_statusCode==ST_FILE_NOT_FOUND)
             {
                 Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Subdir Change Directory Here! stream[%s] > base[%s]", m_cwd->url.c_str(), m_cwd->base().c_str());
-                //m_cwd.reset( MFSOwner::File(m_cwd->base()) );
                 set_cwd(m_cwd->base());
             }
 

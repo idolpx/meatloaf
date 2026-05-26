@@ -69,6 +69,8 @@ public:
   virtual uint8_t readBufferData()  = 0;
   virtual std::shared_ptr<MStream> getStream() { return nullptr; };
 
+  bool m_eos = false;
+
 protected:
   iecDrive *m_drive;
   uint8_t  *m_data;
