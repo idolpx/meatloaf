@@ -18,29 +18,23 @@
 #ifndef LCD_H
 #define LCD_H
 
-#include <st7789.h>
+#include "hagl.h"
+#include "hagl_hal.h"
+#include <freertos/FreeRTOS.h>
 #include <string>
 
-#include "../../include/pinmap.h"
-
-class DisplayLCD 
+class DisplayLCD
 {
 private:
-	TFT_t dev;
+    hagl_backend_t *backend;
 
 public:
-    DisplayLCD() { init_lcd(); };
-    ~DisplayLCD() {};
+    DisplayLCD() : backend(nullptr) { init_lcd(); };
+    ~DisplayLCD() { if (backend) hagl_close(backend); };
 
-#ifndef ST7789_DRIVER
-    esp_err_t init_lcd() { return ESP_OK; };
-#else
     esp_err_t init_lcd();
-
-    TickType_t show_jpeg(char * file, int width = TFT_WIDTH, int height = TFT_HEIGHT);
-    TickType_t show_png(char * file, int width = TFT_WIDTH, int height = TFT_HEIGHT);
-#endif // ST7789_DRIVER
-
+    TickType_t show_jpeg(const char *file);
+    TickType_t show_png(const char *file);
     void show_image(std::string filename);
 };
 

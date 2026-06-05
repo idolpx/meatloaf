@@ -341,7 +341,11 @@ esp_err_t DisplayLEDs::update()
 
 void DisplayLEDs::start(void)
 {
-    init(PIN_LED_RGB, WS2812B, RGB_LED_COUNT);
+    if (init(PIN_LED_RGB, WS2812B, RGB_LED_COUNT) != ESP_OK)
+    {
+        Debug_printv("LED strip init failed; skipping DISPLAY task");
+        return;
+    }
     idle();
 
     // Start DISPLAY task
