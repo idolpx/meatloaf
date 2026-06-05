@@ -373,7 +373,7 @@ int rmdir(int argc, char **argv)
 
     std::unique_ptr<MFile> rd(getCurrentPath()->cd(argv[1]));
 
-    if(rd->rmDir()) {
+    if(!rd->rmDir()) {
         Serial.printf("Error deleting %s: %s\r\n", rd->url.c_str(), strerror(errno));
     }
 
@@ -390,7 +390,7 @@ int mkdir(int argc, char **argv)
 
     std::unique_ptr<MFile> md(getCurrentPath()->cd(argv[1]));
 
-    if(md->mkDir()) {
+    if(!md->mkDir()) {
         Serial.printf("Error creating %s: %s\r\n", md->url.c_str(), strerror(errno));
     }
 
