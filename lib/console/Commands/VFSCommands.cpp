@@ -512,7 +512,7 @@ int wget(int argc, char **argv)
             total_written += bytes_written;
 
             // Show percentage complete in stdout
-            uint8_t percent = (s->size() > 0) ? (s->position() * 100) / s->size() : 0;
+            uint8_t percent = (f->size > 0) ? (s->position() * 100) / f->size : 0;
 #ifdef ENABLE_DISPLAY
             LEDS.progress = percent;
 #endif

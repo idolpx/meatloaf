@@ -448,6 +448,7 @@ bool MeatHttpClient::processRedirectsAndOpen(uint32_t position, uint32_t size) {
     m_isDirectory = false;
 
     uint8_t redirects = 0;
+    uint8_t connectRetries = 0;
     do {
         if (redirects++ > 10) {
             Debug_printv("too many redirects");
@@ -458,11 +459,20 @@ bool MeatHttpClient::processRedirectsAndOpen(uint32_t position, uint32_t size) {
         lastRC = openAndFetchHeaders(lastMethod, position, size);
 
         // openAndFetchHeaders returns 0 when esp_http_client_open() fails (connection error).
-        // Without this check, processRedirectsAndOpen incorrectly sets _is_open = true below.
+        // EAI_AGAIN (202) means the DNS query is still in flight — retry a few times with a
+        // short delay to let the resolver complete before giving up.
         if (lastRC == 0) {
-            Debug_printv("connection failed");
+            if (connectRetries++ < 3) {
+                Debug_printv("connection failed, retrying (%d/3)...", connectRetries);
+                vTaskDelay(pdMS_TO_TICKS(500));
+                init(); // reinitialize the client handle before retrying
+                redirects--; // don't count this as a redirect
+                continue;
+            }
+            Debug_printv("connection failed after retries");
             return false;
         }
+        connectRetries = 0; // reset on success
 
         if (lastRC >= 300 && lastRC <= 399) {
             // Location header handler already updated `url` to the redirect target.
