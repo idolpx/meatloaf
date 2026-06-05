@@ -491,6 +491,7 @@ int wget(int argc, char **argv)
 
         // Receive File
         int count = 0;
+        size_t total_written = 0;
         uint8_t *bytes = (uint8_t *)psram_malloc(256);
         while (true)
         {
@@ -508,9 +509,10 @@ int wget(int argc, char **argv)
                 Serial.printf("\nError writing '%s'\r", f->name.c_str());
                 break;
             }
+            total_written += bytes_written;
 
             // Show percentage complete in stdout
-            uint8_t percent = (s->position() * 100) / s->size();
+            uint8_t percent = (s->size() > 0) ? (s->position() * 100) / s->size() : 0;
 #ifdef ENABLE_DISPLAY
             LEDS.progress = percent;
 #endif
@@ -519,7 +521,16 @@ int wget(int argc, char **argv)
         }
         free(bytes);
         fclose(file);
-        Serial.printf("\n");
+
+        if (total_written == 0)
+        {
+            Serial.printf("\nError: Download failed, removing empty file '%s'\r\n", outfile.c_str());
+            remove(outfile.c_str());
+        }
+        else
+        {
+            Serial.printf("\n");
+        }
         //delete f;
     }
 
