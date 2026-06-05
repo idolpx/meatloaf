@@ -458,6 +458,23 @@ int mount(int argc, char **argv)
     return EXIT_SUCCESS;
 }
 
+int auth(int argc, char **argv)
+{
+    if (argc != 3)
+    {
+        Serial.printf("auth {username} {password}\r\n");
+        return EXIT_SUCCESS;
+    }
+
+    MFile* p = getCurrentPath();
+    p->user = argv[1];
+    p->password = argv[2];
+    p->rebuildUrl();
+    Serial.printf("Auth set for %s\r\n", p->url.c_str());
+
+    return EXIT_SUCCESS;
+}
+
 int wget(int argc, char **argv)
 {
     if (argc != 2)
@@ -677,6 +694,11 @@ namespace ESP32Console::Commands
     const ConsoleCommand getMountCommand()
     {
         return ConsoleCommand("mount", &mount, "Mount url on device id");
+    }
+
+    const ConsoleCommand getAuthCommand()
+    {
+        return ConsoleCommand("auth", &auth, "Set username and password for current path");
     }
 
     const ConsoleCommand getWgetCommand()

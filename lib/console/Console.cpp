@@ -148,6 +148,7 @@ namespace ESP32Console
         registerCommand(getMKDirCommand());
         registerCommand(getEditCommand());
         registerCommand(getMountCommand());
+        registerCommand(getAuthCommand());
         registerCommand(getWgetCommand());
         registerCommand(getUpdateCommand());
         registerCommand(getEnableCommand());
