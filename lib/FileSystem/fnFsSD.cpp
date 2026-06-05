@@ -709,6 +709,7 @@ bool FileSystemSDFAT::start()
     if(e == ESP_OK)
     {
         _started = true;
+        _sdcard_info = sdcard_info;
         _card_capacity = (uint64_t)sdcard_info->csd.capacity * sdcard_info->csd.sector_size;
         Debug_println("SD mounted.");
 
@@ -763,4 +764,26 @@ bool FileSystemSDFAT::start(const char *sd_path)
     return _started;
 }
 // !ESP_PLATFORM
+#endif
+
+#ifdef ESP_PLATFORM
+bool FileSystemSDFAT::format()
+{
+    if (!_started || _sdcard_info == nullptr)
+    {
+        Debug_printf("FileSystemSDFAT::format() - SD card not mounted\r\n");
+        return false;
+    }
+
+    Debug_printf("FileSystemSDFAT::format() - formatting SD card at \"%s\"\r\n", _basepath);
+    esp_err_t e = esp_vfs_fat_sdcard_format(_basepath, _sdcard_info);
+    if (e != ESP_OK)
+    {
+        Debug_printf("FileSystemSDFAT::format() - failed: %s\r\n", esp_err_to_name(e));
+        return false;
+    }
+
+    Debug_printf("FileSystemSDFAT::format() - done\r\n");
+    return true;
+}
 #endif

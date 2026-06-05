@@ -14,6 +14,7 @@ class FileSystemSDFAT : public FileSystem
 private:
 #ifdef ESP_PLATFORM
     FF_DIR _dir;
+    sdmmc_card_t *_sdcard_info = nullptr;
 #else
     DIR * _dir;
 #endif
@@ -59,6 +60,10 @@ public:
     uint64_t total_bytes();
     uint64_t used_bytes();
     const char *partition_type();
+
+#ifdef ESP_PLATFORM
+    bool format();
+#endif
 
     // TODO: make it part of base FileSystem class (similar to filesize)
     long mtime(const char *path);

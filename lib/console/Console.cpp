@@ -152,6 +152,9 @@ namespace ESP32Console
         registerCommand(getUpdateCommand());
         registerCommand(getEnableCommand());
         registerCommand(getDisableCommand());
+#ifdef SD_CARD
+        registerCommand(getFormatSDCommand());
+#endif
     }
 
     void Console::registerGPIOCommands()

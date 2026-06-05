@@ -17,7 +17,12 @@ static inline void *psram_malloc(size_t sz) {
 }
 
 #include "fsFlash.h"
+#include "fnFsSD.h"
 #include "fnConfig.h"
+#ifdef ESP_PLATFORM
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#endif
 #include "../Console.h"
 #include "../Helpers/PWDHelpers.h"
 #include "../ute/ute.h"
@@ -570,6 +575,37 @@ int disable(int argc, char **argv)
     return EXIT_SUCCESS;
 }
 
+#ifdef SD_CARD
+static void format_sd_task(void *arg)
+{
+    Serial.printf("Formatting SD card (this may take several minutes)...\r\n");
+    if (fnSDFAT.format())
+    {
+        Serial.printf("SD card formatted successfully.\r\n");
+    }
+    else
+    {
+        Serial.printf("SD card format FAILED.\r\n");
+    }
+    vTaskDelete(NULL);
+}
+
+int format_sd(int argc, char **argv)
+{
+    if (argc < 2 || strcmp(argv[1], "-y") != 0)
+    {
+        Serial.printf("WARNING: This will erase all data on the SD card!\r\n");
+        Serial.printf("Usage: format_sd -y\r\n");
+        return EXIT_SUCCESS;
+    }
+
+    Serial.printf("Starting SD card format in background...\r\n");
+    xTaskCreate(format_sd_task, "format_sd", 4096, NULL, 5, NULL);
+
+    return EXIT_SUCCESS;
+}
+#endif
+
 namespace ESP32Console::Commands
 {
     const ConsoleCommand getCatCommand()
@@ -650,4 +686,11 @@ namespace ESP32Console::Commands
     {
         return ConsoleCommand("disable", &disable, "Disable virtual drive");
     }
+
+#ifdef SD_CARD
+    const ConsoleCommand getFormatSDCommand()
+    {
+        return ConsoleCommand("format_sd", &format_sd, "Format the SD card (use -y to confirm)");
+    }
+#endif
 }

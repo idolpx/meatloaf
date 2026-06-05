@@ -39,4 +39,8 @@ namespace ESP32Console::Commands
     const ConsoleCommand getEnableCommand();
 
     const ConsoleCommand getDisableCommand();
+
+#ifdef SD_CARD
+    const ConsoleCommand getFormatSDCommand();
+#endif
 }
