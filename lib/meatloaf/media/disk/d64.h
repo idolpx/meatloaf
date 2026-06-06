@@ -62,6 +62,25 @@ protected:
         uint8_t byte_count;
     };
 
+    struct PartitionEntry {
+        uint8_t next_track;
+        uint8_t next_sector;
+        uint8_t partition_type;
+        uint8_t unused_03;
+        uint8_t unused_04;
+        char name[16];
+        uint8_t offset_hi;  // Location of the partition (in blocks) in MSB format. Partition 0, the system partition, always starts at X*$200.
+        uint8_t offset_mid;
+        uint8_t offset_lo;
+        uint8_t unused_18;
+        uint8_t unused_19;
+        uint8_t unused_1A;
+        uint8_t unused_1B;
+        uint8_t unused_1C;
+        uint8_t unused_1D;
+        uint16_t blocks;    // Size of partition (in blocks) in MSB format. Partition 0, the system partition is always 0x90 blocks, which includes blocks from X*$200 to the end of the partition table.
+    };
+
     struct Partition {
         uint8_t header_track;
         uint8_t header_sector;
@@ -269,8 +288,9 @@ public:
     uint32_t readFile(uint8_t* buf, uint32_t size) override;
     uint32_t writeFile(uint8_t* buf, uint32_t size) override;
 
-    Header header;      // Directory header data
-    Entry entry;        // Directory entry data
+    PartitionEntry partition_entry; // Currently selected partition entry data
+    Header header;                  // Directory header data
+    Entry entry;                    // Directory entry data
 
     uint8_t partition = 0;
     uint8_t track = 0;
@@ -344,6 +364,12 @@ private:
     bool isBlockFree(uint8_t track, uint8_t sector);
 
     bool initializeBlocks();
+
+    virtual bool initializePartitionTable()
+    {
+        // For D64, we only have one partition, so this is just a formality
+        return true;
+    }
 
     bool initializeBlockAllocationMap()
     {

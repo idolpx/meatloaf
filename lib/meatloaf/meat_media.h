@@ -117,9 +117,17 @@ protected:
     virtual bool readHeader() { return true; }
     virtual bool writeHeader(std::string name, std::string id) { return false; };
 
+    virtual bool seekPartition( std::string name ) { return false; };
     virtual bool seekPartition( uint8_t index ) { return false; };
     virtual bool readPartition( uint8_t index ) { return false; };
     virtual bool writePartition( uint8_t index ) { return false; };
+
+    void resetPartitionCounter() {
+        partition_index = 0;
+    }
+    virtual bool getNextPartition() {
+        return seekPartition(partition_index + 1);
+    }
 
     virtual bool seekEntry( std::string filename ) { return false; };
     virtual bool seekEntry( uint16_t index ) { return false; };

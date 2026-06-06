@@ -295,8 +295,9 @@ public:
         else
             return false;
     };
+    virtual bool rewindPartitionTable() { return false; };
+    virtual MFile* getNextPartition() { return nullptr; };
     virtual bool rewindDirectory() { return false; };
-    //virtual bool rewindDirectory(std::string filter = "", std::string sort = "") { return false; };
     virtual MFile* getNextFileInDir() { return nullptr; };
 
     virtual bool mkDir() { return false; };

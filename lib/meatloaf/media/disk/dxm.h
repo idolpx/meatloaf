@@ -105,6 +105,13 @@ public:
 
     virtual uint8_t speedZone(uint8_t track) override { return 0; };
 
+    virtual bool initializePartitionTable() override;
+
+    bool seekPartition( std::string name ) override;
+    bool seekPartition( uint8_t index ) override;
+    bool readPartition( uint8_t index ) override;
+    bool writePartition( uint8_t index ) override;
+
 protected:
 
 private:
@@ -132,6 +139,9 @@ public:
 
     bool mkDir() override { return false; };
     bool rmDir() override { return false; };
+
+    bool rewindPartitionTable() override;
+    MFile* getNextPartition() override;
 };
 
 

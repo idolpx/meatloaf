@@ -778,6 +778,9 @@ bool D64MFile::format(std::string header_info)
     if (image == nullptr)
         return false;
 
+    // Initialize Partition Table
+    image->initializePartitionTable();
+
     // Initialize Blocks
     image->initializeBlocks();
 
