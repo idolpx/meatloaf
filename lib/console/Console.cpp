@@ -117,6 +117,7 @@ namespace ESP32Console
     {
 #ifdef ENABLE_DISPLAY
         registerCommand(getLEDCommand());
+        registerCommand(getShowCommand());
 #endif
     }
 

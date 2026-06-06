@@ -27,10 +27,13 @@ class DisplayLCD
 {
 private:
     hagl_backend_t *backend;
+    static DisplayLCD *instance_;
 
 public:
-    DisplayLCD() : backend(nullptr) { init_lcd(); };
+    DisplayLCD() : backend(nullptr) { init_lcd(); instance_ = this; };
     ~DisplayLCD() { if (backend) hagl_close(backend); };
+
+    static DisplayLCD *instance() { return instance_; }
 
     esp_err_t init_lcd();
     TickType_t show_jpeg(const char *file);
