@@ -18,32 +18,7 @@
 
 #include "../../include/debug.h"
 
-// static const char *wlstatus2string(wl_status_t status)
-// {
-//     switch (status)
-//     {
-//     case WL_NO_SHIELD:
-//         return "Not initialized";
-//     case WL_CONNECT_FAILED:
-//         return "Connection failed";
-//     case WL_CONNECTED:
-//         return "Connected";
-//     case WL_CONNECTION_LOST:
-//         return "Connection lost";
-//     case WL_DISCONNECTED:
-//         return "Disconnected";
-//     case WL_IDLE_STATUS:
-//         return "Idle status";
-//     case WL_NO_SSID_AVAIL:
-//         return "No SSID available";
-//     case WL_SCAN_COMPLETED:
-//         return "Scan completed";
-//     default:
-//         return "Unknown";
-//     }
-// }
-
-const char* wlmode2string(wifi_mode_t mode)
+static const char* wlmode2string(wifi_mode_t mode)
 {
     switch(mode) {
         case WIFI_MODE_NULL:
@@ -213,29 +188,46 @@ static int ping(int argc, char **argv)
 static void ipconfig_wlan()
 {
     Serial.printf("==== WLAN ====\r\n");
-    // auto status = fnWiFi.status();
-    // Serial.printf("Mode: %s\r\n", wlmode2string(fnWiFi.getMode()));
-    // Serial.printf("Status: %s\r\n", wlstatus2string(status));
 
-    // if (status == WL_NO_SHIELD) {
-    //     return;
-    // }
-    
-    // Serial.printf("\r\n");
-    // Serial.printf("SSID: %s\r\n", fnWiFi.get_current_ssid().c_str());
-    // Serial.printf("BSSID: %s\r\n", fnWiFi.get_current_bssid_str().c_str());
-    // //Serial.printf("Channel: %d\r\n", fnWiFi.channel());
+    wifi_mode_t mode = WIFI_MODE_NULL;
+    esp_wifi_get_mode(&mode);
+    Serial.printf("Mode: %s\r\n", wlmode2string(mode));
 
-    // Serial.printf("\r\n");
-    // Serial.printf("IP: %s\r\n", fnWiFi.localIP().toString().c_str());
-    // Serial.printf("Subnet Mask: %s (/%d)\r\n", WiFi.subnetMask().toString().c_str(), WiFi.subnetCIDR());
-    // Serial.printf("Gateway: %s\r\n", WiFi.gatewayIP().toString().c_str());
-    // Serial.printf("IPv6: %s\r\n", WiFi.localIPv6().toString().c_str());
-    
-    // Serial.printf("\r\n");
-    // Serial.printf("Hostname: %s\r\n", WiFi.getHostname());
-    // Serial.printf("DNS1: %s\r\n", WiFi.dnsIP(0).toString().c_str());
-    // Serial.printf("DNS2: %s\r\n", WiFi.dnsIP(0).toString().c_str());
+    bool is_connected = fnWiFi.connected();
+    Serial.printf("Status: %s\r\n", is_connected ? "Connected" : "Disconnected");
+
+    if (!is_connected) {
+        return;
+    }
+
+    Serial.printf("\r\n");
+    Serial.printf("SSID: %s\r\n", fnWiFi.get_current_ssid().c_str());
+    Serial.printf("BSSID: %s\r\n", fnWiFi.get_current_bssid_str().c_str());
+
+    Serial.printf("\r\n");
+    esp_netif_ip_info_t ip_info;
+    esp_netif_get_ip_info(fnWiFi.get_adapter_handle(), &ip_info);
+    Serial.printf("IP: " IPSTR "\r\n", IP2STR(&ip_info.ip));
+    Serial.printf("Subnet Mask: " IPSTR "\r\n", IP2STR(&ip_info.netmask));
+    Serial.printf("Gateway: " IPSTR "\r\n", IP2STR(&ip_info.gw));
+
+    esp_ip6_addr_t ip6;
+    if (esp_netif_get_ip6_linklocal(fnWiFi.get_adapter_handle(), &ip6) == ESP_OK) {
+        Serial.printf("IPv6: " IPV6STR "\r\n", IPV62STR(ip6));
+    }
+
+    Serial.printf("\r\n");
+    const char *hostname = nullptr;
+    esp_netif_get_hostname(fnWiFi.get_adapter_handle(), &hostname);
+    Serial.printf("Hostname: %s\r\n", hostname ? hostname : "");
+
+    esp_netif_dns_info_t dns;
+    if (esp_netif_get_dns_info(fnWiFi.get_adapter_handle(), ESP_NETIF_DNS_MAIN, &dns) == ESP_OK) {
+        Serial.printf("DNS1: " IPSTR "\r\n", IP2STR(&dns.ip.u_addr.ip4));
+    }
+    if (esp_netif_get_dns_info(fnWiFi.get_adapter_handle(), ESP_NETIF_DNS_BACKUP, &dns) == ESP_OK) {
+        Serial.printf("DNS2: " IPSTR "\r\n", IP2STR(&dns.ip.u_addr.ip4));
+    }
 }
 
 static int ipconfig(int argc, char **argv)
