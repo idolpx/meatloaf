@@ -86,6 +86,10 @@ ps2dev::PS2Keyboard keyboard(PIN_KB_CLK, PIN_KB_DATA);
 #include "meat_session.h"
 //#include "ml_tests.h"
 
+#ifdef CONFIG_IDF_TARGET_ESP32S3
+#include "usb.h"
+#endif
+
 std::string statusMessage;
 bool initFailed = false;
 
@@ -111,6 +115,12 @@ void main_setup()
 
 #ifdef DELAY_START_MILLIS
     vTaskDelay(DELAY_START_MILLIS / portTICK_PERIOD_MS);
+#endif
+
+#ifdef CONFIG_IDF_TARGET_ESP32S3
+    // Start TinyUSB (CDC + MSC) before the console so that stdin/stdout are
+    // routed through USB CDC from the very first prompt.
+    USB.setup();
 #endif
 
 #ifdef ENABLE_CONSOLE

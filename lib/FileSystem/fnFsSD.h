@@ -65,6 +65,8 @@ public:
     bool format();
 #endif
 
+    sdmmc_card_t *card() const { return _sdcard_info; }
+
     // TODO: make it part of base FileSystem class (similar to filesize)
     long mtime(const char *path);
 };
