@@ -18,6 +18,10 @@
 #include "driver/usb_serial_jtag.h"
 #include "driver/usb_serial_jtag_vfs.h"
 #include "esp_vfs_cdcacm.h"
+#if CONFIG_TINYUSB_CDC_ENABLED
+#include "tinyusb_cdc_acm.h"
+#include "vfs_tinyusb.h"
+#endif
 #include "linenoise/linenoise.h"
 #include "argtable3/argtable3.h"
 
@@ -90,6 +94,35 @@ void initialize_console_peripheral(void)
 
     /* Tell vfs to use usb-serial-jtag driver */
     usb_serial_jtag_vfs_use_driver();
+
+#elif defined(CONFIG_ESP_CONSOLE_NONE)
+#if CONFIG_TINYUSB_CDC_ENABLED
+    /* Route the console REPL through TinyUSB CDC ACM.
+     * USB.setup() must have been called first to start the TinyUSB stack. */
+    const tinyusb_config_cdcacm_t acm_cfg = {
+        .cdc_port = TINYUSB_CDC_ACM_0,
+        .callback_rx = NULL,
+        .callback_rx_wanted_char = NULL,
+        .callback_line_state_changed = NULL,
+        .callback_line_coding_changed = NULL,
+    };
+    ESP_ERROR_CHECK(tinyusb_cdcacm_init(&acm_cfg));
+    ESP_ERROR_CHECK(esp_vfs_tusb_cdc_register(0, NULL));
+
+    /* Minicom, screen, idf_monitor send CR when ENTER key is pressed */
+    esp_vfs_tusb_cdc_set_rx_line_endings(ESP_LINE_ENDINGS_CR);
+    /* Move the caret to the beginning of the next line on '\n' */
+    esp_vfs_tusb_cdc_set_tx_line_endings(ESP_LINE_ENDINGS_CRLF);
+
+    /* Redirect stdin/stdout/stderr to TinyUSB CDC VFS */
+    freopen(VFS_TUSB_PATH_DEFAULT "/0", "r", stdin);
+    freopen(VFS_TUSB_PATH_DEFAULT "/0", "w", stdout);
+    freopen(VFS_TUSB_PATH_DEFAULT "/0", "w", stderr);
+
+    /* Enable blocking mode on stdin and stdout */
+    fcntl(fileno(stdout), F_SETFL, 0);
+    fcntl(fileno(stdin), F_SETFL, 0);
+#endif /* CONFIG_TINYUSB_CDC_ENABLED */
 
 #else
 #error Unsupported console type

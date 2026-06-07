@@ -220,6 +220,12 @@ void main_setup()
     }
 #endif
 
+#ifdef CONFIG_IDF_TARGET_ESP32S3
+    // Register SD card with TinyUSB MSC (requires fnSDFAT to be started first
+    // so that the sdmmc_card_t pointer is valid).
+    USB.setup_storage();
+#endif
+
     // setup crypto key - must be done before loading the config
     crypto.setkey("MLK" + fnWiFi.get_mac_str());
 

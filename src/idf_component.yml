@@ -1,0 +1,5 @@
+## Managed component dependencies for the main meatloaf component.
+## The IDF component manager downloads these into managed_components/ on build.
+dependencies:
+  idf: ">=5.3.0"
+  espressif/esp_tinyusb: ">=0.14.0"
