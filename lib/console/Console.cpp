@@ -259,6 +259,18 @@ namespace ESP32Console
 
         //setvbuf(stdin, NULL, _IONBF, 0);
 
+#if defined(CONFIG_ESP_CONSOLE_NONE) && CONFIG_TINYUSB_CDC_ENABLED
+        /* Per-task stdio: each FreeRTOS task owns its own _reent / FILE* slots.
+         * The freopen() in initialize_console_peripheral() only redirected the
+         * main task's streams. Open TinyUSB CDC VFS here so this task's
+         * stdin/stdout/stderr actually reach the USB serial port. */
+        stdin  = fopen("/dev/tusb_cdc/0", "r");
+        stdout = fopen("/dev/tusb_cdc/0", "w");
+        stderr = stdout;
+        setvbuf(stdin,  NULL, _IONBF, 0);
+        setvbuf(stdout, NULL, _IONBF, 0);
+#endif
+
         /* This message shall be printed here and not earlier as the stdout
          * has just been set above. */
         // printf("\r\n"
