@@ -25,6 +25,9 @@
 #include "tinyusb.h"                // tinyusb_driver_install(), tinyusb_config_t
 #include "tinyusb_default_config.h" // TINYUSB_DEFAULT_TASK_SIZE / PRIO / AFFINITY constants
 #include "tinyusb_msc.h"            // tinyusb_msc_install_driver(), tinyusb_msc_new_storage_sdmmc()
+#if CONFIG_TINYUSB_CDC_ENABLED
+#include "tinyusb_cdc_acm.h"        // tinyusb_cdcacm_init()
+#endif
 
 #include <string.h>
 
@@ -79,6 +82,23 @@ void USBManager::setup()
         ESP_LOGE(TAG, "tinyusb_msc_install_driver failed: %s", esp_err_to_name(msc_err));
         return;
     }
+
+    // CDC ACM must be initialized before tinyusb_driver_install() so the
+    // interface descriptor is present when the host enumerates the device.
+#if CONFIG_TINYUSB_CDC_ENABLED
+    const tinyusb_config_cdcacm_t acm_cfg = {
+        .cdc_port                    = TINYUSB_CDC_ACM_0,
+        .callback_rx                 = nullptr,
+        .callback_rx_wanted_char     = nullptr,
+        .callback_line_state_changed = nullptr,
+        .callback_line_coding_changed = nullptr,
+    };
+    esp_err_t cdc_err = tinyusb_cdcacm_init(&acm_cfg);
+    if (cdc_err != ESP_OK) {
+        ESP_LOGE(TAG, "tinyusb_cdcacm_init failed: %s", esp_err_to_name(cdc_err));
+        return;
+    }
+#endif
 
     // Install TinyUSB device driver. task.size and task.priority must be
     // non-zero — the component rejects 0 values with ESP_ERR_INVALID_ARG.

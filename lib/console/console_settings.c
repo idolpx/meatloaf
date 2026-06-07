@@ -97,17 +97,13 @@ void initialize_console_peripheral(void)
 
 #elif defined(CONFIG_ESP_CONSOLE_NONE)
 #if CONFIG_TINYUSB_CDC_ENABLED
-    /* Route the console REPL through TinyUSB CDC ACM.
-     * USB.setup() must have been called first to start the TinyUSB stack. */
-    const tinyusb_config_cdcacm_t acm_cfg = {
-        .cdc_port = TINYUSB_CDC_ACM_0,
-        .callback_rx = NULL,
-        .callback_rx_wanted_char = NULL,
-        .callback_line_state_changed = NULL,
-        .callback_line_coding_changed = NULL,
-    };
-    ESP_ERROR_CHECK(tinyusb_cdcacm_init(&acm_cfg));
-    ESP_ERROR_CHECK(esp_vfs_tusb_cdc_register(0, NULL));
+    /* Register the CDC VFS path. USB.setup() must have been called first so
+     * that tinyusb_cdcacm_init() has already run. */
+    esp_err_t vfs_err = esp_vfs_tusb_cdc_register(0, NULL);
+    if (vfs_err != ESP_OK) {
+        ESP_LOGE("console", "esp_vfs_tusb_cdc_register failed: %s", esp_err_to_name(vfs_err));
+        return;
+    }
 
     /* Minicom, screen, idf_monitor send CR when ENTER key is pressed */
     esp_vfs_tusb_cdc_set_rx_line_endings(ESP_LINE_ENDINGS_CR);

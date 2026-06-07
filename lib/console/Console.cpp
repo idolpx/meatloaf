@@ -22,6 +22,9 @@
 #include "driver/usb_serial_jtag_vfs.h"
 #endif
 #include "linenoise/linenoise.h"
+#if defined(CONFIG_ESP_CONSOLE_NONE) && CONFIG_TINYUSB_CDC_ENABLED
+#include "tinyusb.h"
+#endif
 #include "Helpers/PWDHelpers.h"
 #include "Helpers/InputParser.h"
 
@@ -269,6 +272,13 @@ namespace ESP32Console
         stderr = stdout;
         setvbuf(stdin,  NULL, _IONBF, 0);
         setvbuf(stdout, NULL, _IONBF, 0);
+
+        // Wait until the host opens the serial port (DTR asserted) so the first
+        // prompt is not sent into the void before the user's terminal connects.
+        while (!tud_cdc_n_connected(0)) {
+            vTaskDelay(pdMS_TO_TICKS(100));
+        }
+        vTaskDelay(pdMS_TO_TICKS(50));
 #endif
 
         /* This message shall be printed here and not earlier as the stdout
