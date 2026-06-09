@@ -234,7 +234,8 @@ esp_err_t cHttpdServer::websocket_handler(httpd_req_t *req)
         console.execute((char*)ws_pkt.payload);
 #endif
 
-        std::string msg = "Wassup Mainiac! echo[" + std::string((char*)ws_pkt.payload) + "]";
+        // Broadcast the message to all other connected WebSocket clients
+        std::string msg = std::string((char*)ws_pkt.payload);
         websocket_send_all(msg.c_str(), msg.length());
     }
 
