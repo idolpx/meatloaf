@@ -315,7 +315,6 @@ namespace ESP32Console
             }
 
             //Debug_printv("Line received from linenoise: [%s]", line);
-            fprintf(stdout, ANSI_YELLOW "[%s:%u] %s(): " ANSI_GREEN_BOLD "line[%s] size[%d]" ANSI_RESET "\r\n", __FILE__, __LINE__, __FUNCTION__, line, strlen(line));
 
             // /* Add the command to the history */
             // linenoiseHistoryAdd(line);
@@ -386,8 +385,21 @@ namespace ESP32Console
 
         std::string command_str = command;
         mstr::trim(command_str);
+
+#ifdef ENABLE_CONSOLE_TCP
+        // Helper lambda to send the current prompt to TCP.
+        auto send_prompt = [&]() {
+            std::string p = prompt_;
+            mstr::replaceAll(p, "%pwd%", getCurrentPath()->url);
+            tcp_server.send(p);
+        };
+#endif
+
         if (command_str.empty())
         {
+#ifdef ENABLE_CONSOLE_TCP
+            send_prompt();
+#endif
             return;
         }
 
@@ -423,6 +435,9 @@ namespace ESP32Console
             printf("Internal error: %s\n", esp_err_to_name(err));
         }
 
+#ifdef ENABLE_CONSOLE_TCP
+        send_prompt();
+#endif
     }
 
     size_t Console::write(uint8_t c)
