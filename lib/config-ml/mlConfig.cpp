@@ -25,7 +25,9 @@
 #include "mbedtls/md5.h"
 
 #include "esp_log.h"
+#include "fnFS.h"
 #include "fnFsSD.h"
+#include "fsFlash.h"
 #include "global_defines.h"
 
 static const char *TAG = "mlConfig";
@@ -47,16 +49,16 @@ std::array<uint8_t, 16> MeatloafConfig::_json_hash(const nlohmann::json &j)
     return digest;
 }
 
-bool MeatloafConfig::_read_json(const char *sd_path, nlohmann::json &out)
+bool MeatloafConfig::_read_json(const char *path, nlohmann::json &out, FileSystem &fs)
 {
-    if (!fnSDFAT.running()) {
-        ESP_LOGW(TAG, "SD not ready, skipping read of %s", sd_path);
+    if (!fs.running()) {
+        ESP_LOGW(TAG, "Filesystem not ready, skipping read of %s", path);
         return false;
     }
 
-    FILE *f = fnSDFAT.file_open(sd_path, "r");
+    FILE *f = fs.file_open(path, "r");
     if (!f) {
-        ESP_LOGW(TAG, "Cannot open %s for reading", sd_path);
+        ESP_LOGW(TAG, "Cannot open %s for reading", path);
         return false;
     }
 
@@ -66,7 +68,7 @@ bool MeatloafConfig::_read_json(const char *sd_path, nlohmann::json &out)
 
     if (size <= 0) {
         fclose(f);
-        ESP_LOGW(TAG, "%s is empty", sd_path);
+        ESP_LOGW(TAG, "%s is empty", path);
         return false;
     }
 
@@ -75,31 +77,31 @@ bool MeatloafConfig::_read_json(const char *sd_path, nlohmann::json &out)
     fclose(f);
 
     if (got != static_cast<size_t>(size)) {
-        ESP_LOGE(TAG, "Short read on %s (%zu of %ld bytes)", sd_path, got, size);
+        ESP_LOGE(TAG, "Short read on %s (%zu of %ld bytes)", path, got, size);
         return false;
     }
 
     // allow_exceptions=false: returns a discarded value instead of throwing.
     out = nlohmann::json::parse(buf, nullptr, false);
     if (out.is_discarded()) {
-        ESP_LOGE(TAG, "JSON parse error in %s", sd_path);
+        ESP_LOGE(TAG, "JSON parse error in %s", path);
         return false;
     }
     return true;
 }
 
-bool MeatloafConfig::_write_json(const char *sd_path, const nlohmann::json &j)
+bool MeatloafConfig::_write_json(const char *path, const nlohmann::json &j, FileSystem &fs)
 {
-    if (!fnSDFAT.running()) {
-        ESP_LOGW(TAG, "SD not ready, skipping write of %s", sd_path);
+    if (!fs.running()) {
+        ESP_LOGW(TAG, "Filesystem not ready, skipping write of %s", path);
         return false;
     }
 
-    fnSDFAT.create_path(SYSTEM_DIR);
+    fs.create_path(SYSTEM_DIR);
 
-    FILE *f = fnSDFAT.file_open(sd_path, "w");
+    FILE *f = fs.file_open(path, "w");
     if (!f) {
-        ESP_LOGE(TAG, "Cannot open %s for writing", sd_path);
+        ESP_LOGE(TAG, "Cannot open %s for writing", path);
         return false;
     }
 
@@ -108,11 +110,11 @@ bool MeatloafConfig::_write_json(const char *sd_path, const nlohmann::json &j)
     fclose(f);
 
     if (written != out.size()) {
-        ESP_LOGE(TAG, "Short write on %s (%zu of %zu bytes)", sd_path, written, out.size());
+        ESP_LOGE(TAG, "Short write on %s (%zu of %zu bytes)", path, written, out.size());
         return false;
     }
 
-    ESP_LOGI(TAG, "Saved %s (%zu bytes)", sd_path, written);
+    ESP_LOGI(TAG, "Saved %s (%zu bytes)", path, written);
     return true;
 }
 
@@ -146,7 +148,11 @@ nlohmann::json MeatloafConfig::_extract_devices() const
 bool MeatloafConfig::load()
 {
     nlohmann::json cfg;
-    bool cfg_ok = _read_json(CFG_FILE, cfg);
+    bool cfg_ok = _read_json(CFG_FILE, cfg, fnSDFAT);
+    if (!cfg_ok) {
+        ESP_LOGW(TAG, "config.json not on SD, trying flash fallback");
+        cfg_ok = _read_json(CFG_FILE, cfg, fsFlash);
+    }
 
     if (cfg_ok) {
         _data = cfg;
@@ -158,7 +164,12 @@ bool MeatloafConfig::load()
 
     // Merge devices.json into _data["iec"]["devices"].
     nlohmann::json dev;
-    if (_read_json(DEVICES_FILE, dev)) {
+    bool dev_ok = _read_json(DEVICES_FILE, dev, fnSDFAT);
+    if (!dev_ok) {
+        ESP_LOGW(TAG, "devices.json not on SD, trying flash fallback");
+        dev_ok = _read_json(DEVICES_FILE, dev, fsFlash);
+    }
+    if (dev_ok) {
         if (dev.contains("iec") && dev["iec"].contains("devices")) {
             _data["iec"]["devices"] = dev["iec"]["devices"];
         }
@@ -176,11 +187,14 @@ bool MeatloafConfig::load()
 
 void MeatloafConfig::save()
 {
+    FileSystem &fs = fnSDFAT.running() ? static_cast<FileSystem &>(fnSDFAT)
+                                       : static_cast<FileSystem &>(fsFlash);
+
     if (_config_dirty) {
         auto current = _extract_config();
         auto h = _json_hash(current);
         if (h != _config_hash) {
-            if (_write_json(CFG_FILE, current)) {
+            if (_write_json(CFG_FILE, current, fs)) {
                 _config_hash = h;
             }
         } else {
@@ -193,7 +207,7 @@ void MeatloafConfig::save()
         auto current = _extract_devices();
         auto h = _json_hash(current);
         if (h != _devices_hash) {
-            if (_write_json(DEVICES_FILE, current)) {
+            if (_write_json(DEVICES_FILE, current, fs)) {
                 _devices_hash = h;
             }
         } else {

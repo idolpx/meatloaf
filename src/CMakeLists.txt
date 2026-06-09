@@ -19,7 +19,6 @@ set(INCLUDES
     ${CMAKE_SOURCE_DIR}/lib/console/Commands
     ${CMAKE_SOURCE_DIR}/lib/console/cxxopts
     ${CMAKE_SOURCE_DIR}/lib/console/Helpers
-    ${CMAKE_SOURCE_DIR}/lib/console/improv
     ${CMAKE_SOURCE_DIR}/lib/console/ute
 
     ${CMAKE_SOURCE_DIR}/lib/device
@@ -81,7 +80,6 @@ FILE(GLOB_RECURSE SOURCES
     ${CMAKE_SOURCE_DIR}/lib/console/console_settings.c
     ${CMAKE_SOURCE_DIR}/lib/console/Commands/*.cpp
     ${CMAKE_SOURCE_DIR}/lib/console/ute/*.cpp
-    ${CMAKE_SOURCE_DIR}/lib/console/improv/*.cpp
     ${CMAKE_SOURCE_DIR}/lib/console/Helpers/*.cpp
 
     ${CMAKE_SOURCE_DIR}/lib/device/*.cpp
