@@ -454,12 +454,15 @@ namespace ESP32Console
     
     size_t Console::lprint(const char *str)
     {
-        int z = strlen(str);
-    
         if (!_initialized)
             return -1;
 
-        return fwrite(str, 1, z, stdout);
+        size_t z = strlen(str);
+        fwrite(str, 1, z, stdout);
+#ifdef ENABLE_CONSOLE_TCP
+        tcp_server.send(str);
+#endif
+        return z;
     }
     
     size_t Console::lprint(const std::string &str)
@@ -474,13 +477,22 @@ namespace ESP32Console
     {
         if (!_initialized)
             return -1;
-    
+
         va_list vargs;
         va_start(vargs, fmt);
-        int z = vfprintf(stdout, fmt, vargs);
+        char *buf = nullptr;
+        int z = vasprintf(&buf, fmt, vargs);
         va_end(vargs);
-    
-        return z >= 0 ? z : 0;
+
+        if (z < 0 || !buf)
+            return 0;
+
+        fwrite(buf, 1, z, stdout);
+#ifdef ENABLE_CONSOLE_TCP
+        tcp_server.send(std::string(buf, z));
+#endif
+        free(buf);
+        return z;
     }
 
     size_t Console::_print_number(unsigned long n, uint8_t base)
