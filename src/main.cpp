@@ -68,8 +68,9 @@ ps2dev::PS2Keyboard keyboard(PIN_KB_CLK, PIN_KB_DATA);
 
 
 #include "fnSystem.h"
-#include "fnConfig.h"
 #include "fnWiFi.h"
+#include "fnConfig.h"
+#include "mlConfig.h"
 
 #include "fsFlash.h"
 #include "fnFsSD.h"
@@ -215,6 +216,7 @@ void main_setup()
 
     // Load our stored configuration
     Config.load();
+    mlConfig.load();
 
     // Setup IEC Bus
     SYSTEM_BUS.setup();

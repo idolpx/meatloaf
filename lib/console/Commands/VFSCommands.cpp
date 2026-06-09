@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <sys/statvfs.h>
 #include <sys/types.h>
 #include <sys/syslimits.h>
 #include <iostream>
@@ -603,6 +604,37 @@ int disable(int argc, char **argv)
     return EXIT_SUCCESS;
 }
 
+static void df_print_fs(const char *label, const char *path)
+{
+    struct statvfs sv;
+    if (statvfs(path, &sv) != 0) {
+        Serial.printf("%-6s  %s: not available\r\n", label, path);
+        return;
+    }
+    uint64_t total = (uint64_t)sv.f_blocks * sv.f_frsize;
+    uint64_t avail = (uint64_t)sv.f_bavail * sv.f_frsize;
+    uint64_t used  = total - avail;
+    uint32_t pct   = total ? (uint32_t)(used * 100 / total) : 0;
+    Serial.printf("%-6s  %8lu KB  %8lu KB  %8lu KB  %3lu%%  %s\r\n",
+        label,
+        (unsigned long)(total / 1024),
+        (unsigned long)(used  / 1024),
+        (unsigned long)(avail / 1024),
+        (unsigned long)pct,
+        path);
+}
+
+static int df(int argc, char **argv)
+{
+    Serial.printf("%-6s  %10s  %10s  %10s  %4s  %s\r\n",
+        "FS", "Size", "Used", "Avail", "Use%", "Mounted on");
+    df_print_fs("flash", "/flash");
+#ifdef SD_CARD
+    df_print_fs("sd", "/sd");
+#endif
+    return EXIT_SUCCESS;
+}
+
 #ifdef SD_CARD
 static void format_sd_task(void *arg)
 {
@@ -709,6 +741,11 @@ namespace ESP32Console::Commands
     const ConsoleCommand getUpdateCommand()
     {
         return ConsoleCommand("update", &update, "Update firmware from file on sd card");
+    }
+
+    const ConsoleCommand getDFCommand()
+    {
+        return ConsoleCommand("df", &df, "Show filesystem disk space usage");
     }
 
     const ConsoleCommand getEnableCommand()

@@ -107,7 +107,7 @@ namespace ESP32Console
     void Console::registerSystemCommands()
     {
         registerCommand(getSysInfoCommand());
-        registerCommand(getRestartCommand());
+        registerCommand(getRebootCommand());
         registerCommand(getMemInfoCommand());
         registerCommand(getTaskInfoCommand());
         registerCommand(getDateCommand());
@@ -130,14 +130,15 @@ namespace ESP32Console
     void ESP32Console::Console::registerNetworkCommands()
     {
         registerCommand(getPingCommand());
-        registerCommand(getIpconfigCommand());
+        registerCommand(getIfconfigCommand());
+        registerCommand(getNetstatCommand());
         registerCommand(getScanCommand());
         registerCommand(getConnectCommand());
-        registerCommand(getIMPROVCommand());
     }
 
     void Console::registerVFSCommands()
     {
+        registerCommand(getDFCommand());
         registerCommand(getCatCommand());
         registerCommand(getHexCommand());
         registerCommand(getCDCommand());
