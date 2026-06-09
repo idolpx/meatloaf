@@ -393,11 +393,9 @@ static int config_cmd(int argc, char **argv)
 
 namespace ESP32Console::Commands
 {
-    const ConsoleCommand getRestartCommand()
+    const ConsoleCommand getRebootCommand()
     {
-        ConsoleCommand("reset", &restart, NULL);
-        ConsoleCommand("reboot", &restart, NULL);
-        return ConsoleCommand("restart", &restart, "Restart / Reboot the system");
+        return ConsoleCommand("reboot", &restart, "Reboot the system");
     }
 
     const ConsoleCommand getSysInfoCommand()

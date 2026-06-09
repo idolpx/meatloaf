@@ -6,6 +6,9 @@
 #include "lwip/inet.h"
 #include "lwip/netdb.h"
 #include "lwip/sockets.h"
+#include "lwip/tcpip.h"
+#include "lwip/priv/tcp_priv.h"
+#include "lwip/udp.h"
 #include <unistd.h>
 #include <esp_wifi.h>
 #include <esp_crc.h>
@@ -14,7 +17,6 @@
 #include "fnWiFi.h"
 
 #include "string_utils.h"
-#include "../improv/improv.h"
 
 #include "../../include/debug.h"
 
@@ -187,8 +189,6 @@ static int ping(int argc, char **argv)
 
 static void ipconfig_wlan()
 {
-    Serial.printf("==== WLAN ====\r\n");
-
     wifi_mode_t mode = WIFI_MODE_NULL;
     esp_wifi_get_mode(&mode);
     Serial.printf("Mode: %s\r\n", wlmode2string(mode));
@@ -230,9 +230,77 @@ static void ipconfig_wlan()
     }
 }
 
-static int ipconfig(int argc, char **argv)
+static int ifconfig(int argc, char **argv)
 {
     ipconfig_wlan();
+    return EXIT_SUCCESS;
+}
+
+static const char *tcp_state_str(enum tcp_state s)
+{
+    switch (s) {
+        case CLOSED:      return "CLOSED";
+        case LISTEN:      return "LISTEN";
+        case SYN_SENT:    return "SYN_SENT";
+        case SYN_RCVD:    return "SYN_RCVD";
+        case ESTABLISHED: return "ESTABLISHED";
+        case FIN_WAIT_1:  return "FIN_WAIT_1";
+        case FIN_WAIT_2:  return "FIN_WAIT_2";
+        case CLOSE_WAIT:  return "CLOSE_WAIT";
+        case CLOSING:     return "CLOSING";
+        case LAST_ACK:    return "LAST_ACK";
+        case TIME_WAIT:   return "TIME_WAIT";
+        default:          return "UNKNOWN";
+    }
+}
+
+static void fmt_addr(char *buf, size_t len, const ip_addr_t *addr, u16_t port)
+{
+    if (ip_addr_isany(addr))
+        snprintf(buf, len, "0.0.0.0:%u", port);
+    else {
+        char ip[INET6_ADDRSTRLEN];
+        ipaddr_ntoa_r(addr, ip, sizeof(ip));
+        snprintf(buf, len, "%s:%u", ip, port);
+    }
+}
+
+static int netstat(int argc, char **argv)
+{
+    char local[32], remote[32];
+
+    Serial.printf("Proto  %-24s %-24s State\r\n", "Local Address", "Foreign Address");
+
+    LOCK_TCPIP_CORE();
+
+    for (struct tcp_pcb_listen *p = tcp_listen_pcbs.listen_pcbs; p; p = p->next) {
+        fmt_addr(local, sizeof(local), &p->local_ip, p->local_port);
+        Serial.printf("tcp    %-24s %-24s LISTEN\r\n", local, "*:*");
+    }
+
+    for (struct tcp_pcb *p = tcp_active_pcbs; p; p = p->next) {
+        fmt_addr(local, sizeof(local), &p->local_ip, p->local_port);
+        fmt_addr(remote, sizeof(remote), &p->remote_ip, p->remote_port);
+        Serial.printf("tcp    %-24s %-24s %s\r\n", local, remote, tcp_state_str(p->state));
+    }
+
+    for (struct tcp_pcb *p = tcp_tw_pcbs; p; p = p->next) {
+        fmt_addr(local, sizeof(local), &p->local_ip, p->local_port);
+        fmt_addr(remote, sizeof(remote), &p->remote_ip, p->remote_port);
+        Serial.printf("tcp    %-24s %-24s TIME_WAIT\r\n", local, remote);
+    }
+
+    for (struct udp_pcb *p = udp_pcbs; p; p = p->next) {
+        fmt_addr(local, sizeof(local), &p->local_ip, p->local_port);
+        if (!ip_addr_isany(&p->remote_ip) && p->remote_port != 0)
+            fmt_addr(remote, sizeof(remote), &p->remote_ip, p->remote_port);
+        else
+            strcpy(remote, "*:*");
+        Serial.printf("udp    %-24s %-24s\r\n", local, remote);
+    }
+
+    UNLOCK_TCPIP_CORE();
+
     return EXIT_SUCCESS;
 }
 
@@ -271,217 +339,6 @@ static int connect(int argc, char **argv)
 
 
 
-// *** Improv
-
-std::vector<std::string> getLocalUrl() {
-  return {
-    // URL where user can finish onboarding or use device
-    // Recommended to use website hosted by device
-    std::string("http://meatloaf.local")
-  };
-}
-
-void serial_write(std::vector<uint8_t> &data) { 
-    // print buffer bytes
-    for (int i = 0; i < data.size(); i++) {
-        Serial.printf("%c", data[i]);
-    }
-}
-
-
-void set_state(improv::State state) {  
-  
-  std::vector<uint8_t> data = {'I', 'M', 'P', 'R', 'O', 'V'};
-  data.resize(11);
-  data[6] = improv::IMPROV_SERIAL_VERSION;
-  data[7] = improv::TYPE_CURRENT_STATE;
-  data[8] = 1;
-  data[9] = state;
-
-  uint8_t checksum = 0x00;
-  for (uint8_t d : data)
-    checksum += d;
-  data[10] = checksum;
-
-  serial_write(data);
-}
-
-
-void send_response(std::vector<uint8_t> &response) {
-  std::vector<uint8_t> data = {'I', 'M', 'P', 'R', 'O', 'V'};
-  data.resize(9);
-  data[6] = improv::IMPROV_SERIAL_VERSION;
-  data[7] = improv::TYPE_RPC_RESPONSE;
-  data[8] = response.size();
-  data.insert(data.end(), response.begin(), response.end());
-
-  uint8_t checksum = 0x00;
-  for (uint8_t d : data)
-    checksum += d;
-  data.push_back(checksum);
-
-  serial_write(data);
-}
-
-void set_error(improv::Error error) {
-  std::vector<uint8_t> data = {'I', 'M', 'P', 'R', 'O', 'V'};
-  data.resize(11);
-  data[6] = improv::IMPROV_SERIAL_VERSION;
-  data[7] = improv::TYPE_ERROR_STATE;
-  data[8] = 1;
-  data[9] = error;
-
-  uint8_t checksum = 0x00;
-  for (uint8_t d : data)
-    checksum += d;
-  data[10] = checksum;
-
-  serial_write(data);
-}
-
-void getAvailableWifiNetworks() {
-//   int networkNum = WiFi.scanNetworks();
-
-//   for (int id = 0; id < networkNum; ++id) { 
-//     std::vector<uint8_t> data = improv::build_rpc_response(
-//             improv::GET_WIFI_NETWORKS, {WiFi.SSID(id), String(WiFi.RSSI(id)), (WiFi.encryptionType(id) == WIFI_AUTH_OPEN ? "NO" : "YES")}, false);
-//     send_response(data);
-//     sleep(1);
-//   }
-//   //final response
-//   std::vector<uint8_t> data =
-//           improv::build_rpc_response(improv::GET_WIFI_NETWORKS, std::vector<std::string>{}, false);
-//   send_response(data);
-}
-
-bool connectWifi(std::string ssid, std::string password) {
-  uint8_t count = 0;
-
-//   WiFi.begin(ssid.c_str(), password.c_str());
-
-//   while (WiFi.status() != WL_CONNECTED) {
-//     blink_led(500, 1);
-
-//     if (count > MAX_ATTEMPTS_WIFI_CONNECTION) {
-//       WiFi.disconnect();
-//       return false;
-//     }
-//     count++;
-//   }
-
-  return true;
-}
-
-static int improv_c(int argc, char **argv)
-{
-
-    if (argc != 2)
-    {
-        Serial.printf("Usage: improv {data}\n");
-        return 1;
-    }
-
-    uint8_t version = argv[1][0];   // 6
-    uint8_t type = argv[1][1];      // 7
-    uint8_t data_len = argv[1][2];  // 8
-    uint8_t data[data_len] = { 0 };
-    memcpy(data, &argv[1][2], data_len);
-
-    uint8_t checksum = 0xDD; // IMPROV
-    checksum += version;
-    checksum += type;
-    checksum += data_len;
-
-    for (size_t i = 0; i < (data_len + 1); i++)
-        checksum += data[i];
-
-    if (checksum != data[data_len + 1]) {
-        Serial.printf("bad checksum [%02x][%02x]\r\n", (data[data_len + 1]), checksum);
-        return false;
-    }
-
-    if (type != improv::TYPE_RPC) {
-        return false;
-    }
-
-    auto cmd = improv::parse_improv_data(data, data_len, false);
-    // Serial.printf("alldata[%s]", mstr::toHex(argv[1], strlen(argv[1])).c_str());
-    // Serial.printf("   data[%s]", mstr::toHex(argv[1][2], data_len).c_str());
-
-    switch (cmd.command) {
-        case improv::Command::GET_CURRENT_STATE:
-        {
-        //if ((WiFi.status() == WL_CONNECTED)) {
-        if (0) {
-            set_state(improv::State::STATE_PROVISIONED);
-            std::vector<uint8_t> data = improv::build_rpc_response(improv::GET_CURRENT_STATE, getLocalUrl(), false);
-            send_response(data);
-
-        } else {
-            set_state(improv::State::STATE_AUTHORIZED);
-        }
-        
-        break;
-        }
-
-        case improv::Command::WIFI_SETTINGS:
-        {
-        if (cmd.ssid.length() == 0) {
-            set_error(improv::Error::ERROR_INVALID_RPC);
-            break;
-        }
-        
-        set_state(improv::STATE_PROVISIONING);
-        
-        if (connectWifi(cmd.ssid, cmd.password)) {
-
-            //blink_led(100, 3);
-            
-            //TODO: Persist credentials here
-
-            set_state(improv::STATE_PROVISIONED);        
-            std::vector<uint8_t> data = improv::build_rpc_response(improv::WIFI_SETTINGS, getLocalUrl(), false);
-            send_response(data);
-        } else {
-            set_state(improv::STATE_STOPPED);
-            set_error(improv::Error::ERROR_UNABLE_TO_CONNECT);
-        }
-        
-        break;
-        }
-
-        case improv::Command::GET_DEVICE_INFO:
-        {
-        std::vector<std::string> infos = {
-            // Firmware name
-            "meatloaf",
-            // Firmware version
-            "20250106.04",
-            // Hardware chip/variant
-            "ESP32",
-            // Device name
-            "Meatloaf!"
-        };
-        std::vector<uint8_t> data = improv::build_rpc_response(improv::GET_DEVICE_INFO, infos, false);
-        send_response(data);
-        break;
-        }
-
-        case improv::Command::GET_WIFI_NETWORKS:
-        {
-        getAvailableWifiNetworks();
-        break;
-        }
-
-        default: {
-        set_error(improv::ERROR_UNKNOWN_RPC);
-        return false;
-        }
-    }
-
-    return EXIT_SUCCESS;
-}
-
 namespace ESP32Console::Commands
 {
     const ConsoleCommand getPingCommand()
@@ -489,9 +346,14 @@ namespace ESP32Console::Commands
         return ConsoleCommand("ping", &ping, "Ping host");
     }
 
-    const ConsoleCommand getIpconfigCommand()
+    const ConsoleCommand getIfconfigCommand()
     {
-        return ConsoleCommand("ipconfig", &ipconfig, "Show IP and connection informations");
+        return ConsoleCommand("ifconfig", &ifconfig, "Show network interface configuration");
+    }
+
+    const ConsoleCommand getNetstatCommand()
+    {
+        return ConsoleCommand("netstat", &netstat, "List open sockets and connections");
     }
 
     const ConsoleCommand getScanCommand()
@@ -502,10 +364,5 @@ namespace ESP32Console::Commands
     const ConsoleCommand getConnectCommand()
     {
         return ConsoleCommand("connect", &connect, "Connect to wifi");
-    }
-
-    const ConsoleCommand getIMPROVCommand()
-    {
-        return ConsoleCommand("improv", &improv_c, "Wifi config via IMPROV protocol");
     }
 }

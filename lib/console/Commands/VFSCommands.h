@@ -38,6 +38,8 @@ namespace ESP32Console::Commands
 
     const ConsoleCommand getUpdateCommand();
 
+    const ConsoleCommand getDFCommand();
+
     const ConsoleCommand getEnableCommand();
 
     const ConsoleCommand getDisableCommand();
