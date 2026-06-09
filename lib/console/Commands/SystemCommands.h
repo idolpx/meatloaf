@@ -13,4 +13,6 @@ namespace ESP32Console::Commands
     const ConsoleCommand getTaskInfoCommand();
 
     const ConsoleCommand getDateCommand();
+
+    const ConsoleCommand getConfigCommand();
 };

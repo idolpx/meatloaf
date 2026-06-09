@@ -111,6 +111,7 @@ namespace ESP32Console
         registerCommand(getMemInfoCommand());
         registerCommand(getTaskInfoCommand());
         registerCommand(getDateCommand());
+        registerCommand(getConfigCommand());
     }
 
     void Console::registerDisplayCommands()
