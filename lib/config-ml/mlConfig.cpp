@@ -97,8 +97,6 @@ bool MeatloafConfig::_write_json(const char *path, const nlohmann::json &j, File
         return false;
     }
 
-    fs.create_path(SYSTEM_DIR);
-
     FILE *f = fs.file_open(path, "w");
     if (!f) {
         ESP_LOGE(TAG, "Cannot open %s for writing", path);
@@ -189,6 +187,11 @@ void MeatloafConfig::save()
 {
     FileSystem &fs = fnSDFAT.running() ? static_cast<FileSystem &>(fnSDFAT)
                                        : static_cast<FileSystem &>(fsFlash);
+
+    if (fnSDFAT.running())
+        fnSDFAT.create_path(SYSTEM_DIR);
+    else
+        fsFlash.create_path(SYSTEM_DIR);
 
     if (_config_dirty) {
         auto current = _extract_config();
