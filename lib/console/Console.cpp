@@ -33,6 +33,20 @@
 
 ESP32Console::Console console;
 
+#ifdef ENABLE_CONSOLE_TCP
+// Write callback for the stdout tee FILE* created by fopencookie().
+// Mirrors every stdout write to the connected TCP client.
+static ssize_t _stdout_tee_write(void *cookie, const char *buf, size_t n)
+{
+    fwrite(buf, 1, n, (FILE *)cookie);
+    tcp_server.send(std::string(buf, n));
+    return (ssize_t)n;
+}
+static cookie_io_functions_t _stdout_tee_fns = {
+    .read = nullptr, .write = _stdout_tee_write, .seek = nullptr, .close = nullptr
+};
+#endif
+
 using namespace ESP32Console::Commands;
 
 namespace ESP32Console
@@ -287,6 +301,20 @@ namespace ESP32Console
             fcntl(fileno(stdin), F_SETFL, stdin_flags & ~O_NONBLOCK);
         }
 
+#ifdef ENABLE_CONSOLE_TCP
+        // Install a permanent tee on this task's stdout so that ALL writes —
+        // including raw printf() inside ESP-IDF built-in commands like "help" —
+        // are automatically mirrored to connected TCP clients.
+        {
+            FILE *orig = stdout;
+            FILE *tee = fopencookie(orig, "w", _stdout_tee_fns);
+            if (tee) {
+                setvbuf(tee, nullptr, _IONBF, 0);
+                stdout = tee;
+            }
+        }
+#endif
+
         linenoiseSetMaxLineLen(console.max_cmdline_len_);
         while (true)
         {
@@ -294,9 +322,6 @@ namespace ESP32Console
 
             // Insert current PWD into prompt if needed
             mstr::replaceAll(prompt, "%pwd%", getCurrentPath()->url);
-#ifdef ENABLE_CONSOLE_TCP
-            tcp_server.send(prompt);
-#endif
             char *line = linenoise(prompt.c_str());
             if (line == NULL)
             {
@@ -330,15 +355,6 @@ namespace ESP32Console
 
             /* Try to run the command */
             int ret;
-#ifdef ENABLE_CONSOLE_TCP
-            {
-                std::string _tcp_line;
-                _tcp_line.reserve(interpolated_line.size() + 1);
-                _tcp_line = interpolated_line;
-                _tcp_line += '\n';
-                tcp_server.send(_tcp_line);
-            }
-#endif
             esp_err_t err = esp_console_run(interpolated_line.c_str(), &ret);
 
             //Reset global state
@@ -346,9 +362,6 @@ namespace ESP32Console
 
             if (err == ESP_ERR_NOT_FOUND)
             {
-#ifdef ENABLE_CONSOLE_TCP
-                tcp_server.send("Unrecognized command\n");
-#endif
                 fprintf(stdout, "Unrecognized command\n");
             }
             else if (err == ESP_ERR_INVALID_ARG)
@@ -387,7 +400,7 @@ namespace ESP32Console
         mstr::trim(command_str);
 
 #ifdef ENABLE_CONSOLE_TCP
-        // Helper lambda to send the current prompt to TCP.
+        // Send current prompt to TCP only (not to UART).
         auto send_prompt = [&]() {
             std::string p = prompt_;
             mstr::replaceAll(p, "%pwd%", getCurrentPath()->url);
@@ -402,6 +415,19 @@ namespace ESP32Console
 #endif
             return;
         }
+
+#ifdef ENABLE_CONSOLE_TCP
+        // Install a temporary tee on this task's stdout so ALL output from the
+        // command — including raw printf() inside built-ins like "help" — reaches
+        // the TCP client. Torn down before send_prompt() so the prompt itself
+        // goes only to TCP, not UART.
+        FILE *_tee_orig = stdout;
+        FILE *_tee = fopencookie(_tee_orig, "w", _stdout_tee_fns);
+        if (_tee) {
+            setvbuf(_tee, nullptr, _IONBF, 0);
+            stdout = _tee;
+        }
+#endif
 
         //Debug_printv("Executing command: [%s]\n", command);
         lprint(command_str);
@@ -436,37 +462,31 @@ namespace ESP32Console
         }
 
 #ifdef ENABLE_CONSOLE_TCP
+        // Remove tee before sending prompt so prompt goes to TCP only, not UART.
+        if (_tee) {
+            fflush(_tee);
+            stdout = _tee_orig;
+            fclose(_tee);
+        }
         send_prompt();
 #endif
     }
 
     size_t Console::write(uint8_t c)
     {
-        int z = fwrite(&c, 1, 1, stdout);
-#ifdef ENABLE_CONSOLE_TCP
-        tcp_server.send(std::string((const char *)&c, 1));
-#endif
-        return z;
+        return fwrite(&c, 1, 1, stdout);
     }
-    
+
     size_t Console::write(const uint8_t *buffer, size_t size)
     {
-        int z = fwrite(buffer, 1, size, stdout);
-#ifdef ENABLE_CONSOLE_TCP
-        tcp_server.send((char *)buffer);
-#endif
-        return z;
+        return fwrite(buffer, 1, size, stdout);
     }
-    
+
     size_t Console::write(const char *str)
     {
-        int z = fwrite(str, 1, strlen(str), stdout);
-#ifdef ENABLE_CONSOLE_TCP
-        tcp_server.send(str);
-#endif
-        return z;
+        return fwrite(str, 1, strlen(str), stdout);
     }
-    
+
     size_t Console::lprint(const char *str)
     {
         if (!_initialized)
@@ -474,9 +494,6 @@ namespace ESP32Console
 
         size_t z = strlen(str);
         fwrite(str, 1, z, stdout);
-#ifdef ENABLE_CONSOLE_TCP
-        tcp_server.send(str);
-#endif
         return z;
     }
     
@@ -495,19 +512,9 @@ namespace ESP32Console
 
         va_list vargs;
         va_start(vargs, fmt);
-        char *buf = nullptr;
-        int z = vasprintf(&buf, fmt, vargs);
+        int z = vfprintf(stdout, fmt, vargs);
         va_end(vargs);
-
-        if (z < 0 || !buf)
-            return 0;
-
-        fwrite(buf, 1, z, stdout);
-#ifdef ENABLE_CONSOLE_TCP
-        tcp_server.send(std::string(buf, z));
-#endif
-        free(buf);
-        return z;
+        return z < 0 ? 0 : z;
     }
 
     size_t Console::_print_number(unsigned long n, uint8_t base)
@@ -537,15 +544,10 @@ namespace ESP32Console
     
     size_t Console::print(const char *str)
     {
-        int z = strlen(str);
-    
         if (!_initialized)
             return -1;
 
-#ifdef ENABLE_CONSOLE_TCP
-        tcp_server.send(str);
-#endif
-        return fwrite(str, 1, z, stdout);
+        return fwrite(str, 1, strlen(str), stdout);
     }
     
     size_t Console::print(const std::string &str)
