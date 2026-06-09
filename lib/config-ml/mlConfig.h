@@ -21,6 +21,8 @@
 #include <cstdint>
 #include <json.hpp>
 
+class FileSystem;
+
 // MeatloafConfig — JSON-based replacement for fnConfig.
 //
 // Loads config.json and devices.json from SYSTEM_DIR on the SD card and merges
@@ -85,9 +87,9 @@ private:
     // Compute MD5 of the serialized JSON. Returns a 16-byte digest.
     static std::array<uint8_t, 16> _json_hash(const nlohmann::json &j);
 
-    // Low-level I/O — paths are relative to the SD root (no leading /sd prefix).
-    bool _read_json(const char *sd_path, nlohmann::json &out);
-    bool _write_json(const char *sd_path, const nlohmann::json &j);
+    // Low-level I/O — both helpers operate on whichever FileSystem is passed.
+    bool _read_json(const char *path, nlohmann::json &out, FileSystem &fs);
+    bool _write_json(const char *path, const nlohmann::json &j, FileSystem &fs);
 };
 
 extern MeatloafConfig mlConfig;
