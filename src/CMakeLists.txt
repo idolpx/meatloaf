@@ -13,6 +13,7 @@ set(INCLUDES
 
     ${CMAKE_SOURCE_DIR}/lib/compat
     ${CMAKE_SOURCE_DIR}/lib/config
+    ${CMAKE_SOURCE_DIR}/lib/config-ml
 
     ${CMAKE_SOURCE_DIR}/lib/console
     ${CMAKE_SOURCE_DIR}/lib/console/Commands
@@ -73,6 +74,7 @@ FILE(GLOB_RECURSE SOURCES
 
     ${CMAKE_SOURCE_DIR}/lib/compat/*.c
     ${CMAKE_SOURCE_DIR}/lib/config/*.cpp
+    ${CMAKE_SOURCE_DIR}/lib/config-ml/*.cpp
 
     ${CMAKE_SOURCE_DIR}/lib/console/*.c
     ${CMAKE_SOURCE_DIR}/lib/console/*.cpp
