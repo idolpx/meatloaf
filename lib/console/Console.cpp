@@ -319,6 +319,16 @@ namespace ESP32Console
                 vTaskDelay(pdMS_TO_TICKS(50));
                 continue;
             }
+            // ESP_LINE_ENDINGS_CR maps both \r and \n to \n, so a \r\n terminal
+            // leaves a second \n in the buffer after linenoise consumes the first.
+            // Drain it non-blocking to prevent a double prompt on the next call.
+            {
+                int fl = fcntl(fileno(stdin), F_GETFL, 0);
+                fcntl(fileno(stdin), F_SETFL, fl | O_NONBLOCK);
+                int ch = fgetc(stdin);
+                fcntl(fileno(stdin), F_SETFL, fl);
+                if (ch != '\n' && ch != EOF) ungetc(ch, stdin);
+            }
 
             // Ignore empty/whitespace-only input lines.
             std::string raw_line = line;
