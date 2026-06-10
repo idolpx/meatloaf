@@ -294,7 +294,7 @@ esp_err_t cHttpdServer::webdav_handler(httpd_req_t *httpd_req)
         return ESP_OK;
     }
 
-    // httpd_rßesp_set_hdr(httpd_req, "Access-Control-Allow-Origin", "*");
+    // httpd_resp_set_hdr(httpd_req, "Access-Control-Allow-Origin", "*");
     // httpd_resp_set_hdr(httpd_req, "Access-Control-Allow-Headers", "*");
     // httpd_resp_set_hdr(httpd_req, "Access-Control-Allow-Methods", "*");
 
@@ -612,6 +612,11 @@ void cHttpdServer::send_file(httpd_req_t *req, const char *filename)
         fpath += default_index;
     else if (pState->_FS->is_dir(fpath.c_str()))
         fpath += "/" + default_index;
+
+    // Allow CORS for all files
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "*");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "*");
 
     // Handle file differently if it's one of the types we parse
     if (is_parsable(get_extension(filename)))

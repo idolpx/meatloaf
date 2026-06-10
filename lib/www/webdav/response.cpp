@@ -11,6 +11,9 @@ void Response::setDavHeaders() {
     setHeader("MS-Author-Via", "DAV");
     setHeader("Allow", "COPY,DELETE,GET,HEAD,LOCK,MKCOL,MOVE,OPTIONS,PROPFIND,PROPPATCH,PUT,UNLOCK");
     setHeader("Public", "COPY,DELETE,GET,HEAD,LOCK,MKCOL,MOVE,OPTIONS,PROPFIND,PROPPATCH,PUT,UNLOCK");
+    setHeader("Access-Control-Allow-Origin", "*");
+    setHeader("Access-Control-Allow-Headers", "*");
+    setHeader("Access-Control-Allow-Methods", "*");
     setHeader("Connection", "close");
 }
 
