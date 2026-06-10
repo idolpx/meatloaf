@@ -20,6 +20,37 @@
 #include <array>
 #include <cstdint>
 #include <json.hpp>
+#include <esp_heap_caps.h>
+
+// Routes every JSON node allocation (map entries, array slots, string objects)
+// to PSRAM instead of internal DRAM. Falls back to internal RAM on boards
+// without SPIRAM so the type is safe to use everywhere.
+template<typename T>
+struct PsramAllocator {
+    using value_type = T;
+    PsramAllocator() noexcept = default;
+    template<typename U> PsramAllocator(const PsramAllocator<U>&) noexcept {}
+    T* allocate(std::size_t n) {
+        void* p = heap_caps_malloc(n * sizeof(T), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (!p) p = heap_caps_malloc(n * sizeof(T), MALLOC_CAP_8BIT);
+        if (!p) abort(); // -fno-exceptions: can't throw, OOM is unrecoverable
+        return static_cast<T*>(p);
+    }
+    void deallocate(T* p, std::size_t) noexcept { free(p); }
+    template<typename U> bool operator==(const PsramAllocator<U>&) const noexcept { return true; }
+    template<typename U> bool operator!=(const PsramAllocator<U>&) const noexcept { return false; }
+};
+
+using psram_json = nlohmann::basic_json<
+    std::map,
+    std::vector,
+    std::string,
+    bool,
+    std::int64_t,
+    std::uint64_t,
+    double,
+    PsramAllocator
+>;
 
 class FileSystem;
 
@@ -51,13 +82,13 @@ public:
 
     // Direct access to the merged JSON tree.
     // Mutate through data() then call mark_*_dirty() so save() knows to check.
-    nlohmann::json&       data()       { return _data; }
-    const nlohmann::json& data() const { return _data; }
+    psram_json&       data()       { return _data; }
+    const psram_json& data() const { return _data; }
 
     // Convenience: access common sections directly.
     // Returns a null JSON value if the key is absent (safe to read, not to write).
-    const nlohmann::json& operator[](const char *key) const {
-        static const nlohmann::json null_json;
+    const psram_json& operator[](const char *key) const {
+        static const psram_json null_json;
         return _data.contains(key) ? _data.at(key) : null_json;
     }
 
@@ -72,24 +103,18 @@ public:
     bool is_devices_dirty() const { return _devices_dirty; }
 
 private:
-    nlohmann::json _data;                        // merged in-memory state
+    psram_json _data;                            // merged in-memory state (PSRAM-allocated)
     std::array<uint8_t, 16> _config_hash  = {}; // MD5 of config.json at last load/save
     std::array<uint8_t, 16> _devices_hash = {}; // MD5 of devices.json at last load/save
 
     bool _config_dirty  = false;
     bool _devices_dirty = false;
 
-    // Return the portion of _data that belongs in config.json (no iec.devices).
-    nlohmann::json _extract_config() const;
-    // Return { "iec": { "devices": ... } } for devices.json.
-    nlohmann::json _extract_devices() const;
-
-    // Compute MD5 of the serialized JSON. Returns a 16-byte digest.
-    static std::array<uint8_t, 16> _json_hash(const nlohmann::json &j);
-
-    // Low-level I/O — both helpers operate on whichever FileSystem is passed.
-    bool _read_json(const char *path, nlohmann::json &out, FileSystem &fs);
-    bool _write_json(const char *path, const nlohmann::json &j, FileSystem &fs);
+    psram_json _extract_config() const;
+    psram_json _extract_devices() const;
+    static std::array<uint8_t, 16> _json_hash(const psram_json &j);
+    bool _read_json(const char *path, psram_json &out, FileSystem &fs);
+    bool _write_json(const char *path, const psram_json &j, FileSystem &fs);
 };
 
 extern MeatloafConfig mlConfig;
