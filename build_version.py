@@ -42,7 +42,7 @@ else:
 
     fw_date = datetime.datetime.now().strftime("%Y%m%d.%H")
 
-    rxs = ['^#define FN_VERSION_MAJOR (\w+)', '^#define FN_VERSION_MINOR (\w+)',
+    rxs = [r'^#define FN_VERSION_MAJOR (\w+)', r'^#define FN_VERSION_MINOR (\w+)',
            '^(#define FN_VERSION_BUILD)', '^(#define FN_VERSION_DATE)', '^(#define FN_VERSION_FULL)', 
            '^(#define FW_VERSION)']
 
