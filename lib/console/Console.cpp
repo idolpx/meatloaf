@@ -34,12 +34,12 @@
 ESP32Console::Console console;
 
 #ifdef ENABLE_CONSOLE_TCP
-// Set while execute()'s stdout tee is active; suppresses explicit tcp sends in
-// Console methods to avoid double-forwarding in the TCP task context.
-static volatile bool _tcp_tee_active = false;
+// Tee FILE* installed on the TCP task's stdout for the duration of a client
+// session. Non-null means a client is connected and all stdout writes go to
+// both UART (via _tee_orig) and TCP (via tcp_server.send).
+static FILE *_tee      = nullptr;
+static FILE *_tee_orig = nullptr;
 
-// Write callback for the stdout tee FILE* created by fopencookie().
-// Mirrors every stdout write to the connected TCP client.
 static ssize_t _stdout_tee_write(void *cookie, const char *buf, size_t n)
 {
     fwrite(buf, 1, n, (FILE *)cookie);
@@ -379,6 +379,32 @@ namespace ESP32Console
         // what do we need to do when exiting?
     }
 
+    void Console::tcpBegin()
+    {
+#ifdef ENABLE_CONSOLE_TCP
+        if (_tee) return; // already active
+        _tee_orig = stdout;
+        FILE *tee = fopencookie(_tee_orig, "w", _stdout_tee_fns);
+        if (tee) {
+            setvbuf(tee, nullptr, _IONBF, 0);
+            stdout = tee;
+            _tee = tee;
+        }
+#endif
+    }
+
+    void Console::tcpEnd()
+    {
+#ifdef ENABLE_CONSOLE_TCP
+        if (!_tee) return;
+        fflush(_tee);
+        stdout = _tee_orig;
+        fclose(_tee);
+        _tee      = nullptr;
+        _tee_orig = nullptr;
+#endif
+    }
+
     void Console::execute(const char *command)
     {
         if (command == nullptr)
@@ -389,32 +415,16 @@ namespace ESP32Console
         std::string command_str = command;
         mstr::trim(command_str);
 
-#ifdef ENABLE_CONSOLE_TCP
-        // Install a tee on this task's stdout so ALL output — including raw
-        // printf() inside built-ins like "help" — is mirrored to TCP.
-        FILE *_tee_orig = stdout;
-        FILE *_tee = fopencookie(_tee_orig, "w", _stdout_tee_fns);
-        if (_tee) {
-            setvbuf(_tee, nullptr, _IONBF, 0);
-            stdout = _tee;
-            _tcp_tee_active = true;
-        }
-#endif
-
         if (!command_str.empty())
         {
-            //Debug_printv("Executing command: [%s]\n", command);
             lprint(command_str);
             lprint("\n");
 
-            //Interpolate the input line
             std::string interpolated_line = interpolateLine(command_str.c_str());
 
-            /* Try to run the command */
             int ret;
             esp_err_t err = esp_console_run(interpolated_line.c_str(), &ret);
 
-            //Reset global state
             resetAfterCommands();
 
             if (err == ESP_ERR_NOT_FOUND)
@@ -425,19 +435,12 @@ namespace ESP32Console
                 printf("Internal error: %s\n", esp_err_to_name(err));
         }
 
-        // Write prompt to stdout — tee forwards it to both UART and TCP uniformly.
+#ifdef ENABLE_CONSOLE_TCP
+        // Prompt goes to TCP only — the REPL loop owns the UART prompt via linenoise.
         {
             std::string p = prompt_;
             mstr::replaceAll(p, "%pwd%", getCurrentPath()->url);
-            lprint(p);
-        }
-
-#ifdef ENABLE_CONSOLE_TCP
-        if (_tee) {
-            fflush(_tee);
-            _tcp_tee_active = false;
-            stdout = _tee_orig;
-            fclose(_tee);
+            tcp_server.send(p);
         }
 #endif
     }
@@ -465,7 +468,7 @@ namespace ESP32Console
         size_t z = strlen(str);
         fwrite(str, 1, z, stdout);
 #ifdef ENABLE_CONSOLE_TCP
-        if (!_tcp_tee_active)
+        if (_tee == nullptr)
             tcp_server.send(std::string(str, z));
 #endif
         return z;
@@ -487,8 +490,8 @@ namespace ESP32Console
         va_list vargs;
         va_start(vargs, fmt);
 #ifdef ENABLE_CONSOLE_TCP
-        if (!_tcp_tee_active) {
-            // REPL task context: tee not active, send explicitly to TCP.
+        if (_tee == nullptr) {
+            // No TCP tee active (REPL task context): forward to TCP explicitly.
             char *buf = nullptr;
             int z = vasprintf(&buf, fmt, vargs);
             va_end(vargs);

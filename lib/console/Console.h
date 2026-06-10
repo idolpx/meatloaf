@@ -140,6 +140,11 @@ namespace ESP32Console
 
         void execute(const char *command);
 
+        // Called by the TCP server when a client connects / disconnects.
+        // Installs (or removes) the stdout tee that mirrors all output to TCP.
+        void tcpBegin();
+        void tcpEnd();
+
 
         size_t write(uint8_t);
         size_t write(const uint8_t *buffer, size_t size);
