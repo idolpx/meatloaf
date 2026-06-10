@@ -76,7 +76,7 @@ public:
         //std::string code = mstr::toUTF8(urlParser->name);
 
         //Debug_printv("url[%s]", urlParser.name.c_str());
-        urlParser->dump();
+        //urlParser->dump();
 
         std::string code;
         std::string code_path;
