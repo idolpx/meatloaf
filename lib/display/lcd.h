@@ -18,6 +18,10 @@
 #ifndef LCD_H
 #define LCD_H
 
+#include "../../include/pinmap.h"
+
+#ifdef PIN_TFT_MOSI
+
 #include "hagl.h"
 #include "hagl_hal.h"
 #include <freertos/FreeRTOS.h>
@@ -42,5 +46,22 @@ public:
 };
 
 extern DisplayLCD LCD;
+
+#else // PIN_TFT_MOSI not defined — no display pins in this board's pinmap
+
+#include <string>
+
+class DisplayLCD
+{
+public:
+    DisplayLCD() = default;
+    ~DisplayLCD() = default;
+    static DisplayLCD *instance() { return nullptr; }
+    void show_image(std::string) {}
+};
+
+extern DisplayLCD LCD;
+
+#endif // PIN_TFT_MOSI
 
 #endif // LCD_H

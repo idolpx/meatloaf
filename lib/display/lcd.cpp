@@ -15,9 +15,9 @@
 // You should have received a copy of the GNU General Public License
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
-#ifdef ENABLE_DISPLAY
-
 #include "lcd.h"
+
+#if defined(ENABLE_DISPLAY) && defined(PIN_TFT_MOSI)
 
 #include <string.h>
 #include <freertos/FreeRTOS.h>
@@ -180,5 +180,10 @@ void DisplayLCD::show_image(std::string filename)
         free(arg);
     }
 }
+
+#elif defined(ENABLE_DISPLAY)
+
+// ENABLE_DISPLAY is set but this board has no PIN_TFT_MOSI — create stub object only
+DisplayLCD LCD;
 
 #endif // ENABLE_DISPLAY
