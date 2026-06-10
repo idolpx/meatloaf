@@ -686,7 +686,16 @@ bool FileSystemSDFAT::start()
 #endif
     };
 
-    spi_bus_initialize(SDSPI_DEFAULT_HOST ,&bus_cfg, SDSPI_DEFAULT_DMA);
+    // The MIPI LCD (or the ST7789 fallback display) may have already
+    // initialised SPI2. That's fine — the SD card can attach to the same
+    // bus as long as the existing driver's max_transfer_sz and DMA channel
+    // are compatible (which they are on this build). Only fail on a
+    // genuine init error.
+    esp_err_t spi_init_err = spi_bus_initialize(SDSPI_DEFAULT_HOST, &bus_cfg, SDSPI_DEFAULT_DMA);
+    if (spi_init_err != ESP_OK && spi_init_err != ESP_ERR_INVALID_STATE)
+    {
+        Debug_printf("FileSystemSDFAT::start();  spi_bus_initialize failed: %s\r\n", esp_err_to_name(spi_init_err));
+    }
 
     sdspi_device_config_t slot_config = SDSPI_DEVICE_CONFIG_DEFAULT();
     slot_config.gpio_cs = PIN_SD_HOST_CS;
@@ -694,11 +703,13 @@ bool FileSystemSDFAT::start()
 
     esp_err_t e = esp_vfs_fat_sdspi_mount(_basepath, &host_config, &slot_config, &mount_config, &sdcard_info);
 
+
 #endif /* SDMMC_HOST_WIDTH */
 
     if(e == ESP_OK)
     {
         _started = true;
+        _sdcard_info = sdcard_info;
         _card_capacity = (uint64_t)sdcard_info->csd.capacity * sdcard_info->csd.sector_size;
         Debug_println("SD mounted.");
 
@@ -753,4 +764,26 @@ bool FileSystemSDFAT::start(const char *sd_path)
     return _started;
 }
 // !ESP_PLATFORM
+#endif
+
+#ifdef ESP_PLATFORM
+bool FileSystemSDFAT::format()
+{
+    if (!_started || _sdcard_info == nullptr)
+    {
+        Debug_printf("FileSystemSDFAT::format() - SD card not mounted\r\n");
+        return false;
+    }
+
+    Debug_printf("FileSystemSDFAT::format() - formatting SD card at \"%s\"\r\n", _basepath);
+    esp_err_t e = esp_vfs_fat_sdcard_format(_basepath, _sdcard_info);
+    if (e != ESP_OK)
+    {
+        Debug_printf("FileSystemSDFAT::format() - failed: %s\r\n", esp_err_to_name(e));
+        return false;
+    }
+
+    Debug_printf("FileSystemSDFAT::format() - done\r\n");
+    return true;
+}
 #endif

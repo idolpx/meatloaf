@@ -1,7 +1,12 @@
 #include "SystemCommands.h"
 
 #include <cstring>
+#include <cstdlib>
+#include <string>
+#include <vector>
 #include <esp_heap_caps.h>
+
+#include "mlConfig.h"
 
 static inline void *psram_malloc(size_t sz) {
     void *p = heap_caps_malloc(sz, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
@@ -289,13 +294,108 @@ static int date(int argc, char **argv)
     return EXIT_SUCCESS;
 }
 
+static void split_dotpath(const char *path, std::vector<std::string> &parts)
+{
+    const char *p = path;
+    while (*p) {
+        const char *dot = strchr(p, '.');
+        if (!dot) {
+            parts.emplace_back(p);
+            break;
+        }
+        parts.emplace_back(p, dot - p);
+        p = dot + 1;
+    }
+}
+
+static int config_cmd(int argc, char **argv)
+{
+    if (argc == 1) {
+        Serial.printf("%s\r\n", mlConfig.data().dump(2).c_str());
+        return EXIT_SUCCESS;
+    }
+
+    std::vector<std::string> parts;
+    split_dotpath(argv[1], parts);
+    if (parts.empty()) {
+        Serial.printf("Invalid key\r\n");
+        return 1;
+    }
+
+    bool writing = (argc >= 3);
+    nlohmann::json *node = &mlConfig.data();
+
+    for (size_t i = 0; i + 1 < parts.size(); i++) {
+        if (!node->is_object()) {
+            Serial.printf("'%s' is not an object\r\n", parts[i].c_str());
+            return 1;
+        }
+        if (!node->contains(parts[i])) {
+            if (!writing) {
+                Serial.printf("Key not found: %s\r\n", argv[1]);
+                return 1;
+            }
+            (*node)[parts[i]] = nlohmann::json::object();
+        }
+        node = &(*node)[parts[i]];
+    }
+
+    const std::string &leaf = parts.back();
+
+    if (!writing) {
+        if (!node->contains(leaf)) {
+            Serial.printf("Key not found: %s\r\n", argv[1]);
+            return 1;
+        }
+        auto &val = (*node)[leaf];
+        if (val.is_string())
+            Serial.printf("%s\r\n", val.get<std::string>().c_str());
+        else
+            Serial.printf("%s\r\n", val.dump().c_str());
+        return EXIT_SUCCESS;
+    }
+
+    // Parse the new value: bool, integer, float, or string.
+    const char *raw = argv[2];
+    nlohmann::json new_val;
+    if (strcmp(raw, "true") == 0) {
+        new_val = true;
+    } else if (strcmp(raw, "false") == 0) {
+        new_val = false;
+    } else if (strcmp(raw, "null") == 0) {
+        new_val = nullptr;
+    } else {
+        char *end;
+        long long i = strtoll(raw, &end, 10);
+        if (*end == '\0' && end != raw) {
+            new_val = i;
+        } else {
+            double d = strtod(raw, &end);
+            if (*end == '\0' && end != raw)
+                new_val = d;
+            else
+                new_val = std::string(raw);
+        }
+    }
+
+    (*node)[leaf] = new_val;
+
+    // Writes to iec.devices go to devices.json; everything else to config.json.
+    if (parts.size() >= 2 && parts[0] == "iec" && parts[1] == "devices")
+        mlConfig.mark_devices_dirty();
+    else
+        mlConfig.mark_config_dirty();
+
+    mlConfig.save();
+    Serial.printf("%s = %s\r\n", argv[1], (*node)[leaf].dump().c_str());
+    return EXIT_SUCCESS;
+}
+
 namespace ESP32Console::Commands
 {
-    const ConsoleCommand getRestartCommand()
+    const ConsoleCommand getRebootCommand()
     {
-        ConsoleCommand("reset", &restart, NULL);
-        ConsoleCommand("reboot", &restart, NULL);
-        return ConsoleCommand("restart", &restart, "Restart / Reboot the system");
+        return ConsoleCommand("reboot", &restart, "Reboot the system");
     }
 
     const ConsoleCommand getSysInfoCommand()
@@ -316,5 +416,12 @@ namespace ESP32Console::Commands
     const ConsoleCommand getDateCommand()
     {
         return ConsoleCommand("date", &date, "Shows and modify the system time");
+    }
+
+    const ConsoleCommand getConfigCommand()
+    {
+        return ConsoleCommand("config", &config_cmd,
+            "Read or write mlConfig values. Usage: config [key[.subkey] [value]]",
+            "[key [value]]");
     }
 }

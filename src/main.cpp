@@ -68,8 +68,9 @@ ps2dev::PS2Keyboard keyboard(PIN_KB_CLK, PIN_KB_DATA);
 
 
 #include "fnSystem.h"
-#include "fnConfig.h"
 #include "fnWiFi.h"
+#include "fnConfig.h"
+#include "mlConfig.h"
 
 #include "fsFlash.h"
 #include "fnFsSD.h"
@@ -119,6 +120,18 @@ void main_setup()
 
     //You can change the baud rate and pin numbers similar to Serial.begin() here.
     console.begin(DEBUG_SPEED);
+
+    // Register all extra command groups right after the console is up.
+    // Doing this here guarantees the user cannot type into a half-initialised
+    // REPL (e.g. before WiFi/SD/IEC init finishes) and ensures the full
+    // command set is available from the first prompt.
+    console.registerSystemCommands();
+    console.registerDisplayCommands();
+    console.registerIECCommands();
+    console.registerNetworkCommands();
+    console.registerVFSCommands();
+    console.registerGPIOCommands();
+    console.registerXFERCommands();
 #else
     Serial.begin(DEBUG_SPEED);
 #endif
@@ -203,6 +216,7 @@ void main_setup()
 
     // Load our stored configuration
     Config.load();
+    mlConfig.load();
 
     // Setup IEC Bus
     SYSTEM_BUS.setup();
@@ -251,8 +265,7 @@ void main_setup()
 
 #ifdef ENABLE_DISPLAY
     LEDS.start();
-    //LEDS.show_image( (char *)WWW_ROOT "/assets/logo.png" );
-    LCD.show_image( (char *)WWW_ROOT "/assets/logo.l.png" );
+    LCD.show_image( (char *)WWW_ROOT "/assets/logo.160x80.jpg" );
 #endif
 
 #ifdef ENABLE_AUDIO
@@ -279,31 +292,6 @@ void main_setup()
 //    runTestsSuite();
     // lfs_test();
 //#endif
-
-#ifdef ENABLE_CONSOLE
-    // Core commands (clear, echo, history, etc.) are registered in Console::beginCommon().
-
-    // System commands
-    console.registerSystemCommands();
-
-    // Display commands
-    console.registerDisplayCommands();
-
-    // IEC bus commands
-    console.registerIECCommands();
-
-    // Network commands
-    console.registerNetworkCommands();
-
-    // VFS commands
-    console.registerVFSCommands();
-
-    // GPIO commands
-    console.registerGPIOCommands();
-
-    // Transfer commands
-    console.registerXFERCommands();
-#endif
 
     printf("READY.\r\n");
     Debug_memory();

@@ -32,11 +32,19 @@ namespace ESP32Console::Commands
 
     const ConsoleCommand getCRC32Command();
 
+    const ConsoleCommand getAuthCommand();
+
     const ConsoleCommand getWgetCommand();
 
     const ConsoleCommand getUpdateCommand();
 
+    const ConsoleCommand getDFCommand();
+
     const ConsoleCommand getEnableCommand();
 
     const ConsoleCommand getDisableCommand();
+
+#ifdef SD_CARD
+    const ConsoleCommand getFormatSDCommand();
+#endif
 }

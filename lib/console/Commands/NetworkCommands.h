@@ -6,11 +6,11 @@ namespace ESP32Console::Commands
 {
     const ConsoleCommand getPingCommand();
 
-    const ConsoleCommand getIpconfigCommand();
+    const ConsoleCommand getIfconfigCommand();
+
+    const ConsoleCommand getNetstatCommand();
 
     const ConsoleCommand getScanCommand();
 
     const ConsoleCommand getConnectCommand();
-
-    const ConsoleCommand getIMPROVCommand();
 }

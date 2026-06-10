@@ -13,12 +13,12 @@ set(INCLUDES
 
     ${CMAKE_SOURCE_DIR}/lib/compat
     ${CMAKE_SOURCE_DIR}/lib/config
+    ${CMAKE_SOURCE_DIR}/lib/config-ml
 
     ${CMAKE_SOURCE_DIR}/lib/console
     ${CMAKE_SOURCE_DIR}/lib/console/Commands
     ${CMAKE_SOURCE_DIR}/lib/console/cxxopts
     ${CMAKE_SOURCE_DIR}/lib/console/Helpers
-    ${CMAKE_SOURCE_DIR}/lib/console/improv
     ${CMAKE_SOURCE_DIR}/lib/console/ute
 
     ${CMAKE_SOURCE_DIR}/lib/device
@@ -73,13 +73,13 @@ FILE(GLOB_RECURSE SOURCES
 
     ${CMAKE_SOURCE_DIR}/lib/compat/*.c
     ${CMAKE_SOURCE_DIR}/lib/config/*.cpp
+    ${CMAKE_SOURCE_DIR}/lib/config-ml/*.cpp
 
     ${CMAKE_SOURCE_DIR}/lib/console/*.c
     ${CMAKE_SOURCE_DIR}/lib/console/*.cpp
     ${CMAKE_SOURCE_DIR}/lib/console/console_settings.c
     ${CMAKE_SOURCE_DIR}/lib/console/Commands/*.cpp
     ${CMAKE_SOURCE_DIR}/lib/console/ute/*.cpp
-    ${CMAKE_SOURCE_DIR}/lib/console/improv/*.cpp
     ${CMAKE_SOURCE_DIR}/lib/console/Helpers/*.cpp
 
     ${CMAKE_SOURCE_DIR}/lib/device/*.cpp
@@ -126,7 +126,7 @@ FILE(GLOB_RECURSE SOURCES
 idf_component_register(
     INCLUDE_DIRS ${INCLUDES}
     SRCS ${SOURCES}
-    PRIV_REQUIRES esp_driver_uart esp_netif esp_driver_gpio fatfs vfs json esp_wifi mbedtls console app_update spi_flash mlff esp_driver_ledc expat http_parser esp-tls tcp_transport esp_driver_gptimer esp_driver_tsens esp_http_client libssh libiscsi
+    PRIV_REQUIRES esp_driver_uart esp_netif esp_driver_gpio fatfs vfs json esp_wifi mbedtls console app_update spi_flash mlff esp_driver_ledc expat http_parser esp-tls tcp_transport esp_driver_gptimer esp_driver_tsens esp_http_client libssh libiscsi hagl hagl_esp_mipi
 )
 
 target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-unused-value)

@@ -7,6 +7,8 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include "esp_littlefs.h"
+#include "esp_vfs_fat.h"
 #include <sys/syslimits.h>
 #include <iostream>
 #include <esp_heap_caps.h>
@@ -17,7 +19,12 @@ static inline void *psram_malloc(size_t sz) {
 }
 
 #include "fsFlash.h"
+#include "fnFsSD.h"
 #include "fnConfig.h"
+#ifdef ESP_PLATFORM
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#endif
 #include "../Console.h"
 #include "../Helpers/PWDHelpers.h"
 #include "../ute/ute.h"
@@ -368,7 +375,7 @@ int rmdir(int argc, char **argv)
 
     std::unique_ptr<MFile> rd(getCurrentPath()->cd(argv[1]));
 
-    if(rd->rmDir()) {
+    if(!rd->rmDir()) {
         Serial.printf("Error deleting %s: %s\r\n", rd->url.c_str(), strerror(errno));
     }
 
@@ -385,7 +392,7 @@ int mkdir(int argc, char **argv)
 
     std::unique_ptr<MFile> md(getCurrentPath()->cd(argv[1]));
 
-    if(md->mkDir()) {
+    if(!md->mkDir()) {
         Serial.printf("Error creating %s: %s\r\n", md->url.c_str(), strerror(errno));
     }
 
@@ -453,6 +460,23 @@ int mount(int argc, char **argv)
     return EXIT_SUCCESS;
 }
 
+int auth(int argc, char **argv)
+{
+    if (argc != 3)
+    {
+        Serial.printf("auth {username} {password}\r\n");
+        return EXIT_SUCCESS;
+    }
+
+    MFile* p = getCurrentPath();
+    p->user = argv[1];
+    p->password = argv[2];
+    p->rebuildUrl();
+    Serial.printf("Auth set for %s\r\n", p->url.c_str());
+
+    return EXIT_SUCCESS;
+}
+
 int wget(int argc, char **argv)
 {
     if (argc != 2)
@@ -486,6 +510,7 @@ int wget(int argc, char **argv)
 
         // Receive File
         int count = 0;
+        size_t total_written = 0;
         uint8_t *bytes = (uint8_t *)psram_malloc(256);
         while (true)
         {
@@ -503,9 +528,10 @@ int wget(int argc, char **argv)
                 Serial.printf("\nError writing '%s'\r", f->name.c_str());
                 break;
             }
+            total_written += bytes_written;
 
             // Show percentage complete in stdout
-            uint8_t percent = (s->position() * 100) / s->size();
+            uint8_t percent = (f->size > 0) ? (s->position() * 100) / f->size : 0;
 #ifdef ENABLE_DISPLAY
             LEDS.progress = percent;
 #endif
@@ -514,7 +540,16 @@ int wget(int argc, char **argv)
         }
         free(bytes);
         fclose(file);
-        Serial.printf("\n");
+
+        if (total_written == 0)
+        {
+            Serial.printf("\nError: Download failed, removing empty file '%s'\r\n", outfile.c_str());
+            remove(outfile.c_str());
+        }
+        else
+        {
+            Serial.printf("\n");
+        }
         //delete f;
     }
 
@@ -569,6 +604,72 @@ int disable(int argc, char **argv)
 
     return EXIT_SUCCESS;
 }
+
+static void df_print_row(const char *label, const char *path, uint64_t total, uint64_t avail)
+{
+    uint64_t used = total - avail;
+    uint32_t pct  = total ? (uint32_t)(used * 100 / total) : 0;
+    Serial.printf("%-6s  %8lu KB  %8lu KB  %8lu KB  %3lu%%  %s\r\n",
+        label,
+        (unsigned long)(total / 1024),
+        (unsigned long)(used  / 1024),
+        (unsigned long)(avail / 1024),
+        (unsigned long)pct,
+        path);
+}
+
+static int df(int argc, char **argv)
+{
+    Serial.printf("%-6s  %10s  %10s  %10s  %4s  %s\r\n",
+        "FS", "Size", "Used", "Avail", "Use%", "Mounted on");
+
+    size_t lfs_total = 0, lfs_used = 0;
+    if (esp_littlefs_info("storage", &lfs_total, &lfs_used) == ESP_OK)
+        df_print_row("flash", "/flash", lfs_total, lfs_total - lfs_used);
+    else
+        Serial.printf("%-6s  not available\r\n", "flash");
+
+#ifdef SD_CARD
+    uint64_t fat_total = 0, fat_free = 0;
+    if (esp_vfs_fat_info("/sd", &fat_total, &fat_free) == ESP_OK)
+        df_print_row("sd", "/sd", fat_total, fat_free);
+    else
+        Serial.printf("%-6s  not available\r\n", "sd");
+#endif
+
+    return EXIT_SUCCESS;
+}
+
+#ifdef SD_CARD
+static void format_sd_task(void *arg)
+{
+    Serial.printf("Formatting SD card (this may take several minutes)...\r\n");
+    if (fnSDFAT.format())
+    {
+        Serial.printf("SD card formatted successfully.\r\n");
+    }
+    else
+    {
+        Serial.printf("SD card format FAILED.\r\n");
+    }
+    vTaskDelete(NULL);
+}
+
+int format_sd(int argc, char **argv)
+{
+    if (argc < 2 || strcmp(argv[1], "-y") != 0)
+    {
+        Serial.printf("WARNING: This will erase all data on the SD card!\r\n");
+        Serial.printf("Usage: format_sd -y\r\n");
+        return EXIT_SUCCESS;
+    }
+
+    Serial.printf("Starting SD card format in background...\r\n");
+    xTaskCreate(format_sd_task, "format_sd", 4096, NULL, 5, NULL);
+
+    return EXIT_SUCCESS;
+}
+#endif
 
 namespace ESP32Console::Commands
 {
@@ -632,6 +733,11 @@ namespace ESP32Console::Commands
         return ConsoleCommand("mount", &mount, "Mount url on device id");
     }
 
+    const ConsoleCommand getAuthCommand()
+    {
+        return ConsoleCommand("auth", &auth, "Set username and password for current path");
+    }
+
     const ConsoleCommand getWgetCommand()
     {
         return ConsoleCommand("wget", &wget, "Download url to file");
@@ -642,6 +748,11 @@ namespace ESP32Console::Commands
         return ConsoleCommand("update", &update, "Update firmware from file on sd card");
     }
 
+    const ConsoleCommand getDFCommand()
+    {
+        return ConsoleCommand("df", &df, "Show filesystem disk space usage");
+    }
+
     const ConsoleCommand getEnableCommand()
     {
         return ConsoleCommand("enable", &enable, "Enable virtual drive");
@@ -650,4 +761,11 @@ namespace ESP32Console::Commands
     {
         return ConsoleCommand("disable", &disable, "Disable virtual drive");
     }
+
+#ifdef SD_CARD
+    const ConsoleCommand getFormatSDCommand()
+    {
+        return ConsoleCommand("format_sd", &format_sd, "Format the SD card (use -y to confirm)");
+    }
+#endif
 }

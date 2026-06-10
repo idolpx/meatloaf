@@ -42,14 +42,20 @@
 
 /* LCD */
 // .96in ST7735 - 160x80
-# define LCD_HOST SPI2_HOST
-# define LCD_WIDTH 80
-# define LCD_HEIGHT 160
-# define PIN_LCD_SCLK           GPIO_NUM_10
-# define PIN_LCD_MOSI           GPIO_NUM_11
-# define PIN_LCD_CS             GPIO_NUM_12
-# define PIN_LCD_DC             GPIO_NUM_13
-# define PIN_LCD_RST            GPIO_NUM_14
+#define TFT_WIDTH               160
+#define TFT_HEIGHT              80
+#define PIN_TFT_SCLK            GPIO_NUM_10
+#define PIN_TFT_MOSI            GPIO_NUM_11
+#define PIN_TFT_CS              GPIO_NUM_12
+#define PIN_TFT_DC              GPIO_NUM_13
+#define PIN_TFT_RST             GPIO_NUM_14
+#define PIN_TFT_BL              GPIO_NUM_NC
+#define TFT_OFFSETX             0
+#define TFT_OFFSETY             0
+//#define TFT_INVERSION_ON
+//#define TFT_SPI_FREQUENCY       40000000 // 40MHz
+#define TFT_SPI_FREQUENCY       60000000 // 60MHz
+
 
 /* Audio Output */
 #define PIN_DAC1                GPIO_NUM_NC // samlib.h

@@ -33,6 +33,24 @@
 
 ESP32Console::Console console;
 
+#ifdef ENABLE_CONSOLE_TCP
+// Tee FILE* installed on the TCP task's stdout for the duration of a client
+// session. Non-null means a client is connected and all stdout writes go to
+// both UART (via _tee_orig) and TCP (via tcp_server.send).
+static FILE *_tee      = nullptr;
+static FILE *_tee_orig = nullptr;
+
+static ssize_t _stdout_tee_write(void *cookie, const char *buf, size_t n)
+{
+    fwrite(buf, 1, n, (FILE *)cookie);
+    tcp_server.send(std::string(buf, n));
+    return (ssize_t)n;
+}
+static cookie_io_functions_t _stdout_tee_fns = {
+    .read = nullptr, .write = _stdout_tee_write, .seek = nullptr, .close = nullptr
+};
+#endif
+
 using namespace ESP32Console::Commands;
 
 namespace ESP32Console
@@ -107,16 +125,18 @@ namespace ESP32Console
     void Console::registerSystemCommands()
     {
         registerCommand(getSysInfoCommand());
-        registerCommand(getRestartCommand());
+        registerCommand(getRebootCommand());
         registerCommand(getMemInfoCommand());
         registerCommand(getTaskInfoCommand());
         registerCommand(getDateCommand());
+        registerCommand(getConfigCommand());
     }
 
     void Console::registerDisplayCommands()
     {
 #ifdef ENABLE_DISPLAY
         registerCommand(getLEDCommand());
+        registerCommand(getShowCommand());
 #endif
     }
 
@@ -128,14 +148,15 @@ namespace ESP32Console
     void ESP32Console::Console::registerNetworkCommands()
     {
         registerCommand(getPingCommand());
-        registerCommand(getIpconfigCommand());
+        registerCommand(getIfconfigCommand());
+        registerCommand(getNetstatCommand());
         registerCommand(getScanCommand());
         registerCommand(getConnectCommand());
-        registerCommand(getIMPROVCommand());
     }
 
     void Console::registerVFSCommands()
     {
+        registerCommand(getDFCommand());
         registerCommand(getCatCommand());
         registerCommand(getHexCommand());
         registerCommand(getCDCommand());
@@ -148,10 +169,14 @@ namespace ESP32Console
         registerCommand(getMKDirCommand());
         registerCommand(getEditCommand());
         registerCommand(getMountCommand());
+        registerCommand(getAuthCommand());
         registerCommand(getWgetCommand());
         registerCommand(getUpdateCommand());
         registerCommand(getEnableCommand());
         registerCommand(getDisableCommand());
+#ifdef SD_CARD
+        registerCommand(getFormatSDCommand());
+#endif
     }
 
     void Console::registerGPIOCommands()
@@ -287,15 +312,22 @@ namespace ESP32Console
 
             // Insert current PWD into prompt if needed
             mstr::replaceAll(prompt, "%pwd%", getCurrentPath()->url);
-#ifdef ENABLE_CONSOLE_TCP
-            tcp_server.send(prompt);
-#endif
             char *line = linenoise(prompt.c_str());
             if (line == NULL)
             {
                 // Avoid tight-looping when input is temporarily unavailable.
                 vTaskDelay(pdMS_TO_TICKS(50));
                 continue;
+            }
+            // ESP_LINE_ENDINGS_CR maps both \r and \n to \n, so a \r\n terminal
+            // leaves a second \n in the buffer after linenoise consumes the first.
+            // Drain it non-blocking to prevent a double prompt on the next call.
+            {
+                int fl = fcntl(fileno(stdin), F_GETFL, 0);
+                fcntl(fileno(stdin), F_SETFL, fl | O_NONBLOCK);
+                int ch = fgetc(stdin);
+                fcntl(fileno(stdin), F_SETFL, fl);
+                if (ch != '\n' && ch != EOF) ungetc(ch, stdin);
             }
 
             // Ignore empty/whitespace-only input lines.
@@ -308,7 +340,6 @@ namespace ESP32Console
             }
 
             //Debug_printv("Line received from linenoise: [%s]", line);
-            fprintf(stdout, ANSI_YELLOW "[%s:%u] %s(): " ANSI_GREEN_BOLD "line[%s] size[%d]" ANSI_RESET "\r\n", __FILE__, __LINE__, __FUNCTION__, line, strlen(line));
 
             // /* Add the command to the history */
             // linenoiseHistoryAdd(line);
@@ -324,15 +355,6 @@ namespace ESP32Console
 
             /* Try to run the command */
             int ret;
-#ifdef ENABLE_CONSOLE_TCP
-            {
-                std::string _tcp_line;
-                _tcp_line.reserve(interpolated_line.size() + 1);
-                _tcp_line = interpolated_line;
-                _tcp_line += '\n';
-                tcp_server.send(_tcp_line);
-            }
-#endif
             esp_err_t err = esp_console_run(interpolated_line.c_str(), &ret);
 
             //Reset global state
@@ -340,9 +362,6 @@ namespace ESP32Console
 
             if (err == ESP_ERR_NOT_FOUND)
             {
-#ifdef ENABLE_CONSOLE_TCP
-                tcp_server.send("Unrecognized command\n");
-#endif
                 fprintf(stdout, "Unrecognized command\n");
             }
             else if (err == ESP_ERR_INVALID_ARG)
@@ -370,6 +389,32 @@ namespace ESP32Console
         // what do we need to do when exiting?
     }
 
+    void Console::tcpBegin()
+    {
+#ifdef ENABLE_CONSOLE_TCP
+        if (_tee) return; // already active
+        _tee_orig = stdout;
+        FILE *tee = fopencookie(_tee_orig, "w", _stdout_tee_fns);
+        if (tee) {
+            setvbuf(tee, nullptr, _IONBF, 0);
+            stdout = tee;
+            _tee = tee;
+        }
+#endif
+    }
+
+    void Console::tcpEnd()
+    {
+#ifdef ENABLE_CONSOLE_TCP
+        if (!_tee) return;
+        fflush(_tee);
+        stdout = _tee_orig;
+        fclose(_tee);
+        _tee      = nullptr;
+        _tee_orig = nullptr;
+#endif
+    }
+
     void Console::execute(const char *command)
     {
         if (command == nullptr)
@@ -379,80 +424,64 @@ namespace ESP32Console
 
         std::string command_str = command;
         mstr::trim(command_str);
-        if (command_str.empty())
+
+        if (!command_str.empty())
         {
-            return;
+            lprint(command_str);
+            lprint("\n");
+
+            std::string interpolated_line = interpolateLine(command_str.c_str());
+
+            int ret;
+            esp_err_t err = esp_console_run(interpolated_line.c_str(), &ret);
+
+            resetAfterCommands();
+
+            if (err == ESP_ERR_NOT_FOUND)
+                printf("Unrecognized command\n");
+            else if (err == ESP_OK && ret != ESP_OK)
+                printf("Command returned non-zero error code: 0x%x (%s)\n", ret, esp_err_to_name(ret));
+            else if (err != ESP_OK)
+                printf("Internal error: %s\n", esp_err_to_name(err));
         }
 
-        //Debug_printv("Executing command: [%s]\n", command);
-        lprint(command_str);
-        lprint("\n");
-
-        //Interpolate the input line
-        std::string interpolated_line = interpolateLine(command_str.c_str());
-        //Debug_printv("Interpolated line: [%s]\n", interpolated_line.c_str());
-
-        /* Try to run the command */
-        int ret;
-        esp_err_t err = esp_console_run(interpolated_line.c_str(), &ret);
-
-        //Reset global state
-        resetAfterCommands();
-
-        if (err == ESP_ERR_NOT_FOUND)
+#ifdef ENABLE_CONSOLE_TCP
+        // Prompt goes to TCP only — the REPL loop owns the UART prompt via linenoise.
         {
-            printf("Unrecognized command\n");
+            std::string p = prompt_;
+            mstr::replaceAll(p, "%pwd%", getCurrentPath()->url);
+            tcp_server.send(p);
         }
-        else if (err == ESP_ERR_INVALID_ARG)
-        {
-            // command was empty
-        }
-        else if (err == ESP_OK && ret != ESP_OK)
-        {
-            printf("Command returned non-zero error code: 0x%x (%s)\n", ret, esp_err_to_name(ret));
-        }
-        else if (err != ESP_OK)
-        {
-            printf("Internal error: %s\n", esp_err_to_name(err));
-        }
-
+#endif
     }
 
     size_t Console::write(uint8_t c)
     {
-        int z = fwrite(&c, 1, 1, stdout);
-#ifdef ENABLE_CONSOLE_TCP
-        tcp_server.send(std::string((const char *)&c, 1));
-#endif
-        return z;
+        return fwrite(&c, 1, 1, stdout);
     }
-    
+
     size_t Console::write(const uint8_t *buffer, size_t size)
     {
-        int z = fwrite(buffer, 1, size, stdout);
-#ifdef ENABLE_CONSOLE_TCP
-        tcp_server.send((char *)buffer);
-#endif
-        return z;
+        return fwrite(buffer, 1, size, stdout);
     }
-    
+
     size_t Console::write(const char *str)
     {
-        int z = fwrite(str, 1, strlen(str), stdout);
-#ifdef ENABLE_CONSOLE_TCP
-        tcp_server.send(str);
-#endif
-        return z;
+        return fwrite(str, 1, strlen(str), stdout);
     }
-    
+
     size_t Console::lprint(const char *str)
     {
-        int z = strlen(str);
-    
         if (!_initialized)
             return -1;
 
-        return fwrite(str, 1, z, stdout);
+        size_t z = strlen(str);
+        fwrite(str, 1, z, stdout);
+#ifdef ENABLE_CONSOLE_TCP
+        if (_tee == nullptr)
+            tcp_server.send(std::string(str, z));
+#endif
+        return z;
     }
     
     size_t Console::lprint(const std::string &str)
@@ -467,13 +496,26 @@ namespace ESP32Console
     {
         if (!_initialized)
             return -1;
-    
+
         va_list vargs;
         va_start(vargs, fmt);
+#ifdef ENABLE_CONSOLE_TCP
+        if (_tee == nullptr) {
+            // No TCP tee active (REPL task context): forward to TCP explicitly.
+            char *buf = nullptr;
+            int z = vasprintf(&buf, fmt, vargs);
+            va_end(vargs);
+            if (z < 0 || !buf)
+                return 0;
+            fwrite(buf, 1, z, stdout);
+            tcp_server.send(std::string(buf, z));
+            free(buf);
+            return z;
+        }
+#endif
         int z = vfprintf(stdout, fmt, vargs);
         va_end(vargs);
-    
-        return z >= 0 ? z : 0;
+        return z < 0 ? 0 : z;
     }
 
     size_t Console::_print_number(unsigned long n, uint8_t base)
@@ -503,15 +545,10 @@ namespace ESP32Console
     
     size_t Console::print(const char *str)
     {
-        int z = strlen(str);
-    
         if (!_initialized)
             return -1;
 
-#ifdef ENABLE_CONSOLE_TCP
-        tcp_server.send(str);
-#endif
-        return fwrite(str, 1, z, stdout);
+        return fwrite(str, 1, strlen(str), stdout);
     }
     
     size_t Console::print(const std::string &str)

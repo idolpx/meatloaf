@@ -1028,7 +1028,7 @@ MFile* MFile::cdLocalParent(std::string plus)
         lastSlash = path.find_last_of('/', path.size() - 2);
     }
     std::string parent = mstr::dropLast(path, path.size() - lastSlash);
-    if(parent.length()-sourceFile->path.length()>1)
+    if(sourceFile != nullptr && parent.length()-sourceFile->path.length()>1)
         parent = sourceFile->path;
 
     if (!plus.empty()) { parent += '/'; parent += plus; }

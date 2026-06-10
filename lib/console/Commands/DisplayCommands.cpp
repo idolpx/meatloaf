@@ -4,6 +4,8 @@
 
 #include "display.h"
 #include "string_utils.h"
+#include "meatloaf.h"
+#include "../Helpers/PWDHelpers.h"
 
 static int led(int argc, char **argv)
 {
@@ -95,11 +97,40 @@ static int led(int argc, char **argv)
     return EXIT_SUCCESS;
 }
 
+static int show(int argc, char **argv)
+{
+    if (argc != 2)
+    {
+        Serial.printf("show {filename}\r\n");
+        return EXIT_FAILURE;
+    }
+
+    std::unique_ptr<MFile> f(ESP32Console::getCurrentPath()->cd(argv[1]));
+    if (f == nullptr || !f->exists())
+    {
+        Serial.printf("show: file not found: %s\r\n", argv[1]);
+        return EXIT_FAILURE;
+    }
+
+    std::string path = f->url;
+    Debug_printv("path[%s]", path.c_str());
+    // strip scheme prefix for local flash/sd paths (e.g. "/flash/..." or "/sd/...")
+    // hagl expects a native filesystem path
+    LCD.show_image(path);
+
+    return EXIT_SUCCESS;
+}
+
 namespace ESP32Console::Commands
 {
     const ConsoleCommand getLEDCommand()
     {
         return ConsoleCommand("led", &led, "Change LED display settings");
+    }
+
+    const ConsoleCommand getShowCommand()
+    {
+        return ConsoleCommand("show", &show, "Display a PNG or JPG image on the LCD");
     }
 }
 

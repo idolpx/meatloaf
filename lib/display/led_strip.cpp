@@ -77,8 +77,9 @@ static void display_task(void *args)
 
 DisplayLEDs::DisplayLEDs()
 {
-    add_segment(0, 5);  // Add default segment
-    spi_mutex = xSemaphoreCreateMutex();
+    // Segment list and SPI mutex are deferred to start() to avoid
+    // allocating from the C++ runtime heap before the system heap is ready.
+    spi_mutex = nullptr;
 }
 
 static inline uint8_t scale_channel(uint8_t value, uint8_t brightness)
@@ -341,7 +342,18 @@ esp_err_t DisplayLEDs::update()
 
 void DisplayLEDs::start(void)
 {
-    init(PIN_LED_RGB, WS2812B, RGB_LED_COUNT);
+    if (init(PIN_LED_RGB, WS2812B, RGB_LED_COUNT) != ESP_OK)
+    {
+        Debug_printv("LED strip init failed; skipping DISPLAY task");
+        return;
+    }
+
+    if (segments.empty()) {
+        add_segment(0, 5);  // Default 5-LED segment, now safe to allocate
+    }
+    if (spi_mutex == nullptr) {
+        spi_mutex = xSemaphoreCreateMutex();
+    }
     idle();
 
     // Start DISPLAY task
