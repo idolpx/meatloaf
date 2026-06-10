@@ -111,6 +111,9 @@ void TCPServer::task(void *pvParameters)
             }
             Debug_printv("Socket accepted");
 
+            // Install stdout tee for this client session.
+            console.tcpBegin();
+
             // Send Welcome message
             write(_client_socket, MESSAGE, strlen(MESSAGE));
 
@@ -171,6 +174,8 @@ void TCPServer::task(void *pvParameters)
                     bzero(rx_buffer, sizeof(rx_buffer));
                 }
             }
+            // Tear down the stdout tee when the client disconnects.
+            console.tcpEnd();
             close(_client_socket);
         }
     }
