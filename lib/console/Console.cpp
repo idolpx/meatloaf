@@ -34,6 +34,10 @@
 ESP32Console::Console console;
 
 #ifdef ENABLE_CONSOLE_TCP
+// Set while execute()'s stdout tee is active; suppresses explicit tcp sends in
+// Console methods to avoid double-forwarding in the TCP task context.
+static volatile bool _tcp_tee_active = false;
+
 // Write callback for the stdout tee FILE* created by fopencookie().
 // Mirrors every stdout write to the connected TCP client.
 static ssize_t _stdout_tee_write(void *cookie, const char *buf, size_t n)
@@ -301,20 +305,6 @@ namespace ESP32Console
             fcntl(fileno(stdin), F_SETFL, stdin_flags & ~O_NONBLOCK);
         }
 
-#ifdef ENABLE_CONSOLE_TCP
-        // Install a permanent tee on this task's stdout so that ALL writes —
-        // including raw printf() inside ESP-IDF built-in commands like "help" —
-        // are automatically mirrored to connected TCP clients.
-        {
-            FILE *orig = stdout;
-            FILE *tee = fopencookie(orig, "w", _stdout_tee_fns);
-            if (tee) {
-                setvbuf(tee, nullptr, _IONBF, 0);
-                stdout = tee;
-            }
-        }
-#endif
-
         linenoiseSetMaxLineLen(console.max_cmdline_len_);
         while (true)
         {
@@ -400,75 +390,55 @@ namespace ESP32Console
         mstr::trim(command_str);
 
 #ifdef ENABLE_CONSOLE_TCP
-        // Send current prompt to TCP only (not to UART).
-        auto send_prompt = [&]() {
-            std::string p = prompt_;
-            mstr::replaceAll(p, "%pwd%", getCurrentPath()->url);
-            tcp_server.send(p);
-        };
-#endif
-
-        if (command_str.empty())
-        {
-#ifdef ENABLE_CONSOLE_TCP
-            send_prompt();
-#endif
-            return;
-        }
-
-#ifdef ENABLE_CONSOLE_TCP
-        // Install a temporary tee on this task's stdout so ALL output from the
-        // command — including raw printf() inside built-ins like "help" — reaches
-        // the TCP client. Torn down before send_prompt() so the prompt itself
-        // goes only to TCP, not UART.
+        // Install a tee on this task's stdout so ALL output — including raw
+        // printf() inside built-ins like "help" — is mirrored to TCP.
         FILE *_tee_orig = stdout;
         FILE *_tee = fopencookie(_tee_orig, "w", _stdout_tee_fns);
         if (_tee) {
             setvbuf(_tee, nullptr, _IONBF, 0);
             stdout = _tee;
+            _tcp_tee_active = true;
         }
 #endif
 
-        //Debug_printv("Executing command: [%s]\n", command);
-        lprint(command_str);
-        lprint("\n");
-
-        //Interpolate the input line
-        std::string interpolated_line = interpolateLine(command_str.c_str());
-        //Debug_printv("Interpolated line: [%s]\n", interpolated_line.c_str());
-
-        /* Try to run the command */
-        int ret;
-        esp_err_t err = esp_console_run(interpolated_line.c_str(), &ret);
-
-        //Reset global state
-        resetAfterCommands();
-
-        if (err == ESP_ERR_NOT_FOUND)
+        if (!command_str.empty())
         {
-            printf("Unrecognized command\n");
+            //Debug_printv("Executing command: [%s]\n", command);
+            lprint(command_str);
+            lprint("\n");
+
+            //Interpolate the input line
+            std::string interpolated_line = interpolateLine(command_str.c_str());
+
+            /* Try to run the command */
+            int ret;
+            esp_err_t err = esp_console_run(interpolated_line.c_str(), &ret);
+
+            //Reset global state
+            resetAfterCommands();
+
+            if (err == ESP_ERR_NOT_FOUND)
+                printf("Unrecognized command\n");
+            else if (err == ESP_OK && ret != ESP_OK)
+                printf("Command returned non-zero error code: 0x%x (%s)\n", ret, esp_err_to_name(ret));
+            else if (err != ESP_OK)
+                printf("Internal error: %s\n", esp_err_to_name(err));
         }
-        else if (err == ESP_ERR_INVALID_ARG)
+
+        // Write prompt to stdout — tee forwards it to both UART and TCP uniformly.
         {
-            // command was empty
-        }
-        else if (err == ESP_OK && ret != ESP_OK)
-        {
-            printf("Command returned non-zero error code: 0x%x (%s)\n", ret, esp_err_to_name(ret));
-        }
-        else if (err != ESP_OK)
-        {
-            printf("Internal error: %s\n", esp_err_to_name(err));
+            std::string p = prompt_;
+            mstr::replaceAll(p, "%pwd%", getCurrentPath()->url);
+            lprint(p);
         }
 
 #ifdef ENABLE_CONSOLE_TCP
-        // Remove tee before sending prompt so prompt goes to TCP only, not UART.
         if (_tee) {
             fflush(_tee);
+            _tcp_tee_active = false;
             stdout = _tee_orig;
             fclose(_tee);
         }
-        send_prompt();
 #endif
     }
 
@@ -494,6 +464,10 @@ namespace ESP32Console
 
         size_t z = strlen(str);
         fwrite(str, 1, z, stdout);
+#ifdef ENABLE_CONSOLE_TCP
+        if (!_tcp_tee_active)
+            tcp_server.send(std::string(str, z));
+#endif
         return z;
     }
     
@@ -512,6 +486,20 @@ namespace ESP32Console
 
         va_list vargs;
         va_start(vargs, fmt);
+#ifdef ENABLE_CONSOLE_TCP
+        if (!_tcp_tee_active) {
+            // REPL task context: tee not active, send explicitly to TCP.
+            char *buf = nullptr;
+            int z = vasprintf(&buf, fmt, vargs);
+            va_end(vargs);
+            if (z < 0 || !buf)
+                return 0;
+            fwrite(buf, 1, z, stdout);
+            tcp_server.send(std::string(buf, z));
+            free(buf);
+            return z;
+        }
+#endif
         int z = vfprintf(stdout, fmt, vargs);
         va_end(vargs);
         return z < 0 ? 0 : z;
