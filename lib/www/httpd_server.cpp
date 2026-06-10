@@ -463,7 +463,7 @@ httpd_handle_t cHttpdServer::start_server(serverstate &state)
     config.stack_size = 8192;
     config.max_uri_handlers = 16;
     config.max_resp_headers = 16;
-    config.max_open_sockets = 8;      // Leave headroom in lwIP pool for WiFi/mDNS/listen socket
+    config.max_open_sockets = 10;      // Leave headroom in lwIP pool for WiFi/mDNS/listen socket
     config.keep_alive_enable = false; // Send Connection: close so WebDAV clients free sockets immediately
     config.open_fn = httpd_open_fn;   // SO_LINGER=0: RST on close, bypasses TIME_WAIT
     config.uri_match_fn = httpd_uri_match_wildcard;
@@ -632,12 +632,24 @@ void cHttpdServer::send_file(httpd_req_t *req, const char *filename)
         // Set the response content type
         set_file_content_type(req, fpath.c_str());
 
-        // Set the expected length of the content
-        char hdrval[10];
-        snprintf(hdrval, 10, "%ld", FileSystem::filesize(file));
-        //httpd_resp_set_hdr(req, "Content-Length", hdrval);
+        long fsize = FileSystem::filesize(file);
 
-        // Send the file content out in chunks (buffer in PSRAM to spare internal RAM)
+        if (fsize > 0)
+        {
+            // Allocate a PSRAM buffer for the full file and send with Content-Length.
+            // httpd_resp_send sets Content-Length and avoids chunked encoding issues.
+            char *buf = (char *)psram_malloc((size_t)fsize);
+            if (buf != nullptr)
+            {
+                size_t got = fread(buf, 1, (size_t)fsize, file);
+                fclose(file);
+                httpd_resp_send(req, buf, (ssize_t)got);
+                free(buf);
+                return;
+            }
+        }
+
+        // Fallback: size unknown or PSRAM exhausted — use chunked transfer
         char *buf = (char *)psram_malloc(http_SEND_BUFF_SIZE);
         if (buf == nullptr)
         {
@@ -645,12 +657,10 @@ void cHttpdServer::send_file(httpd_req_t *req, const char *filename)
             send_http_error(req, 500);
             return;
         }
-        size_t count = 0;
-        do
-        {
-            count = fread(buf, 1, http_SEND_BUFF_SIZE, file);
+        size_t count;
+        while ((count = fread(buf, 1, http_SEND_BUFF_SIZE, file)) > 0)
             httpd_resp_send_chunk(req, buf, count);
-        } while (count > 0);
+        httpd_resp_send_chunk(req, NULL, 0);
         fclose(file);
         free(buf);
     }
