@@ -28,6 +28,7 @@
 // DEBUG==0 => debug logging disabled
 // DEBUG==1 => debug logging enabled, default on, can be disabled by calling IECFileDevice::setLogging()
 // DEBUG==2 => debug logging enabled, default off, can be enabled by calling IECFileDevice::setLogging()
+// DEBUG >2 => additional debug logging that may break some timing (be careful!), default on
 #define DEBUG 0
 
 #if DEBUG>0
@@ -41,7 +42,7 @@ static void print_hex(uint8_t data)
 
 
 static uint8_t dbgbuf[16], dbgnum = 0;
-bool dbglogdata = (DEBUG==1);
+bool dbglogdata = (DEBUG==1) || (DEBUG>2);
 
 static void dbg_print_data()
 {
@@ -242,7 +243,7 @@ void IECFileDevice::executeData(const uint8_t *data, uint8_t len)
 
 int8_t IECFileDevice::canRead() 
 { 
-#if DEBUG>2
+#if DEBUG>3
   Serial.write('c');Serial.write('R');
 #endif
 
@@ -281,7 +282,7 @@ int8_t IECFileDevice::canRead()
 #endif
         }
       
-#if DEBUG>2
+#if DEBUG>3
       print_hex(min(m_statusBufferLen-m_statusBufferPtr, 2));
 #endif
       return min(m_statusBufferLen-m_statusBufferPtr, 2);
@@ -297,7 +298,7 @@ int8_t IECFileDevice::canRead()
       if( m_eoi && m_readBufferLen[m_channel]==0 ) m_eoi = false;
 
       fillReadBuffer();
-#if DEBUG>2
+#if DEBUG>3
       print_hex(m_readBufferLen[m_channel]);
 #endif
       return m_readBufferLen[m_channel];
@@ -314,7 +315,7 @@ uint8_t IECFileDevice::peek()
   else if( m_channel < 15 )
     data = m_readBuffer[m_channel][0];
 
-#if DEBUG>1
+#if DEBUG>2
   Serial.write('P'); print_hex(data);
 #endif
 
@@ -340,7 +341,7 @@ uint8_t IECFileDevice::read()
         m_readBufferLen[m_channel] = 0;
     }
 
-#if DEBUG>1
+#if DEBUG>2
   Serial.write('R'); print_hex(data);
 #endif
 
@@ -378,7 +379,7 @@ uint8_t IECFileDevice::read(uint8_t *buffer, uint8_t bufferSize)
 
 int8_t IECFileDevice::canWrite() 
 {
-#if DEBUG>2
+#if DEBUG>3
   Serial.write('c');Serial.write('W');
 #endif
 
@@ -423,7 +424,7 @@ void IECFileDevice::write(uint8_t data, bool eoi)
   if( m_writeBufferLen<IECFILEDEVICE_WRITE_BUFFER_SIZE-1 )
     m_writeBuffer[m_writeBufferLen++] = data;
  
-#if DEBUG>1
+#if DEBUG>2
   Serial.write('W'); print_hex(data);
 #endif
 }
@@ -453,7 +454,7 @@ uint8_t IECFileDevice::write(uint8_t *buffer, uint8_t bufferSize, bool eoi)
 
 void IECFileDevice::talk(uint8_t secondary)   
 {
-#if DEBUG>1
+#if DEBUG>2
   Serial.write('T'); print_hex(secondary);
 #endif
 
@@ -469,7 +470,7 @@ void IECFileDevice::talk(uint8_t secondary)
 
 void IECFileDevice::untalk() 
 {
-#if DEBUG>1
+#if DEBUG>2
   Serial.write('t');
 #endif
 
@@ -480,7 +481,7 @@ void IECFileDevice::untalk()
 
 void IECFileDevice::listen(uint8_t secondary) 
 {
-#if DEBUG>1
+#if DEBUG>2
   Serial.write('L'); print_hex(secondary);
 #endif
   m_channel = secondary & 0x0F;
@@ -502,7 +503,7 @@ void IECFileDevice::listen(uint8_t secondary)
 
 void IECFileDevice::unlisten() 
 {
-#if DEBUG>1
+#if DEBUG>2
   Serial.write('l'); Serial.write('0'+m_channel);
 #endif
 
