@@ -233,4 +233,13 @@ void TCPServer::send(std::string data)
     }
 }
 
+void TCPServer::disconnect()
+{
+    if (_client_socket > 0)
+    {
+        close(_client_socket);
+        _client_socket = -1;
+    }
+}
+
 #endif // ENABLE_CONSOLE && ENABLE_CONSOLE_TCP

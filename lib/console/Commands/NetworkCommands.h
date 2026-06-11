@@ -13,4 +13,8 @@ namespace ESP32Console::Commands
     const ConsoleCommand getScanCommand();
 
     const ConsoleCommand getConnectCommand();
+
+#ifdef ENABLE_CONSOLE_TCP
+    const ConsoleCommand getExitCommand();
+#endif
 }

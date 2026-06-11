@@ -152,6 +152,9 @@ namespace ESP32Console
         registerCommand(getNetstatCommand());
         registerCommand(getScanCommand());
         registerCommand(getConnectCommand());
+#ifdef ENABLE_CONSOLE_TCP
+        registerCommand(getExitCommand());
+#endif
     }
 
     void Console::registerVFSCommands()

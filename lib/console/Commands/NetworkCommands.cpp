@@ -20,6 +20,10 @@
 
 #include "../../include/debug.h"
 
+#ifdef ENABLE_CONSOLE_TCP
+#include "tcpsvr.h"
+#endif
+
 static const char* wlmode2string(wifi_mode_t mode)
 {
     switch(mode) {
@@ -367,4 +371,17 @@ namespace ESP32Console::Commands
     {
         return ConsoleCommand("connect", &connect, "Connect to wifi");
     }
+
+#ifdef ENABLE_CONSOLE_TCP
+    static int exit_tcp(int argc, char **argv)
+    {
+        tcp_server.disconnect();
+        return EXIT_SUCCESS;
+    }
+
+    const ConsoleCommand getExitCommand()
+    {
+        return ConsoleCommand("exit", &exit_tcp, "Close the TCP console connection");
+    }
+#endif
 }
