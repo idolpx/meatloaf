@@ -393,10 +393,12 @@ void cHttpdServer::webdav_register(httpd_handle_t server, const char *root_uri, 
     // Use a static string so the pointer remains valid for the lifetime of the server.
     // asprintf() here was a leak: ESP-IDF stores the URI pointer without copying it.
     static std::string dav_uri_pattern;
+    // "/*" matches bare "/" and all sub-paths; "/?*" requires at least one char
+    // after the slash and excludes the root, breaking Windows Explorer WebDAV.
     if (strlen(root_uri) > 1)
-        dav_uri_pattern = std::string(root_uri) + "/?*";
+        dav_uri_pattern = std::string(root_uri) + "/*";
     else
-        dav_uri_pattern = "/?*";
+        dav_uri_pattern = "/*";
 
     httpd_uri_t uri_dav = {
         .uri = dav_uri_pattern.c_str(),

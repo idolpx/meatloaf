@@ -218,7 +218,9 @@ void TCPServer::stop()
         close(_server_socket);
 
     _shutdown = true;
-    vTaskDelay(500 / portTICK_PERIOD_MS); // give some time for task to exit
+    // No vTaskDelay here — stop() is called from the WiFi event handler and must
+    // return immediately. The sockets are already closed above; the TCP task will
+    // exit on its own when its next accept()/recv() fails.
 
     Debug_printf("done!\r\n");
 }
