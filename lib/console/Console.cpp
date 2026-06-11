@@ -155,6 +155,9 @@ namespace ESP32Console
 #ifdef ENABLE_CONSOLE_TCP
         registerCommand(getExitCommand());
 #endif
+#ifndef MIN_CONFIG
+        registerCommand(getWsCommand());
+#endif
     }
 
     void Console::registerVFSCommands()

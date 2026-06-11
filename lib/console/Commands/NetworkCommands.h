@@ -17,4 +17,8 @@ namespace ESP32Console::Commands
 #ifdef ENABLE_CONSOLE_TCP
     const ConsoleCommand getExitCommand();
 #endif
+
+#ifndef MIN_CONFIG
+    const ConsoleCommand getWsCommand();
+#endif
 }
