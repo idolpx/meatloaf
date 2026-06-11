@@ -20,6 +20,10 @@
 
 #include "../../include/debug.h"
 
+#ifdef ENABLE_CONSOLE_TCP
+#include "tcpsvr.h"
+#endif
+
 static const char* wlmode2string(wifi_mode_t mode)
 {
     switch(mode) {
@@ -142,20 +146,22 @@ static int ping(int argc, char **argv)
 
     //Configure ping session
     esp_ping_config_t ping_config = ESP_PING_DEFAULT_CONFIG();
-    ping_config.task_stack_size = 4096;
-    ping_config.target_addr = target_addr;          // target IP address
-    ping_config.count = number_of_pings;   // 0 means infinite ping
+    ping_config.target_addr = target_addr;
+    ping_config.count = number_of_pings;
 
     /* set callback functions */
     esp_ping_callbacks_t cbs;
     cbs.on_ping_success = on_ping_success;
     cbs.on_ping_timeout = on_ping_timeout;
     cbs.on_ping_end = on_ping_end;
-    //Pass a variable as pointer so the sub tasks can decrease it
-    //cbs.cb_args = &number_of_pings_remaining;
+    cbs.cb_args = nullptr;
 
-    esp_ping_handle_t ping;
-    esp_ping_new_session(&ping_config, &cbs, &ping);
+    esp_ping_handle_t ping = nullptr;
+    esp_err_t err = esp_ping_new_session(&ping_config, &cbs, &ping);
+    if (err != ESP_OK || ping == nullptr) {
+        Serial.printf("Failed to create ping session: %s\r\n", esp_err_to_name(err));
+        return EXIT_FAILURE;
+    }
 
     Serial.printf("PING %s (%s) 56(84) bytes of data.\r\n", hostname, inet_ntoa(*ip_2_ip4(&target_addr)));
     esp_ping_start(ping);
@@ -179,8 +185,8 @@ static int ping(int argc, char **argv)
     //Reset flags, so we dont end up destroying our terminal env later, when linenoise takes over again
 
     //Print total statistics
-    esp_ping_delete_session(ping);
     esp_ping_stop(ping);
+    esp_ping_delete_session(ping);
     //Debug_printv("Done! number_of_pings[%d] seqno[%d]\r\n", number_of_pings, seqno);
 
     return EXIT_SUCCESS;
@@ -365,4 +371,17 @@ namespace ESP32Console::Commands
     {
         return ConsoleCommand("connect", &connect, "Connect to wifi");
     }
+
+#ifdef ENABLE_CONSOLE_TCP
+    static int exit_tcp(int argc, char **argv)
+    {
+        tcp_server.disconnect();
+        return EXIT_SUCCESS;
+    }
+
+    const ConsoleCommand getExitCommand()
+    {
+        return ConsoleCommand("exit", &exit_tcp, "Close the TCP console connection");
+    }
+#endif
 }

@@ -323,7 +323,7 @@ static int config_cmd(int argc, char **argv)
     }
 
     bool writing = (argc >= 3);
-    nlohmann::json *node = &mlConfig.data();
+    psram_json *node = &mlConfig.data();
 
     for (size_t i = 0; i + 1 < parts.size(); i++) {
         if (!node->is_object()) {
@@ -335,7 +335,7 @@ static int config_cmd(int argc, char **argv)
                 Serial.printf("Key not found: %s\r\n", argv[1]);
                 return 1;
             }
-            (*node)[parts[i]] = nlohmann::json::object();
+            (*node)[parts[i]] = psram_json::object();
         }
         node = &(*node)[parts[i]];
     }
@@ -357,7 +357,7 @@ static int config_cmd(int argc, char **argv)
 
     // Parse the new value: bool, integer, float, or string.
     const char *raw = argv[2];
-    nlohmann::json new_val;
+    psram_json new_val;
     if (strcmp(raw, "true") == 0) {
         new_val = true;
     } else if (strcmp(raw, "false") == 0) {

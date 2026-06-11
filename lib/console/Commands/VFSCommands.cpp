@@ -620,12 +620,12 @@ static void df_print_row(const char *label, const char *path, uint64_t total, ui
 
 static int df(int argc, char **argv)
 {
-    Serial.printf("%-6s  %10s  %10s  %10s  %4s  %s\r\n",
+    Serial.printf("%-6s  %11s  %11s  %11s  %4s  %s\r\n",
         "FS", "Size", "Used", "Avail", "Use%", "Mounted on");
 
     size_t lfs_total = 0, lfs_used = 0;
     if (esp_littlefs_info("storage", &lfs_total, &lfs_used) == ESP_OK)
-        df_print_row("flash", "/flash", lfs_total, lfs_total - lfs_used);
+        df_print_row("flash", "/", lfs_total, lfs_total - lfs_used);
     else
         Serial.printf("%-6s  not available\r\n", "flash");
 

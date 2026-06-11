@@ -39,6 +39,7 @@ public:
     void stop();
 
     static void send(std::string data);
+    static void disconnect();
 };
 
 extern TCPServer tcp_server;

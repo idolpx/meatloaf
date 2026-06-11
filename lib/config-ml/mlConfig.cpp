@@ -41,7 +41,7 @@ MeatloafConfig mlConfig;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-std::array<uint8_t, 16> MeatloafConfig::_json_hash(const nlohmann::json &j)
+std::array<uint8_t, 16> MeatloafConfig::_json_hash(const psram_json &j)
 {
     std::string s = j.dump();
     std::array<uint8_t, 16> digest = {};
@@ -49,7 +49,7 @@ std::array<uint8_t, 16> MeatloafConfig::_json_hash(const nlohmann::json &j)
     return digest;
 }
 
-bool MeatloafConfig::_read_json(const char *path, nlohmann::json &out, FileSystem &fs)
+bool MeatloafConfig::_read_json(const char *path, psram_json &out, FileSystem &fs)
 {
     if (!fs.running()) {
         ESP_LOGW(TAG, "Filesystem not ready, skipping read of %s", path);
@@ -82,7 +82,7 @@ bool MeatloafConfig::_read_json(const char *path, nlohmann::json &out, FileSyste
     }
 
     // allow_exceptions=false: returns a discarded value instead of throwing.
-    out = nlohmann::json::parse(buf, nullptr, false);
+    out = psram_json::parse(buf, nullptr, false);
     if (out.is_discarded()) {
         ESP_LOGE(TAG, "JSON parse error in %s", path);
         return false;
@@ -90,7 +90,7 @@ bool MeatloafConfig::_read_json(const char *path, nlohmann::json &out, FileSyste
     return true;
 }
 
-bool MeatloafConfig::_write_json(const char *path, const nlohmann::json &j, FileSystem &fs)
+bool MeatloafConfig::_write_json(const char *path, const psram_json &j, FileSystem &fs)
 {
     if (!fs.running()) {
         ESP_LOGW(TAG, "Filesystem not ready, skipping write of %s", path);
@@ -119,9 +119,9 @@ bool MeatloafConfig::_write_json(const char *path, const nlohmann::json &j, File
 // ─── Extract helpers ─────────────────────────────────────────────────────────
 
 // Returns _data with iec.devices removed — this is what config.json stores.
-nlohmann::json MeatloafConfig::_extract_config() const
+psram_json MeatloafConfig::_extract_config() const
 {
-    nlohmann::json j = _data;
+    psram_json j = _data;
     if (j.contains("iec")) {
         j["iec"].erase("devices");
         if (j["iec"].empty()) {
@@ -132,9 +132,9 @@ nlohmann::json MeatloafConfig::_extract_config() const
 }
 
 // Returns { "iec": { "devices": ... } } — this is the entirety of devices.json.
-nlohmann::json MeatloafConfig::_extract_devices() const
+psram_json MeatloafConfig::_extract_devices() const
 {
-    nlohmann::json j = nlohmann::json::object();
+    psram_json j = psram_json::object();
     if (_data.contains("iec") && _data["iec"].contains("devices")) {
         j["iec"]["devices"] = _data["iec"]["devices"];
     }
@@ -145,7 +145,7 @@ nlohmann::json MeatloafConfig::_extract_devices() const
 
 bool MeatloafConfig::load()
 {
-    nlohmann::json cfg;
+    psram_json cfg;
     bool cfg_ok = _read_json(CFG_FILE, cfg, fnSDFAT);
     if (!cfg_ok) {
         ESP_LOGW(TAG, "config.json not on SD, trying flash fallback");
@@ -155,13 +155,13 @@ bool MeatloafConfig::load()
     if (cfg_ok) {
         _data = cfg;
     } else {
-        _data = nlohmann::json::object();
-        cfg   = nlohmann::json::object();
+        _data = psram_json::object();
+        cfg   = psram_json::object();
     }
     _config_hash = _json_hash(cfg);
 
     // Merge devices.json into _data["iec"]["devices"].
-    nlohmann::json dev;
+    psram_json dev;
     bool dev_ok = _read_json(DEVICES_FILE, dev, fnSDFAT);
     if (!dev_ok) {
         ESP_LOGW(TAG, "devices.json not on SD, trying flash fallback");
@@ -173,7 +173,7 @@ bool MeatloafConfig::load()
         }
         _devices_hash = _json_hash(_extract_devices());
     } else {
-        _devices_hash = _json_hash(nlohmann::json::object());
+        _devices_hash = _json_hash(psram_json::object());
     }
 
     _config_dirty  = false;

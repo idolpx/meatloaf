@@ -47,11 +47,9 @@ void initialize_console_peripheral(void)
             .data_bits = UART_DATA_8_BITS,
             .parity = UART_PARITY_DISABLE,
             .stop_bits = UART_STOP_BITS_1,
-#if SOC_UART_SUPPORT_REF_TICK
-            .source_clk = UART_SCLK_REF_TICK,
-#elif SOC_UART_SUPPORT_XTAL_CLK
-            .source_clk = UART_SCLK_XTAL,
-#endif
+            // REF_TICK is only 1 MHz and cannot generate baud rates above ~250 kbps.
+            // Use the default clock (APB on ESP32, XTAL on S3/C3) which supports 2 Mbps cleanly.
+            .source_clk = UART_SCLK_DEFAULT,
     };
     /* Install UART driver for interrupt-driven reads and writes */
     ESP_ERROR_CHECK( uart_driver_install(CONFIG_ESP_CONSOLE_UART_NUM, 256, 0, 0, NULL, 0) );

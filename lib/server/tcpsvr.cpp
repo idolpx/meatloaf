@@ -111,11 +111,22 @@ void TCPServer::task(void *pvParameters)
             }
             Debug_printv("Socket accepted");
 
+            // Disable Nagle so small console writes (prompts, command output) are
+            // sent immediately rather than being held for a full segment.
+            {
+                int flag = 1;
+                setsockopt(_client_socket, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
+            }
+
             // Install stdout tee for this client session.
             console.tcpBegin();
 
             // Send Welcome message
-            write(_client_socket, MESSAGE, strlen(MESSAGE));
+            {
+                int n = write(_client_socket, MESSAGE, strlen(MESSAGE));
+                if (n < 0)
+                    Debug_printv("Welcome write failed: errno %d", errno);
+            }
 
             //Optionally set O_NONBLOCK
             //If O_NONBLOCK is set then recv() will return, otherwise it will stall until data is received or the connection is lost.
@@ -134,7 +145,7 @@ void TCPServer::task(void *pvParameters)
                 // Error occured during receiving
                 if (bytes_received < 0)
                 {
-                    Debug_printv("Waiting for data");
+                    Debug_printv("recv failed: errno %d", errno);
                     vTaskDelay(100 / portTICK_PERIOD_MS);
                     break;
                 }
@@ -207,7 +218,9 @@ void TCPServer::stop()
         close(_server_socket);
 
     _shutdown = true;
-    vTaskDelay(500 / portTICK_PERIOD_MS); // give some time for task to exit
+    // No vTaskDelay here — stop() is called from the WiFi event handler and must
+    // return immediately. The sockets are already closed above; the TCP task will
+    // exit on its own when its next accept()/recv() fails.
 
     Debug_printf("done!\r\n");
 }
@@ -217,6 +230,15 @@ void TCPServer::send(std::string data)
     if (_client_socket > 0)
     {
         write(_client_socket, data.c_str(), data.length());
+    }
+}
+
+void TCPServer::disconnect()
+{
+    if (_client_socket > 0)
+    {
+        close(_client_socket);
+        _client_socket = -1;
     }
 }
 
