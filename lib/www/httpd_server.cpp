@@ -35,10 +35,11 @@
 //#include "esp_log.h"
 #include <esp_http_server.h>
 #include <esp_log.h>
-#include <sys/stat.h>
 #include <sys/socket.h>
-//#include <cstdlib>
 #include <sstream>
+
+#include "meatloaf.h"
+#include "device/flash.h"
 
 // Prefer PSRAM for large I/O buffers to keep internal RAM free.
 // Falls back to internal heap if PSRAM is unavailable or exhausted.
@@ -56,9 +57,6 @@ static inline void *psram_malloc(size_t sz)
 #include "fnSystem.h"
 #include "fnConfig.h"
 #include "fnWiFi.h"
-
-#include "fsFlash.h"
-#include "fnFsSD.h"
 
 #include "template.h"
 
@@ -114,19 +112,16 @@ static void websocket_broadcast_send(void *arg)
     free(b);
 }
 
-long file_size(FILE *fd)
+static std::unique_ptr<MFile> make_mfile(const std::string &path)
 {
-    struct stat stat_buf;
-    int rc = fstat((int)fd, &stat_buf);
-    return rc == 0 ? stat_buf.st_size : -1;
+    if (path.find("://") != std::string::npos)
+        return std::unique_ptr<MFile>(MFSOwner::File(path));
+    return std::make_unique<FlashMFile>(path);
 }
 
 bool exists(std::string path)
 {
-    //Debug_printv( "path[%s]", path.c_str() );
-    struct stat st;
-    int i = stat(path.c_str(), &st);
-    return (i == 0);
+    return make_mfile(path)->exists();
 }
 
 /* Our URI handler function to be called during GET /uri request */
@@ -456,9 +451,6 @@ httpd_handle_t cHttpdServer::start_server(serverstate &state)
         return nullptr;
     }
 
-    // Set filesystem where we expect to find our static files
-    state._FS = &fsFlash;
-
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.task_priority = 12; // Bump this higher than fnService loop
     config.core_id = 0; // Pin to CPU core 0
@@ -600,11 +592,6 @@ void cHttpdServer::send_file(httpd_req_t *req, const char *filename)
     if ( !exists(fpath) )
         fpath = httpdocs + std::string(filename);
 
-    // Retrieve server state
-    serverstate *pState = (serverstate *)httpd_get_global_user_ctx(req->handle);
-
-    Debug_printv("is_dir[%d] fpath[%s]", pState->_FS->is_dir(fpath.c_str()), fpath.c_str());
-
     // If filename is just '/', serve index.html
     std::string default_index = "index.html";
     if (fpath.size() == 1 && fpath[0] == '/')
@@ -613,8 +600,12 @@ void cHttpdServer::send_file(httpd_req_t *req, const char *filename)
     // If filename is a directory, look for index.html within it
     else if (fpath.back() == '/')
         fpath += default_index;
-    else if (pState->_FS->is_dir(fpath.c_str()))
-        fpath += "/" + default_index;
+    else {
+        if (make_mfile(fpath)->isDirectory())
+            fpath += "/" + default_index;
+    }
+
+    Debug_printv("fpath[%s]", fpath.c_str());
 
     // Handle file differently if it's one of the types we parse
     if (is_parsable(get_extension(filename)))
@@ -632,52 +623,50 @@ void cHttpdServer::send_file(httpd_req_t *req, const char *filename)
         }
     }
 
-    // Open the file
-    FILE *file = pState->_FS->file_open(fpath.c_str());
+    // make_mfile: FlashMFile for bare paths (serves .gz raw), MFSOwner for network URLs.
+    auto mfile = make_mfile(fpath);
+    auto stream = mfile->getSourceStream(std::ios_base::in);
 
-    //Debug_printv("filename[%s]", filename);
-    if (file == nullptr)
+    if (!stream || !stream->isOpen())
     {
         Debug_printv("Failed to open file for sending: [%s]", fpath.c_str());
         send_http_error(req, 404);
+        return;
     }
-    else
+
+    // Set the response content type from the uncompressed filename
+    set_file_content_type(req, content_type_path.c_str());
+
+    uint32_t fsize = stream->size();
+
+    if (fsize > 0)
     {
-        // Set the response content type from the uncompressed filename
-        set_file_content_type(req, content_type_path.c_str());
-
-        long fsize = FileSystem::filesize(file);
-
-        if (fsize > 0)
+        // Allocate a PSRAM buffer for the full file and send with Content-Length.
+        char *buf = (char *)psram_malloc((size_t)fsize);
+        if (buf != nullptr)
         {
-            // Allocate a PSRAM buffer for the full file and send with Content-Length.
-            // httpd_resp_send sets Content-Length and avoids chunked encoding issues.
-            char *buf = (char *)psram_malloc((size_t)fsize);
-            if (buf != nullptr)
-            {
-                size_t got = fread(buf, 1, (size_t)fsize, file);
-                fclose(file);
-                httpd_resp_send(req, buf, (ssize_t)got);
-                free(buf);
-                return;
-            }
-        }
-
-        // Fallback: size unknown or PSRAM exhausted — use chunked transfer
-        char *buf = (char *)psram_malloc(http_SEND_BUFF_SIZE);
-        if (buf == nullptr)
-        {
-            fclose(file);
-            send_http_error(req, 500);
+            size_t got = stream->read((uint8_t *)buf, fsize);
+            stream->close();
+            httpd_resp_send(req, buf, (ssize_t)got);
+            free(buf);
             return;
         }
-        size_t count;
-        while ((count = fread(buf, 1, http_SEND_BUFF_SIZE, file)) > 0)
-            httpd_resp_send_chunk(req, buf, count);
-        httpd_resp_send_chunk(req, NULL, 0);
-        fclose(file);
-        free(buf);
     }
+
+    // Fallback: size unknown or PSRAM exhausted — use chunked transfer
+    char *buf = (char *)psram_malloc(http_SEND_BUFF_SIZE);
+    if (buf == nullptr)
+    {
+        stream->close();
+        send_http_error(req, 500);
+        return;
+    }
+    uint32_t count;
+    while ((count = stream->read((uint8_t *)buf, http_SEND_BUFF_SIZE)) > 0)
+        httpd_resp_send_chunk(req, buf, count);
+    httpd_resp_send_chunk(req, NULL, 0);
+    stream->close();
+    free(buf);
 }
 
 // Send file content after parsing for replaceable strings.
@@ -687,10 +676,10 @@ void cHttpdServer::send_file_parsed(httpd_req_t *req, const char *filename)
 {
     Debug_printv("filename[%s]", filename);
 
-    serverstate *pState = (serverstate *)httpd_get_global_user_ctx(req->handle);
-    FILE *file = pState->_FS->file_open(filename);
+    auto mfile = make_mfile(std::string(filename));
+    auto stream = mfile->getSourceStream(std::ios_base::in);
 
-    if (file == nullptr)
+    if (!stream || !stream->isOpen())
     {
         Debug_printv("Failed to open file for parsing: [%s]", filename);
         // Do NOT call send_http_error() — error pages route through send_file_parsed() too
@@ -704,11 +693,10 @@ void cHttpdServer::send_file_parsed(httpd_req_t *req, const char *filename)
     set_file_content_type(req, filename);
 
     // Read buffer in PSRAM to keep internal RAM free.
-    // `pending` holds bytes around tag boundaries — stays small (< http_SEND_BUFF_SIZE + ~50 bytes).
     char *buf = (char *)psram_malloc(http_SEND_BUFF_SIZE);
     if (buf == nullptr)
     {
-        fclose(file);
+        stream->close();
         httpd_resp_set_type(req, "text/plain");
         httpd_resp_send(req, "Error 500", 9);
         return;
@@ -719,7 +707,7 @@ void cHttpdServer::send_file_parsed(httpd_req_t *req, const char *filename)
 
     while (!done)
     {
-        size_t count = fread(buf, 1, http_SEND_BUFF_SIZE, file);
+        size_t count = stream->read((uint8_t *)buf, http_SEND_BUFF_SIZE);
         if (count > 0)
             pending.append(buf, count);
         else
@@ -788,7 +776,7 @@ void cHttpdServer::send_file_parsed(httpd_req_t *req, const char *filename)
 
     free(buf);
     httpd_resp_send_chunk(req, nullptr, 0); // terminate chunked response
-    fclose(file);
+    stream->close();
 }
 
 // Send some meaningful(?) error message to client.
@@ -804,18 +792,18 @@ void cHttpdServer::send_http_error(httpd_req_t *req, int errnum)
     if (exists(gz_path)) {
         httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
         set_file_content_type(req, error_path.c_str()); // text/html from .html name
-        serverstate *pState = (serverstate *)httpd_get_global_user_ctx(req->handle);
-        FILE *file = pState->_FS->file_open(gz_path.c_str());
-        if (file != nullptr) {
+        auto mfGz = make_mfile(gz_path);
+        auto gzStream = mfGz->getSourceStream(std::ios_base::in);
+        if (gzStream && gzStream->isOpen()) {
             char *buf = (char *)psram_malloc(http_SEND_BUFF_SIZE);
             if (buf != nullptr) {
-                size_t count;
-                while ((count = fread(buf, 1, http_SEND_BUFF_SIZE, file)) > 0)
+                uint32_t count;
+                while ((count = gzStream->read((uint8_t *)buf, http_SEND_BUFF_SIZE)) > 0)
                     httpd_resp_send_chunk(req, buf, count);
                 httpd_resp_send_chunk(req, nullptr, 0);
                 free(buf);
             }
-            fclose(file);
+            gzStream->close();
             return;
         }
     }
@@ -903,7 +891,6 @@ void cHttpdServer::stop()
         {
             Debug_println("error!");
         }
-        state._FS = nullptr;
         state.hServer = nullptr;
         s_server = nullptr;
     }

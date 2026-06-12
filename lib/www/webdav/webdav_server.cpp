@@ -4,18 +4,15 @@
 #include <stdio.h>
 #include <sstream>
 #include <string.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <dirent.h>
 #include <errno.h>
-#include <sys/stat.h>
 #include <cctype>
 #include <iomanip>
 #include <vector>
+#include <memory>
 
 #include <esp_http_server.h>
 
-#include "file-utils.h"
+#include "meatloaf.h"
 #include "string_utils.h"
 
 using namespace WebDav;
@@ -72,6 +69,94 @@ static bool isJunkLeafName(const std::string &leafName)
 static bool isFilteredJunkPath(const std::string &path)
 {
     return isJunkLeafName(getLeafName(path));
+}
+
+static int mfile_rm_rf(const std::string &path)
+{
+    auto mf = std::unique_ptr<MFile>(MFSOwner::File(path));
+    if (!mf || !mf->exists())
+        return -1;
+
+    if (mf->isDirectory()) {
+        mf->rewindDirectory();
+        MFile *entry;
+        while ((entry = mf->getNextFileInDir()) != nullptr) {
+            std::unique_ptr<MFile> e(entry);
+            if (e->name == "." || e->name == "..")
+                continue;
+            mfile_rm_rf(e->path);
+        }
+        return mf->rmDir() ? 0 : -1;
+    }
+    return mf->remove() ? 0 : -1;
+}
+
+static int mfile_copy_recursive(const std::string &source, const std::string &destination,
+                                int recurse, bool overwrite)
+{
+    auto srcFile = std::unique_ptr<MFile>(MFSOwner::File(source));
+    if (!srcFile || !srcFile->exists())
+        return -ENOENT;
+
+    auto dstFile = std::unique_ptr<MFile>(MFSOwner::File(destination));
+    bool dstExists = dstFile && dstFile->exists();
+
+    if (dstExists && !overwrite)
+        return -EEXIST;
+
+    if (!srcFile->isDirectory()) {
+        auto srcStream = srcFile->getSourceStream(std::ios_base::in);
+        if (!srcStream || !srcStream->isOpen())
+            return -ENOENT;
+
+        auto dstStream = dstFile->getSourceStream(std::ios_base::out);
+        if (!dstStream || !dstStream->isOpen()) {
+            srcStream->close();
+            return -EIO;
+        }
+
+        const int chunkSize = 8192;
+        uint8_t *chunk = (uint8_t *)malloc(chunkSize);
+        if (!chunk) {
+            srcStream->close();
+            dstStream->close();
+            return -ENOSPC;
+        }
+        int ret = 0;
+        for (;;) {
+            uint32_t r = srcStream->read(chunk, chunkSize);
+            if (r == 0)
+                break;
+            if (dstStream->write(chunk, r) != r) {
+                ret = -ENOSPC;
+                break;
+            }
+        }
+        free(chunk);
+        srcStream->close();
+        dstStream->close();
+        return ret;
+    }
+
+    if (!dstExists && !dstFile->mkDir())
+        return -EIO;
+
+    if (recurse <= 0)
+        return 0;
+
+    srcFile->rewindDirectory();
+    MFile *entry;
+    while ((entry = srcFile->getNextFileInDir()) != nullptr) {
+        std::unique_ptr<MFile> e(entry);
+        if (e->name == "." || e->name == "..")
+            continue;
+        int ret = mfile_copy_recursive(source + "/" + e->name,
+                                       destination + "/" + e->name,
+                                       recurse - 1, overwrite);
+        if (ret != 0)
+            return ret;
+    }
+    return 0;
 }
 
 static void discardRequestBody(Request &req)
@@ -366,73 +451,56 @@ int Server::sendPropResponse(Response &resp, std::string path, int recurse)
 {
     mstr::replaceAll(path, "//", "/");
     std::string uri = pathToURI(path);
-    //Debug_printv("uri[%s] path[%s] recurse[%d]", uri.c_str(), path.c_str(), recurse);
 
-    // bool exists = (path == rootPath) ||
-    //               (access(path.c_str(), R_OK) == 0);
-    struct stat sb;
-    int i = stat(path.c_str(), &sb);
-    bool exists (i == 0);
+    auto mfile = std::unique_ptr<MFile>(MFSOwner::File(path));
+    bool exists = mfile && mfile->exists();
 
     MultiStatusResponse r;
-
     r.href = uri;
 
-    if ( exists )
+    if (exists)
     {
         r.status = "HTTP/1.1 200 OK";
 
-        r.props["D:creationdate"] = formatTime(sb.st_ctime);
-        r.props["D:getlastmodified"] = formatTime(sb.st_mtime);
-        //r.props["D:displayname"] = mstr::urlEncode(basename(path.c_str()));
+        r.props["D:creationdate"] = formatTime(mfile->getCreationTime());
+        r.props["D:getlastmodified"] = formatTime(mfile->getLastWrite());
 
-        std::string s = path + std::to_string(sb.st_mtime);
+        std::string s = path + std::to_string(mfile->getLastWrite());
         r.props["D:getetag"] = mstr::sha1(s);
 
-        r.isCollection = ((sb.st_mode & S_IFMT) == S_IFDIR);
-        if ( !r.isCollection )
+        r.isCollection = mfile->isDirectory();
+        if (!r.isCollection)
         {
-            r.props["D:getcontentlength"] = std::to_string(sb.st_size);
+            r.props["D:getcontentlength"] = std::to_string(mfile->size);
             r.props["D:getcontenttype"] = HTTPD_TYPE_OCTET;
         }
-        //Debug_printv("Found!");
     }
     else
     {
         r.status = "HTTP/1.1 404 Not Found";
-        //Debug_printv("Not Found!");
     }
 
     sendMultiStatusResponse(resp, r);
 
     if (r.isCollection && recurse > 0)
     {
-        // If we are at root and SD card is mounted send entry
         if (path == "/")
         {
-            i = stat("/sd", &sb);
-            if (i == 0)
+            auto sdFile = std::unique_ptr<MFile>(MFSOwner::File("/sd"));
+            if (sdFile && sdFile->exists())
                 sendPropResponse(resp, "/sd", recurse - 1);
         }
 
-        DIR *dir = opendir(path.c_str());
-        if (dir)
+        mfile->rewindDirectory();
+        MFile *de;
+        while ((de = mfile->getNextFileInDir()) != nullptr)
         {
-            struct dirent *de;
-
-            while ((de = readdir(dir)))
-            {
-                if (strcmp(de->d_name, ".") == 0 ||
-                    strcmp(de->d_name, "..") == 0)
-                    continue;
-
-                if (isJunkLeafName(de->d_name))
-                    continue;
-
-                std::string rpath = path + "/" + de->d_name;
-                sendPropResponse(resp, rpath, recurse - 1);
-            }
-            closedir(dir);
+            std::unique_ptr<MFile> entry(de);
+            if (entry->name == "." || entry->name == "..")
+                continue;
+            if (isJunkLeafName(entry->name))
+                continue;
+            sendPropResponse(resp, entry->path, recurse - 1);
         }
     }
 
@@ -453,7 +521,8 @@ int Server::doCopy(Request &req, Response &resp)
 
     if (isFilteredJunkPath(source) || isFilteredJunkPath(destination))
     {
-        bool destinationExists = access(destination.c_str(), F_OK) == 0;
+        auto dstFile = std::unique_ptr<MFile>(MFSOwner::File(destination));
+        bool destinationExists = dstFile && dstFile->exists();
         return destinationExists ? 204 : 201;
     }
 
@@ -466,9 +535,10 @@ int Server::doCopy(Request &req, Response &resp)
         (req.getDepth() == Request::DEPTH_0) ? 0 : (req.getDepth() == Request::DEPTH_1) ? 1
                                                                                         : 32;
 
-    bool destinationExists = access(destination.c_str(), F_OK) == 0;
+    auto dstCheck = std::unique_ptr<MFile>(MFSOwner::File(destination));
+    bool destinationExists = dstCheck && dstCheck->exists();
 
-    int ret = copy_recursive(source, destination, recurse, req.getOverwrite());
+    int ret = mfile_copy_recursive(source, destination, recurse, req.getOverwrite());
 
     switch (ret)
     {
@@ -511,8 +581,7 @@ int Server::doDelete(Request &req, Response &resp)
 
     Debug_printv("req[%s] path[%s]", req.getPath().c_str(), path.c_str());
 
-    int ret = rm_rf(path.c_str());
-    if (ret < 0)
+    if (mfile_rm_rf(path) < 0)
         return 404;
 
     return 200;
@@ -530,40 +599,39 @@ int Server::doGet(Request &req, Response &resp)
 
     Debug_printv("req[%s] path[%s]", req.getPath().c_str(), path.c_str());
 
-    struct stat sb;
-    int ret = stat(path.c_str(), &sb);
-    if (ret < 0)
+    auto mfile = std::unique_ptr<MFile>(MFSOwner::File(path));
+    if (!mfile || !mfile->exists())
         return 404;
 
-    // Method Not Allowed
-    if ((sb.st_mode & S_IFMT) == S_IFDIR)
+    if (mfile->isDirectory())
         return 405;
 
-    // Send File
-    FILE *f = fopen(path.c_str(), "r");
-    if (!f)
+    auto stream = mfile->getSourceStream(std::ios_base::in);
+    if (!stream || !stream->isOpen())
         return 404;
 
-    std::string s = path + std::to_string(sb.st_mtime);
+    std::string s = path + std::to_string(mfile->getLastWrite());
 
-    //resp.setHeader("Content-Length", sb.st_size);
     resp.setStatus(200);
     resp.setHeader("ETag", mstr::sha1(s));
-    resp.setHeader("Last-Modified", formatTime(sb.st_mtime));
+    resp.setHeader("Last-Modified", formatTime(mfile->getLastWrite()));
     resp.flushHeaders();
 
-    ret = 0;
-
+    int ret = 0;
     const int chunkSize = 8192;
-    char *chunk = (char *)malloc(chunkSize);
+    uint8_t *chunk = (uint8_t *)malloc(chunkSize);
+    if (!chunk) {
+        stream->close();
+        return 500;
+    }
 
     for (;;)
     {
-        size_t r = fread(chunk, 1, chunkSize, f);
-        if (r <= 0)
+        uint32_t r = stream->read(chunk, chunkSize);
+        if (r == 0)
             break;
 
-        if (!resp.sendChunk(chunk, r))
+        if (!resp.sendChunk((char *)chunk, r))
         {
             ret = -1;
             break;
@@ -571,13 +639,10 @@ int Server::doGet(Request &req, Response &resp)
     }
 
     free(chunk);
-    fclose(f);
+    stream->close();
     resp.closeChunk();
 
-    if (ret != 0)
-        return 500;
-
-    return 200;
+    return ret != 0 ? 500 : 200;
 }
 
 int Server::doHead(Request &req, Response &resp)
@@ -592,16 +657,14 @@ int Server::doHead(Request &req, Response &resp)
 
     Debug_printv("req[%s] path[%s]", req.getPath().c_str(), path.c_str());
 
-    struct stat sb;
-    int ret = stat(path.c_str(), &sb);
-    if (ret < 0)
+    auto mfile = std::unique_ptr<MFile>(MFSOwner::File(path));
+    if (!mfile || !mfile->exists())
         return 404;
 
-    std::string s = path + std::to_string(sb.st_mtime);
+    std::string s = path + std::to_string(mfile->getLastWrite());
 
-    //resp.setHeader("Content-Length", sb.st_size);
     resp.setHeader("ETag", mstr::sha1(s));
-    resp.setHeader("Last-Modified", formatTime(sb.st_mtime));
+    resp.setHeader("Last-Modified", formatTime(mfile->getLastWrite()));
 
     return 200;
 }
@@ -659,21 +722,21 @@ int Server::doMkcol(Request &req, Response &resp)
 
     Debug_printv("req[%s] path[%s]", req.getPath().c_str(), path.c_str());
 
-    int ret = mkdir(path.c_str(), 0755);
-    if (ret == 0)
-        return 201;
-
-    switch (errno)
-    {
-    case EEXIST:
+    auto mfile = std::unique_ptr<MFile>(MFSOwner::File(path));
+    if (mfile && mfile->exists())
         return 405;
 
-    case ENOENT:
-        return 409;
-
-    default:
-        return 500;
+    size_t lastSlash = path.rfind('/');
+    if (lastSlash != std::string::npos && lastSlash > 0) {
+        auto parentFile = std::unique_ptr<MFile>(MFSOwner::File(path.substr(0, lastSlash)));
+        if (!parentFile || !parentFile->exists())
+            return 409;
     }
+
+    if (!mfile || !mfile->mkDir())
+        return 500;
+
+    return 201;
 }
 
 int Server::doMove(Request &req, Response &resp)
@@ -687,10 +750,11 @@ int Server::doMove(Request &req, Response &resp)
 
     Debug_printv("req[%s] source[%s]", req.getPath().c_str(), source.c_str());
 
-    struct stat sourceStat;
-    int ret = stat(source.c_str(), &sourceStat);
-    if (ret < 0)
-        return 404;
+    {
+        auto srcFile = std::unique_ptr<MFile>(MFSOwner::File(source));
+        if (!srcFile || !srcFile->exists())
+            return 404;
+    }
 
     std::string destination = uriToPath(req.getDestination());
     if (destination.empty())
@@ -698,21 +762,23 @@ int Server::doMove(Request &req, Response &resp)
 
     if (isFilteredJunkPath(source) || isFilteredJunkPath(destination))
     {
-        bool destinationExists = access(destination.c_str(), F_OK) == 0;
+        auto dstFile = std::unique_ptr<MFile>(MFSOwner::File(destination));
+        bool destinationExists = dstFile && dstFile->exists();
         return destinationExists ? 204 : 201;
     }
 
-    bool destinationExists = access(destination.c_str(), F_OK) == 0;
+    auto dstFile = std::unique_ptr<MFile>(MFSOwner::File(destination));
+    bool destinationExists = dstFile && dstFile->exists();
 
     if (destinationExists)
     {
         if (!req.getOverwrite())
             return 412;
 
-        rm_rf(destination.c_str());
+        mfile_rm_rf(destination);
     }
 
-    ret = rename(source.c_str(), destination.c_str());
+    int ret = ::rename(source.c_str(), destination.c_str());
 
     if (ret == 0)
     {
@@ -760,14 +826,11 @@ int Server::doPropfind(Request &req, Response &resp)
 
     //Debug_printv("req[%s] path[%s]", req.getPath().c_str(), path.c_str());
 
-    // bool exists = (path == rootPath) ||
-    //               (access(path.c_str(), R_OK) == 0);
-    struct stat sb;
-    int i = stat(path.c_str(), &sb);
-    bool exists (i == 0);
-
-    if (!exists)
-        return 404;
+    {
+        auto mfile = std::unique_ptr<MFile>(MFSOwner::File(path));
+        if (!mfile || !mfile->exists())
+            return 404;
+    }
 
     int recurse =
         (req.getDepth() == Request::DEPTH_0) ? 0 : (req.getDepth() == Request::DEPTH_1) ? 1
@@ -799,11 +862,13 @@ int Server::doProppatch(Request &req, Response &resp)
         return 404;
     }
 
-    struct stat sb;
-    if (stat(path.c_str(), &sb) != 0)
     {
-        discardRequestBody(req);
-        return 404;
+        auto mfile = std::unique_ptr<MFile>(MFSOwner::File(path));
+        if (!mfile || !mfile->exists())
+        {
+            discardRequestBody(req);
+            return 404;
+        }
     }
 
     discardRequestBody(req);
@@ -841,65 +906,56 @@ int Server::doPut(Request &req, Response &resp)
     if (path.empty())
         return 403;
 
+    auto mfile = std::unique_ptr<MFile>(MFSOwner::File(path));
+
     if (isFilteredJunkPath(path))
     {
-        struct stat sb;
-        bool exists = stat(path.c_str(), &sb) == 0;
+        bool exists = mfile && mfile->exists();
         discardRequestBody(req);
         return exists ? 200 : 201;
     }
 
     Debug_printv("req[%s] path[%s]", req.getPath().c_str(), path.c_str());
 
-    struct stat sb;
-    int i = stat(path.c_str(), &sb);
-    bool exists (i == 0);
+    bool exists = mfile && mfile->exists();
 
-    FILE *f = fopen(path.c_str(), "w");
-    if (!f)
+    auto stream = mfile ? mfile->getSourceStream(std::ios_base::out) : nullptr;
+    if (!stream || !stream->isOpen())
         return 404;
-
-    // // Do we need to continue to get the data?
-    // if (req.getHeader("Expect").contains("100-continue") )
-    // {
-    //     Debug_printv("continue");
-    //     req.sendContinue();
-    // }
 
     int remaining = req.getContentLength();
 
     const int chunkSize = 8192;
-    char *chunk = (char *)malloc(chunkSize);
+    uint8_t *chunk = (uint8_t *)malloc(chunkSize);
+    if (!chunk) {
+        stream->close();
+        return 500;
+    }
 
     int ret = 0;
 
     while (remaining > 0)
     {
-        int r, w;
-        r = req.readBody(chunk, std::min(remaining, chunkSize));
+        int r = req.readBody((char *)chunk, std::min(remaining, chunkSize));
         if (r <= 0)
             break;
 
-        w = fwrite(chunk, 1, r, f);
-        if (w != r)
+        if ((int)stream->write(chunk, r) != r)
         {
-            ret = -errno;
+            ret = -1;
             break;
         }
 
-        remaining -= w;
+        remaining -= r;
     }
 
     free(chunk);
-    fclose(f);
+    stream->close();
 
     if (ret < 0)
         return 500;
 
-    if (!exists)
-        return 201;
-
-    return 200;
+    return exists ? 200 : 201;
 }
 
 int Server::doUnlock(Request &req, Response &resp)
