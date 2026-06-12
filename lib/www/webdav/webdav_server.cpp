@@ -500,7 +500,9 @@ int Server::sendPropResponse(Response &resp, std::string path, int recurse)
                 continue;
             if (isJunkLeafName(entry->name))
                 continue;
-            sendPropResponse(resp, entry->path, recurse - 1);
+            // Use path + name so local WebDAV paths are preserved even when
+            // this directory's MFile was redirected to a remote base_url.
+            sendPropResponse(resp, path + "/" + entry->name, recurse - 1);
         }
     }
 
