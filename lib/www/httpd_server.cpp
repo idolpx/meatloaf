@@ -620,6 +620,18 @@ void cHttpdServer::send_file(httpd_req_t *req, const char *filename)
     if (is_parsable(get_extension(filename)))
         return send_file_parsed(req, fpath.c_str());
 
+    // Prefer pre-compressed .gz version if it exists. Content-Type must still
+    // reflect the original file (e.g. text/javascript for app.js.gz), so save
+    // fpath before potentially switching to the .gz variant.
+    std::string content_type_path = fpath;
+    {
+        std::string gz_path = fpath + ".gz";
+        if (exists(gz_path)) {
+            httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
+            fpath = gz_path;
+        }
+    }
+
     // Open the file
     FILE *file = pState->_FS->file_open(fpath.c_str());
 
@@ -631,8 +643,8 @@ void cHttpdServer::send_file(httpd_req_t *req, const char *filename)
     }
     else
     {
-        // Set the response content type
-        set_file_content_type(req, fpath.c_str());
+        // Set the response content type from the uncompressed filename
+        set_file_content_type(req, content_type_path.c_str());
 
         long fsize = FileSystem::filesize(file);
 
