@@ -447,12 +447,21 @@ void Server::sendMultiStatusResponse(Response &resp, MultiStatusResponse &msr)
     resp.sendChunk(s.str().c_str());
 }
 
-int Server::sendPropResponse(Response &resp, std::string path, int recurse)
+int Server::sendPropResponse(Response &resp, std::string path, int recurse, MFile* hint)
 {
     mstr::replaceAll(path, "//", "/");
     std::string uri = pathToURI(path);
 
-    auto mfile = std::unique_ptr<MFile>(MFSOwner::File(path));
+    // Use hint MFile when provided (e.g. from a directory listing that already has
+    // is_dir and size set), avoiding an extra network round-trip per entry.
+    std::unique_ptr<MFile> owned;
+    MFile* mfile;
+    if (hint) {
+        mfile = hint;
+    } else {
+        owned.reset(MFSOwner::File(path));
+        mfile = owned.get();
+    }
     bool exists = mfile && mfile->exists();
 
     MultiStatusResponse r;
@@ -502,7 +511,10 @@ int Server::sendPropResponse(Response &resp, std::string path, int recurse)
                 continue;
             // Use path + name so local WebDAV paths are preserved even when
             // this directory's MFile was redirected to a remote base_url.
-            sendPropResponse(resp, path + "/" + entry->name, recurse - 1);
+            // Pass the entry as a hint: it already has is_dir and size set from
+            // the directory listing, so sendPropResponse skips the MFSOwner::File()
+            // lookup and the extra network round-trips for exists()/isDirectory().
+            sendPropResponse(resp, path + "/" + entry->name, recurse - 1, entry.get());
         }
     }
 
@@ -828,11 +840,9 @@ int Server::doPropfind(Request &req, Response &resp)
 
     //Debug_printv("req[%s] path[%s]", req.getPath().c_str(), path.c_str());
 
-    {
-        auto mfile = std::unique_ptr<MFile>(MFSOwner::File(path));
-        if (!mfile || !mfile->exists())
-            return 404;
-    }
+    auto mfile = std::unique_ptr<MFile>(MFSOwner::File(path));
+    if (!mfile || !mfile->exists())
+        return 404;
 
     int recurse =
         (req.getDepth() == Request::DEPTH_0) ? 0 : (req.getDepth() == Request::DEPTH_1) ? 1
@@ -844,7 +854,9 @@ int Server::doPropfind(Request &req, Response &resp)
 
     resp.sendChunk("<?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n");
     resp.sendChunk("<D:multistatus xmlns:D=\"DAV:\">\r\n");
-    sendPropResponse(resp, path, recurse);
+    // Pass mfile as hint so sendPropResponse doesn't create a second MFile
+    // for the same path, avoiding a duplicate exists()/isDirectory() round-trip.
+    sendPropResponse(resp, path, recurse, mfile.get());
     resp.sendChunk("</D:multistatus>\r\n");
     resp.closeChunk();
 

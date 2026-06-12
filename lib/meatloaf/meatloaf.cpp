@@ -534,36 +534,46 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
 
     // .config-based URL redirect: applies to local paths only (no ://) and never to
     // .config files themselves (would cause infinite recursion reading the config).
+    // Walk up the directory tree so that /sd/zimmers.net/bin inherits the redirect
+    // from /sd/zimmers.net/.config even though /bin doesn't exist locally.
     if (targetFile != nullptr &&
         targetFile->name != ".config" &&
         path.find("://") == std::string::npos)
     {
-        // 1. Check own directory's .config — redirects the directory itself to base_url.
-        auto ownCfg = readLocalConfig(path);
-        auto ownBase = ownCfg.find("base_url");
-        if (ownBase != ownCfg.end() && !ownBase->second.empty()) {
-            std::string remoteUrl = ownBase->second;
-            auto cacheIt = ownCfg.find("cache");
-            if (cacheIt != ownCfg.end() && !cacheIt->second.empty())
-                remoteUrl += "#cache=" + cacheIt->second;
-            delete targetFile;
-            return File(remoteUrl);
-        }
+        std::string currentDir = path;
+        while (true) {
+            auto cfg = readLocalConfig(currentDir);
+            auto baseIt = cfg.find("base_url");
+            if (baseIt != cfg.end() && !baseIt->second.empty()) {
+                std::string base = baseIt->second;
+                while (!base.empty() && base.back() == '/')
+                    base.pop_back();
 
-        // 2. Check parent directory's .config — redirects this file to base_url/name.
-        std::string parentDir = localParentDir(path);
-        auto parentCfg = readLocalConfig(parentDir);
-        auto parentBase = parentCfg.find("base_url");
-        if (parentBase != parentCfg.end() && !parentBase->second.empty()) {
-            std::string base = parentBase->second;
-            while (!base.empty() && base.back() == '/')
-                base.pop_back();
-            std::string remoteUrl = base + "/" + targetFile->name;
-            auto cacheIt = parentCfg.find("cache");
-            if (cacheIt != parentCfg.end() && !cacheIt->second.empty())
-                remoteUrl += "#cache=" + cacheIt->second;
-            delete targetFile;
-            return File(remoteUrl);
+                // Compute the relative path from currentDir to the original path.
+                std::string relPath;
+                if (path.length() > currentDir.length()) {
+                    relPath = path.substr(currentDir.length());
+                    if (!relPath.empty() && relPath.front() == '/')
+                        relPath = relPath.substr(1);
+                }
+
+                std::string remoteUrl = relPath.empty() ? base : (base + "/" + relPath);
+                auto cacheIt = cfg.find("cache");
+                if (cacheIt != cfg.end() && !cacheIt->second.empty())
+                    remoteUrl += "#cache=" + cacheIt->second;
+
+                delete targetFile;
+                return File(remoteUrl);
+            }
+
+            // Stop at the filesystem root.
+            if (currentDir.empty() || currentDir == "/" || currentDir == ".")
+                break;
+
+            std::string parent = localParentDir(currentDir);
+            if (parent == currentDir)
+                break;
+            currentDir = parent;
         }
     }
 

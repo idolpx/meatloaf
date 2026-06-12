@@ -109,6 +109,9 @@ MFile* FTPMFile::getNextFileInDir() {
 bool FTPMFile::mkDir() { return false; }
 
 bool FTPMFile::exists() {
+    // is_dir is set by getNextFileInDir() from the cached directory listing;
+    // if it's known, the entry definitely exists — no extra FTP round-trip needed.
+    if (is_dir >= 0) return true;
     FileSystemFTP* fs = getFS();
     if (!fs) return false;
     if (path.empty() || path == "/") return true;
