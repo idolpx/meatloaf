@@ -798,6 +798,28 @@ void cHttpdServer::send_http_error(httpd_req_t *req, int errnum)
     std::string error_path = httpdocs + "error/" + std::to_string(errnum) + ".html";
     Debug_printv("Error %d, looking for error page [%s]", errnum, error_path.c_str());
 
+    // Prefer pre-compressed error page if available. Template substitution
+    // cannot run on compressed content, so serve it directly in that case.
+    std::string gz_path = error_path + ".gz";
+    if (exists(gz_path)) {
+        httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
+        set_file_content_type(req, error_path.c_str()); // text/html from .html name
+        serverstate *pState = (serverstate *)httpd_get_global_user_ctx(req->handle);
+        FILE *file = pState->_FS->file_open(gz_path.c_str());
+        if (file != nullptr) {
+            char *buf = (char *)psram_malloc(http_SEND_BUFF_SIZE);
+            if (buf != nullptr) {
+                size_t count;
+                while ((count = fread(buf, 1, http_SEND_BUFF_SIZE, file)) > 0)
+                    httpd_resp_send_chunk(req, buf, count);
+                httpd_resp_send_chunk(req, nullptr, 0);
+                free(buf);
+            }
+            fclose(file);
+            return;
+        }
+    }
+
     send_file_parsed(req, error_path.c_str());
 
     // serverstate *pState = (serverstate *)httpd_get_global_user_ctx(req->handle);
