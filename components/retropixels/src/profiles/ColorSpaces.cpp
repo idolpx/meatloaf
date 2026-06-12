@@ -1,4 +1,5 @@
 #include "ColorSpaces.h"
+#include <string>
 #include <cmath>
 
 // Initialize the ColorSpaces map
