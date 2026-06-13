@@ -309,7 +309,7 @@ bool FlashMFile::readEntry( std::string filename )
                     
                     resetURL(apath + entryFilename);
                     //Debug_printv( "Found! file[%s] url[%s]", name.c_str(), url.c_str() );
-                    _exists = true;
+                    //_exists = true;
                     closedir( d );
                     return true;
                 }
