@@ -623,9 +623,27 @@ void cHttpdServer::send_file(httpd_req_t *req, const char *filename)
         }
     }
 
-    // make_mfile: FlashMFile for bare paths (serves .gz raw), MFSOwner for network URLs.
+    // Try flash first (make_mfile uses FlashMFile for bare paths, preserving .gz passthrough).
     auto mfile = make_mfile(fpath);
     auto stream = mfile->getSourceStream(std::ios_base::in);
+
+    if (!stream || !stream->isOpen())
+    {
+        // Flash failed. Try MFSOwner::File on the original request URI so that
+        // .config redirects are applied (e.g. base_url=ftp://zimmers.net means
+        // /zimmers.net/pub/00INDEX is fetched from ftp://zimmers.net/pub/00INDEX).
+        // MFSOwner already prevents .config files themselves from being redirected,
+        // so requesting /some/path/.config still returns 404 when not in flash.
+        auto mfile_net = std::unique_ptr<MFile>(MFSOwner::File(uri));
+        if (mfile_net) {
+            auto net_stream = mfile_net->getSourceStream(std::ios_base::in);
+            if (net_stream && net_stream->isOpen()) {
+                mfile = std::move(mfile_net);
+                stream = net_stream;
+                content_type_path = uri;
+            }
+        }
+    }
 
     if (!stream || !stream->isOpen())
     {
