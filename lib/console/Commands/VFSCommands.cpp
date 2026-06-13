@@ -649,7 +649,14 @@ static int df(int argc, char **argv)
 
 #define LOCATE_DB_PATH "/sd/.locate"
 
-static void updatedb_scan(sqlite3_stmt *stmt, int *count)
+/* Volatile scan state — written by the scan task, read by locate/updatedb. */
+static volatile int    s_scan_running = 0;
+static volatile int    s_scan_files   = 0;
+static volatile int    s_scan_dirs    = 0;
+static volatile time_t s_scan_start   = 0;
+static volatile time_t s_scan_end     = 0;
+
+static void updatedb_scan(sqlite3_stmt *stmt)
 {
     std::vector<std::string> dirs;
     dirs.push_back("/sd");
@@ -683,28 +690,25 @@ static void updatedb_scan(sqlite3_stmt *stmt, int *count)
             sqlite3_bind_int(stmt, 4, is_dir);
             sqlite3_step(stmt);
 
-            (*count)++;
-            if (*count % 100 == 0)
-                Serial.printf("  %d entries indexed...\r\n", *count);
-
-            if (is_dir)
+            if (is_dir) {
+                s_scan_dirs++;
                 dirs.push_back(std::move(full));
+            } else {
+                s_scan_files++;
+            }
+
+            int total = s_scan_files + s_scan_dirs;
+            if (total % 100 == 0)
+                Serial.printf("  %d files, %d directories indexed...\r\n",
+                              (int)s_scan_files, (int)s_scan_dirs);
         }
         closedir(d);
     }
 }
 
-int updatedb(int argc, char **argv)
+static void updatedb_task(void *arg)
 {
-    if (!fnSDFAT.running()) {
-        Serial.printf("updatedb: SD card not mounted\r\n");
-        return EXIT_FAILURE;
-    }
-
-    Serial.printf("Building locate database at " LOCATE_DB_PATH "...\r\n");
-
     // SQLITE_OMIT_AUTOINIT: must call sqlite3_initialize() before sqlite3_open().
-    // sqlite3_os_init() (in esp32_vfs.c) registers our POSIX VFS on first call.
     sqlite3_initialize();
 
     sqlite3 *db = nullptr;
@@ -712,7 +716,9 @@ int updatedb(int argc, char **argv)
         Serial.printf("updatedb: cannot create database: %s\r\n",
                       db ? sqlite3_errmsg(db) : "out of memory");
         if (db) sqlite3_close(db);
-        return EXIT_FAILURE;
+        s_scan_running = 0;
+        vTaskDelete(NULL);
+        return;
     }
 
     sqlite3_exec(db, "PRAGMA journal_mode = OFF", nullptr, nullptr, nullptr);
@@ -734,7 +740,9 @@ int updatedb(int argc, char **argv)
         Serial.printf("updatedb: %s\r\n", errmsg);
         sqlite3_free(errmsg);
         sqlite3_close(db);
-        return EXIT_FAILURE;
+        s_scan_running = 0;
+        vTaskDelete(NULL);
+        return;
     }
 
     const char *sql =
@@ -743,34 +751,96 @@ int updatedb(int argc, char **argv)
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
         Serial.printf("updatedb: prepare failed: %s\r\n", sqlite3_errmsg(db));
         sqlite3_close(db);
-        return EXIT_FAILURE;
+        s_scan_running = 0;
+        vTaskDelete(NULL);
+        return;
     }
 
     sqlite3_exec(db, "BEGIN", nullptr, nullptr, nullptr);
-
-    time_t t0 = time(nullptr);
-    int count = 0;
-    updatedb_scan(stmt, &count);
-
+    updatedb_scan(stmt);
     sqlite3_exec(db, "COMMIT", nullptr, nullptr, nullptr);
+
     sqlite3_finalize(stmt);
     sqlite3_close(db);
 
-    Serial.printf("Done: %d entries indexed in %ld seconds.\r\n",
-                  count, (long)(time(nullptr) - t0));
+    s_scan_end = time(nullptr);
+    s_scan_running = 0;
+
+    Serial.printf("updatedb: done — %d files, %d directories indexed in %ld seconds.\r\n",
+                  (int)s_scan_files, (int)s_scan_dirs,
+                  (long)(s_scan_end - s_scan_start));
+    vTaskDelete(NULL);
+}
+
+int updatedb(int argc, char **argv)
+{
+    if (!fnSDFAT.running()) {
+        Serial.printf("updatedb: SD card not mounted\r\n");
+        return EXIT_FAILURE;
+    }
+    if (s_scan_running) {
+        Serial.printf("updatedb: scan already in progress (%d files, %d directories so far)\r\n",
+                      (int)s_scan_files, (int)s_scan_dirs);
+        return EXIT_FAILURE;
+    }
+
+    s_scan_files   = 0;
+    s_scan_dirs    = 0;
+    s_scan_start   = time(nullptr);
+    s_scan_end     = 0;
+    s_scan_running = 1;
+
+    Serial.printf("Building locate database in background...\r\n");
+    xTaskCreate(updatedb_task, "updatedb", 8192, nullptr, 5, nullptr);
     return EXIT_SUCCESS;
 }
 
 int locate(int argc, char **argv)
 {
     if (argc < 2) {
-        Serial.printf("Usage: locate <pattern>\r\n");
-        Serial.printf("  Wildcards: * (any sequence), ? (one character)\r\n");
+        if (s_scan_running) {
+            time_t elapsed = time(nullptr) - s_scan_start;
+            Serial.printf("Scan in progress: %d files, %d directories indexed (%ld seconds elapsed)\r\n",
+                          (int)s_scan_files, (int)s_scan_dirs, (long)elapsed);
+        } else if (s_scan_end > 0) {
+            Serial.printf("Last scan: %d files, %d directories in %ld seconds\r\n",
+                          (int)s_scan_files, (int)s_scan_dirs,
+                          (long)(s_scan_end - s_scan_start));
+        } else {
+            /* No scan this session — query the database for persisted totals. */
+            if (!fnSDFAT.running()) {
+                Serial.printf("locate: SD card not mounted\r\n");
+                return EXIT_FAILURE;
+            }
+            sqlite3_initialize();
+            sqlite3 *db = nullptr;
+            if (sqlite3_open_v2(LOCATE_DB_PATH, &db, SQLITE_OPEN_READONLY, nullptr) != SQLITE_OK) {
+                Serial.printf("No index found. Run 'updatedb' to build the database.\r\n");
+                if (db) sqlite3_close(db);
+                return EXIT_SUCCESS;
+            }
+            sqlite3_stmt *stmt = nullptr;
+            int files = 0, dirs = 0;
+            if (sqlite3_prepare_v2(db,
+                    "SELECT SUM(is_dir=0), SUM(is_dir=1) FROM files",
+                    -1, &stmt, nullptr) == SQLITE_OK && sqlite3_step(stmt) == SQLITE_ROW) {
+                files = sqlite3_column_int(stmt, 0);
+                dirs  = sqlite3_column_int(stmt, 1);
+            }
+            sqlite3_finalize(stmt);
+            sqlite3_close(db);
+            Serial.printf("Index contains %d files in %d directories. Run 'updatedb' to refresh.\r\n",
+                          files, dirs);
+        }
         return EXIT_SUCCESS;
     }
 
     if (!fnSDFAT.running()) {
         Serial.printf("locate: SD card not mounted\r\n");
+        return EXIT_FAILURE;
+    }
+    if (s_scan_running) {
+        Serial.printf("locate: scan in progress, please wait.\r\n");
         return EXIT_FAILURE;
     }
 
