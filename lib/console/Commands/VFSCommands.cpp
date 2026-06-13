@@ -642,6 +642,189 @@ static int df(int argc, char **argv)
 }
 
 #ifdef SD_CARD
+// ─── locate / updatedb ────────────────────────────────────────────────────────
+#include "sqlite3.h"
+#include <vector>
+#include <ctime>
+
+#define LOCATE_DB_PATH "/sd/.locate"
+
+static void updatedb_scan(sqlite3_stmt *stmt, int *count)
+{
+    std::vector<std::string> dirs;
+    dirs.push_back("/sd");
+
+    while (!dirs.empty()) {
+        std::string dir = std::move(dirs.back());
+        dirs.pop_back();
+
+        DIR *d = opendir(dir.c_str());
+        if (!d) continue;
+
+        struct dirent *ent;
+        while ((ent = readdir(d)) != nullptr) {
+            if (strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0)
+                continue;
+            if (dir == "/sd" && strcmp(ent->d_name, ".locate") == 0)
+                continue;
+
+            std::string full = dir + "/" + ent->d_name;
+            const char *rel = full.c_str() + 3;  // relative to /sd
+
+            struct stat st;
+            if (stat(full.c_str(), &st) != 0) continue;
+
+            int is_dir = S_ISDIR(st.st_mode) ? 1 : 0;
+
+            sqlite3_reset(stmt);
+            sqlite3_bind_text(stmt, 1, rel, -1, SQLITE_TRANSIENT);
+            sqlite3_bind_int64(stmt, 2, (sqlite3_int64)st.st_size);
+            sqlite3_bind_int64(stmt, 3, (sqlite3_int64)st.st_mtime);
+            sqlite3_bind_int(stmt, 4, is_dir);
+            sqlite3_step(stmt);
+
+            (*count)++;
+            if (*count % 100 == 0)
+                Serial.printf("  %d entries indexed...\r\n", *count);
+
+            if (is_dir)
+                dirs.push_back(std::move(full));
+        }
+        closedir(d);
+    }
+}
+
+int updatedb(int argc, char **argv)
+{
+    if (!fnSDFAT.running()) {
+        Serial.printf("updatedb: SD card not mounted\r\n");
+        return EXIT_FAILURE;
+    }
+
+    Serial.printf("Building locate database at " LOCATE_DB_PATH "...\r\n");
+
+    // SQLITE_OMIT_AUTOINIT: must call sqlite3_initialize() before sqlite3_open().
+    // sqlite3_os_init() (in esp32_vfs.c) registers our POSIX VFS on first call.
+    sqlite3_initialize();
+
+    sqlite3 *db = nullptr;
+    if (sqlite3_open(LOCATE_DB_PATH, &db) != SQLITE_OK) {
+        Serial.printf("updatedb: cannot create database: %s\r\n",
+                      db ? sqlite3_errmsg(db) : "out of memory");
+        if (db) sqlite3_close(db);
+        return EXIT_FAILURE;
+    }
+
+    sqlite3_exec(db, "PRAGMA journal_mode = OFF", nullptr, nullptr, nullptr);
+    sqlite3_exec(db, "PRAGMA synchronous = OFF", nullptr, nullptr, nullptr);
+    sqlite3_exec(db, "PRAGMA cache_size = 4", nullptr, nullptr, nullptr);
+
+    const char *schema =
+        "DROP TABLE IF EXISTS files;"
+        "CREATE TABLE files ("
+        "  path TEXT PRIMARY KEY,"
+        "  size INTEGER NOT NULL DEFAULT 0,"
+        "  mtime INTEGER NOT NULL DEFAULT 0,"
+        "  is_dir INTEGER NOT NULL DEFAULT 0"
+        ");"
+        "CREATE INDEX IF NOT EXISTS idx_path ON files(path);";
+
+    char *errmsg = nullptr;
+    if (sqlite3_exec(db, schema, nullptr, nullptr, &errmsg) != SQLITE_OK) {
+        Serial.printf("updatedb: %s\r\n", errmsg);
+        sqlite3_free(errmsg);
+        sqlite3_close(db);
+        return EXIT_FAILURE;
+    }
+
+    const char *sql =
+        "INSERT OR REPLACE INTO files (path, size, mtime, is_dir) VALUES (?, ?, ?, ?)";
+    sqlite3_stmt *stmt = nullptr;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+        Serial.printf("updatedb: prepare failed: %s\r\n", sqlite3_errmsg(db));
+        sqlite3_close(db);
+        return EXIT_FAILURE;
+    }
+
+    sqlite3_exec(db, "BEGIN", nullptr, nullptr, nullptr);
+
+    time_t t0 = time(nullptr);
+    int count = 0;
+    updatedb_scan(stmt, &count);
+
+    sqlite3_exec(db, "COMMIT", nullptr, nullptr, nullptr);
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+
+    Serial.printf("Done: %d entries indexed in %ld seconds.\r\n",
+                  count, (long)(time(nullptr) - t0));
+    return EXIT_SUCCESS;
+}
+
+int locate(int argc, char **argv)
+{
+    if (argc < 2) {
+        Serial.printf("Usage: locate <pattern>\r\n");
+        Serial.printf("  Wildcards: * (any sequence), ? (one character)\r\n");
+        return EXIT_SUCCESS;
+    }
+
+    if (!fnSDFAT.running()) {
+        Serial.printf("locate: SD card not mounted\r\n");
+        return EXIT_FAILURE;
+    }
+
+    sqlite3_initialize();  // SQLITE_OMIT_AUTOINIT: required before sqlite3_open
+
+    sqlite3 *db = nullptr;
+    if (sqlite3_open_v2(LOCATE_DB_PATH, &db, SQLITE_OPEN_READONLY, nullptr) != SQLITE_OK) {
+        Serial.printf("locate: database not found. Run 'updatedb' first.\r\n");
+        if (db) sqlite3_close(db);
+        return EXIT_FAILURE;
+    }
+
+    // Convert shell wildcards (* → %, ? → _) to SQL LIKE syntax.
+    // If the user provided no wildcards at all, wrap the string in % for substring search.
+    bool has_wildcards = strchr(argv[1], '*') || strchr(argv[1], '?');
+    std::string pattern(argv[1]);
+    for (char &c : pattern) {
+        if (c == '*') c = '%';
+        else if (c == '?') c = '_';
+    }
+    if (!has_wildcards)
+        pattern = "%" + pattern + "%";
+
+    const char *sql =
+        "SELECT path, size, is_dir FROM files WHERE path LIKE ? ORDER BY path";
+    sqlite3_stmt *stmt = nullptr;
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+        Serial.printf("locate: %s\r\n", sqlite3_errmsg(db));
+        sqlite3_close(db);
+        return EXIT_FAILURE;
+    }
+
+    sqlite3_bind_text(stmt, 1, pattern.c_str(), -1, SQLITE_TRANSIENT);
+
+    int count = 0;
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        const char *path = (const char *)sqlite3_column_text(stmt, 0);
+        sqlite3_int64 size = sqlite3_column_int64(stmt, 1);
+        int is_dir = sqlite3_column_int(stmt, 2);
+        if (path)
+            Serial.printf("%c %8lld  /sd%s\r\n", is_dir ? 'd' : '-', (long long)size, path);
+        count++;
+    }
+
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
+
+    if (count == 0)
+        Serial.printf("locate: no matches for '%s'\r\n", argv[1]);
+
+    return EXIT_SUCCESS;
+}
+// ─── end locate / updatedb ────────────────────────────────────────────────────
+
 static void format_sd_task(void *arg)
 {
     Serial.printf("Formatting SD card (this may take several minutes)...\r\n");
@@ -767,6 +950,16 @@ namespace ESP32Console::Commands
     const ConsoleCommand getFormatSDCommand()
     {
         return ConsoleCommand("format_sd", &format_sd, "Format the SD card (use -y to confirm)");
+    }
+
+    const ConsoleCommand getUpdatedbCommand()
+    {
+        return ConsoleCommand("updatedb", &updatedb, "Build the locate database from the SD card");
+    }
+
+    const ConsoleCommand getLocateCommand()
+    {
+        return ConsoleCommand("locate", &locate, "Search the locate database for files matching a pattern");
     }
 #endif
 }

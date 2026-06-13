@@ -182,6 +182,8 @@ namespace ESP32Console
         registerCommand(getDisableCommand());
 #ifdef SD_CARD
         registerCommand(getFormatSDCommand());
+        registerCommand(getUpdatedbCommand());
+        registerCommand(getLocateCommand());
 #endif
     }
 
