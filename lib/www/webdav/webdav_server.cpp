@@ -13,6 +13,7 @@
 #include <esp_http_server.h>
 
 #include "meatloaf.h"
+#include "device/flash.h"
 #include "string_utils.h"
 
 using namespace WebDav;
@@ -73,7 +74,13 @@ static bool isFilteredJunkPath(const std::string &path)
 
 static int mfile_rm_rf(const std::string &path)
 {
-    auto mf = std::unique_ptr<MFile>(MFSOwner::File(path));
+    // Use FlashMFile for local paths so .gz files aren't routed to ArchiveMFileSystem,
+    // which can't delete the underlying file.
+    std::unique_ptr<MFile> mf;
+    if (path.find("://") != std::string::npos)
+        mf.reset(MFSOwner::File(path));
+    else
+        mf.reset(new FlashMFile(path));
     if (!mf || !mf->exists())
         return -1;
 
