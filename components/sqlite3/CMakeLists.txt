@@ -1,5 +1,5 @@
 idf_component_register(
-                        SRC_DIRS "src"
+                        SRCS "src/sqlite3.c" "src/esp32_vfs.c"
                         INCLUDE_DIRS "include"
                         PRIV_INCLUDE_DIRS "private_include"
                       )

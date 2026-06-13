@@ -691,10 +691,10 @@ static void updatedb_scan(sqlite3_stmt *stmt)
             sqlite3_step(stmt);
 
             if (is_dir) {
-                s_scan_dirs++;
+                s_scan_dirs = s_scan_dirs + 1;
                 dirs.push_back(std::move(full));
             } else {
-                s_scan_files++;
+                s_scan_files = s_scan_files + 1;
             }
 
             int total = s_scan_files + s_scan_dirs;
