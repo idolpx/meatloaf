@@ -734,6 +734,9 @@ static void updatedb_task(void *arg)
     // SQLITE_OMIT_AUTOINIT: must call sqlite3_initialize() before sqlite3_open().
     sqlite3_initialize();
 
+    // Remove any stale/corrupt database from a previous interrupted scan.
+    unlink(LOCATE_DB_PATH);
+
     sqlite3 *db = nullptr;
     if (sqlite3_open(LOCATE_DB_PATH, &db) != SQLITE_OK) {
         Serial.printf("updatedb: cannot create database: %s\r\n",
