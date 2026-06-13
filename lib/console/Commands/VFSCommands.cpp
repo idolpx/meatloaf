@@ -684,7 +684,6 @@ static void updatedb_scan(sqlite3 *db, sqlite3_stmt *stmt)
     dirs.emplace_back("/sd");
 
     char full[PATH_MAX];
-    int  batch = 0;
 
     while (!dirs.empty()) {
         PsramPath cur(std::move(dirs.back()));
@@ -734,14 +733,6 @@ static void updatedb_scan(sqlite3 *db, sqlite3_stmt *stmt)
                 dirs.emplace_back(full);
             } else {
                 s_scan_files = s_scan_files + 1;
-            }
-
-            // Commit every 1000 rows so partial results survive write errors.
-            if (++batch >= 1000) {
-                if (sqlite3_exec(db, "COMMIT", nullptr, nullptr, nullptr) != SQLITE_OK)
-                    Serial.printf("  batch commit failed: %s\r\n", sqlite3_errmsg(db));
-                sqlite3_exec(db, "BEGIN", nullptr, nullptr, nullptr);
-                batch = 0;
             }
 
             int total = s_scan_files + s_scan_dirs;
@@ -808,15 +799,7 @@ static void updatedb_task(void *arg)
     }
 
     s_scan_errors = 0;
-    sqlite3_exec(db, "BEGIN", nullptr, nullptr, nullptr);
     updatedb_scan(db, stmt);
-
-    char *commit_err = nullptr;
-    if (sqlite3_exec(db, "COMMIT", nullptr, nullptr, &commit_err) != SQLITE_OK) {
-        Serial.printf("updatedb: COMMIT failed: %s\r\n",
-                      commit_err ? commit_err : sqlite3_errmsg(db));
-        sqlite3_free(commit_err);
-    }
 
     sqlite3_finalize(stmt);
     sqlite3_close(db);
