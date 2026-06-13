@@ -127,7 +127,7 @@ bool exists(std::string path)
 /* Our URI handler function to be called during GET /uri request */
 esp_err_t cHttpdServer::get_handler(httpd_req_t *httpd_req)
 {
-    //Debug_printv("uri[%s]", httpd_req->uri);
+    Debug_printv("uri[%s]", httpd_req->uri);
 
 
     uri = mstr::urlDecode(httpd_req->uri);
@@ -157,7 +157,7 @@ esp_err_t cHttpdServer::get_handler(httpd_req_t *httpd_req)
 /* Our URI handler function to be called during POST /uri request */
 esp_err_t cHttpdServer::post_handler(httpd_req_t *httpd_req)
 {
-    Debug_printv("url[%s]", httpd_req->uri);
+    Debug_printv("uri[%s]", httpd_req->uri);
 
     /* Destination buffer for content of HTTP POST request.
      * httpd_req_recv() accepts char* only, but content could
@@ -280,7 +280,7 @@ esp_err_t cHttpdServer::webdav_handler(httpd_req_t *httpd_req)
     WebDav::Response resp(httpd_req);
     int ret;
 
-    //Debug_printv("url[%s]", httpd_req->uri);
+    Debug_printv("uri[%s]", httpd_req->uri);
 
     if ( !req.parseRequest() )
     {
@@ -290,7 +290,7 @@ esp_err_t cHttpdServer::webdav_handler(httpd_req_t *httpd_req)
         return ESP_OK;
     }
 
-    // httpd_rßesp_set_hdr(httpd_req, "Access-Control-Allow-Origin", "*");
+    // httpd_resp_set_hdr(httpd_req, "Access-Control-Allow-Origin", "*");
     // httpd_resp_set_hdr(httpd_req, "Access-Control-Allow-Headers", "*");
     // httpd_resp_set_hdr(httpd_req, "Access-Control-Allow-Methods", "*");
 
