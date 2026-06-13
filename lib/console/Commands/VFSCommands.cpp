@@ -655,6 +655,7 @@ static int df(int argc, char **argv)
 static volatile int    s_scan_running = 0;
 static volatile int    s_scan_files   = 0;
 static volatile int    s_scan_dirs    = 0;
+static volatile int    s_scan_errors  = 0;
 static volatile time_t s_scan_start   = 0;
 static volatile time_t s_scan_end     = 0;
 
@@ -677,12 +678,31 @@ struct PsramPath {
     PsramPath &operator=(const PsramPath &) = delete;
 };
 
-static void updatedb_scan(sqlite3_stmt *stmt)
+/* Zero-allocation junk check — avoids the heap churn of mstr::isJunk() which
+ * allocates a new std::vector<std::string> on every call.  With 95K+ files,
+ * that constant alloc/free fragments internal DRAM until the SDMMC DMA
+ * allocator can't get 125 bytes, causing write failures that silently kill
+ * the SQLite COMMIT. */
+static bool is_junk(const char *name)
+{
+    static const char *const JUNK[] = {
+        "._", ".DS_Store", ".fseventsd", ".Spotlight-V", ".TemporaryItems",
+        ".Trashes", ".VolumeIcon.icns", "Desktop.ini", "Thumbs.db",
+        "System Volume Information", "$Recycle.bin", nullptr
+    };
+    for (int i = 0; JUNK[i]; i++)
+        if (strstr(name, JUNK[i]))
+            return true;
+    return false;
+}
+
+static void updatedb_scan(sqlite3 *db, sqlite3_stmt *stmt)
 {
     std::vector<PsramPath> dirs;
     dirs.emplace_back("/sd");
 
     char full[PATH_MAX];
+    int  batch = 0;
 
     while (!dirs.empty()) {
         PsramPath cur(std::move(dirs.back()));
@@ -701,8 +721,7 @@ static void updatedb_scan(sqlite3_stmt *stmt)
 
             snprintf(full, sizeof(full), "%s/%s", cur.s, ent->d_name);
 
-            std::string name(ent->d_name);
-            if (mstr::isJunk(name)) {
+            if (is_junk(ent->d_name)) {
                 if (remove(full) == 0)
                     Serial.printf("  deleted: %s\r\n", full);
                 continue;
@@ -720,13 +739,27 @@ static void updatedb_scan(sqlite3_stmt *stmt)
             sqlite3_bind_int64(stmt, 2, (sqlite3_int64)st.st_size);
             sqlite3_bind_int64(stmt, 3, (sqlite3_int64)st.st_mtime);
             sqlite3_bind_int(stmt, 4, is_dir);
-            sqlite3_step(stmt);
+            int rc = sqlite3_step(stmt);
+            if (rc != SQLITE_DONE) {
+                s_scan_errors = s_scan_errors + 1;
+                if (s_scan_errors <= 3)
+                    Serial.printf("  insert error %d: %s — %s\r\n",
+                                  rc, sqlite3_errmsg(db), rel);
+            }
 
             if (is_dir) {
                 s_scan_dirs = s_scan_dirs + 1;
                 dirs.emplace_back(full);
             } else {
                 s_scan_files = s_scan_files + 1;
+            }
+
+            // Commit every 1000 rows so partial results survive write errors.
+            if (++batch >= 1000) {
+                if (sqlite3_exec(db, "COMMIT", nullptr, nullptr, nullptr) != SQLITE_OK)
+                    Serial.printf("  batch commit failed: %s\r\n", sqlite3_errmsg(db));
+                sqlite3_exec(db, "BEGIN", nullptr, nullptr, nullptr);
+                batch = 0;
             }
 
             int total = s_scan_files + s_scan_dirs;
@@ -759,7 +792,7 @@ static void updatedb_task(void *arg)
 
     sqlite3_exec(db, "PRAGMA journal_mode = OFF", nullptr, nullptr, nullptr);
     sqlite3_exec(db, "PRAGMA synchronous = OFF", nullptr, nullptr, nullptr);
-    sqlite3_exec(db, "PRAGMA cache_size = 4", nullptr, nullptr, nullptr);
+    sqlite3_exec(db, "PRAGMA cache_size = 32", nullptr, nullptr, nullptr);
 
     const char *schema =
         "DROP TABLE IF EXISTS files;"
@@ -792,9 +825,16 @@ static void updatedb_task(void *arg)
         return;
     }
 
+    s_scan_errors = 0;
     sqlite3_exec(db, "BEGIN", nullptr, nullptr, nullptr);
-    updatedb_scan(stmt);
-    sqlite3_exec(db, "COMMIT", nullptr, nullptr, nullptr);
+    updatedb_scan(db, stmt);
+
+    char *commit_err = nullptr;
+    if (sqlite3_exec(db, "COMMIT", nullptr, nullptr, &commit_err) != SQLITE_OK) {
+        Serial.printf("updatedb: COMMIT failed: %s\r\n",
+                      commit_err ? commit_err : sqlite3_errmsg(db));
+        sqlite3_free(commit_err);
+    }
 
     sqlite3_finalize(stmt);
     sqlite3_close(db);
@@ -802,9 +842,9 @@ static void updatedb_task(void *arg)
     s_scan_end = time(nullptr);
     s_scan_running = 0;
 
-    Serial.printf("updatedb: done — %d files, %d directories indexed in %ld seconds.\r\n",
+    Serial.printf("updatedb: done — %d files, %d directories, %d errors, %ld seconds.\r\n",
                   (int)s_scan_files, (int)s_scan_dirs,
-                  (long)(s_scan_end - s_scan_start));
+                  (int)s_scan_errors, (long)(s_scan_end - s_scan_start));
     vTaskDelete(NULL);
 }
 
@@ -822,6 +862,7 @@ int updatedb(int argc, char **argv)
 
     s_scan_files   = 0;
     s_scan_dirs    = 0;
+    s_scan_errors  = 0;
     s_scan_start   = time(nullptr);
     s_scan_end     = 0;
     s_scan_running = 1;
