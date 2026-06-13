@@ -647,6 +647,8 @@ static int df(int argc, char **argv)
 #include <vector>
 #include <ctime>
 
+#include "string_utils.h"
+
 #define LOCATE_DB_PATH "/sd/.locate"
 
 /* Volatile scan state — written by the scan task, read by locate/updatedb. */
@@ -698,6 +700,14 @@ static void updatedb_scan(sqlite3_stmt *stmt)
                 continue;
 
             snprintf(full, sizeof(full), "%s/%s", cur.s, ent->d_name);
+
+            std::string name(ent->d_name);
+            if (mstr::isJunk(name)) {
+                if (remove(full) == 0)
+                    Serial.printf("  deleted: %s\r\n", full);
+                continue;
+            }
+
             const char *rel = full + 3;  // relative to /sd
 
             struct stat st;
