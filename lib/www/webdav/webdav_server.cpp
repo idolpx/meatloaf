@@ -98,14 +98,23 @@ static int mfile_rm_rf(const std::string &path)
     return mf->remove() ? 0 : -1;
 }
 
+// Returns a FlashMFile for bare local paths so media extensions (.d64, .gz, etc.)
+// are treated as raw bytes rather than being routed to their specialized filesystems.
+static std::unique_ptr<MFile> webdav_mfile(const std::string &path)
+{
+    if (path.find("://") != std::string::npos)
+        return std::unique_ptr<MFile>(MFSOwner::File(path));
+    return std::make_unique<FlashMFile>(path);
+}
+
 static int mfile_copy_recursive(const std::string &source, const std::string &destination,
                                 int recurse, bool overwrite)
 {
-    auto srcFile = std::unique_ptr<MFile>(MFSOwner::File(source));
+    auto srcFile = webdav_mfile(source);
     if (!srcFile || !srcFile->exists())
         return -ENOENT;
 
-    auto dstFile = std::unique_ptr<MFile>(MFSOwner::File(destination));
+    auto dstFile = webdav_mfile(destination);
     bool dstExists = dstFile && dstFile->exists();
 
     if (dstExists && !overwrite)
@@ -542,7 +551,7 @@ int Server::doCopy(Request &req, Response &resp)
 
     if (isFilteredJunkPath(source) || isFilteredJunkPath(destination))
     {
-        auto dstFile = std::unique_ptr<MFile>(MFSOwner::File(destination));
+        auto dstFile = webdav_mfile(destination);
         bool destinationExists = dstFile && dstFile->exists();
         return destinationExists ? 204 : 201;
     }
@@ -556,7 +565,7 @@ int Server::doCopy(Request &req, Response &resp)
         (req.getDepth() == Request::DEPTH_0) ? 0 : (req.getDepth() == Request::DEPTH_1) ? 1
                                                                                         : 32;
 
-    auto dstCheck = std::unique_ptr<MFile>(MFSOwner::File(destination));
+    auto dstCheck = webdav_mfile(destination);
     bool destinationExists = dstCheck && dstCheck->exists();
 
     int ret = mfile_copy_recursive(source, destination, recurse, req.getOverwrite());
@@ -620,7 +629,7 @@ int Server::doGet(Request &req, Response &resp)
 
     Debug_printv("req[%s] path[%s]", req.getPath().c_str(), path.c_str());
 
-    auto mfile = std::unique_ptr<MFile>(MFSOwner::File(path));
+    auto mfile = webdav_mfile(path);
     if (!mfile || !mfile->exists())
         return 404;
 
@@ -747,13 +756,13 @@ int Server::doMkcol(Request &req, Response &resp)
 
     Debug_printv("req[%s] path[%s]", req.getPath().c_str(), path.c_str());
 
-    auto mfile = std::unique_ptr<MFile>(MFSOwner::File(path));
+    auto mfile = webdav_mfile(path);
     if (mfile && mfile->exists())
         return 405;
 
     size_t lastSlash = path.rfind('/');
     if (lastSlash != std::string::npos && lastSlash > 0) {
-        auto parentFile = std::unique_ptr<MFile>(MFSOwner::File(path.substr(0, lastSlash)));
+        auto parentFile = webdav_mfile(path.substr(0, lastSlash));
         if (!parentFile || !parentFile->exists())
             return 409;
     }
@@ -776,7 +785,7 @@ int Server::doMove(Request &req, Response &resp)
     Debug_printv("req[%s] source[%s]", req.getPath().c_str(), source.c_str());
 
     {
-        auto srcFile = std::unique_ptr<MFile>(MFSOwner::File(source));
+        auto srcFile = webdav_mfile(source);
         if (!srcFile || !srcFile->exists())
             return 404;
     }
@@ -787,12 +796,12 @@ int Server::doMove(Request &req, Response &resp)
 
     if (isFilteredJunkPath(source) || isFilteredJunkPath(destination))
     {
-        auto dstFile = std::unique_ptr<MFile>(MFSOwner::File(destination));
+        auto dstFile = webdav_mfile(destination);
         bool destinationExists = dstFile && dstFile->exists();
         return destinationExists ? 204 : 201;
     }
 
-    auto dstFile = std::unique_ptr<MFile>(MFSOwner::File(destination));
+    auto dstFile = webdav_mfile(destination);
     bool destinationExists = dstFile && dstFile->exists();
 
     if (destinationExists)
@@ -851,7 +860,7 @@ int Server::doPropfind(Request &req, Response &resp)
 
     //Debug_printv("req[%s] path[%s]", req.getPath().c_str(), path.c_str());
 
-    auto mfile = std::unique_ptr<MFile>(MFSOwner::File(path));
+    auto mfile = webdav_mfile(path);
     if (!mfile || !mfile->exists())
         return 404;
 
@@ -888,7 +897,7 @@ int Server::doProppatch(Request &req, Response &resp)
     }
 
     {
-        auto mfile = std::unique_ptr<MFile>(MFSOwner::File(path));
+        auto mfile = webdav_mfile(path);
         if (!mfile || !mfile->exists())
         {
             discardRequestBody(req);
