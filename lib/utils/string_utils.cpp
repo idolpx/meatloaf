@@ -110,7 +110,7 @@ namespace mstr {
         };
 
         for (auto it = begin (names); it != end (names); ++it) {
-            if (contains(s, it->c_str()))
+            if (startsWith(s, it->c_str(), true))
                 return true;
         }
         
