@@ -783,6 +783,18 @@ void cHttpdServer::send_file_parsed(httpd_req_t *req, const char *filename)
 // NOTE: Must NOT call send_file()
 void cHttpdServer::send_http_error(httpd_req_t *req, int errnum)
 {
+    // Set the HTTP status code before sending the body.
+    switch (errnum) {
+        case 404: httpd_resp_set_status(req, HTTPD_404); break;
+        case 500: httpd_resp_set_status(req, HTTPD_500); break;
+        default: {
+            static char _status[32];
+            snprintf(_status, sizeof(_status), "%d Error", errnum);
+            httpd_resp_set_status(req, _status);
+            break;
+        }
+    }
+
     std::string error_path = httpdocs + "error/" + std::to_string(errnum) + ".html";
     Debug_printv("Error %d, looking for error page [%s]", errnum, error_path.c_str());
 
