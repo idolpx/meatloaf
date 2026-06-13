@@ -52,8 +52,9 @@ int cat(int argc, char **argv)
             } else {    
                 while(!istream.eof()) {
                     char chr = istream.get();
-                    Serial.printf("%c", chr);
-                }        
+                    if(!istream.eof())
+                        Serial.printf("%c", chr);
+                }
             }
             istream.close();
         }
