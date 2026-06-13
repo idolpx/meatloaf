@@ -656,30 +656,52 @@ static volatile int    s_scan_dirs    = 0;
 static volatile time_t s_scan_start   = 0;
 static volatile time_t s_scan_end     = 0;
 
+/* Directory path entry allocated from PSRAM.
+ * std::string's internal heap allocation for paths > ~15 chars lands in
+ * internal DRAM, which quickly exhausts the DMA-capable heap and breaks
+ * SDMMC reads at scale (57K+ files / 4K+ dirs).  Storing paths in PSRAM
+ * keeps internal DRAM free for the SDMMC DMA allocator. */
+struct PsramPath {
+    char *s = nullptr;
+    explicit PsramPath(const char *str) {
+        size_t n = strlen(str) + 1;
+        s = (char *)heap_caps_malloc(n, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (!s) s = (char *)malloc(n);
+        if (s) memcpy(s, str, n);
+    }
+    ~PsramPath() { free(s); }
+    PsramPath(PsramPath &&o) noexcept : s(o.s) { o.s = nullptr; }
+    PsramPath(const PsramPath &) = delete;
+    PsramPath &operator=(const PsramPath &) = delete;
+};
+
 static void updatedb_scan(sqlite3_stmt *stmt)
 {
-    std::vector<std::string> dirs;
-    dirs.push_back("/sd");
+    std::vector<PsramPath> dirs;
+    dirs.emplace_back("/sd");
+
+    char full[PATH_MAX];
 
     while (!dirs.empty()) {
-        std::string dir = std::move(dirs.back());
+        PsramPath cur(std::move(dirs.back()));
         dirs.pop_back();
+        if (!cur.s) continue;
 
-        DIR *d = opendir(dir.c_str());
+        DIR *d = opendir(cur.s);
         if (!d) continue;
 
         struct dirent *ent;
         while ((ent = readdir(d)) != nullptr) {
             if (strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0)
                 continue;
-            if (dir == "/sd" && strcmp(ent->d_name, ".locate") == 0)
+            if (strcmp(cur.s, "/sd") == 0 && strcmp(ent->d_name, ".locate") == 0)
                 continue;
 
-            std::string full = dir + "/" + ent->d_name;
-            const char *rel = full.c_str() + 3;  // relative to /sd
+            snprintf(full, sizeof(full), "%s/%s", cur.s, ent->d_name);
+            const char *rel = full + 3;  // relative to /sd
 
             struct stat st;
-            if (stat(full.c_str(), &st) != 0) continue;
+            if (stat(full, &st) != 0) continue;
 
             int is_dir = S_ISDIR(st.st_mode) ? 1 : 0;
 
@@ -692,7 +714,7 @@ static void updatedb_scan(sqlite3_stmt *stmt)
 
             if (is_dir) {
                 s_scan_dirs = s_scan_dirs + 1;
-                dirs.push_back(std::move(full));
+                dirs.emplace_back(full);
             } else {
                 s_scan_files = s_scan_files + 1;
             }
@@ -703,6 +725,7 @@ static void updatedb_scan(sqlite3_stmt *stmt)
                               (int)s_scan_files, (int)s_scan_dirs);
         }
         closedir(d);
+        vTaskDelay(1);  // yield after each directory so SDMMC DMA can complete
     }
 }
 
