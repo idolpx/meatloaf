@@ -678,7 +678,11 @@ int Server::doHead(Request &req, Response &resp)
 
     Debug_printv("req[%s] path[%s]", req.getPath().c_str(), path.c_str());
 
-    auto mfile = std::unique_ptr<MFile>(MFSOwner::File(path));
+    std::unique_ptr<MFile> mfile;
+    if (path.find("://") != std::string::npos)
+        mfile.reset(MFSOwner::File(path));
+    else
+        mfile.reset(new FlashMFile(path));
     if (!mfile || !mfile->exists())
         return 404;
 
@@ -927,7 +931,13 @@ int Server::doPut(Request &req, Response &resp)
     if (path.empty())
         return 403;
 
-    auto mfile = std::unique_ptr<MFile>(MFSOwner::File(path));
+    // Use FlashMFile for local paths so .gz files aren't routed to ArchiveMFileSystem
+    // (ArchiveMFile::exists() always returns true, and it can't open a write stream).
+    std::unique_ptr<MFile> mfile;
+    if (path.find("://") != std::string::npos)
+        mfile.reset(MFSOwner::File(path));
+    else
+        mfile.reset(new FlashMFile(path));
 
     if (isFilteredJunkPath(path))
     {
