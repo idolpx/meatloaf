@@ -678,24 +678,6 @@ struct PsramPath {
     PsramPath &operator=(const PsramPath &) = delete;
 };
 
-/* Zero-allocation junk check — avoids the heap churn of mstr::isJunk() which
- * allocates a new std::vector<std::string> on every call.  With 95K+ files,
- * that constant alloc/free fragments internal DRAM until the SDMMC DMA
- * allocator can't get 125 bytes, causing write failures that silently kill
- * the SQLite COMMIT. */
-static bool is_junk(const char *name)
-{
-    static const char *const JUNK[] = {
-        "._", ".DS_Store", ".fseventsd", ".Spotlight-V", ".TemporaryItems",
-        ".Trashes", ".VolumeIcon.icns", "Desktop.ini", "Thumbs.db",
-        "System Volume Information", "$Recycle.bin", nullptr
-    };
-    for (int i = 0; JUNK[i]; i++)
-        if (strstr(name, JUNK[i]))
-            return true;
-    return false;
-}
-
 static void updatedb_scan(sqlite3 *db, sqlite3_stmt *stmt)
 {
     std::vector<PsramPath> dirs;
@@ -721,7 +703,7 @@ static void updatedb_scan(sqlite3 *db, sqlite3_stmt *stmt)
 
             snprintf(full, sizeof(full), "%s/%s", cur.s, ent->d_name);
 
-            if (is_junk(ent->d_name)) {
+            if (mstr::isJunk(ent->d_name)) {
                 if (remove(full) == 0)
                     Serial.printf("  deleted: %s\r\n", full);
                 continue;
