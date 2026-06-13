@@ -380,8 +380,8 @@ static int config_cmd(int argc, char **argv)
 
     (*node)[leaf] = new_val;
 
-    // Writes to iec.devices go to devices.json; everything else to config.json.
-    if (parts.size() >= 2 && parts[0] == "iec" && parts[1] == "devices")
+    // Writes to the devices subtree go to devices.json; everything else to config.json.
+    if (parts.size() >= 1 && parts[0] == "devices")
         mlConfig.mark_devices_dirty();
     else
         mlConfig.mark_config_dirty();
