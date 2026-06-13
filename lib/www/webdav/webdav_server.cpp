@@ -98,12 +98,22 @@ static int mfile_rm_rf(const std::string &path)
     return mf->remove() ? 0 : -1;
 }
 
-// Returns a FlashMFile for bare local paths so media extensions (.d64, .gz, etc.)
-// are treated as raw bytes rather than being routed to their specialized filesystems.
+// Smart MFile factory for WebDAV operations.
+// - Paths with "://" go directly to MFSOwner (already a resolved network URL).
+// - For bare local paths, try MFSOwner first so .config base_url redirects are
+//   applied (e.g. /mount/foo resolved to http://foo.com via .config).
+//   If MFSOwner resolves to a network scheme, return that.
+//   If it resolves to a local/media filesystem (empty scheme, e.g. D64MFile),
+//   fall back to FlashMFile so .d64/.gz/etc. check real file existence via stat().
 static std::unique_ptr<MFile> webdav_mfile(const std::string &path)
 {
     if (path.find("://") != std::string::npos)
         return std::unique_ptr<MFile>(MFSOwner::File(path));
+
+    auto mf = std::unique_ptr<MFile>(MFSOwner::File(path));
+    if (mf && !mf->scheme.empty())
+        return mf;
+
     return std::make_unique<FlashMFile>(path);
 }
 
