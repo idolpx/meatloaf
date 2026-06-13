@@ -1176,8 +1176,13 @@ MFile* MFile::cdLocalRoot(std::string plus)
 //     return true;
 // };
 
-bool MFile::exists() { 
-    return _exists; 
+bool MFile::exists() {
+    if (scheme.empty()) {
+        struct stat st;
+        return stat(path.c_str(), &st) == 0;
+    }
+    //return _exists;
+    return true; // Assume it exists; if it doesn't, we'll find out when we try to open it
 };
 
 uint64_t MFile::getAvailableSpace()
