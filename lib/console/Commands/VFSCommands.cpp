@@ -817,8 +817,11 @@ static void updatedb_scan(sqlite3 *db, sqlite3_stmt *stmt)
 
             int total = s_scan_files + s_scan_dirs;
             if (total % 100 == 0)
-                Serial.printf("  %d files, %d directories indexed...\r\n",
-                              (int)s_scan_files, (int)s_scan_dirs);
+                Serial.printf("  %d files, %d dirs — free=%lu dma_max=%lu\r\n",
+                              (int)s_scan_files, (int)s_scan_dirs,
+                              esp_get_free_internal_heap_size(),
+                              (unsigned long)heap_caps_get_largest_free_block(
+                                  MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL));
         }
         closedir(d);
         vTaskDelay(1);  // yield after each directory so SDMMC DMA can complete
@@ -842,6 +845,11 @@ static void updatedb_task(void *arg)
         vTaskDelete(NULL);
         return;
     }
+
+    Serial.printf("updatedb: db open — free=%lu dma_max=%lu\r\n",
+                  esp_get_free_internal_heap_size(),
+                  (unsigned long)heap_caps_get_largest_free_block(
+                      MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL));
 
     // DELETE journal (the SQLite default) writes the rollback journal to SD and
     // deletes it on each COMMIT.  This properly resets the pager's internal
