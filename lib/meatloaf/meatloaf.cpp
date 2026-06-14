@@ -25,6 +25,8 @@
 #include <vector>
 #include <sstream>
 #include <cerrno>
+#include <map>
+#include <cstdio>
 
 
 #ifdef FLASH_SPIFFS
@@ -376,6 +378,46 @@ MFile* MFSOwner::File(std::shared_ptr<MFile> file) {
     return File(file->url);
 }
 
+// Read key=value pairs from a local .config file using raw POSIX I/O.
+// Uses fopen directly to avoid recursion through MFSOwner::File().
+static std::map<std::string, std::string> readLocalConfig(const std::string& dirPath)
+{
+    std::map<std::string, std::string> cfg;
+
+    std::string configPath = dirPath;
+    while (configPath.size() > 1 && configPath.back() == '/')
+        configPath.pop_back();
+    configPath += "/.config";
+
+    FILE* f = fopen(configPath.c_str(), "r");
+    if (!f)
+        return cfg;
+
+    char line[512];
+    while (fgets(line, sizeof(line), f)) {
+        size_t len = strlen(line);
+        while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r'))
+            line[--len] = '\0';
+        char* eq = strchr(line, '=');
+        if (!eq || eq == line)
+            continue;
+        cfg[std::string(line, eq - line)] = std::string(eq + 1);
+    }
+    fclose(f);
+    return cfg;
+}
+
+// Given a local POSIX path, return the parent directory path.
+static std::string localParentDir(const std::string& path)
+{
+    std::string p = path;
+    while (p.size() > 1 && p.back() == '/')
+        p.pop_back();
+    size_t slash = p.rfind('/');
+    if (slash == std::string::npos || slash == 0)
+        return "/";
+    return p.substr(0, slash);
+}
 
 MFile* MFSOwner::File(std::string path, bool default_fs) {
 
@@ -489,6 +531,51 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
     //     Debug_printv("target bad");
 
     // Debug_println("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
+
+    // .config-based URL redirect: applies to local paths only (no ://) and never to
+    // .config files themselves (would cause infinite recursion reading the config).
+    // Walk up the directory tree so that /sd/zimmers.net/bin inherits the redirect
+    // from /sd/zimmers.net/.config even though /bin doesn't exist locally.
+    if (targetFile != nullptr &&
+        targetFile->name != ".config" &&
+        path.find("://") == std::string::npos)
+    {
+        std::string currentDir = path;
+        while (true) {
+            auto cfg = readLocalConfig(currentDir);
+            auto baseIt = cfg.find("base_url");
+            if (baseIt != cfg.end() && !baseIt->second.empty()) {
+                std::string base = baseIt->second;
+                while (!base.empty() && base.back() == '/')
+                    base.pop_back();
+
+                // Compute the relative path from currentDir to the original path.
+                std::string relPath;
+                if (path.length() > currentDir.length()) {
+                    relPath = path.substr(currentDir.length());
+                    if (!relPath.empty() && relPath.front() == '/')
+                        relPath = relPath.substr(1);
+                }
+
+                std::string remoteUrl = relPath.empty() ? base : (base + "/" + relPath);
+                auto cacheIt = cfg.find("cache");
+                if (cacheIt != cfg.end() && !cacheIt->second.empty())
+                    remoteUrl += "#cache=" + cacheIt->second;
+
+                delete targetFile;
+                return File(remoteUrl);
+            }
+
+            // Stop at the filesystem root.
+            if (currentDir.empty() || currentDir == "/" || currentDir == ".")
+                break;
+
+            std::string parent = localParentDir(currentDir);
+            if (parent == currentDir)
+                break;
+            currentDir = parent;
+        }
+    }
 
     return targetFile;
 }
@@ -1089,8 +1176,13 @@ MFile* MFile::cdLocalRoot(std::string plus)
 //     return true;
 // };
 
-bool MFile::exists() { 
-    return _exists; 
+bool MFile::exists() {
+    if (scheme.empty()) {
+        struct stat st;
+        return stat(path.c_str(), &st) == 0;
+    }
+    //return _exists;
+    return true; // Assume it exists; if it doesn't, we'll find out when we try to open it
 };
 
 uint64_t MFile::getAvailableSpace()

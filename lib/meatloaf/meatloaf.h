@@ -324,7 +324,7 @@ public:
     std::string pathInStream;
 
     uint32_t size = 0;
-    uint32_t _exists = true;
+    //uint32_t _exists = true;
     int is_dir = -1;   // -1 = unknown, 0 = false, 1 = true
     int is_hidden = 0; // 0 = false, 1 = true
 

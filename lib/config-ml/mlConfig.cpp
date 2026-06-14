@@ -118,25 +118,20 @@ bool MeatloafConfig::_write_json(const char *path, const psram_json &j, FileSyst
 
 // ─── Extract helpers ─────────────────────────────────────────────────────────
 
-// Returns _data with iec.devices removed — this is what config.json stores.
+// Returns _data with the "devices" key removed — this is what config.json stores.
 psram_json MeatloafConfig::_extract_config() const
 {
     psram_json j = _data;
-    if (j.contains("iec")) {
-        j["iec"].erase("devices");
-        if (j["iec"].empty()) {
-            j.erase("iec");
-        }
-    }
+    j.erase("devices");
     return j;
 }
 
-// Returns { "iec": { "devices": ... } } — this is the entirety of devices.json.
+// Returns { "devices": { "iec": ..., "ps2": ..., ... } } — this is the entirety of devices.json.
 psram_json MeatloafConfig::_extract_devices() const
 {
     psram_json j = psram_json::object();
-    if (_data.contains("iec") && _data["iec"].contains("devices")) {
-        j["iec"]["devices"] = _data["iec"]["devices"];
+    if (_data.contains("devices")) {
+        j["devices"] = _data["devices"];
     }
     return j;
 }
@@ -160,7 +155,7 @@ bool MeatloafConfig::load()
     }
     _config_hash = _json_hash(cfg);
 
-    // Merge devices.json into _data["iec"]["devices"].
+    // Merge devices.json into _data["devices"].
     psram_json dev;
     bool dev_ok = _read_json(DEVICES_FILE, dev, fnSDFAT);
     if (!dev_ok) {
@@ -168,8 +163,8 @@ bool MeatloafConfig::load()
         dev_ok = _read_json(DEVICES_FILE, dev, fsFlash);
     }
     if (dev_ok) {
-        if (dev.contains("iec") && dev["iec"].contains("devices")) {
-            _data["iec"]["devices"] = dev["iec"]["devices"];
+        if (dev.contains("devices")) {
+            _data["devices"] = dev["devices"];
         }
         _devices_hash = _json_hash(_extract_devices());
     } else {

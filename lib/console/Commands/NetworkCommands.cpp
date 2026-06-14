@@ -24,6 +24,10 @@
 #include "tcpsvr.h"
 #endif
 
+#ifndef MIN_CONFIG
+#include "httpd_server.h"
+#endif
+
 static const char* wlmode2string(wifi_mode_t mode)
 {
     switch(mode) {
@@ -382,6 +386,29 @@ namespace ESP32Console::Commands
     const ConsoleCommand getExitCommand()
     {
         return ConsoleCommand("exit", &exit_tcp, "Close the TCP console connection");
+    }
+#endif
+
+#ifndef MIN_CONFIG
+    static int ws_send(int argc, char **argv)
+    {
+        if (argc < 2) {
+            Serial.printf("Usage: ws <message>\r\n");
+            return EXIT_FAILURE;
+        }
+        std::string msg;
+        for (int i = 1; i < argc; i++) {
+            if (i > 1) msg += ' ';
+            msg += argv[i];
+        }
+        msg += "\r\n";
+        oHttpdServer.websocket_send_all(msg.c_str(), msg.size());
+        return EXIT_SUCCESS;
+    }
+
+    const ConsoleCommand getWsCommand()
+    {
+        return ConsoleCommand("ws", &ws_send, "Send a message to all WebSocket clients");
     }
 #endif
 }

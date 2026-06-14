@@ -2,6 +2,7 @@
 
 #include "request.h"
 #include "response.h"
+#include "meatloaf.h"
 
 namespace WebDav {
 
@@ -30,7 +31,7 @@ private:
         std::string rootURI, rootPath;
 
         std::string formatTime(time_t t);
-        int sendPropResponse(Response &resp, std::string path, int recurse);
+        int sendPropResponse(Response &resp, std::string path, int recurse, MFile* hint = nullptr);
         void sendMultiStatusResponse(Response &resp, MultiStatusResponse &msr);
 };
 

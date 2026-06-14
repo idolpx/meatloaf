@@ -90,31 +90,27 @@ namespace mstr {
     }
 
     // is OSX/Windows junk system file
+    static const char *const s_junk_prefixes[] = {
+        // OSX
+        "._", ".DS_Store", ".fseventsd", ".Spotlight-V", ".TemporaryItems",
+        ".Trashes", ".VolumeIcon.icns",
+        // Windows
+        "Desktop.ini", "Thumbs.db", "System Volume Information", "$Recycle.bin",
+        nullptr
+    };
+
+    bool isJunk(const char *name)
+    {
+        if (!name) return false;
+        for (int i = 0; s_junk_prefixes[i]; i++)
+            if (strncmp(name, s_junk_prefixes[i], strlen(s_junk_prefixes[i])) == 0)
+                return true;
+        return false;
+    }
+
     bool isJunk(std::string &s)
     {
-        std::vector<std::string> names = {
-            // OSX
-            "._",
-            ".DS_Store",
-            ".fseventsd",
-            ".Spotlight-V",
-            ".TemporaryItems",
-            ".Trashes",
-            ".VolumeIcon.icns",
-
-            // Windows
-            "Desktop.ini",
-            "Thumbs.db",
-            "System Volume Information",
-            "$Recycle.bin",
-        };
-
-        for (auto it = begin (names); it != end (names); ++it) {
-            if (contains(s, it->c_str()))
-                return true;
-        }
-        
-        return false;
+        return isJunk(s.c_str());
     }
 
 

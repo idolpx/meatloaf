@@ -89,6 +89,7 @@ namespace mstr {
     bool isNumeric(std::string &s);
     bool isNumeric(char *s);
     bool isA0Space(int ch);
+    bool isJunk(const char *name);
     bool isJunk(std::string &s);
     void A02Space(std::string &s);
 

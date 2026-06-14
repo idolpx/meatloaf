@@ -39,7 +39,7 @@
 
 #include "../console/ESP32Console.h"
 
-#define MESSAGE "Welcome to Meatloaf!\r\n"
+#define MESSAGE "Welcome to Meatloaf!\r\n\r\nmeatloaf[/]# "
 #define LISTENQ 2
 
 TCPServer tcp_server;

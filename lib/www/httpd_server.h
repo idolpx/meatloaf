@@ -22,8 +22,6 @@
 
 #include "webdav/request.h"
 
-#include "fnFS.h"
-
 #define http_SEND_BUFF_SIZE 512 // Used when sending files in chunks
 #define http_RECV_BUFF_SIZE 512 // Used when receiving POST data from client
 
@@ -38,7 +36,6 @@ class cHttpdServer
 private:
     struct serverstate {
         httpd_handle_t hServer;
-        FileSystem *_FS = nullptr;
     } state;
 
     static std::string httpdocs;
