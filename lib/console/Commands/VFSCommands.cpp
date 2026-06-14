@@ -684,6 +684,7 @@ static void updatedb_scan(sqlite3 *db, sqlite3_stmt *stmt)
     dirs.emplace_back("/sd");
 
     char full[PATH_MAX];
+    int  batch = 0;
 
     while (!dirs.empty()) {
         PsramPath cur(std::move(dirs.back()));
@@ -735,6 +736,28 @@ static void updatedb_scan(sqlite3 *db, sqlite3_stmt *stmt)
                 s_scan_files = s_scan_files + 1;
             }
 
+            // Commit every 1000 rows. journal_mode=MEMORY properly resets the
+            // pager state on each COMMIT, allowing reliable multiple-cycle
+            // BEGIN/COMMIT with SQLITE_DEFAULT_LOCKING_MODE=1 (EXCLUSIVE).
+            if (++batch >= 1000) {
+                if (!sqlite3_get_autocommit(db)) {
+                    char *cerr = nullptr;
+                    if (sqlite3_exec(db, "COMMIT", nullptr, nullptr, &cerr) != SQLITE_OK) {
+                        Serial.printf("  commit failed: %s\r\n",
+                                      cerr ? cerr : sqlite3_errmsg(db));
+                        sqlite3_free(cerr);
+                    }
+                }
+                char *berr = nullptr;
+                if (sqlite3_exec(db, "BEGIN", nullptr, nullptr, &berr) != SQLITE_OK) {
+                    Serial.printf("  BEGIN failed: %s\r\n",
+                                  berr ? berr : sqlite3_errmsg(db));
+                    sqlite3_free(berr);
+                    // auto-commit fallback: rows still saved one-by-one
+                }
+                batch = 0;
+            }
+
             int total = s_scan_files + s_scan_dirs;
             if (total % 100 == 0)
                 Serial.printf("  %d files, %d directories indexed...\r\n",
@@ -763,9 +786,14 @@ static void updatedb_task(void *arg)
         return;
     }
 
-    sqlite3_exec(db, "PRAGMA journal_mode = OFF", nullptr, nullptr, nullptr);
+    // MEMORY journal properly resets pager state at each COMMIT in exclusive
+    // locking mode, avoiding the state bug that journal_mode=OFF has after 2+
+    // COMMIT/BEGIN cycles.  No disk I/O for the journal itself.
+    sqlite3_exec(db, "PRAGMA journal_mode = MEMORY", nullptr, nullptr, nullptr);
     sqlite3_exec(db, "PRAGMA synchronous = OFF", nullptr, nullptr, nullptr);
-    sqlite3_exec(db, "PRAGMA cache_size = 32", nullptr, nullptr, nullptr);
+    // 128 pages × 512 bytes = 64 KB cache; larger allocations go to PSRAM on
+    // boards that have it, keeping internal DRAM pressure low.
+    sqlite3_exec(db, "PRAGMA cache_size = 128", nullptr, nullptr, nullptr);
 
     const char *schema =
         "DROP TABLE IF EXISTS files;"
@@ -774,8 +802,9 @@ static void updatedb_task(void *arg)
         "  size INTEGER NOT NULL DEFAULT 0,"
         "  mtime INTEGER NOT NULL DEFAULT 0,"
         "  is_dir INTEGER NOT NULL DEFAULT 0"
-        ");"
-        "CREATE INDEX IF NOT EXISTS idx_path ON files(path);";
+        ");";
+    // No explicit idx_path: "path TEXT PRIMARY KEY" already creates a unique
+    // B-tree index on path.  A second index doubles write work per INSERT.
 
     char *errmsg = nullptr;
     if (sqlite3_exec(db, schema, nullptr, nullptr, &errmsg) != SQLITE_OK) {
@@ -799,7 +828,23 @@ static void updatedb_task(void *arg)
     }
 
     s_scan_errors = 0;
+    char *begin_err = nullptr;
+    if (sqlite3_exec(db, "BEGIN", nullptr, nullptr, &begin_err) != SQLITE_OK) {
+        Serial.printf("updatedb: initial BEGIN failed: %s\r\n",
+                      begin_err ? begin_err : sqlite3_errmsg(db));
+        sqlite3_free(begin_err);
+    }
     updatedb_scan(db, stmt);
+
+    // Commit whatever the last partial batch left in-transaction.
+    if (!sqlite3_get_autocommit(db)) {
+        char *commit_err = nullptr;
+        if (sqlite3_exec(db, "COMMIT", nullptr, nullptr, &commit_err) != SQLITE_OK) {
+            Serial.printf("updatedb: final COMMIT failed: %s\r\n",
+                          commit_err ? commit_err : sqlite3_errmsg(db));
+            sqlite3_free(commit_err);
+        }
+    }
 
     sqlite3_finalize(stmt);
     sqlite3_close(db);
