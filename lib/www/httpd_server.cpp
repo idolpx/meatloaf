@@ -615,7 +615,7 @@ void cHttpdServer::send_file(httpd_req_t *req, const char *filename)
     // reflect the original file (e.g. text/javascript for app.js.gz), so save
     // fpath before potentially switching to the .gz variant.
     std::string content_type_path = fpath;
-    {
+    if (!mstr::endsWith(fpath, ".gz")) { // Don't try to .gz a .gz file
         std::string gz_path = fpath + ".gz";
         if (exists(gz_path)) {
             httpd_resp_set_hdr(req, "Content-Encoding", "gzip");

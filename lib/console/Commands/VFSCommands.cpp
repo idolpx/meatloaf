@@ -821,6 +821,7 @@ static void updatedb_task(void *arg)
 
     // Remove any stale/corrupt database from a previous interrupted scan.
     unlink(LOCATE_DB_PATH);
+    unlink(LOCATE_DB_PATH ".gz"); 
 
     sqlite3 *db = nullptr;
     if (sqlite3_open(LOCATE_DB_PATH, &db) != SQLITE_OK) {
