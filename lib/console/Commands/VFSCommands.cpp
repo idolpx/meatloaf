@@ -736,9 +736,8 @@ static void updatedb_scan(sqlite3 *db, sqlite3_stmt *stmt)
                 s_scan_files = s_scan_files + 1;
             }
 
-            // Commit every 1000 rows. journal_mode=MEMORY properly resets the
-            // pager state on each COMMIT, allowing reliable multiple-cycle
-            // BEGIN/COMMIT with SQLITE_DEFAULT_LOCKING_MODE=1 (EXCLUSIVE).
+            // Commit every 1000 rows. journal_mode=DELETE resets the pager
+            // state on each COMMIT/BEGIN cycle via the journal file lifecycle.
             if (++batch >= 1000) {
                 if (!sqlite3_get_autocommit(db)) {
                     char *cerr = nullptr;
@@ -786,14 +785,19 @@ static void updatedb_task(void *arg)
         return;
     }
 
-    // MEMORY journal properly resets pager state at each COMMIT in exclusive
-    // locking mode, avoiding the state bug that journal_mode=OFF has after 2+
-    // COMMIT/BEGIN cycles.  No disk I/O for the journal itself.
-    sqlite3_exec(db, "PRAGMA journal_mode = MEMORY", nullptr, nullptr, nullptr);
+    // DELETE journal (the SQLite default) writes the rollback journal to SD and
+    // deletes it on each COMMIT.  This properly resets the pager's internal
+    // state on every COMMIT/BEGIN cycle, fixing the "cannot commit - no
+    // transaction is active" error that journal_mode=OFF has after 2+ cycles
+    // with SQLITE_DEFAULT_LOCKING_MODE=1 (EXCLUSIVE).
+    // MEMORY journal was tried but rejected: it allocates ~520-byte entries in
+    // internal DRAM (below SPIRAM_MALLOC_ALWAYSINTERNAL threshold), exhausting
+    // the DMA-capable heap and breaking SDMMC writes at row ~300.
+    sqlite3_exec(db, "PRAGMA journal_mode = DELETE", nullptr, nullptr, nullptr);
     sqlite3_exec(db, "PRAGMA synchronous = OFF", nullptr, nullptr, nullptr);
-    // 128 pages × 512 bytes = 64 KB cache; larger allocations go to PSRAM on
-    // boards that have it, keeping internal DRAM pressure low.
-    sqlite3_exec(db, "PRAGMA cache_size = 128", nullptr, nullptr, nullptr);
+    // 32 pages × 512 bytes = 16 KB; keeps internal DRAM pressure low so the
+    // SDMMC DMA allocator always has its 125-byte window available.
+    sqlite3_exec(db, "PRAGMA cache_size = 32", nullptr, nullptr, nullptr);
 
     const char *schema =
         "DROP TABLE IF EXISTS files;"
