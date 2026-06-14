@@ -659,6 +659,37 @@ static volatile int    s_scan_errors  = 0;
 static volatile time_t s_scan_start   = 0;
 static volatile time_t s_scan_end     = 0;
 
+/* One-time SQLite global init: configure the page cache to use a pre-allocated
+ * PSRAM slab BEFORE sqlite3_initialize().  sqlite3_config() is only valid
+ * before the first sqlite3_initialize(), and with SQLITE_OMIT_AUTOINIT=1 that
+ * is entirely in our hands.
+ *
+ * Why this matters: the default page cache allocates each 512-byte page slot
+ * via sqlite3_malloc() → system malloc().  With CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=1024
+ * those 568-byte allocations land in internal DRAM, fragmenting the heap.
+ * After ~30 pages the SDMMC DMA allocator (esp_dma_capable_malloc(125)) can no
+ * longer find a contiguous aligned block → write fails with 0x101.
+ *
+ * With SQLITE_CONFIG_PAGECACHE the page cache uses fixed slots from a
+ * pre-allocated PSRAM buffer.  Internal DRAM fragmentation vanishes; the DMA
+ * allocator always has room.
+ *
+ * Slot layout: 512 (page data) + ~44 (PgHdr extra) + 32 (PgHdr1) = 588 bytes;
+ * use 640 for alignment headroom.  128 slots = 81 920 bytes of PSRAM. */
+static bool    s_sqlite_inited  = false;
+static uint8_t *s_pcache_buf   = nullptr;
+
+static void sqlite_one_time_init(void)
+{
+    if (s_sqlite_inited) return;
+    s_pcache_buf = (uint8_t *)heap_caps_malloc(
+        640 * 128, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (s_pcache_buf)
+        sqlite3_config(SQLITE_CONFIG_PAGECACHE, s_pcache_buf, 640, 128);
+    sqlite3_initialize();
+    s_sqlite_inited = true;
+}
+
 /* Directory path entry allocated from PSRAM.
  * std::string's internal heap allocation for paths > ~15 chars lands in
  * internal DRAM, which quickly exhausts the DMA-capable heap and breaks
@@ -769,8 +800,8 @@ static void updatedb_scan(sqlite3 *db, sqlite3_stmt *stmt)
 
 static void updatedb_task(void *arg)
 {
-    // SQLITE_OMIT_AUTOINIT: must call sqlite3_initialize() before sqlite3_open().
-    sqlite3_initialize();
+    // SQLITE_OMIT_AUTOINIT: must init before sqlite3_open().
+    sqlite_one_time_init();
 
     // Remove any stale/corrupt database from a previous interrupted scan.
     unlink(LOCATE_DB_PATH);
@@ -795,9 +826,8 @@ static void updatedb_task(void *arg)
     // the DMA-capable heap and breaking SDMMC writes at row ~300.
     sqlite3_exec(db, "PRAGMA journal_mode = DELETE", nullptr, nullptr, nullptr);
     sqlite3_exec(db, "PRAGMA synchronous = OFF", nullptr, nullptr, nullptr);
-    // 32 pages × 512 bytes = 16 KB; keeps internal DRAM pressure low so the
-    // SDMMC DMA allocator always has its 125-byte window available.
-    sqlite3_exec(db, "PRAGMA cache_size = 32", nullptr, nullptr, nullptr);
+    // 128 pages from the pre-allocated PSRAM slab (see sqlite_one_time_init).
+    sqlite3_exec(db, "PRAGMA cache_size = 128", nullptr, nullptr, nullptr);
 
     const char *schema =
         "DROP TABLE IF EXISTS files;"
@@ -903,7 +933,7 @@ int locate(int argc, char **argv)
                 Serial.printf("locate: SD card not mounted\r\n");
                 return EXIT_FAILURE;
             }
-            sqlite3_initialize();
+            sqlite_one_time_init();
             sqlite3 *db = nullptr;
             if (sqlite3_open_v2(LOCATE_DB_PATH, &db, SQLITE_OPEN_READONLY, nullptr) != SQLITE_OK) {
                 Serial.printf("No index found. Run 'updatedb' to build the database.\r\n");
@@ -935,7 +965,7 @@ int locate(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    sqlite3_initialize();  // SQLITE_OMIT_AUTOINIT: required before sqlite3_open
+    sqlite_one_time_init();  // SQLITE_OMIT_AUTOINIT: required before sqlite3_open
 
     sqlite3 *db = nullptr;
     if (sqlite3_open_v2(LOCATE_DB_PATH, &db, SQLITE_OPEN_READONLY, nullptr) != SQLITE_OK) {
