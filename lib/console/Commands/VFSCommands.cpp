@@ -659,51 +659,38 @@ static volatile int    s_scan_errors  = 0;
 static volatile time_t s_scan_start   = 0;
 static volatile time_t s_scan_end     = 0;
 
-/* One-time SQLite global init: redirect ALL SQLite memory to PSRAM before the
+/* One-time SQLite global init: redirect page-cache memory to PSRAM before the
  * first sqlite3_initialize().  sqlite3_config() is only valid before that call,
  * and with SQLITE_OMIT_AUTOINIT=1 the timing is entirely in our hands.
  *
  * ROOT CAUSE of esp_dma_capable_malloc(125) failures:
  *   SDMMC allocates a 125-byte command-buffer from internal DRAM for EVERY
- *   SD transaction (reads and writes alike).  Any internal DRAM fragmentation
- *   can prevent this — even 100 KB of free DRAM is insufficient if no
- *   contiguous 125-byte aligned block exists.
+ *   SD transaction.  CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=512 (set in sdkconfig)
+ *   means allocations > 512 bytes automatically go to PSRAM via system malloc.
+ *   This covers the large SQLite structs (sqlite3, Pager, BtShared, Vdbe, …).
+ *   Only small objects (<= 512 bytes) stay in internal DRAM: cursor state,
+ *   schema strings, bitvec nodes — together ~5 KB, leaving ~35+ KB of DMA
+ *   headroom for SDMMC.
  *
- *   CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=1024 routes all allocations ≤1024 bytes
- *   to internal DRAM.  SQLite's page-cache slots (~568 bytes), pager struct
- *   (~800 bytes), btree struct, bitvec nodes (512 bytes each), schema structs,
- *   and statement objects all fall below this threshold.  Together they fragment
- *   the internal heap until SDMMC can no longer find 125 contiguous bytes.
+ *   Do NOT use memsys5 (SQLITE_CONFIG_HEAP): memsys5 is a fixed-size buddy
+ *   allocator.  SQLite's B-tree operations accumulate enough concurrent
+ *   allocations during large write transactions to exhaust any reasonable
+ *   fixed pool, returning SQLITE_NOMEM on every INSERT after ~200 rows.
  *
- * FIX — two separate PSRAM regions, both configured before sqlite3_initialize():
+ * SQLITE_CONFIG_PAGECACHE:
+ *   The page cache (128 × 640-byte slots = 81 KB) lives in a PSRAM slab so
+ *   page data does not come from system malloc at all.  This is the only
+ *   sqlite3_config() call needed.
  *
- *   1. SQLITE_CONFIG_HEAP (memsys5 allocator, requires SQLITE_ENABLE_MEMSYS5):
- *      Routes all sqlite3_malloc() calls to a 68 KB PSRAM buffer.  This covers
- *      every struct and scratch allocation SQLite makes internally.
- *      memsys5 places a 1-byte control entry per atom at the end of the buffer,
- *      so effective data capacity = bufsize * szAtom / (szAtom+1) = 68K*64/65 ≈ 67K.
- *
- *   2. SQLITE_CONFIG_PAGECACHE:
- *      The page cache (128 × 640-byte slots = 81 KB) lives in a separate PSRAM
- *      slab.  memsys5's 68 KB heap cannot hold both the page cache and SQLite
- *      internals simultaneously, so a dedicated slab is needed.
- *
- * On boards without PSRAM both heap_caps_malloc() calls fail gracefully (return
- * nullptr), the config calls are skipped, and SQLite falls back to system malloc.
- * Performance is degraded but the code remains correct. */
+ * On boards without PSRAM heap_caps_malloc() returns nullptr, the config call
+ * is skipped, and SQLite falls back to system malloc (internal DRAM).
+ * Performance is degraded but the code is correct. */
 static bool     s_sqlite_inited = false;
-static uint8_t *s_sql_heap      = nullptr;
 static uint8_t *s_pcache_buf    = nullptr;
 
 static void sqlite_one_time_init(void)
 {
     if (s_sqlite_inited) return;
-
-    // 68 KB → memsys5 atom=64: nBlock = 69632/65 = 1071 blocks × 64 = 68 544 bytes usable
-    s_sql_heap = (uint8_t *)heap_caps_malloc(
-        68 * 1024, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (s_sql_heap)
-        sqlite3_config(SQLITE_CONFIG_HEAP, s_sql_heap, 68 * 1024, 64);
 
     s_pcache_buf = (uint8_t *)heap_caps_malloc(
         640 * 128, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
@@ -712,8 +699,7 @@ static void sqlite_one_time_init(void)
 
     sqlite3_initialize();
     s_sqlite_inited = true;
-    Serial.printf("sqlite: heap=%s pcache=%s\r\n",
-                  s_sql_heap  ? "PSRAM" : "DRAM(fallback)",
+    Serial.printf("sqlite: pcache=%s\r\n",
                   s_pcache_buf ? "PSRAM" : "DRAM(fallback)");
 }
 
@@ -775,7 +761,7 @@ static void updatedb_scan(sqlite3 *db, sqlite3_stmt *stmt)
             int is_dir = S_ISDIR(st.st_mode) ? 1 : 0;
 
             sqlite3_reset(stmt);
-            sqlite3_bind_text(stmt, 1, rel, -1, SQLITE_TRANSIENT);
+            sqlite3_bind_text(stmt, 1, rel, -1, SQLITE_STATIC);
             sqlite3_bind_int64(stmt, 2, (sqlite3_int64)st.st_size);
             sqlite3_bind_int64(stmt, 3, (sqlite3_int64)st.st_mtime);
             sqlite3_bind_int(stmt, 4, is_dir);
