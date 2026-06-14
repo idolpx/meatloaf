@@ -659,35 +659,62 @@ static volatile int    s_scan_errors  = 0;
 static volatile time_t s_scan_start   = 0;
 static volatile time_t s_scan_end     = 0;
 
-/* One-time SQLite global init: configure the page cache to use a pre-allocated
- * PSRAM slab BEFORE sqlite3_initialize().  sqlite3_config() is only valid
- * before the first sqlite3_initialize(), and with SQLITE_OMIT_AUTOINIT=1 that
- * is entirely in our hands.
+/* One-time SQLite global init: redirect ALL SQLite memory to PSRAM before the
+ * first sqlite3_initialize().  sqlite3_config() is only valid before that call,
+ * and with SQLITE_OMIT_AUTOINIT=1 the timing is entirely in our hands.
  *
- * Why this matters: the default page cache allocates each 512-byte page slot
- * via sqlite3_malloc() → system malloc().  With CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=1024
- * those 568-byte allocations land in internal DRAM, fragmenting the heap.
- * After ~30 pages the SDMMC DMA allocator (esp_dma_capable_malloc(125)) can no
- * longer find a contiguous aligned block → write fails with 0x101.
+ * ROOT CAUSE of esp_dma_capable_malloc(125) failures:
+ *   SDMMC allocates a 125-byte command-buffer from internal DRAM for EVERY
+ *   SD transaction (reads and writes alike).  Any internal DRAM fragmentation
+ *   can prevent this — even 100 KB of free DRAM is insufficient if no
+ *   contiguous 125-byte aligned block exists.
  *
- * With SQLITE_CONFIG_PAGECACHE the page cache uses fixed slots from a
- * pre-allocated PSRAM buffer.  Internal DRAM fragmentation vanishes; the DMA
- * allocator always has room.
+ *   CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=1024 routes all allocations ≤1024 bytes
+ *   to internal DRAM.  SQLite's page-cache slots (~568 bytes), pager struct
+ *   (~800 bytes), btree struct, bitvec nodes (512 bytes each), schema structs,
+ *   and statement objects all fall below this threshold.  Together they fragment
+ *   the internal heap until SDMMC can no longer find 125 contiguous bytes.
  *
- * Slot layout: 512 (page data) + ~44 (PgHdr extra) + 32 (PgHdr1) = 588 bytes;
- * use 640 for alignment headroom.  128 slots = 81 920 bytes of PSRAM. */
-static bool    s_sqlite_inited  = false;
-static uint8_t *s_pcache_buf   = nullptr;
+ * FIX — two separate PSRAM regions, both configured before sqlite3_initialize():
+ *
+ *   1. SQLITE_CONFIG_HEAP (memsys5 allocator, requires SQLITE_ENABLE_MEMSYS5):
+ *      Routes all sqlite3_malloc() calls to a 68 KB PSRAM buffer.  This covers
+ *      every struct and scratch allocation SQLite makes internally.
+ *      memsys5 places a 1-byte control entry per atom at the end of the buffer,
+ *      so effective data capacity = bufsize * szAtom / (szAtom+1) = 68K*64/65 ≈ 67K.
+ *
+ *   2. SQLITE_CONFIG_PAGECACHE:
+ *      The page cache (128 × 640-byte slots = 81 KB) lives in a separate PSRAM
+ *      slab.  memsys5's 68 KB heap cannot hold both the page cache and SQLite
+ *      internals simultaneously, so a dedicated slab is needed.
+ *
+ * On boards without PSRAM both heap_caps_malloc() calls fail gracefully (return
+ * nullptr), the config calls are skipped, and SQLite falls back to system malloc.
+ * Performance is degraded but the code remains correct. */
+static bool     s_sqlite_inited = false;
+static uint8_t *s_sql_heap      = nullptr;
+static uint8_t *s_pcache_buf    = nullptr;
 
 static void sqlite_one_time_init(void)
 {
     if (s_sqlite_inited) return;
+
+    // 68 KB → memsys5 atom=64: nBlock = 69632/65 = 1071 blocks × 64 = 68 544 bytes usable
+    s_sql_heap = (uint8_t *)heap_caps_malloc(
+        68 * 1024, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (s_sql_heap)
+        sqlite3_config(SQLITE_CONFIG_HEAP, s_sql_heap, 68 * 1024, 64);
+
     s_pcache_buf = (uint8_t *)heap_caps_malloc(
         640 * 128, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (s_pcache_buf)
         sqlite3_config(SQLITE_CONFIG_PAGECACHE, s_pcache_buf, 640, 128);
+
     sqlite3_initialize();
     s_sqlite_inited = true;
+    Serial.printf("sqlite: heap=%s pcache=%s\r\n",
+                  s_sql_heap  ? "PSRAM" : "DRAM(fallback)",
+                  s_pcache_buf ? "PSRAM" : "DRAM(fallback)");
 }
 
 /* Directory path entry allocated from PSRAM.
