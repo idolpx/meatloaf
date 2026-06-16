@@ -33,6 +33,10 @@
 #include <freertos/semphr.h>
 #include <freertos/task.h>
 
+#include "../utils/string_utils.h"
+#include "../device/iec/fuji.h"
+#include "../device/iec/meatloaf.h"
+
 #ifdef CONFIG_SPIRAM
 #include <esp_psram.h>
 #ifdef CONFIG_IDF_TARGET_ESP32
@@ -289,6 +293,21 @@ private:
         if (_mutex) xSemaphoreGive(_mutex);
     }
 
+    // Check if a session is currently in use by any active drive
+    static bool is_session_in_use(const std::string& key) {
+        for (int i = 0; i < MAX_DISK_DEVICES; i++) {
+            auto drive = Meatloaf.get_disks(i);
+            if (drive != nullptr) {
+                auto cwd = drive->disk_dev.getCWD();
+                if (cwd.back() == '/') cwd.pop_back();
+                if (!cwd.empty() && mstr::startsWith(cwd.c_str(), key.c_str())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     // FreeRTOS task function
     static void session_service_task(void* arg) {
         //Debug_printv("SessionBroker task started on core %d", xPortGetCoreID());
@@ -428,17 +447,25 @@ public:
         lock();
         for (auto& pair : session_repo) {
             auto& session = pair.second;
+            const std::string& key = pair.first;
+
 
             if (!session->getKeepAliveInterval()) {
                 continue; // Skip sessions with no keep-alive interval
             }
 
             if (!session->isConnected()) {
-                to_remove.push_back(pair.first);
+                to_remove.push_back(key);
                 continue;
             }
 
+
             if (session->isBusy()) {
+                continue;
+            }
+
+            // Skip sessions that are actively mounted on a drive
+            if (is_session_in_use(key)) {
                 continue;
             }
 
