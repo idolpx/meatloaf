@@ -21,6 +21,7 @@
 #include <string>
 #include <memory>
 #include <unordered_map>
+#include <list>
 #include <vector>
 #include <chrono>
 #include <cstdlib>
@@ -143,7 +144,7 @@ public:
         esp_himem_handle_t m_handle;
         bool m_useHimem;
         static esp_himem_rangehandle_t s_range;
-        static int s_rangeUsed;
+        static std::atomic<int> s_rangeUsed;
 #endif
         uint8_t* m_data;  // heap pointer (used when HIMEM unavailable or on non-ESP32)
     };
@@ -218,16 +219,31 @@ public:
     }
 
     // File cache — avoids re-downloading files for random-access container I/O
+    // LRU eviction when exceeding max_file_cache_entries
+    static constexpr size_t max_file_cache_entries = 10;
+
     std::shared_ptr<CachedFile> getCachedFile(const std::string& path) {
         auto it = file_cache.find(path);
         if (it != file_cache.end()) {
+            // Move to front (most recently used)
+            cache_order.remove(path);
+            cache_order.push_front(path);
             return it->second;
         }
         return nullptr;
     }
 
     void cacheFile(const std::string& path, std::shared_ptr<CachedFile> file) {
+        // Evict oldest if at capacity
+        while (cache_order.size() >= max_file_cache_entries) {
+            auto oldest = cache_order.back();
+            cache_order.pop_back();
+            file_cache.erase(oldest);
+            Debug_printv("LRU evicted from file_cache: %s", oldest.c_str());
+        }
         file_cache[path] = file;
+        cache_order.remove(path);
+        cache_order.push_front(path);
         Debug_printv("Cached file: %s (%u bytes), cache entries: %d", path.c_str(), file->size, file_cache.size());
     }
 
@@ -235,6 +251,7 @@ public:
         if (!file_cache.empty()) {
             Debug_printv("Clearing file cache (%d entries)", file_cache.size());
             file_cache.clear();
+            cache_order.clear();
         }
     }
 
@@ -248,6 +265,7 @@ protected:
     std::chrono::steady_clock::time_point last_activity;
     uint32_t keep_alive_interval;  // in milliseconds
     std::unordered_map<std::string, std::shared_ptr<CachedFile>> file_cache;
+    std::list<std::string> cache_order;  // LRU order (front = most recent)
     std::atomic<uint32_t> io_active{0};
 };
 
@@ -275,6 +293,7 @@ private:
     static void session_service_task(void* arg) {
         //Debug_printv("SessionBroker task started on core %d", xPortGetCoreID());
         while (task_running) {
+            if (system_shutdown) break;  // Fast exit on shutdown
             service();
             vTaskDelay(pdMS_TO_TICKS(1000)); // Check every 1 second
         }

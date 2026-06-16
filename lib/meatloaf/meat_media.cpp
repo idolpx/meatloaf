@@ -21,6 +21,8 @@
 #include <freertos/task.h>
 
 std::unordered_map<std::string, std::shared_ptr<MMediaStream>>ImageBroker::image_repo;
+std::vector<ImageBroker::LRUEntry> ImageBroker::lru_order;
+std::chrono::steady_clock::time_point ImageBroker::last_cleanup = std::chrono::steady_clock::now();
 
 // Utility Functions
 
