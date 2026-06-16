@@ -294,6 +294,31 @@ private:
         if (_mutex) xSemaphoreGive(_mutex);
     }
 
+    // Extract scheme://host:port from session key (e.g., "tnfs://host:16384")
+    static std::string session_host_key(const std::string& key) {
+        // Find the colon after the host:port
+        size_t colon = key.find(':');
+        if (colon == std::string::npos) return key;
+        // Find the last colon (after port)
+        size_t last_colon = key.rfind(':');
+        if (last_colon == colon) return key;  // No port in key
+        // Return scheme://host (without port)
+        return key.substr(0, colon);
+    }
+
+    // Check if path matches session key (comparing scheme://host ignoring port)
+    static bool path_matches_session(const std::string& path, const std::string& key) {
+        std::string hostKey = session_host_key(key);
+        // Strip trailing slash from path for comparison
+        std::string p = path;
+        if (!p.empty() && p.back() == '/') p.pop_back();
+        // Check if path starts with scheme://host (ignoring port)
+        if (!p.empty() && mstr::startsWith(p.c_str(), hostKey.c_str())) {
+            return true;
+        }
+        return false;
+    }
+
     // Check if a session is currently in use by any active drive or console
     static bool is_session_in_use(const std::string& key) {
         // Check drives
@@ -301,8 +326,7 @@ private:
             auto drive = Meatloaf.get_disks(i);
             if (drive != nullptr) {
                 auto cwd = drive->disk_dev.getCWD();
-                if (cwd.back() == '/') cwd.pop_back();
-                if (!cwd.empty() && mstr::startsWith(cwd.c_str(), key.c_str())) {
+                if (path_matches_session(cwd, key)) {
                     return true;
                 }
             }
@@ -311,8 +335,7 @@ private:
         auto consolePath = ESP32Console::getCurrentPath();
         if (consolePath != nullptr) {
             auto consoleUrl = consolePath->url;
-            if (consoleUrl.back() == '/') consoleUrl.pop_back();
-            if (!consoleUrl.empty() && mstr::startsWith(consoleUrl.c_str(), key.c_str())) {
+            if (path_matches_session(consoleUrl, key)) {
                 return true;
             }
         }
