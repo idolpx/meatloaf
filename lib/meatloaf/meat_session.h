@@ -294,16 +294,13 @@ private:
         if (_mutex) xSemaphoreGive(_mutex);
     }
 
-    // Extract scheme://host:port from session key (e.g., "tnfs://host:16384")
+    // Extract scheme://host from session key (e.g., "tnfs://host:16384" -> "tnfs://host")
     static std::string session_host_key(const std::string& key) {
-        // Find the colon after the host:port
-        size_t colon = key.find(':');
-        if (colon == std::string::npos) return key;
         // Find the last colon (after port)
         size_t last_colon = key.rfind(':');
-        if (last_colon == colon) return key;  // No port in key
+        if (last_colon == std::string::npos) return key;
         // Return scheme://host (without port)
-        return key.substr(0, colon);
+        return key.substr(0, last_colon);
     }
 
     // Check if path matches session key (comparing scheme://host ignoring port)
