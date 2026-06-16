@@ -36,6 +36,7 @@
 #include "../utils/string_utils.h"
 #include "../device/iec/fuji.h"
 #include "../device/iec/meatloaf.h"
+#include "../console/Helpers/PWDHelpers.h"
 
 #ifdef CONFIG_SPIRAM
 #include <esp_psram.h>
@@ -293,8 +294,9 @@ private:
         if (_mutex) xSemaphoreGive(_mutex);
     }
 
-    // Check if a session is currently in use by any active drive
+    // Check if a session is currently in use by any active drive or console
     static bool is_session_in_use(const std::string& key) {
+        // Check drives
         for (int i = 0; i < MAX_DISK_DEVICES; i++) {
             auto drive = Meatloaf.get_disks(i);
             if (drive != nullptr) {
@@ -303,6 +305,15 @@ private:
                 if (!cwd.empty() && mstr::startsWith(cwd.c_str(), key.c_str())) {
                     return true;
                 }
+            }
+        }
+        // Check console current path
+        auto consolePath = ESP32Console::getCurrentPath();
+        if (consolePath != nullptr) {
+            auto consoleUrl = consolePath->url;
+            if (consoleUrl.back() == '/') consoleUrl.pop_back();
+            if (!consoleUrl.empty() && mstr::startsWith(consoleUrl.c_str(), key.c_str())) {
+                return true;
             }
         }
         return false;
