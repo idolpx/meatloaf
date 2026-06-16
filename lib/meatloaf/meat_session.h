@@ -460,9 +460,15 @@ public:
             auto& session = pair.second;
             const std::string& key = pair.first;
 
+            // If session is NOT in use by any drive or console, remove it immediately
+            if (!is_session_in_use(key)) {
+                Debug_printv("Session not in use, removing: %s", key.c_str());
+                to_remove.push_back(key);
+                continue;
+            }
 
-            if (!session->getKeepAliveInterval()) {
-                continue; // Skip sessions with no keep-alive interval
+            if (session->isBusy()) {
+                continue;  // Skip busy sessions
             }
 
             if (!session->isConnected()) {
@@ -470,16 +476,7 @@ public:
                 continue;
             }
 
-
-            if (session->isBusy()) {
-                continue;
-            }
-
-            // Skip sessions that are actively mounted on a drive
-            if (is_session_in_use(key)) {
-                continue;
-            }
-
+            // Session is in use - check if it needs keep-alive
             uint32_t idle_time = session->getIdleTime();
             if (idle_time >= session->getKeepAliveInterval()) {
                 to_check.push_back(pair);
@@ -493,8 +490,14 @@ public:
                        pair.first.c_str(), pair.second->getIdleTime());
 
             if (!pair.second->keep_alive()) {
-                Debug_printv("Keep-alive failed for: %s", pair.first.c_str());
-                to_remove.push_back(pair.first);
+                Debug_printv("Keep-alive failed for: %s, attempting reconnect", pair.first.c_str());
+                // Try to re-establish the connection
+                if (!pair.second->connect()) {
+                    Debug_printv("Reconnect failed for: %s", pair.first.c_str());
+                    to_remove.push_back(pair.first);
+                } else {
+                    Debug_printv("Reconnected successfully: %s", pair.first.c_str());
+                }
             }
         }
 
