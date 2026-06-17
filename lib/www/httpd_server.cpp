@@ -28,6 +28,8 @@
 #include "../lib/console/ESP32Console.h"
 #endif
 
+#include "ws_command.h"
+
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <esp_system.h>
@@ -225,9 +227,8 @@ esp_err_t cHttpdServer::websocket_handler(httpd_req_t *req)
             return ret;
         }
         //Debug_printv("Got packet with message: %s", ws_pkt.payload);
-#ifdef ENABLE_CONSOLE
-        console.execute((char*)ws_pkt.payload);
-#endif
+        WsCommandExecutor executor;
+        executor.dispatch(buf, ws_pkt.len);
 
         // Broadcast the message to all other connected WebSocket clients
         std::string msg = std::string((char*)ws_pkt.payload);
