@@ -87,10 +87,14 @@ public:
         if(m_wifi.isOpen()) {
             m_wifi.close();
         }
-        if(gbuf != nullptr)
+        if(gbuf != nullptr) {
             delete[] gbuf;
-        if(pbuf != nullptr)
+            gbuf = nullptr;
+        }
+        if(pbuf != nullptr) {
             delete[] pbuf;
+            pbuf = nullptr;
+        }
     }
 
     int underflow() override {
