@@ -53,7 +53,7 @@
 #define SQLITE_OMIT_FLAG_PRAGMAS             1
 #define SQLITE_OMIT_FOREIGN_KEY              1
 #define SQLITE_OMIT_GET_TABLE                1
-#define SQLITE_OMIT_INCRBLOB                 1
+#undef SQLITE_OMIT_INCRBLOB                    // required by FTS5 segment storage
 #define SQLITE_OMIT_INTEGRITY_CHECK          1
 #undef SQLITE_OMIT_LIKE_OPTIMIZATION
 #define SQLITE_OMIT_LOAD_EXTENSION           1
