@@ -13,6 +13,7 @@
 #define SQLITE_DISABLE_DIRSYNC               1
 #define SQLITE_DISABLE_FTS3_UNICODE          1
 #define SQLITE_DISABLE_FTS4_DEFERRED         1
+#define SQLITE_ENABLE_FTS5                   1
 #define SQLITE_LIKE_DOESNT_MATCH_BLOBS       1
 #define SQLITE_DEFAULT_CACHE_SIZE           -1
 #define SQLITE_DEFAULT_FOREIGN_KEYS          0
