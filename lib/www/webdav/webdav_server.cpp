@@ -868,7 +868,7 @@ int Server::doPropfind(Request &req, Response &resp)
     if (isFilteredJunkPath(path))
         return 404;
 
-    //Debug_printv("req[%s] path[%s]", req.getPath().c_str(), path.c_str());
+    Debug_printv("req[%s] path[%s]", req.getPath().c_str(), path.c_str());
 
     auto mfile = webdav_mfile(path);
     if (!mfile || !mfile->exists())
@@ -877,6 +877,8 @@ int Server::doPropfind(Request &req, Response &resp)
     int recurse =
         (req.getDepth() == Request::DEPTH_0) ? 0 : (req.getDepth() == Request::DEPTH_1) ? 1
                                                                                         : 32;
+
+    Debug_printv("depth[%d] recurse[%d]", req.getDepth(), recurse);
 
     resp.setStatus(207);
     resp.setContentType("application/xml;charset=utf-8");

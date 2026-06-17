@@ -78,13 +78,18 @@ Completed optimizations address critical thread-safety, unbounded cache growth, 
 
 ---
 
-### TODO 5: SessionBroker Shutdown Fast Path - DONE
+### TODO 5: SessionBroker Shutdown Fast Path + Idle Session Cleanup - DONE
 **Files:** `meat_session.h`
-**Issue:** Shutdown not checked at loop start.
-**Impact:** LOW - faster shutdown only.
+**Issue:** Shutdown not checked at loop start; sessions not checked for active drive/console usage.
+**Impact:** MEDIUM - prevents stale sessions from accumulating.
 
 **Changes:**
 - [x] Added `if (system_shutdown) break;` at loop start
+- [x] Added `session_host_key()` - extracts scheme://host (stripping port) for comparison
+- [x] Added `path_matches_session()` - compares paths ignoring port numbers
+- [x] Added `is_session_in_use(key)` - checks drives AND console for session usage
+- [x] `service()` now removes NOT-in-use sessions immediately (no keep-alive)
+- [x] `service()` attempts reconnect for in-use sessions if keep-alive fails
 
 ---
 
