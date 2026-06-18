@@ -1112,9 +1112,9 @@ static void updatedb_task(void *arg)
             // (which eats internal DRAM) and keeps the DMA heap from exhausting.
             if (++fts_done % 100 == 0) {
                 int pct = fts_total > 0 ? fts_done * 100 / fts_total : 0;
-                Serial.printf("\r  %d / %d  (%d%%)  %lds",
+                Serial.printf("\r  %d / %d  (%d%%)  %s",
                               fts_done, fts_total, pct,
-                              (long)(time(nullptr) - fts_start));
+                              mstr::formatDuration((long)(time(nullptr) - fts_start)).c_str());
                 sqlite3_exec(db, "COMMIT;BEGIN", nullptr, nullptr, nullptr);
                 vTaskDelay(1);
             }
@@ -1123,8 +1123,8 @@ static void updatedb_task(void *arg)
         sqlite3_finalize(sel_stmt);
         sqlite3_finalize(ins_stmt);
 
-        Serial.printf("\r  %d rows indexed in %ld seconds.          \r\n",
-                      fts_done, (long)(time(nullptr) - fts_start));
+        Serial.printf("\r  %d rows indexed in %s.          \r\n",
+                      fts_done, mstr::formatDuration((long)(time(nullptr) - fts_start)).c_str());
     }
 
     s_scan_end = time(nullptr);
