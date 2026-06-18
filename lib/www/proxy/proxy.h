@@ -20,6 +20,7 @@
 
 #include <esp_http_server.h>
 #include <esp_http_client.h>
+#include <string>
 
 // Core fetch: issue the request to target_url and stream the response back.
 // Called by proxy_handler and by get_handler when a proxy base is active.
