@@ -79,6 +79,12 @@ static std::string httpdocs;
 static std::string uri;
 static std::string queryString;
 
+// Forward declarations for file-serving helpers (defined below start_server)
+static char *get_extension(const char *filename);
+static const char *find_mimetype_str(const char *extension);
+static void set_file_content_type(httpd_req_t *req, const char *filepath);
+static void send_file(httpd_req_t *req, const char *filename);
+static void send_file_parsed(httpd_req_t *req, const char *filename);
 
 static std::unique_ptr<MFile> make_mfile(const std::string &path)
 {
@@ -101,7 +107,7 @@ static esp_err_t get_handler(httpd_req_t *httpd_req)
     uri = uri.substr(0, uri.find("?"));
 
     {
-        HttpServer::send_file(httpd_req, uri.c_str());
+        send_file(httpd_req, uri.c_str());
     }
 
     return ESP_OK;
@@ -211,7 +217,7 @@ httpd_handle_t HttpServer::start_server(serverstate &state)
     return state.hServer;
 }
 
-const char *HttpServer::find_mimetype_str(const char *extension)
+static const char *find_mimetype_str(const char *extension)
 {
     static const struct { const char *ext; const char *mime; } mime_table[] = {
         { "html", HTTPD_TYPE_TEXT       },
@@ -241,7 +247,7 @@ const char *HttpServer::find_mimetype_str(const char *extension)
     return HTTPD_TYPE_OCTET;
 }
 
-char *HttpServer::get_extension(const char *filename)
+static char *get_extension(const char *filename)
 {
     char *result = strrchr(filename, '.');
     if (result != NULL)
@@ -249,14 +255,14 @@ char *HttpServer::get_extension(const char *filename)
     return NULL;
 }
 
-void HttpServer::set_file_content_type(httpd_req_t *req, const char *filepath)
+static void set_file_content_type(httpd_req_t *req, const char *filepath)
 {
     char *dot = get_extension(filepath);
     const char *mimetype = find_mimetype_str(dot);
     httpd_resp_set_type(req, mimetype);
 }
 
-void HttpServer::send_file(httpd_req_t *req, const char *filename)
+static void send_file(httpd_req_t *req, const char *filename)
 {
     std::string fpath;
     Debug_printv("filename[%s]", filename);
@@ -316,7 +322,7 @@ void HttpServer::send_file(httpd_req_t *req, const char *filename)
     if (!stream || !stream->isOpen())
     {
         Debug_printv("Failed to open file for sending: [%s]", fpath.c_str());
-        send_http_error(req, 404);
+        HttpServer::send_http_error(req, 404);
         return;
     }
 
@@ -341,7 +347,7 @@ void HttpServer::send_file(httpd_req_t *req, const char *filename)
     if (buf == nullptr)
     {
         stream->close();
-        send_http_error(req, 500);
+        HttpServer::send_http_error(req, 500);
         return;
     }
     uint32_t count;
@@ -352,7 +358,7 @@ void HttpServer::send_file(httpd_req_t *req, const char *filename)
     free(buf);
 }
 
-void HttpServer::send_file_parsed(httpd_req_t *req, const char *filename)
+static void send_file_parsed(httpd_req_t *req, const char *filename)
 {
     Debug_printv("filename[%s]", filename);
 

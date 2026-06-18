@@ -36,12 +36,6 @@ private:
     static void custom_global_ctx_free(void *ctx);
     static httpd_handle_t start_server(serverstate &state);
 
-    static char *get_extension(const char *filename);
-    static const char *find_mimetype_str(const char *extension);
-    static void set_file_content_type(httpd_req_t *req, const char *filepath);
-    static void send_file(httpd_req_t *req, const char *filename);
-    static void send_file_parsed(httpd_req_t *req, const char *filename);
-
 public:
     static httpd_handle_t s_server;
     static void send_http_error(httpd_req_t *req, int errnum);
