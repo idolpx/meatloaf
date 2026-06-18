@@ -693,6 +693,35 @@ static std::string     s_scan_last_folder;  // last completed directory path
 static bool     s_sqlite_inited = false;
 static uint8_t *s_pcache_buf    = nullptr;
 
+// PSRAM allocator for SQLite — installed during FTS5 index builds so the
+// token accumulation hash lands in PSRAM instead of internal DRAM.
+// FTS5 makes many small allocations (<512 bytes) that bypass the
+// CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=512 threshold and would otherwise
+// exhaust the DMA-capable internal heap, breaking SD card I/O.
+static void *s_psram_malloc(int n)           { return heap_caps_malloc((size_t)n, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT); }
+static void  s_psram_free(void *p)           { free(p); }
+static void *s_psram_realloc(void *p, int n) { return heap_caps_realloc(p, (size_t)n, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT); }
+static int   s_psram_size(void *p)           { return (int)heap_caps_get_allocated_size(p); }
+static int   s_psram_roundup(int n)          { return n; }
+static int   s_psram_init(void *)            { return SQLITE_OK; }
+static void  s_psram_shutdown(void *)        {}
+
+static sqlite3_mem_methods s_psram_mem = {
+    s_psram_malloc, s_psram_free, s_psram_realloc, s_psram_size,
+    s_psram_roundup, s_psram_init, s_psram_shutdown, nullptr
+};
+static sqlite3_mem_methods s_system_mem;  // saved before first sqlite3_initialize()
+
+// Shutdown SQLite, swap in a new allocator, re-apply page cache, and reinitialize.
+static void sqlite_swap_malloc(sqlite3_mem_methods *mem)
+{
+    sqlite3_shutdown();
+    sqlite3_config(SQLITE_CONFIG_MALLOC, mem);
+    if (s_pcache_buf)
+        sqlite3_config(SQLITE_CONFIG_PAGECACHE, s_pcache_buf, 640, 128);
+    sqlite3_initialize();
+}
+
 static void sqlite_one_time_init(void)
 {
     if (s_sqlite_inited) return;
@@ -701,6 +730,9 @@ static void sqlite_one_time_init(void)
         640 * 128, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (s_pcache_buf)
         sqlite3_config(SQLITE_CONFIG_PAGECACHE, s_pcache_buf, 640, 128);
+
+    // Save the default system malloc methods before sqlite3_initialize() locks them in.
+    sqlite3_config(SQLITE_CONFIG_GETMALLOC, &s_system_mem);
 
     sqlite3_initialize();
     s_sqlite_inited = true;
@@ -1085,7 +1117,31 @@ static void updatedb_task(void *arg)
     sqlite3_finalize(file_ins_stmt);
     sqlite3_finalize(mark_stmt);
 
+    bool fts_psram_active = false;
     if (!s_scan_stop) {
+        // Close scan DB, then switch SQLite to the PSRAM allocator before reopening.
+        // FTS5 builds an in-memory token hash with many small (<512-byte) allocations
+        // that fall below CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=512 and would otherwise
+        // land in internal DRAM, exhausting the DMA-capable heap within ~100 rows.
+        // Swapping to a heap_caps PSRAM allocator sends every SQLite allocation
+        // (including the small token-hash entries) to PSRAM for the duration of the
+        // FTS build, then the system allocator is restored.
+        sqlite3_close(db);
+        db = nullptr;
+        sqlite_swap_malloc(&s_psram_mem);
+        fts_psram_active = true;
+
+        if (sqlite3_open_v2(LOCATE_DB_PATH, &db,
+                            SQLITE_OPEN_READWRITE, nullptr) != SQLITE_OK) {
+            Serial.printf("updatedb: FTS reopen failed: %s\r\n", sqlite3_errmsg(db));
+            if (db) sqlite3_close(db);
+            sqlite_swap_malloc(&s_system_mem);
+            s_scan_running = 0;
+            vTaskDelete(NULL);
+            return;
+        }
+        apply_pragmas(db);
+
         // Get true row count (resume adds to existing rows, so s_scan_files/dirs are partial).
         int fts_total = 0;
         {
@@ -1123,7 +1179,9 @@ static void updatedb_task(void *arg)
                 (const char *)sqlite3_column_text(sel_stmt, 1), -1, SQLITE_STATIC);
             sqlite3_step(ins_stmt);
 
-            if (++fts_done % 500 == 0) {
+            // Commit every 100 rows: limits FTS5's in-memory token accumulation
+            // (which eats internal DRAM) and keeps the DMA heap from exhausting.
+            if (++fts_done % 100 == 0) {
                 int pct = fts_total > 0 ? fts_done * 100 / fts_total : 0;
                 Serial.printf("\r  %d / %d  (%d%%)  %lds",
                               fts_done, fts_total, pct,
@@ -1161,6 +1219,8 @@ static void updatedb_task(void *arg)
     }
 
     sqlite3_close(db);
+    if (fts_psram_active)
+        sqlite_swap_malloc(&s_system_mem);
 
     s_scan_resume  = 0;
     s_scan_running = 0;
