@@ -870,9 +870,10 @@ static void updatedb_fts_rebuild(void)
         return;
     }
 
-    Serial.printf("updatedb: building FTS index (%d rows)...\r\n", fts_total);
+    Serial.printf("updatedb: clearing FTS index...\r\n");
     sqlite3_exec(db, "INSERT INTO files_fts(files_fts) VALUES('delete-all')",
                  nullptr, nullptr, nullptr);
+    Serial.printf("updatedb: building FTS index (%d rows)...\r\n", fts_total);
 
     sqlite3_stmt *sel_stmt = nullptr;
     sqlite3_stmt *ins_stmt = nullptr;
@@ -898,7 +899,7 @@ static void updatedb_fts_rebuild(void)
 
         if (++fts_done % 100 == 0) {
             int pct = fts_total > 0 ? fts_done * 100 / fts_total : 0;
-            Serial.printf("\r  %d / %d  (%d%%)  %s",
+            Serial.printf("  %d / %d  (%d%%)  %s\r\n",
                           fts_done, fts_total, pct,
                           mstr::formatDuration((long)(time(nullptr) - fts_start)).c_str());
             sqlite3_exec(db, "COMMIT;BEGIN", nullptr, nullptr, nullptr);
@@ -909,7 +910,7 @@ static void updatedb_fts_rebuild(void)
     sqlite3_finalize(sel_stmt);
     sqlite3_finalize(ins_stmt);
 
-    Serial.printf("\r  %d rows indexed in %s.          \r\n",
+    Serial.printf("  %d rows indexed in %s.\r\n",
                   fts_done, mstr::formatDuration((long)(time(nullptr) - fts_start)).c_str());
 
     sqlite3_close(db);
