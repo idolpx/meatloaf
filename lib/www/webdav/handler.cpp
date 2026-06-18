@@ -1,14 +1,35 @@
+// Meatloaf - A Commodore 64/128 multi-device emulator
+// https://github.com/idolpx/meatloaf
+// Copyright(C) 2020 James Johnston
+//
+// Meatloaf is free software : you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Meatloaf is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
+
 #ifndef MIN_CONFIG
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 
-#include "httpd_webdav.h"
-#include "httpd_server.h"
+#include "handler.h"
+#include "../web_server.h"
 
-#include "../../include/debug.h"
+#include "../../../include/debug.h"
+
+#include "webdav_server.h"
+#include "request.h"
+#include "response.h"
 
 #include <cstring>
 
-esp_err_t cHttpdServer::webdav_handler(httpd_req_t *httpd_req)
+esp_err_t webdav_handler(httpd_req_t *httpd_req)
 {
     WebDav::Server *server = (WebDav::Server *)httpd_req->user_ctx;
     WebDav::Request req(httpd_req);
@@ -19,19 +40,13 @@ esp_err_t cHttpdServer::webdav_handler(httpd_req_t *httpd_req)
 
     if ( !req.parseRequest() )
     {
-        resp.setStatus(400); // Bad Request
+        resp.setStatus(400);
         resp.flushHeaders();
         resp.closeBody();
         return ESP_OK;
     }
 
-    // httpd_resp_set_hdr(httpd_req, "Access-Control-Allow-Origin", "*");
-    // httpd_resp_set_hdr(httpd_req, "Access-Control-Allow-Headers", "*");
-    // httpd_resp_set_hdr(httpd_req, "Access-Control-Allow-Methods", "*");
-
     Debug_printv("%d %s[%s]", httpd_req->method, http_method_str((enum http_method)httpd_req->method), httpd_req->uri);
-    //trace_webdav_request(httpd_req, req);
-    //Debug_memory();
 
     switch (httpd_req->method)
     {
@@ -81,19 +96,16 @@ esp_err_t cHttpdServer::webdav_handler(httpd_req_t *httpd_req)
         break;
     default:
         return ESP_ERR_HTTPD_INVALID_REQ;
-        break;
     }
 
     resp.setStatus(ret);
 
     if ( (ret > 399) & (httpd_req->method != HTTP_HEAD) )
     {
-        // Send error page
-        send_http_error(httpd_req, ret);
+        HttpServer::send_http_error(httpd_req, ret);
     }
     else
     {
-        // Send empty response
         resp.flushHeaders();
         resp.closeBody();
     }
@@ -101,15 +113,11 @@ esp_err_t cHttpdServer::webdav_handler(httpd_req_t *httpd_req)
     return ESP_OK;
 }
 
-void cHttpdServer::webdav_register(httpd_handle_t server, const char *root_uri, const char *root_path)
+void webdav_register(httpd_handle_t server, const char *root_uri, const char *root_path)
 {
     WebDav::Server *webDavServer = new WebDav::Server(root_uri, root_path);
 
-    // Use a static string so the pointer remains valid for the lifetime of the server.
-    // asprintf() here was a leak: ESP-IDF stores the URI pointer without copying it.
     static std::string dav_uri_pattern;
-    // "/*" matches bare "/" and all sub-paths; "/?*" requires at least one char
-    // after the slash and excludes the root, breaking Windows Explorer WebDAV.
     if (strlen(root_uri) > 1)
         dav_uri_pattern = std::string(root_uri) + "/*";
     else

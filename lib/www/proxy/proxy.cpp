@@ -1,8 +1,25 @@
+// Meatloaf - A Commodore 64/128 multi-device emulator
+// https://github.com/idolpx/meatloaf
+// Copyright(C) 2020 James Johnston
+//
+// Meatloaf is free software : you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Meatloaf is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
+
 #ifndef MIN_CONFIG
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 
-#include "httpd_proxy.h"
-#include "httpd_server.h"
+#include "proxy.h"
+#include "../web_server.h"
 
 #include "string_utils.h"
 
@@ -17,7 +34,6 @@ static inline void *psram_malloc(size_t sz)
     return p ? p : malloc(sz);
 }
 
-// Capture upstream response Content-Type for relay back to the client.
 static esp_err_t proxy_event_handler(esp_http_client_event_t *evt)
 {
     if (evt->event_id == HTTP_EVENT_ON_HEADER && evt->user_data
@@ -26,12 +42,11 @@ static esp_err_t proxy_event_handler(esp_http_client_event_t *evt)
     return ESP_OK;
 }
 
-esp_err_t cHttpdServer::proxy_handler(httpd_req_t *req)
+esp_err_t proxy_handler(httpd_req_t *req)
 {
-    // Target URL is the full query string: /proxy?http://host/path
     const char *q = strchr(req->uri, '?');
     if (!q || *(q + 1) == '\0') {
-        send_http_error(req, 400);
+        HttpServer::send_http_error(req, 400);
         return ESP_OK;
     }
     std::string target_url = mstr::urlDecode(q + 1);
@@ -50,7 +65,7 @@ esp_err_t cHttpdServer::proxy_handler(httpd_req_t *req)
 
     esp_http_client_handle_t client = esp_http_client_init(&cfg);
     if (!client) {
-        send_http_error(req, 500);
+        HttpServer::send_http_error(req, 500);
         return ESP_OK;
     }
 
@@ -61,11 +76,10 @@ esp_err_t cHttpdServer::proxy_handler(httpd_req_t *req)
         "Accept", "Accept-Encoding", "Accept-Language",
         "Authorization", "Cache-Control", "Client-Id", "Content-Type",
         "If-Modified-Since", "If-None-Match",
-        "Origin", "Referer", "User-Agent",
+        "Origin", "Referer", "User-Agent", "Client-Id",
         nullptr
     };
     for (int i = 0; kFwdHeaders[i]; i++) {
-        // Try X-prefixed first; fall back to bare name.
         std::string xname = std::string("X-") + kFwdHeaders[i];
         const char *candidates[2] = { xname.c_str(), kFwdHeaders[i] };
         for (const char *hdr : candidates) {
@@ -74,21 +88,19 @@ esp_err_t cHttpdServer::proxy_handler(httpd_req_t *req)
             char *val = (char *)malloc(hlen + 1);
             if (!val) continue;
             if (httpd_req_get_hdr_value_str(req, hdr, val, hlen + 1) == ESP_OK)
-                esp_http_client_set_header(client, kFwdHeaders[i], val); // bare name, X- stripped
+                esp_http_client_set_header(client, kFwdHeaders[i], val);
             free(val);
-            break; // found; don't also try the other form
+            break;
         }
     }
 
-    // Open upstream connection (write_len > 0 tells the client to expect a body).
     int write_len = (req->method == HTTP_POST) ? (int)req->content_len : 0;
     if (esp_http_client_open(client, write_len) != ESP_OK) {
         esp_http_client_cleanup(client);
-        send_http_error(req, 502);
+        HttpServer::send_http_error(req, 502);
         return ESP_OK;
     }
 
-    // Stream POST body upstream.
     if (write_len > 0) {
         char *ibuf = (char *)psram_malloc(http_RECV_BUFF_SIZE);
         if (ibuf) {
@@ -104,17 +116,15 @@ esp_err_t cHttpdServer::proxy_handler(httpd_req_t *req)
         }
     }
 
-    // Read upstream response headers (triggers proxy_event_handler callbacks).
     esp_http_client_fetch_headers(client);
     int status_code = esp_http_client_get_status_code(client);
     if (status_code <= 0) {
         esp_http_client_close(client);
         esp_http_client_cleanup(client);
-        send_http_error(req, 502);
+        HttpServer::send_http_error(req, 502);
         return ESP_OK;
     }
 
-    // Relay status, content-type, and CORS header to the client.
     char status_str[16];
     snprintf(status_str, sizeof(status_str), "%d", status_code);
     httpd_resp_set_status(req, status_str);
@@ -122,7 +132,6 @@ esp_err_t cHttpdServer::proxy_handler(httpd_req_t *req)
         httpd_resp_set_type(req, resp_content_type.c_str());
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
 
-    // Stream upstream response body back to the client.
     char *obuf = (char *)psram_malloc(http_SEND_BUFF_SIZE);
     if (obuf) {
         int n;
@@ -137,7 +146,7 @@ esp_err_t cHttpdServer::proxy_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
-void cHttpdServer::proxy_register(httpd_handle_t server)
+void proxy_register(httpd_handle_t server)
 {
     httpd_uri_t proxy = {
         .uri = "/proxy",

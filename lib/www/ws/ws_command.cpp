@@ -1,13 +1,30 @@
+// Meatloaf - A Commodore 64/128 multi-device emulator
+// https://github.com/idolpx/meatloaf
+// Copyright(C) 2020 James Johnston
+//
+// Meatloaf is free software : you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Meatloaf is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
+
 #include "ws_command.h"
 
 #include <cstdlib>
 
-#include "../../include/debug.h"
+#include "../../../include/debug.h"
 
 #include "protobuf-c/protobuf-c.h"
 
 #ifdef ENABLE_CONSOLE
-#include "../console/Console.h"
+#include "../../console/Console.h"
 extern ESP32Console::Console console;
 #endif
 
@@ -41,7 +58,6 @@ bool WsCommandExecutor::isProtobuf(const uint8_t* data, size_t len)
     size_t check = len < 4 ? len : 4;
     for (size_t i = 0; i < check; i++) {
         uint8_t c = data[i];
-        // Printable ASCII (0x20-0x7E) plus tab/LF/CR are text; everything else is binary.
         bool is_text = (c >= 0x20 && c <= 0x7E) || c == 0x09 || c == 0x0A || c == 0x0D;
         if (!is_text) return true;
     }
@@ -53,7 +69,6 @@ size_t WsCommandExecutor::slipDecode(const uint8_t* in, size_t inLen,
 {
     size_t i = 0, outLen = 0;
 
-    // Packets may be wrapped in leading and/or trailing END bytes
     if (i < inLen && in[i] == SLIP_END) i++;
 
     while (i < inLen && outLen < outMax) {
@@ -65,7 +80,7 @@ size_t WsCommandExecutor::slipDecode(const uint8_t* in, size_t inLen,
             uint8_t esc = in[i++];
             if      (esc == SLIP_ESC_END) b = SLIP_END;
             else if (esc == SLIP_ESC_ESC) b = SLIP_ESC;
-            else                          b = esc; // malformed; pass through
+            else                          b = esc;
         }
 
         out[outLen++] = b;
@@ -76,7 +91,6 @@ size_t WsCommandExecutor::slipDecode(const uint8_t* in, size_t inLen,
 void WsCommandExecutor::handleJson(const uint8_t* data, size_t len)
 {
     Debug_printv("ws: JSON (%u bytes)", (unsigned)len);
-    // TODO: parse JSON and route to structured command handlers
 #ifdef ENABLE_CONSOLE
     console.execute(reinterpret_cast<const char*>(data));
 #endif
@@ -86,14 +100,6 @@ void WsCommandExecutor::handleProtobuf(const uint8_t* data, size_t len)
 {
     Debug_printv("ws: protobuf (%u bytes)", (unsigned)len);
 
-    // TODO: unpack message using a generated descriptor, e.g.:
-    //   MyMessage* msg = my_message__unpack(nullptr, len, data);
-    //   if (msg) {
-    //       // access msg->field_name ...
-    //       my_message__free_unpacked(msg, nullptr);
-    //   }
-    //
-    // Until a .proto schema is defined, log the raw bytes at debug level.
     for (size_t i = 0; i < len && i < 16; i++) {
         Debug_printv("  [%02zu] 0x%02X", i, data[i]);
     }
@@ -103,7 +109,6 @@ void WsCommandExecutor::handleSlip(const uint8_t* data, size_t len)
 {
     Debug_printv("ws: SLIP (%u bytes encoded)", (unsigned)len);
 
-    // Decoded payload is always <= encoded length; +1 for null terminator
     uint8_t* buf = static_cast<uint8_t*>(malloc(len + 1));
     if (!buf) {
         Debug_printv("ws: SLIP decode OOM");

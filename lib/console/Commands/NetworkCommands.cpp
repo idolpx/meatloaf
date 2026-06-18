@@ -25,7 +25,8 @@
 #endif
 
 #ifndef MIN_CONFIG
-#include "httpd_server.h"
+#include "web_server.h"
+#include "ws/ws.h"
 #endif
 
 static const char* wlmode2string(wifi_mode_t mode)
@@ -402,7 +403,7 @@ namespace ESP32Console::Commands
             msg += argv[i];
         }
         msg += "\r\n";
-        oHttpdServer.websocket_send_all(msg.c_str(), msg.size());
+        ws_send_all(msg.c_str(), msg.size());
         return EXIT_SUCCESS;
     }
 
