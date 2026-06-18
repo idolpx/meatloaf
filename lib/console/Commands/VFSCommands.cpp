@@ -895,7 +895,7 @@ static void updatedb_task(void *arg)
             "  scanned INTEGER NOT NULL DEFAULT 0"
             ");"
             "CREATE VIRTUAL TABLE files_fts USING fts5("
-            "  path, content=\"files\", tokenize=\"unicode61\""
+            "  path, tokenize=\"unicode61\""
             ");"
             "CREATE TABLE status ("
             "  id          INTEGER PRIMARY KEY DEFAULT 1,"
@@ -939,7 +939,7 @@ static void updatedb_task(void *arg)
         // Migrate older DBs that lack the FTS5 table.
         sqlite3_exec(db,
             "CREATE VIRTUAL TABLE IF NOT EXISTS files_fts "
-            "USING fts5(path, content=\"files\", tokenize=\"unicode61\")",
+            "USING fts5(path, tokenize=\"unicode61\")",
             nullptr, nullptr, nullptr);
 
         // Migrate older DBs that lack the status table.
@@ -1036,15 +1036,56 @@ static void updatedb_task(void *arg)
     sqlite3_finalize(mark_stmt);
 
     if (!s_scan_stop) {
-        Serial.printf("updatedb: building FTS index...\r\n");
-        char *fts_err = nullptr;
-        if (sqlite3_exec(db,
-                "INSERT INTO files_fts(files_fts) VALUES('rebuild')",
-                nullptr, nullptr, &fts_err) != SQLITE_OK) {
-            Serial.printf("updatedb: FTS rebuild: %s\r\n",
-                          fts_err ? fts_err : sqlite3_errmsg(db));
-            sqlite3_free(fts_err);
+        // Get true row count (resume adds to existing rows, so s_scan_files/dirs are partial).
+        int fts_total = 0;
+        {
+            sqlite3_stmt *cnt = nullptr;
+            if (sqlite3_prepare_v2(db, "SELECT count(*) FROM files", -1, &cnt, nullptr) == SQLITE_OK
+                    && sqlite3_step(cnt) == SQLITE_ROW)
+                fts_total = sqlite3_column_int(cnt, 0);
+            sqlite3_finalize(cnt);
         }
+        Serial.printf("updatedb: building FTS index (%d rows)...\r\n", fts_total);
+
+        // Clear any previous index, then rebuild row by row so we can show progress.
+        sqlite3_exec(db, "INSERT INTO files_fts(files_fts) VALUES('delete-all')",
+                     nullptr, nullptr, nullptr);
+
+        sqlite3_stmt *sel_stmt = nullptr;
+        sqlite3_stmt *ins_stmt = nullptr;
+        sqlite3_prepare_v2(db,
+            "SELECT rowid, path FROM files ORDER BY rowid",
+            -1, &sel_stmt, nullptr);
+        sqlite3_prepare_v2(db,
+            "INSERT INTO files_fts(rowid, path) VALUES(?, ?)",
+            -1, &ins_stmt, nullptr);
+
+        int fts_done = 0;
+        time_t fts_start = time(nullptr);
+        sqlite3_exec(db, "BEGIN", nullptr, nullptr, nullptr);
+
+        while (sqlite3_step(sel_stmt) == SQLITE_ROW) {
+            sqlite3_reset(ins_stmt);
+            sqlite3_bind_int64(ins_stmt, 1, sqlite3_column_int64(sel_stmt, 0));
+            sqlite3_bind_text(ins_stmt, 2,
+                (const char *)sqlite3_column_text(sel_stmt, 1), -1, SQLITE_STATIC);
+            sqlite3_step(ins_stmt);
+
+            if (++fts_done % 500 == 0) {
+                int pct = fts_total > 0 ? fts_done * 100 / fts_total : 0;
+                Serial.printf("\r  %d / %d  (%d%%)  %lds",
+                              fts_done, fts_total, pct,
+                              (long)(time(nullptr) - fts_start));
+                sqlite3_exec(db, "COMMIT;BEGIN", nullptr, nullptr, nullptr);
+                vTaskDelay(1);
+            }
+        }
+        sqlite3_exec(db, "COMMIT", nullptr, nullptr, nullptr);
+        sqlite3_finalize(sel_stmt);
+        sqlite3_finalize(ins_stmt);
+
+        Serial.printf("\r  %d rows indexed in %ld seconds.          \r\n",
+                      fts_done, (long)(time(nullptr) - fts_start));
     }
 
     s_scan_end = time(nullptr);
@@ -1264,9 +1305,9 @@ int locate(int argc, char **argv)
     if (is_simple) fts_pattern += "*";
 
     const char *fts_sql =
-        "SELECT files.path, files.size, files.is_dir "
-        "FROM files_fts JOIN files ON files.rowid = files_fts.rowid "
-        "WHERE files_fts MATCH ? ORDER BY files.path";
+        "SELECT path, size, is_dir FROM files "
+        "WHERE rowid IN (SELECT rowid FROM files_fts WHERE files_fts MATCH ?) "
+        "ORDER BY path";
 
     sqlite3_stmt *stmt = nullptr;
     std::string bound_pattern;
