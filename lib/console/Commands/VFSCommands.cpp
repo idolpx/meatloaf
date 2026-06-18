@@ -841,8 +841,8 @@ static void updatedb_scan(sqlite3 *db,
 
             int total = s_scan_files + s_scan_dirs;
             if (total % 100 == 0)
-                Serial.printf("  %d files, %d dirs — free=%lu dma_max=%lu\r\n",
-                              (int)s_scan_files, (int)s_scan_dirs,
+                Serial.printf("  %d dirs, %d files — free=%lu dma_max=%lu\r\n",
+                              (int)s_scan_dirs, (int)s_scan_files,
                               esp_get_free_internal_heap_size(),
                               (unsigned long)heap_caps_get_largest_free_block(
                                   MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL));
@@ -933,8 +933,8 @@ static void updatedb_task(void *arg)
             ");"
             "CREATE TABLE status ("
             "  id          INTEGER PRIMARY KEY DEFAULT 1,"
-            "  total_files INTEGER NOT NULL DEFAULT 0,"
             "  total_dirs  INTEGER NOT NULL DEFAULT 0,"
+            "  total_files INTEGER NOT NULL DEFAULT 0,"
             "  last_scan   INTEGER NOT NULL DEFAULT 0,"
             "  duration    INTEGER NOT NULL DEFAULT 0,"
             "  last_folder TEXT    NOT NULL DEFAULT ''"
@@ -1147,11 +1147,11 @@ static void updatedb_task(void *arg)
         sqlite3_stmt *ss = nullptr;
         const char *status_sql =
             "INSERT OR REPLACE INTO status"
-            " (id, total_files, total_dirs, last_scan, duration, last_folder)"
+            " (id, total_dirs, total_files, last_scan, duration, last_folder)"
             " VALUES (1, ?, ?, ?, ?, ?)";
         if (sqlite3_prepare_v2(db, status_sql, -1, &ss, nullptr) == SQLITE_OK) {
-            sqlite3_bind_int(ss,   1, (int)s_scan_files);
-            sqlite3_bind_int(ss,   2, (int)s_scan_dirs);
+            sqlite3_bind_int(ss,   1, (int)s_scan_dirs);
+            sqlite3_bind_int(ss,   2, (int)s_scan_files);
             sqlite3_bind_int64(ss, 3, (sqlite3_int64)s_scan_end);
             sqlite3_bind_int64(ss, 4, (sqlite3_int64)(s_scan_end - s_scan_start));
             sqlite3_bind_text(ss,  5, s_scan_last_folder.c_str(), -1, SQLITE_TRANSIENT);
@@ -1166,12 +1166,12 @@ static void updatedb_task(void *arg)
     s_scan_running = 0;
 
     if (s_scan_stop)
-        Serial.printf("updatedb: stopped — %d files, %d directories, last folder: %s\r\n",
-                      (int)s_scan_files, (int)s_scan_dirs, s_scan_last_folder.c_str());
+        Serial.printf("updatedb: stopped — %d directories, %d files, last folder: %s\r\n",
+                      (int)s_scan_dirs, (int)s_scan_files, s_scan_last_folder.c_str());
     else
-        Serial.printf("updatedb: done — %d files, %d directories, %d errors, %ld seconds.\r\n",
-                      (int)s_scan_files, (int)s_scan_dirs,
-                      (int)s_scan_errors, (long)(s_scan_end - s_scan_start));
+        Serial.printf("updatedb: done — %d directories, %d files, %d errors, %s.\r\n",
+                      (int)s_scan_dirs, (int)s_scan_files,
+                      (int)s_scan_errors, mstr::formatDuration(s_scan_end - s_scan_start).c_str());
     vTaskDelete(NULL);
 }
 
@@ -1181,8 +1181,8 @@ int updatedb(int argc, char **argv)
     if (argc < 2) {
         if (s_scan_running) {
             time_t elapsed = time(nullptr) - s_scan_start;
-            Serial.printf("Scan in progress: %d files, %d directories (%ld seconds)\r\n",
-                          (int)s_scan_files, (int)s_scan_dirs, (long)elapsed);
+            Serial.printf("Scan in progress: %d directories, %d files (%s elapsed)\r\n",
+                          (int)s_scan_dirs, (int)s_scan_files, mstr::formatDuration(elapsed).c_str());
             if (!s_scan_last_folder.empty())
                 Serial.printf("Last folder:      /sd%s\r\n", s_scan_last_folder.c_str());
             return EXIT_SUCCESS;
@@ -1200,11 +1200,11 @@ int updatedb(int argc, char **argv)
         }
         sqlite3_stmt *stmt = nullptr;
         if (sqlite3_prepare_v2(db,
-                "SELECT total_files, total_dirs, last_scan, duration, last_folder"
+                "SELECT total_dirs, total_files, last_scan, duration, last_folder"
                 " FROM status WHERE id=1",
                 -1, &stmt, nullptr) == SQLITE_OK && sqlite3_step(stmt) == SQLITE_ROW) {
-            int    total_files  = sqlite3_column_int(stmt, 0);
-            int    total_dirs   = sqlite3_column_int(stmt, 1);
+            int    total_dirs   = sqlite3_column_int(stmt, 0);
+            int    total_files  = sqlite3_column_int(stmt, 1);
             time_t last_scan    = (time_t)sqlite3_column_int64(stmt, 2);
             int    duration     = sqlite3_column_int(stmt, 3);
             const char *folder  = (const char *)sqlite3_column_text(stmt, 4);
@@ -1212,7 +1212,7 @@ int updatedb(int argc, char **argv)
             struct tm *ti = localtime(&last_scan);
             if (ti) strftime(tbuf, sizeof(tbuf), "%Y-%m-%d %H:%M:%S", ti);
             Serial.printf("Last scan:    %s (%s)\r\n", tbuf, mstr::formatDuration(duration).c_str());
-            Serial.printf("Index:        %d files, %d directories\r\n", total_files, total_dirs);
+            Serial.printf("Index:       %d directories, %d files\r\n", total_dirs, total_files);
             if (folder && folder[0])
                 Serial.printf("Last folder:  /sd%s\r\n", folder);
         } else {
@@ -1241,8 +1241,8 @@ int updatedb(int argc, char **argv)
             return EXIT_FAILURE;
         }
         if (s_scan_running) {
-            Serial.printf("updatedb: scan already in progress (%d files, %d directories so far)\r\n",
-                          (int)s_scan_files, (int)s_scan_dirs);
+            Serial.printf("updatedb: scan already in progress (%d directories, %d files so far)\r\n",
+                          (int)s_scan_dirs, (int)s_scan_files);
             return EXIT_FAILURE;
         }
         struct stat dbst;
@@ -1271,8 +1271,8 @@ int updatedb(int argc, char **argv)
             return EXIT_FAILURE;
         }
         if (s_scan_running) {
-            Serial.printf("updatedb: scan already in progress (%d files, %d directories so far)\r\n",
-                          (int)s_scan_files, (int)s_scan_dirs);
+            Serial.printf("updatedb: scan already in progress (%d directories, %d files so far)\r\n",
+                          (int)s_scan_dirs, (int)s_scan_files);
             return EXIT_FAILURE;
         }
         s_scan_files        = 0;
@@ -1298,12 +1298,12 @@ int locate(int argc, char **argv)
     if (argc < 2) {
         if (s_scan_running) {
             time_t elapsed = time(nullptr) - s_scan_start;
-            Serial.printf("Scan in progress: %d files, %d directories indexed (%ld seconds elapsed)\r\n",
-                          (int)s_scan_files, (int)s_scan_dirs, (long)elapsed);
+            Serial.printf("Scan in progress: %d directories, %d files indexed (%s elapsed)\r\n",
+                          (int)s_scan_dirs, (int)s_scan_files, mstr::formatDuration(elapsed).c_str());
         } else if (s_scan_end > 0) {
-            Serial.printf("Last scan: %d files, %d directories in %ld seconds\r\n",
-                          (int)s_scan_files, (int)s_scan_dirs,
-                          (long)(s_scan_end - s_scan_start));
+            Serial.printf("Last scan: %d directories, %d files in %s\r\n",
+                          (int)s_scan_dirs, (int)s_scan_files,
+                          mstr::formatDuration(s_scan_end - s_scan_start).c_str());
         } else {
             /* No scan this session — query the database for persisted totals. */
             if (!fnSDFAT.running()) {
@@ -1327,8 +1327,8 @@ int locate(int argc, char **argv)
             }
             sqlite3_finalize(stmt);
             sqlite3_close(db);
-            Serial.printf("Index contains %d files in %d directories. Run 'updatedb start' to refresh.\r\n",
-                          files, dirs);
+            Serial.printf("Index contains %d directories, %d files. Run 'updatedb start' to refresh.\r\n",
+                          dirs, files);
         }
         return EXIT_SUCCESS;
     }
