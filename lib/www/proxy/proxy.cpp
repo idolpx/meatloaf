@@ -126,9 +126,12 @@ esp_err_t proxy_fetch(httpd_req_t *req, const char *target_url)
         }
     }
 
-    // Use the proxy base as Referer unless the client supplied an explicit X-Referer.
-    if (!s_proxy_base_url.empty() && httpd_req_get_hdr_value_len(req, "X-Referer") == 0)
-        esp_http_client_set_header(client, "Referer", s_proxy_base_url.c_str());
+    // Set Referer unless the client supplied an explicit X-Referer.
+    // Prefer the stored proxy base; fall back to the target URL itself.
+    if (httpd_req_get_hdr_value_len(req, "X-Referer") == 0) {
+        const char *ref = s_proxy_base_url.empty() ? target_url : s_proxy_base_url.c_str();
+        esp_http_client_set_header(client, "Referer", ref);
+    }
 
     int write_len = (req->method == HTTP_POST) ? (int)req->content_len : 0;
     if (esp_http_client_open(client, write_len) != ESP_OK) {
