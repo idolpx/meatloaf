@@ -1340,55 +1340,65 @@ int locate(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    // Try FTS5 full-text search; fall back to LIKE on old DBs without the FTS table.
+    // Build FTS5 pattern (append * for prefix match on bare words).
     bool is_simple = !strchr(argv[1], '*') && !strchr(argv[1], '"');
     std::string fts_pattern(argv[1]);
     if (is_simple) fts_pattern += "*";
+
+    // Build LIKE pattern (convert glob wildcards, wrap bare words in %).
+    bool has_wildcards = strchr(argv[1], '*') || strchr(argv[1], '?');
+    std::string like_pattern(argv[1]);
+    for (char &c : like_pattern) {
+        if (c == '*') c = '%';
+        else if (c == '?') c = '_';
+    }
+    if (!has_wildcards) like_pattern = "%" + like_pattern + "%";
 
     const char *fts_sql =
         "SELECT dirs.path || '/' || files.name, files.size, files.is_dir"
         " FROM files JOIN dirs ON dirs.id = files.dir_id"
         " WHERE files.id IN (SELECT rowid FROM files_fts WHERE files_fts MATCH ?)"
         " ORDER BY dirs.path, files.name";
+    const char *like_sql =
+        "SELECT dirs.path || '/' || files.name, files.size, files.is_dir"
+        " FROM files JOIN dirs ON dirs.id = files.dir_id"
+        " WHERE dirs.path || '/' || files.name LIKE ?"
+        " ORDER BY dirs.path, files.name";
 
+    int count = 0;
     sqlite3_stmt *stmt = nullptr;
-    std::string bound_pattern;
-    if (sqlite3_prepare_v2(db, fts_sql, -1, &stmt, nullptr) == SQLITE_OK) {
-        bound_pattern = fts_pattern;
-    } else {
-        // FTS prepare failed — try LIKE on the same normalized schema.
-        bool has_wildcards = strchr(argv[1], '*') || strchr(argv[1], '?');
-        std::string like_pattern(argv[1]);
-        for (char &c : like_pattern) {
-            if (c == '*') c = '%';
-            else if (c == '?') c = '_';
+
+    auto drain = [&](sqlite3_stmt *s) {
+        while (sqlite3_step(s) == SQLITE_ROW) {
+            const char *p = (const char *)sqlite3_column_text(s, 0);
+            sqlite3_int64 sz = sqlite3_column_int64(s, 1);
+            int is_dir = sqlite3_column_int(s, 2);
+            if (p) Serial.printf("%c %8lld  /sd%s\r\n", is_dir ? 'd' : '-', (long long)sz, p);
+            count++;
         }
-        if (!has_wildcards) like_pattern = "%" + like_pattern + "%";
-        const char *like_sql =
-            "SELECT dirs.path || '/' || files.name, files.size, files.is_dir"
-            " FROM files JOIN dirs ON dirs.id = files.dir_id"
-            " WHERE dirs.path || '/' || files.name LIKE ?"
-            " ORDER BY dirs.path, files.name";
-        if (sqlite3_prepare_v2(db, like_sql, -1, &stmt, nullptr) != SQLITE_OK) {
+    };
+
+    // Try FTS5 first.
+    if (sqlite3_prepare_v2(db, fts_sql, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_text(stmt, 1, fts_pattern.c_str(), -1, SQLITE_TRANSIENT);
+        drain(stmt);
+        sqlite3_finalize(stmt);
+        stmt = nullptr;
+    }
+
+    // Fall back to LIKE if FTS returned nothing or wasn't available.
+    if (count == 0) {
+        if (sqlite3_prepare_v2(db, like_sql, -1, &stmt, nullptr) == SQLITE_OK) {
+            sqlite3_bind_text(stmt, 1, like_pattern.c_str(), -1, SQLITE_TRANSIENT);
+            drain(stmt);
+            sqlite3_finalize(stmt);
+        } else {
             Serial.printf("locate: database schema outdated — run 'updatedb start' to rebuild.\r\n");
             sqlite3_close(db);
             return EXIT_FAILURE;
         }
-        bound_pattern = like_pattern;
-    }
-    sqlite3_bind_text(stmt, 1, bound_pattern.c_str(), -1, SQLITE_TRANSIENT);
-
-    int count = 0;
-    while (sqlite3_step(stmt) == SQLITE_ROW) {
-        const char *path = (const char *)sqlite3_column_text(stmt, 0);
-        sqlite3_int64 size = sqlite3_column_int64(stmt, 1);
-        int is_dir = sqlite3_column_int(stmt, 2);
-        if (path)
-            Serial.printf("%c %8lld  /sd%s\r\n", is_dir ? 'd' : '-', (long long)size, path);
-        count++;
     }
 
-    sqlite3_finalize(stmt);
     sqlite3_close(db);
 
     if (count == 0)
