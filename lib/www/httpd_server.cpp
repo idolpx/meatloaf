@@ -28,7 +28,9 @@
 #include "../lib/console/ESP32Console.h"
 #endif
 
-#include "ws_command.h"
+#include "httpd_ws.h"
+#include "httpd_webdav.h"
+#include "httpd_proxy.h"
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -36,7 +38,6 @@
 #include <esp_heap_caps.h>
 //#include "esp_log.h"
 #include <esp_http_server.h>
-#include <esp_http_client.h>
 #include <esp_log.h>
 #include <sys/socket.h>
 #include <sstream>
@@ -51,11 +52,6 @@ static inline void *psram_malloc(size_t sz)
     void *p = heap_caps_malloc(sz, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     return p ? p : malloc(sz);
 }
-
-// WebDAV
-#include "webdav/webdav_server.h"
-#include "webdav/request.h"
-#include "webdav/response.h"
 
 #include "fnSystem.h"
 #include "fnConfig.h"
@@ -81,39 +77,6 @@ std::string cHttpdServer::uri;
 std::string cHttpdServer::queryString;
 httpd_handle_t cHttpdServer::s_server = nullptr;
 
-
-struct async_resp_arg {
-    httpd_handle_t hd;
-    int fd;
-};
-
-struct broadcast_arg {
-    httpd_handle_t hd;
-    uint8_t* data;
-    size_t len;
-};
-
-static void websocket_broadcast_send(void *arg)
-{
-    broadcast_arg *b = (broadcast_arg*)arg;
-    size_t max_clients = 8; // matches config.max_open_sockets in start_server()
-    int client_fds[8];
-
-    if (httpd_get_client_list(b->hd, &max_clients, client_fds) == ESP_OK) {
-        for (size_t i = 0; i < max_clients; i++) {
-            if (httpd_ws_get_fd_info(b->hd, client_fds[i]) == HTTPD_WS_CLIENT_WEBSOCKET) {
-                httpd_ws_frame_t ws_pkt = {};
-                ws_pkt.payload = b->data;
-                ws_pkt.len = b->len;
-                ws_pkt.type = HTTPD_WS_TYPE_TEXT;
-                httpd_ws_send_frame_async(b->hd, client_fds[i], &ws_pkt);
-            }
-        }
-    }
-
-    free(b->data);
-    free(b);
-}
 
 static std::unique_ptr<MFile> make_mfile(const std::string &path)
 {
@@ -194,373 +157,6 @@ esp_err_t cHttpdServer::post_handler(httpd_req_t *httpd_req)
     return ESP_OK;
 }
 
-
-
-// Capture upstream response Content-Type for relay back to the client.
-static esp_err_t proxy_event_handler(esp_http_client_event_t *evt)
-{
-    if (evt->event_id == HTTP_EVENT_ON_HEADER && evt->user_data
-            && strcasecmp(evt->header_key, "Content-Type") == 0)
-        *static_cast<std::string *>(evt->user_data) = evt->header_value;
-    return ESP_OK;
-}
-
-esp_err_t cHttpdServer::proxy_handler(httpd_req_t *req)
-{
-    // Target URL is the full query string: /proxy?http://host/path
-    const char *q = strchr(req->uri, '?');
-    if (!q || *(q + 1) == '\0') {
-        send_http_error(req, 400);
-        return ESP_OK;
-    }
-    std::string target_url = mstr::urlDecode(q + 1);
-
-    esp_http_client_method_t method =
-        (req->method == HTTP_POST) ? HTTP_METHOD_POST : HTTP_METHOD_GET;
-
-    std::string resp_content_type;
-    esp_http_client_config_t cfg = {};
-    cfg.url           = target_url.c_str();
-    cfg.method        = method;
-    cfg.timeout_ms    = 10000;
-    cfg.event_handler = proxy_event_handler;
-    cfg.user_data     = &resp_content_type;
-    cfg.skip_cert_common_name_check = true;
-
-    esp_http_client_handle_t client = esp_http_client_init(&cfg);
-    if (!client) {
-        send_http_error(req, 500);
-        return ESP_OK;
-    }
-
-    // ESP-IDF httpd has no header-enumeration API so we probe a known set.
-    // For each header we prefer the X-prefixed version (stripping "X-" before
-    // forwarding) so that CORS-constrained clients can pass X-Authorization etc.
-    static const char * const kFwdHeaders[] = {
-        "Accept", "Accept-Encoding", "Accept-Language",
-        "Authorization", "Cache-Control", "Content-Type",
-        "If-Modified-Since", "If-None-Match",
-        "Origin", "Referer", "User-Agent", "Client-Id",
-        nullptr
-    };
-    for (int i = 0; kFwdHeaders[i]; i++) {
-        // Try X-prefixed first; fall back to bare name.
-        std::string xname = std::string("X-") + kFwdHeaders[i];
-        const char *candidates[2] = { xname.c_str(), kFwdHeaders[i] };
-        for (const char *hdr : candidates) {
-            size_t hlen = httpd_req_get_hdr_value_len(req, hdr);
-            if (hlen == 0) continue;
-            char *val = (char *)malloc(hlen + 1);
-            if (!val) continue;
-            if (httpd_req_get_hdr_value_str(req, hdr, val, hlen + 1) == ESP_OK)
-                esp_http_client_set_header(client, kFwdHeaders[i], val); // bare name, X- stripped
-            free(val);
-            break; // found; don't also try the other form
-        }
-    }
-
-    // Open upstream connection (write_len > 0 tells the client to expect a body).
-    int write_len = (req->method == HTTP_POST) ? (int)req->content_len : 0;
-    if (esp_http_client_open(client, write_len) != ESP_OK) {
-        esp_http_client_cleanup(client);
-        send_http_error(req, 502);
-        return ESP_OK;
-    }
-
-    // Stream POST body upstream.
-    if (write_len > 0) {
-        char *ibuf = (char *)psram_malloc(http_RECV_BUFF_SIZE);
-        if (ibuf) {
-            int remaining = write_len;
-            while (remaining > 0) {
-                int chunk = MIN(remaining, http_RECV_BUFF_SIZE);
-                int got = httpd_req_recv(req, ibuf, chunk);
-                if (got <= 0) break;
-                esp_http_client_write(client, ibuf, got);
-                remaining -= got;
-            }
-            free(ibuf);
-        }
-    }
-
-    // Read upstream response headers (triggers proxy_event_handler callbacks).
-    esp_http_client_fetch_headers(client);
-    int status_code = esp_http_client_get_status_code(client);
-    if (status_code <= 0) {
-        esp_http_client_close(client);
-        esp_http_client_cleanup(client);
-        send_http_error(req, 502);
-        return ESP_OK;
-    }
-
-    // Relay status, content-type, and CORS header to the client.
-    char status_str[16];
-    snprintf(status_str, sizeof(status_str), "%d", status_code);
-    httpd_resp_set_status(req, status_str);
-    if (!resp_content_type.empty())
-        httpd_resp_set_type(req, resp_content_type.c_str());
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-
-    // Stream upstream response body back to the client.
-    char *obuf = (char *)psram_malloc(http_SEND_BUFF_SIZE);
-    if (obuf) {
-        int n;
-        while ((n = esp_http_client_read(client, obuf, http_SEND_BUFF_SIZE)) > 0)
-            httpd_resp_send_chunk(req, obuf, n);
-        free(obuf);
-    }
-    httpd_resp_send_chunk(req, nullptr, 0);
-
-    esp_http_client_close(client);
-    esp_http_client_cleanup(client);
-    return ESP_OK;
-}
-
-void cHttpdServer::proxy_register(httpd_handle_t server)
-{
-    httpd_uri_t proxy = {
-        .uri = "/proxy",
-        .method = HTTP_GET,
-        .handler = proxy_handler,
-        .user_ctx = NULL,
-        .is_websocket = false
-    };
-    httpd_register_uri_handler(server, &proxy);
-    proxy.method = HTTP_POST;
-    httpd_register_uri_handler(server, &proxy);
-}
-
-esp_err_t cHttpdServer::websocket_handler(httpd_req_t *req)
-{
-    if (req->method == HTTP_GET) {
-        Debug_printv("Handshake done, the new connection was opened");
-        return ESP_OK;
-    }
-    httpd_ws_frame_t ws_pkt;
-    uint8_t *buf = NULL;
-    memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
-    ws_pkt.type = HTTPD_WS_TYPE_TEXT;
-    /* Set max_len = 0 to get the frame len */
-    esp_err_t ret = httpd_ws_recv_frame(req, &ws_pkt, 0);
-    if (ret != ESP_OK) {
-        Debug_printv("httpd_ws_recv_frame failed to get frame len with %d", ret);
-        return ret;
-    }
-    //Debug_printv("frame len is %d", ws_pkt.len);
-    if (ws_pkt.len) {
-        /* ws_pkt.len + 1 is for NULL termination as we are expecting a string */
-        buf = (uint8_t *)calloc(1, ws_pkt.len + 1);
-        if (buf == NULL) {
-            Debug_printv("Failed to calloc memory for buf");
-            return ESP_ERR_NO_MEM;
-        }
-        ws_pkt.payload = buf;
-        /* Set max_len = ws_pkt.len to get the frame payload */
-        ret = httpd_ws_recv_frame(req, &ws_pkt, ws_pkt.len);
-        if (ret != ESP_OK) {
-            Debug_printv("httpd_ws_recv_frame failed with %d", ret);
-            free(buf);
-            return ret;
-        }
-        //Debug_printv("Got packet with message: %s", ws_pkt.payload);
-        WsCommandExecutor executor;
-        executor.dispatch(buf, ws_pkt.len);
-
-        // Broadcast the message to all other connected WebSocket clients
-        std::string msg = std::string((char*)ws_pkt.payload);
-        websocket_send_all(msg.c_str(), msg.length());
-    }
-
-    // ret = httpd_ws_send_frame(req, &ws_pkt);
-    // if (ret != ESP_OK) {
-    //     Debug_printv("httpd_ws_send_frame failed with %d", ret);
-    // }
-    free(buf);
-    return ESP_OK;
-}
-
-void cHttpdServer::websocket_register(httpd_handle_t server)
-{
-    httpd_uri_t ws = {
-        .uri = "/ws",
-        .method = HTTP_GET,
-        .handler = websocket_handler,
-        .user_ctx = NULL,
-        .is_websocket = true
-    };
-
-    httpd_register_uri_handler(server, &ws);
-}
-
-// esp_err_t cHttpdServer::websocket_trigger_async_send(httpd_handle_t handle, httpd_req_t *req)
-// {
-//     struct async_resp_arg *resp_arg = (async_resp_arg *)malloc(sizeof(struct async_resp_arg));
-//     if (resp_arg == NULL) {
-//         return ESP_ERR_NO_MEM;
-//     }
-//     resp_arg->hd = req->handle;
-//     resp_arg->fd = httpd_req_to_sockfd(req);
-//     esp_err_t ret = httpd_queue_work(handle, websocket_async_send, resp_arg);
-//     if (ret != ESP_OK) {
-//         free(resp_arg);
-//     }
-//     return ret;
-// }
-
-// void cHttpdServer::websocket_async_send(void *arg)
-// {
-//     static const char * data = "Async data from MEATLOAF!";
-//     struct async_resp_arg *resp_arg = (async_resp_arg *)arg;
-//     httpd_handle_t hd = resp_arg->hd;
-//     int fd = resp_arg->fd;
-//     httpd_ws_frame_t ws_pkt;
-//     memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
-//     ws_pkt.payload = (uint8_t*)data;
-//     ws_pkt.len = strlen(data);
-//     ws_pkt.type = HTTPD_WS_TYPE_TEXT;
-
-//     httpd_ws_send_frame_async(hd, fd, &ws_pkt);
-//     free(resp_arg);
-// }
-
-esp_err_t cHttpdServer::webdav_handler(httpd_req_t *httpd_req)
-{
-    WebDav::Server *server = (WebDav::Server *)httpd_req->user_ctx;
-    WebDav::Request req(httpd_req);
-    WebDav::Response resp(httpd_req);
-    int ret;
-
-    Debug_printv("uri[%s]", httpd_req->uri);
-
-    if ( !req.parseRequest() )
-    {
-        resp.setStatus(400); // Bad Request
-        resp.flushHeaders();
-        resp.closeBody();
-        return ESP_OK;
-    }
-
-    // httpd_resp_set_hdr(httpd_req, "Access-Control-Allow-Origin", "*");
-    // httpd_resp_set_hdr(httpd_req, "Access-Control-Allow-Headers", "*");
-    // httpd_resp_set_hdr(httpd_req, "Access-Control-Allow-Methods", "*");
-
-    Debug_printv("%d %s[%s]", httpd_req->method, http_method_str((enum http_method)httpd_req->method), httpd_req->uri);
-    //trace_webdav_request(httpd_req, req);
-    //Debug_memory();
-
-    switch (httpd_req->method)
-    {
-    case HTTP_COPY:
-        ret = server->doCopy(req, resp);
-        break;
-    case HTTP_DELETE:
-        ret = server->doDelete(req, resp);
-        break;
-    case HTTP_GET:
-        ret = server->doGet(req, resp);
-        if ( ret == 200 )
-            return ESP_OK;
-        break;
-    case HTTP_HEAD:
-        ret = server->doHead(req, resp);
-        break;
-    case HTTP_LOCK:
-        ret = server->doLock(req, resp);
-        if ( ret == 200 )
-            return ESP_OK;
-        break;
-    case HTTP_MKCOL:
-        ret = server->doMkcol(req, resp);
-        break;
-    case HTTP_MOVE:
-        ret = server->doMove(req, resp);
-        break;
-    case HTTP_OPTIONS:
-        ret = server->doOptions(req, resp);
-        break;
-    case HTTP_PROPFIND:
-        ret = server->doPropfind(req, resp);
-        if (ret == 207)
-            return ESP_OK;
-        break;
-    case HTTP_PROPPATCH:
-        ret = server->doProppatch(req, resp);
-        if (ret == 207)
-            return ESP_OK;
-        break;
-    case HTTP_PUT:
-        ret = server->doPut(req, resp);
-        break;
-    case HTTP_UNLOCK:
-        ret = server->doUnlock(req, resp);
-        break;
-    default:
-        return ESP_ERR_HTTPD_INVALID_REQ;
-        break;
-    }
-
-    resp.setStatus(ret);
-
-    if ( (ret > 399) & (httpd_req->method != HTTP_HEAD) )
-    {
-        // Send error page
-        send_http_error(httpd_req, ret);
-    }
-    else
-    {
-        // Send empty response
-        resp.flushHeaders();
-        resp.closeBody();
-    }
-
-    //Debug_printv("ret[%d]", ret);
-
-    return ESP_OK;
-}
-
-void cHttpdServer::webdav_register(httpd_handle_t server, const char *root_uri, const char *root_path)
-{
-    WebDav::Server *webDavServer = new WebDav::Server(root_uri, root_path);
-
-    // Use a static string so the pointer remains valid for the lifetime of the server.
-    // asprintf() here was a leak: ESP-IDF stores the URI pointer without copying it.
-    static std::string dav_uri_pattern;
-    // "/*" matches bare "/" and all sub-paths; "/?*" requires at least one char
-    // after the slash and excludes the root, breaking Windows Explorer WebDAV.
-    if (strlen(root_uri) > 1)
-        dav_uri_pattern = std::string(root_uri) + "/*";
-    else
-        dav_uri_pattern = "/*";
-
-    httpd_uri_t uri_dav = {
-        .uri = dav_uri_pattern.c_str(),
-        .method = http_method(0),
-        .handler = webdav_handler,
-        .user_ctx = webDavServer,
-        .is_websocket = false
-    };
-
-    http_method methods[] = {
-        HTTP_COPY,
-        HTTP_DELETE,
-        HTTP_HEAD,
-        HTTP_LOCK,
-        HTTP_MKCOL,
-        HTTP_MOVE,
-        HTTP_OPTIONS,
-        HTTP_PROPFIND,
-        HTTP_PROPPATCH,
-        HTTP_PUT,
-        HTTP_UNLOCK,
-    };
-
-    for (int i = 0; i < sizeof(methods) / sizeof(methods[0]); i++)
-    {
-        uri_dav.method = methods[i];
-        httpd_register_uri_handler(server, &uri_dav);
-    }
-}
-
 void cHttpdServer::custom_global_ctx_free(void *ctx)
 {
     // keep this commented for the moment to avoid warning.
@@ -634,9 +230,13 @@ httpd_handle_t cHttpdServer::start_server(serverstate &state)
 
     if (httpd_start(&(state.hServer), &config) == ESP_OK)
     {
-        /* Register URI handlers */
-        websocket_register(state.hServer);
+        // Register proxy handlers
         proxy_register(state.hServer);
+
+        // Register WebSocket handlers
+        websocket_register(state.hServer);
+        
+        // Register WebDAV handlers
         //webdav_register(state.hServer, "/dav", "/");
         webdav_register(state.hServer);
 
@@ -645,12 +245,12 @@ httpd_handle_t cHttpdServer::start_server(serverstate &state)
         httpd_register_uri_handler(state.hServer, &uri_post);
 
         s_server = state.hServer;
-        printf(ANSI_GREEN_BOLD "WWW/WS/WebDAV Server Started!" ANSI_RESET "\r\n");
+        printf(ANSI_GREEN_BOLD "WWW/PROXY/WS/WebDAV Server Started!" ANSI_RESET "\r\n");
     }
     else
     {
         state.hServer = NULL;
-        printf(ANSI_RED_BOLD "WWW/WS/WebDAV Server FAILED to start!" ANSI_RESET "\r\n");
+        printf(ANSI_RED_BOLD "WWW/PROXY/WS/WebDAV Server FAILED to start!" ANSI_RESET "\r\n");
     }
 
     return state.hServer;
@@ -1008,27 +608,6 @@ void cHttpdServer::send_http_error(httpd_req_t *req, int errnum)
     //     snprintf(msg, sizeof(msg), "Error %d", errnum);
     //     httpd_resp_send(req, msg, strlen(msg));
     // }
-}
-
-void cHttpdServer::websocket_send_all(const char* data, size_t len)
-{
-    //Debug_printv("Broadcasting message to all websocket clients: [%s]", data);
-    if (!s_server || !data || len == 0) return;
-
-    broadcast_arg *b = (broadcast_arg*)malloc(sizeof(broadcast_arg));
-    if (!b) return;
-
-    b->hd   = s_server;
-    b->data = (uint8_t*)psram_malloc(len);
-    if (!b->data) { free(b); return; }
-
-    memcpy(b->data, data, len);
-    b->len = len;
-
-    if (httpd_queue_work(s_server, websocket_broadcast_send, b) != ESP_OK) {
-        free(b->data);
-        free(b);
-    }
 }
 
 /* Set up and start the web server
