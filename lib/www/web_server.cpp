@@ -106,10 +106,14 @@ static esp_err_t get_handler(httpd_req_t *httpd_req)
     queryString = uri.substr(uri.find("?") + 1);
     uri = uri.substr(0, uri.find("?"));
 
-    {
-        send_file(httpd_req, uri.c_str());
+    // If a proxy base is active, forward this request to the remote host.
+    // The full request path (including query string) is appended to the base origin.
+    if (!proxy_base_url().empty()) {
+        std::string full_url = proxy_base_url() + mstr::urlDecode(httpd_req->uri);
+        return proxy_fetch(httpd_req, full_url.c_str());
     }
 
+    send_file(httpd_req, uri.c_str());
     return ESP_OK;
 }
 

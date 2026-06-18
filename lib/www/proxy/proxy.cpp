@@ -21,12 +21,15 @@
 #include "proxy.h"
 #include "../web_server.h"
 
+#include "../include/debug.h"
 #include "string_utils.h"
 
 #include <esp_heap_caps.h>
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
+#include <vector>
+#include <utility>
 
 static inline void *psram_malloc(size_t sz)
 {
@@ -34,33 +37,60 @@ static inline void *psram_malloc(size_t sz)
     return p ? p : malloc(sz);
 }
 
+// Hop-by-hop headers that must not be forwarded to the client.
+// Content-Length is also excluded because we use chunked transfer.
+static const char * const kHopByHop[] = {
+    "Connection", "Keep-Alive", "Transfer-Encoding", "Content-Length",
+    "TE", "Trailers", "Upgrade", "Proxy-Authenticate", "Proxy-Authorization",
+    nullptr
+};
+
+struct ProxyRespInfo {
+    std::string content_type;
+    std::vector<std::pair<std::string, std::string>> headers;
+};
+
+// Stored origin from the last /proxy request; empty means proxy is inactive.
+// Single-user embedded device — global state is appropriate here.
+static std::string s_proxy_base_url;
+
+const std::string &proxy_base_url() { return s_proxy_base_url; }
+void proxy_clear_base()             { s_proxy_base_url.clear(); }
+
+static std::string extract_origin(const std::string &url)
+{
+    size_t scheme_end = url.find("://");
+    if (scheme_end == std::string::npos) return "";
+    size_t path_start = url.find('/', scheme_end + 3);
+    return (path_start == std::string::npos) ? url : url.substr(0, path_start);
+}
+
 static esp_err_t proxy_event_handler(esp_http_client_event_t *evt)
 {
-    if (evt->event_id == HTTP_EVENT_ON_HEADER && evt->user_data
-            && strcasecmp(evt->header_key, "Content-Type") == 0)
-        *static_cast<std::string *>(evt->user_data) = evt->header_value;
+    if (evt->event_id != HTTP_EVENT_ON_HEADER || !evt->user_data)
+        return ESP_OK;
+    ProxyRespInfo *info = static_cast<ProxyRespInfo *>(evt->user_data);
+    if (strcasecmp(evt->header_key, "Content-Type") == 0)
+        info->content_type = evt->header_value;
+    else
+        info->headers.emplace_back(evt->header_key, evt->header_value);
     return ESP_OK;
 }
 
-esp_err_t proxy_handler(httpd_req_t *req)
+esp_err_t proxy_fetch(httpd_req_t *req, const char *target_url)
 {
-    const char *q = strchr(req->uri, '?');
-    if (!q || *(q + 1) == '\0') {
-        HttpServer::send_http_error(req, 400);
-        return ESP_OK;
-    }
-    std::string target_url = mstr::urlDecode(q + 1);
-
     esp_http_client_method_t method =
         (req->method == HTTP_POST) ? HTTP_METHOD_POST : HTTP_METHOD_GET;
 
-    std::string resp_content_type;
+    Debug_printv("proxy_fetch method[%d] url[%s]", method, target_url);
+
+    ProxyRespInfo resp_info;
     esp_http_client_config_t cfg = {};
-    cfg.url           = target_url.c_str();
+    cfg.url           = target_url;
     cfg.method        = method;
     cfg.timeout_ms    = 10000;
     cfg.event_handler = proxy_event_handler;
-    cfg.user_data     = &resp_content_type;
+    cfg.user_data     = &resp_info;
     cfg.skip_cert_common_name_check = true;
 
     esp_http_client_handle_t client = esp_http_client_init(&cfg);
@@ -76,7 +106,7 @@ esp_err_t proxy_handler(httpd_req_t *req)
         "Accept", "Accept-Encoding", "Accept-Language",
         "Authorization", "Cache-Control", "Client-Id", "Content-Type",
         "If-Modified-Since", "If-None-Match",
-        "Origin", "Referer", "User-Agent", "Client-Id",
+        "Origin", "Referer", "User-Agent",
         nullptr
     };
     for (int i = 0; kFwdHeaders[i]; i++) {
@@ -87,8 +117,10 @@ esp_err_t proxy_handler(httpd_req_t *req)
             if (hlen == 0) continue;
             char *val = (char *)malloc(hlen + 1);
             if (!val) continue;
-            if (httpd_req_get_hdr_value_str(req, hdr, val, hlen + 1) == ESP_OK)
+            if (httpd_req_get_hdr_value_str(req, hdr, val, hlen + 1) == ESP_OK) {
                 esp_http_client_set_header(client, kFwdHeaders[i], val);
+                Debug_printv("  fwd header[%s: %s]", kFwdHeaders[i], val);
+            }
             free(val);
             break;
         }
@@ -128,8 +160,19 @@ esp_err_t proxy_handler(httpd_req_t *req)
     char status_str[16];
     snprintf(status_str, sizeof(status_str), "%d", status_code);
     httpd_resp_set_status(req, status_str);
-    if (!resp_content_type.empty())
-        httpd_resp_set_type(req, resp_content_type.c_str());
+
+    if (!resp_info.content_type.empty())
+        httpd_resp_set_type(req, resp_info.content_type.c_str());
+
+    // Forward upstream response headers, skipping hop-by-hop ones.
+    // resp_info lives on this stack frame and remains valid until send_chunk below.
+    for (auto &h : resp_info.headers) {
+        bool skip = false;
+        for (int i = 0; kHopByHop[i]; i++)
+            if (strcasecmp(h.first.c_str(), kHopByHop[i]) == 0) { skip = true; break; }
+        if (!skip)
+            httpd_resp_set_hdr(req, h.first.c_str(), h.second.c_str());
+    }
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
 
     char *obuf = (char *)psram_malloc(http_SEND_BUFF_SIZE);
@@ -144,6 +187,25 @@ esp_err_t proxy_handler(httpd_req_t *req)
     esp_http_client_close(client);
     esp_http_client_cleanup(client);
     return ESP_OK;
+}
+
+esp_err_t proxy_handler(httpd_req_t *req)
+{
+    const char *q = strchr(req->uri, '?');
+    if (!q || *(q + 1) == '\0') {
+        // No URL argument — clear the stored proxy base
+        proxy_clear_base();
+        Debug_printv("proxy: base cleared");
+        httpd_resp_send(req, "OK", 2);
+        return ESP_OK;
+    }
+    std::string target_url = mstr::urlDecode(q + 1);
+
+    // Store the origin so subsequent bare-path requests are also proxied
+    s_proxy_base_url = extract_origin(target_url);
+    Debug_printv("proxy: base set to [%s]", s_proxy_base_url.c_str());
+
+    return proxy_fetch(req, target_url.c_str());
 }
 
 void proxy_register(httpd_handle_t server)
