@@ -727,19 +727,38 @@ struct PsramPath {
     PsramPath &operator=(const PsramPath &) = delete;
 };
 
-static void updatedb_scan(sqlite3 *db, sqlite3_stmt *insert_stmt, sqlite3_stmt *mark_stmt,
+// dir_ins_stmt : INSERT OR IGNORE INTO dirs (path) VALUES (?)
+// dir_id_stmt  : SELECT id FROM dirs WHERE path = ?
+// file_ins_stmt: INSERT OR REPLACE INTO files (dir_id, name, size, mtime, is_dir) VALUES (?,?,?,?,?)
+// mark_stmt    : UPDATE dirs SET scanned=1 WHERE path=?
+static void updatedb_scan(sqlite3 *db,
+                           sqlite3_stmt *dir_ins_stmt,
+                           sqlite3_stmt *dir_id_stmt,
+                           sqlite3_stmt *file_ins_stmt,
+                           sqlite3_stmt *mark_stmt,
                            std::vector<PsramPath> dirs,
                            const std::unordered_set<std::string>& skip_dirs)
 {
     char full[PATH_MAX];
     int  batch = 0;
 
-    /* Mark a directory as fully scanned in the DB so resume can skip it. */
     auto mark_scanned = [&](const char *rel) {
-        if (!mark_stmt || rel[0] == '\0') return;  // nothing to mark for root
         sqlite3_reset(mark_stmt);
         sqlite3_bind_text(mark_stmt, 1, rel, -1, SQLITE_STATIC);
         sqlite3_step(mark_stmt);
+    };
+
+    // Ensure a directory exists in `dirs` and return its id.
+    auto get_or_create_dir = [&](const char *rel) -> sqlite3_int64 {
+        sqlite3_reset(dir_ins_stmt);
+        sqlite3_bind_text(dir_ins_stmt, 1, rel, -1, SQLITE_STATIC);
+        sqlite3_step(dir_ins_stmt);
+        sqlite3_reset(dir_id_stmt);
+        sqlite3_bind_text(dir_id_stmt, 1, rel, -1, SQLITE_STATIC);
+        sqlite3_int64 id = 0;
+        if (sqlite3_step(dir_id_stmt) == SQLITE_ROW)
+            id = sqlite3_column_int64(dir_id_stmt, 0);
+        return id;
     };
 
     while (!dirs.empty() && !s_scan_stop) {
@@ -747,9 +766,12 @@ static void updatedb_scan(sqlite3 *db, sqlite3_stmt *insert_stmt, sqlite3_stmt *
         dirs.pop_back();
         if (!cur.s) continue;
 
+        const char *cur_rel = cur.s + 3;   // relative to /sd, e.g. "" for root, "/games" for subdir
+        sqlite3_int64 cur_dir_id = get_or_create_dir(cur_rel);
+
         DIR *d = opendir(cur.s);
         if (!d) {
-            mark_scanned(cur.s + 3);  // don't retry this dir on resume
+            mark_scanned(cur_rel);
             continue;
         }
 
@@ -768,38 +790,37 @@ static void updatedb_scan(sqlite3 *db, sqlite3_stmt *insert_stmt, sqlite3_stmt *
                 continue;
             }
 
-            const char *rel = full + 3;  // relative to /sd
-
             struct stat st;
             if (stat(full, &st) != 0) continue;
 
             int is_dir = S_ISDIR(st.st_mode) ? 1 : 0;
 
-            sqlite3_reset(insert_stmt);
-            sqlite3_bind_text(insert_stmt, 1, rel, -1, SQLITE_STATIC);
-            sqlite3_bind_int64(insert_stmt, 2, (sqlite3_int64)st.st_size);
-            sqlite3_bind_int64(insert_stmt, 3, (sqlite3_int64)st.st_mtime);
-            sqlite3_bind_int(insert_stmt, 4, is_dir);
-            int rc = sqlite3_step(insert_stmt);
+            sqlite3_reset(file_ins_stmt);
+            sqlite3_bind_int64(file_ins_stmt, 1, cur_dir_id);
+            sqlite3_bind_text(file_ins_stmt, 2, ent->d_name, -1, SQLITE_STATIC);
+            sqlite3_bind_int64(file_ins_stmt, 3, (sqlite3_int64)st.st_size);
+            sqlite3_bind_int64(file_ins_stmt, 4, (sqlite3_int64)st.st_mtime);
+            sqlite3_bind_int(file_ins_stmt, 5, is_dir);
+            int rc = sqlite3_step(file_ins_stmt);
             if (rc != SQLITE_DONE) {
                 s_scan_errors = s_scan_errors + 1;
                 if (s_scan_errors <= 3)
-                    Serial.printf("  insert error %d: %s — %s\r\n",
-                                  rc, sqlite3_errmsg(db), rel);
+                    Serial.printf("  insert error %d: %s — %s/%s\r\n",
+                                  rc, sqlite3_errmsg(db), cur_rel, ent->d_name);
             }
 
             if (is_dir) {
                 s_scan_dirs = s_scan_dirs + 1;
-                if (skip_dirs.count(rel))
-                    mark_scanned(rel);  // INSERT OR REPLACE reset scanned=0; restore it
+                const char *sub_rel = full + 3;
+                get_or_create_dir(sub_rel);  // ensure dirs row exists for resume tracking
+                if (skip_dirs.count(sub_rel))
+                    mark_scanned(sub_rel);
                 else
                     dirs.emplace_back(full);
             } else {
                 s_scan_files = s_scan_files + 1;
             }
 
-            // Commit every 1000 rows. journal_mode=DELETE resets the pager
-            // state on each COMMIT/BEGIN cycle via the journal file lifecycle.
             if (++batch >= 1000) {
                 if (!sqlite3_get_autocommit(db)) {
                     char *cerr = nullptr;
@@ -814,7 +835,6 @@ static void updatedb_scan(sqlite3 *db, sqlite3_stmt *insert_stmt, sqlite3_stmt *
                     Serial.printf("  BEGIN failed: %s\r\n",
                                   berr ? berr : sqlite3_errmsg(db));
                     sqlite3_free(berr);
-                    // auto-commit fallback: rows still saved one-by-one
                 }
                 batch = 0;
             }
@@ -828,9 +848,9 @@ static void updatedb_scan(sqlite3 *db, sqlite3_stmt *insert_stmt, sqlite3_stmt *
                                   MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL));
         }
         closedir(d);
-        mark_scanned(cur.s + 3);
-        s_scan_last_folder = cur.s + 3;
-        vTaskDelay(1);  // yield after each directory so SDMMC DMA can complete
+        mark_scanned(cur_rel);
+        s_scan_last_folder = cur_rel;
+        vTaskDelay(1);
     }
 }
 
@@ -839,9 +859,11 @@ static void updatedb_task(void *arg)
     // SQLITE_OMIT_AUTOINIT: must init before sqlite3_open().
     sqlite_one_time_init();
 
-    sqlite3      *db          = nullptr;
-    sqlite3_stmt *insert_stmt = nullptr;
-    sqlite3_stmt *mark_stmt   = nullptr;
+    sqlite3      *db            = nullptr;
+    sqlite3_stmt *dir_ins_stmt  = nullptr;   // INSERT OR IGNORE INTO dirs (path)
+    sqlite3_stmt *dir_id_stmt   = nullptr;   // SELECT id FROM dirs WHERE path=?
+    sqlite3_stmt *file_ins_stmt = nullptr;   // INSERT OR REPLACE INTO files (dir_id,name,...)
+    sqlite3_stmt *mark_stmt     = nullptr;   // UPDATE dirs SET scanned=1 WHERE path=?
     std::vector<PsramPath>          initial_dirs;
     std::unordered_set<std::string> skip_dirs;
 
@@ -882,20 +904,32 @@ static void updatedb_task(void *arg)
 
         apply_pragmas(db);
 
-        // No explicit idx_path: "path TEXT PRIMARY KEY" already creates a unique
-        // B-tree index on path.  A second index doubles write work per INSERT.
         const char *schema =
             "DROP TABLE IF EXISTS files_fts;"
             "DROP TABLE IF EXISTS files;"
+            "DROP TABLE IF EXISTS dirs;"
+            // dirs: one row per unique directory path; scanned=1 once all children are indexed.
+            "CREATE TABLE dirs ("
+            "  id      INTEGER PRIMARY KEY,"
+            "  path    TEXT    NOT NULL UNIQUE,"
+            "  scanned INTEGER NOT NULL DEFAULT 0"
+            ");"
+            // files: every entry (file or subdir) stored under its parent dir_id.
+            // UNIQUE(dir_id,name) lets INSERT OR REPLACE handle re-scans cleanly.
             "CREATE TABLE files ("
-            "  path    TEXT    PRIMARY KEY,"
+            "  id      INTEGER PRIMARY KEY,"
+            "  dir_id  INTEGER NOT NULL,"
+            "  name    TEXT    NOT NULL,"
             "  size    INTEGER NOT NULL DEFAULT 0,"
             "  mtime   INTEGER NOT NULL DEFAULT 0,"
             "  is_dir  INTEGER NOT NULL DEFAULT 0,"
-            "  scanned INTEGER NOT NULL DEFAULT 0"
+            "  UNIQUE(dir_id, name)"
             ");"
+            "CREATE INDEX files_dir_idx ON files(dir_id);"
+            // FTS5 with content='' stores only the inverted token index, not the
+            // original text — the full path is reconstructed via JOIN at query time.
             "CREATE VIRTUAL TABLE files_fts USING fts5("
-            "  path, tokenize=\"unicode61\""
+            "  path, content='', tokenize=\"unicode61\""
             ");"
             "CREATE TABLE status ("
             "  id          INTEGER PRIMARY KEY DEFAULT 1,"
@@ -931,18 +965,22 @@ static void updatedb_task(void *arg)
 
         apply_pragmas(db);
 
-        // Migrate older DBs that lack the scanned column; ignore error if already present.
-        sqlite3_exec(db,
-            "ALTER TABLE files ADD COLUMN scanned INTEGER NOT NULL DEFAULT 0",
-            nullptr, nullptr, nullptr);
+        // Detect old single-table schema (no `dirs` table).
+        {
+            sqlite3_stmt *chk = nullptr;
+            bool has_dirs = (sqlite3_prepare_v2(db, "SELECT id FROM dirs LIMIT 1",
+                                                -1, &chk, nullptr) == SQLITE_OK);
+            sqlite3_finalize(chk);
+            if (!has_dirs) {
+                Serial.printf("updatedb: schema outdated — run 'updatedb start' to rebuild.\r\n");
+                sqlite3_close(db);
+                s_scan_running = 0;
+                vTaskDelete(NULL);
+                return;
+            }
+        }
 
-        // Migrate older DBs that lack the FTS5 table.
-        sqlite3_exec(db,
-            "CREATE VIRTUAL TABLE IF NOT EXISTS files_fts "
-            "USING fts5(path, tokenize=\"unicode61\")",
-            nullptr, nullptr, nullptr);
-
-        // Migrate older DBs that lack the status table.
+        // Migrate: add status table if absent.
         sqlite3_exec(db,
             "CREATE TABLE IF NOT EXISTS status ("
             "  id INTEGER PRIMARY KEY DEFAULT 1,"
@@ -958,7 +996,7 @@ static void updatedb_task(void *arg)
         {
             sqlite3_stmt *q = nullptr;
             if (sqlite3_prepare_v2(db,
-                    "SELECT path FROM files WHERE is_dir=1 AND scanned=1",
+                    "SELECT path FROM dirs WHERE scanned=1",
                     -1, &q, nullptr) == SQLITE_OK) {
                 while (sqlite3_step(q) == SQLITE_ROW) {
                     const char *p = (const char *)sqlite3_column_text(q, 0);
@@ -968,14 +1006,14 @@ static void updatedb_task(void *arg)
             }
         }
 
-        // Always re-scan /sd root so any entries missing from the DB are picked up.
+        // Always re-scan /sd root so any root-level entries missing from the DB are picked up.
         initial_dirs.emplace_back("/sd");
 
-        // Seed with directories that were found but not yet processed.
+        // Seed with directories that were discovered but not yet fully scanned.
         {
             sqlite3_stmt *q = nullptr;
             if (sqlite3_prepare_v2(db,
-                    "SELECT path FROM files WHERE is_dir=1 AND scanned=0",
+                    "SELECT path FROM dirs WHERE scanned=0",
                     -1, &q, nullptr) == SQLITE_OK) {
                 while (sqlite3_step(q) == SQLITE_ROW) {
                     const char *p = (const char *)sqlite3_column_text(q, 0);
@@ -993,25 +1031,34 @@ static void updatedb_task(void *arg)
                       initial_dirs.size(), skip_dirs.size());
     }
 
-    const char *insert_sql =
-        "INSERT OR REPLACE INTO files (path, size, mtime, is_dir) VALUES (?, ?, ?, ?)";
-    if (sqlite3_prepare_v2(db, insert_sql, -1, &insert_stmt, nullptr) != SQLITE_OK) {
-        Serial.printf("updatedb: prepare failed: %s\r\n", sqlite3_errmsg(db));
+    // Prepare the four statements used by updatedb_scan.
+    auto prep_fail = [&](const char *label) {
+        Serial.printf("updatedb: prepare %s failed: %s\r\n", label, sqlite3_errmsg(db));
+        sqlite3_finalize(dir_ins_stmt);
+        sqlite3_finalize(dir_id_stmt);
+        sqlite3_finalize(file_ins_stmt);
+        sqlite3_finalize(mark_stmt);
         sqlite3_close(db);
         s_scan_running = 0;
         vTaskDelete(NULL);
-        return;
-    }
+    };
 
-    const char *mark_sql = "UPDATE files SET scanned=1 WHERE path=?";
-    if (sqlite3_prepare_v2(db, mark_sql, -1, &mark_stmt, nullptr) != SQLITE_OK) {
-        Serial.printf("updatedb: prepare mark failed: %s\r\n", sqlite3_errmsg(db));
-        sqlite3_finalize(insert_stmt);
-        sqlite3_close(db);
-        s_scan_running = 0;
-        vTaskDelete(NULL);
-        return;
-    }
+    if (sqlite3_prepare_v2(db,
+            "INSERT OR IGNORE INTO dirs (path) VALUES (?)",
+            -1, &dir_ins_stmt, nullptr) != SQLITE_OK) { prep_fail("dir_ins"); return; }
+
+    if (sqlite3_prepare_v2(db,
+            "SELECT id FROM dirs WHERE path=?",
+            -1, &dir_id_stmt, nullptr) != SQLITE_OK) { prep_fail("dir_id"); return; }
+
+    if (sqlite3_prepare_v2(db,
+            "INSERT OR REPLACE INTO files (dir_id, name, size, mtime, is_dir)"
+            " VALUES (?, ?, ?, ?, ?)",
+            -1, &file_ins_stmt, nullptr) != SQLITE_OK) { prep_fail("file_ins"); return; }
+
+    if (sqlite3_prepare_v2(db,
+            "UPDATE dirs SET scanned=1 WHERE path=?",
+            -1, &mark_stmt, nullptr) != SQLITE_OK) { prep_fail("mark"); return; }
 
     s_scan_errors = 0;
     char *begin_err = nullptr;
@@ -1020,7 +1067,8 @@ static void updatedb_task(void *arg)
                       begin_err ? begin_err : sqlite3_errmsg(db));
         sqlite3_free(begin_err);
     }
-    updatedb_scan(db, insert_stmt, mark_stmt, std::move(initial_dirs), skip_dirs);
+    updatedb_scan(db, dir_ins_stmt, dir_id_stmt, file_ins_stmt, mark_stmt,
+                  std::move(initial_dirs), skip_dirs);
 
     // Commit whatever the last partial batch left in-transaction.
     if (!sqlite3_get_autocommit(db)) {
@@ -1032,7 +1080,9 @@ static void updatedb_task(void *arg)
         }
     }
 
-    sqlite3_finalize(insert_stmt);
+    sqlite3_finalize(dir_ins_stmt);
+    sqlite3_finalize(dir_id_stmt);
+    sqlite3_finalize(file_ins_stmt);
     sqlite3_finalize(mark_stmt);
 
     if (!s_scan_stop) {
@@ -1054,7 +1104,9 @@ static void updatedb_task(void *arg)
         sqlite3_stmt *sel_stmt = nullptr;
         sqlite3_stmt *ins_stmt = nullptr;
         sqlite3_prepare_v2(db,
-            "SELECT rowid, path FROM files ORDER BY rowid",
+            "SELECT files.id, dirs.path || '/' || files.name"
+            " FROM files JOIN dirs ON dirs.id = files.dir_id"
+            " ORDER BY files.id",
             -1, &sel_stmt, nullptr);
         sqlite3_prepare_v2(db,
             "INSERT INTO files_fts(rowid, path) VALUES(?, ?)",
@@ -1305,15 +1357,17 @@ int locate(int argc, char **argv)
     if (is_simple) fts_pattern += "*";
 
     const char *fts_sql =
-        "SELECT path, size, is_dir FROM files "
-        "WHERE rowid IN (SELECT rowid FROM files_fts WHERE files_fts MATCH ?) "
-        "ORDER BY path";
+        "SELECT dirs.path || '/' || files.name, files.size, files.is_dir"
+        " FROM files JOIN dirs ON dirs.id = files.dir_id"
+        " WHERE files.id IN (SELECT rowid FROM files_fts WHERE files_fts MATCH ?)"
+        " ORDER BY dirs.path, files.name";
 
     sqlite3_stmt *stmt = nullptr;
     std::string bound_pattern;
     if (sqlite3_prepare_v2(db, fts_sql, -1, &stmt, nullptr) == SQLITE_OK) {
         bound_pattern = fts_pattern;
     } else {
+        // FTS prepare failed — try LIKE on the same normalized schema.
         bool has_wildcards = strchr(argv[1], '*') || strchr(argv[1], '?');
         std::string like_pattern(argv[1]);
         for (char &c : like_pattern) {
@@ -1322,9 +1376,12 @@ int locate(int argc, char **argv)
         }
         if (!has_wildcards) like_pattern = "%" + like_pattern + "%";
         const char *like_sql =
-            "SELECT path, size, is_dir FROM files WHERE path LIKE ? ORDER BY path";
+            "SELECT dirs.path || '/' || files.name, files.size, files.is_dir"
+            " FROM files JOIN dirs ON dirs.id = files.dir_id"
+            " WHERE dirs.path || '/' || files.name LIKE ?"
+            " ORDER BY dirs.path, files.name";
         if (sqlite3_prepare_v2(db, like_sql, -1, &stmt, nullptr) != SQLITE_OK) {
-            Serial.printf("locate: %s\r\n", sqlite3_errmsg(db));
+            Serial.printf("locate: database schema outdated — run 'updatedb start' to rebuild.\r\n");
             sqlite3_close(db);
             return EXIT_FAILURE;
         }
