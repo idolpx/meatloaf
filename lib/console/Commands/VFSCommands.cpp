@@ -820,6 +820,109 @@ static void updatedb_scan(sqlite3 *db,
     }
 }
 
+// DELETE journal (the SQLite default) writes the rollback journal to SD and
+// deletes it on each COMMIT.  This properly resets the pager's internal
+// state on every COMMIT/BEGIN cycle, fixing the "cannot commit - no
+// transaction is active" error that journal_mode=OFF has after 2+ cycles
+// with SQLITE_DEFAULT_LOCKING_MODE=1 (EXCLUSIVE).
+// MEMORY journal was tried but rejected: it allocates ~520-byte entries in
+// internal DRAM (below SPIRAM_MALLOC_ALWAYSINTERNAL threshold), exhausting
+// the DMA-capable heap and breaking SDMMC writes at row ~300.
+static void apply_pragmas(sqlite3 *d)
+{
+    sqlite3_exec(d, "PRAGMA journal_mode = DELETE", nullptr, nullptr, nullptr);
+    sqlite3_exec(d, "PRAGMA synchronous = OFF",     nullptr, nullptr, nullptr);
+    // 128 pages from the pre-allocated PSRAM slab (see sqlite3_esp32_init).
+    sqlite3_exec(d, "PRAGMA cache_size = 128",      nullptr, nullptr, nullptr);
+}
+
+// Rebuild the FTS5 index from the existing files+dirs tables.
+// Swaps SQLite to the PSRAM allocator for the duration so FTS5's token hash
+// doesn't exhaust internal DRAM (see sqlite3_esp32_psram_malloc_enter).
+// Prints progress every 100 rows.  Safe to call from any FreeRTOS task.
+static void updatedb_fts_rebuild(void)
+{
+    sqlite_one_time_init();
+    sqlite3_esp32_psram_malloc_enter();
+
+    sqlite3 *db = nullptr;
+    if (sqlite3_open_v2(LOCATE_DB_PATH, &db, SQLITE_OPEN_READWRITE, nullptr) != SQLITE_OK) {
+        Serial.printf("updatedb fts: open failed: %s\r\n", sqlite3_errmsg(db));
+        if (db) sqlite3_close(db);
+        sqlite3_esp32_psram_malloc_exit();
+        return;
+    }
+    apply_pragmas(db);
+
+    int fts_total = 0;
+    {
+        sqlite3_stmt *cnt = nullptr;
+        if (sqlite3_prepare_v2(db, "SELECT count(*) FROM files", -1, &cnt, nullptr) == SQLITE_OK
+                && sqlite3_step(cnt) == SQLITE_ROW)
+            fts_total = sqlite3_column_int(cnt, 0);
+        sqlite3_finalize(cnt);
+    }
+
+    if (fts_total == 0) {
+        Serial.printf("updatedb fts: no files in database — run 'updatedb start' first\r\n");
+        sqlite3_close(db);
+        sqlite3_esp32_psram_malloc_exit();
+        return;
+    }
+
+    Serial.printf("updatedb: building FTS index (%d rows)...\r\n", fts_total);
+    sqlite3_exec(db, "INSERT INTO files_fts(files_fts) VALUES('delete-all')",
+                 nullptr, nullptr, nullptr);
+
+    sqlite3_stmt *sel_stmt = nullptr;
+    sqlite3_stmt *ins_stmt = nullptr;
+    sqlite3_prepare_v2(db,
+        "SELECT files.id, dirs.path || '/' || files.name"
+        " FROM files JOIN dirs ON dirs.id = files.dir_id"
+        " ORDER BY files.id",
+        -1, &sel_stmt, nullptr);
+    sqlite3_prepare_v2(db,
+        "INSERT INTO files_fts(rowid, path) VALUES(?, ?)",
+        -1, &ins_stmt, nullptr);
+
+    int fts_done = 0;
+    time_t fts_start = time(nullptr);
+    sqlite3_exec(db, "BEGIN", nullptr, nullptr, nullptr);
+
+    while (sqlite3_step(sel_stmt) == SQLITE_ROW) {
+        sqlite3_reset(ins_stmt);
+        sqlite3_bind_int64(ins_stmt, 1, sqlite3_column_int64(sel_stmt, 0));
+        sqlite3_bind_text(ins_stmt, 2,
+            (const char *)sqlite3_column_text(sel_stmt, 1), -1, SQLITE_STATIC);
+        sqlite3_step(ins_stmt);
+
+        if (++fts_done % 100 == 0) {
+            int pct = fts_total > 0 ? fts_done * 100 / fts_total : 0;
+            Serial.printf("\r  %d / %d  (%d%%)  %s",
+                          fts_done, fts_total, pct,
+                          mstr::formatDuration((long)(time(nullptr) - fts_start)).c_str());
+            sqlite3_exec(db, "COMMIT;BEGIN", nullptr, nullptr, nullptr);
+            vTaskDelay(1);
+        }
+    }
+    sqlite3_exec(db, "COMMIT", nullptr, nullptr, nullptr);
+    sqlite3_finalize(sel_stmt);
+    sqlite3_finalize(ins_stmt);
+
+    Serial.printf("\r  %d rows indexed in %s.          \r\n",
+                  fts_done, mstr::formatDuration((long)(time(nullptr) - fts_start)).c_str());
+
+    sqlite3_close(db);
+    sqlite3_esp32_psram_malloc_exit();
+}
+
+static void updatedb_fts_task(void *arg)
+{
+    updatedb_fts_rebuild();
+    s_scan_running = 0;
+    vTaskDelete(NULL);
+}
+
 static void updatedb_task(void *arg)
 {
     // SQLITE_OMIT_AUTOINIT: must init before sqlite3_open().
@@ -832,21 +935,6 @@ static void updatedb_task(void *arg)
     sqlite3_stmt *mark_stmt     = nullptr;   // UPDATE dirs SET scanned=1 WHERE path=?
     std::vector<PsramPath>          initial_dirs;
     std::unordered_set<std::string> skip_dirs;
-
-    // DELETE journal (the SQLite default) writes the rollback journal to SD and
-    // deletes it on each COMMIT.  This properly resets the pager's internal
-    // state on every COMMIT/BEGIN cycle, fixing the "cannot commit - no
-    // transaction is active" error that journal_mode=OFF has after 2+ cycles
-    // with SQLITE_DEFAULT_LOCKING_MODE=1 (EXCLUSIVE).
-    // MEMORY journal was tried but rejected: it allocates ~520-byte entries in
-    // internal DRAM (below SPIRAM_MALLOC_ALWAYSINTERNAL threshold), exhausting
-    // the DMA-capable heap and breaking SDMMC writes at row ~300.
-    auto apply_pragmas = [](sqlite3 *d) {
-        sqlite3_exec(d, "PRAGMA journal_mode = DELETE", nullptr, nullptr, nullptr);
-        sqlite3_exec(d, "PRAGMA synchronous = OFF",     nullptr, nullptr, nullptr);
-        // 128 pages from the pre-allocated PSRAM slab (see sqlite_one_time_init).
-        sqlite3_exec(d, "PRAGMA cache_size = 128",      nullptr, nullptr, nullptr);
-    };
 
     if (!s_scan_resume) {
         // ── Fresh scan ────────────────────────────────────────────────────────
@@ -1050,106 +1138,36 @@ static void updatedb_task(void *arg)
     sqlite3_finalize(dir_id_stmt);
     sqlite3_finalize(file_ins_stmt);
     sqlite3_finalize(mark_stmt);
+    sqlite3_close(db);   /* must close before fts_rebuild calls sqlite3_shutdown() */
+    db = nullptr;
 
-    bool fts_psram_active = false;
-    if (!s_scan_stop) {
-        // Close scan DB then swap to PSRAM allocator before reopening for FTS.
-        // See sqlite3_esp32_psram_malloc_enter() for why this is necessary.
-        sqlite3_close(db);
-        db = nullptr;
-        sqlite3_esp32_psram_malloc_enter();
-        fts_psram_active = true;
-
-        if (sqlite3_open_v2(LOCATE_DB_PATH, &db,
-                            SQLITE_OPEN_READWRITE, nullptr) != SQLITE_OK) {
-            Serial.printf("updatedb: FTS reopen failed: %s\r\n", sqlite3_errmsg(db));
-            if (db) sqlite3_close(db);
-            sqlite3_esp32_psram_malloc_exit();
-            s_scan_running = 0;
-            vTaskDelete(NULL);
-            return;
-        }
-        apply_pragmas(db);
-
-        // Get true row count (resume adds to existing rows, so s_scan_files/dirs are partial).
-        int fts_total = 0;
-        {
-            sqlite3_stmt *cnt = nullptr;
-            if (sqlite3_prepare_v2(db, "SELECT count(*) FROM files", -1, &cnt, nullptr) == SQLITE_OK
-                    && sqlite3_step(cnt) == SQLITE_ROW)
-                fts_total = sqlite3_column_int(cnt, 0);
-            sqlite3_finalize(cnt);
-        }
-        Serial.printf("updatedb: building FTS index (%d rows)...\r\n", fts_total);
-
-        // Clear any previous index, then rebuild row by row so we can show progress.
-        sqlite3_exec(db, "INSERT INTO files_fts(files_fts) VALUES('delete-all')",
-                     nullptr, nullptr, nullptr);
-
-        sqlite3_stmt *sel_stmt = nullptr;
-        sqlite3_stmt *ins_stmt = nullptr;
-        sqlite3_prepare_v2(db,
-            "SELECT files.id, dirs.path || '/' || files.name"
-            " FROM files JOIN dirs ON dirs.id = files.dir_id"
-            " ORDER BY files.id",
-            -1, &sel_stmt, nullptr);
-        sqlite3_prepare_v2(db,
-            "INSERT INTO files_fts(rowid, path) VALUES(?, ?)",
-            -1, &ins_stmt, nullptr);
-
-        int fts_done = 0;
-        time_t fts_start = time(nullptr);
-        sqlite3_exec(db, "BEGIN", nullptr, nullptr, nullptr);
-
-        while (sqlite3_step(sel_stmt) == SQLITE_ROW) {
-            sqlite3_reset(ins_stmt);
-            sqlite3_bind_int64(ins_stmt, 1, sqlite3_column_int64(sel_stmt, 0));
-            sqlite3_bind_text(ins_stmt, 2,
-                (const char *)sqlite3_column_text(sel_stmt, 1), -1, SQLITE_STATIC);
-            sqlite3_step(ins_stmt);
-
-            // Commit every 100 rows: limits FTS5's in-memory token accumulation
-            // (which eats internal DRAM) and keeps the DMA heap from exhausting.
-            if (++fts_done % 100 == 0) {
-                int pct = fts_total > 0 ? fts_done * 100 / fts_total : 0;
-                Serial.printf("\r  %d / %d  (%d%%)  %s",
-                              fts_done, fts_total, pct,
-                              mstr::formatDuration((long)(time(nullptr) - fts_start)).c_str());
-                sqlite3_exec(db, "COMMIT;BEGIN", nullptr, nullptr, nullptr);
-                vTaskDelay(1);
-            }
-        }
-        sqlite3_exec(db, "COMMIT", nullptr, nullptr, nullptr);
-        sqlite3_finalize(sel_stmt);
-        sqlite3_finalize(ins_stmt);
-
-        Serial.printf("\r  %d rows indexed in %s.          \r\n",
-                      fts_done, mstr::formatDuration((long)(time(nullptr) - fts_start)).c_str());
-    }
+    if (!s_scan_stop)
+        updatedb_fts_rebuild();
 
     s_scan_end = time(nullptr);
 
     // Persist scan statistics so 'updatedb' (no args) can display them later.
     {
-        sqlite3_stmt *ss = nullptr;
-        const char *status_sql =
-            "INSERT OR REPLACE INTO status"
-            " (id, total_dirs, total_files, last_scan, duration, last_folder)"
-            " VALUES (1, ?, ?, ?, ?, ?)";
-        if (sqlite3_prepare_v2(db, status_sql, -1, &ss, nullptr) == SQLITE_OK) {
-            sqlite3_bind_int(ss,   1, (int)s_scan_dirs);
-            sqlite3_bind_int(ss,   2, (int)s_scan_files);
-            sqlite3_bind_int64(ss, 3, (sqlite3_int64)s_scan_end);
-            sqlite3_bind_int64(ss, 4, (sqlite3_int64)(s_scan_end - s_scan_start));
-            sqlite3_bind_text(ss,  5, s_scan_last_folder.c_str(), -1, SQLITE_TRANSIENT);
-            sqlite3_step(ss);
-            sqlite3_finalize(ss);
+        sqlite3 *sdb = nullptr;
+        if (sqlite3_open_v2(LOCATE_DB_PATH, &sdb, SQLITE_OPEN_READWRITE, nullptr) == SQLITE_OK) {
+            apply_pragmas(sdb);
+            sqlite3_stmt *ss = nullptr;
+            const char *status_sql =
+                "INSERT OR REPLACE INTO status"
+                " (id, total_dirs, total_files, last_scan, duration, last_folder)"
+                " VALUES (1, ?, ?, ?, ?, ?)";
+            if (sqlite3_prepare_v2(sdb, status_sql, -1, &ss, nullptr) == SQLITE_OK) {
+                sqlite3_bind_int(ss,   1, (int)s_scan_dirs);
+                sqlite3_bind_int(ss,   2, (int)s_scan_files);
+                sqlite3_bind_int64(ss, 3, (sqlite3_int64)s_scan_end);
+                sqlite3_bind_int64(ss, 4, (sqlite3_int64)(s_scan_end - s_scan_start));
+                sqlite3_bind_text(ss,  5, s_scan_last_folder.c_str(), -1, SQLITE_TRANSIENT);
+                sqlite3_step(ss);
+                sqlite3_finalize(ss);
+            }
+            sqlite3_close(sdb);
         }
     }
-
-    sqlite3_close(db);
-    if (fts_psram_active)
-        sqlite3_esp32_psram_malloc_exit();
 
     s_scan_resume  = 0;
     s_scan_running = 0;
@@ -1278,7 +1296,28 @@ int updatedb(int argc, char **argv)
         return EXIT_SUCCESS;
     }
 
-    Serial.printf("Usage: updatedb [start|stop|resume]\r\n");
+    // ── updatedb fts ─────────────────────────────────────────────────────────
+    if (strcmp(argv[1], "fts") == 0) {
+        if (!fnSDFAT.running()) {
+            Serial.printf("updatedb: SD card not mounted\r\n");
+            return EXIT_FAILURE;
+        }
+        if (s_scan_running) {
+            Serial.printf("updatedb: scan already in progress — wait for it to finish\r\n");
+            return EXIT_FAILURE;
+        }
+        struct stat dbst;
+        if (stat(LOCATE_DB_PATH, &dbst) != 0) {
+            Serial.printf("updatedb: no database — run 'updatedb start' first\r\n");
+            return EXIT_FAILURE;
+        }
+        s_scan_running = 1;
+        Serial.printf("Rebuilding FTS index in background...\r\n");
+        xTaskCreate(updatedb_fts_task, "updatedb_fts", 8192, nullptr, 5, nullptr);
+        return EXIT_SUCCESS;
+    }
+
+    Serial.printf("Usage: updatedb [start|stop|resume|fts]\r\n");
     return EXIT_FAILURE;
 }
 
@@ -1340,14 +1379,27 @@ int locate(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    // Build FTS5 pattern (append * for prefix match on bare words).
-    bool is_simple = !strchr(argv[1], '*') && !strchr(argv[1], '"');
-    std::string fts_pattern(argv[1]);
-    if (is_simple) fts_pattern += "*";
+    const char *arg = argv[1];
+    size_t arg_len = strlen(arg);
 
-    // Build LIKE pattern (convert glob wildcards, wrap bare words in %).
-    bool has_wildcards = strchr(argv[1], '*') || strchr(argv[1], '?');
-    std::string like_pattern(argv[1]);
+    // FTS5 only handles trailing-* prefix queries.  Leading wildcards (*foo,
+    // ?foo), mid-string * (f*o), or any ? are invalid FTS5 syntax — skip FTS
+    // and go straight to LIKE for those patterns.
+    bool leading_wild = (arg[0] == '*' || arg[0] == '?');
+    bool has_question = (strchr(arg, '?') != nullptr);
+    bool mid_star = false;
+    for (size_t i = 0; i + 1 < arg_len; i++)
+        if (arg[i] == '*') { mid_star = true; break; }
+    bool use_fts = !leading_wild && !has_question && !mid_star;
+
+    // Build FTS5 pattern: bare words get a trailing * for prefix match.
+    std::string fts_pattern(arg);
+    if (use_fts && !strchr(arg, '*') && !strchr(arg, '"'))
+        fts_pattern += "*";
+
+    // Build LIKE pattern: convert glob wildcards, wrap bare words in %.
+    bool has_wildcards = strchr(arg, '*') || strchr(arg, '?');
+    std::string like_pattern(arg);
     for (char &c : like_pattern) {
         if (c == '*') c = '%';
         else if (c == '?') c = '_';
@@ -1378,15 +1430,15 @@ int locate(int argc, char **argv)
         }
     };
 
-    // Try FTS5 first.
-    if (sqlite3_prepare_v2(db, fts_sql, -1, &stmt, nullptr) == SQLITE_OK) {
+    // Try FTS5 first (only when pattern is FTS-compatible).
+    if (use_fts && sqlite3_prepare_v2(db, fts_sql, -1, &stmt, nullptr) == SQLITE_OK) {
         sqlite3_bind_text(stmt, 1, fts_pattern.c_str(), -1, SQLITE_TRANSIENT);
         drain(stmt);
         sqlite3_finalize(stmt);
         stmt = nullptr;
     }
 
-    // Fall back to LIKE if FTS returned nothing or wasn't available.
+    // Fall back to LIKE if FTS was skipped, returned nothing, or wasn't available.
     if (count == 0) {
         if (sqlite3_prepare_v2(db, like_sql, -1, &stmt, nullptr) == SQLITE_OK) {
             sqlite3_bind_text(stmt, 1, like_pattern.c_str(), -1, SQLITE_TRANSIENT);
