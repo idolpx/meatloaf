@@ -126,6 +126,10 @@ esp_err_t proxy_fetch(httpd_req_t *req, const char *target_url)
         }
     }
 
+    // Use the proxy base as Referer unless the client supplied an explicit X-Referer.
+    if (!s_proxy_base_url.empty() && httpd_req_get_hdr_value_len(req, "X-Referer") == 0)
+        esp_http_client_set_header(client, "Referer", s_proxy_base_url.c_str());
+
     int write_len = (req->method == HTTP_POST) ? (int)req->content_len : 0;
     if (esp_http_client_open(client, write_len) != ESP_OK) {
         esp_http_client_cleanup(client);
@@ -201,9 +205,17 @@ esp_err_t proxy_handler(httpd_req_t *req)
     }
     std::string target_url = mstr::urlDecode(q + 1);
 
-    // Store the origin so subsequent bare-path requests are also proxied
-    s_proxy_base_url = extract_origin(target_url);
-    Debug_printv("proxy: base set to [%s]", s_proxy_base_url.c_str());
+    // Strip the fragment before forwarding (fragments are not sent in HTTP requests).
+    // If the fragment contains "base=1", store the origin as the active proxy base.
+    size_t frag = target_url.find('#');
+    if (frag != std::string::npos) {
+        bool set_base = target_url.find("base=1", frag + 1) != std::string::npos;
+        target_url = target_url.substr(0, frag);
+        if (set_base) {
+            s_proxy_base_url = extract_origin(target_url);
+            Debug_printv("proxy: base set to [%s]", s_proxy_base_url.c_str());
+        }
+    }
 
     return proxy_fetch(req, target_url.c_str());
 }
