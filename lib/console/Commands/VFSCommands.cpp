@@ -644,6 +644,7 @@ static int df(int argc, char **argv)
 #ifdef SD_CARD
 // ─── locate / updatedb ────────────────────────────────────────────────────────
 #include "sqlite3.h"
+#include "sqlite3_esp32.h"
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -664,80 +665,13 @@ static volatile time_t s_scan_start   = 0;
 static volatile time_t s_scan_end     = 0;
 static std::string     s_scan_last_folder;  // last completed directory path
 
-/* One-time SQLite global init: redirect page-cache memory to PSRAM before the
- * first sqlite3_initialize().  sqlite3_config() is only valid before that call,
- * and with SQLITE_OMIT_AUTOINIT=1 the timing is entirely in our hands.
- *
- * ROOT CAUSE of esp_dma_capable_malloc(125) failures:
- *   SDMMC allocates a 125-byte command-buffer from internal DRAM for EVERY
- *   SD transaction.  CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=512 (set in sdkconfig)
- *   means allocations > 512 bytes automatically go to PSRAM via system malloc.
- *   This covers the large SQLite structs (sqlite3, Pager, BtShared, Vdbe, …).
- *   Only small objects (<= 512 bytes) stay in internal DRAM: cursor state,
- *   schema strings, bitvec nodes — together ~5 KB, leaving ~35+ KB of DMA
- *   headroom for SDMMC.
- *
- *   Do NOT use memsys5 (SQLITE_CONFIG_HEAP): memsys5 is a fixed-size buddy
- *   allocator.  SQLite's B-tree operations accumulate enough concurrent
- *   allocations during large write transactions to exhaust any reasonable
- *   fixed pool, returning SQLITE_NOMEM on every INSERT after ~200 rows.
- *
- * SQLITE_CONFIG_PAGECACHE:
- *   The page cache (128 × 640-byte slots = 81 KB) lives in a PSRAM slab so
- *   page data does not come from system malloc at all.  This is the only
- *   sqlite3_config() call needed.
- *
- * On boards without PSRAM heap_caps_malloc() returns nullptr, the config call
- * is skipped, and SQLite falls back to system malloc (internal DRAM).
- * Performance is degraded but the code is correct. */
-static bool     s_sqlite_inited = false;
-static uint8_t *s_pcache_buf    = nullptr;
-
-// PSRAM allocator for SQLite — installed during FTS5 index builds so the
-// token accumulation hash lands in PSRAM instead of internal DRAM.
-// FTS5 makes many small allocations (<512 bytes) that bypass the
-// CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=512 threshold and would otherwise
-// exhaust the DMA-capable internal heap, breaking SD card I/O.
-static void *s_psram_malloc(int n)           { return heap_caps_malloc((size_t)n, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT); }
-static void  s_psram_free(void *p)           { free(p); }
-static void *s_psram_realloc(void *p, int n) { return heap_caps_realloc(p, (size_t)n, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT); }
-static int   s_psram_size(void *p)           { return (int)heap_caps_get_allocated_size(p); }
-static int   s_psram_roundup(int n)          { return n; }
-static int   s_psram_init(void *)            { return SQLITE_OK; }
-static void  s_psram_shutdown(void *)        {}
-
-static sqlite3_mem_methods s_psram_mem = {
-    s_psram_malloc, s_psram_free, s_psram_realloc, s_psram_size,
-    s_psram_roundup, s_psram_init, s_psram_shutdown, nullptr
-};
-static sqlite3_mem_methods s_system_mem;  // saved before first sqlite3_initialize()
-
-// Shutdown SQLite, swap in a new allocator, re-apply page cache, and reinitialize.
-static void sqlite_swap_malloc(sqlite3_mem_methods *mem)
-{
-    sqlite3_shutdown();
-    sqlite3_config(SQLITE_CONFIG_MALLOC, mem);
-    if (s_pcache_buf)
-        sqlite3_config(SQLITE_CONFIG_PAGECACHE, s_pcache_buf, 640, 128);
-    sqlite3_initialize();
-}
-
 static void sqlite_one_time_init(void)
 {
-    if (s_sqlite_inited) return;
-
-    s_pcache_buf = (uint8_t *)heap_caps_malloc(
-        640 * 128, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (s_pcache_buf)
-        sqlite3_config(SQLITE_CONFIG_PAGECACHE, s_pcache_buf, 640, 128);
-
-    // Save the default system malloc methods before sqlite3_initialize() locks them in.
-    sqlite3_config(SQLITE_CONFIG_GETMALLOC, &s_system_mem);
-
-    sqlite3_initialize();
-    s_sqlite_inited = true;
-    Serial.printf("sqlite: pcache=%s\r\n",
-                  s_pcache_buf ? "PSRAM" : "DRAM(fallback)");
+    static bool inited = false;
+    if (inited) return;
+    int psram = sqlite3_esp32_init();
+    Serial.printf("sqlite: pcache=%s\r\n", psram ? "PSRAM" : "DRAM(fallback)");
+    inited = true;
 }
 
 /* Directory path entry allocated from PSRAM.
@@ -1119,23 +1053,18 @@ static void updatedb_task(void *arg)
 
     bool fts_psram_active = false;
     if (!s_scan_stop) {
-        // Close scan DB, then switch SQLite to the PSRAM allocator before reopening.
-        // FTS5 builds an in-memory token hash with many small (<512-byte) allocations
-        // that fall below CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=512 and would otherwise
-        // land in internal DRAM, exhausting the DMA-capable heap within ~100 rows.
-        // Swapping to a heap_caps PSRAM allocator sends every SQLite allocation
-        // (including the small token-hash entries) to PSRAM for the duration of the
-        // FTS build, then the system allocator is restored.
+        // Close scan DB then swap to PSRAM allocator before reopening for FTS.
+        // See sqlite3_esp32_psram_malloc_enter() for why this is necessary.
         sqlite3_close(db);
         db = nullptr;
-        sqlite_swap_malloc(&s_psram_mem);
+        sqlite3_esp32_psram_malloc_enter();
         fts_psram_active = true;
 
         if (sqlite3_open_v2(LOCATE_DB_PATH, &db,
                             SQLITE_OPEN_READWRITE, nullptr) != SQLITE_OK) {
             Serial.printf("updatedb: FTS reopen failed: %s\r\n", sqlite3_errmsg(db));
             if (db) sqlite3_close(db);
-            sqlite_swap_malloc(&s_system_mem);
+            sqlite3_esp32_psram_malloc_exit();
             s_scan_running = 0;
             vTaskDelete(NULL);
             return;
@@ -1220,7 +1149,7 @@ static void updatedb_task(void *arg)
 
     sqlite3_close(db);
     if (fts_psram_active)
-        sqlite_swap_malloc(&s_system_mem);
+        sqlite3_esp32_psram_malloc_exit();
 
     s_scan_resume  = 0;
     s_scan_running = 0;

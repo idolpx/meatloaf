@@ -25,6 +25,8 @@
 #include <time.h>
 
 #include "sqlite3.h"
+#include "sqlite3_esp32.h"
+#include <esp_heap_caps.h>
 
 /* ── File descriptor wrapper ─────────────────────────────────────────────── */
 
@@ -220,4 +222,59 @@ int sqlite3_os_init(void)
 int sqlite3_os_end(void)
 {
     return SQLITE_OK;
+}
+
+/* ── ESP32 PSRAM helpers ─────────────────────────────────────────────────── */
+
+static int   s_esp32_inited  = 0;
+static void *s_pcache_buf    = NULL;
+
+static sqlite3_mem_methods s_system_mem;   /* saved at init time */
+
+static void *psram_malloc(int n)           { return heap_caps_malloc((size_t)n, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT); }
+static void  psram_free(void *p)           { free(p); }
+static void *psram_realloc(void *p, int n) { return heap_caps_realloc(p, (size_t)n, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT); }
+static int   psram_size(void *p)           { return p ? (int)heap_caps_get_allocated_size(p) : 0; }
+static int   psram_roundup(int n)          { return n; }
+static int   psram_init(void *p)           { (void)p; return SQLITE_OK; }
+static void  psram_shutdown(void *p)       { (void)p; }
+
+static sqlite3_mem_methods s_psram_mem = {
+    psram_malloc, psram_free, psram_realloc, psram_size,
+    psram_roundup, psram_init, psram_shutdown, NULL
+};
+
+static void apply_config(sqlite3_mem_methods *mem)
+{
+    if (mem) sqlite3_config(SQLITE_CONFIG_MALLOC, mem);
+    if (s_pcache_buf)
+        sqlite3_config(SQLITE_CONFIG_PAGECACHE, s_pcache_buf, 640, 128);
+}
+
+int sqlite3_esp32_init(void)
+{
+    if (s_esp32_inited) return s_pcache_buf != NULL;
+
+    s_pcache_buf = heap_caps_malloc(640 * 128, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+
+    /* Save system mem methods before sqlite3_initialize() locks them in. */
+    sqlite3_config(SQLITE_CONFIG_GETMALLOC, &s_system_mem);
+    apply_config(NULL);   /* page cache only — keep system malloc for normal use */
+    sqlite3_initialize();
+    s_esp32_inited = 1;
+    return s_pcache_buf != NULL;
+}
+
+void sqlite3_esp32_psram_malloc_enter(void)
+{
+    sqlite3_shutdown();
+    apply_config(&s_psram_mem);
+    sqlite3_initialize();
+}
+
+void sqlite3_esp32_psram_malloc_exit(void)
+{
+    sqlite3_shutdown();
+    apply_config(&s_system_mem);
+    sqlite3_initialize();
 }
