@@ -231,11 +231,35 @@ static void *s_pcache_buf    = NULL;
 
 static sqlite3_mem_methods s_system_mem;   /* saved at init time */
 
-static void *psram_malloc(int n)           { return heap_caps_malloc((size_t)n, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT); }
-static void  psram_free(void *p)           { free(p); }
-static void *psram_realloc(void *p, int n) { return heap_caps_realloc(p, (size_t)n, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT); }
-static int   psram_size(void *p)           { return p ? (int)heap_caps_get_allocated_size(p) : 0; }
-static int   psram_roundup(int n)          { return n; }
+/* SQLite requires xSize(p) to return the exact usable bytes at p.
+ * heap_caps_get_allocated_size() returns the TLSF-rounded block size which
+ * may exceed the user data region and overlap the heap-poisoning tail guard,
+ * causing SQLite to overwrite that guard and crash with "Bad tail" assertion.
+ * Instead we prepend a 4-byte size field to every allocation so xSize can
+ * return exactly what was requested, independent of heap alignment. */
+static void *psram_malloc(int n)
+{
+    size_t *p = heap_caps_malloc((size_t)n + sizeof(size_t),
+                                 MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!p) return NULL;
+    *p = (size_t)n;
+    return p + 1;
+}
+static void psram_free(void *p)
+{
+    if (p) free((size_t *)p - 1);
+}
+static void *psram_realloc(void *p, int n)
+{
+    size_t *orig = p ? (size_t *)p - 1 : NULL;
+    size_t *q = heap_caps_realloc(orig, (size_t)n + sizeof(size_t),
+                                  MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!q) return NULL;
+    *q = (size_t)n;
+    return q + 1;
+}
+static int psram_size(void *p)    { return p ? (int)*((size_t *)p - 1) : 0; }
+static int psram_roundup(int n)   { return n; }
 static int   psram_init(void *p)           { (void)p; return SQLITE_OK; }
 static void  psram_shutdown(void *p)       { (void)p; }
 
