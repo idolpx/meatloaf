@@ -58,12 +58,17 @@ public:
 
     static esp_err_t get_handler(httpd_req_t *httpd_req);
     static esp_err_t post_handler(httpd_req_t *httpd_req);
+
+    static esp_err_t proxy_handler(httpd_req_t *httpd_req);
+    static void proxy_register(httpd_handle_t server);
+
     static esp_err_t websocket_handler(httpd_req_t *httpd_req);
-    static esp_err_t webdav_handler(httpd_req_t *httpd_req);
     static void websocket_send_all(const char* data, size_t len);
     static void websocket_register(httpd_handle_t server);
     // static void websocket_async_send(void *arg);
     // static esp_err_t websocket_trigger_async_send(httpd_handle_t handle, httpd_req_t *req);
+
+    static esp_err_t webdav_handler(httpd_req_t *httpd_req);
     static void webdav_register(httpd_handle_t server, const char *root_uri = "/", const char *root_path = "/");
 
     void start();
