@@ -106,7 +106,7 @@ esp_err_t proxy_fetch(httpd_req_t *req, const char *target_url)
         "Accept", "Accept-Encoding", "Accept-Language",
         "Authorization", "Cache-Control", "Client-Id", "Content-Type",
         "If-Modified-Since", "If-None-Match",
-        "Origin", "Referer", "User-Agent",
+        "Origin", "Referer", "Host", "User-Agent",
         nullptr
     };
     for (int i = 0; kFwdHeaders[i]; i++) {
@@ -131,6 +131,7 @@ esp_err_t proxy_fetch(httpd_req_t *req, const char *target_url)
     if (httpd_req_get_hdr_value_len(req, "X-Referer") == 0) {
         const char *ref = s_proxy_base_url.empty() ? target_url : s_proxy_base_url.c_str();
         esp_http_client_set_header(client, "Referer", ref);
+        Debug_printv("  upd header[%s: %s]", "Referer", ref);
     }
 
     int write_len = (req->method == HTTP_POST) ? (int)req->content_len : 0;
