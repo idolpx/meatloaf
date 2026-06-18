@@ -1211,7 +1211,7 @@ int updatedb(int argc, char **argv)
             char tbuf[32] = "unknown";
             struct tm *ti = localtime(&last_scan);
             if (ti) strftime(tbuf, sizeof(tbuf), "%Y-%m-%d %H:%M:%S", ti);
-            Serial.printf("Last scan:    %s (%d seconds)\r\n", tbuf, duration);
+            Serial.printf("Last scan:    %s (%s)\r\n", tbuf, mstr::formatDuration(duration).c_str());
             Serial.printf("Index:        %d files, %d directories\r\n", total_files, total_dirs);
             if (folder && folder[0])
                 Serial.printf("Last folder:  /sd%s\r\n", folder);
