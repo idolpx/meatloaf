@@ -29,7 +29,7 @@
     "arduino",
     "espidf"
   ],
-  "name": "Meatloaf v1 8MB",
+  "name": "Meatloaf ESP32-WROVER-8M",
   "upload": {
     "flash_size": "8MB",
     "maximum_ram_size": 327680,
