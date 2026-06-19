@@ -39,7 +39,7 @@
     "arduino",
     "espidf"
   ],
-  "name": "Meatloaf ESP32-S3 4MB",
+  "name": "Meatloaf ESP32-S3-FH4R2",
   "upload": {
     "flash_size": "4MB",
     "maximum_ram_size": 327680,
