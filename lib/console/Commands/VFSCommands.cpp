@@ -12,6 +12,11 @@
 #include <sys/syslimits.h>
 #include <iostream>
 #include <esp_heap_caps.h>
+#include <zlib.h>
+#ifndef MIN_CONFIG
+#include <archive.h>
+#include <archive_entry.h>
+#endif
 
 static inline void *psram_malloc(size_t sz) {
     void *p = heap_caps_malloc(sz, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
@@ -649,7 +654,6 @@ static int df(int argc, char **argv)
 #include <unordered_set>
 #include <vector>
 #include <ctime>
-#include <zlib.h>
 
 #include "string_utils.h"
 
@@ -916,11 +920,14 @@ static void updatedb_fts_rebuild(void)
 
     sqlite3_close(db);
     sqlite3_esp32_psram_malloc_exit();
+    updatedb_compress_gz();
 }
 
 static void updatedb_compress_gz(void)
 {
-    Serial.printf("updatedb: compressing to %s.gz...\r\n", LOCATE_DB_PATH);
+    struct stat st = {};
+    size_t total = (stat(LOCATE_DB_PATH, &st) == 0) ? (size_t)st.st_size : 0;
+    Serial.printf("updatedb: compressing to %s.gz (%zu bytes)...\r\n", LOCATE_DB_PATH, total);
 
     FILE *in = fopen(LOCATE_DB_PATH, "rb");
     if (!in) {
@@ -935,20 +942,34 @@ static void updatedb_compress_gz(void)
         return;
     }
 
-    const size_t kBufSz = 4096;
-    char *buf = (char *)heap_caps_malloc(kBufSz, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (!buf) buf = (char *)malloc(kBufSz);
-    if (buf) {
-        size_t n;
-        while ((n = fread(buf, 1, kBufSz, in)) > 0)
-            gzwrite(gz, buf, (unsigned)n);
-        free(buf);
-    } else {
+    const size_t kBufSz = 32768;
+    char *buf = (char *)psram_malloc(kBufSz);
+    if (!buf) {
         Serial.printf("updatedb compress: out of memory\r\n");
+        gzclose(gz);
+        fclose(in);
+        return;
     }
 
+    size_t written = 0, last_report = 0;
+    const size_t kReport = 512 * 1024;
+    size_t n;
+    while ((n = fread(buf, 1, kBufSz, in)) > 0) {
+        gzwrite(gz, buf, (unsigned)n);
+        written += n;
+        if (total > 0 && written - last_report >= kReport) {
+            Serial.printf("  %zu / %zu bytes (%d%%)\r\n",
+                          written, total, (int)(written * 100 / total));
+            last_report = written;
+            vTaskDelay(1);
+        }
+    }
+
+    free(buf);
     gzclose(gz);
     fclose(in);
+    if (total > 0 && last_report < written)
+        Serial.printf("  %zu / %zu bytes (100%%)\r\n", written, total);
     Serial.printf("updatedb: %s.gz written\r\n", LOCATE_DB_PATH);
 }
 
@@ -1204,9 +1225,6 @@ static void updatedb_task(void *arg)
             sqlite3_close(sdb);
         }
     }
-
-    if (!s_scan_stop)
-        updatedb_compress_gz();
 
     s_scan_resume  = 0;
     s_scan_running = 0;
@@ -1529,6 +1547,165 @@ int format_sd(int argc, char **argv)
 }
 #endif
 
+// ─── gzip ─────────────────────────────────────────────────────────────────────
+static int cmd_gzip(int argc, char **argv)
+{
+    if (argc < 2) {
+        Serial.printf("usage: gzip <source> [dest.gz]\r\n");
+        return EXIT_FAILURE;
+    }
+
+    const char *src = argv[1];
+    std::string dst = (argc >= 3) ? argv[2] : (std::string(src) + ".gz");
+
+    struct stat st = {};
+    if (stat(src, &st) != 0) {
+        Serial.printf("gzip: '%s': %s\r\n", src, strerror(errno));
+        return EXIT_FAILURE;
+    }
+    size_t total = (size_t)st.st_size;
+
+    FILE *in = fopen(src, "rb");
+    if (!in) {
+        Serial.printf("gzip: cannot open '%s'\r\n", src);
+        return EXIT_FAILURE;
+    }
+
+    gzFile gz = gzopen(dst.c_str(), "wb9");
+    if (!gz) {
+        Serial.printf("gzip: cannot create '%s'\r\n", dst.c_str());
+        fclose(in);
+        return EXIT_FAILURE;
+    }
+
+    const size_t kBufSz = 32768;
+    char *buf = (char *)psram_malloc(kBufSz);
+    if (!buf) {
+        Serial.printf("gzip: out of memory\r\n");
+        gzclose(gz);
+        fclose(in);
+        return EXIT_FAILURE;
+    }
+
+    Serial.printf("gzip: '%s' -> '%s' (%zu bytes)\r\n", src, dst.c_str(), total);
+
+    size_t written = 0, last_report = 0;
+    const size_t kReport = 512 * 1024;
+    size_t n;
+    while ((n = fread(buf, 1, kBufSz, in)) > 0) {
+        gzwrite(gz, buf, (unsigned)n);
+        written += n;
+        if (total > 0 && written - last_report >= kReport) {
+            Serial.printf("  %zu / %zu bytes (%d%%)\r\n",
+                          written, total, (int)(written * 100 / total));
+            last_report = written;
+        }
+    }
+
+    free(buf);
+    gzclose(gz);
+    fclose(in);
+    if (total > 0 && last_report < written)
+        Serial.printf("  %zu / %zu bytes (100%%)\r\n", written, total);
+    Serial.printf("gzip: done\r\n");
+    return EXIT_SUCCESS;
+}
+
+// ─── unzip ────────────────────────────────────────────────────────────────────
+#ifndef MIN_CONFIG
+static int cmd_unzip(int argc, char **argv)
+{
+    if (argc < 2) {
+        Serial.printf("usage: unzip <archive> [dest_folder]\r\n");
+        return EXIT_FAILURE;
+    }
+
+    const char *src = argv[1];
+    std::string dest;
+    if (argc >= 3) {
+        dest = argv[2];
+    } else {
+        std::string s(src);
+        size_t slash = s.rfind('/');
+        dest = (slash != std::string::npos) ? s.substr(0, slash) : "/";
+    }
+    while (dest.size() > 1 && dest.back() == '/') dest.pop_back();
+
+    struct archive *a = archive_read_new();
+    archive_read_support_filter_all(a);
+    archive_read_support_format_all(a);
+
+    if (archive_read_open_filename(a, src, 16384) != ARCHIVE_OK) {
+        Serial.printf("unzip: cannot open '%s': %s\r\n", src, archive_error_string(a));
+        archive_read_free(a);
+        return EXIT_FAILURE;
+    }
+
+    struct archive *out = archive_write_disk_new();
+    archive_write_disk_set_options(out, ARCHIVE_EXTRACT_TIME | ARCHIVE_EXTRACT_PERM);
+
+    struct archive_entry *entry;
+    int count = 0, r;
+    size_t total_bytes = 0;
+    const size_t kProgressThreshold = 512 * 1024;
+    const size_t kReport = 256 * 1024;
+
+    while ((r = archive_read_next_header(a, &entry)) == ARCHIVE_OK) {
+        std::string path = dest + "/" + archive_entry_pathname(entry);
+        archive_entry_set_pathname(entry, path.c_str());
+
+        int64_t entry_size = archive_entry_size_is_set(entry) ? archive_entry_size(entry) : -1;
+        if (entry_size >= 0)
+            Serial.printf("  %s  (%lld bytes)\r\n", path.c_str(), (long long)entry_size);
+        else
+            Serial.printf("  %s\r\n", path.c_str());
+
+        if (archive_write_header(out, entry) != ARCHIVE_OK) {
+            Serial.printf("unzip: write header: %s\r\n", archive_error_string(out));
+            archive_read_data_skip(a);
+            continue;
+        }
+
+        const void *buf;
+        size_t sz;
+        la_int64_t offset;
+        int dr;
+        size_t entry_bytes = 0, last_report = 0;
+        while ((dr = archive_read_data_block(a, &buf, &sz, &offset)) == ARCHIVE_OK) {
+            archive_write_data_block(out, buf, sz, offset);
+            entry_bytes += sz;
+            if (entry_size >= (int64_t)kProgressThreshold &&
+                entry_bytes - last_report >= kReport) {
+                Serial.printf("    %zu / %lld bytes (%d%%)\r\n",
+                              entry_bytes, (long long)entry_size,
+                              (int)(entry_bytes * 100 / (size_t)entry_size));
+                last_report = entry_bytes;
+            }
+        }
+        if (dr != ARCHIVE_EOF)
+            Serial.printf("unzip: read data: %s\r\n", archive_error_string(a));
+
+        archive_write_finish_entry(out);
+        total_bytes += entry_bytes;
+        count++;
+    }
+
+    archive_write_close(out);
+    archive_write_free(out);
+    archive_read_close(a);
+    archive_read_free(a);
+
+    if (r != ARCHIVE_EOF) {
+        Serial.printf("unzip: error: %s\r\n", archive_error_string(a));
+        return EXIT_FAILURE;
+    }
+
+    Serial.printf("unzip: extracted %d entries, %zu bytes to '%s'\r\n",
+                  count, total_bytes, dest.c_str());
+    return EXIT_SUCCESS;
+}
+#endif // MIN_CONFIG
+
 namespace ESP32Console::Commands
 {
     const ConsoleCommand getCatCommand()
@@ -1619,6 +1796,18 @@ namespace ESP32Console::Commands
     {
         return ConsoleCommand("disable", &disable, "Disable virtual drive");
     }
+
+    const ConsoleCommand getGzipCommand()
+    {
+        return ConsoleCommand("gzip", &cmd_gzip, "Compress a file to .gz (level 9)");
+    }
+
+#ifndef MIN_CONFIG
+    const ConsoleCommand getUnzipCommand()
+    {
+        return ConsoleCommand("unzip", &cmd_unzip, "Extract an archive to a folder");
+    }
+#endif
 
 #ifdef SD_CARD
     const ConsoleCommand getFormatSDCommand()
