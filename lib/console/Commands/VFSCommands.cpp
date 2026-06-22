@@ -649,6 +649,7 @@ static int df(int argc, char **argv)
 #include <unordered_set>
 #include <vector>
 #include <ctime>
+#include <zlib.h>
 
 #include "string_utils.h"
 
@@ -917,6 +918,40 @@ static void updatedb_fts_rebuild(void)
     sqlite3_esp32_psram_malloc_exit();
 }
 
+static void updatedb_compress_gz(void)
+{
+    Serial.printf("updatedb: compressing to %s.gz...\r\n", LOCATE_DB_PATH);
+
+    FILE *in = fopen(LOCATE_DB_PATH, "rb");
+    if (!in) {
+        Serial.printf("updatedb compress: cannot open %s\r\n", LOCATE_DB_PATH);
+        return;
+    }
+
+    gzFile gz = gzopen(LOCATE_DB_PATH ".gz", "wb9");
+    if (!gz) {
+        Serial.printf("updatedb compress: cannot create %s.gz\r\n", LOCATE_DB_PATH);
+        fclose(in);
+        return;
+    }
+
+    const size_t kBufSz = 4096;
+    char *buf = (char *)heap_caps_malloc(kBufSz, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!buf) buf = (char *)malloc(kBufSz);
+    if (buf) {
+        size_t n;
+        while ((n = fread(buf, 1, kBufSz, in)) > 0)
+            gzwrite(gz, buf, (unsigned)n);
+        free(buf);
+    } else {
+        Serial.printf("updatedb compress: out of memory\r\n");
+    }
+
+    gzclose(gz);
+    fclose(in);
+    Serial.printf("updatedb: %s.gz written\r\n", LOCATE_DB_PATH);
+}
+
 static void updatedb_fts_task(void *arg)
 {
     updatedb_fts_rebuild();
@@ -1169,6 +1204,9 @@ static void updatedb_task(void *arg)
             sqlite3_close(sdb);
         }
     }
+
+    if (!s_scan_stop)
+        updatedb_compress_gz();
 
     s_scan_resume  = 0;
     s_scan_running = 0;
