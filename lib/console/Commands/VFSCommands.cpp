@@ -841,6 +841,8 @@ static void apply_pragmas(sqlite3 *d)
     sqlite3_exec(d, "PRAGMA cache_size = 128",      nullptr, nullptr, nullptr);
 }
 
+static void updatedb_compress_gz(void);
+
 // Rebuild the FTS5 index from the existing files+dirs tables.
 // Swaps SQLite to the PSRAM allocator for the duration so FTS5's token hash
 // doesn't exhaust internal DRAM (see sqlite3_esp32_psram_malloc_enter).
