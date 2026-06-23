@@ -125,6 +125,12 @@ std::shared_ptr<MStream> HTTPMFile::getSourceStream(std::ios_base::openmode mode
         resetURL(istream->url);
     }
 
+    // Apply Content-Disposition filename if the server provided one
+    if (_session && _session->client && !_session->client->contentDispositionFilename.empty()) {
+        name = _session->client->contentDispositionFilename;
+        Debug_printv("filename from Content-Disposition: %s", name.c_str());
+    }
+
     return istream;
 }
 
@@ -806,6 +812,62 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
     return 0;
 }
 
+// Parse filename from Content-Disposition header.
+// Handles both RFC 5987 (filename*=UTF-8''name) and plain (filename="name" or filename=name).
+// RFC 5987 form takes precedence when both are present.
+static std::string parse_content_disposition_filename(const char *value)
+{
+    if (!value) return {};
+    std::string v = value;
+    std::string lower = v;
+    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+
+    // Try filename*= (RFC 5987) first: charset'language'percent-encoded-value
+    auto star = lower.find("filename*=");
+    if (star != std::string::npos) {
+        std::string rest = v.substr(star + 10); // skip "filename*="
+        // Skip optional charset'language' prefix (e.g. "UTF-8''")
+        auto q1 = rest.find('\'');
+        if (q1 != std::string::npos) {
+            auto q2 = rest.find('\'', q1 + 1);
+            if (q2 != std::string::npos)
+                rest = rest.substr(q2 + 1);
+        }
+        mstr::trim(rest);
+        if (!rest.empty() && rest.front() == '"') rest = rest.substr(1);
+        auto end = rest.find_first_of(";\"\r\n");
+        if (end != std::string::npos) rest = rest.substr(0, end);
+        // Percent-decode
+        std::string out;
+        for (size_t i = 0; i < rest.size(); ) {
+            if (rest[i] == '%' && i + 2 < rest.size()) {
+                char hex[3] = { rest[i+1], rest[i+2], '\0' };
+                out += (char)strtol(hex, nullptr, 16);
+                i += 3;
+            } else {
+                out += rest[i++];
+            }
+        }
+        if (!out.empty()) return out;
+    }
+
+    // Fallback: plain filename=
+    auto pos = lower.find("filename=");
+    if (pos == std::string::npos) return {};
+    std::string fname = v.substr(pos + 9); // skip "filename="
+    mstr::trim(fname);
+    if (!fname.empty() && fname.front() == '"') {
+        fname = fname.substr(1);
+        auto close = fname.find('"');
+        if (close != std::string::npos) fname = fname.substr(0, close);
+    } else {
+        auto end = fname.find_first_of(";\r\n");
+        if (end != std::string::npos) fname = fname.substr(0, end);
+        mstr::trim(fname);
+    }
+    return fname;
+}
+
 esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
 {
     MeatHttpClient* meatClient = (MeatHttpClient*)evt->user_data;
@@ -873,13 +935,15 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
             }
             else if(mstr::equals("Content-Disposition", evt->header_key, false))
             {
-                // Content-Disposition, value=attachment; filename*=UTF-8''GeckOS-c64.d64
-                // we can set isText from real file extension, too!
                 std::string value = evt->header_value;
                 if ( mstr::contains( value, (char *)"index.prg" ) )
                 {
-                    //Debug_printv("HTTP Directory Listing [%s]", meatClient->url.c_str());
                     meatClient->m_isDirectory = true;
+                }
+                std::string fname = parse_content_disposition_filename(evt->header_value);
+                if (!fname.empty()) {
+                    meatClient->contentDispositionFilename = fname;
+                    Debug_printv("Content-Disposition filename: %s", fname.c_str());
                 }
             }
             else if(mstr::equals("Content-Length", evt->header_key, false))

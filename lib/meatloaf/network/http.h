@@ -153,6 +153,7 @@ public:
     bool disableAutoRedirect = true;
     bool wasRedirected = false;
     std::string url;
+    std::string contentDispositionFilename;
 
     int lastRC = 0;
 };
