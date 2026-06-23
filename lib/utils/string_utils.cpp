@@ -693,7 +693,19 @@ namespace mstr {
     }
 
 
-    void cd( std::string &path, std::string newDir) 
+    std::string formatDuration(uint64_t seconds)
+    {
+        uint64_t h = seconds / 3600;
+        uint64_t m = (seconds % 3600) / 60;
+        uint64_t s = seconds % 60;
+        if (h > 0)
+            return format("%lluh %llum %llus", h, m, s);
+        if (m > 0)
+            return format("%llum %llus", m, s);
+        return format("%llus", s);
+    }
+
+    void cd( std::string &path, std::string newDir)
     {
         //Debug_printv("cd requested: [%s]", newDir.c_str());
 

@@ -41,7 +41,7 @@ SemaphoreHandle_t SessionBroker::_mutex = nullptr;
 // Initialize static members — CachedFile HIMEM
 #if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
 esp_himem_rangehandle_t MSession::CachedFile::s_range;
-int MSession::CachedFile::s_rangeUsed = 0;
+std::atomic<int> MSession::CachedFile::s_rangeUsed{0};
 #endif
 
 // Initialize static members — CachedFile RAM cache
@@ -142,8 +142,10 @@ void MSession::CachedFile::freeStorage() {
         ESP_ERROR_CHECK(esp_himem_free(m_handle));
         Debug_printv("HIMEM available after free: %lu", (uint32_t)esp_himem_get_free_size());
 
-        if (s_rangeUsed > 0) s_rangeUsed--;
-        if (s_rangeUsed == 0) esp_himem_free_map_range(s_range);
+        int prev = s_rangeUsed.fetch_sub(1);
+        if (prev > 0 && s_rangeUsed.load() == 0) {
+            esp_himem_free_map_range(s_range);
+        }
         m_useHimem = false;
         return;
     }
@@ -180,7 +182,7 @@ bool MSession::CachedFile::allocate() {
                 goto heap_alloc;
             }
         }
-        s_rangeUsed++;
+        s_rangeUsed.fetch_add(1);
         m_useHimem = true;
         Debug_printv("HIMEM available after alloc: %lu", (uint32_t)esp_himem_get_free_size());
         return true;
@@ -303,24 +305,24 @@ bool MSession::CachedFile::loadFromStream(MStream* stream, uint32_t fileSize) {
             return false;
         }
         const uint32_t kBufSize = 1024;
-        uint8_t* buf = (uint8_t*)psram_malloc(kBufSize);
-        if (!buf) { fclose(f); return false; }
+        thread_local uint8_t* s_buf = nullptr;
+        if (!s_buf) s_buf = (uint8_t*)psram_malloc(kBufSize);
+        if (!s_buf) { fclose(f); return false; }
         uint32_t total = 0;
         uint32_t remaining = fileSize;
         while (true) {
             uint32_t toRead = (remaining > 0)
                 ? std::min(remaining, kBufSize)
                 : kBufSize;
-            uint32_t r = stream->read(buf, toRead);
+            uint32_t r = stream->read(s_buf, toRead);
             if (r == 0) break;
-            fwrite(buf, 1, r, f);
+            fwrite(s_buf, 1, r, f);
             total += r;
             if (remaining > 0) {
                 remaining -= r;
                 if (remaining == 0) break;
             }
         }
-        free(buf);
         fclose(f);
         size = total;
         Debug_printv("Cached %u bytes to SD: %s", total, m_sdPath.c_str());
@@ -330,14 +332,14 @@ bool MSession::CachedFile::loadFromStream(MStream* stream, uint32_t fileSize) {
     if (fileSize == 0) {
         std::vector<uint8_t> buf;
         const uint32_t kTmpSize = 1024;
-        uint8_t* tmp = (uint8_t*)psram_malloc(kTmpSize);
-        if (!tmp) return false;
+        thread_local uint8_t* s_tmp = nullptr;
+        if (!s_tmp) s_tmp = (uint8_t*)psram_malloc(kTmpSize);
+        if (!s_tmp) return false;
         while (true) {
-            uint32_t r = stream->read(tmp, kTmpSize);
+            uint32_t r = stream->read(s_tmp, kTmpSize);
             if (r == 0) break;
-            buf.insert(buf.end(), tmp, tmp + r);
+            buf.insert(buf.end(), s_tmp, s_tmp + r);
         }
-        free(tmp);
         if (buf.empty()) return false;
         size = (uint32_t)buf.size();
         if (!allocate()) return false;

@@ -21,6 +21,7 @@
 #include <string>
 #include <memory>
 #include <unordered_map>
+#include <list>
 #include <vector>
 #include <chrono>
 #include <cstdlib>
@@ -31,6 +32,11 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include <freertos/task.h>
+
+#include "../utils/string_utils.h"
+#include "../device/iec/fuji.h"
+#include "../device/iec/meatloaf.h"
+#include "../console/Helpers/PWDHelpers.h"
 
 #ifdef CONFIG_SPIRAM
 #include <esp_psram.h>
@@ -143,7 +149,7 @@ public:
         esp_himem_handle_t m_handle;
         bool m_useHimem;
         static esp_himem_rangehandle_t s_range;
-        static int s_rangeUsed;
+        static std::atomic<int> s_rangeUsed;
 #endif
         uint8_t* m_data;  // heap pointer (used when HIMEM unavailable or on non-ESP32)
     };
@@ -218,16 +224,31 @@ public:
     }
 
     // File cache — avoids re-downloading files for random-access container I/O
+    // LRU eviction when exceeding max_file_cache_entries
+    static constexpr size_t max_file_cache_entries = 10;
+
     std::shared_ptr<CachedFile> getCachedFile(const std::string& path) {
         auto it = file_cache.find(path);
         if (it != file_cache.end()) {
+            // Move to front (most recently used)
+            cache_order.remove(path);
+            cache_order.push_front(path);
             return it->second;
         }
         return nullptr;
     }
 
     void cacheFile(const std::string& path, std::shared_ptr<CachedFile> file) {
+        // Evict oldest if at capacity
+        while (cache_order.size() >= max_file_cache_entries) {
+            auto oldest = cache_order.back();
+            cache_order.pop_back();
+            file_cache.erase(oldest);
+            Debug_printv("LRU evicted from file_cache: %s", oldest.c_str());
+        }
         file_cache[path] = file;
+        cache_order.remove(path);
+        cache_order.push_front(path);
         Debug_printv("Cached file: %s (%u bytes), cache entries: %d", path.c_str(), file->size, file_cache.size());
     }
 
@@ -235,6 +256,7 @@ public:
         if (!file_cache.empty()) {
             Debug_printv("Clearing file cache (%d entries)", file_cache.size());
             file_cache.clear();
+            cache_order.clear();
         }
     }
 
@@ -248,6 +270,7 @@ protected:
     std::chrono::steady_clock::time_point last_activity;
     uint32_t keep_alive_interval;  // in milliseconds
     std::unordered_map<std::string, std::shared_ptr<CachedFile>> file_cache;
+    std::list<std::string> cache_order;  // LRU order (front = most recent)
     std::atomic<uint32_t> io_active{0};
 };
 
@@ -271,10 +294,56 @@ private:
         if (_mutex) xSemaphoreGive(_mutex);
     }
 
+    // Extract scheme://host from session key (e.g., "tnfs://host:16384" -> "tnfs://host")
+    static std::string session_host_key(const std::string& key) {
+        // Find the last colon (after port)
+        size_t last_colon = key.rfind(':');
+        if (last_colon == std::string::npos) return key;
+        // Return scheme://host (without port)
+        return key.substr(0, last_colon);
+    }
+
+    // Check if path matches session key (comparing scheme://host ignoring port)
+    static bool path_matches_session(const std::string& path, const std::string& key) {
+        std::string hostKey = session_host_key(key);
+        // Strip trailing slash from path for comparison
+        std::string p = path;
+        if (!p.empty() && p.back() == '/') p.pop_back();
+        // Check if path starts with scheme://host (ignoring port)
+        if (!p.empty() && mstr::startsWith(p.c_str(), hostKey.c_str())) {
+            return true;
+        }
+        return false;
+    }
+
+    // Check if a session is currently in use by any active drive or console
+    static bool is_session_in_use(const std::string& key) {
+        // Check drives
+        for (int i = 0; i < MAX_DISK_DEVICES; i++) {
+            auto drive = Meatloaf.get_disks(i);
+            if (drive != nullptr) {
+                auto cwd = drive->disk_dev.getCWD();
+                if (path_matches_session(cwd, key)) {
+                    return true;
+                }
+            }
+        }
+        // Check console current path
+        auto consolePath = ESP32Console::getCurrentPath();
+        if (consolePath != nullptr) {
+            auto consoleUrl = consolePath->url;
+            if (path_matches_session(consoleUrl, key)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // FreeRTOS task function
     static void session_service_task(void* arg) {
         //Debug_printv("SessionBroker task started on core %d", xPortGetCoreID());
         while (task_running) {
+            if (system_shutdown) break;  // Fast exit on shutdown
             service();
             vTaskDelay(pdMS_TO_TICKS(1000)); // Check every 1 second
         }
@@ -409,20 +478,25 @@ public:
         lock();
         for (auto& pair : session_repo) {
             auto& session = pair.second;
+            const std::string& key = pair.first;
 
-            if (!session->getKeepAliveInterval()) {
-                continue; // Skip sessions with no keep-alive interval
-            }
-
-            if (!session->isConnected()) {
-                to_remove.push_back(pair.first);
+            // If session is NOT in use by any drive or console, remove it immediately
+            if (!is_session_in_use(key)) {
+                Debug_printv("Session not in use, removing: %s", key.c_str());
+                to_remove.push_back(key);
                 continue;
             }
 
             if (session->isBusy()) {
+                continue;  // Skip busy sessions
+            }
+
+            if (!session->isConnected()) {
+                to_remove.push_back(key);
                 continue;
             }
 
+            // Session is in use - check if it needs keep-alive
             uint32_t idle_time = session->getIdleTime();
             if (idle_time >= session->getKeepAliveInterval()) {
                 to_check.push_back(pair);
@@ -436,8 +510,14 @@ public:
                        pair.first.c_str(), pair.second->getIdleTime());
 
             if (!pair.second->keep_alive()) {
-                Debug_printv("Keep-alive failed for: %s", pair.first.c_str());
-                to_remove.push_back(pair.first);
+                Debug_printv("Keep-alive failed for: %s, attempting reconnect", pair.first.c_str());
+                // Try to re-establish the connection
+                if (!pair.second->connect()) {
+                    Debug_printv("Reconnect failed for: %s", pair.first.c_str());
+                    to_remove.push_back(pair.first);
+                } else {
+                    Debug_printv("Reconnected successfully: %s", pair.first.c_str());
+                }
             }
         }
 

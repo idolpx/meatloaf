@@ -18,6 +18,7 @@
 #include "http.h"
 
 #include <esp_idf_version.h>
+#include <esp_crt_bundle.h>
 #include <algorithm>
 #include <cstring>
 #include <freertos/FreeRTOS.h>
@@ -122,6 +123,12 @@ std::shared_ptr<MStream> HTTPMFile::getSourceStream(std::ios_base::openmode mode
 
     if (istream != nullptr && mstr::startsWith(istream->url, "http")) {
         resetURL(istream->url);
+    }
+
+    // Apply Content-Disposition filename if the server provided one
+    if (_session && _session->client && !_session->client->contentDispositionFilename.empty()) {
+        name = _session->client->contentDispositionFilename;
+        Debug_printv("filename from Content-Disposition: %s", name.c_str());
     }
 
     return istream;
@@ -805,6 +812,62 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
     return 0;
 }
 
+// Parse filename from Content-Disposition header.
+// Handles both RFC 5987 (filename*=UTF-8''name) and plain (filename="name" or filename=name).
+// RFC 5987 form takes precedence when both are present.
+static std::string parse_content_disposition_filename(const char *value)
+{
+    if (!value) return {};
+    std::string v = value;
+    std::string lower = v;
+    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+
+    // Try filename*= (RFC 5987) first: charset'language'percent-encoded-value
+    auto star = lower.find("filename*=");
+    if (star != std::string::npos) {
+        std::string rest = v.substr(star + 10); // skip "filename*="
+        // Skip optional charset'language' prefix (e.g. "UTF-8''")
+        auto q1 = rest.find('\'');
+        if (q1 != std::string::npos) {
+            auto q2 = rest.find('\'', q1 + 1);
+            if (q2 != std::string::npos)
+                rest = rest.substr(q2 + 1);
+        }
+        mstr::trim(rest);
+        if (!rest.empty() && rest.front() == '"') rest = rest.substr(1);
+        auto end = rest.find_first_of(";\"\r\n");
+        if (end != std::string::npos) rest = rest.substr(0, end);
+        // Percent-decode
+        std::string out;
+        for (size_t i = 0; i < rest.size(); ) {
+            if (rest[i] == '%' && i + 2 < rest.size()) {
+                char hex[3] = { rest[i+1], rest[i+2], '\0' };
+                out += (char)strtol(hex, nullptr, 16);
+                i += 3;
+            } else {
+                out += rest[i++];
+            }
+        }
+        if (!out.empty()) return out;
+    }
+
+    // Fallback: plain filename=
+    auto pos = lower.find("filename=");
+    if (pos == std::string::npos) return {};
+    std::string fname = v.substr(pos + 9); // skip "filename="
+    mstr::trim(fname);
+    if (!fname.empty() && fname.front() == '"') {
+        fname = fname.substr(1);
+        auto close = fname.find('"');
+        if (close != std::string::npos) fname = fname.substr(0, close);
+    } else {
+        auto end = fname.find_first_of(";\r\n");
+        if (end != std::string::npos) fname = fname.substr(0, end);
+        mstr::trim(fname);
+    }
+    return fname;
+}
+
 esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
 {
     MeatHttpClient* meatClient = (MeatHttpClient*)evt->user_data;
@@ -872,13 +935,15 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
             }
             else if(mstr::equals("Content-Disposition", evt->header_key, false))
             {
-                // Content-Disposition, value=attachment; filename*=UTF-8''GeckOS-c64.d64
-                // we can set isText from real file extension, too!
                 std::string value = evt->header_value;
                 if ( mstr::contains( value, (char *)"index.prg" ) )
                 {
-                    //Debug_printv("HTTP Directory Listing [%s]", meatClient->url.c_str());
                     meatClient->m_isDirectory = true;
+                }
+                std::string fname = parse_content_disposition_filename(evt->header_value);
+                if (!fname.empty()) {
+                    meatClient->contentDispositionFilename = fname;
+                    Debug_printv("Content-Disposition filename: %s", fname.c_str());
                 }
             }
             else if(mstr::equals("Content-Length", evt->header_key, false))
@@ -1002,37 +1067,33 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
 #include <esp_heap_caps.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <sys/stat.h>
 
-static char* g_ca_cert = nullptr;
+static bool g_http_insecure = false;
+static char *g_ca_cert = nullptr;
 static size_t g_ca_cert_len = 0;
 static bool g_ca_cert_loaded = false;
 
-static void load_ca_cert_from_flash() {
+void http_set_insecure(bool v) { g_http_insecure = v; }
+
+static void load_ca_cert_from_flash()
+{
     if (g_ca_cert_loaded) return;
     g_ca_cert_loaded = true;
     const char *ca_path = "/.sys/cert.pem";
     struct stat st;
-    if (stat(ca_path, &st) == 0 && st.st_size > 0) {
-        int fd = open(ca_path, O_RDONLY);
-        if (fd >= 0) {
-            g_ca_cert_len = st.st_size;
-            // Try to allocate in PSRAM first, fallback to default heap
-            g_ca_cert = (char*)heap_caps_malloc(g_ca_cert_len + 1, MALLOC_CAP_SPIRAM);
-            if (!g_ca_cert) {
-                g_ca_cert = (char*)heap_caps_malloc(g_ca_cert_len + 1, MALLOC_CAP_DEFAULT);
-            }
-            if (g_ca_cert) {
-                ssize_t n = read(fd, g_ca_cert, g_ca_cert_len);
-                g_ca_cert[g_ca_cert_len] = '\0';
-                Debug_printv("Loaded CA cert from %s (%d bytes, read %d)", ca_path, (int)g_ca_cert_len, (int)n);
-            } else {
-                Debug_printv("Failed to allocate CA cert buffer (%d bytes)", (int)g_ca_cert_len);
-            }
-            close(fd);
-        }
-    } else {
-        Debug_printv("CA cert file not found: %s", ca_path);
+    if (stat(ca_path, &st) != 0 || st.st_size <= 0) return;
+    int fd = open(ca_path, O_RDONLY);
+    if (fd < 0) return;
+    g_ca_cert_len = (size_t)st.st_size;
+    g_ca_cert = (char *)heap_caps_malloc(g_ca_cert_len + 1, MALLOC_CAP_SPIRAM);
+    if (!g_ca_cert) g_ca_cert = (char *)malloc(g_ca_cert_len + 1);
+    if (g_ca_cert) {
+        ssize_t n = read(fd, g_ca_cert, g_ca_cert_len);
+        g_ca_cert[n > 0 ? (size_t)n : 0] = '\0';
+        Debug_printv("CA cert loaded from %s (%d bytes)", ca_path, (int)g_ca_cert_len);
     }
+    close(fd);
 }
 
 void MeatHttpClient::init() {
@@ -1063,14 +1124,17 @@ void MeatHttpClient::init() {
     config.skip_cert_common_name_check = true;
 
 
-    // Universal CA cert loading (PSRAM)
-    load_ca_cert_from_flash();
-    if (g_ca_cert && g_ca_cert_len > 0) {
-        config.cert_pem = g_ca_cert;
+    if (!g_http_insecure) {
+        // Set CERT.PEM source here flash or bundled
+        // load_ca_cert_from_flash();
+        // if (g_ca_cert && g_ca_cert_len > 0) {
+        //     config.cert_pem = g_ca_cert;
+        // }
+        // else 
+        {
+            config.crt_bundle_attach = esp_crt_bundle_attach;
+        }
         config.skip_cert_common_name_check = false;
-    } else {
-        Debug_printv("No CA cert loaded, skipping cert validation!");
-        config.skip_cert_common_name_check = true;
     }
 
     //Debug_printv("HTTP Init url[%s]", url.c_str());

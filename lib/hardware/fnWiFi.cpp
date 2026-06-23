@@ -22,7 +22,7 @@
 #include "fnConfig.h"
 #include "led.h"
 
-#include "httpd_server.h"
+#include "web_server.h"
 #include "tcpsvr.h"
 
 #ifdef ENABLE_SSDP
@@ -652,7 +652,7 @@ void WiFiManager::handle_station_stop()
     _connected = false;
     fnLedManager.set(eLed::LED_WIFI, false);
 #ifndef MIN_CONFIG
-    oHttpdServer.stop();
+    httpServer.stop();
 #endif
     fnSystem.Net.stop_sntp_client();
 #ifdef ENABLE_CONSOLE_TCP
@@ -690,7 +690,7 @@ void WiFiManager::_wifi_event_handler(void *arg, esp_event_base_t event_base,
 
 #ifndef MIN_CONFIG
             // Start Web / WebDAV Server
-            oHttpdServer.start();
+            httpServer.start();
 
             // Start mDNS Service
             mdns_init();

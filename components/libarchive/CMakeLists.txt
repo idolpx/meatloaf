@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.12)
 
 file(GLOB SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/lib/*.c)
 
+# ESP32 POSIX stubs for archive_write_disk_posix.c
+list(APPEND SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/esp32/esp32_compat.c)
+
 # Add ESP32 HIMEM allocator for LZMA
 #list(APPEND SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/esp32/esp32_himem_allocator.c)
 

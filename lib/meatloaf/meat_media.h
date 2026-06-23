@@ -24,6 +24,7 @@
 #include <bitset>
 #include <unordered_map>
 #include <sstream>
+#include <chrono>
 
 #include "../../include/debug.h"
 
@@ -190,53 +191,114 @@ private:
  * Utility implementations
  ********************************************************/
 class ImageBroker {
+    // LRU entry: stores key + last access timestamp for eviction
+    struct LRUEntry {
+        std::string key;
+        std::chrono::steady_clock::time_point last_access;
+        LRUEntry(std::string k) : key(std::move(k)), last_access(std::chrono::steady_clock::now()) {}
+    };
+
     static std::unordered_map<std::string, std::shared_ptr<MMediaStream>> image_repo;
+    static std::vector<LRUEntry> lru_order;  // oldest-first LRU list
+    static std::chrono::steady_clock::time_point last_cleanup;
+
+    static constexpr size_t max_entries = 50;              // Max cached streams
+    static constexpr unsigned int cleanup_interval_ms = 60000; // Cleanup every 60s
+
+    // Check if an entry is currently in use by any active drive
+    static bool is_in_use(const std::string& key) {
+        for (int i = 0; i < MAX_DISK_DEVICES; i++) {
+            auto drive = Meatloaf.get_disks(i);
+            if (drive != nullptr) {
+                auto cwd = drive->disk_dev.getCWD();
+                if (cwd.back() == '/') cwd.pop_back();
+                if (!cwd.empty() && mstr::endsWith(key, cwd.c_str())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    // Evict oldest entries if over limit (skip entries that are in use)
+    static void evict_lru_if_needed() {
+        while (lru_order.size() >= max_entries) {
+            // Find oldest entry that is NOT in use
+            auto it = lru_order.begin();
+            for (; it != lru_order.end(); ++it) {
+                if (!is_in_use(it->key)) {
+                    Debug_printv("LRU evicting: %s", it->key.c_str());
+                    image_repo.erase(it->key);
+                    lru_order.erase(it);
+                    break;
+                }
+            }
+            // If all entries are in use, cannot evict - exit loop
+            if (it == lru_order.end()) {
+                Debug_printv("LRU: all entries in use, cannot evict");
+                break;
+            }
+        }
+    }
+
+    // Periodic cleanup: remove entries with stale timestamps (skip entries that are in use)
+    static void cleanup_old_entries() {
+        auto now = std::chrono::steady_clock::now();
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_cleanup).count();
+        if (elapsed < cleanup_interval_ms) return;
+
+
+        last_cleanup = now;
+        auto it = lru_order.begin();
+        while (it != lru_order.end()) {
+            auto age = std::chrono::duration_cast<std::chrono::milliseconds>(now - it->last_access).count();
+            if (age >= cleanup_interval_ms && !is_in_use(it->key)) {
+                Debug_printv("LRU stale evicting: %s", it->key.c_str());
+                image_repo.erase(it->key);
+                it = lru_order.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+
+    // Move existing key to back (most-recently-used)
+    static void touch_entry(const std::string& key) {
+        for (auto& e : lru_order) {
+            if (e.key == key) {
+                e.last_access = std::chrono::steady_clock::now();
+                return;
+            }
+        }
+    }
+
 public:
-    template<class T> static std::shared_ptr<T> obtain(std::string type, std::string url) 
+    template<class T> static std::shared_ptr<T> obtain(std::string type, std::string url)
     {
         auto newFile = std::unique_ptr<MFile>(MFSOwner::File(url));
-        //Debug_printv("newFile[%s] newFile->pathInStream[%s]", newFile->url.c_str(), newFile->pathInStream.c_str());
-        //Debug_printv("sourceFile[%s] sourceFile->pathInStream[%s]", (newFile->sourceFile != nullptr) ? newFile->sourceFile->url.c_str() : "nullptr", (newFile->sourceFile != nullptr) ? newFile->sourceFile->pathInStream.c_str() : "nullptr");
 
         std::string key = type + newFile->sourceFile->url;
         if ( newFile->sourceFile->pathInStream.size() && newFile->sourceFile->pathInStream != "/" )
             key += "/" + newFile->sourceFile->pathInStream;
-        //Debug_printv("key[%s]", key.c_str());
 
-        // obviously you have to supply sourceFile.url to this function!
-        if(image_repo.find(key)!=image_repo.end()) {
-            //Debug_printv("stream found! type[%s] url[%s]", type.c_str(), url.c_str());
-            return std::static_pointer_cast<T>(image_repo.at(key));
+        auto it = image_repo.find(key);
+        if (it != image_repo.end()) {
+            touch_entry(key);
+            return std::static_pointer_cast<T>(it->second);
         }
 
-        // create and add stream to image broker if not found
-        //Debug_printv("Creating New Stream type[%s] url[%s]", type.c_str(), url.c_str());
+        cleanup_old_entries();
+        evict_lru_if_needed();
 
-        //Debug_printv("before " ANSI_WHITE_BACKGROUND "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv");
         std::shared_ptr<T> newStream = std::static_pointer_cast<T>(newFile->getSourceStream());
-        //Debug_printv("after  " ANSI_WHITE_BACKGROUND "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^");
 
         if ( newStream != nullptr )
         {
-            //Debug_printv("newFile->sourceFile url[%s] pathInStream[%s]", newFile->sourceFile->url.c_str(), newFile->sourceFile->pathInStream.c_str());
-            //Debug_printv("newStream type[%s] url[%s]", type.c_str(), newStream->url.c_str());
-    
-            // Are we at the root of the pathInStream?
-            // if ( newFile->isDirectory() )
-            // {
-            //     Debug_printv("DIRECTORY [%s]", key.c_str());
-            // }
-            // else
-            // {
-            //     Debug_printv("SINGLE FILE [%s]", key.c_str());
-            // }
-
-            //Debug_printv("image count[%lu]", image_repo.size());
             image_repo.insert(std::make_pair(key, newStream));
+            lru_order.emplace_back(key);
             return newStream;
         }
 
-        //Debug_printv("fail!");
         return nullptr;
     }
 
@@ -245,71 +307,51 @@ public:
     }
 
     static bool exists(std::string url) {
-        if(image_repo.find(url)!=image_repo.end()) {
-            return true;
-        }
-        //Debug_printv("streams[%d]", image_repo.size());
-        return false;
+        return image_repo.find(url) != image_repo.end();
     }
 
     static void dispose(std::string url) {
-        if(image_repo.find(url)!=image_repo.end()) {
-            auto toDelete = image_repo.at(url);
-            image_repo.erase(url);
-            //delete toDelete;
+        auto it = image_repo.find(url);
+        if (it != image_repo.end()) {
+            lru_order.erase(
+                std::remove_if(lru_order.begin(), lru_order.end(),
+                    [&url](const LRUEntry& e) { return e.key == url; }),
+                lru_order.end()
+            );
+            image_repo.erase(it);
         }
-        //Debug_printv("streams[%d]", image_repo.size());
     }
 
     static void validate() {
-
-        for(auto& pair : image_repo) {
-            //Debug_printv("key[%s] stream[%s]", pair.first.c_str(), pair.second->url.c_str());
-        
+        for (auto& pair : image_repo) {
             bool found = false;
-            for (int i = 0; i < MAX_DISK_DEVICES; i++)
-            {
-                // Show device status
-                //Debug_printv("Validating disk device id[%d]", i + 8);
+            for (int i = 0; i < MAX_DISK_DEVICES; i++) {
                 auto drive = Meatloaf.get_disks(i);
-                if (drive != nullptr )
-                {
+                if (drive != nullptr) {
                     auto cwd = drive->disk_dev.getCWD();
-
-                    // remove trailing slash
-                    if ( cwd[cwd.size() - 1] == '/' )
-                        cwd = cwd.substr(0, cwd.size() - 1);
-
-                    if ( cwd.empty() )
-                        continue;
-
-                    //Debug_printv("id[%d] key[%s] cwd[%s] found[%d]", i + 8, pair.first.c_str(), cwd.c_str(), found);
-                    if (mstr::endsWith(pair.first, cwd.c_str()))
-                    {
+                    if (cwd.back() == '/') cwd.pop_back();
+                    if (cwd.empty()) continue;
+                    if (mstr::endsWith(pair.first, cwd.c_str())) {
                         found = true;
                         break;
                     }
                 }
             }
-
-            if ( !found )
-            {
+            if (!found) {
                 Debug_printv("DISPOSING key[%s] stream[%s]", pair.first.c_str(), pair.second->url.c_str());
-                image_repo.erase(pair.first);
+                dispose(pair.first);
             }
         }
     }
 
     static void clear() {
-        // std::for_each(image_repo.begin(), image_repo.end(), [](auto& pair) {
-        //     delete pair.second;
-        // });
         image_repo.clear();
+        lru_order.clear();
     }
 
     static void dump() {
         Debug_printv("streams[%d]", image_repo.size());
-        for(auto& pair : image_repo) {
+        for (auto& pair : image_repo) {
             Debug_printv("key[%s] stream[%s] size[%d]", pair.first.c_str(), pair.second->url.c_str(), sizeof(*pair.second));
         }
     }

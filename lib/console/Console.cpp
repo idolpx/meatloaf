@@ -180,6 +180,10 @@ namespace ESP32Console
         registerCommand(getUpdateCommand());
         registerCommand(getEnableCommand());
         registerCommand(getDisableCommand());
+        registerCommand(getGzipCommand());
+#ifndef MIN_CONFIG
+        registerCommand(getUnzipCommand());
+#endif
 #ifdef SD_CARD
         registerCommand(getFormatSDCommand());
         registerCommand(getUpdatedbCommand());

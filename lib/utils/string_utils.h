@@ -95,6 +95,7 @@ namespace mstr {
 
     std::string format(const char *format, ...);
     std::string formatBytes(uint64_t value);
+    std::string formatDuration(uint64_t seconds);
 
     void cd(std::string &path, std::string newDir);
     std::string parent(std::string path, std::string plus = "");

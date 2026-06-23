@@ -21,6 +21,8 @@
 #include <memory>
 #include <fstream>
 
+#include <esp_heap_caps.h>
+
 #include "meatloaf.h"
 
 #include "../../include/debug.h"
@@ -64,17 +66,20 @@ namespace Meat
 
         mfilebuf()
         {
-            gbuffer = new char[gbuffer_size+1];
-            pbuffer = new char[pbuffer_size+1];
+            // Allocate buffers from PSRAM when available, fall back to heap
+            gbuffer = (char*)heap_caps_malloc(gbuffer_size + 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+            if (!gbuffer) gbuffer = (char*)malloc(gbuffer_size + 1);
+            pbuffer = (char*)heap_caps_malloc(pbuffer_size + 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+            if (!pbuffer) pbuffer = (char*)malloc(pbuffer_size + 1);
         };
 
         ~mfilebuf()
         {
             if (pbuffer != nullptr)
-                delete[] pbuffer;
+                free(pbuffer);
 
             if (gbuffer != nullptr)
-                delete[] gbuffer;
+                free(gbuffer);
 
             close();
         }

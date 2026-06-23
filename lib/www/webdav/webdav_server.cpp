@@ -1,3 +1,19 @@
+// Meatloaf - A Commodore 64/128 multi-device emulator
+// https://github.com/idolpx/meatloaf
+// Copyright(C) 2020 James Johnston
+//
+// Meatloaf is free software : you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Meatloaf is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
 #include "webdav_server.h"
 
@@ -868,7 +884,7 @@ int Server::doPropfind(Request &req, Response &resp)
     if (isFilteredJunkPath(path))
         return 404;
 
-    //Debug_printv("req[%s] path[%s]", req.getPath().c_str(), path.c_str());
+    Debug_printv("req[%s] path[%s]", req.getPath().c_str(), path.c_str());
 
     auto mfile = webdav_mfile(path);
     if (!mfile || !mfile->exists())
@@ -877,6 +893,8 @@ int Server::doPropfind(Request &req, Response &resp)
     int recurse =
         (req.getDepth() == Request::DEPTH_0) ? 0 : (req.getDepth() == Request::DEPTH_1) ? 1
                                                                                         : 32;
+
+    Debug_printv("depth[%d] recurse[%d]", req.getDepth(), recurse);
 
     resp.setStatus(207);
     resp.setContentType("application/xml;charset=utf-8");
