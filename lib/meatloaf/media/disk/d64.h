@@ -58,9 +58,7 @@ protected:
         uint8_t sector;
     };
 
-    struct BlockChain {
-        std::vector<Block> blocks;
-    };
+    using BlockChain = std::vector<Block>;
 
     struct BlockAllocationMap {
         uint8_t track;
