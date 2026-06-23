@@ -342,6 +342,9 @@ namespace ESP32Console
                 if (ch != '\n' && ch != EOF) ungetc(ch, stdin);
             }
 
+            // Truncate to buffer size in case paste overflow corrupted length.
+            line[console.max_cmdline_len_ - 1] = '\0';
+
             // Ignore empty/whitespace-only input lines.
             std::string raw_line = line;
             mstr::trim(raw_line);
