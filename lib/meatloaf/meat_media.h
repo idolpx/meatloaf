@@ -112,15 +112,27 @@ protected:
     size_t partition_count = -1;    // Partition count (-1 unknown)
 
     enum open_modes { OPEN_READ, OPEN_WRITE, OPEN_APPEND, OPEN_MODIFY };
-    std::string file_type_label[12] = { "DEL", "SEQ", "PRG", "USR", "REL", "CBM", "DIR", "???", "SYS", "NAT", "CMD", "CFS" };
-    std::string partition_type_label[9] = { "", "NAT", "41", "71", "81", "C81", "PRN", "FOR", "SYS" };
 
-    virtual bool readHeader() { return true; }
-    virtual bool writeHeader(std::string name, std::string id) { return false; };
+    // Partition methods
+    std::string partition_type_label[9] = { "", "NAT", "41", "71", "81", "C81", "PRN", "FOR", "SYS" };
 
     virtual bool seekPartition( uint8_t index ) { return false; };
     virtual bool readPartition( uint8_t index ) { return false; };
     virtual bool writePartition( uint8_t index ) { return false; };
+
+    void resetPartitionCounter() {
+        partition_index = 0;
+    }
+    virtual bool getNextPartitionEntry()
+    {
+        return seekPartition(partition_index + 1);
+    }
+
+    // Directory methods
+    std::string file_type_label[12] = { "DEL", "SEQ", "PRG", "USR", "REL", "CBM", "DIR", "???", "SYS", "NAT", "CMD", "CFS" };
+
+    virtual bool readHeader() { return true; }
+    virtual bool writeHeader(std::string name, std::string id) { return false; };
 
     virtual bool seekEntry( std::string filename ) { return false; };
     virtual bool seekEntry( uint16_t index ) { return false; };
@@ -134,7 +146,7 @@ protected:
         return seekEntry(entry_index + 1);
     }
 
-    // Disks
+    // Disk methods
     virtual uint16_t blocksFree() { return 0; };
 	virtual uint8_t speedZone(uint8_t track) { return 0; };
 
