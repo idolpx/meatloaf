@@ -1615,6 +1615,21 @@ static int cmd_gzip(int argc, char **argv)
 
 // ─── unzip ────────────────────────────────────────────────────────────────────
 #ifndef MIN_CONFIG
+
+static void unzip_mkdirs(const char *path)
+{
+    char tmp[512];
+    snprintf(tmp, sizeof(tmp), "%s", path);
+    for (char *p = tmp + 1; *p; p++) {
+        if (*p == '/') {
+            *p = '\0';
+            mkdir(tmp, 0755);
+            *p = '/';
+        }
+    }
+    mkdir(tmp, 0755);
+}
+
 static int cmd_unzip(int argc, char **argv)
 {
     if (argc < 2) {
@@ -1643,8 +1658,12 @@ static int cmd_unzip(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    struct archive *out = archive_write_disk_new();
-    archive_write_disk_set_options(out, ARCHIVE_EXTRACT_TIME | ARCHIVE_EXTRACT_PERM);
+    uint8_t *buf = (uint8_t *)psram_malloc(4096);
+    if (!buf) {
+        Serial.printf("unzip: out of memory\r\n");
+        archive_read_free(a);
+        return EXIT_FAILURE;
+    }
 
     struct archive_entry *entry;
     int count = 0, r;
@@ -1654,7 +1673,7 @@ static int cmd_unzip(int argc, char **argv)
 
     while ((r = archive_read_next_header(a, &entry)) == ARCHIVE_OK) {
         std::string path = dest + "/" + archive_entry_pathname(entry);
-        archive_entry_set_pathname(entry, path.c_str());
+        unsigned int type = archive_entry_filetype(entry);
 
         int64_t entry_size = archive_entry_size_is_set(entry) ? archive_entry_size(entry) : -1;
         if (entry_size >= 0)
@@ -1662,20 +1681,34 @@ static int cmd_unzip(int argc, char **argv)
         else
             Serial.printf("  %s\r\n", path.c_str());
 
-        if (archive_write_header(out, entry) != ARCHIVE_OK) {
-            Serial.printf("unzip: write header: %s\r\n", archive_error_string(out));
+        if (type == AE_IFDIR) {
+            unzip_mkdirs(path.c_str());
             archive_read_data_skip(a);
             continue;
         }
 
-        const void *buf;
-        size_t sz;
-        la_int64_t offset;
-        int dr;
+        if (type != AE_IFREG) {
+            archive_read_data_skip(a);
+            continue;
+        }
+
+        // Ensure parent directories exist
+        size_t slash = path.rfind('/');
+        if (slash != std::string::npos)
+            unzip_mkdirs(path.substr(0, slash).c_str());
+
+        FILE *f = fopen(path.c_str(), "wb");
+        if (!f) {
+            Serial.printf("unzip: cannot create '%s'\r\n", path.c_str());
+            archive_read_data_skip(a);
+            continue;
+        }
+
         size_t entry_bytes = 0, last_report = 0;
-        while ((dr = archive_read_data_block(a, &buf, &sz, &offset)) == ARCHIVE_OK) {
-            archive_write_data_block(out, buf, sz, offset);
-            entry_bytes += sz;
+        ssize_t n;
+        while ((n = archive_read_data(a, buf, 4096)) > 0) {
+            fwrite(buf, 1, (size_t)n, f);
+            entry_bytes += (size_t)n;
             if (entry_size >= (int64_t)kProgressThreshold &&
                 entry_bytes - last_report >= kReport) {
                 Serial.printf("    %zu / %lld bytes (%d%%)\r\n",
@@ -1684,16 +1717,12 @@ static int cmd_unzip(int argc, char **argv)
                 last_report = entry_bytes;
             }
         }
-        if (dr != ARCHIVE_EOF)
-            Serial.printf("unzip: read data: %s\r\n", archive_error_string(a));
-
-        archive_write_finish_entry(out);
+        fclose(f);
         total_bytes += entry_bytes;
         count++;
     }
 
-    archive_write_close(out);
-    archive_write_free(out);
+    free(buf);
     archive_read_close(a);
     archive_read_free(a);
 
