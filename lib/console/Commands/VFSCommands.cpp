@@ -13,6 +13,7 @@
 #include <iostream>
 #include <esp_heap_caps.h>
 #include <zlib.h>
+#include "../../meatloaf/network/http.h"
 #ifndef MIN_CONFIG
 #include <archive.h>
 #include <archive_entry.h>
@@ -195,13 +196,20 @@ int cd(int argc, char **argv)
 int ls(int argc, char **argv)
 {
     MFile* listPath = nullptr;
-    if (argc == 1)
+    const char *path_arg = nullptr;
+    for (int i = 1; i < argc; i++) {
+        if (argv[i][0] != '-')
+            path_arg = argv[i];
+        // flags like -la, -l, -a are silently ignored
+    }
+
+    if (path_arg == nullptr)
     {
         listPath = MFSOwner::File(getCurrentPath()->url);
     }
-    else if (argc == 2)
+    else
     {
-        listPath = getCurrentPath()->cd(argv[1]);
+        listPath = getCurrentPath()->cd(path_arg);
     }
 
     Debug_printv("ls path[%s]", listPath->url.c_str());
@@ -485,15 +493,25 @@ int auth(int argc, char **argv)
 
 int wget(int argc, char **argv)
 {
-    if (argc != 2)
-    {
-        Serial.printf("wget {url}\r\n");
+    bool insecure = false;
+    const char *url_arg = nullptr;
+
+    if (argc == 2) {
+        url_arg = argv[1];
+    } else if (argc == 3 && strcmp(argv[1], "-k") == 0) {
+        insecure = true;
+        url_arg = argv[2];
+    } else {
+        Serial.printf("wget [-k] {url}\r\n");
         return EXIT_SUCCESS;
     }
 
     std::string pwd = getCurrentPath()->url;
 
-    std::unique_ptr<MFile>f(MFSOwner::File(argv[1]));
+    if (insecure)
+        http_set_insecure(true);
+
+    std::unique_ptr<MFile>f(MFSOwner::File(url_arg));
     if (f != nullptr)
     {
         auto s = f->getSourceStream();
@@ -558,6 +576,9 @@ int wget(int argc, char **argv)
         }
         //delete f;
     }
+
+    if (insecure)
+        http_set_insecure(false);
 
 #ifdef ENABLE_DISPLAY
     LEDS.idle();
@@ -1806,7 +1827,7 @@ namespace ESP32Console::Commands
 
     const ConsoleCommand getWgetCommand()
     {
-        return ConsoleCommand("wget", &wget, "Download url to file");
+        return ConsoleCommand("wget", &wget, "Download url to file (-k skips TLS cert verification)");
     }
 
     const ConsoleCommand getUpdateCommand()

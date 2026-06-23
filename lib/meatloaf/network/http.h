@@ -28,6 +28,8 @@
 #ifndef MEATLOAF_SCHEME_HTTP
 #define MEATLOAF_SCHEME_HTTP
 
+void http_set_insecure(bool v);
+
 #include "meatloaf.h"
 #include "meat_session.h"
 #include "service/mdns.h"

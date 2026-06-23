@@ -220,9 +220,10 @@ bool FlashMFile::rewindDirectory()
 {
     openDir(fullPath());
 
-    rewinddir( dir );
+    if (dir != NULL)
+        rewinddir( dir );
 
-    return (dir != NULL) ? true: false;
+    return (dir != NULL);
 }
 
 

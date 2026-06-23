@@ -18,6 +18,7 @@
 #include "http.h"
 
 #include <esp_idf_version.h>
+#include <esp_crt_bundle.h>
 #include <algorithm>
 #include <cstring>
 #include <freertos/FreeRTOS.h>
@@ -1002,37 +1003,33 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
 #include <esp_heap_caps.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <sys/stat.h>
 
-static char* g_ca_cert = nullptr;
+static bool g_http_insecure = false;
+static char *g_ca_cert = nullptr;
 static size_t g_ca_cert_len = 0;
 static bool g_ca_cert_loaded = false;
 
-static void load_ca_cert_from_flash() {
+void http_set_insecure(bool v) { g_http_insecure = v; }
+
+static void load_ca_cert_from_flash()
+{
     if (g_ca_cert_loaded) return;
     g_ca_cert_loaded = true;
     const char *ca_path = "/.sys/cert.pem";
     struct stat st;
-    if (stat(ca_path, &st) == 0 && st.st_size > 0) {
-        int fd = open(ca_path, O_RDONLY);
-        if (fd >= 0) {
-            g_ca_cert_len = st.st_size;
-            // Try to allocate in PSRAM first, fallback to default heap
-            g_ca_cert = (char*)heap_caps_malloc(g_ca_cert_len + 1, MALLOC_CAP_SPIRAM);
-            if (!g_ca_cert) {
-                g_ca_cert = (char*)heap_caps_malloc(g_ca_cert_len + 1, MALLOC_CAP_DEFAULT);
-            }
-            if (g_ca_cert) {
-                ssize_t n = read(fd, g_ca_cert, g_ca_cert_len);
-                g_ca_cert[g_ca_cert_len] = '\0';
-                Debug_printv("Loaded CA cert from %s (%d bytes, read %d)", ca_path, (int)g_ca_cert_len, (int)n);
-            } else {
-                Debug_printv("Failed to allocate CA cert buffer (%d bytes)", (int)g_ca_cert_len);
-            }
-            close(fd);
-        }
-    } else {
-        Debug_printv("CA cert file not found: %s", ca_path);
+    if (stat(ca_path, &st) != 0 || st.st_size <= 0) return;
+    int fd = open(ca_path, O_RDONLY);
+    if (fd < 0) return;
+    g_ca_cert_len = (size_t)st.st_size;
+    g_ca_cert = (char *)heap_caps_malloc(g_ca_cert_len + 1, MALLOC_CAP_SPIRAM);
+    if (!g_ca_cert) g_ca_cert = (char *)malloc(g_ca_cert_len + 1);
+    if (g_ca_cert) {
+        ssize_t n = read(fd, g_ca_cert, g_ca_cert_len);
+        g_ca_cert[n > 0 ? (size_t)n : 0] = '\0';
+        Debug_printv("CA cert loaded from %s (%d bytes)", ca_path, (int)g_ca_cert_len);
     }
+    close(fd);
 }
 
 void MeatHttpClient::init() {
@@ -1063,14 +1060,17 @@ void MeatHttpClient::init() {
     config.skip_cert_common_name_check = true;
 
 
-    // Universal CA cert loading (PSRAM)
-    load_ca_cert_from_flash();
-    if (g_ca_cert && g_ca_cert_len > 0) {
-        config.cert_pem = g_ca_cert;
+    if (!g_http_insecure) {
+        // Set CERT.PEM source here flash or bundled
+        // load_ca_cert_from_flash();
+        // if (g_ca_cert && g_ca_cert_len > 0) {
+        //     config.cert_pem = g_ca_cert;
+        // }
+        // else 
+        {
+            config.crt_bundle_attach = esp_crt_bundle_attach;
+        }
         config.skip_cert_common_name_check = false;
-    } else {
-        Debug_printv("No CA cert loaded, skipping cert validation!");
-        config.skip_cert_common_name_check = true;
     }
 
     //Debug_printv("HTTP Init url[%s]", url.c_str());
