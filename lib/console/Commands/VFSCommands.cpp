@@ -1570,6 +1570,15 @@ int format_sd(int argc, char **argv)
 }
 #endif
 
+// Resolve a console argument to an absolute VFS path using the current directory.
+static std::string resolve_path(const char *arg)
+{
+    if (arg[0] == '/') return arg;
+    std::string pwd = getCurrentPath()->url;
+    if (arg[0] == '.' && arg[1] == '\0') return pwd;
+    return pwd + '/' + arg;
+}
+
 // ─── gzip ─────────────────────────────────────────────────────────────────────
 static int cmd_gzip(int argc, char **argv)
 {
@@ -1578,19 +1587,19 @@ static int cmd_gzip(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    const char *src = argv[1];
-    std::string dst = (argc >= 3) ? argv[2] : (std::string(src) + ".gz");
+    std::string src = resolve_path(argv[1]);
+    std::string dst = (argc >= 3) ? resolve_path(argv[2]) : (src + ".gz");
 
     struct stat st = {};
-    if (stat(src, &st) != 0) {
-        Serial.printf("gzip: '%s': %s\r\n", src, strerror(errno));
+    if (stat(src.c_str(), &st) != 0) {
+        Serial.printf("gzip: '%s': %s\r\n", src.c_str(), strerror(errno));
         return EXIT_FAILURE;
     }
     size_t total = (size_t)st.st_size;
 
-    FILE *in = fopen(src, "rb");
+    FILE *in = fopen(src.c_str(), "rb");
     if (!in) {
-        Serial.printf("gzip: cannot open '%s'\r\n", src);
+        Serial.printf("gzip: cannot open '%s'\r\n", src.c_str());
         return EXIT_FAILURE;
     }
 
@@ -1610,7 +1619,7 @@ static int cmd_gzip(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    Serial.printf("gzip: '%s' -> '%s' (%zu bytes)\r\n", src, dst.c_str(), total);
+    Serial.printf("gzip: '%s' -> '%s' (%zu bytes)\r\n", src.c_str(), dst.c_str(), total);
 
     size_t written = 0, last_report = 0;
     const size_t kReport = 512 * 1024;
@@ -1658,14 +1667,13 @@ static int cmd_unzip(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    const char *src = argv[1];
+    std::string src = resolve_path(argv[1]);
     std::string dest;
     if (argc >= 3) {
-        dest = argv[2];
+        dest = resolve_path(argv[2]);
     } else {
-        std::string s(src);
-        size_t slash = s.rfind('/');
-        dest = (slash != std::string::npos) ? s.substr(0, slash) : "/";
+        size_t slash = src.rfind('/');
+        dest = (slash != std::string::npos) ? src.substr(0, slash) : getCurrentPath()->url;
     }
     while (dest.size() > 1 && dest.back() == '/') dest.pop_back();
 
@@ -1673,8 +1681,8 @@ static int cmd_unzip(int argc, char **argv)
     archive_read_support_filter_all(a);
     archive_read_support_format_all(a);
 
-    if (archive_read_open_filename(a, src, 16384) != ARCHIVE_OK) {
-        Serial.printf("unzip: cannot open '%s': %s\r\n", src, archive_error_string(a));
+    if (archive_read_open_filename(a, src.c_str(), 16384) != ARCHIVE_OK) {
+        Serial.printf("unzip: cannot open '%s': %s\r\n", src.c_str(), archive_error_string(a));
         archive_read_free(a);
         return EXIT_FAILURE;
     }
