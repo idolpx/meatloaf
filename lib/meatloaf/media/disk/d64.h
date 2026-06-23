@@ -53,6 +53,15 @@ class D64MStream : public MMediaStream {
 
 protected:
 
+    struct Block {
+        uint8_t track;
+        uint8_t sector;
+    };
+
+    struct BlockChain {
+        std::vector<Block> blocks;
+    };
+
     struct BlockAllocationMap {
         uint8_t track;
         uint8_t sector;
@@ -335,13 +344,18 @@ private:
     bool seekEntry( uint16_t index = 0 ) override;
     bool readEntry( uint16_t index = 0 ) override;
     bool writeEntry( uint16_t index = 0 ) override;
+    uint16_t seekFreeEntry( uint16_t index = 0 );
 
     std::string readBlock( uint8_t track, uint8_t sector );
     bool writeBlock( uint8_t track, uint8_t sector, std::string data );
     bool allocateBlock( uint8_t track, uint8_t sector );
     bool deallocateBlock( uint8_t track, uint8_t sector );
+    BlockChain getFreeBlocks(uint16_t file_size);
     bool getNextFreeBlock(uint8_t startTrack, uint8_t startSector, uint8_t *foundTrack, uint8_t *foundSector, bool forDirectory = false);
     bool isBlockFree(uint8_t track, uint8_t sector);
+
+    BlockChain getBlocks( uint8_t track, uint8_t sector );
+    BlockChain getBlocks( std::string filename );
 
     bool initializeBlocks();
 

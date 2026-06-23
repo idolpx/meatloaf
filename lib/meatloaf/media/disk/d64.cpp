@@ -281,6 +281,36 @@ bool D64MStream::initializeBlocks()
     return true;
 }
 
+D64MStream::BlockChain D64MStream::getFreeBlocks(uint16_t file_size)
+{
+    // Return a vector of <track, sector> offsets for the required file size
+    BlockChain blockChain;
+
+    uint16_t remainingSize = file_size;
+    uint8_t track = 1;
+    uint8_t sector = 0;
+
+    while (remainingSize > 0)
+    {
+        uint8_t foundTrack, foundSector;
+        if (!getNextFreeBlock(track, sector, &foundTrack, &foundSector))
+        {
+            break; // No more free blocks available
+        }
+
+        Block block;
+        block.track = foundTrack;
+        block.sector = foundSector;
+        blockChain.blocks.push_back(block);
+
+        remainingSize -= (block_size - 2); // Adjust for t/s link
+        track = foundTrack;
+        sector = foundSector + 1;
+    }
+
+    return blockChain;
+}
+
 bool D64MStream::getNextFreeBlock(uint8_t startTrack, uint8_t startSector, uint8_t *foundTrack, uint8_t *foundSector, bool forDirectory)
 {
     uint8_t track, sector;
@@ -540,6 +570,53 @@ bool D64MStream::writeEntry( uint16_t index) {
         return writeContainer((uint8_t*)&entry, sizeof(entry));
     }
     return false;
+}
+
+uint16_t D64MStream::seekFreeEntry( uint16_t index )
+{
+    uint16_t free_index = index;
+
+    while (true)
+    {
+        if (!seekEntry(free_index))
+            break;
+
+        if (entry.file_type == 0x00 || entry.file_type == 0xFF)
+            return free_index;
+
+        free_index++;
+    }
+
+    // Add another block to directory if needed
+
+}
+
+
+D64MStream::BlockChain D64MStream::getBlocks( uint8_t track, uint8_t sector )
+{
+    BlockChain chain;
+    Block link;
+    uint8_t next_track = track;
+    uint8_t next_sector = sector;
+    do
+    {
+        if (!seekSector(next_track, next_sector))
+            break;
+
+        readContainer((uint8_t *)&link, sizeof(entry));
+        chain.blocks.push_back(link);
+        next_track = link.track;
+        next_sector = link.sector;
+    } while (next_track != 0);
+
+    return chain;
+}
+
+D64MStream::BlockChain D64MStream::getBlocks( std::string filename )
+{
+    if ( seekEntry(filename) )
+        return getBlocks(entry.next_track, entry.next_sector);
+    return BlockChain();
 }
 
 uint16_t D64MStream::blocksFree()
