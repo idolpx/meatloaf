@@ -301,7 +301,7 @@ D64MStream::BlockChain D64MStream::getFreeBlocks(uint16_t file_size)
         Block block;
         block.track = foundTrack;
         block.sector = foundSector;
-        blockChain.blocks.push_back(block);
+        blockChain.push_back(block);
 
         remainingSize -= (block_size - 2); // Adjust for t/s link
         track = foundTrack;
@@ -604,7 +604,7 @@ D64MStream::BlockChain D64MStream::getBlocks( uint8_t track, uint8_t sector )
             break;
 
         readContainer((uint8_t *)&link, sizeof(entry));
-        chain.blocks.push_back(link);
+        chain.push_back(link);
         next_track = link.track;
         next_sector = link.sector;
     } while (next_track != 0);
