@@ -25,6 +25,7 @@
 
 #define BIN_DIR     "/.bin"
 #define CACHE_DIR   "/.cache"
+#define PRINT_DIR   "/.print"
 #define ROM_DIR     "/.rom"
 #define SYSTEM_DIR  "/.sys"
 #define WWW_ROOT    "/.www"

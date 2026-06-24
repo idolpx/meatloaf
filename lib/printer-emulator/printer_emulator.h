@@ -2,12 +2,13 @@
 #define PRINTER_EMU_H
 
 //#include "../../include/atascii.h"
+#include "../../include/global_defines.h"
 
 #include "fnFsSD.h"
 
 #include <string>
 
-#define PRINTER_OUTFILE "/paper.pdf"
+#define PRINTER_OUTFILE PRINT_DIR "/paper.pdf"
 
 // TODO: Combine html_printer.cpp/h and file_printer.cpp/h
 
