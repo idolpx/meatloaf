@@ -3,21 +3,22 @@
 
 // https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32s3/esp32-s3-devkitc-1/index.html
 // https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32s3/_images/ESP32-S3_DevKitC-1_pinlayout.jpg
+// https://dl.espressif.com/dl/schematics/SCH_ESP32-S3-DevKitC-1_V1.1_20220413.pdf
 
 #ifdef PINMAP_ESP32S3_DEVKITC_1
 
 // ESP32-S3-WROOM-1-N16R8
-#define FLASH_SIZE              16
+#define FLASH_SIZE              8
 #define PSRAM_SIZE              8
 
 /* SD Card */
 #define PIN_CARD_DETECT         GPIO_NUM_NC // fnSystem.h
 #define PIN_CARD_DETECT_FIX     GPIO_NUM_NC // fnSystem.h
 
-#define PIN_SD_HOST_CS          GPIO_NUM_46
-#define PIN_SD_HOST_MISO        GPIO_NUM_13
-#define PIN_SD_HOST_MOSI        GPIO_NUM_11
-#define PIN_SD_HOST_SCK         GPIO_NUM_12
+#define PIN_SD_HOST_CS          GPIO_NUM_11         // GPIO_NUM_46
+#define PIN_SD_HOST_MISO        GPIO_NUM_14         // GPIO_NUM_13
+#define PIN_SD_HOST_SCK         GPIO_NUM_13         // GPIO_NUM_12
+#define PIN_SD_HOST_MOSI        GPIO_NUM_12         // GPIO_NUM_11
 
 /* UART */
 #define PIN_UART0_RX            GPIO_NUM_44  // fnUART.cpp
@@ -33,10 +34,10 @@
 #define PIN_BUTTON_C            GPIO_NUM_NC
 
 /* LEDs */
-#define PIN_LED_WIFI            GPIO_NUM_5   // led.cpp
-#define PIN_LED_BUS             GPIO_NUM_NC
+#define PIN_LED_WIFI            GPIO_NUM_1   // led.cpp
+#define PIN_LED_BUS             GPIO_NUM_2
 #define PIN_LED_BT              GPIO_NUM_NC
-#define PIN_LED_RGB             GPIO_NUM_48
+#define PIN_LED_RGB             GPIO_NUM_38
 
 /* Audio Output */
 #define PIN_DAC1                GPIO_NUM_NC // samlib.h
@@ -62,15 +63,15 @@
 // Reset line is available
 #define IEC_HAS_RESET
                                                 //            WIRING
-                                                //  C64    DIN6    D32Pro       S3PRO   TFT
-#define PIN_IEC_ATN             GPIO_NUM_4      //  ATN    3       A T-LED 32      10 (PURPLE)
-#define PIN_IEC_CLK_IN          GPIO_NUM_5      //  CLK    4       A T-RST 33      8  (BROWN)
+                                                //  C64    DIN6         
+#define PIN_IEC_ATN             GPIO_NUM_4      //  ATN    3      orange
+#define PIN_IEC_CLK_IN          GPIO_NUM_5      //  CLK    4      yellow
 #define PIN_IEC_CLK_OUT         GPIO_NUM_5      //
-#define PIN_IEC_DATA_IN         GPIO_NUM_6      //  DATA   5       T-CS 14         2  (BLACK)
+#define PIN_IEC_DATA_IN         GPIO_NUM_6      //  DATA   5      green
 #define PIN_IEC_DATA_OUT        GPIO_NUM_6      //
-#define PIN_IEC_SRQ             GPIO_NUM_7      //  SRQ    1       T-DC 27         7  (ORANGE)
-#define PIN_IEC_RESET           GPIO_NUM_8      //  RESET  6       A 32            N/C
-                                                //  GND    2       GND             9  (GREY)
+#define PIN_IEC_SRQ             GPIO_NUM_7      //  SRQ    1      brown 
+#define PIN_IEC_RESET           GPIO_NUM_15     //  RESET  6      purple
+                                                //  GND    2      blue
 
 
 /* Modem/Parallel Switch */
