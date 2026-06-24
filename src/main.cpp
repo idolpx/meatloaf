@@ -193,6 +193,9 @@ void main_setup()
     printf("Initializing FileSystem\r\n");
     if ( fsFlash.start() )
     {
+        // Create directories if they doesn't exist
+        fsFlash.create_path( PRINT_DIR );
+
         // Create SYSTEM DIR if it doesn't exist
         fsFlash.create_path( SYSTEM_DIR );
         fsFlash.create_path( SYSTEM_DIR "/ssh" );
@@ -204,6 +207,7 @@ void main_setup()
         // Create directories if they doesn't exist
         fnSDFAT.create_path( BIN_DIR );
         fnSDFAT.create_path( CACHE_DIR );
+        fnSDFAT.create_path( PRINT_DIR );
         fnSDFAT.create_path( ROM_DIR );
 
         fnSDFAT.create_path( SYSTEM_DIR );

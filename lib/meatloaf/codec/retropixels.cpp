@@ -25,6 +25,7 @@
 #ifdef ESP_PLATFORM
 #include <esp_heap_caps.h>
 #endif
+#include <cstring>
 
 // Include RetroPixels headers
 // Note: STB_IMAGE_IMPLEMENTATION is already defined in components/retropixels/src/prepost/ImageUtils.cpp
