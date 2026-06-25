@@ -471,17 +471,17 @@ bool SMBMStream::open(std::ios_base::openmode mode) {
     std::string password = parser->password;
     uint16_t smb_port = parser->port.empty() ? 445 : std::stoi(parser->port);
 
-    // Obtain SMB session via SessionBroker
-    _session = SessionBroker::obtain<SMBMSession>(server, smb_port);
+    std::string session_host = server;
+    if (!user.empty()) {
+        session_host = user;
+        if (!password.empty()) session_host += ":" + password;
+        session_host += "@" + server;
+    }
+    _session = SessionBroker::obtain<SMBMSession>(session_host, smb_port);
     if (!_session || !_session->isConnected()) {
         Debug_printv("Failed to obtain SMB session for %s:%d", server.c_str(), smb_port);
         _error = EACCES;
         return false;
-    }
-
-    // Set credentials on the session if available
-    if (!user.empty() || !password.empty()) {
-        _session->setCredentials(user, password);
     }
 
     // Parse path to get share and file path
@@ -691,8 +691,13 @@ void SMBHandle::obtain(std::string m_path, int smb_mode) {
     Debug_printv("Connecting to server[%s] share[%s] filepath[%s] user[%s]",
                  server.c_str(), share.c_str(), filepath.c_str(), user.c_str());
 
-    // Obtain SMB session via SessionBroker
-    _session = SessionBroker::obtain<SMBMSession>(server, smb_port);
+    std::string session_host = server;
+    if (!user.empty()) {
+        session_host = user;
+        if (!password.empty()) session_host += ":" + password;
+        session_host += "@" + server;
+    }
+    _session = SessionBroker::obtain<SMBMSession>(session_host, smb_port);
     if (!_session || !_session->isConnected()) {
         Debug_printv("Failed to obtain SMB session for %s:%d", server.c_str(), smb_port);
         dispose();
