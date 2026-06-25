@@ -69,30 +69,26 @@ MFile* MDNSMFileSystem::getFile(std::string path) {
             if (service) {
                 //Debug_printv("MDNS service found: %s, instance: %s, service type: %s", service->getDisplayName().c_str(), instance_name.c_str(), service->service_type.c_str());
 
-                // Generate URL for service by service type
+                // Generate URL for service by service type.
+                // Prefer IP address for direct connection; fall back to hostname
+                // when the mDNS PTR response doesn't include address records.
+                std::string host = !service->addresses.empty() ? service->addresses[0] : service->hostname;
                 MFile* file = nullptr;
                 std::string path;
-                if (service->service_type == "_nfs") {
-                    if (!service->addresses.empty()) {
-                        path = "nfs://" + service->addresses[0] + "/";
-                        file = new NFSMFile(path);
-                    }
-                } 
-                else if (service->service_type == "_sftp-ssh") {
-                    if (!service->addresses.empty()) {
-                        path = "sftp://" + service->addresses[0] + "/";
-                        file = new SFTPMFile(path);
-                    }
-                } 
-                else if (service->service_type == "_smb") {
-                    if (!service->addresses.empty()) {
-                        path = "smb://" + service->addresses[0] + "/";
-                        file = new SMBMFile(path);
-                    }
+                if (host.empty()) {
+                    Debug_printv("No host address for service: %s", service->getDisplayName().c_str());
+                } else if (service->service_type == "_nfs") {
+                    path = "nfs://" + host + "/";
+                    file = new NFSMFile(path);
+                } else if (service->service_type == "_sftp-ssh") {
+                    path = "sftp://" + host + "/";
+                    file = new SFTPMFile(path);
+                } else if (service->service_type == "_smb") {
+                    path = "smb://" + host + "/";
+                    file = new SMBMFile(path);
                 } else {
                     Debug_printv("Unsupported service type: %s", service->service_type.c_str());
                 }
-                SessionBroker::dispose("mdns://mdns:0");
                 if (file) {
                     Debug_printv("Created file for service: %s at %s", service->getDisplayName().c_str(), path.c_str());
                     return file;
@@ -101,7 +97,6 @@ MFile* MDNSMFileSystem::getFile(std::string path) {
         }
     }
 
-    SessionBroker::dispose("mdns://mdns:0");
     return new MDNSMFile(path);
 }
 
@@ -333,14 +328,25 @@ std::vector<DiscoveredService> MDNSMSession::getDiscoveredServices() const {
 
 DiscoveredService* MDNSMSession::findServiceByInstance(const std::string& instance_name) {
     std::lock_guard<std::mutex> lock(services_mutex);
-    
+
+    // Build apostrophe-stripped version of the input once for fuzzy matching.
+    // Shell tokenizers strip apostrophes from arguments (e.g. "James's" → "Jamess"),
+    // so we normalize both sides before comparing.
+    std::string norm_input = instance_name;
+    norm_input.erase(std::remove(norm_input.begin(), norm_input.end(), '\''), norm_input.end());
+
     for (auto& service : discovered_services) {
-        //Debug_printv("Checking service: %s, instance: %s", service.getDisplayName().c_str(), instance_name.c_str()); 
         if (service.instance_name == instance_name || service.hostname == instance_name) {
             return &service;
         }
+        // Fuzzy match: strip apostrophes from service name and compare
+        std::string norm_name = service.instance_name;
+        norm_name.erase(std::remove(norm_name.begin(), norm_name.end(), '\''), norm_name.end());
+        if (norm_input == norm_name) {
+            return &service;
+        }
     }
-    
+
     return nullptr;
 }
 
