@@ -233,15 +233,11 @@ void SMBMFile::openDir(std::string apath)
 
     // Open the directory for listing
     std::string dirPath = apath.empty() ? share_path : apath;
-    
-    // For smb2_opendir, we can use empty string for root or "."
-    // Try empty string first (root of share)
-    if (dirPath.empty()) {
-        dirPath = "";
-    }
-    
-    Debug_printv("openDir calling smb2_opendir with path[%s] (empty=%d)", dirPath.c_str(), dirPath.empty());
-    _handle_dir = smb2_opendir(smb, dirPath.empty() ? "" : dirPath.c_str());
+    // libsmb2 requires "." for the share root — empty string causes STATUS_OBJECT_NAME_NOT_FOUND
+    if (dirPath.empty()) dirPath = ".";
+
+    Debug_printv("openDir calling smb2_opendir with path[%s]", dirPath.c_str());
+    _handle_dir = smb2_opendir(smb, dirPath.c_str());
     if (!_handle_dir) {
         Debug_printv("smb2_opendir failed: %s", smb2_get_error(smb));
     }
