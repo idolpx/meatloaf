@@ -225,16 +225,17 @@ int ls(int argc, char **argv)
     if( getCurrentPath()->url.size() == 1 )
     {
         if ( fnSDFAT.running() )
-            Serial.printf("d %8lu  'sd'\r\n", 0);
+            Serial.printf("d %8lu  \"sd\"\r\n", 0);
 
-        Serial.printf("d %8lu  'network'\r\n", 0);
+        Serial.printf("d %8lu  \"network\"\r\n", 0);
     }
 
     while(entry.get() != nullptr) {
         if ( entry->isPETSCII )
             entry->name = mstr::toUTF8(entry->name);
 
-        Serial.printf("%c %8lu  '%s'\r\n", (entry->isDirectory()) ? 'd':'-', entry->size, entry->name.c_str());
+        entry->name = mstr::replaceAll(entry->name, "\"", "\\\""); // Escape double quotes
+        Serial.printf("%c %8lu  \"%s\"\r\n", (entry->isDirectory()) ? 'd':'-', entry->size, entry->name.c_str());
         entry.reset(destPath->getNextFileInDir());
     }
 
