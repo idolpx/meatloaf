@@ -59,7 +59,20 @@ class SMBMSession : public MSession {
 public:
     SMBMSession(std::string host, uint16_t port = 445)
         : MSession("smb://" + host + ":" + std::to_string(port), host, port) {
-        Debug_printv("SMBMSession created for %s:%d", host.c_str(), port);
+        // Parse user:pass@host format so credentials are available before connect()
+        size_t at = host.rfind('@');
+        if (at != std::string::npos) {
+            std::string creds = host.substr(0, at);
+            this->host = host.substr(at + 1);
+            size_t colon = creds.find(':');
+            if (colon != std::string::npos) {
+                _user = creds.substr(0, colon);
+                _password = creds.substr(colon + 1);
+            } else {
+                _user = creds;
+            }
+        }
+        Debug_printv("SMBMSession created for %s:%d (user: %s)", this->host.c_str(), port, _user.c_str());
     }
     ~SMBMSession() override {
         Debug_printv("SMBMSession destroyed for %s:%d", host.c_str(), port);
@@ -333,19 +346,23 @@ public:
     SMBMFile(std::string path): MFile(path) {
         //Debug_printv("url[%s] host[%s] path[%s]", url.c_str(), host.c_str(), this->path.c_str());
 
-        // Obtain or create SMB session via SessionBroker
+        // Obtain or create SMB session via SessionBroker.
+        // Embed credentials in the host key so they are available in the
+        // SMBMSession constructor before connect() is called, and so that
+        // sessions for different users are keyed separately.
         uint16_t smb_port = port.empty() ? 445 : std::stoi(port);
-        _session = SessionBroker::obtain<SMBMSession>(host, smb_port);
+        std::string session_host = host;
+        if (!user.empty()) {
+            session_host = user;
+            if (!password.empty()) session_host += ":" + password;
+            session_host += "@" + host;
+        }
+        _session = SessionBroker::obtain<SMBMSession>(session_host, smb_port);
 
         if (!_session || !_session->isConnected()) {
             Debug_printv("Failed to obtain SMB session for %s:%d", host.c_str(), smb_port);
             m_isNull = true;
             return;
-        }
-
-        // Set credentials on the session if available
-        if (!user.empty() || !password.empty()) {
-            _session->setCredentials(user, password);
         }
 
         // extract share from path
