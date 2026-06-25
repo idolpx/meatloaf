@@ -91,6 +91,7 @@ int hex(int argc, char **argv)
                 Serial.printf("Stream returned EOF!");
             } else {
                 int c = 0;
+                uint32_t size = 0;
                 int address = 0;
                 char b[17] = {0};
                 while(!istream.eof()) 
@@ -113,6 +114,7 @@ int hex(int argc, char **argv)
 
                         b[c] = chr;
                     }
+                    size++;
 
                     // add padding
                     if ( istream.eof() && c )
@@ -144,7 +146,7 @@ int hex(int argc, char **argv)
                     }
                 }
                 Serial.printf("\r\n");
-                Serial.printf("url[%s] size[%ld]\r\n", path->url.c_str(), path->size);
+                Serial.printf("url[%s] size[%u]\r\n", path->url.c_str(), size);
             }
             istream.close();
         }
