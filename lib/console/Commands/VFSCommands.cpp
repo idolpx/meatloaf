@@ -234,7 +234,7 @@ int ls(int argc, char **argv)
         if ( entry->isPETSCII )
             entry->name = mstr::toUTF8(entry->name);
 
-        entry->name = mstr::replaceAll(entry->name, "\"", "\\\""); // Escape double quotes
+        mstr::replaceAll(entry->name, "\"", "\\\""); // Escape double quotes
         Serial.printf("%c %8lu  \"%s\"\r\n", (entry->isDirectory()) ? 'd':'-', entry->size, entry->name.c_str());
         entry.reset(destPath->getNextFileInDir());
     }
