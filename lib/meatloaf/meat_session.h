@@ -313,6 +313,21 @@ private:
         if (!p.empty() && mstr::startsWith(p.c_str(), hostKey.c_str())) {
             return true;
         }
+        // Also match when path is just the scheme root (e.g. "mdns://" matches "mdns://mdns:0")
+        auto schemeEnd = key.find("://");
+        if (schemeEnd != std::string::npos) {
+            std::string schemeRoot = key.substr(0, schemeEnd + 3); // e.g. "mdns://"
+            if (path == schemeRoot) {
+                return true;
+            }
+            // Port-0 sessions use a dummy host (e.g. "mdns://mdns:0") and serve the whole
+            // scheme namespace — any path starting with the same scheme keeps them alive.
+            size_t last_colon = key.rfind(':');
+            if (last_colon != std::string::npos && key.substr(last_colon + 1) == "0" &&
+                mstr::startsWith(path.c_str(), schemeRoot.c_str())) {
+                return true;
+            }
+        }
         return false;
     }
 

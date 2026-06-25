@@ -48,9 +48,24 @@ MFile* MDNSMFileSystem::getFile(std::string path) {
         if (!instance_name.empty()) {
             // Get or create session - use dummy host since MDNS is local
             auto _session = SessionBroker::obtain<MDNSMSession>("mdns", 0);
-            
-            // Find service
+
+            // Find service — if cache is empty, discover by service type first
             DiscoveredService* service = _session->findServiceByInstance(instance_name);
+            if (!service) {
+                // Cache miss: extract service type from URL host (e.g. "_smb._tcp") and discover
+                std::string svc_type = parser->host;
+                std::string type = svc_type, proto = "_tcp";
+                size_t dot = svc_type.rfind('.');
+                if (dot != std::string::npos) {
+                    type = svc_type.substr(0, dot);
+                    proto = svc_type.substr(dot + 1);
+                }
+                if (!type.empty()) {
+                    Debug_printv("Cache miss - discovering %s.%s for instance '%s'", type.c_str(), proto.c_str(), instance_name.c_str());
+                    _session->discoverServices(type, proto, 3000);
+                    service = _session->findServiceByInstance(instance_name);
+                }
+            }
             if (service) {
                 //Debug_printv("MDNS service found: %s, instance: %s, service type: %s", service->getDisplayName().c_str(), instance_name.c_str(), service->service_type.c_str());
 
