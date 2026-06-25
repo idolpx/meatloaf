@@ -607,8 +607,9 @@ MFile* MDNSMFile::getNextFileInDir() {
     
     const auto& service = _session->cached_services[dir_index++];
     
-    // Create file entry for this service instance
-    std::string file_path = "mdns://" + service_type + "/" + service.getDisplayName();
+    // Use hostname (ASCII-safe) as path so navigation doesn't require quoting curly apostrophes
+    std::string display_name = service.hostname.empty() ? service.getDisplayName() : service.hostname;
+    std::string file_path = "mdns://" + service_type + "/" + display_name;
     
     MDNSMFile* file = new MDNSMFile(file_path);
     //Debug_printv("Returning service instance: %s", file_path.c_str());
