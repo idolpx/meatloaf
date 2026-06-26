@@ -1,0 +1,115 @@
+{
+  "version": "0.5.0",
+  "preferences": {
+    "appearance": "auto",
+    "language": "en",
+    "timezone": "America/Los_Angeles",
+    "country": "US",
+    "devicename": "Meatloaf",
+    "rotationsounds": 0,
+    "reset_with_host": 0
+  },
+  "host": {
+    "model": "c64",
+    "video": "ntsc",
+    "language": "en",
+    "kernal": "stock",
+    "basic": "2"
+  },
+  "network": {
+    "hostname": "meatloaf.local",
+    "sntpserver": "pool.ntp.org",
+    "services": {
+      "httpd": {
+        "enabled": 1,
+        "websockets": 1,
+        "webdav": {
+          "enabled": 1,
+          "root_fs": "/|/sd",
+          "root_web": "/|/dav"
+        }
+      },
+      "mdns": 1,
+      "ssdp": 1,
+      "tcp_console": 1
+    }
+  },
+  "wifi": [
+    {
+      "ssid": "EEP_OPP_ORK_AH_AH",
+      "passphrase": "meatloaf",
+      "enabled": 1
+    },
+    {
+      "enabled": 0,
+      "ssid": "meatloaf",
+      "passphrase": "meatloaf"
+    },
+    {
+      "ssid": "CODA-23B0",
+      "passphrase": "meatloaf",
+      "enabled": 0
+    }
+  ],
+  "settings": {
+    "enabled": 1,
+    "vic20_mode": 0,
+    "vdrive_mode": 0,
+    "autoboot": "",
+    "drive_roms": {
+      "enabled": 0,
+      "default": "",
+      "d64": "",
+      "d71": "",
+      "d81": ""
+    },
+    "directory": {
+      "force_0801": 1,
+      "bam_message": 1,
+      "nfo_header": 1,
+      "hidden_dirs": 1,
+      "hidden_files": 1,
+      "long_filenames": 1,
+      "extension_colon": 1,
+      "date_time": 1,
+      "load_address": 1,
+      "sys_address": 1,
+      "footer_bytes": 1
+    },
+    "fastloaders": {
+      "hardware": {
+        "serial": {
+          "fast_serial": 1,
+          "action_replay": 1,
+          "epyx_fastload": 1,
+          "final_cart_iii": 1,
+          "jiffydos": 1,
+          "super_snapshot": 1,
+          "warp_speed": 1
+        },
+        "parallel": {
+          "dolphindos": 1,
+          "speeddos": 1
+        }
+      },
+      "software": {
+        "dreamloader": 1,
+        "eloadv1": 1,
+        "geos": 1,
+        "gijoe": 1,
+        "mmzm": 1,
+        "nippon": 1,
+        "n0sdos": 1,
+        "samsjourney": 1,
+        "turbodisk": 1,
+        "uload3": 1
+      }
+    },
+    "chainloaders": {
+      "prg": 1,
+      "sid": 1,
+      "koa": 1,
+      "bbs": 1
+    }
+  }
+}
