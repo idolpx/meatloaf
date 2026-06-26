@@ -1,11 +1,11 @@
-#ifndef ESP32S3_DEVKITC_1_H
-#define ESP32S3_DEVKITC_1_H
+#ifndef ESP32S3_MAKEMAGAZIN_H
+#define ESP32S3_MAKEMAGAZIN_H
 
 // https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32s3/esp32-s3-devkitc-1/index.html
 // https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32s3/_images/ESP32-S3_DevKitC-1_pinlayout.jpg
 // https://dl.espressif.com/dl/schematics/SCH_ESP32-S3-DevKitC-1_V1.1_20220413.pdf
 
-#ifdef PINMAP_ESP32S3_DEVKITC_1
+#ifdef PINMAP_ESP32S3_MAKEMAGAZIN
 
 // ESP32-S3-WROOM-1-N8R8
 #define FLASH_SIZE              8
@@ -15,10 +15,10 @@
 #define PIN_CARD_DETECT         GPIO_NUM_NC // fnSystem.h
 #define PIN_CARD_DETECT_FIX     GPIO_NUM_NC // fnSystem.h
 
-#define PIN_SD_HOST_CS          GPIO_NUM_46
-#define PIN_SD_HOST_MISO        GPIO_NUM_13
-#define PIN_SD_HOST_SCK         GPIO_NUM_12
-#define PIN_SD_HOST_MOSI        GPIO_NUM_11
+#define PIN_SD_HOST_CS          GPIO_NUM_11         // GPIO_NUM_46
+#define PIN_SD_HOST_MISO        GPIO_NUM_14         // GPIO_NUM_13
+#define PIN_SD_HOST_SCK         GPIO_NUM_13         // GPIO_NUM_12
+#define PIN_SD_HOST_MOSI        GPIO_NUM_12         // GPIO_NUM_11
 
 /* UART */
 #define PIN_UART0_RX            GPIO_NUM_44  // fnUART.cpp
@@ -29,7 +29,7 @@
 #define PIN_UART2_TX            GPIO_NUM_NC
 
 /* Buttons */
-#define PIN_BUTTON_A            GPIO_NUM_0   // keys.cpp
+#define PIN_BUTTON_A            GPIO_NUM_0  // keys.cpp
 #define PIN_BUTTON_B            GPIO_NUM_NC
 #define PIN_BUTTON_C            GPIO_NUM_NC
 
@@ -70,7 +70,7 @@
 #define PIN_IEC_DATA_IN         GPIO_NUM_6      //  DATA   5      green
 #define PIN_IEC_DATA_OUT        GPIO_NUM_6      //
 #define PIN_IEC_SRQ             GPIO_NUM_7      //  SRQ    1      brown 
-#define PIN_IEC_RESET           GPIO_NUM_8      //  RESET  6      purple
+#define PIN_IEC_RESET           GPIO_NUM_15     //  RESET  6      purple
                                                 //  GND    2      blue
 
 
@@ -78,5 +78,5 @@
 #define PIN_MODEM_ENABLE        GPIO_NUM_2  // High = Modem enabled
 #define PIN_MODEM_UP9600        GPIO_NUM_15 // High = UP9600 enabled
 
-#endif // PINMAP_ESP32S3_DEVKITC_1
-#endif // ESP32S3_DEVKITC_1_H
+#endif // PINMAP_ESP32S3_MAKEMAGAZIN
+#endif // ESP32S3_MAKEMAGAZIN_H
