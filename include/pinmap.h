@@ -36,6 +36,7 @@
 #include "pinmap/adafruit_feather_esp32s3_tft.h"
 #include "pinmap/esp32-s3-rgb.h"
 #include "pinmap/esp32-s3-dev-kit-n8r8.h"
+#include "pinmap/esp32-s3-makemagazin.h"
 
 // ESP32 C3
 #include "pinmap/esp32-c3-super-mini.h"

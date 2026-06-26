@@ -337,7 +337,7 @@ extends = esp32_base
 board = esp32-s3-wroom-1-n8r8
 build_flags =
     ${env.build_flags}
-    -D PINMAP_ESP32S3_DEVKITC_1
+    -D PINMAP_ESP32S3_MAKEMAGAZIN
     -D SD_CARD
     -D ENABLE_DISPLAY
     -D ENABLE_CONSOLE
