@@ -1,0 +1,112 @@
+{
+  "devices": {
+    "iec": {
+      "4": {
+        "enabled": 1,
+        "type": "printer",
+        "name": "MPS803",
+        "url": "/.print"
+      },
+      "8": {
+        "enabled": 1,
+        "type": "drive",
+        "mode": 1,
+        "url": "/"
+      },
+      "9": {
+        "enabled": 0,
+        "type": "drive",
+        "mode": 1,
+        "url": "/"
+      },
+      "10": {
+        "enabled": 0,
+        "type": "drive",
+        "mode": 1,
+        "url": "/"
+      },
+      "11": {
+        "enabled": 0,
+        "type": "drive",
+        "mode": 1,
+        "url": "/"
+      },
+      "12": {
+        "enabled": 0,
+        "type": "drive",
+        "mode": 1,
+        "url": "/"
+      },
+      "13": {
+        "enabled": 0,
+        "type": "drive",
+        "mode": 1,
+        "url": "/"
+      },
+      "14": {
+        "enabled": 0,
+        "type": "drive",
+        "mode": 1,
+        "url": "/"
+      },
+      "15": {
+        "enabled": 0,
+        "type": "drive",
+        "mode": 1,
+        "url": "/"
+      },
+      "16": {
+        "enabled": 1,
+        "type": "network",
+        "url": "/sd"
+      },
+      "17": {
+        "enabled": 0,
+        "type": "network",
+        "url": "/"
+      },
+      "18": {
+        "enabled": 0,
+        "type": "network",
+        "url": "/"
+      },
+      "19": {
+        "enabled": 0,
+        "type": "network",
+        "url": "/"
+      },
+      "20": {
+        "enabled": 0,
+        "type": "other",
+        "name": "CP/m"
+      },
+      "21": {
+        "enabled": 0,
+        "type": "other",
+        "name": "S.A.M"
+      },
+      "29": {
+        "enabled": 0,
+        "type": "other",
+        "name": "Clock"
+      },
+      "30": {
+        "enabled": 1,
+        "type": "meatloaf",
+        "mode": 1,
+        "url": "/"
+      }
+    },
+    "ps2": 0,
+    "userport": {
+      "enabled": 0,
+      "mode": "parallel"
+    },
+    "cassette": {
+      "enabled": 0,
+      "play_record": "0 Play",
+      "pulldown": "1 Pulldown Resistor",
+      "url": "/"
+    }
+  }
+}
