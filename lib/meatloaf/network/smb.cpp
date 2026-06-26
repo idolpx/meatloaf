@@ -233,15 +233,11 @@ void SMBMFile::openDir(std::string apath)
 
     // Open the directory for listing
     std::string dirPath = apath.empty() ? share_path : apath;
-    
-    // For smb2_opendir, we can use empty string for root or "."
-    // Try empty string first (root of share)
-    if (dirPath.empty()) {
-        dirPath = "";
-    }
-    
-    Debug_printv("openDir calling smb2_opendir with path[%s] (empty=%d)", dirPath.c_str(), dirPath.empty());
-    _handle_dir = smb2_opendir(smb, dirPath.empty() ? "" : dirPath.c_str());
+    // libsmb2 requires "." for the share root — empty string causes STATUS_OBJECT_NAME_NOT_FOUND
+    if (dirPath.empty()) dirPath = ".";
+
+    Debug_printv("openDir calling smb2_opendir with path[%s]", dirPath.c_str());
+    _handle_dir = smb2_opendir(smb, dirPath.c_str());
     if (!_handle_dir) {
         Debug_printv("smb2_opendir failed: %s", smb2_get_error(smb));
     }
@@ -475,17 +471,17 @@ bool SMBMStream::open(std::ios_base::openmode mode) {
     std::string password = parser->password;
     uint16_t smb_port = parser->port.empty() ? 445 : std::stoi(parser->port);
 
-    // Obtain SMB session via SessionBroker
-    _session = SessionBroker::obtain<SMBMSession>(server, smb_port);
+    std::string session_host = server;
+    if (!user.empty()) {
+        session_host = user;
+        if (!password.empty()) session_host += ":" + password;
+        session_host += "@" + server;
+    }
+    _session = SessionBroker::obtain<SMBMSession>(session_host, smb_port);
     if (!_session || !_session->isConnected()) {
         Debug_printv("Failed to obtain SMB session for %s:%d", server.c_str(), smb_port);
         _error = EACCES;
         return false;
-    }
-
-    // Set credentials on the session if available
-    if (!user.empty() || !password.empty()) {
-        _session->setCredentials(user, password);
     }
 
     // Parse path to get share and file path
@@ -695,8 +691,13 @@ void SMBHandle::obtain(std::string m_path, int smb_mode) {
     Debug_printv("Connecting to server[%s] share[%s] filepath[%s] user[%s]",
                  server.c_str(), share.c_str(), filepath.c_str(), user.c_str());
 
-    // Obtain SMB session via SessionBroker
-    _session = SessionBroker::obtain<SMBMSession>(server, smb_port);
+    std::string session_host = server;
+    if (!user.empty()) {
+        session_host = user;
+        if (!password.empty()) session_host += ":" + password;
+        session_host += "@" + server;
+    }
+    _session = SessionBroker::obtain<SMBMSession>(session_host, smb_port);
     if (!_session || !_session->isConnected()) {
         Debug_printv("Failed to obtain SMB session for %s:%d", server.c_str(), smb_port);
         dispose();
