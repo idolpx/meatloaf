@@ -503,22 +503,30 @@ bool HTTPMStream::open(std::ios_base::openmode mode) {
 }
 
 void HTTPMStream::close() {
-    Debug_printv("HTTPMStream::close called, mode=%d", mode);
-    // Write mode: mode & out bit (0x10), OR explicit out, OR combined in|out (mode > 0 && !in-only)
-    // std::ios_base::out = 0x10, std::ios_base::in = 0x01, std::ios_base::in|std::ios_base::out = 0x03
-    bool isWriteMode = (mode & 0x10) || (mode == std::ios_base::out) || (mode == (std::ios_base::in | std::ios_base::out));
-    Debug_printv("isWriteMode=%d (mode=%d, out_bit=%d, eq_out=%d, eq_in_out=%d)",
-        isWriteMode, mode, (mode & 0x10), (mode == std::ios_base::out), (mode == (std::ios_base::in | std::ios_base::out)));
+    Debug_printv("HTTPMStream::close called, mode=%d, fullMode=%d", mode, (int)fullMode);
+
+    // In full mode, don't trigger automatic POST send — that's for simple mode only
+    if (fullMode != FullModeState::SIMPLE) {
+        Debug_printv("Full mode close (state=%d), skipping automatic POST send", (int)fullMode);
+        if (_session) {
+            _session->releaseIO();
+        }
+        fullMode = FullModeState::SIMPLE;
+        ctx.clear();
+        return;
+    }
+
+    // Simple mode: original behavior
+    bool isWriteMode = (mode & 0x10) || (mode == std::ios_base::out)
+        || (mode == (std::ios_base::in | std::ios_base::out));
     if (isWriteMode && _session && _session->client) {
         Debug_printv("Closing write-mode stream, sending POST request");
         auto client = _session->client.get();
-        // Send the POST request and receive response - close() handles all of this
         client->close();
     }
     if (_session) {
         _session->releaseIO();
     }
-    // client stays alive in session for reuse
 }
 
 bool HTTPMStream::seek(uint32_t pos) {
