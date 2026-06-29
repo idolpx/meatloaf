@@ -205,7 +205,7 @@ bool HTTPMFile::rewindDirectory() {
         return false;
     }
     return false; 
-};
+}
 
 MFile* HTTPMFile::getNextFileInDir() { 
     Debug_printv("");
@@ -215,7 +215,7 @@ MFile* HTTPMFile::getNextFileInDir() {
         return nullptr;
     }
     return nullptr; 
-};
+}
 
 
 bool HTTPMFile::isText() {
