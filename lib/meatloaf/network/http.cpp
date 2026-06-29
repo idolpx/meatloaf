@@ -31,6 +31,121 @@
 //#include "../../../include/global_defines.h"
 
 /********************************************************
+ * HTTPRequestContext implementation
+ ********************************************************/
+
+void HTTPRequestContext::setMethod(const std::string& m) {
+    method = m;
+    mstr::toUpper(method);
+}
+
+void HTTPRequestContext::setHeader(const std::string& name, const std::string& value) {
+    std::string key = name;
+    mstr::toLower(key);
+    headers[key] = {value};  // replaces any existing values for this key
+}
+
+void HTTPRequestContext::appendHeader(const std::string& name, const std::string& value) {
+    std::string key = name;
+    mstr::toLower(key);
+    headers[key].push_back(value);
+}
+
+void HTTPRequestContext::setBody(const std::string& b) {
+    body = b;
+}
+
+void HTTPRequestContext::appendBody(const std::string& b) {
+    body += b;
+}
+
+void HTTPRequestContext::clear() {
+    method = "GET";
+    headers.clear();
+    body.clear();
+    responseHeaders.clear();
+    responseStatus = 0;
+    responseConsumed = false;
+}
+
+bool HTTPRequestContext::sendRequest(std::shared_ptr<HTTPMSession> session) {
+    if (!session || !session->client) {
+        responseStatus = -1;
+        return false;
+    }
+
+    auto& client = *session->client;
+
+    // Reset response header buffer
+    responseHeaders.clear();
+
+    // Set up onHeader callback to capture response headers
+    // The callback is called during HTTP_EVENT_ON_HEADER with key and value
+    client.setOnHeader([this](char* key, char* value) -> int {
+        if (key && value) {
+            std::string headerLine = std::string(key) + ": " + std::string(value);
+            responseHeaders.push_back(headerLine);
+            Debug_printv("Captured response header: %s", headerLine.c_str());
+        }
+        return 0;
+    });
+
+    // Apply request headers to MeatHttpClient's header map
+    for (const auto& [key, values] : headers) {
+        for (const auto& val : values) {
+            std::string headerLine = key + ":" + val;
+            client.setHeader(headerLine);
+        }
+    }
+
+    // Set body if present
+    if (!body.empty()) {
+        client.postBuffer.clear();
+        client.postBuffer.insert(client.postBuffer.end(), body.begin(), body.end());
+    }
+
+    // Determine method and send
+    bool result = false;
+    if (method == "GET") {
+        result = client.GET(client.url);
+    } else if (method == "POST") {
+        result = client.POST(client.url);
+        // For POST, close() sends the buffered body and captures response
+        if (result && !client.postBuffer.empty()) {
+            client.close();
+            // After close, preservedPostResponse holds the body
+            responseStatus = client.lastRC;
+        }
+    } else if (method == "PUT") {
+        result = client.PUT(client.url);
+        if (result && !client.postBuffer.empty()) {
+            client.close();
+            responseStatus = client.lastRC;
+        }
+    } else if (method == "HEAD") {
+        result = client.HEAD(client.url);
+    } else {
+        Debug_printv("Unsupported method: %s", method.c_str());
+        responseStatus = -1;
+        return false;
+    }
+
+    // Capture response status from the perform result
+    if (responseStatus == 0) {
+        responseStatus = client.lastRC;
+    }
+
+    return result;
+}
+
+std::string HTTPRequestContext::popResponseHeader() {
+    if (responseHeaders.empty()) return {};
+    std::string line = responseHeaders.front();
+    responseHeaders.erase(responseHeaders.begin());
+    return line + "\r\n";
+}
+
+/********************************************************
  * HTTPMSession implementation
  ********************************************************/
 

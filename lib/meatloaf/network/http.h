@@ -52,6 +52,40 @@ void http_set_insecure(bool v);
 #define HTTP_BLOCK_SIZE 256
 
 
+// Forward declaration (defined later in this header)
+class HTTPMSession;
+
+/********************************************************
+ * HTTP Request Context — full-mode request builder
+ ********************************************************/
+
+class HTTPRequestContext {
+public:
+    // Request state
+    std::string method = "GET";                              // GET, POST, PUT, DELETE, HEAD, etc.
+    std::map<std::string, std::vector<std::string>> headers; // multi-value headers
+    std::string body;                                        // request body
+
+    // Response state
+    std::vector<std::string> responseHeaders;                // buffered response header lines ("Name: value")
+    int responseStatus = 0;                                  // 0 = success, <0 = local err, >0 = HTTP status
+    bool responseConsumed = false;                           // true after all response data read
+
+    void setMethod(const std::string& m);
+    void setHeader(const std::string& name, const std::string& value);    // replaces
+    void appendHeader(const std::string& name, const std::string& value); // appends
+    void setBody(const std::string& b);
+    void appendBody(const std::string& b);
+    void clear();                                              // resets all state for next request
+    bool sendRequest(std::shared_ptr<HTTPMSession> session);   // executes via session->client
+
+    // For header-mode reading
+    bool hasMoreResponseHeaders() const {
+        return !responseHeaders.empty();
+    }
+    std::string popResponseHeader();  // returns "Name: value\r\n" or "" at end
+};
+
 /********************************************************
  * HTTP Client
  ********************************************************/
