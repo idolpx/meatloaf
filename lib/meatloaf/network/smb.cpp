@@ -231,16 +231,30 @@ void SMBMFile::openDir(std::string apath)
     // Close any previously opened directory
     closeDir();
 
-    // Open the directory for listing
+    // Open the directory for listing.
+    // SMB servers differ in how they represent share root, so try common variants.
     std::string dirPath = apath.empty() ? share_path : apath;
-    // libsmb2 requires "." for the share root — empty string causes STATUS_OBJECT_NAME_NOT_FOUND
-    if (dirPath.empty()) dirPath = ".";
+    _handle_dir = nullptr;
 
-    Debug_printv("openDir calling smb2_opendir with path[%s]", dirPath.c_str());
-    _handle_dir = smb2_opendir(smb, dirPath.c_str());
-    if (!_handle_dir) {
-        Debug_printv("smb2_opendir failed: %s", smb2_get_error(smb));
+    if (dirPath.empty()) {
+        const char* rootCandidates[] = {"", ".", "/"};
+        for (const char* candidate : rootCandidates) {
+            Debug_printv("openDir calling smb2_opendir with path[%s]", candidate);
+            _handle_dir = smb2_opendir(smb, candidate);
+            if (_handle_dir) {
+                dirPath = candidate;
+                break;
+            }
+            Debug_printv("smb2_opendir failed for path[%s]: %s", candidate, smb2_get_error(smb));
+        }
+    } else {
+        Debug_printv("openDir calling smb2_opendir with path[%s]", dirPath.c_str());
+        _handle_dir = smb2_opendir(smb, dirPath.c_str());
+        if (!_handle_dir) {
+            Debug_printv("smb2_opendir failed: %s", smb2_get_error(smb));
+        }
     }
+
     dirOpened = (_handle_dir != nullptr);
     entry_index = 0;
 
