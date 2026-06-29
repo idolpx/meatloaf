@@ -147,6 +147,120 @@ std::string HTTPRequestContext::popResponseHeader() {
 }
 
 /********************************************************
+ * Full-mode command handling
+ ********************************************************/
+
+bool HTTPMStream::handleCommand(const std::string& cmd) {
+    Debug_printv("handleCommand: %s", cmd.c_str());
+
+    // Trim trailing whitespace/newlines that C64 PRINT# may add
+    std::string c = cmd;
+    mstr::trim(c);
+
+    if (c.empty()) return true;  // blank line is harmless
+
+    // Activate full mode on first command
+    if (fullMode == FullModeState::SIMPLE) {
+        fullMode = FullModeState::BUILDING_REQUEST;
+    }
+
+    // "r-h" or "r-b" — switch response read mode
+    if (c.size() >= 3 && c[0] == 'r' && c[1] == '-') {
+        switch (c[2]) {
+            case 'h': case 'H':
+                fullMode = FullModeState::RESPONSE_HEADERS;
+                return true;
+            case 'b': case 'B':
+                fullMode = FullModeState::RESPONSE_BODY;
+                return true;
+        }
+        return false;
+    }
+
+    // "s" — send the request
+    if (c == "s" || c == "S") {
+        fullMode = FullModeState::RESPONSE_HEADERS;
+        if (_session) {
+            ctx.sendRequest(_session);
+        }
+        return true;
+    }
+
+    // "c" — clear context
+    if (c == "c" || c == "C") {
+        ctx.clear();
+        fullMode = FullModeState::BUILDING_REQUEST;
+        _statusRequested = false;
+        return true;
+    }
+
+    // "status" — request HTTP status code
+    if (c.size() >= 6 && (c[0] == 's' || c[0] == 'S') &&
+        (c == "status" || c == "STATUS")) {
+        _statusRequested = true;
+        return true;
+    }
+
+    // "k on" / "k off" — keep-alive
+    if (c.size() >= 3 && (c[0] == 'k' || c[0] == 'K') && c[1] == ' ') {
+        std::string val = c.substr(2);
+        mstr::trim(val);
+        keepAlive = (val == "on" || val == "ON" || val == "1");
+        return true;
+    }
+
+    // Single-letter commands with arguments: "m <method>", "b <body>"
+    if (c.size() >= 2 && c[1] == ' ') {
+        char prefix = c[0];
+        std::string arg = c.substr(2);
+        mstr::trim(arg);
+
+        switch (prefix) {
+            case 'm': case 'M':
+                ctx.setMethod(arg);
+                return true;
+            case 'b': case 'B':
+                ctx.setBody(arg);
+                return true;
+            default:
+                break;
+        }
+    }
+
+    // "h <name>: <value>" and "h+ <name>: <value>" — set/append header
+    if (c.size() >= 2 && (c[0] == 'h' || c[0] == 'H')) {
+        bool append = (c.size() >= 2 && c[1] == '+');
+        size_t start = append ? 2 : 1;
+        if (c.size() > start && c[start] == ' ') start++;
+        std::string rest = c.substr(start);
+        auto colonPos = rest.find(':');
+        if (colonPos != std::string::npos) {
+            std::string name = rest.substr(0, colonPos);
+            std::string value = rest.substr(colonPos + 1);
+            mstr::trim(name);
+            mstr::trim(value);
+            if (append) {
+                ctx.appendHeader(name, value);
+            } else {
+                ctx.setHeader(name, value);
+            }
+            return true;
+        }
+    }
+
+    // "b+" — append body (no space required: "b+more text" or "b+ more text")
+    if (c.size() >= 2 && c[0] == 'b' && c[1] == '+') {
+        std::string rest = c.substr(2);
+        if (!rest.empty() && rest[0] == ' ') rest = rest.substr(1);
+        ctx.appendBody(rest);
+        return true;
+    }
+
+    Debug_printv("Unrecognized command in full mode: %s", c.c_str());
+    return false;  // unknown command, silently ignored
+}
+
+/********************************************************
  * HTTPMSession implementation
  ********************************************************/
 
@@ -470,13 +584,41 @@ uint32_t HTTPMStream::read(uint8_t* buf, uint32_t size) {
 };
 
 uint32_t HTTPMStream::write(const uint8_t *buf, uint32_t size) {
-    Debug_printv("HTTPMStream::write called, size=%u, client=%p", size, _session ? _session->client.get() : nullptr);
-    uint32_t bytesWritten = 0;
-    if (_session && _session->client) {
-        bytesWritten = _session->client->write(buf, size);
-        _position += bytesWritten;
+    Debug_printv("HTTPMStream::write called, size=%u, fullMode=%d, client=%p",
+        size, (int)fullMode, _session ? _session->client.get() : nullptr);
+
+    // In full mode, all writes are commands
+    if (fullMode != FullModeState::SIMPLE) {
+        std::string data(reinterpret_cast<const char*>(buf), size);
+        handleCommand(data);
+        return size;  // always consume the data (even if unrecognized)
     }
-    return bytesWritten;
+
+    // Simple mode: check if incoming data looks like a command
+    if (size > 0) {
+        char first = (char)buf[0];
+        if (first == 'm' || first == 'M' ||
+            first == 'h' || first == 'H' ||
+            first == 'b' || first == 'B' ||
+            first == 's' || first == 'S' ||
+            first == 'c' || first == 'C' ||
+            first == 'k' || first == 'K' ||
+            (size >= 2 && first == 'r' && (buf[1] == '-'))) {
+            // First command detected — enter full mode
+            fullMode = FullModeState::BUILDING_REQUEST;
+            std::string cmd(reinterpret_cast<const char*>(buf), size);
+            handleCommand(cmd);
+            return size;
+        }
+    }
+
+    // Simple mode: pass through to MeatHttpClient (original behavior — POST/PUT body buffering)
+    if (_session && _session->client) {
+        uint32_t bytesWritten = _session->client->write(buf, size);
+        _position += bytesWritten;
+        return bytesWritten;
+    }
+    return 0;
 }
 
 

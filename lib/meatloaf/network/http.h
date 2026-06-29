@@ -277,11 +277,15 @@ public:
 
 class HTTPMStream: public MStream {
 public:
-    HTTPMStream(std::string path): MStream(path) {
-        //url = path;
+    enum class FullModeState {
+        SIMPLE,             // backward-compatible mode, no commands active
+        BUILDING_REQUEST,   // full mode activated, accumulating commands
+        RESPONSE_HEADERS,   // request sent, reading response headers
+        RESPONSE_BODY       // reading response body
     };
+
+    HTTPMStream(std::string path): MStream(path) {};
     HTTPMStream(std::string path, std::ios_base::openmode m): MStream(path) {
-        //url = path;
         mode = m;
     };
 
@@ -291,8 +295,6 @@ public:
 
     // MStream methods
     bool isOpen() override;
-    // bool isBrowsable() override { return false; };
-    // bool isRandomAccess() override { return false; };
     bool isNetwork() override { return true; };
 
     bool open(std::ios_base::openmode mode) override;
@@ -301,40 +303,43 @@ public:
     uint32_t read(uint8_t* buf, uint32_t size) override;
     uint32_t write(const uint8_t *buf, uint32_t size) override;
 
-    // For chunked responses _size grows as chunks arrive and equals _position after
-    // each read, so the base available() would return 0 even with more data pending.
-    // Return HTTP_BLOCK_SIZE as a hint when the connection is open but not yet complete.
     uint32_t available() override {
         // Check if we have POST response data to read
         if (_session && _session->client && !_session->client->postResponse.empty()) {
             uint32_t respAvail = (uint32_t)_session->client->postResponse.size() - _session->client->_position;
             if (respAvail > 0) return respAvail;
         }
+        // Check if we have response headers buffered
+        if (fullMode == FullModeState::RESPONSE_HEADERS && ctx.hasMoreResponseHeaders()) {
+            return 1;  // at least one header line available
+        }
         if (_size > _position)
             return _size - _position;
-        // Check if connection is still open and has more data coming
         if (isOpen() && _session && _session->client && !_session->client->complete())
             return HTTP_BLOCK_SIZE;
         return 0;
     }
 
-    // bool eos() override {
-    //     Debug_printv("complete[%d]", _http.complete());
-    //     return _http.complete();
-    // }
-
     virtual bool seek(uint32_t pos);
-
     virtual bool seekPath(std::string path) override {
         Debug_printv( "path[%s]", path.c_str() );
         return false;
     }
+
+    // Full-mode helpers
+    bool handleCommand(const std::string& cmd);
+    bool isFullMode() const { return fullMode != FullModeState::SIMPLE; }
 
 protected:
     std::shared_ptr<HTTPMSession> _session = nullptr;
 
 private:
     friend class HTTPMFile;
+
+    HTTPRequestContext ctx;
+    FullModeState fullMode = FullModeState::SIMPLE;
+    bool keepAlive = true;
+    bool _statusRequested = false;  // set by handleCommand when "status" received
 };
 
 
