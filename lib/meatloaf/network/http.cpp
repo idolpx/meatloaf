@@ -538,17 +538,54 @@ uint32_t HTTPMStream::read(uint8_t* buf, uint32_t size) {
 
     if ( size > 0 )
     {
-        //Debug_printv("HTTPMStream::read called, mode=%d", mode);
+        // Full mode: handle "status" command — return status code string
+        if (_statusRequested) {
+            _statusRequested = false;
+            std::string statusStr = std::to_string(ctx.responseStatus);
+            uint32_t copyLen = std::min((uint32_t)statusStr.size(), size);
+            memcpy(buf, statusStr.data(), copyLen);
+            Debug_printv("Returning status: %s", statusStr.c_str());
+            return copyLen;
+        }
 
-        // If stream was opened for write mode, need to switch to read mode
-        // by completing the POST request and reading the response
+        // Full mode: RESPONSE_HEADERS — serve buffered header lines
+        if (fullMode == FullModeState::RESPONSE_HEADERS) {
+            std::string headerLine;
+            if (ctx.hasMoreResponseHeaders()) {
+                headerLine = ctx.popResponseHeader();
+            } else {
+                // End-of-headers marker: empty CRLF line
+                headerLine = "\r\n";
+                // Transition to body mode automatically
+                fullMode = FullModeState::RESPONSE_BODY;
+            }
+            uint32_t copyLen = std::min((uint32_t)headerLine.size(), size);
+            memcpy(buf, headerLine.data(), copyLen);
+            _error = 0;
+            Debug_printv("Serving header line: %s", headerLine.c_str());
+            return copyLen;
+        }
+
+        // Full mode: RESPONSE_BODY — read from MeatHttpClient
+        if (fullMode == FullModeState::RESPONSE_BODY) {
+            if (_session && _session->client) {
+                bytesRead = _session->client->read(buf, size);
+                _position += bytesRead;
+                _error = _session->client->_error;
+                if (bytesRead == 0 && _session->client->complete()) {
+                    ctx.responseConsumed = true;
+                }
+                return bytesRead;
+            }
+            return 0;
+        }
+
+        // Simple mode: original behavior (write-mode POST handling)
         bool isWriteMode = (mode & 0x10) || (mode == std::ios_base::out);
         if (isWriteMode && _session && _session->client) {
             Debug_printv("Switching from write mode to read mode");
             auto client = _session->client.get();
 
-            // If POST was already sent (close was called previously), just switch mode
-            // Check BOTH postResponse and preservedPostResponse since close() moves data there
             bool hasResponse = (!client->postBuffer.empty()) ||
                               (!client->postResponse.empty()) ||
                               (!client->preservedPostResponse.empty());
@@ -556,17 +593,12 @@ uint32_t HTTPMStream::read(uint8_t* buf, uint32_t size) {
             if (!hasResponse) {
                 Debug_printv("POST already sent, reading from existing response");
             } else if (!client->postBuffer.empty()) {
-                // Send the POST request with buffered body and read response
                 Debug_printv("Sending POST request...");
-                client->close();  // This sends POST and reads response into postResponse buffer
+                client->close();
             }
 
-            // Switch stream mode so C64 sees it as readable
             mode = std::ios_base::in;
-            // _size is already set from the POST response
             _position = 0;
-            Debug_printv("After POST: _size=%u, postResponse.size=%u, preservedPostResponse.size=%u",
-                _size, (uint32_t)client->postResponse.size(), (uint32_t)client->preservedPostResponse.size());
         }
 
         if ( size > available() )
