@@ -76,8 +76,9 @@ bool HTTPRequestContext::sendRequest(std::shared_ptr<HTTPMSession> session) {
 
     auto& client = *session->client;
 
-    // Reset response header buffer
+    // Reset response header buffer and status
     responseHeaders.clear();
+    responseStatus = 0;
 
     // Set up onHeader callback to capture response headers
     // The callback is called during HTTP_EVENT_ON_HEADER with key and value
