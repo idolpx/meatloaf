@@ -34,6 +34,7 @@
 #include <freertos/task.h>
 
 #include "../utils/string_utils.h"
+#include "../utils/peoples_url_parser.h"
 #include "../device/iec/fuji.h"
 #include "../device/iec/meatloaf.h"
 #include "../console/Helpers/PWDHelpers.h"
@@ -303,7 +304,7 @@ private:
         return key.substr(0, last_colon);
     }
 
-    // Check if path matches session key (comparing scheme://host ignoring port)
+    // Check if path matches session key (comparing host, tolerating scheme differences)
     static bool path_matches_session(const std::string& path, const std::string& key) {
         std::string hostKey = session_host_key(key);
         // Strip trailing slash from path for comparison
@@ -311,6 +312,14 @@ private:
         if (!p.empty() && p.back() == '/') p.pop_back();
         // Check if path starts with scheme://host (ignoring port)
         if (!p.empty() && mstr::startsWith(p.c_str(), hostKey.c_str())) {
+            return true;
+        }
+        // HTTP/HTTPS equivalence: session keys always use "http://" (from getScheme())
+        // but CWD paths use the original scheme ("https://"). Compare hosts directly.
+        auto keyParsed = PeoplesUrlParser::parseURL(key);
+        auto pathParsed = PeoplesUrlParser::parseURL(path);
+        if (!keyParsed->host.empty() && !pathParsed->host.empty() &&
+            keyParsed->host == pathParsed->host) {
             return true;
         }
         // Also match when path is just the scheme root (e.g. "mdns://" matches "mdns://mdns:0")
@@ -333,7 +342,7 @@ private:
 
     // Check if a session is currently in use by any active drive or console
     static bool is_session_in_use(const std::string& key) {
-        // Check drives
+        // Check fuji disk slots (devices 4-11 etc.)
         for (int i = 0; i < MAX_DISK_DEVICES; i++) {
             auto drive = Meatloaf.get_disks(i);
             if (drive != nullptr) {
@@ -342,6 +351,10 @@ private:
                     return true;
                 }
             }
+        }
+        // Check the Meatloaf device (#30) — not in _fnDisks array
+        if (path_matches_session(Meatloaf.getCWD(), key)) {
+            return true;
         }
         // Check console current path
         auto consolePath = ESP32Console::getCurrentPath();
@@ -495,8 +508,13 @@ public:
             auto& session = pair.second;
             const std::string& key = pair.first;
 
-            // If session is NOT in use by any drive or console, remove it immediately
+            // If session is NOT in use by any drive or console, consider removal
             if (!is_session_in_use(key)) {
+                // Grace period: keep sessions alive if busy or recently active,
+                // since CWD isn't updated until after file loading completes
+                if (session->isBusy() || session->getIdleTime() < 5000) {
+                    continue;
+                }
                 Debug_printv("Session not in use, removing: %s", key.c_str());
                 to_remove.push_back(key);
                 continue;
@@ -513,7 +531,8 @@ public:
 
             // Session is in use - check if it needs keep-alive
             uint32_t idle_time = session->getIdleTime();
-            if (idle_time >= session->getKeepAliveInterval()) {
+            uint32_t keep_alive_interval = session->getKeepAliveInterval();
+            if (idle_time >= keep_alive_interval && keep_alive_interval > 0) {
                 to_check.push_back(pair);
             }
         }
