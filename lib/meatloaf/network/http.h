@@ -70,6 +70,7 @@ public:
     std::vector<std::string> responseHeaders;                // buffered response header lines ("Name: value")
     int responseStatus = 0;                                  // 0 = success, <0 = local err, >0 = HTTP status
     bool responseConsumed = false;                           // true after all response data read
+    std::string _headerRemainder;  // buffered remainder of partially-read header line
 
     void setMethod(const std::string& m);
     void setHeader(const std::string& name, const std::string& value);    // replaces
@@ -342,7 +343,6 @@ private:
 
     HTTPRequestContext ctx;
     FullModeState fullMode = FullModeState::SIMPLE;
-    bool keepAlive = true;
     bool _statusRequested = false;  // set by handleCommand when "status" received
 };
 

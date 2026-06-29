@@ -140,10 +140,15 @@ bool HTTPRequestContext::sendRequest(std::shared_ptr<HTTPMSession> session) {
 }
 
 std::string HTTPRequestContext::popResponseHeader() {
+    if (!_headerRemainder.empty()) {
+        std::string r = _headerRemainder;
+        _headerRemainder.clear();
+        return r;
+    }
     if (responseHeaders.empty()) return {};
-    std::string line = responseHeaders.front();
+    std::string line = responseHeaders.front() + "\r\n";
     responseHeaders.erase(responseHeaders.begin());
-    return line + "\r\n";
+    return line;
 }
 
 /********************************************************
@@ -156,6 +161,7 @@ bool HTTPMStream::handleCommand(const std::string& cmd) {
     // Trim trailing whitespace/newlines that C64 PRINT# may add
     std::string c = cmd;
     mstr::trim(c);
+    mstr::toLower(c);
 
     if (c.empty()) return true;  // blank line is harmless
 
@@ -165,12 +171,12 @@ bool HTTPMStream::handleCommand(const std::string& cmd) {
     }
 
     // "r-h" or "r-b" — switch response read mode
-    if (c.size() >= 3 && (c[0] == 'r' || c[0] == 'R') && c[1] == '-') {
+    if (c.size() >= 3 && c[0] == 'r' && c[1] == '-') {
         switch (c[2]) {
-            case 'h': case 'H':
+            case 'h':
                 fullMode = FullModeState::RESPONSE_HEADERS;
                 return true;
-            case 'b': case 'B':
+            case 'b':
                 fullMode = FullModeState::RESPONSE_BODY;
                 return true;
         }
@@ -178,7 +184,7 @@ bool HTTPMStream::handleCommand(const std::string& cmd) {
     }
 
     // "s" — send the request
-    if (c == "s" || c == "S") {
+    if (c == "s") {
         fullMode = FullModeState::RESPONSE_HEADERS;
         if (_session) {
             ctx.sendRequest(_session);
@@ -187,7 +193,7 @@ bool HTTPMStream::handleCommand(const std::string& cmd) {
     }
 
     // "c" — clear context
-    if (c == "c" || c == "C") {
+    if (c == "c") {
         ctx.clear();
         fullMode = FullModeState::BUILDING_REQUEST;
         _statusRequested = false;
@@ -195,17 +201,8 @@ bool HTTPMStream::handleCommand(const std::string& cmd) {
     }
 
     // "status" — request HTTP status code
-    if (c.size() >= 6 && (c[0] == 's' || c[0] == 'S') &&
-        (c == "status" || c == "STATUS")) {
+    if (c == "status") {
         _statusRequested = true;
-        return true;
-    }
-
-    // "k on" / "k off" — keep-alive
-    if (c.size() >= 3 && (c[0] == 'k' || c[0] == 'K') && c[1] == ' ') {
-        std::string val = c.substr(2);
-        mstr::trim(val);
-        keepAlive = (val == "on" || val == "ON" || val == "1");
         return true;
     }
 
@@ -216,10 +213,10 @@ bool HTTPMStream::handleCommand(const std::string& cmd) {
         mstr::trim(arg);
 
         switch (prefix) {
-            case 'm': case 'M':
+            case 'm':
                 ctx.setMethod(arg);
                 return true;
-            case 'b': case 'B':
+            case 'b':
                 ctx.setBody(arg);
                 return true;
             default:
@@ -228,7 +225,7 @@ bool HTTPMStream::handleCommand(const std::string& cmd) {
     }
 
     // "h <name>: <value>" and "h+ <name>: <value>" — set/append header
-    if (c.size() >= 2 && (c[0] == 'h' || c[0] == 'H')) {
+    if (c.size() >= 2 && c[0] == 'h') {
         bool append = (c.size() >= 2 && c[1] == '+');
         size_t start = append ? 2 : 1;
         if (c.size() > start && c[start] == ' ') start++;
@@ -249,7 +246,7 @@ bool HTTPMStream::handleCommand(const std::string& cmd) {
     }
 
     // "b+" — append body (no space required: "b+more text" or "b+ more text")
-    if (c.size() >= 2 && (c[0] == 'b' || c[0] == 'B') && c[1] == '+') {
+    if (c.size() >= 2 && c[0] == 'b' && c[1] == '+') {
         std::string rest = c.substr(2);
         if (!rest.empty() && rest[0] == ' ') rest = rest.substr(1);
         ctx.appendBody(rest);
@@ -569,6 +566,12 @@ uint32_t HTTPMStream::read(uint8_t* buf, uint32_t size) {
             }
             uint32_t copyLen = std::min((uint32_t)headerLine.size(), size);
             memcpy(buf, headerLine.data(), copyLen);
+
+            // Buffer any remainder for the next read
+            if (copyLen < headerLine.size()) {
+                ctx._headerRemainder = headerLine.substr(copyLen);
+            }
+
             _error = 0;
             Debug_printv("Serving header line: %s", headerLine.c_str());
             return copyLen;
