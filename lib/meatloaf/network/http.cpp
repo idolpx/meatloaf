@@ -165,7 +165,7 @@ bool HTTPMStream::handleCommand(const std::string& cmd) {
     }
 
     // "r-h" or "r-b" — switch response read mode
-    if (c.size() >= 3 && c[0] == 'r' && c[1] == '-') {
+    if (c.size() >= 3 && (c[0] == 'r' || c[0] == 'R') && c[1] == '-') {
         switch (c[2]) {
             case 'h': case 'H':
                 fullMode = FullModeState::RESPONSE_HEADERS;
@@ -249,7 +249,7 @@ bool HTTPMStream::handleCommand(const std::string& cmd) {
     }
 
     // "b+" — append body (no space required: "b+more text" or "b+ more text")
-    if (c.size() >= 2 && c[0] == 'b' && c[1] == '+') {
+    if (c.size() >= 2 && (c[0] == 'b' || c[0] == 'B') && c[1] == '+') {
         std::string rest = c.substr(2);
         if (!rest.empty() && rest[0] == ' ') rest = rest.substr(1);
         ctx.appendBody(rest);
@@ -603,7 +603,7 @@ uint32_t HTTPMStream::write(const uint8_t *buf, uint32_t size) {
             first == 's' || first == 'S' ||
             first == 'c' || first == 'C' ||
             first == 'k' || first == 'K' ||
-            (size >= 2 && first == 'r' && (buf[1] == '-'))) {
+            (size >= 2 && (first == 'r' || first == 'R') && (buf[1] == '-'))) {
             // First command detected — enter full mode
             fullMode = FullModeState::BUILDING_REQUEST;
             std::string cmd(reinterpret_cast<const char*>(buf), size);
