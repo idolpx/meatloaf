@@ -993,6 +993,12 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                                     Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "file in container, staying at [%s]", f->url.c_str() );
                                     set_cwd(f->url, true);
                                 } else {
+                                    // HTTP directory URLs (ending with '/') may serve a file
+                                    // via Content-Disposition, setting name without updating
+                                    // path. Append name to URL so base() computes correctly.
+                                    if (!f->url.empty() && f->url.back() == '/' && !f->name.empty()) {
+                                        f->resetURL(f->url + f->name);
+                                    }
                                     Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "file base[%s]", f->base().c_str() );
                                     //m_cwd.reset(MFSOwner::File(f->base()));
                                     set_cwd(f->base(), true);
