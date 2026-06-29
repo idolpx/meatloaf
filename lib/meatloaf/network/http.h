@@ -313,6 +313,10 @@ public:
         if (fullMode == FullModeState::RESPONSE_HEADERS && ctx.hasMoreResponseHeaders()) {
             return 1;  // at least one header line available
         }
+        // Check if status was requested via "status" command
+        if (_statusRequested) {
+            return 1;
+        }
         if (_size > _position)
             return _size - _position;
         if (isOpen() && _session && _session->client && !_session->client->complete())
