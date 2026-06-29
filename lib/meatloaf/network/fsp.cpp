@@ -36,6 +36,7 @@ FSPMSession::FSPMSession(std::string host, uint16_t port)
 {
     Debug_printv("FSPMSession created for %s:%d", host.c_str(), port);
     _password = ""; // Empty password by default
+    keep_alive_interval = 0; // Disable keep-alive — FSP is stateless; no server-side ping needed
 }
 
 FSPMSession::~FSPMSession() {

@@ -549,6 +549,8 @@ uint8_t iecChannelHandlerDir::readBufferData()
             std::string ext = entry->extension;
             if ( !mstr::contains(entry->pathInStream, name.c_str()) && entry->pathInStream.size() )
                 name = entry->pathInStream;
+            if ( ext[0] == '_' )
+                ext.clear();
 
             // Convert to PETSCII and set extension
             if ( !m_dir->isPETSCII )
