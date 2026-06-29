@@ -125,10 +125,10 @@ std::shared_ptr<MStream> HTTPMFile::getSourceStream(std::ios_base::openmode mode
         resetURL(istream->url);
     }
 
-    // Apply Content-Disposition filename if the server provided one
+    // Content-Disposition filename is available in _session->client->contentDispositionFilename
+    // but must NOT be assigned to name — it would desync name from path, breaking pathToFile()/base()
     if (_session && _session->client && !_session->client->contentDispositionFilename.empty()) {
-        name = _session->client->contentDispositionFilename;
-        Debug_printv("filename from Content-Disposition: %s", name.c_str());
+        Debug_printv("filename from Content-Disposition: %s", _session->client->contentDispositionFilename.c_str());
     }
 
     return istream;
