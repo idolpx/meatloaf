@@ -210,8 +210,17 @@ void DisplayLEDs::set_all_pixel_brightness(uint8_t value)
 
 void DisplayLEDs::set_segment(uint16_t index, CRGB color)
 {
+    if (index >= segments.size() || n_of_leds <= 0) {
+        return;
+    }
+
     int start = segments[index].first;
     int end = segments[index].second;
+
+    if (start < 0) start = 0;
+    if (start >= n_of_leds) return;
+    if (end < start) end = start;
+    if (end > n_of_leds) end = n_of_leds;
 
     for (int i = start; i < end; i++) {
         ws28xx_pixels[i] = color;
@@ -227,7 +236,14 @@ void DisplayLEDs::fill_all(CRGB color)
 
 void DisplayLEDs::show_activity()
 {
+    if (n_of_leds <= 0) {
+        return;
+    }
+
     static uint8_t curr_led = 3;
+    if (curr_led >= n_of_leds) {
+        curr_led = static_cast<uint8_t>(n_of_leds - 1);
+    }
 
     // Set all leds to black
     fill_all((CRGB){.r=0, .g=0, .b=0});
@@ -250,6 +266,10 @@ void DisplayLEDs::show_activity()
 
 void DisplayLEDs::show_progress()
 {
+    if (n_of_leds <= 0) {
+        return;
+    }
+
     static bool led_state_off = false;
 
     speed = 25;
@@ -259,7 +279,14 @@ void DisplayLEDs::show_progress()
     fill_all((CRGB){.r=0, .g=0, .b=0});
 
     // Number of leds to light up
-    int n = (n_of_leds * progress) / 100;
+    uint8_t pct = progress;
+    if (pct > 99) {
+        pct = 99;
+    }
+    int n = (n_of_leds * pct) / 100;
+    if (n >= n_of_leds) {
+        n = n_of_leds - 1;
+    }
     for (int i = 0; i < n; i++) {
         // rotate all elements of the array
         ws28xx_pixels[i] = (CRGB){.r=0, .g=100, .b=0};
@@ -400,12 +427,16 @@ void DisplayLEDs::rotate()
 
 void DisplayLEDs::meatloaf()
 {
+    if (n_of_leds <= 0) {
+        return;
+    }
+
     // Pastel Meatloaf Pixels
-    ws28xx_pixels[0] = (CRGB){.r=87, .g=145, .b=178};   // BLUE
-    ws28xx_pixels[1] = (CRGB){.r=128, .g=178, .b=58};   // GREEN
-    ws28xx_pixels[2] = (CRGB){.r=178, .g=168, .b=58};   // YELLOW
-    ws28xx_pixels[3] = (CRGB){.r=178, .g=102, .b=51};   // ORANGE
-    ws28xx_pixels[4] = (CRGB){.r=178, .g=61, .b=53};    // RED
+    if (n_of_leds > 0) ws28xx_pixels[0] = (CRGB){.r=87, .g=145, .b=178};   // BLUE
+    if (n_of_leds > 1) ws28xx_pixels[1] = (CRGB){.r=128, .g=178, .b=58};   // GREEN
+    if (n_of_leds > 2) ws28xx_pixels[2] = (CRGB){.r=178, .g=168, .b=58};   // YELLOW
+    if (n_of_leds > 3) ws28xx_pixels[3] = (CRGB){.r=178, .g=102, .b=51};   // ORANGE
+    if (n_of_leds > 4) ws28xx_pixels[4] = (CRGB){.r=178, .g=61, .b=53};    // RED
 
     // // Vibrant Meatloaf Pixels
     // ws28xx_pixels[0] = (CRGB){.r=0, .g=0, .b=255};   // BLUE
