@@ -125,10 +125,16 @@ std::shared_ptr<MStream> HTTPMFile::getSourceStream(std::ios_base::openmode mode
         resetURL(istream->url);
     }
 
-    // Content-Disposition filename is available in _session->client->contentDispositionFilename
-    // but must NOT be assigned to name — it would desync name from path, breaking pathToFile()/base()
+    // If Content-Disposition provides a filename and the URL has no file extension,
+    // the URL is a directory path serving a default file. Add trailing slash so
+    // base() returns this directory instead of its parent.
+    // Do NOT assign contentDispositionFilename to name — that desyncs name from path,
+    // breaking pathToFile()/base().
     if (_session && _session->client && !_session->client->contentDispositionFilename.empty()) {
         Debug_printv("filename from Content-Disposition: %s", _session->client->contentDispositionFilename.c_str());
+        if (extension.empty() && !url.empty() && url.back() != '/') {
+            resetURL(url + "/");
+        }
     }
 
     return istream;
