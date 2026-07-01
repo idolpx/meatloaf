@@ -77,6 +77,17 @@ protected:
     uint8_t _load_address[2] = {0, 0};
     uint8_t _error = 0;
 
+    // Generic track/sector state: when this stream's url points at a
+    // directory, each file entry acts as a "track". Used by the default
+    // seekBlock()/seekSector() implementation below.
+    std::string _trackDirUrl;
+    uint16_t _openTrack = 0;
+
+    // Opens the file for the given track (1-based), closing whatever track
+    // file is currently open if it differs. Leaves the file open on success
+    // since callers typically seek within it immediately after.
+    bool openTrack( uint16_t track );
+
 public:
     MStream(std::string path) {
         url = path;
@@ -170,9 +181,17 @@ public:
         return "";
     };
 
-    virtual bool seekBlock( uint64_t index, uint8_t offset = 0 ) { return false; };
-    virtual bool seekSector( uint8_t track, uint8_t sector, uint8_t offset = 0 ) { return false; };
-    virtual bool seekSector( std::vector<uint8_t> trackSectorOffset ) { return false; };
+    // Generic track/sector access for streams whose url is a browsable
+    // directory: track N (1-based) is the Nth file entry, sector is a
+    // block_size chunk within that file. Works for any MFile-backed
+    // filesystem that supports directory listing (flash, SD, SMB, NFS,
+    // TNFS, etc). Media formats with real disk geometry (D64, G64, NIB, ...)
+    // override these with their own implementations.
+    virtual uint16_t getTrackCount();
+    virtual uint16_t getSectorCount( uint16_t track );
+    virtual bool seekBlock( uint64_t index, uint8_t offset = 0 );
+    virtual bool seekSector( uint8_t track, uint8_t sector, uint8_t offset = 0 );
+    virtual bool seekSector( std::vector<uint8_t> trackSectorOffset );
 
 // private:
 

@@ -183,6 +183,126 @@ std::string strip_cache_fragment_from_url(const std::string& url) {
 
 
 /********************************************************
+ * MStream implementations
+ ********************************************************/
+
+// A file entry (track) in the directory this stream's url points at.
+struct MStreamTrackEntry {
+    std::string url;
+    uint32_t size;
+};
+
+// Returns the file entries (tracks) in the directory referenced by dirUrl,
+// sorted alphabetically for a stable track order. Sizes come straight from
+// the directory listing metadata, so callers can compute sector counts
+// without opening any of the files.
+static std::vector<MStreamTrackEntry> mstream_track_entries(const std::string& dirUrl)
+{
+    std::vector<MStreamTrackEntry> entries;
+
+    MFile* dir = MFSOwner::File(dirUrl);
+    if (dir != nullptr)
+    {
+        if (dir->isDirectory())
+        {
+            dir->rewindDirectory();
+            MFile* entry;
+            while ((entry = dir->getNextFileInDir()) != nullptr)
+            {
+                if (!entry->isDirectory())
+                    entries.push_back({ entry->url, entry->size });
+                delete entry;
+            }
+        }
+        delete dir;
+    }
+
+    std::sort(entries.begin(), entries.end(), [](const MStreamTrackEntry& a, const MStreamTrackEntry& b) {
+        return a.url < b.url;
+    });
+    return entries;
+}
+
+uint16_t MStream::getTrackCount()
+{
+    return mstream_track_entries(_trackDirUrl.empty() ? url : _trackDirUrl).size();
+}
+
+uint16_t MStream::getSectorCount(uint16_t track)
+{
+    if (track < 1)
+        return 0;
+
+    auto entries = mstream_track_entries(_trackDirUrl.empty() ? url : _trackDirUrl);
+    if (track > entries.size())
+        return 0;
+
+    return (entries[track - 1].size + block_size - 1) / block_size;
+}
+
+bool MStream::openTrack(uint16_t track)
+{
+    if (track < 1)
+        return false;
+
+    if (_trackDirUrl.empty())
+        _trackDirUrl = url;
+
+    if (_openTrack == track && isOpen())
+        return true;
+
+    auto entries = mstream_track_entries(_trackDirUrl);
+    if (track > entries.size())
+        return false;
+
+    close();
+    url = entries[track - 1].url;
+    if (!open(std::ios_base::in | std::ios_base::out))
+        return false;
+
+    _openTrack = track;
+    return true;
+}
+
+bool MStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
+{
+    if (!openTrack(track))
+        return false;
+
+    return seek((sector * block_size) + offset);
+}
+
+bool MStream::seekSector(std::vector<uint8_t> trackSectorOffset)
+{
+    return seekSector(trackSectorOffset[0], trackSectorOffset[1], trackSectorOffset[2]);
+}
+
+bool MStream::seekBlock(uint64_t index, uint8_t offset)
+{
+    uint16_t trackCount = getTrackCount();
+    if (trackCount == 0)
+        return false;
+
+    uint16_t sectorOffset = 0;
+    uint16_t track = 0;
+
+    do
+    {
+        track++;
+        uint16_t count = getSectorCount(track);
+        if (sectorOffset + count <= index)
+            sectorOffset += count;
+        else
+            break;
+    } while (track < trackCount);
+
+    uint8_t sector = index - sectorOffset;
+
+    return seekSector((uint8_t)track, sector, offset);
+}
+
+
+/********************************************************
  * MFSOwner implementations
  ********************************************************/
 
