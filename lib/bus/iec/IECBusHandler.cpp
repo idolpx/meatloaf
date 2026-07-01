@@ -4080,6 +4080,22 @@ void IECBusHandler::task()
     {
       // host has released ATN
       m_flags &= ~P_ATN;
+
+      // ATN was released before handleATNSequence() ran, i.e. no address byte
+      // was received (e.g. ATN glitched low while the host powers up, or we
+      // missed the sequence entirely). atnRequest() pulled DATA low ("I am
+      // here") and disabled the hardware ATN->DATA path; if no transaction is
+      // in progress nothing else will release DATA, leaving it latched low on
+      // an idle bus and wedging hosts that poll for bus-free before starting
+      // a transfer => restore the idle bus state
+      if( !(m_flags & (P_LISTENING|P_TALKING)) || (m_flags & P_DONE)!=0 )
+        {
+          writePinCLK(HIGH);
+          writePinDATA(HIGH);
+        }
+
+      // allow ATN to pull DATA low in hardware
+      writePinCTRL(LOW);
     }
 
   // ------------------ fast-load protocol handling -------------------
