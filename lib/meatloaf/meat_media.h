@@ -116,6 +116,24 @@ protected:
     // Partition methods
     std::string partition_type_label[9] = { "", "NAT", "41", "71", "81", "C81", "PRN", "FOR", "SYS" };
 
+    // /* These are address/value pairs used by some programs to detect a 1541. */
+    // /* Currently we remember two bytes per address since that's the longest  */
+    // /* block required. */
+    // static const PROGMEM magic_value_t c1541_magics[] = {
+    // { 0xfea0, { 0x0d, 0xed } }, /* used by DreamLoad and ULoad Model 3 */
+    // { 0xe5c6, { 0x34, 0xb1 } }, /* used by DreamLoad and ULoad Model 3 */
+    // { 0xfffe, { 0x00, 0x00 } }, /* Disable AR6 fastloader */
+    // { 0,      { 0, 0 } }        /* end mark */
+    // };
+
+    // /* System partition G-P answer */
+    // static const PROGMEM uint8_t system_partition_info[] = {
+    // 0xff,0xe2,0x00,0x53,0x59,0x53,0x54,0x45,
+    // 0x4d,0xa0,0xa0,0xa0,0xa0,0xa0,0xa0,0xa0,
+    // 0xa0,0xa0,0xa0,0x00,0x00,0x00,0x00,0x00,
+    // 0x00,0x00,0x00,0x00,0x00,0x00,0x0d
+    // };
+
     virtual bool seekPartition( uint8_t index ) { return false; };
     virtual bool readPartition( uint8_t index ) { return false; };
     virtual bool writePartition( uint8_t index ) { return false; };
