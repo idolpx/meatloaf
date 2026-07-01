@@ -29,9 +29,70 @@
 
 #include "../../include/debug.h"
 
+/********************************************************
+ * FlashHandle
+ ********************************************************/
+
+class FlashHandle {
+public:
+    //int rc;
+    FILE* file_h = nullptr;
+
+    FlashHandle() 
+    {
+        //Debug_printv("*** Creating flash handle");
+        memset(&file_h, 0, sizeof(file_h));
+    };
+    ~FlashHandle();
+    void obtain(std::string path, std::string mode);
+    void dispose();
+
+private:
+    int flags = 0;
+};
+
 
 /********************************************************
- * MFile
+ * Streams
+ ********************************************************/
+
+class FlashMStream: public MStream {
+public:
+    FlashMStream(std::string& path, std::ios_base::openmode m): MStream(path) {
+        mode = m;
+        handle = std::make_unique<FlashHandle>();
+        //url = path;
+        //Debug_printv("url[%s] mode[%d]", url.c_str(), mode);
+    }
+    ~FlashMStream() override {
+        close();
+    }
+
+    // MStream methods
+    bool isOpen() override;
+    //bool isBrowsable() override { return false; };
+    //bool isRandomAccess() override { return false; };
+
+    bool open(std::ios_base::openmode mode) override;
+    void close() override;
+
+    uint32_t read(uint8_t* buf, uint32_t size) override;
+    uint32_t write(const uint8_t *buf, uint32_t size) override;
+
+    virtual bool seek(uint32_t pos) override;
+
+    virtual bool seekPath(std::string path) override {
+        Debug_printv( "path[%s]", path.c_str() );
+        return false;
+    }
+
+
+protected:
+    std::unique_ptr<FlashHandle> handle;
+};
+
+/********************************************************
+ * File implementations
  ********************************************************/
 
 class FlashMFile: public MFile
@@ -110,68 +171,6 @@ protected:
 private:
 };
 
-
-/********************************************************
- * FlashHandle
- ********************************************************/
-
-class FlashHandle {
-public:
-    //int rc;
-    FILE* file_h = nullptr;
-
-    FlashHandle() 
-    {
-        //Debug_printv("*** Creating flash handle");
-        memset(&file_h, 0, sizeof(file_h));
-    };
-    ~FlashHandle();
-    void obtain(std::string path, std::string mode);
-    void dispose();
-
-private:
-    int flags = 0;
-};
-
-
-/********************************************************
- * MStream I
- ********************************************************/
-
-class FlashMStream: public MStream {
-public:
-    FlashMStream(std::string& path, std::ios_base::openmode m): MStream(path) {
-        mode = m;
-        handle = std::make_unique<FlashHandle>();
-        //url = path;
-        //Debug_printv("url[%s] mode[%d]", url.c_str(), mode);
-    }
-    ~FlashMStream() override {
-        close();
-    }
-
-    // MStream methods
-    bool isOpen() override;
-    //bool isBrowsable() override { return false; };
-    //bool isRandomAccess() override { return false; };
-
-    bool open(std::ios_base::openmode mode) override;
-    void close() override;
-
-    uint32_t read(uint8_t* buf, uint32_t size) override;
-    uint32_t write(const uint8_t *buf, uint32_t size) override;
-
-    virtual bool seek(uint32_t pos) override;
-
-    virtual bool seekPath(std::string path) override {
-        Debug_printv( "path[%s]", path.c_str() );
-        return false;
-    }
-
-
-protected:
-    std::unique_ptr<FlashHandle> handle;
-};
 
 /********************************************************
  * MFileSystem
