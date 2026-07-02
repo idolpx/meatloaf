@@ -271,6 +271,7 @@ static void send_file(httpd_req_t *req, const char *filename)
 {
     std::string fpath;
     Debug_printv("filename[%s]", filename);
+    Debug_memory();
     if ( !exists(filename) )
     {
         while (*filename == '/')
@@ -361,8 +362,6 @@ static void send_file(httpd_req_t *req, const char *filename)
     httpd_resp_send_chunk(req, NULL, 0);
     stream->close();
     free(buf);
-
-    Debug_memory();
 }
 
 static void send_file_parsed(httpd_req_t *req, const char *filename)
