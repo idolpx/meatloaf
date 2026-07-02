@@ -21,6 +21,8 @@
 #ifndef MIN_CONFIG
 
 #include <esp_http_server.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 #include <string>
 
 #define http_SEND_BUFF_SIZE 512
@@ -36,11 +38,18 @@ private:
     static void custom_global_ctx_free(void *ctx);
     static httpd_handle_t start_server(serverstate &state);
 
+    // Lazy-start listener: holds port 80 with a bare socket until the first
+    // client connects, then starts the real httpd server.
+    static int _lazy_sock;
+    static TaskHandle_t _lazy_task;
+    static void lazy_task(void *pv);
+
 public:
     static httpd_handle_t s_server;
     static void send_http_error(httpd_req_t *req, int errnum);
 
     void start();
+    void startOnDemand();
     void stop();
     bool running() { return state.hServer != NULL; }
 };
