@@ -297,6 +297,14 @@ void main_setup()
     // lfs_test();
 //#endif
 
+#ifdef ENABLE_CONSOLE
+    // Defer the REPL task (16 KB internal-RAM stack) until first console
+    // input. Commands were all registered in begin() above, so the TCP
+    // console can still execute them while the serial REPL is dormant.
+    console.startOnDemand();
+    printf("Press ENTER to activate console.\r\n");
+#endif
+
     printf("READY.\r\n");
     Debug_memory();
 }
