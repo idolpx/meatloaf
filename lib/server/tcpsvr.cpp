@@ -50,7 +50,7 @@ TaskHandle_t TCPServer::_htask = NULL;
 
 // Per-client session: runs the console command loop for one connected client.
 // Created by the listener task on accept() and self-deletes on disconnect, so
-// its 4 KB stack only exists while a client is actually connected.
+// its 16 KB stack only exists while a client is actually connected.
 void TCPServer::session_task(void *pvParameters)
 {
     char rx_buffer[128];    // char array to store received data
@@ -184,8 +184,12 @@ void TCPServer::task(void *pvParameters)
             Debug_printv("Socket accepted");
 
             // Run the session in its own task, created on access, so this
-            // always-on listener only needs a minimal stack.
-            if (xTaskCreatePinnedToCore(&TCPServer::session_task, "tcp_session", 4096, NULL, 5, NULL, 0) != pdTRUE)
+            // always-on listener only needs a minimal stack. The session runs
+            // the same console commands as the serial REPL (ls on nested
+            // archive/network streams, etc.), so it needs the same 16 KB
+            // stack — 4096 overflows during libarchive/FSP operations and
+            // corrupts adjacent heap allocations.
+            if (xTaskCreatePinnedToCore(&TCPServer::session_task, "tcp_session", 16384, NULL, 5, NULL, 0) != pdTRUE)
             {
                 Debug_printv("Could not start tcp session task!");
                 close(_client_socket);

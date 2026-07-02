@@ -702,7 +702,7 @@ void HttpServer::startOnDemand()
     if (state.hServer != NULL || _lazy_task != NULL)
         return;
 
-    if (xTaskCreatePinnedToCore(lazy_task, "www_lazy", 4096, this, 5, &_lazy_task, 0) == pdTRUE)
+    if (xTaskCreatePinnedToCore(lazy_task, "www_lazy", 6144, this, 5, &_lazy_task, 0) == pdTRUE)
     {
         printf(ANSI_GREEN_BOLD "WWW/WS/WebDAV Server on standby (starts on first request)" ANSI_RESET "\r\n");
     }
