@@ -641,10 +641,21 @@ bool MeatHttpClient::flush(uint32_t numBytes) {
     // For POST/PUT, the buffered body must be sent before draining the response.
     // Let close() handle sending the POST body - flush() only drains the response here.
     if (numBytes == 0) {
-        // Drain the remaining response body so the connection is clean
-        int bytes = 0;
-        esp_http_client_flush_response(_http, &bytes);
-        Debug_printv("Flushed %d bytes to complete response", bytes);
+        // Drain the remaining response body so the connection is clean.
+        // NOT esp_http_client_flush_response(): its get_data() path feeds
+        // http_on_body with no output buffer, and IDF unconditionally does
+        // raw_len += length there WITHOUT storing anything -- leaving
+        // raw_len counting phantom bytes against a NULL/stale raw_data. The
+        // next esp_http_client_read() then memcpy's from that pointer and
+        // the firmware dies with LoadProhibited (esp_http_client.c:1292;
+        // seen on the second directory listing of a D64 over HTTP).
+        // Draining via read keeps the parser fed with a real output buffer,
+        // so the internal counters stay consistent.
+        char buf[HTTP_BLOCK_SIZE];
+        int total = 0, rc;
+        while ((rc = esp_http_client_read(_http, buf, sizeof buf)) > 0)
+            total += rc;
+        Debug_printv("Drained %d bytes to complete response", total);
         return true;
     }
 
