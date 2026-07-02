@@ -267,6 +267,7 @@ namespace ESP32Console
         {
             Debug_printv("Could not start REPL task!");
             task_ = nullptr;
+            startOnDemand();
         }
     }
 
