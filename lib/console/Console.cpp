@@ -152,9 +152,7 @@ namespace ESP32Console
         registerCommand(getNetstatCommand());
         registerCommand(getScanCommand());
         registerCommand(getConnectCommand());
-#ifdef ENABLE_CONSOLE_TCP
         registerCommand(getExitCommand());
-#endif
 #ifndef MIN_CONFIG
         registerCommand(getWsCommand());
 #endif
@@ -254,13 +252,56 @@ namespace ESP32Console
 
         beginCommon();
 
-        // Start REPL task
+        // The console (stdio, esp_console, commands) is usable now; the REPL
+        // task itself is started separately via startRepl()/startOnDemand()
+        // so its stack is not allocated until the console is actually used.
         _initialized = true;
+    }
+
+    void Console::startRepl()
+    {
+        if (!_initialized || task_ != nullptr)
+            return;
+
         if (xTaskCreatePinnedToCore(&Console::repl_task, "console_repl", task_stack_size_, this, task_priority_, &task_, 0) != pdTRUE)
         {
             Debug_printv("Could not start REPL task!");
-            _initialized = false;
+            task_ = nullptr;
         }
+    }
+
+    void Console::startOnDemand()
+    {
+        if (!_initialized || task_ != nullptr)
+            return;
+
+        if (xTaskCreatePinnedToCore(&Console::watch_task, "console_watch", 2560, this, 2, nullptr, 0) != pdTRUE)
+        {
+            Debug_printv("Could not start console watch task!");
+            startRepl();
+        }
+    }
+
+    void Console::watch_task(void *args)
+    {
+        Console *console = static_cast<Console *>(args);
+
+        // Block until the first byte arrives on the console, then hand over
+        // to the full REPL task. The byte (usually ENTER) is consumed; the
+        // REPL prints its prompt as soon as it starts.
+        int stdin_flags = fcntl(fileno(stdin), F_GETFL, 0);
+        if (stdin_flags >= 0)
+        {
+            fcntl(fileno(stdin), F_SETFL, stdin_flags & ~O_NONBLOCK);
+        }
+
+        while (fgetc(stdin) == EOF)
+        {
+            vTaskDelay(pdMS_TO_TICKS(50));
+        }
+
+        console->startRepl();
+        vTaskDelete(NULL);
     }
 
     static void resetAfterCommands()
@@ -273,7 +314,7 @@ namespace ESP32Console
 
     void Console::repl_task(void *args)
     {
-        Console const &console = *(static_cast<Console *>(args));
+        Console &console = *(static_cast<Console *>(args));
 
         /* Change standard input and output of the task if the requested UART is
          * NOT the default one. This block will replace stdin, stdout and stderr.
@@ -393,10 +434,19 @@ namespace ESP32Console
             }
             /* linenoise allocates line buffer on the heap, so need to free it */
             linenoiseFree(line);
+
+            if (console._exit_requested)
+                break;
         }
-        //Debug_printv("REPL task ended");
+
+        // "exit" was requested: free this task's stack and return to
+        // on-demand mode. The watcher re-creates the REPL on the next byte
+        // of console input.
+        console._exit_requested = false;
+        console.task_ = nullptr;
+        ::printf("Console deactivated. Press ENTER to reactivate.\r\n");
+        console.startOnDemand();
         vTaskDelete(NULL);
-        esp_console_deinit();
     }
 
     void Console::end()

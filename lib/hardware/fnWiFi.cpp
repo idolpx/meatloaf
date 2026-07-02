@@ -689,8 +689,8 @@ void WiFiManager::_wifi_event_handler(void *arg, esp_event_base_t event_base,
             fnSystem.Net.start_sntp_client();
 
 #ifndef MIN_CONFIG
-            // Start Web / WebDAV Server
-            httpServer.start();
+            // Arm Web / WebDAV Server (real httpd starts on first request)
+            httpServer.startOnDemand();
 
             // Start mDNS Service
             mdns_init();

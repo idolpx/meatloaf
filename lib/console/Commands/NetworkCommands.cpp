@@ -18,6 +18,7 @@
 
 #include "string_utils.h"
 
+#include "../Console.h"
 #include "../../include/debug.h"
 
 #ifdef ENABLE_CONSOLE_TCP
@@ -377,18 +378,27 @@ namespace ESP32Console::Commands
         return ConsoleCommand("connect", &connect, "Connect to wifi");
     }
 
-#ifdef ENABLE_CONSOLE_TCP
-    static int exit_tcp(int argc, char **argv)
+    static int exit_console(int argc, char **argv)
     {
-        tcp_server.disconnect();
+#ifdef ENABLE_CONSOLE_TCP
+        if (!console.inReplTask())
+        {
+            // Running in a TCP session: just drop the client connection.
+            tcp_server.disconnect();
+            return EXIT_SUCCESS;
+        }
+#endif
+        // Serial REPL: stop the REPL task and return to on-demand mode so
+        // its stack is freed until the next byte of console input.
+        console.requestExit();
+        Debug_memory();
         return EXIT_SUCCESS;
     }
 
     const ConsoleCommand getExitCommand()
     {
-        return ConsoleCommand("exit", &exit_tcp, "Close the TCP console connection");
+        return ConsoleCommand("exit", &exit_console, "Exit the console (serial: REPL stops until next input; TCP: disconnect)");
     }
-#endif
 
 #ifndef MIN_CONFIG
     static int ws_send(int argc, char **argv)

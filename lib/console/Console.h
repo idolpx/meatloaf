@@ -30,13 +30,16 @@ namespace ESP32Console
         const size_t max_cmdline_len_;
         const size_t max_cmdline_args_;
 
+        volatile bool _exit_requested = false;
+
         uart_port_t uart_channel_;
 
-        TaskHandle_t task_;
+        TaskHandle_t task_ = nullptr;
 
         //QueueHandle_t queue;
         //std::vector<std::string> queue_lines;
         static void repl_task(void *args);
+        static void watch_task(void *args);
 
         void beginCommon();
         size_t _print_number(unsigned long n, uint8_t base);
@@ -52,7 +55,8 @@ namespace ESP32Console
 
         ~Console()
         {
-            vTaskDelete(task_);
+            if (task_ != nullptr)
+                vTaskDelete(task_);
             end();
         }
 
@@ -135,6 +139,31 @@ namespace ESP32Console
          * @param channel The number of the UART to use
          */
         void begin(int baud, int rxPin = -1, int txPin = -1, uart_port_t channel = UART_NUM_0);
+
+        /**
+         * @brief Defer the REPL task until the first byte arrives on the console.
+         * A minimal watcher task waits for input, then calls startRepl() and exits,
+         * keeping the large REPL stack out of internal RAM until actually needed.
+         */
+        void startOnDemand();
+
+        /**
+         * @brief Start the REPL task immediately. Safe to call more than once.
+         */
+        void startRepl();
+
+        /**
+         * @brief Ask the running REPL task to exit after the current command.
+         * The REPL frees its stack and re-arms startOnDemand(), so the next
+         * byte of console input brings it back.
+         */
+        void requestExit() { _exit_requested = true; }
+
+        /**
+         * @brief True when called from the REPL task itself (e.g. to let the
+         * "exit" command distinguish serial REPL from TCP session context).
+         */
+        bool inReplTask() const { return task_ != nullptr && task_ == xTaskGetCurrentTaskHandle(); }
 
         void end();
 

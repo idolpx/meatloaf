@@ -41,6 +41,7 @@
 #include <esp_http_server.h>
 #include <esp_log.h>
 #include <sys/socket.h>
+#include <fcntl.h>
 #include <sstream>
 
 #include "meatloaf.h"
@@ -360,6 +361,8 @@ static void send_file(httpd_req_t *req, const char *filename)
     httpd_resp_send_chunk(req, NULL, 0);
     stream->close();
     free(buf);
+
+    Debug_memory();
 }
 
 static void send_file_parsed(httpd_req_t *req, const char *filename)
@@ -516,8 +519,211 @@ void HttpServer::start()
     start_server(state);
 }
 
+// ---- Lazy start ------------------------------------------------------------
+// At idle, port 80 is held by a bare listen socket serviced by a small task —
+// no httpd task (8 KB stack) and no per-socket session buffers exist until the
+// server is actually accessed. On the first connection the listener closes its
+// socket, starts the real httpd server, and transparently proxies the already-
+// accepted connection(s) to it over loopback (CONFIG_LWIP_NETIF_LOOPBACK=y).
+// Proxying keeps the handover invisible to browsers (which open several
+// parallel connections at once) and to WebDAV clients (which do not follow
+// redirects), so the very first request is served normally.
+
+int HttpServer::_lazy_sock = -1;
+TaskHandle_t HttpServer::_lazy_task = NULL;
+
+// Pipe one accepted connection to the real (now running) server. Reads the
+// request headers, rewrites Connection to "close" so the exchange ends after
+// one response (the client then reconnects directly to the real server), and
+// pumps bytes both ways until either side closes.
+static void lazy_proxy_client(int client, int wait_ms)
+{
+    struct timeval tv = { .tv_sec = wait_ms / 1000, .tv_usec = (wait_ms % 1000) * 1000 };
+    setsockopt(client, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
+    char buf[512];
+    int n = recv(client, buf, sizeof(buf), 0);
+    if (n <= 0)
+    {
+        // No request bytes (speculative browser preconnect, port probe,
+        // telnet): just close; the client reconnects to the real server.
+        close(client);
+        return;
+    }
+
+    std::string req(buf, n);
+
+    // Headers can span several segments; keep reading briefly until we have
+    // them all (needed to patch the Connection header below).
+    tv.tv_sec = 0;
+    tv.tv_usec = 200000;
+    setsockopt(client, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+    while (req.find("\r\n\r\n") == std::string::npos && req.size() < 4096)
+    {
+        n = recv(client, buf, sizeof(buf), 0);
+        if (n <= 0)
+            break;
+        req.append(buf, n);
+    }
+
+    // Force the proxied exchange to end after one response by rewriting the
+    // Connection header (only when the full header block was captured).
+    size_t hdr_end = req.find("\r\n\r\n");
+    if (hdr_end != std::string::npos)
+    {
+        size_t c = req.find("\r\nConnection:");
+        if (c == std::string::npos)
+            c = req.find("\r\nconnection:");
+        if (c != std::string::npos && c < hdr_end)
+        {
+            size_t eol = req.find("\r\n", c + 2);
+            req.replace(c, eol - c, "\r\nConnection: close");
+        }
+        else
+        {
+            req.insert(hdr_end + 2, "Connection: close\r\n");
+        }
+    }
+
+    // Connect to the real server through loopback on our own address.
+    struct sockaddr_in addr = {};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(80);
+    addr.sin_addr.s_addr = inet_addr(fnSystem.Net.get_ip4_address_str().c_str());
+    int upstream = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (upstream < 0 || connect(upstream, (struct sockaddr *)&addr, sizeof(addr)) != 0)
+    {
+        Debug_printv("lazy proxy connect failed: errno %d", errno);
+        if (upstream >= 0)
+            close(upstream);
+        close(client);
+        return;
+    }
+
+    send(upstream, req.c_str(), req.size(), 0);
+
+    // Pump bytes both ways until either side closes or traffic idles out.
+    while (true)
+    {
+        fd_set fds;
+        FD_ZERO(&fds);
+        FD_SET(client, &fds);
+        FD_SET(upstream, &fds);
+        struct timeval idle = { .tv_sec = 10, .tv_usec = 0 };
+        if (select(MAX(client, upstream) + 1, &fds, NULL, NULL, &idle) <= 0)
+            break;
+
+        if (FD_ISSET(client, &fds))
+        {
+            n = recv(client, buf, sizeof(buf), 0);
+            if (n <= 0 || send(upstream, buf, n, 0) < 0)
+                break;
+        }
+        if (FD_ISSET(upstream, &fds))
+        {
+            n = recv(upstream, buf, sizeof(buf), 0);
+            if (n <= 0 || send(client, buf, n, 0) < 0)
+                break;
+        }
+    }
+    close(upstream);
+    close(client);
+}
+
+void HttpServer::lazy_task(void *pv)
+{
+    HttpServer *self = (HttpServer *)pv;
+
+    struct sockaddr_in addr = {};
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    addr.sin_port = htons(80);
+
+    int client = -1;
+    int extra[4];
+    int extras = 0;
+    _lazy_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (_lazy_sock >= 0)
+    {
+        // Accepted clients inherit SO_REUSEADDR from the listen socket; both
+        // their pcbs and httpd's listen socket need it set so httpd can bind
+        // port 80 while those connections are still established.
+        int enable = 1;
+        setsockopt(_lazy_sock, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable));
+
+        if (bind(_lazy_sock, (struct sockaddr *)&addr, sizeof(addr)) == 0 &&
+            listen(_lazy_sock, 4) == 0)
+        {
+            struct sockaddr_in source;
+            socklen_t len = sizeof(source);
+            client = accept(_lazy_sock, (struct sockaddr *)&source, &len);
+            if (client >= 0)
+            {
+                // Browsers open several parallel connections; grab any that
+                // are already queued so they don't get RST when the listen
+                // socket closes below.
+                fcntl(_lazy_sock, F_SETFL, O_NONBLOCK);
+                while (extras < (int)(sizeof(extra) / sizeof(extra[0])))
+                {
+                    len = sizeof(source);
+                    int s = accept(_lazy_sock, (struct sockaddr *)&source, &len);
+                    if (s < 0)
+                        break;
+                    extra[extras++] = s;
+                }
+            }
+        }
+    }
+
+    // Free port 80 before starting the real server. stop() also closes this
+    // socket to shut the lazy listener down; accept() then returns -1.
+    if (_lazy_sock >= 0)
+    {
+        close(_lazy_sock);
+        _lazy_sock = -1;
+    }
+
+    if (client >= 0)
+    {
+        // Real httpd takes over port 80, then the already-accepted
+        // connections are piped to it.
+        self->start();
+
+        lazy_proxy_client(client, 1000);
+        for (int i = 0; i < extras; i++)
+            lazy_proxy_client(extra[i], 250);
+    }
+
+    _lazy_task = NULL;
+    vTaskDelete(NULL);
+}
+
+void HttpServer::startOnDemand()
+{
+    if (state.hServer != NULL || _lazy_task != NULL)
+        return;
+
+    if (xTaskCreatePinnedToCore(lazy_task, "www_lazy", 4096, this, 5, &_lazy_task, 0) == pdTRUE)
+    {
+        printf(ANSI_GREEN_BOLD "WWW/WS/WebDAV Server on standby (starts on first request)" ANSI_RESET "\r\n");
+    }
+    else
+    {
+        _lazy_task = NULL;
+        start();
+    }
+}
+
 void HttpServer::stop()
 {
+    // Shut down the lazy listener if the server was never accessed. Closing
+    // the socket unblocks accept() and lazy_task exits on its own.
+    if (_lazy_sock >= 0)
+    {
+        close(_lazy_sock);
+        _lazy_sock = -1;
+    }
+
     if (state.hServer != nullptr)
     {
         Debug_print("Stopping web service...");

@@ -31,6 +31,7 @@ private:
     static int _client_socket;
     static bool _shutdown;
     static void task(void *pvParameters);
+    static void session_task(void *pvParameters);
 
     static TaskHandle_t _htask;
 
