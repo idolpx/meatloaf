@@ -641,10 +641,21 @@ bool MeatHttpClient::flush(uint32_t numBytes) {
     // For POST/PUT, the buffered body must be sent before draining the response.
     // Let close() handle sending the POST body - flush() only drains the response here.
     if (numBytes == 0) {
-        // Drain the remaining response body so the connection is clean
-        int bytes = 0;
-        esp_http_client_flush_response(_http, &bytes);
-        Debug_printv("Flushed %d bytes to complete response", bytes);
+        // Drain the remaining response body so the connection is clean.
+        // NOT esp_http_client_flush_response(): its get_data() path feeds
+        // http_on_body with no output buffer, and IDF unconditionally does
+        // raw_len += length there WITHOUT storing anything -- leaving
+        // raw_len counting phantom bytes against a NULL/stale raw_data. The
+        // next esp_http_client_read() then memcpy's from that pointer and
+        // the firmware dies with LoadProhibited (esp_http_client.c:1292;
+        // seen on the second directory listing of a D64 over HTTP).
+        // Draining via read keeps the parser fed with a real output buffer,
+        // so the internal counters stay consistent.
+        char buf[HTTP_BLOCK_SIZE];
+        int total = 0, rc;
+        while ((rc = esp_http_client_read(_http, buf, sizeof buf)) > 0)
+            total += rc;
+        Debug_printv("Drained %d bytes to complete response", total);
         return true;
     }
 
@@ -746,12 +757,32 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
     if ( url.size() < 5)
         return 0;
 
-    // static esp_err_t esp_http_client_prepare(esp_http_client_handle_t client)
-    // {
-    // // Reset the response buffer before each new request to ensure raw_data == orig_raw_data.
-    // esp_http_client_cached_buf_cleanup(client->response->buffer);
-    // // Also unconditionally reset raw_len.
-    // client->response->buffer->raw_len = 0;
+    // Reusing the handle for a new request requires the PREVIOUS response to
+    // be fully consumed first. esp_http_client_flush_response() is not
+    // enough: it only drains the wire, while body bytes that arrived WITH
+    // the previous headers stay cached inside the client -- and if that
+    // cache is left partially consumed, the next fetch_headers hits IDF's
+    // http_on_body assert (res_buffer->orig_raw_data == res_buffer->raw_data)
+    // and reboots the firmware. Seen in the wild listing a D64 over HTTP:
+    // the directory walk seeks per sector, issuing many sequential range
+    // GETs on one keep-alive handle. Draining with esp_http_client_read
+    // consumes the cache and resets the pointer (cached_buf_cleanup) once
+    // empty; if a server ignored our Range header and is streaming the whole
+    // file, give up after 64KB and drop the connection instead -- a clean
+    // reconnect also resets the buffer state.
+    if (_is_open && _http != nullptr) {
+        char drain[256];
+        int r, guard = 65536;
+        while ((r = esp_http_client_read(_http, drain, sizeof drain)) > 0) {
+            guard -= r;
+            if (guard <= 0) {
+                Debug_printv("drain guard hit, dropping the connection");
+                esp_http_client_close(_http);
+                break;
+            }
+        }
+        _is_open = false;
+    }
 
     // Set URL and Method
     mstr::replaceAll(url, " ", "%20");
