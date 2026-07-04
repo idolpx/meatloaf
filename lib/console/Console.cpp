@@ -334,6 +334,19 @@ namespace ESP32Console
 
     esp_err_t Console::runCommand(const char *line, int *ret, Origin origin)
     {
+        // Late creation retry: if execAcquire() failed at session start,
+        // memory may have freed since (e.g. a web transfer finished).
+        if (exec_task_ == nullptr)
+        {
+            xSemaphoreTake(exec_users_mutex_, portMAX_DELAY);
+            if (exec_users_ > 0 && exec_task_ == nullptr &&
+                xTaskCreatePinnedToCore(&Console::exec_task_fn, "console_exec", 16384, this, 5, &exec_task_, 0) != pdTRUE)
+            {
+                exec_task_ = nullptr;
+            }
+            xSemaphoreGive(exec_users_mutex_);
+        }
+
         xSemaphoreTake(exec_mutex_, portMAX_DELAY);
 
         // Checked under exec_mutex_: execRelease() deletes the task while
@@ -490,6 +503,15 @@ namespace ESP32Console
                 continue;
             }
 
+            // "exit" must work even when the executor can't be created
+            // (memory pressure) — handle it without submitting a command.
+            if (raw_line == "exit")
+            {
+                linenoiseFree(line);
+                console._exit_requested = true;
+                break;
+            }
+
             //Debug_printv("Line received from linenoise: [%s]", line);
 
             // /* Add the command to the history */
@@ -583,6 +605,16 @@ namespace ESP32Console
 
         std::string command_str = command;
         mstr::trim(command_str);
+
+#ifdef ENABLE_CONSOLE_TCP
+        // "exit" must work even when the executor can't be created
+        // (memory pressure) — drop the client without running a command.
+        if (command_str == "exit")
+        {
+            tcp_server.disconnect();
+            return;
+        }
+#endif
 
         if (!command_str.empty())
         {
