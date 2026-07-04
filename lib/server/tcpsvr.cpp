@@ -62,6 +62,9 @@ void TCPServer::session_task(void *pvParameters)
         // Wait for the listener to hand over an accepted client.
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 
+        // Session active: bring up the shared command executor.
+        console.execAcquire();
+
         char rx_buffer[128];    // char array to store received data
         int bytes_received;     // immediate bytes received
         std::string line;
@@ -122,8 +125,10 @@ void TCPServer::session_task(void *pvParameters)
                 bzero(rx_buffer, sizeof(rx_buffer));
             }
         }
-        // Tear down the stdout tee when the client disconnects.
+        // Tear down the stdout tee when the client disconnects and release
+        // the shared executor (freed if no other console holds it).
         console.tcpEnd();
+        console.execRelease();
         close(_client_socket);
         _client_socket = -1;
 

@@ -13,11 +13,11 @@
 #define FN_VERSION_MAJOR 1
 #define FN_VERSION_MINOR 4
 
-#define FN_VERSION_BUILD "6ed3dcf1"
+#define FN_VERSION_BUILD "1cee36ac"
 
-#define FN_VERSION_DATE "2026-07-03 21:36:21"
+#define FN_VERSION_DATE "2026-07-03 21:46:07"
 
-#define FN_VERSION_FULL "1.4.6ed3dcf1"
+#define FN_VERSION_FULL "1.4.1cee36ac"
 
 #define FW_VERSION "20260703.21"
 #endif /* _VERSION_H */

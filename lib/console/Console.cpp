@@ -257,26 +257,48 @@ namespace ESP32Console
         // so its stack is not allocated until the console is actually used.
         _initialized = true;
 
-        // All commands (serial, TCP, WS) run on one persistent executor task
-        // created now, while a 16 KB contiguous internal-RAM stack is
-        // guaranteed (task stacks cannot live in PSRAM).
-        startExecutor();
-    }
-
-    void Console::startExecutor()
-    {
-        if (exec_task_ != nullptr)
-            return;
-
+        // Executor synchronization objects live forever (tiny); the 16 KB
+        // executor task itself exists only while a console is active — see
+        // execAcquire()/execRelease().
         exec_mutex_ = xSemaphoreCreateMutex();
         exec_start_ = xSemaphoreCreateBinary();
         exec_done_  = xSemaphoreCreateBinary();
+        exec_users_mutex_ = xSemaphoreCreateMutex();
+    }
 
-        if (xTaskCreatePinnedToCore(&Console::exec_task_fn, "console_exec", 16384, this, 5, &exec_task_, 0) != pdTRUE)
+    void Console::execAcquire()
+    {
+        xSemaphoreTake(exec_users_mutex_, portMAX_DELAY);
+        exec_users_++;
+        if (exec_task_ == nullptr)
         {
-            Debug_printv("Could not start console exec task!");
-            exec_task_ = nullptr;
+            // All commands (serial, TCP, WS) run on this one executor task
+            // so the console I/O shells only need small stacks. It exists
+            // only while a console session is active; its 16 KB internal
+            // stack is released when the last session goes dormant.
+            if (xTaskCreatePinnedToCore(&Console::exec_task_fn, "console_exec", 16384, this, 5, &exec_task_, 0) != pdTRUE)
+            {
+                Debug_printv("Could not start console exec task!");
+                exec_task_ = nullptr;
+            }
         }
+        xSemaphoreGive(exec_users_mutex_);
+    }
+
+    void Console::execRelease()
+    {
+        xSemaphoreTake(exec_users_mutex_, portMAX_DELAY);
+        if (exec_users_ > 0 && --exec_users_ == 0 && exec_task_ != nullptr)
+        {
+            // Taking exec_mutex_ waits out any in-flight command; deleting
+            // while holding it keeps runCommand() from submitting to a dead
+            // task (it re-checks exec_task_ under the same mutex).
+            xSemaphoreTake(exec_mutex_, portMAX_DELAY);
+            vTaskDelete(exec_task_);
+            exec_task_ = nullptr;
+            xSemaphoreGive(exec_mutex_);
+        }
+        xSemaphoreGive(exec_users_mutex_);
     }
 
     void Console::exec_task_fn(void *args)
@@ -312,15 +334,22 @@ namespace ESP32Console
 
     esp_err_t Console::runCommand(const char *line, int *ret, Origin origin)
     {
-        // Fallback: run inline if the executor isn't available.
+        xSemaphoreTake(exec_mutex_, portMAX_DELAY);
+
+        // Checked under exec_mutex_: execRelease() deletes the task while
+        // holding this mutex, so the worker cannot vanish after this check.
+        // Refuse rather than run inline — the submitting I/O shells have
+        // small stacks and heavy commands would overflow them (the original
+        // heap-corruption bug).
         if (exec_task_ == nullptr)
         {
-            esp_err_t err = esp_console_run(line, ret);
-            optind = 0;
-            return err;
+            xSemaphoreGive(exec_mutex_);
+            ::printf("Cannot execute command: console exec task not running\r\n");
+            if (ret)
+                *ret = EXIT_FAILURE;
+            return ESP_FAIL;
         }
 
-        xSemaphoreTake(exec_mutex_, portMAX_DELAY);
         exec_line_ = line;
         exec_origin_ = origin;
         xSemaphoreGive(exec_start_);
@@ -422,6 +451,9 @@ namespace ESP32Console
             vTaskDelay(pdMS_TO_TICKS(50));
         }
 
+        // Session became active: bring up the shared command executor.
+        console.execAcquire();
+
         while (true)
         {
             std::string prompt = console.prompt_;
@@ -503,8 +535,10 @@ namespace ESP32Console
         }
 
         // "exit" was requested: go dormant (outer loop waits for the next
-        // byte of console input). The task and its stack persist.
+        // byte of console input). The task and its stack persist; the
+        // shared executor is released (and freed if no other console holds it).
         console._exit_requested = false;
+        console.execRelease();
         ::printf("Console deactivated. Press ENTER to reactivate.\r\n");
         }
     }
@@ -557,8 +591,14 @@ namespace ESP32Console
 
             std::string interpolated_line = interpolateLine(command_str.c_str());
 
+            // Acquire/release around the command so WS-submitted commands
+            // (no console session holding the executor) still get the 16 KB
+            // executor stack. For TCP sessions this just bumps the refcount
+            // the session already holds.
+            execAcquire();
             int ret;
             esp_err_t err = runCommand(interpolated_line.c_str(), &ret, ORIGIN_REMOTE);
+            execRelease();
 
             resetAfterCommands();
 

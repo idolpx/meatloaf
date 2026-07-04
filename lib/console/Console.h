@@ -58,12 +58,13 @@ namespace ESP32Console
         SemaphoreHandle_t exec_mutex_ = nullptr;   // serializes submitters
         SemaphoreHandle_t exec_start_ = nullptr;   // command handed to worker
         SemaphoreHandle_t exec_done_  = nullptr;   // worker finished command
+        SemaphoreHandle_t exec_users_mutex_ = nullptr; // protects refcount + task lifecycle
+        int exec_users_ = 0;
         const char *exec_line_ = nullptr;
         int exec_ret_ = 0;
         esp_err_t exec_err_ = ESP_OK;
         volatile Origin exec_origin_ = ORIGIN_NONE;
         static void exec_task_fn(void *args);
-        void startExecutor();
 
     public:
         /**
@@ -193,6 +194,15 @@ namespace ESP32Console
          * finish. Serializes commands from all consoles (serial/TCP/WS).
          */
         esp_err_t runCommand(const char *line, int *ret, Origin origin);
+
+        /**
+         * @brief Refcounted executor lifecycle: a console session calls
+         * execAcquire() when it becomes active (creating the 16 KB executor
+         * task if needed) and execRelease() when it goes dormant (the task
+         * is deleted when the last user releases, freeing its stack).
+         */
+        void execAcquire();
+        void execRelease();
 
         /**
          * @brief Origin of the command currently executing on the executor
