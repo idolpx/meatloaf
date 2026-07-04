@@ -138,10 +138,7 @@ void TCPServer::session_task(void *pvParameters)
     }
 }
 
-// Per-client session: runs the console command loop for one connected client.
-// Created by the listener task on accept() and self-deletes on disconnect, so
-// its 16 KB stack only exists while a client is actually connected.
-void TCPServer::session_task(void *pvParameters)
+void TCPServer::task(void *pvParameters)
 {
     char addr_str[128];     // char array to store client IP
     int addr_family;        // Ipv4 address protocol variable

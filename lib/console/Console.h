@@ -40,7 +40,6 @@ namespace ESP32Console
         //QueueHandle_t queue;
         //std::vector<std::string> queue_lines;
         static void repl_task(void *args);
-        static void watch_task(void *args);
 
         void beginCommon();
         size_t _print_number(unsigned long n, uint8_t base);
