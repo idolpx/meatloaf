@@ -675,7 +675,10 @@ namespace ESP32Console
         size_t z = strlen(str);
         fwrite(str, 1, z, stdout);
 #ifdef ENABLE_CONSOLE_TCP
-        if (_tee == nullptr)
+        // stdio is per-task: only the task that installed (or adopted) the
+        // tee reaches TCP via stdout. From any other task — e.g. the
+        // esp_ping callbacks — mirror to TCP explicitly.
+        if (stdout != _tee)
             tcp_server.send(std::string(str, z));
 #endif
         return z;
@@ -697,8 +700,11 @@ namespace ESP32Console
         va_list vargs;
         va_start(vargs, fmt);
 #ifdef ENABLE_CONSOLE_TCP
-        if (_tee == nullptr) {
-            // No TCP tee active (REPL task context): forward to TCP explicitly.
+        // stdio is per-task: only the task that installed (or adopted) the
+        // tee reaches TCP via stdout. From any other task — e.g. the
+        // esp_ping callbacks printing replies — mirror to TCP explicitly
+        // (tcp_server.send() no-ops when no client is connected).
+        if (stdout != _tee) {
             char *buf = nullptr;
             int z = vasprintf(&buf, fmt, vargs);
             va_end(vargs);
