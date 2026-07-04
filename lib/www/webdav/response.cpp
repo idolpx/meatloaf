@@ -32,7 +32,10 @@ void Response::setDavHeaders() {
     setHeader("Access-Control-Allow-Origin", "*");
     setHeader("Access-Control-Allow-Headers", "*");
     setHeader("Access-Control-Allow-Methods", "*");
-    setHeader("Connection", "close");
+    // No "Connection: close" — persistent connections let bulk WebDAV
+    // transfers reuse one TCP connection for thousands of requests instead
+    // of paying a handshake + slow-start per PROPFIND/PUT/PROPPATCH. Idle
+    // sessions are reclaimed by lru_purge_enable in the httpd config.
 }
 
 void Response::setHeader(std::string header, std::string value) {
