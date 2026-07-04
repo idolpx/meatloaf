@@ -98,6 +98,24 @@ esp_err_t webdav_handler(httpd_req_t *httpd_req)
         return ESP_ERR_HTTPD_INVALID_REQ;
     }
 
+    // A successful mutating request may have created, changed, moved or
+    // deleted a .config file; drop the cached lookups so base_url redirects
+    // take effect immediately instead of after the cache TTL.
+    if ( ret < 300 )
+    {
+        switch (httpd_req->method)
+        {
+        case HTTP_PUT:
+        case HTTP_DELETE:
+        case HTTP_MOVE:
+        case HTTP_COPY:
+            MFSOwner::invalidateConfigCache();
+            break;
+        default:
+            break;
+        }
+    }
+
     resp.setStatus(ret);
 
     if ( (ret > 399) & (httpd_req->method != HTTP_HEAD) )

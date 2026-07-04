@@ -501,6 +501,20 @@ MFile* MFSOwner::File(std::shared_ptr<MFile> file) {
     return File(file->url);
 }
 
+// Directory listings call MFSOwner::File() once per entry, and each call
+// probes the same directories up the tree. A short-TTL cache turns those
+// repeated failed fopen() calls (a full FATFS path scan each) into map hits.
+// Write paths that touch .config files call MFSOwner::invalidateConfigCache()
+// so edits take effect immediately instead of after the TTL.
+static std::map<std::string, std::pair<uint64_t, std::map<std::string, std::string>>> s_configCache;
+static std::mutex s_configCacheMutex;
+
+void MFSOwner::invalidateConfigCache()
+{
+    std::lock_guard<std::mutex> lock(s_configCacheMutex);
+    s_configCache.clear();
+}
+
 // Read key=value pairs from a local .config file using raw POSIX I/O.
 // Uses fopen directly to avoid recursion through MFSOwner::File().
 static std::map<std::string, std::string> readLocalConfig(const std::string& dirPath)
@@ -512,28 +526,23 @@ static std::map<std::string, std::string> readLocalConfig(const std::string& dir
         configPath.pop_back();
     configPath += "/.config";
 
-    // Directory listings call MFSOwner::File() once per entry, and each call
-    // probes the same directories up the tree. A short-TTL cache turns those
-    // repeated failed fopen() calls (a full FATFS path scan each) into map hits.
-    static std::map<std::string, std::pair<uint64_t, std::map<std::string, std::string>>> cache;
-    static std::mutex cacheMutex;
     const uint64_t CACHE_TTL_MS = 10000;
     uint64_t now = esp_timer_get_time() / 1000ULL;
 
     {
-        std::lock_guard<std::mutex> lock(cacheMutex);
-        auto it = cache.find(configPath);
-        if (it != cache.end() && (now - it->second.first) < CACHE_TTL_MS)
+        std::lock_guard<std::mutex> lock(s_configCacheMutex);
+        auto it = s_configCache.find(configPath);
+        if (it != s_configCache.end() && (now - it->second.first) < CACHE_TTL_MS)
             return it->second.second;
     }
 
     FILE* f = fopen(configPath.c_str(), "r");
     if (!f)
     {
-        std::lock_guard<std::mutex> lock(cacheMutex);
-        if (cache.size() > 64)
-            cache.clear();
-        cache[configPath] = {now, cfg};
+        std::lock_guard<std::mutex> lock(s_configCacheMutex);
+        if (s_configCache.size() > 64)
+            s_configCache.clear();
+        s_configCache[configPath] = {now, cfg};
         return cfg;
     }
 
@@ -550,10 +559,10 @@ static std::map<std::string, std::string> readLocalConfig(const std::string& dir
     fclose(f);
 
     {
-        std::lock_guard<std::mutex> lock(cacheMutex);
-        if (cache.size() > 64)
-            cache.clear();
-        cache[configPath] = {now, cfg};
+        std::lock_guard<std::mutex> lock(s_configCacheMutex);
+        if (s_configCache.size() > 64)
+            s_configCache.clear();
+        s_configCache[configPath] = {now, cfg};
     }
     return cfg;
 }

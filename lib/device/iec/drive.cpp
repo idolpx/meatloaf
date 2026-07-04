@@ -239,6 +239,11 @@ iecChannelHandlerFile::~iecChannelHandlerFile()
     m_stream->close();
     Debug_printv("Stream closed.");
 
+    // If a .config file was just saved, drop the cached lookups so its
+    // base_url redirect takes effect immediately instead of after the TTL.
+    if( m_stream->mode == std::ios_base::out && mstr::endsWith(m_stream->url, ".config") )
+        MFSOwner::invalidateConfigCache();
+
     double cps = m_byteCount / seconds;
     Debug_printv("%s %lu bytes in %0.2f seconds @ %0.2f B/s", m_stream->mode == std::ios_base::in ? "Sent" : "Received", m_byteCount, seconds, cps);
 

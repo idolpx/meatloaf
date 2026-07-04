@@ -585,6 +585,10 @@ public:
     static std::string existsLocal( std::string path );
     static MFileSystem* findParentFS(std::vector<std::string>::iterator &begin, std::vector<std::string>::iterator &pathIterator);
 
+    // Drop cached .config lookups so a just-created/edited .config takes
+    // effect immediately instead of after the cache TTL.
+    static void invalidateConfigCache();
+
 
     static bool mount(std::string name);
     static bool umount(std::string name);
