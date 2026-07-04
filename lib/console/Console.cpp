@@ -265,9 +265,11 @@ namespace ESP32Console
 
         if (xTaskCreatePinnedToCore(&Console::repl_task, "console_repl", task_stack_size_, this, task_priority_, &task_, 0) != pdTRUE)
         {
+            // No fallback call here — startRepl and startOnDemand calling
+            // each other on failure recursed until the caller's stack
+            // overflowed when internal RAM was exhausted.
             Debug_printv("Could not start REPL task!");
             task_ = nullptr;
-            startOnDemand();
         }
     }
 
@@ -279,7 +281,6 @@ namespace ESP32Console
         if (xTaskCreatePinnedToCore(&Console::watch_task, "console_watch", 2560, this, 2, nullptr, 0) != pdTRUE)
         {
             Debug_printv("Could not start console watch task!");
-            startRepl();
         }
     }
 
@@ -301,7 +302,12 @@ namespace ESP32Console
             vTaskDelay(pdMS_TO_TICKS(50));
         }
 
+
         console->startRepl();
+        // If the REPL task failed to start, there is nothing more to do, so return.
+        if (console->task_ == nullptr)
+            console->startOnDemand();
+
         vTaskDelete(NULL);
     }
 

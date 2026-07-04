@@ -34,6 +34,7 @@ private:
     static void session_task(void *pvParameters);
 
     static TaskHandle_t _htask;
+    static TaskHandle_t _session_htask;
 
 public:
     void start();

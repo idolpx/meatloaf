@@ -47,81 +47,91 @@ int TCPServer::_server_socket = -1;
 int TCPServer::_client_socket = -1;
 bool TCPServer::_shutdown = false;
 TaskHandle_t TCPServer::_htask = NULL;
+TaskHandle_t TCPServer::_session_htask = NULL;
 
-// Per-client session: runs the console command loop for one connected client.
-// Created by the listener task on accept() and self-deletes on disconnect, so
-// its 16 KB stack only exists while a client is actually connected.
+// Persistent per-client session worker: runs the console command loop for
+// one connected client per wakeup. Created ONCE in start() while internal
+// RAM is still plentiful — task stacks must be contiguous internal DRAM (no
+// PSRAM fallback), and allocating 16 KB on demand at connect time fails once
+// the heap fragments ("Could not start tcp session task!" → accepted
+// connections were dropped immediately). The listener wakes it for each
+// accepted client; it handles the session, signals completion, and sleeps.
 void TCPServer::session_task(void *pvParameters)
 {
-    char rx_buffer[128];    // char array to store received data
-    int bytes_received;     // immediate bytes received
-    std::string line;
-
-    // Disable Nagle so small console writes (prompts, command output) are
-    // sent immediately rather than being held for a full segment.
+    while (true)
     {
-        int flag = 1;
-        setsockopt(_client_socket, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
-    }
+        // Wait for the listener to hand over an accepted client.
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 
-    // Install stdout tee for this client session.
-    console.tcpBegin();
+        char rx_buffer[128];    // char array to store received data
+        int bytes_received;     // immediate bytes received
+        std::string line;
 
-    // Send Welcome message
-    {
-        int n = write(_client_socket, MESSAGE, strlen(MESSAGE));
-        if (n < 0)
-            Debug_printv("Welcome write failed: errno %d", errno);
-    }
-
-    // Clear rx_buffer, and fill with zero's
-    bzero(rx_buffer, sizeof(rx_buffer));
-    vTaskDelay(500 / portTICK_PERIOD_MS);
-    while (!_shutdown)
-    {
-        bytes_received = recv(_client_socket, rx_buffer, sizeof(rx_buffer) - 1, 0);
-
-        // Error occured during receiving
-        if (bytes_received < 0)
+        // Disable Nagle so small console writes (prompts, command output) are
+        // sent immediately rather than being held for a full segment.
         {
-            Debug_printv("recv failed: errno %d", errno);
-            vTaskDelay(100 / portTICK_PERIOD_MS);
-            break;
+            int flag = 1;
+            setsockopt(_client_socket, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
         }
-        // Connection closed
-        else if (bytes_received == 0)
-        {
-            Debug_printv("Connection closed");
-            break;
-        }
-        // Data received
-        else
-        {
-            line += std::string(rx_buffer);
 
-            // break line on newline and send to console
-            if (mstr::endsWith(line, "\r") || mstr::endsWith(line, "\n"))
+        // Install stdout tee for this client session.
+        console.tcpBegin();
+
+        // Send Welcome message
+        {
+            int n = write(_client_socket, MESSAGE, strlen(MESSAGE));
+            if (n < 0)
+                Debug_printv("Welcome write failed: errno %d", errno);
+        }
+
+        // Clear rx_buffer, and fill with zero's
+        bzero(rx_buffer, sizeof(rx_buffer));
+        vTaskDelay(500 / portTICK_PERIOD_MS);
+        while (!_shutdown)
+        {
+            bytes_received = recv(_client_socket, rx_buffer, sizeof(rx_buffer) - 1, 0);
+
+            // Error occured during receiving
+            if (bytes_received < 0)
             {
-                mstr::rtrim(line);
-                console.execute(line.c_str());  // replace with receive() callback
-                line.clear();
-            } else if (line[0] == 0xBF || line[0] == 0xEF || line[0] == 0xFF) {
-                line.clear();
+                Debug_printv("recv failed: errno %d", errno);
+                vTaskDelay(100 / portTICK_PERIOD_MS);
+                break;
             }
+            // Connection closed
+            else if (bytes_received == 0)
+            {
+                Debug_printv("Connection closed");
+                break;
+            }
+            // Data received
+            else
+            {
+                line += std::string(rx_buffer);
 
-            // Clear rx_buffer, and fill with zero's
-            bzero(rx_buffer, sizeof(rx_buffer));
+                // break line on newline and send to console
+                if (mstr::endsWith(line, "\r") || mstr::endsWith(line, "\n"))
+                {
+                    mstr::rtrim(line);
+                    console.execute(line.c_str());  // replace with receive() callback
+                    line.clear();
+                } else if (line[0] == 0xBF || line[0] == 0xEF || line[0] == 0xFF) {
+                    line.clear();
+                }
+
+                // Clear rx_buffer, and fill with zero's
+                bzero(rx_buffer, sizeof(rx_buffer));
+            }
         }
-    }
-    // Tear down the stdout tee when the client disconnects.
-    console.tcpEnd();
-    close(_client_socket);
-    _client_socket = -1;
+        // Tear down the stdout tee when the client disconnects.
+        console.tcpEnd();
+        close(_client_socket);
+        _client_socket = -1;
 
-    // The listener is blocked on this notification until we send it, so
-    // _htask is guaranteed valid here.
-    xTaskNotifyGive(_htask);
-    vTaskDelete(NULL);
+        // The listener is blocked on this notification until we send it, so
+        // _htask is guaranteed valid here.
+        xTaskNotifyGive(_htask);
+    }
 }
 
 void TCPServer::task(void *pvParameters)
@@ -143,12 +153,25 @@ void TCPServer::task(void *pvParameters)
         ip_protocol = IPPROTO_TCP;                        //Define protocol as TCP
         inet_ntoa_r(destAddr.sin_addr, addr_str, sizeof(addr_str) - 1);
 
+        // Release the previous listen socket (if any) before creating a new
+        // one. Rebinding after a transient accept() failure would otherwise
+        // hit EADDRINUSE forever: the leaked fd keeps the port in LISTEN
+        // state while nobody accepts on it.
+        if (_server_socket >= 0)
+        {
+            close(_server_socket);
+            _server_socket = -1;
+        }
+
         /* Create TCP socket*/
         _server_socket = socket(addr_family, SOCK_STREAM, ip_protocol);
         if (_server_socket < 0)
         {
+            // Transient failure (e.g. lwip socket/heap pressure): retry.
+            // Exiting here would leave port 23 dead forever.
             Debug_printv("Unable to create socket: errno %d", errno);
-            break;
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            continue;
         }
         //Debug_printv("Socket created");
 
@@ -157,7 +180,10 @@ void TCPServer::task(void *pvParameters)
         if (bind_err != 0)
         {
             Debug_printv("Socket unable to bind: errno %d", errno);
-            break;
+            close(_server_socket);
+            _server_socket = -1;
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            continue;
         }
         //Debug_printv("Socket binded");
 
@@ -166,9 +192,12 @@ void TCPServer::task(void *pvParameters)
         if (listen_error != 0)
         {
             Debug_printv("Error occured during listen: errno %d", errno);
-            break;
+            close(_server_socket);
+            _server_socket = -1;
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            continue;
         }
-        //Debug_printv("Socket listening");
+        Debug_printv("TCP console listening on port %d", TCP_SERVER_PORT);
 
         while (!_shutdown)
         {
@@ -178,27 +207,25 @@ void TCPServer::task(void *pvParameters)
             _client_socket = accept(_server_socket, (struct sockaddr *)&sourceAddr, &addrLen);
             if (_client_socket < 0)
             {
+                // Socket closed by stop() (WiFi drop) or transient failure:
+                // fall out to the outer loop, which rebinds and keeps
+                // listening. The task never exits on errors.
                 //Debug_printv("Unable to accept connection: errno %d", errno);
+                vTaskDelay(pdMS_TO_TICKS(1000));
                 break;
             }
             Debug_printv("Socket accepted");
 
-            // Run the session in its own task, created on access, so this
-            // always-on listener only needs a minimal stack. The session runs
-            // the same console commands as the serial REPL (ls on nested
-            // archive/network streams, etc.), so it needs the same 16 KB
-            // stack — 4096 overflows during libarchive/FSP operations and
-            // corrupts adjacent heap allocations.
-            if (xTaskCreatePinnedToCore(&TCPServer::session_task, "tcp_session", 16384, NULL, 5, NULL, 0) != pdTRUE)
+            // Hand the client to the persistent session worker and wait
+            // until the session finishes (one client at a time).
+            if (_session_htask == NULL)
             {
-                Debug_printv("Could not start tcp session task!");
+                Debug_printv("No tcp session task - dropping client!");
                 close(_client_socket);
                 _client_socket = -1;
                 continue;
             }
-
-            // One client at a time: wait until the session task finishes
-            // before accepting the next connection.
+            xTaskNotifyGive(_session_htask);
             ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
         }
     }
@@ -213,6 +240,12 @@ void TCPServer::start()
 {
     _shutdown = false;
 
+    // The listener task is persistent: it survives WiFi drops by rebinding,
+    // so only create it once. Creating a second task here would race the
+    // first over the shared listen socket and _htask.
+    if (_htask != NULL)
+        return;
+
     // Start tcp listener task. It only accepts connections; the per-client
     // session task (with the larger stack) is created on demand.
     if (xTaskCreatePinnedToCore(&TCPServer::task, "console_tcp", 2560, NULL, 5, &_htask, 0) != pdTRUE)
@@ -225,15 +258,20 @@ void TCPServer::stop()
 {
     Debug_printf("Stopping tcp server...");
 
+    // Called on WiFi drop: kick the client and listener off their sockets.
+    // The listener task itself stays alive and rebinds — setting _shutdown
+    // here raced GOT_IP's start() (old task exiting vs. new task starting)
+    // and could leave port 23 permanently dead after a WiFi bounce.
     if (_client_socket > 0)
+    {
         close(_client_socket);
+        _client_socket = -1;
+    }
     if (_server_socket > 0)
+    {
         close(_server_socket);
-
-    _shutdown = true;
-    // No vTaskDelay here — stop() is called from the WiFi event handler and must
-    // return immediately. The sockets are already closed above; the TCP task will
-    // exit on its own when its next accept()/recv() fails.
+        _server_socket = -1;
+    }
 
     Debug_printf("done!\r\n");
 }
