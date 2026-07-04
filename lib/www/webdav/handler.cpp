@@ -100,12 +100,16 @@ esp_err_t webdav_handler(httpd_req_t *httpd_req)
 
     resp.setStatus(ret);
 
-    if ( (ret > 399) & (httpd_req->method != HTTP_HEAD) )
+    if ( (ret > 399) && (httpd_req->method == HTTP_GET) )
     {
+        // Browser-facing GET errors get the HTML error page.
         HttpServer::send_http_error(httpd_req, ret);
     }
     else
     {
+        // WebDAV clients only need the status line. Building the HTML error
+        // page costs several flash opens per miss, and bulk transfers hit
+        // this path with a PROPFIND 404 for every file before its PUT.
         resp.flushHeaders();
         resp.closeBody();
     }
