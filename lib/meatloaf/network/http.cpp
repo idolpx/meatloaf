@@ -273,14 +273,14 @@ bool HTTPMStream::open(std::ios_base::openmode mode) {
 }
 
 void HTTPMStream::close() {
-    Debug_printv("HTTPMStream::close called, mode=%d", mode);
+    //Debug_printv("HTTPMStream::close called, mode=%d", mode);
     // Write mode: mode & out bit (0x10), OR explicit out, OR combined in|out (mode > 0 && !in-only)
     // std::ios_base::out = 0x10, std::ios_base::in = 0x01, std::ios_base::in|std::ios_base::out = 0x03
     bool isWriteMode = (mode & 0x10) || (mode == std::ios_base::out) || (mode == (std::ios_base::in | std::ios_base::out));
-    Debug_printv("isWriteMode=%d (mode=%d, out_bit=%d, eq_out=%d, eq_in_out=%d)",
-        isWriteMode, mode, (mode & 0x10), (mode == std::ios_base::out), (mode == (std::ios_base::in | std::ios_base::out)));
+    //Debug_printv("isWriteMode=%d (mode=%d, out_bit=%d, eq_out=%d, eq_in_out=%d)",
+    //    isWriteMode, mode, (mode & 0x10), (mode == std::ios_base::out), (mode == (std::ios_base::in | std::ios_base::out)));
     if (isWriteMode && _session && _session->client) {
-        Debug_printv("Closing write-mode stream, sending POST request");
+        //Debug_printv("Closing write-mode stream, sending POST request");
         auto client = _session->client.get();
         // Send the POST request and receive response - close() handles all of this
         client->close();
@@ -398,6 +398,9 @@ bool MeatHttpClient::HEAD(std::string dstUrl) {
 bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
     //Debug_printv("open called, url=%s, method=%d", dstUrl.c_str(), meth);
     url = dstUrl;
+    // Encode spaces BEFORE init(): esp_http_client_init() parses config.url and
+    // returns a NULL handle on an unencoded URL, crashing later client calls.
+    mstr::replaceAll(url, " ", "%20");
     lastMethod = meth;
     _error = 0;
     // Reset state for new file operation — MeatHttpClient is shared across files on the same host:port
@@ -654,7 +657,7 @@ bool MeatHttpClient::seek(uint32_t pos) {
 }
 
 bool MeatHttpClient::flush(uint32_t numBytes) {
-    Debug_printv("flush called, numBytes=%u, _http=%p", numBytes, _http);
+    //Debug_printv("flush called, numBytes=%u, _http=%p", numBytes, _http);
     if (_http == nullptr) {
         Debug_printv("flush: _http is null");
         return false;
@@ -666,7 +669,7 @@ bool MeatHttpClient::flush(uint32_t numBytes) {
         // Drain the remaining response body so the connection is clean
         int bytes = 0;
         esp_http_client_flush_response(_http, &bytes);
-        Debug_printv("Flushed %d bytes to complete response", bytes);
+        //Debug_printv("Flushed %d bytes to complete response", bytes);
         return true;
     }
 
@@ -772,6 +775,11 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
     //Debug_printv("openAndFetchHeaders: method=%d, position=%u, size=%u, url=%s", method, position, size, url.c_str());
 
     if ( url.size() < 5)
+        return 0;
+
+    // init() leaves _http NULL when esp_http_client_init() can't parse the URL —
+    // calling set_url/set_method on a NULL handle crashes (StoreProhibited).
+    if ( _http == nullptr )
         return 0;
 
     // static esp_err_t esp_http_client_prepare(esp_http_client_handle_t client)
