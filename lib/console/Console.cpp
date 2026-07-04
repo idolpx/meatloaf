@@ -29,9 +29,44 @@
 #include "string_utils.h"
 #include "console_settings.h"
 
+#include "meat_session.h"
+
 #include "tcpsvr.h"
 
 ESP32Console::Console console;
+
+// SessionBroker entry that frees the 16 KB console executor task after
+// 3 minutes without a command. Keep-alive is disabled (nothing to ping);
+// the broker's service task disposes the session once it has been idle
+// past its grace period, and disconnect() tears the task down. The next
+// runCommand() re-creates both the task and the session.
+class ConsoleExecMSession : public MSession {
+public:
+    static constexpr uint32_t IDLE_TIMEOUT_MS = 3 * 60 * 1000;
+    static const char* sessionKey() { return "console://exec:0"; }
+
+    ConsoleExecMSession(ESP32Console::Console* c)
+        : MSession(sessionKey(), "exec", 0), console_(c)
+    {
+        keep_alive_interval = 0;
+        setIdleGracePeriod(IDLE_TIMEOUT_MS);
+        connected = true;
+    }
+
+    ~ConsoleExecMSession() { disconnect(); }
+
+    bool connect() override { connected = true; return true; }
+    bool keep_alive() override { return true; }
+
+    void disconnect() override {
+        if (!connected) return;
+        connected = false;
+        console_->execIdleFree();
+    }
+
+private:
+    ESP32Console::Console* console_;
+};
 
 #ifdef ENABLE_CONSOLE_TCP
 // Tee FILE* installed on the TCP task's stdout for the duration of a client
@@ -283,6 +318,9 @@ namespace ESP32Console
             }
         }
         xSemaphoreGive(exec_users_mutex_);
+
+        if (exec_task_ != nullptr)
+            execSessionTouch();
     }
 
     void Console::execRelease()
@@ -299,6 +337,36 @@ namespace ESP32Console
             xSemaphoreGive(exec_mutex_);
         }
         xSemaphoreGive(exec_users_mutex_);
+    }
+
+    void Console::execIdleFree()
+    {
+        // Same teardown protocol as execRelease(), but leaves exec_users_
+        // untouched: consoles may still be attached, just idle. The next
+        // runCommand() re-creates the task via its late-creation retry.
+        xSemaphoreTake(exec_users_mutex_, portMAX_DELAY);
+        if (exec_task_ != nullptr)
+        {
+            xSemaphoreTake(exec_mutex_, portMAX_DELAY);
+            vTaskDelete(exec_task_);
+            exec_task_ = nullptr;
+            xSemaphoreGive(exec_mutex_);
+            Debug_printv("console exec task freed after idle timeout");
+        }
+        xSemaphoreGive(exec_users_mutex_);
+    }
+
+    std::shared_ptr<MSession> Console::execSessionTouch()
+    {
+        // find() refreshes the session's activity timestamp; register a new
+        // session when the previous one was disposed by the idle timeout.
+        auto session = SessionBroker::find<MSession>(ConsoleExecMSession::sessionKey());
+        if (session == nullptr)
+        {
+            session = std::make_shared<ConsoleExecMSession>(this);
+            SessionBroker::add(ConsoleExecMSession::sessionKey(), session);
+        }
+        return session;
     }
 
     void Console::exec_task_fn(void *args)
@@ -347,6 +415,12 @@ namespace ESP32Console
             xSemaphoreGive(exec_users_mutex_);
         }
 
+        // Refresh the idle-timeout session and mark it busy for the duration
+        // of the command so the broker never tears the task down mid-command.
+        auto session = execSessionTouch();
+        if (session)
+            session->acquireIO();
+
         xSemaphoreTake(exec_mutex_, portMAX_DELAY);
 
         // Checked under exec_mutex_: execRelease() deletes the task while
@@ -357,6 +431,8 @@ namespace ESP32Console
         if (exec_task_ == nullptr)
         {
             xSemaphoreGive(exec_mutex_);
+            if (session)
+                session->releaseIO();
             ::printf("Cannot execute command: console exec task not running\r\n");
             if (ret)
                 *ret = EXIT_FAILURE;
@@ -372,6 +448,12 @@ namespace ESP32Console
             *ret = exec_ret_;
         exec_origin_ = ORIGIN_NONE;
         xSemaphoreGive(exec_mutex_);
+        if (session)
+        {
+            // Idle timeout counts from command completion, not submission
+            session->updateActivity();
+            session->releaseIO();
+        }
         return err;
     }
 

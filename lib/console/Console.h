@@ -12,8 +12,12 @@
 
 #include "../../include/debug.h"
 
+#include <memory>
+
 #define CONSOLE_UART        UART_NUM_0
 #define MAX_READ_WAIT_TICKS 200
+
+class MSession;
 
 namespace ESP32Console
 {
@@ -65,6 +69,10 @@ namespace ESP32Console
         esp_err_t exec_err_ = ESP_OK;
         volatile Origin exec_origin_ = ORIGIN_NONE;
         static void exec_task_fn(void *args);
+
+        // Find-or-register the SessionBroker session that idle-frees the
+        // executor task; returns it with its activity timestamp refreshed.
+        std::shared_ptr<MSession> execSessionTouch();
 
     public:
         /**
@@ -203,6 +211,15 @@ namespace ESP32Console
          */
         void execAcquire();
         void execRelease();
+
+        /**
+         * @brief Free the executor task after idle timeout. Called by the
+         * ConsoleExecMSession registered with SessionBroker when the session
+         * has seen no commands for 3 minutes; runCommand() re-creates the
+         * task on the next command. Safe to call while a command is queued —
+         * it waits out any in-flight command via exec_mutex_.
+         */
+        void execIdleFree();
 
         /**
          * @brief Origin of the command currently executing on the executor

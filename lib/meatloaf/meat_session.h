@@ -208,6 +208,10 @@ public:
         keep_alive_interval = interval_ms;
     }
 
+    // Grace period before a not-in-use session is disposed by the broker
+    uint32_t getIdleGracePeriod() const { return idle_grace_period; }
+    void setIdleGracePeriod(uint32_t ms) { idle_grace_period = ms; }
+
     void acquireIO() {
         io_active.fetch_add(1, std::memory_order_relaxed);
         updateActivity();
@@ -270,6 +274,7 @@ protected:
     bool connected;
     std::chrono::steady_clock::time_point last_activity;
     uint32_t keep_alive_interval;  // in milliseconds
+    uint32_t idle_grace_period = 5000;  // ms before a not-in-use session is disposed
     std::unordered_map<std::string, std::shared_ptr<CachedFile>> file_cache;
     std::list<std::string> cache_order;  // LRU order (front = most recent)
     std::atomic<uint32_t> io_active{0};
@@ -511,8 +516,9 @@ public:
             // If session is NOT in use by any drive or console, consider removal
             if (!is_session_in_use(key)) {
                 // Grace period: keep sessions alive if busy or recently active,
-                // since CWD isn't updated until after file loading completes
-                if (session->isBusy() || session->getIdleTime() < 5000) {
+                // since CWD isn't updated until after file loading completes.
+                // Per-session so e.g. the console exec session can linger 3 min.
+                if (session->isBusy() || session->getIdleTime() < session->getIdleGracePeriod()) {
                     continue;
                 }
                 Debug_printv("Session not in use, removing: %s", key.c_str());
