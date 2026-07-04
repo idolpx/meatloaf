@@ -674,7 +674,9 @@ int Server::doGet(Request &req, Response &resp)
     resp.flushHeaders();
 
     int ret = 0;
-    const int chunkSize = 8192;
+    // 16 KB: halves the chunked-send round trips vs 8 KB. malloc lands in
+    // PSRAM (above the SPIRAM_MALLOC_ALWAYSINTERNAL threshold).
+    const int chunkSize = 16384;
     uint8_t *chunk = (uint8_t *)malloc(chunkSize);
     if (!chunk) {
         stream->close();
@@ -993,7 +995,8 @@ int Server::doPut(Request &req, Response &resp)
 
     int remaining = req.getContentLength();
 
-    const int chunkSize = 8192;
+    // 16 KB: fewer read/write iterations per PUT; buffer lives in PSRAM.
+    const int chunkSize = 16384;
     uint8_t *chunk = (uint8_t *)malloc(chunkSize);
     if (!chunk) {
         stream->close();
