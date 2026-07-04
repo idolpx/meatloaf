@@ -286,7 +286,23 @@ namespace ESP32Console
         while (true)
         {
             xSemaphoreTake(c->exec_start_, portMAX_DELAY);
+
+            // stdio streams are per-task: the TCP stdout tee is installed on
+            // the session task, not here. For remote-origin commands, adopt
+            // the tee for the duration of the command so output reaches the
+            // TCP client (and UART) exactly as it did when commands ran in
+            // the session task itself.
+            FILE *prev_stdout = stdout;
+#ifdef ENABLE_CONSOLE_TCP
+            if (c->exec_origin_ == ORIGIN_REMOTE && _tee != nullptr)
+                stdout = _tee;
+#endif
+
             c->exec_err_ = esp_console_run(c->exec_line_, &c->exec_ret_);
+
+            fflush(stdout);
+            stdout = prev_stdout;
+
             // Reset getopt state here rather than in the submitter so the
             // next command never sees a stale optind.
             optind = 0;
@@ -317,57 +333,28 @@ namespace ESP32Console
         return err;
     }
 
-    void Console::startRepl()
-    {
-        if (!_initialized || task_ != nullptr)
-            return;
-
-        if (xTaskCreatePinnedToCore(&Console::repl_task, "console_repl", task_stack_size_, this, task_priority_, &task_, 0) != pdTRUE)
-        {
-            // No fallback call here — startRepl and startOnDemand calling
-            // each other on failure recursed until the caller's stack
-            // overflowed when internal RAM was exhausted.
-            Debug_printv("Could not start REPL task!");
-            task_ = nullptr;
-        }
-    }
-
     void Console::startOnDemand()
     {
         if (!_initialized || task_ != nullptr)
             return;
 
-        if (xTaskCreatePinnedToCore(&Console::watch_task, "console_watch", 2560, this, 2, nullptr, 0) != pdTRUE)
+        // One persistent serial-console task, created at boot: it sleeps in
+        // fgetc() until a byte arrives, runs the REPL loop, and goes dormant
+        // again on "exit". No task is ever created at activation time —
+        // that allocation failed under heap fragmentation no matter how
+        // small the stack (even 6 KB), because task stacks must be
+        // contiguous internal DRAM.
+        if (xTaskCreatePinnedToCore(&Console::repl_task, "console_repl", task_stack_size_, this, task_priority_, &task_, 0) != pdTRUE)
         {
-            Debug_printv("Could not start console watch task!");
+            Debug_printv("Could not start console task!");
+            task_ = nullptr;
         }
     }
 
-    void Console::watch_task(void *args)
+    void Console::startRepl()
     {
-        Console *console = static_cast<Console *>(args);
-
-        // Block until the first byte arrives on the console, then hand over
-        // to the full REPL task. The byte (usually ENTER) is consumed; the
-        // REPL prints its prompt as soon as it starts.
-        int stdin_flags = fcntl(fileno(stdin), F_GETFL, 0);
-        if (stdin_flags >= 0)
-        {
-            fcntl(fileno(stdin), F_SETFL, stdin_flags & ~O_NONBLOCK);
-        }
-
-        while (fgetc(stdin) == EOF)
-        {
-            vTaskDelay(pdMS_TO_TICKS(50));
-        }
-
-
-        console->startRepl();
-        // If the REPL task failed to start, there is nothing more to do, so return.
-        if (console->task_ == nullptr)
-            console->startOnDemand();
-
-        vTaskDelete(NULL);
+        // Same persistent task; kept for call-site compatibility.
+        startOnDemand();
     }
 
     static void resetAfterCommands()
@@ -425,6 +412,16 @@ namespace ESP32Console
         }
 
         linenoiseSetMaxLineLen(console.max_cmdline_len_);
+        while (true)
+        {
+        // Dormant: wait for a byte on the console (usually ENTER; it is
+        // consumed). The task persists here instead of being deleted and
+        // re-created — activation can no longer fail on allocation.
+        while (fgetc(stdin) == EOF)
+        {
+            vTaskDelay(pdMS_TO_TICKS(50));
+        }
+
         while (true)
         {
             std::string prompt = console.prompt_;
@@ -505,14 +502,11 @@ namespace ESP32Console
                 break;
         }
 
-        // "exit" was requested: free this task's stack and return to
-        // on-demand mode. The watcher re-creates the REPL on the next byte
-        // of console input.
+        // "exit" was requested: go dormant (outer loop waits for the next
+        // byte of console input). The task and its stack persist.
         console._exit_requested = false;
-        console.task_ = nullptr;
         ::printf("Console deactivated. Press ENTER to reactivate.\r\n");
-        console.startOnDemand();
-        vTaskDelete(NULL);
+        }
     }
 
     void Console::end()

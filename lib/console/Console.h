@@ -40,7 +40,6 @@ namespace ESP32Console
         //QueueHandle_t queue;
         //std::vector<std::string> queue_lines;
         static void repl_task(void *args);
-        static void watch_task(void *args);
 
         void beginCommon();
         size_t _print_number(unsigned long n, uint8_t base);
@@ -165,21 +164,21 @@ namespace ESP32Console
         void begin(int baud, int rxPin = -1, int txPin = -1, uart_port_t channel = UART_NUM_0);
 
         /**
-         * @brief Defer the REPL task until the first byte arrives on the console.
-         * A minimal watcher task waits for input, then calls startRepl() and exits,
-         * keeping the large REPL stack out of internal RAM until actually needed.
+         * @brief Create the persistent serial-console task (once, at boot).
+         * It sleeps until the first byte arrives, runs the REPL loop, and
+         * goes dormant again on "exit". The task is never re-created, so
+         * activation cannot fail on stack allocation.
          */
         void startOnDemand();
 
         /**
-         * @brief Start the REPL task immediately. Safe to call more than once.
+         * @brief Alias for startOnDemand() (same persistent task).
          */
         void startRepl();
 
         /**
-         * @brief Ask the running REPL task to exit after the current command.
-         * The REPL frees its stack and re-arms startOnDemand(), so the next
-         * byte of console input brings it back.
+         * @brief Ask the running REPL loop to go dormant after the current
+         * command. The next byte of console input reactivates it.
          */
         void requestExit() { _exit_requested = true; }
 

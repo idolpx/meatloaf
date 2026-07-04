@@ -298,11 +298,10 @@ void main_setup()
 //#endif
 
 #ifdef ENABLE_CONSOLE
-    // Defer the REPL task (16 KB internal-RAM stack) until first console
-    // input — it is unused in most sessions. The 16 KB allocation can fail
-    // when internal RAM is fragmented (task stacks cannot live in PSRAM);
-    // the watcher retries every 5 s until it succeeds, so activation may be
-    // delayed under load but can no longer die silently.
+    // Create the persistent serial-console task now (small stack, claimed
+    // while memory is plentiful). It stays dormant until the first byte of
+    // console input, so idle sessions cost only the task's stack — and
+    // activation can never fail on allocation.
     console.startOnDemand();
     printf("Press ENTER to activate console.\r\n");
 #endif
