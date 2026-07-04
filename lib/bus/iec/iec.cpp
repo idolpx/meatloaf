@@ -31,7 +31,11 @@
 #include "../../include/pinmap.h"
 #include "../../hardware/led.h"
 
-#define MAIN_STACKSIZE	 32768
+// 20 KB: ps HWM showed <1 KB used at idle; deep use (C64 LOAD through the
+// MFile/stream chain) is the same class as console commands, which fit in
+// 16 KB. The old 32 KB left internal RAM too scarce for the web server and
+// console executor to coexist. Re-check `ps` HWM after heavy C64 sessions.
+#define MAIN_STACKSIZE	 20480
 #define MAIN_PRIORITY	 17
 #define MAIN_CPUAFFINITY 1
 

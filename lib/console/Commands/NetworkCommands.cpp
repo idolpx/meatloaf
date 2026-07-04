@@ -380,10 +380,12 @@ namespace ESP32Console::Commands
 
     static int exit_console(int argc, char **argv)
     {
+        // Commands run on the shared executor task, so use the submission
+        // origin (not the current task) to tell serial REPL from TCP.
 #ifdef ENABLE_CONSOLE_TCP
-        if (!console.inReplTask())
+        if (console.execOrigin() != ESP32Console::Console::ORIGIN_SERIAL)
         {
-            // Running in a TCP session: just drop the client connection.
+            // Submitted from a TCP session: just drop the client connection.
             tcp_server.disconnect();
             return EXIT_SUCCESS;
         }

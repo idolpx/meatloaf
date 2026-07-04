@@ -148,10 +148,16 @@ void HttpServer::custom_global_ctx_free(void *ctx)
 // of going through TIME_WAIT. Without this, rapid sequential WebDAV requests
 // (e.g. Windows Explorer navigating directories) accumulate sockets in
 // TIME_WAIT and exhaust CONFIG_LWIP_MAX_SOCKETS (10) within ~10 requests.
+// TCP_NODELAY disables Nagle: httpd sends status/headers/chunk framing as
+// separate small writes, and Nagle holding those for the client's delayed
+// ACK adds latency to every WebDAV round trip (PROPFIND/PUT/PROPPATCH per
+// file during bulk transfers).
 static esp_err_t httpd_open_fn(httpd_handle_t hd, int sockfd)
 {
     struct linger so_linger = { .l_onoff = 1, .l_linger = 0 };
     setsockopt(sockfd, SOL_SOCKET, SO_LINGER, &so_linger, sizeof(so_linger));
+    int nodelay = 1;
+    setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, &nodelay, sizeof(nodelay));
     return ESP_OK;
 }
 
@@ -171,6 +177,11 @@ httpd_handle_t HttpServer::start_server(serverstate &state)
     config.max_resp_headers = 16;
     config.max_open_sockets = 10;
     config.keep_alive_enable = false;
+    // Purge the least-recently-used idle session when the pool is full so a
+    // new client can always connect. Browsers hold ~6 idle keep-alive
+    // connections; without this, browser + WebDAV client together fill all
+    // 10 slots and lock everyone else out.
+    config.lru_purge_enable = true;
     config.open_fn = httpd_open_fn;
     config.uri_match_fn = httpd_uri_match_wildcard;
 

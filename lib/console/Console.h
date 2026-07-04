@@ -7,6 +7,7 @@
 #include "driver/uart.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/semphr.h"
 #include "linenoise/linenoise.h"
 
 #include "../../include/debug.h"
@@ -45,10 +46,34 @@ namespace ESP32Console
         size_t _print_number(unsigned long n, uint8_t base);
 
     public:
+        // Where the command currently being executed was submitted from.
+        enum Origin { ORIGIN_NONE = 0, ORIGIN_SERIAL, ORIGIN_REMOTE };
+
+    private:
+        // Persistent command-executor task. All console commands run on its
+        // 16 KB stack (created once at boot while contiguous internal RAM is
+        // guaranteed — task stacks cannot live in PSRAM). The REPL and TCP
+        // session tasks are thin I/O shells that submit lines here and can
+        // therefore use small stacks.
+        TaskHandle_t exec_task_ = nullptr;
+        SemaphoreHandle_t exec_mutex_ = nullptr;   // serializes submitters
+        SemaphoreHandle_t exec_start_ = nullptr;   // command handed to worker
+        SemaphoreHandle_t exec_done_  = nullptr;   // worker finished command
+        SemaphoreHandle_t exec_users_mutex_ = nullptr; // protects refcount + task lifecycle
+        int exec_users_ = 0;
+        const char *exec_line_ = nullptr;
+        int exec_ret_ = 0;
+        esp_err_t exec_err_ = ESP_OK;
+        volatile Origin exec_origin_ = ORIGIN_NONE;
+        static void exec_task_fn(void *args);
+
+    public:
         /**
-         * @brief Create a new ESP32Console with the default parameters
+         * @brief Create a new ESP32Console with the default parameters.
+         * The REPL task only does linenoise I/O — commands run on the
+         * executor task's 16 KB stack — so 6 KB is enough here.
          */
-        Console(const uint32_t task_stack_size = 16384, const BaseType_t task_priority = 4, int max_cmdline_len = 256, int max_cmdline_args = 8) : task_priority_(task_priority), task_stack_size_(task_stack_size), max_cmdline_len_(max_cmdline_len), max_cmdline_args_(max_cmdline_args)
+        Console(const uint32_t task_stack_size = 6144, const BaseType_t task_priority = 4, int max_cmdline_len = 256, int max_cmdline_args = 8) : task_priority_(task_priority), task_stack_size_(task_stack_size), max_cmdline_len_(max_cmdline_len), max_cmdline_args_(max_cmdline_args)
         {
             //queue = xQueueCreate( 10, sizeof( int ) );
         };
@@ -141,21 +166,21 @@ namespace ESP32Console
         void begin(int baud, int rxPin = -1, int txPin = -1, uart_port_t channel = UART_NUM_0);
 
         /**
-         * @brief Defer the REPL task until the first byte arrives on the console.
-         * A minimal watcher task waits for input, then calls startRepl() and exits,
-         * keeping the large REPL stack out of internal RAM until actually needed.
+         * @brief Create the persistent serial-console task (once, at boot).
+         * It sleeps until the first byte arrives, runs the REPL loop, and
+         * goes dormant again on "exit". The task is never re-created, so
+         * activation cannot fail on stack allocation.
          */
         void startOnDemand();
 
         /**
-         * @brief Start the REPL task immediately. Safe to call more than once.
+         * @brief Alias for startOnDemand() (same persistent task).
          */
         void startRepl();
 
         /**
-         * @brief Ask the running REPL task to exit after the current command.
-         * The REPL frees its stack and re-arms startOnDemand(), so the next
-         * byte of console input brings it back.
+         * @brief Ask the running REPL loop to go dormant after the current
+         * command. The next byte of console input reactivates it.
          */
         void requestExit() { _exit_requested = true; }
 
@@ -164,6 +189,27 @@ namespace ESP32Console
          * "exit" command distinguish serial REPL from TCP session context).
          */
         bool inReplTask() const { return task_ != nullptr && task_ == xTaskGetCurrentTaskHandle(); }
+
+        /**
+         * @brief Run a command line on the executor task and wait for it to
+         * finish. Serializes commands from all consoles (serial/TCP/WS).
+         */
+        esp_err_t runCommand(const char *line, int *ret, Origin origin);
+
+        /**
+         * @brief Refcounted executor lifecycle: a console session calls
+         * execAcquire() when it becomes active (creating the 16 KB executor
+         * task if needed) and execRelease() when it goes dormant (the task
+         * is deleted when the last user releases, freeing its stack).
+         */
+        void execAcquire();
+        void execRelease();
+
+        /**
+         * @brief Origin of the command currently executing on the executor
+         * task (e.g. lets "exit" distinguish serial REPL from TCP session).
+         */
+        Origin execOrigin() const { return exec_origin_; }
 
         void end();
 
