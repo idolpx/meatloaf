@@ -241,11 +241,19 @@ class ImageBroker {
             auto drive = Meatloaf.get_disks(i);
             if (drive != nullptr) {
                 auto cwd = drive->disk_dev.getCWD();
+                if (cwd.empty()) continue;
                 if (cwd.back() == '/') cwd.pop_back();
                 if (!cwd.empty() && mstr::endsWith(key, cwd.c_str())) {
                     return true;
                 }
             }
+        }
+        // Check the Meatloaf device (#30) — it is not in the _fnDisks array
+        auto cwd = Meatloaf.getCWD();
+        if (!cwd.empty()) {
+            if (cwd.back() == '/') cwd.pop_back();
+            if (!cwd.empty() && mstr::endsWith(key, cwd.c_str()))
+                return true;
         }
         return false;
     }
@@ -353,25 +361,17 @@ public:
     }
 
     static void validate() {
+        // Collect first: dispose() erases from image_repo, which would
+        // invalidate the iterator if done while iterating.
+        std::vector<std::string> stale;
         for (auto& pair : image_repo) {
-            bool found = false;
-            for (int i = 0; i < MAX_DISK_DEVICES; i++) {
-                auto drive = Meatloaf.get_disks(i);
-                if (drive != nullptr) {
-                    auto cwd = drive->disk_dev.getCWD();
-                    if (cwd.back() == '/') cwd.pop_back();
-                    if (cwd.empty()) continue;
-                    if (mstr::endsWith(pair.first, cwd.c_str())) {
-                        found = true;
-                        break;
-                    }
-                }
-            }
-            if (!found) {
+            if (!is_in_use(pair.first)) {
                 Debug_printv("DISPOSING key[%s] stream[%s]", pair.first.c_str(), pair.second->url.c_str());
-                dispose(pair.first);
+                stale.push_back(pair.first);
             }
         }
+        for (auto& key : stale)
+            dispose(key);
     }
 
     static void clear() {
