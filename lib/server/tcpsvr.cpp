@@ -240,14 +240,24 @@ void TCPServer::start()
 {
     _shutdown = false;
 
+    // Create the persistent session worker now, while internal RAM is still
+    // plentiful. Task stacks are internal-DRAM only (no PSRAM fallback);
+    // allocating 16 KB at connect time fails once the heap fragments.
+    if (_session_htask == NULL &&
+        xTaskCreatePinnedToCore(&TCPServer::session_task, "tcp_session", 16384, NULL, 5, &_session_htask, 0) != pdTRUE)
+    {
+        Debug_printv("Could not start tcp session task!");
+        _session_htask = NULL;
+    }
+
     // The listener task is persistent: it survives WiFi drops by rebinding,
     // so only create it once. Creating a second task here would race the
     // first over the shared listen socket and _htask.
     if (_htask != NULL)
         return;
 
-    // Start tcp listener task. It only accepts connections; the per-client
-    // session task (with the larger stack) is created on demand.
+    // Start tcp listener task. It only accepts connections and hands
+    // clients to the session worker created above.
     if (xTaskCreatePinnedToCore(&TCPServer::task, "console_tcp", 2560, NULL, 5, &_htask, 0) != pdTRUE)
     {
         Debug_printv("Could not start tcp server task!");

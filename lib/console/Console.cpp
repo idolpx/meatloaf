@@ -256,6 +256,65 @@ namespace ESP32Console
         // task itself is started separately via startRepl()/startOnDemand()
         // so its stack is not allocated until the console is actually used.
         _initialized = true;
+
+        // All commands (serial, TCP, WS) run on one persistent executor task
+        // created now, while a 16 KB contiguous internal-RAM stack is
+        // guaranteed (task stacks cannot live in PSRAM).
+        startExecutor();
+    }
+
+    void Console::startExecutor()
+    {
+        if (exec_task_ != nullptr)
+            return;
+
+        exec_mutex_ = xSemaphoreCreateMutex();
+        exec_start_ = xSemaphoreCreateBinary();
+        exec_done_  = xSemaphoreCreateBinary();
+
+        if (xTaskCreatePinnedToCore(&Console::exec_task_fn, "console_exec", 16384, this, 5, &exec_task_, 0) != pdTRUE)
+        {
+            Debug_printv("Could not start console exec task!");
+            exec_task_ = nullptr;
+        }
+    }
+
+    void Console::exec_task_fn(void *args)
+    {
+        Console *c = static_cast<Console *>(args);
+
+        while (true)
+        {
+            xSemaphoreTake(c->exec_start_, portMAX_DELAY);
+            c->exec_err_ = esp_console_run(c->exec_line_, &c->exec_ret_);
+            // Reset getopt state here rather than in the submitter so the
+            // next command never sees a stale optind.
+            optind = 0;
+            xSemaphoreGive(c->exec_done_);
+        }
+    }
+
+    esp_err_t Console::runCommand(const char *line, int *ret, Origin origin)
+    {
+        // Fallback: run inline if the executor isn't available.
+        if (exec_task_ == nullptr)
+        {
+            esp_err_t err = esp_console_run(line, ret);
+            optind = 0;
+            return err;
+        }
+
+        xSemaphoreTake(exec_mutex_, portMAX_DELAY);
+        exec_line_ = line;
+        exec_origin_ = origin;
+        xSemaphoreGive(exec_start_);
+        xSemaphoreTake(exec_done_, portMAX_DELAY);
+        esp_err_t err = exec_err_;
+        if (ret)
+            *ret = exec_ret_;
+        exec_origin_ = ORIGIN_NONE;
+        xSemaphoreGive(exec_mutex_);
+        return err;
     }
 
     void Console::startRepl()
@@ -416,9 +475,9 @@ namespace ESP32Console
             //Interpolate the input line
             std::string interpolated_line = interpolateLine(raw_line.c_str());
 
-            /* Try to run the command */
+            /* Run the command on the shared executor task */
             int ret;
-            esp_err_t err = esp_console_run(interpolated_line.c_str(), &ret);
+            esp_err_t err = console.runCommand(interpolated_line.c_str(), &ret, ORIGIN_SERIAL);
 
             //Reset global state
             resetAfterCommands();
@@ -505,7 +564,7 @@ namespace ESP32Console
             std::string interpolated_line = interpolateLine(command_str.c_str());
 
             int ret;
-            esp_err_t err = esp_console_run(interpolated_line.c_str(), &ret);
+            esp_err_t err = runCommand(interpolated_line.c_str(), &ret, ORIGIN_REMOTE);
 
             resetAfterCommands();
 
