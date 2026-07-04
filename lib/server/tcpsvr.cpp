@@ -49,12 +49,11 @@ bool TCPServer::_shutdown = false;
 TaskHandle_t TCPServer::_htask = NULL;
 TaskHandle_t TCPServer::_session_htask = NULL;
 
-// Persistent per-client session worker: runs the console command loop for
-// one connected client per wakeup. Created ONCE in start() while internal
-// RAM is still plentiful — task stacks must be contiguous internal DRAM (no
-// PSRAM fallback), and allocating 16 KB on demand at connect time fails once
-// the heap fragments ("Could not start tcp session task!" → accepted
-// connections were dropped immediately). The listener wakes it for each
+// Persistent per-client session worker: a thin recv loop for one connected
+// client per wakeup. Created ONCE in start() — allocating a task stack on
+// demand at connect time fails once internal heap fragments. Commands are
+// submitted to the console executor task (console.execute → runCommand), so
+// this task only needs a small stack. The listener wakes it for each
 // accepted client; it handles the session, signals completion, and sleeps.
 void TCPServer::session_task(void *pvParameters)
 {
@@ -241,10 +240,11 @@ void TCPServer::start()
     _shutdown = false;
 
     // Create the persistent session worker now, while internal RAM is still
-    // plentiful. Task stacks are internal-DRAM only (no PSRAM fallback);
-    // allocating 16 KB at connect time fails once the heap fragments.
+    // plentiful (task stacks are internal-DRAM only, no PSRAM fallback).
+    // 4 KB suffices: the session is a thin recv loop — commands themselves
+    // run on the console executor task's 16 KB stack.
     if (_session_htask == NULL &&
-        xTaskCreatePinnedToCore(&TCPServer::session_task, "tcp_session", 16384, NULL, 5, &_session_htask, 0) != pdTRUE)
+        xTaskCreatePinnedToCore(&TCPServer::session_task, "tcp_session", 4096, NULL, 5, &_session_htask, 0) != pdTRUE)
     {
         Debug_printv("Could not start tcp session task!");
         _session_htask = NULL;
