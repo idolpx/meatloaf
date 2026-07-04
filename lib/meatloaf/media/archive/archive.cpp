@@ -106,12 +106,17 @@ int64_t cb_skip(struct archive *, void *userData, int64_t request)
             return skipped;
         }
         Debug_printv("ERROR! skip failed: request[%lld]", request);
-        return ARCHIVE_WARN;
+        // Never return a negative code here: libarchive's client_skip_proxy()
+        // does not check for negative returns — it subtracts them from the
+        // remaining request, so the request GROWS by |code| each iteration and
+        // it loops forever. Returning 0 makes libarchive fall back to
+        // read-and-discard via cb_read.
+        return 0;
     }
     else
     {
         Debug_printv("ERROR! skip failed - no archive");
-        return ARCHIVE_FATAL;
+        return 0;
     }
 }
 

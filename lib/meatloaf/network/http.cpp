@@ -592,35 +592,57 @@ bool MeatHttpClient::seek(uint32_t pos) {
 
         // Make a single range request directly to the target position.
         // After this call we are positioned at exactly pos and ready to read.
-        if ( !processRedirectsAndOpen(pos) )
-            return false;
-
-        // 200 = range not supported per https://developer.mozilla.org/en-US/docs/Web/HTTP/Range_requests
-        if( lastRC == 206 )
+        if ( processRedirectsAndOpen(pos) )
         {
-            _position = pos;
-            return true;
+            // 200 = range not supported per https://developer.mozilla.org/en-US/docs/Web/HTTP/Range_requests
+            if( lastRC == 206 )
+            {
+                _position = pos;
+                return true;
+            }
+            // Server returned 200 (doesn't support ranges) — the fresh response
+            // starts at byte 0, so fall through to sequential skip from there.
+            _position = 0;
         }
-        // Server returned 200 (doesn't support ranges) — fall through to sequential seek.
-    }
-
-    if ( lastMethod == HTTP_METHOD_GET ) 
-    {
-        //Debug_printv("Server doesn't support resume, reading from start and discarding");
-        // server doesn't support resume, so...
-        if( pos < _position || pos == 0 ) {
-            if ( !reopen() )
+        else
+        {
+            // Range request refused (e.g. 416 from a server that sent 206 for an
+            // earlier resource on this session but won't honor ranges on this one).
+            // If the target is known to be past EOF there is nothing to seek to —
+            // fail fast so callers (like the zip SEEK_END probe) don't trigger a
+            // full download. Otherwise fall back to a sequential GET below.
+            uint32_t knownSize = (_range_size > 0) ? _range_size : _size;
+            if ( knownSize > 0 && pos >= knownSize )
                 return false;
 
-            // skip pos bytes in HTTP_BLOCK_SIZE chunks to avoid per-byte UART contention
-            uint32_t remaining = pos;
-            flush ( remaining );
+            isFriendlySkipper = false;
         }
-        else {
-            auto delta = pos - _position;
-            // skip forward in HTTP_BLOCK_SIZE chunks to avoid per-byte UART contention
-            uint32_t remaining = delta;
+    }
+
+    if ( lastMethod == HTTP_METHOD_GET )
+    {
+        //Debug_printv("Server doesn't support resume, reading from start and discarding");
+        // Cheap path: already open with the target ahead — read and discard
+        // forward through the current response.
+        if( _is_open && pos >= _position ) {
+            if( pos == _position )
+                return true;
+            if( flush( pos - _position ) ) {
+                _position = pos;
+                return true;
+            }
+            // Ran off the end of the current response window — restart below.
         }
+
+        // Restart from 0 with a range window that reaches the target, then
+        // discard up to it. (reopen() only requests the default HTTP_BLOCK_SIZE
+        // window, which could never be flushed past.)
+        if ( !processRedirectsAndOpen(0, pos + HTTP_BLOCK_SIZE) )
+            return false;
+        _position = 0;
+
+        if( pos > 0 && !flush( pos ) )
+            return false;
 
         _position = pos;
         Debug_printv("stream opened[%s]", url.c_str());
@@ -655,6 +677,12 @@ bool MeatHttpClient::flush(uint32_t numBytes) {
         int rc = esp_http_client_read(_http, buf, (int)toRead);
         if (rc < 0) {
             Debug_printv("flush: read error %d", rc);
+            return false;
+        }
+        if (rc == 0) {
+            // EOF before all requested bytes were flushed — bail out instead
+            // of looping forever on a drained/closed response.
+            Debug_printv("flush: EOF after %u bytes, %u still requested", flushed, numBytes);
             return false;
         }
 
