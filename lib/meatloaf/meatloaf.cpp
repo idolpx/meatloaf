@@ -27,6 +27,9 @@
 #include <cerrno>
 #include <map>
 #include <cstdio>
+#include <mutex>
+
+#include "esp_timer.h"
 
 
 #ifdef FLASH_SPIFFS
@@ -509,9 +512,30 @@ static std::map<std::string, std::string> readLocalConfig(const std::string& dir
         configPath.pop_back();
     configPath += "/.config";
 
+    // Directory listings call MFSOwner::File() once per entry, and each call
+    // probes the same directories up the tree. A short-TTL cache turns those
+    // repeated failed fopen() calls (a full FATFS path scan each) into map hits.
+    static std::map<std::string, std::pair<uint64_t, std::map<std::string, std::string>>> cache;
+    static std::mutex cacheMutex;
+    const uint64_t CACHE_TTL_MS = 10000;
+    uint64_t now = esp_timer_get_time() / 1000ULL;
+
+    {
+        std::lock_guard<std::mutex> lock(cacheMutex);
+        auto it = cache.find(configPath);
+        if (it != cache.end() && (now - it->second.first) < CACHE_TTL_MS)
+            return it->second.second;
+    }
+
     FILE* f = fopen(configPath.c_str(), "r");
     if (!f)
+    {
+        std::lock_guard<std::mutex> lock(cacheMutex);
+        if (cache.size() > 64)
+            cache.clear();
+        cache[configPath] = {now, cfg};
         return cfg;
+    }
 
     char line[512];
     while (fgets(line, sizeof(line), f)) {
@@ -524,6 +548,13 @@ static std::map<std::string, std::string> readLocalConfig(const std::string& dir
         cfg[std::string(line, eq - line)] = std::string(eq + 1);
     }
     fclose(f);
+
+    {
+        std::lock_guard<std::mutex> lock(cacheMutex);
+        if (cache.size() > 64)
+            cache.clear();
+        cache[configPath] = {now, cfg};
+    }
     return cfg;
 }
 
@@ -661,6 +692,11 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
         path.find("://") == std::string::npos)
     {
         std::string currentDir = path;
+        // A .config can never exist on a path segment inside a container image,
+        // so start probing at the container itself. This keeps directory listings
+        // from fopen()ing a unique nonexistent path for every entry.
+        if (!targetFile->pathInStream.empty() && path.size() > targetFile->pathInStream.size())
+            currentDir = path.substr(0, path.size() - targetFile->pathInStream.size());
         while (true) {
             auto cfg = readLocalConfig(currentDir);
             auto baseIt = cfg.find("base_url");
