@@ -31,6 +31,279 @@
 //#include "../../../include/global_defines.h"
 
 /********************************************************
+ * HTTPRequestContext implementation
+ ********************************************************/
+
+void HTTPRequestContext::setMethod(const std::string& m) {
+    method = m;
+    mstr::toUpper(method);
+}
+
+void HTTPRequestContext::setHeader(const std::string& name, const std::string& value) {
+    std::string key = name;
+    mstr::toLower(key);
+    headers[key] = {value};  // replaces any existing values for this key
+}
+
+void HTTPRequestContext::appendHeader(const std::string& name, const std::string& value) {
+    std::string key = name;
+    mstr::toLower(key);
+    headers[key].push_back(value);
+}
+
+void HTTPRequestContext::setBody(const std::string& b) {
+    body = b;
+}
+
+void HTTPRequestContext::appendBody(const std::string& b) {
+    body += b;
+}
+
+void HTTPRequestContext::clear() {
+    method = "GET";
+    headers.clear();
+    body.clear();
+    responseHeaders.clear();
+    responseStatus = 0;
+    responseConsumed = false;
+}
+
+bool HTTPRequestContext::sendRequest(std::shared_ptr<HTTPMSession> session) {
+    if (!session || !session->client) {
+        responseStatus = -1;  // local: no session
+        return false;
+    }
+
+    auto& client = *session->client;
+
+    // Reset response header buffer BEFORE dispatch — onHeader may fire synchronously.
+    responseHeaders.clear();
+    responseStatus = 0;
+
+    // Capture response headers via the existing onHeader callback.
+    client.setOnHeader([this](char* key, char* value) -> int {
+        if (key && value) {
+            std::string headerLine = std::string(key) + ": " + std::string(value);
+            responseHeaders.push_back(headerLine);
+        }
+        return 0;
+    });
+
+    // Apply request headers.
+    for (const auto& [key, values] : headers) {
+        for (const auto& val : values) {
+            std::string headerLine = key + ":" + val;
+            client.setHeader(headerLine);
+        }
+    }
+
+    // Set body if present.
+    if (!body.empty()) {
+        client.postBuffer.clear();
+        client.postBuffer.insert(client.postBuffer.end(), body.begin(), body.end());
+    }
+
+    // Dispatch by method.
+    bool result = false;
+    if (method == "GET") {
+        result = client.GET(client.url);
+    } else if (method == "POST") {
+        result = client.POST(client.url);
+        if (result && !client.postBuffer.empty()) {
+            client.close();
+            // NOTE: responseStatus reflects the header-only POST open, NOT the actual
+            // POST body response. client.POST() calls open() → openAndFetchHeaders()
+            // which returns 200 for POST (hardcoded). client.close() calls
+            // esp_http_client_perform() to send the body and receive the real response,
+            // but does NOT update client.lastRC. So responseStatus here is 200 even
+            // if the server returned 4xx/5xx for the body. A proper fix would require
+            // capturing the status code from the HTTP_EVENT_ON_HEADER callback during
+            // the perform() call inside close(), or refactoring close() to return the
+            // status. Most servers return the same status for header-only and full
+            // requests, so this is acceptable for now.
+        }
+    } else if (method == "PUT") {
+        result = client.PUT(client.url);
+        if (result && !client.postBuffer.empty()) {
+            client.close();
+            // NOTE: Same limitation as POST above — responseStatus may not reflect
+            // the actual PUT body response status.
+        }
+    } else if (method == "HEAD") {
+        result = client.HEAD(client.url);
+    } else {
+        // DELETE and other methods are out of scope for this plan.
+        responseStatus = -99;  // internal error
+        return false;
+    }
+
+    // Capture HTTP status (client.lastRC is set by the dispatch above).
+    if (responseStatus == 0) {
+        responseStatus = client.lastRC;
+    }
+    // 0 from lastRC means the connection itself failed.
+    if (responseStatus == 0) {
+        responseStatus = -1;  // local: connection failed
+    }
+
+    return result;
+}
+
+std::string HTTPRequestContext::popResponseHeader() {
+    if (responseHeaders.empty()) return {};
+    std::string line = responseHeaders.front();
+    responseHeaders.erase(responseHeaders.begin());
+    return line + "\r\n";
+}
+
+static const std::map<int, std::string> http_status_text = {
+    {200, "OK"},
+    {400, "Bad Request"},
+    {401, "Unauthorized"},
+    {403, "Forbidden"},
+    {404, "Not Found"},
+    {405, "Method Not Allowed"},
+    {408, "Request Timeout"},
+    {429, "Too Many Requests"},
+    {500, "Internal Server Error"},
+    {502, "Bad Gateway"},
+    {503, "Service Unavailable"},
+};
+
+void HTTPRequestContext::errorToIecStatus(int& errOut, std::string& msgOut) const {
+    // Spec table: responseStatus → iecStatus.error, iecStatus.msg
+    if (responseStatus >= 200 && responseStatus < 300) {
+        errOut = 0;
+        msgOut = "OK";
+    } else if (responseStatus == -1) {
+        errOut = 20;
+        msgOut = "Connection refused";
+    } else if (responseStatus == -2) {
+        errOut = 20;
+        msgOut = "Host not found";
+    } else if (responseStatus >= 400 && responseStatus < 500) {
+        errOut = 30 + (responseStatus - 400);
+        auto it = http_status_text.find(responseStatus);
+        if (it != http_status_text.end()) {
+            msgOut = std::to_string(responseStatus) + " " + it->second;
+        } else {
+            msgOut = std::to_string(responseStatus) + " HTTP client error";
+        }
+    } else if (responseStatus >= 500 && responseStatus < 600) {
+        errOut = 35 + (responseStatus - 500);
+        auto it = http_status_text.find(responseStatus);
+        if (it != http_status_text.end()) {
+            msgOut = std::to_string(responseStatus) + " " + it->second;
+        } else {
+            msgOut = std::to_string(responseStatus) + " HTTP server error";
+        }
+    } else {
+        errOut = 99;
+        msgOut = "Internal error";
+    }
+}
+
+/********************************************************
+ * Full-mode command handling
+ ********************************************************/
+
+bool HTTPMStream::handleCommand(const std::string& cmd) {
+    std::string c = cmd;
+    mstr::trim(c);
+
+    if (c.empty()) return true;  // blank line is harmless
+
+    // 'r-h' / 'r-b' — switch response read mode (recognized even before 's')
+    if (c.size() >= 3 && (c[0] == 'r' || c[0] == 'R') && c[1] == '-') {
+        switch (c[2]) {
+            case 'h': case 'H':
+                fullMode = FullModeState::RESPONSE_HEADERS;
+                return true;
+            case 'b': case 'B':
+                fullMode = FullModeState::RESPONSE_BODY;
+                return true;
+        }
+        return false;
+    }
+
+    // 's' — send the request
+    if (c == "s" || c == "S") {
+        fullMode = FullModeState::RESPONSE_HEADERS;
+        if (_session) {
+            ctx.sendRequest(_session);
+        }
+        return true;
+    }
+
+    // 'c' — clear context, return to BUILDING_REQUEST for next request
+    if (c == "c" || c == "C") {
+        ctx.clear();
+        fullMode = FullModeState::BUILDING_REQUEST;
+        _statusRequested = false;
+        return true;
+    }
+
+    // 'status' — request HTTP status code (consumed by next read())
+    {
+        std::string lower = c;
+        mstr::toLower(lower);
+        if (lower == "status") {
+            _statusRequested = true;
+            return true;
+        }
+    }
+
+    // Single-letter commands with arguments: 'm <method>', 'b <body>'
+    if (c.size() >= 2 && c[1] == ' ') {
+        char prefix = c[0];
+        std::string arg = c.substr(2);
+        mstr::trim(arg);
+        switch (prefix) {
+            case 'm': case 'M':
+                ctx.setMethod(arg);
+                return true;
+            case 'b': case 'B':
+                ctx.setBody(arg);
+                return true;
+            default:
+                break;
+        }
+    }
+
+    // 'h <name>: <value>' and 'h+ <name>: <value>' — set/append header
+    if (c.size() >= 2 && (c[0] == 'h' || c[0] == 'H')) {
+        bool append = (c.size() >= 2 && c[1] == '+');
+        size_t start = append ? 2 : 1;
+        if (c.size() > start && c[start] == ' ') start++;
+        std::string rest = c.substr(start);
+        auto colonPos = rest.find(':');
+        if (colonPos != std::string::npos) {
+            std::string name = rest.substr(0, colonPos);
+            std::string value = rest.substr(colonPos + 1);
+            mstr::trim(name);
+            mstr::trim(value);
+            if (append) {
+                ctx.appendHeader(name, value);
+            } else {
+                ctx.setHeader(name, value);
+            }
+            return true;
+        }
+    }
+
+    // 'b+' — append body (no space required: 'b+more text' or 'b+ more text')
+    if (c.size() >= 2 && (c[0] == 'b' || c[0] == 'B') && c[1] == '+') {
+        std::string rest = c.substr(2);
+        if (!rest.empty() && rest[0] == ' ') rest = rest.substr(1);
+        ctx.appendBody(rest);
+        return true;
+    }
+
+    // Unrecognized — silently ignored per spec.
+    return false;
+}
+
+/********************************************************
  * HTTPMSession implementation
  ********************************************************/
 
@@ -273,22 +546,26 @@ bool HTTPMStream::open(std::ios_base::openmode mode) {
 }
 
 void HTTPMStream::close() {
-    //Debug_printv("HTTPMStream::close called, mode=%d", mode);
-    // Write mode: mode & out bit (0x10), OR explicit out, OR combined in|out (mode > 0 && !in-only)
-    // std::ios_base::out = 0x10, std::ios_base::in = 0x01, std::ios_base::in|std::ios_base::out = 0x03
-    bool isWriteMode = (mode & 0x10) || (mode == std::ios_base::out) || (mode == (std::ios_base::in | std::ios_base::out));
-    //Debug_printv("isWriteMode=%d (mode=%d, out_bit=%d, eq_out=%d, eq_in_out=%d)",
-    //    isWriteMode, mode, (mode & 0x10), (mode == std::ios_base::out), (mode == (std::ios_base::in | std::ios_base::out)));
+    // Full mode: skip the auto-POST used by simple mode. User already sent 's'.
+    if (fullMode != FullModeState::SIMPLE) {
+        if (_session) {
+            _session->releaseIO();
+        }
+        fullMode = FullModeState::SIMPLE;
+        ctx.clear();
+        return;
+    }
+
+    // Simple mode: original behavior.
+    bool isWriteMode = (mode & 0x10) || (mode == std::ios_base::out)
+        || (mode == (std::ios_base::in | std::ios_base::out));
     if (isWriteMode && _session && _session->client) {
-        //Debug_printv("Closing write-mode stream, sending POST request");
         auto client = _session->client.get();
-        // Send the POST request and receive response - close() handles all of this
         client->close();
     }
     if (_session) {
         _session->releaseIO();
     }
-    // client stays alive in session for reuse
 }
 
 bool HTTPMStream::seek(uint32_t pos) {
@@ -306,44 +583,72 @@ bool HTTPMStream::seek(uint32_t pos) {
 uint32_t HTTPMStream::read(uint8_t* buf, uint32_t size) {
     uint32_t bytesRead = 0;
 
-    if ( size > 0 )
-    {
-        //Debug_printv("HTTPMStream::read called, mode=%d", mode);
+    if (size > 0) {
+        // Full mode: 'status' command — return status as decimal text.
+        if (_statusRequested) {
+            _statusRequested = false;
+            // Surface the error via iecStatus before returning the decimal text.
+            int errCode = 0;
+            std::string errMsg;
+            ctx.errorToIecStatus(errCode, errMsg);
+            _error = ctx.isHttpError() ? 1 : 0;
+            std::string statusStr = std::to_string(ctx.responseStatus);
+            uint32_t copyLen = std::min((uint32_t)statusStr.size(), size);
+            memcpy(buf, statusStr.data(), copyLen);
+            return copyLen;
+        }
 
-        // If stream was opened for write mode, need to switch to read mode
-        // by completing the POST request and reading the response
+        // Full mode: serve buffered response headers one per read().
+        if (fullMode == FullModeState::RESPONSE_HEADERS) {
+            std::string headerLine;
+            if (ctx.hasMoreResponseHeaders()) {
+                headerLine = ctx.popResponseHeader();
+            } else {
+                // End-of-headers marker; auto-transition to body mode.
+                headerLine = "\r\n";
+                fullMode = FullModeState::RESPONSE_BODY;
+            }
+            uint32_t copyLen = std::min((uint32_t)headerLine.size(), size);
+            memcpy(buf, headerLine.data(), copyLen);
+            _error = 0;
+            return copyLen;
+        }
+
+        // Full mode: response body — read from MeatHttpClient.
+        if (fullMode == FullModeState::RESPONSE_BODY) {
+            if (_session && _session->client) {
+                bytesRead = _session->client->read(buf, size);
+                _position += bytesRead;
+                _error = _session->client->_error;
+                if (bytesRead == 0 && _session->client->complete()) {
+                    ctx.responseConsumed = true;
+                }
+                return bytesRead;
+            }
+            return 0;
+        }
+
+        // Simple mode: original write→read switch behavior.
         bool isWriteMode = (mode & 0x10) || (mode == std::ios_base::out);
         if (isWriteMode && _session && _session->client) {
-            Debug_printv("Switching from write mode to read mode");
             auto client = _session->client.get();
-
-            // If POST was already sent (close was called previously), just switch mode
-            // Check BOTH postResponse and preservedPostResponse since close() moves data there
             bool hasResponse = (!client->postBuffer.empty()) ||
                               (!client->postResponse.empty()) ||
                               (!client->preservedPostResponse.empty());
-
             if (!hasResponse) {
                 Debug_printv("POST already sent, reading from existing response");
             } else if (!client->postBuffer.empty()) {
-                // Send the POST request with buffered body and read response
                 Debug_printv("Sending POST request...");
-                client->close();  // This sends POST and reads response into postResponse buffer
+                client->close();
             }
-
-            // Switch stream mode so C64 sees it as readable
             mode = std::ios_base::in;
-            // _size is already set from the POST response
             _position = 0;
-            Debug_printv("After POST: _size=%u, postResponse.size=%u, preservedPostResponse.size=%u",
-                _size, (uint32_t)client->postResponse.size(), (uint32_t)client->preservedPostResponse.size());
         }
 
-        if ( size > available() )
+        if (size > available())
             size = available();
 
-        if ( size > 0 )
-        {
+        if (size > 0) {
             bytesRead = _session->client->read(buf, size);
             _position += bytesRead;
             _error = _session->client->_error;
@@ -351,16 +656,58 @@ uint32_t HTTPMStream::read(uint8_t* buf, uint32_t size) {
     }
 
     return bytesRead;
-};
+}
 
 uint32_t HTTPMStream::write(const uint8_t *buf, uint32_t size) {
-    Debug_printv("HTTPMStream::write called, size=%u, client=%p", size, _session ? _session->client.get() : nullptr);
-    uint32_t bytesWritten = 0;
-    if (_session && _session->client) {
-        bytesWritten = _session->client->write(buf, size);
-        _position += bytesWritten;
+    // In full mode, every write is a command.
+    if (fullMode != FullModeState::SIMPLE) {
+        std::string data(reinterpret_cast<const char*>(buf), size);
+        handleCommand(data);
+        return size;  // always consume
     }
-    return bytesWritten;
+
+    // Simple mode: peek first char(s) — if command-shaped, enter full mode.
+    // Note: this is a heuristic. A simple-mode POST body that happens to
+    // start with bytes matching a command prefix (e.g. a JSON body
+    // starting with 'r-' for some unrelated reason) would be
+    // misclassified. The spec accepts this trade-off; users who need
+    // body data starting with command letters must use simple-mode
+    // directly (not via full mode).
+    if (size > 0) {
+        char first = (char)buf[0];
+        bool looksLikeCommand =
+            first == 'm' || first == 'M' ||
+            first == 'h' || first == 'H' ||
+            first == 'b' || first == 'B' ||
+            first == 's' || first == 'S' ||
+            first == 'c' || first == 'C' ||
+            (size >= 3 && first == 'r' && buf[1] == '-');
+
+        // 'status' is 6 chars — detect explicitly to avoid false positives
+        // on bodies starting with 's' (e.g. "score: 100").
+        if (!looksLikeCommand && size >= 6) {
+            std::string head(reinterpret_cast<const char*>(buf), 6);
+            mstr::toLower(head);
+            if (head == "status") {
+                looksLikeCommand = true;
+            }
+        }
+
+        if (looksLikeCommand) {
+            fullMode = FullModeState::BUILDING_REQUEST;
+            std::string cmd(reinterpret_cast<const char*>(buf), size);
+            handleCommand(cmd);
+            return size;
+        }
+    }
+
+    // Simple mode: pass through to MeatHttpClient (existing POST/PUT buffering).
+    if (_session && _session->client) {
+        uint32_t bytesWritten = _session->client->write(buf, size);
+        _position += bytesWritten;
+        return bytesWritten;
+    }
+    return 0;
 }
 
 

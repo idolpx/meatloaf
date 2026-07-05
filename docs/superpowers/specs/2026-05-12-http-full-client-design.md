@@ -240,11 +240,11 @@ When `S` command is executed:
 ## Plan Tasks (high-level)
 
 1. Discard `http-client-phase3` branch (local + remote tracking).
-2. Add `HTTPRequestContext` class declaration + implementation in `http.h`/`http.cpp`.
-3. Add `FullModeState` enum + `handleCommand()` + modified `HTTPMStream::write()`/`read()`/`close()`.
-4. Implement error routing (`errorToIecStatus`, `isHttpError`, status command ST-bit setting).
-5. Add native unit test (`test/native/test_http_full_client/`).
-6. Update plan document with the 7-task structure (this is item 6; see `docs/superpowers/plans/2026-06-29-http-full-client-implementation.md`).
+2. Add `HTTPRequestContext` class declaration + implementation in `http.h`/`http.cpp` (including `errorToIecStatus()` and `isHttpError()` helpers).
+3. Add `FullModeState` enum + `handleCommand()` + modified `HTTPMStream::write()`/`read()`/`close()` (status-command ST-bit setting uses the helpers defined in task 2).
+4. Add native unit test (`test/native/test_http_full_client/`).
+5. Commit test infrastructure: `test/http/test_server.py`, `test/http/test_client.py`, `test/http/http_full_client_test.bas`.
+6. Update plan document reference in the spec (see `docs/superpowers/plans/2026-06-29-http-full-client-implementation.md`).
 7. Build verification: native tests pass + embedded firmware builds.
 
 Execution method: **subagent-driven-development** — one subagent per task, verified in the main loop before advancing.

@@ -43,3 +43,4 @@ deploy.*
 sdkconfig.*
 version.txt
 include/version.h
+.superpowers/

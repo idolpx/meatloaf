@@ -53,6 +53,45 @@ void http_set_insecure(bool v);
 
 
 /********************************************************
+ * HTTP Request Context — full-mode request builder
+ ********************************************************/
+
+class HTTPMSession;
+
+class HTTPRequestContext {
+public:
+    // Request state
+    std::string method = "GET";                              // GET, POST, PUT, HEAD
+    std::map<std::string, std::vector<std::string>> headers; // multi-value headers
+    std::string body;                                        // request body
+
+    // Response state
+    std::vector<std::string> responseHeaders;                // buffered response header lines ("Name: value")
+    int responseStatus = 0;                                  // 0 = unused, <0 = local err, >0 = HTTP status
+    bool responseConsumed = false;                           // true after all response data read
+
+    void setMethod(const std::string& m);
+    void setHeader(const std::string& name, const std::string& value);    // replaces
+    void appendHeader(const std::string& name, const std::string& value); // appends
+    void setBody(const std::string& b);
+    void appendBody(const std::string& b);
+    void clear();                                              // resets all state for next request
+
+    bool sendRequest(std::shared_ptr<HTTPMSession> session);   // executes via session->client
+
+    // For header-mode reading
+    bool hasMoreResponseHeaders() const {
+        return !responseHeaders.empty();
+    }
+    std::string popResponseHeader();  // returns "Name: value\r\n" or "" at end
+
+    // Error routing
+    void errorToIecStatus(int& errOut, std::string& msgOut) const;
+    bool isHttpError() const { return responseStatus < 200 || responseStatus >= 300; }
+};
+
+
+/********************************************************
  * HTTP Client
  ********************************************************/
 
@@ -243,6 +282,13 @@ public:
 
 class HTTPMStream: public MStream {
 public:
+    enum class FullModeState {
+        SIMPLE,             // backward-compatible mode, no commands active
+        BUILDING_REQUEST,   // full mode activated, accumulating commands
+        RESPONSE_HEADERS,   // request sent, reading response headers
+        RESPONSE_BODY       // reading response body
+    };
+
     HTTPMStream(std::string path): MStream(path) {
         //url = path;
     };
@@ -257,8 +303,6 @@ public:
 
     // MStream methods
     bool isOpen() override;
-    // bool isBrowsable() override { return false; };
-    // bool isRandomAccess() override { return false; };
     bool isNetwork() override { return true; };
 
     bool open(std::ios_base::openmode mode) override;
@@ -267,40 +311,42 @@ public:
     uint32_t read(uint8_t* buf, uint32_t size) override;
     uint32_t write(const uint8_t *buf, uint32_t size) override;
 
-    // For chunked responses _size grows as chunks arrive and equals _position after
-    // each read, so the base available() would return 0 even with more data pending.
-    // Return HTTP_BLOCK_SIZE as a hint when the connection is open but not yet complete.
     uint32_t available() override {
-        // Check if we have POST response data to read
+        // POST response buffer takes priority (existing behavior).
         if (_session && _session->client && !_session->client->postResponse.empty()) {
             uint32_t respAvail = (uint32_t)_session->client->postResponse.size() - _session->client->_position;
             if (respAvail > 0) return respAvail;
         }
+        // Full mode: at least one buffered response header.
+        if (fullMode == FullModeState::RESPONSE_HEADERS && ctx.hasMoreResponseHeaders()) {
+            return 1;
+        }
         if (_size > _position)
             return _size - _position;
-        // Check if connection is still open and has more data coming
         if (isOpen() && _session && _session->client && !_session->client->complete())
             return HTTP_BLOCK_SIZE;
         return 0;
     }
 
-    // bool eos() override {
-    //     Debug_printv("complete[%d]", _http.complete());
-    //     return _http.complete();
-    // }
-
     virtual bool seek(uint32_t pos);
-
     virtual bool seekPath(std::string path) override {
         Debug_printv( "path[%s]", path.c_str() );
         return false;
     }
+
+    // Full-mode helpers
+    bool handleCommand(const std::string& cmd);
+    bool isFullMode() const { return fullMode != FullModeState::SIMPLE; }
 
 protected:
     std::shared_ptr<HTTPMSession> _session = nullptr;
 
 private:
     friend class HTTPMFile;
+
+    HTTPRequestContext ctx;
+    FullModeState fullMode = FullModeState::SIMPLE;
+    bool _statusRequested = false;
 };
 
 
