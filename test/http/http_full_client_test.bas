@@ -13,7 +13,7 @@
 
 12 rem === configuration ===
 13 rem !!! update this to your test server's ip !!!
-14 s$="192.168.1.100"
+14 s$="192.168.1.131"
 15 p$="8080"
 16 b$=""                             : rem response buffer, shared
 
@@ -49,7 +49,6 @@
 45 rem ################################################################
 46 rem call: ch=channel, reads into r$
 47 rem uses: a$, ch
-48 readline:
 49 r$=""
 50 get#ch,a$
 51 if (st and 64)<>0 then return    : rem eoi -> done
@@ -61,7 +60,6 @@
 56 rem ################################################################
 57 rem # helper: read all remaining chars from ch into b$              #
 58 rem ################################################################
-59 readall:
 60 b$=""
 61 get#ch,a$
 62 if (st and 64)<>0 then return    : rem eoi -> done
@@ -83,7 +81,7 @@
 76 rem ################################################################
 77 getstatus:
 78 print#ch,"status"
-79 gosub readline
+79 gosub 49
 80 st$=r$
 81 return
 
@@ -93,7 +91,7 @@
 85 readheaders:
 86 h$=""
 87 print#ch,"r-h"
-88 gosub readline                     : rem read first header
+88 gosub 49                     : rem read first header
 89 if r$="" goto 92                   : rem empty means done
 90 h$=h$+r$+chr$(13)
 91 goto 88
@@ -105,7 +103,7 @@
 96 readbody:
 97 b$=""
 98 print#ch,"r-b"
-99 gosub readall
+99 gosub 60
 100 return
 
 101 rem ################################################################
