@@ -17,8 +17,14 @@ extern "C" {
  * UART                 CONFIG_ESP_CONSOLE_UART_DEFAULT
  * USB_OTG              CONFIG_ESP_CONSOLE_USB_CDC
  * USB_SERIAL_JTAG      CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG
+ *
+ * @param baud UART baud rate to use. Overrides the sdkconfig
+ *             CONFIG_ESP_CONSOLE_UART_BAUDRATE so a regenerated sdkconfig
+ *             (e.g. reset to 115200) cannot silently break the console.
+ *             Pass 0 to fall back to the sdkconfig value. Ignored for
+ *             USB CDC / USB-serial-JTAG consoles (no baud concept).
  */
-void initialize_console_peripheral(void);
+void initialize_console_peripheral(int baud);
 
 /**
  * @brief Initialize linenoise and esp console

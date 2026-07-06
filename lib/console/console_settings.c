@@ -27,7 +27,7 @@
 
 char prompt[CONSOLE_PROMPT_MAX_LEN]; // Prompt to be printed before each line
 
-void initialize_console_peripheral(void)
+void initialize_console_peripheral(int baud)
 {
     /* Drain stdout before reconfiguring it */
     fflush(stdout);
@@ -39,11 +39,12 @@ void initialize_console_peripheral(void)
     /* Move the caret to the beginning of the next line on '\n' */
     uart_vfs_dev_port_set_tx_line_endings(CONFIG_ESP_CONSOLE_UART_NUM, ESP_LINE_ENDINGS_CRLF);
 
-    /* Configure UART. Note that REF_TICK is used so that the baud rate remains
-     * correct while APB frequency is changing in light sleep mode.
-     */
+    /* Configure UART. The application-specified baud (DEBUG_SPEED, which
+     * matches monitor_speed in platformio.ini) overrides the sdkconfig
+     * value — IDF regenerating a board sdkconfig back to 115200 must not
+     * silently break the console. */
     const uart_config_t uart_config = {
-            .baud_rate = CONFIG_ESP_CONSOLE_UART_BAUDRATE,
+            .baud_rate = (baud > 0) ? baud : CONFIG_ESP_CONSOLE_UART_BAUDRATE,
             .data_bits = UART_DATA_8_BITS,
             .parity = UART_PARITY_DISABLE,
             .stop_bits = UART_STOP_BITS_1,

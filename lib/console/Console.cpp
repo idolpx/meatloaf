@@ -274,13 +274,14 @@ namespace ESP32Console
     {
         //Debug_printv("Initialize console");
 
-        (void)baud;
         (void)rxPin;
         (void)txPin;
         (void)channel;
 
-        // Use shared ESP-IDF style console setup for peripheral + stdio behavior.
-        initialize_console_peripheral();
+        // Use shared ESP-IDF style console setup for peripheral + stdio
+        // behavior. The requested baud (DEBUG_SPEED) overrides the sdkconfig
+        // CONFIG_ESP_CONSOLE_UART_BAUDRATE.
+        initialize_console_peripheral(baud);
 
         // Initialize linenoise + esp_console using the shared settings module.
         initialize_console_library(history_save_path_);
