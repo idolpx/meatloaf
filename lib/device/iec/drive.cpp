@@ -275,6 +275,9 @@ uint8_t iecChannelHandlerFile::write(uint8_t *data, uint8_t n) {
         m_transportTimeUS += (esp_timer_get_time() - t);
         m_byteCount += written;
         // Reset IEC buffer so next GET# fills from repositioned stream
+        if (m_eos) {
+            Debug_printv("WRITE-CLR-EOS: stream write forwarded, len=%u", m_len);
+        }
         m_ptr = 0;
         m_len = 0;
         m_eos = false;
