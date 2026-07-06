@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <fujiHost.h>
+#include "fnio.h"
 
 #define INVALID_SECTOR_VALUE 0xFFFFFFFF
 
@@ -26,9 +27,9 @@ enum mediatype_t
 class MediaType
 {
 protected:
-    FILE *_media_fileh = nullptr;
-    FILE *oldFileh = nullptr;
-    FILE *hsFileh = nullptr;
+    fnFile *_media_fileh = nullptr;
+    fnFile *oldFileh = nullptr;
+    fnFile *hsFileh = nullptr;
 
     uint32_t _media_image_size = 0;
     uint32_t _media_num_blocks = 256;
@@ -58,21 +59,21 @@ public:
     uint8_t _media_controller_status = DISK_CTRL_STATUS_CLEAR;
 
     fujiHost *_media_host = nullptr;
-    FILE *_media_hsfileh = nullptr;
+    fnFile *_media_hsfileh = nullptr;
 
     mediatype_t _mediatype = MEDIATYPE_UNKNOWN;
     bool _allow_hsio = true;
 
-    virtual mediatype_t mount(FILE *f, uint32_t disksize) = 0;
+    virtual mediatype_t mount(fnFile *f, uint32_t disksize) = 0;
     virtual void unmount();
 
     // Returns TRUE if an error condition occurred
-    virtual bool format(uint16_t *responsesize);
+    virtual error_is_true format(uint16_t *responsesize);
 
     // Returns TRUE if an error condition occurred
-    virtual bool read(uint32_t blockNum, uint16_t *readcount) = 0;
+    virtual error_is_true read(uint32_t blockNum, uint16_t *readcount) = 0;
     // Returns TRUE if an error condition occurred
-    virtual bool write(uint32_t blockNum, bool verify);
+    virtual error_is_true write(uint32_t blockNum, bool verify);
     
     virtual uint8_t status() = 0;
 

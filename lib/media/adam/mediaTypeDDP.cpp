@@ -10,6 +10,7 @@
 #endif
 
 #include "../../include/debug.h"
+#include "fsFlash.h"
 
 
 // Returns byte offset of given sector number
@@ -19,19 +20,25 @@ uint32_t MediaTypeDDP::_block_to_offset(uint32_t blockNum)
 }
 
 // Returns TRUE if an error condition occurred
-bool MediaTypeDDP::read(uint32_t blockNum, uint16_t *readcount)
+error_is_true MediaTypeDDP::read(uint32_t blockNum, uint16_t *readcount)
 {
     if (blockNum == _media_last_block)
-        return false; // We already have block.
+        RETURN_SUCCESS_AS_FALSE(); // We already have block.
 
     Debug_print("DDP READ\r\n");
+
+    if (_media_fileh == nullptr)
+    {
+        _media_controller_status = 2;
+        RETURN_ERROR_AS_TRUE();
+    }
 
     // Return an error if we're trying to read beyond the end of the disk
     if (blockNum > _media_num_blocks-1)
     {
         Debug_printf("::read block %lu > %lu\r\n", blockNum, _media_num_blocks);
         _media_controller_status=2;
-        return true;
+        RETURN_ERROR_AS_TRUE();
     }
 
     memset(_media_blockbuff, 0, sizeof(_media_blockbuff));
@@ -41,31 +48,31 @@ bool MediaTypeDDP::read(uint32_t blockNum, uint16_t *readcount)
     // if (blockNum != _media_last_block + 1)
     // {
         uint32_t offset = _block_to_offset(blockNum);
-        err = fseek(_media_fileh, offset, SEEK_SET) != 0;
+        err = fnio::fseek(_media_fileh, offset, SEEK_SET) != 0;
         _media_last_block = INVALID_SECTOR_VALUE;
     // }
 
     if (err == false)
-        err = fread(_media_blockbuff, 1, 1024, _media_fileh) != 1024;
+        err = fnio::fread(_media_blockbuff, 1, 1024, _media_fileh) != 1024;
 
     if (err == false)
     {
         _media_last_block = blockNum;
         _media_controller_status = 0;
-        return false;
+        RETURN_SUCCESS_AS_FALSE();
     }
     else
     {
         _media_last_block = INVALID_SECTOR_VALUE;
         _media_controller_status = 2;
-        return true;
+        RETURN_ERROR_AS_TRUE();
     }
 
-    return err;
+    RETURN_ERROR_IF(err);
 }
 
 // Returns TRUE if an error condition occurred
-bool MediaTypeDDP::write(uint32_t blockNum, bool verify)
+error_is_true MediaTypeDDP::write(uint32_t blockNum, bool verify)
 {
     Debug_printf("DDP WRITE [%lu/%lu]\r\n", blockNum, _media_num_blocks);
 
@@ -73,51 +80,65 @@ bool MediaTypeDDP::write(uint32_t blockNum, bool verify)
 
     _media_last_block = INVALID_SECTOR_VALUE;
 
-    if (_media_fileh->_flags == 0x1484) // mounted R/O, attempt HS R/W
+#ifdef FNIO_IS_STDIO
+    bool hs_mode = (_media_fileh->_flags == 0x1484);
+#else
+    bool hs_mode = false; // FileHandler (PC) doesn't expose stdio flags
+#endif
+    if (hs_mode)
     {
         Debug_printf("High score mode activated, attempting write open\r\n");
-        
+
         oldFileh = _media_fileh;
-        hsFileh = _media_host->file_open(_disk_filename, _disk_filename, strlen(_disk_filename) + 1, "r+");
-        _media_fileh = hsFileh;   
+        hsFileh = fsFlash.fnfile_open(_disk_filename, "r+");
+        if (hsFileh == nullptr)
+        {
+            Debug_printf("HS write open failed for %s; leaving read-only\r\n", _disk_filename);
+            _media_fileh = oldFileh;
+            _media_controller_status = 2;
+            RETURN_ERROR_AS_TRUE();
+        }
+        _media_fileh = hsFileh;
     }
 
     // Perform a seek if we're writing to the sector after the last one
     int e;
 //    if (blockNum != _media_last_block + 1)
 //    {
-        e = fseek(_media_fileh, offset, SEEK_SET);
+        e = fnio::fseek(_media_fileh, offset, SEEK_SET);
         if (e != 0)
         {
             Debug_printf("::write seek error %d\r\n", e);
             _media_controller_status=2;
-            return true;
+            if (hs_mode) { fnio::fclose(hsFileh); _media_fileh = oldFileh; }
+            RETURN_ERROR_AS_TRUE();
         }
 //    }
     // Write the data
-    e = fwrite(&_media_blockbuff[0], 1, 256, _media_fileh);
-    e += fwrite(&_media_blockbuff[256], 1, 256, _media_fileh);
-    e += fwrite(&_media_blockbuff[512], 1, 256, _media_fileh);
-    e += fwrite(&_media_blockbuff[768], 1, 256, _media_fileh);
-    
+    e = fnio::fwrite(&_media_blockbuff[0], 1, 256, _media_fileh);
+    e += fnio::fwrite(&_media_blockbuff[256], 1, 256, _media_fileh);
+    e += fnio::fwrite(&_media_blockbuff[512], 1, 256, _media_fileh);
+    e += fnio::fwrite(&_media_blockbuff[768], 1, 256, _media_fileh);
+
     if (e != 1024)
     {
         Debug_printf("::write error %d, %d\r\n", e, errno);
-        return true;
+        if (hs_mode) { fnio::fclose(hsFileh); _media_fileh = oldFileh; }
+        RETURN_ERROR_AS_TRUE();
     }
 
-    int ret = fflush(_media_fileh);    // This doesn't seem to be connected to anything in ESP-IDF VF, so it may not do anything
-    ret = fsync(fileno(_media_fileh)); // Since we might get reset at any moment, go ahead and sync the file (not clear if fflush does this)
+    int ret = fnio::fflush(_media_fileh);
+#ifdef FNIO_IS_STDIO
+    ret = fsync(fileno(_media_fileh)); // sync now in case we get reset at any moment
+#endif
     Debug_printf("DDP::write fsync:%d\r\n", ret);
 
-    Debug_printv("media flags %x\n",_media_fileh->_flags);
-    
-    if (_media_fileh->_flags == 0x1484)
+    if (hs_mode)
     {
         Debug_printf("Closing high score sector.\r\n");
 
         if (hsFileh != nullptr)
-            fclose(hsFileh);
+            fnio::fclose(hsFileh);
 
         _media_fileh = oldFileh;
         _media_last_block = INVALID_SECTOR_VALUE; // force a cache invalidate.
@@ -127,7 +148,7 @@ bool MediaTypeDDP::write(uint32_t blockNum, bool verify)
 
     _media_last_block = INVALID_SECTOR_VALUE;
     _media_controller_status=0;
-    return false;
+    RETURN_SUCCESS_AS_FALSE();
 }
 
 uint8_t MediaTypeDDP::status()
@@ -136,28 +157,35 @@ uint8_t MediaTypeDDP::status()
 }
 
 // Returns TRUE if an error condition occurred
-bool MediaTypeDDP::format(uint16_t *responsesize)
+error_is_true MediaTypeDDP::format(uint16_t *responsesize)
 {
-    return false;
+    RETURN_ERROR_AS_TRUE();
 }
 
-mediatype_t MediaTypeDDP::mount(FILE *f, uint32_t disksize)
+mediatype_t MediaTypeDDP::mount(fnFile *f, uint32_t disksize)
 {
     Debug_print("DDP MOUNT\r\n");
+
+    // f can be NULL (e.g. /autorun.ddp absent on PC); don't dereference it.
+    if (f == nullptr)
+    {
+        Debug_printf("DDP MOUNT failed: null file handle\r\n");
+        _media_fileh = nullptr;
+        return MEDIATYPE_UNKNOWN;
+    }
 
     _media_fileh = f;
     _mediatype = MEDIATYPE_DDP;
     _media_num_blocks = disksize / 1024;
 
-    Debug_printv("FLAGS: %x\n",_media_fileh->_flags);
     return _mediatype;
 }
 
 // Returns FALSE on error
-bool MediaTypeDDP::create(FILE *f, uint32_t numBlocks)
+success_is_true MediaTypeDDP::create(fnFile *f, uint32_t numBlocks)
 {
     Debug_print("DDP CREATE\r\n");
 
-    return true;
+    RETURN_ERROR_AS_FALSE();
 }
 #endif /* BUILD_ADAM */

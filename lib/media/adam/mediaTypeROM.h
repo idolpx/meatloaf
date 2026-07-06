@@ -12,10 +12,10 @@ private:
     // Block 0 and 1 data borrowed from Sean Myers' AdamNet Drive Emulator
     // https://github.com/Kalidomra/AdamNet-Drive-Emulator/blob/master/AdamNet_Drive_Emulator/SDLoadBlock.ino#L95
 
-    const char block0[1024]={0x3A,0x6F,0xFD,0x01,0x00,0x00,0x11,0x01,    // This is the boot block it just loads block 1 into 0x2000 and then jumps to 0x2000
+    const uint8_t block0[1024]={0x3A,0x6F,0xFD,0x01,0x00,0x00,0x11,0x01,    // This is the boot block it just loads block 1 into 0x2000 and then jumps to 0x2000
                              0x00,0x21,0x00,0x20,0xCD,0xF3,0xFC,0xC3,
                              0x00,0x20};
-    const char block1[1024]={0x11,0x02,0x00,0x21,0x00,0x40,0x3A,0x6F,  // This code will load the rom file from block 2 and above into 0x4000
+    const uint8_t block1[1024]={0x11,0x02,0x00,0x21,0x00,0x40,0x3A,0x6F,  // This code will load the rom file from block 2 and above into 0x4000
                              0xFD,0x01,0x00,0x00,0xCD,0xF3,0xFC,0x3E,  // Then the PCB's are move to 0x2100 and the AdamNet scanned
                              0x21,0xBB,0xCA,0x1D,0x20,0x01,0x00,0x04,  // (Thanks to Milli for this information)
                              0x09,0x13,0xC3,0x06,0x20,0x21,0x00,0x21,  // It will then bank switch in OS7 and move the rom code to 0x8000.
@@ -29,18 +29,18 @@ public:
     virtual ~MediaTypeROM();
 
     // Returns byte offset of given sector number
-    virtual uint32_t _block_to_offset(uint32_t blockNum);
+    uint32_t _block_to_offset(uint32_t blockNum);
 
-    virtual bool read(uint32_t blockNum, uint16_t *readcount) override;
-    virtual bool write(uint32_t blockNum, bool verify) override;
+    error_is_true read(uint32_t blockNum, uint16_t *readcount) override;
+    error_is_true write(uint32_t blockNum, bool verify) override;
 
-    virtual bool format(uint16_t *responsesize) override;
+    error_is_true format(uint16_t *responsesize) override;
 
-    virtual mediatype_t mount(FILE *f, uint32_t disksize) override;
+    mediatype_t mount(fnFile *f, uint32_t disksize) override;
 
-    virtual uint8_t status() override;
+    uint8_t status() override;
 
-    static bool create(FILE *f, uint32_t numBlock);
+    static success_is_true create(fnFile *f, uint32_t numBlock);
 };
 
 
