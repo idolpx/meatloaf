@@ -724,8 +724,13 @@ uint32_t HTTPMStream::read(uint8_t* buf, uint32_t size) {
         if (_responseBufPos >= regionEnd) {
             if (fullMode == FullModeState::RESPONSE_HEADERS) {
                 fullMode = FullModeState::RESPONSE_BODY;
+                // Don't nuke _position — body data starts at _headersEnd
+            } else {
+                _position = _size = (uint32_t)_responseBuffer.size();
             }
-            _position = _size = (uint32_t)_responseBuffer.size();
+            Debug_printv("REGION-EXHAUST: mode=%d pos=%u regEnd=%u bufSz=%u sReq=%d",
+                (int)fullMode, _responseBufPos, regionEnd, (uint32_t)_responseBuffer.size(),
+                _statusRequested);
             return 0;
         }
 
