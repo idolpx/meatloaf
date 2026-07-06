@@ -363,8 +363,8 @@ uint8_t WiFiManager::scan_networks(uint8_t maxresults)
     scan_conf.channel = 0; // 0 = all regulatory-allowed channels
     scan_conf.show_hidden = false;
     scan_conf.scan_type = WIFI_SCAN_TYPE_ACTIVE;
-    scan_conf.scan_time.active.min = 100;
-    scan_conf.scan_time.active.max = 300;
+    scan_conf.scan_time.active.min = 100; // ms; 100 is what Arduino-ESP uses
+    scan_conf.scan_time.active.max = 300; // ms; 300 is what Arduino-ESP uses
     // channel_bitmap left zero: bitmap=0 defers to channel=0 (scan all channels).
     // Setting 0xFFFF here includes reserved bits that the driver rejects as invalid.
 
