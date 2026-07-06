@@ -259,6 +259,30 @@ iecChannelHandlerFile::~iecChannelHandlerFile()
   //delete m_stream;
 }
 
+// For network streams (read-write mode), forward writes directly to the
+// stream instead of buffering in the shared m_data[] read buffer.
+// This is critical for full-mode HTTP: PRINT# commands must reach
+// HTTPMStream::write() before the C64 can GET# back the response.
+// ALSO: after forwarding a command, reset the IEC buffer so the next
+// readBufferData() call (from the subsequent GET# or read) fills from
+// the stream's freshly-positioned cursor.  Without this, m_eos locks
+// the buffer permanently and mode-switch commands (r-h, r-b, status)
+// can never re-fill from a different region of the response.
+uint8_t iecChannelHandlerFile::write(uint8_t *data, uint8_t n) {
+    if (m_stream && (m_stream->mode & std::ios_base::out)) {
+        uint64_t t = esp_timer_get_time();
+        size_t written = m_stream->write(data, n);
+        m_transportTimeUS += (esp_timer_get_time() - t);
+        m_byteCount += written;
+        // Reset IEC buffer so next GET# fills from repositioned stream
+        m_ptr = 0;
+        m_len = 0;
+        m_eos = false;
+        return written;
+    }
+    return iecChannelHandler::write(data, n);
+}
+
 
 uint8_t iecChannelHandlerFile::writeBufferData()
 {
@@ -756,6 +780,13 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                 mode = std::ios_base::in;
             else if( pt[2]=="W" )
                 mode = std::ios_base::out;
+        }
+
+        // Network URLs (http://, ftp://, etc.) need read-write mode for
+        // full-mode HTTP protocol: PRINT# writes commands, GET# reads responses.
+        // Must override channel 1's default-out assignment.
+        if ( name.find("://") != std::string::npos && mode != (std::ios_base::in | std::ios_base::out) ) {
+            mode = std::ios_base::in | std::ios_base::out;
         }
 
         if( mstr::startsWith(name, "@") )

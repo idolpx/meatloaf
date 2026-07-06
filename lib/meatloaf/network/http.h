@@ -15,16 +15,6 @@
 // You should have received a copy of the GNU General Public License
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
-// HTTP://  - Hypertext Transfer Protocol
-// HTTPS:// - Hypertext Transfer Protocol Secure
-// https://buger.dread.cz/simple-esp8266-https-client-without-verification-of-certificate-fingerprint.html
-// https://forum.arduino.cc/t/esp8266-httpclient-library-for-https/495245
-
-// WebDAV - Web Distributed Authoring and Versioning
-// http://www.webdav.org/specs/
-// 
-
-
 #ifndef MEATLOAF_SCHEME_HTTP
 #define MEATLOAF_SCHEME_HTTP
 
@@ -42,59 +32,39 @@ void http_set_insecure(bool v);
 #include "../../../include/debug.h"
 
 #include "../../../include/version.h"
-//#define PRODUCT_ID "MEATLOAF CBM"
-//#define PLATFORM_DETAILS "C64; 6510; 2; NTSC; EN;" // Make configurable. This will help server side to select appropriate content.
 #define USER_AGENT "MEATLOAF/" FN_VERSION_FULL " (" PLATFORM_DETAILS ")"
-
 
 #include "utils.h"
 
 #define HTTP_BLOCK_SIZE 256
 
-
-/********************************************************
- * HTTP Request Context — full-mode request builder
- ********************************************************/
-
 class HTTPMSession;
 
 class HTTPRequestContext {
 public:
-    // Request state
-    std::string method = "GET";                              // GET, POST, PUT, HEAD
-    std::map<std::string, std::vector<std::string>> headers; // multi-value headers
-    std::string body;                                        // request body
+    std::string method = "GET";
+    std::map<std::string, std::vector<std::string>> headers;
+    std::string body;
 
-    // Response state
-    std::vector<std::string> responseHeaders;                // buffered response header lines ("Name: value")
-    int responseStatus = 0;                                  // 0 = unused, <0 = local err, >0 = HTTP status
-    bool responseConsumed = false;                           // true after all response data read
+    std::vector<std::string> responseHeaders;
+    int responseStatus = 0;
+    bool responseConsumed = false;
 
     void setMethod(const std::string& m);
-    void setHeader(const std::string& name, const std::string& value);    // replaces
-    void appendHeader(const std::string& name, const std::string& value); // appends
+    void setHeader(const std::string& name, const std::string& value);
+    void appendHeader(const std::string& name, const std::string& value);
     void setBody(const std::string& b);
     void appendBody(const std::string& b);
-    void clear();                                              // resets all state for next request
+    void clear();
 
-    bool sendRequest(std::shared_ptr<HTTPMSession> session);   // executes via session->client
+    bool sendRequest(std::shared_ptr<HTTPMSession> session);
 
-    // For header-mode reading
-    bool hasMoreResponseHeaders() const {
-        return !responseHeaders.empty();
-    }
-    std::string popResponseHeader();  // returns "Name: value\r\n" or "" at end
+    bool hasMoreResponseHeaders() const { return !responseHeaders.empty(); }
+    std::string popResponseHeader();
 
-    // Error routing
     void errorToIecStatus(int& errOut, std::string& msgOut) const;
     bool isHttpError() const { return responseStatus < 200 || responseStatus >= 300; }
 };
-
-
-/********************************************************
- * HTTP Client
- ********************************************************/
-
 
 class MeatHttpClient {
     esp_http_client_handle_t _http = nullptr;
@@ -102,37 +72,19 @@ class MeatHttpClient {
     int openAndFetchHeaders(esp_http_client_method_t method, uint32_t position, uint32_t size = HTTP_BLOCK_SIZE);
     esp_http_client_method_t lastMethod;
 
-    // Callback for HTTP headers received during the request; can be set by users of this class to handle headers as needed
-    std::function<int(char*, char*)> onHeader = [] (char* key, char* value){ 
-        //Debug_printv("HTTP_EVENT_ON_HEADER, key=%s, value=%s", key, value);
-        return 0; 
-    };
-
+    std::function<int(char*, char*)> onHeader = [] (char*, char*){ return 0; };
     std::map<std::string, std::string> headers;
 
 public:
-    // Buffer for POST/PUT body data when streaming
     std::vector<uint8_t> postBuffer;
-
-    // Buffer for POST response body to be read by C64 after POST completes
     std::vector<uint8_t> postResponse;
-
-    // Preserved POST response that survives init() - used when switching from POST to GET
     std::vector<uint8_t> preservedPostResponse;
-
-    // Preserved size of the POST response (since preservedPostResponse may be moved)
     uint32_t preservedPostResponseSize = 0;
 
-    MeatHttpClient() {
-        init();
-    }
-
+    MeatHttpClient() { init(); }
     void init();
 
     ~MeatHttpClient() {
-        // Don't call close() here - it may cause double-cleanup issues.
-        // close() should be called explicitly before destruction.
-        // If _http is still valid, do minimal cleanup.
         if (_http != nullptr) {
             esp_http_client_cleanup(_http);
             _http = nullptr;
@@ -141,17 +93,10 @@ public:
 
     bool setHeader(const std::string header) {
         auto h = util_tokenize(header, ':');
-        if ( h.size() == 2)
-        {
-            headers.insert( std::pair<std::string, std::string>(h[0], h[1]) );
-            return true;
-        }
+        if (h.size() == 2) { headers[h[0]] = h[1]; return true; }
         return false;
     }
-    std::string getHeader(std::string header)
-    {
-        return headers[header];
-    }
+    std::string getHeader(std::string header) { return headers[header]; }
 
     bool GET(std::string url);
     bool POST(std::string url);
@@ -161,22 +106,24 @@ public:
     bool processRedirectsAndOpen(uint32_t position, uint32_t size = HTTP_BLOCK_SIZE);
     bool open(std::string url, esp_http_client_method_t meth);
     bool reopen();
-    //void cancel();
     void close();
     void setOnHeader(const std::function<int(char*, char*)> &f);
     bool seek(uint32_t pos);
-    bool flush(uint32_t numBytes = 0); // Flush all remaining bytes if 0
+    bool flush(uint32_t numBytes = 0);
     uint32_t read(uint8_t* buf, uint32_t size);
     uint32_t write(const uint8_t* buf, uint32_t size);
 
     bool _is_open = false;
     bool _exists = false;
 
-    uint32_t available() {
-        return _size - _position;
-    }
+    uint32_t available() { return _size - _position; }
 
     bool complete() {
+        if (_http == nullptr) {
+            if (!preservedPostResponse.empty())
+                return _position >= (uint32_t)preservedPostResponse.size();
+            return true;
+        }
         return esp_http_client_is_complete_data_received(_http);
     }
 
@@ -194,35 +141,24 @@ public:
     std::string url;
     std::string contentDispositionFilename;
 
+    bool _performPending = false;
     int lastRC = 0;
 };
 
-/********************************************************
- * HTTPMSession - HTTP Session Management
- ********************************************************/
-
 class HTTPMSession : public MSession {
 public:
-    HTTPMSession(std::string host, uint16_t port = 80); // Default HTTP port is 80
+    HTTPMSession(std::string host, uint16_t port = 80);
     ~HTTPMSession() override;
 
     bool connect() override;
     void disconnect() override;
     bool keep_alive() override;
 
-    // Get the scheme for this session type
     static std::string getScheme() { return "http"; }
-
-    // Check if this session supports HTTPS
     bool isSecure() const { return this->port == 443; }
 
     std::shared_ptr<MeatHttpClient> client;
 };
-
-
-/********************************************************
- * HTTPMFile implementation
- ********************************************************/
 
 class HTTPMFile: public MFile {
     std::shared_ptr<MeatHttpClient> getClient();
@@ -230,78 +166,47 @@ class HTTPMFile: public MFile {
     bool _headersFetched = false;
 
 public:
-    HTTPMFile() {
-        Debug_printv("C++, if you try to call this, be damned!");
-    };
-    HTTPMFile(std::string path): MFile(path) { 
-        // Obtain or create HTTP session via SessionBroker
-        // Use default ports if not specified: 443 for https, 80 for http
+    HTTPMFile() {};
+    HTTPMFile(std::string path): MFile(path) {
         uint16_t http_port = port.empty() ? (scheme == "https" ? 443 : 80) : std::stoi(port);
         _session = SessionBroker::obtain<HTTPMSession>(host, http_port);
-        
         if (!_session || !_session->isConnected()) {
-            Debug_printv("Failed to obtain HTTP session for %s:%d", host.c_str(), http_port);
             m_isNull = true;
             return;
         }
-        
-        // Debug_printv("constructing http file from url [%s]", url.c_str());
     };
     HTTPMFile(std::string path, std::string filename): MFile(path) {};
-    ~HTTPMFile() override {
-        // Client is managed by the session, do not close here
-        // Reset session reference
-        if (_session) {
-            _session.reset();
-        }
-    }
+    ~HTTPMFile() override { if (_session) _session.reset(); }
 
-    std::shared_ptr<MStream> getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override ; // has to return OPENED stream
+    std::shared_ptr<MStream> getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override;
     std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> src);
     std::shared_ptr<MStream> createStream(std::ios_base::openmode mode) override;
 
     bool isDirectory() override;
-    time_t getLastWrite() override ;
-    time_t getCreationTime() override ;
-    bool rewindDirectory() override ;
-    MFile* getNextFileInDir() override ;
-    bool mkDir() override ;
-    bool exists() override ;
-
-    bool remove() override ;
-    bool isText() override ;
+    time_t getLastWrite() override;
+    time_t getCreationTime() override;
+    bool rewindDirectory() override;
+    MFile* getNextFileInDir() override;
+    bool mkDir() override;
+    bool exists() override;
+    bool remove() override;
+    bool isText() override;
     bool rename(std::string dest) { return false; };
-    
-    //void addHeader(const String& name, const String& value, bool first = false, bool replace = true);
 };
-
-
-/********************************************************
- * HTTPMStream Implementation
- ********************************************************/
 
 class HTTPMStream: public MStream {
 public:
     enum class FullModeState {
-        SIMPLE,             // backward-compatible mode, no commands active
-        BUILDING_REQUEST,   // full mode activated, accumulating commands
-        RESPONSE_HEADERS,   // request sent, reading response headers
-        RESPONSE_BODY       // reading response body
+        SIMPLE,
+        BUILDING_REQUEST,
+        RESPONSE_HEADERS,
+        RESPONSE_BODY
     };
 
-    HTTPMStream(std::string path): MStream(path) {
-        //url = path;
-    };
-    HTTPMStream(std::string path, std::ios_base::openmode m): MStream(path) {
-        //url = path;
-        mode = m;
-    };
+    HTTPMStream(std::string path): MStream(path) {};
+    HTTPMStream(std::string path, std::ios_base::openmode m): MStream(path) { mode = m; };
+    ~HTTPMStream() { close(); };
 
-    ~HTTPMStream() {
-        close();
-    };
-
-    // MStream methods
     bool isOpen() override;
     bool isNetwork() override { return true; };
 
@@ -312,29 +217,25 @@ public:
     uint32_t write(const uint8_t *buf, uint32_t size) override;
 
     uint32_t available() override {
-        // POST response buffer takes priority (existing behavior).
+        if (!_responseBuffer.empty()) {
+            if (_responseBufPos >= (uint32_t)_responseBuffer.size())
+                return 0;
+            return (uint32_t)_responseBuffer.size() - _responseBufPos;
+        }
         if (_session && _session->client && !_session->client->postResponse.empty()) {
             uint32_t respAvail = (uint32_t)_session->client->postResponse.size() - _session->client->_position;
             if (respAvail > 0) return respAvail;
         }
-        // Full mode: at least one buffered response header.
-        if (fullMode == FullModeState::RESPONSE_HEADERS && ctx.hasMoreResponseHeaders()) {
-            return 1;
-        }
-        if (_size > _position)
-            return _size - _position;
+        if (_size > _position) return _size - _position;
+        if (fullMode == FullModeState::RESPONSE_BODY && ctx.responseConsumed) return 0;
         if (isOpen() && _session && _session->client && !_session->client->complete())
             return HTTP_BLOCK_SIZE;
         return 0;
     }
 
     virtual bool seek(uint32_t pos);
-    virtual bool seekPath(std::string path) override {
-        Debug_printv( "path[%s]", path.c_str() );
-        return false;
-    }
+    virtual bool seekPath(std::string path) override { return false; }
 
-    // Full-mode helpers
     bool handleCommand(const std::string& cmd);
     bool isFullMode() const { return fullMode != FullModeState::SIMPLE; }
 
@@ -347,45 +248,49 @@ private:
     HTTPRequestContext ctx;
     FullModeState fullMode = FullModeState::SIMPLE;
     bool _statusRequested = false;
+    std::string _statusBuffer;
+    uint32_t _statusPos = 0;
+
+    std::string _cmdLine;
+    bool _queuedSend = false;
+
+    // Buffer the whole HTTP response after sendRequest() so the IEC
+    // handler's aggressive readBufferData() pre-fetch can't consume
+    // headers before the C64 requests them via "r-h"/"r-b"/"status".
+    // Layout: [status\r][header1\r]...[headerN\r][\r][body bytes]
+    std::vector<uint8_t> _responseBuffer;
+    uint32_t _responseBufPos = 0;
+    uint32_t _statusEnd = 0;       // one past the last byte of "200\r"
+    uint32_t _headersEnd = 0;      // one past the last byte of "\r" blank line
+
+    // Body bytes captured during open() so _queuedSend doesn't need a
+    // live HTTP connection to build the response buffer.
+    std::vector<uint8_t> _bodyCapture;
 };
 
 
-
-/********************************************************
- * HTTPMFileSystem Implementation
- ********************************************************/
-
-class HTTPMFileSystem: public MFileSystem 
+class HTTPMFileSystem: public MFileSystem
 {
 public:
     HTTPMFileSystem(): MFileSystem("http") {
         isRootFS = true;
         service_type = "_http._tcp";
-        //service_type = "_http-alt._tcp";
-        //service_type = "_webdav._tcp";
     };
 
     bool handles(std::string name) {
-        if ( mstr::equals(name, (char *)"http:", false) )
-            return true;
-
-        if ( mstr::equals(name, (char *)"https:", false) )
-            return true;
-            
+        if (mstr::equals(name, (char *)"http:", false)) return true;
+        if (mstr::equals(name, (char *)"https:", false)) return true;
         return false;
     }
 
     MFile* getFile(std::string path) override {
-        // If host is not specified, search for service records
         auto parser = PeoplesUrlParser::parseURL(path);
         if (parser->host.empty()) {
             path = "mdns://" + service_type;
             return new MDNSMFile(path);
         }
-
         return new HTTPMFile(path);
     }
 };
-
 
 #endif /* MEATLOAF_SCHEME_HTTP */

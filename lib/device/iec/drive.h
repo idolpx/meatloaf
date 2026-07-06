@@ -63,7 +63,7 @@ public:
   virtual ~iecChannelHandler();
 
   uint8_t read(uint8_t *data, uint8_t n);
-  uint8_t write(uint8_t *data, uint8_t n);
+  virtual uint8_t write(uint8_t *data, uint8_t n);
 
   virtual uint8_t writeBufferData() = 0;
   virtual uint8_t readBufferData()  = 0;
@@ -86,6 +86,7 @@ public:
 
   virtual uint8_t readBufferData();
   virtual uint8_t writeBufferData();
+  virtual uint8_t write(uint8_t *data, uint8_t n) override;
   virtual std::shared_ptr<MStream> getStream() override { return m_stream; };
 
 private:

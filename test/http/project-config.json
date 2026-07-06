@@ -3,7 +3,7 @@
     "description": "Project c64-chat-client",
     "toolkit": "basic",
     "sources": [
-        "http_put_test.bas"
+        "http_full_client_test.bas"
     ],
     "build": "debug",
     "definitions": [],

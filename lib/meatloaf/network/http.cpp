@@ -103,31 +103,35 @@ bool HTTPRequestContext::sendRequest(std::shared_ptr<HTTPMSession> session) {
         client.postBuffer.insert(client.postBuffer.end(), body.begin(), body.end());
     }
 
+    // Clear stale preservedPostResponse so a fresh request dispatches a real
+    // HTTP call instead of returning old data.
+    client.preservedPostResponse.clear();
+    client.preservedPostResponseSize = 0;
+
     // Dispatch by method.
     bool result = false;
     if (method == "GET") {
+        // For full-mode GET in read-write mode, the client has already been
+        // initialized (but not connected).  We open the connection now, at
+        // read time where IEC timing constraints don't apply.
+        Debug_printv("sendRequest: GET url=%s", client.url.c_str());
         result = client.GET(client.url);
+        // Capture response headers for the buffer builder (see popResponseHeader)
+        // onHeader callbacks already populated responseHeaders via
+        // setOnHeader() at the top of this function.
     } else if (method == "POST") {
         result = client.POST(client.url);
         if (result && !client.postBuffer.empty()) {
-            client.close();
-            // NOTE: responseStatus reflects the header-only POST open, NOT the actual
-            // POST body response. client.POST() calls open() → openAndFetchHeaders()
-            // which returns 200 for POST (hardcoded). client.close() calls
-            // esp_http_client_perform() to send the body and receive the real response,
-            // but does NOT update client.lastRC. So responseStatus here is 200 even
-            // if the server returned 4xx/5xx for the body. A proper fix would require
-            // capturing the status code from the HTTP_EVENT_ON_HEADER callback during
-            // the perform() call inside close(), or refactoring close() to return the
-            // status. Most servers return the same status for header-only and full
-            // requests, so this is acceptable for now.
+            // Defer the blocking esp_http_client_perform() to first body
+            // read.  If we call client.close() here (which does perform()),
+            // it blocks the IEC bus and the C64 may time out with
+            // ?DEVICE NOT PRESENT.
+            client._performPending = true;
         }
     } else if (method == "PUT") {
         result = client.PUT(client.url);
         if (result && !client.postBuffer.empty()) {
-            client.close();
-            // NOTE: Same limitation as POST above — responseStatus may not reflect
-            // the actual PUT body response status.
+            client._performPending = true;
         }
     } else if (method == "HEAD") {
         result = client.HEAD(client.url);
@@ -153,7 +157,7 @@ std::string HTTPRequestContext::popResponseHeader() {
     if (responseHeaders.empty()) return {};
     std::string line = responseHeaders.front();
     responseHeaders.erase(responseHeaders.begin());
-    return line + "\r\n";
+    return line + "\r";
 }
 
 static const std::map<int, std::string> http_status_text = {
@@ -218,28 +222,39 @@ bool HTTPMStream::handleCommand(const std::string& cmd) {
         switch (c[2]) {
             case 'h': case 'H':
                 fullMode = FullModeState::RESPONSE_HEADERS;
+                _responseBufPos = _statusEnd;
+                _position = _responseBufPos;  // sync for available()/eos()
                 return true;
             case 'b': case 'B':
                 fullMode = FullModeState::RESPONSE_BODY;
+                _responseBufPos = _headersEnd;
+                _position = _responseBufPos;
+                _size = (uint32_t)_responseBuffer.size();  // ensure size is correct
+                ctx.responseConsumed = false;
                 return true;
         }
         return false;
     }
 
-    // 's' — send the request
+    // 's' — send the request (deferred: sets _queuedSend, actual TCP work runs in read())
     if (c == "s" || c == "S") {
         fullMode = FullModeState::RESPONSE_HEADERS;
-        if (_session) {
-            ctx.sendRequest(_session);
-        }
+        _queuedSend = true;
         return true;
     }
 
-    // 'c' — clear context, return to BUILDING_REQUEST for next request
+        // 'c' — clear context, return to BUILDING_REQUEST for next request
     if (c == "c" || c == "C") {
         ctx.clear();
+        _bodyCapture.clear();
+        _responseBuffer.clear();
+        _responseBufPos = 0;
+        _position = 0;
+        _statusEnd = 0;
+        _headersEnd = 0;
         fullMode = FullModeState::BUILDING_REQUEST;
         _statusRequested = false;
+        _queuedSend = false;
         return true;
     }
 
@@ -249,6 +264,8 @@ bool HTTPMStream::handleCommand(const std::string& cmd) {
         mstr::toLower(lower);
         if (lower == "status") {
             _statusRequested = true;
+            _responseBufPos = 0;
+            _position = 0;  // sync for available()/eos()
             return true;
         }
     }
@@ -525,6 +542,50 @@ bool HTTPMStream::open(std::ios_base::openmode mode) {
     auto& client = *_session->client;
     bool r = false;
 
+    // Read-write mode → full-mode HTTP client.
+    // Do a GET now (drive open = relaxed timing), capture the response,
+    // and close the HTTP connection.  _queuedSend at read time will
+    // build the response buffer from captured data.
+    if ((mode & std::ios_base::in) && (mode & std::ios_base::out)) {
+        client.url = url;
+        mstr::replaceAll(client.url, " ", "%20");
+        // Force a fresh HTTP call — don't use cached response
+        client.preservedPostResponse.clear();
+        client.preservedPostResponseSize = 0;
+        client.postResponse.clear();
+        Debug_printv("FULL-OPEN: clearing cache, calling GET url=%s", url.c_str());
+        // Set onHeader to capture response headers into ctx
+        client.setOnHeader([this](char* key, char* value) -> int {
+            if (key && value) {
+                ctx.responseHeaders.push_back(std::string(key) + ": " + std::string(value));
+            }
+            Debug_printv("ON-HDR: key=%s val=%s #hdrs=%zu", key?key:"(null)", value?value:"(null)", ctx.responseHeaders.size());
+            return 0;
+        });
+        r = client.GET(url);
+        ctx.responseStatus = client.lastRC ? client.lastRC : 0;
+        // Capture body while connection is alive
+        _bodyCapture.clear();
+        uint8_t tmp[512];
+        if (client._is_open) {
+            while (true) {
+                uint32_t n = client.read(tmp, sizeof(tmp));
+                if (n == 0) break;
+                _bodyCapture.insert(_bodyCapture.end(), tmp, tmp + n);
+            }
+        } else if (!client.postResponse.empty()) {
+            _bodyCapture = client.postResponse;
+        } else if (!client.preservedPostResponse.empty()) {
+            _bodyCapture = client.preservedPostResponse;
+        }
+        _size = (client._range_size > 0) ? client._range_size : client._size;
+        Debug_printv("FULL-OPEN: r=%d status=%d headers=%zu body=%zu size=%u",
+            r, ctx.responseStatus, ctx.responseHeaders.size(),
+            _bodyCapture.size(), _size);
+        if (_session) _session->acquireIO();
+        return r;
+    }
+
     if(mode == (std::ios_base::out | std::ios_base::app))
         r = client.PUT(url);
     else if(mode == std::ios_base::out)
@@ -583,97 +644,162 @@ bool HTTPMStream::seek(uint32_t pos) {
 uint32_t HTTPMStream::read(uint8_t* buf, uint32_t size) {
     uint32_t bytesRead = 0;
 
-    if (size > 0) {
-        // Full mode: 'status' command — return status as decimal text.
-        if (_statusRequested) {
-            _statusRequested = false;
-            // Surface the error via iecStatus before returning the decimal text.
-            int errCode = 0;
-            std::string errMsg;
-            ctx.errorToIecStatus(errCode, errMsg);
-            _error = ctx.isHttpError() ? 1 : 0;
-            std::string statusStr = std::to_string(ctx.responseStatus);
-            uint32_t copyLen = std::min((uint32_t)statusStr.size(), size);
-            memcpy(buf, statusStr.data(), copyLen);
-            return copyLen;
-        }
+    if (size == 0) return 0;
 
-        // Full mode: serve buffered response headers one per read().
-        if (fullMode == FullModeState::RESPONSE_HEADERS) {
-            std::string headerLine;
-            if (ctx.hasMoreResponseHeaders()) {
-                headerLine = ctx.popResponseHeader();
-            } else {
-                // End-of-headers marker; auto-transition to body mode.
-                headerLine = "\r\n";
+    // Phase 1: If 's' was received in write(), execute the HTTP request now
+    // (safe IEC timing in read phase) and build the response buffer.
+    if (_queuedSend) {
+        _queuedSend = false;
+        if (_session) {
+            auto& cl = *_session->client;
+            // For non-GET methods (POST/PUT), execute the deferred HTTP call
+            if (ctx.method == "POST" || ctx.method == "PUT") {
+                ctx.responseHeaders.clear();
+                ctx.responseStatus = 0;
+                // Set up fresh header capture
+                cl.setOnHeader([this](char* key, char* value) -> int {
+                    if (key && value) {
+                        ctx.responseHeaders.push_back(std::string(key) + ": " + std::string(value));
+                    }
+                    return 0;
+                });
+                ctx.sendRequest(_session);
+                // The POST body was set in postBuffer by write().
+                // close() triggers esp_http_client_perform().
+                if (cl._performPending && !cl.postBuffer.empty()) {
+                    Debug_printv("POST: close+perform (buf=%u)", (uint32_t)cl.postBuffer.size());
+                    cl.close();
+                    cl._performPending = false;
+                    // POST response is now in preservedPostResponse
+                    Debug_printv("POST: after close() preserved=%u lastRC=%d",
+                        (uint32_t)cl.preservedPostResponse.size(), cl.lastRC);
+                    // Update context with POST response data
+                    ctx.responseStatus = cl.lastRC ? cl.lastRC : 200;
+                    _bodyCapture.clear();
+                    if (!cl.preservedPostResponse.empty()) {
+                        _bodyCapture = cl.preservedPostResponse;
+                    }
+                }
+                Debug_printv("POST/capture: status=%d headers=%zu body=%u bodySnippet=%.20s",
+                    ctx.responseStatus, ctx.responseHeaders.size(),
+                    (uint32_t)_bodyCapture.size(),
+                    _bodyCapture.empty() ? "(empty)" : (const char*)_bodyCapture.data());
+            }
+
+            _responseBuffer.clear();
+            _responseBufPos = 0;
+
+            // Status line with \r
+            std::string s = std::to_string(ctx.responseStatus) + "\r";
+            _responseBuffer.insert(_responseBuffer.end(), s.begin(), s.end());
+            _statusEnd = (uint32_t)_responseBuffer.size();
+
+            // Header lines with \r each
+            for (auto& h : ctx.responseHeaders) {
+                std::string line = h + "\r";
+                _responseBuffer.insert(_responseBuffer.end(), line.begin(), line.end());
+            }
+            // Blank line separates headers from body
+            _responseBuffer.push_back('\r');
+            _headersEnd = (uint32_t)_responseBuffer.size();
+
+            // Body captured during open() or deferred POST/PUT
+            _responseBuffer.insert(_responseBuffer.end(), _bodyCapture.begin(), _bodyCapture.end());
+            _size = (uint32_t)_responseBuffer.size();
+            _position = 0;
+
+            Debug_printv("BUFFER: total=%u bytes (statusEnd=%u, headersEnd=%u) bodySnippet=%.30s",
+                (uint32_t)_responseBuffer.size(), _statusEnd, _headersEnd,
+                _responseBuffer.size() > _headersEnd ? (const char*)(&_responseBuffer[_headersEnd]) : "(null)");
+        }
+    }
+
+    // Phase 2: Serve from response buffer (if populated)
+    if (!_responseBuffer.empty()) {
+        // Determine region based on current mode
+        uint32_t regionEnd = (uint32_t)_responseBuffer.size();
+        if (fullMode == FullModeState::RESPONSE_HEADERS && _statusEnd > 0)
+            regionEnd = _headersEnd;
+
+        if (_responseBufPos >= regionEnd) {
+            if (fullMode == FullModeState::RESPONSE_HEADERS) {
                 fullMode = FullModeState::RESPONSE_BODY;
             }
-            uint32_t copyLen = std::min((uint32_t)headerLine.size(), size);
-            memcpy(buf, headerLine.data(), copyLen);
-            _error = 0;
-            return copyLen;
-        }
-
-        // Full mode: response body — read from MeatHttpClient.
-        if (fullMode == FullModeState::RESPONSE_BODY) {
-            if (_session && _session->client) {
-                bytesRead = _session->client->read(buf, size);
-                _position += bytesRead;
-                _error = _session->client->_error;
-                if (bytesRead == 0 && _session->client->complete()) {
-                    ctx.responseConsumed = true;
-                }
-                return bytesRead;
-            }
+            _position = _size = (uint32_t)_responseBuffer.size();
             return 0;
         }
 
-        // Simple mode: original write→read switch behavior.
-        bool isWriteMode = (mode & 0x10) || (mode == std::ios_base::out);
-        if (isWriteMode && _session && _session->client) {
-            auto client = _session->client.get();
-            bool hasResponse = (!client->postBuffer.empty()) ||
-                              (!client->postResponse.empty()) ||
-                              (!client->preservedPostResponse.empty());
-            if (!hasResponse) {
-                Debug_printv("POST already sent, reading from existing response");
-            } else if (!client->postBuffer.empty()) {
-                Debug_printv("Sending POST request...");
-                client->close();
-            }
-            mode = std::ios_base::in;
-            _position = 0;
+        uint32_t remaining = regionEnd - _responseBufPos;
+        uint32_t toCopy = std::min(remaining, size);
+        if (toCopy > 0) {
+            memcpy(buf, _responseBuffer.data() + _responseBufPos, toCopy);
+            _responseBufPos += toCopy;
+            _position = _responseBufPos;
         }
+        _error = 0;
+        return toCopy;
+    }
 
-        if (size > available())
-            size = available();
-
-        if (size > 0) {
-            bytesRead = _session->client->read(buf, size);
-            _position += bytesRead;
-            _error = _session->client->_error;
+    // Phase 3: Simple-mode fallback (original behavior)
+    bool isWriteMode = (mode & 0x10) || (mode == std::ios_base::out);
+    if (isWriteMode && _session && _session->client) {
+        auto client = _session->client.get();
+        bool hasResponse = (!client->postBuffer.empty()) ||
+                          (!client->postResponse.empty()) ||
+                          (!client->preservedPostResponse.empty());
+        if (!hasResponse) {
+            Debug_printv("POST already sent, reading from existing response");
+        } else if (!client->postBuffer.empty()) {
+            Debug_printv("Sending POST request...");
+            client->close();
         }
+        mode = std::ios_base::in;
+        _position = 0;
+    }
+
+    if (size > available())
+        size = available();
+
+    if (size > 0 && _session && _session->client) {
+        bytesRead = _session->client->read(buf, size);
+        _position += bytesRead;
+        _error = _session->client->_error;
     }
 
     return bytesRead;
 }
 
 uint32_t HTTPMStream::write(const uint8_t *buf, uint32_t size) {
-    // In full mode, every write is a command.
+    // In full mode, buffer bytes until a CR/LF-terminated line is complete.
+    // The IEC bus sends PRINT# data one byte at a time (e.g. "m post\r"
+    // arrives as 7 separate calls: 'm', ' ', 'p', 'o', 's', 't', '\r').
     if (fullMode != FullModeState::SIMPLE) {
-        std::string data(reinterpret_cast<const char*>(buf), size);
-        handleCommand(data);
-        return size;  // always consume
+        for (size_t i = 0; i < size; i++) {
+            char c = (char)buf[i];
+            if (c == '\r' || c == '\n') {
+                if (!_cmdLine.empty()) {
+                    handleCommand(_cmdLine);
+                    _cmdLine.clear();
+                }
+            } else {
+                _cmdLine += c;
+            }
+        }
+        return size;
     }
 
     // Simple mode: peek first char(s) — if command-shaped, enter full mode.
-    // Note: this is a heuristic. A simple-mode POST body that happens to
-    // start with bytes matching a command prefix (e.g. a JSON body
-    // starting with 'r-' for some unrelated reason) would be
-    // misclassified. The spec accepts this trade-off; users who need
-    // body data starting with command letters must use simple-mode
-    // directly (not via full mode).
+    // IEC bus delivers PRINT# one byte at a time, so we buffer into _cmdLine.
     if (size > 0) {
+        if (fullMode == FullModeState::BUILDING_REQUEST) {
+            for (size_t i = 0; i < size; i++) {
+                char c = (char)buf[i];
+                if (c == '\r' || c == '\n') {
+                    if (!_cmdLine.empty()) { handleCommand(_cmdLine); _cmdLine.clear(); }
+                } else { _cmdLine += c; }
+            }
+            return size;
+        }
         char first = (char)buf[0];
         bool looksLikeCommand =
             first == 'm' || first == 'M' ||
@@ -695,8 +821,12 @@ uint32_t HTTPMStream::write(const uint8_t *buf, uint32_t size) {
 
         if (looksLikeCommand) {
             fullMode = FullModeState::BUILDING_REQUEST;
-            std::string cmd(reinterpret_cast<const char*>(buf), size);
-            handleCommand(cmd);
+            for (size_t i = 0; i < size; i++) {
+                char c = (char)buf[i];
+                if (c == '\r' || c == '\n') {
+                    if (!_cmdLine.empty()) { handleCommand(_cmdLine); _cmdLine.clear(); }
+                } else { _cmdLine += c; }
+            }
             return size;
         }
     }
