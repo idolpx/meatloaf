@@ -10,9 +10,9 @@
 #include "fnWiFi.h"
 #include "display.h"
 
+#include "fujiCommandID.h"
 #include "../fuji/fujiHost.h"
 #include "../fuji/fujiDisk.h"
-#include "../fuji/fujiCmd.h"
 
 #include "hash.h"
 

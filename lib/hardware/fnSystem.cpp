@@ -363,14 +363,14 @@ void SystemManager::delay_microseconds(uint32_t us)
 void SystemManager::delay_microseconds(uint32_t us)
 {
     // a)
-    // HANDLE timer; 
-    // LARGE_INTEGER ft; 
+    // HANDLE timer;
+    // LARGE_INTEGER ft;
 
     // ft.QuadPart = -(10*us); // Convert to 100 nanosecond interval, negative value indicates relative time
 
-    // timer = CreateWaitableTimer(NULL, TRUE, NULL); 
-    // SetWaitableTimer(timer, &ft, 0, NULL, NULL, 0); 
-    // WaitForSingleObject(timer, INFINITE); 
+    // timer = CreateWaitableTimer(NULL, TRUE, NULL);
+    // SetWaitableTimer(timer, &ft, 0, NULL, NULL, 0);
+    // WaitForSingleObject(timer, INFINITE);
 
     // CloseHandle(timer);
 
@@ -1043,6 +1043,9 @@ const char *SystemManager::get_hardware_ver_str()
     case 2:
         return "Lynx DEVKITC";
         break;
+    case 3:
+        return "Lynx Rev1 (S3)";
+        break;
 #elif defined(BUILD_RS232)
     /* RS232 */
     case 1 :
@@ -1132,11 +1135,11 @@ void SystemManager::check_hardware_ver()
         _hardware_version = 1;
         safe_reset_gpio = GPIO_NUM_NC;
     }
-    
+
 #elif defined(BUILD_ADAM)
     /*  Coleco ADAM
-        Only 1.0 version of Coleco ADAM 
-    */  
+        Only 1.0 version of Coleco ADAM
+    */
     _hardware_version = 1;
     safe_reset_gpio = PIN_BUTTON_C;
     setup_card_detect(PIN_CARD_DETECT);
@@ -1155,7 +1158,7 @@ void SystemManager::check_hardware_ver()
     a2hasbuffer = true;
     _hardware_version = 5;
 #   elif defined(MASTERIES_REVAB)
-    /* All Masteries boards have Tristate buffer. Check for pullup on IO14 to 
+    /* All Masteries boards have Tristate buffer. Check for pullup on IO14 to
         determine if it's RevB
     */
     int hasbufferupcheck, hasbufferdowncheck;
@@ -1230,7 +1233,7 @@ void SystemManager::check_hardware_ver()
             _hardware_version = 3;
         }
     }
-    
+
     /* Apple 2 Rev00 original has no hardware pullup for Button C Safe Reset (IO14)
     Apple 2 Rev00 with SPI fix has 10K hardware pullup on IO14
     Check for pullup and determine if safe reset button or SPI fix
@@ -1297,6 +1300,9 @@ void SystemManager::check_hardware_ver()
     */
 #   if defined(NO_BUTTONS)
     _hardware_version = 2;
+#   elif CONFIG_IDF_TARGET_ESP32S3
+    _hardware_version = 3;
+    safe_reset_gpio = PIN_BUTTON_C;
 #   else
     _hardware_version = 1;
     safe_reset_gpio = PIN_BUTTON_C;
@@ -1305,6 +1311,7 @@ void SystemManager::check_hardware_ver()
 #elif defined(BUILD_RS232)
     /* RS232
     */
+#ifdef PIN_BUTTON_C
 #if CONFIG_IDF_TARGET_ESP32S3
     _hardware_version = 2;
     safe_reset_gpio = PIN_BUTTON_C;
@@ -1313,7 +1320,10 @@ void SystemManager::check_hardware_ver()
     _hardware_version = 1;
     safe_reset_gpio = PIN_BUTTON_C;
     setup_card_detect(PIN_CARD_DETECT); // enable SD card detect
-#endif
+#endif // CONFIG_IDF_TARGET_ESP32S3
+#else
+    safe_reset_gpio = GPIO_NUM_NC;
+#endif // PIN_BUTTON_C
 #elif defined(BUILD_RC2014)
     /* RC2014
     */

@@ -1,6 +1,10 @@
 
 #include "keys.h"
 
+#if CONFIG_IDF_TARGET_ESP32S3 != y
+#include <esp32/himem.h>
+#endif
+
 #include "../../include/debug.h"
 #include "../../include/pinmap.h"
 
@@ -11,10 +15,20 @@
 
 #include "led.h"
 
+#ifndef PIN_BUTTON_A
+#define PIN_BUTTON_A GPIO_NUM_NC
+#endif
+#ifndef PIN_BUTTON_B
+#define PIN_BUTTON_B GPIO_NUM_NC
+#endif
+#ifndef PIN_BUTTON_C
+#define PIN_BUTTON_C GPIO_NUM_NC
+#endif
+
 // Global KeyManager object
 KeyManager fnKeyManager;
 
-static gpio_num_t mButtonPin[eKey::KEY_COUNT] = {PIN_BUTTON_A, PIN_BUTTON_B, PIN_BUTTON_C};
+static gpio_num_t mButtonPin[eKey::KEY_COUNT];
 
 void KeyManager::setup()
 {
@@ -38,7 +52,7 @@ void KeyManager::setup()
 #else /* PINMAP_ESP32S3 */
     mButtonPin[eKey::BUTTON_A] = PIN_BUTTON_A;
     mButtonPin[eKey::BUTTON_B] = PIN_BUTTON_B;
-    mButtonPin[eKey::BUTTON_C] = fnSystem.get_safe_reset_gpio();
+    mButtonPin[eKey::BUTTON_C] = (gpio_num_t)fnSystem.get_safe_reset_gpio();
 
 #   ifdef NO_BUTTONS
     _keys[eKey::BUTTON_A].disabled = true;
@@ -68,7 +82,7 @@ void KeyManager::setup()
         Debug_printf("Button B Enabled on IO%d\r\n", mButtonPin[eKey::BUTTON_B]);
     }
 
-    if (fnSystem.get_safe_reset_gpio() == GPIO_NUM_NC)
+    if ((gpio_num_t)fnSystem.get_safe_reset_gpio() == GPIO_NUM_NC)
     {
         _keys[eKey::BUTTON_C].disabled = true;
         Debug_printf("Button C (Safe Reset) Disabled\r\n");
