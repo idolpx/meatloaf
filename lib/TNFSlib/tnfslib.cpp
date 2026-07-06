@@ -407,6 +407,15 @@ int _tnfs_fill_cache(tnfsMountInfo *m_info, tnfsFileHandleInfo *pFHI)
                 // Copy the actual number of bytes returned to us into our cache
                 // (offset by how many bytes we've already put in the cache)
                 uint16_t bytes_read = TNFS_UINT16_FROM_LOHI_BYTEPTR(packet.payload + 1);
+
+                if (bytes_read > bytes_to_read)
+                {
+                    Debug_printf("_tnfs_fill_cache bogus read length %u > requested %u; rejecting\r\n",
+                                 bytes_read, bytes_to_read);
+                    error = -1;
+                    break;
+                }
+
                 memcpy(pFHI->cache + (sizeof(pFHI->cache) - bytes_remaining_to_load),
                        packet.payload + 3, bytes_read);
 
@@ -1465,7 +1474,7 @@ bool _tnfs_transaction(tnfsMountInfo *m_info, tnfsPacket &pkt, uint16_t payload_
             // fallback to retry
             break;
         }
-        
+
         // Make sure we wait before retrying
         fnSystem.delay(m_info->min_retry_ms);
     }
@@ -1542,7 +1551,7 @@ _tnfs_send_recv_result _tnfs_send_recv(fnUDP &udp, tnfsMountInfo *m_info, tnfsPa
         m_info->protocol = TNFS_PROTOCOL_UDP;
         return RESET;
     }
-    
+
     Debug_printf("Timeout after %d milliseconds. Retrying\r\n", m_info->timeout_ms);
     return FAILED;
 }
@@ -1566,18 +1575,13 @@ _tnfs_recv_result _tnfs_recv_and_validate(fnUDP &udp, tnfsMountInfo *m_info, tnf
         m_info->protocol = TNFS_PROTOCOL_TCP;
     }
 
-    // Delayed response for the previous request. We should just try to recv the next response.
-    if (res_pkt.sequence_num < req_pkt.sequence_num)
-    {
-        Debug_printf("Received delayed response! Rcvd: %x, Expected: %x\r\n", res_pkt.sequence_num, req_pkt.sequence_num);
-        return NO_RESP;
-    }
-
-    // Out of order packet received.
+    // Sequence mismatch = stale/reordered response for an earlier request (the
+    // seq byte wraps at 256). Discard it and keep waiting for the matching one.
     if (res_pkt.sequence_num != req_pkt.sequence_num)
     {
-        Debug_printf("TNFS OUT OF ORDER SEQUENCE! Rcvd: %x, Expected: %x\r\n", res_pkt.sequence_num, req_pkt.sequence_num);
-        return RESP_INVALID;
+        Debug_printf("Discarding stale TNFS response. Rcvd: %x, Expected: %x\r\n",
+                     res_pkt.sequence_num, req_pkt.sequence_num);
+        return NO_RESP;
     }
 
     // Check in case the server asks us to wait and try again
@@ -1656,7 +1660,7 @@ int _tnfs_adjust_with_full_path(tnfsMountInfo *m_info, char *buffer, const char 
     // Use the cwd to bulid the full path
     strlcpy(buffer, m_info->current_working_directory, bufflen);
 
-    // If source is an absolute path, use it directly (ignore cwd).
+    // Figure out whether or not we need to add a slash
     if (source[0] == '/') {
         // Ensure it fits in the buffer
         if ((int)strlen(source) >= bufflen)
@@ -1683,7 +1687,7 @@ int _tnfs_adjust_with_full_path(tnfsMountInfo *m_info, char *buffer, const char 
         buffer[--ll] = '\0';
     }
 
-    // Finally copy the source filepath (relative path appended to cwd)
+    // Finally copy the source filepath
     strlcpy(buffer + ll, source, bufflen - ll);
 
     // And return the new length because that ends up being useful
