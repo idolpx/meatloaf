@@ -63,6 +63,15 @@ public:
     std::string rebuildUrl(void);
     bool isValidUrl();
 
+    /**
+     * @brief Look up a key in the URL query string ("a=1&b=2&...").
+     * @param key   parameter name to find
+     * @param def   value to return if the key is absent
+     * @return the parameter's value, or def if not present
+     */
+    std::string queryParam(const std::string &key, const std::string &def = "");
+
+
     std::string queryValue(const std::string& key, bool caseInsensitive = true) const;
     std::string fragmentValue(const std::string& key, bool caseInsensitive = true) const;
 

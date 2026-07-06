@@ -10,8 +10,8 @@
 
 #include "../../include/debug.h"
 
-
 // Configures a listening TCP socket on given port
+// Returns 0 for error, 1 for success.
 int fnTcpServer::begin(uint16_t port)
 {
     if (_listening) {
@@ -94,7 +94,9 @@ bool fnTcpServer::hasClient()
     struct sockaddr_in _client;
     int cs = sizeof(struct sockaddr_in);
     _accepted_sockfd = ::accept(_sockfd, (struct sockaddr *)&_client, (socklen_t *)&cs);
+#ifdef TOO_MUCH_DEBUG
     Debug_printf("hasClient accepted %d\n", _accepted_sockfd);
+#endif // TOO_MUCH_DEBUG
 
     if (_accepted_sockfd >= 0)
     {

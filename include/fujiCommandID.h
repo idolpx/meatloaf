@@ -72,6 +72,8 @@ enum fujiCommandID_t : uint8_t {
     FUJICMD_QRCODE_ENCODE              = 0xBD,
     FUJICMD_QRCODE_INPUT               = 0xBC,
     FUJICMD_GENERATE_GUID              = 0xBB,
+    FUJICMD_GET_DEVICE10_FULLPATH      = 0xA9,
+    FUJICMD_GET_DEVICE9_FULLPATH       = 0xA8,
     FUJICMD_GET_DEVICE8_FULLPATH       = 0xA7,
     FUJICMD_GET_DEVICE7_FULLPATH       = 0xA6,
     FUJICMD_GET_DEVICE6_FULLPATH       = 0xA5,
@@ -80,6 +82,7 @@ enum fujiCommandID_t : uint8_t {
     FUJICMD_GET_DEVICE3_FULLPATH       = 0xA2,
     FUJICMD_GET_DEVICE2_FULLPATH       = 0xA1,
     FUJICMD_GET_DEVICE1_FULLPATH       = 0xA0,
+    FUJICMD_UPDATE_FIRMWARE            = 0x90,
     FUJICMD_STATUS                     = 0x53, // S
     FUJICMD_HSIO_INDEX                 = 0x3F, // ?
     FUJICMD_NAK                        = 0x15, // ASCII NAK
@@ -104,11 +107,13 @@ enum fujiCommandID_t : uint8_t {
     DISKCMD_FORMAT_MEDIUM              = 0x22, // "
     DISKCMD_FORMAT                     = 0x21, // !
 
-    NETCMD_SPECIAL_INQUIRY             = 0xFF,
+    NETCMD_GET_DSTATS_VALUE            = 0xFF, // Get DSTATS value for a command
+    NETCMD_SPECIAL_INQUIRY             = 0xFF, // (same as NETCMD_GET_DSTATS_VALUE, for backward compatibility)
     NETCMD_PASSWORD                    = 0xFE,
     NETCMD_USERNAME                    = 0xFD,
     NETCMD_CHANNEL_MODE                = 0xFC,
     NETCMD_SET_PARAMETERS              = 0xFB,
+    NETCMD_SET_CHANNEL                 = 0xFA,
     NETCMD_SET_HSIO_INDEX              = 0xE3,
     NETCMD_QUERY_ALT                   = 0x81,
     NETCMD_PARSE_ALT                   = 0x80,
@@ -122,7 +127,7 @@ enum fujiCommandID_t : uint8_t {
     NETCMD_QUERY                       = 0x51, // Q
     NETCMD_PARSE                       = 0x50, // P
     NETCMD_OPEN                        = 0x4F, // O
-    NETCMD_UNLISTEN                    = 0x4D, // M
+    NETCMD_SET_CHANNEL_MODE            = 0x4D, // M
     NETCMD_GET_ERROR                   = 0x45, // E
     NETCMD_SET_DESTINATION             = 0x44, // D
     NETCMD_CLOSE                       = 0x43, // C
@@ -145,6 +150,7 @@ enum fujiCommandID_t : uint8_t {
     MODEMCMD_STREAM                    = 0x58, // X
     MODEMCMD_WRITE                     = 0x57, // W
     MODEMCMD_STATUS                    = 0x53, // S
+    MODEMCMD_READ                      = 0x52, // R
     MODEMCMD_AUTOANSWER                = 0x4F, // O
     MODEMCMD_BAUDRATELOCK              = 0x4E, // N
     MODEMCMD_UNLISTEN                  = 0x4D, // M
@@ -170,10 +176,17 @@ enum fujiCommandID_t : uint8_t {
     APETIMECMD_SETTZ_ALT2              = 0x54, // T
     APETIMECMD_GET_SOS                 = 0x53, // S
     APETIMECMD_GET_PRODOS              = 0x50, // P
+    APETIMECMD_GET_SIMPLE_HUNDREDTHS   = 0x4D, // M - simple binary + 1-byte hundredths (0-99)
     APETIMECMD_GETTZ_LEN               = 0x4C, // L
     APETIMECMD_GET_ISO_LOCAL           = 0x49, // I
     APETIMECMD_GET_GENERAL             = 0x47, // G
     APETIMECMD_GET_ATARI               = 0x41, // A
+
+    CPMCMD_WRITE                       = 0x57, // W
+    CPMCMD_STATUS                      = 0x53, // S
+    CPMCMD_READ                        = 0x52, // R
+    CPMCMD_INIT                        = 0x47, // G
+    CPMCMD_BOOT                        = 0x42, // B
 };
 
 #endif /* FUJI_COMMANDS_H */
