@@ -740,7 +740,15 @@ uint32_t HTTPMStream::read(uint8_t* buf, uint32_t size) {
         return toCopy;
     }
 
-    // Phase 3: Simple-mode fallback (original behavior)
+    // Phase 3: No response buffer available in full mode — return 0 and
+    // signal end-of-stream to prevent readBufferData() infinite retry.
+    // Data will be available after _queuedSend fires.
+    if (isFullMode()) {
+        _position = _size = 0;  // available() → 0 → eos() → true
+        return 0;
+    }
+
+    // Phase 4: Simple-mode fallback (original behavior)
     bool isWriteMode = (mode & 0x10) || (mode == std::ios_base::out);
     if (isWriteMode && _session && _session->client) {
         auto client = _session->client.get();
