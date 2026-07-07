@@ -201,7 +201,8 @@ void TCPServer::task(void *pvParameters)
             vTaskDelay(pdMS_TO_TICKS(1000));
             continue;
         }
-        Debug_printv("TCP console listening on port %d", TCP_SERVER_PORT);
+        //Debug_printv("TCP console listening on port %d", TCP_SERVER_PORT);
+        printf( ANSI_GREEN_BOLD "TCP Console Started! (PORT %d)" ANSI_RESET "\r\n", TCP_SERVER_PORT);
 
         while (!_shutdown)
         {
