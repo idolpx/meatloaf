@@ -217,21 +217,18 @@ bool HTTPMStream::handleCommand(const std::string& cmd) {
 
     if (c.empty()) return true;  // blank line is harmless
 
-    // 'r-h' / 'r-b' — switch response read mode (recognized even before 's')
+        // 'r-h' / 'r-b' -- reposition cursor in response buffer
     if (c.size() >= 3 && (c[0] == 'r' || c[0] == 'R') && c[1] == '-') {
         switch (c[2]) {
             case 'h': case 'H':
-                fullMode = FullModeState::RESPONSE_HEADERS;
                 _responseBufPos = _statusEnd;
                 _position = _responseBufPos;
                 _size = (uint32_t)_responseBuffer.size();
                 return true;
             case 'b': case 'B':
-                fullMode = FullModeState::RESPONSE_BODY;
                 _responseBufPos = _headersEnd;
                 _position = _responseBufPos;
-                _size = (uint32_t)_responseBuffer.size();  // ensure size is correct
-                ctx.responseConsumed = false;
+                _size = (uint32_t)_responseBuffer.size();
                 return true;
         }
         return false;
@@ -689,40 +686,21 @@ uint32_t HTTPMStream::read(uint8_t* buf, uint32_t size) {
         }
     }
 
-    // Phase 2: Serve from response buffer (if populated)
+    // Phase 2: Sequential serve from response buffer.
+    // `_responseBufPos` tracks where we are in the buffer.
+    // Mode commands (status/r-h/r-b in handleCommand) reposition it.
+    // No region boundaries — just serve bytes until the buffer is consumed.
     if (!_responseBuffer.empty()) {
-        // Consume _statusRequested: rewind to status region start
-        if (_statusRequested) {
-            _statusRequested = false;
-            _responseBufPos = 0;
-            _position = 0;
-        }
-
-        // Determine region based on current mode
-        uint32_t regionEnd = (uint32_t)_responseBuffer.size();
-        if (fullMode == FullModeState::RESPONSE_HEADERS && _statusEnd > 0)
-            regionEnd = _headersEnd;
-
-        if (_responseBufPos >= regionEnd) {
-            if (fullMode == FullModeState::RESPONSE_HEADERS) {
-                // Kill available() so readBufferData loop exits.
-                // Don't switch to RESPONSE_BODY — the C64 controls mode
-                // via r-h/r-b commands.  The r-b command will restore
-                // _size and reposition to _headersEnd for body reads.
-                _position = _size = _headersEnd;
-                return 0;
-            }
+        if (_responseBufPos >= _responseBuffer.size()) {
+            // Buffer fully consumed
             _position = _size = (uint32_t)_responseBuffer.size();
             return 0;
         }
-
-        uint32_t remaining = regionEnd - _responseBufPos;
+        uint32_t remaining = (uint32_t)_responseBuffer.size() - _responseBufPos;
         uint32_t toCopy = std::min(remaining, size);
-        if (toCopy > 0) {
-            memcpy(buf, _responseBuffer.data() + _responseBufPos, toCopy);
-            _responseBufPos += toCopy;
-            _position = _responseBufPos;
-        }
+        memcpy(buf, _responseBuffer.data() + _responseBufPos, toCopy);
+        _responseBufPos += toCopy;
+        _position = _responseBufPos;
         _error = 0;
         return toCopy;
     }

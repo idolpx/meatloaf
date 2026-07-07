@@ -274,15 +274,12 @@ uint8_t iecChannelHandlerFile::write(uint8_t *data, uint8_t n) {
         size_t written = m_stream->write(data, n);
         m_transportTimeUS += (esp_timer_get_time() - t);
         m_byteCount += written;
-        // Clear EOS so a subsequent readBufferData() can refill.
-        // Do NOT reset m_ptr/m_len — the C64 may still have unread data
-        // in the buffer from the previous read.  Only reset when the
-        // buffer is actually exhausted (m_ptr >= m_len) so mode-switch
-        // commands don't trash data the C64 hasn't consumed yet.
-        if (m_ptr >= m_len) {
-            m_ptr = 0;
-            m_len = 0;
-        }
+        // Clear EOS and reset the IEC buffer so the next readBufferData()
+        // refills from the stream's freshly-positioned cursor.
+        // Mode-switch commands (r-h, r-b, status) reposition the stream's
+        // internal _responseBufPos — stale m_data bytes must be discarded.
+        m_ptr = 0;
+        m_len = 0;
         m_eos = false;
         return written;
     }
@@ -353,16 +350,13 @@ uint8_t iecChannelHandlerFile::readBufferData()
             m_transportTimeUS += (esp_timer_get_time()-t);
 
             if (got == 0) {
-                // Print diagnostics if stuck
-                //Debug_printv("read returned 0: eos[%d] error[%d]", m_stream->eos(), m_stream->error());
-                // If at end-of-stream or error, break to avoid infinite loop
-                if (m_stream->eos() || m_stream->error()) {
-                    break;
-                }
-                // Otherwise, yield and retry (could add a retry limit here)
-                vTaskDelay(1);
-                continue;
+                // Network streams in full-mode HTTP may return 0 when a
+                // mode region is exhausted (headers done, body waiting).
+                // Just break — the C64's next mode-switch command will
+                // clear m_eos and trigger a fresh refill.
+                break;
             }
+            m_len += got;
             m_len += got;
 
             // if m_fixLoadAddress is set, adjust the first two bytes

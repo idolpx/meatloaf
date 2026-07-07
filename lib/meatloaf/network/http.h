@@ -219,17 +219,15 @@ public:
     uint32_t available() override {
         if (_queuedSend) return 0;
         if (!_responseBuffer.empty()) {
-            // Respect killed state: use _size as authoritative limit
-            if (_size <= _position) return 0;
-            if (_position >= _size) return 0;
-            return _size - _position;
+            uint32_t cnt = (uint32_t)_responseBuffer.size();
+            if (_responseBufPos >= cnt) return 0;
+            return cnt - _responseBufPos;
         }
         if (_session && _session->client && !_session->client->postResponse.empty()) {
             uint32_t respAvail = (uint32_t)_session->client->postResponse.size() - _session->client->_position;
             if (respAvail > 0) return respAvail;
         }
         if (_size > _position) return _size - _position;
-        if (fullMode == FullModeState::RESPONSE_BODY && ctx.responseConsumed) return 0;
         if (isOpen() && _session && _session->client && !_session->client->complete())
             return HTTP_BLOCK_SIZE;
         return 0;
