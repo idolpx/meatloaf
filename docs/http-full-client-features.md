@@ -64,17 +64,17 @@ print#1,"h+ x-custom: second"
 Set the request body (replaces any existing body).
 
 ```basic
-print#1,"b "chr$(123)chr$(34)"key"chr$(34)":"chr$(34)"value"chr$(34)chr$(125)
+print#1,"b ";chr$(123);chr$(34);"key";chr$(34);":";chr$(34);"value";chr$(34);chr$(125)
 ```
 
-Note: `chr$(34)` produces a `"` and `chr$(123)`/`chr$(125)` produce `{`/`}` since these characters aren't easily typed on a C64 keyboard.
+Note: `chr$(34)` produces `"`, `chr$(123)` produces `{`, `chr$(125)` produces `}`. These function calls must be joined with `;` in BASIC v2.
 
 ### `b+ <text>`
 Append to the request body.
 
 ```basic
-print#1,"b "chr$(123)chr$(34)"key"chr$(34)" : "chr$(34)"value"chr$(34)
-print#1,"b+ "chr$(44)chr$(34)"nested"chr$(34)" : "chr$(123)chr$(34)"a"chr$(34)" : 1"chr$(125)chr$(125)
+print#1,"b ";chr$(123);chr$(34);"key";chr$(34);":";chr$(34);"value";chr$(34)
+print#1,"b+ ";chr$(44);chr$(34);"nested";chr$(34);":";chr$(123);chr$(34);"a";chr$(34);":1";chr$(125);chr$(125)
 ```
 
 Produces body: `{"key":"value","nested":{"a":1}}`
@@ -161,7 +161,7 @@ The response is read sequentially using `GET#`. After `s`, all response data is 
 30 print#1,"m post"
 40 print#1,"h content-type: application/json"
 50 print#1,"h accept: application/json"
-60 print#1,"b "chr$(123)chr$(34)"name"chr$(34)" : "chr$(34)"meatloaf"chr$(34)","chr$(34)"version"chr$(34)" : 1"chr$(125)
+60 print#1,"b ";chr$(123);chr$(34);"name";chr$(34);":";chr$(34);"meatloaf";chr$(34);",";chr$(34);"version";chr$(34);":1";chr$(125)
 70 print#1,"s"
 75 rem == read status ==
 80 print#1,"status"
