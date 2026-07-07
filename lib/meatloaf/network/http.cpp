@@ -639,9 +639,8 @@ uint32_t HTTPMStream::read(uint8_t* buf, uint32_t size) {
                 // POST/PUT: close() triggers perform() which fills preservedPostResponse
                 cl.close();
                 cl._performPending = false;
-                if (!cl.preservedPostResponse.empty())
-                    _bodyCapture = cl.preservedPostResponse;
-                ctx.responseStatus = cl.lastRC;  // real HTTP status, not fake 200
+                _bodyCapture = cl.preservedPostResponse;  // may be empty if no body
+                ctx.responseStatus = cl.lastRC;
             } else if (!cl.preservedPostResponse.empty()) {
                 _bodyCapture = cl.preservedPostResponse;
                 ctx.responseStatus = cl.lastRC;
@@ -1281,10 +1280,10 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
     esp_err_t rc;
 
     // For POST/PUT, skip esp_http_client_open() — that would send
-    // Content-Length: 0 to the server.  Return 200 to let the caller
-    // know the client handle initialized.  close() will call
-    // esp_http_client_perform() which handles the full cycle
-    // (connect, send headers+body, receive response).
+    // Content-Length: 0 to the server.  Return 200 so the caller
+    // knows the handle is configured.  close() will perform the full
+    // HTTP cycle (connect, send headers+body, receive response).
+    // The URL, method, and headers are already set on _http above.
     if (method == HTTP_METHOD_POST || method == HTTP_METHOD_PUT) {
         _is_open = true;
         return 200;
