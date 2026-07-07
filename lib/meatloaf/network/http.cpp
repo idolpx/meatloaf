@@ -658,7 +658,9 @@ uint32_t HTTPMStream::read(uint8_t* buf, uint32_t size) {
             } else if (!cl.preservedPostResponse.empty()) {
                 _bodyCapture = cl.preservedPostResponse;
             }
-
+            Debug_printv("BODY-CAPTURE: method=%s result=%zu bytes open=%d pend=%d pres=%zu post=%zu",
+                ctx.method.c_str(), _bodyCapture.size(), cl._is_open, cl._performPending,
+                cl.preservedPostResponse.size(), cl.postResponse.size());
             _responseBuffer.clear();
             _responseBufPos = 0;
 
