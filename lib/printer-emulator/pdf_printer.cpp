@@ -1,7 +1,6 @@
 #include "pdf_printer.h"
 
 #include "../../include/debug.h"
-#include "../../include/global_defines.h"
 
 #include "fsFlash.h"
 
@@ -62,7 +61,7 @@ void pdfPrinter::pdf_add_fonts() // pdfFont_t *fonts[],
 
     // OPEN LUT FILE
     char fname[30]; // filename: /f/shortname/Fi
-    snprintf(fname, sizeof(fname), SYSTEM_DIR "/f/%s/LUT", shortname.c_str());
+    snprintf(fname, sizeof(fname), "/f/%s/LUT", shortname.c_str());
     FILE *lut = fsFlash.file_open(fname);
     int maxFonts = util_parseInt(lut);
 
@@ -80,7 +79,7 @@ void pdfPrinter::pdf_add_fonts() // pdfFont_t *fonts[],
         {
             size_t fp = 0;
             char fname[30];                                        // filename: /f/shortname/Fi
-            snprintf(fname, sizeof(fname), SYSTEM_DIR "/f/%s/F%d", shortname.c_str(), i + 1); // e.g. /f/a820/F2
+            snprintf(fname, sizeof(fname), "/f/%s/F%d", shortname.c_str(), i + 1); // e.g. /f/a820/F2
             FILE *fff = fsFlash.file_open(fname);                 // Font File File - fff
 
             fgetc(fff); // '%'
@@ -343,7 +342,7 @@ bool pdfPrinter::process_buffer(uint8_t n, uint8_t aux1, uint8_t aux2)
     // loop through string
     do
     {
-
+// 
 #ifdef BUILD_APPLE // move this inside the loop incase the buffer has more than one line (SP packet buffering)
         if (TOPflag)
         pdf_new_page();
