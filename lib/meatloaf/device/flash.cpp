@@ -21,6 +21,7 @@
 #include <unistd.h>
 #include <sstream>
 #include <iomanip>
+#include <errno.h>
 
 #include <esp_heap_caps.h>
 
@@ -39,9 +40,10 @@ static inline void *psram_malloc(size_t sz) {
  * MFile implementations
  ********************************************************/
 
-bool FlashMFile::pathValid(std::string path) 
+bool FlashMFile::pathValid(std::string path)
 {
-    auto apath = fullPath().c_str();
+    std::string fullPathStr = fullPath();
+    auto apath = fullPathStr.c_str();
     while (*apath) {
         const char *slash = strchr(apath, '/');
         if (!slash) {
@@ -479,6 +481,9 @@ void FlashHandle::obtain(std::string m_path, std::string mode) {
 
     //Debug_printv("m_path[%s] mode[%s]", m_path.c_str(), mode.c_str());
     file_h = fopen( m_path.c_str(), mode.c_str());
+    if (file_h == nullptr) {
+        Debug_printv("fopen failed path[%s] mode[%s] errno[%d:%s]", m_path.c_str(), mode.c_str(), errno, strerror(errno));
+    }
     // rc = 1;
 
     //printf("FSTEST: lfs_file_open file rc:%d\r\n",rc);
