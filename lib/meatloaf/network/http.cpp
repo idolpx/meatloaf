@@ -641,6 +641,13 @@ uint32_t HTTPMStream::read(uint8_t* buf, uint32_t size) {
                 cl._performPending = false;
                 if (!cl.preservedPostResponse.empty())
                     _bodyCapture = cl.preservedPostResponse;
+                ctx.responseStatus = cl.lastRC;  // real HTTP status, not fake 200
+            } else if (!cl.preservedPostResponse.empty()) {
+                _bodyCapture = cl.preservedPostResponse;
+                ctx.responseStatus = cl.lastRC;
+            } else if (!cl.postResponse.empty()) {
+                _bodyCapture = cl.postResponse;
+                ctx.responseStatus = cl.lastRC;
             } else if (cl._is_open) {
                 // GET: body is available via client->read()
                 uint8_t bodytmp[512];
@@ -652,8 +659,10 @@ uint32_t HTTPMStream::read(uint8_t* buf, uint32_t size) {
                 cl.close();
             } else if (!cl.postResponse.empty()) {
                 _bodyCapture = cl.postResponse;
+                ctx.responseStatus = cl.lastRC;
             } else if (!cl.preservedPostResponse.empty()) {
                 _bodyCapture = cl.preservedPostResponse;
+                ctx.responseStatus = cl.lastRC;
             }
             Debug_printv("BODY-CAPTURE: method=%s result=%zu bytes open=%d pend=%d pres=%zu post=%zu",
                 ctx.method.c_str(), _bodyCapture.size(), cl._is_open, cl._performPending,
@@ -1003,6 +1012,9 @@ void MeatHttpClient::close() {
                 Debug_printv("esp_http_client_perform result: %d", performResult);
                 Debug_printv("POST response captured via events: %u bytes", (uint32_t)postResponse.size());
 
+                // Capture the real HTTP status code
+                lastRC = esp_http_client_get_status_code(_http);
+
                 // Set _size from the captured response
                 _size = (uint32_t)postResponse.size();
                 postBuffer.clear();
@@ -1268,30 +1280,30 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
     int status = 0;
     esp_err_t rc;
 
+    // For POST/PUT, skip esp_http_client_open() — that would send
+    // Content-Length: 0 to the server.  Return 200 to let the caller
+    // know the client handle initialized.  close() will call
+    // esp_http_client_perform() which handles the full cycle
+    // (connect, send headers+body, receive response).
+    if (method == HTTP_METHOD_POST || method == HTTP_METHOD_PUT) {
+        _is_open = true;
+        return 200;
+    }
+
     rc = esp_http_client_open(_http, 0);
     if (rc == ESP_OK)
     {
         // For GET/HEAD, fetch headers immediately
-        if (method == HTTP_METHOD_GET || method == HTTP_METHOD_HEAD)
-        {
-            int64_t lengthResp = esp_http_client_fetch_headers(_http);
-            if (_size == 0 && lengthResp > 0) {
-                _size = (uint32_t)lengthResp;
-                _position = position;
-            }
-            status = esp_http_client_get_status_code(_http);
-            if (method != HTTP_METHOD_HEAD) {
-                _is_open = true;
-            }
-            return status;
+        int64_t lengthResp = esp_http_client_fetch_headers(_http);
+        if (_size == 0 && lengthResp > 0) {
+            _size = (uint32_t)lengthResp;
+            _position = position;
         }
-        else
-        {
-            // For POST/PUT, openAndFetchHeaders returns without fetching response
-            // This allows write() to send body data first
+        status = esp_http_client_get_status_code(_http);
+        if (method != HTTP_METHOD_HEAD) {
             _is_open = true;
-            return 200;
         }
+        return status;
     }
 
     Debug_printv("Connection failed...");
