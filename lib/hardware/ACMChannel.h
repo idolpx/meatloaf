@@ -42,10 +42,10 @@ public:
 
     // FujiNet acts as modem (DCE), computer serial ports are DTE.
     // API names follow the modem (DCE) view, but the actual RS-232 pin differs.
-    bool getDTR() override;           // modem DTR input  ? actually reads RS-232 DSR pin
-    void setDSR(bool state) override; // modem DSR output ? actually drives RS-232 DTR pin
-    bool getRTS() override;           // modem RTS input  ? actually reads RS-232 CTS pin
-    void setCTS(bool state) override; // modem CTS output ? actually drives RS-232 RTS pin
+    bool getDTR() override;           // modem DTR input  → actually reads RS-232 DSR pin
+    void setDSR(bool state) override; // modem DSR output → actually drives RS-232 DTR pin
+    bool getRTS() override;           // modem RTS input  → actually reads RS-232 CTS pin
+    void setCTS(bool state) override; // modem CTS output → actually drives RS-232 RTS pin
     bool getDCD() override;           // DTE DCD input
     bool getRI() override;            // DTE RI input
 
