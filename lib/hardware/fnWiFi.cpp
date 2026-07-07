@@ -706,8 +706,7 @@ void WiFiManager::_wifi_event_handler(void *arg, esp_event_base_t event_base,
 #endif
 
 #ifdef ENABLE_CONSOLE_TCP
-            // Start TCP Server
-            printf( ANSI_GREEN_BOLD "TCP Server Started! (PORT %d)" ANSI_RESET "\r\n", TCP_SERVER_PORT);
+            // Start TCP Console
             tcp_server.start();
 #endif
             break;
