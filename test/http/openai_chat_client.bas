@@ -74,7 +74,9 @@
 595 print#ch,"b ";bq$ : rem set request body
 600 print#ch,"s" : rem send http request
 605 gosub 650 : rem read status into st$
-610 if st$<>"200" then er=1:close ch:return
+610 print"status: ";st$
+612 print#ch,"r-h" : rem drain headers
+613 get#ch,a$:if a$=chr$(13) then 615:goto 613
 615 print#ch,"r-b" : rem switch to body mode
 620 gosub 700 : rem read body into b$
 625 close ch
@@ -108,9 +110,9 @@
 801 rem === prints response to screen        ===
 802 rem === searches for "content":"<text>"   ===
 803 rem ##############################################
-805 nd$=chr$(34)+"content"+chr$(34)+chr$(58)+chr$(34) : rem "content":"
-810 hs$=b$
-815 gosub 900 : rem string search for needle
+805 nd$=chr$(34)+chr$(99)+chr$(111)+chr$(110)+chr$(116)+chr$(101)+chr$(110)+chr$(116)+chr$(34)+chr$(58)+chr$(34)
+806 hs$=b$
+810 gosub 900 : rem string search for "content":"
 820 if in=0 then print"[could not parse response]":print left$(b$,200):er=1:return
 825 p=i+len(nd$) : rem position right after the opening "
 830 rc$=""
