@@ -2,7 +2,7 @@
 #ifndef PINMAP_H
 #define PINMAP_H
 
-#include <soc/gpio_num.h>
+//#include <soc/gpio_num.h>
 
 // ESP32 WROVER-E
 #include "pinmap/lolin-d32-pro.h"
