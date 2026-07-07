@@ -217,14 +217,12 @@ public:
     uint32_t write(const uint8_t *buf, uint32_t size) override;
 
     uint32_t available() override {
-        // Don't allow pre-fetch before _queuedSend executes — the IEC
-        // handler would pull stale body data that doesn't match the
-        // yet-to-be-built response buffer.
         if (_queuedSend) return 0;
         if (!_responseBuffer.empty()) {
-            if (_responseBufPos >= (uint32_t)_responseBuffer.size())
-                return 0;
-            return (uint32_t)_responseBuffer.size() - _responseBufPos;
+            // Respect killed state: use _size as authoritative limit
+            if (_size <= _position) return 0;
+            if (_position >= _size) return 0;
+            return _size - _position;
         }
         if (_session && _session->client && !_session->client->postResponse.empty()) {
             uint32_t respAvail = (uint32_t)_session->client->postResponse.size() - _session->client->_position;

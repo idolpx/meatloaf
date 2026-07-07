@@ -274,12 +274,15 @@ uint8_t iecChannelHandlerFile::write(uint8_t *data, uint8_t n) {
         size_t written = m_stream->write(data, n);
         m_transportTimeUS += (esp_timer_get_time() - t);
         m_byteCount += written;
-        // Reset IEC buffer so next GET# fills from repositioned stream
-        if (m_eos) {
-            Debug_printv("WRITE-CLR-EOS: stream write forwarded, len=%u", m_len);
+        // Clear EOS so a subsequent readBufferData() can refill.
+        // Do NOT reset m_ptr/m_len — the C64 may still have unread data
+        // in the buffer from the previous read.  Only reset when the
+        // buffer is actually exhausted (m_ptr >= m_len) so mode-switch
+        // commands don't trash data the C64 hasn't consumed yet.
+        if (m_ptr >= m_len) {
+            m_ptr = 0;
+            m_len = 0;
         }
-        m_ptr = 0;
-        m_len = 0;
         m_eos = false;
         return written;
     }
