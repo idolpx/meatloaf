@@ -42,7 +42,7 @@
 185 if er=0 then print"ok":goto 195
 190 print:print"request failed":goto 215
 195 print
-200 gosub 800 : rem parse + print response
+200 rem body already streamed by gosub 500
 205 print
 210 print"---"
 215 print"again? (y/n)";
