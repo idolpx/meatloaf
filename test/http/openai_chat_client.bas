@@ -77,10 +77,10 @@
 610 print"status: ";st$
 612 print#ch,"r-h" : rem drain headers
 613 get#ch,a$:if a$=chr$(13) then 615:goto 613
-615 print#ch,"r-b" : rem switch to body mode
-620 gosub 700 : rem read body into b$
-625 close ch
-630 return
+615 gosub 800 : rem stream + parse body from channel
+620 close ch
+625 return
+630 rem
 635 rem
 649 rem ##############################################
 650 rem === read http status into st$ ===
@@ -106,25 +106,32 @@
 735 goto 710
 740 rem
 799 rem ##############################################
-800 rem === parse "content" from json in b$ ===
-801 rem === prints response to screen        ===
-802 rem === searches for "content":"<text>"   ===
+800 rem === stream body, find "CONTENT":" then  ===
+801 rem === print chars until closing quote     ===
+802 rem === avoids 255-char string limit         ===
 803 rem ##############################################
-805 nd$=chr$(34)+chr$(99)+chr$(111)+chr$(110)+chr$(116)+chr$(101)+chr$(110)+chr$(116)+chr$(34)+chr$(58)+chr$(34)
-806 hs$=b$
-810 gosub 900 : rem string search for "content":"
-820 if in=0 then print"[could not parse response]":print left$(b$,200):er=1:return
-825 p=i+len(nd$) : rem position right after the opening "
-830 rc$=""
-835 for i=p to len(b$)
-837 c$=mid$(b$,i,1)
-838 if c$=chr$(92) and mid$(b$,i+1,1)=chr$(34) then rc$=rc$+chr$(34):i=i+1:goto 850 : rem handle \"
-840 if c$=chr$(34) then print rc$:return : rem closing quote, done
-845 rc$=rc$+c$
-850 if len(rc$)>240 then print rc$:return : rem safety limit
-855 next i
-860 print rc$:return
-865 rem
+805 print#ch,"r-b"
+806 mc=0
+807 get#ch,a$
+808 if (st and 64)<>0 then print:return : rem eoi
+809 if (st and 128)<>0 then print:return : rem err
+810 if mc>=0 then 820 : rem searching for "content":" (needle = 13 bytes)
+811 rem streaming: mc=-1 means already in content
+812 if a$=chr$(34) then print:return : rem closing quote
+813 print chr$(asc(a$));:goto 807
+820 rem state machine: match "content":" char by char
+821 if a$=chr$(34) and mc=0 then mc=1:goto 807
+822 if a$=chr$(99) and mc=1 then mc=2:goto 807
+823 if a$=chr$(111) and mc=2 then mc=3:goto 807
+824 if a$=chr$(110) and mc=3 then mc=4:goto 807
+825 if a$=chr$(116) and mc=4 then mc=5:goto 807
+826 if a$=chr$(101) and mc=5 then mc=6:goto 807
+827 if a$=chr$(110) and mc=6 then mc=7:goto 807
+828 if a$=chr$(116) and mc=7 then mc=8:goto 807
+829 if a$=chr$(34) and mc=8 then mc=9:goto 807
+830 if a$=chr$(58) and mc=9 then mc=10:goto 807
+831 if a$=chr$(34) and mc=10 then mc=-1:goto 807 : rem found!
+832 mc=0:goto 807
 899 rem ##############################################
 900 rem === string search: hs$=haystack, nd$=needle ===
 901 rem === returns in=1 at pos i, or in=0 ============
