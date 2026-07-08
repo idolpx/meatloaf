@@ -1807,6 +1807,13 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
         break;
         case 'P':
             {
+                if ( command[1] == 'W' && command[2] == 'D' )
+                {
+                    Debug_printv( "print working directory");
+                    SystemFileDevice::setStatus((const char *) m_cwd->url.c_str(), m_cwd->url.length());
+                    return;
+                }
+
                 command = mstr::drop(command, 1);
                 std::vector<uint8_t> pti = util_tokenize_uint8(command);
                 Debug_printv("position channel[%d] hi[%d] mid[%d] low[%d]", pti[0], pti[1], pti[2], pti[3]);
