@@ -65,6 +65,12 @@ int fnTcpServer::begin(uint16_t port)
         return 0;
     }
 
+    // Find out the actual bound port (needed when port 0 requested an OS-assigned ephemeral port)
+    struct sockaddr_in bound;
+    socklen_t bound_len = sizeof(bound);
+    if (getsockname(_sockfd, (struct sockaddr *)&bound, &bound_len) == 0)
+        _port = ntohs(bound.sin_port);
+
     // Switch to non-blocking mode
 #if defined(_WIN32)
     unsigned long on = 1;

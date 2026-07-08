@@ -4,6 +4,7 @@
 
 #include "fnFTP.h"
 
+#include <cstdio>
 #include <string.h>
 
 #include "../../include/debug.h"
@@ -847,11 +848,18 @@ bool fnFTP::open_file(string path, bool stor)
     if (parse_response())
     {
         Debug_printf("Timed out waiting for 150 response.\r\n");
+        if (_active_mode)
+            _active_server.stop();
         return true;
     }
 
     if (is_positive_preliminary_reply() && is_filesystem_related())
     {
+        if (accept_active_connection())
+        {
+            Debug_printf("fnFTP::open_file(%s, %s) - active mode connection failed.\r\n", path.c_str(), stor ? "STOR" : "RETR");
+            return true;
+        }
         _stor = stor;
         _expect_control_response = !stor;
         Debug_printf("Server began transfer.\r\n");
@@ -860,6 +868,8 @@ bool fnFTP::open_file(string path, bool stor)
     else
     {
         Debug_printf("Server could not begin transfer. Response was: %s\r\n", controlResponse.c_str());
+        if (_active_mode)
+            _active_server.stop();
         return true;
     }
 }
@@ -892,6 +902,8 @@ bool fnFTP::open_directory(string path, string pattern)
     if (parse_response())
     {
         Debug_printf("fnFTP::open_directory(%s%s) Timed out waiting for 150 response.\r\n", path.c_str(), pattern.c_str());
+        if (_active_mode)
+            _active_server.stop();
         return true;
     }
 
@@ -905,6 +917,14 @@ bool fnFTP::open_directory(string path, string pattern)
     else
     {
         Debug_printf("Didn't get our 150\r\n");
+        if (_active_mode)
+            _active_server.stop();
+        return true;
+    }
+
+    if (accept_active_connection())
+    {
+        Debug_printf("fnFTP::open_directory(%s%s) - active mode connection failed.\r\n", path.c_str(), pattern.c_str());
         return true;
     }
 
@@ -1165,11 +1185,28 @@ int fnFTP::read_response_line(char *buf, int buflen)
 
 bool fnFTP::get_data_port()
 {
-    size_t port_pos_beg, port_pos_end;
-
     Debug_printf("fnFTP::get_data_port()\r\n");
 
+    _active_mode = false;
     control->flush();
+
+    if (!get_data_port_epsv())
+        return false; // success
+
+    Debug_printf("EPSV failed (%s), falling back to PASV.\r\n", controlResponse.c_str());
+
+    if (!get_data_port_pasv())
+        return false; // success
+
+    Debug_printf("PASV failed (%s), falling back to PORT (active mode).\r\n", controlResponse.c_str());
+
+    return get_data_port_port();
+}
+
+bool fnFTP::get_data_port_epsv()
+{
+    size_t port_pos_beg, port_pos_end;
+
     EPSV();
 
     Debug_printf("Did EPSV, getting response.\r\n");
@@ -1179,26 +1216,6 @@ bool fnFTP::get_data_port()
         Debug_printf("Timed out waiting for response.\r\n");
         return true;
     }
-
-/*
-    if (is_negative_permanent_reply())
-    {
-        Debug_printf("Server unable to reserve port. Response was: %s\r\n", controlResponse.c_str());
-        return true;
-    }
-
-    if (is_negative_transient_reply())
-    {
-        Debug_printf("Cannot get data port. Response was: %s\r\n", controlResponse.c_str());
-        return true;
-    }
-
-    if (is_negative_transient_reply())
-    {
-        Debug_printf("Cannot get data port. Response was: %s\n", controlResponse.c_str());
-        return true;
-    }
-*/
 
     // accept only 229 response: Entering Extended Passive Mode (|||nnnn|)
     if (_statusCode != 229)
@@ -1222,9 +1239,123 @@ bool fnFTP::get_data_port()
     }
     else
     {
-        Debug_printf("Data port %u opened.\r\n", data_port);
+        Debug_printf("Data port %u opened (EPSV).\r\n", data_port);
     }
 
+    return false;
+}
+
+bool fnFTP::get_data_port_pasv()
+{
+    PASV();
+
+    Debug_printf("Did PASV, getting response.\r\n");
+
+    if (parse_response())
+    {
+        Debug_printf("Timed out waiting for response.\r\n");
+        return true;
+    }
+
+    // accept only 227 response: Entering Passive Mode (h1,h2,h3,h4,p1,p2)
+    if (_statusCode != 227)
+    {
+        Debug_printf("Cannot get data port. Response was: %s\n", controlResponse.c_str());
+        return true;
+    }
+
+    size_t paren_beg = controlResponse.find('(');
+    size_t paren_end = controlResponse.find(')', paren_beg == string::npos ? 0 : paren_beg);
+    if (paren_beg == string::npos || paren_end == string::npos)
+    {
+        Debug_printf("Could not parse PASV response: %s\r\n", controlResponse.c_str());
+        return true;
+    }
+
+    string nums = controlResponse.substr(paren_beg + 1, paren_end - paren_beg - 1);
+    unsigned int h1, h2, h3, h4, p1, p2;
+    if (sscanf(nums.c_str(), "%u,%u,%u,%u,%u,%u", &h1, &h2, &h3, &h4, &p1, &p2) != 6)
+    {
+        Debug_printf("Could not parse PASV address: %s\r\n", nums.c_str());
+        return true;
+    }
+
+    char ip_str[16];
+    snprintf(ip_str, sizeof(ip_str), "%u.%u.%u.%u", h1, h2, h3, h4);
+    data_port = (uint16_t)((p1 << 8) | p2);
+
+    Debug_printf("Server gave us data address %s:%u\r\n", ip_str, data_port);
+
+    // Note: some servers behind NAT report an internal/unreachable IP here;
+    // we use it as given, per RFC 959.
+    if (!data->connect(ip_str, data_port, FTP_TIMEOUT))
+    {
+        Debug_printf("Could not open data port %s:%u, errno = %u\r\n", ip_str, data_port, errno);
+        return true;
+    }
+    else
+    {
+        Debug_printf("Data port %s:%u opened (PASV).\r\n", ip_str, data_port);
+    }
+
+    return false;
+}
+
+bool fnFTP::get_data_port_port()
+{
+    if (!_active_server.begin(0))
+    {
+        Debug_printf("Could not start listening socket for active mode.\r\n");
+        return true;
+    }
+
+    in_addr_t local_ip = control->localIP();
+    uint16_t local_port = _active_server.port();
+    const uint8_t *ip_bytes = (const uint8_t *)&local_ip;
+
+    PORT(ip_bytes[0], ip_bytes[1], ip_bytes[2], ip_bytes[3], local_port);
+
+    if (parse_response())
+    {
+        Debug_printf("Timed out waiting for response.\r\n");
+        _active_server.stop();
+        return true;
+    }
+
+    if (!is_positive_completion_reply())
+    {
+        Debug_printf("Server rejected PORT. Response was: %s\r\n", controlResponse.c_str());
+        _active_server.stop();
+        return true;
+    }
+
+    _active_mode = true;
+    Debug_printf("Listening on port %u for server to connect (PORT).\r\n", local_port);
+
+    return false;
+}
+
+bool fnFTP::accept_active_connection()
+{
+    if (!_active_mode)
+        return false; // nothing to do, EPSV/PASV already connected
+
+    int tmout_counter = 1 + FTP_TIMEOUT / 50;
+    while (!_active_server.hasClient())
+    {
+        if (--tmout_counter == 0)
+        {
+            Debug_printf("fnFTP::accept_active_connection() - timed out waiting for server to connect.\r\n");
+            _active_server.stop();
+            return true;
+        }
+        fnSystem.delay(50);
+    }
+
+    *data = _active_server.client();
+    _active_server.stop(); // done listening, we only needed the one connection
+
+    Debug_printf("fnFTP::accept_active_connection() - server connected.\r\n");
     return false;
 }
 
@@ -1256,6 +1387,20 @@ void fnFTP::EPSV()
 {
     Debug_printf("fnFTP::EPSV()\r\n");
     control->write("EPSV\r\n");
+}
+
+void fnFTP::PASV()
+{
+    Debug_printf("fnFTP::PASV()\r\n");
+    control->write("PASV\r\n");
+}
+
+void fnFTP::PORT(uint8_t h1, uint8_t h2, uint8_t h3, uint8_t h4, uint16_t port)
+{
+    Debug_printf("fnFTP::PORT(%u.%u.%u.%u:%u)\r\n", h1, h2, h3, h4, port);
+    control->write("PORT " + std::to_string(h1) + "," + std::to_string(h2) + "," +
+                   std::to_string(h3) + "," + std::to_string(h4) + "," +
+                   std::to_string(port >> 8) + "," + std::to_string(port & 0xff) + "\r\n");
 }
 
 void fnFTP::RETR(string path)
