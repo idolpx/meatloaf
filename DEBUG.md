@@ -293,6 +293,36 @@ directly into C64 memory. Key rules that affect debugging:
    **no line length limit**. Long lines work fine via injection but render
    wrapped in LIST.
 
+6. **PETSCII case flip on IEC read:** When the C64 reads response data from
+   meatloaf via `GET#`, **`asc(a$)` returns the raw byte** as sent by the HTTP
+   server — no PETSCII conversion happens on the IEC read path. If Ollama sends
+   lowercase `"content":"hello"`, the bytes 99,111,110,116,101,110,116 (`content`)
+   arrive unchanged. `chr$(99)` matches lowercase `c`.
+   
+   PETSCII case-flip ONLY applies when data is **printed** (`PRINT chr$(asc(a$))`
+   displays uppercase). For byte comparisons in state machines and parsers, use
+   the HTTP server's actual ASCII values — do NOT flip case.
+   
+   **Correct** (Ollama sends lowercase JSON):
+   ```basic
+   if a$=chr$(99) then ... : rem matches 'c', not chr$(67)
+   ```
+   
+   **Wrong** — this would only match if the server sent uppercase:
+   ```basic
+   if a$=chr$(67) then ... : rem matches 'C', wrong for lowercase JSON
+   ```
+
+7. **Sending data (PRINT#) is different:** The BASIC tokenizer uppercases string
+   literals (rule #1 above), so `"content"` in `print#1,"b content"` becomes
+   `"CONTENT"`. But `chr$()` calls bypass the tokenizer:
+   ```basic
+   print#1,"b ";chr$(123);chr$(34);"model";chr$(34);...
+   ```
+   The `chr$(34)` produces a raw `"` — never uppercase. The string literal
+   `"model"` gets uppercased to `"MODEL"` in memory, but that's fine for JSON
+   field names because Ollama accepts uppercase JSON.
+
 ## Response Buffer Layout
 
 After the HTTP cycle completes, the response buffer is built in `read()`:

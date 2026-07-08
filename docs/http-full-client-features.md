@@ -151,6 +151,21 @@ The response is read sequentially using `GET#`. After `s`, all response data is 
 240 rem body complete
 ```
 
+**⚠️ Case when reading body bytes:** `asc(a$)` returns the **raw byte** straight
+from the HTTP server — no PETSCII conversion happens on the IEC read path. If
+the server sends lowercase JSON (`"content":"hello"`), you get byte 99 for `c`,
+not 67. PETSCII case-flip only applies when you **print** characters (`PRINT
+chr$(asc(a$))` displays them uppercase). For state machines or byte comparisons:
+
+```basic
+if a$=chr$(99) then ... : rem matches lowercase 'c' — correct for most JSON APIs
+if a$=chr$(67) then ... : rem matches uppercase 'C' — only if server sends uppercase
+```
+
+When in doubt, check server output. Most HTTP APIs (Ollama, OpenAI, REST) return
+lowercase JSON — use `chr$(99)`, `chr$(111)`, `chr$(110)` etc.
+```
+
 ---
 
 ## Complete Example — POST with JSON
