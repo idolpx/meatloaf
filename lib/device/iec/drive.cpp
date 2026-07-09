@@ -357,7 +357,6 @@ uint8_t iecChannelHandlerFile::readBufferData()
                 break;
             }
             m_len += got;
-            m_len += got;
 
             // if m_fixLoadAddress is set, adjust the first two bytes
             if( m_fixLoadAddress>=0 && m_stream->position()==0 && m_len>=2 )
