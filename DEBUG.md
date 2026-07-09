@@ -36,39 +36,32 @@ pio run -e fujiloaf-rev0 -t upload --upload-port /dev/ttyUSB0
 ```
 Wait for "Hard resetting via RTS pin..." — ESP reboots with new firmware.
 
-### 4. Start serial capture
+### 4. Start serial capture (run these one by one)
 ```bash
 # Kill stale captures
 pkill -f "serial_capture.py" 2>/dev/null; sleep 1
-
+```
+```bash
 # Start fresh
 nohup python3 /tmp/serial_capture.py > /tmp/serial_capture_stdout.log 2>&1 &
 echo $! > /tmp/serial_capture_running.pid
-
-# Verify
-sleep 2 && tail -3 /tmp/meatloaf_serial.log
+```
+```bash
+# Verify it's running
+sleep 2 && wc -l /tmp/meatloaf_serial.log
 ```
 
-### 5. Build BASIC test PRG and upload to SD card
-
-The C64 loads `http_test.prg` from the meatloaf's SD card (served via WebDAV). The `.bas` source must be compiled to `.prg`:
+### 5. Run test on C64 via U64 API
 
 ```bash
-# Compile .bas → .prg using the VS64 BASIC compiler
-python3 /home/qus/.vscode/extensions/rosc.vs64-2.6.2/tools/bc.py \
-  -o test/http/build/http_test.prg \
-  test/http/http_full_client_test.bas
+# Inject the client BASIC program into C64 memory
+python3 /home/qus/.claude/skills/ultimate64-debug/scripts/c64_remote.py \
+  --command inject test/http/openai_chat_client.bas
 
-# Verify the PRG contains the correct server IP
-strings test/http/build/http_test.prg | grep 192.168
+# Type RUN and read screen
+python3 /home/qus/.claude/skills/ultimate64-debug/scripts/c64_remote.py \
+  --command run "RUN"
 ```
-
-Then upload the compiled PRG to the meatloaf SD card via WebDAV PUT or directly.
-
-### 6. Run BASIC test on C64
-- Ensure `s$` in the BASIC program points to this machine's IP
-- Run the program from the C64
-- Select test option
 
 ### 6. Read serial log
 ```bash
@@ -113,7 +106,7 @@ The capture script lives at `/tmp/serial_capture.py`. It:
 - **BASIC V2:** No line labels (`getstatus:`), no `INSTR$()`. Fixed in current `.bas` file.
 - **GOTO vs GOSUB:** Tests run via `ON t GOSUB` from menu, indexes 1→9 map to line numbers 200,400,600,800,1000,1200,1400,1600,1800.
 
-# POST Body Debugging Field Guide
+## POST Body Debugging Field Guide
 
 This section captures lessons from fixing the full-mode HTTP client's POST body
 delivery (July 2026). If you're modifying the HTTP client and body capture stops
@@ -368,3 +361,137 @@ For reference, the full diff of the working fix:
   even when empty, and propagate ctx.responseStatus from lastRC
 - No changes to close(), processRedirectsAndOpen, or sendRequest()
 ```
+
+## Failed Debugging Attempts Log
+
+This section documents blind alleys from the OpenAI chat client debugging
+session (July 2026) to avoid repeating them.
+
+### 1. PETSCII Case Flip in asc(a$) (WRONG)
+
+**Attempted:** Changed state machine bytes from lowercase (chr$(99)='c') to
+uppercase (chr$(67)='C') thinking PETSCII flipped case on the IEC read path.
+
+**Why it failed:** `asc(a$)` returns the **raw byte** from the server — no
+PETSCII conversion happens on `GET#` reads. Case-flip only applies when
+printing: `PRINT chr$(asc(a$))` displays uppercase if the byte was lowercase.
+For byte comparisons, use the server's actual ASCII values. Ollama sends
+lowercase JSON → `chr$(99)` matches 'c'. Confirmed via ASC dump test.
+
+### 2. Firmware Keep-Alive Config Change (WRONG)
+
+**Attempted:** Disabled `keep_alive_enable` in `MeatHttpClient::init()` (line
+1618) to force fresh TCP connections per request, hypothesizing that stale
+keep-alive sockets caused silent perform() failures on Q2.
+
+**Why it failed:** Keep-alive wasn't the root cause. The single-query test
+worked fine before and after keep-alive changes. The issue was reproducible
+regardless of keep-alive settings.
+
+### 3. _session = nullptr in full-mode close() (WRONG)
+
+**Attempted:** Set `_session = nullptr` in `HTTPMStream::close()` full-mode
+branch to prevent the destructor from calling releaseIO() a second time
+(double-release causes io_active underflow in SessionBroker).
+
+**Why it failed:** Broke Q1 completely — without `_session`, the destructor
+path (`~HTTPMStream() → close(SIMPLE) → client->close()`) couldn't clean up
+MeatHttpClient, leaving _http handles leaked and causing ESP-IDF heap
+corruption.
+
+### 4. client->close() in full-mode close() (WRONG)
+
+**Attempted:** Called `_session->client->close()` from the full-mode
+`HTTPMStream::close()` branch to get MeatHttpClient cleanup without the
+double-releaseIO problem.
+
+**Why it failed:** `MeatHttpClient::close()` calls `esp_http_client_perform()`
+for POST/PUT, which blocks the IEC bus. The C64 times out waiting for data
+and shows `?DEVICE NOT PRESENT ERROR`.
+
+### 5. Timing / Script Speed (PARTIALLY WRONG)
+
+**Attempted:** Increased wait times in test scripts, added screen polling
+with timeouts, re-injected the BASIC client fresh per query.
+
+**Why it was partially wrong:** Timing affects keystroke injection (C64 10-byte
+keyboard FIFO means long strings get truncated) but the core hanging issue
+occurs even with 2-character questions like "hi". Single-query injection
+works reliably; the hang is specific to multi-query BASIC programs where Q2
+is issued on the same session via the AGAIN loop.
+
+### 6. Multiple firmware rebuilds with log-only changes (WRONG APPROACH)
+
+**Attempted:** Three separate firmware rebuilds with debug logging added to
+the branch-selection code in read() phase 1, each requiring a flash cycle.
+
+**Why it failed:** Serial capture kept failing (exit code 144, `/dev/ttyUSB0`
+port issues), so the logs were never collected. Debugging firmware bugs
+requires reliable serial capture first, then targeted logging changes — not
+the other way around.
+
+### 7. available() returning HTTP_BLOCK_SIZE when _queuedSend (WRONG)
+
+**Attempted:** Changed `available()` in http.h to return `HTTP_BLOCK_SIZE`
+instead of 0 when `_queuedSend` is true in full mode, hypothesizing that
+`readBufferData()` saw available=0 and declared the stream exhausted before
+`read()` could fire Phase 1.
+
+**Why it failed:** Caused Q1 to hang on body read. When `available()`
+returned non-zero before the response was ready (before `_queuedSend` Phase 1
+executed), `readBufferData()` called `m_stream->read()` which fell through
+to `MeatHttpClient::read()` → `esp_http_client_read()` on a not-yet-ready
+handle, blocking the IEC bus. The response data eventually arrived into
+`preservedPostResponse`, but Phase 1 was never entered because `_queuedSend`
+was already false by the time the response was available.
+
+### 8. duplicate `m_len += got` in drive.cpp (CONFIRMED FIX — Jul 9)
+
+**What was wrong:** `lib/device/iec/drive.cpp:359-360` had `m_len += got;`
+appearing twice consecutively. This doubled the buffer-fill count (`m_len`).
+For Ollama responses (~300 bytes body, ~360 bytes total with headers), the
+doubled m_len (~720) exceeded `BUFFER_SIZE=512`, so the fill loop in
+`readBufferData()` exited before polling `eos()`. The C64 read uninitialized
+buffer memory beyond the real data, never seeing EOT (end-of-transmission).
+
+**Why it was easy to miss:** The code was in the generic IEC drive handler,
+not in the HTTP client. All single-query tests used small test servers that
+returned tiny bodies (~20 bytes → m_len=40 → stayed under 512 → loop
+continued normally). Only real Ollama responses (~300+ bytes) triggered it.
+
+**Fix applied** (commit `51116209`): Removed the duplicate `m_len += got;`.
+Comment preserved.
+
+### Key Lessons
+
+1. **Never guess — gather evidence first.** The `asc(a$)` dump test took
+   seconds and immediately disproved the PETSCII case-flip theory. Do this
+   before changing firmware.
+2. **One variable at a time.** Multiple firmware changes were bundled in one
+   flash cycle multiple times, making it impossible to know which change
+   caused what.
+3. **Test scripts must separate Q1 and Q2 concerns.** A single-query script
+   that resets/injects fresh per query proves the firmware works. A multi-query
+   script that shares a BASIC session reveals the state machine problem.
+   These test different things.
+4. **Serial capture reliability.** The capture script exits silently when
+   /dev/ttyUSB0 isn't accessible (another process holds it). Always verify
+   capture is running with `wc -l /tmp/meatloaf_serial.log` before starting
+   the test.
+5. **Firmware changes can break working features.** Even "harmless" logging
+   additions broke the single-query path that was working fine. When debugging
+   a multi-query BASIC issue, don't touch firmware code that handles
+   single-query flow.
+6. **Bugs can hide in unexpected layers.** The `m_len += got` duplication was
+   in the generic IEC drive handler (`drive.cpp`), not in the HTTP client.
+   All previous investigation focused on HTTP code. When a symptom is
+   response-size-dependent, consider the IEC data path (readBufferData,
+   m_len, BUFFER_SIZE), not just HTTP.
+7. **Echo server + response size sweep is a powerful diagnostic.** Replacing
+   Ollama with a local echo server and systematically varying response body
+   size isolated the `m_len` bug within minutes.
+8. **Q2 remains unresolved.** Even after the `m_len` fix, a second POST
+   request (Q2) on the same MeatHttpClient session does not actually send a
+   new HTTP request. The `sendRequest()` → `client.POST()` path returns
+   status 200 from cached/stale state without calling `esp_http_client_perform()`.
+   Root cause is still unknown.

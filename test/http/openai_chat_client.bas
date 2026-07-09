@@ -47,7 +47,7 @@
 210 print"---"
 215 print"again? (y/n)";
 220 get k$:if k$="" goto 220
-225 if k$="y" then goto 150
+225 if asc(k$)=121 or asc(k$)=89 then goto 150
 230 print:print"bye!":end
 235 rem
 499 rem ##############################################

@@ -996,8 +996,8 @@ bool MeatHttpClient::processRedirectsAndOpen(uint32_t position, uint32_t size) {
 // }
 
 void MeatHttpClient::close() {
-    //Debug_printv("close called, _http=%p, _is_open=%d, postBuffer.size=%u, postResponse.size=%u",
-    //    _http, _is_open, (uint32_t)postBuffer.size(), (uint32_t)postResponse.size());
+    Debug_printv("Q2-DIAG close: http=%p is_open=%d postBuf=%u postResp=%u lastRC=%d",
+        _http, _is_open, (uint32_t)postBuffer.size(), (uint32_t)postResponse.size(), lastRC);
     if(_http != nullptr) {
         if ( _is_open ) {
             // For POST/PUT, we need to send the buffered body data
@@ -1008,6 +1008,10 @@ void MeatHttpClient::close() {
                 // Complete the request (sends body and receives response)
                 // Response body data is captured via HTTP_EVENT_ON_DATA
                 int performResult = esp_http_client_perform(_http);
+                Debug_printv("Q2-DIAG perform: result=%d http=%p stCode=%d capBytes=%u",
+                    performResult, _http,
+                    esp_http_client_get_status_code(_http),
+                    (uint32_t)postResponse.size());
                 Debug_printv("esp_http_client_perform result: %d", performResult);
                 Debug_printv("POST response captured via events: %u bytes", (uint32_t)postResponse.size());
 

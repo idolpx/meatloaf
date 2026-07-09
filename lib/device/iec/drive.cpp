@@ -321,7 +321,7 @@ uint8_t iecChannelHandlerFile::readBufferData()
     else
     */
     {
-        Debug_printv("size[%lu] avail[%lu] pos[%lu] eos[%d] error[%d]", m_stream->size(), m_stream->available(), m_stream->position(), m_stream->eos(), m_stream->error());
+        Debug_printv("Q2-RBD size[%lu] avail[%lu] pos[%lu] eos[%d] error[%d] m_len=%d m_eos=%d", m_stream->size(), m_stream->available(), m_stream->position(), m_stream->eos(), m_stream->error(), m_len, m_eos);
         // if (m_stream->size() == 0)
         //     return ST_FILE_NOT_FOUND;
 
