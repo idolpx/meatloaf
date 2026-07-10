@@ -126,13 +126,13 @@ After `j`, call `GET#` to read the extracted value byte by byte until EOI (ST bi
 
 If the JSON pointer doesn't match or the body isn't valid JSON, ST bit 7 (128) is set on the subsequent `GET#`.
 
-**⚠️ PETSCII conversion:** Unlike `r-b` (which returns raw server bytes), the `j` command converts its result to PETSCII for correct C64 display. String values are returned **without surrounding quotes**.
+String values are returned **without surrounding quotes** (the original JSON quotes are stripped).
 
 Serialized types:
 
 | JSON type | Output |
 |-----------|--------|
-| String | PETSCII text, no surrounding quotes |
+| String | Raw bytes, no surrounding quotes |
 | Number | Decimal text (e.g. `42`, `3.14`) |
 | Boolean | `TRUE` or `FALSE` |
 | Null | `NULL` |

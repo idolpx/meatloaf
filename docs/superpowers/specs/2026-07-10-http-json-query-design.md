@@ -163,9 +163,6 @@ REM === Full JSON query example ===
 
 ## Changes from Original Design
 
-### PETSCII conversion (added)
-Results are converted via `mstr::toPETSCII2()` before serving. The original design returned raw UTF-8 bytes, which displayed wrong on C64 (PETSCII case-flip). Conversion uses the existing `U8Char` codec from `lib/utils/string_utils.h`.
-
 ### String values unquoted (added)
 String-type items use `cJSON_GetStringValue()` instead of `cJSON_PrintUnformatted()` to avoid surrounding JSON quotes. Non-string types continue to use `PrintUnformatted`.
 
