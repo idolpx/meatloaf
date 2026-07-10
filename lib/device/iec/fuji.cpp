@@ -244,7 +244,7 @@ void iecFuji::local_ip()
 
 void iecFuji::process_basic_commands()
 {
-    // required for appkey in BASIC
+    // required for iec_appkey in BASIC
     payloadRaw = payload;
     payload = mstr::toUTF8(payload);
     pt = util_tokenize(payload, ',');

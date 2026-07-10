@@ -696,7 +696,7 @@ uint32_t HTTPMStream::read(uint8_t* buf, uint32_t size) {
         if (_session) {
             auto& cl = *_session->client;
             // For non-GET methods (POST/PUT), execute the deferred HTTP call
-                        // Execute the HTTP call now (safe IEC timing at read time).
+            // Execute the HTTP call now (safe IEC timing at read time).
             // For GET this opens a fresh connection. For POST/PUT the 
             // deferred body send happens inside sendRequest().
             ctx.responseHeaders.clear();

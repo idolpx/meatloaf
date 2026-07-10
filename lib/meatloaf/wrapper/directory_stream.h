@@ -3,11 +3,8 @@
 
 #include <memory>
 #include <fstream>
-#if HOST_OS==win32
-#include "meatloaf.h"
-#else
-#include "meatloaf.h"
-#endif
+
+#include "../meatloaf.h"
 
 class idirbuf : public std::filebuf {
     const size_t BUFFER_SIZE = 256;

@@ -41,7 +41,7 @@
 
     #define Debug_memory() {Debug_printv("Heap[%lu] Low[%lu] Task[%u]", esp_get_free_heap_size(), esp_get_free_internal_heap_size(), uxTaskGetStackHighWaterMark(NULL));}
     #define HEAP_CHECK(x) Debug_printf("HEAP CHECK %s " x "\r\n", heap_caps_check_integrity_all(true) ? "PASSED":"FAILED")
-#else // ESP_PLATFORM
+#else // !ESP_PLATFORM
     // Use util_debug_printf() helper function
     #include <utils.h>
 

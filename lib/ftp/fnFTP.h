@@ -144,7 +144,7 @@ private:
 
     /* do STOR - file opened for write */
     bool _stor = false;
-    
+
     /* if to check control channel too while dealing with data channel */
     bool _expect_control_response = false;
 
@@ -185,7 +185,7 @@ private:
      * Directory buffer stream
      */
     std::stringstream dirBuffer;
-    
+
     /**
      * The data port returned by EPSV/PASV
      */

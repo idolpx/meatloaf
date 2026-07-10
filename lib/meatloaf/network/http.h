@@ -15,6 +15,16 @@
 // You should have received a copy of the GNU General Public License
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
+// HTTP://  - Hypertext Transfer Protocol
+// HTTPS:// - Hypertext Transfer Protocol Secure
+// https://buger.dread.cz/simple-esp8266-https-client-without-verification-of-certificate-fingerprint.html
+// https://forum.arduino.cc/t/esp8266-httpclient-library-for-https/495245
+
+// WebDAV - Web Distributed Authoring and Versioning
+// http://www.webdav.org/specs/
+// 
+
+
 #ifndef MEATLOAF_SCHEME_HTTP
 #define MEATLOAF_SCHEME_HTTP
 
@@ -32,6 +42,8 @@ void http_set_insecure(bool v);
 #include "../../../include/debug.h"
 
 #include "../../../include/version.h"
+//#define PRODUCT_ID "MEATLOAF CBM"
+//#define PLATFORM_DETAILS "C64; 6510; 2; NTSC; EN;" // Make configurable. This will help server side to select appropriate content.
 #define USER_AGENT "MEATLOAF/" FN_VERSION_FULL " (" PLATFORM_DETAILS ")"
 
 #include "utils.h"
@@ -76,15 +88,25 @@ class MeatHttpClient {
     std::map<std::string, std::string> headers;
 
 public:
+    // Buffer for POST/PUT body data when streaming
     std::vector<uint8_t> postBuffer;
+
+    // Buffer for POST response body to be read by C64 after POST completes
     std::vector<uint8_t> postResponse;
+
+    // Preserved POST response that survives init() - used when switching from POST to GET
     std::vector<uint8_t> preservedPostResponse;
+
+    // Preserved size of the POST response (since preservedPostResponse may be moved)
     uint32_t preservedPostResponseSize = 0;
 
     MeatHttpClient() { init(); }
     void init();
 
     ~MeatHttpClient() {
+        // Don't call close() here - it may cause double-cleanup issues.
+        // close() should be called explicitly before destruction.
+        // If _http is still valid, do minimal cleanup.
         if (_http != nullptr) {
             esp_http_client_cleanup(_http);
             _http = nullptr;
@@ -109,7 +131,7 @@ public:
     void close();
     void setOnHeader(const std::function<int(char*, char*)> &f);
     bool seek(uint32_t pos);
-    bool flush(uint32_t numBytes = 0);
+    bool flush(uint32_t numBytes = 0); // Flush all remaining bytes if 0
     uint32_t read(uint8_t* buf, uint32_t size);
     uint32_t write(const uint8_t* buf, uint32_t size);
 
@@ -145,20 +167,32 @@ public:
     int lastRC = 0;
 };
 
+/********************************************************
+ * HTTPMSession - HTTP Session Management
+ ********************************************************/
+
 class HTTPMSession : public MSession {
 public:
-    HTTPMSession(std::string host, uint16_t port = 80);
+    HTTPMSession(std::string host, uint16_t port = 80); // Default HTTP port is 80
     ~HTTPMSession() override;
 
     bool connect() override;
     void disconnect() override;
     bool keep_alive() override;
 
+    // Get the scheme for this session type
     static std::string getScheme() { return "http"; }
+
+    // Check if this session supports HTTPS
     bool isSecure() const { return this->port == 443; }
 
     std::shared_ptr<MeatHttpClient> client;
 };
+
+
+/********************************************************
+ * HTTPMFile implementation
+ ********************************************************/
 
 class HTTPMFile: public MFile {
     std::shared_ptr<MeatHttpClient> getClient();
@@ -176,7 +210,13 @@ public:
         }
     };
     HTTPMFile(std::string path, std::string filename): MFile(path) {};
-    ~HTTPMFile() override { if (_session) _session.reset(); }
+    ~HTTPMFile() override {
+        // Client is managed by the session, do not close here
+        // Reset session reference
+        if (_session) {
+            _session.reset();
+        }
+    }
 
     std::shared_ptr<MStream> getSourceStream(std::ios_base::openmode mode=std::ios_base::in) override;
     std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> src);
@@ -193,6 +233,11 @@ public:
     bool isText() override;
     bool rename(std::string dest) { return false; };
 };
+
+
+/********************************************************
+ * HTTPMStream Implementation
+ ********************************************************/
 
 class HTTPMStream: public MStream {
 public:
@@ -216,6 +261,9 @@ public:
     uint32_t read(uint8_t* buf, uint32_t size) override;
     uint32_t write(const uint8_t *buf, uint32_t size) override;
 
+    // For chunked responses _size grows as chunks arrive and equals _position after
+    // each read, so the base available() would return 0 even with more data pending.
+    // Return HTTP_BLOCK_SIZE as a hint when the connection is open but not yet complete.
     uint32_t available() override {
         if (_queuedSend) return 0;
         if (!_responseBuffer.empty()) {
@@ -228,6 +276,7 @@ public:
             if (respAvail > 0) return respAvail;
         }
         if (_size > _position) return _size - _position;
+        // Check if connection is still open and has more data coming
         if (isOpen() && _session && _session->client && !_session->client->complete())
             return HTTP_BLOCK_SIZE;
         return 0;
@@ -272,6 +321,9 @@ private:
     std::vector<uint8_t> _bodyCapture;
 };
 
+/********************************************************
+ * HTTPMFileSystem Implementation
+ ********************************************************/
 
 class HTTPMFileSystem: public MFileSystem
 {
@@ -279,6 +331,8 @@ public:
     HTTPMFileSystem(): MFileSystem("http") {
         isRootFS = true;
         service_type = "_http._tcp";
+        //service_type = "_http-alt._tcp";
+        //service_type = "_webdav._tcp";
     };
 
     bool handles(std::string name) {
@@ -288,6 +342,7 @@ public:
     }
 
     MFile* getFile(std::string path) override {
+        // If host is not specified, search for service records
         auto parser = PeoplesUrlParser::parseURL(path);
         if (parser->host.empty()) {
             path = "mdns://" + service_type;
