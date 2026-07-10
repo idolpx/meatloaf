@@ -251,6 +251,9 @@ private:
     std::string _statusBuffer;
     uint32_t _statusPos = 0;
 
+    bool _jsonQueryRequested = false;
+    std::string _jsonQueryResult;
+
     std::string _cmdLine;
     bool _queuedSend = false;
 

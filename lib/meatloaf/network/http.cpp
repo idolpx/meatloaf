@@ -30,6 +30,9 @@
 #include "../../../include/debug.h"
 //#include "../../../include/global_defines.h"
 
+#include <cJSON.h>
+#include <cJSON_Utils.h>
+
 /********************************************************
  * HTTPRequestContext implementation
  ********************************************************/
@@ -266,6 +269,54 @@ bool HTTPMStream::handleCommand(const std::string& cmd) {
             _position = 0;  // sync for available()/eos()
             return true;
         }
+    }
+
+    // 'j <pointer>' — JSON Pointer query on captured response body
+    if (c.size() >= 2 && (c[0] == 'j' || c[0] == 'J') && c[1] == ' ') {
+        std::string pointer = c.substr(2);
+        mstr::trim(pointer);
+
+        _jsonQueryResult.clear();
+        _jsonQueryRequested = false;
+
+        if (_bodyCapture.empty()) {
+            // No body captured — silently ignore (no error)
+            return true;
+        }
+
+        // Parse body as JSON
+        cJSON *root = cJSON_Parse((const char *)_bodyCapture.data());
+        if (root == nullptr) {
+            // Invalid JSON — set error state
+            ctx.responseStatus = -99;
+            _jsonQueryResult = "JSON parse error";
+            _jsonQueryRequested = true;
+            Debug_printv("JSON query: parse failed for pointer %s", pointer.c_str());
+            return true;
+        }
+
+        // Resolve pointer
+        cJSON *item = cJSONUtils_GetPointer(root, pointer.c_str());
+        if (item == nullptr) {
+            cJSON_Delete(root);
+            ctx.responseStatus = -99;
+            _jsonQueryResult = "JSON pointer not found";
+            _jsonQueryRequested = true;
+            Debug_printv("JSON query: pointer not found: %s", pointer.c_str());
+            return true;
+        }
+
+        // Serialize matched value
+        char *jsonStr = cJSON_PrintUnformatted(item);
+        if (jsonStr != nullptr) {
+            _jsonQueryResult = jsonStr;
+            free(jsonStr);
+        }
+        cJSON_Delete(root);
+
+        _jsonQueryRequested = true;
+        Debug_printv("JSON query: %s -> %zu bytes", pointer.c_str(), _jsonQueryResult.size());
+        return true;
     }
 
     // Single-letter commands with arguments: 'm <method>', 'b <body>'
