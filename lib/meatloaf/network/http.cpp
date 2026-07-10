@@ -220,7 +220,23 @@ bool HTTPMStream::handleCommand(const std::string& cmd) {
 
     if (c.empty()) return true;  // blank line is harmless
 
-        // 'r-h' / 'r-b' -- reposition cursor in response buffer
+    // The C64's BASIC tokenizer uppercases all string literals, and our
+    // PETSCII output conversion (toPETSCII2) flips case of API responses
+    // (e.g. "Luke" becomes "LUKE").  Data returning from the C64 (via write())
+    // arrives in this uppercased form.  Lowercase the JSON pointer now so
+    // cJSON matching works.  Body data and header values are left as-is
+    // (JSON field names are case-sensitive and HTTP headers are handled
+    // by the lowercasing in setHeader()).
+    if (c.size() >= 2 && (c[0] == 'j' || c[0] == 'J') && c[1] == ' ') {
+        std::string ptr = c.substr(2);
+        mstr::trim(ptr);
+        mstr::toLower(ptr);
+        // Strip spaces from STR$() padding (STR$(0) → " 0" in C64 BASIC)
+        ptr.erase(std::remove(ptr.begin(), ptr.end(), ' '), ptr.end());
+        c = "j " + ptr;
+    }
+
+    // 'r-h' / 'r-b' -- reposition cursor in response buffer
     if (c.size() >= 3 && (c[0] == 'r' || c[0] == 'R') && c[1] == '-') {
         switch (c[2]) {
             case 'h': case 'H':
@@ -283,11 +299,8 @@ bool HTTPMStream::handleCommand(const std::string& cmd) {
         _jsonQueryRequested = false;
         _queryResultPos = 0;
 
-        // C64 BASIC uppercases string literals via tokenizer and STR$(n)
-        // prepends a space for positive numbers. Normalize the pointer:
-        // lowercase for cJSON matching and strip spaces.
-        // (BASIC bypass: STR$(0) → " 0", we strip that space here.)
-        mstr::toLower(pointer);
+        // HBC-STRING already lowercased by handleCommand(). Strip spaces
+        // from STR$() padding (STR$(0) → " 0" in C64 BASIC).
         pointer.erase(std::remove(pointer.begin(), pointer.end(), ' '), pointer.end());
 
         if (_bodyCapture.empty()) {
@@ -602,7 +615,13 @@ bool HTTPMStream::open(std::ios_base::openmode mode) {
 
     this->mode = mode;
 
-    // Parse URL to get session
+    // Parse URL to get session.  The URL arrives from the C64 in PETSCII
+    // form (uppercase alpha) because the output of a previous j command
+    // was PETSCII-converted, and the C64 BASIC tokenizer also uppercases
+    // string literals.  Lowercase the whole URL to keep HTTP servers happy
+    // (scheme, host, and path are almost always case-insensitive or
+    // lowercase-only in real-world API endpoints).
+    mstr::toLower(url);
     auto parser = PeoplesUrlParser::parseURL(url);
     if (!parser || (parser->scheme != "http" && parser->scheme != "https")) {
         Debug_printv("Invalid HTTP URL: %s", url.c_str());
