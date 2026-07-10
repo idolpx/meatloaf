@@ -335,6 +335,9 @@ bool HTTPMStream::handleCommand(const std::string& cmd) {
         }
         cJSON_Delete(root);
 
+        // Convert UTF-8 result to PETSCII for C64 display
+        _jsonQueryResult = mstr::toPETSCII2(_jsonQueryResult);
+
         _jsonQueryRequested = true;
         Debug_printv("JSON query: %s -> %zu bytes", pointer.c_str(), _jsonQueryResult.size());
         return true;
