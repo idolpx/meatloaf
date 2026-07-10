@@ -610,8 +610,9 @@ bool HTTPMStream::open(std::ios_base::openmode mode) {
     // Parse URL to get session.  The URL arrives from the C64 in PETSCII
     // form (uppercase alpha) because the C64 BASIC tokenizer uppercases
     // string literals and toPETSCII2() may have case-flipped stored URLs.
-    // Convert PETSCII to UTF-8 here so HTTP servers can parse the URL.
-    url = mstr::toUTF8(url);
+    // toUTF8() is identity for ASCII bytes so it won't help here — lower
+    // the whole URL so HTTP servers accept the scheme/host/path.
+    mstr::toLower(url);
     auto parser = PeoplesUrlParser::parseURL(url);
     if (!parser || (parser->scheme != "http" && parser->scheme != "https")) {
         Debug_printv("Invalid HTTP URL: %s", url.c_str());
