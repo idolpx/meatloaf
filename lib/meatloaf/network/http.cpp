@@ -283,6 +283,13 @@ bool HTTPMStream::handleCommand(const std::string& cmd) {
         _jsonQueryRequested = false;
         _queryResultPos = 0;
 
+        // C64 BASIC uppercases string literals via tokenizer and STR$(n)
+        // prepends a space for positive numbers. Normalize the pointer:
+        // lowercase for cJSON matching and strip spaces.
+        // (BASIC bypass: STR$(0) → " 0", we strip that space here.)
+        mstr::toLower(pointer);
+        pointer.erase(std::remove(pointer.begin(), pointer.end(), ' '), pointer.end());
+
         if (_bodyCapture.empty()) {
             Debug_printv("JSON query: skipped, no body captured");
             return true;
@@ -335,7 +342,7 @@ bool HTTPMStream::handleCommand(const std::string& cmd) {
         }
         cJSON_Delete(root);
 
-        // Convert UTF-8 result to PETSCII for C64 display
+        // Convert result from UTF-8 to PETSCII for C64 display
         _jsonQueryResult = mstr::toPETSCII2(_jsonQueryResult);
 
         _jsonQueryRequested = true;
