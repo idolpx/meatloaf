@@ -280,7 +280,7 @@ bool HTTPMStream::handleCommand(const std::string& cmd) {
         _jsonQueryRequested = false;
 
         if (_bodyCapture.empty()) {
-            // No body captured — silently ignore (no error)
+            Debug_printv("JSON query: skipped, no body captured");
             return true;
         }
 
@@ -311,6 +311,14 @@ bool HTTPMStream::handleCommand(const std::string& cmd) {
         if (jsonStr != nullptr) {
             _jsonQueryResult = jsonStr;
             free(jsonStr);
+        } else {
+            // Heap exhaustion — PrintUnformatted returned null
+            cJSON_Delete(root);
+            ctx.responseStatus = -99;
+            _jsonQueryResult = "JSON serialize error";
+            _jsonQueryRequested = true;
+            Debug_printv("JSON query: cJSON_PrintUnformatted returned null for pointer %s", pointer.c_str());
+            return true;
         }
         cJSON_Delete(root);
 
