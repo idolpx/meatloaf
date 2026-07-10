@@ -109,7 +109,7 @@ get#1,a$:rem reads one digit at a time until CR
 ```
 
 ### `j <json-pointer>`
-Query the captured JSON response body using an RFC 6901 JSON Pointer. The result is read via `GET#` on the next call.
+Query the captured JSON response body using an RFC 6901 JSON Pointer, extracting a single value by path. The result is converted to PETSCII and read via `GET#` on the next call.
 
 ```basic
 print#1,"j /choices/0/message/content"
@@ -126,16 +126,26 @@ After `j`, call `GET#` to read the extracted value byte by byte until EOI (ST bi
 
 If the JSON pointer doesn't match or the body isn't valid JSON, ST bit 7 (128) is set on the subsequent `GET#`.
 
+**⚠️ PETSCII conversion:** Unlike `r-b` (which returns raw server bytes), the `j` command converts its result to PETSCII for correct C64 display. String values are returned **without surrounding quotes**.
+
 Serialized types:
 
 | JSON type | Output |
 |-----------|--------|
-| String | Raw bytes (no quotes) |
+| String | PETSCII text, no surrounding quotes |
 | Number | Decimal text (e.g. `42`, `3.14`) |
 | Boolean | `TRUE` or `FALSE` |
 | Null | `NULL` |
-| Object | Unformatted JSON text |
-| Array | Unformatted JSON text |
+| Object | Unformatted PETSCII JSON text |
+| Array | Unformatted PETSCII JSON text |
+
+**IMPORTANT — appending the last byte:** When reading the `j` result with `GET#`, the last byte read sets ST bit 64 (EOI) but is also a valid data byte. **Always append the byte to your result string before checking ST**:
+
+```basic
+10 rem correct pattern (do not lose last byte)
+20 get#ch,a$:b$=b$+a$:if st and 64 then return
+```
+The status reader helper in this doc uses this pattern. See the SWAPI explorer (`test/http/swapi.bas`) for a complete working example.
 
 ### `r-h`
 Switch response reading to headers mode. The next `GET#` calls read response headers, one line at a time. Each header line ends with `CR`. An empty `CR`-only line marks the end of headers.
@@ -185,6 +195,7 @@ The response is read sequentially using `GET#`. After `s`, all response data is 
 ```
 
 ### Body
+
 ```basic
 200 print#1,"r-b"
 210 get#1,a$:if st and 64 then 240 : rem EOI = body done
@@ -194,20 +205,10 @@ The response is read sequentially using `GET#`. After `s`, all response data is 
 240 rem body complete
 ```
 
-**⚠️ Case when reading body bytes:** `asc(a$)` returns the **raw byte** straight
-from the HTTP server — no PETSCII conversion happens on the IEC read path. If
-the server sends lowercase JSON (`"content":"hello"`), you get byte 99 for `c`,
-not 67. PETSCII case-flip only applies when you **print** characters (`PRINT
-chr$(asc(a$))` displays them uppercase). For state machines or byte comparisons:
-
-```basic
-if a$=chr$(99) then ... : rem matches lowercase 'c' — correct for most JSON APIs
-if a$=chr$(67) then ... : rem matches uppercase 'C' — only if server sends uppercase
-```
-
-When in doubt, check server output. Most HTTP APIs (Ollama, OpenAI, REST) return
-lowercase JSON — use `chr$(99)`, `chr$(111)`, `chr$(110)` etc.
-```
+**⚠️ Case when reading body bytes (`r-b`):** `asc(a$)` returns the **raw byte** straight
+from the HTTP server — no PETSCII conversion happens on the IEC read path.
+This applies only to `r-b` (raw body mode). The `j` command DOES convert to
+PETSCII — see its section below.
 
 ---
 
@@ -382,31 +383,29 @@ Include these in your programs for reusable response reading:
 1000 rem --- read status line into st$ ---
 1005 print#ch,"status"
 1010 st$=""
-1015 get#ch,a$
+1015 get#ch,a$:st$=st$+a$
 1020 if st and 64 then return : rem eoi
 1025 if st and 128 then return : rem error
 1030 if a$=chr$(13) then return : rem cr
-1035 st$=st$+a$
-1040 goto 1015
+1035 goto 1015
 
 2000 rem --- read one header line into r$ ---
 2005 print#ch,"r-h"
 2010 r$=""
-2015 get#ch,a$
+2015 get#ch,a$:r$=r$+a$
 2020 if st and 64 then return : rem eoi
 2025 if st and 128 then return : rem error
 2030 if a$=chr$(13) then return : rem cr = end of this header
-2035 r$=r$+a$
-2040 goto 2015
+2035 goto 2015
 
 3000 rem --- read body into b$ (max 250 bytes) ---
 3005 print#ch,"r-b"
-3010 b$="":bc=0
+3010 b$=""
 3015 get#ch,a$
-3020 if st and 64 then return : rem eoi
+3020 if st and 64 then return : rem eoi — a$ is the final byte
 3025 if st and 128 then return : rem error
-3030 if bc>249 then return : rem string too long guard
-3035 bc=bc+1:b$=b$+a$
+3030 if len(b$)>249 then return : rem string too long guard
+3035 b$=b$+a$
 3040 goto 3015
 ```
 
@@ -475,6 +474,7 @@ The standard test suite (`test/http/http_full_client_test.bas`) exercises all fe
 | 7 | 404 handling | Request nonexistent path, confirm 404 status |
 | 8 | PUT method | Send PUT with body, verify method echoed |
 | 9 | Body append | Use `b+` to build multi-part body |
+| 10 | JSON query | JSON Pointer extraction (`j`) on echo server |
 
 ---
 
@@ -497,6 +497,15 @@ The standard test suite (`test/http/http_full_client_test.bas`) exercises all fe
 120 print:print"---done---"
 130 close 1
 ```
+
+---
+
+## Example Programs
+
+| File | Description |
+|------|-------------|
+| `test/http/openai_chat_client_json.bas` | OpenAI/Ollama chat from C64 using `j /choices/0/message/content` on the response body |
+| `test/http/swapi.bas` | Full SWAPI.dev explorer — browse people, planets, films, species, vehicles, starships with listings, search, and cross-links via JSON Pointer |
 
 ---
 
