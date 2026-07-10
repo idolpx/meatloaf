@@ -18,7 +18,6 @@
 30 ch=1 : rem logical file number
 35 er=0 : rem error flag
 40 po$="" : rem user prompt / question
-45 b$="" : rem response body buffer
 50 ak$="" : rem api key (leave empty for ollama; set for openai)
 55 rem
 99 rem ===== main =====
@@ -39,14 +38,13 @@
 160 input po$
 165 if po$="" then print"ok bye!":end
 170 print
-175 print"sending...";
+175 print"working..."
 180 gosub 500 : rem build + send http request
-185 if er<>0 then print:print"request failed":goto 225
-190 print"ok"
-192 print
-195 print"response:"
+185 if er<>0 then print:print"failed":goto 225
+190 rem stream the extracted json value to screen
+195 print
 200 print"---"
-205 gosub 800 : rem stream extracted json value to screen
+205 gosub 800
 210 print"---"
 220 close ch
 225 print

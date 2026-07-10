@@ -775,6 +775,9 @@ uint32_t HTTPMStream::read(uint8_t* buf, uint32_t size) {
             _jsonQueryRequested = false;  // reset after full consume
             _jsonQueryResult.clear();
             _queryResultPos = 0;
+            // Advance response buffer cursor past end to prevent
+            // subsequent read() calls from serving raw body data.
+            _responseBufPos = (uint32_t)_responseBuffer.size();
             return 0;  // signal EOI
         }
         uint32_t remaining = (uint32_t)_jsonQueryResult.size() - _queryResultPos;
