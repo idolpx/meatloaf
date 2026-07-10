@@ -1344,7 +1344,19 @@ MFile* MFile::cdLocalRoot(std::string plus)
 bool MFile::exists() {
     if (scheme.empty()) {
         struct stat st;
-        return stat(path.c_str(), &st) == 0;
+        if (stat(path.c_str(), &st) == 0)
+            return true;
+
+        // A file nested inside a container (e.g. a .d64/.tcrt/.t64 entry inside
+        // a .zip) has no physical path of its own, so stat() fails. It was
+        // resolved through a container source (sourceFile != nullptr); defer to
+        // whether that container exists. Plain flash/SD files have no sourceFile
+        // and correctly return false here. The actual entry is validated later
+        // when the stream is opened via seekPath()/seekNextEntry().
+        if (sourceFile != nullptr && sourceFile != this)
+            return sourceFile->exists();
+
+        return false;
     }
     //return _exists;
     return true; // Assume it exists; if it doesn't, we'll find out when we try to open it
