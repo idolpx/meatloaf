@@ -34,6 +34,20 @@ This fetches `http://example.com/data.json` and prints the HTTP status code (e.g
 
 All commands are sent via `PRINT#` to the opened channel. They are **case-insensitive** and dispatched when a `CR` (CHR$(13), the PRINT# line terminator) is received.
 
+| Command | Description | Example |
+|---------|-------------|---------|
+| `m <method>` | Set the HTTP method | `m get` |
+| `h <name>: <value>` | Set a request header | `h content-type: application/json` |
+| `h+ <name>: <value>` | Append a request header | `h+ x-custom: first` |
+| `b <text>` | Set the request body | `b {"key":"value"}` |
+| `b+ <text>` | Append to the request body | `b+ ,"more":"data"` |
+| `s` | Send the HTTP request | `s` |
+| `status` | Request the HTTP status code | `status` |
+| `j <pointer>` | JSON Pointer query on response body | `j /choices/0/message/content` |
+| `r-h` | Switch response reading to headers mode | `r-h` |
+| `r-b` | Switch response reading to body mode | `r-b` |
+| `c` | Clear the request context | `c` |
+
 ### `m <method>`
 Set the HTTP method.
 
@@ -93,6 +107,35 @@ Request the HTTP status code. The next `GET#` reads the decimal status (e.g. `20
 print#1,"status"
 get#1,a$:rem reads one digit at a time until CR
 ```
+
+### `j <json-pointer>`
+Query the captured JSON response body using an RFC 6901 JSON Pointer. The result is read via `GET#` on the next call.
+
+```basic
+print#1,"j /choices/0/message/content"
+```
+
+After `j`, call `GET#` to read the extracted value byte by byte until EOI (ST bit 64):
+
+```basic
+60 print#1,"j /choices/0/message/content"
+70 get#1,a$:if st and 64 then 90
+80 print chr$(asc(a$));:goto 70
+90 rem done reading json value
+```
+
+If the JSON pointer doesn't match or the body isn't valid JSON, ST bit 7 (128) is set on the subsequent `GET#`.
+
+Serialized types:
+
+| JSON type | Output |
+|-----------|--------|
+| String | Raw bytes (no quotes) |
+| Number | Decimal text (e.g. `42`, `3.14`) |
+| Boolean | `TRUE` or `FALSE` |
+| Null | `NULL` |
+| Object | Unformatted JSON text |
+| Array | Unformatted JSON text |
 
 ### `r-h`
 Switch response reading to headers mode. The next `GET#` calls read response headers, one line at a time. Each header line ends with `CR`. An empty `CR`-only line marks the end of headers.
@@ -432,6 +475,28 @@ The standard test suite (`test/http/http_full_client_test.bas`) exercises all fe
 | 7 | 404 handling | Request nonexistent path, confirm 404 status |
 | 8 | PUT method | Send PUT with body, verify method echoed |
 | 9 | Body append | Use `b+` to build multi-part body |
+
+---
+
+## Complete Example — JSON Query on POST Response
+
+```basic
+10 open 1,8,2,"http://192.168.50.1:11434/v1/chat/completions"
+20 print#1,"m post"
+30 print#1,"h content-type: application/json"
+40 bq$=chr$(123)+chr$(34)+"model"+chr$(34)+":"+chr$(34)+"qwen2.5:0.5b"+chr$(34)
+50 bq$=bq$+","+chr$(34)+"messages"+chr$(34)+":[{"+chr$(34)+"role"+chr$(34)+":"+chr$(34)+"user"+chr$(34)
+60 bq$=bq$+","+chr$(34)+"content"+chr$(34)+":"+chr$(34)+"hello"+chr$(34)+"}]}"
+70 print#1,"b ";bq$
+80 print#1,"s"
+85 rem query the content field
+90 print#1,"j /choices/0/message/content"
+95 rem read extracted value
+100 get#1,a$:if st and 64 then 120
+110 print chr$(asc(a$));:goto 100
+120 print:print"---done---"
+130 close 1
+```
 
 ---
 
