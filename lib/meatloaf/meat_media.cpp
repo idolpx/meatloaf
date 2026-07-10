@@ -229,6 +229,20 @@ uint32_t MMediaStream::read(uint8_t* buf, uint32_t size) {
     if(seekCalled) {
         // if we have the stream set to a specific file already, either via seekNextEntry or seekPath, return bytes of the file here
         // or set the stream to EOF-like state, if whle file is completely read.
+
+        // Enforce the selected file's boundary: readFile() reads linearly from
+        // the container and does not know where the file ends, so without this
+        // cap it keeps streaming the *following* files' bytes past _size. That
+        // only "worked" for the last entry (its data ends at the container end,
+        // so over-reading hit EOF immediately) and corrupted every other file.
+        if( _size > 0 )
+        {
+            if( _position >= _size )
+                return 0;
+            if( size > _size - _position )
+                size = _size - _position;
+        }
+
         bytesRead = readFile(buf, size);
 
     }

@@ -321,7 +321,8 @@ uint8_t iecChannelHandlerFile::readBufferData()
     else
     */
     {
-        Debug_printv("Q2-RBD size[%lu] avail[%lu] pos[%lu] eos[%d] error[%d] m_len=%d m_eos=%d", m_stream->size(), m_stream->available(), m_stream->position(), m_stream->eos(), m_stream->error(), m_len, m_eos);
+        //Debug_printv("size[%lu] avail[%lu] pos[%lu] eos[%d] error[%d] m_len=%d m_eos=%d", m_stream->size(), m_stream->available(), m_stream->position(), m_stream->eos(), m_stream->error(), m_len, m_eos);
+        Debug_printv("size[%lu] avail[%lu] pos[%lu]", m_stream->size(), m_stream->available(), m_stream->position());
         // if (m_stream->size() == 0)
         //     return ST_FILE_NOT_FOUND;
 
@@ -583,7 +584,7 @@ uint8_t iecChannelHandlerDir::readBufferData()
             // Convert to PETSCII and set extension
             if ( !m_dir->isPETSCII )
             {
-                Debug_printv("original name[%s] ext[%s]", name.c_str(), ext.c_str());
+                //Debug_printv("original name[%s] ext[%s]", name.c_str(), ext.c_str());
                 name = U8Char::encodeACE(name);
                 name = mstr::toPETSCII2( name );
 
