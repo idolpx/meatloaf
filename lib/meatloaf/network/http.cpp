@@ -311,18 +311,27 @@ bool HTTPMStream::handleCommand(const std::string& cmd) {
         }
 
         // Serialize matched value
-        char *jsonStr = cJSON_PrintUnformatted(item);
-        if (jsonStr != nullptr) {
-            _jsonQueryResult = jsonStr;
-            free(jsonStr);
+        if (cJSON_IsString(item)) {
+            // Return raw string value without surrounding quotes
+            char *strVal = cJSON_GetStringValue(item);
+            if (strVal != nullptr) {
+                _jsonQueryResult = strVal;
+            }
         } else {
-            // Heap exhaustion — PrintUnformatted returned null
-            cJSON_Delete(root);
-            ctx.responseStatus = -99;
-            _jsonQueryResult = "JSON serialize error";
-            _jsonQueryRequested = true;
-            Debug_printv("JSON query: cJSON_PrintUnformatted returned null for pointer %s", pointer.c_str());
-            return true;
+            // Use JSON serialization for numbers, booleans, objects, arrays
+            char *jsonStr = cJSON_PrintUnformatted(item);
+            if (jsonStr != nullptr) {
+                _jsonQueryResult = jsonStr;
+                free(jsonStr);
+            } else {
+                // Heap exhaustion — PrintUnformatted returned null
+                cJSON_Delete(root);
+                ctx.responseStatus = -99;
+                _jsonQueryResult = "JSON serialize error";
+                _jsonQueryRequested = true;
+                Debug_printv("JSON query: cJSON_PrintUnformatted returned null for pointer %s", pointer.c_str());
+                return true;
+            }
         }
         cJSON_Delete(root);
 
