@@ -253,6 +253,7 @@ private:
 
     bool _jsonQueryRequested = false;
     std::string _jsonQueryResult;
+    uint32_t _queryResultPos = 0;
 
     std::string _cmdLine;
     bool _queuedSend = false;

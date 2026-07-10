@@ -256,6 +256,9 @@ bool HTTPMStream::handleCommand(const std::string& cmd) {
         fullMode = FullModeState::BUILDING_REQUEST;
         _statusRequested = false;
         _queuedSend = false;
+        _jsonQueryRequested = false;
+        _jsonQueryResult.clear();
+        _queryResultPos = 0;
         return true;
     }
 
@@ -751,6 +754,25 @@ uint32_t HTTPMStream::read(uint8_t* buf, uint32_t size) {
                 (uint32_t)_responseBuffer.size(), _statusEnd, _headersEnd,
                 _responseBuffer.size() > _headersEnd ? (const char*)(&_responseBuffer[_headersEnd]) : "(null)");
         }
+    }
+
+    // Phase 1.5: JSON query result serving
+    // When _jsonQueryRequested is true, serve bytes from _jsonQueryResult
+    // instead of the response buffer. EOI when fully consumed.
+    if (_jsonQueryRequested) {
+        if (_queryResultPos >= _jsonQueryResult.size()) {
+            _position = _size = (uint32_t)_jsonQueryResult.size();
+            _jsonQueryRequested = false;  // reset after full consume
+            _jsonQueryResult.clear();
+            return 0;  // signal EOI
+        }
+        uint32_t remaining = (uint32_t)_jsonQueryResult.size() - _queryResultPos;
+        uint32_t toCopy = std::min(remaining, size);
+        memcpy(buf, _jsonQueryResult.data() + _queryResultPos, toCopy);
+        _queryResultPos += toCopy;
+        _position = _queryResultPos;
+        _error = 0;
+        return toCopy;
     }
 
     // Phase 2: Sequential serve from response buffer.
