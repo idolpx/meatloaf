@@ -90,16 +90,18 @@ The cJSON tree is allocated, queried, and freed during `handleCommand()` — no 
 
 ### Value Serialization
 
+Results are converted to PETSCII via `mstr::toPETSCII2()` before serving, ensuring correct C64 display (case-flip, multi-byte UTF-8 to PETSCII mapping).
+
 | JSON type | Serialized form |
 |-----------|-----------------|
-| String | The string value, raw bytes |
+| String | PETSCII text, no surrounding quotes |
 | Number | Decimal text (e.g. `42`, `3.14`) |
 | Boolean | `TRUE` or `FALSE` |
 | Null | `NULL` |
-| Object | JSON text via `cJSON_PrintUnformatted` |
-| Array | JSON text via `cJSON_PrintUnformatted` |
+| Object | Unformatted JSON text via `cJSON_PrintUnformatted`, PETSCII converted |
+| Array | Unformatted JSON text via `cJSON_PrintUnformatted`, PETSCII converted |
 
-When the pointer targets a string, the value is returned without surrounding quotes — the most common case (extracting a response text or field value) gives back clean text ready to print.
+String values are returned **without surrounding quotes** (using `cJSON_GetStringValue()` instead of `cJSON_PrintUnformatted()`) — the most common case (extracting a response text or field value) gives back clean PETSCII text ready to print.
 
 ### Example Interaction
 
@@ -159,7 +161,25 @@ REM === Full JSON query example ===
 ### test/native/test_http_full_client/
 - Add JSON query unit tests
 
-## Out of Scope
+## Changes from Original Design
+
+### PETSCII conversion (added)
+Results are converted via `mstr::toPETSCII2()` before serving. The original design returned raw UTF-8 bytes, which displayed wrong on C64 (PETSCII case-flip). Conversion uses the existing `U8Char` codec from `lib/utils/string_utils.h`.
+
+### String values unquoted (added)
+String-type items use `cJSON_GetStringValue()` instead of `cJSON_PrintUnformatted()` to avoid surrounding JSON quotes. Non-string types continue to use `PrintUnformatted`.
+
+### Response buffer leak fix (added)
+After a `j` query result is fully consumed (signals EOI), `_responseBufPos` is advanced past the buffer end. This prevents subsequent `read()` calls from falling through to serve the raw response body, which would leak raw JSON after the extracted value.
+
+### Key BASIC pattern: append byte before checking ST
+When reading the `j` query result with `GET#`, the last byte transfers sets ST bit 64 (EOI) immediately — but that byte IS valid data. **Always append to your result buffer before checking ST:**
+
+```basic
+get#ch,a$:r$=r$+a$:if st and 64 then return
+```
+
+This differs from the `status` and `r-h` readers where the CR terminator is not part of the value.
 
 - **Iterative object/array browsing** — only single-pointer queries. The pointer must target a specific value.
 - **Multiple queries before reading** — only one `j` result is buffered at a time; a second `j` replaces the first.
