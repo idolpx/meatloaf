@@ -13,7 +13,7 @@
 12 rem ===== configuration (!! edit line 50 !!) =====
 15 mo$="qwen2.5:0.5b" : rem model name
 20 mx=100 : rem max tokens in response
-25 ap$="http://192.168.1.131:11434/v1/chat/completions"
+25 ap$="http://192.168.50.1:11434/v1/chat/completions"
 30 ch=1 : rem logical file number
 35 er=0 : rem error flag
 40 po$="" : rem user prompt / question
