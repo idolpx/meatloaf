@@ -301,6 +301,9 @@ int WiFiManager::test_connect(const char *ssid, const char *password)
 
     strlcpy((char *)wifi_config.sta.ssid, ssid, sizeof(wifi_config.sta.ssid));
     strlcpy((char *)wifi_config.sta.password, password, sizeof(wifi_config.sta.password));
+    if (strlen(password) == 0) {
+        wifi_config.sta.threshold.authmode = WIFI_AUTH_OPEN;
+    }
 
     // Debug_printf("wifi_config.sta.ssid: >%s<\r\n", wifi_config.sta.ssid);
     // Debug_printf("wifi_config.sta.pass: >%s<\r\n", wifi_config.sta.password);
