@@ -610,8 +610,9 @@ bool HTTPMStream::open(std::ios_base::openmode mode) {
     // Parse URL to get session.  The URL arrives from the C64 in PETSCII
     // form (uppercase alpha) because the C64 BASIC tokenizer uppercases
     // string literals and toPETSCII2() may have case-flipped stored URLs.
-    // toUTF8() is identity for ASCII bytes so it won't help here — lower
-    // the whole URL so HTTP servers accept the scheme/host/path.
+    // Lowercase the URL so HTTP servers accept the scheme/host/path.
+    // std::tolower() maps 'A'-'Z' (0x41-0x5A) to 'a'-'z' (0x61-0x7A),
+    // which covers both ASCII and PETSCII uppercase bytes.
     mstr::toLower(url);
     auto parser = PeoplesUrlParser::parseURL(url);
     if (!parser || (parser->scheme != "http" && parser->scheme != "https")) {
@@ -1042,9 +1043,9 @@ bool MeatHttpClient::processRedirectsAndOpen(uint32_t position, uint32_t size) {
         lastRC = openAndFetchHeaders(lastMethod, position, size);
 
         // openAndFetchHeaders returns 0 when esp_http_client_open() fails (connection error).
-        // EAI_AGAIN (202) means the DNS query is still in flight — retry a few times with a
-        // short delay to let the resolver complete before giving up.
-        if (lastRC == 0) {
+        // Negative values mean fetch_headers failed (TLS/handshake error on redirect target).
+        // In both cases, retry a few times before giving up.
+        if (lastRC <= 0) {
             if (connectRetries++ < 3) {
                 Debug_printv("connection failed, retrying (%d/3)...", connectRetries);
                 vTaskDelay(pdMS_TO_TICKS(500));
@@ -1059,10 +1060,23 @@ bool MeatHttpClient::processRedirectsAndOpen(uint32_t position, uint32_t size) {
 
         if (lastRC >= 300 && lastRC <= 399) {
             // Location header handler already updated `url` to the redirect target.
-            // The next openAndFetchHeaders() call will drain+close the 3xx response
-            // body before opening the new connection — no cleanup() needed here.
+            // Fresh init() for the new URL's TLS connection prevents stale-handle
+            // failures in esp_http_client on the redirect target.
+            init();
+            connectRetries = 0;  // fresh retry budget for the redirect target
         }
     } while (lastRC >= 300 && lastRC <= 399);
+
+    // Negative status means connection failure (TLS, DNS, etc.) that
+    // wasn't caught by the retry loop — always a fatal error here.
+    if (lastRC <= 0) {
+        Debug_printv("opening stream failed, httpCode=%d", lastRC);
+        _error = lastRC;
+        _exists = false;
+        postBuffer.clear();
+        init();
+        return false;
+    }
 
     if (lastRC == 206)
     {
