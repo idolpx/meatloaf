@@ -611,6 +611,16 @@ uint8_t iecChannelHandlerDir::readBufferData()
             {
                 // unescape slashes
                 mstr::replaceAll(name, "\\", "/");
+
+                // Normalize the extension to exactly 5 chars ("* + ext + <"
+                // status field). decodeType() returns a 4-char value like
+                // " PRG", but the fixed 5-byte memcpy below would then copy the
+                // std::string NUL terminator into the middle of the directory
+                // line, corrupting the C64 BASIC listing (truncates on relink).
+                if( ext.size() < 5 )
+                    ext += std::string(5 - ext.size(), ' ');
+                else if( ext.size() > 5 )
+                    ext = ext.substr(0, 5);
             }
 
 
