@@ -325,10 +325,12 @@
 10100 rem --- json pointer: p$ -> v$ ---
 10105 print#ch,"j "+p$
 10110 v$=""
+10112 rem append byte first, then check st -- last byte sets eoi
 10115 get#ch,a$
-10120 if st and 64 then 10140
+10120 v$=v$+a$
+10122 if st and 64 then 10140
 10125 if st and 128 then v$="(n/a)":goto 10140
-10130 v$=v$+a$:if len(v$)<250 then 10115
+10130 if len(v$)<250 then 10115
 10140 return
 
 10300 rem --- url parser: u$ -> rt$,ri$ ---
@@ -372,13 +374,17 @@
 10454 next i
 10457 print#ch,"j /next"
 10460 v$=""
-10463 get#ch,a$:if st and 64 then 10475
+10463 get#ch,a$
+10464 v$=v$+a$
+10465 if st and 64 then 10475
 10466 if st and 128 then v$="":goto 10475
 10469 v$=v$+a$:if len(v$)<250 then 10463
 10475 nn$=v$
 10478 print#ch,"j /previous"
 10481 v$=""
-10484 get#ch,a$:if st and 64 then 10496
+10484 get#ch,a$
+10485 v$=v$+a$
+10486 if st and 64 then 10496
 10487 if st and 128 then v$="":goto 10496
 10490 v$=v$+a$:if len(v$)<250 then 10484
 10496 pv$=v$
