@@ -129,6 +129,23 @@ class MeatloafTestHandler(http.server.BaseHTTPRequestHandler):
 
     # ── Echo handler (all methods) ───────────────────────────────────────
 
+    def _handle_json_echo(self, method: str):
+        """
+        /echo/json — returns a fixed JSON body for testing JSON pointer queries.
+        """
+        rid = self._request_id()
+        self._log_request(rid)
+        self._read_body()  # drain
+        data = {
+            "status": "ok",
+            "code": 200,
+            "active": True,
+            "data": None,
+            "message": "Hello from Meatloaf JSON echo!",
+            "choices": [{"index": 0, "message": {"role": "assistant", "content": "This is the extracted content value."}}]
+        }
+        self._send_json(200, data, rid)
+
     def _handle_echo(self, method: str):
         """
         Universal echo endpoint.
@@ -185,7 +202,9 @@ class MeatloafTestHandler(http.server.BaseHTTPRequestHandler):
 
     def do_GET(self):
         parsed = urlparse(self.path)
-        if parsed.path == "/debug/stored":
+        if parsed.path == "/echo/json":
+            self._handle_json_echo("GET")
+        elif parsed.path == "/debug/stored":
             self._do_debug_stored()
         elif parsed.path == "/debug/log":
             self._do_debug_log()

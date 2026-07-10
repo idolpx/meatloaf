@@ -27,13 +27,14 @@
 29 print"7 - error handling (404)"
 30 print"8 - custom method (put)"
 31 print"9 - b+ append body test"
+315 print"10 - json query"
 32 print"0 - run all tests"
 33 print
 34 print"select test";
 35 get k$:if k$="" goto 35
 36 t=val(k$)
 37 if t=0 goto 2000
-38 on t gosub 200,400,600,800,1000,1200,1400,1600,1800
+38 on t gosub 200,400,600,800,1000,1200,1400,1600,1800,30000
 39 print:print"done - press key for menu";
 40 get k$:if k$="" goto 40
 41 goto 18
@@ -379,6 +380,49 @@
 1907 if mid$(hs$,i,len(nd$))=nd$ then in=1:return
 1908 next i
 1909 in=0:return
+
+30000 rem ################################################################
+30001 rem test 10: json query command
+30002 rem ################################################################
+30003 print chr$(147):print"=== test 10: json query ===":print
+30005 pass=1:ch=1
+30010 open 1,8,2,"http://"+s$+":"+p$+"/echo/json"
+30015 if (st and 128)<>0 then print"open failed":pass=0:goto 30099
+30020 print"open ok"
+30025 print#1,"m get":print#1,"s"
+30030 print#1,"j /message"
+30032 gosub 30190
+30034 print"string: ";left$(r$,80)
+30036 hs$=r$:nd$="Hello from Meatloaf":gosub 1903
+30038 if in=0 then print"UNEXPECTED STRING!":pass=0:goto 30099
+30040 print"string query: ok"
+30042 print#1,"j /choices/0/message/content"
+30044 gosub 30190
+30046 print"nested: ";left$(r$,80)
+30048 hs$=r$:nd$="extracted content":gosub 1903
+30050 if in=0 then print"UNEXPECTED NESTED!":pass=0:goto 30099
+30052 print"nested query: ok"
+30054 print#1,"j /code"
+30056 gosub 30190
+30058 print"number: ";r$
+30060 if r$<>"200" then print"expected 200!":pass=0:goto 30099
+30062 print"number query: ok"
+30064 print#1,"j /active"
+30066 gosub 30190
+30068 print"boolean: ";r$
+30070 if r$<>"TRUE" then print"expected TRUE!":pass=0
+30072 print"boolean query: ok"
+30074 gosub 60
+30099 close 1
+30100 print:print"test 10: ";
+30102 gosub 82
+30104 return
+30190 rem --- read json query value into r$ (max 249) ---
+30192 r$="":bc=0
+30194 get#1,a$:if (st and 64)<>0 then return
+30196 if bc>248 then return
+30198 bc=bc+1:r$=r$+a$:goto 30194
+
 1910 rem ################################################################
 1911 rem test suite: run all tests
 1912 rem ################################################################
@@ -396,6 +440,7 @@
 2011 gosub 1400
 2012 gosub 1600
 2013 gosub 1800
+20135 gosub 30000
 2014 t$=ti$
 2015 print
 2016 print"all tests complete"

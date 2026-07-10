@@ -281,6 +281,7 @@ bool HTTPMStream::handleCommand(const std::string& cmd) {
 
         _jsonQueryResult.clear();
         _jsonQueryRequested = false;
+        _queryResultPos = 0;
 
         if (_bodyCapture.empty()) {
             Debug_printv("JSON query: skipped, no body captured");
@@ -764,6 +765,7 @@ uint32_t HTTPMStream::read(uint8_t* buf, uint32_t size) {
             _position = _size = (uint32_t)_jsonQueryResult.size();
             _jsonQueryRequested = false;  // reset after full consume
             _jsonQueryResult.clear();
+            _queryResultPos = 0;
             return 0;  // signal EOI
         }
         uint32_t remaining = (uint32_t)_jsonQueryResult.size() - _queryResultPos;
