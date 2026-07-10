@@ -19,7 +19,7 @@
 130 if k$="s" then gosub 30000:goto 20
 140 if k$="q" then poke 53280,14:poke 53281,6:print chr$(147):end
 145 if k$<"1" or k$>"6" then 120
-150 on val(k$) gosub 20000,20100,20200,20300,20400,20500
+150 on val(k$) gosub 20005,20105,20205,20305,20405,20505
 160 goto 20
 
 19990 rem --- wait for any key ---
