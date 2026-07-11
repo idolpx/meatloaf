@@ -1,6 +1,7 @@
 ; Compile with bc.py from VS64 — https://github.com/rolandshacks/vs64
 POKE 53280,0 : POKE 53281,0 : POKE 646,1 : rem black border, black bg, white text
 PRINT "{clr}";CHR$(14)
+POKE 204, 0 : rem reset cursor blink timer
 
 ; ===== configuration (!! edit your api key below !!) =====
 @modelName$ = "qwen2.5:0.5b"
@@ -9,7 +10,7 @@ PRINT "{clr}";CHR$(14)
 @apiKey$ = ""  : rem leave empty for ollama; set for openai
 
 ; ===== internal vars =====
-@sysPrompt$ = "Pose as Commodore 64 computer. Keep responses brief."
+@sysPrompt$ = "You are a helpful assistant on running on an old hardware. Keep responses brief."
 @prompt$ = ""
 @resp$ = ""
 @errFlag = 0
@@ -34,8 +35,12 @@ PRINT "system: "; @sysPrompt$
 
 QuestionLoop:
     PRINT "{red}--- USER ---{lightgrey}"
-    INPUT @prompt$
+    GOSUB LineFetch
     IF @prompt$ = "" THEN PRINT "ok bye!" : END
+
+    ; rem --- sanitize against JSON injection ---
+    @src$ = @prompt$ : GOSUB SanitizeStr
+    @prompt$ = @result$
 
     ; rem --- store user message in context ---
     GOSUB EvictIfFull
@@ -80,21 +85,34 @@ SendRequestSafe:
     @ci = 0
 CtxLoop:
     IF @ci >= @ctxCount THEN GOTO CtxLoopEnd
-    PRINT# ch, "b+ " + o$ + q$ + "role" + q$ + ":" + q$ + @ctxRole$(@ci) + q$ + "," + q$ + "content" + q$ + ":" + q$ + @ctxMsg$(@ci) + q$ + c$ + ","
+    ; rem open {"role":"assistant","content":"
+    PRINT# ch, "b+ " + o$ + q$ + "role" + q$ + ":" + q$ + @ctxRole$(@ci) + q$ + "," + q$ + "content" + q$ + ":" + q$
+    ; rem sanitize and send content in chunks of 100
+    @ej = 1 : @echunk = 100
+CtxChunk:
+    IF @ej > LEN(@ctxMsg$(@ci)) THEN GOTO CtxChunkEnd
+    @echunk$ = MID$(@ctxMsg$(@ci), @ej, @echunk)
+    @src$ = @echunk$ : GOSUB SanitizeStr
+    PRINT# ch, "b+ " + @result$
+    @ej = @ej + @echunk
+    GOTO CtxChunk
+CtxChunkEnd:
+    ; rem close "},
+    PRINT# ch, "b+ " + q$ + c$ + ","
     @ci = @ci + 1
     GOTO CtxLoop
 CtxLoopEnd:
     ; rem current user message
-    PRINT# ch, "b+ " + o$ + q$ + "role" + q$ + ":" + q$ + "user" + q$ + ","
-    PRINT# ch, "b+ " + q$ + "content" + q$ + ":" + q$
-    ; rem send prompt in <200 byte chunks to stay under 255
+    PRINT# ch, "b+ " + o$ + q$ + "role" + q$ + ":" + q$ + "user" + q$ + "," + q$ + "content" + q$ + ":" + q$
+    ; rem send sanitized prompt in chunks of 100
     @pi = 1
-    @chunkSize = 200
+    @chunkSize = 100
 
 PromptChunk:
     IF @pi > LEN(@prompt$) THEN GOTO PromptChunkEnd
     @pchunk$ = MID$(@prompt$, @pi, @chunkSize)
-    PRINT# ch, "b+ " + @pchunk$
+    @src$ = @pchunk$ : GOSUB SanitizeStr
+    PRINT# ch, "b+ " + @result$
     @pi = @pi + @chunkSize
     GOTO PromptChunk
 
@@ -103,24 +121,24 @@ PromptChunkEnd:
     PRINT# ch, "b+ " + c$ + "]," + q$ + "max_tokens" + q$ + ":" + STR$(@maxTokens) + c$
 
     PRINT# ch, "s"
-    GOSUB ReadStatus
+    GOSUB PollStatus
     PRINT "status: "; st$
     IF st$ <> "200" THEN @errFlag = 1 : CLOSE ch : PRINT "api error" : RETURN
     PRINT# ch, "j /choices/0/message/content"
     RETURN
 
 ; ===== read http status =====
-ReadStatus:
+PollStatus:
     PRINT# ch, "status"
     st$ = ""
 
-ReadStatusByte:
+FetchStatus:
     GET# ch, a$
     IF (ST AND 64) <> 0 THEN RETURN  : rem eoi
     IF (ST AND 128) <> 0 THEN RETURN : rem error
     IF a$ = CHR$(13) THEN RETURN     : rem cr = end of status
     st$ = st$ + a$
-    GOTO ReadStatusByte
+    GOTO FetchStatus
 
 ; ===== evict oldest 2 when context is full =====
 EvictIfFull:
@@ -136,6 +154,37 @@ EvictShift:
 EvictDone:
     @ctxCount = 8
     RETURN
+
+; ===== line input via GET (handles commas, good with SHIFT-2 for ") =====
+LineFetch:
+    @prompt$ = ""
+FetchKey:
+    GET k$
+    IF k$ = "" THEN GOTO FetchKey
+    IF ASC(k$) = 13 THEN PRINT : RETURN  : rem enter = done
+    IF ASC(k$) = 20 THEN IF LEN(@prompt$) > 0 THEN @prompt$ = LEFT$(@prompt$, LEN(@prompt$) - 1) : PRINT CHR$(20); " "; CHR$(20);  : rem del
+    IF ASC(k$) = 20 THEN GOTO FetchKey
+    PRINT k$;
+    @prompt$ = @prompt$ + k$
+    GOTO FetchKey
+
+; ===== sanitize string in @src$, return in @result$ =====
+; rem replaces " with ' so JSON strings stay valid
+; rem backslash-escaping is impractical here because PETSCII
+; rem doesn't have a clean ASCII backslash. Single quote is safe.
+SanitizeStr:
+    @result$ = ""
+    @si = 1
+SanitizeLoop:
+    IF @si > LEN(@src$) THEN RETURN
+    @ch$ = MID$(@src$, @si, 1)
+    IF @ch$ = q$ THEN @result$ = @result$ + "'" : GOTO SanitizeNext
+    ; rem strip control codes below $20 (except line feed etc.)
+    IF ASC(@ch$) < 32 AND ASC(@ch$) <> 10 AND ASC(@ch$) <> 13 THEN GOTO SanitizeNext
+    @result$ = @result$ + @ch$
+SanitizeNext:
+    @si = @si + 1
+    GOTO SanitizeLoop
 
 ; ===== stream json query result to screen and capture in @resp$ =====
 StreamAndCapture:
