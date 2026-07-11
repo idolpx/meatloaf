@@ -32,7 +32,7 @@ QuestionLoop:
     IF @prompt$ = "" THEN PRINT "ok bye!" : END
     PRINT
     PRINT "working..."
-    GOSUB SendRequest
+    GOSUB SendRequestSafe
     IF @errFlag <> 0 THEN PRINT : PRINT "failed" : GOTO QuestionLoop
     PRINT
     PRINT "---"
@@ -42,8 +42,8 @@ QuestionLoop:
 
     GOTO QuestionLoop
 
-; ===== send request =====
-SendRequest:
+; ===== send request using b+ (no 255-char string overflow) =====
+SendRequestSafe:
     @errFlag = 0
     OPEN ch, 8, 2, @apiUrl$
     IF (ST AND 128) <> 0 THEN @errFlag = 1 : RETURN
@@ -51,18 +51,28 @@ SendRequest:
     IF @apiKey$ <> "" THEN PRINT# ch, "h authorization: bearer "; @apiKey$
     PRINT# ch, "h content-type: application/json"
 
-    ; rem --- build json body in @jsonBody$ ---
-    @jsonBody$ = o$
-    @jsonBody$ = @jsonBody$ + q$ + "model" + q$ + ":" + q$ + @modelName$ + q$ + ","
-    @jsonBody$ = @jsonBody$ + q$ + "messages" + q$ + ":" + "["
-    @jsonBody$ = @jsonBody$ + o$
-    @jsonBody$ = @jsonBody$ + q$ + "role" + q$ + ":" + q$ + "user" + q$ + ","
-    @jsonBody$ = @jsonBody$ + q$ + "content" + q$ + ":" + q$ + @prompt$ + q$
-    @jsonBody$ = @jsonBody$ + c$ + "]" + ","
-    @jsonBody$ = @jsonBody$ + q$ + "max_tokens" + q$ + ":" + STR$(@maxTokens)
-    @jsonBody$ = @jsonBody$ + c$
+    ; rem --- build json body piece by piece with b+ ---
+    ; rem each PRINT# line stays well under 255 chars
+    PRINT# ch, "b " + o$
+    PRINT# ch, "b+ " + q$ + "model" + q$ + ":" + q$ + @modelName$ + q$ + ","
+    PRINT# ch, "b+ " + q$ + "messages" + q$ + ":[" + o$
+    PRINT# ch, "b+ " + q$ + "role" + q$ + ":" + q$ + "user" + q$ + ","
+    PRINT# ch, "b+ " + q$ + "content" + q$ + ":" + q$
+    ; rem send prompt in <200 byte chunks to stay under 255
+    @pi = 1
+    @chunkSize = 200
 
-    PRINT# ch, "b "; @jsonBody$
+PromptChunk:
+    IF @pi > LEN(@prompt$) THEN GOTO PromptChunkEnd
+    @pchunk$ = MID$(@prompt$, @pi, @chunkSize)
+    PRINT# ch, "b+ " + @pchunk$
+    @pi = @pi + @chunkSize
+    GOTO PromptChunk
+
+PromptChunkEnd:
+    PRINT# ch, "b+ " + q$
+    PRINT# ch, "b+ " + c$ + "]," + q$ + "max_tokens" + q$ + ":" + STR$(@maxTokens) + c$
+
     PRINT# ch, "s"
     GOSUB ReadStatus
     PRINT "status: "; st$
