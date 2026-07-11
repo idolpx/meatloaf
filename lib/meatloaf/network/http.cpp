@@ -226,6 +226,11 @@ bool HTTPMStream::handleCommand(const std::string& cmd) {
     // PETSCII-encoded bytes.  Converting here ensures JSON pointer
     // arguments (case-sensitive), header names, and body data arrive in
     // proper ASCII/UTF-8 for downstream consumers (cJSON, esp_http_client).
+    //
+    // PETSCII uppercase letters live at byte values 0x41-0x5A, and the
+    // U8Char utf8map maps these to ASCII lowercase 0x61-0x7A. So toUTF8()
+    // already lowercases as a natural consequence of the PETSCII→ASCII
+    // mapping — no separate toLower() needed here.
     c = mstr::toUTF8(c);
 
     // 'r-h' / 'r-b' -- reposition cursor in response buffer
@@ -347,7 +352,10 @@ bool HTTPMStream::handleCommand(const std::string& cmd) {
         }
         cJSON_Delete(root);
 
-        // Convert result from UTF-8 to PETSCII for C64 display
+        // Convert result from UTF-8 to PETSCII for C64 display.
+        // This maps ASCII lowercase (0x61-0x7A) back to PETSCII
+        // uppercase (0x41-0x5A), restoring the case that toUTF8()
+        // applied on the input side — round-trip is preserved.
         _jsonQueryResult = mstr::toPETSCII2(_jsonQueryResult);
 
         _jsonQueryRequested = true;
@@ -608,12 +616,12 @@ bool HTTPMStream::open(std::ios_base::openmode mode) {
     this->mode = mode;
 
     // Parse URL to get session.  The URL arrives from the C64 in PETSCII
-    // form (uppercase alpha) because the C64 BASIC tokenizer uppercases
-    // string literals and toPETSCII2() may have case-flipped stored URLs.
-    // Lowercase the URL so HTTP servers accept the scheme/host/path.
-    // std::tolower() maps 'A'-'Z' (0x41-0x5A) to 'a'-'z' (0x61-0x7A),
-    // which covers both ASCII and PETSCII uppercase bytes.
-    mstr::toLower(url);
+    // form.  Convert to UTF-8: PETSCII uppercase letters at byte values
+    // 0x41-0x5A map to ASCII lowercase 0x61-0x7A via the utf8map, so
+    // BASIC tokenizer-uppercased "HTTPS://HOST/PATH" becomes the correct
+    // "https://host/path".  No separate toLower() needed — the PETSCII→ASCII
+    // mapping inherently lowercases.
+    url = mstr::toUTF8(url);
     auto parser = PeoplesUrlParser::parseURL(url);
     if (!parser || (parser->scheme != "http" && parser->scheme != "https")) {
         Debug_printv("Invalid HTTP URL: %s", url.c_str());

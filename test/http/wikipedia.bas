@@ -2,12 +2,21 @@
 6 rem == meatloaf full-mode http on device 8 ==
 7 rem == uses wikimedia rest api + opensearch ==
 8 ch=1
-9 ub$="https://en.wikipedia.org/w/api.php?action=opensearch&search="
 
 10 poke 53280,6:poke 53281,0:poke 646,14
 15 dim tl$(9),ul$(9)
 20 print chr$(147)
 30 print tab(5)"*** wikipedia ***"
+31 print"A FREE ONLINE ENCYCLOPEDIA"
+32 print"ANYONE CAN EDIT. FOUNDED IN"
+33 print"2001 BY JIMMY WALES &"
+34 print"LARRY SANGER."
+
+35 print"KEY FACTS:"
+36 print"- OVER 60 MILLION ARTICLES"
+37 print"- 300+ LANGUAGES"
+38 print"- ONE OF THE MOST VISITED"
+39 print"  WEBSITES IN THE WORLD."
 40 print
 50 print "1. search articles"
 60 print "2. random article"
@@ -25,35 +34,14 @@
 19991 get k$:if k$="" then 19991
 19992 return
 
-20000 rem --- search articles ---
+20000 rem --- search articles (direct summary lookup) ---
 20005 print chr$(147):poke 646,5
 20010 print "search wikipedia":print:poke 646,14
 20015 input "search term";sq$
 20020 if sq$="" then return
-20025 gosub 21000 : rem encode sq$ -> se$
-20030 ur$=ub$+se$+"&limit=5&format=json"
-20035 gosub 10000
-20040 if s$<>"200" then print "http error ";s$:gosub 19990:return
-20045 print chr$(147):poke 646,5:print "results:":print:poke 646,14
-20050 rc=0
-20055 for i=0 to 4
-20060 p$="/1/"+str$(i):gosub 10100
-20065 if v$="" or v$="(n/a)" then 20085
-20070 tl$(rc)=v$
-20075 p$="/3/"+str$(i):gosub 10100:ul$(rc)=v$
-20080 rc=rc+1
-20085 next i
-20090 if rc=0 then print "no results":gosub 19990:close ch:return
-20095 for i=0 to rc-1
-20100 print i+1;".";left$(tl$(i),36)
-20105 next i
-20110 print:print "pick (1-";rc;") or 0=menu"
-20115 get k$:if k$="" then 20115
-20120 if k$="0" then close ch:return
-20125 if k$<"1" or val(k$)>rc then 20115
-20130 at$=tl$(val(k$)-1)
-20135 close ch:gosub 20150
-20140 return
+20025 at$=sq$ : rem use search term as article name
+20030 gosub 20150 : rem show summary
+20035 return
 
 21000 rem --- url encode sq$ -> se$ ---
 21005 se$=""
@@ -64,6 +52,7 @@
 21030 return
 
 20150 rem --- show article summary ---
+20155 print chr$(147):poke 646,5:print"fetching article...":poke 646,14
 20160 tu$=""
 20165 for i=1 to len(at$)
 20170 if mid$(at$,i,1)=" " then tu$=tu$+"_":goto 20180
@@ -86,7 +75,8 @@
 20255 return
 
 20300 rem --- random article ---
-20305 ur$="https://en.wikipedia.org/api/rest_v1/page/random/summary"
+20305 print chr$(147):poke 646,5:print"fetching random":print"article...":poke 646,14
+20307 ur$="https://en.wikipedia.org/api/rest_v1/page/random/summary"
 20310 gosub 10000
 20315 if s$<>"200" then print "error ";s$:gosub 19990:return
 20320 print chr$(147):poke 646,5
