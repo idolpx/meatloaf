@@ -4,7 +4,7 @@
 
 ; === Theme: Star Wars opening crawl ===
 POKE 53280,0:POKE 53281,0:POKE 646,7:REM black border, black bg, yellow text
-PRINT "{clr}"
+PRINT "{clr}";CHR$(14);
 
 ch=1
 DIM ur$(9)
@@ -179,6 +179,9 @@ MenuLoop:
 ShowMenu:
     PRINT "{clr}"
     PRINT TAB(7)"*** SWAPI Explorer ***"
+    PRINT TAB(2)"Use HTTP full-mode to browse"
+    PRINT TAB(2)"the Star Wars API (swapi.dev)"
+    PRINT TAB(2)"via Meatloaf on device 8."
     PRINT
     PRINT "1. People"
     PRINT "2. Planets"
