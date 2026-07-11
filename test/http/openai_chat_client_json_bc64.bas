@@ -9,9 +9,15 @@ PRINT "{clr}";CHR$(14)
 @apiKey$ = ""  : rem leave empty for ollama; set for openai
 
 ; ===== internal vars =====
+@sysPrompt$ = "Pose as Commodore 64 computer. Keep responses brief."
 @prompt$ = ""
+@resp$ = ""
 @errFlag = 0
 ch = 1  : rem logical file number
+
+; ===== context tracking =====
+DIM @ctxRole$(9), @ctxMsg$(9)
+@ctxCount = 0
 
 ; ===== helpers for json building =====
 q$ = CHR$(34)  : rem double quote "
@@ -22,24 +28,36 @@ c$ = CHR$(125) : rem close brace }
 ; ===== main =====
 PRINT "OpenAI Chat on Commodore 64"
 PRINT "==========================="
-PRINT "selected model model: "; @modelName$
+PRINT "model: "; @modelName$
 PRINT "max tokens: "; @maxTokens
-PRINT
+PRINT "system: "; @sysPrompt$
 
 QuestionLoop:
-    PRINT "your prompt (empty=quit):"
+    PRINT "{red}--- USER ---{lightgrey}"
     INPUT @prompt$
     IF @prompt$ = "" THEN PRINT "ok bye!" : END
+
+    ; rem --- store user message in context ---
+    GOSUB EvictIfFull
+    @ctxRole$(@ctxCount) = "user"
+    @ctxMsg$(@ctxCount) = @prompt$
+    @ctxCount = @ctxCount + 1
+
     PRINT
-    PRINT "working..."
+    PRINT "{red}working...";
     GOSUB SendRequestSafe
     IF @errFlag <> 0 THEN PRINT : PRINT "failed" : GOTO QuestionLoop
     PRINT
-    PRINT "---"
-    GOSUB StreamResponse
-    PRINT "---"
-    CLOSE ch
+    PRINT "{red}--- AGENT ---{white}"
+    GOSUB StreamAndCapture
 
+    ; rem --- store assistant response in context ---
+    GOSUB EvictIfFull
+    @ctxRole$(@ctxCount) = "assistant"
+    @ctxMsg$(@ctxCount) = @resp$
+    @ctxCount = @ctxCount + 1
+
+    CLOSE ch
     GOTO QuestionLoop
 
 ; ===== send request using b+ (no 255-char string overflow) =====
@@ -55,8 +73,19 @@ SendRequestSafe:
     ; rem each PRINT# line stays well under 255 chars
     PRINT# ch, "b " + o$
     PRINT# ch, "b+ " + q$ + "model" + q$ + ":" + q$ + @modelName$ + q$ + ","
-    PRINT# ch, "b+ " + q$ + "messages" + q$ + ":[" + o$
-    PRINT# ch, "b+ " + q$ + "role" + q$ + ":" + q$ + "user" + q$ + ","
+    PRINT# ch, "b+ " + q$ + "messages" + q$ + ":["
+    ; rem system message
+    PRINT# ch, "b+ " + o$ + q$ + "role" + q$ + ":" + q$ + "system" + q$ + "," + q$ + "content" + q$ + ":" + q$ + @sysPrompt$ + q$ + c$ + ","
+    ; rem context history
+    @ci = 0
+CtxLoop:
+    IF @ci >= @ctxCount THEN GOTO CtxLoopEnd
+    PRINT# ch, "b+ " + o$ + q$ + "role" + q$ + ":" + q$ + @ctxRole$(@ci) + q$ + "," + q$ + "content" + q$ + ":" + q$ + @ctxMsg$(@ci) + q$ + c$ + ","
+    @ci = @ci + 1
+    GOTO CtxLoop
+CtxLoopEnd:
+    ; rem current user message
+    PRINT# ch, "b+ " + o$ + q$ + "role" + q$ + ":" + q$ + "user" + q$ + ","
     PRINT# ch, "b+ " + q$ + "content" + q$ + ":" + q$
     ; rem send prompt in <200 byte chunks to stay under 255
     @pi = 1
@@ -93,14 +122,31 @@ ReadStatusByte:
     st$ = st$ + a$
     GOTO ReadStatusByte
 
-; ===== stream json query result to screen =====
-StreamResponse:
-    ; rem reads bytes via GET# and prints them
-    ; rem until EOI (ST bit 64) or error (ST bit 128)
+; ===== evict oldest 2 when context is full =====
+EvictIfFull:
+    IF @ctxCount < 10 THEN RETURN
+    ; Shift everything down by 2 (drop oldest user+assistant turn)
+    @ci = 0
+EvictShift:
+    IF @ci >= 8 THEN GOTO EvictDone
+    @ctxRole$(@ci) = @ctxRole$(@ci + 2)
+    @ctxMsg$(@ci) = @ctxMsg$(@ci + 2)
+    @ci = @ci + 1
+    GOTO EvictShift
+EvictDone:
+    @ctxCount = 8
+    RETURN
+
+; ===== stream json query result to screen and capture in @resp$ =====
+StreamAndCapture:
+    @resp$ = ""
+    @rc = 0
 
 StreamByte:
     GET# ch, a$
     IF (ST AND 64) <> 0 THEN PRINT : RETURN  : rem eoi
     IF (ST AND 128) <> 0 THEN PRINT : PRINT "err" : RETURN : rem error
     PRINT CHR$(ASC(a$));  : rem print character
+    ; rem capture up to 230 chars for context
+    IF @rc < 196 THEN @resp$ = @resp$ + a$ : @rc = @rc + 1
     GOTO StreamByte
