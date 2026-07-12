@@ -111,11 +111,12 @@ BrStCheck:
     PRINT rs$;" page ";pg;":"
     PRINT
     FOR i=0 TO 9
-        p$="/results/"+STR$(i)+"/"+nf$
+        is$=MID$(STR$(i),2):rem strip leading space from STR$
+        p$="/results/"+is$+"/"+nf$
         GOSUB QueryJson
-        IF v$="" OR v$="(n/a)" THEN BrItemNext
+        IF v$="" OR v$="(n/a)" OR LEFT$(v$,4)="JSON" THEN BrItemNext
         PRINT i+1;".";v$
-        p$="/results/"+STR$(i)+"/url"
+        p$="/results/"+is$+"/url"
         GOSUB QueryJson
         ur$(i)=v$
 
