@@ -266,6 +266,12 @@ public:
     // Return HTTP_BLOCK_SIZE as a hint when the connection is open but not yet complete.
     uint32_t available() override {
         if (_queuedSend) return 0;
+        // Phase 2 JSON: report exact remaining bytes so the IEC bus handler
+        // (and JiffyDOS read-ahead) cannot over-read into stale buffer content.
+        if (_jsonQueryRequested) {
+            if (_queryResultPos >= _jsonQueryResult.size()) return 0;
+            return (uint32_t)_jsonQueryResult.size() - _queryResultPos;
+        }
         if (!_responseBuffer.empty()) {
             uint32_t cnt = (uint32_t)_responseBuffer.size();
             if (_responseBufPos >= cnt) return 0;
@@ -286,6 +292,7 @@ public:
     virtual bool seekPath(std::string path) override { return false; }
 
     bool handleCommand(const std::string& cmd);
+    void performJsonQuery(const std::string& pointer);
     bool isFullMode() const { return fullMode != FullModeState::SIMPLE; }
 
 protected:
@@ -303,6 +310,8 @@ private:
     bool _jsonQueryRequested = false;
     std::string _jsonQueryResult;
     uint32_t _queryResultPos = 0;
+    std::string _pendingJsonPointer;   // set by 'j' in handleCommand, executed in read()
+    bool _jsonResultReady = false;     // true when JSON result is in _responseBuffer
 
     std::string _cmdLine;
     bool _queuedSend = false;
