@@ -1820,7 +1820,8 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
                 if ( command[1] == 'W' && command[2] == 'D' )
                 {
                     Debug_printv( "print working directory");
-                    SystemFileDevice::setStatus((const char *) m_cwd->url.c_str(), m_cwd->url.length());
+                    std::string path = mstr::toPETSCII2(m_cwd->url);
+                    SystemFileDevice::setStatus((const char *) path.c_str(), path.length());
                     return;
                 }
 
@@ -2065,33 +2066,33 @@ uint8_t iecDrive::getNumOpenChannels()
 
 uint8_t iecDrive::getStatusData(char *buffer, uint8_t bufferSize, bool *eoi)
 { 
-  uint8_t res;
-  Debug_printv("iecDrive::getStatus(#%d)", m_devnr);
+    uint8_t res;
+    Debug_printv("iecDrive::getStatus(#%d)", m_devnr);
 
-  // if we have an active VDrive then just return its status
-  if( m_vdrive!=NULL )
-    {
-      m_statusCode = ST_OK;
-      res = m_vdrive->getStatusBuffer(buffer, bufferSize, eoi);
-    }
-  else
-    {
-      // IECFileDevice::getStatusData will in turn call iecDrive::getStatus()
-      getStatus(buffer, bufferSize);
-      res = strlen(buffer);
-      *eoi = true;
-    }
+    // if we have an active VDrive then just return its status
+    if( m_vdrive!=NULL )
+        {
+        m_statusCode = ST_OK;
+        res = m_vdrive->getStatusBuffer(buffer, bufferSize, eoi);
+        }
+    else
+        {
+        // IECFileDevice::getStatusData will in turn call iecDrive::getStatus()
+        getStatus(buffer, bufferSize);
+        res = strlen(buffer);
+        *eoi = true;
+        }
 
-  m_statusCode = ST_OK;
-  m_statusTrk  = 0;
-  m_statusSec  = 0;
-  
-#ifdef ENABLE_DISPLAY
-  LEDS.status( ST_OK );
-#endif
+    m_statusCode = ST_OK;
+    m_statusTrk  = 0;
+    m_statusSec  = 0;
+    
+    #ifdef ENABLE_DISPLAY
+    LEDS.status( ST_OK );
+    #endif
 
-  Debug_printv("status: %s", getCStringLog(std::string(buffer, res)));
-  return res;
+    Debug_printv("status: %s", getCStringLog(std::string(buffer, res)));
+    return res;
 }
 
 
