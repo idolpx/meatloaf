@@ -211,6 +211,69 @@ void HTTPRequestContext::errorToIecStatus(int& errOut, std::string& msgOut) cons
 }
 
 /********************************************************
+ * Perform deferred JSON Pointer query on captured body
+ ********************************************************/
+void HTTPMStream::performJsonQuery(const std::string& pointer) {
+    _jsonQueryResult.clear();
+    _jsonQueryRequested = false;
+    _queryResultPos = 0;
+
+    if (_bodyCapture.empty()) {
+        Debug_printv("JSON query: skipped, no body captured");
+        return;
+    }
+
+    // Parse body as JSON
+    cJSON *root = cJSON_Parse((const char *)_bodyCapture.data());
+    if (root == nullptr) {
+        ctx.responseStatus = -99;
+        _jsonQueryResult = "JSON parse error";
+        _jsonQueryRequested = true;
+        Debug_printv("JSON query: parse failed for pointer %s", pointer.c_str());
+        return;
+    }
+
+    // Resolve pointer
+    cJSON *item = cJSONUtils_GetPointer(root, pointer.c_str());
+    if (item == nullptr) {
+        cJSON_Delete(root);
+        ctx.responseStatus = -99;
+        _jsonQueryResult = "JSON pointer not found";
+        _jsonQueryRequested = true;
+        Debug_printv("JSON query: pointer not found: %s", pointer.c_str());
+        return;
+    }
+
+    // Serialize matched value
+    if (cJSON_IsString(item)) {
+        char *strVal = cJSON_GetStringValue(item);
+        if (strVal != nullptr) {
+            _jsonQueryResult = strVal;
+        }
+    } else {
+        char *jsonStr = cJSON_PrintUnformatted(item);
+        if (jsonStr != nullptr) {
+            _jsonQueryResult = jsonStr;
+            free(jsonStr);
+        } else {
+            cJSON_Delete(root);
+            ctx.responseStatus = -99;
+            _jsonQueryResult = "JSON serialize error";
+            _jsonQueryRequested = true;
+            Debug_printv("JSON query: cJSON_PrintUnformatted returned null for pointer %s", pointer.c_str());
+            return;
+        }
+    }
+    cJSON_Delete(root);
+
+    // Convert result to PETSCII for C64 display
+    _jsonQueryResult = mstr::toPETSCII2(_jsonQueryResult);
+
+    _jsonQueryRequested = true;
+    Debug_printv("JSON query: %s -> %zu bytes", pointer.c_str(), _jsonQueryResult.size());
+}
+
+/********************************************************
  * Full-mode command handling
  ********************************************************/
 
@@ -226,6 +289,11 @@ bool HTTPMStream::handleCommand(const std::string& cmd) {
     // PETSCII-encoded bytes.  Converting here ensures JSON pointer
     // arguments (case-sensitive), header names, and body data arrive in
     // proper ASCII/UTF-8 for downstream consumers (cJSON, esp_http_client).
+    //
+    // PETSCII uppercase letters live at byte values 0x41-0x5A, and the
+    // U8Char utf8map maps these to ASCII lowercase 0x61-0x7A. So toUTF8()
+    // already lowercases as a natural consequence of the PETSCII→ASCII
+    // mapping — no separate toLower() needed here.
     c = mstr::toUTF8(c);
 
     // 'r-h' / 'r-b' -- reposition cursor in response buffer
@@ -252,7 +320,7 @@ bool HTTPMStream::handleCommand(const std::string& cmd) {
         return true;
     }
 
-        // 'c' — clear context, return to BUILDING_REQUEST for next request
+    // 'c' — clear context, return to BUILDING_REQUEST for next request
     if (c == "c" || c == "C") {
         ctx.clear();
         _bodyCapture.clear();
@@ -267,10 +335,17 @@ bool HTTPMStream::handleCommand(const std::string& cmd) {
         _jsonQueryRequested = false;
         _jsonQueryResult.clear();
         _queryResultPos = 0;
+        _pendingJsonPointer.clear();
         return true;
     }
 
-    // 'status' — request HTTP status code (consumed by next read())
+    // 'status' — prepare to serve just the HTTP status line on next read().
+    // JiffyDOS burst-reads 256 bytes via read(m_buffer, 256) and transmits
+    // them to the C64 all at once.  If we let it burst the entire response
+    // (headers + body) the C64's JiffyDOS ROM caches the excess bytes, and
+    // a subsequent "j" query will see stale data ("Co" from "Content-Type")
+    // served from C64-side cache before the fresh JSON arrives.
+    // By setting _statusEndHere we tell read() to stop after the status line.
     {
         std::string lower = c;
         mstr::toLower(lower);
@@ -283,75 +358,27 @@ bool HTTPMStream::handleCommand(const std::string& cmd) {
     }
 
     // 'j <pointer>' — JSON Pointer query on captured response body
+    // Use the Phase 2 serving path (separate from _responseBuffer) so
+    // available() reports the exact JSON result size.  This prevents
+    // the IEC bus handler and JiffyDOS from over-reading into stale
+    // buffer content (e.g. "Co" from "Content-Type") that would appear
+    // before the JSON result.
     if (c.size() >= 2 && (c[0] == 'j' || c[0] == 'J') && c[1] == ' ') {
-        std::string pointer = c.substr(2);
-        mstr::trim(pointer);
-
-        _jsonQueryResult.clear();
-        _jsonQueryRequested = false;
-        _queryResultPos = 0;
-
-        // Already PETSCII-to-UTF8 converted by handleCommand(). Strip spaces
-        // from STR$() padding (STR$(0) → " 0" in C64 BASIC).
-        pointer.erase(std::remove(pointer.begin(), pointer.end(), ' '), pointer.end());
-
-        if (_bodyCapture.empty()) {
-            Debug_printv("JSON query: skipped, no body captured");
-            return true;
+        _pendingJsonPointer = c.substr(2);
+        mstr::trim(_pendingJsonPointer);
+        Debug_printv("JCMD: j='%s' body=%zu", _pendingJsonPointer.c_str(), _bodyCapture.size());
+        if (!_bodyCapture.empty()) {
+            performJsonQuery(_pendingJsonPointer);
+            _pendingJsonPointer.clear();
+            // Advance past all stale content in _responseBuffer so the
+            // readBufferData do-while loop won't fill m_data with stale
+            // "Content-Type" bytes after the JSON result is exhausted.
+            // This is a safety net — the Phase 2 JSON path already
+            // returns the correct JSON data, but the IEC handler's
+            // aggressive pre-read loop may also pull from _responseBuffer
+            // in the same iteration.
+            _responseBufPos = (uint32_t)_responseBuffer.size();
         }
-
-        // Parse body as JSON
-        cJSON *root = cJSON_Parse((const char *)_bodyCapture.data());
-        if (root == nullptr) {
-            // Invalid JSON — set error state
-            ctx.responseStatus = -99;
-            _jsonQueryResult = "JSON parse error";
-            _jsonQueryRequested = true;
-            Debug_printv("JSON query: parse failed for pointer %s", pointer.c_str());
-            return true;
-        }
-
-        // Resolve pointer
-        cJSON *item = cJSONUtils_GetPointer(root, pointer.c_str());
-        if (item == nullptr) {
-            cJSON_Delete(root);
-            ctx.responseStatus = -99;
-            _jsonQueryResult = "JSON pointer not found";
-            _jsonQueryRequested = true;
-            Debug_printv("JSON query: pointer not found: %s", pointer.c_str());
-            return true;
-        }
-
-        // Serialize matched value
-        if (cJSON_IsString(item)) {
-            // Return raw string value without surrounding quotes
-            char *strVal = cJSON_GetStringValue(item);
-            if (strVal != nullptr) {
-                _jsonQueryResult = strVal;
-            }
-        } else {
-            // Use JSON serialization for numbers, booleans, objects, arrays
-            char *jsonStr = cJSON_PrintUnformatted(item);
-            if (jsonStr != nullptr) {
-                _jsonQueryResult = jsonStr;
-                free(jsonStr);
-            } else {
-                // Heap exhaustion — PrintUnformatted returned null
-                cJSON_Delete(root);
-                ctx.responseStatus = -99;
-                _jsonQueryResult = "JSON serialize error";
-                _jsonQueryRequested = true;
-                Debug_printv("JSON query: cJSON_PrintUnformatted returned null for pointer %s", pointer.c_str());
-                return true;
-            }
-        }
-        cJSON_Delete(root);
-
-        // Convert result from UTF-8 to PETSCII for C64 display
-        _jsonQueryResult = mstr::toPETSCII2(_jsonQueryResult);
-
-        _jsonQueryRequested = true;
-        Debug_printv("JSON query: %s -> %zu bytes", pointer.c_str(), _jsonQueryResult.size());
         return true;
     }
 
@@ -610,8 +637,14 @@ bool HTTPMStream::open(std::ios_base::openmode mode) {
     // Parse URL to get session.  The URL arrives from the C64 in PETSCII
     // form (uppercase alpha) because the C64 BASIC tokenizer uppercases
     // string literals and toPETSCII2() may have case-flipped stored URLs.
-    // toUTF8() is identity for ASCII bytes so it won't help here — lower
-    // the whole URL so HTTP servers accept the scheme/host/path.
+    // Lowercase the URL so HTTP servers accept the scheme/host/path.
+    // std::tolower() maps 'A'-'Z' (0x41-0x5A) to 'a'-'z' (0x61-0x7A),
+    // which covers both ASCII and PETSCII uppercase bytes.
+    // DO NOT use toUTF8() here — the URL may have already been through
+    // UTF-8 conversion by the MFile layer; toUTF8() on already-UTF-8
+    // lowercase letters (0x61-0x7A) looks them up in the utf8map at
+    // those indices and returns private Unicode (U+E02x), corrupting
+    // the URL.
     mstr::toLower(url);
     auto parser = PeoplesUrlParser::parseURL(url);
     if (!parser || (parser->scheme != "http" && parser->scheme != "https")) {
@@ -758,6 +791,14 @@ uint32_t HTTPMStream::read(uint8_t* buf, uint32_t size) {
             Debug_printv("BODY-CAPTURE: method=%s result=%zu bytes open=%d pend=%d pres=%zu post=%zu",
                 ctx.method.c_str(), _bodyCapture.size(), cl._is_open, cl._performPending,
                 cl.preservedPostResponse.size(), cl.postResponse.size());
+            // CO-DIAG: show first bytes of captured body in hex
+            if (!_bodyCapture.empty()) {
+                char hex[128] = {0};
+                for (size_t i = 0; i < std::min(_bodyCapture.size(), (size_t)20); i++)
+                    snprintf(hex + strlen(hex), sizeof(hex) - strlen(hex), "%02X ", _bodyCapture[i]);
+                Debug_printv("CO-DIAG bodyCapture[%zu]=%s", _bodyCapture.size(), hex);
+            }
+            // CO-DIAG: show response buffer raw hex (first 32 bytes)
             _responseBuffer.clear();
             _responseBufPos = 0;
 
@@ -783,22 +824,30 @@ uint32_t HTTPMStream::read(uint8_t* buf, uint32_t size) {
             Debug_printv("BUFFER: total=%u bytes (statusEnd=%u, headersEnd=%u) bodySnippet=%.30s",
                 (uint32_t)_responseBuffer.size(), _statusEnd, _headersEnd,
                 _responseBuffer.size() > _headersEnd ? (const char*)(&_responseBuffer[_headersEnd]) : "(null)");
+        } // if (_session)
+    } // if (_queuedSend)
+
+    // Phase 1.5: Deferred JSON pointer resolution (for T1 case:
+    // 'j' arrives before Phase 1 builds _bodyCapture).
+    if (!_pendingJsonPointer.empty()) {
+        if (!_bodyCapture.empty()) {
+            performJsonQuery(_pendingJsonPointer);
         }
+        _pendingJsonPointer.clear();
     }
 
-    // Phase 1.5: JSON query result serving
-    // When _jsonQueryRequested is true, serve bytes from _jsonQueryResult
-    // instead of the response buffer. EOI when fully consumed.
+    // Phase 2: JSON query result serving.
+    // available() reports exact remaining bytes so the IEC bus handler
+    // (and JiffyDOS on the C64 side) cannot over-read into stale buffer
+    // content like "Co" from "Content-Type".  Must be checked BEFORE
+    // _responseBuffer serving — both can be live at different times.
     if (_jsonQueryRequested) {
         if (_queryResultPos >= _jsonQueryResult.size()) {
             _position = _size = (uint32_t)_jsonQueryResult.size();
-            _jsonQueryRequested = false;  // reset after full consume
+            _jsonQueryRequested = false;
             _jsonQueryResult.clear();
             _queryResultPos = 0;
-            // Advance response buffer cursor past end to prevent
-            // subsequent read() calls from serving raw body data.
-            _responseBufPos = (uint32_t)_responseBuffer.size();
-            return 0;  // signal EOI
+            return 0;
         }
         uint32_t remaining = (uint32_t)_jsonQueryResult.size() - _queryResultPos;
         uint32_t toCopy = std::min(remaining, size);
@@ -809,15 +858,39 @@ uint32_t HTTPMStream::read(uint8_t* buf, uint32_t size) {
         return toCopy;
     }
 
-    // Phase 2: Sequential serve from response buffer.
-    // `_responseBufPos` tracks where we are in the buffer.
-    // Mode commands (status/r-h/r-b in handleCommand) reposition it.
-    // No region boundaries — just serve bytes until the buffer is consumed.
+    // Phase 3: Serve from response buffer.
+    // When _statusRequested, cap at _statusEnd so JiffyDOS only bursts
+    // the status line (e.g. "200\r") to the C64.  The C64's JiffyDOS
+    // ROM caches all bytes received in a single burst; without this cap
+    // JiffyDOS would pull the entire response (headers + body) into C64
+    // RAM, and a subsequent "j" query would read stale "Co" from
+    // "Content-Type" out of that cache before reaching fresh JSON data.
+    // After serving the status line, also advance _responseBufPos past
+    // all remaining content so the JiffyDOS task's background read()
+    // calls don't pre-cache headers/body into C64 RAM.
     if (!_responseBuffer.empty()) {
         if (_responseBufPos >= _responseBuffer.size()) {
-            // Buffer fully consumed
             _position = _size = (uint32_t)_responseBuffer.size();
+            _statusRequested = false;
             return 0;
+        }
+        if (_statusRequested) {
+            if (_responseBufPos >= _statusEnd) {
+                // Status line fully served — skip past all remaining
+                // content so the JiffyDOS background task can't
+                // pre-cache headers/body into C64 RAM.
+                _responseBufPos = (uint32_t)_responseBuffer.size();
+                _position = _responseBufPos;
+                _statusRequested = false;
+                return 0;
+            }
+            uint32_t remaining = _statusEnd - _responseBufPos;
+            uint32_t toCopy = std::min(remaining, size);
+            memcpy(buf, _responseBuffer.data() + _responseBufPos, toCopy);
+            _responseBufPos += toCopy;
+            _position = _responseBufPos;
+            _error = 0;
+            return toCopy;
         }
         uint32_t remaining = (uint32_t)_responseBuffer.size() - _responseBufPos;
         uint32_t toCopy = std::min(remaining, size);
@@ -1042,9 +1115,9 @@ bool MeatHttpClient::processRedirectsAndOpen(uint32_t position, uint32_t size) {
         lastRC = openAndFetchHeaders(lastMethod, position, size);
 
         // openAndFetchHeaders returns 0 when esp_http_client_open() fails (connection error).
-        // EAI_AGAIN (202) means the DNS query is still in flight — retry a few times with a
-        // short delay to let the resolver complete before giving up.
-        if (lastRC == 0) {
+        // Negative values mean fetch_headers failed (TLS/handshake error on redirect target).
+        // In both cases, retry a few times before giving up.
+        if (lastRC <= 0) {
             if (connectRetries++ < 3) {
                 Debug_printv("connection failed, retrying (%d/3)...", connectRetries);
                 vTaskDelay(pdMS_TO_TICKS(500));
@@ -1059,10 +1132,23 @@ bool MeatHttpClient::processRedirectsAndOpen(uint32_t position, uint32_t size) {
 
         if (lastRC >= 300 && lastRC <= 399) {
             // Location header handler already updated `url` to the redirect target.
-            // The next openAndFetchHeaders() call will drain+close the 3xx response
-            // body before opening the new connection — no cleanup() needed here.
+            // Fresh init() for the new URL's TLS connection prevents stale-handle
+            // failures in esp_http_client on the redirect target.
+            init();
+            connectRetries = 0;  // fresh retry budget for the redirect target
         }
     } while (lastRC >= 300 && lastRC <= 399);
+
+    // Negative status means connection failure (TLS, DNS, etc.) that
+    // wasn't caught by the retry loop — always a fatal error here.
+    if (lastRC <= 0) {
+        Debug_printv("opening stream failed, httpCode=%d", lastRC);
+        _error = lastRC;
+        _exists = false;
+        postBuffer.clear();
+        init();
+        return false;
+    }
 
     if (lastRC == 206)
     {

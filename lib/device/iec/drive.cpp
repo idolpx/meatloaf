@@ -281,6 +281,9 @@ uint8_t iecChannelHandlerFile::write(uint8_t *data, uint8_t n) {
         m_ptr = 0;
         m_len = 0;
         m_eos = false;
+        // Zero the buffer so stale "Co" bytes from a prior response
+        // can't leak into the next readBufferData refill.
+        memset(m_data, 0, BUFFER_SIZE);
         return written;
     }
     return iecChannelHandler::write(data, n);

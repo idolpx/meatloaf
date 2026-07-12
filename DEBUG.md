@@ -495,3 +495,115 @@ Comment preserved.
    new HTTP request. The `sendRequest()` → `client.POST()` path returns
    status 200 from cached/stale state without calling `esp_http_client_perform()`.
    Root cause is still unknown.
+
+## PETSCII ↔ UTF-8 Encoding Reference
+
+Meatloaf uses two functions for character encoding conversion, defined in
+`lib/utils/string_utils.cpp` and backed by the utf8map in `lib/utils/U8Char.cpp`.
+
+### Conversion Functions
+
+| Function | Direction | How it works |
+|----------|-----------|-------------|
+| `toUTF8()` | PETSCII → UTF-8 | Looks up each PETSCII byte value (0-255) in the 256-entry utf8map table, returns the Unicode codepoint as a UTF-8 byte sequence |
+| `toPETSCII2()` | UTF-8 → PETSCII | Parses multi-byte UTF-8 sequences, looks up each Unicode codepoint in the reverse map, returns single PETSCII byte |
+
+### The utf8map (U8Char.cpp:28-59)
+
+The 256-entry table maps each PETSCII byte to its corresponding Unicode codepoint:
+
+| PETSCII byte | Screen display | utf8map entry | Meaning |
+|---|---|---|---|
+| `0x00` | — | `0x00` (NUL) | Pass-through |
+| `0x01`–`0x40` | control chars / space / punct | identity `0x01`–`0x40` | Same byte in and out |
+| `0x41` | `A` (unshifted, PETSCII uppercase) | `0x61` `a` | ASCII lowercase |
+| `0x42` | `B` | `0x62` `b` | ↓ |
+| ... | ... | ... | ↓ |
+| `0x5A` | `Z` | `0x7A` `z` | ASCII lowercase |
+| `0x5B`–`0x60` | `[ \ ] ^ _ \`` | identity | Same byte in and out |
+| `0x61` | `a` (PETSCII lowercase at this byte) | `0xE021` | Private Unicode (U+E02x range) |
+| `0x62` | `b` | `0xE022` | ↓ |
+| ... | ... | ... | ↓ |
+| `0x7A` | `z` | `0xE03A` | Private Unicode |
+| `0x7B`–`0x7F` | `{ \| } ~ DEL` | identity | Same byte in and out |
+| `0x80`–`0xBF` | PETSCII graphics chars | `0xE00x` / `U+25xx` | Box drawing, tables, etc. |
+| `0xC0` | (shifted space) | `0xE020` | Private Unicode |
+| `0xC1` | `A` (shifted/PETSCII uppercase) | `0x41` `A` | ASCII uppercase |
+| `0xC2` | `B` | `0x42` `B` | ↓ |
+| ... | ... | ... | ↓ |
+| `0xDA` | `Z` | `0x5A` `Z` | ASCII uppercase |
+| `0xDB`–`0xFF` | PETSCII control codes | `0xE04x`–`0xE05F` | Private Unicode |
+
+**Key insight:** PETSCII letters live at TWO byte ranges:
+- **Unshifted** (`0x41-0x5A`): The screen displays `A`–`Z` in **uppercase**. The utf8map entry is **ASCII lowercase** (`0x61`–`0x7A`).
+- **Shifted** (`0xC1-0xDA`): The screen displays `A`–`Z` in **lowercase** (shifted). The utf8map entry is **ASCII uppercase** (`0x41-0x5A`).
+
+This is NOT a "case flip" — it's a **mapping between two different character encodings**. Letters at indices `0x41-0x5A` happen to show uppercase on screen but map to lowercase Unicode. Letters at indices `0xC1-0xDA` show lowercase on screen but map to uppercase Unicode.
+
+### Why Round-Trips Work
+
+`toUTF8()` then `toPETSCII2()` returns the original PETSCII byte:
+
+```
+PETSCII 0x41 → toUTF8 → Unicode 0x61 'a' → toPETSCII2 → PETSCII 0x41 (same as input)
+PETSCII 0xC1 → toUTF8 → Unicode 0x41 'A' → toPETSCII2 → PETSCII 0xC1 (same as input)
+```
+
+Each function mirrors the other — there is no "case flip" anywhere. The tables are
+bijective for the PETSCII range, so the round-trip is exact.
+
+### Practical Guidance for Firmware Code
+
+#### When to use `mstr::toUTF8()`
+
+Use on data arriving **directly from the C64 via IEC write()** — in
+`handleCommand()` at `http.cpp:234`. The BASIC tokenizer uppercases string
+literals (PETSCII bytes `0x41-0x5A`), and `toUTF8()` maps these to proper
+ASCII lowercase for case-insensitive command dispatch and JSON pointer matching.
+
+```cpp
+// http.cpp:234 — handleCommand()
+c = mstr::toUTF8(c);  // PETSCII → ASCII lowercase
+```
+
+#### When to use `mstr::toPETSCII2()`
+
+Use on data going **to the C64** — JSON pointer query results in
+`handleCommand()` at `http.cpp:351`. Converts UTF-8 JSON values back to
+PETSCII for correct C64 screen display.
+
+```cpp
+// http.cpp:351 — j command result
+_jsonQueryResult = mstr::toPETSCII2(_jsonQueryResult);
+```
+
+#### When to use `mstr::toLower()` (NOT toUTF8)
+
+Use in `HTTPMStream::open()` at `http.cpp:622`. The URL arriving at this
+point may come from various sources:
+- A BASIC string literal (already lowercased by previous UTF-8 conversion)
+- A round-tripped URL from a `j` command (UTF-8 → PETSCII → back in)
+- From the MFile layer (may have been normalized already)
+
+Applying `toUTF8()` on already-UTF-8 data that contains lowercase ASCII
+letters (byte values `0x61-0x7A`) would look them up in the utf8map at those
+indices and return **private Unicode** (`U+E02x`) — breaking the URL.
+
+`std::tolower()` is safe here because:
+- It only touches the ASCII uppercase range `0x41-0x5A` (maps to `0x61-0x7A`)
+- For already-lowercase bytes (`0x61-0x7A`), it's a no-op
+- For non-letter bytes (digits, punctuation, `://`), it's a no-op
+- It does NOT use the utf8map — it's a simple arithmetic shift
+
+```cpp
+// http.cpp:622 — open()
+mstr::toLower(url);  // safe: basic ASCII range only
+```
+
+#### Summary Table
+
+| Code location | Data source | Use | Why |
+|---|---|---|---|
+| `handleCommand()` | IEC write (C64) | `toUTF8()` | Raw PETSCII from C64, needs decoding |
+| `j result` | JSON (server) | `toPETSCII2()` | UTF-8 from cJSON, needs C64 encoding |
+| `open()` URL | MFile / round-trip | `toLower()` | Already UTF-8, `toUTF8` would corrupt |

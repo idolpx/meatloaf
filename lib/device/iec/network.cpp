@@ -283,6 +283,10 @@ void iecNetwork::query_json()
 
     Debug_printv("Channel: %u", channel);
 
+    // Clear stale data so the JSON query result isn't appended after
+    // previously buffered bytes (e.g. "Co" from "Content-Type" header).
+    channel_data.receiveBuffer.clear();
+
     channel_data.json->setReadQuery(s, 0);
 
     if (!channel_data.json->readValueLen())
