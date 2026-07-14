@@ -45,56 +45,50 @@ public:
         // DHD Partition Info
         std::vector<BlockAllocationMap> b = { 
             {
-                40,     // track
-                1,      // sector
-                0x10,   // offset
+                1,      // track
+                2,      // sector
+                0x20,   // offset
                 1,      // start_track
-                40,     // end_track
-                6       // byte_count
-            },
-            {
-                40,     // track
-                0,      // sector
-                0x10,   // offset
-                41,     // start_track
-                80,     // end_track
-                6       // byte_count
+                255,    // end_track
+                8       // byte_count
             } 
         };
 
         Partition p = {
-            40,    // track
-            0,     // sector
+            1,     // track
+            1,     // sector
             0x04,  // header_offset
-            40,    // directory_track
-            3,     // directory_sector
+            1,     // directory_track
+            0,     // directory_sector
             0x00,  // directory_offset
+            0,     // parent_header_track
+            0,     // parent_header_sector
+            0,     // parent_entry_track
+            0,     // parent_entry_sector
+            0,     // parent_entry_offset
             b      // block_allocation_map
         };
         partitions.clear();
         partitions.push_back(p);
-        sectorsPerTrack = { 40 };
+        sectorsPerTrack = { 256 };
         has_subdirs = true;
-        dos_rom = "dosCMDHD";
 
         // Read Header
+        //Debug_printv("Reading header");
         readHeader();
+        //Debug_printv("header[%.16s]", header.name);
 
-        uint32_t size = containerStream->size();
-        switch (size + media_header_size) 
-        {
-            case 819200:  // 80 tracks no errors
-                break;
+        // Read this offset to get t/s link to start of directory
+        seek(0x100);
+        partitions[0].directory_track = read(); 
+        partitions[0].directory_sector = read();
 
-            case 822400:  // 80 w/ errors
-                error_info = true;
-                break;
-
-            // https://sourceforge.net/p/vice-emu/bugs/1890/
-            case 829440:  // 81 tracks no errors
-                partitions[partition].block_allocation_map[1].end_track = 81;
-                break;
-        }
+        // Calculate number of tracks based on file size
+        uint32_t size = containerStream->size() / 65536;
+        if ( containerStream->size() % 65536 != 0 )
+            size++;
+        partitions[0].block_allocation_map[0].end_track = size;
+        Debug_printv("size[%d] tracks[%d]", size, partitions[0].block_allocation_map[0].end_track);
     };
 
     virtual uint8_t speedZone(uint8_t track) override { return 0; };
@@ -112,20 +106,14 @@ private:
 
 class DHDMFile: public D64MFile {
 public:
-    DHDMFile(std::string path) : D64MFile(path) 
-    {
-        size = 819200; // Default - 80 tracks no errors
-    };
+    DHDMFile(std::string path) : D64MFile(path) {};
 
     std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> is) override
     {
-        //Debug_printv("[%s]", url.c_str());
+        Debug_printv("[%s]", url.c_str());
 
         return std::make_shared<DHDMStream>(is);
     }
-
-    bool mkDir() override { return false; };
-    bool rmDir() override { return false; };
 };
 
 
@@ -137,12 +125,12 @@ public:
 class DHDMFileSystem: public MFileSystem
 {
 public:
-    DHDMFileSystem(): MFileSystem("dhd") {
+    DHDMFileSystem(): MFileSystem("dnp") {
         vdrive_compatible = true;
     };
 
     bool handles(std::string fileName) override {
-        return byExtension(".dhd", fileName);
+        return byExtension(".dnp", fileName);
     }
 
     MFile* getFile(std::string path) override {
