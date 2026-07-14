@@ -276,6 +276,10 @@ public:
     uint32_t readFile(uint8_t* buf, uint32_t size) override;
     uint32_t writeFile(uint8_t* buf, uint32_t size) override;
 
+    // Finalizes a streamed file write (last block + directory entry)
+    // before releasing the container stream.
+    void close() override;
+
     Header header;      // Directory header data
     Entry entry;        // Directory entry data
 
@@ -342,7 +346,6 @@ private:
     bool seekEntry( uint16_t index = 0 ) override;
     bool readEntry( uint16_t index = 0 ) override;
     bool writeEntry( uint16_t index = 0 ) override;
-    uint16_t seekFreeEntry( uint16_t index = 0 );
 
     std::string readBlock( uint8_t track, uint8_t sector );
     bool writeBlock( uint8_t track, uint8_t sector, std::string data );
@@ -351,6 +354,38 @@ private:
     BlockChain getFreeBlocks(uint16_t file_size);
     bool getNextFreeBlock(uint8_t startTrack, uint8_t startSector, uint8_t *foundTrack, uint8_t *foundSector, bool forDirectory = false);
     bool isBlockFree(uint8_t track, uint8_t sector);
+
+    // BAM record location for one track (which BAM sector holds it and where)
+    struct BAMRecord {
+        uint8_t bam_track;
+        uint8_t bam_sector;
+        uint8_t offset;       // offset of this track's record within the BAM sector
+        uint8_t byte_count;   // record length in bytes
+        bool has_count;       // first byte of record is the free-sector count
+    };
+    bool getBAMRecord( uint8_t track, BAMRecord *rec );
+    bool readBAMRecord( uint8_t track, BAMRecord *rec, uint8_t *buf );
+    bool setBlockAllocation( uint8_t track, uint8_t sector, bool allocate );
+    uint8_t getTrackFreeCount( uint8_t track );
+    bool findFreeSectorOnTrack( uint8_t track, uint8_t startSector, uint8_t *foundSector );
+
+    // Streamed new-file write (SAVE): blocks are allocated one at a time as
+    // data arrives, the directory entry is added when the stream is closed.
+    bool beginFileWrite( std::string filename );
+    uint32_t writeFileNew( uint8_t *buf, uint32_t size );
+    bool finalizeFileWrite();
+    void rollbackFileWrite();
+    bool scratchEntry();
+
+    bool creating = false;          // building a new file via streamed writes
+    std::string create_filename;    // name for the directory entry (UTF8)
+    uint8_t cbuf[254];              // pending data for the current block
+    uint16_t cbuf_len = 0;
+    uint8_t create_start_track = 0; // first block of the file
+    uint8_t create_start_sector = 0;
+    uint8_t create_track = 0;       // block currently being filled
+    uint8_t create_sector = 0;
+    BlockChain create_allocated;    // all blocks claimed so far (for count/rollback)
 
     BlockChain getBlocks( uint8_t track, uint8_t sector );
     BlockChain getBlocks( std::string filename );
