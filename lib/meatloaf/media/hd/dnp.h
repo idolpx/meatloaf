@@ -38,15 +38,15 @@ public:
     DNPMStream(std::shared_ptr<MStream> is) : D64MStream(is) 
     {
         // DNP Partition Info
-        std::vector<BlockAllocationMap> b = { 
+        std::vector<BlockAllocationMap> b = {
             {
                 1,      // track
                 2,      // sector
                 0x20,   // offset
                 1,      // start_track
                 255,    // end_track
-                8       // byte_count
-            } 
+                32      // byte_count (256 sectors/track = 32 bitmap bytes, no count byte)
+            }
         };
 
         Partition p = {

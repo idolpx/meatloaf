@@ -55,7 +55,7 @@ bool D64MStream::seekBlock(uint64_t index, uint8_t offset)
 
     // Debug_printv("track[%d] sector[%d] speedZone[%d] sectorOffset[%d]", track, sector, speedZone(track), sectorOffset);
 
-    return containerStream->seek((index * block_size) + offset);
+    return containerStream->seek(partition_base + (index * block_size) + offset);
 }
 
 bool D64MStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
@@ -103,7 +103,7 @@ bool D64MStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
 
     //Debug_printv("track[%d] sector[%d] speedZone[%d] sectorOffset[%d]", track, sector, speedZone(track), sectorOffset);
 
-    return containerStream->seek((sectorOffset * block_size) + offset);
+    return containerStream->seek(partition_base + (sectorOffset * block_size) + offset);
 }
 
 bool D64MStream::seekSector(std::vector<uint8_t> trackSectorOffset)
@@ -361,10 +361,13 @@ bool D64MStream::getNextFreeBlock(uint8_t startTrack, uint8_t startSector, uint8
 
     if (forDirectory)
     {
-        uint8_t start = (startSector + interleave[0]) % getSectorCount(dir_track);
-        if (findFreeSectorOnTrack(dir_track, start, foundSector))
+        // Directory blocks stay on the track the directory lives on
+        // (the root directory track, or a subdirectory's current track)
+        uint8_t t = startTrack ? startTrack : dir_track;
+        uint8_t start = (startSector + interleave[0]) % getSectorCount(t);
+        if (findFreeSectorOnTrack(t, start, foundSector))
         {
-            *foundTrack = dir_track;
+            *foundTrack = t;
             return true;
         }
         return false; // directory track is full
@@ -519,6 +522,17 @@ bool D64MStream::seekEntry( std::string filename )
 
 bool D64MStream::seekEntry( uint16_t index )
 {
+    // At the root of a multi-partition image the "entries" are partitions
+    if (partition_list)
+        return seekPartitionEntry(index);
+
+    // Current directory defaults to the partition's root directory
+    if (dir_track == 0)
+    {
+        dir_track = partitions[partition].directory_track;
+        dir_sector = partitions[partition].directory_sector;
+    }
+
     // Calculate Sector offset & Entry offset
     // 8 Entries Per Sector, 32 bytes Per Entry
     index--;
@@ -533,8 +547,8 @@ bool D64MStream::seekEntry( uint16_t index )
         // Start at first sector of directory
         next_track = 0;
         if (!seekSector(
-                partitions[partition].directory_track,
-                partitions[partition].directory_sector,
+                dir_track,
+                dir_sector,
                 partitions[partition].directory_offset))
             return false;
 
@@ -702,9 +716,10 @@ bool D64MStream::finalizeFileWrite()
         return false;
     }
 
-    // Find the first free directory entry, following the directory chain
-    uint8_t dt = partitions[partition].directory_track;
-    uint8_t ds = partitions[partition].directory_sector;
+    // Find the first free directory entry, following the chain of the
+    // directory the file was created in
+    uint8_t dt = dir_track ? dir_track : partitions[partition].directory_track;
+    uint8_t ds = dir_track ? dir_sector : partitions[partition].directory_sector;
     std::string dirsec;
     int slot = -1;
     uint16_t chain_safety = 0;
@@ -880,39 +895,15 @@ uint16_t D64MStream::blocksFree()
 {
     uint16_t free_count = 0;
 
-    for (uint8_t x = 0; x < partitions[partition].block_allocation_map.size(); x++)
+    // getTrackFreeCount handles both record styles: free-count byte
+    // (D64/D81) and bitmap-only (D71 side 2, CMD native)
+    for (auto &bam : partitions[partition].block_allocation_map)
     {
-        uint8_t bam[partitions[partition].block_allocation_map[x].byte_count];
-        // Debug_printv("start_track[%d] end_track[%d]", block_allocation_map[x].start_track, block_allocation_map[x].end_track);
-
-        if (!seekSector(
-                partitions[partition].block_allocation_map[x].track,
-                partitions[partition].block_allocation_map[x].sector,
-                partitions[partition].block_allocation_map[x].offset))
-            return 0;
-
-        for (uint16_t i = partitions[partition].block_allocation_map[x].start_track; i <= partitions[partition].block_allocation_map[x].end_track; i++)
+        for (uint16_t t = bam.start_track; t <= bam.end_track; t++)
         {
-            readContainer((uint8_t *)&bam, sizeof(bam));
-            if (sizeof(bam) > 3)
-            {
-                if (i != partitions[partition].directory_track)
-                {
-                    // Debug_printv("x[%d] track[%d] count[%d] size[%d]", x, i, bam[0], sizeof(bam));
-                    free_count += bam[0];
-                }
-            }
-            else
-            {
-                // D71 tracks 36 - 70 you have to count the 1 bits (0 is allocated)
-                uint8_t bit_count = 0;
-                bit_count += std::bitset<8>(bam[0]).count();
-                bit_count += std::bitset<8>(bam[1]).count();
-                bit_count += std::bitset<8>(bam[2]).count();
-
-                // Debug_printv("x[%d] track[%d] count[%d] size[%d] bam0[%d] bam1[%d] bam2[%d] (counting 1 bits)", x, i, bit_count, sizeof(bam), bam[0], bam[1], bam[2]);
-                free_count += bit_count;
-            }
+            if (t == partitions[partition].directory_track)
+                continue;
+            free_count += getTrackFreeCount(t);
         }
     }
 
@@ -1047,6 +1038,123 @@ uint32_t D64MStream::writeFile(uint8_t *buf, uint32_t size)
     return bytesWritten;
 }
 
+// Split an in-image path on '/' (a literal '/' in a filename is encoded
+// as '\' in the URL and restored per-component by seekEntry)
+static std::vector<std::string> splitPathComponents(const std::string &path)
+{
+    std::vector<std::string> parts;
+    size_t start = 0;
+    while (start < path.size())
+    {
+        size_t p = path.find('/', start);
+        if (p == std::string::npos)
+            p = path.size();
+        if (p > start)
+            parts.push_back(path.substr(start, p - start));
+        start = p + 1;
+    }
+    return parts;
+}
+
+// Enter a subdirectory entry in the current directory: CMD native "DIR"
+// entries and 1581 "CBM" sub-partitions both point at a header block whose
+// first two bytes link to the first directory sector.
+bool D64MStream::enterDirectory(std::string name)
+{
+    if (!seekEntry(name))
+        return false;
+
+    uint8_t t = entry.file_type & 0b00000111;
+    if (t != 5 && t != 6) // 5 = CBM sub-partition, 6 = CMD native DIR
+        return false;
+
+    std::string hdr = readBlock(entry.start_track, entry.start_sector);
+    if (hdr.size() != block_size)
+        return false;
+
+    dir_track = (uint8_t)hdr[0];
+    dir_sector = (uint8_t)hdr[1];
+    entry_index = 0;
+    if (dir_track == 0)
+        return false; // not a formatted subdirectory
+
+    //Debug_printv("entered dir[%s] chain[%d/%d]", name.c_str(), dir_track, dir_sector);
+    return true;
+}
+
+bool D64MStream::seekDirectory(std::string path)
+{
+    // Reset to the image root
+    partition_list = hasPartitions();
+    dir_track = 0;
+    dir_sector = 0;
+    entry_index = 0;
+
+    auto parts = splitPathComponents(path);
+    size_t i = 0;
+
+    if (partition_list && parts.size())
+    {
+        if (selectPartitionByName(parts[0]))
+            i = 1;
+        else if (!selectPartitionByName("")) // fall back to default partition
+            return false;
+        partition_list = false;
+        entry_index = 0;
+    }
+
+    for (; i < parts.size(); i++)
+    {
+        if (!enterDirectory(parts[i]))
+            return false;
+    }
+    return true;
+}
+
+D64MStream::PathResult D64MStream::resolvePath(std::string path)
+{
+    auto parts = splitPathComponents(path);
+    if (parts.empty())
+        return seekDirectory("") ? PATH_DIR : PATH_NOT_FOUND;
+
+    // Resolve everything up to the last component as directories
+    std::string parent;
+    for (size_t i = 0; i + 1 < parts.size(); i++)
+    {
+        if (i) parent += '/';
+        parent += parts[i];
+    }
+    if (!seekDirectory(parent))
+        return PATH_NOT_FOUND;
+
+    std::string last = parts.back();
+
+    // At the root of a multi-partition image the last component may be a
+    // partition name; otherwise fall through to the default partition.
+    if (partition_list)
+    {
+        if (selectPartitionByName(last))
+        {
+            partition_list = false;
+            entry_index = 0;
+            return PATH_DIR;
+        }
+        if (!selectPartitionByName(""))
+            return PATH_NOT_FOUND;
+        partition_list = false;
+        entry_index = 0;
+    }
+
+    if (!seekEntry(last))
+        return PATH_NOT_FOUND;
+
+    uint8_t t = entry.file_type & 0b00000111;
+    if (t == 5 || t == 6)
+        return enterDirectory(last) ? PATH_DIR : PATH_NOT_FOUND;
+
+    return PATH_FILE;
+}
+
 bool D64MStream::seekPath(std::string path)
 {
     // Implement this to skip a queue of file streams to start of file by name
@@ -1068,17 +1176,58 @@ bool D64MStream::seekPath(std::string path)
         _size = block_size;
         return seekSector(1, 0);
     }
-    else if (seekEntry(path))
+
+    if (mode == std::ios_base::out)
     {
-        if (mode == std::ios_base::out)
+        PathResult r = resolvePath(path);
+        if (r == PATH_DIR)
+            return false; // cannot write to a directory/partition
+
+        auto parts = splitPathComponents(path);
+        if (parts.empty())
+            return false;
+        std::string last = parts.back();
+
+        if (r == PATH_FILE)
         {
             // SAVE"@:file" overwrite: scratch the old file, then stream a new
             // one - its entry reuses the slot just freed.
             Debug_printv("Overwriting [%s]", path.c_str());
             scratchEntry();
-            return beginFileWrite(path);
+            return beginFileWrite(last);
         }
 
+        // Not found: resolve the parent directory and create the file there
+        std::string parent;
+        for (size_t i = 0; i + 1 < parts.size(); i++)
+        {
+            if (i) parent += '/';
+            parent += parts[i];
+        }
+        if (!seekDirectory(parent))
+            return false;
+        if (partition_list)
+        {
+            if (!selectPartitionByName(""))
+                return false;
+            partition_list = false;
+        }
+        return beginFileWrite(last);
+    }
+
+    PathResult pr = resolvePath(path);
+    if (pr == PATH_DIR)
+    {
+        // Partition or subdirectory: position at the start of its directory
+        // chain so broker-cached streams for listings open successfully
+        // (and the chain can be read raw, as before).
+        _size = 0;
+        uint8_t dt = dir_track ? dir_track : partitions[partition].directory_track;
+        uint8_t ds = dir_track ? dir_sector : partitions[partition].directory_sector;
+        return seekSector(dt, ds);
+    }
+    if (pr == PATH_FILE)
+    {
         // auto entry = containerImage->entry;
         //auto type = decodeType(entry.file_type).c_str();
         //Debug_printv("filename[%.16s] type[%s] start_track[%d] start_sector[%d]", entry.filename, type, entry.start_track, entry.start_sector);
@@ -1102,12 +1251,6 @@ bool D64MStream::seekPath(std::string path)
         Debug_printv("blocks[%d] size[%d] available[%d] r[%d]", entry.blocks, _size, available(), r);
 
         return r;
-    }
-    else if (mode == std::ios_base::out)
-    {
-        // New file: claim the first block now, stream data as it arrives,
-        // add the directory entry when the stream is closed.
-        return beginFileWrite(path);
     }
     else
     {
@@ -1170,6 +1313,15 @@ bool D64MFile::rewindDirectory()
     //Debug_printv("image->url[%s]", image->url.c_str());
     image->resetEntryCounter();
 
+    // Position the stream at the directory this MFile points at
+    // (partition and/or subdirectory path inside the image)
+    if (!image->seekDirectory(pathInStream))
+    {
+        Debug_printv("directory not found in image [%s]", pathInStream.c_str());
+        dirIsOpen = false;
+        return false;
+    }
+
     // Set Media Info Fields
     //Debug_printv("name[%s]", image->header.name);
     //Debug_printv("id_dos[%s]", image->header.id_dos);
@@ -1210,9 +1362,12 @@ MFile* D64MFile::getNextFileInDir()
         mstr::replaceAll(filename, "/", "\\");
         //Debug_printv( "entry[%s]", (url + "/" + filename).c_str() );
 
+        // Entry URL must include the in-image path (partition/subdirectory)
         std::string entryUrl;
-        entryUrl.reserve(url.size() + 1 + filename.size());
-        entryUrl = url; entryUrl += '/'; entryUrl += filename;
+        entryUrl.reserve(url.size() + pathInStream.size() + 2 + filename.size());
+        entryUrl = url;
+        if (pathInStream.size()) { entryUrl += '/'; entryUrl += pathInStream; }
+        entryUrl += '/'; entryUrl += filename;
         auto file = MFSOwner::File(entryUrl);
         file->name = filename;  // Use actual CBM entry name, not container image name
         file->extension = image->decodeType(image->entry.file_type);
@@ -1265,10 +1420,10 @@ bool D64MFile::isDirectory()
     if (pathInStream.empty() || pathInStream == "/")
         return true;
 
-    // Look up entry in the container to check its file type
+    // Walk the path inside the image (partition / subdirectory / file)
     auto stream = ImageBroker::obtain<D64MStream>("d64", url);
-    if (stream != nullptr && stream->seekEntry(pathInStream))
-        return stream->isDirectory(stream->entry.file_type);
+    if (stream != nullptr)
+        return stream->resolvePath(pathInStream) == D64MStream::PATH_DIR;
 
     return false;
 }
@@ -1280,9 +1435,10 @@ bool D64MFile::exists()
     if ( stream == nullptr )
         return false;
 
-    // A path inside the image only exists if there's a directory entry for it
+    // A path inside the image only exists if it resolves to a partition,
+    // directory or file entry
     if ( pathInStream.size() && pathInStream != "/" )
-        return stream->seekEntry(pathInStream);
+        return stream->resolvePath(pathInStream) != D64MStream::PATH_NOT_FOUND;
 
     return true;
 }

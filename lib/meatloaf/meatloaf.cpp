@@ -104,6 +104,7 @@
 
 // Hard Disk
 #include "media/hd/dnp.h"
+#include "media/hd/dhd.h"
 #include "media/hd/hdd.h"
 
 // Tape
@@ -365,6 +366,7 @@ NIBMFileSystem nibFS;
 
 // Hard Disk
 DNPMFileSystem dnpFS;
+DHDMFileSystem dhdFS;
 HDDMFileSystem hddFS;
 
 // Tape
@@ -421,7 +423,7 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
     &g64FS, &nibFS,
 
     // Hard Disk
-    &dnpFS, &hddFS,
+    &dnpFS, &dhdFS, &hddFS,
 
     // Tape
     &tapFS, &t64FS, &tcrtFS,

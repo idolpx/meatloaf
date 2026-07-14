@@ -280,10 +280,36 @@ public:
     // before releasing the container stream.
     void close() override;
 
+    // --- Path navigation (partitions & subdirectories) ---
+    // Paths inside the image are '/'-separated: [PARTITION/]DIR/.../FILE
+    enum PathResult { PATH_NOT_FOUND, PATH_FILE, PATH_DIR };
+
+    // Walks a directory path (all components must be partitions/directories)
+    // and leaves the stream's current directory set to it. Empty path = root.
+    bool seekDirectory(std::string path);
+    // Walks a full path; on PATH_FILE the entry is loaded, on PATH_DIR the
+    // current directory is set to it.
+    PathResult resolvePath(std::string path);
+
+    // Multi-partition formats (DHD) override these
+    virtual bool hasPartitions() { return false; }
+    virtual bool selectPartitionByName(std::string name) { return false; }
+    // Fill 'entry' with partition #index (1-based) as a directory entry
+    virtual bool seekPartitionEntry(uint16_t index) { return false; }
+
+    // Enter a subdirectory entry (CMD native DIR or 1581 CBM sub-partition)
+    bool enterDirectory(std::string name);
+
+    // Current directory chain start (0 = use partition defaults)
+    uint8_t dir_track = 0;
+    uint8_t dir_sector = 0;
+    bool partition_list = false;    // root of a multi-partition image: list partitions
+
     Header header;      // Directory header data
     Entry entry;        // Directory entry data
 
     uint8_t partition = 0;
+    uint32_t partition_base = 0;  // byte offset of current partition within container (DHD)
     uint8_t track = 0;
     uint8_t sector = 0;
     uint8_t offset = 0;
@@ -308,7 +334,8 @@ protected:
             readContainer((uint8_t*)&header, sizeof(header));
     }
 
-private:
+protected:
+    // Block/entry helpers usable by derived formats (D71/D81/DNP/DHD/...)
     bool writeHeader(std::string name, std::string id) override
     {
         if (partitions.empty() || partition >= partitions.size()) {
