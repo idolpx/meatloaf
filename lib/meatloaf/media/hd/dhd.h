@@ -17,6 +17,14 @@
 
 // .DHD - CMD Hard drive image format
 //
+// A DHD image is a raw dump of a CMD HD drive. The system partition is
+// located on a 64 KiB boundary and identified by the CMD HD boot magic at
+// offset $5F0 of the candidate block (track 0, sector 5, offset $F0). The
+// partition table lives on track 1 of the system partition (offset +64 KiB)
+// as 32-byte entries: type at +$02, 16-byte $A0-padded name at +$05,
+// 3-byte big-endian start LBA (512-byte blocks) at +$15 and size at +$1D.
+// Partition types: 1 = Native (DNP layout), 2 = 1541, 3 = 1571, 4 = 1581.
+//
 // https://vice-emu.sourceforge.io/vice_17.html#SEC432
 // https://sourceforge.net/p/vice-emu/patches/253/
 // https://github.com/c64pectre/c64-cmd-hd
@@ -37,69 +45,54 @@
  ********************************************************/
 
 class DHDMStream : public D64MStream {
-    // override everything that requires overriding here
 
 public:
-    DHDMStream(std::shared_ptr<MStream> is) : D64MStream(is) 
+    struct PartEntry {
+        uint8_t number;      // 1-254
+        uint8_t type;        // 1=NAT, 2=1541, 3=1571, 4=1581
+        std::string name;    // PETSCII, $A0 padding trimmed
+        uint32_t start;      // byte offset within image
+        uint32_t size;       // bytes
+    };
+
+    DHDMStream(std::shared_ptr<MStream> is) : D64MStream(is)
     {
-        // DHD Partition Info
-        std::vector<BlockAllocationMap> b = { 
-            {
-                40,     // track
-                1,      // sector
-                0x10,   // offset
-                1,      // start_track
-                40,     // end_track
-                6       // byte_count
-            },
-            {
-                40,     // track
-                0,      // sector
-                0x10,   // offset
-                41,     // start_track
-                80,     // end_track
-                6       // byte_count
-            } 
-        };
-
-        Partition p = {
-            40,    // track
-            0,     // sector
-            0x04,  // header_offset
-            40,    // directory_track
-            3,     // directory_sector
-            0x00,  // directory_offset
-            b      // block_allocation_map
-        };
-        partitions.clear();
-        partitions.push_back(p);
-        sectorsPerTrack = { 40 };
         has_subdirs = true;
-        dos_rom = "dosCMDHD";
 
-        // Read Header
-        readHeader();
-
-        uint32_t size = containerStream->size();
-        switch (size + media_header_size) 
+        if (readPartitionTable())
         {
-            case 819200:  // 80 tracks no errors
-                break;
-
-            case 822400:  // 80 w/ errors
-                error_info = true;
-                break;
-
-            // https://sourceforge.net/p/vice-emu/bugs/1890/
-            case 829440:  // 81 tracks no errors
-                partitions[partition].block_allocation_map[1].end_track = 81;
-                break;
+            // Configure the default partition so bare paths resolve into it
+            selectPartitionByName("");
         }
     };
 
-    virtual uint8_t speedZone(uint8_t track) override { return 0; };
+    virtual uint8_t speedZone(uint8_t track) override
+    {
+        switch (cur_type)
+        {
+            case 2: // 1541
+                return (track < 18) + (track < 25) + (track < 31);
+            case 3: // 1571
+                if (track < 35)
+                    return (track < 18) + (track < 25) + (track < 31);
+                return (track < 53) + (track < 60) + (track < 66);
+            default: // native, 1581
+                return 0;
+        }
+    };
+
+    bool hasPartitions() override { return true; }
+    bool selectPartitionByName(std::string name) override;
+    bool seekPartitionEntry(uint16_t index) override;
 
 protected:
+    bool readPartitionTable();
+    bool configurePartition(const PartEntry &p);
+
+    std::vector<PartEntry> part_table;
+    uint32_t sys_base = 0xFFFFFFFF; // byte offset of system partition
+    uint8_t default_part = 1;
+    uint8_t cur_type = 1;           // type of currently selected partition
 
 private:
     friend class DHDMFile;
@@ -112,20 +105,14 @@ private:
 
 class DHDMFile: public D64MFile {
 public:
-    DHDMFile(std::string path) : D64MFile(path) 
-    {
-        size = 819200; // Default - 80 tracks no errors
-    };
+    DHDMFile(std::string path) : D64MFile(path) {};
 
     std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> is) override
     {
-        //Debug_printv("[%s]", url.c_str());
+        Debug_printv("[%s]", url.c_str());
 
         return std::make_shared<DHDMStream>(is);
     }
-
-    bool mkDir() override { return false; };
-    bool rmDir() override { return false; };
 };
 
 

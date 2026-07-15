@@ -300,6 +300,14 @@ std::string MMediaStream::readStringUntil( uint8_t delimiter )
 }
 
 uint32_t MMediaStream::write(const uint8_t *buf, uint32_t size) {
+    // Mirror read(): when a file inside the image has been selected via
+    // seekPath, route writes through the format's writeFile() so block
+    // chains / allocation are honored. Otherwise write image bytes verbatim.
+    if(seekCalled) {
+        uint32_t bytesWritten = writeFile((uint8_t *)buf, size);
+        _position += bytesWritten;
+        return bytesWritten;
+    }
     return containerStream->write(buf, size);
 }
 

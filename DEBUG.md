@@ -3,13 +3,13 @@
 ## Triple-Setup Architecture
 
 ```
-┌────────────────┐      IEC        ┌──────────────┐       HTTP        ┌─────────────┐
-│  C64 running    │ ◄──serial bus──► │  Meatloaf    │ ◄──────────────► │  Test server │
-│  BASIC test     │                 │  (ESP32)     │                   │  (Python)    │
-│                 │                 │  UART@2M     │                   │  port 8080   │
-└────────────────┘                 └──────┬───────┘                   └─────────────┘
-                                          │ USB serial
-                                          ▼
+┌────────────────┐      IEC         ┌──────────────┐       HTTP        ┌─────────────┐
+│  C64 running   │ ◄──serial bus──► │  Meatloaf    │ ◄──────────────► │  Test server │
+│  BASIC test    │                  │  (ESP32)     │                   │  (Python)    │
+│                │                  │  UART@2M     │                   │  port 8080   │
+└────────────────┘                  └──────┬───────┘                   └─────────────┘
+                                           │ USB serial
+                                           ▼
                                     ┌──────────────┐
                                     │  Serial      │
                                     │  capture     │

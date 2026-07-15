@@ -239,6 +239,11 @@ iecChannelHandlerFile::~iecChannelHandlerFile()
     m_stream->close();
     Debug_printv("Stream closed.");
 
+    // Media image writes report errors (e.g. DISK FULL) at close time, when
+    // the final block and directory entry are committed.
+    if( m_stream->mode == std::ios_base::out && m_stream->error() )
+        m_drive->setStatusCode(m_stream->error());
+
     // If a .config file was just saved, drop the cached lookups so its
     // base_url redirect takes effect immediately instead of after the TTL.
     if( m_stream->mode == std::ios_base::out && mstr::endsWith(m_stream->url, ".config") )
@@ -971,9 +976,12 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                         Debug_printv("Error: file doesn't exist [%s]", f->url.c_str());
                         setStatusCode(ST_FILE_NOT_FOUND);
                     }
-                    else if( (mode == std::ios_base::out) && f->media_image.size()>0 )
+                    else if( (mode == std::ios_base::out) && f->media_image.size()>0 && (!f->isWritable || f->pathInStream.empty()) )
                     {
-                        Debug_printv("Error: writing to files on disk media not supported [%s]", f->url.c_str());
+                        // Files INSIDE writable disk media (D64 etc. on flash/SD) can be
+                        // written; overwriting the image itself or media on read-only
+                        // sources is still refused.
+                        Debug_printv("Error: media not writable [%s]", f->url.c_str());
                         setStatusCode(ST_WRITE_PROTECT_ON);
                     }
                     else if( (mode == std::ios_base::out) && f->exists() && !overwrite )
@@ -2124,6 +2132,8 @@ void iecDrive::getStatus(char *buffer, uint8_t bufferSize)
         case ST_FILE_EXISTS         : msg = "FILE EXISTS"; break;
         case ST_DOSVERSION          : msg = PRODUCT_ID " " FW_VERSION; break;
         case ST_NO_CHANNEL          : msg = "NO CHANNEL"; break;
+        case ST_DIR_ERROR           : msg = "DIR ERROR"; break;
+        case ST_DISK_FULL           : msg = "DISK FULL"; break;
         case ST_DRIVE_NOT_READY     : msg = "DRIVE NOT READY"; break;
         case ST_FILE_TYPE_MISMATCH  : msg = "FILE TYPE MISMATCH"; break;
         case ST_PERMISSION_DENIED   : msg = "PERMISSION DENIED"; break;

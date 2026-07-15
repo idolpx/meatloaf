@@ -276,10 +276,40 @@ public:
     uint32_t readFile(uint8_t* buf, uint32_t size) override;
     uint32_t writeFile(uint8_t* buf, uint32_t size) override;
 
+    // Finalizes a streamed file write (last block + directory entry)
+    // before releasing the container stream.
+    void close() override;
+
+    // --- Path navigation (partitions & subdirectories) ---
+    // Paths inside the image are '/'-separated: [PARTITION/]DIR/.../FILE
+    enum PathResult { PATH_NOT_FOUND, PATH_FILE, PATH_DIR };
+
+    // Walks a directory path (all components must be partitions/directories)
+    // and leaves the stream's current directory set to it. Empty path = root.
+    bool seekDirectory(std::string path);
+    // Walks a full path; on PATH_FILE the entry is loaded, on PATH_DIR the
+    // current directory is set to it.
+    PathResult resolvePath(std::string path);
+
+    // Multi-partition formats (DHD) override these
+    virtual bool hasPartitions() { return false; }
+    virtual bool selectPartitionByName(std::string name) { return false; }
+    // Fill 'entry' with partition #index (1-based) as a directory entry
+    virtual bool seekPartitionEntry(uint16_t index) { return false; }
+
+    // Enter a subdirectory entry (CMD native DIR or 1581 CBM sub-partition)
+    bool enterDirectory(std::string name);
+
+    // Current directory chain start (0 = use partition defaults)
+    uint8_t dir_track = 0;
+    uint8_t dir_sector = 0;
+    bool partition_list = false;    // root of a multi-partition image: list partitions
+
     Header header;      // Directory header data
     Entry entry;        // Directory entry data
 
     uint8_t partition = 0;
+    uint32_t partition_base = 0;  // byte offset of current partition within container (DHD)
     uint8_t track = 0;
     uint8_t sector = 0;
     uint8_t offset = 0;
@@ -304,7 +334,8 @@ protected:
             readContainer((uint8_t*)&header, sizeof(header));
     }
 
-private:
+protected:
+    // Block/entry helpers usable by derived formats (D71/D81/DNP/DHD/...)
     bool writeHeader(std::string name, std::string id) override
     {
         if (partitions.empty() || partition >= partitions.size()) {
@@ -342,7 +373,6 @@ private:
     bool seekEntry( uint16_t index = 0 ) override;
     bool readEntry( uint16_t index = 0 ) override;
     bool writeEntry( uint16_t index = 0 ) override;
-    uint16_t seekFreeEntry( uint16_t index = 0 );
 
     std::string readBlock( uint8_t track, uint8_t sector );
     bool writeBlock( uint8_t track, uint8_t sector, std::string data );
@@ -351,6 +381,38 @@ private:
     BlockChain getFreeBlocks(uint16_t file_size);
     bool getNextFreeBlock(uint8_t startTrack, uint8_t startSector, uint8_t *foundTrack, uint8_t *foundSector, bool forDirectory = false);
     bool isBlockFree(uint8_t track, uint8_t sector);
+
+    // BAM record location for one track (which BAM sector holds it and where)
+    struct BAMRecord {
+        uint8_t bam_track;
+        uint8_t bam_sector;
+        uint8_t offset;       // offset of this track's record within the BAM sector
+        uint8_t byte_count;   // record length in bytes
+        bool has_count;       // first byte of record is the free-sector count
+    };
+    bool getBAMRecord( uint8_t track, BAMRecord *rec );
+    bool readBAMRecord( uint8_t track, BAMRecord *rec, uint8_t *buf );
+    bool setBlockAllocation( uint8_t track, uint8_t sector, bool allocate );
+    uint8_t getTrackFreeCount( uint8_t track );
+    bool findFreeSectorOnTrack( uint8_t track, uint8_t startSector, uint8_t *foundSector );
+
+    // Streamed new-file write (SAVE): blocks are allocated one at a time as
+    // data arrives, the directory entry is added when the stream is closed.
+    bool beginFileWrite( std::string filename );
+    uint32_t writeFileNew( uint8_t *buf, uint32_t size );
+    bool finalizeFileWrite();
+    void rollbackFileWrite();
+    bool scratchEntry();
+
+    bool creating = false;          // building a new file via streamed writes
+    std::string create_filename;    // name for the directory entry (UTF8)
+    uint8_t cbuf[254];              // pending data for the current block
+    uint16_t cbuf_len = 0;
+    uint8_t create_start_track = 0; // first block of the file
+    uint8_t create_start_sector = 0;
+    uint8_t create_track = 0;       // block currently being filled
+    uint8_t create_sector = 0;
+    BlockChain create_allocated;    // all blocks claimed so far (for count/rollback)
 
     BlockChain getBlocks( uint8_t track, uint8_t sector );
     BlockChain getBlocks( std::string filename );

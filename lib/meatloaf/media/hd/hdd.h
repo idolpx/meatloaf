@@ -22,23 +22,19 @@
 //
 
 //  CFS Format Support
-
+//
 //   The implementation supports:
 //   - ✓ Boot sector reading with signature validation
-//   - ✓ Partition directory (up to 16 partitions)
-//   - ✓ Partition selection and boundaries
-//   - ✓ Directory reading (single sector, root only)
-//   - ✓ File entry parsing with all attributes
-//   - ✓ Timestamp decoding (4-byte packed format)
-//   - ✓ File type detection (DEL/PRG/REL/DIR/LNK)
-//   - ✓ Basic file reading via data tree
-//   - ⚠ Simplified data tree (direct pointers only, no recursive tree traversal)
-//   - ⚠ Single directory sector (no multi-sector directory chaining)
-//   - ⚠ Root directory only (no subdirectory navigation)
-//   - ✗ Bitmap allocation reading
+//   - ✓ Partition directory (16 partitions, listed as directories at image root)
+//   - ✓ Partition selection by name (default partition for bare paths)
+//   - ✓ Multi-sector directory chaining (sliced NEXTS pointer)
+//   - ✓ Subdirectory navigation
+//   - ✓ Balanced data tree traversal (all depths, SLICE-assembled next-tree pointers)
+//   - ✓ Holes in files (read as $00)
+//   - ✓ File entry parsing with attributes, 3-char filetypes, timestamps
+//   - ✗ Bitmap allocation reading (blocks free always 0)
 //   - ✗ Write operations
-//   - ✗ REL file support
-//   - ✗ Link file resolution
+//   - ✗ REL file side data / Link file resolution (LNK listed, not followed)
 
 #ifndef MEATLOAF_MEDIA_HDD
 #define MEATLOAF_MEDIA_HDD
@@ -62,82 +58,75 @@ public:
         block_size = 512;
         has_subdirs = true;
 
-        // Read boot sector and partition directory
         if (!readHeader())
         {
-            Debug_printv("Failed to read HDD header");
+            Debug_printv("Failed to read HDD/CFS header");
             return;
         }
 
-        // Select default partition
-        if (!selectPartition(boot_sector.default_partition))
-        {
-            Debug_printv("Failed to select default partition");
-        }
+        // Start at the image root (partition list)
+        seekDirectory("");
     };
 
-    // Pointer structure (4 bytes) used throughout CFS
+    // 4-byte CFS pointer: byte0 = flags + LBA bits 27-24, bytes 1-3 = LBA
+    // high/mid/low (big-endian). CHS format (LBA bit clear) is not supported.
     struct Pointer {
-        uint8_t flags;          // VALID, LBA, HIDDEN, WRITEABLE + high bits
-        uint8_t cyl_lba_mid;    // Middle byte of address
-        uint8_t cyl_lba_low;    // Low byte of address
-        uint8_t head_lba_high;  // High byte (bits 0-3) or head (bits 0-1)
+        uint8_t b[4];
 
-        bool isValid() const { return (flags & 0x80) != 0; }
-        bool isLBA() const { return (flags & 0x40) != 0; }
-        bool isHidden() const { return (flags & 0x20) != 0; }
-        bool isWriteable() const { return (flags & 0x10) != 0; }
+        bool isLBA() const { return (b[0] & 0x40) != 0; }
+        bool isHidden() const { return (b[0] & 0x80) != 0; }   // file pointers ($14)
+        bool isValid() const { return (b[0] & 0x80) != 0; }    // partition start pointer
+        uint8_t slice() const { return (b[0] >> 4) & 0x03; }   // NEXTS / SLICE bits
 
         uint32_t getLBA() const {
-            if (!isLBA()) return 0;
-            return ((uint32_t)(flags & 0x0F) << 20) |
-                   ((uint32_t)head_lba_high << 16) |
-                   ((uint32_t)cyl_lba_mid << 8) |
-                   cyl_lba_low;
+            return ((uint32_t)(b[0] & 0x0F) << 24) |
+                   ((uint32_t)b[1] << 16) |
+                   ((uint32_t)b[2] << 8) |
+                   b[3];
         }
 
-        void setLBA(uint32_t lba) {
-            flags = (flags & 0xF0) | ((lba >> 20) & 0x0F);
-            head_lba_high = (lba >> 16) & 0xFF;
-            cyl_lba_mid = (lba >> 8) & 0xFF;
-            cyl_lba_low = lba & 0xFF;
+        // Hole / end-of-chain marker: all zero except the SLICE bits
+        bool isZero() const {
+            return (b[0] & 0xCF) == 0 && b[1] == 0 && b[2] == 0 && b[3] == 0;
         }
     } __attribute__((packed));
 
-    // Boot sector structure
+    // Boot sector (sector 0)
     struct BootSector {
         uint8_t reserved0;          // $00
-        uint8_t default_partition;  // $01
+        uint8_t default_partition;  // $01: DP (0-15)
         Pointer last_sector;        // $02-$05
         uint8_t reserved1[2];       // $06-$07
         char id[16];                // $08-$17: "C64 CFS V 0.11B "
         Pointer part_dir;           // $18-$1B: Partition directory pointer
         Pointer part_dir_backup;    // $1C-$1F: Backup location
-        char disk_label[16];        // $20-$2F: Global disk label
-        uint8_t reserved2[464];     // $30-$1FF
+        char disk_label[16];        // $20-$2F: Global disk label ($20 padded)
     } __attribute__((packed));
 
     // Partition entry (32 bytes)
     struct PartitionEntry {
-        char name[8];           // $00-$07: Partition name (null-padded)
-        Pointer start;          // $08-$0B: Start sector
-        Pointer end;            // $0C-$0F: End sector (type in flags)
-        uint8_t reserved[16];   // $10-$1F
+        char name[16];          // $00-$0F: Partition name ($00 padded)
+        Pointer start;          // $10-$13: Start sector (VALID/HIDDEN/WRITEABLE flags)
+        Pointer end;            // $14-$17: End sector (TYPE in flags)
+        Pointer deleted_dir;    // $18-$1B: CFS: deleted directory sector
+        Pointer root_dir;       // $1C-$1F: CFS: root directory sector
 
-        uint8_t getType() const { return end.flags & 0x0F; }
+        bool isValid() const { return start.isValid(); }
+        bool isHidden() const { return (start.b[0] & 0x20) != 0; }
+        // TYPE is the high nibble of the end pointer with the LBA bit cleared
+        uint8_t getType() const { return (end.b[0] >> 4) & 0x0B; }
         bool isCFS() const { return getType() == 0x01; }
         bool isGEOS() const { return getType() == 0x02; }
     } __attribute__((packed));
 
     // Directory entry (32 bytes)
     struct DirectoryEntry {
-        char filename[8];       // $00-$07: Filename (null-padded)
-        uint32_t filesize;      // $08-$0B: File size in bytes
-        Pointer data_tree;      // $0C-$0F: Data tree pointer or resource
-        uint8_t attributes;     // $10: File attributes
-        uint8_t timestamp[4];   // $11-$14: Packed timestamp
-        uint8_t filetype_extra; // $15: Extra file type info
-        uint8_t reserved[10];   // $16-$1F
+        char filename[16];      // $00-$0F: Filename ($00 padded)
+        uint8_t info[4];        // $10-$13: filesize (normal, LE) / @this dir (label) / $00 (subdir)
+        Pointer pointer;        // $14-$17: @data tree / @subdirectory / @parent dir; carries NEXTS
+        uint8_t attributes;     // $18: CLOSED/DELETEABLE/READABLE/WRITEABLE/EXECUTEABLE/FILETYPE
+        char type_str[3];       // $19-$1B: filetype string ("PRG", "DIR", "DEL", ...)
+        uint8_t timestamp[4];   // $1C-$1F: packed creation/modification time
 
         bool isClosed() const { return (attributes & 0x80) != 0; }
         bool isDeleteable() const { return (attributes & 0x40) != 0; }
@@ -146,22 +135,34 @@ public:
         bool isExecutable() const { return (attributes & 0x08) != 0; }
         uint8_t getFileType() const { return attributes & 0x07; }
 
-        bool isEmpty() const { return getFileType() == 0 && isClosed(); }
+        bool isFree() const { return getFileType() == 0 && !isClosed(); }
+        bool isSeparator() const { return getFileType() == 0 && isClosed(); }
         bool isNormalFile() const { return getFileType() == 1; }
         bool isRELFile() const { return getFileType() == 2; }
-        bool isDirectory() const { return getFileType() == 3; }
+        bool isDirType() const { return getFileType() == 3; }
+        bool isLabel() const { return isDirType() && !isClosed(); }
+        bool isDirectory() const { return isDirType() && isClosed(); }
         bool isLink() const { return getFileType() == 4; }
-        bool isLabel() const { return !isClosed() && getFileType() == 3; }
+
+        uint32_t getFilesize() const {
+            return (uint32_t)info[0] | ((uint32_t)info[1] << 8) |
+                   ((uint32_t)info[2] << 16) | ((uint32_t)info[3] << 24);
+        }
 
         time_t getTimestamp() const;
     } __attribute__((packed));
 
-    // Directory sector (512 bytes)
+    // Directory sector (512 bytes): 16 entries, the @Next directory sector
+    // pointer is sliced into the NEXTS bits of the 16 entry pointers
     struct DirectorySector {
-        DirectoryEntry entries[16];     // $000-$1EF: 16 entries
-        Pointer next_sector;            // $1F0-$1F3: Next directory sector
-        uint8_t reserved[12];           // $1F4-$1FF
+        DirectoryEntry entries[16];
     } __attribute__((packed));
+
+    enum PathResult { PATH_NOT_FOUND, PATH_FILE, PATH_DIR };
+
+    // Path navigation: [PARTITION/]DIR/.../FILE
+    bool seekDirectory(std::string path);
+    PathResult resolvePath(std::string path);
 
 protected:
     struct Header {
@@ -176,25 +177,45 @@ protected:
         std::string type;
         uint8_t attributes;
         time_t timestamp;
-        Pointer data_tree;
+        Pointer pointer;
         bool is_directory;
+        bool is_hidden;
     };
 
     BootSector boot_sector;
-    PartitionEntry partitions[16];
-    DirectorySector current_dir;
-    uint32_t current_partition_start;
-    uint32_t current_partition_end;
-    uint32_t current_dir_sector;
-    uint8_t current_partition;
+    PartitionEntry partition_entries[16];
+
+    bool partition_list = false;    // at image root: list partitions
+    uint32_t dir_start_lba = 0;     // first sector of the current directory
+    std::string dir_label;
+
+    // Directory walk state (sequential entry iteration)
+    DirectorySector dir_buf;
+    uint32_t walk_lba = 0;          // sector currently in dir_buf (0 = none)
+    uint8_t walk_pos = 0;           // next entry slot to examine (0-15)
+    uint16_t walk_count = 0;        // listable entries delivered so far
+
+    // File read state
+    Pointer file_tree;              // data tree pointer of the selected file
+    uint8_t tree_depth = 1;
+
+    // Tree/data sector cache
+    uint8_t tree_buf[512];
+    uint32_t tree_cache_lba = 0xFFFFFFFF;
 
     Header header;
     Entry entry;
 
     bool readHeader() override;
-    bool readPartitionDirectory();
-    bool selectPartition(uint8_t partition_num);
-    bool readDirectorySector(uint32_t lba);
+    bool readSector(uint32_t lba, uint8_t *buf);
+
+    bool selectPartitionByName(std::string name);   // "" = default partition
+    bool seekPartitionEntry(uint16_t index);
+    bool enterDirectory(std::string name);
+
+    bool readDirSector(uint32_t lba);
+    uint32_t nextDirSector();                       // assemble NEXTS pointer
+    void restartDirWalk();
 
     bool seekEntry(std::string filename) override;
     bool seekEntry(uint16_t index) override;
@@ -203,8 +224,11 @@ protected:
     uint32_t writeFile(uint8_t* buf, uint32_t size) override { return 0; };
     bool seekPath(std::string path) override;
 
-    bool readDataTree(Pointer tree_ptr, uint32_t offset, uint8_t* buf, uint32_t size, uint32_t& bytes_read);
-    uint32_t readDataSector(uint32_t lba, uint8_t* buf, uint32_t size);
+    // Data tree traversal
+    bool loadTreeSector(uint32_t lba);
+    Pointer assembleNextTree(uint8_t k);            // from cached tree sector
+    bool dataSectorForPos(uint32_t pos, uint32_t *lba, bool *hole);
+    static uint64_t treeCoverage(uint8_t depth);
 
 private:
     friend class HDDMFile;
@@ -217,6 +241,7 @@ private:
 
 class HDDMFile: public MFile {
 public:
+
     HDDMFile(std::string path, bool is_dir = true): MFile(path) {
         isDir = is_dir;
         media_image = name;
@@ -235,6 +260,9 @@ public:
 
     bool rewindDirectory() override;
     MFile* getNextFileInDir() override;
+
+    bool isDirectory() override;
+    bool exists() override;
 
     bool isDir = true;
     bool dirIsOpen = false;

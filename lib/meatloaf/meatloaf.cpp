@@ -104,6 +104,7 @@
 
 // Hard Disk
 #include "media/hd/dnp.h"
+#include "media/hd/dhd.h"
 #include "media/hd/hdd.h"
 
 // Tape
@@ -365,6 +366,7 @@ NIBMFileSystem nibFS;
 
 // Hard Disk
 DNPMFileSystem dnpFS;
+DHDMFileSystem dhdFS;
 HDDMFileSystem hddFS;
 
 // Tape
@@ -421,7 +423,7 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
     &g64FS, &nibFS,
 
     // Hard Disk
-    &dnpFS, &hddFS,
+    &dnpFS, &dhdFS, &hddFS,
 
     // Tape
     &tapFS, &t64FS, &tcrtFS,
@@ -1057,7 +1059,14 @@ std::shared_ptr<MStream> MFile::getSourceStream(std::ios_base::openmode mode) {
     // has to return OPENED stream
     //Debug_printv( ANSI_CYAN_BOLD_HIGH_INTENSITY "sourceFile[%s] pathInStream[%s]", sourceFile->url.c_str(), pathInStream.c_str());
 
-    auto sourceStream = sourceFile->getSourceStream(mode);
+    // Writing a file INSIDE a container (e.g. saving into a .d64): the
+    // container itself must be opened read-write, never write-only —
+    // plain 'out' would truncate the image file on flash/SD.
+    auto containerMode = mode;
+    if ( pathInStream.size() > 0 && (mode & std::ios_base::out) )
+        containerMode = std::ios_base::in | std::ios_base::out;
+
+    auto sourceStream = sourceFile->getSourceStream(containerMode);
     if ( sourceStream == nullptr )
     {
         //Debug_printv("null sourceStream for path[%s]", path.c_str());
@@ -1073,6 +1082,11 @@ std::shared_ptr<MStream> MFile::getSourceStream(std::ios_base::openmode mode) {
     std::shared_ptr<MStream> decodedStream(getDecodedStream(containerStream)); // wrap this stream into decoded stream, i.e. unpacked zip files
     //Debug_printv("decodedStream isRandomAccess[%d] isBrowsable[%d] null[%s]", decodedStream->isRandomAccess(), decodedStream->isBrowsable(), (decodedStream == nullptr) ? "null" : "good");
     //Debug_printv("decodedStream url[%s]", decodedStream->url.c_str());
+
+    // Media decoder streams never set their mode themselves; seekPath needs it
+    // to decide between read-existing and create-new, and the drive checks it
+    // to know when to flush buffered write data.
+    decodedStream->mode = mode;
 
 
     //Debug_printv("pathInStream[%s]", pathInStream.c_str());

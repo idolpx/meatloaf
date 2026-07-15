@@ -51,12 +51,12 @@ public:
             },
             {
                 40,     // track
-                0,      // sector
+                2,      // sector (40/1 = BAM side 1, 40/2 = BAM side 2; 40/0 is the header)
                 0x10,   // offset
                 41,     // start_track
                 80,     // end_track
                 6       // byte_count
-            } 
+            }
         };
 
         Partition p = {
