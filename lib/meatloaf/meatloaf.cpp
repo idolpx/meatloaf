@@ -748,15 +748,58 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
 MFile* MFSOwner::NewFile(std::string path) {
 
     auto newFile = File(path);
-    if ( newFile != nullptr )
+    if ( newFile == nullptr )
         return nullptr;
-    
+
     if (newFile->exists()) {
         Debug_printv("File already exists [%s]", path.c_str());
+        delete newFile;
         return nullptr;
     }
 
     return newFile;
+}
+
+
+bool MFSOwner::Copy(std::string sourcePath, std::string destPath) {
+    MFile* sourceFile = File(sourcePath);
+    if (sourceFile == nullptr || !sourceFile->exists()) {
+        Debug_printv("Source file does not exist [%s]", sourcePath.c_str());
+        return false;
+    }
+
+    MFile* destFile = NewFile(destPath);
+    if (destFile == nullptr) {
+        Debug_printv("Destination file already exists or cannot be created [%s]", destPath.c_str());
+        return false;
+    }
+
+    auto sourceStream = sourceFile->getSourceStream(std::ios_base::in);
+    if (sourceStream == nullptr || !sourceStream->isOpen()) {
+        Debug_printv("Failed to open source file for reading [%s]", sourcePath.c_str());
+        delete sourceFile;
+        delete destFile;
+        return false;
+    }
+
+    auto destStream = destFile->getSourceStream(std::ios_base::out);
+    if (destStream == nullptr || !destStream->isOpen()) {
+        Debug_printv("Failed to open destination file for writing [%s]", destPath.c_str());
+        delete sourceFile;
+        delete destFile;
+        return false;
+    }
+
+    const uint32_t bufferSize = 512;
+    uint8_t buffer[bufferSize];
+    uint32_t bytesRead;
+    while ((bytesRead = sourceStream->read(buffer, bufferSize)) > 0) {
+        destStream->write(buffer, bytesRead);
+    }
+
+    delete sourceFile;
+    delete destFile;
+    return true;
 }
 
 

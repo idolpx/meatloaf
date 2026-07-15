@@ -580,6 +580,8 @@ public:
     //static MFile* SourceFile(MFile* file);
     static MFile* NewFile(std::string name);
 
+    static bool Copy(std::string source, std::string destination);
+
     static MFileSystem* scanPathLeft(std::vector<std::string> paths, std::vector<std::string>::iterator &pathIterator);
 
     static std::string existsLocal( std::string path );

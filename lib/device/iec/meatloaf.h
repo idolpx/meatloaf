@@ -103,7 +103,10 @@ public:
             setStatus((const char *)responseV.data(), responseV.size());
         }
         else
+        {
             iecDrive::executeData(data, dataLen); // process CBM DOS commands
+            
+        }
 
     }
 

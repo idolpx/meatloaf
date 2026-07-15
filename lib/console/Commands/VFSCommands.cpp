@@ -595,6 +595,12 @@ int update(int argc, char **argv)
 #if(NO_UPDATES)
     Serial.printf("Not updating; live updates disabled.\r\n");
 #else
+    // Get current app version
+    std::string current_version = fnSystem.get_fujinet_version(true);
+    Debug_printf("Current firmware version: %s\r\n", current_version.c_str());
+
+    // Check for updates
+
     Serial.printf("Stopping flash filesystem...\r\n");
     fsFlash.stop();
 

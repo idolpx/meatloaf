@@ -86,7 +86,8 @@ else:
     fout.close()
 
     # Write version.txt
-    version_txt = ver_maj + "." + ver_min + "." + ver_build[0] + "." + environment_name
+    #version_txt = ver_maj + "." + ver_min + "." + ver_build + "." + environment_name
+    version_txt = fw_date + "." + environment_name
     print(version_txt)
     fout = open(version_file, "w")
     fout.write(version_txt)

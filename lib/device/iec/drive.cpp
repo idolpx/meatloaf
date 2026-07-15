@@ -1820,14 +1820,17 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
         break;
         case 'P':
             {
+                // PWD - print working directory
                 if ( command[1] == 'W' && command[2] == 'D' )
                 {
                     Debug_printv( "print working directory");
                     std::string path = mstr::toPETSCII2(m_cwd->url);
+                    path += "\r";
                     SystemFileDevice::setStatus((const char *) path.c_str(), path.length());
                     return;
                 }
 
+                // Position channel pointer
                 command = mstr::drop(command, 1);
                 std::vector<uint8_t> pti = util_tokenize_uint8(command);
                 Debug_printv("position channel[%d] hi[%d] mid[%d] low[%d]", pti[0], pti[1], pti[2], pti[3]);
@@ -2004,8 +2007,6 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
     // Meatloaf Extended Commands
     command = mstr::toUTF8(command);
     auto pt = util_tokenize(command, ':');
-
-    // TODO: iecdetect - Detect physical devices on the bus and disable virtual devices with same ID
 
     if ( pt[0] == "auth" )
     {
