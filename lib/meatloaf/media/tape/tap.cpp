@@ -37,12 +37,13 @@ bool TAPMStream::ensureDecoder()
 
 void TAPMStream::setDefaultName(std::string name)
 {
-    // Media file name without its extension
+    // Media file name without its extension, PETSCII-encoded so it lists
+    // like the tape's own (PETSCII) entry names
     size_t dot = name.find_last_of('.');
     if (dot != std::string::npos && dot > 0)
         name = name.substr(0, dot);
     if (!name.empty())
-        default_name = name;
+        default_name = mstr::toPETSCII2(name);
 }
 
 std::string TAPMStream::entryDisplayName(const TapeEntry &e)
@@ -95,6 +96,9 @@ void TAPMStream::loadIndex(const std::string &idx_text)
         if (name.empty())
             name = "entry " + std::to_string(idx_entries.size() + 1);
 
+        // .idx files hold ASCII/UTF8 text; entry names are PETSCII internally
+        name = mstr::toPETSCII2(name);
+
         idx_entries.push_back({ (uint32_t)off, (uint32_t)size, name });
     }
 
@@ -117,6 +121,7 @@ bool TAPMStream::setCounterMs(uint32_t ms)
     if (!ensureDecoder())
         return false;
 
+    decoder.resetContinuation();
     tape_pos = decoder.offsetAtTime(ms);
     tape_ended = (tape_pos >= decoder.imageLen());
     have_current = false;
@@ -157,6 +162,7 @@ void TAPMStream::resetTape()
     tape_pos = 0;
     tape_ended = false;
     have_current = false;
+    decoder.resetContinuation();
 }
 
 bool TAPMStream::nextTapeEntry()
@@ -543,8 +549,9 @@ MFile* TAPMFile::getNextFileInDir()
     }
 
     // End of the tape reached
-    auto file = MFSOwner::File(url + "/no more entries");
-    file->name = "no more entries";
+    std::string marker = mstr::toPETSCII2("no more entries");
+    auto file = MFSOwner::File(url + "/" + marker);
+    file->name = marker;
     file->extension = "";
     file->size = 0;
     file->is_dir = 0;

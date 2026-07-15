@@ -486,6 +486,15 @@ struct further_recognition {
   wav2prg_recognize_block recognize_func;
 };
 
+/* Meatloaf: loader/observer state carried between incremental analyse calls */
+struct wav2prg_continuation {
+  char *loader_name;                 /* owned; NULL = start loader */
+  const char *observation;           /* static string from an observer table */
+  struct wav2prg_plugin_conf *conf;  /* owned; may be NULL */
+  struct current_recognition current_recognition;
+  struct further_recognition further_recognition;
+};
+
 struct wav2prg_observer_context {
   struct current_recognition *current_recognition;
   uint16_t where_to_search_in_block;
@@ -606,7 +615,7 @@ static enum wav2prg_bool recognize_new_loader(wav2prg_recognize_block recognize_
 struct block_list_element* wav2prg_analyse(const char* start_loader,
                                            struct wav2prg_plugin_conf* start_conf,
                                            enum wav2prg_bool keep_broken_blocks,
-                                           enum wav2prg_bool stop_at_end_of_program,
+                                           struct wav2prg_continuation **continuation,
                                            struct wav2prg_input_object *input_object,
                                            struct wav2prg_input_functions *input,
                                            struct wav2prg_display_interface *wav2prg_display_interface,
@@ -676,15 +685,32 @@ struct block_list_element* wav2prg_analyse(const char* start_loader,
     add_byte_to_block
   };
   const char *loader_name = start_loader;
+  char *resumed_loader_name = NULL;
   const char *observation = NULL;
   struct wav2prg_plugin_conf* conf = NULL;
   struct further_recognition further_recognition = {NULL,0,NULL};
   struct current_recognition current_recognition = {NULL,wav2prg_false};
   enum wav2prg_bool found_dependent_plugin;
+  enum wav2prg_bool block_kept;
 
-  enum wav2prg_bool had_complete_block = wav2prg_false;
+  /* Resume the loader/observer state saved by a previous incremental call */
+  if (continuation && *continuation) {
+    struct wav2prg_continuation *c = *continuation;
+    *continuation = NULL;
+    resumed_loader_name = c->loader_name;
+    if (resumed_loader_name)
+      loader_name = resumed_loader_name;
+    observation = c->observation;
+    conf = c->conf;
+    current_recognition = c->current_recognition;
+    further_recognition = c->further_recognition;
+    free(c);
+  }
+  if (continuation)
+    *continuation = NULL;
 
-  further_recognition.block = (struct program_block *)calloc(1, sizeof(struct program_block));
+  if (further_recognition.block == NULL)
+    further_recognition.block = (struct program_block *)calloc(1, sizeof(struct program_block));
 
   reset_tolerances();
 
@@ -692,6 +718,7 @@ struct block_list_element* wav2prg_analyse(const char* start_loader,
     enum wav2prg_bool res;
 
     found_dependent_plugin = wav2prg_false;
+    block_kept = wav2prg_false;
     current_loader = get_loader_by_name(loader_name);
     if(current_loader == NULL)
       break;
@@ -851,8 +878,7 @@ struct block_list_element* wav2prg_analyse(const char* start_loader,
     else{
       enum wav2prg_bool try_recognition = current_block->block_status == block_complete;
 
-      if (current_block->block_status == block_complete)
-        had_complete_block = wav2prg_true;
+      block_kept = wav2prg_true;
       pointer_to_current_block = &current_block->next;
       /* got the block */
       if(try_recognition){
@@ -908,15 +934,39 @@ struct block_list_element* wav2prg_analyse(const char* start_loader,
       loader_name = start_loader;
       observation = NULL;
       current_recognition.no_gaps_allowed = wav2prg_false;
+    }
 
-      /* Meatloaf: when loading a single program (e.g. via a .idx offset),
-         stop once a complete program chain has been decoded */
-      if (stop_at_end_of_program && had_complete_block)
-        break;
+    /* Meatloaf: incremental mode - stop after every kept block, saving the
+       loader/observer state so the chain resumes on the next call */
+    if (continuation && block_kept) {
+      struct wav2prg_continuation *c = (struct wav2prg_continuation *)calloc(1, sizeof(*c));
+      c->loader_name = strdup(loader_name);
+      c->observation = observation;
+      c->conf = conf;
+      conf = NULL;
+      c->current_recognition = current_recognition;
+      current_recognition.recognized_info = NULL;
+      c->further_recognition = further_recognition;
+      further_recognition.block = NULL;
+      *continuation = c;
+      break;
     }
   }
+  free(resumed_loader_name);
   free(further_recognition.block);
   free(current_recognition.recognized_info);
   context.wav2prg_display_interface->progress(context.display_interface_internal, context.input->get_pos(context.input_object));
   return blocks;
+}
+
+void wav2prg_continuation_free(struct wav2prg_continuation *cont)
+{
+  if (cont == NULL)
+    return;
+  free(cont->loader_name);
+  if (cont->conf)
+    delete_state(cont->conf);
+  free(cont->current_recognition.recognized_info);
+  free(cont->further_recognition.block);
+  free(cont);
 }

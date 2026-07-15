@@ -41,6 +41,7 @@
 #include <vector>
 
 class MStream;
+struct wav2prg_continuation;
 
 struct TapeEntry {
     std::string name;       // block name (PETSCII, trimmed; may be empty)
@@ -57,6 +58,8 @@ struct TapeEntry {
 
 class TapeDecoder {
 public:
+    ~TapeDecoder();
+
     // Parse the image header; false if the stream is not a supported tape
     bool open(MStream *container);
     bool isOpen() const { return opened; }
@@ -66,8 +69,14 @@ public:
 
     // Decode the next program at/after from_offset, streaming pulses from
     // the container. Fills 'out' (including tape counter times) and returns
-    // true, or returns false at the end of the tape.
+    // true, or returns false at the end of the tape. The loader/observer
+    // state carries over to the next call (turbo loader chains span
+    // programs), as long as from_offset continues where the last call
+    // stopped; jumping elsewhere restarts detection with the ROM loader.
     bool nextProgram(uint32_t from_offset, TapeEntry &out);
+
+    // Drop the carried loader state (rewind / counter change)
+    void resetContinuation();
 
     // Tape counter: time in ms at a byte offset (monotonic forward walker;
     // walking restarts automatically when seeking backwards)
@@ -106,6 +115,16 @@ private:
 
     // wav2prg input cursor
     uint32_t pos = 0;
+
+    // Loader/observer state between incremental analyse calls
+    struct wav2prg_continuation *cont = nullptr;
+    uint32_t cont_pos = 0;      // input position when 'cont' was saved
+
+    // Last returned program (to skip repeated blocks, e.g. Kernal 2nd copy)
+    bool last_valid = false;
+    uint16_t last_start = 0, last_end = 0;
+    uint32_t last_len = 0;
+    std::string last_name;
 
     // Tape counter walker
     uint32_t walk_pos = 0;

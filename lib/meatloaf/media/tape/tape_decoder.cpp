@@ -369,12 +369,33 @@ static struct wav2prg_display_interface tape_display_interface = {
  * Program extraction
  ********************************************************/
 
+TapeDecoder::~TapeDecoder()
+{
+    resetContinuation();
+}
+
+void TapeDecoder::resetContinuation()
+{
+    if (cont != nullptr)
+    {
+        wav2prg_continuation_free(cont);
+        cont = nullptr;
+    }
+    cont_pos = 0;
+    last_valid = false;
+}
+
 bool TapeDecoder::nextProgram(uint32_t from_offset, TapeEntry &out)
 {
     if (!opened)
         return false;
 
     register_loaders();
+
+    // The carried loader state is only valid when resuming exactly where
+    // the previous call stopped
+    if (cont != nullptr && from_offset != cont_pos)
+        resetContinuation();
 
     pos = (from_offset > data_start) ? from_offset : data_start;
     if (pos >= len)
@@ -383,86 +404,109 @@ bool TapeDecoder::nextProgram(uint32_t from_offset, TapeEntry &out)
     const char *start_loader = (platform == 2) ? "Default C16" : "Default C64";
     struct wav2prg_input_object input_object = { this };
 
-    // Analyze the next program chain only (stop_at_end_of_program)
-    struct block_list_element *blocks = wav2prg_analyse(
-        start_loader,
-        NULL,
-        wav2prg_false,
-        wav2prg_true,
-        &input_object,
-        &tape_input_functions,
-        &tape_display_interface,
-        NULL);
-
-    bool found = false;
-    uint32_t chain_end = pos;
-
-    for (struct block_list_element *b = blocks; b != NULL; )
+    // Incremental analysis: each call decodes up to the next kept block,
+    // carrying the loader/observer chain in 'cont'
+    while (true)
     {
-        do
+        struct block_list_element *blocks = wav2prg_analyse(
+            start_loader,
+            NULL,
+            wav2prg_false,
+            &cont,
+            &input_object,
+            &tape_input_functions,
+            &tape_display_interface,
+            NULL);
+
+        bool found = false;
+
+        for (struct block_list_element *b = blocks; b != NULL; )
         {
-            if (b->block_status != block_list_element::block_complete &&
-                b->block_status != block_list_element::block_checksum_expected_but_missing)
-                break;
+            do
+            {
+                if (found)
+                    break;
 
-            // Track the end of the whole program chain so the next scan
-            // resumes past repeated blocks (e.g. the Kernal's second copy)
-            for (uint32_t i = 0; i < b->num_of_syncs; i++)
-                if (b->syncs[i].end > chain_end)
-                    chain_end = b->syncs[i].end;
+                if (b->block_status != block_list_element::block_complete &&
+                    b->block_status != block_list_element::block_checksum_expected_but_missing)
+                    break;
 
-            if (found)
-                break;
+                // Kernal header chunks only carry metadata for the block
+                // that follows them - they are not files themselves
+                if (b->loader_name != NULL &&
+                    (strcmp(b->loader_name, "Default C64") == 0 || strcmp(b->loader_name, "Default C16") == 0))
+                    break;
 
-            // Kernal header chunks only carry metadata for the block that
-            // follows them - they are not files themselves
-            if (b->loader_name != NULL &&
-                (strcmp(b->loader_name, "Default C64") == 0 || strcmp(b->loader_name, "Default C16") == 0))
-                break;
+                if (b->real_end <= b->real_start)
+                    break;
 
-            if (b->real_end <= b->real_start)
-                break;
+                std::string bname = std::string(b->block.info.name, 16);
+                while (!bname.empty() && (bname.back() == ' ' || bname.back() == '\0'))
+                    bname.pop_back();
+                uint32_t blen = (uint32_t)(b->real_end - b->real_start) + 2;
 
-            out.name = std::string(b->block.info.name, 16);
-            while (!out.name.empty() && (out.name.back() == ' ' || out.name.back() == '\0'))
-                out.name.pop_back();
-            out.loader = b->loader_name ? b->loader_name : "unknown";
-            out.start_addr = b->real_start;
-            out.end_addr = b->real_end;
-            out.tape_offset = b->num_of_syncs ? b->syncs[0].start_sync : from_offset;
-            out.checksum_ok = (b->state == wav2prg_checksum_state_correct);
+                // Skip repeated blocks (e.g. the Kernal's second copy)
+                if (last_valid && last_start == b->real_start && last_end == b->real_end &&
+                    last_len == blen && last_name == bname)
+                    break;
 
-            uint16_t plen = b->real_end - b->real_start;
-            uint16_t data_off = b->real_start - b->block.info.start;
-            out.prg.clear();
-            out.prg.reserve(plen + 2);
-            out.prg.push_back(b->real_start & 0xFF);
-            out.prg.push_back(b->real_start >> 8);
-            out.prg.insert(out.prg.end(), &b->block.data[data_off], &b->block.data[data_off] + plen);
+                out.name = bname;
+                out.loader = b->loader_name ? b->loader_name : "unknown";
+                out.start_addr = b->real_start;
+                out.end_addr = b->real_end;
+                out.tape_offset = b->num_of_syncs ? b->syncs[0].start_sync : from_offset;
+                out.checksum_ok = (b->state == wav2prg_checksum_state_correct);
 
-            found = true;
-        } while (0);
+                uint16_t plen = b->real_end - b->real_start;
+                uint16_t data_off = b->real_start - b->block.info.start;
+                out.prg.clear();
+                out.prg.reserve(plen + 2);
+                out.prg.push_back(b->real_start & 0xFF);
+                out.prg.push_back(b->real_start >> 8);
+                out.prg.insert(out.prg.end(), &b->block.data[data_off], &b->block.data[data_off] + plen);
 
-        struct block_list_element *next = b->next;
-        free_block_list_element(b);
-        b = next;
+                found = true;
+            } while (0);
+
+            struct block_list_element *next = b->next;
+            free_block_list_element(b);
+            b = next;
+        }
+
+        // Where this incremental step stopped: the next call resumes here
+        cont_pos = pos;
+
+        if (found)
+        {
+            out.tape_end_offset = pos;
+
+            last_valid = true;
+            last_start = out.start_addr;
+            last_end = out.end_addr;
+            last_len = out.prg.size();
+            last_name = out.name;
+
+            // Tape counter times (forward walker; offsets are monotonic)
+            out.start_time_ms = timeAtOffset(out.tape_offset);
+            out.end_time_ms = timeAtOffset(out.tape_end_offset);
+
+            Debug_printv("Tape file: name[%s] loader[%s] addr[%04X-%04X] size[%u] csum[%d] tape[%lu-%lu] time[%lu-%lu ms]",
+                         out.name.c_str(), out.loader.c_str(), out.start_addr, out.end_addr,
+                         (unsigned)out.prg.size(), out.checksum_ok, out.tape_offset, out.tape_end_offset,
+                         out.start_time_ms, out.end_time_ms);
+            return true;
+        }
+
+        if (cont == nullptr)
+        {
+            // End of the tape with nothing more to return
+            last_valid = false;
+            return false;
+        }
+
+        // A header chunk or repeated block was consumed - keep going
+        from_offset = pos;
     }
-
-    if (!found)
-        return false;
-
-    out.tape_end_offset = (chain_end > out.tape_offset) ? chain_end : out.tape_offset;
-
-    // Tape counter times (forward walker; offsets are monotonic)
-    out.start_time_ms = timeAtOffset(out.tape_offset);
-    out.end_time_ms = timeAtOffset(out.tape_end_offset);
-
-    Debug_printv("Tape file: name[%s] loader[%s] addr[%04X-%04X] size[%u] csum[%d] tape[%lu-%lu] time[%lu-%lu ms]",
-                 out.name.c_str(), out.loader.c_str(), out.start_addr, out.end_addr,
-                 (unsigned)out.prg.size(), out.checksum_ok, out.tape_offset, out.tape_end_offset,
-                 out.start_time_ms, out.end_time_ms);
-
-    return true;
 }
 
 /********************************************************
