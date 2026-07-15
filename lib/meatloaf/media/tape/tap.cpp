@@ -17,562 +17,303 @@
 
 #include "tap.h"
 
-#include "meat_broker.h"
 #include "endianness.h"
 #include <cstring>
-
-/********************************************************
- * Constants (from wav-prg kernal loader)
- ********************************************************/
-
-// Pulse duration thresholds (in C64 machine cycles * 8)
-// Pulse type 0: < 426
-// Pulse type 1: 426-616
-// Pulse type 2: > 616
-const uint16_t TAPMStream::kernal_thresholds[2] = {426, 616};
-
-// Standard C64 tape pilot sequence (decreasing countdown pattern)
-const uint8_t TAPMStream::kernal_pilot_sequence[9] = {137, 136, 135, 134, 133, 132, 131, 130, 129};
+#include <cstdlib>
 
 /********************************************************
  * Streams
  ********************************************************/
 
-bool TAPMStream::readHeader()
+bool TAPMStream::loadImage()
 {
-    // Read TAP header (20 bytes)
+    if (image_data != nullptr)
+        return true;
+
+    uint32_t len = containerStream->size();
+    if (len < 20)
+    {
+        Debug_printv("Tape image too small (%lu bytes)", len);
+        return false;
+    }
+
+    image_data = (uint8_t *)malloc(len);
+    if (image_data == nullptr)
+    {
+        Debug_printv("Cannot allocate %lu bytes for tape image", len);
+        return false;
+    }
+
     containerStream->seek(0);
-    if (containerStream->read((uint8_t*)&tap_header, sizeof(TAPHeader)) != sizeof(TAPHeader))
+    uint32_t got = 0;
+    while (got < len)
     {
-        Debug_printv("Failed to read TAP header");
+        uint32_t n = containerStream->read(image_data + got, len - got);
+        if (n == 0)
+            break;
+        got += n;
+    }
+
+    if (got < len)
+    {
+        Debug_printv("Short read: %lu of %lu bytes", got, len);
+        freeImage();
         return false;
     }
 
-    // Validate signature
-    if (strncmp(tap_header.signature, "C64-TAPE-RAW", 12) != 0)
-    {
-        Debug_printv("Invalid TAP signature: %.12s", tap_header.signature);
-        return false;
-    }
-
-    // Store header info
-    header.signature = std::string(tap_header.signature, 12);
-    header.version = tap_header.version;
-    header.data_size = tap_header.data_size;
-
-    pulse_data_start = sizeof(TAPHeader);
-
-    Debug_printv("TAP Format: signature[%.12s] version[%d] data_size[%d]",
-        tap_header.signature, tap_header.version, header.data_size);
-
+    image_len = len;
     return true;
 }
 
-void TAPMStream::analyzeTapeData()
+void TAPMStream::freeImage()
 {
-    // Reset position to start of pulse data
-    tap_position = pulse_data_start;
-
-    // Build index of files on tape (fast - no data decoding)
-    Debug_printv("Indexing TAP files, pulse data size: %d bytes", header.data_size);
-
-    while (tap_position < pulse_data_start + header.data_size)
+    if (image_data != nullptr)
     {
-        // Try to find sync sequence
-        if (!findSync())
-        {
-            Debug_printv("No more sync sequences found at position %d", tap_position);
-            break;
-        }
+        free(image_data);
+        image_data = nullptr;
+    }
+    image_len = 0;
+}
 
-        // Try to read tape header
-        uint8_t file_type;
-        std::string filename;
-        uint16_t start_addr, end_addr;
+void TAPMStream::loadIndex(const std::string &idx_text)
+{
+    idx_entries.clear();
+    has_idx = false;
 
-        if (!readTapeHeader(file_type, filename, start_addr, end_addr))
-        {
-            Debug_printv("Failed to read tape header at position %d", tap_position);
-            continue;  // Try to find next file
-        }
+    size_t pos = 0;
+    while (pos < idx_text.size())
+    {
+        size_t eol = idx_text.find('\n', pos);
+        if (eol == std::string::npos)
+            eol = idx_text.size();
+        std::string line = idx_text.substr(pos, eol - pos);
+        pos = eol + 1;
 
-        // Calculate expected data size
-        uint16_t data_size = (end_addr >= start_addr) ? (end_addr - start_addr) : 0;
-
-        // Try to find data block sync
-        if (!findSync())
-        {
-            Debug_printv("Failed to find data block sync");
+        while (!line.empty() && (line.back() == '\r' || line.back() == ' ' || line.back() == '\t'))
+            line.pop_back();
+        size_t s = line.find_first_not_of(" \t");
+        if (s == std::string::npos)
             continue;
-        }
+        line = line.substr(s);
 
-        // Skip over data block and record its position
-        uint16_t bytes_length = 0;
-        uint32_t data_offset = 0;
-
-        if (!skipDataBlock(data_size, bytes_length, data_offset))
-        {
-            Debug_printv("Failed to skip data block");
+        // Comments: #, ; or '
+        if (line[0] == '#' || line[0] == ';' || line[0] == '\'')
             continue;
-        }
 
-        // Create tape file index entry (no data cached)
-        TapeFile file;
-        file.filename = filename;
-        file.file_type = file_type;
-        file.data_offset = data_offset;  // Position in TAP where data starts
-        file.data_length = bytes_length;
-        file.start_address = start_addr;
-        file.end_address = start_addr + bytes_length;
-        // Note: cached_data is empty - data will be decoded on-demand
+        // "<offset> <name>" - offset in decimal, 0x-hex or 0-octal
+        char *endp = nullptr;
+        unsigned long off = strtoul(line.c_str(), &endp, 0);
+        if (endp == line.c_str())
+            continue;
+        std::string name(endp);
+        size_t n = name.find_first_not_of(" \t");
+        name = (n == std::string::npos) ? "" : name.substr(n);
+        if (name.empty())
+            name = "entry " + std::to_string(idx_entries.size() + 1);
 
-        tape_files.push_back(file);
-
-        Debug_printv("Indexed file: '%s' Type:%02X Offset:%u Length:%u Addr:%04X-%04X",
-            filename.c_str(), file_type, data_offset, bytes_length, start_addr, file.end_address);
+        idx_entries.push_back({ (uint32_t)off, name });
     }
 
-    if (tape_files.empty())
-    {
-        // Fallback: provide access to raw TAP data
-        Debug_printv("No files indexed, providing raw TAP access");
-
-        TapeFile raw_file;
-        raw_file.filename = "RAW.TAP";
-        raw_file.file_type = 0x00;
-        raw_file.data_offset = pulse_data_start;
-        raw_file.data_length = header.data_size;
-        raw_file.start_address = 0;
-        raw_file.end_address = header.data_size;
-
-        tape_files.push_back(raw_file);
-    }
-    else
-    {
-        Debug_printv("Successfully indexed %d file(s) from tape", tape_files.size());
-    }
+    has_idx = !idx_entries.empty();
+    if (has_idx)
+        Debug_printv("Using .idx directory: %d entries", idx_entries.size());
 }
 
-/********************************************************
- * TAP Pulse Decoding Functions (adapted from wav-prg)
- ********************************************************/
-
-// Read one pulse from TAP file (from libaudiotap tapfile_get_pulse)
-bool TAPMStream::readTAPPulse(uint32_t& pulse)
+bool TAPMStream::ensureAnalyzed()
 {
-    if (tap_position >= pulse_data_start + header.data_size)
+    if (analyzed)
+        return analysis_ok;
+    analyzed = true;
+
+    if (!loadImage())
         return false;
 
-    containerStream->seek(tap_position);
-
-    uint8_t byte;
-    if (containerStream->read(&byte, 1) != 1)
-        return false;
-
-    tap_position++;
-
-    if (byte != 0)
+    analysis_ok = TapeDecoder::analyze(image_data, image_len, 0, false, entries);
+    if (analysis_ok && !times_computed)
     {
-        // Short pulse: value * 8
-        pulse = byte * 8;
-        return true;
+        total_ms = TapeDecoder::computeTimes(image_data, image_len, entries);
+        times_computed = true;
     }
+    return analysis_ok;
+}
 
-    // Long pulse (TAP version 1): read 3-byte value
-    if (header.version == 0)
-    {
-        // TAP version 0: byte 0 means special long pulse
-        pulse = 1000000;
-        return true;
-    }
-
-    uint8_t threebytes[3];
-    if (containerStream->read(threebytes, 3) != 3)
+bool TAPMStream::decodeAt(uint32_t offset, TapeEntry &out)
+{
+    if (!loadImage())
         return false;
 
-    tap_position += 3;
+    std::vector<TapeEntry> found;
+    if (!TapeDecoder::analyze(image_data, image_len, offset, true, found) || found.empty())
+        return false;
 
-    pulse = threebytes[0] | (threebytes[1] << 8) | (threebytes[2] << 16);
+    out = std::move(found[0]);
     return true;
 }
 
-// Convert two pulses to a bit (from kernal_get_bit_func)
-bool TAPMStream::pulseToBit(uint8_t pulse1, uint8_t pulse2, uint8_t& bit)
+uint16_t TAPMStream::entryCount()
 {
-    if (pulse1 == 0 && pulse2 == 1)
+    if (has_idx)
+        return idx_entries.size();
+    if (!ensureAnalyzed())
+        return 0;
+    return entries.size();
+}
+
+bool TAPMStream::getEntry(uint16_t index, std::string &name, std::string &loader,
+                          uint32_t &size, bool &checksum_ok)
+{
+    if (has_idx)
     {
-        bit = 0;
+        if (index >= idx_entries.size())
+            return false;
+        name = idx_entries[index].name;
+        loader = "";
+        size = 0;         // unknown without decoding
+        checksum_ok = true;
         return true;
     }
-    if (pulse1 == 1 && pulse2 == 0)
-    {
-        bit = 1;
-        return true;
-    }
-    return false;
-}
 
-// Get one bit from pulse stream
-bool TAPMStream::getPulseBit(uint8_t& bit)
-{
-    uint32_t pulse1_raw, pulse2_raw;
-
-    if (!readTAPPulse(pulse1_raw))
-        return false;
-    if (!readTAPPulse(pulse2_raw))
+    if (!ensureAnalyzed() || index >= entries.size())
         return false;
 
-    // Convert raw pulse durations to pulse types using thresholds
-    uint8_t pulse1, pulse2;
-
-    if (pulse1_raw < kernal_thresholds[0])
-        pulse1 = 0;
-    else if (pulse1_raw < kernal_thresholds[1])
-        pulse1 = 1;
-    else
-        pulse1 = 2;
-
-    if (pulse2_raw < kernal_thresholds[0])
-        pulse2 = 0;
-    else if (pulse2_raw < kernal_thresholds[1])
-        pulse2 = 1;
-    else
-        pulse2 = 2;
-
-    return pulseToBit(pulse1, pulse2, bit);
-}
-
-// Read one byte from bit stream (8 bits, LSB first)
-bool TAPMStream::getByte(uint8_t& byte)
-{
-    byte = 0;
-
-    for (int i = 0; i < 8; i++)
-    {
-        uint8_t bit;
-        if (!getPulseBit(bit))
-            return false;
-
-        // LSB first (lsbf endianness)
-        byte = (byte >> 1) | (bit << 7);
-    }
-
+    name = entries[index].name;
+    loader = entries[index].loader;
+    size = entries[index].prg.size();
+    checksum_ok = entries[index].checksum_ok;
     return true;
-}
-
-// Read byte with sync and parity check (from sync_with_byte_and_get_it)
-bool TAPMStream::getByteWithSync(uint8_t& byte, bool allow_short_first)
-{
-    uint32_t pulse_raw;
-    uint8_t pulse;
-
-    // Look for sync pulse (pulse type 2 - long pulse)
-    while (true)
-    {
-        if (!readTAPPulse(pulse_raw))
-            return false;
-
-        // Convert to pulse type
-        if (pulse_raw < kernal_thresholds[0])
-            pulse = 0;
-        else if (pulse_raw < kernal_thresholds[1])
-            pulse = 1;
-        else
-            pulse = 2;
-
-        if (pulse == 2)
-            break;
-
-        if (pulse != 0 || !allow_short_first)
-            return false;
-    }
-
-    // Next pulse should be type 1 (medium)
-    if (!readTAPPulse(pulse_raw))
-        return false;
-
-    if (pulse_raw < kernal_thresholds[0])
-        pulse = 0;
-    else if (pulse_raw < kernal_thresholds[1])
-        pulse = 1;
-    else
-        pulse = 2;
-
-    if (pulse == 0)
-    {
-        // EOF marker
-        return false;
-    }
-
-    if (pulse != 1)
-        return false;
-
-    // Read the actual byte
-    if (!getByte(byte))
-        return false;
-
-    // Read and verify parity bit
-    uint8_t parity;
-    if (!getPulseBit(parity))
-        return false;
-
-    // Calculate parity
-    uint8_t expected_parity = 0;
-    for (uint8_t test = 1; test; test <<= 1)
-        expected_parity ^= (byte & test) ? 1 : 0;
-
-    return (parity == expected_parity);
-}
-
-// Find sync sequence (pilot tone followed by sync byte)
-bool TAPMStream::findSync()
-{
-    const int max_search = 100000;  // Limit search to avoid infinite loops
-    int search_count = 0;
-
-    while (search_count++ < max_search)
-    {
-        uint8_t byte;
-        if (getByteWithSync(byte, true))
-        {
-            // Successfully found a sync byte
-            Debug_printv("Found sync byte: %02X at position %d", byte, tap_position);
-            return true;
-        }
-
-        // Skip forward a bit and try again
-        tap_position += 1;
-    }
-
-    Debug_printv("Failed to find sync after %d attempts", search_count);
-    return false;
-}
-
-// Read tape header (21 bytes at address 828-848)
-bool TAPMStream::readTapeHeader(uint8_t& file_type, std::string& filename, uint16_t& start_addr, uint16_t& end_addr)
-{
-    uint8_t header_data[21];
-
-    // Read 21 bytes of header
-    for (int i = 0; i < 21; i++)
-    {
-        if (!getByteWithSync(header_data[i], false))
-        {
-            Debug_printv("Failed to read header byte %d", i);
-            return false;
-        }
-    }
-
-    // Parse header structure:
-    // Byte 0: File type (1 = relocatable, 3 = non-relocatable)
-    // Bytes 1-2: Start address (little-endian)
-    // Bytes 3-4: End address (little-endian)
-    // Bytes 5-20: Filename (16 bytes, PETSCII)
-
-    file_type = header_data[0];
-
-    if (file_type != 1 && file_type != 3)
-    {
-        Debug_printv("Invalid file type: %02X", file_type);
-        return false;
-    }
-
-    start_addr = header_data[1] | (header_data[2] << 8);
-    end_addr = header_data[3] | (header_data[4] << 8);
-
-    // Extract filename (16 bytes, null-terminated or space-padded)
-    filename.assign((char*)&header_data[5], 16);
-
-    // Trim trailing spaces and nulls
-    while (!filename.empty() && (filename.back() == ' ' || filename.back() == '\0'))
-        filename.pop_back();
-
-    return true;
-}
-
-// Read data block with checksum
-bool TAPMStream::readDataBlock(uint8_t* buffer, uint16_t max_size, uint16_t& bytes_read)
-{
-    bytes_read = 0;
-    uint8_t checksum = 0;
-
-    // Read data bytes until EOF marker or max size
-    while (bytes_read < max_size)
-    {
-        uint8_t byte;
-        if (!getByteWithSync(byte, false))
-        {
-            // Could be EOF marker or end of block
-            break;
-        }
-
-        buffer[bytes_read++] = byte;
-        checksum ^= byte;  // XOR checksum
-    }
-
-    // Try to read checksum byte
-    uint8_t expected_checksum;
-    if (getByteWithSync(expected_checksum, false))
-    {
-        if (checksum != expected_checksum)
-        {
-            Debug_printv("Checksum mismatch: got %02X, expected %02X", checksum, expected_checksum);
-            // Continue anyway - data might still be usable
-        }
-    }
-
-    return bytes_read > 0;
-}
-
-// Skip over data block without reading it (for fast indexing)
-bool TAPMStream::skipDataBlock(uint16_t max_size, uint16_t& bytes_skipped, uint32_t& data_start_position)
-{
-    bytes_skipped = 0;
-    data_start_position = tap_position;
-
-    // Skip data bytes until EOF marker or max size
-    while (bytes_skipped < max_size)
-    {
-        uint8_t byte;
-        if (!getByteWithSync(byte, false))
-        {
-            // Could be EOF marker or end of block
-            break;
-        }
-
-        bytes_skipped++;
-    }
-
-    // Try to skip checksum byte
-    uint8_t checksum_byte;
-    getByteWithSync(checksum_byte, false);
-
-    return bytes_skipped > 0;
-}
-
-std::string TAPMStream::seekNextEntry()
-{
-    // Return next file from tape
-    if (current_file_index >= tape_files.size())
-    {
-        current_file_index = 0;  // Reset for next iteration
-        return "";  // No more entries
-    }
-
-    // Get current entry
-    TapeFile& file = tape_files[current_file_index];
-
-    entry.filename = file.filename;
-    entry.file_type = file.file_type;
-    entry.data_offset = file.data_offset;
-    entry.data_length = file.data_length;
-    entry.start_address = file.start_address;
-    entry.end_address = file.end_address;
-
-    // Set stream size and position for this entry
-    _size = entry.data_length;
-    _position = 0;
-
-    // Position container stream at start of data
-    containerStream->seek(entry.data_offset);
-
-    Debug_printv("Entry[%d]: %s Type:%02X Offset:%d Length:%d",
-        current_file_index, entry.filename.c_str(), entry.file_type,
-        entry.data_offset, entry.data_length);
-
-    current_file_index++;
-
-    return entry.filename;
 }
 
 bool TAPMStream::seekPath(std::string path)
 {
-    // TODO: Implement random access seeking if IDX file present
+    seekCalled = true;
+    _position = 0;
+    _size = 0;
+    current_prg.clear();
+
+    if (mode == std::ios_base::out)
+    {
+        Debug_printv("Writing to tape images is not supported");
+        return false;
+    }
+
+    mstr::replaceAll(path, "\\", "/");
+    bool wildcard = (mstr::contains(path, "*") || mstr::contains(path, "?"));
+
+    if (has_idx)
+    {
+        // Find the entry in the index, then decode the program at its offset
+        for (auto &ie : idx_entries)
+        {
+            std::string entryName = mstr::toUTF8(ie.name);
+            if (mstr::compareFilename(entryName, path, wildcard))
+            {
+                TapeEntry e;
+                if (!decodeAt(ie.offset, e))
+                {
+                    Debug_printv("Failed to decode program at offset %lu", ie.offset);
+                    return false;
+                }
+                Debug_printv("Loaded [%s] via idx offset[%lu] loader[%s] size[%u]",
+                             ie.name.c_str(), ie.offset, e.loader.c_str(), (unsigned)e.prg.size());
+                std::vector<TapeEntry> one;
+                one.push_back(TapeEntry());
+                one[0].tape_offset = e.tape_offset;
+                one[0].tape_end_offset = e.tape_end_offset;
+                total_ms = TapeDecoder::computeTimes(image_data, image_len, one);
+                times_computed = true;
+                cur_start_ms = one[0].start_time_ms;
+                cur_end_ms = one[0].end_time_ms;
+                current_prg = std::move(e.prg);
+                _size = current_prg.size();
+                return true;
+            }
+        }
+        Debug_printv("Not found in idx: [%s]", path.c_str());
+        return false;
+    }
+
+    if (!ensureAnalyzed())
+        return false;
+
+    for (auto &e : entries)
+    {
+        std::string entryName = mstr::toUTF8(e.name);
+        if (mstr::compareFilename(entryName, path, wildcard))
+        {
+            Debug_printv("Loaded [%s] loader[%s] size[%u] tape[%lu-%lu ms]",
+                         e.name.c_str(), e.loader.c_str(), (unsigned)e.prg.size(),
+                         e.start_time_ms, e.end_time_ms);
+            current_prg = e.prg;
+            cur_start_ms = e.start_time_ms;
+            cur_end_ms = e.end_time_ms;
+            _size = current_prg.size();
+            return true;
+        }
+    }
+
+    Debug_printv("Not found: [%s]", path.c_str());
     return false;
 }
 
-bool TAPMStream::seek(uint32_t pos)
+/********************************************************
+ * Tape counter
+ ********************************************************/
+
+uint32_t TAPMStream::counterMs()
 {
-    // For sequential tape, seeking is limited
-    // Can only seek within current file entry
-    if (pos > _size)
-        pos = _size;
+    // Position in time from the beginning of the tape: the selected file's
+    // block start plus read progress scaled across the block's duration
+    if (current_prg.empty() || cur_end_ms <= cur_start_ms)
+        return cur_start_ms;
 
-    _position = pos;
-
-    // Seek in container stream relative to current entry
-    return containerStream->seek(entry.data_offset + pos);
+    uint64_t span = cur_end_ms - cur_start_ms;
+    return cur_start_ms + (uint32_t)((span * _position) / current_prg.size());
 }
 
-uint32_t TAPMStream::read(uint8_t* buf, uint32_t size)
+uint32_t TAPMStream::durationMs()
 {
-    // Limit read to remaining file size
-    if (_position + size > _size)
+    if (!times_computed && loadImage())
     {
-        size = _size - _position;
+        std::vector<TapeEntry> none;
+        total_ms = TapeDecoder::computeTimes(image_data, image_len, none);
+        times_computed = true;
     }
+    return total_ms;
+}
 
-    if (size == 0)
+static std::string format_tape_time(uint32_t ms)
+{
+    uint32_t secs = ms / 1000;
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%lu:%02lu", (unsigned long)(secs / 60), (unsigned long)(secs % 60));
+    return buf;
+}
+
+std::string TAPMStream::counterString()
+{
+    return format_tape_time(counterMs()) + "/" + format_tape_time(durationMs());
+}
+
+std::unordered_map<std::string, std::string> TAPMStream::info()
+{
+    return {
+        {"System", "Commodore"},
+        {"Format", "TAP"},
+        {"Media Type", "TAPE"},
+        {"Counter", counterString()},
+        {"Duration", format_tape_time(durationMs())}
+    };
+}
+
+uint32_t TAPMStream::readFile(uint8_t *buf, uint32_t size)
+{
+    if (_position >= current_prg.size())
         return 0;
-
-    // Check if we have a current file
-    if (current_file_index > 0 && current_file_index <= tape_files.size())
-    {
-        TapeFile& file = tape_files[current_file_index - 1];
-
-        // If data not cached yet, decode it on-demand
-        if (file.cached_data.empty() && file.data_length > 0 && file.data_length < 65536)
-        {
-            Debug_printv("Decoding file data on-demand: %s (%d bytes)", 
-                file.filename.c_str(), file.data_length);
-            
-            // Save current position and seek to file data
-            uint32_t saved_position = tap_position;
-            tap_position = file.data_offset;
-            
-            // Decode the data
-            uint8_t temp_buffer[65536];
-            uint16_t bytes_read = 0;
-            
-            if (readDataBlock(temp_buffer, file.data_length, bytes_read))
-            {
-                // Cache the decoded data
-                file.cached_data.assign(temp_buffer, temp_buffer + bytes_read);
-                Debug_printv("Cached %d bytes for %s", bytes_read, file.filename.c_str());
-            }
-            else
-            {
-                Debug_printv("Failed to decode data on-demand");
-            }
-            
-            // Restore position
-            tap_position = saved_position;
-        }
-
-        if (!file.cached_data.empty())
-        {
-            // Read from cached decoded data
-            uint32_t available = file.cached_data.size() - _position;
-            if (size > available)
-                size = available;
-
-            if (size > 0)
-            {
-                memcpy(buf, file.cached_data.data() + _position, size);
-                _position += size;
-                return size;
-            }
-
-            return 0;
-        }
-    }
-
-    // Fallback: read raw TAP data from container stream (for RAW.TAP entry)
-    containerStream->seek(entry.data_offset + _position);
-    uint32_t bytesRead = containerStream->read(buf, size);
-    _position += bytesRead;
-
-    return bytesRead;
+    uint32_t avail = current_prg.size() - _position;
+    if (size > avail)
+        size = avail;
+    memcpy(buf, current_prg.data() + _position, size);
+    return size;
 }
 
 /********************************************************
@@ -581,43 +322,63 @@ uint32_t TAPMStream::read(uint8_t* buf, uint32_t size)
 
 std::shared_ptr<MStream> TAPMFile::getDecodedStream(std::shared_ptr<MStream> is)
 {
-    Debug_printv("[%s]", url.c_str());
-    return std::make_shared<TAPMStream>(is);
+    //Debug_printv("[%s]", url.c_str());
+    auto stream = std::make_shared<TAPMStream>(is);
+    stream->loadIndex(readIdxSibling());
+    return stream;
+}
+
+std::string TAPMFile::readIdxSibling()
+{
+    // Same base name as the image, ".idx" extension
+    std::string idxPath = url;
+    size_t dot = idxPath.find_last_of('.');
+    size_t slash = idxPath.find_last_of('/');
+    if (dot == std::string::npos || (slash != std::string::npos && dot < slash))
+        return "";
+    idxPath = idxPath.substr(0, dot) + ".idx";
+
+    std::unique_ptr<MFile> f(MFSOwner::File(idxPath));
+    if (f == nullptr || !f->exists())
+        return "";
+
+    // Read the raw sidecar bytes (via the underlying filesystem)
+    std::shared_ptr<MStream> s = (f->sourceFile != nullptr)
+        ? f->sourceFile->getSourceStream()
+        : f->getSourceStream();
+    if (s == nullptr || !s->isOpen())
+        return "";
+
+    uint32_t len = s->size();
+    if (len == 0 || len > 65536)
+        return "";
+
+    std::string text(len, '\0');
+    s->seek(0);
+    uint32_t got = s->read((uint8_t *)&text[0], len);
+    text.resize(got);
+
+    Debug_printv("Found index file [%s] (%lu bytes)", idxPath.c_str(), got);
+    return text;
 }
 
 bool TAPMFile::rewindDirectory()
 {
     dirIsOpen = true;
-    Debug_printv("url[%s]", url.c_str());
+    entry_index = 0;
 
-    // Create or reuse cached TAP stream
-    if (!cached_stream)
-    {
-        auto containerStream = sourceFile->getSourceStream();
-        if (containerStream == nullptr)
-            return false;
-
-        cached_stream = std::make_shared<TAPMStream>(containerStream);
-        if (!cached_stream->isOpen())
-        {
-            cached_stream.reset();
-            return false;
-        }
-    }
-
-    // Reset to beginning of tape
-    cached_stream->current_file_index = 0;
+    auto image = ImageBroker::obtain<TAPMStream>("tap", url);
+    if (image == nullptr)
+        return false;
 
     // Set Media Info Fields
-    media_header = "C64 TAPE";
-    media_id = mstr::format("V%d", cached_stream->header.version);
+    media_header = image->media_label;
+    media_id = "tap";
     media_blocks_free = 0;
-    media_block_size = cached_stream->block_size;
+    media_block_size = image->block_size;
     media_image = name;
     if ( !sourceFile->media_archive.empty() )
         media_archive = sourceFile->media_archive;
-
-    Debug_printv("media_header[%s] media_id[%s]", media_header.c_str(), media_id.c_str());
 
     return true;
 }
@@ -627,29 +388,66 @@ MFile* TAPMFile::getNextFileInDir()
     if (!dirIsOpen)
         rewindDirectory();
 
-    if (!cached_stream)
+    auto image = ImageBroker::obtain<TAPMStream>("tap", url);
+    if (image == nullptr)
     {
         dirIsOpen = false;
         return nullptr;
     }
 
-    // Get next entry from tape
-    std::string filename = cached_stream->seekNextEntry();
-    if (filename.empty())
+    std::string filename, loader;
+    uint32_t size = 0;
+    bool checksum_ok = true;
+
+    if (!image->getEntry(entry_index, filename, loader, size, checksum_ok))
     {
         dirIsOpen = false;
         return nullptr;
     }
+    entry_index++;
 
     mstr::replaceAll(filename, "/", "\\");
 
     auto file = MFSOwner::File(url + "/" + filename);
     file->name = filename;  // Use actual entry name, not container image name
-    file->extension = "TAP";
-    file->size = cached_stream->entry.data_length;
+    file->extension = "prg";
+    file->size = size;
     file->is_dir = 0;
 
-    Debug_printv("Entry: %s Size:%d", filename.c_str(), file->size);
+    //Debug_printv("Entry: %s Loader:%s Size:%lu", filename.c_str(), loader.c_str(), size);
 
     return file;
+}
+
+bool TAPMFile::isDirectory()
+{
+    if (is_dir != -1)
+        return is_dir == 1;
+
+    // The image itself is a directory; entries inside it are files
+    return pathInStream.empty() || pathInStream == "/";
+}
+
+bool TAPMFile::exists()
+{
+    auto stream = ImageBroker::obtain<TAPMStream>("tap", url);
+    if (stream == nullptr)
+        return false;
+
+    if (pathInStream.size() && pathInStream != "/")
+    {
+        std::string name, loader;
+        uint32_t size;
+        bool csum;
+        bool wildcard = (mstr::contains(pathInStream, "*") || mstr::contains(pathInStream, "?"));
+        for (uint16_t i = 0; stream->getEntry(i, name, loader, size, csum); i++)
+        {
+            std::string entryName = mstr::toUTF8(name);
+            if (mstr::compareFilename(entryName, pathInStream, wildcard))
+                return true;
+        }
+        return false;
+    }
+
+    return true;
 }
