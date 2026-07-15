@@ -20,6 +20,8 @@
 #include <cstring>
 #include <cstdlib>
 
+#include "meatloaf.h"
+
 #include "../../../../include/debug.h"
 
 #if defined(ESP_PLATFORM)
@@ -38,109 +40,147 @@ extern "C" {
 }
 
 /********************************************************
- * Pulse input: TAP v0/v1/v2, DC2N DMP, HTAP over a memory buffer
+ * Windowed access to the container stream
  ********************************************************/
 
-enum tape_kind {
-    TAPE_KIND_TAP,
-    TAPE_KIND_DMP,
-    TAPE_KIND_HTAP,
-    TAPE_KIND_UNKNOWN
-};
+bool TapeDecoder::readBytes(uint32_t p, uint8_t *dst, uint32_t n)
+{
+    while (n > 0)
+    {
+        if (p < win_start || p >= win_start + win_len)
+        {
+            if (p >= len || stream == nullptr || !stream->seek(p))
+                return false;
+            uint32_t got = stream->read(window, sizeof(window));
+            if (got == 0)
+                return false;
+            win_start = p;
+            win_len = got;
+        }
+        uint32_t off = p - win_start;
+        uint32_t chunk = win_len - off;
+        if (chunk > n)
+            chunk = n;
+        memcpy(dst, window + off, chunk);
+        dst += chunk;
+        p += chunk;
+        n -= chunk;
+    }
+    return true;
+}
 
-struct tape_input_state {
-    const uint8_t *data;
-    uint32_t len;
-    uint32_t pos;           // current byte offset within the image
-    enum tape_kind kind;
-    uint8_t version;        // TAP version (0/1/2)
-    uint8_t platform;       // 0=C64 1=VIC20 2=C16
-    uint8_t video;          // 0=PAL 1=NTSC
-    uint32_t data_start;
-    uint32_t counter_rate;  // DMP/HTAP source sample rate in Hz
-    bool halfwaves;         // TAP v2, HTAP: one value per halfwave
+/********************************************************
+ * Header parsing / pulse extraction
+ ********************************************************/
+
+enum {
+    TAPE_KIND_TAP = 0,
+    TAPE_KIND_DMP,
+    TAPE_KIND_HTAP
 };
 
 // Machine clock in Hz (cycles/second) for pulse duration conversion
-static uint32_t machine_clock(const tape_input_state *st)
+uint32_t TapeDecoder::machineClock() const
 {
-    switch (st->platform) {
-        case 1:  return st->video ? 1022727 : 1108405; // VIC-20
-        case 2:  return st->video ? 894886 : 886724;   // C16/Plus4
-        default: return st->video ? 1022727 : 985248;  // C64
+    switch (platform) {
+        case 1:  return video ? 1022727 : 1108405; // VIC-20
+        case 2:  return video ? 894886 : 886724;   // C16/Plus4
+        default: return video ? 1022727 : 985248;  // C64
     }
 }
 
-static bool tape_parse_header(tape_input_state *st)
+bool TapeDecoder::open(MStream *container)
 {
-    const uint8_t *d = st->data;
+    stream = container;
+    opened = false;
+    win_len = 0;
+    walk_pos = 0;
+    walk_cycles = 0;
+    total_known = false;
 
-    if (st->len >= 20 && memcmp(d, "C64-TAPE-RAW", 12) == 0)
+    if (stream == nullptr)
+        return false;
+
+    len = stream->size();
+    if (len < 20)
+        return false;
+
+    uint8_t d[20];
+    if (!readBytes(0, d, sizeof(d)))
+        return false;
+
+    if (memcmp(d, "C64-TAPE-RAW", 12) == 0)
     {
-        st->kind = TAPE_KIND_TAP;
-        st->version = d[0x0C];
-        st->platform = d[0x0D];
-        st->video = d[0x0E];
-        st->data_start = 20;
-        st->halfwaves = (st->version == 2);
-        return true;
+        kind = TAPE_KIND_TAP;
+        version = d[0x0C];
+        platform = d[0x0D];
+        video = d[0x0E];
+        data_start = 20;
+        halfwaves = (version == 2);
     }
-    if (st->len >= 20 && memcmp(d, "DC2N-TAP-RAW", 12) == 0)
+    else if (memcmp(d, "DC2N-TAP-RAW", 12) == 0)
     {
-        st->kind = TAPE_KIND_DMP;
-        st->version = d[0x0C];
-        st->platform = d[0x0D] & 0x0F;
-        st->video = d[0x0E];
-        st->counter_rate = d[0x10] | (d[0x11] << 8) | (d[0x12] << 16) | ((uint32_t)d[0x13] << 24);
-        if (st->counter_rate == 0)
-            st->counter_rate = 2000000;
-        st->data_start = 20;
-        st->halfwaves = false;
-        return true;
+        kind = TAPE_KIND_DMP;
+        version = d[0x0C];
+        platform = d[0x0D] & 0x0F;
+        video = d[0x0E];
+        counter_rate = d[0x10] | (d[0x11] << 8) | (d[0x12] << 16) | ((uint32_t)d[0x13] << 24);
+        if (counter_rate == 0)
+            counter_rate = 2000000;
+        data_start = 20;
+        halfwaves = false;
     }
-    if (st->len >= 20 && memcmp(d + 6, "-HIRES", 6) == 0)
+    else if (memcmp(d + 6, "-HIRES", 6) == 0)
     {
         // HTAP (Manosoft, spec V0 sub 2.0): hardware id at 0x00, "-HIRES"
-        // at 0x06, version 0x0C, machine 0x0D (0=C64/128 1=VIC20/PET
-        // 2=C16/+4), video 0x0E, reserved 0x0F-0x13, halfwave data at 0x14
-        st->kind = TAPE_KIND_HTAP;
-        st->version = d[0x0C];
-        st->platform = d[0x0D];
-        st->video = d[0x0E];
-        st->counter_rate = 2000000; // pulse halfwaves are 0.5 us ticks
-        st->data_start = 20;
-        st->halfwaves = true;
-        return true;
+        // at 0x06, version 0x0C, machine 0x0D, video 0x0E, halfwaves at 0x14
+        kind = TAPE_KIND_HTAP;
+        version = d[0x0C];
+        platform = d[0x0D];
+        video = d[0x0E];
+        counter_rate = 2000000; // pulse halfwaves are 0.5 us ticks
+        data_start = 20;
+        halfwaves = true;
+    }
+    else
+    {
+        Debug_printv("Unrecognized tape image signature");
+        return false;
     }
 
-    st->kind = TAPE_KIND_UNKNOWN;
-    return false;
+    opened = true;
+    Debug_printv("Tape image: kind[%d] version[%d] platform[%d] video[%d] size[%lu]",
+                 kind, version, platform, video, len);
+    return true;
 }
 
-// Read one duration value (in machine cycles); false at end of data
-static bool tape_next_value(tape_input_state *st, uint32_t *cycles)
+// Read one duration value (in machine cycles) at *p, advancing it;
+// false at end of data
+bool TapeDecoder::nextValue(uint32_t *p, uint32_t *cycles)
 {
-    switch (st->kind)
+    switch (kind)
     {
         case TAPE_KIND_TAP:
         {
-            if (st->pos >= st->len)
+            uint8_t b;
+            if (*p >= len || !readBytes(*p, &b, 1))
                 return false;
-            uint8_t b = st->data[st->pos++];
+            (*p)++;
             if (b != 0)
             {
                 *cycles = (uint32_t)b * 8;
                 return true;
             }
-            if (st->version == 0)
+            if (version == 0)
             {
                 *cycles = 20000; // v0 overflow marker: a long pause
                 return true;
             }
-            if (st->pos + 3 > st->len)
+            uint8_t three[3];
+            if (!readBytes(*p, three, 3))
                 return false;
-            *cycles = st->data[st->pos] | (st->data[st->pos + 1] << 8) | ((uint32_t)st->data[st->pos + 2] << 16);
-            st->pos += 3;
+            *p += 3;
+            *cycles = three[0] | (three[1] << 8) | ((uint32_t)three[2] << 16);
             return true;
         }
 
@@ -150,16 +190,16 @@ static bool tape_next_value(tape_input_state *st, uint32_t *cycles)
             uint64_t total = 0;
             while (true)
             {
-                if (st->pos + 2 > st->len)
+                uint8_t two[2];
+                if (!readBytes(*p, two, 2))
                     return false;
-                uint16_t sample = st->data[st->pos] | (st->data[st->pos + 1] << 8);
-                st->pos += 2;
+                *p += 2;
+                uint16_t sample = two[0] | (two[1] << 8);
                 total += sample;
                 if (sample != 0xFFFF)
                     break;
             }
-            // Convert from counter units to machine cycles
-            *cycles = (uint32_t)((total * machine_clock(st) + st->counter_rate / 2) / st->counter_rate);
+            *cycles = (uint32_t)((total * machineClock() + counter_rate / 2) / counter_rate);
             return true;
         }
 
@@ -169,21 +209,21 @@ static bool tape_next_value(tape_input_state *st, uint32_t *cycles)
             // value: bit 15 = polarity, bits 0-14 = duration in 0.5 us
             // ticks. Pauses (> 10 ms) are four 16-bit values: 0x0000
             // 0x0000, then duration in us as (word1 << 16) | word2.
-            if (st->pos + 2 > st->len)
+            uint8_t two[2];
+            if (!readBytes(*p, two, 2))
                 return false;
-            uint16_t w = st->data[st->pos] | (st->data[st->pos + 1] << 8);
-            st->pos += 2;
+            *p += 2;
+            uint16_t w = two[0] | (two[1] << 8);
 
             uint64_t ticks; // 0.5 us units
             if ((w & 0x7FFF) == 0)
             {
-                // Pause marker (0x0000; 0x8000 is illegal but treat alike)
-                if (st->pos + 6 > st->len)
+                uint8_t rest[6];
+                if (!readBytes(*p, rest, 6))
                     return false;
-                st->pos += 2; // second 0x0000 flag word
-                uint16_t hi = st->data[st->pos] | (st->data[st->pos + 1] << 8);
-                uint16_t lo = st->data[st->pos + 2] | (st->data[st->pos + 3] << 8);
-                st->pos += 4;
+                *p += 6;
+                uint16_t hi = rest[2] | (rest[3] << 8);
+                uint16_t lo = rest[4] | (rest[5] << 8);
                 uint64_t us = ((uint32_t)hi << 16) | lo;
                 ticks = us * 2;
             }
@@ -192,88 +232,87 @@ static bool tape_next_value(tape_input_state *st, uint32_t *cycles)
                 ticks = w & 0x7FFF;
             }
 
-            // 0.5 us ticks -> machine cycles
-            *cycles = (uint32_t)((ticks * machine_clock(st) + 1000000) / 2000000);
+            *cycles = (uint32_t)((ticks * machineClock() + 1000000) / 2000000);
             return true;
         }
-
-        default:
-            return false;
     }
+    return false;
 }
 
 /********************************************************
  * wav2prg input callbacks
  ********************************************************/
 
-static int32_t tape_get_pos(struct wav2prg_input_object *object)
-{
-    tape_input_state *st = (tape_input_state *)object->object;
-    return (int32_t)st->pos;
-}
-
-static uint8_t tape_set_pos(struct wav2prg_input_object *object, uint32_t pos)
-{
-    tape_input_state *st = (tape_input_state *)object->object;
-    if (pos < st->data_start)
-        pos = st->data_start;
-    if (pos > st->len)
-        pos = st->len;
-    st->pos = pos;
-    return 1;
-}
-
-static enum wav2prg_bool tape_get_pulse(struct wav2prg_input_object *object, uint32_t *pulse)
-{
-    tape_input_state *st = (tape_input_state *)object->object;
-    uint32_t v;
-
-    if (!tape_next_value(st, &v))
-        return wav2prg_false;
-
-    if (st->halfwaves)
+struct tape_io {
+    static int32_t get_pos(struct wav2prg_input_object *object)
     {
-        // Combine two halfwaves into one full pulse
-        uint32_t v2;
-        if (!tape_next_value(st, &v2))
-            return wav2prg_false;
-        v += v2;
+        TapeDecoder *td = (TapeDecoder *)object->object;
+        return (int32_t)td->pos;
     }
 
-    *pulse = v;
-    return wav2prg_true;
-}
-
-static enum wav2prg_bool tape_is_eof(struct wav2prg_input_object *object)
-{
-    tape_input_state *st = (tape_input_state *)object->object;
-    return (st->pos >= st->len) ? wav2prg_true : wav2prg_false;
-}
-
-static void tape_invert(struct wav2prg_input_object *object)
-{
-    tape_input_state *st = (tape_input_state *)object->object;
-    // Only meaningful for halfwave formats: consume one halfwave to
-    // shift the phase by 180 degrees
-    if (st->halfwaves)
+    static uint8_t set_pos(struct wav2prg_input_object *object, uint32_t p)
     {
+        TapeDecoder *td = (TapeDecoder *)object->object;
+        if (p < td->data_start)
+            p = td->data_start;
+        if (p > td->len)
+            p = td->len;
+        td->pos = p;
+        return 1;
+    }
+
+    static enum wav2prg_bool get_pulse(struct wav2prg_input_object *object, uint32_t *pulse)
+    {
+        TapeDecoder *td = (TapeDecoder *)object->object;
         uint32_t v;
-        tape_next_value(st, &v);
-    }
-}
 
-static void tape_close(struct wav2prg_input_object *object)
-{
-    (void)object;
-}
+        if (!td->nextValue(&td->pos, &v))
+            return wav2prg_false;
+
+        if (td->halfwaves)
+        {
+            // Combine two halfwaves into one full pulse
+            uint32_t v2;
+            if (!td->nextValue(&td->pos, &v2))
+                return wav2prg_false;
+            v += v2;
+        }
+
+        *pulse = v;
+        return wav2prg_true;
+    }
+
+    static enum wav2prg_bool is_eof(struct wav2prg_input_object *object)
+    {
+        TapeDecoder *td = (TapeDecoder *)object->object;
+        return (td->pos >= td->len) ? wav2prg_true : wav2prg_false;
+    }
+
+    static void invert(struct wav2prg_input_object *object)
+    {
+        TapeDecoder *td = (TapeDecoder *)object->object;
+        // Only meaningful for halfwave formats: consume one halfwave to
+        // shift the phase by 180 degrees
+        if (td->halfwaves)
+        {
+            uint32_t v;
+            td->nextValue(&td->pos, &v);
+        }
+    }
+
+    static void close(struct wav2prg_input_object *object)
+    {
+        (void)object;
+    }
+};
 
 static struct wav2prg_input_functions tape_input_functions = {
-    tape_get_pos,
-    tape_set_pos,
-    tape_get_pulse,
-    tape_is_eof,
-    tape_invert,
-    tape_close
+    tape_io::get_pos,
+    tape_io::set_pos,
+    tape_io::get_pulse,
+    tape_io::is_eof,
+    tape_io::invert,
+    tape_io::close
 };
 
 /********************************************************
@@ -327,60 +366,52 @@ static struct wav2prg_display_interface tape_display_interface = {
 };
 
 /********************************************************
- * Analysis driver
+ * Program extraction
  ********************************************************/
 
-bool TapeDecoder::isTapeImage(const uint8_t *image, uint32_t image_len)
+bool TapeDecoder::nextProgram(uint32_t from_offset, TapeEntry &out)
 {
-    tape_input_state st = {};
-    st.data = image;
-    st.len = image_len;
-    return tape_parse_header(&st);
-}
-
-bool TapeDecoder::analyze(const uint8_t *image, uint32_t image_len,
-                          uint32_t start_offset, bool single_program,
-                          std::vector<TapeEntry> &entries)
-{
-    tape_input_state st = {};
-    st.data = image;
-    st.len = image_len;
-
-    if (!tape_parse_header(&st))
-    {
-        Debug_printv("Unrecognized tape image signature");
+    if (!opened)
         return false;
-    }
-
-    st.pos = st.data_start;
-    if (start_offset > st.data_start && start_offset < st.len)
-        st.pos = start_offset;
 
     register_loaders();
 
-    const char *start_loader = (st.platform == 2) ? "Default C16" : "Default C64";
+    pos = (from_offset > data_start) ? from_offset : data_start;
+    if (pos >= len)
+        return false;
 
-    struct wav2prg_input_object input_object = { &st };
+    const char *start_loader = (platform == 2) ? "Default C16" : "Default C64";
+    struct wav2prg_input_object input_object = { this };
 
-    Debug_printv("Analyzing tape: kind[%d] version[%d] platform[%d] video[%d] size[%lu] start[%lu]",
-                 st.kind, st.version, st.platform, st.video, st.len, st.pos);
-
+    // Analyze the next program chain only (stop_at_end_of_program)
     struct block_list_element *blocks = wav2prg_analyse(
         start_loader,
         NULL,
         wav2prg_false,
-        single_program ? wav2prg_true : wav2prg_false,
+        wav2prg_true,
         &input_object,
         &tape_input_functions,
         &tape_display_interface,
         NULL);
 
-    // Convert the block list into tape entries (PRG data)
+    bool found = false;
+    uint32_t chain_end = pos;
+
     for (struct block_list_element *b = blocks; b != NULL; )
     {
         do
         {
-            if (b->block_status != block_list_element::block_complete && b->block_status != block_list_element::block_checksum_expected_but_missing)
+            if (b->block_status != block_list_element::block_complete &&
+                b->block_status != block_list_element::block_checksum_expected_but_missing)
+                break;
+
+            // Track the end of the whole program chain so the next scan
+            // resumes past repeated blocks (e.g. the Kernal's second copy)
+            for (uint32_t i = 0; i < b->num_of_syncs; i++)
+                if (b->syncs[i].end > chain_end)
+                    chain_end = b->syncs[i].end;
+
+            if (found)
                 break;
 
             // Kernal header chunks only carry metadata for the block that
@@ -392,38 +423,24 @@ bool TapeDecoder::analyze(const uint8_t *image, uint32_t image_len,
             if (b->real_end <= b->real_start)
                 break;
 
-            TapeEntry e;
-            e.name = std::string(b->block.info.name, 16);
-            while (!e.name.empty() && (e.name.back() == ' ' || e.name.back() == '\0'))
-                e.name.pop_back();
-            e.loader = b->loader_name ? b->loader_name : "unknown";
-            e.start_addr = b->real_start;
-            e.end_addr = b->real_end;
-            e.tape_offset = b->num_of_syncs ? b->syncs[0].start_sync : 0;
-            e.tape_end_offset = b->num_of_syncs ? b->syncs[b->num_of_syncs - 1].end : e.tape_offset;
-            e.checksum_ok = (b->state == wav2prg_checksum_state_correct);
+            out.name = std::string(b->block.info.name, 16);
+            while (!out.name.empty() && (out.name.back() == ' ' || out.name.back() == '\0'))
+                out.name.pop_back();
+            out.loader = b->loader_name ? b->loader_name : "unknown";
+            out.start_addr = b->real_start;
+            out.end_addr = b->real_end;
+            out.tape_offset = b->num_of_syncs ? b->syncs[0].start_sync : from_offset;
+            out.checksum_ok = (b->state == wav2prg_checksum_state_correct);
 
-            uint16_t len = b->real_end - b->real_start;
+            uint16_t plen = b->real_end - b->real_start;
             uint16_t data_off = b->real_start - b->block.info.start;
-            e.prg.reserve(len + 2);
-            e.prg.push_back(b->real_start & 0xFF);
-            e.prg.push_back(b->real_start >> 8);
-            e.prg.insert(e.prg.end(), &b->block.data[data_off], &b->block.data[data_off] + len);
+            out.prg.clear();
+            out.prg.reserve(plen + 2);
+            out.prg.push_back(b->real_start & 0xFF);
+            out.prg.push_back(b->real_start >> 8);
+            out.prg.insert(out.prg.end(), &b->block.data[data_off], &b->block.data[data_off] + plen);
 
-            // Skip repeated blocks (e.g. the Kernal's second copy)
-            if (!entries.empty())
-            {
-                TapeEntry &prev = entries.back();
-                if (prev.name == e.name && prev.start_addr == e.start_addr &&
-                    prev.end_addr == e.end_addr && prev.prg.size() == e.prg.size())
-                    break;
-            }
-
-            Debug_printv("Tape file: name[%s] loader[%s] addr[%04X-%04X] size[%u] csum[%d] offset[%lu]",
-                         e.name.c_str(), e.loader.c_str(), e.start_addr, e.end_addr,
-                         (unsigned)e.prg.size(), e.checksum_ok, e.tape_offset);
-
-            entries.push_back(std::move(e));
+            found = true;
         } while (0);
 
         struct block_list_element *next = b->next;
@@ -431,53 +448,59 @@ bool TapeDecoder::analyze(const uint8_t *image, uint32_t image_len,
         b = next;
     }
 
-    Debug_printv("Tape analysis found %d file(s)", entries.size());
+    if (!found)
+        return false;
+
+    out.tape_end_offset = (chain_end > out.tape_offset) ? chain_end : out.tape_offset;
+
+    // Tape counter times (forward walker; offsets are monotonic)
+    out.start_time_ms = timeAtOffset(out.tape_offset);
+    out.end_time_ms = timeAtOffset(out.tape_end_offset);
+
+    Debug_printv("Tape file: name[%s] loader[%s] addr[%04X-%04X] size[%u] csum[%d] tape[%lu-%lu] time[%lu-%lu ms]",
+                 out.name.c_str(), out.loader.c_str(), out.start_addr, out.end_addr,
+                 (unsigned)out.prg.size(), out.checksum_ok, out.tape_offset, out.tape_end_offset,
+                 out.start_time_ms, out.end_time_ms);
+
     return true;
 }
 
-// Walk the pulse stream once, accumulating elapsed time; record the tape
-// counter time at each entry's start/end offset and return total duration
-uint32_t TapeDecoder::computeTimes(const uint8_t *image, uint32_t image_len,
-                                   std::vector<TapeEntry> &entries)
-{
-    tape_input_state st = {};
-    st.data = image;
-    st.len = image_len;
+/********************************************************
+ * Tape counter
+ ********************************************************/
 
-    if (!tape_parse_header(&st))
+uint32_t TapeDecoder::timeAtOffset(uint32_t offset)
+{
+    if (!opened)
         return 0;
 
-    st.pos = st.data_start;
+    if (offset > len)
+        offset = len;
 
-    uint64_t elapsed_cycles = 0;
-    uint32_t clock = machine_clock(&st);
-
-    // Entries are in tape order; track the next start/end offsets to stamp
-    size_t next_start = 0, next_end = 0;
-
-    uint32_t value;
-    while (true)
+    // Restart the walk when seeking backwards
+    if (walk_pos == 0 || offset < walk_pos)
     {
-        uint32_t before = st.pos;
-        uint64_t ms = (elapsed_cycles * 1000) / clock;
-
-        while (next_start < entries.size() && entries[next_start].tape_offset <= before)
-            entries[next_start++].start_time_ms = (uint32_t)ms;
-        while (next_end < entries.size() && entries[next_end].tape_end_offset <= before)
-            entries[next_end++].end_time_ms = (uint32_t)ms;
-
-        if (!tape_next_value(&st, &value))
-            break;
-        elapsed_cycles += value; // each value is one (half)wave duration
+        walk_pos = data_start;
+        walk_cycles = 0;
     }
 
-    uint32_t total_ms = (uint32_t)((elapsed_cycles * 1000) / clock);
+    uint32_t value;
+    while (walk_pos < offset)
+    {
+        if (!nextValue(&walk_pos, &value))
+            break;
+        walk_cycles += value;
+    }
 
-    // Stamp anything left over (offsets at/past EOF)
-    while (next_start < entries.size())
-        entries[next_start++].start_time_ms = total_ms;
-    while (next_end < entries.size())
-        entries[next_end++].end_time_ms = total_ms;
+    return (uint32_t)((walk_cycles * 1000) / machineClock());
+}
 
+uint32_t TapeDecoder::totalMs()
+{
+    if (!total_known && opened)
+    {
+        total_ms = timeAtOffset(len);
+        total_known = true;
+    }
     return total_ms;
 }

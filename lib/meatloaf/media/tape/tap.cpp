@@ -25,54 +25,29 @@
  * Streams
  ********************************************************/
 
-bool TAPMStream::loadImage()
+bool TAPMStream::ensureDecoder()
 {
-    if (image_data != nullptr)
-        return true;
-
-    uint32_t len = containerStream->size();
-    if (len < 20)
+    if (!decoder_tried)
     {
-        Debug_printv("Tape image too small (%lu bytes)", len);
-        return false;
+        decoder_tried = true;
+        decoder_ok = decoder.open(containerStream.get());
     }
-
-    image_data = (uint8_t *)malloc(len);
-    if (image_data == nullptr)
-    {
-        Debug_printv("Cannot allocate %lu bytes for tape image", len);
-        return false;
-    }
-
-    containerStream->seek(0);
-    uint32_t got = 0;
-    while (got < len)
-    {
-        uint32_t n = containerStream->read(image_data + got, len - got);
-        if (n == 0)
-            break;
-        got += n;
-    }
-
-    if (got < len)
-    {
-        Debug_printv("Short read: %lu of %lu bytes", got, len);
-        freeImage();
-        return false;
-    }
-
-    image_len = len;
-    return true;
+    return decoder_ok;
 }
 
-void TAPMStream::freeImage()
+void TAPMStream::setDefaultName(std::string name)
 {
-    if (image_data != nullptr)
-    {
-        free(image_data);
-        image_data = nullptr;
-    }
-    image_len = 0;
+    // Media file name without its extension
+    size_t dot = name.find_last_of('.');
+    if (dot != std::string::npos && dot > 0)
+        name = name.substr(0, dot);
+    if (!name.empty())
+        default_name = name;
+}
+
+std::string TAPMStream::entryDisplayName(const TapeEntry &e)
+{
+    return e.name.empty() ? default_name : e.name;
 }
 
 void TAPMStream::loadIndex(const std::string &idx_text)
@@ -119,68 +94,47 @@ void TAPMStream::loadIndex(const std::string &idx_text)
         Debug_printv("Using .idx directory: %d entries", idx_entries.size());
 }
 
-bool TAPMStream::ensureAnalyzed()
+bool TAPMStream::idxEntry(uint16_t index, std::string &name)
 {
-    if (analyzed)
-        return analysis_ok;
-    analyzed = true;
-
-    if (!loadImage())
+    if (index >= idx_entries.size())
         return false;
-
-    analysis_ok = TapeDecoder::analyze(image_data, image_len, 0, false, entries);
-    if (analysis_ok && !times_computed)
-    {
-        total_ms = TapeDecoder::computeTimes(image_data, image_len, entries);
-        times_computed = true;
-    }
-    return analysis_ok;
-}
-
-bool TAPMStream::decodeAt(uint32_t offset, TapeEntry &out)
-{
-    if (!loadImage())
-        return false;
-
-    std::vector<TapeEntry> found;
-    if (!TapeDecoder::analyze(image_data, image_len, offset, true, found) || found.empty())
-        return false;
-
-    out = std::move(found[0]);
+    name = idx_entries[index].name;
     return true;
 }
 
-uint16_t TAPMStream::entryCount()
+void TAPMStream::resetTape()
 {
-    if (has_idx)
-        return idx_entries.size();
-    if (!ensureAnalyzed())
-        return 0;
-    return entries.size();
+    tape_pos = 0;
+    tape_ended = false;
+    have_current = false;
 }
 
-bool TAPMStream::getEntry(uint16_t index, std::string &name, std::string &loader,
-                          uint32_t &size, bool &checksum_ok)
+bool TAPMStream::nextTapeEntry()
 {
-    if (has_idx)
+    if (!ensureDecoder())
     {
-        if (index >= idx_entries.size())
-            return false;
-        name = idx_entries[index].name;
-        loader = "";
-        size = 0;         // unknown without decoding
-        checksum_ok = true;
+        tape_ended = true;
+        return false;
+    }
+
+    TapeEntry e;
+    if (decoder.nextProgram(tape_pos, e))
+    {
+        tape_pos = e.tape_end_offset;
+        current = std::move(e);
+        have_current = true;
         return true;
     }
 
-    if (!ensureAnalyzed() || index >= entries.size())
-        return false;
+    tape_ended = true;
+    have_current = false;
+    return false;
+}
 
-    name = entries[index].name;
-    loader = entries[index].loader;
-    size = entries[index].prg.size();
-    checksum_ok = entries[index].checksum_ok;
-    return true;
+void TAPMStream::serveCurrent()
+{
+    _size = current.prg.size();
+    _position = 0;
 }
 
 bool TAPMStream::seekPath(std::string path)
@@ -188,7 +142,6 @@ bool TAPMStream::seekPath(std::string path)
     seekCalled = true;
     _position = 0;
     _size = 0;
-    current_prg.clear();
 
     if (mode == std::ios_base::out)
     {
@@ -201,30 +154,21 @@ bool TAPMStream::seekPath(std::string path)
 
     if (has_idx)
     {
-        // Find the entry in the index, then decode the program at its offset
+        // Random access via the index: decode the program at the offset
         for (auto &ie : idx_entries)
         {
             std::string entryName = mstr::toUTF8(ie.name);
             if (mstr::compareFilename(entryName, path, wildcard))
             {
-                TapeEntry e;
-                if (!decodeAt(ie.offset, e))
+                if (!ensureDecoder() || !decoder.nextProgram(ie.offset, current))
                 {
                     Debug_printv("Failed to decode program at offset %lu", ie.offset);
                     return false;
                 }
+                have_current = true;
+                serveCurrent();
                 Debug_printv("Loaded [%s] via idx offset[%lu] loader[%s] size[%u]",
-                             ie.name.c_str(), ie.offset, e.loader.c_str(), (unsigned)e.prg.size());
-                std::vector<TapeEntry> one;
-                one.push_back(TapeEntry());
-                one[0].tape_offset = e.tape_offset;
-                one[0].tape_end_offset = e.tape_end_offset;
-                total_ms = TapeDecoder::computeTimes(image_data, image_len, one);
-                times_computed = true;
-                cur_start_ms = one[0].start_time_ms;
-                cur_end_ms = one[0].end_time_ms;
-                current_prg = std::move(e.prg);
-                _size = current_prg.size();
+                             ie.name.c_str(), ie.offset, current.loader.c_str(), (unsigned)current.prg.size());
                 return true;
             }
         }
@@ -232,27 +176,66 @@ bool TAPMStream::seekPath(std::string path)
         return false;
     }
 
-    if (!ensureAnalyzed())
-        return false;
-
-    for (auto &e : entries)
+    // Sequential: the file found by the last directory request is ready
+    if (have_current)
     {
-        std::string entryName = mstr::toUTF8(e.name);
+        std::string entryName = mstr::toUTF8(entryDisplayName(current));
         if (mstr::compareFilename(entryName, path, wildcard))
         {
-            Debug_printv("Loaded [%s] loader[%s] size[%u] tape[%lu-%lu ms]",
-                         e.name.c_str(), e.loader.c_str(), (unsigned)e.prg.size(),
-                         e.start_time_ms, e.end_time_ms);
-            current_prg = e.prg;
-            cur_start_ms = e.start_time_ms;
-            cur_end_ms = e.end_time_ms;
-            _size = current_prg.size();
+            serveCurrent();
+            Debug_printv("Loaded [%s] loader[%s] size[%u] (current)",
+                         entryName.c_str(), current.loader.c_str(), (unsigned)current.prg.size());
             return true;
         }
     }
 
+    // Otherwise search forward from the current tape position, wrapping
+    // around to the beginning once
+    bool wrapped = false;
+    if (tape_ended)
+    {
+        resetTape();
+        wrapped = true;
+    }
+    uint32_t scan_start = tape_pos;
+
+    while (true)
+    {
+        if (!nextTapeEntry())
+        {
+            if (wrapped || scan_start == 0)
+                break; // searched the whole tape
+            resetTape();
+            wrapped = true;
+            continue;
+        }
+
+        std::string entryName = mstr::toUTF8(entryDisplayName(current));
+        if (mstr::compareFilename(entryName, path, wildcard))
+        {
+            serveCurrent();
+            Debug_printv("Loaded [%s] loader[%s] size[%u]",
+                         entryName.c_str(), current.loader.c_str(), (unsigned)current.prg.size());
+            return true;
+        }
+
+        if (wrapped && current.tape_offset >= scan_start)
+            break; // wrapped past where the search began
+    }
+
     Debug_printv("Not found: [%s]", path.c_str());
     return false;
+}
+
+uint32_t TAPMStream::readFile(uint8_t *buf, uint32_t size)
+{
+    if (!have_current || _position >= current.prg.size())
+        return 0;
+    uint32_t avail = current.prg.size() - _position;
+    if (size > avail)
+        size = avail;
+    memcpy(buf, current.prg.data() + _position, size);
+    return size;
 }
 
 /********************************************************
@@ -261,24 +244,22 @@ bool TAPMStream::seekPath(std::string path)
 
 uint32_t TAPMStream::counterMs()
 {
-    // Position in time from the beginning of the tape: the selected file's
-    // block start plus read progress scaled across the block's duration
-    if (current_prg.empty() || cur_end_ms <= cur_start_ms)
-        return cur_start_ms;
+    // Position in time from the beginning of the tape: the current file's
+    // start plus read progress scaled across its duration on tape
+    if (!have_current)
+        return 0;
+    if (current.prg.empty() || current.end_time_ms <= current.start_time_ms)
+        return current.start_time_ms;
 
-    uint64_t span = cur_end_ms - cur_start_ms;
-    return cur_start_ms + (uint32_t)((span * _position) / current_prg.size());
+    uint64_t span = current.end_time_ms - current.start_time_ms;
+    return current.start_time_ms + (uint32_t)((span * _position) / current.prg.size());
 }
 
 uint32_t TAPMStream::durationMs()
 {
-    if (!times_computed && loadImage())
-    {
-        std::vector<TapeEntry> none;
-        total_ms = TapeDecoder::computeTimes(image_data, image_len, none);
-        times_computed = true;
-    }
-    return total_ms;
+    if (!ensureDecoder())
+        return 0;
+    return decoder.totalMs();
 }
 
 static std::string format_tape_time(uint32_t ms)
@@ -305,17 +286,6 @@ std::unordered_map<std::string, std::string> TAPMStream::info()
     };
 }
 
-uint32_t TAPMStream::readFile(uint8_t *buf, uint32_t size)
-{
-    if (_position >= current_prg.size())
-        return 0;
-    uint32_t avail = current_prg.size() - _position;
-    if (size > avail)
-        size = avail;
-    memcpy(buf, current_prg.data() + _position, size);
-    return size;
-}
-
 /********************************************************
  * File implementations
  ********************************************************/
@@ -324,6 +294,7 @@ std::shared_ptr<MStream> TAPMFile::getDecodedStream(std::shared_ptr<MStream> is)
 {
     //Debug_printv("[%s]", url.c_str());
     auto stream = std::make_shared<TAPMStream>(is);
+    stream->setDefaultName(name);
     stream->loadIndex(readIdxSibling());
     return stream;
 }
@@ -371,7 +342,8 @@ bool TAPMFile::rewindDirectory()
     if (image == nullptr)
         return false;
 
-    // Set Media Info Fields
+    // Set Media Info Fields (the tape position is NOT reset - listings
+    // advance through the tape sequentially)
     media_header = image->media_label;
     media_id = "tap";
     media_blocks_free = 0;
@@ -395,27 +367,62 @@ MFile* TAPMFile::getNextFileInDir()
         return nullptr;
     }
 
-    std::string filename, loader;
-    uint32_t size = 0;
-    bool checksum_ok = true;
+    // .idx present: a normal full directory listing (random access)
+    if (image->hasIndex())
+    {
+        std::string filename;
+        if (!image->idxEntry(entry_index, filename))
+        {
+            dirIsOpen = false;
+            return nullptr;
+        }
+        entry_index++;
 
-    if (!image->getEntry(entry_index, filename, loader, size, checksum_ok))
+        mstr::replaceAll(filename, "/", "\\");
+        auto file = MFSOwner::File(url + "/" + filename);
+        file->name = filename;
+        file->extension = "prg";
+        file->size = 0; // unknown without decoding
+        file->is_dir = 0;
+        return file;
+    }
+
+    // Sequential tape: each directory request returns ONE entry - the next
+    // program on the tape - and leaves it ready to load
+    if (entry_index > 0)
     {
         dirIsOpen = false;
         return nullptr;
     }
     entry_index++;
 
-    mstr::replaceAll(filename, "/", "\\");
+    // The previous request reached the end of the tape: start over
+    if (image->tapeEnded())
+        image->resetTape();
 
-    auto file = MFSOwner::File(url + "/" + filename);
-    file->name = filename;  // Use actual entry name, not container image name
-    file->extension = "prg";
-    file->size = size;
+    if (image->nextTapeEntry())
+    {
+        std::string filename = image->entryDisplayName(image->current);
+        mstr::replaceAll(filename, "/", "\\");
+
+        auto file = MFSOwner::File(url + "/" + filename);
+        file->name = filename;
+        file->extension = "prg";
+        file->size = image->current.prg.size();
+        file->is_dir = 0;
+
+        Debug_printv("Tape entry: %s loader[%s] size[%lu] counter[%s]",
+                     filename.c_str(), image->current.loader.c_str(),
+                     (unsigned long)file->size, image->counterString().c_str());
+        return file;
+    }
+
+    // End of the tape reached
+    auto file = MFSOwner::File(url + "/no more entries");
+    file->name = "no more entries";
+    file->extension = "";
+    file->size = 0;
     file->is_dir = 0;
-
-    //Debug_printv("Entry: %s Loader:%s Size:%lu", filename.c_str(), loader.c_str(), size);
-
     return file;
 }
 
@@ -436,17 +443,20 @@ bool TAPMFile::exists()
 
     if (pathInStream.size() && pathInStream != "/")
     {
-        std::string name, loader;
-        uint32_t size;
-        bool csum;
-        bool wildcard = (mstr::contains(pathInStream, "*") || mstr::contains(pathInStream, "?"));
-        for (uint16_t i = 0; stream->getEntry(i, name, loader, size, csum); i++)
+        if (stream->hasIndex())
         {
-            std::string entryName = mstr::toUTF8(name);
-            if (mstr::compareFilename(entryName, pathInStream, wildcard))
-                return true;
+            bool wildcard = (mstr::contains(pathInStream, "*") || mstr::contains(pathInStream, "?"));
+            std::string name;
+            for (uint16_t i = 0; stream->idxEntry(i, name); i++)
+            {
+                std::string entryName = mstr::toUTF8(name);
+                if (mstr::compareFilename(entryName, pathInStream, wildcard))
+                    return true;
+            }
+            return false;
         }
-        return false;
+        // Sequential tapes resolve names when loading (seekPath scans)
+        return true;
     }
 
     return true;

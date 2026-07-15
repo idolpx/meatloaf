@@ -17,16 +17,23 @@
 
 // .TAP - The raw tape image format
 //
-// Decoding is done by the vendored wav2prg engine (see wav2prg/): the tape
-// is scanned for programs, the loader each program uses is detected via the
-// wav2prg observer chain (Kernal, Turbo Tape 64, Freeload, Novaload,
-// Pavloda, Ocean, and every other wav-prg plugin), and each program is
-// decoded into a PRG (2-byte load address + data).
+// Decoding is done by the vendored wav2prg engine (see components/wav2prg):
+// programs are found sequentially and the loader each one uses is detected
+// via the wav2prg observer chain (Kernal, Turbo Tape 64, Freeload,
+// Novaload, Pavloda, Ocean, and every other wav-prg plugin). Each program
+// is decoded into a PRG (2-byte load address + data).
 //
-// If a companion ".idx" file exists (same base name), it is used for the
-// directory listing instead of analyzing the whole tape: each line is
+// Tapes behave like a real datasette: a directory request returns ONE
+// entry - the next program found from the current tape position - and
+// leaves it ready to load. The next directory request returns the next
+// entry; at the end of the tape a "no more entries" line is shown and the
+// tape rewinds for the following request. The image is never buffered
+// whole in memory; files are found, listed and loaded sequentially.
+//
+// If a companion ".idx" file exists (same base name), it is treated like a
+// normal directory listing for random access instead: each line is
 // "<offset> <name>" (decimal, 0x hex or octal offsets; comments start with
-// #, ; or '). Loading an entry then only analyzes the tape from that offset.
+// #, ; or '). Loading an entry decodes the program at that tape offset.
 //
 // https://en.wikipedia.org/wiki/Commodore_Datasette
 // https://vice-emu.sourceforge.io/vice_17.html#SEC330
@@ -78,13 +85,8 @@ class TAPMStream : public MMediaStream {
 public:
     TAPMStream(std::shared_ptr<MStream> is) : MMediaStream(is)
     {
-        // Analysis is lazy: listing via a .idx needs no decode at all
+        // The decoder opens lazily on first use
     };
-
-    ~TAPMStream()
-    {
-        freeImage();
-    }
 
     struct IdxEntry {
         uint32_t offset;
@@ -93,11 +95,27 @@ public:
 
     // Provide the contents of the companion .idx file (empty = none)
     void loadIndex(const std::string &idx_text);
+    bool hasIndex() { return has_idx; }
 
-    // Directory entries: from .idx when present, else from full analysis
-    uint16_t entryCount();
-    bool getEntry(uint16_t index, std::string &name, std::string &loader,
-                  uint32_t &size, bool &checksum_ok);
+    // Name used for entries with no name (the media file's name)
+    void setDefaultName(std::string name);
+
+    // --- Sequential tape access (no .idx) ---
+    // Advance to the next program on the tape; fills 'current' and leaves
+    // it ready to load. Returns false at the end of the tape (tapeEnded()).
+    bool nextTapeEntry();
+    void resetTape();
+    bool tapeEnded() { return tape_ended; }
+
+    TapeEntry current;              // last program found (ready to load)
+    bool have_current = false;
+
+    // --- .idx directory (random access) ---
+    uint16_t idxCount() { return idx_entries.size(); }
+    bool idxEntry(uint16_t index, std::string &name);
+
+    // Display name for the current entry (media name when unnamed)
+    std::string entryDisplayName(const TapeEntry &e);
 
     bool seekPath(std::string path) override;
 
@@ -116,27 +134,21 @@ protected:
     uint32_t readFile(uint8_t* buf, uint32_t size) override;
     uint32_t writeFile(uint8_t* buf, uint32_t size) override { return 0; };
 
-    bool loadImage();       // buffer the raw image in RAM
-    void freeImage();
-    bool ensureAnalyzed();  // full-tape analysis (no .idx)
-    bool decodeAt(uint32_t offset, TapeEntry &out); // single program at offset
+    bool ensureDecoder();
+    void serveCurrent();            // expose 'current' as the loaded file
 
-    uint8_t *image_data = nullptr;
-    uint32_t image_len = 0;
+    TapeDecoder decoder;
+    bool decoder_tried = false;
+    bool decoder_ok = false;
 
-    bool analyzed = false;
-    bool analysis_ok = false;
-    std::vector<TapeEntry> entries;
+    // Sequential position: where the next program scan resumes
+    uint32_t tape_pos = 0;
+    bool tape_ended = false;
 
     bool has_idx = false;
     std::vector<IdxEntry> idx_entries;
 
-    // Currently selected file (after seekPath)
-    std::vector<uint8_t> current_prg;
-    uint32_t cur_start_ms = 0;     // tape time of the selected file's block
-    uint32_t cur_end_ms = 0;
-    uint32_t total_ms = 0;         // whole tape duration (0 = not computed)
-    bool times_computed = false;
+    std::string default_name = "tape file";
 
 private:
     friend class TAPMFile;
