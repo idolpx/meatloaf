@@ -31,6 +31,7 @@
 #include "proxy/proxy.h"
 #include "template/template.h"
 #include "webdav/handler.h"
+#include "webdav/body_capture.h"
 #include "ws/ws.h"
 
 #include <freertos/FreeRTOS.h>
@@ -158,6 +159,12 @@ static esp_err_t httpd_open_fn(httpd_handle_t hd, int sockfd)
     setsockopt(sockfd, SOL_SOCKET, SO_LINGER, &so_linger, sizeof(so_linger));
     int nodelay = 1;
     setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, &nodelay, sizeof(nodelay));
+
+    // Install the WebDAV raw-body capture (a session recv override) so the
+    // WebDAV handler can read chunked request bodies that esp_http_server
+    // cannot deliver. Bounded and reset per request; harmless on other
+    // connections (see body_capture.h).
+    WebDav::body_capture_install(hd, sockfd);
     return ESP_OK;
 }
 

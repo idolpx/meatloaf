@@ -16,9 +16,15 @@
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
 #include "request.h"
+#include "body_capture.h"
 
 #include <esp_http_server.h>
+#include <cctype>
+#include <cstring>
 #include <string>
+
+// Real socket read behind the session recv function (see body_capture.cpp).
+extern "C" int httpd_default_recv(httpd_handle_t hd, int sockfd, char *buf, size_t buf_len, int flags);
 
 using namespace WebDav;
 
@@ -58,4 +64,194 @@ std::string Request::getDestination() {
         return "";
 
     return destination.substr(pos + host.length());
+}
+
+bool Request::isChunked() {
+    if (!chunkedKnown) {
+        std::string te = getHeader("Transfer-Encoding");
+        for (auto &c : te)
+            c = tolower((unsigned char)c);
+        chunkedFlag = te.find("chunked") != std::string::npos;
+        chunkedKnown = true;
+    }
+    return chunkedFlag;
+}
+
+size_t Request::expectedEntityLength() {
+    if (!expectedKnown) {
+        std::string v = getHeader("X-Expected-Entity-Length");
+        expectedLen = 0;
+        for (size_t i = 0; i < v.size(); ++i) {
+            if (v[i] < '0' || v[i] > '9') {
+                expectedLen = 0;        // not a plain number: ignore it
+                break;
+            }
+            expectedLen = expectedLen * 10 + (v[i] - '0');
+        }
+        expectedKnown = true;
+    }
+    return expectedLen;
+}
+
+// A client that sent "Expect: 100-continue" holds the body back until we
+// answer; esp_http_server never does, so we must (macOS Finder stalls its PUT
+// body without this).
+void Request::handleExpect() {
+    if (continueSent)
+        return;
+    if (getHeader("Expect").empty())
+        return;
+    sendContinue();
+    continueSent = true;
+}
+
+// Point the raw-body reader at the prefix the session recv override captured:
+// everything after the request's CRLFCRLF. Anything past this prefix is read
+// straight from the socket by recvRaw. Failure here means the prefix was
+// unavailable (no capture ctx / overflow / header terminator not found), so a
+// chunked body cannot be reconstructed and the read is failed rather than
+// silently truncated.
+void Request::initCapture() {
+    capInit = true;
+    if (!body_capture_get(req, &capBuf, &capEnd)) {
+        captureFailed = true;
+        capBuf = nullptr;
+        capEnd = 0;
+    }
+    capPos = 0;
+}
+
+// Raw body bytes: first drain the captured prefix, then read the socket for the
+// remainder. httpd_default_recv reads the socket directly (not the parser's
+// pending buffer), and the prefix already holds every byte the parser took off
+// the socket, so the two sources never overlap.
+int Request::recvRaw(char *buf, size_t len) {
+    if (!capInit)
+        initCapture();
+
+    if (capPos < capEnd) {
+        size_t n = capEnd - capPos;
+        if (n > len)
+            n = len;
+        memcpy(buf, capBuf + capPos, n);
+        capPos += n;
+        return (int)n;
+    }
+
+    if (captureFailed)
+        return -1;      // no reliable prefix: cannot continue the chunked body
+
+    for (int tries = 0; tries < RECV_TIMEOUT_RETRIES; ++tries) {
+        int r = httpd_default_recv(req->handle, httpd_req_to_sockfd(req), buf, len, 0);
+        if (r != HTTPD_SOCK_ERR_TIMEOUT)
+            return r;   // data, peer close (0), or a genuine error
+    }
+    Debug_printv("recv timed out %d times, giving up len[%d]", RECV_TIMEOUT_RETRIES, (int)len);
+    return -1;
+}
+
+bool Request::recvByte(char *c) {
+    return recvRaw(c, 1) == 1;
+}
+
+// Read one CRLF-terminated framing line (chunk-size line or trailer) into
+// line[], NUL-terminated, CR/LF stripped. False on socket error, a stray CR,
+// or an overlong line.
+bool Request::readChunkLine(char *line, size_t cap) {
+    size_t n = 0;
+    for (;;) {
+        char c;
+        if (!recvByte(&c))
+            return false;
+        if (c == '\r') {
+            if (!recvByte(&c) || c != '\n')
+                return false;
+            break;
+        }
+        if (c == '\n')      // tolerate bare LF
+            break;
+        if (n + 1 >= cap)
+            return false;
+        line[n++] = c;
+    }
+    line[n] = 0;
+    return true;
+}
+
+int Request::readBodyChunked(char *buf, int len) {
+    if (broken)
+        return -1;
+    if (chunksDone || len <= 0)
+        return 0;
+
+    if (chunkLeft == 0) {
+        // chunk-size line: hex digits, then optional ";ext" up to CRLF
+        char line[128];
+        if (!readChunkLine(line, sizeof(line))) {
+            Debug_printv("bad chunk-size line");
+            return chunkFail();
+        }
+        size_t size = 0;
+        int i = 0;
+        bool any = false;
+        for (; line[i]; ++i) {
+            char c = line[i];
+            unsigned d;
+            if (c >= '0' && c <= '9')      d = c - '0';
+            else if (c >= 'a' && c <= 'f') d = c - 'a' + 10;
+            else if (c >= 'A' && c <= 'F') d = c - 'A' + 10;
+            else break;
+            if (size > 0x0FFFFFFF)         // absurd chunk size: bail out
+                return chunkFail();
+            size = (size << 4) | d;
+            any = true;
+        }
+        if (!any)
+            return chunkFail();
+        if (line[i] && line[i] != ';' && line[i] != ' ' && line[i] != '\t')
+            return chunkFail();
+        if (size == 0) {
+            // trailer section: header lines until an empty line
+            for (;;) {
+                if (!readChunkLine(line, sizeof(line)))
+                    return chunkFail();
+                if (!line[0])
+                    break;
+            }
+            chunksDone = true;
+            return 0;
+        }
+        chunkLeft = size;
+    }
+
+    int want = (size_t)len < chunkLeft ? len : (int)chunkLeft;
+    int r = recvRaw(buf, want);
+    if (r <= 0)
+        return chunkFail();
+    chunkLeft -= r;
+    bodyDone += r;
+
+    if (chunkLeft == 0) {
+        // Stop here if the client told us the body length and we now have it.
+        // macOS webdavfs holds back the CRLF + 0-chunk that close the body until
+        // it has seen a response, so reading on would deadlock: it waits for our
+        // reply, we wait for its framing. The bytes we leave unread desync the
+        // connection, so it must not be reused -- see connectionReusable().
+        size_t expected = expectedEntityLength();
+        if (expected > 0 && bodyDone >= expected) {
+            chunksDone = true;
+            unterminated = true;
+            return r;
+        }
+
+        // consume the CRLF that closes the chunk data
+        char c;
+        if (!recvByte(&c))
+            return chunkFail();
+        if (c == '\r' && !recvByte(&c))
+            return chunkFail();
+        if (c != '\n')
+            return chunkFail();
+    }
+    return r;
 }

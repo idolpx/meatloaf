@@ -203,11 +203,25 @@ static int mfile_copy_recursive(const std::string &source, const std::string &de
 
 static void discardRequestBody(Request &req)
 {
+    char buffer[512];
+
+    if (req.isChunked())
+    {
+        // Finder PUTs junk files (._*, .DS_Store) chunked too; drain them so
+        // the socket isn't left mid-body. readBodyChunked stops on the
+        // expected length (leaving the connection non-reusable, so it is then
+        // closed), or returns 0/negative at end/on error.
+        req.handleExpect();
+        while (req.readBodyChunked(buffer, sizeof(buffer)) > 0)
+            ;
+        return;
+    }
+
     int remaining = req.getContentLength();
     if (remaining <= 0)
         return;
 
-    char buffer[512];
+    req.handleExpect();
     while (remaining > 0)
     {
         int r = req.readBody(buffer, std::min(remaining, static_cast<int>(sizeof(buffer))));
@@ -993,9 +1007,9 @@ int Server::doPut(Request &req, Response &resp)
     if (!stream || !stream->isOpen())
         return 404;
 
-    int remaining = req.getContentLength();
-
     // 16 KB: fewer read/write iterations per PUT; buffer lives in PSRAM.
+    // (The Content-Length case declares its own `remaining` below; the chunked
+    // case has no Content-Length to work from.)
     const int chunkSize = 16384;
     uint8_t *chunk = (uint8_t *)malloc(chunkSize);
     if (!chunk) {
@@ -1005,19 +1019,47 @@ int Server::doPut(Request &req, Response &resp)
 
     int ret = 0;
 
-    while (remaining > 0)
-    {
-        int r = req.readBody((char *)chunk, std::min(remaining, chunkSize));
-        if (r <= 0)
-            break;
+    req.handleExpect();
 
-        if ((int)stream->write(chunk, r) != r)
+    if (req.isChunked())
+    {
+        // Transfer-Encoding: chunked (macOS Finder) -- no Content-Length; the
+        // decoder returns 0 at end-of-body, <0 on error. On error the
+        // connection is desynchronized; webdav_handler closes it.
+        for (;;)
         {
-            ret = -1;
-            break;
+            int r = req.readBodyChunked((char *)chunk, chunkSize);
+            if (r == 0)
+                break;
+            if (r < 0 || (int)stream->write(chunk, r) != r)
+            {
+                ret = -1;
+                break;
+            }
+        }
+    }
+    else
+    {
+        int remaining = req.getContentLength();
+
+        while (remaining > 0)
+        {
+            int r = req.readBody((char *)chunk, std::min(remaining, chunkSize));
+            if (r <= 0)
+                break;
+
+            if ((int)stream->write(chunk, r) != r)
+            {
+                ret = -1;
+                break;
+            }
+
+            remaining -= r;
         }
 
-        remaining -= r;
+        if (remaining > 0 && ret == 0)
+            ret = -1;   // truncated body (recv timeout): report it, don't
+                        // return 201 for a short file
     }
 
     free(chunk);
