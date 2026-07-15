@@ -495,6 +495,31 @@ uint32_t TapeDecoder::timeAtOffset(uint32_t offset)
     return (uint32_t)((walk_cycles * 1000) / machineClock());
 }
 
+uint32_t TapeDecoder::offsetAtTime(uint32_t ms)
+{
+    if (!opened)
+        return 0;
+
+    uint64_t target_cycles = ((uint64_t)ms * machineClock()) / 1000;
+
+    // Restart the walk when seeking backwards
+    if (walk_pos == 0 || walk_cycles > target_cycles)
+    {
+        walk_pos = data_start;
+        walk_cycles = 0;
+    }
+
+    uint32_t value;
+    while (walk_cycles < target_cycles && walk_pos < len)
+    {
+        if (!nextValue(&walk_pos, &value))
+            break;
+        walk_cycles += value;
+    }
+
+    return walk_pos;
+}
+
 uint32_t TapeDecoder::totalMs()
 {
     if (!total_known && opened)

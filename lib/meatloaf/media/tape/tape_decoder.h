@@ -73,6 +73,9 @@ public:
     // walking restarts automatically when seeking backwards)
     uint32_t timeAtOffset(uint32_t offset);
 
+    // Inverse: byte offset of the tape counter time in ms
+    uint32_t offsetAtTime(uint32_t ms);
+
     // Duration of the whole tape in ms (walks the tape once, then cached)
     uint32_t totalMs();
 

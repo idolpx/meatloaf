@@ -32,8 +32,11 @@
 //
 // If a companion ".idx" file exists (same base name), it is treated like a
 // normal directory listing for random access instead: each line is
-// "<offset> <name>" (decimal, 0x hex or octal offsets; comments start with
-// #, ; or '). Loading an entry decodes the program at that tape offset.
+// "<offset>[:<length>] <name>" (decimal, 0x hex or octal numbers; length
+// is the file size in bytes and is optional; comments start with #, ; or
+// '). Loading an entry decodes the program at that tape offset. The drive
+// command "T-I" scans the tape and generates the .idx; "T-C <ms|MMM:SS>"
+// sets the tape counter (read position) by time.
 //
 // https://en.wikipedia.org/wiki/Commodore_Datasette
 // https://vice-emu.sourceforge.io/vice_17.html#SEC330
@@ -90,6 +93,7 @@ public:
 
     struct IdxEntry {
         uint32_t offset;
+        uint32_t size;      // file length in bytes (0 = not in the .idx)
         std::string name;
     };
 
@@ -112,7 +116,11 @@ public:
 
     // --- .idx directory (random access) ---
     uint16_t idxCount() { return idx_entries.size(); }
-    bool idxEntry(uint16_t index, std::string &name);
+    bool idxEntry(uint16_t index, std::string &name, uint32_t &size);
+
+    // Set the tape read position by counter time: milliseconds or "MMM:SS"
+    bool setCounter(std::string spec);
+    bool setCounterMs(uint32_t ms);
 
     // Display name for the current entry (media name when unnamed)
     std::string entryDisplayName(const TapeEntry &e);
@@ -176,12 +184,18 @@ public:
     bool isDirectory() override;
     bool exists() override;
 
+    // Scan the whole tape and write a companion .idx file:
+    // "<offset>:<length> <name>" per program (length in bytes is the new
+    // optional field; readers still accept plain "<offset> <name>" lines)
+    bool buildIndex();
+
     bool isDir = true;
     bool dirIsOpen = false;
 
 protected:
     // Reads the companion .idx file next to the image ("" if none)
     std::string readIdxSibling();
+    std::string idxSiblingPath();
 
     uint16_t entry_index = 0;
 };

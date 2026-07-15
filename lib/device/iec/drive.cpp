@@ -41,6 +41,7 @@
 
 #include "meat_media.h"
 #include "media/hd/dhd.h"
+#include "media/tape/tap.h"
 #include "qrmanager.h"
 
 #include "../../../include/global_defines.h"
@@ -1893,9 +1894,18 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
         case 'T':
             if (command[1] == '-')
             {
+                // Tape image commands (current directory is a mounted tape):
+                // T-C <ms|MMM:SS> - set the tape counter (read position)
+                // T-I             - scan the tape and generate its .idx file
+                if (command[2] == 'C' || command[2] == 'I')
+                {
+                    tapeCommand(command);
+                    return;
+                }
+
                 time_t tt = time(nullptr);
                 struct tm *tinfo = localtime(&tt);
-                
+
                 uint8_t buf[IECFILEDEVICE_STATUS_BUFFER_SIZE];
                 size_t len = 0;
 
@@ -2186,6 +2196,72 @@ void iecDrive::reset()
     Debug_memory();
 }
 
+
+// Path of the ".tap"/".dmp"/".htap" container within 'path', or "" if none
+static std::string tape_container_of(const std::string &path)
+{
+    static const char *exts[] = { ".tap", ".dmp", ".htap" };
+    std::string lower = path;
+    for (auto &c : lower)
+        c = tolower(c);
+
+    for (auto ext : exts)
+    {
+        size_t elen = strlen(ext);
+        size_t p = lower.find(ext);
+        while (p != std::string::npos)
+        {
+            size_t end = p + elen;
+            if (end == lower.size() || lower[end] == '/')
+                return path.substr(0, end);
+            p = lower.find(ext, p + 1);
+        }
+    }
+    return "";
+}
+
+// Tape image commands: "T-C <ms|MMM:SS>" sets the tape counter (read
+// position by time), "T-I" scans the tape and generates its .idx file
+void iecDrive::tapeCommand(std::string command)
+{
+    std::string container = tape_container_of(m_cwd != nullptr ? m_cwd->url : "");
+    if (container.empty())
+    {
+        Debug_printv("Not on a tape image [%s]", m_cwd != nullptr ? m_cwd->url.c_str() : "");
+        setStatusCode(ST_SYNTAX_INVALID);
+        return;
+    }
+
+    if (command[2] == 'C')
+    {
+        // Argument after "T-C", optionally separated by ':' or space
+        std::string arg = command.substr(3);
+        if (!arg.empty() && (arg[0] == ':' || arg[0] == ' '))
+            arg = arg.substr(1);
+        arg = mstr::toUTF8(arg);
+        mstr::trim(arg);
+
+        auto image = ImageBroker::obtain<TAPMStream>("tap", container);
+        if (image == nullptr)
+        {
+            setStatusCode(ST_DRIVE_NOT_READY);
+            return;
+        }
+        setStatusCode(image->setCounter(arg) ? ST_OK : ST_SYNTAX_INVALID);
+        return;
+    }
+
+    // T-I: build the .idx index file
+    std::unique_ptr<MFile> f(MFSOwner::File(container));
+    if (f == nullptr)
+    {
+        setStatusCode(ST_DRIVE_NOT_READY);
+        return;
+    }
+    // tape extensions always resolve to a TAPMFile
+    TAPMFile *tf = static_cast<TAPMFile *>(f.get());
+    setStatusCode(tf->buildIndex() ? ST_OK : ST_WRITE_VERIFY);
+}
 
 // CMD "CP<n>" - change the selected partition of the mounted DHD image
 void iecDrive::changePartition(int pnum)
