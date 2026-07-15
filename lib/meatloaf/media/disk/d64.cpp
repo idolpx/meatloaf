@@ -185,7 +185,7 @@ bool D64MStream::readBAMRecord(uint8_t track, BAMRecord *rec, uint8_t *buf)
 bool D64MStream::setBlockAllocation(uint8_t track, uint8_t sector, bool allocate)
 {
     BAMRecord rec;
-    uint8_t buf[16]; // largest byte_count in use is 8
+    uint8_t buf[32]; // largest byte_count in use is 32 (DNP/DHD native: 256 sectors/track)
     if (!readBAMRecord(track, &rec, buf))
         return false;
 
@@ -236,7 +236,7 @@ bool D64MStream::deallocateBlock(uint8_t track, uint8_t sector)
 uint8_t D64MStream::getTrackFreeCount(uint8_t track)
 {
     BAMRecord rec;
-    uint8_t buf[16];
+    uint8_t buf[32];
     if (!readBAMRecord(track, &rec, buf))
         return 0;
 
@@ -255,7 +255,7 @@ uint8_t D64MStream::getTrackFreeCount(uint8_t track)
 bool D64MStream::findFreeSectorOnTrack(uint8_t track, uint8_t startSector, uint8_t *foundSector)
 {
     BAMRecord rec;
-    uint8_t buf[16];
+    uint8_t buf[32];
     if (!readBAMRecord(track, &rec, buf))
         return false;
 
@@ -457,7 +457,7 @@ bool D64MStream::getNextFreeBlock(uint8_t startTrack, uint8_t startSector, uint8
 bool D64MStream::isBlockFree(uint8_t track, uint8_t sector)
 {
     BAMRecord rec;
-    uint8_t buf[16];
+    uint8_t buf[32];
     if (!readBAMRecord(track, &rec, buf))
         return false;
 
