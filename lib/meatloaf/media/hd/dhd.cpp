@@ -17,9 +17,72 @@
 
 #include "dhd.h"
 
+#include "meat_media.h"
 #include <cstring>
+#include <memory>
 
-bool DHDMStream::readPartitionTable()
+std::map<std::string, DHDImageRegistry::Image> DHDImageRegistry::s_images;
+bool DHDImageRegistry::s_probing = false;
+
+const DHDPartition* DHDImageRegistry::Image::byNumber(uint8_t number) const
+{
+    for (auto &p : parts)
+    {
+        if (p.number == number)
+            return &p;
+    }
+    return nullptr;
+}
+
+const DHDPartition* DHDImageRegistry::Image::byName(std::string utf8name) const
+{
+    bool wildcard = (mstr::contains(utf8name, "*") || mstr::contains(utf8name, "?"));
+    for (auto &p : parts)
+    {
+        std::string pn = mstr::toUTF8(p.name);
+        if (mstr::compareFilename(pn, utf8name, wildcard))
+            return &p;
+    }
+    return nullptr;
+}
+
+std::string DHDImageRegistry::containerOf(const std::string &path)
+{
+    // The container path ends with the ".dhd" component
+    for (size_t i = 0; i + 4 <= path.size(); i++)
+    {
+        if ((path[i] == '.') &&
+            (path[i+1] == 'd' || path[i+1] == 'D') &&
+            (path[i+2] == 'h' || path[i+2] == 'H') &&
+            (path[i+3] == 'd' || path[i+3] == 'D'))
+        {
+            size_t end = i + 4;
+            if (end == path.size() || path[end] == '/')
+                return path.substr(0, end);
+        }
+    }
+    return "";
+}
+
+DHDImageRegistry::Image* DHDImageRegistry::obtain(const std::string &containerUrl)
+{
+    if (containerUrl.empty())
+        return nullptr;
+
+    auto it = s_images.find(containerUrl);
+    if (it != s_images.end() && it->second.valid)
+        return &it->second;
+
+    // (Re-)parse: not yet seen, or the image wasn't readable last time
+    Image img;
+    if (!parse(containerUrl, img))
+        return nullptr;
+
+    s_images[containerUrl] = std::move(img);
+    return &s_images[containerUrl];
+}
+
+bool DHDImageRegistry::parse(const std::string &containerUrl, Image &img)
 {
     // CMD HD boot code signature found at track 0, sector 5, offset $F0
     // of the system partition
@@ -28,16 +91,29 @@ bool DHDMStream::readPartitionTable()
         0x8D, 0x03, 0x88, 0x8E, 0x02, 0x88, 0xEA, 0x60
     };
 
-    uint32_t image_size = containerStream->size();
+    // Open the raw image bytes: the probing flag makes DHDMFileSystem
+    // decline the path so the underlying filesystem serves it
+    s_probing = true;
+    std::unique_ptr<MFile> f(MFSOwner::File(containerUrl));
+    std::shared_ptr<MStream> s = (f != nullptr) ? f->getSourceStream() : nullptr;
+    s_probing = false;
+
+    if (s == nullptr || !s->isOpen())
+    {
+        Debug_printv("Cannot open DHD image [%s]", containerUrl.c_str());
+        return false;
+    }
+
+    uint32_t image_size = s->size();
     uint8_t cfg[256];
 
     // The system partition sits on a 64 KiB boundary
-    sys_base = 0xFFFFFFFF;
+    uint32_t sys_base = 0xFFFFFFFF;
     for (uint32_t base = 0; base + 0x600 <= image_size; base += 65536)
     {
-        if (!containerStream->seek(base + 0x500))
+        if (!s->seek(base + 0x500))
             break;
-        if (readContainer(cfg, sizeof(cfg)) != sizeof(cfg))
+        if (s->read(cfg, sizeof(cfg)) != sizeof(cfg))
             break;
         if (memcmp(&cfg[0xF0], hdmagic, sizeof(hdmagic)) == 0)
         {
@@ -48,177 +124,95 @@ bool DHDMStream::readPartitionTable()
 
     if (sys_base == 0xFFFFFFFF)
     {
-        Debug_printv("No CMD HD system partition found");
+        Debug_printv("No CMD HD system partition found [%s]", containerUrl.c_str());
         return false;
     }
 
-    default_part = cfg[0xE2];
+    img.default_part = cfg[0xE2];
 
     // Partition table on track 1 of the system partition: 32-byte entries,
     // 8 per 256-byte sector, laid out contiguously. Entry 0 is the system
     // partition itself.
-    part_table.clear();
     uint8_t buf[32];
-    for (uint16_t i = 1; i <= 254; i++)
+    for (uint16_t i = 0; i <= 254; i++)
     {
         uint32_t off = sys_base + 65536 + (uint32_t)i * 32;
         if (off + 32 > image_size)
             break;
-        if (!containerStream->seek(off))
+        if (!s->seek(off))
             break;
-        if (readContainer(buf, sizeof(buf)) != sizeof(buf))
+        if (s->read(buf, sizeof(buf)) != sizeof(buf))
             break;
+
+        std::string name = std::string((char *)&buf[5], 16);
+        size_t e = name.find((char)0xA0);
+        if (e != std::string::npos)
+            name.resize(e);
+
+        if (i == 0)
+        {
+            img.disk_label = mstr::toUTF8(name);
+            continue;
+        }
 
         uint8_t type = buf[2];
         if (type < 1 || type > 4)
             continue;
 
-        PartEntry p;
+        DHDPartition p;
         p.number = i;
         p.type = type;
-        p.name = std::string((char *)&buf[5], 16);
-        size_t e = p.name.find((char)0xA0);
-        if (e != std::string::npos)
-            p.name.resize(e);
+        p.name = name;
         // 3-byte big-endian offset/size in 512-byte LBA blocks
         p.start = (((uint32_t)buf[0x15] << 16) | ((uint32_t)buf[0x16] << 8) | buf[0x17]) * 512;
         p.size = (((uint32_t)buf[0x1D] << 16) | ((uint32_t)buf[0x1E] << 8) | buf[0x1F]) * 512;
-        part_table.push_back(p);
+        img.parts.push_back(p);
 
         Debug_printv("partition[%d] type[%d] name[%s] start[%lu] size[%lu]",
                      p.number, p.type, p.name.c_str(), p.start, p.size);
     }
 
-    Debug_printv("CMD HD sys_base[%lu] default[%d] partitions[%d]",
-                 sys_base, default_part, part_table.size());
-    return part_table.size() > 0;
-}
-
-bool DHDMStream::selectPartitionByName(std::string name)
-{
-    const PartEntry *sel = nullptr;
-
-    if (name.empty())
+    if (img.parts.empty())
     {
-        // Default partition
-        for (auto &p : part_table)
-        {
-            if (p.number == default_part)
-            {
-                sel = &p;
-                break;
-            }
-        }
-        if (!sel && part_table.size())
-            sel = &part_table[0];
-    }
-    else
-    {
-        bool wildcard = (mstr::contains(name, "*") || mstr::contains(name, "?"));
-        for (auto &p : part_table)
-        {
-            std::string pn = mstr::toUTF8(p.name);
-            if (mstr::compareFilename(pn, name, wildcard))
-            {
-                sel = &p;
-                break;
-            }
-        }
-    }
-
-    if (!sel)
+        Debug_printv("No usable partitions in [%s]", containerUrl.c_str());
         return false;
-
-    return configurePartition(*sel);
-}
-
-bool DHDMStream::configurePartition(const PartEntry &p)
-{
-    partition = 0;
-    partition_base = p.start;
-    cur_type = p.type;
-    dir_track = 0;
-    dir_sector = 0;
-    entry_index = 0;
-
-    std::vector<BlockAllocationMap> b;
-    Partition part = {};
-
-    switch (p.type)
-    {
-        case 2: // 1541 emulation partition (D64 layout)
-            sectorsPerTrack = { 17, 18, 19, 21 };
-            interleave = { 3, 10 };
-            b = { { 18, 0, 0x04, 1, 35, 4 } };
-            part = { 18, 0, 0x90, 18, 1, 0x00, 0, 0, 0, 0, 0, b };
-            break;
-
-        case 3: // 1571 emulation partition (D71 layout)
-            sectorsPerTrack = { 17, 18, 19, 21 };
-            interleave = { 3, 6 };
-            b = { { 18, 0, 0x04, 1, 35, 4 },
-                  { 53, 0, 0x00, 36, 70, 3 } };
-            part = { 18, 0, 0x90, 18, 1, 0x00, 0, 0, 0, 0, 0, b };
-            break;
-
-        case 4: // 1581 emulation partition (D81 layout)
-            sectorsPerTrack = { 40 };
-            interleave = { 1, 1 };
-            b = { { 40, 1, 0x10, 1, 40, 6 },
-                  { 40, 2, 0x10, 41, 80, 6 } };
-            part = { 40, 0, 0x04, 40, 3, 0x00, 0, 0, 0, 0, 0, b };
-            break;
-
-        default: // 1 = Native partition (DNP layout)
-        {
-            sectorsPerTrack = { 256 };
-            interleave = { 1, 1 };
-            uint8_t end_track = p.size / 65536;
-            if (p.size % 65536)
-                end_track++;
-            if (end_track == 0)
-                end_track = 1;
-            b = { { 1, 2, 0x20, 1, end_track, 32 } };
-            part = { 1, 1, 0x04, 1, 0, 0x00, 0, 0, 0, 0, 0, b };
-            break;
-        }
     }
 
-    partitions.clear();
-    partitions.push_back(part);
+    // First use: select the default partition
+    img.selected = img.byNumber(img.default_part) ? img.default_part : img.parts[0].number;
+    img.valid = true;
 
-    readHeader();
-
-    if (p.type == 1)
-    {
-        // Native partitions link to their root directory chain from the
-        // header block's first two bytes (like DNP)
-        std::string hdr = readBlock(1, 1);
-        if (hdr.size() == block_size && (uint8_t)hdr[0] != 0)
-        {
-            partitions[0].directory_track = (uint8_t)hdr[0];
-            partitions[0].directory_sector = (uint8_t)hdr[1];
-        }
-    }
-
-    Debug_printv("selected partition[%d] type[%d] name[%s]", p.number, p.type, p.name.c_str());
+    Debug_printv("CMD HD [%s] label[%s] partitions[%d] selected[%d]",
+                 containerUrl.c_str(), img.disk_label.c_str(), img.parts.size(), img.selected);
     return true;
 }
 
-bool DHDMStream::seekPartitionEntry(uint16_t index)
+bool DHDImageRegistry::select(const std::string &containerUrl, uint8_t number)
 {
-    if (index == 0 || index > part_table.size())
+    Image* img = obtain(containerUrl);
+    if (img == nullptr)
         return false;
 
-    const PartEntry &p = part_table[index - 1];
+    const DHDPartition* p = img->byNumber(number);
+    if (p == nullptr)
+        return false;
 
-    memset(&entry, 0, sizeof(entry));
-    memset(entry.filename, 0xA0, sizeof(entry.filename));
-    memcpy(entry.filename, p.name.c_str(), std::min(p.name.size(), sizeof(entry.filename)));
-    entry.file_type = 0x86; // closed DIR entry - listed as a directory
-    uint32_t blocks = p.size / block_size;
-    entry.blocks = (blocks > 0xFFFF) ? 0xFFFF : blocks;
+    if (img->selected == number)
+        return true;
 
-    entry_index = index;
+    img->selected = number;
+    Debug_printv("selected partition[%d] type[%d] name[%s]", p->number, p->type, p->name.c_str());
+
+    // Drop the broker-cached image stream so the next access decodes the
+    // newly selected partition (key format mirrors ImageBroker::obtain)
+    std::unique_ptr<MFile> f(MFSOwner::File(containerUrl));
+    if (f != nullptr && f->sourceFile != nullptr)
+    {
+        std::string key = "d64" + f->sourceFile->url;
+        if (f->sourceFile->pathInStream.size() && f->sourceFile->pathInStream != "/")
+            key += "/" + f->sourceFile->pathInStream;
+        ImageBroker::dispose(key);
+    }
+
     return true;
 }

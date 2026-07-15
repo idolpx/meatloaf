@@ -55,7 +55,7 @@ bool D64MStream::seekBlock(uint64_t index, uint8_t offset)
 
     // Debug_printv("track[%d] sector[%d] speedZone[%d] sectorOffset[%d]", track, sector, speedZone(track), sectorOffset);
 
-    return containerStream->seek(partition_base + (index * block_size) + offset);
+    return containerStream->seek((index * block_size) + offset);
 }
 
 bool D64MStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
@@ -103,7 +103,7 @@ bool D64MStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
 
     //Debug_printv("track[%d] sector[%d] speedZone[%d] sectorOffset[%d]", track, sector, speedZone(track), sectorOffset);
 
-    return containerStream->seek(partition_base + (sectorOffset * block_size) + offset);
+    return containerStream->seek((sectorOffset * block_size) + offset);
 }
 
 bool D64MStream::seekSector(std::vector<uint8_t> trackSectorOffset)
@@ -522,10 +522,6 @@ bool D64MStream::seekEntry( std::string filename )
 
 bool D64MStream::seekEntry( uint16_t index )
 {
-    // At the root of a multi-partition image the "entries" are partitions
-    if (partition_list)
-        return seekPartitionEntry(index);
-
     // Current directory defaults to the partition's root directory
     if (dir_track == 0)
     {
@@ -1085,25 +1081,12 @@ bool D64MStream::enterDirectory(std::string name)
 bool D64MStream::seekDirectory(std::string path)
 {
     // Reset to the image root
-    partition_list = hasPartitions();
     dir_track = 0;
     dir_sector = 0;
     entry_index = 0;
 
     auto parts = splitPathComponents(path);
-    size_t i = 0;
-
-    if (partition_list && parts.size())
-    {
-        if (selectPartitionByName(parts[0]))
-            i = 1;
-        else if (!selectPartitionByName("")) // fall back to default partition
-            return false;
-        partition_list = false;
-        entry_index = 0;
-    }
-
-    for (; i < parts.size(); i++)
+    for (size_t i = 0; i < parts.size(); i++)
     {
         if (!enterDirectory(parts[i]))
             return false;
@@ -1128,22 +1111,6 @@ D64MStream::PathResult D64MStream::resolvePath(std::string path)
         return PATH_NOT_FOUND;
 
     std::string last = parts.back();
-
-    // At the root of a multi-partition image the last component may be a
-    // partition name; otherwise fall through to the default partition.
-    if (partition_list)
-    {
-        if (selectPartitionByName(last))
-        {
-            partition_list = false;
-            entry_index = 0;
-            return PATH_DIR;
-        }
-        if (!selectPartitionByName(""))
-            return PATH_NOT_FOUND;
-        partition_list = false;
-        entry_index = 0;
-    }
 
     if (!seekEntry(last))
         return PATH_NOT_FOUND;
@@ -1206,12 +1173,6 @@ bool D64MStream::seekPath(std::string path)
         }
         if (!seekDirectory(parent))
             return false;
-        if (partition_list)
-        {
-            if (!selectPartitionByName(""))
-                return false;
-            partition_list = false;
-        }
         return beginFileWrite(last);
     }
 

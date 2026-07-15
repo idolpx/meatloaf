@@ -178,6 +178,7 @@ protected:
 #endif
 
   void set_cwd(std::string path, bool verified = false);
+  void changePartition(int pnum);   // CMD "CP<n>" on a mounted DHD image
 
   std::unique_ptr<MFile> m_cwd;   // current working directory
   iecChannelHandler *m_channels[16];
