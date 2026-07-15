@@ -859,6 +859,11 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                 close(channel);
             }
 
+            // A "$" open (plain or with CMD filters) lists the CWD itself:
+            // remember that, because the cwd must never be re-anchored around
+            // a listing (see below).
+            bool cwd_listing = (name[0] == '$');
+
             // Handle CMD-style directory filters by preserving them in URL
             if ( name[0] == '$' ) {
                 // Check if this is a CMD-style filter (e.g., $=P, $GAME*, $=P:GAME*)
@@ -1033,7 +1038,19 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                             setStatusCode(ST_OK);
 
                             Debug_printv("isDir[%d] isRandomAccess[%d] isBrowsable[%d]", is_dir, new_stream->isRandomAccess(), new_stream->isBrowsable());
-                            if ( new_stream->isRandomAccess() || new_stream->isBrowsable() )
+                            if ( cwd_listing )
+                            {
+                                // Listing the CWD ("$"): leave the cwd alone.
+                                // HTTP "directories" take this file branch
+                                // (isDirectory() is false -- the server serves
+                                // index.prg as the listing), and the
+                                // set_cwd(f->base()) below would then move the
+                                // cwd UP one level on every directory listing
+                                // once base() correctly returns the parent of a
+                                // trailing-slash URL (observed: each `dir`
+                                // climbing one step toward the root).
+                            }
+                            else if ( new_stream->isRandomAccess() || new_stream->isBrowsable() )
                             {
                                 // This was a directory.  Set m_cwd to the directory
                                 Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "dir url[%s]", f->url.c_str() );
@@ -1074,7 +1091,7 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                             // }
                         }
 
-                        if ( m_statusCode != ST_OK && m_statusCode != ST_DRIVE_NOT_READY )
+                        if ( m_statusCode != ST_OK && m_statusCode != ST_DRIVE_NOT_READY && !cwd_listing )
                         {
                             if (f->pathInStream.size()) {
                                 Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "file in container, staying at [%s]", f->url.c_str() );
