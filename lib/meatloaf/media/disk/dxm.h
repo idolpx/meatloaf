@@ -148,7 +148,11 @@ public:
     };
 
     bool handles(std::string fileName) override {
-        return byExtension({".d2m", ".d4m"}, fileName);
+        return byExtension({
+            ".d1m",
+            ".d2m",
+            ".d4m"
+        }, fileName);
     }
 
     MFile* getFile(std::string path) override {

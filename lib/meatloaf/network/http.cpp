@@ -901,23 +901,23 @@ uint32_t HTTPMStream::read(uint8_t* buf, uint32_t size) {
         return toCopy;
     }
 
-    // Phase 3: No response buffer available in full mode — return 0 and
-    // signal end-of-stream to prevent readBufferData() infinite retry.
-    // Data will be available after _queuedSend fires.
-    if (isFullMode()) {
-        _position = _size = 0;  // available() → 0 → eos() → true
-        return 0;
-    }
-
-    // Phase 4: Simple-mode fallback (original behavior)
-    bool isWriteMode = (mode & 0x10) || (mode == std::ios_base::out);
-    if (isWriteMode && _session && _session->client) {
+    // Phase 4: Simple-mode fallback (original behavior).
+    // Catch both write-only and read-write (in|out init-only) modes.
+    bool needsHttpCall = (mode & 0x10) || (mode == std::ios_base::out) ||
+                         ((mode & std::ios_base::in) && (mode & std::ios_base::out) &&
+                          !_queuedSend && _responseBuffer.empty());
+    if (needsHttpCall && _session && _session->client) {
         auto client = _session->client.get();
         bool hasResponse = (!client->postBuffer.empty()) ||
                           (!client->postResponse.empty()) ||
                           (!client->preservedPostResponse.empty());
         if (!hasResponse) {
-            Debug_printv("POST already sent, reading from existing response");
+            // No POST body was written — this is a read-only open of a
+            // plain HTTP URL (e.g. LOAD or GET#).  Issue a real GET now
+            // so the client has something to read.
+            Debug_printv("SIMPLE GET fallback: url=%s", client->url.c_str());
+            client->GET(client->url);
+            Debug_printv("SIMPLE GET result: _is_open=%d _size=%u", client->_is_open, client->_size);
         } else if (!client->postBuffer.empty()) {
             Debug_printv("Sending POST request...");
             client->close();

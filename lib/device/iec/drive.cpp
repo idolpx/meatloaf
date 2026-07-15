@@ -40,6 +40,7 @@
 #include "time_converter.h"
 
 #include "meat_media.h"
+#include "media/hd/dhd.h"
 #include "qrmanager.h"
 
 #include "../../../include/global_defines.h"
@@ -803,7 +804,9 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
         // Network URLs (http://, ftp://, etc.) need read-write mode for
         // full-mode HTTP protocol: PRINT# writes commands, GET# reads responses.
         // Must override channel 1's default-out assignment.
-        if ( name.find("://") != std::string::npos && mode != (std::ios_base::in | std::ios_base::out) ) {
+        // Only force for channel >= 2 (OPEN for PRINT#/GET#).  Channel 0 LOAD
+        // must stay read-only so it performs the HTTP GET directly.
+        if ( name.find("://") != std::string::npos && channel >= 2 && mode != (std::ios_base::in | std::ios_base::out) ) {
             mode = std::ios_base::in | std::ios_base::out;
         }
 
@@ -1738,16 +1741,18 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
     switch ( command[0] )
     {
         case 'C':
-            if ( command[1] == 'P') // Change Partition text
+            if ( command[1] == 'P') // Change Partition text: CP<n>
             {
-                Debug_printv( "change partition");
-                //ChangeDevice();
+                int pnum = -1;
+                size_t d = command.find_first_of("0123456789");
+                if( d != std::string::npos )
+                    pnum = atoi(command.c_str() + d);
+                changePartition(pnum);
                 return;
             }
-            else if ( command[1] == 'p') // Change Partition binary
+            else if ( command[1] == 'p') // Change Partition binary: C{Shift-P}<byte>
             {
-                Debug_printv( "change partition");
-                //ChangeDevice();
+                changePartition(command.size() > 2 ? (uint8_t)command[2] : -1);
                 return;
             }
             // else if ( command[1] == 'D') // Change Directory
@@ -2115,6 +2120,8 @@ void iecDrive::getStatus(char *buffer, uint8_t bufferSize)
     {
         case ST_OK                  : msg = " OK"; break;
         case ST_SCRATCHED           : msg = "FILES SCRATCHED"; break;
+        case ST_PARTITION_SELECTED  : msg = "PARTITION SELECTED"; break;
+        case ST_PARTITION_ILLEGAL   : msg = "ILLEGAL PARTITION"; break;
 
         case ST_READ_NO_HEADER      :
         case ST_READ_NO_SYNC        :
@@ -2179,6 +2186,30 @@ void iecDrive::reset()
     Debug_memory();
 }
 
+
+// CMD "CP<n>" - change the selected partition of the mounted DHD image
+void iecDrive::changePartition(int pnum)
+{
+    std::string container = DHDImageRegistry::containerOf(m_cwd != nullptr ? m_cwd->url : "");
+    Debug_printv("change partition pnum[%d] container[%s]", pnum, container.c_str());
+
+    if (container.empty() || pnum < 1 || pnum > 254)
+    {
+        setStatusCode(ST_SYNTAX_INVALID);
+        return;
+    }
+
+    if (DHDImageRegistry::select(container, (uint8_t)pnum))
+    {
+        // The new partition's root becomes the working directory
+        set_cwd(container, true);
+        setStatusCode(ST_PARTITION_SELECTED, pnum);
+    }
+    else
+    {
+        setStatusCode(ST_PARTITION_ILLEGAL, pnum);
+    }
+}
 
 void iecDrive::set_cwd(std::string path, bool verified)
 {

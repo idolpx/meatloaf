@@ -282,8 +282,14 @@ public:
             if (respAvail > 0) return respAvail;
         }
         if (_size > _position) return _size - _position;
-        // Check if connection is still open and has more data coming
-        if (isOpen() && _session && _session->client && !_session->client->complete())
+        // Simple mode with open connection: data may be available in the HTTP
+        // client's internal buffer even if _size is 0 (chunked transfer, or
+        // small payload already fully buffered by esp_http_client).  Return a
+        // positive hint so readBufferData() tries to read rather than giving
+        // up immediately.  esp_http_client_read() returns 0 at natural EOF.
+        // Exclude full-mode (in|out) channels that init without an HTTP call.
+        if (isOpen() && _session && _session->client && _session->client->_is_open &&
+            !(mode & std::ios_base::out))
             return HTTP_BLOCK_SIZE;
         return 0;
     }

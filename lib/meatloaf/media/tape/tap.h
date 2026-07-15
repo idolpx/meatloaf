@@ -17,25 +17,48 @@
 
 // .TAP - The raw tape image format
 //
+// Decoding is done by the vendored wav2prg engine (see wav2prg/): the tape
+// is scanned for programs, the loader each program uses is detected via the
+// wav2prg observer chain (Kernal, Turbo Tape 64, Freeload, Novaload,
+// Pavloda, Ocean, and every other wav-prg plugin), and each program is
+// decoded into a PRG (2-byte load address + data).
+//
+// If a companion ".idx" file exists (same base name), it is used for the
+// directory listing instead of analyzing the whole tape: each line is
+// "<offset> <name>" (decimal, 0x hex or octal offsets; comments start with
+// #, ; or '). Loading an entry then only analyzes the tape from that offset.
+//
 // https://en.wikipedia.org/wiki/Commodore_Datasette
 // https://vice-emu.sourceforge.io/vice_17.html#SEC330
 // https://ist.uwaterloo.ca/~schepers/formats/TAP.TXT
 // https://sourceforge.net/p/tapclean/gitcode/ci/master/tree/
+// https://wav-prg.sourceforge.io/tape.html
+// https://www.luigidifraia.com/technical-info/
 // https://github.com/binaryfields/zinc64/blob/master/doc/Analyzing%20C64%20tape%20loaders.txt
 // https://web.archive.org/web/20170117094643/http://tapes.c64.no/
 // https://web.archive.org/web/20191021114418/http://www.subchristsoftware.com:80/finaltap.htm
 //
 
-//   Future Enhancements
-//   For full TAP support, the analyzeTapeData() method should be enhanced to:
-//   1. Decode pulses to bits: Use timing thresholds to determine 0/1 bits
-//   2. Find sync bytes: Look for standard C64 tape sync pattern (0x89...)
-//   3. Parse tape headers: Extract filename, type, load address
-//   4. Extract file data: Follow data blocks with checksums
-//   5. Support turbo loaders: Handle non-standard pulse timings
-//   6. Multiple files: TAP can contain multiple programs
+// .DMP - DC2N format tape image
+//
+// "DC2N-TAP-RAW" signature; 16-bit LE samples at the counter rate stored
+// in the header (usually 2 MHz), 0xFFFF = counter overflow. Decoding and
+// loader detection are shared with .TAP (see tape_decoder.h).
+//
+// https://www.luigidifraia.com/technical-info/
 
-// TODO: Add full emulation of tape counter (Absolute and relative) that allows to load tapes asking to reset the counter and the to rewind to 0. Positioning is very reliable and rewind to zero can be either manual (REW) or with an instant-execution functionality.
+// .HTAP - High resolution tape image format (Manosoft)
+//
+// "-HIRES" signature at offset 0x06; halfwave oriented: pulses are signed
+// 16-bit LE values (bit 15 = polarity, bits 0-14 = duration in 0.5 us
+// ticks, max 10 ms), pauses are 0x0000 0x0000 followed by a 32-bit
+// duration in us. Decoding and loader detection are shared with .TAP
+// (see tape_decoder.h).
+//
+// https://www.manosoft.it/?page_id=4678
+// https://drive.google.com/file/d/11IK1m5-k5Jk9-iR9TpWUmxMAX9MC-s9D/view?usp=drive_link
+//   (HTAP File Format Specifications V0 sub 2.0, Manosoft Group)
+//
 
 #ifndef MEATLOAF_MEDIA_TAP
 #define MEATLOAF_MEDIA_TAP
@@ -43,114 +66,77 @@
 #include "meatloaf.h"
 #include "meat_media.h"
 
+#include "tape_decoder.h"
+
 
 /********************************************************
  * Streams
  ********************************************************/
 
-class TAPMStream : public MStream {
+class TAPMStream : public MMediaStream {
 
 public:
-    TAPMStream(std::shared_ptr<MStream> containerStream) : MStream(containerStream->url)
+    TAPMStream(std::shared_ptr<MStream> is) : MMediaStream(is)
     {
-        this->containerStream = containerStream;
-
-        // Read TAP header
-        if (!readHeader())
-        {
-            Debug_printv("Failed to read TAP header");
-            return;
-        }
-
-        // Analyze tape data to find files
-        analyzeTapeData();
+        // Analysis is lazy: listing via a .idx needs no decode at all
     };
 
-    // TAP file header (20 bytes)
-    struct TAPHeader {
-        char signature[12];     // "C64-TAPE-RAW"
-        uint8_t version;        // $00 or $01
-        uint8_t reserved[3];    // Reserved for future use
-        uint32_t data_size;     // Size of pulse data (little-endian)
-    } __attribute__((packed));
+    ~TAPMStream()
+    {
+        freeImage();
+    }
 
-    // Detected tape file entry
-    struct TapeFile {
-        std::string filename;
-        uint8_t file_type;
-        uint32_t data_offset;       // Offset in cached data
-        uint32_t data_length;       // Length of file data
-        uint16_t start_address;     // Load address
-        uint16_t end_address;       // End address
-        std::vector<uint8_t> cached_data;  // Decoded file data (cached during analysis)
+    struct IdxEntry {
+        uint32_t offset;
+        std::string name;
     };
+
+    // Provide the contents of the companion .idx file (empty = none)
+    void loadIndex(const std::string &idx_text);
+
+    // Directory entries: from .idx when present, else from full analysis
+    uint16_t entryCount();
+    bool getEntry(uint16_t index, std::string &name, std::string &loader,
+                  uint32_t &size, bool &checksum_ok);
+
+    bool seekPath(std::string path) override;
+
+    // Tape counter: current read position as time from the start of the
+    // tape (like a datasette counter). Interpolated within the file being
+    // read; durationMs() is the length of the whole tape.
+    uint32_t counterMs();
+    uint32_t durationMs();
+    std::string counterString();   // "MMM:SS/MMM:SS"
+
+    std::unordered_map<std::string, std::string> info() override;
+
+    std::string media_label = "c64 tape";
 
 protected:
-    struct Header {
-        std::string signature;
-        uint8_t version;
-        uint32_t data_size;
-    };
+    uint32_t readFile(uint8_t* buf, uint32_t size) override;
+    uint32_t writeFile(uint8_t* buf, uint32_t size) override { return 0; };
 
-    struct Entry {
-        std::string filename;
-        uint8_t file_type;
-        uint32_t data_offset;
-        uint32_t data_length;
-        uint16_t start_address;
-        uint16_t end_address;
-    };
+    bool loadImage();       // buffer the raw image in RAM
+    void freeImage();
+    bool ensureAnalyzed();  // full-tape analysis (no .idx)
+    bool decodeAt(uint32_t offset, TapeEntry &out); // single program at offset
 
-    std::shared_ptr<MStream> containerStream;
-    TAPHeader tap_header;
-    std::vector<TapeFile> tape_files;
-    uint32_t pulse_data_start;      // Offset where pulse data begins
-    uint32_t current_file_index = 0;
+    uint8_t *image_data = nullptr;
+    uint32_t image_len = 0;
 
-    // TAP decoding state
-    uint32_t tap_position;          // Current position in TAP data
-    static const uint16_t kernal_thresholds[2];  // Pulse duration thresholds: 426, 616
-    static const uint8_t kernal_pilot_sequence[9];  // 137,136,135,134,133,132,131,130,129
+    bool analyzed = false;
+    bool analysis_ok = false;
+    std::vector<TapeEntry> entries;
 
-    Header header;
-    Entry entry;
+    bool has_idx = false;
+    std::vector<IdxEntry> idx_entries;
 
-    bool readHeader();
-    void analyzeTapeData();
-
-    // TAP decoding functions (adapted from wav-prg)
-    bool readTAPPulse(uint32_t& pulse);
-    bool pulseToBit(uint8_t pulse1, uint8_t pulse2, uint8_t& bit);
-    bool getPulseBit(uint8_t& bit);
-    bool getByte(uint8_t& byte);
-    bool getByteWithSync(uint8_t& byte, bool allow_short_first);
-    bool findSync();
-    bool readTapeHeader(uint8_t& file_type, std::string& filename, uint16_t& start_addr, uint16_t& end_addr);
-    bool readDataBlock(uint8_t* buffer, uint16_t max_size, uint16_t& bytes_read);
-    bool skipDataBlock(uint16_t max_size, uint16_t& bytes_skipped, uint32_t& data_start_position);
-
-    // TAP is browseable (can list files) but not random access (sequential tape data)
-    bool isBrowsable() override { return true; };
-    bool isRandomAccess() override {
-        // If IDX file present, could be random access
-        // TODO: Check for .idx companion file logic here (not implemented)
-        return false;
-    };
-
-    // MStream required methods
-    bool isOpen() override { return containerStream != nullptr && containerStream->isOpen(); };
-    bool open(std::ios_base::openmode mode) override { return containerStream->open(mode); };
-    void close() override { if (containerStream) containerStream->close(); };
-    bool seek(uint32_t pos) override;
-
-    uint32_t read(uint8_t* buf, uint32_t size) override;
-    uint32_t write(const uint8_t* buf, uint32_t size) override { return 0; };
-
-    // Sequential access for TAP files
-    std::string seekNextEntry() override;
-
-    // Random access if IDX file present
-    bool seekPath(std::string path) override;
+    // Currently selected file (after seekPath)
+    std::vector<uint8_t> current_prg;
+    uint32_t cur_start_ms = 0;     // tape time of the selected file's block
+    uint32_t cur_end_ms = 0;
+    uint32_t total_ms = 0;         // whole tape duration (0 = not computed)
+    bool times_computed = false;
 
 private:
     friend class TAPMFile;
@@ -170,22 +156,22 @@ public:
         media_image = name;
     };
 
-    ~TAPMFile() {
-        // Close the cached stream
-        if (cached_stream)
-            cached_stream->close();
-    }
-
     std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> is) override;
 
     bool rewindDirectory() override;
     MFile* getNextFileInDir() override;
 
+    bool isDirectory() override;
+    bool exists() override;
+
     bool isDir = true;
     bool dirIsOpen = false;
 
-private:
-    std::shared_ptr<TAPMStream> cached_stream;  // Cached decoded stream
+protected:
+    // Reads the companion .idx file next to the image ("" if none)
+    std::string readIdxSibling();
+
+    uint16_t entry_index = 0;
 };
 
 
@@ -202,9 +188,8 @@ public:
     bool handles(std::string fileName) override {
         return byExtension({
             ".tap",
-            ".idx",  // https://www.luigidifraia.com/technical-info/
-            ".wav",  // Some TAPs are stored in WAV containers
-            ".tzx"   // https://worldofspectrum.org/faq/reference/formats.htm
+            ".dmp",
+            ".htap"
         },
             fileName
         );
