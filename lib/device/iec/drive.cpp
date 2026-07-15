@@ -804,7 +804,9 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
         // Network URLs (http://, ftp://, etc.) need read-write mode for
         // full-mode HTTP protocol: PRINT# writes commands, GET# reads responses.
         // Must override channel 1's default-out assignment.
-        if ( name.find("://") != std::string::npos && mode != (std::ios_base::in | std::ios_base::out) ) {
+        // Only force for channel >= 2 (OPEN for PRINT#/GET#).  Channel 0 LOAD
+        // must stay read-only so it performs the HTTP GET directly.
+        if ( name.find("://") != std::string::npos && channel >= 2 && mode != (std::ios_base::in | std::ios_base::out) ) {
             mode = std::ios_base::in | std::ios_base::out;
         }
 
