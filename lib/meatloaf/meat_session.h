@@ -334,6 +334,15 @@ private:
             if (path == schemeRoot) {
                 return true;
             }
+            // Hostless paths in the same scheme use the session's default host
+            // (e.g. console cwd "csip:/" after "cd csip://" keeps the
+            // "csip://commodoreserver.com:1541" session alive). Note the cwd
+            // may be normalized to a single slash ("csip:/...").
+            std::string schemePrefix = key.substr(0, schemeEnd + 1); // e.g. "csip:"
+            if (pathParsed != nullptr && pathParsed->host.empty() &&
+                mstr::startsWith(path.c_str(), schemePrefix.c_str())) {
+                return true;
+            }
             // Port-0 sessions use a dummy host (e.g. "mdns://mdns:0") and serve the whole
             // scheme namespace — any path starting with the same scheme keeps them alive.
             size_t last_colon = key.rfind(':');
