@@ -1126,8 +1126,12 @@ bool MeatHttpClient::processRedirectsAndOpen(uint32_t position, uint32_t size) {
 
         if (lastRC >= 300 && lastRC <= 399) {
             // Location header handler already updated `url` to the redirect target.
-            // Fresh init() for the new URL's TLS connection prevents stale-handle
-            // failures in esp_http_client on the redirect target.
+            // Fresh init() for the new URL — prevents stale-handle failures and
+            // clears event-captured redirect body from postResponse.
+            postResponse.clear();
+            postBuffer.clear();
+            _size = 0;
+            _position = 0;
             init();
             connectRetries = 0;  // fresh retry budget for the redirect target
         }
@@ -1219,11 +1223,10 @@ void MeatHttpClient::close() {
             }
             esp_http_client_close(_http);
         }
-        // Keep _http alive for connection reuse — don't cleanup.
-        // The next init() will reconfigure it instead of creating a new handle.
-        Debug_printv("HTTP Close (preserving handle for reuse)");
+        esp_http_client_cleanup(_http);
+        Debug_printv("HTTP Close and Cleanup");
+        _http = nullptr;
     }
-    // ALWAYS preserve postResponse so it survives subsequent operations, even if called multiple times
     if (!postResponse.empty()) {
         uint32_t responseSize = (uint32_t)postResponse.size();
         preservedPostResponse = std::move(postResponse);
@@ -1794,13 +1797,14 @@ static void load_ca_cert_from_flash()
 
 void MeatHttpClient::init() {
     if (_http != nullptr) {
-        // Reuse existing handle — just update URL and reset state.
-        // This avoids destroying and recreating the TCP+TLS connection,
-        // allowing ESP-IDF's keep-alive (already configured) to actually
-        // reuse the socket across requests.
-        esp_http_client_set_url(_http, url.empty() ? "http://localhost/" : url.c_str());
-        _is_open = false;
-        return;
+        // Always clean up the old handle.  esp_http_client_set_url() doesn't
+        // flush the response buffer from the previous request, so redirect
+        // bodies (e.g. Wikipedia's 303 "See Other") leak into the next
+        // response.  The keep-alive benefit of reuse does not justify the
+        // stale-data bugs it causes.  ESP-IDF's transport layer handles
+        // connection pooling internally.
+        esp_http_client_cleanup(_http);
+        _http = nullptr;
     }
     _is_open = false;
 
