@@ -17,6 +17,14 @@
 
 // .D1M/D2M/D4M - CMD FD2000/FD4000 Disk Image Format
 //
+// • D1M FD2000/FD4000 DD disk image format  - 800KB
+// • D2M FD2000/FD4000 HD disk image format  - 1.56MB
+// • D4M FD4000 ED disk image format         - 3.2MB
+//
+// While .d2m and .d4m files are complex containers holding partition tables, 
+// system tracks, and multiple logical drives, the .d1m is a "flat" image. It 
+// represents a single native CMD partition or an emulated 1581 disk.
+//
 // https://cbm8bit.com/8bit/commodore/server/Unrenamed%20Achives/browse/c64/d2m
 // https://web.archive.org/web/20180925144409/https://cbm8bit.com/articles/user-contributions/howto_d1m_d2m_d4m
 // https://ist.uwaterloo.ca/~schepers/formats/D2M-DNP.TXT
@@ -89,16 +97,13 @@ public:
         uint32_t size = containerStream->size();
         switch (size + media_header_size) 
         {
-            case 819200:  // 80 tracks no errors
+            case 829440:  // D1M
                 break;
 
-            case 822400:  // 80 w/ errors
-                error_info = true;
+            case 1658880: // D2M
                 break;
 
-            // https://sourceforge.net/p/vice-emu/bugs/1890/
-            case 829440:  // 81 tracks no errors
-                partitions[partition].block_allocation_map[1].end_track = 81;
+            case 3317760: // D4M
                 break;
         }
     };
@@ -120,7 +125,7 @@ class DXMMFile: public D64MFile {
 public:
     DXMMFile(std::string path) : D64MFile(path) 
     {
-        size = 819200; // Default - 80 tracks no errors
+        size = 829440; // D1M
     };
 
     std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> is) override
