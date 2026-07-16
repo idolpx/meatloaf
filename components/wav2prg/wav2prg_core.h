@@ -30,10 +30,19 @@ typedef int32_t           (*wav2prg_get_pos_func)(void* audiotap);
 extern "C" {
 #endif
 
+/* Carries the loader/observer state between incremental wav2prg_analyse
+   calls, so turbo-loader chains survive stopping after each block */
+struct wav2prg_continuation;
+void wav2prg_continuation_free(struct wav2prg_continuation *cont);
+
+/* When 'continuation' is non-NULL, analysis stops after each block that is
+   kept, saving the loader/observer state into *continuation (freed and
+   resumed on the next call). *continuation == NULL after a call means the
+   end of the tape was reached. Pass NULL to analyse the whole input. */
 struct block_list_element* wav2prg_analyse(const char* start_loader,
                                            struct wav2prg_plugin_conf* start_conf,
                                            enum wav2prg_bool keep_broken_blocks,
-                                           enum wav2prg_bool stop_at_end_of_program,
+                                           struct wav2prg_continuation **continuation,
                                            struct wav2prg_input_object *input_object,
                                            struct wav2prg_input_functions *input,
                                            struct wav2prg_display_interface *wav2prg_display_interface,

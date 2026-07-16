@@ -13,6 +13,14 @@ namespace ESP32Console
 
     MFile* getCurrentPath();
 
+    // Replace the console's current path, deleting the previous MFile.
+    // Takes ownership of 'path'.
+    void setCurrentPath(MFile* path);
+
+    // Thread-safe copy of the current path URL (safe to call from other
+    // tasks, e.g. the SessionBroker service task)
+    std::string getCurrentPathUrl();
+
     /**
      * @brief Returns the current console process working dir
      *

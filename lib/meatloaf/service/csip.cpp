@@ -71,13 +71,16 @@ bool CSIPMSession::connect() {
 }
 
 void CSIPMSession::disconnect() {
-    if (!connected) {
-        return;
+    // Only attempt the polite quit while the session is believed healthy,
+    // but ALWAYS close the stream - 'connected' may already be false (e.g.
+    // after a failed keep-alive) while the TCP socket is still open
+    if (connected) {
+        Debug_printv("Disconnecting from %s:%d", host.c_str(), port);
+        sendCommand("quit");
     }
-
-    Debug_printv("Disconnecting from %s:%d", host.c_str(), port);
-    sendCommand("quit");
-    buf.close();
+    if (buf.is_open()) {
+        buf.close();
+    }
     connected = false;
 }
 

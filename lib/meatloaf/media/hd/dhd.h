@@ -306,6 +306,29 @@ using DHD71MFile = DHDPartitionMFile<D71MFile>;
 using DHD81MFile = DHDPartitionMFile<D81MFile>;
 using DHDNPMFile = DHDPartitionMFile<DNPMFile>;
 
+// Return the MFile type matching the currently selected partition of the
+// CMD media image in 'path' (the default partition on first use). Shared
+// by the DHD (CMD HD) and D1M/D2M/D4M (CMD FD) filesystems.
+inline MFile* DHDCreatePartitionFile(std::string path)
+{
+    uint8_t type = 1;
+    auto img = DHDImageRegistry::obtain(DHDImageRegistry::containerOf(path));
+    if (img != nullptr)
+    {
+        const DHDPartition* p = img->current();
+        if (p != nullptr)
+            type = p->type;
+    }
+
+    switch (type)
+    {
+        case 2: return new DHD41MFile(path);
+        case 3: return new DHD71MFile(path);
+        case 4: return new DHD81MFile(path);
+        default: return new DHDNPMFile(path);
+    }
+}
+
 
 /********************************************************
  * FS
@@ -325,25 +348,8 @@ public:
         return byExtension(".dhd", fileName);
     }
 
-    // Return the MFile type matching the currently selected partition
-    // (the default partition on first use of the image)
     MFile* getFile(std::string path) override {
-        uint8_t type = 1;
-        auto img = DHDImageRegistry::obtain(DHDImageRegistry::containerOf(path));
-        if (img != nullptr)
-        {
-            const DHDPartition* p = img->current();
-            if (p != nullptr)
-                type = p->type;
-        }
-
-        switch (type)
-        {
-            case 2: return new DHD41MFile(path);
-            case 3: return new DHD71MFile(path);
-            case 4: return new DHD81MFile(path);
-            default: return new DHDNPMFile(path);
-        }
+        return DHDCreatePartitionFile(path);
     }
 };
 
