@@ -185,8 +185,10 @@ int cd(int argc, char **argv)
     std::unique_ptr<MFile> destPath(getCurrentPath()->cd(argv[1]));
 
     Debug_printv("url[%s] path[%s] pathInStream[%s]", destPath->url.c_str(), path, destPath->pathInStream.c_str());
-    if(destPath->isDirectory()) {        
-        currentPath = destPath.release();
+    if(destPath->isDirectory()) {
+        // setCurrentPath deletes the previous path object (a leaked MFile
+        // would pin its network session's shared_ptr forever)
+        setCurrentPath(destPath.release());
     } else {
         Serial.printf("cd: not a directory: %s\r\n", path);
         return EXIT_FAILURE;

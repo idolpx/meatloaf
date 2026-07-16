@@ -7,17 +7,43 @@
 
 #include "../Console.h"
 
+#include <mutex>
+
 namespace ESP32Console
 {
     constexpr char *PWD_DEFAULT = (char*) "/";
 
     MFile* currentPath = nullptr;
 
+    // Guards currentPath replacement vs. cross-task readers (SessionBroker)
+    static std::mutex s_path_mutex;
+
     MFile* getCurrentPath() {
         if(currentPath == nullptr) {
             currentPath = MFSOwner::File("/");
         }
         return currentPath;
+    }
+
+    void setCurrentPath(MFile* path) {
+        if (path == nullptr)
+            return;
+        MFile* old;
+        {
+            std::lock_guard<std::mutex> lock(s_path_mutex);
+            old = currentPath;
+            currentPath = path;
+        }
+        // Delete outside the lock: media MFile destructors can do real work
+        if (old != nullptr && old != path)
+            delete old;
+    }
+
+    std::string getCurrentPathUrl() {
+        std::lock_guard<std::mutex> lock(s_path_mutex);
+        if (currentPath == nullptr)
+            return "/";
+        return currentPath->url;
     }
 
     // const char *console_getpwd()

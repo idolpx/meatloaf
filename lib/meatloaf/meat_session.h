@@ -370,13 +370,11 @@ private:
         if (path_matches_session(Meatloaf.getCWD(), key)) {
             return true;
         }
-        // Check console current path
-        auto consolePath = ESP32Console::getCurrentPath();
-        if (consolePath != nullptr) {
-            auto consoleUrl = consolePath->url;
-            if (path_matches_session(consoleUrl, key)) {
-                return true;
-            }
+        // Check console current path (URL copy - the console may replace
+        // its path object concurrently on another task)
+        auto consoleUrl = ESP32Console::getCurrentPathUrl();
+        if (!consoleUrl.empty() && path_matches_session(consoleUrl, key)) {
+            return true;
         }
         return false;
     }
@@ -397,6 +395,11 @@ private:
         auto it = session_repo.find(key);
         if (it != session_repo.end()) {
             Debug_printv("Disposing session: %s", key.c_str());
+            // Disconnect explicitly: a stale shared_ptr held elsewhere would
+            // otherwise keep the destructor (and the socket close) from
+            // running when the repo entry is erased
+            if (it->second != nullptr && !it->second->isBusy())
+                it->second->disconnect();
             session_repo.erase(it);
         }
         Debug_memory();
