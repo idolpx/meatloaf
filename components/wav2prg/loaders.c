@@ -95,6 +95,7 @@ void register_loaders(void) {
   /* Loader plugins */
   STATIC_LOADER(kernal)
   STATIC_LOADER(turbotape)
+  STATIC_LOADER(turbotape_fast)
   STATIC_LOADER(novaload)
   STATIC_LOADER(novaload_special)
   STATIC_LOADER(audiogenic)
@@ -138,6 +139,7 @@ void register_loaders(void) {
   /* Observers (loader detection from loaded blocks) */
   STATIC_OBSERVER(kernal)
   STATIC_OBSERVER(turbotape)
+  STATIC_OBSERVER(turbotape_fast)
   STATIC_OBSERVER(novaload_special)
   STATIC_OBSERVER(audiogenic)
   STATIC_OBSERVER(rackit)
