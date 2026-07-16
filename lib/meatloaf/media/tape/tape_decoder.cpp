@@ -98,6 +98,9 @@ bool TapeDecoder::open(MStream *container)
     time_valid = true;
     total_known = false;
     total_ms = 0;
+    locked_loader.clear();
+    fallback_done = false;
+    trial_end = 0;
     resetContinuation();
 
     if (stream == nullptr)
@@ -157,9 +160,13 @@ bool TapeDecoder::open(MStream *container)
 }
 
 // Read one duration value (in machine cycles) at *p, advancing it;
-// false at end of data
+// false at end of data (or the current trial window)
 bool TapeDecoder::nextValue(uint32_t *p, uint32_t *cycles)
 {
+    // Bounded start-loader trials stop at trial_end
+    if (trial_end != 0 && *p >= trial_end)
+        return false;
+
     switch (kind)
     {
         case TAPE_KIND_TAP:
@@ -295,7 +302,8 @@ struct tape_io {
     static enum wav2prg_bool is_eof(struct wav2prg_input_object *object)
     {
         TapeDecoder *td = (TapeDecoder *)object->object;
-        return (td->pos >= td->len) ? wav2prg_true : wav2prg_false;
+        uint32_t end = (td->trial_end != 0 && td->trial_end < td->len) ? td->trial_end : td->len;
+        return (td->pos >= end) ? wav2prg_true : wav2prg_false;
     }
 
     static void invert(struct wav2prg_input_object *object)
@@ -409,12 +417,15 @@ bool TapeDecoder::nextProgram(uint32_t from_offset, TapeEntry &out)
         resetContinuation();
 
     uint32_t target = (from_offset > data_start) ? from_offset : data_start;
+    bool rewound = false;
     if (target <= data_start)
     {
         // Rewind to the start of the tape
         pos = data_start;
         cursor_cycles = 0;
         time_valid = true;
+        fallback_done = false; // allow the standalone-loader trials again
+        rewound = true;
     }
     else if (target != pos)
     {
@@ -425,7 +436,60 @@ bool TapeDecoder::nextProgram(uint32_t from_offset, TapeEntry &out)
     if (pos >= len)
         return false;
 
-    const char *start_loader = (platform == 2) ? "Default C16" : "Default C64";
+    const char *base_loader = (platform == 2) ? "Default C16" : "Default C64";
+    const char *start_loader = locked_loader.empty() ? base_loader : locked_loader.c_str();
+
+    if (analyzeChain(start_loader, from_offset, out))
+        return true;
+
+    // Fallback: the tape doesn't start with a Kernal boot block. On a fresh
+    // scan of the tape start, try the standalone primary loaders (Pavloda,
+    // Turbo 220, Microload, ...) as the start loader and lock the first that
+    // decodes a program. Only runs once per scan and only when nothing is
+    // already locked.
+    static const char *kFallbackLoaders[] = {
+        "Turbo Tape 64", "Turbo Tape 64 fast", "Turbo 220",
+        "Pavloda", "Pavloda Old", "Pavloda Penetrator",
+        "Microload", "Nobby", "Atlantis", "Alien", "Ash & Dave",
+        "The Edge", "Wizard Development", "Jetload", "Tequila Sunrise",
+        "Novaload Normal"
+    };
+
+    if (locked_loader.empty() && !fallback_done && rewound)
+    {
+        fallback_done = true;
+
+        // Each trial scans at most ~1 MB of tape for its first program
+        uint32_t limit = data_start + 1024 * 1024;
+        for (const char *cand : kFallbackLoaders)
+        {
+            resetContinuation();
+            pos = data_start;
+            cursor_cycles = 0;
+            time_valid = true;
+            trial_end = (limit < len) ? limit : len;
+
+            bool ok = analyzeChain(cand, data_start, out);
+            trial_end = 0;
+
+            if (ok)
+            {
+                Debug_printv("Locked start loader [%s] for this tape", cand);
+                locked_loader = cand;
+                return true;
+            }
+        }
+
+        // Nothing matched: leave the tape at EOF
+        resetContinuation();
+        pos = len;
+    }
+
+    return false;
+}
+
+bool TapeDecoder::analyzeChain(const char *start_loader, uint32_t from_offset, TapeEntry &out)
+{
     struct wav2prg_input_object input_object = { this };
 
     // Incremental analysis: each call decodes up to the next kept block,

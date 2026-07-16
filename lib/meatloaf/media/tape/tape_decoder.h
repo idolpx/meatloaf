@@ -120,6 +120,18 @@ private:
     struct wav2prg_continuation *cont = nullptr;
     uint32_t cont_pos = 0;      // input position when 'cont' was saved
 
+    // Start-loader lock: once a non-Kernal primary loader (Pavloda, Turbo
+    // 220, ...) is detected for this tape, use it as the start loader for
+    // every subsequent program instead of the Kernal ROM loader
+    std::string locked_loader;
+    bool fallback_done = false; // standalone-loader trials attempted this scan
+    uint32_t trial_end = 0;     // 0 = unlimited; else stop input at this offset
+
+    // Decode the next program starting with 'start_loader' (or a saved
+    // continuation); fills 'out'. Returns true on a program, false at the
+    // end of the tape / trial window.
+    bool analyzeChain(const char *start_loader, uint32_t from_offset, TapeEntry &out);
+
     // Last returned program (to skip repeated blocks, e.g. Kernal 2nd copy)
     bool last_valid = false;
     uint16_t last_start = 0, last_end = 0;

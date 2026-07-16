@@ -140,6 +140,7 @@ void register_loaders(void) {
   STATIC_OBSERVER(kernal)
   STATIC_OBSERVER(turbotape)
   STATIC_OBSERVER(turbotape_fast)
+  STATIC_OBSERVER(novaload_observers)
   STATIC_OBSERVER(novaload_special)
   STATIC_OBSERVER(audiogenic)
   STATIC_OBSERVER(rackit)
