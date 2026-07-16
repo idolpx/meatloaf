@@ -1224,6 +1224,21 @@ void MeatHttpClient::close() {
                 // Capture the real HTTP status code
                 lastRC = esp_http_client_get_status_code(_http);
 
+                if (performResult != 0) {
+                    // Connection failed (e.g. 28679 = ESP_ERR_HTTP_CONNECT).
+                    // The keep-alive socket dropped (Ollama idle timeout, etc.).
+                    // Clean up now so the next request creates a fresh handle
+                    // instead of repeatedly hitting a dead TCP connection.
+                    esp_http_client_close(_http);
+                    esp_http_client_cleanup(_http);
+                    _http = nullptr;
+                    _httpOrigin.clear();
+                    _size = (uint32_t)postResponse.size();
+                    postBuffer.clear();
+                    Debug_printv("HTTP Perform failed — handle destroyed");
+                    return;
+                }
+
                 // Set _size from the captured response
                 _size = (uint32_t)postResponse.size();
                 postBuffer.clear();
