@@ -99,6 +99,7 @@
 #include "media/disk/d81.h"
 #include "media/disk/d82.h"
 #include "media/disk/d90.h"
+#include "media/disk/dxm.h"
 #include "media/disk/g64.h"
 #include "media/disk/nib.h"
 
@@ -361,6 +362,7 @@ D80MFileSystem d80FS;
 D81MFileSystem d81FS;
 D82MFileSystem d82FS;
 D90MFileSystem d90FS;
+DXMMFileSystem dxmFS;
 G64MFileSystem g64FS;
 NIBMFileSystem nibFS;
 
@@ -420,6 +422,7 @@ std::vector<MFileSystem*> MFSOwner::availableFS {
 
     // Disk
     &d64FS, &d71FS, &d80FS, &d81FS, &d82FS, &d90FS,
+    &dxmFS,
     &g64FS, &nibFS,
 
     // Hard Disk

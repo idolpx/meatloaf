@@ -2263,7 +2263,8 @@ void iecDrive::tapeCommand(std::string command)
     setStatusCode(tf->buildIndex() ? ST_OK : ST_WRITE_VERIFY);
 }
 
-// CMD "CP<n>" - change the selected partition of the mounted DHD image
+// CMD "CP<n>" - change the selected partition of the mounted CMD media
+// image (DHD hard disk or D1M/D2M/D4M floppy)
 void iecDrive::changePartition(int pnum)
 {
     std::string container = DHDImageRegistry::containerOf(m_cwd != nullptr ? m_cwd->url : "");

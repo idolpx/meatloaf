@@ -48,17 +48,24 @@ const DHDPartition* DHDImageRegistry::Image::byName(std::string utf8name) const
 
 std::string DHDImageRegistry::containerOf(const std::string &path)
 {
-    // The container path ends with the ".dhd" component
-    for (size_t i = 0; i + 4 <= path.size(); i++)
+    // The container path ends with a CMD media image component:
+    // .dhd (HD), .d1m/.d2m/.d4m (FD-2000/FD-4000)
+    static const char *exts[] = { ".dhd", ".d1m", ".d2m", ".d4m" };
+
+    std::string lower = path;
+    for (auto &c : lower)
+        c = tolower(c);
+
+    for (auto ext : exts)
     {
-        if ((path[i] == '.') &&
-            (path[i+1] == 'd' || path[i+1] == 'D') &&
-            (path[i+2] == 'h' || path[i+2] == 'H') &&
-            (path[i+3] == 'd' || path[i+3] == 'D'))
+        size_t elen = strlen(ext);
+        size_t p = lower.find(ext);
+        while (p != std::string::npos)
         {
-            size_t end = i + 4;
-            if (end == path.size() || path[end] == '/')
+            size_t end = p + elen;
+            if (end == lower.size() || lower[end] == '/')
                 return path.substr(0, end);
+            p = lower.find(ext, p + 1);
         }
     }
     return "";
@@ -90,9 +97,29 @@ bool DHDImageRegistry::parse(const std::string &containerUrl, Image &img)
         0x43, 0x4D, 0x44, 0x20, 0x48, 0x44, 0x20, 0x20,   // "CMD HD  "
         0x8D, 0x03, 0x88, 0x8E, 0x02, 0x88, 0xEA, 0x60
     };
+    // CMD FD series signature (same location) for D1M/D2M/D4M images
+    static const uint8_t fdmagic[16] = {
+        0x43, 0x4D, 0x44, 0x20, 0x46, 0x44, 0x20, 0x53,   // "CMD FD SERIES   "
+        0x45, 0x52, 0x49, 0x45, 0x53, 0x20, 0x20, 0x20
+    };
 
-    // Open the raw image bytes: the probing flag makes DHDMFileSystem
-    // decline the path so the underlying filesystem serves it
+    // FD images have the system partition at a fixed location; on track 1
+    // of it (track 0 is 8 sectors: offset = (track << 3) + sector) sits the
+    // partition table, i.e. at sys_base + 2048. HD images are scanned and
+    // use 256-sector tracks (table at sys_base + 65536).
+    std::string lower = containerUrl;
+    for (auto &c : lower)
+        c = tolower(c);
+    uint32_t fd_sys = 0;
+    if (mstr::endsWith(lower, ".d1m"))
+        fd_sys = 0x640 * 512;
+    else if (mstr::endsWith(lower, ".d2m"))
+        fd_sys = 0xC80 * 512;
+    else if (mstr::endsWith(lower, ".d4m"))
+        fd_sys = 0x1900 * 512;
+
+    // Open the raw image bytes: the probing flag makes the CMD media
+    // filesystems decline the path so the underlying filesystem serves it
     s_probing = true;
     std::unique_ptr<MFile> f(MFSOwner::File(containerUrl));
     std::shared_ptr<MStream> s = (f != nullptr) ? f->getSourceStream() : nullptr;
@@ -100,31 +127,50 @@ bool DHDImageRegistry::parse(const std::string &containerUrl, Image &img)
 
     if (s == nullptr || !s->isOpen())
     {
-        Debug_printv("Cannot open DHD image [%s]", containerUrl.c_str());
+        Debug_printv("Cannot open CMD media image [%s]", containerUrl.c_str());
         return false;
     }
 
     uint32_t image_size = s->size();
     uint8_t cfg[256];
 
-    // The system partition sits on a 64 KiB boundary
     uint32_t sys_base = 0xFFFFFFFF;
-    for (uint32_t base = 0; base + 0x600 <= image_size; base += 65536)
+    uint32_t table_base = 0;
+    uint16_t maxpart = 254;
+
+    if (fd_sys != 0)
     {
-        if (!s->seek(base + 0x500))
-            break;
-        if (s->read(cfg, sizeof(cfg)) != sizeof(cfg))
-            break;
-        if (memcmp(&cfg[0xF0], hdmagic, sizeof(hdmagic)) == 0)
+        // CMD FD (D1M/D2M/D4M): fixed system partition location
+        if (fd_sys + 0x600 <= image_size &&
+            s->seek(fd_sys + 0x500) && s->read(cfg, sizeof(cfg)) == sizeof(cfg) &&
+            memcmp(&cfg[0xF0], fdmagic, sizeof(fdmagic)) == 0)
         {
-            sys_base = base;
-            break;
+            sys_base = fd_sys;
+            table_base = sys_base + 2048;
+            maxpart = 31;
+        }
+    }
+    else
+    {
+        // CMD HD: the system partition sits on a 64 KiB boundary
+        for (uint32_t base = 0; base + 0x600 <= image_size; base += 65536)
+        {
+            if (!s->seek(base + 0x500))
+                break;
+            if (s->read(cfg, sizeof(cfg)) != sizeof(cfg))
+                break;
+            if (memcmp(&cfg[0xF0], hdmagic, sizeof(hdmagic)) == 0)
+            {
+                sys_base = base;
+                table_base = sys_base + 65536;
+                break;
+            }
         }
     }
 
     if (sys_base == 0xFFFFFFFF)
     {
-        Debug_printv("No CMD HD system partition found [%s]", containerUrl.c_str());
+        Debug_printv("No CMD system partition found [%s]", containerUrl.c_str());
         return false;
     }
 
@@ -134,9 +180,9 @@ bool DHDImageRegistry::parse(const std::string &containerUrl, Image &img)
     // 8 per 256-byte sector, laid out contiguously. Entry 0 is the system
     // partition itself.
     uint8_t buf[32];
-    for (uint16_t i = 0; i <= 254; i++)
+    for (uint16_t i = 0; i <= maxpart; i++)
     {
-        uint32_t off = sys_base + 65536 + (uint32_t)i * 32;
+        uint32_t off = table_base + (uint32_t)i * 32;
         if (off + 32 > image_size)
             break;
         if (!s->seek(off))
@@ -182,8 +228,9 @@ bool DHDImageRegistry::parse(const std::string &containerUrl, Image &img)
     img.selected = img.byNumber(img.default_part) ? img.default_part : img.parts[0].number;
     img.valid = true;
 
-    Debug_printv("CMD HD [%s] label[%s] partitions[%d] selected[%d]",
-                 containerUrl.c_str(), img.disk_label.c_str(), img.parts.size(), img.selected);
+    Debug_printv("CMD %s [%s] label[%s] partitions[%d] selected[%d]",
+                 fd_sys ? "FD" : "HD", containerUrl.c_str(),
+                 img.disk_label.c_str(), img.parts.size(), img.selected);
     return true;
 }
 
