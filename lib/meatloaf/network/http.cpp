@@ -1125,15 +1125,22 @@ bool MeatHttpClient::processRedirectsAndOpen(uint32_t position, uint32_t size) {
         connectRetries = 0; // reset on success
 
         if (lastRC >= 300 && lastRC <= 399) {
-            // Location header handler already updated `url` to the redirect target.
-            // Fresh init() for the new URL — prevents stale-handle failures and
-            // clears event-captured redirect body from postResponse.
+            // Redirect — the old connection is half-closed (server sent body +
+            // may have closed or will close).  Force full handle cleanup even
+            // if the redirect target is the same origin.  init() will create
+            // a fresh handle for the new URL.
             postResponse.clear();
             postBuffer.clear();
             _size = 0;
             _position = 0;
+            if (_http != nullptr) {
+                esp_http_client_cleanup(_http);
+                _http = nullptr;
+            }
+            _httpOrigin.clear();
+            _is_open = false;
             init();
-            connectRetries = 0;  // fresh retry budget for the redirect target
+            connectRetries = 0;
         }
     } while (lastRC >= 300 && lastRC <= 399);
 
@@ -1223,9 +1230,13 @@ void MeatHttpClient::close() {
             }
             esp_http_client_close(_http);
         }
-        esp_http_client_cleanup(_http);
-        Debug_printv("HTTP Close and Cleanup");
-        _http = nullptr;
+        // Keep the handle alive for connection reuse (TCP keep-alive).
+        // Destroying it forces a new TCP+TLS handshake on every request,
+        // exhausting socket descriptors after 3-4 fast POSTs.
+        // init() will flush stale state and reconfigure for the next request.
+        // NOTE: Redirects (handled in processRedirectsAndOpen) still
+        // perform a full cleanup because the old connection is half-closed.
+        Debug_printv("HTTP Close (keeping handle for reuse)");
     }
     if (!postResponse.empty()) {
         uint32_t responseSize = (uint32_t)postResponse.size();
@@ -1797,12 +1808,39 @@ static void load_ca_cert_from_flash()
 
 void MeatHttpClient::init() {
     if (_http != nullptr) {
-        // Always clean up the old handle.  esp_http_client_set_url() doesn't
-        // flush the response buffer from the previous request, so redirect
-        // bodies (e.g. Wikipedia's 303 "See Other") leak into the next
-        // response.  The keep-alive benefit of reuse does not justify the
-        // stale-data bugs it causes.  ESP-IDF's transport layer handles
-        // connection pooling internally.
+        // Reuse the handle when the origin (scheme://host) matches — avoids TCP
+        // socket exhaustion after 3-4 fast POSTs (lwIP TIME_WAIT pool depletion).
+        // Before reusing, flush ALL stale internal response state so redirect
+        // bodies (e.g. Wikipedia's 303 "See Other") don't leak into the next
+        // response.
+        //
+        // When the origin changes (different host or http↔https switch), the
+        // handle must be destroyed and recreated because a TLS handle cannot
+        // talk plain HTTP (and vice versa).
+        size_t colon = url.find(':');
+        std::string newOrigin;
+        if (colon != std::string::npos) {
+            size_t authEnd = url.find_first_of("/?#", colon + 3);
+            newOrigin = url.substr(0, authEnd == std::string::npos ? url.size() : authEnd);
+        }
+        if (!newOrigin.empty() && newOrigin == _httpOrigin) {
+            // Same origin — flush stale state and reuse
+            int flushed = 0;
+            esp_http_client_flush_response(_http, &flushed);
+            esp_http_client_set_url(_http, url.c_str());
+            esp_http_client_set_method(_http, HTTP_METHOD_GET);
+            esp_http_client_reset_redirect_counter(_http);
+            _is_open = false;
+            postResponse.clear();
+            preservedPostResponse.clear();
+            preservedPostResponseSize = 0;
+            _size = 0;
+            _position = 0;
+            lastRC = 0;
+            Debug_printv("init: reused handle for %s", newOrigin.c_str());
+            return;
+        }
+        // Different origin — full cleanup
         esp_http_client_cleanup(_http);
         _http = nullptr;
     }
@@ -1843,4 +1881,11 @@ void MeatHttpClient::init() {
 
     //Debug_printv("HTTP Init url[%s]", url.c_str());
     _http = esp_http_client_init(&config);
+    if (_http != nullptr) {
+        size_t c = url.find(':');
+        if (c != std::string::npos) {
+            size_t authEnd = url.find_first_of("/?#", c + 3);
+            _httpOrigin = url.substr(0, authEnd == std::string::npos ? url.size() : authEnd);
+        }
+    }
 }

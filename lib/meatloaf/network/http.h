@@ -162,6 +162,7 @@ public:
     bool wasRedirected = false;
     std::string url;
     std::string contentDispositionFilename;
+    std::string _httpOrigin; // origin (scheme://host:port) of current _http handle
 
     bool _performPending = false;
     int lastRC = 0;
