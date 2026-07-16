@@ -635,32 +635,11 @@ bool HTTPMStream::open(std::ios_base::openmode mode) {
 
     this->mode = mode;
 
-    // Parse URL to get session.  A URL typed on the C64 arrives fully
-    // uppercase (PETSCII: the BASIC tokenizer uppercases string literals),
-    // so if the URL contains no lowercase letters at all, lowercase it
-    // entirely so HTTP servers accept the scheme/host/path.
-    // A mixed-case URL (e.g. from navigating a server directory listing)
-    // must keep its path case — paths are case-sensitive on most servers.
-    // Only scheme and host are case-insensitive (RFC 3986), so normalize
-    // just those.
-    // DO NOT use toUTF8() here — the URL may have already been through
-    // UTF-8 conversion by the MFile layer; toUTF8() on already-UTF-8
-    // lowercase letters (0x61-0x7A) looks them up in the utf8map at
-    // those indices and returns private Unicode (U+E02x), corrupting
-    // the URL.
-    if (std::none_of(url.begin(), url.end(),
-                     [](unsigned char ch) { return std::islower(ch); })) {
-        mstr::toLower(url);
-    } else {
-        size_t scheme_end = url.find("://");
-        if (scheme_end != std::string::npos) {
-            size_t host_end = url.find('/', scheme_end + 3);
-            if (host_end == std::string::npos)
-                host_end = url.size();
-            std::transform(url.begin(), url.begin() + host_end, url.begin(),
-                           [](unsigned char ch) { return std::tolower(ch); });
-        }
-    }
+    // Parse URL to get session.  The URL arrives from the C64 in PETSCII
+    // form (uppercase alpha) because the C64 BASIC tokenizer uppercases
+    // string literals and toPETSCII2() may have case-flipped stored URLs.
+    // Do NOT lowercase — the path portion may be case-sensitive
+    // (zimmers.net, csdb.dk) and the C64-side should send the correct case.
     auto parser = PeoplesUrlParser::parseURL(url);
     if (!parser || (parser->scheme != "http" && parser->scheme != "https")) {
         Debug_printv("Invalid HTTP URL: %s", url.c_str());
