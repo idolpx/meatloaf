@@ -94,9 +94,11 @@ bool TapeDecoder::open(MStream *container)
     stream = container;
     opened = false;
     win_len = 0;
-    walk_pos = 0;
-    walk_cycles = 0;
+    cursor_cycles = 0;
+    time_valid = true;
     total_known = false;
+    total_ms = 0;
+    resetContinuation();
 
     if (stream == nullptr)
         return false;
@@ -267,14 +269,22 @@ struct tape_io {
         uint32_t v;
 
         if (!td->nextValue(&td->pos, &v))
+        {
+            td->markEofReached();
             return wav2prg_false;
+        }
+        td->cursor_cycles += v;
 
         if (td->halfwaves)
         {
             // Combine two halfwaves into one full pulse
             uint32_t v2;
             if (!td->nextValue(&td->pos, &v2))
+            {
+                td->markEofReached();
                 return wav2prg_false;
+            }
+            td->cursor_cycles += v2;
             v += v2;
         }
 
@@ -296,7 +306,8 @@ struct tape_io {
         if (td->halfwaves)
         {
             uint32_t v;
-            td->nextValue(&td->pos, &v);
+            if (td->nextValue(&td->pos, &v))
+                td->cursor_cycles += v;
         }
     }
 
@@ -397,7 +408,20 @@ bool TapeDecoder::nextProgram(uint32_t from_offset, TapeEntry &out)
     if (cont != nullptr && from_offset != cont_pos)
         resetContinuation();
 
-    pos = (from_offset > data_start) ? from_offset : data_start;
+    uint32_t target = (from_offset > data_start) ? from_offset : data_start;
+    if (target <= data_start)
+    {
+        // Rewind to the start of the tape
+        pos = data_start;
+        cursor_cycles = 0;
+        time_valid = true;
+    }
+    else if (target != pos)
+    {
+        // Arbitrary jump (e.g. a .idx offset): counter time unknown here
+        pos = target;
+        time_valid = false;
+    }
     if (pos >= len)
         return false;
 
@@ -408,6 +432,8 @@ bool TapeDecoder::nextProgram(uint32_t from_offset, TapeEntry &out)
     // carrying the loader/observer chain in 'cont'
     while (true)
     {
+        uint64_t iter_start_cycles = cursor_cycles;
+
         struct block_list_element *blocks = wav2prg_analyse(
             start_loader,
             NULL,
@@ -486,9 +512,9 @@ bool TapeDecoder::nextProgram(uint32_t from_offset, TapeEntry &out)
             last_len = out.prg.size();
             last_name = out.name;
 
-            // Tape counter times (forward walker; offsets are monotonic)
-            out.start_time_ms = timeAtOffset(out.tape_offset);
-            out.end_time_ms = timeAtOffset(out.tape_end_offset);
+            // Tape counter times, accumulated while the pulses streamed by
+            out.start_time_ms = time_valid ? cyclesToMs(iter_start_cycles) : 0;
+            out.end_time_ms = time_valid ? cyclesToMs(cursor_cycles) : 0;
 
             Debug_printv("Tape file: name[%s] loader[%s] addr[%04X-%04X] size[%u] csum[%d] tape[%lu-%lu] time[%lu-%lu ms]",
                          out.name.c_str(), out.loader.c_str(), out.start_addr, out.end_addr,
@@ -513,30 +539,20 @@ bool TapeDecoder::nextProgram(uint32_t from_offset, TapeEntry &out)
  * Tape counter
  ********************************************************/
 
-uint32_t TapeDecoder::timeAtOffset(uint32_t offset)
+uint32_t TapeDecoder::cyclesToMs(uint64_t cycles) const
 {
-    if (!opened)
-        return 0;
+    return (uint32_t)((cycles * 1000) / machineClock());
+}
 
-    if (offset > len)
-        offset = len;
-
-    // Restart the walk when seeking backwards
-    if (walk_pos == 0 || offset < walk_pos)
+void TapeDecoder::markEofReached()
+{
+    // Latch the tape duration when streaming naturally reaches the end
+    // (a truncated final value still counts as the end)
+    if (time_valid && !total_known && pos + 8 >= len)
     {
-        walk_pos = data_start;
-        walk_cycles = 0;
+        total_ms = cyclesToMs(cursor_cycles);
+        total_known = true;
     }
-
-    uint32_t value;
-    while (walk_pos < offset)
-    {
-        if (!nextValue(&walk_pos, &value))
-            break;
-        walk_cycles += value;
-    }
-
-    return (uint32_t)((walk_cycles * 1000) / machineClock());
 }
 
 uint32_t TapeDecoder::offsetAtTime(uint32_t ms)
@@ -546,30 +562,29 @@ uint32_t TapeDecoder::offsetAtTime(uint32_t ms)
 
     uint64_t target_cycles = ((uint64_t)ms * machineClock()) / 1000;
 
-    // Restart the walk when seeking backwards
-    if (walk_pos == 0 || walk_cycles > target_cycles)
+    // Rewind when the target lies behind the cursor, or the cursor's time
+    // is unknown after an arbitrary jump
+    if (!time_valid || target_cycles < cursor_cycles)
     {
-        walk_pos = data_start;
-        walk_cycles = 0;
+        pos = data_start;
+        cursor_cycles = 0;
+        time_valid = true;
     }
 
     uint32_t value;
-    while (walk_cycles < target_cycles && walk_pos < len)
+    while (cursor_cycles < target_cycles && pos < len)
     {
-        if (!nextValue(&walk_pos, &value))
+        if (!nextValue(&pos, &value))
             break;
-        walk_cycles += value;
+        cursor_cycles += value;
     }
+    markEofReached();
 
-    return walk_pos;
+    return pos;
 }
 
 uint32_t TapeDecoder::totalMs()
 {
-    if (!total_known && opened)
-    {
-        total_ms = timeAtOffset(len);
-        total_known = true;
-    }
-    return total_ms;
+    // Only known once the end of the tape has been reached by streaming
+    return total_known ? total_ms : 0;
 }

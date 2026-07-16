@@ -78,14 +78,13 @@ public:
     // Drop the carried loader state (rewind / counter change)
     void resetContinuation();
 
-    // Tape counter: time in ms at a byte offset (monotonic forward walker;
-    // walking restarts automatically when seeking backwards)
-    uint32_t timeAtOffset(uint32_t offset);
-
-    // Inverse: byte offset of the tape counter time in ms
+    // Tape counter: byte offset of the counter time in ms. Streams forward
+    // from the current cursor; a target before the current position rewinds
+    // and streams from the start (like a real tape deck).
     uint32_t offsetAtTime(uint32_t ms);
 
-    // Duration of the whole tape in ms (walks the tape once, then cached)
+    // Duration of the whole tape in ms; only known (non-zero) once the end
+    // of the tape has been reached by normal streaming - never walked
     uint32_t totalMs();
 
 private:
@@ -108,8 +107,9 @@ private:
     uint32_t counter_rate = 2000000;
     bool halfwaves = false;
 
-    // Sliding window over the container stream
-    uint8_t window[1024];
+    // Sliding window over the container stream (no image buffering; use a
+    // "#cache=..." URL fragment to localize network sources)
+    uint8_t window[4096];
     uint32_t win_start = 0;
     uint32_t win_len = 0;
 
@@ -126,9 +126,14 @@ private:
     uint32_t last_len = 0;
     std::string last_name;
 
-    // Tape counter walker
-    uint32_t walk_pos = 0;
-    uint64_t walk_cycles = 0;
+    // Tape counter: elapsed cycles at the input cursor, accumulated while
+    // pulses stream by (single pass - never re-walked). Invalidated when
+    // the cursor jumps to an arbitrary offset (e.g. .idx loads).
+    uint64_t cursor_cycles = 0;
+    bool time_valid = true;
+
+    void markEofReached();      // latch the total duration at end of tape
+    uint32_t cyclesToMs(uint64_t cycles) const;
 
     uint32_t total_ms = 0;
     bool total_known = false;

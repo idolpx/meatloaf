@@ -328,7 +328,11 @@ static std::string format_tape_time(uint32_t ms)
 
 std::string TAPMStream::counterString()
 {
-    return format_tape_time(counterMs()) + "/" + format_tape_time(durationMs());
+    // The duration is only known once the tape end has been reached
+    uint32_t total = durationMs();
+    if (total == 0)
+        return format_tape_time(counterMs());
+    return format_tape_time(counterMs()) + "/" + format_tape_time(total);
 }
 
 std::unordered_map<std::string, std::string> TAPMStream::info()
@@ -542,9 +546,10 @@ MFile* TAPMFile::getNextFileInDir()
         file->size = image->current.prg.size();
         file->is_dir = 0;
 
-        Debug_printv("Tape entry: %s loader[%s] size[%lu] counter[%s]",
+        Debug_printv("Tape entry: %s loader[%s] size[%lu] tape[%lu-%lu ms]",
                      filename.c_str(), image->current.loader.c_str(),
-                     (unsigned long)file->size, image->counterString().c_str());
+                     (unsigned long)file->size,
+                     image->current.start_time_ms, image->current.end_time_ms);
         return file;
     }
 
