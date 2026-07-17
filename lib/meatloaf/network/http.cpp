@@ -120,6 +120,10 @@ bool HTTPRequestContext::sendRequest(std::shared_ptr<HTTPMSession> session) {
         // read time where IEC timing constraints don't apply.
         Debug_printv("sendRequest: GET url=%s", client.url.c_str());
         result = client.GET(client.url);
+        // Mark perform as pending so close() will call perform() and the
+        // event handler captures the response body into postResponse.
+        if (result)
+            client._performPending = true;
         // Capture response headers for the buffer builder (see popResponseHeader)
         // onHeader callbacks already populated responseHeaders via
         // setOnHeader() at the top of this function.
@@ -754,8 +758,11 @@ uint32_t HTTPMStream::read(uint8_t* buf, uint32_t size) {
             ctx.sendRequest(_session);
             // Capture response body from the live connection or buffer
             _bodyCapture.clear();
-            if (cl._performPending && !cl.postBuffer.empty()) {
-                // POST/PUT: close() triggers perform() which fills preservedPostResponse
+            if ((cl._performPending && !cl.postBuffer.empty()) ||
+                (cl._performPending && ctx.method == "GET")) {
+                // POST/PUT has buffered body; GET has no body but needs perform().
+                // close() fires perform() which fills preservedPostResponse via
+                // HTTP_EVENT_ON_DATA.
                 cl.close();
                 cl._performPending = false;
                 _bodyCapture = cl.preservedPostResponse;  // may be empty if no body
@@ -1202,17 +1209,13 @@ bool MeatHttpClient::processRedirectsAndOpen(uint32_t position, uint32_t size) {
 // }
 
 void MeatHttpClient::close() {
-    Debug_printv("Q2-DIAG close: http=%p is_open=%d postBuf=%u postResp=%u lastRC=%d",
-        _http, _is_open, (uint32_t)postBuffer.size(), (uint32_t)postResponse.size(), lastRC);
+    Debug_printv("Q2-DIAG close: http=%p is_open=%d postBuf=%u postResp=%u lastRC=%d _performPending=%d",
+        _http, _is_open, (uint32_t)postBuffer.size(), (uint32_t)postResponse.size(), lastRC, _performPending);
     if(_http != nullptr) {
         if ( _is_open ) {
-            // For POST/PUT, we need to send the buffered body data
             if (!postBuffer.empty()) {
                 Debug_printv("Sending POST body (%u bytes) from buffer", (uint32_t)postBuffer.size());
-                // Set the post field data
                 esp_http_client_set_post_field(_http, (char*)postBuffer.data(), postBuffer.size());
-                // Complete the request (sends body and receives response)
-                // Response body data is captured via HTTP_EVENT_ON_DATA
                 int performResult = esp_http_client_perform(_http);
                 Debug_printv("Q2-DIAG perform: result=%d http=%p stCode=%d capBytes=%u",
                     performResult, _http,
@@ -1220,15 +1223,8 @@ void MeatHttpClient::close() {
                     (uint32_t)postResponse.size());
                 Debug_printv("esp_http_client_perform result: %d", performResult);
                 Debug_printv("POST response captured via events: %u bytes", (uint32_t)postResponse.size());
-
-                // Capture the real HTTP status code
                 lastRC = esp_http_client_get_status_code(_http);
-
                 if (performResult != 0) {
-                    // Connection failed (e.g. 28679 = ESP_ERR_HTTP_CONNECT).
-                    // The keep-alive socket dropped (Ollama idle timeout, etc.).
-                    // Clean up now so the next request creates a fresh handle
-                    // instead of repeatedly hitting a dead TCP connection.
                     esp_http_client_close(_http);
                     esp_http_client_cleanup(_http);
                     _http = nullptr;
@@ -1238,20 +1234,31 @@ void MeatHttpClient::close() {
                     Debug_printv("HTTP Perform failed — handle destroyed");
                     return;
                 }
-
-                // Set _size from the captured response
                 _size = (uint32_t)postResponse.size();
                 postBuffer.clear();
+            } else if (_performPending) {
+                // GET with pending perform — fire perform() to capture the
+                // response body into postResponse via HTTP_EVENT_ON_DATA.
+                Debug_printv("Performing GET request...");
+                int performResult = esp_http_client_perform(_http);
+                Debug_printv("Q2-DIAG perform(GET): result=%d http=%p stCode=%d capBytes=%u",
+                    performResult, _http,
+                    esp_http_client_get_status_code(_http),
+                    (uint32_t)postResponse.size());
+                lastRC = esp_http_client_get_status_code(_http);
+                if (performResult != 0) {
+                    esp_http_client_close(_http);
+                    esp_http_client_cleanup(_http);
+                    _http = nullptr;
+                    _httpOrigin.clear();
+                    Debug_printv("GET perform failed — handle destroyed");
+                    return;
+                }
+                _size = (uint32_t)postResponse.size();
             }
             esp_http_client_close(_http);
         }
-        // Keep the handle alive for connection reuse (TCP keep-alive).
-        // Destroying it forces a new TCP+TLS handshake on every request,
-        // exhausting socket descriptors after 3-4 fast POSTs.
-        // init() will flush stale state and reconfigure for the next request.
-        // NOTE: Redirects (handled in processRedirectsAndOpen) still
-        // perform a full cleanup because the old connection is half-closed.
-        Debug_printv("HTTP Close (keeping handle for reuse)");
+        _performPending = false;
     }
     if (!postResponse.empty()) {
         uint32_t responseSize = (uint32_t)postResponse.size();
@@ -1752,8 +1759,10 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
         case HTTP_EVENT_ON_DATA: // Occurs multiple times when receiving body data from the server. MAY BE SKIPPED IF BODY IS EMPTY!
             //Debug_printv("HTTP_EVENT_ON_DATA: len=%d", evt->data_len);
             if (evt->data_len > 0 && evt->data != nullptr) {
-                // Append response data to postResponse buffer for POST responses
-                if (meatClient->lastMethod == HTTP_METHOD_POST || meatClient->lastMethod == HTTP_METHOD_PUT) {
+                // Append response data to postResponse buffer
+                if (meatClient->lastMethod == HTTP_METHOD_GET ||
+                    meatClient->lastMethod == HTTP_METHOD_POST ||
+                    meatClient->lastMethod == HTTP_METHOD_PUT) {
                     meatClient->postResponse.insert(
                         meatClient->postResponse.end(),
                         (uint8_t*)evt->data,
