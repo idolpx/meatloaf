@@ -93,7 +93,10 @@ bool HTTPRequestContext::sendRequest(std::shared_ptr<HTTPMSession> session) {
         return 0;
     });
 
-    // Apply request headers.
+    // Apply request headers — wipe stale client headers first so the
+    // previous request's headers (e.g. "content-type: application/json"
+    // from a POST) don't leak into this one.
+    client.clearHeaders();
     for (const auto& [key, values] : headers) {
         for (const auto& val : values) {
             std::string headerLine = key + ":" + val;
@@ -115,18 +118,15 @@ bool HTTPRequestContext::sendRequest(std::shared_ptr<HTTPMSession> session) {
     // Dispatch by method.
     bool result = false;
     if (method == "GET") {
-        // For full-mode GET in read-write mode, the client has already been
-        // initialized (but not connected).  We open the connection now, at
-        // read time where IEC timing constraints don't apply.
+        // For full-mode GET, skip the openAndFetchHeaders() call that
+        // client.GET() would trigger. After a prior POST on the same
+        // handle the ESP-IDF internals have first_line_prepared=true,
+        // so esp_http_client_open() fails to regenerate the request line.
+        // Instead, defer to close() → perform(), which calls prepare()
+        // internally and correctly resets that flag.  This mirrors how
+        // POST already works.
         Debug_printv("sendRequest: GET url=%s", client.url.c_str());
-        result = client.GET(client.url);
-        // Mark perform as pending so close() will call perform() and the
-        // event handler captures the response body into postResponse.
-        if (result)
-            client._performPending = true;
-        // Capture response headers for the buffer builder (see popResponseHeader)
-        // onHeader callbacks already populated responseHeaders via
-        // setOnHeader() at the top of this function.
+        result = client.configureDeferredGet();
     } else if (method == "POST") {
         result = client.POST(client.url);
         if (result && !client.postBuffer.empty()) {
@@ -242,9 +242,11 @@ void HTTPMStream::performJsonQuery(const std::string& pointer) {
     cJSON *item = cJSONUtils_GetPointer(root, pointer.c_str());
     if (item == nullptr) {
         cJSON_Delete(root);
-        ctx.responseStatus = -99;
-        _jsonQueryResult = "JSON pointer not found";
-        _jsonQueryRequested = true;
+        // Clear result so the C64 sees end-of-stream (ml_j_get returns 0
+        // and the calling loop breaks).  Do not populate an error string
+        // here — it would be served as response data to the C64.
+        _jsonQueryResult.clear();
+        _jsonQueryRequested = false;
         Debug_printv("JSON query: pointer not found: %s", pointer.c_str());
         return;
     }
@@ -1019,6 +1021,42 @@ bool HTTPMStream::isOpen() {
 /********************************************************
  * Meat HTTP client impls
  ********************************************************/
+bool MeatHttpClient::configureDeferredGet() {
+    Debug_printv("configureDeferredGet url[%s]", url.c_str());
+    // Always destroy and recreate the handle for deferred GET — the
+    // handle's internal first_line_prepared flag is still true from the
+    // previous POST's perform(), and perform() never calls prepare() for
+    // a fresh request (process_again is 0), so the request line is never
+    // regenerated.  The server receives a garbled request and returns
+    // stCode=200 with 0 body bytes.
+    if (_http != nullptr) {
+        esp_http_client_cleanup(_http);
+        _http = nullptr;
+    }
+    _httpOrigin.clear();
+    lastMethod = HTTP_METHOD_GET;
+    // Temporarily enable auto-redirect for the deferred GET handle.
+    // We aren't using processRedirectsAndOpen() which normally handles
+    // redirects manually.  The perform() call will follow redirects
+    // automatically and deliver the final response body via
+    // HTTP_EVENT_ON_DATA.  Restore immediately after init() so the
+    // member stays at its default (true for POST flows).
+    bool savedAutoRedirect = disableAutoRedirect;
+    disableAutoRedirect = false;
+    init();
+    disableAutoRedirect = savedAutoRedirect;
+    if (_http != nullptr) {
+        for (const auto& pair : headers) {
+            esp_http_client_set_header(_http, pair.first.c_str(), pair.second.c_str());
+        }
+        _is_open = true;
+        lastRC = 0;
+        _performPending = true;
+        return true;
+    }
+    return false;
+}
+
 bool MeatHttpClient::GET(std::string dstUrl) {
     Debug_printv("GET url[%s]", dstUrl.c_str());
     bool result = open(dstUrl, HTTP_METHOD_GET);
@@ -1778,12 +1816,21 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
             }
             break;
 
-        case HTTP_EVENT_ON_FINISH: 
+        case HTTP_EVENT_ON_FINISH:
             // Occurs when finish a HTTP session
             // This may get called more than once if esp_http_client decides to retry in order to handle a redirect or auth response
             //Debug_printv("HTTP_EVENT_ON_FINISH %u\r\n", uxTaskGetStackHighWaterMark(nullptr));
             // Keep track of how many times we "finish" reading a response from the server
             //Debug_printv("HTTP_EVENT_ON_FINISH");
+            // If this response is a redirect, discard any body data
+            // accumulated for it.  The next response (the actual 200)
+            // will fill postResponse with the real body.
+            {
+                int stCode = esp_http_client_get_status_code(evt->client);
+                if (stCode >= 300 && stCode < 400) {
+                    meatClient->postResponse.clear();
+                }
+            }
             break;
         case HTTP_EVENT_DISCONNECTED: // The connection has been disconnected
             //Debug_printv("HTTP_EVENT_DISCONNECTED");
@@ -1853,6 +1900,12 @@ void MeatHttpClient::init() {
             esp_http_client_flush_response(_http, &flushed);
             esp_http_client_set_url(_http, url.c_str());
             esp_http_client_set_method(_http, HTTP_METHOD_GET);
+            // Clear any POST body state that the prior request left on the handle.
+            // Without this, the ESP-IDF handle retains a dangling post_data_ pointer
+            // (set by esp_http_client_set_post_field during the previous POST) and
+            // the internal first_line_prepared flag stays true, which causes
+            // esp_http_client_open() to skip regenerating the request line.
+            esp_http_client_set_post_field(_http, NULL, 0);
             esp_http_client_reset_redirect_counter(_http);
             _is_open = false;
             postResponse.clear();

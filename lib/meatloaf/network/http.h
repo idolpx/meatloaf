@@ -124,11 +124,17 @@ public:
     bool POST(std::string url);
     bool PUT(std::string url);
     bool HEAD(std::string url);
+    void clearHeaders() { headers.clear(); }
 
     bool processRedirectsAndOpen(uint32_t position, uint32_t size = HTTP_BLOCK_SIZE);
     bool open(std::string url, esp_http_client_method_t meth);
     bool reopen();
     void close();
+    // Configure a deferred GET request that will be sent via perform()
+    // in close().  Sets up URL, method, headers and marks the handle
+    // as pending without calling openAndFetchHeaders() — needed after a
+    // POST reuses the handle to avoid first_line_prepared corruption.
+    bool configureDeferredGet();
     void setOnHeader(const std::function<int(char*, char*)> &f);
     bool seek(uint32_t pos);
     bool flush(uint32_t numBytes = 0); // Flush all remaining bytes if 0
