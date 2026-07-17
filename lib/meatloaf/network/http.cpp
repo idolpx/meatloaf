@@ -1490,8 +1490,8 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
         esp_http_client_set_header(_http, pair.first.c_str(), pair.second.c_str());
     }
 
-    // Set Range Header
-    if ( method == HTTP_METHOD_GET )
+    // Set Range Header (only for non-zero positions — avoids 416 Range Not Satisfiable)
+    if ( method == HTTP_METHOD_GET && position > 0 )
     {
         char str[40];
         snprintf(str, sizeof str, "bytes=%" PRIu32 "-%" PRIu32, position, (position + size + 5));
