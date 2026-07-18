@@ -459,6 +459,13 @@ extern char exedir[MAXPATH];	/* assigned in main.c, includes trailing slash. */
 #define debug tapclean_option_debug
 #define tmp tapclean_buf_tmp
 
+/* Route every engine malloc() to PSRAM: the scan makes thousands of
+   small allocations (blk_t structs, decoded data blocks) that would
+   otherwise land in - and exhaust - internal DRAM. free() is unchanged
+   (unified heap). */
+void *tapclean_psram_malloc(unsigned int n);
+#define malloc tapclean_psram_malloc
+
 /* Size-optimize the whole engine regardless of the app build type: the
    app's flash text must stay inside the 3.3 MB instruction window, and
    the PlatformIO ESP-IDF builder ignores per-component -O options. Every

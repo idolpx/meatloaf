@@ -34,67 +34,71 @@
 #include <stdlib.h>
 
 #include "crc32.h"
-#include "main.h"	/* For msgout() */
+#include "main.h"
 
+#ifdef ESP_PLATFORM
+#include "esp_crc.h"
+#else
 static unsigned int *crc_table;
+#endif
 
-
-/*
- * Initialize the CRC calculation table
- */
 
 int crc32_build_crc_table(void)
 {
-	int i, j;
-	unsigned int crc;
+#ifdef ESP_PLATFORM
+    return 0;
+#else
+    int i, j;
+    unsigned int crc;
 
-	crc_table = (unsigned int*)malloc(256 * sizeof(unsigned int));
-	if (crc_table == NULL) {
-		msgout("Error: Can't malloc space for CRC table!");
-		return -1;
-	}
+    crc_table = (unsigned int*)malloc(256 * sizeof(unsigned int));
+    if (crc_table == NULL) {
+        msgout("Error: Can't malloc space for CRC table!");
+        return -1;
+    }
 
-	for (i = 0; i <= 255; i++) {
-		crc = i;
-		for (j = 8; j > 0; j--) {
-			if (crc & 1)
-				crc = (crc >> 1) ^ CRC32_POLYNOMIAL;
-			else
-				crc >>= 1;
-			crc_table[i] = crc;
-		}
-	}
+    for (i = 0; i <= 255; i++) {
+        crc = i;
+        for (j = 8; j > 0; j--) {
+            if (crc & 1)
+                crc = (crc >> 1) ^ CRC32_POLYNOMIAL;
+            else
+                crc >>= 1;
+            crc_table[i] = crc;
+        }
+    }
 
-	return 0;
+    return 0;
+#endif
 }
-
-/*
- * Return the CRC32 for 'buffer' of length 'count' bytes.
- */
 
 unsigned int crc32_compute_crc(unsigned char *buffer, int count)
 {
-	unsigned int t1, t2, crc = 0xFFFFFFFF;
+#ifdef ESP_PLATFORM
+    return esp_crc32_le(0xFFFFFFFF, buffer, count);
+#else
+    unsigned int t1, t2, crc = 0xFFFFFFFF;
 
-	if (count <= 0)
-		return 0;
+    if (count <= 0)
+        return 0;
 
-	while (count-- != 0) {
-		t1 = (crc >> 8) & 0x00FFFFFF;
-		t2 = crc_table[((int)crc ^ *buffer++) & 0xFF];
-		crc = t1 ^ t2;
-	}
+    while (count-- != 0) {
+        t1 = (crc >> 8) & 0x00FFFFFF;
+        t2 = crc_table[((int)crc ^ *buffer++) & 0xFF];
+        crc = t1 ^ t2;
+    }
 
-	return crc;
+    return crc;
+#endif
 }
-
-/*
- * Free the CRC table...
- */
 
 void crc32_free_crc_table(void)
 {
-	if (crc_table != NULL)
-		free(crc_table);
+#ifdef ESP_PLATFORM
+    return;
+#else
+    if (crc_table != NULL)
+        free(crc_table);
+#endif
 }
 
