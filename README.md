@@ -80,12 +80,19 @@ But that's not all. Since Meatloaf has built-in JSON parser you can easily inter
 633 PRINT#15, "H+:AUTHORIZATION:BEARER "+KE$
 ```
 
-Current internet enabled programs include:
+You can find internet apps using `LOAD"ML:$",8`
 
-- ISS tracking application
-- Chuck Norris jokes client
-- Terminal client
-- You can find more internet apps using `LOAD"ML:$",8`
+* ISS tracking application
+* Chuck Norris jokes client
+8 Terminal client
+
+[See how easy it is to access APIs from BASIC v2](https://github.com/ssuukk/meatloaf_examples):
+
+* **swapi_bc64.bas** — Star Wars API Explorer (bc64 BASIC). Browse people, planets, films, species, vehicles and starships from swapi.dev with paginated lists and detail views.
+* **wikipedia_bc64.bas** — Wikipedia Article Browser (bc64 BASIC). Fetch article summaries via the Wikimedia REST API — search, random, or lookup by name.
+* **sky_watcher_bc64.bas** — ADS-B Aircraft Tracker (bc64 BASIC). Live air traffic data from adsb.fi: find flights by callsign or hex code, list military aircraft, scan airspace near airports.
+* **openai_bc64.bas** — OpenAI / Ollama Chat Client (bc64 BASIC). Interactive chatbot with conversation history, JSON body construction, and streaming response display.
+* **c64-chat-client-c/** — Full C Chat Client (cc65). Screen-editor input, conversation history, runtime configuration, PETSCII-aware JSON generation.
 
 ## Many devices in one
 
@@ -165,3 +172,5 @@ Please read the [Meatloaf Wiki](https://github.com/idolpx/meatloaf/wiki/Using-Yo
 # Advanced documentation
 
 Adding new file systems to Meatloaf: [Link](docs/filesystems.md)
+
+Writing C64 programs that use Meatloaf's full-mode HTTP client (BASIC, C, assembly): [Link](docs/meatloaf-networking.md)
