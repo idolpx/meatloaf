@@ -20,10 +20,12 @@
 #include "database.h"
 #include "main.h"
 
-struct blk_t *blk[BLKMAX];	/*!< Database of all found entities */
 #ifdef TAPCLEAN_EMBEDDED
+struct blk_t **blk;		/*!< heap-allocated by tapclean_init() (the
+				     8 KB pointer array is too much BSS) */
 struct prg_t *prg;		/*!< heap-allocated by tapclean_init() */
 #else
+struct blk_t *blk[BLKMAX];	/*!< Database of all found entities */
 struct prg_t prg[BLKMAX];	/*!< Database of all extracted files (prg's) */
 #endif
 int database_is_full = FALSE;	/*!< Flag that indicates database capacity

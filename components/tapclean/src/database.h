@@ -85,12 +85,14 @@ struct prg_t
 				     be long) */
 };
 
+#ifdef TAPCLEAN_EMBEDDED
+/* Both databases are heap-allocated (PSRAM) by tapclean_init() */
+extern struct blk_t **blk;
+extern struct prg_t *prg;
+#else
 /* Database of all found entities. */
 extern struct blk_t *blk[BLKMAX];
 /* Database of all extracted files (prg's). */
-#ifdef TAPCLEAN_EMBEDDED
-extern struct prg_t *prg;	/* heap-allocated by tapclean_init() */
-#else
 extern struct prg_t prg[BLKMAX];
 #endif
 /* Flag used by database_add_blk_def() to indicate database capacity reached */

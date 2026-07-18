@@ -369,7 +369,15 @@ struct tap_t
 	int tst_cs;
 	int tst_rd;
 };
+#ifdef TAPCLEAN_EMBEDDED
+/* The ~3.6 KB tap struct is heap-allocated (PSRAM) by tapclean_init()
+   instead of sitting in internal-DRAM BSS; the macro keeps every use
+   site (tap.field) unchanged. */
+extern struct tap_t *tapclean_tap;
+#define tap (*tapclean_tap)
+#else
 extern struct tap_t tap;
+#endif
 
 
 /* a reduced version of the above used as a database by batch scan... */
@@ -413,7 +421,11 @@ struct fmt_t
 	int pmax;		/* maximum pilots that should be present. */
 	int has_cs;		/* flag, provides checksums, 1=yes, 0=no. */
 };
+#ifdef TAPCLEAN_EMBEDDED
+extern struct fmt_t *ft;	/* PSRAM working copy, see tapclean_init() */
+#else
 extern struct fmt_t ft[];
+#endif
 
 extern unsigned char cbm_header[192];		/* some formats must have their loader... */
 #ifdef TAPCLEAN_EMBEDDED
@@ -463,7 +475,8 @@ extern char exedir[MAXPATH];	/* assigned in main.c, includes trailing slash. */
    small allocations (blk_t structs, decoded data blocks) that would
    otherwise land in - and exhaust - internal DRAM. free() is unchanged
    (unified heap). */
-void *tapclean_psram_malloc(unsigned int n);
+#include <stddef.h>
+void *tapclean_psram_malloc(size_t n);
 #define malloc tapclean_psram_malloc
 
 /* Size-optimize the whole engine regardless of the app build type: the

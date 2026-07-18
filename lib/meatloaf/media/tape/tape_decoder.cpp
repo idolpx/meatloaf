@@ -365,6 +365,7 @@ bool TapeDecoder::analyzeImage()
     if (!tapclean_load_buffer(buf, buflen, machine, video ? 1 : 0))
     {
         Debug_printv("tapclean load failed");
+        tapclean_shutdown();
         return false;
     }
 
@@ -372,7 +373,7 @@ bool TapeDecoder::analyzeImage()
     if (nprg < 0)
     {
         Debug_printv("tapclean analyze failed");
-        tapclean_unload();
+        tapclean_shutdown();
         return false;
     }
 
@@ -494,9 +495,10 @@ bool TapeDecoder::analyzeImage()
 
     total_ms = tapclean_tap_time_ms();
 
-    // The pulse buffer and the engine's decoded copies are no longer
-    // needed; free the multi-megabyte state before serving entries.
-    tapclean_unload();
+    // Everything needed has been copied into 'entries': release the WHOLE
+    // engine (pulse buffer, databases, work buffers - all PSRAM) so no
+    // memory stays allocated between scans. The next tape open re-inits.
+    tapclean_shutdown();
 
     return true;
 }

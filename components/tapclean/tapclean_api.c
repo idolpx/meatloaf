@@ -13,18 +13,9 @@
 #include "src/database.h"
 #include "src/crc32.h"
 
-#ifdef ESP_PLATFORM
-#include <esp_heap_caps.h>
-static void *big_alloc(size_t n)
-{
-    void *p = heap_caps_malloc(n, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (p == NULL)
-        p = malloc(n);
-    return p;
-}
-#else
-static void *big_alloc(size_t n) { return malloc(n); }
-#endif
+/* PSRAM-first allocator from tapclean_alloc.c; mydefs.h also redirects
+   the engine's malloc() to it */
+#define big_alloc tapclean_psram_malloc
 
 /* Sizes for the (former) static work buffers. 'info' only ever holds one
    block's description at a time in the embedded build (reset per block in
@@ -44,6 +35,7 @@ extern char *tmp;
 extern char pal;
 extern char ntsc;
 extern long cps;
+extern const void *tapclean_ft_defaults(size_t *size);
 
 static int tc_initialized = 0;
 
@@ -57,8 +49,15 @@ int tapclean_init(void)
     tmp = (char *)big_alloc(TC_LIN_SIZE);
     cbm_program = (unsigned char *)big_alloc(TC_CBM_SIZE);
     prg = (struct prg_t *)big_alloc(BLKMAX * sizeof(struct prg_t));
+    blk = (struct blk_t **)big_alloc(BLKMAX * sizeof(struct blk_t *));
+    tapclean_tap = (struct tap_t *)big_alloc(sizeof(struct tap_t));
 
-    if (!info || !lin || !tmp || !cbm_program || !prg) {
+    size_t ft_size = 0;
+    const void *ft_src = tapclean_ft_defaults(&ft_size);
+    ft = (struct fmt_t *)big_alloc(ft_size);
+
+    if (!info || !lin || !tmp || !cbm_program || !prg || !blk ||
+        !tapclean_tap || !ft) {
         tapclean_shutdown();
         return 0;
     }
@@ -67,6 +66,9 @@ int tapclean_init(void)
     lin[0] = '\0';
     tmp[0] = '\0';
     memset(prg, 0, BLKMAX * sizeof(struct prg_t));
+    memset(blk, 0, BLKMAX * sizeof(struct blk_t *));
+    memset(tapclean_tap, 0, sizeof(struct tap_t));
+    memcpy(ft, ft_src, ft_size);
 
     if (!database_create_blk_db()) {
         tapclean_shutdown();
@@ -95,6 +97,9 @@ void tapclean_shutdown(void)
     free(tmp);       tmp = NULL;
     free(cbm_program); cbm_program = NULL;
     free(prg);       prg = NULL;
+    free(blk);       blk = NULL;
+    free(tapclean_tap); tapclean_tap = NULL;
+    free(ft);        ft = NULL;
 
     tc_initialized = 0;
 }

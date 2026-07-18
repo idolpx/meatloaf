@@ -172,7 +172,12 @@ static int read_errors[NUM_READ_ERRORS];	/* storage for 1st NUM_READ_ERRORS read
 static char note_errors;	/* set true only when decoding identified files, */
 				/* it just tells 'add_read_error()' to ignore. */
 
+#ifdef TAPCLEAN_EMBEDDED
+struct tap_t *tapclean_tap;	/* allocated by tapclean_init(); 'tap' is a
+				   macro for (*tapclean_tap), see mydefs.h */
+#else
 struct tap_t tap;		/* container for the loaded tap (note: only ONE tap). */
+#endif
 
 int tol = DEFTOL;		/* bit reading tolerance. (1 = zero tolerance) */
 
@@ -235,7 +240,14 @@ long cps = C64_PAL_CPS;		/* CPU Cycles pr second. Default is C64 PAL */
  * size for longer pilot sequences.
  */
 
+#ifdef TAPCLEAN_EMBEDDED
+/* The working table is a PSRAM copy made by tapclean_init() (scanners
+   write the VV fields at runtime, so it cannot be const, and ~4.3 KB of
+   internal-DRAM .data is too expensive); these defaults stay in flash. */
+static const struct fmt_t ft_defaults[] = {
+#else
 struct fmt_t ft[] = {
+#endif
 	/* name,                 en,   tp,   sp,   mp,   lp,   pv,   sv,   pmin, pmax,  has_cs. */
 
 	{""			,NA,   NA,   NA,   NA,   NA,   NA,   NA,   NA,   NA,    NA},
@@ -399,6 +411,16 @@ struct fmt_t ft[] = {
 
 	/* name,                 en,   tp,   sp,   mp,   lp,   pv,   sv,   pmin, pmax,  has_cs. */
 };
+
+#ifdef TAPCLEAN_EMBEDDED
+struct fmt_t *ft;	/* PSRAM working copy, made by tapclean_init() */
+
+const void *tapclean_ft_defaults(size_t *size)
+{
+	*size = sizeof(ft_defaults);
+	return ft_defaults;
+}
+#endif
 
 /*
  * The following strings are used to describe which loader signature has been
