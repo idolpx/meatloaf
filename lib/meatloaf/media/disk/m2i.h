@@ -60,7 +60,17 @@ protected:
         char type;              // 'P','S','U' = file; 'D' = DEL separator line
         std::string dosname;    // 8.3 host filename (trimmed; blank for 'D')
         std::string cbmname;    // CBM name (trimmed)
+
+        // Resolved lazily from the sibling host file (resolveEntry)
+        std::string target_url; // working URL of the host file ("" if missing)
+        uint32_t size = 0;      // host file size
+        bool resolved = false;
     };
+
+    // Locate the entry's host file (exact name, then lowercase for
+    // case-sensitive filesystems - M2I comes from FAT) and cache its
+    // URL and size. Returns true if the host file exists.
+    bool resolveEntry(uint16_t index);
 
     // The whole index is parsed once (M2I files are a few hundred bytes)
     bool readHeader() override;

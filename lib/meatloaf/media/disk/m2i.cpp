@@ -153,6 +153,56 @@ std::string M2IMStream::entryTargetUrl()
     return base + "/" + dosname;
 }
 
+bool M2IMStream::resolveEntry(uint16_t index)
+{
+    if (index == 0 || index > entries.size())
+        return false;
+
+    Entry &e = entries[index - 1];
+    if (e.resolved)
+        return !e.target_url.empty();
+    e.resolved = true;
+
+    if (e.type == 'D' || e.dosname.empty())
+        return false;   // separator lines have no host file
+
+    std::string base = containerStream->url;
+    size_t slash = base.find_last_of('/');
+    if (slash != std::string::npos)
+        base = base.substr(0, slash);
+
+    // Exact name first, then lowercase (M2I was made for FAT, which is
+    // case insensitive; archived host files are often lowercase)
+    std::string lower = e.dosname;
+    for (auto &c : lower)
+        c = tolower((unsigned char)c);
+
+    for (const std::string &name : { e.dosname, lower })
+    {
+        std::string target = base + "/" + name;
+        std::unique_ptr<MFile> f(MFSOwner::File(target));
+        if (f == nullptr)
+            continue;
+        auto s = f->getSourceStream(std::ios_base::in);
+        if (s != nullptr && s->isOpen())
+        {
+            e.target_url = target;
+            e.size = s->size();
+            s->close();
+
+            // keep the selected-entry copy in sync
+            if (entry_index == index)
+                entry = e;
+
+            Debug_printv("entry[%s] target[%s] size[%lu]", e.cbmname.c_str(), target.c_str(), e.size);
+            return true;
+        }
+    }
+
+    Debug_printv("Host file missing for entry [%s] dosname[%s]", e.cbmname.c_str(), e.dosname.c_str());
+    return false;
+}
+
 bool M2IMStream::seekPath(std::string path)
 {
     seekCalled = true;
@@ -167,36 +217,21 @@ bool M2IMStream::seekPath(std::string path)
         return false;
     }
 
-    // Open the entry's host file; the M2I was made for FAT (case
-    // insensitive), so fall back to a lowercase name on case-sensitive
-    // filesystems
-    std::string target = entryTargetUrl();
-    std::unique_ptr<MFile> f(MFSOwner::File(target));
+    if ( !resolveEntry(entry_index) )
+        return false;
+
+    std::unique_ptr<MFile> f(MFSOwner::File(entry.target_url));
     if (f != nullptr)
         fileStream = f->getSourceStream(std::ios_base::in);
 
     if (fileStream == nullptr || !fileStream->isOpen())
     {
-        std::string lower = target;
-        size_t slash = lower.find_last_of('/');
-        for (size_t i = (slash == std::string::npos ? 0 : slash + 1); i < lower.size(); i++)
-            lower[i] = tolower((unsigned char)lower[i]);
-
-        Debug_printv("Retrying lowercase [%s]", lower.c_str());
-        std::unique_ptr<MFile> lf(MFSOwner::File(lower));
-        if (lf != nullptr)
-            fileStream = lf->getSourceStream(std::ios_base::in);
-    }
-
-    if (fileStream == nullptr || !fileStream->isOpen())
-    {
-        Debug_printv("Cannot open target [%s]", target.c_str());
+        Debug_printv("Cannot open target [%s]", entry.target_url.c_str());
         fileStream = nullptr;
         return false;
     }
 
     _size = fileStream->size();
-    Debug_printv("entry[%s] target[%s] size[%lu]", path.c_str(), target.c_str(), _size);
     return true;
 }
 
@@ -255,22 +290,10 @@ MFile* M2IMFile::getNextFileInDir()
         file->extension = image->decodeType(image->entry.type);
         file->is_dir = 0;
 
-        // Size comes from the host file next to the .m2i (DEL separator
-        // lines have no host file)
-        if (image->entry.type != 'D')
-        {
-            std::unique_ptr<MFile> target(MFSOwner::File(image->entryTargetUrl()));
-            if (target != nullptr)
-            {
-                file->size = target->size;
-                if (file->size == 0)
-                {
-                    auto s = target->getSourceStream(std::ios_base::in);
-                    if (s != nullptr && s->isOpen())
-                        file->size = s->size();
-                }
-            }
-        }
+        // Size comes from the sibling host file (resolved once and
+        // cached; DEL separator lines have none and stay 0)
+        if (image->resolveEntry(image->entry_index))
+            file->size = image->entry.size;
 
         Debug_printv("entry[%s] ext[%s] size[%lu]", filename.c_str(), file->extension.c_str(), file->size);
         return file;
