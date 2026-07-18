@@ -175,6 +175,8 @@ static char note_errors;	/* set true only when decoding identified files, */
 #ifdef TAPCLEAN_EMBEDDED
 struct tap_t *tapclean_tap;	/* allocated by tapclean_init(); 'tap' is a
 				   macro for (*tapclean_tap), see mydefs.h */
+int tapclean_tmem_borrowed = 0;	/* tap.tmem belongs to the caller
+				   (tapclean_load_buffer_ref) */
 #else
 struct tap_t tap;		/* container for the loaded tap (note: only ONE tap). */
 #endif
@@ -539,6 +541,14 @@ static void unload_tap(void)
 	strcpy(tap.name, "");
 	strcpy(tap.cbmname, "");
 
+#ifdef TAPCLEAN_EMBEDDED
+	/* A borrowed image buffer (tapclean_load_buffer_ref) belongs to the
+	   caller - just forget it */
+	if (tapclean_tmem_borrowed) {
+		tap.tmem = NULL;
+		tapclean_tmem_borrowed = 0;
+	}
+#endif
 	if(tap.tmem != NULL) {
 		free(tap.tmem);
 		tap.tmem = NULL;
@@ -3554,8 +3564,10 @@ void delete_work_files(void)
  * here because they need main.c statics (unload_tap, get_duration).
  */
 
-/* Mirror of load_tap() for an in-memory image; takes ownership of 'buf'. */
-int tapclean_embedded_load(unsigned char *buf, unsigned int len)
+/* Mirror of load_tap() for an in-memory image. owned != 0: the engine
+   takes ownership of 'buf' (frees it at unload). owned == 0: 'buf' is
+   borrowed - the caller keeps it valid until unload and frees it. */
+int tapclean_embedded_load(unsigned char *buf, unsigned int len, int owned)
 {
 	unsigned char *output_buffer;
 
@@ -3567,16 +3579,19 @@ int tapclean_embedded_load(unsigned char *buf, unsigned int len)
 		output_buffer = (unsigned char*)malloc(len);
 		if (output_buffer == NULL) {
 			msgout("\nError: malloc failed in tapclean_embedded_load().");
-			free(buf);
+			if (owned)
+				free(buf);
 			return 0;
 		}
 
 		tap.len = dc2nconv_to_tap(buf, output_buffer, (int)len);
-		tap.tmem = output_buffer;
-		free(buf);
+		tap.tmem = output_buffer;	/* the converted copy is owned */
+		if (owned)
+			free(buf);
 	} else {
 		tap.tmem = buf;
 		tap.len = len;
+		tapclean_tmem_borrowed = !owned;
 	}
 
 	tap.changed = TRUE;

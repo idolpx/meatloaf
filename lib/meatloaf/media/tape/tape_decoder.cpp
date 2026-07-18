@@ -107,6 +107,11 @@ bool TapeDecoder::open(MStream *container)
     win_len = 0;
     entries.clear();
     total_ms = 0;
+    progressive = false;
+    fully_scanned = false;
+    free(image);
+    image = nullptr;
+    fetched = 0;
 
     if (stream == nullptr)
         return false;
@@ -161,8 +166,21 @@ bool TapeDecoder::open(MStream *container)
     Debug_printv("Tape image: kind[%d] version[%d] platform[%d] video[%d] size[%lu]",
                  kind, version, platform, video, container_len);
 
+    if (kind == TAPE_KIND_TAP && !halfwaves)
+    {
+        // Plain TAP: scanned progressively on demand - the first
+        // nextProgram() fetches and analyzes a growing prefix, so the
+        // first entries list before the whole image is downloaded
+        progressive = true;
+        len = container_len;
+        opened = true;
+        return true;
+    }
+
+    // Conversion formats (DMP/HTAP/TAP-v2): full scan now
     if (!analyzeImage())
         return false;
+    fully_scanned = true;
 
     opened = true;
     Debug_printv("Tape analyzed: programs[%u] duration[%lu ms]",
@@ -278,7 +296,7 @@ uint8_t *TapeDecoder::convertToTapV1(uint32_t *out_len)
             Serial.printf("Converting tape image: %lu/%lu KB\r\n",
                          (unsigned long)(p / 1024),
                          (unsigned long)(container_len / 1024));
-            next_report = p + 256;
+            next_report = p + 64 * 1024;
         }
         // Halfwave sources (HTAP, TAP v2): merge pairs into full waves
         if (halfwaves)
@@ -335,6 +353,7 @@ uint8_t *TapeDecoder::convertToTapV1(uint32_t *out_len)
  * TAPClean scan
  ********************************************************/
 
+// Full scan for images that need conversion first (DMP/HTAP/TAP-v2)
 bool TapeDecoder::analyzeImage()
 {
     std::lock_guard<std::mutex> lock(s_tapclean_mutex);
@@ -342,48 +361,13 @@ bool TapeDecoder::analyzeImage()
     uint8_t *buf;
     uint32_t buflen;
 
-    if (kind == TAPE_KIND_TAP && !halfwaves)
+    buf = convertToTapV1(&buflen);
+    if (buf == nullptr)
     {
-        // Bulk sequential read straight into the buffer - no 4 KB window
-        // hops (matters for network sources)
-        buf = image_alloc(container_len);
-        uint32_t off = 0;
-        if (buf != nullptr && stream->seek(0))
-        {
-            uint32_t next_report = 0;
-            while (off < container_len)
-            {
-                if (off >= next_report)
-                {
-                    Serial.printf("Reading tape image: %lu/%lu KB\r\n",
-                                 (unsigned long)(off / 1024),
-                                 (unsigned long)(container_len / 1024));
-                    next_report = off + 256;
-                }
-                uint32_t got = stream->read(buf + off, container_len - off);
-                if (got == 0)
-                    break;
-                off += got;
-            }
-        }
-        if (buf == nullptr || off != container_len)
-        {
-            Debug_printv("Failed to read tape image (%lu of %lu bytes)", off, container_len);
-            free(buf);
-            return false;
-        }
-        buflen = container_len;
+        Debug_printv("Tape image conversion failed");
+        return false;
     }
-    else
-    {
-        buf = convertToTapV1(&buflen);
-        if (buf == nullptr)
-        {
-            Debug_printv("Tape image conversion failed");
-            return false;
-        }
-        Debug_printv("Converted to TAP v1: %lu -> %lu bytes", container_len, buflen);
-    }
+    Debug_printv("Converted to TAP v1: %lu -> %lu bytes", container_len, buflen);
 
     len = buflen;
 
@@ -409,6 +393,21 @@ bool TapeDecoder::analyzeImage()
     Debug_printv("TAPClean: recognized[%d%%] programs[%d]",
                  tapclean_detected_percent(), nprg);
 
+    entries.clear();
+    harvestEntries(nprg);
+    total_ms = tapclean_tap_time_ms();
+
+    // Everything needed has been copied into 'entries': release the WHOLE
+    // engine (pulse buffer, databases, work buffers - all PSRAM) so no
+    // memory stays allocated between scans. The next tape open re-inits.
+    tapclean_shutdown();
+
+    return true;
+}
+
+// Engine PRG database -> entries, with listing filters applied
+void TapeDecoder::harvestEntries(int nprg)
+{
     // Copy programs out of the engine, in tape order. Loader-internal
     // header blocks (CBM and turbo headers) are folded into the following
     // data program: they contribute their name and are skipped as entries.
@@ -435,7 +434,7 @@ bool TapeDecoder::analyzeImage()
             if (!have_pending)
             {
                 pending_name = p.name ? p.name : "";
-                //pending_start = p.tap_start;
+                pending_start = p.tap_start;
                 have_pending = true;
             }
             continue;
@@ -521,19 +520,131 @@ bool TapeDecoder::analyzeImage()
             i++;
         }
     }
+}
 
-    total_ms = tapclean_tap_time_ms();
+/********************************************************
+ * Progressive scanning (plain TAP)
+ ********************************************************/
 
-    // Everything needed has been copied into 'entries': release the WHOLE
-    // engine (pulse buffer, databases, work buffers - all PSRAM) so no
-    // memory stays allocated between scans. The next tape open re-inits.
-    tapclean_shutdown();
+bool TapeDecoder::fetchTo(uint32_t target)
+{
+    if (image == nullptr)
+    {
+        image = image_alloc(container_len);
+        if (image == nullptr)
+        {
+            Debug_printv("No memory for tape image (%lu bytes)", container_len);
+            return false;
+        }
+        fetched = 0;
+    }
 
+    if (target > container_len)
+        target = container_len;
+    if (fetched >= target)
+        return true;
+
+    if (stream == nullptr || !stream->seek(fetched))
+        return false;
+
+    uint32_t next_report = fetched;
+    while (fetched < target)
+    {
+        if (fetched >= next_report)
+        {
+            Serial.printf("Reading tape image: %lu/%lu KB\r\n",
+                          (unsigned long)(fetched / 1024),
+                          (unsigned long)(container_len / 1024));
+            next_report = fetched + 64 * 1024;
+        }
+        uint32_t got = stream->read(image + fetched, target - fetched);
+        if (got == 0)
+        {
+            Debug_printv("Tape image read failed at %lu of %lu", fetched, target);
+            return false;
+        }
+        fetched += got;
+    }
     return true;
+}
+
+bool TapeDecoder::scanWindow(uint32_t win)
+{
+    std::lock_guard<std::mutex> lock(s_tapclean_mutex);
+
+    int machine = TAPCLEAN_MACHINE_C64;
+    if (platform == 1) machine = TAPCLEAN_MACHINE_VIC20;
+    if (platform == 2) machine = TAPCLEAN_MACHINE_C16;
+
+    Serial.printf("Analyzing tape: %lu/%lu KB\r\n",
+                  (unsigned long)(win / 1024),
+                  (unsigned long)(container_len / 1024));
+
+    // The engine borrows 'image' - no copy, and it stays ours for the
+    // next (larger) window
+    if (!tapclean_load_buffer_ref(image, win, machine, video ? 1 : 0))
+    {
+        tapclean_shutdown();
+        return false;
+    }
+
+    int nprg = tapclean_analyze_tap(1 /* unite neighbouring blocks */);
+    if (nprg < 0)
+    {
+        tapclean_shutdown();
+        return false;
+    }
+
+    Debug_printv("TAPClean: recognized[%d%%] programs[%d] window[%lu/%lu]",
+                 tapclean_detected_percent(), nprg,
+                 (unsigned long)win, (unsigned long)container_len);
+
+    entries.clear();
+    harvestEntries(nprg);
+
+    // A partial window cannot confirm its last entry (the window edge may
+    // have truncated it): withhold it until a later entry or the tape end
+    // proves it complete
+    if (win < container_len && !entries.empty())
+        entries.pop_back();
+
+    if (win >= container_len)
+        total_ms = tapclean_tap_time_ms();
+
+    tapclean_shutdown();
+    return true;
+}
+
+bool TapeDecoder::extendScan()
+{
+    uint32_t target = (fetched == 0) ? (512u * 1024) : (fetched * 2);
+    // Don't leave a tiny tail for one more round trip
+    if (target > container_len || (container_len - target) < 128u * 1024)
+        target = container_len;
+
+    // On failure (e.g. network error) leave state as-is: the next
+    // directory request retries from where the fetch stopped
+    if (!fetchTo(target) || !scanWindow(fetched))
+        return false;
+
+    if (fetched >= container_len)
+    {
+        fully_scanned = true;
+        finishScan();
+    }
+    return true;
+}
+
+void TapeDecoder::finishScan()
+{
+    // The whole image has been analyzed and every entry copied out
+    free(image);
+    image = nullptr;
 }
 
 TapeDecoder::~TapeDecoder()
 {
+    free(image);
 }
 
 /********************************************************
@@ -545,15 +656,21 @@ bool TapeDecoder::nextProgram(uint32_t from_offset, TapeEntry &out)
     if (!opened)
         return false;
 
-    for (auto &e : entries)
+    while (true)
     {
-        if (e.tape_end_offset > from_offset)
+        for (auto &e : entries)
         {
-            out = e;
-            return true;
+            if (e.tape_end_offset > from_offset)
+            {
+                out = e;
+                return true;
+            }
         }
+        if (!progressive || fully_scanned)
+            return false;
+        if (!extendScan())
+            return false;
     }
-    return false;
 }
 
 uint32_t TapeDecoder::offsetAtTime(uint32_t ms)
@@ -563,10 +680,28 @@ uint32_t TapeDecoder::offsetAtTime(uint32_t ms)
 
     // Snap to the program grid: the first program still (partly) ahead of
     // this counter position - exactly what nextProgram() will serve next
-    for (auto &e : entries)
+    while (true)
     {
-        if (e.end_time_ms > ms)
-            return e.tape_offset;
+        for (auto &e : entries)
+        {
+            if (e.end_time_ms > ms)
+                return e.tape_offset;
+        }
+        if (!progressive || fully_scanned)
+            break;
+        if (!extendScan())
+            break;
     }
     return len; // past the last program: end of tape
+}
+
+uint32_t TapeDecoder::totalMs()
+{
+    // Needs the whole tape measured
+    while (opened && progressive && !fully_scanned)
+    {
+        if (!extendScan())
+            break;
+    }
+    return total_ms;
 }

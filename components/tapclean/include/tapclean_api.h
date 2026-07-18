@@ -66,6 +66,13 @@ void tapclean_shutdown(void);
 int tapclean_load_buffer(unsigned char *buf, unsigned int len,
                          int machine, int is_ntsc);
 
+/* Same, but 'buf' is BORROWED: the caller keeps it valid until the next
+   unload/shutdown and frees it afterwards. Lets a caller re-scan a
+   growing prefix of the same buffer without copies. (A DC2N image is
+   still converted into an engine-owned copy.) */
+int tapclean_load_buffer_ref(unsigned char *buf, unsigned int len,
+                             int machine, int is_ntsc);
+
 /* Scan the loaded tape with every enabled scanner and build the block and
    PRG databases. unite_blocks: join neighbouring/contiguous blocks into
    single loadable programs (recommended for turbo loaders that split a

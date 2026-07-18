@@ -21,11 +21,14 @@
 // files, recognizing ~90 commercial loader formats (Cyberload, Visiload,
 // US Gold, Novaload, Freeload, Turbotape 250/64-fast, Pavloda, Ocean, ...).
 //
-// Unlike the previous streaming (wav2prg) engine, TAPClean scans the whole
-// image at open(): the image is read into a PSRAM buffer, analyzed once,
-// and every recognized program is extracted and kept in 'entries'. The
-// multi-megabyte pulse buffer is freed again before open() returns; what
-// remains resident is the decoded program data (typically well under 1 MB).
+// Plain TAP images are scanned PROGRESSIVELY: a growing prefix (512 KB,
+// then doubling) is fetched into PSRAM and analyzed on demand, so the
+// first programs list long before a large image has been downloaded. An
+// entry found in a partial window is only served once a later entry (or
+// the tape end) confirms it complete. When the whole image has been
+// analyzed the pulse buffer is freed; what remains resident is the
+// decoded program data (typically well under 1 MB). DMP/HTAP/TAP-v2
+// images are converted to TAP v1 in memory and scanned in full at open().
 //
 // Formats (auto-detected by signature):
 //  .tap  - "C64-TAPE-RAW", v0/v1 pulses (v2 = halfwaves, converted)
@@ -62,8 +65,11 @@ class TapeDecoder {
 public:
     ~TapeDecoder();
 
-    // Read and analyze the image; false if the stream is not a supported
-    // tape. All programs are decoded here (one whole-image TAPClean scan).
+    // Parse the header; false if the stream is not a supported tape.
+    // Plain TAP images are scanned PROGRESSIVELY afterwards: a growing
+    // prefix of the image is fetched and analyzed on demand, so the first
+    // programs list before the whole file has been downloaded. DMP/HTAP/
+    // TAP-v2 images (which need conversion) are scanned in full here.
     bool open(MStream *container);
     bool isOpen() const { return opened; }
 
@@ -71,7 +77,7 @@ public:
     uint32_t imageLen() const { return len; }
 
     // Return the program at/after from_offset into 'out' and true, or
-    // false at the end of the tape.
+    // false at the end of the tape. May fetch + scan more of the image.
     bool nextProgram(uint32_t from_offset, TapeEntry &out);
 
     // Kept for interface compatibility with the streaming engine (the
@@ -79,18 +85,29 @@ public:
     void resetContinuation() {}
 
     // Tape counter: byte offset for a counter time in ms (snaps to the
-    // program grid - callers follow up with nextProgram)
+    // program grid - callers follow up with nextProgram). May extend the
+    // scan.
     uint32_t offsetAtTime(uint32_t ms);
 
-    // Duration of the whole tape in ms (known right after open())
-    uint32_t totalMs() { return total_ms; }
+    // Duration of the whole tape in ms; forces the full scan
+    uint32_t totalMs();
 
 private:
     bool readBytes(uint32_t pos, uint8_t *dst, uint32_t n);
     bool nextValue(uint32_t *pos, uint32_t *cycles);  // one (half)wave at *pos
     uint32_t machineClock() const;
     uint8_t *convertToTapV1(uint32_t *out_len);       // DMP/HTAP/v2 -> TAP v1
-    bool analyzeImage();                              // run TAPClean, fill entries
+    bool analyzeImage();                              // full scan (non-TAP formats)
+
+    // Progressive scanning (plain TAP): fetch [0..target) of the image,
+    // scan the fetched prefix, rebuild 'entries'. The LAST entry found in
+    // a partial window is withheld until a later entry (or the tape end)
+    // confirms it complete, so a window-truncated block is never served.
+    bool extendScan();                  // grow the window by one step
+    bool fetchTo(uint32_t target);
+    bool scanWindow(uint32_t win);
+    void harvestEntries(int nprg);      // engine PRG db -> entries (+filter)
+    void finishScan();                  // full image analyzed: free it
 
     MStream *stream = nullptr;
     bool opened = false;
@@ -112,9 +129,15 @@ private:
     uint32_t win_len = 0;
     uint32_t container_len = 0;
 
-    // Every program on the tape, in tape order, decoded at open()
+    // Every confirmed program so far, in tape order
     std::vector<TapeEntry> entries;
     uint32_t total_ms = 0;
+
+    // Progressive scan state (plain TAP only)
+    bool progressive = false;
+    bool fully_scanned = false;
+    uint8_t *image = nullptr;   // prefix of the image, PSRAM
+    uint32_t fetched = 0;       // bytes of 'image' valid (== bytes scanned)
 };
 
 #endif /* MEATLOAF_MEDIA_TAPE_DECODER */

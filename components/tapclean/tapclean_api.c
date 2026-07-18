@@ -25,7 +25,7 @@
 #define TC_CBM_SIZE  (64 * 1024)
 
 /* glue in main.c (embedded section) */
-extern int tapclean_embedded_load(unsigned char *buf, unsigned int len);
+extern int tapclean_embedded_load(unsigned char *buf, unsigned int len, int owned);
 extern void tapclean_embedded_unload(void);
 extern float tapclean_embedded_duration(int p1, int p2);
 extern int tapclean_embedded_offset_at_ms(unsigned int ms);
@@ -105,11 +105,12 @@ void tapclean_shutdown(void)
     tc_initialized = 0;
 }
 
-int tapclean_load_buffer(unsigned char *buf, unsigned int len,
-                         int machine, int is_ntsc)
+static int load_common(unsigned char *buf, unsigned int len,
+                       int machine, int is_ntsc, int owned)
 {
     if (!tapclean_init()) {
-        free(buf);
+        if (owned)
+            free(buf);
         return 0;
     }
 
@@ -128,7 +129,19 @@ int tapclean_load_buffer(unsigned char *buf, unsigned int len,
     else
         cps = is_ntsc ? C64_NTSC_CPS : C64_PAL_CPS;
 
-    return tapclean_embedded_load(buf, len);
+    return tapclean_embedded_load(buf, len, owned);
+}
+
+int tapclean_load_buffer(unsigned char *buf, unsigned int len,
+                         int machine, int is_ntsc)
+{
+    return load_common(buf, len, machine, is_ntsc, 1);
+}
+
+int tapclean_load_buffer_ref(unsigned char *buf, unsigned int len,
+                             int machine, int is_ntsc)
+{
+    return load_common(buf, len, machine, is_ntsc, 0);
 }
 
 int tapclean_analyze_tap(int unite_blocks)
