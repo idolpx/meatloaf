@@ -177,12 +177,23 @@ bool M2IMStream::resolveEntry(uint16_t index)
     for (auto &c : lower)
         c = tolower((unsigned char)c);
 
-    for (const std::string &name : { e.dosname, lower })
+    std::vector<std::string> candidates = { e.dosname };
+    if (lower != e.dosname)
+        candidates.push_back(lower);
+
+    for (const std::string &name : candidates)
     {
         std::string target = base + "/" + name;
         std::unique_ptr<MFile> f(MFSOwner::File(target));
         if (f == nullptr)
             continue;
+
+        // exists() does the filesystem's REAL check (stat / fsp_stat);
+        // stream "open" can be lazy on network protocols and succeed for
+        // names that don't exist in this case
+        if (!f->exists())
+            continue;
+
         auto s = f->getSourceStream(std::ios_base::in);
         if (s != nullptr && s->isOpen())
         {

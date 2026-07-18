@@ -326,8 +326,10 @@ bool FSPMFile::exists() {
         return false;
     }
 
+    // stat the URL path (like isDirectory does) - pathInStream is empty
+    // for plain FSP files and only set for paths inside containers
     struct stat sb;
-    return fsp_stat(getSession(), pathInStream.c_str(), &sb) == 0;
+    return fsp_stat(getSession(), path.c_str(), &sb) == 0;
 }
 
 bool FSPMFile::remove() {
