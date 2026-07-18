@@ -31,9 +31,16 @@
 #include "string_utils.h"
 #include "U8Char.h"
 
-#define _MEAT_NO_DATA_AVAIL (std::ios_base::eofbit)
+// "No data available (yet)" sentinel returned by non-blocking stream
+// reads (e.g. TCP). Must NOT collide with any real byte count - it used
+// to be std::ios_base::eofbit (== 2), which made a legitimate 2-byte
+// read indistinguishable from "no data": meat_buffer's underflow() then
+// dropped the bytes and returned the sentinel as a character, pushing
+// gptr past egptr and streaming unbounded heap memory. As an int this
+// value is -2 (distinct from EOF == -1 and from any character).
+#define _MEAT_NO_DATA_AVAIL 0xFFFFFFFEu
 
-static const std::ios_base::iostate ndabit = _MEAT_NO_DATA_AVAIL;
+static const std::ios_base::iostate ndabit = std::ios_base::eofbit;
 
 /********************************************************
  * Universal stream

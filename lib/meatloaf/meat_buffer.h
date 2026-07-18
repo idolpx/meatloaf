@@ -199,8 +199,10 @@ namespace Meat
             {
                 return std::char_traits<char>::eof();
             }
-            else if (this->gptr() == this->egptr())
+            else if (this->gptr() >= this->egptr())
             {
+                // >= not ==: if gptr ever slips past egptr the buffer must
+                // be refilled, never served past its end
                 // the next statement assumes "size" characters were produced (if
                 // no more characters are available, size == 0.
                 // auto buffer = reader->read();
@@ -239,7 +241,7 @@ namespace Meat
             // gptr = current character (get pointer)
             // egptr = one past end of get area
 
-            return this->gptr() == this->egptr()
+            return this->gptr() >= this->egptr()
                        ? std::char_traits<char>::eof()
                        : std::char_traits<char>::to_int_type(*this->gptr());
         };

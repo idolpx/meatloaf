@@ -85,11 +85,9 @@ std::string TAPMStream::entryDisplayName(const TapeEntry &e)
     if (!e.name.empty())
         return e.name;
 
-    // Unnamed entries take the media file's name; the load address keeps
-    // multiple unnamed programs distinguishable (e.g. "pacman 0801")
-    char addr[8];
-    snprintf(addr, sizeof(addr), " %04x", e.start_addr);
-    return default_name + mstr::toPETSCII2(addr);
+    // Unnamed entries take the media file's name (duplicates resolve
+    // positionally: loads search forward from the current tape position)
+    return default_name;
 }
 
 void TAPMStream::loadIndex(const std::string &idx_text)

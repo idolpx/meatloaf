@@ -24,14 +24,17 @@ void *tapclean_psram_malloc(size_t n)
     return p;
 }
 
-/* Called from the pulse readers every ~256K reads: lets lower-priority
-   tasks and the idle task (task watchdog) run during CPU-bound scans,
-   and emits a progress dot so a long scanner pass shows life */
+/* Called from the pulse readers every ~64K reads: emits a progress dot
+   so a long scanner pass shows life, and every 4th call lets lower-
+   priority tasks and the idle task (task watchdog) run */
 void tapclean_scan_yield(void)
 {
+    static unsigned int n;
+
     putchar('.');
     fflush(stdout);
-    vTaskDelay(1);
+    if ((++n & 3) == 0)
+        vTaskDelay(1);
 }
 #else
 void *tapclean_psram_malloc(size_t n) { return malloc(n); }

@@ -354,7 +354,7 @@ void TapeDecoder::harvestEntries(int nprg)
             memcpy(e.prg.data() + 2, p.data, p.size);
 
         Debug_printv("Tape file: name[%s] loader[%s] addr[%04X-%04X] size[%u] csum[%d] tape[%lu-%lu] time[%lu-%lu ms]",
-                     e.name.c_str(), e.loader.c_str(), e.start_addr, e.end_addr,
+                     name.c_str(), e.loader.c_str(), e.start_addr, e.end_addr,
                      (unsigned)e.prg.size(), e.checksum_ok ? 1 : 0,
                      (unsigned long)e.tape_offset, (unsigned long)e.tape_end_offset,
                      (unsigned long)e.start_time_ms, (unsigned long)e.end_time_ms);
@@ -460,23 +460,29 @@ bool TapeDecoder::fetchTo(uint32_t target)
         if (stream == nullptr || !stream->seek(fetched))
             return false;
 
-        uint32_t next_report = fetched;
+        uint32_t next_report = 0;
         while (fetched < target)
         {
-            if (fetched >= next_report)
-            {
-                Serial.printf("Reading tape image: %lu/%lu KB\r\n",
-                              (unsigned long)(fetched / 1024),
-                              (unsigned long)(container_len / 1024));
-                next_report = fetched + 64 * 1024;
-            }
-            uint32_t got = stream->read(image + fetched, target - fetched);
+            // Capped chunks so progress ticks even when the underlying
+            // stream would satisfy one huge read
+            uint32_t chunk = target - fetched;
+            if (chunk > 32 * 1024)
+                chunk = 32 * 1024;
+            uint32_t got = stream->read(image + fetched, chunk);
             if (got == 0)
             {
                 Debug_printv("Tape image read failed at %lu of %lu", fetched, target);
                 return false;
             }
             fetched += got;
+
+            if (fetched >= next_report || fetched >= target)
+            {
+                Serial.printf("Reading tape image: %lu/%lu KB\r\n",
+                              (unsigned long)(fetched / 1024),
+                              (unsigned long)(container_len / 1024));
+                next_report = fetched + 64 * 1024;
+            }
         }
         return true;
     }
@@ -521,6 +527,11 @@ bool TapeDecoder::fetchTo(uint32_t target)
     if (conv_pos >= container_len)
         conv_eof = true;   // cursor at the end: container exhausted
 
+    if (conv_eof)
+        Serial.printf("Converting tape image: %lu/%lu KB\r\n",
+                      (unsigned long)(container_len / 1024),
+                      (unsigned long)(container_len / 1024));
+
     len = fetched;   // converted length known so far
     return true;
 }
@@ -564,6 +575,9 @@ bool TapeDecoder::scanWindow(uint32_t win)
         return false;
     }
 
+    Serial.printf("\r\n%d programs found, %d%% of tape recognized%s\r\n",
+                  nprg, tapclean_detected_percent(),
+                  complete ? "" : " (partial scan)");
     Debug_printv("TAPClean: recognized[%d%%] programs[%d] window[%lu] complete[%d]",
                  tapclean_detected_percent(), nprg,
                  (unsigned long)win, complete ? 1 : 0);

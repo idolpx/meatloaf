@@ -2576,7 +2576,7 @@ int readttbit(int pos, int lp, int sp, int tp)
 	{
 		static unsigned int yield_ctr;
 
-		if ((++yield_ctr & 0x3FFFF) == 0)
+		if ((++yield_ctr & 0xFFFF) == 0)
 			tapclean_scan_yield();
 	}
 #endif
@@ -2707,7 +2707,7 @@ int find_pilot(int pos, int fmt)
 	{
 		static unsigned int yield_ctr;
 
-		if ((++yield_ctr & 0x3FFFF) == 0)
+		if ((++yield_ctr & 0xFFFF) == 0)
 			tapclean_scan_yield();
 	}
 #endif
