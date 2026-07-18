@@ -430,6 +430,32 @@ int idloader(unsigned /*long*/ int crc, int len)
 
 	#define MAXBLOCKLOOKAHEAD 4 /* Max displacement of the array element that is read below */
 
+	/* Meatloaf addition: recognize the "Turbo Tape 64 fast" IRQ loader
+	   stub (see scanners/turbotape_fast.c) by its code signature:
+	   pilot wait  LDA $02 / CMP #$02 / BNE   (A5 02 C9 02 D0)
+	   bit sample  LDA $DC0D                  (AD 0D DC)
+	   bit shift   ROL $02                    (26 02)
+	   All three must be present in the CBM boot program. */
+
+	if (id == 0 && len > 5) {
+		int found_wait = 0, found_cia = 0, found_rol = 0;
+
+		for (i = 0; i < len - MAXBLOCKLOOKAHEAD; i++) {
+			if (cbm_program[i] == 0xA5 && cbm_program[i + 1] == 0x02 &&
+					cbm_program[i + 2] == 0xC9 && cbm_program[i + 3] == 0x02 &&
+					cbm_program[i + 4] == 0xD0)
+				found_wait = 1;
+			if (cbm_program[i] == 0xAD && cbm_program[i + 1] == 0x0D &&
+					cbm_program[i + 2] == 0xDC)
+				found_cia = 1;
+			if (cbm_program[i] == 0x26 && cbm_program[i + 1] == 0x02)
+				found_rol = 1;
+		}
+
+		if (found_wait && found_cia && found_rol)
+			id = LID_TTFAST;
+	}
+
 	/* crc search failed?... do a search in 'cbm_program[]' for loader ID strings... */
 
 	if (id == 0) {

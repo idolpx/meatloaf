@@ -187,6 +187,21 @@ int database_add_blk_def_ex(int lt, int sof, int sod, int eod, int eof, int xi, 
 		return DBERR;
 	}
 
+#ifdef TAPCLEAN_EMBEDDED
+	/* Early scan exit: once found entities account for nearly the whole
+	   tape, the remaining ~85 scanners cannot add anything meaningful.
+	   Set 'aborted' so search_tap() skips them (every scanner call is
+	   gated on !aborted); the scanner currently running finishes its
+	   pass. Only checked when a data block was added, so an all-pause
+	   tape still gets the full sweep. tapclean_analyze_tap() clears
+	   'aborted' before each scan. */
+	if (tap.len > 20 && lt > PAUSE) {
+		long long tot = database_count_recognized_pulses();
+		if (tot * 100 >= (long long)(tap.len - 20) * 97)
+			aborted = TRUE;
+	}
+#endif
+
 	return slot;	/* ok, entry added successfully.   */
 }
 

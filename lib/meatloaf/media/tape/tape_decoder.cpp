@@ -269,9 +269,17 @@ uint8_t *TapeDecoder::convertToTapV1(uint32_t *out_len)
     uint32_t w = 20; // pulse data starts after the header
     uint32_t p = data_start;
     uint32_t cycles;
+    uint32_t next_report = 0;
 
     while (nextValue(&p, &cycles))
     {
+        if (p >= next_report)
+        {
+            Debug_printv("Converting tape image: %lu/%lu KB",
+                         (unsigned long)(p / 1024),
+                         (unsigned long)(container_len / 1024));
+            next_report = p + 256 * 1024;
+        }
         // Halfwave sources (HTAP, TAP v2): merge pairs into full waves
         if (halfwaves)
         {
@@ -336,10 +344,31 @@ bool TapeDecoder::analyzeImage()
 
     if (kind == TAPE_KIND_TAP && !halfwaves)
     {
+        // Bulk sequential read straight into the buffer - no 4 KB window
+        // hops (matters for network sources)
         buf = image_alloc(container_len);
-        if (buf == nullptr || !readBytes(0, buf, container_len))
+        uint32_t off = 0;
+        if (buf != nullptr && stream->seek(0))
         {
-            Debug_printv("Failed to read tape image (%lu bytes)", container_len);
+            uint32_t next_report = 0;
+            while (off < container_len)
+            {
+                if (off >= next_report)
+                {
+                    Debug_printv("Reading tape image: %lu/%lu KB",
+                                 (unsigned long)(off / 1024),
+                                 (unsigned long)(container_len / 1024));
+                    next_report = off + 256 * 1024;
+                }
+                uint32_t got = stream->read(buf + off, container_len - off);
+                if (got == 0)
+                    break;
+                off += got;
+            }
+        }
+        if (buf == nullptr || off != container_len)
+        {
+            Debug_printv("Failed to read tape image (%lu of %lu bytes)", off, container_len);
             free(buf);
             return false;
         }

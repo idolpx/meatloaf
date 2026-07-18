@@ -499,6 +499,7 @@ const char knam[][48] = {
 	{"MMS Tape"},
 	{"Gremlin GBH"},
 	{"Gyrospeed"},
+	{"Turbotape 64 Fast"},
 	/*
 	 * Only loaders with a LID_ entry in mydefs.h enums. Do not list
 	 * them all here!
@@ -995,6 +996,9 @@ static void search_tap(void)
 		if (noid == FALSE) {	/* scanning shortcuts enabled?  */
 			if (tap.cbmid == LID_T250 	&& ldrswt[noturbo].exclude == FALSE && !database_is_full && !aborted)
 				turbotape_search();
+
+			if (tap.cbmid == LID_TTFAST	&& ldrswt[noturbofast].exclude == FALSE && !database_is_full && !aborted)
+				turbotape_fast_search();
 
 			if (tap.cbmid == LID_FREE 	&& ldrswt[nofree ].exclude== FALSE && !database_is_full && !aborted)
 				freeload_search();
@@ -2556,6 +2560,17 @@ int readttbit(int pos, int lp, int sp, int tp)
 {
 	int valid, v, b;
 
+#ifdef TAPCLEAN_EMBEDDED
+	/* Scans are CPU-bound for seconds at a time; breathe periodically so
+	   the idle task (task watchdog) and lower-priority tasks can run */
+	{
+		static unsigned int yield_ctr;
+
+		if ((++yield_ctr & 0x3FFFF) == 0)
+			tapclean_scan_yield();
+	}
+#endif
+
 	if (skewadapt_enabled && tp != NA)
 		return skewadapt_readttbit(pos, lp, sp, tp);
 
@@ -2676,6 +2691,16 @@ int readttbyte(int pos, int lp, int sp, int tp, int endi)
 
 int find_pilot(int pos, int fmt)
 {
+#ifdef TAPCLEAN_EMBEDDED
+	/* See readttbit(): scanners with custom bit readers still call
+	   find_pilot per tape offset, so yield here too */
+	{
+		static unsigned int yield_ctr;
+
+		if ((++yield_ctr & 0x3FFFF) == 0)
+			tapclean_scan_yield();
+	}
+#endif
 	int z, sp, lp, tp, en, pv, sv, pmin, pmax;
 
 	if (pos < 20)

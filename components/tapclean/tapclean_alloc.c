@@ -9,9 +9,12 @@
  */
 
 #include <stdlib.h>
+#include <stdio.h>
 
 #ifdef ESP_PLATFORM
 #include <esp_heap_caps.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 void *tapclean_psram_malloc(size_t n)
 {
@@ -20,6 +23,17 @@ void *tapclean_psram_malloc(size_t n)
         p = malloc(n);
     return p;
 }
+
+/* Called from the pulse readers every ~256K reads: lets lower-priority
+   tasks and the idle task (task watchdog) run during CPU-bound scans,
+   and emits a progress dot so a long scanner pass shows life */
+void tapclean_scan_yield(void)
+{
+    putchar('.');
+    fflush(stdout);
+    vTaskDelay(1);
+}
 #else
 void *tapclean_psram_malloc(size_t n) { return malloc(n); }
+void tapclean_scan_yield(void) {}
 #endif

@@ -319,6 +319,7 @@ enum {
 	LID_MMS,
 	LID_GREMLINGBH,
 	LID_GYROSPEED,
+	LID_TTFAST,
 };
 
 /*
@@ -478,6 +479,9 @@ extern char exedir[MAXPATH];	/* assigned in main.c, includes trailing slash. */
 #include <stddef.h>
 void *tapclean_psram_malloc(size_t n);
 #define malloc tapclean_psram_malloc
+
+/* Cooperative yield used by the pulse readers during long scans */
+void tapclean_scan_yield(void);
 
 /* Size-optimize the whole engine regardless of the app build type: the
    app's flash text must stay inside the 3.3 MB instruction window, and

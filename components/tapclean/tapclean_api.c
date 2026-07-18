@@ -77,7 +77,8 @@ int tapclean_init(void)
 
     crc32_build_crc_table();
 
-    quiet = TRUE;  /* no per-scanner console chatter on the device */
+    /* quiet stays FALSE: the per-scanner msgout() lines double as scan
+       progress on the console ("Scanning...", one name per format) */
 
     tc_initialized = 1;
     return 1;
@@ -135,6 +136,7 @@ int tapclean_analyze_tap(int unite_blocks)
     if (!tc_initialized || tap.tmem == NULL)
         return -1;
 
+    aborted = FALSE;  /* may be left set by the early scan exit */
     prgunite = unite_blocks ? TRUE : FALSE;
 
     if (!analyze())
