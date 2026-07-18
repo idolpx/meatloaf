@@ -17,18 +17,20 @@
 
 // .TAP - The raw tape image format
 //
-// Decoding is done by the vendored wav2prg engine (see components/wav2prg):
-// programs are found sequentially and the loader each one uses is detected
-// via the wav2prg observer chain (Kernal, Turbo Tape 64, Freeload,
-// Novaload, Pavloda, Ocean, and every other wav-prg plugin). Each program
-// is decoded into a PRG (2-byte load address + data).
+// Decoding is done by the vendored TAPClean engine (see
+// components/tapclean): the whole image is scanned once at open and every
+// program is extracted with its loader identified (~90 formats: Kernal,
+// Turbotape 250/64-fast, Cyberload, Visiload, US Gold, Novaload, Freeload,
+// Pavloda, Ocean, ...). Each program is decoded into a PRG (2-byte load
+// address + data).
 //
 // Tapes behave like a real datasette: a directory request returns ONE
 // entry - the next program found from the current tape position - and
 // leaves it ready to load. The next directory request returns the next
 // entry; at the end of the tape a "no more entries" line is shown and the
-// tape rewinds for the following request. The image is never buffered
-// whole in memory; files are found, listed and loaded sequentially.
+// tape rewinds for the following request. The image is buffered in PSRAM
+// only during the open() scan; afterwards just the decoded programs stay
+// resident.
 //
 // If a companion ".idx" file exists (same base name), it is treated like a
 // normal directory listing for random access instead: each line is
