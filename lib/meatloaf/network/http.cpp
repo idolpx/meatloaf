@@ -1086,7 +1086,6 @@ bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
     // Encode spaces BEFORE init(): esp_http_client_init() parses config.url and
     // returns a NULL handle on an unencoded URL, crashing later client calls.
     mstr::replaceAll(url, " ", "%20");
-    lastMethod = meth;
     _error = 0;
     // Reset state for new file operation — MeatHttpClient is shared across files on the same host:port
     isFriendlySkipper = false;
@@ -1115,7 +1114,10 @@ bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
     // After HEAD, _is_open is false (HEAD doesn't set it), so the conditional check
     // would skip init() for the subsequent GET — leaving the handle with stale response
     // buffer state (raw_data != orig_raw_data) that causes esp_http_client_read() to block.
+    // Set lastMethod AFTER init() so init() can see the previous method and decide
+    // whether handle reuse is safe (e.g. HEAD leaves first_line_prepared=true).
     init();
+    lastMethod = meth;
 
     // If we had a POST response saved, restore it for this GET
     if (!savedResponse.empty()) {
@@ -1894,7 +1896,13 @@ void MeatHttpClient::init() {
             size_t authEnd = url.find_first_of("/?#", colon + 3);
             newOrigin = url.substr(0, authEnd == std::string::npos ? url.size() : authEnd);
         }
-        if (!newOrigin.empty() && newOrigin == _httpOrigin) {
+        if (!newOrigin.empty() && newOrigin == _httpOrigin &&
+            // Reuse is only safe when the previous request went through
+            // perform() (POST/PUT), which internally calls prepare() and
+            // resets first_line_prepared.  GET/HEAD leave
+            // first_line_prepared=true — the request line is never
+            // regenerated and the server hangs.  Recreate instead.
+            (lastMethod == HTTP_METHOD_POST || lastMethod == HTTP_METHOD_PUT)) {
             // Same origin — flush stale state and reuse
             int flushed = 0;
             esp_http_client_flush_response(_http, &flushed);
