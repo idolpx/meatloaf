@@ -683,8 +683,21 @@ bool HTTPMStream::open(std::ios_base::openmode mode) {
         r = client.PUT(url);
     else if(mode == std::ios_base::out)
         r = client.POST(url);
-    else
+    else {
+        // Simple GET (channel 0 LOAD) — discard any stale POST response
+        // data preserved from a previous full-mode request.  The getClient()
+        // HEAD call above also restores it, and if we don't clear it here
+        // too, the GET picks it up via open()'s preserved-response fallback
+        // and serves old chat JSON as the first bytes of the loaded file.
+        // Simple GET (channel 0 LOAD) — discard any stale POST response
+        // data preserved from a previous full-mode request.  Without this,
+        // open() finds the preserved data and serves old chat JSON as the
+        // first bytes of the loaded file, corrupting the BASIC stub.
+        client.preservedPostResponse.clear();
+        client.preservedPostResponseSize = 0;
+        client.postResponse.clear();
         r = client.GET(url);
+    }
 
     _size = ( client._range_size > 0) ? client._range_size : client._size;
     if ( client.wasRedirected )
@@ -1111,24 +1124,21 @@ bool MeatHttpClient::open(std::string dstUrl, esp_http_client_method_t meth) {
     }
 
     // Always reset the HTTP client handle before a new request.
-    // After HEAD, _is_open is false (HEAD doesn't set it), so the conditional check
-    // would skip init() for the subsequent GET — leaving the handle with stale response
-    // buffer state (raw_data != orig_raw_data) that causes esp_http_client_read() to block.
-    // Set lastMethod AFTER init() so init() can see the previous method and decide
-    // whether handle reuse is safe (e.g. HEAD leaves first_line_prepared=true).
     init();
     lastMethod = meth;
 
-    // If we had a POST response saved, restore it for this GET
-    if (!savedResponse.empty()) {
+    // If we had a POST response saved, restore it for this GET only.
+    // HEAD requests are always probes — never serve cached data for them.
+    if (!savedResponse.empty() && meth == HTTP_METHOD_GET) {
         postResponse = std::move(savedResponse);
         _is_open = true;
         _size = savedSize;
         _position = 0;
-        Debug_printv("Restored POST response: %u bytes", _size);
+        Debug_printv("Restored POST response: %u bytes for URL %s", _size, url.c_str());
         return true;
     }
 
+    // Not the same POST response — make a real HTTP request.
     //Debug_printv("open: calling processRedirectsAndOpen");
     bool result = processRedirectsAndOpen(0);
     //Debug_printv("open: processRedirectsAndOpen returned %d, _is_open=%d", result, _is_open);
@@ -1799,8 +1809,14 @@ esp_err_t MeatHttpClient::_http_event_handler(esp_http_client_event_t *evt)
         case HTTP_EVENT_ON_DATA: // Occurs multiple times when receiving body data from the server. MAY BE SKIPPED IF BODY IS EMPTY!
             //Debug_printv("HTTP_EVENT_ON_DATA: len=%d", evt->data_len);
             if (evt->data_len > 0 && evt->data != nullptr) {
-                // Append response data to postResponse buffer
-                if (meatClient->lastMethod == HTTP_METHOD_GET ||
+                // Append response data to postResponse buffer.
+                // For POST/PUT (and deferred GET with _performPending) the
+                // response is consumed post-facto from this buffer after
+                // perform() completes.  For SIMPLE GET (openAndFetchHeaders)
+                // the data is read directly via esp_http_client_read() —
+                // buffering it here would cause a stale copy to be served
+                // after the first _is_open=false return.
+                if (meatClient->_performPending ||
                     meatClient->lastMethod == HTTP_METHOD_POST ||
                     meatClient->lastMethod == HTTP_METHOD_PUT) {
                     meatClient->postResponse.insert(
@@ -1929,6 +1945,13 @@ void MeatHttpClient::init() {
         esp_http_client_cleanup(_http);
         _http = nullptr;
     }
+    // Clear stale response data from prior requests regardless of origin.
+    // Without this, a HEAD to a different origin preserves old POST
+    // response data that the next GET restores, serving stale bytes
+    // (e.g. chat JSON) as the first bytes of a LOADed file.
+    preservedPostResponse.clear();
+    preservedPostResponseSize = 0;
+    postResponse.clear();
     _is_open = false;
 
     esp_http_client_config_t config;
