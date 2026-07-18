@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
-// ZipCode - Disk, File, SixPack
+// Z64 - ZipCode - Disk, File, SixPack
 //
 // https://ist.uwaterloo.ca/~schepers/formats/ZIP_DISK.TXT
 // https://ist.uwaterloo.ca/~schepers/formats/ZIP_FILE.TXT
