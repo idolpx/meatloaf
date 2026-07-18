@@ -275,10 +275,10 @@ uint8_t *TapeDecoder::convertToTapV1(uint32_t *out_len)
     {
         if (p >= next_report)
         {
-            Debug_printv("Converting tape image: %lu/%lu KB",
+            Serial.printf("Converting tape image: %lu/%lu KB\r\n",
                          (unsigned long)(p / 1024),
                          (unsigned long)(container_len / 1024));
-            next_report = p + 256 * 1024;
+            next_report = p + 256;
         }
         // Halfwave sources (HTAP, TAP v2): merge pairs into full waves
         if (halfwaves)
@@ -355,10 +355,10 @@ bool TapeDecoder::analyzeImage()
             {
                 if (off >= next_report)
                 {
-                    Debug_printv("Reading tape image: %lu/%lu KB",
+                    Serial.printf("Reading tape image: %lu/%lu KB\r\n",
                                  (unsigned long)(off / 1024),
                                  (unsigned long)(container_len / 1024));
-                    next_report = off + 256 * 1024;
+                    next_report = off + 256;
                 }
                 uint32_t got = stream->read(buf + off, container_len - off);
                 if (got == 0)
@@ -435,7 +435,7 @@ bool TapeDecoder::analyzeImage()
             if (!have_pending)
             {
                 pending_name = p.name ? p.name : "";
-                pending_start = p.tap_start;
+                //pending_start = p.tap_start;
                 have_pending = true;
             }
             continue;
@@ -492,7 +492,7 @@ bool TapeDecoder::analyzeImage()
             memcpy(e.prg.data() + 2, p.data, p.size);
 
         Debug_printv("Tape file: name[%s] loader[%s] addr[%04X-%04X] size[%u] csum[%d] tape[%lu-%lu] time[%lu-%lu ms]",
-                     name.c_str(), e.loader.c_str(), e.start_addr, e.end_addr,
+                     e.name.c_str(), e.loader.c_str(), e.start_addr, e.end_addr,
                      (unsigned)e.prg.size(), e.checksum_ok ? 1 : 0,
                      (unsigned long)e.tape_offset, (unsigned long)e.tape_end_offset,
                      (unsigned long)e.start_time_ms, (unsigned long)e.end_time_ms);
