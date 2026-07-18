@@ -21,14 +21,15 @@
 // files, recognizing ~90 commercial loader formats (Cyberload, Visiload,
 // US Gold, Novaload, Freeload, Turbotape 250/64-fast, Pavloda, Ocean, ...).
 //
-// Plain TAP images are scanned PROGRESSIVELY: a growing prefix (512 KB,
-// then doubling) is fetched into PSRAM and analyzed on demand, so the
-// first programs list long before a large image has been downloaded. An
-// entry found in a partial window is only served once a later entry (or
-// the tape end) confirms it complete. When the whole image has been
-// analyzed the pulse buffer is freed; what remains resident is the
-// decoded program data (typically well under 1 MB). DMP/HTAP/TAP-v2
-// images are converted to TAP v1 in memory and scanned in full at open().
+// All images are scanned PROGRESSIVELY: a growing prefix (512 KB, then
+// doubling) is fetched into PSRAM and analyzed on demand, so the first
+// programs list long before a large image has been downloaded. DMP/HTAP/
+// TAP-v2 sources are converted to TAP v1 on the fly as they stream in
+// (entry offsets then refer to the converted image). An entry found in a
+// partial window is only served once a later entry (or the tape end)
+// confirms it complete. When the whole image has been analyzed the pulse
+// buffer is freed; what remains resident is the decoded program data
+// (typically well under 1 MB).
 //
 // Formats (auto-detected by signature):
 //  .tap  - "C64-TAPE-RAW", v0/v1 pulses (v2 = halfwaves, converted)
@@ -96,15 +97,16 @@ private:
     bool readBytes(uint32_t pos, uint8_t *dst, uint32_t n);
     bool nextValue(uint32_t *pos, uint32_t *cycles);  // one (half)wave at *pos
     uint32_t machineClock() const;
-    uint8_t *convertToTapV1(uint32_t *out_len);       // DMP/HTAP/v2 -> TAP v1
-    bool analyzeImage();                              // full scan (non-TAP formats)
 
-    // Progressive scanning (plain TAP): fetch [0..target) of the image,
-    // scan the fetched prefix, rebuild 'entries'. The LAST entry found in
-    // a partial window is withheld until a later entry (or the tape end)
-    // confirms it complete, so a window-truncated block is never served.
+    // Progressive scanning: fetch/convert a prefix of the image, scan it,
+    // rebuild 'entries'. The LAST entry found in a partial window is
+    // withheld until a later entry (or the tape end) confirms it
+    // complete, so a window-truncated block is never served. DMP/HTAP/
+    // TAP-v2 sources are converted to TAP v1 on the fly as they stream
+    // in; entry offsets then refer to the converted image.
     bool extendScan();                  // grow the window by one step
-    bool fetchTo(uint32_t target);
+    bool fetchTo(uint32_t target);      // raw fetch or streamed conversion
+    bool appendValue(uint32_t cycles);  // encode one v1 pulse into 'image'
     bool scanWindow(uint32_t win);
     void harvestEntries(int nprg);      // engine PRG db -> entries (+filter)
     void finishScan();                  // full image analyzed: free it
@@ -122,9 +124,9 @@ private:
     uint32_t counter_rate = 2000000;
     bool halfwaves = false;
 
-    // Sliding window over the container stream (used while reading/
-    // converting the image at open())
-    uint8_t window[4096];
+    // Sliding window over the container stream (used by the streamed
+    // conversion; 16 KB keeps network round trips low)
+    uint8_t window[16384];
     uint32_t win_start = 0;
     uint32_t win_len = 0;
     uint32_t container_len = 0;
@@ -133,11 +135,14 @@ private:
     std::vector<TapeEntry> entries;
     uint32_t total_ms = 0;
 
-    // Progressive scan state (plain TAP only)
-    bool progressive = false;
+    // Progressive scan state
     bool fully_scanned = false;
-    uint8_t *image = nullptr;   // prefix of the image, PSRAM
-    uint32_t fetched = 0;       // bytes of 'image' valid (== bytes scanned)
+    bool converting = false;    // source needs TAP v1 conversion
+    uint8_t *image = nullptr;   // (converted) image prefix, PSRAM
+    uint32_t image_cap = 0;     // allocated size of 'image'
+    uint32_t fetched = 0;       // valid bytes of 'image' (== bytes scanned)
+    uint32_t conv_pos = 0;      // container read cursor (converting only)
+    bool conv_eof = false;      // container exhausted (converting only)
 };
 
 #endif /* MEATLOAF_MEDIA_TAPE_DECODER */
