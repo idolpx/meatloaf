@@ -197,6 +197,7 @@ int tapclean_get_prg(int idx, tapclean_prg_t *out)
     out->type = p->lt;
     out->type_name = ft[p->lt].name;
     out->is_cbm_header = (p->lt == CBM_HEAD);
+    out->is_cbm_data = (p->lt == CBM_DATA);
     out->start_addr = p->cs;
     out->end_addr = p->ce;
     out->size = p->cx;

@@ -20,6 +20,40 @@
 #include "endianness.h"
 #include <cstring>
 #include <cstdlib>
+#include <map>
+#include <mutex>
+
+/********************************************************
+ * Shared tape state
+ ********************************************************/
+
+// Live states keyed by container URL. weak_ptr: the state lives as long
+// as any TAPMStream on the image does (the ImageBroker's LRU keeps its
+// instance around, preserving the tape position between operations).
+std::shared_ptr<TapeState> TapeState::obtain(const std::string &url)
+{
+    static std::map<std::string, std::weak_ptr<TapeState>> registry;
+    static std::mutex mtx;
+
+    std::lock_guard<std::mutex> lock(mtx);
+
+    for (auto it = registry.begin(); it != registry.end(); )
+    {
+        if (it->second.expired())
+            it = registry.erase(it);
+        else
+            ++it;
+    }
+
+    auto &slot = registry[url];
+    auto state = slot.lock();
+    if (state == nullptr)
+    {
+        state = std::make_shared<TapeState>();
+        slot = state;
+    }
+    return state;
+}
 
 /********************************************************
  * Streams

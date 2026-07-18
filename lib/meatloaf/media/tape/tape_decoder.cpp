@@ -389,6 +389,7 @@ bool TapeDecoder::analyzeImage()
     bool have_pending = false;
     uint32_t prev_off = 20;
     uint32_t prev_ms = 0;
+    std::vector<bool> entry_is_cbm;   // parallel to 'entries'
 
     for (int i = 0; i < nprg; i++)
     {
@@ -467,7 +468,28 @@ bool TapeDecoder::analyzeImage()
                      (unsigned long)e.start_time_ms, (unsigned long)e.end_time_ms);
 
         entries.push_back(std::move(e));
+        entry_is_cbm.push_back(p.is_cbm_data != 0);
         have_pending = false;
+    }
+
+    // Turbo-loader tapes: the Kernal-loaded block is just the boot stub
+    // for the loader system - only the turbo payload is loadable through
+    // Meatloaf. Drop each CBM block that a non-CBM program follows,
+    // passing its name (the game's name) to that program. Pure Kernal
+    // tapes (all blocks CBM) keep every entry.
+    for (size_t i = 0; i + 1 < entries.size(); )
+    {
+        if (entry_is_cbm[i] && !entry_is_cbm[i + 1])
+        {
+            if (entries[i + 1].name.empty())
+                entries[i + 1].name = entries[i].name;
+            entries.erase(entries.begin() + i);
+            entry_is_cbm.erase(entry_is_cbm.begin() + i);
+        }
+        else
+        {
+            i++;
+        }
     }
 
     total_ms = tapclean_tap_time_ms();

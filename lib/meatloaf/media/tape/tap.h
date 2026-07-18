@@ -26,11 +26,14 @@
 //
 // Tapes behave like a real datasette: a directory request returns ONE
 // entry - the next program found from the current tape position - and
-// leaves it ready to load. The next directory request returns the next
-// entry; at the end of the tape a "no more entries" line is shown and the
-// tape rewinds for the following request. The image is buffered in PSRAM
-// only during the open() scan; afterwards just the decoded programs stay
-// resident.
+// leaves it ready to load (LOAD"*",8 or console cat/hex "*" then serve
+// that program - the tape state is shared across stream instances). The
+// next directory request returns the next entry; at the end of the tape
+// a "no more entries" line is shown and the tape rewinds for the
+// following request. Only payloads are listed: the Kernal-loaded boot
+// stub of a turbo-loader tape is skipped (its name goes to the payload).
+// The image is buffered in PSRAM only during the open() scan; afterwards
+// just the decoded programs stay resident.
 //
 // If a companion ".idx" file exists (same base name), it is treated like a
 // normal directory listing for random access instead: each line is
@@ -85,10 +88,52 @@
  * Streams
  ********************************************************/
 
+// Tape state shared by every TAPMStream on the same image: the decoder
+// (one whole-tape scan) and the datasette position. File opens create
+// fresh TAPMStream instances (MFile::getSourceStream -> getDecodedStream)
+// while directory listings use the ImageBroker instance - sharing this
+// state is what makes LOAD"*",8 / console "cat *" serve the program at
+// the current tape position, and prevents a full re-scan on every open.
+struct TapeState {
+    TapeDecoder decoder;
+    bool decoder_tried = false;
+    bool decoder_ok = false;
+
+    uint32_t tape_pos = 0;      // where the next program scan resumes
+    bool tape_ended = false;
+
+    TapeEntry current;          // last program found (ready to load)
+    bool have_current = false;
+
+    // Registry of live states keyed by container URL
+    static std::shared_ptr<TapeState> obtain(const std::string &url);
+};
+
 class TAPMStream : public MMediaStream {
 
+protected:
+    // Shared per-image state; the references below alias into it so the
+    // rest of the class (and TAPMFile) reads like plain members
+    std::shared_ptr<TapeState> state;
+    TapeDecoder &decoder;
+    bool &decoder_tried;
+    bool &decoder_ok;
+    uint32_t &tape_pos;         // where the next program scan resumes
+    bool &tape_ended;
+
 public:
-    TAPMStream(std::shared_ptr<MStream> is) : MMediaStream(is)
+    TapeEntry &current;         // last program found (ready to load)
+    bool &have_current;
+
+    TAPMStream(std::shared_ptr<MStream> is) : MMediaStream(is),
+        state(TapeState::obtain(is != nullptr ? is->url : "")),
+        decoder(state->decoder),
+        decoder_tried(state->decoder_tried),
+        decoder_ok(state->decoder_ok),
+        tape_pos(state->tape_pos),
+        tape_ended(state->tape_ended),
+        current(state->current),
+        have_current(state->have_current)
     {
         // The decoder opens lazily on first use
     };
@@ -112,9 +157,6 @@ public:
     bool nextTapeEntry();
     void resetTape();
     bool tapeEnded() { return tape_ended; }
-
-    TapeEntry current;              // last program found (ready to load)
-    bool have_current = false;
 
     // --- .idx directory (random access) ---
     uint16_t idxCount() { return idx_entries.size(); }
@@ -146,14 +188,6 @@ protected:
 
     bool ensureDecoder();
     void serveCurrent();            // expose 'current' as the loaded file
-
-    TapeDecoder decoder;
-    bool decoder_tried = false;
-    bool decoder_ok = false;
-
-    // Sequential position: where the next program scan resumes
-    uint32_t tape_pos = 0;
-    bool tape_ended = false;
 
     bool has_idx = false;
     std::vector<IdxEntry> idx_entries;

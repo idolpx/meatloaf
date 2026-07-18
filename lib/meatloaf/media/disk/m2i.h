@@ -18,4 +18,6 @@
 // .M2I - MMC2IEC Disk Image format
 //
 // https://larsee.com/blog/2007/02/the-mmc2iec-device/
+// https://github.com/idolpx/sd2iec/blob/master/src/m2iops.c
 //
+

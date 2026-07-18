@@ -42,6 +42,7 @@ typedef struct {
     int type;                  /* loader type id of the (last united) block */
     const char *type_name;
     int is_cbm_header;         /* 1 = C64 ROM-TAPE HEADER block (not a program) */
+    int is_cbm_data;           /* 1 = C64 ROM-TAPE DATA (Kernal-loaded block) */
     int start_addr;
     int end_addr;
     int size;
