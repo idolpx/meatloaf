@@ -1,0 +1,13 @@
+    class SessionBroker {
+        <<static>>
+        -session_repo$ - map key = host colon port
+        -bool task_running - keep-alive task, 8 KB stack (do not shrink)
+        -SemaphoreHandle_t _mutex$
+        -lock()$
+        -unlock()$
+        -session_host_key(key) string$
+        -path_matches_session(path, key) bool$
+        -is_session_in_use(key) bool$ - protects active sessions from cleanup
+        +obtain(host, port)$ - reuse or create the protocol session
+        +service()$ - periodic keep-alive sweep
+    }

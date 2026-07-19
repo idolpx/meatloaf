@@ -1,0 +1,14 @@
+    class MFileSystem {
+        <<abstract>>
+        #bool _is_mounted
+        +bool isRootFS - flash FS resolves bare paths
+        +bool vdrive_compatible - image can be handed to VDrive
+        +string service_type - DNS-SD type for mdns browsing
+        +handles(path)* bool - claim a path by extension or scheme
+        +getFile(path)* MFile*
+        +mount() bool
+        +umount() bool
+        +isMounted() bool
+        +byExtension(ext, path) bool$
+        +byContent(header) string$ - sniff extension from magic bytes
+    }

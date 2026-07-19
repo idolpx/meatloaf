@@ -12,49 +12,94 @@ classDiagram
 
     class MMediaStream {
         <<abstract>>
+        #bool seekCalled - a file inside the image is selected; read() caps at _size
         #shared_ptr~MStream~ containerStream
-        #bool seekCalled
-        +readContainer(buf, size) uint32_t
-        +readFile(buf, size)* uint32_t
-        +seekEntry(filename) bool
-        +getNextImageEntry() bool
-    }
-
-    class D64MStream {
-        +vector~uint16_t~ sectorsPerTrack
-        +blocksFree() uint16_t
-        +seekBlock(index, offset) bool
-        +seekSector(track, sector, offset) bool
-        +seekPath(path) bool
-        +seekDirectory(path) bool
-        +enterDirectory(name) bool
+        #bool _is_open
+        #size_t media_header_size
+        #size_t media_data_offset
+        #size_t entry_index - 1-based current directory entry, 0 none
+        #bool show_hidden
+        +readContainer(buf, size) uint32_t - raw image bytes
+        +readFile(buf, size)* uint32_t - bytes of the SELECTED file
+        +writeFile(buf, size)* uint32_t
         +readHeader() bool
         +writeHeader(name, id) bool
         +seekEntry(filename) bool
-        +readEntry(index) bool
-        +writeEntry(index) bool
+        +seekEntry(index) bool
+        +getNextImageEntry() bool
+        +resetEntryCounter() void
+        +seekFileSize(track, sector) uint32_t - walk block chain to count bytes
+        +decodeType(file_type, hidden) string - CBM file type text
+        +readUntil(delimiter) string
+        +readString(size) string
+        +blocks() uint32_t
+        +blocksFree() uint16_t
+        +seekPath(path) bool
+        +seekNextEntry() string
+    }
+
+    class D64MStream {
+        #vector~Partition~ partitions - header/dir location + BAM layout per partition
+        #vector~uint16_t~ sectorsPerTrack - zone table
+        #uint8_t dos_version
+        #bool error_info - image carries per-sector error bytes
+        #uint16_t block_size
+        #readHeader() bool
+        #writeHeader(name, id) bool
+        #seekEntry(filename) bool - skips scratched entries, wildcard aware
+        #seekEntry(index) bool
+        #readEntry(index) bool
+        #writeEntry(index) bool - commit directory slot
+        #getBAMRecord(track, rec) bool - generic over count-byte and bitmap-only BAMs
+        #readBAMRecord(track, rec, buf) bool
+        #setBlockAllocation(track, sector, allocate) bool
+        #findFreeSectorOnTrack(track, startSector, foundSector) bool
+        +blocksFree() uint16_t - sums getTrackFreeCount, skips dir track
+        +seekBlock(index, offset) bool
+        +seekSector(track, sector, offset) bool
+        +seekPath(path) bool - read selects file; write mode CREATES it (SAVE)
+        +seekDirectory(path) bool - walk slash-separated in-image subdirs
+        +enterDirectory(name) bool - CMD native DIR and 1581 CBM partitions
         +writeBlock(track, sector, data) bool
         +allocateBlock(track, sector) bool
         +deallocateBlock(track, sector) bool
+        +isBlockFree(track, sector) bool
         +getFreeBlocks(file_size) BlockChain
-        +getNextFreeBlock(startT, startS, foundT, foundS, forDir) bool
-        +getBAMRecord(track, rec) bool
-        +setBlockAllocation(track, sector, allocate) bool
+        +getNextFreeBlock(startT, startS, foundT, foundS, forDir) bool - physical-drive algorithm: near dir track, interleave, sweep outward
         +getTrackFreeCount(track) uint8_t
+        +getSectorCount(track) uint16_t
+        +getTrackCount() uint16_t
     }
 
     class TAPMStream {
-        +TapeEntry& current
+        -bool has_idx
+        -vector~IdxEntry~ idx_entries - sidecar random-access listing
+        -string default_name - media name for unnamed entries
+        #shared_ptr~TapeState~ state - SHARED per image url
+        #TapeDecoder& decoder - alias into state
+        #uint32_t& tape_pos - where the next program scan resumes
+        #bool& tape_ended
+        #ensureDecoder() bool
+        #serveCurrent() void - expose current entry as the open file
+        #readFile(buf, size) uint32_t
+        +TapeEntry& current - last program found, ready to load
         +bool& have_current
-        +nextTapeEntry() bool
+        +nextTapeEntry() bool - advance one program (datasette listing)
         +resetTape() void
-        +setCounter(spec) bool
-        +counterMs() uint32_t
+        +tapeEnded() bool
+        +loadIndex(idx_text) void
+        +hasIndex() bool
+        +idxCount() uint16_t
+        +idxEntry(index, name, size) bool
+        +setDefaultName(name) void
+        +setCounter(spec) bool - ms or MMM:SS
+        +setCounterMs(ms) bool
+        +counterMs() uint32_t - position as tape time
         +durationMs() uint32_t
-        +entryDisplayName(e) string
-        +seekPath(path) bool
-        #uint32_t& tape_pos
-        #shared_ptr~TapeState~ state
+        +counterString() string
+        +entryDisplayName(e) string - media name when unnamed, no address suffix
+        +seekPath(path) bool - current entry first, then forward search with wrap
+        +info() map
     }
 
     class TapeState {
@@ -63,97 +108,148 @@ classDiagram
         +bool tape_ended
         +TapeEntry current
         +bool have_current
-        +obtain(url) shared_ptr~TapeState~$
+        +obtain(url) shared_ptr~TapeState~$ - weak_ptr registry keyed by container url
     }
 
     class TapeDecoder {
-        +open(container) bool
-        +nextProgram(from_offset, out) bool
-        +offsetAtTime(ms) uint32_t
-        +totalMs() uint32_t
-        -extendScan() bool
-        -fetchTo(target) bool
-        -scanWindow(win) bool
-        -harvestEntries(nprg) void
-        -appendValue(cycles) bool
-        -vector~TapeEntry~ entries
-        -uint8_t* image
-        -bool converting
+        -MStream* stream - container being fetched
+        -uint8_t window - 16 KB stream window for conversion reads
+        -uint8_t kind - TAP, DMP or HTAP
+        -uint8_t version
+        -uint8_t platform - C64, VIC20, C16
+        -uint8_t video - PAL or NTSC
+        -bool halfwaves - HTAP and TAP v2 sum pairs
+        -bool converting - source needs TAP v1 conversion
         -bool fully_scanned
+        -uint8_t* image - (converted) image prefix in PSRAM
+        -uint32_t image_cap
+        -uint32_t fetched - valid bytes of image (== bytes scanned)
+        -uint32_t conv_pos - container read cursor while converting
+        -bool conv_eof
+        -vector~TapeEntry~ entries - confirmed programs in tape order
+        -uint32_t total_ms
+        -readBytes(pos, dst, n) bool
+        -nextValue(pos, cycles) bool - one pulse or halfwave from container
+        -machineClock() uint32_t
+        -extendScan() bool - grow window 512K doubling, fetch + scan
+        -fetchTo(target) bool - raw fetch or streamed conversion
+        -appendValue(cycles) bool - encode one v1 pulse into image
+        -scanWindow(win) bool - borrowed-buffer TAPClean scan, rebuild entries
+        -harvestEntries(nprg) void - filter boot stubs, dedup repeats, name transfer
+        -finishScan() void - free image once fully analyzed
+        +open(container) bool - header parse only; scanning is on demand
+        +isOpen() bool
+        +dataStart() uint32_t
+        +imageLen() uint32_t
+        +nextProgram(from_offset, out) bool - first entry ending past offset; may extend scan
+        +resetContinuation() void - interface compat, no-op
+        +offsetAtTime(ms) uint32_t - tape counter seek, snaps to program grid
+        +totalMs() uint32_t - forces full scan
     }
 
     class TapeEntry {
         <<struct>>
-        +string name
-        +string loader
+        +string name - PETSCII, may be empty
+        +string loader - TAPClean format name
         +uint16_t start_addr
         +uint16_t end_addr
-        +uint32_t tape_offset
-        +uint32_t tape_end_offset
-        +uint32_t start_time_ms
+        +uint32_t tape_offset - first pulse of the program
+        +uint32_t tape_end_offset - just past the program
+        +uint32_t start_time_ms - tape counter at start
         +uint32_t end_time_ms
         +bool checksum_ok
-        +vector~uint8_t~ prg
+        +vector~uint8_t~ prg - 2-byte load address plus data
     }
 
     class tapclean_api {
-        <<C component>>
-        +tapclean_init() int
-        +tapclean_load_buffer(buf, len, machine, ntsc) int
-        +tapclean_load_buffer_ref(buf, len, machine, ntsc) int
-        +tapclean_analyze_tap(unite) int
-        +tapclean_get_prg(idx, out) int
-        +tapclean_get_block(idx, out) int
-        +tapclean_duration_ms(p1, p2) uint
-        +tapclean_shutdown() void
+        <<C API - components/tapclean/include/tapclean_api.h>>
+        +tapclean_init() int - lazy: allocates all engine buffers PSRAM-first
+        +tapclean_shutdown() void - frees EVERYTHING incl. loaded tape
+        +tapclean_load_buffer(buf, len, machine, ntsc) int - takes ownership of buf
+        +tapclean_load_buffer_ref(buf, len, machine, ntsc) int - borrows buf (window re-scans)
+        +tapclean_analyze_tap(unite_blocks) int - full scan; returns PRG count
+        +tapclean_unload() void - free tape, keep work buffers
+        +tapclean_block_count() int
+        +tapclean_get_block(idx, out) int - raw block records (tapclean_block_t)
+        +tapclean_prg_count() int
+        +tapclean_get_prg(idx, out) int - united programs (tapclean_prg_t)
+        +tapclean_detected_percent() int - pulses accounted for
+        +tapclean_tap_time_ms() uint - whole-tape play time
+        +tapclean_time_at_ms(offset) uint - play time from start to offset
+        +tapclean_offset_at_ms(ms) int - inverse: tape counter seek
+        +tapclean_duration_ms(p1, p2) uint - play time between offsets
     }
 
     class Archive {
-        +struct archive* a
-        +open() bool
+        -struct archive* a - libarchive handle
+        -shared_ptr~MStream~ srcStream
+        +open() bool - registers read/skip/seek callbacks over MStream
         +close() void
+        +cb_read()$ - feed blocks from source stream
+        +cb_skip()$ - returns 0 to force sequential reads
+        +cb_seek()$ - only rewind to 0 allowed
     }
 
     class ArchiveMSession {
-        +getEntry(entryPath, a, entrySize) shared_ptr~CachedFile~
+        -keep_alive disabled - key archive:// plus url
+        +getEntry(entryPath, a, entrySize) shared_ptr~CachedFile~ - extract once, cache in PSRAM/HIMEM
         -loadEntryFromArchive(cf, a, entrySize) bool
     }
 
     class ArchiveMStream {
-        +ensureData() bool
-        +seekPath(path) bool
+        -shared_ptr~CachedFile~ data - cached extracted entry
+        #bool m_isCompressedOnly - bare .gz style, single synthesized entry
+        +ensureData() bool - extract then RELEASE archive + source chain
+        +seekPath(path) bool - session cache first, avoids re-opening archive
+        +seekNextEntry() string - sequential header walk for listings
+        +readFile(buf, size) uint32_t
     }
 
     class DHDImageRegistry {
         <<static>>
-        +partitions(url) vector~DHDPartition~$
-        +selectedPartition(url) uint8_t$
-        +selectPartition(url, num) bool$
+        -per-image partition tables$ - scanned once (CMD HD boot magic / FD fixed layout)
+        +partitions(url)$ - parsed table, 254 (HD) or 31 (FD) entries
+        +selectedPartition(url) uint8_t$ - defaults to image default partition
+        +selectPartition(url, num) bool$ - CP command; disposes ImageBroker entry
     }
 
     class DHDPartition {
         <<struct>>
-        +uint8_t type
-        +string name
-        +uint32_t start_lba
+        +uint8_t type - NATIVE, D64, D71, D81
+        +string name - 16 chars
+        +uint32_t start_lba - 3-byte big-endian in table
         +uint32_t size_lba
     }
 
     class DHDOffsetStream {
-        +window over partition offset
+        -shared_ptr~MStream~ inner
+        -uint32_t offset - partition start in the image
+        -uint32_t length
+        +read/seek windowed into the partition
     }
 
     class HDDMStream {
-        +IDE64 CFS 0.11 decoder
-        +partition root directories
-        +balanced data-tree traversal
+        #partition table at image root - IDE64 CFS 0.11
+        #readHeader() bool
+        #seekEntry(filename) bool - partitions, subdirs, multi-sector dirs
+        #readFile(buf, size) uint32_t - balanced data-tree traversal, holes read as zero
+        +seekPath(path) bool - default partition fallback for bare paths
+        +read only
     }
 
     class M2IMStream {
-        +vector~Entry~ entries
-        +resolveEntry(index) bool
-        +entryTargetUrl() string
-        -shared_ptr~MStream~ fileStream
+        -shared_ptr~MStream~ fileStream - host file being served
+        #string title
+        #vector~Entry~ entries - parsed once (line-based, BOM tolerant)
+        #Entry entry - currently selected
+        #readHeader() bool - parse whole index at open
+        #seekEntry(filename) bool - match CBM name, skip DEL separators
+        #seekEntry(index) bool
+        #resolveEntry(index) bool - find host file (exact then lowercase), cache url+size
+        #entryTargetUrl() string - sibling of the m2i
+        #readFile(buf, size) uint32_t - delegates to fileStream
+        #decodeType(file_type, hidden) string
+        +seekPath(path) bool
     }
 
     MMediaStream <|-- D64MStream

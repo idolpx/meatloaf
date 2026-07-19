@@ -9,21 +9,22 @@ classDiagram
     direction TB
 
     class tapclean_api {
-        <<C API - tapclean_api.h>>
-        +tapclean_init() int
-        +tapclean_shutdown() void
-        +tapclean_load_buffer(buf, len, machine, ntsc) int
-        +tapclean_load_buffer_ref(buf, len, machine, ntsc) int
-        +tapclean_analyze_tap(unite_blocks) int
+        <<C API - components/tapclean/include/tapclean_api.h>>
+        +tapclean_init() int - lazy: allocates all engine buffers PSRAM-first
+        +tapclean_shutdown() void - frees EVERYTHING incl. loaded tape
+        +tapclean_load_buffer(buf, len, machine, ntsc) int - takes ownership of buf
+        +tapclean_load_buffer_ref(buf, len, machine, ntsc) int - borrows buf (window re-scans)
+        +tapclean_analyze_tap(unite_blocks) int - full scan; returns PRG count
+        +tapclean_unload() void - free tape, keep work buffers
         +tapclean_block_count() int
-        +tapclean_get_block(idx, out) int
+        +tapclean_get_block(idx, out) int - raw block records (tapclean_block_t)
         +tapclean_prg_count() int
-        +tapclean_get_prg(idx, out) int
-        +tapclean_detected_percent() int
-        +tapclean_tap_time_ms() uint
-        +tapclean_time_at_ms(offset) uint
-        +tapclean_offset_at_ms(ms) int
-        +tapclean_duration_ms(p1, p2) uint
+        +tapclean_get_prg(idx, out) int - united programs (tapclean_prg_t)
+        +tapclean_detected_percent() int - pulses accounted for
+        +tapclean_tap_time_ms() uint - whole-tape play time
+        +tapclean_time_at_ms(offset) uint - play time from start to offset
+        +tapclean_offset_at_ms(ms) int - inverse: tape counter seek
+        +tapclean_duration_ms(p1, p2) uint - play time between offsets
     }
 
     class tapclean_engine {
@@ -59,11 +60,39 @@ classDiagram
     }
 
     class TapeDecoder {
-        <<lib/meatloaf/media/tape>>
-        +open(container) bool
-        +nextProgram(from_offset, out) bool
-        +offsetAtTime(ms) uint32_t
-        +totalMs() uint32_t
+        -MStream* stream - container being fetched
+        -uint8_t window - 16 KB stream window for conversion reads
+        -uint8_t kind - TAP, DMP or HTAP
+        -uint8_t version
+        -uint8_t platform - C64, VIC20, C16
+        -uint8_t video - PAL or NTSC
+        -bool halfwaves - HTAP and TAP v2 sum pairs
+        -bool converting - source needs TAP v1 conversion
+        -bool fully_scanned
+        -uint8_t* image - (converted) image prefix in PSRAM
+        -uint32_t image_cap
+        -uint32_t fetched - valid bytes of image (== bytes scanned)
+        -uint32_t conv_pos - container read cursor while converting
+        -bool conv_eof
+        -vector~TapeEntry~ entries - confirmed programs in tape order
+        -uint32_t total_ms
+        -readBytes(pos, dst, n) bool
+        -nextValue(pos, cycles) bool - one pulse or halfwave from container
+        -machineClock() uint32_t
+        -extendScan() bool - grow window 512K doubling, fetch + scan
+        -fetchTo(target) bool - raw fetch or streamed conversion
+        -appendValue(cycles) bool - encode one v1 pulse into image
+        -scanWindow(win) bool - borrowed-buffer TAPClean scan, rebuild entries
+        -harvestEntries(nprg) void - filter boot stubs, dedup repeats, name transfer
+        -finishScan() void - free image once fully analyzed
+        +open(container) bool - header parse only; scanning is on demand
+        +isOpen() bool
+        +dataStart() uint32_t
+        +imageLen() uint32_t
+        +nextProgram(from_offset, out) bool - first entry ending past offset; may extend scan
+        +resetContinuation() void - interface compat, no-op
+        +offsetAtTime(ms) uint32_t - tape counter seek, snaps to program grid
+        +totalMs() uint32_t - forces full scan
     }
 
     namespace RetroPixelsCodec {

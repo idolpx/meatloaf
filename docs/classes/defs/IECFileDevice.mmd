@@ -1,0 +1,16 @@
+    class IECFileDevice {
+        <<abstract>>
+        +begin() void
+        +task() void
+        +open(channel, name, nameLen)* bool
+        +close(channel)* void
+        +write(channel, buffer, bufferSize, eoi)* uint8_t
+        +read(channel, buffer, bufferSize, eoi)* uint8_t
+        +getStatus(buffer, bufferSize) void - drive status string
+        +getStatusData(buffer, bufferSize, eoi) uint8_t
+        +execute(command) void - DOS command channel 15
+        +executeData(data, len) void - binary command payloads
+        +reset() void
+        +epyxReadSector(track, sector, buffer) bool
+        +epyxWriteSector(track, sector, buffer) bool
+    }

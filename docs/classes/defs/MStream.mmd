@@ -1,0 +1,38 @@
+    class MStream {
+        <<abstract>>
+        #uint32_t _size
+        #uint32_t _position
+        #uint8_t _load_address - 2-byte C64 load address served first
+        #uint8_t _error - drive error code exposed via error()
+        #string _trackDirUrl - dir-as-disk track/sector emulation state
+        #uint16_t _openTrack
+        #openTrack(track) bool
+        +openmode mode - set by MFile getSourceStream, read by seekPath writes
+        +string url
+        +bool has_subdirs - false for flat media images
+        +size_t block_size - 256 for CBM media
+        +size() uint32_t
+        +available() uint32_t - bytes left before eos
+        +position() uint32_t
+        +position(p) bool
+        +error() size_t
+        +eos() bool
+        +reset() void - rewind and forget served file selection
+        +isOpen()* bool
+        +isBrowsable() bool - true when entries are enumerated by seekNextEntry
+        +isRandomAccess() bool - true when entries are selected by seekPath
+        +isNetwork() bool
+        +open(mode)* bool
+        +close()* void
+        +read(buf, size)* uint32_t
+        +write(buf, size)* uint32_t
+        +seek(pos)* bool
+        +seek(pos, whence) bool
+        +seekPath(path) bool - select a file INSIDE this stream for reading
+        +seekNextEntry() string - advance flat containers one entry
+        +getTrackCount() uint16_t - dir-as-disk emulation
+        +getSectorCount(track) uint16_t
+        +seekBlock(index, offset) bool
+        +seekSector(track, sector, offset) bool
+        +info() map - format-specific key/value details
+    }

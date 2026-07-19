@@ -1,4 +1,6 @@
 %% Meatloaf core VFS classes (lib/meatloaf). Verified against source 2026-07-19.
+%% Members are ordered private (-), protected (#), public (+); public members
+%% whose name is not self-describing carry a short trailing description.
 %% URL resolution is right-to-left: MFSOwner::File() walks the path, finds the
 %% owning MFileSystem per component (by extension/scheme), and nests streams:
 %%   http://srv/game.zip/disk.d64/file.prg
@@ -16,8 +18,9 @@ classDiagram
         +string path
         +string name
         +string extension
-        +pathToFile() string
-        +base() string
+        +pathToFile() string - path without the trailing filename
+        +base() string - url of the containing directory
+        +root() string - scheme plus authority only
         +parseURL(url) unique_ptr~PeoplesUrlParser~$
     }
 
@@ -25,158 +28,227 @@ classDiagram
         <<abstract>>
         #uint32_t _size
         #uint32_t _position
-        #uint8_t _load_address
-        #uint8_t _error
-        +openmode mode
+        #uint8_t _load_address - 2-byte C64 load address served first
+        #uint8_t _error - drive error code exposed via error()
+        #string _trackDirUrl - dir-as-disk track/sector emulation state
+        #uint16_t _openTrack
+        #openTrack(track) bool
+        +openmode mode - set by MFile getSourceStream, read by seekPath writes
         +string url
-        +bool has_subdirs
-        +size_t block_size
+        +bool has_subdirs - false for flat media images
+        +size_t block_size - 256 for CBM media
         +size() uint32_t
-        +available() uint32_t
+        +available() uint32_t - bytes left before eos
         +position() uint32_t
+        +position(p) bool
         +error() size_t
         +eos() bool
+        +reset() void - rewind and forget served file selection
         +isOpen()* bool
-        +isBrowsable() bool
-        +isRandomAccess() bool
+        +isBrowsable() bool - true when entries are enumerated by seekNextEntry
+        +isRandomAccess() bool - true when entries are selected by seekPath
         +isNetwork() bool
         +open(mode)* bool
         +close()* void
         +read(buf, size)* uint32_t
         +write(buf, size)* uint32_t
         +seek(pos)* bool
-        +seekPath(path) bool
-        +seekNextEntry() string
+        +seek(pos, whence) bool
+        +seekPath(path) bool - select a file INSIDE this stream for reading
+        +seekNextEntry() string - advance flat containers one entry
+        +getTrackCount() uint16_t - dir-as-disk emulation
+        +getSectorCount(track) uint16_t
         +seekBlock(index, offset) bool
         +seekSector(track, sector, offset) bool
-        +info() map
+        +info() map - format-specific key/value details
     }
 
     class MFile {
         <<abstract>>
-        +string type
-        +bool isPETSCII
+        -bool m_isNull
+        -buildRequestUrl() string - url with cache fragment stripped
+        -isCacheEnabled(mode) bool - cache=sd url fragment
+        -isCacheForceRefresh() bool
+        +string type - owning filesystem symbol
+        +bool isPETSCII - listing names are PETSCII already
         +bool isWritable
-        +string media_header
-        +string media_id
+        +string media_header - disk name for directory header line
+        +string media_id - disk id shown in listings
         +string media_archive
         +string media_image
+        +uint8_t media_partition
         +uint16_t media_blocks_free
         +uint16_t media_block_size
-        +string pathInStream
-        +MFile* sourceFile
-        +int is_dir
+        +string pathInStream - path of the entry INSIDE the container
+        +MFile* sourceFile - the container file this entry lives in
+        +int is_dir - tri-state -1 unknown, 0 file, 1 dir
+        +int is_hidden
         +uint32_t size
-        +getSourceStream(mode) shared_ptr~MStream~
-        +getDecodedStream(src)* shared_ptr~MStream~
-        +createStream(mode) shared_ptr~MStream~
-        +cd(newDir) MFile*
+        +getSourceStream(mode) shared_ptr~MStream~ - builds container+decoded chain, calls seekPath
+        +getDecodedStream(src)* shared_ptr~MStream~ - wrap container stream in format decoder
+        +createStream(mode) shared_ptr~MStream~ - create-new for writes
+        +openStreamWithCache(mode) shared_ptr~MStream~ - honors cache=sd fragment
+        +cd(newDir) MFile* - handles CBM navigation chars
         +cdParent() MFile*
-        +cdRoot() MFile*
+        +cdLocalParent(path) MFile*
+        +cdRoot(path) MFile* - flash root
+        +cdLocalRoot(path) MFile* - root of current stream
         +isDirectory() bool
-        +exists() bool
+        +exists() bool - stat for local, real FS check for network
         +remove() bool
         +rename(dest) bool
-        +format(header) bool
+        +mkDir() bool
+        +rmDir() bool
+        +format(header_info) bool
         +rewindDirectory() bool
         +getNextFileInDir() MFile*
-        +openStreamWithCache(mode) shared_ptr~MStream~
+        +getLastWrite() time_t
+        +getCreationTime() time_t
+        +getAvailableSpace() uint64_t
+        +blocks() uint32_t - size in media blocks for listings
+        +isText() bool
+        +dump() void - debug print of parsed url fields
     }
 
     class MFileSystem {
         <<abstract>>
-        +bool isRootFS
-        +bool vdrive_compatible
-        +string service_type
-        +handles(path)* bool
+        #bool _is_mounted
+        +bool isRootFS - flash FS resolves bare paths
+        +bool vdrive_compatible - image can be handed to VDrive
+        +string service_type - DNS-SD type for mdns browsing
+        +handles(path)* bool - claim a path by extension or scheme
         +getFile(path)* MFile*
         +mount() bool
         +umount() bool
         +isMounted() bool
         +byExtension(ext, path) bool$
-        +byContent(header) string$
+        +byContent(header) string$ - sniff extension from magic bytes
     }
 
     class MFSOwner {
         <<static>>
-        +availableFS$
-        +availableOther$
-        +File(path) MFile*$
+        +availableFS$ - ordered registry, first handles() match wins
+        +availableOther$ - encoder/link/loader/wrapper schemes
+        +File(path) MFile*$ - THE entry point: right-to-left resolution
         +File(path, default_fs) MFile*$
         +findParentFS(begin, end) MFileSystem*$
     }
 
     class MMediaStream {
         <<abstract>>
-        #bool seekCalled
+        #bool seekCalled - a file inside the image is selected; read() caps at _size
         #shared_ptr~MStream~ containerStream
+        #bool _is_open
         #size_t media_header_size
         #size_t media_data_offset
-        #size_t entry_index
-        +readContainer(buf, size) uint32_t
-        +readFile(buf, size)* uint32_t
+        #size_t entry_index - 1-based current directory entry, 0 none
+        #bool show_hidden
+        +readContainer(buf, size) uint32_t - raw image bytes
+        +readFile(buf, size)* uint32_t - bytes of the SELECTED file
         +writeFile(buf, size)* uint32_t
         +readHeader() bool
+        +writeHeader(name, id) bool
         +seekEntry(filename) bool
         +seekEntry(index) bool
         +getNextImageEntry() bool
         +resetEntryCounter() void
-        +seekFileSize(track, sector) uint32_t
-        +decodeType(file_type, hidden) string
+        +seekFileSize(track, sector) uint32_t - walk block chain to count bytes
+        +decodeType(file_type, hidden) string - CBM file type text
+        +readUntil(delimiter) string
+        +readString(size) string
         +blocks() uint32_t
         +blocksFree() uint16_t
+        +seekPath(path) bool
+        +seekNextEntry() string
     }
 
     class ImageBroker {
         <<static>>
-        -image_repo$
-        -lru_order$
-        +obtain(type, url)$
-        +dispose(type, url)$
+        -image_repo$ - map key = type + container url
+        -lru_order$ - oldest first, max 50 entries
+        -is_in_use(key) bool$ - skip eviction for mounted cwds
+        -evict_lru_if_needed()$
+        -cleanup_old_entries()$ - every 60 s
+        -touch_entry(key)$
+        +obtain(type, url)$ - shared decoded image; creates on first use
+        +exists(url) bool$
+        +dispose(type, url)$ - force re-decode (partition change)
     }
 
     class MSession {
         <<abstract>>
         #bool connected
-        #uint32_t keep_alive_interval
+        #string session_key
+        #uint32_t keep_alive_interval - ms; 0 disables (stateless protocols: NFS, FSP)
         +connect()* bool
         +disconnect()* void
-        +keep_alive()* bool
-        +refresh() bool
+        +keep_alive()* bool - periodic ping from the broker task
+        +refresh() bool - re-list or re-auth after reconnect
         +isConnected() bool
         +setKeepAliveInterval(ms) void
+        +getKeepAliveInterval() uint32_t
     }
 
     class CachedFile {
+        -m_sdPath string - SD-backed variant
+        -bool m_useHimem
+        -freeStorage() void
+        -s_ramCache$ - keyed RAM cache of extracted entries
+        +uint32_t size
+        +bool dirty
+        +allocate() bool - HIMEM page-mapped on SPIRAM boards, heap otherwise
+        +isAllocated() bool
         +read(offset, buf, count) uint32_t
         +write(offset, buf, count) uint32_t
-        +loadFromStream(stream, size) bool
-        +loadViaReader(size, reader) bool
+        +loadFromStream(stream, fileSize) bool
+        +loadViaReader(fileSize, reader) bool - fill via callback in HIMEM-block chunks
+        +forSD(sdPath) shared_ptr~CachedFile~$
+        +getRAMCached(key) shared_ptr~CachedFile~$
+        +setRAMCached(key, cf) void$
+        +clearRAMCached(key) void$
     }
 
     class SessionBroker {
         <<static>>
-        +obtain(host, port)$
-        +service()$
+        -session_repo$ - map key = host colon port
+        -bool task_running - keep-alive task, 8 KB stack (do not shrink)
+        -SemaphoreHandle_t _mutex$
+        -lock()$
+        -unlock()$
+        -session_host_key(key) string$
+        -path_matches_session(path, key) bool$
+        -is_session_in_use(key) bool$ - protects active sessions from cleanup
+        +obtain(host, port)$ - reuse or create the protocol session
+        +service()$ - periodic keep-alive sweep
     }
 
     class mfilebuf {
-        <<streambuf>>
+        <<std::streambuf>>
         -shared_ptr~MStream~ mstream
-        -char* gbuffer
-        +underflow() int
+        -char* gbuffer - 2 KB PSRAM get buffer
+        +underflow() int - refills gbuffer; guards gptr GTE egptr
         +overflow(c) int
+        +sync() int
         +is_open() bool
+        +open(url, mode) bool
+        +close() void
     }
 
     class basic_fstream {
-        <<Meat iostream>>
-        +nda() bool
+        <<Meat::iostream>>
+        +nda() bool - no-data-available state (ndabit) for non-blocking reads
         +get() int
+        +getUtf8() U8Char
     }
 
-    class csstreambuf
-    class idirbuf
+    class csstreambuf {
+        <<std::streambuf>>
+        +console/serial sink
+    }
+    class idirbuf {
+        <<std::streambuf>>
+        +directory listing source
+    }
 
     PeoplesUrlParser <|-- MFile
     MStream <|-- MMediaStream
@@ -188,7 +260,7 @@ classDiagram
     SessionBroker o-- MSession : keyed host-port, keep-alive task
     MSession *-- CachedFile : PSRAM/HIMEM/SD entry cache
     basic_fstream *-- mfilebuf
-    mfilebuf ..> MStream : buffered reads (2 KB gbuffer)
+    mfilebuf ..> MStream : buffered reads
 
-    note for MStream "Sentinel _MEAT_NO_DATA_AVAIL (0xFFFFFFFE, int -2) returned by non-blocking reads; must never collide with a real byte count"
+    note for MStream "Sentinel _MEAT_NO_DATA_AVAIL (0xFFFFFFFE, int -2) returned by non-blocking reads; must never collide with a real byte count or EOF (-1)"
     note for MFile "exists() uses stat() for local paths; network FS override with a real check (e.g. fsp_stat). Never infer existence from a lazy stream open"

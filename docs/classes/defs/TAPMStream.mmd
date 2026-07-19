@@ -1,0 +1,30 @@
+    class TAPMStream {
+        -bool has_idx
+        -vector~IdxEntry~ idx_entries - sidecar random-access listing
+        -string default_name - media name for unnamed entries
+        #shared_ptr~TapeState~ state - SHARED per image url
+        #TapeDecoder& decoder - alias into state
+        #uint32_t& tape_pos - where the next program scan resumes
+        #bool& tape_ended
+        #ensureDecoder() bool
+        #serveCurrent() void - expose current entry as the open file
+        #readFile(buf, size) uint32_t
+        +TapeEntry& current - last program found, ready to load
+        +bool& have_current
+        +nextTapeEntry() bool - advance one program (datasette listing)
+        +resetTape() void
+        +tapeEnded() bool
+        +loadIndex(idx_text) void
+        +hasIndex() bool
+        +idxCount() uint16_t
+        +idxEntry(index, name, size) bool
+        +setDefaultName(name) void
+        +setCounter(spec) bool - ms or MMM:SS
+        +setCounterMs(ms) bool
+        +counterMs() uint32_t - position as tape time
+        +durationMs() uint32_t
+        +counterString() string
+        +entryDisplayName(e) string - media name when unnamed, no address suffix
+        +seekPath(path) bool - current entry first, then forward search with wrap
+        +info() map
+    }

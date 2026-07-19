@@ -1,0 +1,14 @@
+    class M2IMStream {
+        -shared_ptr~MStream~ fileStream - host file being served
+        #string title
+        #vector~Entry~ entries - parsed once (line-based, BOM tolerant)
+        #Entry entry - currently selected
+        #readHeader() bool - parse whole index at open
+        #seekEntry(filename) bool - match CBM name, skip DEL separators
+        #seekEntry(index) bool
+        #resolveEntry(index) bool - find host file (exact then lowercase), cache url+size
+        #entryTargetUrl() string - sibling of the m2i
+        #readFile(buf, size) uint32_t - delegates to fileStream
+        #decodeType(file_type, hidden) string
+        +seekPath(path) bool
+    }

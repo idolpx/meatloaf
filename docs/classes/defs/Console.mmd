@@ -1,0 +1,17 @@
+    class Console {
+        <<ESP32Console>>
+        -const char* prompt_
+        -bool _initialized
+        -volatile bool _exit_requested
+        -int exec_users_ - refcount for the shared executor task
+        -repl_task(args)$ - 6 KB persistent serial shell, dormant in fgetc
+        -exec_task_fn(args)$ - 16 KB console_exec task runs ALL commands
+        +begin(baud, rxPin, txPin, channel) void
+        +registerCommand(command, func, help, hint) bool
+        +setPrompt(prompt) void
+        +enablePersistentHistory(path) void
+        +runCommand(line) int - serialized on the executor task
+        +execAcquire() bool - create executor on first console activity
+        +execRelease() void - delete executor when last session ends
+        +execOrigin() Origin - ORIGIN_SERIAL vs ORIGIN_REMOTE (exit handling)
+    }

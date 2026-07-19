@@ -1,0 +1,13 @@
+    class iecChannelHandler {
+        <<abstract>>
+        #iecDrive* m_drive
+        #uint8_t* m_data - channel buffer
+        #size_t m_len
+        #size_t m_ptr
+        +bool m_eos
+        +read(data, n) uint8_t - refills via readBufferData
+        +write(data, n) uint8_t
+        +writeBufferData()* uint8_t
+        +readBufferData()* uint8_t
+        +getStream() shared_ptr~MStream~
+    }

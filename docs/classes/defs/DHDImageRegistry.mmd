@@ -1,0 +1,7 @@
+    class DHDImageRegistry {
+        <<static>>
+        -per-image partition tables$ - scanned once (CMD HD boot magic / FD fixed layout)
+        +partitions(url)$ - parsed table, 254 (HD) or 31 (FD) entries
+        +selectedPartition(url) uint8_t$ - defaults to image default partition
+        +selectPartition(url, num) bool$ - CP command; disposes ImageBroker entry
+    }

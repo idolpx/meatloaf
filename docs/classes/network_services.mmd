@@ -10,17 +10,29 @@ classDiagram
     class MSession {
         <<abstract>>
         #bool connected
-        #uint32_t keep_alive_interval
+        #string session_key
+        #uint32_t keep_alive_interval - ms; 0 disables (stateless protocols: NFS, FSP)
         +connect()* bool
         +disconnect()* void
-        +keep_alive()* bool
+        +keep_alive()* bool - periodic ping from the broker task
+        +refresh() bool - re-list or re-auth after reconnect
         +isConnected() bool
+        +setKeepAliveInterval(ms) void
+        +getKeepAliveInterval() uint32_t
     }
 
     class SessionBroker {
         <<static>>
-        +obtain(host, port)$
-        +service()$
+        -session_repo$ - map key = host colon port
+        -bool task_running - keep-alive task, 8 KB stack (do not shrink)
+        -SemaphoreHandle_t _mutex$
+        -lock()$
+        -unlock()$
+        -session_host_key(key) string$
+        -path_matches_session(path, key) bool$
+        -is_session_in_use(key) bool$ - protects active sessions from cleanup
+        +obtain(host, port)$ - reuse or create the protocol session
+        +service()$ - periodic keep-alive sweep
     }
 
     namespace ProtocolSessions {
@@ -43,30 +55,80 @@ classDiagram
     }
 
     class MeatHttpClient {
+        -esp_http_client_handle_t _http
+        -esp_http_client_method_t lastMethod
+        -map~string,string~ headers
+        -_http_event_handler(evt) esp_err_t$
+        -openAndFetchHeaders(method, position, size) int
+        +vector~uint8_t~ postBuffer
+        +vector~uint8_t~ postResponse
+        +vector~uint8_t~ preservedPostResponse
+        +bool _is_open
+        +bool _exists
+        +uint32_t _size
+        +uint32_t _range_size
+        +uint32_t _position
+        +bool m_isWebDAV
+        +bool m_isDirectory
+        +bool isText
+        +bool isFriendlySkipper
+        +bool disableAutoRedirect
+        +bool wasRedirected
+        +string url
+        +string contentDispositionFilename
+        +string _httpOrigin
+        +bool _performPending
+        +int lastRC
+        +init() void
         +GET(url) bool
         +POST(url) bool
         +PUT(url) bool
+        +HEAD(url) bool
+        +setHeader(header) bool
+        +getHeader(header) string
+        +clearHeaders() void
+        +setOnHeader(fn) void
         +open(url, method) bool
+        +reopen() bool
+        +close() void
+        +configureDeferredGet() bool
         +processRedirectsAndOpen(position, size) bool
+        +seek(pos) bool
+        +flush(numBytes) bool
         +read(buf, size) uint32_t
         +write(buf, size) uint32_t
+        +available() uint32_t
+        +complete() bool
     }
 
     class MeatSocket {
+        -int sock
+        -uint8_t iecPort
+        -bool blocking
+        +MeatSocket()
+        +MeatSocket(s, iecp) - wrap an accepted fd
         +open(address, port) bool
         +close() void
-        +read() int
-        +write(buf, size) uint32_t
         +isOpen() bool
+        +read() int - single byte, may return the NDA sentinel
+        +write(buf, size) uint32_t
     }
 
     class MeatSocketServer {
-        +start(port) bool
+        +bool isAlive
+        +int port
+        +uint8_t iecPort
+        +start(p) void - spawns tcp_server_task (4 KB, core 0)
         +stop() void
     }
 
     class MDNSMSession {
-        +discoverServices(type, proto, timeout_ms) bool
+        -vector~DiscoveredService~ services - cached discovery results
+        -mutex_protected
+        +connect() bool - esp-idf mdns init
+        +disconnect() void
+        +keep_alive() bool
+        +discoverServices(type, proto, timeout_ms) bool - PTR meta-query for service types
     }
 
     class DiscoveredService {
@@ -78,15 +140,29 @@ classDiagram
     }
 
     class HttpServer {
-        +s_server httpd_handle_t$
-        +send_http_error(req, errnum) void$
+        -serverstate state
+        -int _lazy_sock$ - bare listener holding port 80 before first use
+        -TaskHandle_t _lazy_task$
+        -lazy_task(pv)$ - accepts, starts httpd, loopback-proxies handover
+        -start_server(state)$ httpd_handle_t
+        -custom_global_ctx_free(ctx)$
+        +s_server httpd_handle_t$ - public for ws_send_all
+        +send_http_error(req, errnum)$ - sets real status BEFORE body
         +start() void
-        +startOnDemand() void
+        +startOnDemand() void - lazy listener until first request
         +stop() void
+        +running() bool
     }
 
     class WsCommandExecutor {
-        +execute over websocket
+        +dispatch(data, len) void - route an incoming websocket frame
+        +isSlip(data, len) bool$
+        +isJson(data, len) bool$
+        +isProtobuf(data, len) bool$
+        +handleSlip(data, len) void$ - RFC 1055 framed binary commands
+        +handleJson(data, len) void$
+        +handleProtobuf(data, len) void$
+        +handleText(data, len) void$ - console command passthrough
     }
 
     class wwwModules {

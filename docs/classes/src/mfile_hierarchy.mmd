@@ -6,52 +6,7 @@
 classDiagram
     direction LR
 
-    class MFile {
-        <<abstract>>
-        -bool m_isNull
-        -buildRequestUrl() string - url with cache fragment stripped
-        -isCacheEnabled(mode) bool - cache=sd url fragment
-        -isCacheForceRefresh() bool
-        +string type - owning filesystem symbol
-        +bool isPETSCII - listing names are PETSCII already
-        +bool isWritable
-        +string media_header - disk name for directory header line
-        +string media_id - disk id shown in listings
-        +string media_archive
-        +string media_image
-        +uint8_t media_partition
-        +uint16_t media_blocks_free
-        +uint16_t media_block_size
-        +string pathInStream - path of the entry INSIDE the container
-        +MFile* sourceFile - the container file this entry lives in
-        +int is_dir - tri-state -1 unknown, 0 file, 1 dir
-        +int is_hidden
-        +uint32_t size
-        +getSourceStream(mode) shared_ptr~MStream~ - builds container+decoded chain, calls seekPath
-        +getDecodedStream(src)* shared_ptr~MStream~ - wrap container stream in format decoder
-        +createStream(mode) shared_ptr~MStream~ - create-new for writes
-        +openStreamWithCache(mode) shared_ptr~MStream~ - honors cache=sd fragment
-        +cd(newDir) MFile* - handles CBM navigation chars
-        +cdParent() MFile*
-        +cdLocalParent(path) MFile*
-        +cdRoot(path) MFile* - flash root
-        +cdLocalRoot(path) MFile* - root of current stream
-        +isDirectory() bool
-        +exists() bool - stat for local, real FS check for network
-        +remove() bool
-        +rename(dest) bool
-        +mkDir() bool
-        +rmDir() bool
-        +format(header_info) bool
-        +rewindDirectory() bool
-        +getNextFileInDir() MFile*
-        +getLastWrite() time_t
-        +getCreationTime() time_t
-        +getAvailableSpace() uint64_t
-        +blocks() uint32_t - size in media blocks for listings
-        +isText() bool
-        +dump() void - debug print of parsed url fields
-    }
+    %%include MFile
 
     namespace DeviceFiles {
         class FlashMFile
@@ -184,3 +139,4 @@ classDiagram
 
     note for DHDPartitionMFile "Template: DHDPartitionMFile~BASE~ wraps D64/D71/D81/DNP MFile types as a CMD HD/FD partition view (media/hd/dhd.h)"
     note for MFile "MFileSystem registry (meatloaf.cpp availableFS): FlashMFileSystem (root), D64/D40/D71/D80/D81/D82/D8B/D90/DFI/DNP/DSK/G64/NIB/ATR, DXMMFileSystem (d1m/d2m/d4m), DHDMFileSystem, HDDMFileSystem, M2IMFileSystem, TAP/T64/TCRT/CRT/EFCRT/P00, Archive/ISO/LBR/LNX/ARC/ARK, HTTP/IPFS/TCP/SMB/NFS/TNFS/FTP/SFTP/FSP/AFP/ISCSI/IRC/MQTT/WS/CSIP/I2C, MDNS/JSON/QR/RetroPixels/SQLite/Hash/RAM, ML/MLM/URL filesystems"
+

@@ -1,0 +1,11 @@
+    class mfilebuf {
+        <<std::streambuf>>
+        -shared_ptr~MStream~ mstream
+        -char* gbuffer - 2 KB PSRAM get buffer
+        +underflow() int - refills gbuffer; guards gptr GTE egptr
+        +overflow(c) int
+        +sync() int
+        +is_open() bool
+        +open(url, mode) bool
+        +close() void
+    }

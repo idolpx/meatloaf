@@ -1,0 +1,8 @@
+    class TapeState {
+        +TapeDecoder decoder
+        +uint32_t tape_pos
+        +bool tape_ended
+        +TapeEntry current
+        +bool have_current
+        +obtain(url) shared_ptr~TapeState~$ - weak_ptr registry keyed by container url
+    }

@@ -1,0 +1,12 @@
+    class MeatSocket {
+        -int sock
+        -uint8_t iecPort
+        -bool blocking
+        +MeatSocket()
+        +MeatSocket(s, iecp) - wrap an accepted fd
+        +open(address, port) bool
+        +close() void
+        +isOpen() bool
+        +read() int - single byte, may return the NDA sentinel
+        +write(buf, size) uint32_t
+    }

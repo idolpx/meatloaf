@@ -1,0 +1,27 @@
+    class MMediaStream {
+        <<abstract>>
+        #bool seekCalled - a file inside the image is selected; read() caps at _size
+        #shared_ptr~MStream~ containerStream
+        #bool _is_open
+        #size_t media_header_size
+        #size_t media_data_offset
+        #size_t entry_index - 1-based current directory entry, 0 none
+        #bool show_hidden
+        +readContainer(buf, size) uint32_t - raw image bytes
+        +readFile(buf, size)* uint32_t - bytes of the SELECTED file
+        +writeFile(buf, size)* uint32_t
+        +readHeader() bool
+        +writeHeader(name, id) bool
+        +seekEntry(filename) bool
+        +seekEntry(index) bool
+        +getNextImageEntry() bool
+        +resetEntryCounter() void
+        +seekFileSize(track, sector) uint32_t - walk block chain to count bytes
+        +decodeType(file_type, hidden) string - CBM file type text
+        +readUntil(delimiter) string
+        +readString(size) string
+        +blocks() uint32_t
+        +blocksFree() uint16_t
+        +seekPath(path) bool
+        +seekNextEntry() string
+    }

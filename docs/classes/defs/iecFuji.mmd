@@ -1,0 +1,10 @@
+    class iecFuji {
+        -systemBus* _bus
+        -fujiHost _fnHosts x8 - mountable host slots
+        -fujiDisk _fnDisks x8 - drive slots (plus iecMeatloaf itself as 9th)
+        -int _current_open_directory_slot
+        -iecDrive _bootDisk - CONFIG boot disk
+        -uint8_t bootMode - CONFIG or MINI-BOOT
+        -appkey _current_appkey - app key storage protocol
+        +setup(bus) void
+    }

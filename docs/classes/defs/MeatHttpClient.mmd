@@ -1,0 +1,46 @@
+    class MeatHttpClient {
+        -esp_http_client_handle_t _http
+        -esp_http_client_method_t lastMethod
+        -map~string,string~ headers
+        -_http_event_handler(evt) esp_err_t$
+        -openAndFetchHeaders(method, position, size) int
+        +vector~uint8_t~ postBuffer
+        +vector~uint8_t~ postResponse
+        +vector~uint8_t~ preservedPostResponse
+        +bool _is_open
+        +bool _exists
+        +uint32_t _size
+        +uint32_t _range_size
+        +uint32_t _position
+        +bool m_isWebDAV
+        +bool m_isDirectory
+        +bool isText
+        +bool isFriendlySkipper
+        +bool disableAutoRedirect
+        +bool wasRedirected
+        +string url
+        +string contentDispositionFilename
+        +string _httpOrigin
+        +bool _performPending
+        +int lastRC
+        +init() void
+        +GET(url) bool
+        +POST(url) bool
+        +PUT(url) bool
+        +HEAD(url) bool
+        +setHeader(header) bool
+        +getHeader(header) string
+        +clearHeaders() void
+        +setOnHeader(fn) void
+        +open(url, method) bool
+        +reopen() bool
+        +close() void
+        +configureDeferredGet() bool
+        +processRedirectsAndOpen(position, size) bool
+        +seek(pos) bool
+        +flush(numBytes) bool
+        +read(buf, size) uint32_t
+        +write(buf, size) uint32_t
+        +available() uint32_t
+        +complete() bool
+    }

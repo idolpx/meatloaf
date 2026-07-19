@@ -1,0 +1,9 @@
+    class Archive {
+        -struct archive* a - libarchive handle
+        -shared_ptr~MStream~ srcStream
+        +open() bool - registers read/skip/seek callbacks over MStream
+        +close() void
+        +cb_read()$ - feed blocks from source stream
+        +cb_skip()$ - returns 0 to force sequential reads
+        +cb_seek()$ - only rewind to 0 allowed
+    }

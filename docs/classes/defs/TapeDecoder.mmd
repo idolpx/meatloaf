@@ -1,0 +1,35 @@
+    class TapeDecoder {
+        -MStream* stream - container being fetched
+        -uint8_t window - 16 KB stream window for conversion reads
+        -uint8_t kind - TAP, DMP or HTAP
+        -uint8_t version
+        -uint8_t platform - C64, VIC20, C16
+        -uint8_t video - PAL or NTSC
+        -bool halfwaves - HTAP and TAP v2 sum pairs
+        -bool converting - source needs TAP v1 conversion
+        -bool fully_scanned
+        -uint8_t* image - (converted) image prefix in PSRAM
+        -uint32_t image_cap
+        -uint32_t fetched - valid bytes of image (== bytes scanned)
+        -uint32_t conv_pos - container read cursor while converting
+        -bool conv_eof
+        -vector~TapeEntry~ entries - confirmed programs in tape order
+        -uint32_t total_ms
+        -readBytes(pos, dst, n) bool
+        -nextValue(pos, cycles) bool - one pulse or halfwave from container
+        -machineClock() uint32_t
+        -extendScan() bool - grow window 512K doubling, fetch + scan
+        -fetchTo(target) bool - raw fetch or streamed conversion
+        -appendValue(cycles) bool - encode one v1 pulse into image
+        -scanWindow(win) bool - borrowed-buffer TAPClean scan, rebuild entries
+        -harvestEntries(nprg) void - filter boot stubs, dedup repeats, name transfer
+        -finishScan() void - free image once fully analyzed
+        +open(container) bool - header parse only; scanning is on demand
+        +isOpen() bool
+        +dataStart() uint32_t
+        +imageLen() uint32_t
+        +nextProgram(from_offset, out) bool - first entry ending past offset; may extend scan
+        +resetContinuation() void - interface compat, no-op
+        +offsetAtTime(ms) uint32_t - tape counter seek, snaps to program grid
+        +totalMs() uint32_t - forces full scan
+    }

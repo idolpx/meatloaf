@@ -1,0 +1,8 @@
+    class MFSOwner {
+        <<static>>
+        +availableFS$ - ordered registry, first handles() match wins
+        +availableOther$ - encoder/link/loader/wrapper schemes
+        +File(path) MFile*$ - THE entry point: right-to-left resolution
+        +File(path, default_fs) MFile*$
+        +findParentFS(begin, end) MFileSystem*$
+    }

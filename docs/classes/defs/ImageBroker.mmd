@@ -1,0 +1,12 @@
+    class ImageBroker {
+        <<static>>
+        -image_repo$ - map key = type + container url
+        -lru_order$ - oldest first, max 50 entries
+        -is_in_use(key) bool$ - skip eviction for mounted cwds
+        -evict_lru_if_needed()$
+        -cleanup_old_entries()$ - every 60 s
+        -touch_entry(key)$
+        +obtain(type, url)$ - shared decoded image; creates on first use
+        +exists(url) bool$
+        +dispose(type, url)$ - force re-decode (partition change)
+    }

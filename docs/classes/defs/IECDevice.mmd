@@ -1,0 +1,14 @@
+    class IECDevice {
+        #uint8_t m_devnr
+        #IECBusHandler* m_handler
+        +isActive() bool
+        +begin() void
+        +task() void - called from bus service loop
+        +reset() void
+        +talk(secondary) void
+        +listen(secondary) void
+        +untalk() void
+        +unlisten() void
+        +canWrite() int8_t - -1 wait, 0 no, 1 yes (timing critical)
+        +canRead() int8_t
+    }

@@ -1,0 +1,8 @@
+    class MDNSMSession {
+        -vector~DiscoveredService~ services - cached discovery results
+        -mutex_protected
+        +connect() bool - esp-idf mdns init
+        +disconnect() void
+        +keep_alive() bool
+        +discoverServices(type, proto, timeout_ms) bool - PTR meta-query for service types
+    }

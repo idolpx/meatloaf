@@ -1,0 +1,14 @@
+    class HttpServer {
+        -serverstate state
+        -int _lazy_sock$ - bare listener holding port 80 before first use
+        -TaskHandle_t _lazy_task$
+        -lazy_task(pv)$ - accepts, starts httpd, loopback-proxies handover
+        -start_server(state)$ httpd_handle_t
+        -custom_global_ctx_free(ctx)$
+        +s_server httpd_handle_t$ - public for ws_send_all
+        +send_http_error(req, errnum)$ - sets real status BEFORE body
+        +start() void
+        +startOnDemand() void - lazy listener until first request
+        +stop() void
+        +running() bool
+    }

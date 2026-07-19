@@ -1,0 +1,57 @@
+%% Tape loader analysis engine (components/tapclean) and codecs.
+%% Verified against source 2026-07-19.
+%% The TAPClean engine is vendored C (TAPClean 0.39 / Final TAP 2.76,
+%% GPL v2+), compiled with TAPCLEAN_EMBEDDED: CLI/report/clean code is
+%% compiled out, all big buffers are heap-allocated (PSRAM-first) only
+%% while a tape is being analyzed, and malloc() is redirected engine-wide
+%% to tapclean_psram_malloc().
+classDiagram
+    direction TB
+
+    %%include tapclean_api
+
+    %%include tapclean_engine
+
+    %%include tapclean_scanners
+
+    %%include tapclean_prg_t
+
+    %%include TapeDecoder
+
+    namespace RetroPixelsCodec {
+        class IImageData
+        class PixelImage
+        class GraphicMode
+        class Palette
+        class Quantizer
+        class Converter
+        class RetroPixelsConfig
+        class RetroPixelsMStream
+    }
+
+    %%include QRMStream
+
+    %%include HighMemory
+    class HighMemoryHandle
+
+    %%include Audio
+
+    %%include samlib
+
+    tapclean_api ..> tapclean_engine : TAPCLEAN_EMBEDDED build
+    tapclean_engine *-- tapclean_scanners : search_tap() dispatch
+    tapclean_api ..> tapclean_prg_t : result records
+    TapeDecoder --> tapclean_api : progressive window scans (see media_scanner.mmd)
+
+    Converter ..> PixelImage
+    Converter ..> GraphicMode
+    Quantizer ..> Palette
+    RetroPixelsMStream ..> Converter : image -> koala/hires
+    RetroPixelsMStream ..> RetroPixelsConfig
+
+    HighMemory ..> HighMemoryHandle
+    Audio ..> samlib : speech output
+
+    note for tapclean_engine "Loader-ID fast path: idloader() identifies the loader from the CBM boot block (CRC table + code signatures incl. the Turbo Tape 64 fast IRQ stub) so identified tapes scan pause+CBM+that loader only; unidentified tapes run all scanners with an early exit once 97% of the tape is accounted for"
+    note for tapclean_scanners "Formats table ft[] (PSRAM working copy of const flash defaults); TTFAST entries tp=$0E sp=$0B lp=$12 (116/88/144 cycles)"
+

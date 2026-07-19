@@ -1,0 +1,10 @@
+    class iecPipe {
+        -Meat::iostream* fileStream
+        -oiecstream iecStream
+        -openmode mode
+        -string filename
+        +pipe_status_t status
+        +establish(fn, m, iec) bool - open file stream and bind to IEC channel
+        +teardown() void
+        +getFilename() string
+    }
