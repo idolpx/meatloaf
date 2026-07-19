@@ -1,0 +1,110 @@
+%% Meatloaf high-level architecture: the real modules and how they relate.
+%% Generated from source 2026-07-19. See the other .mmd files for details:
+%%   core_hierarchy.mmd    - MStream/MFile/MFileSystem/brokers/sessions
+%%   stream_hierarchy.mmd  - every MStream implementation
+%%   mfile_hierarchy.mmd   - every MFile implementation + filesystem registry
+%%   media_scanner.mmd     - media containers + TAPClean tape engine
+%%   network_services.mmd  - protocol sessions, HTTP client, sockets, mDNS
+%%   hardware_encoding.mmd - IEC bus, virtual devices, hardware, utils
+%%   loaders_emulation.mmd - tape loader engine internals + codecs
+classDiagram
+    direction TB
+
+    namespace CoreVFS {
+        class MFSOwner {
+            +File(path) MFile$
+            +availableFS vector~MFileSystem~$
+        }
+        class MFileSystem {
+            +handles(path) bool
+            +getFile(path) MFile
+        }
+        class MFile {
+            +getSourceStream(mode) MStream
+            +getDecodedStream(src) MStream
+        }
+        class MStream {
+            +read(buf, size) uint32_t
+            +seekPath(path) bool
+        }
+        class ImageBroker {
+            +obtain~T~(type, url) shared_ptr~T~$
+        }
+        class SessionBroker {
+            +obtain~T~(host, port) shared_ptr~T~$
+        }
+    }
+
+    namespace MediaFormats {
+        class MMediaStream
+        class D64MStream
+        class TAPMStream
+        class ArchiveMStream
+    }
+
+    namespace TapeEngine {
+        class TapeDecoder
+        class tapclean_api {
+            <<C component>>
+        }
+    }
+
+    namespace NetworkProtocols {
+        class HTTPMStream
+        class SMBMStream
+        class FSPMStream
+        class MSession
+    }
+
+    namespace IECBusDevices {
+        class systemBus
+        class IECBusHandler
+        class iecDrive
+        class iecMeatloaf
+    }
+
+    namespace UserInterfaces {
+        class HttpServer
+        class Console {
+            <<ESP32Console>>
+        }
+        class WsCommandExecutor
+    }
+
+    namespace Config {
+        class MeatloafConfig {
+            +psram_json _data
+        }
+    }
+
+    MFSOwner --> MFileSystem : right-to-left URL match
+    MFileSystem --> MFile : getFile()
+    MFile --> MStream : getSourceStream() builds container+decoded chain
+    MStream <|-- MMediaStream
+    MMediaStream <|-- D64MStream
+    MMediaStream <|-- TAPMStream
+    MMediaStream <|-- ArchiveMStream
+    MStream <|-- HTTPMStream
+    MStream <|-- SMBMStream
+    MStream <|-- FSPMStream
+
+    ImageBroker --> MMediaStream : LRU-caches decoded images
+    SessionBroker --> MSession : keep-alive + reuse
+    HTTPMStream --> MSession : per-host session
+    SMBMStream --> MSession
+    FSPMStream --> MSession
+
+    TAPMStream --> TapeDecoder : progressive scan
+    TapeDecoder --> tapclean_api : borrowed-buffer analyze
+
+    IECBusHandler <|-- systemBus
+    systemBus --> iecDrive : attachDevice()
+    iecDrive <|-- iecMeatloaf
+    iecDrive --> MFile : LOAD/SAVE resolve via VFS
+
+    HttpServer --> MFile : WebDAV + file serving
+    Console --> MFile : ls/cat/hex/cp
+    WsCommandExecutor --> Console : remote commands
+
+    MeatloafConfig --> HttpServer : device config
+    MeatloafConfig --> iecDrive : device IDs / mounts

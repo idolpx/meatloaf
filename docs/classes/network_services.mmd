@@ -1,0 +1,127 @@
+%% Network protocol sessions, clients and services.
+%% Verified against source 2026-07-19.
+%% Each network filesystem pairs its MStream with an MSession obtained from
+%% SessionBroker (keyed host:port); the broker runs a keep-alive task.
+%% Stateless protocols (NFS, FSP) set keep_alive_interval = 0 - keep-alive
+%% racing the IEC task's I/O caused heap corruption (see CLAUDE.md).
+classDiagram
+    direction TB
+
+    class MSession {
+        <<abstract>>
+        #bool connected
+        #uint32_t keep_alive_interval
+        +connect()* bool
+        +disconnect()* void
+        +keep_alive()* bool
+        +isConnected() bool
+    }
+
+    class SessionBroker {
+        <<static>>
+        +obtain(host, port)$
+        +service()$
+    }
+
+    namespace ProtocolSessions {
+        class HTTPMSession
+        class TCPMSession
+        class SMBMSession
+        class NFSMSession
+        class TNFSMSession
+        class FTPMSession
+        class SFTPMSession
+        class FSPMSession
+        class AFPMSession
+        class ISCSIMSession
+        class IRCMSession
+        class MQTTMSession
+        class CSIPMSession
+        class I2CMSession
+        class MDNSMSession
+        class ArchiveMSession
+    }
+
+    class MeatHttpClient {
+        +GET(url) bool
+        +POST(url) bool
+        +PUT(url) bool
+        +open(url, method) bool
+        +processRedirectsAndOpen(position, size) bool
+        +read(buf, size) uint32_t
+        +write(buf, size) uint32_t
+    }
+
+    class MeatSocket {
+        +open(address, port) bool
+        +close() void
+        +read() int
+        +write(buf, size) uint32_t
+        +isOpen() bool
+    }
+
+    class MeatSocketServer {
+        +start(port) bool
+        +stop() void
+    }
+
+    class MDNSMSession {
+        +discoverServices(type, proto, timeout_ms) bool
+    }
+
+    class DiscoveredService {
+        <<struct>>
+        +string instance
+        +string service_type
+        +string host
+        +uint16_t port
+    }
+
+    class HttpServer {
+        +s_server httpd_handle_t$
+        +send_http_error(req, errnum) void$
+        +start() void
+        +startOnDemand() void
+        +stop() void
+    }
+
+    class WsCommandExecutor {
+        +execute over websocket
+    }
+
+    class wwwModules {
+        <<free functions>>
+        +proxy_handler() / proxy_register()
+        +ws_handler() / ws_send_all() / ws_register()
+        +webdav_handler() / webdav_register()
+        +send_file() / send_file_parsed()
+    }
+
+    MSession <|-- HTTPMSession
+    MSession <|-- TCPMSession
+    MSession <|-- SMBMSession
+    MSession <|-- NFSMSession
+    MSession <|-- TNFSMSession
+    MSession <|-- FTPMSession
+    MSession <|-- SFTPMSession
+    MSession <|-- FSPMSession
+    MSession <|-- AFPMSession
+    MSession <|-- ISCSIMSession
+    MSession <|-- IRCMSession
+    MSession <|-- MQTTMSession
+    MSession <|-- CSIPMSession
+    MSession <|-- I2CMSession
+    MSession <|-- MDNSMSession
+    MSession <|-- ArchiveMSession
+
+    SessionBroker o-- MSession : reuse + keep-alive
+    HTTPMSession *-- MeatHttpClient : esp_http_client wrapper
+    TCPMSession *-- MeatSocket
+    MeatSocketServer o-- MeatSocket
+    MDNSMSession *-- DiscoveredService : cached results
+    HttpServer ..> wwwModules : registers handlers
+    HttpServer ..> WsCommandExecutor : ws console commands
+
+    note for HttpServer "Lazy start: www_lazy listener holds port 80 until first access, then starts httpd and loopback-proxies the accepted connections. TCP_NODELAY + LRU purge + persistent connections (July 4 2026 notes)"
+    note for MDNSMSession "mdns:// browse: meta-query _services._dns-sd._udp lists service types; instances resolve to their network protocol URLs"
+    note for MSession "Also: handle classes per protocol (FlashHandle, SMBHandle, NFSHandle, TNFSHandle, AFPHandle) wrap native fds; HTTPRequestContext carries esp_http_server request state"

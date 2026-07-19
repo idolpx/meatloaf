@@ -1,0 +1,115 @@
+%% Tape loader analysis engine (components/tapclean) and codecs.
+%% Verified against source 2026-07-19.
+%% The TAPClean engine is vendored C (TAPClean 0.39 / Final TAP 2.76,
+%% GPL v2+), compiled with TAPCLEAN_EMBEDDED: CLI/report/clean code is
+%% compiled out, all big buffers are heap-allocated (PSRAM-first) only
+%% while a tape is being analyzed, and malloc() is redirected engine-wide
+%% to tapclean_psram_malloc().
+classDiagram
+    direction TB
+
+    class tapclean_api {
+        <<C API - tapclean_api.h>>
+        +tapclean_init() int
+        +tapclean_shutdown() void
+        +tapclean_load_buffer(buf, len, machine, ntsc) int
+        +tapclean_load_buffer_ref(buf, len, machine, ntsc) int
+        +tapclean_analyze_tap(unite_blocks) int
+        +tapclean_block_count() int
+        +tapclean_get_block(idx, out) int
+        +tapclean_prg_count() int
+        +tapclean_get_prg(idx, out) int
+        +tapclean_detected_percent() int
+        +tapclean_tap_time_ms() uint
+        +tapclean_time_at_ms(offset) uint
+        +tapclean_offset_at_ms(ms) int
+        +tapclean_duration_ms(p1, p2) uint
+    }
+
+    class tapclean_engine {
+        <<C internals - components/tapclean/src>>
+        +search_tap() pause+CBM, loader-ID shortcut, 90 scanners
+        +describe_blocks() decode data and checksums
+        +idloader(crc, len) CBM boot CRC and code signatures
+        +database_add_blk_def() early exit at 97 pct coverage
+        +database_make_prg_db() unite neighbouring blocks
+        +readttbit() find_pilot() pulse readers with yield and dots
+        +tapclean_psram_malloc() engine-wide PSRAM allocation
+    }
+
+    class tapclean_scanners {
+        <<91 scanner modules>>
+        +turbotape_search() describe()
+        +turbotape_fast_search() describe() Meatloaf addition
+        +cyberload_f1..f4, visiload, usgold, novaload
+        +freeload, pavloda, ocean, bleep, snakeload, more
+    }
+
+    class tapclean_prg_t {
+        <<struct>>
+        +int type
+        +const char* type_name
+        +int is_cbm_header
+        +int is_cbm_data
+        +int start_addr, end_addr, size
+        +const char* name
+        +const uint8_t* data
+        +int read_errors
+        +int tap_start, tap_end
+    }
+
+    class TapeDecoder {
+        <<lib/meatloaf/media/tape>>
+        +open(container) bool
+        +nextProgram(from_offset, out) bool
+        +offsetAtTime(ms) uint32_t
+        +totalMs() uint32_t
+    }
+
+    namespace RetroPixelsCodec {
+        class IImageData
+        class PixelImage
+        class GraphicMode
+        class Palette
+        class Quantizer
+        class Converter
+        class RetroPixelsConfig
+        class RetroPixelsMStream
+    }
+
+    class QRMStream {
+        <<codec/qr.h>>
+        +QR code generator stream
+    }
+
+    class HighMemory {
+        <<device/ram.h>>
+        +ESP32 HIMEM page mapping
+    }
+    class HighMemoryHandle
+
+    class Audio {
+        <<lib/audio>>
+    }
+
+    class samlib {
+        <<lib/sam - C functions>>
+        +SAM speech synthesizer
+    }
+
+    tapclean_api ..> tapclean_engine : TAPCLEAN_EMBEDDED build
+    tapclean_engine *-- tapclean_scanners : search_tap() dispatch
+    tapclean_api ..> tapclean_prg_t : result records
+    TapeDecoder --> tapclean_api : progressive window scans (see media_scanner.mmd)
+
+    Converter ..> PixelImage
+    Converter ..> GraphicMode
+    Quantizer ..> Palette
+    RetroPixelsMStream ..> Converter : image -> koala/hires
+    RetroPixelsMStream ..> RetroPixelsConfig
+
+    HighMemory ..> HighMemoryHandle
+    Audio ..> samlib : speech output
+
+    note for tapclean_engine "Loader-ID fast path: idloader() identifies the loader from the CBM boot block (CRC table + code signatures incl. the Turbo Tape 64 fast IRQ stub) so identified tapes scan pause+CBM+that loader only; unidentified tapes run all scanners with an early exit once 97% of the tape is accounted for"
+    note for tapclean_scanners "Formats table ft[] (PSRAM working copy of const flash defaults); TTFAST entries tp=$0E sp=$0B lp=$12 (116/88/144 cycles)"

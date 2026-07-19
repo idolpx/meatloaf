@@ -1,0 +1,194 @@
+%% Meatloaf core VFS classes (lib/meatloaf). Verified against source 2026-07-19.
+%% URL resolution is right-to-left: MFSOwner::File() walks the path, finds the
+%% owning MFileSystem per component (by extension/scheme), and nests streams:
+%%   http://srv/game.zip/disk.d64/file.prg
+%%   -> HTTPMStream (container) -> ArchiveMStream -> D64MStream -> file entry
+classDiagram
+    direction TB
+
+    class PeoplesUrlParser {
+        +string url
+        +string scheme
+        +string user
+        +string password
+        +string host
+        +string port
+        +string path
+        +string name
+        +string extension
+        +pathToFile() string
+        +base() string
+        +parseURL(url) unique_ptr~PeoplesUrlParser~$
+    }
+
+    class MStream {
+        <<abstract>>
+        #uint32_t _size
+        #uint32_t _position
+        #uint8_t _load_address
+        #uint8_t _error
+        +openmode mode
+        +string url
+        +bool has_subdirs
+        +size_t block_size
+        +size() uint32_t
+        +available() uint32_t
+        +position() uint32_t
+        +error() size_t
+        +eos() bool
+        +isOpen()* bool
+        +isBrowsable() bool
+        +isRandomAccess() bool
+        +isNetwork() bool
+        +open(mode)* bool
+        +close()* void
+        +read(buf, size)* uint32_t
+        +write(buf, size)* uint32_t
+        +seek(pos)* bool
+        +seekPath(path) bool
+        +seekNextEntry() string
+        +seekBlock(index, offset) bool
+        +seekSector(track, sector, offset) bool
+        +info() map
+    }
+
+    class MFile {
+        <<abstract>>
+        +string type
+        +bool isPETSCII
+        +bool isWritable
+        +string media_header
+        +string media_id
+        +string media_archive
+        +string media_image
+        +uint16_t media_blocks_free
+        +uint16_t media_block_size
+        +string pathInStream
+        +MFile* sourceFile
+        +int is_dir
+        +uint32_t size
+        +getSourceStream(mode) shared_ptr~MStream~
+        +getDecodedStream(src)* shared_ptr~MStream~
+        +createStream(mode) shared_ptr~MStream~
+        +cd(newDir) MFile*
+        +cdParent() MFile*
+        +cdRoot() MFile*
+        +isDirectory() bool
+        +exists() bool
+        +remove() bool
+        +rename(dest) bool
+        +format(header) bool
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile*
+        +openStreamWithCache(mode) shared_ptr~MStream~
+    }
+
+    class MFileSystem {
+        <<abstract>>
+        +bool isRootFS
+        +bool vdrive_compatible
+        +string service_type
+        +handles(path)* bool
+        +getFile(path)* MFile*
+        +mount() bool
+        +umount() bool
+        +isMounted() bool
+        +byExtension(ext, path) bool$
+        +byContent(header) string$
+    }
+
+    class MFSOwner {
+        <<static>>
+        +availableFS$
+        +availableOther$
+        +File(path) MFile*$
+        +File(path, default_fs) MFile*$
+        +findParentFS(begin, end) MFileSystem*$
+    }
+
+    class MMediaStream {
+        <<abstract>>
+        #bool seekCalled
+        #shared_ptr~MStream~ containerStream
+        #size_t media_header_size
+        #size_t media_data_offset
+        #size_t entry_index
+        +readContainer(buf, size) uint32_t
+        +readFile(buf, size)* uint32_t
+        +writeFile(buf, size)* uint32_t
+        +readHeader() bool
+        +seekEntry(filename) bool
+        +seekEntry(index) bool
+        +getNextImageEntry() bool
+        +resetEntryCounter() void
+        +seekFileSize(track, sector) uint32_t
+        +decodeType(file_type, hidden) string
+        +blocks() uint32_t
+        +blocksFree() uint16_t
+    }
+
+    class ImageBroker {
+        <<static>>
+        -image_repo$
+        -lru_order$
+        +obtain(type, url)$
+        +dispose(type, url)$
+    }
+
+    class MSession {
+        <<abstract>>
+        #bool connected
+        #uint32_t keep_alive_interval
+        +connect()* bool
+        +disconnect()* void
+        +keep_alive()* bool
+        +refresh() bool
+        +isConnected() bool
+        +setKeepAliveInterval(ms) void
+    }
+
+    class CachedFile {
+        +read(offset, buf, count) uint32_t
+        +write(offset, buf, count) uint32_t
+        +loadFromStream(stream, size) bool
+        +loadViaReader(size, reader) bool
+    }
+
+    class SessionBroker {
+        <<static>>
+        +obtain(host, port)$
+        +service()$
+    }
+
+    class mfilebuf {
+        <<streambuf>>
+        -shared_ptr~MStream~ mstream
+        -char* gbuffer
+        +underflow() int
+        +overflow(c) int
+        +is_open() bool
+    }
+
+    class basic_fstream {
+        <<Meat iostream>>
+        +nda() bool
+        +get() int
+    }
+
+    class csstreambuf
+    class idirbuf
+
+    PeoplesUrlParser <|-- MFile
+    MStream <|-- MMediaStream
+    MFile ..> MStream : getSourceStream() chains container to decoded
+    MFileSystem ..> MFile : getFile()
+    MFSOwner ..> MFileSystem : right-to-left path match
+    MFSOwner ..> MFile : creates
+    ImageBroker o-- MMediaStream : LRU cache keyed type+url
+    SessionBroker o-- MSession : keyed host-port, keep-alive task
+    MSession *-- CachedFile : PSRAM/HIMEM/SD entry cache
+    basic_fstream *-- mfilebuf
+    mfilebuf ..> MStream : buffered reads (2 KB gbuffer)
+
+    note for MStream "Sentinel _MEAT_NO_DATA_AVAIL (0xFFFFFFFE, int -2) returned by non-blocking reads; must never collide with a real byte count"
+    note for MFile "exists() uses stat() for local paths; network FS override with a real check (e.g. fsp_stat). Never infer existence from a lazy stream open"

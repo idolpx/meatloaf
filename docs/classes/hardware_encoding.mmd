@@ -1,0 +1,194 @@
+%% IEC bus, virtual devices, hardware managers and utility classes.
+%% Verified against source 2026-07-19.
+%% SystemFileDevice / SystemDevice are build-time aliases: IECFileDevice /
+%% IECDevice for BUILD_IEC, GPIBFileDevice / GPIBDevice for BUILD_GPIB.
+%% IEC bus timing runs in systemBus::service() (core 1, priority 17).
+classDiagram
+    direction TB
+
+    class IECBusHandler {
+        +begin() void
+        +attachDevice(dev) bool
+        +detachDevice(dev) bool
+        +task() void
+    }
+
+    class systemBus {
+        +setup() void
+        +service() void
+        +shutdown() void
+    }
+
+    class IECDevice {
+        +isActive() bool
+        +begin() void
+        +task() void
+        +reset() void
+        +talk(secondary) void
+        +listen(secondary) void
+        +untalk() void
+        +unlisten() void
+        +canWrite() int8_t
+        +canRead() int8_t
+    }
+
+    class IECFileDevice {
+        <<abstract>>
+        +open(channel, name, nameLen)* bool
+        +close(channel)* void
+        +write(channel, buffer, size, eoi)* uint8_t
+        +read(channel, buffer, size, eoi)* uint8_t
+        +getStatus(buffer, size) void
+        +execute(command) void
+        +epyxReadSector(track, sector, buffer) bool
+        +epyxWriteSector(track, sector, buffer) bool
+    }
+
+    class iecDrive {
+        +unmount() void
+        +getNumOpenChannels() uint8_t
+        +getStatusCode() uint8_t
+        +setStatusCode(code, trk, sec) void
+        +hasError() bool
+        +set_cwd(path, update) void
+        +getCWD() string
+        -m_channels iecChannelHandler*
+        -m_cwd unique_ptr~MFile~
+        -m_memory driveMemory
+    }
+
+    class iecFuji {
+        +fujiDisk _fnDisks x8
+        +setup(bus) void
+    }
+
+    class iecMeatloaf
+
+    class iecNetwork
+    class iecModem
+    class iecPrinter
+    class iecClock
+    class iecCpm
+    class iecOpenAI
+    class iecVoice
+    class WiC64
+
+    class iecChannelHandler {
+        <<abstract>>
+        +read(data, n) uint8_t
+        +write(data, n) uint8_t
+    }
+    class iecChannelHandlerFile {
+        -m_stream shared_ptr~MStream~
+        -m_fixLoadAddress int
+        +readBufferData() uint8_t
+    }
+    class iecChannelHandlerDir {
+        -m_dir MFile*
+        +addExtraInfo(title, text) void
+    }
+
+    class driveMemory {
+        +setROM(filename) bool
+        +read(addr, buf, n) uint8_t
+        +write(addr, buf, n) uint8_t
+        -shared ROM cache (weak_ptr, PSRAM)
+        -lazy RAM vector
+    }
+
+    class IECProtocol {
+        <<abstract>>
+    }
+    class CPBStandardSerial
+    class CPBFastSerial
+    class JiffyDOS
+    class DolphinDOS
+    class SauceDOS
+
+    class iecPipe {
+        +stream-to-IEC transfer helper
+    }
+    class iecPipeBroker
+
+    class GPIBusHandler
+    class GPIBDevice
+    class GPIBFileDevice
+    class parallelBus
+
+    namespace HardwareManagers {
+        class SystemManager
+        class WiFiManager
+        class DummyWiFiManager
+        class UARTManager
+        class LedManager
+        class LedStripManager
+        class KeyManager
+        class BluetoothManager
+        class fnBluetoothSPP
+        class HardwareTimer
+        class EspClass
+        class SerialClass
+        class printerlist
+        class DisplayLCD
+    }
+
+    namespace ConsoleUI {
+        class Console
+        class ConsoleCommandBase
+        class ConsoleCommand
+        class ConsoleCommandD
+        class OptionsConsoleCommand
+    }
+
+    namespace UtilsEncoding {
+        class U8Char
+        class cbuf
+        class TimeConverter
+        class MeatloafConfig
+        class BasicConfigReader
+        class IOChannel
+        class COMChannel
+        class ACMChannel
+        class TTYChannel
+        class RS232ChannelProtocol
+    }
+
+    IECBusHandler <|-- systemBus : BUILD_IEC
+    GPIBusHandler <|-- systemBus : BUILD_GPIB
+    IECBusHandler o-- IECDevice : attached devices 4-30
+    IECDevice <|-- IECFileDevice
+    IECDevice <|-- iecModem
+    IECDevice <|-- iecPrinter : via SystemDevice alias
+    IECDevice <|-- iecClock : via SystemDevice alias
+    IECFileDevice <|-- iecDrive : via SystemFileDevice alias
+    IECFileDevice <|-- iecNetwork : via SystemFileDevice alias
+    GPIBDevice <|-- GPIBFileDevice
+    iecDrive <|-- iecMeatloaf
+    iecFuji <|-- iecMeatloaf : multiple inheritance
+    iecDrive *-- iecChannelHandler : per-channel 0-15
+    iecChannelHandler <|-- iecChannelHandlerFile
+    iecChannelHandler <|-- iecChannelHandlerDir
+    iecDrive *-- driveMemory : 6502 memory map (M-R/M-W/M-E)
+    iecChannelHandlerFile ..> MStream : serves LOAD/SAVE
+    IECProtocol <|-- CPBStandardSerial
+    CPBStandardSerial <|-- CPBFastSerial
+    IECProtocol <|-- JiffyDOS
+    IECProtocol <|-- DolphinDOS
+    IECProtocol <|-- SauceDOS
+    systemBus ..> IECProtocol : per-transfer negotiation
+    iecPipeBroker o-- iecPipe
+    Console *-- ConsoleCommandBase : registered commands
+    ConsoleCommandBase <|-- ConsoleCommand
+    ConsoleCommand <|-- ConsoleCommandD
+    ConsoleCommandBase <|-- OptionsConsoleCommand
+    IOChannel <|-- COMChannel
+    IOChannel <|-- ACMChannel
+    IOChannel <|-- TTYChannel
+
+    class MStream {
+        <<from core>>
+    }
+
+    note for Console "All commands run on one refcounted 16 KB console_exec task; I/O shells (console_repl 6 KB, tcp_session 4 KB, console_tcp listener 2.5 KB) are persistent boot-created tasks (July 4 2026 architecture)"
+    note for driveMemory "ROMs shared across drives via static weak_ptr cache in PSRAM; RAM lazily allocated on first write"
+    note for MeatloafConfig "_data is psram_json (nlohmann basic_json with PsramAllocator); config.json + devices.json split with separate dirty flags"

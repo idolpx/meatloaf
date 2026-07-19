@@ -1,0 +1,176 @@
+%% Media containers and the tape analysis engine.
+%% Verified against source 2026-07-19.
+%% - D64MStream is the base decoder for all CBM disk geometries; writing
+%%   (SAVE into images) allocates blocks CBM-style with BAM updates.
+%% - TAP/DMP/HTAP decoding is done by the vendored TAPClean engine
+%%   (components/tapclean, ~90 loader scanners) driven progressively by
+%%   TapeDecoder - see also loaders_emulation.mmd.
+%% - Archives (zip/7z/rar/tar/gz/...) go through libarchive with extracted
+%%   entries cached per-session (ArchiveMSession).
+classDiagram
+    direction TB
+
+    class MMediaStream {
+        <<abstract>>
+        #shared_ptr~MStream~ containerStream
+        #bool seekCalled
+        +readContainer(buf, size) uint32_t
+        +readFile(buf, size)* uint32_t
+        +seekEntry(filename) bool
+        +getNextImageEntry() bool
+    }
+
+    class D64MStream {
+        +vector~uint16_t~ sectorsPerTrack
+        +blocksFree() uint16_t
+        +seekBlock(index, offset) bool
+        +seekSector(track, sector, offset) bool
+        +seekPath(path) bool
+        +seekDirectory(path) bool
+        +enterDirectory(name) bool
+        +readHeader() bool
+        +writeHeader(name, id) bool
+        +seekEntry(filename) bool
+        +readEntry(index) bool
+        +writeEntry(index) bool
+        +writeBlock(track, sector, data) bool
+        +allocateBlock(track, sector) bool
+        +deallocateBlock(track, sector) bool
+        +getFreeBlocks(file_size) BlockChain
+        +getNextFreeBlock(startT, startS, foundT, foundS, forDir) bool
+        +getBAMRecord(track, rec) bool
+        +setBlockAllocation(track, sector, allocate) bool
+        +getTrackFreeCount(track) uint8_t
+    }
+
+    class TAPMStream {
+        +TapeEntry& current
+        +bool& have_current
+        +nextTapeEntry() bool
+        +resetTape() void
+        +setCounter(spec) bool
+        +counterMs() uint32_t
+        +durationMs() uint32_t
+        +entryDisplayName(e) string
+        +seekPath(path) bool
+        #uint32_t& tape_pos
+        #shared_ptr~TapeState~ state
+    }
+
+    class TapeState {
+        +TapeDecoder decoder
+        +uint32_t tape_pos
+        +bool tape_ended
+        +TapeEntry current
+        +bool have_current
+        +obtain(url) shared_ptr~TapeState~$
+    }
+
+    class TapeDecoder {
+        +open(container) bool
+        +nextProgram(from_offset, out) bool
+        +offsetAtTime(ms) uint32_t
+        +totalMs() uint32_t
+        -extendScan() bool
+        -fetchTo(target) bool
+        -scanWindow(win) bool
+        -harvestEntries(nprg) void
+        -appendValue(cycles) bool
+        -vector~TapeEntry~ entries
+        -uint8_t* image
+        -bool converting
+        -bool fully_scanned
+    }
+
+    class TapeEntry {
+        <<struct>>
+        +string name
+        +string loader
+        +uint16_t start_addr
+        +uint16_t end_addr
+        +uint32_t tape_offset
+        +uint32_t tape_end_offset
+        +uint32_t start_time_ms
+        +uint32_t end_time_ms
+        +bool checksum_ok
+        +vector~uint8_t~ prg
+    }
+
+    class tapclean_api {
+        <<C component>>
+        +tapclean_init() int
+        +tapclean_load_buffer(buf, len, machine, ntsc) int
+        +tapclean_load_buffer_ref(buf, len, machine, ntsc) int
+        +tapclean_analyze_tap(unite) int
+        +tapclean_get_prg(idx, out) int
+        +tapclean_get_block(idx, out) int
+        +tapclean_duration_ms(p1, p2) uint
+        +tapclean_shutdown() void
+    }
+
+    class Archive {
+        +struct archive* a
+        +open() bool
+        +close() void
+    }
+
+    class ArchiveMSession {
+        +getEntry(entryPath, a, entrySize) shared_ptr~CachedFile~
+        -loadEntryFromArchive(cf, a, entrySize) bool
+    }
+
+    class ArchiveMStream {
+        +ensureData() bool
+        +seekPath(path) bool
+    }
+
+    class DHDImageRegistry {
+        <<static>>
+        +partitions(url) vector~DHDPartition~$
+        +selectedPartition(url) uint8_t$
+        +selectPartition(url, num) bool$
+    }
+
+    class DHDPartition {
+        <<struct>>
+        +uint8_t type
+        +string name
+        +uint32_t start_lba
+        +uint32_t size_lba
+    }
+
+    class DHDOffsetStream {
+        +window over partition offset
+    }
+
+    class HDDMStream {
+        +IDE64 CFS 0.11 decoder
+        +partition root directories
+        +balanced data-tree traversal
+    }
+
+    class M2IMStream {
+        +vector~Entry~ entries
+        +resolveEntry(index) bool
+        +entryTargetUrl() string
+        -shared_ptr~MStream~ fileStream
+    }
+
+    MMediaStream <|-- D64MStream
+    MMediaStream <|-- TAPMStream
+    MMediaStream <|-- ArchiveMStream
+    MMediaStream <|-- HDDMStream
+    MMediaStream <|-- M2IMStream
+
+    TAPMStream --> TapeState : shared per image URL (weak_ptr registry)
+    TapeState *-- TapeDecoder
+    TapeDecoder --> tapclean_api : borrowed-buffer window scans
+    TapeDecoder *-- TapeEntry : decoded programs
+    ArchiveMStream --> ArchiveMSession : cached extracted entries
+    ArchiveMSession --> Archive : libarchive callbacks
+    DHDImageRegistry *-- DHDPartition
+    DHDImageRegistry ..> DHDOffsetStream : partition windows
+    DHDOffsetStream ..> D64MStream : D64/D71/D81/DNP decode inside partition
+
+    note for TapeDecoder "Progressive: fetch 512 KB prefix (doubling) into PSRAM, scan, withhold last entry of a partial window until confirmed; DMP/HTAP/TAP-v2 converted to TAP v1 on the fly; engine freed after each window (no resident memory between scans)"
+    note for D64MStream "Subclassed by D40/D71/D80/D81/D82/D8B/D90/DFI/DNP/DSK/G64/NIB/ATR streams and DSKIStream; write path claims blocks near the directory track with per-block BAM updates and rollback on failure"
