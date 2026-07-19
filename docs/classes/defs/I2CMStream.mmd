@@ -1,0 +1,21 @@
+%%gen
+    class I2CMStream {
+        -uint8_t _address*
+        -uint8_t _reg*
+        -bool _has_address
+        -bool _has_reg
+        -bool _opened
+        -std.shared_ptr~I2CMSession~ _session
+        -_parse_url(const std.string path) void
+        +I2CMStream(std.string path) explicit
+        +size() uint32_t
+        +available() uint32_t
+        +position() uint32_t
+        +error() size_t
+        +seek(uint32_t pos) bool
+        +isOpen() bool
+        +open(std.ios_base.openmode mode) bool
+        +close() void
+        +read(uint8_t* buf, uint32_t size) uint32_t
+        +write(const uint8_t* buf, uint32_t size) uint32_t
+    }

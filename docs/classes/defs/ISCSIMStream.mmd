@@ -1,0 +1,22 @@
+%%gen
+    class ISCSIMStream {
+        #std.shared_ptr~ISCSIMSession~ _session
+        #int _lun*
+        #uint32_t _block_size
+        #bool _connected
+        #std.vector~uint8_t~ _block_buf
+        #int64_t _buf_lba
+        #readBlock(uint32_t lba) bool
+        #writeBlock(uint32_t lba, const uint8_t* src) bool
+        +ISCSIMStream(std.string path)
+        +isOpen() bool
+        +isNetwork() bool
+        +isRandomAccess() bool
+        +open(std.ios_base.openmode mode) bool
+        +close() void
+        +read(uint8_t* buf, uint32_t size) uint32_t
+        +write(const uint8_t* buf, uint32_t size) uint32_t
+        +seek(uint32_t pos) bool
+        +seek(uint32_t pos, int mode) bool
+        +seekPath(std.string path) bool
+    }

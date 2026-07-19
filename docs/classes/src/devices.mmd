@@ -1,0 +1,55 @@
+%% Virtual devices on the bus: drive, fuji, printer, modem, network, clock
+%% GENERATED template (gen_templates.js) - curated content lives in
+%% src/extra/devices.mmd; class bodies live in defs/<Class>.mmd
+classDiagram
+    direction LR
+
+    %%include driveMemory
+    %%include iecChannelHandler
+    %%include iecChannelHandlerDir
+    %%include iecChannelHandlerFile
+    %%include iecClock
+    %%include iecCpm
+    %%include IECData
+    %%include iecDrive
+    %%include iecFuji
+    %%include iecMeatloaf
+    %%include iecModem
+    %%include iecNetwork
+    %%include iecPrinter
+    %%include printerlist
+    %%include WiC64
+
+    class IECDevice {
+        <<see bus>>
+    }
+
+    iecChannelHandler <|-- iecChannelHandlerDir
+    iecChannelHandler <|-- iecChannelHandlerFile
+    iecDrive <|-- iecMeatloaf
+    iecFuji <|-- iecMeatloaf
+    IECDevice <|-- iecModem
+
+    class IECFileDevice {
+        <<see bus>>
+    }
+    class IECDevice {
+        <<see bus>>
+    }
+    class MStream {
+        <<see vfs_core>>
+    }
+    IECFileDevice <|-- iecDrive : via SystemFileDevice alias
+    IECFileDevice <|-- iecNetwork : via SystemFileDevice alias
+    IECDevice <|-- iecModem
+    IECDevice <|-- iecPrinter : via SystemDevice alias
+    IECDevice <|-- iecClock : via SystemDevice alias
+    iecDrive <|-- iecMeatloaf
+    iecFuji <|-- iecMeatloaf : multiple inheritance
+    iecDrive *-- iecChannelHandler : per-channel 0-15
+    iecChannelHandler <|-- iecChannelHandlerFile
+    iecChannelHandler <|-- iecChannelHandlerDir
+    iecDrive *-- driveMemory : 6502 memory map (M-R/M-W/M-E)
+    iecChannelHandlerFile ..> MStream : serves LOAD/SAVE
+
+    note for driveMemory "ROMs shared across drives via static weak_ptr cache in PSRAM; RAM lazily allocated on first write"

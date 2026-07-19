@@ -1,0 +1,14 @@
+%%gen
+    class TCPServer {
+        -int _server_socket$
+        -int _client_socket$
+        -bool _shutdown$
+        -task(void *pvParameters) void$
+        -session_task(void *pvParameters) void$
+        -TaskHandle_t _htask$
+        -TaskHandle_t _session_htask$
+        +start() void
+        +stop() void
+        +send(std.string data) void$
+        +disconnect() void$
+    }

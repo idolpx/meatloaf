@@ -1,0 +1,22 @@
+%%gen
+    class FileSystemTNFS {
+        -tnfsMountInfo _mountinfo
+        -esp_timer_handle_t keepAliveTimerHandle
+        +FileSystemTNFS()
+        +start(...) bool
+        +type() fsType
+        +typestring() const char *
+        +file_open(...) FILE *
+        +exists(const char* path) bool
+        +remove(const char* path) bool
+        +rename(const char* pathFrom, const char* pathTo) bool
+        +is_dir(const char *path) bool
+        +mkdir(const char* path) bool
+        +rmdir(const char* path) bool
+        +dir_exists(const char* path) bool
+        +dir_open(...) bool
+        +dir_read() fsdir_entry *
+        +dir_close() void
+        +dir_tell() uint16_t
+        +dir_seek(uint16_t) bool
+    }

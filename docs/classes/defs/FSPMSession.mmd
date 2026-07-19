@@ -1,0 +1,12 @@
+%%gen
+    class FSPMSession {
+        -std.unique_ptr~FSP_SESSION, FSPSessionDeleter~ _session
+        -std.string _password
+        -std.mutex _session_mutex
+        +FSPMSession(std.string host, uint16_t port)
+        +connect() bool
+        +disconnect() void
+        +keep_alive() bool
+        +getScheme() std.string$
+        +getSession() FSP_SESSION*
+    }

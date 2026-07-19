@@ -1,0 +1,17 @@
+%%gen
+    class MQTTMStream {
+        -std.shared_ptr~MQTTMSession~ session
+        -std.string topic
+        -bool is_subscribed
+        -std.string read_buffer
+        -size_t read_pos*
+        +MQTTMStream(std.string path)
+        +isOpen() bool
+        +isBrowsable() bool
+        +isRandomAccess() bool
+        +open(std.ios_base.openmode mode) bool
+        +close() void
+        +read(uint8_t* buf, uint32_t size) uint32_t
+        +write(const uint8_t *buf, uint32_t size) uint32_t
+        +seek(uint32_t pos) bool
+    }

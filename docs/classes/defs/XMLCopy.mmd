@@ -1,0 +1,11 @@
+%%gen
+    class XMLCopy {
+        #XMLElement * _target
+        #XMLDocument * _newDoc
+        +XMLCopy(XMLElement * target)
+        +VisitEnter(...) bool
+        +VisitExit(const XMLElement element) bool
+        +Visit(const XMLDeclaration declaration) bool
+        +Visit(const XMLText txt) bool
+        +Visit(const XMLComment comment) bool
+    }

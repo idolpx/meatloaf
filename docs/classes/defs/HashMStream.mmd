@@ -1,0 +1,12 @@
+%%gen
+    class HashMStream {
+        -std.string hash
+        -generate(std.string data) uint32_t
+        +HashMStream(std.string path, std.ios_base.openmode m)
+        +isOpen() bool
+        +open(std.ios_base.openmode mode) bool
+        +close() void
+        +read(uint8_t* buf, uint32_t size) uint32_t
+        +write(const uint8_t *buf, uint32_t size) uint32_t
+        +seek(uint32_t pos) bool
+    }

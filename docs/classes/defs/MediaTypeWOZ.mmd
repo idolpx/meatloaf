@@ -1,0 +1,21 @@
+%%gen
+    class MediaTypeWOZ {
+        -char woz_version
+        -wozX_check_header() error_is_true
+        -wozX_read_info() error_is_true
+        -wozX_read_tmap() error_is_true
+        -woz1_read_tracks() error_is_true
+        -woz2_read_tracks() error_is_true
+        #uint8_t tmap[MAX_TRACKS]
+        #TRK_bitstream *trk_data[MAX_TRACKS]
+        +read(...) error_is_true
+        +write(...) error_is_true
+        +write_sector(int track, int sector, uint8_t *buffer) error_is_true
+        +format(uint16_t *responsesize) error_is_true
+        +mount(fnFile *f, uint32_t disksize) mediatype_t
+        +unmount() void
+        +status() success_is_true
+        +trackmap(uint8_t t) uint8_t
+        +get_track(int t) TRK_bitstream *
+        +uint8_t optimal_bit_timing
+    }

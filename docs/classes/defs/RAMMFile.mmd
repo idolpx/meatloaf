@@ -1,0 +1,24 @@
+%%gen
+    class RAMMFile {
+        -openDir(std.string path) void
+        -closeDir() void
+        -bool _valid
+        -std.string _pattern
+        -pathValid(std.string path) bool
+        #DIR* dir
+        #bool dirOpened
+        +std.string basepath
+        +RAMMFile(std.string path)
+        +isDirectory() bool
+        +getSourceStream(...) std.shared_ptr~MStream~
+        +getDecodedStream(std.shared_ptr~MStream~ src) std.shared_ptr~MStream~
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile*
+        +mkDir() bool
+        +exists() bool
+        +remove() bool
+        +rename(std.string dest) bool
+        +getLastWrite() time_t
+        +getCreationTime() time_t
+        +readEntry(std.string filename) bool
+    }

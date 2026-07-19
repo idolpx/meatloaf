@@ -1,0 +1,55 @@
+%%gen
+    class GPIBusHandler {
+        -readPinATN() bool
+        -readPinDAV() bool
+        -readPinNRFD() bool
+        -readPinNDAC() bool
+        -readPinEOI() bool
+        -readPinSRQ() bool
+        -readPinDDR() bool
+        -readPinRESET() bool
+        -writePinDAV(bool v) void
+        -writePinNRFD(bool v) void
+        -writePinNDAC(bool v) void
+        -writePinEOI(bool v) void
+        -writePinSRQ(bool v) void
+        -writePinDDR(bool v) void
+        -writePinCTRL(bool v) void
+        -waitTimeout(uint16_t timeout, uint8_t cond) bool
+        -waitPinEOI(bool state, uint16_t timeout) bool
+        -waitPinNDAC(bool state, uint16_t timeout) bool
+        -waitPinNRFD(bool state, uint16_t timeout) bool
+        -waitPinDAV(bool state, uint16_t timeout) bool
+        -waitPinATN(bool state) void
+        -atnRequest() void
+        -receiveGPIBByteATN(uint8_t data) bool
+        -receiveGPIBByte(bool canWriteOk) bool
+        -transmitGPIBByte(uint8_t numData) bool
+        -handleATNSequence() void
+        -volatile uint16_t m_timeoutDuration
+        -volatile uint32_t m_timeoutStart
+        -volatile bool m_inTask
+        -volatile uint8_t m_flags
+        -uint8_t m_primary, m_secondary
+        -uint8_t m_dataDirection
+        -volatile IOREG_TYPE *m_regNRFDwrite, *m_regNRFDmode, *m_regNDACwrite, *m_regNDACmode
+        -volatile IOREG_TYPE *m_regEOIwrite, *m_regEOImode, *m_regSRQwrite, *m_regSRQmode
+        -volatile IOREG_TYPE *m_regDDRwrite, *m_regDDRmode
+        -endParallelTransaction() void
+        -setParallelBusModeInput() void
+        -setParallelBusModeOutput() void
+        -readParallelData() uint8_t
+        -writeParallelData(uint8_t data) void
+        +GPIBusHandler(...)
+        +begin() void
+        +attachDevice(GPIBDevice *dev) bool
+        +detachDevice(GPIBDevice *dev) bool
+        +task() void
+        +canServeATN() bool
+        +inTransaction() bool
+        +sendSRQ() void
+        +GPIBDevice *m_currentDevice
+        +GPIBDevice *m_devices[GPIB_MAX_DEVICES]
+        +uint8_t m_numDevices
+        +int m_atnInterrupt
+    }

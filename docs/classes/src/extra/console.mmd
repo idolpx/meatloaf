@@ -1,0 +1,3 @@
+    Console *-- ConsoleCommandBase : registered commands
+
+    note for Console "All commands run on one refcounted 16 KB console_exec task; I/O shells (console_repl 6 KB, tcp_session 4 KB, console_tcp listener 2.5 KB) are persistent boot-created tasks"

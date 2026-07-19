@@ -1,0 +1,10 @@
+%%gen
+    class TimeConverter {
+        -toBcd(uint8_t decimal) uint8_t$
+        -const char* DAY_NAMES_FULL[]$
+        -const char* DAY_NAMES_SHORT[]$
+        +toAsciiTime(...) size_t$
+        +toBcdTime(...) size_t$
+        +toDecimalTime(...) size_t$
+        +toIsoTime(...) size_t$
+    }

@@ -1,0 +1,10 @@
+%%gen
+    class ElementIterator {
+        <<template>>
+        -descend(element_path_iterator_t~XE~ ixSel) bool
+        -traverse(element_path_iterator_t~XE~ ixSel) void
+        -element_path_t~XE~ _selectionPath
+        +ElementIterator()
+        +ElementIterator(XE * origin)
+        +ElementIterator(XE * origin, const std.string xpath)
+    }

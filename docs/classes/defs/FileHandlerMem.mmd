@@ -1,0 +1,16 @@
+%%gen
+    class FileHandlerMem {
+        #uint8_t *_buffer
+        #long int _size
+        #long int _filesize
+        #long int _position
+        +FileHandlerMem()
+        +FileHandlerMem() ~
+        +close(bool destroy) int
+        +seek(long int off, int whence) int
+        +tell() long int
+        +read(void *ptr, size_t size, size_t count) size_t
+        +write(...) size_t
+        +flush() int
+        +grow(long filesize) int
+    }

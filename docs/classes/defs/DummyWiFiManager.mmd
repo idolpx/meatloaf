@@ -1,0 +1,23 @@
+%%gen
+    class DummyWiFiManager {
+        -bool _started
+        -bool _connected
+        +store_wifi(std.string ssid, std.string password) void
+        +int retries
+        +start() int
+        +stop() void
+        +test_connect(const char *ssid, const char *password) int
+        +connect(const char *ssid, const char *password) int
+        +connect() int
+        +connected() bool
+        +handle_station_stop() void
+        +set_hostname(const char* hostname) void
+        +get_current_ssid() std.string
+        +get_current_detail_str() const char *
+        +get_current_bssid(uint8_t bssid[6]) int
+        +get_current_bssid_str() std.string
+        +get_mac(uint8_t mac[6]) int
+        +get_mac_str() std.string
+        +scan_networks(...) uint8_t
+        +get_scan_result(...) int
+    }

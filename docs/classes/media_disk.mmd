@@ -1,0 +1,431 @@
+%% Disk media: D64 family, CMD HD/FD partitions, IDE64 CFS, M2I index
+%% GENERATED template (gen_templates.js) - curated content lives in
+%% src/extra/media_disk.mmd; class bodies live in defs/<Class>.mmd
+classDiagram
+    direction LR
+
+%%gen
+    class ATRMFile {
+        +ATRMFile(std.string path, bool is_dir)
+        +getDecodedStream(std.shared_ptr~MStream~ is) std.shared_ptr~MStream~
+    }
+%%gen
+    class ATRMFileSystem {
+        +ATRMFileSystem()
+        +handles(std.string fileName) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class ATRMStream {
+        #private- friend class ATRMFile
+        +ATRMStream(std.shared_ptr~MStream~ is)
+        +speedZone(uint8_t track) uint8_t
+    }
+%%gen
+    class D40MFile {
+        +D40MFile(std.string path)
+        +getDecodedStream(std.shared_ptr~MStream~ is) std.shared_ptr~MStream~
+    }
+%%gen
+    class D40MFileSystem {
+        +D40MFileSystem()
+        +handles(std.string fileName) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class D40MStream {
+        #private- friend class D40MFile
+        +D40MStream(std.shared_ptr~MStream~ is)
+        +speedZone(uint8_t track) uint8_t
+    }
+%%gen
+    class D64MFile {
+        +D64MFile(std.string path)
+        +getDecodedStream(std.shared_ptr~MStream~ is) std.shared_ptr~MStream~
+        +format(std.string header_info) bool
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile*
+        +isDirectory() bool
+        +exists() bool
+        +remove() bool
+        +rename(std.string dest) bool
+        +getLastWrite() time_t
+        +getCreationTime() time_t
+        +bool isDir
+        +bool dirIsOpen
+    }
+%%gen
+    class D64MFileSystem {
+        +D64MFileSystem()
+        +handles(std.string fileName) bool
+        +getFile(std.string path) MFile*
+    }
+    class D64MStream {
+        #vector~Partition~ partitions - header/dir location + BAM layout per partition
+        #vector~uint16_t~ sectorsPerTrack - zone table
+        #uint8_t dos_version
+        #bool error_info - image carries per-sector error bytes
+        #uint16_t block_size
+        #readHeader() bool
+        #writeHeader(name, id) bool
+        #seekEntry(filename) bool - skips scratched entries, wildcard aware
+        #seekEntry(index) bool
+        #readEntry(index) bool
+        #writeEntry(index) bool - commit directory slot
+        #getBAMRecord(track, rec) bool - generic over count-byte and bitmap-only BAMs
+        #readBAMRecord(track, rec, buf) bool
+        #setBlockAllocation(track, sector, allocate) bool
+        #findFreeSectorOnTrack(track, startSector, foundSector) bool
+        +blocksFree() uint16_t - sums getTrackFreeCount, skips dir track
+        +seekBlock(index, offset) bool
+        +seekSector(track, sector, offset) bool
+        +seekPath(path) bool - read selects file; write mode CREATES it (SAVE)
+        +seekDirectory(path) bool - walk slash-separated in-image subdirs
+        +enterDirectory(name) bool - CMD native DIR and 1581 CBM partitions
+        +writeBlock(track, sector, data) bool
+        +allocateBlock(track, sector) bool
+        +deallocateBlock(track, sector) bool
+        +isBlockFree(track, sector) bool
+        +getFreeBlocks(file_size) BlockChain
+        +getNextFreeBlock(startT, startS, foundT, foundS, forDir) bool - physical-drive algorithm: near dir track, interleave, sweep outward
+        +getTrackFreeCount(track) uint8_t
+        +getSectorCount(track) uint16_t
+        +getTrackCount() uint16_t
+    }
+%%gen
+    class D71MFile {
+        +D71MFile(std.string path)
+        +getDecodedStream(std.shared_ptr~MStream~ is) std.shared_ptr~MStream~
+    }
+%%gen
+    class D71MFileSystem {
+        +D71MFileSystem()
+        +handles(std.string fileName) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class D71MStream {
+        #private- friend class D71MFile
+        +D71MStream(std.shared_ptr~MStream~ is)
+        +speedZone(uint8_t track) uint8_t
+    }
+%%gen
+    class D80MFile {
+        +D80MFile(std.string path)
+        +getDecodedStream(std.shared_ptr~MStream~ is) std.shared_ptr~MStream~
+    }
+%%gen
+    class D80MFileSystem {
+        +D80MFileSystem()
+        +handles(std.string fileName) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class D80MStream {
+        #private- friend class D80MFile
+        +D80MStream(std.shared_ptr~MStream~ is)
+        +speedZone(uint8_t track) uint8_t
+    }
+%%gen
+    class D81MFile {
+        +D81MFile(std.string path)
+        +getDecodedStream(std.shared_ptr~MStream~ is) std.shared_ptr~MStream~
+        +mkDir() bool
+        +rmDir() bool
+    }
+%%gen
+    class D81MFileSystem {
+        +D81MFileSystem()
+        +handles(std.string fileName) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class D81MStream {
+        #private- friend class D81MFile
+        +D81MStream(std.shared_ptr~MStream~ is)
+        +speedZone(uint8_t track) uint8_t
+    }
+%%gen
+    class D82MFile {
+        +D82MFile(std.string path)
+        +getDecodedStream(std.shared_ptr~MStream~ is) std.shared_ptr~MStream~
+    }
+%%gen
+    class D82MFileSystem {
+        +D82MFileSystem()
+        +handles(std.string fileName) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class D82MStream {
+        #private- friend class D82MFile
+        +D82MStream(std.shared_ptr~MStream~ is)
+        +speedZone(uint8_t track) uint8_t
+    }
+%%gen
+    class D90MFile {
+        +D90MFile(std.string path)
+        +getDecodedStream(std.shared_ptr~MStream~ is) std.shared_ptr~MStream~
+    }
+%%gen
+    class D90MFileSystem {
+        +D90MFileSystem()
+        +handles(std.string fileName) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class D90MStream {
+        #private- friend class D90MFile
+        +D90MStream(std.shared_ptr~MStream~ is)
+        +speedZone(uint8_t track) uint8_t
+    }
+    class DHDImageRegistry {
+        <<static>>
+        -per-image partition tables$ - scanned once (CMD HD boot magic / FD fixed layout)
+        +partitions(url)$ - parsed table, 254 (HD) or 31 (FD) entries
+        +selectedPartition(url) uint8_t$ - defaults to image default partition
+        +selectPartition(url, num) bool$ - CP command; disposes ImageBroker entry
+    }
+%%gen
+    class DHDMFileSystem {
+        +DHDMFileSystem()
+        +handles(std.string fileName) bool
+        +getFile(std.string path) MFile*
+    }
+    class DHDOffsetStream {
+        -shared_ptr~MStream~ inner
+        -uint32_t offset - partition start in the image
+        -uint32_t length
+        +read/seek windowed into the partition
+    }
+%%gen
+    class DHDPartitionMFile {
+        <<template>>
+        #normalizePath() void
+        #bool normalized
+        #bool listing_partitions
+        #uint16_t part_index*
+        +DHDPartitionMFile(std.string path)
+        +getDecodedStream(std.shared_ptr~MStream~ is) std.shared_ptr~MStream~
+        +getSourceStream(...) std.shared_ptr~MStream~
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile*
+        +isDirectory() bool
+        +exists() bool
+    }
+%%gen
+    class DNPMFile {
+        +DNPMFile(std.string path)
+        +getDecodedStream(std.shared_ptr~MStream~ is) std.shared_ptr~MStream~
+    }
+%%gen
+    class DNPMFileSystem {
+        +DNPMFileSystem()
+        +handles(std.string fileName) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class DNPMStream {
+        #private- friend class DNPMFile
+        +DNPMStream(std.shared_ptr~MStream~ is)
+        +speedZone(uint8_t track) uint8_t
+    }
+%%gen
+    class DSKFileSystem {
+        +DSKFileSystem()
+        +handles(std.string fileName) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class DSKIStream {
+        #private- friend class DSKMFile
+        +DSKIStream(std.shared_ptr~MStream~ is)
+        +speedZone(uint8_t track) uint8_t
+    }
+%%gen
+    class DSKMFile {
+        +DSKMFile(std.string path, bool is_dir)
+        +getDecodedStream(std.shared_ptr~MStream~ is) std.shared_ptr~MStream~
+    }
+%%gen
+    class DXMMFileSystem {
+        +DXMMFileSystem()
+        +handles(std.string fileName) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class G64MFile {
+        +G64MFile(std.string path)
+        +getDecodedStream(std.shared_ptr~MStream~ is) std.shared_ptr~MStream~
+    }
+%%gen
+    class G64MFileSystem {
+        +G64MFileSystem()
+        +handles(std.string fileName) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class G64MStream {
+        #uint8_t sector_buffer[260]
+        +G64MStream(std.shared_ptr~MStream~ is)
+        +MediaHeader gcr_header
+        +SectorHeader gcr_sector_header
+        +seekSector(...) bool
+        +readContainer(uint8_t *buf, uint32_t size) uint32_t
+        +readSectorHeader() bool
+        +readSector() bool
+        +findSync(uint32_t gcr_end) bool
+        +convert4BytesFromGCR(uint8_t * gcr, uint8_t * plain) int
+    }
+%%gen
+    class HDDMFile {
+        +HDDMFile(std.string path, bool is_dir)
+        +getDecodedStream(std.shared_ptr~MStream~ is) std.shared_ptr~MStream~
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile*
+        +isDirectory() bool
+        +exists() bool
+        +bool isDir
+        +bool dirIsOpen
+    }
+%%gen
+    class HDDMFileSystem {
+        +HDDMFileSystem()
+        +handles(std.string fileName) bool
+        +getFile(std.string path) MFile*
+    }
+    class HDDMStream {
+        #partition table at image root - IDE64 CFS 0.11
+        #readHeader() bool
+        #seekEntry(filename) bool - partitions, subdirs, multi-sector dirs
+        #readFile(buf, size) uint32_t - balanced data-tree traversal, holes read as zero
+        +seekPath(path) bool - default partition fallback for bare paths
+        +read only
+    }
+%%gen
+    class M2IMFile {
+        +M2IMFile(std.string path, bool is_dir)
+        +getDecodedStream(std.shared_ptr~MStream~ is) std.shared_ptr~MStream~
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile*
+        +bool isDir
+        +bool dirIsOpen
+    }
+%%gen
+    class M2IMFileSystem {
+        +M2IMFileSystem()
+        +handles(std.string fileName) bool
+        +getFile(std.string path) MFile*
+    }
+    class M2IMStream {
+        -shared_ptr~MStream~ fileStream - host file being served
+        #string title
+        #vector~Entry~ entries - parsed once (line-based, BOM tolerant)
+        #Entry entry - currently selected
+        #readHeader() bool - parse whole index at open
+        #seekEntry(filename) bool - match CBM name, skip DEL separators
+        #seekEntry(index) bool
+        #resolveEntry(index) bool - find host file (exact then lowercase), cache url+size
+        #entryTargetUrl() string - sibling of the m2i
+        #readFile(buf, size) uint32_t - delegates to fileStream
+        #decodeType(file_type, hidden) string
+        +seekPath(path) bool
+    }
+%%gen
+    class NIBMFile {
+        +NIBMFile(std.string path)
+        +getDecodedStream(std.shared_ptr~MStream~ is) std.shared_ptr~MStream~
+    }
+%%gen
+    class NIBMFileSystem {
+        +NIBMFileSystem()
+        +handles(std.string fileName) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class NIBMStream {
+        #uint8_t sector_buffer[260]
+        +NIBMStream(std.shared_ptr~MStream~ is)
+        +MediaHeader gcr_header
+        +SectorHeader gcr_sector_header
+        +seekSector(...) bool
+        +readContainer(uint8_t *buf, uint32_t size) uint32_t
+        +readSectorHeader() bool
+        +readSector() bool
+        +findSync(uint32_t gcr_end) bool
+        +convert4BytesFromGCR(uint8_t * gcr, uint8_t * plain) int
+    }
+
+    class MFile {
+        <<see vfs_core>>
+    }
+    class MFileSystem {
+        <<see vfs_core>>
+    }
+    class MMediaStream {
+        <<see vfs_core>>
+    }
+    class MStream {
+        <<see vfs_core>>
+    }
+
+    D64MFile <|-- ATRMFile
+    MFileSystem <|-- ATRMFileSystem
+    D64MStream <|-- ATRMStream
+    D64MFile <|-- D40MFile
+    MFileSystem <|-- D40MFileSystem
+    D64MStream <|-- D40MStream
+    MFile <|-- D64MFile
+    MFileSystem <|-- D64MFileSystem
+    MMediaStream <|-- D64MStream
+    D64MFile <|-- D71MFile
+    MFileSystem <|-- D71MFileSystem
+    D64MStream <|-- D71MStream
+    D64MFile <|-- D80MFile
+    MFileSystem <|-- D80MFileSystem
+    D64MStream <|-- D80MStream
+    D64MFile <|-- D81MFile
+    MFileSystem <|-- D81MFileSystem
+    D64MStream <|-- D81MStream
+    D64MFile <|-- D82MFile
+    MFileSystem <|-- D82MFileSystem
+    D64MStream <|-- D82MStream
+    D64MFile <|-- D90MFile
+    MFileSystem <|-- D90MFileSystem
+    D64MStream <|-- D90MStream
+    MFileSystem <|-- DHDMFileSystem
+    MStream <|-- DHDOffsetStream
+    D64MFile <|-- DNPMFile
+    MFileSystem <|-- DNPMFileSystem
+    D64MStream <|-- DNPMStream
+    MFileSystem <|-- DSKFileSystem
+    D64MStream <|-- DSKIStream
+    D64MFile <|-- DSKMFile
+    MFileSystem <|-- DXMMFileSystem
+    D64MFile <|-- G64MFile
+    MFileSystem <|-- G64MFileSystem
+    D64MStream <|-- G64MStream
+    MFile <|-- HDDMFile
+    MFileSystem <|-- HDDMFileSystem
+    MMediaStream <|-- HDDMStream
+    MFile <|-- M2IMFile
+    MFileSystem <|-- M2IMFileSystem
+    MMediaStream <|-- M2IMStream
+    D64MFile <|-- NIBMFile
+    MFileSystem <|-- NIBMFileSystem
+    D64MStream <|-- NIBMStream
+
+    class DHDPartition {
+        <<struct>>
+        +uint8_t type - NATIVE, D64, D71, D81
+        +string name - 16 chars
+        +uint32_t start_lba - 3-byte big-endian in table
+        +uint32_t size_lba
+    }
+
+    DHDImageRegistry *-- DHDPartition
+    DHDImageRegistry ..> DHDOffsetStream : partition windows
+    DHDOffsetStream ..> D64MStream : D64/D71/D81/DNP decode inside partition
+
+    note for D64MStream "Write path (SAVE into images) claims blocks near the directory track with per-block BAM updates and rollback on failure; subdirectory walk supports CMD native DIR and 1581 CBM partitions"
+    note for M2IMStream "Index only - readFile() delegates to the sibling host file's stream; resolveEntry validates candidates with MFile exists(), exact then lowercase"

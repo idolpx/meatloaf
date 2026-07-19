@@ -1,0 +1,21 @@
+%%gen
+    class NetworkProtocolSSH {
+        -ssh_session session
+        -ssh_channel channel
+        -fnTcpClient client
+        -unsigned char *fingerprint
+        -const char *userauthlist
+        -char *rxbuf
+        -available() unsigned short
+        +NetworkProtocolSSH(...)
+        +NetworkProtocolSSH() ~
+        +open(...) bool
+        +close() bool
+        +read(unsigned short len) bool
+        +write(unsigned short len) bool
+        +status(NetworkStatus *status) bool
+        +special_inquiry(uint8_t cmd) uint8_t
+        +special_00(cmdFrame_t *cmdFrame) bool
+        +special_40(...) bool
+        +special_80(...) bool
+    }

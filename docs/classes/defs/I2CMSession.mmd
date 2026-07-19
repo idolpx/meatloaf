@@ -1,0 +1,12 @@
+%%gen
+    class I2CMSession {
+        -i2c_port_t _i2c_port
+        +I2CMSession(std.string host, uint16_t port)
+        +getScheme() std.string$
+        +connect() bool
+        +disconnect() void
+        +keep_alive() bool
+        +probe(uint8_t addr) bool
+        +read(...) esp_err_t
+        +write(...) esp_err_t
+    }

@@ -1,0 +1,16 @@
+%%gen
+    class Base64 {
+        -const char base64_table[65]
+        -const char base64_url_table[65]
+        -base64_gen_encode(...) std.unique_ptr~char[]~
+        -base64_gen_decode(...) std.unique_ptr~unsigned char[]~
+        +encode(...) std.unique_ptr~char[]~
+        +url_encode(...) std.unique_ptr~char[]~
+        +decode(...) std.unique_ptr~unsigned char[]~
+        +url_decode(...) std.unique_ptr~unsigned char[]~
+        +get_buffer() std.string
+        +set_buffer(const std.string buffer) void
+        +clear_buffer() void
+        +add_buffer(const std.string extra) void
+        +std.string base64_buffer
+    }

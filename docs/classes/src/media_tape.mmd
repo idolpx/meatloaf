@@ -1,0 +1,60 @@
+%% Tape media: TAP/DMP/HTAP pipeline over the TAPClean engine, T64/TCRT
+%% GENERATED template (gen_templates.js) - curated content lives in
+%% src/extra/media_tape.mmd; class bodies live in defs/<Class>.mmd
+classDiagram
+    direction LR
+
+    %%include T64MFile
+    %%include T64MFileSystem
+    %%include T64MStream
+    %%include TapeDecoder
+    %%include TAPMFile
+    %%include TAPMFileSystem
+    %%include TAPMStream
+    %%include TCRTMFile
+    %%include TCRTMFileSystem
+    %%include TCRTMStream
+
+    class MFile {
+        <<see vfs_core>>
+    }
+    class MFileSystem {
+        <<see vfs_core>>
+    }
+    class MMediaStream {
+        <<see vfs_core>>
+    }
+
+    MFile <|-- T64MFile
+    MFileSystem <|-- T64MFileSystem
+    MMediaStream <|-- T64MStream
+    MFile <|-- TAPMFile
+    MFileSystem <|-- TAPMFileSystem
+    MMediaStream <|-- TAPMStream
+    MFile <|-- TCRTMFile
+    MFileSystem <|-- TCRTMFileSystem
+    MMediaStream <|-- TCRTMStream
+
+    %%include TapeState
+    %%include TapeEntry
+    %%include tapclean_api
+    %%include tapclean_engine
+    %%include tapclean_scanners
+    %%include tapclean_prg_t
+
+    class MMediaStream {
+        <<see vfs_core>>
+    }
+    MMediaStream <|-- TAPMStream
+    MMediaStream <|-- T64MStream
+    MMediaStream <|-- TCRTMStream
+    TAPMStream --> TapeState : shared per image URL (weak_ptr registry)
+    TapeState *-- TapeDecoder
+    TapeDecoder --> tapclean_api : borrowed-buffer window scans
+    TapeDecoder *-- TapeEntry : decoded programs
+    tapclean_api ..> tapclean_engine : TAPCLEAN_EMBEDDED build
+    tapclean_engine *-- tapclean_scanners : search_tap() dispatch
+    tapclean_api ..> tapclean_prg_t : result records
+
+    note for TapeDecoder "Progressive: fetch 512 KB prefix (doubling) into PSRAM, scan, withhold last entry of a partial window until confirmed; DMP/HTAP/TAP-v2 converted to TAP v1 on the fly; engine freed after each window"
+    note for tapclean_engine "Loader-ID fast path identifies the loader from the CBM boot block so identified tapes scan pause+CBM+that loader only; unidentified tapes run all scanners with an early exit at 97 pct coverage"

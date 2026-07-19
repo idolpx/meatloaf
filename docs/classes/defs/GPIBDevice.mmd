@@ -1,0 +1,25 @@
+%%gen
+    class GPIBDevice {
+        #begin() void
+        #task() void
+        #reset() void
+        #talk(uint8_t secondary) void
+        #listen(uint8_t secondary) void
+        #untalk() void
+        #unlisten() void
+        #canWrite() int8_t
+        #canRead() int8_t
+        #write(uint8_t data, bool eoi) void
+        #read() uint8_t
+        #sendSRQ() void
+        #bool m_isActive
+        #uint8_t m_devnr
+        #uint8_t m_flEnabled
+        #uint32_t m_flFlags
+        #uint8_t m_flProtocol
+        #GPIBusHandler *m_handler
+        +GPIBDevice(uint8_t devnr)
+        +setDeviceNumber(uint8_t devnr) void
+        +isActive() bool
+        +setActive(bool b) void
+    }

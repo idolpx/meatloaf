@@ -1,0 +1,27 @@
+%%gen
+    class cbuf {
+        -wrap_if_bufend(char *ptr) char *
+        -size_t _size
+        -char *_buf
+        -const char *_bufend
+        -char *_begin
+        -char *_end
+        +cbuf(size_t size)
+        +cbuf (const cbuf)
+        +resizeAdd(size_t addSize) size_t
+        +resize(size_t newSize) size_t
+        +available() size_t
+        +size() size_t
+        +room() size_t
+        +empty() bool
+        +full() bool
+        +peek() int
+        +peek(char *dst, size_t size) size_t
+        +read() int
+        +read(char *dst, size_t size) size_t
+        +write(char c) size_t
+        +write(const char *src, size_t size) size_t
+        +flush() void
+        +remove(size_t size) size_t
+        +cbuf *next
+    }

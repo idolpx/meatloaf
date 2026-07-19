@@ -1,0 +1,11 @@
+%%gen
+    class IndexParser {
+        #IndexEntry currentEntry
+        #bool isIndexOf
+        #std.string lineBuffer
+        #int entriesCounter
+        +begin_parser() bool
+        +end_parser(bool clear_entries) void
+        +parse(const char *buf, int len, int isFinal) bool
+        +parse_line(std.string line) bool
+    }

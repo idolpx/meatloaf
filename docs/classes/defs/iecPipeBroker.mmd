@@ -1,0 +1,11 @@
+%%gen
+    class iecPipeBroker {
+        -std.unordered_map~int, std.unique_ptr~iecPipe~~ deviceChannelMap
+        +addPipe(...) iecPipe*
+        +getPipeByDeviceAndChannel(int device, int channel) iecPipe*
+        +getPipeByFilename(const std.string filename) iecPipe*
+        +removePipeByDeviceAndChannel(int device, int channel) void
+        +removePipeByFilename(const std.string filename) void
+        +removeInactivePipes() void
+        +getDeviceChannelMap() const std.unordered_map~int, std.unique_ptr~iecPipe~~
+    }

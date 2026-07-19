@@ -1,0 +1,18 @@
+%%gen
+    class Response {
+        -writeHeader(const char *header, const char *value) void
+        -httpd_req_t *req
+        -bool chunked
+        -std.map~std.string, std.string~ headers
+        +Response(httpd_req_t *httpd_req)
+        +setDavHeaders() void
+        +setHeader(std.string header, std.string value) void
+        +setHeader(std.string header, size_t value) void
+        +flushHeaders() void
+        +setStatus(int ret) void
+        +setContentType(const char *ct) void
+        +sendChunk(const char *buf, ssize_t len) bool
+        +closeChunk() void
+        +sendBody(const char *buf, ssize_t len) void
+        +closeBody() void
+    }

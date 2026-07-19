@@ -1,0 +1,23 @@
+%%gen
+    class DynArray {
+        <<template>>
+        -DynArray(const DynArray)
+        -EnsureCapacity(size_t cap) void
+        -T* _mem
+        -T _pool[INITIAL_SIZE]
+        -size_t _allocated
+        -size_t _size
+        +DynArray()
+        +Clear() void
+        +Push(T t) void
+        +PushArr(size_t count) T*
+        +Pop() T
+        +PopArr(size_t count) void
+        +Empty() bool
+        +PeekTop() const T
+        +Size() size_t
+        +Capacity() size_t
+        +SwapRemove(size_t i) void
+        +Mem() const T*
+        +Mem() T*
+    }

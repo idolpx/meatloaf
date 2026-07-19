@@ -1,0 +1,12 @@
+%%gen
+    class IECData {
+        +uint8_t primary*
+        +uint8_t secondary*
+        +uint8_t device*
+        +uint8_t channel*
+        +std.string payload
+        +std.vector~uint8_t~ payload_raw
+        +init(void) void
+        +channelCommand() int
+        +debugPrint() void
+    }

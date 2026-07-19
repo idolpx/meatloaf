@@ -1,0 +1,27 @@
+%%gen
+    class AFPMFile {
+        -openDir(std.string path) void
+        -closeDir() void
+        -pathValid(std.string path) bool
+        -int entry_index*
+        -std.vector~std.string~ volumes$
+        #bool dirOpened
+        #std.shared_ptr~AFPMSession~ _session
+        +std.string volume_name
+        +std.string file_path
+        +AFPMFile(std.string path)
+        +getSourceStream(...) std.shared_ptr~MStream~
+        +getDecodedStream(std.shared_ptr~MStream~ src) std.shared_ptr~MStream~
+        +createStream(std.ios_base.openmode mode) std.shared_ptr~MStream~
+        +isDirectory() bool
+        +getLastWrite() time_t
+        +getCreationTime() time_t
+        +getAvailableSpace() uint64_t
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile*
+        +mkDir() bool
+        +exists() bool
+        +remove() bool
+        +rename(std.string dest) bool
+        +readEntry(std.string filename) bool
+    }

@@ -1,0 +1,302 @@
+%% Virtual devices on the bus: drive, fuji, printer, modem, network, clock
+%% GENERATED template (gen_templates.js) - curated content lives in
+%% src/extra/devices.mmd; class bodies live in defs/<Class>.mmd
+classDiagram
+    direction LR
+
+    class driveMemory {
+        -vector~uint8_t~ ram - 0000-07FF, lazy-allocated on first write
+        -size_t _ramSize
+        -shared_ptr~RomBytes~ rom - ROM bytes in PSRAM
+        -getRomCache()$ - weak_ptr map, one shared copy per ROM file
+        +uint16_t mw_hash - rolling hash of M-W writes for M-E detection
+        +setRAM(ramSize) bool
+        +setROM(filename) bool - loads once, shared across all drives
+        +read(addr, data, len) size_t - serve M-R from ram and rom map
+        +write(addr, data, len) void - M-W into ram
+        +execute(addr) void - M-E entry points (known routines only)
+        +reset() void
+    }
+    class iecChannelHandler {
+        <<abstract>>
+        #iecDrive* m_drive
+        #uint8_t* m_data - channel buffer
+        #size_t m_len
+        #size_t m_ptr
+        +bool m_eos
+        +read(data, n) uint8_t - refills via readBufferData
+        +write(data, n) uint8_t
+        +writeBufferData()* uint8_t
+        +readBufferData()* uint8_t
+        +getStream() shared_ptr~MStream~
+    }
+    class iecChannelHandlerDir {
+        -MFile* m_dir
+        -uint8_t m_headerLine
+        -vector~string~ m_headers - extra info lines under the header
+        -addExtraInfo(title, text) void
+        +readBufferData() uint8_t - emits BASIC directory listing lines
+        +writeBufferData() uint8_t
+    }
+    class iecChannelHandlerFile {
+        -shared_ptr~MStream~ m_stream
+        -int m_fixLoadAddress - override first two bytes (dir loads to 0801)
+        -uint32_t m_byteCount
+        -uint64_t m_timeStart
+        -uint64_t m_transportTimeUS - transfer speed accounting
+        +readBufferData() uint8_t - fills from stream, latches EOS on empty fill
+        +writeBufferData() uint8_t - SAVE path; errors surface AFTER close
+        +write(data, n) uint8_t
+        +getStream() shared_ptr~MStream~
+    }
+%%gen
+    class iecClock {
+        -time_t ts
+        -std.string tf, payload, response
+        -size_t responsePtr
+        #talk(uint8_t secondary) void
+        #listen(uint8_t secondary) void
+        #untalk() void
+        #unlisten() void
+        #canWrite() int8_t
+        #canRead() int8_t
+        #write(uint8_t data, bool eoi) void
+        #read() uint8_t
+        #task() void
+        #reset() void
+        +iecClock(uint8_t devnr)
+        +set_timestamp(std.string s) void
+        +set_timestamp_format(std.string s) void
+    }
+%%gen
+    class iecCpm {
+    }
+%%gen
+    class IECData {
+        +uint8_t primary*
+        +uint8_t secondary*
+        +uint8_t device*
+        +uint8_t channel*
+        +std.string payload
+        +std.vector~uint8_t~ payload_raw
+        +init(void) void
+        +channelCommand() int
+        +debugPrint() void
+    }
+    class iecDrive {
+        -unique_ptr~MFile~ m_cwd - current working directory
+        -iecChannelHandler* m_channels - one per channel 0-15
+        -uint8_t m_statusCode
+        -uint8_t m_statusTrk
+        -uint8_t m_statusSec
+        -uint8_t m_numOpenChannels
+        -VDrive* m_vdrive - optional vdrive-backed image handling
+        -uint32_t m_byteCount
+        -uint64_t m_timeStart
+        -driveMemory m_memory - 6502 memory map for M-R M-W M-E
+        +fujiHost* m_host
+        +id() int - IEC device number
+        +mount(f, filename, disksize, disk_type) mediatype_t
+        +unmount() void
+        +getNumOpenChannels() uint8_t
+        +getStatusCode() uint8_t
+        +setStatusCode(code, trk, sec) void
+        +hasError() bool
+        +hasMemExeError() bool - M-E executed unsupported code
+        +getCWD() string
+        +set_cwd(path, verified) void
+        +changePartition(pnum) void - CMD CP command on DHD D1M D2M D4M
+        +tapeCommand(command) void - T-C set counter, T-I build tape index
+        +begin() void
+        +open(channel, name, nameLen) bool
+        +close(channel) void
+        +write(channel, buffer, bufferSize, eoi) uint8_t
+        +read(channel, buffer, bufferSize, eoi) uint8_t
+        +getStatusData(buffer, bufferSize, eoi) uint8_t
+        +getStatus(buffer, bufferSize) void
+        +executeData(data, dataLen) void - binary command channel payloads
+        +reset() void
+        +epyxReadSector(track, sector, buffer) bool - Epyx FastLoad sector API
+        +epyxWriteSector(track, sector, buffer) bool
+    }
+    class iecFuji {
+        -systemBus* _bus
+        -fujiHost _fnHosts x8 - mountable host slots
+        -fujiDisk _fnDisks x8 - drive slots (plus iecMeatloaf itself as 9th)
+        -int _current_open_directory_slot
+        -iecDrive _bootDisk - CONFIG boot disk
+        -uint8_t bootMode - CONFIG or MINI-BOOT
+        -appkey _current_appkey - app key storage protocol
+        +setup(bus) void
+    }
+%%gen
+    class iecMeatloaf {
+        -iecMeatloaf(uint8_t id) protected- public-
+        -reset() void
+        -executeData(const uint8_t *data, uint8_t dataLen) void
+        -enable(std.string deviceids) void
+        -disable(std.string deviceids) void
+    }
+%%gen
+    class iecModem {
+        -ModemSniffer* modemSniffer
+        -FileSystem *activeFS
+        -time_t _lasttime
+        +iecModem(FileSystem *_fs, bool snifferEnable)
+        +iecModem() ~
+        +get_modem_sniffer() ModemSniffer *
+        +get_last_activity_time() time_t
+    }
+%%gen
+    class iecNetwork {
+        -bool is_binary_status
+        -bool file_not_found
+        -uint8_t active_status_channel*
+        -parse_json() void
+        -query_json() void
+        -parse_bite() void
+        -set_device_id() void
+        -set_status(bool is_binary) void
+        -set_prefix() void
+        -get_prefix() void
+        -set_channel_mode() void
+        -set_login_password() void
+        -set_translation_mode() void
+        -fsop(unsigned char comnd) void
+        -iec_open() void
+        -iec_close() void
+        -iec_command() void
+        -perform_special_00() void
+        -perform_special_40() void
+        -perform_special_80() void
+        -set_open_params() void
+        -init() void
+        -transmit(NetworkData channel_data) bool
+        -receive(...) bool
+        -iecStatus
+        -std.vector~std.string~ pt
+        -IECData commanddata
+        -std.string payload
+        -cmdFrame_t cmdFrame
+        #task() void
+        #open(...) bool
+        #close(uint8_t channel) void
+        #write(...) uint8_t
+        #read(...) uint8_t
+        #execute(const char *command) void
+        #getStatusData(...) uint8_t
+        #reset() void
+        +iecNetwork(uint8_t devnr)
+        +iecNetwork() ~
+        +std.unordered_map~uint8_t, NetworkData~ network_data_map
+    }
+%%gen
+    class iecPrinter {
+        -canWrite() int8_t
+        -write(uint8_t data, bool eoi) void
+        -listen(uint8_t channel) void
+        -uint8_t _channel
+        -printer_type _ptype
+        #printer_emu *_pptr
+        #FileSystem *_storage
+        #time_t _last_ms
+        #shutdown() void
+        +constexpr static const char * const printer_model_str[PRINTER_INVALID]
+        +iecPrinter(...)
+        +match_modelname(std.string model_name) printer_type$
+        +set_printer_type(printer_type printer_type) void
+        +reset_printer() void
+        +lastPrintTime() time_t
+        +print_from_cpm(uint8_t c) void
+        +getPrinterPtr() printer_emu *
+        +bool device_active
+        +isActive() bool
+    }
+%%gen
+    class printerlist {
+        -printerlist_entry _printers[PRINTERLIST_SIZE]
+        +set_entry(...) void
+        +set_ptr(int index, iecPrinter *ptr) void
+        +set_type(int index, iecPrinter.printer_type ptype) void
+        +set_port(int index, int pport) void
+        +get_ptr(int index) iecPrinter *
+        +get_type(int index) iecPrinter.printer_type
+        +get_port(int index) int
+    }
+%%gen
+    class WiC64 {
+        +bool displayattached
+        +bool inputmode
+        +bool transferdata
+        +bool ex
+        +unsigned long crashcounter*
+        +unsigned long payloadsize
+        +unsigned long timeout
+        +unsigned long count*
+        +unsigned long sizel
+        +unsigned long sizeh
+        +unsigned long transsize
+        +std.string defaultserver*
+        +bool killswitch
+        +bool killled
+        +std.string payload
+        +std.string errorcode
+        +std.string act
+        +std.string input
+        +std.string lastinput
+        +std.string setserver
+        +std.string httpstring
+        +std.string wic64hostname
+        +std.string localip
+        +std.string localssid
+        +char sep
+        +int udpport
+        +int tcpport
+        +std.string udpmsg
+        +std.string udpmsgr
+        +std.string remotedata
+        +uint8_t buffer[50]
+        +setup() void
+        +loop() void
+        +sendmessage(std.string errorcode) std.string
+        +disablewic() void
+        +setwlan() std.string
+        +loader(std.string httpstring) void
+        +sendudpmsg(std.string udpmsg) void
+        +getudpmsg() std.string
+        +startudpport() void
+    }
+
+    class IECDevice {
+        <<see bus>>
+    }
+
+    iecChannelHandler <|-- iecChannelHandlerDir
+    iecChannelHandler <|-- iecChannelHandlerFile
+    iecDrive <|-- iecMeatloaf
+    iecFuji <|-- iecMeatloaf
+    IECDevice <|-- iecModem
+
+    class IECFileDevice {
+        <<see bus>>
+    }
+    class IECDevice {
+        <<see bus>>
+    }
+    class MStream {
+        <<see vfs_core>>
+    }
+    IECFileDevice <|-- iecDrive : via SystemFileDevice alias
+    IECFileDevice <|-- iecNetwork : via SystemFileDevice alias
+    IECDevice <|-- iecModem
+    IECDevice <|-- iecPrinter : via SystemDevice alias
+    IECDevice <|-- iecClock : via SystemDevice alias
+    iecDrive <|-- iecMeatloaf
+    iecFuji <|-- iecMeatloaf : multiple inheritance
+    iecDrive *-- iecChannelHandler : per-channel 0-15
+    iecChannelHandler <|-- iecChannelHandlerFile
+    iecChannelHandler <|-- iecChannelHandlerDir
+    iecDrive *-- driveMemory : 6502 memory map (M-R/M-W/M-E)
+    iecChannelHandlerFile ..> MStream : serves LOAD/SAVE
+
+    note for driveMemory "ROMs shared across drives via static weak_ptr cache in PSRAM; RAM lazily allocated on first write"

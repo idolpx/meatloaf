@@ -1,0 +1,12 @@
+%%gen
+    class EFCRTMStream {
+        #readHeader() void
+        #readEntry(std.string filename) bool
+        #readEntry(uint16_t index) bool
+        #seekPath(std.string path) bool
+        #readFile(uint8_t* buf, uint32_t size) uint32_t
+        #Header header
+        #Entry entry
+        #decodeType(...) std.string
+        +EFCRTMStream(std.shared_ptr~MStream~ is)
+    }

@@ -1,0 +1,254 @@
+%% Tape media: TAP/DMP/HTAP pipeline over the TAPClean engine, T64/TCRT
+%% GENERATED template (gen_templates.js) - curated content lives in
+%% src/extra/media_tape.mmd; class bodies live in defs/<Class>.mmd
+classDiagram
+    direction LR
+
+%%gen
+    class T64MFile {
+        +T64MFile(std.string path, bool is_dir)
+        +getDecodedStream(std.shared_ptr~MStream~ is) std.shared_ptr~MStream~
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile*
+        +bool isDir
+        +bool dirIsOpen
+    }
+%%gen
+    class T64MFileSystem {
+        +T64MFileSystem()
+        +handles(std.string fileName) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class T64MStream {
+        #readHeader() bool
+        #seekEntry(std.string filename) bool
+        #seekEntry(uint16_t index) bool
+        #readFile(uint8_t* buf, uint32_t size) uint32_t
+        #writeFile(uint8_t* buf, uint32_t size) uint32_t
+        #seekPath(std.string path) bool
+        #Header header
+        #Entry entry
+        #decodeType(...) std.string
+        +T64MStream(std.shared_ptr~MStream~ is)
+    }
+    class TapeDecoder {
+        -MStream* stream - container being fetched
+        -uint8_t window - 16 KB stream window for conversion reads
+        -uint8_t kind - TAP, DMP or HTAP
+        -uint8_t version
+        -uint8_t platform - C64, VIC20, C16
+        -uint8_t video - PAL or NTSC
+        -bool halfwaves - HTAP and TAP v2 sum pairs
+        -bool converting - source needs TAP v1 conversion
+        -bool fully_scanned
+        -uint8_t* image - (converted) image prefix in PSRAM
+        -uint32_t image_cap
+        -uint32_t fetched - valid bytes of image (== bytes scanned)
+        -uint32_t conv_pos - container read cursor while converting
+        -bool conv_eof
+        -vector~TapeEntry~ entries - confirmed programs in tape order
+        -uint32_t total_ms
+        -readBytes(pos, dst, n) bool
+        -nextValue(pos, cycles) bool - one pulse or halfwave from container
+        -machineClock() uint32_t
+        -extendScan() bool - grow window 512K doubling, fetch + scan
+        -fetchTo(target) bool - raw fetch or streamed conversion
+        -appendValue(cycles) bool - encode one v1 pulse into image
+        -scanWindow(win) bool - borrowed-buffer TAPClean scan, rebuild entries
+        -harvestEntries(nprg) void - filter boot stubs, dedup repeats, name transfer
+        -finishScan() void - free image once fully analyzed
+        +open(container) bool - header parse only; scanning is on demand
+        +isOpen() bool
+        +dataStart() uint32_t
+        +imageLen() uint32_t
+        +nextProgram(from_offset, out) bool - first entry ending past offset; may extend scan
+        +resetContinuation() void - interface compat, no-op
+        +offsetAtTime(ms) uint32_t - tape counter seek, snaps to program grid
+        +totalMs() uint32_t - forces full scan
+    }
+%%gen
+    class TAPMFile {
+        #readIdxSibling() std.string
+        #idxSiblingPath() std.string
+        #uint16_t entry_index*
+        +TAPMFile(std.string path, bool is_dir)
+        +getDecodedStream(std.shared_ptr~MStream~ is) std.shared_ptr~MStream~
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile*
+        +isDirectory() bool
+        +exists() bool
+        +buildIndex() bool
+        +bool isDir
+        +bool dirIsOpen
+    }
+%%gen
+    class TAPMFileSystem {
+        +TAPMFileSystem()
+        +handles(std.string fileName) bool
+        +getFile(std.string path) MFile*
+    }
+    class TAPMStream {
+        -bool has_idx
+        -vector~IdxEntry~ idx_entries - sidecar random-access listing
+        -string default_name - media name for unnamed entries
+        #shared_ptr~TapeState~ state - SHARED per image url
+        #TapeDecoder& decoder - alias into state
+        #uint32_t& tape_pos - where the next program scan resumes
+        #bool& tape_ended
+        #ensureDecoder() bool
+        #serveCurrent() void - expose current entry as the open file
+        #readFile(buf, size) uint32_t
+        +TapeEntry& current - last program found, ready to load
+        +bool& have_current
+        +nextTapeEntry() bool - advance one program (datasette listing)
+        +resetTape() void
+        +tapeEnded() bool
+        +loadIndex(idx_text) void
+        +hasIndex() bool
+        +idxCount() uint16_t
+        +idxEntry(index, name, size) bool
+        +setDefaultName(name) void
+        +setCounter(spec) bool - ms or MMM:SS
+        +setCounterMs(ms) bool
+        +counterMs() uint32_t - position as tape time
+        +durationMs() uint32_t
+        +counterString() string
+        +entryDisplayName(e) string - media name when unnamed, no address suffix
+        +seekPath(path) bool - current entry first, then forward search with wrap
+        +info() map
+    }
+%%gen
+    class TCRTMFile {
+        +TCRTMFile(std.string path, bool is_dir)
+        +getDecodedStream(std.shared_ptr~MStream~ is) std.shared_ptr~MStream~
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile*
+        +bool isDir
+        +bool dirIsOpen
+    }
+%%gen
+    class TCRTMFileSystem {
+        +TCRTMFileSystem()
+        +handles(std.string fileName) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class TCRTMStream {
+        #readHeader() bool
+        #seekEntry(std.string filename) bool
+        #seekEntry(uint16_t index) bool
+        #seekPath(std.string path) bool
+        #readFile(uint8_t* buf, uint32_t size) uint32_t
+        #writeFile(uint8_t* buf, uint32_t size) uint32_t
+        #Header header
+        #Entry entry
+        #decodeType(...) std.string
+        +TCRTMStream(std.shared_ptr~MStream~ is)
+    }
+
+    class MFile {
+        <<see vfs_core>>
+    }
+    class MFileSystem {
+        <<see vfs_core>>
+    }
+    class MMediaStream {
+        <<see vfs_core>>
+    }
+
+    MFile <|-- T64MFile
+    MFileSystem <|-- T64MFileSystem
+    MMediaStream <|-- T64MStream
+    MFile <|-- TAPMFile
+    MFileSystem <|-- TAPMFileSystem
+    MMediaStream <|-- TAPMStream
+    MFile <|-- TCRTMFile
+    MFileSystem <|-- TCRTMFileSystem
+    MMediaStream <|-- TCRTMStream
+
+    class TapeState {
+        +TapeDecoder decoder
+        +uint32_t tape_pos
+        +bool tape_ended
+        +TapeEntry current
+        +bool have_current
+        +obtain(url) shared_ptr~TapeState~$ - weak_ptr registry keyed by container url
+    }
+    class TapeEntry {
+        <<struct>>
+        +string name - PETSCII, may be empty
+        +string loader - TAPClean format name
+        +uint16_t start_addr
+        +uint16_t end_addr
+        +uint32_t tape_offset - first pulse of the program
+        +uint32_t tape_end_offset - just past the program
+        +uint32_t start_time_ms - tape counter at start
+        +uint32_t end_time_ms
+        +bool checksum_ok
+        +vector~uint8_t~ prg - 2-byte load address plus data
+    }
+    class tapclean_api {
+        <<C API - components/tapclean/include/tapclean_api.h>>
+        +tapclean_init() int - lazy: allocates all engine buffers PSRAM-first
+        +tapclean_shutdown() void - frees EVERYTHING incl. loaded tape
+        +tapclean_load_buffer(buf, len, machine, ntsc) int - takes ownership of buf
+        +tapclean_load_buffer_ref(buf, len, machine, ntsc) int - borrows buf (window re-scans)
+        +tapclean_analyze_tap(unite_blocks) int - full scan; returns PRG count
+        +tapclean_unload() void - free tape, keep work buffers
+        +tapclean_block_count() int
+        +tapclean_get_block(idx, out) int - raw block records (tapclean_block_t)
+        +tapclean_prg_count() int
+        +tapclean_get_prg(idx, out) int - united programs (tapclean_prg_t)
+        +tapclean_detected_percent() int - pulses accounted for
+        +tapclean_tap_time_ms() uint - whole-tape play time
+        +tapclean_time_at_ms(offset) uint - play time from start to offset
+        +tapclean_offset_at_ms(ms) int - inverse: tape counter seek
+        +tapclean_duration_ms(p1, p2) uint - play time between offsets
+    }
+    class tapclean_engine {
+        <<C internals - components/tapclean/src>>
+        +search_tap() pause+CBM, loader-ID shortcut, 90 scanners
+        +describe_blocks() decode data and checksums
+        +idloader(crc, len) CBM boot CRC and code signatures
+        +database_add_blk_def() early exit at 97 pct coverage
+        +database_make_prg_db() unite neighbouring blocks
+        +readttbit() find_pilot() pulse readers with yield and dots
+        +tapclean_psram_malloc() engine-wide PSRAM allocation
+    }
+    class tapclean_scanners {
+        <<91 scanner modules>>
+        +turbotape_search() describe()
+        +turbotape_fast_search() describe() Meatloaf addition
+        +cyberload_f1..f4, visiload, usgold, novaload
+        +freeload, pavloda, ocean, bleep, snakeload, more
+    }
+    class tapclean_prg_t {
+        <<struct>>
+        +int type
+        +const char* type_name
+        +int is_cbm_header
+        +int is_cbm_data
+        +int start_addr, end_addr, size
+        +const char* name
+        +const uint8_t* data
+        +int read_errors
+        +int tap_start, tap_end
+    }
+
+    class MMediaStream {
+        <<see vfs_core>>
+    }
+    MMediaStream <|-- TAPMStream
+    MMediaStream <|-- T64MStream
+    MMediaStream <|-- TCRTMStream
+    TAPMStream --> TapeState : shared per image URL (weak_ptr registry)
+    TapeState *-- TapeDecoder
+    TapeDecoder --> tapclean_api : borrowed-buffer window scans
+    TapeDecoder *-- TapeEntry : decoded programs
+    tapclean_api ..> tapclean_engine : TAPCLEAN_EMBEDDED build
+    tapclean_engine *-- tapclean_scanners : search_tap() dispatch
+    tapclean_api ..> tapclean_prg_t : result records
+
+    note for TapeDecoder "Progressive: fetch 512 KB prefix (doubling) into PSRAM, scan, withhold last entry of a partial window until confirmed; DMP/HTAP/TAP-v2 converted to TAP v1 on the fly; engine freed after each window"
+    note for tapclean_engine "Loader-ID fast path identifies the loader from the CBM boot block so identified tapes scan pause+CBM+that loader only; unidentified tapes run all scanners with an early exit at 97 pct coverage"

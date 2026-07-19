@@ -1,0 +1,354 @@
+%% Containers and file wrappers: archives, ISO, LBR/LNX/ARC/ARK, P00, carts
+%% GENERATED template (gen_templates.js) - curated content lives in
+%% src/extra/media_container.mmd; class bodies live in defs/<Class>.mmd
+classDiagram
+    direction LR
+
+    class Archive {
+        -struct archive* a - libarchive handle
+        -shared_ptr~MStream~ srcStream
+        +open() bool - registers read/skip/seek callbacks over MStream
+        +close() void
+        +cb_read()$ - feed blocks from source stream
+        +cb_skip()$ - returns 0 to force sequential reads
+        +cb_seek()$ - only rewind to 0 allowed
+    }
+%%gen
+    class ArchiveMFile {
+        -Archive *m_archive
+        -MFile *m_innerFile
+        +ArchiveMFile(std.string path)
+        +getDecodedStream(std.shared_ptr~MStream~ is) std.shared_ptr~MStream~
+        +isSingleFileCompression() bool
+        +getInnerFilename() std.string
+        +getInnerFile() MFile*
+        +isDirectory() bool
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile *
+        +bool isDir
+        +bool dirIsOpen
+    }
+%%gen
+    class ArchiveMFileSystem {
+        +ArchiveMFileSystem()
+        +handles(std.string fileName) bool
+        +getFile(std.string path) MFile *
+    }
+    class ArchiveMSession {
+        -keep_alive disabled - key archive:// plus url
+        +getEntry(entryPath, a, entrySize) shared_ptr~CachedFile~ - extract once, cache in PSRAM/HIMEM
+        -loadEntryFromArchive(cf, a, entrySize) bool
+    }
+    class ArchiveMStream {
+        -shared_ptr~CachedFile~ data - cached extracted entry
+        #bool m_isCompressedOnly - bare .gz style, single synthesized entry
+        +ensureData() bool - extract then RELEASE archive + source chain
+        +seekPath(path) bool - session cache first, avoids re-opening archive
+        +seekNextEntry() string - sequential header walk for listings
+        +readFile(buf, size) uint32_t
+    }
+%%gen
+    class ARCMFile {
+        +ARCMFile(std.string path, bool is_dir)
+        +getDecodedStream(std.shared_ptr~MStream~ is) std.shared_ptr~MStream~
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile*
+        +bool isDir
+        +bool dirIsOpen
+    }
+%%gen
+    class ARCMFileSystem {
+        +ARCMFileSystem()
+        +handles(std.string fileName) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class ARCMStream {
+        #std.vector~Entry~ entries
+        #loadEntries() int8_t
+        #skipBasicLoader() void
+        #readHeader() bool
+        #seekEntry(std.string filename) bool
+        #seekEntry(uint16_t index) bool
+        #readFile(uint8_t* buf, uint32_t size) uint32_t
+        #writeFile(uint8_t* buf, uint32_t size) uint32_t
+        #seekPath(std.string path) bool
+        #Header header
+        #Entry entry
+        +ARCMStream(std.shared_ptr~MStream~ is)
+    }
+%%gen
+    class ARKMFile {
+        +ARKMFile(std.string path, bool is_dir)
+        +getDecodedStream(std.shared_ptr~MStream~ is) std.shared_ptr~MStream~
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile*
+        +bool isDir
+        +bool dirIsOpen
+    }
+%%gen
+    class ARKMFileSystem {
+        +ARKMFileSystem()
+        +handles(std.string fileName) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class ARKMStream {
+        #readHeader() bool
+        #seekEntry(std.string filename) bool
+        #seekEntry(uint16_t index) bool
+        #readFile(uint8_t* buf, uint32_t size) uint32_t
+        #writeFile(uint8_t* buf, uint32_t size) uint32_t
+        #seekPath(std.string path) bool
+        #Header header
+        #Entry entry
+        +ARKMStream(std.shared_ptr~MStream~ is)
+    }
+%%gen
+    class CRTMFile {
+        +CRTMFile(std.string path, bool is_dir)
+        +getDecodedStream(std.shared_ptr~MStream~ is) std.shared_ptr~MStream~
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile*
+        +isDirectory() bool
+    }
+%%gen
+    class CRTMFileSystem {
+        +CRTMFileSystem()
+        +handles(std.string fileName) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class CRTMStream {
+        #seekEntry(std.string filename) bool
+        #seekEntry(uint16_t index) bool
+        #readEntry(uint16_t index) bool
+        #seekPath(std.string path) bool
+        #readFile(uint8_t* buf, uint32_t size) uint32_t
+        #writeFile(uint8_t* buf, uint32_t size) uint32_t
+        +CRTMStream(std.shared_ptr~MStream~ is)
+    }
+%%gen
+    class D8BMFile {
+        +D8BMFile(std.string path)
+        +getDecodedStream(std.shared_ptr~MStream~ is) std.shared_ptr~MStream~
+    }
+%%gen
+    class D8BMFileSystem {
+        +D8BMFileSystem()
+        +handles(std.string fileName) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class D8BMStream {
+        #private- friend class D8BMFile
+        +D8BMStream(std.shared_ptr~MStream~ is)
+        +speedZone(uint8_t track) uint8_t
+    }
+%%gen
+    class DFIMFile {
+        +DFIMFile(std.string path)
+        +getDecodedStream(std.shared_ptr~MStream~ is) std.shared_ptr~MStream~
+    }
+%%gen
+    class DFIMFileSystem {
+        +DFIMFileSystem()
+        +handles(std.string fileName) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class DFIMStream {
+        #private- friend class DFIMFile
+        +DFIMStream(std.shared_ptr~MStream~ is)
+        +speedZone(uint8_t track) uint8_t
+    }
+%%gen
+    class EFCRTMFile {
+        +EFCRTMFile(std.string path, bool is_dir)
+        +getDecodedStream(std.shared_ptr~MStream~ is) std.shared_ptr~MStream~
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile*
+        +bool isDir
+        +bool dirIsOpen
+    }
+%%gen
+    class EFCRTMStream {
+        #readHeader() void
+        #readEntry(std.string filename) bool
+        #readEntry(uint16_t index) bool
+        #seekPath(std.string path) bool
+        #readFile(uint8_t* buf, uint32_t size) uint32_t
+        #Header header
+        #Entry entry
+        #decodeType(...) std.string
+        +EFCRTMStream(std.shared_ptr~MStream~ is)
+    }
+%%gen
+    class ISOMFile {
+        +ISOMFile(std.string path, bool is_dir)
+        +getDecodedStream(std.shared_ptr~MStream~ is) std.shared_ptr~MStream~
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile*
+        +bool isDir
+        +bool dirIsOpen
+    }
+%%gen
+    class ISOMFileSystem {
+        +ISOMFileSystem()
+        +handles(std.string fileName) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class ISOMStream {
+        #readHeader() bool
+        #seekEntry(std.string filename) bool
+        #seekEntry(uint16_t index) bool
+        #readEntry(uint16_t index) bool
+        #writeEntry(uint16_t index) bool
+        #seekPath(std.string path) bool
+        #readFile(uint8_t* buf, uint32_t size) uint32_t
+        #Header header
+        #Entry entry
+        #decodeType(...) std.string
+        +bool has_subdirs
+        +const size_t block_size
+        +ISOMStream(std.shared_ptr~MStream~ is)
+    }
+%%gen
+    class LBRMFile {
+        +LBRMFile(std.string path, bool is_dir)
+        +getDecodedStream(std.shared_ptr~MStream~ is) std.shared_ptr~MStream~
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile*
+        +bool isDir
+        +bool dirIsOpen
+    }
+%%gen
+    class LBRMFileSystem {
+        +LBRMFileSystem()
+        +handles(std.string fileName) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class LBRMStream {
+        #std.vector~Entry~ entries
+        #loadEntries() int8_t
+        #readHeader() bool
+        #seekEntry(std.string filename) bool
+        #seekEntry(uint16_t index) bool
+        #readFile(uint8_t* buf, uint32_t size) uint32_t
+        #writeFile(uint8_t* buf, uint32_t size) uint32_t
+        #seekPath(std.string path) bool
+        #Header header
+        #Entry entry
+        +LBRMStream(std.shared_ptr~MStream~ is)
+    }
+%%gen
+    class LNXMFile {
+        +LNXMFile(std.string path, bool is_dir)
+        +getDecodedStream(std.shared_ptr~MStream~ is) std.shared_ptr~MStream~
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile*
+        +bool isDir
+        +bool dirIsOpen
+    }
+%%gen
+    class LNXMFileSystem {
+        +LNXMFileSystem()
+        +handles(std.string fileName) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class LNXMStream {
+        #std.vector~Entry~ entries
+        #loadEntries() int8_t
+        #skipBasicLoader() void
+        #readHeader() bool
+        #seekEntry(std.string filename) bool
+        #seekEntry(uint16_t index) bool
+        #readFile(uint8_t* buf, uint32_t size) uint32_t
+        #writeFile(uint8_t* buf, uint32_t size) uint32_t
+        #seekPath(std.string path) bool
+        #Header header
+        #Entry entry
+        +LNXMStream(std.shared_ptr~MStream~ is)
+    }
+%%gen
+    class P00MFile {
+        +P00MFile(std.string path, bool is_dir)
+        +getDecodedStream(std.shared_ptr~MStream~ is) std.shared_ptr~MStream~
+        +isDirectory() bool
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile*
+        +bool isDir
+        +bool dirIsOpen
+    }
+%%gen
+    class P00MFileSystem {
+        +P00MFileSystem()
+        +handles(std.string fileName) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class P00MStream {
+        #readHeader() bool
+        #isRandomAccess() bool
+        #isBrowsable() bool
+        #readFile(uint8_t* buf, uint32_t size) uint32_t
+        #writeFile(uint8_t* buf, uint32_t size) uint32_t
+        #Header header
+        +P00MStream(std.shared_ptr~MStream~ is)
+    }
+
+    class D64MFile {
+        <<see media_disk>>
+    }
+    class D64MStream {
+        <<see media_disk>>
+    }
+    class MFile {
+        <<see vfs_core>>
+    }
+    class MFileSystem {
+        <<see vfs_core>>
+    }
+    class MMediaStream {
+        <<see vfs_core>>
+    }
+    class MSession {
+        <<see vfs_core>>
+    }
+
+    MFile <|-- ArchiveMFile
+    MFileSystem <|-- ArchiveMFileSystem
+    MSession <|-- ArchiveMSession
+    MMediaStream <|-- ArchiveMStream
+    MFile <|-- ARCMFile
+    MFileSystem <|-- ARCMFileSystem
+    MMediaStream <|-- ARCMStream
+    MFile <|-- ARKMFile
+    MFileSystem <|-- ARKMFileSystem
+    MMediaStream <|-- ARKMStream
+    MFile <|-- CRTMFile
+    MFileSystem <|-- CRTMFileSystem
+    MMediaStream <|-- CRTMStream
+    D64MFile <|-- D8BMFile
+    MFileSystem <|-- D8BMFileSystem
+    D64MStream <|-- D8BMStream
+    D64MFile <|-- DFIMFile
+    MFileSystem <|-- DFIMFileSystem
+    D64MStream <|-- DFIMStream
+    MFile <|-- EFCRTMFile
+    MMediaStream <|-- EFCRTMStream
+    MFile <|-- ISOMFile
+    MFileSystem <|-- ISOMFileSystem
+    MMediaStream <|-- ISOMStream
+    MFile <|-- LBRMFile
+    MFileSystem <|-- LBRMFileSystem
+    MMediaStream <|-- LBRMStream
+    MFile <|-- LNXMFile
+    MFileSystem <|-- LNXMFileSystem
+    MMediaStream <|-- LNXMStream
+    MFile <|-- P00MFile
+    MFileSystem <|-- P00MFileSystem
+    MMediaStream <|-- P00MStream

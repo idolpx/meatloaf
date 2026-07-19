@@ -1,0 +1,8 @@
+%%gen
+    class FileCache {
+        +open(...) FileHandler *$
+        +create(...) fc_handle *$
+        +write(...) size_t$
+        +reopen(fc_handle *fc, const char *mode) FileHandler *$
+        +remove(fc_handle *fc) void$
+    }

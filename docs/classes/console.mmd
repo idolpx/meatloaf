@@ -1,0 +1,68 @@
+%% Serial/TCP console: command registry and executor task
+%% GENERATED template (gen_templates.js) - curated content lives in
+%% src/extra/console.mmd; class bodies live in defs/<Class>.mmd
+classDiagram
+    direction LR
+
+    class Console {
+        <<ESP32Console>>
+        -const char* prompt_
+        -bool _initialized
+        -volatile bool _exit_requested
+        -int exec_users_ - refcount for the shared executor task
+        -repl_task(args)$ - 6 KB persistent serial shell, dormant in fgetc
+        -exec_task_fn(args)$ - 16 KB console_exec task runs ALL commands
+        +begin(baud, rxPin, txPin, channel) void
+        +registerCommand(command, func, help, hint) bool
+        +setPrompt(prompt) void
+        +enablePersistentHistory(path) void
+        +runCommand(line) int - serialized on the executor task
+        +execAcquire() bool - create executor on first console activity
+        +execRelease() void - delete executor when last session ends
+        +execOrigin() Origin - ORIGIN_SERIAL vs ORIGIN_REMOTE (exit handling)
+    }
+%%gen
+    class ConsoleCommand {
+        #const char *hint_
+        +ConsoleCommand(...)
+        +const esp_console_cmd_t toCommandStruct() const
+    }
+%%gen
+    class ConsoleCommandBase {
+        #const char *command_
+        #const char *help_
+        #esp_console_cmd_func_t func_
+        +getCommand() const char*
+        +getHelp() const char*
+        +const esp_console_cmd_t toCommandStruct() const*
+    }
+%%gen
+    class ConsoleCommandD {
+        #delegateFunc delegateFn_
+        #delegateResolver(int argc, char **argv) int$
+        +std.unordered_map~std.string, delegateFunc~ registry_$
+        +ConsoleCommandD(...)
+        +const esp_console_cmd_t toCommandStruct() const
+        +getDelegateFunction() delegateFunc
+    }
+%%gen
+    class OptionsConsoleCommand {
+        #argParseFunc delegateFn_
+        #const char *hint_
+        #const char *version_
+        #delegateResolver(int argc, char **argv) int$
+        +Options options
+        +std.unordered_map~std.string, OptionsConsoleCommand~ registry_$
+        +OptionsConsoleCommand(...)
+        +const esp_console_cmd_t toCommandStruct() const
+        +getDelegateFunction() argParseFunc
+        +getVersion() const char*
+    }
+
+    ConsoleCommandBase <|-- ConsoleCommand
+    ConsoleCommand <|-- ConsoleCommandD
+    ConsoleCommandBase <|-- OptionsConsoleCommand
+
+    Console *-- ConsoleCommandBase : registered commands
+
+    note for Console "All commands run on one refcounted 16 KB console_exec task; I/O shells (console_repl 6 KB, tcp_session 4 KB, console_tcp listener 2.5 KB) are persistent boot-created tasks"

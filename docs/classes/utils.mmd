@@ -1,0 +1,1931 @@
+%% Utilities: string/URL/PETSCII helpers, config, buffers, misc libs
+%% GENERATED template (gen_templates.js) - curated content lives in
+%% src/extra/utils.mmd; class bodies live in defs/<Class>.mmd
+classDiagram
+    direction LR
+
+%%gen
+    class AttributeNameValue {
+        -std.string _name
+        -std.string _value
+        +AttributeNameValue(std.string name, std.string value)
+        +Name() std.string
+        +Value() std.string
+    }
+%%gen
+    class AtxSector {
+        +uint8_t number*
+        +uint8_t status*
+        +uint16_t position*
+        +uint32_t start_data*
+        +uint16_t weakoffset
+        +uint16_t extendedsize*
+        +AtxSector(sector_header_t header)
+    }
+%%gen
+    class AtxTrack {
+        +int8_t track_number
+        +uint16_t sector_count*
+        +uint16_t rate
+        +uint32_t flags
+        +uint32_t record_bytes_read*
+        +uint32_t offset_to_data_start*
+        +uint8_t * data
+        +AtxTrack()
+    }
+    class Audio {
+        <<lib/audio>>
+    }
+%%gen
+    class Base64 {
+        -const char base64_table[65]
+        -const char base64_url_table[65]
+        -base64_gen_encode(...) std.unique_ptr~char[]~
+        -base64_gen_decode(...) std.unique_ptr~unsigned char[]~
+        +encode(...) std.unique_ptr~char[]~
+        +url_encode(...) std.unique_ptr~char[]~
+        +decode(...) std.unique_ptr~unsigned char[]~
+        +url_decode(...) std.unique_ptr~unsigned char[]~
+        +get_buffer() std.string
+        +set_buffer(const std.string buffer) void
+        +clear_buffer() void
+        +add_buffer(const std.string extra) void
+        +std.string base64_buffer
+    }
+%%gen
+    class BasicConfigReader {
+        +std.unordered_map~std.string, std.string~* entries
+        +BasicConfigReader()
+        +read(std.string name) void
+        +get(std.string key) std.string
+    }
+%%gen
+    class cbuf {
+        -wrap_if_bufend(char *ptr) char *
+        -size_t _size
+        -char *_buf
+        -const char *_bufend
+        -char *_begin
+        -char *_end
+        +cbuf(size_t size)
+        +cbuf (const cbuf)
+        +resizeAdd(size_t addSize) size_t
+        +resize(size_t newSize) size_t
+        +available() size_t
+        +size() size_t
+        +room() size_t
+        +empty() bool
+        +full() bool
+        +peek() int
+        +peek(char *dst, size_t size) size_t
+        +read() int
+        +read(char *dst, size_t size) size_t
+        +write(char c) size_t
+        +write(const char *src, size_t size) size_t
+        +flush() void
+        +remove(size_t size) size_t
+        +cbuf *next
+    }
+%%gen
+    class Crypto {
+        -std.string _key
+        -myencrypt(char *bptr, unsigned len) void
+        -mod95(int) int
+        +crypt(std.string t) std.string
+        +setkey(const std.string key) void
+        +getkey() std.string
+    }
+%%gen
+    class DepthTracker {
+        -XMLDocument * _document
+        +DepthTracker(XMLDocument * document) explicit
+    }
+%%gen
+    class DirCache {
+        -std.vector~fsdir_entry *,PSRAMAllocator~fsdir_entry *~~ _entries_filtered
+        -std.vector~fsdir_entry *~ _entries_filtered
+        +clear() void
+        +new_entry() fsdir_entry
+        +apply_filter(const char *pattern, uint16_t diropts) void
+        +empty() bool
+        +read() fsdir_entry *
+        +tell() uint16_t
+        +seek(uint16_t pos) bool
+    }
+%%gen
+    class DirectoryPageGroup {
+        -set_block_entry_details(fsdir_entry_t *f, uint8_t *dest) size_t$
+        +const uint8_t HEADER_SIZE$
+        +const uint8_t ENTRY_HEADER_SIZE$
+        +std.vector~uint8_t~ data
+        +uint8_t entry_count
+        +bool is_last_group
+        +uint8_t index
+        +DirectoryPageGroup()
+        +add_entry(fsdir_entry_t* f) bool
+        +finalize() void
+    }
+%%gen
+    class DynArray {
+        <<template>>
+        -DynArray(const DynArray)
+        -EnsureCapacity(size_t cap) void
+        -T* _mem
+        -T _pool[INITIAL_SIZE]
+        -size_t _allocated
+        -size_t _size
+        +DynArray()
+        +Clear() void
+        +Push(T t) void
+        +PushArr(size_t count) T*
+        +Pop() T
+        +PopArr(size_t count) void
+        +Empty() bool
+        +PeekTop() const T
+        +Size() size_t
+        +Capacity() size_t
+        +SwapRemove(size_t i) void
+        +Mem() const T*
+        +Mem() T*
+    }
+%%gen
+    class ElementIterator {
+        <<template>>
+        -descend(element_path_iterator_t~XE~ ixSel) bool
+        -traverse(element_path_iterator_t~XE~ ixSel) void
+        -element_path_t~XE~ _selectionPath
+        +ElementIterator()
+        +ElementIterator(XE * origin)
+        +ElementIterator(XE * origin, const std.string xpath)
+    }
+%%gen
+    class ElementProperties {
+        -std.string _name
+        -attribute_list_t _attributes
+        -_state
+        +ElementProperties(std.string xProps)
+        +ElementProperties()
+        +Name() std.string
+        +Match(const XMLElement * element) bool
+        +Update(XMLElement * element) void
+    }
+%%gen
+    class FileCache {
+        +open(...) FileHandler *$
+        +create(...) fc_handle *$
+        +write(...) size_t$
+        +reopen(fc_handle *fc, const char *mode) FileHandler *$
+        +remove(fc_handle *fc) void$
+    }
+%%gen
+    class FileHandler {
+        +FileHandler() ~*
+        +close(bool destroy) int*
+        +seek(long int off, int whence) int*
+        +tell() long int*
+        +read(void *ptr, size_t size, size_t n) size_t*
+        +write(const void *ptr, size_t size, size_t n) size_t*
+        +flush() int*
+        +eof() int
+    }
+%%gen
+    class FileHandlerLocal {
+        #FILE *_fh
+        +FileHandlerLocal(FILE *fh)
+        +FileHandlerLocal() ~
+        +close(bool destroy) int
+        +seek(long int off, int whence) int
+        +tell() long int
+        +read(void *ptr, size_t size, size_t n) size_t
+        +write(const void *ptr, size_t size, size_t n) size_t
+        +flush() int
+    }
+%%gen
+    class FileHandlerMem {
+        #uint8_t *_buffer
+        #long int _size
+        #long int _filesize
+        #long int _position
+        +FileHandlerMem()
+        +FileHandlerMem() ~
+        +close(bool destroy) int
+        +seek(long int off, int whence) int
+        +tell() long int
+        +read(void *ptr, size_t size, size_t count) size_t
+        +write(...) size_t
+        +flush() int
+        +grow(long filesize) int
+    }
+%%gen
+    class FileHandlerNFS {
+        +FileHandlerNFS(...)
+        +FileHandlerNFS() ~
+        +close(bool destroy) int
+        +seek(long int off, int whence) int
+        +tell() long int
+        +read(void *ptr, size_t size, size_t count) size_t
+        +write(...) size_t
+        +flush() int
+    }
+%%gen
+    class FileHandlerSMB {
+        +FileHandlerSMB(...)
+        +FileHandlerSMB() ~
+        +close(bool destroy) int
+        +seek(long int off, int whence) int
+        +tell() long int
+        +read(void *ptr, size_t size, size_t count) size_t
+        +write(...) size_t
+        +flush() int
+    }
+%%gen
+    class FileHandlerTNFS {
+        -_bad_fd_recovery() uint8_t
+        #tnfsMountInfo *_mountinfo
+        #int _handle
+        +FileHandlerTNFS(tnfsMountInfo *mountinfo, int handle)
+        +FileHandlerTNFS() ~
+        +close(bool destroy) int
+        +seek(long int off, int whence) int
+        +tell() long int
+        +read(void *ptr, size_t size, size_t count) size_t
+        +write(...) size_t
+        +flush() int
+    }
+%%gen
+    class FileSystem {
+        #fsdir_entry _direntry
+        #_make_fullpath(const char *path) char *
+        +FileSystem() ~
+        +is_global() bool
+        +running() bool
+        +basepath() const char *
+        +type() fsType*
+        +typestring() const char **
+        +type_to_string(fsType type) const char *$
+        +filesize(FILE *) long$
+        +file_open(...) FILE **
+        +fnfile_open(...) fnFile *
+        +remove(const char* path) bool*
+        +rename(const char* pathFrom, const char* pathTo) bool*
+        +is_dir(const char *path) bool*
+        +mkdir(const char* path) bool*
+        +rmdir(const char* path) bool*
+        +dir_exists(const char* path) bool*
+        +dir_open(...) bool*
+        +dir_read() fsdir_entry_t **
+        +dir_close() void*
+        +dir_tell() uint16_t*
+        +dir_seek(uint16_t position) bool*
+        +keep_alive() bool
+    }
+%%gen
+    class FileSystemFTP {
+        -std.unique_ptr~PeoplesUrlParser~ _url
+        -fnFTP *_ftp
+        -std.string _username
+        -std.string _password
+        -char _last_dir[MAX_PATHLEN]
+        -DirCache _dircache
+        -ensure_connected() bool
+        +FileSystemFTP()
+        +start(...) bool
+        +type() fsType
+        +typestring() const char *
+        +file_open(...) FILE *
+        +remove(const char *path) bool
+        +rename(const char *pathFrom, const char *pathTo) bool
+        +is_dir(const char *path) bool
+        +mkdir(const char* path) bool
+        +rmdir(const char* path) bool
+        +dir_exists(const char* path) bool
+        +dir_open(...) bool
+        +dir_read() fsdir_entry *
+        +dir_close() void
+        +dir_tell() uint16_t
+        +dir_seek(uint16_t pos) bool
+        +keep_alive() bool
+    }
+%%gen
+    class FileSystemHTTP {
+        -std.unique_ptr~PeoplesUrlParser~ _url
+        -HTTP_CLIENT_CLASS *_http
+        -IndexParser _parser
+        -char _last_dir[MAX_PATHLEN]
+        -DirCache _dircache
+        +FileSystemHTTP()
+        +start(...) bool
+        +type() fsType
+        +typestring() const char *
+        +file_open(...) FILE *
+        +remove(const char *path) bool
+        +rename(const char *pathFrom, const char *pathTo) bool
+        +is_dir(const char *path) bool
+        +mkdir(const char* path) bool
+        +rmdir(const char* path) bool
+        +dir_exists(const char* path) bool
+        +dir_open(...) bool
+        +dir_read() fsdir_entry *
+        +dir_close() void
+        +dir_tell() uint16_t
+        +dir_seek(uint16_t pos) bool
+    }
+%%gen
+    class FileSystemLittleFS {
+        -DIR * _dir
+        +FileSystemLittleFS()
+        +start() bool
+        +stop() bool
+        +type() fsType
+        +typestring() const char *
+        +is_global() bool
+        +file_open(...) FILE *
+        +remove(const char* path) bool
+        +rename(const char* pathFrom, const char* pathTo) bool
+        +is_dir(const char *path) bool
+        +mkdir(const char* path) bool
+        +rmdir(const char* path) bool
+        +dir_exists(const char* path) bool
+        +dir_open(...) bool
+        +dir_read() fsdir_entry *
+        +dir_close() void
+        +dir_tell() uint16_t
+        +dir_seek(uint16_t) bool
+        +create_path(const char *fullpath) bool
+        +total_bytes() uint64_t
+        +used_bytes() uint64_t
+    }
+%%gen
+    class FileSystemNFS {
+        -char _last_dir[MAX_PATHLEN]
+        -DirCache _dircache
+        +FileSystemNFS()
+        +start(...) bool
+        +type() fsType
+        +typestring() const char *
+        +file_open(...) FILE *
+        +remove(const char *path) bool
+        +rename(const char *pathFrom, const char *pathTo) bool
+        +is_dir(const char *path) bool
+        +mkdir(const char* path) bool
+        +rmdir(const char* path) bool
+        +dir_exists(const char* path) bool
+        +dir_open(...) bool
+        +dir_read() fsdir_entry *
+        +dir_close() void
+        +dir_tell() uint16_t
+        +dir_seek(uint16_t pos) bool
+    }
+%%gen
+    class FileSystemSDFAT {
+        -sdmmc_card_t *_sdcard_info
+        +type() fsType
+        +typestring() const char *
+        +filesize(const char *filepath) long
+        +file_open(...) FILE *
+        +remove(const char* path) bool
+        +rename(const char* pathFrom, const char* pathTo) bool
+        +is_dir(const char *path) bool
+        +mkdir(const char* path) bool
+        +rmdir(const char* path) bool
+        +dir_exists(const char* path) bool
+        +dir_open(...) bool
+        +dir_read() fsdir_entry *
+        +dir_close() void
+        +dir_tell() uint16_t
+        +dir_seek(uint16_t) bool
+        +create_path(const char *path) bool
+        +card_size() uint64_t
+        +total_bytes() uint64_t
+        +used_bytes() uint64_t
+        +partition_type() const char *
+    }
+%%gen
+    class FileSystemSMB {
+        -char _last_dir[MAX_PATHLEN]
+        -DirCache _dircache
+        +FileSystemSMB()
+        +start(...) bool
+        +type() fsType
+        +typestring() const char *
+        +file_open(...) FILE *
+        +remove(const char *path) bool
+        +rename(const char *pathFrom, const char *pathTo) bool
+        +is_dir(const char *path) bool
+        +mkdir(const char* path) bool
+        +rmdir(const char* path) bool
+        +dir_exists(const char* path) bool
+        +dir_open(...) bool
+        +dir_read() fsdir_entry *
+        +dir_close() void
+        +dir_tell() uint16_t
+        +dir_seek(uint16_t pos) bool
+    }
+%%gen
+    class FileSystemSPIFFS {
+        -DIR * _dir
+        +FileSystemSPIFFS()
+        +start() bool
+        +stop() bool
+        +type() fsType
+        +typestring() const char *
+        +is_global() bool
+        +file_open(...) FILE *
+        +remove(const char* path) bool
+        +rename(const char* pathFrom, const char* pathTo) bool
+        +is_dir(const char *path) bool
+        +mkdir(const char* path) bool
+        +rmdir(const char* path) bool
+        +dir_exists(const char* path) bool
+        +dir_open(...) bool
+        +dir_read() fsdir_entry *
+        +dir_close() void
+        +dir_tell() uint16_t
+        +dir_seek(uint16_t) bool
+        +total_bytes() uint64_t
+        +used_bytes() uint64_t
+    }
+%%gen
+    class FileSystemTNFS {
+        -tnfsMountInfo _mountinfo
+        -esp_timer_handle_t keepAliveTimerHandle
+        +FileSystemTNFS()
+        +start(...) bool
+        +type() fsType
+        +typestring() const char *
+        +file_open(...) FILE *
+        +exists(const char* path) bool
+        +remove(const char* path) bool
+        +rename(const char* pathFrom, const char* pathTo) bool
+        +is_dir(const char *path) bool
+        +mkdir(const char* path) bool
+        +rmdir(const char* path) bool
+        +dir_exists(const char* path) bool
+        +dir_open(...) bool
+        +dir_read() fsdir_entry *
+        +dir_close() void
+        +dir_tell() uint16_t
+        +dir_seek(uint16_t) bool
+    }
+%%gen
+    class fnConfig {
+        -bool _dirty
+        -_read_line(...) int
+        -_read_section_general(std.stringstream ss) void
+        -_read_section_wifi(std.stringstream ss) void
+        -_read_section_wifi_stored(std.stringstream ss, int index) void
+        -_read_section_bt(std.stringstream ss) void
+        -_read_section_network(std.stringstream ss) void
+        -_read_section_host(std.stringstream ss, int index) void
+        -_read_section_mount(std.stringstream ss, int index) void
+        -_read_section_printer(std.stringstream ss, int index) void
+        -_read_section_tape(std.stringstream ss, int index) void
+        -_read_section_modem(std.stringstream ss) void
+        -_read_section_cassette(std.stringstream ss) void
+        -_read_section_phonebook(std.stringstream ss, int index) void
+        -_read_section_cpm(std.stringstream ss) void
+        -_read_section_device_enable(std.stringstream ss) void
+        -_read_section_boip(std.stringstream ss) void
+        -_read_section_bos(std.stringstream ss) void
+        -_find_section_in_line(std.string line, int index) section_match
+        -_split_name_value(...) bool
+        -const char * _host_type_names[HOSTTYPE_INVALID]
+        -const char * _mount_mode_names[MOUNTMODE_INVALID]
+        -const char * _serial_proceed_pin_names[SERIAL_PROCEED_INVALID]
+        -host_info _host_slots[MAX_HOST_SLOTS]
+        -mount_info _mount_slots[MAX_MOUNT_SLOTS]
+        -printer_info _printer_slots[MAX_PRINTER_SLOTS]
+        -mount_info _tape_slots[MAX_TAPE_SLOTS]
+        -wifi_info _wifi_stored[MAX_WIFI_STORED]
+        -wifi_info _wifi
+        -bt_info _bt
+        -network_info _network
+        -general_info _general
+        -modem_info _modem
+        -cassette_info _cassette
+        -boip_info _boip
+        -bos_info _bos
+        -device_enable_info _denable
+        -phbook_info _phonebook_slots[MAX_PB_SLOTS]
+        +host_type_from_string(const char *str) host_type_t
+        +mount_mode_from_string(const char *str) mount_mode_t
+        +serial_command_from_string(const char *str) serial_command_pin
+        +serial_proceed_from_string(const char *str) serial_proceed_pin
+        +get_general_timezone() std.string
+        +get_general_rotation_sounds() bool
+        +get_network_udpstream_host() std.string
+        +get_network_udpstream_port() int
+        +get_network_udpstream_servermode() bool
+        +get_general_config_enabled() bool
+        +store_general_devicename(const char *devicename) void
+        +store_general_hsioindex(int hsio_index) void
+        +store_general_timezone(const char *timezone) void
+        +store_general_rotation_sounds(bool rotation_sounds) void
+        +store_general_config_enabled(bool config_enabled) void
+        +store_general_config_ng(bool config_ng) void
+        +get_general_config_ng() bool
+        +get_config_filename() std.string
+        +store_config_filename(const std.string filename) void
+        +get_general_boot_mode() bool
+        +store_general_boot_mode(uint8_t boot_mode) void
+        +store_udpstream_host(const char host_ip[64]) void
+        +store_udpstream_port(int port) void
+        +store_udpstream_servermode(bool mode) void
+        +get_general_fnconfig_spifs() bool
+        +store_general_fnconfig_spifs(bool fnconfig_spifs) void
+        +get_general_status_wait_enabled() bool
+        +store_general_status_wait_enabled(bool status_wait_enabled) void
+        +store_general_encrypt_passphrase(bool encrypt_passphrase) void
+        +get_general_encrypt_passphrase() bool
+        +get_network_sntpserver() const char *
+        +store_general_interface_url(const char *url) void
+        +get_general_config_path() std.string
+        +store_general_config_path(const char *file_path) void
+        +get_general_SD_path() std.string
+        +store_general_SD_path(const char *dir_path) void
+        +get_serial_port() std.string
+        +get_serial_baud() int
+        +get_serial_command() serial_command_pin
+        +get_serial_proceed() serial_proceed_pin
+    }
+%%gen
+    class fnFTP {
+        -unsigned long _range_begin*
+        -unsigned long _range_end*
+        #private- string hostname
+        #bool _stor
+        #bool _expect_control_response
+        #int _statusCode*
+        #unsigned short control_port
+        #fnTcpClient *control
+        #fnTcpClient *data
+        #string controlResponse
+        #string username
+        #string password
+        #std.stringstream dirBuffer
+        #unsigned short data_port*
+        #bool _active_mode
+        #fnTcpServer _active_server
+        #parse_response() bool
+        #read_response_line(char *buf, int buflen) int
+        #get_data_port() bool
+        #get_data_port_epsv() bool
+        #get_data_port_pasv() bool
+        #get_data_port_port() bool
+        #accept_active_connection() bool
+        #is_positive_preliminary_reply() bool
+        #is_positive_completion_reply() bool
+        #is_positive_intermediate_reply() bool
+        #is_negative_transient_reply() bool
+        #is_negative_permanent_reply() bool
+        #is_protected_reply() bool
+        #is_syntax() bool
+        #is_informational() bool
+        #is_connection() bool
+        #is_authentication() bool
+        #is_filesystem_related() bool
+        #USER() void
+        #PASS() void
+        #TYPE() void
+        #QUIT() void
+        #EPSV() void
+        #PASV() void
+        #PORT(...) void
+        #RETR(string path) void
+        +fnFTP()
+        +fnFTP() ~
+        +fnFTP (const fnFTP)
+        +login(...) bool
+        +logout() bool
+        +open_file(string path, bool stor) bool
+        +open_directory(string path, string pattern) bool
+        +read_directory(string name, long filesize, bool is_dir) bool
+        +read_file(...) bool
+        +write_file(uint8_t* buf, unsigned short len) bool
+        +close() bool
+        +status() int
+        +data_available() int
+        +data_connected() bool
+        +control_connected() bool
+        +reconnect() bool
+        +get_file_size(string path) int32_t
+        +delete_file(string path) bool
+        +rename_file(string pathFrom, string pathTo) bool
+        +make_directory(string path) bool
+        +remove_directory(string path) bool
+        +keep_alive() bool
+    }
+%%gen
+    class fnHttpClient {
+        -char *_buffer
+        -int _buffer_pos*
+        -int _buffer_len*
+        -int _buffer_total_read*
+        -TaskHandle_t _taskh_consumer
+        -TaskHandle_t _taskh_subtask
+        -bool _ignore_response_body
+        -bool _transaction_begin
+        -bool _transaction_done
+        -int _redirect_count*
+        -int _max_redirects*
+        -bool connected
+        -esp_http_client_auth_type_t _auth_type
+        -esp_err_t _client_err
+        -uint16_t _port
+        -header_map_t _stored_headers
+        -esp_http_client_handle_t _handle
+        -_perform_subtask(void *param) void$
+        -_httpevent_handler(esp_http_client_event_t *evt) esp_err_t$
+        -_delete_subtask_if_running() void
+        -_flush_response() void
+        -_perform() int
+        -_perform_stream(...) int
+        +fnHttpClient()
+        +begin(const std.string url) bool
+        +close() void
+        +GET() int
+        +HEAD() int
+        +POST(const char *post_data, int post_datalen) int
+        +PUT(const char *put_data, int put_datalen) int
+        +PROPFIND(...) int
+        +DELETE() int
+        +MKCOL() int
+        +COPY(...) int
+        +MOVE(const char *destination, bool overwrite) int
+        +available() int
+        +content_length() int
+        +is_transaction_done() bool
+        +read(uint8_t *dest_buffer, int dest_bufflen) int
+        +set_url(const char *url) bool
+        +set_header(...) bool
+        +get_header(const char *header) const std.string
+        +get_header(int index) const std.string
+        +get_header(int index, char *buffer, int buffer_len) char *
+        +get_header_count() int
+        +create_empty_stored_headers(const std.vector~std.string~ headerKeys) void
+        +set_header_value(const char *name, const char *value) void
+        +get_stored_headers() const std.map~std.string, std.string~
+    }
+%%gen
+    class FNJSON {
+        -cJSON *_json
+        -cJSON *_item
+        -NetworkProtocol *_protocol
+        -std.string _queryString
+        -uint8_t _queryParam*
+        -std.string lineEnding
+        -getValue(cJSON *item) std.string
+        -std.string _parseBuffer
+        +FNJSON()
+        +FNJSON() ~
+        +setLineEnding(const std.string _lineEnding) void
+        +setProtocol(NetworkProtocol *newProtocol) void
+        +setReadQuery(...) void
+        +resolveQuery() cJSON *
+        +status(NetworkStatus *status) bool
+        +parse() bool
+        +readValueLen() int
+        +readValue(uint8_t *buf, unsigned short len) bool
+        +processString(std.string in) std.string
+        +int json_bytes_remaining*
+        +setQueryParam(uint8_t qp) void
+    }
+%%gen
+    class fnTask {
+        #start() int*
+        #pause() int
+        #resume() int
+        #abort() int
+        #step() int*
+        #uint8_t _id
+        #task_state _state
+        #done_reason _reason
+        #void(...)
+        +fnTask()
+        +fnTask() ~*
+        +get_state() task_state
+        +get_done_reason() done_reason
+        +get_progress() int
+        +get_result() void *
+    }
+%%gen
+    class fnTaskManager {
+        -complete_task(uint8_t tid) int
+        -get_free_tid() uint8_t
+        -shutdown() void
+        -std.map~uint8_t, fnTask *~ _task_map
+        -uint8_t _next_tid
+        -uint8_t _task_count
+        +fnTaskManager()
+        +submit_task(fnTask * t) int
+        +get_task(uint8_t tid) fnTask *
+        +pause_task(uint8_t tid) int
+        +resume_task(uint8_t tid) int
+        +abort_task(uint8_t tid) int
+        +service() bool
+    }
+%%gen
+    class fnTcpClient {
+        #std.string _rxBuffer
+        #std.shared_ptr~fnTcpClientSocketHandle~ _clientSocketHandle
+        #bool _connected
+        +fnTcpClient()
+        +fnTcpClient(int fd)
+        +stop() void
+        +connect(...) int
+        +connect(...) int
+        +write(uint8_t data) size_t
+        +write(const uint8_t *buf, size_t size) size_t
+        +write(const char *buff) size_t
+        +write(const std.string str) size_t
+        +read() int
+        +read(uint8_t *buf, size_t size) int
+        +read_until(char terminator, char *buf, size_t size) int
+        +updateFIFO() void
+        +available() size_t
+        +peek() int
+        +flush() void
+        +connected() uint8_t
+        +bool() operator
+        +setSocketOption(int option, char* value, size_t len) int
+        +setOption(int option, int *value) int
+        +getOption(int option, int *value) int
+        +setTimeout(uint32_t seconds) int
+        +setNoDelay(bool nodelay) int
+        +getNoDelay() bool
+        +remoteIP() in_addr_t
+        +remoteIP(int fd) in_addr_t
+        +remotePort() uint16_t
+        +remotePort(int fd) uint16_t
+        +localIP() in_addr_t
+        +localIP(int fd) in_addr_t
+        +localPort() uint16_t
+        +localPort(int fd) uint16_t
+        +fd() int
+    }
+%%gen
+    class fnTcpServer {
+        -int _sockfd
+        -int _accepted_sockfd
+        -uint16_t _port
+        -uint8_t _max_clients
+        -bool _listening
+        -bool _noDelay
+        +listenOnLocalhost() void
+        +fnTcpServer(uint16_t port, uint8_t max_clients)
+        +begin(uint16_t port) int
+        +port() uint16_t
+        +accept() fnTcpClient
+        +setNoDelay(bool nodelay) void
+        +getNoDelay() bool
+        +setTimeout(uint32_t seconds) int
+        +setMaxClients(int maxClients) void
+        +hasClient() bool
+        +client() fnTcpClient
+        +stop() void
+        +bool() operator
+    }
+%%gen
+    class fnTestTask {
+        -int _count
+        -int _i
+        #start() int
+        #pause() int
+        #resume() int
+        #abort() int
+        #step() int
+        +fnTestTask(int count)
+        +fnTestTask() ~
+        +get_progress() int
+        +get_result() void *
+    }
+%%gen
+    class fnUDP {
+        -int udp_server
+        -in_addr_t multicast_ip
+        -in_addr_t remote_ip
+        -uint16_t server_port*
+        -uint16_t remote_port*
+        -char * tx_buffer
+        -size_t tx_buffer_len*
+        -cbuf * rx_buffer
+        +fnUDP()
+        +stop() void
+        +begin(in_addr_t a, uint16_t p) bool
+        +begin(uint16_t p) bool
+        +beginMulticast(in_addr_t a, uint16_t p) bool
+        +beginMulticastPacket() bool
+        +beginPacket() bool
+        +beginPacket(in_addr_t ip, uint16_t port) bool
+        +beginPacket(const char *host, uint16_t port) bool
+        +endPacket() bool
+        +write(uint8_t) size_t
+        +write(const uint8_t *buffer, size_t size) size_t
+        +parsePacket() int
+        +read() int
+        +read(unsigned char* buffer, size_t len) int
+        +read(char* buffer, size_t len) int
+        +peek() int
+        +available() int
+        +flush() void
+        +remoteIP() in_addr_t
+        +remotePort() uint16_t
+    }
+%%gen
+    class Hash {
+        -std.vector~uint8_t~ accumulated_data
+        -std.vector~uint8_t~ hash_output
+        -compute_md5() void
+        -compute_sha1() void
+        -compute_sha256(int is224) void
+        -compute_sha512(int is384) void
+        -compute_md(mbedtls_md_type_t md_type, uint8_t size) void
+        -bytes_to_hex(const std.vector~uint8_t~ bytes) std.string
+        +Hash()
+        +std.string key
+        +add_data(const std.vector~uint8_t~ data) void
+        +add_data(const std.string data) void
+        +clear() void
+        +hash_length(Algorithm algorithm, bool is_hex) size_t
+        +compute(Algorithm algorithm, bool clear_data) void
+        +output_binary() std.vector~uint8_t~
+        +output_hex() std.string
+        +to_algorithm(uint8_t value) Hash.Algorithm$
+        +from_string(std.string hash_name) Hash.Algorithm$
+    }
+%%gen
+    class HTMLDocument {
+        -void* internal
+        +HTMLDocument()
+        +HTMLDocument() ~
+        +ParseFile(const char * file) bool
+        +ParseData(const char * data) bool
+        +Query(const char* query) HTMLResult*
+    }
+%%gen
+    class HTMLElement {
+        +HTMLElement(void* internal)
+        +HTMLElement(HTMLElement* element)
+        +Attribute(const char* name) const char*
+        +GetText() const char*
+        +Query(const char* query) HTMLResult*
+        +void* internal
+    }
+%%gen
+    class HTMLResult {
+        -HTMLElement** elements
+        -int capacity
+        -int count
+        +HTMLResult()
+        +HTMLResult() ~
+        +Count() int
+        +Element(int index) HTMLElement*
+        +Append(HTMLElement* element) bool
+        +Append(HTMLResult* result) bool
+        +Clear() void
+    }
+%%gen
+    class IndexParser {
+        #IndexEntry currentEntry
+        #bool isIndexOf
+        #std.string lineBuffer
+        #int entriesCounter
+        +begin_parser() bool
+        +end_parser(bool clear_entries) void
+        +parse(const char *buf, int len, int isFinal) bool
+        +parse_line(std.string line) bool
+    }
+%%gen
+    class IPAddress {
+        -union
+        -_address
+        -raw_address() uint8_t*
+        +IPAddress()
+        +IPAddress(...)
+        +IPAddress(uint32_t address)
+        +IPAddress(const uint8_t *address)
+        +IPAddress() ~
+        +fromString(const char *address) bool
+        +fromString(const std.string address) bool
+        +uint32_t() operator
+        +toString() std.string
+    }
+%%gen
+    class MCP23017 {
+        #I2C_t myI2C
+        #volatile uint16_t _PIN
+        #volatile uint16_t _oldPIN
+        #volatile uint16_t _PORT
+        #volatile uint16_t _DDR
+        #uint8_t _address
+        #readGPIO() void
+        #updateGPIO() void
+        +MCP23017()
+        +begin(...) void
+        +pinMode(uint8_t pin, uint8_t mode) void
+        +digitalWrite(uint8_t pin, uint8_t value) void
+        +digitalRead(uint8_t pin) uint8_t
+        +write(uint16_t value) void
+        +read() uint16_t
+        +clear() void
+        +set() void
+        +toggle(uint8_t pin) void
+    }
+%%gen
+    class MeatloafConfig {
+        -psram_json _data
+        -std.array~uint8_t, 16~ _config_hash
+        -std.array~uint8_t, 16~ _devices_hash
+        -bool _config_dirty
+        -bool _devices_dirty
+        -_extract_config() psram_json
+        -_extract_devices() psram_json
+        -_json_hash(const psram_json j) std.array~uint8_t, 16~$
+        -_read_json(...) bool
+        -_write_json(...) bool
+        +load() bool
+        +save() void
+        +data() psram_json
+        +data() const psram_json
+        +mark_config_dirty() void
+        +mark_devices_dirty() void
+        +is_dirty() bool
+        +is_config_dirty() bool
+        +is_devices_dirty() bool
+    }
+%%gen
+    class MediaType {
+        #fnFile *_media_fileh
+        #fnFile *oldFileh
+        #fnFile *hsFileh
+        #uint32_t _media_image_size*
+        #uint32_t _media_num_blocks
+        #uint16_t _media_sector_size
+        +_percomBlock
+        +char _disk_filename[256]
+        +uint8_t _media_blockbuff[MEDIA_BLOCK_SIZE]
+        +uint32_t _media_last_block
+        +uint8_t _media_controller_status
+        +fujiHost *_media_host
+        +fnFile *_media_hsfileh
+        +mediatype_t _mediatype
+        +bool _allow_hsio
+        +mount(fnFile *f, uint32_t disksize) mediatype_t*
+        +unmount() void
+        +format(uint16_t *responsesize) error_is_true
+        +read(uint32_t blockNum, uint16_t *readcount) error_is_true*
+        +write(uint32_t blockNum, bool verify) error_is_true
+        +status() uint8_t*
+        +discover_mediatype(const char *filename) mediatype_t$
+        +dump_percom_block() void
+        +derive_percom_block(uint16_t numSectors) void
+        +num_blocks() uint32_t
+        +MediaType() ~
+    }
+%%gen
+    class MediaTypeATR {
+        -_sector_to_offset(uint16_t sectorNum) uint32_t
+        +read(uint16_t sectornum, uint16_t *readcount) error_is_true
+        +write(uint16_t sectornum, bool verify) error_is_true
+        +format(uint16_t *responsesize) error_is_true
+        +mount(fnFile *f, uint32_t disksize) mediatype_t
+        +status(uint8_t statusbuff[4]) void
+        +create(...) success_is_true$
+    }
+%%gen
+    class MediaTypeATX {
+        -uint8_t _atx_num_tracks*
+        -uint8_t _atx_num_records*
+        -uint8_t _atx_controller_status*
+        -uint8_t _atx_last_track*
+        -uint8_t _atx_sectors_per_track
+        -uint8_t _atx_drive_model
+        -uint16_t __atx_current_angular_pos*
+        -uint32_t _atx_total_rotations*
+        -uint32_t _atx_size*
+        -_load_atx_data(atx_header_t atx_hdr) success_is_true
+        -_load_atx_record() success_is_true
+        -_load_atx_track_record(uint32_t length) success_is_true
+        -_load_atx_track_chunk(track_header_t trk_hdr, AtxTrack track) int
+        -_load_atx_chunk_sector_list(chunk_header_t chunk_hdr, AtxTrack track) success_is_true
+        -_load_atx_chunk_sector_data(chunk_header_t chunk_hdr, AtxTrack track) success_is_true
+        -_load_atx_chunk_weak_sector(chunk_header_t chunk_hdr, AtxTrack track) success_is_true
+        -_load_atx_chunk_extended_sector(chunk_header_t chunk_hdr, AtxTrack track) success_is_true
+        -_load_atx_chunk_unknown(chunk_header_t chunk_hdr, AtxTrack track) success_is_true
+        -_copy_track_sector_data(...) error_is_true
+        -_process_sector(...) void
+        -_get_head_position() uint16_t
+        -_wait_full_rotation() void
+        -_wait_head_position(uint16_t pos, uint16_t extra_delay) void
+        +read(uint16_t sectornum, uint16_t *readcount) error_is_true
+        +format(uint16_t *responsesize) error_is_true
+        +mount(fnFile *f, uint32_t disksize) mediatype_t
+        +status(uint8_t statusbuff[4]) void
+        +on_timer(void *info) void$
+        +MediaTypeATX()
+    }
+%%gen
+    class MediaTypeDCD {
+        -uint32_t last_block_num
+        -uint32_t offset*
+        +read(uint32_t blockNum, uint8_t* buffer) bool
+        +write(uint32_t blockNum, uint8_t* buffer) bool
+        +format(uint16_t *responsesize) bool
+        +mount(FILE *f, uint32_t disksize) mediatype_t
+        +mount(FILE *f) mediatype_t
+        +status() bool
+        +size() size_t
+        +sectorsize() size_t
+        +reset_seek_opto() void
+        +MediaTypeDCD(int x)
+    }
+%%gen
+    class MediaTypeDDP {
+        -_block_to_offset(uint32_t blockNum) uint32_t
+        +read(uint32_t blockNum, uint16_t *readcount) error_is_true
+        +write(uint32_t blockNum, bool verify) error_is_true
+        +format(uint16_t *responsesize) error_is_true
+        +mount(fnFile *f, uint32_t disksize) mediatype_t
+        +status() uint8_t
+        +create(fnFile *f, uint32_t numBlock) success_is_true$
+    }
+%%gen
+    class MediaTypeDO {
+        -read_sector(int track, int sector, uint8_t* buffer) error_is_true
+        -write_sector(int track, int sector, uint8_t* buffer) error_is_true
+        +read(...) error_is_true
+        +write(...) error_is_true
+        +format(uint16_t *responsesize) error_is_true
+        +mount(fnFile *f, uint32_t disksize) mediatype_t
+        +status() success_is_true
+    }
+%%gen
+    class MediaTypeDSK {
+        -_block_to_offsets(uint32_t blockNum) std.pair~uint32_t, uint32_t~
+        +read(uint32_t blockNum, uint16_t *readcount) error_is_true
+        +write(uint32_t blockNum, bool verify) error_is_true
+        +format(uint16_t *responsesize) error_is_true
+        +mount(fnFile *f, uint32_t disksize) mediatype_t
+        +status() uint8_t
+        +create(fnFile *f, uint32_t numBlock) success_is_true$
+    }
+%%gen
+    class MediaTypeIMG {
+        -_sector_to_offset(uint16_t sectorNum) uint32_t
+        +read(uint16_t sectornum, uint16_t *readcount) success_is_true
+        +write(uint16_t sectornum, bool verify) success_is_true
+        +format(uint16_t *responsesize) success_is_true
+        +mount(...) mediatype_t
+        +status(uint8_t statusbuff[4]) void
+        +create(...) success_is_true$
+    }
+%%gen
+    class MediaTypeIMG {
+        -_sector_to_offset(uint16_t sectorNum) uint32_t
+        +read(uint16_t sectornum, uint16_t *readcount) success_is_true
+        +write(uint16_t sectornum, bool verify) success_is_true
+        +format(uint16_t *responsesize) success_is_true
+        +mount(...) mediatype_t
+        +status(uint8_t statusbuff[4]) void
+        +create(...) success_is_true$
+    }
+%%gen
+    class MediaTypeMOOF {
+        -moof_disk_type_t moof_disktype
+        -moof_check_header() bool
+        -moof_read_info() bool
+        -moof_read_tmap() bool
+        -moof_read_tracks() bool
+        #uint8_t tmap[MAX_TRACKS]
+        #TRK_t trks[MAX_TRACKS]
+        +MediaTypeMOOF()
+        +read(uint32_t blockNum, uint8_t *buffer) bool
+        +write(uint32_t blockNum, uint8_t *buffer) bool
+        +format(uint16_t *responsesize) bool
+        +mount(FILE *f, uint32_t disksize) mediatype_t
+        +mount(FILE *f) mediatype_t
+        +unmount() void
+        +status() bool
+        +trackmap(uint8_t t) uint8_t
+        +get_track(int t) uint8_t *
+        +track_len(int t) int
+        +num_bits(int t) int
+        +uint8_t optimal_bit_timing
+    }
+%%gen
+    class MediaTypeMRM {
+        -_block_to_offset(uint32_t blockNum) uint32_t
+        +uint8_t _media_blockbuff[MRM_BLOCK_SIZE]
+        +read(uint32_t blockNum, uint16_t *readcount) error_is_true
+        +write(uint32_t blockNum, bool verify) error_is_true
+        +get_block_buffer(uint8_t **p_buffer, uint16_t *p_blk_size) void
+        +format(uint16_t *responsesize) error_is_true
+        +mount(fnFile *f, uint32_t disksize) mediatype_t
+        +status() uint8_t
+        +create(FILE *f, uint32_t numBlock) success_is_true$
+    }
+%%gen
+    class MediaTypePO {
+        -uint32_t last_block_num
+        -uint32_t offset*
+        +read(...) error_is_true
+        +write(...) error_is_true
+        +write_sector(int track, int sector, uint8_t *buffer) error_is_true
+        +format(uint16_t *responsesize) error_is_true
+        +mount(fnFile *f, uint32_t disksize) mediatype_t
+        +status() success_is_true
+        +size() size_t
+        +reset_seek_opto() void
+    }
+%%gen
+    class MediaTypeROM {
+        -const uint8_t block0[1024]
+        -const uint8_t block1[1024]
+        -char *rom
+        +MediaTypeROM()
+        +MediaTypeROM() ~
+        +_block_to_offset(uint32_t blockNum) uint32_t
+        +read(uint32_t blockNum, uint16_t *readcount) error_is_true
+        +write(uint32_t blockNum, bool verify) error_is_true
+        +format(uint16_t *responsesize) error_is_true
+        +mount(fnFile *f, uint32_t disksize) mediatype_t
+        +status() uint8_t
+        +create(fnFile *f, uint32_t numBlock) success_is_true$
+    }
+%%gen
+    class MediaTypeVDK {
+        -_block_to_offset(uint32_t blockNum) uint32_t
+        -bool bIsVDK
+        -uint16_t _media_sector_size
+        +uint8_t _media_blockbuff[VDK_BLOCK_SIZE]
+        +read(uint32_t blockNum, uint16_t *readcount) error_is_true
+        +write(uint32_t blockNum, bool verify) error_is_true
+        +format(uint16_t *responsesize) error_is_true
+        +mount(fnFile *f, uint32_t disksize) mediatype_t
+        +status() uint8_t
+        +create(FILE *f, uint32_t numBlock) success_is_true$
+        +get_block_buffer(uint8_t **p_buffer, uint16_t *p_blk_size) void
+    }
+%%gen
+    class MediaTypeWOZ {
+        -char woz_version
+        -wozX_check_header() error_is_true
+        -wozX_read_info() error_is_true
+        -wozX_read_tmap() error_is_true
+        -woz1_read_tracks() error_is_true
+        -woz2_read_tracks() error_is_true
+        #uint8_t tmap[MAX_TRACKS]
+        #TRK_bitstream *trk_data[MAX_TRACKS]
+        +read(...) error_is_true
+        +write(...) error_is_true
+        +write_sector(int track, int sector, uint8_t *buffer) error_is_true
+        +format(uint16_t *responsesize) error_is_true
+        +mount(fnFile *f, uint32_t disksize) mediatype_t
+        +unmount() void
+        +status() success_is_true
+        +trackmap(uint8_t t) uint8_t
+        +get_track(int t) TRK_bitstream *
+        +uint8_t optimal_bit_timing
+    }
+%%gen
+    class MediaTypeXEX {
+        -uint8_t _xex_bootloader[384]
+        -int _xex_bootloadersize*
+        -_fake_vtoc() void
+        -_fake_directory_entry() void
+        +read(uint16_t sectornum, uint16_t *readcount) error_is_true
+        +mount(fnFile *f, uint32_t disksize) mediatype_t
+        +unmount() void
+        +status(uint8_t statusbuff[4]) void
+    }
+%%gen
+    class MemPool {
+        +MemPool()
+        +MemPool() ~
+        +size_t ItemSize() const*
+        +Alloc() void**
+        +Free(void*) void*
+        +SetTracked() void*
+    }
+%%gen
+    class MemPoolT {
+        <<template>>
+        -MemPoolT(const MemPoolT)
+        -union Item
+        -DynArray~ Block*, 10 ~ _blockPtrs
+        -Item* _root
+        -size_t _currentAllocs
+        -size_t _nAllocs
+        -size_t _maxAllocs
+        -size_t _nUntracked
+        +MemPoolT()
+        +Clear() void
+        +size_t ItemSize() const
+        +CurrentAllocs() size_t
+        +Alloc() void*
+        +Free(void* mem) void
+        +Trace(const char* name) void
+        +SetTracked() void
+        +Untracked() size_t
+    }
+%%gen
+    class NetworkProtocol {
+        #unsigned char aux1_open*
+        #unsigned char aux2_open*
+        #translate_receive_buffer() void
+        #translate_transmit_buffer() unsigned short
+        +std.string name
+        +bool is_write
+        +std.string *receiveBuffer
+        +std.string *transmitBuffer
+        +std.string *specialBuffer
+        +PeoplesUrlParser *opened_url
+        +NetworkProtocol(...)
+        +NetworkProtocol() ~
+        +bool connectionIsServer
+        +unsigned short bytesWaiting*
+        +unsigned char error*
+        +unsigned char translation_mode*
+        +bool fromInterrupt
+        +bool interruptEnable
+        +bool forceStatus
+        +std.string lineEnding
+        +setLineEnding(std.string s) void
+        +int FSSectorSize
+        +setFSSectorSize(int sectorSize) void
+        +open(...) bool
+        +close() bool
+        +read(unsigned short len) bool
+        +write(unsigned short len) bool
+        +status(NetworkStatus *status) bool
+        +special_inquiry(uint8_t cmd) uint8_t
+        +special_00(cmdFrame_t *cmdFrame) bool
+        +special_40(...) bool
+        +special_80(...) bool
+        +perform_idempotent_80(...) bool
+        +errno_to_error() void
+        +set_open_params(uint8_t p1, uint8_t p2) void
+        +seek(off_t offset, int whence) off_t
+        +std.string *login
+        +std.string *password
+    }
+%%gen
+    class NetworkProtocolFactory {
+        +createProtocol(...) std.unique_ptr~NetworkProtocol~$
+    }
+%%gen
+    class NetworkProtocolFS {
+        #OpenMode
+        #OpenMode openMode
+        #std.string dir
+        #std.string filename
+        #std.string destFilename
+        #int fileSize*
+        #std.string dirBuffer
+        #bool is_directory
+        #uint16_t mode*
+        #bool is_locked
+        #open_file() bool
+        #open_file_handle() bool*
+        #open_dir() bool
+        #open_dir_handle() bool*
+        #mount(PeoplesUrlParser *url) bool*
+        #umount() bool*
+        #fserror_to_error() void*
+        #resolve() void
+        #update_dir_filename(PeoplesUrlParser *url) void
+        #read_file(unsigned short len) bool
+        #read_file_handle(uint8_t *buf, unsigned short len) bool*
+        #read_dir(unsigned short len) bool
+        #read_dir_entry(char *buf, unsigned short len) bool*
+        #status_file(NetworkStatus *status) bool
+        #status_dir(NetworkStatus *status) bool
+        #close_file() bool
+        #close_file_handle() bool*
+        #close_dir() bool
+        #close_dir_handle() bool*
+        #write_file(unsigned short len) bool
+        #write_file_handle(uint8_t *buf, unsigned short len) bool*
+        #stat() bool*
+        #rename(...) bool
+        #del(...) bool
+        #mkdir(...) bool
+        #rmdir(...) bool
+        #lock(...) bool
+        #unlock(...) bool
+        +bool rename_implemented
+        +bool delete_implemented
+        +bool mkdir_implemented
+        +bool rmdir_implemented
+        +NetworkProtocolFS(...)
+        +NetworkProtocolFS() ~
+        +open(...) bool
+        +close() bool
+        +read(unsigned short len) bool
+        +write(unsigned short len) bool
+        +status(NetworkStatus *status) bool
+        +special_inquiry(uint8_t cmd) uint8_t
+        +special_00(cmdFrame_t *cmdFrame) bool
+        +special_40(...) bool
+        +special_80(...) bool
+        +perform_idempotent_80(...) bool
+    }
+%%gen
+    class NetworkProtocolFTP {
+        -fnFTP *ftp
+        -bool stor
+        -stat() bool
+        #bool rename_implemented
+        #bool delete_implemented
+        #bool mkdir_implemented
+        #bool rmdir_implemented
+        #open_file_handle() bool
+        #open_dir_handle() bool
+        #mount(PeoplesUrlParser *url) bool
+        #umount() bool
+        #fserror_to_error() void
+        #read_file_handle(uint8_t *buf, unsigned short len) bool
+        #read_dir_entry(char *buf, unsigned short len) bool
+        #write_file_handle(uint8_t *buf, unsigned short len) bool
+        #close_file_handle() bool
+        #close_dir_handle() bool
+        #status_file(NetworkStatus *status) bool
+        +NetworkProtocolFTP(...)
+        +NetworkProtocolFTP() ~
+        +NetworkProtocolFTP (const NetworkProtocolFTP)
+        +special_inquiry(uint8_t cmd) uint8_t
+        +special_00(cmdFrame_t *cmdFrame) bool
+        +special_40(...) bool
+        +special_80(...) bool
+        +rename(...) bool
+        +del(...) bool
+        +mkdir(...) bool
+        +rmdir(...) bool
+        +lock(...) bool
+        +unlock(...) bool
+    }
+%%gen
+    class NetworkProtocolHTTP {
+        -HTTPOpenMode
+        -HTTPOpenMode httpOpenMode
+        -HTTPChannelMode
+        -HTTPChannelMode httpChannelMode
+        -HTTP_CLIENT_CLASS *client
+        -int resultCode*
+        -std.vector~std.string~ collect_headers
+        -std.vector~std.string~ returned_headers
+        -size_t returned_header_cursor*
+        -int bodySize*
+        -std.string postData
+        -WebDAV webDAV
+        -std.vector~WebDAV.DAVEntry~.iterator dirEntryCursor
+        -http_transaction() void
+        -special_set_channel_mode(cmdFrame_t *cmdFrame) bool
+        -read_file_handle_header(uint8_t *buf, unsigned short len) bool
+        -read_file_handle_data(uint8_t *buf, unsigned short len) bool
+        -write_file_handle_get_header(uint8_t *buf, unsigned short len) bool
+        -write_file_handle_set_header(uint8_t *buf, unsigned short len) bool
+        -write_file_handle_send_post_data(uint8_t *buf, unsigned short len) bool
+        -write_file_handle_data(uint8_t *buf, unsigned short len) bool
+        -parseDir(char *buf, unsigned short len) bool
+        #open_file_handle() bool
+        #open_dir_handle() bool
+        #mount(PeoplesUrlParser *url) bool
+        #umount() bool
+        #fserror_to_error() void
+        #read_file_handle(uint8_t *buf, unsigned short len) bool
+        #read_dir_entry(char *buf, unsigned short len) bool
+        #close_file_handle() bool
+        #close_dir_handle() bool
+        #write_file_handle(uint8_t *buf, unsigned short len) bool
+        #status_file(NetworkStatus *status) bool
+        #stat() bool
+        #rename(...) bool
+        #del(...) bool
+        #mkdir(...) bool
+        #rmdir(...) bool
+        +NetworkProtocolHTTP(...)
+        +NetworkProtocolHTTP() ~
+        +special_inquiry(uint8_t cmd) uint8_t
+        +special_00(cmdFrame_t *cmdFrame) bool
+    }
+%%gen
+    class NetworkProtocolSD {
+        -uint16_t perms*
+        -.FILE *fh
+        -check_fs() bool
+        -errno_to_error() void
+        -stat() bool
+        #bool rename_implemented
+        #bool delete_implemented
+        #bool mkdir_implemented
+        #bool rmdir_implemented
+        #open_file_handle() bool
+        #open_dir_handle() bool
+        #mount(PeoplesUrlParser *url) bool
+        #umount() bool
+        #fserror_to_error() void
+        #read_file_handle(uint8_t *buf, unsigned short len) bool
+        #read_dir_entry(char *buf, unsigned short len) bool
+        #write_file_handle(uint8_t *buf, unsigned short len) bool
+        #close_file_handle() bool
+        #close_dir_handle() bool
+        #seek(off_t offset, int whence) off_t
+        +NetworkProtocolSD(...)
+        +NetworkProtocolSD() ~
+        +special_inquiry(uint8_t cmd) uint8_t
+        +special_00(cmdFrame_t *cmdFrame) bool
+        +special_40(...) bool
+        +special_80(...) bool
+        +rename(...) bool
+        +del(...) bool
+        +mkdir(...) bool
+        +rmdir(...) bool
+        +lock(...) bool
+        +unlock(...) bool
+    }
+%%gen
+    class NetworkProtocolSMB {
+        -int smb_error*
+        -uint64_t offset*
+        -stat() bool
+        #bool rename_implemented
+        #bool delete_implemented
+        #bool mkdir_implemented
+        #bool rmdir_implemented
+        #open_file_handle() bool
+        #open_dir_handle() bool
+        #mount(PeoplesUrlParser *url) bool
+        #umount() bool
+        #fserror_to_error() void
+        #read_file_handle(uint8_t *buf, unsigned short len) bool
+        #read_dir_entry(char *buf, unsigned short len) bool
+        #write_file_handle(uint8_t *buf, unsigned short len) bool
+        #close_file_handle() bool
+        #close_dir_handle() bool
+        +NetworkProtocolSMB(...)
+        +NetworkProtocolSMB() ~
+        +special_inquiry(uint8_t cmd) uint8_t
+        +special_00(cmdFrame_t *cmdFrame) bool
+        +special_40(...) bool
+        +special_80(...) bool
+        +rename(...) bool
+        +del(...) bool
+        +mkdir(...) bool
+        +rmdir(...) bool
+        +lock(...) bool
+        +unlock(...) bool
+        +seek(off_t offset, int whence) off_t
+    }
+%%gen
+    class NetworkProtocolSSH {
+        -ssh_session session
+        -ssh_channel channel
+        -fnTcpClient client
+        -unsigned char *fingerprint
+        -const char *userauthlist
+        -char *rxbuf
+        -available() unsigned short
+        +NetworkProtocolSSH(...)
+        +NetworkProtocolSSH() ~
+        +open(...) bool
+        +close() bool
+        +read(unsigned short len) bool
+        +write(unsigned short len) bool
+        +status(NetworkStatus *status) bool
+        +special_inquiry(uint8_t cmd) uint8_t
+        +special_00(cmdFrame_t *cmdFrame) bool
+        +special_40(...) bool
+        +special_80(...) bool
+    }
+%%gen
+    class NetworkProtocolTCP {
+        #fnTcpServer *server
+        #fnTcpClient client
+        #open_server(unsigned short port) bool
+        #open_client(std.string hostname, unsigned short port) bool
+        #special_accept_connection() bool
+        #special_close_client_connection() bool
+        #status_server(NetworkStatus* status) void
+        #status_client(NetworkStatus* status) void
+        +NetworkProtocolTCP(...)
+        +NetworkProtocolTCP() ~
+        +open(...) bool
+        +close() bool
+        +read(unsigned short len) bool
+        +write(unsigned short len) bool
+        +status(NetworkStatus *status) bool
+        +special_inquiry(uint8_t cmd) uint8_t
+        +special_00(cmdFrame_t *cmdFrame) bool
+        +special_40(...) bool
+        +special_80(...) bool
+    }
+%%gen
+    class NetworkProtocolTELNET {
+        +NetworkProtocolTELNET(...)
+        +NetworkProtocolTELNET() ~
+        +read(unsigned short len) bool
+        +write(unsigned short len) bool
+        +getReceiveBuffer() std.string *
+        +getTransmitBuffer() std.string *
+        +flush(const char* buf, unsigned short size) void
+        +int newRxLen
+        +char ttype[32]
+    }
+%%gen
+    class NetworkProtocolTest {
+        -std.string test_data
+        +NetworkProtocolTest(...)
+        +NetworkProtocolTest() ~
+        +open(...) bool
+        +close() bool
+        +read(unsigned short len) bool
+        +write(unsigned short len) bool
+        +status(NetworkStatus *status) bool
+        +special_inquiry(uint8_t cmd) uint8_t
+        +special_00(cmdFrame_t *cmdFrame) bool
+        +special_40(...) bool
+        +special_80(...) bool
+    }
+%%gen
+    class NetworkProtocolTNFS {
+        -tnfsMountInfo mountInfo
+        -int tnfs_error*
+        -uint16_t perms*
+        -int16_t fd*
+        -tnfsStat fileStat
+        -stat() bool
+        #bool rename_implemented
+        #bool delete_implemented
+        #bool mkdir_implemented
+        #bool rmdir_implemented
+        #open_file_handle() bool
+        #open_dir_handle() bool
+        #mount(PeoplesUrlParser *url) bool
+        #umount() bool
+        #fserror_to_error() void
+        #read_file_handle(uint8_t *buf, unsigned short len) bool
+        #read_dir_entry(char *buf, unsigned short len) bool
+        #write_file_handle(uint8_t *buf, unsigned short len) bool
+        #close_file_handle() bool
+        #close_dir_handle() bool
+        +NetworkProtocolTNFS(...)
+        +NetworkProtocolTNFS() ~
+        +special_inquiry(uint8_t cmd) uint8_t
+        +special_00(cmdFrame_t *cmdFrame) bool
+        +special_40(...) bool
+        +special_80(...) bool
+        +rename(...) bool
+        +del(...) bool
+        +mkdir(...) bool
+        +rmdir(...) bool
+        +lock(...) bool
+        +unlock(...) bool
+        +seek(off_t offset, int whence) off_t
+    }
+%%gen
+    class NetworkProtocolUDP {
+        -is_multicast() bool
+        -is_multicast(std.string h) bool
+        -is_multicast(in_addr_t addr) bool
+        #fnUDP udp
+        #std.string dest
+        #unsigned short port*
+        #bool multicast_write
+        #set_destination(uint8_t *sp_buf, unsigned short len) bool
+        +NetworkProtocolUDP(...)
+        +NetworkProtocolUDP() ~
+        +open(...) bool
+        +close() bool
+        +read(unsigned short len) bool
+        +write(unsigned short len) bool
+        +status(NetworkStatus *status) bool
+        +special_inquiry(uint8_t cmd) uint8_t
+        +special_00(cmdFrame_t *cmdFrame) bool
+        +special_40(...) bool
+        +special_80(...) bool
+    }
+%%gen
+    class NetworkStatus {
+        +NetworkStatus()
+        +uint16_t rxBytesWaiting
+        +uint8_t connected
+        +uint8_t error
+        +reset() void
+        +checksum() int
+    }
+%%gen
+    class PCF8575 {
+        #I2C_t myI2C
+        #volatile uint16_t _DIN
+        #volatile uint16_t _DIN_LAST
+        #volatile uint16_t _DOUT
+        #volatile uint16_t _DDR
+        #uint8_t _address
+        #readGPIOX() void
+        #writeGPIOX() void
+        #updateGPIOX() void
+        +PCF8575()
+        +uint8_t PORT0
+        +uint8_t PORT1
+        +begin(...) void
+        +pinMode(uint8_t pin, pin_mode_t mode) void
+        +portMode(port_t port, pin_mode_t mode) void
+        +portMode(port_t port, uint16_t mode) void
+        +digitalWrite(uint8_t pin, uint8_t value) void
+        +digitalRead(uint8_t pin) uint8_t
+        +write(port_t port, uint16_t value) void
+        +write(uint16_t value) void
+        +read(port_t port) uint16_t
+        +clear(port_t port) void
+        +set(port_t port) void
+        +toggle(uint8_t pin) void
+    }
+    class PeoplesUrlParser {
+        +string url
+        +string scheme
+        +string user
+        +string password
+        +string host
+        +string port
+        +string path
+        +string name
+        +string extension
+        +pathToFile() string - path without the trailing filename
+        +base() string - url of the containing directory
+        +root() string - scheme plus authority only
+        +parseURL(url) unique_ptr~PeoplesUrlParser~$
+    }
+%%gen
+    class ProtocolParser {
+        +ProtocolParser()
+        +createProtocol(...) NetworkProtocol*
+    }
+%%gen
+    class QRManager {
+        -QRCode qrcode
+        +QRManager(...)
+        +encode(...) std.vector~uint8_t~
+        +to_ansi(void) std.vector~uint8_t~
+        +to_binary(void) std.vector~uint8_t~
+        +to_bitmap(void) std.vector~uint8_t~
+        +to_svg(...) std.vector~uint8_t~
+        +to_atascii(void) std.vector~uint8_t~
+        +to_petscii(void) std.vector~uint8_t~
+        +version() uint8_t
+        +version(uint8_t v) void
+        +ecc() qr_ecc_t
+        +ecc(qr_ecc_t e) void
+        +size() uint8_t
+        +ouput_mode_t output_mode
+        +std.string data
+        +std.vector~uint8_t~ code
+    }
+%%gen
+    class Selector {
+        <<template>>
+        -XE * _base
+        -std.string _xpath
+        +Selector(XE * base, std.string xpath)
+        +begin() ElementIterator~XE~
+        +end() ElementIterator~XE~
+    }
+%%gen
+    class SSDPDeviceClass {
+        -fnUDP *m_server
+        -IPAddress m_last
+        -char m_schemaURL[SSDP_SCHEMA_URL_SIZE]
+        -char m_uuid[SSDP_UUID_SIZE]
+        -char m_deviceType[SSDP_DEVICE_TYPE_SIZE]
+        -char m_friendlyName[SSDP_FRIENDLY_NAME_SIZE]
+        -char m_serialNumber[SSDP_SERIAL_NUMBER_SIZE]
+        -char m_presentationURL[SSDP_PRESENTATION_URL_SIZE]
+        -char m_manufacturer[SSDP_MANUFACTURER_SIZE]
+        -char m_manufacturerURL[SSDP_MANUFACTURER_URL_SIZE]
+        -char m_modelName[SSDP_MODEL_NAME_SIZE]
+        -char m_modelURL[SSDP_MODEL_URL_SIZE]
+        -char m_modelNumber[SSDP_MODEL_VERSION_SIZE]
+        -uint16_t m_port
+        -uint8_t m_ttl
+        -ssdp_send_parameters_t m_queue[SSDP_QUEUE_SIZE]
+        #notify_timer(void* args) void$
+        #readLine(std.string value) bool
+        #readKeyValue(std.string key, std.string value) bool
+        #postNotifyALive() void
+        #postNotifyUpdate() void
+        #postResponse(long mx) void
+        #postResponse(ssdp_udn_t udn, long mx) void
+        #post(...) void
+        #send(ssdp_send_parameters_t *parameters) void
+        +SSDPDeviceClass()
+        +update() void
+        +start() void
+        +service() void
+        +getUUID() const char*
+        +setDeviceType(const std.string deviceType) void
+        +setDeviceType(const char *deviceType) void
+        +setName(const std.string name) void
+        +setName(const char *name) void
+        +setURL(const std.string url) void
+        +setURL(const char *url) void
+        +setSchemaURL(const std.string url) void
+        +setSchemaURL(const char *url) void
+        +setSerialNumber(const std.string serialNumber) void
+        +setSerialNumber(const char *serialNumber) void
+        +setSerialNumber(const uint32_t serialNumber) void
+        +setModelName(const std.string name) void
+        +setModelName(const char *name) void
+        +setModelNumber(const std.string num) void
+        +setModelNumber(const char *num) void
+        +setModelURL(const std.string url) void
+        +setModelURL(const char *url) void
+        +setManufacturer(const std.string name) void
+        +setManufacturer(const char *name) void
+        +setManufacturerURL(const std.string url) void
+        +setManufacturerURL(const char *url) void
+        +setHTTPPort(uint16_t port) void
+        +setTTL(uint8_t ttl) void
+    }
+%%gen
+    class TCPServer {
+        -int _server_socket$
+        -int _client_socket$
+        -bool _shutdown$
+        -task(void *pvParameters) void$
+        -session_task(void *pvParameters) void$
+        -TaskHandle_t _htask$
+        -TaskHandle_t _session_htask$
+        +start() void
+        +stop() void
+        +send(std.string data) void$
+        +disconnect() void$
+    }
+%%gen
+    class TimeConverter {
+        -toBcd(uint8_t decimal) uint8_t$
+        -const char* DAY_NAMES_FULL[]$
+        -const char* DAY_NAMES_SHORT[]$
+        +toAsciiTime(...) size_t$
+        +toBcdTime(...) size_t$
+        +toDecimalTime(...) size_t$
+        +toIsoTime(...) size_t$
+    }
+%%gen
+    class U8Char {
+        -const char16_t utf8map[]$
+        -const char missing
+        -fromUtf8Stream(std.istream* reader) void
+        +char16_t ch
+        +U8Char(const uint16_t codepoint)
+        +U8Char(std.istream* reader)
+        +U8Char(const char petscii)
+        +fromCharArray(char* reader) size_t
+        +toUtf8() std.string
+        +toPetscii() uint8_t
+        +toUnicode32(...) size_t
+        +fromUnicode32(...) std.string
+        +toPunycode(std.string utf8String) std.string$
+        +fromPunycode(std.string punycodeString) std.string$
+        +encodeACE(std.string utf8String) std.string$
+        +decodeACE(std.string aceOrPunycode) std.string$
+    }
+%%gen
+    class VDrive {
+        -countOpenChannels() void
+        -int m_numOpenChannels
+        +VDrive(uint8_t unit)
+        +create(...) VDrive *$
+        +openDiskImage(...) bool
+        +getDiskImageFilename() const char *
+        +closeDiskImage() void
+        +isOk() bool
+        +openFile(...) bool
+        +closeFile(uint8_t channel) bool
+        +closeAllChannels() void
+        +getNumOpenChannels() int
+        +getFileNumBlocks(...) int
+        +printDir() void
+        +isFileOk(uint8_t channel) bool
+        +read(...) bool
+        +write(...) bool
+        +execute(...) int
+        +getStatusString() const char *
+        +getStatusCode() int
+        +getStatusBuffer(...) size_t
+        +readSector(...) bool
+        +writeSector(...) bool
+        +createDiskImage(...) bool$
+    }
+%%gen
+    class WebDAV {
+        #DAVEntry currentEntry
+        #bool insideResponse
+        #bool insideDisplayName
+        #bool insideGetContentLength
+        #XML_Parser parser
+        #int entriesCounter
+        +begin_parser() bool
+        +end_parser(bool clear_entries) void
+        +parse(const char *buf, int len, int isFinal) bool
+        +rewind() std.vector~WebDAV.DAVEntry~.iterator
+        +clear() void
+        +Start(...) void
+        +End(const XML_Char *el) void
+        +Char(const XML_Char *s, int len) void
+        +std.vector~DAVEntry~ entries
+    }
+%%gen
+    class XMLCopy {
+        #XMLElement * _target
+        #XMLDocument * _newDoc
+        +XMLCopy(XMLElement * target)
+        +VisitEnter(...) bool
+        +VisitExit(const XMLElement element) bool
+        +Visit(const XMLDeclaration declaration) bool
+        +Visit(const XMLText txt) bool
+        +Visit(const XMLComment comment) bool
+    }
+%%gen
+    class XMLCopyAndReplace {
+        -substitute(const std.string val) std.pair ~bool, std.string~
+        -const std.unordered_map~std.string, std.string~ _params
+        -const char _openDelim
+        -const char _closeDelim
+        +XMLCopyAndReplace(...)
+        +VisitEnter(...) bool
+        +Visit(const XMLText txt) bool
+    }
+%%gen
+    class XmlException {
+        +XmlException(const std.string description)
+    }
+%%gen
+    class XRA1405 {
+        #I2C_t myI2C
+        #volatile uint16_t _DIN
+        #volatile uint16_t _DIN_LAST
+        #volatile uint16_t _DOUT
+        #volatile uint16_t _DDR
+        #uint8_t _address
+        #readGPIOX() void
+        #writeGPIOX() void
+        #updateGPIOX() void
+        +XRA1405()
+        +uint8_t PORT0
+        +uint8_t PORT1
+        +begin(...) void
+        +pinMode(uint8_t pin, pin_mode_t mode) void
+        +portMode(port_t port, pin_mode_t mode) void
+        +portMode(port_t port, uint16_t mode) void
+        +digitalWrite(uint8_t pin, uint8_t value) void
+        +digitalRead(uint8_t pin) uint8_t
+        +write(port_t port, uint16_t value) void
+        +write(uint16_t value) void
+        +read(port_t port) uint16_t
+        +clear(port_t port) void
+        +set(port_t port) void
+        +toggle(uint8_t pin) void
+    }
+
+    FileHandler <|-- FileHandlerLocal
+    FileHandler <|-- FileHandlerMem
+    FileHandler <|-- FileHandlerNFS
+    FileHandler <|-- FileHandlerSMB
+    FileHandler <|-- FileHandlerTNFS
+    FileSystem <|-- FileSystemFTP
+    FileSystem <|-- FileSystemHTTP
+    FileSystem <|-- FileSystemLittleFS
+    FileSystem <|-- FileSystemNFS
+    FileSystem <|-- FileSystemSDFAT
+    FileSystem <|-- FileSystemSMB
+    FileSystem <|-- FileSystemSPIFFS
+    FileSystem <|-- FileSystemTNFS
+    fnTask <|-- fnTestTask
+    MediaType <|-- MediaTypeATR
+    MediaType <|-- MediaTypeATX
+    MediaType <|-- MediaTypeDCD
+    MediaType <|-- MediaTypeDDP
+    MediaType <|-- MediaTypeDO
+    MediaType <|-- MediaTypeDSK
+    MediaType <|-- MediaTypeImg
+    MediaType <|-- MediaTypeIMG
+    MediaType <|-- MediaTypeMOOF
+    MediaType <|-- MediaTypeMRM
+    MediaType <|-- MediaTypePO
+    MediaType <|-- MediaTypeROM
+    MediaType <|-- MediaTypeVDK
+    MediaType <|-- MediaTypeWOZ
+    MediaType <|-- MediaTypeXEX
+    MemPool <|-- MemPoolT
+    NetworkProtocol <|-- NetworkProtocolFS
+    NetworkProtocolFS <|-- NetworkProtocolFTP
+    NetworkProtocolFS <|-- NetworkProtocolHTTP
+    NetworkProtocolFS <|-- NetworkProtocolSD
+    NetworkProtocolFS <|-- NetworkProtocolSMB
+    NetworkProtocol <|-- NetworkProtocolSSH
+    NetworkProtocol <|-- NetworkProtocolTCP
+    NetworkProtocolTCP <|-- NetworkProtocolTELNET
+    NetworkProtocol <|-- NetworkProtocolTest
+    NetworkProtocolFS <|-- NetworkProtocolTNFS
+    NetworkProtocol <|-- NetworkProtocolUDP
+    XMLCopy <|-- XMLCopyAndReplace

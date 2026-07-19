@@ -1,0 +1,43 @@
+%% Device filesystems: flash/SD (POSIX VFS), RAM, HIMEM
+%% GENERATED template (gen_templates.js) - curated content lives in
+%% src/extra/fs_device.mmd; class bodies live in defs/<Class>.mmd
+classDiagram
+    direction LR
+
+    %%include FlashHandle
+    %%include FlashMFile
+    %%include FlashMFileSystem
+    %%include FlashMStream
+    %%include HighMemory
+    %%include HighMemoryHandle
+    %%include I2CMFile
+    %%include I2CMFileSystem
+    %%include I2CMSession
+    %%include I2CMStream
+    %%include RAMMFile
+    %%include RAMMFileSystem
+    %%include SDFileSystem
+
+    class MFile {
+        <<see vfs_core>>
+    }
+    class MFileSystem {
+        <<see vfs_core>>
+    }
+    class MSession {
+        <<see vfs_core>>
+    }
+    class MStream {
+        <<see vfs_core>>
+    }
+
+    MFile <|-- FlashMFile
+    MFileSystem <|-- FlashMFileSystem
+    MStream <|-- FlashMStream
+    MFile <|-- I2CMFile
+    MFileSystem <|-- I2CMFileSystem
+    MSession <|-- I2CMSession
+    MStream <|-- I2CMStream
+    MFile <|-- RAMMFile
+    MFileSystem <|-- RAMMFileSystem
+    MFileSystem <|-- SDFileSystem

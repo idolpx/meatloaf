@@ -1,0 +1,19 @@
+%%gen
+    class IRCMSession {
+        -parseHost() void
+        -std.shared_ptr~TCPMStream~ _tcp
+        -std.string nick
+        -std.string server_host
+        -std.string joined_channel
+        -bool registered
+        +IRCMSession(std.string host, uint16_t port)
+        +getScheme() std.string$
+        +connect() bool
+        +disconnect() void
+        +keep_alive() bool
+        +stream() std.shared_ptr~TCPMStream~
+        +getNick() const std.string
+        +getServerHost() const std.string
+        +ensureRegistered() bool
+        +ensureJoined(const std.string channel) bool
+    }

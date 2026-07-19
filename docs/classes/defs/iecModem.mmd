@@ -1,0 +1,10 @@
+%%gen
+    class iecModem {
+        -ModemSniffer* modemSniffer
+        -FileSystem *activeFS
+        -time_t _lasttime
+        +iecModem(FileSystem *_fs, bool snifferEnable)
+        +iecModem() ~
+        +get_modem_sniffer() ModemSniffer *
+        +get_last_activity_time() time_t
+    }

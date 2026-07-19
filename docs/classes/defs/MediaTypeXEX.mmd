@@ -1,0 +1,11 @@
+%%gen
+    class MediaTypeXEX {
+        -uint8_t _xex_bootloader[384]
+        -int _xex_bootloadersize*
+        -_fake_vtoc() void
+        -_fake_directory_entry() void
+        +read(uint16_t sectornum, uint16_t *readcount) error_is_true
+        +mount(fnFile *f, uint32_t disksize) mediatype_t
+        +unmount() void
+        +status(uint8_t statusbuff[4]) void
+    }

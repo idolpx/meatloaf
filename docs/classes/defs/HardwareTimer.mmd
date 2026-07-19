@@ -1,0 +1,14 @@
+%%gen
+    class HardwareTimer {
+        -HideESPDetails *espTimer
+        -fn_timer
+        +HardwareTimer()
+        +config() void
+        +reset() void
+        +latch() void
+        +read() void
+        +timeout() bool
+        +wait() void
+        +alarm_set(int s) void
+        +alarm_snooze(int s) void
+    }

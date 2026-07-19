@@ -1,0 +1,21 @@
+%%gen
+    class FileSystemSMB {
+        -char _last_dir[MAX_PATHLEN]
+        -DirCache _dircache
+        +FileSystemSMB()
+        +start(...) bool
+        +type() fsType
+        +typestring() const char *
+        +file_open(...) FILE *
+        +remove(const char *path) bool
+        +rename(const char *pathFrom, const char *pathTo) bool
+        +is_dir(const char *path) bool
+        +mkdir(const char* path) bool
+        +rmdir(const char* path) bool
+        +dir_exists(const char* path) bool
+        +dir_open(...) bool
+        +dir_read() fsdir_entry *
+        +dir_close() void
+        +dir_tell() uint16_t
+        +dir_seek(uint16_t pos) bool
+    }

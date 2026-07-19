@@ -1,0 +1,54 @@
+%%gen
+    class UARTManager {
+        -QueueHandle_t _uart_q
+        -uint32_t _baud
+        -int _command_pin
+        -int _proceed_pin
+        -int _proceed_set
+        -int _proceed_clear
+        -HANDLE _fd
+        -int _proceed_tiocm
+        -int _fd
+        -unsigned long _suspend_time
+        -_print_number(unsigned long n, uint8_t base) size_t
+        +begin(int baud) void
+        +end() void
+        +get_baudrate() uint32_t
+        +set_baudrate(uint32_t baud) void
+        +initialized() bool
+        +available() int
+        +peek() int
+        +flush() void
+        +flush_input() void
+        +read() int
+        +readBytes(uint8_t *buffer, size_t length) size_t
+        +readBytes(char *buffer, size_t length) size_t
+        +write(uint8_t) size_t
+        +write(const uint8_t *buffer, size_t size) size_t
+        +write(const char *s) size_t
+        +write(unsigned long n) size_t
+        +write(long n) size_t
+        +write(unsigned int n) size_t
+        +write(int n) size_t
+        +printf(const char *format, ...) size_t
+        +println(const char *str) size_t
+        +println() size_t
+        +println(std.string str) size_t
+        +println(int num, int base) size_t
+        +print(const char *str) size_t
+        +print(const std.string str) size_t
+        +print(int n, int base) size_t
+        +print(unsigned int n, int base) size_t
+        +print(long n, int base) size_t
+        +print(unsigned long n, int base) size_t
+        +begin(int baud) void
+        +end() void
+        +poll(int ms) bool
+        +suspend(int sec) void
+        +initialized() bool
+        +set_port(...) void
+        +get_port(...) const char*
+        +set_baudrate(uint32_t baud) void
+        +get_baudrate() uint32_t
+        +command_asserted() bool
+    }

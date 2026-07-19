@@ -1,0 +1,51 @@
+%%gen
+    class SystemManager {
+        -char _uptime_string[24]
+        -char _currenttime_string[40]
+        -int _hardware_version*
+        -bool a2hasbuffer
+        -bool a2no3state
+        -bool ledstrip_found
+        -uint64_t _reboot_at*
+        -int _reboot_code
+        -volatile sig_atomic_t _shutdown_requests*
+        +SystemManager()
+        +_net Net
+        +digital_write(gpio_num_t pin, uint8_t val) void
+        +check_deferred_reboot() bool
+        +request_for_shutdown() int
+        +check_for_shutdown() int
+        +get_free_heap_size() uint32_t
+        +get_psram_size() uint32_t
+        +get_sdk_version() const char *
+        +get_cpu_model() chipmodels
+        +get_cpu_rev() int
+        +millis() unsigned long
+        +micros() unsigned long
+        +millis() uint64_t
+        +micros() uint64_t
+        +delay(uint32_t ms) void
+        +get_uptime_str() const char *
+        +get_current_time_str() const char *
+        +update_timezone(const char *timezone) void
+        +update_hostname(const char *hostname) void
+        +update_firmware() void
+        +get_fujinet_version(bool shortVersionOnly) const char *
+        +yield() void
+        +copy_file(...) size_t
+        +make_tempfile(FileSystem *fs, char *result_filename) FILE *
+        +make_tempfile(char *result_filename) FILE *
+        +delete_tempfile(FileSystem *fs, const char *filename) void
+        +delete_tempfile(const char *filename) void
+        +load_firmware(const char *filename, uint8_t *buffer) int
+        +debug_print_tasks() void
+        +check_hardware_ver() void
+        +get_hardware_ver() int
+        +get_hardware_ver_str() const char *
+        +get_target_platform_str() const char *
+        +hasbuffer() bool
+        +spishared() bool
+        +no3state() bool
+        +ledstrip() bool
+        +has_button_c() bool
+    }

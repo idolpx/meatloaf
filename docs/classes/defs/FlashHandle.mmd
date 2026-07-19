@@ -1,0 +1,8 @@
+%%gen
+    class FlashHandle {
+        -int flags*
+        +FILE* file_h
+        +FlashHandle()
+        +obtain(std.string path, std.string mode) void
+        +dispose() void
+    }

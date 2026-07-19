@@ -1,0 +1,9 @@
+%%gen
+    class AFPHandle {
+        -std.shared_ptr~AFPMSession~ _session
+        -std.string _volume_name
+        -std.string _file_path
+        +AFPHandle()
+        +obtain(std.string localPath, int flags) void
+        +dispose() void
+    }

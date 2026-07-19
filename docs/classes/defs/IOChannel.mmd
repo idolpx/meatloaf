@@ -1,0 +1,34 @@
+%%gen
+    class IOChannel {
+        -_print_number(unsigned long n, uint8_t base) size_t
+        #std.string _fifo
+        #double read_timeout_ms
+        #double discard_timeout_ms
+        #dataIn(void *buffer, size_t length) size_t
+        #dataOut(const void *buffer, size_t length) size_t*
+        #updateFIFO() void*
+        +end() void*
+        +flushOutput() void*
+        +available() size_t
+        +discardInput() void
+        +read(void *buffer, size_t length) size_t
+        +read(void) int
+        +write(const void *buffer, size_t length) size_t
+        +write(uint8_t c) size_t
+        +write(const char *s) size_t
+        +write(unsigned long n) size_t
+        +write(long n) size_t
+        +write(unsigned int n) size_t
+        +write(int n) size_t
+        +printf(const char *format, ...) size_t
+        +println(const char *str) size_t
+        +println() size_t
+        +println(std.string str) size_t
+        +println(int num, int base) size_t
+        +print(const char *str) size_t
+        +print(const std.string str) size_t
+        +print(int n, int base) size_t
+        +print(unsigned int n, int base) size_t
+        +print(long n, int base) size_t
+        +print(unsigned long n, int base) size_t
+    }

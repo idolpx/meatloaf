@@ -1,0 +1,16 @@
+%%gen
+    class ISOMStream {
+        #readHeader() bool
+        #seekEntry(std.string filename) bool
+        #seekEntry(uint16_t index) bool
+        #readEntry(uint16_t index) bool
+        #writeEntry(uint16_t index) bool
+        #seekPath(std.string path) bool
+        #readFile(uint8_t* buf, uint32_t size) uint32_t
+        #Header header
+        #Entry entry
+        #decodeType(...) std.string
+        +bool has_subdirs
+        +const size_t block_size
+        +ISOMStream(std.shared_ptr~MStream~ is)
+    }

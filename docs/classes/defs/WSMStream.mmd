@@ -1,0 +1,22 @@
+%%gen
+    class WSMStream {
+        #websockets.WSInterfaceString address
+        #uint16_t port
+        #bool _is_open
+        #bool m_isServer
+        #websockets.WebsocketsClient client
+        #websockets.WebsocketsServer server
+        #websockets.WSInterfaceString lastMsg
+        #prepareClientCallbacks() void
+        +isNetwork() bool
+        +WSMStream(MFile* file, bool isServer)
+        +close() void
+        +open() bool
+        +position() uint32_t
+        +available() uint32_t
+        +isOpen() bool
+        +seek(uint32_t pos) bool
+        +size() uint32_t
+        +read(uint8_t* buf, uint32_t size) uint32_t
+        +write(const uint8_t *buf, size_t size) size_t
+    }

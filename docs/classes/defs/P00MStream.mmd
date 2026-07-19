@@ -1,0 +1,10 @@
+%%gen
+    class P00MStream {
+        #readHeader() bool
+        #isRandomAccess() bool
+        #isBrowsable() bool
+        #readFile(uint8_t* buf, uint32_t size) uint32_t
+        #writeFile(uint8_t* buf, uint32_t size) uint32_t
+        #Header header
+        +P00MStream(std.shared_ptr~MStream~ is)
+    }

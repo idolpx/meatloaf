@@ -1,0 +1,27 @@
+%%gen
+    class PCF8575 {
+        #I2C_t myI2C
+        #volatile uint16_t _DIN
+        #volatile uint16_t _DIN_LAST
+        #volatile uint16_t _DOUT
+        #volatile uint16_t _DDR
+        #uint8_t _address
+        #readGPIOX() void
+        #writeGPIOX() void
+        #updateGPIOX() void
+        +PCF8575()
+        +uint8_t PORT0
+        +uint8_t PORT1
+        +begin(...) void
+        +pinMode(uint8_t pin, pin_mode_t mode) void
+        +portMode(port_t port, pin_mode_t mode) void
+        +portMode(port_t port, uint16_t mode) void
+        +digitalWrite(uint8_t pin, uint8_t value) void
+        +digitalRead(uint8_t pin) uint8_t
+        +write(port_t port, uint16_t value) void
+        +write(uint16_t value) void
+        +read(port_t port) uint16_t
+        +clear(port_t port) void
+        +set(port_t port) void
+        +toggle(uint8_t pin) void
+    }

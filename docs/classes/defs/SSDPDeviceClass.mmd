@@ -1,0 +1,56 @@
+%%gen
+    class SSDPDeviceClass {
+        -fnUDP *m_server
+        -IPAddress m_last
+        -char m_schemaURL[SSDP_SCHEMA_URL_SIZE]
+        -char m_uuid[SSDP_UUID_SIZE]
+        -char m_deviceType[SSDP_DEVICE_TYPE_SIZE]
+        -char m_friendlyName[SSDP_FRIENDLY_NAME_SIZE]
+        -char m_serialNumber[SSDP_SERIAL_NUMBER_SIZE]
+        -char m_presentationURL[SSDP_PRESENTATION_URL_SIZE]
+        -char m_manufacturer[SSDP_MANUFACTURER_SIZE]
+        -char m_manufacturerURL[SSDP_MANUFACTURER_URL_SIZE]
+        -char m_modelName[SSDP_MODEL_NAME_SIZE]
+        -char m_modelURL[SSDP_MODEL_URL_SIZE]
+        -char m_modelNumber[SSDP_MODEL_VERSION_SIZE]
+        -uint16_t m_port
+        -uint8_t m_ttl
+        -ssdp_send_parameters_t m_queue[SSDP_QUEUE_SIZE]
+        #notify_timer(void* args) void$
+        #readLine(std.string value) bool
+        #readKeyValue(std.string key, std.string value) bool
+        #postNotifyALive() void
+        #postNotifyUpdate() void
+        #postResponse(long mx) void
+        #postResponse(ssdp_udn_t udn, long mx) void
+        #post(...) void
+        #send(ssdp_send_parameters_t *parameters) void
+        +SSDPDeviceClass()
+        +update() void
+        +start() void
+        +service() void
+        +getUUID() const char*
+        +setDeviceType(const std.string deviceType) void
+        +setDeviceType(const char *deviceType) void
+        +setName(const std.string name) void
+        +setName(const char *name) void
+        +setURL(const std.string url) void
+        +setURL(const char *url) void
+        +setSchemaURL(const std.string url) void
+        +setSchemaURL(const char *url) void
+        +setSerialNumber(const std.string serialNumber) void
+        +setSerialNumber(const char *serialNumber) void
+        +setSerialNumber(const uint32_t serialNumber) void
+        +setModelName(const std.string name) void
+        +setModelName(const char *name) void
+        +setModelNumber(const std.string num) void
+        +setModelNumber(const char *num) void
+        +setModelURL(const std.string url) void
+        +setModelURL(const char *url) void
+        +setManufacturer(const std.string name) void
+        +setManufacturer(const char *name) void
+        +setManufacturerURL(const std.string url) void
+        +setManufacturerURL(const char *url) void
+        +setHTTPPort(uint16_t port) void
+        +setTTL(uint8_t ttl) void
+    }

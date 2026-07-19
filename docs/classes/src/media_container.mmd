@@ -1,0 +1,93 @@
+%% Containers and file wrappers: archives, ISO, LBR/LNX/ARC/ARK, P00, carts
+%% GENERATED template (gen_templates.js) - curated content lives in
+%% src/extra/media_container.mmd; class bodies live in defs/<Class>.mmd
+classDiagram
+    direction LR
+
+    %%include Archive
+    %%include ArchiveMFile
+    %%include ArchiveMFileSystem
+    %%include ArchiveMSession
+    %%include ArchiveMStream
+    %%include ARCMFile
+    %%include ARCMFileSystem
+    %%include ARCMStream
+    %%include ARKMFile
+    %%include ARKMFileSystem
+    %%include ARKMStream
+    %%include CRTMFile
+    %%include CRTMFileSystem
+    %%include CRTMStream
+    %%include D8BMFile
+    %%include D8BMFileSystem
+    %%include D8BMStream
+    %%include DFIMFile
+    %%include DFIMFileSystem
+    %%include DFIMStream
+    %%include EFCRTMFile
+    %%include EFCRTMStream
+    %%include ISOMFile
+    %%include ISOMFileSystem
+    %%include ISOMStream
+    %%include LBRMFile
+    %%include LBRMFileSystem
+    %%include LBRMStream
+    %%include LNXMFile
+    %%include LNXMFileSystem
+    %%include LNXMStream
+    %%include P00MFile
+    %%include P00MFileSystem
+    %%include P00MStream
+
+    class D64MFile {
+        <<see media_disk>>
+    }
+    class D64MStream {
+        <<see media_disk>>
+    }
+    class MFile {
+        <<see vfs_core>>
+    }
+    class MFileSystem {
+        <<see vfs_core>>
+    }
+    class MMediaStream {
+        <<see vfs_core>>
+    }
+    class MSession {
+        <<see vfs_core>>
+    }
+
+    MFile <|-- ArchiveMFile
+    MFileSystem <|-- ArchiveMFileSystem
+    MSession <|-- ArchiveMSession
+    MMediaStream <|-- ArchiveMStream
+    MFile <|-- ARCMFile
+    MFileSystem <|-- ARCMFileSystem
+    MMediaStream <|-- ARCMStream
+    MFile <|-- ARKMFile
+    MFileSystem <|-- ARKMFileSystem
+    MMediaStream <|-- ARKMStream
+    MFile <|-- CRTMFile
+    MFileSystem <|-- CRTMFileSystem
+    MMediaStream <|-- CRTMStream
+    D64MFile <|-- D8BMFile
+    MFileSystem <|-- D8BMFileSystem
+    D64MStream <|-- D8BMStream
+    D64MFile <|-- DFIMFile
+    MFileSystem <|-- DFIMFileSystem
+    D64MStream <|-- DFIMStream
+    MFile <|-- EFCRTMFile
+    MMediaStream <|-- EFCRTMStream
+    MFile <|-- ISOMFile
+    MFileSystem <|-- ISOMFileSystem
+    MMediaStream <|-- ISOMStream
+    MFile <|-- LBRMFile
+    MFileSystem <|-- LBRMFileSystem
+    MMediaStream <|-- LBRMStream
+    MFile <|-- LNXMFile
+    MFileSystem <|-- LNXMFileSystem
+    MMediaStream <|-- LNXMStream
+    MFile <|-- P00MFile
+    MFileSystem <|-- P00MFileSystem
+    MMediaStream <|-- P00MStream

@@ -1,0 +1,43 @@
+%%gen
+    class iecNetwork {
+        -bool is_binary_status
+        -bool file_not_found
+        -uint8_t active_status_channel*
+        -parse_json() void
+        -query_json() void
+        -parse_bite() void
+        -set_device_id() void
+        -set_status(bool is_binary) void
+        -set_prefix() void
+        -get_prefix() void
+        -set_channel_mode() void
+        -set_login_password() void
+        -set_translation_mode() void
+        -fsop(unsigned char comnd) void
+        -iec_open() void
+        -iec_close() void
+        -iec_command() void
+        -perform_special_00() void
+        -perform_special_40() void
+        -perform_special_80() void
+        -set_open_params() void
+        -init() void
+        -transmit(NetworkData channel_data) bool
+        -receive(...) bool
+        -iecStatus
+        -std.vector~std.string~ pt
+        -IECData commanddata
+        -std.string payload
+        -cmdFrame_t cmdFrame
+        #task() void
+        #open(...) bool
+        #close(uint8_t channel) void
+        #write(...) uint8_t
+        #read(...) uint8_t
+        #execute(const char *command) void
+        #getStatusData(...) uint8_t
+        #reset() void
+        +iecNetwork(uint8_t devnr)
+        +iecNetwork() ~
+        +std.unordered_map~uint8_t, NetworkData~ network_data_map
+    }

@@ -1,0 +1,308 @@
+%% Service and codec filesystems: mDNS, JSON, QR, RetroPixels, SQLite, hash, ML
+%% GENERATED template (gen_templates.js) - curated content lives in
+%% src/extra/fs_service.mmd; class bodies live in defs/<Class>.mmd
+classDiagram
+    direction LR
+
+%%gen
+    class CSIPMFile {
+        #std.shared_ptr~CSIPMSession~ _session
+        #bool dirIsOpen
+        #bool dirIsImage
+        #bool dirHoldsIo
+        +CSIPMFile(std.string path, size_t size)
+        +getSourceStream(...) std.shared_ptr~MStream~
+        +getDecodedStream(std.shared_ptr~MStream~ src) std.shared_ptr~MStream~
+        +createStream(std.ios_base.openmode mode) std.shared_ptr~MStream~
+        +isDirectory() bool
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile*
+        +mkDir() bool
+        +exists() bool
+        +remove() bool
+        +getSession() std.shared_ptr~CSIPMSession~
+    }
+%%gen
+    class CSIPMFileSystem {
+        +CSIPMFileSystem()
+        +handles(std.string name) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class CSIPMSession {
+        #csstreambuf buf
+        #std.string currentDir
+        #establish() bool
+        +CSIPMSession(...)
+        +connect() bool
+        +disconnect() void
+        +keep_alive() bool
+        +getScheme() std.string$
+        +sendCommand(const std.string command) bool
+        +traversePath(std.string path) bool
+        +isOK() bool
+        +readLn() std.string
+        +receive(uint8_t* buffer, size_t size) size_t
+        +send(const uint8_t* buffer, size_t size) size_t
+        +getCurrentDir() std.string
+    }
+%%gen
+    class CSIPMStream {
+        #std.shared_ptr~CSIPMSession~ _session
+        #bool _is_open
+        #bool _holds_io
+        +CSIPMStream(std.string path)
+        +isOpen() bool
+        +isBrowsable() bool
+        +isRandomAccess() bool
+        +open(std.ios_base.openmode mode) bool
+        +close() void
+        +read(uint8_t* buf, uint32_t size) uint32_t
+        +write(const uint8_t *buf, uint32_t size) uint32_t
+        +seek(uint32_t pos) bool
+    }
+    class csstreambuf {
+        <<std::streambuf>>
+        +console/serial sink
+    }
+    class idirbuf {
+        <<std::streambuf>>
+        +directory listing source
+    }
+%%gen
+    class MDNSMFile {
+        #std.shared_ptr~MDNSMSession~ _session
+        #std.string service_type
+        #std.string instance_name
+        #bool dirOpened
+        #size_t dir_index
+        #parseUrl() void
+        #refreshServiceList() void
+        +MDNSMFile(std.string path)
+        +getSourceStream(...) std.shared_ptr~MStream~
+        +getDecodedStream(std.shared_ptr~MStream~ src) std.shared_ptr~MStream~
+        +createStream(std.ios_base.openmode mode) std.shared_ptr~MStream~
+        +isDirectory() bool
+        +exists() bool
+        +remove() bool
+        +rename(std.string dest) bool
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile*
+        +getLastWrite() time_t
+        +getCreationTime() time_t
+        +size() uint32_t
+    }
+%%gen
+    class MDNSMFileSystem {
+        +MDNSMFileSystem()
+        +handles(std.string name) bool
+        +getFile(std.string path) MFile*
+    }
+    class MDNSMSession {
+        -vector~DiscoveredService~ services - cached discovery results
+        -mutex_protected
+        +connect() bool - esp-idf mdns init
+        +disconnect() void
+        +keep_alive() bool
+        +discoverServices(type, proto, timeout_ms) bool - PTR meta-query for service types
+    }
+%%gen
+    class MDNSMStream {
+        -std.shared_ptr~MDNSMSession~ _session
+        -std.string service_type
+        -std.string instance_name
+        -bool _is_open
+        -std.string content
+        -uint32_t _position
+        -parseUrl() void
+        -generateContent() void
+        +MDNSMStream(std.string path)
+        +isOpen() bool
+        +isBrowsable() bool
+        +isRandomAccess() bool
+        +open(std.ios_base.openmode mode) bool
+        +close() void
+        +read(uint8_t* buf, uint32_t size) uint32_t
+        +write(const uint8_t *buf, uint32_t size) uint32_t
+        +seek(uint32_t pos) bool
+        +size() uint32_t
+        +available() uint32_t
+        +position() uint32_t
+    }
+%%gen
+    class MLFileSystem {
+        +MLFileSystem()
+        +handles(std.string fileName) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class MLMFileSystem {
+        +MLMFileSystem()
+        +handles(std.string name) bool
+        +getFile(std.string path) MFile*
+        +resolve(std.string path) std.string
+    }
+%%gen
+    class MQTTMFile {
+        #std.shared_ptr~MQTTMSession~ _session
+        #std.string topic
+        +MQTTMFile(std.string path)
+        +getSourceStream(...) std.shared_ptr~MStream~
+        +getDecodedStream(std.shared_ptr~MStream~ src) std.shared_ptr~MStream~
+        +createStream(std.ios_base.openmode mode) std.shared_ptr~MStream~
+        +isDirectory() bool
+        +exists() bool
+        +remove() bool
+        +rename(std.string dest) bool
+        +getSession() std.shared_ptr~MQTTMSession~
+    }
+%%gen
+    class MQTTMFileSystem {
+        +MQTTMFileSystem()
+        +handles(std.string name) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class MQTTMSession {
+        -esp_mqtt_client_handle_t mqtt_client
+        -std.string client_id
+        -std.queue~esp_mqtt_event_t*~ message_queue
+        -std.mutex queue_mutex
+        -std.condition_variable queue_cv
+        -mqtt_event_handler(...) void$
+        -handle_event(esp_mqtt_event_t *event) void
+        +MQTTMSession(...)
+        +connect() bool
+        +disconnect() void
+        +keep_alive() bool
+        +getScheme() std.string$
+        +publish(...) bool
+        +subscribe(const std.string topic, int qos) bool
+        +unsubscribe(const std.string topic) bool
+        +hasMessage() bool
+        +getMessage() esp_mqtt_event_t*
+        +clearMessage() void
+        +bool isConnected() const
+    }
+%%gen
+    class MQTTMStream {
+        -std.shared_ptr~MQTTMSession~ session
+        -std.string topic
+        -bool is_subscribed
+        -std.string read_buffer
+        -size_t read_pos*
+        +MQTTMStream(std.string path)
+        +isOpen() bool
+        +isBrowsable() bool
+        +isRandomAccess() bool
+        +open(std.ios_base.openmode mode) bool
+        +close() void
+        +read(uint8_t* buf, uint32_t size) uint32_t
+        +write(const uint8_t *buf, uint32_t size) uint32_t
+        +seek(uint32_t pos) bool
+    }
+%%gen
+    class QRMFile {
+        +QRMFile(std.string path)
+        +isDirectory() bool
+        +getSourceStream(...) std.shared_ptr~MStream~
+        +getDecodedStream(std.shared_ptr~MStream~ is) std.shared_ptr~MStream~
+    }
+%%gen
+    class QRMFileSystem {
+        +QRMFileSystem()
+        +handles(std.string name) bool
+        +getFile(std.string path) MFile*
+    }
+    class QRMStream {
+        <<codec/qr.h>>
+        +QR code generator stream
+    }
+%%gen
+    class RetroPixelsDither {
+    }
+%%gen
+    class RetroPixelsFormat {
+    }
+%%gen
+    class RetroPixelsMFile {
+        -RetroPixelsConfig _config
+        +RetroPixelsMFile(...)
+        +isDirectory() bool
+        +getSourceStream(...) std.shared_ptr~MStream~
+        +getDecodedStream(std.shared_ptr~MStream~ is) std.shared_ptr~MStream~
+        +setConfig(const RetroPixelsConfig config) void
+        +getConfig() RetroPixelsConfig
+    }
+%%gen
+    class RetroPixelsMFileSystem {
+        +RetroPixelsMFileSystem()
+        +handles(std.string name) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class RetroPixelsMStream {
+        -std.shared_ptr~MStream~ _source_stream
+        -RetroPixelsConfig _config
+        -std.vector~uint8_t~ _output_buffer
+        -bool _converted
+        -convertImage() bool
+        -getFormatExtension() std.string
+        +RetroPixelsMStream(...)
+        +isOpen() bool
+        +open(std.ios_base.openmode mode) bool
+        +close() void
+        +size() uint32_t
+        +read(uint8_t* buf, uint32_t size) uint32_t
+        +write(const uint8_t *buf, uint32_t size) uint32_t
+        +seek(uint32_t pos) bool
+        +setConfig(const RetroPixelsConfig config) void
+        +getConfig() RetroPixelsConfig
+    }
+%%gen
+    class RetroPixelsPalette {
+    }
+%%gen
+    class RetroPixelsScale {
+    }
+%%gen
+    class URLMFileSystem {
+        +URLMFileSystem()
+        +handles(std.string fileName) bool
+        +getFile(std.string path) MFile*
+    }
+
+    class MFile {
+        <<see vfs_core>>
+    }
+    class MFileSystem {
+        <<see vfs_core>>
+    }
+    class MSession {
+        <<see vfs_core>>
+    }
+    class MStream {
+        <<see vfs_core>>
+    }
+
+    MFile <|-- CSIPMFile
+    MFileSystem <|-- CSIPMFileSystem
+    MSession <|-- CSIPMSession
+    MStream <|-- CSIPMStream
+    MFile <|-- MDNSMFile
+    MFileSystem <|-- MDNSMFileSystem
+    MSession <|-- MDNSMSession
+    MStream <|-- MDNSMStream
+    MFileSystem <|-- MLFileSystem
+    MFileSystem <|-- MLMFileSystem
+    MFile <|-- MQTTMFile
+    MFileSystem <|-- MQTTMFileSystem
+    MSession <|-- MQTTMSession
+    MStream <|-- MQTTMStream
+    MFile <|-- QRMFile
+    MFileSystem <|-- QRMFileSystem
+    MStream <|-- QRMStream
+    MFile <|-- RetroPixelsMFile
+    MFileSystem <|-- RetroPixelsMFileSystem
+    MStream <|-- RetroPixelsMStream
+    MFileSystem <|-- URLMFileSystem

@@ -1,0 +1,27 @@
+%%gen
+    class VDrive {
+        -countOpenChannels() void
+        -int m_numOpenChannels
+        +VDrive(uint8_t unit)
+        +create(...) VDrive *$
+        +openDiskImage(...) bool
+        +getDiskImageFilename() const char *
+        +closeDiskImage() void
+        +isOk() bool
+        +openFile(...) bool
+        +closeFile(uint8_t channel) bool
+        +closeAllChannels() void
+        +getNumOpenChannels() int
+        +getFileNumBlocks(...) int
+        +printDir() void
+        +isFileOk(uint8_t channel) bool
+        +read(...) bool
+        +write(...) bool
+        +execute(...) int
+        +getStatusString() const char *
+        +getStatusCode() int
+        +getStatusBuffer(...) size_t
+        +readSector(...) bool
+        +writeSector(...) bool
+        +createDiskImage(...) bool$
+    }

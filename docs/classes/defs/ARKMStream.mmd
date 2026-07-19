@@ -1,0 +1,12 @@
+%%gen
+    class ARKMStream {
+        #readHeader() bool
+        #seekEntry(std.string filename) bool
+        #seekEntry(uint16_t index) bool
+        #readFile(uint8_t* buf, uint32_t size) uint32_t
+        #writeFile(uint8_t* buf, uint32_t size) uint32_t
+        #seekPath(std.string path) bool
+        #Header header
+        #Entry entry
+        +ARKMStream(std.shared_ptr~MStream~ is)
+    }

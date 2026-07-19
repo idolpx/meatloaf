@@ -1,0 +1,265 @@
+%% IEC/GPIB bus: handlers, transfer protocols, fastloaders
+%% GENERATED template (gen_templates.js) - curated content lives in
+%% src/extra/bus.mmd; class bodies live in defs/<Class>.mmd
+classDiagram
+    direction LR
+
+%%gen
+    class CPBStandardSerial {
+        +receiveByte() uint8_t
+        +sendByte(uint8_t data, bool eoi) bool
+    }
+%%gen
+    class DolphinDOS {
+        #receiveByte(void) uint8_t
+        #sendByte(uint8_t data, bool signalEOI) bool
+    }
+%%gen
+    class GPIBDevice {
+        #begin() void
+        #task() void
+        #reset() void
+        #talk(uint8_t secondary) void
+        #listen(uint8_t secondary) void
+        #untalk() void
+        #unlisten() void
+        #canWrite() int8_t
+        #canRead() int8_t
+        #write(uint8_t data, bool eoi) void
+        #read() uint8_t
+        #sendSRQ() void
+        #bool m_isActive
+        #uint8_t m_devnr
+        #uint8_t m_flEnabled
+        #uint32_t m_flFlags
+        #uint8_t m_flProtocol
+        #GPIBusHandler *m_handler
+        +GPIBDevice(uint8_t devnr)
+        +setDeviceNumber(uint8_t devnr) void
+        +isActive() bool
+        +setActive(bool b) void
+    }
+%%gen
+    class GPIBFileDevice {
+        -talk(uint8_t secondary) void
+        -listen(uint8_t secondary) void
+        -untalk() void
+        -unlisten() void
+        -canWrite() int8_t
+        -canRead() int8_t
+        -write(uint8_t data, bool eoi) void
+        -write(...) uint8_t
+        -read() uint8_t
+        -read(uint8_t *buffer, uint8_t bufferSize) uint8_t
+        -peek() uint8_t
+        -fillReadBuffer() void
+        -emptyWriteBuffer() void
+        -fileTask() void
+        -checkMWcmd(...) bool
+        -checkMWcmds(...) bool
+        -bool m_opening, m_eoi, m_canServeATN
+        -uint8_t m_channel, m_cmd, m_uploadCtr
+        -uint8_t m_readBuffer[15][2]
+        -uint8_t m_statusBufferLen, m_statusBufferPtr, m_writeBufferLen
+        -int8_t m_readBufferLen[15]
+        -char m_statusBuffer[GPIBFILEDEVICE_STATUS_BUFFER_SIZE]
+        #begin() void
+        #task() void
+        #open(uint8_t channel, const char *name) bool*
+        #close(uint8_t channel) void*
+        #write(...) uint8_t*
+        #read(...) uint8_t*
+        #getStatus(char *buffer, uint8_t bufferSize) void
+        #getStatusData(char *buffer, uint8_t bufferSize) uint8_t
+        #execute(const char *command, uint8_t cmdLen) void
+        #reset() void
+        #setStatus(const char *data, uint8_t dataLen) void
+        #clearStatus() void
+        #clearReadBuffer(uint8_t channel) void
+        #epyxWriteSector(...) bool
+        +GPIBFileDevice(uint8_t devnr)
+    }
+%%gen
+    class GPIBusHandler {
+        -readPinATN() bool
+        -readPinDAV() bool
+        -readPinNRFD() bool
+        -readPinNDAC() bool
+        -readPinEOI() bool
+        -readPinSRQ() bool
+        -readPinDDR() bool
+        -readPinRESET() bool
+        -writePinDAV(bool v) void
+        -writePinNRFD(bool v) void
+        -writePinNDAC(bool v) void
+        -writePinEOI(bool v) void
+        -writePinSRQ(bool v) void
+        -writePinDDR(bool v) void
+        -writePinCTRL(bool v) void
+        -waitTimeout(uint16_t timeout, uint8_t cond) bool
+        -waitPinEOI(bool state, uint16_t timeout) bool
+        -waitPinNDAC(bool state, uint16_t timeout) bool
+        -waitPinNRFD(bool state, uint16_t timeout) bool
+        -waitPinDAV(bool state, uint16_t timeout) bool
+        -waitPinATN(bool state) void
+        -atnRequest() void
+        -receiveGPIBByteATN(uint8_t data) bool
+        -receiveGPIBByte(bool canWriteOk) bool
+        -transmitGPIBByte(uint8_t numData) bool
+        -handleATNSequence() void
+        -volatile uint16_t m_timeoutDuration
+        -volatile uint32_t m_timeoutStart
+        -volatile bool m_inTask
+        -volatile uint8_t m_flags
+        -uint8_t m_primary, m_secondary
+        -uint8_t m_dataDirection
+        -volatile IOREG_TYPE *m_regNRFDwrite, *m_regNRFDmode, *m_regNDACwrite, *m_regNDACmode
+        -volatile IOREG_TYPE *m_regEOIwrite, *m_regEOImode, *m_regSRQwrite, *m_regSRQmode
+        -volatile IOREG_TYPE *m_regDDRwrite, *m_regDDRmode
+        -endParallelTransaction() void
+        -setParallelBusModeInput() void
+        -setParallelBusModeOutput() void
+        -readParallelData() uint8_t
+        -writeParallelData(uint8_t data) void
+        +GPIBusHandler(...)
+        +begin() void
+        +attachDevice(GPIBDevice *dev) bool
+        +detachDevice(GPIBDevice *dev) bool
+        +task() void
+        +canServeATN() bool
+        +inTransaction() bool
+        +sendSRQ() void
+        +GPIBDevice *m_currentDevice
+        +GPIBDevice *m_devices[GPIB_MAX_DEVICES]
+        +uint8_t m_numDevices
+        +int m_atnInterrupt
+    }
+    class IECBusHandler {
+        -IECDevice* m_devices - attached devices
+        -uint8_t* m_buffer - transfer buffer
+        +IECBusHandler(pinATN, pinCLK, pinDATA, pinRESET, pinCTRL, pinSRQ)
+        +begin() void
+        +task() void - the microsecond-timing bus protocol loop
+        +attachDevice(dev) bool - devices answer ids 4-30
+        +detachDevice(dev) bool
+        +findDevice(devnr, includeInactive) IECDevice*
+        +setBuffer(buffer, bufferSize) void
+        +getSupportedFastLoaders() uint8_t$
+        +isFastLoaderSupported(loader) bool$
+        +enableFastLoader(dev, protocol, enable) bool - JiffyDOS Dolphin Epyx
+        +fastLoadRequest(dev, loader, request) void
+        +enableDolphinBurstMode(dev, enable) void
+        +setParallelPins(pins) void - DolphinDOS parallel cable
+    }
+    class IECDevice {
+        #uint8_t m_devnr
+        #IECBusHandler* m_handler
+        +isActive() bool
+        +begin() void
+        +task() void - called from bus service loop
+        +reset() void
+        +talk(secondary) void
+        +listen(secondary) void
+        +untalk() void
+        +unlisten() void
+        +canWrite() int8_t - -1 wait, 0 no, 1 yes (timing critical)
+        +canRead() int8_t
+    }
+    class IECFileDevice {
+        <<abstract>>
+        +begin() void
+        +task() void
+        +open(channel, name, nameLen)* bool
+        +close(channel)* void
+        +write(channel, buffer, bufferSize, eoi)* uint8_t
+        +read(channel, buffer, bufferSize, eoi)* uint8_t
+        +getStatus(buffer, bufferSize) void - drive status string
+        +getStatusData(buffer, bufferSize, eoi) uint8_t
+        +execute(command) void - DOS command channel 15
+        +executeData(data, len) void - binary command payloads
+        +reset() void
+        +epyxReadSector(track, sector, buffer) bool
+        +epyxWriteSector(track, sector, buffer) bool
+    }
+%%gen
+    class IECHost {
+        -enterHostMode() void
+        -exitHostMode() void
+        -hAssertATN() void
+        -hReleaseATN() void
+        -hSendByte(...) bool
+        -hRecvByte(uint8_t data, bool eoi) bool
+        -hJiffyRecvByte(uint8_t data, bool eoi) bool
+        -hJiffySendByte(uint8_t data, bool eoi) bool
+        -hBeginATN() bool
+        -cmdOpen(...) bool
+        -cmdClose(uint8_t devnr, uint8_t channel) bool
+        -IECBusHandler m_bus
+        -std.map~uint8_t, IECDeviceInfo~ m_devices
+        -bool m_wasATNEnabled
+        +IECHost(IECBusHandler bus) explicit
+        +scanBus(...) int
+        +probeDevice(uint8_t devnr) bool
+        +initDevice(uint8_t devnr) bool
+        +getDevices() const std.map~uint8_t, IECDeviceInfo~
+        +sendCommand(...) bool
+        +readStatus(...) uint8_t
+        +openForWrite(...) bool
+        +writeData(...) bool
+        +openForRead(...) bool
+        +readData(...) uint8_t
+        +closeChannel(uint8_t devnr, uint8_t channel) bool
+        +resetBus() void
+    }
+    class IECProtocol {
+        <<abstract>>
+    }
+%%gen
+    class JiffyDOS {
+        #uint8_t loadmode*
+        #uint8_t skipeoi*
+        #receiveByte(void) uint8_t
+        #sendByte(uint8_t data, bool eoi) bool
+        #sendByte(...) bool
+        +JiffyDOS()
+    }
+%%gen
+    class parallelBus {
+        +setup() void
+        +reset() void
+        +service() void
+        +setMode(parallel_mode_t mode) void
+        +handShake() void
+        +readByte() uint8_t
+        +writeByte(uint8_t byte) void
+        +uint8_t flags
+        +uint8_t data*
+        +parallel_mode_t mode
+        +pbus_state_t state
+        +bool enabled
+    }
+%%gen
+    class SauceDOS {
+        #receiveByte(void) uint8_t
+        #sendByte(uint8_t data, bool eoi) bool
+        +SauceDOS()
+    }
+    class systemBus {
+        +setup() void - GPIO config and device attach from config
+        +service() void - bus task loop (core 1, priority 17)
+        +shutdown() void
+    }
+
+    IECProtocol <|-- CPBStandardSerial
+    IECProtocol <|-- DolphinDOS
+    GPIBDevice <|-- GPIBFileDevice
+    IECDevice <|-- IECFileDevice
+    IECProtocol <|-- JiffyDOS
+    IECProtocol <|-- SauceDOS
+    GPIBusHandler <|-- systemBus
+
+    IECBusHandler o-- IECDevice : attached devices 4-30
+    CPBStandardSerial <|-- CPBFastSerial
+    systemBus ..> IECProtocol : per-transfer negotiation
+
+    note for IECBusHandler "Bus timing runs in systemBus service() on core 1 at priority 17; microsecond windows - debug logging can break the protocol"

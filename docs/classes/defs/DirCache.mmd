@@ -1,0 +1,12 @@
+%%gen
+    class DirCache {
+        -std.vector~fsdir_entry *,PSRAMAllocator~fsdir_entry *~~ _entries_filtered
+        -std.vector~fsdir_entry *~ _entries_filtered
+        +clear() void
+        +new_entry() fsdir_entry
+        +apply_filter(const char *pattern, uint16_t diropts) void
+        +empty() bool
+        +read() fsdir_entry *
+        +tell() uint16_t
+        +seek(uint16_t pos) bool
+    }

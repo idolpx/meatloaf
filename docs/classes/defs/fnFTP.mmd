@@ -1,0 +1,67 @@
+%%gen
+    class fnFTP {
+        -unsigned long _range_begin*
+        -unsigned long _range_end*
+        #private- string hostname
+        #bool _stor
+        #bool _expect_control_response
+        #int _statusCode*
+        #unsigned short control_port
+        #fnTcpClient *control
+        #fnTcpClient *data
+        #string controlResponse
+        #string username
+        #string password
+        #std.stringstream dirBuffer
+        #unsigned short data_port*
+        #bool _active_mode
+        #fnTcpServer _active_server
+        #parse_response() bool
+        #read_response_line(char *buf, int buflen) int
+        #get_data_port() bool
+        #get_data_port_epsv() bool
+        #get_data_port_pasv() bool
+        #get_data_port_port() bool
+        #accept_active_connection() bool
+        #is_positive_preliminary_reply() bool
+        #is_positive_completion_reply() bool
+        #is_positive_intermediate_reply() bool
+        #is_negative_transient_reply() bool
+        #is_negative_permanent_reply() bool
+        #is_protected_reply() bool
+        #is_syntax() bool
+        #is_informational() bool
+        #is_connection() bool
+        #is_authentication() bool
+        #is_filesystem_related() bool
+        #USER() void
+        #PASS() void
+        #TYPE() void
+        #QUIT() void
+        #EPSV() void
+        #PASV() void
+        #PORT(...) void
+        #RETR(string path) void
+        +fnFTP()
+        +fnFTP() ~
+        +fnFTP (const fnFTP)
+        +login(...) bool
+        +logout() bool
+        +open_file(string path, bool stor) bool
+        +open_directory(string path, string pattern) bool
+        +read_directory(string name, long filesize, bool is_dir) bool
+        +read_file(...) bool
+        +write_file(uint8_t* buf, unsigned short len) bool
+        +close() bool
+        +status() int
+        +data_available() int
+        +data_connected() bool
+        +control_connected() bool
+        +reconnect() bool
+        +get_file_size(string path) int32_t
+        +delete_file(string path) bool
+        +rename_file(string pathFrom, string pathTo) bool
+        +make_directory(string path) bool
+        +remove_directory(string path) bool
+        +keep_alive() bool
+    }

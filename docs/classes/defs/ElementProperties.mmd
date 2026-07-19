@@ -1,0 +1,11 @@
+%%gen
+    class ElementProperties {
+        -std.string _name
+        -attribute_list_t _attributes
+        -_state
+        +ElementProperties(std.string xProps)
+        +ElementProperties()
+        +Name() std.string
+        +Match(const XMLElement * element) bool
+        +Update(XMLElement * element) void
+    }

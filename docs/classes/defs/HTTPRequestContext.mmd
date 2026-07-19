@@ -1,0 +1,20 @@
+%%gen
+    class HTTPRequestContext {
+        +std.string method
+        +std.map~std.string, std.vector~std.string~~ headers
+        +std.string body
+        +std.vector~std.string~ responseHeaders
+        +int responseStatus*
+        +bool responseConsumed
+        +setMethod(const std.string m) void
+        +setHeader(...) void
+        +appendHeader(...) void
+        +setBody(const std.string b) void
+        +appendBody(const std.string b) void
+        +clear() void
+        +sendRequest(std.shared_ptr~HTTPMSession~ session) bool
+        +hasMoreResponseHeaders() bool
+        +popResponseHeader() std.string
+        +errorToIecStatus(int errOut, std.string msgOut) void
+        +isHttpError() bool
+    }

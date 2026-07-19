@@ -1,0 +1,15 @@
+%%gen
+    class NetworkProtocolTest {
+        -std.string test_data
+        +NetworkProtocolTest(...)
+        +NetworkProtocolTest() ~
+        +open(...) bool
+        +close() bool
+        +read(unsigned short len) bool
+        +write(unsigned short len) bool
+        +status(NetworkStatus *status) bool
+        +special_inquiry(uint8_t cmd) uint8_t
+        +special_00(cmdFrame_t *cmdFrame) bool
+        +special_40(...) bool
+        +special_80(...) bool
+    }

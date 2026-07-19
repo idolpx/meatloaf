@@ -1,0 +1,22 @@
+%%gen
+    class NetworkProtocolTCP {
+        #fnTcpServer *server
+        #fnTcpClient client
+        #open_server(unsigned short port) bool
+        #open_client(std.string hostname, unsigned short port) bool
+        #special_accept_connection() bool
+        #special_close_client_connection() bool
+        #status_server(NetworkStatus* status) void
+        #status_client(NetworkStatus* status) void
+        +NetworkProtocolTCP(...)
+        +NetworkProtocolTCP() ~
+        +open(...) bool
+        +close() bool
+        +read(unsigned short len) bool
+        +write(unsigned short len) bool
+        +status(NetworkStatus *status) bool
+        +special_inquiry(uint8_t cmd) uint8_t
+        +special_00(cmdFrame_t *cmdFrame) bool
+        +special_40(...) bool
+        +special_80(...) bool
+    }

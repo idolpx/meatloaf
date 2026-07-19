@@ -1,7 +1,7 @@
 %% Every concrete MStream implementation. Verified against source 2026-07-19.
 %% "Bottom" streams read a real data source (flash, SD via VFS, network);
 %% MMediaStream decoders wrap another stream (containerStream) and expose the
-%% files INSIDE it - see media_scanner.mmd for the media subtree details.
+%% files INSIDE it - see media_disk.mmd, media_tape.mmd and media_container.mmd for details.
 classDiagram
     direction LR
 
@@ -90,7 +90,7 @@ classDiagram
     MStream <|-- HashMStream
 
     MStream <|-- MMediaStream
-    MMediaStream <|-- D64MStream : + 13 disk formats, see media_scanner.mmd
+    MMediaStream <|-- D64MStream : + 13 disk formats, see media_disk.mmd
     MMediaStream <|-- TAPMStream
     MMediaStream <|-- T64MStream
     MMediaStream <|-- TCRTMStream
@@ -109,7 +109,7 @@ classDiagram
     MStream <|-- DHDOffsetStream : partition window over CMD HD/FD images
     D64MStream <|-- DSKIStream
 
-    note for FlashMStream "Bottom stream for local files; most network streams pair with an MSession obtained from SessionBroker (see network_services.mmd)"
+    note for FlashMStream "Bottom stream for local files; most network streams pair with an MSession obtained from SessionBroker (see fs_network.mmd)"
     note for M2IMStream "Index only - readFile() delegates to the sibling host file's stream (resolveEntry caches URL + size)"
-    note for TAPMStream "Serves programs decoded by TapeDecoder/TAPClean; tape state shared across instances via TapeState (see media_scanner.mmd)"
+    note for TAPMStream "Serves programs decoded by TapeDecoder/TAPClean; tape state shared across instances via TapeState (see media_disk.mmd)"
 

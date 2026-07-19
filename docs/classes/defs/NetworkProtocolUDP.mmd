@@ -1,0 +1,22 @@
+%%gen
+    class NetworkProtocolUDP {
+        -is_multicast() bool
+        -is_multicast(std.string h) bool
+        -is_multicast(in_addr_t addr) bool
+        #fnUDP udp
+        #std.string dest
+        #unsigned short port*
+        #bool multicast_write
+        #set_destination(uint8_t *sp_buf, unsigned short len) bool
+        +NetworkProtocolUDP(...)
+        +NetworkProtocolUDP() ~
+        +open(...) bool
+        +close() bool
+        +read(unsigned short len) bool
+        +write(unsigned short len) bool
+        +status(NetworkStatus *status) bool
+        +special_inquiry(uint8_t cmd) uint8_t
+        +special_00(cmdFrame_t *cmdFrame) bool
+        +special_40(...) bool
+        +special_80(...) bool
+    }

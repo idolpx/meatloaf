@@ -1,0 +1,21 @@
+%%gen
+    class MemPoolT {
+        <<template>>
+        -MemPoolT(const MemPoolT)
+        -union Item
+        -DynArray~ Block*, 10 ~ _blockPtrs
+        -Item* _root
+        -size_t _currentAllocs
+        -size_t _nAllocs
+        -size_t _maxAllocs
+        -size_t _nUntracked
+        +MemPoolT()
+        +Clear() void
+        +size_t ItemSize() const
+        +CurrentAllocs() size_t
+        +Alloc() void*
+        +Free(void* mem) void
+        +Trace(const char* name) void
+        +SetTracked() void
+        +Untracked() size_t
+    }

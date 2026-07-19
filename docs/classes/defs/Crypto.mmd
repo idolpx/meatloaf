@@ -1,0 +1,9 @@
+%%gen
+    class Crypto {
+        -std.string _key
+        -myencrypt(char *bptr, unsigned len) void
+        -mod95(int) int
+        +crypt(std.string t) std.string
+        +setkey(const std.string key) void
+        +getkey() std.string
+    }

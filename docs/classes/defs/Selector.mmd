@@ -1,0 +1,9 @@
+%%gen
+    class Selector {
+        <<template>>
+        -XE * _base
+        -std.string _xpath
+        +Selector(XE * base, std.string xpath)
+        +begin() ElementIterator~XE~
+        +end() ElementIterator~XE~
+    }

@@ -1,0 +1,18 @@
+%%gen
+    class fnTask {
+        #start() int*
+        #pause() int
+        #resume() int
+        #abort() int
+        #step() int*
+        #uint8_t _id
+        #task_state _state
+        #done_reason _reason
+        #void(...)
+        +fnTask()
+        +fnTask() ~*
+        +get_state() task_state
+        +get_done_reason() done_reason
+        +get_progress() int
+        +get_result() void *
+    }

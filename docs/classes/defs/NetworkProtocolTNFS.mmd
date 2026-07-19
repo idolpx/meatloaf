@@ -1,0 +1,36 @@
+%%gen
+    class NetworkProtocolTNFS {
+        -tnfsMountInfo mountInfo
+        -int tnfs_error*
+        -uint16_t perms*
+        -int16_t fd*
+        -tnfsStat fileStat
+        -stat() bool
+        #bool rename_implemented
+        #bool delete_implemented
+        #bool mkdir_implemented
+        #bool rmdir_implemented
+        #open_file_handle() bool
+        #open_dir_handle() bool
+        #mount(PeoplesUrlParser *url) bool
+        #umount() bool
+        #fserror_to_error() void
+        #read_file_handle(uint8_t *buf, unsigned short len) bool
+        #read_dir_entry(char *buf, unsigned short len) bool
+        #write_file_handle(uint8_t *buf, unsigned short len) bool
+        #close_file_handle() bool
+        #close_dir_handle() bool
+        +NetworkProtocolTNFS(...)
+        +NetworkProtocolTNFS() ~
+        +special_inquiry(uint8_t cmd) uint8_t
+        +special_00(cmdFrame_t *cmdFrame) bool
+        +special_40(...) bool
+        +special_80(...) bool
+        +rename(...) bool
+        +del(...) bool
+        +mkdir(...) bool
+        +rmdir(...) bool
+        +lock(...) bool
+        +unlock(...) bool
+        +seek(off_t offset, int whence) off_t
+    }

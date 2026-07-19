@@ -1,0 +1,13 @@
+%%gen
+    class G64MStream {
+        #uint8_t sector_buffer[260]
+        +G64MStream(std.shared_ptr~MStream~ is)
+        +MediaHeader gcr_header
+        +SectorHeader gcr_sector_header
+        +seekSector(...) bool
+        +readContainer(uint8_t *buf, uint32_t size) uint32_t
+        +readSectorHeader() bool
+        +readSector() bool
+        +findSync(uint32_t gcr_end) bool
+        +convert4BytesFromGCR(uint8_t * gcr, uint8_t * plain) int
+    }

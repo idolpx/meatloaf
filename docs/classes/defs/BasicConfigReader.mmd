@@ -1,0 +1,7 @@
+%%gen
+    class BasicConfigReader {
+        +std.unordered_map~std.string, std.string~* entries
+        +BasicConfigReader()
+        +read(std.string name) void
+        +get(std.string key) std.string
+    }

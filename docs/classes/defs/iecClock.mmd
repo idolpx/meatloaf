@@ -1,0 +1,19 @@
+%%gen
+    class iecClock {
+        -time_t ts
+        -std.string tf, payload, response
+        -size_t responsePtr
+        #talk(uint8_t secondary) void
+        #listen(uint8_t secondary) void
+        #untalk() void
+        #unlisten() void
+        #canWrite() int8_t
+        #canRead() int8_t
+        #write(uint8_t data, bool eoi) void
+        #read() uint8_t
+        #task() void
+        #reset() void
+        +iecClock(uint8_t devnr)
+        +set_timestamp(std.string s) void
+        +set_timestamp_format(std.string s) void
+    }

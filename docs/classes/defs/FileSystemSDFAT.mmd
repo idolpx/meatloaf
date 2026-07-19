@@ -1,0 +1,24 @@
+%%gen
+    class FileSystemSDFAT {
+        -sdmmc_card_t *_sdcard_info
+        +type() fsType
+        +typestring() const char *
+        +filesize(const char *filepath) long
+        +file_open(...) FILE *
+        +remove(const char* path) bool
+        +rename(const char* pathFrom, const char* pathTo) bool
+        +is_dir(const char *path) bool
+        +mkdir(const char* path) bool
+        +rmdir(const char* path) bool
+        +dir_exists(const char* path) bool
+        +dir_open(...) bool
+        +dir_read() fsdir_entry *
+        +dir_close() void
+        +dir_tell() uint16_t
+        +dir_seek(uint16_t) bool
+        +create_path(const char *path) bool
+        +card_size() uint64_t
+        +total_bytes() uint64_t
+        +used_bytes() uint64_t
+        +partition_type() const char *
+    }

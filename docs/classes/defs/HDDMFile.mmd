@@ -1,0 +1,11 @@
+%%gen
+    class HDDMFile {
+        +HDDMFile(std.string path, bool is_dir)
+        +getDecodedStream(std.shared_ptr~MStream~ is) std.shared_ptr~MStream~
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile*
+        +isDirectory() bool
+        +exists() bool
+        +bool isDir
+        +bool dirIsOpen
+    }

@@ -1,0 +1,15 @@
+%%gen
+    class Request {
+        -httpd_req_t *req
+        #std.string path
+        #bool overwrite
+        +Request(httpd_req_t *httpd_req)
+        +parseRequest() bool
+        +getDestination() std.string
+        +getPath() std.string
+        +getOverwrite() bool
+        +getHeader(std.string name) std.string
+        +sendContinue() void
+        +getContentLength() size_t
+        +readBody(char *buf, int len) int
+    }

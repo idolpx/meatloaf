@@ -1,0 +1,23 @@
+    %%include TapeState
+    %%include TapeEntry
+    %%include tapclean_api
+    %%include tapclean_engine
+    %%include tapclean_scanners
+    %%include tapclean_prg_t
+
+    class MMediaStream {
+        <<see vfs_core>>
+    }
+    MMediaStream <|-- TAPMStream
+    MMediaStream <|-- T64MStream
+    MMediaStream <|-- TCRTMStream
+    TAPMStream --> TapeState : shared per image URL (weak_ptr registry)
+    TapeState *-- TapeDecoder
+    TapeDecoder --> tapclean_api : borrowed-buffer window scans
+    TapeDecoder *-- TapeEntry : decoded programs
+    tapclean_api ..> tapclean_engine : TAPCLEAN_EMBEDDED build
+    tapclean_engine *-- tapclean_scanners : search_tap() dispatch
+    tapclean_api ..> tapclean_prg_t : result records
+
+    note for TapeDecoder "Progressive: fetch 512 KB prefix (doubling) into PSRAM, scan, withhold last entry of a partial window until confirmed; DMP/HTAP/TAP-v2 converted to TAP v1 on the fly; engine freed after each window"
+    note for tapclean_engine "Loader-ID fast path identifies the loader from the CBM boot block so identified tapes scan pause+CBM+that loader only; unidentified tapes run all scanners with an early exit at 97 pct coverage"

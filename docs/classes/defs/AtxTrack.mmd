@@ -1,0 +1,11 @@
+%%gen
+    class AtxTrack {
+        +int8_t track_number
+        +uint16_t sector_count*
+        +uint16_t rate
+        +uint32_t flags
+        +uint32_t record_bytes_read*
+        +uint32_t offset_to_data_start*
+        +uint8_t * data
+        +AtxTrack()
+    }

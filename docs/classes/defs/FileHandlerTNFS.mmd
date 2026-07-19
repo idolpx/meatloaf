@@ -1,0 +1,14 @@
+%%gen
+    class FileHandlerTNFS {
+        -_bad_fd_recovery() uint8_t
+        #tnfsMountInfo *_mountinfo
+        #int _handle
+        +FileHandlerTNFS(tnfsMountInfo *mountinfo, int handle)
+        +FileHandlerTNFS() ~
+        +close(bool destroy) int
+        +seek(long int off, int whence) int
+        +tell() long int
+        +read(void *ptr, size_t size, size_t count) size_t
+        +write(...) size_t
+        +flush() int
+    }

@@ -1,0 +1,11 @@
+%%gen
+    class FileHandlerSMB {
+        +FileHandlerSMB(...)
+        +FileHandlerSMB() ~
+        +close(bool destroy) int
+        +seek(long int off, int whence) int
+        +tell() long int
+        +read(void *ptr, size_t size, size_t count) size_t
+        +write(...) size_t
+        +flush() int
+    }

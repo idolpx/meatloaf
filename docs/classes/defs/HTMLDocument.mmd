@@ -1,0 +1,9 @@
+%%gen
+    class HTMLDocument {
+        -void* internal
+        +HTMLDocument()
+        +HTMLDocument() ~
+        +ParseFile(const char * file) bool
+        +ParseData(const char * data) bool
+        +Query(const char* query) HTMLResult*
+    }

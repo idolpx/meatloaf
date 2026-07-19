@@ -1,0 +1,12 @@
+%%gen
+    class NetworkProtocolTELNET {
+        +NetworkProtocolTELNET(...)
+        +NetworkProtocolTELNET() ~
+        +read(unsigned short len) bool
+        +write(unsigned short len) bool
+        +getReceiveBuffer() std.string *
+        +getTransmitBuffer() std.string *
+        +flush(const char* buf, unsigned short size) void
+        +int newRxLen
+        +char ttype[32]
+    }

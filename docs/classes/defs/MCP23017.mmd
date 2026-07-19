@@ -1,0 +1,21 @@
+%%gen
+    class MCP23017 {
+        #I2C_t myI2C
+        #volatile uint16_t _PIN
+        #volatile uint16_t _oldPIN
+        #volatile uint16_t _PORT
+        #volatile uint16_t _DDR
+        #uint8_t _address
+        #readGPIO() void
+        #updateGPIO() void
+        +MCP23017()
+        +begin(...) void
+        +pinMode(uint8_t pin, uint8_t mode) void
+        +digitalWrite(uint8_t pin, uint8_t value) void
+        +digitalRead(uint8_t pin) uint8_t
+        +write(uint16_t value) void
+        +read() uint16_t
+        +clear() void
+        +set() void
+        +toggle(uint8_t pin) void
+    }
