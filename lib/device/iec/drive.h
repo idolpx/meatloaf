@@ -124,6 +124,10 @@ public:
   mediatype_t mount(fnFile *f, const char *filename, uint32_t disksize, mediatype_t disk_type = MEDIATYPE_UNKNOWN);
   void unmount();
 
+  // Persist/reload this drive's settings in mlConfig (devices.iec.<id>)
+  void persistConfig();
+  void reloadConfig();
+
   int     id() { return m_devnr; };
   uint8_t getNumOpenChannels();
   std::string getCWD() { return m_cwd->url; }

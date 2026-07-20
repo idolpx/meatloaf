@@ -11,7 +11,6 @@
 static void persist_led_setting(const char *key, int value)
 {
     mlConfig.data()["devices"]["led_strip"][key] = value;
-    mlConfig.mark_devices_dirty();
     mlConfig.save();
 }
 
