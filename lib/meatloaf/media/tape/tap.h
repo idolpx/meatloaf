@@ -208,7 +208,7 @@ public:
 
     TAPMFile(std::string path, bool is_dir = true): MFile(path) {
         isDir = is_dir;
-        isPETSCII = true;
+        isPETSCII = false;
         media_image = name;
     };
 

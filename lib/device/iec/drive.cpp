@@ -1885,10 +1885,18 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
         case 'S':
             if (command[1] == '-')
             {
-                // Swap drive number 
-                Debug_printv( "swap drive number");
-                //Error(ERROR_31_SYNTAX_ERROR);
-                break;
+                if (command[2] == 'D' || mstr::isNumeric(&command[2])) // Swap Drive
+                {
+                    // Swap drive number 
+                    Debug_printv( "swap drive number [%c]", command[2]);
+                    return;
+                }
+                else if (command[2] == 'C') // Send SCSI Command
+                {
+                    // Set partition number
+                    Debug_printv( "send scsi command");
+                    return;
+                }
             }
         break;
         case 'T':
@@ -1986,9 +1994,19 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
             }
         break;
         case 'W':
-            // Save out current options?
-            //OPEN1, 9, 15, "XW":CLOSE1
-            Debug_printv( "user 1a2b");
+            if (command[1] == '-') // Write Protect
+            {
+                if (command[2] == '0') // W-0 disable write protect
+                {
+                    Debug_printv( "write protect disabled");
+                    return;
+                }
+                else if (command[2] == '1') // W-1 enable write protect
+                {
+                    Debug_printv( "write protect enabled");
+                    return;
+                }
+            }
         break;
         case 'X':
             Debug_printv( "xtended commands");

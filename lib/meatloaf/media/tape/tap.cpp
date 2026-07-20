@@ -555,7 +555,7 @@ MFile* TAPMFile::getNextFileInDir()
         mstr::replaceAll(filename, "/", "\\");
         auto file = MFSOwner::File(url + "/" + filename);
         file->name = filename;
-        file->extension = "prg";
+        file->extension = " prg";
         file->size = size; // from the .idx length field (0 if absent)
         file->is_dir = 0;
         return file;
@@ -593,7 +593,7 @@ MFile* TAPMFile::getNextFileInDir()
     }
 
     // End of the tape reached
-    std::string marker = mstr::toPETSCII2("no more entries");
+    std::string marker = "end of tape";
     auto file = MFSOwner::File(url + "/" + marker);
     file->name = marker;
     file->extension = "";
@@ -626,7 +626,7 @@ bool TAPMFile::exists()
             uint32_t size;
             for (uint16_t i = 0; stream->idxEntry(i, name, size); i++)
             {
-                std::string entryName = mstr::toUTF8(name);
+                std::string entryName = name;
                 if (mstr::compareFilename(entryName, pathInStream, wildcard))
                     return true;
             }
