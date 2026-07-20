@@ -1,0 +1,10 @@
+%%gen
+    class TNFSMSession {
+        -std.unique_ptr~tnfsMountInfo~ _mountinfo
+        +TNFSMSession(...)
+        +connect() bool
+        +disconnect() void
+        +keep_alive() bool
+        +getScheme() std.string$
+        +getMountInfo() tnfsMountInfo*
+    }

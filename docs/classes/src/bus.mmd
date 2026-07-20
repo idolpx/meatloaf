@@ -1,0 +1,34 @@
+%% IEC/GPIB bus: handlers, transfer protocols, fastloaders
+%% GENERATED template (gen_templates.js) - curated content lives in
+%% src/extra/bus.mmd; class bodies live in defs/<Class>.mmd
+classDiagram
+    direction LR
+
+    %%include CPBStandardSerial
+    %%include DolphinDOS
+    %%include GPIBDevice
+    %%include GPIBFileDevice
+    %%include GPIBusHandler
+    %%include IECBusHandler
+    %%include IECDevice
+    %%include IECFileDevice
+    %%include IECHost
+    %%include IECProtocol
+    %%include JiffyDOS
+    %%include parallelBus
+    %%include SauceDOS
+    %%include systemBus
+
+    IECProtocol <|-- CPBStandardSerial
+    IECProtocol <|-- DolphinDOS
+    GPIBDevice <|-- GPIBFileDevice
+    IECDevice <|-- IECFileDevice
+    IECProtocol <|-- JiffyDOS
+    IECProtocol <|-- SauceDOS
+    GPIBusHandler <|-- systemBus
+
+    IECBusHandler o-- IECDevice : attached devices 4-30
+    CPBStandardSerial <|-- CPBFastSerial
+    systemBus ..> IECProtocol : per-transfer negotiation
+
+    note for IECBusHandler "Bus timing runs in systemBus service() on core 1 at priority 17; microsecond windows - debug logging can break the protocol"

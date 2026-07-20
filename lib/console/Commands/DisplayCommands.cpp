@@ -5,12 +5,19 @@
 #include "display.h"
 #include "string_utils.h"
 #include "meatloaf.h"
+#include "mlConfig.h"
 #include "../Helpers/PWDHelpers.h"
+
+static void persist_led_setting(const char *key, int value)
+{
+    mlConfig.data()["devices"]["led_strip"][key] = value;
+    mlConfig.save();
+}
 
 static int led(int argc, char **argv)
 {
     if (argc < 2) {
-        Serial.printf("led {idle|send|receive|activity|progress {0-100}|status {1-255}|speed {0-255}|brightness {*|index} {0-255}}\r\n");
+        Serial.printf("led {idle|send|receive|activity|count {0-255}|progress {0-100}|status {1-255}|speed {0-255}|brightness {*|index} {0-255}}\r\n");
         return EXIT_FAILURE;
     }
 
@@ -29,6 +36,25 @@ static int led(int argc, char **argv)
     else if (mstr::startsWith(argv[1], "activity"))
     {
         LEDS.activity = !LEDS.activity;
+    }
+    else if (mstr::startsWith(argv[1], "count"))
+    {
+        if (argc == 3 && mstr::isNumeric(argv[2]))
+        {
+            int count = atoi(argv[2]);
+            if (count < 0 || count > 255)
+            {
+                Serial.printf("led count {0-255}\r\n");
+                return EXIT_FAILURE;
+            }
+            LEDS.set_count(static_cast<uint8_t>(count));
+            persist_led_setting("count", count);
+        }
+        else
+        {
+            Serial.printf("led count {0-255}\r\n");
+            return EXIT_FAILURE;
+        }
     }
     else if (mstr::startsWith(argv[1], "progress"))
     {
@@ -73,7 +99,9 @@ static int led(int argc, char **argv)
     {
         if (argc == 3)
         {
-            LEDS.set_brightness(static_cast<uint8_t>(atoi(argv[2])));
+            uint8_t brightness = static_cast<uint8_t>(atoi(argv[2]));
+            LEDS.set_brightness(brightness);
+            persist_led_setting("brightness", brightness);
         }
         else if (argc == 4)
         {

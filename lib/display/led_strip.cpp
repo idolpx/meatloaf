@@ -29,6 +29,8 @@
 #include "../../include/debug.h"
 #include "../../include/cbm_defines.h"
 
+#include "mlConfig.h"
+
 //#include "WS2812FX/WS2812FX.h"
 
 
@@ -89,6 +91,11 @@ static inline uint8_t scale_channel(uint8_t value, uint8_t brightness)
 
 void DisplayLEDs::service()
 {
+    if (m_pending_count >= 0) {
+        resize(m_pending_count);
+        m_pending_count = -1;
+    }
+
     switch(mode)
     {
         case MODE_CLEAR:
@@ -145,16 +152,16 @@ esp_err_t DisplayLEDs::init(int pin, led_strip_model_t model, int num_of_leds)
     reset_delay = (model == WS2812B) ? 3 : 30;
     // 12 bytes for each led + bytes for initial zero and reset state
     dma_buf_size = n_of_leds * 12 + (reset_delay + 1) * 2;
-    ws28xx_pixels = (CRGB*)malloc(sizeof(CRGB) * n_of_leds);
+    ws28xx_pixels = (CRGB*)malloc(sizeof(CRGB) * (n_of_leds > 0 ? n_of_leds : RGB_LED_COUNT));
     if (ws28xx_pixels == NULL) {
         return ESP_ERR_NO_MEM;
     }
 
-    pixel_brightness.assign(n_of_leds, 255);
-    global_brightness = 255;
+    pixel_brightness.assign(n_of_leds, brightness);
 
     spi_settings.buscfg.mosi_io_num = pin;
-    spi_settings.buscfg.max_transfer_sz = dma_buf_size;
+    // Sized for the maximum count so set_count() never exceeds the bus limit
+    spi_settings.buscfg.max_transfer_sz = 255 * 12 + (reset_delay + 1) * 2;
     err = spi_bus_initialize(spi_settings.host, &spi_settings.buscfg,
                              spi_settings.dma_chan);
     if (err != ESP_OK) {
@@ -176,6 +183,41 @@ esp_err_t DisplayLEDs::init(int pin, led_strip_model_t model, int num_of_leds)
     return ESP_OK;
 }
 
+// Runs on the display task (via service) so no other code touches the
+// buffers mid-swap; the mutex still guards against a concurrent update()
+bool DisplayLEDs::resize(int num_of_leds)
+{
+    if (num_of_leds == n_of_leds)
+        return true;
+
+    int new_buf_size = num_of_leds * 12 + (reset_delay + 1) * 2;
+    CRGB *new_pixels = (CRGB *)malloc(sizeof(CRGB) * (num_of_leds > 0 ? num_of_leds : 1));
+    uint16_t *new_dma = (uint16_t *)heap_caps_malloc(new_buf_size, MALLOC_CAP_DMA);
+    if (new_pixels == NULL || new_dma == NULL) {
+        free(new_pixels);
+        if (new_dma != NULL)
+            heap_caps_free(new_dma);
+        Debug_printv("led resize failed count[%d]", num_of_leds);
+        return false;
+    }
+
+    if (spi_mutex != nullptr)
+        xSemaphoreTake(spi_mutex, portMAX_DELAY);
+    free(ws28xx_pixels);
+    heap_caps_free(dma_buffer);
+    ws28xx_pixels = new_pixels;
+    dma_buffer = new_dma;
+    n_of_leds = num_of_leds;
+    dma_buf_size = new_buf_size;
+    if (spi_mutex != nullptr)
+        xSemaphoreGive(spi_mutex);
+
+    pixel_brightness.assign(num_of_leds, brightness);
+    fill_all((CRGB){.r=0, .g=0, .b=0});
+    mode = MODE_CLEAR;  // repaint the idle pattern at the new size
+    return true;
+}
+
 void DisplayLEDs::set_pixel(uint16_t index, CRGB color) { ws28xx_pixels[index] = color; };
 void DisplayLEDs::set_pixel(uint16_t index, uint8_t r, uint8_t g, uint8_t b) { ws28xx_pixels[index] = (CRGB){.r=r, .g=g, .b=b}; };
 
@@ -191,7 +233,7 @@ void DisplayLEDs::set_pixels(uint16_t index, CRGB *colors, uint16_t count)
 
 void DisplayLEDs::set_brightness(uint8_t value)
 {
-    global_brightness = value;
+    brightness = value;
 }
 
 void DisplayLEDs::set_pixel_brightness(uint16_t index, uint8_t value)
@@ -319,7 +361,7 @@ esp_err_t DisplayLEDs::update()
     for (int i = 0; i < n_of_leds; i++) {
         // Data you want to write to each LEDs
         uint8_t per_led = (i < pixel_brightness.size()) ? pixel_brightness[i] : 255;
-        uint8_t effective_brightness = scale_channel(per_led, global_brightness);
+        uint8_t effective_brightness = scale_channel(per_led, brightness);
 
         CRGB scaled;
         scaled.r = scale_channel(ws28xx_pixels[i].r, effective_brightness);
@@ -369,7 +411,28 @@ esp_err_t DisplayLEDs::update()
 
 void DisplayLEDs::start(void)
 {
-    if (init(PIN_LED_RGB, WS2812B, RGB_LED_COUNT) != ESP_OK)
+    int count = RGB_LED_COUNT;
+    bool enabled = true;
+
+    const psram_json &devices = mlConfig["devices"];
+    if (devices.contains("led_strip"))
+    {
+        const psram_json &strip = devices["led_strip"];
+        enabled = strip.value("enabled", 1) != 0;
+        count = strip.value("count", (int)RGB_LED_COUNT);
+        brightness = static_cast<uint8_t>(strip.value("brightness", (int)brightness));
+    }
+
+    if (!enabled)
+    {
+        Debug_printv("LED strip disabled in config");
+        return;
+    }
+
+    if (count < 0) count = 0;
+    if (count > 255) count = 255;
+
+    if (init(PIN_LED_RGB, WS2812B, count) != ESP_OK)
     {
         Debug_printv("LED strip init failed; skipping DISPLAY task");
         return;
@@ -397,7 +460,7 @@ void DisplayLEDs::blink(void)
     speed = 100;
 
     led_state_off = !led_state_off;
-    for(int i = 0; i < RGB_LED_COUNT; i++) {
+    for(int i = 0; i < n_of_leds; i++) {
         if (led_state_off) 
             ws28xx_pixels[i] = (CRGB){.r=0, .g=0, .b=0};
         else 
@@ -407,6 +470,10 @@ void DisplayLEDs::blink(void)
 
 void DisplayLEDs::rotate()
 {
+    if (n_of_leds <= 1) {
+        return;
+    }
+
     if ( !direction )
     {
         // rotate left

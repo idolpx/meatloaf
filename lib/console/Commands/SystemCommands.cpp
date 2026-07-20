@@ -153,9 +153,11 @@ static int sysInfo(int argc, char **argv)
     return EXIT_SUCCESS;
 }
 
-static int restart(int argc, char **argv)
+static int reboot(int argc, char **argv)
 {
-    Serial.printf("Restarting...");
+    Serial.println("Saving configuration...");
+    mlConfig.save();
+    Serial.println("Rebooting...");
     ESP.restart();
     return EXIT_SUCCESS;
 }
@@ -380,12 +382,7 @@ static int config_cmd(int argc, char **argv)
 
     (*node)[leaf] = new_val;
 
-    // Writes to the devices subtree go to devices.json; everything else to config.json.
-    if (parts.size() >= 1 && parts[0] == "devices")
-        mlConfig.mark_devices_dirty();
-    else
-        mlConfig.mark_config_dirty();
-
+    // save() detects by hash whether config.json and/or devices.json changed.
     mlConfig.save();
     Serial.printf("%s = %s\r\n", argv[1], (*node)[leaf].dump().c_str());
     return EXIT_SUCCESS;
@@ -395,7 +392,7 @@ namespace ESP32Console::Commands
 {
     const ConsoleCommand getRebootCommand()
     {
-        return ConsoleCommand("reboot", &restart, "Reboot the system");
+        return ConsoleCommand("reboot", &reboot, "Reboot the system");
     }
 
     const ConsoleCommand getSysInfoCommand()

@@ -1,0 +1,35 @@
+%%gen
+    class HTTPMStream {
+        -HTTPRequestContext ctx
+        -FullModeState fullMode
+        -bool _statusRequested
+        -std.string _statusBuffer
+        -uint32_t _statusPos*
+        -bool _jsonQueryRequested
+        -std.string _jsonQueryResult
+        -uint32_t _queryResultPos*
+        -std.string _pendingJsonPointer
+        -bool _jsonResultReady
+        -std.string _cmdLine
+        -bool _queuedSend
+        -std.vector~uint8_t~ _responseBuffer
+        -uint32_t _responseBufPos*
+        -uint32_t _statusEnd*
+        -uint32_t _headersEnd*
+        -std.vector~uint8_t~ _bodyCapture
+        #std.shared_ptr~HTTPMSession~ _session
+        +HTTPMStream(std.string path)
+        +HTTPMStream(std.string path, std.ios_base.openmode m)
+        +isOpen() bool
+        +isNetwork() bool
+        +open(std.ios_base.openmode mode) bool
+        +close() void
+        +read(uint8_t* buf, uint32_t size) uint32_t
+        +write(const uint8_t *buf, uint32_t size) uint32_t
+        +available() uint32_t
+        +seek(uint32_t pos) bool
+        +seekPath(std.string path) bool
+        +handleCommand(const std.string cmd) bool
+        +performJsonQuery(const std.string pointer) void
+        +isFullMode() bool
+    }

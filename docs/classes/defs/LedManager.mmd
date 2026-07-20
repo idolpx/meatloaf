@@ -1,0 +1,10 @@
+%%gen
+    class LedManager {
+        -bool mLedState[eLed.LED_COUNT]
+        -gpio_num_t mLedPin[eLed.LED_COUNT]
+        +LedManager()
+        +setup() void
+        +set(eLed led, bool one) void
+        +toggle(eLed led) void
+        +blink(eLed led, int count) void
+    }

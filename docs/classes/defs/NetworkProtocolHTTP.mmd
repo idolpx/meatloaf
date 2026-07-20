@@ -1,0 +1,45 @@
+%%gen
+    class NetworkProtocolHTTP {
+        -HTTPOpenMode
+        -HTTPOpenMode httpOpenMode
+        -HTTPChannelMode
+        -HTTPChannelMode httpChannelMode
+        -HTTP_CLIENT_CLASS *client
+        -int resultCode*
+        -std.vector~std.string~ collect_headers
+        -std.vector~std.string~ returned_headers
+        -size_t returned_header_cursor*
+        -int bodySize*
+        -std.string postData
+        -WebDAV webDAV
+        -std.vector~WebDAV.DAVEntry~.iterator dirEntryCursor
+        -http_transaction() void
+        -special_set_channel_mode(cmdFrame_t *cmdFrame) bool
+        -read_file_handle_header(uint8_t *buf, unsigned short len) bool
+        -read_file_handle_data(uint8_t *buf, unsigned short len) bool
+        -write_file_handle_get_header(uint8_t *buf, unsigned short len) bool
+        -write_file_handle_set_header(uint8_t *buf, unsigned short len) bool
+        -write_file_handle_send_post_data(uint8_t *buf, unsigned short len) bool
+        -write_file_handle_data(uint8_t *buf, unsigned short len) bool
+        -parseDir(char *buf, unsigned short len) bool
+        #open_file_handle() bool
+        #open_dir_handle() bool
+        #mount(PeoplesUrlParser *url) bool
+        #umount() bool
+        #fserror_to_error() void
+        #read_file_handle(uint8_t *buf, unsigned short len) bool
+        #read_dir_entry(char *buf, unsigned short len) bool
+        #close_file_handle() bool
+        #close_dir_handle() bool
+        #write_file_handle(uint8_t *buf, unsigned short len) bool
+        #status_file(NetworkStatus *status) bool
+        #stat() bool
+        #rename(...) bool
+        #del(...) bool
+        #mkdir(...) bool
+        #rmdir(...) bool
+        +NetworkProtocolHTTP(...)
+        +NetworkProtocolHTTP() ~
+        +special_inquiry(uint8_t cmd) uint8_t
+        +special_00(cmdFrame_t *cmdFrame) bool
+    }

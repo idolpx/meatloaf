@@ -1,0 +1,8 @@
+    class iecChannelHandlerDir {
+        -MFile* m_dir
+        -uint8_t m_headerLine
+        -vector~string~ m_headers - extra info lines under the header
+        -addExtraInfo(title, text) void
+        +readBufferData() uint8_t - emits BASIC directory listing lines
+        +writeBufferData() uint8_t
+    }

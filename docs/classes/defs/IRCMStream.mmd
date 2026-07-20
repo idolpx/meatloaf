@@ -1,0 +1,16 @@
+%%gen
+    class IRCMStream {
+        #std.shared_ptr~IRCMSession~ _session
+        +isNetwork() bool
+        +IRCMStream(std.string path)
+        +size() uint32_t
+        +available() uint32_t
+        +position() uint32_t
+        +error() size_t
+        +open(std.ios_base.openmode mode) bool
+        +close() void
+        +read(uint8_t* buf, uint32_t size) uint32_t
+        +write(const uint8_t *buf, uint32_t size) uint32_t
+        +seek(uint32_t pos) bool
+        +isOpen() bool
+    }

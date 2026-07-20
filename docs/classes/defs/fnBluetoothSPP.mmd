@@ -1,0 +1,25 @@
+%%gen
+    class fnBluetoothSPP {
+        -string local_name
+        +fnBluetoothSPP()
+        +begin(...) bool
+        +available(void) int
+        +peek(void) int
+        +hasClient(void) bool
+        +read(void) int
+        +write(uint8_t c) size_t
+        +write(const uint8_t *buffer, size_t size) size_t
+        +flush() void
+        +end(void) void
+        +onData(fnBluetoothDataCb cb) void
+        +register_callback(esp_spp_cb_t *callback) esp_err_t
+        +enableSSP() void
+        +setPin(const char *pin) bool
+        +connect(std.string remoteName) bool
+        +connect(uint8_t remoteAddress[]) bool
+        +connect() bool
+        +connected(int timeout) bool
+        +isReady(...) bool
+        +disconnect() bool
+        +unpairDevice(uint8_t remoteAddress[]) bool
+    }

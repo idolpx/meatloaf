@@ -1,0 +1,22 @@
+%%gen
+    class MQTTMSession {
+        -esp_mqtt_client_handle_t mqtt_client
+        -std.string client_id
+        -std.queue~esp_mqtt_event_t*~ message_queue
+        -std.mutex queue_mutex
+        -std.condition_variable queue_cv
+        -mqtt_event_handler(...) void$
+        -handle_event(esp_mqtt_event_t *event) void
+        +MQTTMSession(...)
+        +connect() bool
+        +disconnect() void
+        +keep_alive() bool
+        +getScheme() std.string$
+        +publish(...) bool
+        +subscribe(const std.string topic, int qos) bool
+        +unsubscribe(const std.string topic) bool
+        +hasMessage() bool
+        +getMessage() esp_mqtt_event_t*
+        +clearMessage() void
+        +bool isConnected() const
+    }

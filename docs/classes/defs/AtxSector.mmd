@@ -1,0 +1,10 @@
+%%gen
+    class AtxSector {
+        +uint8_t number*
+        +uint8_t status*
+        +uint16_t position*
+        +uint32_t start_data*
+        +uint16_t weakoffset
+        +uint16_t extendedsize*
+        +AtxSector(sector_header_t header)
+    }

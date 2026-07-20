@@ -1,0 +1,144 @@
+%% Network filesystems: one MFile/MStream/MSession trio per protocol
+%% GENERATED template (gen_templates.js) - curated content lives in
+%% src/extra/fs_network.mmd; class bodies live in defs/<Class>.mmd
+classDiagram
+    direction LR
+
+    %%include AFPHandle
+    %%include AFPMFile
+    %%include AFPMFileSystem
+    %%include AFPMSession
+    %%include AFPMStream
+    %%include FSPMFile
+    %%include FSPMFileSystem
+    %%include FSPMSession
+    %%include FSPMStream
+    %%include FTPMFile
+    %%include FTPMFileSystem
+    %%include FTPMSession
+    %%include FTPMStream
+    %%include HTTPMFile
+    %%include HTTPMFileSystem
+    %%include HTTPMSession
+    %%include HTTPMStream
+    %%include HTTPRequestContext
+    %%include IPFSFileSystem
+    %%include IPFSMFile
+    %%include IPFSMStream
+    %%include IRCMFile
+    %%include IRCMFileSystem
+    %%include IRCMSession
+    %%include IRCMStream
+    %%include ISCSIMFile
+    %%include ISCSIMFileSystem
+    %%include ISCSIMSession
+    %%include ISCSIMStream
+    %%include MeatHttpClient
+    %%include MeatSocket
+    %%include MeatSocketServer
+    %%include NFSHandle
+    %%include NFSMFile
+    %%include NFSMFileSystem
+    %%include NFSMSession
+    %%include NFSMStream
+    %%include SFTPMFile
+    %%include SFTPMFileSystem
+    %%include SFTPMSession
+    %%include SFTPMStream
+    %%include SMBHandle
+    %%include SMBMFile
+    %%include SMBMFileSystem
+    %%include SMBMSession
+    %%include SMBMStream
+    %%include TCPMFile
+    %%include TCPMFileSystem
+    %%include TCPMSession
+    %%include TCPMStream
+    %%include TNFSHandle
+    %%include TNFSMFile
+    %%include TNFSMFileSystem
+    %%include TNFSMSession
+    %%include TNFSMStream
+    %%include WSFileSystem
+    %%include WSMFile
+    %%include WSMStream
+
+    class MFile {
+        <<see vfs_core>>
+    }
+    class MFileSystem {
+        <<see vfs_core>>
+    }
+    class MSession {
+        <<see vfs_core>>
+    }
+    class MStream {
+        <<see vfs_core>>
+    }
+
+    MFile <|-- AFPMFile
+    MFileSystem <|-- AFPMFileSystem
+    MSession <|-- AFPMSession
+    MStream <|-- AFPMStream
+    MFile <|-- FSPMFile
+    MFileSystem <|-- FSPMFileSystem
+    MSession <|-- FSPMSession
+    MStream <|-- FSPMStream
+    MFile <|-- FTPMFile
+    MFileSystem <|-- FTPMFileSystem
+    MSession <|-- FTPMSession
+    MStream <|-- FTPMStream
+    MFile <|-- HTTPMFile
+    MFileSystem <|-- HTTPMFileSystem
+    MSession <|-- HTTPMSession
+    MStream <|-- HTTPMStream
+    MFileSystem <|-- IPFSFileSystem
+    HTTPMFile <|-- IPFSMFile
+    HTTPMStream <|-- IPFSMStream
+    MFile <|-- IRCMFile
+    MFileSystem <|-- IRCMFileSystem
+    MSession <|-- IRCMSession
+    MStream <|-- IRCMStream
+    MFile <|-- ISCSIMFile
+    MFileSystem <|-- ISCSIMFileSystem
+    MSession <|-- ISCSIMSession
+    MStream <|-- ISCSIMStream
+    MFile <|-- NFSMFile
+    MFileSystem <|-- NFSMFileSystem
+    MSession <|-- NFSMSession
+    MStream <|-- NFSMStream
+    MFile <|-- SFTPMFile
+    MFileSystem <|-- SFTPMFileSystem
+    MSession <|-- SFTPMSession
+    MStream <|-- SFTPMStream
+    MFile <|-- SMBMFile
+    MFileSystem <|-- SMBMFileSystem
+    MSession <|-- SMBMSession
+    MStream <|-- SMBMStream
+    MFile <|-- TCPMFile
+    MFileSystem <|-- TCPMFileSystem
+    MSession <|-- TCPMSession
+    MStream <|-- TCPMStream
+    MFile <|-- TNFSMFile
+    MFileSystem <|-- TNFSMFileSystem
+    MSession <|-- TNFSMSession
+    MStream <|-- TNFSMStream
+    MFileSystem <|-- WSFileSystem
+    MFile <|-- WSMFile
+    MStream <|-- WSMStream
+
+    %%include DiscoveredService
+
+    class MSession {
+        <<see vfs_core>>
+    }
+    class SessionBroker {
+        <<see vfs_core>>
+    }
+    SessionBroker o-- MSession : reuse + keep-alive
+    HTTPMSession *-- MeatHttpClient : esp_http_client wrapper
+    TCPMSession *-- MeatSocket
+    MeatSocketServer o-- MeatSocket
+    MDNSMSession *-- DiscoveredService : cached results
+
+    note for MSession "Stateless protocols (NFS, FSP) set keep_alive_interval = 0 - keep-alive racing IEC-task I/O corrupts the heap (see CLAUDE.md)"

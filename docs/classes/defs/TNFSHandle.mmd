@@ -1,0 +1,9 @@
+%%gen
+    class TNFSHandle {
+        -mapOpenMode(std.ios_base.openmode mode) uint16_t
+        +std.unique_ptr~tnfsMountInfo~ _mountinfo
+        +int16_t _handle
+        +TNFSHandle()
+        +obtain(...) void
+        +dispose() void
+    }

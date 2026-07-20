@@ -1,0 +1,18 @@
+%%gen
+    class WebDAV {
+        #DAVEntry currentEntry
+        #bool insideResponse
+        #bool insideDisplayName
+        #bool insideGetContentLength
+        #XML_Parser parser
+        #int entriesCounter
+        +begin_parser() bool
+        +end_parser(bool clear_entries) void
+        +parse(const char *buf, int len, int isFinal) bool
+        +rewind() std.vector~WebDAV.DAVEntry~.iterator
+        +clear() void
+        +Start(...) void
+        +End(const XML_Char *el) void
+        +Char(const XML_Char *s, int len) void
+        +std.vector~DAVEntry~ entries
+    }

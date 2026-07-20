@@ -1,0 +1,19 @@
+%%gen
+    class RetroPixelsMStream {
+        -std.shared_ptr~MStream~ _source_stream
+        -RetroPixelsConfig _config
+        -std.vector~uint8_t~ _output_buffer
+        -bool _converted
+        -convertImage() bool
+        -getFormatExtension() std.string
+        +RetroPixelsMStream(...)
+        +isOpen() bool
+        +open(std.ios_base.openmode mode) bool
+        +close() void
+        +size() uint32_t
+        +read(uint8_t* buf, uint32_t size) uint32_t
+        +write(const uint8_t *buf, uint32_t size) uint32_t
+        +seek(uint32_t pos) bool
+        +setConfig(const RetroPixelsConfig config) void
+        +getConfig() RetroPixelsConfig
+    }

@@ -1,0 +1,10 @@
+    class WsCommandExecutor {
+        +dispatch(data, len) void - route an incoming websocket frame
+        +isSlip(data, len) bool$
+        +isJson(data, len) bool$
+        +isProtobuf(data, len) bool$
+        +handleSlip(data, len) void$ - RFC 1055 framed binary commands
+        +handleJson(data, len) void$
+        +handleProtobuf(data, len) void$
+        +handleText(data, len) void$ - console command passthrough
+    }

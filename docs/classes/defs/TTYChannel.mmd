@@ -1,0 +1,24 @@
+%%gen
+    class TTYChannel {
+        -int _fd
+        -std.string _device
+        -uint32_t _baud
+        -bool _dtrState
+        #updateFIFO() void
+        #dataOut(const void *buffer, size_t length) size_t
+        +begin(const ChannelConfig conf) void
+        +end() void
+        +flushOutput() void
+        +getBaudrate() uint32_t
+        +setBaudrate(uint32_t baud) void
+        +getDTR() bool
+        +setDSR(bool state) void
+        +getRTS() bool
+        +setCTS(bool state) void
+        +getDCD() bool
+        +getRI() bool
+        +setDCD(bool state) void
+        +setRI(bool state) void
+        +setPort(std.string device) void
+        +getPort() std.string
+    }

@@ -1,0 +1,933 @@
+%% Network filesystems: one MFile/MStream/MSession trio per protocol
+%% GENERATED template (gen_templates.js) - curated content lives in
+%% src/extra/fs_network.mmd; class bodies live in defs/<Class>.mmd
+classDiagram
+    direction LR
+
+%%gen
+    class AFPHandle {
+        -std.shared_ptr~AFPMSession~ _session
+        -std.string _volume_name
+        -std.string _file_path
+        +AFPHandle()
+        +obtain(std.string localPath, int flags) void
+        +dispose() void
+    }
+%%gen
+    class AFPMFile {
+        -openDir(std.string path) void
+        -closeDir() void
+        -pathValid(std.string path) bool
+        -int entry_index*
+        -std.vector~std.string~ volumes$
+        #bool dirOpened
+        #std.shared_ptr~AFPMSession~ _session
+        +std.string volume_name
+        +std.string file_path
+        +AFPMFile(std.string path)
+        +getSourceStream(...) std.shared_ptr~MStream~
+        +getDecodedStream(std.shared_ptr~MStream~ src) std.shared_ptr~MStream~
+        +createStream(std.ios_base.openmode mode) std.shared_ptr~MStream~
+        +isDirectory() bool
+        +getLastWrite() time_t
+        +getCreationTime() time_t
+        +getAvailableSpace() uint64_t
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile*
+        +mkDir() bool
+        +exists() bool
+        +remove() bool
+        +rename(std.string dest) bool
+        +readEntry(std.string filename) bool
+    }
+%%gen
+    class AFPMFileSystem {
+        +AFPMFileSystem()
+        +handles(std.string name) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class AFPMSession {
+        -enumerateVolumes() void
+        -std.string _user
+        -std.string _password
+        -std.map~std.string, struct afp_volume*~ _mounted_volumes
+        -std.vector~std.string~ _volumes_list
+        -bool _volumes_enumerated
+        -bool _afp_initialized$
+        +AFPMSession(...)
+        +getScheme() std.string$
+        +setCredentials(...) void
+        +connect() bool
+        +disconnect() void
+        +keep_alive() bool
+        +getVolumes() const std.vector~std.string~
+    }
+%%gen
+    class AFPMStream {
+        #std.shared_ptr~AFPMSession~ _session
+        #std.string _volume_name
+        #std.string _file_path
+        #int _eof*
+        +AFPMStream(std.string path)
+        +isOpen() bool
+        +isNetwork() bool
+        +open(std.ios_base.openmode mode) bool
+        +close() void
+        +read(uint8_t* buf, uint32_t size) uint32_t
+        +write(const uint8_t* buf, uint32_t size) uint32_t
+        +seek(uint32_t pos) bool
+        +seek(uint32_t pos, int mode) bool
+        +seekPath(std.string path) bool
+    }
+%%gen
+    class FSPMFile {
+        -openDir(std.string path) void
+        -closeDir() void
+        -pathValid(std.string path) bool
+        -int entry_index*
+        -std.vector~FSP_RDENTRY~ _dir_entries
+        -size_t _current_entry*
+        #bool dirOpened
+        #std.shared_ptr~FSPMSession~ _session
+        #FSP_DIR* _dir_handle
+        #getSession() FSP_SESSION*
+        +FSPMFile(std.string path)
+        +getSourceStream(...) std.shared_ptr~MStream~
+        +getDecodedStream(std.shared_ptr~MStream~ src) std.shared_ptr~MStream~
+        +createStream(std.ios_base.openmode mode) std.shared_ptr~MStream~
+        +isDirectory() bool
+        +getLastWrite() time_t
+        +getCreationTime() time_t
+        +getAvailableSpace() uint64_t
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile*
+        +mkDir() bool
+        +exists() bool
+        +remove() bool
+        +rename(std.string dest) bool
+        +readEntry(std.string filename) bool
+    }
+%%gen
+    class FSPMFileSystem {
+        +FSPMFileSystem()
+        +handles(std.string name) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class FSPMSession {
+        -std.unique_ptr~FSP_SESSION, FSPSessionDeleter~ _session
+        -std.string _password
+        -std.mutex _session_mutex
+        +FSPMSession(std.string host, uint16_t port)
+        +connect() bool
+        +disconnect() void
+        +keep_alive() bool
+        +getScheme() std.string$
+        +getSession() FSP_SESSION*
+    }
+%%gen
+    class FSPMStream {
+        -std.ios_base.openmode _mode
+        -std.string _mode_str
+        -setModeString(std.ios_base.openmode mode) void
+        #std.shared_ptr~FSPMSession~ _session
+        #FSP_FILE* _file_handle
+        +FSPMStream(std.string path)
+        +isOpen() bool
+        +isNetwork() bool
+        +open(std.ios_base.openmode mode) bool
+        +close() void
+        +read(uint8_t* buf, uint32_t size) uint32_t
+        +write(const uint8_t *buf, uint32_t size) uint32_t
+        +seek(uint32_t pos) bool
+        +seek(uint32_t pos, int mode) bool
+        +seekPath(std.string path) bool
+    }
+%%gen
+    class FTPMFile {
+        -openDir(std.string path) void
+        -closeDir() void
+        #bool dirOpened
+        #std.shared_ptr~FTPMSession~ _session
+        #getFS() FileSystemFTP*
+        +std.string basepath
+        +FTPMFile(std.string path)
+        +getSourceStream(...) std.shared_ptr~MStream~
+        +getDecodedStream(std.shared_ptr~MStream~ src) std.shared_ptr~MStream~
+        +createStream(std.ios_base.openmode mode) std.shared_ptr~MStream~
+        +isDirectory() bool
+        +getLastWrite() time_t
+        +getCreationTime() time_t
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile*
+        +mkDir() bool
+        +exists() bool
+        +remove() bool
+        +rename(std.string dest) bool
+        +readEntry(std.string filename) bool
+    }
+%%gen
+    class FTPMFileSystem {
+        +FTPMFileSystem()
+        +handles(std.string name) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class FTPMSession {
+        -std.unique_ptr~FileSystemFTP~ _fs
+        +FTPMSession(std.string host, uint16_t port)
+        +getScheme() std.string$
+        +connect() bool
+        +disconnect() void
+        +keep_alive() bool
+        +fs() FileSystemFTP*
+    }
+%%gen
+    class FTPMStream {
+        #std.shared_ptr~FTPMSession~ _session
+        #FTPMStream_impl_access* _impl
+        +FTPMStream(std.string path)
+        +isOpen() bool
+        +isNetwork() bool
+        +open(std.ios_base.openmode mode) bool
+        +close() void
+        +read(uint8_t* buf, uint32_t size) uint32_t
+        +write(const uint8_t* buf, uint32_t size) uint32_t
+        +seek(uint32_t pos) bool
+        +seek(uint32_t pos, int mode) bool
+        +seekPath(std.string path) bool
+    }
+%%gen
+    class HTTPMFile {
+        -getClient() std.shared_ptr~MeatHttpClient~
+        -std.shared_ptr~HTTPMSession~ _session
+        -bool _headersFetched
+        +HTTPMFile()
+        +HTTPMFile(std.string path)
+        +HTTPMFile(std.string path, std.string filename)
+        +getSourceStream(...) std.shared_ptr~MStream~
+        +getDecodedStream(std.shared_ptr~MStream~ src) std.shared_ptr~MStream~
+        +createStream(std.ios_base.openmode mode) std.shared_ptr~MStream~
+        +isDirectory() bool
+        +getLastWrite() time_t
+        +getCreationTime() time_t
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile*
+        +mkDir() bool
+        +exists() bool
+        +remove() bool
+        +isText() bool
+        +rename(std.string dest) bool
+    }
+%%gen
+    class HTTPMFileSystem {
+        +HTTPMFileSystem()
+        +handles(std.string name) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class HTTPMSession {
+        +HTTPMSession(std.string host, uint16_t port)
+        +connect() bool
+        +disconnect() void
+        +keep_alive() bool
+        +getScheme() std.string$
+        +isSecure() bool
+        +std.shared_ptr~MeatHttpClient~ client
+    }
+%%gen
+    class HTTPMStream {
+        -HTTPRequestContext ctx
+        -FullModeState fullMode
+        -bool _statusRequested
+        -std.string _statusBuffer
+        -uint32_t _statusPos*
+        -bool _jsonQueryRequested
+        -std.string _jsonQueryResult
+        -uint32_t _queryResultPos*
+        -std.string _pendingJsonPointer
+        -bool _jsonResultReady
+        -std.string _cmdLine
+        -bool _queuedSend
+        -std.vector~uint8_t~ _responseBuffer
+        -uint32_t _responseBufPos*
+        -uint32_t _statusEnd*
+        -uint32_t _headersEnd*
+        -std.vector~uint8_t~ _bodyCapture
+        #std.shared_ptr~HTTPMSession~ _session
+        +HTTPMStream(std.string path)
+        +HTTPMStream(std.string path, std.ios_base.openmode m)
+        +isOpen() bool
+        +isNetwork() bool
+        +open(std.ios_base.openmode mode) bool
+        +close() void
+        +read(uint8_t* buf, uint32_t size) uint32_t
+        +write(const uint8_t *buf, uint32_t size) uint32_t
+        +available() uint32_t
+        +seek(uint32_t pos) bool
+        +seekPath(std.string path) bool
+        +handleCommand(const std.string cmd) bool
+        +performJsonQuery(const std.string pointer) void
+        +isFullMode() bool
+    }
+%%gen
+    class HTTPRequestContext {
+        +std.string method
+        +std.map~std.string, std.vector~std.string~~ headers
+        +std.string body
+        +std.vector~std.string~ responseHeaders
+        +int responseStatus*
+        +bool responseConsumed
+        +setMethod(const std.string m) void
+        +setHeader(...) void
+        +appendHeader(...) void
+        +setBody(const std.string b) void
+        +appendBody(const std.string b) void
+        +clear() void
+        +sendRequest(std.shared_ptr~HTTPMSession~ session) bool
+        +hasMoreResponseHeaders() bool
+        +popResponseHeader() std.string
+        +errorToIecStatus(int errOut, std.string msgOut) void
+        +isHttpError() bool
+    }
+%%gen
+    class IPFSFileSystem {
+        +IPFSFileSystem()
+        +handles(std.string name) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class IPFSMFile {
+        +IPFSMFile(std.string path)
+        +getSourceStream(...) std.shared_ptr~MStream~
+    }
+%%gen
+    class IPFSMStream {
+        +IPFSMStream(std.string path)
+        +open(std.ios_base.openmode mode) bool
+        +seek(uint32_t pos) bool
+    }
+%%gen
+    class IRCMFile {
+        +IRCMFile()
+        +IRCMFile(std.string path)
+        +getSourceStream(...) std.shared_ptr~MStream~
+        +getDecodedStream(std.shared_ptr~MStream~ src) std.shared_ptr~MStream~
+        +createStream(std.ios_base.openmode mode) std.shared_ptr~MStream~
+        +isDirectory() bool
+    }
+%%gen
+    class IRCMFileSystem {
+        +IRCMFileSystem()
+        +handles(std.string name) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class IRCMSession {
+        -parseHost() void
+        -std.shared_ptr~TCPMStream~ _tcp
+        -std.string nick
+        -std.string server_host
+        -std.string joined_channel
+        -bool registered
+        +IRCMSession(std.string host, uint16_t port)
+        +getScheme() std.string$
+        +connect() bool
+        +disconnect() void
+        +keep_alive() bool
+        +stream() std.shared_ptr~TCPMStream~
+        +getNick() const std.string
+        +getServerHost() const std.string
+        +ensureRegistered() bool
+        +ensureJoined(const std.string channel) bool
+    }
+%%gen
+    class IRCMStream {
+        #std.shared_ptr~IRCMSession~ _session
+        +isNetwork() bool
+        +IRCMStream(std.string path)
+        +size() uint32_t
+        +available() uint32_t
+        +position() uint32_t
+        +error() size_t
+        +open(std.ios_base.openmode mode) bool
+        +close() void
+        +read(uint8_t* buf, uint32_t size) uint32_t
+        +write(const uint8_t *buf, uint32_t size) uint32_t
+        +seek(uint32_t pos) bool
+        +isOpen() bool
+    }
+%%gen
+    class ISCSIMFile {
+        #std.shared_ptr~ISCSIMSession~ _session
+        #bool _dirOpened
+        #int _dir_index*
+        #std.vector~uint16_t~ _lun_list
+        #bool _luns_enumerated
+        #openDir(std.string apath) void
+        #closeDir() void
+        #enumerateLuns() void
+        +std.string target_iqn
+        +int lun_number
+        +ISCSIMFile(std.string path)
+        +getSourceStream(...) std.shared_ptr~MStream~
+        +getDecodedStream(std.shared_ptr~MStream~ src) std.shared_ptr~MStream~
+        +createStream(std.ios_base.openmode mode) std.shared_ptr~MStream~
+        +isDirectory() bool
+        +getLastWrite() time_t
+        +getCreationTime() time_t
+        +getAvailableSpace() uint64_t
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile*
+        +mkDir() bool
+        +exists() bool
+        +remove() bool
+        +rename(std.string dest) bool
+        +readEntry(std.string filename) bool
+    }
+%%gen
+    class ISCSIMFileSystem {
+        +ISCSIMFileSystem()
+        +handles(std.string name) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class ISCSIMSession {
+        -enumerateTargets() void
+        -std.vector~std.string~ _targets_list
+        -bool _targets_enumerated
+        +ISCSIMSession(std.string host, uint16_t port)
+        +getScheme() std.string$
+        +connect() bool
+        +disconnect() void
+        +keep_alive() bool
+        +getTargets() const std.vector~std.string~
+        +portal() std.string
+    }
+%%gen
+    class ISCSIMStream {
+        #std.shared_ptr~ISCSIMSession~ _session
+        #int _lun*
+        #uint32_t _block_size
+        #bool _connected
+        #std.vector~uint8_t~ _block_buf
+        #int64_t _buf_lba
+        #readBlock(uint32_t lba) bool
+        #writeBlock(uint32_t lba, const uint8_t* src) bool
+        +ISCSIMStream(std.string path)
+        +isOpen() bool
+        +isNetwork() bool
+        +isRandomAccess() bool
+        +open(std.ios_base.openmode mode) bool
+        +close() void
+        +read(uint8_t* buf, uint32_t size) uint32_t
+        +write(const uint8_t* buf, uint32_t size) uint32_t
+        +seek(uint32_t pos) bool
+        +seek(uint32_t pos, int mode) bool
+        +seekPath(std.string path) bool
+    }
+    class MeatHttpClient {
+        -esp_http_client_handle_t _http
+        -esp_http_client_method_t lastMethod
+        -map~string,string~ headers
+        -_http_event_handler(evt) esp_err_t$
+        -openAndFetchHeaders(method, position, size) int
+        +vector~uint8_t~ postBuffer
+        +vector~uint8_t~ postResponse
+        +vector~uint8_t~ preservedPostResponse
+        +bool _is_open
+        +bool _exists
+        +uint32_t _size
+        +uint32_t _range_size
+        +uint32_t _position
+        +bool m_isWebDAV
+        +bool m_isDirectory
+        +bool isText
+        +bool isFriendlySkipper
+        +bool disableAutoRedirect
+        +bool wasRedirected
+        +string url
+        +string contentDispositionFilename
+        +string _httpOrigin
+        +bool _performPending
+        +int lastRC
+        +init() void
+        +GET(url) bool
+        +POST(url) bool
+        +PUT(url) bool
+        +HEAD(url) bool
+        +setHeader(header) bool
+        +getHeader(header) string
+        +clearHeaders() void
+        +setOnHeader(fn) void
+        +open(url, method) bool
+        +reopen() bool
+        +close() void
+        +configureDeferredGet() bool
+        +processRedirectsAndOpen(position, size) bool
+        +seek(pos) bool
+        +flush(numBytes) bool
+        +read(buf, size) uint32_t
+        +write(buf, size) uint32_t
+        +available() uint32_t
+        +complete() bool
+    }
+    class MeatSocket {
+        -int sock
+        -uint8_t iecPort
+        -bool blocking
+        +MeatSocket()
+        +MeatSocket(s, iecp) - wrap an accepted fd
+        +open(address, port) bool
+        +close() void
+        +isOpen() bool
+        +read() int - single byte, may return the NDA sentinel
+        +write(buf, size) uint32_t
+    }
+    class MeatSocketServer {
+        +bool isAlive
+        +int port
+        +uint8_t iecPort
+        +start(p) void - spawns tcp_server_task (4 KB, core 0)
+        +stop() void
+    }
+%%gen
+    class NFSHandle {
+        -std.shared_ptr~NFSMSession~ _session
+        -int flags*
+        +NFSHandle()
+        +obtain(std.string localPath, int nfs_mode) void
+        +dispose() void
+    }
+%%gen
+    class NFSMFile {
+        -openDir(std.string path) void
+        -closeDir() void
+        -pathValid(std.string path) bool
+        -int entry_index
+        -std.vector~std.string~ exports$
+        #bool dirOpened
+        #std.shared_ptr~NFSMSession~ _session
+        +std.string basepath
+        +std.string export_path
+        +std.string file_path
+        +NFSMFile(std.string path)
+        +getSourceStream(...) std.shared_ptr~MStream~
+        +getDecodedStream(std.shared_ptr~MStream~ src) std.shared_ptr~MStream~
+        +createStream(std.ios_base.openmode mode) std.shared_ptr~MStream~
+        +isDirectory() bool
+        +getLastWrite() time_t
+        +getCreationTime() time_t
+        +getAvailableSpace() uint64_t
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile*
+        +mkDir() bool
+        +exists() bool
+        +remove() bool
+        +rename(std.string dest) bool
+        +readEntry(std.string filename) bool
+    }
+%%gen
+    class NFSMFileSystem {
+        +NFSMFileSystem()
+        +handles(std.string name) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class NFSMSession {
+        -enumerateExports() void
+        -std.map~std.string, struct nfs_context*~ _export_contexts
+        -std.vector~std.string~ _exports_list
+        -bool _exports_enumerated
+        +NFSMSession(std.string host, uint16_t port)
+        +getScheme() std.string$
+        +connect() bool
+        +disconnect() void
+        +keep_alive() bool
+        +getExports() const std.vector~std.string~
+    }
+%%gen
+    class NFSMStream {
+        #std.shared_ptr~NFSMSession~ _session
+        #std.string _export
+        +NFSMStream(std.string path)
+        +isOpen() bool
+        +isNetwork() bool
+        +open(std.ios_base.openmode mode) bool
+        +close() void
+        +read(uint8_t* buf, uint32_t size) uint32_t
+        +write(const uint8_t *buf, uint32_t size) uint32_t
+        +seek(uint32_t pos) bool
+        +seek(uint32_t pos, int mode) bool
+        +seekPath(std.string path) bool
+    }
+%%gen
+    class SFTPMFile {
+        -openDir(std.string path) void
+        -closeDir() void
+        -pathValid(std.string path) bool
+        -sftp_attributes current_attrs
+        #bool dirOpened
+        #std.shared_ptr~SFTPMSession~ _session
+        #sftp_dir _dir_handle
+        #getSFTPSession() sftp_session
+        +SFTPMFile(std.string path)
+        +getSourceStream(...) std.shared_ptr~MStream~
+        +getDecodedStream(std.shared_ptr~MStream~ src) std.shared_ptr~MStream~
+        +createStream(std.ios_base.openmode mode) std.shared_ptr~MStream~
+        +isDirectory() bool
+        +getLastWrite() time_t
+        +getCreationTime() time_t
+        +getAvailableSpace() uint64_t
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile*
+        +mkDir() bool
+        +exists() bool
+        +remove() bool
+        +rename(std.string dest) bool
+    }
+%%gen
+    class SFTPMFileSystem {
+        +SFTPMFileSystem()
+        +handles(std.string name) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class SFTPMSession {
+        -ssh_session ssh_handle
+        -sftp_session sftp_handle
+        -std.string private_key_path
+        -authenticatePassword() bool
+        -authenticatePublicKey() bool
+        +SFTPMSession(std.string host, uint16_t port)
+        +connect() bool
+        +disconnect() void
+        +keep_alive() bool
+        +getScheme() std.string$
+        +getSSHSession() ssh_session
+        +getSFTPSession() sftp_session
+        +setCredentials(...) void
+        +setPrivateKey(const std.string keypath) void
+    }
+%%gen
+    class SFTPMStream {
+        -mapOpenMode(std.ios_base.openmode mode) uint32_t
+        -mapFileMode(std.ios_base.openmode mode) mode_t
+        #std.shared_ptr~SFTPMSession~ _session
+        #sftp_file _file_handle
+        #constexpr uint32_t BUFFER_THRESHOLD$
+        #std.shared_ptr~MSession.CachedFile~ _cached_file
+        #bool _buffered
+        #bufferEntireFile() bool
+        +SFTPMStream(std.string path)
+        +isOpen() bool
+        +isNetwork() bool
+        +open(std.ios_base.openmode mode) bool
+        +close() void
+        +read(uint8_t* buf, uint32_t size) uint32_t
+        +write(const uint8_t *buf, uint32_t size) uint32_t
+        +seek(uint32_t pos) bool
+        +seek(uint32_t pos, int mode) bool
+        +seekPath(std.string path) bool
+    }
+%%gen
+    class SMBHandle {
+        -std.shared_ptr~SMBMSession~ _session
+        -int flags*
+        +SMBHandle()
+        +obtain(std.string localPath, int smb_mode) void
+        +dispose() void
+    }
+%%gen
+    class SMBMFile {
+        -openDir(std.string path) void
+        -closeDir() void
+        -pathValid(std.string path) bool
+        -int entry_index
+        -std.vector~std.string~ shares$
+        #bool dirOpened
+        #std.shared_ptr~SMBMSession~ _session
+        +std.string basepath
+        +std.string share
+        +std.string share_path
+        +SMBMFile(std.string path)
+        +getSourceStream(...) std.shared_ptr~MStream~
+        +getDecodedStream(std.shared_ptr~MStream~ src) std.shared_ptr~MStream~
+        +createStream(std.ios_base.openmode mode) std.shared_ptr~MStream~
+        +isDirectory() bool
+        +getLastWrite() time_t
+        +getCreationTime() time_t
+        +getAvailableSpace() uint64_t
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile*
+        +mkDir() bool
+        +exists() bool
+        +remove() bool
+        +rename(std.string dest) bool
+        +readEntry(std.string filename) bool
+    }
+%%gen
+    class SMBMFileSystem {
+        +SMBMFileSystem()
+        +handles(std.string name) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class SMBMSession {
+        +SMBMSession(std.string host, uint16_t port)
+        +if(at !)
+        +Debug_printv(...)
+    }
+%%gen
+    class SMBMStream {
+        #std.shared_ptr~SMBMSession~ _session
+        #std.string _share
+        +SMBMStream(std.string path)
+        +isOpen() bool
+        +isNetwork() bool
+        +open(std.ios_base.openmode mode) bool
+        +close() void
+        +read(uint8_t* buf, uint32_t size) uint32_t
+        +write(const uint8_t *buf, uint32_t size) uint32_t
+        +seek(uint32_t pos) bool
+        +seek(uint32_t pos, int mode) bool
+        +seekPath(std.string path) bool
+    }
+%%gen
+    class TCPMFile {
+        +TCPMFile()
+        +TCPMFile(std.string path)
+        +TCPMFile(std.string path, std.string filename)
+        +getSourceStream(...) std.shared_ptr~MStream~
+        +getDecodedStream(std.shared_ptr~MStream~ src) std.shared_ptr~MStream~
+        +createStream(std.ios_base.openmode mode) std.shared_ptr~MStream~
+    }
+%%gen
+    class TCPMFileSystem {
+        +TCPMFileSystem()
+        +handles(std.string name) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class TCPMSession {
+        -MeatSocket _socket
+        +TCPMSession(std.string host, uint16_t port)
+        +getScheme() std.string$
+        +connect() bool
+        +disconnect() void
+        +keep_alive() bool
+        +socket() MeatSocket*
+    }
+%%gen
+    class TCPMStream {
+        #std.shared_ptr~TCPMSession~ _session
+        +isNetwork() bool
+        +TCPMStream(std.string path)
+        +size() uint32_t
+        +available() uint32_t
+        +position() uint32_t
+        +error() size_t
+        +seek(uint32_t pos) bool
+        +close() void
+        +open(std.ios_base.openmode mode) bool
+        +read(uint8_t* buf, uint32_t size) uint32_t
+        +write(const uint8_t *buf, uint32_t size) uint32_t
+        +isOpen() bool
+    }
+%%gen
+    class TNFSHandle {
+        -mapOpenMode(std.ios_base.openmode mode) uint16_t
+        +std.unique_ptr~tnfsMountInfo~ _mountinfo
+        +int16_t _handle
+        +TNFSHandle()
+        +obtain(...) void
+        +dispose() void
+    }
+%%gen
+    class TNFSMFile {
+        -openDir(std.string path) void
+        -closeDir() void
+        -pathValid(std.string path) bool
+        -int entry_index*
+        #bool dirOpened
+        #std.shared_ptr~TNFSMSession~ _session
+        #uint16_t _dir_handle
+        #getMountInfo() tnfsMountInfo*
+        +TNFSMFile(std.string path)
+        +getSourceStream(...) std.shared_ptr~MStream~
+        +getDecodedStream(std.shared_ptr~MStream~ src) std.shared_ptr~MStream~
+        +createStream(std.ios_base.openmode mode) std.shared_ptr~MStream~
+        +isDirectory() bool
+        +getLastWrite() time_t
+        +getCreationTime() time_t
+        +getAvailableSpace() uint64_t
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile*
+        +mkDir() bool
+        +exists() bool
+        +remove() bool
+        +rename(std.string dest) bool
+        +readEntry(std.string filename) bool
+    }
+%%gen
+    class TNFSMFileSystem {
+        +TNFSMFileSystem()
+        +handles(std.string name) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class TNFSMSession {
+        -std.unique_ptr~tnfsMountInfo~ _mountinfo
+        +TNFSMSession(...)
+        +connect() bool
+        +disconnect() void
+        +keep_alive() bool
+        +getScheme() std.string$
+        +getMountInfo() tnfsMountInfo*
+    }
+%%gen
+    class TNFSMStream {
+        -mapOpenMode(std.ios_base.openmode mode) uint16_t
+        #std.shared_ptr~TNFSMSession~ _session
+        #int16_t _handle
+        +TNFSMStream(std.string path)
+        +isOpen() bool
+        +isNetwork() bool
+        +open(std.ios_base.openmode mode) bool
+        +close() void
+        +read(uint8_t* buf, uint32_t size) uint32_t
+        +write(const uint8_t *buf, uint32_t size) uint32_t
+        +seek(uint32_t pos) bool
+        +seek(uint32_t pos, int mode) bool
+        +seekPath(std.string path) bool
+    }
+%%gen
+    class WSFileSystem {
+        +WSFileSystem()
+        +handles(std.string name) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class WSMFile {
+        +WSMFile(std.string path)
+        +isDirectory() bool
+        +getSourceStream(...) std.shared_ptr~MStream~
+        +getLastWrite() time_t
+        +getCreationTime() time_t
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile*
+        +mkDir() bool
+        +exists() bool
+        +remove() bool
+        +rename(std.string dest) bool
+        +getDecodedStream(std.shared_ptr~MStream~ src) std.shared_ptr~MStream~
+    }
+%%gen
+    class WSMStream {
+        #websockets.WSInterfaceString address
+        #uint16_t port
+        #bool _is_open
+        #bool m_isServer
+        #websockets.WebsocketsClient client
+        #websockets.WebsocketsServer server
+        #websockets.WSInterfaceString lastMsg
+        #prepareClientCallbacks() void
+        +isNetwork() bool
+        +WSMStream(MFile* file, bool isServer)
+        +close() void
+        +open() bool
+        +position() uint32_t
+        +available() uint32_t
+        +isOpen() bool
+        +seek(uint32_t pos) bool
+        +size() uint32_t
+        +read(uint8_t* buf, uint32_t size) uint32_t
+        +write(const uint8_t *buf, size_t size) size_t
+    }
+
+    class MFile {
+        <<see vfs_core>>
+    }
+    class MFileSystem {
+        <<see vfs_core>>
+    }
+    class MSession {
+        <<see vfs_core>>
+    }
+    class MStream {
+        <<see vfs_core>>
+    }
+
+    MFile <|-- AFPMFile
+    MFileSystem <|-- AFPMFileSystem
+    MSession <|-- AFPMSession
+    MStream <|-- AFPMStream
+    MFile <|-- FSPMFile
+    MFileSystem <|-- FSPMFileSystem
+    MSession <|-- FSPMSession
+    MStream <|-- FSPMStream
+    MFile <|-- FTPMFile
+    MFileSystem <|-- FTPMFileSystem
+    MSession <|-- FTPMSession
+    MStream <|-- FTPMStream
+    MFile <|-- HTTPMFile
+    MFileSystem <|-- HTTPMFileSystem
+    MSession <|-- HTTPMSession
+    MStream <|-- HTTPMStream
+    MFileSystem <|-- IPFSFileSystem
+    HTTPMFile <|-- IPFSMFile
+    HTTPMStream <|-- IPFSMStream
+    MFile <|-- IRCMFile
+    MFileSystem <|-- IRCMFileSystem
+    MSession <|-- IRCMSession
+    MStream <|-- IRCMStream
+    MFile <|-- ISCSIMFile
+    MFileSystem <|-- ISCSIMFileSystem
+    MSession <|-- ISCSIMSession
+    MStream <|-- ISCSIMStream
+    MFile <|-- NFSMFile
+    MFileSystem <|-- NFSMFileSystem
+    MSession <|-- NFSMSession
+    MStream <|-- NFSMStream
+    MFile <|-- SFTPMFile
+    MFileSystem <|-- SFTPMFileSystem
+    MSession <|-- SFTPMSession
+    MStream <|-- SFTPMStream
+    MFile <|-- SMBMFile
+    MFileSystem <|-- SMBMFileSystem
+    MSession <|-- SMBMSession
+    MStream <|-- SMBMStream
+    MFile <|-- TCPMFile
+    MFileSystem <|-- TCPMFileSystem
+    MSession <|-- TCPMSession
+    MStream <|-- TCPMStream
+    MFile <|-- TNFSMFile
+    MFileSystem <|-- TNFSMFileSystem
+    MSession <|-- TNFSMSession
+    MStream <|-- TNFSMStream
+    MFileSystem <|-- WSFileSystem
+    MFile <|-- WSMFile
+    MStream <|-- WSMStream
+
+    class DiscoveredService {
+        <<struct>>
+        +string instance
+        +string service_type
+        +string host
+        +uint16_t port
+    }
+
+    class MSession {
+        <<see vfs_core>>
+    }
+    class SessionBroker {
+        <<see vfs_core>>
+    }
+    SessionBroker o-- MSession : reuse + keep-alive
+    HTTPMSession *-- MeatHttpClient : esp_http_client wrapper
+    TCPMSession *-- MeatSocket
+    MeatSocketServer o-- MeatSocket
+    MDNSMSession *-- DiscoveredService : cached results
+
+    note for MSession "Stateless protocols (NFS, FSP) set keep_alive_interval = 0 - keep-alive racing IEC-task I/O corrupts the heap (see CLAUDE.md)"

@@ -1,0 +1,13 @@
+%%gen
+    class DirectoryPageGroup {
+        -set_block_entry_details(fsdir_entry_t *f, uint8_t *dest) size_t$
+        +const uint8_t HEADER_SIZE$
+        +const uint8_t ENTRY_HEADER_SIZE$
+        +std.vector~uint8_t~ data
+        +uint8_t entry_count
+        +bool is_last_group
+        +uint8_t index
+        +DirectoryPageGroup()
+        +add_entry(fsdir_entry_t* f) bool
+        +finalize() void
+    }

@@ -1,0 +1,15 @@
+%%gen
+    class SMBMStream {
+        #std.shared_ptr~SMBMSession~ _session
+        #std.string _share
+        +SMBMStream(std.string path)
+        +isOpen() bool
+        +isNetwork() bool
+        +open(std.ios_base.openmode mode) bool
+        +close() void
+        +read(uint8_t* buf, uint32_t size) uint32_t
+        +write(const uint8_t *buf, uint32_t size) uint32_t
+        +seek(uint32_t pos) bool
+        +seek(uint32_t pos, int mode) bool
+        +seekPath(std.string path) bool
+    }

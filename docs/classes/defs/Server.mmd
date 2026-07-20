@@ -1,0 +1,22 @@
+%%gen
+    class Server {
+        -std.string rootURI, rootPath
+        -formatTime(time_t t) std.string
+        -sendPropResponse(...) int
+        -sendMultiStatusResponse(Response resp, MultiStatusResponse msr) void
+        +Server(std.string rootURI, std.string rootPath)
+        +pathToURI(std.string path) std.string
+        +uriToPath(std.string uri) std.string
+        +doCopy(Request req, Response resp) int
+        +doDelete(Request req, Response resp) int
+        +doGet(Request req, Response resp) int
+        +doHead(Request req, Response resp) int
+        +doLock(Request req, Response resp) int
+        +doMkcol(Request req, Response resp) int
+        +doMove(Request req, Response resp) int
+        +doOptions(Request req, Response resp) int
+        +doPropfind(Request req, Response resp) int
+        +doProppatch(Request req, Response resp) int
+        +doPut(Request req, Response resp) int
+        +doUnlock(Request req, Response resp) int
+    }

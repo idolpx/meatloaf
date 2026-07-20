@@ -1,0 +1,22 @@
+%%gen
+    class Hash {
+        -std.vector~uint8_t~ accumulated_data
+        -std.vector~uint8_t~ hash_output
+        -compute_md5() void
+        -compute_sha1() void
+        -compute_sha256(int is224) void
+        -compute_sha512(int is384) void
+        -compute_md(mbedtls_md_type_t md_type, uint8_t size) void
+        -bytes_to_hex(const std.vector~uint8_t~ bytes) std.string
+        +Hash()
+        +std.string key
+        +add_data(const std.vector~uint8_t~ data) void
+        +add_data(const std.string data) void
+        +clear() void
+        +hash_length(Algorithm algorithm, bool is_hex) size_t
+        +compute(Algorithm algorithm, bool clear_data) void
+        +output_binary() std.vector~uint8_t~
+        +output_hex() std.string
+        +to_algorithm(uint8_t value) Hash.Algorithm$
+        +from_string(std.string hash_name) Hash.Algorithm$
+    }

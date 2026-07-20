@@ -1,0 +1,15 @@
+%%gen
+    class MediaTypeDCD {
+        -uint32_t last_block_num
+        -uint32_t offset*
+        +read(uint32_t blockNum, uint8_t* buffer) bool
+        +write(uint32_t blockNum, uint8_t* buffer) bool
+        +format(uint16_t *responsesize) bool
+        +mount(FILE *f, uint32_t disksize) mediatype_t
+        +mount(FILE *f) mediatype_t
+        +status() bool
+        +size() size_t
+        +sectorsize() size_t
+        +reset_seek_opto() void
+        +MediaTypeDCD(int x)
+    }

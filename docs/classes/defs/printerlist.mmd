@@ -1,0 +1,11 @@
+%%gen
+    class printerlist {
+        -printerlist_entry _printers[PRINTERLIST_SIZE]
+        +set_entry(...) void
+        +set_ptr(int index, iecPrinter *ptr) void
+        +set_type(int index, iecPrinter.printer_type ptype) void
+        +set_port(int index, int pport) void
+        +get_ptr(int index) iecPrinter *
+        +get_type(int index) iecPrinter.printer_type
+        +get_port(int index) int
+    }

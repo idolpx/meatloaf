@@ -1,0 +1,11 @@
+%%gen
+    class DisplayLCD {
+        -hagl_backend_t *backend
+        -DisplayLCD *instance_$
+        +DisplayLCD()
+        +instance() DisplayLCD *$
+        +init_lcd() esp_err_t
+        +show_jpeg(const char *file) TickType_t
+        +show_png(const char *file) TickType_t
+        +show_image(std.string filename) void
+    }

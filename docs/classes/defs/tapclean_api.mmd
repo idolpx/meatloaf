@@ -1,0 +1,18 @@
+    class tapclean_api {
+        <<C API - components/tapclean/include/tapclean_api.h>>
+        +tapclean_init() int - lazy: allocates all engine buffers PSRAM-first
+        +tapclean_shutdown() void - frees EVERYTHING incl. loaded tape
+        +tapclean_load_buffer(buf, len, machine, ntsc) int - takes ownership of buf
+        +tapclean_load_buffer_ref(buf, len, machine, ntsc) int - borrows buf (window re-scans)
+        +tapclean_analyze_tap(unite_blocks) int - full scan; returns PRG count
+        +tapclean_unload() void - free tape, keep work buffers
+        +tapclean_block_count() int
+        +tapclean_get_block(idx, out) int - raw block records (tapclean_block_t)
+        +tapclean_prg_count() int
+        +tapclean_get_prg(idx, out) int - united programs (tapclean_prg_t)
+        +tapclean_detected_percent() int - pulses accounted for
+        +tapclean_tap_time_ms() uint - whole-tape play time
+        +tapclean_time_at_ms(offset) uint - play time from start to offset
+        +tapclean_offset_at_ms(ms) int - inverse: tape counter seek
+        +tapclean_duration_ms(p1, p2) uint - play time between offsets
+    }

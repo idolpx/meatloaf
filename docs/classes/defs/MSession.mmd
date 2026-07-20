@@ -1,0 +1,13 @@
+    class MSession {
+        <<abstract>>
+        #bool connected
+        #string session_key
+        #uint32_t keep_alive_interval - ms; 0 disables (stateless protocols: NFS, FSP)
+        +connect()* bool
+        +disconnect()* void
+        +keep_alive()* bool - periodic ping from the broker task
+        +refresh() bool - re-list or re-auth after reconnect
+        +isConnected() bool
+        +setKeepAliveInterval(ms) void
+        +getKeepAliveInterval() uint32_t
+    }

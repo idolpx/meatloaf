@@ -288,6 +288,18 @@ void main_setup()
     // Start SessionBroker service task on CPU0
     SessionBroker::setup();
 
+    // Restore each drive's persisted mlConfig state (enabled flag, mounted URL).
+    // Must happen after fnWiFi.start(): reloadConfig() may mount a network URL
+    // (fsp://, http://, ...), and that needs the LWIP tcpip task that
+    // fnWiFi.start() creates via esp_netif_init(). Calling this any earlier
+    // (e.g. from iecDrive::begin() during SYSTEM_BUS.setup()) crashes with
+    // "assert failed: tcpip_send_msg_wait_sem ... Invalid mbox".
+#if defined(BUILD_IEC) || defined(BUILD_GPIB)
+    for (int i = 0; i < MAX_DISK_DEVICES; i++)
+        Meatloaf.get_disks(i)->disk_dev.reloadConfig();
+    Meatloaf.reloadConfig();
+#endif
+
 #ifdef DEBUG_TIMING
     Debug_printv( ANSI_GREEN_BOLD "DEBUG_TIMING enabled" ANSI_RESET );
 #endif

@@ -1,0 +1,9 @@
+%%gen
+    class ConsoleCommandBase {
+        #const char *command_
+        #const char *help_
+        #esp_console_cmd_func_t func_
+        +getCommand() const char*
+        +getHelp() const char*
+        +const esp_console_cmd_t toCommandStruct() const*
+    }

@@ -1,0 +1,49 @@
+%%gen
+    class WiFiManager {
+        -bool _started
+        -bool _connected
+        -std.string _ssid
+        -std.string _password
+        -esp_netif_t *_wifi_sta
+        -esp_netif_t *_wifi_ap
+        -wifi_ap_record_t * _scan_records
+        -uint16_t _scan_record_count*
+        -bool _scan_in_progress
+        -bool _disconnecting
+        -uint16_t _reconnect_attempts*
+        -_mac_to_string(char dest[18], uint8_t mac[6]) char *
+        -conn_event_handler(...) void$
+        -block() esp_err_t$
+        -_wifi_event_handler(...) void$
+        -EventGroupHandle_t _wifi_event_group
+        -remove_duplicate_scan_results(...) int
+        -bool _trying_stored
+        -uint16_t _stored_index*
+        -bool _all_stored_failed
+        -uint16_t _common_index*
+        -std.vector~stored_wifi~ _matched_wifis
+        +get_network_names() std.vector~std.string~
+        +get_stored_wifis() std.vector~stored_wifi~
+        +match_stored_with_network_wifis(...) std.vector~stored_wifi~
+        +store_wifi(std.string ssid, std.string password) void
+        +int retries
+        +start() int
+        +stop() void
+        +test_connect(const char *ssid, const char *password) int
+        +connect(const char *ssid, const char *password) int
+        +connect() int
+        +connected() bool
+        +get_adapter_handle() esp_netif_t *
+        +handle_station_stop() void
+        +set_hostname(const char* hostname) void
+        +get_current_ssid() std.string
+        +get_current_detail_str() const char *
+        +get_current_bssid(uint8_t bssid[6]) int
+        +get_current_bssid_str() std.string
+        +get_mac(uint8_t mac[6]) int
+        +get_mac_str() std.string
+        +scan_networks(...) uint8_t
+        +get_scan_result(...) int
+        +get_network_name_by_crc8(uint8_t crc8) std.string
+        +localIP() int32_t
+    }

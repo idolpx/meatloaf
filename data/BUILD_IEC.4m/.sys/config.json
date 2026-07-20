@@ -3,7 +3,7 @@
   "preferences": {
     "appearance": "auto",
     "language": "en",
-    "timezone": "America/Los_Angeles",
+    "timezone": "America/New_York",
     "country": "US",
     "devicename": "Meatloaf",
     "rotationsounds": 0,
@@ -70,10 +70,13 @@
       "hidden_dirs": 1,
       "hidden_files": 1,
       "long_filenames": 1,
-      "extension_colon": 1,
+      "hide_extension": 0,
+      "type_colon": 0,
+      "standard_types": 0,
       "date_time": 1,
       "load_address": 1,
       "sys_address": 1,
+      "entry_counts": 1,
       "footer_bytes": 1
     },
     "fastloaders": {

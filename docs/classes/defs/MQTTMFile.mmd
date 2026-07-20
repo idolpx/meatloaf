@@ -1,0 +1,14 @@
+%%gen
+    class MQTTMFile {
+        #std.shared_ptr~MQTTMSession~ _session
+        #std.string topic
+        +MQTTMFile(std.string path)
+        +getSourceStream(...) std.shared_ptr~MStream~
+        +getDecodedStream(std.shared_ptr~MStream~ src) std.shared_ptr~MStream~
+        +createStream(std.ios_base.openmode mode) std.shared_ptr~MStream~
+        +isDirectory() bool
+        +exists() bool
+        +remove() bool
+        +rename(std.string dest) bool
+        +getSession() std.shared_ptr~MQTTMSession~
+    }

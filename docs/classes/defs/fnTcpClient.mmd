@@ -1,0 +1,39 @@
+%%gen
+    class fnTcpClient {
+        #std.string _rxBuffer
+        #std.shared_ptr~fnTcpClientSocketHandle~ _clientSocketHandle
+        #bool _connected
+        +fnTcpClient()
+        +fnTcpClient(int fd)
+        +stop() void
+        +connect(...) int
+        +connect(...) int
+        +write(uint8_t data) size_t
+        +write(const uint8_t *buf, size_t size) size_t
+        +write(const char *buff) size_t
+        +write(const std.string str) size_t
+        +read() int
+        +read(uint8_t *buf, size_t size) int
+        +read_until(char terminator, char *buf, size_t size) int
+        +updateFIFO() void
+        +available() size_t
+        +peek() int
+        +flush() void
+        +connected() uint8_t
+        +bool() operator
+        +setSocketOption(int option, char* value, size_t len) int
+        +setOption(int option, int *value) int
+        +getOption(int option, int *value) int
+        +setTimeout(uint32_t seconds) int
+        +setNoDelay(bool nodelay) int
+        +getNoDelay() bool
+        +remoteIP() in_addr_t
+        +remoteIP(int fd) in_addr_t
+        +remotePort() uint16_t
+        +remotePort(int fd) uint16_t
+        +localIP() in_addr_t
+        +localIP(int fd) in_addr_t
+        +localPort() uint16_t
+        +localPort(int fd) uint16_t
+        +fd() int
+    }

@@ -1,0 +1,10 @@
+%%gen
+    class FTPMSession {
+        -std.unique_ptr~FileSystemFTP~ _fs
+        +FTPMSession(std.string host, uint16_t port)
+        +getScheme() std.string$
+        +connect() bool
+        +disconnect() void
+        +keep_alive() bool
+        +fs() FileSystemFTP*
+    }

@@ -1,0 +1,23 @@
+%%gen
+    class MediaTypeMOOF {
+        -moof_disk_type_t moof_disktype
+        -moof_check_header() bool
+        -moof_read_info() bool
+        -moof_read_tmap() bool
+        -moof_read_tracks() bool
+        #uint8_t tmap[MAX_TRACKS]
+        #TRK_t trks[MAX_TRACKS]
+        +MediaTypeMOOF()
+        +read(uint32_t blockNum, uint8_t *buffer) bool
+        +write(uint32_t blockNum, uint8_t *buffer) bool
+        +format(uint16_t *responsesize) bool
+        +mount(FILE *f, uint32_t disksize) mediatype_t
+        +mount(FILE *f) mediatype_t
+        +unmount() void
+        +status() bool
+        +trackmap(uint8_t t) uint8_t
+        +get_track(int t) uint8_t *
+        +track_len(int t) int
+        +num_bits(int t) int
+        +uint8_t optimal_bit_timing
+    }

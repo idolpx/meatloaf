@@ -1,0 +1,20 @@
+%%gen
+    class QRManager {
+        -QRCode qrcode
+        +QRManager(...)
+        +encode(...) std.vector~uint8_t~
+        +to_ansi(void) std.vector~uint8_t~
+        +to_binary(void) std.vector~uint8_t~
+        +to_bitmap(void) std.vector~uint8_t~
+        +to_svg(...) std.vector~uint8_t~
+        +to_atascii(void) std.vector~uint8_t~
+        +to_petscii(void) std.vector~uint8_t~
+        +version() uint8_t
+        +version(uint8_t v) void
+        +ecc() qr_ecc_t
+        +ecc(qr_ecc_t e) void
+        +size() uint8_t
+        +ouput_mode_t output_mode
+        +std.string data
+        +std.vector~uint8_t~ code
+    }

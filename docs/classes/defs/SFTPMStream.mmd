@@ -1,0 +1,21 @@
+%%gen
+    class SFTPMStream {
+        -mapOpenMode(std.ios_base.openmode mode) uint32_t
+        -mapFileMode(std.ios_base.openmode mode) mode_t
+        #std.shared_ptr~SFTPMSession~ _session
+        #sftp_file _file_handle
+        #constexpr uint32_t BUFFER_THRESHOLD$
+        #std.shared_ptr~MSession.CachedFile~ _cached_file
+        #bool _buffered
+        #bufferEntireFile() bool
+        +SFTPMStream(std.string path)
+        +isOpen() bool
+        +isNetwork() bool
+        +open(std.ios_base.openmode mode) bool
+        +close() void
+        +read(uint8_t* buf, uint32_t size) uint32_t
+        +write(const uint8_t *buf, uint32_t size) uint32_t
+        +seek(uint32_t pos) bool
+        +seek(uint32_t pos, int mode) bool
+        +seekPath(std.string path) bool
+    }

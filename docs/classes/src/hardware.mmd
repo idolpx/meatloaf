@@ -1,0 +1,32 @@
+%% Hardware managers: WiFi, UART, LEDs, keys, Bluetooth, display
+%% GENERATED template (gen_templates.js) - curated content lives in
+%% src/extra/hardware.mmd; class bodies live in defs/<Class>.mmd
+classDiagram
+    direction LR
+
+    %%include ACMChannel
+    %%include BluetoothManager
+    %%include COMChannel
+    %%include DisplayLCD
+    %%include DisplayLEDs
+    %%include DummyWiFiManager
+    %%include EspClass
+    %%include fnBluetoothSPP
+    %%include HardwareTimer
+    %%include IOChannel
+    %%include KeyManager
+    %%include LedManager
+    %%include LedStripManager
+    %%include RS232ChannelProtocol
+    %%include SerialClass
+    %%include SystemManager
+    %%include TTYChannel
+    %%include UARTManager
+    %%include WiFiManager
+
+    IOChannel <|-- ACMChannel
+    RS232ChannelProtocol <|-- ACMChannel
+    IOChannel <|-- COMChannel
+    RS232ChannelProtocol <|-- COMChannel
+    IOChannel <|-- TTYChannel
+    RS232ChannelProtocol <|-- TTYChannel

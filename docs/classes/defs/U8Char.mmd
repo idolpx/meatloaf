@@ -1,0 +1,19 @@
+%%gen
+    class U8Char {
+        -const char16_t utf8map[]$
+        -const char missing
+        -fromUtf8Stream(std.istream* reader) void
+        +char16_t ch
+        +U8Char(const uint16_t codepoint)
+        +U8Char(std.istream* reader)
+        +U8Char(const char petscii)
+        +fromCharArray(char* reader) size_t
+        +toUtf8() std.string
+        +toPetscii() uint8_t
+        +toUnicode32(...) size_t
+        +fromUnicode32(...) std.string
+        +toPunycode(std.string utf8String) std.string$
+        +fromPunycode(std.string punycodeString) std.string$
+        +encodeACE(std.string utf8String) std.string$
+        +decodeACE(std.string aceOrPunycode) std.string$
+    }

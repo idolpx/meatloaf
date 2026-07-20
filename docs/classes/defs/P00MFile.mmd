@@ -1,0 +1,10 @@
+%%gen
+    class P00MFile {
+        +P00MFile(std.string path, bool is_dir)
+        +getDecodedStream(std.shared_ptr~MStream~ is) std.shared_ptr~MStream~
+        +isDirectory() bool
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile*
+        +bool isDir
+        +bool dirIsOpen
+    }

@@ -1,0 +1,23 @@
+    class IECFileDevice {
+        <<see bus>>
+    }
+    class IECDevice {
+        <<see bus>>
+    }
+    class MStream {
+        <<see vfs_core>>
+    }
+    IECFileDevice <|-- iecDrive : via SystemFileDevice alias
+    IECFileDevice <|-- iecNetwork : via SystemFileDevice alias
+    IECDevice <|-- iecModem
+    IECDevice <|-- iecPrinter : via SystemDevice alias
+    IECDevice <|-- iecClock : via SystemDevice alias
+    iecDrive <|-- iecMeatloaf
+    iecFuji <|-- iecMeatloaf : multiple inheritance
+    iecDrive *-- iecChannelHandler : per-channel 0-15
+    iecChannelHandler <|-- iecChannelHandlerFile
+    iecChannelHandler <|-- iecChannelHandlerDir
+    iecDrive *-- driveMemory : 6502 memory map (M-R/M-W/M-E)
+    iecChannelHandlerFile ..> MStream : serves LOAD/SAVE
+
+    note for driveMemory "ROMs shared across drives via static weak_ptr cache in PSRAM; RAM lazily allocated on first write"

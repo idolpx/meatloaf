@@ -1,0 +1,36 @@
+    class iecDrive {
+        -unique_ptr~MFile~ m_cwd - current working directory
+        -iecChannelHandler* m_channels - one per channel 0-15
+        -uint8_t m_statusCode
+        -uint8_t m_statusTrk
+        -uint8_t m_statusSec
+        -uint8_t m_numOpenChannels
+        -VDrive* m_vdrive - optional vdrive-backed image handling
+        -uint32_t m_byteCount
+        -uint64_t m_timeStart
+        -driveMemory m_memory - 6502 memory map for M-R M-W M-E
+        +fujiHost* m_host
+        +id() int - IEC device number
+        +mount(f, filename, disksize, disk_type) mediatype_t
+        +unmount() void
+        +getNumOpenChannels() uint8_t
+        +getStatusCode() uint8_t
+        +setStatusCode(code, trk, sec) void
+        +hasError() bool
+        +hasMemExeError() bool - M-E executed unsupported code
+        +getCWD() string
+        +set_cwd(path, verified) void
+        +changePartition(pnum) void - CMD CP command on DHD D1M D2M D4M
+        +tapeCommand(command) void - T-C set counter, T-I build tape index
+        +begin() void
+        +open(channel, name, nameLen) bool
+        +close(channel) void
+        +write(channel, buffer, bufferSize, eoi) uint8_t
+        +read(channel, buffer, bufferSize, eoi) uint8_t
+        +getStatusData(buffer, bufferSize, eoi) uint8_t
+        +getStatus(buffer, bufferSize) void
+        +executeData(data, dataLen) void - binary command channel payloads
+        +reset() void
+        +epyxReadSector(track, sector, buffer) bool - Epyx FastLoad sector API
+        +epyxWriteSector(track, sector, buffer) bool
+    }

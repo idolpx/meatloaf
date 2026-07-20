@@ -1,0 +1,12 @@
+%%gen
+    class LedStripManager {
+        -unsigned char r
+        -unsigned char g
+        -unsigned char b
+        -const unsigned char brightness$
+        +setup() void
+        +set(eLedID id, bool on) void
+        +toggle(eLedID id) void
+        +blink(eLedID led, int count) void
+        +present() bool
+    }

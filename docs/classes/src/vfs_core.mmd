@@ -1,0 +1,62 @@
+%% Core VFS: MStream/MFile/MFileSystem, brokers, sessions, iostream buffer
+%% GENERATED template (gen_templates.js) - curated content lives in
+%% src/extra/vfs_core.mmd; class bodies live in defs/<Class>.mmd
+classDiagram
+    direction LR
+
+    %%include basic_fstream
+    %%include HashMFile
+    %%include HashMFileSystem
+    %%include HashMStream
+    %%include iecPipe
+    %%include iecPipeBroker
+    %%include ImageBroker
+    %%include JSONMFile
+    %%include JSONMFileSystem
+    %%include JSONMStream
+    %%include MFile
+    %%include mfilebuf
+    %%include MFileSystem
+    %%include MFSOwner
+    %%include MMediaStream
+    %%include MSession
+    %%include MStream
+    %%include SessionBroker
+    %%include SQLiteMFile
+    %%include SQLiteMFileSystem
+    %%include SQLiteMStream
+
+    class PeoplesUrlParser {
+        <<see utils>>
+    }
+
+    MFile <|-- HashMFile
+    MFileSystem <|-- HashMFileSystem
+    MStream <|-- HashMStream
+    MFile <|-- JSONMFile
+    MFileSystem <|-- JSONMFileSystem
+    MStream <|-- JSONMStream
+    PeoplesUrlParser <|-- MFile
+    MStream <|-- MMediaStream
+    MFile <|-- SQLiteMFile
+    MFileSystem <|-- SQLiteMFileSystem
+    MStream <|-- SQLiteMStream
+
+    PeoplesUrlParser <|-- MFile
+    MStream <|-- MMediaStream
+    MFile ..> MStream : getSourceStream() chains container to decoded
+    MFileSystem ..> MFile : getFile()
+    MFSOwner ..> MFileSystem : right-to-left path match
+    MFSOwner ..> MFile : creates
+    ImageBroker o-- MMediaStream : LRU cache keyed type+url
+    SessionBroker o-- MSession : keyed host-port, keep-alive task
+    MSession *-- CachedFile : PSRAM/HIMEM/SD entry cache
+    basic_fstream *-- mfilebuf
+    mfilebuf ..> MStream : buffered reads
+    iecPipeBroker o-- iecPipe
+    iecPipe ..> basic_fstream : stream-to-IEC transfers
+
+    %%include CachedFile
+
+    note for MStream "Sentinel _MEAT_NO_DATA_AVAIL (0xFFFFFFFE, int -2) returned by non-blocking reads; must never collide with a real byte count or EOF (-1)"
+    note for MFile "exists() uses stat() for local paths; network FS override with a real check (e.g. fsp_stat). Never infer existence from a lazy stream open"

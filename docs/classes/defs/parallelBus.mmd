@@ -1,0 +1,15 @@
+%%gen
+    class parallelBus {
+        +setup() void
+        +reset() void
+        +service() void
+        +setMode(parallel_mode_t mode) void
+        +handShake() void
+        +readByte() uint8_t
+        +writeByte(uint8_t byte) void
+        +uint8_t flags
+        +uint8_t data*
+        +parallel_mode_t mode
+        +pbus_state_t state
+        +bool enabled
+    }

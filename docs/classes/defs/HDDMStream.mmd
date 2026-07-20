@@ -1,0 +1,8 @@
+    class HDDMStream {
+        #partition table at image root - IDE64 CFS 0.11
+        #readHeader() bool
+        #seekEntry(filename) bool - partitions, subdirs, multi-sector dirs
+        #readFile(buf, size) uint32_t - balanced data-tree traversal, holes read as zero
+        +seekPath(path) bool - default partition fallback for bare paths
+        +read only
+    }

@@ -1,0 +1,40 @@
+%%gen
+    class GPIBFileDevice {
+        -talk(uint8_t secondary) void
+        -listen(uint8_t secondary) void
+        -untalk() void
+        -unlisten() void
+        -canWrite() int8_t
+        -canRead() int8_t
+        -write(uint8_t data, bool eoi) void
+        -write(...) uint8_t
+        -read() uint8_t
+        -read(uint8_t *buffer, uint8_t bufferSize) uint8_t
+        -peek() uint8_t
+        -fillReadBuffer() void
+        -emptyWriteBuffer() void
+        -fileTask() void
+        -checkMWcmd(...) bool
+        -checkMWcmds(...) bool
+        -bool m_opening, m_eoi, m_canServeATN
+        -uint8_t m_channel, m_cmd, m_uploadCtr
+        -uint8_t m_readBuffer[15][2]
+        -uint8_t m_statusBufferLen, m_statusBufferPtr, m_writeBufferLen
+        -int8_t m_readBufferLen[15]
+        -char m_statusBuffer[GPIBFILEDEVICE_STATUS_BUFFER_SIZE]
+        #begin() void
+        #task() void
+        #open(uint8_t channel, const char *name) bool*
+        #close(uint8_t channel) void*
+        #write(...) uint8_t*
+        #read(...) uint8_t*
+        #getStatus(char *buffer, uint8_t bufferSize) void
+        #getStatusData(char *buffer, uint8_t bufferSize) uint8_t
+        #execute(const char *command, uint8_t cmdLen) void
+        #reset() void
+        #setStatus(const char *data, uint8_t dataLen) void
+        #clearStatus() void
+        #clearReadBuffer(uint8_t channel) void
+        #epyxWriteSector(...) bool
+        +GPIBFileDevice(uint8_t devnr)
+    }

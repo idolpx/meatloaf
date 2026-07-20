@@ -1,0 +1,11 @@
+    class iecChannelHandlerFile {
+        -shared_ptr~MStream~ m_stream
+        -int m_fixLoadAddress - override first two bytes (dir loads to 0801)
+        -uint32_t m_byteCount
+        -uint64_t m_timeStart
+        -uint64_t m_transportTimeUS - transfer speed accounting
+        +readBufferData() uint8_t - fills from stream, latches EOS on empty fill
+        +writeBufferData() uint8_t - SAVE path; errors surface AFTER close
+        +write(data, n) uint8_t
+        +getStream() shared_ptr~MStream~
+    }

@@ -1,0 +1,6 @@
+    class DHDOffsetStream {
+        -shared_ptr~MStream~ inner
+        -uint32_t offset - partition start in the image
+        -uint32_t length
+        +read/seek windowed into the partition
+    }

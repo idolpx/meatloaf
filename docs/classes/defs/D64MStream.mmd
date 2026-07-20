@@ -1,0 +1,32 @@
+    class D64MStream {
+        #vector~Partition~ partitions - header/dir location + BAM layout per partition
+        #vector~uint16_t~ sectorsPerTrack - zone table
+        #uint8_t dos_version
+        #bool error_info - image carries per-sector error bytes
+        #uint16_t block_size
+        #readHeader() bool
+        #writeHeader(name, id) bool
+        #seekEntry(filename) bool - skips scratched entries, wildcard aware
+        #seekEntry(index) bool
+        #readEntry(index) bool
+        #writeEntry(index) bool - commit directory slot
+        #getBAMRecord(track, rec) bool - generic over count-byte and bitmap-only BAMs
+        #readBAMRecord(track, rec, buf) bool
+        #setBlockAllocation(track, sector, allocate) bool
+        #findFreeSectorOnTrack(track, startSector, foundSector) bool
+        +blocksFree() uint16_t - sums getTrackFreeCount, skips dir track
+        +seekBlock(index, offset) bool
+        +seekSector(track, sector, offset) bool
+        +seekPath(path) bool - read selects file; write mode CREATES it (SAVE)
+        +seekDirectory(path) bool - walk slash-separated in-image subdirs
+        +enterDirectory(name) bool - CMD native DIR and 1581 CBM partitions
+        +writeBlock(track, sector, data) bool
+        +allocateBlock(track, sector) bool
+        +deallocateBlock(track, sector) bool
+        +isBlockFree(track, sector) bool
+        +getFreeBlocks(file_size) BlockChain
+        +getNextFreeBlock(startT, startS, foundT, foundS, forDir) bool - physical-drive algorithm: near dir track, interleave, sweep outward
+        +getTrackFreeCount(track) uint8_t
+        +getSectorCount(track) uint16_t
+        +getTrackCount() uint16_t
+    }

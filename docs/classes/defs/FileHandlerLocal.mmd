@@ -1,0 +1,12 @@
+%%gen
+    class FileHandlerLocal {
+        #FILE *_fh
+        +FileHandlerLocal(FILE *fh)
+        +FileHandlerLocal() ~
+        +close(bool destroy) int
+        +seek(long int off, int whence) int
+        +tell() long int
+        +read(void *ptr, size_t size, size_t n) size_t
+        +write(const void *ptr, size_t size, size_t n) size_t
+        +flush() int
+    }

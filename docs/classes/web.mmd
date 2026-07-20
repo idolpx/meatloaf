@@ -1,0 +1,106 @@
+%% Web server: httpd lifecycle, WebDAV, websocket, proxy
+%% GENERATED template (gen_templates.js) - curated content lives in
+%% src/extra/web.mmd; class bodies live in defs/<Class>.mmd
+classDiagram
+    direction LR
+
+    class HttpServer {
+        -serverstate state
+        -int _lazy_sock$ - bare listener holding port 80 before first use
+        -TaskHandle_t _lazy_task$
+        -lazy_task(pv)$ - accepts, starts httpd, loopback-proxies handover
+        -start_server(state)$ httpd_handle_t
+        -custom_global_ctx_free(ctx)$
+        +s_server httpd_handle_t$ - public for ws_send_all
+        +send_http_error(req, errnum)$ - sets real status BEFORE body
+        +start() void
+        +startOnDemand() void - lazy listener until first request
+        +stop() void
+        +running() bool
+    }
+%%gen
+    class MultiStatusResponse {
+        +std.string href
+        +std.string status
+        +std.map~std.string, std.string~ props
+        +bool isCollection
+    }
+%%gen
+    class Request {
+        -httpd_req_t *req
+        #std.string path
+        #bool overwrite
+        +Request(httpd_req_t *httpd_req)
+        +parseRequest() bool
+        +getDestination() std.string
+        +getPath() std.string
+        +getOverwrite() bool
+        +getHeader(std.string name) std.string
+        +sendContinue() void
+        +getContentLength() size_t
+        +readBody(char *buf, int len) int
+    }
+%%gen
+    class Response {
+        -writeHeader(const char *header, const char *value) void
+        -httpd_req_t *req
+        -bool chunked
+        -std.map~std.string, std.string~ headers
+        +Response(httpd_req_t *httpd_req)
+        +setDavHeaders() void
+        +setHeader(std.string header, std.string value) void
+        +setHeader(std.string header, size_t value) void
+        +flushHeaders() void
+        +setStatus(int ret) void
+        +setContentType(const char *ct) void
+        +sendChunk(const char *buf, ssize_t len) bool
+        +closeChunk() void
+        +sendBody(const char *buf, ssize_t len) void
+        +closeBody() void
+    }
+%%gen
+    class Server {
+        -std.string rootURI, rootPath
+        -formatTime(time_t t) std.string
+        -sendPropResponse(...) int
+        -sendMultiStatusResponse(Response resp, MultiStatusResponse msr) void
+        +Server(std.string rootURI, std.string rootPath)
+        +pathToURI(std.string path) std.string
+        +uriToPath(std.string uri) std.string
+        +doCopy(Request req, Response resp) int
+        +doDelete(Request req, Response resp) int
+        +doGet(Request req, Response resp) int
+        +doHead(Request req, Response resp) int
+        +doLock(Request req, Response resp) int
+        +doMkcol(Request req, Response resp) int
+        +doMove(Request req, Response resp) int
+        +doOptions(Request req, Response resp) int
+        +doPropfind(Request req, Response resp) int
+        +doProppatch(Request req, Response resp) int
+        +doPut(Request req, Response resp) int
+        +doUnlock(Request req, Response resp) int
+    }
+    class WsCommandExecutor {
+        +dispatch(data, len) void - route an incoming websocket frame
+        +isSlip(data, len) bool$
+        +isJson(data, len) bool$
+        +isProtobuf(data, len) bool$
+        +handleSlip(data, len) void$ - RFC 1055 framed binary commands
+        +handleJson(data, len) void$
+        +handleProtobuf(data, len) void$
+        +handleText(data, len) void$ - console command passthrough
+    }
+
+
+    class wwwModules {
+        <<free functions>>
+        +proxy_handler() / proxy_register()
+        +ws_handler() / ws_send_all() / ws_register()
+        +webdav_handler() / webdav_register()
+        +send_file() / send_file_parsed()
+    }
+
+    HttpServer ..> wwwModules : registers handlers
+    HttpServer ..> WsCommandExecutor : ws console commands
+
+    note for HttpServer "Lazy start: www_lazy listener holds port 80 until first access, then starts httpd and loopback-proxies the accepted connections; TCP_NODELAY, LRU purge, persistent connections"

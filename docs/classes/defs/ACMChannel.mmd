@@ -1,0 +1,28 @@
+%%gen
+    class ACMChannel {
+        -SemaphoreHandle_t device_disconnected_sem
+        -SemaphoreHandle_t device_connected_sem
+        -uint16_t found_vid, found_pid, found_interface
+        -cdc_acm_dev_hdl_t cdc_dev
+        -QueueHandle_t rxQueue
+        -cdc_acm_uart_state_t _serial_state
+        -bool _dsr, _cts
+        #updateFIFO() void
+        #dataOut(const void *buffer, size_t length) size_t
+        +begin() void
+        +end() void
+        +flushOutput() void
+        +getBaudrate() uint32_t
+        +setBaudrate(uint32_t baud) void
+        +eventReceived(...) void
+        +dataReceived(const uint8_t *data, size_t length) void
+        +newDevice(usb_device_handle_t usb_dev) void
+        +getDTR() bool
+        +setDSR(bool state) void
+        +getRTS() bool
+        +setCTS(bool state) void
+        +getDCD() bool
+        +getRI() bool
+        +setDCD(bool state) void
+        +setRI(bool state) void
+    }

@@ -1,0 +1,6 @@
+    %%include wwwModules
+
+    HttpServer ..> wwwModules : registers handlers
+    HttpServer ..> WsCommandExecutor : ws console commands
+
+    note for HttpServer "Lazy start: www_lazy listener holds port 80 until first access, then starts httpd and loopback-proxies the accepted connections; TCP_NODELAY, LRU purge, persistent connections"

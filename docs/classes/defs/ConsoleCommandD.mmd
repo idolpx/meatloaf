@@ -1,0 +1,9 @@
+%%gen
+    class ConsoleCommandD {
+        #delegateFunc delegateFn_
+        #delegateResolver(int argc, char **argv) int$
+        +std.unordered_map~std.string, delegateFunc~ registry_$
+        +ConsoleCommandD(...)
+        +const esp_console_cmd_t toCommandStruct() const
+        +getDelegateFunction() delegateFunc
+    }

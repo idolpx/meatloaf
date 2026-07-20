@@ -1,0 +1,5 @@
+    IECBusHandler o-- IECDevice : attached devices 4-30
+    CPBStandardSerial <|-- CPBFastSerial
+    systemBus ..> IECProtocol : per-transfer negotiation
+
+    note for IECBusHandler "Bus timing runs in systemBus service() on core 1 at priority 17; microsecond windows - debug logging can break the protocol"

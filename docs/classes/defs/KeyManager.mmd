@@ -1,0 +1,9 @@
+%%gen
+    class KeyManager {
+        -_key_t _keys[eKey.KEY_COUNT]
+        -_keystate_task(void *param) void$
+        +setup() void
+        +getKeyStatus(eKey key) eKeyStatus
+        +keyCurrentlyPressed(eKey key) bool
+        +ignoreKeyPress(eKey key) void
+    }

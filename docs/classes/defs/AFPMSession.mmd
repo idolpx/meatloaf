@@ -1,0 +1,17 @@
+%%gen
+    class AFPMSession {
+        -enumerateVolumes() void
+        -std.string _user
+        -std.string _password
+        -std.map~std.string, struct afp_volume*~ _mounted_volumes
+        -std.vector~std.string~ _volumes_list
+        -bool _volumes_enumerated
+        -bool _afp_initialized$
+        +AFPMSession(...)
+        +getScheme() std.string$
+        +setCredentials(...) void
+        +connect() bool
+        +disconnect() void
+        +keep_alive() bool
+        +getVolumes() const std.vector~std.string~
+    }

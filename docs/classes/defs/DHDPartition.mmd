@@ -1,0 +1,7 @@
+    class DHDPartition {
+        <<struct>>
+        +uint8_t type - NATIVE, D64, D71, D81
+        +string name - 16 chars
+        +uint32_t start_lba - 3-byte big-endian in table
+        +uint32_t size_lba
+    }

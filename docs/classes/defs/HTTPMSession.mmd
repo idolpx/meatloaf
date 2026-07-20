@@ -1,0 +1,10 @@
+%%gen
+    class HTTPMSession {
+        +HTTPMSession(std.string host, uint16_t port)
+        +connect() bool
+        +disconnect() void
+        +keep_alive() bool
+        +getScheme() std.string$
+        +isSecure() bool
+        +std.shared_ptr~MeatHttpClient~ client
+    }

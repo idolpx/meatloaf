@@ -1,0 +1,15 @@
+%%gen
+    class IPAddress {
+        -union
+        -_address
+        -raw_address() uint8_t*
+        +IPAddress()
+        +IPAddress(...)
+        +IPAddress(uint32_t address)
+        +IPAddress(const uint8_t *address)
+        +IPAddress() ~
+        +fromString(const char *address) bool
+        +fromString(const std.string address) bool
+        +uint32_t() operator
+        +toString() std.string
+    }

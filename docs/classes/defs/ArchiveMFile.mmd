@@ -1,0 +1,15 @@
+%%gen
+    class ArchiveMFile {
+        -Archive *m_archive
+        -MFile *m_innerFile
+        +ArchiveMFile(std.string path)
+        +getDecodedStream(std.shared_ptr~MStream~ is) std.shared_ptr~MStream~
+        +isSingleFileCompression() bool
+        +getInnerFilename() std.string
+        +getInnerFile() MFile*
+        +isDirectory() bool
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile *
+        +bool isDir
+        +bool dirIsOpen
+    }

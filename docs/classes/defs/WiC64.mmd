@@ -1,0 +1,43 @@
+%%gen
+    class WiC64 {
+        +bool displayattached
+        +bool inputmode
+        +bool transferdata
+        +bool ex
+        +unsigned long crashcounter*
+        +unsigned long payloadsize
+        +unsigned long timeout
+        +unsigned long count*
+        +unsigned long sizel
+        +unsigned long sizeh
+        +unsigned long transsize
+        +std.string defaultserver*
+        +bool killswitch
+        +bool killled
+        +std.string payload
+        +std.string errorcode
+        +std.string act
+        +std.string input
+        +std.string lastinput
+        +std.string setserver
+        +std.string httpstring
+        +std.string wic64hostname
+        +std.string localip
+        +std.string localssid
+        +char sep
+        +int udpport
+        +int tcpport
+        +std.string udpmsg
+        +std.string udpmsgr
+        +std.string remotedata
+        +uint8_t buffer[50]
+        +setup() void
+        +loop() void
+        +sendmessage(std.string errorcode) std.string
+        +disablewic() void
+        +setwlan() std.string
+        +loader(std.string httpstring) void
+        +sendudpmsg(std.string udpmsg) void
+        +getudpmsg() std.string
+        +startudpport() void
+    }

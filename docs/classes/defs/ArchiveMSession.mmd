@@ -1,0 +1,5 @@
+    class ArchiveMSession {
+        -keep_alive disabled - key archive:// plus url
+        +getEntry(entryPath, a, entrySize) shared_ptr~CachedFile~ - extract once, cache in PSRAM/HIMEM
+        -loadEntryFromArchive(cf, a, entrySize) bool
+    }

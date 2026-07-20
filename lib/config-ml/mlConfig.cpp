@@ -30,6 +30,8 @@
 #include "fsFlash.h"
 #include "global_defines.h"
 
+#include "../../include/debug.h"
+
 static const char *TAG = "mlConfig";
 
 // The two on-disk files, relative to the SD mount root.
@@ -171,15 +173,25 @@ bool MeatloafConfig::load()
         _devices_hash = _json_hash(psram_json::object());
     }
 
-    _config_dirty  = false;
-    _devices_dirty = false;
-
     ESP_LOGI(TAG, "Config loaded (cfg=%s)", cfg_ok ? "ok" : "missing");
     return cfg_ok;
 }
 
 void MeatloafConfig::save()
 {
+    psram_json cfg      = _extract_config();
+    auto       cfg_hash = _json_hash(cfg);
+    psram_json dev      = _extract_devices();
+    auto       dev_hash = _json_hash(dev);
+
+    bool config_changed  = (cfg_hash != _config_hash);
+    bool devices_changed = (dev_hash != _devices_hash);
+
+    if (!config_changed && !devices_changed) {
+        ESP_LOGD(TAG, "Config unchanged, skipping save");
+        return;
+    }
+
     FileSystem &fs = fnSDFAT.running() ? static_cast<FileSystem &>(fnSDFAT)
                                        : static_cast<FileSystem &>(fsFlash);
 
@@ -188,29 +200,14 @@ void MeatloafConfig::save()
     else
         fsFlash.create_path(SYSTEM_DIR);
 
-    if (_config_dirty) {
-        auto current = _extract_config();
-        auto h = _json_hash(current);
-        if (h != _config_hash) {
-            if (_write_json(CFG_FILE, current, fs)) {
-                _config_hash = h;
-            }
-        } else {
-            ESP_LOGD(TAG, "config.json unchanged, skipping write");
-        }
-        _config_dirty = false;
+    if (config_changed && _write_json(CFG_FILE, cfg, fs))
+    {
+        _config_hash = cfg_hash;
+        Serial.println("Saved config.json");
     }
-
-    if (_devices_dirty) {
-        auto current = _extract_devices();
-        auto h = _json_hash(current);
-        if (h != _devices_hash) {
-            if (_write_json(DEVICES_FILE, current, fs)) {
-                _devices_hash = h;
-            }
-        } else {
-            ESP_LOGD(TAG, "devices.json unchanged, skipping write");
-        }
-        _devices_dirty = false;
+    if (devices_changed && _write_json(DEVICES_FILE, dev, fs))
+    {
+        _devices_hash = dev_hash;
+        Serial.println("Saved devices.json");
     }
 }

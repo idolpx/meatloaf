@@ -1,0 +1,22 @@
+%%gen
+    class MeatloafConfig {
+        -psram_json _data
+        -std.array~uint8_t, 16~ _config_hash
+        -std.array~uint8_t, 16~ _devices_hash
+        -bool _config_dirty
+        -bool _devices_dirty
+        -_extract_config() psram_json
+        -_extract_devices() psram_json
+        -_json_hash(const psram_json j) std.array~uint8_t, 16~$
+        -_read_json(...) bool
+        -_write_json(...) bool
+        +load() bool
+        +save() void
+        +data() psram_json
+        +data() const psram_json
+        +mark_config_dirty() void
+        +mark_devices_dirty() void
+        +is_dirty() bool
+        +is_config_dirty() bool
+        +is_devices_dirty() bool
+    }

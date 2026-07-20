@@ -1,0 +1,15 @@
+%%gen
+    class WSMFile {
+        +WSMFile(std.string path)
+        +isDirectory() bool
+        +getSourceStream(...) std.shared_ptr~MStream~
+        +getLastWrite() time_t
+        +getCreationTime() time_t
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile*
+        +mkDir() bool
+        +exists() bool
+        +remove() bool
+        +rename(std.string dest) bool
+        +getDecodedStream(std.shared_ptr~MStream~ src) std.shared_ptr~MStream~
+    }

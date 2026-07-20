@@ -1,0 +1,142 @@
+%% Every concrete MFile implementation and the filesystem registry.
+%% Verified against source 2026-07-19. Each format also registers an
+%% MFileSystem subclass (XxxMFileSystem) providing handles()/getFile();
+%% they are 1:1 with the MFile classes below and registered in
+%% MFSOwner::availableFS (lib/meatloaf/meatloaf.cpp).
+classDiagram
+    direction LR
+
+    %%include MFile
+
+    namespace DeviceFiles {
+        class FlashMFile
+        class RAMMFile
+    }
+
+    namespace DiskImages {
+        class D64MFile
+        class D40MFile
+        class D71MFile
+        class D80MFile
+        class D81MFile
+        class D82MFile
+        class D8BMFile
+        class D90MFile
+        class DFIMFile
+        class DNPMFile
+        class DSKMFile
+        class G64MFile
+        class NIBMFile
+        class ATRMFile
+        class DHDPartitionMFile
+    }
+
+    namespace TapeCartImages {
+        class TAPMFile
+        class T64MFile
+        class TCRTMFile
+        class CRTMFile
+        class EFCRTMFile
+        class P00MFile
+    }
+
+    namespace ContainersIndexes {
+        class ArchiveMFile
+        class ISOMFile
+        class LBRMFile
+        class LNXMFile
+        class ARCMFile
+        class ARKMFile
+        class M2IMFile
+        class HDDMFile
+    }
+
+    namespace NetworkFiles {
+        class HTTPMFile
+        class IPFSMFile
+        class TCPMFile
+        class SMBMFile
+        class NFSMFile
+        class TNFSMFile
+        class FTPMFile
+        class SFTPMFile
+        class FSPMFile
+        class AFPMFile
+        class ISCSIMFile
+        class IRCMFile
+        class MQTTMFile
+        class WSMFile
+        class CSIPMFile
+        class I2CMFile
+    }
+
+    namespace ServiceFiles {
+        class MDNSMFile
+        class JSONMFile
+        class QRMFile
+        class RetroPixelsMFile
+        class SQLiteMFile
+        class HashMFile
+    }
+
+    MFile <|-- FlashMFile
+    MFile <|-- RAMMFile
+
+    MFile <|-- D64MFile
+    D64MFile <|-- D40MFile
+    D64MFile <|-- D71MFile
+    D64MFile <|-- D80MFile
+    D64MFile <|-- D81MFile
+    D64MFile <|-- D82MFile
+    D64MFile <|-- D8BMFile
+    D64MFile <|-- D90MFile
+    D64MFile <|-- DFIMFile
+    D64MFile <|-- DNPMFile
+    D64MFile <|-- DSKMFile
+    D64MFile <|-- G64MFile
+    D64MFile <|-- NIBMFile
+    D64MFile <|-- ATRMFile
+
+    MFile <|-- TAPMFile
+    MFile <|-- T64MFile
+    MFile <|-- TCRTMFile
+    MFile <|-- CRTMFile
+    MFile <|-- EFCRTMFile
+    MFile <|-- P00MFile
+
+    MFile <|-- ArchiveMFile
+    MFile <|-- ISOMFile
+    MFile <|-- LBRMFile
+    MFile <|-- LNXMFile
+    MFile <|-- ARCMFile
+    MFile <|-- ARKMFile
+    MFile <|-- M2IMFile
+    MFile <|-- HDDMFile
+
+    MFile <|-- HTTPMFile
+    HTTPMFile <|-- IPFSMFile
+    MFile <|-- TCPMFile
+    MFile <|-- SMBMFile
+    MFile <|-- NFSMFile
+    MFile <|-- TNFSMFile
+    MFile <|-- FTPMFile
+    MFile <|-- SFTPMFile
+    MFile <|-- FSPMFile
+    MFile <|-- AFPMFile
+    MFile <|-- ISCSIMFile
+    MFile <|-- IRCMFile
+    MFile <|-- MQTTMFile
+    MFile <|-- WSMFile
+    MFile <|-- CSIPMFile
+    MFile <|-- I2CMFile
+
+    MFile <|-- MDNSMFile
+    MFile <|-- JSONMFile
+    MFile <|-- QRMFile
+    MFile <|-- RetroPixelsMFile
+    MFile <|-- SQLiteMFile
+    MFile <|-- HashMFile
+
+    note for DHDPartitionMFile "Template: DHDPartitionMFile~BASE~ wraps D64/D71/D81/DNP MFile types as a CMD HD/FD partition view (media/hd/dhd.h)"
+    note for MFile "MFileSystem registry (meatloaf.cpp availableFS): FlashMFileSystem (root), D64/D40/D71/D80/D81/D82/D8B/D90/DFI/DNP/DSK/G64/NIB/ATR, DXMMFileSystem (d1m/d2m/d4m), DHDMFileSystem, HDDMFileSystem, M2IMFileSystem, TAP/T64/TCRT/CRT/EFCRT/P00, Archive/ISO/LBR/LNX/ARC/ARK, HTTP/IPFS/TCP/SMB/NFS/TNFS/FTP/SFTP/FSP/AFP/ISCSI/IRC/MQTT/WS/CSIP/I2C, MDNS/JSON/QR/RetroPixels/SQLite/Hash/RAM, ML/MLM/URL filesystems"
+

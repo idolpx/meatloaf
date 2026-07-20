@@ -1,0 +1,68 @@
+%% Service and codec filesystems: mDNS, JSON, QR, RetroPixels, SQLite, hash, ML
+%% GENERATED template (gen_templates.js) - curated content lives in
+%% src/extra/fs_service.mmd; class bodies live in defs/<Class>.mmd
+classDiagram
+    direction LR
+
+    %%include CSIPMFile
+    %%include CSIPMFileSystem
+    %%include CSIPMSession
+    %%include CSIPMStream
+    %%include csstreambuf
+    %%include idirbuf
+    %%include MDNSMFile
+    %%include MDNSMFileSystem
+    %%include MDNSMSession
+    %%include MDNSMStream
+    %%include MLFileSystem
+    %%include MLMFileSystem
+    %%include MQTTMFile
+    %%include MQTTMFileSystem
+    %%include MQTTMSession
+    %%include MQTTMStream
+    %%include QRMFile
+    %%include QRMFileSystem
+    %%include QRMStream
+    %%include RetroPixelsDither
+    %%include RetroPixelsFormat
+    %%include RetroPixelsMFile
+    %%include RetroPixelsMFileSystem
+    %%include RetroPixelsMStream
+    %%include RetroPixelsPalette
+    %%include RetroPixelsScale
+    %%include URLMFileSystem
+
+    class MFile {
+        <<see vfs_core>>
+    }
+    class MFileSystem {
+        <<see vfs_core>>
+    }
+    class MSession {
+        <<see vfs_core>>
+    }
+    class MStream {
+        <<see vfs_core>>
+    }
+
+    MFile <|-- CSIPMFile
+    MFileSystem <|-- CSIPMFileSystem
+    MSession <|-- CSIPMSession
+    MStream <|-- CSIPMStream
+    MFile <|-- MDNSMFile
+    MFileSystem <|-- MDNSMFileSystem
+    MSession <|-- MDNSMSession
+    MStream <|-- MDNSMStream
+    MFileSystem <|-- MLFileSystem
+    MFileSystem <|-- MLMFileSystem
+    MFile <|-- MQTTMFile
+    MFileSystem <|-- MQTTMFileSystem
+    MSession <|-- MQTTMSession
+    MStream <|-- MQTTMStream
+    MFile <|-- QRMFile
+    MFileSystem <|-- QRMFileSystem
+    MStream <|-- QRMStream
+    MFile <|-- RetroPixelsMFile
+    MFileSystem <|-- RetroPixelsMFileSystem
+    MStream <|-- RetroPixelsMStream
+    MFileSystem <|-- URLMFileSystem

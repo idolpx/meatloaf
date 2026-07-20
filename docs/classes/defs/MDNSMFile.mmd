@@ -1,0 +1,23 @@
+%%gen
+    class MDNSMFile {
+        #std.shared_ptr~MDNSMSession~ _session
+        #std.string service_type
+        #std.string instance_name
+        #bool dirOpened
+        #size_t dir_index
+        #parseUrl() void
+        #refreshServiceList() void
+        +MDNSMFile(std.string path)
+        +getSourceStream(...) std.shared_ptr~MStream~
+        +getDecodedStream(std.shared_ptr~MStream~ src) std.shared_ptr~MStream~
+        +createStream(std.ios_base.openmode mode) std.shared_ptr~MStream~
+        +isDirectory() bool
+        +exists() bool
+        +remove() bool
+        +rename(std.string dest) bool
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile*
+        +getLastWrite() time_t
+        +getCreationTime() time_t
+        +size() uint32_t
+    }

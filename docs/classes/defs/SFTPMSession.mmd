@@ -1,0 +1,17 @@
+%%gen
+    class SFTPMSession {
+        -ssh_session ssh_handle
+        -sftp_session sftp_handle
+        -std.string private_key_path
+        -authenticatePassword() bool
+        -authenticatePublicKey() bool
+        +SFTPMSession(std.string host, uint16_t port)
+        +connect() bool
+        +disconnect() void
+        +keep_alive() bool
+        +getScheme() std.string$
+        +getSSHSession() ssh_session
+        +getSFTPSession() sftp_session
+        +setCredentials(...) void
+        +setPrivateKey(const std.string keypath) void
+    }

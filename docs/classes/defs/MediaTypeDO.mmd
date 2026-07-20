@@ -1,0 +1,10 @@
+%%gen
+    class MediaTypeDO {
+        -read_sector(int track, int sector, uint8_t* buffer) error_is_true
+        -write_sector(int track, int sector, uint8_t* buffer) error_is_true
+        +read(...) error_is_true
+        +write(...) error_is_true
+        +format(uint16_t *responsesize) error_is_true
+        +mount(fnFile *f, uint32_t disksize) mediatype_t
+        +status() success_is_true
+    }

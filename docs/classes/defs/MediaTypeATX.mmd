@@ -1,0 +1,32 @@
+%%gen
+    class MediaTypeATX {
+        -uint8_t _atx_num_tracks*
+        -uint8_t _atx_num_records*
+        -uint8_t _atx_controller_status*
+        -uint8_t _atx_last_track*
+        -uint8_t _atx_sectors_per_track
+        -uint8_t _atx_drive_model
+        -uint16_t __atx_current_angular_pos*
+        -uint32_t _atx_total_rotations*
+        -uint32_t _atx_size*
+        -_load_atx_data(atx_header_t atx_hdr) success_is_true
+        -_load_atx_record() success_is_true
+        -_load_atx_track_record(uint32_t length) success_is_true
+        -_load_atx_track_chunk(track_header_t trk_hdr, AtxTrack track) int
+        -_load_atx_chunk_sector_list(chunk_header_t chunk_hdr, AtxTrack track) success_is_true
+        -_load_atx_chunk_sector_data(chunk_header_t chunk_hdr, AtxTrack track) success_is_true
+        -_load_atx_chunk_weak_sector(chunk_header_t chunk_hdr, AtxTrack track) success_is_true
+        -_load_atx_chunk_extended_sector(chunk_header_t chunk_hdr, AtxTrack track) success_is_true
+        -_load_atx_chunk_unknown(chunk_header_t chunk_hdr, AtxTrack track) success_is_true
+        -_copy_track_sector_data(...) error_is_true
+        -_process_sector(...) void
+        -_get_head_position() uint16_t
+        -_wait_full_rotation() void
+        -_wait_head_position(uint16_t pos, uint16_t extra_delay) void
+        +read(uint16_t sectornum, uint16_t *readcount) error_is_true
+        +format(uint16_t *responsesize) error_is_true
+        +mount(fnFile *f, uint32_t disksize) mediatype_t
+        +status(uint8_t statusbuff[4]) void
+        +on_timer(void *info) void$
+        +MediaTypeATX()
+    }

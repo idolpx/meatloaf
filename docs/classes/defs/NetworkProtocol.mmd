@@ -1,0 +1,41 @@
+%%gen
+    class NetworkProtocol {
+        #unsigned char aux1_open*
+        #unsigned char aux2_open*
+        #translate_receive_buffer() void
+        #translate_transmit_buffer() unsigned short
+        +std.string name
+        +bool is_write
+        +std.string *receiveBuffer
+        +std.string *transmitBuffer
+        +std.string *specialBuffer
+        +PeoplesUrlParser *opened_url
+        +NetworkProtocol(...)
+        +NetworkProtocol() ~
+        +bool connectionIsServer
+        +unsigned short bytesWaiting*
+        +unsigned char error*
+        +unsigned char translation_mode*
+        +bool fromInterrupt
+        +bool interruptEnable
+        +bool forceStatus
+        +std.string lineEnding
+        +setLineEnding(std.string s) void
+        +int FSSectorSize
+        +setFSSectorSize(int sectorSize) void
+        +open(...) bool
+        +close() bool
+        +read(unsigned short len) bool
+        +write(unsigned short len) bool
+        +status(NetworkStatus *status) bool
+        +special_inquiry(uint8_t cmd) uint8_t
+        +special_00(cmdFrame_t *cmdFrame) bool
+        +special_40(...) bool
+        +special_80(...) bool
+        +perform_idempotent_80(...) bool
+        +errno_to_error() void
+        +set_open_params(uint8_t p1, uint8_t p2) void
+        +seek(off_t offset, int whence) off_t
+        +std.string *login
+        +std.string *password
+    }

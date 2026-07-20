@@ -67,7 +67,6 @@ class FileSystem;
 // Usage:
 //   mlConfig.load();                       // call after fnSDFAT.start()
 //   mlConfig.data()["general"]["devicename"] = "new name";
-//   mlConfig.mark_config_dirty();
 //   mlConfig.save();                       // only writes config.json
 
 class MeatloafConfig {
@@ -77,11 +76,12 @@ public:
     bool load();
 
     // Write only the file(s) whose data changed since the last load/save.
-    // Dirty flags gate the comparison; only files that actually differ are written.
+    // Dirtiness is detected automatically by hashing the current data and
+    // comparing against the hash captured at the last load/save.
     void save();
 
     // Direct access to the merged JSON tree.
-    // Mutate through data() then call mark_*_dirty() so save() knows to check.
+    // Mutate through data() then call save(); changed files are detected by hash.
     psram_json&       data()       { return _data; }
     const psram_json& data() const { return _data; }
 
@@ -92,23 +92,15 @@ public:
         return _data.contains(key) ? _data.at(key) : null_json;
     }
 
-    // Explicit dirty-flag setters.
-    // Call after any mutation to the corresponding section so save() acts on it.
-    void mark_config_dirty()  { _config_dirty  = true; }
-    void mark_devices_dirty() { _devices_dirty = true; }
-
-    // Query unsaved-change state.
-    bool is_dirty()         const { return _config_dirty || _devices_dirty; }
-    bool is_config_dirty()  const { return _config_dirty; }
-    bool is_devices_dirty() const { return _devices_dirty; }
+    // Query unsaved-change state (computed by hashing the current data).
+    bool is_dirty()         const { return is_config_dirty() || is_devices_dirty(); }
+    bool is_config_dirty()  const { return _json_hash(_extract_config())  != _config_hash; }
+    bool is_devices_dirty() const { return _json_hash(_extract_devices()) != _devices_hash; }
 
 private:
     psram_json _data;                            // merged in-memory state (PSRAM-allocated)
     std::array<uint8_t, 16> _config_hash  = {}; // MD5 of config.json at last load/save
     std::array<uint8_t, 16> _devices_hash = {}; // MD5 of devices.json at last load/save
-
-    bool _config_dirty  = false;
-    bool _devices_dirty = false;
 
     psram_json _extract_config() const;
     psram_json _extract_devices() const;

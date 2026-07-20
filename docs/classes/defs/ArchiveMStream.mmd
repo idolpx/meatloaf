@@ -1,0 +1,8 @@
+    class ArchiveMStream {
+        -shared_ptr~CachedFile~ data - cached extracted entry
+        #bool m_isCompressedOnly - bare .gz style, single synthesized entry
+        +ensureData() bool - extract then RELEASE archive + source chain
+        +seekPath(path) bool - session cache first, avoids re-opening archive
+        +seekNextEntry() string - sequential header walk for listings
+        +readFile(buf, size) uint32_t
+    }

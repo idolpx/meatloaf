@@ -1,0 +1,13 @@
+    class driveMemory {
+        -vector~uint8_t~ ram - 0000-07FF, lazy-allocated on first write
+        -size_t _ramSize
+        -shared_ptr~RomBytes~ rom - ROM bytes in PSRAM
+        -getRomCache()$ - weak_ptr map, one shared copy per ROM file
+        +uint16_t mw_hash - rolling hash of M-W writes for M-E detection
+        +setRAM(ramSize) bool
+        +setROM(filename) bool - loads once, shared across all drives
+        +read(addr, data, len) size_t - serve M-R from ram and rom map
+        +write(addr, data, len) void - M-W into ram
+        +execute(addr) void - M-E entry points (known routines only)
+        +reset() void
+    }

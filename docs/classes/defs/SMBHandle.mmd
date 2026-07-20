@@ -1,0 +1,8 @@
+%%gen
+    class SMBHandle {
+        -std.shared_ptr~SMBMSession~ _session
+        -int flags*
+        +SMBHandle()
+        +obtain(std.string localPath, int smb_mode) void
+        +dispose() void
+    }

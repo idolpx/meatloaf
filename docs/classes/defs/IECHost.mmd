@@ -1,0 +1,30 @@
+%%gen
+    class IECHost {
+        -enterHostMode() void
+        -exitHostMode() void
+        -hAssertATN() void
+        -hReleaseATN() void
+        -hSendByte(...) bool
+        -hRecvByte(uint8_t data, bool eoi) bool
+        -hJiffyRecvByte(uint8_t data, bool eoi) bool
+        -hJiffySendByte(uint8_t data, bool eoi) bool
+        -hBeginATN() bool
+        -cmdOpen(...) bool
+        -cmdClose(uint8_t devnr, uint8_t channel) bool
+        -IECBusHandler m_bus
+        -std.map~uint8_t, IECDeviceInfo~ m_devices
+        -bool m_wasATNEnabled
+        +IECHost(IECBusHandler bus) explicit
+        +scanBus(...) int
+        +probeDevice(uint8_t devnr) bool
+        +initDevice(uint8_t devnr) bool
+        +getDevices() const std.map~uint8_t, IECDeviceInfo~
+        +sendCommand(...) bool
+        +readStatus(...) uint8_t
+        +openForWrite(...) bool
+        +writeData(...) bool
+        +openForRead(...) bool
+        +readData(...) uint8_t
+        +closeChannel(uint8_t devnr, uint8_t channel) bool
+        +resetBus() void
+    }

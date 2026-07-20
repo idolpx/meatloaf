@@ -1,0 +1,189 @@
+%% Device filesystems: flash/SD (POSIX VFS), RAM, HIMEM
+%% GENERATED template (gen_templates.js) - curated content lives in
+%% src/extra/fs_device.mmd; class bodies live in defs/<Class>.mmd
+classDiagram
+    direction LR
+
+%%gen
+    class FlashHandle {
+        -int flags*
+        +FILE* file_h
+        +FlashHandle()
+        +obtain(std.string path, std.string mode) void
+        +dispose() void
+    }
+%%gen
+    class FlashMFile {
+        #DIR* dir
+        #bool dirOpened
+        #openDir(std.string path) void
+        #closeDir() void
+        #pathValid(std.string path) bool
+        #fullPath() std.string
+        #std.string _pattern
+        +std.string basepath
+        +FlashMFile(std.string path)
+        +isDirectory() bool
+        +getSourceStream(...) std.shared_ptr~MStream~
+        +getDecodedStream(std.shared_ptr~MStream~ src) std.shared_ptr~MStream~
+        +createStream(std.ios_base.openmode mode) std.shared_ptr~MStream~
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile*
+        +mkDir() bool
+        +rmDir() bool
+        +exists() bool
+        +remove() bool
+        +rename(std.string dest) bool
+        +getLastWrite() time_t
+        +getCreationTime() time_t
+        +readEntry(std.string filename) bool
+    }
+%%gen
+    class FlashMFileSystem {
+        +FlashMFileSystem()
+        +handles(std.string path) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class FlashMStream {
+        #std.unique_ptr~FlashHandle~ handle
+        +FlashMStream(std.string path, std.ios_base.openmode m)
+        +isOpen() bool
+        +open(std.ios_base.openmode mode) bool
+        +close() void
+        +read(uint8_t* buf, uint32_t size) uint32_t
+        +write(const uint8_t *buf, uint32_t size) uint32_t
+        +seek(uint32_t pos) bool
+        +seekPath(std.string path) bool
+    }
+    class HighMemory {
+        <<device/ram.h>>
+        +ESP32 HIMEM page mapping
+    }
+%%gen
+    class HighMemoryHandle {
+        -int flags*
+        +FILE* file_h
+        +HighMemoryHandle()
+        +obtain(std.string localPath, std.string mode) void
+        +dispose() void
+    }
+%%gen
+    class I2CMFile {
+        -uint8_t _address*
+        -uint8_t _reg*
+        -bool _has_address
+        -bool _has_reg
+        -int _scan_addr
+        -std.shared_ptr~I2CMSession~ _session
+        -_parse_fields() void
+        +I2CMFile(std.string path) explicit
+        +getSourceStream(...) std.shared_ptr~MStream~
+        +getDecodedStream(std.shared_ptr~MStream~ src) std.shared_ptr~MStream~
+        +createStream(std.ios_base.openmode mode) std.shared_ptr~MStream~
+        +isDirectory() bool
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile*
+        +exists() bool
+        +getLastWrite() time_t
+        +getCreationTime() time_t
+    }
+%%gen
+    class I2CMFileSystem {
+        +I2CMFileSystem()
+        +handles(std.string name) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class I2CMSession {
+        -i2c_port_t _i2c_port
+        +I2CMSession(std.string host, uint16_t port)
+        +getScheme() std.string$
+        +connect() bool
+        +disconnect() void
+        +keep_alive() bool
+        +probe(uint8_t addr) bool
+        +read(...) esp_err_t
+        +write(...) esp_err_t
+    }
+%%gen
+    class I2CMStream {
+        -uint8_t _address*
+        -uint8_t _reg*
+        -bool _has_address
+        -bool _has_reg
+        -bool _opened
+        -std.shared_ptr~I2CMSession~ _session
+        -_parse_url(const std.string path) void
+        +I2CMStream(std.string path) explicit
+        +size() uint32_t
+        +available() uint32_t
+        +position() uint32_t
+        +error() size_t
+        +seek(uint32_t pos) bool
+        +isOpen() bool
+        +open(std.ios_base.openmode mode) bool
+        +close() void
+        +read(uint8_t* buf, uint32_t size) uint32_t
+        +write(const uint8_t* buf, uint32_t size) uint32_t
+    }
+%%gen
+    class RAMMFile {
+        -openDir(std.string path) void
+        -closeDir() void
+        -bool _valid
+        -std.string _pattern
+        -pathValid(std.string path) bool
+        #DIR* dir
+        #bool dirOpened
+        +std.string basepath
+        +RAMMFile(std.string path)
+        +isDirectory() bool
+        +getSourceStream(...) std.shared_ptr~MStream~
+        +getDecodedStream(std.shared_ptr~MStream~ src) std.shared_ptr~MStream~
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile*
+        +mkDir() bool
+        +exists() bool
+        +remove() bool
+        +rename(std.string dest) bool
+        +getLastWrite() time_t
+        +getCreationTime() time_t
+        +readEntry(std.string filename) bool
+    }
+%%gen
+    class RAMMFileSystem {
+        +RAMMFileSystem()
+        +handles(std.string path) bool
+        +getFile(std.string path) MFile*
+    }
+%%gen
+    class SDFileSystem {
+        +SDFileSystem()
+        +handles(std.string name) bool
+        +getFile(std.string path) MFile*
+    }
+
+    class MFile {
+        <<see vfs_core>>
+    }
+    class MFileSystem {
+        <<see vfs_core>>
+    }
+    class MSession {
+        <<see vfs_core>>
+    }
+    class MStream {
+        <<see vfs_core>>
+    }
+
+    MFile <|-- FlashMFile
+    MFileSystem <|-- FlashMFileSystem
+    MStream <|-- FlashMStream
+    MFile <|-- I2CMFile
+    MFileSystem <|-- I2CMFileSystem
+    MSession <|-- I2CMSession
+    MStream <|-- I2CMStream
+    MFile <|-- RAMMFile
+    MFileSystem <|-- RAMMFileSystem
+    MFileSystem <|-- SDFileSystem

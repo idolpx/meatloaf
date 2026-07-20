@@ -1,0 +1,13 @@
+    class TapeEntry {
+        <<struct>>
+        +string name - PETSCII, may be empty
+        +string loader - TAPClean format name
+        +uint16_t start_addr
+        +uint16_t end_addr
+        +uint32_t tape_offset - first pulse of the program
+        +uint32_t tape_end_offset - just past the program
+        +uint32_t start_time_ms - tape counter at start
+        +uint32_t end_time_ms
+        +bool checksum_ok
+        +vector~uint8_t~ prg - 2-byte load address plus data
+    }

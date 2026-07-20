@@ -1,0 +1,18 @@
+    class CachedFile {
+        -m_sdPath string - SD-backed variant
+        -bool m_useHimem
+        -freeStorage() void
+        -s_ramCache$ - keyed RAM cache of extracted entries
+        +uint32_t size
+        +bool dirty
+        +allocate() bool - HIMEM page-mapped on SPIRAM boards, heap otherwise
+        +isAllocated() bool
+        +read(offset, buf, count) uint32_t
+        +write(offset, buf, count) uint32_t
+        +loadFromStream(stream, fileSize) bool
+        +loadViaReader(fileSize, reader) bool - fill via callback in HIMEM-block chunks
+        +forSD(sdPath) shared_ptr~CachedFile~$
+        +getRAMCached(key) shared_ptr~CachedFile~$
+        +setRAMCached(key, cf) void$
+        +clearRAMCached(key) void$
+    }

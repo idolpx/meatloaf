@@ -1,0 +1,29 @@
+%%gen
+    class MediaType {
+        #fnFile *_media_fileh
+        #fnFile *oldFileh
+        #fnFile *hsFileh
+        #uint32_t _media_image_size*
+        #uint32_t _media_num_blocks
+        #uint16_t _media_sector_size
+        +_percomBlock
+        +char _disk_filename[256]
+        +uint8_t _media_blockbuff[MEDIA_BLOCK_SIZE]
+        +uint32_t _media_last_block
+        +uint8_t _media_controller_status
+        +fujiHost *_media_host
+        +fnFile *_media_hsfileh
+        +mediatype_t _mediatype
+        +bool _allow_hsio
+        +mount(fnFile *f, uint32_t disksize) mediatype_t*
+        +unmount() void
+        +format(uint16_t *responsesize) error_is_true
+        +read(uint32_t blockNum, uint16_t *readcount) error_is_true*
+        +write(uint32_t blockNum, bool verify) error_is_true
+        +status() uint8_t*
+        +discover_mediatype(const char *filename) mediatype_t$
+        +dump_percom_block() void
+        +derive_percom_block(uint16_t numSectors) void
+        +num_blocks() uint32_t
+        +MediaType() ~
+    }

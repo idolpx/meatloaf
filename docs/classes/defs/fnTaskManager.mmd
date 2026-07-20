@@ -1,0 +1,16 @@
+%%gen
+    class fnTaskManager {
+        -complete_task(uint8_t tid) int
+        -get_free_tid() uint8_t
+        -shutdown() void
+        -std.map~uint8_t, fnTask *~ _task_map
+        -uint8_t _next_tid
+        -uint8_t _task_count
+        +fnTaskManager()
+        +submit_task(fnTask * t) int
+        +get_task(uint8_t tid) fnTask *
+        +pause_task(uint8_t tid) int
+        +resume_task(uint8_t tid) int
+        +abort_task(uint8_t tid) int
+        +service() bool
+    }

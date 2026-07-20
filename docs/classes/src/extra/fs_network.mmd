@@ -1,0 +1,15 @@
+    %%include DiscoveredService
+
+    class MSession {
+        <<see vfs_core>>
+    }
+    class SessionBroker {
+        <<see vfs_core>>
+    }
+    SessionBroker o-- MSession : reuse + keep-alive
+    HTTPMSession *-- MeatHttpClient : esp_http_client wrapper
+    TCPMSession *-- MeatSocket
+    MeatSocketServer o-- MeatSocket
+    MDNSMSession *-- DiscoveredService : cached results
+
+    note for MSession "Stateless protocols (NFS, FSP) set keep_alive_interval = 0 - keep-alive racing IEC-task I/O corrupts the heap (see CLAUDE.md)"

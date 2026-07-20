@@ -1,0 +1,121 @@
+%% Disk media: D64 family, CMD HD/FD partitions, IDE64 CFS, M2I index
+%% GENERATED template (gen_templates.js) - curated content lives in
+%% src/extra/media_disk.mmd; class bodies live in defs/<Class>.mmd
+classDiagram
+    direction LR
+
+    %%include ATRMFile
+    %%include ATRMFileSystem
+    %%include ATRMStream
+    %%include D40MFile
+    %%include D40MFileSystem
+    %%include D40MStream
+    %%include D64MFile
+    %%include D64MFileSystem
+    %%include D64MStream
+    %%include D71MFile
+    %%include D71MFileSystem
+    %%include D71MStream
+    %%include D80MFile
+    %%include D80MFileSystem
+    %%include D80MStream
+    %%include D81MFile
+    %%include D81MFileSystem
+    %%include D81MStream
+    %%include D82MFile
+    %%include D82MFileSystem
+    %%include D82MStream
+    %%include D90MFile
+    %%include D90MFileSystem
+    %%include D90MStream
+    %%include DHDImageRegistry
+    %%include DHDMFileSystem
+    %%include DHDOffsetStream
+    %%include DHDPartitionMFile
+    %%include DNPMFile
+    %%include DNPMFileSystem
+    %%include DNPMStream
+    %%include DSKFileSystem
+    %%include DSKIStream
+    %%include DSKMFile
+    %%include DXMMFileSystem
+    %%include G64MFile
+    %%include G64MFileSystem
+    %%include G64MStream
+    %%include HDDMFile
+    %%include HDDMFileSystem
+    %%include HDDMStream
+    %%include M2IMFile
+    %%include M2IMFileSystem
+    %%include M2IMStream
+    %%include NIBMFile
+    %%include NIBMFileSystem
+    %%include NIBMStream
+
+    class MFile {
+        <<see vfs_core>>
+    }
+    class MFileSystem {
+        <<see vfs_core>>
+    }
+    class MMediaStream {
+        <<see vfs_core>>
+    }
+    class MStream {
+        <<see vfs_core>>
+    }
+
+    D64MFile <|-- ATRMFile
+    MFileSystem <|-- ATRMFileSystem
+    D64MStream <|-- ATRMStream
+    D64MFile <|-- D40MFile
+    MFileSystem <|-- D40MFileSystem
+    D64MStream <|-- D40MStream
+    MFile <|-- D64MFile
+    MFileSystem <|-- D64MFileSystem
+    MMediaStream <|-- D64MStream
+    D64MFile <|-- D71MFile
+    MFileSystem <|-- D71MFileSystem
+    D64MStream <|-- D71MStream
+    D64MFile <|-- D80MFile
+    MFileSystem <|-- D80MFileSystem
+    D64MStream <|-- D80MStream
+    D64MFile <|-- D81MFile
+    MFileSystem <|-- D81MFileSystem
+    D64MStream <|-- D81MStream
+    D64MFile <|-- D82MFile
+    MFileSystem <|-- D82MFileSystem
+    D64MStream <|-- D82MStream
+    D64MFile <|-- D90MFile
+    MFileSystem <|-- D90MFileSystem
+    D64MStream <|-- D90MStream
+    MFileSystem <|-- DHDMFileSystem
+    MStream <|-- DHDOffsetStream
+    D64MFile <|-- DNPMFile
+    MFileSystem <|-- DNPMFileSystem
+    D64MStream <|-- DNPMStream
+    MFileSystem <|-- DSKFileSystem
+    D64MStream <|-- DSKIStream
+    D64MFile <|-- DSKMFile
+    MFileSystem <|-- DXMMFileSystem
+    D64MFile <|-- G64MFile
+    MFileSystem <|-- G64MFileSystem
+    D64MStream <|-- G64MStream
+    MFile <|-- HDDMFile
+    MFileSystem <|-- HDDMFileSystem
+    MMediaStream <|-- HDDMStream
+    MFile <|-- M2IMFile
+    MFileSystem <|-- M2IMFileSystem
+    MMediaStream <|-- M2IMStream
+    D64MFile <|-- NIBMFile
+    MFileSystem <|-- NIBMFileSystem
+    D64MStream <|-- NIBMStream
+
+    %%include DHDPartition
+
+    DHDImageRegistry *-- DHDPartition
+    DHDImageRegistry ..> DHDOffsetStream : partition windows
+    DHDOffsetStream ..> D64MStream : D64/D71/D81/DNP decode inside partition
+
+    note for D64MStream "Write path (SAVE into images) claims blocks near the directory track with per-block BAM updates and rollback on failure; subdirectory walk supports CMD native DIR and 1581 CBM partitions"
+    note for M2IMStream "Index only - readFile() delegates to the sibling host file's stream; resolveEntry validates candidates with MFile exists(), exact then lowercase"

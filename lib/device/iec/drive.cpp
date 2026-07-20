@@ -32,6 +32,7 @@
 
 #include "meatloaf.h"
 #include "meat_session.h"
+#include "mlConfig.h"
 #include "fuji.h"
 #include "fnFsSD.h"
 #include "led.h"
@@ -749,8 +750,15 @@ void iecDrive::begin()
 
     setStatusCode(ST_DOSVERSION);
     m_numOpenChannels = 0;
-    for(int i=0; i<16; i++) 
+    for(int i=0; i<16; i++)
         m_channels[i] = nullptr;
+
+    // NOTE: reloadConfig() is NOT called here. begin() runs during bus attach
+    // (main_setup() -> SYSTEM_BUS.setup()), which happens before fnWiFi.start().
+    // A persisted network URL (fsp://, http://, ...) would call set_cwd() ->
+    // getaddrinfo() before the LWIP tcpip task exists, aborting with
+    // "assert failed: tcpip_send_msg_wait_sem ... Invalid mbox". Callers must
+    // invoke reloadConfig() explicitly once WiFi is up (see main.cpp).
 }
 
 bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
@@ -1133,6 +1141,8 @@ void iecDrive::close(uint8_t channel)
         Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "id[%d] cwd[%s]", m_devnr, m_cwd==nullptr ? "NULL" : m_cwd->url.c_str());
         m_cwd->dump();
         Debug_memory();
+        persistConfig();
+        mlConfig.save();
 #endif
     }
 
@@ -2392,7 +2402,6 @@ void iecDrive::set_cwd(std::string path, bool verified)
                 setStatusCode(ST_FILE_NOT_FOUND);
                 delete n;
             }
-            return;
         }
         else if( n->exists() && (isDirectory || haveStream) )
         {
@@ -2407,7 +2416,9 @@ void iecDrive::set_cwd(std::string path, bool verified)
         }
     }
     else
-    setStatusCode(ST_SYNTAX_INVALID);
+        setStatusCode(ST_SYNTAX_INVALID);
+
+    persistConfig();
 }
 
 
@@ -2455,6 +2466,41 @@ void iecDrive::unmount()
     //   //m_cwd->unmount();
     //   device_active = false;
     // }
+}
+
+
+// Persist this drive's settings to mlConfig (devices.iec.<id>).
+// Only writes the keys the drive owns; other keys in the entry
+// (mode, media_stack, ...) are preserved.
+void iecDrive::persistConfig()
+{
+    auto &entry = mlConfig.data()["devices"]["iec"][std::to_string(m_devnr)];
+    entry["enabled"] = isActive() ? 1 : 0;
+    if (!entry.contains("type"))
+        entry["type"] = "drive";  // don't clobber subclass types (e.g. "meatloaf")
+    entry["url"] = m_cwd ? m_cwd->url : "/";
+}
+
+
+// Apply this drive's settings from mlConfig (devices.iec.<id>).
+// Missing entry or keys leave the current state unchanged.
+void iecDrive::reloadConfig()
+{
+    const psram_json &devices = mlConfig["devices"];
+    if (!devices.contains("iec"))
+        return;
+
+    const psram_json &iec = devices["iec"];
+    std::string key = std::to_string(m_devnr);
+    if (!iec.contains(key))
+        return;
+
+    const psram_json &entry = iec[key];
+    setActive(entry.value("enabled", 1) != 0);
+
+    std::string url = entry.value("url", "");
+    if (!url.empty() && (m_cwd == nullptr || m_cwd->url != url))
+        set_cwd(url);
 }
 
 

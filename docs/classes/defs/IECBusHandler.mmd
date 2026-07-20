@@ -1,0 +1,17 @@
+    class IECBusHandler {
+        -IECDevice* m_devices - attached devices
+        -uint8_t* m_buffer - transfer buffer
+        +IECBusHandler(pinATN, pinCLK, pinDATA, pinRESET, pinCTRL, pinSRQ)
+        +begin() void
+        +task() void - the microsecond-timing bus protocol loop
+        +attachDevice(dev) bool - devices answer ids 4-30
+        +detachDevice(dev) bool
+        +findDevice(devnr, includeInactive) IECDevice*
+        +setBuffer(buffer, bufferSize) void
+        +getSupportedFastLoaders() uint8_t$
+        +isFastLoaderSupported(loader) bool$
+        +enableFastLoader(dev, protocol, enable) bool - JiffyDOS Dolphin Epyx
+        +fastLoadRequest(dev, loader, request) void
+        +enableDolphinBurstMode(dev, enable) void
+        +setParallelPins(pins) void - DolphinDOS parallel cable
+    }

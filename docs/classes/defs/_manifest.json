@@ -1,0 +1,2327 @@
+{
+ "Audio": {
+  "header": "lib/audio/audio.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "systemBus": {
+  "header": "lib/bus/gpib/gpib.h",
+  "bases": [
+   "GPIBusHandler"
+  ],
+  "area": "bus"
+ },
+ "GPIBDevice": {
+  "header": "lib/bus/gpib/GPIBDevice.h",
+  "bases": [],
+  "area": "bus"
+ },
+ "GPIBFileDevice": {
+  "header": "lib/bus/gpib/GPIBFileDevice.h",
+  "bases": [
+   "GPIBDevice"
+  ],
+  "area": "bus"
+ },
+ "GPIBusHandler": {
+  "header": "lib/bus/gpib/GPIBusHandler.h",
+  "bases": [],
+  "area": "bus"
+ },
+ "IECBusHandler": {
+  "header": "lib/bus/iec/IECBusHandler.h",
+  "bases": [],
+  "area": "bus"
+ },
+ "IECDevice": {
+  "header": "lib/bus/iec/IECDevice.h",
+  "bases": [],
+  "area": "bus"
+ },
+ "IECFileDevice": {
+  "header": "lib/bus/iec/IECFileDevice.h",
+  "bases": [
+   "IECDevice"
+  ],
+  "area": "bus"
+ },
+ "IECHost": {
+  "header": "lib/bus/iec/IECHost.h",
+  "bases": [],
+  "area": "bus"
+ },
+ "CPBStandardSerial": {
+  "header": "lib/bus/iec/protocol/cpbstandardserial.h",
+  "bases": [
+   "IECProtocol"
+  ],
+  "area": "bus"
+ },
+ "DolphinDOS": {
+  "header": "lib/bus/iec/protocol/dolphindos.h",
+  "bases": [
+   "IECProtocol"
+  ],
+  "area": "bus"
+ },
+ "JiffyDOS": {
+  "header": "lib/bus/iec/protocol/jiffydos.h",
+  "bases": [
+   "IECProtocol"
+  ],
+  "area": "bus"
+ },
+ "SauceDOS": {
+  "header": "lib/bus/iec/protocol/saucedos.h",
+  "bases": [
+   "IECProtocol"
+  ],
+  "area": "bus"
+ },
+ "IECProtocol": {
+  "header": "lib/bus/iec/protocol/_protocol.h",
+  "bases": [],
+  "area": "bus"
+ },
+ "parallelBus": {
+  "header": "lib/bus/userport/parallel.h",
+  "bases": [],
+  "area": "bus"
+ },
+ "fnConfig": {
+  "header": "lib/config/fnConfig.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "MeatloafConfig": {
+  "header": "lib/config-ml/mlConfig.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "Console": {
+  "header": "lib/console/Console.h",
+  "bases": [],
+  "area": "console"
+ },
+ "ConsoleCommand": {
+  "header": "lib/console/ConsoleCommand.h",
+  "bases": [
+   "ConsoleCommandBase"
+  ],
+  "area": "console"
+ },
+ "ConsoleCommandBase": {
+  "header": "lib/console/ConsoleCommandBase.h",
+  "bases": [],
+  "area": "console"
+ },
+ "ConsoleCommandD": {
+  "header": "lib/console/ConsoleCommandD.h",
+  "bases": [
+   "ConsoleCommand"
+  ],
+  "area": "console"
+ },
+ "OptionsConsoleCommand": {
+  "header": "lib/console/OptionsConsoleCommand.h",
+  "bases": [
+   "ConsoleCommandBase"
+  ],
+  "area": "console"
+ },
+ "iecClock": {
+  "header": "lib/device/iec/clock.h",
+  "bases": [
+   "SystemDevice"
+  ],
+  "area": "devices"
+ },
+ "iecCpm": {
+  "header": "lib/device/iec/cpm.h",
+  "bases": [],
+  "area": "devices"
+ },
+ "driveMemory": {
+  "header": "lib/device/iec/drive/ram.h",
+  "bases": [],
+  "area": "devices"
+ },
+ "iecChannelHandler": {
+  "header": "lib/device/iec/drive.h",
+  "bases": [],
+  "area": "devices"
+ },
+ "iecChannelHandlerFile": {
+  "header": "lib/device/iec/drive.h",
+  "bases": [
+   "iecChannelHandler"
+  ],
+  "area": "devices"
+ },
+ "iecChannelHandlerDir": {
+  "header": "lib/device/iec/drive.h",
+  "bases": [
+   "iecChannelHandler"
+  ],
+  "area": "devices"
+ },
+ "iecDrive": {
+  "header": "lib/device/iec/drive.h",
+  "bases": [
+   "SystemFileDevice"
+  ],
+  "area": "devices"
+ },
+ "iecFuji": {
+  "header": "lib/device/iec/fuji.h",
+  "bases": [],
+  "area": "devices"
+ },
+ "iecMeatloaf": {
+  "header": "lib/device/iec/meatloaf.h",
+  "bases": [
+   "iecDrive",
+   "iecFuji"
+  ],
+  "area": "devices"
+ },
+ "iecModem": {
+  "header": "lib/device/iec/modem.h",
+  "bases": [
+   "IECDevice"
+  ],
+  "area": "devices"
+ },
+ "IECData": {
+  "header": "lib/device/iec/network.h",
+  "bases": [],
+  "area": "devices"
+ },
+ "iecNetwork": {
+  "header": "lib/device/iec/network.h",
+  "bases": [
+   "SystemFileDevice"
+  ],
+  "area": "devices"
+ },
+ "iecPrinter": {
+  "header": "lib/device/iec/printer.h",
+  "bases": [
+   "SystemDevice"
+  ],
+  "area": "devices"
+ },
+ "printerlist": {
+  "header": "lib/device/iec/printerlist.h",
+  "bases": [],
+  "area": "devices"
+ },
+ "WiC64": {
+  "header": "lib/device/iec/wic64.h",
+  "bases": [],
+  "area": "devices"
+ },
+ "DisplayLCD": {
+  "header": "lib/display/lcd.h",
+  "bases": [],
+  "area": "hardware"
+ },
+ "DisplayLEDs": {
+  "header": "lib/display/led_strip.h",
+  "bases": [],
+  "area": "hardware"
+ },
+ "Base64": {
+  "header": "lib/encoding/base64.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "Hash": {
+  "header": "lib/encoding/hash.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "Crypto": {
+  "header": "lib/encrypt/crypt.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "DirectoryPageGroup": {
+  "header": "lib/FileSystem/directoryPageGroup.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "DirCache": {
+  "header": "lib/FileSystem/fnDirCache.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "FileHandler": {
+  "header": "lib/FileSystem/fnFile.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "FileCache": {
+  "header": "lib/FileSystem/fnFileCache.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "FileHandlerLocal": {
+  "header": "lib/FileSystem/fnFileLocal.h",
+  "bases": [
+   "FileHandler"
+  ],
+  "area": "utils"
+ },
+ "FileHandlerMem": {
+  "header": "lib/FileSystem/fnFileMem.h",
+  "bases": [
+   "FileHandler"
+  ],
+  "area": "utils"
+ },
+ "FileHandlerNFS": {
+  "header": "lib/FileSystem/fnFileNFS.h",
+  "bases": [
+   "FileHandler"
+  ],
+  "area": "utils"
+ },
+ "FileHandlerSMB": {
+  "header": "lib/FileSystem/fnFileSMB.h",
+  "bases": [
+   "FileHandler"
+  ],
+  "area": "utils"
+ },
+ "FileHandlerTNFS": {
+  "header": "lib/FileSystem/fnFileTNFS.h",
+  "bases": [
+   "FileHandler"
+  ],
+  "area": "utils"
+ },
+ "FileSystem": {
+  "header": "lib/FileSystem/fnFS.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "FileSystemFTP": {
+  "header": "lib/FileSystem/fnFsFTP.h",
+  "bases": [
+   "FileSystem"
+  ],
+  "area": "utils"
+ },
+ "FileSystemHTTP": {
+  "header": "lib/FileSystem/fnFsHTTP.h",
+  "bases": [
+   "FileSystem"
+  ],
+  "area": "utils"
+ },
+ "FileSystemLittleFS": {
+  "header": "lib/FileSystem/fnFsLittleFS.h",
+  "bases": [
+   "FileSystem"
+  ],
+  "area": "utils"
+ },
+ "FileSystemNFS": {
+  "header": "lib/FileSystem/fnFsNFS.h",
+  "bases": [
+   "FileSystem"
+  ],
+  "area": "utils"
+ },
+ "FileSystemSDFAT": {
+  "header": "lib/FileSystem/fnFsSD.h",
+  "bases": [
+   "FileSystem"
+  ],
+  "area": "utils"
+ },
+ "FileSystemSMB": {
+  "header": "lib/FileSystem/fnFsSMB.h",
+  "bases": [
+   "FileSystem"
+  ],
+  "area": "utils"
+ },
+ "FileSystemSPIFFS": {
+  "header": "lib/FileSystem/fnFsSPIFFS.h",
+  "bases": [
+   "FileSystem"
+  ],
+  "area": "utils"
+ },
+ "FileSystemTNFS": {
+  "header": "lib/FileSystem/fnFsTNFS.h",
+  "bases": [
+   "FileSystem"
+  ],
+  "area": "utils"
+ },
+ "FNJSON": {
+  "header": "lib/fnjson/fnjson.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "fnFTP": {
+  "header": "lib/ftp/fnFTP.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "MCP23017": {
+  "header": "lib/gpiox/mcp23017.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "PCF8575": {
+  "header": "lib/gpiox/pcf8575.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "XRA1405": {
+  "header": "lib/gpiox/xra1405.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "ACMChannel": {
+  "header": "lib/hardware/ACMChannel.h",
+  "bases": [
+   "IOChannel",
+   "RS232ChannelProtocol"
+  ],
+  "area": "hardware"
+ },
+ "COMChannel": {
+  "header": "lib/hardware/COMChannel.h",
+  "bases": [
+   "IOChannel",
+   "RS232ChannelProtocol"
+  ],
+  "area": "hardware"
+ },
+ "EspClass": {
+  "header": "lib/hardware/Esp.h",
+  "bases": [],
+  "area": "hardware"
+ },
+ "BluetoothManager": {
+  "header": "lib/hardware/fnBluetooth.h",
+  "bases": [],
+  "area": "hardware"
+ },
+ "fnBluetoothSPP": {
+  "header": "lib/hardware/fnBluetoothSPP.h",
+  "bases": [],
+  "area": "hardware"
+ },
+ "DummyWiFiManager": {
+  "header": "lib/hardware/fnDummyWiFi.h",
+  "bases": [],
+  "area": "hardware"
+ },
+ "HardwareTimer": {
+  "header": "lib/hardware/fnHardwareTimer.h",
+  "bases": [],
+  "area": "hardware"
+ },
+ "LedStripManager": {
+  "header": "lib/hardware/fnLedStrip.h",
+  "bases": [],
+  "area": "hardware"
+ },
+ "SystemManager": {
+  "header": "lib/hardware/fnSystem.h",
+  "bases": [],
+  "area": "hardware"
+ },
+ "UARTManager": {
+  "header": "lib/hardware/fnUART.h",
+  "bases": [],
+  "area": "hardware"
+ },
+ "WiFiManager": {
+  "header": "lib/hardware/fnWiFi.h",
+  "bases": [],
+  "area": "hardware"
+ },
+ "IOChannel": {
+  "header": "lib/hardware/IOChannel.h",
+  "bases": [],
+  "area": "hardware"
+ },
+ "KeyManager": {
+  "header": "lib/hardware/keys.h",
+  "bases": [],
+  "area": "hardware"
+ },
+ "LedManager": {
+  "header": "lib/hardware/led.h",
+  "bases": [],
+  "area": "hardware"
+ },
+ "RS232ChannelProtocol": {
+  "header": "lib/hardware/RS232ChannelProtocol.h",
+  "bases": [],
+  "area": "hardware"
+ },
+ "SerialClass": {
+  "header": "lib/hardware/SerialCompat.h",
+  "bases": [],
+  "area": "hardware"
+ },
+ "TTYChannel": {
+  "header": "lib/hardware/TTYChannel.h",
+  "bases": [
+   "IOChannel",
+   "RS232ChannelProtocol"
+  ],
+  "area": "hardware"
+ },
+ "fnHttpClient": {
+  "header": "lib/http/fnHttpClient.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "QRMStream": {
+  "header": "lib/meatloaf/codec/qr.h",
+  "bases": [
+   "MStream"
+  ],
+  "area": "fs_service"
+ },
+ "QRMFile": {
+  "header": "lib/meatloaf/codec/qr.h",
+  "bases": [
+   "MFile"
+  ],
+  "area": "fs_service"
+ },
+ "QRMFileSystem": {
+  "header": "lib/meatloaf/codec/qr.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "fs_service"
+ },
+ "RetroPixelsFormat": {
+  "header": "lib/meatloaf/codec/retropixels.h",
+  "bases": [],
+  "area": "fs_service"
+ },
+ "RetroPixelsPalette": {
+  "header": "lib/meatloaf/codec/retropixels.h",
+  "bases": [],
+  "area": "fs_service"
+ },
+ "RetroPixelsDither": {
+  "header": "lib/meatloaf/codec/retropixels.h",
+  "bases": [],
+  "area": "fs_service"
+ },
+ "RetroPixelsScale": {
+  "header": "lib/meatloaf/codec/retropixels.h",
+  "bases": [],
+  "area": "fs_service"
+ },
+ "RetroPixelsMStream": {
+  "header": "lib/meatloaf/codec/retropixels.h",
+  "bases": [
+   "MStream"
+  ],
+  "area": "fs_service"
+ },
+ "RetroPixelsMFile": {
+  "header": "lib/meatloaf/codec/retropixels.h",
+  "bases": [
+   "MFile"
+  ],
+  "area": "fs_service"
+ },
+ "RetroPixelsMFileSystem": {
+  "header": "lib/meatloaf/codec/retropixels.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "fs_service"
+ },
+ "JSONMStream": {
+  "header": "lib/meatloaf/data/json.h",
+  "bases": [
+   "MStream"
+  ],
+  "area": "vfs_core"
+ },
+ "JSONMFile": {
+  "header": "lib/meatloaf/data/json.h",
+  "bases": [
+   "MFile"
+  ],
+  "area": "vfs_core"
+ },
+ "JSONMFileSystem": {
+  "header": "lib/meatloaf/data/json.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "vfs_core"
+ },
+ "SQLiteMStream": {
+  "header": "lib/meatloaf/data/sqlite.h",
+  "bases": [
+   "MStream"
+  ],
+  "area": "vfs_core"
+ },
+ "SQLiteMFile": {
+  "header": "lib/meatloaf/data/sqlite.h",
+  "bases": [
+   "MFile"
+  ],
+  "area": "vfs_core"
+ },
+ "SQLiteMFileSystem": {
+  "header": "lib/meatloaf/data/sqlite.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "vfs_core"
+ },
+ "FlashHandle": {
+  "header": "lib/meatloaf/device/flash.h",
+  "bases": [],
+  "area": "fs_device"
+ },
+ "FlashMStream": {
+  "header": "lib/meatloaf/device/flash.h",
+  "bases": [
+   "MStream"
+  ],
+  "area": "fs_device"
+ },
+ "FlashMFile": {
+  "header": "lib/meatloaf/device/flash.h",
+  "bases": [
+   "MFile"
+  ],
+  "area": "fs_device"
+ },
+ "FlashMFileSystem": {
+  "header": "lib/meatloaf/device/flash.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "fs_device"
+ },
+ "I2CMSession": {
+  "header": "lib/meatloaf/device/i2c.h",
+  "bases": [
+   "MSession"
+  ],
+  "area": "fs_device"
+ },
+ "I2CMStream": {
+  "header": "lib/meatloaf/device/i2c.h",
+  "bases": [
+   "MStream"
+  ],
+  "area": "fs_device"
+ },
+ "I2CMFile": {
+  "header": "lib/meatloaf/device/i2c.h",
+  "bases": [
+   "MFile"
+  ],
+  "area": "fs_device"
+ },
+ "I2CMFileSystem": {
+  "header": "lib/meatloaf/device/i2c.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "fs_device"
+ },
+ "HighMemory": {
+  "header": "lib/meatloaf/device/ram.h",
+  "bases": [],
+  "area": "fs_device"
+ },
+ "HighMemoryHandle": {
+  "header": "lib/meatloaf/device/ram.h",
+  "bases": [],
+  "area": "fs_device"
+ },
+ "RAMMFile": {
+  "header": "lib/meatloaf/device/ram.h",
+  "bases": [
+   "MFile"
+  ],
+  "area": "fs_device"
+ },
+ "RAMMFileSystem": {
+  "header": "lib/meatloaf/device/ram.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "fs_device"
+ },
+ "SDFileSystem": {
+  "header": "lib/meatloaf/device/sd.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "fs_device"
+ },
+ "HashMStream": {
+  "header": "lib/meatloaf/hash/hash.h",
+  "bases": [
+   "MStream"
+  ],
+  "area": "vfs_core"
+ },
+ "HashMFile": {
+  "header": "lib/meatloaf/hash/hash.h",
+  "bases": [
+   "MFile"
+  ],
+  "area": "vfs_core"
+ },
+ "HashMFileSystem": {
+  "header": "lib/meatloaf/hash/hash.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "vfs_core"
+ },
+ "iecPipe": {
+  "header": "lib/meatloaf/iec_pipe.h",
+  "bases": [],
+  "area": "vfs_core"
+ },
+ "iecPipeBroker": {
+  "header": "lib/meatloaf/iec_pipe_broker.h",
+  "bases": [],
+  "area": "vfs_core"
+ },
+ "URLMFileSystem": {
+  "header": "lib/meatloaf/link/url.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "fs_service"
+ },
+ "MLFileSystem": {
+  "header": "lib/meatloaf/link/webloc.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "fs_service"
+ },
+ "MStream": {
+  "header": "lib/meatloaf/meatloaf.h",
+  "bases": [],
+  "area": "vfs_core"
+ },
+ "MFile": {
+  "header": "lib/meatloaf/meatloaf.h",
+  "bases": [
+   "PeoplesUrlParser"
+  ],
+  "area": "vfs_core"
+ },
+ "MFileSystem": {
+  "header": "lib/meatloaf/meatloaf.h",
+  "bases": [],
+  "area": "vfs_core"
+ },
+ "MFSOwner": {
+  "header": "lib/meatloaf/meatloaf.h",
+  "bases": [],
+  "area": "vfs_core"
+ },
+ "mfilebuf": {
+  "header": "lib/meatloaf/meat_buffer.h",
+  "bases": [
+   "std",
+   "traits>"
+  ],
+  "area": "vfs_core"
+ },
+ "basic_fstream": {
+  "header": "lib/meatloaf/meat_buffer.h",
+  "bases": [
+   "std",
+   "_Traits>"
+  ],
+  "area": "vfs_core"
+ },
+ "MMediaStream": {
+  "header": "lib/meatloaf/meat_media.h",
+  "bases": [
+   "MStream"
+  ],
+  "area": "vfs_core"
+ },
+ "ImageBroker": {
+  "header": "lib/meatloaf/meat_media.h",
+  "bases": [],
+  "area": "vfs_core"
+ },
+ "MSession": {
+  "header": "lib/meatloaf/meat_session.h",
+  "bases": [],
+  "area": "vfs_core"
+ },
+ "SessionBroker": {
+  "header": "lib/meatloaf/meat_session.h",
+  "bases": [],
+  "area": "vfs_core"
+ },
+ "ARCMStream": {
+  "header": "lib/meatloaf/media/archive/arc.h",
+  "bases": [
+   "MMediaStream"
+  ],
+  "area": "media_container"
+ },
+ "ARCMFile": {
+  "header": "lib/meatloaf/media/archive/arc.h",
+  "bases": [
+   "MFile"
+  ],
+  "area": "media_container"
+ },
+ "ARCMFileSystem": {
+  "header": "lib/meatloaf/media/archive/arc.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "media_container"
+ },
+ "Archive": {
+  "header": "lib/meatloaf/media/archive/archive.h",
+  "bases": [],
+  "area": "media_container"
+ },
+ "ArchiveMSession": {
+  "header": "lib/meatloaf/media/archive/archive.h",
+  "bases": [
+   "MSession"
+  ],
+  "area": "media_container"
+ },
+ "ArchiveMStream": {
+  "header": "lib/meatloaf/media/archive/archive.h",
+  "bases": [
+   "MMediaStream"
+  ],
+  "area": "media_container"
+ },
+ "ArchiveMFile": {
+  "header": "lib/meatloaf/media/archive/archive.h",
+  "bases": [
+   "MFile"
+  ],
+  "area": "media_container"
+ },
+ "ArchiveMFileSystem": {
+  "header": "lib/meatloaf/media/archive/archive.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "media_container"
+ },
+ "ARKMStream": {
+  "header": "lib/meatloaf/media/archive/ark.h",
+  "bases": [
+   "MMediaStream"
+  ],
+  "area": "media_container"
+ },
+ "ARKMFile": {
+  "header": "lib/meatloaf/media/archive/ark.h",
+  "bases": [
+   "MFile"
+  ],
+  "area": "media_container"
+ },
+ "ARKMFileSystem": {
+  "header": "lib/meatloaf/media/archive/ark.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "media_container"
+ },
+ "LBRMStream": {
+  "header": "lib/meatloaf/media/archive/lbr.h",
+  "bases": [
+   "MMediaStream"
+  ],
+  "area": "media_container"
+ },
+ "LBRMFile": {
+  "header": "lib/meatloaf/media/archive/lbr.h",
+  "bases": [
+   "MFile"
+  ],
+  "area": "media_container"
+ },
+ "LBRMFileSystem": {
+  "header": "lib/meatloaf/media/archive/lbr.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "media_container"
+ },
+ "LNXMStream": {
+  "header": "lib/meatloaf/media/archive/lnx.h",
+  "bases": [
+   "MMediaStream"
+  ],
+  "area": "media_container"
+ },
+ "LNXMFile": {
+  "header": "lib/meatloaf/media/archive/lnx.h",
+  "bases": [
+   "MFile"
+  ],
+  "area": "media_container"
+ },
+ "LNXMFileSystem": {
+  "header": "lib/meatloaf/media/archive/lnx.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "media_container"
+ },
+ "EFCRTMStream": {
+  "header": "lib/meatloaf/media/cartridge/crt/easyfs.h",
+  "bases": [
+   "MMediaStream"
+  ],
+  "area": "media_container"
+ },
+ "EFCRTMFile": {
+  "header": "lib/meatloaf/media/cartridge/crt/easyfs.h",
+  "bases": [
+   "MFile"
+  ],
+  "area": "media_container"
+ },
+ "CRTMStream": {
+  "header": "lib/meatloaf/media/cartridge/crt.h",
+  "bases": [
+   "MMediaStream"
+  ],
+  "area": "media_container"
+ },
+ "CRTMFile": {
+  "header": "lib/meatloaf/media/cartridge/crt.h",
+  "bases": [
+   "MFile"
+  ],
+  "area": "media_container"
+ },
+ "CRTMFileSystem": {
+  "header": "lib/meatloaf/media/cartridge/crt.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "media_container"
+ },
+ "D8BMStream": {
+  "header": "lib/meatloaf/media/container/d8b.h",
+  "bases": [
+   "D64MStream"
+  ],
+  "area": "media_container"
+ },
+ "D8BMFile": {
+  "header": "lib/meatloaf/media/container/d8b.h",
+  "bases": [
+   "D64MFile"
+  ],
+  "area": "media_container"
+ },
+ "D8BMFileSystem": {
+  "header": "lib/meatloaf/media/container/d8b.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "media_container"
+ },
+ "DFIMStream": {
+  "header": "lib/meatloaf/media/container/dfi.h",
+  "bases": [
+   "D64MStream"
+  ],
+  "area": "media_container"
+ },
+ "DFIMFile": {
+  "header": "lib/meatloaf/media/container/dfi.h",
+  "bases": [
+   "D64MFile"
+  ],
+  "area": "media_container"
+ },
+ "DFIMFileSystem": {
+  "header": "lib/meatloaf/media/container/dfi.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "media_container"
+ },
+ "ISOMStream": {
+  "header": "lib/meatloaf/media/disc/iso.h",
+  "bases": [
+   "MMediaStream"
+  ],
+  "area": "media_container"
+ },
+ "ISOMFile": {
+  "header": "lib/meatloaf/media/disc/iso.h",
+  "bases": [
+   "MFile"
+  ],
+  "area": "media_container"
+ },
+ "ISOMFileSystem": {
+  "header": "lib/meatloaf/media/disc/iso.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "media_container"
+ },
+ "ATRMStream": {
+  "header": "lib/meatloaf/media/disk/atr.h",
+  "bases": [
+   "D64MStream"
+  ],
+  "area": "media_disk"
+ },
+ "ATRMFile": {
+  "header": "lib/meatloaf/media/disk/atr.h",
+  "bases": [
+   "D64MFile"
+  ],
+  "area": "media_disk"
+ },
+ "ATRMFileSystem": {
+  "header": "lib/meatloaf/media/disk/atr.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "media_disk"
+ },
+ "D40MStream": {
+  "header": "lib/meatloaf/media/disk/d40.h",
+  "bases": [
+   "D64MStream"
+  ],
+  "area": "media_disk"
+ },
+ "D40MFile": {
+  "header": "lib/meatloaf/media/disk/d40.h",
+  "bases": [
+   "D64MFile"
+  ],
+  "area": "media_disk"
+ },
+ "D40MFileSystem": {
+  "header": "lib/meatloaf/media/disk/d40.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "media_disk"
+ },
+ "D64MStream": {
+  "header": "lib/meatloaf/media/disk/d64.h",
+  "bases": [
+   "MMediaStream"
+  ],
+  "area": "media_disk"
+ },
+ "D64MFile": {
+  "header": "lib/meatloaf/media/disk/d64.h",
+  "bases": [
+   "MFile"
+  ],
+  "area": "media_disk"
+ },
+ "D64MFileSystem": {
+  "header": "lib/meatloaf/media/disk/d64.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "media_disk"
+ },
+ "D71MStream": {
+  "header": "lib/meatloaf/media/disk/d71.h",
+  "bases": [
+   "D64MStream"
+  ],
+  "area": "media_disk"
+ },
+ "D71MFile": {
+  "header": "lib/meatloaf/media/disk/d71.h",
+  "bases": [
+   "D64MFile"
+  ],
+  "area": "media_disk"
+ },
+ "D71MFileSystem": {
+  "header": "lib/meatloaf/media/disk/d71.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "media_disk"
+ },
+ "D80MStream": {
+  "header": "lib/meatloaf/media/disk/d80.h",
+  "bases": [
+   "D64MStream"
+  ],
+  "area": "media_disk"
+ },
+ "D80MFile": {
+  "header": "lib/meatloaf/media/disk/d80.h",
+  "bases": [
+   "D64MFile"
+  ],
+  "area": "media_disk"
+ },
+ "D80MFileSystem": {
+  "header": "lib/meatloaf/media/disk/d80.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "media_disk"
+ },
+ "D81MStream": {
+  "header": "lib/meatloaf/media/disk/d81.h",
+  "bases": [
+   "D64MStream"
+  ],
+  "area": "media_disk"
+ },
+ "D81MFile": {
+  "header": "lib/meatloaf/media/disk/d81.h",
+  "bases": [
+   "D64MFile"
+  ],
+  "area": "media_disk"
+ },
+ "D81MFileSystem": {
+  "header": "lib/meatloaf/media/disk/d81.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "media_disk"
+ },
+ "D82MStream": {
+  "header": "lib/meatloaf/media/disk/d82.h",
+  "bases": [
+   "D64MStream"
+  ],
+  "area": "media_disk"
+ },
+ "D82MFile": {
+  "header": "lib/meatloaf/media/disk/d82.h",
+  "bases": [
+   "D64MFile"
+  ],
+  "area": "media_disk"
+ },
+ "D82MFileSystem": {
+  "header": "lib/meatloaf/media/disk/d82.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "media_disk"
+ },
+ "D90MStream": {
+  "header": "lib/meatloaf/media/disk/d90.h",
+  "bases": [
+   "D64MStream"
+  ],
+  "area": "media_disk"
+ },
+ "D90MFile": {
+  "header": "lib/meatloaf/media/disk/d90.h",
+  "bases": [
+   "D64MFile"
+  ],
+  "area": "media_disk"
+ },
+ "D90MFileSystem": {
+  "header": "lib/meatloaf/media/disk/d90.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "media_disk"
+ },
+ "DSKIStream": {
+  "header": "lib/meatloaf/media/disk/dsk.h",
+  "bases": [
+   "D64MStream"
+  ],
+  "area": "media_disk"
+ },
+ "DSKMFile": {
+  "header": "lib/meatloaf/media/disk/dsk.h",
+  "bases": [
+   "D64MFile"
+  ],
+  "area": "media_disk"
+ },
+ "DSKFileSystem": {
+  "header": "lib/meatloaf/media/disk/dsk.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "media_disk"
+ },
+ "DXMMFileSystem": {
+  "header": "lib/meatloaf/media/disk/dxm.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "media_disk"
+ },
+ "G64MStream": {
+  "header": "lib/meatloaf/media/disk/g64.h",
+  "bases": [
+   "D64MStream"
+  ],
+  "area": "media_disk"
+ },
+ "G64MFile": {
+  "header": "lib/meatloaf/media/disk/g64.h",
+  "bases": [
+   "D64MFile"
+  ],
+  "area": "media_disk"
+ },
+ "G64MFileSystem": {
+  "header": "lib/meatloaf/media/disk/g64.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "media_disk"
+ },
+ "M2IMStream": {
+  "header": "lib/meatloaf/media/disk/m2i.h",
+  "bases": [
+   "MMediaStream"
+  ],
+  "area": "media_disk"
+ },
+ "M2IMFile": {
+  "header": "lib/meatloaf/media/disk/m2i.h",
+  "bases": [
+   "MFile"
+  ],
+  "area": "media_disk"
+ },
+ "M2IMFileSystem": {
+  "header": "lib/meatloaf/media/disk/m2i.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "media_disk"
+ },
+ "NIBMStream": {
+  "header": "lib/meatloaf/media/disk/nib.h",
+  "bases": [
+   "D64MStream"
+  ],
+  "area": "media_disk"
+ },
+ "NIBMFile": {
+  "header": "lib/meatloaf/media/disk/nib.h",
+  "bases": [
+   "D64MFile"
+  ],
+  "area": "media_disk"
+ },
+ "NIBMFileSystem": {
+  "header": "lib/meatloaf/media/disk/nib.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "media_disk"
+ },
+ "P00MStream": {
+  "header": "lib/meatloaf/media/file/p00.h",
+  "bases": [
+   "MMediaStream"
+  ],
+  "area": "media_container"
+ },
+ "P00MFile": {
+  "header": "lib/meatloaf/media/file/p00.h",
+  "bases": [
+   "MFile"
+  ],
+  "area": "media_container"
+ },
+ "P00MFileSystem": {
+  "header": "lib/meatloaf/media/file/p00.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "media_container"
+ },
+ "DHDImageRegistry": {
+  "header": "lib/meatloaf/media/hd/dhd.h",
+  "bases": [],
+  "area": "media_disk"
+ },
+ "DHDOffsetStream": {
+  "header": "lib/meatloaf/media/hd/dhd.h",
+  "bases": [
+   "MStream"
+  ],
+  "area": "media_disk"
+ },
+ "DHDPartitionMFile": {
+  "header": "lib/meatloaf/media/hd/dhd.h",
+  "bases": [
+   "BASE"
+  ],
+  "area": "media_disk"
+ },
+ "DHDMFileSystem": {
+  "header": "lib/meatloaf/media/hd/dhd.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "media_disk"
+ },
+ "DNPMStream": {
+  "header": "lib/meatloaf/media/hd/dnp.h",
+  "bases": [
+   "D64MStream"
+  ],
+  "area": "media_disk"
+ },
+ "DNPMFile": {
+  "header": "lib/meatloaf/media/hd/dnp.h",
+  "bases": [
+   "D64MFile"
+  ],
+  "area": "media_disk"
+ },
+ "DNPMFileSystem": {
+  "header": "lib/meatloaf/media/hd/dnp.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "media_disk"
+ },
+ "HDDMStream": {
+  "header": "lib/meatloaf/media/hd/hdd.h",
+  "bases": [
+   "MMediaStream"
+  ],
+  "area": "media_disk"
+ },
+ "HDDMFile": {
+  "header": "lib/meatloaf/media/hd/hdd.h",
+  "bases": [
+   "MFile"
+  ],
+  "area": "media_disk"
+ },
+ "HDDMFileSystem": {
+  "header": "lib/meatloaf/media/hd/hdd.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "media_disk"
+ },
+ "T64MStream": {
+  "header": "lib/meatloaf/media/tape/t64.h",
+  "bases": [
+   "MMediaStream"
+  ],
+  "area": "media_tape"
+ },
+ "T64MFile": {
+  "header": "lib/meatloaf/media/tape/t64.h",
+  "bases": [
+   "MFile"
+  ],
+  "area": "media_tape"
+ },
+ "T64MFileSystem": {
+  "header": "lib/meatloaf/media/tape/t64.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "media_tape"
+ },
+ "TAPMStream": {
+  "header": "lib/meatloaf/media/tape/tap.h",
+  "bases": [
+   "MMediaStream"
+  ],
+  "area": "media_tape"
+ },
+ "TAPMFile": {
+  "header": "lib/meatloaf/media/tape/tap.h",
+  "bases": [
+   "MFile"
+  ],
+  "area": "media_tape"
+ },
+ "TAPMFileSystem": {
+  "header": "lib/meatloaf/media/tape/tap.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "media_tape"
+ },
+ "TapeDecoder": {
+  "header": "lib/meatloaf/media/tape/tape_decoder.h",
+  "bases": [],
+  "area": "media_tape"
+ },
+ "TCRTMStream": {
+  "header": "lib/meatloaf/media/tape/tcrt.h",
+  "bases": [
+   "MMediaStream"
+  ],
+  "area": "media_tape"
+ },
+ "TCRTMFile": {
+  "header": "lib/meatloaf/media/tape/tcrt.h",
+  "bases": [
+   "MFile"
+  ],
+  "area": "media_tape"
+ },
+ "TCRTMFileSystem": {
+  "header": "lib/meatloaf/media/tape/tcrt.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "media_tape"
+ },
+ "AFPMSession": {
+  "header": "lib/meatloaf/network/afp.h",
+  "bases": [
+   "MSession"
+  ],
+  "area": "fs_network"
+ },
+ "AFPMFile": {
+  "header": "lib/meatloaf/network/afp.h",
+  "bases": [
+   "MFile"
+  ],
+  "area": "fs_network"
+ },
+ "AFPHandle": {
+  "header": "lib/meatloaf/network/afp.h",
+  "bases": [],
+  "area": "fs_network"
+ },
+ "AFPMStream": {
+  "header": "lib/meatloaf/network/afp.h",
+  "bases": [
+   "MStream"
+  ],
+  "area": "fs_network"
+ },
+ "AFPMFileSystem": {
+  "header": "lib/meatloaf/network/afp.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "fs_network"
+ },
+ "FSPMSession": {
+  "header": "lib/meatloaf/network/fsp.h",
+  "bases": [
+   "MSession"
+  ],
+  "area": "fs_network"
+ },
+ "FSPMFile": {
+  "header": "lib/meatloaf/network/fsp.h",
+  "bases": [
+   "MFile"
+  ],
+  "area": "fs_network"
+ },
+ "FSPMStream": {
+  "header": "lib/meatloaf/network/fsp.h",
+  "bases": [
+   "MStream"
+  ],
+  "area": "fs_network"
+ },
+ "FSPMFileSystem": {
+  "header": "lib/meatloaf/network/fsp.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "fs_network"
+ },
+ "FTPMSession": {
+  "header": "lib/meatloaf/network/ftp.h",
+  "bases": [
+   "MSession"
+  ],
+  "area": "fs_network"
+ },
+ "FTPMFile": {
+  "header": "lib/meatloaf/network/ftp.h",
+  "bases": [
+   "MFile"
+  ],
+  "area": "fs_network"
+ },
+ "FTPMStream": {
+  "header": "lib/meatloaf/network/ftp.h",
+  "bases": [
+   "MStream"
+  ],
+  "area": "fs_network"
+ },
+ "FTPMFileSystem": {
+  "header": "lib/meatloaf/network/ftp.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "fs_network"
+ },
+ "HTTPRequestContext": {
+  "header": "lib/meatloaf/network/http.h",
+  "bases": [],
+  "area": "fs_network"
+ },
+ "MeatHttpClient": {
+  "header": "lib/meatloaf/network/http.h",
+  "bases": [],
+  "area": "fs_network"
+ },
+ "HTTPMSession": {
+  "header": "lib/meatloaf/network/http.h",
+  "bases": [
+   "MSession"
+  ],
+  "area": "fs_network"
+ },
+ "HTTPMFile": {
+  "header": "lib/meatloaf/network/http.h",
+  "bases": [
+   "MFile"
+  ],
+  "area": "fs_network"
+ },
+ "HTTPMStream": {
+  "header": "lib/meatloaf/network/http.h",
+  "bases": [
+   "MStream"
+  ],
+  "area": "fs_network"
+ },
+ "HTTPMFileSystem": {
+  "header": "lib/meatloaf/network/http.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "fs_network"
+ },
+ "IPFSMFile": {
+  "header": "lib/meatloaf/network/ipfs.h",
+  "bases": [
+   "HTTPMFile"
+  ],
+  "area": "fs_network"
+ },
+ "IPFSMStream": {
+  "header": "lib/meatloaf/network/ipfs.h",
+  "bases": [
+   "HTTPMStream"
+  ],
+  "area": "fs_network"
+ },
+ "IPFSFileSystem": {
+  "header": "lib/meatloaf/network/ipfs.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "fs_network"
+ },
+ "IRCMSession": {
+  "header": "lib/meatloaf/network/irc.h",
+  "bases": [
+   "MSession"
+  ],
+  "area": "fs_network"
+ },
+ "IRCMStream": {
+  "header": "lib/meatloaf/network/irc.h",
+  "bases": [
+   "MStream"
+  ],
+  "area": "fs_network"
+ },
+ "IRCMFile": {
+  "header": "lib/meatloaf/network/irc.h",
+  "bases": [
+   "MFile"
+  ],
+  "area": "fs_network"
+ },
+ "IRCMFileSystem": {
+  "header": "lib/meatloaf/network/irc.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "fs_network"
+ },
+ "ISCSIMSession": {
+  "header": "lib/meatloaf/network/iscsi.h",
+  "bases": [
+   "MSession"
+  ],
+  "area": "fs_network"
+ },
+ "ISCSIMFile": {
+  "header": "lib/meatloaf/network/iscsi.h",
+  "bases": [
+   "MFile"
+  ],
+  "area": "fs_network"
+ },
+ "ISCSIMStream": {
+  "header": "lib/meatloaf/network/iscsi.h",
+  "bases": [
+   "MStream"
+  ],
+  "area": "fs_network"
+ },
+ "ISCSIMFileSystem": {
+  "header": "lib/meatloaf/network/iscsi.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "fs_network"
+ },
+ "NFSMSession": {
+  "header": "lib/meatloaf/network/nfs.h",
+  "bases": [
+   "MSession"
+  ],
+  "area": "fs_network"
+ },
+ "NFSMFile": {
+  "header": "lib/meatloaf/network/nfs.h",
+  "bases": [
+   "MFile"
+  ],
+  "area": "fs_network"
+ },
+ "NFSHandle": {
+  "header": "lib/meatloaf/network/nfs.h",
+  "bases": [],
+  "area": "fs_network"
+ },
+ "NFSMStream": {
+  "header": "lib/meatloaf/network/nfs.h",
+  "bases": [
+   "MStream"
+  ],
+  "area": "fs_network"
+ },
+ "NFSMFileSystem": {
+  "header": "lib/meatloaf/network/nfs.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "fs_network"
+ },
+ "SFTPMSession": {
+  "header": "lib/meatloaf/network/sftp.h",
+  "bases": [
+   "MSession"
+  ],
+  "area": "fs_network"
+ },
+ "SFTPMFile": {
+  "header": "lib/meatloaf/network/sftp.h",
+  "bases": [
+   "MFile"
+  ],
+  "area": "fs_network"
+ },
+ "SFTPMStream": {
+  "header": "lib/meatloaf/network/sftp.h",
+  "bases": [
+   "MStream"
+  ],
+  "area": "fs_network"
+ },
+ "SFTPMFileSystem": {
+  "header": "lib/meatloaf/network/sftp.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "fs_network"
+ },
+ "SMBMSession": {
+  "header": "lib/meatloaf/network/smb.h",
+  "bases": [
+   "MSession"
+  ],
+  "area": "fs_network"
+ },
+ "SMBMFile": {
+  "header": "lib/meatloaf/network/smb.h",
+  "bases": [
+   "MFile"
+  ],
+  "area": "fs_network"
+ },
+ "SMBHandle": {
+  "header": "lib/meatloaf/network/smb.h",
+  "bases": [],
+  "area": "fs_network"
+ },
+ "SMBMStream": {
+  "header": "lib/meatloaf/network/smb.h",
+  "bases": [
+   "MStream"
+  ],
+  "area": "fs_network"
+ },
+ "SMBMFileSystem": {
+  "header": "lib/meatloaf/network/smb.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "fs_network"
+ },
+ "MeatSocket": {
+  "header": "lib/meatloaf/network/tcp.h",
+  "bases": [],
+  "area": "fs_network"
+ },
+ "TCPMSession": {
+  "header": "lib/meatloaf/network/tcp.h",
+  "bases": [
+   "MSession"
+  ],
+  "area": "fs_network"
+ },
+ "MeatSocketServer": {
+  "header": "lib/meatloaf/network/tcp.h",
+  "bases": [],
+  "area": "fs_network"
+ },
+ "TCPMStream": {
+  "header": "lib/meatloaf/network/tcp.h",
+  "bases": [
+   "MStream"
+  ],
+  "area": "fs_network"
+ },
+ "TCPMFile": {
+  "header": "lib/meatloaf/network/tcp.h",
+  "bases": [
+   "MFile"
+  ],
+  "area": "fs_network"
+ },
+ "TCPMFileSystem": {
+  "header": "lib/meatloaf/network/tcp.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "fs_network"
+ },
+ "TNFSMSession": {
+  "header": "lib/meatloaf/network/tnfs.h",
+  "bases": [
+   "MSession"
+  ],
+  "area": "fs_network"
+ },
+ "TNFSMFile": {
+  "header": "lib/meatloaf/network/tnfs.h",
+  "bases": [
+   "MFile"
+  ],
+  "area": "fs_network"
+ },
+ "TNFSHandle": {
+  "header": "lib/meatloaf/network/tnfs.h",
+  "bases": [],
+  "area": "fs_network"
+ },
+ "TNFSMStream": {
+  "header": "lib/meatloaf/network/tnfs.h",
+  "bases": [
+   "MStream"
+  ],
+  "area": "fs_network"
+ },
+ "TNFSMFileSystem": {
+  "header": "lib/meatloaf/network/tnfs.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "fs_network"
+ },
+ "WSMStream": {
+  "header": "lib/meatloaf/network/ws.h",
+  "bases": [
+   "MStream"
+  ],
+  "area": "fs_network"
+ },
+ "WSMFile": {
+  "header": "lib/meatloaf/network/ws.h",
+  "bases": [
+   "MFile"
+  ],
+  "area": "fs_network"
+ },
+ "WSFileSystem": {
+  "header": "lib/meatloaf/network/ws.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "fs_network"
+ },
+ "csstreambuf": {
+  "header": "lib/meatloaf/service/csip.h",
+  "bases": [
+   "std"
+  ],
+  "area": "fs_service"
+ },
+ "CSIPMSession": {
+  "header": "lib/meatloaf/service/csip.h",
+  "bases": [
+   "MSession",
+   "std"
+  ],
+  "area": "fs_service"
+ },
+ "CSIPMFile": {
+  "header": "lib/meatloaf/service/csip.h",
+  "bases": [
+   "MFile"
+  ],
+  "area": "fs_service"
+ },
+ "CSIPMStream": {
+  "header": "lib/meatloaf/service/csip.h",
+  "bases": [
+   "MStream"
+  ],
+  "area": "fs_service"
+ },
+ "CSIPMFileSystem": {
+  "header": "lib/meatloaf/service/csip.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "fs_service"
+ },
+ "MDNSMSession": {
+  "header": "lib/meatloaf/service/mdns.h",
+  "bases": [
+   "MSession"
+  ],
+  "area": "fs_service"
+ },
+ "MDNSMFile": {
+  "header": "lib/meatloaf/service/mdns.h",
+  "bases": [
+   "MFile"
+  ],
+  "area": "fs_service"
+ },
+ "MDNSMStream": {
+  "header": "lib/meatloaf/service/mdns.h",
+  "bases": [
+   "MStream"
+  ],
+  "area": "fs_service"
+ },
+ "MDNSMFileSystem": {
+  "header": "lib/meatloaf/service/mdns.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "fs_service"
+ },
+ "MLMFileSystem": {
+  "header": "lib/meatloaf/service/ml.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "fs_service"
+ },
+ "MQTTMSession": {
+  "header": "lib/meatloaf/service/mqtt.h",
+  "bases": [
+   "MSession"
+  ],
+  "area": "fs_service"
+ },
+ "MQTTMFile": {
+  "header": "lib/meatloaf/service/mqtt.h",
+  "bases": [
+   "MFile"
+  ],
+  "area": "fs_service"
+ },
+ "MQTTMStream": {
+  "header": "lib/meatloaf/service/mqtt.h",
+  "bases": [
+   "MStream"
+  ],
+  "area": "fs_service"
+ },
+ "MQTTMFileSystem": {
+  "header": "lib/meatloaf/service/mqtt.h",
+  "bases": [
+   "MFileSystem"
+  ],
+  "area": "fs_service"
+ },
+ "idirbuf": {
+  "header": "lib/meatloaf/wrapper/directory_stream.h",
+  "bases": [
+   "std"
+  ],
+  "area": "fs_service"
+ },
+ "MediaType": {
+  "header": "lib/media/adam/mediaType.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "MediaTypeDDP": {
+  "header": "lib/media/adam/mediaTypeDDP.h",
+  "bases": [
+   "MediaType"
+  ],
+  "area": "utils"
+ },
+ "MediaTypeDSK": {
+  "header": "lib/media/adam/mediaTypeDSK.h",
+  "bases": [
+   "MediaType"
+  ],
+  "area": "utils"
+ },
+ "MediaTypeROM": {
+  "header": "lib/media/adam/mediaTypeROM.h",
+  "bases": [
+   "MediaType"
+  ],
+  "area": "utils"
+ },
+ "MediaTypeDO": {
+  "header": "lib/media/apple/mediaTypeDO.h",
+  "bases": [
+   "MediaType"
+  ],
+  "area": "utils"
+ },
+ "MediaTypePO": {
+  "header": "lib/media/apple/mediaTypePO.h",
+  "bases": [
+   "MediaType"
+  ],
+  "area": "utils"
+ },
+ "MediaTypeWOZ": {
+  "header": "lib/media/apple/mediaTypeWOZ.h",
+  "bases": [
+   "MediaType"
+  ],
+  "area": "utils"
+ },
+ "MediaTypeATR": {
+  "header": "lib/media/atari/diskTypeAtr.h",
+  "bases": [
+   "MediaType"
+  ],
+  "area": "utils"
+ },
+ "AtxSector": {
+  "header": "lib/media/atari/diskTypeAtx.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "AtxTrack": {
+  "header": "lib/media/atari/diskTypeAtx.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "MediaTypeATX": {
+  "header": "lib/media/atari/diskTypeAtx.h",
+  "bases": [
+   "MediaType"
+  ],
+  "area": "utils"
+ },
+ "MediaTypeXEX": {
+  "header": "lib/media/atari/diskTypeXex.h",
+  "bases": [
+   "MediaType"
+  ],
+  "area": "utils"
+ },
+ "MediaTypeMRM": {
+  "header": "lib/media/drivewire/mediaTypeMRM.h",
+  "bases": [
+   "MediaType"
+  ],
+  "area": "utils"
+ },
+ "MediaTypeVDK": {
+  "header": "lib/media/drivewire/mediaTypeVDK.h",
+  "bases": [
+   "MediaType"
+  ],
+  "area": "utils"
+ },
+ "MediaTypeIMG": {
+  "header": "lib/media/h89/mediaTypeIMG.h",
+  "bases": [
+   "MediaType"
+  ],
+  "area": "utils"
+ },
+ "MediaTypeDCD": {
+  "header": "lib/media/mac/mediaTypeDCD.h",
+  "bases": [
+   "MediaType"
+  ],
+  "area": "utils"
+ },
+ "MediaTypeMOOF": {
+  "header": "lib/media/mac/mediaTypeMOOF.h",
+  "bases": [
+   "MediaType"
+  ],
+  "area": "utils"
+ },
+ "MediaTypeImg": {
+  "header": "lib/media/rs232/diskTypeImg.h",
+  "bases": [
+   "MediaType"
+  ],
+  "area": "utils"
+ },
+ "NetworkProtocolFS": {
+  "header": "lib/network-protocol/FS.h",
+  "bases": [
+   "NetworkProtocol"
+  ],
+  "area": "utils"
+ },
+ "NetworkProtocolFTP": {
+  "header": "lib/network-protocol/FTP.h",
+  "bases": [
+   "NetworkProtocolFS"
+  ],
+  "area": "utils"
+ },
+ "NetworkProtocolHTTP": {
+  "header": "lib/network-protocol/HTTP.h",
+  "bases": [
+   "NetworkProtocolFS"
+  ],
+  "area": "utils"
+ },
+ "NetworkProtocolFactory": {
+  "header": "lib/network-protocol/NetworkProtocolFactory.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "NetworkStatus": {
+  "header": "lib/network-protocol/networkStatus.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "NetworkProtocol": {
+  "header": "lib/network-protocol/Protocol.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "ProtocolParser": {
+  "header": "lib/network-protocol/ProtocolParser.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "NetworkProtocolSD": {
+  "header": "lib/network-protocol/SD.h",
+  "bases": [
+   "NetworkProtocolFS"
+  ],
+  "area": "utils"
+ },
+ "NetworkProtocolSMB": {
+  "header": "lib/network-protocol/SMB.h",
+  "bases": [
+   "NetworkProtocolFS"
+  ],
+  "area": "utils"
+ },
+ "NetworkProtocolSSH": {
+  "header": "lib/network-protocol/SSH.h",
+  "bases": [
+   "NetworkProtocol"
+  ],
+  "area": "utils"
+ },
+ "NetworkProtocolTCP": {
+  "header": "lib/network-protocol/TCP.h",
+  "bases": [
+   "NetworkProtocol"
+  ],
+  "area": "utils"
+ },
+ "NetworkProtocolTELNET": {
+  "header": "lib/network-protocol/Telnet.h",
+  "bases": [
+   "NetworkProtocolTCP"
+  ],
+  "area": "utils"
+ },
+ "NetworkProtocolTest": {
+  "header": "lib/network-protocol/Test.h",
+  "bases": [
+   "NetworkProtocol"
+  ],
+  "area": "utils"
+ },
+ "NetworkProtocolTNFS": {
+  "header": "lib/network-protocol/TNFS.h",
+  "bases": [
+   "NetworkProtocolFS"
+  ],
+  "area": "utils"
+ },
+ "NetworkProtocolUDP": {
+  "header": "lib/network-protocol/UDP.h",
+  "bases": [
+   "NetworkProtocol"
+  ],
+  "area": "utils"
+ },
+ "QRManager": {
+  "header": "lib/qrcode/qrmanager.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "TCPServer": {
+  "header": "lib/server/tcpsvr.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "IPAddress": {
+  "header": "lib/ssdp/IPAddress.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "SSDPDeviceClass": {
+  "header": "lib/ssdp/ssdp.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "fnTask": {
+  "header": "lib/task/fnTask.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "fnTestTask": {
+  "header": "lib/task/fnTask.h",
+  "bases": [
+   "fnTask"
+  ],
+  "area": "utils"
+ },
+ "fnTaskManager": {
+  "header": "lib/task/fnTaskManager.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "fnTcpClient": {
+  "header": "lib/tcpip/fnTcpClient.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "fnTcpServer": {
+  "header": "lib/tcpip/fnTcpServer.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "fnUDP": {
+  "header": "lib/tcpip/fnUDP.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "HTMLElement": {
+  "header": "lib/tinyxml2/tinyhtml2.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "HTMLResult": {
+  "header": "lib/tinyxml2/tinyhtml2.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "HTMLDocument": {
+  "header": "lib/tinyxml2/tinyhtml2.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "DynArray": {
+  "header": "lib/tinyxml2/tinyxml2.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "MemPool": {
+  "header": "lib/tinyxml2/tinyxml2.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "MemPoolT": {
+  "header": "lib/tinyxml2/tinyxml2.h",
+  "bases": [
+   "MemPool"
+  ],
+  "area": "utils"
+ },
+ "DepthTracker": {
+  "header": "lib/tinyxml2/tinyxml2.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "XMLCopy": {
+  "header": "lib/tinyxml2/tixml2cx.h",
+  "bases": [
+   "XMLVisitor"
+  ],
+  "area": "utils"
+ },
+ "XMLCopyAndReplace": {
+  "header": "lib/tinyxml2/tixml2cx.h",
+  "bases": [
+   "XMLCopy"
+  ],
+  "area": "utils"
+ },
+ "XmlException": {
+  "header": "lib/tinyxml2/tixml2ex.h",
+  "bases": [
+   "std"
+  ],
+  "area": "utils"
+ },
+ "AttributeNameValue": {
+  "header": "lib/tinyxml2/tixml2ex.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "ElementProperties": {
+  "header": "lib/tinyxml2/tixml2ex.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "ElementIterator": {
+  "header": "lib/tinyxml2/tixml2ex.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "Selector": {
+  "header": "lib/tinyxml2/tixml2ex.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "BasicConfigReader": {
+  "header": "lib/utils/basic_config.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "cbuf": {
+  "header": "lib/utils/cbuf.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "PeoplesUrlParser": {
+  "header": "lib/utils/peoples_url_parser.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "TimeConverter": {
+  "header": "lib/utils/time_converter.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "U8Char": {
+  "header": "lib/utils/U8Char.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "VDrive": {
+  "header": "lib/vdrive/VDriveClass.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "IndexParser": {
+  "header": "lib/webdav/IndexParser.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "WebDAV": {
+  "header": "lib/webdav/WebDAV.h",
+  "bases": [],
+  "area": "utils"
+ },
+ "Request": {
+  "header": "lib/www/webdav/request.h",
+  "bases": [],
+  "area": "web"
+ },
+ "MultiStatusResponse": {
+  "header": "lib/www/webdav/response.h",
+  "bases": [],
+  "area": "web"
+ },
+ "Response": {
+  "header": "lib/www/webdav/response.h",
+  "bases": [],
+  "area": "web"
+ },
+ "Server": {
+  "header": "lib/www/webdav/webdav_server.h",
+  "bases": [],
+  "area": "web"
+ },
+ "HttpServer": {
+  "header": "lib/www/web_server.h",
+  "bases": [],
+  "area": "web"
+ },
+ "WsCommandExecutor": {
+  "header": "lib/www/ws/ws_command.h",
+  "bases": [],
+  "area": "web"
+ }
+}

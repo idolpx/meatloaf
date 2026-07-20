@@ -1,0 +1,22 @@
+%%gen
+    class iecPrinter {
+        -canWrite() int8_t
+        -write(uint8_t data, bool eoi) void
+        -listen(uint8_t channel) void
+        -uint8_t _channel
+        -printer_type _ptype
+        #printer_emu *_pptr
+        #FileSystem *_storage
+        #time_t _last_ms
+        #shutdown() void
+        +constexpr static const char * const printer_model_str[PRINTER_INVALID]
+        +iecPrinter(...)
+        +match_modelname(std.string model_name) printer_type$
+        +set_printer_type(printer_type printer_type) void
+        +reset_printer() void
+        +lastPrintTime() time_t
+        +print_from_cpm(uint8_t c) void
+        +getPrinterPtr() printer_emu *
+        +bool device_active
+        +isActive() bool
+    }

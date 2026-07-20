@@ -80,12 +80,13 @@ private:
     //BaseType_t m_task_handle;
     uint8_t m_statusCode = 0;
     SemaphoreHandle_t spi_mutex = nullptr;
+    volatile int m_pending_count = -1;
     esp_err_t init(int pin, led_strip_model_t model, int num_of_leds);
+    bool resize(int num_of_leds);
 
     // Array of segements that contain index and length
     std::vector<std::pair<uint8_t, uint8_t>> segments;
     std::vector<uint8_t> pixel_brightness;
-    uint8_t global_brightness = 255;
 
     // Use properties to change state and let the task call these functions
     void show_progress();
@@ -112,7 +113,7 @@ public:
     uint8_t progress = 100;
     bool activity = false;
     uint8_t direction = 1;  // 0 = left (RECEIVE), 1 = right (SEND)
-    uint8_t brightness = 8;
+    uint8_t brightness = 20;
     uint8_t segment = 0;    // Segment 0 is the first 5 LEDs
 
     DisplayLEDs();
@@ -125,6 +126,9 @@ public:
     void send(void) { mode = MODE_SEND; direction = 0; };
     void receive(void) { mode = MODE_RECEIVE; direction = 1; };
     void status(uint8_t code) { mode = MODE_STATUS; m_statusCode = code; };
+
+    // Applied by the display task on its next pass
+    void set_count(uint8_t count) { m_pending_count = count; }
 
     void set_pixel(uint16_t index, CRGB color);
     void set_pixel(uint16_t index, uint8_t r, uint8_t g, uint8_t b);

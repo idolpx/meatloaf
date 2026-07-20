@@ -1,0 +1,20 @@
+%% Web server: httpd lifecycle, WebDAV, websocket, proxy
+%% GENERATED template (gen_templates.js) - curated content lives in
+%% src/extra/web.mmd; class bodies live in defs/<Class>.mmd
+classDiagram
+    direction LR
+
+    %%include HttpServer
+    %%include MultiStatusResponse
+    %%include Request
+    %%include Response
+    %%include Server
+    %%include WsCommandExecutor
+
+
+    %%include wwwModules
+
+    HttpServer ..> wwwModules : registers handlers
+    HttpServer ..> WsCommandExecutor : ws console commands
+
+    note for HttpServer "Lazy start: www_lazy listener holds port 80 until first access, then starts httpd and loopback-proxies the accepted connections; TCP_NODELAY, LRU purge, persistent connections"

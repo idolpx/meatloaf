@@ -1,0 +1,9 @@
+%%gen
+    class TCPMFile {
+        +TCPMFile()
+        +TCPMFile(std.string path)
+        +TCPMFile(std.string path, std.string filename)
+        +getSourceStream(...) std.shared_ptr~MStream~
+        +getDecodedStream(std.shared_ptr~MStream~ src) std.shared_ptr~MStream~
+        +createStream(std.ios_base.openmode mode) std.shared_ptr~MStream~
+    }

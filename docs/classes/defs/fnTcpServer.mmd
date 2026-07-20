@@ -1,0 +1,22 @@
+%%gen
+    class fnTcpServer {
+        -int _sockfd
+        -int _accepted_sockfd
+        -uint16_t _port
+        -uint8_t _max_clients
+        -bool _listening
+        -bool _noDelay
+        +listenOnLocalhost() void
+        +fnTcpServer(uint16_t port, uint8_t max_clients)
+        +begin(uint16_t port) int
+        +port() uint16_t
+        +accept() fnTcpClient
+        +setNoDelay(bool nodelay) void
+        +getNoDelay() bool
+        +setTimeout(uint32_t seconds) int
+        +setMaxClients(int maxClients) void
+        +hasClient() bool
+        +client() fnTcpClient
+        +stop() void
+        +bool() operator
+    }

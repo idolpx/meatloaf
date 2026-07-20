@@ -1,0 +1,13 @@
+%%gen
+    class HTMLResult {
+        -HTMLElement** elements
+        -int capacity
+        -int count
+        +HTMLResult()
+        +HTMLResult() ~
+        +Count() int
+        +Element(int index) HTMLElement*
+        +Append(HTMLElement* element) bool
+        +Append(HTMLResult* result) bool
+        +Clear() void
+    }

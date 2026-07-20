@@ -1,0 +1,8 @@
+%%gen
+    class HighMemoryHandle {
+        -int flags*
+        +FILE* file_h
+        +HighMemoryHandle()
+        +obtain(std.string localPath, std.string mode) void
+        +dispose() void
+    }

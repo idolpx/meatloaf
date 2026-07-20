@@ -1,0 +1,18 @@
+%%gen
+    class CSIPMFile {
+        #std.shared_ptr~CSIPMSession~ _session
+        #bool dirIsOpen
+        #bool dirIsImage
+        #bool dirHoldsIo
+        +CSIPMFile(std.string path, size_t size)
+        +getSourceStream(...) std.shared_ptr~MStream~
+        +getDecodedStream(std.shared_ptr~MStream~ src) std.shared_ptr~MStream~
+        +createStream(std.ios_base.openmode mode) std.shared_ptr~MStream~
+        +isDirectory() bool
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile*
+        +mkDir() bool
+        +exists() bool
+        +remove() bool
+        +getSession() std.shared_ptr~CSIPMSession~
+    }

@@ -1,0 +1,488 @@
+%% Hardware managers: WiFi, UART, LEDs, keys, Bluetooth, display
+%% GENERATED template (gen_templates.js) - curated content lives in
+%% src/extra/hardware.mmd; class bodies live in defs/<Class>.mmd
+classDiagram
+    direction LR
+
+%%gen
+    class ACMChannel {
+        -SemaphoreHandle_t device_disconnected_sem
+        -SemaphoreHandle_t device_connected_sem
+        -uint16_t found_vid, found_pid, found_interface
+        -cdc_acm_dev_hdl_t cdc_dev
+        -QueueHandle_t rxQueue
+        -cdc_acm_uart_state_t _serial_state
+        -bool _dsr, _cts
+        #updateFIFO() void
+        #dataOut(const void *buffer, size_t length) size_t
+        +begin() void
+        +end() void
+        +flushOutput() void
+        +getBaudrate() uint32_t
+        +setBaudrate(uint32_t baud) void
+        +eventReceived(...) void
+        +dataReceived(const uint8_t *data, size_t length) void
+        +newDevice(usb_device_handle_t usb_dev) void
+        +getDTR() bool
+        +setDSR(bool state) void
+        +getRTS() bool
+        +setCTS(bool state) void
+        +getDCD() bool
+        +getRI() bool
+        +setDCD(bool state) void
+        +setRI(bool state) void
+    }
+%%gen
+    class BluetoothManager {
+        -eBTBaudrate _mBTBaudrate
+        -bool _mActive
+        +isActive() bool
+        +start() void
+        +stop() void
+        +toggleBaudrate() eBTBaudrate
+        +service() void
+    }
+%%gen
+    class COMChannel {
+        -HANDLE _fd
+        -std.string _device
+        -uint32_t _baud
+        -bool _dtrState
+        #updateFIFO() void
+        #dataOut(const void *buffer, size_t length) size_t
+        +begin(const ChannelConfig conf) void
+        +end() void
+        +flushOutput() void
+        +getBaudrate() uint32_t
+        +setBaudrate(uint32_t baud) void
+        +getDTR() bool
+        +setDSR(bool state) void
+        +getRTS() bool
+        +setCTS(bool state) void
+        +getDCD() bool
+        +getRI() bool
+        +setDCD(bool state) void
+        +setRI(bool state) void
+    }
+%%gen
+    class DisplayLCD {
+        -hagl_backend_t *backend
+        -DisplayLCD *instance_$
+        +DisplayLCD()
+        +instance() DisplayLCD *$
+        +init_lcd() esp_err_t
+        +show_jpeg(const char *file) TickType_t
+        +show_png(const char *file) TickType_t
+        +show_image(std.string filename) void
+    }
+%%gen
+    class DisplayLEDs {
+        -uint8_t m_statusCode*
+        -SemaphoreHandle_t spi_mutex
+        -init(...) esp_err_t
+        -std.vector~std.pair~uint8_t, uint8_t~~ segments
+        -std.vector~uint8_t~ pixel_brightness
+        -uint8_t global_brightness
+        -show_progress() void
+        -show_activity() void
+        -blink() void
+        -rotate() void
+        -fill_all(CRGB color) void
+        -meatloaf() void
+        +Mode mode
+        +uint16_t speed
+        +uint8_t progress
+        +bool activity
+        +uint8_t direction
+        +uint8_t brightness
+        +uint8_t segment*
+        +DisplayLEDs()
+        +start(void) void
+        +service() void
+        +update() esp_err_t
+        +idle(void) void
+        +send(void) void
+        +receive(void) void
+        +status(uint8_t code) void
+        +set_pixel(uint16_t index, CRGB color) void
+        +set_pixel(...) void
+        +set_pixels(...) void
+        +set_brightness(uint8_t value) void
+        +set_pixel_brightness(uint16_t index, uint8_t value) void
+        +set_all_pixel_brightness(uint8_t value) void
+        +add_segment(uint8_t index, uint8_t length) uint8_t
+        +clear_segments() void
+        +set_segment(uint16_t index, CRGB color) void
+    }
+%%gen
+    class DummyWiFiManager {
+        -bool _started
+        -bool _connected
+        +store_wifi(std.string ssid, std.string password) void
+        +int retries
+        +start() int
+        +stop() void
+        +test_connect(const char *ssid, const char *password) int
+        +connect(const char *ssid, const char *password) int
+        +connect() int
+        +connected() bool
+        +handle_station_stop() void
+        +set_hostname(const char* hostname) void
+        +get_current_ssid() std.string
+        +get_current_detail_str() const char *
+        +get_current_bssid(uint8_t bssid[6]) int
+        +get_current_bssid_str() std.string
+        +get_mac(uint8_t mac[6]) int
+        +get_mac_str() std.string
+        +scan_networks(...) uint8_t
+        +get_scan_result(...) int
+    }
+%%gen
+    class EspClass {
+        +EspClass()
+        +restart() void
+        +getHeapSize() uint32_t
+        +getFreeHeap() uint32_t
+        +getMinFreeHeap() uint32_t
+        +getMaxAllocHeap() uint32_t
+        +getPsramSize() uint32_t
+        +getPsramFree() uint32_t
+        +getPsramMinFree() uint32_t
+        +getPsramMaxAlloc() uint32_t
+        +getPsramHiMemSize() uint32_t
+        +getPsramHiMemFree() uint32_t
+        +getPsramHiMemReserved() uint32_t
+        +getChipRevision() uint16_t
+        +getChipModel() const char *
+        +getChipCores() uint8_t
+        +getCpuFreqMHz() uint32_t
+        +getCycleCount() uint32_t
+        +getSdkVersion() const char *
+        +deepSleep(uint64_t time_us) void
+        +getFlashChipSize() uint32_t
+        +getFlashChipSpeed() uint32_t
+        +getFlashChipMode() FlashMode_t
+        +magicFlashChipSize(uint8_t byte) uint32_t
+        +magicFlashChipSpeed(uint8_t byte) uint32_t
+        +magicFlashChipMode(uint8_t byte) FlashMode_t
+        +flashEraseSector(uint32_t sector) bool
+        +flashWrite(...) bool
+        +flashRead(...) bool
+        +partitionEraseRange(...) bool
+        +partitionWrite(...) bool
+        +partitionRead(...) bool
+        +getPartitionInfo() std.string
+        +getEfuseMac() uint64_t
+        +temperatureRead() float
+    }
+%%gen
+    class fnBluetoothSPP {
+        -string local_name
+        +fnBluetoothSPP()
+        +begin(...) bool
+        +available(void) int
+        +peek(void) int
+        +hasClient(void) bool
+        +read(void) int
+        +write(uint8_t c) size_t
+        +write(const uint8_t *buffer, size_t size) size_t
+        +flush() void
+        +end(void) void
+        +onData(fnBluetoothDataCb cb) void
+        +register_callback(esp_spp_cb_t *callback) esp_err_t
+        +enableSSP() void
+        +setPin(const char *pin) bool
+        +connect(std.string remoteName) bool
+        +connect(uint8_t remoteAddress[]) bool
+        +connect() bool
+        +connected(int timeout) bool
+        +isReady(...) bool
+        +disconnect() bool
+        +unpairDevice(uint8_t remoteAddress[]) bool
+    }
+%%gen
+    class HardwareTimer {
+        -HideESPDetails *espTimer
+        -fn_timer
+        +HardwareTimer()
+        +config() void
+        +reset() void
+        +latch() void
+        +read() void
+        +timeout() bool
+        +wait() void
+        +alarm_set(int s) void
+        +alarm_snooze(int s) void
+    }
+%%gen
+    class IOChannel {
+        -_print_number(unsigned long n, uint8_t base) size_t
+        #std.string _fifo
+        #double read_timeout_ms
+        #double discard_timeout_ms
+        #dataIn(void *buffer, size_t length) size_t
+        #dataOut(const void *buffer, size_t length) size_t*
+        #updateFIFO() void*
+        +end() void*
+        +flushOutput() void*
+        +available() size_t
+        +discardInput() void
+        +read(void *buffer, size_t length) size_t
+        +read(void) int
+        +write(const void *buffer, size_t length) size_t
+        +write(uint8_t c) size_t
+        +write(const char *s) size_t
+        +write(unsigned long n) size_t
+        +write(long n) size_t
+        +write(unsigned int n) size_t
+        +write(int n) size_t
+        +printf(const char *format, ...) size_t
+        +println(const char *str) size_t
+        +println() size_t
+        +println(std.string str) size_t
+        +println(int num, int base) size_t
+        +print(const char *str) size_t
+        +print(const std.string str) size_t
+        +print(int n, int base) size_t
+        +print(unsigned int n, int base) size_t
+        +print(long n, int base) size_t
+        +print(unsigned long n, int base) size_t
+    }
+%%gen
+    class KeyManager {
+        -_key_t _keys[eKey.KEY_COUNT]
+        -_keystate_task(void *param) void$
+        +setup() void
+        +getKeyStatus(eKey key) eKeyStatus
+        +keyCurrentlyPressed(eKey key) bool
+        +ignoreKeyPress(eKey key) void
+    }
+%%gen
+    class LedManager {
+        -bool mLedState[eLed.LED_COUNT]
+        -gpio_num_t mLedPin[eLed.LED_COUNT]
+        +LedManager()
+        +setup() void
+        +set(eLed led, bool one) void
+        +toggle(eLed led) void
+        +blink(eLed led, int count) void
+    }
+%%gen
+    class LedStripManager {
+        -unsigned char r
+        -unsigned char g
+        -unsigned char b
+        -const unsigned char brightness$
+        +setup() void
+        +set(eLedID id, bool on) void
+        +toggle(eLedID id) void
+        +blink(eLedID led, int count) void
+        +present() bool
+    }
+%%gen
+    class RS232ChannelProtocol {
+        +getBaudrate() uint32_t*
+        +setBaudrate(uint32_t baud) void*
+        +getDTR() bool*
+        +setDSR(bool state) void*
+        +getRTS() bool*
+        +setCTS(bool state) void*
+        +setDCD(bool state) void*
+        +getDCD() bool*
+        +setRI(bool state) void*
+        +getRI() bool*
+    }
+%%gen
+    class SerialClass {
+        +printf(const char *fmt, ...) int
+        +print(const char *s) void
+        +print(const std.string s) void
+        +println(const char *s) void
+        +println(const std.string s) void
+        +println() void
+    }
+%%gen
+    class SystemManager {
+        -char _uptime_string[24]
+        -char _currenttime_string[40]
+        -int _hardware_version*
+        -bool a2hasbuffer
+        -bool a2no3state
+        -bool ledstrip_found
+        -uint64_t _reboot_at*
+        -int _reboot_code
+        -volatile sig_atomic_t _shutdown_requests*
+        +SystemManager()
+        +_net Net
+        +digital_write(gpio_num_t pin, uint8_t val) void
+        +check_deferred_reboot() bool
+        +request_for_shutdown() int
+        +check_for_shutdown() int
+        +get_free_heap_size() uint32_t
+        +get_psram_size() uint32_t
+        +get_sdk_version() const char *
+        +get_cpu_model() chipmodels
+        +get_cpu_rev() int
+        +millis() unsigned long
+        +micros() unsigned long
+        +millis() uint64_t
+        +micros() uint64_t
+        +delay(uint32_t ms) void
+        +get_uptime_str() const char *
+        +get_current_time_str() const char *
+        +update_timezone(const char *timezone) void
+        +update_hostname(const char *hostname) void
+        +update_firmware() void
+        +get_fujinet_version(bool shortVersionOnly) const char *
+        +yield() void
+        +copy_file(...) size_t
+        +make_tempfile(FileSystem *fs, char *result_filename) FILE *
+        +make_tempfile(char *result_filename) FILE *
+        +delete_tempfile(FileSystem *fs, const char *filename) void
+        +delete_tempfile(const char *filename) void
+        +load_firmware(const char *filename, uint8_t *buffer) int
+        +debug_print_tasks() void
+        +check_hardware_ver() void
+        +get_hardware_ver() int
+        +get_hardware_ver_str() const char *
+        +get_target_platform_str() const char *
+        +hasbuffer() bool
+        +spishared() bool
+        +no3state() bool
+        +ledstrip() bool
+        +has_button_c() bool
+    }
+%%gen
+    class TTYChannel {
+        -int _fd
+        -std.string _device
+        -uint32_t _baud
+        -bool _dtrState
+        #updateFIFO() void
+        #dataOut(const void *buffer, size_t length) size_t
+        +begin(const ChannelConfig conf) void
+        +end() void
+        +flushOutput() void
+        +getBaudrate() uint32_t
+        +setBaudrate(uint32_t baud) void
+        +getDTR() bool
+        +setDSR(bool state) void
+        +getRTS() bool
+        +setCTS(bool state) void
+        +getDCD() bool
+        +getRI() bool
+        +setDCD(bool state) void
+        +setRI(bool state) void
+        +setPort(std.string device) void
+        +getPort() std.string
+    }
+%%gen
+    class UARTManager {
+        -QueueHandle_t _uart_q
+        -uint32_t _baud
+        -int _command_pin
+        -int _proceed_pin
+        -int _proceed_set
+        -int _proceed_clear
+        -HANDLE _fd
+        -int _proceed_tiocm
+        -int _fd
+        -unsigned long _suspend_time
+        -_print_number(unsigned long n, uint8_t base) size_t
+        +begin(int baud) void
+        +end() void
+        +get_baudrate() uint32_t
+        +set_baudrate(uint32_t baud) void
+        +initialized() bool
+        +available() int
+        +peek() int
+        +flush() void
+        +flush_input() void
+        +read() int
+        +readBytes(uint8_t *buffer, size_t length) size_t
+        +readBytes(char *buffer, size_t length) size_t
+        +write(uint8_t) size_t
+        +write(const uint8_t *buffer, size_t size) size_t
+        +write(const char *s) size_t
+        +write(unsigned long n) size_t
+        +write(long n) size_t
+        +write(unsigned int n) size_t
+        +write(int n) size_t
+        +printf(const char *format, ...) size_t
+        +println(const char *str) size_t
+        +println() size_t
+        +println(std.string str) size_t
+        +println(int num, int base) size_t
+        +print(const char *str) size_t
+        +print(const std.string str) size_t
+        +print(int n, int base) size_t
+        +print(unsigned int n, int base) size_t
+        +print(long n, int base) size_t
+        +print(unsigned long n, int base) size_t
+        +begin(int baud) void
+        +end() void
+        +poll(int ms) bool
+        +suspend(int sec) void
+        +initialized() bool
+        +set_port(...) void
+        +get_port(...) const char*
+        +set_baudrate(uint32_t baud) void
+        +get_baudrate() uint32_t
+        +command_asserted() bool
+    }
+%%gen
+    class WiFiManager {
+        -bool _started
+        -bool _connected
+        -std.string _ssid
+        -std.string _password
+        -esp_netif_t *_wifi_sta
+        -esp_netif_t *_wifi_ap
+        -wifi_ap_record_t * _scan_records
+        -uint16_t _scan_record_count*
+        -bool _scan_in_progress
+        -bool _disconnecting
+        -uint16_t _reconnect_attempts*
+        -_mac_to_string(char dest[18], uint8_t mac[6]) char *
+        -conn_event_handler(...) void$
+        -block() esp_err_t$
+        -_wifi_event_handler(...) void$
+        -EventGroupHandle_t _wifi_event_group
+        -remove_duplicate_scan_results(...) int
+        -bool _trying_stored
+        -uint16_t _stored_index*
+        -bool _all_stored_failed
+        -uint16_t _common_index*
+        -std.vector~stored_wifi~ _matched_wifis
+        +get_network_names() std.vector~std.string~
+        +get_stored_wifis() std.vector~stored_wifi~
+        +match_stored_with_network_wifis(...) std.vector~stored_wifi~
+        +store_wifi(std.string ssid, std.string password) void
+        +int retries
+        +start() int
+        +stop() void
+        +test_connect(const char *ssid, const char *password) int
+        +connect(const char *ssid, const char *password) int
+        +connect() int
+        +connected() bool
+        +get_adapter_handle() esp_netif_t *
+        +handle_station_stop() void
+        +set_hostname(const char* hostname) void
+        +get_current_ssid() std.string
+        +get_current_detail_str() const char *
+        +get_current_bssid(uint8_t bssid[6]) int
+        +get_current_bssid_str() std.string
+        +get_mac(uint8_t mac[6]) int
+        +get_mac_str() std.string
+        +scan_networks(...) uint8_t
+        +get_scan_result(...) int
+        +get_network_name_by_crc8(uint8_t crc8) std.string
+        +localIP() int32_t
+    }
+
+    IOChannel <|-- ACMChannel
+    RS232ChannelProtocol <|-- ACMChannel
+    IOChannel <|-- COMChannel
+    RS232ChannelProtocol <|-- COMChannel
+    IOChannel <|-- TTYChannel
+    RS232ChannelProtocol <|-- TTYChannel

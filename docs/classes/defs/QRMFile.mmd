@@ -1,0 +1,7 @@
+%%gen
+    class QRMFile {
+        +QRMFile(std.string path)
+        +isDirectory() bool
+        +getSourceStream(...) std.shared_ptr~MStream~
+        +getDecodedStream(std.shared_ptr~MStream~ is) std.shared_ptr~MStream~
+    }

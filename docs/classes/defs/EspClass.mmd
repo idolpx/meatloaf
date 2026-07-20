@@ -1,0 +1,38 @@
+%%gen
+    class EspClass {
+        +EspClass()
+        +restart() void
+        +getHeapSize() uint32_t
+        +getFreeHeap() uint32_t
+        +getMinFreeHeap() uint32_t
+        +getMaxAllocHeap() uint32_t
+        +getPsramSize() uint32_t
+        +getPsramFree() uint32_t
+        +getPsramMinFree() uint32_t
+        +getPsramMaxAlloc() uint32_t
+        +getPsramHiMemSize() uint32_t
+        +getPsramHiMemFree() uint32_t
+        +getPsramHiMemReserved() uint32_t
+        +getChipRevision() uint16_t
+        +getChipModel() const char *
+        +getChipCores() uint8_t
+        +getCpuFreqMHz() uint32_t
+        +getCycleCount() uint32_t
+        +getSdkVersion() const char *
+        +deepSleep(uint64_t time_us) void
+        +getFlashChipSize() uint32_t
+        +getFlashChipSpeed() uint32_t
+        +getFlashChipMode() FlashMode_t
+        +magicFlashChipSize(uint8_t byte) uint32_t
+        +magicFlashChipSpeed(uint8_t byte) uint32_t
+        +magicFlashChipMode(uint8_t byte) FlashMode_t
+        +flashEraseSector(uint32_t sector) bool
+        +flashWrite(...) bool
+        +flashRead(...) bool
+        +partitionEraseRange(...) bool
+        +partitionWrite(...) bool
+        +partitionRead(...) bool
+        +getPartitionInfo() std.string
+        +getEfuseMac() uint64_t
+        +temperatureRead() float
+    }

@@ -1,0 +1,10 @@
+%%gen
+    class MediaTypeDSK {
+        -_block_to_offsets(uint32_t blockNum) std.pair~uint32_t, uint32_t~
+        +read(uint32_t blockNum, uint16_t *readcount) error_is_true
+        +write(uint32_t blockNum, bool verify) error_is_true
+        +format(uint16_t *responsesize) error_is_true
+        +mount(fnFile *f, uint32_t disksize) mediatype_t
+        +status() uint8_t
+        +create(fnFile *f, uint32_t numBlock) success_is_true$
+    }

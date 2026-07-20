@@ -11,13 +11,21 @@
         "enabled": 1,
         "type": "drive",
         "mode": 1,
-        "url": "/"
+        "url": "/sd/autoswap/maniac mansion/maniac-a.d64",
+        "media_stack": [
+          "/sd/autoswap/maniac mansion/maniac-a.d64",
+          "/sd/autoswap/maniac mansion/maniac-b.d64"
+        ]
       },
       "9": {
-        "enabled": 0,
+        "enabled": 1,
         "type": "drive",
         "mode": 1,
-        "url": "/"
+        "url": "/sd/autoswap/ultima 2/1.d64",
+        "media_stack": [
+          "/sd/autoswap/ultima 2/1.d64",
+          "/sd/autoswap/ultima 2/2.d64"
+        ]
       },
       "10": {
         "enabled": 0,
@@ -38,10 +46,24 @@
         "url": "/"
       },
       "13": {
-        "enabled": 0,
+        "enabled": 1,
         "type": "drive",
         "mode": 1,
-        "url": "/"
+        "url": "/sd/autoswap/zak mckracken/1.d64",
+        "media_stack": [
+          {
+            "url": "/sd/autoswap/zak mckracken/1.d64",
+            "name": "Boot Disk"
+          },
+          {
+            "url": "/sd/autoswap/zak mckracken/2.d64",
+            "name": "Disk 1 - San Francisco"
+          },
+          {
+            "url": "/sd/autoswap/zak mckracken/3.d64",
+            "name": "Disk 2 - New Mars"
+          }
+        ]
       },
       "14": {
         "enabled": 0,
@@ -106,7 +128,12 @@
       "enabled": 0,
       "play_record": "0 Play",
       "pulldown": "1 Pulldown Resistor",
-      "url": "/"
+      "url": "/sd/choppin_mall.t64"
+    },
+    "led_strip": {
+      "enabled": 1,
+      "count": 5,
+      "brightness": 50
     }
   }
 }

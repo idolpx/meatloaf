@@ -1,0 +1,144 @@
+%% Utilities: string/URL/PETSCII helpers, config, buffers, misc libs
+%% GENERATED template (gen_templates.js) - curated content lives in
+%% src/extra/utils.mmd; class bodies live in defs/<Class>.mmd
+classDiagram
+    direction LR
+
+    %%include AttributeNameValue
+    %%include AtxSector
+    %%include AtxTrack
+    %%include Audio
+    %%include Base64
+    %%include BasicConfigReader
+    %%include cbuf
+    %%include Crypto
+    %%include DepthTracker
+    %%include DirCache
+    %%include DirectoryPageGroup
+    %%include DynArray
+    %%include ElementIterator
+    %%include ElementProperties
+    %%include FileCache
+    %%include FileHandler
+    %%include FileHandlerLocal
+    %%include FileHandlerMem
+    %%include FileHandlerNFS
+    %%include FileHandlerSMB
+    %%include FileHandlerTNFS
+    %%include FileSystem
+    %%include FileSystemFTP
+    %%include FileSystemHTTP
+    %%include FileSystemLittleFS
+    %%include FileSystemNFS
+    %%include FileSystemSDFAT
+    %%include FileSystemSMB
+    %%include FileSystemSPIFFS
+    %%include FileSystemTNFS
+    %%include fnConfig
+    %%include fnFTP
+    %%include fnHttpClient
+    %%include FNJSON
+    %%include fnTask
+    %%include fnTaskManager
+    %%include fnTcpClient
+    %%include fnTcpServer
+    %%include fnTestTask
+    %%include fnUDP
+    %%include Hash
+    %%include HTMLDocument
+    %%include HTMLElement
+    %%include HTMLResult
+    %%include IndexParser
+    %%include IPAddress
+    %%include MCP23017
+    %%include MeatloafConfig
+    %%include MediaType
+    %%include MediaTypeATR
+    %%include MediaTypeATX
+    %%include MediaTypeDCD
+    %%include MediaTypeDDP
+    %%include MediaTypeDO
+    %%include MediaTypeDSK
+    %%include MediaTypeImg
+    %%include MediaTypeIMG
+    %%include MediaTypeMOOF
+    %%include MediaTypeMRM
+    %%include MediaTypePO
+    %%include MediaTypeROM
+    %%include MediaTypeVDK
+    %%include MediaTypeWOZ
+    %%include MediaTypeXEX
+    %%include MemPool
+    %%include MemPoolT
+    %%include NetworkProtocol
+    %%include NetworkProtocolFactory
+    %%include NetworkProtocolFS
+    %%include NetworkProtocolFTP
+    %%include NetworkProtocolHTTP
+    %%include NetworkProtocolSD
+    %%include NetworkProtocolSMB
+    %%include NetworkProtocolSSH
+    %%include NetworkProtocolTCP
+    %%include NetworkProtocolTELNET
+    %%include NetworkProtocolTest
+    %%include NetworkProtocolTNFS
+    %%include NetworkProtocolUDP
+    %%include NetworkStatus
+    %%include PCF8575
+    %%include PeoplesUrlParser
+    %%include ProtocolParser
+    %%include QRManager
+    %%include Selector
+    %%include SSDPDeviceClass
+    %%include TCPServer
+    %%include TimeConverter
+    %%include U8Char
+    %%include VDrive
+    %%include WebDAV
+    %%include XMLCopy
+    %%include XMLCopyAndReplace
+    %%include XmlException
+    %%include XRA1405
+
+    FileHandler <|-- FileHandlerLocal
+    FileHandler <|-- FileHandlerMem
+    FileHandler <|-- FileHandlerNFS
+    FileHandler <|-- FileHandlerSMB
+    FileHandler <|-- FileHandlerTNFS
+    FileSystem <|-- FileSystemFTP
+    FileSystem <|-- FileSystemHTTP
+    FileSystem <|-- FileSystemLittleFS
+    FileSystem <|-- FileSystemNFS
+    FileSystem <|-- FileSystemSDFAT
+    FileSystem <|-- FileSystemSMB
+    FileSystem <|-- FileSystemSPIFFS
+    FileSystem <|-- FileSystemTNFS
+    fnTask <|-- fnTestTask
+    MediaType <|-- MediaTypeATR
+    MediaType <|-- MediaTypeATX
+    MediaType <|-- MediaTypeDCD
+    MediaType <|-- MediaTypeDDP
+    MediaType <|-- MediaTypeDO
+    MediaType <|-- MediaTypeDSK
+    MediaType <|-- MediaTypeImg
+    MediaType <|-- MediaTypeIMG
+    MediaType <|-- MediaTypeMOOF
+    MediaType <|-- MediaTypeMRM
+    MediaType <|-- MediaTypePO
+    MediaType <|-- MediaTypeROM
+    MediaType <|-- MediaTypeVDK
+    MediaType <|-- MediaTypeWOZ
+    MediaType <|-- MediaTypeXEX
+    MemPool <|-- MemPoolT
+    NetworkProtocol <|-- NetworkProtocolFS
+    NetworkProtocolFS <|-- NetworkProtocolFTP
+    NetworkProtocolFS <|-- NetworkProtocolHTTP
+    NetworkProtocolFS <|-- NetworkProtocolSD
+    NetworkProtocolFS <|-- NetworkProtocolSMB
+    NetworkProtocol <|-- NetworkProtocolSSH
+    NetworkProtocol <|-- NetworkProtocolTCP
+    NetworkProtocolTCP <|-- NetworkProtocolTELNET
+    NetworkProtocol <|-- NetworkProtocolTest
+    NetworkProtocolFS <|-- NetworkProtocolTNFS
+    NetworkProtocol <|-- NetworkProtocolUDP
+    XMLCopy <|-- XMLCopyAndReplace

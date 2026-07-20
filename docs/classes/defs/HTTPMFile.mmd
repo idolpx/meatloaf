@@ -1,0 +1,22 @@
+%%gen
+    class HTTPMFile {
+        -getClient() std.shared_ptr~MeatHttpClient~
+        -std.shared_ptr~HTTPMSession~ _session
+        -bool _headersFetched
+        +HTTPMFile()
+        +HTTPMFile(std.string path)
+        +HTTPMFile(std.string path, std.string filename)
+        +getSourceStream(...) std.shared_ptr~MStream~
+        +getDecodedStream(std.shared_ptr~MStream~ src) std.shared_ptr~MStream~
+        +createStream(std.ios_base.openmode mode) std.shared_ptr~MStream~
+        +isDirectory() bool
+        +getLastWrite() time_t
+        +getCreationTime() time_t
+        +rewindDirectory() bool
+        +getNextFileInDir() MFile*
+        +mkDir() bool
+        +exists() bool
+        +remove() bool
+        +isText() bool
+        +rename(std.string dest) bool
+    }

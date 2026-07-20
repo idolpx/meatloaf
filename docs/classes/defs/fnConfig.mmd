@@ -1,0 +1,81 @@
+%%gen
+    class fnConfig {
+        -bool _dirty
+        -_read_line(...) int
+        -_read_section_general(std.stringstream ss) void
+        -_read_section_wifi(std.stringstream ss) void
+        -_read_section_wifi_stored(std.stringstream ss, int index) void
+        -_read_section_bt(std.stringstream ss) void
+        -_read_section_network(std.stringstream ss) void
+        -_read_section_host(std.stringstream ss, int index) void
+        -_read_section_mount(std.stringstream ss, int index) void
+        -_read_section_printer(std.stringstream ss, int index) void
+        -_read_section_tape(std.stringstream ss, int index) void
+        -_read_section_modem(std.stringstream ss) void
+        -_read_section_cassette(std.stringstream ss) void
+        -_read_section_phonebook(std.stringstream ss, int index) void
+        -_read_section_cpm(std.stringstream ss) void
+        -_read_section_device_enable(std.stringstream ss) void
+        -_read_section_boip(std.stringstream ss) void
+        -_read_section_bos(std.stringstream ss) void
+        -_find_section_in_line(std.string line, int index) section_match
+        -_split_name_value(...) bool
+        -const char * _host_type_names[HOSTTYPE_INVALID]
+        -const char * _mount_mode_names[MOUNTMODE_INVALID]
+        -const char * _serial_proceed_pin_names[SERIAL_PROCEED_INVALID]
+        -host_info _host_slots[MAX_HOST_SLOTS]
+        -mount_info _mount_slots[MAX_MOUNT_SLOTS]
+        -printer_info _printer_slots[MAX_PRINTER_SLOTS]
+        -mount_info _tape_slots[MAX_TAPE_SLOTS]
+        -wifi_info _wifi_stored[MAX_WIFI_STORED]
+        -wifi_info _wifi
+        -bt_info _bt
+        -network_info _network
+        -general_info _general
+        -modem_info _modem
+        -cassette_info _cassette
+        -boip_info _boip
+        -bos_info _bos
+        -device_enable_info _denable
+        -phbook_info _phonebook_slots[MAX_PB_SLOTS]
+        +host_type_from_string(const char *str) host_type_t
+        +mount_mode_from_string(const char *str) mount_mode_t
+        +serial_command_from_string(const char *str) serial_command_pin
+        +serial_proceed_from_string(const char *str) serial_proceed_pin
+        +get_general_timezone() std.string
+        +get_general_rotation_sounds() bool
+        +get_network_udpstream_host() std.string
+        +get_network_udpstream_port() int
+        +get_network_udpstream_servermode() bool
+        +get_general_config_enabled() bool
+        +store_general_devicename(const char *devicename) void
+        +store_general_hsioindex(int hsio_index) void
+        +store_general_timezone(const char *timezone) void
+        +store_general_rotation_sounds(bool rotation_sounds) void
+        +store_general_config_enabled(bool config_enabled) void
+        +store_general_config_ng(bool config_ng) void
+        +get_general_config_ng() bool
+        +get_config_filename() std.string
+        +store_config_filename(const std.string filename) void
+        +get_general_boot_mode() bool
+        +store_general_boot_mode(uint8_t boot_mode) void
+        +store_udpstream_host(const char host_ip[64]) void
+        +store_udpstream_port(int port) void
+        +store_udpstream_servermode(bool mode) void
+        +get_general_fnconfig_spifs() bool
+        +store_general_fnconfig_spifs(bool fnconfig_spifs) void
+        +get_general_status_wait_enabled() bool
+        +store_general_status_wait_enabled(bool status_wait_enabled) void
+        +store_general_encrypt_passphrase(bool encrypt_passphrase) void
+        +get_general_encrypt_passphrase() bool
+        +get_network_sntpserver() const char *
+        +store_general_interface_url(const char *url) void
+        +get_general_config_path() std.string
+        +store_general_config_path(const char *file_path) void
+        +get_general_SD_path() std.string
+        +store_general_SD_path(const char *dir_path) void
+        +get_serial_port() std.string
+        +get_serial_baud() int
+        +get_serial_command() serial_command_pin
+        +get_serial_proceed() serial_proceed_pin
+    }

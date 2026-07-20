@@ -1,0 +1,18 @@
+%%gen
+    class CSIPMSession {
+        #csstreambuf buf
+        #std.string currentDir
+        #establish() bool
+        +CSIPMSession(...)
+        +connect() bool
+        +disconnect() void
+        +keep_alive() bool
+        +getScheme() std.string$
+        +sendCommand(const std.string command) bool
+        +traversePath(std.string path) bool
+        +isOK() bool
+        +readLn() std.string
+        +receive(uint8_t* buffer, size_t size) size_t
+        +send(const uint8_t* buffer, size_t size) size_t
+        +getCurrentDir() std.string
+    }

@@ -1,0 +1,8 @@
+    %%include DHDPartition
+
+    DHDImageRegistry *-- DHDPartition
+    DHDImageRegistry ..> DHDOffsetStream : partition windows
+    DHDOffsetStream ..> D64MStream : D64/D71/D81/DNP decode inside partition
+
+    note for D64MStream "Write path (SAVE into images) claims blocks near the directory track with per-block BAM updates and rollback on failure; subdirectory walk supports CMD native DIR and 1581 CBM partitions"
+    note for M2IMStream "Index only - readFile() delegates to the sibling host file's stream; resolveEntry validates candidates with MFile exists(), exact then lowercase"

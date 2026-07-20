@@ -1,0 +1,23 @@
+%%gen
+    class MDNSMStream {
+        -std.shared_ptr~MDNSMSession~ _session
+        -std.string service_type
+        -std.string instance_name
+        -bool _is_open
+        -std.string content
+        -uint32_t _position
+        -parseUrl() void
+        -generateContent() void
+        +MDNSMStream(std.string path)
+        +isOpen() bool
+        +isBrowsable() bool
+        +isRandomAccess() bool
+        +open(std.ios_base.openmode mode) bool
+        +close() void
+        +read(uint8_t* buf, uint32_t size) uint32_t
+        +write(const uint8_t *buf, uint32_t size) uint32_t
+        +seek(uint32_t pos) bool
+        +size() uint32_t
+        +available() uint32_t
+        +position() uint32_t
+    }

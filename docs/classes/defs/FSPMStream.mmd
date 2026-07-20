@@ -1,0 +1,18 @@
+%%gen
+    class FSPMStream {
+        -std.ios_base.openmode _mode
+        -std.string _mode_str
+        -setModeString(std.ios_base.openmode mode) void
+        #std.shared_ptr~FSPMSession~ _session
+        #FSP_FILE* _file_handle
+        +FSPMStream(std.string path)
+        +isOpen() bool
+        +isNetwork() bool
+        +open(std.ios_base.openmode mode) bool
+        +close() void
+        +read(uint8_t* buf, uint32_t size) uint32_t
+        +write(const uint8_t *buf, uint32_t size) uint32_t
+        +seek(uint32_t pos) bool
+        +seek(uint32_t pos, int mode) bool
+        +seekPath(std.string path) bool
+    }

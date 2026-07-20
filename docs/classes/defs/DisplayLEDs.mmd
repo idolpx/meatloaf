@@ -1,0 +1,39 @@
+%%gen
+    class DisplayLEDs {
+        -uint8_t m_statusCode*
+        -SemaphoreHandle_t spi_mutex
+        -init(...) esp_err_t
+        -std.vector~std.pair~uint8_t, uint8_t~~ segments
+        -std.vector~uint8_t~ pixel_brightness
+        -uint8_t global_brightness
+        -show_progress() void
+        -show_activity() void
+        -blink() void
+        -rotate() void
+        -fill_all(CRGB color) void
+        -meatloaf() void
+        +Mode mode
+        +uint16_t speed
+        +uint8_t progress
+        +bool activity
+        +uint8_t direction
+        +uint8_t brightness
+        +uint8_t segment*
+        +DisplayLEDs()
+        +start(void) void
+        +service() void
+        +update() esp_err_t
+        +idle(void) void
+        +send(void) void
+        +receive(void) void
+        +status(uint8_t code) void
+        +set_pixel(uint16_t index, CRGB color) void
+        +set_pixel(...) void
+        +set_pixels(...) void
+        +set_brightness(uint8_t value) void
+        +set_pixel_brightness(uint16_t index, uint8_t value) void
+        +set_all_pixel_brightness(uint8_t value) void
+        +add_segment(uint8_t index, uint8_t length) uint8_t
+        +clear_segments() void
+        +set_segment(uint16_t index, CRGB color) void
+    }

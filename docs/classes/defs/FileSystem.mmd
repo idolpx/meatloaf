@@ -1,0 +1,27 @@
+%%gen
+    class FileSystem {
+        #fsdir_entry _direntry
+        #_make_fullpath(const char *path) char *
+        +FileSystem() ~
+        +is_global() bool
+        +running() bool
+        +basepath() const char *
+        +type() fsType*
+        +typestring() const char **
+        +type_to_string(fsType type) const char *$
+        +filesize(FILE *) long$
+        +file_open(...) FILE **
+        +fnfile_open(...) fnFile *
+        +remove(const char* path) bool*
+        +rename(const char* pathFrom, const char* pathTo) bool*
+        +is_dir(const char *path) bool*
+        +mkdir(const char* path) bool*
+        +rmdir(const char* path) bool*
+        +dir_exists(const char* path) bool*
+        +dir_open(...) bool*
+        +dir_read() fsdir_entry_t **
+        +dir_close() void*
+        +dir_tell() uint16_t*
+        +dir_seek(uint16_t position) bool*
+        +keep_alive() bool
+    }

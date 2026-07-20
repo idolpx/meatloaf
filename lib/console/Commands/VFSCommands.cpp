@@ -447,9 +447,8 @@ int mount(int argc, char **argv)
     int did = atoi(argv[1]) - 8;
 
     std::string filename;
-    filename.reserve(getCurrentPath()->url.size() + 1);
-    filename = '^';
-    filename += getCurrentPath()->url;
+    // filename.reserve(getCurrentPath()->url.size() + 1);
+    filename = getCurrentPath()->url;
     if ( argc > 2 )
     {
         // Use current path + filename

@@ -1,0 +1,13 @@
+%%gen
+    class OptionsConsoleCommand {
+        #argParseFunc delegateFn_
+        #const char *hint_
+        #const char *version_
+        #delegateResolver(int argc, char **argv) int$
+        +Options options
+        +std.unordered_map~std.string, OptionsConsoleCommand~ registry_$
+        +OptionsConsoleCommand(...)
+        +const esp_console_cmd_t toCommandStruct() const
+        +getDelegateFunction() argParseFunc
+        +getVersion() const char*
+    }

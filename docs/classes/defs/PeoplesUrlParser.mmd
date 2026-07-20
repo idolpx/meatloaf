@@ -1,0 +1,15 @@
+    class PeoplesUrlParser {
+        +string url
+        +string scheme
+        +string user
+        +string password
+        +string host
+        +string port
+        +string path
+        +string name
+        +string extension
+        +pathToFile() string - path without the trailing filename
+        +base() string - url of the containing directory
+        +root() string - scheme plus authority only
+        +parseURL(url) unique_ptr~PeoplesUrlParser~$
+    }
