@@ -29,6 +29,8 @@
 #include "../../include/debug.h"
 #include "../../include/cbm_defines.h"
 
+#include "mlConfig.h"
+
 //#include "WS2812FX/WS2812FX.h"
 
 
@@ -150,7 +152,7 @@ esp_err_t DisplayLEDs::init(int pin, led_strip_model_t model, int num_of_leds)
     reset_delay = (model == WS2812B) ? 3 : 30;
     // 12 bytes for each led + bytes for initial zero and reset state
     dma_buf_size = n_of_leds * 12 + (reset_delay + 1) * 2;
-    ws28xx_pixels = (CRGB*)malloc(sizeof(CRGB) * n_of_leds);
+    ws28xx_pixels = (CRGB*)malloc(sizeof(CRGB) * (n_of_leds > 0 ? n_of_leds : RGB_LED_COUNT));
     if (ws28xx_pixels == NULL) {
         return ESP_ERR_NO_MEM;
     }
@@ -409,7 +411,28 @@ esp_err_t DisplayLEDs::update()
 
 void DisplayLEDs::start(void)
 {
-    if (init(PIN_LED_RGB, WS2812B, RGB_LED_COUNT) != ESP_OK)
+    int count = RGB_LED_COUNT;
+    bool enabled = true;
+
+    const psram_json &devices = mlConfig["devices"];
+    if (devices.contains("led_strip"))
+    {
+        const psram_json &strip = devices["led_strip"];
+        enabled = strip.value("enabled", 1) != 0;
+        count = strip.value("count", (int)RGB_LED_COUNT);
+        brightness = static_cast<uint8_t>(strip.value("brightness", (int)brightness));
+    }
+
+    if (!enabled)
+    {
+        Debug_printv("LED strip disabled in config");
+        return;
+    }
+
+    if (count < 0) count = 0;
+    if (count > 255) count = 255;
+
+    if (init(PIN_LED_RGB, WS2812B, count) != ESP_OK)
     {
         Debug_printv("LED strip init failed; skipping DISPLAY task");
         return;
