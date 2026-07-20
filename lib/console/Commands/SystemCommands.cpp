@@ -153,9 +153,11 @@ static int sysInfo(int argc, char **argv)
     return EXIT_SUCCESS;
 }
 
-static int restart(int argc, char **argv)
+static int reboot(int argc, char **argv)
 {
-    Serial.printf("Restarting...");
+    Serial.println("Saving configuration...");
+    mlConfig.save();
+    Serial.println("Rebooting...");
     ESP.restart();
     return EXIT_SUCCESS;
 }
@@ -390,7 +392,7 @@ namespace ESP32Console::Commands
 {
     const ConsoleCommand getRebootCommand()
     {
-        return ConsoleCommand("reboot", &restart, "Reboot the system");
+        return ConsoleCommand("reboot", &reboot, "Reboot the system");
     }
 
     const ConsoleCommand getSysInfoCommand()

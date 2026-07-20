@@ -750,10 +750,15 @@ void iecDrive::begin()
 
     setStatusCode(ST_DOSVERSION);
     m_numOpenChannels = 0;
-    for(int i=0; i<16; i++) 
+    for(int i=0; i<16; i++)
         m_channels[i] = nullptr;
 
-    reloadConfig();
+    // NOTE: reloadConfig() is NOT called here. begin() runs during bus attach
+    // (main_setup() -> SYSTEM_BUS.setup()), which happens before fnWiFi.start().
+    // A persisted network URL (fsp://, http://, ...) would call set_cwd() ->
+    // getaddrinfo() before the LWIP tcpip task exists, aborting with
+    // "assert failed: tcpip_send_msg_wait_sem ... Invalid mbox". Callers must
+    // invoke reloadConfig() explicitly once WiFi is up (see main.cpp).
 }
 
 bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
@@ -1137,6 +1142,7 @@ void iecDrive::close(uint8_t channel)
         m_cwd->dump();
         Debug_memory();
         persistConfig();
+        mlConfig.save();
 #endif
     }
 
@@ -2378,7 +2384,6 @@ void iecDrive::set_cwd(std::string path, bool verified)
                 setStatusCode(ST_FILE_NOT_FOUND);
                 delete n;
             }
-            return;
         }
         else if( n->exists() && (isDirectory || haveStream) )
         {
@@ -2393,7 +2398,9 @@ void iecDrive::set_cwd(std::string path, bool verified)
         }
     }
     else
-    setStatusCode(ST_SYNTAX_INVALID);
+        setStatusCode(ST_SYNTAX_INVALID);
+
+    persistConfig();
 }
 
 
@@ -2454,7 +2461,6 @@ void iecDrive::persistConfig()
     if (!entry.contains("type"))
         entry["type"] = "drive";  // don't clobber subclass types (e.g. "meatloaf")
     entry["url"] = m_cwd ? m_cwd->url : "/";
-    mlConfig.save();
 }
 
 

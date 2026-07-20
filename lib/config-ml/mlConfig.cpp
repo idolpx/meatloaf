@@ -30,6 +30,8 @@
 #include "fsFlash.h"
 #include "global_defines.h"
 
+#include "../../include/debug.h"
+
 static const char *TAG = "mlConfig";
 
 // The two on-disk files, relative to the SD mount root.
@@ -199,8 +201,13 @@ void MeatloafConfig::save()
         fsFlash.create_path(SYSTEM_DIR);
 
     if (config_changed && _write_json(CFG_FILE, cfg, fs))
+    {
         _config_hash = cfg_hash;
-
+        Serial.println("Saved config.json");
+    }
     if (devices_changed && _write_json(DEVICES_FILE, dev, fs))
+    {
         _devices_hash = dev_hash;
+        Serial.println("Saved devices.json");
+    }
 }
