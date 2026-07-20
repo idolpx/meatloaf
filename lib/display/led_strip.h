@@ -113,7 +113,7 @@ public:
     uint8_t progress = 100;
     bool activity = false;
     uint8_t direction = 1;  // 0 = left (RECEIVE), 1 = right (SEND)
-    uint8_t brightness = 20;
+    uint8_t brightness = 100;
     uint8_t segment = 0;    // Segment 0 is the first 5 LEDs
 
     DisplayLEDs();
