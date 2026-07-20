@@ -1095,9 +1095,8 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                                 Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Change Directory Here! url[%s] > base[%s]", f->url.c_str(), f->base().c_str() );
                                 set_cwd(f->base());
                             }
-                            persistConfig();
-                            mlConfig.save();
                         }
+                        mlConfig.save();
                     }
 
 #ifdef DEBUG
@@ -2348,6 +2347,7 @@ void iecDrive::set_cwd(std::string path, bool verified)
         if (n != nullptr) {
             m_cwd.reset(n);
             setStatusCode(ST_OK);
+            persistConfig();
         } else {
             setStatusCode(ST_FILE_NOT_FOUND);
         }
