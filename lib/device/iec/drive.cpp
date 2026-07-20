@@ -1095,6 +1095,8 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                                 Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Change Directory Here! url[%s] > base[%s]", f->url.c_str(), f->base().c_str() );
                                 set_cwd(f->base());
                             }
+                            persistConfig();
+                            mlConfig.save();
                         }
                     }
 
@@ -1141,8 +1143,6 @@ void iecDrive::close(uint8_t channel)
         Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "id[%d] cwd[%s]", m_devnr, m_cwd==nullptr ? "NULL" : m_cwd->url.c_str());
         m_cwd->dump();
         Debug_memory();
-        persistConfig();
-        mlConfig.save();
 #endif
     }
 
