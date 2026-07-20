@@ -10,7 +10,7 @@
 static int led(int argc, char **argv)
 {
     if (argc < 2) {
-        Serial.printf("led {idle|send|receive|activity|progress {0-100}|status {1-255}|speed {0-255}|brightness {*|index} {0-255}}\r\n");
+        Serial.printf("led {idle|send|receive|activity|count {0-255}|progress {0-100}|status {1-255}|speed {0-255}|brightness {*|index} {0-255}}\r\n");
         return EXIT_FAILURE;
     }
 
@@ -29,6 +29,24 @@ static int led(int argc, char **argv)
     else if (mstr::startsWith(argv[1], "activity"))
     {
         LEDS.activity = !LEDS.activity;
+    }
+    else if (mstr::startsWith(argv[1], "count"))
+    {
+        if (argc == 3 && mstr::isNumeric(argv[2]))
+        {
+            int count = atoi(argv[2]);
+            if (count < 0 || count > 255)
+            {
+                Serial.printf("led count {0-255}\r\n");
+                return EXIT_FAILURE;
+            }
+            LEDS.set_count(static_cast<uint8_t>(count));
+        }
+        else
+        {
+            Serial.printf("led count {0-255}\r\n");
+            return EXIT_FAILURE;
+        }
     }
     else if (mstr::startsWith(argv[1], "progress"))
     {
