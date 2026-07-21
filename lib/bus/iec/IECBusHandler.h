@@ -137,6 +137,7 @@ class IECBusHandler
   bool waitPinDATA(bool state, uint16_t timeout = 1000);
   bool waitPinCLK(bool state, uint16_t timeout = 1000);
   void waitPinATN(bool state);
+  void attachATNInterrupt();
   void atnRequest();
   bool receiveIECByteATN(uint8_t &data, uint8_t bytenum);
   bool receiveIECByte(bool canWriteOk);
@@ -144,13 +145,21 @@ class IECBusHandler
   void handleFastLoadProtocols();
   void handleATNSequence();
 
-  volatile uint16_t m_timeoutDuration; 
+  volatile uint16_t m_timeoutDuration;
   volatile uint32_t m_timeoutStart;
   volatile bool m_inTask;
   volatile bool m_hostMode;
   bool m_atnInterruptEnabled;
   volatile uint8_t m_flags;
   uint8_t m_primary, m_secondary;
+
+  // Dedicated enable/disable latch for end()/begin(), checked by task() before
+  // touching anything else. m_flags is NOT safe for this purpose: task() does
+  // many m_flags|=/&=~ bit updates throughout its body, so a task() call that
+  // is already in flight when end() runs can clobber an m_flags==0xFF sentinel
+  // back to a non-sentinel value, un-disabling the bus. Nothing but begin()/end()
+  // ever writes m_enabled, so it can't be corrupted that way.
+  volatile bool m_enabled;
 
 #ifdef IOREG_TYPE
   volatile IOREG_TYPE *m_regCLKwrite, *m_regCLKmode, *m_regDATAwrite, *m_regDATAmode;

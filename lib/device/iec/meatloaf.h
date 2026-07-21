@@ -47,9 +47,6 @@ public:
 
     void reset() override {
         iecDrive::reset();
-
-        // if bus is asleep, wake it up
-        IEC.begin();
     }
 
     // // open file "name" on channel

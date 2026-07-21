@@ -619,8 +619,9 @@ IECBusHandler::IECBusHandler(uint8_t pinATN, uint8_t pinCLK, uint8_t pinDATA, ui
   m_inTask     = false;
   m_hostMode   = false;
   m_atnInterruptEnabled = false;
-  m_flags      = 0xFF; // 0xFF means: begin() has not yet been called
+  m_flags      = 0; // P_RESET etc. all clear; resynced from real pin state once task() runs
   m_currentDevice = NULL;
+  m_enabled    = false; // task() won't process ATN/transfers until begin() runs (see task())
 
   m_pinATN       = pinATN;
   m_pinCLK       = pinCLK;
@@ -670,6 +671,24 @@ IECBusHandler::IECBusHandler(uint8_t pinATN, uint8_t pinCLK, uint8_t pinDATA, ui
 }
 
 
+// Attaches the shared ATN interrupt if this handler owns the ATN pin and
+// isn't already attached. Used by begin() and by task()'s RESET handling
+// when a RESET-line transition re-enables a previously end()'d bus.
+void IECBusHandler::attachATNInterrupt()
+{
+  if( m_atnInterrupt!=NOT_AN_INTERRUPT && s_bushandler==NULL )
+    {
+      s_bushandler = this;
+#if defined(IEC_USE_LINE_DRIVERS) && defined(IEC_USE_INVERTED_INPUTS)
+      attachInterrupt(m_atnInterrupt, atnInterruptFcn, RISING);
+#else
+      attachInterrupt(m_atnInterrupt, atnInterruptFcn, FALLING);
+#endif
+      m_atnInterruptEnabled = true;
+    }
+}
+
+
 void IECBusHandler::begin()
 {
   JDEBUGI();
@@ -702,34 +721,35 @@ void IECBusHandler::begin()
   // allow ATN to pull DATA low in hardware
   writePinCTRL(LOW);
 
-  // if the ATN pin is capable of interrupts then use interrupts to detect 
+  // if the ATN pin is capable of interrupts then use interrupts to detect
   // ATN requests, otherwise we'll poll the ATN pin in function microTask().
-  if( m_atnInterrupt!=NOT_AN_INTERRUPT && s_bushandler==NULL )
-    {
-      s_bushandler = this;
-#if defined(IEC_USE_LINE_DRIVERS) && defined(IEC_USE_INVERTED_INPUTS)
-      attachInterrupt(m_atnInterrupt, atnInterruptFcn, RISING);
-#else
-      attachInterrupt(m_atnInterrupt, atnInterruptFcn, FALLING);
-#endif
-      m_atnInterruptEnabled = true;
-    }
+  attachATNInterrupt();
 
   // call begin() function for all attached devices
   for(uint8_t i=0; i<m_numDevices; i++)
     m_devices[i]->begin();
+
+  // let task() start processing now that begin() has fully completed
+  m_enabled = true;
 }
 
 
 void IECBusHandler::end()
 {
-  // release CLK/DATA (switch to high-Z input) so we stop driving the bus,
-  // as if this device were physically unplugged
-  writePinCLK(HIGH);
-  writePinDATA(HIGH);
-  writePinCTRL(HIGH);  // disable ATN->DATA hardware coupling, if present
+  // Set this FIRST, before anything else. task() checks m_enabled right
+  // after its RESET-pin handling (which stays active even while disabled --
+  // see task()), so any call starting after this write skips straight past
+  // the ATN/transfer handling. This has to be a flag nothing but begin()/
+  // end() ever writes: m_flags gets many m_flags|=/&=~ updates throughout
+  // task()'s ATN/transfer handling, so reusing it as a "disabled" sentinel
+  // (as a stale comment here used to claim) is not safe -- a task() call
+  // already past the ATN section when end() runs could clobber a sentinel
+  // value via its own unrelated bitwise ops.
+  m_enabled = false;
 
-  // stop reacting to ATN edges
+  // Stop reacting to ATN edges: task() runs continuously on its own FreeRTOS
+  // task (possibly on the other core), so if we changed pins before detaching
+  // the interrupt, atnInterruptFcn() could still fire and call atnRequest().
   if( m_atnInterrupt!=NOT_AN_INTERRUPT && s_bushandler==this )
     {
       detachInterrupt(m_atnInterrupt);
@@ -739,8 +759,16 @@ void IECBusHandler::end()
 
   m_currentDevice = NULL;
 
-  // sentinel checked by task(): "begin() has not yet been called"
-  m_flags = 0xFF;
+  // Same convention begin() uses: start with P_RESET clear rather than
+  // asserting a stale value, so the next task() call resyncs it from a real
+  // readPinRESET() rather than possibly reporting a phantom falling edge.
+  m_flags = 0;
+
+  // release CLK/DATA (switch to high-Z input) so we stop driving the bus,
+  // as if this device were physically unplugged
+  writePinCLK(HIGH);
+  writePinDATA(HIGH);
+  writePinCTRL(HIGH);  // disable ATN->DATA hardware coupling, if present
 }
 
 
@@ -4033,38 +4061,44 @@ void IECBusHandler::handleFastLoadProtocols()
 
 void IECBusHandler::task()
 {
-
   if( m_hostMode )
     return;
 
   // ------------------ check for activity on RESET pin -------------------
+  // Checked even while disabled (after end()/sleep): a RESET-line transition
+  // returns the bus to its default enabled state, the same way a real drive
+  // responds to the C64's reset line regardless of its own power state.
 
   if( readPinRESET() )
     m_flags |= P_RESET;
   else if( (m_flags & P_RESET)!=0 )
-    { 
+    {
       // falling edge on RESET pin
       m_currentDevice = NULL;
+      m_flags = 0;
 
-      if( m_flags!=0xFF )
-      {
-        m_flags = 0;
-      
-        // release CLK and DATA, allow ATN to pull DATA low in hardware
-        writePinCLK(HIGH);
-        writePinDATA(HIGH);
-        writePinCTRL(LOW);
-      }
+      // release CLK and DATA, allow ATN to pull DATA low in hardware
+      writePinCLK(HIGH);
+      writePinDATA(HIGH);
+      writePinCTRL(LOW);
+
+      if( !m_enabled )
+        {
+          // bus was end()'d -- RESET brings it back to its default enabled
+          // state, including re-arming the ATN interrupt end() tore down
+          m_enabled = true;
+          attachATNInterrupt();
+        }
 
       // call "reset" function for attached devices
       for(uint8_t i=0; i<m_numDevices; i++)
-        m_devices[i]->reset(); 
+        m_devices[i]->reset();
     }
 
   // ------------------ check for activity on ATN pin -------------------
-
-  // don't do anything if begin() hasn't been called yet
-  if( m_flags==0xFF ) return;
+  // don't do anything else if the bus hasn't been begin()'d, or is end()'d
+  // and hasn't seen a RESET-line transition yet (handled above)
+  if( !m_enabled ) return;
 
   // prevent interrupt handler from calling atnRequest()
   m_inTask = true;
