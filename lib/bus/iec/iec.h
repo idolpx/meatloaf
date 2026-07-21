@@ -41,7 +41,7 @@
 
 #define BUS_DEVICEID_GLOBAL     0   // Addresses all devices
 #define BUS_DEVICEID_PRINTER    4   // 4-7
-#define BUS_DEVICEID_DISK       8   // 8-15
+#define BUS_DEVICEID_DRIVE      8   // 8-15
 #define BUS_DEVICEID_NETWORK    16  // 16-19
 #define BUS_DEVICEID_OTHER      20  // 20-29
 #define BUS_DEVICEID_SYSTEM     30

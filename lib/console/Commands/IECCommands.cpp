@@ -11,8 +11,8 @@
 static const char *deviceTypeLabel(uint8_t devnr)
 {
     if (devnr < BUS_DEVICEID_PRINTER) return "system";
-    if (devnr < BUS_DEVICEID_DISK)    return "printer";
-    if (devnr < BUS_DEVICEID_NETWORK) return "disk";
+    if (devnr < BUS_DEVICEID_DRIVE)    return "printer";
+    if (devnr < BUS_DEVICEID_NETWORK) return "drive";
     if (devnr < BUS_DEVICEID_OTHER)   return "network";
     if (devnr < BUS_DEVICEID_SYSTEM)  return "other";
     return "meatloaf";
@@ -32,7 +32,7 @@ static void iecStatus()
     for (uint8_t i = 0; i < IEC.m_numDevices; i++)
     {
         IECDevice *dev = IEC.m_devices[i];
-        Serial.printf("  #%-2u  %-8s  %s\r\n",
+        Serial.printf(" #%-2d: %-8s  %s\r\n",
                       dev->getDeviceNumber(),
                       deviceTypeLabel(dev->getDeviceNumber()),
                       dev->isActive() ? "active" : "inactive");
@@ -75,29 +75,33 @@ static int iecScan(int argc, char **argv)
     Serial.printf("Scanning IEC devices in range %u-%u ...\r\n", first, last);
 
     IECHost host(IEC);
-    host.scanBus(first, last);
+    int found = host.scanBus(first, last);
 
-    const auto &devices = host.getDevices();
-    if (devices.empty())
+    if (found == 0)
     {
         Serial.printf("No physical IEC devices discovered.\r\n");
         return EXIT_SUCCESS;
     }
 
-    Serial.printf("Discovered %u physical IEC device(s):\r\n", static_cast<unsigned>(devices.size()));
-    for (const auto &entry : devices)
+    // scanBus() pre-populates an entry for every ID in the scanned range, whether
+    // or not anything responded, so only entries with present==true are real.
+    Serial.printf("Discovered %d physical IEC device(s):\r\n", found);
+    for (const auto &entry : host.getDevices())
     {
+        if (!entry.second.present)
+            continue;
+
         uint8_t devnr = entry.first;
         const auto &device = entry.second;
-        Serial.printf("  #%u  %s\r\n", devnr, device.status);
+        Serial.printf(" #%-2d:  %s\r\n", devnr, device.status);
 
-        // A virtual device answering the same address would collide with the
-        // physical device we just found responding on the wire; disable it.
+        // Only disable a virtual device if a physical device with the same ID
+        // actually responded on the wire.
         IECDevice *virt = IEC.findDevice(devnr);
         if (virt != nullptr)
         {
             virt->setActive(false);
-            Serial.printf("  #%u  disabled conflicting virtual %s device\r\n", devnr, deviceTypeLabel(devnr));
+            Serial.printf(" #%-2d: disabled conflicting virtual %s device\r\n", devnr, deviceTypeLabel(devnr));
         }
     }
 

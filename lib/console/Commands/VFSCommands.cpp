@@ -424,13 +424,14 @@ int mount(int argc, char **argv)
     {
         //Serial.printf("mount {device id} {url/path/filename}\r\n");
 
+        Serial.printf("IEC drive mounts:\r\n");
         for (int i = 0; i < MAX_DISK_DEVICES; i++)
         {
             // Show device status
             auto drive = Meatloaf.get_disks(i);
             if (drive != nullptr)
             {
-                Serial.printf("#%02d: %s %s\r\n", i + 8, drive->disk_dev.getCWD().c_str(), (Config.get_device_slot_enable(i+1) ? "":"[disabled]")); //"%d: %s\r\n", drive->disk_dev.getCWD().c_str();
+                Serial.printf(" #%-2d: %s %s\r\n", i + 8, drive->disk_dev.getCWD().c_str(), (Config.get_device_slot_enable(i+1) ? "":"[disabled]")); //"%d: %s\r\n", drive->disk_dev.getCWD().c_str();
             }
         }
 

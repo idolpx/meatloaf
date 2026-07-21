@@ -121,11 +121,11 @@ void iecFuji::setup(systemBus *bus)
     // 08-15 Drives
     for (int i = 0; i < MAX_DISK_DEVICES; i++)
     {
-        _fnDisks[i].disk_dev.setDeviceNumber(BUS_DEVICEID_DISK+i);
+        _fnDisks[i].disk_dev.setDeviceNumber(BUS_DEVICEID_DRIVE+i);
         if (bus->attachDevice(&_fnDisks[i].disk_dev))
         {
             bool enabled = Config.get_device_slot_enable(i+1);
-            Debug_printf("Attached drive device #%d %s\r\n", BUS_DEVICEID_DISK+i, (enabled ? "":"[disabled]"));
+            Debug_printf("Attached drive device #%d %s\r\n", BUS_DEVICEID_DRIVE+i, (enabled ? "":"[disabled]"));
             _fnDisks[i].disk_dev.setActive(enabled);
         }
     }
