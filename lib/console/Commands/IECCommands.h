@@ -4,7 +4,5 @@
 
 namespace ESP32Console::Commands
 {
-    const ConsoleCommand getIECDetectCommand();
-    const ConsoleCommand getIECSleepCommand();
-    const ConsoleCommand getIECWakeCommand();
+    const ConsoleCommand getIECCommand();
 }

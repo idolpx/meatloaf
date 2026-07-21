@@ -110,6 +110,7 @@ class IECBusHandler
   bool isATNInterruptEnabled() const { return m_atnInterruptEnabled; }
   void setHostMode(bool enable) { m_hostMode = enable; }
   bool isHostMode() const { return m_hostMode; }
+  bool isEnabled() const { return m_enabled; }
 
   IECDevice *m_currentDevice;
   IECDevice *m_devices[IEC_MAX_DEVICES];

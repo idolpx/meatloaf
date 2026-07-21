@@ -5,19 +5,48 @@
 #include "../Console.h"
 
 #include <cstdlib>
+#include <cstring>
 
-static int iecdetect(int argc, char **argv)
+#ifdef BUILD_IEC
+static const char *deviceTypeLabel(uint8_t devnr)
 {
-#ifndef BUILD_IEC
-    Serial.printf("IEC bus support is disabled in this build.\r\n");
-    return EXIT_FAILURE;
-#else
+    if (devnr < BUS_DEVICEID_PRINTER) return "system";
+    if (devnr < BUS_DEVICEID_DISK)    return "printer";
+    if (devnr < BUS_DEVICEID_NETWORK) return "disk";
+    if (devnr < BUS_DEVICEID_OTHER)   return "network";
+    if (devnr < BUS_DEVICEID_SYSTEM)  return "other";
+    return "meatloaf";
+}
+
+static void iecStatus()
+{
+    Serial.printf("IEC bus: %s\r\n", IEC.isEnabled() ? "enabled" : "disabled");
+
+    if (IEC.m_numDevices == 0)
+    {
+        Serial.printf("No devices attached.\r\n");
+        return;
+    }
+
+    Serial.printf("Attached devices:\r\n");
+    for (uint8_t i = 0; i < IEC.m_numDevices; i++)
+    {
+        IECDevice *dev = IEC.m_devices[i];
+        Serial.printf("  #%-2u  %-8s  %s\r\n",
+                      dev->getDeviceNumber(),
+                      deviceTypeLabel(dev->getDeviceNumber()),
+                      dev->isActive() ? "active" : "inactive");
+    }
+}
+
+static int iecScan(int argc, char **argv)
+{
     uint8_t first = BUS_DEVICEID_PRINTER;
     uint8_t last = BUS_DEVICEID_SYSTEM;
 
-    if (argc >= 2)
+    if (argc >= 3)
     {
-        int value = atoi(argv[1]);
+        int value = atoi(argv[2]);
         if (value < 0 || value > 30)
         {
             Serial.printf("Invalid start device ID. Must be 0-30.\r\n");
@@ -26,9 +55,9 @@ static int iecdetect(int argc, char **argv)
         first = static_cast<uint8_t>(value);
     }
 
-    if (argc >= 3)
+    if (argc >= 4)
     {
-        int value = atoi(argv[2]);
+        int value = atoi(argv[3]);
         if (value < 0 || value > 30)
         {
             Serial.printf("Invalid end device ID. Must be 0-30.\r\n");
@@ -51,59 +80,71 @@ static int iecdetect(int argc, char **argv)
     const auto &devices = host.getDevices();
     if (devices.empty())
     {
-        Serial.printf("No IEC devices discovered.\r\n");
+        Serial.printf("No physical IEC devices discovered.\r\n");
         return EXIT_SUCCESS;
     }
 
-    Serial.printf("Discovered %u IEC device(s):\r\n", static_cast<unsigned>(devices.size()));
+    Serial.printf("Discovered %u physical IEC device(s):\r\n", static_cast<unsigned>(devices.size()));
     for (const auto &entry : devices)
     {
+        uint8_t devnr = entry.first;
         const auto &device = entry.second;
-        Serial.printf("  #%u  %s\r\n", entry.first, device.status);
+        Serial.printf("  #%u  %s\r\n", devnr, device.status);
+
+        // A virtual device answering the same address would collide with the
+        // physical device we just found responding on the wire; disable it.
+        IECDevice *virt = IEC.findDevice(devnr);
+        if (virt != nullptr)
+        {
+            virt->setActive(false);
+            Serial.printf("  #%u  disabled conflicting virtual %s device\r\n", devnr, deviceTypeLabel(devnr));
+        }
     }
 
     return EXIT_SUCCESS;
-#endif
 }
 
-static int iecsleep(int argc, char **argv)
+static int iec(int argc, char **argv)
 {
-#ifndef BUILD_IEC
-    Serial.printf("IEC bus support is disabled in this build.\r\n");
-    return EXIT_FAILURE;
-#else
-    IEC.end();
-    Serial.printf("IEC bus disabled.\r\n");
-    return EXIT_SUCCESS;
-#endif
-}
+    if (argc < 2)
+    {
+        iecStatus();
+        return EXIT_SUCCESS;
+    }
 
-static int iecwake(int argc, char **argv)
+    if (strcmp(argv[1], "sleep") == 0)
+    {
+        IEC.end();
+        Serial.printf("IEC bus disabled.\r\n");
+        return EXIT_SUCCESS;
+    }
+    else if (strcmp(argv[1], "wake") == 0)
+    {
+        IEC.begin();
+        Serial.printf("IEC bus enabled.\r\n");
+        return EXIT_SUCCESS;
+    }
+    else if (strcmp(argv[1], "scan") == 0)
+    {
+        return iecScan(argc, argv);
+    }
+
+    Serial.printf("Usage: iec [sleep|wake|scan [start] [end]]\r\n");
+    return EXIT_FAILURE;
+}
+#else
+static int iec(int argc, char **argv)
 {
-#ifndef BUILD_IEC
     Serial.printf("IEC bus support is disabled in this build.\r\n");
     return EXIT_FAILURE;
-#else
-    IEC.begin();
-    Serial.printf("IEC bus enabled.\r\n");
-    return EXIT_SUCCESS;
-#endif
 }
+#endif
 
 namespace ESP32Console::Commands
 {
-    const ConsoleCommand getIECDetectCommand()
+    const ConsoleCommand getIECCommand()
     {
-        return ConsoleCommand("iecdetect", &iecdetect, "Detect IEC devices and print status (usage: iecdetect [start] [end])");
-    }
-
-    const ConsoleCommand getIECSleepCommand()
-    {
-        return ConsoleCommand("sleep", &iecsleep, "Disable the IEC bus (releases CLK/DATA and stops ATN handling)");
-    }
-
-    const ConsoleCommand getIECWakeCommand()
-    {
-        return ConsoleCommand("wake", &iecwake, "Re-enable the IEC bus (also re-initializes all attached devices)");
+        return ConsoleCommand("iec", &iec,
+            "Show/control the IEC bus. Usage: iec [sleep|wake|scan [start] [end]]");
     }
 }
