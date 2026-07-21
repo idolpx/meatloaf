@@ -106,12 +106,19 @@ void IECHost::hReleaseATN()
 
 // ---------------------------------------------------------------------------
 // hBeginATN — assert ATN and wait for any device to acknowledge (DATA LOW).
-// Returns false if nothing responds within 1 ms.
+// Returns false immediately if ATN is already asserted by another bus master,
+// or if nothing responds within 1 ms.
 // ATN remains asserted on return; caller must hReleaseATN() when done.
 // ---------------------------------------------------------------------------
 
 bool IECHost::hBeginATN()
 {
+    // If ATN or CLK is already asserted by someone else (e.g. a real C64 also on the
+    // bus, mid-transaction), don't drive our own ATN on top of it -- abort
+    // instead of taking over a bus another master is already using.
+    if (!m_bus.readPinATN() || !m_bus.readPinCLK())
+        return false;
+
     hAssertATN();
     m_bus.writePinCLK(false);   // CLK LOW = "not ready to send"
     m_bus.writePinDATA(true);   // release DATA
