@@ -105,6 +105,12 @@ class IECBusHandler
   IECDevice *findDevice(uint8_t devnr, bool includeInactive = false);
   bool canServeATN();
   bool inTransaction();
+
+  // True if the RESET pin currently reads idle (not asserted), or if this
+  // board has no RESET pin wired at all. NOT declared inline (unlike the
+  // private readPin* helpers) so it reliably links when called from other
+  // translation units, e.g. IECHost.
+  bool isResetPinIdle();
   void sendSRQ();
   void setATNInterruptEnabled(bool enable);
   bool isATNInterruptEnabled() const { return m_atnInterruptEnabled; }

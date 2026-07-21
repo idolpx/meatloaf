@@ -773,8 +773,14 @@ void IECBusHandler::end()
 
 
 bool IECBusHandler::canServeATN()
-{ 
-  return (m_pinCTRL!=0xFF) || (m_atnInterrupt != NOT_AN_INTERRUPT); 
+{
+  return (m_pinCTRL!=0xFF) || (m_atnInterrupt != NOT_AN_INTERRUPT);
+}
+
+
+bool IECBusHandler::isResetPinIdle()
+{
+  return readPinRESET();
 }
 
 

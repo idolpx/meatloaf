@@ -452,11 +452,23 @@ bool IECHost::probeDevice(uint8_t devnr)
 }
 
 // ---------------------------------------------------------------------------
+// isBusConnected
+// ---------------------------------------------------------------------------
+
+bool IECHost::isBusConnected()
+{
+    return m_bus.isResetPinIdle();
+}
+
+// ---------------------------------------------------------------------------
 // scanBus
 // ---------------------------------------------------------------------------
 
 int IECHost::scanBus(uint8_t fromDevnr, uint8_t toDevnr)
 {
+    if (!isBusConnected())
+        return -1;
+
     int found = 0;
     for (uint8_t d = fromDevnr; d <= toDevnr; d++) {
         // Pre-populate entry so probeDevice can update protocol field

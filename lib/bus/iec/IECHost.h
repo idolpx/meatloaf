@@ -77,8 +77,16 @@ public:
     // Bus scanning & device management
     // -------------------------------------------------------------------------
 
+    // On boards with a wired RESET line, returns false if RESET currently
+    // reads asserted (LOW) -- on an idle bus that means nothing is attached
+    // to pull it HIGH, so any device probe would just be reading floating
+    // lines. Boards without a RESET line always return true (connection
+    // state can't be detected there).
+    bool isBusConnected();
+
     // Probe a range of device IDs.  Detected devices are added to m_devices.
-    // Returns the number of devices found.
+    // Returns the number of devices found, or -1 if isBusConnected() is
+    // false (scan is aborted without touching the bus).
     // Defaults to the full disk-drive range (8-15).
     int scanBus(uint8_t fromDevnr = IEC_DEV_DISK_MIN,
                 uint8_t toDevnr  = IEC_DEV_DISK_MAX);

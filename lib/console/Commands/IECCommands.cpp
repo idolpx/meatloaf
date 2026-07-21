@@ -77,6 +77,12 @@ static int iecScan(int argc, char **argv)
     IECHost host(IEC);
     int found = host.scanBus(first, last);
 
+    if (found < 0)
+    {
+        Serial.printf("IEC bus not connected (RESET line is low) -- aborting scan.\r\n");
+        return EXIT_FAILURE;
+    }
+
     if (found == 0)
     {
         Serial.printf("No physical IEC devices discovered.\r\n");
