@@ -48,10 +48,8 @@ public:
     void reset() override {
         iecDrive::reset();
 
-        // if device is not active, reboot
-        //Debug_printv("active[%d]", m_isActive);
-        if ( !m_isActive )
-            fnSystem.reboot();
+        // if bus is asleep, wake it up
+        IEC.begin();
     }
 
     // // open file "name" on channel

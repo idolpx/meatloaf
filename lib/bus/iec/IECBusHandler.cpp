@@ -712,7 +712,7 @@ void IECBusHandler::begin()
 #else
       attachInterrupt(m_atnInterrupt, atnInterruptFcn, FALLING);
 #endif
-    m_atnInterruptEnabled = true;
+      m_atnInterruptEnabled = true;
     }
 
   // call begin() function for all attached devices
@@ -721,7 +721,30 @@ void IECBusHandler::begin()
 }
 
 
-bool IECBusHandler::canServeATN() 
+void IECBusHandler::end()
+{
+  // release CLK/DATA (switch to high-Z input) so we stop driving the bus,
+  // as if this device were physically unplugged
+  writePinCLK(HIGH);
+  writePinDATA(HIGH);
+  writePinCTRL(HIGH);  // disable ATN->DATA hardware coupling, if present
+
+  // stop reacting to ATN edges
+  if( m_atnInterrupt!=NOT_AN_INTERRUPT && s_bushandler==this )
+    {
+      detachInterrupt(m_atnInterrupt);
+      s_bushandler = NULL;
+    }
+  m_atnInterruptEnabled = false;
+
+  m_currentDevice = NULL;
+
+  // sentinel checked by task(): "begin() has not yet been called"
+  m_flags = 0xFF;
+}
+
+
+bool IECBusHandler::canServeATN()
 { 
   return (m_pinCTRL!=0xFF) || (m_atnInterrupt != NOT_AN_INTERRUPT); 
 }
@@ -4010,14 +4033,9 @@ void IECBusHandler::handleFastLoadProtocols()
 
 void IECBusHandler::task()
 {
-  // don't do anything if begin() hasn't been called yet
-  if( m_flags==0xFF ) return;
 
   if( m_hostMode )
     return;
-
-  // prevent interrupt handler from calling atnRequest()
-  m_inTask = true;
 
   // ------------------ check for activity on RESET pin -------------------
 
@@ -4027,12 +4045,16 @@ void IECBusHandler::task()
     { 
       // falling edge on RESET pin
       m_currentDevice = NULL;
-      m_flags = 0;
+
+      if( m_flags!=0xFF )
+      {
+        m_flags = 0;
       
-      // release CLK and DATA, allow ATN to pull DATA low in hardware
-      writePinCLK(HIGH);
-      writePinDATA(HIGH);
-      writePinCTRL(LOW);
+        // release CLK and DATA, allow ATN to pull DATA low in hardware
+        writePinCLK(HIGH);
+        writePinDATA(HIGH);
+        writePinCTRL(LOW);
+      }
 
       // call "reset" function for attached devices
       for(uint8_t i=0; i<m_numDevices; i++)
@@ -4040,6 +4062,12 @@ void IECBusHandler::task()
     }
 
   // ------------------ check for activity on ATN pin -------------------
+
+  // don't do anything if begin() hasn't been called yet
+  if( m_flags==0xFF ) return;
+
+  // prevent interrupt handler from calling atnRequest()
+  m_inTask = true;
 
   if( !(m_flags & P_ATN) && !readPinATN() )
     {

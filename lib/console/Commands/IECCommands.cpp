@@ -66,10 +66,44 @@ static int iecdetect(int argc, char **argv)
 #endif
 }
 
+static int iecsleep(int argc, char **argv)
+{
+#ifndef BUILD_IEC
+    Serial.printf("IEC bus support is disabled in this build.\r\n");
+    return EXIT_FAILURE;
+#else
+    IEC.end();
+    Serial.printf("IEC bus disabled.\r\n");
+    return EXIT_SUCCESS;
+#endif
+}
+
+static int iecwake(int argc, char **argv)
+{
+#ifndef BUILD_IEC
+    Serial.printf("IEC bus support is disabled in this build.\r\n");
+    return EXIT_FAILURE;
+#else
+    IEC.begin();
+    Serial.printf("IEC bus enabled.\r\n");
+    return EXIT_SUCCESS;
+#endif
+}
+
 namespace ESP32Console::Commands
 {
     const ConsoleCommand getIECDetectCommand()
     {
         return ConsoleCommand("iecdetect", &iecdetect, "Detect IEC devices and print status (usage: iecdetect [start] [end])");
+    }
+
+    const ConsoleCommand getIECSleepCommand()
+    {
+        return ConsoleCommand("sleep", &iecsleep, "Disable the IEC bus (releases CLK/DATA and stops ATN handling)");
+    }
+
+    const ConsoleCommand getIECWakeCommand()
+    {
+        return ConsoleCommand("wake", &iecwake, "Re-enable the IEC bus (also re-initializes all attached devices)");
     }
 }

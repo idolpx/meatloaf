@@ -178,6 +178,8 @@ namespace ESP32Console
     void Console::registerIECCommands()
     {
         registerCommand(getIECDetectCommand());
+        registerCommand(getIECSleepCommand());
+        registerCommand(getIECWakeCommand());
     }
 
     void ESP32Console::Console::registerNetworkCommands()

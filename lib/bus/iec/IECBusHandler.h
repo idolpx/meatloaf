@@ -63,6 +63,11 @@ class IECBusHandler
   // is the IEC bus device number that this device should react to
   void begin();
 
+  // releases the bus (CLK/DATA lines and ATN interrupt) and makes task()
+  // a no-op until begin() is called again. Attached devices are left in
+  // place; begin() re-initializes them the same way it did at startup.
+  void end();
+
   bool attachDevice(IECDevice *dev);
   bool detachDevice(IECDevice *dev);
 
