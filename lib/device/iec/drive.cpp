@@ -889,7 +889,18 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
             Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Changing directory to [%s][%s] hex[%s]", m_cwd->url.c_str(), name.c_str(), mstr::toHex(name).c_str());
             name = mstr::toUTF8(name);
             name = U8Char::decodeACE(name);
-            MFile *f = m_cwd->cd(name);
+            MFile *f;
+            if ( name == "*" && !m_cwd->isDirectory() )
+            {
+                // m_cwd already points directly at a file (e.g. CD'd onto a file
+                // instead of its parent directory) — LOAD"*" should load that file
+                // rather than wildcard-matching within it.
+                f = MFSOwner::File(m_cwd->url);
+            }
+            else
+            {
+                f = m_cwd->cd(name);
+            }
             if (f == nullptr)
             {
                 Debug_printv("Error: could not find file system for URL [%s]", name.c_str());
