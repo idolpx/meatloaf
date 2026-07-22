@@ -126,7 +126,9 @@ public:
 
   // Persist/reload this drive's settings in mlConfig (devices.iec.<id>)
   void persistConfig();
-  void reloadConfig();
+  // Returns true if a network-scheme URL restore was deferred because WiFi
+  // isn't connected yet (caller should retry later), false otherwise.
+  bool reloadConfig();
 
   int     id() { return m_devnr; };
   uint8_t getNumOpenChannels();

@@ -213,7 +213,8 @@ httpd_handle_t HttpServer::start_server(serverstate &state)
     if (exists("/sd" WWW_ROOT))
         httpdocs = "/sd" WWW_ROOT "/";
 
-    if (httpd_start(&(state.hServer), &config) == ESP_OK)
+    esp_err_t start_err = httpd_start(&(state.hServer), &config);
+    if (start_err == ESP_OK)
     {
         ws_register(state.hServer);
         proxy_register(state.hServer);
@@ -229,7 +230,11 @@ httpd_handle_t HttpServer::start_server(serverstate &state)
     else
     {
         state.hServer = NULL;
-        printf(ANSI_RED_BOLD "WWW/WS/WebDAV Server FAILED to start!" ANSI_RESET "\r\n");
+        printf(ANSI_RED_BOLD "WWW/WS/WebDAV Server FAILED to start!" ANSI_RESET
+               " err=%s free_internal=%u largest_internal_block=%u\r\n",
+               esp_err_to_name(start_err),
+               (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+               (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
     }
 
     return state.hServer;

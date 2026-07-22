@@ -35,6 +35,7 @@
 #include "mlConfig.h"
 #include "fuji.h"
 #include "fnFsSD.h"
+#include "fnWiFi.h"
 #include "led.h"
 #include "utils.h"
 #include "display.h"
@@ -2484,23 +2485,33 @@ void iecDrive::persistConfig()
 
 // Apply this drive's settings from mlConfig (devices.iec.<id>).
 // Missing entry or keys leave the current state unchanged.
-void iecDrive::reloadConfig()
+// Returns true if a network-scheme URL restore was deferred (WiFi not connected yet).
+bool iecDrive::reloadConfig()
 {
     const psram_json &devices = mlConfig["devices"];
     if (!devices.contains("iec"))
-        return;
+        return false;
 
     const psram_json &iec = devices["iec"];
     std::string key = std::to_string(m_devnr);
     if (!iec.contains(key))
-        return;
+        return false;
 
     const psram_json &entry = iec[key];
     setActive(entry.value("enabled", 1) != 0);
 
     std::string url = entry.value("url", "");
     if (!url.empty() && (m_cwd == nullptr || m_cwd->url != url))
+    {
+        // Network-scheme URLs (fsp://, http://, ...) need a live route. Attempting
+        // one before WiFi has an IP fails immediately (no DNS/route yet) and just
+        // wastes heap churn at boot. Skip for now; main_setup() retries this same
+        // reloadConfig() once WiFi actually connects.
+        if (mstr::contains(url, "://") && !fnWiFi.connected())
+            return true;
         set_cwd(url);
+    }
+    return false;
 }
 
 

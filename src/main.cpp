@@ -94,6 +94,32 @@ bool initFailed = false;
 /**************************/
 
 
+#if defined(BUILD_IEC) || defined(BUILD_GPIB)
+// One-shot task: retries reloadConfig() for drives whose persisted network-scheme
+// URL (fsp://, http://, ...) was deferred at boot because WiFi wasn't connected
+// yet. Polls fnWiFi.connected() and exits once it retries (or WiFi never comes up).
+static void reload_network_drives_task(void *)
+{
+    const int max_wait_ms = 30000;
+    const int poll_ms = 500;
+    int waited = 0;
+    while (!fnWiFi.connected() && waited < max_wait_ms)
+    {
+        vTaskDelay(poll_ms / portTICK_PERIOD_MS);
+        waited += poll_ms;
+    }
+
+    if (fnWiFi.connected())
+    {
+        for (int i = 0; i < MAX_DISK_DEVICES; i++)
+            Meatloaf.get_disks(i)->disk_dev.reloadConfig();
+        Meatloaf.reloadConfig();
+    }
+
+    vTaskDelete(NULL);
+}
+#endif
+
 void main_shutdown_handler()
 {
     Debug_println("Shutdown handler called.");
@@ -295,9 +321,15 @@ void main_setup()
     // (e.g. from iecDrive::begin() during SYSTEM_BUS.setup()) crashes with
     // "assert failed: tcpip_send_msg_wait_sem ... Invalid mbox".
 #if defined(BUILD_IEC) || defined(BUILD_GPIB)
+    bool network_drive_deferred = false;
     for (int i = 0; i < MAX_DISK_DEVICES; i++)
-        Meatloaf.get_disks(i)->disk_dev.reloadConfig();
-    Meatloaf.reloadConfig();
+        network_drive_deferred |= Meatloaf.get_disks(i)->disk_dev.reloadConfig();
+    network_drive_deferred |= Meatloaf.reloadConfig();
+
+    // At least one drive has a persisted network-scheme URL and WiFi isn't
+    // connected yet: retry once it is, instead of leaving it unmounted forever.
+    if (network_drive_deferred)
+        xTaskCreatePinnedToCore(reload_network_drives_task, "net_drive_retry", 3072, nullptr, 3, nullptr, 0);
 #endif
 
 #ifdef DEBUG_TIMING
