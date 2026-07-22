@@ -6,6 +6,7 @@
 #include "soc/soc_caps.h"
 #include "esp_err.h"
 #include "esp_log.h"
+#include "esp_heap_caps.h"
 
 #include "Commands/CoreCommands.h"
 #include "Commands/DisplayCommands.h"
@@ -302,6 +303,17 @@ namespace ESP32Console
         exec_users_mutex_ = xSemaphoreCreateMutex();
     }
 
+    // Logged whenever console_exec task creation fails, so a repro shows
+    // whether it's outright exhaustion or fragmentation (free vs. largest
+    // contiguous block) — mirrors the diagnostics on the httpd task-create
+    // failure path in web_server.cpp.
+    static void log_exec_task_create_failure()
+    {
+        Debug_printv("Could not start console exec task! free_internal=%u largest_internal_block=%u",
+                      (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+                      (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+    }
+
     void Console::execAcquire()
     {
         xSemaphoreTake(exec_users_mutex_, portMAX_DELAY);
@@ -314,7 +326,7 @@ namespace ESP32Console
             // stack is released when the last session goes dormant.
             if (xTaskCreatePinnedToCore(&Console::exec_task_fn, "console_exec", 16384, this, 5, &exec_task_, 0) != pdTRUE)
             {
-                Debug_printv("Could not start console exec task!");
+                log_exec_task_create_failure();
                 exec_task_ = nullptr;
             }
         }
@@ -420,6 +432,7 @@ namespace ESP32Console
             if (exec_users_ > 0 && exec_task_ == nullptr &&
                 xTaskCreatePinnedToCore(&Console::exec_task_fn, "console_exec", 16384, this, 5, &exec_task_, 0) != pdTRUE)
             {
+                log_exec_task_create_failure();
                 exec_task_ = nullptr;
             }
             xSemaphoreGive(exec_users_mutex_);
@@ -479,6 +492,7 @@ namespace ESP32Console
             if (exec_users_ > 0 && exec_task_ == nullptr &&
                 xTaskCreatePinnedToCore(&Console::exec_task_fn, "console_exec", 16384, this, 5, &exec_task_, 0) != pdTRUE)
             {
+                log_exec_task_create_failure();
                 exec_task_ = nullptr;
             }
             xSemaphoreGive(exec_users_mutex_);

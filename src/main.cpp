@@ -16,6 +16,7 @@
 // along with Meatloaf. If not, see <http://www.gnu.org/licenses/>.
 
 #include <esp_system.h>
+#include <esp_heap_caps.h>
 #include <nvs_flash.h>
 
 #ifdef CONFIG_SPIRAM
@@ -92,6 +93,20 @@ bool initFailed = false;
 
 
 /**************************/
+
+// Labeled internal-heap checkpoint for locating where boot-time RAM goes.
+// internal_largest matters as much as internal_free: task stacks (and other
+// contiguous-only allocations) need one free block big enough, not just a
+// high aggregate total (see the httpd/console_exec stack-creation failures
+// this was added to track down).
+static void log_heap_checkpoint(const char *label)
+{
+    Debug_printv("[MEM] %-28s heap=%lu internal_free=%u internal_largest=%u",
+                 label,
+                 (unsigned long)esp_get_free_heap_size(),
+                 (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+                 (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+}
 
 
 #if defined(BUILD_IEC) || defined(BUILD_GPIB)
@@ -197,7 +212,7 @@ void main_setup()
     //printf( "HIMEM reserved %u\r\n", esp_himem_reserved_area_size() );
 #endif
 #endif
-    Debug_memory();
+    log_heap_checkpoint("boot start");
 
     // Install a reboot handler
     esp_register_shutdown_handler(main_shutdown_handler);
@@ -220,6 +235,7 @@ void main_setup()
     // Setup hardware
     fnKeyManager.setup();
     fnLedManager.setup();
+    log_heap_checkpoint("after nvs/gpio/key/led setup");
 
 #ifndef MIN_CONFIG
     if (PIN_MODEM_ENABLE != GPIO_NUM_NC && PIN_MODEM_UP9600 != GPIO_NUM_NC) {
@@ -244,6 +260,7 @@ void main_setup()
         fsFlash.create_path( SYSTEM_DIR );
         fsFlash.create_path( SYSTEM_DIR "/ssh" );
     }
+    log_heap_checkpoint("after flash FS init");
 
 #ifdef SD_CARD
     if ( fnSDFAT.start() )
@@ -257,6 +274,7 @@ void main_setup()
         fnSDFAT.create_path( SYSTEM_DIR );
         fnSDFAT.create_path( SYSTEM_DIR "/ssh" );
     }
+    log_heap_checkpoint("after SD FS init");
 #endif
 
     // setup crypto key - must be done before loading the config
@@ -265,6 +283,7 @@ void main_setup()
     // Load our stored configuration
     Config.load();
     mlConfig.load();
+    log_heap_checkpoint("after config load");
 
     // Setup IEC Bus
     SYSTEM_BUS.setup();
@@ -274,8 +293,10 @@ void main_setup()
 #ifdef BUILD_GPIB
     printf(ANSI_GREEN_BOLD "GPIB Bus Initialized" ANSI_RESET "\r\n");
 #endif
+    log_heap_checkpoint("after IEC/GPIB bus setup");
 
     Meatloaf.setup(&SYSTEM_BUS);
+    log_heap_checkpoint("after Meatloaf/drive devices setup");
     // {
     //     // Add devices to bus
     //     FileSystem *ptrfs = fnSDFAT.running() ? (FileSystem *)&fnSDFAT : (FileSystem *)&fsFlash;
@@ -314,10 +335,12 @@ void main_setup()
 #ifdef ENABLE_DISPLAY
     LEDS.start();
     LCD.show_image( (char *)WWW_ROOT "/assets/logo.160x80.jpg" );
+    log_heap_checkpoint("after display/LEDs start");
 #endif
 
 #ifdef ENABLE_AUDIO
     AUDIO.start(); // start sound
+    log_heap_checkpoint("after audio start");
 #endif
 
 #ifdef DEBUG
@@ -328,9 +351,11 @@ void main_setup()
 
     // Set up the WiFi adapter
     fnWiFi.start();
+    log_heap_checkpoint("after fnWiFi.start()");
 
     // Start SessionBroker service task on CPU0
     SessionBroker::setup();
+    log_heap_checkpoint("after SessionBroker::setup()");
 
     // Restore each drive's persisted mlConfig state (enabled flag, mounted URL).
     // Must happen after fnWiFi.start(): reloadConfig() may mount a network URL
@@ -357,6 +382,7 @@ void main_setup()
 #endif
     if (network_drive_deferred)
         xTaskCreatePinnedToCore(reload_network_drives_task, "net_drive_retry", net_drive_retry_stack, nullptr, 3, nullptr, 0);
+    log_heap_checkpoint("after drive config reload");
 #endif
 
 #ifdef DEBUG_TIMING
@@ -374,11 +400,12 @@ void main_setup()
     // console input, so idle sessions cost only the task's stack — and
     // activation can never fail on allocation.
     console.startOnDemand();
+    log_heap_checkpoint("after console.startOnDemand()");
     printf("Press ENTER to activate console.\r\n");
 #endif
 
     printf("READY.\r\n");
-    Debug_memory();
+    log_heap_checkpoint("setup complete");
 }
 
 /*
