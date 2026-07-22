@@ -35,16 +35,16 @@
 
 // Fine-grained internal-heap checkpoint for isolating which step inside
 // WiFiManager::start() is responsible for its ~80 KB / halved-largest-block
-// hit at boot (see src/main.cpp's log_heap_checkpoint for the coarser,
+// hit at boot (see src/main.cpp's //log_heap_checkpoint for the coarser,
 // whole-main_setup() version this mirrors).
-static void log_wifi_heap_checkpoint(const char *label)
-{
-    Debug_printv("[MEM][wifi] %-28s heap=%lu internal_free=%u internal_largest=%u",
-                 label,
-                 (unsigned long)esp_get_free_heap_size(),
-                 (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
-                 (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
-}
+// static void log_wifi_heap_checkpoint(const char *label)
+// {
+//     Debug_printv("[MEM][wifi] %-28s heap=%lu internal_free=%u internal_largest=%u",
+//                  label,
+//                  (unsigned long)esp_get_free_heap_size(),
+//                  (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+//                  (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+// }
 
 WiFiManager fnWiFi;
 
@@ -87,7 +87,7 @@ void WiFiManager::stop()
 // Set up requried resources and start WiFi driver
 int WiFiManager::start()
 {
-    log_wifi_heap_checkpoint("start() entry");
+    //log_wifi_heap_checkpoint("start() entry");
 
     // Initilize an event group
     if (_wifi_event_group == nullptr)
@@ -95,7 +95,7 @@ int WiFiManager::start()
 
     // Make sure our network interface is initialized
     ESP_ERROR_CHECK(esp_netif_init());
-    log_wifi_heap_checkpoint("after esp_netif_init()");
+    //log_wifi_heap_checkpoint("after esp_netif_init()");
 
     // Set custom MAC Address
     uint8_t mac[6];
@@ -108,22 +108,22 @@ int WiFiManager::start()
     {
         // Create the default event loop, which is where the WiFi driver sends events
         ESP_ERROR_CHECK(esp_event_loop_create_default());
-        log_wifi_heap_checkpoint("after esp_event_loop_create_default()");
+        //log_wifi_heap_checkpoint("after esp_event_loop_create_default()");
 
         // Create a default WIFI station interface
         _wifi_sta = esp_netif_create_default_wifi_sta();
-        log_wifi_heap_checkpoint("after create STA netif");
+        //log_wifi_heap_checkpoint("after create STA netif");
 
         // Create a default WIFI access point interface
         _wifi_ap = esp_netif_create_default_wifi_ap();
-        log_wifi_heap_checkpoint("after create AP netif");
+        //log_wifi_heap_checkpoint("after create AP netif");
 
         // Configure basic WiFi settings
         wifi_init_config_t wifi_init_cfg = WIFI_INIT_CONFIG_DEFAULT();
         ESP_ERROR_CHECK(esp_wifi_init(&wifi_init_cfg));
-        log_wifi_heap_checkpoint("after esp_wifi_init()");
+        //log_wifi_heap_checkpoint("after esp_wifi_init()");
         ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
-        log_wifi_heap_checkpoint("after esp_wifi_set_storage()");
+        //log_wifi_heap_checkpoint("after esp_wifi_set_storage()");
         Debug_printf("WiFiManager::start() complete\r\n");
         printf("MAC Address: ");
         for (int i = 0; i < 5; i++) {
@@ -139,7 +139,7 @@ int WiFiManager::start()
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, _wifi_event_handler, this));
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, _wifi_event_handler, this));
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_LOST_IP, _wifi_event_handler, this));
-    log_wifi_heap_checkpoint("after event handler register");
+    //log_wifi_heap_checkpoint("after event handler register");
 
 
     // // SoftAP Setup
@@ -175,13 +175,13 @@ int WiFiManager::start()
 
     // Set WiFi mode to Station
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-    log_wifi_heap_checkpoint("after esp_wifi_set_mode(STA)");
+    //log_wifi_heap_checkpoint("after esp_wifi_set_mode(STA)");
     ESP_ERROR_CHECK(esp_wifi_start());
-    log_wifi_heap_checkpoint("after esp_wifi_start()");
+    //log_wifi_heap_checkpoint("after esp_wifi_start()");
 
     // Disable powersave for lower latency
     ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
-    log_wifi_heap_checkpoint("after esp_wifi_set_ps()");
+    //log_wifi_heap_checkpoint("after esp_wifi_set_ps()");
 
     // Set a hostname from our configuration
     esp_netif_set_hostname(_wifi_sta, Config.get_general_devicename().c_str());
@@ -190,7 +190,7 @@ int WiFiManager::start()
 
     // Go ahead and try connecting to WiFi
     connect();
-    log_wifi_heap_checkpoint("after connect() (esp_wifi_connect issued)");
+    //log_wifi_heap_checkpoint("after connect() (esp_wifi_connect issued)");
 
     return 0;
 }

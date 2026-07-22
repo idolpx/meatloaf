@@ -111,6 +111,20 @@ public:
     void disable(std::string deviceids) {
         disable_device_basic(deviceids);
     }
+
+    // Reload every disk device's persisted mlConfig state, plus this device's
+    // own (device 30). Single source of truth for "apply mlConfig to the live
+    // devices" — used at boot (src/main.cpp) and by the `config load` console
+    // command so a live config reload actually takes effect, not just the
+    // in-memory JSON. Returns true if any drive's network-scheme URL restore
+    // was deferred because WiFi isn't connected yet.
+    bool reloadAllConfig() {
+        bool deferred = false;
+        for (int i = 0; i < MAX_DISK_DEVICES; i++)
+            deferred |= get_disks(i)->disk_dev.reloadConfig();
+        deferred |= reloadConfig();
+        return deferred;
+    }
 };
 
 extern iecMeatloaf Meatloaf;

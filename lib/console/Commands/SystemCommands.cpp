@@ -7,6 +7,7 @@
 #include <esp_heap_caps.h>
 
 #include "mlConfig.h"
+#include "../../device/iec/meatloaf.h"
 
 static inline void *psram_malloc(size_t sz) {
     void *p = heap_caps_malloc(sz, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
@@ -322,7 +323,13 @@ static int config_cmd(int argc, char **argv)
             Serial.printf("Failed to reload config\r\n");
             return 1;
         }
+        // Apply the reloaded config to the live devices (enabled flag, mounted
+        // URL), not just the in-memory JSON — this command runs on the console
+        // executor's 16 KB stack, so it's safe to do the deep MFile work inline.
+        bool deferred = Meatloaf.reloadAllConfig();
         Serial.printf("Config reloaded\r\n");
+        if (deferred)
+            Serial.printf("Note: a drive's network URL restore was deferred (WiFi not connected)\r\n");
         return EXIT_SUCCESS;
     }
 
