@@ -1,0 +1,23 @@
+{
+  "name": "Meatloaf Manipulator",
+  "short_name": "Meatloaf",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#4d4d4d",
+  "theme_color": "#4d4d4d",
+  "description": "Configuration app for Meatloaf device.",
+  "icons": [
+    {
+      "src": "icon.192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon.512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
