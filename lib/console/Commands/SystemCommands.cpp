@@ -317,6 +317,15 @@ static int config_cmd(int argc, char **argv)
         return EXIT_SUCCESS;
     }
 
+    if (argc == 2 && strcmp(argv[1], "load") == 0) {
+        if (!mlConfig.load()) {
+            Serial.printf("Failed to reload config\r\n");
+            return 1;
+        }
+        Serial.printf("Config reloaded\r\n");
+        return EXIT_SUCCESS;
+    }
+
     std::vector<std::string> parts;
     split_dotpath(argv[1], parts);
     if (parts.empty()) {
@@ -418,7 +427,7 @@ namespace ESP32Console::Commands
     const ConsoleCommand getConfigCommand()
     {
         return ConsoleCommand("config", &config_cmd,
-            "Read or write mlConfig values. Usage: config [key[.subkey] [value]]",
-            "[key [value]]");
+            "Read or write mlConfig values, or reload from disk. Usage: config [key[.subkey] [value]] | config load",
+            "[key [value] | load]");
     }
 }
