@@ -10,6 +10,9 @@
 #include "mlConfig.h"
 #include "Esp.h"
 #include "tcpsvr.h"
+#include <cstdio>
+#include <getopt.h>
+#include "esp_console.h"
 
 // Defined in SystemCommands.cpp; reboot() below needs ESP.restart().
 extern EspClass ESP;
@@ -130,14 +133,72 @@ static int declare(int argc, char **argv)
     return EXIT_SUCCESS;
 }
 
+// Runs a ".sh" script: one console command per line, executed sequentially.
+// Blank lines and lines starting with '#' are skipped. Runs on the caller's
+// own stack (the console executor when invoked as "run script.sh") via
+// esp_console_run() directly, rather than console.runCommand() — submitting
+// to the executor from within a command already running on it would
+// deadlock (the executor can't service a nested submission to itself).
+static int run_script(const char *path)
+{
+    FILE *f = fopen(path, "r");
+    if (!f)
+    {
+        Serial.printf("Cannot open script: %s\r\n", path);
+        return EXIT_FAILURE;
+    }
+
+    char line[256];
+    int line_num = 0;
+    int overall_ret = EXIT_SUCCESS;
+    while (fgets(line, sizeof(line), f))
+    {
+        line_num++;
+        std::string cmd = line;
+        mstr::trim(cmd);
+        if (cmd.empty() || cmd[0] == '#')
+            continue;
+
+        Serial.printf("%s\r\n", cmd.c_str());
+
+        int ret = 0;
+        esp_err_t err = esp_console_run(cmd.c_str(), &ret);
+        if (err == ESP_ERR_NOT_FOUND)
+        {
+            Serial.printf("Line %d: unrecognized command\r\n", line_num);
+            overall_ret = EXIT_FAILURE;
+        }
+        else if (err == ESP_OK && ret != 0)
+        {
+            Serial.printf("Line %d: command returned %d\r\n", line_num, ret);
+            overall_ret = EXIT_FAILURE;
+        }
+        else if (err != ESP_OK && err != ESP_ERR_INVALID_ARG)
+        {
+            Serial.printf("Line %d: internal error: %s\r\n", line_num, esp_err_to_name(err));
+            overall_ret = EXIT_FAILURE;
+        }
+
+        // Reset getopt state between commands, same as Console's resetAfterCommands().
+        optind = 0;
+    }
+
+    fclose(f);
+    return overall_ret;
+}
+
 static int run(int argc, char **argv)
 {
     if (argc < 2) {
-        Serial.printf("run {test}\r\n");
-        return EXIT_FAILURE; 
+        Serial.printf("Usage: run test | run <script.sh>\r\n");
+        return EXIT_FAILURE;
     }
 
-    if (mstr::startsWith(argv[1], "test"))
+    if (mstr::endsWith(argv[1], ".sh"))
+    {
+        return run_script(argv[1]);
+    }
+    else if (mstr::startsWith(argv[1], "test"))
     {
         runTestsSuite();
     }
@@ -216,7 +277,7 @@ namespace ESP32Console::Commands
 
     const ConsoleCommand getRunCommand()
     {
-        return ConsoleCommand("run", &run, "Run a command");
+        return ConsoleCommand("run", &run, "Run the test suite, or a \".sh\" script of console commands", "test | <script.sh>");
     }
 
     const ConsoleCommand getRebootCommand()
