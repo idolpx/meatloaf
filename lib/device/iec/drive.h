@@ -129,6 +129,12 @@ public:
   // Returns true if a network-scheme URL restore was deferred because WiFi
   // isn't connected yet (caller should retry later), false otherwise.
   bool reloadConfig();
+  // Cheap, RESET-safe restore of just the persisted enabled flag (no URL/
+  // mount work, unlike reloadConfig()) — safe to call from the real-time
+  // IEC bus task's RESET handling. Undoes a runtime-only `iec sleep <id>`
+  // by restoring the device to its persisted enabled state; a device
+  // persistently disabled via config (enabled=0) correctly stays disabled.
+  void restoreActiveFromConfig();
 
   int     id() { return m_devnr; };
   uint8_t getNumOpenChannels();

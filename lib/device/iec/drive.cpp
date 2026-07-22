@@ -2194,6 +2194,12 @@ void iecDrive::reset()
     Debug_printv("iecDrive::reset(#%d)", m_devnr);
     setStatusCode(ST_DOSVERSION);
 
+    // A C64-side RESET restores the bus's own end()/sleep state (see
+    // IECBusHandler::task()'s RESET handling); do the same for a device put
+    // to sleep at runtime via `iec sleep <id>` — restore it to its persisted
+    // enabled state (a config-disabled device correctly stays disabled).
+    restoreActiveFromConfig();
+
     // close all open channels
     for(int i=0; i<16; i++)
         if( m_channels[i]!=nullptr )
@@ -2512,6 +2518,24 @@ bool iecDrive::reloadConfig()
         set_cwd(url);
     }
     return false;
+}
+
+// Cheap, RESET-safe counterpart to reloadConfig(): only restores the
+// persisted enabled flag, never touches m_cwd/set_cwd() so it can't do
+// network/MFile work. See drive.h for why that matters when called from
+// the real-time IEC bus task's RESET handling.
+void iecDrive::restoreActiveFromConfig()
+{
+    const psram_json &devices = mlConfig["devices"];
+    if (!devices.contains("iec"))
+        return;
+
+    const psram_json &iec = devices["iec"];
+    std::string key = std::to_string(m_devnr);
+    if (!iec.contains(key))
+        return;
+
+    setActive(iec[key].value("enabled", 1) != 0);
 }
 
 

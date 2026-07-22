@@ -124,12 +124,50 @@ static int iec(int argc, char **argv)
 
     if (strcmp(argv[1], "sleep") == 0)
     {
+        if (argc >= 3)
+        {
+            int value = atoi(argv[2]);
+            if (value < 0 || value > 30)
+            {
+                Serial.printf("Invalid device ID. Must be 0-30.\r\n");
+                return EXIT_FAILURE;
+            }
+            uint8_t devnr = static_cast<uint8_t>(value);
+            IECDevice *dev = IEC.findDevice(devnr, true);
+            if (dev == nullptr)
+            {
+                Serial.printf("No device #%u attached.\r\n", devnr);
+                return EXIT_FAILURE;
+            }
+            dev->setActive(false);
+            Serial.printf("Device #%u disabled until reset/reboot.\r\n", devnr);
+            return EXIT_SUCCESS;
+        }
         IEC.end();
         Serial.printf("IEC bus disabled.\r\n");
         return EXIT_SUCCESS;
     }
     else if (strcmp(argv[1], "wake") == 0)
     {
+        if (argc >= 3)
+        {
+            int value = atoi(argv[2]);
+            if (value < 0 || value > 30)
+            {
+                Serial.printf("Invalid device ID. Must be 0-30.\r\n");
+                return EXIT_FAILURE;
+            }
+            uint8_t devnr = static_cast<uint8_t>(value);
+            IECDevice *dev = IEC.findDevice(devnr, true);
+            if (dev == nullptr)
+            {
+                Serial.printf("No device #%u attached.\r\n", devnr);
+                return EXIT_FAILURE;
+            }
+            dev->setActive(true);
+            Serial.printf("Device #%u enabled.\r\n", devnr);
+            return EXIT_SUCCESS;
+        }
         IEC.begin();
         Serial.printf("IEC bus enabled.\r\n");
         return EXIT_SUCCESS;
@@ -139,7 +177,7 @@ static int iec(int argc, char **argv)
         return iecScan(argc, argv);
     }
 
-    Serial.printf("Usage: iec [sleep|wake|scan [start] [end]]\r\n");
+    Serial.printf("Usage: iec [sleep|wake [id]|scan [start] [end]]\r\n");
     return EXIT_FAILURE;
 }
 #else
