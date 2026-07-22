@@ -6,7 +6,7 @@
     </specVersion>
     <device>
         <deviceType>urn:schemas-upnp-org:device:ManageableDevice:1</deviceType>
-        <UDN>uuid:{{DEVICE_UUID}}</UDN>
+        <UDN>uuid:SSDP-DISABLED</UDN>
         <friendlyName>Meatloaf (Multi-device emulator)</friendlyName>
         <manufacturer>Meatloaf</manufacturer>
         <manufacturerURL>https://meatloaf.cc/</manufacturerURL>
@@ -14,6 +14,6 @@
         <modelNumber>ML-CBM-1.6.1</modelNumber>
         <modelURL>https://github.com/idolpx/meatloaf</modelURL>
         <serialNumber>MLCBM3C214F90</serialNumber>
-        <presentationURL>http://{{DEVICE_IPADDRESS}}</presentationURL>
+        <presentationURL>http://192.168.1.185</presentationURL>
     </device> 
 </root>
