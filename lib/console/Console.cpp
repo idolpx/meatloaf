@@ -33,8 +33,25 @@
 #include "meat_session.h"
 
 #include "tcpsvr.h"
+#include "mlConfig.h"
+#include "Esp.h"
+
+// Defined in SystemCommands.cpp; do_reboot() below needs ESP.restart().
+extern EspClass ESP;
 
 ESP32Console::Console console;
+
+// "reboot" must work even when the executor can't be created (memory
+// pressure) or is busy — same reasoning as "exit" below. Executes
+// immediately in the calling shell task rather than being submitted to
+// console_exec.
+static void do_reboot()
+{
+    printf("Saving configuration...\r\n");
+    mlConfig.save();
+    printf("Rebooting...\r\n");
+    ESP.restart();
+}
 
 // SessionBroker entry that frees the 16 KB console executor task after
 // 3 minutes without a command. Keep-alive is disabled (nothing to ping);
@@ -156,12 +173,13 @@ namespace ESP32Console
         registerCommand(getEnvCommand());
         registerCommand(getDeclareCommand());
         registerCommand(getRunCommand());
+        registerCommand(getRebootCommand());
+        registerCommand(getExitCommand());
     }
 
     void Console::registerSystemCommands()
     {
         registerCommand(getSysInfoCommand());
-        registerCommand(getRebootCommand());
         registerCommand(getMemInfoCommand());
         registerCommand(getTaskInfoCommand());
         registerCommand(getDateCommand());
@@ -188,7 +206,6 @@ namespace ESP32Console
         registerCommand(getNetstatCommand());
         registerCommand(getScanCommand());
         registerCommand(getConnectCommand());
-        registerCommand(getExitCommand());
 #ifndef MIN_CONFIG
         registerCommand(getWsCommand());
 #endif
@@ -656,6 +673,15 @@ namespace ESP32Console
                 continue;
             }
 
+            // "reboot" must work even when the executor can't be created
+            // (memory pressure) or is busy — handle it directly rather than
+            // submitting a command. Never returns.
+            if (raw_line == "reboot")
+            {
+                linenoiseFree(line);
+                do_reboot();
+            }
+
             // "exit" must work even when the executor can't be created
             // (memory pressure) — handle it without submitting a command.
             if (raw_line == "exit")
@@ -758,6 +784,14 @@ namespace ESP32Console
 
         std::string command_str = command;
         mstr::trim(command_str);
+
+        // "reboot" must work even when the executor can't be created (memory
+        // pressure) or is busy — handle it directly rather than submitting a
+        // command. Never returns.
+        if (command_str == "reboot")
+        {
+            do_reboot();
+        }
 
 #ifdef ENABLE_CONSOLE_TCP
         // "exit" must work even when the executor can't be created

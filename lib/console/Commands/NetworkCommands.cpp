@@ -378,30 +378,6 @@ namespace ESP32Console::Commands
         return ConsoleCommand("connect", &connect, "Connect to wifi");
     }
 
-    static int exit_console(int argc, char **argv)
-    {
-        // Commands run on the shared executor task, so use the submission
-        // origin (not the current task) to tell serial REPL from TCP.
-#ifdef ENABLE_CONSOLE_TCP
-        if (console.execOrigin() != ESP32Console::Console::ORIGIN_SERIAL)
-        {
-            // Submitted from a TCP session: just drop the client connection.
-            tcp_server.disconnect();
-            return EXIT_SUCCESS;
-        }
-#endif
-        // Serial REPL: stop the REPL task and return to on-demand mode so
-        // its stack is freed until the next byte of console input.
-        console.requestExit();
-        Debug_memory();
-        return EXIT_SUCCESS;
-    }
-
-    const ConsoleCommand getExitCommand()
-    {
-        return ConsoleCommand("exit", &exit_console, "Exit the console (serial: REPL stops until next input; TCP: disconnect)");
-    }
-
 #ifndef MIN_CONFIG
     static int ws_send(int argc, char **argv)
     {

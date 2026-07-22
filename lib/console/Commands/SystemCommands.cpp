@@ -154,15 +154,6 @@ static int sysInfo(int argc, char **argv)
     return EXIT_SUCCESS;
 }
 
-static int reboot(int argc, char **argv)
-{
-    Serial.println("Saving configuration...");
-    mlConfig.save();
-    Serial.println("Rebooting...");
-    ESP.restart();
-    return EXIT_SUCCESS;
-}
-
 static int meminfo(int argc, char **argv)
 {
     uint32_t free = ESP.getFreeHeap() / 1024;
@@ -406,11 +397,6 @@ static int config_cmd(int argc, char **argv)
 
 namespace ESP32Console::Commands
 {
-    const ConsoleCommand getRebootCommand()
-    {
-        return ConsoleCommand("reboot", &reboot, "Reboot the system");
-    }
-
     const ConsoleCommand getSysInfoCommand()
     {
         return ConsoleCommand("sysinfo", &sysInfo, "Shows informations about the system like chip model and ESP-IDF version");

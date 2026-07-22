@@ -7,6 +7,12 @@
 
 #include "string_utils.h"
 #include "../../../src/ml_tests.h"
+#include "mlConfig.h"
+#include "Esp.h"
+#include "tcpsvr.h"
+
+// Defined in SystemCommands.cpp; reboot() below needs ESP.restart().
+extern EspClass ESP;
 
 static int clear(int argc, char **argv)
 {
@@ -147,6 +153,34 @@ static int run(int argc, char **argv)
     return EXIT_SUCCESS;
 }
 
+static int reboot(int argc, char **argv)
+{
+    Serial.println("Saving configuration...");
+    mlConfig.save();
+    Serial.println("Rebooting...");
+    ESP.restart();
+    return EXIT_SUCCESS;
+}
+
+static int exit_console(int argc, char **argv)
+{
+    // Commands run on the shared executor task, so use the submission
+    // origin (not the current task) to tell serial REPL from TCP.
+#ifdef ENABLE_CONSOLE_TCP
+    if (console.execOrigin() != ESP32Console::Console::ORIGIN_SERIAL)
+    {
+        // Submitted from a TCP session: just drop the client connection.
+        tcp_server.disconnect();
+        return EXIT_SUCCESS;
+    }
+#endif
+    // Serial REPL: stop the REPL task and return to on-demand mode so
+    // its stack is freed until the next byte of console input.
+    console.requestExit();
+    Debug_memory();
+    return EXIT_SUCCESS;
+}
+
 namespace ESP32Console::Commands
 {
     const ConsoleCommand getClearCommand()
@@ -183,5 +217,15 @@ namespace ESP32Console::Commands
     const ConsoleCommand getRunCommand()
     {
         return ConsoleCommand("run", &run, "Run a command");
+    }
+
+    const ConsoleCommand getRebootCommand()
+    {
+        return ConsoleCommand("reboot", &reboot, "Reboot the system");
+    }
+
+    const ConsoleCommand getExitCommand()
+    {
+        return ConsoleCommand("exit", &exit_console, "Exit the console (serial: REPL stops until next input; TCP: disconnect)");
     }
 }
