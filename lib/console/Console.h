@@ -12,6 +12,7 @@
 
 #include "../../include/debug.h"
 
+#include <functional>
 #include <memory>
 
 #define CONSOLE_UART        UART_NUM_0
@@ -65,6 +66,7 @@ namespace ESP32Console
         SemaphoreHandle_t exec_users_mutex_ = nullptr; // protects refcount + task lifecycle
         int exec_users_ = 0;
         const char *exec_line_ = nullptr;
+        std::function<void()> exec_fn_;    // set instead of exec_line_ by runOnExecutor()
         int exec_ret_ = 0;
         esp_err_t exec_err_ = ESP_OK;
         volatile Origin exec_origin_ = ORIGIN_NONE;
@@ -202,6 +204,16 @@ namespace ESP32Console
          * finish. Serializes commands from all consoles (serial/TCP/WS).
          */
         esp_err_t runCommand(const char *line, int *ret, Origin origin);
+
+        /**
+         * @brief Run an arbitrary function on the executor task's 16 KB
+         * stack and wait for it to finish. For system code that needs the
+         * same deep-stack headroom console commands get (e.g. constructing
+         * a network MFile chain) without registering a fake command or
+         * paying for a dedicated task. Caller must bracket the call with
+         * execAcquire()/execRelease() so the executor task exists.
+         */
+        esp_err_t runOnExecutor(std::function<void()> fn);
 
         /**
          * @brief Refcounted executor lifecycle: a console session calls

@@ -95,9 +95,23 @@ bool initFailed = false;
 
 
 #if defined(BUILD_IEC) || defined(BUILD_GPIB)
-// One-shot task: retries reloadConfig() for drives whose persisted network-scheme
-// URL (fsp://, http://, ...) was deferred at boot because WiFi wasn't connected
-// yet. Polls fnWiFi.connected() and exits once it retries (or WiFi never comes up).
+// Retries reloadConfig() for drives whose persisted network-scheme URL
+// (fsp://, http://, ...) was deferred at boot because WiFi wasn't connected
+// yet. Constructing a network MFile chain needs deep stack (PeoplesUrlParser
+// + nlohmann::json), so this must run somewhere with a big contiguous stack.
+static void reload_network_drives()
+{
+    for (int i = 0; i < MAX_DISK_DEVICES; i++)
+        Meatloaf.get_disks(i)->disk_dev.reloadConfig();
+    Meatloaf.reloadConfig();
+}
+
+// One-shot task: polls fnWiFi.connected() and, once up, runs
+// reload_network_drives(). The polling loop itself is stack-cheap; the
+// deep-stack work is handed off to the console's existing 16 KB executor
+// task (ENABLE_CONSOLE builds) instead of paying for a second dedicated
+// big-stack task. Builds without a console fall back to running it inline
+// on this task's own (in that case, 16 KB) stack.
 static void reload_network_drives_task(void *)
 {
     const int max_wait_ms = 30000;
@@ -111,9 +125,13 @@ static void reload_network_drives_task(void *)
 
     if (fnWiFi.connected())
     {
-        for (int i = 0; i < MAX_DISK_DEVICES; i++)
-            Meatloaf.get_disks(i)->disk_dev.reloadConfig();
-        Meatloaf.reloadConfig();
+#ifdef ENABLE_CONSOLE
+        console.execAcquire();
+        console.runOnExecutor(reload_network_drives);
+        console.execRelease();
+#else
+        reload_network_drives();
+#endif
     }
 
     vTaskDelete(NULL);
@@ -328,8 +346,17 @@ void main_setup()
 
     // At least one drive has a persisted network-scheme URL and WiFi isn't
     // connected yet: retry once it is, instead of leaving it unmounted forever.
+    // The task itself only polls fnWiFi.connected() — the deep-stack MFile
+    // work runs on console's executor task (see reload_network_drives_task),
+    // so this stack only needs to be big enough without ENABLE_CONSOLE, where
+    // reload_network_drives() runs inline on it.
+#ifdef ENABLE_CONSOLE
+    const uint32_t net_drive_retry_stack = 3072;
+#else
+    const uint32_t net_drive_retry_stack = 16384;
+#endif
     if (network_drive_deferred)
-        xTaskCreatePinnedToCore(reload_network_drives_task, "net_drive_retry", 3072, nullptr, 3, nullptr, 0);
+        xTaskCreatePinnedToCore(reload_network_drives_task, "net_drive_retry", net_drive_retry_stack, nullptr, 3, nullptr, 0);
 #endif
 
 #ifdef DEBUG_TIMING

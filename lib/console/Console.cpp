@@ -389,7 +389,16 @@ namespace ESP32Console
                 stdout = _tee;
 #endif
 
-            c->exec_err_ = esp_console_run(c->exec_line_, &c->exec_ret_);
+            if (c->exec_fn_)
+            {
+                c->exec_fn_();
+                c->exec_err_ = ESP_OK;
+                c->exec_ret_ = 0;
+            }
+            else
+            {
+                c->exec_err_ = esp_console_run(c->exec_line_, &c->exec_ret_);
+            }
 
             fflush(stdout);
             stdout = prev_stdout;
@@ -440,6 +449,7 @@ namespace ESP32Console
             return ESP_FAIL;
         }
 
+        exec_fn_ = nullptr;   // ensure exec_task_fn takes the esp_console_run() branch
         exec_line_ = line;
         exec_origin_ = origin;
         xSemaphoreGive(exec_start_);
@@ -452,6 +462,52 @@ namespace ESP32Console
         if (session)
         {
             // Idle timeout counts from command completion, not submission
+            session->updateActivity();
+            session->releaseIO();
+        }
+        return err;
+    }
+
+    esp_err_t Console::runOnExecutor(std::function<void()> fn)
+    {
+        // Mirrors runCommand()'s submission choreography, but runs an
+        // arbitrary function on the executor task instead of a parsed
+        // command line.
+        if (exec_task_ == nullptr)
+        {
+            xSemaphoreTake(exec_users_mutex_, portMAX_DELAY);
+            if (exec_users_ > 0 && exec_task_ == nullptr &&
+                xTaskCreatePinnedToCore(&Console::exec_task_fn, "console_exec", 16384, this, 5, &exec_task_, 0) != pdTRUE)
+            {
+                exec_task_ = nullptr;
+            }
+            xSemaphoreGive(exec_users_mutex_);
+        }
+
+        auto session = execSessionTouch();
+        if (session)
+            session->acquireIO();
+
+        xSemaphoreTake(exec_mutex_, portMAX_DELAY);
+
+        if (exec_task_ == nullptr)
+        {
+            xSemaphoreGive(exec_mutex_);
+            if (session)
+                session->releaseIO();
+            return ESP_FAIL;
+        }
+
+        exec_line_ = nullptr;   // ensure exec_task_fn takes the exec_fn_ branch
+        exec_fn_ = fn;
+        exec_origin_ = ORIGIN_NONE;
+        xSemaphoreGive(exec_start_);
+        xSemaphoreTake(exec_done_, portMAX_DELAY);
+        esp_err_t err = exec_err_;
+        exec_fn_ = nullptr;
+        xSemaphoreGive(exec_mutex_);
+        if (session)
+        {
             session->updateActivity();
             session->releaseIO();
         }

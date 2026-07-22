@@ -1,1 +1,1 @@
-20260716.02.freenove-esp32-s3-wroom-1
+20260721.23.lolin-d32-pro
