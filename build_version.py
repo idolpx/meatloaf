@@ -25,25 +25,33 @@ print(f"Setting build version for environment: {environment_name}")
 #    print("Automatic versioning disabled")
 #    exit
 
-# Don't do anything if nothing has changed
-if len(subprocess.check_output(["git", "diff", "--name-only"], universal_newlines=True)) == 0:
-    print("Nothing has changed")
+try:
+    ver_build = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], universal_newlines=True).strip()
+except subprocess.CalledProcessError as e:
+    ver_build = "NOGIT"
 
+header_file = "include/version.h"
+version_file = "version.txt"
+
+ver_date = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+fw_date = datetime.datetime.now().strftime("%Y%m%d.%H")
+
+# Only rewrite version.h if the commit has changed since the last build (avoids
+# forcing a rebuild of everything that includes version.h just because the
+# embedded timestamp would differ).
+last_build = ""
+for line in open(header_file):
+    m = re.match(r'^#define FN_VERSION_BUILD "(\w+)"', line)
+    if m is not None:
+        last_build = m.group(1)
+        break
+
+if ver_build == last_build:
+    print("Commit hasn't changed, skipping version.h update")
 else:
-    try:
-        ver_build = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], universal_newlines=True).strip()
-    except subprocess.CalledProcessError as e:
-        ver_build = "NOGIT"
-    
-    header_file = "include/version.h"
-    version_file = "version.txt"
-
-    ver_date = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    fw_date = datetime.datetime.now().strftime("%Y%m%d.%H")
-
     rxs = [r'^#define FN_VERSION_MAJOR (\w+)', r'^#define FN_VERSION_MINOR (\w+)',
-           '^(#define FN_VERSION_BUILD)', '^(#define FN_VERSION_DATE)', '^(#define FN_VERSION_FULL)', 
+           '^(#define FN_VERSION_BUILD)', '^(#define FN_VERSION_DATE)', '^(#define FN_VERSION_FULL)',
            '^(#define FW_VERSION)']
 
     ver_maj = ""
@@ -85,10 +93,9 @@ else:
 
     fout.close()
 
-    # Write version.txt
-    #version_txt = ver_maj + "." + ver_min + "." + ver_build + "." + environment_name
-    version_txt = fw_date + "." + environment_name
-    print(version_txt)
-    fout = open(version_file, "w")
-    fout.write(version_txt)
-    fout.close()
+# Always write version.txt
+version_txt = fw_date + "." + environment_name
+print(version_txt)
+fout = open(version_file, "w")
+fout.write(version_txt)
+fout.close()

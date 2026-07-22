@@ -45,3 +45,4 @@ version.txt
 include/version.h
 .superpowers/
 
+__pycache__/build_version.cpython-314.pyc
