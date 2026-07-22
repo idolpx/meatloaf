@@ -76,10 +76,11 @@ public:
         switch (size + media_header_size) 
         {
             // Apple        // 35 Tracks, 16 sector/track, 256 bytes/sector
-            case 146660:    
+            case 143360:    
                 break;
 
-            // Coco         // 35 Tracks, 16 sector/track, 256 bytes/sector
+            // Coco         // DECB - 35 Tracks, 16 sector/track, 256 bytes/sector
+            // Coco         // OS9
             case 161280:
                 break;
 
@@ -88,9 +89,17 @@ public:
             case 163840:
                 break;
 
-            // Coco OS9
+            // Coco         // OS9
+            // TI99/4A      // PC99 - 40 tracks, 9 sectors per track, 256 bytes per sector, 2 sides
             case 184320:
                 break;
+
+            // TI99/4A
+            case 92160:     // V9T9 - 40 tracks, 9 sectors per track, 256 bytes per sector, 1 side
+                break;
+
+            default:
+                throw std::runtime_error("Unsupported DSK image size: " + std::to_string(size));
         }
     };
 
