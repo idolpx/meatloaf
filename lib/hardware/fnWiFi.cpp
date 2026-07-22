@@ -695,6 +695,17 @@ void WiFiManager::_wifi_event_handler(void *arg, esp_event_base_t event_base,
             // Arm Web / WebDAV Server (real httpd starts on first request)
             httpServer.startOnDemand();
 
+            // Give the interface an IPv6 link-local address BEFORE mDNS starts.
+            // Resolvers (macOS getaddrinfo, and so Finder) query A and AAAA
+            // together and wait for both. With no IPv6 address the responder
+            // answered neither the AAAA nor a negative NSEC record, so every
+            // lookup of <name>.local sat out the resolver's full 5-second
+            // timeout. Finder opens a fresh connection per request, so one file
+            // copy paid that 5s ~200 times -- slow enough that its client gave
+            // up mid-PUT and the file was left at the zero length its
+            // placeholder PUT created.
+            esp_netif_create_ip6_linklocal(pFnWiFi->_wifi_sta);
+
             // Start mDNS Service
             mdns_init();
             mdns_hostname_set(Config.get_general_devicename().c_str());

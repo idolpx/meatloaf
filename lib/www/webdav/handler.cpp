@@ -26,8 +26,19 @@
 #include "webdav_server.h"
 #include "request.h"
 #include "response.h"
+#include "body_capture.h"
 
 #include <cstring>
+
+// A non-ESP_OK return makes esp_http_server close the socket, required when the
+// request body was not read to its end: a chunked body has no Content-Length
+// for the server to skip by, so the leftover bytes would be parsed as the next
+// request. connectionReusable() is false in exactly that case (an unterminated
+// or errored chunked body).
+static esp_err_t finish(WebDav::Request &req)
+{
+    return req.connectionReusable() ? ESP_OK : ESP_FAIL;
+}
 
 esp_err_t webdav_handler(httpd_req_t *httpd_req)
 {
@@ -35,6 +46,14 @@ esp_err_t webdav_handler(httpd_req_t *httpd_req)
     WebDav::Request req(httpd_req);
     WebDav::Response resp(httpd_req);
     int ret;
+
+    // Mark this request's captured body prefix consumed on every exit path, so
+    // the next request on a kept-alive connection starts with a fresh buffer.
+    struct CaptureReset
+    {
+        httpd_req_t *r;
+        ~CaptureReset() { WebDav::body_capture_reset(r); }
+    } captureReset{httpd_req};
 
     Debug_printv("uri[%s]", httpd_req->uri);
 
@@ -59,7 +78,7 @@ esp_err_t webdav_handler(httpd_req_t *httpd_req)
     case HTTP_GET:
         ret = server->doGet(req, resp);
         if ( ret == 200 )
-            return ESP_OK;
+            return finish(req);
         break;
     case HTTP_HEAD:
         ret = server->doHead(req, resp);
@@ -67,7 +86,7 @@ esp_err_t webdav_handler(httpd_req_t *httpd_req)
     case HTTP_LOCK:
         ret = server->doLock(req, resp);
         if ( ret == 200 )
-            return ESP_OK;
+            return finish(req);
         break;
     case HTTP_MKCOL:
         ret = server->doMkcol(req, resp);
@@ -81,12 +100,12 @@ esp_err_t webdav_handler(httpd_req_t *httpd_req)
     case HTTP_PROPFIND:
         ret = server->doPropfind(req, resp);
         if (ret == 207)
-            return ESP_OK;
+            return finish(req);
         break;
     case HTTP_PROPPATCH:
         ret = server->doProppatch(req, resp);
         if (ret == 207)
-            return ESP_OK;
+            return finish(req);
         break;
     case HTTP_PUT:
         ret = server->doPut(req, resp);
@@ -132,7 +151,7 @@ esp_err_t webdav_handler(httpd_req_t *httpd_req)
         resp.closeBody();
     }
 
-    return ESP_OK;
+    return finish(req);
 }
 
 void webdav_register(httpd_handle_t server, const char *root_uri, const char *root_path)
