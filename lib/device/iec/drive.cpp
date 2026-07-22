@@ -45,6 +45,7 @@
 #include "media/hd/dhd.h"
 #include "media/tape/tap.h"
 #include "qrmanager.h"
+#include "../../www/ws/activity.h"
 
 #include "../../../include/global_defines.h"
 #include "../../../include/debug.h"
@@ -255,6 +256,19 @@ iecChannelHandlerFile::~iecChannelHandlerFile()
 
     double cps = m_byteCount / seconds;
     Debug_printv("%s %lu bytes in %0.2f seconds @ %0.2f B/s", m_stream->mode == std::ios_base::in ? "Sent" : "Received", m_byteCount, seconds, cps);
+
+    // "Sent" (mode == in) is a LOAD from the C64's perspective.
+    if( m_stream->mode == std::ios_base::in && m_byteCount > 0 )
+    {
+        std::string basename = m_stream->url;
+        size_t slash = basename.find_last_of('/');
+        if (slash != std::string::npos)
+            basename = basename.substr(slash + 1);
+
+        char loadMsg[160];
+        snprintf(loadMsg, sizeof(loadMsg), "%s (%lu bytes @ %.0f B/s)", basename.c_str(), m_byteCount, cps);
+        notify_activity(m_drive->activitySource(), "load", loadMsg);
+    }
 
     double tseconds = m_transportTimeUS / 1000000.0;
     cps = m_byteCount / (seconds-tseconds);
@@ -2104,6 +2118,10 @@ void iecDrive::setStatusCode(uint8_t code, uint8_t trk, uint8_t sec)
 #ifdef ENABLE_DISPLAY
     LEDS.status( code );
 #endif
+
+    char statusMsg[64];
+    getStatus(statusMsg, sizeof(statusMsg));
+    notify_activity(activitySource(), "status", statusMsg);
 }
 
 
@@ -2349,6 +2367,8 @@ void iecDrive::set_cwd(std::string path, bool verified)
         m_cwd.reset(MFSOwner::File("/", true));
     }
 
+    std::string old_url = m_cwd->url;
+
     Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "Changing directory to [%s][%s]", m_cwd ? m_cwd->url.c_str() : "<null>", path.c_str());
     if ( m_cwd->url == path)
     {
@@ -2366,6 +2386,7 @@ void iecDrive::set_cwd(std::string path, bool verified)
             m_cwd.reset(n);
             setStatusCode(ST_OK);
             persistConfig();
+            notify_activity(activitySource(), "path", m_cwd->url);
         } else {
             setStatusCode(ST_FILE_NOT_FOUND);
         }
@@ -2437,6 +2458,9 @@ void iecDrive::set_cwd(std::string path, bool verified)
         setStatusCode(ST_SYNTAX_INVALID);
 
     persistConfig();
+
+    if (m_cwd->url != old_url)
+        notify_activity(activitySource(), "path", m_cwd->url);
 }
 
 
@@ -2515,7 +2539,10 @@ bool iecDrive::reloadConfig()
         return false;
 
     const psram_json &entry = iec[key];
+    bool wasActive = isActive();
     setActive(entry.value("enabled", 1) != 0);
+    if (isActive() != wasActive)
+        notify_activity(activitySource(), isActive() ? "active" : "disabled");
 
     std::string url = entry.value("url", "");
     if (!url.empty() && (m_cwd == nullptr || m_cwd->url != url))
@@ -2546,7 +2573,10 @@ void iecDrive::restoreActiveFromConfig()
     if (!iec.contains(key))
         return;
 
+    bool wasActive = isActive();
     setActive(iec[key].value("enabled", 1) != 0);
+    if (isActive() != wasActive)
+        notify_activity(activitySource(), isActive() ? "active" : "disabled");
 }
 
 

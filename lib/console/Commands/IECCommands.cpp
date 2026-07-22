@@ -3,9 +3,11 @@
 #include "../../bus/iec/IECHost.h"
 #include "../../bus/iec/iec.h"
 #include "../Console.h"
+#include "../../www/ws/activity.h"
 
 #include <cstdlib>
 #include <cstring>
+#include <string>
 
 #ifdef BUILD_IEC
 static const char *deviceTypeLabel(uint8_t devnr)
@@ -107,6 +109,7 @@ static int iecScan(int argc, char **argv)
         if (virt != nullptr)
         {
             virt->setActive(false);
+            notify_activity("device" + std::to_string(devnr), "disabled", "conflicting physical device detected");
             Serial.printf(" #%-2d: disabled conflicting virtual %s device\r\n", devnr, deviceTypeLabel(devnr));
         }
     }
@@ -140,10 +143,12 @@ static int iec(int argc, char **argv)
                 return EXIT_FAILURE;
             }
             dev->setActive(false);
+            notify_activity("device" + std::to_string(devnr), "disabled");
             Serial.printf("Device #%u disabled until reset/reboot.\r\n", devnr);
             return EXIT_SUCCESS;
         }
         IEC.end();
+        notify_activity("bus", "disabled");
         Serial.printf("IEC bus disabled.\r\n");
         return EXIT_SUCCESS;
     }
@@ -165,10 +170,12 @@ static int iec(int argc, char **argv)
                 return EXIT_FAILURE;
             }
             dev->setActive(true);
+            notify_activity("device" + std::to_string(devnr), "active");
             Serial.printf("Device #%u enabled.\r\n", devnr);
             return EXIT_SUCCESS;
         }
         IEC.begin();
+        notify_activity("bus", "active");
         Serial.printf("IEC bus enabled.\r\n");
         return EXIT_SUCCESS;
     }

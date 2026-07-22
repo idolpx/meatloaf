@@ -136,6 +136,9 @@ public:
   // persistently disabled via config (enabled=0) correctly stays disabled.
   void restoreActiveFromConfig();
 
+  // Source identifier used for WS activity notifications, e.g. "drive8".
+  std::string activitySource() { return "drive" + std::to_string(m_devnr); }
+
   int     id() { return m_devnr; };
   uint8_t getNumOpenChannels();
   std::string getCWD() { return m_cwd->url; }
