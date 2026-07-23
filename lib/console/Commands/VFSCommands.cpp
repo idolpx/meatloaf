@@ -11,6 +11,7 @@
 #include "esp_vfs_fat.h"
 #include <sys/syslimits.h>
 #include <iostream>
+#include <vector>
 #include <esp_heap_caps.h>
 #include <zlib.h>
 #include "../../meatloaf/network/http.h"
@@ -32,6 +33,13 @@ static inline void *psram_malloc(size_t sz) {
 #include "../ute/ute.h"
 #include "../../device/iec/meatloaf.h"
 #include "mlff.h"
+#include "mlConfig.h"
+
+// A std::string/std::vector pair backed by PsramAllocator (mlConfig.h) instead
+// of the default internal-DRAM allocator, for lists that can grow large
+// (e.g. rm -rf * matching thousands of directory entries).
+using psram_string = std::basic_string<char, std::char_traits<char>, PsramAllocator<char>>;
+using psram_string_vector = std::vector<psram_string, PsramAllocator<psram_string>>;
 
 using namespace ESP32Console;
 
@@ -326,58 +334,128 @@ int cp(int argc, char **argv)
     return EXIT_SUCCESS;
 }
 
+// Recursively deletes a file or directory tree via MFile, so it works for
+// any MFSOwner-addressable path (not just local flash/SD). Returns true if
+// the path is gone by the time this returns (or -f suppressed the failure).
+static bool rm_path(const std::string &path, bool recursive, bool force)
+{
+    std::unique_ptr<MFile> f(MFSOwner::File(path));
+    if (!f || !f->exists())
+    {
+        if (!force)
+            Serial.printf("rm: cannot remove '%s': No such file or directory\r\n", path.c_str());
+        return force;
+    }
+
+    if (f->isDirectory())
+    {
+        if (!recursive)
+        {
+            if (!force)
+                Serial.printf("rm: cannot remove '%s': Is a directory\r\n", path.c_str());
+            return force;
+        }
+
+        bool ok = true;
+        f->rewindDirectory();
+        MFile *rawEntry;
+        while ((rawEntry = f->getNextFileInDir()) != nullptr)
+        {
+            std::unique_ptr<MFile> entry(rawEntry);
+            if (entry->name == "." || entry->name == "..")
+                continue;
+            if (!rm_path(path + "/" + entry->name, recursive, force))
+                ok = false;
+        }
+
+        if (!f->rmDir())
+        {
+            if (!force)
+                Serial.printf("rm: cannot remove '%s'\r\n", path.c_str());
+            return force;
+        }
+        Serial.printf("%s removed\r\n", path.c_str());
+        return ok;
+    }
+
+    if (!f->remove())
+    {
+        if (!force)
+            Serial.printf("rm: cannot remove '%s': %s\r\n", path.c_str(), strerror(errno));
+        return force;
+    }
+    Serial.printf("%s removed\r\n", path.c_str());
+    return true;
+}
+
 int rm(int argc, char **argv)
 {
-    if (argc != 2)
+    bool recursive = false;
+    bool force = false;
+    int argi = 1;
+
+    // Parse leading -r/-f/-rf style flags (combined single-dash groups).
+    while (argi < argc && argv[argi][0] == '-' && argv[argi][1] != '\0')
     {
-        Serial.printf("You have to pass exactly one file. Syntax rm [FILE]\r\n");
+        for (const char *p = argv[argi] + 1; *p; p++)
+        {
+            if (*p == 'r' || *p == 'R') recursive = true;
+            else if (*p == 'f') force = true;
+            else
+            {
+                Serial.printf("rm: invalid option -- '%c'\r\n", *p);
+                return EXIT_FAILURE;
+            }
+        }
+        argi++;
+    }
+
+    if (argi >= argc)
+    {
+        Serial.printf("Usage: rm [-rf] FILE...\r\n");
         return EXIT_SUCCESS;
     }
 
-    char filename[PATH_MAX];
-    ESP32Console::console_realpath(argv[1], filename);
-    Debug_printv("argv[1][%s] filename[%s]", argv[1], filename);
+    bool anyFailed = false;
 
-    if ( strlen(filename) > 1 && filename[strlen(filename) - 1] == '*' )
+    for (; argi < argc; argi++)
     {
-        char path[PATH_MAX];
-        ESP32Console::console_realpath(".", path);
+        std::string pattern = argv[argi];
 
-        DIR *dir = opendir(path);
-        struct dirent *d;
-        while ((d = readdir(dir)) != NULL)
+        if (pattern.find('*') != std::string::npos || pattern.find('?') != std::string::npos)
         {
-            std::string pattern = filename;
-            std::string match_file;
-            match_file.reserve(strlen(path) + 1 + strlen(d->d_name));
-            match_file = path;
-            if (strlen(path) > 1)
-                match_file += '/';
-            match_file += d->d_name;
-            Debug_printv("pattern[%s] match_file[%s]", pattern.c_str(), match_file.c_str());
-            if ( mstr::compare(match_file, pattern, false) )
+            // List matches first, then delete — removing entries while
+            // iterating the directory handle isn't safe on all backing
+            // filesystems.
+            MFile *cwd = getCurrentPath();
+            psram_string_vector matches;
+            cwd->rewindDirectory();
+            MFile *rawEntry;
+            while ((rawEntry = cwd->getNextFileInDir()) != nullptr)
             {
-                if (remove(match_file.c_str()))
-                {
-                    Serial.printf("Error removing %s: %s\r\n", filename, strerror(errno));
-                    closedir(dir);
-                    return EXIT_FAILURE;
-                }
-                Serial.printf("%s removed\r\n", d->d_name);
+                std::unique_ptr<MFile> entry(rawEntry);
+                if (entry->name == "." || entry->name == "..")
+                    continue;
+                if (mstr::compare(entry->name, pattern, false))
+                    matches.emplace_back((cwd->url + "/" + entry->name).c_str());
             }
+
+            if (matches.empty() && !force)
+                Serial.printf("rm: no matches for '%s'\r\n", pattern.c_str());
+
+            for (auto &m : matches)
+                if (!rm_path(std::string(m.c_str()), recursive, force))
+                    anyFailed = true;
         }
-        closedir(dir);
-    }
-    else
-    {
-        if(remove(filename)) {
-            Serial.printf("Error removing %s: %s\r\n", filename, strerror(errno));
-            return EXIT_FAILURE;
+        else
+        {
+            std::unique_ptr<MFile> target(getCurrentPath()->cd(argv[argi]));
+            if (!target || !rm_path(target->url, recursive, force))
+                anyFailed = true;
         }
-        Serial.printf("%s removed\r\n", filename);
     }
 
-    return EXIT_SUCCESS;
+    return anyFailed ? EXIT_FAILURE : EXIT_SUCCESS;
 }
 
 int rmdir(int argc, char **argv)
@@ -1852,7 +1930,7 @@ namespace ESP32Console::Commands
 
     const ConsoleCommand getRMCommand()
     {
-         return ConsoleCommand("rm", &rm, "Permanenty deletes the given file.");
+         return ConsoleCommand("rm", &rm, "Permanently deletes files. Usage: rm [-rf] FILE...", "[-rf] FILE...");
     }
 
     const ConsoleCommand getRMDirCommand()
