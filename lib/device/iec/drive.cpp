@@ -887,6 +887,7 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
             }
 
             // Handle CMD-style directory filters by preserving them in URL
+            bool wasDirListing = false;
             if ( name[0] == '$' ) {
                 // Check if this is a CMD-style filter (e.g., $=P, $GAME*, $=P:GAME*)
                 if (name.length() > 1 && (name[1] == '=' || isalnum(name[1]))) {
@@ -896,6 +897,7 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                 } else {
                     // Plain "$" - traditional directory listing
                     name.clear();
+                    wasDirListing = true;
                 }
             }
 
@@ -1077,6 +1079,13 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                                 Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "dir url[%s]", f->url.c_str() );
                                 //m_cwd.reset(MFSOwner::File(f->url));
                                 set_cwd(f->url, true);
+                            }
+                            else if (wasDirListing && f->url == m_cwd->url)
+                            {
+                                // A plain "$" listing degenerated into re-opening the file m_cwd
+                                // already points at (cwd is parked directly on a file, not a
+                                // directory) — just a look, not a navigation, so leave cwd alone.
+                                Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "dir listing on file, not changing cwd [%s]", f->url.c_str() );
                             }
                             else
                             {
