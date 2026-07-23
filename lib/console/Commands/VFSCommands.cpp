@@ -14,10 +14,6 @@
 #include <esp_heap_caps.h>
 #include <zlib.h>
 #include "../../meatloaf/network/http.h"
-#ifndef MIN_CONFIG
-#include <archive.h>
-#include <archive_entry.h>
-#endif
 
 static inline void *psram_malloc(size_t sz) {
     void *p = heap_caps_malloc(sz, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
@@ -1657,18 +1653,76 @@ static int cmd_gzip(int argc, char **argv)
 // ─── unzip ────────────────────────────────────────────────────────────────────
 #ifndef MIN_CONFIG
 
-static void unzip_mkdirs(const char *path)
+// Creates every path segment (mkdir -p semantics) via MFile::mkDir(), so it
+// works for any MFSOwner-addressable destination, not just local flash/SD.
+// Intermediate segments that already exist are expected to fail — ignored,
+// matching the previous POSIX mkdir()-based behavior.
+static void unzip_mkdirs(const std::string &path)
 {
-    char tmp[512];
-    snprintf(tmp, sizeof(tmp), "%s", path);
-    for (char *p = tmp + 1; *p; p++) {
-        if (*p == '/') {
-            *p = '\0';
-            mkdir(tmp, 0755);
-            *p = '/';
+    for (size_t pos = path.find('/', 1); pos != std::string::npos; pos = path.find('/', pos + 1)) {
+        std::unique_ptr<MFile> dir(MFSOwner::File(path.substr(0, pos)));
+        if (dir) dir->mkDir();
+    }
+    std::unique_ptr<MFile> dir(MFSOwner::File(path));
+    if (dir) dir->mkDir();
+}
+
+// Mirrors ArchiveMFile::isSingleFileCompression()/getInnerFilename() without
+// reaching into that class's internals — just enough to route a single-file
+// compressed input (.gz, .bz2, ...) through its one decoded stream instead
+// of ArchiveMFile's directory tree-walk (see below).
+static const char *const kCompressionExts[] = {".gz", ".bz2", ".xz", ".lz", ".z", ".zst", ".lz4", nullptr};
+
+static bool is_single_file_compression(const std::string &name)
+{
+    for (int i = 0; kCompressionExts[i]; i++)
+        if (mstr::endsWith(name, kCompressionExts[i], false))
+            return true;
+    return false;
+}
+
+static std::string strip_compression_ext(const std::string &name)
+{
+    for (int i = 0; kCompressionExts[i]; i++)
+        if (mstr::endsWith(name, kCompressionExts[i], false))
+            return name.substr(0, name.length() - strlen(kCompressionExts[i]));
+    return name;
+}
+
+// Copies srcStream's content to destPath (an MFile opened for write),
+// creating parent directories as needed. Prints progress for large entries.
+// Returns bytes copied, or -1 on error.
+static int64_t unzip_write_entry(uint8_t *buf, size_t bufSize, std::shared_ptr<MStream> srcStream,
+                                  const std::string &destPath, int64_t entry_size)
+{
+    const int64_t kProgressThreshold = 512 * 1024;
+    const size_t kReport = 256 * 1024;
+
+    size_t slash = destPath.rfind('/');
+    if (slash != std::string::npos)
+        unzip_mkdirs(destPath.substr(0, slash));
+
+    std::unique_ptr<MFile> outFile(MFSOwner::File(destPath));
+    std::shared_ptr<MStream> outStream = outFile ? outFile->getSourceStream(std::ios_base::out) : nullptr;
+    if (!outStream || !outStream->isOpen()) {
+        Serial.printf("unzip: cannot create '%s'\r\n", destPath.c_str());
+        return -1;
+    }
+
+    size_t entry_bytes = 0, last_report = 0;
+    uint32_t n;
+    while ((n = srcStream->read(buf, bufSize)) > 0) {
+        outStream->write(buf, n);
+        entry_bytes += n;
+        if (entry_size >= kProgressThreshold && entry_bytes - last_report >= kReport) {
+            Serial.printf("    %zu / %lld bytes (%d%%)\r\n",
+                          entry_bytes, (long long)entry_size,
+                          (int)(entry_bytes * 100 / (size_t)entry_size));
+            last_report = entry_bytes;
         }
     }
-    mkdir(tmp, 0755);
+    outStream->close();
+    return (int64_t)entry_bytes;
 }
 
 static int cmd_unzip(int argc, char **argv)
@@ -1688,88 +1742,70 @@ static int cmd_unzip(int argc, char **argv)
     }
     while (dest.size() > 1 && dest.back() == '/') dest.pop_back();
 
-    struct archive *a = archive_read_new();
-    archive_read_support_filter_all(a);
-    archive_read_support_format_all(a);
-
-    if (archive_read_open_filename(a, src.c_str(), 16384) != ARCHIVE_OK) {
-        Serial.printf("unzip: cannot open '%s': %s\r\n", src.c_str(), archive_error_string(a));
-        archive_read_free(a);
+    std::unique_ptr<MFile> srcFile(MFSOwner::File(src));
+    if (!srcFile || !srcFile->exists()) {
+        Serial.printf("unzip: cannot open '%s'\r\n", src.c_str());
         return EXIT_FAILURE;
     }
 
     uint8_t *buf = (uint8_t *)psram_malloc(4096);
     if (!buf) {
         Serial.printf("unzip: out of memory\r\n");
-        archive_read_free(a);
         return EXIT_FAILURE;
     }
 
-    struct archive_entry *entry;
-    int count = 0, r;
+    int count = 0;
     size_t total_bytes = 0;
-    const size_t kProgressThreshold = 512 * 1024;
-    const size_t kReport = 256 * 1024;
 
-    while ((r = archive_read_next_header(a, &entry)) == ARCHIVE_OK) {
-        std::string path = dest + "/" + archive_entry_pathname(entry);
-        unsigned int type = archive_entry_filetype(entry);
+    if (is_single_file_compression(srcFile->name)) {
+        // .gz/.bz2/etc: exactly one decompressed entry. getSourceStream()
+        // already resolves this transparently — the same path LOAD uses.
+        std::shared_ptr<MStream> srcStream = srcFile->getSourceStream(std::ios_base::in);
+        if (!srcStream || !srcStream->isOpen()) {
+            Serial.printf("unzip: cannot open '%s'\r\n", src.c_str());
+            free(buf);
+            return EXIT_FAILURE;
+        }
 
-        int64_t entry_size = archive_entry_size_is_set(entry) ? archive_entry_size(entry) : -1;
-        if (entry_size >= 0)
+        std::string path = dest + "/" + strip_compression_ext(srcFile->name);
+        int64_t entry_size = (int64_t)srcStream->size();
+        Serial.printf("  %s  (%lld bytes)\r\n", path.c_str(), (long long)entry_size);
+
+        int64_t written = unzip_write_entry(buf, 4096, srcStream, path, entry_size);
+        if (written < 0) {
+            free(buf);
+            return EXIT_FAILURE;
+        }
+        total_bytes = (size_t)written;
+        count = 1;
+    } else {
+        // Multi-file archive: ArchiveMFile's directory tree-walk enumerates
+        // every entry (the same mechanism `ls`/`cd` already use to browse
+        // into archives) — no direct libarchive calls needed here at all.
+        srcFile->rewindDirectory();
+        MFile *rawEntry;
+        while ((rawEntry = srcFile->getNextFileInDir()) != nullptr) {
+            std::unique_ptr<MFile> entryFile(rawEntry);
+
+            std::string path = dest + "/" + entryFile->name;
+            int64_t entry_size = (int64_t)entryFile->size;
             Serial.printf("  %s  (%lld bytes)\r\n", path.c_str(), (long long)entry_size);
-        else
-            Serial.printf("  %s\r\n", path.c_str());
 
-        if (type == AE_IFDIR) {
-            unzip_mkdirs(path.c_str());
-            archive_read_data_skip(a);
-            continue;
-        }
-
-        if (type != AE_IFREG) {
-            archive_read_data_skip(a);
-            continue;
-        }
-
-        // Ensure parent directories exist
-        size_t slash = path.rfind('/');
-        if (slash != std::string::npos)
-            unzip_mkdirs(path.substr(0, slash).c_str());
-
-        FILE *f = fopen(path.c_str(), "wb");
-        if (!f) {
-            Serial.printf("unzip: cannot create '%s'\r\n", path.c_str());
-            archive_read_data_skip(a);
-            continue;
-        }
-
-        size_t entry_bytes = 0, last_report = 0;
-        ssize_t n;
-        while ((n = archive_read_data(a, buf, 4096)) > 0) {
-            fwrite(buf, 1, (size_t)n, f);
-            entry_bytes += (size_t)n;
-            if (entry_size >= (int64_t)kProgressThreshold &&
-                entry_bytes - last_report >= kReport) {
-                Serial.printf("    %zu / %lld bytes (%d%%)\r\n",
-                              entry_bytes, (long long)entry_size,
-                              (int)(entry_bytes * 100 / (size_t)entry_size));
-                last_report = entry_bytes;
+            std::shared_ptr<MStream> srcStream = entryFile->getSourceStream(std::ios_base::in);
+            if (!srcStream || !srcStream->isOpen()) {
+                Serial.printf("unzip: cannot read '%s'\r\n", entryFile->name.c_str());
+                continue;
             }
+
+            int64_t written = unzip_write_entry(buf, 4096, srcStream, path, entry_size);
+            if (written < 0)
+                continue;
+            total_bytes += (size_t)written;
+            count++;
         }
-        fclose(f);
-        total_bytes += entry_bytes;
-        count++;
     }
 
     free(buf);
-    archive_read_close(a);
-    archive_read_free(a);
-
-    if (r != ARCHIVE_EOF) {
-        Serial.printf("unzip: error: %s\r\n", archive_error_string(a));
-        return EXIT_FAILURE;
-    }
 
     Serial.printf("unzip: extracted %d entries, %zu bytes to '%s'\r\n",
                   count, total_bytes, dest.c_str());
