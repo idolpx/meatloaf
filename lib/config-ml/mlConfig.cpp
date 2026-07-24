@@ -33,6 +33,10 @@
 #include "global_defines.h"
 
 #include "../../include/debug.h"
+#include "../hardware/Esp.h"
+#include "../www/ws/activity.h"
+
+extern EspClass ESP;
 
 static const char *TAG = "mlConfig";
 
@@ -183,6 +187,16 @@ bool MeatloafConfig::load()
         tzset();
     }
 
+    // Keep firmware/hardware in sync with the running app version
+    // (esp_app_desc_t.version, split at the last '.').
+    std::string actual_firmware = ESP.getFirmwareVersion();
+    std::string actual_hardware = ESP.getHardwareVersion();
+    if (_data.value("firmware", "") != actual_firmware || _data.value("hardware", "") != actual_hardware) {
+        _data["firmware"] = actual_firmware;
+        _data["hardware"] = actual_hardware;
+        save();
+    }
+
     ESP_LOGI(TAG, "Config loaded (cfg=%s)", cfg_ok ? "ok" : "missing");
     return cfg_ok;
 }
@@ -214,10 +228,12 @@ void MeatloafConfig::save()
     {
         _config_hash = cfg_hash;
         Serial.println("Saved config.json");
+        notify_activity("config", "save", "config.json");
     }
     if (devices_changed && _write_json(DEVICES_FILE, dev, fs))
     {
         _devices_hash = dev_hash;
         Serial.println("Saved devices.json");
+        notify_activity("config", "save", "devices.json");
     }
 }

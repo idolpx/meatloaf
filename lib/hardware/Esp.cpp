@@ -37,6 +37,7 @@ extern "C" {
 #include "esp_image_format.h"
 #include "esp_ota_ops.h"
 }
+#include "esp_app_desc.h"
 // #include <MD5Builder.h>
 
 #ifdef CONFIG_SPIRAM
@@ -339,6 +340,33 @@ uint8_t EspClass::getChipCores(void) {
 }
 
 const char *EspClass::getSdkVersion(void) { return esp_get_idf_version(); }
+
+// Splits esp_app_desc_t.version at the last '.': everything before it is the
+// firmware version, everything after it is the hardware version.
+static void split_app_version(std::string &firmware, std::string &hardware) {
+    const esp_app_desc_t *app_info = esp_app_get_description();
+    std::string ver = app_info->version;
+    size_t pos = ver.find_last_of('.');
+    if (pos == std::string::npos) {
+        firmware = ver;
+        hardware.clear();
+    } else {
+        firmware = ver.substr(0, pos);
+        hardware = ver.substr(pos + 1);
+    }
+}
+
+std::string EspClass::getFirmwareVersion(void) {
+    std::string firmware, hardware;
+    split_app_version(firmware, hardware);
+    return firmware;
+}
+
+std::string EspClass::getHardwareVersion(void) {
+    std::string firmware, hardware;
+    split_app_version(firmware, hardware);
+    return hardware;
+}
 
 //const char *EspClass::getCoreVersion(void) { return ESP_ARDUINO_VERSION_STR; }
 

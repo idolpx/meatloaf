@@ -32,6 +32,7 @@ static inline void *psram_malloc(size_t sz) {
 #include "../Helpers/PWDHelpers.h"
 #include "../ute/ute.h"
 #include "../../device/iec/meatloaf.h"
+#include "../../www/ws/activity.h"
 #include "mlff.h"
 #include "mlConfig.h"
 
@@ -728,6 +729,10 @@ static void df_print_row(const char *label, const char *path, uint64_t total, ui
         (unsigned long)(avail / 1024),
         (unsigned long)pct,
         path);
+
+    char msg[64];
+    snprintf(msg, sizeof(msg), "%llu, %llu", (unsigned long long)total, (unsigned long long)avail);
+    notify_activity(label, "df", msg);
 }
 
 static int df(int argc, char **argv)
@@ -738,15 +743,19 @@ static int df(int argc, char **argv)
     size_t lfs_total = 0, lfs_used = 0;
     if (esp_littlefs_info("storage", &lfs_total, &lfs_used) == ESP_OK)
         df_print_row("flash", "/", lfs_total, lfs_total - lfs_used);
-    else
+    else {
         Serial.printf("%-6s  not available\r\n", "flash");
+        notify_activity("flash", "df", "0, 0");
+    }
 
 #ifdef SD_CARD
     uint64_t fat_total = 0, fat_free = 0;
     if (esp_vfs_fat_info("/sd", &fat_total, &fat_free) == ESP_OK)
         df_print_row("sd", "/sd", fat_total, fat_free);
-    else
+    else {
         Serial.printf("%-6s  not available\r\n", "sd");
+        notify_activity("sd", "df", "0, 0");
+    }
 #endif
 
     return EXIT_SUCCESS;

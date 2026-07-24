@@ -94,6 +94,11 @@ class EspClass {
     const char *getSdkVersion();   // version of ESP-IDF
     //const char *getCoreVersion();  // version of this core
 
+    // App version (esp_app_desc_t.version) is "<firmware>.<hardware>" -
+    // firmware is everything before the last '.', hardware is what follows it.
+    std::string getFirmwareVersion();
+    std::string getHardwareVersion();
+
     void deepSleep(uint64_t time_us);
 
     uint32_t getFlashChipSize();
