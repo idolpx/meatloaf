@@ -2031,7 +2031,6 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
 
                         setenv("TZ", command.c_str(), 1);
                         tzset(); // Assign the local timezone from setenv
-                        
                     }
                 }
                 return;

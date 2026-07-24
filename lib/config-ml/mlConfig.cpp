@@ -20,6 +20,8 @@
 #include <array>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
+#include <ctime>
 #include <string>
 
 #include "mbedtls/md5.h"
@@ -171,6 +173,14 @@ bool MeatloafConfig::load()
         _devices_hash = _json_hash(_extract_devices());
     } else {
         _devices_hash = _json_hash(psram_json::object());
+    }
+
+    // Apply preferences.timezone (if set) so localtime()/strftime() reflect
+    // it immediately.
+    std::string tz = _data.value("preferences", psram_json::object()).value("timezone", "");
+    if (!tz.empty()) {
+        setenv("TZ", tz.c_str(), 1);
+        tzset();
     }
 
     ESP_LOGI(TAG, "Config loaded (cfg=%s)", cfg_ok ? "ok" : "missing");
