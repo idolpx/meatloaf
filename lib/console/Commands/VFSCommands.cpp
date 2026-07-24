@@ -1660,6 +1660,13 @@ static std::string resolve_path(const char *arg)
 {
     if (arg[0] == '/') return arg;
     std::string pwd = getCurrentPath()->url;
+
+    // If this is a new url then use it
+    if ( mstr::contains(arg, "://") )
+    {
+        return arg;
+    }
+
     if (arg[0] == '.' && arg[1] == '\0') return pwd;
     return pwd + '/' + arg;
 }
