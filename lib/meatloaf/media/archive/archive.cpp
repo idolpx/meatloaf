@@ -769,8 +769,8 @@ MFile *ArchiveMFile::getNextFileInDir()
         Debug_printv("Found entry: filename=[%s] size=%lu", filename.c_str(), image->entry.size);
 
         std::string entryUrl;
-        entryUrl.reserve(sourceFile->url.size() + 1 + filename.size());
-        entryUrl = sourceFile->url; entryUrl += '/'; entryUrl += filename;
+        entryUrl.reserve(url.size() + 1 + filename.size());
+        entryUrl = url; entryUrl += '/'; entryUrl += filename;
         auto file = MFSOwner::File(entryUrl);
         file->name = filename;  // Use actual entry name, not container image name
         file->size = image->entry.size;
