@@ -37,19 +37,20 @@ ver_date = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 fw_date = datetime.datetime.now().strftime("%Y%m%d.%H")
 
-# Only rewrite version.h if the commit has changed since the last build (avoids
-# forcing a rebuild of everything that includes version.h just because the
-# embedded timestamp would differ).
-last_build = ""
-for line in open(header_file):
-    m = re.match(r'^#define FN_VERSION_BUILD "(\w+)"', line)
-    if m is not None:
-        last_build = m.group(1)
-        break
+# # Only rewrite version.h if the commit has changed since the last build (avoids
+# # forcing a rebuild of everything that includes version.h just because the
+# # embedded timestamp would differ).
+# last_build = ""
+# for line in open(header_file):
+#     m = re.match(r'^#define FN_VERSION_BUILD "(\w+)"', line)
+#     if m is not None:
+#         last_build = m.group(1)
+#         break
 
-if ver_build == last_build:
-    print("Commit hasn't changed, skipping version.h update")
-else:
+# if ver_build == last_build:
+#     print("Commit hasn't changed, skipping version.h update")
+# else:
+if 1:
     rxs = [r'^#define FN_VERSION_MAJOR (\w+)', r'^#define FN_VERSION_MINOR (\w+)',
            '^(#define FN_VERSION_BUILD)', '^(#define FN_VERSION_DATE)', '^(#define FN_VERSION_FULL)',
            '^(#define FW_VERSION)']
