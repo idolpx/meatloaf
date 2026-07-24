@@ -1,5 +1,7 @@
 {
-  "version": "0.5.0",
+  "version": "0.5.2",
+  "firmware": "",
+  "hardware": "",
   "preferences": {
     "appearance": "auto",
     "language": "en",
@@ -34,23 +36,51 @@
       "tcp_console": 1
     }
   },
-  "wifi": [
-    {
-      "ssid": "EEP_OPP_ORK_AH_AH",
-      "passphrase": "meatloaf",
-      "enabled": 1
-    },
-    {
-      "enabled": 0,
-      "ssid": "meatloaf",
-      "passphrase": "meatloaf"
-    },
-    {
-      "ssid": "CODA-23B0",
-      "passphrase": "meatloaf",
-      "enabled": 0
-    }
-  ],
+  "wifi": {
+    "selected": "EEP_OPP_ORK_AH_AH",
+    "known":
+      [
+        {
+          "ssid": "EEP_OPP_ORK_AH_AH",
+          "passphrase": "meatloaf",
+          "enabled": 1
+        },
+        {
+          "enabled": 0,
+          "ssid": "meatloaf",
+          "passphrase": "meatloaf"
+        },
+        {
+          "ssid": "CODA-23B0",
+          "passphrase": "meatloaf",
+          "enabled": 0
+        }
+      ],
+    "scan_results": 
+      [
+        {
+          "ssid": "EEP_OPP_ORK_AH_AH",
+          "bssid": "00:11:22:33:44:55",
+          "channel": 6,
+          "rssi": -60,
+          "security": "WPA2-PSK"
+        },
+        {
+          "ssid": "meatloaf",
+          "bssid": "66:77:88:99:AA:BB",
+          "channel": 11,
+          "rssi": -70,
+          "security": "WPA2-PSK"
+        },
+        {
+          "ssid": "CODA-23B0",
+          "bssid": "CC:DD:EE:FF:GG:HH",
+          "channel": 1,
+          "rssi": -80,
+          "security": "WPA2-PSK"
+        }
+      ]
+  },
   "settings": {
     "enabled": 1,
     "vic20_mode": 0,

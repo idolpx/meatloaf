@@ -58,7 +58,7 @@
       "16": {
         "enabled": 1,
         "type": "network",
-        "url": "/sd"
+        "url": "/"
       },
       "17": {
         "enabled": 0,
