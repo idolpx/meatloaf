@@ -76,6 +76,15 @@ CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
 CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ=240
 CONFIG_ESP_SYSTEM_EVENT_TASK_STACK_SIZE=4096
 
+# Meatloaf.reloadAllConfig() runs inline on the "main" task (before it deletes
+# itself in app_main()) to restore each drive's persisted mounted URL at boot,
+# including local SD/D64 paths — the same deep-stack MFile/PeoplesUrlParser
+# resolution chain that reload_network_drives_task already needs 16384 bytes
+# for (see src/main.cpp). The ESP-IDF default (3584) is too small and overflows
+# on long SD paths.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=16384
+CONFIG_MAIN_TASK_STACK_SIZE=16384
+
 # HAGL display pins — set to -1 so boards without a wired display don't get GPIO conflicts
 # Boards with a display override these in their board-specific sdkconfig
 CONFIG_MIPI_DISPLAY_PIN_MOSI=-1

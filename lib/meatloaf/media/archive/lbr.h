@@ -39,10 +39,9 @@ class LBRMStream : public MMediaStream {
 public:
     LBRMStream(std::shared_ptr<MStream> is) : MMediaStream(is)
     {
-        // Read Header
-        readHeader();
-
-        loadEntries();
+        // // Read Header
+        // readHeader();
+        // loadEntries();
     };
 
 protected:

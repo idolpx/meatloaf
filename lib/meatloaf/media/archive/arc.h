@@ -50,10 +50,9 @@ public:
         // ARC uses 254-byte blocks
         block_size = 254;
 
-        // Read Header
-        readHeader();
-
-        loadEntries();
+        // // Read Header
+        // readHeader();
+        // loadEntries();
     };
 
 protected:

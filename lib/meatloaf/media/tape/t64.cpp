@@ -166,6 +166,8 @@ bool T64MFile::rewindDirectory() {
     if (image == nullptr)
         return false;
 
+    // Read Header
+    image->readHeader();
     image->resetEntryCounter();
 
     // Set Media Info Fields

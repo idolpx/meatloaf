@@ -153,6 +153,14 @@ bool ARKMFile::rewindDirectory()
     if (image == nullptr)
         return false;
 
+    // Read Header
+    image->readHeader();
+
+    // Get the entry count
+    image->containerStream->seek(0);
+    uint8_t count;
+    image->readContainer((uint8_t *)&count, 1);
+    image->entry_count = count;
     image->resetEntryCounter();
 
     // Set Media Info Fields

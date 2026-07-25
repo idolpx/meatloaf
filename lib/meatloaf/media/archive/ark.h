@@ -40,14 +40,14 @@ class ARKMStream : public MMediaStream {
 public:
     ARKMStream(std::shared_ptr<MStream> is) : MMediaStream(is)
     {
-        // Read Header
-        readHeader();
+        // // Read Header
+        // readHeader();
 
-        // Get the entry count
-        containerStream->seek(0);
-        uint8_t count;
-        readContainer((uint8_t *)&count, 1);
-        entry_count = count;
+        // // Get the entry count
+        // containerStream->seek(0);
+        // uint8_t count;
+        // readContainer((uint8_t *)&count, 1);
+        // entry_count = count;
     };
 
 protected:

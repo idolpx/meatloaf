@@ -153,8 +153,15 @@ public:
         partitions.push_back(p);
         sectorsPerTrack = { 17, 18, 19, 21 };
 
-        // Read Header
-        readHeader();
+        // // Read Header
+        // readHeader();
+
+        // // readHeader() seeks containerStream into the BAM sector to grab the
+        // // disk name/ID for media_id/media_header. Restore position 0 so a
+        // // caller that never calls seekPath()/seekEntry() (raw verbatim copy
+        // // mode in MMediaStream::read()) starts from the true beginning of
+        // // the image instead of mid-file.
+        // containerStream->seek(0);
 
         uint32_t size = containerStream->size();
         switch (size + media_header_size) 
@@ -313,6 +320,7 @@ public:
     uint8_t sector_offset = 0;
 
 protected:
+
     bool readHeader() override
     {
         memset(&header, 0, sizeof(header));

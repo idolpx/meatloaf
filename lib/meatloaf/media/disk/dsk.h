@@ -69,8 +69,8 @@ public:
         dos_rom = "";
         dos_name = "";
 
-        // Read Header
-        readHeader();
+        // // Read Header
+        // readHeader();
 
         uint32_t size = containerStream->size();
         switch (size + media_header_size) 

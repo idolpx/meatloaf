@@ -265,6 +265,7 @@ bool M2IMFile::rewindDirectory()
     if (image == nullptr)
         return false;
 
+    image->readHeader();
     image->resetEntryCounter();
 
     // Set Media Info Fields

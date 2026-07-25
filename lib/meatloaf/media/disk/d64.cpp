@@ -1271,6 +1271,7 @@ bool D64MFile::rewindDirectory()
     if (image == nullptr)
         return false;
 
+    image->readHeader();
     //Debug_printv("image->url[%s]", image->url.c_str());
     image->resetEntryCounter();
 

@@ -93,8 +93,15 @@ public:
         partitions.push_back(p);
         sectorsPerTrack = { 23, 25, 27, 29 };
 
-        // Read Header
-        readHeader();
+        // // Read Header
+        // readHeader();
+
+        // // readHeader() seeks containerStream into the BAM sector to grab the
+        // // disk name/ID for media_id/media_header. Restore position 0 so a
+        // // caller that never calls seekPath()/seekEntry() (raw verbatim copy
+        // // mode in MMediaStream::read()) starts from the true beginning of
+        // // the image instead of mid-file.
+        // containerStream->seek(0);
     };
 
     virtual uint8_t speedZone(uint8_t track) override

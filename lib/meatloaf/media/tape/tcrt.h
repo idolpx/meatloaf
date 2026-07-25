@@ -38,8 +38,8 @@ class TCRTMStream : public MMediaStream {
 public:
     TCRTMStream(std::shared_ptr<MStream> is) : MMediaStream(is)
     {
-        // Read Header
-        readHeader();
+        // // Read Header
+        // readHeader();
     };
 
 protected:

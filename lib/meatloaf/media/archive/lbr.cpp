@@ -172,6 +172,9 @@ bool LBRMFile::rewindDirectory()
     if (image == nullptr)
         return false;
 
+    // Read Header
+    image->readHeader();
+    image->loadEntries();
     image->resetEntryCounter();
 
     // Set Media Info Fields
