@@ -32,6 +32,7 @@ static inline void *psram_malloc(size_t sz) {
 #include "../Helpers/PWDHelpers.h"
 #include "../ute/ute.h"
 #include "../../device/iec/meatloaf.h"
+#include "../../www/ws/activity.h"
 #include "mlff.h"
 #include "mlConfig.h"
 
@@ -59,12 +60,13 @@ int cat(int argc, char **argv)
         if(istream.is_open()) {
             if(istream.eof()) {
                 Serial.print("Stream returned EOF!");
-            } else {    
+            } else {
                 while(!istream.eof()) {
                     char chr = istream.get();
                     if(!istream.eof())
                         Serial.printf("%c", chr);
                 }
+                Serial.printf("\r\n");
             }
             istream.close();
         }
@@ -594,14 +596,15 @@ int wget(int argc, char **argv)
     if (f != nullptr)
     {
         auto s = f->getSourceStream();
+        std::string outname = f->getDownloadFilename();
 
         std::string outfile;
-        outfile.reserve(pwd.size() + 1 + f->name.size());
+        outfile.reserve(pwd.size() + 1 + outname.size());
         outfile = pwd;
         outfile += '/';
-        outfile += f->name;
+        outfile += outname;
 
-        Debug_printv("size[%lu] name[%s] url[%s] outfile[%s]", f->size, f->name.c_str(), s->url.c_str(), outfile.c_str());
+        Debug_printv("size[%lu] name[%s] url[%s] outfile[%s]", f->size, outname.c_str(), s->url.c_str(), outfile.c_str());
 
 
         FILE *file = fopen(outfile.c_str(), "w");
@@ -619,16 +622,12 @@ int wget(int argc, char **argv)
         {
             int bytes_read = s->read(bytes, 256);
             if (bytes_read < 1)
-            {
-                if (s->available())
-                    Serial.printf("\nError reading '%s'\r", f->name.c_str());
                 break;
-            }
 
             int bytes_written = fwrite(bytes, 1, bytes_read, file);
             if (bytes_written != bytes_read)
             {
-                Serial.printf("\nError writing '%s'\r", f->name.c_str());
+                Serial.printf("\nError writing '%s'\r", outname.c_str());
                 break;
             }
             total_written += bytes_written;
@@ -638,7 +637,7 @@ int wget(int argc, char **argv)
 #ifdef ENABLE_DISPLAY
             LEDS.progress = percent;
 #endif
-            Serial.printf("Downloading '%s' %d%% [%lu]\r", f->name.c_str(), percent, s->position());
+            Serial.printf("Downloading '%s' %d%% [%lu]\r", outname.c_str(), percent, s->position());
             count++;
         }
         free(bytes);
@@ -728,6 +727,10 @@ static void df_print_row(const char *label, const char *path, uint64_t total, ui
         (unsigned long)(avail / 1024),
         (unsigned long)pct,
         path);
+
+    char msg[64];
+    snprintf(msg, sizeof(msg), "%llu, %llu", (unsigned long long)total, (unsigned long long)avail);
+    notify_activity(label, "df", msg);
 }
 
 static int df(int argc, char **argv)
@@ -738,15 +741,19 @@ static int df(int argc, char **argv)
     size_t lfs_total = 0, lfs_used = 0;
     if (esp_littlefs_info("storage", &lfs_total, &lfs_used) == ESP_OK)
         df_print_row("flash", "/", lfs_total, lfs_total - lfs_used);
-    else
+    else {
         Serial.printf("%-6s  not available\r\n", "flash");
+        notify_activity("flash", "df", "0, 0");
+    }
 
 #ifdef SD_CARD
     uint64_t fat_total = 0, fat_free = 0;
     if (esp_vfs_fat_info("/sd", &fat_total, &fat_free) == ESP_OK)
         df_print_row("sd", "/sd", fat_total, fat_free);
-    else
+    else {
         Serial.printf("%-6s  not available\r\n", "sd");
+        notify_activity("sd", "df", "0, 0");
+    }
 #endif
 
     return EXIT_SUCCESS;

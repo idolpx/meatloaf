@@ -1,0 +1,23 @@
+[
+  {
+    "version": "v2.6.1",
+    "date": "2025-05-20",
+    "description": "Improved SD card compatibility, faster boot time, fixed IEC timing on PAL machines.",
+    "url": "/sd/firmware/meatloaf-v2.6.1.bin",
+    "size": 1572864
+  },
+  {
+    "version": "v2.6.0",
+    "date": "2025-03-11",
+    "description": "Added BOIP support, WiFi stability improvements, new partition editor.",
+    "url": "/sd/firmware/meatloaf-v2.6.0.bin",
+    "size": 1548288
+  },
+  {
+    "version": "v2.5.1",
+    "date": "2024-12-04",
+    "description": "Bug fixes for D81 image handling and modem emulation.",
+    "url": "/sd/firmware/meatloaf-v2.5.1.bin",
+    "size": 1523712
+  }
+]

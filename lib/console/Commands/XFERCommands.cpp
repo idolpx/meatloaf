@@ -12,8 +12,12 @@
 #include <iostream>
 #include <sstream>
 #include <sys/fcntl.h>
-#include <driver/uart.h>
 #include <esp_heap_caps.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "driver/uart_vfs.h"
+#include "driver/usb_serial_jtag_vfs.h"
+#include "esp_vfs_cdcacm.h"
 
 static inline void *psram_malloc(size_t sz) {
     void *p = heap_caps_malloc(sz, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
@@ -29,30 +33,101 @@ static inline void *psram_malloc(size_t sz) {
 #define ChunkSize              64   //bytes to send in chunk before ack
 #define ChunkAckChar          '+'   //char sent to ack chunk
 
+// rx/tx move raw binary data over the console, but the console driver is
+// configured (console_settings.c) for interactive terminal use: RX turns a
+// bare '\r' into '\n' (ESP_LINE_ENDINGS_CR), and TX expands '\n' to '\r\n'
+// (ESP_LINE_ENDINGS_CRLF). Both silently corrupt raw bytes that happen to
+// contain '\r'/'\n'. Disable both for the duration of the transfer and
+// restore the interactive defaults on scope exit, including early returns.
+static void set_console_rx_line_endings(esp_line_endings_t mode)
+{
+#if defined(CONFIG_ESP_CONSOLE_UART_DEFAULT) || defined(CONFIG_ESP_CONSOLE_UART_CUSTOM)
+    uart_vfs_dev_port_set_rx_line_endings(CONFIG_ESP_CONSOLE_UART_NUM, mode);
+#elif defined(CONFIG_ESP_CONSOLE_USB_CDC)
+    esp_vfs_dev_cdcacm_set_rx_line_endings(mode);
+#elif defined(CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG)
+    usb_serial_jtag_vfs_set_rx_line_endings(mode);
+#endif
+}
+
+static void set_console_tx_line_endings(esp_line_endings_t mode)
+{
+#if defined(CONFIG_ESP_CONSOLE_UART_DEFAULT) || defined(CONFIG_ESP_CONSOLE_UART_CUSTOM)
+    uart_vfs_dev_port_set_tx_line_endings(CONFIG_ESP_CONSOLE_UART_NUM, mode);
+#elif defined(CONFIG_ESP_CONSOLE_USB_CDC)
+    esp_vfs_dev_cdcacm_set_tx_line_endings(mode);
+#elif defined(CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG)
+    usb_serial_jtag_vfs_set_tx_line_endings(mode);
+#endif
+}
+
+class ConsoleRawIOGuard
+{
+public:
+    ConsoleRawIOGuard()
+    {
+        set_console_rx_line_endings(ESP_LINE_ENDINGS_LF);
+        set_console_tx_line_endings(ESP_LINE_ENDINGS_LF);
+    }
+    ~ConsoleRawIOGuard()
+    {
+        set_console_rx_line_endings(ESP_LINE_ENDINGS_CR);
+        set_console_tx_line_endings(ESP_LINE_ENDINGS_CRLF);
+    }
+};
+
+// Reads a single byte from the console's stdin, regardless of the underlying
+// transport (UART, USB-Serial-JTAG, USB-CDC) - unlike driver-specific calls
+// (e.g. uart_read_bytes on a hardcoded UART port), this works on every board.
+// Same non-blocking poll idiom as the REPL's stdin handling in Console.cpp.
+static bool console_read_byte(uint8_t *out, int timeout_ms)
+{
+    int fd = fileno(stdin);
+    int flags = fcntl(fd, F_GETFL, 0);
+    if (flags >= 0)
+        fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+
+    int c = EOF;
+    for (int waited = 0; waited < timeout_ms; waited += 10)
+    {
+        c = fgetc(stdin);
+        if (c != EOF)
+            break;
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+
+    if (flags >= 0)
+        fcntl(fd, F_SETFL, flags);
+
+    if (c == EOF)
+        return false;
+
+    *out = (uint8_t)c;
+    return true;
+}
+
 std::string read_until(char delimiter)
 {
     uint8_t byte = 0;
     std::string response;
     while (byte != delimiter)
     {
-        size_t size = 0;
-        uart_get_buffered_data_len(CONSOLE_UART, &size);
-        if (size > 0)
+        if (!console_read_byte(&byte, pdTICKS_TO_MS(MAX_READ_WAIT_TICKS)))
         {
-            int result = uart_read_bytes((uart_port_t)CONSOLE_UART, &byte, 1, MAX_READ_WAIT_TICKS);
-            if (result < 1)
-            {
-                Serial.printf("3 Error: Response Timeout\r\n");
-                return "";
-            }
-
-            if (byte != delimiter)
-                response.push_back(byte);
+            Serial.printf("3 Error: Response Timeout\r\n");
+            return "";
         }
+
+        if (byte != delimiter)
+            response.push_back(byte);
     }
     return response;
 }
 
+/* rx test.txt (then paste this data into the console)
+10 261daee5
+1234567890
+*/
 int rx(int argc, char **argv)
 {
     // rx {filename}
@@ -62,6 +137,8 @@ int rx(int argc, char **argv)
         return EXIT_SUCCESS;
     }
 
+    ConsoleRawIOGuard raw_io;
+
     char filename[PATH_MAX];
     ESP32Console::console_realpath(argv[1], filename);
 
@@ -70,6 +147,8 @@ int rx(int argc, char **argv)
     int size = atoi(s.c_str());
     std::string src_checksum = read_until('\n');
     mstr::trim(src_checksum);
+
+    //Serial.printf("[%d][%s]\r\n", size, src_checksum.c_str());
 
     FILE *file = fopen(filename, "w");
     if (file == nullptr)
@@ -84,25 +163,19 @@ int rx(int argc, char **argv)
     int dest_checksum = 0;
     while (count < size)
     {
-        size_t datalen = 0;
-        uart_get_buffered_data_len((uart_port_t)CONSOLE_UART, &datalen);
-        if (datalen > 0)
+        if (!console_read_byte(&byte, pdTICKS_TO_MS(MAX_READ_WAIT_TICKS)))
         {
-            int result = uart_read_bytes((uart_port_t)CONSOLE_UART, &byte, 1, MAX_READ_WAIT_TICKS);
-            if (result < 1)
-            {
-                Serial.printf("3 Error: Receive Timeout at %lu bytes\r\n", count);
-                fclose(file);
-                return 3;
-            }    
-
-            fprintf(file, "%c", byte);
-
-            // Calculate checksum
-            dest_checksum = esp_rom_crc32_le(dest_checksum, &byte, 1);
-            count++;
-            if (count % ChunkSize == 0 || count == size) Serial.printf("%c", ChunkAckChar); // send ack character after every chunk
+            Serial.printf("3 Error: Receive Timeout at %lu bytes\r\n", count);
+            fclose(file);
+            return 3;
         }
+
+        fprintf(file, "%c", byte);
+
+        // Calculate checksum
+        dest_checksum = esp_rom_crc32_le(dest_checksum, &byte, 1);
+        count++;
+        if (count % ChunkSize == 0 || count == size) Serial.printf("%c", ChunkAckChar); // send ack character after every chunk
     }
     fclose(file);
 
@@ -128,6 +201,8 @@ int tx(int argc, char **argv)
         Serial.printf("tx {filename}\r\n");
         return EXIT_SUCCESS;
     }
+
+    ConsoleRawIOGuard raw_io;
 
     // Get file size
     char filename[PATH_MAX];
@@ -162,12 +237,27 @@ int tx(int argc, char **argv)
     // Send size and checksum
     Serial.printf("%d %8x\r\n", size, src_checksum);
 
-    // Send file 256 bytes at a time
+    // Send file 256 bytes at a time, waiting for the receiver's chunk ack
+    // (the '+' rx() sends back every ChunkSize bytes) before continuing -
+    // mirrors the flow control rx() implements from the receiving side.
+    int count = 0;
     while ((bytesRead = fread(buffer, 1, 256, file)) > 0)
     {
         // print buffer bytes
         for (int i = 0; i < bytesRead; i++) {
             Serial.printf("%c", buffer[i]);
+            count++;
+            if (count % ChunkSize == 0 || count == size)
+            {
+                uint8_t ack = 0;
+                if (!console_read_byte(&ack, pdTICKS_TO_MS(MAX_READ_WAIT_TICKS)) || ack != ChunkAckChar)
+                {
+                    Serial.printf("\r\n3 Error: Ack Timeout at %d bytes\r\n", count);
+                    fclose(file);
+                    free(buffer);
+                    return 3;
+                }
+            }
         }
     }
     fclose(file);

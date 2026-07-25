@@ -25,6 +25,7 @@
 #include "drive.h"
 
 #include <cstring>
+#include <ctime>
 #include <sstream>
 #include <unordered_map>
 
@@ -36,6 +37,7 @@
 #include "fuji.h"
 #include "fnFsSD.h"
 #include "fnWiFi.h"
+#include "fnSystem.h"
 #include "led.h"
 #include "utils.h"
 #include "display.h"
@@ -2029,8 +2031,15 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
                         mstr::replaceAll(command, " ", "_");
                         Debug_printv("write TIMEZONE [%s]", command.c_str());
 
-                        setenv("TZ", command.c_str(), 1);
-                        tzset(); // Assign the local timezone from setenv
+                        const char *posix_tz = iana_to_posix_tz(command);
+                        setenv("TZ", posix_tz ? posix_tz : command.c_str(), 1);
+                        tzset();
+
+                        // Persist the IANA name (not the resolved POSIX
+                        // string) so mlConfig.load() re-resolves it the
+                        // same way on the next boot.
+                        mlConfig.data()["preferences"]["timezone"] = command;
+                        mlConfig.save();
                     }
                 }
                 return;

@@ -239,6 +239,7 @@ public:
     bool remove() override;
     bool isText() override;
     bool rename(std::string dest) { return false; };
+    std::string getDownloadFilename() override;
 };
 
 

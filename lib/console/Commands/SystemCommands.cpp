@@ -108,18 +108,16 @@ static int sysInfo(int argc, char **argv)
     esp_chip_info_t info;
     esp_chip_info(&info);
 
-    Serial.printf("Meatloaf v%s\r\n", FW_VERSION);
+    Serial.printf("Meatloaf v%s (%s)\r\n\r\n", ESP.getFirmwareVersion().c_str(), ESP.getHardwareVersion().c_str());
 //    Serial.printf("ESP32Console version: %s\r\n", ESP32CONSOLE_VERSION);
 //    Serial.printf("Arduino Core version: %s (%x)\r\n", XTSTR(ARDUINO_ESP32_GIT_DESC), ARDUINO_ESP32_GIT_VER);
     Serial.printf("ESP-IDF v%s\r\n", ESP.getSdkVersion());
-
-    Serial.printf("\r\n");
     Serial.printf("Chip info:\r\n");
-    Serial.printf("\tModel: %s\r\n", ESP.getChipModel());
-    Serial.printf("\tRevison number: %d\r\n", ESP.getChipRevision());
-    Serial.printf("\tCores: %d\r\n", ESP.getChipCores());
-    Serial.printf("\tClock: %lu MHz\r\n", ESP.getCpuFreqMHz());
-    Serial.printf("\tFeatures:%s%s%s%s%s\r\r\n",
+    Serial.printf(" Model: %s\r\n", ESP.getChipModel());
+    Serial.printf(" Revison number: %d\r\n", ESP.getChipRevision());
+    Serial.printf(" Cores: %d\r\n", ESP.getChipCores());
+    Serial.printf(" Clock: %lu MHz\r\n", ESP.getCpuFreqMHz());
+    Serial.printf(" Features:%s%s%s%s%s\r\r\n",
            info.features & CHIP_FEATURE_WIFI_BGN ? " 802.11bgn " : "",
            info.features & CHIP_FEATURE_BLE ? " BLE " : "",
            info.features & CHIP_FEATURE_BT ? " BT " : "",

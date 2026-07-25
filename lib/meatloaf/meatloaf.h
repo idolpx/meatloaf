@@ -335,6 +335,12 @@ public:
     virtual time_t getCreationTime() { return 0; };
     virtual uint64_t getAvailableSpace();
 
+    // Filename to use when saving this file locally (e.g. `wget`). Defaults
+    // to the URL-derived name; filesystems that can learn a more accurate
+    // name after the transfer starts (e.g. HTTP Content-Disposition) override
+    // this instead of touching `name`, which must stay in sync with `path`.
+    virtual std::string getDownloadFilename() { return name; }
+
     virtual uint32_t blocks() {
         //Debug_printv("size[%d] media_block_size[%d]", size, media_block_size);
         if ( size > 0 && size < media_block_size )

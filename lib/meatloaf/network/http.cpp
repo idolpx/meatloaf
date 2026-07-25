@@ -535,12 +535,19 @@ std::shared_ptr<MStream> HTTPMFile::getSourceStream(std::ios_base::openmode mode
     }
 
     // Content-Disposition filename must NOT be assigned to name — it would desync
-    // name from path, breaking pathToFile()/base(). Log it for debugging only.
+    // name from path, breaking pathToFile()/base(). Available via
+    // getDownloadFilename() for callers (e.g. wget) that want the real name.
     if (_session && _session->client && !_session->client->contentDispositionFilename.empty()) {
         Debug_printv("filename from Content-Disposition: %s", _session->client->contentDispositionFilename.c_str());
     }
 
     return istream;
+}
+
+std::string HTTPMFile::getDownloadFilename() {
+    if (_session && _session->client && !_session->client->contentDispositionFilename.empty())
+        return _session->client->contentDispositionFilename;
+    return name;
 }
 
 std::shared_ptr<MStream> HTTPMFile::getDecodedStream(std::shared_ptr<MStream> is) {

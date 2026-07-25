@@ -15,7 +15,7 @@
 ; https://docs.platformio.org/page/projectconf.html
 
 [meatloaf]
-description = Meatloaf Commodore to ESP32 WiFi Multifunction Firmware
+description = The internet is a massive floppy drive for you C64 with Meatloaf!
 
 ; Uncomment ONLY ONE of the below lines to target the hardware you use
 ; GPIO pin assignments are located in the include/pinmap/ directory for reference
