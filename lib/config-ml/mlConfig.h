@@ -19,8 +19,16 @@
 
 #include <array>
 #include <cstdint>
+#include <string>
 #include <json.hpp>
 #include <esp_heap_caps.h>
+
+// Maps a common IANA zone name (e.g. "America/New_York") to its POSIX TZ
+// equivalent (e.g. "EST5EDT,M3.2.0,M11.1.0/2") - newlib has no IANA tzdata
+// database, so setenv("TZ", ...)/tzset() only understand POSIX TZ strings.
+// Returns nullptr if iana isn't a recognized name (caller should then pass
+// the original string through as-is, e.g. in case it's already POSIX format).
+const char *iana_to_posix_tz(const std::string &iana);
 
 // Routes every JSON node allocation (map entries, array slots, string objects)
 // to PSRAM instead of internal DRAM. Falls back to internal RAM on boards
