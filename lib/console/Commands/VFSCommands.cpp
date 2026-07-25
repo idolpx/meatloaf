@@ -596,14 +596,15 @@ int wget(int argc, char **argv)
     if (f != nullptr)
     {
         auto s = f->getSourceStream();
+        std::string outname = f->getDownloadFilename();
 
         std::string outfile;
-        outfile.reserve(pwd.size() + 1 + f->name.size());
+        outfile.reserve(pwd.size() + 1 + outname.size());
         outfile = pwd;
         outfile += '/';
-        outfile += f->name;
+        outfile += outname;
 
-        Debug_printv("size[%lu] name[%s] url[%s] outfile[%s]", f->size, f->name.c_str(), s->url.c_str(), outfile.c_str());
+        Debug_printv("size[%lu] name[%s] url[%s] outfile[%s]", f->size, outname.c_str(), s->url.c_str(), outfile.c_str());
 
 
         FILE *file = fopen(outfile.c_str(), "w");
@@ -621,16 +622,12 @@ int wget(int argc, char **argv)
         {
             int bytes_read = s->read(bytes, 256);
             if (bytes_read < 1)
-            {
-                if (s->available())
-                    Serial.printf("\nError reading '%s'\r", f->name.c_str());
                 break;
-            }
 
             int bytes_written = fwrite(bytes, 1, bytes_read, file);
             if (bytes_written != bytes_read)
             {
-                Serial.printf("\nError writing '%s'\r", f->name.c_str());
+                Serial.printf("\nError writing '%s'\r", outname.c_str());
                 break;
             }
             total_written += bytes_written;
@@ -640,7 +637,7 @@ int wget(int argc, char **argv)
 #ifdef ENABLE_DISPLAY
             LEDS.progress = percent;
 #endif
-            Serial.printf("Downloading '%s' %d%% [%lu]\r", f->name.c_str(), percent, s->position());
+            Serial.printf("Downloading '%s' %d%% [%lu]\r", outname.c_str(), percent, s->position());
             count++;
         }
         free(bytes);
