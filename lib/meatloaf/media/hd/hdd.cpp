@@ -631,6 +631,15 @@ bool HDDMFile::rewindDirectory()
     if (image == nullptr)
         return false;
 
+    if (!image->readHeader())
+    {
+        Debug_printv("Failed to read HDD/CFS header");
+        return;
+    }
+
+    // Start at the image root (partition list)
+    image->seekDirectory("");
+
     image->resetEntryCounter();
 
     if (!image->seekDirectory(pathInStream))

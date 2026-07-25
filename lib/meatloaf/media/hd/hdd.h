@@ -58,14 +58,14 @@ public:
         block_size = 512;
         has_subdirs = true;
 
-        if (!readHeader())
-        {
-            Debug_printv("Failed to read HDD/CFS header");
-            return;
-        }
+        // if (!readHeader())
+        // {
+        //     Debug_printv("Failed to read HDD/CFS header");
+        //     return;
+        // }
 
-        // Start at the image root (partition list)
-        seekDirectory("");
+        // // Start at the image root (partition list)
+        // seekDirectory("");
     };
 
     // 4-byte CFS pointer: byte0 = flags + LBA bits 27-24, bytes 1-3 = LBA

@@ -83,8 +83,8 @@ public:
 
     ISOMStream(std::shared_ptr<MStream> is) : MMediaStream(is)
     {
-        // Read Header
-        readHeader();
+        // // Read Header
+        // readHeader();
 
         uint32_t size = containerStream->size();
         switch (size + media_header_size) 
