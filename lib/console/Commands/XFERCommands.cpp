@@ -15,6 +15,9 @@
 #include <esp_heap_caps.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "driver/uart_vfs.h"
+#include "driver/usb_serial_jtag_vfs.h"
+#include "esp_vfs_cdcacm.h"
 
 static inline void *psram_malloc(size_t sz) {
     void *p = heap_caps_malloc(sz, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
@@ -29,6 +32,49 @@ static inline void *psram_malloc(size_t sz) {
 
 #define ChunkSize              64   //bytes to send in chunk before ack
 #define ChunkAckChar          '+'   //char sent to ack chunk
+
+// rx/tx move raw binary data over the console, but the console driver is
+// configured (console_settings.c) for interactive terminal use: RX turns a
+// bare '\r' into '\n' (ESP_LINE_ENDINGS_CR), and TX expands '\n' to '\r\n'
+// (ESP_LINE_ENDINGS_CRLF). Both silently corrupt raw bytes that happen to
+// contain '\r'/'\n'. Disable both for the duration of the transfer and
+// restore the interactive defaults on scope exit, including early returns.
+static void set_console_rx_line_endings(esp_line_endings_t mode)
+{
+#if defined(CONFIG_ESP_CONSOLE_UART_DEFAULT) || defined(CONFIG_ESP_CONSOLE_UART_CUSTOM)
+    uart_vfs_dev_port_set_rx_line_endings(CONFIG_ESP_CONSOLE_UART_NUM, mode);
+#elif defined(CONFIG_ESP_CONSOLE_USB_CDC)
+    esp_vfs_dev_cdcacm_set_rx_line_endings(mode);
+#elif defined(CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG)
+    usb_serial_jtag_vfs_set_rx_line_endings(mode);
+#endif
+}
+
+static void set_console_tx_line_endings(esp_line_endings_t mode)
+{
+#if defined(CONFIG_ESP_CONSOLE_UART_DEFAULT) || defined(CONFIG_ESP_CONSOLE_UART_CUSTOM)
+    uart_vfs_dev_port_set_tx_line_endings(CONFIG_ESP_CONSOLE_UART_NUM, mode);
+#elif defined(CONFIG_ESP_CONSOLE_USB_CDC)
+    esp_vfs_dev_cdcacm_set_tx_line_endings(mode);
+#elif defined(CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG)
+    usb_serial_jtag_vfs_set_tx_line_endings(mode);
+#endif
+}
+
+class ConsoleRawIOGuard
+{
+public:
+    ConsoleRawIOGuard()
+    {
+        set_console_rx_line_endings(ESP_LINE_ENDINGS_LF);
+        set_console_tx_line_endings(ESP_LINE_ENDINGS_LF);
+    }
+    ~ConsoleRawIOGuard()
+    {
+        set_console_rx_line_endings(ESP_LINE_ENDINGS_CR);
+        set_console_tx_line_endings(ESP_LINE_ENDINGS_CRLF);
+    }
+};
 
 // Reads a single byte from the console's stdin, regardless of the underlying
 // transport (UART, USB-Serial-JTAG, USB-CDC) - unlike driver-specific calls
@@ -78,6 +124,10 @@ std::string read_until(char delimiter)
     return response;
 }
 
+/* rx test.txt (then paste this data into the console)
+10 261daee5
+1234567890
+*/
 int rx(int argc, char **argv)
 {
     // rx {filename}
@@ -87,6 +137,8 @@ int rx(int argc, char **argv)
         return EXIT_SUCCESS;
     }
 
+    ConsoleRawIOGuard raw_io;
+
     char filename[PATH_MAX];
     ESP32Console::console_realpath(argv[1], filename);
 
@@ -95,6 +147,8 @@ int rx(int argc, char **argv)
     int size = atoi(s.c_str());
     std::string src_checksum = read_until('\n');
     mstr::trim(src_checksum);
+
+    //Serial.printf("[%d][%s]\r\n", size, src_checksum.c_str());
 
     FILE *file = fopen(filename, "w");
     if (file == nullptr)
@@ -117,7 +171,6 @@ int rx(int argc, char **argv)
         }
 
         fprintf(file, "%c", byte);
-        Serial.printf("%02X", byte);
 
         // Calculate checksum
         dest_checksum = esp_rom_crc32_le(dest_checksum, &byte, 1);
@@ -125,7 +178,6 @@ int rx(int argc, char **argv)
         if (count % ChunkSize == 0 || count == size) Serial.printf("%c", ChunkAckChar); // send ack character after every chunk
     }
     fclose(file);
-    Serial.printf("[%d]\r\n", dest_checksum);
 
     // Check checksum
     std::ostringstream ss;
@@ -149,6 +201,8 @@ int tx(int argc, char **argv)
         Serial.printf("tx {filename}\r\n");
         return EXIT_SUCCESS;
     }
+
+    ConsoleRawIOGuard raw_io;
 
     // Get file size
     char filename[PATH_MAX];
@@ -198,7 +252,7 @@ int tx(int argc, char **argv)
                 uint8_t ack = 0;
                 if (!console_read_byte(&ack, pdTICKS_TO_MS(MAX_READ_WAIT_TICKS)) || ack != ChunkAckChar)
                 {
-                    Serial.printf("\n3 Error: Ack Timeout at %d bytes\r\n", count);
+                    Serial.printf("\r\n3 Error: Ack Timeout at %d bytes\r\n", count);
                     fclose(file);
                     free(buffer);
                     return 3;
