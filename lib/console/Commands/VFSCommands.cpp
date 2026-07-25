@@ -60,12 +60,13 @@ int cat(int argc, char **argv)
         if(istream.is_open()) {
             if(istream.eof()) {
                 Serial.print("Stream returned EOF!");
-            } else {    
+            } else {
                 while(!istream.eof()) {
                     char chr = istream.get();
                     if(!istream.eof())
                         Serial.printf("%c", chr);
                 }
+                Serial.printf("\r\n");
             }
             istream.close();
         }
