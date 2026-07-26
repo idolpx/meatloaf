@@ -584,7 +584,7 @@ public:
 
     bool isDirectory() override;
     bool exists() override;
-    bool remove() override { return false; };
+    bool remove() override;
     bool rename(std::string dest) override { return false; };
     time_t getLastWrite() override;
     time_t getCreationTime() override;
