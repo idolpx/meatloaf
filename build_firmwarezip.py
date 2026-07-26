@@ -1,31 +1,28 @@
 # Create a compressed ZIP file of meatloaf firmware
 # for use with the meatloaf web flaser
 
-import sys, os, configparser, json, shutil, re, subprocess
+import sys, os, configparser, json, shutil, re, subprocess, pprint
 from os.path import join
 from datetime import datetime
 from zipfile import ZipFile
 
 Import("env")
+# print(pprint.pformat(env.Dictionary()))
+# exit(0)
 
 #platform = env.PioPlatform()
 
 print("Build firmware ZIP enabled")
 
-# ini_file = 'platformio.ini'
-# # this is specified with "-c /path/to/your.ini" when running pio
-# if env["PROJECT_CONFIG"] is not None:
-#     ini_file = env["PROJECT_CONFIG"]
+environment_name = env['PIOENV']
 
-# print(f"Reading from config file {ini_file}")
-
-environment_name = env["PIOENV"]
 print(f"Creating firmware ZIP for environment: {environment_name}")
 
 def image_info(filename):
     """
     https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/system/app_image_format.html
     """
+    global flash_size
     with open(filename, "rb") as f:
         try:
             common_header = f.read(8)
@@ -51,17 +48,17 @@ def image_info(filename):
             chip_name = "esp32s3"
 
         if spi_size >= 0x50:
-            flash_size = "32m"
+            chip_flash_size = "32m"
         elif spi_size >= 0x40:
-            flash_size = "16m"
+            chip_flash_size = "16m"
         elif spi_size >= 0x30:
-            flash_size = "8m"
+            chip_flash_size = "8m"
         elif spi_size >= 0x20:
-            flash_size = "4m"
+            chip_flash_size = "4m"
 
-        print(f"Chip name: {chip_name}, Flash size: {flash_size}")
+        print(f"Chip name: {chip_name}, Flash size: {chip_flash_size}")
 
-        return chip_name, flash_size
+        return chip_name, chip_flash_size
 
 def makezip(source, target, env):
     global environment_name
@@ -73,6 +70,7 @@ def makezip(source, target, env):
 
     # Make sure all the files are built and ready to zip
     zipit = True
+    builtit = False
     if not os.path.exists(env.subst("$BUILD_DIR/bootloader.bin")):
         print("\033[1;31mBOOTLOADER not available to pack in firmware zip\033[1;37m")
         zipit = False
@@ -86,6 +84,7 @@ def makezip(source, target, env):
         print("\033[1;31mLittleFS not available to archive in firmware zip, building...\033[1;37m")
         os.system("pio run -t buildfs -e " + environment_name)
         zipit = False
+        builtit = True
 
     if zipit == True:
         # # Get the build_board variable
@@ -191,16 +190,18 @@ def makezip(source, target, env):
                 # Old archive files
                 #zip_object.write(env.subst("$BUILD_DIR/firmware.bin"), "firmware.bin")
                 #zip_object.write(f"{firmware_dir}/filesystem.bin", "filesystem.bin")
-        finally: 
+        finally:
+            print("\033[1;32m")
             print("*" * 80)
             print("*")
             print("*   FIRMWARE ZIP CREATED AT: " + firmwarezip)
             print("*")
             print("*" * 80)
- 
-	
+            print("\033[1;37m")
+
     else:
-        print("Skipping making firmware ZIP due to error")
+        if builtit == False:
+            print("\033[1;31m*** Skipping making firmware ZIP due to error\033[1;37m")
 
 env.AddPostAction("$BUILD_DIR/${PROGNAME}.bin", makezip)
 env.AddPostAction("buildfs", makezip)
