@@ -41,10 +41,11 @@ void http_set_insecure(bool v);
 #include "../../../include/global_defines.h"
 #include "../../../include/debug.h"
 
-#include "../../../include/version.h"
+#include "Esp.h"
+//#include "../../../include/version.h"
 //#define PRODUCT_ID "MEATLOAF CBM"
 //#define PLATFORM_DETAILS "C64; 6510; 2; NTSC; EN;" // Make configurable. This will help server side to select appropriate content.
-#define USER_AGENT "MEATLOAF/" FN_VERSION_FULL " (" PLATFORM_DETAILS ")"
+#define USER_AGENT "MEATLOAF/%s (" PLATFORM_DETAILS ")"
 
 #include "utils.h"
 

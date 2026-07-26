@@ -34,11 +34,8 @@ static inline void *psram_malloc(size_t sz) {
 
 #include "../ESP32Console.h"
 
-#include "../../../include/version.h"
-
+//#include "../../../include/version.h"
 #include "Esp.h"
-
-EspClass ESP;
 
 static std::string mac2String(uint64_t mac)
 {

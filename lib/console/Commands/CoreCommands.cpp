@@ -14,8 +14,6 @@
 #include <getopt.h>
 #include "esp_console.h"
 
-// Defined in SystemCommands.cpp; reboot() below needs ESP.restart().
-extern EspClass ESP;
 
 static int clear(int argc, char **argv)
 {

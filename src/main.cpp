@@ -42,8 +42,9 @@
 
 #include "../include/global_defines.h"
 #include "../include/debug.h"
-#include "../include/version.h"
 #include "../include/pinmap.h"
+//#include "../include/version.h"
+#include "Esp.h"
 
 
 #ifdef ENABLE_CONSOLE
@@ -194,7 +195,7 @@ void main_setup()
 #endif
 
     printf( ANSI_WHITE "\r\n\r\n" ANSI_BLUE_BACKGROUND "==============================" ANSI_RESET_NL );
-    printf( ANSI_BLUE_BACKGROUND "   " PRODUCT_ID " " FW_VERSION "   " ANSI_RESET_NL );
+    printf( ANSI_BLUE_BACKGROUND "   " PRODUCT_ID " %s   " ANSI_RESET_NL, ESP.getFirmwareVersion().c_str() );
     printf( ANSI_BLUE_BACKGROUND "   " PLATFORM_DETAILS "    " ANSI_RESET_NL );
     printf( ANSI_BLUE_BACKGROUND "------------------------------" ANSI_RESET_NL "\r\n" );
 

@@ -51,8 +51,9 @@
 
 #include "../../../include/global_defines.h"
 #include "../../../include/debug.h"
-#include "../../../include/version.h"
+//#include "../../../include/version.h"
 #include "../../../include/cbm_defines.h"
+#include "Esp.h"
 
 // Buffering data when reading/writing streams because during regular (non-fastloader)
 // transmissions, the read/write functions are called for each single byte at a time and
@@ -2221,7 +2222,9 @@ void iecDrive::getStatus(char *buffer, uint8_t bufferSize)
         case ST_FILE_NOT_FOUND      : msg = "FILE NOT FOUND"; break;
         case ST_FILE_NOT_OPEN       : msg = "FILE NOT OPEN"; break;
         case ST_FILE_EXISTS         : msg = "FILE EXISTS"; break;
-        case ST_DOSVERSION          : msg = PRODUCT_ID " " FW_VERSION; break;
+        case ST_DOSVERSION          : 
+            msg = strcat(PRODUCT_ID " ", ESP.getFirmwareVersion().c_str()); 
+            break;
         case ST_NO_CHANNEL          : msg = "NO CHANNEL"; break;
         case ST_DIR_ERROR           : msg = "DIR ERROR"; break;
         case ST_DISK_FULL           : msg = "DISK FULL"; break;

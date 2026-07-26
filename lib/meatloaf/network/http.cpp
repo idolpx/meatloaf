@@ -1968,7 +1968,11 @@ void MeatHttpClient::init() {
     // Fall back to plain HTTP when url is not yet set (constructor call).
     config.url = url.empty() ? "http://localhost/" : url.c_str();
     config.auth_type = HTTP_AUTH_TYPE_BASIC;
-    config.user_agent = USER_AGENT;
+
+    std::string user_agent = USER_AGENT;
+    user_agent = mstr::format(USER_AGENT, ESP.getFirmwareVersion().c_str());
+    config.user_agent = user_agent.c_str();
+
     config.method = HTTP_METHOD_GET;
     config.timeout_ms = 10000;
     config.disable_auto_redirect = disableAutoRedirect;

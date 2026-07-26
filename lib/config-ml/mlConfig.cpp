@@ -37,8 +37,6 @@
 #include "../hardware/Esp.h"
 #include "../www/ws/activity.h"
 
-extern EspClass ESP;
-
 static const char *TAG = "mlConfig";
 
 // The two on-disk files, relative to the SD mount root.
