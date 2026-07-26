@@ -1129,15 +1129,6 @@ std::shared_ptr<MStream> MFile::getSourceStream(std::ios_base::openmode mode) {
             return nullptr;
     }
 
-    // A container format (archive, disk image) fetched at its own bare URL
-    // (no pathInStream to seek into) never gets opened above — opening only
-    // happens via seekPath()/seekNextEntry() or a directory-browsing call
-    // like rewindDirectory(), none of which run here. Returning that unopened
-    // decoder leaves callers that just want raw bytes (wget, cat, etc.) with
-    // an unreadable stream. Fall back to the raw container bytes instead.
-    if (pathInStream.empty() && !decodedStream->isOpen())
-        return containerStream;
-
     //Debug_printv("returning decodedStream 2 [%s][%s]", decodedStream->url.c_str(), pathInStream.c_str());
     return decodedStream;
 };

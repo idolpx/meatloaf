@@ -1405,17 +1405,3 @@ bool D64MFile::exists()
     return true;
 }
 
-bool D64MFile::remove()
-{
-    // A path inside the image would mean deleting a directory entry within
-    // the disk image's own filesystem (BAM update, dir entry removal) —
-    // not implemented.
-    if ( pathInStream.size() && pathInStream != "/" )
-        return false;
-
-    // No pathInStream: this MFile IS the container file itself (isDirectory()
-    // reports true for browsing purposes, but on disk it's one ordinary file).
-    // Delete it the same way FlashMFile::remove() deletes any other file.
-    return ::remove(url.c_str()) == 0;
-}
-

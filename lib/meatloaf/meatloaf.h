@@ -24,6 +24,7 @@
 #include <fstream>
 #include <ctime>
 #include <functional>
+#include <cstdio>
 
 #include "../../include/debug.h"
 
@@ -329,7 +330,17 @@ public:
     virtual bool mkDir() { return false; };
     virtual bool rmDir() { return false; };
     virtual bool exists();
-    virtual bool remove() { return false; };
+    // Default: pathInStream empty means this MFile IS the container/file
+    // itself (isDirectory() reports true above so it can be browsed, but on
+    // whatever backend it lives on it's one ordinary file). Try deleting the
+    // real underlying entity via its url. Harmless no-op-that-fails for
+    // remote/synthetic URLs (::remove() just returns nonzero), and any
+    // subclass with real delete semantics of its own already overrides this.
+    virtual bool remove() {
+        if (!pathInStream.empty() && pathInStream != "/")
+            return false;
+        return ::remove(url.c_str()) == 0;
+    };
     virtual bool rename(std::string dest) { return false; };
     virtual time_t getLastWrite() { return 0; };
     virtual time_t getCreationTime() { return 0; };

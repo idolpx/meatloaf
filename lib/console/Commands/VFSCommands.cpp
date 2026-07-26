@@ -607,6 +607,18 @@ int wget(int argc, char **argv)
     if (f != nullptr)
     {
         auto s = f->getSourceStream();
+        // For a container format (archive, disk image) fetched at its own
+        // bare URL, getSourceStream() returns an unopened decoder — opening
+        // only happens via seekPath()/rewindDirectory(), neither of which
+        // apply here. Fall back to sourceFile's raw, undecoded stream so a
+        // plain wget saves the container's actual bytes instead of failing.
+        if ((!s || !s->isOpen()) && f->sourceFile != nullptr)
+            s = f->sourceFile->getSourceStream();
+        if (!s)
+        {
+            Serial.printf("wget: cannot open '%s'\r\n", url_arg);
+            return 1;
+        }
         std::string outname = f->getDownloadFilename();
 
         std::string outfile;
