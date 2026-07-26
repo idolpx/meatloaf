@@ -351,6 +351,17 @@ static bool rm_path(const std::string &path, bool recursive, bool force)
 
     if (f->isDirectory())
     {
+        // Some "directories" (a D64/D81/etc. container file sitting directly
+        // on a real filesystem, or an empty real directory) are actually a
+        // single removable entry from the underlying filesystem's point of
+        // view — try direct removal before requiring -r for real recursive
+        // descent into a non-empty directory.
+        if (f->remove())
+        {
+            Serial.printf("%s removed\r\n", path.c_str());
+            return true;
+        }
+
         if (!recursive)
         {
             if (!force)
@@ -1825,20 +1836,26 @@ static int cmd_unzip(int argc, char **argv)
     }
 
     std::string src = resolve_path(argv[1]);
-    std::string dest;
-    if (argc >= 3) {
-        dest = resolve_path(argv[2]);
-    } else {
-        size_t slash = src.rfind('/');
-        dest = (slash != std::string::npos) ? src.substr(0, slash) : getCurrentPath()->url;
-    }
-    while (dest.size() > 1 && dest.back() == '/') dest.pop_back();
 
     std::unique_ptr<MFile> srcFile(MFSOwner::File(src));
     if (!srcFile || !srcFile->exists()) {
         Serial.printf("unzip: cannot open '%s'\r\n", src.c_str());
         return EXIT_FAILURE;
     }
+
+    std::string dest;
+    if (argc >= 3) {
+        dest = resolve_path(argv[2]);
+    } else if (!srcFile->scheme.empty()) {
+        // Network source (http, https, ftp, smb, ...): "same directory as
+        // source" would try to write the extracted files back to the remote
+        // server, which always fails. Default to the current directory instead.
+        dest = getCurrentPath()->url;
+    } else {
+        size_t slash = src.rfind('/');
+        dest = (slash != std::string::npos) ? src.substr(0, slash) : getCurrentPath()->url;
+    }
+    while (dest.size() > 1 && dest.back() == '/') dest.pop_back();
 
     uint8_t *buf = (uint8_t *)psram_malloc(4096);
     if (!buf) {
@@ -1883,7 +1900,29 @@ static int cmd_unzip(int argc, char **argv)
             int64_t entry_size = (int64_t)entryFile->size;
             Serial.printf("  %s  (%lld bytes)\r\n", path.c_str(), (long long)entry_size);
 
-            std::shared_ptr<MStream> srcStream = entryFile->getSourceStream(std::ios_base::in);
+            // Each getSourceStream() call reopens the archive from scratch and
+            // rescans its headers over the network — a transient connection
+            // drop during that scan fails the whole entry even though the
+            // underlying HTTP layer's own internal retries usually recover.
+            // Retry the entry itself a few times before giving up on it.
+            // A fresh MFile is built for every attempt — calling
+            // getSourceStream() twice on the SAME MFile mutates its internal
+            // state (the sourceFile's url grows a duplicated path segment on
+            // each call), so reusing entryFile across retries guarantees every
+            // attempt after the first will fail.
+            std::string entryUrl = srcFile->url + "/" + entryFile->name;
+            std::shared_ptr<MStream> srcStream;
+            const int kEntryRetries = 3;
+            for (int attempt = 1; attempt <= kEntryRetries; attempt++) {
+                std::unique_ptr<MFile> attemptFile(MFSOwner::File(entryUrl));
+                srcStream = attemptFile ? attemptFile->getSourceStream(std::ios_base::in) : nullptr;
+                if (srcStream && srcStream->isOpen())
+                    break;
+                if (attempt < kEntryRetries) {
+                    Serial.printf("  retrying '%s' (%d/%d)...\r\n", entryFile->name.c_str(), attempt, kEntryRetries);
+                    vTaskDelay(pdMS_TO_TICKS(500));
+                }
+            }
             if (!srcStream || !srcStream->isOpen()) {
                 Serial.printf("unzip: cannot read '%s'\r\n", entryFile->name.c_str());
                 continue;
