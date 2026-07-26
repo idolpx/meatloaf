@@ -127,4 +127,6 @@ class EspClass {
     float temperatureRead();
 };
 
+extern EspClass ESP;
+
 #endif  // ESP_H

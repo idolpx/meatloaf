@@ -105,6 +105,8 @@ extern "C" {
 #include "driver/temperature_sensor.h"
 #endif
 
+EspClass ESP;
+
 /**
  * User-defined Literals
  *  usage:
