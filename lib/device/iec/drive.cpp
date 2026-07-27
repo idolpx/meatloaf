@@ -2201,6 +2201,7 @@ uint8_t iecDrive::getStatusData(char *buffer, uint8_t bufferSize, bool *eoi)
 void iecDrive::getStatus(char *buffer, uint8_t bufferSize)
 {
     const char *msg = NULL;
+    std::string dosVersionMsg;  // must outlive the switch below - msg points into it
     switch( m_statusCode )
     {
         case ST_OK                  : msg = " OK"; break;
@@ -2222,8 +2223,9 @@ void iecDrive::getStatus(char *buffer, uint8_t bufferSize)
         case ST_FILE_NOT_FOUND      : msg = "FILE NOT FOUND"; break;
         case ST_FILE_NOT_OPEN       : msg = "FILE NOT OPEN"; break;
         case ST_FILE_EXISTS         : msg = "FILE EXISTS"; break;
-        case ST_DOSVERSION          : 
-            msg = strcat(PRODUCT_ID " ", ESP.getFirmwareVersion().c_str()); 
+        case ST_DOSVERSION          :
+            dosVersionMsg = std::string(PRODUCT_ID " ") + ESP.getFirmwareVersion().c_str();
+            msg = dosVersionMsg.c_str();
             break;
         case ST_NO_CHANNEL          : msg = "NO CHANNEL"; break;
         case ST_DIR_ERROR           : msg = "DIR ERROR"; break;
