@@ -1554,12 +1554,24 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
         esp_http_client_set_header(_http, pair.first.c_str(), pair.second.c_str());
     }
 
-    // Set Range Header (only for non-zero positions — avoids 416 Range Not Satisfiable)
-    if ( method == HTTP_METHOD_GET && position > 0 )
+    // Set Range Header — on EVERY GET, including position 0. The probe on the
+    // first request is what detects range support: a range-capable server
+    // answers 206, which sets isFriendlySkipper and _range_size (total size
+    // from Content-Range). Without it the server answers 200 with the full
+    // body, range support is never detected, and every seek in seek-heavy
+    // media streaming (e.g. a D64 image over HTTP) degrades to
+    // restart-and-flush over the whole body — with the restart reusing the
+    // handle while the previous full-body response is still in flight,
+    // desyncing the connection. A 416 from a server that can't satisfy
+    // "bytes=0-N" (empty file, range-hostile server) is retried below
+    // without the header.
+    bool sentRange = false;
+    if ( method == HTTP_METHOD_GET )
     {
         char str[40];
         snprintf(str, sizeof str, "bytes=%" PRIu32 "-%" PRIu32, position, (position + size + 5));
         esp_http_client_set_header(_http, "Range", str);
+        sentRange = true;
         //Debug_printv("seeking range[%s] url[%s]", str, url.c_str());
     }
 
@@ -1586,11 +1598,31 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
     {
         // For GET/HEAD, fetch headers immediately
         int64_t lengthResp = esp_http_client_fetch_headers(_http);
-        if (_size == 0 && lengthResp > 0) {
+        status = esp_http_client_get_status_code(_http);
+
+        // Range not satisfiable on the position-0 probe (empty file or
+        // range-hostile server): retry once without the Range header.
+        // Status must be read BEFORE the _size assignment below so the 416
+        // error body's length never pollutes _size.
+        if (status == 416 && sentRange && position == 0)
+        {
+            Debug_printv("416 on range probe, retrying without Range header");
+            int flushed = 0;
+            esp_http_client_flush_response(_http, &flushed);
+            esp_http_client_delete_header(_http, "Range");
+            rc = esp_http_client_open(_http, 0);
+            if (rc != ESP_OK) {
+                Debug_printv("Connection failed on 416 retry...");
+                return 0;
+            }
+            lengthResp = esp_http_client_fetch_headers(_http);
+            status = esp_http_client_get_status_code(_http);
+        }
+
+        if (_size == 0 && lengthResp > 0 && status < 400) {
             _size = (uint32_t)lengthResp;
             _position = position;
         }
-        status = esp_http_client_get_status_code(_http);
         if (method != HTTP_METHOD_HEAD) {
             _is_open = true;
         }
