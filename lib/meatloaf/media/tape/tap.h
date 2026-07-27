@@ -180,8 +180,6 @@ public:
 
     std::unordered_map<std::string, std::string> info() override;
 
-    std::string media_label = "c64 tape";
-
 protected:
     uint32_t readFile(uint8_t* buf, uint32_t size) override;
     uint32_t writeFile(uint8_t* buf, uint32_t size) override { return 0; };
@@ -208,7 +206,7 @@ public:
 
     TAPMFile(std::string path, bool is_dir = true): MFile(path) {
         isDir = is_dir;
-        isPETSCII = false;
+        isPETSCII = true;
         media_image = name;
     };
 

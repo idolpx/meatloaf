@@ -93,6 +93,9 @@ public:
     // Duration of the whole tape in ms; forces the full scan
     uint32_t totalMs();
 
+    std::string platformName() const;
+    std::string videoName() const;
+
 private:
     bool readBytes(uint32_t pos, uint8_t *dst, uint32_t n);
     bool nextValue(uint32_t *pos, uint32_t *cycles);  // one (half)wave at *pos

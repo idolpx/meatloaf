@@ -517,8 +517,9 @@ bool TAPMFile::rewindDirectory()
 
     // Set Media Info Fields (the tape position is NOT reset - listings
     // advance through the tape sequentially)
-    media_header = image->media_label;
-    media_id = "tap";
+
+    media_header = image->decoder.platformName() + " (" + image->decoder.videoName() + ")";
+    media_id = "TAPE";
     media_blocks_free = 0;
     media_block_size = image->block_size;
     media_image = name;
@@ -581,7 +582,7 @@ MFile* TAPMFile::getNextFileInDir()
 
         auto file = MFSOwner::File(url + "/" + filename);
         file->name = filename;
-        file->extension = "prg";
+        file->extension = " PRG";
         file->size = image->current.prg.size();
         file->is_dir = 0;
 
@@ -593,10 +594,10 @@ MFile* TAPMFile::getNextFileInDir()
     }
 
     // End of the tape reached
-    std::string marker = "end of tape";
+    std::string marker = "END OF TAPE";
     auto file = MFSOwner::File(url + "/" + marker);
     file->name = marker;
-    file->extension = "";
+    file->extension = " NFO";
     file->size = 0;
     file->is_dir = 0;
     return file;

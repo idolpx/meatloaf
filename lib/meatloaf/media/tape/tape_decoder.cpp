@@ -100,6 +100,20 @@ uint32_t TapeDecoder::machineClock() const
     }
 }
 
+std::string TapeDecoder::platformName() const
+{
+    switch (platform) {
+        case 1:  return "VIC-20";
+        case 2:  return "C16/PLUS4";
+        default: return "C64";
+    }
+}
+
+std::string TapeDecoder::videoName() const
+{
+    return video ? "NTSC" : "PAL";
+}
+
 bool TapeDecoder::open(MStream *container)
 {
     stream = container;
@@ -330,7 +344,12 @@ void TapeDecoder::harvestEntries(int nprg)
             name.resize(name.size() - 5);
         if (name.empty() && have_pending)
             name = pending_name;
-        mstr::rtrim(name);
+        // rtrim() alone misses PETSCII's 0xA0 shift-space, which some
+        // scanners use to pad the fixed-width tape header filename field.
+        // Left untrimmed, it survives into e.name and makes exact-name
+        // lookups (TAPMStream::seekPath()) fail even though display (which
+        // stops at the first embedded low byte) looks fine.
+        mstr::rtrimA0(name);
         if (!name.empty())
             e.name = mstr::toPETSCII2(name);
         e.loader = p.type_name ? p.type_name : "";
