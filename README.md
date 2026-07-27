@@ -1,5 +1,7 @@
 [![Meatloaf (C64/C128/VIC20/+4)](images/meatloaf.logo.png)](https://meatloaf.cc)
 
+[![Meatloaf Maniacs](https://facebook.com/favicon.ico)](https://fb.meatloaf.cc)  [![Jaime Idolpx](https://www.youtube.com/s/desktop/513a5249/img/favicon_48x48.png)](https://yt.meatloaf.cc)
+
 # What is Meatloaf?
 
 "Meatloaf" for Commodore computers is not a game or software application. Instead, it's a hardware device designed to enhance the functionality of the classic computer. Here's what it does:
