@@ -60,7 +60,12 @@ class Archive {
     std::shared_ptr<MStream> m_srcStream = nullptr;  // a stream that is able to serve bytes of this archive
     bool m_hasCompressionFilter = false;  // True when gzip/bz2/xz/etc filter is active (disables raw seeking)
 
-  static const size_t m_buffSize = 4096;
+  // 32KB source read block: cb_read pulls this much per libarchive callback.
+  // Larger blocks mean far fewer HTTP range requests when the archive source
+  // is a network stream (a 3.9MB entry needs ~120 requests instead of ~950 at
+  // 4KB), which keeps extraction fast enough to finish before the server drops
+  // the connection. PSRAM-backed (psram_malloc), so the size is not a concern.
+  static const size_t m_buffSize = 32768;
 
   //friend int cb_open(struct archive *, void *userData);
   //friend int cb_close(struct archive *, void *userData);

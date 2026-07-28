@@ -1912,30 +1912,36 @@ static int cmd_unzip(int argc, char **argv)
             int64_t entry_size = (int64_t)entryFile->size;
             Serial.printf("  %s  (%lld bytes)\r\n", path.c_str(), (long long)entry_size);
 
-            // Each getSourceStream() call reopens the archive from scratch and
-            // rescans its headers over the network — a transient connection
-            // drop during that scan fails the whole entry even though the
-            // underlying HTTP layer's own internal retries usually recover.
-            // Retry the entry itself a few times before giving up on it.
-            // A fresh MFile is built for every attempt — calling
-            // getSourceStream() twice on the SAME MFile mutates its internal
-            // state (the sourceFile's url grows a duplicated path segment on
-            // each call), so reusing entryFile across retries guarantees every
-            // attempt after the first will fail.
-            std::string entryUrl = srcFile->url + "/" + entryFile->name;
+            // Extract the entry's RAW bytes via the archive's own stream +
+            // seekPath(). Re-resolving the entry URL through MFSOwner::File()
+            // would wrap format-recognized entries (.g64/.d81/.d64/etc.) in a
+            // disk-image decoder, so getSourceStream() reads the files *inside*
+            // the image instead of extracting the image file itself. Going
+            // through the archive stream yields raw entry bytes uniformly for
+            // every entry type — the same path LOAD uses to pull a file out of
+            // an archive.
+            //
+            // Each attempt reopens the archive from scratch and rescans its
+            // headers over the network — a transient connection drop during
+            // that scan fails the entry even though the HTTP layer's own
+            // retries usually recover. Retry a few times before giving up. A
+            // fresh archive MFile is built per attempt because getSourceStream()
+            // mutates MFile state.
             std::shared_ptr<MStream> srcStream;
             const int kEntryRetries = 3;
             for (int attempt = 1; attempt <= kEntryRetries; attempt++) {
-                std::unique_ptr<MFile> attemptFile(MFSOwner::File(entryUrl));
-                srcStream = attemptFile ? attemptFile->getSourceStream(std::ios_base::in) : nullptr;
-                if (srcStream && srcStream->isOpen())
+                std::unique_ptr<MFile> archiveFile(MFSOwner::File(srcFile->url));
+                auto entryStream = archiveFile ? archiveFile->getSourceStream(std::ios_base::in) : nullptr;
+                if (entryStream && entryStream->seekPath(entryFile->name)) {
+                    srcStream = entryStream;
                     break;
+                }
                 if (attempt < kEntryRetries) {
                     Serial.printf("  retrying '%s' (%d/%d)...\r\n", entryFile->name.c_str(), attempt, kEntryRetries);
                     vTaskDelay(pdMS_TO_TICKS(500));
                 }
             }
-            if (!srcStream || !srcStream->isOpen()) {
+            if (!srcStream) {
                 Serial.printf("unzip: cannot read '%s'\r\n", entryFile->name.c_str());
                 continue;
             }

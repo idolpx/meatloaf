@@ -1515,7 +1515,18 @@ uint32_t MeatHttpClient::read(uint8_t* buf, uint32_t size) {
             if (bytesRead > 0 && bytesRead < size && !esp_http_client_is_chunked_response(_http)) {
                 uint32_t totalSize = (_range_size > 0) ? _range_size : ((_size > 0) ? _size : 0);
                 if (totalSize == 0 || _position < totalSize)
-                    openAndFetchHeaders(lastMethod, _position);
+                    // Re-page with the caller's requested size, NOT the default
+                    // HTTP_BLOCK_SIZE. Bulk sequential readers (archive
+                    // extraction requests m_buffSize at a time) then get large
+                    // ranges instead of ~262-byte windows — a 3.9MB entry drops
+                    // from ~15000 range round-trips (which exhausted the
+                    // connection mid-transfer) to a few hundred. Small callers
+                    // (IEC drive block reads) pass a small size and are
+                    // unchanged. esp_http_client_read() fills the full request
+                    // unless the range is exhausted, so a partial read here
+                    // always means "range end" and re-paging at _position
+                    // continues the byte stream seamlessly.
+                    openAndFetchHeaders(lastMethod, _position, size);
             }
         }
 
