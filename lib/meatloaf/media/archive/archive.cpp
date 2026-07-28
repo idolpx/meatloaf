@@ -171,7 +171,13 @@ int64_t cb_seek(struct archive *, void *userData, int64_t offset, int whence)
             // This is critical for .7z files which require accurate positioning
             return (int64_t)a->m_srcStream->position();
         }
-        Debug_printv("ERROR! seek failed: offset[%lld] whence[%d] abs[%lld]", (long long)offset, whence, (long long)abs);
+        // A seek to exactly EOF (abs == total) is an EXPECTED failure: the ZIP
+        // bidder probes SEEK_END to find the End-Of-Central-Directory record,
+        // and HTTP sources 416 on a range starting at/after EOF. Don't log it
+        // as an error — only genuinely unexpected in-range seek failures.
+        if (!(total > 0 && abs >= total)) {
+            Debug_printv("ERROR! seek failed: offset[%lld] whence[%d] abs[%lld]", (long long)offset, whence, (long long)abs);
+        }
         return ARCHIVE_WARN;
     }
     else
