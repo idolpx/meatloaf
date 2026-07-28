@@ -157,6 +157,12 @@ public:
     virtual bool isRandomAccess() { return false; };
     virtual bool isNetwork() { return false; }; // Override to true in network stream classes
 
+    // Hint that the caller will read this stream sequentially in bulk (e.g.
+    // archive extraction reading the whole container forward). Network streams
+    // can use this to fetch one continuous response instead of many small
+    // range requests. No-op for streams that don't care.
+    virtual void setSequentialAccess(bool on) {};
+
     virtual bool open(std::ios_base::openmode mode) = 0;
     virtual void close() = 0;
 

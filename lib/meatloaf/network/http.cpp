@@ -1614,6 +1614,21 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
         // probe, clamp the requested end to it so the lookahead margin
         // never asks past EOF, while leaving it untouched everywhere else.
         char str[40];
+        if ( _sequentialAccess )
+        {
+            // Bulk sequential read (archive extraction): request an open-ended
+            // range so the ENTIRE remainder streams over ONE connection. Reading
+            // a large file as ~N small ranges instead churns a new
+            // esp_http_client_open() per 32KB block — latency degrades
+            // exponentially and the stream eventually corrupts (ZIP -5). One
+            // continuous response never re-pages (reads fill fully until the
+            // real EOF), so it's both fast and reliable.
+            snprintf(str, sizeof str, "bytes=%" PRIu32 "-", position);
+            esp_http_client_set_header(_http, "Range", str);
+            sentRange = true;
+        }
+        else
+        {
         uint32_t rangeEnd = position + size + 5;
         // _range_size (from a prior 206's Content-Range ".../TOTAL") is the
         // authoritative total once any ranged response has occurred — on a
@@ -1628,6 +1643,7 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
         esp_http_client_set_header(_http, "Range", str);
         sentRange = true;
         //Debug_printv("seeking range[%s] url[%s]", str, url.c_str());
+        }
     }
 
     // POST

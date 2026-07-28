@@ -145,6 +145,11 @@ public:
     bool _is_open = false;
     bool _exists = false;
 
+    // When true, GETs request an open-ended range ("bytes=pos-") so the whole
+    // remainder streams over one connection — used for bulk sequential reads
+    // (archive extraction) to avoid the connection churn of many small ranges.
+    bool _sequentialAccess = false;
+
     uint32_t available() { return _size - _position; }
 
     bool complete() {
@@ -305,6 +310,10 @@ public:
 
     virtual bool seek(uint32_t pos);
     virtual bool seekPath(std::string path) override { return false; }
+
+    void setSequentialAccess(bool on) override {
+        if (_session && _session->client) _session->client->_sequentialAccess = on;
+    }
 
     bool handleCommand(const std::string& cmd);
     void performJsonQuery(const std::string& pointer);

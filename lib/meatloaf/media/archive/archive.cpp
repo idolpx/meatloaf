@@ -201,6 +201,10 @@ bool Archive::open(std::ios_base::openmode mode, bool rawOnly) {
     bool seekOk = m_srcStream->seek(0, SEEK_SET);
     Debug_printv("post-seek pos[%lu] seekOk[%d]", (unsigned long)m_srcStream->position(), (int)seekOk);
 
+    // The archive is read sequentially forward; tell a network source to stream
+    // the whole container over one connection instead of many small ranges.
+    m_srcStream->setSequentialAccess(true);
+
     if (rawOnly) {
         // Only add decompression filters + raw format — no competing archive formats.
         // This guarantees archive_read_next_header() returns ARCHIVE_OK (synthetic raw
@@ -293,6 +297,9 @@ void Archive::close() {
         m_srcBuffer = nullptr;
     }
     m_hasCompressionFilter = false;
+    // Clear the bulk-read hint so a later non-archive read of the same shared
+    // (pooled) source stream reverts to normal range-based paging.
+    if (m_srcStream) m_srcStream->setSequentialAccess(false);
 }
 
 
