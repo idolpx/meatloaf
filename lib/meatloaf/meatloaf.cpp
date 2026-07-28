@@ -641,13 +641,13 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
         //Debug_printv("** LOOK UP PATH NOT NEEDED   path[%s]", path.c_str());
         targetFile = targetFileSystem->getFile(path);
         //targetFile->pathInStream = sourcePathInStream;
-        targetFile->type = targetFileSystem->symbol;
+        //targetFile->type = targetFileSystem->symbol;
         //Debug_printv( ANSI_WHITE_BOLD "targetPathInStream[%s] is in sourcePath[%s][%s]", targetFile->pathInStream.c_str(), path.c_str(), targetFileSystem->symbol);
     } 
     else
     {
         targetFile = targetFileSystem->getFile(sourcePath);
-        targetFile->type = targetFileSystem->symbol;
+        //targetFile->type = targetFileSystem->symbol;
         targetFile->pathInStream = sourcePathInStream;
         //Debug_printv( ANSI_WHITE_BOLD "targetPathInStream[%s] is in sourcePath[%s][%s]", targetFile->pathInStream.c_str(), sourcePath.c_str(), targetFileSystem->symbol);
 
@@ -678,7 +678,7 @@ MFile* MFSOwner::File(std::string path, bool default_fs) {
         }
         //Debug_printv( ANSI_RED_BOLD "sourcePath[%s] sourcePathInStream[%s]", sourcePath.c_str(), sourcePathInStream.c_str());
 
-        targetFile->sourceFile->type = sourceFileSystem->symbol;
+        //targetFile->sourceFile->type = sourceFileSystem->symbol;
         targetFile->isWritable = targetFile->sourceFile->isWritable;   // This stream is writable if the container is writable
         //Debug_printv( ANSI_WHITE_BOLD "sourcePathInStream[%s] is in sourcePath[%s][%s]", sourcePathInStream.c_str(), sourcePath.c_str(), sourceFileSystem->symbol);
 

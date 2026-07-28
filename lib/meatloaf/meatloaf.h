@@ -248,10 +248,11 @@ std::string strip_cache_fragment_from_url(const std::string& url);
  ********************************************************/
 
 enum mfile_type_t {
-    MFILE_VFS = 0,
-    MFILE_PROTOCOL = 1,
-    MFILE_SERVICE = 2,
-    MFILE_OTHER = 3
+    MFILE_VFS,
+    MFILE_CONTAINER,
+    MFILE_PROTOCOL,
+    MFILE_SERVICE,
+    MFILE_OTHER
 };
 
 class MFile : public PeoplesUrlParser {
@@ -394,7 +395,7 @@ public:
 
     void dump() {
         static int index = 0;
-        printf("index[%d] url[%s][%s][%s]\r\n", index, url.c_str(), pathInStream.c_str(), type.c_str());
+        printf("index[%d] url[%s][%s][%d]\r\n", index, url.c_str(), pathInStream.c_str(), type);
         index++;
         if ( sourceFile != nullptr )
             sourceFile->dump();
