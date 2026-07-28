@@ -751,7 +751,18 @@ bool HTTPMStream::seek(uint32_t pos) {
         }
     }
 
-    return _session->client->seek(pos);
+    // Keep this stream's own _position in sync with the client's. Without
+    // this, position() still reports the pre-seek offset after a successful
+    // seek, so callers that measure progress by the delta — notably the
+    // archive cb_skip (skipped = position()-old_pos) — see 0 and give up on
+    // the fast range-request skip, falling back to reading and discarding the
+    // whole span in tiny HTTP_BLOCK_SIZE chunks. Every other stream's seek
+    // (FSP, flash, ...) updates _position; HTTP was the outlier.
+    if ( _session->client->seek(pos) ) {
+        _position = pos;
+        return true;
+    }
+    return false;
 }
 
 uint32_t HTTPMStream::read(uint8_t* buf, uint32_t size) {
