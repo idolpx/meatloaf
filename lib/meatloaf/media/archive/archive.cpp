@@ -715,6 +715,28 @@ bool ArchiveMStream::seekCachedFile(const std::string sessionKey, const std::str
     return false;
 }
 
+bool ArchiveMStream::nextEntrySimple() {
+    if (!m_archive || !m_archive->isOpen()) return false;
+
+    struct archive *a = m_archive->getArchive();
+    while (true) {
+        int r = archive_read_next_header(a, &a_entry);
+        if (r != ARCHIVE_OK) {
+            entry.filename.clear();
+            entry.size = 0;
+            return false;  // EOF or error ends the walk
+        }
+        if (!S_ISREG(archive_entry_filetype(a_entry))) continue;  // skip dirs
+
+        const char *pn = archive_entry_pathname(a_entry);
+        entry.filename = (pn && pn[0]) ? basename((char *)pn) : "";
+        if (entry.filename.empty()) continue;  // unnamed/synthetic — skip
+
+        entry.size = (uint32_t)archive_entry_size(a_entry);
+        return true;
+    }
+}
+
 bool ArchiveMStream::seekPath(std::string path) {
     Debug_printv("seekPath called for path: %s", path.c_str());
 
@@ -794,6 +816,52 @@ bool ArchiveMFile::rewindDirectory()
     Debug_printv("Archive opened: [%s]", media_archive.c_str());
 
     return true;
+}
+
+bool ArchiveMFile::extractAll(const ExtractCallback &onEntry)
+{
+    // Single-file compressions (.gz/.bz2/…) have no directory to walk — the
+    // caller extracts them transparently via the inner file.
+    if (isSingleFileCompression())
+        return false;
+
+    // Reuse the one shared ArchiveMStream: listing and extraction go through
+    // the same instance and the same source, so nothing else opens the host
+    // concurrently (the reset that would corrupt a pooled HTTP connection).
+    auto image = ImageBroker::obtain<ArchiveMStream>("archive", url);
+    if (image == nullptr || image->m_archive == nullptr)
+        return false;
+
+    if (!image->m_archive->open(std::ios_base::in)) {
+        Debug_printv("extractAll: failed to open archive [%s]", url.c_str());
+        return false;
+    }
+    image->resetEntryCounter();
+
+    // Streams the current entry's raw bytes; returns 0 at end-of-entry.
+    auto readFn = [image](uint8_t *buf, uint32_t n) -> uint32_t {
+        if (!image->m_archive || !image->m_archive->isOpen()) return 0;
+        la_ssize_t r = archive_read_data(image->m_archive->getArchive(), buf, n);
+        if (r < 0) {
+            Debug_printv("extractAll: read error: %s",
+                         archive_error_string(image->m_archive->getArchive()));
+            return 0;
+        }
+        return (uint32_t)r;
+    };
+
+    bool ok = true;
+    while (image->nextEntrySimple()) {
+        // Any bytes of this entry left unread are skipped by the next
+        // archive_read_next_header(), so aborting a partial read is safe.
+        if (!onEntry(image->entry.filename, image->entry.size, readFn)) {
+            ok = false;
+            break;
+        }
+    }
+
+    image->m_archive->close();
+    return ok;
 }
 
 MFile *ArchiveMFile::getNextFileInDir()

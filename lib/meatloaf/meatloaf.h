@@ -327,6 +327,15 @@ public:
     //virtual bool rewindDirectory(std::string filter = "", std::string sort = "") { return false; };
     virtual MFile* getNextFileInDir() { return nullptr; };
 
+    // Bulk single-pass extraction of a container's entries (archives). onEntry
+    // is invoked per regular-file entry with its name, size, and a read()
+    // function that streams that entry's raw bytes. Containers that support it
+    // (ArchiveMFile) override this; the default is a no-op returning false so
+    // callers can fall back. See ArchiveMFile::extractAll for the rationale
+    // (one shared stream, HTTP-safe, no per-entry reopen).
+    virtual bool extractAll(const std::function<bool(const std::string &name, uint32_t size,
+                            const std::function<uint32_t(uint8_t *, uint32_t)> &read)> &onEntry) { return false; };
+
     virtual bool mkDir() { return false; };
     virtual bool rmDir() { return false; };
     virtual bool exists();

@@ -27,6 +27,8 @@
 #include <archive.h>
 #include <archive_entry.h>
 
+#include <functional>
+
 #include "../../../include/debug.h"
 #include "meat_media.h"
 #include "meatloaf.h"
@@ -220,6 +222,14 @@ class ArchiveMStream : public MMediaStream {
     bool seekPath(std::string path) override;
     bool seekCachedFile(const std::string sessionKey, const std::string path);
 
+    // Minimal forward advance for extract-all walks: read the next regular-file
+    // header and populate entry.filename/entry.size. Unlike seekEntry(index),
+    // it performs NO size-determination reopen (which would reset the archive's
+    // sequential position mid-walk). Directory entries are skipped. Returns
+    // false at end-of-archive. The archive stays positioned at the entry's data
+    // so the next archive_read_data() streams it.
+    bool nextEntrySimple();
+
    private:
     bool ensureData();
 
@@ -353,6 +363,18 @@ class ArchiveMFile : public MFile {
 
     bool rewindDirectory() override;
     MFile *getNextFileInDir() override;
+
+    // Single forward pass over the archive, reusing the one shared ("archive")
+    // ImageBroker stream — so only ONE source is ever open (HTTP-safe: no
+    // per-entry reopen that would reset a pooled esp_http_client). For each
+    // regular file entry, onEntry(name, size, read) is invoked; `read` streams
+    // that entry's raw bytes (archive_read_data). Return false from onEntry to
+    // abort the walk. Only valid for multi-file archives (single compressed
+    // .gz/.bz2/... are handled transparently elsewhere). Returns false if the
+    // archive could not be opened or onEntry aborted.
+    using ExtractCallback = std::function<bool(const std::string &name, uint32_t size,
+                                               const std::function<uint32_t(uint8_t *, uint32_t)> &read)>;
+    bool extractAll(const ExtractCallback &onEntry) override;
 
     bool isDir = true;
     bool dirIsOpen = false;

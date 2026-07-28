@@ -1804,10 +1804,12 @@ static std::string strip_compression_ext(const std::string &name)
     return name;
 }
 
-// Copies srcStream's content to destPath (an MFile opened for write),
+// Copies bytes from readFn into destPath (an MFile opened for write),
 // creating parent directories as needed. Prints progress for large entries.
-// Returns bytes copied, or -1 on error.
-static int64_t unzip_write_entry(uint8_t *buf, size_t bufSize, std::shared_ptr<MStream> srcStream,
+// readFn(buf, n) returns bytes read, 0 at end-of-entry. Returns bytes copied,
+// or -1 on error.
+static int64_t unzip_write_entry(uint8_t *buf, size_t bufSize,
+                                  const std::function<uint32_t(uint8_t *, uint32_t)> &readFn,
                                   const std::string &destPath, int64_t entry_size)
 {
     const int64_t kProgressThreshold = 512 * 1024;
@@ -1826,7 +1828,7 @@ static int64_t unzip_write_entry(uint8_t *buf, size_t bufSize, std::shared_ptr<M
 
     size_t entry_bytes = 0, last_report = 0;
     uint32_t n;
-    while ((n = srcStream->read(buf, bufSize)) > 0) {
+    while ((n = readFn(buf, bufSize)) > 0) {
         outStream->write(buf, n);
         entry_bytes += n;
         if (entry_size >= kProgressThreshold && entry_bytes - last_report >= kReport) {
@@ -1892,7 +1894,10 @@ static int cmd_unzip(int argc, char **argv)
         int64_t entry_size = (int64_t)srcStream->size();
         Serial.printf("  %s  (%lld bytes)\r\n", path.c_str(), (long long)entry_size);
 
-        int64_t written = unzip_write_entry(buf, 4096, srcStream, path, entry_size);
+        int64_t written = unzip_write_entry(
+            buf, 4096,
+            [srcStream](uint8_t *b, uint32_t n) { return srcStream->read(b, n); },
+            path, entry_size);
         if (written < 0) {
             free(buf);
             return EXIT_FAILURE;
@@ -1900,57 +1905,29 @@ static int cmd_unzip(int argc, char **argv)
         total_bytes = (size_t)written;
         count = 1;
     } else {
-        // Multi-file archive: ArchiveMFile's directory tree-walk enumerates
-        // every entry (the same mechanism `ls`/`cd` already use to browse
-        // into archives) — no direct libarchive calls needed here at all.
-        srcFile->rewindDirectory();
-        MFile *rawEntry;
-        while ((rawEntry = srcFile->getNextFileInDir()) != nullptr) {
-            std::unique_ptr<MFile> entryFile(rawEntry);
-
-            std::string path = dest + "/" + entryFile->name;
-            int64_t entry_size = (int64_t)entryFile->size;
-            Serial.printf("  %s  (%lld bytes)\r\n", path.c_str(), (long long)entry_size);
-
-            // Extract the entry's RAW bytes via the archive's own stream +
-            // seekPath(). Re-resolving the entry URL through MFSOwner::File()
-            // would wrap format-recognized entries (.g64/.d81/.d64/etc.) in a
-            // disk-image decoder, so getSourceStream() reads the files *inside*
-            // the image instead of extracting the image file itself. Going
-            // through the archive stream yields raw entry bytes uniformly for
-            // every entry type — the same path LOAD uses to pull a file out of
-            // an archive.
-            //
-            // Each attempt reopens the archive from scratch and rescans its
-            // headers over the network — a transient connection drop during
-            // that scan fails the entry even though the HTTP layer's own
-            // retries usually recover. Retry a few times before giving up. A
-            // fresh archive MFile is built per attempt because getSourceStream()
-            // mutates MFile state.
-            std::shared_ptr<MStream> srcStream;
-            const int kEntryRetries = 3;
-            for (int attempt = 1; attempt <= kEntryRetries; attempt++) {
-                std::unique_ptr<MFile> archiveFile(MFSOwner::File(srcFile->url));
-                auto entryStream = archiveFile ? archiveFile->getSourceStream(std::ios_base::in) : nullptr;
-                if (entryStream && entryStream->seekPath(entryFile->name)) {
-                    srcStream = entryStream;
-                    break;
+        // Multi-file archive: ONE forward pass over a single shared stream.
+        // extractAll() walks the archive once (reusing the one ImageBroker
+        // "archive" instance) and streams each entry's RAW bytes to us — no
+        // per-entry reopen/rescan, and only ONE source is ever open, so a
+        // pooled HTTP connection is never reset mid-read. Raw bytes are written
+        // as-is: format-recognized entries (.g64/.d81/…) are extracted as the
+        // stored file, never decoded into the files inside the image.
+        bool ok = srcFile->extractAll(
+            [&](const std::string &name, uint32_t size,
+                const std::function<uint32_t(uint8_t *, uint32_t)> &read) -> bool {
+                std::string path = dest + "/" + name;
+                Serial.printf("  %s  (%u bytes)\r\n", path.c_str(), size);
+                int64_t written = unzip_write_entry(buf, 4096, read, path, (int64_t)size);
+                if (written >= 0) {
+                    total_bytes += (size_t)written;
+                    count++;
                 }
-                if (attempt < kEntryRetries) {
-                    Serial.printf("  retrying '%s' (%d/%d)...\r\n", entryFile->name.c_str(), attempt, kEntryRetries);
-                    vTaskDelay(pdMS_TO_TICKS(500));
-                }
-            }
-            if (!srcStream) {
-                Serial.printf("unzip: cannot read '%s'\r\n", entryFile->name.c_str());
-                continue;
-            }
-
-            int64_t written = unzip_write_entry(buf, 4096, srcStream, path, entry_size);
-            if (written < 0)
-                continue;
-            total_bytes += (size_t)written;
-            count++;
+                return true;  // keep walking even if one entry failed to write
+            });
+        if (!ok) {
+            Serial.printf("unzip: cannot read archive '%s'\r\n", src.c_str());
+            free(buf);
+            return EXIT_FAILURE;
         }
     }
 
