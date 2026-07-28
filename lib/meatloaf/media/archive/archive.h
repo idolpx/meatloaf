@@ -411,32 +411,49 @@ public:
     {
         return byExtension(
             {
-                ".tar.xz",
-                ".tar.bz2",
-                ".tar.gz",
-                ".tar.z",
-                ".tar.lz",
-                ".tar",
-                ".tgz",
-                ".7z",
-                ".bz2",
-                ".gz",
-                ".lha",    // Have to find a way to distinquish between PC/C64 LHA/LXH/SFX file
+                // Archives (central directory or table of contents)
+                ".zip",     // ZIP archive
+                ".rar",     // RAR archive
+                ".7z",      // 7-Zip (LZMA) archive - not enough ram for decompress on ESP32
+                ".xar",     // XAR (eXtensible ARchive format) archive
+                ".iso",     // ISO 9660 Optical Disc Image
+
+                // Multi-format archives (have to check file header to determine format)
+                ".arc",     // Have to find a way to distinquish between PC/C64 ARC file
+                ".ark",     // Have to find a way to distinquish between PC/C64 ARK file
+                ".lha",     // Have to find a way to distinquish between PC/C64 LHA/LXH/SFX file
                 ".lzh",
                 ".lzx",
-                ".rar",
-                ".xar",
-                ".zip",
-                ".zst",
-                ".iso",
-                ".lz4",
-                ".cpgz",
+
+                // Archives (no central directory, no table of contents)
+                ".tar",
                 ".cpio",
-                ".jar",
-                ".rp9",    // Cloanto RetroPlatform Archive (https://www.retroplatform.com/kb/15-122)
-                ".vms"     // Meatloaf Virtual Media Stack!
-                //".arc",  // Have to find a way to distinquish between PC/C64 ARC file
-                //".ark",  // Have to find a way to distinquish between PC/C64 ARK file
+                ".a", ".ar",
+
+                // Single-file compressed archives)
+                ".gz",
+                ".xz",
+                ".lz",
+                ".z",
+                ".bz2",
+                ".zst",
+                ".lz4",
+
+                // Compression wrappers
+                ".tgz",
+                ".tar.gz",
+                ".tar.bz2",
+                ".tar.xz",
+                ".tar.lz",
+                ".tar.z",
+                ".tar.zst",
+                ".tar.lz4",
+                ".cpgz",
+
+                // Application-specific archives (not all are supported by libarchive)
+                ".jar",     // Java Archive
+                ".rp9",     // Cloanto RetroPlatform Archive (https://www.retroplatform.com/kb/15-122)
+                ".vms"      // Meatloaf Virtual Media Stack!
             },
             fileName
         );
