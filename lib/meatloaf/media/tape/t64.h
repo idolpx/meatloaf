@@ -36,13 +36,7 @@ class T64MStream : public MMediaStream {
     // override everything that requires overriding here
 
 public:
-    T64MStream(std::shared_ptr<MStream> is) : MMediaStream(is)
-    {
-        // // Read Header
-        // readHeader();
-
-        //Debug_printv("name[%16s] entry_count[%d]", header.name, header.entry_count);
-    };
+    T64MStream(std::shared_ptr<MStream> is) : MMediaStream(is) {};
 
 protected:
     struct Header {

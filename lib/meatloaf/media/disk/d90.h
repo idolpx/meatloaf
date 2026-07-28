@@ -94,16 +94,6 @@ public:
         sectorsPerTrack = { 32 };
         dos_rom = "dos9000";
 
-        // // Read Header
-        // readHeader();
-
-        // // readHeader() seeks containerStream into the BAM sector to grab the
-        // // disk name/ID for media_id/media_header. Restore position 0 so a
-        // // caller that never calls seekPath()/seekEntry() (raw verbatim copy
-        // // mode in MMediaStream::read()) starts from the true beginning of
-        // // the image instead of mid-file.
-        // containerStream->seek(0);
-
         // this.size = data.media_data.length;
         // switch (this.size + this.media_header_size) {
         uint32_t size = containerStream->size();

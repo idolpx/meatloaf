@@ -50,10 +50,7 @@
 class M2IMStream : public MMediaStream {
 
 public:
-    M2IMStream(std::shared_ptr<MStream> is) : MMediaStream(is)
-    {
-        // readHeader();
-    };
+    M2IMStream(std::shared_ptr<MStream> is) : MMediaStream(is) {};
 
 protected:
     struct Entry {

@@ -38,17 +38,7 @@ class ARKMStream : public MMediaStream {
     // override everything that requires overriding here
 
 public:
-    ARKMStream(std::shared_ptr<MStream> is) : MMediaStream(is)
-    {
-        // // Read Header
-        // readHeader();
-
-        // // Get the entry count
-        // containerStream->seek(0);
-        // uint8_t count;
-        // readContainer((uint8_t *)&count, 1);
-        // entry_count = count;
-    };
+    ARKMStream(std::shared_ptr<MStream> is) : MMediaStream(is) {};
 
 protected:
     struct Header {

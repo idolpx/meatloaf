@@ -79,16 +79,6 @@ public:
         interleave = { 3, 6 }; // Directory, File
         dos_rom = "dos1571";
 
-        // // Read Header
-        // readHeader();
-
-        // // readHeader() seeks containerStream into the BAM sector to grab the
-        // // disk name/ID for media_id/media_header. Restore position 0 so a
-        // // caller that never calls seekPath()/seekEntry() (raw verbatim copy
-        // // mode in MMediaStream::read()) starts from the true beginning of
-        // // the image instead of mid-file.
-        // containerStream->seek(0);
-
         uint32_t size = containerStream->size();
         switch (size + media_header_size) 
         {

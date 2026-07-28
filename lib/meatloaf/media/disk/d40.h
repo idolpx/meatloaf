@@ -64,9 +64,6 @@ public:
         sectorsPerTrack = { 17, 18, 20, 21 };
         dos_rom = "dos2040";
 
-        // // Read Header
-        // readHeader();
-
         // this.size = data.media_data.length;
         // switch (this.size + this.media_header_size) {
         uint32_t size = containerStream->size();

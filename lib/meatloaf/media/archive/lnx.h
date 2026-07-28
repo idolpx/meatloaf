@@ -36,15 +36,7 @@ class LNXMStream : public MMediaStream {
     // override everything that requires overriding here
 
 public:
-    LNXMStream(std::shared_ptr<MStream> is) : MMediaStream(is)
-    {
-        // LNX uses 254-byte blocks
-        block_size = 254;
-
-        // // Read Header
-        // readHeader();
-        // loadEntries();
-    };
+    LNXMStream(std::shared_ptr<MStream> is) : MMediaStream(is) {};
 
 protected:
     struct Header {
