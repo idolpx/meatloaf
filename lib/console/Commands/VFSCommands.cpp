@@ -1788,8 +1788,19 @@ static void unzip_mkdirs(const std::string &path)
 // of ArchiveMFile's directory tree-walk (see below).
 static const char *const kCompressionExts[] = {".gz", ".bz2", ".xz", ".lz", ".z", ".zst", ".lz4", nullptr};
 
+// Tar-based (and cpio-based) compressions are multi-file archives — the
+// decompressed stream is itself a tar whose entries must be extracted, not a
+// single file. Must be checked before the plain compression suffixes since
+// ".tar.gz" also ends ".gz".
+static const char *const kTarCompressionExts[] = {
+    ".tar.gz", ".tgz", ".tar.bz2", ".tar.xz", ".tar.lz", ".tar.z",
+    ".tar.zst", ".tar.lz4", ".cpgz", nullptr};
+
 static bool is_single_file_compression(const std::string &name)
 {
+    for (int i = 0; kTarCompressionExts[i]; i++)
+        if (mstr::endsWith(name, kTarCompressionExts[i], false))
+            return false;
     for (int i = 0; kCompressionExts[i]; i++)
         if (mstr::endsWith(name, kCompressionExts[i], false))
             return true;

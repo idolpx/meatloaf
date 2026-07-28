@@ -235,7 +235,7 @@ bool Archive::open(std::ios_base::openmode mode, bool rawOnly, bool randomAccess
         // or ambiguous extensions fall back to trying everything.
         std::string u = m_srcStream->url;
         mstr::toLower(u);
-        if (mstr::endsWith(u, ".zip") || mstr::endsWith(u, ".rp9")) {
+        if (mstr::endsWith(u, ".zip") || mstr::endsWith(u, ".jar") || mstr::endsWith(u, ".rp9")) {
             archive_read_support_format_zip(m_archive);
         } else if (mstr::endsWith(u, ".tar") || mstr::endsWith(u, ".tgz") ||
                    mstr::contains(u, (char *)".tar.")) {

@@ -308,12 +308,19 @@ class ArchiveMFile : public MFile {
     // Single-file compressed archives are transparent: directory operations delegate
     // directly to the inner file so the compression layer is invisible to the user.
     bool isSingleFileCompression() const {
-        // static const char* multiFileExts[] = {
-        //     ".tar.gz", ".tgz", ".tar.bz2", ".tar.xz", ".tar.lz", ".tar.z", ".cpgz", nullptr
-        // };
-        // for (int i = 0; multiFileExts[i]; i++) {
-        //     if (mstr::endsWith(name, multiFileExts[i], false)) return false;
-        // }
+        // Tar-based (and cpio-based) compressions are MULTI-file: the
+        // decompressed stream is an archive whose entries libarchive lists
+        // directly (gzip filter + tar format). They must NOT be treated as a
+        // transparent single-file compression — there is no inner "name.tar"
+        // entry to delegate to; the entries ARE the tar's contents. Checked
+        // before the single-file suffixes below since ".tar.gz" also ends ".gz".
+        static const char* multiFileExts[] = {
+            ".tar.gz", ".tgz", ".tar.bz2", ".tar.xz", ".tar.lz", ".tar.z",
+            ".tar.zst", ".tar.lz4", ".cpgz", nullptr
+        };
+        for (int i = 0; multiFileExts[i]; i++) {
+            if (mstr::endsWith(name, multiFileExts[i], false)) return false;
+        }
         static const char* singleFileExts[] = {
             ".gz", ".bz2", ".xz", ".lz", ".z", ".zst", ".lz4", nullptr
         };
@@ -425,6 +432,7 @@ public:
                 ".lz4",
                 ".cpgz",
                 ".cpio",
+                ".jar",
                 ".rp9",    // Cloanto RetroPlatform Archive (https://www.retroplatform.com/kb/15-122)
                 ".vms"     // Meatloaf Virtual Media Stack!
                 //".arc",  // Have to find a way to distinquish between PC/C64 ARC file
