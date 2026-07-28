@@ -101,16 +101,24 @@ int64_t cb_skip(struct archive *, void *userData, int64_t request)
             return 0;
         }
 
+        // Skip forward by seeking to an ABSOLUTE target (position + request)
+        // rather than a relative SEEK_CUR. Some source streams implement
+        // SEEK_CUR relative to an internal buffer-fill position that differs
+        // from the logical read position (fsplib's fsp_fseek does), which
+        // lands the skip at the wrong place and corrupts the next header read.
+        // Absolute positioning (SEEK_SET) is unambiguous and every source
+        // supports it — the same reason cb_seek converts everything to it.
         uint32_t old_pos = a->m_srcStream->position();
-        bool rc = a->m_srcStream->seek(request, SEEK_CUR);
-        if (rc) {
+        uint32_t target = old_pos + (uint32_t)request;   // libarchive only ever skips forward
+        bool rc = a->m_srcStream->seek(target);          // single-arg seek == absolute SEEK_SET
+        int64_t skipped = rc ? ((int64_t)a->m_srcStream->position() - old_pos) : 0;
+        Debug_printv("DIAG cb_skip: request[%lld] old_pos[%lu] target[%lu] rc[%d] skipped[%lld]",
+                     (long long)request, (unsigned long)old_pos, (unsigned long)target, (int)rc, (long long)skipped);
+        if (rc && skipped > 0) {
             // Return actual bytes skipped (may differ from request if seek is clamped)
-            int64_t skipped = a->m_srcStream->position() - old_pos;
-            // Debug_printv("skip request[%lld] old_pos[%u] new_pos[%u] skipped[%lld]",
-            //              request, old_pos, a->m_srcStream->position(), skipped);
             return skipped;
         }
-        Debug_printv("ERROR! skip failed: request[%lld]", request);
+        Debug_printv("skip failed/zero: request[%lld]", (long long)request);
         // Never return a negative code here: libarchive's client_skip_proxy()
         // does not check for negative returns — it subtracts them from the
         // remaining request, so the request GROWS by |code| each iteration and
