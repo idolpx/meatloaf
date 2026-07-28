@@ -146,24 +146,23 @@ std::shared_ptr<MSession::CachedFile> MSession::CachedFile::loadUnknownSize(
     uint32_t caps = MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT;
     uint8_t* buf = (uint8_t*)heap_caps_malloc(cap, caps);
     if (!buf) { caps = MALLOC_CAP_8BIT; buf = (uint8_t*)heap_caps_malloc(cap, caps); }
-    if (!buf) return nullptr;
+    if (!buf) return spillToSD(reader, nullptr, 0);  // no RAM at all -> straight to SD
 
     for (;;) {
         if (len == cap) {
-            if (cap >= maxSize) {
-                // At the ceiling — check whether the stream is exactly maxSize
-                // (done) or genuinely overflows.
-                uint8_t probe;
-                if (reader(&probe, 1) == 0) break;  // exactly maxSize, done
-                Debug_printv("loadUnknownSize: exceeded max %u bytes", maxSize);
+            // Buffer full and can't grow further in RAM (hit the ceiling or
+            // PSRAM is exhausted): spill everything to SD instead of failing.
+            bool atCeiling = (cap >= maxSize);
+            uint8_t* nb = atCeiling ? nullptr
+                                    : (uint8_t*)heap_caps_realloc(buf,
+                                          (cap > maxSize / 2) ? maxSize : cap * 2, caps);
+            if (!nb) {
+                auto cf = spillToSD(reader, buf, len);  // buf + remaining -> SD
                 heap_caps_free(buf);
-                return nullptr;
+                return cf;  // nullptr if no SD card
             }
-            uint32_t ncap = (cap > maxSize / 2) ? maxSize : cap * 2;  // cap at maxSize
-            uint8_t* nb = (uint8_t*)heap_caps_realloc(buf, ncap, caps);
-            if (!nb) { heap_caps_free(buf); return nullptr; }
             buf = nb;
-            cap = ncap;
+            cap = (cap > maxSize / 2) ? maxSize : cap * 2;
         }
         uint32_t got = reader(buf + len, cap - len);
         if (got == 0) break;  // end of stream (or read error surfaced as 0)
@@ -177,12 +176,62 @@ std::shared_ptr<MSession::CachedFile> MSession::CachedFile::loadUnknownSize(
         uint8_t* nb = (uint8_t*)heap_caps_realloc(buf, len, caps);
         if (nb) buf = nb;  // shrink can't fail meaningfully; keep buf if it does
     }
-    Debug_printv("loadUnknownSize: %u bytes", len);
+    Debug_printv("loadUnknownSize: %u bytes (PSRAM)", len);
     return std::make_shared<CachedFile>(buf, len);  // takes ownership
 }
 
+std::shared_ptr<MSession::CachedFile> MSession::CachedFile::spillToSD(
+    const std::function<uint32_t(uint8_t*, uint32_t)>& reader,
+    const uint8_t* existing, uint32_t existingLen)
+{
+    static std::atomic<uint32_t> s_tmpCounter{0};
+    std::string dir = "/sd/.ml_cache";
+    if (!session_ensure_dir(dir)) {
+        Debug_printv("spillToSD: no SD card / cannot create %s", dir.c_str());
+        return nullptr;
+    }
+    std::string path = dir + "/x" + std::to_string(s_tmpCounter.fetch_add(1)) + ".tmp";
+
+    FILE* f = fopen(path.c_str(), "wb");
+    if (!f) {
+        Debug_printv("spillToSD: cannot open %s for writing", path.c_str());
+        return nullptr;
+    }
+
+    bool ok = true;
+    if (existing && existingLen)
+        ok = (fwrite(existing, 1, existingLen, f) == existingLen);
+
+    uint8_t chunk[4096];
+    uint32_t got;
+    uint32_t total = existingLen;
+    while (ok && (got = reader(chunk, sizeof(chunk))) > 0) {
+        ok = (fwrite(chunk, 1, got, f) == got);
+        total += got;
+    }
+    fclose(f);
+
+    if (!ok || total == 0) {
+        remove(path.c_str());
+        return nullptr;
+    }
+
+    Debug_printv("spillToSD: %u bytes -> %s", total, path.c_str());
+    auto cf = forSD(path);
+    if (cf) cf->m_tempSD = true;  // delete on destruction
+    return cf;
+}
+
 void MSession::CachedFile::freeStorage() {
-    if (m_store == Store::SD) return;  // SD cache is persistent; don't delete on destruction
+    if (m_store == Store::SD) {
+        // Temp spill files are deleted with the cache entry; a real SD cache
+        // (forSD) is persistent.
+        if (m_tempSD && !m_sdPath.empty()) {
+            remove(m_sdPath.c_str());
+            m_tempSD = false;
+        }
+        return;
+    }
 #if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)
     if (m_useHimem) {
         ESP_ERROR_CHECK(esp_himem_free(m_handle));

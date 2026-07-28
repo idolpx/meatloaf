@@ -152,7 +152,16 @@ public:
     private:
         void freeStorage();
 
+        // Stream a reader's output to a temp SD file (used when PSRAM can't
+        // hold it). `existing`/`existingLen` are bytes already read into RAM
+        // that get written first. Returns an SD-backed (delete-on-destroy)
+        // CachedFile, or nullptr if no SD card is available.
+        static std::shared_ptr<CachedFile> spillToSD(
+            const std::function<uint32_t(uint8_t*, uint32_t)>& reader,
+            const uint8_t* existing, uint32_t existingLen);
+
         Store m_store;
+        bool m_tempSD = false;  // SD-backed temp: delete the file on destruction
         std::string m_sdPath;  // SD-backed only
 
         static std::unordered_map<std::string, std::shared_ptr<CachedFile>> s_ramCache;
