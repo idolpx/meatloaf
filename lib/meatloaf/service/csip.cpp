@@ -261,6 +261,7 @@ bool CSIPMSession::traversePath(std::string path) {
 
 CSIPMFile::CSIPMFile(std::string path, size_t filesize): MFile(path) {
     //Debug_printv("path[%s] size[%d]", path.c_str(), filesize);
+    type = MFILE_SERVICE;
     this->size = filesize;
 
     media_blocks_free = 65535;

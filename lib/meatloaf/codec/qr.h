@@ -135,10 +135,11 @@ public:
 class QRMFile: public MFile
 {
 public:
-    
+
     QRMFile(std::string path): MFile(path)
     {
         Debug_printv("path[%s]", path.c_str());
+        type = MFILE_OTHER;
     };
 
     bool isDirectory() override { return false; };

@@ -247,6 +247,13 @@ std::string strip_cache_fragment_from_url(const std::string& url);
  * Universal file
  ********************************************************/
 
+enum mfile_type_t {
+    MFILE_VFS = 0,
+    MFILE_PROTOCOL = 1,
+    MFILE_SERVICE = 2,
+    MFILE_OTHER = 3
+};
+
 class MFile : public PeoplesUrlParser {
 public:
     MFile() {}; // only for local FS!!!
@@ -266,14 +273,12 @@ public:
         }
         
         // Explicitly clear all string members to prevent fragmentation
-        type.clear();
         media_header.clear();
         media_id.clear();
         media_archive.clear();
         media_image.clear();
         
         // Shrink to fit to release memory
-        type.shrink_to_fit();
         media_header.shrink_to_fit();
         media_id.shrink_to_fit();
         media_archive.shrink_to_fit();
@@ -282,7 +287,7 @@ public:
         //Debug_printv("dtor path[%s]", path.c_str());
     };
 
-    std::string type;
+    mfile_type_t type = MFILE_VFS;
 
     bool isPETSCII = false;
     bool isWritable = false;

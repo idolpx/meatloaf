@@ -414,7 +414,8 @@ void MDNSMSession::clearCache() {
 
 MDNSMFile::MDNSMFile(std::string path) : MFile(path), dirOpened(false), dir_index(0) {
     //Debug_printv("MDNSMFile created: %s", path.c_str());
-    
+    type = MFILE_SERVICE;
+
     // Get or create session - use dummy host since MDNS is local
     _session = SessionBroker::obtain<MDNSMSession>("mdns", 0);
     

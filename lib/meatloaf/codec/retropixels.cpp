@@ -645,6 +645,8 @@ bool RetroPixelsMStream::seek(uint32_t pos)
 RetroPixelsMFile::RetroPixelsMFile(std::string path, RetroPixelsConfig config)
     : MFile(path), _config(config)
 {
+    type = MFILE_OTHER;
+
     // Parse URL and extract configuration
     pathInStream = parseRetroPixelsUrl(path, _config);
     parseURL(pathInStream);

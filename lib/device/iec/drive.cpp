@@ -2479,7 +2479,10 @@ void iecDrive::set_cwd(std::string path, bool verified)
     else
         setStatusCode(ST_SYNTAX_INVALID);
 
-    persistConfig();
+    // Don't persist if new working directory is OTHER
+    // QR://, HASH://, etc. are not persistent across reboots
+    if (m_cwd->type != MFILE_OTHER)
+        persistConfig();
 
     if (m_cwd->url != old_url)
         notify_activity(activitySource(), "path", m_cwd->url);
