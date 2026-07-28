@@ -205,7 +205,41 @@ bool Archive::open(std::ios_base::openmode mode, bool rawOnly) {
         m_hasCompressionFilter = true;
     } else {
         archive_read_support_filter_all(m_archive);
-        archive_read_support_format_all(m_archive);
+
+        // Select the archive format by file extension instead of registering
+        // every format and letting libarchive bid. Bidding reads a lot of the
+        // file up front — the ISO9660 bidder alone probes at offset 32768 —
+        // which is very slow over network sources that deliver small blocks
+        // per request (HTTP hands back ~256 bytes at a time, so the ~48 KB of
+        // bid probing was ~180 round-trips before the first entry). With one
+        // format registered, only that format's (cheap) bidder runs. Unknown
+        // or ambiguous extensions fall back to trying everything.
+        std::string u = m_srcStream->url;
+        mstr::toLower(u);
+        if (mstr::endsWith(u, ".zip") || mstr::endsWith(u, ".rp9")) {
+            archive_read_support_format_zip(m_archive);
+        } else if (mstr::endsWith(u, ".tar") || mstr::endsWith(u, ".tgz") ||
+                   mstr::contains(u, (char *)".tar.")) {
+            archive_read_support_format_tar(m_archive);
+        } else if (mstr::endsWith(u, ".7z")) {
+            archive_read_support_format_7zip(m_archive);
+        } else if (mstr::endsWith(u, ".rar")) {
+            archive_read_support_format_rar(m_archive);
+            archive_read_support_format_rar5(m_archive);
+        } else if (mstr::endsWith(u, ".lha") || mstr::endsWith(u, ".lzh") ||
+                   mstr::endsWith(u, ".lzx")) {
+            archive_read_support_format_lha(m_archive);
+        } else if (mstr::endsWith(u, ".xar")) {
+            archive_read_support_format_xar(m_archive);
+        } else if (mstr::endsWith(u, ".iso")) {
+            archive_read_support_format_iso9660(m_archive);
+        } else if (mstr::endsWith(u, ".cpio") || mstr::endsWith(u, ".cpgz")) {
+            archive_read_support_format_cpio(m_archive);
+        } else {
+            // Unknown/ambiguous extension — let libarchive bid across all formats.
+            archive_read_support_format_all(m_archive);
+        }
+
         archive_read_support_format_raw(m_archive);  // Support single compressed files like .gz
     }
 
