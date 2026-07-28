@@ -49,18 +49,25 @@ class Archive {
         Debug_printv("Archive destructor");
     }
 
-    bool open(std::ios_base::openmode mode, bool rawOnly = false);
+    bool open(std::ios_base::openmode mode, bool rawOnly = false, bool randomAccess = false);
     void close();
 
     bool isOpen() { return m_archive != nullptr; }
     archive *getArchive() { return m_archive; }
     bool hasCompressionFilter() { return m_hasCompressionFilter; }
+    bool isRandomAccess() { return m_randomAccess; }
+
+    // Hint the source stream to stream one continuous response (open-ended
+    // range) for bulk sequential reads (extraction). No-op for non-network
+    // sources. Cleared on close().
+    void setSequential(bool on) { if (m_srcStream) m_srcStream->setSequentialAccess(on); }
 
    private:
     struct archive *m_archive = nullptr;
     uint8_t *m_srcBuffer = nullptr;
     std::shared_ptr<MStream> m_srcStream = nullptr;  // a stream that is able to serve bytes of this archive
     bool m_hasCompressionFilter = false;  // True when gzip/bz2/xz/etc filter is active (disables raw seeking)
+    bool m_randomAccess = false;  // True for directory listing (seekable reader); false for streaming extraction
 
   // 32KB source read block: cb_read pulls this much per libarchive callback.
   // Larger blocks mean far fewer HTTP range requests when the archive source

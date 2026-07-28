@@ -163,7 +163,18 @@ int64_t cb_seek(struct archive *, void *userData, int64_t offset, int whence)
             default:       return ARCHIVE_FATAL;
         }
         if (abs < 0) abs = 0;
-        if (total > 0 && abs > total) abs = total;
+
+        // Seeking to (or past) EOF is never a real data position — there are no
+        // bytes there, and a network range at EOF 416s. Handle it WITHOUT a
+        // physical request:
+        //   - randomAccess (directory listing): report the total size so
+        //     libarchive's SEEK_END size-probe succeeds and the SEEKABLE reader
+        //     (ZIP central directory) activates — fast, no per-entry data skip.
+        //   - otherwise (streaming extraction): fail the probe so the streaming
+        //     reader is used, and never issue the wasted 416.
+        if (total > 0 && abs >= total) {
+            return a->m_randomAccess ? total : ARCHIVE_WARN;
+        }
 
         bool rc = a->m_srcStream->seek((uint32_t)abs);
         if (rc) {
@@ -171,13 +182,7 @@ int64_t cb_seek(struct archive *, void *userData, int64_t offset, int whence)
             // This is critical for .7z files which require accurate positioning
             return (int64_t)a->m_srcStream->position();
         }
-        // A seek to exactly EOF (abs == total) is an EXPECTED failure: the ZIP
-        // bidder probes SEEK_END to find the End-Of-Central-Directory record,
-        // and HTTP sources 416 on a range starting at/after EOF. Don't log it
-        // as an error — only genuinely unexpected in-range seek failures.
-        if (!(total > 0 && abs >= total)) {
-            Debug_printv("ERROR! seek failed: offset[%lld] whence[%d] abs[%lld]", (long long)offset, whence, (long long)abs);
-        }
+        Debug_printv("ERROR! seek failed: offset[%lld] whence[%d] abs[%lld]", (long long)offset, whence, (long long)abs);
         return ARCHIVE_WARN;
     }
     else
@@ -189,7 +194,7 @@ int64_t cb_seek(struct archive *, void *userData, int64_t offset, int whence)
 
 
 
-bool Archive::open(std::ios_base::openmode mode, bool rawOnly) {
+bool Archive::open(std::ios_base::openmode mode, bool rawOnly, bool randomAccess) {
     // close the archive if it was already open
     close();
 
@@ -201,9 +206,13 @@ bool Archive::open(std::ios_base::openmode mode, bool rawOnly) {
     bool seekOk = m_srcStream->seek(0, SEEK_SET);
     Debug_printv("post-seek pos[%lu] seekOk[%d]", (unsigned long)m_srcStream->position(), (int)seekOk);
 
-    // The archive is read sequentially forward; tell a network source to stream
-    // the whole container over one connection instead of many small ranges.
-    m_srcStream->setSequentialAccess(true);
+    // randomAccess (directory listing of a central-directory format like ZIP):
+    // let cb_seek satisfy libarchive's SEEK_END size-probe so the SEEKABLE
+    // reader activates and reads the central directory via range jumps — no
+    // per-entry data skip. Sequential (streaming) bulk reads use the opposite:
+    // cb_seek fails the EOF probe → streaming reader, paired with an open-ended
+    // source (set by extractAll after open).
+    m_randomAccess = randomAccess;
 
     if (rawOnly) {
         // Only add decompression filters + raw format — no competing archive formats.
@@ -816,7 +825,11 @@ bool ArchiveMFile::rewindDirectory()
         return false;
 
     dirIsOpen = true;
-    image->m_archive->open( std::ios_base::in );
+    // randomAccess=true: prefer libarchive's seekable reader so a
+    // central-directory format (ZIP/7z/…) lists via the directory (range jumps)
+    // instead of skipping each entry's data — the difference between a couple
+    // of requests and reading/discarding the whole container.
+    image->m_archive->open( std::ios_base::in, false, true );
     image->resetEntryCounter();
 
     media_archive = name;
@@ -839,10 +852,16 @@ bool ArchiveMFile::extractAll(const ExtractCallback &onEntry)
     if (image == nullptr || image->m_archive == nullptr)
         return false;
 
+    // Streaming open (randomAccess=false): entries are read forward, so once
+    // opened we flip the source to sequential (open-ended range) — the whole
+    // container streams over ONE connection instead of churning a request per
+    // block. Set AFTER open so the SEEK_END probe during bidding stays a cheap
+    // range check, not a read-through.
     if (!image->m_archive->open(std::ios_base::in)) {
         Debug_printv("extractAll: failed to open archive [%s]", url.c_str());
         return false;
     }
+    image->m_archive->setSequential(true);
     image->resetEntryCounter();
 
     // Streams the current entry's raw bytes; returns 0 at end-of-entry.
