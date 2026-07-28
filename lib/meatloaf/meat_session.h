@@ -29,6 +29,7 @@
 #include <ios>
 #include <algorithm>
 #include <atomic>
+#include <functional>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include <freertos/task.h>
@@ -137,6 +138,16 @@ public:
             }
             return true;
         }
+
+        // Single-pass load when the decompressed size is NOT known up front
+        // (compressed-only .xz/.bz2/.lz4 — bz2 stores no size at all). Grows a
+        // PSRAM-backed buffer as `reader` produces bytes (reader returns 0 at
+        // end), then hands ownership to a new CachedFile — one decompress, no
+        // size probe, no internal-RAM staging. Returns nullptr on failure or if
+        // the data exceeds maxSize. reader: uint32_t reader(uint8_t*, uint32_t).
+        static std::shared_ptr<CachedFile> loadUnknownSize(
+            const std::function<uint32_t(uint8_t*, uint32_t)>& reader,
+            uint32_t maxSize = 8u * 1024u * 1024u);
 
     private:
         void freeStorage();

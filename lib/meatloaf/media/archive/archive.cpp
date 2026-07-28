@@ -542,7 +542,11 @@ bool ArchiveMStream::seekEntry( uint16_t index )
             }
         }
         if (entry.size == 0) {
-            Debug_printv("Size unknown (non-gz or ISIZE read failed); will be determined on extraction");
+            // Non-gz single-file compressions (.xz/.bz2/.lz4) carry no stored
+            // size (bz2 has none at all). Leave size 0 — ensureData() extracts
+            // in a single pass into a growing HIMEM/PSRAM CachedFile, which
+            // discovers the size as it decompresses.
+            Debug_printv("Size unknown (non-gz); determined during single-pass extraction");
         }
 
         entry_index = 1;

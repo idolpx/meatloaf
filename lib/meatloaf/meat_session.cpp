@@ -135,6 +135,52 @@ MSession::CachedFile::~CachedFile() {
     freeStorage();
 }
 
+std::shared_ptr<MSession::CachedFile> MSession::CachedFile::loadUnknownSize(
+    const std::function<uint32_t(uint8_t*, uint32_t)>& reader, uint32_t maxSize)
+{
+    // Grow a PSRAM buffer (falling back to internal RAM only if there's no
+    // SPIRAM) as the reader decompresses. One pass; the buffer is handed to a
+    // CachedFile that owns and frees it.
+    uint32_t cap = 64u * 1024u;
+    uint32_t len = 0;
+    uint32_t caps = MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT;
+    uint8_t* buf = (uint8_t*)heap_caps_malloc(cap, caps);
+    if (!buf) { caps = MALLOC_CAP_8BIT; buf = (uint8_t*)heap_caps_malloc(cap, caps); }
+    if (!buf) return nullptr;
+
+    for (;;) {
+        if (len == cap) {
+            if (cap >= maxSize) {
+                // At the ceiling — check whether the stream is exactly maxSize
+                // (done) or genuinely overflows.
+                uint8_t probe;
+                if (reader(&probe, 1) == 0) break;  // exactly maxSize, done
+                Debug_printv("loadUnknownSize: exceeded max %u bytes", maxSize);
+                heap_caps_free(buf);
+                return nullptr;
+            }
+            uint32_t ncap = (cap > maxSize / 2) ? maxSize : cap * 2;  // cap at maxSize
+            uint8_t* nb = (uint8_t*)heap_caps_realloc(buf, ncap, caps);
+            if (!nb) { heap_caps_free(buf); return nullptr; }
+            buf = nb;
+            cap = ncap;
+        }
+        uint32_t got = reader(buf + len, cap - len);
+        if (got == 0) break;  // end of stream (or read error surfaced as 0)
+        len += got;
+    }
+
+    if (len == 0) { heap_caps_free(buf); return nullptr; }
+
+    // Trim the over-allocation from doubling back down to the exact size.
+    if (len < cap) {
+        uint8_t* nb = (uint8_t*)heap_caps_realloc(buf, len, caps);
+        if (nb) buf = nb;  // shrink can't fail meaningfully; keep buf if it does
+    }
+    Debug_printv("loadUnknownSize: %u bytes", len);
+    return std::make_shared<CachedFile>(buf, len);  // takes ownership
+}
+
 void MSession::CachedFile::freeStorage() {
     if (m_store == Store::SD) return;  // SD cache is persistent; don't delete on destruction
 #if defined(CONFIG_IDF_TARGET_ESP32) && defined(CONFIG_SPIRAM)

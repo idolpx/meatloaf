@@ -165,10 +165,30 @@ public:
 
         // Extract from archive into new CachedFile
         Debug_printv("Extracting entry: %s (%u bytes)", entryPath.c_str(), entrySize);
-        auto cf = std::make_shared<CachedFile>(entrySize);
-        if (!loadEntryFromArchive(cf, a, entrySize)) {
-            Debug_printv("Failed to extract entry: %s", entryPath.c_str());
-            return nullptr;
+
+        std::shared_ptr<CachedFile> cf;
+        if (entrySize > 0) {
+            cf = std::make_shared<CachedFile>(entrySize);
+            if (!loadEntryFromArchive(cf, a, entrySize)) {
+                Debug_printv("Failed to extract entry: %s", entryPath.c_str());
+                return nullptr;
+            }
+        } else {
+            // Unknown size (compressed-only .xz/.bz2/.lz4 — bz2 has no stored
+            // size). Single-pass extract into a growing PSRAM-backed CachedFile;
+            // the size is discovered as it decompresses.
+            cf = CachedFile::loadUnknownSize([a](uint8_t* dst, uint32_t n) -> uint32_t {
+                la_ssize_t r = archive_read_data(a, dst, n);
+                if (r < 0) {
+                    Debug_printv("archive read error %i: %s", archive_errno(a), archive_error_string(a));
+                    return 0;
+                }
+                return (uint32_t)r;
+            });
+            if (!cf) {
+                Debug_printv("Failed to extract entry (unknown size): %s", entryPath.c_str());
+                return nullptr;
+            }
         }
 
         cacheFile(entryPath, cf);
