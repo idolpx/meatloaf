@@ -1478,8 +1478,15 @@ uint32_t MeatHttpClient::read(uint8_t* buf, uint32_t size) {
     }
 
     if (!_is_open) {
-        Debug_printv("Opening HTTP Stream!");
-        processRedirectsAndOpen(0, size);
+        // Reopen at the current consumed position, NOT 0. When a ranged
+        // response body completes (or a SEEK_END probe 416'd during archive
+        // format bidding) the stream closes mid-read; libarchive's next
+        // cb_read expects the bytes at _position, so reopening at 0 would
+        // feed it the file header again and corrupt the decompressor
+        // (ZIP decompression failed -3/-5). On the first read _position is 0,
+        // so the normal open path is unchanged.
+        Debug_printv("Reopening HTTP Stream at pos[%u]", _position);
+        processRedirectsAndOpen(_position, size);
     }
 
     if (_is_open) {
