@@ -67,7 +67,12 @@ ssize_t cb_read(struct archive *, void *userData, const void **buff) {
     Archive *a = (Archive *)userData;
     *buff = a->m_srcBuffer;
     if (a->m_archive == NULL) return 0;
+    uint32_t posBefore = a->m_srcStream->position();
     ssize_t n = (ssize_t)a->m_srcStream->read(a->m_srcBuffer, a->m_buffSize);
+    Debug_printv("DIAG cb_read: pos[%lu] req[%lu] got[%zd] head[%02X %02X %02X %02X]",
+                 (unsigned long)posBefore, (unsigned long)a->m_buffSize, (ssize_t)n,
+                 n > 0 ? a->m_srcBuffer[0] : 0, n > 1 ? a->m_srcBuffer[1] : 0,
+                 n > 2 ? a->m_srcBuffer[2] : 0, n > 3 ? a->m_srcBuffer[3] : 0);
     return n;
 }
 
@@ -139,15 +144,35 @@ int64_t cb_seek(struct archive *, void *userData, int64_t offset, int whence)
             return ARCHIVE_FATAL;
         }
 
-        bool rc = a->m_srcStream->seek(offset, whence);
+        // Translate whence -> absolute position in int64, then seek the source
+        // with an ABSOLUTE position. libarchive passes signed int64 offsets
+        // (SEEK_END uses negative offsets like -22 to read the End Of Central
+        // Directory record), which must not be truncated to uint32 or fed to a
+        // source seek that computes _size-offset. Doing the translation here —
+        // and only ever calling the source's absolute SEEK_SET path — means we
+        // never depend on any source stream implementing SEEK_END/SEEK_CUR
+        // (fsplib's fsp_fseek returns ENOTSUP for SEEK_END; HTTP's SEEK_END is
+        // unreliable). Every source supports absolute positioning.
+        int64_t total = (int64_t)a->m_srcStream->size();
+        int64_t abs;
+        switch (whence) {
+            case SEEK_SET: abs = offset; break;
+            case SEEK_CUR: abs = (int64_t)a->m_srcStream->position() + offset; break;
+            case SEEK_END: abs = total + offset; break;
+            default:       return ARCHIVE_FATAL;
+        }
+        if (abs < 0) abs = 0;
+        if (total > 0 && abs > total) abs = total;
+
+        bool rc = a->m_srcStream->seek((uint32_t)abs);
+        int64_t pos = a->m_srcStream->position();
+        Debug_printv("DIAG cb_seek: offset[%lld] whence[%d] total[%lld] abs[%lld] rc[%d] -> pos[%lld]",
+                     (long long)offset, whence, (long long)total, (long long)abs, (int)rc, (long long)pos);
         if (rc) {
             // Must return the resulting absolute position, not the offset
             // This is critical for .7z files which require accurate positioning
-            int64_t pos = a->m_srcStream->position();
-            //Debug_printv("seek offset[%lld] whence[%d] -> pos[%lld]", offset, whence, pos);
             return pos;
         }
-        Debug_printv("ERROR! seek failed: offset[%lld] whence[%d]", offset, whence);
         return ARCHIVE_WARN;
     }
     else
