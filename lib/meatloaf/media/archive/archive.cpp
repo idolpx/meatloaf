@@ -67,12 +67,7 @@ ssize_t cb_read(struct archive *, void *userData, const void **buff) {
     Archive *a = (Archive *)userData;
     *buff = a->m_srcBuffer;
     if (a->m_archive == NULL) return 0;
-    uint32_t posBefore = a->m_srcStream->position();
     ssize_t n = (ssize_t)a->m_srcStream->read(a->m_srcBuffer, a->m_buffSize);
-    Debug_printv("DIAG cb_read: pos[%lu] req[%lu] got[%zd] head[%02X %02X %02X %02X]",
-                 (unsigned long)posBefore, (unsigned long)a->m_buffSize, (ssize_t)n,
-                 n > 0 ? a->m_srcBuffer[0] : 0, n > 1 ? a->m_srcBuffer[1] : 0,
-                 n > 2 ? a->m_srcBuffer[2] : 0, n > 3 ? a->m_srcBuffer[3] : 0);
     return n;
 }
 
@@ -112,13 +107,11 @@ int64_t cb_skip(struct archive *, void *userData, int64_t request)
         uint32_t target = old_pos + (uint32_t)request;   // libarchive only ever skips forward
         bool rc = a->m_srcStream->seek(target);          // single-arg seek == absolute SEEK_SET
         int64_t skipped = rc ? ((int64_t)a->m_srcStream->position() - old_pos) : 0;
-        Debug_printv("DIAG cb_skip: request[%lld] old_pos[%lu] target[%lu] rc[%d] skipped[%lld]",
-                     (long long)request, (unsigned long)old_pos, (unsigned long)target, (int)rc, (long long)skipped);
         if (rc && skipped > 0) {
             // Return actual bytes skipped (may differ from request if seek is clamped)
             return skipped;
         }
-        Debug_printv("skip failed/zero: request[%lld]", (long long)request);
+        Debug_printv("ERROR! skip failed: request[%lld]", (long long)request);
         // Never return a negative code here: libarchive's client_skip_proxy()
         // does not check for negative returns — it subtracts them from the
         // remaining request, so the request GROWS by |code| each iteration and
@@ -173,14 +166,12 @@ int64_t cb_seek(struct archive *, void *userData, int64_t offset, int whence)
         if (total > 0 && abs > total) abs = total;
 
         bool rc = a->m_srcStream->seek((uint32_t)abs);
-        int64_t pos = a->m_srcStream->position();
-        Debug_printv("DIAG cb_seek: offset[%lld] whence[%d] total[%lld] abs[%lld] rc[%d] -> pos[%lld]",
-                     (long long)offset, whence, (long long)total, (long long)abs, (int)rc, (long long)pos);
         if (rc) {
             // Must return the resulting absolute position, not the offset
             // This is critical for .7z files which require accurate positioning
-            return pos;
+            return (int64_t)a->m_srcStream->position();
         }
+        Debug_printv("ERROR! seek failed: offset[%lld] whence[%d] abs[%lld]", (long long)offset, whence, (long long)abs);
         return ARCHIVE_WARN;
     }
     else
