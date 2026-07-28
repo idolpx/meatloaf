@@ -321,7 +321,7 @@ public:
 
 protected:
 
-    bool readHeader() override
+    virtual bool readHeader() override
     {
         memset(&header, 0, sizeof(header));
         if (partitions.empty() || partition >= partitions.size()) {
@@ -334,7 +334,6 @@ protected:
             readContainer((uint8_t*)&header, sizeof(header));
     }
 
-protected:
     // Block/entry helpers usable by derived formats (D71/D81/DNP/DHD/...)
     bool writeHeader(std::string name, std::string id) override
     {
@@ -548,7 +547,9 @@ protected:
     friend class D80MFile;
     friend class D81MFile;
     friend class D82MFile;
-    friend class DNPMFile;    
+    friend class DNPMFile;
+    friend class G64MFile;
+    friend class NIBMFile;
 };
 
 
@@ -579,7 +580,7 @@ public:
 
     bool format(std::string header_info) override;
 
-    bool rewindDirectory() override;
+    virtual bool rewindDirectory() override;
     MFile* getNextFileInDir() override;
 
     bool isDirectory() override;

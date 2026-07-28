@@ -1393,15 +1393,23 @@ bool D64MFile::isDirectory()
 bool D64MFile::exists()
 {
     //Debug_printv("url[%s] sourceFile->url[%s]", url.c_str(), sourceFile->url.c_str());
+
+    // Container root (no pathInStream): the image IS one ordinary file on its
+    // backend, so existence is just the underlying file's existence. Don't
+    // build/parse a disk-image stream to answer it — for G64 that constructs a
+    // G64MStream (readHeader() -> seekSector() -> GCR findSync()), needless
+    // work here and actively fragile when the caller (e.g. rm) only wants to
+    // delete the container file. isDirectory() already short-circuits the root
+    // the same way.
+    if ( pathInStream.empty() || pathInStream == "/" )
+        return ( sourceFile != nullptr ) ? sourceFile->exists() : true;
+
     auto stream = ImageBroker::obtain<D64MStream>("d64", url);
     if ( stream == nullptr )
         return false;
 
     // A path inside the image only exists if it resolves to a partition,
     // directory or file entry
-    if ( pathInStream.size() && pathInStream != "/" )
-        return stream->resolvePath(pathInStream) != D64MStream::PATH_NOT_FOUND;
-
-    return true;
+    return stream->resolvePath(pathInStream) != D64MStream::PATH_NOT_FOUND;
 }
 

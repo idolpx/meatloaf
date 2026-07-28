@@ -65,16 +65,24 @@ public:
         //block_allocation_map = { {18, 0, 0x04, 1, 35, 4}, {53, 0, 0x00, 36, 70, 3} };
         //sectorsPerTrack = { 17, 18, 19, 21 };
 
-        // Read Header
-        readHeader();
+        // // Read Header
+        // readHeader();
 
-        containerStream->read((uint8_t*)&gcr_header, sizeof(gcr_header));
+        // containerStream->read((uint8_t*)&gcr_header, sizeof(gcr_header));
 
-        Debug_printv("signature[%s] version[%d] track_count[%d] track_size[%d]", gcr_header.signature, gcr_header.version, gcr_header.track_count, gcr_header.track_size);
+        // Debug_printv("signature[%s] version[%d] track_count[%d] track_size[%d]", gcr_header.signature, gcr_header.version, gcr_header.track_count, gcr_header.track_size);
     };
 
     MediaHeader gcr_header;
     SectorHeader gcr_sector_header;
+
+    bool readHeader() override
+    {
+        D64MStream::readHeader();
+        containerStream->read((uint8_t*)&gcr_header, sizeof(gcr_header));
+        Debug_printv("signature[%s] version[%d] track_count[%d] track_size[%d]", gcr_header.signature, gcr_header.version, gcr_header.track_count, gcr_header.track_size);
+        return true;
+    }
 
     bool seekSector( uint8_t track, uint8_t sector, uint8_t offset = 0 ) override;
 
@@ -105,6 +113,18 @@ public:
     {
         return std::make_shared<NIBMStream>(is);
     }
+
+    bool rewindDirectory() override {
+
+        auto image = ImageBroker::obtain<D64MStream>("nib", url);
+        if (image == nullptr)
+            return false;
+
+        // Read Header
+        image->readHeader();
+
+        return D64MFile::rewindDirectory();
+    }
 };
 
 
@@ -124,7 +144,7 @@ public:
                 ".nib",
                 ".nb2",
                 ".nbz"
-             },
+            },
             fileName
         );
     }

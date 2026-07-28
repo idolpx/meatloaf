@@ -201,6 +201,8 @@ private:
     friend class D80MFile;
     friend class D81MFile;
     friend class D82MFile;
+    friend class G64MFile;
+    friend class NIBMFile;
 
     // HARD DRIVE
     friend class DNPMFile;
