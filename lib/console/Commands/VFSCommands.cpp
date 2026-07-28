@@ -1765,7 +1765,7 @@ static int cmd_gzip(int argc, char **argv)
     return EXIT_SUCCESS;
 }
 
-// ─── unzip ────────────────────────────────────────────────────────────────────
+// ─── unzipx ────────────────────────────────────────────────────────────────────
 #ifndef MIN_CONFIG
 
 // Creates every path segment (mkdir -p semantics) via MFile::mkDir(), so it
@@ -1833,7 +1833,7 @@ static int64_t unzip_write_entry(uint8_t *buf, size_t bufSize,
     std::unique_ptr<MFile> outFile(MFSOwner::File(destPath));
     std::shared_ptr<MStream> outStream = outFile ? outFile->getSourceStream(std::ios_base::out) : nullptr;
     if (!outStream || !outStream->isOpen()) {
-        Serial.printf("unzip: cannot create '%s'\r\n", destPath.c_str());
+        Serial.printf("unzipx: cannot create '%s'\r\n", destPath.c_str());
         return -1;
     }
 
@@ -1853,10 +1853,10 @@ static int64_t unzip_write_entry(uint8_t *buf, size_t bufSize,
     return (int64_t)entry_bytes;
 }
 
-static int cmd_unzip(int argc, char **argv)
+static int cmd_unzipx(int argc, char **argv)
 {
     if (argc < 2) {
-        Serial.printf("usage: unzip <archive> [dest_folder]\r\n");
+        Serial.printf("usage: unzipx <archive> [dest_folder]\r\n");
         return EXIT_FAILURE;
     }
 
@@ -1864,7 +1864,7 @@ static int cmd_unzip(int argc, char **argv)
 
     std::unique_ptr<MFile> srcFile(MFSOwner::File(src));
     if (!srcFile || !srcFile->exists()) {
-        Serial.printf("unzip: cannot open '%s'\r\n", src.c_str());
+        Serial.printf("unzipx: cannot open '%s'\r\n", src.c_str());
         return EXIT_FAILURE;
     }
 
@@ -1884,7 +1884,7 @@ static int cmd_unzip(int argc, char **argv)
 
     uint8_t *buf = (uint8_t *)psram_malloc(4096);
     if (!buf) {
-        Serial.printf("unzip: out of memory\r\n");
+        Serial.printf("unzipx: out of memory\r\n");
         return EXIT_FAILURE;
     }
 
@@ -1896,7 +1896,7 @@ static int cmd_unzip(int argc, char **argv)
         // already resolves this transparently — the same path LOAD uses.
         std::shared_ptr<MStream> srcStream = srcFile->getSourceStream(std::ios_base::in);
         if (!srcStream || !srcStream->isOpen()) {
-            Serial.printf("unzip: cannot open '%s'\r\n", src.c_str());
+            Serial.printf("unzipx: cannot open '%s'\r\n", src.c_str());
             free(buf);
             return EXIT_FAILURE;
         }
@@ -1936,7 +1936,7 @@ static int cmd_unzip(int argc, char **argv)
                 return true;  // keep walking even if one entry failed to write
             });
         if (!ok) {
-            Serial.printf("unzip: cannot read archive '%s'\r\n", src.c_str());
+            Serial.printf("unzipx: cannot read archive '%s'\r\n", src.c_str());
             free(buf);
             return EXIT_FAILURE;
         }
@@ -1944,7 +1944,7 @@ static int cmd_unzip(int argc, char **argv)
 
     free(buf);
 
-    Serial.printf("unzip: extracted %d entries, %zu bytes to '%s'\r\n",
+    Serial.printf("unzipx: extracted %d entries, %zu bytes to '%s'\r\n",
                   count, total_bytes, dest.c_str());
     return EXIT_SUCCESS;
 }
@@ -2049,7 +2049,7 @@ namespace ESP32Console::Commands
 #ifndef MIN_CONFIG
     const ConsoleCommand getUnzipCommand()
     {
-        return ConsoleCommand("unzip", &cmd_unzip, "Extract an archive to a folder");
+        return ConsoleCommand("unzipx", &cmd_unzipx, "Extract an archive to a folder");
     }
 #endif
 
