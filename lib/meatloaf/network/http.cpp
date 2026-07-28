@@ -1487,8 +1487,15 @@ uint32_t MeatHttpClient::read(uint8_t* buf, uint32_t size) {
             //   server may keep the keep-alive connection open without a
             //   Content-Length on the error body, causing esp_http_client_read()
             //   to block forever waiting for a body that never arrives).
+            //   _range_size (from a 206's Content-Range ".../TOTAL") is the
+            //   authoritative total once any ranged response has occurred —
+            //   _size (Content-Length) on a 206 describes only that partial
+            //   chunk, not the resource's total size, so it must never win
+            //   once _range_size is known. _size is only the right fallback
+            //   for a server that answers with a plain 200 (full body, no
+            //   Content-Range) and never sends a 206 at all.
             if (bytesRead > 0 && bytesRead < size && !esp_http_client_is_chunked_response(_http)) {
-                uint32_t totalSize = (_range_size > 0) ? _range_size : 0;
+                uint32_t totalSize = (_range_size > 0) ? _range_size : ((_size > 0) ? _size : 0);
                 if (totalSize == 0 || _position < totalSize)
                     openAndFetchHeaders(lastMethod, _position);
             }
@@ -1568,8 +1575,27 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
     bool sentRange = false;
     if ( method == HTTP_METHOD_GET )
     {
+        // The +5 past "size" is a deliberate lookahead margin: reading a
+        // block at a time, it lets a same-connection follow-up read detect
+        // whether more data exists without a fresh round-trip. That only
+        // breaks for the final chunk of a resource, where position+size+5
+        // overshoots the actual end — the server correctly answers 416 for
+        // that chunk, and (unlike the position==0 probe) there was no
+        // recovery for it. Once the real size is known from the initial
+        // probe, clamp the requested end to it so the lookahead margin
+        // never asks past EOF, while leaving it untouched everywhere else.
         char str[40];
-        snprintf(str, sizeof str, "bytes=%" PRIu32 "-%" PRIu32, position, (position + size + 5));
+        uint32_t rangeEnd = position + size + 5;
+        // _range_size (from a prior 206's Content-Range ".../TOTAL") is the
+        // authoritative total once any ranged response has occurred — on a
+        // 206, _size (Content-Length) is only that partial chunk's length,
+        // not the resource's total, so it must never win once _range_size
+        // is known. _size is the right fallback only for a server that
+        // answers with a plain 200 (full body) and never sends a 206.
+        uint32_t knownSize = (_range_size > 0) ? _range_size : ((_size > 0) ? _size : 0);
+        if (knownSize > 0 && rangeEnd >= knownSize)
+            rangeEnd = knownSize - 1;
+        snprintf(str, sizeof str, "bytes=%" PRIu32 "-%" PRIu32, position, rangeEnd);
         esp_http_client_set_header(_http, "Range", str);
         sentRange = true;
         //Debug_printv("seeking range[%s] url[%s]", str, url.c_str());
@@ -1602,6 +1628,13 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
 
         // Range not satisfiable on the position-0 probe (empty file or
         // range-hostile server): retry once without the Range header.
+        // (position > 0 is NOT retried the same way: the retry drops Range
+        // and gets the full body from byte 0, but _size/_position below are
+        // only corrected when _size==0 — for a mid-transfer 416 that would
+        // silently misalign the read instead of failing it cleanly. The
+        // fix for that case is the corrected range-end math above, which
+        // stops the overshoot-past-EOF that caused the 416 in the first
+        // place.)
         // Status must be read BEFORE the _size assignment below so the 416
         // error body's length never pollutes _size.
         if (status == 416 && sentRange && position == 0)
