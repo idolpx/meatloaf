@@ -21,6 +21,10 @@
 #include "drive.h"
 #include "fuji.h"
 
+#ifdef ENABLE_DISPLAY
+#include "led_strip.h"
+#endif
+
 class iecMeatloaf : public iecDrive, public iecFuji
 {
 private:
@@ -123,6 +127,9 @@ public:
         for (int i = 0; i < MAX_DISK_DEVICES; i++)
             deferred |= get_disks(i)->disk_dev.reloadConfig();
         deferred |= reloadConfig();
+#ifdef ENABLE_DISPLAY
+        LEDS.reloadConfig();
+#endif
         return deferred;
     }
 };

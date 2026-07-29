@@ -122,6 +122,13 @@ public:
     void service();
     esp_err_t update();
 
+    // Persist current live settings (enabled/count/brightness) into
+    // mlConfig's devices.led_strip section; caller invokes mlConfig.save().
+    void persistConfig();
+    // Apply devices.led_strip settings from mlConfig to the live strip.
+    // Returns true if a led_strip section was found and applied.
+    bool reloadConfig();
+
     void idle(void) { mode = MODE_CLEAR; };
     void send(void) { mode = MODE_SEND; direction = 0; };
     void receive(void) { mode = MODE_RECEIVE; direction = 1; };

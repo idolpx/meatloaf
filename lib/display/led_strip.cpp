@@ -157,7 +157,12 @@ esp_err_t DisplayLEDs::init(int pin, led_strip_model_t model, int num_of_leds)
         return ESP_ERR_NO_MEM;
     }
 
-    pixel_brightness.assign(n_of_leds, brightness);
+    // Per-pixel brightness is a NEUTRAL multiplier applied on top of the
+    // global brightness (see update(): effective = per_led * brightness/255).
+    // It must default to 255 (full), NOT the global brightness value — else
+    // the two scalings compound and the global control can never reach max
+    // (e.g. global 255 stays capped at the frozen per-pixel value).
+    pixel_brightness.assign(n_of_leds, 255);
 
     spi_settings.buscfg.mosi_io_num = pin;
     // Sized for the maximum count so set_count() never exceeds the bus limit
@@ -212,7 +217,7 @@ bool DisplayLEDs::resize(int num_of_leds)
     if (spi_mutex != nullptr)
         xSemaphoreGive(spi_mutex);
 
-    pixel_brightness.assign(num_of_leds, brightness);
+    pixel_brightness.assign(num_of_leds, 255);  // neutral per-pixel multiplier (see init())
     fill_all((CRGB){.r=0, .g=0, .b=0});
     mode = MODE_CLEAR;  // repaint the idle pattern at the new size
     return true;
@@ -453,8 +458,45 @@ void DisplayLEDs::start(void)
     }
 }
 
+// Persist live settings into devices.led_strip. Mirrors iecDrive::persistConfig():
+// mutate mlConfig only — the caller invokes mlConfig.save(). Preserves an
+// existing "enabled" flag rather than clobbering it (the strip has no runtime
+// enable/disable, so it's owned by config). A pending count from set_count()
+// that the display task hasn't applied yet is persisted in preference to the
+// stale live n_of_leds.
+void DisplayLEDs::persistConfig()
+{
+    auto &entry = mlConfig.data()["devices"]["led_strip"];
+    if (!entry.contains("enabled"))
+        entry["enabled"] = 1;
+    entry["count"] = (m_pending_count >= 0) ? m_pending_count : n_of_leds;
+    entry["brightness"] = brightness;
+}
 
-void DisplayLEDs::blink(void) 
+// Apply devices.led_strip settings from mlConfig to the live strip. Only the
+// runtime-adjustable settings (brightness, count) are applied; "enabled" is
+// honored solely at start() since there is no clean way to tear down/recreate
+// the display task here. count goes through set_count() so the actual buffer
+// resize happens on the display task's next pass (never from the caller's task).
+bool DisplayLEDs::reloadConfig()
+{
+    const psram_json &devices = mlConfig["devices"];
+    if (!devices.contains("led_strip"))
+        return false;
+
+    const psram_json &strip = devices["led_strip"];
+    set_brightness(static_cast<uint8_t>(strip.value("brightness", (int)brightness)));
+
+    int count = strip.value("count", n_of_leds);
+    if (count < 0) count = 0;
+    if (count > 255) count = 255;
+    set_count(static_cast<uint8_t>(count));
+
+    return true;
+}
+
+
+void DisplayLEDs::blink(void)
 {
     static bool led_state_off = false;
     speed = 100;

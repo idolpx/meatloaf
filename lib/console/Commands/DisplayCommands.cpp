@@ -8,12 +8,6 @@
 #include "mlConfig.h"
 #include "../Helpers/PWDHelpers.h"
 
-static void persist_led_setting(const char *key, int value)
-{
-    mlConfig.data()["devices"]["led_strip"][key] = value;
-    mlConfig.save();
-}
-
 static int led(int argc, char **argv)
 {
     if (argc < 2) {
@@ -48,7 +42,8 @@ static int led(int argc, char **argv)
                 return EXIT_FAILURE;
             }
             LEDS.set_count(static_cast<uint8_t>(count));
-            persist_led_setting("count", count);
+            LEDS.persistConfig();
+            mlConfig.save();
         }
         else
         {
@@ -101,7 +96,8 @@ static int led(int argc, char **argv)
         {
             uint8_t brightness = static_cast<uint8_t>(atoi(argv[2]));
             LEDS.set_brightness(brightness);
-            persist_led_setting("brightness", brightness);
+            LEDS.persistConfig();
+            mlConfig.save();
         }
         else if (argc == 4)
         {
