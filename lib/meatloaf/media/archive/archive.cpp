@@ -427,7 +427,13 @@ bool ArchiveMStream::seekEntry(std::string filename)
     // Read Directory Entries
     if (filename.size())
     {
-        m_archive->open( std::ios_base::in );
+        // randomAccess=true: single-entry lookup needs the seekable reader.
+        // 7z is seekable-ONLY (no streaming reader — it must seek to the footer
+        // to read entries), so without this archive_read_next_header() returns
+        // ARCHIVE_FATAL. Harmless for streaming formats (zip/tar) and for
+        // compressed-only files (.xz/.bz2/.lz4 register no seekable format, so
+        // they stay streaming regardless).
+        m_archive->open( std::ios_base::in, false, true );
 
         size_t index = 1;
         //mstr::replaceAll(filename, "\\", "/");
@@ -856,16 +862,21 @@ bool ArchiveMFile::extractAll(const ExtractCallback &onEntry)
     if (image == nullptr || image->m_archive == nullptr)
         return false;
 
-    // Streaming open (randomAccess=false): entries are read forward, so once
-    // opened we flip the source to sequential (open-ended range) — the whole
-    // container streams over ONE connection instead of churning a request per
-    // block. Set AFTER open so the SEEK_END probe during bidding stays a cheap
-    // range check, not a read-through.
-    if (!image->m_archive->open(std::ios_base::in)) {
+    // 7z is a seekable-ONLY format (no streaming reader — it must seek to the
+    // footer to read entries), so it has to open randomAccess=true and CANNOT
+    // use the open-ended sequential source (which precludes seeking). Streaming
+    // formats (zip/tar) open randomAccess=false and flip the source to
+    // sequential — the whole container streams over ONE connection instead of
+    // churning a request per block. Sequential is set AFTER open so the
+    // SEEK_END probe during bidding stays a cheap range check, not a read
+    // through.
+    bool seekable = mstr::endsWith(url, ".7z", false);
+    if (!image->m_archive->open(std::ios_base::in, false, seekable)) {
         Debug_printv("extractAll: failed to open archive [%s]", url.c_str());
         return false;
     }
-    image->m_archive->setSequential(true);
+    if (!seekable)
+        image->m_archive->setSequential(true);
     image->resetEntryCounter();
 
     // Streams the current entry's raw bytes; returns 0 at end-of-entry.

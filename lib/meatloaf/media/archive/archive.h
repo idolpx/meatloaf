@@ -441,6 +441,7 @@ public:
                 // Multi-format archives (have to check file header to determine format)
                 ".arc",     // Have to find a way to distinquish between PC/C64 ARC file
                 ".ark",     // Have to find a way to distinquish between PC/C64 ARK file
+                ".arj",
                 ".lha",     // Have to find a way to distinquish between PC/C64 LHA/LXH/SFX file
                 ".lzh",
                 ".lzx",

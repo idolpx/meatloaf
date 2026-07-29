@@ -2047,7 +2047,7 @@ namespace ESP32Console::Commands
     }
 
 #ifndef MIN_CONFIG
-    const ConsoleCommand getUnzipCommand()
+    const ConsoleCommand getUnzipxCommand()
     {
         return ConsoleCommand("unzipx", &cmd_unzipx, "Extract an archive to a folder");
     }

@@ -47,7 +47,7 @@ namespace ESP32Console::Commands
     const ConsoleCommand getGzipCommand();
 
 #ifndef MIN_CONFIG
-    const ConsoleCommand getUnzipCommand();
+    const ConsoleCommand getUnzipxCommand();
 #endif
 
 #ifdef SD_CARD

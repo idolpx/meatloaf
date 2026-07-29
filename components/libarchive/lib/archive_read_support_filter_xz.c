@@ -491,7 +491,7 @@ esp32_lzma_free(void *opaque, void *ptr)
 	(void)opaque;
 	free(ptr);
 }
-static const lzma_allocator esp32_lzma_allocator = {
+static lzma_allocator esp32_lzma_allocator = {
 	esp32_lzma_alloc, esp32_lzma_free, NULL
 };
 #endif
