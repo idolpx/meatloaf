@@ -82,7 +82,7 @@ void accolade_search (void)
 	sv = ft[THISLOADER].sv;
 
 	if (!quiet)
-		msgout("  Accolade (+clone)");
+		msgout("\r\n  Accolade (+clone)");
 
 	for (i = 20; i > 0 && i < tap.len - BITSINABYTE; i++) {
 		eop = find_pilot(i, THISLOADER);

@@ -76,7 +76,7 @@ void freeload_search(void)
 	sv = ft[THISLOADER].sv;
 
 	if (!quiet)
-		msgout("  Freeload (+clones)");
+		msgout("\r\n  Freeload (+clones)");
 
 	for (i = 20; i > 0 && i < tap.len - BITSINABYTE; i++) {
 		eop = find_pilot(i, THISLOADER);

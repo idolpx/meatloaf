@@ -67,7 +67,7 @@ void turbotape_search(void)
    int hd[HDSZ];
 
    if(!quiet)
-      msgout("  Turbotape 250 (+clones)");
+      msgout("\r\n  Turbotape 250 (+clones)");
 
 
    for(i=20; i<tap.len-8; i++)

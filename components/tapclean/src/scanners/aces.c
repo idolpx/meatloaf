@@ -78,7 +78,7 @@ void aces_search (void)
 	sv = ft[THISLOADER].sv;
 
 	if (!quiet)
-		msgout("  Ace of Aces tape");
+		msgout("\r\n  Ace of Aces tape");
 
 	for (i = 20; i > 0 && i < tap.len - BITSINABYTE; i++) {
 		eop = find_pilot(i, THISLOADER);

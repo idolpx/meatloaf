@@ -176,7 +176,7 @@ void cyberload_f1_search(void)
       return;
 
    if(!quiet)
-      msgout("  Cyberload F1");
+      msgout("\r\n  Cyberload F1");
 
    for(i=20; i<tap.len-50; i++)      /* find all format 1 files... */
    {

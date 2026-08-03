@@ -76,7 +76,7 @@ void rainbowislands_search (void)
 	sv = ft[THISLOADER].sv;
 
 	if (!quiet)
-		msgout("  Rainbow Islands");
+		msgout("\r\n  Rainbow Islands");
 
 	for (i = 20; i > 0 && i < tap.len - BITSINABYTE; i++) {
 		eop = find_pilot(i, THISLOADER);

@@ -192,7 +192,7 @@ void enigma_search(void)
 	sv = ft[THISLOADER].sv;
 
 	if (!quiet)
-		msgout("  Enigma Variations Tape");
+		msgout("\r\n  Enigma Variations Tape");
 
 	enigma_index = 0;
 

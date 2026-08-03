@@ -243,7 +243,7 @@ void cyberload_f2_search(void)
       return;
 
    if(!quiet)
-      msgout("  Cyberload F2");
+      msgout("\r\n  Cyberload F2");
 
    strcpy(info,"");
 

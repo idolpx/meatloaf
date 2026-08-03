@@ -41,7 +41,7 @@ void usgold_search(void)
 	int z, tcnt, hd[HDSZ], x;
 
 	if (!quiet)
-		msgout("  US Gold tape");
+		msgout("\r\n  US Gold tape");
          
 
 	for (i = 20; i < tap.len - 8; i++) {

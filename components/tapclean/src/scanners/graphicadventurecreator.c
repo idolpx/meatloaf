@@ -116,7 +116,7 @@ void graphicadventurecreator_search (void)
 	sv = ft[THISLOADER].sv;
 
 	if (!quiet)
-		msgout("  GAC Save tape");
+		msgout("\r\n  GAC Save tape");
 
 	for (i = 20; i > 0 && i < tap.len - BITSINABYTE; i++) {
 		eop = graphicadventurecreator_find_pilot(i);

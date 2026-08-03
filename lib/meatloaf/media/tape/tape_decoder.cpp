@@ -340,8 +340,8 @@ void TapeDecoder::harvestEntries(int nprg)
         TapeEntry e;
         std::string name = (p.name && p.name[0]) ? p.name : "";
         // drop the engine's "_DATA" filename suffix (turbo data blocks)
-        if (name.size() >= 5 && name.compare(name.size() - 5, 5, "_DATA") == 0)
-            name.resize(name.size() - 5);
+        // if (name.size() >= 5 && name.compare(name.size() - 5, 5, "_DATA") == 0)
+        //     name.resize(name.size() - 5);
         if (name.empty() && have_pending)
             name = pending_name;
         // rtrim() alone misses PETSCII's 0xA0 shift-space, which some
@@ -351,7 +351,7 @@ void TapeDecoder::harvestEntries(int nprg)
         // stops at the first embedded low byte) looks fine.
         mstr::rtrimA0(name);
         if (!name.empty())
-            e.name = mstr::toPETSCII2(name);
+            e.name = name;
         e.loader = p.type_name ? p.type_name : "";
         e.start_addr = (uint16_t)p.start_addr;
         e.end_addr = (uint16_t)p.end_addr;
@@ -383,25 +383,25 @@ void TapeDecoder::harvestEntries(int nprg)
         have_pending = false;
     }
 
-    // Turbo-loader tapes: the Kernal-loaded block is just the boot stub
-    // for the loader system - only the turbo payload is loadable through
-    // Meatloaf. Drop each CBM block that a non-CBM program follows,
-    // passing its name (the game's name) to that program. Pure Kernal
-    // tapes (all blocks CBM) keep every entry.
-    for (size_t i = 0; i + 1 < entries.size(); )
-    {
-        if (entry_is_cbm[i] && !entry_is_cbm[i + 1])
-        {
-            if (entries[i + 1].name.empty())
-                entries[i + 1].name = entries[i].name;
-            entries.erase(entries.begin() + i);
-            entry_is_cbm.erase(entry_is_cbm.begin() + i);
-        }
-        else
-        {
-            i++;
-        }
-    }
+    // // Turbo-loader tapes: the Kernal-loaded block is just the boot stub
+    // // for the loader system - only the turbo payload is loadable through
+    // // Meatloaf. Drop each CBM block that a non-CBM program follows,
+    // // passing its name (the game's name) to that program. Pure Kernal
+    // // tapes (all blocks CBM) keep every entry.
+    // for (size_t i = 0; i + 1 < entries.size(); )
+    // {
+    //     if (entry_is_cbm[i] && !entry_is_cbm[i + 1])
+    //     {
+    //         if (entries[i + 1].name.empty())
+    //             entries[i + 1].name = entries[i].name;
+    //         entries.erase(entries.begin() + i);
+    //         entry_is_cbm.erase(entry_is_cbm.begin() + i);
+    //     }
+    //     else
+    //     {
+    //         i++;
+    //     }
+    // }
 }
 
 /********************************************************

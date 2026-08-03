@@ -173,7 +173,7 @@ void supertape_search(void)
    int j,x,b,s,byt,nxt,hd[HDSZ], pilots;
    
    if(!quiet)
-      msgout("  Supertape");
+      msgout("\r\n  Supertape");
          
 
    for(i=20; i<tap.len-100; i++)

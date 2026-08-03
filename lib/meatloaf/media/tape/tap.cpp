@@ -75,9 +75,9 @@ void TAPMStream::setDefaultName(std::string name)
     // like the tape's own (PETSCII) entry names
     size_t dot = name.find_last_of('.');
     if (dot != std::string::npos && dot > 0)
-        name = name.substr(0, dot);
+        name = mstr::toPETSCII2(name.substr(0, dot));
     if (!name.empty())
-        default_name = mstr::toPETSCII2(name);
+        default_name = name;
 }
 
 std::string TAPMStream::entryDisplayName(const TapeEntry &e)
@@ -556,7 +556,7 @@ MFile* TAPMFile::getNextFileInDir()
         mstr::replaceAll(filename, "/", "\\");
         auto file = MFSOwner::File(url + "/" + filename);
         file->name = filename;
-        file->extension = " prg";
+        file->extension = " PRG";
         file->size = size; // from the .idx length field (0 if absent)
         file->is_dir = 0;
         return file;
@@ -586,10 +586,10 @@ MFile* TAPMFile::getNextFileInDir()
         file->size = image->current.prg.size();
         file->is_dir = 0;
 
-        Debug_printv("Tape entry: %s loader[%s] size[%lu] tape[%lu-%lu ms]",
+        Debug_printv("Tape entry: name[%s] loader[%s] addr[%04X-%04X] size[%lu] tape[%lu-%lu ms]",
                      filename.c_str(), image->current.loader.c_str(),
                      (unsigned long)file->size,
-                     image->current.start_time_ms, image->current.end_time_ms);
+                     image->current.end_addr, image->current.start_addr, image->current.start_time_ms, image->current.end_time_ms);
         return file;
     }
 

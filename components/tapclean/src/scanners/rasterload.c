@@ -39,7 +39,7 @@ void raster_search(void)
    int z,tcnt,hd[HDSZ],x;
 
    if(!quiet)
-      msgout("  Rasterload");
+      msgout("\r\n  Rasterload");
          
 
    for(i=20; i<tap.len-8; i++)

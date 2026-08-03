@@ -115,7 +115,7 @@ void gremlin_f1_search (void)
 	sv = ft[THISLOADER].sv;
 
 	if (!quiet)
-		msgout("  Gremlin F1");
+		msgout("\r\n  Gremlin F1");
 
 	/*
 	 * First we check if this is the genuine format/a known variant.

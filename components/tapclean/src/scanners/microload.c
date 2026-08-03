@@ -81,7 +81,7 @@ void micro_search(void)
 	lp = ft[THISLOADER].lp;
 
 	if (!quiet)
-		msgout("  Microload");
+		msgout("\r\n  Microload");
 
 	for (i = 20; i > 0 && i < tap.len - BITSINABYTE; i++) {
 		eop = find_pilot(i, THISLOADER);

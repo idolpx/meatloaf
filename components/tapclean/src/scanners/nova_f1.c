@@ -50,7 +50,7 @@ void nova_search(void)
    double ftmp;
 
    if(!quiet)
-      msgout("  Novaload");
+      msgout("\r\n  Novaload");
 
    for(i=20; i>0 && i<tap.len-8; i++)
    {

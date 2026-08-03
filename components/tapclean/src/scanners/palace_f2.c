@@ -44,7 +44,7 @@ void palacef2_search(void)
    int bsync[5]= {0x4A,0x50,0x47,0x10};    /* block sync sequence. followed by block #. */
    
    if(!quiet)
-      msgout("  Palace Tape F2");
+      msgout("\r\n  Palace Tape F2");
          
    
    for(i=20; i<tap.len-8; i++)

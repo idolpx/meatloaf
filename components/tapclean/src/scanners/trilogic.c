@@ -83,7 +83,7 @@ void trilogic_search (void)
 	lp = ft[THISLOADER].lp;
 
 	if (!quiet)
-		msgout("  Trilogic v3.2");
+		msgout("\r\n  Trilogic v3.2");
 
 	for (i = 20; i > 0 && i < tap.len - BITSINABYTE; i++) {
 		eop = find_pilot(i, THISLOADER);

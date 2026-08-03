@@ -245,6 +245,7 @@ int ls(int argc, char **argv)
             entry->name = mstr::toUTF8(entry->name);
 
         mstr::replaceAll(entry->name, "\"", "\\\""); // Escape double quotes
+        // Serial.printf("%c %8lu  \"%s\"  {%s}\r\n", (entry->isDirectory()) ? 'd':'-', entry->size, entry->name.c_str(), (entry->isPETSCII) ? "PETSCII" : "ASCII");
         Serial.printf("%c %8lu  \"%s\"\r\n", (entry->isDirectory()) ? 'd':'-', entry->size, entry->name.c_str());
         entry.reset(destPath->getNextFileInDir());
     }

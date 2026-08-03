@@ -47,7 +47,7 @@ void jetload_search(void)
 	sv = ft[JET].sv;	/* set sync value */
 
 	if (!quiet)
-		msgout("  Jetload");
+		msgout("\r\n  Jetload");
          
    
 	for (i = 20; i < tap.len - 8; i++) {

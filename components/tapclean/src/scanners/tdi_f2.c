@@ -85,7 +85,7 @@ void tdif2_search (void)
 	lp = ft[THISLOADER].lp;
 
 	if (!quiet)
-		msgout("  TDI F2");
+		msgout("\r\n  TDI F2");
 
 	for (i = 20; i > 0 && i < tap.len - BITSINABYTE; i++) {
 		eop = find_pilot(i, THISLOADER);

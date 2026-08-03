@@ -118,7 +118,7 @@ void glass_search (void)
 	sv = ft[THISLOADER].sv;
 
 	if (!quiet)
-		msgout("  Glass Tape");
+		msgout("\r\n  Glass Tape");
 
 	state = STATE_SEARCH_HEADER;	/* Initially search for a header */
 

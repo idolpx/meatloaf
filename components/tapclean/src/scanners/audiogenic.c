@@ -48,7 +48,7 @@ void audiogenic_search(void)
 	sv = ft[AUDIOGENIC].sv;
 
 	if (!quiet)
-		msgout("  Audiogenic");
+		msgout("\r\n  Audiogenic");
 
 	for (i = 20; i < tap.len - 8; i++) {
 		if ((z = find_pilot(i, AUDIOGENIC)) > 0) {

@@ -42,7 +42,7 @@ void tdi_search(void)
    int x;
 
    if(!quiet)
-      msgout("  TDI F1");
+      msgout("\r\n  TDI F1");
          
    
    for(i=20; i<tap.len-8; i++)

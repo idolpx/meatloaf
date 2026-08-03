@@ -48,7 +48,7 @@ void ocean_search(void)
    int start,z,ipulse, done, byt;
 
    if(!quiet)
-      msgout("  Ocean/Imagine (F1,F2,F3)");
+      msgout("\r\n  Ocean/Imagine (F1,F2,F3)");
    
 
    for(i=20; i>0 && i<tap.len-8; i++)

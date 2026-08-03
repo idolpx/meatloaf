@@ -177,7 +177,7 @@ static void msx_search_core (int lt)
 
 
 	if (!quiet) {
-		msgout("  MSX Tape ");
+		msgout("\r\n  MSX Tape ");
 		msgout((lt == MSX_HEAD) ? "Standard" : "Fast");
 	}
 

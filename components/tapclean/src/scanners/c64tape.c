@@ -225,7 +225,7 @@ void cbm_search(void)
 	int s, e, x;
 
 	if (!quiet)
-		msgout("  C64 ROM tape");
+		msgout("\r\n  C64 ROM tape");
 
 	/* clear global header and data buffers... */
 

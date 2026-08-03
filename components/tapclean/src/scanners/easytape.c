@@ -80,7 +80,7 @@ void easytape_search (void)
 	lp = ft[THISLOADER].lp;
 
 	if (!quiet)
-		msgout("  Easy-Tape System C");
+		msgout("\r\n  Easy-Tape System C");
 
 	for (i = 20; i > 0 && i < tap.len - BITSINABYTE; i++) {
 		eop = find_pilot(i, THISLOADER);

@@ -114,7 +114,7 @@ void turbotape263_search(void)
 	lp = ft[THISLOADER].lp;
 
 	if (!quiet)
-		msgout("  Turbotape 263");
+		msgout("\r\n  Turbotape 263");
 
 	state = STATE_SEARCH_HEADER;	/* Initially search for a Header */
 

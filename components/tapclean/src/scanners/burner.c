@@ -82,7 +82,7 @@ void burner_search (void)
 	lp = ft[THISLOADER].lp;
 
 	if (!quiet)
-		msgout("  Burner");
+		msgout("\r\n  Burner");
 
 	/*
 	 * First we retrieve loader variables from the CBM header block, 

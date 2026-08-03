@@ -88,7 +88,7 @@ void mms_search (void)
 	lp = ft[THISLOADER].lp;
 
 	if (!quiet)
-		msgout("  MMS Tape");
+		msgout("\r\n  MMS Tape");
 
 	cbm_index = 1;
 

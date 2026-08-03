@@ -81,7 +81,7 @@ void creativesparks_search (void)
 	lp = ft[THISLOADER].lp;
 
 	if (!quiet)
-		msgout("  Creative Sparks");
+		msgout("\r\n  Creative Sparks");
 
 	/*
 	 * First we retrieve load variables from the CBM header.
