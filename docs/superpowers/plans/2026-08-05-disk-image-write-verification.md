@@ -31,39 +31,96 @@ These facts were established by probe before this plan was written. Trust them.
 
 ---
 
-### Task 1: Make `lib/meatloaf` compile for the host
+### Task 1: Make `lib/meatloaf` compile for the host, with a file-backed container stream
 
 **Files:**
 - Modify: `lib/meatloaf/meat_media.h:23-33` (includes), `:241-266` (`is_in_use`)
 - Modify: `lib/meatloaf/meat_media.cpp:19-21` (includes) and its watchdog calls
 - Create: `test/native/test_disk_write/native_stubs.cpp`
+- Create: `test/native/test_disk_write/file_container_stream.h`
 - Create: `test/native/test_disk_write/test_disk_write.cpp`
 
 **Interfaces:**
 - Consumes: nothing (first task)
-- Produces: a native test binary that links `D64MStream`. Later tasks add tests to `test_disk_write.cpp`.
+- Produces: a native test binary that links `D64MStream`, plus
+  `class FileContainerStream : public MStream` with constructor
+  `FileContainerStream(const std::string& path, uint32_t initial_size = 0)`. Creates the file
+  zero-filled to `initial_size` when `initial_size > 0`, otherwise opens an existing file.
+  Every later task uses this as the bottom stream under a `D64MStream`.
+
+This task was merged with the original Task 2 so its test exercises the engine for real —
+constructing a `D64MStream` and asserting its geometry — rather than asserting a constant.
 
 - [ ] **Step 1: Write the failing test**
 
-Create `test/native/test_disk_write/test_disk_write.cpp`:
+Create `test/native/test_disk_write/test_disk_write.cpp`. The geometry assertions are the
+point: they prove the engine constructed and its tables are reachable, which a constant
+comparison would not.
 
 ```cpp
 #include <unity.h>
+#include <cstdio>
+#include <memory>
 #include "media/disk/d64.h"
+#include "file_container_stream.h"
 
 void setUp(void) {}
 void tearDown(void) {}
 
-// Proves the write engine links and its geometry tables are reachable natively.
-void test_engine_links(void)
+void test_file_container_stream_roundtrip(void)
 {
-    TEST_ASSERT_EQUAL_UINT32(174848, 683 * 256);
+    const char* path = "build_test_fcs.bin";
+    remove(path);
+    {
+        FileContainerStream s(path, 1024);
+        TEST_ASSERT_TRUE(s.isOpen());
+        TEST_ASSERT_EQUAL_UINT32(1024, s.size());
+
+        const uint8_t out[4] = { 0xDE, 0xAD, 0xBE, 0xEF };
+        TEST_ASSERT_TRUE(s.seek(256));
+        TEST_ASSERT_EQUAL_UINT32(4, s.write(out, 4));
+
+        uint8_t in[4] = { 0, 0, 0, 0 };
+        TEST_ASSERT_TRUE(s.seek(256));
+        TEST_ASSERT_EQUAL_UINT32(4, s.read(in, 4));
+        TEST_ASSERT_EQUAL_UINT8_ARRAY(out, in, 4);
+    }
+    // Reopening must see the persisted bytes and the original size.
+    {
+        FileContainerStream s(path);
+        TEST_ASSERT_EQUAL_UINT32(1024, s.size());
+        uint8_t in[4] = { 0, 0, 0, 0 };
+        TEST_ASSERT_TRUE(s.seek(256));
+        TEST_ASSERT_EQUAL_UINT32(4, s.read(in, 4));
+        TEST_ASSERT_EQUAL_UINT8(0xDE, in[0]);
+        TEST_ASSERT_EQUAL_UINT8(0xEF, in[3]);
+    }
+    remove(path);
+}
+
+// Proves the write engine compiles, links, and constructs natively, by reading
+// values that only exist if its geometry tables were built.
+void test_engine_constructs_with_expected_geometry(void)
+{
+    const char* path = "build_test_geom.d64";
+    remove(path);
+    auto src = std::make_shared<FileContainerStream>(path, 174848);
+    D64MStream image(src);
+
+    TEST_ASSERT_EQUAL_UINT16(21, image.getSectorCount(1));   // zone 1
+    TEST_ASSERT_EQUAL_UINT16(19, image.getSectorCount(25));  // zone 2
+    TEST_ASSERT_EQUAL_UINT16(18, image.getSectorCount(31));  // zone 3
+    TEST_ASSERT_EQUAL_UINT16(17, image.getSectorCount(35));  // zone 4
+    TEST_ASSERT_EQUAL_UINT8(18, image.partitions[image.partition].directory_track);
+
+    remove(path);
 }
 
 void process()
 {
     UNITY_BEGIN();
-    RUN_TEST(test_engine_links);
+    RUN_TEST(test_file_container_stream_roundtrip);
+    RUN_TEST(test_engine_constructs_with_expected_geometry);
     UNITY_END();
 }
 
@@ -73,6 +130,10 @@ int main(int argc, char **argv)
     return 0;
 }
 ```
+
+If the sector-count expectations do not match, read `sectorsPerTrack` and `speedZone()` in
+`d64.h` and correct the test to the values the code actually defines — the point is to assert
+real geometry, not to force a particular number.
 
 - [ ] **Step 2: Run it to verify it fails to build**
 
@@ -183,19 +244,125 @@ uint64_t MFile::getAvailableSpace()
 
 Check the exact signatures in `lib/meatloaf/meatloaf.h` before writing this file and match them exactly, including default arguments (defaults are declared in the header, so do **not** repeat them here).
 
-- [ ] **Step 7: Run the test to verify it passes**
+- [ ] **Step 7: Implement the file-backed container stream**
+
+Create `test/native/test_disk_write/file_container_stream.h`:
+
+```cpp
+#ifndef TEST_FILE_CONTAINER_STREAM
+#define TEST_FILE_CONTAINER_STREAM
+
+#include <cstdio>
+#include <string>
+#include <vector>
+#include "meatloaf.h"
+
+// A bottom MStream backed by a real file on disk, so images the tests produce
+// can be handed straight to c1541 without conversion.
+class FileContainerStream : public MStream
+{
+public:
+    // initial_size > 0 creates (or truncates) the file zero-filled to that
+    // length; initial_size == 0 opens an existing file and adopts its size.
+    FileContainerStream(const std::string& path, uint32_t initial_size = 0)
+        : MStream(path), m_path(path)
+    {
+        if (initial_size > 0)
+        {
+            m_fp = fopen(path.c_str(), "w+b");
+            if (m_fp != nullptr)
+            {
+                std::vector<uint8_t> zeros(initial_size, 0);
+                fwrite(zeros.data(), 1, initial_size, m_fp);
+                fflush(m_fp);
+                _size = initial_size;
+            }
+        }
+        else
+        {
+            m_fp = fopen(path.c_str(), "r+b");
+            if (m_fp != nullptr)
+            {
+                fseek(m_fp, 0, SEEK_END);
+                _size = (uint32_t)ftell(m_fp);
+            }
+        }
+        _position = 0;
+        if (m_fp != nullptr)
+            fseek(m_fp, 0, SEEK_SET);
+    }
+
+    ~FileContainerStream() override { close(); }
+
+    bool isOpen() override { return m_fp != nullptr; }
+    bool isRandomAccess() override { return true; }
+
+    bool open(std::ios_base::openmode mode) override { (void)mode; return isOpen(); }
+
+    void close() override
+    {
+        if (m_fp != nullptr) { fclose(m_fp); m_fp = nullptr; }
+    }
+
+    uint32_t read(uint8_t* buf, uint32_t size) override
+    {
+        if (m_fp == nullptr) return 0;
+        uint32_t n = (uint32_t)fread(buf, 1, size, m_fp);
+        _position += n;
+        return n;
+    }
+
+    uint32_t write(const uint8_t* buf, uint32_t size) override
+    {
+        if (m_fp == nullptr) return 0;
+        uint32_t n = (uint32_t)fwrite(buf, 1, size, m_fp);
+        fflush(m_fp);
+        _position += n;
+        if (_position > _size) _size = _position;
+        return n;
+    }
+
+    bool seek(uint32_t pos) override
+    {
+        if (m_fp == nullptr) return false;
+        if (fseek(m_fp, (long)pos, SEEK_SET) != 0) return false;
+        _position = pos;
+        return true;
+    }
+
+    uint32_t size() override { return _size; }
+    uint32_t available() override { return _size > _position ? _size - _position : 0; }
+    uint32_t position() override { return _position; }
+
+private:
+    std::string m_path;
+    FILE* m_fp = nullptr;
+};
+
+#endif
+```
+
+Before writing, open `lib/meatloaf/meatloaf.h` and confirm which of `size()`, `available()`,
+`position()` are virtual and their exact return types; match them. Drop any `override` that
+does not apply.
+
+- [ ] **Step 8: Run the test to verify it passes**
 
 Run: `pio test -e native -f native/test_disk_write`
-Expected: PASS, 1 test.
+Expected: PASS, 2 tests.
 
 If the link fails with additional undefined symbols, add them to `native_stubs.cpp` following the same abort-loudly pattern.
 
-- [ ] **Step 8: Verify the device build still works**
+- [ ] **Step 9: Verify the device build still works**
 
 Run: `pio run -e lolin-d32-pro`
 Expected: SUCCESS. This guards the Global Constraint that firmware behavior is unchanged.
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 10: Commit**
+
+Stage only these paths. The working tree contains unrelated uncommitted work
+(`components/tapclean/`, `include/version.h`, `lib/console/`) that must not be swept in —
+never use `git add -A` or `git add .`.
 
 ```bash
 git add lib/meatloaf/meat_media.h lib/meatloaf/meat_media.cpp test/native/test_disk_write/
@@ -204,12 +371,22 @@ git commit -m "test: compile the disk write engine for the host
 Guards meat_media's device-layer and ESP-IDF includes behind TEST_NATIVE and
 adds the <algorithm> include it was getting transitively from ESP-IDF. Three
 link-only stubs cover the MFSOwner/MFile symbols d64.cpp references but the
-native tests never call."
+native tests never call. Adds a file-backed container stream so the engine
+can be driven over real image files."
 ```
 
 ---
 
-### Task 2: File-backed container stream
+### Task 2: (merged into Task 1)
+
+The file-backed container stream originally specified here was merged into Task 1, so that
+Task 1's test exercises the engine rather than asserting a constant. Task numbering is
+unchanged so cross-references elsewhere in this plan stay valid. **Skip this task.**
+
+<details>
+<summary>Original Task 2 text (superseded)</summary>
+
+### Superseded: File-backed container stream
 
 **Files:**
 - Create: `test/native/test_disk_write/file_container_stream.h`
@@ -380,6 +557,8 @@ Expected: PASS, 2 tests.
 git add test/native/test_disk_write/
 git commit -m "test: add file-backed container stream for native disk tests"
 ```
+
+</details>
 
 ---
 
@@ -1160,10 +1339,20 @@ recorded, not fixed; they become a separate fix spec.
 
 | # | Format(s) | Tier | Summary | Evidence |
 |---|-----------|------|---------|----------|
-| 1 | D80, D82 | 0 | `getTrackCount()` returns `block_allocation_map[0].end_track` (50 on D80) instead of `.back().end_track` (77). `getNextFreeBlock()` uses `.back()`. | `d64.h:270` |
+
+## Coverage gaps
+
+- **1581 `CBM` sub-partition writes (D81)** — not tested. Exercising it needs a D81 that already
+  contains a CBM sub-partition; the write path cannot create one and `c1541` cannot either.
+  Needs a committed binary fixture.
 ```
 
-Append a row for every failure the suite surfaces, with the test name and message as evidence.
+Start the table empty and append a row for every failure the suite surfaces, with the test name
+and message as evidence (and the seed, for Tier 3).
+
+Note: an earlier draft of this plan pre-seeded a `getTrackCount()` finding here. That bug has
+since been fixed in the working tree — `getTrackCount()` now returns the last BAM record's
+`end_track`. Do **not** re-add it.
 
 - [ ] **Step 5: Run the tests**
 
