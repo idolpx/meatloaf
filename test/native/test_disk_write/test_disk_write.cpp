@@ -7,6 +7,7 @@
 #include "media/disk/d81.h"
 #include "media/disk/d82.h"
 #include "file_container_stream.h"
+#include "c1541_oracle.h"
 
 void setUp(void) {}
 void tearDown(void) {}
@@ -101,6 +102,23 @@ void test_format_image_creates_sized_image(void)
     remove(path);
 }
 
+void test_c1541_validates_our_formatted_image(void)
+{
+    if (!c1541_available())
+        TEST_IGNORE_MESSAGE("c1541 not found; set C1541 env var");
+
+    const char* path = "build_test_oracle.d64";
+    remove(path);
+    {
+        auto src = std::make_shared<FileContainerStream>(path, 174848);
+        D64MStream image(src);
+        TEST_ASSERT_TRUE(image.formatImage("testdisk", "01"));
+    }
+    TEST_ASSERT_TRUE_MESSAGE(c1541_validate(path),
+                             "c1541 validate rejected our formatted image");
+    remove(path);
+}
+
 void process()
 {
     UNITY_BEGIN();
@@ -108,6 +126,7 @@ void process()
     RUN_TEST(test_engine_constructs_with_expected_geometry);
     RUN_TEST(test_default_image_sizes);
     RUN_TEST(test_format_image_creates_sized_image);
+    RUN_TEST(test_c1541_validates_our_formatted_image);
     UNITY_END();
 }
 
