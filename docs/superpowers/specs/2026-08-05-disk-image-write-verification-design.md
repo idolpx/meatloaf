@@ -25,10 +25,15 @@ bug reaches every format, and a single well-tested engine protects all of them.
 
 Deliver an automated, repeatable test suite that proves two things:
 
-1. `format()` produces a structurally valid blank image for each format.
+1. `format()` creates a structurally valid blank image for each format, from nothing.
 2. Writing files into an image never corrupts it, and the data written can be read back byte-for-byte.
 
 The suite must run in CI and serve as a regression guard for future changes to the write path.
+
+Two production changes are in scope as prerequisites, because the suite cannot exist without them:
+the default-image-size support that lets `format()` create an image (see "Default image size"), and
+the device-layer decoupling that lets `lib/meatloaf` compile natively (see "Decoupling"). Both are
+behavior-preserving for existing firmware paths.
 
 ## Non-Goals
 
@@ -87,6 +92,43 @@ storage abstraction reaches upward into the device layer.
 
 Firmware behavior must not change. The hooks are wired at boot before any device is attached.
 
+### Default image size
+
+`format()` must be able to create an image from nothing. Today it cannot: it sizes the file with
+`image->seek(size - 1)`, taking `size` from the `MFile` member, which is 0 for a path that does not
+exist — so the seek underflows and no image is produced.
+
+`format()` will instead use the **default image size for that media**, exposed as a new virtual on
+`D64MStream`. An existing file keeps its own size, so formatting a 40- or 42-track D64 does not
+truncate it to 35; the default applies only when creating.
+
+The default is declared **explicitly per format** rather than computed from the geometry tables.
+Computing it would be DRYer, but it makes the suite circular: a wrong geometry table would produce
+a wrongly-sized image that the suite then validates against that same wrong table. An explicit
+constant is independent, so Tier 0 can cross-check the declared size against the total derived from
+`block_allocation_map` and `sectorsPerTrack` — turning a potential blind spot into a test that
+catches geometry errors.
+
+| Format | Blocks | Default size |
+|---|---|---|
+| D64 (35 track) | 683 | 174,848 |
+| D71 | 1,366 | 349,696 |
+| D80 | 2,083 | 533,248 |
+| D81 | 3,200 | 819,200 |
+| D82 | 4,166 | 1,066,496 |
+| DNP | variable | **decision needed** |
+
+DNP has no canonical size — `dnp.h` derives its track count from the container as `size / 65536`,
+and CMD native partitions are sized at creation. A default must be chosen; the suite additionally
+needs a small one so tests stay fast. Recommendation: default to 1 track (65,536 bytes) as the
+minimum valid partition, and let tests request a specific size explicitly.
+
+Note the cross-check will likely fail for D80/D82 on first run: `getTrackCount()` returns
+`block_allocation_map[0].end_track`, which is 50 for D80 rather than 77, because these formats
+have multiple BAM records. `getNextFreeBlock()` correctly uses `.back().end_track`. This is a real
+inconsistency and exactly the kind of finding the cross-check exists to surface; per the Non-Goals
+it is documented, not fixed here.
+
 ### Validation strategy
 
 Two independent validators, applied together where both are available.
@@ -98,7 +140,7 @@ Two independent validators, applied together where both are available.
 - `dir` — the directory entry appears with the correct name, type, and block count.
 - `read` — extract the file and byte-compare against what was written.
 
-**Our own invariant checker** — required for DNP, DHD, D90, and D40, where c1541 has no support,
+**Our own invariant checker** — required for DNP, DHD, and D40, where c1541 has no support,
 and run on every format regardless so that a c1541-validatable format gets both. It also gives
 better diagnostics than c1541's pass/fail: it reports *which* block violated *which* invariant.
 
@@ -128,12 +170,8 @@ testing on sand, which is why `format()` comes first.
 `D64MFile::format("name,id")` and run both validators against the result. If a format's BAM
 record table is wrong, every later tier reports garbage and time is lost chasing phantom write bugs.
 
-Setup note: `format()` sizes the image with `image->seek(size - 1)`, taking `size` from the
-`MFile` member, which is 0 for a file that does not yet exist. Tier 0 therefore creates a
-zero-filled file of the correct length for the format first, then calls `format()` on it. Whether
-`format()` should be able to originate an image from nothing is a real question the suite will
-document — with `size` at 0, `seek(size - 1)` underflows — but the tier is specified to work with
-current behavior rather than depend on a fix.
+Tier 0 calls `format()` on a path that does not yet exist and expects a complete, valid image.
+This requires the prerequisite change described in "Default image size" below.
 
 **Tier 1 — Single-file write.** Save one small file into a fresh blank. Verify the directory
 entry, block chain, BAM accounting, and byte-exact contents.
@@ -167,11 +205,17 @@ hand-written scenarios miss.
 | D82 | ✅ | ✅ | ✅ |
 | DNP | ✅ | ✅ | ❌ invariants only |
 | DHD partition | partition format only | ✅ | ❌ invariants only |
-| D40, D90 | ✅ | ✅ | ❌ invariants only |
+| D40 | ✅ | ✅ | ❌ invariants only |
+| **D90** | **excluded** | **excluded** | — |
 
-D40 and D90 are included because they are the same `D64MFile` subclass shape and cost almost
-nothing to add. A DHD *container* is created by a different code path than `format()`, so Tier 0
-for DHD means formatting a partition within an existing image.
+D40 is included because it is the same `D64MFile` subclass shape and costs almost nothing to add.
+A DHD *container* is created by a different code path than `format()`, so Tier 0 for DHD means
+formatting a partition within an existing image.
+
+**D90 is out of scope.** It needs further work before it is ready for this treatment. Its
+interleave was corrected alongside D80/D82 (see below) since that was a one-line change to a
+clearly-wrong inherited value, but no tier exercises D90 and no claim is made about its
+correctness. It should be added once its remaining work is done.
 
 ## Completed Prerequisite Work
 
@@ -201,9 +245,10 @@ rather than measured, because c1541 cannot format `d90`.
 - **Two parallel image-creation paths.** `VDrive::createDiskImage()` at `drive.cpp:1582` and
   `MFile::format()` at `drive.cpp:1595`. The suite tests `format()`. Whether these should converge
   is a separate question.
-- **D90 BAM table looks copied from D82.** `d90.h:60-76` carries track ranges 101-150 and 151-154,
-  which cannot be right for a 9060/9090. The constructor does overwrite the BAM location from the
-  image at runtime, so this may be dead data — worth confirming.
+- **`getTrackCount()` is wrong for multi-BAM-record formats.** It returns
+  `block_allocation_map[0].end_track` (`d64.h:270`), which is 50 for D80 rather than 77, and
+  similarly short for D82. `getNextFreeBlock()` correctly uses `.back().end_track`. The Tier 0
+  size cross-check will surface this; the fix belongs to the follow-up spec.
 
 ## Risks
 
@@ -232,4 +277,4 @@ rather than measured, because c1541 cannot format `d90`.
 - **On-device smoke test** replaying a subset of scenarios through the real drive path to cover
   the integration surfaces the native suite cannot reach. More valuable after the native suite has
   flushed out logic bugs, so a hardware failure means something integration-specific.
-- **D90 geometry review** per the flagged BAM table issue.
+- **Add D90 to the suite** once its outstanding work is complete.
