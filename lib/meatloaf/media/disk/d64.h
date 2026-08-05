@@ -545,6 +545,9 @@ protected:
     friend class D8BMFile;
     friend class DFIMFile;
 
+    // Test-only structural invariant checker (test/native/test_disk_write)
+    friend struct ImageInvariantChecker;
+
     // Disk
     friend class D64MFile;
     friend class D71MFile;
