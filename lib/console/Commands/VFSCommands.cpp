@@ -152,7 +152,7 @@ int hex(int argc, char **argv)
                     }
                 }
                 Serial.printf("\r\n");
-                Serial.printf("url[%s] size[%u]\r\n", path->url.c_str(), size);
+                Serial.printf("url[%s] size[%u]\r\n", path->url.c_str(), --size);
             }
             istream.close();
         }
