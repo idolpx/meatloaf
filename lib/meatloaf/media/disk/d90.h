@@ -92,6 +92,7 @@ public:
         partitions.clear();
         partitions.push_back(p);
         sectorsPerTrack = { 32 };
+        interleave = { 1, 1 }; // Directory, File - hard disk, no rotational interleave
         dos_rom = "dos9000";
 
         // this.size = data.media_data.length;

@@ -92,6 +92,7 @@ public:
         partitions.clear();
         partitions.push_back(p);
         sectorsPerTrack = { 23, 25, 27, 29 };
+        interleave = { 3, 5 }; // Directory, File
     };
 
     virtual uint8_t speedZone(uint8_t track) override
