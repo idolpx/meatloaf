@@ -102,6 +102,28 @@ void test_format_image_creates_sized_image(void)
     remove(path);
 }
 
+// FIX ROUND 1 (see task-5-report.md): the original c1541_validate() judged
+// success/failure by scanning `-validate`'s text output for "error"/"wrong".
+// But `-validate` REPAIRS BAM-vs-chain mismatches silently - no diagnostic
+// text, exit code 0 - so that check could never detect the exact corruption
+// class this suite exists to catch. c1541_validate() now byte-diffs the
+// image before/after; any difference means validate had to fix something.
+//
+// Running that corrected check against our own formatImage() output (write
+// a real file, then validate) surfaced a REAL, previously unknown defect:
+// D64MStream::initializeBlockAllocationMap() (lib/meatloaf/media/disk/d64.h)
+// marks every sector of the header/directory track (track 18) as BAM-free,
+// including the two sectors formatImage() itself just used - 18/0 (header/
+// BAM sector) and 18/1 (first directory sector). c1541's first validate
+// pass reserves them (free count 19->17, bitmap byte 0xFF->0xFC for
+// track 18's own BAM record), which the byte-diff correctly reports as an
+// inconsistent image. This is a genuine finding, not a false positive from
+// the new detector: on real hardware those two sectors would eventually be
+// handed out to a file by getNextFreeBlock(), corrupting the header/
+// directory. Per this task's constraints, the engine is NOT fixed here -
+// this test instead asserts the CURRENT (broken) behavior so it stays green
+// and turns red the day someone fixes the BAM reservation, as a prompt to
+// flip this assertion back to TEST_ASSERT_TRUE.
 void test_c1541_validates_our_formatted_image(void)
 {
     if (!c1541_available())
@@ -113,10 +135,200 @@ void test_c1541_validates_our_formatted_image(void)
         auto src = std::make_shared<FileContainerStream>(path, 174848);
         D64MStream image(src);
         TEST_ASSERT_TRUE(image.formatImage("testdisk", "01"));
+
+        // A file write is needed to reproduce the finding above: an empty
+        // freshly-formatted image never calls getNextFreeBlock(), so the
+        // header/directory track's BAM entries are read but never compared
+        // against anything until a real allocation walks near them.
+        image.mode = std::ios_base::out;
+        TEST_ASSERT_TRUE(image.seekPath("REGRESS"));
+        std::vector<uint8_t> payload(600, 0x41);
+        TEST_ASSERT_EQUAL_UINT32(600, image.writeFile(payload.data(), (uint32_t)payload.size()));
+        image.close();
     }
-    TEST_ASSERT_TRUE_MESSAGE(c1541_validate(path),
-                             "c1541 validate rejected our formatted image");
+    TEST_ASSERT_FALSE_MESSAGE(c1541_validate(path),
+                              "expected FALSE: formatImage() leaves the header/directory "
+                              "track's own sectors marked free in the BAM (see comment above "
+                              "this test) - if this now passes, that bug was fixed and this "
+                              "assertion should flip to TEST_ASSERT_TRUE_MESSAGE");
     remove(path);
+}
+
+// Positive-path proof for c1541_validate(): a c1541-formatted image (not
+// ours) must validate clean, so the wrapper is shown to return TRUE for a
+// genuinely consistent image and not just FALSE for everything.
+void test_c1541_validates_a_c1541_formatted_image(void)
+{
+    if (!c1541_available())
+        TEST_IGNORE_MESSAGE("c1541 not found; set C1541 env var");
+
+    const char* path = "build_test_oracle_ref.d64";
+    remove(path);
+    c1541_run("-format " + c1541_quote("refdisk,01") + " d64 " + c1541_quote(path));
+
+    TEST_ASSERT_TRUE_MESSAGE(c1541_validate(path),
+                             "c1541 validate rejected an image c1541 itself just formatted");
+    remove(path);
+}
+
+// Regression test for the fix-round-1 defect: c1541_validate() must detect
+// a BAM-vs-chain inconsistency even when c1541 prints nothing about it.
+// Reproduces the reviewer's exact repro - write a real multi-block file (so
+// a genuine T/S chain + BAM allocation exists), then flip one BAM bitmap
+// bit for an allocated block back to "free" while its directory/chain still
+// references that block.
+void test_c1541_validate_detects_bam_chain_corruption(void)
+{
+    if (!c1541_available())
+        TEST_IGNORE_MESSAGE("c1541 not found; set C1541 env var");
+
+    const char* path = "build_test_oracle_corrupt.d64";
+    remove(path);
+
+    // Header/directory track (18) sector 0 byte offset, computed from the
+    // public per-track sector counts rather than any protected partition
+    // internals.
+    uint32_t bamOffset = 0;
+    uint8_t bamBefore[256] = {0};
+    uint8_t bamAfter[256] = {0};
+
+    {
+        auto src = std::make_shared<FileContainerStream>(path, 174848);
+        D64MStream image(src);
+        TEST_ASSERT_TRUE(image.formatImage("regress", "01"));
+
+        for (uint8_t t = 1; t < 18; t++)
+            bamOffset += (uint32_t)image.getSectorCount(t) * 256;
+
+        TEST_ASSERT_TRUE(src->seek(bamOffset));
+        TEST_ASSERT_EQUAL_UINT32(256, src->read(bamBefore, 256));
+
+        // Write a real multi-block file so a genuine T/S chain + BAM
+        // allocation exists to corrupt.
+        image.mode = std::ios_base::out;
+        TEST_ASSERT_TRUE(image.seekPath("REGRESS"));
+        std::vector<uint8_t> payload(600, 0x41);
+        TEST_ASSERT_EQUAL_UINT32(600, image.writeFile(payload.data(), (uint32_t)payload.size()));
+        image.close(); // finalizes the write and closes the container
+    }
+
+    // Re-read the BAM sector fresh off disk now that the file is closed.
+    {
+        FILE* fp = fopen(path, "rb");
+        TEST_ASSERT_NOT_NULL(fp);
+        fseek(fp, (long)bamOffset, SEEK_SET);
+        TEST_ASSERT_EQUAL_UINT32(256, (uint32_t)fread(bamAfter, 1, 256, fp));
+        fclose(fp);
+    }
+
+    // Find one BAM bitmap bit (not a per-track free-count byte, which sits
+    // at offset 4 + (track-1)*4) that flipped from free(1) to allocated(0) -
+    // i.e. a real block the file write actually claimed.
+    int flipByte = -1;
+    uint8_t flipBit = 0;
+    for (int i = 4; i < 144 && flipByte < 0; i++)
+    {
+        if (((i - 4) % 4) == 0) continue; // skip the per-track free-count byte
+        uint8_t clearedBits = (uint8_t)(bamBefore[i] & (uint8_t)~bamAfter[i]);
+        if (clearedBits != 0)
+        {
+            flipByte = i;
+            for (uint8_t b = 0; b < 8; b++)
+            {
+                if (clearedBits & (1 << b)) { flipBit = (uint8_t)(1 << b); break; }
+            }
+        }
+    }
+    TEST_ASSERT_TRUE_MESSAGE(flipByte >= 0, "writing a file did not allocate any BAM bitmap bit");
+
+    // Corrupt the image: mark that allocated, chain-referenced block "free"
+    // in the BAM - a textbook BAM-vs-chain inconsistency.
+    {
+        FILE* fp = fopen(path, "r+b");
+        TEST_ASSERT_NOT_NULL(fp);
+        fseek(fp, (long)(bamOffset + (uint32_t)flipByte), SEEK_SET);
+        uint8_t corrupted = (uint8_t)(bamAfter[flipByte] | flipBit);
+        TEST_ASSERT_EQUAL_UINT32(1, (uint32_t)fwrite(&corrupted, 1, 1, fp));
+        fclose(fp);
+    }
+
+    TEST_ASSERT_FALSE_MESSAGE(c1541_validate(path),
+                              "c1541 validate did not flag a BAM bit that falsely marks an "
+                              "allocated, chain-referenced block as free");
+    remove(path);
+}
+
+// Regression test for the fix-round-1 c1541_read() defect: a mid-chain
+// error (bad T/S link) made c1541 write a truncated output file and print
+// an error, but the old c1541_read() only checked "did fopen() succeed" and
+// reported success anyway.
+void test_c1541_read_detects_truncated_read(void)
+{
+    if (!c1541_available())
+        TEST_IGNORE_MESSAGE("c1541 not found; set C1541 env var");
+
+    const char* path = "build_test_oracle_trunc.d64";
+    const char* outPath = "build_test_oracle_trunc.prg";
+    remove(path);
+    remove(outPath);
+
+    {
+        auto src = std::make_shared<FileContainerStream>(path, 174848);
+        D64MStream image(src);
+        TEST_ASSERT_TRUE(image.formatImage("regress", "01"));
+
+        image.mode = std::ios_base::out;
+        TEST_ASSERT_TRUE(image.seekPath("REGRESS"));
+        std::vector<uint8_t> payload(600, 0x41); // 3 blocks - a real chain to break
+        TEST_ASSERT_EQUAL_UINT32(600, image.writeFile(payload.data(), (uint32_t)payload.size()));
+        image.close(); // finalizes the write and closes the container
+    }
+
+    // Fresh probe over the finished image. getSectorCount() is pure
+    // per-track geometry (no I/O against the file), reused here to convert
+    // track/sector to a byte offset without touching any protected
+    // partition internals.
+    auto probeSrc = std::make_shared<FileContainerStream>(path);
+    D64MStream probe(probeSrc);
+    auto sectorOffset = [&](uint8_t trk, uint8_t sec) -> uint32_t {
+        uint32_t off = 0;
+        for (uint8_t t = 1; t < trk; t++)
+            off += (uint32_t)probe.getSectorCount(t) * 256;
+        return off + (uint32_t)sec * 256;
+    };
+
+    // File lands in directory slot 0 on a freshly formatted disk;
+    // start_track/start_sector are entry bytes 3/4 of the first directory
+    // sector (18/1).
+    uint8_t entry[5] = {0};
+    TEST_ASSERT_TRUE(probeSrc->seek(sectorOffset(18, 1)));
+    TEST_ASSERT_EQUAL_UINT32(5, probeSrc->read(entry, 5));
+    uint8_t startTrack = entry[3];
+    uint8_t startSector = entry[4];
+    TEST_ASSERT_NOT_EQUAL(0, startTrack);
+
+    uint32_t firstBlockOffset = sectorOffset(startTrack, startSector);
+    probeSrc->close();
+
+    // Corrupt the first block's T/S link to an out-of-bounds track/sector,
+    // breaking the chain after the first block's payload is delivered.
+    {
+        FILE* fp = fopen(path, "r+b");
+        TEST_ASSERT_NOT_NULL(fp);
+        fseek(fp, (long)firstBlockOffset, SEEK_SET);
+        uint8_t badLink[2] = {99, 99};
+        TEST_ASSERT_EQUAL_UINT32(2, (uint32_t)fwrite(badLink, 1, 2, fp));
+        fclose(fp);
+    }
+
+    size_t bytesRead = 0;
+    TEST_ASSERT_FALSE_MESSAGE(c1541_read(path, "REGRESS", outPath, &bytesRead),
+                              "c1541_read() reported success for a chain that broke mid-read");
+    TEST_ASSERT_TRUE_MESSAGE(bytesRead < 600,
+                             "expected a truncated (partial) output file, got the full size");
+
+    remove(path);
+    remove(outPath);
 }
 
 void process()
@@ -127,6 +339,9 @@ void process()
     RUN_TEST(test_default_image_sizes);
     RUN_TEST(test_format_image_creates_sized_image);
     RUN_TEST(test_c1541_validates_our_formatted_image);
+    RUN_TEST(test_c1541_validates_a_c1541_formatted_image);
+    RUN_TEST(test_c1541_validate_detects_bam_chain_corruption);
+    RUN_TEST(test_c1541_read_detects_truncated_read);
     UNITY_END();
 }
 
