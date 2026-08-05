@@ -415,6 +415,13 @@ protected:
 
     bool initializeBlocks();
 
+public:
+    // Lay out a blank image: fill blocks, initialize the BAM and directory,
+    // and write the header. Contains no MFSOwner/MFile resolution so it can
+    // be driven directly over any container stream.
+    bool formatImage(std::string name, std::string id);
+
+protected:
     bool initializeBlockAllocationMap()
     {
         uint16_t bam_index = 0;

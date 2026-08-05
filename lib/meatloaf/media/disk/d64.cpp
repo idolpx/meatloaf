@@ -1225,41 +1225,59 @@ bool D64MStream::seekPath(std::string path)
  * File implementations
  ********************************************************/
 
+bool D64MStream::formatImage(std::string name, std::string id)
+{
+    if (!initializeBlocks())
+        return false;
+
+    if (!initializeBlockAllocationMap())
+        return false;
+
+    if (!initializeDirectory())
+        return false;
+
+    if (!writeHeader(name, id))
+        return false;
+
+    // Size the container. Use the media's canonical size when the container
+    // is empty (a brand new image); otherwise keep the existing size so a
+    // 40- or 42-track D64 is not truncated back to 35.
+    uint32_t image_size = containerStream->size();
+    if (image_size == 0)
+        image_size = defaultImageSize();
+
+    if (!seek(image_size - 1))
+        return false;
+
+    uint8_t pad = 0x00;
+    return write(&pad, 1) == 1;
+}
+
 bool D64MFile::format(std::string header_info)
 {
     Debug_printv("header_info[%s] url[%s]", header_info.c_str(), url.c_str());
 
-    // Set the stream file
     auto newFile = MFSOwner::File(url);
-    std::shared_ptr<D64MStream> image = std::static_pointer_cast<D64MStream>(newFile->getSourceStream(std::ios_base::in | std::ios_base::out | std::ios_base::trunc));
-    if (image == nullptr)
+    if (newFile == nullptr)
         return false;
 
-    // Initialize Blocks
-    image->initializeBlocks();
+    std::shared_ptr<D64MStream> image = std::static_pointer_cast<D64MStream>(
+        newFile->getSourceStream(std::ios_base::in | std::ios_base::out | std::ios_base::trunc));
+    if (image == nullptr)
+    {
+        delete newFile;
+        return false;
+    }
 
-    // Initialize Block Allocation Map
-    image->initializeBlockAllocationMap();
-
-    // Initialize directory
-    image->initializeDirectory();
-
-    // Write the header to the file
     size_t comma = header_info.find(',');
-    std::string diskname = header_info.substr(0,comma);
-    std::string id = header_info.substr(comma+1);
-    Debug_printv("write media header");
+    std::string diskname = header_info.substr(0, comma);
+    std::string id = (comma == std::string::npos) ? "" : header_info.substr(comma + 1);
     Debug_printv("name[%s] id[%s]", diskname.c_str(), id.c_str());
-    image->writeHeader(diskname, id);
 
-    // Truncate the file to the desired size
-    image->seek(size - 1);
-    uint8_t data = 0x00;
-    image->write(&data, 1);
+    bool ok = image->formatImage(diskname, id);
 
     delete newFile;
-    //delete image;
-    return true;
+    return ok;
 }
 
 

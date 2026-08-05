@@ -84,12 +84,30 @@ void test_default_image_sizes(void)
     remove(path);
 }
 
+void test_format_image_creates_sized_image(void)
+{
+    const char* path = "build_test_fmt.d64";
+    remove(path);
+    {
+        auto src = std::make_shared<FileContainerStream>(path, 174848);
+        D64MStream image(src);
+        TEST_ASSERT_TRUE(image.formatImage("testdisk", "01"));
+    }
+    FILE* fp = fopen(path, "rb");
+    TEST_ASSERT_NOT_NULL(fp);
+    fseek(fp, 0, SEEK_END);
+    TEST_ASSERT_EQUAL_UINT32(174848, (uint32_t)ftell(fp));
+    fclose(fp);
+    remove(path);
+}
+
 void process()
 {
     UNITY_BEGIN();
     RUN_TEST(test_file_container_stream_roundtrip);
     RUN_TEST(test_engine_constructs_with_expected_geometry);
     RUN_TEST(test_default_image_sizes);
+    RUN_TEST(test_format_image_creates_sized_image);
     UNITY_END();
 }
 
