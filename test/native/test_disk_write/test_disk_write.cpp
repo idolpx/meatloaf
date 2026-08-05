@@ -2,6 +2,10 @@
 #include <cstdio>
 #include <memory>
 #include "media/disk/d64.h"
+#include "media/disk/d71.h"
+#include "media/disk/d80.h"
+#include "media/disk/d81.h"
+#include "media/disk/d82.h"
 #include "file_container_stream.h"
 
 void setUp(void) {}
@@ -65,11 +69,27 @@ void test_engine_constructs_with_expected_geometry(void)
     remove(path);
 }
 
+void test_default_image_sizes(void)
+{
+    const char* path = "build_test_sizes.bin";
+    remove(path);
+    auto src = std::make_shared<FileContainerStream>(path, 256);
+
+    TEST_ASSERT_EQUAL_UINT32(174848,  D64MStream(src).defaultImageSize());
+    TEST_ASSERT_EQUAL_UINT32(349696,  D71MStream(src).defaultImageSize());
+    TEST_ASSERT_EQUAL_UINT32(533248,  D80MStream(src).defaultImageSize());
+    TEST_ASSERT_EQUAL_UINT32(819200,  D81MStream(src).defaultImageSize());
+    TEST_ASSERT_EQUAL_UINT32(1066496, D82MStream(src).defaultImageSize());
+
+    remove(path);
+}
+
 void process()
 {
     UNITY_BEGIN();
     RUN_TEST(test_file_container_stream_roundtrip);
     RUN_TEST(test_engine_constructs_with_expected_geometry);
+    RUN_TEST(test_default_image_sizes);
     UNITY_END();
 }
 

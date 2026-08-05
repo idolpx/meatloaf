@@ -251,6 +251,12 @@ public:
 
     uint16_t blocksFree() override;
 
+    // Canonical image size in bytes for this media type. Used when format()
+    // creates an image from nothing. Declared explicitly per format rather
+    // than derived from the geometry tables, so the two can be cross-checked
+    // against each other instead of a wrong table validating itself.
+    virtual uint32_t defaultImageSize() { return 174848; } // D64, 35 tracks
+
     uint8_t speedZone( uint8_t track) override
     {
         return (track < 18) + (track < 25) + (track < 31);

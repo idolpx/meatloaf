@@ -99,6 +99,8 @@ public:
 
     virtual uint8_t speedZone(uint8_t track) override { return 0; };
 
+    uint32_t defaultImageSize() override { return 819200; }
+
 protected:
 
 private:

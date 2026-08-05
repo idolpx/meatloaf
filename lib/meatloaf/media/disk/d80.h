@@ -84,6 +84,8 @@ public:
         return (track < 40) + (track < 54) + (track < 65);
     };
 
+    uint32_t defaultImageSize() override { return 533248; }
+
 protected:
 
 private:
