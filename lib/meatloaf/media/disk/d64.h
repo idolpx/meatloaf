@@ -331,40 +331,6 @@ protected:
             readContainer((uint8_t*)&header, sizeof(header));
     }
 
-    // Block/entry helpers usable by derived formats (D71/D81/DNP/DHD/...)
-    bool writeHeader(std::string name, std::string id) override
-    {
-        if (partitions.empty() || partition >= partitions.size()) {
-            Debug_printv("Invalid partition index: %d", partition);
-            return false;
-        }
-        seekSector( 
-            partitions[partition].header_track, 
-            partitions[partition].header_sector, 
-            partitions[partition].header_offset 
-        );
-
-        name = mstr::toPETSCII2(name);
-        id = mstr::toPETSCII2(id);
-
-        // Set default values
-        memset(&header, 0xA0, sizeof(header));
-        memcpy(header.id_dos, "\x30\x30\xA0\x32\x41", 5); // "00 2A"
-
-        // Set values
-        memcpy(header.name, name.c_str(), name.size());
-        memcpy(header.id_dos, id.c_str(), id.size());
-        Debug_printv("name[%16s] id_dos[%5s]", header.name, header.id_dos);
-        if (writeContainer((uint8_t*)&header, sizeof(header)))
-            return true;
-
-        std::string bam_message = "meatloaf!!! https://meatloaf.cc";
-        if (writeContainer((uint8_t*)bam_message.c_str(), sizeof(bam_message)))
-            return true;
-
-        return false;
-    }
-
     bool seekEntry( std::string filename ) override;
     bool seekEntry( uint16_t index = 0 ) override;
     bool readEntry( uint16_t index = 0 ) override;
@@ -477,6 +443,48 @@ protected:
 
         return true;
     }
+
+
+    // Block/entry helpers usable by derived formats (D71/D81/DNP/DHD/...)
+    bool writeHeader(std::string name, std::string id) override
+    {
+        if (partitions.empty() || partition >= partitions.size()) {
+            Debug_printv("Invalid partition index: %d", partition);
+            return false;
+        }
+        seekSector( 
+            partitions[partition].header_track, 
+            partitions[partition].header_sector, 
+            partitions[partition].header_offset 
+        );
+
+        name = mstr::toPETSCII2(name);
+        id = mstr::toPETSCII2(id);
+
+        // Set default values
+        memset(&header, 0xA0, sizeof(header));
+        memcpy(header.id_dos, "\x30\x30\xA0\x32\x41", 5); // "00 2A"
+
+        // Set values
+        memcpy(header.name, name.c_str(), name.size());
+        memcpy(header.id_dos, id.c_str(), id.size());
+        Debug_printv("name[%16s] id_dos[%5s]", header.name, header.id_dos);
+        if (writeContainer((uint8_t*)&header, sizeof(header)))
+            return true;
+
+        std::string bam_message = "meatloaf!!! https://meatloaf.cc";
+        if (writeContainer((uint8_t*)bam_message.c_str(), sizeof(bam_message)))
+            return true;
+
+        // Allocate the BAM sector
+        if (!setBlockAllocation( partitions[partition].header_track, 
+                                 partitions[partition].header_sector, 
+                                 true ))
+            return false;
+
+        return false;
+    }
+
     // bool initializeDirectory()
     // {
     //     Debug_printv("initialize directory");
@@ -538,6 +546,13 @@ protected:
         for (int i = 0; i < 8; i++) {
             if (!writeContainer(emptyEntry, 32)) return false;
         }
+
+        // Allocate the directory sector
+        if (!setBlockAllocation( partitions[partition].block_allocation_map[0].track, 
+                                 partitions[partition].block_allocation_map[0].sector, 
+                                 true ))
+            return false;
+
         return true;
     }
 
