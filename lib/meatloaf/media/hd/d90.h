@@ -26,7 +26,7 @@
 #define MEATLOAF_MEDIA_D90
 
 #include "meatloaf.h"
-#include "d64.h"
+#include "../disk/d64.h"
 
 
 /********************************************************

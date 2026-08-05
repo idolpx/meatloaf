@@ -98,13 +98,13 @@
 #include "media/disk/d80.h"
 #include "media/disk/d81.h"
 #include "media/disk/d82.h"
-#include "media/disk/d90.h"
 #include "media/disk/dxm.h"
 #include "media/disk/g64.h"
 #include "media/disk/m2i.h"
 #include "media/disk/nib.h"
 
 // Hard Disk
+#include "media/hd/d90.h"
 #include "media/hd/dnp.h"
 #include "media/hd/dhd.h"
 #include "media/hd/hdd.h"
