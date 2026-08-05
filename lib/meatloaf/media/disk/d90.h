@@ -40,37 +40,14 @@ public:
     D90MStream(std::shared_ptr<MStream> is) : D64MStream(is)
     {
         // D90 Partition Info
+        // BAM blocks link to next bam block starting at Track 1
         std::vector<BlockAllocationMap> b = { 
             {
-                38,     // track
+                1,     // track
                 0,      // sector
-                0x06,   // offset
+                0x10,   // offset
                 1,      // start_track
                 50,     // end_track
-                5       // byte_count
-            },
-            {
-                38,     // track
-                3,      // sector
-                0x06,   // offset
-                51,     // start_track
-                100,    // end_track
-                5       // byte_count
-            },
-            {
-                38,     // track
-                6,      // sector
-                0x06,   // offset
-                101,    // start_track
-                150,    // end_track
-                5       // byte_count
-            },
-            {
-                38,     // track
-                9,      // sector
-                0x06,   // offset
-                151,    // start_track
-                154,    // end_track
                 5       // byte_count
             }
         };

@@ -267,7 +267,7 @@ public:
     }
     uint16_t getTrackCount()
     {
-        return partitions[partition].block_allocation_map[0].end_track;
+        return partitions[partition].block_allocation_map[partitions[partition].block_allocation_map.size() - 1].end_track;
     }
 
     virtual bool seekPath(std::string path) override;
