@@ -111,6 +111,19 @@ inline bool c1541_validate(const std::string& image)
     if (out.find("error") != std::string::npos) return false;
     if (out.find("Error") != std::string::npos) return false;
     if (out.find("wrong") != std::string::npos) return false;
+    // c1541 reports drive-level DOS errors it hits DURING validate in the
+    // CBM error-channel format "ERR = <code>, <MESSAGE>, <track>, <sector>"
+    // (e.g. "ERR = 65, NO BLOCK, 00, 38") - this text contains none of
+    // "error"/"Error"/"wrong" (uppercase ERR, no "rror"), so it was
+    // previously invisible to the check above. It's also not caught by the
+    // byte-diff below: c1541 aborts on the bad block instead of rewriting
+    // anything, so before == after even though the image is genuinely
+    // invalid. Matching the literal "ERR =" (and "ERR=" for safety, in case
+    // of no space) targets exactly this report format; deliberately NOT a
+    // case-insensitive "err" search, which would false-positive on
+    // innocuous words in unrelated output.
+    if (out.find("ERR =") != std::string::npos) return false;
+    if (out.find("ERR=") != std::string::npos) return false;
 
     std::string after;
     if (!c1541_read_raw_file(image, after)) return false;

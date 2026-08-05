@@ -373,6 +373,45 @@ void test_c1541_read_detects_truncated_read(void)
     remove(outPath);
 }
 
+// Fix round 1 regression test (see task-7-report.md): c1541_validate()'s two
+// detection paths (text scan for "error"/"Error"/"wrong", byte-diff
+// before/after) both missed c1541's CBM error-channel report format
+// ("ERR = 65, NO BLOCK, 00, 38"), which is what c1541 prints - with no bytes
+// changed - when -validate hits a genuinely invalid track/sector reference
+// it can't repair. That made c1541_validate() silently report an image as
+// VALID when c1541 itself had just rejected it (discovered on D80/D82 Tier
+// 0 output). Fixed by additionally matching the literal "ERR =" (see
+// c1541_oracle.h for why not a case-insensitive "err" search).
+//
+// Fixture: our own D80 formatImage() output reproduces "ERR = 65, NO BLOCK"
+// on c1541 -validate today, courtesy of finding #2
+// (initializeBlockAllocationMap() never reserving the header/directory
+// sectors - see the findings file). That makes this test depend on a known-
+// broken engine path: it will stop reproducing the moment finding #2 is
+// fixed, at which point it needs a replacement fixture (ideally a hand-
+// corrupted c1541-built image that induces the same c1541 error report
+// without relying on our engine being broken).
+void test_c1541_validate_detects_cbm_error_channel_report(void)
+{
+    if (!c1541_available())
+        TEST_IGNORE_MESSAGE("c1541 not found; set C1541 env var");
+
+    const char* path = "build_test_oracle_errchan.d80";
+    remove(path);
+    {
+        auto src = std::make_shared<FileContainerStream>(path, 533248); // D80MStream::defaultImageSize()
+        D80MStream image(src);
+        TEST_ASSERT_TRUE(image.formatImage("testdisk", "01"));
+    }
+
+    bool valid = c1541_validate(path);
+    remove(path);
+
+    TEST_ASSERT_FALSE_MESSAGE(valid,
+        "c1541_validate() did not detect c1541's \"ERR =\" error-channel report "
+        "during -validate on a D80 image with an invalid track/sector reference");
+}
+
 // FIX ROUND 1: our own independent structural walk of a freshly formatted
 // image trips immediately - directory: block 18/1 is in a chain but marked
 // free in BAM. That is finding #2 again (initializeBlockAllocationMap()
@@ -582,6 +621,7 @@ void process()
     RUN_TEST(test_c1541_validates_a_c1541_formatted_image);
     RUN_TEST(test_c1541_validate_detects_bam_chain_corruption);
     RUN_TEST(test_c1541_read_detects_truncated_read);
+    RUN_TEST(test_c1541_validate_detects_cbm_error_channel_report);
     RUN_TEST(test_invariants_pass_on_clean_c1541_image_with_two_files);
     RUN_TEST(test_invariants_pass_on_blank_image);
     RUN_TEST(test_tier0_format_all_media);

@@ -1,13 +1,17 @@
 # Disk Write Verification — Findings
 
 Bugs found by the write verification suite. Per the design spec these are
-recorded, not fixed; they become a separate fix spec.
+recorded, not fixed; they become a separate fix spec. (Exception: finding #4
+below is a defect in the test oracle helper itself, not the disk-write
+engine, and per the coordinator's fix-round-1 instruction it *was* fixed as
+part of this work — see its entry for detail.)
 
 | # | Format(s) | Tier | Summary | Evidence |
 |---|-----------|------|---------|----------|
 | 1 | D64/D71/D80/D81/D82 (shared base) | 0 | `D64MStream::initializeDirectory()` (`lib/meatloaf/media/disk/d64.h`) writes 258 bytes into a 256-byte directory sector (2 T/S-link bytes + 8 × 32 entry bytes = 258; only 254 bytes may follow the 2-byte link), spilling 2 bytes into the next sector's T/S link field. Structurally undetectable by the seven invariants on a blank image: the overflow writes zero over zero (a never-formatted sector is already all zero), so `check_invariants()` cannot see it. Catching it would need an eighth "write stayed inside its own 256-byte sector" invariant, which is not in the spec — nobody should assume coverage that does not exist. | n/a — not observable via the current invariant set |
-| 2 | D64/D71/D80/D81/D82 (shared base) | 0 | `D64MStream::initializeBlockAllocationMap()` (`lib/meatloaf/media/disk/d64.h`) marks every sector of every track FREE, never reserving the header/BAM sector or the first directory sector that `formatImage()` itself just wrote into. A real 1541 format leaves track 18 with 17 free, not 19. Manifests identically (same defect, different header/directory coordinates) on all five formats — see per-format table below. | see below |
+| 2 | D64/D71/D80/D81/D82 (shared base) | 0 | `D64MStream::initializeBlockAllocationMap()` (`lib/meatloaf/media/disk/d64.h`) marks every sector of every track FREE, never reserving the header/BAM sector or the first directory sector that `formatImage()` itself just wrote into. A real 1541 format leaves track 18 with 17 free, not 19. Manifests identically (same defect, different header/directory coordinates) on all five formats, and now confirmed to fail **both** independent oracles (`check_invariants()` and `c1541_validate()`) on all five — see per-format table below. | see below |
 | 3 | D71 only | 0 | `D71MStream::speedZone()` (`lib/meatloaf/media/disk/d71.h`) tests `track < 35` instead of `track <= 35`. Track 35 (the last track of side 1, correctly 17 sectors) falls through to the `else` branch meant for side 2 and is misclassified into the first side-2 speed zone (boundary at track 53), which resolves to `sectorsPerTrack[3]` = 21 sectors instead of the correct `sectorsPerTrack[0]` = 17. That is exactly 4 extra blocks, matching the observed mismatch: geometry (`getSectorCount()` summed over all tracks) implies 350720 bytes (1370 blocks) but `defaultImageSize()` declares 349696 (1366 blocks) — the real, correct D71 size. | `test_tier0_declared_size_matches_geometry`: `d71: declared 349696 bytes but geometry implies 350720 (1370 blocks)` |
+| 4 | Test infra only (`c1541_oracle.h`) — **FIXED**, not an engine bug | 0 | `c1541_validate()` (`test/native/test_disk_write/c1541_oracle.h`) had two detection paths — a text scan for `"error"`/`"Error"`/`"wrong"`, and a before/after byte-diff — and **both** missed c1541's CBM error-channel report format, `"ERR = <code>, <MESSAGE>, <track>, <sector>"` (e.g. `"ERR = 65, NO BLOCK, 00, 38"`), which is what c1541 prints on D80/D82 `-validate` when it hits a track/sector reference it can't repair: the text doesn't contain any of the three substrings (uppercase `ERR`, no `rror`), and c1541 aborts on the bad block rather than rewriting bytes, so the diff is also clean. Net effect: `c1541_validate()` silently reported **VALID** for D80/D82 images c1541 itself had just rejected — discovered because the D80/D82 rows of finding #2's per-format table looked inconsistent with D64/D71/D81 for what should be the identical defect. Fixed by additionally matching the literal `"ERR ="` / `"ERR="` (deliberately not a case-insensitive `"err"` search — that would false-positive on unrelated output). Regression test `test_c1541_validate_detects_cbm_error_channel_report` added (uses our own D80 `formatImage()` output, which reproduces finding #2's `ERR =` report today, as a ready-made fixture — see the test's comment for why that's a soft dependency worth watching). Mutation-tested: reverting the two new lines makes the regression test fail with the expected message; restoring them makes it pass again. | `test_c1541_validate_detects_cbm_error_channel_report`; manual `c1541 -attach diag_keep.d80 -validate` showing `ERR = 65, NO BLOCK, 00, 38` / `ERR = 65, NO BLOCK, 78, 23` (`155, 23` for D82) |
 
 ## Finding #2 — confirmed per-format (Tier 0, `test_tier0_format_all_media`)
 
@@ -18,39 +22,23 @@ never reaches d71/d80/d81/d82 in a single run. To confirm finding #2 actually
 reproduces on every format (not assumed), each format was additionally run in
 isolation via a throwaway, uncommitted diagnostic that calls the same
 `formatImage()` / `check_invariants()` / `c1541_validate()` functions per
-format without Unity's longjmp semantics. Verbatim results:
+format without Unity's longjmp semantics. Verbatim results, **after** the
+finding #4 oracle fix above (D80/D82's `c1541_validate()` column changed from
+a false "OK" to the correct "FAIL" once the fix landed — see the
+superseded/original readings in git history of this file if needed):
 
 | Format | `formatImage()` | `check_invariants()` | `c1541_validate()` |
 |--------|-----------------|-----------------------|---------------------|
 | d64 | true | FAIL: `directory: block 18/1 is in a chain but marked free in BAM` | FAIL (image byte-diff after `-validate`) |
 | d71 | true | FAIL: `directory: block 1/4 is in a chain but marked free in BAM` | FAIL (image byte-diff after `-validate`) |
-| d80 | true | FAIL: `directory: block 39/1 is in a chain but marked free in BAM` | reports OK — see oracle limitation below, this is **not** evidence the image is actually fine |
+| d80 | true | FAIL: `directory: block 39/1 is in a chain but marked free in BAM` | FAIL (`"ERR = 65, NO BLOCK, 00, 38"` from c1541 — only detectable after the finding #4 fix) |
 | d81 | true | FAIL: `directory: block 40/3 is in a chain but marked free in BAM` | FAIL (image byte-diff after `-validate`) |
-| d82 | true | FAIL: `directory: block 39/1 is in a chain but marked free in BAM` | reports OK — see oracle limitation below, this is **not** evidence the image is actually fine |
+| d82 | true | FAIL: `directory: block 39/1 is in a chain but marked free in BAM` | FAIL (`"ERR = 65, NO BLOCK, 00, 38"` / `"78, 23"`→`"155, 23"` from c1541 — only detectable after the finding #4 fix) |
 
-### Oracle limitation: `c1541_validate()` misses D80/D82's error report
-
-Running `c1541 -attach <image> -validate` directly against a freshly
-formatted (buggy) D80/D82 image prints:
-
-```
-ERR = 65, NO BLOCK, 00, 38
-ERR = 65, NO BLOCK, 78, 23        (155, 23 for D82)
-```
-
-`c1541_validate()` (`test/native/test_disk_write/c1541_oracle.h`) treats a run
-as failed if its output contains the substrings `"error"`, `"Error"`, or
-`"wrong"`, and otherwise falls back to a before/after byte-diff. c1541's own
-message here is `"ERR ="`, not `"error"`/`"Error"`, so the text check misses
-it; and for D80/D82, c1541 evidently does not silently repair the BAM the way
-it does for D64/D71/D81 (no bytes change), so the byte-diff also reports
-"clean." The net effect is `c1541_validate()` returning `true` for a D80/D82
-image that c1541 itself flagged as inconsistent. This is a gap in the test
-oracle helper, not in the disk-write engine, and not fixed here (out of
-Task 7's scope, which only creates fixtures/tests/findings) — noted so nobody
-mistakes "d80/d82 c1541_validate passed" for "d80/d82 is correct." The
-underlying defect on d80/d82 is the same finding #2, independently confirmed
-by `check_invariants()` above.
+All five formats now fail **both** independent oracles, consistently. Before
+the finding #4 fix, D80/D82 misleadingly showed `c1541_validate()` as OK —
+that was never evidence those two formats were actually fine; it was a gap
+in the oracle helper, corrected as described in finding #4.
 
 ## Coverage gaps
 
