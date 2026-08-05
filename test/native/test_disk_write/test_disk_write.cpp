@@ -9,6 +9,7 @@
 #include "file_container_stream.h"
 #include "c1541_oracle.h"
 #include "image_invariants.h"
+#include "format_fixtures.h"
 
 void setUp(void) {}
 void tearDown(void) {}
@@ -469,6 +470,107 @@ void test_invariants_pass_on_clean_c1541_image_with_two_files(void)
     TEST_ASSERT_TRUE_MESSAGE(r.ok, r.message.c_str());
 }
 
+// Tier 0: format() must produce a structurally valid blank image for all
+// five in-scope formats (D64/D71/D80/D81/D82). Per the design spec, engine
+// bugs found here are recorded in the findings file and NOT fixed - a
+// failing format gets a TEST_IGNORE_MESSAGE naming its finding so the suite
+// stays runnable, with the test body left intact so it goes live the moment
+// that finding is fixed.
+void test_tier0_format_all_media(void)
+{
+    // finding #2 (shared D64MStream base - see the findings file) makes d64,
+    // the first format in the table, fail check_invariants() before this
+    // loop ever reaches d71/d80/d81/d82: TEST_FAIL_MESSAGE longjmps out of
+    // the whole function on the first failing iteration, so it cannot report
+    // per-format results on its own. All five formats' actual per-format
+    // results (confirmed independently, outside this test, via a throwaway
+    // diagnostic that isolates each format so a longjmp in one can't hide
+    // the others) are recorded in
+    // docs/superpowers/findings/2026-08-05-disk-write-findings.md: all five
+    // fail check_invariants() the same way (header/directory-track sectors
+    // in a chain but marked free in BAM); d64/d71/d81 additionally fail
+    // c1541 validate, while d80/d82's c1541 check reports OK only because
+    // c1541 prints "ERR = 65, NO BLOCK" for those formats' inconsistency
+    // (verified with a direct c1541 -validate run) and c1541_validate()'s
+    // text scan only recognizes "error"/"Error"/"wrong" - a gap in the
+    // oracle helper, not evidence the d80/d82 images are actually fine.
+    // The loop below is left intact, unmodified from the brief, so it goes
+    // live the moment finding #2 is fixed.
+    TEST_IGNORE_MESSAGE("finding #2: initializeBlockAllocationMap() never reserves the "
+                        "header/directory sectors on any of the five formats; see the "
+                        "findings file for confirmed per-format results");
+
+    for (const auto& f : all_formats())
+    {
+        std::string path = std::string("build_t0_") + f.name + "." + f.ext;
+        remove(path.c_str());
+        {
+            auto src = std::make_shared<FileContainerStream>(path, f.size);
+            auto image = f.make(src);
+            char msg[128];
+            snprintf(msg, sizeof(msg), "%s: formatImage failed", f.name);
+            TEST_ASSERT_TRUE_MESSAGE(image->formatImage("testdisk", "01"), msg);
+
+            InvariantResult r = check_invariants(*image);
+            if (!r.ok)
+            {
+                std::string m = std::string(f.name) + ": " + r.message;
+                TEST_FAIL_MESSAGE(m.c_str());
+            }
+        }
+        if (c1541_available())
+        {
+            std::string m = std::string(f.name) + ": c1541 validate rejected the blank image";
+            TEST_ASSERT_TRUE_MESSAGE(c1541_validate(path), m.c_str());
+        }
+        remove(path.c_str());
+    }
+}
+
+// The declared default size must agree with what the geometry tables imply.
+// A mismatch means one of the two is wrong; without this check a bad table
+// would silently validate against itself.
+void test_tier0_declared_size_matches_geometry(void)
+{
+    // finding #3 (D71-specific, see the findings file): D71MStream::speedZone()
+    // (lib/meatloaf/media/disk/d71.h) tests `track < 35` instead of
+    // `track <= 35`, so track 35 falls through to the side-2 branch and gets
+    // 21 sectors (sectorsPerTrack[3]) instead of the correct 17
+    // (sectorsPerTrack[0]) - exactly 4 extra blocks, matching the observed
+    // mismatch (350720 vs declared 349696 = 1370 vs 1366 blocks). d64 passes
+    // this check, but d71 (the next format in the table) fails and
+    // TEST_ASSERT_EQUAL_UINT32_MESSAGE longjmps out of the whole function
+    // before d80/d81/d82 are ever reached. Confirmed independently (outside
+    // this test, via a throwaway per-format diagnostic) that d64/d80/d81/d82
+    // all match their declared size - only d71 is affected. The loop below
+    // is left intact, unmodified from the brief, so it goes live the moment
+    // finding #3 is fixed.
+    TEST_IGNORE_MESSAGE("finding #3: D71MStream::speedZone() misclassifies track 35, "
+                        "inflating d71's geometry-implied size by 4 blocks; "
+                        "d64/d80/d81/d82 match their declared size, see the findings file");
+
+    for (const auto& f : all_formats())
+    {
+        std::string path = std::string("build_t0g_") + f.name + "." + f.ext;
+        remove(path.c_str());
+        auto src = std::make_shared<FileContainerStream>(path, f.size);
+        auto image = f.make(src);
+
+        uint8_t last = image->partitions[image->partition]
+                            .block_allocation_map.back().end_track;
+        uint32_t blocks = 0;
+        for (uint8_t t = 1; t <= last; t++)
+            blocks += image->getSectorCount(t);
+
+        char msg[192];
+        snprintf(msg, sizeof(msg),
+                 "%s: declared %u bytes but geometry implies %u (%u blocks)",
+                 f.name, image->defaultImageSize(), blocks * 256, blocks);
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(image->defaultImageSize(), blocks * 256, msg);
+        remove(path.c_str());
+    }
+}
+
 void process()
 {
     UNITY_BEGIN();
@@ -482,6 +584,8 @@ void process()
     RUN_TEST(test_c1541_read_detects_truncated_read);
     RUN_TEST(test_invariants_pass_on_clean_c1541_image_with_two_files);
     RUN_TEST(test_invariants_pass_on_blank_image);
+    RUN_TEST(test_tier0_format_all_media);
+    RUN_TEST(test_tier0_declared_size_matches_geometry);
     UNITY_END();
 }
 
