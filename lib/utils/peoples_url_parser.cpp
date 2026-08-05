@@ -228,6 +228,25 @@ std::string PeoplesUrlParser::base(void)
 
     cleanPath();
 
+    // base() means "the directory CONTAINING this URL" (all callers use it
+    // to move the cwd next to a just-opened file). A path that ends in '/'
+    // has an empty name component, so pathToFile() would return the path
+    // itself and base() the full URL -- the cwd then teleports INTO it.
+    // Seen with server endpoints that serve a file from a directory-shaped
+    // URL: ML:GOTD resolves to http://host/gotd/ serving the game PRG;
+    // after the load the drive sat inside gotd/, and a directory read
+    // streamed that same PRG as a bogus one-line listing ("1984 2064" --
+    // its BASIC stub). Strip trailing slashes and take the parent of the
+    // last path segment instead.
+    if ( name.size() == 0 && path.size() > 1 && path.back() == '/' )
+    {
+        std::string p = path;
+        while ( p.size() > 1 && p.back() == '/' )
+            p.pop_back();
+        auto cut = p.find_last_of('/');
+        return root() + p.substr(0, cut + 1);
+    }
+
     return root() + pathToFile() ;
 }
 
