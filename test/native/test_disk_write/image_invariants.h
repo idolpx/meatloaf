@@ -4,6 +4,7 @@
 #include <set>
 #include <string>
 #include <utility>
+#include <vector>
 #include "media/disk/d64.h"
 
 struct InvariantResult
@@ -99,6 +100,30 @@ struct ImageInvariantChecker
 
         // Invariant 7: every directory entry points at a valid start block,
         // and invariants 1/3/4/5 hold along each file's chain.
+        //
+        // FIX ROUND 1: this used to call walkChain() for each entry inline,
+        // interleaved with the img.seekEntry(++index) calls that read the
+        // next entry. D64MStream::seekEntry() has a "same sector, not first
+        // slot" fast path that trusts the stream is exactly where the
+        // PREVIOUS seekEntry() left it - it does not reseek in that case.
+        // walkChain() issues its own seekSector()/readContainer() calls into
+        // the file's data blocks and never restores the position, so any
+        // seekEntry() call after a walkChain() silently read garbage (a
+        // reviewer repro against a genuinely clean c1541-built two-file
+        // image: "directory entry 2 points at out-of-bounds block 65/65" -
+        // 0x41 0x41 being the first file's own 'A' payload bytes misread as
+        // a directory entry). Fixed by strictly separating the two phases:
+        // Phase A reads every directory entry with NOTHING else touching
+        // the stream in between consecutive seekEntry() calls; Phase B only
+        // starts once the directory scan is completely finished, and is
+        // free to reposition the stream via walkChain() since no further
+        // seekEntry() call depends on where it leaves things.
+        struct DirEntry { uint16_t index; uint8_t start_track; uint8_t start_sector; };
+        std::vector<DirEntry> liveEntries;
+
+        // Phase A: collect every live entry's start block. No walkChain()
+        // (or any other stream access) may run between these seekEntry()
+        // calls.
         uint16_t index = 0;
         while (img.seekEntry(++index))
         {
@@ -106,13 +131,20 @@ struct ImageInvariantChecker
             uint8_t st = img.entry.start_track;
             uint8_t ss = img.entry.start_sector;
             if (st == 0) continue;                          // no data
-            if (!inBounds(st, ss))
+            liveEntries.push_back(DirEntry{ index, st, ss });
+        }
+
+        // Phase B: the directory scan is done, so it's now safe to walk
+        // each file's chain (which repositions the stream).
+        for (auto& e : liveEntries)
+        {
+            if (!inBounds(e.start_track, e.start_sector))
             {
-                fail("directory entry " + std::to_string(index) +
-                     " points at out-of-bounds block " + ts(st, ss));
+                fail("directory entry " + std::to_string(e.index) +
+                     " points at out-of-bounds block " + ts(e.start_track, e.start_sector));
                 continue;
             }
-            walkChain(st, ss, "file");
+            walkChain(e.start_track, e.start_sector, "file");
         }
 
         // Invariant 2: nothing is allocated in the BAM that no chain claims.

@@ -406,6 +406,69 @@ void test_invariants_pass_on_blank_image(void)
     TEST_ASSERT_TRUE_MESSAGE(r.ok, r.message.c_str());
 }
 
+// Regression test for the FIX ROUND 1 defect described above
+// (image_invariants.h): check_invariants() must not fabricate violations on
+// a genuinely clean image. Built entirely with c1541 itself - format plus
+// TWO real file writes - so it sidesteps findings #1/#2 in our own engine
+// and isolates the checker's own logic. TWO files matter: the bug only
+// showed up on directory entries read AFTER the first file's chain had
+// already been walked, so a single-file image can't exercise it.
+void test_invariants_pass_on_clean_c1541_image_with_two_files(void)
+{
+    if (!c1541_available())
+        TEST_IGNORE_MESSAGE("c1541 not found; set C1541 env var");
+
+    const char* path = "build_test_inv_c1541.d64";
+    const char* srcPath1 = "build_test_inv_c1541_a.bin";
+    const char* srcPath2 = "build_test_inv_c1541_b.bin";
+    remove(path);
+    remove(srcPath1);
+    remove(srcPath2);
+
+    c1541_run("-format " + c1541_quote("regress,01") + " d64 " + c1541_quote(path));
+
+    {
+        FILE* fp = fopen(srcPath1, "wb");
+        TEST_ASSERT_NOT_NULL(fp);
+        std::vector<uint8_t> payload(600, 0x41); // 'A' - this is the exact
+                                                  // byte pattern the reviewer's
+                                                  // repro found misread as a
+                                                  // directory entry (65/65).
+        TEST_ASSERT_EQUAL_UINT32(600, (uint32_t)fwrite(payload.data(), 1, payload.size(), fp));
+        fclose(fp);
+    }
+    {
+        FILE* fp = fopen(srcPath2, "wb");
+        TEST_ASSERT_NOT_NULL(fp);
+        std::vector<uint8_t> payload(600, 0x42);
+        TEST_ASSERT_EQUAL_UINT32(600, (uint32_t)fwrite(payload.data(), 1, payload.size(), fp));
+        fclose(fp);
+    }
+    c1541_run("-attach " + c1541_quote(path) + " -write " + c1541_quote(srcPath1) + " " + c1541_quote("FILEA"));
+    c1541_run("-attach " + c1541_quote(path) + " -write " + c1541_quote(srcPath2) + " " + c1541_quote("FILEB"));
+
+    // The baseline must itself validate clean before we trust conclusions
+    // drawn from running our own checker on it.
+    bool valid = c1541_validate(path);
+
+    InvariantResult r;
+    {
+        auto src = std::make_shared<FileContainerStream>(path);
+        D64MStream image(src);
+        r = check_invariants(image);
+        src->close();
+    }
+
+    remove(path);
+    remove(srcPath1);
+    remove(srcPath2);
+
+    TEST_ASSERT_TRUE_MESSAGE(valid,
+        "baseline (c1541-formatted + c1541-written two files) did not validate clean - "
+        "cannot draw any conclusion from checking it");
+    TEST_ASSERT_TRUE_MESSAGE(r.ok, r.message.c_str());
+}
+
 void process()
 {
     UNITY_BEGIN();
@@ -417,6 +480,7 @@ void process()
     RUN_TEST(test_c1541_validates_a_c1541_formatted_image);
     RUN_TEST(test_c1541_validate_detects_bam_chain_corruption);
     RUN_TEST(test_c1541_read_detects_truncated_read);
+    RUN_TEST(test_invariants_pass_on_clean_c1541_image_with_two_files);
     RUN_TEST(test_invariants_pass_on_blank_image);
     UNITY_END();
 }
