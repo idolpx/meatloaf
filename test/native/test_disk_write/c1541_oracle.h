@@ -28,6 +28,12 @@ inline std::string c1541_bin()
 // correctly. Quoting only tokens that actually contain whitespace keeps
 // every one of this suite's own calls (bare filenames, "c1541" with no env
 // override) down to zero or one quoted segment, avoiding the bug.
+// Known residual edge case (not hit by anything in this suite): if C1541
+// ever points at a path containing a space AND some argument in the same
+// call also needs quoting, two quoted segments recur and this bug could
+// resurface. The failure mode stays safe either way - c1541_run()'s rc
+// check in c1541_validate()/c1541_read() treats a failed invocation as
+// false, so it fails loud rather than misreporting a valid image.
 inline std::string c1541_quote(const std::string& token)
 {
     if (token.find(' ') == std::string::npos && token.find('\t') == std::string::npos)
