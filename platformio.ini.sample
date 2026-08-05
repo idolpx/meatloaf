@@ -182,10 +182,16 @@ build_unflags =
 ; https://blog.leon0399.ru/platformio-coverage-github-actions
 platform = native
 test_filter = native/*
+lib_deps = throwtheswitch/Unity@^2.6.1
 extra_scripts = gen_coverage.py
 build_flags =
     ${env.build_flags}
     -D TEST_NATIVE
+    ; Header search paths for the disk-write engine sources pulled in by
+    ; test/native/test_disk_write/engine_sources.cpp (see that file for why
+    ; they're included directly instead of relying on PlatformIO's LDF).
+    -I lib/meatloaf
+    -I lib/utils
     ;-lgcov
     ;--coverage
     ;-fprofile-abs-path

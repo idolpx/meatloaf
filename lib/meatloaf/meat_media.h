@@ -25,11 +25,14 @@
 #include <unordered_map>
 #include <sstream>
 #include <chrono>
+#include <algorithm>
 
 #include "../../include/debug.h"
 
+#ifndef TEST_NATIVE
 #include "../device/iec/meatloaf.h"
 #include "../device/iec/fuji.h"
+#endif
 #include "string_utils.h"
 
 
@@ -239,6 +242,9 @@ class ImageBroker {
 
     // Check if an entry is currently in use by any active drive
     static bool is_in_use(const std::string& key) {
+#ifdef TEST_NATIVE
+        return false;
+#else
         for (int i = 0; i < MAX_DISK_DEVICES; i++) {
             auto drive = Meatloaf.get_disks(i);
             if (drive != nullptr) {
@@ -258,6 +264,7 @@ class ImageBroker {
                 return true;
         }
         return false;
+#endif
     }
 
     // Evict oldest entries if over limit (skip entries that are in use)
