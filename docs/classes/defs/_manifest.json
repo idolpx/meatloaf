@@ -1143,21 +1143,21 @@
   "area": "media_disk"
  },
  "D90MStream": {
-  "header": "lib/meatloaf/media/disk/d90.h",
+  "header": "lib/meatloaf/media/hd/d90.h",
   "bases": [
    "D64MStream"
   ],
   "area": "media_disk"
  },
  "D90MFile": {
-  "header": "lib/meatloaf/media/disk/d90.h",
+  "header": "lib/meatloaf/media/hd/d90.h",
   "bases": [
    "D64MFile"
   ],
   "area": "media_disk"
  },
  "D90MFileSystem": {
-  "header": "lib/meatloaf/media/disk/d90.h",
+  "header": "lib/meatloaf/media/hd/d90.h",
   "bases": [
    "MFileSystem"
   ],
