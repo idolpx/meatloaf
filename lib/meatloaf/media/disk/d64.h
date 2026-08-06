@@ -398,7 +398,9 @@ protected:
     // c1541 derives a bogus track range and reports "ERR = 65, NO BLOCK" for
     // tracks outside the disk. BlockAllocationMap has no room for it, so
     // formats that need it call this after the generic initializer.
-    bool writeBamBlockHeaders( uint8_t dos_ver )
+    // Uses the dos_version member rather than a parameter: passing it in let
+    // D80 and D82 drift apart (one read the member, the other hardcoded 0x43).
+    bool writeBamBlockHeaders()
     {
         auto &maps = partitions[partition].block_allocation_map;
         for (size_t i = 0; i < maps.size(); i++)
@@ -412,7 +414,7 @@ protected:
             uint8_t hdr[6] = {
                 next_track,
                 next_sector,
-                dos_ver,
+                dos_version,
                 0x00,                               // reserved
                 maps[i].start_track,
                 (uint8_t)(maps[i].end_track + 1)    // highest track + 1

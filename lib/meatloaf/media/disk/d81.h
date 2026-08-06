@@ -77,6 +77,7 @@ public:
         partitions.push_back(p);
         sectorsPerTrack = { 40 };
         interleave = { 1, 1 }; // Directory, File
+        dos_version = 0x44; // 'D' - CBM DOS 3.0 (1581)
         has_subdirs = true;
         dos_rom = "dos1581";
 
