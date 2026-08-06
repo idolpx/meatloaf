@@ -513,12 +513,11 @@ void test_invariants_pass_on_clean_c1541_image_with_two_files(void)
 // that finding is fixed.
 void test_tier0_format_all_media(void)
 {
-    // d64 now passes both validators (findings #1 and #2 fixed). d71 still
-    // fails on finding #5 (its Partition names header 1/0 and directory 1/4
-    // instead of 18/0 and 18/1), and d80/d81/d82 are unverified because this
-    // loop stops at the first failing format. Lift this to re-check.
-    TEST_IGNORE_MESSAGE("finding #5: D71MStream's Partition is misconfigured; "
-                        "d64 passes, d80/d81/d82 unverified behind it");
+    // d64 passes BOTH validators. d71/d80/d81 pass check_invariants() but are
+    // still rejected by c1541 (finding #7); d82 is unverified behind them
+    // because this loop stops at the first failing format. Lift to re-check.
+    TEST_IGNORE_MESSAGE("finding #7: d71/d80/d81 satisfy our invariants but c1541 "
+                        "still rejects them; d64 passes both, d82 unverified");
     // finding #2 (shared D64MStream base - see the findings file) makes d64,
     // the first format in the table, fail check_invariants() before this
     // loop ever reaches d71/d80/d81/d82: TEST_FAIL_MESSAGE longjmps out of

@@ -405,21 +405,34 @@ protected:
             // Set default values
             uint8_t track = partitions[partition].block_allocation_map[bam_index].start_track;
             uint8_t end_track = partitions[partition].block_allocation_map[bam_index].end_track;
-            uint8_t byte_count = partitions[partition].block_allocation_map[bam_index].byte_count;
-            byte_count--; // First byte is number of sectors allocated
+            uint8_t rec_bytes = partitions[partition].block_allocation_map[bam_index].byte_count;
 
             // Update BAM for each track
             for (uint16_t t = track; t <= end_track; t++) {
                 uint8_t sectors = getSectorCount(t);
                 uint8_t data = 0;
-                
-                // First byte is count of free sectors
-                data = sectors;
-                if (!writeContainer((uint8_t*)&data, 1))
-                    return false;
+
+                // A record carries a leading free-sector count ONLY when it has
+                // more bytes than the bitmap needs (D64/D81). Bitmap-only records
+                // - D71 side 2, CMD native 32-byte records - must not get one:
+                // writing it anyway shifts the whole bitmap over by a byte and
+                // truncates its last byte, so blocks read back as allocated that
+                // were never allocated. Same test getBAMRecord() uses, so the
+                // writer and the readers agree about the record's shape.
+                uint8_t bitmap_bytes = (sectors + 7) / 8;
+                bool has_count = rec_bytes > bitmap_bytes;
+                if (has_count)
+                {
+                    data = sectors;
+                    if (!writeContainer((uint8_t*)&data, 1))
+                        return false;
+                }
+                // Keep the record's fixed width either way, so the next track's
+                // entry lands at the right offset.
+                bitmap_bytes = has_count ? (uint8_t)(rec_bytes - 1) : rec_bytes;
 
                 // Next bytes are the bit map (1 = Free, 0 = Allocated)
-                for (uint8_t i = 0; i < byte_count; i++) {
+                for (uint8_t i = 0; i < bitmap_bytes; i++) {
                     if ( sectors >= 8 )
                     {
                         data = 0xFF;

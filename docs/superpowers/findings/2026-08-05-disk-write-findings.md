@@ -127,6 +127,52 @@ reports `orphan: block 36/1 allocated in BAM but unreachable`.
 D80/D81/D82 remain **unverified**: `test_tier0_format_all_media` stops at the first failing
 format, and D71 now fails ahead of them. Fixing #5 will reveal their true state.
 
+## Second fix pass — #5 and #6 closed, #7 opened
+
+**Finding #5 — FIXED** (by the user): `D71MStream`'s `Partition` now reads header `18/0`,
+header_offset `0x90`, directory `18/1`, matching the 1541-compatible 1571 layout and its own
+`block_allocation_map[0]`.
+
+**Finding #6 — NEW, FIXED**: `D64MStream::initializeBlockAllocationMap()`
+(`lib/meatloaf/media/disk/d64.h`) unconditionally wrote a leading free-sector count byte for
+every track and did `byte_count--`, ignoring whether the record actually has one. Records carry
+a count only when they have more bytes than the bitmap needs — `getBAMRecord()` already computes
+exactly this as `byte_count > (getSectorCount(track) + 7) / 8`. D71's side-2 record (tracks
+36-70, `byte_count 3`, 21 sectors → 3 bitmap bytes) is bitmap-ONLY, so the spurious count byte
+shifted the whole bitmap one byte over and truncated its last byte. Blocks then read back as
+allocated that were never allocated — the symptom was `orphan: block 36/1 allocated in BAM but
+unreachable`, which survived the #5 fix. The initializer now uses the same has-count test the
+readers use, so writer and readers agree on each record's shape, and keeps the record's fixed
+width either way so the next track's entry lands at the right offset.
+
+### Finding #7 — non-D64 formats still rejected by c1541 (NEW, open)
+
+Current per-format state after all fixes above:
+
+| Format | `check_invariants()` | `c1541_validate()` |
+|--------|----------------------|--------------------|
+| d64 | **PASS** | **PASS** |
+| d71 | PASS | FAIL |
+| d80 | PASS | FAIL |
+| d81 | PASS | FAIL |
+| d82 | unverified | unverified |
+
+D71/D80/D81 now satisfy every one of our seven structural invariants but c1541 still rejects
+their blank images, so there is format-specific header/BAM detail c1541 checks that our
+invariants do not. D82 sits behind them because `test_tier0_format_all_media` stops at the
+first failing format (see the deferred note about that loop's design — it should become
+per-format tests).
+
+A concrete lead for D71: on a real 1571 the side-2 **free counts** live in `18/0` at offset
+`0xDD` (one byte per track 36-70) while the side-2 **bitmaps** live at `53/0`. The
+`BlockAllocationMap` struct cannot express a record whose counts and bitmap are in different
+places, so `formatImage()` never writes those counts at all. D80/D82 and D81 will each need
+their own check against their real DOS layout.
+
+This is also a useful demonstration of why the suite runs two independent validators: our
+checker passing is necessary but not sufficient, and a suite built on invariants alone would
+have declared these three formats correct.
+
 ## Coverage gaps
 
 - **1581 `CBM` sub-partition writes (D81)** — not tested. Exercising it needs a D81 that already
