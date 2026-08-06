@@ -52,7 +52,8 @@ to copy it from `platformio.ini.sample`, which carries the block.
 
 ## Reading the output
 
-A healthy run is `13 test cases: 13 succeeded`.
+A healthy run is `20 test cases: 20 succeeded`, taking roughly 35 seconds — most of that is Tier 3
+and the disk-filling scenarios in Tier 2.
 
 `SKIPPED` is the mechanism for tracking known-broken behavior: the message names the finding that
 blocks the test, and the test body is left intact. **Lift the `TEST_IGNORE_MESSAGE` and re-run to
@@ -114,16 +115,40 @@ building.
 
 ## Known wart
 
-A passing run can leave `build_t0g_*.d*` files in the repo root — cleanup does not cover every exit
-path. Harmless; `rm -f build_t0*.d*` clears them.
+A run can leave `build_t*.d*` scratch images in the repo root — cleanup does not cover every exit
+path, and a failing test skips its own cleanup because Unity's assert macros longjmp. Harmless;
+`rm -f build_t*.d* *.out` clears them.
+
+## What the tiers cover
+
+Each tier builds on the one below it, so a failure low down explains failures above it.
+
+- **Tier 0 — `format()` produces a valid blank.** Per format, plus a cross-check that the declared
+  `defaultImageSize()` matches what the geometry tables imply.
+- **Tier 1 — single-file write.** Drives the real SAVE path (`mode = out`, `seekPath()`, `write()`,
+  `close()`), then verifies against a *reopened* image: invariants, c1541 validate, the entry in
+  c1541's directory listing, byte-exact read-back, and block accounting.
+- **Tier 2 — structural stress.** Multi-block files crossing track boundaries, disk-full rollback,
+  directory extension past the first sector, save-over-an-existing-name, and allocation across BAM
+  record boundaries (D71's bitmap-only side-2 record, D80/D82's multiple counted records).
+- **Tier 3 — seeded randomized stress.** 375 operations (5 formats × 3 seeds × 25 ops) over a small
+  reused name pool, with the invariant checker run after *every* operation so a failure names the
+  exact op rather than an end state to bisect. Seeds are fixed; one that finds a bug should stay in
+  the list as a permanent regression case.
+
+## Two things that will bite you when writing tests here
+
+**`blocksFree()` returns 0 if read from a stream you have just `close()`d.** `close()` drops state
+it depends on, and the next `seekPath()` rebuilds it. Read free-block counts from a reopened image.
+
+**The CBM `@:` save-and-replace prefix never reaches the engine.** `drive.cpp` strips it, sets an
+overwrite flag, and passes the bare name down; `seekPath()` then decides on its own — a name that
+resolves to an existing file is scratched and its slot reused. Saving a literal `"@:doc"` just
+creates a second file called `@:doc`. That mistake looked exactly like a leaked chain, and *both*
+validators passed on the result, because two complete files genuinely existed. Only the block
+accounting was surprising.
 
 ## Not covered
 
-Writing files *into* images (the plan's Tiers 1-3) is not built yet. When it is, build each tier's
-starting image with `c1541 -format` rather than our own `formatImage()`, so a format bug cannot
-masquerade as a write bug — the pattern
-`test_invariants_pass_on_clean_c1541_image_with_two_files` already uses.
-
-Also untested: writes into 1581 `CBM` sub-partitions (needs a committed binary fixture; neither the
-write path nor `c1541` can create one), and the D40/D90/DNP/DHD formats, which are out of scope for
-this suite.
+Writes into 1581 `CBM` sub-partitions — needs a committed binary fixture, since neither the write
+path nor `c1541` can create one. The D40, D90, DNP and DHD formats are out of scope for this suite.
