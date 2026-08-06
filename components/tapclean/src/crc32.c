@@ -34,7 +34,7 @@
 #include <stdlib.h>
 
 #include "crc32.h"
-#include "main.h"
+#include "main.h"	/* For msgout() */
 
 #ifdef ESP_PLATFORM
 #include "esp_crc.h"
@@ -42,6 +42,10 @@
 static unsigned int *crc_table;
 #endif
 
+
+/*
+ * Initialize the CRC calculation table
+ */
 
 int crc32_build_crc_table(void)
 {
@@ -72,6 +76,10 @@ int crc32_build_crc_table(void)
 #endif
 }
 
+/*
+ * Return the CRC32 for 'buffer' of length 'count' bytes.
+ */
+
 unsigned int crc32_compute_crc(unsigned char *buffer, int count)
 {
 #ifdef ESP_PLATFORM
@@ -91,6 +99,10 @@ unsigned int crc32_compute_crc(unsigned char *buffer, int count)
     return crc;
 #endif
 }
+
+/*
+ * Free the CRC table...
+ */
 
 void crc32_free_crc_table(void)
 {

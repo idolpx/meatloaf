@@ -86,7 +86,7 @@ void firebird_search(void)
    /*-------------------------------------------------------------------*/
    if(!quiet)
    {
-      sprintf(lin,"  Firebird Loader %s",lname[sr]);
+      sprintf(lin,"\r\n  Firebird Loader %s",lname[sr]);
       msgout(lin);
          
    }
