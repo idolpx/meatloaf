@@ -321,8 +321,16 @@ block is `1/35`.
 
 ### DNP grows; it is not fixed at creation
 
-A CMD native partition starts at **one track (64 KB)** and extends a track at a time as files are
-written - that is what "native" means. Three engine changes make that work:
+A CMD native partition is created at **one track (64 KB)**. Meatloaf can extend it a track at a
+time as files are written, but **that is an extension of ours, not CMD behaviour** - a real native
+partition is fixed at its creation size. `D64MStream::allow_grow` therefore defaults to false and
+`growImage()` refuses unless it is set.
+
+The default is a safety property: a DNP embedded in a DHD occupies a fixed window at a fixed
+offset, so a partition that grew there would overwrite its neighbour. Nothing on the DHD path sets
+the flag, and `DHDPartitionMFile::getDecodedStream()` carries a comment saying it must not.
+
+Three engine changes make growth work when it is enabled:
 
 - **`D64MStream::growImage()`** (virtual, refuses by default) is called by `getNextFreeBlock()`
   once when no free block can be found, then the search is retried. `DNPMStream` overrides it to

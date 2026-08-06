@@ -123,6 +123,17 @@ public:
     // data blocks at all.
     bool dedicated_directory_track = true;
 
+    // Opt-in permission to extend the medium as it fills. OFF by default, and
+    // deliberately so: a growable partition is a MEATLOAF EXTENSION, not CMD
+    // behaviour - a real CMD native partition is fixed at the size it was
+    // created with. Leaving it off keeps us compatible by default.
+    //
+    // It must also stay off whenever the image is embedded in a container. A
+    // DNP inside a DHD occupies a fixed window at a fixed offset, so growing it
+    // would write straight over the NEXT partition. Nothing sets this flag for
+    // a DHD-hosted partition, and nothing should.
+    bool allow_grow = false;
+
     uint8_t dos_version = 0x41;
     std::string dos_rom = "dos1541";
     std::string dos_name = "";

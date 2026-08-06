@@ -57,10 +57,10 @@ to copy it from `platformio.ini.sample`, which carries the block.
 
 ## Reading the output
 
-A healthy run is `72 test cases: 5 skipped, 67 succeeded`, taking roughly 50 seconds — most of that
+A healthy run is `73 test cases: 5 skipped, 68 succeeded`, taking roughly 55 seconds — most of that
 is Tier 3 and the disk-filling scenarios in Tier 2, which reopen the image once per save.
 
-**72 comes from 12 format-independent tests plus 10 tier tests run once per format across six
+**73 comes from 13 format-independent tests plus 10 tier tests run once per format across six
 formats.** Each tier test takes a single format via `g_format_index`; `process()` drives the loop.
 The obvious alternative — looping over `all_formats()` *inside* each test — silently hides formats,
 because Unity's assert macros longjmp out of the whole test function, so the first format to fail
@@ -197,12 +197,27 @@ the gap is visible at each call site rather than c1541 quietly failing on an ima
 This is measurably weaker: finding #7 was a case where D71, D80 and D81 satisfied every invariant
 while c1541 still rejected them.
 
-**It grows.** A native partition is created at one track (64 KB) and extends a track at a time as
-files are written. `D64MStream::growImage()` is a virtual that refuses by default;
-`getNextFreeBlock()` calls it once when it can find no free block, then retries the search, so all
-three callers (first block, next block, directory extension) get the behavior uniformly.
-`test_dnp_grows_beyond_its_initial_track` covers it directly — format one track, write more than a
-track of data, assert the container grew by a whole number of 64 KB tracks and is still sound.
+**It can grow — but only if you ask.** Extending a partition as it fills is a **Meatloaf
+extension, not CMD behaviour**: a real CMD native partition is fixed at the size it was created
+with. So `D64MStream::allow_grow` defaults to **false** and `DNPMStream::growImage()` refuses
+unless it is set, reporting `DISK FULL` like any other medium.
+
+That default is a safety property, not a preference. **A DNP embedded in a DHD occupies a fixed
+window at a fixed offset**, so a partition that grew there would write straight over its neighbour.
+`DHDPartitionMFile::getDecodedStream()` builds its streams over a `DHDOffsetStream` and must never
+set this flag.
+
+The mechanism: `getNextFreeBlock()` calls `growImage()` once when it can find no free block, then
+retries the search — so all three callers (first block, next block, directory extension) get the
+behaviour uniformly rather than each handling it.
+
+Two tests cover this, and they are each other's control — same setup, opposite flag, opposite
+expectation:
+
+- `test_dnp_grows_beyond_its_initial_track` — with `allow_grow` set, writing more than a track of
+  data must extend the container by a whole number of 64 KB tracks and leave it sound.
+- `test_dnp_does_not_grow_by_default` — with the flag left alone, the same writes must fail with
+  CBM error 72 and the container must be **byte-for-byte the size it was created with**.
 
 **Its system area is the first 34 sectors of track 1:** `1/0` autoboot, `1/1` partition info,
 `1/2`–`1/33` BAM (255 tracks × 32 bytes from `1/2` offset `0x20` is 8160 bytes, ending exactly at

@@ -157,6 +157,13 @@ public:
     // no relocation, no risk of overrunning into the directory.
     bool growImage() override
     {
+        // Growth is a Meatloaf extension and is opt-in. A real CMD native
+        // partition is fixed at its creation size, and one embedded in a DHD
+        // container has a fixed window it must not write past - so the default
+        // is to refuse and report DISK FULL like any other medium.
+        if (!allow_grow)
+            return false;
+
         auto &bam = partitions[partition].block_allocation_map[0];
         uint16_t new_track = (uint16_t)bam.end_track + 1;
 

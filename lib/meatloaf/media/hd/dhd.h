@@ -171,6 +171,11 @@ public:
         if (p == nullptr)
             return nullptr;
 
+        // Every partition here is a FIXED window at a fixed offset inside the
+        // container, so none of these streams may ever grow - a DNP that
+        // extended itself would write directly over the next partition.
+        // D64MStream::allow_grow defaults to false and must stay false on this
+        // path; do not set it here.
         auto view = std::make_shared<DHDOffsetStream>(is, p->start, p->size);
         switch (p->type)
         {

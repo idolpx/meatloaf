@@ -818,10 +818,13 @@ static uint16_t blocks_free_of(const FormatFixture& f, const std::string& path)
 static bool open_and_save(const FormatFixture& f,
                           const std::string& path,
                           const std::string& name,
-                          const std::vector<uint8_t>& data)
+                          const std::vector<uint8_t>& data,
+                          bool allow_grow = false)
 {
     auto src = std::make_shared<FileContainerStream>(path);
     auto image = f.make(src);
+    // Growing the medium is opt-in and off by default, matching the engine.
+    image->allow_grow = allow_grow;
     return save_file(*image, name, data);
 }
 
@@ -1143,10 +1146,11 @@ static void run_random_session(const FormatFixture& f, unsigned seed)
     remove(path.c_str());
 }
 
-// A CMD native partition is created small and extends as files are written.
-// Starting from a single 64 KB track, writing more than one track's worth of
-// data must grow the container rather than fail - and the result must still be
-// structurally sound.
+// Growing is a MEATLOAF EXTENSION, opt-in via allow_grow. With it set, a
+// partition created as a single 64 KB track must extend rather than fail when
+// more than a track of data is written - and stay structurally sound.
+// test_dnp_does_not_grow_by_default covers the other half: that the default is
+// still fixed-size CMD behaviour.
 void test_dnp_grows_beyond_its_initial_track(void)
 {
     const FormatFixture* dnp = nullptr;
@@ -1171,7 +1175,7 @@ void test_dnp_grows_beyond_its_initial_track(void)
         snprintf(name, sizeof(name), "grow%d", i);
         char msg[128];
         snprintf(msg, sizeof(msg), "dnp: save %d failed - partition did not grow", i);
-        if (!open_and_save(*dnp, path, name, chunk))
+        if (!open_and_save(*dnp, path, name, chunk, /*allow_grow=*/true))
         {
             remove(path);
             TEST_FAIL_MESSAGE(msg);
@@ -1196,6 +1200,62 @@ void test_dnp_grows_beyond_its_initial_track(void)
     if (grown % 65536 != 0) { remove(path); TEST_FAIL_MESSAGE(msg); }
 
     assert_image_sound(*dnp, path, "after growing");
+    remove(path);
+}
+
+// The default must remain fixed-size, matching real CMD behaviour. This also
+// guards the case that actually matters for corruption: a DNP embedded in a DHD
+// occupies a fixed window, and a partition that grew there would write straight
+// over its neighbour.
+void test_dnp_does_not_grow_by_default(void)
+{
+    const FormatFixture* dnp = nullptr;
+    for (const auto& f : all_formats())
+        if (std::string(f.name) == "dnp") { dnp = &f; break; }
+    TEST_ASSERT_NOT_NULL_MESSAGE(dnp, "dnp fixture missing from all_formats()");
+
+    const char* path = "build_dnp_nogrow.dnp";
+    remove(path);
+    {
+        auto src = std::make_shared<FileContainerStream>(path, dnp->size);
+        auto image = dnp->make(src);
+        TEST_ASSERT_TRUE_MESSAGE(image->formatImage("nogrow", "01"), "dnp: formatImage failed");
+    }
+
+    // A single track holds 221 free blocks after the system area. Writing well
+    // past that must fail rather than extend the container.
+    std::vector<uint8_t> chunk(254 * 100, 0x5A);
+    uint8_t status = 0;
+    int saved = 0;
+    for (; saved < 5; saved++)
+    {
+        auto src = std::make_shared<FileContainerStream>(path);
+        auto image = dnp->make(src);          // allow_grow stays false
+        status = save_file_status(*image, "f" + std::to_string(saved), chunk);
+        if (status != 0) break;
+    }
+
+    char msg[192];
+    snprintf(msg, sizeof(msg),
+             "dnp: wrote %d x 100 blocks into a 1-track partition without failing - it grew", saved);
+    if (status == 0) { remove(path); TEST_FAIL_MESSAGE(msg); }
+
+    snprintf(msg, sizeof(msg), "dnp: expected DISK FULL (%u), got %u",
+             (unsigned)CBM_ERR_DISK_FULL, (unsigned)status);
+    if (status != CBM_ERR_DISK_FULL) { remove(path); TEST_FAIL_MESSAGE(msg); }
+
+    // The container must be exactly the size it was created with.
+    FILE* fp = fopen(path, "rb");
+    TEST_ASSERT_NOT_NULL(fp);
+    fseek(fp, 0, SEEK_END);
+    long size_now = ftell(fp);
+    fclose(fp);
+
+    snprintf(msg, sizeof(msg), "dnp: container grew from %u to %ld bytes with allow_grow off",
+             (unsigned)dnp->size, size_now);
+    if (size_now != (long)dnp->size) { remove(path); TEST_FAIL_MESSAGE(msg); }
+
+    assert_image_sound(*dnp, path, "after filling without growth");
     remove(path);
 }
 
@@ -1224,6 +1284,7 @@ void process()
     RUN_TEST(test_invariants_pass_on_clean_c1541_image_with_two_files);
     RUN_TEST(test_invariants_pass_on_blank_image);
     RUN_TEST(test_dnp_grows_beyond_its_initial_track);
+    RUN_TEST(test_dnp_does_not_grow_by_default);
     // Once per format, so no format can be hidden behind another's failure.
     for (g_format_index = 0; g_format_index < all_formats().size(); g_format_index++)
     {
