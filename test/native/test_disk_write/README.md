@@ -10,7 +10,7 @@ running here buys a sub-second edit-test cycle and a real debugger.
 From the repo root:
 
 ```bash
-pio test -e native -f native/test_disk_write     # this suite, ~8s
+pio test -e native -f native/test_disk_write     # this suite, ~50s
 pio run -e lolin-d32-pro                         # firmware, to confirm nothing broke on-device
 ```
 
@@ -33,7 +33,12 @@ repository, broken long before this suite and unrelated to it.
 
 There is no per-test filter. The file uses a hand-written `process()` that calls `RUN_TEST` for
 each case, so `-f` selects the *folder* only. To run a single test, comment out the other
-`RUN_TEST` lines in `test_disk_write.cpp`.
+`RUN_TEST` lines in `test_disk_write.cpp`. To run the tier tests against one format only, narrow
+the loop bounds on `g_format_index` in `process()`.
+
+If a run fails with `program.exe: Access is denied` at the build step, a previous test binary is
+still running and holding the file — `Get-Process program | Stop-Process -Force` clears it. This is
+easy to misread as the suite hanging.
 
 ## Requirements
 
@@ -52,8 +57,20 @@ to copy it from `platformio.ini.sample`, which carries the block.
 
 ## Reading the output
 
-A healthy run is `21 test cases: 21 succeeded`, taking roughly 60 seconds — most of that is Tier 3
-and the disk-filling scenarios in Tier 2, which reopen the image once per save.
+A healthy run is `72 test cases: 5 skipped, 67 succeeded`, taking roughly 50 seconds — most of that
+is Tier 3 and the disk-filling scenarios in Tier 2, which reopen the image once per save.
+
+**72 comes from 12 format-independent tests plus 10 tier tests run once per format across six
+formats.** Each tier test takes a single format via `g_format_index`; `process()` drives the loop.
+The obvious alternative — looping over `all_formats()` *inside* each test — silently hides formats,
+because Unity's assert macros longjmp out of the whole test function, so the first format to fail
+stops the rest from ever running. A regression in D82 would sit behind a D64 failure and look as
+though it had been covered.
+
+**The 5 skips are deliberate scenario exclusions, not blocked findings** — three for
+`test_tier2_bam_record_boundary` (D64, D81 and DNP each have a single BAM record, so there is no
+boundary to cross) and two for DNP, explained below. Skips that name a *finding* are the other
+thing entirely; see below.
 
 `SKIPPED` is the mechanism for tracking known-broken behavior: the message names the finding that
 blocks the test, and the test body is left intact. **Lift the `TEST_IGNORE_MESSAGE` and re-run to
@@ -135,7 +152,7 @@ Each tier builds on the one below it, so a failure low down explains failures ab
   directory extension past the first sector, save-over-an-existing-name, a full directory reporting
   CBM error 72 with blocks still free (proving directory-full rather than disk-full), and allocation
   across BAM record boundaries (D71's bitmap-only side-2 record, D80/D82's multiple counted records).
-- **Tier 3 — seeded randomized stress.** 375 operations (5 formats × 3 seeds × 25 ops) over a small
+- **Tier 3 — seeded randomized stress.** 450 operations (6 formats × 3 seeds × 25 ops) over a small
   reused name pool, with the invariant checker run after *every* operation so a failure names the
   exact op rather than an end state to bisect. Seeds are fixed; one that finds a bug should stay in
   the list as a permanent regression case.
@@ -161,7 +178,56 @@ creates a second file called `@:doc`. That mistake looked exactly like a leaked 
 validators passed on the result, because two complete files genuinely existed. Only the block
 accounting was surprising.
 
+## DNP — the one that is not a floppy
+
+DNP is a CMD **native partition**, and it differs from the five floppy formats in ways that shape
+the tests. Worth reading before touching either the DNP code or its fixture.
+
+| | Floppy formats | DNP |
+|---|---|---|
+| Size | fixed per format | derived from the container, and **grows on demand** |
+| Directory location | compile-time constant | read from the image at `1/1` |
+| Directory track | dedicated; data never goes there | shared — the directory is a plain chain |
+| BAM | counted and/or bitmap records | one bitmap-only record, 32 bytes per track |
+| c1541 oracle | yes | **none** |
+
+**No oracle.** VICE cannot attach a CMD native partition, so DNP is verified by our seven
+invariants alone. `FormatFixture::has_c1541_oracle` is false for it and gates every c1541 call, so
+the gap is visible at each call site rather than c1541 quietly failing on an image it cannot read.
+This is measurably weaker: finding #7 was a case where D71, D80 and D81 satisfied every invariant
+while c1541 still rejected them.
+
+**It grows.** A native partition is created at one track (64 KB) and extends a track at a time as
+files are written. `D64MStream::growImage()` is a virtual that refuses by default;
+`getNextFreeBlock()` calls it once when it can find no free block, then retries the search, so all
+three callers (first block, next block, directory extension) get the behavior uniformly.
+`test_dnp_grows_beyond_its_initial_track` covers it directly — format one track, write more than a
+track of data, assert the container grew by a whole number of 64 KB tracks and is still sound.
+
+**Its system area is the first 34 sectors of track 1:** `1/0` autoboot, `1/1` partition info,
+`1/2`–`1/33` BAM (255 tracks × 32 bytes from `1/2` offset `0x20` is 8160 bytes, ending exactly at
+the start of sector 34), with `1/34` the first directory block. Those are reserved whatever the
+partition's size, because the BAM is laid out for the maximum 255 tracks up front. They are
+allocated but belong to no chain, so `D64MStream::isReservedBlock()` lets the format declare them
+and the invariant checker's orphan sweep skips them.
+
+**`dedicated_directory_track`** (true for the floppies, false for DNP) governs two things that turn
+out to be one question: whether directory blocks are confined to a single track, and whether file
+data is kept off it. On a 1-track DNP that is not academic — reserving track 1 would leave nowhere
+at all to put data.
+
+**Two Tier 2 scenarios skip DNP** because they cannot exist there:
+
+- *Disk full* — a native partition grows instead of filling. Its real ceiling is 255 tracks
+  (~65280 blocks), far too many to fill in a test. Growth is covered by its own test instead.
+- *Directory full* — DNP's directory can extend across ~220 sectors (~1760 entries), but every
+  entry also consumes a data block, so the disk fills first at any size that keeps the exhaustive
+  per-operation checks affordable.
+
+DNP also has no canonical size, so `defaultImageSize()` returning 64 KB is a *creation* size, not a
+property of the format. Sizing it up costs 256 block reads per extra track in every exhaustive scan.
+
 ## Not covered
 
 Writes into 1581 `CBM` sub-partitions — needs a committed binary fixture, since neither the write
-path nor `c1541` can create one. The D40, D90, DNP and DHD formats are out of scope for this suite.
+path nor `c1541` can create one. The D40, D90 and DHD formats remain out of scope for this suite.
