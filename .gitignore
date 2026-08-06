@@ -8,9 +8,15 @@
 .github
 
 # LLM assistant files
-.claude
 **/CLAUDE.md
+**/AGENTS.md
+!/AGENTS.md
+!/CLAUDE.md
+!/lib/meatloaf/AGENTS.md
+!/lib/meatloaf/CLAUDE.md
+.claude
 .serena
+
 
 # PlatformIO build directory
 **/.pio
