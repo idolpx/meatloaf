@@ -621,17 +621,38 @@ void test_tier0_declared_size_matches_geometry(void)
 // getSourceStream() sets `mode` to out, seekPath() creates the entry and claims
 // the first block, write() streams the data, and close() commits the directory
 // entry via finalizeFileWrite(). Returns false if any step fails.
+// CBM DOS status codes, from include/cbm_defines.h. Declared locally so this
+// file does not have to pull in that header (it defines an ERROR macro that
+// collides with <windows.h> on this host).
+static const uint8_t CBM_ERR_WRITE_VERIFY = 25;  // ST_WRITE_VERIFY
+static const uint8_t CBM_ERR_DIR_ERROR    = 71;  // ST_DIR_ERROR
+static const uint8_t CBM_ERR_DISK_FULL    = 72;  // ST_DISK_FULL
+
+// Returns 0 on success, otherwise the CBM error code the write failed with.
+//
+// Note where failures surface: close() runs finalizeFileWrite(), which is what
+// commits the directory entry, so "no room left in the directory" is only
+// discovered THERE - not at seekPath() or write(). This mirrors the drive,
+// where iecChannelHandlerFile's destructor maps m_stream->error() to the drive
+// status after the channel closes.
+static uint8_t save_file_status(D64MStream& image,
+                                const std::string& cbm_name,
+                                const std::vector<uint8_t>& data)
+{
+    image.mode = std::ios_base::out;
+    if (!image.seekPath(cbm_name))
+        return image.error() ? (uint8_t)image.error() : CBM_ERR_WRITE_VERIFY;
+    if (image.write(data.data(), (uint32_t)data.size()) != (uint32_t)data.size())
+        return image.error() ? (uint8_t)image.error() : CBM_ERR_WRITE_VERIFY;
+    image.close();
+    return (uint8_t)image.error();
+}
+
 static bool save_file(D64MStream& image,
                       const std::string& cbm_name,
                       const std::vector<uint8_t>& data)
 {
-    image.mode = std::ios_base::out;
-    if (!image.seekPath(cbm_name))
-        return false;
-    if (image.write(data.data(), (uint32_t)data.size()) != (uint32_t)data.size())
-        return false;
-    image.close();
-    return true;
+    return save_file_status(image, cbm_name, data) == 0;
 }
 
 void test_tier1_single_file_write(void)
@@ -789,18 +810,36 @@ static bool open_and_save(const FormatFixture& f,
     return save_file(*image, name, data);
 }
 
-// Saves files of a fixed size until one fails, returning how many succeeded.
-static int fill_until_full(D64MStream& image, size_t payload_size, int limit)
+// Saves files of a fixed size until one fails. Returns how many succeeded and,
+// via out_status, the CBM error the failing save reported.
+//
+// Every save gets a FRESH stream, and that is not incidental: after close() the
+// stream's BAM state is gone (blocksFree() reads 0) and the very next write on
+// the same stream fails with DISK FULL. This mirrors the drive, where each SAVE
+// opens its own channel. Looping saves on one stream instead makes every save
+// after the first fail at finalizeFileWrite() - silently, if the caller only
+// looks at a bool that ignores close().
+static int fill_until_full(const FormatFixture& f,
+                           const std::string& path,
+                           size_t payload_size,
+                           int limit,
+                           uint8_t* out_status = nullptr)
 {
     std::vector<uint8_t> payload(payload_size, 0xAA);
     int n = 0;
+    uint8_t st = 0;
     while (n < limit)
     {
         char name[24];
         snprintf(name, sizeof(name), "file%d", n);
-        if (!save_file(image, name, payload)) break;
+
+        auto src = std::make_shared<FileContainerStream>(path);
+        auto image = f.make(src);
+        st = save_file_status(*image, name, payload);
+        if (st != 0) break;
         n++;
     }
+    if (out_status) *out_status = st;
     return n;
 }
 
@@ -837,12 +876,16 @@ void test_tier2_disk_full_rolls_back(void)
             auto src = std::make_shared<FileContainerStream>(path, f.size);
             auto image = f.make(src);
             TEST_ASSERT_TRUE(image->formatImage("testdisk", "01"));
-
-            int saved = fill_until_full(*image, 254 * 10, 5000);
-            char msg[128];
-            snprintf(msg, sizeof(msg), "%s: nothing saved before the disk filled", f.name);
-            TEST_ASSERT_GREATER_THAN_INT_MESSAGE(0, saved, msg);
         }
+
+        uint8_t status = 0;
+        int saved = fill_until_full(f, path, 254 * 10, 5000, &status);
+        char msg[160];
+        snprintf(msg, sizeof(msg), "%s: nothing saved before the disk filled", f.name);
+        TEST_ASSERT_GREATER_THAN_INT_MESSAGE(0, saved, msg);
+        snprintf(msg, sizeof(msg), "%s: expected DISK FULL (%u) after %d files, got %u",
+                 f.name, (unsigned)CBM_ERR_DISK_FULL, saved, (unsigned)status);
+        if (status != CBM_ERR_DISK_FULL) { remove(path.c_str()); TEST_FAIL_MESSAGE(msg); }
         // The save that failed must leave NO half-allocated blocks behind.
         // Invariant 2 (allocated but unreachable) is what catches a broken
         // rollback, which is why this stage runs the full checker.
@@ -861,14 +904,15 @@ void test_tier2_directory_extension(void)
             auto src = std::make_shared<FileContainerStream>(path, f.size);
             auto image = f.make(src);
             TEST_ASSERT_TRUE(image->formatImage("testdisk", "01"));
-            // 8 entries fit per directory sector, so 40 tiny files force the
-            // directory to extend onto several sectors.
-            int saved = fill_until_full(*image, 16, 40);
-            char msg[128];
-            snprintf(msg, sizeof(msg), "%s: only %d files saved, directory never extended",
-                     f.name, saved);
-            TEST_ASSERT_GREATER_THAN_INT_MESSAGE(8, saved, msg);
         }
+
+        // 8 entries fit per directory sector, so 40 tiny files force the
+        // directory to extend onto several sectors.
+        int saved = fill_until_full(f, path, 16, 40);
+        char msg[128];
+        snprintf(msg, sizeof(msg), "%s: only %d files saved, directory never extended",
+                 f.name, saved);
+        TEST_ASSERT_GREATER_THAN_INT_MESSAGE(8, saved, msg);
         assert_image_sound(f, path, "after directory extension");
         remove(path.c_str());
     }
@@ -923,6 +967,61 @@ void test_tier2_overwrite_reuses_slot(void)
     }
 }
 
+void test_tier2_directory_full_reports_disk_full(void)
+{
+    // One block per file, so the DIRECTORY runs out long before the disk does.
+    // A D64's directory track holds 18 sectors x 8 entries = 144 files against
+    // 664 free blocks; every other format has a similar margin. That isolates
+    // "directory full" from "disk full" - CBM DOS reports both as 72, so the
+    // free-block assertion below is what proves which one we actually hit.
+    for (const auto& f : all_formats())
+    {
+        std::string path = std::string("build_t2f_") + f.name + "." + f.ext;
+        remove(path.c_str());
+        {
+            auto src = std::make_shared<FileContainerStream>(path, f.size);
+            auto image = f.make(src);
+            TEST_ASSERT_TRUE(image->formatImage("testdisk", "01"));
+        }
+
+        uint8_t status = 0;
+        int saved = fill_until_full(f, path, 16, 4000, &status);
+        uint16_t free_at_failure = blocks_free_of(f, path);
+
+        char msg[224];
+
+        // It has to actually run out, not just stop early.
+        snprintf(msg, sizeof(msg),
+                 "%s: saved %d files without ever failing - directory never filled",
+                 f.name, saved);
+        if (status == 0) { remove(path.c_str()); TEST_FAIL_MESSAGE(msg); }
+
+        // More than one directory sector's worth, so the directory genuinely
+        // extended before it ran out.
+        snprintf(msg, sizeof(msg),
+                 "%s: only %d files fit, directory never extended past its first sector",
+                 f.name, saved);
+        if (saved <= 8) { remove(path.c_str()); TEST_FAIL_MESSAGE(msg); }
+
+        snprintf(msg, sizeof(msg),
+                 "%s: expected error %u (DISK FULL) after %d files, got %u",
+                 f.name, (unsigned)CBM_ERR_DISK_FULL, saved, (unsigned)status);
+        if (status != CBM_ERR_DISK_FULL) { remove(path.c_str()); TEST_FAIL_MESSAGE(msg); }
+
+        // Blocks still free => the directory ran out, not the disk. Without
+        // this the test would pass just as happily on a genuinely full disk.
+        snprintf(msg, sizeof(msg),
+                 "%s: no blocks left at failure (%u), so this was disk-full not directory-full",
+                 f.name, (unsigned)free_at_failure);
+        if (free_at_failure == 0) { remove(path.c_str()); TEST_FAIL_MESSAGE(msg); }
+
+        // The rejected save must have rolled back cleanly - no half-written
+        // entry, no blocks allocated to a file that does not exist.
+        assert_image_sound(f, path, "after directory full");
+        remove(path.c_str());
+    }
+}
+
 void test_tier2_bam_record_boundary(void)
 {
     // d64 and d81 have a single BAM record; the others span more than one and
@@ -940,8 +1039,8 @@ void test_tier2_bam_record_boundary(void)
             auto src = std::make_shared<FileContainerStream>(path, f.size);
             auto image = f.make(src);
             TEST_ASSERT_TRUE(image->formatImage("testdisk", "01"));
-            fill_until_full(*image, 254 * 20, 5000);
         }
+        fill_until_full(f, path, 254 * 20, 5000);
         assert_image_sound(f, path, "after crossing BAM records");
         remove(path.c_str());
     }
@@ -1042,6 +1141,7 @@ void process()
     RUN_TEST(test_tier2_disk_full_rolls_back);
     RUN_TEST(test_tier2_directory_extension);
     RUN_TEST(test_tier2_overwrite_reuses_slot);
+    RUN_TEST(test_tier2_directory_full_reports_disk_full);
     RUN_TEST(test_tier2_bam_record_boundary);
     RUN_TEST(test_tier3_randomized_stress);
     UNITY_END();
