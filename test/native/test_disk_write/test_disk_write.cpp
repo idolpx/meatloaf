@@ -612,6 +612,131 @@ void test_tier0_declared_size_matches_geometry(void)
     }
 }
 
+// ---------------------------------------------------------------------------
+// Tier 1 - single-file write
+// ---------------------------------------------------------------------------
+
+// Drives the real SAVE path rather than the protected write primitives:
+// getSourceStream() sets `mode` to out, seekPath() creates the entry and claims
+// the first block, write() streams the data, and close() commits the directory
+// entry via finalizeFileWrite(). Returns false if any step fails.
+static bool save_file(D64MStream& image,
+                      const std::string& cbm_name,
+                      const std::vector<uint8_t>& data)
+{
+    image.mode = std::ios_base::out;
+    if (!image.seekPath(cbm_name))
+        return false;
+    if (image.write(data.data(), (uint32_t)data.size()) != (uint32_t)data.size())
+        return false;
+    image.close();
+    return true;
+}
+
+void test_tier1_single_file_write(void)
+{
+    // A payload that spans more than one block (254 usable bytes each), so the
+    // T/S chain is actually exercised rather than a single-block special case.
+    std::vector<uint8_t> payload;
+    for (int i = 0; i < 500; i++)
+        payload.push_back((uint8_t)(i & 0xFF));
+
+    for (const auto& f : all_formats())
+    {
+        std::string path = std::string("build_t1_") + f.name + "." + f.ext;
+        remove(path.c_str());
+
+        uint16_t free_before = 0, free_after = 0;
+        {
+            auto src = std::make_shared<FileContainerStream>(path, f.size);
+            auto image = f.make(src);
+            char msg[128];
+            snprintf(msg, sizeof(msg), "%s: formatImage failed", f.name);
+            TEST_ASSERT_TRUE_MESSAGE(image->formatImage("testdisk", "01"), msg);
+            free_before = image->blocksFree();
+
+            snprintf(msg, sizeof(msg), "%s: save_file failed", f.name);
+            TEST_ASSERT_TRUE_MESSAGE(save_file(*image, "hello", payload), msg);
+        }
+
+        // Reopen so the checks run against what actually landed on disk, not
+        // against in-memory state left over from the write.
+        {
+            auto src = std::make_shared<FileContainerStream>(path);
+            auto image = f.make(src);
+            free_after = image->blocksFree();
+
+            InvariantResult r = check_invariants(*image);
+            if (!r.ok)
+            {
+                std::string m = std::string(f.name) + " after write: " + r.message;
+                remove(path.c_str());
+                TEST_FAIL_MESSAGE(m.c_str());
+            }
+
+            // 500 bytes needs 2 blocks (254 + 246).
+            char msg[160];
+            snprintf(msg, sizeof(msg), "%s: expected 2 blocks consumed, got %d",
+                     f.name, (int)(free_before - free_after));
+            if (free_before - free_after != 2)
+            {
+                remove(path.c_str());
+                TEST_FAIL_MESSAGE(msg);
+            }
+        }
+
+        if (c1541_available())
+        {
+            char msg[160];
+            snprintf(msg, sizeof(msg), "%s: c1541 validate rejected the image after write", f.name);
+            bool ok = c1541_validate(path);
+            if (!ok) { remove(path.c_str()); TEST_FAIL_MESSAGE(msg); }
+
+            // c1541 renders CBM (PETSCII) filenames in lower case, so compare
+            // case-insensitively rather than assuming the shifted form.
+            std::string listing = c1541_dir(path);
+            std::string lower;
+            for (char c : listing) lower += (char)tolower((unsigned char)c);
+            if (lower.find("\"hello\"") == std::string::npos)
+            {
+                std::string tail = listing.size() > 120
+                                 ? listing.substr(listing.size() - 120) : listing;
+                snprintf(msg, sizeof(msg), "%s: hello missing; listing tail >>>%s<<<",
+                         f.name, tail.c_str());
+                remove(path.c_str());
+                TEST_FAIL_MESSAGE(msg);
+            }
+
+            std::string out = path + ".out";
+            size_t got_bytes = 0;
+            bool read_ok = c1541_read(path, "hello", out, &got_bytes);
+            if (!read_ok)
+            {
+                snprintf(msg, sizeof(msg), "%s: c1541 could not read HELLO back", f.name);
+                remove(path.c_str()); remove(out.c_str());
+                TEST_FAIL_MESSAGE(msg);
+            }
+
+            std::vector<uint8_t> got(payload.size(), 0);
+            FILE* fp = fopen(out.c_str(), "rb");
+            size_t n = fp ? fread(got.data(), 1, got.size(), fp) : 0;
+            if (fp) fclose(fp);
+            remove(out.c_str());
+
+            if (n != payload.size() || got != payload)
+            {
+                snprintf(msg, sizeof(msg),
+                         "%s: read-back mismatch (%u of %u bytes matched size)",
+                         f.name, (unsigned)n, (unsigned)payload.size());
+                remove(path.c_str());
+                TEST_FAIL_MESSAGE(msg);
+            }
+        }
+
+        remove(path.c_str());
+    }
+}
+
 void process()
 {
     UNITY_BEGIN();
@@ -628,6 +753,7 @@ void process()
     RUN_TEST(test_invariants_pass_on_blank_image);
     RUN_TEST(test_tier0_format_all_media);
     RUN_TEST(test_tier0_declared_size_matches_geometry);
+    RUN_TEST(test_tier1_single_file_write);
     UNITY_END();
 }
 
