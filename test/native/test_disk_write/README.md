@@ -175,6 +175,25 @@ Each tier builds on the one below it, so a failure low down explains failures ab
 `test_format_honours_track_count_and_error_info` checks all of it against the actual file size on
 disk — 13 cases spanning defaults, explicit track counts, and error-info variants.
 
+**From the C64 this is reachable through `N0:`.** `D64MFile::format()` parses the extended form
+`name,id[,track_count[,error_info]]`, so:
+
+```
+N0:disk,01            media default geometry
+N0:disk,01,40         40-track D64
+N0:disk,01,40,1       40 tracks with an error-info area
+N0:disk,01,,1         default geometry with an error-info area
+```
+
+The two trailing fields are a Meatloaf extension to the CBM syntax; a plain `name,id` behaves
+exactly as it always did. Parsing lives in `parseD64FormatSpec()` rather than inside `format()`
+specifically so it can be tested: `format()` calls `MFSOwner::File()`, which is an abort-stub in
+the native build, so anything inside it is unreachable from here. `test_parse_format_spec` covers
+14 cases including the malformed input a C64 can actually send — out-of-range counts, negatives,
+`40x`, `abc`, extra fields — all of which fall back to defaults rather than producing a nonsense
+image. It uses `strtol`, **not `std::stoi`**: ESP-IDF builds with `-fno-exceptions`, so a `stoi` on
+garbage would call `std::terminate` rather than throw something catchable.
+
 One wrinkle worth knowing: `FileContainerStream(path, 0)` opens an **existing** file, so a test
 that wants formatImage to size an empty container has to create the file first. And a DNP whose
 container is empty divides to *zero* tracks, which cannot be formatted — the constructor floors it

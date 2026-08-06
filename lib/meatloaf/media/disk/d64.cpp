@@ -1312,6 +1312,51 @@ bool D64MStream::formatImage(std::string name, std::string id, size_t track_coun
     return write(&pad, 1) == 1;
 }
 
+D64FormatSpec parseD64FormatSpec(const std::string& header_info)
+{
+    D64FormatSpec spec;
+
+    // Split into at most four fields; everything after the fourth comma is
+    // ignored rather than treated as an error.
+    std::string field[4];
+    size_t n = 0, start = 0;
+    while (n < 4)
+    {
+        size_t comma = header_info.find(',', start);
+        field[n++] = (comma == std::string::npos)
+                   ? header_info.substr(start)
+                   : header_info.substr(start, comma - start);
+        if (comma == std::string::npos)
+            break;
+        start = comma + 1;
+    }
+
+    spec.name = field[0];
+    spec.id   = field[1];
+
+    // strtol, NOT std::stoi: this string arrives from the C64 and can be
+    // anything, and ESP-IDF builds with -fno-exceptions - a stoi on garbage
+    // would call std::terminate rather than throw something catchable.
+    if (!field[2].empty())
+    {
+        char* end = nullptr;
+        long v = strtol(field[2].c_str(), &end, 10);
+        // Only a whole, in-range track count counts; anything else leaves the
+        // default in place rather than creating a nonsense image.
+        if (end != field[2].c_str() && *end == '\0' && v > 0 && v <= 255)
+            spec.track_count = (size_t)v;
+    }
+
+    if (!field[3].empty())
+    {
+        char* end = nullptr;
+        long v = strtol(field[3].c_str(), &end, 10);
+        spec.error_info = (end != field[3].c_str() && *end == '\0' && v != 0);
+    }
+
+    return spec;
+}
+
 bool D64MFile::format(std::string header_info)
 {
     Debug_printv("header_info[%s] url[%s]", header_info.c_str(), url.c_str());
@@ -1328,12 +1373,12 @@ bool D64MFile::format(std::string header_info)
         return false;
     }
 
-    size_t comma = header_info.find(',');
-    std::string diskname = header_info.substr(0, comma);
-    std::string id = (comma == std::string::npos) ? "" : header_info.substr(comma + 1);
-    Debug_printv("name[%s] id[%s]", diskname.c_str(), id.c_str());
+    D64FormatSpec spec = parseD64FormatSpec(header_info);
+    Debug_printv("name[%s] id[%s] tracks[%d] error_info[%d]",
+                 spec.name.c_str(), spec.id.c_str(),
+                 (int)spec.track_count, (int)spec.error_info);
 
-    bool ok = image->formatImage(diskname, id);
+    bool ok = image->formatImage(spec.name, spec.id, spec.track_count, spec.error_info);
 
     delete newFile;
     return ok;

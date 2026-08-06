@@ -49,6 +49,28 @@
  * Streams
  ********************************************************/
 
+// The string a CBM NEW (N0:) hands to format(), parsed.
+//
+// CBM syntax is "name,id". Meatloaf extends it with two optional trailing
+// fields, so a 40-track D64 or a multi-track DNP can be created from BASIC:
+//
+//     N0:name,id                 media default geometry, no error info
+//     N0:name,id,40              40 tracks
+//     N0:name,id,40,1            40 tracks with an error-info area
+//     N0:name,id,,1              default geometry with an error-info area
+//
+// Missing or unparseable trailing fields fall back to the defaults, so a plain
+// "name,id" behaves exactly as it always did.
+struct D64FormatSpec
+{
+    std::string name;
+    std::string id;
+    size_t      track_count = 0;      // 0 = whatever the media's default is
+    bool        error_info  = false;
+};
+
+D64FormatSpec parseD64FormatSpec(const std::string& header_info);
+
 class D64MStream : public MMediaStream {
 
 protected:

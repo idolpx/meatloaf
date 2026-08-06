@@ -1323,6 +1323,61 @@ void test_format_honours_track_count_and_error_info(void)
     }
 }
 
+// The N0: argument is parsed from a string the C64 sends, so it has to cope
+// with anything. Bad trailing fields must fall back to the defaults rather
+// than produce a nonsense image - and must not throw, since ESP-IDF builds
+// with -fno-exceptions.
+void test_parse_format_spec(void)
+{
+    struct Case {
+        const char* in;
+        const char* name;
+        const char* id;
+        size_t      tracks;
+        bool        err;
+        const char* why;
+    };
+
+    const Case cases[] = {
+        { "disk,01",        "disk", "01",  0, false, "plain CBM name,id" },
+        { "disk",           "disk", "",    0, false, "no id at all" },
+        { "",               "",     "",    0, false, "empty string" },
+        { "disk,01,40",     "disk", "01", 40, false, "explicit track count" },
+        { "disk,01,40,1",   "disk", "01", 40, true,  "track count + error info" },
+        { "disk,01,,1",     "disk", "01",  0, true,  "default geometry + error info" },
+        { "disk,01,0",      "disk", "01",  0, false, "zero tracks means default" },
+        { "disk,01,256",    "disk", "01",  0, false, "out of range - falls back" },
+        { "disk,01,-5",     "disk", "01",  0, false, "negative - falls back" },
+        { "disk,01,abc",    "disk", "01",  0, false, "not a number - falls back" },
+        { "disk,01,40x",    "disk", "01",  0, false, "trailing junk - falls back" },
+        { "disk,01,40,0",   "disk", "01", 40, false, "explicit error_info off" },
+        { "disk,01,40,yes", "disk", "01", 40, false, "non-numeric flag - falls back" },
+        { "disk,01,40,1,9", "disk", "01", 40, true,  "extra field ignored" },
+    };
+
+    for (const auto& c : cases)
+    {
+        D64FormatSpec got = parseD64FormatSpec(c.in);
+        char msg[192];
+
+        snprintf(msg, sizeof(msg), "\"%s\" (%s): name expected \"%s\", got \"%s\"",
+                 c.in, c.why, c.name, got.name.c_str());
+        TEST_ASSERT_EQUAL_STRING_MESSAGE(c.name, got.name.c_str(), msg);
+
+        snprintf(msg, sizeof(msg), "\"%s\" (%s): id expected \"%s\", got \"%s\"",
+                 c.in, c.why, c.id, got.id.c_str());
+        TEST_ASSERT_EQUAL_STRING_MESSAGE(c.id, got.id.c_str(), msg);
+
+        snprintf(msg, sizeof(msg), "\"%s\" (%s): tracks expected %u, got %u",
+                 c.in, c.why, (unsigned)c.tracks, (unsigned)got.track_count);
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE((uint32_t)c.tracks, (uint32_t)got.track_count, msg);
+
+        snprintf(msg, sizeof(msg), "\"%s\" (%s): error_info expected %d, got %d",
+                 c.in, c.why, (int)c.err, (int)got.error_info);
+        TEST_ASSERT_EQUAL_INT_MESSAGE((int)c.err, (int)got.error_info, msg);
+    }
+}
+
 void test_tier3_randomized_stress(void)
 {
     // Fixed seeds keep failures reproducible. When a seed finds a bug, keep it
@@ -1350,6 +1405,7 @@ void process()
     RUN_TEST(test_dnp_grows_beyond_its_initial_track);
     RUN_TEST(test_dnp_does_not_grow_by_default);
     RUN_TEST(test_format_honours_track_count_and_error_info);
+    RUN_TEST(test_parse_format_spec);
     // Once per format, so no format can be hidden behind another's failure.
     for (g_format_index = 0; g_format_index < all_formats().size(); g_format_index++)
     {
