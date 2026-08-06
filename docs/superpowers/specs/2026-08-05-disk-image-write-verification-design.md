@@ -1,7 +1,23 @@
 # Disk Image Write Verification Harness
 
 **Date:** 2026-08-05
-**Status:** Design approved, ready for implementation planning
+**Status:** DELIVERED — all four tiers built, 21/21 passing on D64/D71/D80/D81/D82.
+
+> This document is the original design, kept as the record of what was intended and why. Two things
+> changed in execution and are worth knowing before reading it as current fact:
+>
+> - **The "do not fix engine bugs" non-goal was overridden** partway through, on the user's call, once
+>   Tier 0 established that `format()` produced structurally invalid images on *all five* formats.
+>   Writing into an invalid image tests nothing, so the engine was fixed first and the write tiers
+>   were built afterwards. Eight findings were found and fixed; see
+>   `docs/superpowers/findings/2026-08-05-disk-write-findings.md`.
+> - **Tiers 1-3 were built against our own `formatImage()` output**, not the `c1541 -format`
+>   baseline this document recommends. That recommendation existed to stop a format bug masquerading
+>   as a write bug — which Tier 0 now rules out directly, since it proves the blank is valid before
+>   any write tier runs.
+>
+> For how to run and extend the suite, read `test/native/test_disk_write/README.md` instead; it is
+> maintained, this is not.
 
 ## Problem
 
@@ -232,10 +248,11 @@ suite makes no claim about it.
 - **Two parallel image-creation paths.** `VDrive::createDiskImage()` at `drive.cpp:1582` and
   `MFile::format()` at `drive.cpp:1595`. The suite tests `format()`. Whether these should converge
   is a separate question.
-- **`getTrackCount()` is wrong for multi-BAM-record formats.** It returns
-  `block_allocation_map[0].end_track` (`d64.h:270`), which is 50 for D80 rather than 77, and
-  similarly short for D82. `getNextFreeBlock()` correctly uses `.back().end_track`. The Tier 0 size
-  cross-check will surface this; the fix belongs to the follow-up spec.
+- ~~**`getTrackCount()` is wrong for multi-BAM-record formats.**~~ **FIXED.** It returned
+  `block_allocation_map[0].end_track`, which was 50 for D80 rather than 77 and similarly short for
+  D82, while `getNextFreeBlock()` already used `.back().end_track`. It now returns the last
+  record's `end_track`, so writer and readers agree. The Tier 0 size cross-check passes on all five
+  formats.
 
 ## Risks
 
