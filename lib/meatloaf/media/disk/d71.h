@@ -93,7 +93,10 @@ public:
 
     virtual uint8_t speedZone( uint8_t track) override
     {
-        if ( track < 35 )
+        // Track 35 is the LAST track of side 1 (17 sectors). `track < 35` sent
+        // it into the side-2 branch below, which resolved to 21 sectors and
+        // inflated the computed image size by 4 blocks.
+        if ( track <= 35 )
 		    return (track < 18) + (track < 25) + (track < 31);
         else
             return (track < 53) + (track < 60) + (track < 66);

@@ -469,20 +469,25 @@ protected:
         memcpy(header.name, name.c_str(), name.size());
         memcpy(header.id_dos, id.c_str(), id.size());
         Debug_printv("name[%16s] id_dos[%5s]", header.name, header.id_dos);
-        if (writeContainer((uint8_t*)&header, sizeof(header)))
-            return true;
-
-        std::string bam_message = "meatloaf!!! https://meatloaf.cc";
-        if (writeContainer((uint8_t*)bam_message.c_str(), sizeof(bam_message)))
-            return true;
-
-        // Allocate the BAM sector
-        if (!setBlockAllocation( partitions[partition].header_track, 
-                                 partitions[partition].header_sector, 
-                                 true ))
+        // NOTE: writeContainer() returns a BYTE COUNT, so `if (writeContainer(...))
+        // return true;` used to exit here on SUCCESS - making everything below
+        // unreachable, and inverting the return value on the failure path.
+        if (writeContainer((uint8_t*)&header, sizeof(header)) != sizeof(header))
             return false;
 
-        return false;
+        // NOTE: a "meatloaf!!! https://meatloaf.cc" bam_message write used to sit
+        // here, but it was unreachable behind the early return above and used
+        // sizeof() on a std::string (the OBJECT size, not the text length).
+        // Left out deliberately: enabling it writes bytes into the header sector
+        // that were never written before, which is a behavior change this fix
+        // should not smuggle in.
+
+        // The BAM/header sector and the first directory sector are allocated by
+        // initializeDirectory(), which runs before this. Allocating them again
+        // here would fail: setBlockAllocation() returns false for a block that
+        // is already allocated.
+
+        return true;
     }
 
     // bool initializeDirectory()
@@ -541,15 +546,26 @@ protected:
         if (!writeContainer(&data, 1)) return false;
         data = 0xFF;
         if (!writeContainer(&data, 1)) return false;
-        // Clear directory entries (e.g., 8 entries per sector)
-        uint8_t emptyEntry[32] = {0}; // 32 bytes per entry
-        for (int i = 0; i < 8; i++) {
-            if (!writeContainer(emptyEntry, 32)) return false;
-        }
+        // Clear the rest of the sector. A directory sector holds 8 x 32-byte
+        // entries = 256 bytes TOTAL, and the 2-byte T/S link written above
+        // occupies the head of the first entry slot - so only 254 bytes may
+        // follow it. Writing a full 8 x 32 here overran the sector by 2 bytes
+        // and clobbered the NEXT sector's T/S link.
+        std::vector<uint8_t> empty(block_size - 2, 0);
+        if (writeContainer(empty.data(), empty.size()) != empty.size()) return false;
 
-        // Allocate the directory sector
+        // Allocate the BAM/header sector, which formatImage() has just written
+        // into. block_allocation_map[0] is that sector (e.g. 18/0 on D64).
         if (!setBlockAllocation( partitions[partition].block_allocation_map[0].track, 
                                  partitions[partition].block_allocation_map[0].sector, 
+                                 true ))
+            return false;
+
+        // ...and the first directory sector (e.g. 18/1 on D64). Without this
+        // the BAM claims a sector the directory chain is actively using, so a
+        // later write can allocate it a second time and corrupt the directory.
+        if (!setBlockAllocation( partitions[partition].directory_track,
+                                 partitions[partition].directory_sector,
                                  true ))
             return false;
 

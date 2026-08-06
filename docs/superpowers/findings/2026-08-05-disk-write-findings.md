@@ -79,6 +79,54 @@ it needs `bam_message.size()` when the control flow is fixed.
 The guards remain in place with this diagnosis in their message. Lift them and re-run to
 verify any future fix — that is what they are for.
 
+## Fix pass — findings #1, #2, #3 addressed; #5 opened
+
+Findings #1, #2 and #3 were fixed and verified with this suite. **D64 now passes both
+validators** (`check_invariants()` and `c1541_validate()`) on a freshly formatted blank.
+
+What changed, all in `lib/meatloaf/media/disk/`:
+
+- **#1** `d64.h` `initializeDirectory()` — the entry-clearing write is now `block_size - 2`
+  bytes instead of `8 × 32`. A directory sector is 8 × 32 = 256 bytes TOTAL and the 2-byte
+  T/S link occupies the head of the first entry slot, so only 254 may follow it.
+- **#2** `d64.h` `initializeDirectory()` now allocates the first **directory** sector
+  (`directory_track`/`directory_sector`) in addition to the BAM/header sector it already
+  reserved. That missing allocation was the whole of finding #2.
+- **#2** `d64.h` `writeHeader()` — the control flow was inverted: `if (writeContainer(...))
+  return true;` returned on SUCCESS because `writeContainer()` yields a byte count, making
+  everything after it dead code (including commit `b9584efc`'s allocation attempt). Now
+  checks against the expected byte count and returns `true` only at the end.
+- **#3** `d71.h` `speedZone()` — `track < 35` → `track <= 35`, so track 35 stays on side 1
+  with 17 sectors.
+
+One deliberate omission: a `bam_message` ("meatloaf!!! https://meatloaf.cc") write sat in the
+dead region of `writeHeader()`, using `sizeof()` on a `std::string` (the OBJECT size, not the
+text length). Fixing the control flow would have made it live for the first time — and testing
+confirmed **c1541 rejects the image when it is enabled**, because it writes into the header
+sector where nothing was written before. It is left out, with a comment explaining why.
+Re-enabling it needs its own decision and verification.
+
+### Finding #5 — D71 `Partition` is misconfigured (NEW, open)
+
+`D71MStream`'s constructor (`lib/meatloaf/media/disk/d71.h`) declares:
+
+```cpp
+1,     // header_track      <- should be 18
+0,     // header_sector
+0x04,  // header_offset     <- should be 0x90
+1,     // directory_track   <- should be 18
+4,     // directory_sector  <- should be 1
+```
+
+A 1571 uses the same layout as a 1541: BAM/header at 18/0, directory starting at 18/1, disk
+name at offset 0x90. The struct also contradicts its own `block_allocation_map[0]`, which
+correctly names track 18. This is why D71's original failure message pointed at `block 1/4` —
+it was walking a "directory chain" that starts in a data block. After the #1/#2/#3 fixes it
+reports `orphan: block 36/1 allocated in BAM but unreachable`.
+
+D80/D81/D82 remain **unverified**: `test_tier0_format_all_media` stops at the first failing
+format, and D71 now fails ahead of them. Fixing #5 will reveal their true state.
+
 ## Coverage gaps
 
 - **1581 `CBM` sub-partition writes (D81)** — not tested. Exercising it needs a D81 that already

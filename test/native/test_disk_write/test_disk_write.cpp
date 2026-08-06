@@ -158,11 +158,6 @@ void test_c1541_validates_our_formatted_image(void)
     bool valid = c1541_validate(path);
     remove(path);
 
-    TEST_IGNORE_MESSAGE("finding #2 (still open): commit b9584efc added a "
-                        "setBlockAllocation() call to writeHeader(), but it is "
-                        "unreachable - the earlier 'if (writeContainer(...)) return true;' "
-                        "returns on success. The directory sector is also never "
-                        "allocated. Re-enable once both are addressed.");
 
     TEST_ASSERT_TRUE_MESSAGE(valid, "c1541 validate rejected our formatted image");
 }
@@ -443,11 +438,6 @@ void test_invariants_pass_on_blank_image(void)
     src->close();
     remove(path);
 
-    TEST_IGNORE_MESSAGE("finding #2 (still open): commit b9584efc added a "
-                        "setBlockAllocation() call to writeHeader(), but it is "
-                        "unreachable - the earlier 'if (writeContainer(...)) return true;' "
-                        "returns on success. The directory sector is also never "
-                        "allocated. Re-enable once both are addressed.");
 
     TEST_ASSERT_TRUE_MESSAGE(r.ok, r.message.c_str());
 }
@@ -523,6 +513,12 @@ void test_invariants_pass_on_clean_c1541_image_with_two_files(void)
 // that finding is fixed.
 void test_tier0_format_all_media(void)
 {
+    // d64 now passes both validators (findings #1 and #2 fixed). d71 still
+    // fails on finding #5 (its Partition names header 1/0 and directory 1/4
+    // instead of 18/0 and 18/1), and d80/d81/d82 are unverified because this
+    // loop stops at the first failing format. Lift this to re-check.
+    TEST_IGNORE_MESSAGE("finding #5: D71MStream's Partition is misconfigured; "
+                        "d64 passes, d80/d81/d82 unverified behind it");
     // finding #2 (shared D64MStream base - see the findings file) makes d64,
     // the first format in the table, fail check_invariants() before this
     // loop ever reaches d71/d80/d81/d82: TEST_FAIL_MESSAGE longjmps out of
@@ -541,11 +537,6 @@ void test_tier0_format_all_media(void)
     // oracle helper, not evidence the d80/d82 images are actually fine.
     // The loop below is left intact, unmodified from the brief, so it goes
     // live the moment finding #2 is fixed.
-    TEST_IGNORE_MESSAGE("finding #2 (still open): commit b9584efc added a "
-                        "setBlockAllocation() call to writeHeader(), but it is "
-                        "unreachable - the earlier 'if (writeContainer(...)) return true;' "
-                        "returns on success. The directory sector is also never "
-                        "allocated. Re-enable once both are addressed.");
 
     for (const auto& f : all_formats())
     {
