@@ -57,10 +57,10 @@
  ********************************************************/
 
 struct DHDPartition {
-    uint8_t number;      // 1-254
+    uint8_t number;      // 0-255
     uint8_t type;        // 1=NAT, 2=1541, 3=1571, 4=1581
     std::string name;    // PETSCII, $A0 padding trimmed
-    uint32_t start;      // byte offset within image
+    uint32_t start;      // byte offset within image - If 0x00 then look for name.dxx file in the same directory as the image
     uint32_t size;       // bytes
 };
 
