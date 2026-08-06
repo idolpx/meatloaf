@@ -526,6 +526,21 @@ void test_invariants_pass_on_clean_c1541_image_with_two_files(void)
 // failing format gets a TEST_IGNORE_MESSAGE naming its finding so the suite
 // stays runnable, with the test body left intact so it goes live the moment
 // that finding is fixed.
+// ---------------------------------------------------------------------------
+// Per-format test driving
+// ---------------------------------------------------------------------------
+//
+// Each tier test runs against ONE format, selected by g_format_index, and
+// process() runs the set once per format. The obvious alternative - looping
+// over all_formats() inside each test - silently hides formats: Unity's assert
+// macros longjmp out of the whole test function, so the first format to fail
+// stops the rest from ever being exercised. A regression in d82 would sit
+// behind a d64 failure and look as though it had been covered. Failure
+// messages all lead with the format name, so the repeated Unity test name is
+// not ambiguous.
+static size_t g_format_index = 0;
+static const FormatFixture& current_format() { return all_formats()[g_format_index]; }
+
 void test_tier0_format_all_media(void)
 {
     // finding #2 (shared D64MStream base - see the findings file) makes d64,
@@ -547,8 +562,8 @@ void test_tier0_format_all_media(void)
     // The loop below is left intact, unmodified from the brief, so it goes
     // live the moment finding #2 is fixed.
 
-    for (const auto& f : all_formats())
     {
+        const FormatFixture& f = current_format();
         std::string path = std::string("build_t0_") + f.name + "." + f.ext;
         remove(path.c_str());
         {
@@ -591,8 +606,8 @@ void test_tier0_declared_size_matches_geometry(void)
     // this test, via a throwaway per-format diagnostic) that d64/d80/d81/d82
     // all match their declared size - only d71 is affected. The loop below
 
-    for (const auto& f : all_formats())
     {
+        const FormatFixture& f = current_format();
         std::string path = std::string("build_t0g_") + f.name + "." + f.ext;
         remove(path.c_str());
         auto src = std::make_shared<FileContainerStream>(path, f.size);
@@ -663,8 +678,8 @@ void test_tier1_single_file_write(void)
     for (int i = 0; i < 500; i++)
         payload.push_back((uint8_t)(i & 0xFF));
 
-    for (const auto& f : all_formats())
     {
+        const FormatFixture& f = current_format();
         std::string path = std::string("build_t1_") + f.name + "." + f.ext;
         remove(path.c_str());
 
@@ -849,8 +864,8 @@ void test_tier2_multiblock_crossing_tracks(void)
     // is forced across a track boundary and through the interleave logic.
     std::vector<uint8_t> payload(254 * 30, 0x5A);
 
-    for (const auto& f : all_formats())
     {
+        const FormatFixture& f = current_format();
         std::string path = std::string("build_t2a_") + f.name + "." + f.ext;
         remove(path.c_str());
         {
@@ -868,13 +883,14 @@ void test_tier2_multiblock_crossing_tracks(void)
 
 void test_tier2_disk_full_rolls_back(void)
 {
-    for (const auto& f : all_formats())
     {
+        const FormatFixture& f = current_format();
         // DNP never reaches DISK FULL by design - a native partition grows a
         // track at a time instead. Its ceiling is 255 tracks (~65280 blocks),
         // far too many to fill in a test. Growth is covered separately by
         // test_dnp_grows_beyond_its_initial_track.
-        if (std::string(f.name) == "dnp") continue;
+        if (std::string(f.name) == "dnp")
+            TEST_IGNORE_MESSAGE("dnp: scenario not applicable - see comment above");
 
         std::string path = std::string("build_t2b_") + f.name + "." + f.ext;
         remove(path.c_str());
@@ -902,8 +918,8 @@ void test_tier2_disk_full_rolls_back(void)
 
 void test_tier2_directory_extension(void)
 {
-    for (const auto& f : all_formats())
     {
+        const FormatFixture& f = current_format();
         std::string path = std::string("build_t2c_") + f.name + "." + f.ext;
         remove(path.c_str());
         {
@@ -929,8 +945,8 @@ void test_tier2_overwrite_reuses_slot(void)
     std::vector<uint8_t> first(254 * 4, 0x11);
     std::vector<uint8_t> second(254 * 2, 0x22);
 
-    for (const auto& f : all_formats())
     {
+        const FormatFixture& f = current_format();
         std::string path = std::string("build_t2d_") + f.name + "." + f.ext;
         remove(path.c_str());
         {
@@ -980,14 +996,15 @@ void test_tier2_directory_full_reports_disk_full(void)
     // 664 free blocks; every other format has a similar margin. That isolates
     // "directory full" from "disk full" - CBM DOS reports both as 72, so the
     // free-block assertion below is what proves which one we actually hit.
-    for (const auto& f : all_formats())
     {
+        const FormatFixture& f = current_format();
         // DNP cannot reach this state. Its directory lives on track 1 and can
         // extend across ~220 sectors = ~1760 entries, but every entry also
         // consumes a data block and the whole partition only has 1024 - so the
         // DISK fills first, no matter the size. Sizing it up to change that
         // makes the exhaustive per-operation checks prohibitively slow.
-        if (std::string(f.name) == "dnp") continue;
+        if (std::string(f.name) == "dnp")
+            TEST_IGNORE_MESSAGE("dnp: scenario not applicable - see comment above");
 
         std::string path = std::string("build_t2f_") + f.name + "." + f.ext;
         remove(path.c_str());
@@ -1041,13 +1058,13 @@ void test_tier2_bam_record_boundary(void)
     // are where record-boundary arithmetic can go wrong. d71's side-2 record is
     // bitmap-only (no leading free count), d80/d82 carry several counted
     // records, so filling most of the disk walks across those boundaries.
-    for (const auto& f : all_formats())
     {
+        const FormatFixture& f = current_format();
         // d64/d81 have a single BAM record, and so does DNP - there is no
         // record boundary to cross on any of them.
         if (std::string(f.name) == "d64" || std::string(f.name) == "d81" ||
             std::string(f.name) == "dnp")
-            continue;
+            TEST_IGNORE_MESSAGE("single BAM record - no boundary to cross");
 
         std::string path = std::string("build_t2e_") + f.name + "." + f.ext;
         remove(path.c_str());
@@ -1187,9 +1204,9 @@ void test_tier3_randomized_stress(void)
     // Fixed seeds keep failures reproducible. When a seed finds a bug, keep it
     // in this list permanently - it becomes a regression case for free.
     const unsigned seeds[] = { 1, 42, 1337 };
-    for (const auto& f : all_formats())
-        for (unsigned s : seeds)
-            run_random_session(f, s);
+    const FormatFixture& f = current_format();
+    for (unsigned s : seeds)
+        run_random_session(f, s);
 }
 
 void process()
@@ -1206,17 +1223,22 @@ void process()
     RUN_TEST(test_c1541_validate_detects_cbm_error_channel_report);
     RUN_TEST(test_invariants_pass_on_clean_c1541_image_with_two_files);
     RUN_TEST(test_invariants_pass_on_blank_image);
-    RUN_TEST(test_tier0_format_all_media);
-    RUN_TEST(test_tier0_declared_size_matches_geometry);
-    RUN_TEST(test_tier1_single_file_write);
-    RUN_TEST(test_tier2_multiblock_crossing_tracks);
-    RUN_TEST(test_tier2_disk_full_rolls_back);
-    RUN_TEST(test_tier2_directory_extension);
-    RUN_TEST(test_tier2_overwrite_reuses_slot);
-    RUN_TEST(test_tier2_directory_full_reports_disk_full);
-    RUN_TEST(test_tier2_bam_record_boundary);
     RUN_TEST(test_dnp_grows_beyond_its_initial_track);
-    RUN_TEST(test_tier3_randomized_stress);
+    // Once per format, so no format can be hidden behind another's failure.
+    for (g_format_index = 0; g_format_index < all_formats().size(); g_format_index++)
+    {
+        RUN_TEST(test_tier0_format_all_media);
+        RUN_TEST(test_tier0_declared_size_matches_geometry);
+        RUN_TEST(test_tier1_single_file_write);
+        RUN_TEST(test_tier2_multiblock_crossing_tracks);
+        RUN_TEST(test_tier2_disk_full_rolls_back);
+        RUN_TEST(test_tier2_directory_extension);
+        RUN_TEST(test_tier2_overwrite_reuses_slot);
+        RUN_TEST(test_tier2_directory_full_reports_disk_full);
+        RUN_TEST(test_tier2_bam_record_boundary);
+        RUN_TEST(test_tier3_randomized_stress);
+    }
+
     UNITY_END();
 }
 
