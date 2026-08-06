@@ -737,6 +737,215 @@ void test_tier1_single_file_write(void)
     }
 }
 
+// ---------------------------------------------------------------------------
+// Tier 2 - structural stress
+// ---------------------------------------------------------------------------
+
+// Opens a fresh stream over an existing image and runs both validators.
+// Reopening matters: it checks what is on disk, not leftover in-memory state.
+static void assert_image_sound(const FormatFixture& f,
+                               const std::string& path,
+                               const char* stage)
+{
+    {
+        auto src = std::make_shared<FileContainerStream>(path);
+        auto image = f.make(src);
+        InvariantResult r = check_invariants(*image);
+        if (!r.ok)
+        {
+            std::string m = std::string(f.name) + " " + stage + ": " + r.message;
+            remove(path.c_str());
+            TEST_FAIL_MESSAGE(m.c_str());
+        }
+    }
+    if (c1541_available() && !c1541_validate(path))
+    {
+        std::string m = std::string(f.name) + " " + stage + ": c1541 validate rejected the image";
+        remove(path.c_str());
+        TEST_FAIL_MESSAGE(m.c_str());
+    }
+}
+
+// Reads blocksFree() from a freshly opened stream. Reading it from a stream
+// that has just been close()d returns 0 - close() drops state blocksFree()
+// needs, and the next seekPath() rebuilds it - so every free-block reading in
+// these tests comes from a reopen.
+static uint16_t blocks_free_of(const FormatFixture& f, const std::string& path)
+{
+    auto src = std::make_shared<FileContainerStream>(path);
+    auto image = f.make(src);
+    return image->blocksFree();
+}
+
+// Opens an existing image, saves one file into it, and closes.
+static bool open_and_save(const FormatFixture& f,
+                          const std::string& path,
+                          const std::string& name,
+                          const std::vector<uint8_t>& data)
+{
+    auto src = std::make_shared<FileContainerStream>(path);
+    auto image = f.make(src);
+    return save_file(*image, name, data);
+}
+
+// Saves files of a fixed size until one fails, returning how many succeeded.
+static int fill_until_full(D64MStream& image, size_t payload_size, int limit)
+{
+    std::vector<uint8_t> payload(payload_size, 0xAA);
+    int n = 0;
+    while (n < limit)
+    {
+        char name[24];
+        snprintf(name, sizeof(name), "file%d", n);
+        if (!save_file(image, name, payload)) break;
+        n++;
+    }
+    return n;
+}
+
+void test_tier2_multiblock_crossing_tracks(void)
+{
+    // 30 blocks cannot fit on one track of any of these formats, so the chain
+    // is forced across a track boundary and through the interleave logic.
+    std::vector<uint8_t> payload(254 * 30, 0x5A);
+
+    for (const auto& f : all_formats())
+    {
+        std::string path = std::string("build_t2a_") + f.name + "." + f.ext;
+        remove(path.c_str());
+        {
+            auto src = std::make_shared<FileContainerStream>(path, f.size);
+            auto image = f.make(src);
+            TEST_ASSERT_TRUE(image->formatImage("testdisk", "01"));
+            char msg[128];
+            snprintf(msg, sizeof(msg), "%s: multi-track save failed", f.name);
+            TEST_ASSERT_TRUE_MESSAGE(save_file(*image, "big", payload), msg);
+        }
+        assert_image_sound(f, path, "after multi-track write");
+        remove(path.c_str());
+    }
+}
+
+void test_tier2_disk_full_rolls_back(void)
+{
+    for (const auto& f : all_formats())
+    {
+        std::string path = std::string("build_t2b_") + f.name + "." + f.ext;
+        remove(path.c_str());
+        {
+            auto src = std::make_shared<FileContainerStream>(path, f.size);
+            auto image = f.make(src);
+            TEST_ASSERT_TRUE(image->formatImage("testdisk", "01"));
+
+            int saved = fill_until_full(*image, 254 * 10, 5000);
+            char msg[128];
+            snprintf(msg, sizeof(msg), "%s: nothing saved before the disk filled", f.name);
+            TEST_ASSERT_GREATER_THAN_INT_MESSAGE(0, saved, msg);
+        }
+        // The save that failed must leave NO half-allocated blocks behind.
+        // Invariant 2 (allocated but unreachable) is what catches a broken
+        // rollback, which is why this stage runs the full checker.
+        assert_image_sound(f, path, "after disk full");
+        remove(path.c_str());
+    }
+}
+
+void test_tier2_directory_extension(void)
+{
+    for (const auto& f : all_formats())
+    {
+        std::string path = std::string("build_t2c_") + f.name + "." + f.ext;
+        remove(path.c_str());
+        {
+            auto src = std::make_shared<FileContainerStream>(path, f.size);
+            auto image = f.make(src);
+            TEST_ASSERT_TRUE(image->formatImage("testdisk", "01"));
+            // 8 entries fit per directory sector, so 40 tiny files force the
+            // directory to extend onto several sectors.
+            int saved = fill_until_full(*image, 16, 40);
+            char msg[128];
+            snprintf(msg, sizeof(msg), "%s: only %d files saved, directory never extended",
+                     f.name, saved);
+            TEST_ASSERT_GREATER_THAN_INT_MESSAGE(8, saved, msg);
+        }
+        assert_image_sound(f, path, "after directory extension");
+        remove(path.c_str());
+    }
+}
+
+void test_tier2_overwrite_reuses_slot(void)
+{
+    std::vector<uint8_t> first(254 * 4, 0x11);
+    std::vector<uint8_t> second(254 * 2, 0x22);
+
+    for (const auto& f : all_formats())
+    {
+        std::string path = std::string("build_t2d_") + f.name + "." + f.ext;
+        remove(path.c_str());
+        {
+            auto src = std::make_shared<FileContainerStream>(path, f.size);
+            auto image = f.make(src);
+            TEST_ASSERT_TRUE(image->formatImage("testdisk", "01"));
+        }
+
+        char msg[192];
+        snprintf(msg, sizeof(msg), "%s: first save failed", f.name);
+        TEST_ASSERT_TRUE_MESSAGE(open_and_save(f, path, "doc", first), msg);
+        uint16_t free_after_first = blocks_free_of(f, path);
+
+        // Save over the same name. Note the CBM "@:" save-and-replace prefix is
+        // stripped by the DRIVE layer (drive.cpp sets an overwrite flag and
+        // passes the bare name down) - the engine never sees it. seekPath()
+        // decides on its own: a name that resolves to an existing file is
+        // scratched and its slot reused. Passing a literal "@:doc" here would
+        // just create a second file called "@:doc".
+        // The old 4-block chain must be returned, not leaked.
+        snprintf(msg, sizeof(msg), "%s: overwrite save failed", f.name);
+        TEST_ASSERT_TRUE_MESSAGE(open_and_save(f, path, "doc", second), msg);
+        uint16_t free_after_overwrite = blocks_free_of(f, path);
+
+        // Structural soundness first: if the old chain was dropped without being
+        // deallocated, its blocks are allocated-but-unreachable and invariant 2
+        // reports them as orphans. That distinguishes real corruption from a
+        // mere free-count discrepancy.
+        assert_image_sound(f, path, "after @: overwrite");
+
+        snprintf(msg, sizeof(msg),
+                 "%s: overwrite did not release the old chain (free %u -> %u, expected +2)",
+                 f.name, (unsigned)free_after_first, (unsigned)free_after_overwrite);
+        if (free_after_overwrite != free_after_first + 2)
+        {
+            remove(path.c_str());
+            TEST_FAIL_MESSAGE(msg);
+        }
+        remove(path.c_str());
+    }
+}
+
+void test_tier2_bam_record_boundary(void)
+{
+    // d64 and d81 have a single BAM record; the others span more than one and
+    // are where record-boundary arithmetic can go wrong. d71's side-2 record is
+    // bitmap-only (no leading free count), d80/d82 carry several counted
+    // records, so filling most of the disk walks across those boundaries.
+    for (const auto& f : all_formats())
+    {
+        if (std::string(f.name) == "d64" || std::string(f.name) == "d81")
+            continue;
+
+        std::string path = std::string("build_t2e_") + f.name + "." + f.ext;
+        remove(path.c_str());
+        {
+            auto src = std::make_shared<FileContainerStream>(path, f.size);
+            auto image = f.make(src);
+            TEST_ASSERT_TRUE(image->formatImage("testdisk", "01"));
+            fill_until_full(*image, 254 * 20, 5000);
+        }
+        assert_image_sound(f, path, "after crossing BAM records");
+        remove(path.c_str());
+    }
+}
+
 void process()
 {
     UNITY_BEGIN();
@@ -754,6 +963,11 @@ void process()
     RUN_TEST(test_tier0_format_all_media);
     RUN_TEST(test_tier0_declared_size_matches_geometry);
     RUN_TEST(test_tier1_single_file_write);
+    RUN_TEST(test_tier2_multiblock_crossing_tracks);
+    RUN_TEST(test_tier2_disk_full_rolls_back);
+    RUN_TEST(test_tier2_directory_extension);
+    RUN_TEST(test_tier2_overwrite_reuses_slot);
+    RUN_TEST(test_tier2_bam_record_boundary);
     UNITY_END();
 }
 
