@@ -565,7 +565,7 @@ void test_tier0_format_all_media(void)
                 TEST_FAIL_MESSAGE(m.c_str());
             }
         }
-        if (c1541_available())
+        if (f.has_c1541_oracle && c1541_available())
         {
             std::string m = std::string(f.name) + ": c1541 validate rejected the blank image";
             TEST_ASSERT_TRUE_MESSAGE(c1541_validate(path), m.c_str());
@@ -707,7 +707,7 @@ void test_tier1_single_file_write(void)
             }
         }
 
-        if (c1541_available())
+        if (f.has_c1541_oracle && c1541_available())
         {
             char msg[160];
             snprintf(msg, sizeof(msg), "%s: c1541 validate rejected the image after write", f.name);
@@ -780,7 +780,7 @@ static void assert_image_sound(const FormatFixture& f,
             TEST_FAIL_MESSAGE(m.c_str());
         }
     }
-    if (c1541_available() && !c1541_validate(path))
+    if (f.has_c1541_oracle && c1541_available() && !c1541_validate(path))
     {
         std::string m = std::string(f.name) + " " + stage + ": c1541 validate rejected the image";
         remove(path.c_str());
@@ -976,6 +976,13 @@ void test_tier2_directory_full_reports_disk_full(void)
     // free-block assertion below is what proves which one we actually hit.
     for (const auto& f : all_formats())
     {
+        // DNP cannot reach this state. Its directory lives on track 1 and can
+        // extend across ~220 sectors = ~1760 entries, but every entry also
+        // consumes a data block and the whole partition only has 1024 - so the
+        // DISK fills first, no matter the size. Sizing it up to change that
+        // makes the exhaustive per-operation checks prohibitively slow.
+        if (std::string(f.name) == "dnp") continue;
+
         std::string path = std::string("build_t2f_") + f.name + "." + f.ext;
         remove(path.c_str());
         {
@@ -1030,7 +1037,10 @@ void test_tier2_bam_record_boundary(void)
     // records, so filling most of the disk walks across those boundaries.
     for (const auto& f : all_formats())
     {
-        if (std::string(f.name) == "d64" || std::string(f.name) == "d81")
+        // d64/d81 have a single BAM record, and so does DNP - there is no
+        // record boundary to cross on any of them.
+        if (std::string(f.name) == "d64" || std::string(f.name) == "d81" ||
+            std::string(f.name) == "dnp")
             continue;
 
         std::string path = std::string("build_t2e_") + f.name + "." + f.ext;
@@ -1099,7 +1109,7 @@ static void run_random_session(const FormatFixture& f, unsigned seed)
         }
     }
 
-    if (c1541_available() && !c1541_validate(path))
+    if (f.has_c1541_oracle && c1541_available() && !c1541_validate(path))
     {
         char m[160];
         snprintf(m, sizeof(m), "%s seed=%u: c1541 validate rejected the image after the session",

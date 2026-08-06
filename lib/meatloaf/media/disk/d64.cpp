@@ -233,7 +233,11 @@ bool D64MStream::deallocateBlock(uint8_t track, uint8_t sector)
     return setBlockAllocation(track, sector, false);
 }
 
-uint8_t D64MStream::getTrackFreeCount(uint8_t track)
+// Returns uint16_t, not uint8_t: a CMD native track (DNP, DHD) has 256 sectors,
+// so a fully free one counts 256 - which truncates to 0 in a byte. That made
+// blocksFree() report 0 and, worse, made getNextFreeBlock() treat every track as
+// full so no write could allocate anything.
+uint16_t D64MStream::getTrackFreeCount(uint8_t track)
 {
     BAMRecord rec;
     uint8_t buf[32];
@@ -244,7 +248,7 @@ uint8_t D64MStream::getTrackFreeCount(uint8_t track)
         return buf[0];
 
     // Bitmap-only record: count the free (1) bits
-    uint8_t count = 0;
+    uint16_t count = 0;
     for (uint8_t i = 0; i < rec.byte_count; i++)
         count += std::bitset<8>(buf[i]).count();
     return count;

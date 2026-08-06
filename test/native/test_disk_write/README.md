@@ -1,7 +1,7 @@
 # Disk Image Write Verification Suite
 
 Host-side tests for the disk-image write engine (`D64MStream`, `lib/meatloaf/media/disk/d64.cpp`),
-covering **D64, D71, D80, D81 and D82**. They run natively on your development machine, not on the
+covering **D64, D71, D80, D81, D82 and DNP**. They run natively on your development machine, not on the
 ESP32 — the write engine manipulates a byte buffer and behaves identically on x86 and Xtensa, so
 running here buys a sub-second edit-test cycle and a real debugger.
 
@@ -52,7 +52,7 @@ to copy it from `platformio.ini.sample`, which carries the block.
 
 ## Reading the output
 
-A healthy run is `21 test cases: 21 succeeded`, taking roughly 75 seconds — most of that is Tier 3
+A healthy run is `21 test cases: 21 succeeded`, taking roughly 60 seconds — most of that is Tier 3
 and the disk-filling scenarios in Tier 2, which reopen the image once per save.
 
 `SKIPPED` is the mechanism for tracking known-broken behavior: the message names the finding that
@@ -67,7 +67,10 @@ Findings are recorded in `docs/superpowers/findings/2026-08-05-disk-write-findin
 Every produced image is judged by **two independent validators that deliberately do not share an
 implementation**:
 
-- **`c1541_oracle.h`** — wraps VICE. `c1541_validate()`, `c1541_dir()`, `c1541_read()`.
+- **`c1541_oracle.h`** — wraps VICE. `c1541_validate()`, `c1541_dir()`, `c1541_read()`. Only the
+  classic floppy formats have this; **DNP does not** (VICE cannot attach a CMD native partition),
+  so `FormatFixture::has_c1541_oracle` gates every c1541 call. DNP is therefore checked by our
+  invariants alone, which is measurably weaker - see the note below about what c1541 has caught.
 - **`image_invariants.h`** — our own seven structural invariants, with per-block diagnostics
   (`check_invariants()` reports *which* block violated *which* rule).
 

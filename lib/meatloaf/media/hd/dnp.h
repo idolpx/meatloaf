@@ -74,13 +74,35 @@ public:
         partitions[0].directory_track = read(); 
         partitions[0].directory_sector = read();
 
+        // A blank container reads back 0/0, which is not a valid location - and
+        // formatImage() would then lay the directory down on track 0. CMD native
+        // partitions put it at 1/34: the BAM is 32 bytes per track for 255 tracks
+        // starting at 1/2 offset 0x20, i.e. 544 + 8160 = 8704 bytes = exactly 34
+        // sectors, so the directory begins right after it. That area is reserved
+        // at full size regardless of how many tracks the partition actually has,
+        // so 1/34 holds for every DNP.
+        if (partitions[0].directory_track == 0)
+        {
+            partitions[0].directory_track = 1;
+            partitions[0].directory_sector = 34;
+        }
+
         // Calculate number of tracks based on file size
         uint32_t size = containerStream->size() / 65536;
         if ( containerStream->size() % 65536 != 0 )
             size++;
         partitions[0].block_allocation_map[0].end_track = size;
         Debug_printv("size[%d] tracks[%d]", size, partitions[0].block_allocation_map[0].end_track);
-    };
+    }
+
+    // A CMD native partition has no canonical size - it is whatever it was
+    // created as, and the constructor derives the track count from the
+    // container. This is only the size used when creating one from nothing.
+    // 4 tracks (256 KB) - large enough that data blocks are not confined to
+    // the directory track, small enough to keep a full-image scan cheap: a DNP
+    // track is 256 sectors, so every extra track costs 256 block reads in any
+    // exhaustive check.
+    uint32_t defaultImageSize() override { return 4 * 65536; };
 
     virtual uint8_t speedZone(uint8_t track) override { return 0; };
 

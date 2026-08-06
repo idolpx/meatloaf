@@ -120,7 +120,7 @@ public:
         // Side 2: mirror the change into the split-off count byte. getTrackFreeCount()
         // counts bits in the bitmap the base class just updated, so it is already
         // the post-change value - no need to re-derive it here.
-        return writeSide2FreeCount(track, getTrackFreeCount(track));
+        return writeSide2FreeCount(track, (uint8_t)getTrackFreeCount(track));
     }
 
     bool initializeBlockAllocationMap() override
@@ -134,7 +134,7 @@ public:
         uint8_t last_track = partitions[partition].block_allocation_map.back().end_track;
         for (uint8_t t = SIDE2_FIRST_TRACK; t <= last_track; t++)
         {
-            if (!writeSide2FreeCount(t, getTrackFreeCount(t)))
+            if (!writeSide2FreeCount(t, (uint8_t)getTrackFreeCount(t)))
                 return false;
         }
 

@@ -358,7 +358,7 @@ protected:
     // can maintain both halves - see D71MStream, where side 2's counts live in
     // 18/0 at 0xDD while its bitmaps live at 53/0.
     virtual bool setBlockAllocation( uint8_t track, uint8_t sector, bool allocate );
-    uint8_t getTrackFreeCount( uint8_t track );
+    uint16_t getTrackFreeCount( uint8_t track );
     bool findFreeSectorOnTrack( uint8_t track, uint8_t startSector, uint8_t *foundSector );
 
     // Streamed new-file write (SAVE): blocks are allocated one at a time as
@@ -466,7 +466,14 @@ protected:
 
             // Update BAM for each track
             for (uint16_t t = track; t <= end_track; t++) {
-                uint8_t sectors = getSectorCount(t);
+                // MUST be 16-bit: CMD native formats (DNP, DHD) have 256
+                // sectors per track, which truncates to 0 in a uint8_t. That
+                // made the bitmap loop write all-zero bytes - every block
+                // marked ALLOCATED - and made bitmap_bytes compute as 0, which
+                // flipped has_count on so the writer emitted a leading count
+                // byte the reader does not expect. getSectorCount() returns
+                // uint16_t for exactly this reason.
+                uint16_t sectors = getSectorCount(t);
                 uint8_t data = 0;
 
                 // A record carries a leading free-sector count ONLY when it has
@@ -476,11 +483,11 @@ protected:
                 // truncates its last byte, so blocks read back as allocated that
                 // were never allocated. Same test getBAMRecord() uses, so the
                 // writer and the readers agree about the record's shape.
-                uint8_t bitmap_bytes = (sectors + 7) / 8;
+                uint8_t bitmap_bytes = (uint8_t)((sectors + 7) / 8);
                 bool has_count = rec_bytes > bitmap_bytes;
                 if (has_count)
                 {
-                    data = sectors;
+                    data = (uint8_t)sectors;
                     if (!writeContainer((uint8_t*)&data, 1))
                         return false;
                 }

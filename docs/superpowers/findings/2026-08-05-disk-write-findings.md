@@ -248,6 +248,58 @@ This is also a useful demonstration of why the suite runs two independent valida
 checker passing is necessary but not sufficient, and a suite built on invariants alone would
 have declared these three formats correct.
 
+## Findings #8 and #9 — 8-bit truncation on 256-sector tracks (FIXED)
+
+Found by extending the suite to DNP. A CMD native track holds **256** sectors, which is exactly
+one more than a `uint8_t` can represent — so both of these were invisible on every floppy format
+(D64's largest track is 21 sectors) and broke DNP completely.
+
+**#8 — `initializeBlockAllocationMap()` (`d64.h`)** read the sector count into a `uint8_t`:
+
+```cpp
+uint8_t sectors = getSectorCount(t);   // 256 -> 0
+```
+
+With `sectors == 0` the bitmap loop wrote all-zero bytes, marking **every block allocated** on a
+freshly formatted image, and `bitmap_bytes` computed as 0, which flipped `has_count` on so the
+writer emitted a leading count byte the reader does not expect — the same writer/reader
+disagreement as finding #6, arriving by a different route. Now `uint16_t`.
+
+**#9 — `getTrackFreeCount()` returned `uint8_t`.** A fully free CMD native track counts 256 free
+sectors, truncating to 0. That made `blocksFree()` report 0, and worse, made `getNextFreeBlock()`
+treat every track as full — so no write could allocate anything at all. Now returns `uint16_t`.
+D71's split side-2 count byte still narrows explicitly, which is correct: those tracks hold at
+most 21 sectors.
+
+Both are a reminder that `getSectorCount()` returns `uint16_t` for a reason, and that anything
+storing a sector count or a per-track free count needs the same width.
+
+### DNP-specific: directory location on a blank image
+
+`DNPMStream`'s constructor reads the directory T/S out of the image at offset `0x100`, which on a
+zeroed container reads back `0/0` — so `formatImage()` would have laid the directory down on track
+0. It now falls back to `1/34` when the read yields track 0. That is where CMD native partitions
+put it: the BAM is 32 bytes per track for 255 tracks starting at `1/2` offset `0x20`, i.e.
+`544 + 8160 = 8704` bytes = exactly 34 sectors, and the area is reserved at full size regardless of
+how many tracks the partition actually has.
+
+### What DNP is and is not checked against
+
+DNP has **no c1541 oracle** — VICE cannot attach a CMD native partition — so it is verified by our
+seven structural invariants alone. `FormatFixture::has_c1541_oracle` makes that explicit at every
+call site rather than letting c1541 fail on an image it cannot read. This is a genuinely weaker
+check: c1541 has caught things the invariants accept (see finding #7).
+
+Two Tier 2 scenarios skip DNP, both because the scenario cannot exist there:
+
+- **Directory full** — DNP's directory lives on track 1 and can extend across ~220 sectors
+  (~1760 entries), but every entry also consumes a data block and the partition has 1024. The disk
+  fills first at any size that keeps the exhaustive per-operation checks affordable.
+- **BAM record boundary** — DNP has a single BAM record, so there is no boundary to cross.
+
+DNP's default size for creation is 4 tracks (256 KB). It has no canonical size, and the suite's
+exhaustive checks scan every block, so each extra track costs 256 block reads per scan.
+
 ## Coverage gaps
 
 - **1581 `CBM` sub-partition writes (D81)** — not tested. Exercising it needs a D81 that already
