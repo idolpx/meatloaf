@@ -1233,10 +1233,10 @@ bool D64MStream::formatImage(std::string name, std::string id)
     if (!initializeBlockAllocationMap())
         return false;
 
-    if (!initializeDirectory())
+    if (!writeHeader(name, id))
         return false;
 
-    if (!writeHeader(name, id))
+    if (!initializeDirectory())
         return false;
 
     // Size the container. Use the media's canonical size when the container
