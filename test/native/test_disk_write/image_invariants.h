@@ -174,6 +174,10 @@ struct ImageInvariantChecker
             for (uint16_t s = 0; s < spt; s++)
             {
                 if (img.isBlockFree(t, (uint8_t)s)) continue;
+                // Blocks a format permanently reserves for its own structures
+                // (a CMD native partition's autoboot sector and full BAM area)
+                // are allocated on purpose and belong to no chain.
+                if (img.isReservedBlock(t, (uint8_t)s)) continue;
                 if (seen.count(TS(t, (uint8_t)s)) == 0)
                     fail("orphan: block " + ts(t, (uint8_t)s) +
                          " allocated in BAM but unreachable");

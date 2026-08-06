@@ -54,7 +54,7 @@ public:
             1,     // sector
             0x04,  // header_offset
             1,     // directory_track
-            0,     // directory_sector
+            34,     // directory_sector
             0x00,  // directory_offset
             0,     // parent_header_track
             0,     // parent_header_sector
@@ -108,6 +108,44 @@ public:
     // - growImage() adds tracks on demand - so there is no reason to reserve
     // space up front.
     uint32_t defaultImageSize() override { return 65536; }
+
+    // The system area of a CMD native partition, all on track 1:
+    //
+    //   1/0        autoboot sector
+    //   1/1        partition info (the header)
+    //   1/2..1/33  BAM - 255 tracks x 32 bytes starting at 1/2 offset 0x20 is
+    //              8160 bytes, ending exactly at the start of sector 34
+    //   1/34       first directory block
+    //
+    // Sectors 0..33 are reserved whatever the partition's size, because the BAM
+    // is laid out for the maximum 255 tracks up front. 1/34 is allocated by
+    // initializeDirectory() along with every other format's first directory
+    // block, so it is not part of this range.
+    static constexpr uint8_t SYSTEM_AREA_LAST_SECTOR = 33;
+
+    bool isReservedBlock(uint8_t track, uint8_t sector) override
+    {
+        return track == partitions[partition].header_track &&
+               sector <= SYSTEM_AREA_LAST_SECTOR;
+    }
+
+    bool initializeBlockAllocationMap() override
+    {
+        if (!D64MStream::initializeBlockAllocationMap())
+            return false;
+
+        // Reserve the whole system area. The generic code only knows to
+        // allocate the FIRST sector of each BAM record, which would leave the
+        // autoboot sector and 31 of the BAM's 32 sectors advertised as free.
+        for (uint8_t s = 0; s <= SYSTEM_AREA_LAST_SECTOR; s++)
+        {
+            if (!isBlockFree(partitions[partition].header_track, s))
+                continue;
+            if (!setBlockAllocation(partitions[partition].header_track, s, true))
+                return false;
+        }
+        return true;
+    }
 
     // Add one track and mark it entirely free. This is what makes a CMD native
     // partition "native": it starts small and grows as files are written,

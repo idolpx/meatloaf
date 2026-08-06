@@ -353,6 +353,17 @@ protected:
     bool getNextFreeBlock(uint8_t startTrack, uint8_t startSector, uint8_t *foundTrack, uint8_t *foundSector, bool forDirectory = false);
     bool findFreeBlock(uint8_t startTrack, uint8_t startSector, uint8_t *foundTrack, uint8_t *foundSector, bool forDirectory);
 
+    // True for blocks a format permanently reserves for its own structures,
+    // beyond the header/BAM/first-directory blocks the generic code already
+    // knows about. They are allocated but belong to no chain, so anything
+    // auditing reachability has to treat them as reservations rather than
+    // leaks. Only CMD native partitions have such an area today.
+    virtual bool isReservedBlock(uint8_t track, uint8_t sector)
+    {
+        (void)track; (void)sector;
+        return false;
+    }
+
     // Grow the medium by one track and return true if that succeeded. Fixed
     // geometry formats cannot, so the default refuses; a CMD native partition
     // (DNP) can, which is the whole point of "native" - it is sized at creation

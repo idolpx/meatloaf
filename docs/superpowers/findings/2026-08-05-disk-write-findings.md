@@ -297,6 +297,28 @@ Two Tier 2 scenarios skip DNP, both because the scenario cannot exist there:
   fills first at any size that keeps the exhaustive per-operation checks affordable.
 - **BAM record boundary** — DNP has a single BAM record, so there is no boundary to cross.
 
+### DNP system area — the first 34 sectors are reserved
+
+A CMD native partition reserves this on track 1, whatever its size:
+
+| Block | Purpose |
+|-------|---------|
+| `1/0` | autoboot sector |
+| `1/1` | partition info (header) |
+| `1/2`-`1/33` | BAM — 255 tracks x 32 bytes from `1/2` offset `0x20` is 8160 bytes, ending exactly at the start of sector 34 |
+| `1/34` | first directory block |
+
+The generic format code only allocates the FIRST sector of each BAM record, plus the header and
+the first directory block — so on a DNP it left the autoboot sector and 31 of the BAM's 32
+sectors advertised as free. A later write would happily allocate a block on top of the BAM.
+`DNPMStream::initializeBlockAllocationMap()` now reserves sectors 0..33 explicitly.
+
+Because those blocks are allocated but belong to no chain, the invariant checker would read them
+as orphans. New virtual `D64MStream::isReservedBlock()` (false by default) lets a format declare
+such blocks; the orphan sweep skips them. Verified directly: a freshly formatted 1-track DNP has
+35 allocated and 221 free on track 1, `blocksFree()` agrees with the bitmap, and the first free
+block is `1/35`.
+
 ### DNP grows; it is not fixed at creation
 
 A CMD native partition starts at **one track (64 KB)** and extends a track at a time as files are
