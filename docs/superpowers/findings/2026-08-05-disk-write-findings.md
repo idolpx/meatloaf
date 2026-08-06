@@ -40,6 +40,45 @@ the finding #4 fix, D80/D82 misleadingly showed `c1541_validate()` as OK —
 that was never evidence those two formats were actually fine; it was a gap
 in the oracle helper, corrected as described in finding #4.
 
+## Finding #2 — status update after commit `b9584efc`
+
+`b9584efc` ("refactor: reorganize writeHeader method and add BAM/Directory sector
+allocation") attempted a fix. **It does not take effect.** Verified by lifting the
+`TEST_IGNORE_MESSAGE` guards and re-running: `test_invariants_pass_on_blank_image`,
+`test_tier0_format_all_media` and `test_c1541_validates_our_formatted_image` all still
+fail with `directory: block 18/1 is in a chain but marked free in BAM`.
+
+Two reasons, both in `D64MStream::writeHeader()` (`lib/meatloaf/media/disk/d64.h`):
+
+1. **The new `setBlockAllocation()` call is unreachable.** The function reads:
+
+   ```cpp
+   if (writeContainer((uint8_t*)&header, sizeof(header)))
+       return true;                       // returns on SUCCESS
+   ...
+   if (!setBlockAllocation(header_track, header_sector, true))   // never reached
+       return false;
+   return false;
+   ```
+
+   `writeContainer()` returns the number of bytes written, so it is truthy on success and
+   the function returns before reaching the allocation. (The return values also read
+   inverted: `true` on the early success path, `false` on every other path.)
+
+2. **The directory sector is never allocated at all.** Only `header_track`/`header_sector`
+   is passed to `setBlockAllocation()`. The first directory sector — `18/1` on D64, and the
+   coordinates in the per-format table above for the others — also has to be reserved,
+   which is exactly what the failing message names.
+
+A third, latent issue on the same path: `writeContainer((uint8_t*)bam_message.c_str(),
+sizeof(bam_message))` uses `sizeof` on a `std::string`, which is the size of the string
+OBJECT (~32 bytes on most builds), not its text length. It would write the string object's
+internal bytes into the image. Currently harmless only because that line is unreachable too;
+it needs `bam_message.size()` when the control flow is fixed.
+
+The guards remain in place with this diagnosis in their message. Lift them and re-run to
+verify any future fix — that is what they are for.
+
 ## Coverage gaps
 
 - **1581 `CBM` sub-partition writes (D81)** — not tested. Exercising it needs a D81 that already

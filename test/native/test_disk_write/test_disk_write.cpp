@@ -158,9 +158,11 @@ void test_c1541_validates_our_formatted_image(void)
     bool valid = c1541_validate(path);
     remove(path);
 
-    TEST_IGNORE_MESSAGE("finding #2: initializeBlockAllocationMap() never reserves the "
-                        "header/directory sectors, so formatImage() output does not pass "
-                        "c1541 validate; re-enable when that is fixed");
+    TEST_IGNORE_MESSAGE("finding #2 (still open): commit b9584efc added a "
+                        "setBlockAllocation() call to writeHeader(), but it is "
+                        "unreachable - the earlier 'if (writeContainer(...)) return true;' "
+                        "returns on success. The directory sector is also never "
+                        "allocated. Re-enable once both are addressed.");
 
     TEST_ASSERT_TRUE_MESSAGE(valid, "c1541 validate rejected our formatted image");
 }
@@ -441,7 +443,11 @@ void test_invariants_pass_on_blank_image(void)
     src->close();
     remove(path);
 
-    TEST_IGNORE_MESSAGE(("finding #2: " + r.message).c_str());
+    TEST_IGNORE_MESSAGE("finding #2 (still open): commit b9584efc added a "
+                        "setBlockAllocation() call to writeHeader(), but it is "
+                        "unreachable - the earlier 'if (writeContainer(...)) return true;' "
+                        "returns on success. The directory sector is also never "
+                        "allocated. Re-enable once both are addressed.");
 
     TEST_ASSERT_TRUE_MESSAGE(r.ok, r.message.c_str());
 }
@@ -535,9 +541,11 @@ void test_tier0_format_all_media(void)
     // oracle helper, not evidence the d80/d82 images are actually fine.
     // The loop below is left intact, unmodified from the brief, so it goes
     // live the moment finding #2 is fixed.
-    TEST_IGNORE_MESSAGE("finding #2: initializeBlockAllocationMap() never reserves the "
-                        "header/directory sectors on any of the five formats; see the "
-                        "findings file for confirmed per-format results");
+    TEST_IGNORE_MESSAGE("finding #2 (still open): commit b9584efc added a "
+                        "setBlockAllocation() call to writeHeader(), but it is "
+                        "unreachable - the earlier 'if (writeContainer(...)) return true;' "
+                        "returns on success. The directory sector is also never "
+                        "allocated. Re-enable once both are addressed.");
 
     for (const auto& f : all_formats())
     {
