@@ -1,5 +1,51 @@
 # Disk Write Verification — Findings
 
+> **RESOLVED — all findings fixed. `format()` now produces a valid image on all five
+> formats (D64, D71, D80, D81, D82), confirmed by BOTH independent validators.**
+> Suite: 13 cases, 13 passing, 0 skipped. The sections below are kept as the investigation
+> record; read them for *why* each defect existed, not for current status.
+
+## Final resolution
+
+Beyond findings #1-#6, closing #7 needed four more fixes. Each was found the same way:
+capture the image before and after `c1541 -validate` (validate rewrites in place), diff, and
+compare the disagreeing bytes against c1541's own freshly formatted image.
+
+- **D71 reserves ALL of track 53.** A 1571 allocates the entire side-2 BAM track, unlike
+  track 18 where only the two sectors actually in use are allocated. Verified against
+  c1541: track 53 reads `00 00 00` while track 18 reads `11 fc ff 07` (17 of 19 free), and
+  `-dir` reports `1328 blocks free` = 1366 - 19 - 19, excluding both tracks whole.
+  `D71MStream::initializeBlockAllocationMap()` now reserves the whole track.
+- **The invariant checker had no concept of a reserved track.** It flagged
+  `orphan: block 53/1 allocated in BAM but unreachable` — correct by its own rule, wrong
+  about reality. `image_invariants.h` now treats a track that hosts a BAM record AND is
+  allocated end to end as a system reservation. Only *fully* allocated BAM tracks qualify,
+  so track 18 keeps normal orphan checking and a genuinely leaked directory block there is
+  still caught.
+- **D80/D82 BAM blocks need a 6-byte header** — T/S link, DOS version, reserved byte, and
+  the track range (lowest, highest + 1). The blocks chain to each other and the last links
+  to the first directory sector. Without it c1541 derived a bogus range and reported
+  `ERR = 65, NO BLOCK, 00, 38` / `78, 23`, walking tracks 0 and 78 which do not exist. New
+  shared helper `D64MStream::writeBamBlockHeaders()`, called by D80 and D82. It also zeroes
+  each BAM sector's unused tail, which otherwise kept `initializeBlocks()`'s `0x4B`/`0x01`
+  fill pattern (117 stray bytes on D80).
+- **The header sector was never allocated on D80/D82.** `initializeDirectory()` allocated
+  every `block_allocation_map` sector plus the directory sector — which covers D64/D71,
+  where the header IS `block_allocation_map[0]` (18/0). On a D80 the header is at 39/0 while
+  the BAM sits on track 38, so it is not in the map at all. Symptom: track 39's free count
+  read 28 where c1541 said 27.
+
+One test had to be rebuilt as a consequence: `test_c1541_validate_detects_cbm_error_channel_report`
+used our own broken D80 output as a ready-made `ERR =` fixture, and stopped reproducing the
+moment D80 was fixed — the soft dependency its comment warned about, failing loudly as
+intended. It now builds a clean D80 with `c1541 -format` and corrupts the BAM header's
+track-range byte itself, so it is engine-independent.
+
+**Known minor issue:** `test_tier0_declared_size_matches_geometry` leaves `build_t0g_*.d*`
+files in the working directory after a passing run; its cleanup only happens on some paths.
+Harmless, worth tidying.
+
+
 Bugs found by the write verification suite. Per the design spec these are
 recorded, not fixed; they become a separate fix spec. (Exception: finding #4
 below is a defect in the test oracle helper itself, not the disk-write

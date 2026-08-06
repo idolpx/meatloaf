@@ -95,6 +95,16 @@ public:
         interleave = { 3, 5 }; // Directory, File
     };
 
+    // An 8250 BAM spans 38/0, 38/3, 38/6 and 38/9, each carrying a 6-byte
+    // header the generic initializer cannot express (link, DOS version,
+    // track range).
+    bool initializeBlockAllocationMap() override
+    {
+        if (!D64MStream::initializeBlockAllocationMap())
+            return false;
+        return writeBamBlockHeaders(0x43); // 'C' - CBM DOS 2.7
+    }
+
     virtual uint8_t speedZone(uint8_t track) override
     {
         if (track < 78)

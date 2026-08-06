@@ -393,12 +393,26 @@ void test_c1541_validate_detects_cbm_error_channel_report(void)
     if (!c1541_available())
         TEST_IGNORE_MESSAGE("c1541 not found; set C1541 env var");
 
+    // Build a clean D80 with c1541 itself, then deliberately corrupt it, so this
+    // test stays engine-independent. It originally used our own formatImage()
+    // output as a ready-made fixture, which stopped reproducing the moment the
+    // D80 format bugs were fixed - the fixture has to create the fault itself.
     const char* path = "build_test_oracle_errchan.d80";
     remove(path);
+    c1541_run("-format " + c1541_quote("errchan,01") + " d80 " + c1541_quote(path));
+
+    // An 8050 BAM block carries its track range at bytes 4 (lowest) and 5
+    // (highest + 1). 38/0 sits at (37 tracks * 29 sectors) * 256. Pushing the
+    // upper bound past the last real track (77) makes -validate walk blocks that
+    // do not exist and emit "ERR = 65, NO BLOCK, ...".
+    const long bam_hi_byte = (37L * 29L) * 256L + 5L;
     {
-        auto src = std::make_shared<FileContainerStream>(path, 533248); // D80MStream::defaultImageSize()
-        D80MStream image(src);
-        TEST_ASSERT_TRUE(image.formatImage("testdisk", "01"));
+        FILE* f = fopen(path, "r+b");
+        TEST_ASSERT_NOT_NULL_MESSAGE(f, "could not open the c1541-built D80 fixture");
+        TEST_ASSERT_EQUAL_INT(0, fseek(f, bam_hi_byte, SEEK_SET));
+        uint8_t bogus = 96; // well past track 77
+        fwrite(&bogus, 1, 1, f);
+        fclose(f);
     }
 
     bool valid = c1541_validate(path);
@@ -513,12 +527,6 @@ void test_invariants_pass_on_clean_c1541_image_with_two_files(void)
 // that finding is fixed.
 void test_tier0_format_all_media(void)
 {
-    // d64 passes BOTH validators. d71/d80/d81 pass check_invariants() but c1541
-    // still rejects them (finding #7 - see the findings file for byte-level
-    // evidence on d71); d82 is unverified because this loop stops at the first
-    // failing format. Lift this to re-check after any fix.
-    TEST_IGNORE_MESSAGE("finding #7: d71/d80/d81 satisfy our invariants but c1541 "
-                        "still rejects them; d64 passes both, d82 unverified");
     // finding #2 (shared D64MStream base - see the findings file) makes d64,
     // the first format in the table, fail check_invariants() before this
     // loop ever reaches d71/d80/d81/d82: TEST_FAIL_MESSAGE longjmps out of
@@ -581,11 +589,6 @@ void test_tier0_declared_size_matches_geometry(void)
     // before d80/d81/d82 are ever reached. Confirmed independently (outside
     // this test, via a throwaway per-format diagnostic) that d64/d80/d81/d82
     // all match their declared size - only d71 is affected. The loop below
-    // is left intact, unmodified from the brief, so it goes live the moment
-    // finding #3 is fixed.
-    TEST_IGNORE_MESSAGE("finding #3: D71MStream::speedZone() misclassifies track 35, "
-                        "inflating d71's geometry-implied size by 4 blocks; "
-                        "d64/d80/d81/d82 match their declared size, see the findings file");
 
     for (const auto& f : all_formats())
     {

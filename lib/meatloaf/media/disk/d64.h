@@ -391,6 +391,56 @@ public:
     bool formatImage(std::string name, std::string id);
 
 protected:
+    // CBM 8050/8250 BAM blocks carry a 6-byte header ahead of their per-track
+    // entries: a T/S link, the DOS version, a reserved byte, and the range of
+    // tracks the block covers (lowest, highest + 1). The blocks chain to each
+    // other and the last one links to the first directory sector. Without this
+    // c1541 derives a bogus track range and reports "ERR = 65, NO BLOCK" for
+    // tracks outside the disk. BlockAllocationMap has no room for it, so
+    // formats that need it call this after the generic initializer.
+    bool writeBamBlockHeaders( uint8_t dos_ver )
+    {
+        auto &maps = partitions[partition].block_allocation_map;
+        for (size_t i = 0; i < maps.size(); i++)
+        {
+            // Link to the next BAM block, or to the directory from the last one.
+            uint8_t next_track  = (i + 1 < maps.size()) ? maps[i + 1].track
+                                                        : partitions[partition].directory_track;
+            uint8_t next_sector = (i + 1 < maps.size()) ? maps[i + 1].sector
+                                                        : partitions[partition].directory_sector;
+
+            uint8_t hdr[6] = {
+                next_track,
+                next_sector,
+                dos_ver,
+                0x00,                               // reserved
+                maps[i].start_track,
+                (uint8_t)(maps[i].end_track + 1)    // highest track + 1
+            };
+
+            if (!seekSector(maps[i].track, maps[i].sector, 0))
+                return false;
+            if (writeContainer(hdr, sizeof(hdr)) != sizeof(hdr))
+                return false;
+
+            // Zero the unused tail of the sector. initializeBlocks() fills every
+            // non-header track with the CBM 0x4B/0x01 pattern, and the per-track
+            // entries only cover part of the sector, so the remainder would keep
+            // that fill - a real format leaves it zero.
+            uint16_t used = maps[i].offset
+                          + (uint16_t)(maps[i].end_track - maps[i].start_track + 1) * maps[i].byte_count;
+            if (used < block_size)
+            {
+                std::vector<uint8_t> pad(block_size - used, 0);
+                if (!seekSector(maps[i].track, maps[i].sector, (uint8_t)used))
+                    return false;
+                if (writeContainer(pad.data(), pad.size()) != pad.size())
+                    return false;
+            }
+        }
+        return true;
+    }
+
     // Virtual for the same reason as setBlockAllocation(): a format whose BAM
     // splits counts from bitmaps has to seed both halves at format time.
     virtual bool initializeBlockAllocationMap()
@@ -583,6 +633,18 @@ protected:
             if (!isBlockFree(bam.track, bam.sector))
                 continue;
             if (!setBlockAllocation(bam.track, bam.sector, true))
+                return false;
+        }
+
+        // ...and the header sector. On a D64/D71 that IS block_allocation_map[0]
+        // (18/0) so the loop above already took it, but on a D80/D82 the header
+        // lives at 39/0 while the BAM sits on track 38 - it is not in the map at
+        // all and would otherwise never be allocated.
+        if (isBlockFree(partitions[partition].header_track,
+                        partitions[partition].header_sector))
+        {
+            if (!setBlockAllocation(partitions[partition].header_track,
+                                    partitions[partition].header_sector, true))
                 return false;
         }
 

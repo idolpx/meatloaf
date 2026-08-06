@@ -137,6 +137,22 @@ public:
             if (!writeSide2FreeCount(t, getTrackFreeCount(t)))
                 return false;
         }
+
+        // A 1571 reserves the side-2 BAM track (53) IN FULL, not just the one
+        // sector the BAM occupies - unlike track 18, where only the two sectors
+        // actually in use (18/0 header+BAM, 18/1 first directory block) are
+        // allocated. Verified against c1541's own format: it writes 00 00 00 for
+        // track 53 while track 18 reads 11 fc ff 07 (17 of 19 free), and reports
+        // "1328 blocks free" = 1366 - 19 - 19, excluding both tracks whole.
+        uint8_t bam2_track = partitions[partition].block_allocation_map.back().track;
+        uint16_t bam2_sectors = getSectorCount(bam2_track);
+        for (uint16_t s = 0; s < bam2_sectors; s++)
+        {
+            if (!isBlockFree(bam2_track, (uint8_t)s))
+                continue;
+            if (!setBlockAllocation(bam2_track, (uint8_t)s, true))
+                return false;
+        }
         return true;
     }
 

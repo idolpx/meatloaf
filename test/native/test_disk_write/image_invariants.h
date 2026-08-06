@@ -149,8 +149,27 @@ struct ImageInvariantChecker
 
         // Invariant 2: nothing is allocated in the BAM that no chain claims.
         uint8_t last = img.partitions[img.partition].block_allocation_map.back().end_track;
+        // A track that hosts a BAM record AND is allocated end to end is a
+        // whole-track system RESERVATION, not a set of leaked blocks - a 1571
+        // reserves all of track 53 this way (verified against c1541's own
+        // format). Only fully-allocated BAM tracks qualify: track 18 on a D64
+        // or D71 has just its used sectors allocated, so it still gets the
+        // normal orphan treatment and a genuinely leaked directory block there
+        // is still caught.
+        auto is_reserved_track = [&](uint8_t t) {
+            bool hosts_bam = false;
+            for (auto &bam : img.partitions[img.partition].block_allocation_map)
+                if (bam.track == t) { hosts_bam = true; break; }
+            if (!hosts_bam) return false;
+            uint16_t n = img.getSectorCount(t);
+            for (uint16_t s = 0; s < n; s++)
+                if (img.isBlockFree(t, (uint8_t)s)) return false;
+            return true;
+        };
+
         for (uint8_t t = 1; t <= last; t++)
         {
+            if (is_reserved_track(t)) continue;
             uint16_t spt = img.getSectorCount(t);
             for (uint16_t s = 0; s < spt; s++)
             {
