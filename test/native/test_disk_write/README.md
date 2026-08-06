@@ -52,8 +52,8 @@ to copy it from `platformio.ini.sample`, which carries the block.
 
 ## Reading the output
 
-A healthy run is `20 test cases: 20 succeeded`, taking roughly 35 seconds — most of that is Tier 3
-and the disk-filling scenarios in Tier 2.
+A healthy run is `21 test cases: 21 succeeded`, taking roughly 75 seconds — most of that is Tier 3
+and the disk-filling scenarios in Tier 2, which reopen the image once per save.
 
 `SKIPPED` is the mechanism for tracking known-broken behavior: the message names the finding that
 blocks the test, and the test body is left intact. **Lift the `TEST_IGNORE_MESSAGE` and re-run to
@@ -129,8 +129,9 @@ Each tier builds on the one below it, so a failure low down explains failures ab
   `close()`), then verifies against a *reopened* image: invariants, c1541 validate, the entry in
   c1541's directory listing, byte-exact read-back, and block accounting.
 - **Tier 2 — structural stress.** Multi-block files crossing track boundaries, disk-full rollback,
-  directory extension past the first sector, save-over-an-existing-name, and allocation across BAM
-  record boundaries (D71's bitmap-only side-2 record, D80/D82's multiple counted records).
+  directory extension past the first sector, save-over-an-existing-name, a full directory reporting
+  CBM error 72 with blocks still free (proving directory-full rather than disk-full), and allocation
+  across BAM record boundaries (D71's bitmap-only side-2 record, D80/D82's multiple counted records).
 - **Tier 3 — seeded randomized stress.** 375 operations (5 formats × 3 seeds × 25 ops) over a small
   reused name pool, with the invariant checker run after *every* operation so a failure names the
   exact op rather than an end state to bisect. Seeds are fixed; one that finds a bug should stay in
@@ -138,8 +139,17 @@ Each tier builds on the one below it, so a failure low down explains failures ab
 
 ## Two things that will bite you when writing tests here
 
-**`blocksFree()` returns 0 if read from a stream you have just `close()`d.** `close()` drops state
-it depends on, and the next `seekPath()` rebuilds it. Read free-block counts from a reopened image.
+**One stream, one save.** After `close()` a stream's BAM state is gone — `blocksFree()` reads 0 —
+and the *next* save on that same stream fails with `DISK FULL`. Give every save a fresh stream, the
+way the drive does (each SAVE opens its own channel), and read free-block counts from a reopened
+image too.
+
+This one bit hard: because `close()` returns void, a helper that saved and returned `true`
+unconditionally reported those failures as successes. Three Tier 2 tests passed vacuously for a
+while — their file counts were just the loop limit and they never reached the conditions they
+claimed to test. **A write is not verified until you inspect `error()` after `close()`**, which is
+where `finalizeFileWrite()` commits the directory entry and therefore where a full directory is
+discovered. `save_file_status()` exists for exactly this.
 
 **The CBM `@:` save-and-replace prefix never reaches the engine.** `drive.cpp` strips it, sets an
 overwrite flag, and passes the bare name down; `seekPath()` then decides on its own — a name that
