@@ -1260,8 +1260,20 @@ bool D64MStream::seekPath(std::string path)
  * File implementations
  ********************************************************/
 
-bool D64MStream::formatImage(std::string name, std::string id)
+bool D64MStream::formatImage(std::string name, std::string id, size_t track_count, bool error_info)
 {
+    // Settle the geometry BEFORE anything is laid out: initializeBlocks() fills
+    // every track and initializeBlockAllocationMap() writes one BAM entry per
+    // track, and both read end_track. A non-zero track_count is how a 40- or
+    // 42-track D64, an 81-track D81, or a DNP created with more than one track
+    // is asked for; 0 means "whatever this media's default is".
+    if (track_count > 0)
+        partitions[partition].block_allocation_map.back().end_track = (uint8_t)track_count;
+
+    // The parameter shadows the member of the same name - keep the member in
+    // step so anything reading it later sees what was actually created.
+    this->error_info = error_info;
+
     if (!initializeBlocks())
         return false;
 
@@ -1274,12 +1286,24 @@ bool D64MStream::formatImage(std::string name, std::string id)
     if (!initializeDirectory())
         return false;
 
-    // Size the container. Use the media's canonical size when the container
-    // is empty (a brand new image); otherwise keep the existing size so a
-    // 40- or 42-track D64 is not truncated back to 35.
-    uint32_t image_size = containerStream->size();
-    if (image_size == 0)
-        image_size = defaultImageSize();
+    // Total blocks across the geometry just laid down.
+    uint8_t last_track = partitions[partition].block_allocation_map.back().end_track;
+    uint32_t blocks = 0;
+    for (uint16_t t = 1; t <= last_track; t++)
+        blocks += getSectorCount(t);
+
+    // Canonical size only for a brand new image with no track count asked for.
+    // Otherwise size from the geometry, which both honours an explicit
+    // track_count and stops an existing 40-track D64 being truncated to 35.
+    uint32_t image_size = (track_count == 0 && containerStream->size() == 0)
+                        ? defaultImageSize()
+                        : blocks * block_size;
+
+    // An image carrying error info appends one status byte per sector after the
+    // data area: 174848 + 683 = 175531 for a 35-track D64, 196608 + 768 =
+    // 197376 for 40 tracks, 205312 + 802 = 206114 for 42.
+    if (error_info)
+        image_size += blocks;
 
     if (!seek(image_size - 1))
         return false;

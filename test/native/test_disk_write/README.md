@@ -144,7 +144,9 @@ path, and a failing test skips its own cleanup because Unity's assert macros lon
 Each tier builds on the one below it, so a failure low down explains failures above it.
 
 - **Tier 0 — `format()` produces a valid blank.** Per format, plus a cross-check that the declared
-  `defaultImageSize()` matches what the geometry tables imply.
+  `defaultImageSize()` matches what the geometry tables imply, and
+  `test_format_honours_track_count_and_error_info`, which checks the resulting file size in bytes
+  for 13 geometry variants (see below).
 - **Tier 1 — single-file write.** Drives the real SAVE path (`mode = out`, `seekPath()`, `write()`,
   `close()`), then verifies against a *reopened* image: invariants, c1541 validate, the entry in
   c1541's directory listing, byte-exact read-back, and block accounting.
@@ -156,6 +158,27 @@ Each tier builds on the one below it, so a failure low down explains failures ab
   reused name pool, with the invariant checker run after *every* operation so a failure names the
   exact op rather than an end state to bisect. Seeds are fixed; one that finds a bug should stay in
   the list as a permanent regression case.
+
+## Choosing geometry at format time
+
+`formatImage(name, id, track_count, error_info)` takes the geometry rather than assuming it:
+
+- **`track_count == 0`** means the media default — `defaultImageSize()`.
+- **`track_count > 0`** sizes the image from that many tracks instead. This is how a 40- or
+  42-track D64, an 81-track D81, or a DNP created with more than one track is made. It has to be
+  applied *before* anything is laid out, because `initializeBlocks()` fills every track and
+  `initializeBlockAllocationMap()` writes one BAM entry per track — both read `end_track`.
+- **`error_info`** appends one status byte per sector after the data area, so a 35-track D64 is
+  174848 + 683 = 175531 bytes. The expected sizes are exactly the ones `D64MStream`'s constructor
+  already recognises in its size switch, so writer and reader agree by construction.
+
+`test_format_honours_track_count_and_error_info` checks all of it against the actual file size on
+disk — 13 cases spanning defaults, explicit track counts, and error-info variants.
+
+One wrinkle worth knowing: `FileContainerStream(path, 0)` opens an **existing** file, so a test
+that wants formatImage to size an empty container has to create the file first. And a DNP whose
+container is empty divides to *zero* tracks, which cannot be formatted — the constructor floors it
+at one.
 
 ## Two things that will bite you when writing tests here
 

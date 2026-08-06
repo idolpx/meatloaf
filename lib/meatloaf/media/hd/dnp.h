@@ -97,6 +97,13 @@ public:
         uint32_t size = containerStream->size() / 65536;
         if ( containerStream->size() % 65536 != 0 )
             size++;
+        // An empty container - a partition about to be created - divides to
+        // zero tracks, and a zero-track partition cannot be formatted: the BAM
+        // loop has nothing to iterate and no block is ever marked free. One
+        // track is the floor; formatImage() raises it if a track count is asked
+        // for, and growImage() extends it later when growth is enabled.
+        if ( size == 0 )
+            size = 1;
         partitions[0].block_allocation_map[0].end_track = size;
         Debug_printv("size[%d] tracks[%d]", size, partitions[0].block_allocation_map[0].end_track);
     }

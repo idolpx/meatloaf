@@ -1259,6 +1259,70 @@ void test_dnp_does_not_grow_by_default(void)
     remove(path);
 }
 
+// track_count selects the geometry at format time; 0 means the media default.
+// error_info appends one status byte per sector after the data area. The
+// expected sizes below are the canonical ones the D64MStream constructor
+// already recognises in its size switch, so this test and the reader agree.
+struct GeometryCase
+{
+    const char* name;
+    std::shared_ptr<D64MStream> (*make)(std::shared_ptr<MStream>);
+    size_t      tracks;       // 0 = media default
+    bool        error_info;
+    uint32_t    expected_size;
+    const char* why;
+};
+
+void test_format_honours_track_count_and_error_info(void)
+{
+    const GeometryCase cases[] = {
+        { "d64", make_d64,  0, false, 174848, "default = 35 tracks" },
+        { "d64", make_d64, 35, false, 174848, "35 tracks explicitly" },
+        { "d64", make_d64, 40, false, 196608, "40-track D64" },
+        { "d64", make_d64, 42, false, 205312, "42-track D64" },
+        { "d64", make_d64, 35, true,  175531, "35 tracks + 683 error bytes" },
+        { "d64", make_d64, 40, true,  197376, "40 tracks + 768 error bytes" },
+        { "d64", make_d64, 42, true,  206114, "42 tracks + 802 error bytes" },
+        { "d71", make_d71,  0, false, 349696, "default = 70 tracks" },
+        { "d81", make_d81,  0, false, 819200, "default = 80 tracks" },
+        { "d81", make_d81, 81, false, 829440, "81-track D81" },
+        { "dnp", make_dnp,  0, false,  65536, "default = 1 track" },
+        { "dnp", make_dnp,  4, false, 262144, "DNP created with 4 tracks" },
+        { "dnp", make_dnp, 16, false,1048576, "DNP created with 16 tracks" },
+    };
+
+    for (const auto& c : cases)
+    {
+        std::string path = std::string("build_geom_") + c.name + "_" +
+                           std::to_string(c.tracks) + (c.error_info ? "e" : "") + ".img";
+        remove(path.c_str());
+        {
+            // Start from an EMPTY container so formatImage() must size it
+            // itself rather than inherit a size the test chose. Note
+            // FileContainerStream(path, 0) opens an EXISTING file, so the file
+            // has to be created first - it just has no bytes in it.
+            { FILE* mk = fopen(path.c_str(), "wb"); if (mk) fclose(mk); }
+            auto src = std::make_shared<FileContainerStream>(path, 0);
+            auto image = c.make(src);
+            char msg[160];
+            snprintf(msg, sizeof(msg), "%s (%s): formatImage failed", c.name, c.why);
+            TEST_ASSERT_TRUE_MESSAGE(image->formatImage("geom", "01", c.tracks, c.error_info), msg);
+        }
+
+        FILE* fp = fopen(path.c_str(), "rb");
+        TEST_ASSERT_NOT_NULL(fp);
+        fseek(fp, 0, SEEK_END);
+        long got = ftell(fp);
+        fclose(fp);
+
+        char msg[192];
+        snprintf(msg, sizeof(msg), "%s (%s): expected %u bytes, got %ld",
+                 c.name, c.why, (unsigned)c.expected_size, got);
+        if (got != (long)c.expected_size) { remove(path.c_str()); TEST_FAIL_MESSAGE(msg); }
+        remove(path.c_str());
+    }
+}
+
 void test_tier3_randomized_stress(void)
 {
     // Fixed seeds keep failures reproducible. When a seed finds a bug, keep it
@@ -1285,6 +1349,7 @@ void process()
     RUN_TEST(test_invariants_pass_on_blank_image);
     RUN_TEST(test_dnp_grows_beyond_its_initial_track);
     RUN_TEST(test_dnp_does_not_grow_by_default);
+    RUN_TEST(test_format_honours_track_count_and_error_info);
     // Once per format, so no format can be hidden behind another's failure.
     for (g_format_index = 0; g_format_index < all_formats().size(); g_format_index++)
     {
