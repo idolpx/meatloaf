@@ -605,7 +605,7 @@ protected:
         }
         uint8_t track = partitions[partition].directory_track;
         uint8_t sector = partitions[partition].directory_sector;
-        uint8_t data = 0x41; // DOS version
+        uint8_t data = dos_version; // DOS version
         if (!writeContainer(&track, 1) || !writeContainer(&sector, 1) || !writeContainer(&data, 1)) {
             return false;
         }
