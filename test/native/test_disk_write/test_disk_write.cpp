@@ -1,4 +1,5 @@
 #include <unity.h>
+#include <random>
 #include <cstdio>
 #include <memory>
 #include "media/disk/d64.h"
@@ -946,6 +947,80 @@ void test_tier2_bam_record_boundary(void)
     }
 }
 
+// ---------------------------------------------------------------------------
+// Tier 3 - seeded randomized stress
+// ---------------------------------------------------------------------------
+
+// Issues a deterministic pseudo-random sequence of saves over a small pool of
+// reused names, checking structure after EVERY operation so a failure names the
+// exact op that broke the image rather than handing back an end state to
+// bisect. Reusing names means many operations are overwrites, which exercises
+// scratch-and-reallocate interleaved with fresh allocation - the sequences
+// hand-written scenarios do not reach.
+static void run_random_session(const FormatFixture& f, unsigned seed)
+{
+    std::string path = std::string("build_t3_") + f.name + "_" +
+                       std::to_string(seed) + "." + f.ext;
+    remove(path.c_str());
+    {
+        auto src = std::make_shared<FileContainerStream>(path, f.size);
+        auto image = f.make(src);
+        char msg[128];
+        snprintf(msg, sizeof(msg), "%s seed=%u: formatImage failed", f.name, seed);
+        TEST_ASSERT_TRUE_MESSAGE(image->formatImage("stress", "01"), msg);
+    }
+
+    std::mt19937 rng(seed);
+    std::uniform_int_distribution<int> size_dist(1, 254 * 6);
+    std::uniform_int_distribution<int> name_dist(0, 7);
+
+    for (int op = 0; op < 25; op++)
+    {
+        char name[24];
+        snprintf(name, sizeof(name), "f%d", name_dist(rng));
+        std::vector<uint8_t> payload((size_t)size_dist(rng), (uint8_t)(op & 0xFF));
+
+        // A failed save is legitimate here - the disk fills up. What must hold
+        // either way is that the image is still structurally sound afterwards,
+        // i.e. a failure rolled back cleanly.
+        open_and_save(f, path, name, payload);
+
+        {
+            auto src = std::make_shared<FileContainerStream>(path);
+            auto image = f.make(src);
+            InvariantResult r = check_invariants(*image);
+            if (!r.ok)
+            {
+                char m[256];
+                snprintf(m, sizeof(m), "%s seed=%u op=%d (%s, %u bytes): %s",
+                         f.name, seed, op, name, (unsigned)payload.size(), r.message.c_str());
+                remove(path.c_str());
+                TEST_FAIL_MESSAGE(m);
+            }
+        }
+    }
+
+    if (c1541_available() && !c1541_validate(path))
+    {
+        char m[160];
+        snprintf(m, sizeof(m), "%s seed=%u: c1541 validate rejected the image after the session",
+                 f.name, seed);
+        remove(path.c_str());
+        TEST_FAIL_MESSAGE(m);
+    }
+    remove(path.c_str());
+}
+
+void test_tier3_randomized_stress(void)
+{
+    // Fixed seeds keep failures reproducible. When a seed finds a bug, keep it
+    // in this list permanently - it becomes a regression case for free.
+    const unsigned seeds[] = { 1, 42, 1337 };
+    for (const auto& f : all_formats())
+        for (unsigned s : seeds)
+            run_random_session(f, s);
+}
+
 void process()
 {
     UNITY_BEGIN();
@@ -968,6 +1043,7 @@ void process()
     RUN_TEST(test_tier2_directory_extension);
     RUN_TEST(test_tier2_overwrite_reuses_slot);
     RUN_TEST(test_tier2_bam_record_boundary);
+    RUN_TEST(test_tier3_randomized_stress);
     UNITY_END();
 }
 
