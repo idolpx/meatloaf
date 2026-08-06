@@ -4,6 +4,14 @@
 # VS Code build directory
 **/.vscode
 
+# GitHub Actions workflow files
+.github
+
+# LLM assistant files
+.claude
+**/CLAUDE.md
+.serena
+
 # PlatformIO build directory
 **/.pio
 **/build
@@ -34,9 +42,6 @@ managed_components/*
 compile_commands.json
 dependencies.lock
 components.staged/*
-
-.claude/*
-**/CLAUDE.md
 
 deploy.*
 sdkconfig.*
