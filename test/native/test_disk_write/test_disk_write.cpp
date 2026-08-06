@@ -870,6 +870,12 @@ void test_tier2_disk_full_rolls_back(void)
 {
     for (const auto& f : all_formats())
     {
+        // DNP never reaches DISK FULL by design - a native partition grows a
+        // track at a time instead. Its ceiling is 255 tracks (~65280 blocks),
+        // far too many to fill in a test. Growth is covered separately by
+        // test_dnp_grows_beyond_its_initial_track.
+        if (std::string(f.name) == "dnp") continue;
+
         std::string path = std::string("build_t2b_") + f.name + "." + f.ext;
         remove(path.c_str());
         {
@@ -1120,6 +1126,62 @@ static void run_random_session(const FormatFixture& f, unsigned seed)
     remove(path.c_str());
 }
 
+// A CMD native partition is created small and extends as files are written.
+// Starting from a single 64 KB track, writing more than one track's worth of
+// data must grow the container rather than fail - and the result must still be
+// structurally sound.
+void test_dnp_grows_beyond_its_initial_track(void)
+{
+    const FormatFixture* dnp = nullptr;
+    for (const auto& f : all_formats())
+        if (std::string(f.name) == "dnp") { dnp = &f; break; }
+    TEST_ASSERT_NOT_NULL_MESSAGE(dnp, "dnp fixture missing from all_formats()");
+
+    const char* path = "build_dnp_grow.dnp";
+    remove(path);
+    {
+        auto src = std::make_shared<FileContainerStream>(path, dnp->size);
+        auto image = dnp->make(src);
+        TEST_ASSERT_TRUE_MESSAGE(image->formatImage("grow", "01"), "dnp: formatImage failed");
+    }
+
+    // One track is 256 blocks of 254 usable bytes. Write appreciably more than
+    // that across several files, so growth is forced more than once.
+    std::vector<uint8_t> chunk(254 * 100, 0x5A);
+    for (int i = 0; i < 5; i++)
+    {
+        char name[24];
+        snprintf(name, sizeof(name), "grow%d", i);
+        char msg[128];
+        snprintf(msg, sizeof(msg), "dnp: save %d failed - partition did not grow", i);
+        if (!open_and_save(*dnp, path, name, chunk))
+        {
+            remove(path);
+            TEST_FAIL_MESSAGE(msg);
+        }
+    }
+
+    // The container must actually be bigger than the single track it started as.
+    FILE* fp = fopen(path, "rb");
+    TEST_ASSERT_NOT_NULL(fp);
+    fseek(fp, 0, SEEK_END);
+    long grown = ftell(fp);
+    fclose(fp);
+
+    char msg[160];
+    snprintf(msg, sizeof(msg),
+             "dnp: expected the image to grow past %u bytes, it is %ld",
+             (unsigned)dnp->size, grown);
+    if (grown <= (long)dnp->size) { remove(path); TEST_FAIL_MESSAGE(msg); }
+
+    // Growth must be a whole number of 64 KB tracks.
+    snprintf(msg, sizeof(msg), "dnp: grown size %ld is not a whole number of 64 KB tracks", grown);
+    if (grown % 65536 != 0) { remove(path); TEST_FAIL_MESSAGE(msg); }
+
+    assert_image_sound(*dnp, path, "after growing");
+    remove(path);
+}
+
 void test_tier3_randomized_stress(void)
 {
     // Fixed seeds keep failures reproducible. When a seed finds a bug, keep it
@@ -1153,6 +1215,7 @@ void process()
     RUN_TEST(test_tier2_overwrite_reuses_slot);
     RUN_TEST(test_tier2_directory_full_reports_disk_full);
     RUN_TEST(test_tier2_bam_record_boundary);
+    RUN_TEST(test_dnp_grows_beyond_its_initial_track);
     RUN_TEST(test_tier3_randomized_stress);
     UNITY_END();
 }

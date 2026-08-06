@@ -357,7 +357,9 @@ D64MStream::BlockChain D64MStream::getFreeBlocks(uint16_t file_size)
 //   when the track fills up, move one track further away from the directory,
 //   and when that side of the disk is exhausted, switch to the other side.
 // startTrack == 0 (files only) means "first block of a new file".
-bool D64MStream::getNextFreeBlock(uint8_t startTrack, uint8_t startSector, uint8_t *foundTrack, uint8_t *foundSector, bool forDirectory)
+// Searches the tracks that exist right now. getNextFreeBlock() wraps this with
+// a grow-and-retry for media that can be extended.
+bool D64MStream::findFreeBlock(uint8_t startTrack, uint8_t startSector, uint8_t *foundTrack, uint8_t *foundSector, bool forDirectory)
 {
     uint8_t dir_track = partitions[partition].directory_track;
     uint8_t first_track = partitions[partition].block_allocation_map.front().start_track;
@@ -374,12 +376,27 @@ bool D64MStream::getNextFreeBlock(uint8_t startTrack, uint8_t startSector, uint8
             *foundTrack = t;
             return true;
         }
-        return false; // directory track is full
+        // A dedicated directory track is a hard limit. Without one the
+        // directory is just a chain, so a new block may go anywhere and the
+        // search below applies - the caller links it to the previous block.
+        if (dedicated_directory_track)
+            return false;
     }
 
     if (startTrack == 0)
     {
-        // First block: closest track to the directory track with a free sector
+        // First block: closest track to the directory track with a free sector.
+        // Distance 0 - the directory track itself - is only a candidate when the
+        // format does not dedicate that track to the directory. Skipping it
+        // unconditionally left a 1-track CMD native partition with nowhere to
+        // put a first block, so every save "filled the disk" immediately.
+        if (!dedicated_directory_track &&
+            getTrackFreeCount(dir_track) && findFreeSectorOnTrack(dir_track, 0, foundSector))
+        {
+            *foundTrack = dir_track;
+            return true;
+        }
+
         for (uint16_t d = 1; ; d++)
         {
             int below = (int)dir_track - d;
@@ -420,7 +437,7 @@ bool D64MStream::getNextFreeBlock(uint8_t startTrack, uint8_t startSector, uint8
     int step = (startTrack < dir_track) ? -1 : 1;
     for (int t = (int)startTrack + step; t >= first_track && t <= last_track; t += step)
     {
-        if (t == dir_track)
+        if (dedicated_directory_track && t == dir_track)
             continue;
         if (getTrackFreeCount(t) && findFreeSectorOnTrack(t, 0, foundSector))
         {
@@ -431,7 +448,7 @@ bool D64MStream::getNextFreeBlock(uint8_t startTrack, uint8_t startSector, uint8
     // ...then try the other side of the directory
     for (int t = (int)dir_track - step; t >= first_track && t <= last_track; t -= step)
     {
-        if (t == dir_track)
+        if (dedicated_directory_track && t == dir_track)
             continue;
         if (getTrackFreeCount(t) && findFreeSectorOnTrack(t, 0, foundSector))
         {
@@ -446,7 +463,7 @@ bool D64MStream::getNextFreeBlock(uint8_t startTrack, uint8_t startSector, uint8
     // otherwise be missed.
     for (int t = first_track; t <= last_track; t++)
     {
-        if (t == dir_track)
+        if (dedicated_directory_track && t == dir_track)
             continue;
         if (getTrackFreeCount(t) && findFreeSectorOnTrack(t, 0, foundSector))
         {
@@ -456,6 +473,20 @@ bool D64MStream::getNextFreeBlock(uint8_t startTrack, uint8_t startSector, uint8
     }
 
     return false;
+}
+
+bool D64MStream::getNextFreeBlock(uint8_t startTrack, uint8_t startSector, uint8_t *foundTrack, uint8_t *foundSector, bool forDirectory)
+{
+    if (findFreeBlock(startTrack, startSector, foundTrack, foundSector, forDirectory))
+        return true;
+
+    // Nothing free in the tracks that exist. Media that can be extended get one
+    // more track and a second look; for everything else growImage() refuses and
+    // this is a genuine DISK FULL.
+    if (!growImage())
+        return false;
+
+    return findFreeBlock(startTrack, startSector, foundTrack, foundSector, forDirectory);
 }
 
 bool D64MStream::isBlockFree(uint8_t track, uint8_t sector)
@@ -901,7 +932,7 @@ uint16_t D64MStream::blocksFree()
     {
         for (uint16_t t = bam.start_track; t <= bam.end_track; t++)
         {
-            if (t == partitions[partition].directory_track)
+            if (dedicated_directory_track && t == partitions[partition].directory_track)
                 continue;
             free_count += getTrackFreeCount(t);
         }

@@ -114,6 +114,15 @@ public:
     std::vector<uint16_t> sectorsPerTrack = { 17, 18, 19, 21 };
     std::vector<uint8_t> interleave = { 3, 10 }; // Directory, File
 
+    // True for the floppy formats: one whole track belongs to the directory,
+    // so directory blocks are only ever placed there and file data never is.
+    // CMD native partitions (DNP) do not work that way - their directory is a
+    // plain chain that can extend onto any track, and file data shares track 1
+    // with it. On a small native partition that distinction is not cosmetic:
+    // excluding the directory track would leave a 1-track partition with no
+    // data blocks at all.
+    bool dedicated_directory_track = true;
+
     uint8_t dos_version = 0x41;
     std::string dos_rom = "dos1541";
     std::string dos_name = "";
@@ -342,6 +351,14 @@ protected:
     bool deallocateBlock( uint8_t track, uint8_t sector );
     BlockChain getFreeBlocks(uint16_t file_size);
     bool getNextFreeBlock(uint8_t startTrack, uint8_t startSector, uint8_t *foundTrack, uint8_t *foundSector, bool forDirectory = false);
+    bool findFreeBlock(uint8_t startTrack, uint8_t startSector, uint8_t *foundTrack, uint8_t *foundSector, bool forDirectory);
+
+    // Grow the medium by one track and return true if that succeeded. Fixed
+    // geometry formats cannot, so the default refuses; a CMD native partition
+    // (DNP) can, which is the whole point of "native" - it is sized at creation
+    // but not capped there. getNextFreeBlock() calls this once when it can find
+    // no free block, then retries.
+    virtual bool growImage() { return false; }
     bool isBlockFree(uint8_t track, uint8_t sector);
 
     // BAM record location for one track (which BAM sector holds it and where)

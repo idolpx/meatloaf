@@ -297,8 +297,28 @@ Two Tier 2 scenarios skip DNP, both because the scenario cannot exist there:
   fills first at any size that keeps the exhaustive per-operation checks affordable.
 - **BAM record boundary** — DNP has a single BAM record, so there is no boundary to cross.
 
-DNP's default size for creation is 4 tracks (256 KB). It has no canonical size, and the suite's
-exhaustive checks scan every block, so each extra track costs 256 block reads per scan.
+### DNP grows; it is not fixed at creation
+
+A CMD native partition starts at **one track (64 KB)** and extends a track at a time as files are
+written - that is what "native" means. Three engine changes make that work:
+
+- **`D64MStream::growImage()`** (virtual, refuses by default) is called by `getNextFreeBlock()`
+  once when no free block can be found, then the search is retried. `DNPMStream` overrides it to
+  append a 64 KB track and mark its 256 sectors free. The BAM area is reserved at full size (32
+  bytes per track for 255 tracks) regardless of how many tracks exist, so a new track's entry always
+  lands in space already allocated to the BAM. Ceiling is 255 tracks.
+- **`dedicated_directory_track`** (true for the floppy formats, false for DNP) governs two things
+  that turn out to be the same question: whether directory blocks are confined to one track, and
+  whether file data is kept off it. DNP's directory is a plain chain that may extend onto any track,
+  and shares track 1 with data. `blocksFree()` and the invariant checker both honor the flag.
+- **The first-block search now considers the directory track itself** when the flag is false. It
+  previously scanned tracks at ±d from the directory starting at d=1, so a 1-track partition had
+  nowhere to put a first block and every save reported the disk full.
+
+DNP is therefore excluded from the disk-full rollback scenario - it grows instead of filling, and
+its real ceiling is ~65280 blocks. `test_dnp_grows_beyond_its_initial_track` covers growth
+directly: format one track, write appreciably more than a track of data, and assert the container
+grew by a whole number of 64 KB tracks and is still structurally sound.
 
 ## Coverage gaps
 

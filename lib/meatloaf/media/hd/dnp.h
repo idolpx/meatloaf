@@ -68,6 +68,12 @@ public:
         sectorsPerTrack = { 256 };
         has_subdirs = true;
 
+        // A CMD native partition has no dedicated directory track: the
+        // directory is a plain chain that may extend onto any track, and file
+        // data shares track 1 with it. On a 1-track partition that matters a
+        // great deal - reserving track 1 would leave nowhere to put data.
+        dedicated_directory_track = false;
+
 
         // Read this offset to get t/s link to start of directory
         seek(0x100);
@@ -98,11 +104,54 @@ public:
     // A CMD native partition has no canonical size - it is whatever it was
     // created as, and the constructor derives the track count from the
     // container. This is only the size used when creating one from nothing.
-    // 4 tracks (256 KB) - large enough that data blocks are not confined to
-    // the directory track, small enough to keep a full-image scan cheap: a DNP
-    // track is 256 sectors, so every extra track costs 256 block reads in any
-    // exhaustive check.
-    uint32_t defaultImageSize() override { return 4 * 65536; };
+    // One track (64 KB). A native partition is not capped at its creation size
+    // - growImage() adds tracks on demand - so there is no reason to reserve
+    // space up front.
+    uint32_t defaultImageSize() override { return 65536; }
+
+    // Add one track and mark it entirely free. This is what makes a CMD native
+    // partition "native": it starts small and grows as files are written,
+    // rather than being fixed at creation like a floppy image.
+    //
+    // The BAM area is reserved at full size (32 bytes per track for 255 tracks,
+    // sectors 1/2..1/33) regardless of how many tracks exist, so a new track's
+    // entry always lands inside space that is already allocated to the BAM -
+    // no relocation, no risk of overrunning into the directory.
+    bool growImage() override
+    {
+        auto &bam = partitions[partition].block_allocation_map[0];
+        uint16_t new_track = (uint16_t)bam.end_track + 1;
+
+        // 255 tracks is the ceiling the BAM can describe (~16 MB).
+        if (new_track > 255)
+            return false;
+
+        // Extend the container by writing the last byte of the new track. A
+        // seek alone does not grow a file; a write does.
+        uint32_t new_size = (uint32_t)new_track * 65536;
+        if (!containerStream->seek(new_size - 1))
+            return false;
+        uint8_t pad = 0x00;
+        if (containerStream->write(&pad, 1) != 1)
+            return false;
+
+        bam.end_track = (uint8_t)new_track;
+
+        // Mark every sector of the new track free. 256 sectors = 32 bitmap
+        // bytes, all 0xFF; this record style carries no leading count byte.
+        if (!seekSector(bam.track, bam.sector, 0))
+            return false;
+        uint16_t offset = bam.offset + (uint16_t)(new_track - bam.start_track) * bam.byte_count;
+        if (!seekSector(bam.track, (uint8_t)(bam.sector + offset / block_size),
+                        (uint8_t)(offset % block_size)))
+            return false;
+        std::vector<uint8_t> all_free(bam.byte_count, 0xFF);
+        if (writeContainer(all_free.data(), all_free.size()) != all_free.size())
+            return false;
+
+        Debug_printv("grew DNP to %d tracks", (int)new_track);
+        return true;
+    };
 
     virtual uint8_t speedZone(uint8_t track) override { return 0; };
 

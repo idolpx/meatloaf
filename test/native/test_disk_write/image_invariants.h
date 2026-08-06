@@ -184,7 +184,12 @@ struct ImageInvariantChecker
         uint16_t counted = 0;
         for (uint8_t t = 1; t <= last; t++)
         {
-            if (t == img.partitions[img.partition].directory_track) continue;
+            // Mirror blocksFree(): it excludes the directory track only on
+            // formats that dedicate a whole track to it. A CMD native partition
+            // does not - its directory shares track 1 with file data, and on a
+            // 1-track partition that track is the entire medium.
+            if (img.dedicated_directory_track &&
+                t == img.partitions[img.partition].directory_track) continue;
             uint16_t spt = img.getSectorCount(t);
             for (uint16_t s = 0; s < spt; s++)
                 if (img.isBlockFree(t, (uint8_t)s)) counted++;

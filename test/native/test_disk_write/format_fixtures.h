@@ -47,7 +47,7 @@ inline const std::vector<FormatFixture>& all_formats()
         { "d80", "d80", 533248,     make_d80, true  },
         { "d81", "d81", 819200,     make_d81, true  },
         { "d82", "d82", 1066496,    make_d82, true  },
-        { "dnp", "dnp", 4 * 65536,  make_dnp, false },
+        { "dnp", "dnp", 65536,      make_dnp, false },
     };
     return formats;
 }
