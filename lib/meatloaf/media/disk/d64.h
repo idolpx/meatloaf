@@ -354,7 +354,10 @@ protected:
     };
     bool getBAMRecord( uint8_t track, BAMRecord *rec );
     bool readBAMRecord( uint8_t track, BAMRecord *rec, uint8_t *buf );
-    bool setBlockAllocation( uint8_t track, uint8_t sector, bool allocate );
+    // Virtual so formats whose BAM splits the free COUNT away from the BITMAP
+    // can maintain both halves - see D71MStream, where side 2's counts live in
+    // 18/0 at 0xDD while its bitmaps live at 53/0.
+    virtual bool setBlockAllocation( uint8_t track, uint8_t sector, bool allocate );
     uint8_t getTrackFreeCount( uint8_t track );
     bool findFreeSectorOnTrack( uint8_t track, uint8_t startSector, uint8_t *foundSector );
 
@@ -388,7 +391,9 @@ public:
     bool formatImage(std::string name, std::string id);
 
 protected:
-    bool initializeBlockAllocationMap()
+    // Virtual for the same reason as setBlockAllocation(): a format whose BAM
+    // splits counts from bitmaps has to seed both halves at format time.
+    virtual bool initializeBlockAllocationMap()
     {
         uint16_t bam_index = 0;
         uint16_t bam_count = partitions[partition].block_allocation_map.size();
@@ -567,12 +572,19 @@ protected:
         std::vector<uint8_t> empty(block_size - 2, 0);
         if (writeContainer(empty.data(), empty.size()) != empty.size()) return false;
 
-        // Allocate the BAM/header sector, which formatImage() has just written
-        // into. block_allocation_map[0] is that sector (e.g. 18/0 on D64).
-        if (!setBlockAllocation( partitions[partition].block_allocation_map[0].track, 
-                                 partitions[partition].block_allocation_map[0].sector, 
-                                 true ))
-            return false;
+        // Allocate EVERY sector the BAM itself occupies. Formats with more than
+        // one BAM record spread them over several sectors - D71 has 18/0 plus
+        // 53/0 for side 2, D80 has 38/0 and 38/3, D82 adds 38/6 and 38/9 - and
+        // leaving those unallocated makes the BAM advertise its own storage as
+        // free. Records can share a sector, so skip one that is already taken
+        // rather than letting setBlockAllocation() fail on a double allocation.
+        for (auto &bam : partitions[partition].block_allocation_map)
+        {
+            if (!isBlockFree(bam.track, bam.sector))
+                continue;
+            if (!setBlockAllocation(bam.track, bam.sector, true))
+                return false;
+        }
 
         // ...and the first directory sector (e.g. 18/1 on D64). Without this
         // the BAM claims a sector the directory chain is actively using, so a

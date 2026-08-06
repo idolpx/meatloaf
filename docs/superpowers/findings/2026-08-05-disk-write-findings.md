@@ -163,11 +163,40 @@ invariants do not. D82 sits behind them because `test_tier0_format_all_media` st
 first failing format (see the deferred note about that loop's design — it should become
 per-format tests).
 
-A concrete lead for D71: on a real 1571 the side-2 **free counts** live in `18/0` at offset
-`0xDD` (one byte per track 36-70) while the side-2 **bitmaps** live at `53/0`. The
-`BlockAllocationMap` struct cannot express a record whose counts and bitmap are in different
-places, so `formatImage()` never writes those counts at all. D80/D82 and D81 will each need
-their own check against their real DOS layout.
+Two partial fixes have landed against #7 (both correct, neither sufficient on their own):
+
+- **`setBlockAllocation()` / `initializeBlockAllocationMap()` are now virtual**, and
+  `D71MStream` overrides both to maintain the side-2 free COUNTS in `18/0` at `0xDD` (one byte
+  per track 36-70) alongside the side-2 BITMAPS at `53/0`. `BlockAllocationMap` describes one
+  contiguous run of bytes and cannot express a split record, so the base class owns the bitmap
+  and D71 owns the counts.
+- **`initializeDirectory()` now allocates EVERY sector the BAM occupies**, not just
+  `block_allocation_map[0]`. D71's BAM spans `18/0` and `53/0`; D80's spans `38/0` and `38/3`;
+  D82's adds `38/6` and `38/9`. Leaving those unallocated made the BAM advertise its own
+  storage as free.
+
+**D71 still fails, and there is byte-level evidence of where.** Capturing the image before and
+after `c1541 -validate` (temporary instrumentation, since validate rewrites in place) shows
+exactly four bytes differ:
+
+| Offset | Location | Ours | After validate |
+|--------|----------|------|----------------|
+| 91631 | `18/0` + `0xEF` — side-2 count for track 54 | 18 | 0 |
+| 266292 | `53/0` + `0x34` | `0xFE` | 0 |
+| 266293 | `53/0` + `0x35` | `0xFF` | 0 |
+| 266294 | `53/0` + `0x36` | `0x07` | 0 |
+
+The side-2 record is 3 bytes per track from offset `0x00`, so track 53's bitmap belongs at
+`0x33`-`0x35` and track 54's at `0x36`-`0x38`. Our `0xFE, 0xFF, 0x07` — the correct pattern for
+a 19-sector track with sector 0 allocated — starts at `0x34` instead of `0x33`, i.e. **shifted
+one byte late**, and the corruption straddles into track 54. Something in the side-2 write path
+is still off by one past track 52. That is the next thing to chase.
+
+(For reference: `18/0` begins at byte 91392 — tracks 1-17 × 21 sectors × 256 — and `53/0` at
+byte 266240.)
+
+D80/D82 and D81 have not been analysed at this level yet; each needs checking against its own
+DOS layout.
 
 This is also a useful demonstration of why the suite runs two independent validators: our
 checker passing is necessary but not sufficient, and a suite built on invariants alone would

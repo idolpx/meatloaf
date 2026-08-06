@@ -91,6 +91,55 @@ public:
         }
     };
 
+    // On a 1571 the side-2 BAM is SPLIT: the per-track free-sector COUNTS for
+    // tracks 36-70 live in the header sector (18/0) at offset 0xDD - one byte
+    // per track, filling 0xDD..0xFF - while the matching BITMAPS live at 53/0.
+    // BlockAllocationMap can only describe one contiguous run of bytes, so the
+    // base class maintains the bitmap and D71 maintains the counts alongside it.
+    static constexpr uint8_t SIDE2_FIRST_TRACK = 36;
+    static constexpr uint8_t SIDE2_COUNT_OFFSET = 0xDD;
+
+    bool writeSide2FreeCount( uint8_t track, uint8_t count )
+    {
+        if (!seekSector( partitions[partition].header_track,
+                         partitions[partition].header_sector,
+                         SIDE2_COUNT_OFFSET + (track - SIDE2_FIRST_TRACK) ))
+            return false;
+        return writeContainer(&count, 1) == 1;
+    }
+
+    bool setBlockAllocation( uint8_t track, uint8_t sector, bool allocate ) override
+    {
+        // The base class owns the bitmap. For side 1 that is the whole job.
+        if (!D64MStream::setBlockAllocation(track, sector, allocate))
+            return false;
+
+        if (track < SIDE2_FIRST_TRACK)
+            return true;
+
+        // Side 2: mirror the change into the split-off count byte. getTrackFreeCount()
+        // counts bits in the bitmap the base class just updated, so it is already
+        // the post-change value - no need to re-derive it here.
+        return writeSide2FreeCount(track, getTrackFreeCount(track));
+    }
+
+    bool initializeBlockAllocationMap() override
+    {
+        if (!D64MStream::initializeBlockAllocationMap())
+            return false;
+
+        // The base initializer only writes the records BlockAllocationMap
+        // describes, so side 2's counts would be left as whatever was in 18/0.
+        // Seed them from the bitmaps it just wrote.
+        uint8_t last_track = partitions[partition].block_allocation_map.back().end_track;
+        for (uint8_t t = SIDE2_FIRST_TRACK; t <= last_track; t++)
+        {
+            if (!writeSide2FreeCount(t, getTrackFreeCount(t)))
+                return false;
+        }
+        return true;
+    }
+
     virtual uint8_t speedZone( uint8_t track) override
     {
         // Track 35 is the LAST track of side 1 (17 sectors). `track < 35` sent

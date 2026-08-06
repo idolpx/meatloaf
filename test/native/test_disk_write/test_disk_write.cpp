@@ -513,9 +513,10 @@ void test_invariants_pass_on_clean_c1541_image_with_two_files(void)
 // that finding is fixed.
 void test_tier0_format_all_media(void)
 {
-    // d64 passes BOTH validators. d71/d80/d81 pass check_invariants() but are
-    // still rejected by c1541 (finding #7); d82 is unverified behind them
-    // because this loop stops at the first failing format. Lift to re-check.
+    // d64 passes BOTH validators. d71/d80/d81 pass check_invariants() but c1541
+    // still rejects them (finding #7 - see the findings file for byte-level
+    // evidence on d71); d82 is unverified because this loop stops at the first
+    // failing format. Lift this to re-check after any fix.
     TEST_IGNORE_MESSAGE("finding #7: d71/d80/d81 satisfy our invariants but c1541 "
                         "still rejects them; d64 passes both, d82 unverified");
     // finding #2 (shared D64MStream base - see the findings file) makes d64,
