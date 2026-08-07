@@ -159,6 +159,14 @@ void main_shutdown_handler()
 
     SessionBroker::shutdown();
     SYSTEM_BUS.shutdown();
+
+#ifdef SD_CARD
+    // Unmount LAST, once the bus and network sessions have stopped, so nothing
+    // can write to the card after its FAT has been flushed. esp_restart() runs
+    // registered shutdown handlers, so this covers the "reboot" command, and
+    // any other esp_restart() path, but NOT a crash or a power cut.
+    fnSDFAT.stop();
+#endif
 }
 
 // Initial setup

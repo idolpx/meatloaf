@@ -22,6 +22,9 @@ private:
 public:
 #ifdef ESP_PLATFORM
     bool start();
+    // Flushes FATFS's cached FAT/directory sectors and releases the card.
+    // Must run before any reset/reboot or the filesystem is left dirty.
+    bool stop();
 #else
     bool start(const char *sd_path = nullptr);
 #endif

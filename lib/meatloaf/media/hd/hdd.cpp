@@ -663,8 +663,11 @@ bool HDDMFile::rewindDirectory()
 
 MFile* HDDMFile::getNextFileInDir()
 {
-    if (!dirIsOpen)
-        rewindDirectory();
+    // Same as D64MFile::getNextFileInDir(): a failed rewind has already reset
+    // the shared stream's entry counter, so reading on would restart the
+    // listing from entry 0 forever.
+    if (!dirIsOpen && !rewindDirectory())
+        return nullptr;
 
     auto image = ImageBroker::obtain<HDDMStream>("hdd", url);
     if (image == nullptr)

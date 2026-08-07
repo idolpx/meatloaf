@@ -1427,8 +1427,12 @@ MFile* D64MFile::getNextFileInDir()
 {
     bool r = false;
 
-    if (!dirIsOpen)
-        rewindDirectory();
+    // A failed rewind leaves dirIsOpen false but has already reset the shared
+    // stream's entry counter, so continuing would hand back the first entry
+    // again on every call - an endless listing (e.g. "ls sett*", where
+    // pathInStream names a file, not a directory).
+    if (!dirIsOpen && !rewindDirectory())
+        return nullptr;
 
     // Get entry pointed to by containerStream
     auto image = ImageBroker::obtain<D64MStream>("d64", url);

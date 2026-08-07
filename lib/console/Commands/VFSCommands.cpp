@@ -213,7 +213,22 @@ int ls(int argc, char **argv)
         // flags like -la, -l, -a are silently ignored
     }
 
-    if (path_arg == nullptr)
+    // A wildcard in the LAST component filters the listing instead of naming
+    // something to descend into ("ls fb*", "ls /sd/games/*.d64"). Without this
+    // the pattern reaches cd(), which resolves it to the FIRST matching entry
+    // and then lists that single file as though it were a directory.
+    std::string arg = (path_arg == nullptr) ? "" : path_arg;
+    size_t slash = arg.find_last_of('/');
+    std::string pattern = (slash == std::string::npos) ? arg : arg.substr(slash + 1);
+    bool filtered = pattern.find('*') != std::string::npos ||
+                    pattern.find('?') != std::string::npos;
+
+    if (filtered && slash != std::string::npos)
+    {
+        // Keep the trailing '/' so a rooted "/fb*" still resolves to "/"
+        listPath = getCurrentPath()->cd(arg.substr(0, slash + 1));
+    }
+    else if (filtered || path_arg == nullptr)
     {
         listPath = MFSOwner::File(getCurrentPath()->fullUrl());
     }
@@ -234,19 +249,25 @@ int ls(int argc, char **argv)
     // If sd card is mounted and we are at root
     if( getCurrentPath()->url.size() == 1 )
     {
-        if ( fnSDFAT.running() )
+        if ( fnSDFAT.running() && ( !filtered || mstr::compare("sd", pattern, false) ) )
             Serial.printf("d %8lu  \"sd\"\r\n", 0);
 
-        Serial.printf("d %8lu  \"network\"\r\n", 0);
+        if ( !filtered || mstr::compare("network", pattern, false) )
+            Serial.printf("d %8lu  \"network\"\r\n", 0);
     }
 
     while(entry.get() != nullptr) {
-        if ( entry->isPETSCII )
-            entry->name = mstr::toUTF8(entry->name);
+        // Compare against the raw entry name, before the UTF-8 conversion
+        // below rewrites it (same basis rm's wildcard branch matches on).
+        if ( !filtered || mstr::compare(entry->name, pattern, false) )
+        {
+            if ( entry->isPETSCII )
+                entry->name = mstr::toUTF8(entry->name);
 
-        mstr::replaceAll(entry->name, "\"", "\\\""); // Escape double quotes
-        // Serial.printf("%c %8lu  \"%s\"  {%s}\r\n", (entry->isDirectory()) ? 'd':'-', entry->size, entry->name.c_str(), (entry->isPETSCII) ? "PETSCII" : "ASCII");
-        Serial.printf("%c %8lu  \"%s\"\r\n", (entry->isDirectory()) ? 'd':'-', entry->size, entry->name.c_str());
+            mstr::replaceAll(entry->name, "\"", "\\\""); // Escape double quotes
+            // Serial.printf("%c %8lu  \"%s\"  {%s}\r\n", (entry->isDirectory()) ? 'd':'-', entry->size, entry->name.c_str(), (entry->isPETSCII) ? "PETSCII" : "ASCII");
+            Serial.printf("%c %8lu  \"%s\"\r\n", (entry->isDirectory()) ? 'd':'-', entry->size, entry->name.c_str());
+        }
         entry.reset(destPath->getNextFileInDir());
     }
 
