@@ -7,11 +7,6 @@
 # GitHub Actions workflow files
 .github
 
-# LLM assistant files
-.claude
-.serena
-
-
 # PlatformIO build directory
 **/.pio
 **/build
@@ -49,4 +44,4 @@ version.txt
 include/version.h
 .superpowers/
 
-__pycache__/build_version.cpython-314.pyc
+**/*.pyc

@@ -1,0 +1,20 @@
+{
+  "skill_name": "c64-meatloaf-debug",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I'm trying to debug why my C64 BASIC program isn't getting a response from my API server. The program opens a GET request to my echo server at http://192.168.1.131:8080/echo, sends it, reads the status, but the status line shows 'STATUS: 0' and the serial log doesn't show any 'Request URL:' or 'perform OK' lines. I've flashed the latest firmware. Can you help me diagnose what's going wrong and fix it?",
+      "expected_output": "A systematic debugging session that: 1) checks serial capture is running, 2) reads the C64 screen, 3) injects a diagnostic program, 4) greps serial logs, 5) diagnoses the issue from evidence, 6) deploys the fix (either BASIC or firmware change)"
+    },
+    {
+      "id": 2,
+      "prompt": "I'm working on a C64 chat client that talks to an Ollama API via Meatloaf. The first question works fine — I get a response back. But when I ask a second question (the program loops back and makes another POST request), it just shows the same answer as the first question. The screen shows 'STATUS: 200' immediately for Q2, and the serial log doesn't show any new HTTP request being made for Q2. Can you help me fix this? The Meatloaf source is at /home/qus/dev/_c/meatloaf/.",
+      "expected_output": "A debugging session that: 1) recognizes this as the known Q2 state machine issue, 2) explains the root cause (session reuse without fresh perform), 3) tries a BASIC-side workaround (close/reopen the channel between requests), 4) if that doesn't work, analyzes the firmware source to find the issue"
+    },
+    {
+      "id": 3,
+      "prompt": "I just made a change to handleCommand() in Meatloaf's http.cpp at /home/qus/dev/_c/meatloaf/lib/network/http.cpp and flashed it. Now none of my BASIC programs work — the C64 just shows '?DEVICE NOT PRESENT  ERROR' when I try to OPEN a URL. I need to run the unattended debug cycle to figure out what I broke and fix it. Start from scratch: check the U64 is connected, start serial capture, and run a test.",
+      "expected_output": "A full unattended debug cycle: 1) runs diagnostic check, 2) ensures serial capture is running, 3) builds+flashes firmware, 4) injects a minimal test program, 5) reads screen and serial logs, 6) deduces whether the issue is in the freshly-flashed firmware or the BASIC code, 7) iterates"
+    }
+  ]
+}
