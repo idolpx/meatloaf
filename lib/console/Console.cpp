@@ -642,7 +642,7 @@ namespace ESP32Console
             std::string prompt = console.prompt_;
 
             // Insert current PWD into prompt if needed
-            mstr::replaceAll(prompt, "%pwd%", getCurrentPath()->url);
+            mstr::replaceAll(prompt, "%pwd%", getCurrentPathUrl());
             char *line = linenoise(prompt.c_str());
             if (line == NULL)
             {
@@ -833,7 +833,7 @@ namespace ESP32Console
         // Prompt goes to TCP only — the REPL loop owns the UART prompt via linenoise.
         {
             std::string p = prompt_;
-            mstr::replaceAll(p, "%pwd%", getCurrentPath()->url);
+            mstr::replaceAll(p, "%pwd%", getCurrentPathUrl());
             tcp_server.send(p);
         }
 #endif

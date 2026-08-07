@@ -385,6 +385,21 @@ public:
         return mstr::isText(extension);
     }
 
+    virtual std::string fullUrl() const {
+        std::string u = url;
+        if (!pathInStream.empty() && pathInStream != "/") {
+            bool uEnds = mstr::endsWith(u, "/");
+            bool pStarts = mstr::startsWith(pathInStream, "/");
+            if (!uEnds && !pStarts)
+                u += '/';
+            else if (uEnds && pStarts)
+                u.pop_back();
+            u += pathInStream;
+        }
+        return u;
+    }
+
+
     MFile* sourceFile = nullptr;
     std::string pathInStream;
 

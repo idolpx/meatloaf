@@ -1166,6 +1166,7 @@ bool D64MStream::seekPath(std::string path)
     next_track = 0;
     next_sector = 0;
     sector_offset = 0;
+    _position = 0;
 
     entry_index = 0;
 

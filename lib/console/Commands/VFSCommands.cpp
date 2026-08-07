@@ -166,7 +166,7 @@ int hex(int argc, char **argv)
 
 int pwd(int argc, char **argv)
 {
-    Serial.printf("%s\r\n", getCurrentPath()->url.c_str());
+    Serial.printf("%s\r\n", getCurrentPath()->fullUrl().c_str());
     return EXIT_SUCCESS;
 }
 
@@ -215,7 +215,7 @@ int ls(int argc, char **argv)
 
     if (path_arg == nullptr)
     {
-        listPath = MFSOwner::File(getCurrentPath()->url);
+        listPath = MFSOwner::File(getCurrentPath()->fullUrl());
     }
     else
     {
