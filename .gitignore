@@ -8,12 +8,6 @@
 .github
 
 # LLM assistant files
-**/CLAUDE.md
-**/AGENTS.md
-!/AGENTS.md
-!/CLAUDE.md
-!/lib/meatloaf/AGENTS.md
-!/lib/meatloaf/CLAUDE.md
 .claude
 .serena
 
