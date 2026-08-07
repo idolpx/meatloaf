@@ -289,7 +289,18 @@ protected:
         const DHDPartition *p = nullptr;
         bool numeric = comp.size() && comp.find_first_not_of("0123456789") == std::string::npos;
         if (numeric)
-            p = img->byNumber(atoi(comp.c_str()));
+        {
+            // Partition numbers are uint8_t. atoi() returned an int that was
+            // then SILENTLY truncated on the way into byNumber(), so any
+            // all-digit name of 256 or more wrapped onto a real partition: a
+            // file called "1571" inside a partition resolved to 1571 & 0xFF =
+            // 35 and switched the whole image to partition 35 part-way
+            // through a directory listing. Range-check before the cast.
+            char *end = nullptr;
+            long v = strtol(comp.c_str(), &end, 10);
+            if (end != comp.c_str() && *end == '\0' && v >= 0 && v <= 255)
+                p = img->byNumber((uint8_t)v);
+        }
         else
             p = img->byName(comp);
         if (p == nullptr)
