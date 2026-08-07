@@ -51,7 +51,7 @@ description = The internet is a massive floppy drive for your C64 with Meatloaf!
 ;environment = adafruit_feather_esp32s3_tft ; Adafruit ESP32-S3 TFT Feather               (ESP32-S3, 4M Flash, 2M PSRAM)
 ;environment = esp32-s3-rgb                 ;                                             (ESP32-S3, 16M Flash, 8M PSRAM)
 ;environment = esp32-s3-dev-kit-n8r8        ; Waveshare ESP32-S3                          (ESP32-S3, 8M Flash, 8M PSRAM)
-environment = esp32-s3-makemagazin         ; Make Magazin Germany ESP32-S3-DevKitC-1     (ESP32-S3, 8M Flash, 8M PSRAM)
+;environment = esp32-s3-makemagazin         ; Make Magazin Germany ESP32-S3-DevKitC-1     (ESP32-S3, 8M Flash, 8M PSRAM)
 
 ; EXPERIMENTAL
 ; ESP32-C3
