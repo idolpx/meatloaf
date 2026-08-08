@@ -778,6 +778,12 @@ public:
     virtual bool rewindDirectory() override;
     MFile* getNextFileInDir() override;
 
+    // Builds the URL for one entry of THIS directory. Virtual so a subclass can
+    // inject a component the base class knows nothing about - DHDPartitionMFile
+    // re-inserts the partition, without which a listing of a non-selected
+    // partition would emit entries that resolve into the selected one.
+    virtual std::string entryUrlFor(const std::string& filename);
+
     bool isDirectory() override;
     bool exists() override;
     bool rename(std::string dest) override { return false; };

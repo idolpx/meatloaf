@@ -1423,6 +1423,17 @@ bool D64MFile::rewindDirectory()
     return true;
 }
 
+std::string D64MFile::entryUrlFor(const std::string& filename)
+{
+    // Entry URL must include the in-image path (partition/subdirectory)
+    std::string entryUrl;
+    entryUrl.reserve(url.size() + pathInStream.size() + 2 + filename.size());
+    entryUrl = url;
+    if (pathInStream.size()) { entryUrl += '/'; entryUrl += pathInStream; }
+    entryUrl += '/'; entryUrl += filename;
+    return entryUrl;
+}
+
 MFile* D64MFile::getNextFileInDir()
 {
     bool r = false;
@@ -1451,12 +1462,7 @@ MFile* D64MFile::getNextFileInDir()
         mstr::replaceAll(filename, "/", "\\");
         //Debug_printv( "entry[%s]", (url + "/" + filename).c_str() );
 
-        // Entry URL must include the in-image path (partition/subdirectory)
-        std::string entryUrl;
-        entryUrl.reserve(url.size() + pathInStream.size() + 2 + filename.size());
-        entryUrl = url;
-        if (pathInStream.size()) { entryUrl += '/'; entryUrl += pathInStream; }
-        entryUrl += '/'; entryUrl += filename;
+        std::string entryUrl = entryUrlFor(filename);
         auto file = MFSOwner::File(entryUrl);
         file->name = filename;  // Use actual CBM entry name, not container image name
         file->extension = image->decodeType(image->entry.file_type);
