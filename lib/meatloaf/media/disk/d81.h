@@ -93,7 +93,7 @@ public:
 
             // https://sourceforge.net/p/vice-emu/bugs/1890/
             case 829440:  // 81 tracks no errors
-                partitions[partition].block_allocation_map[1].end_track = 81;
+                curPartition().block_allocation_map[1].end_track = 81;
                 break;
         }
     };

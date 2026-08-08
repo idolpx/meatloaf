@@ -207,20 +207,20 @@ public:
                 break;
 
             case 196608: // 40 tracks no errors
-                partitions[partition].block_allocation_map[0].end_track = 40;
+                curPartition().block_allocation_map[0].end_track = 40;
                 break;
 
             case 197376: // 40 w/ errors
-                partitions[partition].block_allocation_map[0].end_track = 40;
+                curPartition().block_allocation_map[0].end_track = 40;
                 error_info = true;
                 break;
 
             case 205312: // 42 tracks no errors
-                partitions[partition].block_allocation_map[0].end_track = 42;
+                curPartition().block_allocation_map[0].end_track = 42;
                 break;
 
             case 206114: // 42 w/ errors
-                partitions[partition].block_allocation_map[0].end_track = 42;
+                curPartition().block_allocation_map[0].end_track = 42;
                 error_info = true;
                 break;
         }
@@ -315,7 +315,7 @@ public:
     }
     uint16_t getTrackCount()
     {
-        return partitions[partition].block_allocation_map[partitions[partition].block_allocation_map.size() - 1].end_track;
+        return curPartition().block_allocation_map[curPartition().block_allocation_map.size() - 1].end_track;
     }
 
     virtual bool seekPath(std::string path) override;
@@ -347,7 +347,22 @@ public:
     Header header;      // Directory header data
     Entry entry;        // Directory entry data
 
+    // The current partition WITHIN this disk image - an index into
+    // partitions[], selecting among a 1581's CBM sub-partitions or a CMD
+    // native image's sub-partitions. Every format currently pushes exactly one
+    // Partition, so it is 0 today, but this is a real index and must stay one:
+    // callers index partitions[] with it, and the bounds guards on it are
+    // load-bearing.
+    //
+    // This is NOT the CMD HD partition. Which partition of a .dhd/.d1m/.d2m/
+    // .d4m file a disk image lives in is tracked by DHDImageRegistry, one
+    // level up - this field is scoped to the decoded disk itself.
     uint8_t partition = 0;
+
+    // Geometry for the current partition of this image.
+    Partition& curPartition() { return partitions[partition]; }
+    const Partition& curPartition() const { return partitions[partition]; }
+
     uint8_t track = 0;
     uint8_t sector = 0;
     uint8_t offset = 0;
@@ -367,9 +382,9 @@ protected:
             Debug_printv("Invalid partition index: %d", partition);
             return false;
         }
-        return seekSector(partitions[partition].header_track, 
-                        partitions[partition].header_sector, 
-                        partitions[partition].header_offset) &&
+        return seekSector(curPartition().header_track, 
+                        curPartition().header_sector, 
+                        curPartition().header_offset) &&
             readContainer((uint8_t*)&header, sizeof(header));
     }
 
@@ -463,14 +478,14 @@ protected:
     // D80 and D82 drift apart (one read the member, the other hardcoded 0x43).
     bool writeBamBlockHeaders()
     {
-        auto &maps = partitions[partition].block_allocation_map;
+        auto &maps = curPartition().block_allocation_map;
         for (size_t i = 0; i < maps.size(); i++)
         {
             // Link to the next BAM block, or to the directory from the last one.
             uint8_t next_track  = (i + 1 < maps.size()) ? maps[i + 1].track
-                                                        : partitions[partition].directory_track;
+                                                        : curPartition().directory_track;
             uint8_t next_sector = (i + 1 < maps.size()) ? maps[i + 1].sector
-                                                        : partitions[partition].directory_sector;
+                                                        : curPartition().directory_sector;
 
             uint8_t hdr[6] = {
                 next_track,
@@ -509,21 +524,21 @@ protected:
     virtual bool initializeBlockAllocationMap()
     {
         uint16_t bam_index = 0;
-        uint16_t bam_count = partitions[partition].block_allocation_map.size();
+        uint16_t bam_count = curPartition().block_allocation_map.size();
 
         Debug_printv("initialize block allocation map");
 
         while (bam_index < bam_count) {
             seekSector( 
-                partitions[partition].block_allocation_map[bam_index].track, 
-                partitions[partition].block_allocation_map[bam_index].sector, 
-                partitions[partition].block_allocation_map[bam_index].offset 
+                curPartition().block_allocation_map[bam_index].track, 
+                curPartition().block_allocation_map[bam_index].sector, 
+                curPartition().block_allocation_map[bam_index].offset 
             );
 
             // Set default values
-            uint8_t track = partitions[partition].block_allocation_map[bam_index].start_track;
-            uint8_t end_track = partitions[partition].block_allocation_map[bam_index].end_track;
-            uint8_t rec_bytes = partitions[partition].block_allocation_map[bam_index].byte_count;
+            uint8_t track = curPartition().block_allocation_map[bam_index].start_track;
+            uint8_t end_track = curPartition().block_allocation_map[bam_index].end_track;
+            uint8_t rec_bytes = curPartition().block_allocation_map[bam_index].byte_count;
 
             // Update BAM for each track
             for (uint16_t t = track; t <= end_track; t++) {
@@ -590,10 +605,10 @@ protected:
             Debug_printv("Invalid partition index: %d", partition);
             return false;
         }
-        seekSector( 
-            partitions[partition].header_track, 
-            partitions[partition].header_sector, 
-            partitions[partition].header_offset 
+        seekSector(
+            curPartition().header_track,
+            curPartition().header_sector, 
+            curPartition().header_offset 
         );
 
         name = mstr::toPETSCII2(name);
@@ -632,14 +647,14 @@ protected:
     // {
     //     Debug_printv("initialize directory");
     //     seekSector( 
-    //         partitions[partition].header_track, 
-    //         partitions[partition].header_sector, 
+    //         curPartition().header_track, 
+    //         curPartition().header_sector, 
     //         0
     //     );
 
     //     // Set default values in sector 0
-    //     uint8_t track = partitions[partition].directory_track;
-    //     uint8_t sector = partitions[partition].directory_sector;
+    //     uint8_t track = curPartition().directory_track;
+    //     uint8_t sector = curPartition().directory_sector;
     //     uint8_t data = 0x41;
 
     //     writeContainer((uint8_t*)&track, 1);
@@ -648,9 +663,9 @@ protected:
 
     //     // Set T/S link in first sector to 0x00 0xFF
     //     seekSector( 
-    //         partitions[partition].directory_track,
-    //         partitions[partition].directory_sector,
-    //         partitions[partition].directory_offset
+    //         curPartition().directory_track,
+    //         curPartition().directory_sector,
+    //         curPartition().directory_offset
     //     );
     //     data = 0x00;
     //     writeContainer((uint8_t*)&data, 1);
@@ -668,16 +683,16 @@ protected:
     bool initializeDirectory()
     {
         Debug_printv("initialize directory");
-        if (!seekSector(partitions[partition].header_track, partitions[partition].header_sector, 0)) {
+        if (!seekSector(curPartition().header_track, curPartition().header_sector, 0)) {
             return false;
         }
-        uint8_t track = partitions[partition].directory_track;
-        uint8_t sector = partitions[partition].directory_sector;
+        uint8_t track = curPartition().directory_track;
+        uint8_t sector = curPartition().directory_sector;
         uint8_t data = dos_version; // DOS version
         if (!writeContainer(&track, 1) || !writeContainer(&sector, 1) || !writeContainer(&data, 1)) {
             return false;
         }
-        if (!seekSector(partitions[partition].directory_track, partitions[partition].directory_sector, partitions[partition].directory_offset)) {
+        if (!seekSector(curPartition().directory_track, curPartition().directory_sector, curPartition().directory_offset)) {
             return false;
         }
         data = 0x00; // End of directory chain
@@ -698,7 +713,7 @@ protected:
         // leaving those unallocated makes the BAM advertise its own storage as
         // free. Records can share a sector, so skip one that is already taken
         // rather than letting setBlockAllocation() fail on a double allocation.
-        for (auto &bam : partitions[partition].block_allocation_map)
+        for (auto &bam : curPartition().block_allocation_map)
         {
             if (!isBlockFree(bam.track, bam.sector))
                 continue;
@@ -710,19 +725,19 @@ protected:
         // (18/0) so the loop above already took it, but on a D80/D82 the header
         // lives at 39/0 while the BAM sits on track 38 - it is not in the map at
         // all and would otherwise never be allocated.
-        if (isBlockFree(partitions[partition].header_track,
-                        partitions[partition].header_sector))
+        if (isBlockFree(curPartition().header_track,
+                        curPartition().header_sector))
         {
-            if (!setBlockAllocation(partitions[partition].header_track,
-                                    partitions[partition].header_sector, true))
+            if (!setBlockAllocation(curPartition().header_track,
+                                    curPartition().header_sector, true))
                 return false;
         }
 
         // ...and the first directory sector (e.g. 18/1 on D64). Without this
         // the BAM claims a sector the directory chain is actively using, so a
         // later write can allocate it a second time and corrupt the directory.
-        if (!setBlockAllocation( partitions[partition].directory_track,
-                                 partitions[partition].directory_sector,
+        if (!setBlockAllocation( curPartition().directory_track,
+                                 curPartition().directory_sector,
                                  true ))
             return false;
 
@@ -777,6 +792,19 @@ public:
 
     virtual bool rewindDirectory() override;
     MFile* getNextFileInDir() override;
+
+    // Builds the URL for one entry of THIS directory. Virtual so a subclass can
+    // inject a component the base class knows nothing about - DHDPartitionMFile
+    // re-inserts the partition, without which a listing of a non-selected
+    // partition would emit entries that resolve into the selected one.
+    virtual std::string entryUrlFor(const std::string& filename);
+
+    // The URL handed to ImageBroker::obtain(). The broker rebuilds the stream
+    // from this URL, so a subclass whose stream depends on more than the
+    // container must include that here - DHDPartitionMFile appends the CMD
+    // partition number, without which the rebuilt stream decodes whichever
+    // partition happens to be selected.
+    virtual std::string brokerUrl() { return url; }
 
     bool isDirectory() override;
     bool exists() override;

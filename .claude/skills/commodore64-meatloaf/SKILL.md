@@ -467,8 +467,10 @@ close 15
 
 Switches to a different partition on mounted CMD media (DHD hard
 disks, D1M/D2M/D4M floppy images). The partition number must be
-1–254. Returns `PARTITION SELECTED` on success or `ILLEGAL PARTITION`
-if the partition doesn't exist.
+1–254 (a CMD HD holds at most 254 partitions); partition 0 is the
+system partition and cannot be selected, though it does appear in
+the `$=P` listing. Returns `PARTITION SELECTED` on success or `ILLEGAL
+PARTITION` if the partition doesn't exist.
 
 Two forms:
 - **Text form**: `cp 2`, `cp 5` — the number follows `cp`.
@@ -476,6 +478,15 @@ Two forms:
 
 After a successful partition change, the working directory is set to
 that partition's root.
+
+A partition can also be named directly as the first component of an
+in-image path — `hdbackup.dhd/2/game` or `hdbackup.dhd/subs/game`. That
+loads or saves from that partition **without changing the selected
+one**; only `cp n` and the `partition` console command change the
+selection. A partition number of `0` in a path means "the currently
+selected partition". Where a file has the same name as a partition the
+partition wins — reach the file by giving the partition number
+explicitly, e.g. `hdbackup.dhd/2/subs`.
 
 **BASIC V2:**
 ```basic

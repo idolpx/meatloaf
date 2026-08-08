@@ -219,6 +219,7 @@ namespace ESP32Console
         registerCommand(getCDCommand());
         registerCommand(getPWDCommand());
         registerCommand(getLsCommand());
+        registerCommand(getPartitionCommand());
         registerCommand(getMvCommand());
         registerCommand(getCPCommand());
         registerCommand(getRMCommand());

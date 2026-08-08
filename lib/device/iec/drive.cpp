@@ -1791,10 +1791,22 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
         case 'C':
             if ( command[1] == 'P') // Change Partition text: CP<n>
             {
+                // Digits must start right after "CP" - find_first_of over the
+                // whole string would let "CPX5" parse as partition 5. strtol
+                // (not atoi) per the project rule against atoi/std::stoi on
+                // C64-sourced input; leave pnum = -1 on any parse failure so
+                // changePartition() rejects it via its existing range check.
                 int pnum = -1;
-                size_t d = command.find_first_of("0123456789");
-                if( d != std::string::npos )
-                    pnum = atoi(command.c_str() + d);
+                char *end = nullptr;
+                const char *start = command.c_str() + 2;
+                long v = strtol(start, &end, 10);
+                if ( end != start )
+                {
+                    while ( *end == ' ' || *end == '\r' )
+                        end++;
+                    if ( *end == '\0' )
+                        pnum = (int)v;
+                }
                 changePartition(pnum);
                 return;
             }
@@ -2355,6 +2367,8 @@ void iecDrive::changePartition(int pnum)
     std::string container = DHDImageRegistry::containerOf(m_cwd != nullptr ? m_cwd->url : "");
     Debug_printv("change partition pnum[%d] container[%s]", pnum, container.c_str());
 
+    // A CMD HD holds a maximum of 254 partitions; 0 is the system partition,
+    // which is listed but never selectable.
     if (container.empty() || pnum < 1 || pnum > 254)
     {
         setStatusCode(ST_SYNTAX_INVALID);
