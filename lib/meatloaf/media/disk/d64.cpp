@@ -1390,7 +1390,7 @@ bool D64MFile::rewindDirectory()
 {
     dirIsOpen = true;
     //Debug_printv("url[%s] sourceFile->url[%s]", url.c_str(), sourceFile->url.c_str());
-    auto image = ImageBroker::obtain<D64MStream>("d64", url);
+    auto image = ImageBroker::obtain<D64MStream>("d64", brokerUrl());
     if (image == nullptr)
         return false;
 
@@ -1446,7 +1446,7 @@ MFile* D64MFile::getNextFileInDir()
         return nullptr;
 
     // Get entry pointed to by containerStream
-    auto image = ImageBroker::obtain<D64MStream>("d64", url);
+    auto image = ImageBroker::obtain<D64MStream>("d64", brokerUrl());
     if (image == nullptr)
         goto exit;
 
@@ -1491,7 +1491,7 @@ time_t D64MFile::getCreationTime()
 {
     // Use a stack-allocated tm to avoid dereferencing a null pointer.
     std::tm entry_time = {};
-    auto stream = ImageBroker::obtain<D64MStream>("d64", url);
+    auto stream = ImageBroker::obtain<D64MStream>("d64", brokerUrl());
     if ( stream != nullptr )
     {
         auto entry = stream->entry;
@@ -1516,7 +1516,7 @@ bool D64MFile::isDirectory()
         return true;
 
     // Walk the path inside the image (partition / subdirectory / file)
-    auto stream = ImageBroker::obtain<D64MStream>("d64", url);
+    auto stream = ImageBroker::obtain<D64MStream>("d64", brokerUrl());
     if (stream != nullptr)
         return stream->resolvePath(pathInStream) == D64MStream::PATH_DIR;
 
@@ -1537,7 +1537,7 @@ bool D64MFile::exists()
     if ( pathInStream.empty() || pathInStream == "/" )
         return ( sourceFile != nullptr ) ? sourceFile->exists() : true;
 
-    auto stream = ImageBroker::obtain<D64MStream>("d64", url);
+    auto stream = ImageBroker::obtain<D64MStream>("d64", brokerUrl());
     if ( stream == nullptr )
         return false;
 

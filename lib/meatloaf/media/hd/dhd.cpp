@@ -19,6 +19,7 @@
 
 #include "meat_media.h"
 #include <cstring>
+#include <cstdlib>
 #include <memory>
 
 std::map<std::string, DHDImageRegistry::Image> DHDImageRegistry::s_images;
@@ -295,15 +296,85 @@ bool DHDImageRegistry::select(const std::string &containerUrl, uint8_t number)
     Debug_printv("selected partition[%d] type[%d] name[%s]", p->number, p->type, p->name.c_str());
 
     // Drop the broker-cached image stream so the next access decodes the
-    // newly selected partition (key format mirrors ImageBroker::obtain)
-    std::unique_ptr<MFile> f(MFSOwner::File(containerUrl));
-    if (f != nullptr && f->sourceFile != nullptr)
-    {
-        std::string key = "d64" + f->sourceFile->url;
-        if (f->sourceFile->pathInStream.size() && f->sourceFile->pathInStream != "/")
-            key += "/" + f->sourceFile->pathInStream;
-        ImageBroker::dispose(key);
-    }
+    // newly selected partition
+    disposeCachedStream(containerUrl);
+    img->cached_part = number;
 
     return true;
+}
+
+void DHDImageRegistry::disposeCachedStream(const std::string &containerUrl)
+{
+    // Key format mirrors ImageBroker::obtain(): type + the SOURCE file's url,
+    // plus its pathInStream when it has one. The broker derives its key from a
+    // freshly resolved MFile, so we must do the same to name the same entry.
+    std::unique_ptr<MFile> f(MFSOwner::File(containerUrl));
+    if (f == nullptr || f->sourceFile == nullptr)
+        return;
+
+    std::string key = "d64" + f->sourceFile->url;
+    if (f->sourceFile->pathInStream.size() && f->sourceFile->pathInStream != "/")
+        key += "/" + f->sourceFile->pathInStream;
+    ImageBroker::dispose(key);
+}
+
+const DHDPartition* DHDResolvePartition(const std::string &containerUrl,
+                                        const std::string &in_path,
+                                        std::string *out_rest,
+                                        bool *out_explicit)
+{
+    if (out_rest) *out_rest = in_path;
+    if (out_explicit) *out_explicit = false;
+
+    DHDImageRegistry::Image *img = DHDImageRegistry::obtain(containerUrl);
+    if (img == nullptr || !img->valid)
+        return nullptr;
+
+    const DHDPartition *p = nullptr;
+
+    if (!in_path.empty())
+    {
+        std::string comp = in_path;
+        size_t slash = comp.find('/');
+        if (slash != std::string::npos)
+            comp = comp.substr(0, slash);
+
+        if (!comp.empty())
+        {
+            bool numeric = comp.find_first_not_of("0123456789") == std::string::npos;
+            if (numeric)
+            {
+                // Range-check before narrowing to uint8_t - an int silently
+                // truncated into byNumber() is what once made "1571" resolve to
+                // partition 35. v == 0 means "currently selected" and must NOT
+                // go through byNumber(), which would return table entry 0, the
+                // system partition.
+                char *end = nullptr;
+                long v = strtol(comp.c_str(), &end, 10);
+                if (end != comp.c_str() && *end == '\0' && v >= 0 && v <= 254)
+                    p = (v == 0) ? img->current() : img->byNumber((uint8_t)v);
+            }
+            else
+            {
+                p = img->byName(comp);
+                // byName() honours wildcards, so a bare "*" can match the
+                // system partition (entry 0). It is not mountable.
+                if (p != nullptr && p->number == 0)
+                    p = nullptr;
+            }
+
+            if (p != nullptr)
+            {
+                if (out_explicit) *out_explicit = true;
+                if (out_rest)
+                    *out_rest = (slash == std::string::npos) ? std::string()
+                                                            : in_path.substr(slash + 1);
+            }
+        }
+    }
+
+    if (p == nullptr)
+        p = img->current();
+
+    return p;
 }

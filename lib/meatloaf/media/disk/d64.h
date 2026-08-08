@@ -799,6 +799,13 @@ public:
     // partition would emit entries that resolve into the selected one.
     virtual std::string entryUrlFor(const std::string& filename);
 
+    // The URL handed to ImageBroker::obtain(). The broker rebuilds the stream
+    // from this URL, so a subclass whose stream depends on more than the
+    // container must include that here - DHDPartitionMFile appends the CMD
+    // partition number, without which the rebuilt stream decodes whichever
+    // partition happens to be selected.
+    virtual std::string brokerUrl() { return url; }
+
     bool isDirectory() override;
     bool exists() override;
     bool rename(std::string dest) override { return false; };
