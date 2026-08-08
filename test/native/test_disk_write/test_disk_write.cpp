@@ -13,7 +13,61 @@
 #include "format_fixtures.h"
 
 void setUp(void) {}
-void tearDown(void) {}
+
+// Removes every image the suite can leave behind, whatever happened to the test
+// that created it.
+//
+// Individual tests do call remove() on their own artifacts, but that is not
+// enough on its own for two reasons:
+//
+//   1. Unity's TEST_ASSERT_*/TEST_FAIL macros longjmp out of the test function.
+//      A longjmp does not run C++ destructors and does not reach any remove()
+//      further down the function, so a single failing assertion strands the
+//      image it was working on.
+//   2. On Windows an open FILE handle blocks remove(), so a remove() issued
+//      while the FileContainerStream is still alive silently does nothing.
+//
+// Unity runs tearDown() under its own TEST_PROTECT(), so this executes after a
+// failed assertion as well as a passing one - and by then every stream from the
+// test body has been destroyed, so the handles are closed and remove() bites.
+// Names are enumerated rather than glob-matched to keep this portable (the
+// suite builds on Windows, where <windows.h> cannot be included here: it
+// defines an ERROR macro that collides with cbm_defines.h).
+void tearDown(void)
+{
+    // Per-format artifacts: "<prefix><format name>.<format ext>"
+    static const char* kFormatPrefixes[] = {
+        "build_geom_", "build_t0_", "build_t0g_", "build_t1_",
+        "build_t2a_", "build_t2b_", "build_t2c_", "build_t2d_",
+        "build_t2e_", "build_t2f_", "build_t3_",
+    };
+    for (const char* prefix : kFormatPrefixes)
+        for (const FormatFixture& f : all_formats())
+        {
+            std::string path = std::string(prefix) + f.name + "." + f.ext;
+            remove(path.c_str());
+            remove((path + ".out").c_str());   // c1541 read-back scratch file
+        }
+
+    // Fixed-name artifacts
+    static const char* kFixedNames[] = {
+        "build_dnp_grow.dnp", "build_dnp_nogrow.dnp",
+        "build_test_fcs.bin", "build_test_fmt.d64", "build_test_geom.d64",
+        "build_test_inv.d64", "build_test_inv_c1541.d64",
+        "build_test_inv_c1541_a.bin", "build_test_inv_c1541_b.bin",
+        "build_test_oracle.d64", "build_test_oracle_corrupt.d64",
+        "build_test_oracle_corrupt_probe.tmp",
+        "build_test_oracle_corrupt_src.bin",
+        "build_test_oracle_errchan.d80", "build_test_oracle_ref.d64",
+        "build_test_oracle_trunc.d64", "build_test_oracle_trunc.prg",
+        "build_test_sizes.bin",
+    };
+    for (const char* name : kFixedNames)
+    {
+        remove(name);
+        remove((std::string(name) + ".out").c_str());
+    }
+}
 
 void test_file_container_stream_roundtrip(void)
 {
@@ -623,8 +677,14 @@ void test_tier0_declared_size_matches_geometry(void)
         snprintf(msg, sizeof(msg),
                  "%s: declared %u bytes but geometry implies %u (%u blocks)",
                  f.name, image->defaultImageSize(), blocks * 256, blocks);
-        TEST_ASSERT_EQUAL_UINT32_MESSAGE(image->defaultImageSize(), blocks * 256, msg);
+        // Close before removing: on Windows the still-open handle (held via
+        // src, and via image which owns src) blocks remove(), which is why
+        // build_t0g_*.* survived every run. tearDown() is the backstop if the
+        // assertion below longjmps past this.
+        src->close();
         remove(path.c_str());
+
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(image->defaultImageSize(), blocks * 256, msg);
     }
 }
 
