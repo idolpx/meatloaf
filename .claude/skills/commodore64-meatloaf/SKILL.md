@@ -467,8 +467,9 @@ close 15
 
 Switches to a different partition on mounted CMD media (DHD hard
 disks, D1M/D2M/D4M floppy images). The partition number must be
-1–255; partition 0 is the reserved system partition and cannot be
-selected. Returns `PARTITION SELECTED` on success or `ILLEGAL
+1–254 (a CMD HD holds at most 254 partitions); partition 0 is the
+system partition and cannot be selected, though it does appear in
+the `$=P` listing. Returns `PARTITION SELECTED` on success or `ILLEGAL
 PARTITION` if the partition doesn't exist.
 
 Two forms:

@@ -1,7 +1,23 @@
 # `partition` Console Command — CMD HD/FD Partition Switching
 
 **Date:** 2026-08-07
-**Status:** DESIGN — approved, not yet implemented.
+**Status:** DELIVERED, with one section retracted.
+
+> **Retraction — "Partition 255 is unreachable" is wrong.** That section, and the partition-count
+> claims in the Problem statement below, rest on the premise that a CMD HD has 254 *user*
+> partitions plus a separate system partition at entry 0, making table entry 255 an unreachable
+> 255th user slot. It is not: a CMD HD holds a **maximum of 254 partitions**, and the vendored
+> `lib/vdrive/vdrive.c:1180` says so directly — "CMD HDs can access 254 partitions (255 is system)"
+> — while `vdrive.c:1201` remaps physical entry 0 onto *logical* slot 255. VICE's "255" is the
+> system partition under a different numbering, not an extra partition.
+>
+> The final whole-branch review caught this and rated it Critical; the project owner confirmed the
+> correction. `maxpart` is back to 254 and the `CP<n>` bound back to `1..254`. Everything else in
+> this document — the `partition` command, the removal of path-based selection, and the
+> documentation corrections — stands as delivered and is unaffected.
+>
+> One thing was added after this document was written: table entry 0 (the system partition) is now
+> **shown** in both partition listings, typed `sys`/`SYS`, while `select()` refuses it.
 
 ## Problem
 

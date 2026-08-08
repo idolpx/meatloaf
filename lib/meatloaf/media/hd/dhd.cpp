@@ -136,22 +136,22 @@ bool DHDImageRegistry::parse(const std::string &containerUrl, Image &img)
 
     uint32_t sys_base = 0xFFFFFFFF;
     uint32_t table_base = 0;
-    // Partitions are numbered 1-255; entry 0 is the reserved system partition
-    // (it supplies disk_label below). The loop runs i <= maxpart, so 255 here
-    // yields partitions 1..255. Both this and the loop counter must stay
-    // uint16_t - as uint8_t, "i <= 255" would never be false.
+    // A CMD HD holds a MAXIMUM OF 254 partitions. The loop below runs
+    // i <= maxpart over the table's PHYSICAL entries: entry 0 is the system
+    // partition (it supplies disk_label and is listed but never selectable),
+    // and entries 1..254 are the user partitions. There is no entry 255.
     //
-    // Meatloaf numbers partitions by PHYSICAL table index: entry 0 is always
-    // the system partition (always present, supplies disk_label), entries
-    // 1..255 are user partitions. This differs from the vendored VICE code
-    // in lib/vdrive/vdrive.c, which uses a LOGICAL numbering instead: it caps
-    // its loop at 254 (vdrive.c:1179) and remaps physical entry 0 to LOGICAL
-    // slot 255 (vdrive.c:1201, `k = (i == 0) ? 255 : i`). That is a different
-    // numbering space, not a contradiction - physical entry 255 cannot be the
-    // system partition precisely because it may not exist in a given image,
-    // whereas physical entry 0 always does. Do not "correct" 255 back to 254
-    // on the basis of that file.
-    uint16_t maxpart = 255;
+    // This agrees with the vendored VICE code, which is the reference to trust
+    // here: lib/vdrive/vdrive.c:1180 caps at 254 with the comment "CMD HDs can
+    // access 254 partitions (255 is system)", and vdrive.c:1201 remaps physical
+    // entry 0 onto LOGICAL slot 255 (`k = (i == 0) ? 255 : i`) - so VICE's
+    // "255" is the system partition under a different numbering, NOT a 255th
+    // user partition. Raising this to 255 reads 32 bytes past the real table
+    // and can fabricate a phantom partition from whatever follows.
+    //
+    // Both this and the loop counter must stay uint16_t: as uint8_t, an
+    // "i <= 255" bound would never be false.
+    uint16_t maxpart = 254;
 
     if (fd_sys != 0)
     {
@@ -193,7 +193,7 @@ bool DHDImageRegistry::parse(const std::string &containerUrl, Image &img)
 
     // Partition table on track 1 of the system partition: 32-byte entries,
     // 8 per 256-byte sector, laid out contiguously. Entry 0 is the system
-    // partition itself; entries 1..255 are the selectable partitions (CMD FD
+    // partition itself; entries 1..254 are the selectable partitions (CMD FD
     // caps at 31).
     uint8_t buf[32];
     for (uint16_t i = 0; i <= maxpart; i++)

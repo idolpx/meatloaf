@@ -31,11 +31,12 @@
 // window of the image at the partition's offset. The selection changes ONLY
 // via the CBM DOS "CP<n>" command or the "partition" console command - the
 // real CMD HD does not switch partitions on LOAD or CD, and neither do we.
-// LOAD"$=P",8 lists the partitions. Partitions are numbered 1-255 (CMD FD:
-// 1-31); 0 is the system partition, which carries the drive label and the
-// partition table. Entry 0 IS included in the listing (type $FF, shown as
-// "sys") because it is a real table entry, but select() refuses it - it is not
-// a mountable disk.
+// LOAD"$=P",8 lists the partitions. A CMD HD holds a MAXIMUM OF 254 partitions,
+// numbered 1-254 (CMD FD: 1-31); table entry 0 is the system partition, which
+// carries the drive label and the partition table. Entry 0 IS included in the
+// listing (type $FF, shown as "sys") because it is a real table entry, but
+// select() refuses it - it is not a mountable disk. There is no entry 255:
+// vdrive.c's logical slot 255 is this same entry 0 under its own numbering.
 //
 // https://vice-emu.sourceforge.io/vice_17.html#SEC432
 // https://sourceforge.net/p/vice-emu/patches/253/

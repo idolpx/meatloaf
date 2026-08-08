@@ -338,10 +338,11 @@ int partition(int argc, char **argv)
         // the system partition actually is rather than "no such partition" -
         // it is in the listing, so denying its existence would be incoherent.
         // Selecting it is refused below. Accepting 0 does not weaken the
-        // truncation guard, which is the 0..255 bound itself.
+        // truncation guard, which is the bound itself. A CMD HD holds at most
+        // 254 partitions, so 254 is the top of the range - there is no 255.
         char *end = nullptr;
         long v = strtol(arg.c_str(), &end, 10);
-        if (end != arg.c_str() && *end == '\0' && v >= 0 && v <= 255)
+        if (end != arg.c_str() && *end == '\0' && v >= 0 && v <= 254)
             p = img->byNumber((uint8_t)v);
     }
 
