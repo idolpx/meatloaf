@@ -132,7 +132,7 @@ public:
 
     bool isReservedBlock(uint8_t track, uint8_t sector) override
     {
-        return track == partitions[partition].header_track &&
+        return track == curPartition().header_track &&
                sector <= SYSTEM_AREA_LAST_SECTOR;
     }
 
@@ -146,9 +146,9 @@ public:
         // autoboot sector and 31 of the BAM's 32 sectors advertised as free.
         for (uint8_t s = 0; s <= SYSTEM_AREA_LAST_SECTOR; s++)
         {
-            if (!isBlockFree(partitions[partition].header_track, s))
+            if (!isBlockFree(curPartition().header_track, s))
                 continue;
-            if (!setBlockAllocation(partitions[partition].header_track, s, true))
+            if (!setBlockAllocation(curPartition().header_track, s, true))
                 return false;
         }
         return true;
@@ -171,7 +171,7 @@ public:
         if (!allow_grow)
             return false;
 
-        auto &bam = partitions[partition].block_allocation_map[0];
+        auto &bam = curPartition().block_allocation_map[0];
         uint16_t new_track = (uint16_t)bam.end_track + 1;
 
         // 255 tracks is the ceiling the BAM can describe (~16 MB).

@@ -101,8 +101,8 @@ public:
 
     bool writeSide2FreeCount( uint8_t track, uint8_t count )
     {
-        if (!seekSector( partitions[partition].header_track,
-                         partitions[partition].header_sector,
+        if (!seekSector( curPartition().header_track,
+                         curPartition().header_sector,
                          SIDE2_COUNT_OFFSET + (track - SIDE2_FIRST_TRACK) ))
             return false;
         return writeContainer(&count, 1) == 1;
@@ -131,7 +131,7 @@ public:
         // The base initializer only writes the records BlockAllocationMap
         // describes, so side 2's counts would be left as whatever was in 18/0.
         // Seed them from the bitmaps it just wrote.
-        uint8_t last_track = partitions[partition].block_allocation_map.back().end_track;
+        uint8_t last_track = curPartition().block_allocation_map.back().end_track;
         for (uint8_t t = SIDE2_FIRST_TRACK; t <= last_track; t++)
         {
             if (!writeSide2FreeCount(t, (uint8_t)getTrackFreeCount(t)))
@@ -144,7 +144,7 @@ public:
         // allocated. Verified against c1541's own format: it writes 00 00 00 for
         // track 53 while track 18 reads 11 fc ff 07 (17 of 19 free), and reports
         // "1328 blocks free" = 1366 - 19 - 19, excluding both tracks whole.
-        uint8_t bam2_track = partitions[partition].block_allocation_map.back().track;
+        uint8_t bam2_track = curPartition().block_allocation_map.back().track;
         uint16_t bam2_sectors = getSectorCount(bam2_track);
         for (uint16_t s = 0; s < bam2_sectors; s++)
         {

@@ -43,9 +43,9 @@ bool NIBMStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
     //Debug_printv("track[%d] sector[%d] offset[%d]", track, sector, offset);
 
     // Is this a valid track?
-    uint16_t c = partitions[partition].block_allocation_map.size() - 1;
-    uint8_t start_track = partitions[partition].block_allocation_map[0].start_track;
-    uint8_t end_track = partitions[partition].block_allocation_map[c].end_track;
+    uint16_t c = curPartition().block_allocation_map.size() - 1;
+    uint8_t start_track = curPartition().block_allocation_map[0].start_track;
+    uint8_t end_track = curPartition().block_allocation_map[c].end_track;
     if (track < start_track || track > end_track)
     {
         Debug_printv("Invalid Track: track[%d] start_track[%d] end_track[%d]", track, start_track, end_track);

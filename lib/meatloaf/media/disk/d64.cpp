@@ -65,9 +65,9 @@ bool D64MStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
     //Debug_printv("track[%d] sector[%d] offset[%d]", track, sector, offset);
 
     // Is this a valid track?
-    uint16_t c = partitions[partition].block_allocation_map.size() - 1;
-    uint8_t start_track = partitions[partition].block_allocation_map[0].start_track;
-    uint8_t end_track = partitions[partition].block_allocation_map[c].end_track;
+    uint16_t c = curPartition().block_allocation_map.size() - 1;
+    uint8_t start_track = curPartition().block_allocation_map[0].start_track;
+    uint8_t end_track = curPartition().block_allocation_map[c].end_track;
     if (track < start_track || track > end_track)
     {
         Debug_printv("Invalid Track: track[%d] start_track[%d] end_track[%d]", track, start_track, end_track);
@@ -152,7 +152,7 @@ bool D64MStream::writeBlock(uint8_t track, uint8_t sector, std::string data)
 // map(s), so multi-BAM formats (D71 second side, D81 side 2) work too.
 bool D64MStream::getBAMRecord(uint8_t track, BAMRecord *rec)
 {
-    for (auto &bam : partitions[partition].block_allocation_map)
+    for (auto &bam : curPartition().block_allocation_map)
     {
         if (track >= bam.start_track && track <= bam.end_track)
         {
@@ -298,7 +298,7 @@ bool D64MStream::initializeBlocks()
         for (uint8_t s = 0; s < sectors; s++)
         {
             // Skip the directory track (track 18) - it will be initialized separately
-            if (t == partitions[partition].header_track)
+            if (t == curPartition().header_track)
                 continue;
 
             if (!seekSector(t, s, 0))
@@ -361,9 +361,9 @@ D64MStream::BlockChain D64MStream::getFreeBlocks(uint16_t file_size)
 // a grow-and-retry for media that can be extended.
 bool D64MStream::findFreeBlock(uint8_t startTrack, uint8_t startSector, uint8_t *foundTrack, uint8_t *foundSector, bool forDirectory)
 {
-    uint8_t dir_track = partitions[partition].directory_track;
-    uint8_t first_track = partitions[partition].block_allocation_map.front().start_track;
-    uint8_t last_track = partitions[partition].block_allocation_map.back().end_track;
+    uint8_t dir_track = curPartition().directory_track;
+    uint8_t first_track = curPartition().block_allocation_map.front().start_track;
+    uint8_t last_track = curPartition().block_allocation_map.back().end_track;
 
     if (forDirectory)
     {
@@ -560,8 +560,8 @@ bool D64MStream::seekEntry( uint16_t index )
     // Current directory defaults to the partition's root directory
     if (dir_track == 0)
     {
-        dir_track = partitions[partition].directory_track;
-        dir_sector = partitions[partition].directory_sector;
+        dir_track = curPartition().directory_track;
+        dir_sector = curPartition().directory_sector;
     }
 
     // Calculate Sector offset & Entry offset
@@ -580,7 +580,7 @@ bool D64MStream::seekEntry( uint16_t index )
         if (!seekSector(
                 dir_track,
                 dir_sector,
-                partitions[partition].directory_offset))
+                curPartition().directory_offset))
             return false;
 
         // Find sector with requested entry
@@ -749,8 +749,8 @@ bool D64MStream::finalizeFileWrite()
 
     // Find the first free directory entry, following the chain of the
     // directory the file was created in
-    uint8_t dt = dir_track ? dir_track : partitions[partition].directory_track;
-    uint8_t ds = dir_track ? dir_sector : partitions[partition].directory_sector;
+    uint8_t dt = dir_track ? dir_track : curPartition().directory_track;
+    uint8_t ds = dir_track ? dir_sector : curPartition().directory_sector;
     std::string dirsec;
     int slot = -1;
     uint16_t chain_safety = 0;
@@ -928,11 +928,11 @@ uint16_t D64MStream::blocksFree()
 
     // getTrackFreeCount handles both record styles: free-count byte
     // (D64/D81) and bitmap-only (D71 side 2, CMD native)
-    for (auto &bam : partitions[partition].block_allocation_map)
+    for (auto &bam : curPartition().block_allocation_map)
     {
         for (uint16_t t = bam.start_track; t <= bam.end_track; t++)
         {
-            if (dedicated_directory_track && t == partitions[partition].directory_track)
+            if (dedicated_directory_track && t == curPartition().directory_track)
                 continue;
             free_count += getTrackFreeCount(t);
         }
@@ -1219,8 +1219,8 @@ bool D64MStream::seekPath(std::string path)
         // chain so broker-cached streams for listings open successfully
         // (and the chain can be read raw, as before).
         _size = 0;
-        uint8_t dt = dir_track ? dir_track : partitions[partition].directory_track;
-        uint8_t ds = dir_track ? dir_sector : partitions[partition].directory_sector;
+        uint8_t dt = dir_track ? dir_track : curPartition().directory_track;
+        uint8_t ds = dir_track ? dir_sector : curPartition().directory_sector;
         return seekSector(dt, ds);
     }
     if (pr == PATH_FILE)
@@ -1269,7 +1269,7 @@ bool D64MStream::formatImage(std::string name, std::string id, size_t track_coun
     // 42-track D64, an 81-track D81, or a DNP created with more than one track
     // is asked for; 0 means "whatever this media's default is".
     if (track_count > 0)
-        partitions[partition].block_allocation_map.back().end_track = (uint8_t)track_count;
+        curPartition().block_allocation_map.back().end_track = (uint8_t)track_count;
 
     // The parameter shadows the member of the same name - keep the member in
     // step so anything reading it later sees what was actually created.
@@ -1288,7 +1288,7 @@ bool D64MStream::formatImage(std::string name, std::string id, size_t track_coun
         return false;
 
     // Total blocks across the geometry just laid down.
-    uint8_t last_track = partitions[partition].block_allocation_map.back().end_track;
+    uint8_t last_track = curPartition().block_allocation_map.back().end_track;
     uint32_t blocks = 0;
     for (uint16_t t = 1; t <= last_track; t++)
         blocks += getSectorCount(t);
