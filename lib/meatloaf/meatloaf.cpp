@@ -1363,9 +1363,21 @@ MFile* MFile::cdRoot(std::string plus)
     return MFSOwner::File( plus, true );
 };
 
-MFile* MFile::cdLocalRoot(std::string plus) 
+MFile* MFile::cdLocalRoot(std::string plus)
 {
     Debug_printv("url[%s] path[%s] plus[%s]", url.c_str(), path.c_str(), plus.c_str());
+
+    // cd() must not mutate `this`. Callers do getCurrentPath()->cd(...) and only
+    // adopt the result if it turns out to be a directory - so mutating here moved
+    // the console's working directory to the new path even when the cd command
+    // rejected it and never called setCurrentPath(). That left the shell sitting
+    // in a non-existent directory.
+    //
+    // rebuildUrl() composes url from root() + path (and normalises path via
+    // cleanPath()), so it writes exactly these two members: save and restore them
+    // rather than duplicating that composition here.
+    std::string saved_path = path;
+    std::string saved_url = url;
 
     if ( path.empty() || sourceFile == nullptr ) {
         // from here we can go only to flash root!
@@ -1376,8 +1388,13 @@ MFile* MFile::cdLocalRoot(std::string plus)
     if (!plus.empty()) { path += '/'; path += plus; }
 
     rebuildUrl();
-    Debug_printv("url[%s]", url.c_str());
-    return MFSOwner::File( url );
+    std::string destUrl = url;
+    Debug_printv("url[%s]", destUrl.c_str());
+
+    path = saved_path;
+    url = saved_url;
+
+    return MFSOwner::File( destUrl );
 };
 
 // bool MFile::copyTo(MFile* dst) {

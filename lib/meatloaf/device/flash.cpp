@@ -183,7 +183,11 @@ bool FlashMFile::rename(std::string pathTo) {
 
 void FlashMFile::openDir(std::string path) 
 {
-    if (!isDirectory()) { 
+    if (!isDirectory()) {
+        // Clear the handle too, not just the flag: callers guard on `dir`
+        // being non-NULL, and leaving a stale or uninitialised value here is
+        // what turned a missing directory into a rewinddir() crash.
+        dir = nullptr;
         dirOpened = false;
         return;
     }
@@ -213,6 +217,7 @@ void FlashMFile::closeDir()
 {
     if(dirOpened) {
         closedir( dir );
+        dir = nullptr;   // closedir() frees it; don't leave it dangling
         dirOpened = false;
     }
 }
