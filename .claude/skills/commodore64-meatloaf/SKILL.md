@@ -479,6 +479,15 @@ Two forms:
 After a successful partition change, the working directory is set to
 that partition's root.
 
+A partition can also be named directly as the first component of an
+in-image path — `hdbackup.dhd/2/game` or `hdbackup.dhd/subs/game`. That
+loads or saves from that partition **without changing the selected
+one**; only `cp n` and the `partition` console command change the
+selection. A partition number of `0` in a path means "the currently
+selected partition". Where a file has the same name as a partition the
+partition wins — reach the file by giving the partition number
+explicitly, e.g. `hdbackup.dhd/2/subs`.
+
 **BASIC V2:**
 ```basic
 open 15,8,15,"cp 2" : close 15   : rem switch to partition 2
