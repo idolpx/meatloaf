@@ -140,6 +140,17 @@ bool DHDImageRegistry::parse(const std::string &containerUrl, Image &img)
     // (it supplies disk_label below). The loop runs i <= maxpart, so 255 here
     // yields partitions 1..255. Both this and the loop counter must stay
     // uint16_t - as uint8_t, "i <= 255" would never be false.
+    //
+    // Meatloaf numbers partitions by PHYSICAL table index: entry 0 is always
+    // the system partition (always present, supplies disk_label), entries
+    // 1..255 are user partitions. This differs from the vendored VICE code
+    // in lib/vdrive/vdrive.c, which uses a LOGICAL numbering instead: it caps
+    // its loop at 254 (vdrive.c:1179) and remaps physical entry 0 to LOGICAL
+    // slot 255 (vdrive.c:1201, `k = (i == 0) ? 255 : i`). That is a different
+    // numbering space, not a contradiction - physical entry 255 cannot be the
+    // system partition precisely because it may not exist in a given image,
+    // whereas physical entry 0 always does. Do not "correct" 255 back to 254
+    // on the basis of that file.
     uint16_t maxpart = 255;
 
     if (fd_sys != 0)

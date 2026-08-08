@@ -311,7 +311,7 @@ int partition(int argc, char **argv)
     // that is both what `ls` shows and what byName() matches against.
     if (argc < 2)
     {
-        Serial.printf("  #  type   name\r\n");
+        Serial.printf("   #  type   name\r\n");
         for (const auto &p : img->parts)
         {
             std::string name = mstr::toUTF8(p.name);
@@ -338,9 +338,12 @@ int partition(int argc, char **argv)
         if (end != arg.c_str() && *end == '\0' && v >= 1 && v <= 255)
             p = img->byNumber((uint8_t)v);
     }
-    else
+
+    if (p == nullptr)
     {
-        // Case-sensitive, and accepts * / ? wildcards.
+        // Either non-numeric, or numeric but out of range / no match - a
+        // partition can legitimately be named e.g. "1571", so try a name
+        // lookup before giving up. Case-sensitive, and accepts * / ? wildcards.
         p = img->byName(arg);
     }
 
