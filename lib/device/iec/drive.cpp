@@ -2355,7 +2355,8 @@ void iecDrive::changePartition(int pnum)
     std::string container = DHDImageRegistry::containerOf(m_cwd != nullptr ? m_cwd->url : "");
     Debug_printv("change partition pnum[%d] container[%s]", pnum, container.c_str());
 
-    if (container.empty() || pnum < 1 || pnum > 254)
+    // Valid partitions are 1-255; 0 is the reserved system partition.
+    if (container.empty() || pnum < 1 || pnum > 255)
     {
         setStatusCode(ST_SYNTAX_INVALID);
         return;

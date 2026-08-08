@@ -136,7 +136,11 @@ bool DHDImageRegistry::parse(const std::string &containerUrl, Image &img)
 
     uint32_t sys_base = 0xFFFFFFFF;
     uint32_t table_base = 0;
-    uint16_t maxpart = 254;
+    // Partitions are numbered 1-255; entry 0 is the reserved system partition
+    // (it supplies disk_label below). The loop runs i <= maxpart, so 255 here
+    // yields partitions 1..255. Both this and the loop counter must stay
+    // uint16_t - as uint8_t, "i <= 255" would never be false.
+    uint16_t maxpart = 255;
 
     if (fd_sys != 0)
     {
@@ -178,7 +182,8 @@ bool DHDImageRegistry::parse(const std::string &containerUrl, Image &img)
 
     // Partition table on track 1 of the system partition: 32-byte entries,
     // 8 per 256-byte sector, laid out contiguously. Entry 0 is the system
-    // partition itself.
+    // partition itself; entries 1..255 are the selectable partitions (CMD FD
+    // caps at 31).
     uint8_t buf[32];
     for (uint16_t i = 0; i <= maxpart; i++)
     {
