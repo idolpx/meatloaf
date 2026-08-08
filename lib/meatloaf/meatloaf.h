@@ -319,7 +319,7 @@ public:
     MFile* cdLocalRoot(std::string);
 
     virtual bool isDirectory() {
-        Debug_printv("isDirectory path[%s] is_dir[%d]", path.c_str(), is_dir);
+        //Debug_printv("isDirectory path[%s] is_dir[%d]", path.c_str(), is_dir);
         if (is_dir != -1)
             return is_dir == 1;
 
