@@ -160,7 +160,8 @@ private:
 // Wraps a disk-type MFile (D64/D71/D81/DNP) so it decodes the currently
 // selected partition of the DHD image, and adds partition semantics:
 // - "$=P" lists the partitions
-// - a leading path component naming a partition (name or number) selects it
+// - a leading path component naming a partition does NOT select it; only
+//   CP<n> or the "partition" console command changes the selection
 template <class BASE>
 class DHDPartitionMFile : public BASE {
 public:
