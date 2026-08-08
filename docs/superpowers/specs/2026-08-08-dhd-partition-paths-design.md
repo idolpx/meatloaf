@@ -185,8 +185,18 @@ only ways to change what is *selected*.
 - Changing `LOAD"$=P"`, the partition table parser, the 254 bound, or the
   system-partition listing.
 - Changing how `CP<n>` or the `partition` command behave.
-- A distinct partition syntax (e.g. `//name`). Meatloaf already uses `//` for
-  "from root" (`cd//sd/games`), so it is unavailable.
+- **A slash-based partition marker (`//name`, `31//`).** Beyond `//` already meaning
+  "from root" in `cd`, no `//` marker can work as a path syntax at all:
+  `util_get_canonical_path()` (`lib/utils/utils.cpp:961`) unconditionally collapses runs
+  of `/` ("skip all the multiple '/'"), and it runs from `cleanPath()` on every
+  `rebuildUrl()`/`processPath()`. Any `//` is destroyed before partition logic sees it.
+  `cd//sd` survives only because `cd()` inspects the raw argument string before URL
+  parsing — which a listing-generated entry URL never does. The partition is therefore an
+  ordinary first path component (`image.dhd/31/file`), which round-trips intact.
+  For reference, real CMD DOS does not use a trailing `//` either: `CP<n>` changes an HD
+  partition (`vdrive-command.c:4052`), a `/name` *command* enters a 1581/native
+  sub-partition (`vdrive-command.c:381-385`), and a *leading* `//` in a path resets to the
+  partition root (`vdrive-command.c:1780-1788`).
 
 ## Risks
 
