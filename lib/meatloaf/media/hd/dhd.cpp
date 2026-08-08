@@ -307,3 +307,62 @@ bool DHDImageRegistry::select(const std::string &containerUrl, uint8_t number)
 
     return true;
 }
+
+const DHDPartition* DHDResolvePartition(const std::string &containerUrl,
+                                        const std::string &in_path,
+                                        std::string *out_rest,
+                                        bool *out_explicit)
+{
+    if (out_rest) *out_rest = in_path;
+    if (out_explicit) *out_explicit = false;
+
+    DHDImageRegistry::Image *img = DHDImageRegistry::obtain(containerUrl);
+    if (img == nullptr || !img->valid)
+        return nullptr;
+
+    const DHDPartition *p = nullptr;
+
+    if (!in_path.empty())
+    {
+        std::string comp = in_path;
+        size_t slash = comp.find('/');
+        if (slash != std::string::npos)
+            comp = comp.substr(0, slash);
+
+        if (!comp.empty())
+        {
+            bool numeric = comp.find_first_not_of("0123456789") == std::string::npos;
+            if (numeric)
+            {
+                // Range-check before narrowing. 0 means "currently selected"
+                // and must NOT go through byNumber(), which would return the
+                // system partition (table entry 0).
+                char *end = nullptr;
+                long v = strtol(comp.c_str(), &end, 10);
+                if (end != comp.c_str() && *end == '\0' && v >= 0 && v <= 254)
+                    p = (v == 0) ? img->current() : img->byNumber((uint8_t)v);
+            }
+            else
+            {
+                p = img->byName(comp);
+            }
+
+            // Never let a path select the system partition.
+            if (p != nullptr && p->number == 0 && !(numeric && comp == "0"))
+                p = nullptr;
+
+            if (p != nullptr)
+            {
+                if (out_explicit) *out_explicit = true;
+                if (out_rest)
+                    *out_rest = (slash == std::string::npos) ? std::string()
+                                                            : in_path.substr(slash + 1);
+            }
+        }
+    }
+
+    if (p == nullptr)
+        p = img->current();
+
+    return p;
+}

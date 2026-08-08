@@ -103,6 +103,29 @@ private:
     static bool s_probing;
 };
 
+// Resolve which partition an in-image path refers to, WITHOUT changing the
+// image's selected partition.
+//
+//   containerUrl  the .dhd/.d1m/.d2m/.d4m path
+//   in_path       pathInStream as given
+//   out_rest      (optional) the path with any partition component removed
+//   out_explicit  (optional) true if in_path actually named a partition
+//
+// Resolution order for the first component: an in-range number, then byName(),
+// otherwise it is not a partition at all and the currently selected partition
+// applies. Partition wins over a same-named file; such a file is still
+// reachable as "<image>/<partition-number>/<file>".
+//
+// NOTE the two meanings of 0: a partition NUMBER of 0 in a path means "the
+// currently selected partition" (as vdrive.c:1324 does it), NOT table entry 0,
+// which is the system partition. Never resolve 0 through byNumber().
+//
+// Returns nullptr only if the image has no usable partition table.
+const DHDPartition* DHDResolvePartition(const std::string& containerUrl,
+                                        const std::string& in_path,
+                                        std::string* out_rest = nullptr,
+                                        bool* out_explicit = nullptr);
+
 
 /********************************************************
  * Streams
@@ -171,10 +194,25 @@ class DHDPartitionMFile : public BASE {
 public:
     DHDPartitionMFile(std::string path) : BASE(path) {};
 
-    std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> is) override
+    // The partition this MFile refers to. 0 means "whatever the image has
+    // selected", so an MFile created before a CP<n> follows the new selection.
+    // Set only when the PATH named a partition.
+    uint8_t m_part = 0;
+
+    // The partition resolved for THIS MFile: m_part when the path named one,
+    // otherwise the image's current selection.
+    const DHDPartition* effectivePartition()
     {
         auto img = DHDImageRegistry::obtain(DHDImageRegistry::containerOf(this->url));
-        const DHDPartition* p = img ? img->current() : nullptr;
+        if (img == nullptr)
+            return nullptr;
+        return (m_part == 0) ? img->current() : img->byNumber(m_part);
+    }
+
+    std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> is) override
+    {
+        normalizePath();
+        const DHDPartition* p = effectivePartition();
         if (p == nullptr)
             return nullptr;
 
@@ -266,6 +304,25 @@ public:
         return BASE::exists();
     }
 
+    // Emit entry URLs that name their partition. Without this, listing a
+    // partition other than the selected one produces entries that resolve into
+    // the SELECTED partition - the base class strips the partition from
+    // pathInStream, so a bare entry URL carries no partition at all.
+    // The NUMBER is used, not the name: names may contain '/', spaces and
+    // PETSCII bytes, none of which survive a URL path component.
+    std::string entryUrlFor(const std::string& filename) override
+    {
+        const DHDPartition* p = effectivePartition();
+        if (p == nullptr || p->number == 0)
+            return BASE::entryUrlFor(filename);
+
+        std::string u = this->url;
+        u += '/'; u += std::to_string((unsigned)p->number);
+        if (this->pathInStream.size()) { u += '/'; u += this->pathInStream; }
+        u += '/'; u += filename;
+        return u;
+    }
+
 protected:
     // Handle the partition part of pathInStream once per MFile:
     // "$=P" switches to partition-list mode. A leading path component no
@@ -287,18 +344,21 @@ protected:
             return;
         }
 
-        // A partition name or number in a path does NOT select a partition.
-        // The real CMD HD requires CP<n>; resolving paths here was a Meatloaf
-        // invention and an actively harmful one. Selecting strips the
-        // partition from the path, so the entry URLs getNextFileInDir()
-        // builds during a listing carry no partition component - and a file
-        // whose name happened to match a partition (e.g. "1571" inside BIBLE)
-        // re-entered this function, switched the image to another partition
-        // part-way through the listing, and disposed the cached stream out
-        // from under it. Use CP<n> or the "partition" console command.
-        //
-        // pathInStream is therefore always relative to the selected
-        // partition, and nothing a listing generates can be reinterpreted.
+        // A leading component naming a partition binds THIS MFile to that
+        // partition and is stripped, so the base class resolves the rest inside
+        // it. It deliberately does NOT call select(): referencing a partition by
+        // path must not change what the image has selected. That coupling is
+        // what let a directory listing switch partitions part-way through.
+        std::string rest;
+        bool explicit_part = false;
+        const DHDPartition *p = DHDResolvePartition(
+            DHDImageRegistry::containerOf(this->url), this->pathInStream, &rest, &explicit_part);
+
+        if (p != nullptr && explicit_part)
+        {
+            m_part = p->number;
+            this->pathInStream = rest;
+        }
     }
 
     bool normalized = false;
@@ -317,13 +377,16 @@ using DHDNPMFile = DHDPartitionMFile<DNPMFile>;
 inline MFile* DHDCreatePartitionFile(std::string path)
 {
     uint8_t type = 1;
-    auto img = DHDImageRegistry::obtain(DHDImageRegistry::containerOf(path));
-    if (img != nullptr)
-    {
-        const DHDPartition* p = img->current();
-        if (p != nullptr)
-            type = p->type;
-    }
+    // Resolve from the PATH, not from the current selection: the base class is
+    // chosen by the partition's type, and the path may name a partition other
+    // than the selected one. Shares one resolver with normalizePath() so the
+    // two can never disagree about which partition a path means.
+    std::string container = DHDImageRegistry::containerOf(path);
+    std::string in_path = path.size() > container.size()
+                        ? path.substr(container.size() + 1) : std::string();
+    const DHDPartition* p = DHDResolvePartition(container, in_path);
+    if (p != nullptr)
+        type = p->type;
 
     switch (type)
     {
