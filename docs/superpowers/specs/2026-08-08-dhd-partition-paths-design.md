@@ -1,7 +1,26 @@
 # Partition References in Paths — CMD HD/FD
 
 **Date:** 2026-08-08
-**Status:** DESIGN — approved 2026-08-08.
+**Status:** DESIGN — REVISED 2026-08-08 after a failed first implementation. Read the revision note.
+
+> **Revision — the first implementation was reverted (`128df503`, reverted by `8951dd49`).**
+>
+> The *model* below (a partition resolved from the path, 0 meaning "the selected
+> partition", no `select()` mutation) was right. The *mechanism* was wrong: it put the
+> partition solely on the `MFile`, where only `getDecodedStream()` could see it.
+>
+> `ImageBroker` caches **streams**, and the five operations that matter —
+> `rewindDirectory`, `getNextFileInDir`, `isDirectory`, `exists`, `getCreationTime` —
+> all fetch the cached stream via `ImageBroker::obtain("d64", url)` where `url` is the
+> container only. `obtain()` then rebuilds the stream from a fresh `MFSOwner::File(url)`
+> whose `pathInStream` is empty, so the MFile's partition never reached any of them.
+> Listing a non-selected partition read the *selected* one and stamped its entries with
+> the wrong partition number. A whole-branch review caught it; both causes were verified
+> against the source.
+>
+> **The corrected mechanism is in "Design" below: the partition lives on the STREAM.**
+> That is what makes it visible to all five operations for free, because they all hold
+> the stream. See `D64MStream::partition`, which already exists for this purpose.
 **Supersedes:** the "Remove path-based selection" section of
 `2026-08-07-dhd-partition-command-design.md`. Everything else in that document
 (the `partition` console command, the documentation corrections, the 254 bound,
@@ -85,6 +104,42 @@ construction: a generated path is never ambiguous, so no listing can be
 hijacked by an entry whose name happens to match a partition.
 
 ## Design
+
+### The partition lives on the stream
+
+`D64MStream::partition` (`d64.h:350`) already exists and is **vestigial**: it is read at
+~20 sites as an index into `partitions[]`, but it is never assigned anywhere, and every
+format pushes exactly one `Partition`, so it is always 0. The multi-entry index hook was
+never driven — D81 CBM sub-partitions and DNP `DIR` entries use `dir_track`/`dir_sector`,
+not this vector.
+
+It is **repurposed** to mean *"the CMD partition number this stream decodes"* (0 = not a
+CMD image). The ~20 read sites move to an accessor returning `partitions[0]`.
+
+This is what fixes the failure above: `ImageBroker` caches streams, so every operation
+that holds the stream sees the partition without any per-call plumbing.
+
+### One partition-stream cached per image
+
+The stream for a CMD image decodes exactly one partition — a `DHDOffsetStream` window at
+that partition's offset, wrapped in the class matching its type (unchanged). Only one such
+stream is cached per image at a time.
+
+Two pieces are needed, and **both** are required — either alone leaves the bug in place:
+
+1. **A partition-carrying broker URL.** `ImageBroker::obtain()` rebuilds the stream from
+   `MFSOwner::File(url)`. Given only the container it produces a partition-less MFile and
+   decodes the *selected* partition. `D64MFile` gains a virtual for the URL it hands the
+   broker (default: `url`); `DHDPartitionMFile` overrides it to append the partition
+   number, so the rebuild resolves the intended partition.
+2. **Dispose on mismatch.** The broker key is derived from the container's `sourceFile`,
+   so it does **not** distinguish partitions — two partitions collide on one key. Before
+   any operation, if a stream is cached for this image whose `partition` differs from the
+   one wanted, dispose it so `obtain()` rebuilds. `DHDPartitionMFile::normalizePath()` is
+   the single choke point: it already runs from all five entry points.
+
+Consequence: interleaving access to two partitions of the same image re-parses on each
+switch. Accepted — `select()` already disposes on every partition change today.
 
 ### A single shared resolver
 
