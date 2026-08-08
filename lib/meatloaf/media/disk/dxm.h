@@ -30,9 +30,10 @@
 // the partition it contains.
 //
 // Handling is shared with .dhd (see media/hd/dhd.h): the image has a
-// currently selected partition (the default partition on first use);
-// LOAD"$=P" lists the partitions, CD/LOAD of a partition name or number
-// selects it, and the CBM DOS "CP<n>" command changes it.
+// currently selected partition (the default partition on first use).
+// The selection changes ONLY via the CBM DOS "CP<n>" command or the
+// "partition" console command - the real CMD FD does not switch on
+// LOAD or CD, and neither do we. LOAD"$=P" lists the partitions.
 //
 // https://vice-emu.sourceforge.io/vice_17.html#SEC403
 // https://web.archive.org/web/20180925144409/https://cbm8bit.com/articles/user-contributions/howto_d1m_d2m_d4m
