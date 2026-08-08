@@ -42,7 +42,7 @@ bool G64MStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
 {
     uint32_t sectorOffset = 0;
 
-    Debug_printv("track[%d] sector[%d] offset[%d]", track, sector, offset);
+    //Debug_printv("track[%d] sector[%d] offset[%d]", track, sector, offset);
 
     // Is this a valid track?
     uint16_t c = partitions[partition].block_allocation_map.size() - 1;
@@ -92,7 +92,7 @@ bool G64MStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
         //Debug_printv( "Read Sector Data [%04X]", containerStream->position() );
     } 
     while ( sector != gcr_sector_header.sector );
-    Debug_printv( "Start Sector Data [%04lX]", containerStream->position() );
+    //Debug_printv( "Start Sector Data [%04lX]", containerStream->position() );
     readSector();
 
     sectorOffset += sector;

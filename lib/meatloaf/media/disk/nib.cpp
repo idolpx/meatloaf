@@ -40,7 +40,7 @@ static uint8_t gcr_decode_low[32] = {
 
 bool NIBMStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
 {
-    Debug_printv("track[%d] sector[%d] offset[%d]", track, sector, offset);
+    //Debug_printv("track[%d] sector[%d] offset[%d]", track, sector, offset);
 
     // Is this a valid track?
     uint16_t c = partitions[partition].block_allocation_map.size() - 1;
@@ -99,7 +99,7 @@ bool NIBMStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
     if ( !sync_found )
         return false;
 
-    Debug_printv( "Start Sector Data [%04lX]", containerStream->position() );
+    //Debug_printv( "Start Sector Data [%04lX]", containerStream->position() );
     readSector();
 
 
