@@ -28,9 +28,11 @@
 // Each image has a "currently selected partition" (the default partition on
 // first use, like the real drive). getFile() returns a D64MFile, D71MFile,
 // D81MFile or DNPMFile matched to the selected partition's type, decoding a
-// window of the image at the partition's offset. The selection changes via
-// the CBM DOS "CP<n>" command, or by loading / CD'ing a partition name or
-// number. LOAD"$=P",8 lists the partitions.
+// window of the image at the partition's offset. The selection changes ONLY
+// via the CBM DOS "CP<n>" command or the "partition" console command - the
+// real CMD HD does not switch partitions on LOAD or CD, and neither do we.
+// LOAD"$=P",8 lists the partitions. Partitions are numbered 1-255 (CMD FD:
+// 1-31); 0 is the reserved system partition.
 //
 // https://vice-emu.sourceforge.io/vice_17.html#SEC432
 // https://sourceforge.net/p/vice-emu/patches/253/
@@ -258,9 +260,8 @@ public:
 
 protected:
     // Handle the partition part of pathInStream once per MFile:
-    // "$=P" switches to partition-list mode; a leading component naming a
-    // partition (name or number) selects that partition and is stripped so
-    // the base class resolves the rest inside it.
+    // "$=P" switches to partition-list mode. A leading path component no
+    // longer selects a partition - see the comment inside the method.
     void normalizePath()
     {
         if (normalized)
@@ -270,6 +271,7 @@ protected:
         if (this->pathInStream.empty())
             return;
 
+        // "$=P" switches to partition-list mode.
         if (mstr::startsWith(this->pathInStream, "$=P") || mstr::startsWith(this->pathInStream, "$=p"))
         {
             listing_partitions = true;
@@ -277,39 +279,18 @@ protected:
             return;
         }
 
-        std::string comp = this->pathInStream;
-        size_t slash = comp.find('/');
-        if (slash != std::string::npos)
-            comp = comp.substr(0, slash);
-
-        auto img = DHDImageRegistry::obtain(DHDImageRegistry::containerOf(this->url));
-        if (img == nullptr)
-            return;
-
-        const DHDPartition *p = nullptr;
-        bool numeric = comp.size() && comp.find_first_not_of("0123456789") == std::string::npos;
-        if (numeric)
-        {
-            // Partition numbers are uint8_t. atoi() returned an int that was
-            // then SILENTLY truncated on the way into byNumber(), so any
-            // all-digit name of 256 or more wrapped onto a real partition: a
-            // file called "1571" inside a partition resolved to 1571 & 0xFF =
-            // 35 and switched the whole image to partition 35 part-way
-            // through a directory listing. Range-check before the cast.
-            char *end = nullptr;
-            long v = strtol(comp.c_str(), &end, 10);
-            if (end != comp.c_str() && *end == '\0' && v >= 0 && v <= 255)
-                p = img->byNumber((uint8_t)v);
-        }
-        else
-            p = img->byName(comp);
-        if (p == nullptr)
-            return;
-
-        // Using a partition in a path selects it
-        DHDImageRegistry::select(DHDImageRegistry::containerOf(this->url), p->number);
-
-        this->pathInStream = (slash == std::string::npos) ? "" : this->pathInStream.substr(slash + 1);
+        // A partition name or number in a path does NOT select a partition.
+        // The real CMD HD requires CP<n>; resolving paths here was a Meatloaf
+        // invention and an actively harmful one. Selecting strips the
+        // partition from the path, so the entry URLs getNextFileInDir()
+        // builds during a listing carry no partition component - and a file
+        // whose name happened to match a partition (e.g. "1571" inside BIBLE)
+        // re-entered this function, switched the image to another partition
+        // part-way through the listing, and disposed the cached stream out
+        // from under it. Use CP<n> or the "partition" console command.
+        //
+        // pathInStream is therefore always relative to the selected
+        // partition, and nothing a listing generates can be reinterpreted.
     }
 
     bool normalized = false;
