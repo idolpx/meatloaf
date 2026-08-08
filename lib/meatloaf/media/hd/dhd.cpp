@@ -211,15 +211,23 @@ bool DHDImageRegistry::parse(const std::string &containerUrl, Image &img)
         if (e != std::string::npos)
             name.resize(e);
 
+        uint8_t type = buf[2];
+
         if (i == 0)
         {
+            // Entry 0 is the system partition: it carries the drive label and
+            // the partition table itself. Its type byte is 0xFF in every real
+            // image (which is what vdrive's `ptype[part] == 255` test keys on),
+            // so it would never pass the 1..4 filter below - it is added
+            // explicitly instead, because it belongs in the partition listing.
+            // It is NOT selectable: select() refuses partition 0, since the
+            // system partition is not a mountable disk.
             img.disk_label = mstr::toUTF8(name);
+        }
+        else if (type < 1 || type > 4)
+        {
             continue;
         }
-
-        uint8_t type = buf[2];
-        if (type < 1 || type > 4)
-            continue;
 
         DHDPartition p;
         p.number = i;
@@ -234,14 +242,26 @@ bool DHDImageRegistry::parse(const std::string &containerUrl, Image &img)
                      p.number, p.type, p.name.c_str(), p.start, p.size);
     }
 
-    if (img.parts.empty())
+    // parts[] now always holds the system partition (entry 0), so "is it empty"
+    // no longer answers "is anything mountable here" - count USER partitions.
+    uint8_t first_user = 0;
+    for (const DHDPartition &p : img.parts)
+    {
+        if (p.number != 0) { first_user = p.number; break; }
+    }
+
+    if (first_user == 0)
     {
         Debug_printv("No usable partitions in [%s]", containerUrl.c_str());
         return false;
     }
 
-    // First use: select the default partition
-    img.selected = img.byNumber(img.default_part) ? img.default_part : img.parts[0].number;
+    // First use: select the default partition, falling back to the first USER
+    // partition - never entry 0. parts[0] is the system partition now, so using
+    // it as the fallback would mount the partition table as if it were a disk.
+    img.selected = (img.default_part != 0 && img.byNumber(img.default_part))
+                 ? img.default_part
+                 : first_user;
     img.valid = true;
 
     Debug_printv("CMD %s [%s] label[%s] partitions[%d] selected[%d]",
@@ -254,6 +274,14 @@ bool DHDImageRegistry::select(const std::string &containerUrl, uint8_t number)
 {
     Image* img = obtain(containerUrl);
     if (img == nullptr)
+        return false;
+
+    // Partition 0 is the system partition. It appears in the listing (it is a
+    // real table entry, and users want to see it), but it is not a mountable
+    // disk - it holds the partition table. Refusing it HERE rather than in each
+    // caller covers every route in: CP<n>, the console command's numeric form,
+    // and a by-NAME lookup, since byNumber(0)/byName("system") now resolve.
+    if (number == 0)
         return false;
 
     const DHDPartition* p = img->byNumber(number);

@@ -283,6 +283,8 @@ static const char *partition_type_name(uint8_t type)
         case 2:  return "1541";
         case 3:  return "1571";
         case 4:  return "1581";
+        // Entry 0, the system partition: listed but not selectable.
+        case 0xFF: return "SYS";
         default: return "?";
     }
 }
@@ -330,12 +332,16 @@ int partition(int argc, char **argv)
     bool numeric = arg.size() && arg.find_first_not_of("0123456789") == std::string::npos;
     if (numeric)
     {
-        // Valid partitions are 1-255; 0 is the reserved system partition.
         // Range-check BEFORE narrowing to uint8_t: an int silently truncated
         // into byNumber() is exactly what made "1571" resolve to partition 35.
+        // 0 is accepted for LOOKUP only, so that "partition 0" can report what
+        // the system partition actually is rather than "no such partition" -
+        // it is in the listing, so denying its existence would be incoherent.
+        // Selecting it is refused below. Accepting 0 does not weaken the
+        // truncation guard, which is the 0..255 bound itself.
         char *end = nullptr;
         long v = strtol(arg.c_str(), &end, 10);
-        if (end != arg.c_str() && *end == '\0' && v >= 1 && v <= 255)
+        if (end != arg.c_str() && *end == '\0' && v >= 0 && v <= 255)
             p = img->byNumber((uint8_t)v);
     }
 
@@ -350,6 +356,15 @@ int partition(int argc, char **argv)
     if (p == nullptr)
     {
         Serial.printf("partition: no such partition: %s\r\n", arg.c_str());
+        return EXIT_FAILURE;
+    }
+
+    // Reachable both as "partition 0" and by name, since entry 0 is in parts[].
+    // select() refuses it too; this is here only to explain why.
+    if (p->number == 0)
+    {
+        Serial.printf("partition: %u \"%s\" is the system partition and cannot be selected\r\n",
+                      (unsigned)p->number, mstr::toUTF8(p->name).c_str());
         return EXIT_FAILURE;
     }
 

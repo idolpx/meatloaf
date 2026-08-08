@@ -32,7 +32,10 @@
 // via the CBM DOS "CP<n>" command or the "partition" console command - the
 // real CMD HD does not switch partitions on LOAD or CD, and neither do we.
 // LOAD"$=P",8 lists the partitions. Partitions are numbered 1-255 (CMD FD:
-// 1-31); 0 is the reserved system partition.
+// 1-31); 0 is the system partition, which carries the drive label and the
+// partition table. Entry 0 IS included in the listing (type $FF, shown as
+// "sys") because it is a real table entry, but select() refuses it - it is not
+// a mountable disk.
 //
 // https://vice-emu.sourceforge.io/vice_17.html#SEC432
 // https://sourceforge.net/p/vice-emu/patches/253/
@@ -235,7 +238,10 @@ public:
             auto file = MFSOwner::File(this->url + "/" + fname);
             file->name = fname;
             static const char *type_label[5] = { "???", "nat", "41", "71", "81" };
-            file->extension = type_label[(p.type <= 4) ? p.type : 0];
+            // Type $FF is the system partition (entry 0), which is listed but
+            // not selectable; everything else outside 1..4 is an unknown type.
+            file->extension = (p.type == 0xFF) ? "sys"
+                                               : type_label[(p.type <= 4) ? p.type : 0];
             file->size = p.size;
             file->is_dir = 1;
             return file;
