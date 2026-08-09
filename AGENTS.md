@@ -63,15 +63,6 @@ For multi-step tasks, state a brief plan:
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
 
-## Tool Preferences
-
-1. **Conceptual Search**: Always use `semble_search` for natural language queries, finding implementations by concept, or locating code snippets without known symbol names.
-2. **Symbol Navigation & Editing**: Use **Serena** tools (`find_symbol`, `find_referencing_symbols`, `replace_symbol_body`) when:
-   - The exact function, class, or variable name is known.
-   - Performing refactoring or edits requiring precise symbol-level understanding.
-   - Navigating call hierarchies or type definitions.
-3. **Fallback**: Only use native `grep`, `awk`, `sed`, or `read_file` if both Semble and Serena return no relevant results.   
-
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
