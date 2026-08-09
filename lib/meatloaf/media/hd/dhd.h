@@ -79,12 +79,16 @@ public:
         uint8_t default_part = 1;
         uint8_t selected = 0;
 
-        // Which partition of this image the ImageBroker's cached stream
-        // currently decodes. The broker keys on the CONTAINER, so it holds one
-        // stream per image and cannot tell partitions apart itself - this is
-        // how we know a cached stream belongs to a different partition and must
-        // be disposed before it is handed to a directory operation. 0 = nothing
-        // cached yet.
+        // The partition of the stream the ImageBroker currently has cached for
+        // this image; 0 when nothing is cached. The broker keys on the
+        // CONTAINER, so it holds one stream per image and cannot tell
+        // partitions apart itself - this is how brokerUrl() knows a cached
+        // stream belongs to a different partition and must be dropped.
+        //
+        // It is written only where a stream is actually built
+        // (getDecodedStream) or discarded (select), never predicted ahead of
+        // the build - a prediction goes stale as soon as two MFiles on
+        // different partitions interleave.
         uint8_t cached_part = 0;
         std::string disk_label;             // system partition (entry 0) name
         std::vector<DHDPartition> parts;
@@ -220,6 +224,15 @@ public:
         // extended itself would write directly over the next partition.
         // D64MStream::allow_grow defaults to false and must stay false on this
         // path; do not set it here.
+        // Record the partition actually being decoded. cached_part must be a
+        // record, not a prediction: it is what brokerUrl() compares against to
+        // decide whether the broker's one cached stream belongs to this path.
+        {
+            auto img = DHDImageRegistry::obtain(DHDImageRegistry::containerOf(this->url));
+            if (img != nullptr)
+                img->cached_part = p->number;
+        }
+
         auto view = std::make_shared<DHDOffsetStream>(is, p->start, p->size);
         // The decoded stream is scoped to ONE CMD partition; D64MStream's own
         // `partition` field is the sub-partition within that disk and is left
@@ -344,19 +357,6 @@ protected:
             }
         }
 
-        // The broker holds ONE stream per image and keys on the container, so
-        // it cannot tell partitions apart. If what it has cached decodes a
-        // different partition than this path wants, drop it - otherwise the
-        // directory operations, which all read the cached stream, would answer
-        // for the wrong partition.
-        std::string container = DHDImageRegistry::containerOf(this->url);
-        auto img = DHDImageRegistry::obtain(container);
-        const DHDPartition *want = effectivePartition();
-        if (img != nullptr && want != nullptr && img->cached_part != want->number)
-        {
-            DHDImageRegistry::disposeCachedStream(container);
-            img->cached_part = want->number;
-        }
     }
 
     bool normalized = false;
@@ -387,6 +387,21 @@ public:
         const DHDPartition* p = effectivePartition();
         if (p == nullptr || p->number == 0)
             return this->url;
+
+        // The broker keys on the CONTAINER, so it holds one stream per image
+        // and cannot tell partitions apart. Drop a stream cached for a
+        // different partition before obtain() can hand it to us.
+        //
+        // This check belongs HERE, not in normalizePath(): normalizePath runs
+        // once per MFile, obtain() runs on every directory operation. At the
+        // slower rate, two MFiles on different partitions desynced - each
+        // normalized once, then whichever built its stream first won, and the
+        // other silently read that partition instead.
+        std::string container = DHDImageRegistry::containerOf(this->url);
+        auto img = DHDImageRegistry::obtain(container);
+        if (img != nullptr && img->cached_part != p->number)
+            DHDImageRegistry::disposeCachedStream(container);
+
         return this->url + "/" + std::to_string((unsigned)p->number);
     }
 

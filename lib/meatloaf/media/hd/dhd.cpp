@@ -296,9 +296,11 @@ bool DHDImageRegistry::select(const std::string &containerUrl, uint8_t number)
     Debug_printv("selected partition[%d] type[%d] name[%s]", p->number, p->type, p->name.c_str());
 
     // Drop the broker-cached image stream so the next access decodes the
-    // newly selected partition
+    // newly selected partition. cached_part records what IS cached, so after
+    // discarding it that is nothing - not the partition we are about to use.
+    // getDecodedStream() sets it when a stream is actually built.
     disposeCachedStream(containerUrl);
-    img->cached_part = number;
+    img->cached_part = 0;
 
     return true;
 }
