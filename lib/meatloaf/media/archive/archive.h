@@ -222,7 +222,14 @@ class ArchiveMStream : public MMediaStream {
 
     struct archive_entry *a_entry;
     struct Entry {
+        // The entry's basename. Directory listings are flat - a CBM directory
+        // has no notion of nested paths - so this is what browsing shows.
         std::string filename;
+        // The path as STORED in the archive, e.g. "docs/manual/readme.txt".
+        // Kept separately because basename() throws it away and extraction
+        // needs it to recreate the directory structure. Empty if the archive
+        // stored no path component.
+        std::string pathname;
         uint32_t size;
     };
     Entry entry;

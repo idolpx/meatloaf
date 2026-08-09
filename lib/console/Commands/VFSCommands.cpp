@@ -1957,6 +1957,38 @@ static std::string strip_compression_ext(const std::string &name)
 // creating parent directories as needed. Prints progress for large entries.
 // readFn(buf, n) returns bytes read, 0 at end-of-entry. Returns bytes copied,
 // or -1 on error.
+// Make an archive-stored entry path safe to append to a destination folder.
+//
+// An archive can name an entry "../../etc/passwd" or "/etc/passwd", and unzipx
+// extracts from http:// and smb:// sources as readily as from local ones - so
+// honouring stored paths verbatim would let a hostile archive write anywhere on
+// the device (the classic zip-slip). Leading separators are dropped, "." is
+// skipped, and ".." pops the previous component but can never climb above the
+// destination. Backslashes are treated as separators too: archives written on
+// Windows sometimes store them.
+//
+// Returns "" when nothing usable is left, in which case the entry is skipped.
+static std::string unzip_safe_relpath(const std::string &name)
+{
+    std::string out;
+    size_t i = 0;
+    while (i < name.size()) {
+        size_t j = name.find_first_of("/\\", i);
+        std::string comp = (j == std::string::npos) ? name.substr(i) : name.substr(i, j - i);
+        i = (j == std::string::npos) ? name.size() : j + 1;
+
+        if (comp.empty() || comp == ".") continue;
+        if (comp == "..") {
+            size_t s = out.rfind('/');
+            out = (s == std::string::npos) ? std::string() : out.substr(0, s);
+            continue;   // popping an empty path is a no-op, so dest is the floor
+        }
+        if (!out.empty()) out += '/';
+        out += comp;
+    }
+    return out;
+}
+
 static int64_t unzip_write_entry(uint8_t *buf, size_t bufSize,
                                   const std::function<uint32_t(uint8_t *, uint32_t)> &readFn,
                                   const std::string &destPath, int64_t entry_size)
@@ -1993,12 +2025,29 @@ static int64_t unzip_write_entry(uint8_t *buf, size_t bufSize,
 
 static int cmd_unzipx(int argc, char **argv)
 {
-    if (argc < 2) {
-        Serial.printf("usage: unzipx <archive> [dest_folder]\r\n");
+    // -j ("junk paths") extracts every entry straight into the destination.
+    // Without it the archive's stored directory structure is recreated, which
+    // is what unzip(1) does by default.
+    bool junk_paths = false;
+    int argi = 1;
+    while (argi < argc && argv[argi][0] == '-' && argv[argi][1] != '\0') {
+        for (const char *p = argv[argi] + 1; *p; p++) {
+            if (*p == 'j') junk_paths = true;
+            else {
+                Serial.printf("unzipx: invalid option -- '%c'\r\n", *p);
+                return EXIT_FAILURE;
+            }
+        }
+        argi++;
+    }
+
+    if (argi >= argc) {
+        Serial.printf("usage: unzipx [-j] <archive> [dest_folder]\r\n");
+        Serial.printf("  -j  junk paths: extract all files into the destination folder\r\n");
         return EXIT_FAILURE;
     }
 
-    std::string src = resolve_path(argv[1]);
+    std::string src = resolve_path(argv[argi]);
 
     std::unique_ptr<MFile> srcFile(MFSOwner::File(src));
     if (!srcFile || !srcFile->exists()) {
@@ -2007,8 +2056,8 @@ static int cmd_unzipx(int argc, char **argv)
     }
 
     std::string dest;
-    if (argc >= 3) {
-        dest = resolve_path(argv[2]);
+    if (argc > argi + 1) {
+        dest = resolve_path(argv[argi + 1]);
     } else if (!srcFile->scheme.empty()) {
         // Network source (http, https, ftp, smb, ...): "same directory as
         // source" would try to write the extracted files back to the remote
@@ -2064,7 +2113,21 @@ static int cmd_unzipx(int argc, char **argv)
         bool ok = srcFile->extractAll(
             [&](const std::string &name, uint32_t size,
                 const std::function<uint32_t(uint8_t *, uint32_t)> &read) -> bool {
-                std::string path = dest + "/" + name;
+                // 'name' is the path as stored in the archive. Sanitise it so a
+                // hostile entry cannot write outside dest, then flatten it if
+                // -j was given. unzip_write_entry() creates any missing parent
+                // directories, which is what recreates the structure.
+                std::string rel = unzip_safe_relpath(name);
+                if (junk_paths) {
+                    size_t s = rel.rfind('/');
+                    if (s != std::string::npos) rel = rel.substr(s + 1);
+                }
+                if (rel.empty()) {
+                    Serial.printf("  (skipped unsafe entry '%s')\r\n", name.c_str());
+                    return true;
+                }
+
+                std::string path = dest + "/" + rel;
                 Serial.printf("  %s  (%u bytes)\r\n", path.c_str(), size);
                 int64_t written = unzip_write_entry(buf, 4096, read, path, (int64_t)size);
                 if (written >= 0) {
@@ -2193,7 +2256,8 @@ namespace ESP32Console::Commands
 #ifndef MIN_CONFIG
     const ConsoleCommand getUnzipxCommand()
     {
-        return ConsoleCommand("unzipx", &cmd_unzipx, "Extract an archive to a folder");
+        return ConsoleCommand("unzipx", &cmd_unzipx,
+            "Extract an archive, recreating its directory structure. Usage: unzipx [-j] <archive> [dest]");
     }
 #endif
 

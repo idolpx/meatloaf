@@ -755,6 +755,10 @@ bool ArchiveMStream::nextEntrySimple() {
         if (!S_ISREG(archive_entry_filetype(a_entry))) continue;  // skip dirs
 
         const char *pn = archive_entry_pathname(a_entry);
+        // Keep BOTH: the basename for flat listings, and the stored path so
+        // extraction can recreate the directory structure. basename() is
+        // destructive on some platforms, so read pathname first.
+        entry.pathname = (pn && pn[0]) ? pn : "";
         entry.filename = (pn && pn[0]) ? basename((char *)pn) : "";
         if (entry.filename.empty()) continue;  // unnamed/synthetic — skip
 
@@ -895,7 +899,12 @@ bool ArchiveMFile::extractAll(const ExtractCallback &onEntry)
     while (image->nextEntrySimple()) {
         // Any bytes of this entry left unread are skipped by the next
         // archive_read_next_header(), so aborting a partial read is safe.
-        if (!onEntry(image->entry.filename, image->entry.size, readFn)) {
+        // Hand over the STORED path so the caller can recreate the directory
+        // structure; fall back to the basename when the archive stored none.
+        const std::string &entryName = image->entry.pathname.empty()
+                                     ? image->entry.filename
+                                     : image->entry.pathname;
+        if (!onEntry(entryName, image->entry.size, readFn)) {
             ok = false;
             break;
         }
