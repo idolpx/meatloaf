@@ -1261,6 +1261,19 @@ static void updatedb_task(void *arg)
     // SQLITE_OMIT_AUTOINIT: must init before sqlite3_open().
     sqlite_one_time_init();
 
+    // Swap SQLite to the PSRAM allocator for the whole scan, for the same
+    // reason updatedb_fts_rebuild() does it (see sqlite3_esp32.h): FTS5's
+    // token hash is thousands of sub-512-byte allocations, and
+    // CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=512 puts every one of them in
+    // internal DRAM. That starves the DMA-capable heap, and the SDMMC driver
+    // needs a 512-byte MALLOC_CAP_DMA bounce buffer for EVERY sector it
+    // writes (sdmmc_cmd.c, sdmmc_write_sectors). Creating the files_fts
+    // shadow tables was failing with ESP_ERR_NO_MEM for exactly that reason -
+    // the rebuild path was protected, this one was not.
+    // enter/exit are stateless swaps of the allocator saved at init, so the
+    // nested enter inside updatedb_fts_rebuild() below is harmless.
+    sqlite3_esp32_psram_malloc_enter();
+
     sqlite3      *db            = nullptr;
     sqlite3_stmt *dir_ins_stmt  = nullptr;   // INSERT OR IGNORE INTO dirs (path)
     sqlite3_stmt *dir_id_stmt   = nullptr;   // SELECT id FROM dirs WHERE path=?
@@ -1280,6 +1293,7 @@ static void updatedb_task(void *arg)
                           db ? sqlite3_errmsg(db) : "out of memory");
             if (db) sqlite3_close(db);
             s_scan_running = 0;
+            sqlite3_esp32_psram_malloc_exit();
             vTaskDelete(NULL);
             return;
         }
@@ -1333,6 +1347,7 @@ static void updatedb_task(void *arg)
             sqlite3_free(errmsg);
             sqlite3_close(db);
             s_scan_running = 0;
+            sqlite3_esp32_psram_malloc_exit();
             vTaskDelete(NULL);
             return;
         }
@@ -1346,6 +1361,7 @@ static void updatedb_task(void *arg)
                           db ? sqlite3_errmsg(db) : "out of memory");
             if (db) sqlite3_close(db);
             s_scan_running = 0;
+            sqlite3_esp32_psram_malloc_exit();
             vTaskDelete(NULL);
             return;
         }
@@ -1362,6 +1378,7 @@ static void updatedb_task(void *arg)
                 Serial.printf("updatedb: schema outdated — run 'updatedb start' to rebuild.\r\n");
                 sqlite3_close(db);
                 s_scan_running = 0;
+                sqlite3_esp32_psram_malloc_exit();
                 vTaskDelete(NULL);
                 return;
             }
@@ -1427,6 +1444,7 @@ static void updatedb_task(void *arg)
         sqlite3_finalize(mark_stmt);
         sqlite3_close(db);
         s_scan_running = 0;
+        sqlite3_esp32_psram_malloc_exit();
         vTaskDelete(NULL);
     };
 
@@ -1512,6 +1530,12 @@ static void updatedb_task(void *arg)
         Serial.printf("updatedb: done — %d directories, %d files, %d errors, %s.\r\n",
                       (int)s_scan_dirs, (int)s_scan_files,
                       (int)s_scan_errors, mstr::formatDuration(s_scan_end - s_scan_start).c_str());
+
+    // Restore explicitly rather than relying on updatedb_fts_rebuild() having
+    // done it: leaving SQLite on the PSRAM allocator would be a system-wide
+    // change made by a task that has finished. exit() is a stateless restore of
+    // the allocator saved at init, so calling it twice costs nothing.
+    sqlite3_esp32_psram_malloc_exit();
     vTaskDelete(NULL);
 }
 
