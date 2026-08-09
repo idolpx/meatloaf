@@ -1318,7 +1318,6 @@ static void updatedb_run(void)
             s_scan_running = 0;
             sqlite3_esp32_psram_malloc_exit();
             return;
-            return;
         }
 
         Serial.printf("updatedb: db open — free=%lu dma_max=%lu\r\n",
@@ -1372,7 +1371,6 @@ static void updatedb_run(void)
             s_scan_running = 0;
             sqlite3_esp32_psram_malloc_exit();
             return;
-            return;
         }
 
         initial_dirs.emplace_back("/sd");
@@ -1385,7 +1383,6 @@ static void updatedb_run(void)
             if (db) sqlite3_close(db);
             s_scan_running = 0;
             sqlite3_esp32_psram_malloc_exit();
-            return;
             return;
         }
 
@@ -1402,7 +1399,6 @@ static void updatedb_run(void)
                 sqlite3_close(db);
                 s_scan_running = 0;
                 sqlite3_esp32_psram_malloc_exit();
-                return;
                 return;
             }
         }
