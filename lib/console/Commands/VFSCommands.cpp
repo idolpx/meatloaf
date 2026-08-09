@@ -17,6 +17,9 @@
 #include "../../meatloaf/network/http.h"
 #include "../../meatloaf/media/hd/dhd.h"
 
+// Defined further down; cp() needs it and sits above the definition.
+static std::string resolve_path(const char *arg);
+
 static inline void *psram_malloc(size_t sz) {
     void *p = heap_caps_malloc(sz, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     return p ? p : malloc(sz);
@@ -416,61 +419,86 @@ int mv(int argc, char **argv)
 
 int cp(int argc, char **argv)
 {
-    //TODO: Shows weird error message
     if (argc != 3)
     {
         Serial.printf("Syntax is cp [ORIGIN] [TARGET]\r\n");
-        return 1;
+        return EXIT_FAILURE;
     }
 
-    char old_name[PATH_MAX], new_name[PATH_MAX];
+    // Goes through MFile, not fopen(). The POSIX path only sees real files on
+    // flash and SD, so copying out of a disk image, an archive or a URL was
+    // impossible - "cp bible/read.me x" inside a .dhd failed with ENOENT
+    // because that path exists only to the media layer. cat/hex/ls/wget all
+    // resolve through MFSOwner already; cp and mv were the holdouts.
+    std::string src = resolve_path(argv[1]);
+    std::string dst = resolve_path(argv[2]);
 
-    // Resolve arguments to full path
-    ESP32Console::console_realpath(argv[1], old_name);
-    ESP32Console::console_realpath(argv[2], new_name);
-
-    // Do copy
-    FILE *origin = fopen(old_name, "r");
-    if (!origin)
+    std::unique_ptr<MFile> srcFile(MFSOwner::File(src));
+    if (!srcFile || !srcFile->exists())
     {
-        Serial.printf("Error opening origin file: %s\r\n", strerror(errno));
-        return 1;
+        Serial.printf("cp: cannot open '%s': No such file or directory\r\n", src.c_str());
+        return EXIT_FAILURE;
+    }
+    if (srcFile->isDirectory())
+    {
+        Serial.printf("cp: '%s' is a directory\r\n", src.c_str());
+        return EXIT_FAILURE;
     }
 
-    FILE *target = fopen(new_name, "w");
-    if (!target)
+    // "cp file dir" copies INTO dir, as cp(1) does.
     {
-        fclose(origin);
-        Serial.printf("Error opening target file: %s\r\n", strerror(errno));
-        return 1;
-    }
-
-    int buffer;
-
-    // Clear existing errors
-    auto error = errno;
-
-    while ((buffer = getc(origin)) != EOF)
-    {
-        if(fputc(buffer, target) == EOF) {
-            Serial.printf("Error writing: %s\r\n", strerror(errno));
-            fclose(origin); fclose(target);
-            return 1;
+        std::unique_ptr<MFile> dstProbe(MFSOwner::File(dst));
+        if (dstProbe && dstProbe->exists() && dstProbe->isDirectory())
+        {
+            while (dst.size() > 1 && dst.back() == '/') dst.pop_back();
+            dst += "/" + srcFile->name;
         }
     }
 
-    error = errno;
-    if (error && !feof(origin))
+    auto in = srcFile->getSourceStream(std::ios_base::in);
+    if (!in || !in->isOpen())
     {
-        Serial.printf("Error copying: %s\r\n", strerror(error));
-        fclose(origin);
-        fclose(target);
-        return 1;
+        Serial.printf("cp: cannot read '%s'\r\n", src.c_str());
+        return EXIT_FAILURE;
     }
 
-    fclose(origin);
-    fclose(target);
+    std::unique_ptr<MFile> dstFile(MFSOwner::File(dst));
+    auto out = dstFile ? dstFile->getSourceStream(std::ios_base::out) : nullptr;
+    if (!out || !out->isOpen())
+    {
+        Serial.printf("cp: cannot create '%s'\r\n", dst.c_str());
+        return EXIT_FAILURE;
+    }
 
+    const uint32_t bufSize = 4096;
+    uint8_t *buf = (uint8_t *)psram_malloc(bufSize);
+    if (!buf)
+    {
+        Serial.printf("cp: out of memory\r\n");
+        return EXIT_FAILURE;
+    }
+
+    size_t total = 0;
+    uint32_t n;
+    bool ok = true;
+    while ((n = in->read(buf, bufSize)) > 0)
+    {
+        if (out->write(buf, n) != n)
+        {
+            Serial.printf("cp: write failed after %zu bytes\r\n", total);
+            ok = false;
+            break;
+        }
+        total += n;
+    }
+
+    free(buf);
+    out->close();
+
+    if (!ok)
+        return EXIT_FAILURE;
+
+    Serial.printf("%s -> %s (%zu bytes)\r\n", src.c_str(), dst.c_str(), total);
     return EXIT_SUCCESS;
 }
 
