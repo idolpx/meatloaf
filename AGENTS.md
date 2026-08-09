@@ -245,7 +245,7 @@ Two main build platforms (set in `platformio.ini`):
 1. Create new class in `lib/meatloaf/network/` extending `MStream`
 2. Implement `getDecodedStream()` or override `getSourceStream()` for bottom streams
 3. Register URL scheme in the stream factory/resolver
-4. See detailed architecture documentation in `lib/meatloaf/CLAUDE.md` (includes SMB, HTTP, and other protocol implementations)
+4. See detailed architecture documentation in `lib/meatloaf/AGENTS.md` (includes SMB, HTTP, and other protocol implementations). `lib/meatloaf/CLAUDE.md` is only a bridge to it and holds no content.
 
 ### Archive Support (libarchive)
 
