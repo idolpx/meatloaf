@@ -1454,8 +1454,8 @@ uint64_t MFile::getAvailableSpace()
 
         if (f_getfree("/", &fre_clust, &fsinfo) == 0)
         {
-            uint64_t total = ((uint64_t)(fsinfo->csize)) * (fsinfo->n_fatent - 2) * (fsinfo->ssize);
-            uint64_t used = ((uint64_t)(fsinfo->csize)) * ((fsinfo->n_fatent - 2) - (fsinfo->free_clst)) * (fsinfo->ssize);
+            uint64_t total = ((uint64_t)(fsinfo->csize)) * (fsinfo->n_fatent - 2) * fatfs_sector_size(fsinfo);
+            uint64_t used = ((uint64_t)(fsinfo->csize)) * ((fsinfo->n_fatent - 2) - (fsinfo->free_clst)) * fatfs_sector_size(fsinfo);
             uint64_t free = total - used;
             //Debug_printv("total[%llu] used[%llu free[%llu]", total, used, free);
             return free;

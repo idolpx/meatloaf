@@ -9,6 +9,23 @@
 
 #include "fnFS.h"
 
+#ifdef ESP_PLATFORM
+// FatFs only carries a per-volume `ssize` when built for VARIABLE sector sizes
+// (FF_MAX_SS != FF_MIN_SS). When they are equal the member is compiled out and
+// the sector size is that constant, so reading fsinfo->ssize stops compiling.
+// Both builds are reachable - FF_MAX_SS is MAX(FF_SS_SDCARD, FF_SS_WL), so it
+// depends on CONFIG_WL_SECTOR_SIZE - hence one accessor instead of assuming.
+static inline uint32_t fatfs_sector_size(const FATFS* fsinfo)
+{
+#if FF_MAX_SS != FF_MIN_SS
+    return fsinfo->ssize;
+#else
+    (void)fsinfo;
+    return FF_MAX_SS;
+#endif
+}
+#endif
+
 class FileSystemSDFAT : public FileSystem
 {
 private:

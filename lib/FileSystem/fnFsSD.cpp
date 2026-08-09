@@ -569,7 +569,7 @@ uint64_t FileSystemSDFAT::total_bytes()
 	if (f_getfree("0:", &fre_clust, &fsinfo) == 0)
     {
         // cluster_size * num_clusters * sector_size
-        size = ((uint64_t)(fsinfo->csize)) * (fsinfo->n_fatent - 2) * (fsinfo->ssize);
+        size = ((uint64_t)(fsinfo->csize)) * (fsinfo->n_fatent - 2) * fatfs_sector_size(fsinfo);
     }
 #endif
 	return size;
@@ -585,7 +585,7 @@ uint64_t FileSystemSDFAT::used_bytes()
 	if(f_getfree("0:", &fre_clust, &fsinfo) == 0)
     {
         // cluster_size * (num_clusters - free_clusters) * sector_size
-	    size = ((uint64_t)(fsinfo->csize)) * ((fsinfo->n_fatent-2)-(fsinfo->free_clst)) * (fsinfo->ssize);
+	    size = ((uint64_t)(fsinfo->csize)) * ((fsinfo->n_fatent-2)-(fsinfo->free_clst)) * fatfs_sector_size(fsinfo);
     }
 #endif
 	return size;

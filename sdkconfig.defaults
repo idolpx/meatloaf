@@ -93,3 +93,15 @@ CONFIG_MIPI_DISPLAY_PIN_CS=-1
 CONFIG_MIPI_DISPLAY_PIN_DC=-1
 CONFIG_MIPI_DISPLAY_PIN_RST=-1
 CONFIG_MIPI_DISPLAY_PIN_BL=-1
+
+# Wear-levelling sector size. This project never uses wear levelling - internal
+# flash is LittleFS and no partition table declares a FAT partition - but this
+# value still drives FatFs: FF_MAX_SS = MAX(FF_SS_SDCARD, FF_SS_WL), and
+# FF_SS_SDCARD is hardcoded 512. At 4096 it made every FatFs buffer 8x larger
+# than an SD card needs, and with CONFIG_FATFS_PER_FILE_CACHE=y (FF_FS_TINY=0)
+# that is a per-OPEN-FILE cost in internal DRAM, not a one-off. SQLite holding
+# its db plus a DELETE-mode rollback journal open then ran the DMA-capable heap
+# down far enough that sdmmc_write_sectors() failed with ESP_ERR_NO_MEM.
+CONFIG_WL_SECTOR_SIZE_512=y
+# CONFIG_WL_SECTOR_SIZE_4096 is not set
+CONFIG_WL_SECTOR_SIZE=512
