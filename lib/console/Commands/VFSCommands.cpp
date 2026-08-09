@@ -1560,8 +1560,8 @@ static void updatedb_run(void)
 
 int updatedb(int argc, char **argv)
 {
-    // ── updatedb (no args) → show persistent status ──────────────────────────
-    if (argc < 2) {
+    // -- updatedb status -- persistent status read back from the database ----
+    if (argc > 1 && strcmp(argv[1], "status") == 0) {
         if (s_scan_running) {
             time_t elapsed = time(nullptr) - s_scan_start;
             Serial.printf("Scan in progress: %d directories, %d files (%s elapsed)\r\n",
@@ -1607,7 +1607,7 @@ int updatedb(int argc, char **argv)
     }
 
     // ── updatedb stop ─────────────────────────────────────────────────────────
-    if (strcmp(argv[1], "stop") == 0) {
+    if (argc > 1 && strcmp(argv[1], "stop") == 0) {
         if (!s_scan_running) {
             Serial.printf("updatedb: no scan in progress\r\n");
             return EXIT_FAILURE;
@@ -1618,7 +1618,7 @@ int updatedb(int argc, char **argv)
     }
 
     // ── updatedb resume ───────────────────────────────────────────────────────
-    if (strcmp(argv[1], "resume") == 0) {
+    if (argc > 1 && strcmp(argv[1], "resume") == 0) {
         if (!fnSDFAT.running()) {
             Serial.printf("updatedb: SD card not mounted\r\n");
             return EXIT_FAILURE;
@@ -1648,7 +1648,9 @@ int updatedb(int argc, char **argv)
     }
 
     // ── updatedb start ────────────────────────────────────────────────────────
-    if (strcmp(argv[1], "start") == 0) {
+    // Bare "updatedb" scans, same as "updatedb start" - the common case does
+    // not need a subcommand. Status moved to "updatedb status" above.
+    if (argc < 2 || strcmp(argv[1], "start") == 0) {
         if (!fnSDFAT.running()) {
             Serial.printf("updatedb: SD card not mounted\r\n");
             return EXIT_FAILURE;
@@ -1673,7 +1675,7 @@ int updatedb(int argc, char **argv)
     }
 
     // ── updatedb fts ─────────────────────────────────────────────────────────
-    if (strcmp(argv[1], "fts") == 0) {
+    if (argc > 1 && strcmp(argv[1], "fts") == 0) {
         if (!fnSDFAT.running()) {
             Serial.printf("updatedb: SD card not mounted\r\n");
             return EXIT_FAILURE;
@@ -1693,7 +1695,7 @@ int updatedb(int argc, char **argv)
         return EXIT_SUCCESS;
     }
 
-    Serial.printf("Usage: updatedb [start|stop|resume|fts]\r\n");
+    Serial.printf("Usage: updatedb [start|status|stop|resume|fts]  (no argument = start)\r\n");
     return EXIT_FAILURE;
 }
 
@@ -2312,7 +2314,8 @@ namespace ESP32Console::Commands
 
     const ConsoleCommand getUpdatedbCommand()
     {
-        return ConsoleCommand("updatedb", &updatedb, "Build the locate database from the SD card");
+        return ConsoleCommand("updatedb", &updatedb,
+            "Build the locate database from the SD card. Usage: updatedb [start|status|stop|resume|fts]");
     }
 
     const ConsoleCommand getLocateCommand()

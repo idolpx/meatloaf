@@ -721,8 +721,22 @@ void WiFiManager::_wifi_event_handler(void *arg, esp_event_base_t event_base,
             fnSystem.Net.start_sntp_client();
 
 #ifndef MIN_CONFIG
-            // Arm Web / WebDAV Server (real httpd starts on first request)
-            httpServer.startOnDemand();
+            // Start the Web / WebDAV server NOW, not on first request.
+            //
+            // The lazy path (startOnDemand(), still implemented below in
+            // web_server.cpp) held port 80 with a small listener and started
+            // httpd on first access. That saves memory only if httpd can
+            // still start later - and it could not: httpd asks for an 8192
+            // byte task stack, and once the system has been up a while the
+            // largest contiguous internal block settles at 8180. Twelve bytes
+            // short, every time, reported as ESP_ERR_HTTPD_TASK with plenty
+            // of free_internal but no block big enough.
+            //
+            // Task stacks are internal-DRAM only with no PSRAM fallback, so
+            // this is the same lesson as console_exec and the updatedb task:
+            // claim big stacks at boot, while the heap is still unfragmented,
+            // never on demand.
+            httpServer.start();
 
             // Give the interface an IPv6 link-local address BEFORE mDNS starts.
             // Resolvers (macOS getaddrinfo, and so Finder) query A and AAAA
