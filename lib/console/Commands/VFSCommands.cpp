@@ -936,6 +936,16 @@ static int df(int argc, char **argv)
 /* Volatile scan state — written by the scan task, read by locate/updatedb. */
 static volatile int    s_scan_running = 0;
 static volatile int    s_scan_stop    = 0;  // set to 1 to request cancellation
+
+// Exported so the console shells can cancel a scan that is occupying the
+// executor task — see the declaration in VFSCommands.h.
+bool updatedb_request_stop()
+{
+    if (!s_scan_running)
+        return false;
+    s_scan_stop = 1;
+    return true;
+}
 static volatile int    s_scan_resume  = 0;  // set to 1 to resume from existing DB
 static volatile int    s_scan_files   = 0;
 static volatile int    s_scan_dirs    = 0;
@@ -1249,14 +1259,27 @@ static void updatedb_compress_gz(void)
     Serial.printf("updatedb: %s.gz written\r\n", LOCATE_DB_PATH);
 }
 
-static void updatedb_fts_task(void *arg)
+static void updatedb_fts_run(void)
 {
     updatedb_fts_rebuild();
     s_scan_running = 0;
-    vTaskDelete(NULL);
+
 }
 
-static void updatedb_task(void *arg)
+// Runs on the CALLING task. Console commands already execute on console_exec,
+// which has a 16 KB internal stack, so this used to spawn a second 8 KB task
+// for no benefit - and task stacks are internal-DRAM only, with no PSRAM
+// fallback. Claiming that block ON DEMAND is what left the lazily-started web
+// server unable to find a contiguous stack (ESP_ERR_HTTPD_TASK reporting
+// free_internal=17116 but largest_internal_block=8180 - fragmentation, not
+// exhaustion), which is the failure mode AGENTS.md warns about for on-demand
+// task creation.
+//
+// The trade is that the console blocks for the whole scan. "updatedb stop" is
+// intercepted shell-side in Console.cpp so cancelling still works, the same way
+// "exit" and "reboot" are - the scan polls s_scan_stop and yields once per
+// directory, so the REPL keeps reading input.
+static void updatedb_run(void)
 {
     // SQLITE_OMIT_AUTOINIT: must init before sqlite3_open().
     sqlite_one_time_init();
@@ -1294,7 +1317,7 @@ static void updatedb_task(void *arg)
             if (db) sqlite3_close(db);
             s_scan_running = 0;
             sqlite3_esp32_psram_malloc_exit();
-            vTaskDelete(NULL);
+            return;
             return;
         }
 
@@ -1348,7 +1371,7 @@ static void updatedb_task(void *arg)
             sqlite3_close(db);
             s_scan_running = 0;
             sqlite3_esp32_psram_malloc_exit();
-            vTaskDelete(NULL);
+            return;
             return;
         }
 
@@ -1362,7 +1385,7 @@ static void updatedb_task(void *arg)
             if (db) sqlite3_close(db);
             s_scan_running = 0;
             sqlite3_esp32_psram_malloc_exit();
-            vTaskDelete(NULL);
+            return;
             return;
         }
 
@@ -1379,7 +1402,7 @@ static void updatedb_task(void *arg)
                 sqlite3_close(db);
                 s_scan_running = 0;
                 sqlite3_esp32_psram_malloc_exit();
-                vTaskDelete(NULL);
+                return;
                 return;
             }
         }
@@ -1445,7 +1468,7 @@ static void updatedb_task(void *arg)
         sqlite3_close(db);
         s_scan_running = 0;
         sqlite3_esp32_psram_malloc_exit();
-        vTaskDelete(NULL);
+        return;
     };
 
     if (sqlite3_prepare_v2(db,
@@ -1536,7 +1559,7 @@ static void updatedb_task(void *arg)
     // change made by a task that has finished. exit() is a stateless restore of
     // the allocator saved at init, so calling it twice costs nothing.
     sqlite3_esp32_psram_malloc_exit();
-    vTaskDelete(NULL);
+    return;
 }
 
 int updatedb(int argc, char **argv)
@@ -1623,8 +1646,8 @@ int updatedb(int argc, char **argv)
         s_scan_end          = 0;
         s_scan_last_folder  = "";
         s_scan_running      = 1;
-        Serial.printf("Resuming locate database scan in background...\r\n");
-        xTaskCreate(updatedb_task, "updatedb", 8192, nullptr, 5, nullptr);
+        Serial.printf("Resuming locate database scan (console blocked; 'updatedb stop' to cancel)...\r\n");
+        updatedb_run();   // on console_exec's stack - see the comment above
         return EXIT_SUCCESS;
     }
 
@@ -1648,8 +1671,8 @@ int updatedb(int argc, char **argv)
         s_scan_end          = 0;
         s_scan_last_folder  = "";
         s_scan_running      = 1;
-        Serial.printf("Building locate database in background...\r\n");
-        xTaskCreate(updatedb_task, "updatedb", 8192, nullptr, 5, nullptr);
+        Serial.printf("Building locate database (console blocked; 'updatedb stop' to cancel)...\r\n");
+        updatedb_run();   // on console_exec's stack - see the comment above
         return EXIT_SUCCESS;
     }
 
@@ -1669,8 +1692,8 @@ int updatedb(int argc, char **argv)
             return EXIT_FAILURE;
         }
         s_scan_running = 1;
-        Serial.printf("Rebuilding FTS index in background...\r\n");
-        xTaskCreate(updatedb_fts_task, "updatedb_fts", 8192, nullptr, 5, nullptr);
+        Serial.printf("Rebuilding FTS index (console blocked)...\r\n");
+        updatedb_fts_run();   // on console_exec's stack - see the comment above
         return EXIT_SUCCESS;
     }
 

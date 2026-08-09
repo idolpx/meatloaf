@@ -58,3 +58,14 @@ namespace ESP32Console::Commands
     const ConsoleCommand getLocateCommand();
 #endif
 }
+
+#ifdef SD_CARD
+// Request cancellation of a running updatedb scan.
+//
+// The scan runs ON the console executor, so "updatedb stop" typed at a prompt
+// would queue behind it and never run. The shells therefore intercept that line
+// and call this directly, the same way they intercept "exit" and "reboot".
+// Returns false if no scan is in progress. Safe from any task: it only sets a
+// volatile flag the scan polls once per directory.
+bool updatedb_request_stop();
+#endif

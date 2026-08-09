@@ -683,6 +683,22 @@ namespace ESP32Console
                 do_reboot();
             }
 
+#ifdef SD_CARD
+            // "updatedb stop" must work while a scan is running. The scan
+            // occupies the executor, so submitting this as a command would
+            // queue it behind the very thing it is meant to cancel. It only
+            // sets a volatile flag the scan polls, so it is safe here.
+            if (raw_line == "updatedb stop")
+            {
+                linenoiseFree(line);
+                if (updatedb_request_stop())
+                    ::printf("updatedb: stopping...\r\n");
+                else
+                    ::printf("updatedb: no scan in progress\r\n");
+                continue;
+            }
+#endif
+
             // "exit" must work even when the executor can't be created
             // (memory pressure) — handle it without submitting a command.
             if (raw_line == "exit")
@@ -793,6 +809,19 @@ namespace ESP32Console
         {
             do_reboot();
         }
+
+#ifdef SD_CARD
+        // "updatedb stop" must work while a scan occupies the executor — see
+        // the matching interception in repl_task().
+        if (command_str == "updatedb stop")
+        {
+            if (updatedb_request_stop())
+                ::printf("updatedb: stopping...\r\n");
+            else
+                ::printf("updatedb: no scan in progress\r\n");
+            return;
+        }
+#endif
 
 #ifdef ENABLE_CONSOLE_TCP
         // "exit" must work even when the executor can't be created
