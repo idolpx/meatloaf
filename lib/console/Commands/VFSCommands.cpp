@@ -211,10 +211,17 @@ int ls(int argc, char **argv)
 {
     MFile* listPath = nullptr;
     const char *path_arg = nullptr;
+    bool show_hidden = false;
     for (int i = 1; i < argc; i++) {
         if (argv[i][0] != '-')
             path_arg = argv[i];
-        // flags like -la, -l, -a are silently ignored
+        else
+        {
+            // -a shows hidden entries. Other flags (-l, -h, ...) are accepted
+            // and ignored so habitual "ls -la" still works.
+            for (const char *p = argv[i] + 1; *p; p++)
+                if (*p == 'a' || *p == 'A') show_hidden = true;
+        }
     }
 
     // A wildcard in the LAST component filters the listing instead of naming
@@ -261,16 +268,27 @@ int ls(int argc, char **argv)
     }
 
     while(entry.get() != nullptr) {
+        // An unnamed entry is a free or scratched directory slot, not a file.
+        // A CBM directory is a fixed array of slots, so the tail of one is
+        // normally full of them - listing them made a healthy image look
+        // corrupt. They are never shown, not even with -a: there is nothing
+        // there to show.
+        bool nameless = entry->name.empty();
+
         // Compare against the raw entry name, before the UTF-8 conversion
         // below rewrites it (same basis rm's wildcard branch matches on).
-        if ( !filtered || mstr::compare(entry->name, pattern, false) )
+        if ( !nameless &&
+             (show_hidden || !entry->is_hidden) &&
+             ( !filtered || mstr::compare(entry->name, pattern, false) ) )
         {
             if ( entry->isPETSCII )
                 entry->name = mstr::toUTF8(entry->name);
 
             mstr::replaceAll(entry->name, "\"", "\\\""); // Escape double quotes
-            // Serial.printf("%c %8lu  \"%s\"  {%s}\r\n", (entry->isDirectory()) ? 'd':'-', entry->size, entry->name.c_str(), (entry->isPETSCII) ? "PETSCII" : "ASCII");
-            Serial.printf("%c %8lu  \"%s\"\r\n", (entry->isDirectory()) ? 'd':'-', entry->size, entry->name.c_str());
+
+            // 'd' directory, 'h' hidden (only reachable with -a), '-' regular.
+            char kind = entry->isDirectory() ? 'd' : (entry->is_hidden ? 'h' : '-');
+            Serial.printf("%c %8lu  \"%s\"\r\n", kind, entry->size, entry->name.c_str());
         }
         entry.reset(destPath->getNextFileInDir());
     }
@@ -393,27 +411,124 @@ int partition(int argc, char **argv)
     return EXIT_SUCCESS;
 }
 
+// Shared by cp and mv. Resolves both sides through MFSOwner, so either end may
+// be inside a disk image or an archive, or a URL. Returns false having already
+// printed the reason. 'verb' only names the caller in messages.
+static bool copy_via_mfile(const char *verb,
+                           const std::string &src, std::string &dst,
+                           size_t *out_total)
+{
+    std::unique_ptr<MFile> srcFile(MFSOwner::File(src));
+    if (!srcFile || !srcFile->exists())
+    {
+        Serial.printf("%s: cannot open '%s': No such file or directory\r\n", verb, src.c_str());
+        return false;
+    }
+    if (srcFile->isDirectory())
+    {
+        Serial.printf("%s: '%s' is a directory\r\n", verb, src.c_str());
+        return false;
+    }
+
+    // "<verb> file dir" puts it INSIDE dir, as cp(1)/mv(1) do.
+    {
+        std::unique_ptr<MFile> dstProbe(MFSOwner::File(dst));
+        if (dstProbe && dstProbe->exists() && dstProbe->isDirectory())
+        {
+            while (dst.size() > 1 && dst.back() == '/') dst.pop_back();
+            dst += "/" + srcFile->name;
+        }
+    }
+
+    auto in = srcFile->getSourceStream(std::ios_base::in);
+    if (!in || !in->isOpen())
+    {
+        Serial.printf("%s: cannot read '%s'\r\n", verb, src.c_str());
+        return false;
+    }
+
+    std::unique_ptr<MFile> dstFile(MFSOwner::File(dst));
+    auto out = dstFile ? dstFile->getSourceStream(std::ios_base::out) : nullptr;
+    if (!out || !out->isOpen())
+    {
+        Serial.printf("%s: cannot create '%s'\r\n", verb, dst.c_str());
+        return false;
+    }
+
+    const uint32_t bufSize = 4096;
+    uint8_t *buf = (uint8_t *)psram_malloc(bufSize);
+    if (!buf)
+    {
+        Serial.printf("%s: out of memory\r\n", verb);
+        return false;
+    }
+
+    size_t total = 0;
+    bool ok = true;
+    uint32_t n;
+    while ((n = in->read(buf, bufSize)) > 0)
+    {
+        if (out->write(buf, n) != n)
+        {
+            Serial.printf("%s: write failed after %zu bytes\r\n", verb, total);
+            ok = false;
+            break;
+        }
+        total += n;
+    }
+
+    free(buf);
+    out->close();
+
+    if (out_total) *out_total = total;
+    return ok;
+}
+
 int mv(int argc, char **argv)
 {
     if (argc != 3)
     {
         Serial.printf("Syntax is mv [ORIGIN] [TARGET]\r\n");
-        return 1;
-    }
-
-    char old_name[PATH_MAX], new_name[PATH_MAX];
-
-    // Resolve arguments to full path
-    ESP32Console::console_realpath(argv[1], old_name);
-    ESP32Console::console_realpath(argv[2], new_name);
-
-    // Do rename
-    if (rename(old_name, new_name))
-    {
-        Serial.printf("Error moving: %s\r\n", strerror(errno));
         return EXIT_FAILURE;
     }
 
+    std::string src = resolve_path(argv[1]);
+    std::string dst = resolve_path(argv[2]);
+
+    // Same directory: this is a pure rename, which every filesystem can do
+    // in place. MFile::rename() takes a NAME relative to the file's own
+    // directory (see FlashMFile::rename), not a path, so only this case can
+    // use it.
+    size_t s_slash = src.find_last_of('/');
+    size_t d_slash = dst.find_last_of('/');
+    if (s_slash != std::string::npos && d_slash != std::string::npos &&
+        src.compare(0, s_slash, dst, 0, d_slash) == 0 && s_slash == d_slash)
+    {
+        std::unique_ptr<MFile> srcFile(MFSOwner::File(src));
+        if (srcFile && srcFile->exists() && srcFile->rename(dst.substr(d_slash + 1)))
+            return EXIT_SUCCESS;
+        // Fall through: media filesystems return false from rename() rather
+        // than implementing it, so a failure here is expected, not fatal.
+    }
+
+    // Anything else - a different directory, or crossing between SD, flash,
+    // a disk image or an archive - is a copy followed by a delete. rename(2)
+    // cannot move data across those boundaries at all.
+    size_t total = 0;
+    if (!copy_via_mfile("mv", src, dst, &total))
+        return EXIT_FAILURE;
+
+    // Only unlink the source once the copy has fully succeeded, so a failed
+    // move never destroys the original.
+    std::unique_ptr<MFile> srcFile(MFSOwner::File(src));
+    if (!srcFile || !srcFile->remove())
+    {
+        Serial.printf("mv: copied to '%s' but could not remove '%s' - left both\r\n",
+                      dst.c_str(), src.c_str());
+        return EXIT_FAILURE;
+    }
+
+    Serial.printf("%s -> %s (%zu bytes)\r\n", src.c_str(), dst.c_str(), total);
     return EXIT_SUCCESS;
 }
 
@@ -433,69 +548,8 @@ int cp(int argc, char **argv)
     std::string src = resolve_path(argv[1]);
     std::string dst = resolve_path(argv[2]);
 
-    std::unique_ptr<MFile> srcFile(MFSOwner::File(src));
-    if (!srcFile || !srcFile->exists())
-    {
-        Serial.printf("cp: cannot open '%s': No such file or directory\r\n", src.c_str());
-        return EXIT_FAILURE;
-    }
-    if (srcFile->isDirectory())
-    {
-        Serial.printf("cp: '%s' is a directory\r\n", src.c_str());
-        return EXIT_FAILURE;
-    }
-
-    // "cp file dir" copies INTO dir, as cp(1) does.
-    {
-        std::unique_ptr<MFile> dstProbe(MFSOwner::File(dst));
-        if (dstProbe && dstProbe->exists() && dstProbe->isDirectory())
-        {
-            while (dst.size() > 1 && dst.back() == '/') dst.pop_back();
-            dst += "/" + srcFile->name;
-        }
-    }
-
-    auto in = srcFile->getSourceStream(std::ios_base::in);
-    if (!in || !in->isOpen())
-    {
-        Serial.printf("cp: cannot read '%s'\r\n", src.c_str());
-        return EXIT_FAILURE;
-    }
-
-    std::unique_ptr<MFile> dstFile(MFSOwner::File(dst));
-    auto out = dstFile ? dstFile->getSourceStream(std::ios_base::out) : nullptr;
-    if (!out || !out->isOpen())
-    {
-        Serial.printf("cp: cannot create '%s'\r\n", dst.c_str());
-        return EXIT_FAILURE;
-    }
-
-    const uint32_t bufSize = 4096;
-    uint8_t *buf = (uint8_t *)psram_malloc(bufSize);
-    if (!buf)
-    {
-        Serial.printf("cp: out of memory\r\n");
-        return EXIT_FAILURE;
-    }
-
     size_t total = 0;
-    uint32_t n;
-    bool ok = true;
-    while ((n = in->read(buf, bufSize)) > 0)
-    {
-        if (out->write(buf, n) != n)
-        {
-            Serial.printf("cp: write failed after %zu bytes\r\n", total);
-            ok = false;
-            break;
-        }
-        total += n;
-    }
-
-    free(buf);
-    out->close();
-
-    if (!ok)
+    if (!copy_via_mfile("cp", src, dst, &total))
         return EXIT_FAILURE;
 
     Serial.printf("%s -> %s (%zu bytes)\r\n", src.c_str(), dst.c_str(), total);
@@ -2251,7 +2305,8 @@ namespace ESP32Console::Commands
 
     const ConsoleCommand getLsCommand()
     {
-        return ConsoleCommand("ls", &ls, "List the contents of the given path");
+        return ConsoleCommand("ls", &ls,
+            "List the contents of the given path. Usage: ls [-a] [path]  (-a shows hidden entries)");
     }
 
     const ConsoleCommand getPartitionCommand()
