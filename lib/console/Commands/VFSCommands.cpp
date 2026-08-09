@@ -1096,11 +1096,14 @@ static void updatedb_scan(sqlite3 *db,
 
             int total = s_scan_files + s_scan_dirs;
             if (total % 100 == 0)
-                Serial.printf("  %d dirs, %d files — free=%lu dma_max=%lu\r\n",
-                              (int)s_scan_dirs, (int)s_scan_files,
-                              esp_get_free_internal_heap_size(),
-                              (unsigned long)heap_caps_get_largest_free_block(
-                                  MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL));
+                Serial.printf("  %d dirs, %d files\r\n",
+                              (int)s_scan_dirs, (int)s_scan_files);
+
+                // Serial.printf("  %d dirs, %d files — free=%lu dma_max=%lu\r\n",
+                //               (int)s_scan_dirs, (int)s_scan_files,
+                //               esp_get_free_internal_heap_size(),
+                //               (unsigned long)heap_caps_get_largest_free_block(
+                //                   MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL));
         }
         closedir(d);
         mark_scanned(cur_rel);
