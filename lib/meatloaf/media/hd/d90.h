@@ -112,6 +112,22 @@ public:
 protected:
 
 private:
+    void allocateBadBlocks() {
+        // seekSector( 0, 10, 0x00 );
+        // uint8_t next_track = read();
+        // uint8_t next_sector = read();
+        // uint8_t current_track = 0;
+        // uint8_t current_sector = read();
+
+        // while (current_track != 0xFF && current_sector != 0xFF) {
+        //     //Debug_printv("current_track[%d] current_sector[%d]", current_track, current_sector);
+        //     seekSector( current_track, current_sector, 0x00 );
+        //     current_track = read();
+        //     current_sector = read();
+            
+        // }
+    };
+
     friend class D90MFile;
 };
 
