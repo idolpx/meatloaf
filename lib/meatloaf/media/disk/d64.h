@@ -156,7 +156,7 @@ public:
     // a DHD-hosted partition, and nothing should.
     bool allow_grow = false;
 
-    uint8_t dos_version = 0x41;
+    uint8_t dos_version = 0x41; // 'A' - CBM DOS 2.6 (1541)
     std::string dos_rom = "dos1541";
     std::string dos_name = "";
 

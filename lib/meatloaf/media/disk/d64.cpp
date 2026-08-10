@@ -88,13 +88,13 @@ bool D64MStream::seekSector(uint8_t track, uint8_t sector, uint8_t offset)
         // Look up error for this track/sector
     }
 
-    track--;
+    if (dos_version != 0xFF) track--; // D9060/D9090: Track 1 is at index 0, not 1
     for (uint8_t index = 0; index < track; ++index)
     {
         sectorOffset += getSectorCount(index + 1);
         //Debug_printv("track[%d] speedZone[%d] secotorsPerTrack[%d] sectorOffset[%d]", (index + 1), speedZone(index), getSectorCount(index + 1), sectorOffset);
     }
-    track++;
+    if (dos_version != 0xFF) track++;
     sectorOffset += sector;
 
     this->block = sectorOffset;

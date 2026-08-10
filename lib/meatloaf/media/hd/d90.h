@@ -44,21 +44,21 @@ public:
         // BAM blocks link to next bam block starting at Track 1
         std::vector<BlockAllocationMap> b = { 
             {
-                1,     // track
+                1,      // track
                 0,      // sector
                 0x10,   // offset
-                1,      // start_track
-                50,     // end_track
+                0,      // start_track
+                153,    // end_track
                 5       // byte_count
             }
         };
 
         Partition p = {
-            39,    // track
-            0,     // sector
+            76,    // track
+            20,    // sector
             0x06,  // header_offset
-            39,    // directory_track
-            1,     // directory_sector
+            76,    // directory_track
+            10,    // directory_sector
             0x00,  // directory_offset
             0,     // parent_header_track
             0,     // parent_header_sector
@@ -70,23 +70,25 @@ public:
         partitions.clear();
         partitions.push_back(p);
         sectorsPerTrack = { 32 };
-        interleave = { 1, 1 }; // Directory, File - hard disk, no rotational interleave
+        interleave = { 10, 10 }; // Directory, File
         dos_rom = "dos9000";
+        dos_version = 0xFF;
 
         // this.size = data.media_data.length;
         // switch (this.size + this.media_header_size) {
         uint32_t size = containerStream->size();
         switch (size + media_header_size) 
         {
-             case 5013504:  // D9060
+             case 5013504:  // D9060 - 153 tracks, 32 sectors, 4 heads
                  sectorsPerTrack = { (4 * 32) }; // Heads * Sectors
                  break;
 
-             case 7520256:  // D9090
+             case 7520256:  // D9090 - 153 tracks, 32 sectors, 6 heads
                 sectorsPerTrack = { (6 * 32) }; // Heads * Sectors
                  break;
         }
 
+        // Read Configuration Sector @ Track 0, Sector 0, Offset 0x04
         // this.seek(0x04);
         seek( 0x04 );
         // this.partitions[0].directory_track = this.read();
@@ -103,13 +105,9 @@ public:
         partitions[0].block_allocation_map[0].sector = read();
     };
 
-	virtual uint8_t speedZone(uint8_t track) override
-	{
-        if ( track < 78 )
-		    return (track < 39) + (track < 53) + (track < 64);
-        else
-            return (track < 116) + (track < 130) + (track < 141);
-	};
+    virtual uint8_t speedZone(uint8_t track) override { return 0; };
+
+    uint32_t defaultImageSize() override { return 7520256; } // D9090 - 153 tracks, 32 sectors, 6 heads
 
 protected:
 
