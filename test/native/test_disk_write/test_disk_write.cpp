@@ -39,7 +39,8 @@ void tearDown(void)
     static const char* kFormatPrefixes[] = {
         "build_geom_", "build_t0_", "build_t0g_", "build_t1_",
         "build_t2a_", "build_t2b_", "build_t2c_", "build_t2d_",
-        "build_t2e_", "build_t2f_", "build_t3_",
+        "build_t2e_", "build_t2f_", "build_t2g_", "build_t2h_", "build_t2i_",
+        "build_t3_",
     };
     for (const char* prefix : kFormatPrefixes)
         for (const FormatFixture& f : all_formats())
@@ -888,6 +889,35 @@ static bool open_and_save(const FormatFixture& f,
     return save_file(*image, name, data);
 }
 
+// Opens an existing image and deletes one file from it, the same way
+// D64MFile::remove() does: resolvePath() to position on the directory entry,
+// then scratchEntry() to free the chain and blank the slot.
+static bool open_and_remove(const FormatFixture& f,
+                            const std::string& path,
+                            const std::string& name)
+{
+    auto src = std::make_shared<FileContainerStream>(path);
+    auto image = f.make(src);
+    image->mode = std::ios_base::in | std::ios_base::out;
+    return image->removeFile(name);
+}
+
+// True if the image still has a directory entry for 'name'.
+static bool file_present(const FormatFixture& f,
+                         const std::string& path,
+                         const std::string& name)
+{
+    auto src = std::make_shared<FileContainerStream>(path);
+    auto image = f.make(src);
+    // mode MUST be set: MMediaStream::mode is uninitialised on a directly
+    // constructed stream (only MFile::getSourceStream() sets it), and if the
+    // garbage happens to have the out bit set, seekPath() takes the WRITE
+    // branch and CREATES the entry it was asked to look for - reporting every
+    // deleted file as still present, intermittently.
+    image->mode = std::ios_base::in;
+    return image->seekPath(name);
+}
+
 // Saves files of a fixed size until one fails. Returns how many succeeded and,
 // via out_status, the CBM error the failing save reported.
 //
@@ -1438,6 +1468,266 @@ void test_parse_format_spec(void)
     }
 }
 
+// ---------------------------------------------------------------------------
+// Tier 2 - delete
+// ---------------------------------------------------------------------------
+
+// Deleting must give the blocks back AND blank the directory slot. Checking
+// only one of those hides the common half-failure: an entry that disappears
+// from the listing while its chain stays allocated leaks the disk away a file
+// at a time, and c1541 would still call the image valid.
+void test_tier2_remove_frees_blocks_and_slot(void)
+{
+    const FormatFixture& f = current_format();
+    std::string path = std::string("build_t2g_") + f.name + "." + f.ext;
+    remove(path.c_str());
+
+    {
+        auto src = std::make_shared<FileContainerStream>(path, f.size);
+        auto image = f.make(src);
+        char m[128];
+        snprintf(m, sizeof(m), "%s: formatImage failed", f.name);
+        TEST_ASSERT_TRUE_MESSAGE(image->formatImage("testdisk", "01"), m);
+    }
+
+    uint16_t free_blank = blocks_free_of(f, path);
+
+    // Multi-block on purpose: a single-block file would not prove the whole
+    // chain is walked and freed.
+    std::vector<uint8_t> payload;
+    for (int i = 0; i < 1500; i++)
+        payload.push_back((uint8_t)(i & 0xFF));
+
+    char msg[192];
+    if (!open_and_save(f, path, "doomed", payload))
+    {
+        snprintf(msg, sizeof(msg), "%s: save failed", f.name);
+        remove(path.c_str());
+        TEST_FAIL_MESSAGE(msg);
+    }
+
+    uint16_t free_after_save = blocks_free_of(f, path);
+    if (free_after_save >= free_blank)
+    {
+        snprintf(msg, sizeof(msg), "%s: save consumed no blocks (%u -> %u)",
+                 f.name, free_blank, free_after_save);
+        remove(path.c_str());
+        TEST_FAIL_MESSAGE(msg);
+    }
+
+    if (!open_and_remove(f, path, "doomed"))
+    {
+        snprintf(msg, sizeof(msg), "%s: removeFile returned false", f.name);
+        remove(path.c_str());
+        TEST_FAIL_MESSAGE(msg);
+    }
+
+    // 1. every block came back
+    uint16_t free_after_remove = blocks_free_of(f, path);
+    if (free_after_remove != free_blank)
+    {
+        snprintf(msg, sizeof(msg), "%s: BAM not fully freed - blank %u, after delete %u",
+                 f.name, free_blank, free_after_remove);
+        remove(path.c_str());
+        TEST_FAIL_MESSAGE(msg);
+    }
+
+    // 2. the directory entry is gone
+    if (file_present(f, path, "doomed"))
+    {
+        snprintf(msg, sizeof(msg), "%s: entry still found after delete", f.name);
+        remove(path.c_str());
+        TEST_FAIL_MESSAGE(msg);
+    }
+
+    // 3. the image is still structurally sound
+    {
+        auto src = std::make_shared<FileContainerStream>(path);
+        auto image = f.make(src);
+        InvariantResult r = check_invariants(*image);
+        if (!r.ok)
+        {
+            std::string m = std::string(f.name) + " after delete: " + r.message;
+            remove(path.c_str());
+            TEST_FAIL_MESSAGE(m.c_str());
+        }
+    }
+
+    // 4. and an independent implementation agrees
+    if (f.has_c1541_oracle && c1541_available())
+    {
+        if (!c1541_validate(path))
+        {
+            snprintf(msg, sizeof(msg), "%s: c1541 validate rejected the image after delete", f.name);
+            remove(path.c_str());
+            TEST_FAIL_MESSAGE(msg);
+        }
+        std::string listing = c1541_dir(path);
+        std::string lower;
+        for (char c : listing) lower += (char)tolower((unsigned char)c);
+        if (lower.find("doomed") != std::string::npos)
+        {
+            snprintf(msg, sizeof(msg), "%s: c1541 still lists the deleted file", f.name);
+            remove(path.c_str());
+            TEST_FAIL_MESSAGE(msg);
+        }
+    }
+
+    remove(path.c_str());
+}
+
+// Deleting one file must not disturb its neighbours. Freeing a block that
+// belongs to another file is the failure this catches, and it stays invisible
+// until that file is read back.
+void test_tier2_remove_leaves_neighbours_intact(void)
+{
+    const FormatFixture& f = current_format();
+    std::string path = std::string("build_t2h_") + f.name + "." + f.ext;
+    remove(path.c_str());
+
+    {
+        auto src = std::make_shared<FileContainerStream>(path, f.size);
+        auto image = f.make(src);
+        char m[128];
+        snprintf(m, sizeof(m), "%s: formatImage failed", f.name);
+        TEST_ASSERT_TRUE_MESSAGE(image->formatImage("testdisk", "01"), m);
+    }
+
+    std::vector<uint8_t> keep, doomed;
+    for (int i = 0; i < 800; i++)  keep.push_back((uint8_t)(0xA0 + (i & 0x0F)));
+    for (int i = 0; i < 1200; i++) doomed.push_back((uint8_t)(i & 0xFF));
+
+    char msg[192];
+    if (!open_and_save(f, path, "keeper", keep) ||
+        !open_and_save(f, path, "doomed", doomed))
+    {
+        snprintf(msg, sizeof(msg), "%s: setup saves failed", f.name);
+        remove(path.c_str());
+        TEST_FAIL_MESSAGE(msg);
+    }
+
+    uint16_t free_both = blocks_free_of(f, path);
+
+    if (!open_and_remove(f, path, "doomed"))
+    {
+        snprintf(msg, sizeof(msg), "%s: removeFile returned false", f.name);
+        remove(path.c_str());
+        TEST_FAIL_MESSAGE(msg);
+    }
+
+    // The survivor is still there, and still reads back byte for byte.
+    {
+        auto src = std::make_shared<FileContainerStream>(path);
+        auto image = f.make(src);
+        image->mode = std::ios_base::in;   // see file_present()
+        if (!image->seekPath("keeper"))
+        {
+            snprintf(msg, sizeof(msg), "%s: neighbour lost after delete", f.name);
+            remove(path.c_str());
+            TEST_FAIL_MESSAGE(msg);
+        }
+        // read() returns at most one block, so loop until it dries up. A
+        // single call returned 254 bytes and looked like corruption.
+        std::vector<uint8_t> got(keep.size(), 0);
+        size_t n = 0;
+        while (n < got.size())
+        {
+            uint32_t got_now = image->read(got.data() + n, (uint32_t)(got.size() - n));
+            if (got_now == 0) break;
+            n += got_now;
+        }
+        if (n != keep.size() || got != keep)
+        {
+            snprintf(msg, sizeof(msg), "%s: neighbour corrupted (%u of %u bytes)",
+                     f.name, (unsigned)n, (unsigned)keep.size());
+            remove(path.c_str());
+            TEST_FAIL_MESSAGE(msg);
+        }
+    }
+
+    // Only the deleted file's blocks came back, not the survivor's.
+    uint16_t free_after = blocks_free_of(f, path);
+    if (free_after <= free_both)
+    {
+        snprintf(msg, sizeof(msg), "%s: delete freed nothing (%u -> %u)",
+                 f.name, free_both, free_after);
+        remove(path.c_str());
+        TEST_FAIL_MESSAGE(msg);
+    }
+
+    {
+        auto src = std::make_shared<FileContainerStream>(path);
+        auto image = f.make(src);
+        InvariantResult r = check_invariants(*image);
+        if (!r.ok)
+        {
+            std::string m = std::string(f.name) + " after delete: " + r.message;
+            remove(path.c_str());
+            TEST_FAIL_MESSAGE(m.c_str());
+        }
+    }
+
+    remove(path.c_str());
+}
+
+// Deleting something that is not there must fail and change nothing. A
+// removeFile() that returned true here would let rm report success for a typo;
+// one that scratched whatever the last seek happened to land on would silently
+// destroy an unrelated file.
+void test_tier2_remove_missing_file_is_a_noop(void)
+{
+    const FormatFixture& f = current_format();
+    std::string path = std::string("build_t2i_") + f.name + "." + f.ext;
+    remove(path.c_str());
+
+    {
+        auto src = std::make_shared<FileContainerStream>(path, f.size);
+        auto image = f.make(src);
+        char m[128];
+        snprintf(m, sizeof(m), "%s: formatImage failed", f.name);
+        TEST_ASSERT_TRUE_MESSAGE(image->formatImage("testdisk", "01"), m);
+    }
+
+    std::vector<uint8_t> payload;
+    for (int i = 0; i < 600; i++)
+        payload.push_back((uint8_t)(i & 0xFF));
+
+    char msg[192];
+    if (!open_and_save(f, path, "keeper", payload))
+    {
+        snprintf(msg, sizeof(msg), "%s: setup save failed", f.name);
+        remove(path.c_str());
+        TEST_FAIL_MESSAGE(msg);
+    }
+
+    uint16_t before = blocks_free_of(f, path);
+
+    if (open_and_remove(f, path, "nosuchfile"))
+    {
+        snprintf(msg, sizeof(msg), "%s: removeFile claimed to delete a missing file", f.name);
+        remove(path.c_str());
+        TEST_FAIL_MESSAGE(msg);
+    }
+
+    uint16_t after = blocks_free_of(f, path);
+    if (after != before)
+    {
+        snprintf(msg, sizeof(msg), "%s: failed delete changed the BAM (%u -> %u)",
+                 f.name, before, after);
+        remove(path.c_str());
+        TEST_FAIL_MESSAGE(msg);
+    }
+
+    if (!file_present(f, path, "keeper"))
+    {
+        snprintf(msg, sizeof(msg), "%s: failed delete removed the wrong file", f.name);
+        remove(path.c_str());
+        TEST_FAIL_MESSAGE(msg);
+    }
+
+    remove(path.c_str());
+}
+
 void test_tier3_randomized_stress(void)
 {
     // Fixed seeds keep failures reproducible. When a seed finds a bug, keep it
@@ -1478,6 +1768,9 @@ void process()
         RUN_TEST(test_tier2_overwrite_reuses_slot);
         RUN_TEST(test_tier2_directory_full_reports_disk_full);
         RUN_TEST(test_tier2_bam_record_boundary);
+        RUN_TEST(test_tier2_remove_frees_blocks_and_slot);
+        RUN_TEST(test_tier2_remove_leaves_neighbours_intact);
+        RUN_TEST(test_tier2_remove_missing_file_is_a_noop);
         RUN_TEST(test_tier3_randomized_stress);
     }
 
