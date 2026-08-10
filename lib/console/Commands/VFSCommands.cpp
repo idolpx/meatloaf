@@ -681,8 +681,11 @@ int rm(int argc, char **argv)
                 std::unique_ptr<MFile> entry(rawEntry);
                 if (entry->name == "." || entry->name == "..")
                     continue;
+                // fullUrl(), not url: inside a container url is the CONTAINER's
+                // path and the part within it lives in pathInStream. See the
+                // comment on the non-wildcard branch below.
                 if (mstr::compare(entry->name, pattern, false))
-                    matches.emplace_back((cwd->url + "/" + entry->name).c_str());
+                    matches.emplace_back((cwd->fullUrl() + "/" + entry->name).c_str());
             }
 
             if (matches.empty() && !force)
@@ -695,7 +698,14 @@ int rm(int argc, char **argv)
         else
         {
             std::unique_ptr<MFile> target(getCurrentPath()->cd(argv[argi]));
-            if (!target || !rm_path(target->url, recursive, force))
+
+            // fullUrl(), NOT url. For anything inside a container, url is the
+            // CONTAINER's path and the part within it is held separately in
+            // pathInStream - so passing url alone silently rewrites
+            // "rm fb" inside hdbackup.dhd into "rm hdbackup.dhd" and deletes
+            // the whole image. rm_path() takes a string and re-resolves it, so
+            // it can only see what the string carries.
+            if (!target || !rm_path(target->fullUrl(), recursive, force))
                 anyFailed = true;
         }
     }
@@ -768,7 +778,7 @@ int mount(int argc, char **argv)
 
     std::string filename;
     // filename.reserve(getCurrentPath()->url.size() + 1);
-    filename = getCurrentPath()->url;
+    filename = getCurrentPath()->fullUrl();   // see resolve_path()
     if ( argc > 2 )
     {
         // Use current path + filename
@@ -830,7 +840,7 @@ int wget(int argc, char **argv)
         return EXIT_SUCCESS;
     }
 
-    std::string pwd = getCurrentPath()->url;
+    std::string pwd = getCurrentPath()->fullUrl();   // see resolve_path()
 
     if (insecure)
         http_set_insecure(true);
@@ -1969,7 +1979,11 @@ int format_sd(int argc, char **argv)
 static std::string resolve_path(const char *arg)
 {
     if (arg[0] == '/') return arg;
-    std::string pwd = getCurrentPath()->url;
+    // fullUrl(), not url: inside a container url is only the CONTAINER's
+    // path, with the position within it held in pathInStream. Using url
+    // alone resolves every relative name against the container root, so a
+    // path inside a subdirectory silently points somewhere else.
+    std::string pwd = getCurrentPath()->fullUrl();
 
     // If this is a new url then use it
     if ( mstr::contains(arg, "://") )
