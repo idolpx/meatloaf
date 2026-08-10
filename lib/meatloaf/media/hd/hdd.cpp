@@ -144,6 +144,7 @@ bool HDDMStream::readHeader()
     Debug_printv("CFS label[%s] partitions[%d] default[%d]",
         header.disk_label.c_str(), header.partition_count, boot_sector.default_partition);
 
+    header_read = true;
     return true;
 }
 
@@ -384,6 +385,14 @@ bool HDDMStream::enterDirectory(std::string name)
 
 bool HDDMStream::seekDirectory(std::string path)
 {
+    // The whole CFS geometry lives in the boot sector and partition directory,
+    // and the constructor no longer reads them. Every path walk enters here,
+    // so this is where a stream that has not been through a directory listing
+    // gets its header - without it the partition table is empty and every
+    // path resolves to "not found".
+    if (!header_read && !readHeader())
+        return false;
+
     // Reset to the image root: the partition list
     partition_list = true;
     dir_start_lba = 0;

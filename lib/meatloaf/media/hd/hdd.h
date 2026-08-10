@@ -184,6 +184,7 @@ protected:
 
     BootSector boot_sector;
     PartitionEntry partition_entries[16];
+    bool header_read = false;       // boot sector + partition directory parsed
 
     bool partition_list = false;    // at image root: list partitions
     uint32_t dir_start_lba = 0;     // first sector of the current directory
