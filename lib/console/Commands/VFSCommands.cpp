@@ -435,8 +435,20 @@ static bool copy_via_mfile(const char *verb,
         std::unique_ptr<MFile> dstProbe(MFSOwner::File(dst));
         if (dstProbe && dstProbe->exists() && dstProbe->isDirectory())
         {
+            // Take the name from the source PATH, not srcFile->name. For a
+            // path inside a container, MFile::name is the CONTAINER's name -
+            // only getNextFileInDir() overrides it with the entry's name (see
+            // the comment in D64MFile::getNextFileInDir). Using it turned
+            // "cp raw/digiplayer.mod ." into a file called "hdbackup.dhd".
+            size_t s = src.find_last_of('/');
+            std::string base = (s == std::string::npos) ? src : src.substr(s + 1);
+            if (base.empty())
+            {
+                Serial.printf("%s: cannot derive a name from '%s'\r\n", verb, src.c_str());
+                return false;
+            }
             while (dst.size() > 1 && dst.back() == '/') dst.pop_back();
-            dst += "/" + srcFile->name;
+            dst += "/" + base;
         }
     }
 

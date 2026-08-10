@@ -224,15 +224,14 @@ public:
         // extended itself would write directly over the next partition.
         // D64MStream::allow_grow defaults to false and must stay false on this
         // path; do not set it here.
-        // Record the partition actually being decoded. cached_part must be a
-        // record, not a prediction: it is what brokerUrl() compares against to
-        // decide whether the broker's one cached stream belongs to this path.
-        {
-            auto img = DHDImageRegistry::obtain(DHDImageRegistry::containerOf(this->url));
-            if (img != nullptr)
-                img->cached_part = p->number;
-        }
-
+        // Deliberately does NOT touch cached_part. This runs for BOTH the
+        // broker's rebuild and a direct getSourceStream() - a plain file read
+        // or write never goes near the broker - so recording the partition
+        // here made cached_part describe the last stream built by anyone,
+        // not the one the broker is holding. A cp out of partition 25 into
+        // partition 13 then left cached_part=13 while the broker still had
+        // 25's stream, and the next listing reused it. brokerUrl() owns that
+        // field; see the comment there.
         auto view = std::make_shared<DHDOffsetStream>(is, p->start, p->size);
         // The decoded stream is scoped to ONE CMD partition; D64MStream's own
         // `partition` field is the sub-partition within that disk and is left
@@ -400,7 +399,16 @@ public:
         std::string container = DHDImageRegistry::containerOf(this->url);
         auto img = DHDImageRegistry::obtain(container);
         if (img != nullptr && img->cached_part != p->number)
+        {
             DHDImageRegistry::disposeCachedStream(container);
+            // Record it HERE, not in getDecodedStream(). This function exists
+            // only to feed ImageBroker::obtain(), and the caller invokes it as
+            // that call's argument - so the stream this names is built
+            // immediately after, with nothing in between. getDecodedStream()
+            // cannot do it: it also serves direct getSourceStream() reads and
+            // writes, which never reach the broker.
+            img->cached_part = p->number;
+        }
 
         return this->url + "/" + std::to_string((unsigned)p->number);
     }
