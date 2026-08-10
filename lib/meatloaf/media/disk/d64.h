@@ -344,6 +344,16 @@ public:
     // leaves track/sector on the file's first block, not its directory sector).
     bool removeFile(std::string path);
 
+    // Recover a scratched file, the way a CBM unscratch utility does. A scratch
+    // only zeroes the entry's type byte, so the name, start track/sector and
+    // block count all survive - the file is recoverable until either its
+    // directory slot is reused or its blocks are handed to a new file.
+    //
+    // Fails, changing nothing, if any block of the chain has since been
+    // allocated. Restores the type as PRG: the original type is genuinely gone,
+    // since that is the single byte a scratch overwrites.
+    bool unremoveFile(std::string path);
+
     // Enter a subdirectory entry (CMD native DIR or 1581 CBM sub-partition)
     bool enterDirectory(std::string name);
 
@@ -451,6 +461,20 @@ protected:
     bool finalizeFileWrite();
     void rollbackFileWrite();
     bool scratchEntry();
+
+    // Restore the entry scratchEntry() blanked. Assumes the caller has already
+    // positioned on it (see seekScratchedEntry), same contract as scratchEntry.
+    bool unscratchEntry();
+
+    // Locate a SCRATCHED entry by name. seekEntry() skips type-0 entries, which
+    // is correct for every normal lookup and exactly wrong for recovery. Slots
+    // that were never used are also type 0, so a blank name is not a match.
+    bool seekScratchedEntry(std::string filename);
+
+    // Read a block's BAM bit. Returns false if the block is not representable
+    // in the BAM at all, so a caller that cannot answer treats it as unsafe
+    // rather than assuming free. out_allocated is only set when it returns true.
+    bool queryBlockAllocation(uint8_t track, uint8_t sector, bool& out_allocated);
 
     bool creating = false;          // building a new file via streamed writes
     std::string create_filename;    // name for the directory entry (UTF8)

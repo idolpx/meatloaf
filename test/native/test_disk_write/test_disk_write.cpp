@@ -39,7 +39,7 @@ void tearDown(void)
     static const char* kFormatPrefixes[] = {
         "build_geom_", "build_t0_", "build_t0g_", "build_t1_",
         "build_t2a_", "build_t2b_", "build_t2c_", "build_t2d_",
-        "build_t2e_", "build_t2f_", "build_t2g_", "build_t2h_", "build_t2i_",
+        "build_t2e_", "build_t2f_", "build_t2g_", "build_t2h_", "build_t2i_", "build_t2j_", "build_t2k_",
         "build_t3_",
     };
     for (const char* prefix : kFormatPrefixes)
@@ -1728,6 +1728,201 @@ void test_tier2_remove_missing_file_is_a_noop(void)
     remove(path.c_str());
 }
 
+// Opens an existing image and recovers a scratched file.
+static bool open_and_unremove(const FormatFixture& f,
+                              const std::string& path,
+                              const std::string& name)
+{
+    auto src = std::make_shared<FileContainerStream>(path);
+    auto image = f.make(src);
+    image->mode = std::ios_base::in | std::ios_base::out;
+    return image->unremoveFile(name);
+}
+
+// Reads a file back in full. read() returns at most one block, so it loops.
+// mode must be set: on a directly constructed stream it is uninitialised, and
+// an out bit would send seekPath() down the write path (see file_present).
+static bool read_file_equals(const FormatFixture& f,
+                             const std::string& path,
+                             const std::string& name,
+                             const std::vector<uint8_t>& expect)
+{
+    auto src = std::make_shared<FileContainerStream>(path);
+    auto image = f.make(src);
+    image->mode = std::ios_base::in;
+    if (!image->seekPath(name))
+        return false;
+
+    std::vector<uint8_t> got(expect.size(), 0);
+    size_t n = 0;
+    while (n < got.size())
+    {
+        uint32_t got_now = image->read(got.data() + n, (uint32_t)(got.size() - n));
+        if (got_now == 0) break;
+        n += got_now;
+    }
+    return n == expect.size() && got == expect;
+}
+
+// A scratch leaves everything but the type byte, so an untouched disk can give
+// the file back intact - contents included, not just a directory entry.
+void test_tier2_unremove_recovers_a_scratched_file(void)
+{
+    const FormatFixture& f = current_format();
+    std::string path = std::string("build_t2j_") + f.name + "." + f.ext;
+    remove(path.c_str());
+
+    {
+        auto src = std::make_shared<FileContainerStream>(path, f.size);
+        auto image = f.make(src);
+        char m[128];
+        snprintf(m, sizeof(m), "%s: formatImage failed", f.name);
+        TEST_ASSERT_TRUE_MESSAGE(image->formatImage("testdisk", "01"), m);
+    }
+
+    std::vector<uint8_t> payload;
+    for (int i = 0; i < 1500; i++)
+        payload.push_back((uint8_t)((i * 7) & 0xFF));
+
+    char msg[192];
+    if (!open_and_save(f, path, "phoenix", payload))
+    {
+        snprintf(msg, sizeof(msg), "%s: save failed", f.name);
+        remove(path.c_str()); TEST_FAIL_MESSAGE(msg);
+    }
+
+    uint16_t free_with_file = blocks_free_of(f, path);
+
+    if (!open_and_remove(f, path, "phoenix"))
+    {
+        snprintf(msg, sizeof(msg), "%s: removeFile returned false", f.name);
+        remove(path.c_str()); TEST_FAIL_MESSAGE(msg);
+    }
+
+    if (!open_and_unremove(f, path, "phoenix"))
+    {
+        snprintf(msg, sizeof(msg), "%s: unremoveFile returned false", f.name);
+        remove(path.c_str()); TEST_FAIL_MESSAGE(msg);
+    }
+
+    // The blocks are allocated again...
+    uint16_t free_after = blocks_free_of(f, path);
+    if (free_after != free_with_file)
+    {
+        snprintf(msg, sizeof(msg), "%s: BAM not restored - had %u, recovered %u",
+                 f.name, free_with_file, free_after);
+        remove(path.c_str()); TEST_FAIL_MESSAGE(msg);
+    }
+
+    // ...and the file reads back byte for byte, which is the whole point: a
+    // recovered directory entry pointing at a broken chain would be worse
+    // than leaving it deleted.
+    if (!read_file_equals(f, path, "phoenix", payload))
+    {
+        snprintf(msg, sizeof(msg), "%s: recovered file does not match", f.name);
+        remove(path.c_str()); TEST_FAIL_MESSAGE(msg);
+    }
+
+    {
+        auto src = std::make_shared<FileContainerStream>(path);
+        auto image = f.make(src);
+        InvariantResult r = check_invariants(*image);
+        if (!r.ok)
+        {
+            std::string m = std::string(f.name) + " after unremove: " + r.message;
+            remove(path.c_str()); TEST_FAIL_MESSAGE(m.c_str());
+        }
+    }
+
+    if (f.has_c1541_oracle && c1541_available())
+    {
+        if (!c1541_validate(path))
+        {
+            snprintf(msg, sizeof(msg), "%s: c1541 rejected the image after unremove", f.name);
+            remove(path.c_str()); TEST_FAIL_MESSAGE(msg);
+        }
+    }
+
+    remove(path.c_str());
+}
+
+// Once the blocks have been handed to another file the data is gone, and
+// saying so is the only safe answer. Recovering anyway would cross-link two
+// files onto the same blocks - silent corruption that outlives the mistake.
+void test_tier2_unremove_refuses_when_blocks_reused(void)
+{
+    const FormatFixture& f = current_format();
+    std::string path = std::string("build_t2k_") + f.name + "." + f.ext;
+    remove(path.c_str());
+
+    {
+        auto src = std::make_shared<FileContainerStream>(path, f.size);
+        auto image = f.make(src);
+        char m[128];
+        snprintf(m, sizeof(m), "%s: formatImage failed", f.name);
+        TEST_ASSERT_TRUE_MESSAGE(image->formatImage("testdisk", "01"), m);
+    }
+
+    std::vector<uint8_t> first, second;
+    for (int i = 0; i < 1500; i++) first.push_back((uint8_t)(i & 0xFF));
+    for (int i = 0; i < 1500; i++) second.push_back((uint8_t)(0x5A));
+
+    char msg[192];
+    if (!open_and_save(f, path, "doomed", first))
+    {
+        snprintf(msg, sizeof(msg), "%s: setup save failed", f.name);
+        remove(path.c_str()); TEST_FAIL_MESSAGE(msg);
+    }
+    if (!open_and_remove(f, path, "doomed"))
+    {
+        snprintf(msg, sizeof(msg), "%s: removeFile returned false", f.name);
+        remove(path.c_str()); TEST_FAIL_MESSAGE(msg);
+    }
+
+    // A new file of the same size lands on the blocks just freed.
+    if (!open_and_save(f, path, "usurper", second))
+    {
+        snprintf(msg, sizeof(msg), "%s: second save failed", f.name);
+        remove(path.c_str()); TEST_FAIL_MESSAGE(msg);
+    }
+
+    uint16_t before = blocks_free_of(f, path);
+
+    if (open_and_unremove(f, path, "doomed"))
+    {
+        snprintf(msg, sizeof(msg), "%s: unremoveFile recovered over a live file", f.name);
+        remove(path.c_str()); TEST_FAIL_MESSAGE(msg);
+    }
+
+    // The refusal must be total: no blocks taken, and the new file untouched.
+    uint16_t after = blocks_free_of(f, path);
+    if (after != before)
+    {
+        snprintf(msg, sizeof(msg), "%s: refused unremove still changed the BAM (%u -> %u)",
+                 f.name, before, after);
+        remove(path.c_str()); TEST_FAIL_MESSAGE(msg);
+    }
+
+    if (!read_file_equals(f, path, "usurper", second))
+    {
+        snprintf(msg, sizeof(msg), "%s: refused unremove damaged the newer file", f.name);
+        remove(path.c_str()); TEST_FAIL_MESSAGE(msg);
+    }
+
+    {
+        auto src = std::make_shared<FileContainerStream>(path);
+        auto image = f.make(src);
+        InvariantResult r = check_invariants(*image);
+        if (!r.ok)
+        {
+            std::string m = std::string(f.name) + " after refused unremove: " + r.message;
+            remove(path.c_str()); TEST_FAIL_MESSAGE(m.c_str());
+        }
+    }
+
+    remove(path.c_str());
+}
+
 void test_tier3_randomized_stress(void)
 {
     // Fixed seeds keep failures reproducible. When a seed finds a bug, keep it
@@ -1771,6 +1966,8 @@ void process()
         RUN_TEST(test_tier2_remove_frees_blocks_and_slot);
         RUN_TEST(test_tier2_remove_leaves_neighbours_intact);
         RUN_TEST(test_tier2_remove_missing_file_is_a_noop);
+        RUN_TEST(test_tier2_unremove_recovers_a_scratched_file);
+        RUN_TEST(test_tier2_unremove_refuses_when_blocks_reused);
         RUN_TEST(test_tier3_randomized_stress);
     }
 

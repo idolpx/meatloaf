@@ -853,6 +853,138 @@ void D64MStream::rollbackFileWrite()
     creating = false;
 }
 
+// Defined further down; unremoveFile() needs it and sits above the definition.
+static std::vector<std::string> splitPathComponents(const std::string &path);
+
+bool D64MStream::queryBlockAllocation(uint8_t track, uint8_t sector, bool& out_allocated)
+{
+    BAMRecord rec;
+    uint8_t buf[32];
+    if (!readBAMRecord(track, &rec, buf))
+        return false;
+
+    uint8_t base = rec.has_count ? 1 : 0;
+    uint8_t byte_index = base + (sector >> 3);
+    if (byte_index >= rec.byte_count)
+        return false;   // sector beyond what this BAM record can represent
+
+    uint8_t bitmask = (uint8_t)(1 << (sector & 7));
+    out_allocated = (buf[byte_index] & bitmask) == 0;   // 1 = free, 0 = allocated
+    return true;
+}
+
+bool D64MStream::seekScratchedEntry(std::string filename)
+{
+    if (filename.empty())
+        return false;
+
+    mstr::replaceAll(filename, "\\", "/");
+    bool wildcard = (mstr::contains(filename, "*") || mstr::contains(filename, "?"));
+
+    uint16_t index = 1;
+    while (seekEntry(index))
+    {
+        // Only scratched entries are candidates. A never-used slot is also
+        // type 0, but carries no name, so an empty name is not a match.
+        if (entry.file_type != 0x00)
+        {
+            index++;
+            continue;
+        }
+
+        std::string entryFilename = entry.filename;
+        size_t i = entryFilename.find_first_of(0xA0);
+        if (i == std::string::npos || i > 16) i = 16;
+        entryFilename = mstr::toUTF8(entryFilename.substr(0, i));
+
+        if (!entryFilename.empty() &&
+            mstr::compareFilename(entryFilename, filename, wildcard))
+            return true;
+
+        index++;
+    }
+
+    return false;
+}
+
+bool D64MStream::unscratchEntry()
+{
+    uint8_t dir_track = track;
+    uint8_t dir_sector = sector;
+    uint8_t slot = (entry_index - 1) % 8;
+
+    // Pass 1: walk the chain and prove every block is still free. The links
+    // live in the blocks themselves, which are unallocated now, so they may
+    // have been overwritten - hence bounding the walk by the block count the
+    // entry recorded and bailing out on anything that does not add up.
+    //
+    // Nothing is modified during this pass. A recovery that cannot complete
+    // must leave the disk exactly as it found it, or a failed unscratch would
+    // be worse than the delete it was trying to undo.
+    std::vector<Block> chain;
+    uint8_t t = entry.start_track;
+    uint8_t s = entry.start_sector;
+    size_t limit = entry.blocks ? (size_t)entry.blocks + 2 : 10000;
+
+    while (t != 0)
+    {
+        if (chain.size() >= limit)
+            return false;   // chain runs longer than the entry claims
+
+        bool allocated = false;
+        if (!queryBlockAllocation(t, s, allocated))
+            return false;   // not a representable block: garbage link
+        if (allocated)
+            return false;   // already handed to a newer file - unrecoverable
+
+        chain.push_back({t, s});
+
+        if (!seekSector(t, s))
+            return false;
+        uint8_t link[2];
+        if (readContainer(link, 2) != 2)
+            return false;
+        t = link[0];
+        s = link[1];
+    }
+
+    if (chain.empty())
+        return false;
+
+    // Pass 2: commit. Reclaim the blocks, then put the type back.
+    for (const Block& b : chain)
+    {
+        if (!allocateBlock(b.track, b.sector))
+            return false;
+    }
+
+    std::string dirsec = readBlock(dir_track, dir_sector);
+    if (dirsec.size() != block_size)
+        return false;
+    dirsec[slot * 32 + 2] = 0x82;   // PRG, closed
+    return writeBlock(dir_track, dir_sector, dirsec);
+}
+
+bool D64MStream::unremoveFile(std::string path)
+{
+    auto parts = splitPathComponents(path);
+    if (parts.empty())
+        return false;
+
+    std::string parent;
+    for (size_t i = 0; i + 1 < parts.size(); i++)
+    {
+        if (i) parent += '/';
+        parent += parts[i];
+    }
+
+    if (!seekDirectory(parent))
+        return false;
+    if (!seekScratchedEntry(parts.back()))
+        return false;
+    return unscratchEntry();
+}
+
 bool D64MStream::removeFile(std::string path)
 {
     // resolvePath() leaves track/sector on the entry's DIRECTORY sector, which
