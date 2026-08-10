@@ -17,9 +17,10 @@
 
 // .D90, .D60 - The D90 image is bit-for-bit copy of the hard drives in the D9090 and D9060
 //
-// https://vice-emu.sourceforge.io/vice_16.html#SEC429
+// https://vice-emu.sourceforge.io/vice_17.html#SEC439
 // http://www.baltissen.org/newhtm/diskimag.htm
 // http://www.baltissen.org/newhtm/sasi.htm
+// https://www.lemon64.com/forum/viewtopic.php?t=76483&sid=c3d6ee61cd935ebf0dc4fb3eebfd724e
 //
 
 
@@ -165,7 +166,8 @@ public:
         return byExtension(
             {
                 ".d90",
-                ".d60"
+                ".d60",
+                ".d96"
             }, 
             fileName
         );

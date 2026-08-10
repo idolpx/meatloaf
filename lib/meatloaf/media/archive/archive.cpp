@@ -465,7 +465,7 @@ bool ArchiveMStream::seekEntry(std::string filename)
 
 bool ArchiveMStream::seekEntry( uint16_t index )
 {
-    Debug_printv("entry_count[%d] entry_index[%d] index[%d] m_isCompressedOnly[%d]", entry_count, entry_index, index, m_isCompressedOnly);
+    //Debug_printv("entry_count[%d] entry_index[%d] index[%d] m_isCompressedOnly[%d]", entry_count, entry_index, index, m_isCompressedOnly);
 
     if ( !m_archive->isOpen() ) {
         Debug_printv("ERROR: archive not open");
@@ -487,7 +487,7 @@ bool ArchiveMStream::seekEntry( uint16_t index )
     archive *a = m_archive->getArchive();
 
     int r = archive_read_next_header(a, &a_entry);
-    Debug_printv("archive_read_next_header returned: %d", r);
+    //Debug_printv("archive_read_next_header returned: %d", r);
 
     // Special handling for compressed-only files (e.g., standalone .gz, .bz2 files)
     // These have compression filters but no archive format, so archive_read_next_header returns EOF
@@ -578,7 +578,7 @@ bool ArchiveMStream::seekEntry( uint16_t index )
 
     // Check filetype
     const mode_t type = archive_entry_filetype(a_entry);
-    Debug_printv("entry filetype: 0x%x, S_ISREG=%d", type, S_ISREG(type));
+    //Debug_printv("entry filetype: 0x%x, S_ISREG=%d", type, S_ISREG(type));
     if ( S_ISREG(type) ) {
         const char* pathname = archive_entry_pathname(a_entry);
 
@@ -705,7 +705,7 @@ bool ArchiveMStream::seekEntry( uint16_t index )
 
     entry_index = index + 1;
 
-    Debug_printv("entry_index[%d] filename[%s] size[%lu]", entry_index, entry.filename.c_str(), entry.size);
+    //Debug_printv("entry_index[%d] filename[%s] size[%lu]", entry_index, entry.filename.c_str(), entry.size);
     return true;
 }
 
@@ -938,17 +938,17 @@ MFile *ArchiveMFile::getNextFileInDir()
         goto exit;
     }
 
-    Debug_printv("Calling getNextImageEntry()");
+    //Debug_printv("Calling getNextImageEntry()");
     do
     {
         r = image->getNextImageEntry();
-        Debug_printv("getNextImageEntry() returned %d, filename=[%s]", r, r ? image->entry.filename.c_str() : "");
+        //Debug_printv("getNextImageEntry() returned %d, filename=[%s]", r, r ? image->entry.filename.c_str() : "");
     } while (r && image->entry.filename.empty()); // Don't want empty entries
 
     if (r)
     {
         std::string filename = image->entry.filename;
-        Debug_printv("Found entry: filename=[%s] size=%lu", filename.c_str(), image->entry.size);
+        //Debug_printv("Found entry: filename=[%s] size=%lu", filename.c_str(), image->entry.size);
 
         std::string entryUrl;
         entryUrl.reserve(url.size() + 1 + filename.size());
