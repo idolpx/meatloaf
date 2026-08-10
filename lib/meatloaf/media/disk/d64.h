@@ -337,6 +337,13 @@ public:
     // current directory is set to it.
     PathResult resolvePath(std::string path);
 
+    // Delete a file inside the image: free its block chain and mark the
+    // directory entry scratched. Public counterpart to scratchEntry(), which
+    // is protected because it assumes the caller has already positioned on
+    // the entry - a contract that is easy to get wrong from outside (seekPath
+    // leaves track/sector on the file's first block, not its directory sector).
+    bool removeFile(std::string path);
+
     // Enter a subdirectory entry (CMD native DIR or 1581 CBM sub-partition)
     bool enterDirectory(std::string name);
 
@@ -808,6 +815,7 @@ public:
 
     bool isDirectory() override;
     bool exists() override;
+    bool remove() override;
     bool rename(std::string dest) override { return false; };
     time_t getLastWrite() override;
     time_t getCreationTime() override;

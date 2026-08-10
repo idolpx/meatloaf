@@ -369,6 +369,20 @@ public:
         }
     }
 
+    // Drop whatever obtain(type, url) would have returned. The key is derived
+    // from the SOURCE file, so it cannot be spelled by callers - anyone
+    // invalidating a cached image stream needs this rather than a hand-built
+    // string that silently drifts from obtain()'s.
+    static void disposeFor(const std::string& type, const std::string& url) {
+        std::unique_ptr<MFile> f(MFSOwner::File(url));
+        if (f == nullptr || f->sourceFile == nullptr)
+            return;
+        std::string key = type + f->sourceFile->url;
+        if (f->sourceFile->pathInStream.size() && f->sourceFile->pathInStream != "/")
+            key += "/" + f->sourceFile->pathInStream;
+        dispose(key);
+    }
+
     static void validate() {
         // Collect first: dispose() erases from image_repo, which would
         // invalidate the iterator if done while iterating.

@@ -310,14 +310,7 @@ void DHDImageRegistry::disposeCachedStream(const std::string &containerUrl)
     // Key format mirrors ImageBroker::obtain(): type + the SOURCE file's url,
     // plus its pathInStream when it has one. The broker derives its key from a
     // freshly resolved MFile, so we must do the same to name the same entry.
-    std::unique_ptr<MFile> f(MFSOwner::File(containerUrl));
-    if (f == nullptr || f->sourceFile == nullptr)
-        return;
-
-    std::string key = "d64" + f->sourceFile->url;
-    if (f->sourceFile->pathInStream.size() && f->sourceFile->pathInStream != "/")
-        key += "/" + f->sourceFile->pathInStream;
-    ImageBroker::dispose(key);
+    ImageBroker::disposeFor("d64", containerUrl);
 }
 
 const DHDPartition* DHDResolvePartition(const std::string &containerUrl,

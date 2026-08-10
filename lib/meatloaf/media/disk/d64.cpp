@@ -853,6 +853,16 @@ void D64MStream::rollbackFileWrite()
     creating = false;
 }
 
+bool D64MStream::removeFile(std::string path)
+{
+    // resolvePath() leaves track/sector on the entry's DIRECTORY sector, which
+    // is what scratchEntry() requires. seekPath() would not: in read mode it
+    // goes on to seek the file's first block.
+    if (resolvePath(path) != PATH_FILE)
+        return false;
+    return scratchEntry();
+}
+
 // Scratch an existing entry so a SAVE"@:file" can rewrite it: free the block
 // chain and mark the entry deleted. Assumes seekEntry() just succeeded, so
 // 'entry' holds the file and track/sector point at its directory sector.
@@ -1521,6 +1531,36 @@ bool D64MFile::isDirectory()
         return stream->resolvePath(pathInStream) == D64MStream::PATH_DIR;
 
     return false;
+}
+
+bool D64MFile::remove()
+{
+    // The container itself - a .d64/.dhd sitting on flash or SD - is an
+    // ordinary file, and deleting it is the base class's business.
+    if (pathInStream.empty() || pathInStream == "/")
+        return MFile::remove();
+
+    // A file INSIDE the image. The base MFile::remove() deliberately refuses
+    // this (there is no such path for ::remove() to unlink), so without this
+    // override "rm" simply could not delete anything in a disk image.
+    //
+    // Not the ImageBroker's stream: that one is opened read-only, so freeing
+    // blocks and rewriting the directory sector through it would fail. Ask for
+    // in|out, which makes MFile::getSourceStream() open the container "r+".
+    auto stream = std::static_pointer_cast<D64MStream>(
+        getSourceStream(std::ios_base::in | std::ios_base::out));
+    if (stream == nullptr || !stream->isOpen())
+        return false;
+
+    bool ok = stream->removeFile(pathInStream);
+    stream->close();
+
+    // The cached listing stream has its own handle on the container and would
+    // keep serving the entry we just scratched.
+    if (ok)
+        ImageBroker::disposeFor("d64", brokerUrl());
+
+    return ok;
 }
 
 bool D64MFile::exists()
