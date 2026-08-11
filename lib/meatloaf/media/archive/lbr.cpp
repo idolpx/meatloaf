@@ -232,6 +232,11 @@ MFile *LBRMFile::getNextFileInDir()
         auto file = MFSOwner::File(url + "/" + filename);
         file->name = filename;  // Use actual entry name, not container image name
         file->extension = image->entry.type;
+        // The LBR directory records each file's length in BYTES (verified
+        // against a real archive: directory end + the sum of every size is
+        // the file length), so it needs no derivation - it was simply never
+        // assigned, which is why every entry listed as 0.
+        file->size = image->entry.size;
         //Debug_printv("entry[%s] ext[%s]", fileName.c_str(), file->extension.c_str());
         file->is_dir = 0;
         

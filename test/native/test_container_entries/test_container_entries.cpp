@@ -42,6 +42,17 @@ static const char* NAME_2 = "LOADER";
  * Fixture builders
  ********************************************************/
 
+// Samples under .archive/ are gitignored, so tests that use them skip when
+// they aren't present.
+static bool haveFile(const char* path)
+{
+    FILE* fp = fopen(path, "rb");
+    if (fp == nullptr)
+        return false;
+    fclose(fp);
+    return true;
+}
+
 static void writeFile(const char* path, const std::vector<uint8_t>& bytes)
 {
     FILE* fp = fopen(path, "wb");
@@ -167,8 +178,10 @@ static void buildT64()
         using Base::Base;                                 \
         using Base::entry;                                \
         using Base::entry_count;                          \
+        using Base::containerStream;                      \
         using Base::readHeader;                           \
         using Base::seekEntry;                            \
+        using Base::seekPath;                             \
         __VA_ARGS__                                       \
     }
 
@@ -301,6 +314,58 @@ void test_lnx_repeated_lookups_do_not_grow_the_directory(void)
     TEST_ASSERT_FALSE(image->seekEntry((uint16_t)3));
 }
 
+// $A0 is the pad; a trailing SPACE belongs to the name. This archive is the
+// case that proves it - two entries whose names differ ONLY in six trailing
+// spaces. mstr::rtrimA0() strips whitespace as well as $A0, which collapsed
+// them into one name and made the second file unreachable.
+void test_lnx_real_archive_keeps_trailing_spaces(void)
+{
+    static const char* PATH = ".archive/lnx/Cloud King.lnx";
+    if (!haveFile(PATH))
+        TEST_IGNORE_MESSAGE("sample .archive/lnx/Cloud King.lnx not present");
+
+    auto image = openImage<TestLNXStream>(PATH);
+    TEST_ASSERT_NOT_NULL(image.get());
+
+    // "CLOUD KING" + six $A0 pad bytes
+    TEST_ASSERT_TRUE(image->seekEntry((uint16_t)1));
+    TEST_ASSERT_EQUAL_STRING("CLOUD KING", image->entry.filename.c_str());
+
+    // "CLOUD KING" + six real spaces
+    TEST_ASSERT_TRUE(image->seekEntry((uint16_t)2));
+    TEST_ASSERT_EQUAL_STRING("CLOUD KING      ", image->entry.filename.c_str());
+
+    // ...and the two must resolve to different files.
+    TEST_ASSERT_TRUE(image->seekEntry(mstr::toUTF8("CLOUD KING")));
+    uint32_t first = image->entry.size;
+    TEST_ASSERT_TRUE(image->seekEntry(mstr::toUTF8("CLOUD KING      ")));
+    TEST_ASSERT_NOT_EQUAL(first, image->entry.size);
+}
+
+// The two trims differ by one letter and confusing them is exactly the bug
+// above, so pin the distinction: rtrimA0() takes only the PETSCII pad,
+// rtrimPad() also takes spaces (for space-padded fields like CBM tape
+// headers - see TapeDecoder::harvestEntries and csip.cpp).
+void test_rtrim_variants_differ_on_trailing_space(void)
+{
+    std::string a0 = "CLOUD KING      ";
+    mstr::rtrimA0(a0);
+    TEST_ASSERT_EQUAL_STRING("CLOUD KING      ", a0.c_str());
+
+    std::string pad = "CLOUD KING      ";
+    mstr::rtrimPad(pad);
+    TEST_ASSERT_EQUAL_STRING("CLOUD KING", pad.c_str());
+
+    // Both remove $A0, and rtrimPad() handles a mix in either order.
+    std::string mixed_a0 = std::string("NAME") + "\xA0\xA0";
+    mstr::rtrimA0(mixed_a0);
+    TEST_ASSERT_EQUAL_STRING("NAME", mixed_a0.c_str());
+
+    std::string mixed = std::string("NAME") + " \xA0 \xA0";
+    mstr::rtrimPad(mixed);
+    TEST_ASSERT_EQUAL_STRING("NAME", mixed.c_str());
+}
+
 /********************************************************
  * T64
  ********************************************************/
@@ -327,6 +392,196 @@ void test_t64_wildcard_without_listing(void)
 
     TEST_ASSERT_TRUE(image->seekEntry(std::string("*")));
     TEST_ASSERT_EQUAL_STRING_LEN(NAME_1, image->entry.filename, strlen(NAME_1));
+}
+
+/********************************************************
+ * Entry sizes, against the real archives.
+ *
+ * <Format>MFile::getNextFileInDir() is what puts a size in the listing, and
+ * it cannot be reached natively (it needs MFSOwner/ImageBroker). What these
+ * pin down is the number it now reads: the directory field for LBR, and the
+ * derived expression for ARK. Both were checked against the whole-file
+ * arithmetic - see the comments on each.
+ *
+ * .archive/ is gitignored, so these skip when the samples aren't present.
+ ********************************************************/
+
+static const char* REAL_LBR = ".archive/lbr/zbbs-files!.lbr";
+static const char* REAL_ARK = ".archive/ark/Turbo_Assembler5t.ark";
+
+// LBR stores byte counts directly. Directory ends at 344 and the sizes sum
+// to 4774; 344 + 4774 = 5118 of the archive's 5120 bytes.
+void test_lbr_real_archive_sizes(void)
+{
+    if (!haveFile(REAL_LBR))
+        TEST_IGNORE_MESSAGE("sample .archive/lbr/zbbs-files!.lbr not present");
+
+    auto image = openImage<TestLBRStream>(REAL_LBR);
+    TEST_ASSERT_NOT_NULL(image.get());
+
+    TEST_ASSERT_TRUE(image->seekEntry((uint16_t)1));
+    TEST_ASSERT_EQUAL_STRING(".SET-UP.BBS", image->entry.filename.c_str());
+    TEST_ASSERT_EQUAL_UINT32(77, image->entry.size);
+
+    TEST_ASSERT_TRUE(image->seekEntry((uint16_t)2));
+    TEST_ASSERT_EQUAL_UINT32(151, image->entry.size);
+
+    TEST_ASSERT_TRUE(image->seekEntry((uint16_t)3));
+    TEST_ASSERT_EQUAL_UINT32(4, image->entry.size);
+
+    TEST_ASSERT_EQUAL_UINT32(18, (uint32_t)image->entry_count);
+}
+
+// ARK stores a block count plus the bytes used in the last block. Data
+// starts on the first 254-byte boundary after the directory and each file
+// occupies blocks*254, so 254 + 762 + 16256 + 207 = 17479 - the archive's
+// exact length, with the last file truncated to its real size.
+void test_ark_real_archive_sizes(void)
+{
+    if (!haveFile(REAL_ARK))
+        TEST_IGNORE_MESSAGE("sample .archive/ark/Turbo_Assembler5t.ark not present");
+
+    auto image = openImage<TestARKStream>(REAL_ARK);
+    TEST_ASSERT_NOT_NULL(image.get());
+
+    struct { uint16_t blocks; uint8_t lsu; uint32_t expect; } want[] = {
+        { 3,  155, 662   },
+        { 64, 129, 16130 },
+        { 1,  208, 207   },
+    };
+
+    for (uint16_t i = 0; i < 3; i++)
+    {
+        TEST_ASSERT_TRUE(image->seekEntry((uint16_t)(i + 1)));
+        TEST_ASSERT_EQUAL_UINT32(want[i].blocks, image->entry.blocks);
+        TEST_ASSERT_EQUAL_UINT32(want[i].lsu, image->entry.lsu_byte);
+
+        uint32_t size = image->entry.blocks
+                      ? ((image->entry.blocks - 1) * 254) + image->entry.lsu_byte - 1
+                      : 0;
+        TEST_ASSERT_EQUAL_UINT32(want[i].expect, size);
+    }
+
+    TEST_ASSERT_EQUAL_UINT32(3, (uint32_t)image->entry_count);
+}
+
+// seekPath() has to skip the space every preceding file occupies to reach a
+// file's data. It walked that with readEntry(), which ARKMStream never
+// overrides, so `entry` was never updated and the walk added the TARGET
+// file's block count once per preceding entry - every file after the first
+// resolved into the middle of an earlier one.
+//
+// Each of the three files in the sample starts with distinct bytes, so
+// reading through seekPath() and comparing against the raw image at the
+// independently computed offset catches a wrong landing spot.
+void test_ark_real_archive_data_offsets(void)
+{
+    if (!haveFile(REAL_ARK))
+        TEST_IGNORE_MESSAGE("sample .archive/ark/Turbo_Assembler5t.ark not present");
+
+    // Directory is 3*29+1 bytes, so data starts on the 254 boundary at 254;
+    // then each file occupies blocks*254 (3 and 64 blocks).
+    struct { const char* name; uint32_t offset; uint32_t size; } want[] = {
+        { "FAST/ESM",      254,               662   },
+        { "TASS V5.3/ESM", 254 + 762,         16130 },
+        { "FAST.HLP",      254 + 762 + 16256, 207   },
+    };
+
+    // Raw image, to compare the decoded bytes against.
+    FILE* fp = fopen(REAL_ARK, "rb");
+    TEST_ASSERT_NOT_NULL(fp);
+    fseek(fp, 0, SEEK_END);
+    long raw_len = ftell(fp);
+    std::vector<uint8_t> raw((size_t)raw_len);
+    fseek(fp, 0, SEEK_SET);
+    TEST_ASSERT_EQUAL_UINT32(raw.size(), fread(raw.data(), 1, raw.size(), fp));
+    fclose(fp);
+
+    for (const auto& w : want)
+    {
+        auto image = openImage<TestARKStream>(REAL_ARK);
+        TEST_ASSERT_NOT_NULL(image.get());
+
+        TEST_ASSERT_TRUE_MESSAGE(image->seekPath(mstr::toUTF8(w.name)), w.name);
+        TEST_ASSERT_EQUAL_UINT32(w.size, image->size());
+
+        // The landing spot itself, not just the bytes: several files in these
+        // archives open with the same BASIC loader stub, so a short content
+        // comparison can match at the wrong offset.
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(w.offset, image->containerStream->position(), w.name);
+
+        // The entry left selected must be the one that was asked for, not
+        // whichever one the offset walk visited last.
+        TEST_ASSERT_EQUAL_STRING_LEN(w.name, image->entry.filename, strlen(w.name));
+
+        uint8_t got[64] = {0};
+        TEST_ASSERT_EQUAL_UINT32(sizeof(got), image->read(got, sizeof(got)));
+        TEST_ASSERT_EQUAL_UINT8_ARRAY_MESSAGE(&raw[w.offset], got, sizeof(got), w.name);
+    }
+}
+
+// The listing escapes a '/' in a CBM name as '\' (T64, LNX, M2I and the disk
+// formats all do), and seekEntry() converts it back. This walks that round
+// trip on the name as it appears in `ls`, on an archive where the entry is
+// four deep so the offset walk has real work to do.
+//
+// It also stands in for what cannot be tested here: typing that name at the
+// console does NOT work, because ESP-IDF's esp_console_split_argv() treats
+// the backslash as its own escape character and drops "\T" entirely.
+void test_ark_backslash_name_round_trip(void)
+{
+    static const char* PATH = ".archive/ark/Tpztools.ark";
+    if (!haveFile(PATH))
+        TEST_IGNORE_MESSAGE("sample .archive/ark/Tpztools.ark not present");
+
+    auto image = openImage<TestARKStream>(PATH);
+    TEST_ASSERT_NOT_NULL(image.get());
+
+    // 5 entries of 54/23/12/28/43 blocks; data starts at 254.
+    TEST_ASSERT_TRUE(image->seekPath(mstr::toUTF8("ASS.C.NOTE\\TOPAZ")));
+    TEST_ASSERT_EQUAL_UINT32(7031, image->size());
+    TEST_ASSERT_EQUAL_UINT32(22860, image->containerStream->position());
+
+    // The '/' form - what a C64 sends over IEC, where no shell escaping is
+    // involved - must resolve identically.
+    auto other = openImage<TestARKStream>(PATH);
+    TEST_ASSERT_NOT_NULL(other.get());
+    TEST_ASSERT_TRUE(other->seekPath(mstr::toUTF8("ASS.C.NOTE/TOPAZ")));
+    TEST_ASSERT_EQUAL_UINT32(7031, other->size());
+    TEST_ASSERT_EQUAL_UINT32(22860, other->containerStream->position());
+}
+
+// seekEntry() matches against mstr::toUTF8(entry name), and the PETSCII map
+// sends 'A'-'Z' to 'a'-'z' - so for these archives the UTF-8 form is NOT the
+// raw bytes, and a listing that prints the raw name shows something that
+// cannot be typed back. That is what ARK and LNX did by naming their entries
+// through sourceFile->url (the archive's PARENT directory), which resolves to
+// a plain file with isPETSCII false so `ls` skips the conversion.
+//
+// getNextFileInDir() needs MFSOwner and cannot run here; what this pins is
+// the invariant that made the mismatch visible.
+void test_ark_lookup_domain_is_utf8_not_raw(void)
+{
+    static const char* PATH = ".archive/ark/Tpztools.ark";
+    if (!haveFile(PATH))
+        TEST_IGNORE_MESSAGE("sample .archive/ark/Tpztools.ark not present");
+
+    // The conversion is not a no-op for these names.
+    TEST_ASSERT_EQUAL_STRING("w.bazaar  /topaz", mstr::toUTF8("W.BAZAAR  /TOPAZ").c_str());
+
+    {   // The UTF-8 form - what a listing must show - resolves.
+        auto image = openImage<TestARKStream>(PATH);
+        TEST_ASSERT_NOT_NULL(image.get());
+        TEST_ASSERT_TRUE(image->seekPath("w.bazaar  \\topaz"));
+        TEST_ASSERT_EQUAL_UINT32(10772, image->size());
+        TEST_ASSERT_EQUAL_UINT32(29972, image->containerStream->position());
+    }
+    {   // The raw PETSCII bytes do not - this is exactly what the console
+        // sent when the listing printed the unconverted name.
+        auto image = openImage<TestARKStream>(PATH);
+        TEST_ASSERT_NOT_NULL(image.get());
+        TEST_ASSERT_FALSE(image->seekPath("W.BAZAAR  \\TOPAZ"));
+    }
 }
 
 /********************************************************
@@ -383,9 +638,17 @@ int main(int argc, char** argv)
 
     RUN_TEST(test_lnx_lookup_without_listing);
     RUN_TEST(test_lnx_repeated_lookups_do_not_grow_the_directory);
+    RUN_TEST(test_lnx_real_archive_keeps_trailing_spaces);
+    RUN_TEST(test_rtrim_variants_differ_on_trailing_space);
 
     RUN_TEST(test_t64_lookup_without_listing);
     RUN_TEST(test_t64_wildcard_without_listing);
+
+    RUN_TEST(test_lbr_real_archive_sizes);
+    RUN_TEST(test_ark_real_archive_sizes);
+    RUN_TEST(test_ark_real_archive_data_offsets);
+    RUN_TEST(test_ark_backslash_name_round_trip);
+    RUN_TEST(test_ark_lookup_domain_is_utf8_not_raw);
 
     RUN_TEST(test_explicit_parse_finds_the_same_entries);
 

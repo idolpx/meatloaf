@@ -67,7 +67,7 @@ bool ARKMStream::seekEntry( uint16_t index )
     if ( entry_count == (size_t)-1 && !readHeader() )
         return false;
 
-    Debug_printv("entry_count[%d] entry_index[%d] index[%d]", entry_count, entry_index, index);
+    //Debug_printv("entry_count[%d] entry_index[%d] index[%d]", entry_count, entry_index, index);
 
     if ( !index || index > entry_count )
         return false;
@@ -84,7 +84,7 @@ bool ARKMStream::seekEntry( uint16_t index )
 
     entry_index = index + 1;
 
-    Debug_printv("entry_index[%d] entryOffset[%u] blocks[%u] filename[%s]", entry_index, entryOffset, entry.blocks, entry.filename);
+    //Debug_printv("entry_index[%d] entryOffset[%u] blocks[%u] filename[%s]", entry_index, entryOffset, entry.blocks, entry.filename);
 
     return true;
 }
@@ -121,17 +121,25 @@ bool ARKMStream::seekPath(std::string path)
 
         Debug_printv("entry_index[%d] entry_data_offset[%lu] blocks[%u] _size[%lu] lsu[%d]", entry_index, entry_data_offset, blocks, _size, entry.lsu_byte);
 
-        // Get size of files up to this one to calculate data_offset
-        uint8_t c = 1;
-        uint8_t t = entry_index;
-        while ( c < t )
+        // Add the space every preceding file occupies (blocks * 254 each) to
+        // reach this one's data. This walked with readEntry(), which is not
+        // overridden here, so the base always returned false and left `entry`
+        // untouched - the loop then added THIS file's block count once per
+        // preceding entry, and every file after the first was read from the
+        // wrong offset.
+        uint16_t target = entry_index;
+        for ( uint16_t c = 1; c < target; c++ )
         {
-            readEntry(c);
+            if ( !seekEntry(c) )
+                return false;
+
             entry_data_offset += ( entry.blocks * 254);
-            Debug_printv("c[%d] blocks[%u] entry_index[%d] entry_data_offset[%lu]", c, entry.blocks, entry_index, entry_data_offset);
-            c++;
+            Debug_printv("c[%d] blocks[%u] entry_data_offset[%lu]", c, entry.blocks, entry_data_offset);
         }
-        
+
+        // seekEntry() above overwrote `entry`; restore the one being opened
+        if ( target > 1 && !seekEntry(target) )
+            return false;
 
         Debug_printv("filename [%.16s] type[%s] data_offset[%lu] blocks[%u] file_size[%lu]", entry.filename, type.c_str(), entry_data_offset, blocks, _size);
 
@@ -198,9 +206,22 @@ MFile *ARKMFile::getNextFileInDir()
         mstr::replaceAll(filename, "/", "\\");
         //Debug_printv( "entry[%s]", (sourceFile->url + "/" + fileName).c_str() );
 
-        auto file = MFSOwner::File(sourceFile->url + "/" + filename);
+        // sourceFile->url is the archive's PARENT DIRECTORY, so this used to
+        // name a file next to the archive rather than one inside it. The
+        // entry then resolved to a plain flash file with isPETSCII false, and
+        // `ls` printed the raw PETSCII bytes instead of the UTF-8 form that
+        // seekEntry() matches against - so the listed name could not be typed
+        // back. fullUrl() rejoins any pathInStream, per the rule on joining a
+        // child name onto an MFile.
+        auto file = MFSOwner::File(fullUrl() + "/" + filename);
         file->name = filename;  // Use actual entry name, not container image name
         file->extension = image->decodeType(image->entry.file_type);
+        // Same expression seekPath() uses for _size: the last block holds
+        // lsu_byte bytes, so the file is exact rather than an estimate. A
+        // zero-block entry would underflow the subtraction.
+        file->size = image->entry.blocks
+                   ? ((image->entry.blocks - 1) * 254) + image->entry.lsu_byte - 1
+                   : 0;
         //Debug_printv("entry[%s] ext[%s]", fileName.c_str(), file->extension.c_str());
         file->is_dir = 0;
 

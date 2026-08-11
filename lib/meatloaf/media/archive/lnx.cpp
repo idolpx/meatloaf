@@ -100,7 +100,9 @@ int8_t LNXMStream::loadEntries()
     {
         Entry e;
 
-        // Read filename (16 chars, PETASCII, padded with $A0)
+        // Read filename (16 chars, PETASCII, padded with $A0). Only the $A0
+        // comes off - a trailing SPACE is part of the name, so rtrimPad()
+        // would merge "CLOUD KING" and "CLOUD KING      " into one entry.
         uint8_t filename_buf[17];
         readContainer(filename_buf, 16);
         filename_buf[16] = '\0';
@@ -328,13 +330,16 @@ MFile *LNXMFile::getNextFileInDir()
         filename = filename.substr(0, i);
         mstr::replaceAll(filename, "/", "\\");
 
-        auto file = MFSOwner::File(sourceFile->url + "/" + filename);
+        // sourceFile->url is the archive's PARENT DIRECTORY - see the note in
+        // ARKMFile::getNextFileInDir(); LNX was the only other format naming
+        // its entries outside its own container.
+        auto file = MFSOwner::File(fullUrl() + "/" + filename);
         file->name = filename;  // Use actual entry name, not container image name
         file->extension = image->entry.type;
         file->size = image->entry.size;
         file->is_dir = 0;
 
-        Debug_printv("entry[%s] ext[%s] size[%d]", filename.c_str(), file->extension.c_str(), file->size);
+        //Debug_printv("entry[%s] ext[%s] size[%d]", filename.c_str(), file->extension.c_str(), file->size);
 
         return file;
     }

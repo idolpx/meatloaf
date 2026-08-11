@@ -344,12 +344,13 @@ void TapeDecoder::harvestEntries(int nprg)
         //     name.resize(name.size() - 5);
         if (name.empty() && have_pending)
             name = pending_name;
-        // rtrim() alone misses PETSCII's 0xA0 shift-space, which some
-        // scanners use to pad the fixed-width tape header filename field.
-        // Left untrimmed, it survives into e.name and makes exact-name
+        // The fixed-width tape header filename field is padded with spaces,
+        // and some scanners pad with PETSCII's 0xA0 shift-space instead.
+        // Either one left untrimmed survives into e.name and makes exact-name
         // lookups (TAPMStream::seekPath()) fail even though display (which
-        // stops at the first embedded low byte) looks fine.
-        mstr::rtrimA0(name);
+        // stops at the first embedded low byte) looks fine - so both have to
+        // go, which is rtrimPad() rather than rtrimA0().
+        mstr::rtrimPad(name);
         if (!name.empty())
             e.name = name;
         e.loader = p.type_name ? p.type_name : "";

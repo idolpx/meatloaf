@@ -80,6 +80,26 @@ namespace mstr {
             std::find_if(s.rbegin(), s.rend(), [](int ch) { return !isA0Space(ch); }).base(), s.end());
     }
 
+    // Strip the trailing padding of a fixed-width name field: PETSCII $A0,
+    // spaces, or a mix. rtrimA0() removes ONLY $A0, because in a CBM
+    // directory a trailing space can be part of the name (an LNX archive can
+    // hold "CLOUD KING" and "CLOUD KING      " as two different files). Use
+    // this one where the field is known to be space-padded instead - CBM tape
+    // headers, for example.
+    void rtrimPad(std::string &s)
+    {
+        while (!s.empty())
+        {
+            // isspace() is only defined for unsigned char values; $A0 in a
+            // signed char would be negative.
+            unsigned char ch = (unsigned char)s.back();
+            if (ch != 0xA0 && !std::isspace(ch))
+                break;
+
+            s.pop_back();
+        }
+    }
+
     // trim from both ends (in place)
     void trim(std::string &s)
     {
@@ -90,7 +110,7 @@ namespace mstr {
     // is space or petscii shifted space
     bool isA0Space(int ch)
     {
-        return ch == '\xA0' || std::isspace(ch);
+        return ch == '\xA0';
     }
 
     // is OSX/Windows junk system file

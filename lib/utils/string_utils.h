@@ -59,7 +59,8 @@ namespace mstr {
 
     void ltrim(std::string &s);
     void rtrim(std::string &s);
-    void rtrimA0(std::string &s);
+    void rtrimA0(std::string &s);   // PETSCII $A0 pad only - keeps a trailing space
+    void rtrimPad(std::string &s);  // $A0 and whitespace, for space-padded fields
     void trim(std::string &s);
 
     void replaceAll(std::string &s, const std::string &search, const std::string &replace);
