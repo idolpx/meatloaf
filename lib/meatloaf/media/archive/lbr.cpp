@@ -23,6 +23,14 @@
  * Streams
  ********************************************************/
 
+bool LBRMStream::ensureEntries()
+{
+    if (entry_count != (size_t)-1)
+        return true;
+
+    return loadEntries() >= 0;
+}
+
 int8_t LBRMStream::loadEntries()
 {
     std::string signature = readUntil(0x20);
@@ -79,7 +87,10 @@ bool LBRMStream::seekEntry( std::string filename )
         size_t index = 1;
         mstr::replaceAll(filename, "\\", "/");
         bool wildcard = (mstr::contains(filename, "*") || mstr::contains(filename, "?"));
-        while (readEntry(index))
+        // readEntry() is not overridden here, so the base always returned
+        // false and this loop never ran: every by-name lookup missed. Every
+        // other format walks its directory with seekEntry().
+        while (seekEntry(index))
         {
             std::string entryFilename = entry.filename;
             size_t i = entryFilename.find_first_of(0xA0);
@@ -106,6 +117,13 @@ bool LBRMStream::seekEntry( std::string filename )
 
 bool LBRMStream::seekEntry( uint16_t index )
 {
+    // The constructor no longer parses the directory. Both the directory
+    // listing and a by-name lookup funnel through here, so this is where a
+    // stream that has not been through a directory listing gets its entries -
+    // without it `entries` is empty and every load reports "not found".
+    if ( !ensureEntries() )
+        return false;
+
     if ( index && index <= entries.size() )
     {
         index--;
@@ -174,7 +192,7 @@ bool LBRMFile::rewindDirectory()
 
     // Read Header
     image->readHeader();
-    image->loadEntries();
+    image->ensureEntries();
     image->resetEntryCounter();
 
     // Set Media Info Fields

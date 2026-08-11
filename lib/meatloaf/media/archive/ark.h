@@ -62,7 +62,20 @@ protected:
         uint16_t blocks;
     };
 
-    bool readHeader() override { return true; };
+    // The first byte of an ARK is its directory entry count. It used to be
+    // read inline by ARKMFile::rewindDirectory(), which left a stream that had
+    // not been listed with no bound at all (entry_count stays (size_t)-1).
+    bool readHeader() override {
+        if (!containerStream->seek(0))
+            return false;
+
+        uint8_t count = 0;
+        if (readContainer(&count, 1) != 1)
+            return false;
+
+        entry_count = count;
+        return true;
+    };
     bool seekEntry( std::string filename ) override;
     bool seekEntry( uint16_t index ) override;
 

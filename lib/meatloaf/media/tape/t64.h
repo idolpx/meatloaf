@@ -61,8 +61,14 @@ protected:
     bool readHeader() override {
         containerStream->seek(0x20);
         if (readContainer((uint8_t*)&header, 32))
+        {
+            // Publish the count through the base member so seekEntry() can
+            // tell a header it has read from one it has not: `header` is an
+            // uninitialised POD until this runs.
+            entry_count = header.entry_count;
             return true;
-        
+        }
+
         return false;
     }
 

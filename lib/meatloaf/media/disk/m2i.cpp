@@ -98,11 +98,19 @@ bool M2IMStream::readHeader()
     }
 
     //Debug_printv("title[%s] entries[%u]", title.c_str(), (unsigned)entries.size());
+    header_read = true;
     return true;
 }
 
 bool M2IMStream::seekEntry( uint16_t index )
 {
+    // The index is the whole filesystem, and the constructor no longer parses
+    // it. Both the directory listing and a by-name lookup funnel through here,
+    // so this is where a stream that has not been through a directory listing
+    // gets its entries - without it every load reports "not found".
+    if (!header_read && !readHeader())
+        return false;
+
     if (index == 0 || index > entries.size())
         return false;
 

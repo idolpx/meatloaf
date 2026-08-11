@@ -86,6 +86,7 @@ protected:
     std::string title;
     std::vector<Entry> entries;
     Entry entry;                // currently selected entry
+    bool header_read = false;   // index parsed into entries
 
     // The host file being served after seekPath()
     std::shared_ptr<MStream> fileStream;

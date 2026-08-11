@@ -59,6 +59,11 @@ protected:
     int8_t loadEntries();
     void skipBasicLoader();
 
+    // Parse the index once per stream: readHeader() then loadEntries(), which
+    // must run in that order and from that stream position. entry_count is the
+    // "not parsed yet" marker (see meat_media.h).
+    bool ensureEntries();
+
     bool readHeader() override;
     bool seekEntry( std::string filename ) override;
     bool seekEntry( uint16_t index ) override;

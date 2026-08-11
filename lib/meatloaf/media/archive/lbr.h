@@ -55,6 +55,11 @@ protected:
     std::vector<Entry> entries;
     int8_t loadEntries();
 
+    // Parse the directory once per stream. entry_count is the "not parsed
+    // yet" marker (see meat_media.h); loadEntries() reads sequentially from
+    // the stream's current position, so it cannot simply be re-run.
+    bool ensureEntries();
+
     bool readHeader() override { return true; };
     bool seekEntry( std::string filename ) override;
     bool seekEntry( uint16_t index ) override;

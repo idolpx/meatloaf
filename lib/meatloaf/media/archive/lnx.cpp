@@ -76,6 +76,17 @@ bool LNXMStream::readHeader()
     return true;
 }
 
+bool LNXMStream::ensureEntries()
+{
+    if (entry_count != (size_t)-1)
+        return true;
+
+    if (!readHeader())
+        return false;
+
+    return loadEntries() >= 0;
+}
+
 int8_t LNXMStream::loadEntries()
 {
     // Skip to start of directory entries (after header padding to 254-byte boundary)
@@ -193,6 +204,13 @@ bool LNXMStream::seekEntry( std::string filename )
 
 bool LNXMStream::seekEntry( uint16_t index )
 {
+    // The constructor no longer parses the index. Both the directory listing
+    // and a by-name lookup funnel through here, so this is where a stream that
+    // has not been through a directory listing gets its entries - without it
+    // `entries` is empty and every load reports "not found".
+    if ( !ensureEntries() )
+        return false;
+
     if ( index && index <= entries.size() )
     {
         index--;
@@ -269,9 +287,9 @@ bool LNXMFile::rewindDirectory()
     if (image == nullptr)
         return false;
 
-    // Read Header
-    image->readHeader();
-    image->loadEntries();
+    // Parse the index (once per stream; re-running loadEntries() appended a
+    // second copy of every entry to the listing)
+    image->ensureEntries();
     image->resetEntryCounter();
 
     // Set Media Info Fields

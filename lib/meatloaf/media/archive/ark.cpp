@@ -60,6 +60,13 @@ bool ARKMStream::seekEntry( std::string filename )
 
 bool ARKMStream::seekEntry( uint16_t index )
 {
+    // A stream that has not been through a directory listing has no entry
+    // count, and the default (size_t)-1 makes the bound below useless: the
+    // walk runs off the end of the directory into file data, and seekPath()
+    // derives its data offset from the same number.
+    if ( entry_count == (size_t)-1 && !readHeader() )
+        return false;
+
     Debug_printv("entry_count[%d] entry_index[%d] index[%d]", entry_count, entry_index, index);
 
     if ( !index || index > entry_count )
@@ -153,14 +160,8 @@ bool ARKMFile::rewindDirectory()
     if (image == nullptr)
         return false;
 
-    // Read Header
+    // Read Header (sets the entry count)
     image->readHeader();
-
-    // Get the entry count
-    image->containerStream->seek(0);
-    uint8_t count;
-    image->readContainer((uint8_t *)&count, 1);
-    image->entry_count = count;
     image->resetEntryCounter();
 
     // Set Media Info Fields
