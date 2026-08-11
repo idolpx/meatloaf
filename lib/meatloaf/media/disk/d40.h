@@ -68,6 +68,7 @@ public:
         partitions.push_back(p);
         sectorsPerTrack = { 17, 18, 20, 21 };
         dos_rom = "dos2040";
+        dos_version = 0x01; 
 
         // this.size = data.media_data.length;
         // switch (this.size + this.media_header_size) {
