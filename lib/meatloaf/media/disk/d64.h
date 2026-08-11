@@ -18,6 +18,7 @@
 // .D64, .D41 - 1541 disk image format
 //
 // https://vice-emu.sourceforge.io/vice_16.html#SEC408
+// http://fileformats.archiveteam.org/wiki/CBMFS
 // https://ist.uwaterloo.ca/~schepers/formats/D64.TXT
 // https://ist.uwaterloo.ca/~schepers/formats/REL.TXT
 // https://ist.uwaterloo.ca/~schepers/formats/GEOS.TXT
