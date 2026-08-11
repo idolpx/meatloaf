@@ -49,7 +49,7 @@ public:
                 0,      // sector
                 0x10,   // offset
                 0,      // start_track
-                153,    // end_track
+                152,    // end_track - 153 tracks indexed 0-152
                 5       // byte_count
             }
         };
@@ -81,11 +81,11 @@ public:
         switch (size + media_header_size) 
         {
              case 5013504:  // D9060 - 153 tracks, 32 sectors, 4 heads
-                 sectorsPerTrack = { (4 * 32) }; // Heads * Sectors
+                 sectorsPerTrack = { (4 * 32) }; // Heads * Sectors/Track = 128 sectors/track
                  break;
 
              case 7520256:  // D9090 - 153 tracks, 32 sectors, 6 heads
-                sectorsPerTrack = { (6 * 32) }; // Heads * Sectors
+                sectorsPerTrack = { (6 * 32) }; // Heads * Sectors/Track = 192 sectors/track
                  break;
         }
 
