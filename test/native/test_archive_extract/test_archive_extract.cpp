@@ -41,6 +41,7 @@ static const char* ZIP_PATH = ".archive/zip/Donnie_Russell_II_d64.zip";
 // Artifacts this suite writes; see tearDown().
 static const char* GZ_PATH = "build_test_archive.gz";
 static const char* GZ_BAD_ISIZE_PATH = "build_test_archive_badisize.gz";
+static const char* GZ_PCT_PATH = "build_test_archive%2bplus.gz";
 
 // nextEntrySimple()/entry are protected - extractAll() reaches them as a
 // friend of ArchiveMStream. Widen access rather than duplicating the walk,
@@ -91,6 +92,7 @@ void tearDown(void)
 {
     remove(GZ_PATH);
     remove(GZ_BAD_ISIZE_PATH);
+    remove(GZ_PCT_PATH);
 }
 
 // Collects every entry name a caller would see from one extractAll-style walk.
@@ -240,6 +242,61 @@ void test_gz_size_is_the_decompressed_length(void)
         "size must be the decompressed length, not the compressed one");
 }
 
+// A single compressed file has no stored entry name, so the archive layer
+// synthesises one from the container's URL. When that URL is a network URL the
+// component is percent-encoded, and the encoding must not survive into the
+// name a file is written under: `.../ordeal%2b2100p.d64.gz` fetched over HTTPS
+// extracted to a file literally called `ordeal%2b2100p.d64` instead of
+// `ordeal+2100p.d64`.
+//
+// alter_pluses must be false: a '+' in a PATH is a literal plus, not the
+// form-encoded space it means in a query string.
+static std::string entryNameFor(const std::string& fixturePath, const std::string& reportedUrl)
+{
+    auto src = std::make_shared<FileContainerStream>(fixturePath);
+    if (!src->isOpen())
+        return "<fixture missing>";
+    if (!reportedUrl.empty())
+        src->url = reportedUrl;   // read the local bytes, report a network URL
+
+    // seekPath(), not nextEntrySimple(): the latter is the minimal walk used by
+    // extractAll() and deliberately skips the name/size synthesis. Deriving a
+    // name for a single compressed file happens in seekEntry().
+    WalkableArchiveStream stream(src);
+    if (!stream.seekPath("*"))
+        return "<not found>";
+    return stream.entry.filename;
+}
+
+static void writeGz(const char* path)
+{
+    FILE* fp = fopen(path, "wb");
+    TEST_ASSERT_NOT_NULL(fp);
+    fwrite(GZ_BYTES, 1, sizeof(GZ_BYTES), fp);
+    fclose(fp);
+}
+
+void test_url_encoded_entry_name_is_decoded(void)
+{
+    writeGz(GZ_PATH);
+    std::string name = entryNameFor(
+        GZ_PATH, "https://zimmers.net/anonftp/pub/cbm/c64/games/ordeal%2b2100p.d64.gz");
+
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("ordeal+2100p.d64", name.c_str(),
+        "percent-encoding from the URL leaked into the extracted filename");
+}
+
+// The other half: a LOCAL path is not URL-encoded, so a file genuinely named
+// with a '%' keeps it. Decoding unconditionally would rename it.
+void test_percent_in_local_path_is_left_alone(void)
+{
+    writeGz(GZ_PCT_PATH);
+    std::string name = entryNameFor(GZ_PCT_PATH, "");
+
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("build_test_archive%2bplus", name.c_str(),
+        "a local filename containing '%' must not be percent-decoded");
+}
+
 int main(int, char**)
 {
     UNITY_BEGIN();
@@ -248,5 +305,7 @@ int main(int, char**)
     RUN_TEST(test_unreadable_zip_fails_rather_than_succeeding_with_junk);
     RUN_TEST(test_gz_still_reaches_its_content_through_raw);
     RUN_TEST(test_gz_size_is_the_decompressed_length);
+    RUN_TEST(test_url_encoded_entry_name_is_decoded);
+    RUN_TEST(test_percent_in_local_path_is_left_alone);
     return UNITY_END();
 }

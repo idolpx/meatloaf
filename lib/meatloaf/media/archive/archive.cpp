@@ -205,6 +205,37 @@ int64_t cb_seek(struct archive *, void *userData, int64_t offset, int whence)
 
 
 
+// The name to give the single entry of a compressed-only file (.gz, .bz2, ...),
+// derived from the container's own path because the stream carries no directory.
+//
+// Percent-decoding is applied ONLY when the container came from a URL. A URL
+// path component is encoded, and letting the encoding through names the
+// extracted file literally `ordeal%2b2100p.d64`; a LOCAL path is not encoded,
+// so a file genuinely containing '%' must keep it. `alter_pluses` is false
+// because a '+' in a path is a literal plus, not the form-encoded space it
+// means in a query string — the same call fnFsHTTP.cpp makes for the filenames
+// in an HTTP directory listing.
+static std::string compressedEntryNameFromUrl(const std::string &containerUrl)
+{
+    size_t lastSlash = containerUrl.find_last_of("/\\");
+    std::string filename = (lastSlash != std::string::npos)
+        ? containerUrl.substr(lastSlash + 1)
+        : containerUrl;
+
+    static const char *compressionExts[] = {".gz", ".bz2", ".xz", ".lz", ".z", ".zst", ".lz4"};
+    for (const char *ext : compressionExts) {
+        if (mstr::endsWith(filename, ext, false)) {
+            filename = filename.substr(0, filename.length() - strlen(ext));
+            break;
+        }
+    }
+
+    if (containerUrl.find("://") != std::string::npos)
+        filename = mstr::urlDecode(filename, false);
+
+    return filename;
+}
+
 bool Archive::open(std::ios_base::openmode mode, bool rawOnly, bool randomAccess) {
     // close the archive if it was already open
     close();
@@ -531,25 +562,9 @@ bool ArchiveMStream::seekEntry( uint16_t index )
         // Mark this as a compressed-only file so we don't try to read more entries
         m_isCompressedOnly = true;
 
-        // Derive filename from archive URL by removing compression extension
-        std::string archivePath = url;
-
-        // Extract filename from path
-        size_t lastSlash = archivePath.find_last_of("/\\");
-        std::string filename = (lastSlash != std::string::npos)
-            ? archivePath.substr(lastSlash + 1)
-            : archivePath;
-
-        // Remove compression extension
-        const char* compressionExts[] = {".gz", ".bz2", ".xz", ".lz", ".z", ".zst", ".lz4"};
-        for (const char* ext : compressionExts) {
-            if (mstr::endsWith(filename, ext, false)) {
-                filename = filename.substr(0, filename.length() - strlen(ext));
-                break;
-            }
-        }
-
-        entry.filename = filename;
+        // Derive the filename from the archive's own path (percent-decoded only
+        // when that path is a URL - see compressedEntryNameFromUrl).
+        entry.filename = compressedEntryNameFromUrl(url);
         Debug_printv("Synthesized filename: %s", entry.filename.c_str());
 
         // Determine decompressed size via gzip ISIZE trailer (last 4 bytes of .gz file).
@@ -625,24 +640,7 @@ bool ArchiveMStream::seekEntry( uint16_t index )
         bool isRawCompressedEntry = (pathname == nullptr || pathname[0] == '\0' ||
                                      strcmp(pathname, "data") == 0);
         if (isRawCompressedEntry) {
-            std::string archivePath = url;
-
-            // Extract filename from path
-            size_t lastSlash = archivePath.find_last_of("/\\");
-            std::string filename = (lastSlash != std::string::npos)
-                ? archivePath.substr(lastSlash + 1)
-                : archivePath;
-
-            // Remove compression extension
-            const char* compressionExts[] = {".gz", ".bz2", ".xz", ".lz", ".z", ".zst", ".lz4"};
-            for (const char* ext : compressionExts) {
-                if (mstr::endsWith(filename, ext, false)) {
-                    filename = filename.substr(0, filename.length() - strlen(ext));
-                    break;
-                }
-            }
-
-            entry.filename = filename;
+            entry.filename = compressedEntryNameFromUrl(url);
         } else {
             entry.filename = basename(pathname);
         }
