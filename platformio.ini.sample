@@ -101,6 +101,9 @@ extra_scripts =
     pre:build_data.py
 ;    pre:build_version.py
 ;    pre:build_nvs.py
+    ; Applies fixes to the ESP-IDF package that upstream has not released yet.
+    ; Idempotent; see the script for what and why.
+    pre:patch_framework.py
 ;    post:build_firmwarezip.py
 
 [env]
