@@ -709,6 +709,36 @@ bool ArchiveMStream::seekEntry( uint16_t index )
             }
 
             if (!sizeKnown) {
+                // The count below measures whatever the archive currently decodes.
+                // If the re-open above came back WITHOUT the compression filter,
+                // it measures the COMPRESSED stream and reports that as the
+                // decompressed size — and the caller then extracts exactly that
+                // many bytes, i.e. a silently truncated file. Seen on hardware
+                // for a .gz over HTTPS: `srcSize=41448` (compressed) followed by
+                // `Counted decompressed size: 41448` for a 174848-byte D64,
+                // because the re-open reported `filter count: 1 / none`. The
+                // cause is upstream — the source served something other than the
+                // file's start after a seek, which a network source does when a
+                // re-request desynchronises — but counting the wrong stream must
+                // not be how it surfaces.
+                //
+                // A further re-open is worth one try: on the hardware trace the
+                // NEXT open of the same source did come back with the filter.
+                if (isRawCompressedEntry && !m_archive->hasCompressionFilter()) {
+                    Debug_printv("compression filter missing after reopen — retrying once");
+                    m_archive->close();
+                    m_archive->open(std::ios_base::in);
+                    a = m_archive->getArchive();
+                    if (archive_read_next_header(a, &a_entry) != ARCHIVE_OK ||
+                        !m_archive->hasCompressionFilter()) {
+                        Debug_printv("ERROR! source is not serving [%s] as a compressed stream; "
+                                     "refusing to report the compressed length as the entry size",
+                                     url.c_str());
+                        entry.size = 0;
+                        return false;
+                    }
+                }
+
                 // Fallback: count actual decompressed bytes by reading through the data.
                 // Used for non-gz compressed formats (.bz2, .xz, etc.) or when ISIZE read fails.
                 uint8_t buff[256] = {0};

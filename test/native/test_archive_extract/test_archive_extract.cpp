@@ -28,6 +28,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <cstring>
 
 #include "../test_disk_write/file_container_stream.h"
 #include "media/archive/archive.h"
@@ -47,6 +48,7 @@ public:
     using ArchiveMStream::entry;
     using ArchiveMStream::nextEntrySimple;
     using ArchiveMStream::open;
+    using ArchiveMStream::seekPath;
 };
 
 // A source stream that starts `skew` bytes into the file and hides it: seek(p)
@@ -184,6 +186,51 @@ void test_gz_still_reaches_its_content_through_raw(void)
     (void)GZ_PAYLOAD;
 }
 
+// GZ_BYTES with the ISIZE field (last 4 bytes) corrupted, so the gzip trailer
+// probe is rejected by the 8 MB sanity cap and seekEntry() falls through to
+// counting decompressed bytes. That fallback is the path a truncated
+// extraction came out of on hardware, so this pins its result.
+//
+// HONEST SCOPE: this does NOT reproduce that hardware failure. There the
+// re-open before the count came back WITHOUT the gzip filter (`filter count:
+// 1 / none`), so the count measured the COMPRESSED stream and reported 41448
+// bytes for a 174848-byte D64. That state comes from the HTTP source serving
+// something other than the file's start after a seek, and every attempt to
+// model it here - including a stream that garbles the first read after a
+// backward seek - failed to put the archive in it. So this test passed both
+// before and after the guard added for it in seekEntry(); it is a regression
+// guard on the fallback's arithmetic, not evidence the guard works.
+static const char* GZ_BAD_ISIZE_PATH = "build_test_archive_badisize.gz";
+static const uint32_t GZ_PAYLOAD_LEN = 120;   // 4 x GZ_PAYLOAD
+static const uint32_t GZ_COMPRESSED_LEN = sizeof(GZ_BYTES);   // 52
+
+void test_gz_size_is_the_decompressed_length(void)
+{
+    std::vector<uint8_t> bytes(GZ_BYTES, GZ_BYTES + sizeof(GZ_BYTES));
+    bytes[bytes.size() - 4] = 0xFF;
+    bytes[bytes.size() - 3] = 0xFF;
+    bytes[bytes.size() - 2] = 0xFF;
+    bytes[bytes.size() - 1] = 0xFF;
+
+    FILE* fp = fopen(GZ_BAD_ISIZE_PATH, "wb");
+    TEST_ASSERT_NOT_NULL(fp);
+    fwrite(bytes.data(), 1, bytes.size(), fp);
+    fclose(fp);
+
+    auto src = std::make_shared<FileContainerStream>(GZ_BAD_ISIZE_PATH);
+    TEST_ASSERT_TRUE(src->isOpen());
+
+    WalkableArchiveStream stream(src);
+    bool found = stream.seekPath("*");
+    uint32_t reported = stream.size();
+
+    remove(GZ_BAD_ISIZE_PATH);
+
+    TEST_ASSERT_TRUE_MESSAGE(found, "entry not found");
+    TEST_ASSERT_EQUAL_UINT32_MESSAGE(GZ_PAYLOAD_LEN, reported,
+        "size must be the decompressed length, not the compressed one");
+}
+
 int main(int, char**)
 {
     UNITY_BEGIN();
@@ -191,5 +238,6 @@ int main(int, char**)
     RUN_TEST(test_misaligned_zip_is_not_extracted_as_raw_data);
     RUN_TEST(test_unreadable_zip_fails_rather_than_succeeding_with_junk);
     RUN_TEST(test_gz_still_reaches_its_content_through_raw);
+    RUN_TEST(test_gz_size_is_the_decompressed_length);
     return UNITY_END();
 }
