@@ -80,6 +80,10 @@ bool MFile::exists()
 // synthesizer (SDL2 audio + an ESP pinmap header) via samlib.h - unrelated to
 // the disk-write engine and not natively compilable. This stub forwards to
 // stderr so test failures still get useful diagnostic output.
+// A suite that needs util_*() for real (test_archive_extract compiles
+// utils.cpp because peoples_url_parser.cpp calls into it) defines
+// NATIVE_STUBS_REAL_UTILS and gets the real implementation instead.
+#ifndef NATIVE_STUBS_REAL_UTILS
 void util_debug_printf(const char *fmt, ...)
 {
     va_list args;
@@ -87,3 +91,4 @@ void util_debug_printf(const char *fmt, ...)
     vfprintf(stderr, fmt, args);
     va_end(args);
 }
+#endif

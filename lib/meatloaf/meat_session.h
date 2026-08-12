@@ -36,9 +36,11 @@
 
 #include "../utils/string_utils.h"
 #include "../utils/peoples_url_parser.h"
+#ifndef TEST_NATIVE
 #include "../device/iec/fuji.h"
 #include "../device/iec/meatloaf.h"
 #include "../console/Helpers/PWDHelpers.h"
+#endif
 
 #ifdef CONFIG_SPIRAM
 #include <esp_psram.h>
@@ -376,6 +378,13 @@ private:
 
     // Check if a session is currently in use by any active drive or console
     static bool is_session_in_use(const std::string& key) {
+#ifdef TEST_NATIVE
+        // The native test build has no drives and no console, so nothing can
+        // be holding a session (the device layer isn't compiled — see the
+        // include guard above, and the same pattern in meat_media.h).
+        (void)key;
+        return false;
+#else
         // Check fuji disk slots (devices 4-11 etc.)
         for (int i = 0; i < MAX_DISK_DEVICES; i++) {
             auto drive = Meatloaf.get_disks(i);
@@ -397,6 +406,7 @@ private:
             return true;
         }
         return false;
+#endif
     }
 
     // FreeRTOS task function

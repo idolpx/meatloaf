@@ -248,7 +248,7 @@ int ls(int argc, char **argv)
         listPath = getCurrentPath()->cd(path_arg);
     }
 
-    Debug_printv("ls path[%s]", listPath->url.c_str());
+    //Debug_printv("ls path[%s]", listPath->url.c_str());
     std::unique_ptr<MFile> destPath(listPath);
     std::unique_ptr<MFile> entry(destPath->getNextFileInDir());
 
@@ -2066,14 +2066,33 @@ static int cmd_gzip(int argc, char **argv)
 // works for any MFSOwner-addressable destination, not just local flash/SD.
 // Intermediate segments that already exist are expected to fail — ignored,
 // matching the previous POSIX mkdir()-based behavior.
-static void unzip_mkdirs(const std::string &path)
+// `last_dir` is the directory the previous entry went into. Archives list
+// entries grouped by directory, so remembering just the last one skips the
+// whole walk for every entry after the first in each directory.
+//
+// It matters for memory, not speed. Each MFSOwner::File() here probes for a
+// `.config` at every level above it, and that cache holds 64 entries and
+// clears wholesale on overflow - which a deep archive triggers, so the probes
+// fall through to real fopen()s on SD. Each of those needs a 512-byte
+// MALLOC_CAP_DMA bounce buffer per sector plus a newlib FILE lock, both
+// internal-DRAM-only. That storm is what turned an archive with a deep tree
+// into `sdmmc_read_sectors: not enough mem` and then an abort() inside
+// fopen(). (A std::set of every segment created would skip marginally more
+// work, but instantiating one costs ~1 KB of flash text - enough to push
+// fujiloaf-rev0 past its iram0_2_seg limit.)
+static void unzip_mkdirs(const std::string &path, std::string &last_dir)
 {
+    if (path == last_dir)
+        return;
+
     for (size_t pos = path.find('/', 1); pos != std::string::npos; pos = path.find('/', pos + 1)) {
         std::unique_ptr<MFile> dir(MFSOwner::File(path.substr(0, pos)));
         if (dir) dir->mkDir();
     }
     std::unique_ptr<MFile> dir(MFSOwner::File(path));
     if (dir) dir->mkDir();
+
+    last_dir = path;
 }
 
 // Mirrors ArchiveMFile::isSingleFileCompression()/getInnerFilename() without
@@ -2147,14 +2166,15 @@ static std::string unzip_safe_relpath(const std::string &name)
 
 static int64_t unzip_write_entry(uint8_t *buf, size_t bufSize,
                                   const std::function<uint32_t(uint8_t *, uint32_t)> &readFn,
-                                  const std::string &destPath, int64_t entry_size)
+                                  const std::string &destPath, int64_t entry_size,
+                                  std::string &last_dir)
 {
     const int64_t kProgressThreshold = 512 * 1024;
     const size_t kReport = 256 * 1024;
 
     size_t slash = destPath.rfind('/');
     if (slash != std::string::npos)
-        unzip_mkdirs(destPath.substr(0, slash));
+        unzip_mkdirs(destPath.substr(0, slash), last_dir);
 
     std::unique_ptr<MFile> outFile(MFSOwner::File(destPath));
     std::shared_ptr<MStream> outStream = outFile ? outFile->getSourceStream(std::ios_base::out) : nullptr;
@@ -2233,6 +2253,9 @@ static int cmd_unzipx(int argc, char **argv)
 
     int count = 0;
     size_t total_bytes = 0;
+    // Directory the previous entry was written into, so a deep archive does
+    // not re-walk (and re-probe for .config) the same tree for every entry.
+    std::string last_dir;
 
     if (is_single_file_compression(srcFile->name)) {
         // .gz/.bz2/etc: exactly one decompressed entry. getSourceStream()
@@ -2251,7 +2274,7 @@ static int cmd_unzipx(int argc, char **argv)
         int64_t written = unzip_write_entry(
             buf, 4096,
             [srcStream](uint8_t *b, uint32_t n) { return srcStream->read(b, n); },
-            path, entry_size);
+            path, entry_size, last_dir);
         if (written < 0) {
             free(buf);
             return EXIT_FAILURE;
@@ -2285,7 +2308,7 @@ static int cmd_unzipx(int argc, char **argv)
 
                 std::string path = dest + "/" + rel;
                 Serial.printf("  %s  (%u bytes)\r\n", path.c_str(), size);
-                int64_t written = unzip_write_entry(buf, 4096, read, path, (int64_t)size);
+                int64_t written = unzip_write_entry(buf, 4096, read, path, (int64_t)size, last_dir);
                 if (written >= 0) {
                     total_bytes += (size_t)written;
                     count++;
