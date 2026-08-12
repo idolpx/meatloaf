@@ -79,8 +79,7 @@ def patch_esp_http_client(idf_dir):
         "    /* " + marker + ": ensure raw_data == orig_raw_data before a new\n"
         "     * request, so a response is never parsed out of the previous\n"
         "     * response's leftovers. */\n"
-        "    esp_http_client_cached_buf_cleanup(client->response->buffer);\n"
-        "    client->response->buffer->raw_len = 0;",
+        "    esp_http_client_cached_buf_cleanup(client->response->buffer);\n",
         1,
     )
 
