@@ -276,13 +276,78 @@ static void writeGz(const char* path)
     fclose(fp);
 }
 
-void test_url_encoded_entry_name_is_decoded(void)
+// A gzip header can carry the ORIGINAL filename (RFC 1952 FNAME, flag bit 3),
+// and it is a better name than anything the URL gives: zimmers'
+// `ordeal%2b2100p.d64.gz` carries `ordeal +2 100% (ntsc).d64`. libarchive
+// surfaces FNAME as the entry pathname - but only when a format reader
+// produces an entry, and for these files archive_read_next_header() returns
+// ARCHIVE_EOF, so that branch never sees it and the URL is all that is left.
+//
+// Same payload as GZ_BYTES, written by python's gzip module with filename set.
+static const uint8_t GZ_FNAME_BYTES[] = {
+    0x1f, 0x8b, 0x08, 0x08, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x6f, 0x72, 0x64,
+    0x65, 0x61, 0x6c, 0x20, 0x2b, 0x32, 0x20, 0x31, 0x30, 0x30, 0x25, 0x20, 0x28,
+    0x6e, 0x74, 0x73, 0x63, 0x29, 0x2e, 0x64, 0x36, 0x34, 0x00, 0xf3, 0x75, 0x75,
+    0x0c, 0xf1, 0xf1, 0x77, 0x74, 0x53, 0x70, 0x0c, 0x72, 0xf6, 0xf0, 0x0c, 0x73,
+    0x55, 0x08, 0x71, 0x0d, 0x0e, 0x51, 0x08, 0x70, 0x8c, 0x04, 0x0a, 0xba, 0x70,
+    0xf9, 0xd2, 0x4c, 0x16, 0x00, 0x8d, 0x90, 0x92, 0xdc, 0x78, 0x00, 0x00, 0x00
+};
+
+// Archive::gzipNameFromHeader() on its own. The compressed-only path that
+// needs it is only reachable when archive_read_next_header() returns
+// ARCHIVE_EOF, which happens on the device but not for these fixtures (here a
+// raw entry is produced and libarchive reports FNAME as its pathname), so the
+// parser is exercised directly.
+void test_gzip_header_name_parser(void)
 {
-    writeGz(GZ_PATH);
+    // FNAME present.
+    std::string name = Archive::gzipNameFromHeader(GZ_FNAME_BYTES, sizeof(GZ_FNAME_BYTES));
+    TEST_ASSERT_EQUAL_STRING("ordeal +2 100% (ntsc).d64", name.c_str());
+
+    // FNAME absent (GZ_BYTES has FLG=0).
+    TEST_ASSERT_EQUAL_STRING("",
+        Archive::gzipNameFromHeader(GZ_BYTES, sizeof(GZ_BYTES)).c_str());
+
+    // Not a gzip stream at all.
+    static const uint8_t notGz[] = { 'P', 'K', 3, 4, 0, 0, 0, 0, 0, 0, 0, 0 };
+    TEST_ASSERT_EQUAL_STRING("",
+        Archive::gzipNameFromHeader(notGz, sizeof(notGz)).c_str());
+
+    // Truncated before the name terminates: must yield nothing rather than a
+    // partial filename. 20 bytes cuts into "ordeal +2 ...".
+    TEST_ASSERT_EQUAL_STRING("",
+        Archive::gzipNameFromHeader(GZ_FNAME_BYTES, 20).c_str());
+
+    // Too short to be a header, and null.
+    TEST_ASSERT_EQUAL_STRING("", Archive::gzipNameFromHeader(GZ_FNAME_BYTES, 4).c_str());
+    TEST_ASSERT_EQUAL_STRING("", Archive::gzipNameFromHeader(nullptr, 100).c_str());
+}
+
+void test_gzip_fname_is_preferred_over_the_url(void)
+{
+    FILE* fp = fopen(GZ_PATH, "wb");
+    TEST_ASSERT_NOT_NULL(fp);
+    fwrite(GZ_FNAME_BYTES, 1, sizeof(GZ_FNAME_BYTES), fp);
+    fclose(fp);
+
     std::string name = entryNameFor(
         GZ_PATH, "https://zimmers.net/anonftp/pub/cbm/c64/games/ordeal%2b2100p.d64.gz");
 
-    TEST_ASSERT_EQUAL_STRING_MESSAGE("ordeal+2100p.d64", name.c_str(),
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("ordeal +2 100% (ntsc).d64", name.c_str(),
+        "the name stored in the gzip header should win over the URL basename");
+}
+
+void test_url_encoded_entry_name_is_decoded(void)
+{
+    // A DIFFERENT URL from the FNAME test above on purpose: seekPath() caches
+    // the resolved entry in an ArchiveMSession keyed on the container URL, and
+    // SessionBroker state outlives a single test. Reusing the URL returns the
+    // previous test's cached entry instead of resolving this fixture.
+    writeGz(GZ_PATH);   // GZ_BYTES has no FNAME, so the URL is the only source
+    std::string name = entryNameFor(
+        GZ_PATH, "https://zimmers.net/anonftp/pub/cbm/c64/games/plain%2bname.d64.gz");
+
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("plain+name.d64", name.c_str(),
         "percent-encoding from the URL leaked into the extracted filename");
 }
 
@@ -305,6 +370,8 @@ int main(int, char**)
     RUN_TEST(test_unreadable_zip_fails_rather_than_succeeding_with_junk);
     RUN_TEST(test_gz_still_reaches_its_content_through_raw);
     RUN_TEST(test_gz_size_is_the_decompressed_length);
+    RUN_TEST(test_gzip_header_name_parser);
+    RUN_TEST(test_gzip_fname_is_preferred_over_the_url);
     RUN_TEST(test_url_encoded_entry_name_is_decoded);
     RUN_TEST(test_percent_in_local_path_is_left_alone);
     return UNITY_END();

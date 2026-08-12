@@ -54,6 +54,20 @@ class Archive {
 
     bool isOpen() { return m_archive != nullptr; }
     archive *getArchive() { return m_archive; }
+
+    // The original filename a gzip stream stores in its header (RFC 1952
+    // FNAME, flag bit 3), or "" if absent/incomplete. libarchive surfaces
+    // FNAME as the entry pathname, but only when a format reader produces an
+    // entry — for a compressed-only file archive_read_next_header() returns
+    // ARCHIVE_EOF, so the name has to be read from the header directly.
+    // `n` is however many leading bytes are available; a name that would run
+    // past them is rejected rather than truncated.
+    static std::string gzipNameFromHeader(const uint8_t *p, size_t n);
+
+    // The leading bytes of this archive, captured by cb_read at no extra I/O
+    // cost. Enough to hold a gzip header with a filename in it.
+    const uint8_t *firstBytes() const { return m_firstBytes; }
+    size_t firstBytesLen() const { return m_firstBytesLen; }
     bool hasCompressionFilter() { return m_hasCompressionFilter; }
     bool isRandomAccess() { return m_randomAccess; }
 
@@ -69,9 +83,11 @@ class Archive {
     bool m_hasCompressionFilter = false;  // True when gzip/bz2/xz/etc filter is active (disables raw seeking)
     bool m_randomAccess = false;  // True for directory listing (seekable reader); false for streaming extraction
 
-    // First bytes handed to libarchive this open, recorded by cb_read and
-    // reported when no format recognizes the stream. See cb_read().
-    uint8_t m_firstBytes[16] = {0};
+    // First bytes handed to libarchive this open, recorded by cb_read. Used
+    // for two things: reported when no format recognizes the stream (see
+    // cb_read()), and parsed for a gzip FNAME when the file is compressed-only.
+    // 256 is sized for the latter — a gzip header plus a long stored filename.
+    uint8_t m_firstBytes[256] = {0};
     size_t m_firstBytesLen = 0;
 
   // 32KB source read block: cb_read pulls this much per libarchive callback.

@@ -215,6 +215,43 @@ int64_t cb_seek(struct archive *, void *userData, int64_t offset, int whence)
 // because a '+' in a path is a literal plus, not the form-encoded space it
 // means in a query string — the same call fnFsHTTP.cpp makes for the filenames
 // in an HTTP directory listing.
+std::string Archive::gzipNameFromHeader(const uint8_t *p, size_t n)
+{
+    // RFC 1952: ID1 ID2 CM FLG MTIME(4) XFL OS  = 10 bytes, then the optional
+    // fields in FLG order. FNAME is a NUL-terminated string, and it is only
+    // present when bit 3 is set.
+    static const uint8_t FEXTRA = 0x04, FNAME = 0x08;
+
+    if (p == nullptr || n < 10) return "";
+    if (p[0] != 0x1f || p[1] != 0x8b || p[2] != 0x08) return "";   // not gzip/deflate
+
+    const uint8_t flg = p[3];
+    if ((flg & FNAME) == 0) return "";
+
+    size_t at = 10;
+    if (flg & FEXTRA) {
+        if (at + 2 > n) return "";
+        const size_t xlen = (size_t)p[at] | ((size_t)p[at + 1] << 8);
+        at += 2 + xlen;
+    }
+    if (at >= n) return "";
+
+    // The name must terminate within what we have; a partial one would be a
+    // silently truncated filename, which is worse than falling back to the URL.
+    const void *nul = memchr(p + at, '\0', n - at);
+    if (nul == nullptr) return "";
+
+    std::string name((const char *)(p + at), (const char *)nul - (const char *)(p + at));
+
+    // Stored names are meant to be bare, but strip any directory part rather
+    // than trust an archive to write outside where the caller intends.
+    size_t slash = name.find_last_of("/\\");
+    if (slash != std::string::npos)
+        name = name.substr(slash + 1);
+
+    return name;
+}
+
 static std::string compressedEntryNameFromUrl(const std::string &containerUrl)
 {
     size_t lastSlash = containerUrl.find_last_of("/\\");
@@ -332,8 +369,11 @@ bool Archive::open(std::ios_base::openmode mode, bool rawOnly, bool randomAccess
         // a container whose first bytes are not its own signature is being
         // read from the wrong offset, which is a source-stream fault, not an
         // archive one, and is otherwise invisible from the outside.
-        char hex[3 * sizeof(m_firstBytes) + 1] = {0};
-        for (size_t i = 0; i < m_firstBytesLen; i++)
+        // Only the leading bytes are diagnostic — m_firstBytes is sized for a
+        // gzip FNAME, not for printing.
+        const size_t kShow = 16;
+        char hex[3 * kShow + 1] = {0};
+        for (size_t i = 0; i < m_firstBytesLen && i < kShow; i++)
             snprintf(hex + (i * 3), 4, "%02X ", m_firstBytes[i]);
         Debug_printv("first bytes[%s] srcSize[%lu] srcPos[%lu]", hex,
                      (unsigned long)m_srcStream->size(),
@@ -562,9 +602,19 @@ bool ArchiveMStream::seekEntry( uint16_t index )
         // Mark this as a compressed-only file so we don't try to read more entries
         m_isCompressedOnly = true;
 
-        // Derive the filename from the archive's own path (percent-decoded only
-        // when that path is a URL - see compressedEntryNameFromUrl).
-        entry.filename = compressedEntryNameFromUrl(url);
+        // Prefer the name the gzip stream stores in its own header: it is the
+        // ORIGINAL filename, which the URL cannot reproduce
+        // (`ordeal%2b2100p.d64.gz` on the server is
+        // `ordeal +2 100% (ntsc pal) wanderer.d64` inside). libarchive exposes
+        // FNAME as the entry pathname, but only when a format reader yields an
+        // entry — and getting here means it returned ARCHIVE_EOF instead, so it
+        // is read from the header bytes cb_read already captured. Falls back to
+        // the archive's own path (percent-decoded only when that path is a URL
+        // — see compressedEntryNameFromUrl).
+        entry.filename = Archive::gzipNameFromHeader(m_archive->firstBytes(),
+                                                     m_archive->firstBytesLen());
+        if (entry.filename.empty())
+            entry.filename = compressedEntryNameFromUrl(url);
         Debug_printv("Synthesized filename: %s", entry.filename.c_str());
 
         // Determine decompressed size via gzip ISIZE trailer (last 4 bytes of .gz file).
