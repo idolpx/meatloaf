@@ -38,6 +38,10 @@
 // entry tests). Paths are relative to the repo root, which is pio test's cwd.
 static const char* ZIP_PATH = ".archive/zip/Donnie_Russell_II_d64.zip";
 
+// Artifacts this suite writes; see tearDown().
+static const char* GZ_PATH = "build_test_archive.gz";
+static const char* GZ_BAD_ISIZE_PATH = "build_test_archive_badisize.gz";
+
 // nextEntrySimple()/entry are protected - extractAll() reaches them as a
 // friend of ArchiveMStream. Widen access rather than duplicating the walk,
 // so these tests drive exactly the code extractAll drives.
@@ -77,8 +81,17 @@ static bool haveFile(const char* path)
     return true;
 }
 
+// Artifacts follow the disk-write suite's "build_*" convention. They are
+// removed HERE rather than at the end of each test: tearDown() runs after the
+// test function's locals are destroyed, and on Windows remove() fails while
+// the stream still holds the file open. Removing here also survives a failed
+// assertion, which aborts the test body before any inline cleanup.
 void setUp(void) {}
-void tearDown(void) {}
+void tearDown(void)
+{
+    remove(GZ_PATH);
+    remove(GZ_BAD_ISIZE_PATH);
+}
 
 // Collects every entry name a caller would see from one extractAll-style walk.
 static std::vector<std::string> walkEntries(std::shared_ptr<MStream> src, bool* openedOut)
@@ -156,7 +169,6 @@ void test_unreadable_zip_fails_rather_than_succeeding_with_junk(void)
 // The fixture is written byte by byte rather than checked in so the test is
 // self-contained (same convention as test_container_entries): a gzip stream
 // of GZ_PAYLOAD, produced by python's gzip module.
-static const char* GZ_PATH = "build_test_archive.gz";
 static const char* GZ_PAYLOAD = "MEATLOAF ARCHIVE TEST PAYLOAD\n";  // x4 = 120 bytes
 
 static const uint8_t GZ_BYTES[] = {
@@ -182,7 +194,6 @@ void test_gz_still_reaches_its_content_through_raw(void)
     TEST_ASSERT_TRUE_MESSAGE(opened, ".gz failed to open");
     TEST_ASSERT_EQUAL_MESSAGE(1, names.size(), "expected the single synthetic entry");
 
-    remove(GZ_PATH);
     (void)GZ_PAYLOAD;
 }
 
@@ -200,7 +211,6 @@ void test_gz_still_reaches_its_content_through_raw(void)
 // backward seek - failed to put the archive in it. So this test passed both
 // before and after the guard added for it in seekEntry(); it is a regression
 // guard on the fallback's arithmetic, not evidence the guard works.
-static const char* GZ_BAD_ISIZE_PATH = "build_test_archive_badisize.gz";
 static const uint32_t GZ_PAYLOAD_LEN = 120;   // 4 x GZ_PAYLOAD
 static const uint32_t GZ_COMPRESSED_LEN = sizeof(GZ_BYTES);   // 52
 
@@ -224,7 +234,6 @@ void test_gz_size_is_the_decompressed_length(void)
     bool found = stream.seekPath("*");
     uint32_t reported = stream.size();
 
-    remove(GZ_BAD_ISIZE_PATH);
 
     TEST_ASSERT_TRUE_MESSAGE(found, "entry not found");
     TEST_ASSERT_EQUAL_UINT32_MESSAGE(GZ_PAYLOAD_LEN, reported,
