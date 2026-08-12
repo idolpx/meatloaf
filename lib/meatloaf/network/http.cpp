@@ -1404,8 +1404,28 @@ bool MeatHttpClient::seek(uint32_t pos) {
     if(isFriendlySkipper) {
 
         if (_is_open) {
-            // Drain remaining bytes from the current range response.
-            flush(0);
+            // Drain the current range response so the handle can be re-opened.
+            //
+            // If that does not complete, REBUILD the handle instead of reusing
+            // it. esp_http_client_open() on a handle whose previous GET is
+            // still outstanding does not regenerate the request line — ESP-IDF
+            // leaves first_line_prepared set for GET/HEAD, which init() below
+            // documents — so the client sends a stale request and then parses
+            // whatever comes back as if it were the response it asked for.
+            // That is the fault behind every archive failure seen over HTTPS:
+            // read buffers returned unwritten (0xBAAD5678 heap canaries), a
+            // gzip filter lost on re-open so a 174848-byte D64 was measured as
+            // its 52223-byte compressed length, and finally a NULL-pointer
+            // memcpy inside esp_http_client_read() during filter bidding.
+            //
+            // init() recreates the handle for a GET, which costs a fresh
+            // connection but is the state the client actually works in — the
+            // one time this path recovered on hardware was when the re-request
+            // failed and the error path called init().
+            if (!flush(0)) {
+                Debug_printv("response not fully drained — rebuilding the client handle");
+                init();
+            }
         }
 
         // Make a single range request directly to the target position.
@@ -1481,11 +1501,13 @@ bool MeatHttpClient::flush(uint32_t numBytes) {
     // For POST/PUT, the buffered body must be sent before draining the response.
     // Let close() handle sending the POST body - flush() only drains the response here.
     if (numBytes == 0) {
-        // Drain the remaining response body so the connection is clean
+        // Drain the remaining response body so the connection is clean.
+        // The RESULT matters: re-opening a handle whose previous response was
+        // not fully consumed is what corrupts this client (see seek()).
         int bytes = 0;
-        esp_http_client_flush_response(_http, &bytes);
+        esp_err_t e = esp_http_client_flush_response(_http, &bytes);
         //Debug_printv("Flushed %d bytes to complete response", bytes);
-        return true;
+        return e == ESP_OK;
     }
 
     uint32_t flushed = 0;
