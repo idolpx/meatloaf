@@ -170,6 +170,7 @@ public:
     virtual uint32_t write(const uint8_t *buf, uint32_t size) = 0;
 
     virtual bool seek(uint32_t pos, int mode) {
+        uint32_t previous = _position;
         if(mode == SEEK_SET) {
             _position = pos;
         }
@@ -179,7 +180,15 @@ public:
         else {
             _position = _size - pos;
         }
-        return seek( _position );
+        if( seek( _position ) )
+            return true;
+        // A refused seek must not leave _position claiming a move that never
+        // happened: every later read would then be attributed to an offset
+        // the stream is not at, and callers that compare position() against
+        // where they wanted to be (the archive layer does, to decide whether
+        // its container is aligned) are told a lie they cannot detect.
+        _position = previous;
+        return false;
     }
     virtual bool seek(uint32_t pos) = 0;
 

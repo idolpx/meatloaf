@@ -159,7 +159,7 @@ bool FlashMFile::remove() {
 
     int rc = ::remove( fullPath().c_str() );
     if (rc != 0) {
-        Debug_printv("remove: rc=%d path=`%s`\r\n", rc, path.c_str());
+        //Debug_printv("remove: rc=%d path=`%s`\r\n", rc, path.c_str());
         return false;
     }
 

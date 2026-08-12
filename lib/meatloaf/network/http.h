@@ -309,6 +309,10 @@ public:
     }
 
     virtual bool seek(uint32_t pos);
+    // Overridden away from MStream's: that one assigns _position before
+    // delegating, and seek(uint32_t) needs this stream's real offset to tell
+    // the shared MeatHttpClient where it actually is. See http.cpp.
+    virtual bool seek(uint32_t pos, int mode) override;
     virtual bool seekPath(std::string path) override { return false; }
 
     void setSequentialAccess(bool on) override {

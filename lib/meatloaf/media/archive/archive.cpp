@@ -68,6 +68,17 @@ ssize_t cb_read(struct archive *, void *userData, const void **buff) {
     *buff = a->m_srcBuffer;
     if (a->m_archive == NULL) return 0;
     ssize_t n = (ssize_t)a->m_srcStream->read(a->m_srcBuffer, a->m_buffSize);
+
+    // Keep the first bytes libarchive is handed. When no format recognizes
+    // the stream, these say WHY in one line: a container that opens fine
+    // locally but not over the network is being served bytes that are not
+    // its first bytes, and the signature here proves it rather than
+    // suggesting it. Costs one memcpy per archive open.
+    if (a->m_firstBytesLen == 0 && n > 0) {
+        size_t keep = (n < (ssize_t)sizeof(a->m_firstBytes)) ? (size_t)n : sizeof(a->m_firstBytes);
+        memcpy(a->m_firstBytes, a->m_srcBuffer, keep);
+        a->m_firstBytesLen = keep;
+    }
     return n;
 }
 
@@ -202,6 +213,7 @@ bool Archive::open(std::ios_base::openmode mode, bool rawOnly, bool randomAccess
 
     m_srcBuffer = (uint8_t*)psram_malloc(m_buffSize);
     m_archive = archive_read_new();
+    m_firstBytesLen = 0;
     Debug_printv("pre-seek pos[%lu]", (unsigned long)m_srcStream->position());
     bool seekOk = m_srcStream->seek(0, SEEK_SET);
     Debug_printv("post-seek pos[%lu] seekOk[%d]", (unsigned long)m_srcStream->position(), (int)seekOk);
@@ -255,11 +267,23 @@ bool Archive::open(std::ios_base::openmode mode, bool rawOnly, bool randomAccess
         } else if (mstr::endsWith(u, ".cpio") || mstr::endsWith(u, ".cpgz")) {
             archive_read_support_format_cpio(m_archive);
         } else {
-            // Unknown/ambiguous extension — let libarchive bid across all formats.
+            // Unknown/ambiguous extension — let libarchive bid across all
+            // formats, and fall back to raw for single compressed files like
+            // .gz/.bz2, whose decompressed content is just bytes that no
+            // archive format recognizes.
             archive_read_support_format_all(m_archive);
+            archive_read_support_format_raw(m_archive);
         }
 
-        archive_read_support_format_raw(m_archive);  // Support single compressed files like .gz
+        // NOTE: raw is deliberately NOT registered above when the extension
+        // names a real container. raw bids 1 on ANY byte stream and
+        // synthesizes a single entry called "data" spanning the whole input,
+        // so registering it alongside zip/tar/7z/... turns "this isn't the
+        // format it claims to be" into a silent success: the caller extracts
+        // one bogus file that is a byte-for-byte copy of the container. That
+        // is what `unzipx <a .zip whose source stream was misaligned>`
+        // produced — "extracted 1 entries, 303509 bytes" of nothing but the
+        // zip itself. With raw absent the open fails, which callers report.
     }
 
     //archive_read_set_open_callback(m_archive, cb_open);
@@ -273,6 +297,16 @@ bool Archive::open(std::ios_base::openmode mode, bool rawOnly, bool randomAccess
     int r = archive_read_open1(m_archive);
     if (r != ARCHIVE_OK) {
         Debug_printv("Error opening archive: %d! [%s]", r, archive_error_string(m_archive));
+        // No format bid on this stream. Report what it was actually handed —
+        // a container whose first bytes are not its own signature is being
+        // read from the wrong offset, which is a source-stream fault, not an
+        // archive one, and is otherwise invisible from the outside.
+        char hex[3 * sizeof(m_firstBytes) + 1] = {0};
+        for (size_t i = 0; i < m_firstBytesLen; i++)
+            snprintf(hex + (i * 3), 4, "%02X ", m_firstBytes[i]);
+        Debug_printv("first bytes[%s] srcSize[%lu] srcPos[%lu]", hex,
+                     (unsigned long)m_srcStream->size(),
+                     (unsigned long)m_srcStream->position());
         archive_read_free(m_archive);
         m_archive = NULL;
     } else {

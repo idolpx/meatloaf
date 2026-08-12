@@ -69,6 +69,11 @@ class Archive {
     bool m_hasCompressionFilter = false;  // True when gzip/bz2/xz/etc filter is active (disables raw seeking)
     bool m_randomAccess = false;  // True for directory listing (seekable reader); false for streaming extraction
 
+    // First bytes handed to libarchive this open, recorded by cb_read and
+    // reported when no format recognizes the stream. See cb_read().
+    uint8_t m_firstBytes[16] = {0};
+    size_t m_firstBytesLen = 0;
+
   // 32KB source read block: cb_read pulls this much per libarchive callback.
   // Larger blocks mean far fewer HTTP range requests when the archive source
   // is a network stream (a 3.9MB entry needs ~120 requests instead of ~950 at

@@ -742,6 +742,17 @@ void HTTPMStream::close() {
     }
 }
 
+bool HTTPMStream::seek(uint32_t pos, int mode) {
+    // NOT MStream::seek(pos, mode): that commits _position before delegating,
+    // which destroys the one piece of information seek() below needs — where
+    // this stream actually is. seek() commits _position itself on success.
+    uint32_t target;
+    if ( mode == SEEK_SET )      target = pos;
+    else if ( mode == SEEK_CUR ) target = _position + pos;
+    else                         target = _size - pos;
+    return seek( target );
+}
+
 bool HTTPMStream::seek(uint32_t pos) {
     if ( !_session->client->_is_open )
     {
@@ -750,6 +761,25 @@ bool HTTPMStream::seek(uint32_t pos) {
             return false;
         }
     }
+
+    // ONE MeatHttpClient is shared by every stream on this host:port, so its
+    // _position is whichever stream — or reopen — last touched it, not
+    // necessarily this one. Its seek() decides whether a real re-request is
+    // needed by comparing the target against that counter and returns
+    // "already there" when they match, doing nothing at all. A stale counter
+    // therefore turns a rewind into a silent no-op, and the caller reads on
+    // from wherever the previous response stopped.
+    //
+    // That is how an archive re-opened from a cached ArchiveMStream got
+    // handed bytes 524 into the file: the stream had consumed 524 bytes, the
+    // shared client's counter said 0, seek(0) "succeeded" without moving, and
+    // libarchive bid the format on mid-file bytes. Hand the client OUR offset
+    // first — for the bytes this stream consumed it is the authoritative one.
+    //
+    // Only in the plain streaming path: in full mode _position indexes
+    // _responseBuffer / the JSON result, which are not HTTP body offsets.
+    if ( _responseBuffer.empty() && !_jsonQueryRequested )
+        _session->client->_position = _position;
 
     // Keep this stream's own _position in sync with the client's. Without
     // this, position() still reports the pre-seek offset after a successful
@@ -1349,6 +1379,27 @@ void MeatHttpClient::setOnHeader(const std::function<int(char*, char*)> &lambda)
 }
 
 bool MeatHttpClient::seek(uint32_t pos) {
+
+    // Already sitting exactly where the caller wants to be, on a response that
+    // still has data coming: there is nothing to do. Without this the
+    // isFriendlySkipper path below drains the live response and re-requests
+    // the same bytes — and re-using the handle for a fresh request right after
+    // flushing the previous one desynchronises it, so the reads that follow
+    // return the buffer UNWRITTEN (ESP-IDF heap canaries, 0xBAAD5678) while
+    // still reporting a positive byte count.
+    //
+    // That is the "fails on the first attempt, works on the second" case: on a
+    // freshly opened stream Archive::open()'s seek(0) is a seek to where the
+    // stream already is, and the pointless re-request corrupted it. The second
+    // attempt only worked because its re-request FAILED (httpCode=-1), and the
+    // failure path tears the handle down and rebuilds it clean.
+    //
+    // _position is the offset of the next byte this response will yield
+    // (processRedirectsAndOpen() sets it to the requested position, read()
+    // advances it), so pos == _position means the caller's target is exactly
+    // what a read would return next.
+    if ( _is_open && pos == _position && !complete() )
+        return true;
 
     if(isFriendlySkipper) {
 
