@@ -334,30 +334,30 @@ static bool probedTrailer(const std::string& reportedUrl)
     return src->sawSeekTo(sz - 4);   // the gzip ISIZE trailer probe
 }
 
-// The trailer probe seeks to EOF-4 and back. On a network source that seek is
-// what breaks the stream: on hardware the probe read ASCII "core" instead of
-// ISIZE, and the re-open after it came back WITHOUT the gzip filter, so the
-// extraction measured the compressed stream and truncated a 174848-byte D64 to
-// its 52223-byte compressed length.
+// The trailer probe seeks to EOF-4 and back to learn a .gz's decompressed size
+// without decompressing it. It was briefly disabled for network sources,
+// because that seek appeared to be what corrupted them: the probe read ASCII
+// "core" instead of ISIZE, and the re-open after it lost the gzip filter, so a
+// 174848-byte D64 was measured as its 52223-byte compressed length.
 //
-// The probe is only an optimisation - it learns the size without decompressing.
-// ensureData() falls back to a single pass that determines the size while
-// extracting, which needs no seek at all. So don't probe a network source.
-void test_no_trailer_probe_on_a_network_source(void)
+// The seek was not the fault. esp-idf#18359 was: esp_http_client_prepare() did
+// not reset the response buffer, so any re-request parsed the PREVIOUS
+// response's leftovers. With that patched (see patch_framework.py) the probe is
+// safe again, and it is worth having - without it a .gz served over HTTP has no
+// known size until its content is read, so a directory listing shows 0.
+void test_trailer_probe_used_for_a_network_source(void)
 {
     writeGz(GZ_PATH);
-    TEST_ASSERT_FALSE_MESSAGE(
+    TEST_ASSERT_TRUE_MESSAGE(
         probedTrailer("https://zimmers.net/anonftp/pub/cbm/c64/games/probe%2btest.d64.gz"),
-        "seeking to EOF-4 on a network source is what corrupts these streams");
+        "a .gz over HTTP should learn its size from the trailer");
 }
 
-// Locally the seek is free and reliable, so the optimisation is kept: this
-// pins that the fix is "not over a network", not "never".
-void test_trailer_probe_still_used_for_a_local_file(void)
+void test_trailer_probe_used_for_a_local_file(void)
 {
     writeGz(GZ_PATH);
     TEST_ASSERT_TRUE_MESSAGE(probedTrailer(""),
-        "a local .gz should still learn its size from the trailer");
+        "a local .gz should learn its size from the trailer");
 }
 
 void test_gzip_header_name_parser(void)
@@ -432,8 +432,8 @@ int main(int, char**)
     RUN_TEST(test_unreadable_zip_fails_rather_than_succeeding_with_junk);
     RUN_TEST(test_gz_still_reaches_its_content_through_raw);
     RUN_TEST(test_gz_size_is_the_decompressed_length);
-    RUN_TEST(test_no_trailer_probe_on_a_network_source);
-    RUN_TEST(test_trailer_probe_still_used_for_a_local_file);
+    RUN_TEST(test_trailer_probe_used_for_a_network_source);
+    RUN_TEST(test_trailer_probe_used_for_a_local_file);
     RUN_TEST(test_gzip_header_name_parser);
     RUN_TEST(test_gzip_fname_is_preferred_over_the_url);
     RUN_TEST(test_url_encoded_entry_name_is_decoded);
