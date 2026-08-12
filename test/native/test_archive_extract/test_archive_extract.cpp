@@ -298,6 +298,68 @@ static const uint8_t GZ_FNAME_BYTES[] = {
 // ARCHIVE_EOF, which happens on the device but not for these fixtures (here a
 // raw entry is produced and libarchive reports FNAME as its pathname), so the
 // parser is exercised directly.
+// Records every position the archive layer asks the source to seek to.
+class SeekRecordingStream : public FileContainerStream
+{
+public:
+    explicit SeekRecordingStream(const std::string& path) : FileContainerStream(path) {}
+
+    bool seek(uint32_t pos) override
+    {
+        seeks.push_back(pos);
+        return FileContainerStream::seek(pos);
+    }
+
+    bool sawSeekTo(uint32_t pos) const
+    {
+        for (uint32_t p : seeks)
+            if (p == pos)
+                return true;
+        return false;
+    }
+
+    std::vector<uint32_t> seeks;
+};
+
+static bool probedTrailer(const std::string& reportedUrl)
+{
+    auto src = std::make_shared<SeekRecordingStream>(GZ_PATH);
+    TEST_ASSERT_TRUE(src->isOpen());
+    const uint32_t sz = src->size();
+    if (!reportedUrl.empty())
+        src->url = reportedUrl;
+
+    WalkableArchiveStream stream(src);
+    stream.seekPath("*");
+    return src->sawSeekTo(sz - 4);   // the gzip ISIZE trailer probe
+}
+
+// The trailer probe seeks to EOF-4 and back. On a network source that seek is
+// what breaks the stream: on hardware the probe read ASCII "core" instead of
+// ISIZE, and the re-open after it came back WITHOUT the gzip filter, so the
+// extraction measured the compressed stream and truncated a 174848-byte D64 to
+// its 52223-byte compressed length.
+//
+// The probe is only an optimisation - it learns the size without decompressing.
+// ensureData() falls back to a single pass that determines the size while
+// extracting, which needs no seek at all. So don't probe a network source.
+void test_no_trailer_probe_on_a_network_source(void)
+{
+    writeGz(GZ_PATH);
+    TEST_ASSERT_FALSE_MESSAGE(
+        probedTrailer("https://zimmers.net/anonftp/pub/cbm/c64/games/probe%2btest.d64.gz"),
+        "seeking to EOF-4 on a network source is what corrupts these streams");
+}
+
+// Locally the seek is free and reliable, so the optimisation is kept: this
+// pins that the fix is "not over a network", not "never".
+void test_trailer_probe_still_used_for_a_local_file(void)
+{
+    writeGz(GZ_PATH);
+    TEST_ASSERT_TRUE_MESSAGE(probedTrailer(""),
+        "a local .gz should still learn its size from the trailer");
+}
+
 void test_gzip_header_name_parser(void)
 {
     // FNAME present.
@@ -370,6 +432,8 @@ int main(int, char**)
     RUN_TEST(test_unreadable_zip_fails_rather_than_succeeding_with_junk);
     RUN_TEST(test_gz_still_reaches_its_content_through_raw);
     RUN_TEST(test_gz_size_is_the_decompressed_length);
+    RUN_TEST(test_no_trailer_probe_on_a_network_source);
+    RUN_TEST(test_trailer_probe_still_used_for_a_local_file);
     RUN_TEST(test_gzip_header_name_parser);
     RUN_TEST(test_gzip_fname_is_preferred_over_the_url);
     RUN_TEST(test_url_encoded_entry_name_is_decoded);

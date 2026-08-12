@@ -215,6 +215,25 @@ int64_t cb_seek(struct archive *, void *userData, int64_t offset, int whence)
 // because a '+' in a path is a literal plus, not the form-encoded space it
 // means in a query string — the same call fnFsHTTP.cpp makes for the filenames
 // in an HTTP directory listing.
+// Whether it is safe to learn a .gz's decompressed size from its ISIZE trailer,
+// which costs a seek to EOF-4 and a seek back.
+//
+// Not over a network. That seek is what breaks these streams: on hardware the
+// probe read the ASCII bytes `core` instead of ISIZE, and the re-open after it
+// came back WITHOUT the gzip filter, so the extraction measured the compressed
+// stream and truncated a 174848-byte D64 to its 52223-byte compressed length.
+// The probe is only an optimisation — it avoids a decompression pass to learn
+// the size — and ensureData() already falls back to a single pass that
+// determines the size WHILE extracting, needing no seek at all. Locally the
+// seek is free and reliable, so the optimisation is kept there.
+//
+// The cost of skipping it: a .gz served over HTTP has no known size until its
+// content is actually read, so a directory listing shows 0 for one.
+static bool canProbeGzipTrailer(const std::string &containerUrl)
+{
+    return containerUrl.find("://") == std::string::npos;
+}
+
 std::string Archive::gzipNameFromHeader(const uint8_t *p, size_t n)
 {
     // RFC 1952: ID1 ID2 CM FLG MTIME(4) XFL OS  = 10 bytes, then the optional
@@ -622,7 +641,7 @@ bool ArchiveMStream::seekEntry( uint16_t index )
         // We close the libarchive handle (which held gzip state) and seek containerStream
         // directly; ensureData() will reopen with rawOnly=true for actual extraction.
         entry.size = 0;
-        if (mstr::endsWith(url, ".gz", false) && containerStream) {
+        if (mstr::endsWith(url, ".gz", false) && containerStream && canProbeGzipTrailer(url)) {
             uint32_t srcSize = (uint32_t)containerStream->size();
             Debug_printv("gzip ISIZE check: srcSize=%lu", (unsigned long)srcSize);
             if (srcSize >= 18) {  // min valid gzip: 10 header + 2 deflate + 8 trailer
@@ -716,7 +735,7 @@ bool ArchiveMStream::seekEntry( uint16_t index )
             // ISIZE = decompressed size mod 2^32 — exact for files < 4 GB.
             // This avoids reading through all the compressed data (which exhauts the
             // source stream and can cause Z_DATA_ERROR on the subsequent reopen).
-            if (mstr::endsWith(url, ".gz", false)) {
+            if (mstr::endsWith(url, ".gz", false) && canProbeGzipTrailer(url)) {
                 uint32_t srcSize = (uint32_t)containerStream->size();
                 Debug_printv("gzip ISIZE check: srcSize=%lu", (unsigned long)srcSize);
                 if (srcSize >= 18) {  // min valid gzip: 10 header + 2 deflate + 8 trailer
