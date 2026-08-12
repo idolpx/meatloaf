@@ -2258,6 +2258,14 @@ static int cmd_unzipx(int argc, char **argv)
     std::string last_dir;
 
     if (is_single_file_compression(srcFile->name)) {
+        // Take the output name BEFORE opening the stream. For a single-file
+        // compression ArchiveMFile::getDecodedStream() ends with
+        // resetURL(base()) — it repoints the MFile at the containing
+        // directory so the CWD is right after a LOAD — which leaves
+        // srcFile->name empty. Reading it afterwards produced a path of
+        // "<dest>/", and fopen() on a directory fails with EACCES.
+        const std::string out_name = strip_compression_ext(srcFile->name);
+
         // .gz/.bz2/etc: exactly one decompressed entry. getSourceStream()
         // already resolves this transparently — the same path LOAD uses.
         std::shared_ptr<MStream> srcStream = srcFile->getSourceStream(std::ios_base::in);
@@ -2267,7 +2275,7 @@ static int cmd_unzipx(int argc, char **argv)
             return EXIT_FAILURE;
         }
 
-        std::string path = dest + "/" + strip_compression_ext(srcFile->name);
+        std::string path = dest + "/" + out_name;
         int64_t entry_size = (int64_t)srcStream->size();
         Serial.printf("  %s  (%lld bytes)\r\n", path.c_str(), (long long)entry_size);
 
