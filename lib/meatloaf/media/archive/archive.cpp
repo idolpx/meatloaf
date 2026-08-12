@@ -655,6 +655,15 @@ bool ArchiveMStream::seekEntry( uint16_t index )
         if (entry.size == 0 || isRawCompressedEntry) {
             bool sizeKnown = false;
 
+            // Whether the archive is decoding a COMPRESSED stream right now,
+            // captured before the probes below re-open it. That is the state
+            // any later byte count has to still be in to mean anything, and
+            // it is not the same question as isRawCompressedEntry: a gzip
+            // stream carrying an FNAME header (Elite.d64.gz does) yields a
+            // real pathname, so isRawCompressedEntry is false and only the
+            // `entry.size == 0` arm brought us here.
+            const bool hadCompressionFilter = m_archive->hasCompressionFilter();
+
             // For .gz files: read the ISIZE field from the gzip trailer (last 4 bytes).
             // ISIZE = decompressed size mod 2^32 — exact for files < 4 GB.
             // This avoids reading through all the compressed data (which exhauts the
@@ -724,8 +733,8 @@ bool ArchiveMStream::seekEntry( uint16_t index )
                 //
                 // A further re-open is worth one try: on the hardware trace the
                 // NEXT open of the same source did come back with the filter.
-                if (isRawCompressedEntry && !m_archive->hasCompressionFilter()) {
-                    Debug_printv("compression filter missing after reopen — retrying once");
+                if (hadCompressionFilter && !m_archive->hasCompressionFilter()) {
+                    Debug_printv("compression filter LOST after reopen — retrying once");
                     m_archive->close();
                     m_archive->open(std::ios_base::in);
                     a = m_archive->getArchive();
