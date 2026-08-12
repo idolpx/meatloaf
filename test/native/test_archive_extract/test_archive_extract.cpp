@@ -424,6 +424,39 @@ void test_percent_in_local_path_is_left_alone(void)
         "a local filename containing '%' must not be percent-decoded");
 }
 
+// What a caller writing the decompressed file to disk should name it.
+//
+// The archive layer resolves the right name (gzip FNAME, or the URL basename
+// percent-decoded), but that lives on the STREAM's entry. unzipx took its
+// destination from the MFile's `name`, which is the raw URL basename — so a
+// file whose header said `ordeal +2 100% (ntsc pal) wanderer.d64` was written
+// as `ordeal%2b2100p.d64`. getDownloadFilename() is the existing hook for
+// "the real name" (wget already uses it for Content-Disposition), so
+// ArchiveMFile answers it with the entry it resolved.
+//
+// It must be asked AFTER the stream is opened: resolving the entry is what
+// discovers the name, and getDecodedStream() also calls resetURL(base()),
+// which empties `name`.
+void test_download_filename_is_the_resolved_entry(void)
+{
+    FILE* fp = fopen(GZ_PATH, "wb");
+    TEST_ASSERT_NOT_NULL(fp);
+    fwrite(GZ_FNAME_BYTES, 1, sizeof(GZ_FNAME_BYTES), fp);
+    fclose(fp);
+
+    ArchiveMFile file("https://zimmers.net/anonftp/pub/cbm/c64/games/dlname%2btest.d64.gz");
+    auto src = std::make_shared<FileContainerStream>(GZ_PATH);
+    TEST_ASSERT_TRUE(src->isOpen());
+    src->url = file.url;
+
+    auto stream = file.getDecodedStream(src);
+    TEST_ASSERT_NOT_NULL(stream.get());
+
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("ordeal +2 100% (ntsc).d64",
+        file.getDownloadFilename().c_str(),
+        "the extracted file should be named what the archive says it is");
+}
+
 int main(int, char**)
 {
     UNITY_BEGIN();
@@ -438,5 +471,6 @@ int main(int, char**)
     RUN_TEST(test_gzip_fname_is_preferred_over_the_url);
     RUN_TEST(test_url_encoded_entry_name_is_decoded);
     RUN_TEST(test_percent_in_local_path_is_left_alone);
+    RUN_TEST(test_download_filename_is_the_resolved_entry);
     return UNITY_END();
 }

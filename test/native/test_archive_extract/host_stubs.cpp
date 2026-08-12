@@ -11,6 +11,21 @@
 #include <cstdio>
 #include <cstdlib>
 
+#include "meatloaf.h"
+
+// MFile's one-argument constructor, needed to build an ArchiveMFile here. Its
+// real definition is in meatloaf.cpp, which cannot compile natively (it
+// registers every network/media filesystem and includes esp_timer.h etc).
+//
+// This is not a stub - it is the real body, verbatim from meatloaf.cpp:905,
+// and resetURL() itself is the real one (peoples_url_parser.cpp is compiled
+// into this suite). Keep it in sync if that constructor ever does more than
+// parse the path.
+MFile::MFile(std::string path)
+{
+    resetURL(path);
+}
+
 int sam(int argc, char** argv)
 {
     (void)argc;

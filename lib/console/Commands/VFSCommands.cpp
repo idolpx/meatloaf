@@ -2275,7 +2275,14 @@ static int cmd_unzipx(int argc, char **argv)
             return EXIT_FAILURE;
         }
 
-        std::string path = dest + "/" + out_name;
+        // Prefer what the archive says the content is called, now that the
+        // stream is open and the entry resolved: a .gz stores the original
+        // filename in its header, and a URL basename is percent-encoded
+        // (`ordeal%2b2100p.d64.gz` on the server is
+        // `ordeal +2 100% (ntsc pal) wanderer.d64` inside). out_name, taken
+        // from the URL before opening, is the fallback.
+        std::string resolved = srcFile->getDownloadFilename();
+        std::string path = dest + "/" + (resolved.empty() ? out_name : resolved);
         int64_t entry_size = (int64_t)srcStream->size();
         Serial.printf("  %s  (%lld bytes)\r\n", path.c_str(), (long long)entry_size);
 

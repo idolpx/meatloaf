@@ -341,7 +341,15 @@ class ArchiveMFile : public MFile {
                 // so we must seek the single inner entry here to produce a ready-to-read stream.
                 auto archiveStream = std::make_shared<ArchiveMStream>(is);
                 if (archiveStream->seekPath("*")) {
-                    Debug_printv("url[%s] base[%s] inner[%s]", url.c_str(), base().c_str(), innerFilename.c_str());
+                    // Remember what the entry actually resolved to. It is the
+                    // gzip header's stored FNAME when there is one, or the URL
+                    // basename percent-decoded — either way a better name than
+                    // `name`, which is the raw URL basename and is about to be
+                    // emptied by resetURL() below. getDownloadFilename() hands
+                    // it to callers that write the decompressed file to disk.
+                    m_resolvedName = archiveStream->entry.filename;
+                    Debug_printv("url[%s] base[%s] inner[%s] resolved[%s]", url.c_str(),
+                                 base().c_str(), innerFilename.c_str(), m_resolvedName.c_str());
                     Debug_printv("stream->url[%s]", archiveStream->url.c_str());
                     resetURL(base());
                     return archiveStream;
@@ -376,6 +384,14 @@ class ArchiveMFile : public MFile {
             if (mstr::endsWith(name, singleFileExts[i], false)) return true;
         }
         return false;
+    }
+
+    // The name a caller should write the decompressed content under: what the
+    // entry actually resolved to once the stream was opened (gzip FNAME, or
+    // the URL basename percent-decoded). Falls back to MFile's answer before
+    // that has happened. Same hook wget uses for Content-Disposition.
+    std::string getDownloadFilename() override {
+        return m_resolvedName.empty() ? MFile::getDownloadFilename() : m_resolvedName;
     }
 
     // Strip the outermost compression extension to get the inner filename.
@@ -444,6 +460,8 @@ class ArchiveMFile : public MFile {
    private:
     Archive *m_archive = nullptr;
     MFile   *m_innerFile = nullptr;
+    // Entry name resolved by getDecodedStream(); see getDownloadFilename().
+    std::string m_resolvedName;
 };
 
 /********************************************************
