@@ -1208,7 +1208,7 @@ Not covered by the native suite: `HDDMFile` calls `MFSOwner::File()` and `ImageB
 
 **Interfaces:**
 - Consumes: `HDDImageRegistry::{containerOf,obtain}`, `HDDResolvePartition` (Task 3); `HDDMStream::selected_partition` (Task 4).
-- Produces: `HDDMFile::m_part` (0xFF = follow the selection) and `HDDMFile::effectivePartition()`, used only within `hdd.cpp`.
+- Produces: `HDDMFile::m_part` (0 = the path named no partition, follow the selection) and `HDDMFile::effectivePartition()`, used only within `hdd.cpp`.
 
 - [ ] **Step 1: Declare the new members**
 
@@ -1987,8 +1987,9 @@ container URL is recoverable from the stream's `url`, but using it would make
 `HDDMStream` call `MFSOwner::File()`, which `abort()`s under the native test
 stubs — and `FileContainerStream` sets `url` to a path ending in `.hdd`, so the
 lookup would fire and break the existing `test_hdd_read` suite. `HDDMStream`
-therefore carries a plain `selected_partition` member (`0xFF` = fall back to
-the boot sector's DP) that `HDDMFile::applyPartition()` writes at all four
+therefore carries a plain `selected_partition` member (`0` = fall back to the
+boot sector's DP, unambiguous because partitions are numbered from 1) that
+`HDDMFile::applyPartition()` writes at all four
 sites that touch a stream. This is also the better layering: the stream is
 about CFS bytes, the registry is about selection policy.
 ```
