@@ -37,6 +37,9 @@ public:
     using HDDMStream::readHeader;
     using HDDMStream::seekPath;
     using HDDMStream::boot_sector;
+    using HDDMStream::seekEntry;
+    using HDDMStream::dir_label;
+    using HDDMStream::selectPartitionByNumber;
 };
 
 static bool imageAvailable()
@@ -201,6 +204,43 @@ void test_default_partition_reads_byte_3(void)
     TEST_ASSERT_TRUE(image->readHeader());
 
     TEST_ASSERT_EQUAL_UINT8(raw[3], image->boot_sector.default_partition);
+}
+
+// With no partition named in the path, the root of the image is now the
+// SELECTED partition's directory rather than the list of partitions. A
+// directly constructed stream has no selection, so it falls back to the boot
+// sector's DP - which is what the four original read tests rely on.
+void test_seekDirectory_empty_path_enters_default_partition(void)
+{
+    auto image = openImage();
+    TEST_ASSERT_NOT_NULL(image.get());
+
+    TEST_ASSERT_TRUE(image->seekDirectory(""));
+
+    // Assert the label BEFORE any seekEntry: the first entry of a CFS root
+    // directory is a LABEL entry, and seekEntry() overwrites dir_label from
+    // it. (In this image both happen to read "STUFF", so checking afterwards
+    // would pass under the old semantics too and prove nothing.)
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("STUFF", image->dir_label.c_str(),
+        "seekDirectory(\"\") should select the default partition");
+
+    // The real discriminator: entry 1 of the root is now the first FILE
+    // inside the default partition. Under the old semantics the root was the
+    // partition list, so entry 1 was the partition STUFF itself.
+    TEST_ASSERT_TRUE(image->seekEntry((uint16_t)1));
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("%DELETED  FILES%", image->entry.filename.c_str(),
+        "the image root should list the partition's files, not the partitions");
+}
+
+// A path that names a partition still resolves, and reaching a file inside it
+// works exactly as before.
+void test_seekDirectory_partition_name_still_resolves(void)
+{
+    auto image = openImage();
+    TEST_ASSERT_NOT_NULL(image.get());
+
+    TEST_ASSERT_TRUE(image->seekDirectory("STUFF/UTILS"));
+    TEST_ASSERT_EQUAL(HDDMStream::PATH_FILE, image->resolvePath(DEEP_FILE));
 }
 
 void test_registry_parses_single_partition_image(void)
@@ -409,6 +449,33 @@ void test_resolve_empty_path_uses_selection(void)
     TEST_ASSERT_EQUAL_STRING("", rest.c_str());
 }
 
+// selected_partition overrides the boot sector's DP.
+void test_selected_partition_overrides_default(void)
+{
+    auto src = std::make_shared<FileContainerStream>(MULTI_IMAGE_PATH);
+    TEST_ASSERT_TRUE(src->isOpen());
+    auto image = std::make_shared<TestHDDStream>(src);
+    image->mode = std::ios_base::in;
+
+    image->selected_partition = 2;          // "DISK IMAGES"
+    TEST_ASSERT_TRUE(image->seekDirectory(""));
+    TEST_ASSERT_EQUAL_STRING("DISK IMAGES", image->dir_label.c_str());
+
+    image->selected_partition = 1;          // "C64 OS"
+    TEST_ASSERT_TRUE(image->seekDirectory(""));
+    TEST_ASSERT_EQUAL_STRING("C64 OS", image->dir_label.c_str());
+
+    // 0 is not a partition number - it means "no selection", so the stream
+    // falls back to the boot sector's DP (slot 0, which is "C64 OS").
+    image->selected_partition = 0;
+    TEST_ASSERT_TRUE(image->seekDirectory(""));
+    TEST_ASSERT_EQUAL_STRING("C64 OS", image->dir_label.c_str());
+
+    // A number past the end is not a silent fallback - it fails outright,
+    // rather than quietly landing on the default partition.
+    TEST_ASSERT_FALSE(image->selectPartitionByNumber(9));
+}
+
 int main(int argc, char** argv)
 {
     (void)argc; (void)argv;
@@ -429,6 +496,8 @@ int main(int argc, char** argv)
     RUN_TEST(test_seekPath_succeeds_after_explicit_readHeader);
     RUN_TEST(test_read_returns_whole_file);
     RUN_TEST(test_resolvePath_finds_directory_without_listing);
+    RUN_TEST(test_seekDirectory_empty_path_enters_default_partition);
+    RUN_TEST(test_seekDirectory_partition_name_still_resolves);
     RUN_TEST(test_boot_sector_field_offsets);
     RUN_TEST(test_last_sector_is_one_past_partition_dir_backup);
     RUN_TEST(test_default_partition_reads_byte_3);
@@ -446,6 +515,7 @@ int main(int argc, char** argv)
         RUN_TEST(test_resolve_zero_means_the_selected_partition);
         RUN_TEST(test_resolve_non_partition_falls_back_to_selection);
         RUN_TEST(test_resolve_empty_path_uses_selection);
+        RUN_TEST(test_selected_partition_overrides_default);
     }
 
     return UNITY_END();

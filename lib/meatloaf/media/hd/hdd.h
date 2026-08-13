@@ -164,6 +164,16 @@ public:
 
     enum PathResult { PATH_NOT_FOUND, PATH_FILE, PATH_DIR };
 
+    // The partition NUMBER (1-based over valid entries) this stream treats as
+    // its root. 0 means "no selection - use the boot sector's default", which
+    // is unambiguous precisely because partitions are numbered from 1. A
+    // directly constructed stream (tests, ImageBroker rebuilds) gets 0;
+    // HDDMFile overwrites it with whatever the registry or the path resolved.
+    //
+    // The stream deliberately does NOT consult HDDImageRegistry itself: that
+    // would need MFSOwner::File(), which the native test stubs abort on.
+    uint8_t selected_partition = 0;
+
     // Path navigation: [PARTITION/]DIR/.../FILE
     bool seekDirectory(std::string path);
     PathResult resolvePath(std::string path);
@@ -215,6 +225,8 @@ protected:
     bool readSector(uint32_t lba, uint8_t *buf);
 
     bool selectPartitionByName(std::string name);   // "" = default partition
+    bool selectPartitionByNumber(uint8_t number);   // 1-based, valid entries only
+    bool selectCurrentPartition();
     bool seekPartitionEntry(uint16_t index);
     bool enterDirectory(std::string name);
 

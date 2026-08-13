@@ -204,6 +204,39 @@ bool HDDMStream::selectPartitionByName(std::string name)
     return true;
 }
 
+// 'number' is 1-based and counts only VALID entries - identical to the walk
+// in seekPartitionEntry(), and it must stay identical, or the registry and
+// the stream would disagree about which partition a number names. 0 is not a
+// partition: it means "the currently selected one", which the caller has
+// already resolved before reaching here.
+bool HDDMStream::selectPartitionByNumber(uint8_t number)
+{
+    if (number == 0)
+        return false;
+
+    uint8_t count = 0;
+    for (int i = 0; i < 16; i++)
+    {
+        const PartitionEntry &pe = partition_entries[i];
+        if (!pe.isValid())
+            continue;
+
+        if (++count != number)
+            continue;
+
+        if (!pe.isCFS())
+            return false;   // listed, but not browsable
+
+        partition_list = false;
+        dir_start_lba = pe.root_dir.getLBA();
+        dir_label = trimEntryName(pe.name, 16, '\0');
+        restartDirWalk();
+        entry_index = 0;
+        return true;
+    }
+    return false;
+}
+
 bool HDDMStream::seekPartitionEntry(uint16_t index)
 {
     if (index == 0)
@@ -386,6 +419,17 @@ bool HDDMStream::enterDirectory(std::string name)
     return true;
 }
 
+// The partition this stream treats as its root: whatever HDDMFile put in
+// selected_partition, else the boot sector's default partition, else the
+// first valid CFS partition (which is what selectPartitionByName("") does).
+bool HDDMStream::selectCurrentPartition()
+{
+    if (selected_partition != 0 && selectPartitionByNumber(selected_partition))
+        return true;
+
+    return selectPartitionByName("");
+}
+
 bool HDDMStream::seekDirectory(std::string path)
 {
     // The whole CFS geometry lives in the boot sector and partition directory,
@@ -406,12 +450,16 @@ bool HDDMStream::seekDirectory(std::string path)
     auto parts = splitPathComponents(path);
     size_t i = 0;
 
-    if (parts.size())
+    // The image root is the SELECTED partition's directory, matching the CMD
+    // HD/FD behaviour and a real drive. The partition list is served only in
+    // response to "$=P", which HDDMFile handles.
+    if (parts.size() && selectPartitionByName(parts[0]))
     {
-        if (selectPartitionByName(parts[0]))
-            i = 1;
-        else if (!selectPartitionByName("")) // fall back to default partition
-            return false;
+        i = 1;
+    }
+    else if (!selectCurrentPartition())
+    {
+        return false;
     }
 
     for (; i < parts.size(); i++)
