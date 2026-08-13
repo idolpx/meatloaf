@@ -513,6 +513,12 @@ When implementing a new stream:
 6. Verify ImageBroker caching works correctly
 7. Check memory leaks with stream chains
 
+## Recent Changes (August 13, 2026)
+
+- **IDE64 CFS gained the CMD partition model** (`media/hd/hdd.h/.cpp`, new `media/hd/partition_select.h/.cpp`): `HDDImageRegistry` mirrors `DHDImageRegistry` — per-image table and selection keyed on the container URL, `HDDResolvePartition()` binding a partition to a path without calling `select()`, `$=P` listing on `HDDMFile`, and entry URLs that name the partition BY NUMBER. The image root is now the SELECTED partition's directory rather than the partition list; that is the one visible regression, and `partition` / `$=P` are how the list is reached. See the three divergences from DHD in `AGENTS.md` before touching any of it.
+- **`HDDMStream::BootSector` had `default_partition` and `last_sector` off by two** — DP is `$03` and `@Last disk sector` is `$04-$07`. Latent on the whole sample corpus, which has DP = 0 either way.
+- **The registry's parsing is split from its opening** so it is natively testable: `parseInto(MStream*, Image&)` takes an already-open stream, `parse(url, Image&)` does the `MFSOwner` open with the `s_probing` guard. `hddResolvePartitionIn(const Image&, ...)` is the same split for resolution. `test/native/test_hdd_read` drives both directly — `MFSOwner::File()` and `MFile::getSourceStream()` abort under the native stubs, so anything that reaches them is untestable there.
+
 ## Recent Changes (August 12, 2026)
 
 - **A seek to where the stream already is must not re-request** (`network/http.cpp`, `MeatHttpClient::seek()`): the `isFriendlySkipper` path drained the live response and re-requested the same bytes even when `pos == _position`, and re-using the handle for a fresh request immediately after flushing the previous one desynchronises it — the reads that follow return the buffer **unwritten** (ESP-IDF heap canaries `0xBAAD5678`, stray strings) while still reporting a positive count. Symptom: `unzipx` over HTTPS failed on the FIRST attempt and worked on the second, because `Archive::open()`'s `seek(0)` on a freshly opened stream is a seek to where it already is, and the second attempt only recovered when its re-request FAILED (`httpCode=-1`) and the failure path tore the handle down. Guarded with `_is_open && pos == _position && !complete()`; `_position` is the offset of the next byte the current response will yield, so that comparison is exactly "a read would already return what you asked for".

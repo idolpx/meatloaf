@@ -239,11 +239,16 @@ cached-stream disposal — see the divergence above.
 - The selection is read from `HDDImageRegistry::obtain(containerOf(url))`,
   falling back to `boot_sector.default_partition` when the registry has no entry.
 
-*To confirm during planning:* that the container URL is recoverable from the
-stream's own `url` for every construction path, including
-`ImageBroker::obtain<HDDMStream>("hdd", url)`. If it is not, the selection is
-passed in by `HDDMFile` instead, at its three call sites (`rewindDirectory`,
-`isDirectory`, `exists`).
+**Resolved during planning: the stream does not consult the registry.** The
+container URL is recoverable from the stream's `url`, but using it would make
+`HDDMStream` call `MFSOwner::File()`, which `abort()`s under the native test
+stubs — and `FileContainerStream` sets `url` to a path ending in `.hdd`, so the
+lookup would fire and break the existing `test_hdd_read` suite. `HDDMStream`
+therefore carries a plain `selected_partition` member (`0` = fall back to the
+boot sector's DP, unambiguous because partitions are numbered from 1) that
+`HDDMFile::applyPartition()` writes at all four
+sites that touch a stream. This is also the better layering: the stream is
+about CFS bytes, the registry is about selection policy.
 
 ### `HDDMFile`
 
