@@ -1055,8 +1055,8 @@ void test_selected_partition_overrides_default(void)
     TEST_ASSERT_TRUE(image->seekDirectory(""));
     TEST_ASSERT_EQUAL_STRING("C64 OS", image->dir_label.c_str());
 
-    // A number past the end is not a silent fallback - it fails.
-    image->selected_partition = 9;
+    // A number past the end is not a silent fallback - it fails outright,
+    // rather than quietly landing on the default partition.
     TEST_ASSERT_FALSE(image->selectPartitionByNumber(9));
 }
 ```
