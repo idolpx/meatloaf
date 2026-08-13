@@ -368,8 +368,11 @@ public:
 
     std::shared_ptr<MStream> getDecodedStream(std::shared_ptr<MStream> is) override
     {
+        normalizePath();
         Debug_printv("[%s]", url.c_str());
-        return std::make_shared<HDDMStream>(is);
+        auto stream = std::make_shared<HDDMStream>(is);
+        applyPartition(stream);
+        return stream;
     }
 
     bool rewindDirectory() override;
@@ -380,6 +383,31 @@ public:
 
     bool isDir = true;
     bool dirIsOpen = false;
+
+protected:
+    // Handle the partition part of pathInStream once per MFile. "$=P"
+    // switches to partition-list mode; a leading component naming a partition
+    // binds THIS path to it and is stripped, so the rest resolves inside it.
+    // It deliberately does NOT call select(): naming a partition in a path
+    // must not change what the image has selected.
+    void normalizePath();
+
+    // The partition this MFile operates on, or nullptr when the image has no
+    // usable partition table.
+    const HDDPartition* effectivePartition();
+
+    // Writes the resolved partition into the stream, which is how the stream
+    // learns which directory is its root. Safe to call with a null stream.
+    void applyPartition(const std::shared_ptr<HDDMStream>& image);
+
+    bool normalized = false;
+    bool listing_partitions = false;
+    uint16_t part_index = 0;
+
+    // The partition NUMBER this MFile's path names. 0 = the path named none,
+    // so the image's current selection applies - the same convention and the
+    // same sentinel value DHDPartitionMFile::m_part uses.
+    uint8_t m_part = 0;
 };
 
 
