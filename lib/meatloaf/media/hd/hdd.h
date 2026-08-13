@@ -91,12 +91,14 @@ public:
         }
     } __attribute__((packed));
 
-    // Boot sector (sector 0)
+    // Boot sector (sector 0). Offsets per the CFS 0.11 spec, whose table is
+    // colspan-encoded: "Unused" spans $00-$02, DP is $03, and @Last disk
+    // sector spans $04-$07. Confirmed against every image in .archive/hdd/,
+    // where @Last disk sector is @Partition directory backup + 1.
     struct BootSector {
-        uint8_t reserved0;          // $00
-        uint8_t default_partition;  // $01: DP (0-15)
-        Pointer last_sector;        // $02-$05
-        uint8_t reserved1[2];       // $06-$07
+        uint8_t reserved0[3];       // $00-$02: unused
+        uint8_t default_partition;  // $03: DP (0-15)
+        Pointer last_sector;        // $04-$07
         char id[16];                // $08-$17: "C64 CFS V 0.11B "
         Pointer part_dir;           // $18-$1B: Partition directory pointer
         Pointer part_dir_backup;    // $1C-$1F: Backup location

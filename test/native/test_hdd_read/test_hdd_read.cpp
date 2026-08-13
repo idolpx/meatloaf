@@ -7,6 +7,7 @@
 
 #include <unity.h>
 
+#include <cstddef>
 #include <memory>
 #include <string>
 #include <vector>
@@ -31,6 +32,7 @@ public:
     using HDDMStream::entry;
     using HDDMStream::readHeader;
     using HDDMStream::seekPath;
+    using HDDMStream::boot_sector;
 };
 
 static bool imageAvailable()
@@ -127,6 +129,56 @@ void test_resolvePath_finds_directory_without_listing(void)
     TEST_ASSERT_EQUAL(HDDMStream::PATH_NOT_FOUND, image->resolvePath("STUFF/NO SUCH DIR/AA"));
 }
 
+// The CFS 0.11 spec's boot sector table is colspan-encoded:
+//   <TH>$0000<TD COLSPAN=3>Unused<TD>DP<TD COLSPAN=4>@Last disk sector
+// so "Unused" spans $00-$02, DP is $03, and @Last disk sector is $04-$07.
+// The struct had DP at $01 and @Last disk sector at $02-$05.
+void test_boot_sector_field_offsets(void)
+{
+    TEST_ASSERT_EQUAL_UINT32(3, offsetof(HDDMStream::BootSector, default_partition));
+    TEST_ASSERT_EQUAL_UINT32(4, offsetof(HDDMStream::BootSector, last_sector));
+    TEST_ASSERT_EQUAL_UINT32(8, offsetof(HDDMStream::BootSector, id));
+    TEST_ASSERT_EQUAL_UINT32(0x18, offsetof(HDDMStream::BootSector, part_dir));
+    TEST_ASSERT_EQUAL_UINT32(0x1C, offsetof(HDDMStream::BootSector, part_dir_backup));
+    TEST_ASSERT_EQUAL_UINT32(0x20, offsetof(HDDMStream::BootSector, disk_label));
+}
+
+// Corpus invariant that pins @Last disk sector to $04 independently of the
+// spec: the partition directory BACKUP sits on the last sector of the disk,
+// so @Last disk sector is always @Partition directory backup + 1. With the
+// old $02-$05 placement the pointer decodes to garbage and this fails.
+void test_last_sector_is_one_past_partition_dir_backup(void)
+{
+    auto image = openImage();
+    TEST_ASSERT_NOT_NULL(image.get());
+    TEST_ASSERT_TRUE(image->readHeader());
+
+    uint32_t last   = image->boot_sector.last_sector.getLBA();
+    uint32_t backup = image->boot_sector.part_dir_backup.getLBA();
+
+    TEST_ASSERT_TRUE_MESSAGE(image->boot_sector.last_sector.isLBA(),
+        "@Last disk sector does not have the LBA bit set - wrong offset");
+    TEST_ASSERT_EQUAL_UINT32(backup + 1, last);
+}
+
+// DP must come from byte $03. Read it straight out of the file so the test
+// does not depend on the struct being right.
+void test_default_partition_reads_byte_3(void)
+{
+    FILE* fp = fopen(IMAGE_PATH, "rb");
+    TEST_ASSERT_NOT_NULL(fp);
+    uint8_t raw[8] = {0};
+    size_t n = fread(raw, 1, sizeof(raw), fp);
+    fclose(fp);
+    TEST_ASSERT_EQUAL_UINT32(sizeof(raw), n);
+
+    auto image = openImage();
+    TEST_ASSERT_NOT_NULL(image.get());
+    TEST_ASSERT_TRUE(image->readHeader());
+
+    TEST_ASSERT_EQUAL_UINT8(raw[3], image->boot_sector.default_partition);
+}
+
 int main(int argc, char** argv)
 {
     (void)argc; (void)argv;
@@ -145,6 +197,9 @@ int main(int argc, char** argv)
     RUN_TEST(test_seekPath_succeeds_after_explicit_readHeader);
     RUN_TEST(test_read_returns_whole_file);
     RUN_TEST(test_resolvePath_finds_directory_without_listing);
+    RUN_TEST(test_boot_sector_field_offsets);
+    RUN_TEST(test_last_sector_is_one_past_partition_dir_backup);
+    RUN_TEST(test_default_partition_reads_byte_3);
 
     return UNITY_END();
 }
