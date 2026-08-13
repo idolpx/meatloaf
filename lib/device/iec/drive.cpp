@@ -45,6 +45,7 @@
 
 #include "meat_media.h"
 #include "media/hd/dhd.h"
+#include "media/hd/partition_select.h"
 #include "media/tape/tap.h"
 #include "qrmanager.h"
 #include "../../www/ws/activity.h"
@@ -2360,25 +2361,24 @@ void iecDrive::tapeCommand(std::string command)
     setStatusCode(tf->buildIndex() ? ST_OK : ST_WRITE_VERIFY);
 }
 
-// CMD "CP<n>" - change the selected partition of the mounted CMD media
-// image (DHD hard disk or D1M/D2M/D4M floppy)
+// CMD "CP<n>" - change the selected partition of the mounted image. Works on
+// a CMD HD/FD image (DHD, D1M/D2M/D4M) and on an IDE64 CFS image (.hdd); the
+// valid range differs per format and lives in hdpart::select().
 void iecDrive::changePartition(int pnum)
 {
-    std::string container = DHDImageRegistry::containerOf(m_cwd != nullptr ? m_cwd->url : "");
-    Debug_printv("change partition pnum[%d] container[%s]", pnum, container.c_str());
+    hdpart::Target t = hdpart::targetFor(m_cwd != nullptr ? m_cwd->url : "");
+    Debug_printv("change partition pnum[%d] container[%s]", pnum, t.container.c_str());
 
-    // A CMD HD holds a maximum of 254 partitions; 0 is the system partition,
-    // which is listed but never selectable.
-    if (container.empty() || pnum < 1 || pnum > 254)
+    if (!t)
     {
         setStatusCode(ST_SYNTAX_INVALID);
         return;
     }
 
-    if (DHDImageRegistry::select(container, (uint8_t)pnum))
+    if (hdpart::select(t, pnum))
     {
         // The new partition's root becomes the working directory
-        set_cwd(container, true);
+        set_cwd(t.container, true);
         setStatusCode(ST_PARTITION_SELECTED, pnum);
     }
     else

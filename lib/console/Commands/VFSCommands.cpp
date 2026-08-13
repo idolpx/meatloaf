@@ -16,6 +16,7 @@
 #include <zlib.h>
 #include "../../meatloaf/network/http.h"
 #include "../../meatloaf/media/hd/dhd.h"
+#include "../../meatloaf/media/hd/partition_select.h"
 
 // Defined further down; cp() needs it and sits above the definition.
 static std::string resolve_path(const char *arg);
@@ -295,107 +296,77 @@ int ls(int argc, char **argv)
     return EXIT_SUCCESS;
 }
 
-static const char *partition_type_name(uint8_t type)
-{
-    switch (type)
-    {
-        case 1:  return "NAT";
-        case 2:  return "1541";
-        case 3:  return "1571";
-        case 4:  return "1581";
-        // Entry 0, the system partition: listed but not selectable.
-        case 0xFF: return "SYS";
-        default: return "?";
-    }
-}
-
-// Switch the selected partition of the CMD HD/FD image the console is inside.
-// The selection belongs to the IMAGE (DHDImageRegistry), not to any one MFile,
-// which is why this takes no image argument: it always acts on the container
-// in the current path. This is the console's equivalent of the drive's CP<n>.
+// Switch the selected partition of the CMD HD/FD or IDE64 CFS image the
+// console is inside. The selection belongs to the IMAGE, not to any one
+// MFile, which is why this takes no image argument: it always acts on the
+// container in the current path. This is the console's equivalent of CP<n>.
 int partition(int argc, char **argv)
 {
-    std::string container = DHDImageRegistry::containerOf(getCurrentPath()->url);
-    if (container.empty())
+    hdpart::Target t = hdpart::targetFor(getCurrentPath()->url);
+    if (!t)
     {
-        Serial.printf("partition: not inside a CMD HD/FD image\r\n");
+        Serial.printf("partition: not inside a partitioned disk image\r\n");
         return EXIT_FAILURE;
     }
 
-    auto img = DHDImageRegistry::obtain(container);
-    if (img == nullptr || !img->valid)
+    std::vector<hdpart::View> parts;
+    std::string disk_label;
+    if (!hdpart::list(t, parts, disk_label))
     {
-        Serial.printf("partition: cannot read the partition table of '%s'\r\n", container.c_str());
+        Serial.printf("partition: cannot read the partition table of '%s'\r\n",
+                      t.container.c_str());
         return EXIT_FAILURE;
     }
 
-    // No argument: list. Names are PETSCII on disk, so print the UTF-8 form -
-    // that is both what `ls` shows and what byName() matches against.
+    // No argument: list. CMD names are PETSCII on disk and are already
+    // converted to UTF-8 by hdpart::list(), which is what `ls` shows and what
+    // the name lookup matches against.
     if (argc < 2)
     {
         Serial.printf("   #  type   name\r\n");
-        for (const auto &p : img->parts)
+        for (const auto &p : parts)
         {
-            std::string name = mstr::toUTF8(p.name);
             Serial.printf("%c%3u  %-5s  \"%s\"\r\n",
-                          (p.number == img->selected) ? '*' : ' ',
+                          p.selected ? '*' : ' ',
                           (unsigned)p.number,
-                          partition_type_name(p.type),
-                          name.c_str());
+                          p.type_label.c_str(),
+                          p.name.c_str());
         }
         return EXIT_SUCCESS;
     }
 
     std::string arg = argv[1];
-    const DHDPartition *p = nullptr;
-
-    bool numeric = arg.size() && arg.find_first_not_of("0123456789") == std::string::npos;
-    if (numeric)
-    {
-        // Range-check BEFORE narrowing to uint8_t: an int silently truncated
-        // into byNumber() is exactly what made "1571" resolve to partition 35.
-        // 0 is accepted for LOOKUP only, so that "partition 0" can report what
-        // the system partition actually is rather than "no such partition" -
-        // it is in the listing, so denying its existence would be incoherent.
-        // Selecting it is refused below. Accepting 0 does not weaken the
-        // truncation guard, which is the bound itself. A CMD HD holds at most
-        // 254 partitions, so 254 is the top of the range - there is no 255.
-        char *end = nullptr;
-        long v = strtol(arg.c_str(), &end, 10);
-        if (end != arg.c_str() && *end == '\0' && v >= 0 && v <= 254)
-            p = img->byNumber((uint8_t)v);
-    }
-
-    if (p == nullptr)
-    {
-        // Either non-numeric, or numeric but out of range / no match - a
-        // partition can legitimately be named e.g. "1571", so try a name
-        // lookup before giving up. Case-sensitive, and accepts * / ? wildcards.
-        p = img->byName(arg);
-    }
-
-    if (p == nullptr)
+    int number = hdpart::resolve(t, arg);
+    if (number < 0)
     {
         Serial.printf("partition: no such partition: %s\r\n", arg.c_str());
         return EXIT_FAILURE;
     }
 
-    // Reachable both as "partition 0" and by name, since entry 0 is in parts[].
-    // select() refuses it too; this is here only to explain why.
-    if (p->number == 0)
+    // Copy what we need before select(), which may dispose cached streams.
+    std::string name;
+    std::string type_label;
+    bool selectable = false;
+    for (const auto &p : parts)
     {
-        Serial.printf("partition: %u \"%s\" is the system partition and cannot be selected\r\n",
-                      (unsigned)p->number, mstr::toUTF8(p->name).c_str());
+        if (p.number == (uint8_t)number)
+        {
+            name = p.name;
+            type_label = p.type_label;
+            selectable = p.selectable;
+            break;
+        }
+    }
+
+    // Reachable both by number and by name, since every table entry is listed.
+    if (!selectable)
+    {
+        Serial.printf("partition: %u \"%s\" (%s) cannot be selected\r\n",
+                      (unsigned)number, name.c_str(), type_label.c_str());
         return EXIT_FAILURE;
     }
 
-    // Copy what we need before select() - it disposes cached streams, and we
-    // do not want to rely on 'p' outliving that.
-    uint8_t number = p->number;
-    uint8_t type = p->type;
-    std::string name = mstr::toUTF8(p->name);
-
-    if (!DHDImageRegistry::select(container, number))
+    if (!hdpart::select(t, number))
     {
         Serial.printf("partition: could not select partition %u\r\n", (unsigned)number);
         return EXIT_FAILURE;
@@ -403,10 +374,10 @@ int partition(int argc, char **argv)
 
     // The old cwd may name a subdirectory that existed only in the previous
     // partition, so drop back to the image root.
-    setCurrentPath(MFSOwner::File(container));
+    setCurrentPath(MFSOwner::File(t.container));
 
     Serial.printf("Selected partition %u \"%s\" (%s)\r\n",
-                  (unsigned)number, name.c_str(), partition_type_name(type));
+                  (unsigned)number, name.c_str(), type_label.c_str());
     return EXIT_SUCCESS;
 }
 
