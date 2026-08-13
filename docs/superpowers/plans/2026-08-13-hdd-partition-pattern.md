@@ -12,8 +12,9 @@
 
 ## Global Constraints
 
-- **Numbers are the CFS slot index 0-15.** Not a sequential count of valid entries.
-- **Slot 0 is a real, selectable partition.** `0` in a path is a literal slot 0, **never** "the currently selected partition" — do not copy `DHDResolvePartition()`'s `v == 0` special case. `CP0` is legal.
+- **Partitions are numbered from 1, counting only VALID table entries.** An invalid slot is skipped rather than consuming a number. This is already what `HDDMStream::seekPartitionEntry()` does, and the registry must agree with it entry for entry.
+- **Two numbering spaces, never to be confused.** The **slot index** 0-15 is how the partition directory is physically laid out and what the boot sector's DP byte holds. The **partition number** 1-N is what paths, `CP<n>`, `$=P` and the `partition` command speak. `parse()` converts DP from the first space to the second exactly once; nothing downstream sees a slot index.
+- **Partition 0 behaves exactly as in DHD.** `0` in a path means "the currently selected partition" — copy `DHDResolvePartition()`'s `v == 0` case verbatim. `select()` refuses 0, so `CP0` is a syntax error.
 - **Never call `select()` while resolving a path.** Only `CP<n>` and the `partition` console command change the selection.
 - **Never use `atoi`/`std::stoi`** on C64- or network-sourced input. Use `strtol`, check `end != start && *end == '\0'`, and range-check **before** narrowing to `uint8_t`. An unchecked `int` truncated into `byNumber()` is the bug that once made `1571` resolve to partition 35 in DHD.
 - **A partition is selectable only when `type == 1` (CFS).** Unformatted (0), GEOS (2) and reserved (3-11) are listed, never selected.
@@ -38,10 +39,12 @@ Update the spec's `HDDMStream` section to record this once Task 4 is done (Task 
 
 | Image | Label | DP | Partitions |
 |---|---|---|---|
-| `.archive/hdd/ide20201227.hdd` | `SOCI/SINGULAR` | 0 | slot 0 `STUFF`, type 1, start 2, end 16383, root LBA **5** |
-| `.archive/hdd/c64os v1.09-clean.hdd` | `C64 OS` | 0 | slot 0 `C64 OS`, type 1, root LBA **5**; slot 1 `DISK IMAGES`, type 1, root LBA **32773** |
+| `.archive/hdd/ide20201227.hdd` | `SOCI/SINGULAR` | slot 0 | partition **1** `STUFF`, type 1, start 2, end 16383, root LBA **5** |
+| `.archive/hdd/c64os v1.09-clean.hdd` | `C64 OS` | slot 0 | partition **1** `C64 OS`, type 1, root LBA **5**; partition **2** `DISK IMAGES`, type 1, root LBA **32773** |
 
 The C64 OS image is the only one with two partitions, so it carries every selection test.
+
+**Neither image can validate the numbering rule**, because both fill slots contiguously from 0, so "slot + 1" and "1-based over valid entries" produce identical numbers. The rule rests on `seekPartitionEntry()`'s existing behaviour; do not weaken it on the grounds that no test distinguishes it.
 
 ## File Structure
 
@@ -193,7 +196,7 @@ The natively-testable core: parse a CFS partition table out of an open stream, w
 **Interfaces:**
 - Consumes: `HDDMStream::BootSector` and `HDDMStream::PartitionEntry` (Task 1).
 - Produces:
-  - `struct HDDPartition { uint8_t number; uint8_t type; std::string name; uint32_t root_lba; uint32_t size; bool hidden; bool writeable; };`
+  - `struct HDDPartition { uint8_t number; uint8_t slot; uint8_t type; std::string name; uint32_t root_lba; uint32_t size; bool hidden; bool writeable; };` — `number` is 1-based over valid entries, `slot` is the raw table index 0-15.
   - `HDDImageRegistry::Image` with `bool valid`, `uint8_t default_part`, `uint8_t selected`, `std::string disk_label`, `std::vector<HDDPartition> parts`, and methods `const HDDPartition* byNumber(uint8_t) const`, `const HDDPartition* byName(std::string) const`, `const HDDPartition* current() const`, `bool trySelect(uint8_t)`.
   - `static bool HDDImageRegistry::parseInto(MStream* s, Image& img)`.
 
@@ -233,7 +236,8 @@ void test_registry_parses_single_partition_image(void)
     TEST_ASSERT_TRUE(img.valid);
     TEST_ASSERT_EQUAL_STRING("SOCI/SINGULAR", img.disk_label.c_str());
     TEST_ASSERT_EQUAL_UINT32(1, img.parts.size());
-    TEST_ASSERT_EQUAL_UINT8(0, img.parts[0].number);
+    TEST_ASSERT_EQUAL_UINT8(1, img.parts[0].number);        // numbered from 1
+    TEST_ASSERT_EQUAL_UINT8(0, img.parts[0].slot);          // from table slot 0
     TEST_ASSERT_EQUAL_UINT8(1, img.parts[0].type);          // CFS
     TEST_ASSERT_EQUAL_STRING("STUFF", img.parts[0].name.c_str());
     TEST_ASSERT_EQUAL_UINT32(5, img.parts[0].root_lba);
@@ -241,7 +245,7 @@ void test_registry_parses_single_partition_image(void)
     TEST_ASSERT_FALSE(img.parts[0].hidden);
 }
 
-void test_registry_parses_two_partitions_and_keeps_slot_numbers(void)
+void test_registry_numbers_partitions_from_one(void)
 {
     HDDImageRegistry::Image img;
     TEST_ASSERT_TRUE(parseImage(MULTI_IMAGE_PATH, img));
@@ -249,24 +253,33 @@ void test_registry_parses_two_partitions_and_keeps_slot_numbers(void)
     TEST_ASSERT_EQUAL_STRING("C64 OS", img.disk_label.c_str());
     TEST_ASSERT_EQUAL_UINT32(2, img.parts.size());
 
-    TEST_ASSERT_EQUAL_UINT8(0, img.parts[0].number);
+    TEST_ASSERT_EQUAL_UINT8(1, img.parts[0].number);
+    TEST_ASSERT_EQUAL_UINT8(0, img.parts[0].slot);
     TEST_ASSERT_EQUAL_STRING("C64 OS", img.parts[0].name.c_str());
     TEST_ASSERT_EQUAL_UINT32(5, img.parts[0].root_lba);
 
-    TEST_ASSERT_EQUAL_UINT8(1, img.parts[1].number);
+    TEST_ASSERT_EQUAL_UINT8(2, img.parts[1].number);
+    TEST_ASSERT_EQUAL_UINT8(1, img.parts[1].slot);
     TEST_ASSERT_EQUAL_STRING("DISK IMAGES", img.parts[1].name.c_str());
     TEST_ASSERT_EQUAL_UINT32(32773, img.parts[1].root_lba);
+
+    // No partition is ever numbered 0 - that number means "the currently
+    // selected partition" and must never name a table entry.
+    for (const auto& p : img.parts)
+        TEST_ASSERT_NOT_EQUAL_MESSAGE(0, p.number, "partition 0 must not exist");
 }
 
-// Slot 0 is a real user partition in CFS - there is no system partition to
-// exclude - so DP = 0 must select it rather than being treated as "unset".
-void test_registry_selects_default_partition_slot_zero(void)
+// DP is a SLOT index in the boot sector and must be converted into the
+// partition-number space exactly once, at parse time. Slot 0 is DP here, and
+// slot 0 is partition 1.
+void test_registry_converts_default_partition_from_slot_to_number(void)
 {
     HDDImageRegistry::Image img;
     TEST_ASSERT_TRUE(parseImage(MULTI_IMAGE_PATH, img));
 
-    TEST_ASSERT_EQUAL_UINT8(0, img.default_part);
-    TEST_ASSERT_EQUAL_UINT8(0, img.selected);
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE(1, img.default_part,
+        "default_part must hold a partition NUMBER, not the raw DP slot index");
+    TEST_ASSERT_EQUAL_UINT8(1, img.selected);
     TEST_ASSERT_NOT_NULL(img.current());
     TEST_ASSERT_EQUAL_STRING("C64 OS", img.current()->name.c_str());
 }
@@ -276,15 +289,16 @@ void test_registry_lookup_by_number_and_name(void)
     HDDImageRegistry::Image img;
     TEST_ASSERT_TRUE(parseImage(MULTI_IMAGE_PATH, img));
 
-    TEST_ASSERT_NOT_NULL(img.byNumber(1));
-    TEST_ASSERT_EQUAL_STRING("DISK IMAGES", img.byNumber(1)->name.c_str());
-    TEST_ASSERT_NULL(img.byNumber(2));
+    TEST_ASSERT_NOT_NULL(img.byNumber(2));
+    TEST_ASSERT_EQUAL_STRING("DISK IMAGES", img.byNumber(2)->name.c_str());
+    TEST_ASSERT_NULL(img.byNumber(0));      // never a real partition
+    TEST_ASSERT_NULL(img.byNumber(3));
     TEST_ASSERT_NULL(img.byNumber(15));
 
     TEST_ASSERT_NOT_NULL(img.byName("DISK IMAGES"));
-    TEST_ASSERT_EQUAL_UINT8(1, img.byName("DISK IMAGES")->number);
+    TEST_ASSERT_EQUAL_UINT8(2, img.byName("DISK IMAGES")->number);
     TEST_ASSERT_NOT_NULL(img.byName("DISK*"));          // wildcards honoured
-    TEST_ASSERT_EQUAL_UINT8(1, img.byName("DISK*")->number);
+    TEST_ASSERT_EQUAL_UINT8(2, img.byName("DISK*")->number);
     TEST_ASSERT_NULL(img.byName("NO SUCH PARTITION"));
 }
 
@@ -293,16 +307,18 @@ void test_registry_try_select(void)
     HDDImageRegistry::Image img;
     TEST_ASSERT_TRUE(parseImage(MULTI_IMAGE_PATH, img));
 
+    TEST_ASSERT_TRUE(img.trySelect(2));
+    TEST_ASSERT_EQUAL_UINT8(2, img.selected);
+
     TEST_ASSERT_TRUE(img.trySelect(1));
     TEST_ASSERT_EQUAL_UINT8(1, img.selected);
 
-    // Slot 0 is selectable in CFS, unlike DHD's table entry 0.
-    TEST_ASSERT_TRUE(img.trySelect(0));
-    TEST_ASSERT_EQUAL_UINT8(0, img.selected);
-
-    // A slot that does not exist leaves the selection alone.
+    // 0 means "the currently selected partition" and is never selectable, as
+    // in DHD. A number past the end leaves the selection alone too.
+    TEST_ASSERT_FALSE(img.trySelect(0));
+    TEST_ASSERT_EQUAL_UINT8(1, img.selected);
     TEST_ASSERT_FALSE(img.trySelect(7));
-    TEST_ASSERT_EQUAL_UINT8(0, img.selected);
+    TEST_ASSERT_EQUAL_UINT8(1, img.selected);
 }
 ```
 
@@ -325,8 +341,8 @@ and wrap the four `MULTI_IMAGE_PATH` tests in `main()`:
     RUN_TEST(test_registry_parses_single_partition_image);
     if (multiImageAvailable())
     {
-        RUN_TEST(test_registry_parses_two_partitions_and_keeps_slot_numbers);
-        RUN_TEST(test_registry_selects_default_partition_slot_zero);
+        RUN_TEST(test_registry_numbers_partitions_from_one);
+        RUN_TEST(test_registry_converts_default_partition_from_slot_to_number);
         RUN_TEST(test_registry_lookup_by_number_and_name);
         RUN_TEST(test_registry_try_select);
     }
@@ -349,8 +365,16 @@ In `lib/meatloaf/media/hd/hdd.h`, add `#include <map>` and `#include <vector>` t
  * Partition registry
  ********************************************************/
 
+// TWO numbering spaces, and they must not be confused:
+//   number - 1-based, counting only VALID table entries. What paths, CP<n>,
+//            "$=P" and the `partition` command all speak. Never 0: that
+//            number means "the currently selected partition", as in DHD.
+//   slot   - the raw 0-15 index into the 16-entry partition directory, and
+//            what the boot sector's DP byte holds. Converted into `number`
+//            once, at parse time; nothing downstream sees a slot.
 struct HDDPartition {
-    uint8_t     number;      // CFS slot index, 0-15
+    uint8_t     number;      // 1-based over valid entries
+    uint8_t     slot;        // raw table index, 0-15
     uint8_t     type;        // 0=unformatted, 1=CFS, 2=GEOS, 3-11 reserved
     std::string name;        // ASCII, $00 padding trimmed
     uint32_t    root_lba;    // @Root directory (entry +$1C)
@@ -381,8 +405,8 @@ public:
         const HDDPartition* current() const { return byNumber(selected); }
 
         // Selects a partition if it exists and is CFS. Leaves the selection
-        // untouched and returns false otherwise. Slot 0 IS selectable - CFS
-        // has no system partition at entry 0.
+        // untouched and returns false otherwise - including for 0, which
+        // means "the currently selected partition" and is never a real one.
         bool trySelect(uint8_t number);
     };
 
@@ -432,6 +456,12 @@ const HDDPartition* HDDImageRegistry::Image::byName(std::string name) const
 
 bool HDDImageRegistry::Image::trySelect(uint8_t number)
 {
+    // 0 is not a partition - it means "the currently selected one". byNumber()
+    // never returns an entry for it, so this is belt-and-braces, but it states
+    // the rule where a reader will look for it.
+    if (number == 0)
+        return false;
+
     const HDDPartition* p = byNumber(number);
     if (p == nullptr || p->type != 1)   // only a CFS partition is browsable
         return false;
@@ -461,7 +491,10 @@ bool HDDImageRegistry::parseInto(MStream* s, Image& img)
            (img.disk_label.back() == ' ' || img.disk_label.back() == '\0'))
         img.disk_label.pop_back();
 
-    img.default_part = boot.default_partition & 0x0F;
+    // DP is a SLOT index here; it is converted to a partition number below,
+    // once the table has been walked and the numbering is known.
+    const uint8_t dp_slot = boot.default_partition & 0x0F;
+    img.default_part = 0;
 
     // The partition directory is exactly one 512-byte sector: 16 entries of
     // 32 bytes. There is no second sector and no chaining.
@@ -472,16 +505,18 @@ bool HDDImageRegistry::parseInto(MStream* s, Image& img)
         return false;
 
     img.parts.clear();
+    uint8_t next_number = 1;                // partitions are numbered from 1
     for (uint8_t i = 0; i < 16; i++)
     {
         HDDMStream::PartitionEntry pe;
         memcpy(&pe, sector + (i * 32), sizeof(pe));
 
         if (!pe.isValid())
-            continue;
+            continue;                       // an invalid slot consumes no number
 
         HDDPartition p;
-        p.number = i;                       // the SLOT index - what DP indexes
+        p.number = next_number++;           // must match seekPartitionEntry()
+        p.slot = i;
         p.type = pe.getType();
         p.name = trimEntryName(pe.name, 16, '\0');
         p.root_lba = pe.root_dir.getLBA();
@@ -492,11 +527,18 @@ bool HDDImageRegistry::parseInto(MStream* s, Image& img)
         p.writeable = (pe.start.b[0] & 0x10) != 0;
         img.parts.push_back(p);
 
-        Debug_printv("partition[%d] type[%d] name[%s] root[%lu] size[%lu]",
-                     p.number, p.type, p.name.c_str(), p.root_lba, p.size);
+        Debug_printv("partition[%d] slot[%d] type[%d] name[%s] root[%lu] size[%lu]",
+                     p.number, p.slot, p.type, p.name.c_str(), p.root_lba, p.size);
     }
 
-    // The default partition when it is valid and CFS, else the first CFS
+    // Convert DP out of slot space into partition-number space. This is the
+    // ONLY place the two meet; everything downstream speaks numbers.
+    for (const HDDPartition &p : img.parts)
+    {
+        if (p.slot == dp_slot) { img.default_part = p.number; break; }
+    }
+
+    // The default partition when it names a CFS one, else the first CFS
     // partition. An image with NO CFS partition fails to parse: there is
     // nothing to select and nothing to mount, and the alternative is a
     // `selected` naming a partition trySelect() would refuse.
@@ -521,6 +563,9 @@ bool HDDImageRegistry::parseInto(MStream* s, Image& img)
     return true;
 }
 ```
+
+`img.default_part` stays 0 when the DP slot is invalid — 0 is not a partition
+number, so `trySelect(0)` correctly fails and the first-CFS fallback runs.
 
 `trimEntryName()` is the existing file-static helper at the top of `hdd.cpp` — no change needed.
 
@@ -582,7 +627,7 @@ void test_resolve_binds_partition_without_selecting(void)
 {
     HDDImageRegistry::Image img;
     TEST_ASSERT_TRUE(parseImage(MULTI_IMAGE_PATH, img));
-    TEST_ASSERT_EQUAL_UINT8(0, img.selected);
+    TEST_ASSERT_EQUAL_UINT8(1, img.selected);
 
     std::string rest;
     bool explicit_part = false;
@@ -591,9 +636,9 @@ void test_resolve_binds_partition_without_selecting(void)
 
     TEST_ASSERT_NOT_NULL(p);
     TEST_ASSERT_TRUE(explicit_part);
-    TEST_ASSERT_EQUAL_UINT8(1, p->number);
+    TEST_ASSERT_EQUAL_UINT8(2, p->number);
     TEST_ASSERT_EQUAL_STRING("GAME", rest.c_str());
-    TEST_ASSERT_EQUAL_UINT8_MESSAGE(0, img.selected,
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE(1, img.selected,
         "resolving a path must not change the selected partition");
 }
 
@@ -602,31 +647,37 @@ void test_resolve_by_number(void)
     HDDImageRegistry::Image img;
     TEST_ASSERT_TRUE(parseImage(MULTI_IMAGE_PATH, img));
 
+    // "2" is DISK IMAGES, the SECOND valid entry - not table slot 2, which
+    // does not exist in this image.
     std::string rest;
     bool explicit_part = false;
-    const HDDPartition* p = hddResolvePartitionIn(img, "1/GAME", &rest, &explicit_part);
+    const HDDPartition* p = hddResolvePartitionIn(img, "2/GAME", &rest, &explicit_part);
     TEST_ASSERT_NOT_NULL(p);
     TEST_ASSERT_TRUE(explicit_part);
-    TEST_ASSERT_EQUAL_UINT8(1, p->number);
+    TEST_ASSERT_EQUAL_UINT8(2, p->number);
+    TEST_ASSERT_EQUAL_STRING("DISK IMAGES", p->name.c_str());
     TEST_ASSERT_EQUAL_STRING("GAME", rest.c_str());
 }
 
-// Divergence from DHD: 0 is a LITERAL slot 0, not "the currently selected
-// partition". Select slot 1 first, then check that "0/..." still resolves to
-// slot 0 rather than following the selection.
-void test_resolve_zero_is_literal_slot_zero(void)
+// As in DHD (vdrive.c:1324), a partition number of 0 in a path means "the
+// currently selected partition". Select 2, then check "0/..." follows it.
+void test_resolve_zero_means_the_selected_partition(void)
 {
     HDDImageRegistry::Image img;
     TEST_ASSERT_TRUE(parseImage(MULTI_IMAGE_PATH, img));
-    TEST_ASSERT_TRUE(img.trySelect(1));
+    TEST_ASSERT_TRUE(img.trySelect(2));
 
     std::string rest;
     bool explicit_part = false;
     const HDDPartition* p = hddResolvePartitionIn(img, "0/GAME", &rest, &explicit_part);
     TEST_ASSERT_NOT_NULL(p);
     TEST_ASSERT_TRUE(explicit_part);
-    TEST_ASSERT_EQUAL_UINT8_MESSAGE(0, p->number,
-        "0 in a path must mean slot 0, not the selected partition");
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE(2, p->number,
+        "0 in a path must follow the selection, as it does in DHD");
+    TEST_ASSERT_EQUAL_STRING("GAME", rest.c_str());
+
+    // ...and it is still only a reference: the selection is unchanged.
+    TEST_ASSERT_EQUAL_UINT8(2, img.selected);
 }
 
 // A component that is not a partition is a FILENAME: resolution falls back to
@@ -635,14 +686,14 @@ void test_resolve_non_partition_falls_back_to_selection(void)
 {
     HDDImageRegistry::Image img;
     TEST_ASSERT_TRUE(parseImage(MULTI_IMAGE_PATH, img));
-    TEST_ASSERT_TRUE(img.trySelect(1));
+    TEST_ASSERT_TRUE(img.trySelect(2));
 
     std::string rest;
     bool explicit_part = true;
     const HDDPartition* p = hddResolvePartitionIn(img, "SOMEFILE", &rest, &explicit_part);
     TEST_ASSERT_NOT_NULL(p);
     TEST_ASSERT_FALSE(explicit_part);
-    TEST_ASSERT_EQUAL_UINT8(1, p->number);              // the selection
+    TEST_ASSERT_EQUAL_UINT8(2, p->number);              // the selection
     TEST_ASSERT_EQUAL_STRING("SOMEFILE", rest.c_str()); // untouched
 
     // Out-of-range and unparseable numbers are filenames too, never a
@@ -658,19 +709,39 @@ void test_resolve_empty_path_uses_selection(void)
 {
     HDDImageRegistry::Image img;
     TEST_ASSERT_TRUE(parseImage(MULTI_IMAGE_PATH, img));
-    TEST_ASSERT_TRUE(img.trySelect(1));
+    TEST_ASSERT_TRUE(img.trySelect(2));
 
     std::string rest = "unset";
     bool explicit_part = true;
     const HDDPartition* p = hddResolvePartitionIn(img, "", &rest, &explicit_part);
     TEST_ASSERT_NOT_NULL(p);
     TEST_ASSERT_FALSE(explicit_part);
-    TEST_ASSERT_EQUAL_UINT8(1, p->number);
+    TEST_ASSERT_EQUAL_UINT8(2, p->number);
     TEST_ASSERT_EQUAL_STRING("", rest.c_str());
 }
 ```
 
-Register all six in `main()`. `test_containerOf_finds_the_hdd_component` needs no image, so put its `RUN_TEST` **before** the `imageAvailable()` guard; put the other five inside the `multiImageAvailable()` block.
+Register them in `main()`. `test_containerOf_finds_the_hdd_component` parses no image, so it goes **before** the `imageAvailable()` guard — that guard calls `TEST_IGNORE_MESSAGE` and returns, which would skip it:
+
+```cpp
+    RUN_TEST(test_containerOf_finds_the_hdd_component);
+
+    if (!imageAvailable())
+    {
+        TEST_IGNORE_MESSAGE("sample image .archive/hdd/ide20201227.hdd not present");
+        return UNITY_END();
+    }
+```
+
+The other five go inside the existing `multiImageAvailable()` block, after `test_registry_try_select`:
+
+```cpp
+        RUN_TEST(test_resolve_binds_partition_without_selecting);
+        RUN_TEST(test_resolve_by_number);
+        RUN_TEST(test_resolve_zero_means_the_selected_partition);
+        RUN_TEST(test_resolve_non_partition_falls_back_to_selection);
+        RUN_TEST(test_resolve_empty_path_uses_selection);
+```
 
 - [ ] **Step 2: Run and verify failure**
 
@@ -708,14 +779,13 @@ Then, after the class:
 // Resolve which partition an in-image path refers to, WITHOUT changing the
 // image's selected partition.
 //
-// Resolution order for the FIRST component: an in-range slot number 0-15,
-// then byName(), otherwise it is not a partition and the current selection
-// applies. A partition wins over a same-named file; such a file stays
-// reachable as "<image>/<number>/<file>".
+// Resolution order for the FIRST component: an in-range partition number
+// 0-16, then byName(), otherwise it is not a partition and the current
+// selection applies. A partition wins over a same-named file; such a file
+// stays reachable as "<image>/<number>/<file>".
 //
-// NOTE the difference from DHD: a partition number of 0 here is a LITERAL
-// slot 0, which in CFS is an ordinary user partition. It does NOT mean "the
-// currently selected partition".
+// As in DHD, a partition number of 0 means "the currently selected
+// partition" - it is NOT a table entry, and must never reach byNumber().
 //
 // hddResolvePartitionIn() is the pure core, taking an already-parsed image so
 // it can be tested without MFSOwner. HDDResolvePartition() is the wrapper the
@@ -831,12 +901,16 @@ const HDDPartition* hddResolvePartitionIn(const HDDImageRegistry::Image &img,
             {
                 // Range-check BEFORE narrowing to uint8_t. An int silently
                 // truncated into byNumber() is what once made "1571" resolve
-                // to partition 35 in DHD. Unlike DHD there is no v == 0 case:
-                // slot 0 is an ordinary CFS partition.
+                // to partition 35 in DHD.
+                //
+                // v == 0 means "the currently selected partition", exactly as
+                // in DHD (vdrive.c:1324) - it must NOT go through byNumber().
+                // 16 is the bound because a CFS table holds 16 entries, so
+                // that is the highest number the 1-based numbering reaches.
                 char *end = nullptr;
                 long v = strtol(comp.c_str(), &end, 10);
-                if (end != comp.c_str() && *end == '\0' && v >= 0 && v <= 15)
-                    p = img.byNumber((uint8_t)v);
+                if (end != comp.c_str() && *end == '\0' && v >= 0 && v <= 16)
+                    p = (v == 0) ? img.current() : img.byNumber((uint8_t)v);
             }
             else
             {
@@ -914,7 +988,7 @@ git commit -m "feat: HDDImageRegistry selection and path-based partition resolut
 **Interfaces:**
 - Consumes: Task 2/3's registry (indirectly — the stream never calls it; see below).
 - Produces:
-  - `uint8_t HDDMStream::selected_partition` — the slot the stream treats as its root. `HDD_PART_DEFAULT` (0xFF) means "fall back to the boot sector's DP", which is what a directly constructed stream gets.
+  - `uint8_t HDDMStream::selected_partition` — the partition NUMBER the stream treats as its root. `0` means "fall back to the boot sector's DP", which is what a directly constructed stream gets.
   - `bool HDDMStream::selectPartitionByNumber(uint8_t number)`
 
 **Why the stream does not read the registry:** see "Deviation from the spec" in Global Constraints. `HDDMFile` writes `selected_partition` before each call.
@@ -967,17 +1041,39 @@ void test_selected_partition_overrides_default(void)
     auto image = std::make_shared<TestHDDStream>(src);
     image->mode = std::ios_base::in;
 
-    image->selected_partition = 1;          // "DISK IMAGES"
+    image->selected_partition = 2;          // "DISK IMAGES"
     TEST_ASSERT_TRUE(image->seekDirectory(""));
     TEST_ASSERT_EQUAL_STRING("DISK IMAGES", image->dir_label.c_str());
 
-    image->selected_partition = 0;          // "C64 OS"
+    image->selected_partition = 1;          // "C64 OS"
     TEST_ASSERT_TRUE(image->seekDirectory(""));
     TEST_ASSERT_EQUAL_STRING("C64 OS", image->dir_label.c_str());
+
+    // 0 is not a partition number - it means "no selection", so the stream
+    // falls back to the boot sector's DP (slot 0, which is "C64 OS").
+    image->selected_partition = 0;
+    TEST_ASSERT_TRUE(image->seekDirectory(""));
+    TEST_ASSERT_EQUAL_STRING("C64 OS", image->dir_label.c_str());
+
+    // A number past the end is not a silent fallback - it fails.
+    image->selected_partition = 9;
+    TEST_ASSERT_FALSE(image->selectPartitionByNumber(9));
 }
 ```
 
-Extend the `TestHDDStream` helper with `using HDDMStream::seekDirectory;`, `using HDDMStream::seekEntry;`, `using HDDMStream::dir_label;` and `using HDDMStream::selected_partition;`. Register the first two tests inside the `imageAvailable()` section and the third inside the `multiImageAvailable()` block.
+Extend the `TestHDDStream` helper with `using HDDMStream::seekEntry;`, `using HDDMStream::dir_label;` and `using HDDMStream::selectPartitionByNumber;` — all three are `protected`. (`seekDirectory`, `resolvePath` and `selected_partition` are already public, so they need no `using`.)
+
+Register the first two beside the other single-image tests, and the third in the `multiImageAvailable()` block:
+
+```cpp
+    RUN_TEST(test_seekDirectory_empty_path_enters_default_partition);
+    RUN_TEST(test_seekDirectory_partition_name_still_resolves);
+    if (multiImageAvailable())
+    {
+        // ...existing multi-image registrations...
+        RUN_TEST(test_selected_partition_overrides_default);
+    }
+```
 
 - [ ] **Step 2: Run and verify failure**
 
@@ -992,19 +1088,21 @@ Expected: a compile error for `selected_partition`, and once that is declared, `
 In `lib/meatloaf/media/hd/hdd.h`, add to `HDDMStream`'s `public:` section, just after the `PathResult` enum:
 
 ```cpp
-    // "No selection - use the boot sector's default partition." A directly
-    // constructed stream (tests, ImageBroker rebuilds) gets this; HDDMFile
-    // overwrites it with the partition the registry or the path resolved to.
+    // The partition NUMBER (1-based over valid entries) this stream treats as
+    // its root. 0 means "no selection - use the boot sector's default", which
+    // is unambiguous precisely because partitions are numbered from 1. A
+    // directly constructed stream (tests, ImageBroker rebuilds) gets 0;
+    // HDDMFile overwrites it with whatever the registry or the path resolved.
+    //
     // The stream deliberately does NOT consult HDDImageRegistry itself: that
     // would need MFSOwner::File(), which the native test stubs abort on.
-    static const uint8_t HDD_PART_DEFAULT = 0xFF;
-    uint8_t selected_partition = HDD_PART_DEFAULT;
+    uint8_t selected_partition = 0;
 ```
 
 and to the `protected:` method list, beside `selectPartitionByName`:
 
 ```cpp
-    bool selectPartitionByNumber(uint8_t number);   // CFS slot index 0-15
+    bool selectPartitionByNumber(uint8_t number);   // 1-based, valid entries only
 ```
 
 - [ ] **Step 4: Implement**
@@ -1012,21 +1110,37 @@ and to the `protected:` method list, beside `selectPartitionByName`:
 In `lib/meatloaf/media/hd/hdd.cpp`, add after `selectPartitionByName()`:
 
 ```cpp
+// 'number' is 1-based and counts only VALID entries - identical to the walk
+// in seekPartitionEntry(), and it must stay identical, or the registry and
+// the stream would disagree about which partition a number names. 0 is not a
+// partition: it means "the currently selected one", which the caller has
+// already resolved before reaching here.
 bool HDDMStream::selectPartitionByNumber(uint8_t number)
 {
-    if (number > 15)
+    if (number == 0)
         return false;
 
-    const PartitionEntry &pe = partition_entries[number];
-    if (!pe.isValid() || !pe.isCFS())
-        return false;
+    uint8_t count = 0;
+    for (int i = 0; i < 16; i++)
+    {
+        const PartitionEntry &pe = partition_entries[i];
+        if (!pe.isValid())
+            continue;
 
-    partition_list = false;
-    dir_start_lba = pe.root_dir.getLBA();
-    dir_label = trimEntryName(pe.name, 16, '\0');
-    restartDirWalk();
-    entry_index = 0;
-    return true;
+        if (++count != number)
+            continue;
+
+        if (!pe.isCFS())
+            return false;   // listed, but not browsable
+
+        partition_list = false;
+        dir_start_lba = pe.root_dir.getLBA();
+        dir_label = trimEntryName(pe.name, 16, '\0');
+        restartDirWalk();
+        entry_index = 0;
+        return true;
+    }
+    return false;
 }
 ```
 
@@ -1057,8 +1171,7 @@ and add the small helper above `seekDirectory()`:
 // first valid CFS partition (which is what selectPartitionByName("") does).
 bool HDDMStream::selectCurrentPartition()
 {
-    if (selected_partition != HDD_PART_DEFAULT &&
-        selectPartitionByNumber(selected_partition))
+    if (selected_partition != 0 && selectPartitionByNumber(selected_partition))
         return true;
 
     return selectPartitionByName("");
@@ -1131,11 +1244,10 @@ protected:
     bool listing_partitions = false;
     uint16_t part_index = 0;
 
-    // The CFS slot this MFile's path names. HDD_PART_FOLLOW means the path
-    // named none, so the image's current selection applies. It is NOT 0 -
-    // slot 0 is an ordinary CFS partition.
-    static const uint8_t HDD_PART_FOLLOW = 0xFF;
-    uint8_t m_part = HDD_PART_FOLLOW;
+    // The partition NUMBER this MFile's path names. 0 = the path named none,
+    // so the image's current selection applies - the same convention and the
+    // same sentinel value DHDPartitionMFile::m_part uses.
+    uint8_t m_part = 0;
 };
 ```
 
@@ -1178,7 +1290,7 @@ const HDDPartition* HDDMFile::effectivePartition()
     auto img = HDDImageRegistry::obtain(HDDImageRegistry::containerOf(url));
     if (img == nullptr)
         return nullptr;
-    return (m_part == HDD_PART_FOLLOW) ? img->current() : img->byNumber(m_part);
+    return (m_part == 0) ? img->current() : img->byNumber(m_part);
 }
 
 void HDDMFile::applyPartition(const std::shared_ptr<HDDMStream>& image)
@@ -1186,9 +1298,11 @@ void HDDMFile::applyPartition(const std::shared_ptr<HDDMStream>& image)
     if (image == nullptr)
         return;
 
+    // 0 when the image has no usable table, which is the stream's "use the
+    // boot sector's DP" fallback - the same value m_part uses for "no
+    // partition named", since partitions are numbered from 1.
     const HDDPartition *p = effectivePartition();
-    image->selected_partition = (p != nullptr) ? p->number
-                                               : HDDMStream::HDD_PART_DEFAULT;
+    image->selected_partition = (p != nullptr) ? p->number : 0;
 }
 ```
 
@@ -1604,7 +1718,7 @@ int resolve(const Target& t, const std::string& arg)
     if (t.kind == Kind::None || arg.empty())
         return -1;
 
-    const long hi = (t.kind == Kind::CMD) ? 254 : 15;
+    const long hi = (t.kind == Kind::CMD) ? 254 : 16;
 
     // Numbers first. Range-checked BEFORE any narrowing, per the project rule
     // against atoi/std::stoi on C64- or network-sourced input.
@@ -1657,8 +1771,10 @@ int resolve(const Target& t, const std::string& arg)
 bool select(const Target& t, int number)
 {
     // The valid ranges genuinely differ and must stay separate: a CMD HD holds
-    // 1..254 with entry 0 the system partition, while CFS holds slots 0..15
-    // with slot 0 an ordinary user partition.
+    // 1..254 with table entry 0 the system partition,
+    // and CFS numbers its partitions 1..16 over the valid entries of a
+    // 16-entry table. Both reserve 0 for "the currently selected partition",
+    // so neither accepts it here.
     if (t.kind == Kind::CMD)
     {
         if (number < 1 || number > 254)
@@ -1668,7 +1784,7 @@ bool select(const Target& t, int number)
 
     if (t.kind == Kind::CFS)
     {
-        if (number < 0 || number > 15)
+        if (number < 1 || number > 16)
             return false;
         return HDDImageRegistry::select(t.container, (uint8_t)number);
     }
@@ -1820,9 +1936,10 @@ Flash and check each of these, since none is reachable from the native suite:
 1. `partition` inside a `.hdd` lists the CFS partitions with `*` on the selected one, and still lists CMD partitions correctly inside a `.dhd`.
 2. `partition 1` inside `c64os v1.09-clean.hdd` selects `DISK IMAGES`; `ls` then shows that partition's files, and `partition 0` returns to `C64 OS`.
 3. `partition "DISK IMAGES"` selects by name.
-4. From the C64: `LOAD"$=P",8` lists the partitions; `CP1` returns `02, PARTITION SELECTED`; `CP0` also succeeds on a CFS image (it must NOT be a syntax error); `CP99` returns `77, SELECTED PARTITION ILLEGAL`.
-5. `LOAD"0/<file>",8` loads from slot 0 while slot 1 is selected, and the selection is unchanged afterwards (`partition` still marks 1).
-6. Regression: `CP0` on a **DHD** image still fails — CMD entry 0 is the system partition.
+4. From the C64: `LOAD"$=P",8` lists the partitions; `CP2` returns `02, PARTITION SELECTED`; `CP0` is refused, as on a CMD HD; `CP99` returns `77, SELECTED PARTITION ILLEGAL`.
+5. `LOAD"1/<file>",8` loads from partition 1 while partition 2 is selected, and the selection is unchanged afterwards (`partition` still marks 2).
+6. `LOAD"0/<file>",8` loads from the SELECTED partition — `0` is a reference to the selection, not to a table entry.
+7. Regression: `CP0` and `partition 0` on a **DHD** image still fail, and DHD's `partition` listing still shows entry 0 as `SYS`.
 
 - [ ] **Step 7: Commit**
 
@@ -1843,9 +1960,9 @@ git commit -m "feat: CP<n> and the partition command work on IDE64 CFS images"
 Add to the "Important Notes" bullet list, after the existing CMD media images entry:
 
 ```markdown
-- **IDE64 CFS images (.hdd) follow the same partition model as CMD images, with three differences that matter.** `HDDImageRegistry` (lib/meatloaf/media/hd/hdd.h/cpp) holds the per-image partition table and selection, exactly as `DHDImageRegistry` does, and `hdpart::` (media/hd/partition_select.h) is the one surface `CP<n>` and the `partition` console command both use. But: (1) **partition numbers are the CFS slot index 0-15**, which is what the boot sector's DP byte indexes — not a sequential count of valid entries; (2) **slot 0 is an ordinary, selectable user partition**, so `CP0` is legal and a `0` in a path is a LITERAL slot 0, never "the currently selected partition" as it is for DHD — do not copy `DHDResolvePartition()`'s `v == 0` case; (3) there is **no `cached_part`/`brokerUrl()` machinery and no dispose-on-select**, because `HDDMStream` re-derives its position from `seekDirectory(pathInStream)` on every operation and so a broker-cached stream carries no partition identity that can go stale. Only CFS-type partitions (`type == 1`) are selectable; unformatted, GEOS and reserved types are listed but refused.
+- **IDE64 CFS images (.hdd) follow the same partition model as CMD images.** `HDDImageRegistry` (lib/meatloaf/media/hd/hdd.h/cpp) holds the per-image partition table and selection exactly as `DHDImageRegistry` does; `HDDResolvePartition()` binds a partition to a path without ever calling `select()`; `hdpart::` (media/hd/partition_select.h) is the one surface `CP<n>` and the `partition` console command both use. **Partition 0 means "the currently selected partition" in a path and is refused by `select()`, identical to DHD.** Two things are CFS-specific: (1) **there are two numbering spaces** — the raw table SLOT 0-15, which is how the 16-entry partition directory is laid out and what the boot sector's DP byte holds, and the partition NUMBER 1-N, which counts only VALID entries and is what paths, `CP<n>`, `$=P` and the `partition` command speak. `parse()` converts DP between them exactly once; nothing downstream sees a slot, and the numbering must match `HDDMStream::seekPartitionEntry()` entry for entry. (2) There is **no `cached_part`/`brokerUrl()` machinery and no dispose-on-select**, because `HDDMStream` re-derives its position from `seekDirectory(pathInStream)` on every operation, so a broker-cached stream carries no partition identity that can go stale. Only CFS-type partitions (`type == 1`) are selectable; unformatted, GEOS and reserved types are listed but refused.
 - **The CFS boot sector's default-partition byte is `$03`, not `$01`** (`HDDMStream::BootSector`). The spec's table is colspan-encoded — `Unused` spans `$00-$02`, `DP` is `$03`, `@Last disk sector` spans `$04-$07` — and the struct had both `default_partition` and `last_sector` off by two. It was latent because every sample image in `.archive/hdd/` has `$00-$03 = 00 00 00 00`. The corpus invariant that pins it: `@Last disk sector == @Partition directory backup + 1`, since the backup directory lives on the last sector of the disk.
-- **`HDDMStream` must never call `HDDImageRegistry`.** The selection is written into `HDDMStream::selected_partition` by `HDDMFile` (`applyPartition()`), at all four sites that touch a stream. A registry lookup from inside the stream would need `MFSOwner::File()`, which `abort()`s under the native test stubs — and `FileContainerStream` sets `url` to a path ending in `.hdd`, so the lookup would fire. `HDD_PART_DEFAULT` (0xFF) means "fall back to the boot sector's DP", which is what a directly constructed stream gets.
+- **`HDDMStream` must never call `HDDImageRegistry`.** The selection is written into `HDDMStream::selected_partition` by `HDDMFile` (`applyPartition()`), at all four sites that touch a stream. A registry lookup from inside the stream would need `MFSOwner::File()`, which `abort()`s under the native test stubs — and `FileContainerStream` sets `url` to a path ending in `.hdd`, so the lookup would fire. `selected_partition == 0` means "fall back to the boot sector's DP" — unambiguous precisely because partitions are numbered from 1 — and is what a directly constructed stream gets.
 ```
 
 - [ ] **Step 2: Record the stream-layer detail in `lib/meatloaf/AGENTS.md`**
@@ -1887,8 +2004,12 @@ git commit -m "docs: record the CFS partition model and its divergences from CMD
 
 ## Self-Review Notes
 
-**Spec coverage.** Every section maps to a task: §0 boot sector → Task 1; `HDDImageRegistry` + `HDDPartition` → Tasks 2-3; divergences 1 and 2 → Task 3 (`hddResolvePartitionIn`, `trySelect`) with dedicated tests; divergence 3 → Task 2's class comment, and absent by construction; `HDDMStream` → Task 4; `HDDMFile` → Task 5; `CP<n>` and the console command → Task 6; verification → tests in Tasks 1-4 plus Task 6 Step 6; the breaking change → Task 4 and Task 7.
+**Spec coverage.** Every section maps to a task: §0 boot sector → Task 1; `HDDImageRegistry` + `HDDPartition` → Tasks 2-3; the two numbering spaces and DP conversion → Task 2 (`parseInto`, with `test_registry_numbers_partitions_from_one` and `test_registry_converts_default_partition_from_slot_to_number`); partition 0's DHD semantics → Task 3 (`hddResolvePartitionIn`, `trySelect`, with dedicated tests); the no-`cached_part` divergence → Task 2's class comment, and absent by construction; `HDDMStream` → Task 4; `HDDMFile` → Task 5; `CP<n>` and the console command → Task 6; verification → tests in Tasks 1-4 plus Task 6 Step 6; the breaking change → Task 4 and Task 7.
 
 **Known gap, accepted:** the spec's `HDDResolvePartition()` "hidden partitions are listed, marked, not omitted" rule is implemented (Task 5 sets `file->is_hidden = p.hidden`; Task 6's `View` has no hidden flag because the console lists every entry unconditionally) but is **not** covered by an automated test — neither `HDDMFile` nor the console compiles natively, and no corpus image has a hidden partition. It rests on inspection.
 
-**Type consistency.** `HDD_PART_DEFAULT` (0xFF, on `HDDMStream`, "use the boot sector DP") and `HDD_PART_FOLLOW` (0xFF, on `HDDMFile`, "the path named no partition") are deliberately distinct names for the same sentinel value on two different classes; `applyPartition()` is the one place that converts between them. `parseInto` takes `MStream*` (raw) while callers hold `shared_ptr`, hence `.get()` at both call sites. `Image::byName` takes `std::string` by value to match `DHDImageRegistry::Image::byName`.
+**Type consistency.** `0` is the sentinel in three places and means a consistent thing in each, because partitions are numbered from 1: `HDDMFile::m_part == 0` ("the path named no partition, follow the selection", matching `DHDPartitionMFile::m_part`), `HDDMStream::selected_partition == 0` ("no selection, use the boot sector's DP"), and `hddResolvePartitionIn`'s `v == 0` ("the currently selected partition", matching `DHDResolvePartition`). `Image::default_part` is likewise 0 only when the DP slot is invalid, which `trySelect(0)` correctly rejects.
+
+Distinct from all of those is the raw **slot** index, which is 0-based and appears only in `HDDPartition::slot`, in the DP byte, and inside `parseInto`/`selectPartitionByName("")`. Any code holding a slot must not pass it where a number is expected. `parseInto` takes `MStream*` (raw) while callers hold `shared_ptr`, hence `.get()` at both call sites. `Image::byName` takes `std::string` by value to match `DHDImageRegistry::Image::byName`.
+
+**Numbering agreement is an invariant with no test.** `HDDImageRegistry::parseInto()` and `HDDMStream::selectPartitionByNumber()`/`seekPartitionEntry()` independently walk the same table with the same `isValid()` predicate to derive the same 1-based numbering. Neither corpus image can detect a divergence, because both fill slots contiguously from 0. If the predicate in one is ever changed, change the other.

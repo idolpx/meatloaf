@@ -105,26 +105,36 @@ DHD and matching a real drive. Partitions are reachable through `LOAD"$=P"`, the
 This is a visible regression for one workflow: `ls /sd/image.hdd` stops listing
 partitions. It is the intended consequence of the chosen semantics.
 
-### Three divergences from DHD
+### Numbering, and the one real divergence from DHD
 
-These are the reasons the two registries stay separate rather than sharing a
-base class. The tables share a shape but not their semantics.
+**Partitions are numbered from 1, counting only VALID table entries.** An
+invalid slot is skipped rather than consuming a number, so a table with slots
+0 and 2 used presents partitions 1 and 2. This is already the convention in
+`HDDMStream::seekPartitionEntry()`, which counts valid entries and rejects
+index 0, and the registry must agree with it entry for entry.
 
-**1. Numbers are the CFS slot index 0-15.** Not a sequential count of valid
-entries. The slot index is what the boot sector's DP byte indexes, and it is the
-only numbering that survives an empty slot in the middle of the table.
+There are therefore **two numbering spaces** and they must not be confused:
 
-**2. Slot 0 is a real, selectable user partition.** CFS has no
-system-partition-at-entry-0. Two consequences that must not be carried over from
-DHD by reflex:
+- the **slot index** 0-15, which is what the partition directory is physically
+  laid out by and what the boot sector's DP byte holds;
+- the **partition number** 1-N, which is what a path, `CP<n>`, `$=P` and the
+  `partition` command all speak.
 
-- **`0` in a path is a literal slot 0**, never "the currently selected
-  partition". `DHDResolvePartition()`'s special case for `v == 0` has no
-  counterpart here and must not be copied.
-- **`CP0` is legal** and selects slot 0. The drive's existing `pnum < 1`
-  rejection is DHD-specific and must not apply to CFS.
+`parse()` converts DP from the first space to the second exactly once, and
+`Image::default_part` holds the converted **number**. Nothing downstream ever
+sees a slot index.
 
-**3. No `cached_part`, no `brokerUrl()`, no dispose-on-select.** DHD needs all
+**Partition 0 behaves exactly as it does in DHD**, and for the same reason —
+with numbering based at 1, zero is free to carry the meaning `vdrive.c:1324`
+gives it:
+
+- **`0` in a path means "the currently selected partition"**, so
+  `DHDResolvePartition()`'s `v == 0` case is copied verbatim rather than
+  dropped.
+- **`select()` refuses 0**, so `CP0` is a syntax error, as on a CMD HD.
+
+**The one real divergence: no `cached_part`, no `brokerUrl()`, no
+dispose-on-select.** DHD needs all
 three because `ImageBroker` caches one *decoded* D64/D71/D81/DNP stream per
 image and cannot tell partitions apart, so a stream cached for one partition
 would silently serve another. That failure mode does not exist here:
@@ -149,11 +159,12 @@ non-CFS partition.
 
 ### `HDDImageRegistry` — `hdd.h` / `hdd.cpp`
 
-Mirrors `DHDImageRegistry`, minus the machinery named in divergence 3.
+Mirrors `DHDImageRegistry`, minus the caching machinery named above.
 
 ```c
 struct HDDPartition {
-    uint8_t     number;      // CFS slot index, 0-15
+    uint8_t     number;      // partition NUMBER: 1-based over valid entries
+    uint8_t     slot;        // table SLOT index 0-15 (what DP holds)
     uint8_t     type;        // 0=unformatted, 1=CFS, 2=GEOS, 3-11 reserved
     std::string name;        // ASCII, $00 padding trimmed
     uint32_t    root_lba;    // @Root directory  (entry +$1C)
@@ -194,8 +205,10 @@ const HDDPartition* HDDResolvePartition(const std::string& containerUrl,
 ```
 
 `parse()` reads the boot sector and the single partition-directory sector,
-records all 16 slots that are VALID, and sets `selected` to `default_part` when
-that slot is valid and CFS, else the first valid CFS partition. **An image with
+records every VALID slot — assigning each the next partition number from 1 —
+converts the boot sector's DP slot index into a partition number, and sets
+`selected` to that number when it names a CFS partition, else to the first CFS
+partition. **An image with
 no valid CFS partition fails to parse** (`valid` stays false), mirroring DHD's
 "No usable partitions" path — there is nothing to select and nothing to mount,
 and the alternative is a `selected` that names a partition `select()` would
@@ -204,16 +217,17 @@ refuse. It uses the same `s_probing` guard as DHD so
 read.
 
 `HDDResolvePartition()` resolves the FIRST path component: an in-range number
-`0-15`, then `byName()`, otherwise it is not a partition and the current
-selection applies. Numbers are parsed with `strtol` + `*end == '\0'` + a range
-check before narrowing to `uint8_t`, per the project rule against `atoi`/
-`std::stoi` on C64- or network-sourced input — and because an unchecked `int`
-truncated into `byNumber()` is exactly the bug that once made `1571` resolve to
-partition 35 in DHD. A partition wins over a same-named file; such a file stays
-reachable as `<image>/<number>/<file>`.
+`0-16` — where **0 means the currently selected partition**, as in DHD — then
+`byName()`, otherwise it is not a partition and the current selection applies.
+Numbers are parsed with `strtol` + `*end == '\0'` + a range check before
+narrowing to `uint8_t`, per the project rule against `atoi`/`std::stoi` on C64-
+or network-sourced input — and because an unchecked `int` truncated into
+`byNumber()` is exactly the bug that once made `1571` resolve to partition 35
+in DHD. A partition wins over a same-named file; such a file stays reachable as
+`<image>/<number>/<file>`.
 
-`select()` refuses a non-CFS partition. It needs no cached-stream disposal —
-see divergence 3.
+`select()` refuses partition 0 and any non-CFS partition. It needs no
+cached-stream disposal — see the divergence above.
 
 ### `HDDMStream`
 
@@ -272,8 +286,7 @@ Named so a later reader does not treat their absence as an oversight:
 | `DHDOffsetStream` | A CFS partition is a root-directory LBA inside the same stream, not a byte window over a different disk format. |
 | `DHDPartitionMFile<BASE>` template | CFS has one MFile type. The behaviours go on `HDDMFile` directly. |
 | `DHDCreatePartitionFile()` | No per-partition format selection to make. |
-| `brokerUrl()` / `cached_part` | See divergence 3. |
-| Partition `0` meaning "selected" | See divergence 2. |
+| `brokerUrl()` / `cached_part` | See the divergence above. |
 
 ## Verification
 
@@ -292,7 +305,10 @@ for the host (`meat_media.h` guards its `device/iec` includes behind
 - the parsed partition table against each corpus image;
 - resolution by number and by name, including a numeric name;
 - that binding a partition through a path leaves `selected` unchanged;
-- that `select()` refuses a non-CFS partition, and accepts slot 0.
+- that partition numbers count only VALID slots, starting at 1, and that DP is
+  converted from its slot index into that space;
+- that `select()` refuses partition 0 and any non-CFS partition, and that `0`
+  in a path resolves to the currently selected partition instead.
 
 Per the standing test rules: artifacts are removed in `tearDown()`, never
 inline; and any test constructing a stream directly must set `mode` before
