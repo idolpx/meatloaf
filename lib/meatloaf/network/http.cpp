@@ -1654,6 +1654,10 @@ int MeatHttpClient::openAndFetchHeaders(esp_http_client_method_t method, uint32_
     // Set URL and Method
     mstr::replaceAll(url, " ", "%20");
     //Debug_printv("method[%d] url[%s]", method, url.c_str());
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 1, 3)
+    // Clear the response buffer before each new request to ensure raw_data == orig_raw_data.
+    esp_http_client_clear_response_buffer(_http);
+#endif
     esp_http_client_set_url(_http, url.c_str());
     esp_http_client_set_method(_http, method);
 

@@ -93,7 +93,8 @@ default_envs = ${meatloaf.environment}
 [esp32_base]
 ; Espressif32 PlatformIO Version to use for building
 ; https://github.com/platformio/platform-espressif32/releases
-platform = espressif32 @ 6.12.0
+platform = espressif32 @ 6.13.0
+;platform = espressif32 @ 7.0.1
 framework = espidf
 board_build.filesystem = littlefs
 test_filter = embedded/*
