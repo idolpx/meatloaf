@@ -15,7 +15,6 @@
 #include <esp_heap_caps.h>
 #include <zlib.h>
 #include "../../meatloaf/network/http.h"
-#include "../../meatloaf/media/hd/dhd.h"
 #include "../../meatloaf/media/hd/partition_select.h"
 
 // Defined further down; cp() needs it and sits above the definition.
@@ -2320,7 +2319,7 @@ namespace ESP32Console::Commands
     const ConsoleCommand getPartitionCommand()
     {
         return ConsoleCommand("partition", &partition,
-            "List or switch CMD HD/FD partitions. Usage: partition [number|name]");
+            "List or switch CMD HD/FD or IDE64 CFS partitions. Usage: partition [number|name]");
     }
 
     const ConsoleCommand getMvCommand()

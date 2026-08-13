@@ -1,8 +1,10 @@
 // One partition surface over both CMD (DHD/D1M/D2M/D4M) and IDE64 CFS (.hdd)
 // images, so the drive's CP<n> and the console's `partition` command share a
 // single implementation. The two formats have DIFFERENT valid ranges - CMD is
-// 1..254, CFS is 0..15 - and they must not be merged into one bound; select()
-// is the only place that knows either.
+// 1..254, CFS is 1..16 (1-based over the valid entries of a 16-entry table) -
+// and they must not be merged into one bound. select() owns the authoritative
+// bound for each format; resolve() applies the same limit as a pre-filter on
+// numeric input, so a change to either bound must update both.
 #ifndef MEATLOAF_MEDIA_PARTITION_SELECT
 #define MEATLOAF_MEDIA_PARTITION_SELECT
 
