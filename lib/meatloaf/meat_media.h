@@ -324,6 +324,22 @@ public:
     {
         auto newFile = std::unique_ptr<MFile>(MFSOwner::File(url));
 
+        // Both of these are reachable for a path the resolver cannot make
+        // sense of, and neither used to be checked. MFSOwner::File() assigns
+        // sourceFile ONLY on its "look up path" branch, so a path it resolves
+        // without needing a container lookup legitimately comes back with a
+        // null sourceFile. Dereferencing it panicked the device
+        // (LoadProhibited, EXCVADDR 0x20 — the offset of `url`) on a real
+        // web.archive.org URL carrying a second scheme mid-path:
+        //   https://web.archive.org/web/20180901151341/http://vic20tapes.org/…zip
+        // Callers already handle a null return as "cannot read this", which is
+        // the right answer for a path that has no container to read from.
+        if (newFile == nullptr || newFile->sourceFile == nullptr) {
+            Debug_printv("no source for url[%s] — cannot obtain a %s stream",
+                         url.c_str(), type.c_str());
+            return nullptr;
+        }
+
         std::string key = type + newFile->sourceFile->url;
         if ( newFile->sourceFile->pathInStream.size() && newFile->sourceFile->pathInStream != "/" )
             key += "/" + newFile->sourceFile->pathInStream;
