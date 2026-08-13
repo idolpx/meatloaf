@@ -5,4 +5,8 @@
 namespace ESP32Console::Commands
 {
     const ConsoleCommand getIECCommand();
+
+    const ConsoleCommand getEnableCommand();
+
+    const ConsoleCommand getDisableCommand();
 }

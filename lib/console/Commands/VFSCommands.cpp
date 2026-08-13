@@ -35,7 +35,6 @@ static inline void *psram_malloc(size_t sz) {
 #include "../Console.h"
 #include "../Helpers/PWDHelpers.h"
 #include "../ute/ute.h"
-#include "../../device/iec/meatloaf.h"
 #include "../../www/ws/activity.h"
 #include "mlff.h"
 #include "mlConfig.h"
@@ -955,31 +954,6 @@ int update(int argc, char **argv)
     return EXIT_SUCCESS;
 }
 
-int enable(int argc, char **argv)
-{
-    if (argc != 2)
-    {
-        Serial.printf("enable {id_1}|{id_1},{id_2},...\r\n");
-        return EXIT_SUCCESS;
-    }
-
-    Meatloaf.enable(argv[1]);
-
-    return EXIT_SUCCESS;
-}
-
-int disable(int argc, char **argv)
-{
-    if (argc != 2)
-    {
-        Serial.printf("disable {id_1}|{id_1},{id_2},...\r\n");
-        return EXIT_SUCCESS;
-    }
-
-    Meatloaf.disable(argv[1]);
-
-    return EXIT_SUCCESS;
-}
 
 static void df_print_row(const char *label, const char *path, uint64_t total, uint64_t avail)
 {
@@ -1995,6 +1969,7 @@ static std::string resolve_path(const char *arg)
     return pwd + '/' + arg;
 }
 
+#ifndef MIN_CONFIG
 // ─── gzip ─────────────────────────────────────────────────────────────────────
 static int cmd_gzip(int argc, char **argv)
 {
@@ -2060,8 +2035,6 @@ static int cmd_gzip(int argc, char **argv)
 }
 
 // ─── unzipx ────────────────────────────────────────────────────────────────────
-#ifndef MIN_CONFIG
-
 // Creates every path segment (mkdir -p semantics) via MFile::mkDir(), so it
 // works for any MFSOwner-addressable destination, not just local flash/SD.
 // Intermediate segments that already exist are expected to fail — ignored,
@@ -2434,21 +2407,12 @@ namespace ESP32Console::Commands
         return ConsoleCommand("df", &df, "Show filesystem disk space usage");
     }
 
-    const ConsoleCommand getEnableCommand()
-    {
-        return ConsoleCommand("enable", &enable, "Enable virtual drive");
-    }
-    const ConsoleCommand getDisableCommand()
-    {
-        return ConsoleCommand("disable", &disable, "Disable virtual drive");
-    }
-
+#ifndef MIN_CONFIG
     const ConsoleCommand getGzipCommand()
     {
         return ConsoleCommand("gzip", &cmd_gzip, "Compress a file to .gz (level 9)");
     }
 
-#ifndef MIN_CONFIG
     const ConsoleCommand getUnzipxCommand()
     {
         return ConsoleCommand("unzipx", &cmd_unzipx,
