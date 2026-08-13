@@ -294,10 +294,47 @@ public:
     // MFSOwner::File() aborts.
     static bool parseInto(MStream* s, Image& img);
 
+    static Image* obtain(const std::string& containerUrl);
+    static bool   select(const std::string& containerUrl, uint8_t number);
+
+    // True while the registry reads the raw image bytes, so
+    // HDDMFileSystem::handles() declines the path and the underlying
+    // filesystem serves them instead of another HDDMFile.
+    static bool probing() { return s_probing; }
+
+    // Path of the ".hdd" container within 'path', or "" if none.
+    static std::string containerOf(const std::string& path);
+
 private:
+    static bool parse(const std::string& containerUrl, Image& img);
+
     static std::map<std::string, Image> s_images;
     static bool s_probing;
 };
+
+// Resolve which partition an in-image path refers to, WITHOUT changing the
+// image's selected partition.
+//
+// Resolution order for the FIRST component: an in-range partition number
+// 0-16, then byName(), otherwise it is not a partition and the current
+// selection applies. A partition wins over a same-named file; such a file
+// stays reachable as "<image>/<number>/<file>".
+//
+// As in DHD, a partition number of 0 means "the currently selected
+// partition" - it is NOT a table entry, and must never reach byNumber().
+//
+// hddResolvePartitionIn() is the pure core, taking an already-parsed image so
+// it can be tested without MFSOwner. HDDResolvePartition() is the wrapper the
+// firmware calls.
+const HDDPartition* hddResolvePartitionIn(const HDDImageRegistry::Image& img,
+                                          const std::string& in_path,
+                                          std::string* out_rest = nullptr,
+                                          bool* out_explicit = nullptr);
+
+const HDDPartition* HDDResolvePartition(const std::string& containerUrl,
+                                        const std::string& in_path,
+                                        std::string* out_rest = nullptr,
+                                        bool* out_explicit = nullptr);
 
 
 /********************************************************
@@ -344,6 +381,9 @@ public:
     HDDMFileSystem(): MFileSystem("hdd") {};
 
     bool handles(std::string fileName) override {
+        // Decline while the registry reads the raw image bytes
+        if (HDDImageRegistry::probing())
+            return false;
         return byExtension(".hdd", fileName);
     }
 

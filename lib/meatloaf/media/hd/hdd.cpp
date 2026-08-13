@@ -18,8 +18,10 @@
 #include "hdd.h"
 
 #include "endianness.h"
+#include <cstdlib>
 #include <cstring>
 #include <map>
+#include <memory>
 
 /********************************************************
  * Utility Functions
@@ -764,6 +766,148 @@ bool HDDImageRegistry::parseInto(MStream* s, Image& img)
                  img.disk_label.c_str(), img.parts.size(),
                  img.default_part, img.selected);
     return true;
+}
+
+std::string HDDImageRegistry::containerOf(const std::string &path)
+{
+    static const char *ext = ".hdd";
+    const size_t elen = 4;
+
+    std::string lower = path;
+    for (auto &c : lower)
+        c = tolower(c);
+
+    size_t p = lower.find(ext);
+    while (p != std::string::npos)
+    {
+        size_t end = p + elen;
+        if (end == lower.size() || lower[end] == '/')
+            return path.substr(0, end);
+        p = lower.find(ext, p + 1);
+    }
+    return "";
+}
+
+HDDImageRegistry::Image* HDDImageRegistry::obtain(const std::string &containerUrl)
+{
+    if (containerUrl.empty())
+        return nullptr;
+
+    auto it = s_images.find(containerUrl);
+    if (it != s_images.end() && it->second.valid)
+        return &it->second;
+
+    // (Re-)parse: not yet seen, or the image wasn't readable last time
+    Image img;
+    if (!parse(containerUrl, img))
+        return nullptr;
+
+    s_images[containerUrl] = std::move(img);
+    return &s_images[containerUrl];
+}
+
+bool HDDImageRegistry::parse(const std::string &containerUrl, Image &img)
+{
+    // Open the raw image bytes: the probing flag makes HDDMFileSystem decline
+    // the path so the underlying filesystem serves it, rather than handing
+    // back another HDDMFile whose stream is already decoded.
+    s_probing = true;
+    std::unique_ptr<MFile> f(MFSOwner::File(containerUrl));
+    std::shared_ptr<MStream> s = (f != nullptr) ? f->getSourceStream() : nullptr;
+    s_probing = false;
+
+    if (s == nullptr || !s->isOpen())
+    {
+        Debug_printv("Cannot open CFS image [%s]", containerUrl.c_str());
+        return false;
+    }
+
+    return parseInto(s.get(), img);
+}
+
+bool HDDImageRegistry::select(const std::string &containerUrl, uint8_t number)
+{
+    Image* img = obtain(containerUrl);
+    if (img == nullptr)
+        return false;
+
+    // No cached-stream disposal here, unlike DHDImageRegistry::select(): see
+    // the class comment. HDDMStream re-derives its position on every call.
+    return img->trySelect(number);
+}
+
+const HDDPartition* hddResolvePartitionIn(const HDDImageRegistry::Image &img,
+                                          const std::string &in_path,
+                                          std::string *out_rest,
+                                          bool *out_explicit)
+{
+    if (out_rest) *out_rest = in_path;
+    if (out_explicit) *out_explicit = false;
+
+    if (!img.valid)
+        return nullptr;
+
+    const HDDPartition *p = nullptr;
+
+    if (!in_path.empty())
+    {
+        std::string comp = in_path;
+        size_t slash = comp.find('/');
+        if (slash != std::string::npos)
+            comp = comp.substr(0, slash);
+
+        if (!comp.empty())
+        {
+            bool numeric = comp.find_first_not_of("0123456789") == std::string::npos;
+            if (numeric)
+            {
+                // Range-check BEFORE narrowing to uint8_t. An int silently
+                // truncated into byNumber() is what once made "1571" resolve
+                // to partition 35 in DHD.
+                //
+                // v == 0 means "the currently selected partition", exactly as
+                // in DHD (vdrive.c:1324) - it must NOT go through byNumber().
+                // 16 is the bound because a CFS table holds 16 entries, so
+                // that is the highest number the 1-based numbering reaches.
+                char *end = nullptr;
+                long v = strtol(comp.c_str(), &end, 10);
+                if (end != comp.c_str() && *end == '\0' && v >= 0 && v <= 16)
+                    p = (v == 0) ? img.current() : img.byNumber((uint8_t)v);
+            }
+            else
+            {
+                p = img.byName(comp);
+            }
+
+            if (p != nullptr)
+            {
+                if (out_explicit) *out_explicit = true;
+                if (out_rest)
+                    *out_rest = (slash == std::string::npos) ? std::string()
+                                                            : in_path.substr(slash + 1);
+            }
+        }
+    }
+
+    if (p == nullptr)
+        p = img.current();
+
+    return p;
+}
+
+const HDDPartition* HDDResolvePartition(const std::string &containerUrl,
+                                        const std::string &in_path,
+                                        std::string *out_rest,
+                                        bool *out_explicit)
+{
+    if (out_rest) *out_rest = in_path;
+    if (out_explicit) *out_explicit = false;
+
+    HDDImageRegistry::Image *img = HDDImageRegistry::obtain(containerUrl);
+    if (img == nullptr)
+        return nullptr;
+
+    return hddResolvePartitionIn(*img, in_path, out_rest, out_explicit);
 }
 
 /********************************************************

@@ -296,11 +296,126 @@ void test_registry_try_select(void)
     TEST_ASSERT_EQUAL_UINT8(1, img.selected);
 }
 
+void test_containerOf_finds_the_hdd_component(void)
+{
+    TEST_ASSERT_EQUAL_STRING("/sd/x.hdd",
+        HDDImageRegistry::containerOf("/sd/x.hdd").c_str());
+    TEST_ASSERT_EQUAL_STRING("/sd/x.hdd",
+        HDDImageRegistry::containerOf("/sd/x.hdd/STUFF/GAME").c_str());
+    TEST_ASSERT_EQUAL_STRING("/sd/X.HDD",
+        HDDImageRegistry::containerOf("/sd/X.HDD/STUFF").c_str());
+    TEST_ASSERT_EQUAL_STRING("",
+        HDDImageRegistry::containerOf("/sd/games/x.d64").c_str());
+    // ".hdd" inside a NAME, not as a path component, is not a container.
+    TEST_ASSERT_EQUAL_STRING("",
+        HDDImageRegistry::containerOf("/sd/my.hddx/file").c_str());
+}
+
+// A path may BIND a partition; it must never change the image's selection.
+void test_resolve_binds_partition_without_selecting(void)
+{
+    HDDImageRegistry::Image img;
+    TEST_ASSERT_TRUE(parseImage(MULTI_IMAGE_PATH, img));
+    TEST_ASSERT_EQUAL_UINT8(1, img.selected);
+
+    std::string rest;
+    bool explicit_part = false;
+    const HDDPartition* p =
+        hddResolvePartitionIn(img, "DISK IMAGES/GAME", &rest, &explicit_part);
+
+    TEST_ASSERT_NOT_NULL(p);
+    TEST_ASSERT_TRUE(explicit_part);
+    TEST_ASSERT_EQUAL_UINT8(2, p->number);
+    TEST_ASSERT_EQUAL_STRING("GAME", rest.c_str());
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE(1, img.selected,
+        "resolving a path must not change the selected partition");
+}
+
+void test_resolve_by_number(void)
+{
+    HDDImageRegistry::Image img;
+    TEST_ASSERT_TRUE(parseImage(MULTI_IMAGE_PATH, img));
+
+    // "2" is DISK IMAGES, the SECOND valid entry - not table slot 2, which
+    // does not exist in this image.
+    std::string rest;
+    bool explicit_part = false;
+    const HDDPartition* p = hddResolvePartitionIn(img, "2/GAME", &rest, &explicit_part);
+    TEST_ASSERT_NOT_NULL(p);
+    TEST_ASSERT_TRUE(explicit_part);
+    TEST_ASSERT_EQUAL_UINT8(2, p->number);
+    TEST_ASSERT_EQUAL_STRING("DISK IMAGES", p->name.c_str());
+    TEST_ASSERT_EQUAL_STRING("GAME", rest.c_str());
+}
+
+// As in DHD (vdrive.c:1324), a partition number of 0 in a path means "the
+// currently selected partition". Select 2, then check "0/..." follows it.
+void test_resolve_zero_means_the_selected_partition(void)
+{
+    HDDImageRegistry::Image img;
+    TEST_ASSERT_TRUE(parseImage(MULTI_IMAGE_PATH, img));
+    TEST_ASSERT_TRUE(img.trySelect(2));
+
+    std::string rest;
+    bool explicit_part = false;
+    const HDDPartition* p = hddResolvePartitionIn(img, "0/GAME", &rest, &explicit_part);
+    TEST_ASSERT_NOT_NULL(p);
+    TEST_ASSERT_TRUE(explicit_part);
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE(2, p->number,
+        "0 in a path must follow the selection, as it does in DHD");
+    TEST_ASSERT_EQUAL_STRING("GAME", rest.c_str());
+
+    // ...and it is still only a reference: the selection is unchanged.
+    TEST_ASSERT_EQUAL_UINT8(2, img.selected);
+}
+
+// A component that is not a partition is a FILENAME: resolution falls back to
+// the current selection and reports the path unchanged.
+void test_resolve_non_partition_falls_back_to_selection(void)
+{
+    HDDImageRegistry::Image img;
+    TEST_ASSERT_TRUE(parseImage(MULTI_IMAGE_PATH, img));
+    TEST_ASSERT_TRUE(img.trySelect(2));
+
+    std::string rest;
+    bool explicit_part = true;
+    const HDDPartition* p = hddResolvePartitionIn(img, "SOMEFILE", &rest, &explicit_part);
+    TEST_ASSERT_NOT_NULL(p);
+    TEST_ASSERT_FALSE(explicit_part);
+    TEST_ASSERT_EQUAL_UINT8(2, p->number);              // the selection
+    TEST_ASSERT_EQUAL_STRING("SOMEFILE", rest.c_str()); // untouched
+
+    // Out-of-range and unparseable numbers are filenames too, never a
+    // truncated partition number - this is the 1571-resolved-to-35 bug.
+    explicit_part = true;
+    TEST_ASSERT_NOT_NULL(hddResolvePartitionIn(img, "1571", &rest, &explicit_part));
+    TEST_ASSERT_FALSE(explicit_part);
+    TEST_ASSERT_EQUAL_STRING("1571", rest.c_str());
+}
+
+// A partition wins over a same-named file; the file stays reachable by number.
+void test_resolve_empty_path_uses_selection(void)
+{
+    HDDImageRegistry::Image img;
+    TEST_ASSERT_TRUE(parseImage(MULTI_IMAGE_PATH, img));
+    TEST_ASSERT_TRUE(img.trySelect(2));
+
+    std::string rest = "unset";
+    bool explicit_part = true;
+    const HDDPartition* p = hddResolvePartitionIn(img, "", &rest, &explicit_part);
+    TEST_ASSERT_NOT_NULL(p);
+    TEST_ASSERT_FALSE(explicit_part);
+    TEST_ASSERT_EQUAL_UINT8(2, p->number);
+    TEST_ASSERT_EQUAL_STRING("", rest.c_str());
+}
+
 int main(int argc, char** argv)
 {
     (void)argc; (void)argv;
 
     UNITY_BEGIN();
+
+    RUN_TEST(test_containerOf_finds_the_hdd_component);
 
     if (!imageAvailable())
     {
@@ -325,6 +440,12 @@ int main(int argc, char** argv)
         RUN_TEST(test_registry_converts_default_partition_from_slot_to_number);
         RUN_TEST(test_registry_lookup_by_number_and_name);
         RUN_TEST(test_registry_try_select);
+
+        RUN_TEST(test_resolve_binds_partition_without_selecting);
+        RUN_TEST(test_resolve_by_number);
+        RUN_TEST(test_resolve_zero_means_the_selected_partition);
+        RUN_TEST(test_resolve_non_partition_falls_back_to_selection);
+        RUN_TEST(test_resolve_empty_path_uses_selection);
     }
 
     return UNITY_END();
