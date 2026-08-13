@@ -19,6 +19,7 @@
 
 #include "endianness.h"
 #include <cstring>
+#include <map>
 
 /********************************************************
  * Utility Functions
@@ -625,6 +626,144 @@ bool HDDMStream::seekPath(std::string path)
 
     Debug_printv("Not found: %s", path.c_str());
     return false;
+}
+
+/********************************************************
+ * Partition registry
+ ********************************************************/
+
+std::map<std::string, HDDImageRegistry::Image> HDDImageRegistry::s_images;
+bool HDDImageRegistry::s_probing = false;
+
+const HDDPartition* HDDImageRegistry::Image::byNumber(uint8_t number) const
+{
+    for (auto &p : parts)
+    {
+        if (p.number == number)
+            return &p;
+    }
+    return nullptr;
+}
+
+const HDDPartition* HDDImageRegistry::Image::byName(std::string name) const
+{
+    bool wildcard = (mstr::contains(name, "*") || mstr::contains(name, "?"));
+    for (auto &p : parts)
+    {
+        std::string p_name = p.name;
+        if (mstr::compareFilename(p_name, name, wildcard))
+            return &p;
+    }
+    return nullptr;
+}
+
+bool HDDImageRegistry::Image::trySelect(uint8_t number)
+{
+    // 0 is not a partition - it means "the currently selected one". byNumber()
+    // never returns an entry for it, so this is belt-and-braces, but it states
+    // the rule where a reader will look for it.
+    if (number == 0)
+        return false;
+
+    const HDDPartition* p = byNumber(number);
+    if (p == nullptr || p->type != 1)   // only a CFS partition is browsable
+        return false;
+    selected = number;
+    return true;
+}
+
+bool HDDImageRegistry::parseInto(MStream* s, Image& img)
+{
+    if (s == nullptr || !s->isOpen())
+        return false;
+
+    HDDMStream::BootSector boot;
+    if (!s->seek(0))
+        return false;
+    if (s->read((uint8_t*)&boot, sizeof(boot)) != sizeof(boot))
+        return false;
+
+    if (strncmp(boot.id, "C64 CFS", 7) != 0)
+    {
+        Debug_printv("Invalid CFS signature");
+        return false;
+    }
+
+    img.disk_label = std::string(boot.disk_label, 16);
+    while (!img.disk_label.empty() &&
+           (img.disk_label.back() == ' ' || img.disk_label.back() == '\0'))
+        img.disk_label.pop_back();
+
+    // DP is a SLOT index here; it is converted to a partition number below,
+    // once the table has been walked and the numbering is known.
+    const uint8_t dp_slot = boot.default_partition & 0x0F;
+    img.default_part = 0;
+
+    // The partition directory is exactly one 512-byte sector: 16 entries of
+    // 32 bytes. There is no second sector and no chaining.
+    uint8_t sector[512];
+    if (!s->seek(boot.part_dir.getLBA() * 512))
+        return false;
+    if (s->read(sector, sizeof(sector)) != sizeof(sector))
+        return false;
+
+    img.parts.clear();
+    uint8_t next_number = 1;                // partitions are numbered from 1
+    for (uint8_t i = 0; i < 16; i++)
+    {
+        HDDMStream::PartitionEntry pe;
+        memcpy(&pe, sector + (i * 32), sizeof(pe));
+
+        if (!pe.isValid())
+            continue;                       // an invalid slot consumes no number
+
+        HDDPartition p;
+        p.number = next_number++;           // must match seekPartitionEntry()
+        p.slot = i;
+        p.type = pe.getType();
+        p.name = trimEntryName(pe.name, 16, '\0');
+        p.root_lba = pe.root_dir.getLBA();
+        p.size = 0;
+        if (pe.end.getLBA() >= pe.start.getLBA())
+            p.size = (pe.end.getLBA() - pe.start.getLBA() + 1) * 512;
+        p.hidden = pe.isHidden();
+        p.writeable = (pe.start.b[0] & 0x10) != 0;
+        img.parts.push_back(p);
+
+        Debug_printv("partition[%d] slot[%d] type[%d] name[%s] root[%lu] size[%lu]",
+                     p.number, p.slot, p.type, p.name.c_str(), p.root_lba, p.size);
+    }
+
+    // Convert DP out of slot space into partition-number space. This is the
+    // ONLY place the two meet; everything downstream speaks numbers.
+    for (const HDDPartition &p : img.parts)
+    {
+        if (p.slot == dp_slot) { img.default_part = p.number; break; }
+    }
+
+    // The default partition when it names a CFS one, else the first CFS
+    // partition. An image with NO CFS partition fails to parse: there is
+    // nothing to select and nothing to mount, and the alternative is a
+    // `selected` naming a partition trySelect() would refuse.
+    if (!img.trySelect(img.default_part))
+    {
+        bool any = false;
+        for (const HDDPartition &p : img.parts)
+        {
+            if (p.type == 1) { img.selected = p.number; any = true; break; }
+        }
+        if (!any)
+        {
+            Debug_printv("No usable CFS partitions");
+            return false;
+        }
+    }
+
+    img.valid = true;
+    Debug_printv("CFS label[%s] partitions[%d] default[%d] selected[%d]",
+                 img.disk_label.c_str(), img.parts.size(),
+                 img.default_part, img.selected);
+    return true;
 }
 
 /********************************************************

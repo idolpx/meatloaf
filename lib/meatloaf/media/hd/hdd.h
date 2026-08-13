@@ -43,6 +43,8 @@
 #include "meat_media.h"
 
 #include <ctime>
+#include <map>
+#include <vector>
 
 
 /********************************************************
@@ -235,6 +237,66 @@ protected:
 
 private:
     friend class HDDMFile;
+};
+
+
+/********************************************************
+ * Partition registry
+ ********************************************************/
+
+// TWO numbering spaces, and they must not be confused:
+//   number - 1-based, counting only VALID table entries. What paths, CP<n>,
+//            "$=P" and the `partition` command all speak. Never 0: that
+//            number means "the currently selected partition", as in DHD.
+//   slot   - the raw 0-15 index into the 16-entry partition directory, and
+//            what the boot sector's DP byte holds. Converted into `number`
+//            once, at parse time; nothing downstream sees a slot.
+struct HDDPartition {
+    uint8_t     number;      // 1-based over valid entries
+    uint8_t     slot;        // raw table index, 0-15
+    uint8_t     type;        // 0=unformatted, 1=CFS, 2=GEOS, 3-11 reserved
+    std::string name;        // ASCII, $00 padding trimmed
+    uint32_t    root_lba;    // @Root directory (entry +$1C)
+    uint32_t    size;        // bytes: (end - start + 1) * 512
+    bool        hidden;      // @Start bit 5: excluded from a plain listing
+    bool        writeable;   // @Start bit 4 (recorded; CFS support is read-only)
+};
+
+// Per-image partition table and selection state, keyed by container URL.
+//
+// Deliberately SMALLER than DHDImageRegistry: there is no cached_part, no
+// brokerUrl() and no dispose-on-select. DHD needs those because ImageBroker
+// caches one DECODED D64/D71/D81/DNP stream per image and cannot tell
+// partitions apart. HDDMStream re-derives its whole position from
+// seekDirectory(pathInStream) on every operation, so a cached stream holds no
+// partition identity that could go stale.
+class HDDImageRegistry {
+public:
+    struct Image {
+        bool        valid = false;
+        uint8_t     default_part = 0;
+        uint8_t     selected = 0;
+        std::string disk_label;
+        std::vector<HDDPartition> parts;
+
+        const HDDPartition* byNumber(uint8_t number) const;
+        const HDDPartition* byName(std::string name) const;
+        const HDDPartition* current() const { return byNumber(selected); }
+
+        // Selects a partition if it exists and is CFS. Leaves the selection
+        // untouched and returns false otherwise - including for 0, which
+        // means "the currently selected partition" and is never a real one.
+        bool trySelect(uint8_t number);
+    };
+
+    // Parses a boot sector + partition directory from an ALREADY OPEN stream.
+    // Split out from parse() so the registry is testable natively, where
+    // MFSOwner::File() aborts.
+    static bool parseInto(MStream* s, Image& img);
+
+private:
+    static std::map<std::string, Image> s_images;
+    static bool s_probing;
 };
 
 
