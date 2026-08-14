@@ -453,7 +453,15 @@ bool HDDMStream::seekDirectory(std::string path)
     // The image root is the SELECTED partition's directory, matching the CMD
     // HD/FD behaviour and a real drive. The partition list is served only in
     // response to "$=P", which HDDMFile handles.
-    if (parts.size() && selectPartitionByName(parts[0]))
+    //
+    // Only re-resolve a leading component as a partition name when NO partition
+    // has been pushed in. HDDMFile::normalizePath() already stripped any
+    // partition from the path, so once selected_partition is set, parts[0] is a
+    // directory INSIDE that partition - and matching it against the partition
+    // table here would silently switch partitions on a name collision.
+    // A directly constructed stream (the native tests) has no selection and
+    // keeps the legacy name-first behaviour.
+    if (selected_partition == 0 && parts.size() && selectPartitionByName(parts[0]))
     {
         i = 1;
     }
@@ -487,14 +495,6 @@ HDDMStream::PathResult HDDMStream::resolvePath(std::string path)
         return PATH_NOT_FOUND;
 
     std::string last = parts.back();
-
-    if (partition_list)
-    {
-        if (selectPartitionByName(last))
-            return PATH_DIR;
-        if (!selectPartitionByName(""))
-            return PATH_NOT_FOUND;
-    }
 
     if (!seekEntry(last))
         return PATH_NOT_FOUND;

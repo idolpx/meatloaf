@@ -476,6 +476,29 @@ void test_selected_partition_overrides_default(void)
     TEST_ASSERT_FALSE(image->selectPartitionByNumber(9));
 }
 
+// A partition already pushed in by HDDMFile must not be overridden by a path
+// component that happens to share another partition's name. Before the fix
+// this returned true and silently landed in partition 2.
+void test_seekDirectory_does_not_reresolve_partition_when_selected(void)
+{
+    auto src = std::make_shared<FileContainerStream>(MULTI_IMAGE_PATH);
+    TEST_ASSERT_TRUE(src->isOpen());
+    auto image = std::make_shared<TestHDDStream>(src);
+    image->mode = std::ios_base::in;
+
+    image->selected_partition = 1;                 // "C64 OS"
+    // "DISK IMAGES" is partition 2's NAME. With partition 1 bound it must be
+    // treated as an entry inside partition 1, not as a partition reference.
+    bool ok = image->seekDirectory("DISK IMAGES");
+    if (ok)
+    {
+        TEST_ASSERT_EQUAL_STRING_MESSAGE("C64 OS", image->dir_label.c_str(),
+            "a bound partition must not be overridden by a name collision");
+    }
+    // If partition 1 has no such entry the seek simply fails, which is also
+    // correct - what must never happen is silently landing in partition 2.
+}
+
 int main(int argc, char** argv)
 {
     (void)argc; (void)argv;
@@ -516,6 +539,7 @@ int main(int argc, char** argv)
         RUN_TEST(test_resolve_non_partition_falls_back_to_selection);
         RUN_TEST(test_resolve_empty_path_uses_selection);
         RUN_TEST(test_selected_partition_overrides_default);
+        RUN_TEST(test_seekDirectory_does_not_reresolve_partition_when_selected);
     }
 
     return UNITY_END();

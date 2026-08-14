@@ -1795,7 +1795,8 @@ void iecDrive::executeData(const uint8_t *data, uint8_t dataLen)
                 // whole string would let "CPX5" parse as partition 5. strtol
                 // (not atoi) per the project rule against atoi/std::stoi on
                 // C64-sourced input; leave pnum = -1 on any parse failure so
-                // changePartition() rejects it via its existing range check.
+                // hdpart::select() (called via changePartition()) rejects it,
+                // range-checking per format.
                 int pnum = -1;
                 char *end = nullptr;
                 const char *start = command.c_str() + 2;
