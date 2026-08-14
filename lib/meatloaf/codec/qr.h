@@ -46,7 +46,7 @@ class QRMStream: public MStream
     uint32_t generate(std::string data)
     {
         uint8_t version = 0; // default version
-        uint8_t ecc = 0;     // default ecc
+        uint8_t ecc = ECC_HIGH;     // default ecc
 
         Debug_printv("data[%s]", data.c_str());
         auto d = util_tokenize(data, '/');
@@ -117,11 +117,15 @@ public:
 
         return size;
     };
-     uint32_t write(const uint8_t *buf, uint32_t size) override 
+     uint32_t write(const uint8_t *buf, uint32_t size) override
     {
         char *s = reinterpret_cast<char*>(const_cast<uint8_t*>(buf));
         _position = 0;
-        return generate(std::string(s, size));
+        Debug_printv("position[%d] size[%d] buf[%s]", _position, size, s);
+        // Regenerate the QR from the written data and update _size so the new
+        // code can be read back from this same stream. Return bytes consumed.
+        _size = generate(std::string(s, size));
+        return size;
     };
 
     bool seek(uint32_t pos) override { return position(pos); };

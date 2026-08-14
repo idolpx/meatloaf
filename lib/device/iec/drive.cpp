@@ -1027,8 +1027,11 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                         Debug_printv("Error: media not writable [%s]", f->url.c_str());
                         setStatusCode(ST_WRITE_PROTECT_ON);
                     }
-                    else if( (mode == std::ios_base::out) && f->exists() && !overwrite )
+                    else if( (mode == std::ios_base::out) && f->exists() && !overwrite && f->type != MFILE_OTHER )
                     {
+                        // MFILE_OTHER (QR://, HASH://, …) are written in place to update
+                        // their generated data, so the "already exists" guard (which
+                        // would need @ to overwrite a real file) does not apply.
                         Debug_printv("Error: file exists [%s]", f->url.c_str());
                         setStatusCode(ST_FILE_EXISTS);
                     }
@@ -1076,7 +1079,14 @@ bool iecDrive::open(uint8_t channel, const char *cname, uint8_t nameLen)
                             setStatusCode(ST_OK);
 
                             Debug_printv("isDir[%d] isRandomAccess[%d] isBrowsable[%d]", is_dir, new_stream->isRandomAccess(), new_stream->isBrowsable());
-                            if ( new_stream->isRandomAccess() || new_stream->isBrowsable() )
+                            if ( f->type == MFILE_OTHER )
+                            {
+                                // QR://, HASH://, retropixels://, etc. are file-like
+                                // resources, not locations — opening (or writing) one
+                                // acts on it in place; never move the current directory.
+                                Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "MFILE_OTHER, leaving cwd unchanged [%s]", f->url.c_str() );
+                            }
+                            else if ( new_stream->isRandomAccess() || new_stream->isBrowsable() )
                             {
                                 // This was a directory.  Set m_cwd to the directory
                                 Debug_printv( ANSI_MAGENTA_BOLD_HIGH_INTENSITY "dir url[%s]", f->url.c_str() );
