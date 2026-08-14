@@ -137,7 +137,10 @@ gives it:
   currently selected partition". `30 SYNTAX ERROR` is reserved for input that
   is not a partition number at all: unparseable, or beyond the one-byte range
   (`CP256` and up). The same split applies to a CFS image's 17-255, which are
-  well-formed but never present in a 16-entry table.
+  well-formed but never present in a 16-entry table. A third code,
+  `31 INVALID COMMAND`, covers `CP` issued when the drive is not inside a
+  partitioned image at all — there is no table, so the number is never
+  examined.
 
 **The one real divergence: no `cached_part`, no `brokerUrl()`, no
 dispose-on-select.** DHD needs all

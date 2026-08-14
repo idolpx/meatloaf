@@ -2231,6 +2231,10 @@ void iecDrive::getStatus(char *buffer, uint8_t bufferSize)
 
         case ST_WRITE_VERIFY        : msg = "WRITE ERROR"; break;
         case ST_WRITE_PROTECT_ON    : msg = "WRITE PROTECT"; break;
+        // 30 became reachable when CP<n> started distinguishing "not a
+        // partition number" from "no such partition"; without a case here it
+        // fell through to "UNKNOWN ERROR".
+        case ST_SYNTAX_UNKNOWN      : msg = "SYNTAX ERROR"; break;
         case ST_SYNTAX_INVALID      : msg = "INVALID COMMAND"; break;
         case ST_SYNTAX_BAD_NAME     : msg = "INVALID FILENAME"; break;
         case ST_FILE_NOT_FOUND      : msg = "FILE NOT FOUND"; break;
@@ -2365,12 +2369,17 @@ void iecDrive::tapeCommand(std::string command)
 // a CMD HD/FD image (DHD, D1M/D2M/D4M) and on an IDE64 CFS image (.hdd); the
 // per-format bound on which partitions actually EXIST lives in hdpart::select().
 //
-// The two error codes answer different questions, and the split is by what the
-// number could ever mean rather than by what this image happens to hold:
+// Three failures, three codes. The split is by WHAT FAILED, not by how far out
+// of range the number was:
 //
-//   30 SYNTAX ERROR  - the argument is not a partition number at all: it did
-//                      not parse, or it cannot fit the one-byte partition
-//                      number a CBM drive uses (CP256 and up).
+//   31 INVALID COMMAND (ST_SYNTAX_INVALID)
+//                    - there is no partition table here at all, so CP is not a
+//                      command this image understands. Nothing to do with the
+//                      number, which is never even looked at.
+//   30 SYNTAX ERROR (ST_SYNTAX_UNKNOWN)
+//                    - the argument is not a partition number: it did not
+//                      parse, or it cannot fit the one-byte partition number a
+//                      CBM drive uses (CP256 and up).
 //   77 SELECTED PARTITION ILLEGAL
 //                    - it IS a well-formed partition number (0-255) but this
 //                      image has no such partition. That covers CP0, which is
@@ -2378,6 +2387,10 @@ void iecDrive::tapeCommand(std::string command)
 //                      therefore never a real one, and every unused number up
 //                      to 255 - including 17-255 on a CFS image, whose table
 //                      only ever holds 16.
+//
+// Note ST_SYNTAX_UNKNOWN is 30 and ST_SYNTAX_INVALID is 31 (include/
+// cbm_defines.h) - the names do not read in that order, so check the value
+// rather than the name when touching this.
 void iecDrive::changePartition(int pnum)
 {
     hdpart::Target t = hdpart::targetFor(m_cwd != nullptr ? m_cwd->url : "");
@@ -2385,7 +2398,7 @@ void iecDrive::changePartition(int pnum)
 
     if (!t)
     {
-        setStatusCode(ST_SYNTAX_INVALID);
+        setStatusCode(ST_SYNTAX_INVALID);   // 31 - CP means nothing here
         return;
     }
 
@@ -2393,7 +2406,7 @@ void iecDrive::changePartition(int pnum)
     // the one-byte range a partition number can occupy.
     if (pnum < 0 || pnum > 255)
     {
-        setStatusCode(ST_SYNTAX_INVALID);
+        setStatusCode(ST_SYNTAX_UNKNOWN);   // 30 - not a partition number
         return;
     }
 
