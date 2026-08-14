@@ -1,7 +1,7 @@
 # Partition Listing, Access and Selection — IDE64 CFS (.hdd)
 
 **Date:** 2026-08-13
-**Status:** DESIGN — approved, not yet implemented
+**Status:** IMPLEMENTED on branch `feat/hdd-partition-pattern`
 **Applies to:** `lib/meatloaf/media/hd/hdd.h`, `hdd.cpp`, `lib/device/iec/drive.cpp`,
 `lib/console/Commands/VFSCommands.cpp`
 
@@ -246,9 +246,10 @@ stubs — and `FileContainerStream` sets `url` to a path ending in `.hdd`, so th
 lookup would fire and break the existing `test_hdd_read` suite. `HDDMStream`
 therefore carries a plain `selected_partition` member (`0` = fall back to the
 boot sector's DP, unambiguous because partitions are numbered from 1) that
-`HDDMFile::applyPartition()` writes at all four
-sites that touch a stream. This is also the better layering: the stream is
-about CFS bytes, the registry is about selection policy.
+`HDDMFile::applyPartition()` writes at all five sites that touch a stream:
+`getDecodedStream()`, `rewindDirectory()`, `getNextFileInDir()`, `isDirectory()`,
+and `exists()`. This is also the better layering: the stream is about CFS bytes,
+the registry is about selection policy.
 
 ### `HDDMFile`
 
