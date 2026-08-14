@@ -457,6 +457,27 @@ void test_download_filename_is_the_resolved_entry(void)
         "the extracted file should be named what the archive says it is");
 }
 
+
+// ImageBroker::obtain() builds its cache key from newFile->sourceFile->url.
+// MFSOwner::File() assigns sourceFile only on its "look up path" branch, so a
+// path resolved without a container lookup comes back with sourceFile null -
+// and obtain() dereferenced it, panicking the device (LoadProhibited,
+// EXCVADDR 0x20, the offset of `url`). Hit by a real web.archive.org URL that
+// carries a second scheme mid-path:
+//   https://web.archive.org/web/20180901151341/http://vic20tapes.org/...zip
+// Whatever the resolver does with an odd path, a URL must not panic the
+// device: obtain() has to return null so callers take their existing
+// "cannot read archive" path.
+void test_image_broker_survives_a_null_source_file(void)
+{
+    auto image = ImageBroker::obtain<ArchiveMStream>(
+        "archive",
+        "https://web.archive.org/web/20180901151341/http://vic20tapes.org/taps/x.zip");
+
+    TEST_ASSERT_NULL_MESSAGE(image.get(),
+        "obtain() must return null for a file with no source, not crash");
+}
+
 int main(int, char**)
 {
     UNITY_BEGIN();
@@ -472,5 +493,6 @@ int main(int, char**)
     RUN_TEST(test_url_encoded_entry_name_is_decoded);
     RUN_TEST(test_percent_in_local_path_is_left_alone);
     RUN_TEST(test_download_filename_is_the_resolved_entry);
+    RUN_TEST(test_image_broker_survives_a_null_source_file);
     return UNITY_END();
 }

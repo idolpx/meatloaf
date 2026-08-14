@@ -29,6 +29,8 @@
 // NATIVE_STUBS_REAL_UTILS tells the shared disk-write stub file to leave
 // util_debug_printf() to the real utils.cpp included here.
 #define NATIVE_STUBS_REAL_UTILS 1
+// This suite supplies its own MFSOwner::File(); see host_stubs.cpp.
+#define NATIVE_STUBS_REAL_MFSOWNER 1
 #include "../../../lib/utils/utils.cpp"
 
 // Link-only stubs for symbols meatloaf.h references but these tests never

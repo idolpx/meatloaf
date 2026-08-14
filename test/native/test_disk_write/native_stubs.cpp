@@ -15,12 +15,17 @@
 #include <cstdarg>
 #include "meatloaf.h"
 
+// A suite that needs MFSOwner::File() to actually return something
+// (test_archive_extract drives ImageBroker::obtain(), which resolves a path)
+// defines NATIVE_STUBS_REAL_MFSOWNER and supplies its own.
+#ifndef NATIVE_STUBS_REAL_MFSOWNER
 MFile* MFSOwner::File(std::string path, bool default_to_flash)
 {
     (void)path; (void)default_to_flash;
     fprintf(stderr, "native_stubs: MFSOwner::File called unexpectedly\n");
     abort();
 }
+#endif
 
 std::shared_ptr<MStream> MFile::getSourceStream(std::ios_base::openmode mode)
 {

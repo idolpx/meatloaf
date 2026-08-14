@@ -12,6 +12,7 @@
 #include <cstdlib>
 
 #include "meatloaf.h"
+#include "media/archive/archive.h"
 
 // MFile's one-argument constructor, needed to build an ArchiveMFile here. Its
 // real definition is in meatloaf.cpp, which cannot compile natively (it
@@ -24,6 +25,22 @@
 MFile::MFile(std::string path)
 {
     resetURL(path);
+}
+
+// MFSOwner::File() for this suite. The real one is in meatloaf.cpp, which
+// cannot compile natively.
+//
+// It reproduces the case that crashed the device: MFSOwner::File() assigns
+// sourceFile ONLY on its "look up path" branch, so a path it resolves without
+// needing a container lookup comes back with sourceFile == nullptr. That is
+// legitimate, and ImageBroker::obtain() must cope with it rather than
+// dereference it. Real URL that produced it, from web.archive.org, where a
+// second scheme appears mid-path:
+//   https://web.archive.org/web/20180901151341/http://vic20tapes.org/...zip
+MFile* MFSOwner::File(std::string path, bool default_to_flash)
+{
+    (void)default_to_flash;
+    return new ArchiveMFile(path);   // sourceFile left null, as the real one can
 }
 
 int sam(int argc, char** argv)
